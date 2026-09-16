@@ -19,7 +19,7 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'home',
     component: () => import('@/features/dashboard/views/HomeView.vue'),
-    meta: { title: 'SIMPEG v2' },
+    meta: { title: 'Beranda' },
   },
   {
     path: '/login',
