@@ -1,0 +1,15 @@
+# Normalisasi line ending: simpan LF di repo. Script shell WAJIB LF agar jalan di server Linux (hook post-receive).
+* text=auto
+*.sh text eol=lf
+check.sh text eol=lf
+deploy/* text eol=lf
+backend/spark text eol=lf
+*.php text eol=lf
+*.ts text eol=lf
+*.vue text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
