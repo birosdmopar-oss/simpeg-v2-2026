@@ -63,7 +63,10 @@ deploy_ref() {
     echo "==> [deploy] $DEPLOY_BRANCH @ $short -> $release_dir (log: $logfile)"
 
     # Seluruh build dibungkus subshell; kegagalan apa pun -> release dihapus, current tidak disentuh.
-    if (
+    # CATATAN: subshell TIDAK boleh dijadikan kondisi `if (...)` — bash mengabaikan `set -e` di dalam
+    # kondisi if/&&/||, sehingga langkah yang gagal tidak menghentikan build. Status ditangkap manual.
+    set +e
+    (
         set -euo pipefail
         exec > >(tee -a "$logfile") 2>&1
 
@@ -103,7 +106,11 @@ deploy_ref() {
         fi
         ln -sfn "$release_dir" "$CURRENT_LINK.tmp" && mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
         echo "OK  release $release_id aktif"
-    ); then
+    )
+    local rc=$?
+    set -e
+
+    if [ "$rc" -eq 0 ]; then
         echo "==> [deploy] SUKSES: current -> $release_id"
         prune_releases
     else
