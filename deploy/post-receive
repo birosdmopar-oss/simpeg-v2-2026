@@ -35,25 +35,78 @@ BARE_REPO="$(cd "$HOOK_DIR/.." && pwd)"
 # shellcheck disable=SC1091
 [ -f "$HOOK_DIR/deploy.env" ] && source "$HOOK_DIR/deploy.env"
 
-DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/simpeg-v2}"
-DEPLOY_BRANCH="${DEPLOY_BRANCH:-dev}"
-KEEP_RELEASES="${KEEP_RELEASES:-5}"
-PHP_BIN="${PHP_BIN:-php}"
-COMPOSER_BIN="${COMPOSER_BIN:-composer}"
-NPM_BIN="${NPM_BIN:-npm}"
-RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
+export BARE_REPO
+export DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/simpeg-v2}"
+export DEPLOY_BRANCH="${DEPLOY_BRANCH:-dev}"
+export KEEP_RELEASES="${KEEP_RELEASES:-5}"
+export PHP_BIN="${PHP_BIN:-php}"
+export COMPOSER_BIN="${COMPOSER_BIN:-composer}"
+export NPM_BIN="${NPM_BIN:-npm}"
+export RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
 
-RELEASES_DIR="$DEPLOY_ROOT/releases"
-SHARED_DIR="$DEPLOY_ROOT/shared"
-LOG_DIR="$DEPLOY_ROOT/logs"
-CURRENT_LINK="$DEPLOY_ROOT/current"
-PREVIOUS_LINK="$DEPLOY_ROOT/previous"
+export RELEASES_DIR="$DEPLOY_ROOT/releases"
+export SHARED_DIR="$DEPLOY_ROOT/shared"
+export LOG_DIR="$DEPLOY_ROOT/logs"
+export CURRENT_LINK="$DEPLOY_ROOT/current"
+export PREVIOUS_LINK="$DEPLOY_ROOT/previous"
 
 mkdir -p "$RELEASES_DIR" "$SHARED_DIR" "$LOG_DIR"
 
+# -----------------------------------------------------------------------------
+# build_release <sha> <release_id> <release_dir> <logfile>
+# Dijalankan di PROSES BASH TERPISAH dengan `set -euo pipefail` (lihat deploy_ref) supaya langkah
+# yang gagal benar-benar menghentikan build. Catatan: bash mengabaikan `set -e` untuk perintah yang
+# berada di dalam kondisi if / && / ||, termasuk subshell dan fungsi yang dipanggil dari sana —
+# karena itu build tidak boleh dibungkus `if ( ... )` atau `deploy_ref || ...`.
+# -----------------------------------------------------------------------------
+build_release() {
+    local sha="$1" release_id="$2" release_dir="$3" logfile="$4"
+
+    exec > >(tee -a "$logfile") 2>&1
+
+    echo "--- checkout $sha"
+    mkdir -p "$release_dir"
+    git --git-dir="$BARE_REPO" archive "$sha" | tar -x -C "$release_dir"
+
+    echo "--- backend: composer install --no-dev"
+    cd "$release_dir/backend"
+    if [ -f "$SHARED_DIR/backend.env" ]; then
+        cp "$SHARED_DIR/backend.env" .env
+    else
+        echo "!!  $SHARED_DIR/backend.env tidak ada — buat dulu dari backend/.env.example" >&2
+        return 1
+    fi
+    # writable/ persisten lintas release
+    if [ -d "$SHARED_DIR/writable" ]; then
+        rm -rf writable && ln -s "$SHARED_DIR/writable" writable
+    fi
+    "$COMPOSER_BIN" install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
+    if [ "$RUN_MIGRATIONS" = "1" ]; then
+        echo "--- backend: php spark migrate --all"
+        "$PHP_BIN" spark migrate --all --no-header
+    fi
+
+    echo "--- frontend: npm ci && npm run build"
+    cd "$release_dir/frontend"
+    if [ -f "$SHARED_DIR/frontend.env.local" ]; then
+        cp "$SHARED_DIR/frontend.env.local" .env.local
+    fi
+    "$NPM_BIN" ci --no-audit --no-fund
+    "$NPM_BIN" run build
+    rm -rf node_modules   # hasil build ada di dist/, node_modules tidak diperlukan runtime
+
+    echo "--- switch symlink current -> $release_id"
+    cd "$DEPLOY_ROOT"
+    if [ -L "$CURRENT_LINK" ]; then
+        ln -sfn "$(readlink -f "$CURRENT_LINK")" "$PREVIOUS_LINK"
+    fi
+    ln -sfn "$release_dir" "$CURRENT_LINK.tmp" && mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
+    echo "OK  release $release_id aktif"
+}
+
 deploy_ref() {
     local newrev="$1"
-    local sha short release_id release_dir logfile
+    local sha short release_id release_dir logfile rc
     sha="$(git --git-dir="$BARE_REPO" rev-parse "$newrev")"
     short="${sha:0:8}"
     release_id="$(date +%Y%m%d%H%M%S)-$short"
@@ -62,63 +115,22 @@ deploy_ref() {
 
     echo "==> [deploy] $DEPLOY_BRANCH @ $short -> $release_dir (log: $logfile)"
 
-    # Seluruh build dibungkus subshell; kegagalan apa pun -> release dihapus, current tidak disentuh.
-    # CATATAN: subshell TIDAK boleh dijadikan kondisi `if (...)` — bash mengabaikan `set -e` di dalam
-    # kondisi if/&&/||, sehingga langkah yang gagal tidak menghentikan build. Status ditangkap manual.
+    # Build di proses bash baru: `set -e` di dalamnya dijamin aktif, dan kegagalan tidak menghentikan hook ini.
     set +e
-    (
-        set -euo pipefail
-        exec > >(tee -a "$logfile") 2>&1
-
-        echo "--- checkout $sha"
-        mkdir -p "$release_dir"
-        git --git-dir="$BARE_REPO" archive "$sha" | tar -x -C "$release_dir"
-
-        echo "--- backend: composer install --no-dev"
-        cd "$release_dir/backend"
-        if [ -f "$SHARED_DIR/backend.env" ]; then
-            cp "$SHARED_DIR/backend.env" .env
-        else
-            echo "!!  $SHARED_DIR/backend.env tidak ada — buat dulu dari backend/.env.example" >&2
-            exit 1
-        fi
-        # writable/ persisten lintas release
-        if [ -d "$SHARED_DIR/writable" ]; then
-            rm -rf writable && ln -s "$SHARED_DIR/writable" writable
-        fi
-        "$COMPOSER_BIN" install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
-        if [ "$RUN_MIGRATIONS" = "1" ]; then
-            echo "--- backend: php spark migrate --all"
-            "$PHP_BIN" spark migrate --all --no-header
-        fi
-
-        echo "--- frontend: npm ci && npm run build"
-        cd "$release_dir/frontend"
-        [ -f "$SHARED_DIR/frontend.env.local" ] && cp "$SHARED_DIR/frontend.env.local" .env.local
-        "$NPM_BIN" ci --no-audit --no-fund
-        "$NPM_BIN" run build
-        rm -rf node_modules   # hasil build ada di dist/, node_modules tidak diperlukan runtime
-
-        echo "--- switch symlink current -> $release_id"
-        cd "$DEPLOY_ROOT"
-        if [ -L "$CURRENT_LINK" ]; then
-            ln -sfn "$(readlink -f "$CURRENT_LINK")" "$PREVIOUS_LINK"
-        fi
-        ln -sfn "$release_dir" "$CURRENT_LINK.tmp" && mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
-        echo "OK  release $release_id aktif"
-    )
-    local rc=$?
+    bash -c "$(declare -f build_release); set -euo pipefail; build_release \"\$@\"" _ "$sha" "$release_id" "$release_dir" "$logfile"
+    rc=$?
     set -e
 
     if [ "$rc" -eq 0 ]; then
         echo "==> [deploy] SUKSES: current -> $release_id"
         prune_releases
-    else
-        echo "==> [deploy] GAGAL: build $release_id dihentikan. current tetap -> $(readlink -f "$CURRENT_LINK" 2>/dev/null || echo '(belum ada)')" >&2
-        echo "    lihat log: $logfile" >&2
-        rm -rf "$release_dir"
-        return 1
+        return 0
     fi
+
+    echo "==> [deploy] GAGAL (exit $rc): build $release_id dihentikan. current tetap -> $(readlink -f "$CURRENT_LINK" 2>/dev/null || echo '(belum ada)')" >&2
+    echo "    lihat log: $logfile" >&2
+    rm -rf "$release_dir"
+    return 1
 }
 
 prune_releases() {
@@ -146,7 +158,14 @@ while read -r oldrev newrev refname; do
         echo "==> [deploy] branch dihapus, tidak ada deploy"
         continue
     fi
-    deploy_ref "$newrev" || status=1
+
+    set +e
+    deploy_ref "$newrev"
+    rc=$?
+    set -e
+    if [ "$rc" -ne 0 ]; then
+        status=1
+    fi
 done
 
 exit $status
