@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# =============================================================================
+# SIMPEG v2 — git hook `post-receive` untuk server Dev (F0-18)
+#
+# Dipasang di bare repo server dev:  <BARE_REPO>/hooks/post-receive  (chmod +x)
+# Setiap push ke branch $DEPLOY_BRANCH memicu build otomatis:
+#   1. checkout commit ke releases/<timestamp>-<sha>
+#   2. backend : salin .env bersama (shared/backend.env) -> composer install --no-dev -> php spark migrate --all
+#   3. frontend: salin .env.local bersama (opsional)     -> npm ci -> npm run build
+#   4. symlink `current` -> release baru (atomic), simpan release sebelumnya di `previous`
+#   5. kalau langkah mana pun gagal: release baru dihapus, `current` TIDAK diubah (rollback otomatis)
+#
+# Konfigurasi lewat environment (set di <BARE_REPO>/hooks/deploy.env, di-source di bawah):
+#   DEPLOY_ROOT     : direktori aplikasi di server, mis. /var/www/simpeg-v2
+#   DEPLOY_BRANCH   : branch yang dideploy (default: dev)
+#   KEEP_RELEASES   : jumlah release yang disimpan untuk rollback (default: 5)
+#   PHP_BIN, COMPOSER_BIN, NPM_BIN : path binary (default: php, composer, npm)
+#   RUN_MIGRATIONS  : 1 = jalankan `php spark migrate --all` (default: 1)
+#
+# Struktur DEPLOY_ROOT:
+#   releases/<id>/{backend,frontend}   snapshot tiap deploy
+#   shared/backend.env                 .env backend (berisi secret — dibuat manual sekali, TIDAK dari git)
+#   shared/frontend.env.local          .env.local frontend (opsional)
+#   shared/writable/                   writable/ backend yang persisten (cache, logs, uploads)
+#   current -> releases/<id>           yang disajikan web server (document root: current/backend/public
+#                                      untuk API, current/frontend/dist untuk SPA)
+#   previous -> releases/<id-lama>     target rollback cepat (deploy/rollback.sh)
+#   logs/deploy-<id>.log               log tiap build
+# =============================================================================
+set -euo pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BARE_REPO="$(cd "$HOOK_DIR/.." && pwd)"
+
+# shellcheck disable=SC1091
+[ -f "$HOOK_DIR/deploy.env" ] && source "$HOOK_DIR/deploy.env"
+
+DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/simpeg-v2}"
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-dev}"
+KEEP_RELEASES="${KEEP_RELEASES:-5}"
+PHP_BIN="${PHP_BIN:-php}"
+COMPOSER_BIN="${COMPOSER_BIN:-composer}"
+NPM_BIN="${NPM_BIN:-npm}"
+RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
+
+RELEASES_DIR="$DEPLOY_ROOT/releases"
+SHARED_DIR="$DEPLOY_ROOT/shared"
+LOG_DIR="$DEPLOY_ROOT/logs"
+CURRENT_LINK="$DEPLOY_ROOT/current"
+PREVIOUS_LINK="$DEPLOY_ROOT/previous"
+
+mkdir -p "$RELEASES_DIR" "$SHARED_DIR" "$LOG_DIR"
+
+deploy_ref() {
+    local newrev="$1"
+    local sha short release_id release_dir logfile
+    sha="$(git --git-dir="$BARE_REPO" rev-parse "$newrev")"
+    short="${sha:0:8}"
+    release_id="$(date +%Y%m%d%H%M%S)-$short"
+    release_dir="$RELEASES_DIR/$release_id"
+    logfile="$LOG_DIR/deploy-$release_id.log"
+
+    echo "==> [deploy] $DEPLOY_BRANCH @ $short -> $release_dir (log: $logfile)"
+
+    # Seluruh build dibungkus subshell; kegagalan apa pun -> release dihapus, current tidak disentuh.
+    if (
+        set -euo pipefail
+        exec > >(tee -a "$logfile") 2>&1
+
+        echo "--- checkout $sha"
+        mkdir -p "$release_dir"
+        git --git-dir="$BARE_REPO" archive "$sha" | tar -x -C "$release_dir"
+
+        echo "--- backend: composer install --no-dev"
+        cd "$release_dir/backend"
+        if [ -f "$SHARED_DIR/backend.env" ]; then
+            cp "$SHARED_DIR/backend.env" .env
+        else
+            echo "!!  $SHARED_DIR/backend.env tidak ada — buat dulu dari backend/.env.example" >&2
+            exit 1
+        fi
+        # writable/ persisten lintas release
+        if [ -d "$SHARED_DIR/writable" ]; then
+            rm -rf writable && ln -s "$SHARED_DIR/writable" writable
+        fi
+        "$COMPOSER_BIN" install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
+        if [ "$RUN_MIGRATIONS" = "1" ]; then
+            echo "--- backend: php spark migrate --all"
+            "$PHP_BIN" spark migrate --all --no-header
+        fi
+
+        echo "--- frontend: npm ci && npm run build"
+        cd "$release_dir/frontend"
+        [ -f "$SHARED_DIR/frontend.env.local" ] && cp "$SHARED_DIR/frontend.env.local" .env.local
+        "$NPM_BIN" ci --no-audit --no-fund
+        "$NPM_BIN" run build
+        rm -rf node_modules   # hasil build ada di dist/, node_modules tidak diperlukan runtime
+
+        echo "--- switch symlink current -> $release_id"
+        cd "$DEPLOY_ROOT"
+        if [ -L "$CURRENT_LINK" ]; then
+            ln -sfn "$(readlink -f "$CURRENT_LINK")" "$PREVIOUS_LINK"
+        fi
+        ln -sfn "$release_dir" "$CURRENT_LINK.tmp" && mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
+        echo "OK  release $release_id aktif"
+    ); then
+        echo "==> [deploy] SUKSES: current -> $release_id"
+        prune_releases
+    else
+        echo "==> [deploy] GAGAL: build $release_id dihentikan. current tetap -> $(readlink -f "$CURRENT_LINK" 2>/dev/null || echo '(belum ada)')" >&2
+        echo "    lihat log: $logfile" >&2
+        rm -rf "$release_dir"
+        return 1
+    fi
+}
+
+prune_releases() {
+    # Simpan KEEP_RELEASES terbaru; jangan hapus yang sedang ditunjuk current/previous.
+    local keep="$KEEP_RELEASES" cur prev
+    cur="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
+    prev="$(readlink -f "$PREVIOUS_LINK" 2>/dev/null || true)"
+    ls -1dt "$RELEASES_DIR"/*/ 2>/dev/null | tail -n +"$((keep + 1))" | while read -r old; do
+        old="${old%/}"
+        if [ "$old" != "$cur" ] && [ "$old" != "$prev" ]; then
+            echo "--- prune $old"
+            rm -rf "$old"
+        fi
+    done
+}
+
+status=0
+while read -r oldrev newrev refname; do
+    branch="${refname#refs/heads/}"
+    if [ "$branch" != "$DEPLOY_BRANCH" ]; then
+        echo "==> [deploy] lewati $refname (hanya branch '$DEPLOY_BRANCH' yang dideploy)"
+        continue
+    fi
+    if [ "$newrev" = "0000000000000000000000000000000000000000" ]; then
+        echo "==> [deploy] branch dihapus, tidak ada deploy"
+        continue
+    fi
+    deploy_ref "$newrev" || status=1
+done
+
+exit $status

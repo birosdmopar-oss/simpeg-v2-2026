@@ -1,0 +1,22 @@
+includes:
+    - vendor/codeigniter/phpstan-codeigniter/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - tests
+    excludePaths:
+        - app/Views/*
+    bootstrapFiles:
+        - vendor/codeigniter4/framework/system/Test/bootstrap.php
+    scanDirectories:
+        - vendor/codeigniter4/framework/system/Helpers
+    universalObjectCratesClasses:
+        - CodeIgniter\Entity
+        - CodeIgniter\Entity\Entity
+        - Faker\Generator
+    tmpDir: build/phpstan
+    codeigniter:
+        additionalServices:
+            - CodeIgniter\Queue\Config\Services

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "simpeg-frontend-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend", "--", "--port", "5173", "--strictPort"],
+      "port": 5173
+    },
+    {
+      "name": "simpeg-backend-serve",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["backend/spark", "serve", "--port", "8080"],
+      "port": 8080
+    }
+  ]
+}

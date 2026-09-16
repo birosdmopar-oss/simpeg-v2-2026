@@ -1,0 +1,13 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# secrets — jangan pernah commit
+.env
+.env.local
+*.env
+!*.env.example
+!.env.example

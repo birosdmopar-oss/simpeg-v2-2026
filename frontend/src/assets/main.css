@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design token global ditaruh di tailwind.config.js (theme.extend). Dark mode out of scope (ADR-028). */
