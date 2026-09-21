@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Config;
 
+use App\Libraries\ApiExceptionHandler;
 use CodeIgniter\Config\BaseConfig;
 use CodeIgniter\Debug\ExceptionHandler;
 use CodeIgniter\Debug\ExceptionHandlerInterface;
@@ -103,6 +104,24 @@ class Exceptions extends BaseConfig
      */
     public function handler(int $statusCode, Throwable $exception): ExceptionHandlerInterface
     {
+        // API (prefix api/ atau klien minta JSON) → envelope JSON (ADR-001/ADR-002).
+        if (! is_cli() && self::isApiRequest()) {
+            return new ApiExceptionHandler($this);
+        }
+
         return new ExceptionHandler($this);
+    }
+
+    private static function isApiRequest(): bool
+    {
+        try {
+            $request = service('request');
+            $path    = trim($request->getUri()->getPath(), '/');
+            $accept  = $request->getHeaderLine('Accept');
+
+            return $path === '' || str_starts_with($path, 'api/') || str_contains($accept, 'application/json');
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

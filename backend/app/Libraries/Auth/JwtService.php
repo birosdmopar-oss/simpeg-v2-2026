@@ -186,7 +186,10 @@ class JwtService
         }
 
         if ((int) $row['revoked'] === 1) {
-            // Reuse detection: token yang sudah dipakai/dicabut dipakai lagi.
+            // Reuse detection (A-05): token yang sudah dipakai/dicabut dipakai lagi → indikasi pencurian token.
+            // Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut.
+            $this->tokens->revokeAllForNip((string) $row['nip'], $this->now());
+
             throw AuthException::reusedToken();
         }
 
@@ -206,17 +209,11 @@ class JwtService
     }
 
     /**
-     * Cabut satu refresh token (logout).
+     * Logout: hapus row refresh token dari DB (A-05). Replay token setelahnya → unknownToken (401).
      */
-    public function revoke(string $refreshToken): bool
+    public function deleteRefreshToken(string $refreshToken): bool
     {
-        $row = $this->tokens->findByHash(self::hash($refreshToken));
-
-        if ($row === null) {
-            return false;
-        }
-
-        return $this->tokens->revoke((int) $row['id'], $this->now());
+        return $this->tokens->deleteByHash(self::hash($refreshToken));
     }
 
     /**

@@ -18,6 +18,33 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
     $routes->get('health', 'Home::index');
 
     // ------------------------------------------------------------------
+    // Modul A — Autentikasi & Akun (Fase 1). Role akses: Matriks Role x Endpoint Bagian 2 Modul A.
+    // Dokumentasi payload: app/Controllers/Api/Auth/README.md
+    // ------------------------------------------------------------------
+    $routes->group('auth', ['namespace' => 'App\Controllers\Api\Auth'], static function (RouteCollection $routes): void {
+        // Publik (Guest)
+        $routes->post('login', 'LoginController::login');
+        $routes->post('refresh', 'TokenController::refresh');
+        $routes->post('forgot-password', 'ResetPasswordController::forgot');
+        $routes->post('reset-password', 'ResetPasswordController::reset');
+
+        // UL_ALL (sudah login)
+        $routes->post('logout', 'TokenController::logout', ['filter' => 'jwt']);
+        $routes->get('me', 'TokenController::me', ['filter' => 'jwt']);
+        $routes->post('change-password', 'PasswordController::change', ['filter' => 'jwt']);
+
+        // user/index, add, edit, delete = role 1, 3 (scoping satker di UserService)
+        $routes->group('users', ['filter' => ['jwt', Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]], static function (RouteCollection $routes): void {
+            $routes->get('/', 'UserController::index');
+            $routes->post('/', 'UserController::create');
+            $routes->get('(:num)', 'UserController::show/$1');
+            $routes->put('(:num)', 'UserController::update/$1');
+            $routes->patch('(:num)/status', 'UserController::setStatus/$1');
+            $routes->delete('(:num)', 'UserController::delete/$1');
+        });
+    });
+
+    // ------------------------------------------------------------------
     // Endpoint dummy RBAC (F0-08) — HANYA untuk verifikasi filter jwt+role.
     // Tidak tersedia di production. Pola diambil dari Matriks Role x Endpoint Bagian 3.
     // ------------------------------------------------------------------

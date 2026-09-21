@@ -37,6 +37,16 @@ class TokenModel extends Model
         ]);
     }
 
+    /**
+     * Hapus fisik satu refresh token (logout, A-05: "hapus dari DB, bukan cuma clear cookie").
+     */
+    public function deleteByHash(string $hash): bool
+    {
+        $this->where('token_hash', $hash)->delete();
+
+        return $this->db->affectedRows() > 0;
+    }
+
     public function revokeAllForNip(string $nip, int $now): int
     {
         $this->where('nip', $nip)->where('revoked', 0)->set([

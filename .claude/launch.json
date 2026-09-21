@@ -10,8 +10,8 @@
     {
       "name": "simpeg-backend-serve",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["backend/spark", "serve", "--port", "8080"],
-      "port": 8080
+      "runtimeArgs": ["backend/spark", "serve", "--port", "8089"],
+      "port": 8089
     }
   ]
 }

@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
-use RuntimeException;
-
 /**
- * Kegagalan autentikasi token. Pesan sengaja generik (tidak membocorkan detail) — Tech Spec Bagian 9.
+ * 401 — kegagalan autentikasi (token/kredensial). Pesan sengaja generik untuk klien
+ * (tidak membocorkan mana yang salah) — alasan detail hanya untuk log/test via getReason().
  */
-class AuthException extends RuntimeException
+class AuthException extends ApiException
 {
-    public const REASON_MISSING   = 'missing';
-    public const REASON_INVALID   = 'invalid';
-    public const REASON_EXPIRED   = 'expired';
-    public const REASON_REVOKED   = 'revoked';
-    public const REASON_REUSED    = 'reused';
-    public const REASON_NOT_FOUND = 'not_found';
+    public const REASON_MISSING     = 'missing';
+    public const REASON_INVALID     = 'invalid';
+    public const REASON_EXPIRED     = 'expired';
+    public const REASON_REVOKED     = 'revoked';
+    public const REASON_REUSED      = 'reused';
+    public const REASON_NOT_FOUND   = 'not_found';
+    public const REASON_CREDENTIALS = 'credentials';
+    public const REASON_INACTIVE    = 'inactive';
 
     private string $reason;
 
@@ -59,5 +60,13 @@ class AuthException extends RuntimeException
     public static function unknownToken(): self
     {
         return new self(self::REASON_NOT_FOUND, 'Refresh token tidak dikenal.');
+    }
+
+    /**
+     * Pesan generik yang sama untuk username tidak terdaftar, password salah, maupun akun nonaktif.
+     */
+    public static function invalidCredentials(string $reason = self::REASON_CREDENTIALS): self
+    {
+        return new self($reason, 'Username atau password salah.');
     }
 }

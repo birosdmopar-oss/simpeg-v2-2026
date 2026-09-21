@@ -26,6 +26,13 @@ abstract class BaseAuditableModel extends Model
     protected bool $auditEnabled = true;
 
     /**
+     * Kolom sensitif yang nilainya dimasking di before/after JSON (mis. hash password).
+     *
+     * @var list<string>
+     */
+    protected array $auditMaskedFields = [];
+
+    /**
      * Snapshot row sebelum update/delete, di-key oleh primary key.
      *
      * @var array<int|string, array<string, mixed>>
@@ -186,8 +193,8 @@ abstract class BaseAuditableModel extends Model
                 $entity ?? $this->table,
                 $entityId,
                 $event,
-                $before,
-                $after,
+                $this->maskSensitive($before),
+                $this->maskSensitive($after),
                 $this->currentActorNip(),
             );
         } catch (Throwable $e) {
@@ -199,6 +206,26 @@ abstract class BaseAuditableModel extends Model
                 'msg'    => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param array<string, mixed>|null $row
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function maskSensitive(?array $row): ?array
+    {
+        if ($row === null || $this->auditMaskedFields === []) {
+            return $row;
+        }
+
+        foreach ($this->auditMaskedFields as $field) {
+            if (array_key_exists($field, $row) && $row[$field] !== null && $row[$field] !== '') {
+                $row[$field] = '***';
+            }
+        }
+
+        return $row;
     }
 
     protected function currentActorNip(): ?string

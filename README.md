@@ -72,6 +72,27 @@ Perbaikan style otomatis: `composer cs-fix` (backend), `npm run format` (fronten
 | F0-15/16/17 Adapter | `app/Interfaces/{Esign,Siasn,PushNotif}GatewayInterface.php`, `app/Libraries/{Esign,Siasn,Push}/Mock*Adapter.php`, resolver di `Config/Services.php` (driver `mock` via `.env`) |
 | F0-18 Deploy dev | `deploy/post-receive`, `deploy/rollback.sh`, `README-deploy.md` |
 
+## Modul A — Autentikasi & Akun (Fase 1)
+
+| Task | Implementasi |
+|---|---|
+| A-01 Migration Auth | migration `pengguna`, `login_attempts`, `forgot_attempts`, `audit_logs.event` (+login/logout); review DB Validator: `backend/docs/db-review/A-01-auth-schema.md` |
+| A-02/A-02b Login + lazy rehash | `LoginController`, `Libraries/Auth/AuthService.php`, `PasswordVerifier.php` (MD5 → Argon2id saat login pertama) |
+| A-03 Turnstile | `Libraries/Auth/TurnstileVerifier.php` (+ `MockCaptchaVerifier` untuk lokal), `frontend/.../TurnstileWidget.vue` |
+| A-04 Lockout | `Libraries/Auth/LockoutService.php` (N=5, `Config/Auth.php`) |
+| A-05 Refresh & logout | `TokenController` (`/auth/refresh`, `/auth/logout`, `/auth/me`); reuse refresh token → seluruh sesi dicabut |
+| A-06 Change password | `PasswordController`, `Libraries/Auth/PasswordService.php` |
+| A-07 Forgot/reset | `ResetPasswordController`, `Libraries/Auth/ResetPasswordService.php` |
+| A-08 CRUD akun scoped | `UserController`, `Libraries/Auth/UserService.php` (role 3 dibatasi `id_satker`) |
+| A-09 Lifecycle akun | `Libraries/Auth/AccountProvisioner.php` (dipanggil Modul B saat pegawai baru) |
+| A-10 Audit | `PenggunaModel` (auditable, hash dimasking) + event `login`/`logout` dari `AuthService` |
+| A-11 Login FE | `frontend/src/features/auth/views/LoginView.vue`, `stores/auth.store.ts`, `schemas/login.schema.ts` |
+| A-12 Manajemen Akun FE | `views/UserManagementView.vue`, `components/UserFormDialog.vue`; menu hanya role 1 & 3 (`shared/components/AppShell.vue`), route guard `src/router/index.ts` |
+| A-13 Test RBAC & JWT | `backend/tests/Auth/*` (94 test), bagian dari `check.sh` |
+
+Dokumentasi endpoint: [backend/app/Controllers/Api/Auth/README.md](backend/app/Controllers/Api/Auth/README.md).
+Akun uji lokal: `php spark db:seed 'Tests\Support\Database\Seeds\AuthSeeder'` (12 akun README_local_seed, password `Password123!`), set `auth.captchaDriver = mock` di `.env`.
+
 ## Konvensi penting (dari ADR)
 
 - **Response envelope** (ADR-001): `{status:'success', data}` / `{status:'error', message, errors?}` — helper di `App\Controllers\Api\ApiController`.

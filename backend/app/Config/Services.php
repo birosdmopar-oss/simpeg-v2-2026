@@ -4,15 +4,29 @@ declare(strict_types=1);
 
 namespace Config;
 
+use App\Interfaces\CaptchaVerifierInterface;
 use App\Interfaces\EsignGatewayInterface;
 use App\Interfaces\PushNotifGatewayInterface;
 use App\Interfaces\SiasnGatewayInterface;
+use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Auth\AuthService;
 use App\Libraries\Auth\JwtService;
+use App\Libraries\Auth\LockoutService;
+use App\Libraries\Auth\MockCaptchaVerifier;
+use App\Libraries\Auth\PasswordService;
+use App\Libraries\Auth\PasswordVerifier;
+use App\Libraries\Auth\ResetPasswordService;
+use App\Libraries\Auth\TurnstileVerifier;
+use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Push\MockFcmAdapter;
 use App\Libraries\Siasn\MockSiasnAdapter;
+use App\Models\AuditLogModel;
+use App\Models\Auth\ForgotAttemptModel;
+use App\Models\Auth\LoginAttemptModel;
+use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Config\BaseService;
 use RuntimeException;
 
@@ -42,6 +56,105 @@ class Services extends BaseService
 
         return new JwtService(config(Jwt::class));
     }
+
+    // ------------------------------------------------------------------
+    // Modul A — Autentikasi & Akun (Fase 1)
+    // ------------------------------------------------------------------
+
+    public static function captchaVerifier(bool $getShared = true): CaptchaVerifierInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('captchaVerifier');
+        }
+
+        $config = config(Auth::class);
+
+        return match ($config->captchaDriver) {
+            'mock'  => new MockCaptchaVerifier(),
+            default => new TurnstileVerifier($config),
+        };
+    }
+
+    public static function passwordVerifier(bool $getShared = true): PasswordVerifier
+    {
+        if ($getShared) {
+            return static::getSharedInstance('passwordVerifier');
+        }
+
+        return new PasswordVerifier(new PenggunaModel(), config(Auth::class));
+    }
+
+    public static function lockoutService(bool $getShared = true): LockoutService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('lockoutService');
+        }
+
+        return new LockoutService(new LoginAttemptModel(), config(Auth::class));
+    }
+
+    public static function authService(bool $getShared = true): AuthService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('authService');
+        }
+
+        return new AuthService(
+            new PenggunaModel(),
+            static::passwordVerifier(),
+            static::lockoutService(),
+            static::captchaVerifier(),
+            static::jwt(),
+            new AuditLogModel(),
+        );
+    }
+
+    public static function passwordService(bool $getShared = true): PasswordService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('passwordService');
+        }
+
+        return new PasswordService(new PenggunaModel(), static::passwordVerifier(), static::jwt());
+    }
+
+    public static function resetPasswordService(bool $getShared = true): ResetPasswordService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('resetPasswordService');
+        }
+
+        return new ResetPasswordService(
+            new PenggunaModel(),
+            new ForgotAttemptModel(),
+            static::passwordVerifier(),
+            static::passwordService(),
+            static::jwt(),
+            config(Auth::class),
+        );
+    }
+
+    public static function userService(bool $getShared = true): UserService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('userService');
+        }
+
+        return new UserService(new PenggunaModel(), static::passwordVerifier(), static::jwt());
+    }
+
+    public static function accountProvisioner(bool $getShared = true): AccountProvisioner
+    {
+        if ($getShared) {
+            return static::getSharedInstance('accountProvisioner');
+        }
+
+        return new AccountProvisioner(new PenggunaModel(), static::passwordVerifier());
+    }
+
+    // ------------------------------------------------------------------
+    // Fondasi (Fase 0)
+    // ------------------------------------------------------------------
 
     public static function cacheService(bool $getShared = true): CacheService
     {
