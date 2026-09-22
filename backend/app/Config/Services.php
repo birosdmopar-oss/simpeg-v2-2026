@@ -21,6 +21,8 @@ use App\Libraries\Auth\TurnstileVerifier;
 use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
+use App\Libraries\MasterData\MasterRegistry;
+use App\Libraries\MasterData\MasterService;
 use App\Libraries\Push\MockFcmAdapter;
 use App\Libraries\Siasn\MockSiasnAdapter;
 use App\Models\AuditLogModel;
@@ -150,6 +152,28 @@ class Services extends BaseService
         }
 
         return new AccountProvisioner(new PenggunaModel(), static::passwordVerifier());
+    }
+
+    // ------------------------------------------------------------------
+    // Modul G — Master Data (Fase 2)
+    // ------------------------------------------------------------------
+
+    public static function masterRegistry(bool $getShared = true): MasterRegistry
+    {
+        if ($getShared) {
+            return static::getSharedInstance('masterRegistry');
+        }
+
+        return new MasterRegistry(config(MasterData::class));
+    }
+
+    public static function masterService(bool $getShared = true): MasterService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('masterService');
+        }
+
+        return new MasterService(static::masterRegistry(), static::cacheService());
     }
 
     // ------------------------------------------------------------------

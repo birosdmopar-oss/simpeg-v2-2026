@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Constants\Role;
 use CodeIgniter\Router\RouteCollection;
+use Config\MasterData as MasterDataConfig;
 
 /** @var RouteCollection $routes */
 
@@ -42,6 +43,33 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
             $routes->patch('(:num)/status', 'UserController::setStatus/$1');
             $routes->delete('(:num)', 'UserController::delete/$1');
         });
+    });
+
+    // ------------------------------------------------------------------
+    // Modul G — Master Data & Pengaturan (Fase 2). Matriks Role x Endpoint Modul G: seluruh CRUD master = role 1.
+    // Route per master dibangkitkan dari Config\MasterData; dokumentasi: app/Controllers/Api/MasterData/README.md
+    // ------------------------------------------------------------------
+    $routes->group('master', ['namespace' => 'App\Controllers\Api\MasterData'], static function (RouteCollection $routes): void {
+        $superAdmin = ['filter' => ['jwt', Role::filter(Role::SUPER_ADMIN)]];
+
+        $routes->get('meta', 'MetaController::index', $superAdmin);
+
+        foreach (config(MasterDataConfig::class)->entities as $key => $entity) {
+            $c = $entity['controller'];
+
+            // Dropdown untuk modul lain: UL_ALL, read-only, hanya entri aktif. Didaftarkan sebelum (:segment).
+            $routes->get("{$key}/options", "{$c}::options/{$key}", ['filter' => 'jwt']);
+
+            $routes->group($key, $superAdmin, static function (RouteCollection $routes) use ($c, $key): void {
+                $routes->get('/', "{$c}::index/{$key}");
+                $routes->post('/', "{$c}::create/{$key}");
+                $routes->get('(:segment)', "{$c}::show/{$key}/\$1");
+                $routes->put('(:segment)', "{$c}::update/{$key}/\$1");
+                $routes->patch('(:segment)/status', "{$c}::setStatus/{$key}/\$1");
+                $routes->patch('(:segment)/order', "{$c}::reorder/{$key}/\$1");
+                $routes->delete('(:segment)', "{$c}::delete/{$key}/\$1");
+            });
+        }
     });
 
     // ------------------------------------------------------------------

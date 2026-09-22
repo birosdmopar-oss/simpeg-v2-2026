@@ -1,0 +1,194 @@
+<script setup lang="ts">
+/**
+ * Form tambah/edit master generik (Modul G) — Radix Vue Dialog + VeeValidate/Zod. Field dibangun dari metadata
+ * master: kode (hanya saat tambah; kode tidak bisa diubah), induk (dropdown berjenjang), nama, urutan.
+ * Error 422 backend (keunikan kode/nama, induk non-aktif) dipetakan ke field.
+ */
+import { toTypedSchema } from '@vee-validate/zod'
+import { X } from 'lucide-vue-next'
+import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
+import { type TypedSchema, useForm } from 'vee-validate'
+import { computed, ref, watch } from 'vue'
+
+import { isApiError } from '@/lib/axios'
+import FormField from '@/shared/components/FormField.vue'
+
+import { resolveAncestorPath, useCascadeOptions } from '../composables/useCascadeOptions'
+import { ancestorChain, buildMasterSchema } from '../schemas/master.schema'
+import { masterService } from '../services/master.service'
+import type { MasterFormValues, MasterMeta, MasterRow } from '../types'
+
+const props = defineProps<{ open: boolean; meta: MasterMeta; allMeta: MasterMeta[]; row: MasterRow | null }>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: MasterRow] }>()
+
+const isEdit = computed(() => props.row !== null)
+const submitting = ref(false)
+const formError = ref('')
+
+const chain = computed(() => ancestorChain(props.meta, props.allMeta))
+const cascade = useCascadeOptions(chain)
+
+const schema = computed(
+  () => toTypedSchema(buildMasterSchema(props.meta, isEdit.value)) as unknown as TypedSchema<MasterFormValues>,
+)
+
+const { values, handleSubmit, errors, resetForm, setFieldError, setFieldValue } = useForm<MasterFormValues>({
+  validationSchema: schema,
+})
+
+const rowId = computed(() => (props.row ? String(props.row[props.meta.primary_key] ?? '') : ''))
+
+watch(
+  () => [props.open, props.row, props.meta.key] as const,
+  async ([open, row]) => {
+    if (!open) return
+    formError.value = ''
+    const m = props.meta
+    const initial: MasterFormValues = {
+      [m.primary_key]: row ? String(row[m.primary_key] ?? '') : '',
+      [m.name_field]: row ? String(row[m.name_field] ?? '') : '',
+      order: row ? String(row.order ?? '') : '',
+    }
+    if (m.parent) initial[m.parent.field] = row ? String(row[m.parent.field] ?? '') : ''
+    resetForm({ values: initial })
+
+    if (m.parent) {
+      const directParent = row ? String(row[m.parent.field] ?? '') : ''
+      const path = directParent ? await resolveAncestorPath(chain.value, directParent) : []
+      await cascade.init(path)
+    }
+  },
+  { immediate: true },
+)
+
+async function onLevelChange(index: number, value: string): Promise<void> {
+  await cascade.select(index, value)
+  if (props.meta.parent) setFieldValue(props.meta.parent.field, cascade.leafValue())
+}
+
+const onSubmit = handleSubmit(async (formValues) => {
+  submitting.value = true
+  formError.value = ''
+  const m = props.meta
+  const payload: Record<string, string | number> = { [m.name_field]: String(formValues[m.name_field] ?? '').trim() }
+  if (m.parent) payload[m.parent.field] = String(formValues[m.parent.field] ?? '')
+  // Kirim urutan hanya kalau diubah: memindah posisi menggeser entri lain (tiap geseran teraudit).
+  const order = String(formValues.order ?? '').trim()
+  const originalOrder = props.row ? String(props.row.order ?? '') : ''
+  if (order !== '' && order !== originalOrder) payload.order = Number(order)
+
+  try {
+    let saved: MasterRow
+    if (isEdit.value) {
+      saved = await masterService.update(m.key, rowId.value, payload)
+    } else {
+      payload[m.primary_key] = String(formValues[m.primary_key] ?? '').trim()
+      saved = await masterService.create(m.key, payload)
+    }
+    emit('saved', saved)
+    emit('update:open', false)
+  } catch (err) {
+    if (isApiError(err) && err.errors) {
+      for (const [field, messages] of Object.entries(err.errors)) {
+        setFieldError(field, messages[0])
+      }
+      formError.value = err.message
+    } else if (isApiError(err)) {
+      formError.value = err.message
+    } else {
+      formError.value = 'Terjadi kesalahan. Silakan coba lagi.'
+    }
+  } finally {
+    submitting.value = false
+  }
+})
+
+const { levels } = cascade
+</script>
+
+<template>
+  <DialogRoot :open="open" @update:open="emit('update:open', $event)">
+    <DialogPortal>
+      <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
+      <DialogContent
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+      >
+        <div class="mb-4 flex items-start justify-between">
+          <div>
+            <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEdit ? `Edit ${meta.label}` : `Tambah ${meta.label}` }}</DialogTitle>
+            <DialogDescription class="text-sm text-slate-500">
+              {{ isEdit ? `Kode ${rowId} (kode tidak dapat diubah)` : 'Kode tidak dapat diubah setelah disimpan.' }}
+            </DialogDescription>
+          </div>
+          <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+            <X class="h-5 w-5" />
+          </DialogClose>
+        </div>
+
+        <form class="space-y-4" novalidate data-testid="master-form" @submit="onSubmit">
+          <p v-if="formError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            {{ formError }}
+          </p>
+
+          <FormField
+            v-if="!isEdit"
+            :model-value="values[meta.primary_key]"
+            :name="meta.primary_key"
+            label="Kode"
+            required
+            :hint="`Maksimal ${meta.id_max_length} karakter, tanpa spasi.`"
+            :error="errors[meta.primary_key]"
+            @update:model-value="setFieldValue(meta.primary_key, $event)"
+          />
+
+          <template v-if="meta.parent">
+            <FormField
+              v-for="(level, index) in levels"
+              :key="level.meta.key"
+              :model-value="level.value"
+              :name="index === levels.length - 1 ? meta.parent.field : `cascade_${level.meta.key}`"
+              :label="level.meta.label"
+              type="select"
+              :required="index === levels.length - 1"
+              :placeholder="level.loading ? 'Memuat...' : `Pilih ${level.meta.label}`"
+              :disabled="level.loading || (index > 0 && !levels[index - 1]?.value)"
+              :options="level.options.map((o) => ({ value: o.id, label: `${o.nama} (${o.id})` }))"
+              :error="index === levels.length - 1 ? errors[meta.parent.field] : ''"
+              @update:model-value="onLevelChange(index, $event)"
+            />
+          </template>
+
+          <FormField
+            :model-value="values[meta.name_field]"
+            :name="meta.name_field"
+            :label="meta.name_label"
+            required
+            :error="errors[meta.name_field]"
+            @update:model-value="setFieldValue(meta.name_field, $event)"
+          />
+
+          <FormField
+            :model-value="values.order"
+            name="order"
+            label="Urutan tampil"
+            type="number"
+            :hint="isEdit ? 'Ubah untuk memindah posisi; entri lain ikut bergeser.' : 'Kosongkan = ditaruh paling akhir.'"
+            :error="errors.order"
+            @update:model-value="setFieldValue('order', $event)"
+          />
+
+          <div class="flex justify-end gap-2 pt-2">
+            <DialogClose class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</DialogClose>
+            <button
+              type="submit"
+              class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
+              :disabled="submitting"
+            >
+              {{ submitting ? 'Menyimpan...' : 'Simpan' }}
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
+</template>

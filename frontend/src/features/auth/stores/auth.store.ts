@@ -10,7 +10,7 @@ import { computed, ref } from 'vue'
 import { isApiError } from '@/lib/axios'
 
 import { authService } from '../services/auth.service'
-import { type LoginPayload, type RoleCode, type SessionClaims, type User, USER_MANAGEMENT_ROLES } from '../types'
+import { type LoginPayload, Role, type RoleCode, type SessionClaims, type User, USER_MANAGEMENT_ROLES } from '../types'
 
 export type AuthStatus = 'unknown' | 'loading' | 'authenticated' | 'guest'
 
@@ -24,6 +24,8 @@ export const useAuthStore = defineStore('auth', () => {
   const canManageUsers = computed(
     () => role.value !== null && (USER_MANAGEMENT_ROLES as readonly number[]).includes(role.value),
   )
+  /** Menu Master Data (Modul G) — role 1 saja. */
+  const canManageMasterData = computed(() => role.value === Role.SUPER_ADMIN)
 
   function setSession(nextUser: User, nextClaims: SessionClaims | null = null): void {
     user.value = nextUser
@@ -82,6 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     role,
     canManageUsers,
+    canManageMasterData,
     setSession,
     clearSession,
     fetchCurrentUser,

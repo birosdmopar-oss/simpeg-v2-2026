@@ -78,6 +78,15 @@ describe('useAuthStore', () => {
     expect(store.canManageUsers).toBe(expected)
   })
 
+  it.each(Object.values(Role).map((role) => [role, role === Role.SUPER_ADMIN] as const))(
+    'canManageMasterData role %i → %s (menu Master Data hanya role 1, Modul G)',
+    (role, expected) => {
+      const store = useAuthStore()
+      store.setSession(user(role))
+      expect(store.canManageMasterData).toBe(expected)
+    },
+  )
+
   it('login menyimpan user & claims; logout mengosongkan sesi walau API gagal', async () => {
     vi.mocked(authService.login).mockResolvedValue({ user: user(Role.PEGAWAI), access_token: 't', access_expires_at: 99, refresh_expires_at: 100 })
     vi.mocked(authService.logout).mockRejectedValue(apiError(500))

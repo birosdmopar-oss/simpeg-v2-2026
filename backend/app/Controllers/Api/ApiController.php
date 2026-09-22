@@ -23,6 +23,12 @@ use CodeIgniter\HTTP\ResponseInterface;
 abstract class ApiController extends BaseController
 {
     /**
+     * Cast parameter route numerik ke int. Matikan untuk controller yang parameternya kode string
+     * (mis. master data: kode '01' tidak boleh berubah jadi 1).
+     */
+    protected bool $castNumericParams = true;
+
+    /**
      * @param mixed ...$params parameter route (string) yang diteruskan ke method
      */
     public function _remap(string $method, ...$params): mixed
@@ -32,7 +38,9 @@ abstract class ApiController extends BaseController
         }
 
         // Parameter route selalu string; dengan strict_types, cast angka ke int agar cocok dengan signature (int $id).
-        $params = array_map(static fn ($p) => is_string($p) && ctype_digit($p) ? (int) $p : $p, $params);
+        if ($this->castNumericParams) {
+            $params = array_map(static fn ($p) => is_string($p) && ctype_digit($p) ? (int) $p : $p, $params);
+        }
 
         try {
             return $this->{$method}(...$params);

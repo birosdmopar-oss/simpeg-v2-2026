@@ -283,9 +283,11 @@ abstract class BaseAuditableModel extends Model
      */
     private function rowKey(array $row): int|string
     {
-        $key = $row[$this->primaryKey] ?? '';
+        $key = (string) ($row[$this->primaryKey] ?? '');
 
-        return is_numeric($key) ? (int) $key : (string) $key;
+        // Hanya integer kanonik yang di-cast: kode master string seperti '01' atau '3171' berawalan nol
+        // tidak boleh kehilangan nol di depan (entity_id audit harus sama dengan PK aslinya).
+        return ctype_digit($key) && (string) (int) $key === $key ? (int) $key : $key;
     }
 
     /**

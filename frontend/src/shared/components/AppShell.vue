@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * Layout aplikasi setelah login: header + navigasi. Menu "Manajemen Akun" hanya tampil untuk role 1 & 3 (A-12).
+ * Layout aplikasi setelah login: header + navigasi. Menu "Manajemen Akun" hanya tampil untuk role 1 & 3 (A-12),
+ * menu "Master Data" hanya role 1 (Modul G).
  * Tampilan menu = UX saja; backend tetap menegakkan RoleFilter (ADR-024).
  */
-import { LogOut, Users, Home } from 'lucide-vue-next'
+import { Database, LogOut, Users, Home } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -52,6 +53,15 @@ async function logout(): Promise<void> {
             data-testid="nav-users"
           >
             <Users class="h-4 w-4" /> Manajemen Akun
+          </RouterLink>
+          <RouterLink
+            v-if="auth.canManageMasterData"
+            :to="{ name: 'master-data' }"
+            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100"
+            active-class="bg-slate-100 text-brand-primary font-medium"
+            data-testid="nav-master-data"
+          >
+            <Database class="h-4 w-4" /> Master Data
           </RouterLink>
         </nav>
 

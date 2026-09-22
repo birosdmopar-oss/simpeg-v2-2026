@@ -8,6 +8,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
+import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -39,6 +40,12 @@ const routes: RouteRecordRaw[] = [
     name: 'users',
     component: () => import('@/features/auth/views/UserManagementPage.vue'),
     meta: { roles: USER_MANAGEMENT_ROLES, title: 'Manajemen Akun' },
+  },
+  {
+    path: '/master/:entity?',
+    name: 'master-data',
+    component: () => import('@/features/master-data/views/MasterDataPage.vue'),
+    meta: { roles: MASTER_DATA_ROLES, title: 'Master Data' },
   },
   {
     path: '/403',
