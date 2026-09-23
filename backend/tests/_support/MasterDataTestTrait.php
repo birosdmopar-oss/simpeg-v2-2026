@@ -15,8 +15,8 @@ trait MasterDataTestTrait
 {
     /**
      * Fixture per master (key Config\MasterData) untuk G-TC generik.
-     *   new       : payload entri baru yang valid
-     *   duplicate : nama yang SUDAH ada di induk yang sama (seed MasterDataSeeder)
+     *   new       : payload entri baru yang valid (tanpa kode untuk master AUTO_INCREMENT)
+     *   duplicate : nama yang SUDAH ada di lingkup yang sama (induk / uniqueScope) di seed MasterDataSeeder
      *   existing  : kode entri seed (untuk update/status/delete)
      *   parent    : [field, id induk] atau null
      *
@@ -26,46 +26,46 @@ trait MasterDataTestTrait
     {
         return [
             'agama' => [
-                'new'       => ['id_agama' => '7', 'nama_agama' => 'Kepercayaan'],
+                'new'       => ['agama' => 'Kepercayaan'],
                 'duplicate' => 'islam',
                 'existing'  => '6',
                 'parent'    => null,
             ],
             'jenis-pegawai' => [
-                'new'       => ['id_jenis_pegawai' => 'CPNS', 'nama_jenis_pegawai' => 'Calon PNS'],
+                'new'       => ['jenis_pegawai' => 'Calon PNS'],
                 'duplicate' => 'Pegawai Tidak Tetap',
-                'existing'  => 'PTT',
+                'existing'  => '3',
                 'parent'    => null,
             ],
             'jenis-status' => [
-                'new'       => ['id_jenis_status' => 'CLTN', 'nama_jenis_status' => 'Cuti di Luar Tanggungan Negara'],
+                'new'       => ['jenis_status' => 'Cuti di Luar Tanggungan Negara', 'status_pegawai' => '2'],
                 'duplicate' => 'Pensiun',
-                'existing'  => 'PSN',
+                'existing'  => '3',
                 'parent'    => null,
             ],
             'provinsi' => [
-                'new'       => ['id_provinsi' => '33', 'nama_provinsi' => 'Jawa Tengah'],
+                'new'       => ['id_provinsi' => '33', 'provinsi' => 'Jawa Tengah'],
                 'duplicate' => 'JAWA BARAT',
                 'existing'  => '32',
                 'parent'    => null,
             ],
             'kabupaten-kota' => [
-                'new'       => ['id_kabupaten_kota' => '3173', 'id_provinsi' => '31', 'nama_kabupaten_kota' => 'Jakarta Barat'],
+                'new'       => ['id_kabupaten_kota' => '3173', 'id_provinsi' => '31', 'kabupaten_kota' => 'Jakarta Barat', 'kd_area' => '021'],
                 'duplicate' => 'Jakarta Utara',
                 'existing'  => '3172',
                 'parent'    => ['id_provinsi', '31'],
             ],
             'kecamatan' => [
-                'new'       => ['id_kecamatan' => '317103', 'id_kabupaten_kota' => '3171', 'nama_kecamatan' => 'Kemayoran'],
+                'new'       => ['id_kecamatan' => '3171030', 'id_kabupaten_kota' => '3171', 'kecamatan' => 'Kemayoran'],
                 'duplicate' => 'Sawah Besar',
-                'existing'  => '317102',
+                'existing'  => '3171020',
                 'parent'    => ['id_kabupaten_kota', '3171'],
             ],
             'kelurahan' => [
-                'new'       => ['id_kelurahan' => '3171011003', 'id_kecamatan' => '317101', 'nama_kelurahan' => 'Petojo Utara'],
+                'new'       => ['id_kelurahan' => '3171010003', 'id_kecamatan' => '3171010', 'kelurahan' => 'Petojo Utara', 'kd_pos' => '10130'],
                 'duplicate' => 'Cideng',
-                'existing'  => '3171011002',
-                'parent'    => ['id_kecamatan', '317101'],
+                'existing'  => '3171010002',
+                'parent'    => ['id_kecamatan', '3171010'],
             ],
         ];
     }

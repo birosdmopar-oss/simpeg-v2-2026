@@ -2,9 +2,10 @@
 /**
  * Halaman Master Data generik (Modul G, MTC-008/009) — role 1 saja. Daftar master & kolomnya dari GET /master/meta.
  * Fitur per master: cari, filter status, filter induk berjenjang, tabel urut `order`, toggle switch status,
- * badge Aktif (hijau)/Non-aktif (abu), naik/turun urutan (entri lain bergeser), tambah/edit, hapus (soft delete).
+ * badge Aktif (hijau)/Tidak Aktif (abu)/Dihapus (merah), naik/turun urutan (entri lain bergeser), tambah/edit,
+ * hapus (soft delete → status 10) dan pulihkan. Status mengikuti legacy (DBV-001): 1 / 2 / 10.
  */
-import { ArrowDown, ArrowUp, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -49,8 +50,17 @@ const { levels: filterLevels } = filterCascade
 
 /** Reorder via panah hanya bermakna saat daftar menampilkan satu kelompok induk utuh tanpa pencarian. */
 const canReorder = computed(
-  () => meta.value !== null && search.value.trim() === '' && statusFilter.value === '' && (!meta.value.parent || filterCascade.leafValue() !== ''),
+  () =>
+    meta.value !== null &&
+    meta.value.has_order &&
+    search.value.trim() === '' &&
+    statusFilter.value === '' &&
+    (!meta.value.parent || filterCascade.leafValue() !== ''),
 )
+
+function statusOf(row: MasterRow): string {
+  return String(row.status ?? '1')
+}
 
 function idOf(row: MasterRow): string {
   return meta.value ? String(row[meta.value.primary_key] ?? '') : ''
@@ -146,11 +156,27 @@ async function toggleStatus(row: MasterRow, active: boolean): Promise<void> {
   busyId.value = idOf(row)
   error.value = ''
   try {
-    const updated = await masterService.setStatus(meta.value.key, idOf(row), active ? '1' : '0')
+    const updated = await masterService.setStatus(meta.value.key, idOf(row), active ? '1' : '2')
     row.status = updated.status
     notice.value = active ? `"${nameOf(row)}" diaktifkan dan kembali muncul di dropdown.` : `"${nameOf(row)}" dinonaktifkan dan tidak lagi muncul di dropdown.`
   } catch (err) {
     error.value = isApiError(err) ? err.message : 'Gagal mengubah status.'
+  } finally {
+    busyId.value = ''
+  }
+}
+
+/** Pulihkan entri berstatus 10 (Dihapus) menjadi Aktif. */
+async function restore(row: MasterRow): Promise<void> {
+  if (!meta.value) return
+  busyId.value = idOf(row)
+  error.value = ''
+  try {
+    await masterService.setStatus(meta.value.key, idOf(row), '1')
+    notice.value = `"${nameOf(row)}" dipulihkan dan kembali aktif.`
+    await load()
+  } catch (err) {
+    error.value = isApiError(err) ? err.message : 'Gagal memulihkan data.'
   } finally {
     busyId.value = ''
   }
@@ -183,7 +209,7 @@ async function onConfirmDelete(): Promise<void> {
   confirm.value.loading = true
   try {
     await masterService.remove(meta.value.key, idOf(row))
-    notice.value = `"${nameOf(row)}" dihapus (dinonaktifkan). Data yang sudah memakainya tetap utuh.`
+    notice.value = `"${nameOf(row)}" dihapus. Data yang sudah memakainya tetap utuh; bisa dipulihkan lewat filter status Dihapus.`
     confirm.value.open = false
     await load()
   } catch (err) {
@@ -263,9 +289,10 @@ onMounted(() => {
             <option v-for="o in level.options" :key="o.id" :value="o.id">{{ o.nama }}</option>
           </select>
           <select v-model="statusFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm" aria-label="Filter status">
-            <option value="">Semua status</option>
+            <option value="">Aktif &amp; Tidak Aktif</option>
             <option value="1">Aktif</option>
-            <option value="0">Non-aktif</option>
+            <option value="2">Tidak Aktif</option>
+            <option value="10">Dihapus</option>
           </select>
         </div>
 
@@ -273,7 +300,7 @@ onMounted(() => {
           <table class="min-w-full text-sm">
             <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th class="w-16 px-4 py-3">Urutan</th>
+                <th v-if="meta.has_order" class="w-16 px-4 py-3">Urutan</th>
                 <th class="px-4 py-3">Kode</th>
                 <th class="px-4 py-3">{{ meta.name_label }}</th>
                 <th v-if="meta.parent" class="px-4 py-3">{{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'Induk' }}</th>
@@ -289,19 +316,20 @@ onMounted(() => {
                 <td colspan="6" class="px-4 py-8 text-center text-slate-500">Belum ada data yang cocok.</td>
               </tr>
               <tr v-for="(row, index) in items" v-else :key="idOf(row)" class="hover:bg-slate-50" :data-testid="`master-row-${idOf(row)}`">
-                <td class="px-4 py-3 text-slate-600">{{ row.order }}</td>
+                <td v-if="meta.has_order" class="px-4 py-3 text-slate-600">{{ row.order }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ idOf(row) }}</td>
                 <td class="px-4 py-3 font-medium text-slate-800">{{ nameOf(row) }}</td>
                 <td v-if="meta.parent" class="px-4 py-3 text-slate-600">{{ row.parent_nama ?? '—' }}</td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <StatusSwitch
-                      :checked="row.status === '1'"
+                      v-if="statusOf(row) !== '10'"
+                      :checked="statusOf(row) === '1'"
                       :disabled="busyId === idOf(row)"
                       :label="`Status ${nameOf(row)}`"
                       @toggle="toggleStatus(row, $event)"
                     />
-                    <StatusBadge :status="row.status" />
+                    <StatusBadge :status="row.status ?? '1'" />
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -326,6 +354,17 @@ onMounted(() => {
                         <ArrowDown class="h-4 w-4" />
                       </button>
                     </template>
+                    <button
+                      v-if="statusOf(row) === '10'"
+                      type="button"
+                      class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-green-700 disabled:opacity-40"
+                      title="Pulihkan"
+                      :disabled="busyId === idOf(row)"
+                      :data-testid="`master-restore-${idOf(row)}`"
+                      @click="restore(row)"
+                    >
+                      <RotateCcw class="h-4 w-4" />
+                    </button>
                     <button type="button" class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary" title="Edit" @click="openEdit(row)">
                       <Pencil class="h-4 w-4" />
                     </button>
@@ -333,7 +372,7 @@ onMounted(() => {
                       type="button"
                       class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-40"
                       title="Hapus"
-                      :disabled="row.status === '0'"
+                      :disabled="statusOf(row) === '10'"
                       @click="askDelete(row)"
                     >
                       <Trash2 class="h-4 w-4" />
@@ -345,7 +384,7 @@ onMounted(() => {
           </table>
         </div>
 
-        <p v-if="meta.parent && !canReorder && !search && !statusFilter" class="text-xs text-slate-500">
+        <p v-if="meta.has_order && meta.parent && !canReorder && !search && !statusFilter" class="text-xs text-slate-500">
           Pilih {{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'induk' }} untuk mengubah urutan (urutan berlaku per induk).
         </p>
 
@@ -364,7 +403,7 @@ onMounted(() => {
     <ConfirmDialog
       v-model:open="confirm.open"
       :title="`Hapus ${meta?.label ?? ''} &quot;${confirm.row ? nameOf(confirm.row) : ''}&quot;?`"
-      description="Data tidak dihapus permanen: statusnya menjadi Non-aktif sehingga hilang dari dropdown, sementara data pegawai/riwayat yang sudah memakainya tetap utuh. Bisa diaktifkan kembali lewat toggle status."
+      description="Data tidak dihapus permanen: statusnya menjadi Dihapus sehingga hilang dari daftar dan dropdown, sementara data pegawai/riwayat yang sudah memakainya tetap utuh. Bisa dipulihkan lewat filter status Dihapus."
       danger
       confirm-label="Hapus"
       :loading="confirm.loading"

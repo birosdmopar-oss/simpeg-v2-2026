@@ -55,7 +55,7 @@ final class RbacMasterEndpointsTest extends CIUnitTestCase
             ['POST', "api/v1/master/{$entity}", []],
             ['GET', "api/v1/master/{$entity}/{$existing}", []],
             ['PUT', "api/v1/master/{$entity}/{$existing}", []],
-            ['PATCH', "api/v1/master/{$entity}/{$existing}/status", ['status' => '0']],
+            ['PATCH', "api/v1/master/{$entity}/{$existing}/status", ['status' => '2']],
             ['PATCH', "api/v1/master/{$entity}/{$existing}/order", ['order' => 1]],
             ['DELETE', "api/v1/master/{$entity}/{$existing}", []],
         ];
@@ -97,7 +97,7 @@ final class RbacMasterEndpointsTest extends CIUnitTestCase
             $this->get("api/v1/master/{$entity}/{$fx['existing']}")->assertStatus(200);
             $this->sendJson('PUT', "api/v1/master/{$entity}/{$fx['existing']}", [$def->nameField => 'Nama Uji ' . $entity])->assertStatus(200);
             $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/order", ['order' => 1])->assertStatus(200);
-            $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/status", ['status' => '0'])->assertStatus(200);
+            $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/status", ['status' => '2'])->assertStatus(200);
             $this->delete("api/v1/master/{$entity}/{$fx['existing']}")->assertStatus(200);
         }
 

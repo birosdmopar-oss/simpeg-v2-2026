@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * Form tambah/edit master generik (Modul G) — Radix Vue Dialog + VeeValidate/Zod. Field dibangun dari metadata
- * master: kode (hanya saat tambah; kode tidak bisa diubah), induk (dropdown berjenjang), nama, urutan.
+ * master: kode (hanya saat tambah dan hanya master ber-kode manual; kode tidak bisa diubah), induk (dropdown
+ * berjenjang), nama, kolom tambahan legacy (kd_area, kd_pos, status_pegawai, ...), urutan.
  * Error 422 backend (keunikan kode/nama, induk non-aktif) dipetakan ke field.
  */
 import { toTypedSchema } from '@vee-validate/zod'
@@ -16,7 +17,7 @@ import FormField from '@/shared/components/FormField.vue'
 import { resolveAncestorPath, useCascadeOptions } from '../composables/useCascadeOptions'
 import { ancestorChain, buildMasterSchema } from '../schemas/master.schema'
 import { masterService } from '../services/master.service'
-import type { MasterFormValues, MasterMeta, MasterRow } from '../types'
+import type { MasterFieldMeta, MasterFormValues, MasterMeta, MasterRow } from '../types'
 
 const props = defineProps<{ open: boolean; meta: MasterMeta; allMeta: MasterMeta[]; row: MasterRow | null }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: MasterRow] }>()
@@ -47,10 +48,14 @@ watch(
     const initial: MasterFormValues = {
       [m.primary_key]: row ? String(row[m.primary_key] ?? '') : '',
       [m.name_field]: row ? String(row[m.name_field] ?? '') : '',
-      order: row ? String(row.order ?? '') : '',
+    }
+    if (m.has_order) initial.order = row ? String(row.order ?? '') : ''
+    for (const field of m.fields) {
+      initial[field.name] = row ? String(row[field.name] ?? '') : ''
     }
     if (m.parent) initial[m.parent.field] = row ? String(row[m.parent.field] ?? '') : ''
-    resetForm({ values: initial })
+    // errors: {} — schema baru (computed) memicu validasi ulang; form yang baru dibuka tidak boleh langsung merah.
+    resetForm({ values: initial, errors: {} })
 
     if (m.parent) {
       const directParent = row ? String(row[m.parent.field] ?? '') : ''
@@ -72,17 +77,25 @@ const onSubmit = handleSubmit(async (formValues) => {
   const m = props.meta
   const payload: Record<string, string | number> = { [m.name_field]: String(formValues[m.name_field] ?? '').trim() }
   if (m.parent) payload[m.parent.field] = String(formValues[m.parent.field] ?? '')
+  for (const field of m.fields) {
+    const value = String(formValues[field.name] ?? '').trim()
+    // Saat edit, kolom opsional yang dikosongkan tetap dikirim agar nilainya terhapus.
+    if (value !== '' || field.required || isEdit.value) payload[field.name] = value
+  }
+
   // Kirim urutan hanya kalau diubah: memindah posisi menggeser entri lain (tiap geseran teraudit).
-  const order = String(formValues.order ?? '').trim()
-  const originalOrder = props.row ? String(props.row.order ?? '') : ''
-  if (order !== '' && order !== originalOrder) payload.order = Number(order)
+  if (m.has_order) {
+    const order = String(formValues.order ?? '').trim()
+    const originalOrder = props.row ? String(props.row.order ?? '') : ''
+    if (order !== '' && order !== originalOrder) payload.order = Number(order)
+  }
 
   try {
     let saved: MasterRow
     if (isEdit.value) {
       saved = await masterService.update(m.key, rowId.value, payload)
     } else {
-      payload[m.primary_key] = String(formValues[m.primary_key] ?? '').trim()
+      if (!m.auto_increment) payload[m.primary_key] = String(formValues[m.primary_key] ?? '').trim()
       saved = await masterService.create(m.key, payload)
     }
     emit('saved', saved)
@@ -103,6 +116,22 @@ const onSubmit = handleSubmit(async (formValues) => {
   }
 })
 
+/** Pemetaan tipe field backend → tipe input FormField. */
+function fieldInputType(field: MasterFieldMeta): 'text' | 'number' | 'select' | 'date' | 'textarea' {
+  // Desimal (mis. koordinat) memakai input teks: input number menolak sebagian ketikan tanda minus.
+  if (field.type === 'int') return 'number'
+  if (field.type === 'select') return 'select'
+  if (field.type === 'date') return 'date'
+  if (field.type === 'textarea') return 'textarea'
+  return 'text'
+}
+
+const codeHint = computed(() =>
+  props.meta.id_digits !== null
+    ? `Tepat ${props.meta.id_digits} digit angka, tanpa titik (kode wilayah legacy).`
+    : `Maksimal ${props.meta.id_max_length} karakter, tanpa spasi.`,
+)
+
 const { levels } = cascade
 </script>
 
@@ -117,7 +146,13 @@ const { levels } = cascade
           <div>
             <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEdit ? `Edit ${meta.label}` : `Tambah ${meta.label}` }}</DialogTitle>
             <DialogDescription class="text-sm text-slate-500">
-              {{ isEdit ? `Kode ${rowId} (kode tidak dapat diubah)` : 'Kode tidak dapat diubah setelah disimpan.' }}
+              {{
+                isEdit
+                  ? `Kode ${rowId} (kode tidak dapat diubah)`
+                  : meta.auto_increment
+                    ? 'Kode dibuat otomatis oleh sistem.'
+                    : 'Kode tidak dapat diubah setelah disimpan.'
+              }}
             </DialogDescription>
           </div>
           <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
@@ -131,12 +166,12 @@ const { levels } = cascade
           </p>
 
           <FormField
-            v-if="!isEdit"
+            v-if="!isEdit && !meta.auto_increment"
             :model-value="values[meta.primary_key]"
             :name="meta.primary_key"
             label="Kode"
             required
-            :hint="`Maksimal ${meta.id_max_length} karakter, tanpa spasi.`"
+            :hint="codeHint"
             :error="errors[meta.primary_key]"
             @update:model-value="setFieldValue(meta.primary_key, $event)"
           />
@@ -168,6 +203,22 @@ const { levels } = cascade
           />
 
           <FormField
+            v-for="field in meta.fields"
+            :key="field.name"
+            :model-value="values[field.name]"
+            :name="field.name"
+            :label="field.label"
+            :type="fieldInputType(field)"
+            :required="field.required"
+            :options="field.options ?? []"
+            :placeholder="fieldInputType(field) === 'select' ? `Pilih ${field.label}` : undefined"
+            :hint="field.hint ?? ''"
+            :error="errors[field.name]"
+            @update:model-value="setFieldValue(field.name, $event)"
+          />
+
+          <FormField
+            v-if="meta.has_order"
             :model-value="values.order"
             name="order"
             label="Urutan tampil"
