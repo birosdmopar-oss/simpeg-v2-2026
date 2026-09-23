@@ -21,16 +21,17 @@ class MasterModel extends BaseAuditableModel
     public const STATUS_ACTIVE   = '1';
     public const STATUS_INACTIVE = '0';
 
-    protected $returnType       = 'array';
-    protected $useTimestamps    = false;
-    protected $useSoftDeletes   = false;
-    protected $useAutoIncrement = false;
+    protected $returnType     = 'array';
+    protected $useTimestamps  = false;
+    protected $useSoftDeletes = false;
 
     public function __construct(private MasterDefinition $definition, ?ConnectionInterface $db = null)
     {
         $this->table         = $definition->table;
         $this->primaryKey    = $definition->primaryKey;
         $this->allowedFields = $definition->columns();
+        // PK string yang diinput admin: matikan auto increment supaya CI4 mengirim kolom PK saat insert.
+        $this->useAutoIncrement = $definition->autoIncrement;
 
         parent::__construct($db);
     }

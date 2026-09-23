@@ -4,7 +4,7 @@
  * menu "Master Data" hanya role 1 (Modul G).
  * Tampilan menu = UX saja; backend tetap menegakkan RoleFilter (ADR-024).
  */
-import { Database, LogOut, Users, Home } from 'lucide-vue-next'
+import { CalendarDays, Database, HelpCircle, LogOut, Settings, Users, Home } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -62,6 +62,32 @@ async function logout(): Promise<void> {
             data-testid="nav-master-data"
           >
             <Database class="h-4 w-4" /> Master Data
+          </RouterLink>
+          <RouterLink
+            v-if="auth.canManageMasterData"
+            :to="{ name: 'hari-libur' }"
+            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100"
+            active-class="bg-slate-100 text-brand-primary font-medium"
+            data-testid="nav-hari-libur"
+          >
+            <CalendarDays class="h-4 w-4" /> Hari Libur
+          </RouterLink>
+          <RouterLink
+            v-if="auth.canManageMasterData"
+            :to="{ name: 'web-config' }"
+            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100"
+            active-class="bg-slate-100 text-brand-primary font-medium"
+            data-testid="nav-web-config"
+          >
+            <Settings class="h-4 w-4" /> Web Config
+          </RouterLink>
+          <RouterLink
+            :to="{ name: 'faq' }"
+            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100"
+            active-class="bg-slate-100 text-brand-primary font-medium"
+            data-testid="nav-faq"
+          >
+            <HelpCircle class="h-4 w-4" /> FAQ
           </RouterLink>
         </nav>
 

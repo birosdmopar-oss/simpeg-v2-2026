@@ -21,14 +21,18 @@ use App\Libraries\Auth\TurnstileVerifier;
 use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
+use App\Libraries\MasterData\HariLiburService;
 use App\Libraries\MasterData\MasterRegistry;
 use App\Libraries\MasterData\MasterService;
+use App\Libraries\MasterData\WebConfigService;
 use App\Libraries\Push\MockFcmAdapter;
 use App\Libraries\Siasn\MockSiasnAdapter;
 use App\Models\AuditLogModel;
 use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\LoginAttemptModel;
 use App\Models\Auth\PenggunaModel;
+use App\Models\MasterData\HariLiburModel;
+use App\Models\MasterData\WebConfigModel;
 use CodeIgniter\Config\BaseService;
 use RuntimeException;
 
@@ -174,6 +178,24 @@ class Services extends BaseService
         }
 
         return new MasterService(static::masterRegistry(), static::cacheService());
+    }
+
+    public static function hariLiburService(bool $getShared = true): HariLiburService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('hariLiburService');
+        }
+
+        return new HariLiburService(new HariLiburModel(), static::cacheService());
+    }
+
+    public static function webConfigService(bool $getShared = true): WebConfigService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('webConfigService');
+        }
+
+        return new WebConfigService(new WebConfigModel(), static::cacheService());
     }
 
     // ------------------------------------------------------------------

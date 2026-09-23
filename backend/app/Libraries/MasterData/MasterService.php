@@ -24,6 +24,10 @@ use Throwable;
  *  5. RBAC ditegakkan di routing (role 1; options = UL_ALL).
  *  6. Audit: seluruh tulis lewat MasterModel (BaseAuditableModel).
  *
+ * Mendukung dua bentuk kode: PK string yang diinput admin (wilayah `char(2..10)`, agama, dsb.) dan PK
+ * AUTO_INCREMENT sesuai DDL legacy (jabatan, unit, satker, pangkat, dsb.). Kolom tambahan per master
+ * (zonasi satker, radius lokasi presensi, affect_tukin konket, …) didefinisikan sebagai MasterField.
+ *
  * Semua penulisan dibungkus transaksi: pergeseran urutan + audit ikut rollback kalau gagal.
  */
 class MasterService
@@ -73,7 +77,7 @@ class MasterService
 
         $builder = $this->db->table($def->table);
 
-        if (isset($filters['status']) && in_array((string) $filters['status'], ['0', '1'], true)) {
+        if ($def->hasStatus && isset($filters['status']) && in_array((string) $filters['status'], ['0', '1'], true)) {
             $builder->where(MasterDefinition::STATUS_FIELD, (string) $filters['status']);
         }
 
@@ -83,7 +87,13 @@ class MasterService
 
         if (isset($filters['search']) && trim((string) $filters['search']) !== '') {
             $search = trim((string) $filters['search']);
-            $builder->groupStart()->like($def->nameField, $search)->orLike($def->primaryKey, $search)->groupEnd();
+            $builder->groupStart()->like($def->nameField, $search)->orLike($def->primaryKey, $search);
+
+            foreach ($def->extraSearch as $column) {
+                $builder->orLike($column, $search);
+            }
+
+            $builder->groupEnd();
         }
 
         $total = (clone $builder)->countAllResults();
@@ -92,9 +102,12 @@ class MasterService
             $builder->orderBy($def->parentField, 'ASC');
         }
 
+        if ($def->hasOrder) {
+            $builder->orderBy(MasterDefinition::ORDER_FIELD, 'ASC');
+        }
+
         /** @var list<array<string, mixed>> $rows */
         $rows = $builder
-            ->orderBy(MasterDefinition::ORDER_FIELD, 'ASC')
             ->orderBy($def->nameField, 'ASC')
             ->limit($perPage, ($page - 1) * $perPage)
             ->get()
@@ -129,18 +142,22 @@ class MasterService
 
         /** @var list<array{id: string, nama: string, parent: string|null}> $options */
         $options = $this->cache->remember($key, self::OPTIONS_TTL, function () use ($def, $parent): array {
-            $builder = $this->db->table($def->table)->where(MasterDefinition::STATUS_FIELD, MasterModel::STATUS_ACTIVE);
+            $builder = $this->db->table($def->table);
+
+            if ($def->hasStatus) {
+                $builder->where(MasterDefinition::STATUS_FIELD, MasterModel::STATUS_ACTIVE);
+            }
 
             if ($def->parentField !== null && $parent !== null) {
                 $builder->where($def->parentField, $parent);
             }
 
+            if ($def->hasOrder) {
+                $builder->orderBy(MasterDefinition::ORDER_FIELD, 'ASC');
+            }
+
             /** @var list<array<string, mixed>> $rows */
-            $rows = $builder
-                ->orderBy(MasterDefinition::ORDER_FIELD, 'ASC')
-                ->orderBy($def->nameField, 'ASC')
-                ->get()
-                ->getResultArray();
+            $rows = $builder->orderBy($def->nameField, 'ASC')->get()->getResultArray();
 
             return array_map(static fn (array $row): array => [
                 'id'     => (string) $row[$def->primaryKey],
@@ -157,7 +174,7 @@ class MasterService
     // ------------------------------------------------------------------
 
     /**
-     * @param array<string, mixed> $data kode (PK), nama, induk (kalau ada), order? (posisi 1..n), status?
+     * @param array<string, mixed> $data kode (kalau bukan auto increment), nama, induk, field tambahan, order?, status?
      *
      * @return array<string, mixed>
      */
@@ -167,12 +184,14 @@ class MasterService
         $name   = $this->normalizeName($data[$def->nameField] ?? '');
         $parent = $def->parentField !== null ? trim((string) ($data[$def->parentField] ?? '')) : null;
 
-        if (in_array(strtolower($id), self::RESERVED_IDS, true)) {
-            throw ValidationException::forField($def->primaryKey, 'Kode tidak boleh memakai kata yang dicadangkan sistem.');
-        }
+        if (! $def->autoIncrement) {
+            if (in_array(strtolower($id), self::RESERVED_IDS, true)) {
+                throw ValidationException::forField($def->primaryKey, 'Kode tidak boleh memakai kata yang dicadangkan sistem.');
+            }
 
-        if ($this->exists($def, $id)) {
-            throw ValidationException::forField($def->primaryKey, "Kode {$id} sudah dipakai.");
+            if ($this->exists($def, $id)) {
+                throw ValidationException::forField($def->primaryKey, "Kode {$id} sudah dipakai.");
+            }
         }
 
         if ($def->hasParent()) {
@@ -181,34 +200,54 @@ class MasterService
 
         $this->assertNameUnique($def, $name, $parent);
 
-        $this->transactional(function () use ($def, $id, $name, $parent, $data): void {
-            $row = [
-                $def->primaryKey               => $id,
-                $def->nameField                => $name,
-                MasterDefinition::ORDER_FIELD  => $this->nextOrder($def, $parent),
-                MasterDefinition::STATUS_FIELD => $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD] ?? MasterModel::STATUS_ACTIVE),
-            ];
+        $newId = $id;
+
+        $this->transactional(function () use ($def, $id, $name, $parent, $data, &$newId): void {
+            $row = [$def->nameField => $name];
+
+            if (! $def->autoIncrement) {
+                $row[$def->primaryKey] = $id;
+            }
 
             if ($def->parentField !== null) {
                 $row[$def->parentField] = $parent;
             }
 
-            $this->model($def)->insert($row);
+            foreach ($def->fields as $field) {
+                if (array_key_exists($field->name, $data)) {
+                    $row[$field->name] = $field->normalize($data[$field->name]);
+                }
+            }
 
-            if (isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
-                $this->placeAt($def, $id, (int) $data[MasterDefinition::ORDER_FIELD]);
+            if ($def->hasOrder) {
+                $row[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, $parent);
+            }
+
+            if ($def->hasStatus) {
+                $row[MasterDefinition::STATUS_FIELD] = $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD] ?? MasterModel::STATUS_ACTIVE);
+            }
+
+            $model = $this->model($def);
+            $model->insert($row);
+
+            if ($def->autoIncrement) {
+                $newId = (string) $model->getInsertID();
+            }
+
+            if ($def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
+                $this->placeAt($def, $newId, (int) $data[MasterDefinition::ORDER_FIELD]);
             }
         });
 
         $this->invalidate($def);
 
-        return $this->get($def, $id);
+        return $this->get($def, $newId);
     }
 
     /**
      * Kode (PK) tidak bisa diubah — dipakai sebagai referensi oleh data lain.
      *
-     * @param array<string, mixed> $data nama?, induk?, order?, status?
+     * @param array<string, mixed> $data nama?, induk?, field tambahan?, order?, status?
      *
      * @return array<string, mixed>
      */
@@ -245,7 +284,17 @@ class MasterService
             $this->assertNameUnique($def, $name, $parent, $id);
         }
 
-        if (array_key_exists(MasterDefinition::STATUS_FIELD, $data)) {
+        foreach ($def->fields as $field) {
+            if (array_key_exists($field->name, $data)) {
+                $value = $field->normalize($data[$field->name]);
+
+                if ((string) $value !== (string) ($current[$field->name] ?? '')) {
+                    $changes[$field->name] = $value;
+                }
+            }
+        }
+
+        if ($def->hasStatus && array_key_exists(MasterDefinition::STATUS_FIELD, $data)) {
             $status = $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD]);
 
             if ($status !== (string) $current[MasterDefinition::STATUS_FIELD]) {
@@ -254,7 +303,7 @@ class MasterService
         }
 
         $this->transactional(function () use ($def, $id, $current, $changes, $parentChanged, $data): void {
-            if ($parentChanged) {
+            if ($parentChanged && $def->hasOrder) {
                 // Pindah induk: taruh di akhir induk baru, rapikan urutan induk lama.
                 $changes[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, (string) $changes[$def->parentField]);
             }
@@ -263,11 +312,11 @@ class MasterService
                 $this->model($def)->update($id, $changes);
             }
 
-            if ($parentChanged && $def->parentField !== null) {
+            if ($parentChanged && $def->parentField !== null && $def->hasOrder) {
                 $this->renumber($def, (string) $current[$def->parentField]);
             }
 
-            if (isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
+            if ($def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
                 $this->placeAt($def, $id, (int) $data[MasterDefinition::ORDER_FIELD]);
             }
         });
@@ -285,7 +334,8 @@ class MasterService
     public function setStatus(MasterDefinition $def, string $id, string $status): array
     {
         $current = $this->findOrFail($def, $id);
-        $status  = $this->normalizeStatus($status);
+        $this->assertHasStatus($def);
+        $status = $this->normalizeStatus($status);
 
         if ((string) $current[MasterDefinition::STATUS_FIELD] !== $status) {
             $this->model($def)->update($id, [MasterDefinition::STATUS_FIELD => $status]);
@@ -303,6 +353,7 @@ class MasterService
     public function delete(MasterDefinition $def, string $id): array
     {
         $current = $this->findOrFail($def, $id);
+        $this->assertHasStatus($def);
 
         if ((string) $current[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_INACTIVE) {
             $this->model($def)->softDelete($id);
@@ -320,6 +371,10 @@ class MasterService
     public function reorder(MasterDefinition $def, string $id, int $position): array
     {
         $this->findOrFail($def, $id);
+
+        if (! $def->hasOrder) {
+            throw new ValidationException("{$def->label} tidak memakai urutan tampil.");
+        }
 
         $this->transactional(function () use ($def, $id, $position): void {
             $this->placeAt($def, $id, $position);
@@ -442,6 +497,13 @@ class MasterService
         return $this->db->table($def->table)->where($def->primaryKey, $id)->countAllResults() > 0;
     }
 
+    private function assertHasStatus(MasterDefinition $def): void
+    {
+        if (! $def->hasStatus) {
+            throw new ValidationException("{$def->label} tidak memakai kolom status.");
+        }
+    }
+
     /**
      * Induk wajib ada dan aktif (entri baru tidak boleh digantung di induk yang sudah non-aktif).
      */
@@ -460,7 +522,7 @@ class MasterService
             throw ValidationException::forField($def->parentField, "{$parentDef->label} tidak ditemukan.");
         }
 
-        if ((string) $parent[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_ACTIVE) {
+        if ($parentDef->hasStatus && (string) $parent[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_ACTIVE) {
             throw ValidationException::forField($def->parentField, "{$parentDef->label} {$parent[$parentDef->nameField]} sedang non-aktif.");
         }
     }
@@ -488,7 +550,7 @@ class MasterService
             return;
         }
 
-        $hint = (string) $duplicate[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_INACTIVE
+        $hint = $def->hasStatus && (string) $duplicate[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_INACTIVE
             ? ' (non-aktif — aktifkan kembali entri tersebut)'
             : '';
 
