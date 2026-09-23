@@ -49,7 +49,12 @@ const { levels: filterLevels } = filterCascade
 
 /** Reorder via panah hanya bermakna saat daftar menampilkan satu kelompok induk utuh tanpa pencarian. */
 const canReorder = computed(
-  () => meta.value !== null && search.value.trim() === '' && statusFilter.value === '' && (!meta.value.parent || filterCascade.leafValue() !== ''),
+  () =>
+    meta.value !== null &&
+    meta.value.has_order &&
+    search.value.trim() === '' &&
+    statusFilter.value === '' &&
+    (!meta.value.parent || filterCascade.leafValue() !== ''),
 )
 
 function idOf(row: MasterRow): string {
@@ -273,7 +278,7 @@ onMounted(() => {
           <table class="min-w-full text-sm">
             <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th class="w-16 px-4 py-3">Urutan</th>
+                <th v-if="meta.has_order" class="w-16 px-4 py-3">Urutan</th>
                 <th class="px-4 py-3">Kode</th>
                 <th class="px-4 py-3">{{ meta.name_label }}</th>
                 <th v-if="meta.parent" class="px-4 py-3">{{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'Induk' }}</th>
@@ -289,7 +294,7 @@ onMounted(() => {
                 <td colspan="6" class="px-4 py-8 text-center text-slate-500">Belum ada data yang cocok.</td>
               </tr>
               <tr v-for="(row, index) in items" v-else :key="idOf(row)" class="hover:bg-slate-50" :data-testid="`master-row-${idOf(row)}`">
-                <td class="px-4 py-3 text-slate-600">{{ row.order }}</td>
+                <td v-if="meta.has_order" class="px-4 py-3 text-slate-600">{{ row.order }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ idOf(row) }}</td>
                 <td class="px-4 py-3 font-medium text-slate-800">{{ nameOf(row) }}</td>
                 <td v-if="meta.parent" class="px-4 py-3 text-slate-600">{{ row.parent_nama ?? '—' }}</td>
@@ -301,7 +306,7 @@ onMounted(() => {
                       :label="`Status ${nameOf(row)}`"
                       @toggle="toggleStatus(row, $event)"
                     />
-                    <StatusBadge :status="row.status" />
+                    <StatusBadge :status="row.status ?? '1'" />
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -345,7 +350,7 @@ onMounted(() => {
           </table>
         </div>
 
-        <p v-if="meta.parent && !canReorder && !search && !statusFilter" class="text-xs text-slate-500">
+        <p v-if="meta.has_order && meta.parent && !canReorder && !search && !statusFilter" class="text-xs text-slate-500">
           Pilih {{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'induk' }} untuk mengubah urutan (urutan berlaku per induk).
         </p>
 

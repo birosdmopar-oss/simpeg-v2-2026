@@ -95,8 +95,12 @@ final class RbacMasterEndpointsTest extends CIUnitTestCase
             $this->get("api/v1/master/{$entity}")->assertStatus(200);
             $this->sendJson('POST', "api/v1/master/{$entity}", $fx['new'])->assertStatus(201);
             $this->get("api/v1/master/{$entity}/{$fx['existing']}")->assertStatus(200);
-            $this->sendJson('PUT', "api/v1/master/{$entity}/{$fx['existing']}", [$def->nameField => 'Nama Uji ' . $entity])->assertStatus(200);
-            $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/order", ['order' => 1])->assertStatus(200);
+            $rename = self::renamedValue($def, (string) $fx['new'][$def->nameField]);
+            $this->sendJson('PUT', "api/v1/master/{$entity}/{$fx['existing']}", [$def->nameField => $rename])->assertStatus(200);
+
+            // Master tanpa kolom `order` (mis. pemetaan pegawai↔lokasi) menolak reorder dengan 422, bukan 403.
+            $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/order", ['order' => 1])
+                ->assertStatus($def->hasOrder ? 200 : 422);
             $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/status", ['status' => '0'])->assertStatus(200);
             $this->delete("api/v1/master/{$entity}/{$fx['existing']}")->assertStatus(200);
         }

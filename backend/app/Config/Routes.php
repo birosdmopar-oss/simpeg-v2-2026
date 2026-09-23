@@ -54,6 +54,26 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
 
         $routes->get('meta', 'MetaController::index', $superAdmin);
 
+        // G-08 hari libur (service khusus: validasi rentang & overlap). `calendar` terbuka untuk UL_ALL.
+        $routes->get('hari-libur/calendar', 'HariLiburController::calendar', ['filter' => 'jwt']);
+        $routes->group('hari-libur', $superAdmin, static function (RouteCollection $routes): void {
+            $routes->get('/', 'HariLiburController::liburIndex');
+            $routes->post('/', 'HariLiburController::liburCreate');
+            $routes->get('(:num)', 'HariLiburController::liburShow/$1');
+            $routes->put('(:num)', 'HariLiburController::liburUpdate/$1');
+            $routes->patch('(:num)/status', 'HariLiburController::liburSetStatus/$1');
+            $routes->delete('(:num)', 'HariLiburController::liburDelete/$1');
+        });
+
+        // G-09 web config (key-value bertipe; key dipakai sebagai path)
+        $routes->group('web-config', $superAdmin, static function (RouteCollection $routes): void {
+            $routes->get('/', 'WebConfigController::index');
+            $routes->post('/', 'WebConfigController::create');
+            $routes->get('(:segment)', 'WebConfigController::show/$1');
+            $routes->put('(:segment)', 'WebConfigController::update/$1');
+            $routes->delete('(:segment)', 'WebConfigController::delete/$1');
+        });
+
         foreach (config(MasterDataConfig::class)->entities as $key => $entity) {
             $c = $entity['controller'];
 
@@ -70,6 +90,14 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
                 $routes->delete('(:segment)', "{$c}::delete/{$key}/\$1");
             });
         }
+    });
+
+    // ------------------------------------------------------------------
+    // G-10 — FAQ view untuk pegawai (UL_ALL, hanya konten published). Kelola konten: master/faq-* (role 1).
+    // ------------------------------------------------------------------
+    $routes->group('faq', ['namespace' => 'App\Controllers\Api\MasterData', 'filter' => 'jwt'], static function (RouteCollection $routes): void {
+        $routes->get('/', 'FaqController::publicIndex');
+        $routes->get('(:segment)', 'FaqController::publicShow/$1');
     });
 
     // ------------------------------------------------------------------

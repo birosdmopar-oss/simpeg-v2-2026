@@ -9,7 +9,7 @@ const props = withDefaults(
   defineProps<{
     label: string
     modelValue: string | number | null | undefined
-    type?: 'text' | 'password' | 'select' | 'number'
+    type?: 'text' | 'password' | 'select' | 'number' | 'date' | 'textarea'
     placeholder?: string
     error?: string
     hint?: string
@@ -34,7 +34,7 @@ const inputClass = computed(() => [
 ])
 
 function onInput(event: Event): void {
-  emit('update:modelValue', (event.target as HTMLInputElement | HTMLSelectElement).value)
+  emit('update:modelValue', (event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value)
 }
 </script>
 
@@ -58,6 +58,21 @@ function onInput(event: Event): void {
       <option value="" disabled>{{ placeholder || 'Pilih...' }}</option>
       <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
     </select>
+
+    <textarea
+      v-else-if="type === 'textarea'"
+      :id="id"
+      :name="name"
+      :value="String(modelValue ?? '')"
+      :placeholder="placeholder"
+      :class="inputClass"
+      :disabled="disabled"
+      rows="3"
+      :aria-invalid="Boolean(error)"
+      :aria-describedby="error ? `${id}-error` : undefined"
+      @input="onInput"
+      @blur="emit('blur')"
+    />
 
     <div v-else class="relative">
       <input

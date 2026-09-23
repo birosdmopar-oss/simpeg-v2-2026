@@ -15,6 +15,10 @@ const meta = (key: string, pk: string, name: string, parent: MasterMeta['parent'
   name_label: `Nama ${key}`,
   name_max_length: 100,
   parent,
+  auto_increment: false,
+  has_order: true,
+  has_status: true,
+  fields: [],
 })
 
 const provinsi = meta('provinsi', 'id_provinsi', 'nama_provinsi')

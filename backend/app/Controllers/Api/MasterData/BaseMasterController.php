@@ -104,9 +104,10 @@ abstract class BaseMasterController extends ApiController
     }
 
     /**
-     * Rules validasi bentuk (CI4). Aturan bisnis (keunikan, induk aktif) ada di MasterService.
+     * Rules validasi bentuk (CI4) + pesan berbahasa Indonesia. Aturan bisnis (keunikan, induk aktif,
+     * overlap tanggal) ada di service masing-masing.
      *
-     * @return array<string, string>
+     * @return array<string, array<string, mixed>|string>
      */
     protected function rules(MasterDefinition $def, bool $creating): array
     {
@@ -114,18 +115,54 @@ abstract class BaseMasterController extends ApiController
         $required = $creating ? 'required' : 'if_exist|required';
         $rules    = [];
 
-        if ($creating) {
+        // Kode diinput admin hanya untuk master ber-PK string; PK AUTO_INCREMENT diberikan DB.
+        if ($creating && ! $def->autoIncrement) {
             // Kode: huruf/angka/titik/strip/garis bawah, tanpa spasi.
-            $rules[$def->primaryKey] = "required|max_length[{$def->idMaxLength}]|regex_match[/^[A-Za-z0-9._-]+$/]";
+            $rules[$def->primaryKey] = [
+                'rules'  => "required|max_length[{$def->idMaxLength}]|regex_match[/^[A-Za-z0-9._-]+$/]",
+                'errors' => [
+                    'required'    => 'Kode wajib diisi.',
+                    'max_length'  => "Kode maksimal {$def->idMaxLength} karakter.",
+                    'regex_match' => 'Kode hanya boleh huruf, angka, titik, strip, atau garis bawah (tanpa spasi).',
+                ],
+            ];
         }
 
         if ($def->parentField !== null) {
-            $rules[$def->parentField] = "{$required}|max_length[{$def->idMaxLength}]";
+            $rules[$def->parentField] = [
+                'rules'  => "{$required}|max_length[{$def->idMaxLength}]",
+                'errors' => ['required' => 'Induk wajib dipilih.'],
+            ];
         }
 
-        $rules[$def->nameField]                = "{$required}|string|max_length[{$def->nameMaxLength}]";
-        $rules[MasterDefinition::ORDER_FIELD]  = 'permit_empty|is_natural_no_zero';
-        $rules[MasterDefinition::STATUS_FIELD] = 'permit_empty|in_list[0,1]';
+        $rules[$def->nameField] = [
+            'rules'  => "{$required}|string|max_length[{$def->nameMaxLength}]",
+            'errors' => [
+                'required'   => "{$def->nameLabel} wajib diisi.",
+                'max_length' => "{$def->nameLabel} maksimal {$def->nameMaxLength} karakter.",
+            ],
+        ];
+
+        foreach ($def->fields as $field) {
+            $rules[$field->name] = [
+                'rules'  => $field->validationRules($creating),
+                'errors' => $field->validationMessages(),
+            ];
+        }
+
+        if ($def->hasOrder) {
+            $rules[MasterDefinition::ORDER_FIELD] = [
+                'rules'  => 'permit_empty|is_natural_no_zero',
+                'errors' => ['is_natural_no_zero' => 'Urutan harus bilangan bulat minimal 1.'],
+            ];
+        }
+
+        if ($def->hasStatus) {
+            $rules[MasterDefinition::STATUS_FIELD] = [
+                'rules'  => 'permit_empty|in_list[0,1]',
+                'errors' => ['in_list' => "Status hanya boleh '1' (aktif) atau '0' (non-aktif)."],
+            ];
+        }
 
         return $rules;
     }

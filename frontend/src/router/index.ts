@@ -48,6 +48,24 @@ const routes: RouteRecordRaw[] = [
     meta: { roles: MASTER_DATA_ROLES, title: 'Master Data' },
   },
   {
+    path: '/master-data/hari-libur',
+    name: 'hari-libur',
+    component: () => import('@/features/master-data/views/HariLiburPage.vue'),
+    meta: { roles: MASTER_DATA_ROLES, title: 'Hari Libur' },
+  },
+  {
+    path: '/master-data/web-config',
+    name: 'web-config',
+    component: () => import('@/features/master-data/views/WebConfigPage.vue'),
+    meta: { roles: MASTER_DATA_ROLES, title: 'Web Config' },
+  },
+  {
+    path: '/faq',
+    name: 'faq',
+    component: () => import('@/features/master-data/views/FaqPage.vue'),
+    meta: { title: 'FAQ' },
+  },
+  {
     path: '/403',
     name: 'forbidden',
     component: () => import('@/shared/views/ForbiddenView.vue'),

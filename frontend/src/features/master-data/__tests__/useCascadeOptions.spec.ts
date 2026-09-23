@@ -22,6 +22,10 @@ const meta = (key: string, parent: MasterMeta['parent'] = null): MasterMeta => (
   name_label: key,
   name_max_length: 100,
   parent,
+  auto_increment: false,
+  has_order: true,
+  has_status: true,
+  fields: [],
 })
 
 const chain = [
