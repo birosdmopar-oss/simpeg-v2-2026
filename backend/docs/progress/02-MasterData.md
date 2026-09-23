@@ -8,7 +8,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 
 | Task | Status | Ringkas |
 |---|---|---|
-| G-01 Migration tabel master | **IN_PROGRESS** | Batch 1 (7 tabel Tier 0) ditulis, jalan di lokal/test; menunggu DB Validator + DDL legacy |
+| G-01 Migration tabel master | **IN_PROGRESS** | Batch 1 (7 tabel Tier 0) **disetujui DB Validator 23-09-2026** (boleh jalan di Dev); sisa ~38 tabel menunggu DDL legacy |
 | G-02 Jabatan, Unit & Satker | TODO (blocked) | Butuh DDL `jabatan` (5 FK di legacy), `kelas_jabatan`, `peta_jabatan` |
 | G-03 Lokasi Presensi | TODO (blocked) | Kolom `lokasi_presensi` ada di seed; `user_lokasi_presensi` butuh `pegawai` (Fase 3) + `dm_user_lokasi_presensi` |
 | G-04 Kenaikan Pangkat | TODO (blocked) | `gol_pppk` legacy memuat nominal uang makan — tidak ada di seed |
@@ -28,7 +28,8 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - Dijalankan HANYA di DB lokal (`simpeg_v2`) & test (`simpeg_v2_testing`).
 
 **Belum**
-- Approval DB Validator (Keputusan #1–#8).
+- ~~Approval DB Validator~~ → Batch 1 **DISETUJUI** 23-09-2026 (Keputusan #1, #3, #5 terisi). Keputusan #2, #4, #9 **ditunda sampai seluruh Fase 2 selesai**; #6, #7, #8 masih menunggu DDL legacy.
+- Wajib sebelum impor data master legacy: panjang kode wilayah, UNIQUE index nama, collation (G-01 Bagian 6 → Trello ISSUE).
 - ~38 tabel Tier 0/1 sisanya — menunggu hasil `mysqldump --no-data simpeg01 …` (ISSUE-003).
 - Berhenti di: menunggu DDL. Langkah berikut: tulis migration per grup (G-02..G-10) mengikuti DDL legacy, tambah entri di `Config\MasterData`.
 
