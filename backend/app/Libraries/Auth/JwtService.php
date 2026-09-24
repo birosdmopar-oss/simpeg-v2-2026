@@ -7,6 +7,7 @@ namespace App\Libraries\Auth;
 use App\Exceptions\AuthException;
 use App\Models\Auth\TokenModel;
 use CodeIgniter\Cookie\Cookie;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use Config\Jwt as JwtConfig;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWT;
@@ -176,6 +177,7 @@ class JwtService
      * @return array{access_token: string, refresh_token: string, access_expires_at: int, refresh_expires_at: int}
      *
      * @throws AuthException
+     * @throws DatabaseException error DB (bukan reuse) — rotasi di-rollback, token lama tetap berlaku
      */
     public function refresh(string $refreshToken): array
     {
@@ -186,11 +188,7 @@ class JwtService
         }
 
         if ((int) $row['revoked'] === 1) {
-            // Reuse detection (A-05): token yang sudah dipakai/dicabut dipakai lagi → indikasi pencurian token.
-            // Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut.
-            $this->tokens->revokeAllForNip((string) $row['nip'], $this->now());
-
-            throw AuthException::reusedToken();
+            $this->handleReuse((string) $row['nip']);
         }
 
         if (strtotime((string) $row['expires_at']) <= $this->now()) {
@@ -199,13 +197,23 @@ class JwtService
             throw AuthException::expiredToken();
         }
 
-        // Invalidasi token lama SEBELUM menerbitkan yang baru (single-use).
-        $this->tokens->revoke((int) $row['id'], $this->now());
-
         /** @var array<string, mixed> $claims */
         $claims = json_decode((string) $row['claims_json'], true, 512, JSON_THROW_ON_ERROR);
 
-        return $this->issueTokenPair($claims);
+        $pair = $this->rotate((int) $row['id'], $claims);
+
+        if ($pair !== null) {
+            return $pair;
+        }
+
+        // Kalah race (affected rows 0). Transaksi sudah di-rollback, jadi baca ulang melihat data ter-commit terbaru.
+        // Baris hilang = token dihapus logout di antara SELECT dan UPDATE → sama dengan jalur berurutan
+        // (unknownToken), bukan reuse. Baris masih ada = sudah dicabut request lain → reuse.
+        if ($this->tokens->find((int) $row['id']) === null) {
+            throw AuthException::unknownToken();
+        }
+
+        $this->handleReuse((string) $row['nip']);
     }
 
     /**
@@ -287,5 +295,82 @@ class JwtService
         if (! isset($claims['sub']) || (string) $claims['sub'] === '' || ! isset($claims['role'])) {
             throw new InvalidArgumentException("Claims wajib berisi 'sub' (nip) dan 'role'.");
         }
+    }
+
+    /**
+     * Rotasi atomik (DEV-002 Bagian 8 #1): cabut token lama lalu terbitkan pasangan baru dalam SATU transaksi.
+     * Mengembalikan null bila kalah race (affected rows 0); transaksinya sudah di-rollback.
+     *
+     * Cek revoked di refresh() hanya jalur cepat; UPDATE bersyarat revoked=0 yang menentukan pemenang. Lock baris
+     * token lama dari UPDATE itu ditahan sampai token baru ter-commit, sehingga UPDATE request paralel yang kalah
+     * menunggu lock, lalu mendapat affected rows 0 dan baru menjalankan reuse detection SETELAH token baru pemenang
+     * ada — revokeAllForNip ikut mencabutnya. Tanpa transaksi, pencabutan massal pihak kalah bisa jatuh di antara
+     * UPDATE dan INSERT pemenang sehingga sesi pemenang lolos.
+     *
+     * Query gagal di dalam transaksi CI4 tidak melempar exception (apa pun DBDebug-nya), hanya mengembalikan false
+     * dan menandai transStatus, sedangkan transCommit() tidak memeriksa transStatus. Karena itu transStatus dicek
+     * eksplisit sebelum commit.
+     *
+     * @param array<string, mixed> $claims
+     *
+     * @return array{access_token: string, refresh_token: string, access_expires_at: int, refresh_expires_at: int}|null
+     *
+     * @throws DatabaseException penulisan/commit gagal; transaksi di-rollback, token lama tetap berlaku
+     */
+    private function rotate(int $tokenId, array $claims): ?array
+    {
+        $db    = $this->tokens->connection();
+        $depth = $db->transDepth;
+
+        if ($depth === 0) {
+            // Status gagal sisa transaksi lain di koneksi bersama tidak boleh menggagalkan rotasi ini.
+            $db->resetTransStatus();
+        }
+
+        if (! $db->transBegin()) {
+            throw new DatabaseException('Gagal memulai transaksi rotasi refresh token.');
+        }
+
+        try {
+            if (! $this->tokens->revoke($tokenId, $this->now())) {
+                $db->transRollback();
+                $pair = null;
+            } else {
+                $pair = $this->issueTokenPair($claims);
+
+                if ($db->transStatus() === false) {
+                    throw new DatabaseException('Rotasi refresh token gagal: penulisan token baru gagal.');
+                }
+
+                if (! $db->transCommit()) {
+                    throw new DatabaseException('Rotasi refresh token gagal di-commit.');
+                }
+            }
+        } catch (Throwable $e) {
+            if ($db->transDepth > $depth) {
+                $db->transRollback();
+            }
+
+            if ($depth === 0) {
+                $db->resetTransStatus();
+            }
+
+            throw $e;
+        }
+
+        return $pair;
+    }
+
+    /**
+     * Reuse detection (A-05): token yang sudah dipakai/dicabut dipakai lagi → indikasi pencurian token.
+     * Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut.
+     *
+     * @throws AuthException selalu (reusedToken → 401)
+     */
+    private function handleReuse(string $nip): never
+    {
+        $this->tokens->revokeAllForNip($nip, $this->now());
+
+        throw AuthException::reusedToken();
     }
 }
