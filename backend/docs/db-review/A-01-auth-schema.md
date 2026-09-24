@@ -119,3 +119,5 @@ Divalidasi 21-09-2026 di lokal (MariaDB 10.4, `simpeg_v2` + `simpeg_v2_testing`)
 | 12 | Tidak ada purge `login_attempts`, `forgot_attempts`, `token` | lintas | Job purge + kebijakan retensi |
 | 13 | Lockout hanya per username (bisa dipakai mengunci akun orang lain), tanpa limit per IP | A-04 | Putuskan kebijakan |
 | 14 | Validasi hanya di MariaDB 10.4 lokal | lintas | Ulangi validasi di MySQL 8 |
+
+> **Pengecualian F0-04 (disetujui reviewer CR, 24-09-2026, CR-005):** audit reset password bersifat **fail-closed** — bila INSERT `audit_logs` gagal, seluruh transaksi reset dibatalkan (HTTP 500, password tidak berubah, token reset tetap berlaku). Alasan: ganti password tanpa jejak audit adalah celah keamanan, dan di dalam transaksi kegagalan audit tidak bisa dibedakan dari transaksi yang sudah di-rollback server. Jalur lain tetap fail-open sesuai F0-04.
