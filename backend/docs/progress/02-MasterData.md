@@ -2,13 +2,13 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `02-MasterData.md`.
 
-**Terakhir diperbarui:** 23 September 2026 (DBV-001)
+**Terakhir diperbarui:** 24 September 2026 (DBV-001 disetujui & di-merge)
 **Entry criteria:** Fase 1 sign-off dikonfirmasi user (21 Sep 2026).
 **Blocker utama:** DDL legacy 13 tabel Tier 0/1 belum ada → Trello **ISSUE-003**. Keputusan skema → `backend/docs/db-review/G-01-master-schema.md` Bagian 4.
 
 | Task | Status | Ringkas |
 |---|---|---|
-| G-01 Migration tabel master | **IN_PROGRESS** | Batch 1 (7 tabel Tier 0) **disetujui DB Validator 23-09-2026**; revisi ke skema legacy **DBV-001 menunggu approval** (G-01 Bagian 8); sisa ~38 tabel menunggu DDL legacy |
+| G-01 Migration tabel master | **IN_PROGRESS** | Batch 1 (7 tabel Tier 0) **disetujui DB Validator 23-09-2026**; revisi ke skema legacy **DBV-001 disetujui 24-09-2026 & sudah di main** (G-01 Bagian 8); sisa ~38 tabel menunggu DDL legacy |
 | G-02 Jabatan, Unit & Satker | TODO (blocked) | Butuh DDL `jabatan` (5 FK di legacy), `kelas_jabatan`, `peta_jabatan` |
 | G-03 Lokasi Presensi | TODO (blocked) | Kolom `lokasi_presensi` ada di seed; `user_lokasi_presensi` butuh `pegawai` (Fase 3) + `dm_user_lokasi_presensi` |
 | G-04 Kenaikan Pangkat | TODO (blocked) | `gol_pppk` legacy memuat nominal uang makan — tidak ada di seed |
@@ -26,11 +26,11 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - `app/Database/Migrations/2026-09-22-000002_CreateReferensiUmum.php` — agama, jenis_pegawai, jenis_status.
 - Dokumen review DB Validator: `backend/docs/db-review/G-01-master-schema.md`.
 - Dijalankan HANYA di DB lokal (`simpeg_v2`) & test (`simpeg_v2_testing`).
-- **DBV-001** `app/Database/Migrations/2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` — ALTER ke skema legacy (nama/tipe kolom legacy, status 1/2/10, kolom audit, `utf8mb4_unicode_ci`, UNIQUE nama, kode wilayah CHAR(2/4/7/10)). ⏳ Menunggu approval DB Validator — **jangan jalankan di Dev**. Menyelesaikan ISSUE-008/009/010 untuk 7 tabel ini.
+- **DBV-001** `app/Database/Migrations/2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` — ALTER ke skema legacy (nama/tipe kolom legacy, status 1/2/10, kolom audit, `utf8mb4_unicode_ci`, UNIQUE nama, kode wilayah CHAR(2/4/7/10)). ✅ Disetujui DB Validator 24-09-2026 (PR #4, merge `633dbb0`); jalankan hanya saat ketujuh tabel kosong. Menyelesaikan ISSUE-008/009/010 untuk 7 tabel ini (sisa di luar tabel ini tetap dilacak di kartu masing-masing).
 
 **Belum**
-- ~~Approval DB Validator~~ → Batch 1 **DISETUJUI** 23-09-2026 (Keputusan #1, #3, #5 terisi). Keputusan #2, #4, #9 ditunda sampai seluruh Fase 2 selesai → **dikerjakan lebih awal di DBV-001** atas keputusan user 23-09-2026 (menunggu approval, G-01 Bagian 8.5; #3 dibalik); #6, #7, #8 masih menunggu DDL legacy.
-- Wajib sebelum impor data master legacy: ~~panjang kode wilayah, UNIQUE index nama, collation~~ → dikerjakan di DBV-001 (menunggu approval); tersisa strict mode koneksi (A-01) + audit duplikat data legacy + pencocokan nilai dugaan dengan dump struktur produksi (G-01 Bagian 8.3).
+- ~~Approval DB Validator~~ → Batch 1 **DISETUJUI** 23-09-2026 (Keputusan #1, #3, #5 terisi). Keputusan #2, #4, #9 ditunda sampai seluruh Fase 2 selesai → **dikerjakan lebih awal di DBV-001** atas keputusan user 23-09-2026 (✅ disetujui 24-09-2026, G-01 Bagian 8.5; #3 dibalik); #6, #7, #8 masih menunggu DDL legacy.
+- Wajib sebelum impor data master legacy: ~~panjang kode wilayah, UNIQUE index nama, collation~~ → dikerjakan di DBV-001 (✅ disetujui 24-09-2026); tersisa strict mode koneksi (A-01) + audit duplikat data legacy + pencocokan nilai dugaan dengan dump struktur produksi (G-01 Bagian 8.3).
 - ~38 tabel Tier 0/1 sisanya — menunggu hasil `mysqldump --no-data simpeg01 …` (ISSUE-003).
 - Berhenti di: menunggu DDL. Langkah berikut: tulis migration per grup (G-02..G-10) mengikuti DDL legacy, tambah entri di `Config\MasterData`.
 
