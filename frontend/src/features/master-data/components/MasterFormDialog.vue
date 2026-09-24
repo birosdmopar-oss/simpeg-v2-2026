@@ -33,11 +33,30 @@ const schema = computed(
   () => toTypedSchema(buildMasterSchema(props.meta, isEdit.value)) as unknown as TypedSchema<MasterFormValues>,
 )
 
-const { values, handleSubmit, errors, resetForm, setFieldError, setFieldValue } = useForm<MasterFormValues>({
+const { values, handleSubmit, errors, resetForm, setFieldError, setFieldValue, submitCount } = useForm<MasterFormValues>({
   validationSchema: schema,
 })
 
+/**
+ * Field di form ini tidak didaftarkan lewat useField, sehingga validasi "silent" vee-validate setelah resetForm tetap
+ * mengisi `errors` untuk semua field (form baru langsung merah). Pesan hanya ditampilkan untuk field yang sudah
+ * diisi/diubah pengguna, atau setelah form dikirim (termasuk error 422 dari backend).
+ */
+const interacted = ref(new Set<string>())
+
+function fieldError(field: string): string | undefined {
+  return submitCount.value > 0 || interacted.value.has(field) ? errors.value[field] : undefined
+}
+
+function updateField(field: string, value: string): void {
+  interacted.value.add(field)
+  setFieldValue(field, value)
+}
+
 const rowId = computed(() => (props.row ? String(props.row[props.meta.primary_key] ?? '') : ''))
+
+/** Entri berstatus 10 (Dihapus) tidak punya urutan tampil (backend menolak 422); urutan diatur setelah dipulihkan. */
+const showOrder = computed(() => props.meta.has_order && String(props.row?.status ?? '') !== '10')
 
 watch(
   () => [props.open, props.row, props.meta.key] as const,
@@ -49,13 +68,14 @@ watch(
       [m.primary_key]: row ? String(row[m.primary_key] ?? '') : '',
       [m.name_field]: row ? String(row[m.name_field] ?? '') : '',
     }
-    if (m.has_order) initial.order = row ? String(row.order ?? '') : ''
+    if (showOrder.value) initial.order = row ? String(row.order ?? '') : ''
     for (const field of m.fields) {
       initial[field.name] = row ? String(row[field.name] ?? '') : ''
     }
     if (m.parent) initial[m.parent.field] = row ? String(row[m.parent.field] ?? '') : ''
     // errors: {} — schema baru (computed) memicu validasi ulang; form yang baru dibuka tidak boleh langsung merah.
     resetForm({ values: initial, errors: {} })
+    interacted.value = new Set()
 
     if (m.parent) {
       const directParent = row ? String(row[m.parent.field] ?? '') : ''
@@ -68,7 +88,7 @@ watch(
 
 async function onLevelChange(index: number, value: string): Promise<void> {
   await cascade.select(index, value)
-  if (props.meta.parent) setFieldValue(props.meta.parent.field, cascade.leafValue())
+  if (props.meta.parent) updateField(props.meta.parent.field, cascade.leafValue())
 }
 
 const onSubmit = handleSubmit(async (formValues) => {
@@ -84,7 +104,7 @@ const onSubmit = handleSubmit(async (formValues) => {
   }
 
   // Kirim urutan hanya kalau diubah: memindah posisi menggeser entri lain (tiap geseran teraudit).
-  if (m.has_order) {
+  if (showOrder.value) {
     const order = String(formValues.order ?? '').trim()
     const originalOrder = props.row ? String(props.row.order ?? '') : ''
     if (order !== '' && order !== originalOrder) payload.order = Number(order)
@@ -172,8 +192,8 @@ const { levels } = cascade
             label="Kode"
             required
             :hint="codeHint"
-            :error="errors[meta.primary_key]"
-            @update:model-value="setFieldValue(meta.primary_key, $event)"
+            :error="fieldError(meta.primary_key)"
+            @update:model-value="updateField(meta.primary_key, $event)"
           />
 
           <template v-if="meta.parent">
@@ -188,7 +208,7 @@ const { levels } = cascade
               :placeholder="level.loading ? 'Memuat...' : `Pilih ${level.meta.label}`"
               :disabled="level.loading || (index > 0 && !levels[index - 1]?.value)"
               :options="level.options.map((o) => ({ value: o.id, label: `${o.nama} (${o.id})` }))"
-              :error="index === levels.length - 1 ? errors[meta.parent.field] : ''"
+              :error="index === levels.length - 1 ? fieldError(meta.parent.field) : ''"
               @update:model-value="onLevelChange(index, $event)"
             />
           </template>
@@ -198,8 +218,8 @@ const { levels } = cascade
             :name="meta.name_field"
             :label="meta.name_label"
             required
-            :error="errors[meta.name_field]"
-            @update:model-value="setFieldValue(meta.name_field, $event)"
+            :error="fieldError(meta.name_field)"
+            @update:model-value="updateField(meta.name_field, $event)"
           />
 
           <FormField
@@ -213,19 +233,19 @@ const { levels } = cascade
             :options="field.options ?? []"
             :placeholder="fieldInputType(field) === 'select' ? `Pilih ${field.label}` : undefined"
             :hint="field.hint ?? ''"
-            :error="errors[field.name]"
-            @update:model-value="setFieldValue(field.name, $event)"
+            :error="fieldError(field.name)"
+            @update:model-value="updateField(field.name, $event)"
           />
 
           <FormField
-            v-if="meta.has_order"
+            v-if="showOrder"
             :model-value="values.order"
             name="order"
             label="Urutan tampil"
             type="number"
             :hint="isEdit ? 'Ubah untuk memindah posisi; entri lain ikut bergeser.' : 'Kosongkan = ditaruh paling akhir.'"
-            :error="errors.order"
-            @update:model-value="setFieldValue('order', $event)"
+            :error="fieldError('order')"
+            @update:model-value="updateField('order', $event)"
           />
 
           <div class="flex justify-end gap-2 pt-2">

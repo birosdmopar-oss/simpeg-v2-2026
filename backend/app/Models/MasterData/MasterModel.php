@@ -8,6 +8,7 @@ use App\Libraries\MasterData\MasterDefinition;
 use App\Models\AuditLogModel;
 use App\Models\BaseAuditableModel;
 use CodeIgniter\Database\ConnectionInterface;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\I18n\Time;
 
 /**
@@ -20,6 +21,11 @@ use CodeIgniter\I18n\Time;
  *
  * Kolom audit legacy (created_at, updated_at, updated_by) diisi otomatis sesuai MasterDefinition::$auditColumns:
  * timestamp dalam zona waktu aplikasi (UTC), updated_by = id_pengguna aktor (null untuk proses tanpa login).
+ *
+ * Tulisan bisnis gagal = exception (insert()/update() di-override): di dalam transaksi CI4 query yang gagal hanya
+ * mengembalikan false + menandai transStatus (tanpa exception, kecuali transException), sehingga tanpa ini
+ * pelanggaran UNIQUE ikut "sukses" dan transaksi tetap di-commit. Tulisan audit_logs (AuditLogModel) sengaja tidak
+ * ikut: audit tetap fail-open (F0-04).
  */
 class MasterModel extends BaseAuditableModel
 {
@@ -62,6 +68,37 @@ class MasterModel extends BaseAuditableModel
     }
 
     /**
+     * @param array<string, mixed>|object|null $row
+     *
+     * @throws DatabaseException query gagal (mis. 1062 UNIQUE/PRIMARY), juga saat DBDebug = false
+     */
+    public function insert($row = null, bool $returnID = true)
+    {
+        $result = parent::insert($row, $returnID);
+
+        if ($result === false) {
+            throw $this->writeFailure();
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<int|string>|int|string|null $id
+     * @param array<string, mixed>|object|null  $row
+     *
+     * @throws DatabaseException query gagal (mis. 1062 UNIQUE), juga saat DBDebug = false
+     */
+    public function update($id = null, $row = null): bool
+    {
+        if (parent::update($id, $row) === false) {
+            throw $this->writeFailure();
+        }
+
+        return true;
+    }
+
+    /**
      * Soft delete: status → 10 (+ deleted_at) tanpa menghapus baris, audit dicatat sebagai event 'delete'.
      */
     public function softDelete(string $id): void
@@ -99,6 +136,13 @@ class MasterModel extends BaseAuditableModel
         }
 
         return $eventData;
+    }
+
+    private function writeFailure(): DatabaseException
+    {
+        $error = $this->db->error();
+
+        return new DatabaseException('Penulisan master data gagal: ' . $error['message'], (int) $error['code']);
     }
 
     private function currentActorId(): ?int

@@ -84,7 +84,12 @@ abstract class BaseMasterController extends ApiController
 
     public function reorder(string $entity, string $id): ResponseInterface
     {
-        $data = $this->validateOrFail($this->payload(), ['order' => 'required|is_natural_no_zero']);
+        $data = $this->validateOrFail($this->payload(), [
+            'order' => [
+                'rules'  => 'required|is_natural_no_zero',
+                'errors' => ['required' => 'Urutan wajib diisi.', 'is_natural_no_zero' => 'Urutan harus bilangan bulat minimal 1.'],
+            ],
+        ]);
 
         return $this->respondSuccess(service('masterService')->reorder($this->definition($entity), $id, (int) $data['order']));
     }
@@ -125,16 +130,16 @@ abstract class BaseMasterController extends ApiController
             $rules[$def->primaryKey] = $def->idDigits !== null
                 // Kode wilayah legacy: tepat N digit angka tanpa titik (CHAR(N) di DB, ISSUE-008).
                 ? [
-                    'rules'  => "required|exact_length[{$def->idDigits}]|regex_match[/^[0-9]+$/]",
+                    // \z, bukan $: '$' PCRE juga cocok sebelum newline di akhir ("31\n" akan lolos).
+                    'rules'  => "required|regex_match[/^[0-9]{{$def->idDigits}}\\z/]",
                     'errors' => [
-                        'required'     => 'Kode wajib diisi.',
-                        'exact_length' => "Kode harus tepat {$def->idDigits} digit angka.",
-                        'regex_match'  => "Kode harus tepat {$def->idDigits} digit angka (tanpa titik atau spasi).",
+                        'required'    => 'Kode wajib diisi.',
+                        'regex_match' => "Kode harus tepat {$def->idDigits} digit angka (tanpa titik atau spasi).",
                     ],
                 ]
                 // Kode umum: huruf/angka/titik/strip/garis bawah, tanpa spasi.
                 : [
-                    'rules'  => "required|max_length[{$def->idMaxLength}]|regex_match[/^[A-Za-z0-9._-]+$/]",
+                    'rules'  => "required|max_length[{$def->idMaxLength}]|regex_match[/^[A-Za-z0-9._-]+\\z/]",
                     'errors' => [
                         'required'    => 'Kode wajib diisi.',
                         'max_length'  => "Kode maksimal {$def->idMaxLength} karakter.",
@@ -156,6 +161,7 @@ abstract class BaseMasterController extends ApiController
             'rules'  => "{$required}|string|max_length[{$def->nameMaxLength}]",
             'errors' => [
                 'required'   => "{$def->nameLabel} wajib diisi.",
+                'string'     => "{$def->nameLabel} harus teks.",
                 'max_length' => "{$def->nameLabel} maksimal {$def->nameMaxLength} karakter.",
             ],
         ];
@@ -176,7 +182,7 @@ abstract class BaseMasterController extends ApiController
 
         if ($def->hasStatus) {
             $rules[MasterDefinition::STATUS_FIELD] = [
-                'rules'  => 'permit_empty|in_list[1,2]',
+                'rules'  => $creating ? 'permit_empty|in_list[1,2]' : 'if_exist|in_list[1,2]',
                 'errors' => ['in_list' => "Status hanya boleh '1' (aktif) atau '2' (tidak aktif)."],
             ];
         }

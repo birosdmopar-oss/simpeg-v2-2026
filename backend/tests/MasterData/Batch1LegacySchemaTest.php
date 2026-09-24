@@ -214,6 +214,34 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
         $this->assertSame(self::LEGACY['provinsi'], $this->columnTypes('provinsi'));
     }
 
+    /**
+     * down() menyempitkan nama wilayah ke VARCHAR(100): nama yang lebih panjang harus ditolak sebelum ada ALTER.
+     */
+    public function testDownRefusesWhenWilayahNameTooLong(): void
+    {
+        $this->db->table('provinsi')->insert(['id_provinsi' => '31', 'provinsi' => str_repeat('A', 150), 'status' => 1]);
+
+        try {
+            $refused = null;
+
+            try {
+                $this->migration()->down();
+            } catch (RuntimeException $e) {
+                $refused = $e->getMessage();
+            }
+
+            $this->assertNotNull($refused, 'down() harus menolak nama wilayah > 100 karakter.');
+            $this->assertStringContainsString('provinsi (150 karakter)', (string) $refused);
+
+            // Tidak ada ALTER yang jalan: skema masih legacy.
+            $this->assertSame(self::LEGACY['provinsi'], $this->columnTypes('provinsi'));
+            $this->assertSame(self::LEGACY_FK, $this->foreignKeys());
+        } finally {
+            // Nama 150 karakter akan membuat migrate:refresh test berikutnya ikut ditolak.
+            $this->db->table('provinsi')->emptyTable();
+        }
+    }
+
     private function migration(): AlterBatch1KeSkemaLegacy
     {
         require_once APPPATH . 'Database/Migrations/2026-09-23-000000_AlterBatch1KeSkemaLegacy.php';

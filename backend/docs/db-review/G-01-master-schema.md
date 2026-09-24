@@ -122,7 +122,7 @@ Keputusan user 23-09-2026. Ketiganya **wajib selesai sebelum impor data master l
 
 ## 8. DBV-001 — Revisi skema Batch 1 ke skema SIMPEG legacy (⏳ MENUNGGU APPROVAL DB Validator)
 
-**Key review:** `DBV-001` (review DB Validator) + `CR-001` (review kode) — satu pull request, judul `[DBV-001][CR-001] …`, branch `dbv-001/g01-batch1-skema-legacy`. Merge hanya setelah **kedua** review menyatakan setuju.
+**Key review:** `DBV-001` (review DB Validator) + `CR-001` (review kode) — satu pull request, judul `[DBV-001][CR-001] …`, branch `dbv-001/g01-batch1-skema-legacy`. Merge hanya setelah **kedua** review menyatakan setuju. Aturan 24-09-2026: untuk PR dengan dua key [CR] & [DBV], DB Validator **hanya me-review/approve** (tidak merge); **merge dilakukan oleh reviewer CR**. Status: CR-001 ✅ (24-09-2026), DBV-001 ⏳.
 
 **Status:** ⏳ MENUNGGU APPROVAL. Migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` **JANGAN dijalankan di Dev/Production** sebelum DBV-001 disetujui.
 
@@ -191,14 +191,15 @@ Kalau dump berbeda, koreksi lewat migration ALTER berikutnya (selagi tabel masih
 | Keputusan #3 (tanpa created_at/updated_at) | TIDAK | **Dibalik** — kolom audit legacy ditambahkan (keputusan user c) |
 | Keputusan #4 / Bagian 6 #1 (panjang kode) — ISSUE-008 | Ditunda | **Dikerjakan**: CHAR(2/4/7/10) + validasi tepat N digit. Strict mode koneksi (A-01 Bagian 8 #8) **masih terbuka** |
 | Keputusan #9 / Bagian 6 #3 (collation) — ISSUE-010 | Ditunda | **Selesai sebagian**: 7 tabel ini → `utf8mb4_unicode_ci`. `DBCollat` koneksi (`Config\Database`) sengaja **belum** diubah (mengubahnya membuat tabel auth yang dibuat ulang berbeda collation antar-environment). Konsekuensi: **setiap migration baru yang mereferensikan kode wilayah/nama master ini wajib menulis `COLLATE utf8mb4_unicode_ci` eksplisit** (FK string beda collation ditolak MySQL 8, error 3780). Tabel auth (A-01) dikonversi terpisah sebelum ada FK/JOIN string lintas tabel (mis. `pengguna.nip → pegawai.nip`) |
-| Bagian 7 #1–#6 (temuan menengah) | Belum diputuskan | Tidak berubah (di luar cakupan DBV-001) |
+| Bagian 7 #3 (`transactional()` tanpa cek status) | Belum diputuskan | **Dikerjakan** (review kode CR-001): tulisan bisnis master yang gagal melempar exception (`MasterModel::insert/update`) sehingga seluruh transaksi di-rollback; `transStatus` di-reset. Tulisan audit tetap fail-open (F0-04) |
+| Bagian 7 #1, #2, #4–#6 (temuan menengah) | Belum diputuskan | Tidak berubah (di luar cakupan DBV-001) |
 
 ### 8.6 Verifikasi developer (sebelum review DB Validator)
 
 - MySQL 8.0.30 lokal, DB kosong: `migrate --all` → `up()` sukses; `migrate:rollback` (hanya migration ini) → skema Batch 1 approved kembali **persis** (tipe kolom, collation `utf8mb4_general_ci`, nama FK approved); `migrate` ulang sukses.
 - `up()` menolak berjalan bila salah satu dari 7 tabel berisi data (pesan menyebut tabel & jumlah baris; tidak ada ALTER yang sempat jalan) — terbukti juga di DB dev lokal `simpeg_v2` yang berisi data uji QA.
 - `down()` mempertahankan data (dipakai `migrate:refresh` test): status `1` → `'1'`, `2`/`10` → `'0'`. Kolom legacy tambahan (`kd_area`, `kd_pos`, `status_pegawai`, audit, `deleted_at`) ikut terhapus; `down()` menolak jalan bila ada nama wilayah > 100 karakter (tidak muat VARCHAR(100) Batch 1).
-- Keunikan: pelanggaran UNIQUE/PRIMARY (1062) akibat dua permintaan balapan diterjemahkan ke 422 (bukan 500).
+- Keunikan: pelanggaran UNIQUE/PRIMARY (1062) akibat dua permintaan balapan membatalkan seluruh transaksi dan diterjemahkan ke 422. Catatan CR-001: di CodeIgniter 4.7 query yang gagal **di dalam transaksi** tidak melempar exception (hanya `false` + `transStatus`), sehingga sebelumnya tulisan gagal ikut "sukses" dan transaksi tetap di-commit; kini dicegah di `MasterModel` dan dibuktikan `MasterGenericTcTest::testDuplicateRaceIsRolledBackAndTranslatedTo422`.
 - Test otomatis: `tests/MasterData/Batch1LegacySchemaTest.php` (kolom & tipe, collation, UNIQUE, AUTO_INCREMENT, FK legacy, rollback, penolakan saat berisi data) + `MasterGenericTcTest`/`RbacMasterEndpointsTest` diperbarui ke skema legacy.
 - **Belum** diverifikasi di MariaDB 10.4 (lingkungan DB Validator) — mohon dijalankan di sana saat review.
 

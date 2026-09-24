@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
+use App\Exceptions\ValidationException;
 use App\Libraries\MasterData\MasterDefinition;
+use App\Libraries\MasterData\MasterService;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use ReflectionMethod;
 use Tests\Support\AuthTestTrait;
+use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\MasterDataTestTrait;
 use Throwable;
@@ -112,6 +116,52 @@ final class MasterGenericTcTest extends CIUnitTestCase
         }
     }
 
+    /**
+     * Keunikan nama juga berlaku terhadap entri Tidak Aktif (status 2) — pesan mengarahkan untuk mengaktifkan kembali.
+     */
+    public function testNameUniquenessIncludesInactiveEntries(): void
+    {
+        $this->sendJson('PATCH', 'api/v1/master/agama/4/status', ['status' => '2'])->assertStatus(200);
+
+        $result = $this->sendJson('POST', 'api/v1/master/agama', ['agama' => 'hindu']);
+        $result->assertStatus(422);
+        $this->assertStringContainsString('tidak aktif', implode(' ', (array) $this->json($result)['errors']['agama']));
+        $this->sendJson('PUT', 'api/v1/master/agama/6', ['agama' => 'HINDU'])->assertStatus(422);
+        $this->assertSame(1, $this->db->table('agama')->where('agama', 'Hindu')->countAllResults());
+    }
+
+    /**
+     * Balapan: dua permintaan lolos cek aplikasi, UNIQUE index menolak yang kedua (1062). Transaksi harus di-rollback
+     * utuh dan hasilnya 422 (bukan 201/404 palsu), serta koneksi tidak tertinggal dalam transStatus gagal.
+     */
+    public function testDuplicateRaceIsRolledBackAndTranslatedTo422(): void
+    {
+        $service = service('masterService');
+        $def     = service('masterRegistry')->get('agama');
+
+        // Simulasikan pemenang balapan: cek aplikasi dilewati, INSERT langsung menabrak uq_agama_nama.
+        $invoke = static fn (string $method, mixed ...$args): mixed => (new ReflectionMethod(MasterService::class, $method))->invoke($service, ...$args);
+
+        try {
+            $invoke(
+                'translateDuplicate',
+                static fn () => $invoke('transactional', static function () use ($invoke, $def): void {
+                    $invoke('model', $def)->update('6', [MasterDefinition::ORDER_FIELD => 99]);
+                    $invoke('model', $def)->insert([$def->nameField => 'Islam', MasterDefinition::ORDER_FIELD => 7, MasterDefinition::STATUS_FIELD => '1']);
+                }),
+                static fn () => $invoke('assertNameUnique', $def, 'Islam', null),
+            );
+            $this->fail('Pelanggaran UNIQUE harus diterjemahkan menjadi ValidationException (422).');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('agama', (array) $e->getErrors());
+        }
+
+        // Rollback utuh: UPDATE sebelum INSERT yang gagal ikut dibatalkan, tidak ada baris ganda.
+        $this->seeInDatabase('agama', ['id_agama' => 6, 'order' => 6]);
+        $this->assertSame(1, $this->db->table('agama')->where('agama', 'Islam')->countAllResults());
+        $this->assertTrue($this->db->transStatus());
+    }
+
     public function testSameNameIsAllowedUnderDifferentParent(): void
     {
         // "Gambir" sudah ada di kecamatan 3171010; boleh dipakai di kecamatan lain.
@@ -193,6 +243,40 @@ final class MasterGenericTcTest extends CIUnitTestCase
         }
 
         $this->dontSeeInDatabase('kelurahan', ['kelurahan' => 'Format Bertitik']);
+    }
+
+    public function testKodeWithTrailingNewlineIsRejected(): void
+    {
+        $result = $this->sendJson('POST', 'api/v1/master/provinsi', ['id_provinsi' => "33\n", 'provinsi' => 'Newline']);
+        $result->assertStatus(422);
+        $this->assertArrayHasKey('id_provinsi', $this->json($result)['errors']);
+        $this->dontSeeInDatabase('provinsi', ['provinsi' => 'Newline']);
+    }
+
+    /**
+     * Id route harus bentuk kanonik — '06', '6abc', '1e0' tidak boleh jadi alias id 6 lewat cast numerik MySQL.
+     */
+    public function testNonCanonicalRouteIdsAreNotFound(): void
+    {
+        foreach (['agama/06', 'agama/6abc', 'agama/1e0', 'agama/0', 'provinsi/3', 'provinsi/031', 'kecamatan/317101'] as $path) {
+            $this->get("api/v1/master/{$path}")->assertStatus(404);
+        }
+
+        $this->sendJson('PUT', 'api/v1/master/agama/06', ['agama' => 'Alias'])->assertStatus(404);
+        $this->dontSeeInDatabase('agama', ['agama' => 'Alias']);
+        $this->get('api/v1/master/agama/6')->assertStatus(200);
+        $this->get('api/v1/master/kecamatan/3171010')->assertStatus(200);
+    }
+
+    public function testValidationMessagesAreIndonesian(): void
+    {
+        $order = $this->sendJson('PATCH', 'api/v1/master/agama/6/order', []);
+        $order->assertStatus(422);
+        $this->assertSame('Urutan wajib diisi.', ((array) $this->json($order)['errors']['order'])[0]);
+
+        $name = $this->sendJson('POST', 'api/v1/master/agama', ['agama' => 123]);
+        $name->assertStatus(422);
+        $this->assertSame('Agama harus teks.', ((array) $this->json($name)['errors']['agama'])[0]);
     }
 
     /**
@@ -322,6 +406,39 @@ final class MasterGenericTcTest extends CIUnitTestCase
 
         $this->seeInDatabase('agama', ['id_agama' => 4, 'status' => 1, 'deleted_at' => null]);
         $this->assertSame(['1', '2', '3', '5', '6', '4'], $this->optionIds('agama'), 'dipulihkan = ditaruh di akhir urutan');
+    }
+
+    /**
+     * Entri yang dihapus tidak punya urutan tampil: PATCH order / PUT order ditolak; memulihkan sekaligus menaruh
+     * urutan (PUT status + order) tetap boleh. Pemulihan ke status 2 (Tidak Aktif) juga mengosongkan deleted_at.
+     */
+    public function testDeletedEntryOrderIsLockedUntilRestored(): void
+    {
+        $this->delete('api/v1/master/agama/5')->assertStatus(200);
+
+        $this->sendJson('PATCH', 'api/v1/master/agama/5/order', ['order' => 1])->assertStatus(422);
+        $this->sendJson('PUT', 'api/v1/master/agama/5', ['order' => 1])->assertStatus(422);
+        $this->assertSame([1, 2, 3, 4, 5], $this->orders('agama', 'id_agama', ['1', '2', '3', '4', '6']));
+
+        $this->sendJson('PUT', 'api/v1/master/agama/5', ['status' => '2', 'order' => 1])->assertStatus(200);
+        $this->seeInDatabase('agama', ['id_agama' => 5, 'status' => 2, 'order' => 1, 'deleted_at' => null]);
+        $this->assertSame([1, 2, 3, 4, 5, 6], $this->orders('agama', 'id_agama', ['5', '1', '2', '3', '4', '6']));
+    }
+
+    /**
+     * Status yang dikirim eksplisit di PUT wajib 1/2: null/'' tidak boleh diam-diam mengaktifkan/memulihkan entri.
+     */
+    public function testUpdateRejectsEmptyOrNullStatus(): void
+    {
+        $this->sendJson('PATCH', 'api/v1/master/agama/4/status', ['status' => '2'])->assertStatus(200);
+
+        $this->sendJson('PUT', 'api/v1/master/agama/4', ['status' => null])->assertStatus(422);
+        $this->sendJson('PUT', 'api/v1/master/agama/4', ['status' => ''])->assertStatus(422);
+        $this->seeInDatabase('agama', ['id_agama' => 4, 'status' => 2]);
+
+        // Field status tidak dikirim = tidak berubah.
+        $this->sendJson('PUT', 'api/v1/master/agama/4', ['agama' => 'Hindu Dharma'])->assertStatus(200);
+        $this->seeInDatabase('agama', ['id_agama' => 4, 'status' => 2, 'agama' => 'Hindu Dharma']);
     }
 
     // ------------------------------------------------------------------
@@ -461,7 +578,14 @@ final class MasterGenericTcTest extends CIUnitTestCase
      */
     public function testLegacyAuditColumnsAreFilledWithActor(): void
     {
-        $adminId = (int) $this->db->table('pengguna')->where('nip', self::ADMIN_NIP)->get()->getRowArray()['id_pengguna'];
+        // Super Admin kedua dengan id_pengguna 77: tidak mungkin tertukar dengan kode role (1..8).
+        $this->db->table('pengguna')->insert([
+            'id_pengguna'     => 77, 'nip' => '198001012005011077', 'username' => '198001012005011077', 'password' => null,
+            'password_legacy' => md5(AuthSeeder::PASSWORD), 'user_level' => Role::SUPER_ADMIN, 'id_unit' => 'U01',
+            'id_satker'       => 'S01', 'status' => '1',
+        ]);
+        $this->asNip('198001012005011077');
+        $adminId = 77;
 
         Time::setTestNow('2020-01-02 03:04:05', 'UTC');
 

@@ -92,6 +92,14 @@ async function load(): Promise<void> {
       page: page.value,
       per_page: perPage.value,
     })
+    // Halaman terakhir jadi kosong setelah hapus/pulihkan/ubah status: mundur ke halaman terakhir yang ada.
+    const lastPage = Math.max(1, Math.ceil(result.total / perPage.value))
+    if (result.items.length === 0 && result.total > 0 && page.value > lastPage) {
+      page.value = lastPage
+      loading.value = false
+      await load()
+      return
+    }
     items.value = result.items
     total.value = result.total
   } catch (err) {
@@ -359,6 +367,7 @@ onMounted(() => {
                       type="button"
                       class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-green-700 disabled:opacity-40"
                       title="Pulihkan"
+                      :aria-label="`Pulihkan ${nameOf(row)}`"
                       :disabled="busyId === idOf(row)"
                       :data-testid="`master-restore-${idOf(row)}`"
                       @click="restore(row)"

@@ -317,12 +317,20 @@ class MasterService
             $this->assertNameUnique($def, $name, $parent, $this->scopeValues($def, $changes + $current), $id);
         }
 
-        if ($def->hasStatus && array_key_exists(MasterDefinition::STATUS_FIELD, $data) && $data[MasterDefinition::STATUS_FIELD] !== '') {
+        $rawStatus = $data[MasterDefinition::STATUS_FIELD] ?? null;
+
+        if ($def->hasStatus && is_scalar($rawStatus) && trim((string) $rawStatus) !== '') {
             $status = $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD]);
 
             if ($status !== (string) $current[MasterDefinition::STATUS_FIELD]) {
                 $changes = $this->statusChanges($def, $current, $status) + $changes;
             }
+        }
+
+        $orderRequested = $def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '';
+
+        if ($orderRequested && $def->hasStatus && (string) ($changes + $current)[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_DELETED) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, "{$def->label} yang dihapus tidak punya urutan tampil — pulihkan dulu.");
         }
 
         $scope = $this->scopeValues($def, $changes + $current);
@@ -403,10 +411,14 @@ class MasterService
      */
     public function reorder(MasterDefinition $def, string $id, int $position): array
     {
-        $this->findOrFail($def, $id);
+        $current = $this->findOrFail($def, $id);
 
         if (! $def->hasOrder) {
             throw new ValidationException("{$def->label} tidak memakai urutan tampil.");
+        }
+
+        if ($def->hasStatus && (string) $current[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_DELETED) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, "{$def->label} yang dihapus tidak punya urutan tampil — pulihkan dulu.");
         }
 
         $this->transactional(function () use ($def, $id, $position): void {
@@ -432,7 +444,7 @@ class MasterService
         $parent = $def->parentField !== null ? (string) $row[$def->parentField] : null;
 
         $ids = array_values(array_filter(
-            array_keys($this->scopeOrders($def, $parent)),
+            $this->scopeIds($def, $parent),
             static fn (string $other): bool => $other !== $id,
         ));
 
@@ -444,7 +456,7 @@ class MasterService
 
     private function renumber(MasterDefinition $def, ?string $parent): void
     {
-        $this->applyOrder($def, $parent, array_keys($this->scopeOrders($def, $parent)));
+        $this->applyOrder($def, $parent, $this->scopeIds($def, $parent));
     }
 
     /**
@@ -459,7 +471,7 @@ class MasterService
             $order = $index + 1;
 
             if (($current[$id] ?? null) !== $order) {
-                $model->update($id, [MasterDefinition::ORDER_FIELD => $order]);
+                $model->update((string) $id, [MasterDefinition::ORDER_FIELD => $order]);
             }
         }
     }
@@ -498,6 +510,17 @@ class MasterService
         return $orders;
     }
 
+    /**
+     * Id dalam urutan tampil sebagai string. array_keys() mengubah key numerik ('3171', '6') menjadi int, yang membuat
+     * WHERE PK CHAR dibandingkan dengan angka (index PK tidak terpakai) dan entity_id audit tidak konsisten.
+     *
+     * @return list<string>
+     */
+    private function scopeIds(MasterDefinition $def, ?string $parent): array
+    {
+        return array_map('strval', array_keys($this->scopeOrders($def, $parent)));
+    }
+
     private function nextOrder(MasterDefinition $def, ?string $parent): int
     {
         $builder = $this->db->table($def->table)->selectMax(MasterDefinition::ORDER_FIELD, 'max_order');
@@ -524,6 +547,10 @@ class MasterService
      */
     private function findOrFail(MasterDefinition $def, string $id): array
     {
+        if (! $this->isCanonicalId($def, $id)) {
+            throw new NotFoundException("{$def->label} {$id} tidak ditemukan.");
+        }
+
         /** @var array<string, mixed>|null $row */
         $row = $this->db->table($def->table)->where($def->primaryKey, $id)->get()->getRowArray();
 
@@ -532,6 +559,21 @@ class MasterService
         }
 
         return $row;
+    }
+
+    /**
+     * Bentuk kode yang sah: AUTO_INCREMENT = bilangan bulat positif tanpa nol di depan; kode wilayah = tepat N digit;
+     * kode lain = huruf/angka/titik/strip/garis bawah. Selain itu dianggap tidak ada (404), bukan alias entri lain.
+     */
+    private function isCanonicalId(MasterDefinition $def, string $id): bool
+    {
+        $pattern = match (true) {
+            $def->autoIncrement     => '/^[1-9][0-9]*\z/',
+            $def->idDigits !== null => '/^[0-9]{' . $def->idDigits . '}\z/',
+            default                 => '/^[A-Za-z0-9._-]+\z/',
+        };
+
+        return preg_match($pattern, $id) === 1;
     }
 
     private function exists(MasterDefinition $def, string $id): bool
@@ -664,7 +706,8 @@ class MasterService
 
     /**
      * UNIQUE/PRIMARY index DB (1062) adalah lapis kedua keunikan. Kalau dua permintaan balapan lolos cek aplikasi,
-     * pelanggaran index diterjemahkan ulang ke 422 lewat $recheck (cek aplikasi diulang setelah rollback).
+     * pelanggaran index (DatabaseException dari MasterModel, transaksi sudah di-rollback) diterjemahkan ulang ke 422
+     * lewat $recheck (cek aplikasi diulang).
      */
     private function translateDuplicate(Closure $work, Closure $recheck): void
     {
@@ -740,6 +783,12 @@ class MasterService
         $this->cache->invalidateMatching("master_opt_{$def->key}_*");
     }
 
+    /**
+     * Tulisan bisnis yang gagal melempar DatabaseException dari MasterModel (insert/update di-override), sehingga
+     * seluruh transaksi di-rollback — termasuk 1062 yang lalu diterjemahkan translateDuplicate() ke 422. Tulisan
+     * audit tetap fail-open (F0-04): kegagalannya hanya menandai transStatus, yang di-reset agar transaksi berikutnya
+     * di koneksi yang sama (transStart/transComplete) tidak ikut rollback.
+     */
     private function transactional(Closure $work): void
     {
         $this->db->transBegin();
@@ -748,10 +797,12 @@ class MasterService
             $work();
         } catch (Throwable $e) {
             $this->db->transRollback();
+            $this->db->resetTransStatus();
 
             throw $e;
         }
 
         $this->db->transCommit();
+        $this->db->resetTransStatus();
     }
 }

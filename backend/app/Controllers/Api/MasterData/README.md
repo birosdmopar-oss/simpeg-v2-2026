@@ -21,6 +21,8 @@ Kode master (PK) **tidak bisa diubah** setelah dibuat. Dua bentuk:
 - **kode diinput admin** (wilayah): string tepat 2/4/7/10 digit angka (`CHAR(N)`), tidak pernah di-cast ke int (`'09'` ≠ `'9'`);
 - **AUTO_INCREMENT** (agama, jenis pegawai, jenis status): diberikan DB, kode dari input diabaikan.
 
+`{kode}` di URL harus bentuk kanonik; selain itu 404 (bukan alias entri lain): AUTO_INCREMENT = bilangan bulat positif tanpa nol di depan (`6`, bukan `06`/`6abc`), kode wilayah = tepat N digit.
+
 ## Endpoint
 
 `{entity}` = key master (tabel di bawah). `{kode}` = PK entri.
@@ -34,7 +36,7 @@ Kode master (PK) **tidak bisa diubah** setelah dibuat. Dua bentuk:
 | GET | `/master/{entity}/{kode}` | 1 | Detail (+ `parent_nama` untuk master berinduk) |
 | PUT | `/master/{entity}/{kode}` | 1 | Ubah parsial (nama, induk, order, status). Kode tidak ikut diubah |
 | PATCH | `/master/{entity}/{kode}/status` | 1 | Toggle `{ "status": "1"\|"2" }`; juga **memulihkan** entri berstatus `10` (kosongkan `deleted_at`) |
-| PATCH | `/master/{entity}/{kode}/order` | 1 | Pindah posisi `{ "order": n }` (1-based, per induk); entri lain bergeser |
+| PATCH | `/master/{entity}/{kode}/order` | 1 | Pindah posisi `{ "order": n }` (1-based, per induk, hanya entri yang tampil); entri lain bergeser. Entri berstatus `10` → 422 (pulihkan dulu) |
 | DELETE | `/master/{entity}/{kode}` | 1 | **Soft delete** → `status=10` (+ `deleted_at` bila ada). Tidak pernah hard delete |
 
 Role selain 1 → `403 {status:'error', message:'Forbidden'}`; tanpa token → 401.
@@ -76,7 +78,7 @@ Contoh agama (kode otomatis): `{ "agama": "Kepercayaan" }`
 | 422 | kode dipakai / nama duplikat / induk tidak ada atau tidak aktif / format salah | `errors: { <field>: ["..."] }` — duplikat nama menyebut kode entri yang sudah ada (dan saran aktifkan kembali / pulihkan kalau entri itu tidak aktif / dihapus) |
 
 ### PUT /master/{entity}/{kode}
-Parsial; field yang dikirim wajib terisi. Pindah induk → entri ditaruh di akhir induk baru, urutan induk lama dirapikan. `order` (kalau dikirim) memindah posisi.
+Parsial; field yang dikirim wajib terisi. Pindah induk → entri ditaruh di akhir induk baru, urutan induk lama dirapikan. `order` (kalau dikirim) memindah posisi; untuk entri berstatus `10` ditolak 422 kecuali sekaligus dipulihkan (`status` 1/2). `status` yang dikirim wajib `1`/`2` (`null`/`''` → 422, bukan diam-diam diaktifkan).
 
 ### DELETE /master/{entity}/{kode}
 `data: { deleted: true, soft_delete: true, item: {…, status:'10'} }`. Audit dicatat sebagai event `delete` (before/after). Relasi dari data lain tetap utuh; FK `ON DELETE RESTRICT` di DB menolak hard delete master yang direlasikan.
