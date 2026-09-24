@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Auth;
 
 use App\Models\BaseAuditableModel;
+use Closure;
 
 /**
  * Tabel pengguna (A-01). Turunan BaseAuditableModel → seluruh create/update/delete akun otomatis
@@ -32,6 +33,11 @@ class PenggunaModel extends BaseAuditableModel
     protected array $auditMaskedFields = ['password', 'password_legacy'];
 
     /**
+     * Actor audit eksplisit untuk operasi tanpa sesi login (mis. reset password via token) — lihat withActor().
+     */
+    private ?string $actorOverride = null;
+
+    /**
      * @return array<string, mixed>|null
      */
     public function findByUsername(string $username): ?array
@@ -51,6 +57,28 @@ class PenggunaModel extends BaseAuditableModel
         $row = $this->where('nip', $nip)->first();
 
         return $row;
+    }
+
+    /**
+     * Jalankan $work dengan nip_actor audit = $nip. Dipakai jalur tanpa JWT (AuthContext kosong) agar audit tidak
+     * tercatat dengan actor NULL (DEV-002 Bagian 8 #4 / ISSUE-005).
+     *
+     * @template T
+     *
+     * @param Closure(): T $work
+     *
+     * @return T
+     */
+    public function withActor(string $nip, Closure $work): mixed
+    {
+        $previous            = $this->actorOverride;
+        $this->actorOverride = $nip;
+
+        try {
+            return $work();
+        } finally {
+            $this->actorOverride = $previous;
+        }
     }
 
     /**
@@ -74,5 +102,10 @@ class PenggunaModel extends BaseAuditableModel
             'created_at'    => $row['created_at'] ?? null,
             'updated_at'    => $row['updated_at'] ?? null,
         ];
+    }
+
+    protected function currentActorNip(): ?string
+    {
+        return $this->actorOverride ?? parent::currentActorNip();
     }
 }

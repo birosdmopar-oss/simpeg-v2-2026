@@ -34,4 +34,34 @@ class ForgotAttemptModel extends Model
 
         return $row;
     }
+
+    /**
+     * Klaim token secara atomik: `UPDATE ... SET used_at = ? WHERE id = ? AND used_at IS NULL`.
+     * True hanya jika baris ini yang benar-benar menandai token terpakai (affected rows = 1); false berarti token
+     * sudah diklaim lebih dulu — mis. oleh request paralel dengan token yang sama (DEV-002 Bagian 8 #2).
+     */
+    public function markUsed(int $id, int $now): bool
+    {
+        $this->where('id', $id)->where('used_at', null)->set([
+            'used_at' => date('Y-m-d H:i:s', $now),
+        ])->update();
+
+        return $this->db->affectedRows() === 1;
+    }
+
+    /**
+     * Batalkan seluruh token reset lain milik username yang belum dipakai (ditandai used_at), dipanggil setelah
+     * reset sukses agar token yang pernah diminta sebelumnya tidak bisa dipakai lagi.
+     */
+    public function invalidateOtherTokens(string $username, int $exceptId, int $now): int
+    {
+        $this->where('username', $username)
+            ->where('id !=', $exceptId)
+            ->where('token_hash IS NOT NULL')
+            ->where('used_at', null)
+            ->set(['used_at' => date('Y-m-d H:i:s', $now)])
+            ->update();
+
+        return $this->db->affectedRows();
+    }
 }

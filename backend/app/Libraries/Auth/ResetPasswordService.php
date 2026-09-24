@@ -8,7 +8,9 @@ use App\Exceptions\TooManyRequestsException;
 use App\Exceptions\ValidationException;
 use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\PenggunaModel;
+use CodeIgniter\Database\BaseConnection;
 use Config\Auth as AuthConfig;
+use Throwable;
 
 /**
  * Lupa / reset password (A-07).
@@ -16,7 +18,9 @@ use Config\Auth as AuthConfig;
  * request(): rate limit via forgot_attempts (forgotMaxPerWindow per forgotWindowMinutes), response selalu
  *            generik (tidak membocorkan apakah username terdaftar). Token acak 256-bit, di DB hanya hash.
  * reset()  : token expired → ditolak; token sudah dipakai → ditolak; sukses → password Argon2id baru,
- *            token ditandai used_at, SELURUH refresh token dicabut.
+ *            token ditandai used_at, token reset lain milik user dibatalkan, SELURUH refresh token dicabut.
+ *            Semua tulisan dalam satu transaksi; klaim token lewat UPDATE bersyarat used_at IS NULL sehingga
+ *            dua request paralel dengan token yang sama hanya satu yang berhasil (DEV-002 Bagian 8 #2).
  *
  * Kanal pengiriman token (email/WA) belum ditentukan di dokumen sumber → token di-log (info) dan,
  * hanya jika Config\Auth::$exposeResetTokenInResponse = true (development), dikembalikan ke pemanggil.
@@ -32,8 +36,10 @@ class ResetPasswordService
         private PasswordService $passwordService,
         private JwtService $jwt,
         private ?AuthConfig $config = null,
+        private ?BaseConnection $db = null,
     ) {
         $this->config ??= config(AuthConfig::class);
+        $this->db ??= db_connect();
     }
 
     public function setNow(?int $now): void
@@ -116,15 +122,37 @@ class ResetPasswordService
 
         $this->passwordService->assertNewPassword($newPassword, $confirmation);
 
-        $this->pengguna->update((int) $user['id_pengguna'], [
-            'password'            => $this->passwords->hash($newPassword),
-            'password_legacy'     => null,
-            'password_changed_at' => date('Y-m-d H:i:s', $now),
-        ]);
+        // Hash Argon2id (lambat) dihitung di luar transaksi agar lock baris forgot_attempts tidak lama.
+        $hash = $this->passwords->hash($newPassword);
+        $nip  = (string) $user['nip'];
 
-        // Single-use.
-        $this->attempts->update((int) $row['id'], ['used_at' => date('Y-m-d H:i:s', $now)]);
+        $this->db->transBegin();
 
-        $this->jwt->revokeAllForNip((string) $user['nip']);
+        try {
+            // Single-use: cek used_at di atas hanya jalur cepat. UPDATE bersyarat used_at IS NULL yang menentukan
+            // pemenang; request paralel yang kalah mendapat affected rows 0 → ditolak, transaksi di-rollback.
+            if (! $this->attempts->markUsed((int) $row['id'], $now)) {
+                throw ValidationException::forField('token', 'Token reset sudah pernah dipakai.');
+            }
+
+            // Tidak ada sesi login pada jalur reset → actor audit = pemilik akun (ISSUE-005).
+            $this->pengguna->withActor($nip, fn (): bool => $this->pengguna->update((int) $user['id_pengguna'], [
+                'password'            => $hash,
+                'password_legacy'     => null,
+                'password_changed_at' => date('Y-m-d H:i:s', $now),
+            ]));
+
+            $this->attempts->invalidateOtherTokens((string) $row['username'], (int) $row['id'], $now);
+
+            $this->jwt->revokeAllForNip($nip);
+        } catch (Throwable $e) {
+            $this->db->transRollback();
+            $this->db->resetTransStatus();
+
+            throw $e;
+        }
+
+        $this->db->transCommit();
+        $this->db->resetTransStatus();
     }
 }
