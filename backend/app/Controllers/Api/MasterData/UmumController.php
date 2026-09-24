@@ -12,9 +12,12 @@ namespace App\Controllers\Api\MasterData;
  * POST   api/v1/master/{entity}                          → 201
  * GET    api/v1/master/{entity}/{kode}
  * PUT    api/v1/master/{entity}/{kode}
- * PATCH  api/v1/master/{entity}/{kode}/status  { status: '0'|'1' }
+ * PATCH  api/v1/master/{entity}/{kode}/status  { status: '1'|'2' }   (juga memulihkan entri berstatus 10)
  * PATCH  api/v1/master/{entity}/{kode}/order   { order: n }
- * DELETE api/v1/master/{entity}/{kode}                  (soft delete → status '0')
+ * DELETE api/v1/master/{entity}/{kode}                  (soft delete → status 10 'Dihapus')
+ *
+ * Skema legacy (DBV-001): agama/jenis-pegawai/jenis-status ber-PK AUTO_INCREMENT (kode tidak diinput); kode
+ * wilayah tepat 2/4/7/10 digit. Daftar default menyembunyikan status 10; filter ?status=1|2|10.
  *
  * Dropdown berjenjang wilayah 4 level: options provinsi → kabupaten-kota?parent={id_provinsi}
  * → kecamatan?parent={id_kabupaten_kota} → kelurahan?parent={id_kecamatan}.

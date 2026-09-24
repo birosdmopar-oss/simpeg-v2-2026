@@ -10,19 +10,27 @@ use App\Libraries\CacheService;
 use App\Models\MasterData\MasterModel;
 use Closure;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use Throwable;
 
 /**
  * Engine CRUD master generik Modul G (G-02 s.d. G-10) — menegakkan seluruh G-TC di satu tempat:
  *
- *  1. Keunikan: kode (PK) unik; nama unik per induk (case-insensitive, termasuk entri non-aktif) → 422.
- *  2. Soft-delete only: DELETE = status '0' (audit event 'delete'); baris tidak pernah dihapus, sehingga relasi
- *     dari data pegawai/riwayat tetap utuh. FK ON DELETE RESTRICT menjadi lapis kedua di DB.
+ *  1. Keunikan: kode (PK) unik; nama unik per induk (+ kolom uniqueScope), case-insensitive, termasuk entri
+ *     non-aktif & dihapus → 422. Lapis kedua di DB: UNIQUE index (DBV-001 / ISSUE-009).
+ *  2. Soft-delete only: DELETE = status 10 'Dihapus' (audit event 'delete'); baris tidak pernah dihapus, sehingga
+ *     relasi dari data pegawai/riwayat tetap utuh. FK ON DELETE RESTRICT menjadi lapis kedua di DB.
+ *     Status mengikuti legacy: 1 Aktif, 2 Tidak Aktif, 10 Dihapus. Daftar default menyembunyikan status 10;
+ *     entri yang dihapus bisa dipulihkan lewat setStatus (1/2).
  *  3. Toggle status langsung ter-reflect: cache dropdown (options) di-invalidate di setiap penulisan.
  *  4. Re-ordering: memindah 1 entri ke posisi N menggeser entri lain dalam induk yang sama; urutan dinormalisasi
  *     1..n agar dropdown selalu urut logis.
  *  5. RBAC ditegakkan di routing (role 1; options = UL_ALL).
  *  6. Audit: seluruh tulis lewat MasterModel (BaseAuditableModel).
+ *
+ * Mendukung dua bentuk kode sesuai DDL legacy: PK string yang diinput admin (kode wilayah CHAR(2/4/7/10), wajib
+ * tepat N digit) dan PK AUTO_INCREMENT (agama, jenis_pegawai, jenis_status). Kolom tambahan legacy per master
+ * (kd_area, kd_pos, status_pegawai, …) didefinisikan sebagai MasterField.
  *
  * Semua penulisan dibungkus transaksi: pergeseran urutan + audit ikut rollback kalau gagal.
  */
@@ -73,8 +81,15 @@ class MasterService
 
         $builder = $this->db->table($def->table);
 
-        if (isset($filters['status']) && in_array((string) $filters['status'], ['0', '1'], true)) {
-            $builder->where(MasterDefinition::STATUS_FIELD, (string) $filters['status']);
+        if ($def->hasStatus) {
+            $status = (string) ($filters['status'] ?? '');
+
+            if (in_array($status, [MasterModel::STATUS_ACTIVE, MasterModel::STATUS_INACTIVE, MasterModel::STATUS_DELETED], true)) {
+                $builder->where(MasterDefinition::STATUS_FIELD, $status);
+            } else {
+                // Default seperti legacy (status != 10): entri yang dihapus tidak tampil kecuali difilter.
+                $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
+            }
         }
 
         if ($def->parentField !== null && isset($filters['parent']) && $filters['parent'] !== '') {
@@ -83,7 +98,13 @@ class MasterService
 
         if (isset($filters['search']) && trim((string) $filters['search']) !== '') {
             $search = trim((string) $filters['search']);
-            $builder->groupStart()->like($def->nameField, $search)->orLike($def->primaryKey, $search)->groupEnd();
+            $builder->groupStart()->like($def->nameField, $search)->orLike($def->primaryKey, $search);
+
+            foreach ($def->extraSearch as $column) {
+                $builder->orLike($column, $search);
+            }
+
+            $builder->groupEnd();
         }
 
         $total = (clone $builder)->countAllResults();
@@ -92,9 +113,12 @@ class MasterService
             $builder->orderBy($def->parentField, 'ASC');
         }
 
+        if ($def->hasOrder) {
+            $builder->orderBy(MasterDefinition::ORDER_FIELD, 'ASC');
+        }
+
         /** @var list<array<string, mixed>> $rows */
         $rows = $builder
-            ->orderBy(MasterDefinition::ORDER_FIELD, 'ASC')
             ->orderBy($def->nameField, 'ASC')
             ->limit($perPage, ($page - 1) * $perPage)
             ->get()
@@ -129,18 +153,22 @@ class MasterService
 
         /** @var list<array{id: string, nama: string, parent: string|null}> $options */
         $options = $this->cache->remember($key, self::OPTIONS_TTL, function () use ($def, $parent): array {
-            $builder = $this->db->table($def->table)->where(MasterDefinition::STATUS_FIELD, MasterModel::STATUS_ACTIVE);
+            $builder = $this->db->table($def->table);
+
+            if ($def->hasStatus) {
+                $builder->where(MasterDefinition::STATUS_FIELD, MasterModel::STATUS_ACTIVE);
+            }
 
             if ($def->parentField !== null && $parent !== null) {
                 $builder->where($def->parentField, $parent);
             }
 
+            if ($def->hasOrder) {
+                $builder->orderBy(MasterDefinition::ORDER_FIELD, 'ASC');
+            }
+
             /** @var list<array<string, mixed>> $rows */
-            $rows = $builder
-                ->orderBy(MasterDefinition::ORDER_FIELD, 'ASC')
-                ->orderBy($def->nameField, 'ASC')
-                ->get()
-                ->getResultArray();
+            $rows = $builder->orderBy($def->nameField, 'ASC')->get()->getResultArray();
 
             return array_map(static fn (array $row): array => [
                 'id'     => (string) $row[$def->primaryKey],
@@ -157,7 +185,7 @@ class MasterService
     // ------------------------------------------------------------------
 
     /**
-     * @param array<string, mixed> $data kode (PK), nama, induk (kalau ada), order? (posisi 1..n), status?
+     * @param array<string, mixed> $data kode (kalau bukan auto increment), nama, induk, field tambahan, order?, status?
      *
      * @return array<string, mixed>
      */
@@ -167,48 +195,80 @@ class MasterService
         $name   = $this->normalizeName($data[$def->nameField] ?? '');
         $parent = $def->parentField !== null ? trim((string) ($data[$def->parentField] ?? '')) : null;
 
-        if (in_array(strtolower($id), self::RESERVED_IDS, true)) {
-            throw ValidationException::forField($def->primaryKey, 'Kode tidak boleh memakai kata yang dicadangkan sistem.');
-        }
+        if (! $def->autoIncrement) {
+            if (in_array(strtolower($id), self::RESERVED_IDS, true)) {
+                throw ValidationException::forField($def->primaryKey, 'Kode tidak boleh memakai kata yang dicadangkan sistem.');
+            }
 
-        if ($this->exists($def, $id)) {
-            throw ValidationException::forField($def->primaryKey, "Kode {$id} sudah dipakai.");
+            if ($this->exists($def, $id)) {
+                throw ValidationException::forField($def->primaryKey, "Kode {$id} sudah dipakai.");
+            }
         }
 
         if ($def->hasParent()) {
             $this->assertParentUsable($def, (string) $parent);
         }
 
-        $this->assertNameUnique($def, $name, $parent);
+        $scope = $this->scopeValues($def, $data);
+        $this->assertNameUnique($def, $name, $parent, $scope);
 
-        $this->transactional(function () use ($def, $id, $name, $parent, $data): void {
-            $row = [
-                $def->primaryKey               => $id,
-                $def->nameField                => $name,
-                MasterDefinition::ORDER_FIELD  => $this->nextOrder($def, $parent),
-                MasterDefinition::STATUS_FIELD => $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD] ?? MasterModel::STATUS_ACTIVE),
-            ];
+        $newId = $id;
 
-            if ($def->parentField !== null) {
-                $row[$def->parentField] = $parent;
+        // Closure biasa (bukan arrow fn) supaya $newId dari AUTO_INCREMENT ikut keluar lewat referensi.
+        $this->translateDuplicate(function () use ($def, $id, $name, $parent, $data, &$newId): void {
+            $this->transactional(function () use ($def, $id, $name, $parent, $data, &$newId): void {
+                $row = [$def->nameField => $name];
+
+                if (! $def->autoIncrement) {
+                    $row[$def->primaryKey] = $id;
+                }
+
+                if ($def->parentField !== null) {
+                    $row[$def->parentField] = $parent;
+                }
+
+                foreach ($def->fields as $field) {
+                    if (array_key_exists($field->name, $data)) {
+                        $row[$field->name] = $field->normalize($data[$field->name]);
+                    }
+                }
+
+                if ($def->hasOrder) {
+                    $row[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, $parent);
+                }
+
+                if ($def->hasStatus) {
+                    $row[MasterDefinition::STATUS_FIELD] = $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD] ?? MasterModel::STATUS_ACTIVE);
+                }
+
+                $model = $this->model($def);
+                $model->insert($row);
+
+                if ($def->autoIncrement) {
+                    $newId = (string) $model->getInsertID();
+                }
+
+                if ($def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
+                    $this->placeAt($def, $newId, (int) $data[MasterDefinition::ORDER_FIELD]);
+                }
+            });
+        }, function () use ($def, $id, $name, $parent, $scope): void {
+            if (! $def->autoIncrement && $this->exists($def, $id)) {
+                throw ValidationException::forField($def->primaryKey, "Kode {$id} sudah dipakai.");
             }
 
-            $this->model($def)->insert($row);
-
-            if (isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
-                $this->placeAt($def, $id, (int) $data[MasterDefinition::ORDER_FIELD]);
-            }
+            $this->assertNameUnique($def, $name, $parent, $scope);
         });
 
         $this->invalidate($def);
 
-        return $this->get($def, $id);
+        return $this->get($def, $newId);
     }
 
     /**
      * Kode (PK) tidak bisa diubah — dipakai sebagai referensi oleh data lain.
      *
-     * @param array<string, mixed> $data nama?, induk?, order?, status?
+     * @param array<string, mixed> $data nama?, induk?, field tambahan?, order?, status?
      *
      * @return array<string, mixed>
      */
@@ -241,20 +301,42 @@ class MasterService
             }
         }
 
-        if (isset($changes[$def->nameField]) || $parentChanged) {
-            $this->assertNameUnique($def, $name, $parent, $id);
-        }
+        foreach ($def->fields as $field) {
+            if (array_key_exists($field->name, $data)) {
+                $value = $field->normalize($data[$field->name]);
 
-        if (array_key_exists(MasterDefinition::STATUS_FIELD, $data)) {
-            $status = $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD]);
-
-            if ($status !== (string) $current[MasterDefinition::STATUS_FIELD]) {
-                $changes[MasterDefinition::STATUS_FIELD] = $status;
+                if ((string) $value !== (string) ($current[$field->name] ?? '')) {
+                    $changes[$field->name] = $value;
+                }
             }
         }
 
-        $this->transactional(function () use ($def, $id, $current, $changes, $parentChanged, $data): void {
-            if ($parentChanged) {
+        $scopeChanged = array_intersect($def->uniqueScope, array_keys($changes)) !== [];
+
+        if (isset($changes[$def->nameField]) || $parentChanged || $scopeChanged) {
+            $this->assertNameUnique($def, $name, $parent, $this->scopeValues($def, $changes + $current), $id);
+        }
+
+        $rawStatus = $data[MasterDefinition::STATUS_FIELD] ?? null;
+
+        if ($def->hasStatus && is_scalar($rawStatus) && trim((string) $rawStatus) !== '') {
+            $status = $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD]);
+
+            if ($status !== (string) $current[MasterDefinition::STATUS_FIELD]) {
+                $changes = $this->statusChanges($def, $current, $status) + $changes;
+            }
+        }
+
+        $orderRequested = $def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '';
+
+        if ($orderRequested && $def->hasStatus && (string) ($changes + $current)[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_DELETED) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, "{$def->label} yang dihapus tidak punya urutan tampil — pulihkan dulu.");
+        }
+
+        $scope = $this->scopeValues($def, $changes + $current);
+
+        $this->translateDuplicate(fn () => $this->transactional(function () use ($def, $id, $current, $changes, $parentChanged, $data): void {
+            if ($parentChanged && $def->hasOrder) {
                 // Pindah induk: taruh di akhir induk baru, rapikan urutan induk lama.
                 $changes[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, (string) $changes[$def->parentField]);
             }
@@ -263,14 +345,14 @@ class MasterService
                 $this->model($def)->update($id, $changes);
             }
 
-            if ($parentChanged && $def->parentField !== null) {
+            if ($parentChanged && $def->parentField !== null && $def->hasOrder) {
                 $this->renumber($def, (string) $current[$def->parentField]);
             }
 
-            if (isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
+            if ($def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
                 $this->placeAt($def, $id, (int) $data[MasterDefinition::ORDER_FIELD]);
             }
-        });
+        }), fn () => $this->assertNameUnique($def, $name, $parent, $scope, $id));
 
         $this->invalidate($def);
 
@@ -278,17 +360,19 @@ class MasterService
     }
 
     /**
-     * Aktif/non-aktifkan (toggle switch). Non-aktif = hilang dari dropdown modul lain, data relasi tetap utuh.
+     * Aktif (1) / Tidak Aktif (2) — toggle switch. Tidak aktif = hilang dari dropdown modul lain, data relasi tetap
+     * utuh. Dipakai juga untuk memulihkan entri yang dihapus (status 10).
      *
      * @return array<string, mixed>
      */
     public function setStatus(MasterDefinition $def, string $id, string $status): array
     {
         $current = $this->findOrFail($def, $id);
-        $status  = $this->normalizeStatus($status);
+        $this->assertHasStatus($def);
+        $status = $this->normalizeStatus($status);
 
         if ((string) $current[MasterDefinition::STATUS_FIELD] !== $status) {
-            $this->model($def)->update($id, [MasterDefinition::STATUS_FIELD => $status]);
+            $this->model($def)->update($id, $this->statusChanges($def, $current, $status));
             $this->invalidate($def);
         }
 
@@ -296,16 +380,24 @@ class MasterService
     }
 
     /**
-     * "Hapus" master = soft delete (status '0'), TIDAK PERNAH hard delete (G-TC #2). Audit event 'delete'.
+     * "Hapus" master = soft delete (status 10), TIDAK PERNAH hard delete (G-TC #2). Audit event 'delete'.
      *
      * @return array<string, mixed>
      */
     public function delete(MasterDefinition $def, string $id): array
     {
         $current = $this->findOrFail($def, $id);
+        $this->assertHasStatus($def);
 
-        if ((string) $current[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_INACTIVE) {
-            $this->model($def)->softDelete($id);
+        if ((string) $current[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_DELETED) {
+            $this->transactional(function () use ($def, $id, $current): void {
+                $this->model($def)->softDelete($id);
+
+                // Entri yang dihapus keluar dari urutan tampil: rapatkan urutan sisanya 1..n.
+                if ($def->hasOrder) {
+                    $this->renumber($def, $def->parentField !== null ? (string) $current[$def->parentField] : null);
+                }
+            });
             $this->invalidate($def);
         }
 
@@ -319,7 +411,15 @@ class MasterService
      */
     public function reorder(MasterDefinition $def, string $id, int $position): array
     {
-        $this->findOrFail($def, $id);
+        $current = $this->findOrFail($def, $id);
+
+        if (! $def->hasOrder) {
+            throw new ValidationException("{$def->label} tidak memakai urutan tampil.");
+        }
+
+        if ($def->hasStatus && (string) $current[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_DELETED) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, "{$def->label} yang dihapus tidak punya urutan tampil — pulihkan dulu.");
+        }
 
         $this->transactional(function () use ($def, $id, $position): void {
             $this->placeAt($def, $id, $position);
@@ -344,7 +444,7 @@ class MasterService
         $parent = $def->parentField !== null ? (string) $row[$def->parentField] : null;
 
         $ids = array_values(array_filter(
-            array_keys($this->scopeOrders($def, $parent)),
+            $this->scopeIds($def, $parent),
             static fn (string $other): bool => $other !== $id,
         ));
 
@@ -356,7 +456,7 @@ class MasterService
 
     private function renumber(MasterDefinition $def, ?string $parent): void
     {
-        $this->applyOrder($def, $parent, array_keys($this->scopeOrders($def, $parent)));
+        $this->applyOrder($def, $parent, $this->scopeIds($def, $parent));
     }
 
     /**
@@ -371,7 +471,7 @@ class MasterService
             $order = $index + 1;
 
             if (($current[$id] ?? null) !== $order) {
-                $model->update($id, [MasterDefinition::ORDER_FIELD => $order]);
+                $model->update((string) $id, [MasterDefinition::ORDER_FIELD => $order]);
             }
         }
     }
@@ -387,6 +487,11 @@ class MasterService
 
         if ($def->parentField !== null) {
             $builder->where($def->parentField, $parent);
+        }
+
+        // Posisi dihitung dari entri yang tampil di daftar default (status 10 disembunyikan), sama dengan FE.
+        if ($def->hasStatus) {
+            $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
         }
 
         /** @var list<array<string, mixed>> $rows */
@@ -405,12 +510,27 @@ class MasterService
         return $orders;
     }
 
+    /**
+     * Id dalam urutan tampil sebagai string. array_keys() mengubah key numerik ('3171', '6') menjadi int, yang membuat
+     * WHERE PK CHAR dibandingkan dengan angka (index PK tidak terpakai) dan entity_id audit tidak konsisten.
+     *
+     * @return list<string>
+     */
+    private function scopeIds(MasterDefinition $def, ?string $parent): array
+    {
+        return array_map('strval', array_keys($this->scopeOrders($def, $parent)));
+    }
+
     private function nextOrder(MasterDefinition $def, ?string $parent): int
     {
         $builder = $this->db->table($def->table)->selectMax(MasterDefinition::ORDER_FIELD, 'max_order');
 
         if ($def->parentField !== null) {
             $builder->where($def->parentField, $parent);
+        }
+
+        if ($def->hasStatus) {
+            $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
         }
 
         $row = $builder->get()->getRowArray();
@@ -427,6 +547,10 @@ class MasterService
      */
     private function findOrFail(MasterDefinition $def, string $id): array
     {
+        if (! $this->isCanonicalId($def, $id)) {
+            throw new NotFoundException("{$def->label} {$id} tidak ditemukan.");
+        }
+
         /** @var array<string, mixed>|null $row */
         $row = $this->db->table($def->table)->where($def->primaryKey, $id)->get()->getRowArray();
 
@@ -437,9 +561,31 @@ class MasterService
         return $row;
     }
 
+    /**
+     * Bentuk kode yang sah: AUTO_INCREMENT = bilangan bulat positif tanpa nol di depan; kode wilayah = tepat N digit;
+     * kode lain = huruf/angka/titik/strip/garis bawah. Selain itu dianggap tidak ada (404), bukan alias entri lain.
+     */
+    private function isCanonicalId(MasterDefinition $def, string $id): bool
+    {
+        $pattern = match (true) {
+            $def->autoIncrement     => '/^[1-9][0-9]*\z/',
+            $def->idDigits !== null => '/^[0-9]{' . $def->idDigits . '}\z/',
+            default                 => '/^[A-Za-z0-9._-]+\z/',
+        };
+
+        return preg_match($pattern, $id) === 1;
+    }
+
     private function exists(MasterDefinition $def, string $id): bool
     {
         return $this->db->table($def->table)->where($def->primaryKey, $id)->countAllResults() > 0;
+    }
+
+    private function assertHasStatus(MasterDefinition $def): void
+    {
+        if (! $def->hasStatus) {
+            throw new ValidationException("{$def->label} tidak memakai kolom status.");
+        }
     }
 
     /**
@@ -460,21 +606,27 @@ class MasterService
             throw ValidationException::forField($def->parentField, "{$parentDef->label} tidak ditemukan.");
         }
 
-        if ((string) $parent[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_ACTIVE) {
+        if ($parentDef->hasStatus && (string) $parent[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_ACTIVE) {
             throw ValidationException::forField($def->parentField, "{$parentDef->label} {$parent[$parentDef->nameField]} sedang non-aktif.");
         }
     }
 
     /**
-     * Nama unik per induk. Collation *_ci → perbandingan case-insensitive. Entri non-aktif ikut dicek:
-     * master yang "dihapus" diaktifkan kembali, bukan dibuat ganda.
+     * Nama unik per induk (+ kolom uniqueScope). Collation *_ci → perbandingan case-insensitive. Entri tidak aktif
+     * dan yang dihapus ikut dicek (sama dengan UNIQUE index di DB): entri lama dipulihkan, bukan dibuat ganda.
+     *
+     * @param array<string, string|null> $scope nilai kolom uniqueScope
      */
-    private function assertNameUnique(MasterDefinition $def, string $name, ?string $parent, ?string $exceptId = null): void
+    private function assertNameUnique(MasterDefinition $def, string $name, ?string $parent, array $scope = [], ?string $exceptId = null): void
     {
         $builder = $this->db->table($def->table)->where($def->nameField, $name);
 
         if ($def->parentField !== null) {
             $builder->where($def->parentField, $parent);
+        }
+
+        foreach ($scope as $column => $value) {
+            $builder->where($column, $value);
         }
 
         if ($exceptId !== null) {
@@ -488,9 +640,11 @@ class MasterService
             return;
         }
 
-        $hint = (string) $duplicate[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_INACTIVE
-            ? ' (non-aktif — aktifkan kembali entri tersebut)'
-            : '';
+        $hint = match ($def->hasStatus ? (string) $duplicate[MasterDefinition::STATUS_FIELD] : '') {
+            MasterModel::STATUS_INACTIVE => ' (tidak aktif — aktifkan kembali entri tersebut)',
+            MasterModel::STATUS_DELETED  => ' (sudah dihapus — pulihkan entri tersebut lewat filter status Dihapus)',
+            default                      => '',
+        };
 
         throw ValidationException::forField(
             $def->nameField,
@@ -503,6 +657,74 @@ class MasterService
         return trim((string) preg_replace('/\s+/u', ' ', (string) $value));
     }
 
+    /**
+     * Nilai kolom lingkup keunikan (uniqueScope), dinormalisasi seperti saat disimpan.
+     *
+     * @param array<string, mixed> $values
+     *
+     * @return array<string, string|null>
+     */
+    private function scopeValues(MasterDefinition $def, array $values): array
+    {
+        $scope = [];
+
+        foreach ($def->uniqueScope as $column) {
+            $field = $def->field($column);
+            $value = $values[$column] ?? null;
+            $value = $field !== null ? $field->normalize($value) : $value;
+
+            $scope[$column] = $value === null ? null : (string) $value;
+        }
+
+        return $scope;
+    }
+
+    /**
+     * Perubahan kolom saat status berganti. Memulihkan entri yang dihapus (10 → 1/2): kosongkan deleted_at dan
+     * taruh kembali di akhir urutan induknya (entri terhapus tidak ikut urutan tampil).
+     *
+     * @param array<string, mixed> $current
+     *
+     * @return array<string, mixed>
+     */
+    private function statusChanges(MasterDefinition $def, array $current, string $status): array
+    {
+        $changes = [MasterDefinition::STATUS_FIELD => $status];
+
+        if ((string) $current[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_DELETED) {
+            if ($def->hasAudit(MasterDefinition::AUDIT_DELETED_AT)) {
+                $changes[MasterDefinition::AUDIT_DELETED_AT] = null;
+            }
+
+            if ($def->hasOrder) {
+                $changes[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, $def->parentField !== null ? (string) $current[$def->parentField] : null);
+            }
+        }
+
+        return $changes;
+    }
+
+    /**
+     * UNIQUE/PRIMARY index DB (1062) adalah lapis kedua keunikan. Kalau dua permintaan balapan lolos cek aplikasi,
+     * pelanggaran index (DatabaseException dari MasterModel, transaksi sudah di-rollback) diterjemahkan ulang ke 422
+     * lewat $recheck (cek aplikasi diulang).
+     */
+    private function translateDuplicate(Closure $work, Closure $recheck): void
+    {
+        try {
+            $work();
+        } catch (DatabaseException $e) {
+            if ($e->getCode() === 1062) {
+                $recheck();
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Status yang boleh diset lewat API: 1 Aktif / 2 Tidak Aktif. Status 10 hanya lewat delete().
+     */
     private function normalizeStatus(mixed $value): string
     {
         return (string) $value === MasterModel::STATUS_INACTIVE ? MasterModel::STATUS_INACTIVE : MasterModel::STATUS_ACTIVE;
@@ -561,6 +783,12 @@ class MasterService
         $this->cache->invalidateMatching("master_opt_{$def->key}_*");
     }
 
+    /**
+     * Tulisan bisnis yang gagal melempar DatabaseException dari MasterModel (insert/update di-override), sehingga
+     * seluruh transaksi di-rollback — termasuk 1062 yang lalu diterjemahkan translateDuplicate() ke 422. Tulisan
+     * audit tetap fail-open (F0-04): kegagalannya hanya menandai transStatus, yang di-reset agar transaksi berikutnya
+     * di koneksi yang sama (transStart/transComplete) tidak ikut rollback.
+     */
     private function transactional(Closure $work): void
     {
         $this->db->transBegin();
@@ -569,10 +797,12 @@ class MasterService
             $work();
         } catch (Throwable $e) {
             $this->db->transRollback();
+            $this->db->resetTransStatus();
 
             throw $e;
         }
 
         $this->db->transCommit();
+        $this->db->resetTransStatus();
     }
 }

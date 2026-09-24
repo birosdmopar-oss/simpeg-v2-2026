@@ -11,7 +11,7 @@ import type {
   MasterMeta,
   MasterOption,
   MasterRow,
-  MasterStatus,
+  MasterSettableStatus,
 } from '../types'
 
 const base = (entity: string): string => `/master/${encodeURIComponent(entity)}`
@@ -53,7 +53,8 @@ export const masterService = {
     return data
   },
 
-  async setStatus(entity: string, id: string, status: MasterStatus): Promise<MasterRow> {
+  /** 1 Aktif / 2 Tidak Aktif; dipakai juga untuk memulihkan entri berstatus 10 (Dihapus). */
+  async setStatus(entity: string, id: string, status: MasterSettableStatus): Promise<MasterRow> {
     const { data } = await api.patch<MasterRow>(`${item(entity, id)}/status`, { status })
     return data
   },
@@ -63,7 +64,7 @@ export const masterService = {
     return data
   },
 
-  /** Soft delete — backend mengubah status menjadi '0', data tidak dihapus permanen. */
+  /** Soft delete — backend mengubah status menjadi 10 (Dihapus), data tidak dihapus permanen. */
   async remove(entity: string, id: string): Promise<MasterDeleteResponse> {
     const { data } = await api.delete<MasterDeleteResponse>(item(entity, id))
     return data
