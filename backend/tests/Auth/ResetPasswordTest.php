@@ -132,13 +132,15 @@ final class ResetPasswordTest extends CIUnitTestCase
     /**
      * DEV-002 Bagian 8 #2 — race: satu token reset dipakai 2x bersamaan. Interleaving dibuat deterministik:
      * request A sudah membaca row (used_at NULL) ketika request B menyelesaikan reset. A harus ditolak dan tidak
-     * boleh menimpa password hasil B.
+     * boleh menimpa password hasil B. B memakai detik berikutnya (now + 1): tanpa syarat `used_at IS NULL`, UPDATE
+     * milik A akan mengubah used_at (affected rows 1) sehingga A ikut "menang" dan test ini gagal.
      */
     public function testConcurrentResetWithSameTokenOnlyOneSucceeds(): void
     {
-        $token = (string) $this->service()->request(self::NIP, null)['token'];
+        $base  = time();
+        $token = (string) $this->service($base)->request(self::NIP, null)['token'];
 
-        $racingAttempts = new class ($this->db, fn () => $this->service()->reset($token, self::NEW, self::NEW)) extends ForgotAttemptModel {
+        $racingAttempts = new class ($this->db, fn () => $this->service($base + 1)->reset($token, self::NEW, self::NEW)) extends ForgotAttemptModel {
             /** @var (Closure(): void)|null */
             private ?Closure $beforeReturn;
 
@@ -163,7 +165,7 @@ final class ResetPasswordTest extends CIUnitTestCase
         };
 
         try {
-            $this->service(null, $racingAttempts)->reset($token, 'PasswordLain999', 'PasswordLain999');
+            $this->service($base, $racingAttempts)->reset($token, 'PasswordLain999', 'PasswordLain999');
             $this->fail('Request kedua dengan token reset yang sama harus ditolak');
         } catch (ValidationException $e) {
             $this->assertStringContainsString('sudah pernah dipakai', $e->getErrors()['token'][0]);
@@ -174,24 +176,60 @@ final class ResetPasswordTest extends CIUnitTestCase
         $this->assertTrue(password_verify(self::NEW, (string) $row['password']));
         $this->assertFalse(password_verify('PasswordLain999', (string) $row['password']));
         $this->assertSame(1, $this->db->table('audit_logs')->where('entity', 'pengguna')->where('event', 'update')->countAllResults());
+
+        // used_at tetap milik B (A tidak menimpa klaim).
+        $this->seeInDatabase('forgot_attempts', ['token_hash' => hash('sha256', $token), 'used_at' => date('Y-m-d H:i:s', $base + 1)]);
+    }
+
+    /**
+     * ForgotAttemptModel::markUsed() — klaim atomik: hanya panggilan pertama yang menang, walau panggilan berikutnya
+     * memakai waktu berbeda (UPDATE tanpa `used_at IS NULL` akan tetap affected rows 1).
+     */
+    public function testMarkUsedClaimsTokenOnlyOnce(): void
+    {
+        $base  = time();
+        $token = (string) $this->service($base)->request(self::NIP, null)['token'];
+        $model = new ForgotAttemptModel($this->db);
+        $id    = (int) $model->findByTokenHash(hash('sha256', $token))['id'];
+
+        $this->assertTrue($model->markUsed($id, $base));
+        $this->assertFalse($model->markUsed($id, $base + 1));
+        $this->assertFalse($model->markUsed($id, $base + 3600));
+
+        $this->seeInDatabase('forgot_attempts', ['id' => $id, 'used_at' => date('Y-m-d H:i:s', $base)]);
+        $this->assertFalse(ForgotAttemptModel::isInvalidated((array) $model->find($id)));
+
+        // Id yang tidak ada: bukan error, hanya tidak ada yang diklaim.
+        $this->assertFalse($model->markUsed($id + 1000, $base));
     }
 
     public function testSuccessfulResetInvalidatesOtherResetTokensOfSameUser(): void
     {
-        $first  = (string) $this->service()->request(self::NIP, null)['token'];
-        $second = (string) $this->service()->request(self::NIP, null)['token'];
-        $other  = (string) $this->service()->request(AuthSeeder::NIP_ARGON, null)['token'];
+        $base   = time();
+        $first  = (string) $this->service($base)->request(self::NIP, null)['token'];
+        $second = (string) $this->service($base)->request(self::NIP, null)['token'];
+        $other  = (string) $this->service($base)->request(AuthSeeder::NIP_ARGON, null)['token'];
 
-        $this->service()->reset($second, self::NEW, self::NEW);
+        $this->service($base + 5)->reset($second, self::NEW, self::NEW);
 
         try {
-            $this->service()->reset($first, 'PasswordLain999', 'PasswordLain999');
+            $this->service($base + 10)->reset($first, 'PasswordLain999', 'PasswordLain999');
             $this->fail('Token reset lain milik user yang sama harus ikut dibatalkan');
         } catch (ValidationException $e) {
-            $this->assertStringContainsString('sudah pernah dipakai', $e->getErrors()['token'][0]);
+            // Token yang dibatalkan tidak dilaporkan sebagai "sudah pernah dipakai" (tidak pernah dipakai user).
+            $this->assertSame('Token reset sudah tidak berlaku lagi.', $e->getErrors()['token'][0]);
         }
 
         $this->assertSame(0, $this->db->table('forgot_attempts')->where('username', self::NIP)->where('used_at', null)->countAllResults());
+
+        // Data membedakan token yang dipakai (used_at < expires_at) dari yang dibatalkan (expires_at <= used_at).
+        $used      = (array) $this->db->table('forgot_attempts')->where('token_hash', hash('sha256', $second))->get()->getRowArray();
+        $cancelled = (array) $this->db->table('forgot_attempts')->where('token_hash', hash('sha256', $first))->get()->getRowArray();
+        $this->assertFalse(ForgotAttemptModel::isInvalidated($used));
+        $this->assertTrue(ForgotAttemptModel::isInvalidated($cancelled));
+        $this->assertSame(date('Y-m-d H:i:s', $base + 5), $cancelled['used_at']);
+        $this->assertSame(date('Y-m-d H:i:s', $base + 5), $cancelled['expires_at']);
+        $this->assertSame(date('Y-m-d H:i:s', $base + $this->config->resetTokenTtl), $used['expires_at']);
 
         // Token milik user lain tidak tersentuh.
         $this->seeInDatabase('forgot_attempts', ['token_hash' => hash('sha256', $other), 'used_at' => null]);
@@ -230,7 +268,17 @@ final class ResetPasswordTest extends CIUnitTestCase
         $logs = $this->db->table('audit_logs')->where('entity', 'pengguna')->where('event', 'update')->get()->getResultArray();
         $this->assertCount(1, $logs);
         $this->assertSame(self::NIP, $logs[0]['nip_actor'], 'Audit reset password harus mencatat pemilik akun sebagai actor (ISSUE-005)');
-        $this->assertStringNotContainsString(self::NEW, (string) $logs[0]['after_json']);
+
+        // Masking: hash Argon2id baru dan hash MD5 legacy tidak boleh masuk audit_logs, hanya '***'.
+        $hash   = (string) $this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray()['password'];
+        $before = json_decode((string) $logs[0]['before_json'], true);
+        $after  = json_decode((string) $logs[0]['after_json'], true);
+        $this->assertStringStartsWith('$argon2id$', $hash);
+        $this->assertSame('***', $after['password']);
+        $this->assertNull($after['password_legacy']);
+        $this->assertSame('***', $before['password_legacy']);
+        $this->assertStringNotContainsString($hash, (string) $logs[0]['after_json']);
+        $this->assertStringNotContainsString(md5(AuthSeeder::PASSWORD), (string) $logs[0]['before_json']);
     }
 
     public function testExpiredResetTokenIsRejected(): void

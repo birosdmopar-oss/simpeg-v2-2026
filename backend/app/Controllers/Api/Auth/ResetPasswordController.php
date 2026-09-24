@@ -14,8 +14,9 @@ use CodeIgniter\HTTP\ResponseInterface;
  *   200 selalu generik: { accepted:true } (+ token/expires_at HANYA kalau auth.exposeResetTokenInResponse=true, development)
  *   429 kalau melebihi rate limit forgot_attempts
  * POST api/v1/auth/reset-password   { token, new_password, new_password_confirmation }
- *   200 { reset:true } — seluruh refresh token akun dicabut
- *   422 token invalid / sudah dipakai / kedaluwarsa / kebijakan password
+ *   200 { reset:true } — token reset lain milik akun dibatalkan, seluruh refresh token akun dicabut (satu transaksi)
+ *   422 token invalid / sudah dipakai / tidak berlaku lagi (dibatalkan) / kedaluwarsa / kebijakan password
+ *   500 penyimpanan gagal (error database) — tidak ada yang tersimpan, token belum terpakai
  */
 class ResetPasswordController extends ApiController
 {

@@ -65,7 +65,10 @@ Request `{ "username" }`. 200 selalu generik `data: { accepted:true, message }`;
 
 ### POST /auth/reset-password
 Request `{ "token", "new_password", "new_password_confirmation" }`. 200 `data: { reset:true }`.
-422 `errors.token`: "tidak valid" / "sudah pernah dipakai" / "sudah kedaluwarsa" (TTL `auth.resetTokenTtl`, default 30 menit).
+Sukses: password baru, token ditandai terpakai, **token reset lain milik akun yang sama dibatalkan**, seluruh refresh token akun dicabut — semuanya dalam satu transaksi (all-or-nothing).
+422 `errors.token`: "tidak valid" / "sudah pernah dipakai" / "sudah tidak berlaku lagi" (token dibatalkan karena reset lain sudah sukses) / "sudah kedaluwarsa" (TTL `auth.resetTokenTtl`, default 30 menit).
+Dua request paralel untuk akun yang sama (token sama atau berbeda): hanya satu yang 200, sisanya 422.
+500 bila penyimpanan gagal (error database: lock wait timeout, deadlock, dll.) — tidak ada yang tersimpan dan token belum terpakai, jadi bisa dicoba lagi.
 
 ### /auth/users (A-08)
 Query index: `search` (username/nip LIKE), `user_level`, `status`, `id_satker` (role 1 saja), `sort` (username|nip|user_level|status|created_at|last_login_at), `order`, `page`, `per_page` (≤100).
@@ -80,3 +83,4 @@ Validasi: 422 `errors` per-field (nip 18 digit, nip/username unik, role valid, k
 
 ## Audit trail (A-10)
 `audit_logs` — `login` dan `logout` ditulis eksplisit oleh `AuthService` (entity `pengguna`, `nip_actor` = akun ybs); ganti password, reset password, dan seluruh CRUD akun tercatat otomatis lewat `PenggunaModel` (turunan `BaseAuditableModel`) dengan kolom hash password dimasking `***`.
+Reset password (tanpa sesi login): `nip_actor` = NIP pemilik akun (`PenggunaModel::withActor()`). Pengecualian fail-open F0-04: bila INSERT audit reset gagal, reset ikut dibatalkan (500), karena di dalam transaksi kegagalannya tidak bisa dibedakan dari transaksi yang sudah di-rollback server.
