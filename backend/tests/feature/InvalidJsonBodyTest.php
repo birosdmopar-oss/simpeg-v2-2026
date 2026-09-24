@@ -62,8 +62,8 @@ final class InvalidJsonBodyTest extends CIUnitTestCase
     public function testMalformedJsonBodyReturns400WithErrorEnvelope(): void
     {
         $bodies = [
-            'newline mentah di string' => "{\"id_provinsi\":\"33\",\"nama_provinsi\":\"Jawa\nTengah\"}",
-            'JSON terpotong'           => '{"id_provinsi":"33","nama_provinsi":"Jawa Te',
+            'newline mentah di string' => "{\"id_provinsi\":\"33\",\"provinsi\":\"Jawa\nTengah\"}",
+            'JSON terpotong'           => '{"id_provinsi":"33","provinsi":"Jawa Te',
         ];
 
         foreach ($bodies as $case => $body) {
@@ -82,14 +82,14 @@ final class InvalidJsonBodyTest extends CIUnitTestCase
 
     public function testFormUrlencodedBodyStillFallsBackToPost(): void
     {
-        $data = ['id_provinsi' => '33', 'nama_provinsi' => 'Jawa Tengah'];
+        $data = ['id_provinsi' => '33', 'provinsi' => 'Jawa Tengah'];
 
         $result = $this->asSuperAdminWith('application/x-www-form-urlencoded')
             ->withBody(http_build_query($data))
             ->post(self::URI, $data);
 
         $result->assertStatus(201);
-        $this->assertSame('Jawa Tengah', $this->json($result)['data']['nama_provinsi']);
+        $this->assertSame('Jawa Tengah', $this->json($result)['data']['provinsi']);
     }
 
     public function testEmptyBodyIsValidatedNotRejectedAsBadJson(): void
