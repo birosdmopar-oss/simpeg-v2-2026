@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Models\Auth;
 
 use App\Models\BaseAuditableModel;
+use Closure;
+use CodeIgniter\Database\Exceptions\DatabaseException;
+use CodeIgniter\Database\ResultInterface;
 
 /**
  * Tabel pengguna (A-01). Turunan BaseAuditableModel → seluruh create/update/delete akun otomatis
@@ -32,6 +35,11 @@ class PenggunaModel extends BaseAuditableModel
     protected array $auditMaskedFields = ['password', 'password_legacy'];
 
     /**
+     * Actor audit eksplisit untuk operasi tanpa sesi login (mis. reset password via token) — lihat withActor().
+     */
+    private ?string $actorOverride = null;
+
+    /**
      * @return array<string, mixed>|null
      */
     public function findByUsername(string $username): ?array
@@ -51,6 +59,54 @@ class PenggunaModel extends BaseAuditableModel
         $row = $this->where('nip', $nip)->first();
 
         return $row;
+    }
+
+    /**
+     * Jalankan $work dengan nip_actor audit = $nip. Dipakai jalur tanpa JWT (AuthContext kosong) agar audit tidak
+     * tercatat dengan actor NULL (DEV-002 Bagian 8 #4 / ISSUE-005).
+     *
+     * @template T
+     *
+     * @param Closure(): T $work
+     *
+     * @return T
+     */
+    public function withActor(string $nip, Closure $work): mixed
+    {
+        $previous            = $this->actorOverride;
+        $this->actorOverride = $nip;
+
+        try {
+            return $work();
+        } finally {
+            $this->actorOverride = $previous;
+        }
+    }
+
+    /**
+     * Kunci baris akun (`SELECT ... FOR UPDATE`) di dalam transaksi yang sedang berjalan. Dipakai sebagai langkah
+     * pertama transaksi yang menulis beberapa tabel milik satu akun (reset password) agar urutan lock selalu sama
+     * dan transaksi paralel untuk akun yang sama berjalan berurutan (DEV-002 Bagian 8 #2).
+     *
+     * @return bool false bila baris tidak ada
+     *
+     * @throws DatabaseException query gagal (lock wait timeout, deadlock, dll.); di dalam transaksi CI4 query gagal
+     *                           tidak melempar exception sendiri
+     */
+    public function lockForUpdate(int $idPengguna): bool
+    {
+        $sql = $this->db->table($this->table)
+            ->select($this->primaryKey)
+            ->where($this->primaryKey, $idPengguna)
+            ->getCompiledSelect() . ' FOR UPDATE';
+
+        $query = $this->db->query($sql);
+
+        if (! $query instanceof ResultInterface) {
+            throw new DatabaseException('Gagal mengunci baris pengguna.');
+        }
+
+        return $query->getRowArray() !== null;
     }
 
     /**
@@ -74,5 +130,10 @@ class PenggunaModel extends BaseAuditableModel
             'created_at'    => $row['created_at'] ?? null,
             'updated_at'    => $row['updated_at'] ?? null,
         ];
+    }
+
+    protected function currentActorNip(): ?string
+    {
+        return $this->actorOverride ?? parent::currentActorNip();
     }
 }
