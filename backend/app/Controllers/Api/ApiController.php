@@ -6,9 +6,11 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Exceptions\ApiException;
+use App\Exceptions\BadRequestException;
 use App\Exceptions\ValidationException;
 use App\Libraries\ApiExceptionHandler;
 use CodeIgniter\Exceptions\PageNotFoundException;
+use CodeIgniter\HTTP\Exceptions\HTTPException;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
@@ -74,12 +76,22 @@ abstract class ApiController extends BaseController
 
     /**
      * Body JSON request sebagai array (fallback ke form-data).
+     * Body yang bukan JSON valid → BadRequestException (400), kecuali request memang dikirim sebagai form.
      *
      * @return array<string, mixed>
      */
     protected function payload(): array
     {
-        $json = $this->request->getJSON(true);
+        try {
+            $json = $this->request->getJSON(true);
+        } catch (HTTPException) {
+            // Body form-urlencoded juga gagal di-parse sebagai JSON; itu bukan error, ambil dari getPost().
+            if (! $this->isFormRequest()) {
+                throw new BadRequestException('Body JSON tidak valid.');
+            }
+
+            $json = null;
+        }
 
         if (is_array($json)) {
             return $json;
@@ -89,6 +101,14 @@ abstract class ApiController extends BaseController
         $post = $this->request->getPost();
 
         return $post;
+    }
+
+    private function isFormRequest(): bool
+    {
+        $contentType = strtolower($this->request->getHeaderLine('Content-Type'));
+
+        return str_starts_with($contentType, 'application/x-www-form-urlencoded')
+            || str_starts_with($contentType, 'multipart/form-data');
     }
 
     /**
