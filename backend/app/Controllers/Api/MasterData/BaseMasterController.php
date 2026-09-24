@@ -14,7 +14,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  * "Files touched" di 02-MasterData.md) cukup mendaftarkan key master miliknya di $entities.
  * Logika bisnis seluruhnya di MasterService (ADR-002: controller tipis). Route dibangkitkan dari Config\MasterData.
  *
- * Role (Matriks Role x Endpoint Modul G): CRUD = role 1; options (dropdown) = UL_ALL (lihat Routes).
+ * Role (Matriks Role x Endpoint Modul G): CRUD = role 1; options (dropdown) = UL_ALL, kecuali master ber-publicOptions
+ * false (FAQ) = role 1 (lihat Routes).
  * Parameter pertama setiap method = key master (diinjeksi routing), lalu kode entri.
  */
 abstract class BaseMasterController extends ApiController

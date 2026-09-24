@@ -6,7 +6,8 @@ namespace App\Libraries\MasterData;
 
 /**
  * Field tambahan sebuah master di luar kolom standar (kode, nama, induk, order, status).
- * Contoh: `kd_area` kabupaten/kota, `kd_pos` kelurahan, `status_pegawai` jenis status (G-07, kolom legacy).
+ * Contoh: `kd_area` kabupaten/kota, `kd_pos` kelurahan, `status_pegawai` jenis status (G-07, kolom legacy),
+ * `remark` topik FAQ (TINYTEXT), `content` artikel FAQ (HTML, G-10).
  *
  * Tipe dipakai untuk: rules validasi backend, casting nilai, dan metadata form frontend (GET master/meta).
  */
@@ -20,7 +21,20 @@ final class MasterField
     public const TYPE_SELECT   = 'select';
 
     /**
-     * @param array<string|int, string> $options nilai => label (tipe select)
+     * Konten HTML (LONGTEXT), mis. isi artikel FAQ. Disanitasi server saat tulis lewat hook master (MasterHooks),
+     * bukan di sini — field ini hanya memvalidasi bentuk (teks) dan batas ukuran.
+     */
+    public const TYPE_HTML = 'html';
+
+    /**
+     * Batas byte bawaan tipe html bila maxBytes tidak diisi (jauh di bawah LONGTEXT, cukup untuk artikel panjang).
+     */
+    public const HTML_MAX_BYTES = 1000000;
+
+    /**
+     * @param array<string|int, string> $options  nilai => label (tipe select)
+     * @param int|null                  $maxBytes batas panjang dalam BYTE (strlen), mis. 255 untuk TINYTEXT — kolom
+     *                                            TINYTEXT dihitung byte, dan koneksi strictOn=false memotong diam-diam
      */
     public function __construct(
         public readonly string $name,
@@ -30,13 +44,14 @@ final class MasterField
         public readonly ?string $rules = null,
         public readonly array $options = [],
         public readonly ?string $hint = null,
+        public readonly ?int $maxBytes = null,
     ) {
     }
 
     /**
      * @param array{
      *     label: string, type?: string, required?: bool, rules?: string,
-     *     options?: array<string|int, string>, hint?: string
+     *     options?: array<string|int, string>, hint?: string, maxBytes?: int
      * } $config
      */
     public static function fromConfig(string $name, array $config): self
@@ -49,7 +64,16 @@ final class MasterField
             rules: $config['rules'] ?? null,
             options: $config['options'] ?? [],
             hint: $config['hint'] ?? null,
+            maxBytes: $config['maxBytes'] ?? null,
         );
+    }
+
+    /**
+     * Batas byte yang berlaku: maxBytes eksplisit, atau bawaan tipe html. null = tanpa batas byte.
+     */
+    public function byteLimit(): ?int
+    {
+        return $this->maxBytes ?? ($this->type === self::TYPE_HTML ? self::HTML_MAX_BYTES : null);
     }
 
     /**
@@ -72,6 +96,12 @@ final class MasterField
             self::TYPE_SELECT  => 'in_list[' . implode(',', array_map('strval', array_keys($this->options))) . ']',
             default            => 'string',
         };
+
+        $byteLimit = $this->byteLimit();
+
+        if ($byteLimit !== null) {
+            $parts[] = "max_byte_length[{$byteLimit}]";
+        }
 
         if ($this->rules !== null && $this->rules !== '') {
             $parts[] = $this->rules;
@@ -96,6 +126,12 @@ final class MasterField
             'string'      => "{$this->label} harus teks.",
             'regex_match' => "{$this->label} tidak sesuai format." . ($this->hint !== null ? " {$this->hint}" : ''),
         ];
+
+        $byteLimit = $this->byteLimit();
+
+        if ($byteLimit !== null) {
+            $messages['max_byte_length'] = "{$this->label} maksimal " . number_format($byteLimit, 0, ',', '.') . ' byte.';
+        }
 
         foreach (explode('|', (string) $this->rules) as $rule) {
             if (preg_match('/^(greater_than_equal_to|less_than_equal_to|max_length|min_length)\[(.+)\]$/', $rule, $m) !== 1) {
@@ -145,6 +181,8 @@ final class MasterField
                 array_values($this->options),
             ),
             'hint' => $this->hint,
+            // Batas byte UTF-8 (TINYTEXT = 255; html bawaan 1.000.000) agar form ikut memvalidasi; null = tanpa batas.
+            'max_bytes' => $this->byteLimit(),
         ];
     }
 }

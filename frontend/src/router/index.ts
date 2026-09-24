@@ -48,6 +48,13 @@ const routes: RouteRecordRaw[] = [
     meta: { roles: MASTER_DATA_ROLES, title: 'Master Data' },
   },
   {
+    // G-10 FAQ pegawai: semua role login (UL_ALL). :id = artikel yang dibuka, ?q= = kata kunci pencarian.
+    path: '/faq/:id?',
+    name: 'faq',
+    component: () => import('@/features/master-data/views/FaqPage.vue'),
+    meta: { title: 'FAQ' },
+  },
+  {
     path: '/403',
     name: 'forbidden',
     component: () => import('@/shared/views/ForbiddenView.vue'),

@@ -21,6 +21,8 @@ use App\Libraries\Auth\TurnstileVerifier;
 use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
+use App\Libraries\Html\HtmlSanitizer;
+use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
 use App\Libraries\MasterData\MasterService;
 use App\Libraries\Push\MockFcmAdapter;
@@ -174,6 +176,30 @@ class Services extends BaseService
         }
 
         return new MasterService(static::masterRegistry(), static::cacheService());
+    }
+
+    /**
+     * G-10 — baca FAQ (UL_ALL) + rating artikel (UL_PEGAWAI). CRUD admin FAQ tetap lewat masterService.
+     */
+    public static function faqService(bool $getShared = true): FaqService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('faqService');
+        }
+
+        return new FaqService();
+    }
+
+    /**
+     * Sanitasi HTML konten admin (HTMLPurifier whitelist, DBV-002). Shared: definisi purifier dibangun sekali.
+     */
+    public static function htmlSanitizer(bool $getShared = true): HtmlSanitizer
+    {
+        if ($getShared) {
+            return static::getSharedInstance('htmlSanitizer');
+        }
+
+        return new HtmlSanitizer();
     }
 
     // ------------------------------------------------------------------

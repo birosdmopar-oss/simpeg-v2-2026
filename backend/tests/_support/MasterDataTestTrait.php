@@ -67,12 +67,37 @@ trait MasterDataTestTrait
                 'existing'  => '3171010002',
                 'parent'    => ['id_kecamatan', '3171010'],
             ],
+            // G-10 FAQ (DBV-002). Entri `new` digantung di rantai yang TIDAK disentuh fixture `existing` level atasnya
+            // (topik 1 / sub topik 1), karena test RBAC menghapus `existing` secara berurutan per master dan induk
+            // wajib aktif di seluruh rantai (E6).
+            'faq-topic' => [
+                'new'       => ['faq_topic' => 'Cuti dan Izin'],
+                'duplicate' => 'KEPEGAWAIAN',
+                'existing'  => '3',
+                'parent'    => null,
+            ],
+            'faq-sub-topic' => [
+                'new'       => ['id_faq_topic' => '1', 'faq_sub_topic' => 'Akun Terkunci'],
+                'duplicate' => 'profil akun',
+                'existing'  => '2',
+                'parent'    => ['id_faq_topic', '1'],
+            ],
+            'faq-article' => [
+                'new' => [
+                    'id_faq_sub_topic' => '1',
+                    'title'            => 'Akun terkunci setelah salah kata sandi',
+                    'content'          => '<p>Tunggu lima belas menit lalu coba masuk kembali.</p>',
+                ],
+                'duplicate' => 'SYARAT KATA SANDI BARU',
+                'existing'  => '2',
+                'parent'    => ['id_faq_sub_topic', '1'],
+            ],
         ];
     }
 
     protected function resetMasterState(): void
     {
-        foreach (['masterRegistry', 'masterService', 'cacheService'] as $name) {
+        foreach (['masterRegistry', 'masterService', 'cacheService', 'faqService', 'htmlSanitizer'] as $name) {
             Services::resetSingle($name);
         }
 

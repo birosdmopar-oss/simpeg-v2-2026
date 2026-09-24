@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Constants\Role;
+use App\Libraries\MasterData\FaqService;
 use CodeIgniter\Router\RouteCollection;
 use Config\MasterData as MasterDataConfig;
 
@@ -57,8 +58,9 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
         foreach (config(MasterDataConfig::class)->entities as $key => $entity) {
             $c = $entity['controller'];
 
-            // Dropdown untuk modul lain: UL_ALL, read-only, hanya entri aktif. Didaftarkan sebelum (:segment).
-            $routes->get("{$key}/options", "{$c}::options/{$key}", ['filter' => 'jwt']);
+            // Dropdown untuk modul lain: UL_ALL, read-only, hanya entri aktif. Master ber-publicOptions false (FAQ) hanya
+            // role 1: dropdown-nya khusus form admin dan tidak menyaring rantai status (CR-003). Didaftarkan sebelum (:segment).
+            $routes->get("{$key}/options", "{$c}::options/{$key}", ($entity['publicOptions'] ?? true) ? ['filter' => 'jwt'] : $superAdmin);
 
             $routes->group($key, $superAdmin, static function (RouteCollection $routes) use ($c, $key): void {
                 $routes->get('/', "{$c}::index/{$key}");
@@ -70,6 +72,16 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
                 $routes->delete('(:segment)', "{$c}::delete/{$key}/\$1");
             });
         }
+    });
+
+    // ------------------------------------------------------------------
+    // G-10 — FAQ untuk pegawai (DBV-002): baca = UL_ALL (wajib login, D8), rating = UL_PEGAWAI (2, 6, 7; U2).
+    // Kelola konten: master/faq-topic|faq-sub-topic|faq-article (role 1). Tidak ada endpoint faq_related_article.
+    // ------------------------------------------------------------------
+    $routes->group('faq', ['namespace' => 'App\Controllers\Api\MasterData'], static function (RouteCollection $routes): void {
+        $routes->get('/', 'FaqController::publicIndex', ['filter' => 'jwt']);
+        $routes->get('(:segment)', 'FaqController::publicShow/$1', ['filter' => 'jwt']);
+        $routes->post('(:segment)/rate', 'FaqController::rate/$1', ['filter' => ['jwt', Role::filter(...FaqService::RATER_ROLES)]]);
     });
 
     // ------------------------------------------------------------------

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { ancestorChain, buildMasterSchema } from '../schemas/master.schema'
+import { ancestorChain, buildMasterSchema, fieldsMissingFromRow, MASTER_HTML_MAX_BYTES } from '../schemas/master.schema'
 import type { MasterMeta } from '../types'
 
 const meta = (
@@ -120,5 +120,67 @@ describe('ancestorChain', () => {
     const a = meta('a', 'id_a', 'nama_a', { field: 'id_b', entity: 'b' })
     const b = meta('b', 'id_b', 'nama_b', { field: 'id_a', entity: 'a' })
     expect(ancestorChain(a, [a, b]).map((m) => m.key)).toEqual(['a', 'b'])
+  })
+})
+
+describe('field html & batas byte (DBV-002 E3/E5)', () => {
+  const faqArticle = meta(
+    'faq-article',
+    'id_faq_article',
+    'title',
+    { field: 'id_faq_sub_topic', entity: 'faq-sub-topic' },
+    {
+      auto_increment: true,
+      fields: [{ name: 'content', label: 'Isi Artikel', type: 'html', required: true, options: null, hint: null }],
+    },
+  )
+  const faqTopic = meta('faq-topic', 'id_faq_topic', 'faq_topic', null, {
+    auto_increment: true,
+    fields: [{ name: 'remark', label: 'Keterangan', type: 'textarea', required: false, options: null, hint: null, max_bytes: 255 }],
+  })
+  const base = { title: 'Cara reset password', id_faq_sub_topic: '1' }
+
+  it('html wajib: kosong / spasi saja ditolak dengan pesan Indonesia', () => {
+    const schema = buildMasterSchema(faqArticle, false)
+    expect(schema.safeParse({ ...base, content: '<p>Buka menu Akun.</p>' }).success).toBe(true)
+    for (const content of ['', '   ', undefined]) {
+      const result = schema.safeParse({ ...base, content })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues[0]?.path[0]).toBe('content')
+        expect(result.error.issues[0]?.message).toBe('Isi Artikel wajib diisi.')
+      }
+    }
+  })
+
+  it('html dibatasi 1.000.000 byte bila meta tidak menyebut max_bytes', () => {
+    const schema = buildMasterSchema(faqArticle, false)
+    expect(MASTER_HTML_MAX_BYTES).toBe(1_000_000)
+    expect(schema.safeParse({ ...base, content: 'a'.repeat(MASTER_HTML_MAX_BYTES) }).success).toBe(true)
+    const tooLong = schema.safeParse({ ...base, content: 'a'.repeat(MASTER_HTML_MAX_BYTES + 1) })
+    expect(tooLong.success).toBe(false)
+    if (!tooLong.success) expect(tooLong.error.issues[0]?.message).toBe('Isi Artikel maksimal 1.000.000 byte.')
+  })
+
+  it('max_bytes dari meta dihitung byte UTF-8, bukan karakter (TINYTEXT remark)', () => {
+    const schema = buildMasterSchema(faqTopic, false)
+    expect(schema.safeParse({ faq_topic: 'Akun', remark: '' }).success).toBe(true)
+    expect(schema.safeParse({ faq_topic: 'Akun', remark: 'a'.repeat(255) }).success).toBe(true)
+    // 128 karakter "é" = 256 byte → ditolak walau < 255 karakter.
+    const multibyte = schema.safeParse({ faq_topic: 'Akun', remark: 'é'.repeat(128) })
+    expect(multibyte.success).toBe(false)
+    if (!multibyte.success) expect(multibyte.error.issues[0]?.message).toBe('Keterangan maksimal 255 byte.')
+  })
+})
+
+describe('fieldsMissingFromRow (listExclude)', () => {
+  const faqArticle = meta('faq-article', 'id_faq_article', 'title', null, {
+    fields: [{ name: 'content', label: 'Isi Artikel', type: 'html', required: true, options: null, hint: null }],
+  })
+
+  it('field yang tidak ada di baris list harus dimuat dari detail saat edit', () => {
+    expect(fieldsMissingFromRow(faqArticle, { id_faq_article: 1, title: 'A', order: 1, status: '1' }).map((f) => f.name)).toEqual(['content'])
+    expect(fieldsMissingFromRow(faqArticle, { id_faq_article: 1, title: 'A', content: '' })).toEqual([])
+    expect(fieldsMissingFromRow(faqArticle, null)).toEqual([])
   })
 })

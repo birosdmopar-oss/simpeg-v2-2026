@@ -5,10 +5,15 @@
  */
 import { z } from 'zod'
 
-import type { MasterFieldMeta, MasterMeta } from '../types'
+import { utf8ByteLength } from '@/shared/utils/byteLength'
+
+import type { MasterFieldMeta, MasterMeta, MasterRow } from '../types'
 
 /** Sama dengan regex backend: huruf/angka/titik/strip/garis bawah, tanpa spasi. */
 export const MASTER_CODE_PATTERN = /^[A-Za-z0-9._-]+$/
+
+/** Batas bawaan field `html` bila meta tidak menyebut `max_bytes` (SPEC DBV-002 E3: 1.000.000 byte). */
+export const MASTER_HTML_MAX_BYTES = 1_000_000
 
 function fieldSchema(field: MasterFieldMeta): z.ZodTypeAny {
   const label = field.label
@@ -34,8 +39,26 @@ function fieldSchema(field: MasterFieldMeta): z.ZodTypeAny {
     return field.required ? base : z.union([z.literal(''), base]).optional()
   }
 
-  const text = z.string().trim()
-  return field.required ? text.min(1, `${label} wajib diisi.`) : text.optional()
+  // text, textarea, html. Batas byte (TINYTEXT/HTML) dihitung UTF-8 seperti strlen() rule backend max_byte_length.
+  const maxBytes = field.max_bytes ?? (field.type === 'html' ? MASTER_HTML_MAX_BYTES : null)
+  const text = z.string({ required_error: `${label} wajib diisi.` }).trim()
+  const base = field.required ? text.min(1, `${label} wajib diisi.`) : text
+  const limited: z.ZodTypeAny =
+    maxBytes === null
+      ? base
+      : base.refine((v) => utf8ByteLength(v) <= maxBytes, {
+          message: `${label} maksimal ${maxBytes.toLocaleString('id-ID')} byte.`,
+        })
+  return field.required ? limited : limited.optional()
+}
+
+/**
+ * Field yang tidak ikut terkirim di baris list admin (opsi backend `listExclude`, mis. isi artikel FAQ) — saat edit,
+ * nilainya harus diambil dulu dari detail (GET master/{entity}/{id}) agar tidak terkirim kosong.
+ */
+export function fieldsMissingFromRow(meta: MasterMeta, row: MasterRow | null): MasterFieldMeta[] {
+  if (row === null) return []
+  return meta.fields.filter((field) => !Object.prototype.hasOwnProperty.call(row, field.name))
 }
 
 export function buildMasterSchema(meta: MasterMeta, isEdit: boolean) {
