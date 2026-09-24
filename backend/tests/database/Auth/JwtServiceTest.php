@@ -8,9 +8,14 @@ use App\Constants\Role;
 use App\Exceptions\AuthException;
 use App\Libraries\Auth\JwtService;
 use App\Models\Auth\TokenModel;
+use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\ConnectionInterface;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use Config\Database;
 use Config\Jwt as JwtConfig;
+use Throwable;
 
 /**
  * F0-06 — issue / verify / refresh token.
@@ -34,6 +39,18 @@ final class JwtServiceTest extends CIUnitTestCase
      */
     private array $claims = ['sub' => '198501012010011001', 'role' => Role::ADMIN_SATKER, 'id_unit' => 'U01', 'id_satker' => 'S01'];
 
+    /**
+     * Koneksi DB tambahan (request/proses lain) yang dibuka test; ditutup di tearDown.
+     *
+     * @var list<BaseConnection>
+     */
+    private array $otherConnections = [];
+
+    /**
+     * Koneksi yang menahan lock baris token (lihat lockTokenRow()).
+     */
+    private ?BaseConnection $lockHolder = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -44,6 +61,44 @@ final class JwtServiceTest extends CIUnitTestCase
         $this->config->refreshTtl = 604800;
 
         $this->jwt = new JwtService($this->config, new TokenModel($this->db));
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->otherConnections as $conn) {
+            while ($conn->transDepth > 0) {
+                $conn->transRollback();
+            }
+
+            $conn->close();
+        }
+
+        $this->otherConnections = [];
+        $this->lockHolder       = null;
+
+        parent::tearDown();
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function dbDebugModes(): iterable
+    {
+        yield 'DBDebug=true' => [true];
+
+        yield 'DBDebug=false' => [false];
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function tokenWriteModes(): iterable
+    {
+        foreach (['revoke', 'revokeAllForNip'] as $method) {
+            yield $method . ' DBDebug=true' => [$method, true];
+
+            yield $method . ' DBDebug=false' => [$method, false];
+        }
     }
 
     public function testIssueAndVerifyAccessToken(): void
@@ -149,37 +204,19 @@ final class JwtServiceTest extends CIUnitTestCase
      * DEV-002 Bagian 8 #1 — race: satu refresh token dipakai 2x bersamaan.
      * Interleaving dibuat deterministik: request A sudah membaca row (revoked=0) ketika request B
      * menyelesaikan rotasi. A tidak boleh ikut menerbitkan token; A = reuse → seluruh sesi dicabut.
+     * A memakai waktu berbeda (+60 detik) agar UPDATE tanpa syarat revoked=0 benar-benar mengubah baris
+     * (affected rows 1) — tanpa itu MySQL (foundRows=false) melaporkan 0 dan syarat revoked=0 tidak teruji.
      */
     public function testConcurrentRefreshWithSameTokenIssuesOnlyOneSessionAndTriggersReuse(): void
     {
         $pair = $this->jwt->issueTokenPair($this->claims);
 
         $winner = null;
-        $racing = new JwtService($this->config, new class ($this->db, function () use ($pair, &$winner): void {
+        $racing = new JwtService($this->config, $this->modelWithHookAfterFind($this->db, function () use ($pair, &$winner): void {
             // Request B memakai token yang sama dan menang di antara SELECT dan UPDATE milik request A.
             $winner = $this->jwt->refresh($pair['refresh_token']);
-        }) extends TokenModel {
-            /** @var (callable(): void)|null */
-            private $beforeReturn;
-
-            public function __construct(\CodeIgniter\Database\ConnectionInterface $db, callable $beforeReturn)
-            {
-                parent::__construct($db);
-                $this->beforeReturn = $beforeReturn;
-            }
-
-            public function findByHash(string $hash): ?array
-            {
-                $row = parent::findByHash($hash);
-
-                if ($this->beforeReturn !== null) {
-                    ($this->beforeReturn)();
-                    $this->beforeReturn = null;
-                }
-
-                return $row;
-            }
-        });
+        }));
+        $racing->setNow(time() + 60);
 
         try {
             $racing->refresh($pair['refresh_token']);
@@ -202,15 +239,272 @@ final class JwtServiceTest extends CIUnitTestCase
         }
     }
 
+    /**
+     * DEV-002 Bagian 8 #1 — urutan "UPDATE pemenang → revokeAll pihak kalah → INSERT pemenang" tidak boleh terjadi.
+     *
+     * Pemenang (koneksi test) sudah lolos UPDATE bersyarat; tepat sebelum INSERT token barunya, request pihak kalah
+     * berjalan di koneksi DB kedua (= proses lain). Karena revoke + INSERT satu transaksi, lock baris token lama masih
+     * ditahan: pihak kalah tertahan di UPDATE (di test ini berakhir lock wait timeout 1 detik) dan TIDAK sempat
+     * mencabut sesi sebelum token baru pemenang ada. Setelah pemenang commit, pihak kalah melanjutkan dengan baris
+     * yang sudah ia baca → affected rows 0 → reuse → seluruh sesi, termasuk hasil rotasi pemenang, dicabut.
+     */
+    public function testRaceLoserCannotRevokeAllBetweenWinnerUpdateAndInsert(): void
+    {
+        $pair  = $this->jwt->issueTokenPair($this->claims);
+        $other = $this->jwt->issueRefreshToken($this->claims); // sesi di perangkat lain
+
+        $loserDb = $this->otherConnection();
+        $loser   = new JwtService($this->config, new class ($loserDb) extends TokenModel {
+            /** @var array<string, mixed>|null */
+            private ?array $row = null;
+
+            // Request pihak kalah membaca baris SEKALI; setelah lolos dari tunggu lock ia lanjut dengan baris itu.
+            public function findByHash(string $hash): ?array
+            {
+                return $this->row ??= parent::findByHash($hash);
+            }
+        });
+
+        $loserIssued       = false;
+        $loserError        = null;
+        $otherActiveInGap  = null;
+        $inGapBeforeInsert = function () use ($loser, $loserDb, $pair, $other, &$loserIssued, &$loserError, &$otherActiveInGap): void {
+            try {
+                $loser->refresh($pair['refresh_token']);
+                $loserIssued = true;
+            } catch (Throwable $e) {
+                $loserError = $e;
+            }
+
+            $otherActiveInGap = $loserDb->table('token')
+                ->where('token_hash', hash('sha256', $other['token']))
+                ->where('revoked', 0)
+                ->countAllResults();
+        };
+
+        $winnerModel = new class ($this->db, $inGapBeforeInsert) extends TokenModel {
+            /** @var (callable(): void)|null */
+            private $hookBeforeInsert;
+
+            public function __construct(ConnectionInterface $db, callable $hookBeforeInsert)
+            {
+                parent::__construct($db);
+                $this->hookBeforeInsert = $hookBeforeInsert;
+            }
+
+            public function insert($row = null, bool $returnID = true)
+            {
+                if ($this->hookBeforeInsert !== null) {
+                    $hook                   = $this->hookBeforeInsert;
+                    $this->hookBeforeInsert = null;
+                    $hook();
+                }
+
+                return parent::insert($row, $returnID);
+            }
+        };
+
+        $winner = (new JwtService($this->config, $winnerModel))->refresh($pair['refresh_token']);
+
+        $this->assertFalse($loserIssued, 'Pihak kalah tidak boleh ikut menerbitkan token');
+        $this->assertInstanceOf(DatabaseException::class, $loserError, 'Pihak kalah harus tertahan lock baris token lama sampai token baru pemenang ter-commit, bukan langsung diperlakukan sebagai reuse');
+        $this->assertSame(1205, $loserError->getCode(), 'Harus lock wait timeout (1205)');
+        $this->assertSame(1, $otherActiveInGap, 'revokeAll pihak kalah tidak boleh jalan sebelum INSERT token baru pemenang');
+
+        // Pemenang sudah commit → lock dilepas; pihak kalah melanjutkan UPDATE-nya → affected rows 0 → reuse.
+        try {
+            $loser->refresh($pair['refresh_token']);
+            $this->fail('Pihak kalah harus ditolak sebagai reuse setelah lock dilepas');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_REUSED, $e->getReason());
+        }
+
+        $this->dontSeeInDatabase('token', ['nip' => '198501012010011001', 'revoked' => 0]);
+
+        try {
+            $this->jwt->refresh($winner['refresh_token']);
+            $this->fail('Sesi hasil rotasi pemenang harus ikut dicabut setelah reuse terdeteksi');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_REUSED, $e->getReason());
+        }
+    }
+
+    /**
+     * Logout (hapus fisik row) yang jatuh di antara SELECT dan UPDATE milik refresh = token tidak dikenal, sama seperti
+     * jalur berurutan (logout lalu refresh) — bukan reuse, sehingga sesi di perangkat lain tidak ikut dicabut.
+     */
+    public function testRefreshRacingLogoutIsUnknownTokenAndKeepsOtherSessions(): void
+    {
+        $pair  = $this->jwt->issueTokenPair($this->claims);
+        $other = $this->jwt->issueRefreshToken($this->claims); // sesi di perangkat lain
+
+        $racing = new JwtService($this->config, $this->modelWithHookAfterFind($this->db, function () use ($pair): void {
+            $this->assertTrue($this->jwt->deleteRefreshToken($pair['refresh_token']), 'Logout harus menghapus row token');
+        }));
+
+        try {
+            $racing->refresh($pair['refresh_token']);
+            $this->fail('Refresh dengan token yang dihapus logout harus ditolak');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_NOT_FOUND, $e->getReason());
+        }
+
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $other['token']), 'revoked' => 0]);
+        $this->assertSame(1, $this->db->table('token')->countAllResults(), 'Tidak boleh ada token baru yang terbit');
+    }
+
+    /**
+     * Error DB saat revoke (di sini lock wait timeout karena proses lain menahan lock baris) harus menjadi error DB:
+     * transaksi di-rollback, token lama tetap berlaku — BUKAN dibaca "kalah race" lalu dianggap reuse (cabut semua sesi,
+     * 401). Di dalam transaksi CI4 query gagal hanya mengembalikan false apa pun DBDebug-nya; diuji di kedua mode.
+     *
+     * @dataProvider dbDebugModes
+     */
+    public function testDatabaseErrorDuringRevokeIsNotTreatedAsReuse(bool $dbDebug): void
+    {
+        $pair  = $this->jwt->issueTokenPair($this->claims);
+        $other = $this->jwt->issueRefreshToken($this->claims);
+        $this->lockTokenRow($pair['refresh_token']);
+
+        $db    = $this->otherConnection($dbDebug);
+        $model = new class ($db) extends TokenModel {
+            public int $revokeAllCalls = 0;
+
+            public function revokeAllForNip(string $nip, int $now): int
+            {
+                $this->revokeAllCalls++;
+
+                return parent::revokeAllForNip($nip, $now);
+            }
+        };
+        $jwt = new JwtService($this->config, $model);
+
+        try {
+            $jwt->refresh($pair['refresh_token']);
+            $this->fail('Error DB saat revoke harus dilempar');
+        } catch (DatabaseException $e) {
+            $this->assertSame(1205, $e->getCode(), 'Harus lock wait timeout (1205)');
+        } finally {
+            $this->releaseTokenLocks();
+        }
+
+        $this->assertSame(0, $model->revokeAllCalls, 'Error DB tidak boleh diperlakukan sebagai reuse (cabut semua sesi)');
+        $this->assertSame(0, $db->transDepth, 'Transaksi rotasi harus ditutup (rollback)');
+        $this->assertTrue($db->transStatus(), 'transStatus koneksi harus di-reset setelah rollback');
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $pair['refresh_token']), 'revoked' => 0]);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $other['token']), 'revoked' => 0]);
+
+        // Lock sudah dilepas → token yang sama masih bisa dipakai (sesi tidak hilang karena error DB sesaat).
+        $new = $jwt->refresh($pair['refresh_token']);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $new['refresh_token']), 'revoked' => 0]);
+    }
+
+    /**
+     * INSERT token baru gagal di dalam transaksi rotasi (di sini pelanggaran UNIQUE token_hash, 1062). CI4 tidak
+     * melempar exception di dalam transaksi dan transCommit() tidak memeriksa transStatus, jadi tanpa cek eksplisit
+     * revoke token lama ikut ter-commit dan klien menerima refresh token yang tidak ada di DB (sesi hilang).
+     *
+     * @dataProvider dbDebugModes
+     */
+    public function testFailedInsertDuringRotationRollsBackRevoke(bool $dbDebug): void
+    {
+        $pair    = $this->jwt->issueTokenPair($this->claims);
+        $oldHash = hash('sha256', $pair['refresh_token']);
+
+        $db  = $this->otherConnection($dbDebug);
+        $jwt = new JwtService($this->config, new class ($db, $oldHash) extends TokenModel {
+            public function __construct(ConnectionInterface $db, private string $duplicateHash)
+            {
+                parent::__construct($db);
+            }
+
+            public function insert($row = null, bool $returnID = true)
+            {
+                if (is_array($row)) {
+                    $row['token_hash'] = $this->duplicateHash;
+                }
+
+                return parent::insert($row, $returnID);
+            }
+        });
+
+        try {
+            $jwt->refresh($pair['refresh_token']);
+            $this->fail('INSERT token baru yang gagal harus menggagalkan rotasi');
+        } catch (DatabaseException) {
+            // diharapkan
+        }
+
+        $this->assertSame(0, $db->transDepth, 'Transaksi rotasi harus ditutup (rollback)');
+        $this->assertTrue($db->transStatus(), 'transStatus koneksi harus di-reset setelah rollback');
+        $this->seeInDatabase('token', ['token_hash' => $oldHash, 'revoked' => 0]);
+        $this->assertSame(1, $this->db->table('token')->countAllResults());
+
+        // Token lama tetap berlaku.
+        $new = $this->jwt->refresh($pair['refresh_token']);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $new['refresh_token']), 'revoked' => 0]);
+    }
+
+    /**
+     * Status gagal sisa transaksi lain (strict mode: transStatus tetap false sampai di-reset) di koneksi bersama tidak
+     * boleh membuat rotasi yang sehat ikut dianggap gagal.
+     */
+    public function testStaleFailedTransStatusOnSharedConnectionDoesNotBreakRefresh(): void
+    {
+        $pair = $this->jwt->issueTokenPair($this->claims);
+
+        $this->db->transBegin();
+        $this->assertFalse($this->db->query('SELECT 1 FROM tabel_yang_tidak_ada'));
+        $this->db->transRollback();
+        $this->assertFalse($this->db->transStatus(), 'Prasyarat: transStatus koneksi bersama tertinggal false');
+
+        $new = $this->jwt->refresh($pair['refresh_token']);
+
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $new['refresh_token']), 'revoked' => 0]);
+        $this->assertTrue($this->db->transStatus());
+    }
+
     public function testTokenModelRevokeIsConditionalOnRevokedZero(): void
     {
         $refresh = $this->jwt->issueRefreshToken($this->claims);
         $model   = new TokenModel($this->db);
         $id      = (int) $model->findByHash(hash('sha256', $refresh['token']))['id'];
+        $now     = time();
 
-        $this->assertTrue($model->revoke($id, time()), 'Revoke pertama harus mengubah tepat 1 baris');
-        $this->assertFalse($model->revoke($id, time()), 'Revoke kedua (token sudah revoked) harus affected rows = 0');
-        $this->assertFalse($model->revoke($id + 999, time()), 'Id tidak dikenal harus affected rows = 0');
+        $this->assertTrue($model->revoke($id, $now), 'Revoke pertama harus mengubah tepat 1 baris');
+        // Timestamp berbeda: tanpa syarat revoked=0 UPDATE ini benar-benar mengubah revoked_at (affected rows 1).
+        $this->assertFalse($model->revoke($id, $now + 60), 'Revoke kedua (token sudah revoked) harus affected rows = 0');
+        $this->seeInDatabase('token', ['id' => $id, 'revoked' => 1, 'revoked_at' => date('Y-m-d H:i:s', $now)]);
+        $this->assertFalse($model->revoke($id + 999, $now + 60), 'Id tidak dikenal harus affected rows = 0');
+    }
+
+    /**
+     * Query tulis TokenModel yang gagal harus dilempar sebagai DatabaseException di kedua mode DBDebug — dengan
+     * DBDebug=false CI4 hanya mengembalikan false (affected rows -1) yang kalau diabaikan terbaca "0 baris".
+     *
+     * @dataProvider tokenWriteModes
+     */
+    public function testTokenModelWriteErrorIsThrownNotReportedAsZeroRows(string $method, bool $dbDebug): void
+    {
+        $refresh = $this->jwt->issueRefreshToken($this->claims);
+        $id      = $this->lockTokenRow($refresh['token']);
+        $model   = new TokenModel($this->otherConnection($dbDebug));
+
+        try {
+            if ($method === 'revoke') {
+                $model->revoke($id, time());
+            } else {
+                $model->revokeAllForNip('198501012010011001', time());
+            }
+
+            $this->fail($method . '() harus melempar DatabaseException saat query gagal');
+        } catch (DatabaseException $e) {
+            $this->assertSame(1205, $e->getCode(), 'Harus lock wait timeout (1205)');
+        } finally {
+            $this->releaseTokenLocks();
+        }
+
+        $this->seeInDatabase('token', ['id' => $id, 'revoked' => 0]);
     }
 
     public function testRefreshTokenExpiredAfterSevenDaysIsRejected(): void
@@ -268,5 +562,73 @@ final class JwtServiceTest extends CIUnitTestCase
 
         $this->expectException(\InvalidArgumentException::class);
         new JwtService($weak, new TokenModel($this->db));
+    }
+
+    /**
+     * Koneksi DB kedua (non-shared) ke database test = request/proses lain; lock wait dipersingkat jadi 1 detik.
+     */
+    private function otherConnection(bool $dbDebug = true): BaseConnection
+    {
+        $group            = config(Database::class)->tests;
+        $group['DBDebug'] = $dbDebug;
+
+        $db = Database::connect($group, false);
+        $db->query('SET SESSION innodb_lock_wait_timeout = 1');
+        $this->otherConnections[] = $db;
+
+        return $db;
+    }
+
+    /**
+     * Proses lain menahan X-lock baris token (SELECT ... FOR UPDATE dalam transaksi yang dibiarkan terbuka).
+     *
+     * @return int id baris token
+     */
+    private function lockTokenRow(string $plainToken): int
+    {
+        $id = (int) (new TokenModel($this->db))->findByHash(hash('sha256', $plainToken))['id'];
+
+        $this->lockHolder ??= $this->otherConnection();
+        $this->lockHolder->transBegin();
+        $this->lockHolder->query('SELECT id FROM ' . $this->lockHolder->prefixTable('token') . ' WHERE id = ? FOR UPDATE', [$id]);
+
+        return $id;
+    }
+
+    private function releaseTokenLocks(): void
+    {
+        while ($this->lockHolder !== null && $this->lockHolder->transDepth > 0) {
+            $this->lockHolder->transRollback();
+        }
+    }
+
+    /**
+     * TokenModel yang menjalankan $hook SEKALI tepat setelah findByHash() membaca baris (= di antara SELECT dan UPDATE).
+     */
+    private function modelWithHookAfterFind(ConnectionInterface $db, callable $hook): TokenModel
+    {
+        return new class ($db, $hook) extends TokenModel {
+            /** @var (callable(): void)|null */
+            private $hookAfterFind;
+
+            public function __construct(ConnectionInterface $db, callable $hookAfterFind)
+            {
+                parent::__construct($db);
+                $this->hookAfterFind = $hookAfterFind;
+            }
+
+            public function findByHash(string $hash): ?array
+            {
+                $row = parent::findByHash($hash);
+
+                if ($this->hookAfterFind !== null) {
+                    $hook                = $this->hookAfterFind;
+                    $this->hookAfterFind = null;
+                    $hook();
+                }
+
+                return $row;
+            }
+        };
     }
 }
