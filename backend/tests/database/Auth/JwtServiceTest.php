@@ -145,6 +145,74 @@ final class JwtServiceTest extends CIUnitTestCase
         }
     }
 
+    /**
+     * DEV-002 Bagian 8 #1 — race: satu refresh token dipakai 2x bersamaan.
+     * Interleaving dibuat deterministik: request A sudah membaca row (revoked=0) ketika request B
+     * menyelesaikan rotasi. A tidak boleh ikut menerbitkan token; A = reuse → seluruh sesi dicabut.
+     */
+    public function testConcurrentRefreshWithSameTokenIssuesOnlyOneSessionAndTriggersReuse(): void
+    {
+        $pair = $this->jwt->issueTokenPair($this->claims);
+
+        $winner = null;
+        $racing = new JwtService($this->config, new class ($this->db, function () use ($pair, &$winner): void {
+            // Request B memakai token yang sama dan menang di antara SELECT dan UPDATE milik request A.
+            $winner = $this->jwt->refresh($pair['refresh_token']);
+        }) extends TokenModel {
+            /** @var (callable(): void)|null */
+            private $beforeReturn;
+
+            public function __construct(\CodeIgniter\Database\ConnectionInterface $db, callable $beforeReturn)
+            {
+                parent::__construct($db);
+                $this->beforeReturn = $beforeReturn;
+            }
+
+            public function findByHash(string $hash): ?array
+            {
+                $row = parent::findByHash($hash);
+
+                if ($this->beforeReturn !== null) {
+                    ($this->beforeReturn)();
+                    $this->beforeReturn = null;
+                }
+
+                return $row;
+            }
+        });
+
+        try {
+            $racing->refresh($pair['refresh_token']);
+            $this->fail('Request kedua dengan token yang sama harus ditolak sebagai reuse');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_REUSED, $e->getReason());
+        }
+
+        // Hanya B yang sempat menerbitkan token (1 row lama + 1 row baru), dan reuse mencabut sesi B juga.
+        $this->assertNotNull($winner);
+        $this->assertSame(2, $this->db->table('token')->countAllResults());
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $winner['refresh_token']), 'revoked' => 1]);
+        $this->dontSeeInDatabase('token', ['nip' => '198501012010011001', 'revoked' => 0]);
+
+        try {
+            $this->jwt->refresh($winner['refresh_token']);
+            $this->fail('Sesi hasil rotasi harus ikut dicabut setelah reuse terdeteksi');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_REUSED, $e->getReason());
+        }
+    }
+
+    public function testTokenModelRevokeIsConditionalOnRevokedZero(): void
+    {
+        $refresh = $this->jwt->issueRefreshToken($this->claims);
+        $model   = new TokenModel($this->db);
+        $id      = (int) $model->findByHash(hash('sha256', $refresh['token']))['id'];
+
+        $this->assertTrue($model->revoke($id, time()), 'Revoke pertama harus mengubah tepat 1 baris');
+        $this->assertFalse($model->revoke($id, time()), 'Revoke kedua (token sudah revoked) harus affected rows = 0');
+        $this->assertFalse($model->revoke($id + 999, time()), 'Id tidak dikenal harus affected rows = 0');
+    }
+
     public function testRefreshTokenExpiredAfterSevenDaysIsRejected(): void
     {
         $this->jwt->setNow(time() - 604801); // diterbitkan 7 hari 1 detik lalu

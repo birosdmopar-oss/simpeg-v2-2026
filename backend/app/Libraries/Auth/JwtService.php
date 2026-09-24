@@ -186,11 +186,7 @@ class JwtService
         }
 
         if ((int) $row['revoked'] === 1) {
-            // Reuse detection (A-05): token yang sudah dipakai/dicabut dipakai lagi → indikasi pencurian token.
-            // Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut.
-            $this->tokens->revokeAllForNip((string) $row['nip'], $this->now());
-
-            throw AuthException::reusedToken();
+            $this->handleReuse((string) $row['nip']);
         }
 
         if (strtotime((string) $row['expires_at']) <= $this->now()) {
@@ -199,8 +195,13 @@ class JwtService
             throw AuthException::expiredToken();
         }
 
-        // Invalidasi token lama SEBELUM menerbitkan yang baru (single-use).
-        $this->tokens->revoke((int) $row['id'], $this->now());
+        // Invalidasi token lama SEBELUM menerbitkan yang baru (single-use). Cek di atas hanya jalur cepat:
+        // UPDATE bersyarat revoked=0 yang menentukan pemenang. Dua request paralel dengan token yang sama
+        // sama-sama lolos cek di atas, tetapi hanya satu yang mendapat affected rows = 1; yang kalah
+        // diperlakukan sebagai reuse (DEV-002 Bagian 8 #1).
+        if (! $this->tokens->revoke((int) $row['id'], $this->now())) {
+            $this->handleReuse((string) $row['nip']);
+        }
 
         /** @var array<string, mixed> $claims */
         $claims = json_decode((string) $row['claims_json'], true, 512, JSON_THROW_ON_ERROR);
@@ -287,5 +288,18 @@ class JwtService
         if (! isset($claims['sub']) || (string) $claims['sub'] === '' || ! isset($claims['role'])) {
             throw new InvalidArgumentException("Claims wajib berisi 'sub' (nip) dan 'role'.");
         }
+    }
+
+    /**
+     * Reuse detection (A-05): token yang sudah dipakai/dicabut dipakai lagi → indikasi pencurian token.
+     * Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut.
+     *
+     * @throws AuthException selalu (reusedToken → 401)
+     */
+    private function handleReuse(string $nip): never
+    {
+        $this->tokens->revokeAllForNip($nip, $this->now());
+
+        throw AuthException::reusedToken();
     }
 }

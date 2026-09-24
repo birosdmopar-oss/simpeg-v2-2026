@@ -29,12 +29,19 @@ class TokenModel extends Model
         return $row;
     }
 
+    /**
+     * Cabut satu token secara atomik: `UPDATE ... WHERE id = ? AND revoked = 0`.
+     * True hanya jika baris ini yang benar-benar mengubah status (affected rows = 1); false berarti token
+     * sudah dicabut lebih dulu — mis. oleh request paralel yang memakai token yang sama (DEV-002 Bagian 8 #1).
+     */
     public function revoke(int $id, int $now): bool
     {
-        return $this->update($id, [
+        $this->where('id', $id)->where('revoked', 0)->set([
             'revoked'    => 1,
             'revoked_at' => date('Y-m-d H:i:s', $now),
-        ]);
+        ])->update();
+
+        return $this->db->affectedRows() === 1;
     }
 
     /**

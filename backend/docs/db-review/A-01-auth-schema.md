@@ -105,7 +105,7 @@ Divalidasi 21-09-2026 di lokal (MariaDB 10.4, `simpeg_v2` + `simpeg_v2_testing`)
 
 | # | Temuan | Task | Tindakan |
 |---|---|---|---|
-| 1 | Race refresh token: 1 token dipakai 2x bersamaan → 2 sesi aktif, reuse detection tidak jalan (terbukti) | A-05 | `UPDATE token SET revoked=1 WHERE id=? AND revoked=0`, lanjut hanya jika affected rows = 1 |
+| 1 | Race refresh token: 1 token dipakai 2x bersamaan → 2 sesi aktif, reuse detection tidak jalan (terbukti) | A-05 | `UPDATE token SET revoked=1 WHERE id=? AND revoked=0`, lanjut hanya jika affected rows = 1. **Diperbaiki 24-09-2026** (`fix/refresh-token-race`): `TokenModel::revoke()` bersyarat `revoked=0` + cek affected rows; `JwtService::refresh()` memperlakukan affected rows 0 sebagai reuse (cabut semua sesi, 401). Test regresi `JwtServiceTest` (interleaving deterministik). Uji 8 proses paralel, 1 token: sebelum = 8× 200 / 8 sesi aktif; sesudah = 1× 200 + 7× 401 reused / 0 sesi aktif. Menunggu merge + QA ulang QASMTASK-024 |
 | 2 | Race token reset: 1 token dipakai 2x → 2 ganti password berhasil (terbukti); token reset lain milik user tetap berlaku | A-07 | `UPDATE forgot_attempts SET used_at=? WHERE id=? AND used_at IS NULL` + cek affected rows, dalam transaksi; batalkan token reset lain setelah sukses |
 | 3 | Collation app `utf8mb4_general_ci` vs seed `utf8mb4_unicode_ci` — FK ke `pegawai` (Fase 3) gagal di MySQL 8 | A-01 | Tetapkan satu collation dan set eksplisit |
 | 4 | Audit reset password `nip_actor = NULL` | A-10 | Isi NIP pemilik akun sebagai actor |
