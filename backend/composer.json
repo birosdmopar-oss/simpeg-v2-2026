@@ -40,6 +40,7 @@
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",
+        "process-timeout": 0,
         "sort-packages": true
     },
     "scripts": {
