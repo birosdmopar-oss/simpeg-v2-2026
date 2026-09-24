@@ -2,7 +2,7 @@
 
 **Status:** ✅ **BATCH 1 DISETUJUI DB VALIDATOR** (23-09-2026, jjoseph48) — boleh dijalankan di Dev. G-01 secara keseluruhan **masih SEBAGIAN**: sisa ~38 tabel Tier 0/1 belum ditulis (menunggu DDL legacy, Trello **ISSUE-003**) dan perlu review batch berikutnya sebelum sign-off Fase 2.
 
-**Revisi Batch 1 — DBV-001 (⏳ MENUNGGU APPROVAL):** skema Batch 1 diubah ke skema SIMPEG legacy lewat migration ALTER baru (bukan mengedit migration yang sudah disetujui), sekaligus menyelesaikan ISSUE-008/009/010 — lihat **Bagian 8**. Riwayat approval Batch 1 di bawah ini tetap berlaku sebagai catatan.
+**Revisi Batch 1 — DBV-001 (✅ DISETUJUI 24-09-2026, di main lewat PR #4 / `633dbb0`):** skema Batch 1 diubah ke skema SIMPEG legacy lewat migration ALTER baru (bukan mengedit migration yang sudah disetujui), sekaligus menyelesaikan ISSUE-008/009/010 — lihat **Bagian 8**. Riwayat approval Batch 1 di bawah ini tetap berlaku sebagai catatan.
 
 **Syarat persetujuan:** temuan #1–#3 di Bagian 6 (panjang kode wilayah, UNIQUE index nama, collation) **ditunda perbaikannya sampai seluruh DEV-003 Fase 2 selesai** — keputusan user, 23-09-2026. Aman selama tabel master masih kosong; **ketiganya wajib selesai sebelum impor data master legacy** dan sebelum sign-off Fase 2, karena perbaikan setelah tabel terisi butuh `ALTER TABLE` + dedupe data.
 
@@ -12,7 +12,7 @@
 
 | # | Kriteria DoD | Hasil | Bukti |
 |---|---|---|---|
-| 1 | Skema direview & di-approve DB Validator sebelum dijalankan | ✅ DISETUJUI untuk Batch 1 (23-09-2026); batch berikutnya menyusul | dokumen ini, Bagian 4 & 6 |
+| 1 | Skema direview & di-approve DB Validator sebelum dijalankan | ✅ DISETUJUI untuk Batch 1 (23-09-2026); revisi skema legacy DBV-001 ✅ (24-09-2026, Bagian 8); batch berikutnya menyusul | dokumen ini, Bagian 4 & 6 |
 | 2 | Urutan migration mengikuti dependency (Tier 0 dulu, lalu Tier 1 sesuai hierarki) | Batch 1 OK (provinsi → kabupaten_kota → kecamatan → kelurahan dalam satu migration, berurutan). Tier 1 belum | `2026-09-22-000001_CreateWilayah.php` |
 | 3 | FK aktif di seluruh relasi Tier 1 | Batch 1: FK wilayah aktif (`ON DELETE RESTRICT`). Tier 1 belum | test `MasterGenericTcTest::testDeleteIsAlwaysSoftAndReferencedMasterCannotBeHardDeleted` |
 
@@ -74,14 +74,14 @@ Sumber kolom: `simpeg_v2_local_seed.sql`. Struktur & relasi konsisten dengan ERD
 | # | Pertanyaan | Usulan | Keputusan |
 |---|---|---|---|
 | 1 | Setujui skema Batch 1 (Bagian 2) untuk dijalankan di Dev | Setujui | ✅ **DISETUJUI** (23-09-2026, jjoseph48) |
-| 2 | Keunikan nama master: cukup di aplikasi, atau tambah UNIQUE index (`nama` / `induk+nama`)? | Aplikasi dulu; UNIQUE index setelah data quality audit legacy (duplikat legacy akan menggagalkan migrasi data) | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #2) |
+| 2 | Keunikan nama master: cukup di aplikasi, atau tambah UNIQUE index (`nama` / `induk+nama`)? | Aplikasi dulu; UNIQUE index setelah data quality audit legacy (duplikat legacy akan menggagalkan migrasi data) | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #2) → **dikerjakan di DBV-001 ✅** (UNIQUE index, Bagian 8.5) |
 | 3 | Kolom `created_at`/`updated_at` di tabel master? | Tidak (ikut legacy; histori di `audit_logs`) | ✅ **TIDAK** — ikut usulan (23-09-2026). Jejak perubahan mengandalkan `audit_logs`; catat bahwa audit bersifat fail-open (A-01) |
-| 4 | Panjang kode wilayah VARCHAR(10) cukup? (kode Kemendagri kelurahan tanpa titik = 10 digit; dengan titik = 13) | Konfirmasi format kode legacy dari DDL/data `simpeg01` | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #1) |
+| 4 | Panjang kode wilayah VARCHAR(10) cukup? (kode Kemendagri kelurahan tanpa titik = 10 digit; dengan titik = 13) | Konfirmasi format kode legacy dari DDL/data `simpeg01` | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #1) → **dikerjakan di DBV-001 ✅** (CHAR(2/4/7/10), Bagian 8.5) |
 | 5 | Master tanpa `order` di seed: tambahkan `order` sesuai pola 02-MasterData.md? | Ya, semua master `order` + `status` | ✅ **YA** — ikut usulan (23-09-2026). Semua master Tier 0/1 wajib `order` + `status`, termasuk yang di seed belum punya (`jenis_libur`, `jenis_kp`, `gol_pppk`, `bidang`/`jurusan_pendidikan`, `diklat`, `hukdis`, `konket`, `tanda_jasa`, `lokasi_presensi`, `faq_sub_topic`, `faq_article`) dan `status` untuk `hari_libur` |
 | 6 | `jenjang_jf`, `faq_related_article`, `dm_user_lokasi_presensi`: ikut dimigrasi di G-01? | Tunggu DDL, lalu putuskan | **BELUM DIPUTUSKAN** (blocked ISSUE-003) |
 | 7 | FK `user_lokasi_presensi.nip` dan `faq_rate.nip` → `pegawai.nip`: tabel `pegawai` baru ada di Fase 3 | Defer FK ke B-01 (pola sama dengan A-01 `pengguna.nip`) | **BELUM DIPUTUSKAN** |
 | 8 | FK `pengguna.id_unit`/`id_satker` → `unit`/`satker` (ditunda dari A-01 ke Fase 2) | Ditambahkan saat migration unit/satker (G-02) setelah DDL legacy ada | **BELUM DIPUTUSKAN** |
-| 9 | Collation (A-01 Bagian 8 #3 — belum diputuskan): tabel master batch 1 mewarisi default koneksi (`utf8mb4_general_ci`). Keunikan nama master bergantung pada collation `*_ci` | Ikuti keputusan #3 A-01; kalau ditetapkan `utf8mb4_unicode_ci`, batch 1 ditambah `ALTER TABLE … CONVERT TO` sebelum dijalankan di Dev | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #3) |
+| 9 | Collation (A-01 Bagian 8 #3 — belum diputuskan): tabel master batch 1 mewarisi default koneksi (`utf8mb4_general_ci`). Keunikan nama master bergantung pada collation `*_ci` | Ikuti keputusan #3 A-01; kalau ditetapkan `utf8mb4_unicode_ci`, batch 1 ditambah `ALTER TABLE … CONVERT TO` sebelum dijalankan di Dev | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #3) → **sebagian di DBV-001 ✅** (7 tabel `utf8mb4_unicode_ci`, Bagian 8.5) |
 
 ## 5. Hasil verifikasi DB Validator (23-09-2026)
 
@@ -120,11 +120,11 @@ Keputusan user 23-09-2026. Ketiganya **wajib selesai sebelum impor data master l
 | 5 | Kode (PK) immutable + FK `ON UPDATE RESTRICT`; perubahan kode wilayah dari Kemendagri hanya bisa lewat SQL manual | migration wilayah | Siapkan prosedur perawatan kode master |
 | 6 | `order` adalah kata kunci SQL | seluruh tabel master | Wajib backtick di script migrasi/report manual |
 
-## 8. DBV-001 — Revisi skema Batch 1 ke skema SIMPEG legacy (⏳ MENUNGGU APPROVAL DB Validator)
+## 8. DBV-001 — Revisi skema Batch 1 ke skema SIMPEG legacy (✅ DISETUJUI DB Validator 24-09-2026)
 
-**Key review:** `DBV-001` (review DB Validator) + `CR-001` (review kode) — satu pull request, judul `[DBV-001][CR-001] …`, branch `dbv-001/g01-batch1-skema-legacy`. Merge hanya setelah **kedua** review menyatakan setuju. Aturan 24-09-2026: untuk PR dengan dua key [CR] & [DBV], DB Validator **hanya me-review/approve** (tidak merge); **merge dilakukan oleh reviewer CR**. Status: CR-001 ✅ (24-09-2026), DBV-001 ⏳.
+**Key review:** `DBV-001` (review DB Validator) + `CR-001` (review kode) — satu pull request, judul `[DBV-001][CR-001] …`, branch `dbv-001/g01-batch1-skema-legacy`. Merge hanya setelah **kedua** review menyatakan setuju. Aturan 24-09-2026: untuk PR dengan dua key [CR] & [DBV], DB Validator **hanya me-review/approve** (tidak merge); **merge dilakukan oleh reviewer CR**. Status: CR-001 ✅ (24-09-2026), DBV-001 ✅ (24-09-2026, jjoseph48 — komentar "DBV-001 ✅" di PR #4); di-merge ke `main` 24-09-2026 oleh reviewer CR (merge commit `633dbb0`).
 
-**Status:** ⏳ MENUNGGU APPROVAL. Migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` **JANGAN dijalankan di Dev/Production** sebelum DBV-001 disetujui.
+**Status:** ✅ DISETUJUI (24-09-2026). Migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` boleh dijalankan di Dev, dengan syarat ketujuh tabel Batch 1 **kosong** (`up()` menolak jalan bila berisi data). Deploy otomatis ke server Dev tetap mengikuti Trello ISSUE-014 (HOLD).
 
 ### 8.1 Latar belakang
 
@@ -178,10 +178,12 @@ Kalau dump berbeda, koreksi lewat migration ALTER berikutnya (selagi tabel masih
 
 | # | Pertanyaan | Usulan | Keputusan |
 |---|---|---|---|
-| 1 | Setujui skema Bagian 8.2 + migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy` untuk Dev | Setujui, dengan catatan 8.3 dicocokkan saat dump tersedia | ⏳ |
-| 2 | UNIQUE index mencakup baris berstatus 10 (Dihapus): nama yang pernah dihapus tidak bisa dibuat ulang, harus dipulihkan (aplikasi memberi petunjuk) | Terima — sama dengan aturan aplikasi yang sudah disetujui (unik termasuk entri non-aktif). Konsekuensi: **audit duplikat data legacy wajib sebelum impor** | ⏳ |
-| 3 | `created_at DEFAULT CURRENT_TIMESTAMP` memakai jam server DB (WIB), sedangkan aplikasi menulis UTC (catatan zona waktu A-01) | Aplikasi selalu mengisi eksplisit; default DB hanya cadangan. Keputusan zona waktu global tetap di item A-01 | ⏳ |
-| 4 | `order` tetap ada di tabel wilayah walau code legacy mengurutkan menurut nama | Pertahankan (Keputusan #5 & G-TC #4); isi `order` saat impor = urutan nama | ⏳ |
+| 1 | Setujui skema Bagian 8.2 + migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy` untuk Dev | Setujui, dengan catatan 8.3 dicocokkan saat dump tersedia | ✅ Disetujui sesuai usulan* |
+| 2 | UNIQUE index mencakup baris berstatus 10 (Dihapus): nama yang pernah dihapus tidak bisa dibuat ulang, harus dipulihkan (aplikasi memberi petunjuk) | Terima — sama dengan aturan aplikasi yang sudah disetujui (unik termasuk entri non-aktif). Konsekuensi: **audit duplikat data legacy wajib sebelum impor** | ✅ Disetujui sesuai usulan* |
+| 3 | `created_at DEFAULT CURRENT_TIMESTAMP` memakai jam server DB (WIB), sedangkan aplikasi menulis UTC (catatan zona waktu A-01) | Aplikasi selalu mengisi eksplisit; default DB hanya cadangan. Keputusan zona waktu global tetap di item A-01 | ✅ Disetujui sesuai usulan* |
+| 4 | `order` tetap ada di tabel wilayah walau code legacy mengurutkan menurut nama | Pertahankan (Keputusan #5 & G-TC #4); isi `order` saat impor = urutan nama | ✅ Disetujui sesuai usulan* |
+
+\* Approval DBV-001 berupa satu komentar menyeluruh ("DBV-001 ✅", jjoseph48, PR #4, 24-09-2026) tanpa catatan per poin, sehingga keputusan no. 1–4 dicatat mengikuti kolom **Usulan**. Bila DB Validator bermaksud lain, koreksi lewat PR lanjutan. Catatan no. 1 (pencocokan nilai [I] Bagian 8.3 dengan dump struktur produksi) dilacak di Trello ISSUE-015 (checklist dump).
 
 ### 8.5 Status keputusan & temuan sebelumnya setelah DBV-001
 
@@ -201,6 +203,6 @@ Kalau dump berbeda, koreksi lewat migration ALTER berikutnya (selagi tabel masih
 - `down()` mempertahankan data (dipakai `migrate:refresh` test): status `1` → `'1'`, `2`/`10` → `'0'`. Kolom legacy tambahan (`kd_area`, `kd_pos`, `status_pegawai`, audit, `deleted_at`) ikut terhapus; `down()` menolak jalan bila ada nama wilayah > 100 karakter (tidak muat VARCHAR(100) Batch 1).
 - Keunikan: pelanggaran UNIQUE/PRIMARY (1062) akibat dua permintaan balapan membatalkan seluruh transaksi dan diterjemahkan ke 422. Catatan CR-001: di CodeIgniter 4.7 query yang gagal **di dalam transaksi** tidak melempar exception (hanya `false` + `transStatus`), sehingga sebelumnya tulisan gagal ikut "sukses" dan transaksi tetap di-commit; kini dicegah di `MasterModel` dan dibuktikan `MasterGenericTcTest::testDuplicateRaceIsRolledBackAndTranslatedTo422`.
 - Test otomatis: `tests/MasterData/Batch1LegacySchemaTest.php` (kolom & tipe, collation, UNIQUE, AUTO_INCREMENT, FK legacy, rollback, penolakan saat berisi data) + `MasterGenericTcTest`/`RbacMasterEndpointsTest` diperbarui ke skema legacy.
-- **Belum** diverifikasi di MariaDB 10.4 (lingkungan DB Validator) — mohon dijalankan di sana saat review.
+- Verifikasi di MariaDB 10.4 (lingkungan DB Validator) **tidak dilaporkan terpisah** saat approval DBV-001 (24-09-2026). Sebelum migration ini dijalankan di server berbasis MariaDB, jalankan sekali `migrate` → `migrate:rollback` → `migrate` di sana.
 
 **Pemulihan bila `up()` gagal di tengah** (DDL MySQL ter-commit per statement, migration tidak tercatat): karena `up()` hanya jalan saat ketujuh tabel kosong, tidak ada data yang hilang. Pulihkan manual (jangan `migrate:rollback` batch, karena di environment baru Batch 1 bisa satu batch dengan tabel auth): drop 7 tabel kosong itu (urutan kelurahan, kecamatan, kabupaten_kota, provinsi, agama, jenis_pegawai, jenis_status), hapus baris `2026-09-22-000001` & `2026-09-22-000002` di tabel `migrations`, lalu `php spark migrate`. Catat kejadian di kartu DBV-001.
