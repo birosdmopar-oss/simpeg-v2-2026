@@ -65,8 +65,10 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     result.value = await authService.forgotPassword(values)
   } catch (err) {
-    // Token captcha sekali pakai: selalu minta verifikasi ulang setelah gagal.
-    setFieldValue('captcha_token', '')
+    // Token captcha sekali pakai: selalu minta verifikasi ulang setelah gagal. Tanpa validasi ulang (false):
+    // validasi skema berjalan async dan akan menimpa error field dari backend (setFieldError di bawah) dengan hasil
+    // validasi klien yang lolos, sehingga pesan 422 errors.username hilang.
+    setFieldValue('captcha_token', '', false)
     turnstile.value?.reset()
 
     if (!isApiError(err)) {
@@ -114,7 +116,7 @@ const onSubmit = handleSubmit(async (values) => {
         <p class="font-semibold">Mode pengembangan</p>
         <p class="mt-1">Kanal pengiriman belum aktif; token dikembalikan backend untuk pengujian.</p>
         <RouterLink
-          :to="{ name: 'reset-password', query: { token: devToken } }"
+          :to="{ name: 'reset-password', hash: `#token=${encodeURIComponent(devToken)}` }"
           class="mt-1 inline-block font-medium text-brand-primary underline"
           data-testid="forgot-dev-link"
         >

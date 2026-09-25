@@ -63,7 +63,7 @@ Request `{ "username", "captcha_token": "<cf-turnstile-response>" }`. 200 selalu
 422 captcha kosong/invalid — dicek PALING AWAL seperti login, sehingga percobaan tanpa captcha valid tidak tercatat di `forgot_attempts` dan tidak menghabiskan kuota username korban.
 429 kalau > `auth.forgotMaxPerWindow` (3) permintaan per `auth.forgotWindowMinutes` (60) untuk username yang sama.
 
-Pengiriman tautan (ISSUE-006, kanal final = email/K3): untuk akun aktif, tautan `{auth.resetLinkBase}?token=<token>` dikirim lewat `App\Interfaces\ResetTokenNotifierInterface`; driver dipilih `auth.resetTokenNotifier`:
+Pengiriman tautan (ISSUE-006, kanal final = email/K3): untuk akun aktif, tautan `{auth.resetLinkBase}#token=<token>` dikirim lewat `App\Interfaces\ResetTokenNotifierInterface`; driver dipilih `auth.resetTokenNotifier`. Token sengaja di **fragment** (`#`), bukan query: browser tidak mengirim fragment ke server, sehingga token tidak tercatat di access log web server frontend maupun header Referer (halaman reset frontend masih menerima `?token=` gaya legacy sebagai cadangan).
 
 | Driver | Untuk | Perilaku |
 |---|---|---|
@@ -71,7 +71,7 @@ Pengiriman tautan (ISSUE-006, kanal final = email/K3): untuk akun aktif, tautan 
 | `mock` | test (PHPUnit) | tautan disimpan di memori — **ditolak di production** |
 | `email` | production | belum ada; menunggu akun SMTP (driver wajib async lewat Queue) |
 
-Selama driver email belum ada, production menolak forgot-password dengan 500 (ConfigException) yang sama untuk semua username, dan frontend menyembunyikan halamannya (`VITE_PASSWORD_RESET_ENABLED=false` → "Hubungi Admin"). `auth.resetLinkBase` wajib URL absolut http(s) halaman `/reset-password` frontend tanpa query. Log milik service tidak memuat token; kegagalan kirim dicatat di log dan respons tetap generik.
+Selama driver email belum ada, production menolak forgot-password dengan 500 (ConfigException) yang sama untuk semua username, dan frontend menyembunyikan halamannya (`VITE_PASSWORD_RESET_ENABLED=false` → "Hubungi Admin"). `auth.resetLinkBase` wajib URL absolut http(s) halaman `/reset-password` frontend tanpa query/fragment. Log milik service tidak memuat token; kegagalan kirim dicatat di log dan respons tetap generik.
 
 ### POST /auth/reset-password
 Request `{ "token", "new_password", "new_password_confirmation" }`. 200 `data: { reset:true }`.

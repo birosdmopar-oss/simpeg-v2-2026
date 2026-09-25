@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 describe('router — lupa/reset password di balik VITE_PASSWORD_RESET_ENABLED', () => {
-  it.each(['/lupa-password', '/reset-password?token=abc'])('flag false → %s dialihkan ke login', async (path) => {
+  it.each(['/lupa-password', '/reset-password?token=abc', '/reset-password#token=abc'])('flag false → %s dialihkan ke login', async (path) => {
     vi.stubEnv('VITE_PASSWORD_RESET_ENABLED', 'false')
     await router.push(path)
 

@@ -48,7 +48,7 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: requirePasswordReset,
   },
   {
-    // A-07 langkah 2: tautan dari kanal = /reset-password?token=… (backend auth.resetLinkBase).
+    // A-07 langkah 2: tautan dari kanal = /reset-password#token=… (backend auth.resetLinkBase; ?token= = cadangan legacy).
     path: '/reset-password',
     name: 'reset-password',
     component: () => import('@/features/auth/views/ResetPasswordView.vue'),

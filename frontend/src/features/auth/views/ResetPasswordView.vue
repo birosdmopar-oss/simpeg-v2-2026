@@ -2,8 +2,10 @@
 /**
  * Reset password dengan token dari tautan (A-07, ISSUE-006 / MTC-007). Tamu saja, di balik VITE_PASSWORD_RESET_ENABLED.
  *
- * - Token dibaca dari query `?token=` (tautan dari backend: auth.resetLinkBase?token=…), disimpan di memori, lalu
- *   dihapus dari URL (router.replace) supaya tidak tertinggal di riwayat browser. Tanpa token → field tempel manual.
+ * - Token dibaca dari fragment `#token=` (tautan dari backend: auth.resetLinkBase#token=…; fragment tidak dikirim
+ *   browser ke server sehingga tidak masuk access log web server maupun Referer), atau dari query `?token=` sebagai
+ *   cadangan gaya legacy. Token disimpan di memori, lalu fragment/query token dihapus dari URL (router.replace)
+ *   supaya tidak tertinggal di riwayat browser. Tanpa token → field tempel manual.
  * - Password baru + konfirmasi memakai checklist real-time yang sama (tanpa aturan "beda dari password lama").
  * - 422 errors.token (tidak valid / kedaluwarsa / sudah dipakai / tidak berlaku lagi) → banner, form dinonaktifkan,
  *   tombol minta tautan baru. 5xx → token belum terpakai, sarankan coba lagi. Sukses → login dengan pesan sukses.
@@ -26,7 +28,9 @@ import { authService } from '../services/auth.service'
 const route = useRoute()
 const router = useRouter()
 
-const linkToken = typeof route.query.token === 'string' ? route.query.token.trim() : ''
+const hashParams = new URLSearchParams(route.hash.replace(/^#/, ''))
+const queryToken = typeof route.query.token === 'string' ? route.query.token : null
+const linkToken = (hashParams.get('token') ?? queryToken ?? '').trim()
 const fromLink = linkToken !== ''
 
 const submitting = ref(false)
@@ -49,10 +53,10 @@ const formRules = computed<PasswordChecklistItem[]>(() => {
 })
 
 onMounted(() => {
-  if ('token' in route.query) {
+  if (hashParams.has('token') || 'token' in route.query) {
     const query = { ...route.query }
     delete query.token
-    void router.replace({ name: 'reset-password', query })
+    void router.replace({ name: 'reset-password', query, hash: '' })
   }
 })
 
@@ -101,8 +105,10 @@ const onSubmit = handleSubmit(async (values) => {
     >
       <div>
         <h2 class="text-lg font-semibold text-slate-800">Buat Password Baru</h2>
-        <p class="mt-1 text-sm text-slate-500">
-          Setelah berhasil, semua sesi login akun ini diakhiri dan Anda masuk dengan password baru.
+        <!-- Lihat ChangePasswordView: access token lain tetap sah sampai kedaluwarsa (jwt.accessTtl, default 60 menit). -->
+        <p class="mt-1 text-sm text-slate-500" data-testid="reset-note">
+          Setelah berhasil, masuk dengan password baru. Sesi login akun ini di perangkat lain tidak bisa diperpanjang
+          lagi dan berakhir paling lambat 60 menit kemudian.
         </p>
       </div>
 

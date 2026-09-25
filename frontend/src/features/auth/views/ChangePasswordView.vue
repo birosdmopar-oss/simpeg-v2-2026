@@ -84,9 +84,13 @@ const onSubmit = handleSubmit(async (values) => {
   <section class="mx-auto max-w-lg space-y-4">
     <div>
       <h1 class="text-xl font-semibold text-slate-800">Ganti Password</h1>
-      <p class="mt-1 text-sm text-slate-500">
-        Setelah password diganti, semua sesi login Anda (termasuk di perangkat lain) diakhiri dan Anda perlu masuk
-        kembali.
+      <!--
+        Backend hanya mencabut refresh token; access token yang sudah terbit di perangkat lain tetap sah sampai
+        kedaluwarsa (jwt.accessTtl, default 3600 detik). Jangan menjanjikan sesi lain langsung terputus.
+      -->
+      <p class="mt-1 text-sm text-slate-500" data-testid="change-password-note">
+        Setelah password diganti, Anda perlu masuk kembali. Sesi login Anda di perangkat lain tidak bisa diperpanjang
+        lagi dan berakhir paling lambat 60 menit kemudian.
       </p>
     </div>
 

@@ -86,6 +86,16 @@ describe('ChangePasswordView', () => {
     expect(authService.changePassword).not.toHaveBeenCalled()
   })
 
+  it('keterangan sesi sesuai backend: login ulang, sesi perangkat lain berakhir paling lambat 60 menit', async () => {
+    // Backend hanya mencabut refresh token; access token lain tetap sah sampai kedaluwarsa (jwt.accessTtl 3600 s).
+    const wrapper = await mountView()
+    const note = wrapper.get('[data-testid="change-password-note"]').text()
+
+    expect(note).toContain('Anda perlu masuk kembali')
+    expect(note).toContain('paling lambat 60 menit')
+    expect(note).not.toMatch(/semua sesi .*diakhiri/)
+  })
+
   it('password baru di luar kebijakan diblok di klien dengan pesan backend yang sama', async () => {
     const wrapper = await mountView()
     await fill(wrapper, { old_password: 'lama', new_password: 'password1', new_password_confirmation: 'password1' })

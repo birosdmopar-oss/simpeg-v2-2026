@@ -1,6 +1,7 @@
 /**
- * A-07 / ISSUE-006 — halaman reset password: token dari query dibaca lalu dihapus dari URL, checklist real-time tanpa
- * aturan "beda dari lama", token ditolak → form dikunci + tautan minta baru, sukses → /login?reason=password-reset.
+ * A-07 / ISSUE-006 — halaman reset password: token dari fragment #token= (tautan backend) atau ?token= (cadangan legacy)
+ * dibaca lalu dihapus dari URL, checklist real-time tanpa aturan "beda dari lama", token ditolak → form dikunci +
+ * tautan minta baru, sukses → /login?reason=password-reset.
  */
 import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { AxiosError } from 'axios'
@@ -56,7 +57,36 @@ beforeEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('ResetPasswordView', () => {
-  it('token dari ?token= disimpan di memori lalu dihapus dari URL; sukses → login dengan pesan', async () => {
+  it('token dari fragment #token= (tautan backend) disimpan di memori lalu dihapus dari URL', async () => {
+    vi.mocked(authService.resetPassword).mockResolvedValue(undefined)
+    const wrapper = await mountAt('/reset-password#token=tokhash789')
+
+    expect(router.currentRoute.value.fullPath).toBe('/reset-password')
+    expect(router.currentRoute.value.hash).toBe('')
+    expect(wrapper.find('input[name="token"]').exists()).toBe(false)
+
+    await fillAndSubmit(wrapper)
+
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('login'))
+    expect(authService.resetPassword).toHaveBeenCalledWith({
+      token: 'tokhash789',
+      new_password: NEW,
+      new_password_confirmation: NEW,
+    })
+  })
+
+  it('fragment #token= didahulukan dari ?token=; keduanya dihapus dari URL', async () => {
+    vi.mocked(authService.resetPassword).mockResolvedValue(undefined)
+    const wrapper = await mountAt('/reset-password?token=dariquery&lang=id#token=darihash')
+
+    expect(router.currentRoute.value.fullPath).toBe('/reset-password?lang=id')
+
+    await fillAndSubmit(wrapper)
+    await vi.waitFor(() => expect(authService.resetPassword).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(authService.resetPassword).mock.calls[0]?.[0].token).toBe('darihash')
+  })
+
+  it('cadangan legacy: token dari ?token= disimpan di memori lalu dihapus dari URL; sukses → login dengan pesan', async () => {
     vi.mocked(authService.resetPassword).mockResolvedValue(undefined)
     const wrapper = await mountAt('/reset-password?token=tok123')
 
@@ -112,6 +142,24 @@ describe('ResetPasswordView', () => {
     await vi.waitFor(() => expect(wrapper.get('input[name="new_password"]').attributes('aria-invalid')).toBe('true'))
     expect(wrapper.text()).toContain('Password harus mengandung minimal 1 huruf kecil.')
     expect(wrapper.find('[data-testid="reset-token-error"]').exists()).toBe(false)
+  })
+
+  it('422 tanpa field yang dikenali → pesan backend tampil sebagai banner', async () => {
+    vi.mocked(authService.resetPassword).mockRejectedValue(apiError(422, 'Validasi gagal.', {}))
+    const wrapper = await mountAt('/reset-password#token=tok123')
+    await fillAndSubmit(wrapper)
+
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="reset-error"]').text()).toBe('Validasi gagal.'))
+    expect(wrapper.find('[data-testid="reset-token-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="reset-fields"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('keterangan sesi tidak menjanjikan sesi lain langsung diakhiri (access token berlaku s.d. 60 menit)', async () => {
+    const wrapper = await mountAt('/reset-password#token=tok123')
+    const note = wrapper.get('[data-testid="reset-note"]').text()
+
+    expect(note).toContain('paling lambat 60 menit')
+    expect(note).not.toMatch(/semua sesi .*diakhiri/)
   })
 
   it('500 → sarankan coba lagi karena token belum terpakai', async () => {

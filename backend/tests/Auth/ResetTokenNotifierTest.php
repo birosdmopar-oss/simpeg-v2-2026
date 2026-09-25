@@ -98,7 +98,8 @@ final class ResetTokenNotifierTest extends CIUnitTestCase
         $this->assertCount(1, $sent);
         $this->assertSame(self::NIP, $sent[0]['nip']);
         $this->assertSame(self::NIP, $sent[0]['username']);
-        $this->assertSame(self::BASE . '?token=' . $sent[0]['token'], $sent[0]['reset_link']);
+        // Token di fragment (#), bukan query: tidak dikirim browser ke server → tidak masuk access log / Referer.
+        $this->assertSame(self::BASE . '#token=' . $sent[0]['token'], $sent[0]['reset_link']);
         $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $sent[0]['token']);
 
         // Token yang dikirim = token yang hash-nya tersimpan, dengan masa berlaku yang sama.
@@ -143,6 +144,20 @@ final class ResetTokenNotifierTest extends CIUnitTestCase
         }
 
         $this->assertCount(3, $this->notifier->sent());
+
+        // Kuota username sudah habis: captcha tetap dicek lebih dulu → 422 captcha, bukan 429. Tanpa captcha valid,
+        // pemohon tidak bisa membaca status kuota username dan tidak menambah baris forgot_attempts.
+        foreach (['', 'invalid'] as $captcha) {
+            $result = $this->forgotPassword(self::NIP, $captcha);
+            $result->assertStatus(422);
+            $this->assertSame(['Verifikasi captcha gagal. Silakan ulangi.'], $this->json($result)['errors']['captcha_token']);
+        }
+
+        $this->assertSame(3, $this->db->table('forgot_attempts')->where('username', self::NIP)->countAllResults());
+
+        // Pembanding: dengan captcha valid, kuota yang habis memang menghasilkan 429.
+        $this->forgotPassword(self::NIP)->assertStatus(429);
+        $this->assertCount(3, $this->notifier->sent());
     }
 
     public function testDeliveryFailureKeepsGenericResponseAndIsLogged(): void
@@ -172,7 +187,7 @@ final class ResetTokenNotifierTest extends CIUnitTestCase
         $this->service($notifier)->request(self::NIP, 'ok', null);
 
         $this->assertLogContains('info', LogResetTokenNotifier::LOG_PREFIX . ' tautan reset untuk username=' . self::NIP);
-        $this->assertLogContains('info', self::BASE . '?token=');
+        $this->assertLogContains('info', self::BASE . '#token=');
     }
 
     public function testNonDeliveringDriversAreRejectedInProduction(): void
@@ -200,6 +215,38 @@ final class ResetTokenNotifierTest extends CIUnitTestCase
         $this->config->resetTokenNotifier = 'email';
         $this->expectException(ConfigException::class);
         service('resetTokenNotifier', false);
+    }
+
+    /**
+     * Driver kanal yang ditolak (setara log/mock di production, atau driver email yang belum ada) di-resolve lewat
+     * service('resetTokenNotifier') SEBELUM username dicari: gagal SAMA (ConfigException) untuk username terdaftar
+     * maupun tidak, dan tidak menulis apa pun ke forgot_attempts. Service sengaja dibangun TANPA notifier eksplisit
+     * supaya jalur resolusi yang dipakai production ikut diuji.
+     */
+    public function testRejectedNotifierDriverFailsForEveryUsernameBeforeLookup(): void
+    {
+        $this->config->resetTokenNotifier = 'email';
+        Services::resetSingle('resetTokenNotifier');
+
+        $outcome = [];
+
+        try {
+            foreach ([self::NIP, '000000000000000000'] as $username) {
+                try {
+                    $this->service()->request($username, 'ok', null);
+                    $outcome[$username] = 'accepted';
+                } catch (ConfigException $e) {
+                    $this->assertStringContainsString('auth.resetTokenNotifier', $e->getMessage());
+                    $outcome[$username] = 'ConfigException';
+                }
+            }
+        } finally {
+            $this->config->resetTokenNotifier = 'mock';
+            Services::resetSingle('resetTokenNotifier');
+        }
+
+        $this->assertSame([self::NIP => 'ConfigException', '000000000000000000' => 'ConfigException'], $outcome);
+        $this->assertSame(0, $this->db->table('forgot_attempts')->countAllResults());
     }
 
     /**

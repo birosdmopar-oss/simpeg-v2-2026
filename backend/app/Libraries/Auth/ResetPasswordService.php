@@ -21,8 +21,10 @@ use Throwable;
  *
  * request(): captcha Turnstile (A-03, pola login: dicek PALING AWAL, sebelum rate limit dan lookup username) →
  *            rate limit via forgot_attempts (forgotMaxPerWindow per forgotWindowMinutes) → token acak 256-bit (di DB
- *            hanya hash) → tautan {auth.resetLinkBase}?token=… dikirim lewat ResetTokenNotifierInterface. Response
- *            selalu generik (tidak membocorkan apakah username terdaftar).
+ *            hanya hash) → tautan {auth.resetLinkBase}#token=… dikirim lewat ResetTokenNotifierInterface. Response
+ *            selalu generik (tidak membocorkan apakah username terdaftar). Token di FRAGMENT (#), bukan query: browser
+ *            tidak mengirim fragment ke server, jadi token tidak tercatat di access log web server frontend maupun
+ *            header Referer.
  * reset()  : token expired → ditolak; token sudah dipakai / dibatalkan → ditolak; sukses → password Argon2id baru,
  *            token ditandai used_at, token reset lain milik user dibatalkan, SELURUH refresh token dicabut.
  *            Semua tulisan dalam satu transaksi; klaim token lewat UPDATE bersyarat used_at IS NULL sehingga
@@ -121,7 +123,7 @@ class ResetPasswordService
                 'exp'      => (string) $expiresAt,
             ]);
 
-            $this->deliver($notifier, $user, $token, $linkBase . '?token=' . rawurlencode($token), (string) $expiresAt);
+            $this->deliver($notifier, $user, $token, $linkBase . '#token=' . rawurlencode($token), (string) $expiresAt);
         }
 
         return [
@@ -228,7 +230,7 @@ class ResetPasswordService
     }
 
     /**
-     * auth.resetLinkBase wajib URL absolut http(s) tanpa query/fragment; token ditambahkan sebagai ?token=….
+     * auth.resetLinkBase wajib URL absolut http(s) tanpa query/fragment; token ditambahkan sebagai fragment #token=….
      *
      * @throws ConfigException
      */

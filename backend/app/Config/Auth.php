@@ -80,7 +80,8 @@ class Auth extends BaseConfig
 
     /**
      * URL absolut halaman reset password di FRONTEND (backend tidak tahu URL frontend). Tautan yang dikirim:
-     * {resetLinkBase}?token=<token>. WAJIB diisi URL production (https) lewat .env auth.resetLinkBase.
+     * {resetLinkBase}#token=<token> — token di fragment agar tidak ikut ke access log web server maupun Referer.
+     * Tanpa query/fragment. WAJIB diisi URL production (https) lewat .env auth.resetLinkBase.
      */
     public string $resetLinkBase = 'http://localhost:5173/reset-password';
 

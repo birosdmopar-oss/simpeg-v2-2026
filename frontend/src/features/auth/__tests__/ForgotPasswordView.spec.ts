@@ -75,13 +75,13 @@ describe('ForgotPasswordView', () => {
     expect(wrapper.find('[data-testid="forgot-dev-token"]').exists()).toBe(false)
   })
 
-  it('development + token dari backend → tautan langsung ke /reset-password?token=…', async () => {
+  it('development + token dari backend → tautan langsung ke /reset-password#token=… (fragment, seperti tautan backend)', async () => {
     vi.mocked(authService.forgotPassword).mockResolvedValue({ accepted: true, message: GENERIC, token: 'abc123', expires_at: '2026-09-25 10:30:00' })
     const wrapper = await mountView()
     await fillAndSubmit(wrapper)
 
     await vi.waitFor(() =>
-      expect(wrapper.get('[data-testid="forgot-dev-link"]').attributes('href')).toBe('/reset-password?token=abc123'),
+      expect(wrapper.get('[data-testid="forgot-dev-link"]').attributes('href')).toBe('/reset-password#token=abc123'),
     )
   })
 
@@ -106,6 +106,24 @@ describe('ForgotPasswordView', () => {
       expect(wrapper.get('[data-testid="forgot-error-rate-limit"]').text()).toContain('Coba lagi dalam 60 menit'),
     )
     expect((wrapper.get('[data-testid="captcha-mock"] input').element as HTMLInputElement).checked).toBe(false)
+
+    // Token captcha lama benar-benar dikosongkan: kirim ulang tanpa verifikasi baru diblok di klien.
+    await wrapper.get('[data-testid="forgot-form"]').trigger('submit')
+    await flushPromises()
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Selesaikan verifikasi captcha terlebih dahulu.'))
+    expect(authService.forgotPassword).toHaveBeenCalledTimes(1)
+  })
+
+  it('422 errors.username → error di field username, bukan banner', async () => {
+    vi.mocked(authService.forgotPassword).mockRejectedValue(
+      apiError(422, 'Validasi gagal.', { username: ['Username/NIP tidak valid.'] }),
+    )
+    const wrapper = await mountView()
+    await fillAndSubmit(wrapper)
+
+    await vi.waitFor(() => expect(wrapper.get('input[name="username"]').attributes('aria-invalid')).toBe('true'))
+    expect(wrapper.text()).toContain('Username/NIP tidak valid.')
+    expect(wrapper.find('[role="alert"][data-testid^="forgot-error-"]').exists()).toBe(false)
   })
 
   it('422 captcha → banner captcha', async () => {

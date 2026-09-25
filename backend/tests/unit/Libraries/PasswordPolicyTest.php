@@ -6,6 +6,8 @@ namespace Tests\Unit\Libraries;
 
 use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\PasswordPolicy;
+use App\Libraries\Auth\PasswordVerifier;
+use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Auth as AuthConfig;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -70,6 +72,20 @@ final class PasswordPolicyTest extends CIUnitTestCase
     }
 
     /**
+     * Jalur nyata ganti/reset password, admin buat/ubah akun, dan password awal A-09 memanggil
+     * PasswordVerifier::policyErrors(): nilai auth.passwordMinLength harus sampai ke sana, bukan default 8.
+     */
+    public function testVerifierPolicyErrorsUseConfiguredMinimumLength(): void
+    {
+        $config                    = new AuthConfig();
+        $config->passwordMinLength = 10;
+        $verifier                  = new PasswordVerifier($this->createStub(PenggunaModel::class), $config);
+
+        $this->assertSame(['Password minimal 10 karakter.'], $verifier->policyErrors('Password1'));
+        $this->assertSame([], $verifier->policyErrors('Password12'));
+    }
+
+    /**
      * Password awal akun otomatis (A-09) wajib selalu lolos kebijakan: minimal 1 huruf besar, 1 huruf kecil, 1 angka.
      * Tanpa jaminan per kelas karakter, peluang 12 karakter acak tanpa huruf besar ±1 dari 310 → 3000 percobaan
      * praktis pasti menemukannya.
@@ -77,11 +93,25 @@ final class PasswordPolicyTest extends CIUnitTestCase
     public function testGeneratedPasswordAlwaysSatisfiesPolicy(): void
     {
         $policy = new PasswordPolicy(8);
+        /** @var array<int, array<string, true>> $classesAt kelas karakter yang pernah muncul di posisi 0..2 */
+        $classesAt = [0 => [], 1 => [], 2 => []];
 
         for ($i = 0; $i < 3000; $i++) {
             $password = AccountProvisioner::generatePassword();
             $this->assertSame(12, strlen($password));
             $this->assertSame([], $policy->failedRules($password), "Password acak '{$password}' melanggar kebijakan");
+
+            foreach (array_keys($classesAt) as $pos) {
+                $classesAt[$pos][ctype_upper($password[$pos]) ? 'upper' : (ctype_lower($password[$pos]) ? 'lower' : 'digit')] = true;
+            }
+        }
+
+        // Karakter wajib diacak posisinya (Fisher-Yates): tanpa pengacakan, password selalu diawali pola
+        // [A-Z][a-z][2-9] sehingga prefiks mudah ditebak. Dengan pengacakan, peluang satu kelas tidak pernah muncul di
+        // posisi tertentu dalam 3000 percobaan < 1e-250.
+        foreach ($classesAt as $pos => $seen) {
+            ksort($seen);
+            $this->assertSame(['digit', 'lower', 'upper'], array_keys($seen), "Posisi {$pos} password acak tidak bervariasi");
         }
 
         $this->assertSame([], $policy->failedRules(AccountProvisioner::generatePassword(8)));
