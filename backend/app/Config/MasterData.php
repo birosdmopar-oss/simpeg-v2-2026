@@ -132,6 +132,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 30,
             'parent'        => null,
             'auditColumns'  => [...self::AUDIT, 'deleted_at'],
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'jenis-pegawai' => [
             'label'         => 'Jenis Pegawai',
@@ -145,6 +147,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 50,
             'parent'        => null,
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'jenis-status' => [
             'label'         => 'Jenis Status Pegawai',
@@ -169,6 +173,8 @@ class MasterData extends BaseConfig
             // Legacy: jenis_status unik per status_pegawai.
             'uniqueScope'  => ['status_pegawai'],
             'auditColumns' => self::AUDIT,
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'provinsi' => [
             'label'         => 'Provinsi',
@@ -181,6 +187,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => null,
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
             // Sentinel LAIN-LAIN legacy (DBV-003, migration 2026-09-25-100200): baris sistem, lihat 'systemIds'.
             'systemIds' => ['99'],
         ],
@@ -198,7 +206,10 @@ class MasterData extends BaseConfig
                 'kd_area' => ['label' => 'Kode Area', 'rules' => 'max_length[4]', 'hint' => 'Kode area telepon, maksimal 4 karakter.'],
             ],
             'auditColumns' => self::AUDIT,
-            'systemIds'    => ['9999'],
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999'],
         ],
         'kecamatan' => [
             'label'         => 'Kecamatan',
@@ -211,7 +222,10 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => ['field' => 'id_kabupaten_kota', 'entity' => 'kabupaten-kota'],
             'auditColumns'  => self::AUDIT,
-            'systemIds'     => ['9999999'],
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999999'],
         ],
         'kelurahan' => [
             'label'         => 'Kelurahan/Desa',
@@ -232,7 +246,10 @@ class MasterData extends BaseConfig
                 ],
             ],
             'auditColumns' => self::AUDIT,
-            'systemIds'    => ['9999999999'],
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999999999'],
         ],
 
         // ------------------------------------------------------------------
