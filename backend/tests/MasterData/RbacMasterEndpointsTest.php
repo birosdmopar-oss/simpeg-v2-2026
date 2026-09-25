@@ -9,6 +9,7 @@ use App\Libraries\MasterData\MasterDefinition;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\MasterData as MasterDataConfig;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\MasterDataTestTrait;
@@ -109,12 +110,22 @@ final class RbacMasterEndpointsTest extends CIUnitTestCase
 
     public function testOptionsAreOpenToEveryLoggedInRoleExceptAdminOnlyMasters(): void
     {
-        // Master tanpa konsumen dropdown di luar form admin (publicOptions = false): FAQ (CR-003).
+        // Master tanpa konsumen dropdown di luar form admin (publicOptions = false). Daftarnya dibaca dari
+        // Config\MasterData (CR-009), bukan daftar tetap: grup DBV berikutnya cukup mengatur publicOptions di entrinya.
         $adminOnly = array_keys(array_filter(
+            config(MasterDataConfig::class)->entities,
+            static fn (array $entity): bool => ($entity['publicOptions'] ?? true) === false,
+        ));
+
+        // Registry (dipakai routing & service) harus sepakat dengan config, dan master FAQ tetap role 1 (CR-003).
+        $this->assertSame($adminOnly, array_keys(array_filter(
             service('masterRegistry')->all(),
             static fn (MasterDefinition $def): bool => ! $def->publicOptions,
-        ));
-        $this->assertSame(['faq-topic', 'faq-sub-topic', 'faq-article'], $adminOnly);
+        )));
+
+        foreach (['faq-topic', 'faq-sub-topic', 'faq-article'] as $faq) {
+            $this->assertContains($faq, $adminOnly, "{$faq} wajib publicOptions false (CR-003)");
+        }
 
         foreach (Role::all() as $role) {
             $this->asRole($role);
@@ -134,7 +145,8 @@ final class RbacMasterEndpointsTest extends CIUnitTestCase
             }
         }
 
-        $this->withHeaders(['Authorization' => ''])->get('api/v1/master/agama/options')->assertStatus(401);
-        $this->withHeaders(['Authorization' => ''])->get('api/v1/master/faq-article/options')->assertStatus(401);
+        foreach (array_keys(self::masterFixtures()) as $entity) {
+            $this->withHeaders(['Authorization' => ''])->get("api/v1/master/{$entity}/options")->assertStatus(401);
+        }
     }
 }

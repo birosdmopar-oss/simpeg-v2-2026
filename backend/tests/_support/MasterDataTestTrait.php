@@ -92,6 +92,18 @@ trait MasterDataTestTrait
                 'existing'  => '2',
                 'parent'    => ['id_faq_sub_topic', '1'],
             ],
+
+            // Blok per grup DBV (CR-009): urutan & isi mengikuti blok yang sama di Config\MasterData (urutan key fixture
+            // = urutan master di meta, lihat RbacMasterEndpointsTest). Tambah fixture hanya di dalam blok grup sendiri.
+
+            // --- DBV-003 ---
+            // --- /DBV-003 ---
+
+            // --- DBV-004 ---
+            // --- /DBV-004 ---
+
+            // --- DBV-005 ---
+            // --- /DBV-005 ---
         ];
     }
 
@@ -116,13 +128,15 @@ trait MasterDataTestTrait
     }
 
     /**
-     * Daftar id dari endpoint options (dropdown).
+     * Daftar id dari endpoint options (dropdown), opsional dengan filter kolom allowlist (CR-009).
+     *
+     * @param array<string, mixed> $filters
      *
      * @return list<string>
      */
-    protected function optionIds(string $entity, ?string $parent = null): array
+    protected function optionIds(string $entity, ?string $parent = null, array $filters = []): array
     {
-        $result = $this->get("api/v1/master/{$entity}/options", $parent !== null ? ['parent' => $parent] : []);
+        $result = $this->get("api/v1/master/{$entity}/options", ($parent !== null ? ['parent' => $parent] : []) + $filters);
         $result->assertStatus(200);
 
         return array_map(static fn (array $o): string => (string) $o['id'], $this->json($result)['data']);

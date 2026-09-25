@@ -63,6 +63,18 @@ class MasterDataSeeder extends Seeder
         ]);
 
         $this->seedFaq();
+
+        // Blok per grup DBV (CR-009): panggil method seed grup hanya di dalam blok grup sendiri (method-nya di blok grup
+        // yang sama di akhir kelas), agar cabang DBV-003/004/005 yang paralel tidak saling konflik.
+
+        // --- DBV-003 ---
+        // --- /DBV-003 ---
+
+        // --- DBV-004 ---
+        // --- /DBV-004 ---
+
+        // --- DBV-005 ---
+        // --- /DBV-005 ---
     }
 
     /**
@@ -103,4 +115,14 @@ class MasterDataSeeder extends Seeder
             'status'           => 1,
         ], $articles));
     }
+
+    // Method seed per grup DBV (CR-009) — tambahkan hanya di dalam blok grup sendiri.
+    // --- DBV-003 (method) ---
+    // --- /DBV-003 ---
+
+    // --- DBV-004 (method) ---
+    // --- /DBV-004 ---
+
+    // --- DBV-005 (method) ---
+    // --- /DBV-005 ---
 }

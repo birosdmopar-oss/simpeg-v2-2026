@@ -4,6 +4,8 @@
  * Dipasangkan dengan VeeValidate `useField`/`defineField` di komponen pemanggil.
  * Tipe `html`: textarea tinggi (kode HTML) + tombol "Pratinjau" yang merender isi lewat sanitizeHtml() (SafeHtml).
  * Kontainer pratinjau dirender v-if, jadi aria-controls tombol hanya dipasang selama pratinjau terbuka.
+ * Tipe `checkbox` (flag 1/0 master, CR-009): kotak centang dengan label di sampingnya; nilai '1' tercentang, emit
+ * '1'/'0'.
  */
 import { computed, defineAsyncComponent, ref, useId } from 'vue'
 
@@ -14,7 +16,7 @@ const props = withDefaults(
   defineProps<{
     label: string
     modelValue: string | number | null | undefined
-    type?: 'text' | 'password' | 'select' | 'number' | 'date' | 'textarea' | 'html'
+    type?: 'text' | 'password' | 'select' | 'number' | 'date' | 'textarea' | 'html' | 'checkbox'
     placeholder?: string
     error?: string
     hint?: string
@@ -24,8 +26,22 @@ const props = withDefaults(
     inputmode?: 'text' | 'numeric'
     options?: Array<{ value: string | number; label: string }>
     name?: string
+    /** Select opsional: pilihan kosong (placeholder) bisa dipilih lagi untuk mengosongkan nilai. */
+    allowEmpty?: boolean
   }>(),
-  { type: 'text', placeholder: '', error: '', hint: '', required: false, disabled: false, autocomplete: undefined, inputmode: undefined, options: () => [], name: undefined },
+  {
+    type: 'text',
+    placeholder: '',
+    error: '',
+    hint: '',
+    required: false,
+    disabled: false,
+    autocomplete: undefined,
+    inputmode: undefined,
+    options: () => [],
+    name: undefined,
+    allowEmpty: false,
+  },
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
@@ -42,11 +58,35 @@ const inputClass = computed(() => [
 function onInput(event: Event): void {
   emit('update:modelValue', (event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value)
 }
+
+const checked = computed(() => String(props.modelValue ?? '') === '1')
+
+function onCheck(event: Event): void {
+  emit('update:modelValue', (event.target as HTMLInputElement).checked ? '1' : '0')
+}
 </script>
 
 <template>
   <div class="space-y-1">
-    <div v-if="type === 'html'" class="flex items-center justify-between gap-2">
+    <div v-if="type === 'checkbox'" class="flex items-center gap-2">
+      <input
+        :id="id"
+        :name="name"
+        type="checkbox"
+        :checked="checked"
+        class="h-4 w-4 rounded border-slate-300 text-brand-primary focus:ring-2 focus:ring-brand-tertiary/40 disabled:cursor-not-allowed"
+        :disabled="disabled"
+        :aria-invalid="Boolean(error)"
+        :aria-describedby="error ? `${id}-error` : undefined"
+        @change="onCheck"
+        @blur="emit('blur')"
+      />
+      <label :for="id" class="text-sm font-medium text-slate-700">
+        {{ label }}<span v-if="required" class="text-red-600"> *</span>
+      </label>
+    </div>
+
+    <div v-else-if="type === 'html'" class="flex items-center justify-between gap-2">
       <label :for="id" class="block text-sm font-medium text-slate-700">
         {{ label }}<span v-if="required" class="text-red-600"> *</span>
       </label>
@@ -76,7 +116,7 @@ function onInput(event: Event): void {
       @change="onInput"
       @blur="emit('blur')"
     >
-      <option value="" disabled>{{ placeholder || 'Pilih...' }}</option>
+      <option value="" :disabled="!allowEmpty">{{ placeholder || 'Pilih...' }}</option>
       <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
     </select>
 
@@ -122,7 +162,7 @@ function onInput(event: Event): void {
       </div>
     </template>
 
-    <div v-else class="relative">
+    <div v-else-if="type !== 'checkbox'" class="relative">
       <input
         :id="id"
         :name="name"

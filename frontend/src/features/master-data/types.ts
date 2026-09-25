@@ -23,8 +23,10 @@ export const MASTER_STATUS_LABELS: Record<MasterStatus, string> = {
 /**
  * Tipe field tambahan (App\Libraries\MasterData\MasterField). `html` = konten HTML (mis. isi artikel FAQ):
  * textarea besar + pratinjau lewat sanitizeHtml(); backend menyanitasi ulang (HTMLPurifier) saat simpan.
+ * CR-009: `boolean` = flag 1/0 (checkbox), `ref` = rujukan ke master lain (dropdown `{entity}/options`, berjenjang
+ * lewat `depends_on`).
  */
-export type MasterFieldType = 'text' | 'textarea' | 'int' | 'decimal' | 'date' | 'select' | 'html'
+export type MasterFieldType = 'text' | 'textarea' | 'int' | 'decimal' | 'date' | 'select' | 'html' | 'boolean' | 'ref'
 
 export interface MasterFieldMeta {
   name: string
@@ -35,7 +37,20 @@ export interface MasterFieldMeta {
   hint: string | null
   /** Batas panjang dalam byte UTF-8 (mis. TINYTEXT = 255), bila diekspos backend; ikut divalidasi di form. */
   max_bytes?: number | null
+  /** Batas nilai field angka (int: rentang tipe kolom, mis. TINYINT 0–127; CR-009); null = tanpa batas. */
+  min?: number | null
+  max?: number | null
+  /** Tipe ref: key master rujukan (pilihan dari `{entity}/options`). */
+  entity?: string | null
+  /** Tipe ref: field ref lain di form yang menjadi induk entri rujukan (pilihan disaring `?parent=` nilainya). */
+  depends_on?: string | null
 }
+
+/**
+ * Mode urutan (CR-009): `shift` = posisi tampil 1..n (entri lain bergeser); `manual` = nilai bisnis (mis. level
+ * pangkat) yang disimpan apa adanya, entri lain tidak pernah digeser.
+ */
+export type MasterOrderMode = 'shift' | 'manual'
 
 export interface MasterMeta {
   key: string
@@ -54,6 +69,16 @@ export interface MasterMeta {
   parent: { field: string; entity: string } | null
   /** Kolom tambahan legacy (mis. kd_area, kd_pos, status_pegawai). */
   fields: MasterFieldMeta[]
+  /** CR-009 — bawaan `shift`. */
+  order_mode?: MasterOrderMode
+  /** Field pembentuk lingkup urutan selain induk (mis. `jenis_diklat`): urutan berlaku per nilainya. */
+  order_scope?: string[]
+  /** Batas nilai urutan mode manual (tipe kolom `order`, mis. TINYINT = 127); null untuk mode shift. */
+  order_max?: number | null
+  /** Field yang boleh dipakai filter `?kolom=nilai` di daftar & dropdown (allowlist backend). */
+  filters?: string[]
+  /** Dropdown hanya memuat entri yang seluruh rantai induknya aktif (pola FAQ). */
+  status_chain?: boolean
 }
 
 /** Baris master: kolom dinamis per tabel + kolom standar order/status (+ parent_nama untuk master berinduk). */
@@ -69,6 +94,8 @@ export interface MasterListQuery {
   parent?: string
   page?: number
   per_page?: number
+  /** Filter field allowlist master (meta `filters`), mis. { jenis_diklat: '2' }; nilai kosong diabaikan. */
+  filters?: Record<string, string>
 }
 
 export interface MasterListResponse {

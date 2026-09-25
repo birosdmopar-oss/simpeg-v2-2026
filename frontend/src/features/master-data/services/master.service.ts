@@ -15,6 +15,15 @@ import type {
 } from '../types'
 
 const base = (entity: string): string => `/master/${encodeURIComponent(entity)}`
+
+/** Filter field master (CR-009) sebagai parameter query; nilai kosong = tanpa filter. */
+function filterParams(filters: Record<string, string> | undefined): Record<string, string> {
+  const params: Record<string, string> = {}
+  for (const [key, value] of Object.entries(filters ?? {})) {
+    if (value !== '') params[key] = value
+  }
+  return params
+}
 const item = (entity: string, id: string): string => `${base(entity)}/${encodeURIComponent(id)}`
 
 export const masterService = {
@@ -24,10 +33,12 @@ export const masterService = {
   },
 
   async list(entity: string, query: MasterListQuery = {}): Promise<MasterListResponse> {
+    const { filters, ...rest } = query
     const params: Record<string, string | number> = {}
-    for (const [key, value] of Object.entries(query)) {
+    for (const [key, value] of Object.entries(rest)) {
       if (value !== undefined && value !== '' && value !== null) params[key] = value
     }
+    Object.assign(params, filterParams(filters))
     const { data } = await api.get<MasterListResponse>(base(entity), { params })
     return data
   },
@@ -37,9 +48,14 @@ export const masterService = {
     return data
   },
 
-  /** Dropdown (entri aktif saja, urut `order`) — dipakai juga oleh modul lain. */
-  async options(entity: string, parent?: string | null): Promise<MasterOption[]> {
-    const { data } = await api.get<MasterOption[]>(`${base(entity)}/options`, { params: parent ? { parent } : {} })
+  /**
+   * Dropdown (entri aktif saja, urut `order`) — dipakai juga oleh modul lain. `filters` = field allowlist master
+   * (meta `filters`, mis. { cpns: '1' }); backend menolak nilai yang tidak sah (422) dan mengabaikan field lain.
+   */
+  async options(entity: string, parent?: string | null, filters?: Record<string, string>): Promise<MasterOption[]> {
+    const params: Record<string, string> = { ...filterParams(filters) }
+    if (parent) params.parent = parent
+    const { data } = await api.get<MasterOption[]>(`${base(entity)}/options`, { params })
     return data
   },
 

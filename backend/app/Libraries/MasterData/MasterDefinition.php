@@ -15,6 +15,20 @@ final class MasterDefinition
     public const STATUS_FIELD = 'status';
 
     /**
+     * Mode urutan (CR-009). shift (bawaan): `order` = posisi tampil 1..n per lingkup urutan — tambah/pindah menggeser
+     * entri lain dan hapus merapatkan urutan. manual: `order` = nilai bisnis (mis. level pangkat yang dipakai kalkulasi
+     * KP/AK, DBV-004) — disimpan apa adanya (dibatasi tipe kolom), entri lain tidak pernah digeser atau dinomori ulang,
+     * boleh sama antar entri; kosong saat tambah = MAX+1 di lingkupnya.
+     */
+    public const ORDER_SHIFT  = 'shift';
+    public const ORDER_MANUAL = 'manual';
+
+    /**
+     * Parameter query yang sudah dipakai engine — tidak boleh jadi nama kolom filter (opsi `filters`).
+     */
+    public const RESERVED_QUERY = ['search', 'status', 'parent', 'page', 'per_page'];
+
+    /**
      * Kolom audit legacy yang dikenali engine (diisi otomatis oleh MasterModel bila ada di $auditColumns).
      * Tabel yang punya created_by (FAQ, DBV-002) mengikuti legacy: created_by diisi saat insert, updated_by hanya saat
      * update. Tabel tanpa created_by (Batch 1) mengisi updated_by saat insert maupun update.
@@ -31,20 +45,35 @@ final class MasterDefinition
     private ?MasterHooks $hooksInstance = null;
 
     /**
-     * @param list<MasterField> $fields        kolom tambahan di luar kode/nama/induk/order/status
-     * @param list<string>      $extraSearch   kolom tambahan yang ikut dicari (selain kode & nama)
-     * @param int|null          $idDigits      kode wajib tepat N digit angka (kode wilayah legacy: 2/4/7/10)
-     * @param list<string>      $uniqueScope   kolom tambahan pembentuk lingkup keunikan nama (selain induk),
-     *                                         mis. jenis_status unik per status_pegawai
-     * @param list<string>      $auditColumns  kolom audit legacy yang ada di tabel (lihat konstanta AUDIT_*)
-     * @param string|null       $hooks         nama kelas hook tulis (implementasi MasterHooks: sanitasi/kolom turunan)
-     * @param list<string>      $listExclude   kolom yang tidak dikirim di daftar admin (hemat payload, mis. LONGTEXT);
-     *                                         detail satu entri tetap mengirimnya
-     * @param bool              $publicOptions dropdown `{key}/options` terbuka untuk semua role login (UL_ALL); false =
-     *                                         hanya role 1, untuk master yang dropdown-nya hanya dipakai form admin dan
-     *                                         bisa membocorkan entri tersembunyi (mis. FAQ, U3)
-     * @param list<string>      $hiddenColumns kolom tabel yang tidak dikelola engine dan tidak pernah dikirim di respons
-     *                                         admin mana pun (daftar, detail, hasil tulis), mis. `icon` topik FAQ (D6)
+     * @param list<MasterField>           $fields          kolom tambahan di luar kode/nama/induk/order/status
+     * @param list<string>                $extraSearch     kolom tambahan yang ikut dicari (selain kode & nama)
+     * @param int|null                    $idDigits        kode wajib tepat N digit angka (kode wilayah legacy: 2/4/7/10)
+     * @param list<string>                $uniqueScope     kolom tambahan pembentuk lingkup keunikan nama (selain induk),
+     *                                                     mis. jenis_status unik per status_pegawai
+     * @param list<string>                $auditColumns    kolom audit legacy yang ada di tabel (lihat konstanta AUDIT_*)
+     * @param string|null                 $hooks           nama kelas hook tulis (implementasi MasterHooks: sanitasi/kolom
+     *                                                     turunan)
+     * @param list<string>                $listExclude     kolom yang tidak dikirim di daftar admin (hemat payload, mis.
+     *                                                     LONGTEXT); detail satu entri tetap mengirimnya
+     * @param bool                        $publicOptions   dropdown `{key}/options` terbuka untuk semua role login (UL_ALL);
+     *                                                     false = hanya role 1, untuk master yang dropdown-nya hanya dipakai
+     *                                                     form admin dan bisa membocorkan entri tersembunyi (mis. FAQ, U3)
+     * @param list<string>                $hiddenColumns   kolom tabel yang tidak dikelola engine dan tidak pernah dikirim di
+     *                                                     respons admin mana pun (daftar, detail, hasil tulis), mis. `icon`
+     *                                                     topik FAQ (D6)
+     * @param string                      $orderMode       ORDER_SHIFT (bawaan) atau ORDER_MANUAL (lihat konstanta)
+     * @param list<string>                $orderScope      field pembentuk lingkup urutan selain induk, mis. diklat diurutkan
+     *                                                     per `jenis_diklat` (DBV-005)
+     * @param string                      $orderColumnType tipe kolom `order` (kunci MasterField::INT_RANGES): batas nilai
+     *                                                     urutan mode manual dan batas MAX+1 otomatis, mis. 'tinyint' = 127
+     * @param array<string, list<string>> $uniqueFields    field selain nama yang ber-UNIQUE di DB => field lingkupnya
+     *                                                     (kosong = unik global), mis. `old_id` jenis konket
+     * @param list<string>                $filters         field yang boleh dipakai sebagai filter `?kolom=nilai` di options
+     *                                                     dan daftar admin (allowlist; parameter lain diabaikan), mis.
+     *                                                     pangkat `?cpns=1`
+     * @param bool                        $statusChain     options hanya memuat entri yang SELURUH rantai induknya aktif
+     *                                                     (pola U3 FAQ), mis. jurusan hilang dari dropdown saat bidangnya
+     *                                                     tidak aktif (DBV-004 E6)
      */
     public function __construct(
         public readonly string $key,
@@ -70,7 +99,18 @@ final class MasterDefinition
         public readonly array $listExclude = [],
         public readonly bool $publicOptions = true,
         public readonly array $hiddenColumns = [],
+        public readonly string $orderMode = self::ORDER_SHIFT,
+        public readonly array $orderScope = [],
+        public readonly string $orderColumnType = MasterField::DEFAULT_INT_COLUMN,
+        public readonly array $uniqueFields = [],
+        public readonly array $filters = [],
+        public readonly bool $statusChain = false,
     ) {
+        if (! in_array($orderMode, [self::ORDER_SHIFT, self::ORDER_MANUAL], true)) {
+            throw new LogicException("orderMode master {$key} tidak dikenal: {$orderMode}.");
+        }
+
+        MasterField::intRange($orderColumnType);
     }
 
     /**
@@ -79,7 +119,7 @@ final class MasterDefinition
      *     nameField: string, nameLabel: string, nameMaxLength: int,
      *     parent?: array{field: string, entity: string}|null,
      *     autoIncrement?: bool, hasOrder?: bool, hasStatus?: bool,
-     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int}>,
+     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool}>,
      *     extraSearch?: list<string>,
      *     idDigits?: int,
      *     uniqueScope?: list<string>,
@@ -87,7 +127,13 @@ final class MasterDefinition
      *     hooks?: class-string<MasterHooks>,
      *     listExclude?: list<string>,
      *     publicOptions?: bool,
-     *     hiddenColumns?: list<string>
+     *     hiddenColumns?: list<string>,
+     *     orderMode?: string,
+     *     orderScope?: list<string>,
+     *     orderColumnType?: string,
+     *     uniqueFields?: array<int|string, string|list<string>>,
+     *     filters?: list<string>,
+     *     statusChain?: bool
      * } $config
      */
     public static function fromConfig(string $key, array $config): self
@@ -96,6 +142,17 @@ final class MasterDefinition
 
         foreach ($config['fields'] ?? [] as $name => $field) {
             $fields[] = MasterField::fromConfig($name, $field);
+        }
+
+        // uniqueFields boleh berupa daftar field (unik global) atau field => daftar field lingkup.
+        $uniqueFields = [];
+
+        foreach ($config['uniqueFields'] ?? [] as $column => $scope) {
+            if (is_int($column)) {
+                $uniqueFields[(string) $scope] = [];
+            } else {
+                $uniqueFields[$column] = (array) $scope;
+            }
         }
 
         return new self(
@@ -122,6 +179,12 @@ final class MasterDefinition
             listExclude: $config['listExclude'] ?? [],
             publicOptions: $config['publicOptions'] ?? true,
             hiddenColumns: $config['hiddenColumns'] ?? [],
+            orderMode: $config['orderMode'] ?? self::ORDER_SHIFT,
+            orderScope: $config['orderScope'] ?? [],
+            orderColumnType: $config['orderColumnType'] ?? MasterField::DEFAULT_INT_COLUMN,
+            uniqueFields: $uniqueFields,
+            filters: $config['filters'] ?? [],
+            statusChain: $config['statusChain'] ?? false,
         );
     }
 
@@ -144,6 +207,39 @@ final class MasterDefinition
         }
 
         return null;
+    }
+
+    public function isManualOrder(): bool
+    {
+        return $this->hasOrder && $this->orderMode === self::ORDER_MANUAL;
+    }
+
+    /**
+     * Nilai `order` terbesar yang muat di kolomnya (tipe orderColumnType).
+     */
+    public function orderMax(): int
+    {
+        return MasterField::intRange($this->orderColumnType)[1];
+    }
+
+    /**
+     * Kolom pembentuk lingkup urutan: induk (bila ada) + orderScope. Urutan/penggeseran berlaku per kombinasi nilainya.
+     *
+     * @return list<string>
+     */
+    public function orderScopeColumns(): array
+    {
+        return $this->parentField !== null ? [$this->parentField, ...$this->orderScope] : $this->orderScope;
+    }
+
+    /**
+     * Field bertipe ref (rujukan ke master lain).
+     *
+     * @return list<MasterField>
+     */
+    public function refFields(): array
+    {
+        return array_values(array_filter($this->fields, static fn (MasterField $f): bool => $f->type === MasterField::TYPE_REF));
     }
 
     /**
@@ -257,6 +353,13 @@ final class MasterDefinition
             'has_status'      => $this->hasStatus,
             'parent'          => $this->hasParent() ? ['field' => $this->parentField, 'entity' => $this->parentEntity] : null,
             'fields'          => array_map(static fn (MasterField $f): array => $f->toMeta(), $this->fields),
+            // CR-009: mode & lingkup urutan (FE: panah naik/turun hanya mode shift dan saat satu lingkup utuh tampil),
+            // batas nilai urutan mode manual, field filter (allowlist), dan rantai status options.
+            'order_mode'   => $this->orderMode,
+            'order_scope'  => $this->orderScope,
+            'order_max'    => $this->isManualOrder() ? $this->orderMax() : null,
+            'filters'      => $this->filters,
+            'status_chain' => $this->statusChain,
         ];
     }
 }

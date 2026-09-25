@@ -7,6 +7,7 @@ namespace App\Controllers\Api\MasterData;
 use App\Controllers\Api\ApiController;
 use App\Exceptions\NotFoundException;
 use App\Libraries\MasterData\MasterDefinition;
+use App\Libraries\MasterData\MasterField;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
@@ -45,20 +46,26 @@ abstract class BaseMasterController extends ApiController
         return $this->respondSuccess(service('masterService')->get($this->definition($entity), $id));
     }
 
+    /**
+     * Dropdown: `?parent=` (induk) + filter kolom allowlist opsi `filters` master (mis. `?cpns=1`, CR-009).
+     */
     public function options(string $entity): ResponseInterface
     {
         $parent = $this->request->getGet('parent');
+        /** @var array<string, mixed> $query */
+        $query = $this->request->getGet() ?? [];
 
         return $this->respondSuccess(service('masterService')->options(
             $this->definition($entity),
             is_string($parent) ? $parent : null,
+            $query,
         ));
     }
 
     public function create(string $entity): ResponseInterface
     {
         $def  = $this->definition($entity);
-        $data = $this->validateOrFail($this->payload(), $this->rules($def, true));
+        $data = $this->validateOrFail($this->input($def), $this->rules($def, true));
 
         return $this->respondSuccess(service('masterService')->create($def, $data), 201);
     }
@@ -66,7 +73,7 @@ abstract class BaseMasterController extends ApiController
     public function update(string $entity, string $id): ResponseInterface
     {
         $def  = $this->definition($entity);
-        $data = $this->validateOrFail($this->payload(), $this->rules($def, false));
+        $data = $this->validateOrFail($this->input($def), $this->rules($def, false));
 
         return $this->respondSuccess(service('masterService')->update($def, $id, $data));
     }
@@ -85,14 +92,16 @@ abstract class BaseMasterController extends ApiController
 
     public function reorder(string $entity, string $id): ResponseInterface
     {
+        $def  = $this->definition($entity);
+        $rule = $this->orderRule($def);
         $data = $this->validateOrFail($this->payload(), [
             'order' => [
-                'rules'  => 'required|is_natural_no_zero',
-                'errors' => ['required' => 'Urutan wajib diisi.', 'is_natural_no_zero' => 'Urutan harus bilangan bulat minimal 1.'],
+                'rules'  => 'required|' . $rule['rules'],
+                'errors' => ['required' => 'Urutan wajib diisi.', ...$rule['errors']],
             ],
         ]);
 
-        return $this->respondSuccess(service('masterService')->reorder($this->definition($entity), $id, (int) $data['order']));
+        return $this->respondSuccess(service('masterService')->reorder($def, $id, (int) $data['order']));
     }
 
     /**
@@ -168,16 +177,23 @@ abstract class BaseMasterController extends ApiController
         ];
 
         foreach ($def->fields as $field) {
+            // Field ref: panjang maksimal mengikuti kode master rujukannya (bentuk kanonik & keberadaan dicek service).
+            $refIdMaxLength = $field->type === MasterField::TYPE_REF
+                ? service('masterRegistry')->get((string) $field->entity)->idMaxLength
+                : null;
+
             $rules[$field->name] = [
-                'rules'  => $field->validationRules($creating),
+                'rules'  => $field->validationRules($creating, $refIdMaxLength),
                 'errors' => $field->validationMessages(),
             ];
         }
 
         if ($def->hasOrder) {
+            $rule = $this->orderRule($def);
+
             $rules[MasterDefinition::ORDER_FIELD] = [
-                'rules'  => 'permit_empty|is_natural_no_zero',
-                'errors' => ['is_natural_no_zero' => 'Urutan harus bilangan bulat minimal 1.'],
+                'rules'  => 'permit_empty|' . $rule['rules'],
+                'errors' => $rule['errors'],
             ];
         }
 
@@ -189,5 +205,44 @@ abstract class BaseMasterController extends ApiController
         }
 
         return $rules;
+    }
+
+    /**
+     * Rule `order` (tanpa required/permit_empty): bilangan bulat >= 1. Mode urutan manual (CR-009) menyimpan nilainya
+     * apa adanya, jadi juga dibatasi tipe kolom `order` (mis. TINYINT 127) → 422, bukan 500/terpotong di DB. Mode shift
+     * tidak perlu batas atas: posisi dijepit ke jumlah entri.
+     *
+     * @return array{rules: string, errors: array<string, string>}
+     */
+    protected function orderRule(MasterDefinition $def): array
+    {
+        $rules  = 'is_natural_no_zero';
+        $errors = ['is_natural_no_zero' => 'Urutan harus bilangan bulat minimal 1.'];
+
+        if ($def->isManualOrder()) {
+            $rules .= '|less_than_equal_to[' . $def->orderMax() . ']';
+            $errors['less_than_equal_to'] = 'Urutan maksimal ' . number_format($def->orderMax(), 0, ',', '.') . '.';
+        }
+
+        return ['rules' => $rules, 'errors' => $errors];
+    }
+
+    /**
+     * Payload tambah/ubah. Field boolean (CR-009) menerima JSON true/false selain '1'/'0': dikonversi dulu karena rule
+     * in_list membaca false sebagai string kosong.
+     *
+     * @return array<string, mixed>
+     */
+    protected function input(MasterDefinition $def): array
+    {
+        $payload = $this->payload();
+
+        foreach ($def->fields as $field) {
+            if ($field->type === MasterField::TYPE_BOOLEAN && is_bool($payload[$field->name] ?? null)) {
+                $payload[$field->name] = $payload[$field->name] ? '1' : '0';
+            }
+        }
+
+        return $payload;
     }
 }
