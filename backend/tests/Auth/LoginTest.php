@@ -322,12 +322,20 @@ final class LoginTest extends CIUnitTestCase
      * ber-actor pemilik akun. Saat login AuthContext masih kosong, sehingga update `last_login_at` dan lazy rehash
      * sebelumnya tercatat dengan nip_actor NULL.
      *
+     * Username akun uji sengaja dibuat BUKAN NIP (akun legacy / username custom): actor harus NIP pemilik akun, bukan
+     * username yang dipakai login. Dengan username == NIP (default seeder) keduanya tidak bisa dibedakan.
+     *
      * @param list<string> $expectedEvents
      */
     #[DataProvider('loginWritePaths')]
     public function testEveryAuditRowWrittenDuringLoginHasAccountOwnerAsActor(string $path, array $expectedEvents): void
     {
-        $nip = $path === 'legacy' ? self::NIP : AuthSeeder::NIP_ARGON;
+        $nip      = $path === 'legacy' ? self::NIP : AuthSeeder::NIP_ARGON;
+        $username = 'pegawai.lama';
+
+        // Query Builder langsung (bukan Model) agar persiapan ini tidak menulis audit.
+        $this->db->table('pengguna')->where('nip', $nip)->update(['username' => $username]);
+        $this->assertSame(1, $this->db->affectedRows(), 'Prasyarat: username akun uji diganti menjadi bukan NIP');
 
         if ($path === 'argon2id-rehash') {
             // Hash Argon2id dengan parameter lebih lemah dari default → password_needs_rehash() true saat login.
@@ -338,7 +346,7 @@ final class LoginTest extends CIUnitTestCase
 
         $lastId = (int) ($this->db->table('audit_logs')->selectMax('id_log')->get()->getRowArray()['id_log'] ?? 0);
 
-        $this->login($nip, AuthSeeder::PASSWORD)->assertStatus(200);
+        $this->login($username, AuthSeeder::PASSWORD)->assertStatus(200);
 
         $rows = $this->db->table('audit_logs')->where('id_log >', $lastId)->orderBy('id_log')->get()->getResultArray();
         $this->assertSame($expectedEvents, array_column($rows, 'event'));

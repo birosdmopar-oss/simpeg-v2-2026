@@ -172,7 +172,8 @@ class JwtService
 
     /**
      * Tukar refresh token dengan pasangan token baru (rotation).
-     * Token lama di-revoke. Token yang sudah revoked/expired/tidak dikenal → AuthException.
+     * Token lama di-revoke. Token yang sudah revoked/expired/tidak dikenal → AuthException; token expired sekaligus
+     * dihapus dari DB (bukan revoked=1) agar pengiriman ulangnya tidak terbaca reuse.
      *
      * @return array{access_token: string, refresh_token: string, access_expires_at: int, refresh_expires_at: int}
      *
@@ -192,7 +193,10 @@ class JwtService
         }
 
         if (strtotime((string) $row['expires_at']) <= $this->now()) {
-            $this->tokens->revoke((int) $row['id'], $this->now());
+            // Dihapus seperti logout, BUKAN revoked=1: token kedaluwarsa yang dikirim lagi (retry klien body, tab
+            // paralel, jam klien tertinggal) → unknownToken, bukan reuse yang ikut mencabut sesi baru di perangkat
+            // lain (T-01). revoked=1 tetap khusus rotasi dan reuse detection.
+            $this->tokens->deleteExpired((int) $row['id'], $this->now());
 
             throw AuthException::expiredToken();
         }

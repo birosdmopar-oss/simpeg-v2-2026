@@ -47,6 +47,7 @@ Tanpa body (cookie `refresh_token`) atau `{ "refresh_token": "..." }`. 200 `data
 401 kalau token tidak ada / tidak dikenal (termasuk sudah di-logout atau dicabut massal) / kedaluwarsa / **sudah pernah dipakai (reuse) → seluruh sesi akun dicabut**.
 Setiap 401 dari endpoint ini juga menghapus cookie `refresh_token` (Set-Cookie kedaluwarsa) agar tab/perangkat lama berhenti mengirim token mati; error lain (500) tidak menghapus cookie.
 
+Token kedaluwarsa yang ditolak (401 "Token sudah kedaluwarsa.") barisnya **dihapus** (bukan `revoked=1`); bila dikirim lagi (retry klien body, tab paralel) → 401 "Refresh token tidak dikenal." tanpa mencabut sesi lain.
 Pencabutan sesi: `token.revoked=1` hanya untuk token yang sudah dirotasi (dan sesi yang dicabut reuse detection), sehingga memakai lagi token seperti itu = reuse.
 Logout, ganti/reset password, serta perubahan/penghapusan akun oleh admin **menghapus baris token** — token lama terbaca "tidak dikenal" (401) dan tidak mencabut sesi baru setelah pengguna login ulang.
 
@@ -66,7 +67,7 @@ Kebijakan password: min `auth.passwordMinLength` (8), mengandung huruf dan angka
 ### POST /auth/forgot-password
 Request `{ "username" }`. 200 selalu generik `data: { accepted:true, message }`; di development (`auth.exposeResetTokenInResponse=true`) ditambah `token`, `expires_at`.
 429 kalau > `auth.forgotMaxPerWindow` (3) permintaan per `auth.forgotWindowMinutes` (60) untuk username yang sama.
-**Kanal pengiriman token (email/WA) belum ditentukan di dokumen sumber** — token **tidak** dicatat di log (log hanya memuat username dan waktu kedaluwarsa; DB hanya menyimpan hash SHA-256). Selama kanal belum ada, token hanya bisa diperoleh lewat `auth.exposeResetTokenInResponse=true` (khusus development).
+**Kanal pengiriman token (email/WA) belum ditentukan di dokumen sumber** — token saat ini dicatat di log.
 
 ### POST /auth/reset-password
 Request `{ "token", "new_password", "new_password_confirmation" }`. 200 `data: { reset:true }`.

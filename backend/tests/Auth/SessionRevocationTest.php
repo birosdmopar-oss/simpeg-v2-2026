@@ -138,6 +138,61 @@ final class SessionRevocationTest extends CIUnitTestCase
     }
 
     /**
+     * @return iterable<string, array{string}>
+     */
+    public static function refreshTransports(): iterable
+    {
+        yield 'cookie (dua tab paralel)' => ['cookie'];
+
+        yield 'body (klien non-browser me-retry)' => ['body'];
+    }
+
+    /**
+     * T-01 lewat jalur kedaluwarsa: perangkat A masih menyimpan refresh token yang sudah kedaluwarsa, pengguna login di
+     * perangkat B, lalu A mengirim token itu dua kali — dua tab paralel (request kedua terkirim sebelum respons pertama
+     * menghapus cookie) atau klien body yang me-retry. Kiriman pertama 401 kedaluwarsa, kiriman kedua 401 "tidak
+     * dikenal" (bukan reuse), dan sesi B tetap hidup. Sebelumnya token kedaluwarsa ditandai revoked=1 sehingga kiriman
+     * kedua terbaca reuse dan mencabut sesi B.
+     */
+    #[DataProvider('refreshTransports')]
+    public function testExpiredRefreshTokenSentTwiceDoesNotRevokeNewSession(string $transport): void
+    {
+        $jwt = service('jwt');
+        $jwt->setNow(time() - 7 * 86400 - 1);
+        $expired = $jwt->issueTokenPair(['sub' => self::NIP, 'role' => Role::PEGAWAI])['refresh_token'];
+        $jwt->setNow(null);
+
+        $this->clearAuthState();
+        $login = $this->login(self::NIP, AuthSeeder::PASSWORD);
+        $login->assertStatus(200);
+        $deviceB = (string) $this->responseCookie($login, 'refresh_token');
+
+        $messages = [];
+
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            $this->clearAuthState();
+
+            if ($transport === 'cookie') {
+                $this->setRefreshCookie($expired);
+                $result = $this->post('api/v1/auth/refresh');
+            } else {
+                $result = $this->withBodyFormat('json')->post('api/v1/auth/refresh', ['refresh_token' => $expired]);
+            }
+
+            $result->assertStatus(401);
+            $messages[] = $this->json($result)['message'];
+        }
+
+        $this->assertSame(['Token sudah kedaluwarsa.', 'Refresh token tidak dikenal.'], $messages, 'Kiriman kedua token kedaluwarsa harus "tidak dikenal", bukan reuse');
+        $this->dontSeeInDatabase('token', ['token_hash' => hash('sha256', $expired)]);
+        $this->assertSame(1, $this->db->table('token')->where('nip', self::NIP)->where('revoked', 0)->countAllResults(), 'Sesi baru di perangkat B tidak boleh ikut dicabut');
+
+        $this->clearAuthState();
+        $this->setRefreshCookie($deviceB);
+        $this->post('api/v1/auth/refresh')->assertStatus(200);
+    }
+
+    /**
      * Sesi perangkat A yang sudah pernah refresh sekali: token hasil rotasi (revoked=1) dan token aktifnya.
      *
      * @return array{rotated: string, current: string}
