@@ -68,6 +68,7 @@ class MasterDataSeeder extends Seeder
         // yang sama di akhir kelas), agar cabang DBV-003/004/005 yang paralel tidak saling konflik.
 
         // --- DBV-003 ---
+        $this->seedDbv003();
         // --- /DBV-003 ---
 
         // --- DBV-004 ---
@@ -118,6 +119,53 @@ class MasterDataSeeder extends Seeder
 
     // Method seed per grup DBV (CR-009) — tambahkan hanya di dalam blok grup sendiri.
     // --- DBV-003 (method) ---
+
+    /**
+     * G-07/G-08 (DBV-003): jenis libur, kursem, 2 kantor (rantai riil dan LAIN-LAIN), 5 hari libur (status 1/2/10,
+     * satu tanpa jenis seperti hasil impor legacy). Sentinel LAIN-LAIN wilayah sudah di-seed migration 100200.
+     */
+    private function seedDbv003(): void
+    {
+        $this->db->table('jenis_libur')->insertBatch([
+            ['id_jenis_libur' => 1, 'jenis_libur' => 'Libur Nasional', 'order' => 1, 'status' => 1],
+            ['id_jenis_libur' => 2, 'jenis_libur' => 'Cuti Bersama', 'order' => 2, 'status' => 1],
+        ]);
+
+        $this->db->table('bidang_kursem')->insertBatch([
+            ['id_bidang_kursem' => 1, 'bidang_kursem' => 'Teknologi Informasi', 'order' => 1, 'status' => 1],
+            ['id_bidang_kursem' => 2, 'bidang_kursem' => 'Manajemen', 'order' => 2, 'status' => 1],
+            ['id_bidang_kursem' => 3, 'bidang_kursem' => 'Pariwisata', 'order' => 3, 'status' => 1],
+        ]);
+
+        $this->db->table('instansi_kursem')->insertBatch([
+            ['id_instansi_kursem' => 1, 'instansi_kursem' => 'Lembaga Administrasi Negara', 'order' => 1, 'status' => 1],
+            ['id_instansi_kursem' => 2, 'instansi_kursem' => 'BPSDM Kemenparekraf', 'order' => 2, 'status' => 1],
+        ]);
+
+        $this->db->table('kantor')->insertBatch([
+            [
+                'id_kantor'     => 1, 'order' => 1, 'nama_kantor' => 'Kantor Pusat', 'alamat' => 'Jl. Medan Merdeka Barat No. 17',
+                'id_provinsi'   => '31', 'id_kabupaten' => '3171', 'id_kecamatan' => '3171010', 'id_kelurahan' => '3171010001',
+                'kode_pos'      => '10110', 'telp' => '021-3838899', 'status' => 1,
+                'provinsi_lain' => null, 'kabupaten_lain' => null, 'kecamatan_lain' => null, 'kelurahan_lain' => null,
+            ],
+            [
+                'id_kantor'     => 2, 'order' => 2, 'nama_kantor' => 'Kantor Perwakilan Luar Negeri', 'alamat' => '1-3-1 Higashi-Gotanda',
+                'id_provinsi'   => '99', 'id_kabupaten' => '9999', 'id_kecamatan' => '9999999', 'id_kelurahan' => '9999999999',
+                'kode_pos'      => null, 'telp' => null, 'status' => 1,
+                'provinsi_lain' => 'Jepang', 'kabupaten_lain' => 'Tokyo', 'kecamatan_lain' => 'Shinagawa', 'kelurahan_lain' => 'Higashi-Gotanda',
+            ],
+        ]);
+
+        $this->db->table('hari_libur')->insertBatch([
+            ['id_libur' => 1, 'id_jenis_libur' => 1, 'tgl_mulai' => '2026-01-01', 'tgl_akhir' => '2026-01-01', 'nama_libur' => 'Tahun Baru 2026 Masehi', 'keterangan' => null, 'status' => 1],
+            ['id_libur' => 2, 'id_jenis_libur' => 2, 'tgl_mulai' => '2026-03-19', 'tgl_akhir' => '2026-03-20', 'nama_libur' => 'Cuti Bersama Idul Fitri', 'keterangan' => 'SKB 3 Menteri', 'status' => 1],
+            ['id_libur' => 3, 'id_jenis_libur' => 1, 'tgl_mulai' => '2026-05-01', 'tgl_akhir' => '2026-05-01', 'nama_libur' => 'Hari Buruh Internasional', 'keterangan' => null, 'status' => 2],
+            ['id_libur' => 4, 'id_jenis_libur' => 1, 'tgl_mulai' => '2026-06-01', 'tgl_akhir' => '2026-06-01', 'nama_libur' => 'Hari Lahir Pancasila', 'keterangan' => null, 'status' => 10],
+            ['id_libur' => 5, 'id_jenis_libur' => null, 'tgl_mulai' => '2025-12-25', 'tgl_akhir' => '2025-12-25', 'nama_libur' => 'Hari Raya Natal', 'keterangan' => 'Impor legacy tanpa jenis', 'status' => 1],
+        ]);
+    }
+
     // --- /DBV-003 ---
 
     // --- DBV-004 (method) ---

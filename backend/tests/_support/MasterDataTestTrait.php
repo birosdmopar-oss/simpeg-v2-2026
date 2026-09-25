@@ -97,6 +97,40 @@ trait MasterDataTestTrait
             // = urutan master di meta, lihat RbacMasterEndpointsTest). Tambah fixture hanya di dalam blok grup sendiri.
 
             // --- DBV-003 ---
+            // Kantor baru di rantai wilayah yang TIDAK disentuh fixture `existing` wilayah (32/3172/3171020/3171010002),
+            // karena test RBAC menghapus `existing` berurutan dan kode wilayah kantor wajib aktif.
+            'kantor' => [
+                'new' => [
+                    'nama_kantor'  => 'Kantor Wilayah Gambir',
+                    'alamat'       => 'Jl. Medan Merdeka Barat No. 17',
+                    'id_provinsi'  => '31',
+                    'id_kabupaten' => '3171',
+                    'id_kecamatan' => '3171010',
+                    'id_kelurahan' => '3171010001',
+                    'kode_pos'     => '10110',
+                ],
+                'duplicate' => 'KANTOR PUSAT',
+                'existing'  => '1',
+                'parent'    => null,
+            ],
+            'bidang-kursem' => [
+                'new'       => ['bidang_kursem' => 'Kearsipan'],
+                'duplicate' => 'manajemen',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'instansi-kursem' => [
+                'new'       => ['instansi_kursem' => 'Arsip Nasional Republik Indonesia'],
+                'duplicate' => 'LEMBAGA ADMINISTRASI NEGARA',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'jenis-libur' => [
+                'new'       => ['jenis_libur' => 'Libur Daerah'],
+                'duplicate' => 'libur nasional',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
             // --- /DBV-003 ---
 
             // --- DBV-004 ---
