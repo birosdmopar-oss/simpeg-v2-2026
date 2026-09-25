@@ -59,7 +59,7 @@ Perilaku legacy yang memengaruhi skema [K]:
 | D1 | PK `tingkat_hukdis`, `jenis_hukdis`, `jenis_konket`, `tanda_jasa` = **INT** signed AUTO_INCREMENT [I] (satu-satunya bukti tipe: `simpegdev_local`; aman untuk ID legacy berapa pun). Alternatif TINYINT seperti master kecil produksi (Bagian 4 #2) |
 | D2 | Kolom audit empat tabel [I] meniru `diklat` [K]: `updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`, `updated_by INT NULL`, tanpa `created_*` |
 | D3 | `masa_sanksi_bulan` TINYINT UNSIGNED (1–255 bulan), 0 ditolak CHECK (tanpa masa = NULL) |
-| D4 | 3 CHECK: `ck_diklat_jenis_diklat` (1–5), `ck_jenis_hukdis_masa_sanksi_bulan` (NULL atau ≥ 1), `ck_jenis_konket_affect_tukin` (1/2) |
+| D4 | 3 CHECK: `chk_diklat_jenis_diklat` (1–5), `chk_jenis_hukdis_masa_sanksi_bulan` (NULL atau ≥ 1), `chk_jenis_konket_affect_tukin` (1/2) |
 | D5 | UNIQUE nama `jenis_konket` (`uq_jenis_konket_nama`) — aturan umum UNIQUE nama master; cek legacy hanya saat tambah |
 | D6 | Tanpa baris seed/sentinel di migration (Bagian 2.6) |
 
@@ -100,7 +100,7 @@ Berlaku untuk kelima tabel:
 | `updated_at` | DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | [K] :449 |
 | `updated_by` | INT NULL DEFAULT NULL | [K] :450; COMMENT [V2] |
 
-Kunci: `PRIMARY (id_diklat)` [K] :451; **UNIQUE** `uq_diklat_nama (jenis_diklat, nama_diklat)` [V2] (B1; cek legacy per jenis `Lm_diklat.php:179,197` mengecualikan status 10, v2 tidak); **CHECK** `ck_diklat_jenis_diklat` (`jenis_diklat BETWEEN 1 AND 5`) [V2] (D4).
+Kunci: `PRIMARY (id_diklat)` [K] :451; **UNIQUE** `uq_diklat_nama (jenis_diklat, nama_diklat)` [V2] (B1; cek legacy per jenis `Lm_diklat.php:179,197` mengecualikan status 10, v2 tidak); **CHECK** `chk_diklat_jenis_diklat` (`jenis_diklat BETWEEN 1 AND 5`) [V2] (D4).
 
 ### 2.2 tingkat_hukdis — [I] (ERD entity 271; `simpegdev_local`; `Lm_hukdis.php`)
 
@@ -127,7 +127,7 @@ Kunci: `PRIMARY (id_tingkat_hukdis)` [I]; **UNIQUE** `uq_tingkat_hukdis_nama (ti
 | `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | nilai 10 [K] kode (soft delete :349-354); tipe [I] |
 | `updated_at`, `updated_by` | pola umum | `updated_by` [K] kode :352, :428; lainnya [I] (D2) |
 
-Kunci: `PRIMARY (id_jenis_hukdis)` [I]; **UNIQUE** `uq_jenis_hukdis_nama (id_tingkat_hukdis, jenis_hukdis)` [V2] (B3; cek legacy per tingkat :399, :412 mengecualikan status 10); `KEY fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis (id_tingkat_hukdis)` — nama [K] ERD, secara teknis berlebih karena UNIQUE sudah diawali kolom yang sama, tetapi dipertahankan agar DDL sebanding (preseden G-10); FK `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` → `tingkat_hukdis (id_tingkat_hukdis)` **ON DELETE RESTRICT ON UPDATE RESTRICT** — nama [K] ERD, aksi [V2] (B4, G2; aksi legacy tidak tercatat di ERD → [I]); **CHECK** `ck_jenis_hukdis_masa_sanksi_bulan` (`masa_sanksi_bulan IS NULL OR masa_sanksi_bulan >= 1`) [V2] (D4).
+Kunci: `PRIMARY (id_jenis_hukdis)` [I]; **UNIQUE** `uq_jenis_hukdis_nama (id_tingkat_hukdis, jenis_hukdis)` [V2] (B3; cek legacy per tingkat :399, :412 mengecualikan status 10); `KEY fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis (id_tingkat_hukdis)` — nama [K] ERD, secara teknis berlebih karena UNIQUE sudah diawali kolom yang sama, tetapi dipertahankan agar DDL sebanding (preseden G-10); FK `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` → `tingkat_hukdis (id_tingkat_hukdis)` **ON DELETE RESTRICT ON UPDATE RESTRICT** — nama [K] ERD, aksi [V2] (B4, G2; aksi legacy tidak tercatat di ERD → [I]); **CHECK** `chk_jenis_hukdis_masa_sanksi_bulan` (`masa_sanksi_bulan IS NULL OR masa_sanksi_bulan >= 1`) [V2] (D4).
 
 ### 2.4 jenis_konket — [I] (ERD entity 78; `simpegdev_local`; `Lm_konket.php`, `rwy/L_konket.php`)
 
@@ -141,7 +141,7 @@ Kunci: `PRIMARY (id_jenis_hukdis)` [I]; **UNIQUE** `uq_jenis_hukdis_nama (id_tin
 | `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | tipe [I] (`simpegdev_local` VARCHAR(10) DEFAULT '1'; bila produksi VARCHAR, ini deviasi [V2] seperti `gol_pppk` DBV-004); legacy hard delete (:134) |
 | `updated_at`, `updated_by` | pola umum | `updated_by` [K] kode :212; lainnya [I] (D2) |
 
-Kunci: `PRIMARY (id_jenis_konket)` [I]; **UNIQUE** `uq_jenis_konket_nama (jenis_konket)` [V2] (D5; cek legacy hanya saat tambah :174, cek ubah rusak :189 → risiko duplikat tinggi); **UNIQUE** `uq_jenis_konket_old_id (old_id)` [V2] (B2); **CHECK** `ck_jenis_konket_affect_tukin` (`affect_tukin IN (1, 2)`) [V2] (D4).
+Kunci: `PRIMARY (id_jenis_konket)` [I]; **UNIQUE** `uq_jenis_konket_nama (jenis_konket)` [V2] (D5; cek legacy hanya saat tambah :174, cek ubah rusak :189 → risiko duplikat tinggi); **UNIQUE** `uq_jenis_konket_old_id (old_id)` [V2] (B2); **CHECK** `chk_jenis_konket_affect_tukin` (`affect_tukin IN (1, 2)`) [V2] (D4).
 
 ### 2.5 tanda_jasa — [I] (ERD entity 264; `Lm_tj.php`)
 
@@ -159,10 +159,10 @@ Ringkasan nama constraint:
 
 | Tabel | PRIMARY | UNIQUE | KEY | FK | CHECK |
 |---|---|---|---|---|---|
-| `diklat` | `id_diklat` | `uq_diklat_nama` | — | — | `ck_diklat_jenis_diklat` |
+| `diklat` | `id_diklat` | `uq_diklat_nama` | — | — | `chk_diklat_jenis_diklat` |
 | `tingkat_hukdis` | `id_tingkat_hukdis` | `uq_tingkat_hukdis_nama` | — | — (diacu 1 FK) | — |
-| `jenis_hukdis` | `id_jenis_hukdis` | `uq_jenis_hukdis_nama` | `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` | `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` | `ck_jenis_hukdis_masa_sanksi_bulan` |
-| `jenis_konket` | `id_jenis_konket` | `uq_jenis_konket_nama`, `uq_jenis_konket_old_id` | — | — | `ck_jenis_konket_affect_tukin` |
+| `jenis_hukdis` | `id_jenis_hukdis` | `uq_jenis_hukdis_nama` | `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` | `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` | `chk_jenis_hukdis_masa_sanksi_bulan` |
+| `jenis_konket` | `id_jenis_konket` | `uq_jenis_konket_nama`, `uq_jenis_konket_old_id` | — | — | `chk_jenis_konket_affect_tukin` |
 | `tanda_jasa` | `id_tanda_jasa` | `uq_tanda_jasa_nama` | — | — | — |
 
 Sengaja **tidak** dibuat:
@@ -216,7 +216,7 @@ Belum ada entri Config, controller, maupun frontend di PR ini: kelima tabel seng
 | 4 | `jenis_konket.affect_tukin` | Tidak ada di master; hanya per pengajuan `absen_ijin.affect_tukin` 1 Yes / 2 No (`form_ad.php:116-122`) | Kolom baru TINYINT NOT NULL DEFAULT 1 (K5a) | Nilai awal pengajuan; admin tetap bisa mengubah per pengajuan |
 | 5 | `jenis_hukdis.masa_sanksi_bulan` | Tidak ada; `riwayat_hukdis.masa_hukuman` teks bebas + `akhir_hukdis` manual (`rwy/hukdis/form.php:122-130`); SIASN mengisi per SK (`Siasn.php:2940-2946`) | Kolom baru TINYINT UNSIGNED NULL (K5b, D3) | Default hitung `akhir_hukdis`; riwayat tetap menyimpan masa sendiri. Berbeda dengan Tech Spec §3.5 "bukan input manual" (1.4 #4) |
 | 6 | Aksi FK | Tidak tercatat (ERD hanya nama) → [I] | `ON DELETE RESTRICT ON UPDATE RESTRICT`, nama legacy | G2/B4. MySQL 8 menampilkan RESTRICT eksplisit di `SHOW CREATE TABLE`; MariaDB bisa menghilangkannya karena itu default — verifikasi lewat `information_schema.REFERENTIAL_CONSTRAINTS` (dilakukan schema test) |
-| 7 | 3 CHECK | Tidak ada | `ck_diklat_jenis_diklat`, `ck_jenis_hukdis_masa_sanksi_bulan`, `ck_jenis_konket_affect_tukin` (D4) | Menegakkan B1/K5 di lapis DB. MySQL ≥ 8.0.16 dan MariaDB ≥ 10.2.1 menegakkan CHECK (MySQL error 3819, MariaDB 4025), juga saat `sql_mode=''` (diuji di MySQL 8.0.30). Impor dengan nilai di luar rentang akan gagal → normalkan dulu (6.5 #5) |
+| 7 | 3 CHECK | Tidak ada | `chk_diklat_jenis_diklat`, `chk_jenis_hukdis_masa_sanksi_bulan`, `chk_jenis_konket_affect_tukin` (D4) | Menegakkan B1/K5 di lapis DB. MySQL ≥ 8.0.16 dan MariaDB ≥ 10.2.1 menegakkan CHECK (MySQL error 3819, MariaDB 4025), juga saat `sql_mode=''` (diuji di MySQL 8.0.30). Impor dengan nilai di luar rentang akan gagal → normalkan dulu (6.5 #5) |
 | 8 | Tipe PK | `diklat` TINYINT signed [K]; empat tabel lain tidak ada DDL | `diklat` TINYINT signed; empat lainnya INT [I] (D1) | TINYINT signed berhenti di 127: setelah id 127, insert berikutnya gagal (`1062 Duplicate entry '127' for key PRIMARY` di MySQL 8.0.30, diuji schema test). `diklat` produksi AUTO_INCREMENT=17 → sisa ± 110 ID seumur hidup (soft delete tidak membebaskan ID). Tipe PK menentukan tipe kolom FK `riwayat_*` di B-11/B-14/B-17 |
 | 9 | Kolom audit empat tabel | Kode hanya menulis `updated_by`; DDL tidak ada | Pola `diklat` [K]: `updated_at` NOT NULL ON UPDATE + `updated_by`, tanpa `created_*` [I] (D2) | `group_jabatan` membuktikan tabel dengan pustaka serupa bisa punya `created_at` dari default DB. Bila dump menunjukkan `created_at`, tambahkan lewat ALTER selagi tabel kosong |
 | 10 | Opsi `jenis_diklat` | COMMENT 1–5 [K]; form master hanya 4/1/2 (3 `disabled`, 5 tidak ada); riwayat jenis 3/5 tidak memakai baris master | 1–5 (B1) + CHECK | Konsekuensi untuk B-11 (1.4 #1, 2.7) |
@@ -290,7 +290,7 @@ CREATE TABLE `diklat` (
   `updated_by` int DEFAULT NULL COMMENT 'id_pengguna yang terakhir mengubah',
   PRIMARY KEY (`id_diklat`),
   UNIQUE KEY `uq_diklat_nama` (`jenis_diklat`,`nama_diklat`),
-  CONSTRAINT `ck_diklat_jenis_diklat` CHECK ((`jenis_diklat` between 1 and 5))
+  CONSTRAINT `chk_diklat_jenis_diklat` CHECK ((`jenis_diklat` between 1 and 5))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 
 CREATE TABLE `tingkat_hukdis` (
@@ -318,7 +318,7 @@ CREATE TABLE `jenis_hukdis` (
   UNIQUE KEY `uq_jenis_hukdis_nama` (`id_tingkat_hukdis`,`jenis_hukdis`),
   KEY `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` (`id_tingkat_hukdis`),
   CONSTRAINT `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` FOREIGN KEY (`id_tingkat_hukdis`) REFERENCES `tingkat_hukdis` (`id_tingkat_hukdis`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `ck_jenis_hukdis_masa_sanksi_bulan` CHECK (((`masa_sanksi_bulan` is null) or (`masa_sanksi_bulan` >= 1)))
+  CONSTRAINT `chk_jenis_hukdis_masa_sanksi_bulan` CHECK (((`masa_sanksi_bulan` is null) or (`masa_sanksi_bulan` >= 1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 
 CREATE TABLE `jenis_konket` (
@@ -333,7 +333,7 @@ CREATE TABLE `jenis_konket` (
   PRIMARY KEY (`id_jenis_konket`),
   UNIQUE KEY `uq_jenis_konket_nama` (`jenis_konket`),
   UNIQUE KEY `uq_jenis_konket_old_id` (`old_id`),
-  CONSTRAINT `ck_jenis_konket_affect_tukin` CHECK ((`affect_tukin` in (1,2)))
+  CONSTRAINT `chk_jenis_konket_affect_tukin` CHECK ((`affect_tukin` in (1,2)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 
 CREATE TABLE `tanda_jasa` (

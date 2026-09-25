@@ -99,7 +99,7 @@ class CreateDiklatHukdisKonketTandaJasa extends Migration
             {$audit},
             PRIMARY KEY (`id_diklat`),
             UNIQUE KEY `uq_diklat_nama` (`jenis_diklat`, `nama_diklat`),
-            CONSTRAINT `ck_diklat_jenis_diklat` CHECK (`jenis_diklat` BETWEEN 1 AND 5)
+            CONSTRAINT `chk_diklat_jenis_diklat` CHECK (`jenis_diklat` BETWEEN 1 AND 5)
         ) " . self::TABLE_OPTIONS;
 
         // bobot_ipasn: skor IPASN dimensi disiplin legacy (L_user.php:1059-1070); disimpan, tidak dikelola v2 (B5).
@@ -129,7 +129,7 @@ class CreateDiklatHukdisKonketTandaJasa extends Migration
             KEY `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` (`id_tingkat_hukdis`),
             CONSTRAINT `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` FOREIGN KEY (`id_tingkat_hukdis`)
                 REFERENCES {$this->t('tingkat_hukdis')} (`id_tingkat_hukdis`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-            CONSTRAINT `ck_jenis_hukdis_masa_sanksi_bulan` CHECK (`masa_sanksi_bulan` IS NULL OR `masa_sanksi_bulan` >= 1)
+            CONSTRAINT `chk_jenis_hukdis_masa_sanksi_bulan` CHECK (`masa_sanksi_bulan` IS NULL OR `masa_sanksi_bulan` >= 1)
         ) " . self::TABLE_OPTIONS;
 
         // old_id = absen_ijin.kategori: relasi logis tanpa FK fisik (legacy juga tanpa FK, simpeg_prod.sql:68).
@@ -144,7 +144,7 @@ class CreateDiklatHukdisKonketTandaJasa extends Migration
             PRIMARY KEY (`id_jenis_konket`),
             UNIQUE KEY `uq_jenis_konket_nama` (`jenis_konket`),
             UNIQUE KEY `uq_jenis_konket_old_id` (`old_id`),
-            CONSTRAINT `ck_jenis_konket_affect_tukin` CHECK (`affect_tukin` IN (1, 2))
+            CONSTRAINT `chk_jenis_konket_affect_tukin` CHECK (`affect_tukin` IN (1, 2))
         ) " . self::TABLE_OPTIONS;
 
         $sql['tanda_jasa'] = "CREATE TABLE {$this->t('tanda_jasa')} (

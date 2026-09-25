@@ -104,10 +104,10 @@ final class DiklatHukdisKonketSchemaTest extends CIUnitTestCase
      * perilakunya dibuktikan di testConstraintsAreEnforced().
      */
     private const CHECKS = [
-        'diklat'         => ['ck_diklat_jenis_diklat'],
+        'diklat'         => ['chk_diklat_jenis_diklat'],
         'tingkat_hukdis' => [],
-        'jenis_hukdis'   => ['ck_jenis_hukdis_masa_sanksi_bulan'],
-        'jenis_konket'   => ['ck_jenis_konket_affect_tukin'],
+        'jenis_hukdis'   => ['chk_jenis_hukdis_masa_sanksi_bulan'],
+        'jenis_konket'   => ['chk_jenis_konket_affect_tukin'],
         'tanda_jasa'     => [],
     ];
 
