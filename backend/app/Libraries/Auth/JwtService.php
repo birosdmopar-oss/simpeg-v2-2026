@@ -207,8 +207,8 @@ class JwtService
         }
 
         // Kalah race (affected rows 0). Transaksi sudah di-rollback, jadi baca ulang melihat data ter-commit terbaru.
-        // Baris hilang = token dihapus logout di antara SELECT dan UPDATE → sama dengan jalur berurutan
-        // (unknownToken), bukan reuse. Baris masih ada = sudah dicabut request lain → reuse.
+        // Baris hilang = token dihapus logout atau pencabutan massal (revokeAllForNip) di antara SELECT dan UPDATE →
+        // sama dengan jalur berurutan (unknownToken), bukan reuse. Baris masih ada = sudah dirotasi request lain → reuse.
         if ($this->tokens->find((int) $row['id']) === null) {
             throw AuthException::unknownToken();
         }
@@ -225,11 +225,18 @@ class JwtService
     }
 
     /**
-     * Cabut seluruh refresh token milik satu NIP (force logout semua perangkat).
+     * Cabut seluruh sesi milik satu NIP (force logout semua perangkat): ganti/reset password, perubahan atau
+     * penghapusan akun oleh admin. Baris token DIHAPUS seperti logout (bukan `revoked=1`), sehingga refresh token lama
+     * di perangkat lain → unknownToken (401) tanpa reuse detection — sesi baru setelah login ulang tidak ikut dicabut
+     * (T-01). Reuse detection sendiri tetap menandai `revoked=1` (handleReuse()).
+     *
+     * @return int jumlah baris token yang dihapus
+     *
+     * @throws DatabaseException penghapusan gagal
      */
     public function revokeAllForNip(string $nip): int
     {
-        return $this->tokens->revokeAllForNip($nip, $this->now());
+        return $this->tokens->deleteAllForNip($nip);
     }
 
     // ------------------------------------------------------------------
@@ -265,8 +272,17 @@ class JwtService
     {
         return [
             $this->makeCookie($this->config->accessCookie, '', -3600, $this->config->accessCookiePath),
-            $this->makeCookie($this->config->refreshCookie, '', -3600, $this->config->refreshCookiePath),
+            $this->expiredRefreshCookie(),
         ];
+    }
+
+    /**
+     * Cookie kedaluwarsa khusus refresh token — dikirim saat refresh ditolak (401) agar browser berhenti mengirim
+     * refresh token yang sudah mati (T-01).
+     */
+    public function expiredRefreshCookie(): Cookie
+    {
+        return $this->makeCookie($this->config->refreshCookie, '', -3600, $this->config->refreshCookiePath);
     }
 
     public static function hash(string $plain): string
@@ -362,8 +378,9 @@ class JwtService
     }
 
     /**
-     * Reuse detection (A-05): token yang sudah dipakai/dicabut dipakai lagi → indikasi pencurian token.
-     * Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut.
+     * Reuse detection (A-05): token yang sudah dirotasi dipakai lagi → indikasi pencurian token.
+     * Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut dengan `revoked=1` (bukan dihapus), agar
+     * token hasil rotasi pihak lain tetap terbaca reuse bila dipakai (kontrak race CR-004).
      *
      * @throws AuthException selalu (reusedToken → 401)
      */

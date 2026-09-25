@@ -9,6 +9,7 @@ use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 
@@ -302,6 +303,52 @@ final class LoginTest extends CIUnitTestCase
             $this->assertStringNotContainsString('$argon2id$', (string) $u['after_json']);
             $this->assertStringNotContainsString(md5(AuthSeeder::PASSWORD), (string) $u['before_json']);
         }
+    }
+
+    /**
+     * @return iterable<string, array{string, list<string>}>
+     */
+    public static function loginWritePaths(): iterable
+    {
+        yield 'MD5 legacy → lazy rehash' => ['legacy', ['update', 'update', 'login']];
+
+        yield 'Argon2id parameter lama → rehash' => ['argon2id-rehash', ['update', 'update', 'login']];
+
+        yield 'Argon2id tanpa rehash' => ['argon2id', ['update', 'login']];
+    }
+
+    /**
+     * T-02 (QAFUNC-002-R1 29-02): SEMUA baris audit yang ditulis selama login — bukan hanya event `login` — harus
+     * ber-actor pemilik akun. Saat login AuthContext masih kosong, sehingga update `last_login_at` dan lazy rehash
+     * sebelumnya tercatat dengan nip_actor NULL.
+     *
+     * @param list<string> $expectedEvents
+     */
+    #[DataProvider('loginWritePaths')]
+    public function testEveryAuditRowWrittenDuringLoginHasAccountOwnerAsActor(string $path, array $expectedEvents): void
+    {
+        $nip = $path === 'legacy' ? self::NIP : AuthSeeder::NIP_ARGON;
+
+        if ($path === 'argon2id-rehash') {
+            // Hash Argon2id dengan parameter lebih lemah dari default → password_needs_rehash() true saat login.
+            $weak = password_hash(AuthSeeder::PASSWORD, PASSWORD_ARGON2ID, ['memory_cost' => 1024, 'time_cost' => 1, 'threads' => 1]);
+            $this->assertTrue(password_needs_rehash($weak, PASSWORD_ARGON2ID), 'Prasyarat: hash perlu di-rehash');
+            $this->db->table('pengguna')->where('nip', $nip)->update(['password' => $weak]);
+        }
+
+        $lastId = (int) ($this->db->table('audit_logs')->selectMax('id_log')->get()->getRowArray()['id_log'] ?? 0);
+
+        $this->login($nip, AuthSeeder::PASSWORD)->assertStatus(200);
+
+        $rows = $this->db->table('audit_logs')->where('id_log >', $lastId)->orderBy('id_log')->get()->getResultArray();
+        $this->assertSame($expectedEvents, array_column($rows, 'event'));
+
+        foreach ($rows as $row) {
+            $this->assertSame('pengguna', $row['entity']);
+            $this->assertSame($nip, $row['nip_actor'], sprintf('Audit %s #%s saat login harus ber-actor pemilik akun', $row['event'], $row['id_log']));
+        }
+
+        $this->assertSame(0, $this->db->table('audit_logs')->where('nip_actor', null)->countAllResults(), 'Login tidak boleh menulis audit tanpa actor');
     }
 
     public function testFailedLoginIsNotAuditedAsLogin(): void

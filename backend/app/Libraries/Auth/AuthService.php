@@ -76,8 +76,13 @@ class AuthService
         }
 
         // Sukses: reset lockout, catat last_login (via Model → audit update), audit event login.
+        // Login belum punya sesi (AuthContext kosong) → actor audit update = pemilik akun, bukan NULL (A-10, T-02).
+        // Lazy rehash di PasswordVerifier::verify() di atas memakai actor yang sama.
         $this->lockout->recordSuccess($username, $ip);
-        $this->pengguna->update((int) $user['id_pengguna'], ['last_login_at' => date('Y-m-d H:i:s')]);
+        $this->pengguna->withActor(
+            (string) $user['nip'],
+            fn (): bool => $this->pengguna->update((int) $user['id_pengguna'], ['last_login_at' => date('Y-m-d H:i:s')]),
+        );
 
         $claims = self::claimsFor($user);
         $tokens = $this->jwt->issueTokenPair($claims);

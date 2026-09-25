@@ -74,6 +74,10 @@ class TokenModel extends Model
     }
 
     /**
+     * Tandai seluruh token aktif satu NIP `revoked=1` — KHUSUS reuse detection (JwtService::handleReuse). Baris
+     * sengaja dipertahankan: token yang sudah dirotasi atau dicabut karena reuse tetap terbaca "reuse" bila dipakai
+     * lagi. Pencabutan massal biasa (ganti/reset password, perubahan akun oleh admin) memakai deleteAllForNip().
+     *
      * @throws DatabaseException query gagal — juga saat DBDebug = false (pencabutan massal tidak boleh gagal diam-diam)
      */
     public function revokeAllForNip(string $nip, int $now): int
@@ -85,6 +89,29 @@ class TokenModel extends Model
 
         if ($updated === false) {
             throw $this->writeFailure('Gagal mencabut seluruh refresh token');
+        }
+
+        return $this->db->affectedRows();
+    }
+
+    /**
+     * Hapus fisik SELURUH refresh token satu NIP, termasuk yang sudah dirotasi (revoked=1) — pencabutan massal
+     * karena ganti/reset password atau perubahan/penghapusan akun oleh admin. Sama seperti logout: token lama yang
+     * masih tersimpan di perangkat lain terbaca "tidak dikenal" (401), bukan "reuse" yang ikut mencabut sesi baru
+     * pengguna setelah ia login ulang (T-01, QAFUNC-002-R1). Dengan begitu `revoked=1` hanya berarti "sudah
+     * dirotasi" (atau dicabut reuse detection), sehingga reuse detection tidak salah sasaran.
+     *
+     * @return int jumlah baris yang dihapus
+     *
+     * @throws DatabaseException query gagal — juga saat DBDebug = false atau di dalam transaksi (reset password),
+     *                           yang di CI4 hanya mengembalikan false
+     */
+    public function deleteAllForNip(string $nip): int
+    {
+        $deleted = $this->where('nip', $nip)->delete();
+
+        if ($deleted === false) {
+            throw $this->writeFailure('Gagal menghapus seluruh refresh token');
         }
 
         return $this->db->affectedRows();

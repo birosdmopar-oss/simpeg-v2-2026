@@ -51,7 +51,7 @@ class PasswordVerifier
             $rehashed = false;
 
             if (password_needs_rehash($hash, PASSWORD_ARGON2ID)) {
-                $this->storeHash((int) $user['id_pengguna'], $this->hash($plain));
+                $this->storeHash($user, $this->hash($plain));
                 $rehashed = true;
             }
 
@@ -64,7 +64,7 @@ class PasswordVerifier
             }
 
             // Lazy rehash: simpan Argon2id, kosongkan MD5 (MTC-003).
-            $this->storeHash((int) $user['id_pengguna'], $this->hash($plain));
+            $this->storeHash($user, $this->hash($plain));
 
             return ['ok' => true, 'path' => 'legacy', 'rehashed' => true];
         }
@@ -93,9 +93,17 @@ class PasswordVerifier
         return $errors;
     }
 
-    private function storeHash(int $idPengguna, string $hash): void
+    /**
+     * @param array<string, mixed> $user row pengguna
+     */
+    private function storeHash(array $user, string $hash): void
     {
-        // Lewat Model agar audit (masked) tetap tercatat (ADR-012).
-        $this->pengguna->update($idPengguna, ['password' => $hash, 'password_legacy' => null]);
+        // Lewat Model agar audit (masked) tetap tercatat (ADR-012). Rehash hanya terjadi setelah pemilik akun
+        // membuktikan password-nya sendiri, jadi actor audit = pemilik akun. Saat login AuthContext masih kosong;
+        // tanpa withActor() audit rehash tercatat dengan actor NULL (T-02).
+        $this->pengguna->withActor(
+            (string) $user['nip'],
+            fn (): bool => $this->pengguna->update((int) $user['id_pengguna'], ['password' => $hash, 'password_legacy' => null]),
+        );
     }
 }
