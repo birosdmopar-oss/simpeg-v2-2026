@@ -1,5 +1,6 @@
 /**
- * AppShell — menu per role (A-12, Modul G, G-10) dan navigasi yang boleh membungkus di layar HP.
+ * AppShell — menu per role (A-12, Modul G, G-10), tautan "Ganti Password" untuk semua role (ISSUE-006), dan navigasi
+ * yang boleh membungkus di layar HP.
  * Layout sungguhan tidak bisa diukur di jsdom; pengecekan lebar 375px dilakukan di browser (uji UI CR-003),
  * test ini mengunci syarat CSS-nya: nav wajib `flex-wrap`, bukan satu baris kaku.
  */
@@ -29,6 +30,7 @@ async function mountAs(role: RoleCode) {
       { path: '/users', name: 'users', component: stub },
       { path: '/master/:entity?', name: 'master-data', component: stub },
       { path: '/faq/:id?', name: 'faq', component: stub },
+      { path: '/ganti-password', name: 'change-password', component: stub },
     ],
   })
   await router.push('/')
@@ -51,6 +53,16 @@ describe('AppShell', () => {
 
     expect(nav.findAll('a').map((a) => a.text())).toEqual(['Beranda', 'Manajemen Akun', 'Master Data', 'FAQ'])
     expect(nav.classes()).toContain('flex-wrap')
+  })
+
+  it.each(Object.values(Role))('role %i melihat tautan Ganti Password di menu pengguna (A-06)', async (role) => {
+    const wrapper = await mountAs(role)
+    const link = wrapper.get('[data-testid="user-menu"] [data-testid="nav-change-password"]')
+
+    expect(link.attributes('href')).toBe('/ganti-password')
+    expect(link.attributes('aria-label')).toBe('Ganti Password')
+    // Bukan bagian nav utama: daftar menu per role tetap sama.
+    expect(wrapper.get('[data-testid="nav-main"]').find('[data-testid="nav-change-password"]').exists()).toBe(false)
   })
 
   it('Pegawai hanya melihat Beranda dan FAQ', async () => {

@@ -1,8 +1,11 @@
 /**
  * Skema form akun pengguna (A-12) — mengikuti aturan validasi backend UserService
- * (NIP 18 digit, username ≤30, password ≥8 huruf+angka, role 1-8). Backend tetap final authority.
+ * (NIP 18 digit, username ≤30, password sesuai kebijakan K4 dari password.schema.ts, role 1-8).
+ * Backend tetap final authority.
  */
 import { z } from 'zod'
+
+import { newPasswordSchema } from './password.schema'
 
 const nip = z
   .string({ message: 'NIP wajib diisi.' })
@@ -16,11 +19,8 @@ const username = z
   .optional()
   .or(z.literal(''))
 
-const passwordRule = z
-  .string()
-  .min(8, 'Password minimal 8 karakter.')
-  .regex(/[A-Za-z]/, 'Password harus mengandung huruf.')
-  .regex(/\d/, 'Password harus mengandung angka.')
+// Satu sumber aturan password (PASSWORD_RULES) — sama dengan halaman ganti/reset password dan backend PasswordPolicy.
+const passwordRule = newPasswordSchema
 
 const userLevel = z.coerce.number({ message: 'Role wajib dipilih.' }).int().min(1, 'Role wajib dipilih.').max(8, 'Role tidak valid.')
 

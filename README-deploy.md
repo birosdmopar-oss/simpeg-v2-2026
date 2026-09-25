@@ -37,8 +37,10 @@ sudo chown -R deploy:deploy /var/www/simpeg-v2
 # 3) .env backend (berisi secret — TIDAK dari git). Isi dari backend/.env.example
 cp backend/.env.example /var/www/simpeg-v2/shared/backend.env
 vi /var/www/simpeg-v2/shared/backend.env      # CI_ENVIRONMENT=development, database.*, jwt.secret, cors.allowedOrigins, dst.
+# Lupa password (ISSUE-006): auth.resetLinkBase = URL frontend server ini + /reset-password. Driver
+# auth.resetTokenNotifier=log menulis tautan reset ke writable/logs dan DITOLAK di production (driver email menyusul).
 
-# (opsional) .env.local frontend
+# (opsional) .env.local frontend — VITE_PASSWORD_RESET_ENABLED=true hanya kalau kanal reset di backend aktif
 printf 'VITE_API_BASE_URL=https://simpegdev.example.go.id/api/v1\n' > /var/www/simpeg-v2/shared/frontend.env.local
 
 # 4) writable/ persisten (cache, logs, uploads) — salin dari backend/writable repo

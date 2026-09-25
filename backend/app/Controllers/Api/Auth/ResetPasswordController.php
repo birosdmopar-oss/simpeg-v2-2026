@@ -10,9 +10,12 @@ use CodeIgniter\HTTP\ResponseInterface;
 /**
  * A-07 — Lupa / reset password (Publik/Guest).
  *
- * POST api/v1/auth/forgot-password  { username }
- *   200 selalu generik: { accepted:true } (+ token/expires_at HANYA kalau auth.exposeResetTokenInResponse=true, development)
+ * POST api/v1/auth/forgot-password  { username, captcha_token }
+ *   200 selalu generik: { accepted:true, message } (+ token/expires_at HANYA kalau auth.exposeResetTokenInResponse=true,
+ *       development). Tautan reset dikirim lewat driver auth.resetTokenNotifier (ResetTokenNotifierInterface).
+ *   422 captcha kosong/invalid (dicek SEBELUM rate limit, pola login) atau username kosong
  *   429 kalau melebihi rate limit forgot_attempts
+ *   500 kanal pengiriman belum dikonfigurasi (mis. driver log/mock di production) — sama untuk semua username
  * POST api/v1/auth/reset-password   { token, new_password, new_password_confirmation }
  *   200 { reset:true } — token reset lain milik akun dibatalkan, seluruh refresh token akun dicabut (satu transaksi)
  *   422 token invalid / sudah dipakai / tidak berlaku lagi (dibatalkan) / kedaluwarsa / kebijakan password
@@ -23,10 +26,15 @@ class ResetPasswordController extends ApiController
     public function forgot(): ResponseInterface
     {
         $data = $this->validateOrFail($this->payload(), [
-            'username' => 'required|string|max_length[30]',
+            'username'      => 'required|string|max_length[30]',
+            'captcha_token' => 'permit_empty|string',
         ]);
 
-        $result = service('resetPasswordService')->request((string) $data['username'], $this->request->getIPAddress());
+        $result = service('resetPasswordService')->request(
+            (string) $data['username'],
+            (string) ($data['captcha_token'] ?? ''),
+            $this->request->getIPAddress(),
+        );
 
         $payload = [
             'accepted' => true,

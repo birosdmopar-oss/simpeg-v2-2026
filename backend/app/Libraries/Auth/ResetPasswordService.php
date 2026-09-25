@@ -6,18 +6,23 @@ namespace App\Libraries\Auth;
 
 use App\Exceptions\TooManyRequestsException;
 use App\Exceptions\ValidationException;
+use App\Interfaces\CaptchaVerifierInterface;
+use App\Interfaces\ResetTokenNotifierInterface;
 use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
+use CodeIgniter\Exceptions\ConfigException;
 use Config\Auth as AuthConfig;
 use Throwable;
 
 /**
  * Lupa / reset password (A-07).
  *
- * request(): rate limit via forgot_attempts (forgotMaxPerWindow per forgotWindowMinutes), response selalu
- *            generik (tidak membocorkan apakah username terdaftar). Token acak 256-bit, di DB hanya hash.
+ * request(): captcha Turnstile (A-03, pola login: dicek PALING AWAL, sebelum rate limit dan lookup username) →
+ *            rate limit via forgot_attempts (forgotMaxPerWindow per forgotWindowMinutes) → token acak 256-bit (di DB
+ *            hanya hash) → tautan {auth.resetLinkBase}?token=… dikirim lewat ResetTokenNotifierInterface. Response
+ *            selalu generik (tidak membocorkan apakah username terdaftar).
  * reset()  : token expired → ditolak; token sudah dipakai / dibatalkan → ditolak; sukses → password Argon2id baru,
  *            token ditandai used_at, token reset lain milik user dibatalkan, SELURUH refresh token dicabut.
  *            Semua tulisan dalam satu transaksi; klaim token lewat UPDATE bersyarat used_at IS NULL sehingga
@@ -34,8 +39,10 @@ use Throwable;
  * - Termasuk tulisan audit_logs yang gagal (transStatus false): untuk jalur ini audit TIDAK fail-open (pengecualian
  *   F0-04) karena kegagalannya tidak bisa dibedakan dari transaksi yang sudah di-rollback server.
  *
- * Kanal pengiriman token (email/WA) belum ditentukan di dokumen sumber → token di-log (info) dan,
- * hanya jika Config\Auth::$exposeResetTokenInResponse = true (development), dikembalikan ke pemanggil.
+ * Kanal pengiriman = email (K3); driver dipilih lewat auth.resetTokenNotifier (Config\Services::resetTokenNotifier):
+ * 'log' (development, tautan ditulis ke log) atau 'mock' (test) — keduanya ditolak di production sampai driver email
+ * tersedia. Log milik service ini TIDAK memuat token. Hanya jika Config\Auth::$exposeResetTokenInResponse = true
+ * (development) token juga dikembalikan ke pemanggil.
  */
 class ResetPasswordService
 {
@@ -49,6 +56,8 @@ class ResetPasswordService
         private JwtService $jwt,
         private ?AuthConfig $config = null,
         private ?BaseConnection $db = null,
+        private ?CaptchaVerifierInterface $captcha = null,
+        private ?ResetTokenNotifierInterface $notifier = null,
     ) {
         $this->config ??= config(AuthConfig::class);
         $this->db ??= db_connect();
@@ -63,9 +72,21 @@ class ResetPasswordService
      * @return array{accepted: bool, token: string|null, expires_at: string|null}
      *                                                                            token hanya terisi kalau exposeResetTokenInResponse=true DAN username dikenal
      */
-    public function request(string $username, ?string $ip): array
+    public function request(string $username, string $captchaToken, ?string $ip): array
     {
-        $now = $this->now ?? time();
+        // A-03 (pola login): captcha ditolak SEBELUM rate limit — percobaan tanpa captcha valid tidak tercatat di
+        // forgot_attempts, sehingga bot tidak bisa menghabiskan kuota reset milik username korban.
+        $this->captcha ??= service('captchaVerifier');
+
+        if (! $this->captcha->verify($captchaToken, $ip)) {
+            throw ValidationException::forField('captcha_token', 'Verifikasi captcha gagal. Silakan ulangi.');
+        }
+
+        // Konfigurasi kanal diperiksa sebelum username dicari: salah konfigurasi (mis. driver log di production)
+        // gagal sama untuk semua username, jadi tidak membocorkan username mana yang terdaftar.
+        $notifier = $this->notifier();
+        $linkBase = $this->resetLinkBase();
+        $now      = $this->now ?? time();
 
         if ($this->attempts->countRecent($username, $this->config->forgotWindowMinutes, $now) >= $this->config->forgotMaxPerWindow) {
             throw new TooManyRequestsException(sprintf(
@@ -94,12 +115,13 @@ class ResetPasswordService
             'requested_at' => date('Y-m-d H:i:s', $now),
         ]);
 
-        if ($token !== null) {
-            // Pengiriman token ke pengguna: kanal belum ditentukan (TBD). Sementara dicatat di log lokal.
+        if ($user !== null && $token !== null) {
             log_message('info', '[ResetPassword] token reset diterbitkan untuk username={username}, berlaku s.d. {exp}', [
                 'username' => $username,
                 'exp'      => (string) $expiresAt,
             ]);
+
+            $this->deliver($notifier, $user, $token, $linkBase . '?token=' . rawurlencode($token), (string) $expiresAt);
         }
 
         return [
@@ -180,6 +202,45 @@ class ResetPasswordService
         }
 
         $this->db->resetTransStatus();
+    }
+
+    /**
+     * Kegagalan kirim tidak mengubah respons (tetap generik, token tetap tercatat): pemohon tidak boleh bisa
+     * membedakan username terdaftar dari yang tidak. Kegagalan dicatat di log (tanpa token) untuk ditindaklanjuti.
+     *
+     * @param array<string, mixed> $user
+     */
+    private function deliver(ResetTokenNotifierInterface $notifier, array $user, string $token, string $link, string $expiresAt): void
+    {
+        try {
+            $notifier->send($user, $token, $link, $expiresAt);
+        } catch (Throwable $e) {
+            log_message('error', '[ResetPassword] tautan reset untuk username={username} gagal dikirim: {msg}', [
+                'username' => (string) $user['username'],
+                'msg'      => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function notifier(): ResetTokenNotifierInterface
+    {
+        return $this->notifier ??= service('resetTokenNotifier');
+    }
+
+    /**
+     * auth.resetLinkBase wajib URL absolut http(s) tanpa query/fragment; token ditambahkan sebagai ?token=….
+     *
+     * @throws ConfigException
+     */
+    private function resetLinkBase(): string
+    {
+        $base = trim($this->config->resetLinkBase);
+
+        if (preg_match('#^https?://[^\s?\#]+$#i', $base) !== 1) {
+            throw new ConfigException('auth.resetLinkBase wajib berisi URL absolut (http/https, tanpa query) halaman reset password frontend.');
+        }
+
+        return $base;
     }
 
     /**

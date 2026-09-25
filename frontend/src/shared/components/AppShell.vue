@@ -2,9 +2,10 @@
 /**
  * Layout aplikasi setelah login: header + navigasi. Menu "Manajemen Akun" hanya tampil untuk role 1 & 3 (A-12),
  * menu "Master Data" hanya role 1 (Modul G), menu "FAQ" untuk semua role login (G-10).
+ * Menu pengguna (kanan): "Ganti Password" (A-06, ISSUE-006) untuk semua role, lalu "Keluar".
  * Tampilan menu = UX saja; backend tetap menegakkan RoleFilter (ADR-024).
  */
-import { CircleHelp, Database, LogOut, Users, Home } from 'lucide-vue-next'
+import { CircleHelp, Database, KeyRound, LogOut, Users, Home } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -74,11 +75,22 @@ async function logout(): Promise<void> {
           </RouterLink>
         </nav>
 
-        <div class="flex items-center gap-3 text-sm">
+        <div class="flex flex-wrap items-center justify-end gap-2 text-sm" data-testid="user-menu">
           <div v-if="auth.user" class="text-right leading-tight">
             <div class="font-medium text-slate-800">{{ auth.user.username }}</div>
             <div class="text-xs text-slate-500">{{ roleLabel }}</div>
           </div>
+          <!-- Label disembunyikan di layar HP (ikon + title/aria-label) agar header tidak melebar. -->
+          <RouterLink
+            :to="{ name: 'change-password' }"
+            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-slate-700 hover:bg-slate-100"
+            active-class="bg-slate-100 text-brand-primary font-medium"
+            title="Ganti Password"
+            aria-label="Ganti Password"
+            data-testid="nav-change-password"
+          >
+            <KeyRound class="h-4 w-4" /> <span class="hidden sm:inline">Ganti Password</span>
+          </RouterLink>
           <button
             type="button"
             class="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-slate-700 hover:bg-slate-50 disabled:opacity-60"

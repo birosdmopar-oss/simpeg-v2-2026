@@ -69,6 +69,34 @@ export interface MeResponse {
   claims: SessionClaims
 }
 
+/** POST /auth/change-password (A-06). Sukses → seluruh sesi dicabut, cookie dihapus. */
+export interface ChangePasswordPayload {
+  old_password: string
+  new_password: string
+  new_password_confirmation: string
+}
+
+/** POST /auth/forgot-password (A-07). */
+export interface ForgotPasswordPayload {
+  username: string
+  captcha_token: string
+}
+
+/** Respons selalu generik; `token`/`expires_at` HANYA ada di development (auth.exposeResetTokenInResponse). */
+export interface ForgotPasswordResponse {
+  accepted: boolean
+  message: string
+  token?: string
+  expires_at?: string
+}
+
+/** POST /auth/reset-password (A-07). */
+export interface ResetPasswordPayload {
+  token: string
+  new_password: string
+  new_password_confirmation: string
+}
+
 export interface UserListQuery {
   search?: string
   user_level?: RoleCode | ''

@@ -122,8 +122,8 @@ final class ResetPasswordTransactionTest extends CIUnitTestCase
     {
         $conn    = $this->connection($dbDebug);
         $service = $this->serviceOn($conn);
-        $token   = (string) $service->request(self::NIP, null)['token'];
-        $other   = (string) $service->request(self::NIP, null)['token'];
+        $token   = (string) $service->request(self::NIP, 'ok', null)['token'];
+        $other   = (string) $service->request(self::NIP, 'ok', null)['token'];
         $this->issueTokensFor(self::NIP);
         $before = $this->state($token);
 
@@ -172,8 +172,8 @@ final class ResetPasswordTransactionTest extends CIUnitTestCase
     {
         $conn    = $this->connection($dbDebug);
         $service = $this->serviceOn($conn);
-        $token   = (string) $service->request(self::NIP, null)['token'];
-        $service->request(self::NIP, null);
+        $token   = (string) $service->request(self::NIP, 'ok', null)['token'];
+        $service->request(self::NIP, 'ok', null);
         $this->issueTokensFor(self::NIP);
         $before = $this->state($token);
 
@@ -204,8 +204,8 @@ final class ResetPasswordTransactionTest extends CIUnitTestCase
     public function testDeadlockVictimDoesNotRunRemainingStepsOutsideTransaction(): void
     {
         $conn  = $this->connection(true);
-        $token = (string) $this->serviceOn($conn)->request(self::NIP, null)['token'];
-        $this->serviceOn($conn)->request(self::NIP, null);
+        $token = (string) $this->serviceOn($conn)->request(self::NIP, 'ok', null)['token'];
+        $this->serviceOn($conn)->request(self::NIP, 'ok', null);
         $this->issueTokensFor(self::NIP);
         $before = $this->state($token);
         $userId = (int) $this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray()['id_pengguna'];
@@ -252,7 +252,7 @@ final class ResetPasswordTransactionTest extends CIUnitTestCase
         $this->connections[] = $conn;
 
         $service = $this->serviceOn($conn);
-        $token   = (string) $service->request(self::NIP, null)['token'];
+        $token   = (string) $service->request(self::NIP, 'ok', null)['token'];
         $this->issueTokensFor(self::NIP);
         $before = $this->state($token);
 
@@ -276,7 +276,7 @@ final class ResetPasswordTransactionTest extends CIUnitTestCase
         $tokens    = [];
 
         foreach (array_keys($passwords) as $name) {
-            $tokens[$name] = (string) $this->serviceOn($this->db)->request(self::NIP, null)['token'];
+            $tokens[$name] = (string) $this->serviceOn($this->db)->request(self::NIP, 'ok', null)['token'];
         }
 
         $holder  = $this->holdLock('SELECT id_pengguna FROM ' . $this->table('pengguna') . ' WHERE nip = ? FOR UPDATE', [self::NIP]);

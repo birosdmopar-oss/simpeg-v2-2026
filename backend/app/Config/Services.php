@@ -7,13 +7,16 @@ namespace Config;
 use App\Interfaces\CaptchaVerifierInterface;
 use App\Interfaces\EsignGatewayInterface;
 use App\Interfaces\PushNotifGatewayInterface;
+use App\Interfaces\ResetTokenNotifierInterface;
 use App\Interfaces\SiasnGatewayInterface;
 use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Auth\AuthService;
 use App\Libraries\Auth\JwtService;
 use App\Libraries\Auth\LockoutService;
+use App\Libraries\Auth\LogResetTokenNotifier;
 use App\Libraries\Auth\MockCaptchaVerifier;
+use App\Libraries\Auth\MockResetTokenNotifier;
 use App\Libraries\Auth\PasswordService;
 use App\Libraries\Auth\PasswordVerifier;
 use App\Libraries\Auth\ResetPasswordService;
@@ -32,6 +35,7 @@ use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\LoginAttemptModel;
 use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Config\BaseService;
+use CodeIgniter\Exceptions\ConfigException;
 use RuntimeException;
 
 /**
@@ -128,6 +132,8 @@ class Services extends BaseService
             return static::getSharedInstance('resetPasswordService');
         }
 
+        // Notifier sengaja tidak di-resolve di sini: driver yang ditolak (mis. log di production) hanya menggagalkan
+        // forgot-password, bukan reset-password.
         return new ResetPasswordService(
             new PenggunaModel(),
             new ForgotAttemptModel(),
@@ -135,7 +141,27 @@ class Services extends BaseService
             static::passwordService(),
             static::jwt(),
             config(Auth::class),
+            captcha: static::captchaVerifier(),
         );
+    }
+
+    /**
+     * Kanal pengiriman tautan reset password (A-07, ISSUE-006) dari Config\Auth::$resetTokenNotifier.
+     * Driver email (K3) belum ada — menunggu akun SMTP.
+     */
+    public static function resetTokenNotifier(bool $getShared = true): ResetTokenNotifierInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('resetTokenNotifier');
+        }
+
+        $driver = config(Auth::class)->resetTokenNotifier;
+
+        return match ($driver) {
+            'mock'  => new MockResetTokenNotifier(),
+            'log'   => new LogResetTokenNotifier(),
+            default => throw new ConfigException("Driver auth.resetTokenNotifier '{$driver}' belum tersedia (driver email menunggu akun SMTP)."),
+        };
     }
 
     public static function userService(bool $getShared = true): UserService

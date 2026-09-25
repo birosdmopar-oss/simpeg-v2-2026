@@ -4,7 +4,15 @@
  */
 import { api } from '@/lib/axios'
 
-import type { LoginPayload, LoginResponse, MeResponse } from '../types'
+import type {
+  ChangePasswordPayload,
+  ForgotPasswordPayload,
+  ForgotPasswordResponse,
+  LoginPayload,
+  LoginResponse,
+  MeResponse,
+  ResetPasswordPayload,
+} from '../types'
 
 export const authService = {
   async login(payload: LoginPayload): Promise<LoginResponse> {
@@ -21,11 +29,16 @@ export const authService = {
     await api.post('/auth/logout')
   },
 
-  async changePassword(payload: {
-    old_password: string
-    new_password: string
-    new_password_confirmation: string
-  }): Promise<void> {
+  async changePassword(payload: ChangePasswordPayload): Promise<void> {
     await api.post('/auth/change-password', payload)
+  },
+
+  async forgotPassword(payload: ForgotPasswordPayload): Promise<ForgotPasswordResponse> {
+    const { data } = await api.post<ForgotPasswordResponse>('/auth/forgot-password', payload)
+    return data
+  },
+
+  async resetPassword(payload: ResetPasswordPayload): Promise<void> {
+    await api.post('/auth/reset-password', payload)
   },
 }
