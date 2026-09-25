@@ -205,6 +205,18 @@ class Services extends BaseService
     }
 
     /**
+     * G-08 — hari libur (DBV-003/CR-010): daftar/detail role 1/4/5/8, tulis role 1, tanggalLibur() untuk Fase 5.
+     */
+    public static function hariLiburService(bool $getShared = true): \App\Libraries\MasterData\HariLiburService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('hariLiburService');
+        }
+
+        return new \App\Libraries\MasterData\HariLiburService();
+    }
+
+    /**
      * G-10 — baca FAQ (UL_ALL) + rating artikel (UL_PEGAWAI). CRUD admin FAQ tetap lewat masterService.
      */
     public static function faqService(bool $getShared = true): FaqService
