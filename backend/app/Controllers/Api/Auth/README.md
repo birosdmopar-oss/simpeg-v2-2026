@@ -4,6 +4,12 @@ Controller REST API modul ini (`App\Controllers\Api\Auth\*`), semua extends `App
 Envelope: sukses `{status:'success', data}`, gagal `{status:'error', message, errors?}` (ADR-001).
 Role akses mengacu Matriks Role x Endpoint Bagian 2 Modul A. Prefix seluruh path: `/api/v1`.
 
+Error umum di seluruh endpoint (`ApiController` dan handler global `ApiExceptionHandler`, CR-007):
+- query string atau body form (form-urlencoded/multipart) yang bukan UTF-8 valid → **422** `message: "Input tidak valid (encoding)."`, `errors: { <field>: ["Isian mengandung karakter yang tidak valid (bukan UTF-8)."] }` (field bersarang bernotasi titik; key ikut dicek). Ditolak sebelum menyentuh DB. Body JSON seperti itu tetap 400 "Body JSON tidak valid.".
+- segmen path URL yang bukan UTF-8 valid (mis. `/master/agama/%C3`), atau memuat karakter di luar `Config\App::$permittedURIChars` (huruf/angka ASCII, spasi, `~ % . : _ -`), ditolak Router CI4 sebelum controller → **400** `message: "Permintaan tidak valid."` tanpa `errors`; segmen tidak dipantulkan (detail di log). Cek parameter route di `ApiController::_remap()` (422 "Input tidak valid (encoding)." tanpa `errors`) hanya lapis cadangan bila `permittedURIChars` dilonggarkan.
+- exception yang lolos ke handler global pada path `/api/...` (dan `/`) selalu dijawab envelope ini, dengan atau tanpa header `Accept: application/json` (`Config\Exceptions::isApiRequest()` memakai route path, bukan path yang memuat `index.php`); error 4xx dari framework → "Permintaan tidak valid.".
+- nilai yang ditolak MySQL strict (1406 terlalu panjang, 1264 di luar rentang, 1366, 1292, 1265, 1364) → **422** `message: "Data tidak dapat diproses karena ada isian yang tidak valid."` tanpa `errors`; pesan MySQL (kolom, nilai) hanya di log. Error DB lain (lock wait, deadlock, 1062 yang tidak diterjemahkan service, koneksi) tetap 500.
+
 Token: access token JWT 1 jam + refresh token 7 hari (rotating, single-use), keduanya cookie httpOnly
 (`access_token` path `/`, `refresh_token` path `/api/v1/auth`). Klien non-browser boleh memakai header
 `Authorization: Bearer <access_token>` dan body `refresh_token`.
