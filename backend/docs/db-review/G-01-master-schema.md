@@ -168,7 +168,7 @@ Semua tabel: `ENGINE=InnoDB`, `utf8mb4` / `utf8mb4_unicode_ci`; `status TINYINT 
 
 Perilaku aplikasi (engine master): kode wilayah wajib tepat 2/4/7/10 digit; PK agama/jenis_* diberikan DB (input kode diabaikan); daftar default menyembunyikan status 10 (seperti legacy `status!='10'`), filter `?status=1|2|10`; entri terhapus dipulihkan lewat `PATCH …/status {1|2}`; `updated_by` = `id_pengguna` aktor; timestamp ditulis aplikasi dalam UTC.
 
-> **Catatan CR-003 / DBV-002 (24-09-2026, menunggu approval di `G-10-faq-schema.md` Bagian 4 #10):** entri yang hanya bergeser urutannya karena entri lain dipindah/ditambah/dihapus/pindah induk tidak lagi di-stamp `updated_at`/`updated_by` (tetap teraudit di `audit_logs`), dan tambah dengan `order` langsung di posisi final. Keputusan DBV-001 di atas tidak berubah.
+> **Catatan CR-003 / DBV-002 (✅ disetujui DB Validator 25-09-2026, `G-10-faq-schema.md` Bagian 4 #10):** entri yang hanya bergeser urutannya karena entri lain dipindah/ditambah/dihapus/pindah induk tidak lagi di-stamp `updated_at`/`updated_by` (tetap teraudit di `audit_logs`), dan tambah dengan `order` langsung di posisi final. Keputusan DBV-001 di atas tidak berubah.
 
 ### 8.3 Nilai dugaan [I] yang wajib dicocokkan dengan dump struktur produksi
 

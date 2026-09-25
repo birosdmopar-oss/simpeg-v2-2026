@@ -2,7 +2,7 @@
 
 **Key review:** `DBV-002` (review DB Validator, skema) + `CR-003` (review kode) — satu pull request, judul `[DBV-002][CR-003] …`, branch `dbv-002/g10-faq-pilot`. Merge hanya setelah **kedua** review menyatakan setuju. Aturan 24-09-2026 (G-01 Bagian 8): untuk PR dengan dua key [CR] & [DBV], DB Validator **hanya me-review/approve** (tidak merge); **merge dilakukan oleh reviewer CR**. (Key `CR-002` sudah dipakai PR #5.)
 
-**Status:** ⏳ **MENUNGGU APPROVAL DB VALIDATOR (DBV-002) DAN REVIEW KODE (CR-003).** Migration `2026-09-24-000001_CreateFaq.php` **belum boleh dijalankan di Dev/Production**; sejauh ini hanya dijalankan di database test `simpeg_v2_testing` lewat PHPUnit. Deploy otomatis ke Dev tetap mengikuti Trello ISSUE-014 (HOLD).
+**Status:** ✅ **DISETUJUI DB VALIDATOR (DBV-002, jjoseph48, komentar "DBV-002 ✅" di PR #10, 25-09-2026) DAN REVIEW KODE (CR-003, 24-09-2026)**; di-merge ke `main` (merge commit `f958cb5`). Migration `2026-09-24-000001_CreateFaq.php` boleh dijalankan di Dev; deploy otomatis ke server Dev tetap mengikuti Trello ISSUE-014 (HOLD).
 
 **Rujukan:** `02-MasterData.md` G-10, Tech Spec §2.3 G-10 ("DB Impact: faq_topic, faq_sub_topic, faq_article, faq_rate"), `Mapping_Migrasi_Data_SIMPEG_v2.docx` (FAQ: "sama / Copy langsung"), DDL produksi `simpeg_prod.sql:949-1030` (HeidiSQL, host 172.17.100.83, MySQL 8.0.21), ERD legacy `simpeg01.erd` (nama FK), kode legacy (`application/libraries/hr/L_faq.php`, `application/controllers/hr/Faq.php`, `application/controllers/hr/services/Local.php:4125-4222`, `application/views/hr/faq/**`), Matriks Role x Endpoint Modul G ("Lihat FAQ"), MTC-013/MTC-014, `G-01-master-schema.md` (Keputusan #5–#7, Bagian 8 / DBV-001).
 
@@ -157,24 +157,26 @@ Nilai **[I]** yang tersisa: tipe & default `faq_article.order` (#2) dan lingkup 
 
 | # | Pertanyaan | Usulan | Keputusan |
 |---|---|---|---|
-| 1 | Setujui skema Bagian 2 + migration `2026-09-24-000001_CreateFaq` untuk dijalankan di Dev | Setujui. Sebelum dijalankan di server MariaDB, jalankan sekali `migrate` → `migrate:rollback` → `migrate` di sana (Bagian 3 #7) | ⏳ |
-| 2 | Aksi FK `RESTRICT/RESTRICT` dengan nama FK legacy, bukan `CASCADE` legacy (U4) | Setujui (sudah diputuskan user, alasan Bagian 3 #1) | ⏳ |
-| 3 | D1: `faq_related_article` dibuat persis DDL legacy tanpa API/UI | Setujui. DBV cukup mengecek `COUNT(*)` di produksi; bila > 0 datanya ikut disalin tanpa dipakai aplikasi | ⏳ |
-| 4 | D2: `faq_rate.nip` tanpa FK sekarang; FK `fk_nip_faqrate_to_peg` lewat migration baru di B-01 | Setujui (preseden A-01 #1). Syarat collation & audit orphan di Bagian 3 #5 | ⏳ |
-| 5 | D3: `faq_topic.status` tetap INT | Pertahankan INT seperti legacy [K] | ⏳ |
-| 6 | D4: `faq_article.order` INT NOT NULL DEFAULT 1 | Setujui; saat impor `order` diisi urutan `title` per sub topik (Bagian 6.3) | ⏳ |
-| 7 | D5: 3 UNIQUE nama, termasuk baris status 2/10 (case-insensitive lewat collation) | Setujui — aturan sama dengan DBV-001 #2. Konsekuensi: audit duplikat data legacy wajib sebelum impor | ⏳ |
-| 8 | Status 10 (Dihapus) + COMMENT v2 untuk tabel FAQ; status anak tidak ditulis ulang saat induk dinonaktifkan/dihapus (U3) | Setujui | ⏳ |
-| 9 | Kolom audit diisi aplikasi: `created_by`/`updated_by` = `id_pengguna` tanpa FK; `updated_at` ikut terisi saat insert (Bagian 3 #8) | Setujui; zona waktu mengikuti keputusan global A-01 | ⏳ |
-| 10 | Perubahan engine generik yang **ikut berlaku untuk 7 tabel Batch 1 (DBV-001)**: entri yang hanya bergeser urutannya karena entri lain dipindah/ditambah/dihapus/pindah induk **tidak lagi** di-stamp `updated_at`/`updated_by` (perubahan `order` tetap tercatat di `audit_logs`); tambah dengan `order` langsung di posisi final (tanpa event audit `update` tambahan untuk baris baru) | Setujui — legacy tidak me-renumber saudara, dan tanggal "Diperbarui" artikel pegawai tidak boleh bergeser hanya karena urutan. Mengubah perilaku yang tercatat di G-01 Bagian 8.2 (catatan rujukan ditambahkan di sana) | ⏳ |
+| 1 | Setujui skema Bagian 2 + migration `2026-09-24-000001_CreateFaq` untuk dijalankan di Dev | Setujui. Sebelum dijalankan di server MariaDB, jalankan sekali `migrate` → `migrate:rollback` → `migrate` di sana (Bagian 3 #7) | ✅ Disetujui sesuai usulan* |
+| 2 | Aksi FK `RESTRICT/RESTRICT` dengan nama FK legacy, bukan `CASCADE` legacy (U4) | Setujui (sudah diputuskan user, alasan Bagian 3 #1) | ✅ Disetujui sesuai usulan* |
+| 3 | D1: `faq_related_article` dibuat persis DDL legacy tanpa API/UI | Setujui. DBV cukup mengecek `COUNT(*)` di produksi; bila > 0 datanya ikut disalin tanpa dipakai aplikasi | ✅ Disetujui sesuai usulan* |
+| 4 | D2: `faq_rate.nip` tanpa FK sekarang; FK `fk_nip_faqrate_to_peg` lewat migration baru di B-01 | Setujui (preseden A-01 #1). Syarat collation & audit orphan di Bagian 3 #5 | ✅ Disetujui sesuai usulan* |
+| 5 | D3: `faq_topic.status` tetap INT | Pertahankan INT seperti legacy [K] | ✅ Disetujui sesuai usulan* |
+| 6 | D4: `faq_article.order` INT NOT NULL DEFAULT 1 | Setujui; saat impor `order` diisi urutan `title` per sub topik (Bagian 6.3) | ✅ Disetujui sesuai usulan* |
+| 7 | D5: 3 UNIQUE nama, termasuk baris status 2/10 (case-insensitive lewat collation) | Setujui — aturan sama dengan DBV-001 #2. Konsekuensi: audit duplikat data legacy wajib sebelum impor | ✅ Disetujui sesuai usulan* |
+| 8 | Status 10 (Dihapus) + COMMENT v2 untuk tabel FAQ; status anak tidak ditulis ulang saat induk dinonaktifkan/dihapus (U3) | Setujui | ✅ Disetujui sesuai usulan* |
+| 9 | Kolom audit diisi aplikasi: `created_by`/`updated_by` = `id_pengguna` tanpa FK; `updated_at` ikut terisi saat insert (Bagian 3 #8) | Setujui; zona waktu mengikuti keputusan global A-01 | ✅ Disetujui sesuai usulan* |
+| 10 | Perubahan engine generik yang **ikut berlaku untuk 7 tabel Batch 1 (DBV-001)**: entri yang hanya bergeser urutannya karena entri lain dipindah/ditambah/dihapus/pindah induk **tidak lagi** di-stamp `updated_at`/`updated_by` (perubahan `order` tetap tercatat di `audit_logs`); tambah dengan `order` langsung di posisi final (tanpa event audit `update` tambahan untuk baris baru) | Setujui — legacy tidak me-renumber saudara, dan tanggal "Diperbarui" artikel pegawai tidak boleh bergeser hanya karena urutan. Mengubah perilaku yang tercatat di G-01 Bagian 8.2 (catatan rujukan ditambahkan di sana) | ✅ Disetujui eksplisit |
+
+\* Approval DBV-002 (jjoseph48, komentar "DBV-002 ✅" di PR #10, 25-09-2026): "Skema DB sudah sesuai dengan DB legacy. Setuju untuk perubahan pencatatan: entri yang hanya bergeser urutannya tidak lagi di-stamp updated_at/updated_by." Poin #10 disetujui eksplisit; poin lain dicatat mengikuti kolom **Usulan** karena approval tanpa catatan per poin. Verifikasi MariaDB 10.4 tidak dilaporkan terpisah — jalankan `migrate` → `migrate:rollback` → `migrate` sekali sebelum dipakai di server MariaDB. Koreksi lewat perubahan lanjutan bila DB Validator bermaksud lain.
 
 ## 5. Status keputusan G-01 terkait
 
 | G-01 | Isi | Sebelumnya | Setelah DBV-002 |
 |---|---|---|---|
-| Keputusan #5 | Semua master wajib `order` + `status`, termasuk `faq_sub_topic` & `faq_article` | ✅ YA (23-09-2026) | Tidak berubah, dijalankan: `faq_sub_topic.order` ternyata sudah ada di DDL legacy [K]; `faq_article.order` ditambahkan (D4, ⏳ #6) |
-| Keputusan #6 | `jenjang_jf`, `faq_related_article`, `dm_user_lokasi_presensi` ikut dimigrasi di G-01? | BELUM DIPUTUSKAN (blocked ISSUE-003) | `faq_related_article`: DDL ada, diusulkan dibuat tanpa API/UI (D1, ⏳ #3). `jenjang_jf` & `dm_user_lokasi_presensi` tetap menunggu DDL |
-| Keputusan #7 | FK `user_lokasi_presensi.nip` & `faq_rate.nip` → `pegawai.nip` | BELUM DIPUTUSKAN | `faq_rate.nip`: diusulkan defer ke B-01 (D2, ⏳ #4). `user_lokasi_presensi` tetap di G-03 |
+| Keputusan #5 | Semua master wajib `order` + `status`, termasuk `faq_sub_topic` & `faq_article` | ✅ YA (23-09-2026) | Tidak berubah, dijalankan: `faq_sub_topic.order` ternyata sudah ada di DDL legacy [K]; `faq_article.order` ditambahkan (D4, ✅ DBV-002 #6) |
+| Keputusan #6 | `jenjang_jf`, `faq_related_article`, `dm_user_lokasi_presensi` ikut dimigrasi di G-01? | BELUM DIPUTUSKAN (blocked ISSUE-003) | `faq_related_article`: DDL ada, diusulkan dibuat tanpa API/UI (D1, ✅ DBV-002 #3). `jenjang_jf` & `dm_user_lokasi_presensi` tetap menunggu DDL |
+| Keputusan #7 | FK `user_lokasi_presensi.nip` & `faq_rate.nip` → `pegawai.nip` | BELUM DIPUTUSKAN | `faq_rate.nip`: diusulkan defer ke B-01 (D2, ✅ DBV-002 #4). `user_lokasi_presensi` tetap di G-03 |
 | Bagian 3 | `faq_rate` "tanpa definisi kolom"; `faq_sub_topic`/`faq_article` "tanpa `order`" di seed | Menunggu DDL | DDL kelima tabel ditemukan (`simpeg_prod.sql:949-1030`) |
 | Bagian 7 #1 | Induk non-aktif tidak menurunkan status ke anak; perilaku tidak konsisten | Belum diputuskan | Sebagian ditangani: tambah/pindah induk kini memeriksa seluruh rantai (E6, generik), dan tampilan FAQ pegawai menyaring seluruh rantai (U3). `options()` tetap hanya menyaring status baris itu sendiri: untuk FAQ endpoint options dibatasi ke role 1 (`publicOptions: false`, CR-003) agar entri tersembunyi tidak bocor ke pegawai; options wilayah belum menyaring rantai (tetap UL_ALL) |
 
@@ -198,7 +200,7 @@ MySQL 8.0.30 lokal (Laragon), database test `simpeg_v2_testing` (DBPrefix `t_`, 
 | `tests/unit/Libraries/HtmlSanitizerTest` | 7 test / 28 assertion |
 | `npm run check` di `frontend/` | exit 0 — ESLint 0 error/0 warning, vue-tsc tanpa error, Vitest 12 file / 94 test lolos, build sukses |
 
-Belum dilakukan: verifikasi di MariaDB 10.4; uji visual/end-to-end halaman FAQ & form admin di browser dengan backend sungguhan (baru unit/komponen test).
+Setelah CR-003: uji E2E API 84/84 (DB scratch) dan uji UI di browser (Super Admin & Pegawai, termasuk lebar HP) sudah dilakukan. Verifikasi di MariaDB 10.4 tidak dilaporkan terpisah saat approval DBV-002.
 
 ### 6.3 Catatan migrasi data untuk Mapping
 
