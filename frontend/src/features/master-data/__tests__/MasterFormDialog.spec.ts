@@ -483,3 +483,121 @@ describe('MasterFormDialog — field ref berjenjang, boolean, urutan manual (CR-
     wrapper.unmount()
   })
 })
+
+describe('MasterFormDialog — select opsional bisa dikosongkan (CR-011, row_jurusan jenjang pendidikan)', () => {
+  const jenjangMeta: MasterMeta = {
+    key: 'jenjang-pendidikan',
+    label: 'Jenjang Pendidikan',
+    primary_key: 'id_jenjang_pendidikan',
+    id_max_length: 11,
+    id_digits: null,
+    auto_increment: true,
+    name_field: 'jenjang_pendidikan',
+    name_label: 'Jenjang Pendidikan',
+    name_max_length: 100,
+    has_order: true,
+    has_status: true,
+    parent: null,
+    fields: [
+      { name: 'jenjang_pendidikan_singkat', label: 'Singkatan', type: 'text', required: true, options: null, hint: null },
+      {
+        name: 'row_jurusan',
+        label: 'Kolom Jurusan',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'D_III', label: 'D.III' },
+          { value: 'S_1', label: 'S.1' },
+        ],
+        hint: null,
+      },
+      // Select wajib (pola status_pegawai jenis status): pilihan kosong tetap tidak bisa dipilih.
+      {
+        name: 'status_pegawai',
+        label: 'Status Pegawai',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '1', label: 'Aktif' },
+          { value: '2', label: 'Tidak Aktif' },
+        ],
+        hint: null,
+      },
+    ],
+  }
+
+  function select(name: string): HTMLSelectElement {
+    const el = document.body.querySelector<HTMLSelectElement>(`select[name="${name}"]`)
+    if (!el) throw new Error(`select ${name} tidak ditemukan`)
+    return el
+  }
+
+  function mountJenjang(row: MasterRow | null) {
+    return mount(MasterFormDialog, { props: { open: true, meta: jenjangMeta, allMeta: [jenjangMeta], row }, attachTo: document.body })
+  }
+
+  beforeEach(() => {
+    vi.mocked(masterService.update).mockImplementation(async (_entity, _id, payload) => ({ id_jenjang_pendidikan: 8, ...payload }))
+    vi.mocked(masterService.create).mockImplementation(async (_entity, payload) => ({ id_jenjang_pendidikan: 10, ...payload }))
+  })
+
+  it('pilihan kosong select opsional bisa dipilih; select wajib tetap berplaceholder non-aktif', async () => {
+    const wrapper = mountJenjang(null)
+    await flushPromises()
+
+    expect(select('row_jurusan').options[0]?.value).toBe('')
+    expect(select('row_jurusan').options[0]?.disabled).toBe(false)
+    expect(select('status_pegawai').options[0]?.disabled).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('edit: mengosongkan row_jurusan → update() membawa row_jurusan kosong (backend menyimpan NULL)', async () => {
+    const row: MasterRow = {
+      id_jenjang_pendidikan: 8,
+      jenjang_pendidikan: 'Strata 1',
+      jenjang_pendidikan_singkat: 'S.1',
+      row_jurusan: 'S_1',
+      status_pegawai: '1',
+      order: 4,
+      status: '1',
+    }
+    const wrapper = mountJenjang(row)
+    await flushPromises()
+    expect(select('row_jurusan').value).toBe('S_1')
+
+    const el = select('row_jurusan')
+    el.value = ''
+    el.dispatchEvent(new Event('change'))
+    await flushPromises()
+    expect(select('row_jurusan').value).toBe('')
+
+    await submitForm()
+    await vi.waitFor(() => expect(masterService.update).toHaveBeenCalledTimes(1))
+    expect(masterService.update).toHaveBeenCalledWith(
+      'jenjang-pendidikan',
+      '8',
+      expect.objectContaining({ jenjang_pendidikan_singkat: 'S.1', row_jurusan: '', status_pegawai: '1' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('tambah: row_jurusan yang dibiarkan kosong tidak dikirim', async () => {
+    const wrapper = mountJenjang(null)
+    await flushPromises()
+
+    typeInto('input[name="jenjang_pendidikan"]', 'Profesi Dokter')
+    typeInto('input[name="jenjang_pendidikan_singkat"]', 'Dokter')
+    const status = select('status_pegawai')
+    status.value = '1'
+    status.dispatchEvent(new Event('change'))
+    await flushPromises()
+    await submitForm()
+    await vi.waitFor(() => expect(masterService.create).toHaveBeenCalledTimes(1))
+    expect(masterService.create).toHaveBeenCalledWith('jenjang-pendidikan', {
+      jenjang_pendidikan: 'Profesi Dokter',
+      jenjang_pendidikan_singkat: 'Dokter',
+      status_pegawai: '1',
+    })
+    wrapper.unmount()
+  })
+})

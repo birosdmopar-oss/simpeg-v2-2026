@@ -423,6 +423,7 @@ const { levels } = cascade
               :label="field.label"
               :type="fieldInputType(field)"
               :required="field.required"
+              :allow-empty="!field.required"
               :options="field.options ?? []"
               :placeholder="fieldPlaceholder(field)"
               :disabled="pendingFields.has(field.name)"
