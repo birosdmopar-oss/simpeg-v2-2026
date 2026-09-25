@@ -18,3 +18,10 @@ Opsi engine CR-009 yang dibaca FE: field `ref` (dropdown `{entity}/options`, ber
 yang tidak ada di `filters` membuat panah tidak pernah tampil, ubah urutan lewat Edit), filter field `ref` (pilihan dari
 `{entity}/options`), `status_chain`
 (keterangan hapus induk).
+
+CR-010 (DBV-003): field `ref` ber-`allow_system` (kolom wilayah kantor) mendapat pilihan LAIN-LAIN dari `system_ids`
+master rujukan; LAIN-LAIN berjenjang ke semua level turunan (level bawah terkunci, tanpa memanggil API), dan field ber-
+`other_for` (`*_lain`) hanya tampil & wajib saat field ref-nya LAIN-LAIN (tersembunyi = dikosongkan). Halaman Hari Libur
+(`views/HariLiburView.vue`, route `/hari-libur`, menu untuk role 1/4/5/8) memakai `services/hariLibur.service.ts`
+(`/hari-libur`), `schemas/hariLibur.schema.ts`, `components/HariLiburFormDialog.vue`, dan tipe di `hariLibur.types.ts`;
+tombol tambah/ubah/status/hapus/pulihkan dan filter status hanya untuk role 1 (role 4/5/8 hanya menerima status Aktif).
