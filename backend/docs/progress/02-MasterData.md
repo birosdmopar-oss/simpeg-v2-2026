@@ -2,7 +2,7 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `02-MasterData.md`.
 
-**Terakhir diperbarui:** 25 September 2026 (G-10 FAQ pilot DBV-002/CR-003 disetujui & di-merge)
+**Terakhir diperbarui:** 25 September 2026 (G-10 FAQ pilot DBV-002/CR-003 disetujui & di-merge; perluasan engine CR-009 untuk DBV-003/004/005)
 **Entry criteria:** Fase 1 sign-off dikonfirmasi user (21 Sep 2026).
 **Blocker utama:** DDL legacy 13 tabel Tier 0/1 belum ada → Trello **ISSUE-003** (FAQ tidak lagi: DDL-nya ada di `simpeg_prod.sql:949-1030`). Keputusan skema → `backend/docs/db-review/G-01-master-schema.md` Bagian 4; FAQ → `backend/docs/db-review/G-10-faq-schema.md` Bagian 4.
 
@@ -87,6 +87,15 @@ Perluasan engine di DBV-002/CR-003 (G-10, berlaku generik, regresi Batch 1 tetap
 - `publicOptions` (default `true`): `false` = dropdown `{key}/options` hanya role 1 (master FAQ, CR-003 — options tidak menyaring rantai status). Query options hanya membaca kolom kode/nama/induk.
 - `hiddenColumns`: kolom tabel yang tidak dikelola engine dan dibuang dari seluruh respons admin (mis. `faq_topic.icon`, D6).
 - Urutan (CR-003): tambah dengan `order` langsung meng-insert di posisi final (baris baru tidak di-update lagi → `updated_by` tetap NULL untuk tabel ber-`created_by`). Saudara yang hanya bergeser (reorder/sisip/hapus/pindah induk entri lain; pulihkan menaruh entri di akhir tanpa menggeser saudara) tidak di-stamp `updated_at`/`updated_by` (`MasterModel::shiftOrder`, `updated_at = updated_at`), tetapi tetap teraudit. Berlaku juga untuk Batch 1.
+
+Perluasan engine di CR-009 (fondasi DBV-003/004/005, berlaku generik, tanpa master/migration grup baru; regresi Batch 1 & FAQ tetap hijau). Rincian opsi: `app/Controllers/Api/MasterData/README.md`.
+- Mode urutan `orderMode: 'manual'` (level pangkat: nilai tidak digeser/dinomori ulang), `orderScope` (urutan per field lain, mis. diklat per jenis), `orderColumnType` (batas nilai urutan manual & MAX+1).
+- `uniqueFields` (UNIQUE selain nama → 422 pada field itu, termasuk balapan 1062), batas angka field int per tipe kolom (`columnType`, `min`/`max`; meta `min`/`max`), field `boolean` 1/0, field `ref` + `dependsOn` (dropdown berjenjang ke master lain, cek kanonik/ada/aktif/rantai).
+- `filters` (allowlist filter `?field=` di options & daftar admin, cache per filter), `statusChain` (options mengikuti rantai status induk, pola U3 FAQ; `whereActiveChain()` untuk service khusus).
+- `MasterRegistry` memvalidasi konfigurasi (rujukan antar-master, field opsi, rantai melingkar) → `LogicException`.
+- FE: `MasterFormDialog` (ref berjenjang + nilai non-aktif tetap tampil, checkbox boolean, batas angka, urutan manual), `MasterDataView` (filter field, panah urutan hanya mode shift & satu lingkup utuh, keterangan hapus untuk turunan ber-`status_chain`), `FormField` tipe `checkbox` + `allowEmpty`.
+- Scaffolding anti-konflik: blok `// --- DBV-00X ---` di `Config\MasterData`, `masterFixtures()`, `MasterDataSeeder`; daftar master admin-only di `RbacMasterEndpointsTest` dibaca dari config.
+- Belum: kunci baris ID "sakti" (E7), hook saat ubah status/pulihkan, kolom tambahan di options (E3) — menunggu keputusan grup masing-masing.
 
 ## Perubahan di luar folder Modul G (bug yang ditemukan — scope diperluas sesuai 00-INDEX)
 

@@ -439,7 +439,12 @@ final class FaqTest extends CIUnitTestCase
 
         $meta   = array_column($this->json($this->get('api/v1/master/meta'))['data'], null, 'key');
         $fields = array_column($meta['faq-article']['fields'], null, 'name');
-        $this->assertSame(['name' => 'content', 'label' => 'Isi Artikel', 'type' => 'html', 'required' => true, 'options' => null, 'hint' => null, 'max_bytes' => 1000000], $fields['content']);
+        $this->assertSame([
+            'name'      => 'content', 'label' => 'Isi Artikel', 'type' => 'html', 'required' => true, 'options' => null, 'hint' => null,
+            'max_bytes' => 1000000,
+            // CR-009: batas angka & rujukan master hanya terisi untuk field int/decimal dan ref.
+            'min' => null, 'max' => null, 'entity' => null, 'depends_on' => null,
+        ], $fields['content']);
     }
 
     /**

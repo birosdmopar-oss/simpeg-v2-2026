@@ -4,6 +4,9 @@
  * Fitur per master: cari, filter status, filter induk berjenjang, tabel urut `order`, toggle switch status,
  * badge Aktif (hijau)/Tidak Aktif (abu)/Dihapus (merah), naik/turun urutan (entri lain bergeser), tambah/edit,
  * hapus (soft delete → status 10) dan pulihkan. Status mengikuti legacy (DBV-001): 1 / 2 / 10.
+ * CR-009: filter field allowlist master (meta `filters`, mis. jenis diklat), panah urutan hanya untuk mode shift dan
+ * hanya saat daftar menampilkan satu lingkup urutan utuh (induk + `order_scope` terpilih, tanpa filter lain); mode
+ * manual (mis. level pangkat) diubah lewat Edit karena nilainya tidak menggeser entri lain.
  */
 import { ArrowDown, ArrowUp, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -16,9 +19,9 @@ import MasterFormDialog from '../components/MasterFormDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import StatusSwitch from '../components/StatusSwitch.vue'
 import { useCascadeOptions } from '../composables/useCascadeOptions'
-import { ancestorChain } from '../schemas/master.schema'
+import { ancestorChain, isManualOrder } from '../schemas/master.schema'
 import { masterService } from '../services/master.service'
-import type { MasterMeta, MasterRow, MasterStatus } from '../types'
+import type { MasterFieldMeta, MasterMeta, MasterOption, MasterRow, MasterStatus } from '../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,6 +42,11 @@ const search = ref('')
 const statusFilter = ref<MasterStatus | ''>('')
 const busyId = ref('')
 
+/** Nilai filter field allowlist (meta `filters`), per nama field; '' = semua. */
+const fieldFilters = ref<Record<string, string>>({})
+/** Pilihan filter untuk field ref (dimuat dari `{entity}/options`). */
+const filterRefOptions = ref<Record<string, MasterOption[]>>({})
+
 const formOpen = ref(false)
 const editing = ref<MasterRow | null>(null)
 const confirm = ref<{ open: boolean; row: MasterRow | null; loading: boolean }>({ open: false, row: null, loading: false })
@@ -53,26 +61,85 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.va
 const deleteDescription = computed(() => {
   const base =
     'Data tidak dihapus permanen: statusnya menjadi Dihapus sehingga hilang dari daftar dan dropdown, sementara data pegawai/riwayat yang sudah memakainya tetap utuh. Bisa dipulihkan lewat filter status Dihapus.'
-  const key = meta.value?.key ?? ''
+  const current = meta.value
+  const key = current?.key ?? ''
   const children = metas.value.filter((m) => m.parent?.entity === key).map((m) => m.label)
-  if (children.length === 0) return base
-  if (!key.startsWith('faq-')) return `${base} Status data turunan tidak ikut diubah.`
-  return `${base} Status ${children.join(', ')} di bawahnya tidak ikut diubah, tetapi ikut tersembunyi dari halaman FAQ pegawai sampai entri ini dipulihkan.`
+  if (children.length === 0 || !current) return base
+  if (key.startsWith('faq-')) {
+    return `${base} Status ${children.join(', ')} di bawahnya tidak ikut diubah, tetapi ikut tersembunyi dari halaman FAQ pegawai sampai entri ini dipulihkan.`
+  }
+  // CR-009: master turunan ber-status_chain (di level mana pun) ikut tersembunyi dari dropdown selama entri ini tidak aktif.
+  const chained = metas.value
+    .filter((m) => m.status_chain && ancestorChain(m, metas.value).some((a) => a.key === key))
+    .map((m) => m.label)
+  if (chained.length > 0) {
+    return `${base} Status ${chained.join(', ')} di bawahnya tidak ikut diubah, tetapi ikut tersembunyi dari dropdown sampai entri ini dipulihkan.`
+  }
+  return `${base} Status data turunan tidak ikut diubah.`
 })
+
+/** Field yang boleh dipakai filter daftar (meta `filters`, allowlist backend). */
+const filterFields = computed<MasterFieldMeta[]>(() => {
+  const current = meta.value
+  if (!current) return []
+  return (current.filters ?? [])
+    .map((name) => current.fields.find((f) => f.name === name))
+    .filter((f): f is MasterFieldMeta => f !== undefined)
+})
+
+function filterOptions(field: MasterFieldMeta): Array<{ value: string; label: string }> {
+  if (field.type === 'boolean') {
+    return [
+      { value: '1', label: 'Ya' },
+      { value: '0', label: 'Tidak' },
+    ]
+  }
+  if (field.type === 'ref') return (filterRefOptions.value[field.name] ?? []).map((o) => ({ value: o.id, label: o.nama }))
+  return field.options ?? []
+}
+
+/** Label field lingkup urutan (order_scope) master aktif. */
+const orderScopeLabels = computed(() =>
+  (meta.value?.order_scope ?? []).map((name) => meta.value?.fields.find((f) => f.name === name)?.label ?? name),
+)
+
+/** Filter field yang terisi (dikirim ke backend). */
+function activeFieldFilters(): Record<string, string> {
+  return Object.fromEntries(Object.entries(fieldFilters.value).filter(([, value]) => value !== ''))
+}
 
 const filterChain = computed(() => (meta.value ? ancestorChain(meta.value, metas.value) : []))
 const filterCascade = useCascadeOptions(filterChain)
 const { levels: filterLevels } = filterCascade
 
-/** Reorder via panah hanya bermakna saat daftar menampilkan satu kelompok induk utuh tanpa pencarian. */
-const canReorder = computed(
-  () =>
-    meta.value !== null &&
-    meta.value.has_order &&
-    search.value.trim() === '' &&
-    statusFilter.value === '' &&
-    (!meta.value.parent || filterCascade.leafValue() !== ''),
-)
+/**
+ * Reorder via panah hanya bermakna saat daftar menampilkan satu lingkup urutan utuh (induk + order_scope terpilih)
+ * tanpa pencarian/filter lain, dan hanya untuk mode shift (mode manual diubah lewat Edit).
+ */
+const canReorder = computed(() => {
+  const current = meta.value
+  if (current === null || !current.has_order || isManualOrder(current)) return false
+  if (search.value.trim() !== '' || statusFilter.value !== '') return false
+  if (current.parent && filterCascade.leafValue() === '') return false
+  const scope = current.order_scope ?? []
+  return filterFields.value.every((field) => (scope.includes(field.name) ? (fieldFilters.value[field.name] ?? '') !== '' : (fieldFilters.value[field.name] ?? '') === ''))
+})
+
+/** Keterangan di bawah tabel saat panah urutan tidak tersedia. */
+const reorderHint = computed(() => {
+  const current = meta.value
+  if (!current?.has_order || canReorder.value || search.value || statusFilter.value) return ''
+  if (isManualOrder(current)) return `Urutan ${current.label} adalah nilai tetap (mis. level): ubah lewat Edit; entri lain tidak bergeser.`
+  const parentLabel = current.parent ? (metas.value.find((m) => m.key === current.parent?.entity)?.label ?? 'induk') : null
+  if (parentLabel !== null && orderScopeLabels.value.length === 0) {
+    return `Pilih ${parentLabel} untuk mengubah urutan (urutan berlaku per induk).`
+  }
+  const scope = [...(parentLabel !== null ? [parentLabel] : []), ...orderScopeLabels.value]
+  if (scope.length === 0) return ''
+  const others = filterFields.value.filter((f) => !(current.order_scope ?? []).includes(f.name)).map((f) => f.label)
+  const reset = others.length > 0 ? ` dan kosongkan filter ${others.join(', ')}` : ''
+  return `Pilih ${scope.join(' dan ')}${reset} untuk mengubah urutan (urutan berlaku per ${scope.join(' dan ')}).`
+})
 
 function statusOf(row: MasterRow): string {
   return String(row.status ?? '1')
@@ -107,6 +174,7 @@ async function load(): Promise<void> {
       parent: meta.value.parent ? filterCascade.leafValue() : undefined,
       page: page.value,
       per_page: perPage.value,
+      filters: activeFieldFilters(),
     })
     // Halaman terakhir jadi kosong setelah hapus/pulihkan/ubah status: mundur ke halaman terakhir yang ada.
     const lastPage = Math.max(1, Math.ceil(result.total / perPage.value))
@@ -130,11 +198,33 @@ watch(activeKey, async (key, previous) => {
   if (previous && route.params.entity !== key) void router.replace({ name: 'master-data', params: { entity: key } })
   search.value = ''
   statusFilter.value = ''
+  fieldFilters.value = {}
   page.value = 1
   notice.value = ''
+  void loadFilterRefOptions()
   await filterCascade.init()
   await load()
 })
+
+/** Pilihan filter field ref (seluruh entri aktif master rujukan). */
+async function loadFilterRefOptions(): Promise<void> {
+  const refs = filterFields.value.filter((f) => f.type === 'ref' && f.entity)
+  const loaded: Record<string, MasterOption[]> = {}
+  for (const field of refs) {
+    try {
+      loaded[field.name] = await masterService.options(field.entity ?? '')
+    } catch {
+      loaded[field.name] = []
+    }
+  }
+  filterRefOptions.value = loaded
+}
+
+function onFieldFilter(name: string, value: string): void {
+  fieldFilters.value = { ...fieldFilters.value, [name]: value }
+  page.value = 1
+  void load()
+}
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(search, () => {
@@ -312,6 +402,18 @@ onMounted(() => {
             <option value="">Semua {{ level.meta.label }}</option>
             <option v-for="o in level.options" :key="o.id" :value="o.id">{{ o.nama }}</option>
           </select>
+          <select
+            v-for="field in filterFields"
+            :key="field.name"
+            :value="fieldFilters[field.name] ?? ''"
+            class="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            :aria-label="`Filter ${field.label}`"
+            :data-testid="`master-filter-${field.name}`"
+            @change="onFieldFilter(field.name, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">Semua {{ field.label }}</option>
+            <option v-for="o in filterOptions(field)" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
           <select v-model="statusFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm" aria-label="Filter status">
             <option value="">Aktif &amp; Tidak Aktif</option>
             <option value="1">Aktif</option>
@@ -409,9 +511,7 @@ onMounted(() => {
           </table>
         </div>
 
-        <p v-if="meta.has_order && meta.parent && !canReorder && !search && !statusFilter" class="text-xs text-slate-500">
-          Pilih {{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'induk' }} untuk mengubah urutan (urutan berlaku per induk).
-        </p>
+        <p v-if="reorderHint" class="text-xs text-slate-500" data-testid="master-reorder-hint">{{ reorderHint }}</p>
 
         <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
           <span>{{ total }} data · halaman {{ page }} dari {{ totalPages }}</span>

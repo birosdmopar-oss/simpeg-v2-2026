@@ -231,3 +231,175 @@ describe('MasterFormDialog — payload simpan field html (CR-003)', () => {
     wrapper.unmount()
   })
 })
+
+describe('MasterFormDialog — field ref berjenjang, boolean, urutan manual (CR-009)', () => {
+  const base = { has_order: true, has_status: true, id_digits: null, auto_increment: true, name_max_length: 255, fields: [] }
+  const provinsiMeta: MasterMeta = { ...base, key: 'provinsi', label: 'Provinsi', primary_key: 'id_provinsi', id_max_length: 2, name_field: 'provinsi', name_label: 'Nama Provinsi', parent: null }
+  const kabMeta: MasterMeta = {
+    ...base,
+    key: 'kabupaten-kota',
+    label: 'Kabupaten/Kota',
+    primary_key: 'id_kabupaten_kota',
+    id_max_length: 4,
+    name_field: 'kabupaten_kota',
+    name_label: 'Nama Kabupaten/Kota',
+    parent: { field: 'id_provinsi', entity: 'provinsi' },
+  }
+  const kantorMeta: MasterMeta = {
+    ...base,
+    key: 'kantor',
+    label: 'Kantor',
+    primary_key: 'id_kantor',
+    id_max_length: 11,
+    name_field: 'nama_kantor',
+    name_label: 'Nama Kantor',
+    parent: null,
+    order_mode: 'manual',
+    order_max: 127,
+    fields: [
+      { name: 'id_provinsi', label: 'Provinsi', type: 'ref', required: true, options: null, hint: null, entity: 'provinsi' },
+      { name: 'id_kabupaten', label: 'Kabupaten/Kota', type: 'ref', required: false, options: null, hint: null, entity: 'kabupaten-kota', depends_on: 'id_provinsi' },
+      { name: 'melayani_tamu', label: 'Melayani Tamu', type: 'boolean', required: false, options: null, hint: null },
+    ],
+  }
+  const allMeta = [provinsiMeta, kabMeta, kantorMeta]
+
+  function mountKantor(row: MasterRow | null) {
+    return mount(MasterFormDialog, { props: { open: true, meta: kantorMeta, allMeta, row }, attachTo: document.body })
+  }
+
+  function select(name: string): HTMLSelectElement {
+    const el = document.body.querySelector<HTMLSelectElement>(`select[name="${name}"]`)
+    if (!el) throw new Error(`select ${name} tidak ditemukan`)
+    return el
+  }
+
+  async function choose(name: string, value: string): Promise<void> {
+    const el = select(name)
+    el.value = value
+    el.dispatchEvent(new Event('change'))
+    await flushPromises()
+  }
+
+  function optionValues(name: string): string[] {
+    return Array.from(select(name).options).map((o) => o.value)
+  }
+
+  beforeEach(() => {
+    vi.mocked(masterService.options).mockImplementation(async (entity, parent) => {
+      if (entity === 'provinsi') {
+        return [
+          { id: '31', nama: 'DKI Jakarta', parent: null },
+          { id: '32', nama: 'Jawa Barat', parent: null },
+        ]
+      }
+      if (entity === 'kabupaten-kota' && parent === '31') return [{ id: '3171', nama: 'Jakarta Pusat', parent: '31' }]
+      if (entity === 'kabupaten-kota' && parent === '32') return [{ id: '3273', nama: 'Kota Bandung', parent: '32' }]
+      return []
+    })
+    vi.mocked(masterService.create).mockImplementation(async (_entity, payload) => ({ id_kantor: 9, ...payload }))
+    vi.mocked(masterService.update).mockImplementation(async (_entity, _id, payload) => ({ id_kantor: 3, ...payload }))
+  })
+
+  it('tambah: dropdown turunan terkunci sampai induk dipilih, ganti induk mengosongkan & memuat ulang turunan', async () => {
+    const wrapper = mountKantor(null)
+    await flushPromises()
+
+    expect(masterService.options).toHaveBeenCalledWith('provinsi', null)
+    expect(masterService.options).not.toHaveBeenCalledWith('kabupaten-kota', expect.anything())
+    expect(select('id_kabupaten').disabled).toBe(true)
+    expect(optionValues('id_provinsi')).toEqual(['', '31', '32'])
+    // Ref opsional bisa dikosongkan lagi; ref wajib tidak.
+    expect(select('id_provinsi').options[0]?.disabled).toBe(true)
+    expect(select('id_kabupaten').options[0]?.disabled).toBe(false)
+
+    await choose('id_provinsi', '31')
+    expect(masterService.options).toHaveBeenCalledWith('kabupaten-kota', '31')
+    expect(select('id_kabupaten').disabled).toBe(false)
+    await choose('id_kabupaten', '3171')
+
+    await choose('id_provinsi', '32')
+    expect(select('id_kabupaten').value).toBe('')
+    expect(optionValues('id_kabupaten')).toEqual(['', '3273'])
+    await choose('id_kabupaten', '3273')
+
+    typeInto('input[name="nama_kantor"]', 'Kantor Bandung')
+    const box = document.body.querySelector<HTMLInputElement>('input[type="checkbox"][name="melayani_tamu"]')
+    expect(box?.checked).toBe(false)
+    box?.click()
+    typeInto('input[name="order"]', '5')
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Urutan (nilai tetap)')
+    expect(document.body.textContent).toContain('Nilai urutan (mis. level) disimpan apa adanya, maksimal 127; entri lain tidak bergeser. Kosongkan = nilai terbesar + 1.')
+
+    await submitForm()
+    await vi.waitFor(() => expect(masterService.create).toHaveBeenCalledTimes(1))
+    expect(masterService.create).toHaveBeenCalledWith('kantor', {
+      nama_kantor: 'Kantor Bandung',
+      id_provinsi: '32',
+      id_kabupaten: '3273',
+      melayani_tamu: '1',
+      order: 5,
+    })
+    wrapper.unmount()
+  })
+
+  it('tambah: boolean yang tidak dicentang terkirim 0 (bukan kosong), ref opsional kosong tidak dikirim', async () => {
+    const wrapper = mountKantor(null)
+    await flushPromises()
+
+    await choose('id_provinsi', '31')
+    typeInto('input[name="nama_kantor"]', 'Kantor Jakarta')
+    await flushPromises()
+    await submitForm()
+    await vi.waitFor(() => expect(masterService.create).toHaveBeenCalledTimes(1))
+    expect(masterService.create).toHaveBeenCalledWith('kantor', { nama_kantor: 'Kantor Jakarta', id_provinsi: '31', melayani_tamu: '0' })
+    wrapper.unmount()
+  })
+
+  it('edit: nilai rujukan yang kini non-aktif/hilang tetap tampil bertanda dan ikut terkirim', async () => {
+    vi.mocked(masterService.get).mockImplementation(async (entity, id): Promise<MasterRow> => {
+      if (entity === 'provinsi') return { id_provinsi: id, provinsi: 'Jawa Tengah' }
+      throw new Error('tidak ada')
+    })
+    const row: MasterRow = { id_kantor: 3, nama_kantor: 'Kantor Semarang', id_provinsi: '33', id_kabupaten: '3374', melayani_tamu: 0, order: 4, status: '1' }
+    const wrapper = mountKantor(row)
+    await flushPromises()
+
+    expect(select('id_provinsi').value).toBe('33')
+    expect(Array.from(select('id_provinsi').options).map((o) => o.textContent?.trim())).toContain('Jawa Tengah — tidak aktif (33)')
+    expect(select('id_kabupaten').value).toBe('3374')
+    expect(Array.from(select('id_kabupaten').options).map((o) => o.textContent?.trim())).toContain('3374 — tidak ditemukan (3374)')
+    expect(document.body.querySelector<HTMLInputElement>('input[name="melayani_tamu"]')?.checked).toBe(false)
+
+    await submitForm()
+    await vi.waitFor(() => expect(masterService.update).toHaveBeenCalledTimes(1))
+    // Urutan tidak berubah → tidak dikirim.
+    expect(masterService.update).toHaveBeenCalledWith('kantor', '3', {
+      nama_kantor: 'Kantor Semarang',
+      id_provinsi: '33',
+      id_kabupaten: '3374',
+      melayani_tamu: '0',
+    })
+    wrapper.unmount()
+  })
+
+  it('edit: pilihan ref gagal dimuat → nilai tersimpan tetap dipertahankan tanpa ditandai non-aktif', async () => {
+    vi.mocked(masterService.options).mockImplementation(async (entity) => {
+      if (entity === 'provinsi') throw new Error('jaringan putus')
+      return []
+    })
+    vi.mocked(masterService.get).mockImplementation(async (_entity, id): Promise<MasterRow> => ({ id_provinsi: id, provinsi: 'DKI Jakarta' }))
+    const row: MasterRow = { id_kantor: 3, nama_kantor: 'Kantor Pusat', id_provinsi: '31', id_kabupaten: '', melayani_tamu: 1, order: 1, status: '1' }
+    const wrapper = mountKantor(row)
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Gagal memuat pilihan Provinsi.')
+    expect(select('id_provinsi').value).toBe('31')
+    const labels = Array.from(select('id_provinsi').options).map((o) => o.textContent?.trim())
+    expect(labels).toContain('31 (31)')
+    expect(labels.some((label) => label?.includes('tidak aktif'))).toBe(false)
+    wrapper.unmount()
+  })
+})

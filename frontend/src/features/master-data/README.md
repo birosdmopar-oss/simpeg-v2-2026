@@ -10,3 +10,9 @@ Struktur feature-based (ADR-019):
 - `schemas/` — skema Zod untuk VeeValidate (ADR-026)
 
 Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
+
+Halaman master generik (`views/MasterDataView.vue`, `components/MasterFormDialog.vue`) dibangun dari `GET /master/meta`.
+Opsi engine CR-009 yang dibaca FE: field `ref` (dropdown `{entity}/options`, berjenjang lewat `depends_on`), `boolean`
+(checkbox 1/0), batas angka `min`/`max`, `order_mode` (`manual` = nilai urutan tetap, tanpa panah naik/turun),
+`order_scope` + `filters` (filter daftar; panah urutan hanya saat satu lingkup urutan utuh tampil), `status_chain`
+(keterangan hapus induk).
