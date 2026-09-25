@@ -158,7 +158,11 @@ final class JwtServiceTest extends CIUnitTestCase
 
     public function testRefreshTokenIsStoredAsHashNotPlaintext(): void
     {
+        // Waktu dibekukan agar assertion expires_at tidak goyah saat detik berganti di tengah test.
+        $now = time();
+        $this->jwt->setNow($now);
         $refresh = $this->jwt->issueRefreshToken($this->claims);
+        $this->jwt->setNow(null);
 
         $this->assertSame(64, strlen($refresh['token']));
         $this->seeInDatabase('token', ['token_hash' => hash('sha256', $refresh['token']), 'nip' => '198501012010011001', 'revoked' => 0]);
@@ -166,7 +170,7 @@ final class JwtServiceTest extends CIUnitTestCase
 
         $row = $this->db->table('token')->get()->getRowArray();
         $this->assertStringNotContainsString($refresh['token'], json_encode($row, JSON_THROW_ON_ERROR), 'Plaintext refresh token tidak boleh ada di DB');
-        $this->assertSame(time() + 604800, $refresh['expires_at'], 'Refresh token harus berlaku 7 hari');
+        $this->assertSame($now + 604800, $refresh['expires_at'], 'Refresh token harus berlaku 7 hari');
     }
 
     public function testRefreshRotatesTokensAndReusesClaims(): void
