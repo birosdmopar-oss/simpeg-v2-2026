@@ -174,13 +174,26 @@ class MasterService
      * (mis. `?cpns=1`; parameter lain diabaikan). Di-cache per master+induk+filter dan di-invalidate setiap kali master
      * tersebut (atau leluhurnya, untuk statusChain) ditulis (G-TC #3).
      *
+     * `parent` wajib bentuk kanonik kode induk (seperti induk saat tambah/ubah, CR-003) → selain itu 422: MySQL
+     * meng-cast '1abc' menjadi 1 pada FK INT, sehingga tanpa cek ini id tersebut menjadi alias induk 1. Master tanpa
+     * induk mengabaikan `parent`.
+     *
      * @param array<string, mixed> $query parameter query options (kolom filter; kunci lain diabaikan)
      *
      * @return list<array{id: string, nama: string, parent: string|null}>
      */
     public function options(MasterDefinition $def, ?string $parent = null, array $query = []): array
     {
-        $parent  = $parent === '' ? null : $parent;
+        $parent = $parent === '' || ! $def->hasParent() ? null : $parent;
+
+        if ($parent !== null) {
+            $parentDef = $this->registry->get((string) $def->parentEntity);
+
+            if (! $this->isCanonicalId($parentDef, $parent)) {
+                throw ValidationException::forField('parent', "Filter {$parentDef->label} tidak valid.");
+            }
+        }
+
         $filters = $this->filterValues($def, $query);
         $key     = $this->optionsCacheKey($def, $parent, $filters);
 
@@ -322,13 +335,17 @@ class MasterService
                         }
 
                         $row[MasterDefinition::ORDER_FIELD] = $requested ?? $this->nextOrder($def, $orderScope);
+                    } elseif ($requested === null) {
+                        $row[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, $orderScope);
                     } else {
                         // `order` dikirim: posisi final dihitung SEBELUM insert (dijepit 1..jumlah saudara tampil + 1),
                         // jadi baris baru tidak di-update lagi sesudahnya — updated_by tetap NULL untuk tabel
                         // ber-created_by (E1) dan tanpa audit 'update' tambahan. Hanya saudara yang digeser (placeAt).
-                        $row[MasterDefinition::ORDER_FIELD] = $requested === null
-                            ? $this->nextOrder($def, $orderScope)
-                            : $this->clampPosition($requested, count($this->scopeIds($def, $orderScope)));
+                        // Kapasitas lingkup (saudara + 1) juga dicek sebelum insert: posisi hasil jepit bisa melewati
+                        // batas kolom `order` (TINYINT: 127 saudara → INSERT 128 = 1264/500 di koneksi strict).
+                        $siblings = count($this->scopeIds($def, $orderScope));
+                        $this->assertOrderFits($def, $siblings + 1);
+                        $row[MasterDefinition::ORDER_FIELD] = $this->clampPosition($requested, $siblings);
                     }
                 }
 
@@ -754,8 +771,9 @@ class MasterService
     }
 
     /**
-     * Nilai urutan otomatis tidak boleh melewati batas tipe kolom `order` (orderColumnType): koneksi strict menolaknya
-     * (1264 → 500) dan non-strict memotongnya diam-diam (TINYINT → 127, urutan kembar).
+     * Nilai urutan (MAX+1 otomatis, kapasitas lingkup mode shift, nilai mode manual) tidak boleh melewati batas tipe
+     * kolom `order` (orderColumnType): koneksi strict menolaknya (1264 → 500) dan non-strict memotongnya diam-diam
+     * (TINYINT → 127, urutan kembar). Dicek sebelum baris ditulis.
      */
     private function assertOrderFits(MasterDefinition $def, int $order): void
     {
@@ -1209,15 +1227,21 @@ class MasterService
     }
 
     /**
+     * Kunci cache dropdown, prefiks `master_opt_{key}_` (dipakai invalidate()): tanpa induk & filter = `all`; induk saja
+     * = `p_<kode induk>` (sudah kanonik); ada filter = `q_` + md5 [induk, filter]. Tiap bentuk berprefiks sendiri dan
+     * filter di-hash bersama induknya, sehingga dua kombinasi berbeda tidak pernah berbagi kunci — mis. induk
+     * `1_f<md5 filter>` (kode string boleh memuat `_`) tanpa filter vs induk `1` + filter itu. Kunci yang bentrok
+     * membuat siapa pun yang bisa memanggil options (UL_ALL) menyimpan hasil yang salah di kunci milik permintaan lain.
+     *
      * @param array<string, string> $filters filter allowlist (sudah divalidasi & terurut)
      */
     private function optionsCacheKey(MasterDefinition $def, ?string $parent, array $filters = []): string
     {
-        $suffix = $parent === null ? 'all' : 'p_' . preg_replace('/[^A-Za-z0-9_.-]/', '_', $parent);
-
-        if ($filters !== []) {
-            $suffix .= '_f' . md5((string) json_encode($filters));
-        }
+        $suffix = match (true) {
+            $filters !== []  => 'q_' . md5((string) json_encode([$parent, $filters])),
+            $parent !== null => 'p_' . preg_replace('/[^A-Za-z0-9_.-]/', '_', $parent),
+            default          => 'all',
+        };
 
         return "master_opt_{$def->key}_{$suffix}";
     }

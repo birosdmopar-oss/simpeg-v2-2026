@@ -104,7 +104,9 @@ class MasterDataUji extends MasterData
                 'filters'     => ['flag_d3'],
                 'statusChain' => true,
             ],
-            // Field ref ke master wilayah sungguhan, kabupaten/kota bergantung pada provinsi (dependsOn).
+            // Field ref ke master wilayah sungguhan, kabupaten/kota bergantung pada provinsi (dependsOn). id_kabupaten_lain:
+            // checkDependsOn false (pola sentinel LAIN-LAIN kantor DBV-003) — rantai diserahkan ke hook, engine hanya
+            // memeriksa kanonik/ada/aktif.
             'uji-kantor' => [
                 'label'         => 'Kantor Uji',
                 'controller'    => self::CONTROLLER,
@@ -116,8 +118,9 @@ class MasterDataUji extends MasterData
                 'nameMaxLength' => 100,
                 'parent'        => null,
                 'fields'        => [
-                    'id_provinsi'  => ['label' => 'Provinsi', 'type' => 'ref', 'entity' => 'provinsi'],
-                    'id_kabupaten' => ['label' => 'Kabupaten/Kota', 'type' => 'ref', 'entity' => 'kabupaten-kota', 'dependsOn' => 'id_provinsi'],
+                    'id_provinsi'       => ['label' => 'Provinsi', 'type' => 'ref', 'entity' => 'provinsi'],
+                    'id_kabupaten'      => ['label' => 'Kabupaten/Kota', 'type' => 'ref', 'entity' => 'kabupaten-kota', 'dependsOn' => 'id_provinsi'],
+                    'id_kabupaten_lain' => ['label' => 'Kabupaten/Kota Lain', 'type' => 'ref', 'entity' => 'kabupaten-kota', 'dependsOn' => 'id_provinsi', 'checkDependsOn' => false],
                 ],
                 'auditColumns' => ['updated_at', 'updated_by'],
                 'filters'      => ['id_provinsi'],

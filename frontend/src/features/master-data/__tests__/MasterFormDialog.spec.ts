@@ -385,6 +385,86 @@ describe('MasterFormDialog — field ref berjenjang, boolean, urutan manual (CR-
     wrapper.unmount()
   })
 
+  describe('rantai ref 3 level (pola kantor DBV-003: provinsi → kabupaten/kota → kecamatan)', () => {
+    const kecMeta: MasterMeta = {
+      ...base,
+      key: 'kecamatan',
+      label: 'Kecamatan',
+      primary_key: 'id_kecamatan',
+      id_max_length: 7,
+      name_field: 'kecamatan',
+      name_label: 'Nama Kecamatan',
+      parent: { field: 'id_kabupaten_kota', entity: 'kabupaten-kota' },
+    }
+    const kantor3Meta: MasterMeta = {
+      ...kantorMeta,
+      key: 'kantor-tiga',
+      order_mode: 'shift',
+      order_max: null,
+      fields: [
+        { name: 'id_provinsi', label: 'Provinsi', type: 'ref', required: true, options: null, hint: null, entity: 'provinsi' },
+        { name: 'id_kabupaten', label: 'Kabupaten/Kota', type: 'ref', required: false, options: null, hint: null, entity: 'kabupaten-kota', depends_on: 'id_provinsi' },
+        { name: 'id_kecamatan', label: 'Kecamatan', type: 'ref', required: false, options: null, hint: null, entity: 'kecamatan', depends_on: 'id_kabupaten' },
+      ],
+    }
+
+    function mountKantor3(row: MasterRow | null) {
+      return mount(MasterFormDialog, {
+        props: { open: true, meta: kantor3Meta, allMeta: [provinsiMeta, kabMeta, kecMeta, kantor3Meta], row },
+        attachTo: document.body,
+      })
+    }
+
+    beforeEach(() => {
+      const base3 = vi.mocked(masterService.options).getMockImplementation()
+      vi.mocked(masterService.options).mockImplementation(async (entity, parent) => {
+        if (entity === 'kecamatan' && parent === '3171') return [{ id: '3171010', nama: 'Gambir', parent: '3171' }]
+        if (entity === 'kecamatan' && parent === '3273') return [{ id: '3273010', nama: 'Sukasari', parent: '3273' }]
+        return base3 ? base3(entity, parent) : []
+      })
+    })
+
+    it('ganti level teratas mengosongkan & mengunci SEMUA turunan (bukan hanya anak langsung)', async () => {
+      const wrapper = mountKantor3(null)
+      await flushPromises()
+
+      await choose('id_provinsi', '31')
+      await choose('id_kabupaten', '3171')
+      expect(masterService.options).toHaveBeenCalledWith('kecamatan', '3171')
+      await choose('id_kecamatan', '3171010')
+      expect(select('id_kecamatan').value).toBe('3171010')
+
+      await choose('id_provinsi', '32')
+      expect(select('id_kabupaten').value).toBe('')
+      expect(optionValues('id_kabupaten')).toEqual(['', '3273'])
+      expect(select('id_kecamatan').value).toBe('')
+      expect(select('id_kecamatan').disabled).toBe(true)
+      expect(optionValues('id_kecamatan')).toEqual([''])
+
+      typeInto('input[name="nama_kantor"]', 'Kantor Bandung')
+      await flushPromises()
+      await submitForm()
+      await vi.waitFor(() => expect(masterService.create).toHaveBeenCalledTimes(1))
+      // Kecamatan lama (milik provinsi sebelumnya) tidak ikut terkirim.
+      expect(masterService.create).toHaveBeenCalledWith('kantor-tiga', { nama_kantor: 'Kantor Bandung', id_provinsi: '32' })
+      wrapper.unmount()
+    })
+
+    it('edit: pilihan seluruh level dimuat berjenjang dari nilai tersimpan', async () => {
+      const row: MasterRow = { id_kantor: 3, nama_kantor: 'Kantor Pusat', id_provinsi: '31', id_kabupaten: '3171', id_kecamatan: '3171010', order: 1, status: '1' }
+      const wrapper = mountKantor3(row)
+      await flushPromises()
+
+      expect(masterService.options).toHaveBeenCalledWith('provinsi', null)
+      expect(masterService.options).toHaveBeenCalledWith('kabupaten-kota', '31')
+      expect(masterService.options).toHaveBeenCalledWith('kecamatan', '3171')
+      expect([select('id_provinsi').value, select('id_kabupaten').value, select('id_kecamatan').value]).toEqual(['31', '3171', '3171010'])
+      expect(select('id_kecamatan').disabled).toBe(false)
+      expect(Array.from(select('id_kecamatan').options).map((o) => o.textContent?.trim())).toContain('Gambir (3171010)')
+      wrapper.unmount()
+    })
+  })
+
   it('edit: pilihan ref gagal dimuat → nilai tersimpan tetap dipertahankan tanpa ditandai non-aktif', async () => {
     vi.mocked(masterService.options).mockImplementation(async (entity) => {
       if (entity === 'provinsi') throw new Error('jaringan putus')

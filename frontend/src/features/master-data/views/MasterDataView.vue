@@ -112,15 +112,23 @@ const filterChain = computed(() => (meta.value ? ancestorChain(meta.value, metas
 const filterCascade = useCascadeOptions(filterChain)
 const { levels: filterLevels } = filterCascade
 
+/** Field order_scope yang tidak bisa dipilih lewat filter daftar (bukan anggota meta `filters`). */
+const unfilterableOrderScope = computed(() =>
+  (meta.value?.order_scope ?? []).filter((name) => !filterFields.value.some((field) => field.name === name)),
+)
+
 /**
  * Reorder via panah hanya bermakna saat daftar menampilkan satu lingkup urutan utuh (induk + order_scope terpilih)
- * tanpa pencarian/filter lain, dan hanya untuk mode shift (mode manual diubah lewat Edit).
+ * tanpa pencarian/filter lain, dan hanya untuk mode shift (mode manual diubah lewat Edit). Field order_scope yang tidak
+ * ada di filter membuat daftar selalu mencampur beberapa lingkup (posisi baris ≠ posisi di lingkupnya), jadi panah
+ * tidak pernah tampil (backend juga mewajibkan order_scope ⊆ filters).
  */
 const canReorder = computed(() => {
   const current = meta.value
   if (current === null || !current.has_order || isManualOrder(current)) return false
   if (search.value.trim() !== '' || statusFilter.value !== '') return false
   if (current.parent && filterCascade.leafValue() === '') return false
+  if (unfilterableOrderScope.value.length > 0) return false
   const scope = current.order_scope ?? []
   return filterFields.value.every((field) => (scope.includes(field.name) ? (fieldFilters.value[field.name] ?? '') !== '' : (fieldFilters.value[field.name] ?? '') === ''))
 })
@@ -130,6 +138,9 @@ const reorderHint = computed(() => {
   const current = meta.value
   if (!current?.has_order || canReorder.value || search.value || statusFilter.value) return ''
   if (isManualOrder(current)) return `Urutan ${current.label} adalah nilai tetap (mis. level): ubah lewat Edit; entri lain tidak bergeser.`
+  if (unfilterableOrderScope.value.length > 0) {
+    return `Urutan berlaku per ${orderScopeLabels.value.join(' dan ')} dan daftar ini tidak bisa disaring per lingkup itu: ubah urutan lewat Edit.`
+  }
   const parentLabel = current.parent ? (metas.value.find((m) => m.key === current.parent?.entity)?.label ?? 'induk') : null
   if (parentLabel !== null && orderScopeLabels.value.length === 0) {
     return `Pilih ${parentLabel} untuk mengubah urutan (urutan berlaku per induk).`

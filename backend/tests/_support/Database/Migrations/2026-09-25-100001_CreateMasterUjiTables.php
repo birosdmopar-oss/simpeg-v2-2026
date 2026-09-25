@@ -17,7 +17,8 @@ use RuntimeException;
  *   - uji_bidang  : induk uji_jurusan
  *   - uji_jurusan : statusChain, uniqueFields (`singkat` global, `kode_lama` per bidang), boolean (flag_d3/flag_s1),
  *                   batas angka (`bobot` TINYINT, `kuota` INT UNSIGNED)
- *   - uji_kantor  : field ref ke provinsi & kabupaten-kota (dependsOn)
+ *   - uji_kantor  : field ref ke provinsi & kabupaten-kota (dependsOn), plus kabupaten-kota ber-checkDependsOn false
+ *                   (rantai diperiksa hook, bukan engine)
  *   - uji_dusun   : statusChain 5 level di bawah wilayah (kelurahan → … → provinsi)
  * Collation utf8mb4_unicode_ci seperti tabel master (kolom kode wilayah dibandingkan dengan tabel wilayah).
  */
@@ -44,7 +45,7 @@ class CreateMasterUjiTables extends Migration
         ) {$options}");
 
         $this->exec("CREATE TABLE {$this->t('uji_diklat')} (
-            `id_diklat` TINYINT NOT NULL AUTO_INCREMENT,
+            `id_diklat` INT NOT NULL AUTO_INCREMENT,
             `jenis` TINYINT NOT NULL DEFAULT 1,
             `diklat` VARCHAR(100) NOT NULL,
             `order` TINYINT NOT NULL DEFAULT 1,
@@ -88,6 +89,7 @@ class CreateMasterUjiTables extends Migration
             `kantor` VARCHAR(100) NOT NULL,
             `id_provinsi` CHAR(2) NULL,
             `id_kabupaten` CHAR(4) NULL,
+            `id_kabupaten_lain` CHAR(4) NULL,
             `order` INT NOT NULL DEFAULT 1,
             `status` TINYINT NOT NULL DEFAULT 1,
             {$audit},

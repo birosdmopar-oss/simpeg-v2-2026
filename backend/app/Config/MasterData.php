@@ -42,7 +42,8 @@ use CodeIgniter\Config\BaseConfig;
  *     'hiddenColumns' => kolom tabel yang tidak dikelola engine & tidak pernah dikirim di respons admin (mis. `icon`),
  *     'orderMode'     => 'shift' (bawaan: posisi tampil, entri lain bergeser) | 'manual' (nilai bisnis, mis. level
  *                        pangkat: disimpan apa adanya, tidak pernah digeser/dinomori ulang) — CR-009,
- *     'orderScope'    => field wajib pembentuk lingkup urutan selain induk (mis. diklat per jenis_diklat),
+ *     'orderScope'    => field wajib pembentuk lingkup urutan selain induk (mis. diklat per jenis_diklat); wajib juga
+ *                        ada di 'filters' (daftar admin disaring per lingkup),
  *     'orderColumnType' => tipe kolom `order` (bawaan 'int'; mis. 'tinyint' → urutan maksimal 127),
  *     'uniqueFields'  => field selain nama yang ber-UNIQUE di DB: ['kolom', ...] (unik global) atau
  *                        ['kolom' => ['lingkup', ...]] → duplikat = 422 pada field itu (termasuk balapan 1062),

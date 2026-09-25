@@ -160,6 +160,12 @@ class MasterRegistry
             if ($def->field($column)?->required !== true) {
                 $fail("orderScope {$column} harus field wajib (required) master ini.");
             }
+
+            // Daftar admin harus bisa disaring ke satu lingkup urutan utuh (syarat panah naik/turun FE): tanpa filter,
+            // daftar mencampur beberapa lingkup dan posisi baris tidak sama dengan posisi di lingkupnya.
+            if (! in_array($column, $def->filters, true)) {
+                $fail("orderScope {$column} harus ikut filters (daftar admin disaring per lingkup urutan).");
+            }
         }
 
         foreach ($def->uniqueFields as $column => $scope) {

@@ -77,6 +77,10 @@ final class MasterRegistryTest extends CIUnitTestCase
             'orderScope jenis harus field wajib' => static function (MasterDataConfig $c): void {
                 $c->entities['uji'] = [...self::BASE, 'fields' => ['jenis' => ['label' => 'Jenis', 'type' => 'select', 'options' => [1 => 'A']]], 'orderScope' => ['jenis']];
             },
+            // Tanpa filter lingkup, daftar admin mencampur beberapa lingkup urutan (panah naik/turun FE salah hitung).
+            'orderScope jenis harus ikut filters' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'fields' => ['jenis' => ['label' => 'Jenis', 'type' => 'select', 'required' => true, 'options' => [1 => 'A']]], 'orderScope' => ['jenis']];
+            },
             'uniqueFields kode bukan field' => static function (MasterDataConfig $c): void {
                 $c->entities['uji'] = [...self::BASE, 'uniqueFields' => ['kode']];
             },

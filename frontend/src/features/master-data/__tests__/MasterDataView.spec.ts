@@ -12,7 +12,7 @@ vi.mock('../services/master.service', () => ({
 }))
 
 import { masterService } from '../services/master.service'
-import type { MasterMeta } from '../types'
+import type { MasterMeta, MasterRow } from '../types'
 import MasterDataView from '../views/MasterDataView.vue'
 
 function metaOf(key: string, label: string, parent: MasterMeta['parent'] = null): MasterMeta {
@@ -135,18 +135,25 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
   const bidangMeta: MasterMeta = { ...base, key: 'uji-bidang', label: 'Bidang Uji' }
   const jurusanMeta: MasterMeta = { ...base, key: 'uji-jurusan', label: 'Jurusan Uji', parent: { field: 'id_bidang', entity: 'uji-bidang' }, status_chain: true }
   const peminatanMeta: MasterMeta = { ...base, key: 'uji-peminatan', label: 'Peminatan Uji', parent: { field: 'id_jurusan', entity: 'uji-jurusan' }, status_chain: true }
+  // order_scope tanpa filter lingkup (backend menolak konfigurasi ini; FE tetap tidak boleh menampilkan panah).
+  const diklatCampurMeta: MasterMeta = { ...diklatMeta, key: 'uji-diklat-campur', label: 'Diklat Campur', filters: [] }
+  const kantorMeta: MasterMeta = {
+    ...base,
+    key: 'uji-kantor',
+    label: 'Kantor Uji',
+    filters: ['id_provinsi'],
+    fields: [{ name: 'id_provinsi', label: 'Provinsi', type: 'ref', required: false, options: null, hint: null, entity: 'provinsi' }],
+  }
 
-  async function mountView(entity: string) {
-    vi.mocked(masterService.meta).mockResolvedValue([levelMeta, diklatMeta, bidangMeta, jurusanMeta, peminatanMeta])
-    vi.mocked(masterService.list).mockResolvedValue({
-      items: [
-        { kode: '1', nama: 'Pertama', order: 1, status: '1' },
-        { kode: '2', nama: 'Kedua', order: 2, status: '1' },
-      ],
-      total: 2,
-      page: 1,
-      per_page: 20,
-    })
+  async function mountView(
+    entity: string,
+    items: MasterRow[] = [
+      { kode: '1', nama: 'Pertama', order: 1, status: '1' },
+      { kode: '2', nama: 'Kedua', order: 2, status: '1' },
+    ],
+  ) {
+    vi.mocked(masterService.meta).mockResolvedValue([levelMeta, diklatMeta, bidangMeta, jurusanMeta, peminatanMeta, diklatCampurMeta, kantorMeta])
+    vi.mocked(masterService.list).mockResolvedValue({ items, total: items.length, page: 1, per_page: 20 })
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/master/:entity?', name: 'master-data', component: MasterDataView }],
@@ -194,6 +201,49 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
     expect(
       Array.from(wrapper.get<HTMLSelectElement>('[data-testid="master-filter-aktif_sertifikasi"]').element.options).map((o) => o.textContent),
     ).toEqual(['Semua Sertifikasi', 'Ya', 'Tidak'])
+    wrapper.unmount()
+  })
+
+  it('order_scope yang tidak ada di filter: daftar mencampur lingkup → panah tidak pernah tampil', async () => {
+    // Daftar gabungan dua jenis: posisi baris (B1 = baris ke-3) ≠ posisi di jenisnya (1).
+    const wrapper = await mountView('uji-diklat-campur', [
+      { kode: '1', nama: 'A1', jenis: '1', order: 1, status: '1' },
+      { kode: '2', nama: 'A2', jenis: '1', order: 2, status: '1' },
+      { kode: '3', nama: 'B1', jenis: '2', order: 1, status: '1' },
+    ])
+
+    expect(wrapper.find('[data-testid="master-row-3"]').exists()).toBe(true)
+    expect(wrapper.find('button[title="Naikkan urutan"]').exists()).toBe(false)
+    expect(wrapper.find('button[title="Turunkan urutan"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="master-reorder-hint"]').text()).toBe(
+      'Urutan berlaku per Jenis Diklat dan daftar ini tidak bisa disaring per lingkup itu: ubah urutan lewat Edit.',
+    )
+    expect(masterService.reorder).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('filter field ref: pilihan dimuat dari {entity}/options dan nilai terpilih terkirim ke daftar', async () => {
+    vi.mocked(masterService.options).mockImplementation(async (entity) =>
+      entity === 'provinsi'
+        ? [
+            { id: '31', nama: 'DKI Jakarta', parent: null },
+            { id: '32', nama: 'Jawa Barat', parent: null },
+          ]
+        : [],
+    )
+    const wrapper = await mountView('uji-kantor')
+
+    expect(masterService.options).toHaveBeenCalledWith('provinsi')
+    const select = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-id_provinsi"]')
+    expect(Array.from(select.element.options).map((o) => [o.value, o.textContent])).toEqual([
+      ['', 'Semua Provinsi'],
+      ['31', 'DKI Jakarta'],
+      ['32', 'Jawa Barat'],
+    ])
+
+    await select.setValue('32')
+    await flushPromises()
+    expect(masterService.list).toHaveBeenLastCalledWith('uji-kantor', expect.objectContaining({ filters: { id_provinsi: '32' }, page: 1 }))
     wrapper.unmount()
   })
 

@@ -89,13 +89,14 @@ Perluasan engine di DBV-002/CR-003 (G-10, berlaku generik, regresi Batch 1 tetap
 - Urutan (CR-003): tambah dengan `order` langsung meng-insert di posisi final (baris baru tidak di-update lagi → `updated_by` tetap NULL untuk tabel ber-`created_by`). Saudara yang hanya bergeser (reorder/sisip/hapus/pindah induk entri lain; pulihkan menaruh entri di akhir tanpa menggeser saudara) tidak di-stamp `updated_at`/`updated_by` (`MasterModel::shiftOrder`, `updated_at = updated_at`), tetapi tetap teraudit. Berlaku juga untuk Batch 1.
 
 Perluasan engine di CR-009 (fondasi DBV-003/004/005, berlaku generik, tanpa master/migration grup baru; regresi Batch 1 & FAQ tetap hijau). Rincian opsi: `app/Controllers/Api/MasterData/README.md`.
-- Mode urutan `orderMode: 'manual'` (level pangkat: nilai tidak digeser/dinomori ulang), `orderScope` (urutan per field lain, mis. diklat per jenis), `orderColumnType` (batas nilai urutan manual & MAX+1).
+- Mode urutan `orderMode: 'manual'` (level pangkat: nilai tidak digeser/dinomori ulang), `orderScope` (urutan per field lain, mis. diklat per jenis; wajib ikut `filters`), `orderColumnType` (batas nilai urutan manual, MAX+1, dan kapasitas lingkup mode shift saat tambah dengan `order` — dicek sebelum insert).
 - `uniqueFields` (UNIQUE selain nama → 422 pada field itu, termasuk balapan 1062), batas angka field int per tipe kolom (`columnType`, `min`/`max`; meta `min`/`max`), field `boolean` 1/0, field `ref` + `dependsOn` (dropdown berjenjang ke master lain, cek kanonik/ada/aktif/rantai).
 - `filters` (allowlist filter `?field=` di options & daftar admin, cache per filter), `statusChain` (options mengikuti rantai status induk, pola U3 FAQ; `whereActiveChain()` untuk service khusus).
+- Options: `parent` wajib bentuk kanonik kode induk → 422 (dulu `?parent=1_f<md5 filter>` di-cast MySQL ke 1 dan berbagi kunci cache dengan `?parent=1&<filter>`, sehingga pengguna mana pun bisa meracuni dropdown terfilter); kunci cache `all` / `p_<induk>` / `q_<md5 induk+filter>` tidak bisa bentrok; master tanpa induk mengabaikan `parent`.
 - `MasterRegistry` memvalidasi konfigurasi (rujukan antar-master, field opsi, rantai melingkar) → `LogicException`.
 - FE: `MasterFormDialog` (ref berjenjang + nilai non-aktif tetap tampil, checkbox boolean, batas angka, urutan manual), `MasterDataView` (filter field, panah urutan hanya mode shift & satu lingkup utuh, keterangan hapus untuk turunan ber-`status_chain`), `FormField` tipe `checkbox` + `allowEmpty`.
 - Scaffolding anti-konflik: blok `// --- DBV-00X ---` di `Config\MasterData`, `masterFixtures()`, `MasterDataSeeder`; daftar master admin-only di `RbacMasterEndpointsTest` dibaca dari config.
-- Belum: kunci baris ID "sakti" (E7), hook saat ubah status/pulihkan, kolom tambahan di options (E3) — menunggu keputusan grup masing-masing.
+- Belum: kunci baris ID "sakti" (E7), hook saat ubah status/pulihkan, kolom tambahan di options (E3) — menunggu keputusan grup masing-masing. Tabel daftar admin (`MasterDataView`) belum menampilkan field tambahan (ref/boolean/field lingkup urutan): tanpa filter lingkup terpilih, kolom "Urutan" master ber-`orderScope` menampilkan nomor per lingkup (1,2,3,1,2,…) tanpa kolom lingkupnya. `UNIQUE(cpns, order)` pangkat ditunda di DBV-004.
 
 ## Perubahan di luar folder Modul G (bug yang ditemukan — scope diperluas sesuai 00-INDEX)
 

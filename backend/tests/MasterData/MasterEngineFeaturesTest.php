@@ -87,9 +87,12 @@ final class MasterEngineFeaturesTest extends CIUnitTestCase
         $auto = $this->json($this->sendJson('POST', $base, ['level' => 'II/c', 'kategori' => '2']))['data'];
         $this->assertSame(6, (int) $auto['order']);
 
-        // PATCH order & PUT order: hanya entri itu yang berubah (dan di-stamp), entri lain tetap.
+        // PATCH order & PUT order: hanya entri itu yang berubah (dan di-stamp), entri lain tetap. Dropdown yang sudah
+        // ter-cache sebelum PATCH langsung mengikuti nilai baru (cache di-invalidate).
+        $this->assertSame(['3', '1', '6', '2', '5', '4', '7'], $this->optionIds('uji-level'));
         $this->sendJson('PATCH', "{$base}/2/order", ['order' => 10])->assertStatus(200);
         $this->seeInDatabase('uji_level', ['id_level' => 2, 'order' => 10, 'updated_by' => $this->adminId()]);
+        $this->assertSame(['3', '1', '6', '5', '4', '7', '2'], $this->optionIds('uji-level'));
         $this->sendJson('PUT', "{$base}/1", ['order' => 7])->assertStatus(200);
         $this->assertSame([7, 10, 1, 5], $this->orders('uji_level', 'id_level', ['1', '2', '3', '4']));
 
@@ -189,7 +192,8 @@ final class MasterEngineFeaturesTest extends CIUnitTestCase
 
     /**
      * Filter per jenis di daftar & dropdown, nama unik per jenis (uniqueScope), dan batas kapasitas urutan per jenis
-     * (TINYINT): MAX+1 = 128 → 422.
+     * (TINYINT): MAX+1 = 128 → 422; tambah dengan `order` di jenis yang sudah berisi 127 entri → 422 sebelum insert
+     * (posisi hasil jepit 128 tidak pernah ditulis: bukan 1264/500 di koneksi strict atau terpotong).
      */
     public function testOrderScopeFilterUniquenessAndCapacity(): void
     {
@@ -209,8 +213,26 @@ final class MasterEngineFeaturesTest extends CIUnitTestCase
         $result = $this->sendJson('POST', $base, ['diklat' => 'Fungsional Baru', 'jenis' => '3']);
         $result->assertStatus(422);
         $this->assertSame(['Urutan Diklat Uji sudah mencapai batas maksimal 127.'], $this->json($result)['errors']['order']);
+
+        $rows = [];
+
+        for ($order = 1; $order <= 126; $order++) {
+            $rows[] = ['jenis' => 3, 'diklat' => "Fungsional {$order}", 'order' => $order, 'status' => 1];
+        }
+
+        $this->db->table('uji_diklat')->insertBatch($rows);
+
+        foreach ([500, 128, 1] as $order) {
+            $result = $this->sendJson('POST', $base, ['diklat' => 'Fungsional Baru', 'jenis' => '3', 'order' => $order]);
+            $result->assertStatus(422);
+            $this->assertSame(['Urutan Diklat Uji sudah mencapai batas maksimal 127.'], $this->json($result)['errors']['order'], "order {$order}");
+        }
+
+        $this->dontSeeInDatabase('uji_diklat', ['diklat' => 'Fungsional Baru']);
+
         // Jenis lain tidak terpengaruh.
-        $this->sendJson('POST', $base, ['diklat' => 'Fungsional Baru', 'jenis' => '4'])->assertStatus(201);
+        $this->sendJson('POST', $base, ['diklat' => 'Fungsional Baru', 'jenis' => '4', 'order' => 5])->assertStatus(201);
+        $this->seeInDatabase('uji_diklat', ['diklat' => 'Fungsional Baru', 'jenis' => 4, 'order' => 1]);
     }
 
     // ------------------------------------------------------------------
@@ -248,6 +270,40 @@ final class MasterEngineFeaturesTest extends CIUnitTestCase
         $this->assertSame(['kategori'], $this->metaByKey(Role::SUPER_ADMIN)['uji-level']['filters']);
     }
 
+    /**
+     * `parent` options wajib bentuk kanonik kode induk → 422 (MySQL meng-cast '1_f…'/'01'/'1abc' ke 1 pada FK INT), dan
+     * dropdown terfilter tidak bisa diracuni: `?parent=1_f<md5 filter>` dulu berbagi kunci cache dengan
+     * `?parent=1&flag_d3=1`, sehingga pengguna mana pun (options = UL_ALL) bisa menyimpan daftar anak induk 1 TANPA
+     * filter di kunci dropdown terfilter pengguna lain. Master tanpa induk mengabaikan `parent`.
+     */
+    public function testOptionsParentMustBeCanonicalAndCannotPoisonFilteredCache(): void
+    {
+        $crafted = '1_f' . md5((string) json_encode(['flag_d3' => '1']));
+
+        // Objek response dipakai bersama antar request: status & isi dicatat langsung, diperiksa setelah dropdown
+        // terfilter dibaca (supaya efek racun, bila ada, terlihat lebih dulu).
+        $this->asRole(Role::PEGAWAI);
+        $attempts = [];
+
+        foreach ([$crafted, '01', '1abc', '1 '] as $parent) {
+            $result            = $this->get('api/v1/master/uji-jurusan/options', ['parent' => $parent]);
+            $attempts[$parent] = [$result->response()->getStatusCode(), $this->json($result)['errors']['parent'] ?? null];
+        }
+
+        // Dropdown terfilter pengguna lain tetap benar (jurusan tanpa flag D-III tidak ikut muncul).
+        $this->asRole(Role::SUPER_ADMIN);
+        $this->assertSame(['1'], $this->optionIds('uji-jurusan', '1', ['flag_d3' => '1']));
+        $this->assertSame(['1', '2'], $this->optionIds('uji-jurusan', '1'));
+
+        foreach ($attempts as $parent => $attempt) {
+            $this->assertSame([422, ['Filter Bidang Uji tidak valid.']], $attempt, (string) $parent);
+        }
+
+        // Induk kanonik yang tidak ada = dropdown kosong; master tanpa induk mengabaikan `parent`.
+        $this->assertSame([], $this->optionIds('uji-jurusan', '99'));
+        $this->assertSame(['3', '1', '2', '4'], $this->optionIds('uji-level', 'apa-saja'));
+    }
+
     // ------------------------------------------------------------------
     // uniqueFields
     // ------------------------------------------------------------------
@@ -275,8 +331,10 @@ final class MasterEngineFeaturesTest extends CIUnitTestCase
         $result->assertStatus(422);
         $this->assertSame(['Kode Lama "101" sudah dipakai Jurusan "Teknik Sipil" (kode 1).'], $this->json($result)['errors']['kode_lama']);
 
-        // Ubah: nilai sendiri bukan bentrok; nilai entri lain ditolak; pindah bidang memeriksa ulang lingkup.
-        $this->sendJson('PUT', "{$base}/2", ['singkat' => 'TM', 'kode_lama' => '102'])->assertStatus(200);
+        // Ubah: nilai sendiri bukan bentrok (hanya beda huruf besar/kecil → tetap diperiksa, dan tidak bentrok dengan
+        // baris itu sendiri); nilai entri lain ditolak; pindah bidang memeriksa ulang lingkup.
+        $this->sendJson('PUT', "{$base}/2", ['singkat' => 'tm'])->assertStatus(200);
+        $this->assertSame('tm', $this->db->table('uji_jurusan')->select('singkat')->where('id_jurusan', 2)->get()->getRowArray()['singkat']);
         $this->sendJson('PUT', "{$base}/2", ['singkat' => 'ts'])->assertStatus(422);
         $result = $this->sendJson('PUT', "{$base}/{$manajemen['id_jurusan']}", ['id_bidang' => '1']);
         $result->assertStatus(422);
@@ -499,6 +557,24 @@ final class MasterEngineFeaturesTest extends CIUnitTestCase
         $result = $this->sendJson('POST', $base, ['kantor' => 'Bandung Tiga', 'id_provinsi' => '32', 'id_kabupaten' => '3273']);
         $result->assertStatus(422);
         $this->assertSame(['Kabupaten/Kota Kota Bandung sedang non-aktif.'], $this->json($result)['errors']['id_kabupaten']);
+
+        // checkDependsOn false (id_kabupaten_lain, pola sentinel LAIN-LAIN kantor DBV-003): rantai dengan dependsOn
+        // diserahkan ke hook — kabupaten/kota di luar provinsi terpilih, atau tanpa provinsi, diterima engine. Kanonik,
+        // ada, dan aktif tetap diperiksa engine.
+        $this->sendJson('POST', $base, ['kantor' => 'Lintas Rantai', 'id_provinsi' => '32', 'id_kabupaten_lain' => '3171'])->assertStatus(201);
+        $this->seeInDatabase('uji_kantor', ['kantor' => 'Lintas Rantai', 'id_provinsi' => '32', 'id_kabupaten_lain' => '3171']);
+        $this->sendJson('POST', $base, ['kantor' => 'Lain Tanpa Provinsi', 'id_kabupaten_lain' => '3171'])->assertStatus(201);
+        $this->seeInDatabase('uji_kantor', ['kantor' => 'Lain Tanpa Provinsi', 'id_provinsi' => null, 'id_kabupaten_lain' => '3171']);
+
+        foreach ([
+            ['9999', 'Kabupaten/Kota Lain tidak ditemukan.'],
+            ['317', 'Kabupaten/Kota Lain tidak ditemukan.'],
+            ['3273', 'Kabupaten/Kota Lain Kota Bandung sedang non-aktif.'],
+        ] as [$value, $message]) {
+            $result = $this->sendJson('POST', $base, ['kantor' => "Lain {$value}", 'id_provinsi' => '32', 'id_kabupaten_lain' => $value]);
+            $result->assertStatus(422);
+            $this->assertSame([$message], $this->json($result)['errors']['id_kabupaten_lain'], $value);
+        }
     }
 
     // ------------------------------------------------------------------

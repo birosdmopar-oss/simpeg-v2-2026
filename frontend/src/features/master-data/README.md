@@ -14,5 +14,7 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
 Halaman master generik (`views/MasterDataView.vue`, `components/MasterFormDialog.vue`) dibangun dari `GET /master/meta`.
 Opsi engine CR-009 yang dibaca FE: field `ref` (dropdown `{entity}/options`, berjenjang lewat `depends_on`), `boolean`
 (checkbox 1/0), batas angka `min`/`max`, `order_mode` (`manual` = nilai urutan tetap, tanpa panah naik/turun),
-`order_scope` + `filters` (filter daftar; panah urutan hanya saat satu lingkup urutan utuh tampil), `status_chain`
+`order_scope` + `filters` (filter daftar; panah urutan hanya saat satu lingkup urutan utuh tampil — field `order_scope`
+yang tidak ada di `filters` membuat panah tidak pernah tampil, ubah urutan lewat Edit), filter field `ref` (pilihan dari
+`{entity}/options`), `status_chain`
 (keterangan hapus induk).
