@@ -20,8 +20,11 @@ export const MASTER_STATUS_LABELS: Record<MasterStatus, string> = {
   '10': 'Dihapus',
 }
 
-/** Tipe field tambahan (App\Libraries\MasterData\MasterField). */
-export type MasterFieldType = 'text' | 'textarea' | 'int' | 'decimal' | 'date' | 'select'
+/**
+ * Tipe field tambahan (App\Libraries\MasterData\MasterField). `html` = konten HTML (mis. isi artikel FAQ):
+ * textarea besar + pratinjau lewat sanitizeHtml(); backend menyanitasi ulang (HTMLPurifier) saat simpan.
+ */
+export type MasterFieldType = 'text' | 'textarea' | 'int' | 'decimal' | 'date' | 'select' | 'html'
 
 export interface MasterFieldMeta {
   name: string
@@ -30,6 +33,8 @@ export interface MasterFieldMeta {
   required: boolean
   options: Array<{ value: string; label: string }> | null
   hint: string | null
+  /** Batas panjang dalam byte UTF-8 (mis. TINYTEXT = 255), bila diekspos backend; ikut divalidasi di form. */
+  max_bytes?: number | null
 }
 
 export interface MasterMeta {
@@ -87,3 +92,110 @@ export interface MasterDeleteResponse {
 
 /** Nilai form generik: kode, induk, nama (key = nama kolom backend), order opsional. */
 export type MasterFormValues = Record<string, string | undefined>
+
+// ------------------------------------------------------------------
+// G-10 FAQ — halaman baca pegawai & rating (DBV-002/CR-003 §4). Kelola konten memakai master generik
+// faq-topic / faq-sub-topic / faq-article (role 1). Id dinormalkan ke string oleh faqService.
+// ------------------------------------------------------------------
+
+/** Id dari API: kolom INT, bisa terkirim sebagai angka atau string. */
+export type FaqApiId = number | string
+
+export interface FaqRef {
+  id: string
+  nama: string
+}
+
+export interface FaqArticleRef {
+  id: string
+  title: string
+}
+
+export interface FaqSubTopic {
+  id: string
+  nama: string
+  articles: FaqArticleRef[]
+}
+
+export interface FaqTopic {
+  id: string
+  nama: string
+  sub_topics: FaqSubTopic[]
+}
+
+export interface FaqSearchResult {
+  id: string
+  title: string
+  topic: FaqRef
+  sub_topic: FaqRef
+  /** Kalimat pertama isi artikel (teks polos, maks 200 karakter). */
+  snippet: string
+}
+
+/** 1 = Membantu, 2 = Kurang Membantu (faq_rate.rate legacy). */
+export type FaqRate = 1 | 2
+
+export interface FaqRating {
+  /** Role 2/6/7 (UL_PEGAWAI) yang belum menilai artikel ini. */
+  can_rate: boolean
+  rated: boolean
+  rate: FaqRate | null
+}
+
+export interface FaqArticleDetail {
+  id: string
+  title: string
+  /** HTML yang sudah disanitasi backend; tetap dirender lewat sanitizeHtml(). */
+  content: string
+  topic: FaqRef
+  sub_topic: FaqRef
+  updated_at: string | null
+  /** Maks 5 artikel aktif lain di sub topik yang sama (dihitung otomatis seperti legacy). */
+  related: FaqArticleRef[]
+  rating: FaqRating
+}
+
+export interface FaqRatePayload {
+  rate: FaqRate
+  /** Wajib bila rate = 2 (maks 255 byte); tidak dikirim bila rate = 1. */
+  reason?: string
+}
+
+export interface FaqRateResponse {
+  rated: boolean
+  rate: FaqRate
+}
+
+/** Bentuk mentah respons API (sebelum normalisasi id). */
+export interface FaqApiRef {
+  id: FaqApiId
+  nama: string
+}
+
+export interface FaqApiArticleRef {
+  id: FaqApiId
+  title: string
+}
+
+export interface FaqApiTreeResponse {
+  topics: Array<FaqApiRef & { sub_topics?: Array<FaqApiRef & { articles?: FaqApiArticleRef[] }> }>
+}
+
+export interface FaqApiSearchResponse {
+  results: Array<FaqApiArticleRef & { topic: FaqApiRef; sub_topic: FaqApiRef; snippet: string | null }>
+  search: string
+}
+
+export interface FaqApiArticleResponse extends FaqApiArticleRef {
+  content: string | null
+  topic: FaqApiRef
+  sub_topic: FaqApiRef
+  updated_at: string | null
+  related?: FaqApiArticleRef[]
+  rating?: { can_rate: boolean; rated: boolean; rate: FaqApiId | null }
+}
+
+export interface FaqApiRateResponse {
+  rated: boolean
+  rate: FaqApiId
+}

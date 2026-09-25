@@ -4,6 +4,8 @@
  * master: kode (hanya saat tambah dan hanya master ber-kode manual; kode tidak bisa diubah), induk (dropdown
  * berjenjang), nama, kolom tambahan legacy (kd_area, kd_pos, status_pegawai, ...), urutan.
  * Error 422 backend (keunikan kode/nama, induk non-aktif) dipetakan ke field.
+ * Field yang tidak dikirim di list admin (`listExclude`, mis. isi artikel FAQ bertipe html) dimuat dari detail
+ * sebelum form edit bisa disimpan, agar nilainya tidak terkirim kosong.
  */
 import { toTypedSchema } from '@vee-validate/zod'
 import { X } from 'lucide-vue-next'
@@ -15,7 +17,7 @@ import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 
 import { resolveAncestorPath, useCascadeOptions } from '../composables/useCascadeOptions'
-import { ancestorChain, buildMasterSchema } from '../schemas/master.schema'
+import { ancestorChain, buildMasterSchema, fieldsMissingFromRow } from '../schemas/master.schema'
 import { masterService } from '../services/master.service'
 import type { MasterFieldMeta, MasterFormValues, MasterMeta, MasterRow } from '../types'
 
@@ -58,9 +60,34 @@ const rowId = computed(() => (props.row ? String(props.row[props.meta.primary_ke
 /** Entri berstatus 10 (Dihapus) tidak punya urutan tampil (backend menolak 422); urutan diatur setelah dipulihkan. */
 const showOrder = computed(() => props.meta.has_order && String(props.row?.status ?? '') !== '10')
 
+/** Form lebar untuk master yang punya field HTML (textarea besar + pratinjau). */
+const hasHtmlField = computed(() => props.meta.fields.some((f) => f.type === 'html'))
+
+/** Field edit yang nilainya sedang dimuat dari detail (tidak ada di baris list). */
+const pendingFields = ref(new Set<string>())
+const detailFailed = ref(false)
+let detailToken = 0
+
+async function loadMissingFields(row: MasterRow, missing: MasterFieldMeta[], token: number): Promise<void> {
+  try {
+    const full = await masterService.get(props.meta.key, String(row[props.meta.primary_key] ?? ''))
+    if (token !== detailToken) return
+    for (const field of missing) setFieldValue(field.name, String(full[field.name] ?? ''), false)
+  } catch (err) {
+    if (token !== detailToken) return
+    detailFailed.value = true
+    formError.value = `Gagal memuat data lengkap (${missing.map((f) => f.label).join(', ')}). ${
+      isApiError(err) ? err.message : 'Tutup lalu buka kembali form ini.'
+    }`
+  } finally {
+    if (token === detailToken) pendingFields.value = new Set()
+  }
+}
+
 watch(
   () => [props.open, props.row, props.meta.key] as const,
   async ([open, row]) => {
+    detailToken++
     if (!open) return
     formError.value = ''
     const m = props.meta
@@ -77,6 +104,11 @@ watch(
     resetForm({ values: initial, errors: {} })
     interacted.value = new Set()
 
+    const missing = fieldsMissingFromRow(m, row)
+    pendingFields.value = new Set(missing.map((f) => f.name))
+    detailFailed.value = false
+    if (row && missing.length > 0) void loadMissingFields(row, missing, detailToken)
+
     if (m.parent) {
       const directParent = row ? String(row[m.parent.field] ?? '') : ''
       const path = directParent ? await resolveAncestorPath(chain.value, directParent) : []
@@ -92,6 +124,8 @@ async function onLevelChange(index: number, value: string): Promise<void> {
 }
 
 const onSubmit = handleSubmit(async (formValues) => {
+  // Nilai field listExclude belum termuat: jangan kirim (akan terkirim kosong / menghapus isi).
+  if (pendingFields.value.size > 0 || detailFailed.value) return
   submitting.value = true
   formError.value = ''
   const m = props.meta
@@ -137,13 +171,29 @@ const onSubmit = handleSubmit(async (formValues) => {
 })
 
 /** Pemetaan tipe field backend → tipe input FormField. */
-function fieldInputType(field: MasterFieldMeta): 'text' | 'number' | 'select' | 'date' | 'textarea' {
+function fieldInputType(field: MasterFieldMeta): 'text' | 'number' | 'select' | 'date' | 'textarea' | 'html' {
   // Desimal (mis. koordinat) memakai input teks: input number menolak sebagian ketikan tanda minus.
   if (field.type === 'int') return 'number'
   if (field.type === 'select') return 'select'
   if (field.type === 'date') return 'date'
   if (field.type === 'textarea') return 'textarea'
+  if (field.type === 'html') return 'html'
   return 'text'
+}
+
+function fieldPlaceholder(field: MasterFieldMeta): string | undefined {
+  if (pendingFields.value.has(field.name)) return 'Memuat...'
+  if (field.type === 'select') return `Pilih ${field.label}`
+  if (field.type === 'html') return '<p>Tulis isi dalam format HTML...</p>'
+  return undefined
+}
+
+function fieldHint(field: MasterFieldMeta): string {
+  if (field.hint) return field.hint
+  if (field.type === 'html') {
+    return 'Format HTML. Tag yang diizinkan: p, br, strong, em, u, s, sub, sup, ul, ol, li, a, img, h2-h4, blockquote, pre, code, hr, table, span. Script, style, dan atribut on* dibuang otomatis saat disimpan.'
+  }
+  return ''
 }
 
 const codeHint = computed(() =>
@@ -160,7 +210,8 @@ const { levels } = cascade
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+        :class="hasHtmlField ? 'max-w-3xl' : 'max-w-lg'"
       >
         <div class="mb-4 flex items-start justify-between">
           <div>
@@ -231,8 +282,9 @@ const { levels } = cascade
             :type="fieldInputType(field)"
             :required="field.required"
             :options="field.options ?? []"
-            :placeholder="fieldInputType(field) === 'select' ? `Pilih ${field.label}` : undefined"
-            :hint="field.hint ?? ''"
+            :placeholder="fieldPlaceholder(field)"
+            :disabled="pendingFields.has(field.name)"
+            :hint="fieldHint(field)"
             :error="fieldError(field.name)"
             @update:model-value="updateField(field.name, $event)"
           />
@@ -253,7 +305,7 @@ const { levels } = cascade
             <button
               type="submit"
               class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
-              :disabled="submitting"
+              :disabled="submitting || pendingFields.size > 0 || detailFailed"
             >
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}
             </button>

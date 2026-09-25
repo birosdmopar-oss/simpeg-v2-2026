@@ -21,7 +21,8 @@ use Throwable;
 
 /**
  * G-TC — test case generik Modul G (02-MasterData.md), dijalankan ke SELURUH master yang terdaftar di engine
- * (saat ini G-07: agama, jenis_pegawai, jenis_status, wilayah 4 level). MTC-008 (pola CRUD master).
+ * (saat ini G-07: agama, jenis_pegawai, jenis_status, wilayah 4 level; G-10: topik, sub topik, artikel FAQ).
+ * MTC-008 (pola CRUD master). Test khusus FAQ (baca, rating, sanitasi) ada di FaqTest.
  * Skema & status mengikuti legacy (DBV-001): status 1 Aktif / 2 Tidak Aktif / 10 Dihapus.
  *
  * Tiap test mengulang skenario untuk semua master sekaligus agar biaya migrate:refresh per test tetap kecil.
@@ -220,6 +221,63 @@ final class MasterGenericTcTest extends CIUnitTestCase
 
         // Nama tidak boleh dikosongkan lewat update.
         $this->sendJson('PUT', 'api/v1/master/agama/6', ['agama' => '  '])->assertStatus(422);
+    }
+
+    /**
+     * DBV-002 E6: SELURUH leluhur (bukan hanya induk langsung) wajib ada dan aktif saat tambah / pindah induk.
+     * Kabupaten/kota 3171 aktif, tetapi provinsinya (31) Tidak Aktif lalu Dihapus → kecamatan baru ditolak.
+     */
+    public function testWholeParentChainMustBeActive(): void
+    {
+        $this->sendJson('PATCH', 'api/v1/master/provinsi/31/status', ['status' => '2'])->assertStatus(200);
+        $this->seeInDatabase('kabupaten_kota', ['id_kabupaten_kota' => '3171', 'status' => 1]);
+
+        $payload = ['id_kecamatan' => '3171030', 'id_kabupaten_kota' => '3171', 'kecamatan' => 'Kemayoran'];
+        $result  = $this->sendJson('POST', 'api/v1/master/kecamatan', $payload);
+        $result->assertStatus(422);
+        $this->assertSame(['Provinsi DKI Jakarta sedang non-aktif.'], $this->json($result)['errors']['id_kabupaten_kota']);
+
+        // Tiga level: kelurahan di kecamatan aktif → kabupaten aktif → provinsi non-aktif.
+        $result = $this->sendJson('POST', 'api/v1/master/kelurahan', ['id_kelurahan' => '3171010003', 'id_kecamatan' => '3171010', 'kelurahan' => 'Petojo Utara']);
+        $result->assertStatus(422);
+        $this->assertArrayHasKey('id_kecamatan', $this->json($result)['errors']);
+
+        // Pindah induk ke rantai yang non-aktif juga ditolak (kecamatan 3273010 → kabupaten 3171).
+        $this->sendJson('PUT', 'api/v1/master/kecamatan/3273010', ['id_kabupaten_kota' => '3171'])->assertStatus(422);
+        $this->seeInDatabase('kecamatan', ['id_kecamatan' => '3273010', 'id_kabupaten_kota' => '3273']);
+
+        // Status 10 (Dihapus) sama dengan non-aktif; memulihkan provinsi membuka kembali rantainya.
+        $this->delete('api/v1/master/provinsi/31')->assertStatus(200);
+        $this->sendJson('POST', 'api/v1/master/kecamatan', $payload)->assertStatus(422);
+        $this->sendJson('PATCH', 'api/v1/master/provinsi/31/status', ['status' => '1'])->assertStatus(200);
+        $this->sendJson('POST', 'api/v1/master/kecamatan', $payload)->assertStatus(201);
+
+        // Mengubah entri tanpa pindah induk tetap boleh walau leluhurnya non-aktif (data lama tetap bisa dirapikan).
+        $this->sendJson('PATCH', 'api/v1/master/provinsi/31/status', ['status' => '2'])->assertStatus(200);
+        $this->sendJson('PUT', 'api/v1/master/kecamatan/3171010', ['kecamatan' => 'Gambir Raya'])->assertStatus(200);
+    }
+
+    /**
+     * DBV-002 E5: kolom TINYTEXT (remark) dibatasi 255 BYTE, bukan karakter — 128 huruf 'é' (2 byte) = 256 byte.
+     */
+    public function testMaxBytesFieldCountsBytesNotCharacters(): void
+    {
+        $tooLong = str_repeat('é', 128);
+        $this->assertSame(128, mb_strlen($tooLong));
+
+        $result = $this->sendJson('POST', 'api/v1/master/faq-topic', ['faq_topic' => 'Topik Remark', 'remark' => $tooLong]);
+        $result->assertStatus(422);
+        $this->assertSame(['Keterangan maksimal 255 byte.'], $this->json($result)['errors']['remark']);
+        $this->sendJson('PUT', 'api/v1/master/faq-sub-topic/1', ['remark' => $tooLong])->assertStatus(422);
+        $this->dontSeeInDatabase('faq_topic', ['faq_topic' => 'Topik Remark']);
+
+        // 127 × 2 byte + 1 = 255 byte: tepat di batas.
+        $fits = str_repeat('é', 127) . 'a';
+        $this->sendJson('POST', 'api/v1/master/faq-topic', ['faq_topic' => 'Topik Remark', 'remark' => $fits])->assertStatus(201);
+        $this->seeInDatabase('faq_topic', ['faq_topic' => 'Topik Remark', 'remark' => $fits]);
+
+        $meta = array_column($this->json($this->get('api/v1/master/meta'))['data'], null, 'key');
+        $this->assertSame(255, $meta['faq-topic']['fields'][0]['max_bytes']);
     }
 
     /**
@@ -543,6 +601,38 @@ final class MasterGenericTcTest extends CIUnitTestCase
         $this->seeInDatabase('kabupaten_kota', ['id_kabupaten_kota' => '3171', 'order' => 2]);
     }
 
+    /**
+     * CR-003: menggeser SAUDARA (reorder, hapus, pindah induk entri lain) tidak mengubah updated_at/updated_by saudara
+     * — hanya entri yang diedit yang di-stamp (legacy tidak me-renumber saudara sama sekali). Perubahan order saudara
+     * tetap tercatat di audit_logs. Kolom updated_at legacy ber-ON UPDATE CURRENT_TIMESTAMP pun tidak ikut bergeser.
+     */
+    public function testShiftedSiblingsKeepTheirAuditColumns(): void
+    {
+        $adminId = (int) $this->db->table('pengguna')->select('id_pengguna')->where('nip', self::ADMIN_NIP)->get()->getRowArray()['id_pengguna'];
+        Time::setTestNow('2021-05-06 07:08:09', 'UTC');
+
+        // Reorder: Konghucu (6) ke posisi 1 → agama 1..5 hanya bergeser.
+        $this->sendJson('PATCH', 'api/v1/master/agama/6/order', ['order' => 1])->assertStatus(200);
+        $this->seeInDatabase('agama', ['id_agama' => 6, 'order' => 1, 'updated_by' => $adminId, 'updated_at' => '2021-05-06 07:08:09']);
+
+        foreach ([1, 2, 3, 4, 5] as $id) {
+            $this->seeInDatabase('agama', ['id_agama' => $id, 'order' => $id + 1, 'updated_by' => null, 'updated_at' => null]);
+        }
+
+        $log = $this->db->table('audit_logs')->where(['entity' => 'agama', 'entity_id' => '1', 'event' => 'update'])->get()->getRowArray();
+        $this->assertSame(1, (int) json_decode((string) $log['before_json'], true)['order']);
+        $this->assertSame(2, (int) json_decode((string) $log['after_json'], true)['order']);
+
+        // Hapus: sisanya dirapatkan tanpa stamp.
+        $this->delete('api/v1/master/agama/6')->assertStatus(200);
+        $this->seeInDatabase('agama', ['id_agama' => 1, 'order' => 1, 'updated_by' => null, 'updated_at' => null]);
+
+        // Pindah induk: yang dipindah di-stamp, urutan induk lama dirapatkan tanpa stamp.
+        $this->sendJson('PUT', 'api/v1/master/kabupaten-kota/3171', ['id_provinsi' => '32'])->assertStatus(200);
+        $this->seeInDatabase('kabupaten_kota', ['id_kabupaten_kota' => '3171', 'id_provinsi' => '32', 'updated_by' => $adminId]);
+        $this->seeInDatabase('kabupaten_kota', ['id_kabupaten_kota' => '3172', 'order' => 1, 'updated_by' => null, 'updated_at' => null]);
+    }
+
     // ------------------------------------------------------------------
     // G-TC #6 — audit log tambah/ubah/hapus + kolom audit legacy
     // ------------------------------------------------------------------
@@ -590,10 +680,18 @@ final class MasterGenericTcTest extends CIUnitTestCase
         Time::setTestNow('2020-01-02 03:04:05', 'UTC');
 
         foreach (self::masterFixtures() as $entity => $fx) {
+            $def     = service('masterRegistry')->get($entity);
             $created = $this->json($this->sendJson('POST', "api/v1/master/{$entity}", $fx['new']))['data'];
 
             $this->assertSame('2020-01-02 03:04:05', $created['created_at'], $entity);
-            $this->assertSame($adminId, (int) $created['updated_by'], $entity);
+
+            if ($def->hasAudit(MasterDefinition::AUDIT_CREATED_BY)) {
+                // Tabel ber-created_by (FAQ, legacy L_faq.php): created_by saat tambah, updated_by baru terisi saat ubah.
+                $this->assertSame($adminId, (int) $created['created_by'], $entity);
+                $this->assertNull($created['updated_by'], $entity);
+            } else {
+                $this->assertSame($adminId, (int) $created['updated_by'], $entity);
+            }
         }
 
         // Update tercatat di updated_at & updated_by (baris seed awalnya NULL).

@@ -2,14 +2,19 @@
 /**
  * FormField generik (ADR-026): label + input/select + pesan error. Dipakai lintas modul.
  * Dipasangkan dengan VeeValidate `useField`/`defineField` di komponen pemanggil.
+ * Tipe `html`: textarea tinggi (kode HTML) + tombol "Pratinjau" yang merender isi lewat sanitizeHtml() (SafeHtml).
+ * Kontainer pratinjau dirender v-if, jadi aria-controls tombol hanya dipasang selama pratinjau terbuka.
  */
-import { computed, useId } from 'vue'
+import { computed, defineAsyncComponent, ref, useId } from 'vue'
+
+// Dimuat saat pratinjau dibuka saja: FormField dipakai halaman login, DOMPurify tidak perlu ikut di bundel itu.
+const SafeHtml = defineAsyncComponent(() => import('./SafeHtml.vue'))
 
 const props = withDefaults(
   defineProps<{
     label: string
     modelValue: string | number | null | undefined
-    type?: 'text' | 'password' | 'select' | 'number' | 'date' | 'textarea'
+    type?: 'text' | 'password' | 'select' | 'number' | 'date' | 'textarea' | 'html'
     placeholder?: string
     error?: string
     hint?: string
@@ -26,6 +31,7 @@ const props = withDefaults(
 const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
 
 const id = useId()
+const previewing = ref(false)
 const inputClass = computed(() => [
   'block w-full rounded-md border px-3 py-2 text-sm shadow-sm outline-none transition',
   'focus:ring-2 focus:ring-brand-tertiary/40 focus:border-brand-tertiary',
@@ -40,7 +46,22 @@ function onInput(event: Event): void {
 
 <template>
   <div class="space-y-1">
-    <label :for="id" class="block text-sm font-medium text-slate-700">
+    <div v-if="type === 'html'" class="flex items-center justify-between gap-2">
+      <label :for="id" class="block text-sm font-medium text-slate-700">
+        {{ label }}<span v-if="required" class="text-red-600"> *</span>
+      </label>
+      <button
+        type="button"
+        class="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        :aria-pressed="previewing"
+        :aria-controls="previewing ? `${id}-preview` : undefined"
+        data-testid="html-preview-toggle"
+        @click="previewing = !previewing"
+      >
+        {{ previewing ? 'Tutup pratinjau' : 'Pratinjau' }}
+      </button>
+    </div>
+    <label v-else :for="id" class="block text-sm font-medium text-slate-700">
       {{ label }}<span v-if="required" class="text-red-600"> *</span>
     </label>
 
@@ -73,6 +94,33 @@ function onInput(event: Event): void {
       @input="onInput"
       @blur="emit('blur')"
     />
+
+    <template v-else-if="type === 'html'">
+      <textarea
+        v-show="!previewing"
+        :id="id"
+        :name="name"
+        :value="String(modelValue ?? '')"
+        :placeholder="placeholder"
+        :class="[inputClass, 'font-mono text-xs leading-relaxed']"
+        :disabled="disabled"
+        rows="14"
+        spellcheck="false"
+        :aria-invalid="Boolean(error)"
+        :aria-describedby="error ? `${id}-error` : undefined"
+        @input="onInput"
+        @blur="emit('blur')"
+      />
+      <div
+        v-if="previewing"
+        :id="`${id}-preview`"
+        class="max-h-[50vh] min-h-[10rem] overflow-y-auto rounded-md border border-dashed border-slate-300 bg-white p-3"
+        data-testid="html-preview"
+      >
+        <p class="mb-2 text-xs text-slate-400">Pratinjau — tag/atribut di luar daftar yang diizinkan tidak ditampilkan.</p>
+        <SafeHtml :html="String(modelValue ?? '')" empty-text="Belum ada konten untuk dipratinjau." />
+      </div>
+    </template>
 
     <div v-else class="relative">
       <input

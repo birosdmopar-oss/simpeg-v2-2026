@@ -19,8 +19,11 @@ use CodeIgniter\I18n\Time;
  * dari aplikasi (G-TC soft-delete only): "hapus" = status 10 (+ deleted_at bila kolomnya ada), dicatat sebagai
  * event audit 'delete' lewat softDelete().
  *
- * Kolom audit legacy (created_at, updated_at, updated_by) diisi otomatis sesuai MasterDefinition::$auditColumns:
- * timestamp dalam zona waktu aplikasi (UTC), updated_by = id_pengguna aktor (null untuk proses tanpa login).
+ * Kolom audit legacy (created_at, created_by, updated_at, updated_by) diisi otomatis sesuai
+ * MasterDefinition::$auditColumns: timestamp dalam zona waktu aplikasi (UTC), *_by = id_pengguna aktor (null untuk
+ * proses tanpa login). Tabel ber-created_by (FAQ, DBV-002) mengikuti legacy: insert mengisi created_by dan membiarkan
+ * updated_by NULL, update mengisi updated_by. Tabel tanpa created_by (Batch 1) mengisi updated_by di insert & update.
+ * Saudara yang hanya tergeser urutannya (shiftOrder) tidak di-stamp.
  *
  * Tulisan bisnis gagal = exception (insert()/update() di-override): di dalam transaksi CI4 query yang gagal hanya
  * mengembalikan false + menandai transStatus (tanpa exception, kecuali transException), sehingga tanpa ini
@@ -56,8 +59,17 @@ class MasterModel extends BaseAuditableModel
 
         parent::__construct($db);
 
+        $hasCreatedBy = $definition->hasAudit(MasterDefinition::AUDIT_CREATED_BY);
+
+        if ($hasCreatedBy) {
+            $this->beforeInsert[] = 'stampCreatedBy';
+        }
+
         if ($definition->hasAudit(MasterDefinition::AUDIT_UPDATED_BY)) {
-            $this->beforeInsert[] = 'stampUpdatedBy';
+            if (! $hasCreatedBy) {
+                $this->beforeInsert[] = 'stampUpdatedBy';
+            }
+
             $this->beforeUpdate[] = 'stampUpdatedBy';
         }
     }
@@ -123,6 +135,34 @@ class MasterModel extends BaseAuditableModel
     }
 
     /**
+     * Geser `order` satu baris SAUDARA karena entri lain dipindah, ditambah, atau dihapus. Baris ini tidak
+     * diedit admin, jadi updated_at/updated_by-nya TIDAK diubah (CR-003; legacy tidak me-renumber saudara, dan tanggal
+     * "Diperbarui" artikel FAQ tidak boleh bergeser hanya karena urutan). `updated_at = updated_at` mencegah
+     * ON UPDATE CURRENT_TIMESTAMP kolom legacy ikut mengisi jam server. Perubahan tetap dicatat di audit_logs (event
+     * 'update', before/after) — ditulis manual karena query ini tidak lewat Model Events.
+     *
+     * @throws DatabaseException query gagal, juga saat DBDebug = false
+     */
+    public function shiftOrder(string $id, int $order): void
+    {
+        $before  = $this->fetchRows([$id])[0] ?? null;
+        $builder = $this->db->table($this->table)
+            ->set(MasterDefinition::ORDER_FIELD, $order)
+            ->where($this->primaryKey, $id);
+
+        if ($this->definition->hasAudit(MasterDefinition::AUDIT_UPDATED_AT)) {
+            $builder->set(MasterDefinition::AUDIT_UPDATED_AT, $this->db->escapeIdentifiers(MasterDefinition::AUDIT_UPDATED_AT), false);
+        }
+
+        if ($builder->update() === false) {
+            throw $this->writeFailure();
+        }
+
+        $after = $this->fetchRows([$id])[0] ?? null;
+        $this->writeAudit(AuditLogModel::EVENT_UPDATE, $id, $before, $after);
+    }
+
+    /**
      * Model event beforeInsert/beforeUpdate: isi updated_by dengan id_pengguna aktor (kolom legacy INT).
      *
      * @param array<string, mixed> $eventData
@@ -131,8 +171,30 @@ class MasterModel extends BaseAuditableModel
      */
     public function stampUpdatedBy(array $eventData): array
     {
+        return $this->stampActor($eventData, MasterDefinition::AUDIT_UPDATED_BY);
+    }
+
+    /**
+     * Model event beforeInsert (tabel ber-created_by): isi created_by dengan id_pengguna aktor (kolom legacy INT).
+     *
+     * @param array<string, mixed> $eventData
+     *
+     * @return array<string, mixed>
+     */
+    public function stampCreatedBy(array $eventData): array
+    {
+        return $this->stampActor($eventData, MasterDefinition::AUDIT_CREATED_BY);
+    }
+
+    /**
+     * @param array<string, mixed> $eventData
+     *
+     * @return array<string, mixed>
+     */
+    private function stampActor(array $eventData, string $column): array
+    {
         if (isset($eventData['data']) && is_array($eventData['data'])) {
-            $eventData['data'][MasterDefinition::AUDIT_UPDATED_BY] = $this->currentActorId();
+            $eventData['data'][$column] = $this->currentActorId();
         }
 
         return $eventData;

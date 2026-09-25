@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
+use App\Libraries\MasterData\MasterDefinition;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -16,7 +17,8 @@ use Tests\Support\MasterDataTestTrait;
  * G-TC #5 — RBAC Modul G (Matriks Role x Endpoint Bagian 2 Modul G, pola "Super Admin only").
  *
  * - Seluruh endpoint CRUD master + master/meta: role 1 saja; role 2-8 → 403, tanpa token → 401.
- * - master/{entity}/options (dropdown read-only, entri aktif): UL_ALL (8 role), tanpa token → 401.
+ * - master/{entity}/options (dropdown read-only, entri aktif): UL_ALL (8 role), tanpa token → 401 — kecuali master
+ *   ber-`publicOptions = false` (FAQ, CR-003): role 1 saja, role 2-8 → 403.
  *
  * @internal
  */
@@ -105,16 +107,34 @@ final class RbacMasterEndpointsTest extends CIUnitTestCase
         $this->assertSame(array_keys(self::masterFixtures()), array_column($meta, 'key'));
     }
 
-    public function testOptionsAreOpenToEveryLoggedInRole(): void
+    public function testOptionsAreOpenToEveryLoggedInRoleExceptAdminOnlyMasters(): void
     {
+        // Master tanpa konsumen dropdown di luar form admin (publicOptions = false): FAQ (CR-003).
+        $adminOnly = array_keys(array_filter(
+            service('masterRegistry')->all(),
+            static fn (MasterDefinition $def): bool => ! $def->publicOptions,
+        ));
+        $this->assertSame(['faq-topic', 'faq-sub-topic', 'faq-article'], $adminOnly);
+
         foreach (Role::all() as $role) {
             $this->asRole($role);
 
             foreach (self::masterFixtures() as $entity => $fx) {
-                $this->assertNotSame([], $this->optionIds($entity, $fx['parent'][1] ?? null), "{$entity} role {$role}");
+                $parent = $fx['parent'][1] ?? null;
+
+                if ($role === Role::SUPER_ADMIN || ! in_array($entity, $adminOnly, true)) {
+                    $this->assertNotSame([], $this->optionIds($entity, $parent), "{$entity} role {$role}");
+
+                    continue;
+                }
+
+                $result = $this->get("api/v1/master/{$entity}/options", $parent !== null ? ['parent' => $parent] : []);
+                $result->assertStatus(403);
+                $this->assertSame(['status' => 'error', 'message' => 'Forbidden'], $this->json($result), "{$entity} role {$role}");
             }
         }
 
         $this->withHeaders(['Authorization' => ''])->get('api/v1/master/agama/options')->assertStatus(401);
+        $this->withHeaders(['Authorization' => ''])->get('api/v1/master/faq-article/options')->assertStatus(401);
     }
 }

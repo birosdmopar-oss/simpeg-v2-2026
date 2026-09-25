@@ -44,6 +44,22 @@ const editing = ref<MasterRow | null>(null)
 const confirm = ref<{ open: boolean; row: MasterRow | null; loading: boolean }>({ open: false, row: null, loading: false })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.value)))
+
+/**
+ * Keterangan hapus. Status turunan tidak ditulis ulang (DBV-002 U3). Penyaringan rantai status untuk tampilan
+ * pegawai hanya ada di FAQ (FaqService): turunan master FAQ ikut tersembunyi dari halaman FAQ selama induknya tidak
+ * aktif dan muncul kembali saat induk dipulihkan. Master berinduk lain (mis. wilayah) cukup kalimat netral.
+ */
+const deleteDescription = computed(() => {
+  const base =
+    'Data tidak dihapus permanen: statusnya menjadi Dihapus sehingga hilang dari daftar dan dropdown, sementara data pegawai/riwayat yang sudah memakainya tetap utuh. Bisa dipulihkan lewat filter status Dihapus.'
+  const key = meta.value?.key ?? ''
+  const children = metas.value.filter((m) => m.parent?.entity === key).map((m) => m.label)
+  if (children.length === 0) return base
+  if (!key.startsWith('faq-')) return `${base} Status data turunan tidak ikut diubah.`
+  return `${base} Status ${children.join(', ')} di bawahnya tidak ikut diubah, tetapi ikut tersembunyi dari halaman FAQ pegawai sampai entri ini dipulihkan.`
+})
+
 const filterChain = computed(() => (meta.value ? ancestorChain(meta.value, metas.value) : []))
 const filterCascade = useCascadeOptions(filterChain)
 const { levels: filterLevels } = filterCascade
@@ -412,7 +428,7 @@ onMounted(() => {
     <ConfirmDialog
       v-model:open="confirm.open"
       :title="`Hapus ${meta?.label ?? ''} &quot;${confirm.row ? nameOf(confirm.row) : ''}&quot;?`"
-      description="Data tidak dihapus permanen: statusnya menjadi Dihapus sehingga hilang dari daftar dan dropdown, sementara data pegawai/riwayat yang sudah memakainya tetap utuh. Bisa dipulihkan lewat filter status Dihapus."
+      :description="deleteDescription"
       danger
       confirm-label="Hapus"
       :loading="confirm.loading"

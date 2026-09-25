@@ -4,6 +4,8 @@
 
 **Revisi Batch 1 — DBV-001 (✅ DISETUJUI 24-09-2026, di main lewat PR #4 / `633dbb0`):** skema Batch 1 diubah ke skema SIMPEG legacy lewat migration ALTER baru (bukan mengedit migration yang sudah disetujui), sekaligus menyelesaikan ISSUE-008/009/010 — lihat **Bagian 8**. Riwayat approval Batch 1 di bawah ini tetap berlaku sebagai catatan.
 
+**G-10 FAQ — DBV-002 (⏳ menunggu approval DB Validator & review kode CR-003):** lima tabel FAQ (`faq_topic`, `faq_sub_topic`, `faq_article`, `faq_rate`, `faq_related_article`) diajukan dengan skema legacy (DDL `simpeg_prod.sql:949-1030`) di dokumen terpisah → lihat `G-10-faq-schema.md` (DBV-002). Rujukan FAQ di dokumen ini di bawah hanya diberi penunjuk; riwayat keputusannya tidak diubah.
+
 **Syarat persetujuan:** temuan #1–#3 di Bagian 6 (panjang kode wilayah, UNIQUE index nama, collation) **ditunda perbaikannya sampai seluruh DEV-003 Fase 2 selesai** — keputusan user, 23-09-2026. Aman selama tabel master masih kosong; **ketiganya wajib selesai sebelum impor data master legacy** dan sebelum sign-off Fase 2, karena perbaikan setelah tabel terisi butuh `ALTER TABLE` + dedupe data.
 
 **Rujukan:** `02-MasterData.md` G-01, Tech Spec §2.3 G-01, `Mapping_Migrasi_Data_SIMPEG_v2.docx` Tier 0 & Tier 1, `simpeg_v2_local_seed.sql`, ERD legacy `simpeg01.erd` (relasi FK), `Legacy_System_Audit_SIMPEG.pdf` (Master Data & Pengaturan).
@@ -55,6 +57,8 @@ Sumber kolom: `simpeg_v2_local_seed.sql`. Struktur & relasi konsisten dengan ERD
 **Tanpa definisi kolom sama sekali** (tidak ada di seed maupun Legacy Audit):
 `kelas_jabatan`, `peta_jabatan`, `struktur_jabatan`, `periode_struktur_jabatan`, `jabatan_koordinasi`, `rumpun_jabatan`, `subrumpun_jabatan`, `jabatan_akademik`, `dm_ak_jf`, `faq_rate`, `bidang_kursem`, `instansi_kursem`, `jenis_layanan`.
 
+→ `faq_rate`: DDL ditemukan di `simpeg_prod.sql:971-982` → lihat `G-10-faq-schema.md` (DBV-002).
+
 **Ada di seed, tapi berbeda dari ERD legacy** (perlu cross-check DDL sebelum ditulis):
 
 | Tabel | Seed lokal | ERD legacy `simpeg01` |
@@ -64,10 +68,10 @@ Sumber kolom: `simpeg_v2_local_seed.sql`. Struktur & relasi konsisten dengan ERD
 | user_lokasi_presensi | `id` AI, `nip`, `id_lokasi_presensi` (FK pegawai, lokasi_presensi) | FK ke `lokasi_presensi`, `pegawai`, **`dm_user_lokasi_presensi`** |
 | gol_pppk | `nama_gol_pppk` | Legacy Audit: "master nominal uang makan per golongan PPPK" → kolom nominal tidak ada di seed |
 | web_config | `config_key`, `config_value`, `tipe_data`, `keterangan` | Legacy Audit: `config_name`, `config_value` |
-| beberapa master (jenis_libur, jenis_kp, gol_pppk, bidang/jurusan_pendidikan, diklat, hukdis, konket, tanda_jasa, lokasi_presensi, faq_sub_topic, faq_article) | tanpa kolom `order` | 02-MasterData.md: semua master punya `order` + `status` |
+| beberapa master (jenis_libur, jenis_kp, gol_pppk, bidang/jurusan_pendidikan, diklat, hukdis, konket, tanda_jasa, lokasi_presensi, faq_sub_topic, faq_article) | tanpa kolom `order` | 02-MasterData.md: semua master punya `order` + `status` (→ `faq_sub_topic`/`faq_article`: lihat `G-10-faq-schema.md` (DBV-002)) |
 | hari_libur | tanpa `status` | idem |
 
-**Ada di legacy, tidak ada di Mapping Tier 0/1:** `jenjang_jf` (direferensikan `jabatan`), `faq_related_article`, `dm_user_lokasi_presensi` (disebut Mapping di Tier 3).
+**Ada di legacy, tidak ada di Mapping Tier 0/1:** `jenjang_jf` (direferensikan `jabatan`), `faq_related_article`, `dm_user_lokasi_presensi` (disebut Mapping di Tier 3). (→ `faq_related_article`: lihat `G-10-faq-schema.md` (DBV-002).)
 
 ## 4. Keputusan yang diminta dari DB Validator / Tech Lead
 
@@ -77,9 +81,9 @@ Sumber kolom: `simpeg_v2_local_seed.sql`. Struktur & relasi konsisten dengan ERD
 | 2 | Keunikan nama master: cukup di aplikasi, atau tambah UNIQUE index (`nama` / `induk+nama`)? | Aplikasi dulu; UNIQUE index setelah data quality audit legacy (duplikat legacy akan menggagalkan migrasi data) | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #2) → **dikerjakan di DBV-001 ✅** (UNIQUE index, Bagian 8.5) |
 | 3 | Kolom `created_at`/`updated_at` di tabel master? | Tidak (ikut legacy; histori di `audit_logs`) | ✅ **TIDAK** — ikut usulan (23-09-2026). Jejak perubahan mengandalkan `audit_logs`; catat bahwa audit bersifat fail-open (A-01) |
 | 4 | Panjang kode wilayah VARCHAR(10) cukup? (kode Kemendagri kelurahan tanpa titik = 10 digit; dengan titik = 13) | Konfirmasi format kode legacy dari DDL/data `simpeg01` | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #1) → **dikerjakan di DBV-001 ✅** (CHAR(2/4/7/10), Bagian 8.5) |
-| 5 | Master tanpa `order` di seed: tambahkan `order` sesuai pola 02-MasterData.md? | Ya, semua master `order` + `status` | ✅ **YA** — ikut usulan (23-09-2026). Semua master Tier 0/1 wajib `order` + `status`, termasuk yang di seed belum punya (`jenis_libur`, `jenis_kp`, `gol_pppk`, `bidang`/`jurusan_pendidikan`, `diklat`, `hukdis`, `konket`, `tanda_jasa`, `lokasi_presensi`, `faq_sub_topic`, `faq_article`) dan `status` untuk `hari_libur` |
-| 6 | `jenjang_jf`, `faq_related_article`, `dm_user_lokasi_presensi`: ikut dimigrasi di G-01? | Tunggu DDL, lalu putuskan | **BELUM DIPUTUSKAN** (blocked ISSUE-003) |
-| 7 | FK `user_lokasi_presensi.nip` dan `faq_rate.nip` → `pegawai.nip`: tabel `pegawai` baru ada di Fase 3 | Defer FK ke B-01 (pola sama dengan A-01 `pengguna.nip`) | **BELUM DIPUTUSKAN** |
+| 5 | Master tanpa `order` di seed: tambahkan `order` sesuai pola 02-MasterData.md? | Ya, semua master `order` + `status` | ✅ **YA** — ikut usulan (23-09-2026). Semua master Tier 0/1 wajib `order` + `status`, termasuk yang di seed belum punya (`jenis_libur`, `jenis_kp`, `gol_pppk`, `bidang`/`jurusan_pendidikan`, `diklat`, `hukdis`, `konket`, `tanda_jasa`, `lokasi_presensi`, `faq_sub_topic`, `faq_article`) dan `status` untuk `hari_libur` → `faq_sub_topic`/`faq_article`: lihat `G-10-faq-schema.md` (DBV-002 ⏳) |
+| 6 | `jenjang_jf`, `faq_related_article`, `dm_user_lokasi_presensi`: ikut dimigrasi di G-01? | Tunggu DDL, lalu putuskan | **BELUM DIPUTUSKAN** (blocked ISSUE-003) → `faq_related_article`: lihat `G-10-faq-schema.md` (DBV-002 ⏳) |
+| 7 | FK `user_lokasi_presensi.nip` dan `faq_rate.nip` → `pegawai.nip`: tabel `pegawai` baru ada di Fase 3 | Defer FK ke B-01 (pola sama dengan A-01 `pengguna.nip`) | **BELUM DIPUTUSKAN** → `faq_rate.nip`: lihat `G-10-faq-schema.md` (DBV-002 ⏳) |
 | 8 | FK `pengguna.id_unit`/`id_satker` → `unit`/`satker` (ditunda dari A-01 ke Fase 2) | Ditambahkan saat migration unit/satker (G-02) setelah DDL legacy ada | **BELUM DIPUTUSKAN** |
 | 9 | Collation (A-01 Bagian 8 #3 — belum diputuskan): tabel master batch 1 mewarisi default koneksi (`utf8mb4_general_ci`). Keunikan nama master bergantung pada collation `*_ci` | Ikuti keputusan #3 A-01; kalau ditetapkan `utf8mb4_unicode_ci`, batch 1 ditambah `ALTER TABLE … CONVERT TO` sebelum dijalankan di Dev | ⏳ **DITUNDA** sampai seluruh DEV-003 Fase 2 selesai (lihat Bagian 6 #3) → **sebagian di DBV-001 ✅** (7 tabel `utf8mb4_unicode_ci`, Bagian 8.5) |
 
@@ -119,6 +123,8 @@ Keputusan user 23-09-2026. Ketiganya **wajib selesai sebelum impor data master l
 | 4 | Reorder menulis 1 baris audit + 1 UPDATE per entri yang bergeser | `MasterService::applyOrder()` | Batasi untuk master besar, atau catat 1 audit per operasi reorder |
 | 5 | Kode (PK) immutable + FK `ON UPDATE RESTRICT`; perubahan kode wilayah dari Kemendagri hanya bisa lewat SQL manual | migration wilayah | Siapkan prosedur perawatan kode master |
 | 6 | `order` adalah kata kunci SQL | seluruh tabel master | Wajib backtick di script migrasi/report manual |
+
+Catatan #1: sebagian ditangani di DBV-002 (⏳) — tambah/pindah induk kini memeriksa seluruh rantai leluhur (generik, termasuk wilayah) dan tampilan FAQ pegawai menyaring seluruh rantai; `options()` dropdown belum → lihat `G-10-faq-schema.md` Bagian 5.
 
 ## 8. DBV-001 — Revisi skema Batch 1 ke skema SIMPEG legacy (✅ DISETUJUI DB Validator 24-09-2026)
 
@@ -161,6 +167,8 @@ Semua tabel: `ENGINE=InnoDB`, `utf8mb4` / `utf8mb4_unicode_ci`; `status TINYINT 
 | jenis_status | `id_jenis_status` TINYINT AUTO_INCREMENT, `jenis_status` VARCHAR(50), `status_pegawai` TINYINT DEFAULT 1 (1 Aktif / 2 Tidak Aktif), `order` TINYINT DEFAULT 1, `status`, audit | PK; **UNIQUE** (status_pegawai, jenis_status) — keunikan legacy (`Lm_umum.php:578-595`) | `status_pegawai` K (code, form wajib); tipe I |
 
 Perilaku aplikasi (engine master): kode wilayah wajib tepat 2/4/7/10 digit; PK agama/jenis_* diberikan DB (input kode diabaikan); daftar default menyembunyikan status 10 (seperti legacy `status!='10'`), filter `?status=1|2|10`; entri terhapus dipulihkan lewat `PATCH …/status {1|2}`; `updated_by` = `id_pengguna` aktor; timestamp ditulis aplikasi dalam UTC.
+
+> **Catatan CR-003 / DBV-002 (24-09-2026, menunggu approval di `G-10-faq-schema.md` Bagian 4 #10):** entri yang hanya bergeser urutannya karena entri lain dipindah/ditambah/dihapus/pindah induk tidak lagi di-stamp `updated_at`/`updated_by` (tetap teraudit di `audit_logs`), dan tambah dengan `order` langsung di posisi final. Keputusan DBV-001 di atas tidak berubah.
 
 ### 8.3 Nilai dugaan [I] yang wajib dicocokkan dengan dump struktur produksi
 

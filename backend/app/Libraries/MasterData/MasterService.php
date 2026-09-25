@@ -24,9 +24,14 @@ use Throwable;
  *     entri yang dihapus bisa dipulihkan lewat setStatus (1/2).
  *  3. Toggle status langsung ter-reflect: cache dropdown (options) di-invalidate di setiap penulisan.
  *  4. Re-ordering: memindah 1 entri ke posisi N menggeser entri lain dalam induk yang sama; urutan dinormalisasi
- *     1..n agar dropdown selalu urut logis.
- *  5. RBAC ditegakkan di routing (role 1; options = UL_ALL).
+ *     1..n agar dropdown selalu urut logis. Entri baru dengan `order` langsung di-insert di posisi finalnya. Saudara
+ *     yang hanya tergeser tidak di-stamp updated_at/updated_by (hanya entri yang diedit), tetapi tetap teraudit.
+ *  5. RBAC ditegakkan di routing (role 1; options = UL_ALL, kecuali master ber-publicOptions false = role 1).
  *  6. Audit: seluruh tulis lewat MasterModel (BaseAuditableModel).
+ *  7. Induk: entri baru / pindah induk hanya boleh di rantai yang SELURUH levelnya ada dan aktif (DBV-002 E6).
+ *  8. Kolom turunan & sanitasi lewat hook per master (MasterHooks, DBV-002 E2), mis. isi artikel FAQ; kolom besar
+ *     bisa dikecualikan dari daftar admin (listExclude, E4); kolom yang tidak dikelola tidak pernah dikirim
+ *     (hiddenColumns, mis. `icon` topik FAQ).
  *
  * Mendukung dua bentuk kode sesuai DDL legacy: PK string yang diinput admin (kode wilayah CHAR(2/4/7/10), wajib
  * tepat N digit) dan PK AUTO_INCREMENT (agama, jenis_pegawai, jenis_status). Kolom tambahan legacy per master
@@ -80,6 +85,13 @@ class MasterService
         $perPage = min(self::PER_PAGE_MAX, max(1, (int) ($filters['per_page'] ?? self::PER_PAGE_DEFAULT)));
 
         $builder = $this->db->table($def->table);
+
+        // Kolom besar (mis. LONGTEXT isi artikel) tidak dikirim di daftar; detail (get) tetap mengirim semua kolom.
+        $columns = $def->listColumns();
+
+        if ($columns !== null) {
+            $builder->select($columns);
+        }
 
         if ($def->hasStatus) {
             $status = (string) ($filters['status'] ?? '');
@@ -153,7 +165,14 @@ class MasterService
 
         /** @var list<array{id: string, nama: string, parent: string|null}> $options */
         $options = $this->cache->remember($key, self::OPTIONS_TTL, function () use ($def, $parent): array {
-            $builder = $this->db->table($def->table);
+            // Hanya kolom yang dipetakan ke hasil: kolom besar (mis. LONGTEXT isi artikel) tidak ikut terbaca.
+            $columns = [$def->primaryKey, $def->nameField];
+
+            if ($def->parentField !== null) {
+                $columns[] = $def->parentField;
+            }
+
+            $builder = $this->db->table($def->table)->select($columns);
 
             if ($def->hasStatus) {
                 $builder->where(MasterDefinition::STATUS_FIELD, MasterModel::STATUS_ACTIVE);
@@ -212,11 +231,12 @@ class MasterService
         $scope = $this->scopeValues($def, $data);
         $this->assertNameUnique($def, $name, $parent, $scope);
 
-        $newId = $id;
+        $newId     = $id;
+        $requested = $this->requestedOrder($def, $data);
 
         // Closure biasa (bukan arrow fn) supaya $newId dari AUTO_INCREMENT ikut keluar lewat referensi.
-        $this->translateDuplicate(function () use ($def, $id, $name, $parent, $data, &$newId): void {
-            $this->transactional(function () use ($def, $id, $name, $parent, $data, &$newId): void {
+        $this->translateDuplicate(function () use ($def, $id, $name, $parent, $data, $requested, &$newId): void {
+            $this->transactional(function () use ($def, $id, $name, $parent, $data, $requested, &$newId): void {
                 $row = [$def->nameField => $name];
 
                 if (! $def->autoIncrement) {
@@ -234,12 +254,19 @@ class MasterService
                 }
 
                 if ($def->hasOrder) {
-                    $row[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, $parent);
+                    // `order` dikirim: posisi final dihitung SEBELUM insert (dijepit 1..jumlah saudara tampil + 1), jadi
+                    // baris baru tidak di-update lagi sesudahnya — updated_by tetap NULL untuk tabel ber-created_by
+                    // (E1) dan tanpa audit 'update' tambahan. Hanya saudara yang digeser (placeAt di bawah).
+                    $row[MasterDefinition::ORDER_FIELD] = $requested === null
+                        ? $this->nextOrder($def, $parent)
+                        : $this->clampPosition($requested, count($this->scopeIds($def, $parent)));
                 }
 
                 if ($def->hasStatus) {
                     $row[MasterDefinition::STATUS_FIELD] = $this->normalizeStatus($data[MasterDefinition::STATUS_FIELD] ?? MasterModel::STATUS_ACTIVE);
                 }
+
+                $row = $this->applyHooks($def, $row, null);
 
                 $model = $this->model($def);
                 $model->insert($row);
@@ -248,8 +275,8 @@ class MasterService
                     $newId = (string) $model->getInsertID();
                 }
 
-                if ($def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
-                    $this->placeAt($def, $newId, (int) $data[MasterDefinition::ORDER_FIELD]);
+                if ($requested !== null) {
+                    $this->placeAt($def, $newId, $requested, false);
                 }
             });
         }, function () use ($def, $id, $name, $parent, $scope): void {
@@ -327,19 +354,21 @@ class MasterService
             }
         }
 
-        $orderRequested = $def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '';
+        $requested = $this->requestedOrder($def, $data);
 
-        if ($orderRequested && $def->hasStatus && (string) ($changes + $current)[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_DELETED) {
+        if ($requested !== null && $def->hasStatus && (string) ($changes + $current)[MasterDefinition::STATUS_FIELD] === MasterModel::STATUS_DELETED) {
             throw ValidationException::forField(MasterDefinition::ORDER_FIELD, "{$def->label} yang dihapus tidak punya urutan tampil — pulihkan dulu.");
         }
 
         $scope = $this->scopeValues($def, $changes + $current);
 
-        $this->translateDuplicate(fn () => $this->transactional(function () use ($def, $id, $current, $changes, $parentChanged, $data): void {
+        $this->translateDuplicate(fn () => $this->transactional(function () use ($def, $id, $current, $changes, $parentChanged, $requested): void {
             if ($parentChanged && $def->hasOrder) {
                 // Pindah induk: taruh di akhir induk baru, rapikan urutan induk lama.
                 $changes[MasterDefinition::ORDER_FIELD] = $this->nextOrder($def, (string) $changes[$def->parentField]);
             }
+
+            $changes = $this->applyHooks($def, $changes, $current);
 
             if ($changes !== []) {
                 $this->model($def)->update($id, $changes);
@@ -349,8 +378,8 @@ class MasterService
                 $this->renumber($def, (string) $current[$def->parentField]);
             }
 
-            if ($def->hasOrder && isset($data[MasterDefinition::ORDER_FIELD]) && $data[MasterDefinition::ORDER_FIELD] !== '') {
-                $this->placeAt($def, $id, (int) $data[MasterDefinition::ORDER_FIELD]);
+            if ($requested !== null) {
+                $this->placeAt($def, $id, $requested, true);
             }
         }), fn () => $this->assertNameUnique($def, $name, $parent, $scope, $id));
 
@@ -422,7 +451,7 @@ class MasterService
         }
 
         $this->transactional(function () use ($def, $id, $position): void {
-            $this->placeAt($def, $id, $position);
+            $this->placeAt($def, $id, $position, true);
         });
 
         $this->invalidate($def);
@@ -436,9 +465,12 @@ class MasterService
 
     /**
      * Susun ulang urutan dalam satu induk: entri $id ditaruh di posisi $position, sisanya bergeser,
-     * lalu seluruhnya dinomori ulang 1..n. Hanya baris yang berubah yang ditulis (lewat Model → teraudit).
+     * lalu seluruhnya dinomori ulang 1..n. Hanya baris yang berubah yang ditulis (teraudit).
+     *
+     * @param bool $stamp true = $id sedang diedit admin (reorder/ubah), sehingga perubahan order-nya di-stamp
+     *                    updated_at/updated_by seperti ubah biasa; false = entri baru yang sudah di-insert di posisinya
      */
-    private function placeAt(MasterDefinition $def, string $id, int $position): void
+    private function placeAt(MasterDefinition $def, string $id, int $position, bool $stamp): void
     {
         $row    = $this->findOrFail($def, $id);
         $parent = $def->parentField !== null ? (string) $row[$def->parentField] : null;
@@ -448,10 +480,9 @@ class MasterService
             static fn (string $other): bool => $other !== $id,
         ));
 
-        $position = max(1, min($position, count($ids) + 1));
-        array_splice($ids, $position - 1, 0, [$id]);
+        array_splice($ids, $this->clampPosition($position, count($ids)) - 1, 0, [$id]);
 
-        $this->applyOrder($def, $parent, $ids);
+        $this->applyOrder($def, $parent, $ids, $stamp ? $id : null);
     }
 
     private function renumber(MasterDefinition $def, ?string $parent): void
@@ -460,9 +491,14 @@ class MasterService
     }
 
     /**
+     * Tulis urutan final. Baris $editedId (yang sedang diedit admin) ditulis lewat update Model biasa sehingga
+     * di-stamp updated_at/updated_by. Saudara yang hanya tergeser ditulis lewat MasterModel::shiftOrder(): kolom audit
+     * legacy-nya tidak berubah (legacy tidak me-renumber saudara; mis. tanggal "Diperbarui" artikel FAQ tidak boleh
+     * bergeser hanya karena urutan), tetapi perubahan order tetap tercatat di audit_logs.
+     *
      * @param list<string> $ids urutan final
      */
-    private function applyOrder(MasterDefinition $def, ?string $parent, array $ids): void
+    private function applyOrder(MasterDefinition $def, ?string $parent, array $ids, ?string $editedId = null): void
     {
         $current = $this->scopeOrders($def, $parent);
         $model   = $this->model($def);
@@ -470,10 +506,36 @@ class MasterService
         foreach ($ids as $index => $id) {
             $order = $index + 1;
 
-            if (($current[$id] ?? null) !== $order) {
-                $model->update((string) $id, [MasterDefinition::ORDER_FIELD => $order]);
+            if (($current[$id] ?? null) === $order) {
+                continue;
+            }
+
+            if ($id === $editedId) {
+                $model->update($id, [MasterDefinition::ORDER_FIELD => $order]);
+            } else {
+                $model->shiftOrder($id, $order);
             }
         }
+    }
+
+    /**
+     * Posisi 1-based yang dijepit ke 1..(jumlah saudara tampil + 1).
+     */
+    private function clampPosition(int $position, int $siblings): int
+    {
+        return max(1, min($position, $siblings + 1));
+    }
+
+    /**
+     * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan).
+     *
+     * @param array<string, mixed> $data
+     */
+    private function requestedOrder(MasterDefinition $def, array $data): ?int
+    {
+        $order = $data[MasterDefinition::ORDER_FIELD] ?? null;
+
+        return $def->hasOrder && $order !== null && $order !== '' ? (int) $order : null;
     }
 
     /**
@@ -589,25 +651,54 @@ class MasterService
     }
 
     /**
-     * Induk wajib ada dan aktif (entri baru tidak boleh digantung di induk yang sudah non-aktif).
+     * Induk wajib ada dan aktif — termasuk SELURUH leluhurnya (DBV-002 E6): entri baru / pindah induk tidak boleh
+     * digantung di rantai yang salah satu levelnya non-aktif (mis. kecamatan di bawah kabupaten aktif yang
+     * provinsinya Tidak Aktif, atau artikel FAQ di sub topik aktif yang topiknya Dihapus). Error dilaporkan pada
+     * field induk langsung, dengan nama level yang non-aktif.
      */
     private function assertParentUsable(MasterDefinition $def, string $parentId): void
     {
-        if ($def->parentField === null || $def->parentEntity === null) {
+        $field = $def->parentField;
+
+        if ($field === null) {
             return;
         }
 
-        $parentDef = $this->registry->get($def->parentEntity);
+        // Id induk dari input wajib bentuk kanonik (CR-003): untuk PK INT, MySQL meng-cast '01'/'1abc'/'1.0' menjadi 1,
+        // sehingga tanpa cek ini id tersebut lolos sebagai induk 1 lalu memicu "pindah induk" palsu (urutan bergeser)
+        // atau gagal saat tulis. Level di atasnya dibaca dari DB, jadi sudah kanonik.
+        if ($def->parentEntity !== null) {
+            $parentDef = $this->registry->get($def->parentEntity);
 
-        /** @var array<string, mixed>|null $parent */
-        $parent = $this->db->table($parentDef->table)->where($parentDef->primaryKey, $parentId)->get()->getRowArray();
-
-        if ($parent === null) {
-            throw ValidationException::forField($def->parentField, "{$parentDef->label} tidak ditemukan.");
+            if (! $this->isCanonicalId($parentDef, $parentId)) {
+                throw ValidationException::forField($field, "{$parentDef->label} tidak ditemukan.");
+            }
         }
 
-        if ($parentDef->hasStatus && (string) $parent[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_ACTIVE) {
-            throw ValidationException::forField($def->parentField, "{$parentDef->label} {$parent[$parentDef->nameField]} sedang non-aktif.");
+        $level = $def;
+        $id    = $parentId;
+        // Pengaman konfigurasi induk melingkar: rantai tidak mungkin lebih panjang dari jumlah master terdaftar.
+        $guard = count($this->registry->all());
+
+        while ($level->hasParent() && $guard-- > 0) {
+            $parentDef = $this->registry->get((string) $level->parentEntity);
+
+            /** @var array<string, mixed>|null $parent */
+            $parent = $this->db->table($parentDef->table)->where($parentDef->primaryKey, $id)->get()->getRowArray();
+
+            if ($parent === null) {
+                throw ValidationException::forField($field, "{$parentDef->label} tidak ditemukan.");
+            }
+
+            if ($parentDef->hasStatus && (string) $parent[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_ACTIVE) {
+                throw ValidationException::forField($field, "{$parentDef->label} {$parent[$parentDef->nameField]} sedang non-aktif.");
+            }
+
+            if ($parentDef->parentField !== null) {
+                $id = (string) $parent[$parentDef->parentField];
+            }
+
+            $level = $parentDef;
         }
     }
 
@@ -731,7 +822,8 @@ class MasterService
     }
 
     /**
-     * Tambah nama induk (untuk tampilan tabel) tanpa JOIN: satu query per halaman.
+     * Bentuk baris untuk respons admin: buang hiddenColumns (kolom yang tidak dikelola, mis. `icon` topik FAQ, D6) dan
+     * tambah nama induk (untuk tampilan tabel) tanpa JOIN: satu query per halaman.
      *
      * @param list<array<string, mixed>> $rows
      *
@@ -739,6 +831,8 @@ class MasterService
      */
     private function present(MasterDefinition $def, array $rows): array
     {
+        $rows = array_map(static fn (array $row): array => $def->withoutHiddenColumns($row), $rows);
+
         if ($def->parentField === null || $def->parentEntity === null || $rows === []) {
             return $rows;
         }
@@ -764,6 +858,21 @@ class MasterService
 
             return $row;
         }, $rows);
+    }
+
+    /**
+     * Jalankan hook tulis master (MasterHooks) — setelah validasi, sebelum tulis, di dalam transaksi pemanggil.
+     *
+     * @param array<string, mixed>      $row
+     * @param array<string, mixed>|null $existing
+     *
+     * @return array<string, mixed>
+     */
+    private function applyHooks(MasterDefinition $def, array $row, ?array $existing): array
+    {
+        $hooks = $def->hooks();
+
+        return $hooks === null ? $row : $hooks->beforeWrite($row, $existing);
     }
 
     private function model(MasterDefinition $def): MasterModel

@@ -1,6 +1,6 @@
 /**
  * API master data generik (Modul G). Satu service untuk seluruh master — endpoint dibedakan oleh key master.
- * Otorisasi ditegakkan backend (CRUD role 1; options UL_ALL).
+ * Otorisasi ditegakkan backend (CRUD role 1; options UL_ALL, kecuali master FAQ yang hanya role 1).
  */
 import { api } from '@/lib/axios'
 
