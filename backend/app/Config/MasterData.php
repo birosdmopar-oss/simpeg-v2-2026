@@ -79,6 +79,11 @@ class MasterData extends BaseConfig
     // --- /DBV-004 ---
 
     // --- DBV-005 (konstanta) ---
+    /**
+     * Kolom audit G-06 (pola DDL legacy `diklat`, simpeg_prod.sql:449-450): tanpa created_*, updated_at/updated_by diisi
+     * saat tambah maupun ubah (mode Batch 1).
+     */
+    private const AUDIT_G06 = ['updated_at', 'updated_by'];
     // --- /DBV-005 ---
 
     /**
@@ -295,6 +300,123 @@ class MasterData extends BaseConfig
         // --- /DBV-004 ---
 
         // --- DBV-005 (G-06 diklat, hukdis, konket, tanda jasa) ---
+        // G-06 (DBV-005/CR-012 ⏳). Legacy hr/master/c_diklat|c_hukdis|c_konket|c_tj (Lm_*.php), CRUD role 1; dropdown UL_ALL
+        // (riwayat B-11/B-13/B-14/B-17, presensi D-06). Skema: backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md.
+        // Baris ber-ID hard-coded legacy (G-06 Bagian 2.6) sengaja tidak dikunci (B6). Kolom `order` TINYINT → orderColumnType.
+        'diklat' => [
+            'label'         => 'Pelatihan',
+            'controller'    => 'DiklatController',
+            'table'         => 'diklat',
+            'primaryKey'    => 'id_diklat',
+            'autoIncrement' => true,
+            'idMaxLength'   => 3,
+            'nameField'     => 'nama_diklat',
+            'nameLabel'     => 'Nama Pelatihan',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'fields'        => [
+                // Pilihan = COMMENT kolom legacy [K] simpeg_prod.sql:445 (B1); CHECK chk_diklat_jenis_diklat 1..5.
+                'jenis_diklat' => [
+                    'label'    => 'Jenis Pelatihan',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'Struktural', 2 => 'Teknis', 3 => 'Fungsional', 4 => 'Prajabatan', 5 => 'Sertifikasi'],
+                ],
+            ],
+            // UNIQUE uq_diklat_nama (jenis_diklat, nama_diklat); urutan per jenis (Lm_diklat.php:13), daftar & dropdown bisa
+            // disaring per jenis (riwayat B-11 memuat pelatihan per jenis, rwy/L_diklat.php:67).
+            'uniqueScope'     => ['jenis_diklat'],
+            'orderScope'      => ['jenis_diklat'],
+            'filters'         => ['jenis_diklat'],
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'tingkat-hukdis' => [
+            'label'         => 'Tingkat Hukuman Disiplin',
+            'controller'    => 'HukdisController',
+            'table'         => 'tingkat_hukdis',
+            'primaryKey'    => 'id_tingkat_hukdis',
+            'autoIncrement' => true,
+            'nameField'     => 'tingkat_hukdis',
+            'nameLabel'     => 'Tingkat Hukuman Disiplin',
+            'nameMaxLength' => 100,
+            'parent'        => null,
+            // bobot_ipasn: skor IPASN legacy (L_user.php:1059-1070), disimpan tetapi tidak dikelola/dikirim (B5).
+            'hiddenColumns'   => ['bobot_ipasn'],
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'jenis-hukdis' => [
+            'label'         => 'Jenis Hukuman Disiplin',
+            'controller'    => 'HukdisController',
+            'table'         => 'jenis_hukdis',
+            'primaryKey'    => 'id_jenis_hukdis',
+            'autoIncrement' => true,
+            'nameField'     => 'jenis_hukdis',
+            'nameLabel'     => 'Jenis Hukuman Disiplin',
+            'nameMaxLength' => 255,
+            'parent'        => ['field' => 'id_tingkat_hukdis', 'entity' => 'tingkat-hukdis'],
+            'fields'        => [
+                // K5b: nullable, TINYINT UNSIGNED + CHECK >= 1 → 1..255; kosong = NULL (tanpa masa).
+                'masa_sanksi_bulan' => [
+                    'label'      => 'Masa Sanksi (bulan)',
+                    'type'       => 'int',
+                    'columnType' => 'tinyint unsigned',
+                    'min'        => 1,
+                    'hint'       => 'Opsional. Nilai awal hitung akhir hukuman (TMT + masa); kosongkan bila tanpa masa. Riwayat tetap menyimpan masa per SK.',
+                ],
+            ],
+            // Dropdown jenis hanya memuat jenis yang tingkatnya aktif (legacy hanya menawarkan tingkat status 1, Lm_hukdis.php:221).
+            'statusChain'     => true,
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'jenis-konket' => [
+            'label'         => 'Jenis Konfirmasi Ketidakhadiran',
+            'controller'    => 'KonketController',
+            'table'         => 'jenis_konket',
+            'primaryKey'    => 'id_jenis_konket',
+            'autoIncrement' => true,
+            'nameField'     => 'jenis_konket',
+            'nameLabel'     => 'Jenis Konfirmasi Ketidakhadiran',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'fields'        => [
+                // B2: kode kategori = absen_ijin.kategori (value pilihan pengajuan legacy), wajib & unik (uq_jenis_konket_old_id).
+                'old_id' => [
+                    'label'    => 'Kode Kategori',
+                    'type'     => 'int',
+                    'required' => true,
+                    'min'      => 1,
+                    'hint'     => 'Kode yang disimpan di pengajuan konket (absen_ijin.kategori). Unik. Mengubahnya memutus pengajuan lama yang memakai kode ini.',
+                ],
+                // K5a: nilai awal "Pengaruh ke Tukin" pengajuan (label legacy rwy/konket/form_ad.php:112). Wajib: kosong akan
+                // menjadi NULL di kolom NOT NULL (1048 → 500). Default kolom 1 tetap berlaku untuk impor/SQL.
+                'affect_tukin' => [
+                    'label'    => 'Pengaruh ke Tukin',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'Ya', 2 => 'Tidak'],
+                    'hint'     => 'Nilai awal saat pengajuan konket; admin tetap bisa mengubahnya per pengajuan.',
+                ],
+            ],
+            'uniqueFields'    => ['old_id'],
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'tanda-jasa' => [
+            'label'           => 'Tanda Jasa',
+            'controller'      => 'TandaJasaController',
+            'table'           => 'tanda_jasa',
+            'primaryKey'      => 'id_tanda_jasa',
+            'autoIncrement'   => true,
+            'nameField'       => 'tanda_jasa',
+            'nameLabel'       => 'Tanda Jasa',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
         // --- /DBV-005 ---
     ];
 }

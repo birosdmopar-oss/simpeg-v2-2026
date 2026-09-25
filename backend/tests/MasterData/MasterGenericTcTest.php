@@ -683,13 +683,23 @@ final class MasterGenericTcTest extends CIUnitTestCase
             $def     = service('masterRegistry')->get($entity);
             $created = $this->json($this->sendJson('POST', "api/v1/master/{$entity}", $fx['new']))['data'];
 
-            $this->assertSame('2020-01-02 03:04:05', $created['created_at'], $entity);
+            // Kolom waktu yang ada di tabel (pola legacy berbeda: created_at + updated_at, atau updated_at saja) diisi jam
+            // aplikasi saat tambah; setiap master wajib punya minimal satu.
+            $stamped = array_values(array_filter(
+                [MasterDefinition::AUDIT_CREATED_AT, MasterDefinition::AUDIT_UPDATED_AT],
+                static fn (string $column): bool => $def->hasAudit($column),
+            ));
+            $this->assertNotSame([], $stamped, "{$entity}: tanpa kolom waktu audit");
+
+            foreach ($stamped as $column) {
+                $this->assertSame('2020-01-02 03:04:05', $created[$column], "{$entity}.{$column}");
+            }
 
             if ($def->hasAudit(MasterDefinition::AUDIT_CREATED_BY)) {
                 // Tabel ber-created_by (FAQ, legacy L_faq.php): created_by saat tambah, updated_by baru terisi saat ubah.
                 $this->assertSame($adminId, (int) $created['created_by'], $entity);
                 $this->assertNull($created['updated_by'], $entity);
-            } else {
+            } elseif ($def->hasAudit(MasterDefinition::AUDIT_UPDATED_BY)) {
                 $this->assertSame($adminId, (int) $created['updated_by'], $entity);
             }
         }
