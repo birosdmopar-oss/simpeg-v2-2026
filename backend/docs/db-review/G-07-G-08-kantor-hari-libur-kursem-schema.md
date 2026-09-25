@@ -2,7 +2,7 @@
 
 **Key review:** `DBV-003` (review DB Validator, skema) + `CR-010` (review kode) — satu pull request, judul `[DBV-003][CR-010] …`, branch `dbv-003/g07-g08-libur-kantor-kursem`. DB Validator hanya me-review/approve; merge oleh user (reviewer CR) setelah kedua review setuju (aturan 24-09-2026, G-01 Bagian 8). PR dibuka setelah CR-009 (perluasan engine master) ada di `main`.
 
-**Status:** ⏳ **MENUNGGU APPROVAL DB VALIDATOR (DBV-003) DAN REVIEW KODE (CR-010)** — migration `2026-09-25-100000`, `2026-09-25-100100`, `2026-09-25-100300`, dan `2026-09-25-100200` (menyusul di tahap CR-010) JANGAN dijalankan di Dev/Production sebelum disetujui.
+**Status:** ⏳ **MENUNGGU APPROVAL DB VALIDATOR (DBV-003) DAN REVIEW KODE (CR-010)** — migration `2026-09-25-100000`, `2026-09-25-100100`, dan `2026-09-25-100300` JANGAN dijalankan di Dev/Production sebelum disetujui. Migration sentinel `2026-09-25-100200` **belum ada di branch ini dan belum diajukan untuk approval**: file-nya menyusul di tahap CR-010 dalam PR yang sama (D5, Bagian 2.5, Bagian 4 #14). Di Dev/Production keempat migration dijalankan bersama setelah PR itu disetujui dan di-merge, sehingga jatuh dalam satu batch.
 
 **Rujukan:** `02-MasterData.md` G-07 ("CRUD … kantor") dan G-08 (hari libur: `tgl_mulai <= tgl_akhir`, tidak boleh overlap), DDL produksi `simpeg_prod.sql:245-252` (`bidang_kursem`), `:1308-1321` (`hari_libur`), `:1435-1442` (`instansi_kursem`), ERD legacy `simpeg01.erd` (entity 61 `hari_libur`, 81 `jenis_libur`, 90 `kantor`, 11 `bidang_kursem`, 68 `instansi_kursem`; 5 nama FK), kode legacy (`libraries/hr/master/Lm_umum.php`, `controllers/hr/master/C_umum.php`, `views/hr/master/umum/kantor/form.php`, `libraries/hr/L_presensi.php`, `controllers/hr/Presensi.php`, `views/hr/employee/presensi/holiday/form.php`, `libraries/hr/rwy/L_seminar.php`, `libraries/hr/rwy/L_alamat.php`, `libraries/hr/L_user.php`, `controllers/Tester.php`), `G-01-master-schema.md` (Keputusan #5, Bagian 3, Bagian 7 #1, Bagian 8 / DBV-001), `G-10-faq-schema.md` (pola pilot DBV-002), keputusan user DBV-003 (25-09-2026).
 
@@ -12,7 +12,7 @@
 |---|---|
 | `app/Database/Migrations/2026-09-25-100000_CreateHariLibur.php` | `jenis_libur`, lalu `hari_libur` (SQL mentah sadar prefix; FK + UNIQUE `tgl_mulai` + CHECK rentang; `down()` men-drop anak → induk) |
 | `app/Database/Migrations/2026-09-25-100100_CreateKursem.php` | `bidang_kursem`, `instansi_kursem` |
-| `app/Database/Migrations/2026-09-25-100200_SeedWilayahLainLain.php` | **tahap CR-010** (belum ada di branch ini): 4 baris sentinel LAIN-LAIN di tabel wilayah (Bagian 2.5) |
+| `app/Database/Migrations/2026-09-25-100200_SeedWilayahLainLain.php` | **tahap CR-010** (belum ada di branch ini, belum diajukan untuk approval): 4 baris sentinel LAIN-LAIN di tabel wilayah (rancangan di Bagian 2.5) |
 | `app/Database/Migrations/2026-09-25-100300_CreateKantor.php` | `kantor` + 4 FK ke wilayah |
 | `tests/MasterData/LiburKantorKursemSchemaTest.php` | skema hasil migration dibandingkan dengan Bagian 2 lewat `information_schema`, CHECK (query portabel), constraint DB, rollback |
 | `tests/MasterData/Batch1LegacySchemaTest.php` | **diadaptasi** (test DBV-001): melepas/memasang ulang migration dependen wilayah di `setUp()`/`tearDown()`, assertion tidak berubah (Bagian 4 #13) |
@@ -42,7 +42,7 @@ Perilaku legacy yang memengaruhi skema [K]:
 | F5 | `hari_libur.id_jenis_libur` | Tetap NULL seperti legacy [K], wajib diisi di aplikasi | migration + CR-010 |
 | F6 | Hak akses hari libur | Tambah/ubah/hapus role 1; daftar dibaca role 1/4/5/8 seperti legacy | CR-010 |
 | F7 | `jenis_libur` | Engine generik, CRUD role 1, dropdown untuk semua role | migration + CR-010 |
-| F8 | `kantor` | Sentinel LAIN-LAIN ikut legacy: 4 baris sentinel di-seed ke tabel wilayah lewat migration baru, dilindungi dan dikeluarkan dari options (engine); server memeriksa konsistensi rantai wilayah untuk kode non-sentinel (`KantorHooks`); field `ref`; UNIQUE `nama_kantor` global; `kode_pos` 5 digit | migration `CreateKantor` + CR-010 |
+| F8 | `kantor` | Sentinel LAIN-LAIN ikut legacy: 4 baris sentinel di-seed ke tabel wilayah lewat migration baru, dilindungi dan dikeluarkan dari options (engine); server memeriksa konsistensi rantai wilayah untuk kode non-sentinel (`KantorHooks`); field `ref`; UNIQUE `nama_kantor` global; `kode_pos` 5 digit | migration `CreateKantor`; migration sentinel `100200` dan engine di tahap CR-010 (D5) |
 | F9 | Kursem | Engine generik, CRUD role 1, dropdown semua role; tambah `order` [V2] (G-01 #5); tanpa kolom `*_by`; PK TINYINT [K] | migration `CreateKursem` + CR-010 |
 | F10 | Umum master | Status 1/2/10, soft delete, UNIQUE nama, `utf8mb4_unicode_ci`, FK RESTRICT dengan nama legacy (ERD), tipe PK ikut legacy termasuk signed, impor pakai ID legacy apa adanya, nilai [I] berlabel, verifikasi MariaDB 10.4 diminta eksplisit | semua migration |
 
@@ -54,7 +54,7 @@ Perilaku legacy yang memengaruhi skema [K]:
 | D2 | Tipe [I] `kantor`: kode wilayah CHAR(2/4/7/10), `*_lain` VARCHAR(255), `kode_pos` CHAR(5), `alamat` TEXT, `telp`/`faks` VARCHAR(50), `remark` TEXT, `order` INT DEFAULT 1, audit lengkap (Bagian 2.4) |
 | D3 | `order` kursem bertipe TINYINT (bukan INT): pola [K] tabel ber-PK TINYINT (`agama` :178, `diklat` :447, `gol_pppk` :1281) |
 | D4 | Baris sentinel wilayah ber-`order` 0 (di luar urutan tampil) dan status 1; engine mengeluarkannya dari options dan lingkup urutan (tahap CR-010) |
-| D5 | Migration sentinel `2026-09-25-100200` ditambahkan di tahap CR-010 bersama fitur sentinel engine, bukan sekarang (Bagian 2.5) |
+| D5 | Migration sentinel `2026-09-25-100200` ditambahkan di tahap CR-010 bersama fitur sentinel engine, bukan sekarang (Bagian 2.5). Isi F8 tidak berubah, hanya waktunya yang dipisah; pemisahan ini diajukan di Bagian 4 #14. Konsekuensi: sampai migration itu ada, `kantor` berkode LAIN-LAIN ditolak FK (error 1452) |
 | D6 | Penempatan CRUD: `bidang-kursem`, `instansi-kursem`, `kantor` di `UmumController`; `jenis-libur` di `HariLiburController` (tahap CR-010) |
 | D7 | Migration tidak men-seed `jenis_libur`/kursem: impor memakai ID legacy apa adanya. Nilai 1 = Libur Nasional, 2 = Cuti Bersama [I] hanya dipakai fixture test/seeder lokal |
 
@@ -158,10 +158,13 @@ Kunci:
 
 - Kolom kode mewarisi `utf8mb4_unicode_ci` = collation PK wilayah pasca-DBV-001. FK string beda collation ditolak MySQL (error 3780), sehingga `CreateKantor` wajib berjalan setelah `2026-09-23-000000_AlterBatch1KeSkemaLegacy`.
 - FK per kolom **tidak** memeriksa konsistensi rantai (mis. provinsi 32 dengan kabupaten 3171 milik provinsi 31 diterima DB, dibuktikan schema test). Penegakan rantai ada di aplikasi (`KantorHooks`, F8).
+- Keempat kolom kode NOT NULL dengan FK, sehingga kantor berkode LAIN-LAIN (99/9999/9999999/9999999999) baru bisa disimpan setelah baris sentinel ada (migration `100200`, tahap CR-010). Sebelum itu DB menolaknya (error 1452). Dampaknya tidak ada selama `kantor` belum punya endpoint dan impor data kantor belum dijalankan; keduanya baru ada di tahap CR-010 dan sesudahnya.
 - Tanpa KEY `order`/`status` (tabel kecil, tidak ada bukti index legacy).
-- Konsekuensi untuk rollback DBV-001: selama `kantor` ada, `AlterBatch1KeSkemaLegacy::down()` langsung ditolak MySQL (error 1833 saat MODIFY kolom yang dirujuk, 3780 saat CONVERT collation). Rollback batch normal aman karena `CreateKantor` (versi lebih besar) di-rollback lebih dulu.
+- Konsekuensi untuk rollback DBV-001: selama `kantor` ada, `AlterBatch1KeSkemaLegacy::down()` langsung ditolak MySQL (error 1833 saat MODIFY kolom yang dirujuk, 3780 saat CONVERT collation). Rollback batch normal aman karena `CreateKantor` selalu di-rollback lebih dulu (versi lebih besar di batch yang sama, atau batch yang lebih baru).
 
 ### 2.5 Sentinel LAIN-LAIN di tabel wilayah (seed, migration `2026-09-25-100200_SeedWilayahLainLain`, tahap CR-010)
+
+Bagian ini rancangan. File migration-nya belum ada di branch ini dan belum diajukan untuk approval (D5, Bagian 4 #14). Yang diminta dari DB Validator sekarang hanya persetujuan rancangan (Bagian 4 #10).
 
 | Tabel | PK | Induk | Nama | Kolom lain |
 |---|---|---|---|---|
@@ -182,9 +185,11 @@ Rencana migration (dikerjakan di tahap CR-010):
 - `up()`: pastikan skema wilayah sudah legacy (kolom `provinsi.provinsi` ada), lalu cek keempat PK sentinel. Bila **satu saja** sudah ada, lempar exception yang menyebut tabel dan barisnya (fail-closed, tanpa `INSERT IGNORE`). Lalu 4 `INSERT` dalam satu transaksi (provinsi → kabupaten_kota → kecamatan → kelurahan); gagal → rollback + lempar.
 - `down()`: DELETE dalam satu transaksi (kelurahan → … → provinsi), `WHERE pk = <sentinel>`. Bila FK RESTRICT menolak (sentinel masih dirujuk), rollback dan lempar pesan "baris sentinel LAIN-LAIN masih dirujuk … — hapus rujukannya dulu".
 - Nilai sentinel ditulis literal di migration (tidak diambil dari kelas aplikasi); test mencocokkan literal migration dengan konstanta sentinel engine.
-- Versi `100200` sengaja **lebih kecil** dari `CreateKantor` (`100300`): rollback batch men-drop `kantor` dulu (baris kantor yang merujuk sentinel ikut hilang), baru sentinel dihapus.
+- Versi `100200` sengaja **lebih kecil** dari `CreateKantor` (`100300`). Urutan rollback "kantor dulu, baru sentinel" hanya terjamin bila keduanya jalan dalam **satu batch**: CodeIgniter menjalankan migration dalam satu batch urut versi dan me-rollback-nya terbalik, sehingga `kantor` di-drop dulu (baris kantor yang merujuk sentinel ikut hilang), baru sentinel dihapus. Di Dev/Production keduanya datang bersama dalam PR `[DBV-003][CR-010]` dan tidak dijalankan sebelum disetujui, jadi selalu satu batch.
+- Bila `CreateKantor` sudah jalan lebih dulu (mis. DB lokal/scratch yang menjalankan branch ini sebelum tahap CR-010), `MigrationRunner::latest()` menjalankan `100200` di **batch baru** walaupun versinya lebih kecil. `migrate:rollback` berikutnya menghapus sentinel selagi `kantor` masih ada. `down()` sentinel menolak (FK 1451, pesan "hapus rujukannya dulu") selama ada baris kantor yang merujuk sentinel, dan berhasil bila tidak ada. Untuk menghindarinya, DB seperti itu me-rollback batch DBV-003 dulu (tabelnya masih kosong) sebelum `migrate` tahap CR-010, sehingga keempat migration jatuh dalam satu batch.
+- Alternatif versi di atas `100300` ditolak: dalam satu batch (kasus Dev/Production), sentinel justru dihapus sebelum `kantor` di-drop, sehingga rollback gagal setiap kali ada kantor berkode LAIN-LAIN.
 
-Alasan ditunda ke CR-010: bila baris sentinel ada sebelum engine mengenalnya, 2 test generik yang sudah disetujui gagal — `MasterGenericTcTest::testParentMustExistAndBeActiveAndCodeIsImmutable` (memakai induk `9999` sebagai "tidak ada") dan `testFourLevelCascadeOptions` (options provinsi memuat `99`, options kelurahan di bawah `9999999` memuat `9999999999`). Engine dan Config baru boleh diubah setelah CR-009 merge. Dengan fitur sentinel engine (dikeluarkan dari options dan lingkup urutan, tidak bisa diubah/dihapus, tidak bisa menjadi induk) kedua test itu lolos tanpa diubah.
+Alasan ditunda ke CR-010: bila baris sentinel ada sebelum engine mengenalnya, 2 test generik yang sudah disetujui gagal — `MasterGenericTcTest::testParentMustExistAndBeActiveAndCodeIsImmutable` (memakai induk `9999` sebagai "tidak ada") dan `testFourLevelCascadeOptions` (options provinsi memuat `99`, options kelurahan di bawah `9999999` memuat `9999999999`). Engine dan Config baru boleh diubah setelah CR-009 merge. Dengan fitur sentinel engine (dikeluarkan dari options dan lingkup urutan, tidak bisa diubah/dihapus, tidak bisa menjadi induk) kedua test itu lolos tanpa diubah. Selama migration sentinel belum ada, `kantor` berkode LAIN-LAIN ditolak FK (Bagian 2.4).
 
 ### 2.6 Perilaku aplikasi yang bergantung pada skema (bahan CR-010)
 
@@ -230,7 +235,7 @@ Nilai [I] lain: `order` kursem TINYINT (#9, D3) dan lingkup UNIQUE `nama_kantor`
 
 | # | Pertanyaan | Usulan | Keputusan |
 |---|---|---|---|
-| 1 | Setujui skema Bagian 2 + 4 migration (`100000`, `100100`, `100200`, `100300`) untuk Dev | Setujui. Sebelum dipakai di server, jalankan sekali `migrate` → `migrate:rollback` → `migrate` di MariaDB 10.4 (Bagian 6.4) | ⏳ |
+| 1 | Setujui skema Bagian 2.1-2.4 + 3 migration yang ada di branch ini (`100000`, `100100`, `100300`) untuk Dev. Migration sentinel `100200` belum termasuk (belum ada, lihat #10 dan #14) | Setujui. Sebelum dipakai di server, jalankan sekali `migrate` → `migrate:rollback` → `migrate` di MariaDB 10.4 (Bagian 6.4). Dijalankan di Dev hanya setelah PR `[DBV-003][CR-010]` (termasuk `100200`) disetujui dan di-merge, supaya keempatnya satu batch (Bagian 2.5) | ⏳ |
 | 2 | FK RESTRICT/RESTRICT dengan nama legacy (`hari_libur` dan `kantor`), bukan SET NULL/CASCADE legacy | Setujui (Bagian 3 #1-#2) | ⏳ |
 | 3 | CHECK `chk_hari_libur_rentang`, CHECK pertama di repo | Setujui + verifikasi MariaDB 10.4 (error 4025, `SHOW CREATE TABLE`, `information_schema.CHECK_CONSTRAINTS`) | ⏳ |
 | 4 | UNIQUE `tgl_mulai` + Paket A (overlap dicek terhadap semua status; libur terhapus dipulihkan dulu sebelum tanggalnya dipakai) | Setujui (keputusan user F2/F3) | ⏳ |
@@ -239,10 +244,11 @@ Nilai [I] lain: `order` kursem TINYINT (#9, D3) dan lingkup UNIQUE `nama_kantor`
 | 7 | `hari_libur.status` [V2] dengan semantik hanya status 1 dihitung | Setujui | ⏳ |
 | 8 | DDL `jenis_libur` [I] (VARCHAR(255), `order` TINYINT, audit Batch 1, UNIQUE nama) | Setujui sementara; cocokkan dengan dump (3.1) | ⏳ |
 | 9 | DDL `kantor` [I] (tipe Bagian 2.4, UNIQUE nama global) | Setujui sementara; cocokkan dengan dump; audit data 6.3 | ⏳ |
-| 10 | 4 baris sentinel LAIN-LAIN (`order` 0, status 1) di wilayah v2, dilindungi engine; impor wilayah melewati 4 PK ini | Setujui (F8) | ⏳ |
+| 10 | Rancangan 4 baris sentinel LAIN-LAIN (`order` 0, status 1) di wilayah v2 (Bagian 2.5), dilindungi engine; impor wilayah melewati 4 PK ini | Setujui rancangannya (F8). File migration `100200` di-review dan diverifikasi saat diajukan di tahap CR-010 (6.4 h) | ⏳ |
 | 11 | Kursem: `order` TINYINT [V2], tanpa `*_by`, UNIQUE nama, PK TINYINT maks 127 | Setujui (F9) | ⏳ |
 | 12 | `kode_pos` kantor wajib salah satu dari `kelurahan.kd_pos` bila daftarnya terisi (usulan riset, di luar F8 yang hanya "5 digit") | Ya, di `KantorHooks` | ⏳ |
 | 13 | Perubahan `Batch1LegacySchemaTest` (test DBV-001) untuk melepas/memasang dependen wilayah di `setUp()`/`tearDown()` | Setujui — assertion DBV-001 tidak berubah (diff hanya penambahan). Konsekuensi di environment nyata: rollback DBV-001 mensyaratkan DBV-003 di-rollback lebih dulu | ⏳ |
+| 14 | Migration sentinel `100200` dipisah ke tahap CR-010 (D5), sehingga `CreateKantor` masuk lebih dulu tanpa baris sentinel; kantor berkode LAIN-LAIN baru bisa disimpan setelah `100200` ada | Setujui. Alasan: 2 test generik yang sudah disetujui gagal bila sentinel ada sebelum engine mengenalnya (Bagian 2.5). Dampak: tidak ada, karena `kantor` belum punya endpoint dan belum diimpor sebelum CR-010. Syarat: keempat migration dijalankan di Dev dalam satu batch (#1) | ⏳ |
 
 ## 5. Status keputusan G-01 terkait
 
@@ -286,7 +292,7 @@ Salinan lokal `hari_libur` dan kedua tabel kursem berisi 0 baris; `jenis_libur`,
 2. **Audit `hari_libur` sebelum impor**: `tgl_akhir < tgl_mulai` (menggagalkan CHECK); `tgl_mulai` ganda (menggagalkan UNIQUE); pasangan rentang overlap (aturan overlap v2 menolak data baru, data lama perlu dirapikan); `id_jenis_libur IS NULL` (butuh keputusan pemetaan karena aplikasi mewajibkan); `tgl_mulai`/`tgl_akhir` bernilai `0000-00-00`.
 3. **Duplikat nama** (perbandingan `utf8mb4_unicode_ci`, setelah `stripslashes` dan trim) di `jenis_libur`, `bidang_kursem`, `instansi_kursem`, dan `kantor.nama_kantor` (global). Duplikat harus dirapikan dulu, karena impor akan gagal.
 4. **Kantor**: rantai wilayah tidak konsisten (kabupaten bukan anak provinsi, dst.); kode wilayah yang tidak ada di tabel wilayah v2 (menggagalkan FK); `kode_pos` bukan 5 digit (input bebas legacy; kolom CHAR(5) dengan `strictOn=false` memotong diam-diam — **wajib diaudit sebelum impor**); panjang `telp`/`faks` > 50; `order` di luar 1..99 atau ganda (normalkan 1..n); `*_lain` terisi padahal kode bukan sentinel (v2 memaksanya NULL).
-5. **Wilayah**: impor tabel wilayah legacy **melewati** 4 PK sentinel yang sudah di-seed migration (atau membandingkannya). Cek keberadaan, nama, dan status sentinel produksi.
+5. **Wilayah**: impor tabel wilayah legacy **melewati** 4 PK sentinel yang sudah di-seed migration `100200` (atau membandingkannya). Cek keberadaan, nama, dan status sentinel produksi. Impor `kantor` berkode LAIN-LAIN baru bisa dijalankan setelah `100200` ada (tahap CR-010).
 6. **ID legacy** dipakai apa adanya. PK TINYINT (`jenis_libur`, kursem): pastikan semua ID ≤ 127. `AUTO_INCREMENT` naik otomatis setelah impor ID eksplisit.
 7. **`order`**: kursem diisi urut nama; `jenis_libur` disalin; kantor dinormalkan 1..n.
 8. **`created_by` / `updated_by` legacy** berisi `user.id` akun legacy (`Lm_umum.php:1862, 1865`, `L_presensi.php:20561`), sedangkan v2 berisi `id_pengguna`. Perlu dipetakan bila ID akun tidak dipertahankan.
@@ -305,7 +311,7 @@ Mohon dijalankan sekali di MariaDB 10.4 (lingkungan server) sebelum approval, da
 - [ ] (e) 4 FK `kantor` → wilayah dan FK `hari_libur` → `jenis_libur` terbentuk dengan `UPDATE_RULE`/`DELETE_RULE` RESTRICT di `information_schema.REFERENTIAL_CONSTRAINTS`.
 - [ ] (f) UNIQUE nama 1.020 byte terbentuk (row format DYNAMIC).
 - [ ] (g) `DATETIME DEFAULT CURRENT_TIMESTAMP` dan `ON UPDATE CURRENT_TIMESTAMP` diterima.
-- [ ] (h) Migration sentinel `2026-09-25-100200` up/down (tahap CR-010).
+- [ ] (h) Migration sentinel `2026-09-25-100200` up/down. **Belum bisa dijalankan**: file-nya belum ada di branch ini dan diajukan di tahap CR-010 (Bagian 4 #14). Saat itu, uji juga rollback satu batch bersama `CreateKantor` (Bagian 2.5).
 - [ ] (i) Bila memungkinkan, jalankan `vendor/bin/phpunit --no-coverage tests/MasterData/LiburKantorKursemSchemaTest.php` di MariaDB (test sudah ditulis portabel: kode error CHECK 3819/4025, normalisasi `tinyint(4)`/`int(11)`, CHECK_CLAUSE tanpa/dengan kurung).
 
 **Pemulihan bila `up()` gagal di tengah** (DDL MySQL/MariaDB ter-commit per statement, migration yang gagal tidak tercatat di tabel `migrations`):
@@ -313,3 +319,4 @@ Mohon dijalankan sekali di MariaDB 10.4 (lingkungan server) sebelum approval, da
 - `CreateKantor` hanya satu statement CREATE: bila gagal (mis. error 3780 karena skema wilayah belum DBV-001), tidak ada tabel yang tertinggal.
 - Bila pembersihan otomatis ikut gagal (mis. koneksi putus), pulihkan manual — **jangan `migrate:rollback` batch**: migration yang gagal tidak tercatat, sehingga rollback justru membatalkan batch terakhir yang tercatat. Drop tabel DBV-003 kosong yang tersisa dengan urutan `kantor`, `hari_libur`, `jenis_libur`, `instansi_kursem`, `bidang_kursem`, lalu `php spark migrate`. Catat kejadian di kartu DBV-003.
 - **Rollback DBV-001** (`AlterBatch1KeSkemaLegacy::down()`) ditolak MySQL (error 1833/3780) selama tabel `kantor` ada. Rollback normal per batch aman (DBV-003 lebih dulu); bila DBV-001 perlu di-rollback sendiri, rollback DBV-003 dulu.
+- **DB lokal/scratch yang sudah menjalankan 3 migration DBV-003 di tahap ini** (mis. `simpeg_v2_s_dbv003x7`): sebelum `migrate` tahap CR-010, rollback batch DBV-003 dulu (tabel masih kosong), supaya `100200` dan `100300` jatuh dalam satu batch. Bila tidak, `100200` jalan di batch baru dan rollback batch itu menolak selama ada kantor yang merujuk sentinel (Bagian 2.5).
