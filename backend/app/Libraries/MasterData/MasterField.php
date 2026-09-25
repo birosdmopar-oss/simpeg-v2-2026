@@ -55,7 +55,7 @@ final class MasterField
 
     /**
      * Rentang nilai kolom bilangan bulat MySQL/MariaDB (CR-009). Koneksi strict menolak nilai di luar rentang (1264 →
-     * 500) dan koneksi non-strict memotongnya diam-diam (TINYINT 300 → 127), jadi batasnya divalidasi aplikasi (422).
+     * 422 generik tanpa `errors`, CR-007) dan koneksi non-strict memotongnya diam-diam (TINYINT 300 → 127), jadi batasnya divalidasi aplikasi (422).
      * PHP tidak bisa merepresentasikan batas atas BIGINT UNSIGNED, jadi dibatasi PHP_INT_MAX.
      *
      * @var array<string, array{0: int, 1: int}>

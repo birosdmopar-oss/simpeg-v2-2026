@@ -342,7 +342,7 @@ class MasterService
                         // jadi baris baru tidak di-update lagi sesudahnya — updated_by tetap NULL untuk tabel
                         // ber-created_by (E1) dan tanpa audit 'update' tambahan. Hanya saudara yang digeser (placeAt).
                         // Kapasitas lingkup (saudara + 1) juga dicek sebelum insert: posisi hasil jepit bisa melewati
-                        // batas kolom `order` (TINYINT: 127 saudara → INSERT 128 = 1264/500 di koneksi strict).
+                        // batas kolom `order` (TINYINT: 127 saudara → INSERT 128 = 1264 → 422 generik di koneksi strict).
                         $siblings = count($this->scopeIds($def, $orderScope));
                         $this->assertOrderFits($def, $siblings + 1);
                         $row[MasterDefinition::ORDER_FIELD] = $this->clampPosition($requested, $siblings);
@@ -772,7 +772,7 @@ class MasterService
 
     /**
      * Nilai urutan (MAX+1 otomatis, kapasitas lingkup mode shift, nilai mode manual) tidak boleh melewati batas tipe
-     * kolom `order` (orderColumnType): koneksi strict menolaknya (1264 → 500) dan non-strict memotongnya diam-diam
+     * kolom `order` (orderColumnType): koneksi strict menolaknya (1264 → 422 generik tanpa `errors`, CR-007) dan non-strict memotongnya diam-diam
      * (TINYINT → 127, urutan kembar). Dicek sebelum baris ditulis.
      */
     private function assertOrderFits(MasterDefinition $def, int $order): void
