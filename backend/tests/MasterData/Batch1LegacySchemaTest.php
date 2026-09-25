@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Database\Migrations\AlterBatch1KeSkemaLegacy;
+use App\Database\Migrations\CreateKantor;
+use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use RuntimeException;
@@ -13,6 +15,12 @@ use RuntimeException;
  * DBV-001 — skema G-01 Batch 1 hasil migration 2026-09-23-000000_AlterBatch1KeSkemaLegacy harus sama dengan skema
  * legacy yang diajukan ke DB Validator (backend/docs/db-review/G-01-master-schema.md Bagian 8), bisa di-rollback
  * ke skema Batch 1 yang disetujui 23-09-2026, dan menolak berjalan kalau tabel sudah berisi data.
+ *
+ * Test di sini memanggil down()/up() DBV-001 langsung, sementara migration sesudahnya tetap terpasang. Migration
+ * sesudah DBV-001 yang bergantung pada tabel wilayah (DBV-003) menghalangi itu: FK `kantor` → wilayah membuat down()
+ * ditolak MySQL (error 1833 saat MODIFY kolom yang dirujuk, 3780 saat CONVERT collation), dan baris sentinel
+ * LAIN-LAIN (tahap CR-010) membuat up() menolak jalan (assertTablesEmpty). Karena itu dependen tersebut dilepas di
+ * setUp() dan dipasang ulang di tearDown(); assertion DBV-001 tidak berubah.
  *
  * @internal
  */
@@ -23,6 +31,23 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
     protected $migrate   = true;
     protected $refresh   = true;
     protected $namespace = null;
+
+    /**
+     * Migration dependen wilayah sesudah DBV-001, urut LEPAS (down() berurutan; pasang ulang urutan terbalik).
+     * Tahap CR-010: tambahkan '2026-09-25-100200_SeedWilayahLainLain.php' SETELAH kantor.
+     *
+     * @var array<string, class-string<Migration>>
+     */
+    private const WILAYAH_DEPENDENTS = [
+        '2026-09-25-100300_CreateKantor.php' => CreateKantor::class,
+    ];
+
+    /**
+     * Dependen yang sudah dilepas setUp() pada test ini, urut lepas.
+     *
+     * @var list<string>
+     */
+    private array $detached = [];
 
     /**
      * Skema legacy yang diharapkan: tabel => [kolom => tipe kolom (information_schema.COLUMN_TYPE)].
@@ -80,9 +105,20 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
         'fk_id_provinsi_kabupaten_kota_to_provinsi'        => ['kabupaten_kota', 'id_provinsi', 'provinsi'],
     ];
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        foreach (array_keys(self::WILAYAH_DEPENDENTS) as $file) {
+            $this->dependent($file)->down();
+            $this->detached[] = $file;
+        }
+    }
+
     /**
      * Test di bawah memanggil down() di tengah jalan. Kalau ada assertion yang gagal sebelum up(), skema harus tetap
      * dikembalikan ke bentuk legacy (sesuai tabel migrations) — kalau tidak, migrate:refresh test berikutnya gagal.
+     * Sesudah itu dependen wilayah yang dilepas setUp() dipasang ulang (urutan terbalik).
      */
     protected function tearDown(): void
     {
@@ -93,6 +129,12 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
 
             $this->migration()->up();
         }
+
+        foreach (array_reverse($this->detached) as $file) {
+            $this->dependent($file)->up();
+        }
+
+        $this->detached = [];
 
         parent::tearDown();
     }
@@ -247,6 +289,15 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
         require_once APPPATH . 'Database/Migrations/2026-09-23-000000_AlterBatch1KeSkemaLegacy.php';
 
         return new AlterBatch1KeSkemaLegacy();
+    }
+
+    private function dependent(string $file): Migration
+    {
+        require_once APPPATH . 'Database/Migrations/' . $file;
+
+        $class = self::WILAYAH_DEPENDENTS[$file];
+
+        return new $class();
     }
 
     /**
