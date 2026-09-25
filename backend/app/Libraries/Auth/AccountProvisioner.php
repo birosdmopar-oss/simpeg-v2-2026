@@ -42,6 +42,13 @@ class AccountProvisioner
             throw ValidationException::forField('user_level', 'Role tidak valid (1-8).');
         }
 
+        // Password awal dari pemanggil tunduk pada kebijakan yang sama dengan admin set password (K4).
+        $policyErrors = $initialPassword === null ? [] : $this->passwords->policyErrors($initialPassword);
+
+        if ($policyErrors !== []) {
+            throw new ValidationException('Validasi gagal.', ['password' => $policyErrors]);
+        }
+
         $existing = $this->pengguna->withDeleted()->where('nip', $nip)->first();
 
         if (is_array($existing)) {
@@ -69,18 +76,29 @@ class AccountProvisioner
     }
 
     /**
-     * Password acak 12 karakter: huruf besar/kecil + angka (memenuhi kebijakan PasswordVerifier).
+     * Password acak (default 12 karakter) yang selalu memenuhi PasswordPolicy (K4): minimal 1 huruf besar, 1 huruf
+     * kecil, dan 1 angka, lalu posisinya diacak. Karakter yang mirip (I/l/1, O/o/0) tidak dipakai.
      */
     public static function generatePassword(int $length = 12): string
     {
-        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-        $out      = '';
+        $classes  = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghjkmnpqrstuvwxyz', '23456789'];
+        $alphabet = implode('', $classes);
+        $chars    = [];
 
-        for ($i = 0; $i < $length; $i++) {
-            $out .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        foreach ($classes as $class) {
+            $chars[] = $class[random_int(0, strlen($class) - 1)];
         }
 
-        // Jamin minimal 1 huruf dan 1 angka.
-        return substr($out, 0, $length - 2) . 'a' . (string) random_int(2, 9);
+        while (count($chars) < $length) {
+            $chars[] = $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        // Fisher-Yates dengan random_int: karakter wajib tidak selalu di posisi yang sama.
+        for ($i = count($chars) - 1; $i > 0; $i--) {
+            $j                       = random_int(0, $i);
+            [$chars[$i], $chars[$j]] = [$chars[$j], $chars[$i]];
+        }
+
+        return implode('', $chars);
     }
 }

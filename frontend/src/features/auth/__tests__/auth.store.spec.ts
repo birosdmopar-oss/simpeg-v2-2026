@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AxiosError } from 'axios'
 
 vi.mock('../services/auth.service', () => ({
-  authService: { me: vi.fn(), login: vi.fn(), logout: vi.fn() },
+  authService: { me: vi.fn(), login: vi.fn(), logout: vi.fn(), changePassword: vi.fn() },
 }))
 
 import { authService } from '../services/auth.service'
@@ -38,6 +38,7 @@ describe('useAuthStore', () => {
     vi.mocked(authService.me).mockReset()
     vi.mocked(authService.login).mockReset()
     vi.mocked(authService.logout).mockReset()
+    vi.mocked(authService.changePassword).mockReset()
   })
 
   it('fetchCurrentUser: 401 → guest, tidak melempar', async () => {
@@ -99,5 +100,29 @@ describe('useAuthStore', () => {
     await expect(store.logout()).rejects.toBeTruthy()
     expect(store.status).toBe('guest')
     expect(store.user).toBeNull()
+  })
+
+  it('changePassword sukses: sesi lokal dikosongkan TANPA memanggil /auth/logout (ISSUE-006)', async () => {
+    vi.mocked(authService.changePassword).mockResolvedValue(undefined)
+    const store = useAuthStore()
+    store.setSession(user(Role.PEGAWAI))
+    const payload = { old_password: 'Lama1234', new_password: 'Baru12345', new_password_confirmation: 'Baru12345' }
+
+    await store.changePassword(payload)
+
+    expect(authService.changePassword).toHaveBeenCalledWith(payload)
+    expect(authService.logout).not.toHaveBeenCalled()
+    expect(store.status).toBe('guest')
+    expect(store.user).toBeNull()
+    expect(store.isAuthenticated).toBe(false)
+  })
+
+  it('changePassword gagal (422): sesi tetap utuh dan error diteruskan', async () => {
+    vi.mocked(authService.changePassword).mockRejectedValue(apiError(422))
+    const store = useAuthStore()
+    store.setSession(user(Role.PEGAWAI))
+
+    await expect(store.changePassword({ old_password: 'x', new_password: 'Baru12345', new_password_confirmation: 'Baru12345' })).rejects.toBeTruthy()
+    expect(store.isAuthenticated).toBe(true)
   })
 })

@@ -40,6 +40,10 @@ class Auth extends BaseConfig
     // A-02 / A-06 Password
     // ------------------------------------------------------------------
 
+    /**
+     * Panjang minimal password baru (K4, ikut legacy). Aturan lengkap ada di App\Libraries\Auth\PasswordPolicy dan
+     * dicerminkan frontend (PASSWORD_RULES) — kalau nilai ini diubah, ubah juga PASSWORD_MIN_LENGTH di frontend.
+     */
     public int $passwordMinLength = 8;
 
     // ------------------------------------------------------------------
@@ -59,10 +63,27 @@ class Auth extends BaseConfig
     public int $forgotWindowMinutes = 60;
 
     /**
-     * Kanal pengiriman token reset (email/WA) belum ditentukan di sumber. Kalau true (HANYA development),
-     * token ikut dikembalikan di response agar alur bisa diuji end-to-end. WAJIB false di production.
+     * Kalau true (HANYA development), token ikut dikembalikan di response forgot-password agar alur bisa diuji
+     * end-to-end tanpa kanal pengiriman. WAJIB false di production.
      */
     public bool $exposeResetTokenInResponse = false;
+
+    /**
+     * Driver pengiriman tautan reset (App\Interfaces\ResetTokenNotifierInterface, dipilih di Config\Services):
+     * - 'log'  : development — tautan reset (berisi token) ditulis ke log lokal. DITOLAK di production.
+     * - 'mock' : test — tautan disimpan di memori untuk di-assert. DITOLAK di production.
+     * Kanal final = email (K3, keputusan user 25-09-2026); driver 'email' menyusul setelah akun SMTP tersedia.
+     * Selama driver email belum ada, production menolak permintaan lupa password (ConfigException → 500) dan
+     * frontend menyembunyikan halamannya (VITE_PASSWORD_RESET_ENABLED=false → "Hubungi Admin").
+     */
+    public string $resetTokenNotifier = 'log';
+
+    /**
+     * URL absolut halaman reset password di FRONTEND (backend tidak tahu URL frontend). Tautan yang dikirim:
+     * {resetLinkBase}#token=<token> — token di fragment agar tidak ikut ke access log web server maupun Referer.
+     * Tanpa query/fragment. WAJIB diisi URL production (https) lewat .env auth.resetLinkBase.
+     */
+    public string $resetLinkBase = 'http://localhost:5173/reset-password';
 
     // ------------------------------------------------------------------
     // A-03 Captcha Cloudflare Turnstile

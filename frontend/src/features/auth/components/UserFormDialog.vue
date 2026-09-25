@@ -11,6 +11,7 @@ import { computed, ref, watch } from 'vue'
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 
+import { PASSWORD_POLICY_HINT } from '../schemas/password.schema'
 import { userCreateSchema, userUpdateSchema } from '../schemas/user.schema'
 import { usersService } from '../services/users.service'
 import { useAuthStore } from '../stores/auth.store'
@@ -165,7 +166,7 @@ const onSubmit = handleSubmit(async (values) => {
             type="password"
             autocomplete="new-password"
             :required="!isEdit"
-            :hint="isEdit ? 'Kosongkan jika tidak diganti. Mengganti password mencabut seluruh sesi akun.' : 'Minimal 8 karakter, huruf dan angka.'"
+            :hint="isEdit ? `Kosongkan jika tidak diganti. ${PASSWORD_POLICY_HINT} Mengganti password mencabut seluruh sesi akun.` : PASSWORD_POLICY_HINT"
             :error="errors.password"
           />
           <FormField v-model="user_level" name="user_level" label="Role" type="select" required :options="roleOptions" :error="errors.user_level" />

@@ -4,8 +4,9 @@
  * Belum login → /login (dengan ?redirect). Salah role → /403 (terpisah dari kasus belum login).
  * Guard FE murni UX — otorisasi sesungguhnya ditegakkan RoleFilter backend (ADR-005).
  */
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type NavigationGuard, type RouteRecordRaw } from 'vue-router'
 
+import { passwordResetEnabled } from '@/features/auth/config'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
@@ -22,6 +23,9 @@ declare module 'vue-router' {
   }
 }
 
+/** Lupa/reset password (A-07) hanya aktif kalau VITE_PASSWORD_RESET_ENABLED=true (kanal email siap); selain itu → login. */
+const requirePasswordReset: NavigationGuard = () => (passwordResetEnabled() ? true : { name: 'login' })
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
@@ -34,6 +38,29 @@ const routes: RouteRecordRaw[] = [
     name: 'login',
     component: () => import('@/features/auth/views/LoginView.vue'),
     meta: { requiresAuth: false, guestOnly: true, title: 'Masuk' },
+  },
+  {
+    // A-07 langkah 1: minta tautan reset (ISSUE-006).
+    path: '/lupa-password',
+    name: 'forgot-password',
+    component: () => import('@/features/auth/views/ForgotPasswordView.vue'),
+    meta: { requiresAuth: false, guestOnly: true, title: 'Lupa Password' },
+    beforeEnter: requirePasswordReset,
+  },
+  {
+    // A-07 langkah 2: tautan dari kanal = /reset-password#token=… (backend auth.resetLinkBase; ?token= = cadangan legacy).
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('@/features/auth/views/ResetPasswordView.vue'),
+    meta: { requiresAuth: false, guestOnly: true, title: 'Reset Password' },
+    beforeEnter: requirePasswordReset,
+  },
+  {
+    // A-06 ganti password sendiri: semua role login (UL_ALL). Path /akun sudah dipakai Manajemen Akun.
+    path: '/ganti-password',
+    name: 'change-password',
+    component: () => import('@/features/auth/views/ChangePasswordPage.vue'),
+    meta: { title: 'Ganti Password' },
   },
   {
     path: '/akun',

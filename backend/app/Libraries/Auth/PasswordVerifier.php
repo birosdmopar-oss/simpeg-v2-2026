@@ -73,24 +73,13 @@ class PasswordVerifier
     }
 
     /**
-     * Validasi kebijakan password baru; kembalikan daftar pesan error (kosong = valid).
+     * Validasi kebijakan password baru (K4, lihat PasswordPolicy); kembalikan daftar pesan error (kosong = valid).
      *
      * @return list<string>
      */
     public function policyErrors(string $plain): array
     {
-        $errors = [];
-        $min    = $this->config->passwordMinLength;
-
-        if (mb_strlen($plain) < $min) {
-            $errors[] = sprintf('Password minimal %d karakter.', $min);
-        }
-
-        if (preg_match('/[A-Za-z]/', $plain) !== 1 || preg_match('/\d/', $plain) !== 1) {
-            $errors[] = 'Password harus mengandung huruf dan angka.';
-        }
-
-        return $errors;
+        return PasswordPolicy::fromConfig($this->config)->errors($plain);
     }
 
     /**

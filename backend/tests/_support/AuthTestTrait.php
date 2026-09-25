@@ -72,7 +72,7 @@ trait AuthTestTrait
         // Service shared (response, auth services) bocor antar request/test: bangun ulang agar cookie/config segar.
         foreach ([
             'response', 'authContext', 'jwt', 'captchaVerifier', 'passwordVerifier', 'lockoutService',
-            'authService', 'passwordService', 'resetPasswordService', 'userService', 'accountProvisioner',
+            'authService', 'passwordService', 'resetPasswordService', 'resetTokenNotifier', 'userService', 'accountProvisioner',
         ] as $name) {
             Services::resetSingle($name);
         }
@@ -91,6 +91,17 @@ trait AuthTestTrait
         return $this->withBodyFormat('json')->post('api/v1/auth/login', [
             'username'      => $username,
             'password'      => $password,
+            'captcha_token' => $captcha,
+        ]);
+    }
+
+    /**
+     * POST JSON ke endpoint lupa password (captcha wajib, pola login).
+     */
+    protected function forgotPassword(string $username, string $captcha = 'ok'): TestResponse
+    {
+        return $this->withBodyFormat('json')->post('api/v1/auth/forgot-password', [
+            'username'      => $username,
             'captcha_token' => $captcha,
         ]);
     }

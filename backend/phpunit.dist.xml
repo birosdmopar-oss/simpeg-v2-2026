@@ -53,5 +53,7 @@
         <!-- Nilai default group `tests` ada di app/Config/Database.php; override lewat .env (database.tests.*) bila perlu -->
         <env name="jwt.secret" value="phpunit-only-secret-do-not-use-in-production-0123456789abcdef"/>
         <env name="cors.allowedOrigins" value="http://localhost:5173"/>
+        <!-- ISSUE-006: tautan reset password ditangkap di memori (MockResetTokenNotifier), tidak ditulis ke log -->
+        <env name="auth.resetTokenNotifier" value="mock"/>
     </php>
 </phpunit>

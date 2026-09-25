@@ -10,7 +10,15 @@ import { computed, ref } from 'vue'
 import { isApiError } from '@/lib/axios'
 
 import { authService } from '../services/auth.service'
-import { type LoginPayload, Role, type RoleCode, type SessionClaims, type User, USER_MANAGEMENT_ROLES } from '../types'
+import {
+  type ChangePasswordPayload,
+  type LoginPayload,
+  Role,
+  type RoleCode,
+  type SessionClaims,
+  type User,
+  USER_MANAGEMENT_ROLES,
+} from '../types'
 
 export type AuthStatus = 'unknown' | 'loading' | 'authenticated' | 'guest'
 
@@ -77,6 +85,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * Ganti password (A-06). Sukses → backend mencabut SELURUH refresh token dan menghapus cookie sesi, jadi sesi lokal
+   * cukup dikosongkan; pemanggil mengarahkan ke login. Sengaja TIDAK memanggil /auth/logout: cookie sudah tidak ada
+   * → 401 → refresh gagal → authFailureHandler. Gagal (422/jaringan) → sesi tetap utuh.
+   */
+  async function changePassword(payload: ChangePasswordPayload): Promise<void> {
+    await authService.changePassword(payload)
+    clearSession()
+  }
+
   return {
     user,
     claims,
@@ -90,5 +108,6 @@ export const useAuthStore = defineStore('auth', () => {
     fetchCurrentUser,
     login,
     logout,
+    changePassword,
   }
 })

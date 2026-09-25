@@ -48,6 +48,15 @@ describe('userCreateSchema', () => {
     expect(userCreateSchema.safeParse({ ...valid, password: '12345678' }).success).toBe(false)
   })
 
+  it('kebijakan K4 dari PASSWORD_RULES: huruf besar dan huruf kecil wajib (ISSUE-006)', () => {
+    const noUpper = userCreateSchema.safeParse({ ...valid, password: 'akunbaru2026' })
+    expect(noUpper.success).toBe(false)
+    if (!noUpper.success) expect(noUpper.error.issues[0]?.message).toBe('Password harus mengandung minimal 1 huruf besar.')
+
+    expect(userCreateSchema.safeParse({ ...valid, password: 'AKUNBARU2026' }).success).toBe(false)
+    expect(userUpdateSchema.safeParse({ username: 'x', password: 'akunbaru2026', user_level: 3, status: '1' }).success).toBe(false)
+  })
+
   it('menolak role di luar 1-8', () => {
     expect(userCreateSchema.safeParse({ ...valid, user_level: '9' }).success).toBe(false)
     expect(userCreateSchema.safeParse({ ...valid, user_level: '0' }).success).toBe(false)

@@ -81,7 +81,7 @@ final class ResetPasswordTest extends CIUnitTestCase
     {
         $session = $this->issueTokensFor(self::NIP);
 
-        $forgot = $this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => self::NIP]);
+        $forgot = $this->forgotPassword(self::NIP);
         $forgot->assertStatus(200);
         $token = $this->json($forgot)['data']['token'];
         $this->assertNotEmpty($token);
@@ -112,7 +112,7 @@ final class ResetPasswordTest extends CIUnitTestCase
 
     public function testReusedResetTokenIsRejected(): void
     {
-        $token = $this->json($this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => self::NIP]))['data']['token'];
+        $token = $this->json($this->forgotPassword(self::NIP))['data']['token'];
 
         $this->withBodyFormat('json')->post('api/v1/auth/reset-password', [
             'token' => $token, 'new_password' => self::NEW, 'new_password_confirmation' => self::NEW,
@@ -138,7 +138,7 @@ final class ResetPasswordTest extends CIUnitTestCase
     public function testConcurrentResetWithSameTokenOnlyOneSucceeds(): void
     {
         $base  = time();
-        $token = (string) $this->service($base)->request(self::NIP, null)['token'];
+        $token = (string) $this->service($base)->request(self::NIP, 'ok', null)['token'];
 
         $racingAttempts = new class ($this->db, fn () => $this->service($base + 1)->reset($token, self::NEW, self::NEW)) extends ForgotAttemptModel {
             /** @var (Closure(): void)|null */
@@ -188,7 +188,7 @@ final class ResetPasswordTest extends CIUnitTestCase
     public function testMarkUsedClaimsTokenOnlyOnce(): void
     {
         $base  = time();
-        $token = (string) $this->service($base)->request(self::NIP, null)['token'];
+        $token = (string) $this->service($base)->request(self::NIP, 'ok', null)['token'];
         $model = new ForgotAttemptModel($this->db);
         $id    = (int) $model->findByTokenHash(hash('sha256', $token))['id'];
 
@@ -206,9 +206,9 @@ final class ResetPasswordTest extends CIUnitTestCase
     public function testSuccessfulResetInvalidatesOtherResetTokensOfSameUser(): void
     {
         $base   = time();
-        $first  = (string) $this->service($base)->request(self::NIP, null)['token'];
-        $second = (string) $this->service($base)->request(self::NIP, null)['token'];
-        $other  = (string) $this->service($base)->request(AuthSeeder::NIP_ARGON, null)['token'];
+        $first  = (string) $this->service($base)->request(self::NIP, 'ok', null)['token'];
+        $second = (string) $this->service($base)->request(self::NIP, 'ok', null)['token'];
+        $other  = (string) $this->service($base)->request(AuthSeeder::NIP_ARGON, 'ok', null)['token'];
 
         $this->service($base + 5)->reset($second, self::NEW, self::NEW);
 
@@ -237,7 +237,7 @@ final class ResetPasswordTest extends CIUnitTestCase
 
     public function testFailedResetRollsBackTokenClaim(): void
     {
-        $token = (string) $this->service()->request(self::NIP, null)['token'];
+        $token = (string) $this->service()->request(self::NIP, 'ok', null)['token'];
 
         $failing = new class ($this->db) extends PenggunaModel {
             public function update($id = null, $row = null): bool
@@ -261,7 +261,7 @@ final class ResetPasswordTest extends CIUnitTestCase
 
     public function testResetAuditRecordsAccountOwnerAsActor(): void
     {
-        $token = (string) $this->service()->request(self::NIP, null)['token'];
+        $token = (string) $this->service()->request(self::NIP, 'ok', null)['token'];
 
         $this->service()->reset($token, self::NEW, self::NEW);
 
@@ -284,7 +284,7 @@ final class ResetPasswordTest extends CIUnitTestCase
     public function testExpiredResetTokenIsRejected(): void
     {
         $base   = time();
-        $result = $this->service($base)->request(self::NIP, '10.0.0.1');
+        $result = $this->service($base)->request(self::NIP, 'ok', '10.0.0.1');
         $token  = (string) $result['token'];
 
         // Tepat setelah TTL habis.
@@ -298,14 +298,14 @@ final class ResetPasswordTest extends CIUnitTestCase
         }
 
         // Sesaat sebelum habis masih valid.
-        $result2 = $this->service($base)->request(self::NIP, '10.0.0.1');
+        $result2 = $this->service($base)->request(self::NIP, 'ok', '10.0.0.1');
         $this->service($base + $this->config->resetTokenTtl - 1)->reset((string) $result2['token'], self::NEW, self::NEW);
         $this->assertTrue(password_verify(self::NEW, (string) $this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray()['password']));
     }
 
     public function testExpiredResetTokenIsRejectedViaEndpoint(): void
     {
-        $token = $this->json($this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => self::NIP]))['data']['token'];
+        $token = $this->json($this->forgotPassword(self::NIP))['data']['token'];
 
         $this->db->table('forgot_attempts')
             ->where('token_hash', hash('sha256', $token))
@@ -338,16 +338,16 @@ final class ResetPasswordTest extends CIUnitTestCase
     public function testRateLimitViaForgotAttempts(): void
     {
         for ($i = 0; $i < 3; $i++) {
-            $this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => self::NIP])->assertStatus(200);
+            $this->forgotPassword(self::NIP)->assertStatus(200);
         }
 
-        $fourth = $this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => self::NIP]);
+        $fourth = $this->forgotPassword(self::NIP);
         $fourth->assertStatus(429);
 
         $this->assertSame(3, $this->db->table('forgot_attempts')->where('username', self::NIP)->countAllResults());
 
         // Username lain tidak terpengaruh.
-        $this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => AuthSeeder::NIP_ARGON])->assertStatus(200);
+        $this->forgotPassword(AuthSeeder::NIP_ARGON)->assertStatus(200);
     }
 
     public function testRateLimitResetsAfterWindow(): void
@@ -355,23 +355,23 @@ final class ResetPasswordTest extends CIUnitTestCase
         $base = time();
 
         for ($i = 0; $i < 3; $i++) {
-            $this->service($base)->request(self::NIP, null);
+            $this->service($base)->request(self::NIP, 'ok', null);
         }
 
         try {
-            $this->service($base)->request(self::NIP, null);
+            $this->service($base)->request(self::NIP, 'ok', null);
             $this->fail('Harus 429');
         } catch (TooManyRequestsException) {
             $this->addToAssertionCount(1);
         }
 
-        $this->service($base + $this->config->forgotWindowMinutes * 60 + 1)->request(self::NIP, null);
+        $this->service($base + $this->config->forgotWindowMinutes * 60 + 1)->request(self::NIP, 'ok', null);
         $this->addToAssertionCount(1);
     }
 
     public function testUnknownUsernameGetsGenericResponseWithoutToken(): void
     {
-        $result = $this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => '000000000000000000']);
+        $result = $this->forgotPassword('000000000000000000');
 
         $result->assertStatus(200);
         $json = $this->json($result);
@@ -386,7 +386,7 @@ final class ResetPasswordTest extends CIUnitTestCase
     {
         $this->config->exposeResetTokenInResponse = false;
 
-        $result = $this->withBodyFormat('json')->post('api/v1/auth/forgot-password', ['username' => self::NIP]);
+        $result = $this->forgotPassword(self::NIP);
 
         $result->assertStatus(200);
         $this->assertArrayNotHasKey('token', $this->json($result)['data']);

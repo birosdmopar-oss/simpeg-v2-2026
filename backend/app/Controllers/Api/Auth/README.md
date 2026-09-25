@@ -68,12 +68,22 @@ Replay token itu → 401 "Refresh token tidak dikenal."; sesi di perangkat lain 
 Request `{ "old_password", "new_password", "new_password_confirmation" }`.
 200 `data: { changed:true, sessions_revoked:true }` (seluruh baris refresh token akun dihapus, cookie dihapus → login ulang).
 422 `errors: { old_password | new_password | new_password_confirmation }`.
-Kebijakan password: min `auth.passwordMinLength` (8), mengandung huruf dan angka, beda dari password lama.
+Kebijakan password (K4, ikut legacy; satu sumber `App\Libraries\Auth\PasswordPolicy`, dicerminkan frontend `PASSWORD_RULES`): min `auth.passwordMinLength` (8) karakter, minimal 1 huruf besar, 1 huruf kecil, dan 1 angka; untuk ganti password juga harus beda dari password lama. Berlaku untuk semua jalur yang menetapkan password (ganti, reset, admin buat/ubah akun, password awal A-09). Login tidak memeriksa kebijakan: password lama yang tidak memenuhi aturan tetap bisa dipakai dan tidak dipaksa diganti.
 
 ### POST /auth/forgot-password
-Request `{ "username" }`. 200 selalu generik `data: { accepted:true, message }`; di development (`auth.exposeResetTokenInResponse=true`) ditambah `token`, `expires_at`.
+Request `{ "username", "captcha_token": "<cf-turnstile-response>" }`. 200 selalu generik `data: { accepted:true, message }`; di development (`auth.exposeResetTokenInResponse=true`) ditambah `token`, `expires_at`.
+422 captcha kosong/invalid — dicek PALING AWAL seperti login, sehingga percobaan tanpa captcha valid tidak tercatat di `forgot_attempts` dan tidak menghabiskan kuota username korban.
 429 kalau > `auth.forgotMaxPerWindow` (3) permintaan per `auth.forgotWindowMinutes` (60) untuk username yang sama.
-**Kanal pengiriman token (email/WA) belum ditentukan di dokumen sumber** — token saat ini dicatat di log.
+
+Pengiriman tautan (ISSUE-006, kanal final = email/K3): untuk akun aktif, tautan `{auth.resetLinkBase}#token=<token>` dikirim lewat `App\Interfaces\ResetTokenNotifierInterface`; driver dipilih `auth.resetTokenNotifier`. Token sengaja di **fragment** (`#`), bukan query: browser tidak mengirim fragment ke server, sehingga token tidak tercatat di access log web server frontend maupun header Referer (halaman reset frontend masih menerima `?token=` gaya legacy sebagai cadangan).
+
+| Driver | Untuk | Perilaku |
+|---|---|---|
+| `log` (default) | development | tautan (berisi token) ditulis ke `writable/logs` — **ditolak di production** |
+| `mock` | test (PHPUnit) | tautan disimpan di memori — **ditolak di production** |
+| `email` | production | belum ada; menunggu akun SMTP (driver wajib async lewat Queue) |
+
+Selama driver email belum ada, production menolak forgot-password dengan 500 (ConfigException) yang sama untuk semua username, dan frontend menyembunyikan halamannya (`VITE_PASSWORD_RESET_ENABLED=false` → "Hubungi Admin"). `auth.resetLinkBase` wajib URL absolut http(s) halaman `/reset-password` frontend tanpa query/fragment. Log milik service tidak memuat token; kegagalan kirim dicatat di log dan respons tetap generik.
 
 ### POST /auth/reset-password
 Request `{ "token", "new_password", "new_password_confirmation" }`. 200 `data: { reset:true }`.
