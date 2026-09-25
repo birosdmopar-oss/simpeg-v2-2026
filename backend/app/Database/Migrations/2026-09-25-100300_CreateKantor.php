@@ -26,16 +26,16 @@ use RuntimeException;
  *   - Status v2 1 Aktif / 2 Tidak Aktif / 10 Dihapus (legacy hanya 1, hapus fisik); COMMENT kolom audit.
  *
  * Kode LAIN-LAIN legacy (99/9999/9999999/9999999999, teks di kolom `*_lain`) membutuhkan 4 baris sentinel di tabel
- * wilayah. Baris itu di-seed migration terpisah `2026-09-25-100200_SeedWilayahLainLain`, yang belum ada di branch ini
- * dan menyusul di tahap CR-010 bersama fitur sentinel engine. Sampai migration itu ada, kantor berkode LAIN-LAIN
- * ditolak FK (error 1452).
+ * wilayah. Baris itu di-seed migration terpisah `2026-09-25-100200_SeedWilayahLainLain` (di aplikasi: baris sistem
+ * yang dilindungi engine, CR-010); tanpa baris itu kantor berkode LAIN-LAIN ditolak FK (error 1452). Konsistensi
+ * rantai wilayah, isian `*_lain`, dan `kode_pos` ditegakkan aplikasi (App\Libraries\MasterData\KantorHooks).
  *
  * Versi 100200 lebih kecil dari migration ini. Urutan rollback "kantor dulu, baru sentinel" hanya terjamin bila
- * keduanya jalan dalam SATU batch; Dev/Production menerima keduanya bersama dalam PR DBV-003/CR-010. Di DB yang
- * sudah menjalankan migration ini lebih dulu (mis. DB lokal cabang ini), CodeIgniter menjalankan 100200 di batch
- * baru (MigrationRunner::latest()), sehingga rollback batch itu menghapus sentinel selagi `kantor` masih ada, dan
- * down() sentinel menolak (FK 1451) selama ada baris kantor yang merujuk sentinel. Di DB seperti itu, rollback
- * batch DBV-003 dulu sebelum migrate tahap CR-010.
+ * keduanya jalan dalam SATU batch; Dev/Production menerima keempat migration DBV-003 bersama dalam PR
+ * DBV-003/CR-010. Di DB yang sudah menjalankan migration ini tanpa 100200 (DB lokal sebelum tahap CR-010),
+ * CodeIgniter menjalankan 100200 di batch baru (MigrationRunner::latest()), sehingga rollback batch itu menghapus
+ * sentinel selagi `kantor` masih ada, dan down() sentinel menolak (FK 1451) selama ada baris kantor yang merujuk
+ * sentinel. Di DB seperti itu, rollback batch DBV-003 dulu sebelum migrate.
  *
  * Kolom kode mewarisi collation tabel (utf8mb4_unicode_ci) = collation PK wilayah pasca-DBV-001; FK string beda
  * collation ditolak MySQL (error 3780), jadi migration ini wajib berjalan setelah 2026-09-23-000000. Selama `kantor`

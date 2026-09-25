@@ -7,13 +7,16 @@ namespace Tests\MasterData;
 use App\Database\Migrations\CreateHariLibur;
 use App\Database\Migrations\CreateKantor;
 use App\Database\Migrations\CreateKursem;
+use App\Database\Migrations\SeedWilayahLainLain;
 use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use RuntimeException;
 
 /**
- * DBV-003 — skema G-07/G-08 hasil migration 2026-09-25-100000_CreateHariLibur, 2026-09-25-100100_CreateKursem, dan
- * 2026-09-25-100300_CreateKantor harus sama dengan skema yang diajukan ke DB Validator
+ * DBV-003 — skema G-07/G-08 hasil migration 2026-09-25-100000_CreateHariLibur, 2026-09-25-100100_CreateKursem,
+ * 2026-09-25-100200_SeedWilayahLainLain (baris sentinel LAIN-LAIN di wilayah), dan 2026-09-25-100300_CreateKantor
+ * harus sama dengan skema yang diajukan ke DB Validator
  * (backend/docs/db-review/G-07-G-08-kantor-hari-libur-kursem-schema.md): DDL legacy `hari_libur`, `bidang_kursem`,
  * `instansi_kursem` [K], kolom `jenis_libur`/`kantor` dari kode legacy dengan tipe [I], plus deviasi v2 (FK RESTRICT
  * nama legacy, `hari_libur.status`, UNIQUE `tgl_mulai`, CHECK rentang, UNIQUE nama, `order` kursem, status 10), dan
@@ -137,6 +140,16 @@ final class LiburKantorKursemSchemaTest extends CIUnitTestCase
     private const STATUS_COMMENT = '1: Aktif, 2: Tidak Aktif, 10: Dihapus';
 
     /**
+     * Tabel wilayah => key master di Config\MasterData (systemIds = kode sentinel di aplikasi).
+     */
+    private const WILAYAH_MASTER = [
+        'provinsi'       => 'provinsi',
+        'kabupaten_kota' => 'kabupaten-kota',
+        'kecamatan'      => 'kecamatan',
+        'kelurahan'      => 'kelurahan',
+    ];
+
+    /**
      * Kode error MySQL/MariaDB yang diharapkan dari pelanggaran constraint.
      */
     private const ERR_DUPLICATE    = [1062];
@@ -162,6 +175,13 @@ final class LiburKantorKursemSchemaTest extends CIUnitTestCase
                     break;
                 }
             }
+        }
+
+        // Sentinel yang dilepas/dirusak testWilayahSentinelRows dipasang ulang (tabel migrations mencatatnya sudah jalan).
+        if ($this->sentinelCount() !== count(SeedWilayahLainLain::ROWS)) {
+            $this->db->table('kantor')->emptyTable();
+            $this->sentinelMigration()->down();
+            $this->sentinelMigration()->up();
         }
 
         parent::tearDown();
@@ -370,6 +390,77 @@ final class LiburKantorKursemSchemaTest extends CIUnitTestCase
     }
 
     /**
+     * Migration 100200: 4 baris sentinel LAIN-LAIN persis G-doc 2.5 (rantai 99 → 9999 → 9999999 → 9999999999, `order` 0,
+     * status 1, kolom opsional NULL) dan sama dengan `systemIds` Config\MasterData; up() fail-closed bila satu kode
+     * sudah ada (tanpa insert parsial); down() transaksional dan menolak selama sentinel masih dirujuk (FK RESTRICT
+     * 1451); kantor berkode LAIN-LAIN + `*_lain` diterima DB.
+     */
+    public function testWilayahSentinelRows(): void
+    {
+        foreach (SeedWilayahLainLain::ROWS as $table => [$pk, $code, $parentColumn, $parentCode]) {
+            $row = $this->db->table($table)->where($pk, $code)->get()->getRowArray();
+
+            $this->assertNotNull($row, "{$table} {$code}");
+            $this->assertSame(SeedWilayahLainLain::NAME, $row[$table], $table);
+            $this->assertSame([0, 1], [(int) $row['order'], (int) $row['status']], $table);
+            $this->assertNotNull($row['created_at'], $table);
+            $this->assertSame([null, null], [$row['updated_at'], $row['updated_by']], $table);
+
+            if ($parentColumn !== null) {
+                $this->assertSame($parentCode, $row[$parentColumn], $table);
+            }
+
+            // Literal migration = satu-satunya kode sistem master itu di aplikasi.
+            $this->assertSame([$code], service('masterRegistry')->get(self::WILAYAH_MASTER[$table])->systemIds, $table);
+        }
+
+        $this->assertNull($this->db->table('kabupaten_kota')->where('id_kabupaten_kota', '9999')->get()->getRowArray()['kd_area']);
+        $this->assertNull($this->db->table('kelurahan')->where('id_kelurahan', '9999999999')->get()->getRowArray()['kd_pos']);
+        $this->assertSame(['99', '9999', '9999999', '9999999999'], array_column(array_values(SeedWilayahLainLain::ROWS), 1));
+
+        // Kantor berkode LAIN-LAIN di keempat level (teks di *_lain) diterima DB.
+        $this->db->table('kantor')->insert([
+            'nama_kantor'    => 'KBRI Tokyo', 'alamat' => 'Minato-ku, Tokyo',
+            'id_provinsi'    => '99', 'provinsi_lain' => 'Jepang', 'id_kabupaten' => '9999', 'kabupaten_lain' => 'Tokyo',
+            'id_kecamatan'   => '9999999', 'kecamatan_lain' => 'Minato', 'id_kelurahan' => '9999999999',
+            'kelurahan_lain' => 'Higashi-Gotanda', 'kode_pos' => '14100',
+        ]);
+        $this->seeInDatabase('kantor', ['nama_kantor' => 'KBRI Tokyo', 'id_kelurahan' => '9999999999', 'kelurahan_lain' => 'Higashi-Gotanda']);
+
+        // down() menolak selama dirujuk kantor; seluruh baris tetap utuh.
+        $this->assertSentinelDownRefused('kelurahan 9999999999');
+        $this->db->table('kantor')->emptyTable();
+
+        // Transaksional: kantor yang hanya merujuk provinsi 99 (level lain riil) membuat DELETE terakhir gagal —
+        // tiga DELETE sebelumnya ikut dibatalkan.
+        $this->seedWilayahUji();
+        $this->db->table('kantor')->insert($this->kantorRow('Kantor Campur', ['id_provinsi' => '99']));
+        $this->assertSentinelDownRefused('provinsi 99');
+        $this->db->table('kantor')->emptyTable();
+
+        // Tanpa rujukan: down() menghapus keempatnya.
+        $this->sentinelMigration()->down();
+        $this->assertSame(0, $this->sentinelCount());
+
+        // up() fail-closed: satu kode saja sudah ada → tidak ada yang ditulis, pesan menyebut tabel + kode.
+        $this->db->table('provinsi')->insert(['id_provinsi' => '99', 'provinsi' => 'Sisa Impor']);
+
+        try {
+            $this->sentinelMigration()->up();
+            $this->fail('up() harus menolak bila baris sentinel sudah ada.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('sudah ada (provinsi 99)', $e->getMessage());
+        }
+
+        $this->assertSame(1, $this->sentinelCount());
+        $this->seeInDatabase('provinsi', ['id_provinsi' => '99', 'provinsi' => 'Sisa Impor']);
+
+        $this->db->table('provinsi')->where('id_provinsi', '99')->delete();
+        $this->sentinelMigration()->up();
+        $this->assertSame(count(SeedWilayahLainLain::ROWS), $this->sentinelCount());
+    }
+
+    /**
      * down() tiap migration menghapus tabelnya saja; up() membuatnya kembali persis.
      */
     public function testMigrationsRollBackAndUpAgain(): void
@@ -457,6 +548,43 @@ final class LiburKantorKursemSchemaTest extends CIUnitTestCase
                 "collation kantor.{$column} = {$parent}.{$pk}",
             );
         }
+    }
+
+    /**
+     * down() sentinel harus menolak (1451, pesan menyebut baris yang masih dirujuk) dan keempat baris tetap ada.
+     */
+    private function assertSentinelDownRefused(string $row): void
+    {
+        try {
+            $this->sentinelMigration()->down();
+            $this->fail("down() sentinel harus menolak selama {$row} dirujuk.");
+        } catch (RuntimeException $e) {
+            $this->assertSame(1451, $e->getCode());
+            $this->assertStringContainsString("masih dirujuk ({$row})", $e->getMessage());
+        }
+
+        $this->assertSame(count(SeedWilayahLainLain::ROWS), $this->sentinelCount(), $row);
+    }
+
+    /**
+     * Jumlah baris sentinel yang ada di keempat tabel wilayah.
+     */
+    private function sentinelCount(): int
+    {
+        $count = 0;
+
+        foreach (SeedWilayahLainLain::ROWS as $table => [$pk, $code]) {
+            $count += $this->db->table($table)->where($pk, $code)->countAllResults();
+        }
+
+        return $count;
+    }
+
+    private function sentinelMigration(): SeedWilayahLainLain
+    {
+        require_once APPPATH . 'Database/Migrations/2026-09-25-100200_SeedWilayahLainLain.php';
+
+        return new SeedWilayahLainLain();
     }
 
     /**

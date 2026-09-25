@@ -32,6 +32,8 @@ use CodeIgniter\Config\BaseConfig;
  *                        columnType (tipe kolom int: tinyint/smallint/mediumint/int/bigint [+ ' unsigned'] → batas
  *                        nilai, bawaan 'int'), min/max (batas eksplisit int/decimal), entity + dependsOn +
  *                        checkDependsOn (tipe ref: master rujukan, field ref induknya di form, cek rantai oleh engine),
+ *                        allowSystem (tipe ref: boleh merujuk baris sistem master rujukan, CR-010), otherFor (tipe
+ *                        text/textarea: isian "lainnya" milik field ref ber-allowSystem, CR-010),
  *     'extraSearch'   => kolom tambahan yang ikut dicari (LIKE) di daftar admin,
  *     'uniqueScope'   => kolom tambahan pembentuk lingkup keunikan nama (selain induk),
  *     'auditColumns'  => kolom audit legacy yang ada di tabel (created_at, created_by, updated_at, updated_by,
@@ -49,6 +51,9 @@ use CodeIgniter\Config\BaseConfig;
  *                        ['kolom' => ['lingkup', ...]] → duplikat = 422 pada field itu (termasuk balapan 1062),
  *     'filters'       => field yang boleh dipakai filter `?kolom=nilai` di options & daftar admin (allowlist),
  *     'statusChain'   => true = options hanya memuat entri yang SELURUH rantai induknya aktif (pola U3 FAQ),
+ *     'systemIds'     => kode baris sistem (CR-010, mis. sentinel LAIN-LAIN wilayah): tidak tampil di options/daftar
+ *                        admin, tidak ikut urutan, tidak bisa diubah/dihapus/menjadi induk; hanya bisa dirujuk field
+ *                        ref ber-allowSystem,
  *   ]
  *
  * Keunikan nama berlaku per induk (mis. nama kecamatan unik dalam satu kabupaten/kota), termasuk entri tidak aktif
@@ -94,7 +99,7 @@ class MasterData extends BaseConfig
      *     nameLabel: string,
      *     nameMaxLength: int,
      *     parent?: array{field: string, entity: string}|null,
-     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool}>,
+     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool, allowSystem?: bool, otherFor?: string}>,
      *     extraSearch?: list<string>,
      *     uniqueScope?: list<string>,
      *     auditColumns?: list<string>,
@@ -107,7 +112,8 @@ class MasterData extends BaseConfig
      *     orderColumnType?: string,
      *     uniqueFields?: array<int|string, string|list<string>>,
      *     filters?: list<string>,
-     *     statusChain?: bool
+     *     statusChain?: bool,
+     *     systemIds?: list<string>
      * }>
      */
     public array $entities = [
@@ -175,6 +181,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => null,
             'auditColumns'  => self::AUDIT,
+            // Sentinel LAIN-LAIN legacy (DBV-003, migration 2026-09-25-100200): baris sistem, lihat 'systemIds'.
+            'systemIds' => ['99'],
         ],
         'kabupaten-kota' => [
             'label'         => 'Kabupaten/Kota',
@@ -190,6 +198,7 @@ class MasterData extends BaseConfig
                 'kd_area' => ['label' => 'Kode Area', 'rules' => 'max_length[4]', 'hint' => 'Kode area telepon, maksimal 4 karakter.'],
             ],
             'auditColumns' => self::AUDIT,
+            'systemIds'    => ['9999'],
         ],
         'kecamatan' => [
             'label'         => 'Kecamatan',
@@ -202,6 +211,7 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => ['field' => 'id_kabupaten_kota', 'entity' => 'kabupaten-kota'],
             'auditColumns'  => self::AUDIT,
+            'systemIds'     => ['9999999'],
         ],
         'kelurahan' => [
             'label'         => 'Kelurahan/Desa',
@@ -222,6 +232,7 @@ class MasterData extends BaseConfig
                 ],
             ],
             'auditColumns' => self::AUDIT,
+            'systemIds'    => ['9999999999'],
         ],
 
         // ------------------------------------------------------------------

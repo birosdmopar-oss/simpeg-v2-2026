@@ -6,6 +6,7 @@ namespace Tests\MasterData;
 
 use App\Database\Migrations\AlterBatch1KeSkemaLegacy;
 use App\Database\Migrations\CreateKantor;
+use App\Database\Migrations\SeedWilayahLainLain;
 use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
@@ -33,13 +34,14 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
     protected $namespace = null;
 
     /**
-     * Migration dependen wilayah sesudah DBV-001, urut LEPAS (down() berurutan; pasang ulang urutan terbalik).
-     * Tahap CR-010: tambahkan '2026-09-25-100200_SeedWilayahLainLain.php' SETELAH kantor.
+     * Migration dependen wilayah sesudah DBV-001, urut LEPAS (down() berurutan; pasang ulang urutan terbalik): kantor
+     * dulu (FK ke baris sentinel), baru baris sentinel LAIN-LAIN.
      *
      * @var array<string, class-string<Migration>>
      */
     private const WILAYAH_DEPENDENTS = [
-        '2026-09-25-100300_CreateKantor.php' => CreateKantor::class,
+        '2026-09-25-100300_CreateKantor.php'        => CreateKantor::class,
+        '2026-09-25-100200_SeedWilayahLainLain.php' => SeedWilayahLainLain::class,
     ];
 
     /**
