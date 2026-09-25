@@ -9,6 +9,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\BadRequestException;
 use App\Exceptions\ValidationException;
 use App\Libraries\ApiExceptionHandler;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\HTTP\Exceptions\HTTPException;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -21,9 +22,17 @@ use CodeIgniter\HTTP\ResponseInterface;
  *
  * _remap() menangkap App\Exceptions\ApiException dari method mana pun dan mengubahnya ke envelope,
  * sehingga method controller tetap tipis (ADR-002) dan perilaku sama di feature test maupun runtime.
+ *
+ * CR-007 (prasyarat strictOn): input yang bukan UTF-8 valid (parameter route, query string, body) ditolak 422
+ * sebelum menyentuh DB, dan error data MySQL (ApiExceptionHandler::DATA_ERROR_CODES) diterjemahkan ke 422 generik
+ * dengan detail hanya di log.
  */
 abstract class ApiController extends BaseController
 {
+    public const INVALID_ENCODING_MESSAGE = 'Input tidak valid (encoding).';
+
+    public const INVALID_ENCODING_FIELD_MESSAGE = 'Isian mengandung karakter yang tidak valid (bukan UTF-8).';
+
     /**
      * Cast parameter route numerik ke int. Matikan untuk controller yang parameternya kode string
      * (mis. master data: kode '01' tidak boleh berubah jadi 1).
@@ -45,8 +54,28 @@ abstract class ApiController extends BaseController
         }
 
         try {
+            $this->assertValidUtf8Input($params);
+
             return $this->{$method}(...$params);
         } catch (ApiException $e) {
+            [$status, $body] = ApiExceptionHandler::toEnvelope($e);
+
+            return $this->response->setStatusCode($status)->setJSON($body);
+        } catch (DatabaseException $e) {
+            // Hanya error data (nilai tidak muat/tidak sesuai kolom di koneksi strict) yang menjadi 422; error DB lain
+            // (1062 yang tidak ditangani service, lock wait, deadlock, koneksi) tetap dilempar ke handler global (500).
+            if (! ApiExceptionHandler::isDataError($e)) {
+                throw $e;
+            }
+
+            // Detail (kolom, nilai) hanya di log — exception ini ditelan di sini sehingga tidak dicatat handler global.
+            log_message('error', 'Error data database diterjemahkan ke 422: [{code}] {message} in {exFile} on line {exLine}.', [
+                'code'    => $e->getCode(),
+                'message' => $e->getMessage(),
+                'exFile'  => clean_path($e->getFile()),
+                'exLine'  => $e->getLine(),
+            ]);
+
             [$status, $body] = ApiExceptionHandler::toEnvelope($e);
 
             return $this->response->setStatusCode($status)->setJSON($body);
@@ -77,6 +106,8 @@ abstract class ApiController extends BaseController
     /**
      * Body JSON request sebagai array (fallback ke form-data).
      * Body yang bukan JSON valid → BadRequestException (400), kecuali request memang dikirim sebagai form.
+     * Nilai/key yang bukan UTF-8 valid (hanya bisa lewat form-urlencoded/multipart; JSON seperti itu sudah ditolak
+     * json_decode) → ValidationException (422) per field.
      *
      * @return array<string, mixed>
      */
@@ -93,14 +124,78 @@ abstract class ApiController extends BaseController
             $json = null;
         }
 
-        if (is_array($json)) {
-            return $json;
+        /** @var array<string, mixed> $data */
+        $data = is_array($json) ? $json : $this->request->getPost();
+
+        self::assertUtf8Fields($data);
+
+        return $data;
+    }
+
+    /**
+     * Penjaga UTF-8 untuk input yang dibaca di luar payload(): parameter route dan query string (getGet()).
+     * Byte non-UTF-8 di koneksi strict gagal ditulis (1366 → sebelumnya 500), dan di kolom utf8mb4_unicode_ci bisa
+     * cocok dengan nilai lain saat dibandingkan (mis. username 'admin\xC3(' = 'admin') — keduanya dicegah di sini.
+     *
+     * @param array<array-key, mixed> $params
+     *
+     * @throws ValidationException
+     */
+    private function assertValidUtf8Input(array $params): void
+    {
+        // Segmen route non-UTF-8 sudah ditolak Router CI4 (permittedURIChars dengan modifier /u); ini lapis kedua.
+        // Segmen tidak punya nama field, jadi tanpa errors per field.
+        if (self::invalidUtf8Fields($params) !== []) {
+            throw new ValidationException(self::INVALID_ENCODING_MESSAGE);
         }
 
-        /** @var array<string, mixed> $post */
-        $post = $this->request->getPost();
+        $query = $this->request->getGet();
 
-        return $post;
+        if (is_array($query)) {
+            self::assertUtf8Fields($query);
+        }
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @throws ValidationException 422 dengan errors per field (notasi titik untuk array bersarang)
+     */
+    private static function assertUtf8Fields(array $data): void
+    {
+        $fields = self::invalidUtf8Fields($data);
+
+        if ($fields !== []) {
+            throw new ValidationException(
+                self::INVALID_ENCODING_MESSAGE,
+                array_fill_keys($fields, [self::INVALID_ENCODING_FIELD_MESSAGE]),
+            );
+        }
+    }
+
+    /**
+     * Nama field (notasi titik) yang key atau nilai string-nya bukan UTF-8 valid. Nama field ikut di-scrub agar
+     * respons JSON tetap bisa di-encode.
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @return list<string>
+     */
+    private static function invalidUtf8Fields(array $data, string $prefix = ''): array
+    {
+        $fields = [];
+
+        foreach ($data as $key => $value) {
+            $name = $prefix . $key;
+
+            if (! mb_check_encoding((string) $key, 'UTF-8') || (is_string($value) && ! mb_check_encoding($value, 'UTF-8'))) {
+                $fields[] = mb_scrub($name, 'UTF-8');
+            } elseif (is_array($value)) {
+                array_push($fields, ...self::invalidUtf8Fields($value, $name . '.'));
+            }
+        }
+
+        return $fields;
     }
 
     private function isFormRequest(): bool

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries;
 
 use App\Exceptions\ApiException;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Debug\BaseExceptionHandler;
 use CodeIgniter\Debug\ExceptionHandlerInterface;
 use CodeIgniter\Exceptions\PageNotFoundException;
@@ -19,6 +20,20 @@ use Throwable;
  */
 class ApiExceptionHandler extends BaseExceptionHandler implements ExceptionHandlerInterface
 {
+    /**
+     * Kode error "data" MySQL/MariaDB (CR-007): di koneksi strict (strictOn=true) nilai yang tidak muat/tidak sesuai
+     * kolom ditolak alih-alih dipotong diam-diam. Itu kesalahan input (422), bukan kerusakan server (500).
+     *   1406 terlalu panjang · 1264 di luar rentang · 1366 nilai/encoding tidak valid · 1292 tanggal/angka tidak valid
+     *   1265 data terpotong (ENUM, angka berekor teks) · 1364 kolom NOT NULL tanpa default tidak diisi
+     * Error DB lain (1062 yang tidak diterjemahkan service, lock wait, deadlock, koneksi) tetap 500.
+     */
+    public const DATA_ERROR_CODES = [1406, 1264, 1366, 1292, 1265, 1364];
+
+    /**
+     * Pesan generik: pesan MySQL (nama kolom, nilai) tidak pernah dikirim ke klien, hanya ke log.
+     */
+    public const DATA_ERROR_MESSAGE = 'Data tidak dapat diproses karena ada isian yang tidak valid.';
+
     public function handle(
         Throwable $exception,
         RequestInterface $request,
@@ -52,6 +67,11 @@ class ApiExceptionHandler extends BaseExceptionHandler implements ExceptionHandl
             return [404, ['status' => 'error', 'message' => 'Endpoint tidak ditemukan.']];
         }
 
+        // Detail sudah dicatat: oleh handler global CI4 (Exceptions::exceptionHandler) atau ApiController::_remap().
+        if (self::isDataError($exception)) {
+            return [422, ['status' => 'error', 'message' => self::DATA_ERROR_MESSAGE]];
+        }
+
         $status = $fallbackStatus >= 400 && $fallbackStatus < 600 ? $fallbackStatus : 500;
 
         // Server error: tidak silent (ter-log oleh CI4), pesan detail hanya di luar production.
@@ -60,5 +80,15 @@ class ApiExceptionHandler extends BaseExceptionHandler implements ExceptionHandl
             : $exception->getMessage();
 
         return [$status, ['status' => 'error', 'message' => $message]];
+    }
+
+    /**
+     * Error data DB (DATA_ERROR_CODES) — dari query builder (kode errno MySQL) maupun DatabaseException yang dibangun
+     * model dari $db->error() (MasterModel, TokenModel, FaqRateModel).
+     */
+    public static function isDataError(Throwable $exception): bool
+    {
+        return $exception instanceof DatabaseException
+            && in_array($exception->getCode(), self::DATA_ERROR_CODES, true);
     }
 }

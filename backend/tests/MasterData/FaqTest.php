@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
+use App\Controllers\Api\ApiController;
 use App\Exceptions\ValidationException;
 use App\Libraries\MasterData\FaqService;
 use App\Models\MasterData\FaqRateModel;
@@ -582,7 +583,9 @@ final class FaqTest extends CIUnitTestCase
 
     /**
      * CR-003: kata kunci / alasan yang bukan UTF-8 valid → 422 pada field terkait (sebelumnya 500 karena `search`
-     * dipantulkan ke JSON, dan `reason` gagal ditulis di koneksi strict).
+     * dipantulkan ke JSON, dan `reason` gagal ditulis di koneksi strict). Sejak CR-007 lewat HTTP keduanya sudah
+     * ditolak penjaga UTF-8 ApiController (pesan generik per field); cek di FaqService tetap berlaku untuk pemanggil
+     * service langsung.
      */
     public function testInvalidUtf8SearchOrReasonIsRejected(): void
     {
@@ -592,7 +595,7 @@ final class FaqTest extends CIUnitTestCase
         foreach (['%C3', '%C3%C3%C3', 'sandi%FF'] as $raw) {
             $result = $this->get("api/v1/faq?search={$raw}");
             $result->assertStatus(422);
-            $this->assertSame(['Kata kunci pencarian tidak valid.'], $this->json($result)['errors']['search'], $raw);
+            $this->assertSame([ApiController::INVALID_ENCODING_FIELD_MESSAGE], $this->json($result)['errors']['search'], $raw);
         }
 
         // Alasan tidak bisa berisi byte non-UTF-8 lewat JSON; lewat form-urlencoded bisa.
@@ -602,7 +605,25 @@ final class FaqTest extends CIUnitTestCase
             'Content-Type'  => 'application/x-www-form-urlencoded',
         ])->withBody(http_build_query($body))->post('api/v1/faq/1/rate', $body);
         $result->assertStatus(422);
-        $this->assertSame(['Alasan tidak valid.'], $this->json($result)['errors']['reason']);
+        $this->assertSame([ApiController::INVALID_ENCODING_FIELD_MESSAGE], $this->json($result)['errors']['reason']);
+        $this->assertSame(0, $this->db->table('faq_rate')->countAllResults());
+
+        // Lapis service (tanpa HTTP).
+        $service = service('faqService');
+        $cases   = [
+            'search' => ['Kata kunci pencarian tidak valid.', static fn () => $service->browse("sandi\xFF")],
+            'reason' => ['Alasan tidak valid.', static fn () => $service->rate('1', AuthSeeder::nipForRole(Role::PEGAWAI), Role::PEGAWAI, 2, "\xFF\xFF")],
+        ];
+
+        foreach ($cases as $field => [$message, $call]) {
+            try {
+                $call();
+                $this->fail("{$field} non-UTF-8 harus ditolak FaqService.");
+            } catch (ValidationException $e) {
+                $this->assertSame([$field => [$message]], $e->getErrors());
+            }
+        }
+
         $this->assertSame(0, $this->db->table('faq_rate')->countAllResults());
     }
 

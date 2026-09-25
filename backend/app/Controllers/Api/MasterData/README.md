@@ -4,6 +4,10 @@ Controller REST API modul ini (`App\Controllers\Api\MasterData\*`), semua extend
 Envelope: sukses `{status:'success', data}`, gagal `{status:'error', message, errors?}` (ADR-001).
 Role akses mengacu Matriks Role x Endpoint Bagian 2 Modul G. Prefix seluruh path: `/api/v1`.
 
+Error umum di seluruh endpoint (`ApiController`, CR-007):
+- parameter route, query string, atau body form (form-urlencoded/multipart) yang bukan UTF-8 valid → **422** `message: "Input tidak valid (encoding)."`, `errors: { <field>: ["Isian mengandung karakter yang tidak valid (bukan UTF-8)."] }` (field bersarang bernotasi titik; parameter route tanpa `errors`). Ditolak sebelum menyentuh DB. Body JSON seperti itu tetap 400 "Body JSON tidak valid.".
+- nilai yang ditolak MySQL strict (1406 terlalu panjang, 1264 di luar rentang, 1366, 1292, 1265, 1364) → **422** `message: "Data tidak dapat diproses karena ada isian yang tidak valid."` tanpa `errors`; pesan MySQL (kolom, nilai) hanya di log. Error DB lain (lock wait, deadlock, 1062 yang tidak diterjemahkan service, koneksi) tetap 500.
+
 ## Engine CRUD master generik
 
 Seluruh master memakai satu engine. Menambah master = migration + 1 entri di `Config\MasterData` + key di controller grupnya.
@@ -119,7 +123,7 @@ Tanpa token → 401; role lain di endpoint rating → `403 {status:'error', mess
 
 ### GET /faq?search=q
 `data: { results: [ { id, title, topic: { id, nama }, sub_topic: { id, nama }, snippet } ], search }`
-- `q` di-trim; kosong → sama dengan tanpa `search` (pohon). Lebih dari 100 karakter → 422 `search`. Bukan UTF-8 valid (mis. `?search=%C3`) → 422 `search` "Kata kunci pencarian tidak valid.".
+- `q` di-trim; kosong → sama dengan tanpa `search` (pohon). Lebih dari 100 karakter → 422 `search`. Bukan UTF-8 valid (mis. `?search=%C3`) → 422 `search` dari penjaga UTF-8 `ApiController` (lihat atas).
 - `q` ≥ 3 karakter: `MATCH(title, content_stripped) AGAINST(? IN NATURAL LANGUAGE MODE)` (FULLTEXT legacy, parameter terikat), urut relevansi lalu id terbaru. Relevansi InnoDB memakai statistik jumlah baris tabel: tepat setelah tabel dibuat/diimpor statistiknya bisa masih 0 sehingga seluruh relevansi 0 dan urutan jatuh ke id terbaru, sampai statistik dihitung ulang (otomatis di latar, atau `ANALYZE TABLE faq_article` setelah impor). `q` < 3 karakter atau FULLTEXT tanpa hasil: fallback `title LIKE %q%` (`%`, `_`, `!` dicari sebagai karakter biasa), urut id terbaru.
 - `snippet` = kalimat pertama `content_stripped` (sampai `.`/`!`/`?`/`:` yang diikuti spasi atau akhir teks), maks 200 karakter (dipotong 199 + "…").
 
@@ -136,7 +140,7 @@ Body `{ "rate": 1 | 2, "reason"?: string }` → **201** `data: { rated: true, ra
 | Field | Aturan |
 |---|---|
 | `rate` | wajib, `1` (Membantu) atau `2` (Kurang Membantu) — selain itu 422. Divalidasi sebelum cek artikel |
-| `reason` | `rate` 2: wajib teks UTF-8 valid ("Alasan tidak valid." — byte non-UTF-8 hanya bisa lewat form-urlencoded), di-trim, tidak kosong, maks **255 byte** → 422 `reason`. `rate` 1: diabaikan, disimpan NULL |
+| `reason` | `rate` 2: wajib teks UTF-8 valid (byte non-UTF-8 hanya bisa lewat form-urlencoded dan ditolak penjaga UTF-8 `ApiController`), di-trim, tidak kosong, maks **255 byte** → 422 `reason`. `rate` 1: diabaikan, disimpan NULL |
 
 | Status | Kapan |
 |---|---|
@@ -161,4 +165,5 @@ FE: 4 alasan baku legacy (`views/hr/faq/detail.php:142-156`) + "Lainnya" (teks b
 | Rantai induk & batas byte (DBV-002) | `MasterGenericTcTest::testWholeParentChainMustBeActive`, `testMaxBytesFieldCountsBytesNotCharacters`; `testLegacyAuditColumnsAreFilledWithActor` (juga `created_by`) |
 | Skema DBV-002 (FAQ) | `tests/MasterData/FaqSchemaTest` (kolom & tipe, collation, UNIQUE, FULLTEXT, FK legacy RESTRICT + kolom induk FK, tanpa FK `faq_rate.nip`, rollback, `up()` gagal di tengah membersihkan tabel run itu) |
 | FAQ baca & rating (G-10) | `tests/MasterData/FaqTest` (8 role, rantai status, pencarian FULLTEXT + fallback, urutan relevansi lalu id, batas 50 di kedua jalur, sanitasi, list tanpa `content`, `icon` tidak diekspos, options FAQ role 1, induk kanonik, UTF-8 tidak valid → 422, `created_by`/`updated_by`, `updated_at` detail, rating role 2/6/7 + audit, 403/404/422, balapan PK); `tests/unit/Libraries/HtmlSanitizerTest` |
+| Penjaga UTF-8 & error data DB (CR-007) | `tests/feature/InvalidUtf8InputTest` (body form login, lupa sandi, create/update akun & master — update lewat `_method=PUT`; query string; parameter route; field bersarang & key non-UTF-8; JSON tetap 400), `tests/feature/DatabaseDataErrorTest` (6 kode error data nyata di koneksi strict → 422 generik + log, tulis gagal di engine master di-rollback, error DB lain tetap 500) |
 | #7 QA Lapis 1 (Figma) | **Belum bisa** — desain Figma belum ada (item terbuka 00-INDEX) |
