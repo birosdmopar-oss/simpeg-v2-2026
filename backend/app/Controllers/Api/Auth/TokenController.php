@@ -14,7 +14,7 @@ use Config\Jwt as JwtConfig;
 /**
  * A-05 — Refresh token & logout, plus profil sesi.
  *
- * POST api/v1/auth/refresh  (cookie refresh_token; tanpa access token)   → token pair baru (rotating)
+ * POST api/v1/auth/refresh  (cookie refresh_token; tanpa access token)   → token pair baru (rotating); 401 → cookie refresh dihapus
  * POST api/v1/auth/logout   (filter jwt; cookie refresh_token)            → refresh token dihapus dari DB, cookie dihapus
  * GET  api/v1/auth/me       (filter jwt)                                  → akun yang sedang login (dipakai route guard FE)
  */
@@ -23,14 +23,23 @@ class TokenController extends ApiController
     public function refresh(): ResponseInterface
     {
         $refreshToken = $this->refreshTokenFromRequest();
+        $jwt          = service('jwt');
 
-        if ($refreshToken === null) {
-            throw AuthException::missingToken();
+        try {
+            if ($refreshToken === null) {
+                throw AuthException::missingToken();
+            }
+
+            $tokens = service('authService')->refresh($refreshToken);
+        } catch (AuthException $e) {
+            // 401 (tidak ada / tidak dikenal / kedaluwarsa / reuse): hapus cookie refresh agar tab/perangkat lama
+            // berhenti mengirim token mati di setiap refresh berikutnya (T-01). Error lain (mis. error DB) tidak
+            // menghapus cookie karena token lama masih berlaku.
+            $this->response->setCookie($jwt->expiredRefreshCookie());
+
+            throw $e;
         }
 
-        $tokens = service('authService')->refresh($refreshToken);
-
-        $jwt = service('jwt');
         $this->response->setCookie($jwt->accessCookie($tokens['access_token']));
         $this->response->setCookie($jwt->refreshCookie($tokens['refresh_token']));
 

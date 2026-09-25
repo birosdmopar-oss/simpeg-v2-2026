@@ -44,17 +44,23 @@ Lazy rehash (A-02b): kalau `password` NULL, verifikasi ke `password_legacy` (MD5
 
 ### POST /auth/refresh
 Tanpa body (cookie `refresh_token`) atau `{ "refresh_token": "..." }`. 200 `data: { access_token, access_expires_at, refresh_expires_at }` + cookie baru.
-401 kalau token tidak dikenal / kedaluwarsa / **sudah pernah dipakai (reuse) → seluruh sesi akun dicabut**.
+401 kalau token tidak ada / tidak dikenal (termasuk sudah di-logout atau dicabut massal) / kedaluwarsa / **sudah pernah dipakai (reuse) → seluruh sesi akun dicabut**.
+Setiap 401 dari endpoint ini juga menghapus cookie `refresh_token` (Set-Cookie kedaluwarsa) agar tab/perangkat lama berhenti mengirim token mati; error lain (500) tidak menghapus cookie.
+
+Token kedaluwarsa yang ditolak (401 "Token sudah kedaluwarsa.") barisnya **dihapus** (bukan `revoked=1`); bila dikirim lagi (retry klien body, tab paralel) → 401 "Refresh token tidak dikenal." tanpa mencabut sesi lain.
+Pencabutan sesi: `token.revoked=1` hanya untuk token yang sudah dirotasi (dan sesi yang dicabut reuse detection), sehingga memakai lagi token seperti itu = reuse.
+Logout, ganti/reset password, serta perubahan/penghapusan akun oleh admin **menghapus baris token** — token lama terbaca "tidak dikenal" (401) dan tidak mencabut sesi baru setelah pengguna login ulang.
 
 ### POST /auth/logout
-Cookie/body refresh token dicabut di DB (`token.revoked=1`), cookie dihapus, audit `logout`. 200 `data: { logged_out: true }`.
+Baris refresh token (cookie/body) **dihapus dari DB** (bukan `revoked=1`), cookie access & refresh dihapus, audit `logout`. 200 `data: { logged_out: true }`.
+Replay token itu → 401 "Refresh token tidak dikenal."; sesi di perangkat lain tidak terpengaruh.
 
 ### GET /auth/me
 200 `data: { user, claims:{ role, id_unit, id_satker, exp } }`.
 
 ### POST /auth/change-password
 Request `{ "old_password", "new_password", "new_password_confirmation" }`.
-200 `data: { changed:true, sessions_revoked:true }` (seluruh refresh token dicabut, cookie dihapus → login ulang).
+200 `data: { changed:true, sessions_revoked:true }` (seluruh baris refresh token akun dihapus, cookie dihapus → login ulang).
 422 `errors: { old_password | new_password | new_password_confirmation }`.
 Kebijakan password: min `auth.passwordMinLength` (8), mengandung huruf dan angka, beda dari password lama.
 
@@ -65,7 +71,7 @@ Request `{ "username" }`. 200 selalu generik `data: { accepted:true, message }`;
 
 ### POST /auth/reset-password
 Request `{ "token", "new_password", "new_password_confirmation" }`. 200 `data: { reset:true }`.
-Sukses: password baru, token ditandai terpakai, **token reset lain milik akun yang sama dibatalkan**, seluruh refresh token akun dicabut — semuanya dalam satu transaksi (all-or-nothing).
+Sukses: password baru, token ditandai terpakai, **token reset lain milik akun yang sama dibatalkan**, seluruh baris refresh token akun dihapus — semuanya dalam satu transaksi (all-or-nothing).
 422 `errors.token`: "tidak valid" / "sudah pernah dipakai" / "sudah tidak berlaku lagi" (token dibatalkan karena reset lain sudah sukses) / "sudah kedaluwarsa" (TTL `auth.resetTokenTtl`, default 30 menit).
 Dua request paralel untuk akun yang sama (token sama atau berbeda): hanya satu yang 200, sisanya 422.
 500 bila penyimpanan gagal (error database: lock wait timeout, deadlock, dll.) — tidak ada yang tersimpan dan token belum terpakai, jadi bisa dicoba lagi.
@@ -75,12 +81,12 @@ Query index: `search` (username/nip LIKE), `user_level`, `status`, `id_satker` (
 Response index: `data: { items:[user...], total, page, per_page }`.
 
 Create `{ nip (18 digit), username? (default = nip), password, user_level (1-8), id_unit?, id_satker?, status? }` → 201 `data: user`.
-Update `{ username?, user_level?, id_unit?, id_satker?, status?, password? }` → 200 `data: user`; perubahan role/status/password/satker mencabut seluruh sesi akun tsb.
-Status `{ "status": "0"|"1" }`. Delete → soft delete (`deleted_at`) + sesi dicabut; tidak boleh menghapus akun sendiri.
+Update `{ username?, user_level?, id_unit?, id_satker?, status?, password? }` → 200 `data: user`; perubahan role/status/password/satker mencabut seluruh sesi akun tsb (baris refresh token dihapus).
+Status `{ "status": "0"|"1" }`. Delete → soft delete (`deleted_at`) + sesi dicabut (baris refresh token dihapus); tidak boleh menghapus akun sendiri.
 
 Scoping: role 3 hanya melihat/mengubah akun dengan `id_satker` = satker di claims JWT-nya; akun lain → **403**. Role 3 tidak dapat membuat/memberi role Super Admin (asumsi keamanan, perlu konfirmasi).
 Validasi: 422 `errors` per-field (nip 18 digit, nip/username unik, role valid, kebijakan password).
 
 ## Audit trail (A-10)
 `audit_logs` — `login` dan `logout` ditulis eksplisit oleh `AuthService` (entity `pengguna`, `nip_actor` = akun ybs); ganti password, reset password, dan seluruh CRUD akun tercatat otomatis lewat `PenggunaModel` (turunan `BaseAuditableModel`) dengan kolom hash password dimasking `***`.
-Reset password (tanpa sesi login): `nip_actor` = NIP pemilik akun (`PenggunaModel::withActor()`). Pengecualian fail-open F0-04: bila INSERT audit reset gagal, reset ikut dibatalkan (500), karena di dalam transaksi kegagalannya tidak bisa dibedakan dari transaksi yang sudah di-rollback server.
+Jalur tanpa sesi login memakai `nip_actor` = NIP pemilik akun (`PenggunaModel::withActor()`): reset password, serta update `last_login_at` dan lazy rehash saat login — setiap baris audit yang ditulis selama login ber-actor pemilik akun, bukan hanya event `login`. Pengecualian fail-open F0-04: bila INSERT audit reset gagal, reset ikut dibatalkan (500), karena di dalam transaksi kegagalannya tidak bisa dibedakan dari transaksi yang sudah di-rollback server.

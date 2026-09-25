@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Auth;
 
+use App\Libraries\Auth\AuthService;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
+use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 
@@ -109,6 +114,72 @@ final class TokenTest extends CIUnitTestCase
         $this->post('api/v1/auth/refresh')->assertStatus(401);
     }
 
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function rejectedRefreshCases(): iterable
+    {
+        yield 'tanpa cookie' => ['missing'];
+
+        yield 'token tidak dikenal' => ['unknown'];
+
+        yield 'token kedaluwarsa' => ['expired'];
+
+        yield 'token hasil rotasi dipakai ulang (reuse)' => ['reused'];
+    }
+
+    /**
+     * T-01 — setiap 401 dari /auth/refresh menghapus cookie refresh_token (Set-Cookie kedaluwarsa, path sama), sehingga
+     * tab/perangkat lama tidak terus mengirim token mati pada setiap refresh berikutnya. Cookie access tidak disentuh.
+     */
+    #[DataProvider('rejectedRefreshCases')]
+    public function testRejectedRefreshClearsRefreshCookie(string $case): void
+    {
+        $refresh = match ($case) {
+            'missing' => null,
+            'unknown' => bin2hex(random_bytes(32)),
+            'expired' => $this->expiredRefreshToken(),
+            'reused'  => $this->rotatedRefreshToken(),
+            default   => throw new InvalidArgumentException('Kasus tidak dikenal: ' . $case),
+        };
+
+        $this->clearAuthState();
+        $this->setRefreshCookie($refresh);
+
+        $result = $this->post('api/v1/auth/refresh');
+
+        $result->assertStatus(401);
+        $response = $result->response();
+        $this->assertTrue($response->hasCookie('refresh_token'), 'Respons 401 refresh harus menghapus cookie refresh_token');
+        $cookie = $response->getCookie('refresh_token');
+        $this->assertSame('', $cookie->getValue());
+        $this->assertTrue($cookie->isExpired(), 'Cookie refresh harus kedaluwarsa');
+        $this->assertSame('/api/v1/auth', $cookie->getPath(), 'Path harus sama dengan cookie refresh agar benar-benar terhapus');
+        $this->assertTrue($cookie->isHTTPOnly());
+        $this->assertFalse($response->hasCookie('access_token'), 'Cookie access tidak ikut diubah');
+    }
+
+    /**
+     * Error server saat refresh (mis. lock wait timeout) bukan penolakan token: token lama tetap berlaku (rotasi
+     * di-rollback), jadi cookie refresh TIDAK boleh dihapus.
+     */
+    public function testServerErrorDuringRefreshKeepsRefreshCookie(): void
+    {
+        $authService = $this->createMock(AuthService::class);
+        $authService->method('refresh')->willThrowException(new DatabaseException('Lock wait timeout exceeded', 1205));
+        Services::injectMock('authService', $authService);
+        $this->setRefreshCookie(bin2hex(random_bytes(32)));
+
+        try {
+            $status = $this->post('api/v1/auth/refresh')->response()->getStatusCode();
+        } catch (DatabaseException) {
+            $status = 500; // tidak ditangkap controller → ditangani exception handler global sebagai 500
+        }
+
+        $this->assertSame(500, $status);
+        $this->assertFalse(service('response')->hasCookie('refresh_token'), 'Error server tidak boleh menghapus cookie refresh');
+    }
+
     public function testExpiredAccessTokenIsRejectedOnProtectedEndpoint(): void
     {
         $jwt = service('jwt');
@@ -181,5 +252,26 @@ final class TokenTest extends CIUnitTestCase
         $this->assertSame(2, $json['data']['claims']['role']);
         $this->assertSame('S01', $json['data']['claims']['id_satker']);
         $this->assertArrayNotHasKey('password', $json['data']['user']);
+    }
+
+    private function expiredRefreshToken(): string
+    {
+        $jwt = service('jwt');
+        $jwt->setNow(time() - 7 * 86400 - 1);
+        $tokens = $jwt->issueTokenPair(['sub' => self::NIP, 'role' => 2]);
+        $jwt->setNow(null);
+
+        return $tokens['refresh_token'];
+    }
+
+    /**
+     * Refresh token yang sudah dirotasi sekali (revoked=1) — memakainya lagi = reuse.
+     */
+    private function rotatedRefreshToken(): string
+    {
+        $old = $this->issueTokensFor(self::NIP)['refresh_token'];
+        service('jwt')->refresh($old);
+
+        return $old;
     }
 }

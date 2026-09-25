@@ -94,7 +94,7 @@ final class JwtServiceTest extends CIUnitTestCase
      */
     public static function tokenWriteModes(): iterable
     {
-        foreach (['revoke', 'revokeAllForNip'] as $method) {
+        foreach (['revoke', 'revokeAllForNip', 'deleteAllForNip', 'deleteExpired'] as $method) {
             yield $method . ' DBDebug=true' => [$method, true];
 
             yield $method . ' DBDebug=false' => [$method, false];
@@ -354,6 +354,33 @@ final class JwtServiceTest extends CIUnitTestCase
     }
 
     /**
+     * T-01 — pencabutan massal (mis. reset password) lalu login ulang di perangkat lain, keduanya jatuh di antara
+     * SELECT dan UPDATE milik refresh token lama: baris token lama sudah dihapus → unknownToken, bukan reuse, dan sesi
+     * baru hasil login ulang tidak ikut dicabut.
+     */
+    public function testRefreshRacingMassRevocationIsUnknownTokenAndKeepsNewSession(): void
+    {
+        $pair  = $this->jwt->issueTokenPair($this->claims);
+        $fresh = null;
+
+        $racing = new JwtService($this->config, $this->modelWithHookAfterFind($this->db, function () use (&$fresh): void {
+            $this->jwt->revokeAllForNip('198501012010011001');
+            $fresh = $this->jwt->issueRefreshToken($this->claims);
+        }));
+
+        try {
+            $racing->refresh($pair['refresh_token']);
+            $this->fail('Refresh dengan token yang sudah dicabut massal harus ditolak');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_NOT_FOUND, $e->getReason(), 'Token yang dicabut massal harus "tidak dikenal", bukan reuse');
+        }
+
+        $this->assertNotNull($fresh);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $fresh['token']), 'revoked' => 0]);
+        $this->assertSame(1, $this->db->table('token')->countAllResults(), 'Tidak boleh ada token baru yang terbit dari token lama');
+    }
+
+    /**
      * Error DB saat revoke (di sini lock wait timeout karena proses lain menahan lock baris) harus menjadi error DB:
      * transaksi di-rollback, token lama tetap berlaku — BUKAN dibaca "kalah race" lalu dianggap reuse (cabut semua sesi,
      * 401). Di dalam transaksi CI4 query gagal hanya mengembalikan false apa pun DBDebug-nya; diuji di kedua mode.
@@ -493,8 +520,12 @@ final class JwtServiceTest extends CIUnitTestCase
         try {
             if ($method === 'revoke') {
                 $model->revoke($id, time());
-            } else {
+            } elseif ($method === 'revokeAllForNip') {
                 $model->revokeAllForNip('198501012010011001', time());
+            } elseif ($method === 'deleteExpired') {
+                $model->deleteExpired($id, time() + $this->config->refreshTtl + 60);
+            } else {
+                $model->deleteAllForNip('198501012010011001');
             }
 
             $this->fail($method . '() harus melempar DatabaseException saat query gagal');
@@ -507,11 +538,16 @@ final class JwtServiceTest extends CIUnitTestCase
         $this->seeInDatabase('token', ['id' => $id, 'revoked' => 0]);
     }
 
+    /**
+     * Token kedaluwarsa ditolak lalu barisnya DIHAPUS (bukan revoked=1). Dikirim lagi (retry klien body, tab paralel,
+     * jam klien tertinggal) → unknownToken, bukan reuse yang mencabut sesi lain milik nip yang sama (T-01).
+     */
     public function testRefreshTokenExpiredAfterSevenDaysIsRejected(): void
     {
         $this->jwt->setNow(time() - 604801); // diterbitkan 7 hari 1 detik lalu
         $refresh = $this->jwt->issueRefreshToken($this->claims);
         $this->jwt->setNow(null);
+        $other = $this->jwt->issueRefreshToken($this->claims); // sesi baru di perangkat lain
 
         try {
             $this->jwt->refresh($refresh['token']);
@@ -520,7 +556,67 @@ final class JwtServiceTest extends CIUnitTestCase
             $this->assertSame(AuthException::REASON_EXPIRED, $e->getReason());
         }
 
+        $this->dontSeeInDatabase('token', ['token_hash' => hash('sha256', $refresh['token'])]);
+
+        try {
+            $this->jwt->refresh($refresh['token']);
+            $this->fail('Refresh token expired yang dikirim lagi harus ditolak');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_NOT_FOUND, $e->getReason(), 'Token expired yang dikirim lagi harus "tidak dikenal", bukan reuse');
+        }
+
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $other['token']), 'revoked' => 0]);
+        $new = $this->jwt->refresh($other['token']);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $new['refresh_token']), 'revoked' => 0]);
+    }
+
+    /**
+     * Request lain merotasi token (masih berlaku menurut jamnya) di antara SELECT dan DELETE milik request yang sudah
+     * melihatnya kedaluwarsa: baris hasil rotasi (revoked=1) TIDAK ikut terhapus, sehingga pemakaian ulangnya tetap
+     * terbaca reuse; sesi hasil rotasi tetap hidup.
+     */
+    public function testExpiredRefreshRacingRotationKeepsRotatedRowForReuseDetection(): void
+    {
+        $refresh = $this->jwt->issueRefreshToken($this->claims);
+        $rotated = null;
+
+        $racing = new JwtService($this->config, $this->modelWithHookAfterFind($this->db, function () use ($refresh, &$rotated): void {
+            $rotated = $this->jwt->refresh($refresh['token']);
+        }));
+        $racing->setNow($refresh['expires_at'] + 1); // jam request ini sudah lewat masa berlaku token
+
+        try {
+            $racing->refresh($refresh['token']);
+            $this->fail('Refresh token expired harus ditolak');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_EXPIRED, $e->getReason());
+        }
+
+        $this->assertNotNull($rotated);
         $this->seeInDatabase('token', ['token_hash' => hash('sha256', $refresh['token']), 'revoked' => 1]);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $rotated['refresh_token']), 'revoked' => 0]);
+    }
+
+    public function testTokenModelDeleteExpiredOnlyDeletesExpiredUnrotatedRow(): void
+    {
+        $model   = new TokenModel($this->db);
+        $now     = time();
+        $expired = $now + $this->config->refreshTtl + 60; // jam "sekarang" setelah token kedaluwarsa
+
+        $active = $this->jwt->issueRefreshToken($this->claims);
+        $id     = (int) $model->findByHash(hash('sha256', $active['token']))['id'];
+        $this->assertFalse($model->deleteExpired($id, $now), 'Token yang masih berlaku tidak boleh dihapus');
+        $this->seeInDatabase('token', ['id' => $id]);
+
+        $rotated   = $this->jwt->issueRefreshToken($this->claims);
+        $rotatedId = (int) $model->findByHash(hash('sha256', $rotated['token']))['id'];
+        $this->assertTrue($model->revoke($rotatedId, $now));
+        $this->assertFalse($model->deleteExpired($rotatedId, $expired), 'Token yang sudah dirotasi (revoked=1) tidak boleh dihapus');
+        $this->seeInDatabase('token', ['id' => $rotatedId, 'revoked' => 1]);
+
+        $this->assertTrue($model->deleteExpired($id, $expired), 'Token kedaluwarsa yang belum dirotasi harus terhapus');
+        $this->dontSeeInDatabase('token', ['id' => $id]);
+        $this->assertFalse($model->deleteExpired($id, $expired), 'Baris yang sudah terhapus = affected rows 0');
     }
 
     public function testUnknownRefreshTokenIsRejected(): void
@@ -539,6 +635,37 @@ final class JwtServiceTest extends CIUnitTestCase
         $this->expectException(AuthException::class);
         $this->jwt->refresh($a['token']);
         $this->jwt->refresh($b['token']);
+    }
+
+    /**
+     * T-01 (QAFUNC-002-R1 24-09) — pencabutan massal (ganti/reset password, perubahan/hapus akun oleh admin) MENGHAPUS
+     * seluruh baris token nip tsb, termasuk token yang sudah dirotasi (revoked=1). Token lama di perangkat lain →
+     * unknownToken, bukan reuse, sehingga sesi yang terbit sesudahnya (login ulang) tidak ikut dicabut.
+     */
+    public function testRevokeAllForNipDeletesEveryTokenSoStaleTokensAreUnknownNotReuse(): void
+    {
+        $rotated = $this->jwt->issueTokenPair($this->claims);
+        $current = $this->jwt->refresh($rotated['refresh_token']); // token lama revoked=1, token baru aktif
+        $other   = $this->jwt->issueRefreshToken($this->claims);  // perangkat lain
+        $foreign = $this->jwt->issueRefreshToken(['sub' => '199002152015022002', 'role' => Role::PEGAWAI]);
+
+        $this->assertSame(3, $this->jwt->revokeAllForNip('198501012010011001'));
+        $this->dontSeeInDatabase('token', ['nip' => '198501012010011001']);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $foreign['token']), 'revoked' => 0]);
+
+        $fresh = $this->jwt->issueRefreshToken($this->claims); // login ulang di perangkat B
+
+        foreach ([$rotated['refresh_token'], $current['refresh_token'], $other['token']] as $stale) {
+            try {
+                $this->jwt->refresh($stale);
+                $this->fail('Token yang dicabut massal harus ditolak');
+            } catch (AuthException $e) {
+                $this->assertSame(AuthException::REASON_NOT_FOUND, $e->getReason(), 'Token yang dicabut massal harus "tidak dikenal", bukan reuse');
+            }
+        }
+
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $fresh['token']), 'revoked' => 0]);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $foreign['token']), 'revoked' => 0]);
     }
 
     public function testCookiesAreHttpOnly(): void
