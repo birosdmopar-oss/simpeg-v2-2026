@@ -8,6 +8,8 @@ use App\Libraries\ApiExceptionHandler;
 use CodeIgniter\Config\BaseConfig;
 use CodeIgniter\Debug\ExceptionHandler;
 use CodeIgniter\Debug\ExceptionHandlerInterface;
+use CodeIgniter\HTTP\IncomingRequest;
+use CodeIgniter\HTTP\RequestInterface;
 use Psr\Log\LogLevel;
 use Throwable;
 
@@ -104,7 +106,7 @@ class Exceptions extends BaseConfig
      */
     public function handler(int $statusCode, Throwable $exception): ExceptionHandlerInterface
     {
-        // API (prefix api/ atau klien minta JSON) → envelope JSON (ADR-001/ADR-002).
+        // API (route kosong/berprefix api/ atau klien minta JSON) → envelope JSON (ADR-001/ADR-002).
         if (! is_cli() && self::isApiRequest()) {
             return new ApiExceptionHandler($this);
         }
@@ -112,14 +114,30 @@ class Exceptions extends BaseConfig
         return new ExceptionHandler($this);
     }
 
-    private static function isApiRequest(): bool
+    /**
+     * Request API = route path kosong (healthcheck) atau berprefix `api/`, atau klien meminta JSON.
+     *
+     * Route path diambil dari IncomingRequest::getPath() (relatif baseURL, tanpa indexPage). Jangan pakai
+     * getUri()->getPath(): selama Config\App::$indexPage = 'index.php' nilainya 'index.php/api/...', sehingga prefix
+     * api/ tidak pernah cocok dan request API tanpa `Accept: application/json` jatuh ke handler bawaan CI4 — bukan
+     * envelope, dan pesan yang memuat byte non-UTF-8 (segmen URI yang ditolak Router) berujung fatal error HTML (CR-007).
+     *
+     * @param RequestInterface|null $request null = service('request')
+     */
+    public static function isApiRequest(?RequestInterface $request = null): bool
     {
         try {
-            $request = service('request');
-            $path    = trim($request->getUri()->getPath(), '/');
-            $accept  = $request->getHeaderLine('Accept');
+            $request ??= service('request');
 
-            return $path === '' || str_starts_with($path, 'api/') || str_contains($accept, 'application/json');
+            if ($request instanceof IncomingRequest) {
+                $path = trim($request->getPath(), '/');
+
+                if ($path === '' || str_starts_with($path, 'api/')) {
+                    return true;
+                }
+            }
+
+            return str_contains($request->getHeaderLine('Accept'), 'application/json');
         } catch (Throwable) {
             return false;
         }

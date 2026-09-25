@@ -11,6 +11,7 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\TestLogger;
 use Config\Services;
 use RuntimeException;
 use Tests\Support\AuthTestTrait;
@@ -42,6 +43,8 @@ final class DatabaseDataErrorTest extends CIUnitTestCase
 
     private const PROBE_URI = 'api/v1/_probe/write/';
 
+    private const THROW_URI = 'api/v1/_probe/throw/';
+
     /**
      * Kode error data yang WAJIB menjadi 422 (spesifikasi CR-007), sengaja ditulis ulang di sini — bukan dibaca dari
      * ApiExceptionHandler::DATA_ERROR_CODES — agar kode yang hilang dari daftar itu ketahuan.
@@ -54,7 +57,10 @@ final class DatabaseDataErrorTest extends CIUnitTestCase
         $this->clearAuthState();
         $this->resetMasterState();
 
-        $this->withRoutes([['POST', 'api/v1/_probe/write/(:segment)', '\\' . DataErrorProbeController::class . '::write/$1']]);
+        $this->withRoutes([
+            ['POST', 'api/v1/_probe/write/(:segment)', '\\' . DataErrorProbeController::class . '::write/$1'],
+            ['POST', 'api/v1/_probe/throw/(:segment)', '\\' . DataErrorProbeController::class . '::throwDbError/$1'],
+        ]);
     }
 
     protected function tearDown(): void
@@ -111,13 +117,28 @@ final class DatabaseDataErrorTest extends CIUnitTestCase
     {
         $this->db->table('pegawai_dummy')->insert(['nip' => 'NIP-GANDA']);
 
-        // 1062 yang tidak diterjemahkan service tetap dilempar ke handler global (500), tidak ditelan _remap().
-        try {
-            $this->post(self::PROBE_URI . 'duplikat');
-            $this->fail('Error 1062 di luar engine master harus tetap dilempar.');
-        } catch (DatabaseException $e) {
-            $this->assertSame(1062, $e->getCode());
-            $this->assertSame(500, ApiExceptionHandler::toEnvelope($e)[0]);
+        // Error DB selain kode data tidak ditelan _remap(): tetap dilempar ke handler global (log critical + trace, 500)
+        // dan tidak tercatat sebagai "diterjemahkan ke 422". Nyata: 1062 yang tidak diterjemahkan service, 1146; simulasi
+        // dari dalam controller: lock wait, deadlock, SIGNAL, DatabaseException tanpa kode.
+        $cases = [
+            self::PROBE_URI . 'duplikat'        => 1062,
+            self::PROBE_URI . 'tabel-tidak-ada' => 1146,
+        ];
+
+        foreach (DataErrorProbeController::simulatedServerErrorCases() as $case => $code) {
+            $cases[self::THROW_URI . $case] = $code;
+        }
+
+        foreach ($cases as $uri => $code) {
+            try {
+                $this->post($uri);
+                $this->fail("Error DB {$code} ({$uri}) harus tetap dilempar ke handler global.");
+            } catch (DatabaseException $e) {
+                $this->assertSame($code, $e->getCode(), $uri);
+                $this->assertSame(500, ApiExceptionHandler::toEnvelope($e)[0], $uri);
+            }
+
+            $this->assertFalse(TestLogger::didLog('error', "Error data database diterjemahkan ke 422: [{$code}]", false), $uri);
         }
 
         $this->assertSame(1, $this->db->table('pegawai_dummy')->countAllResults());

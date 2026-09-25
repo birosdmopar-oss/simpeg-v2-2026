@@ -34,6 +34,15 @@ class ApiExceptionHandler extends BaseExceptionHandler implements ExceptionHandl
      */
     public const DATA_ERROR_MESSAGE = 'Data tidak dapat diproses karena ada isian yang tidak valid.';
 
+    /**
+     * Pesan exception 4xx di luar ApiException/PageNotFoundException — mis. segmen URI yang ditolak Router CI4
+     * (CodeIgniter\HTTP\Exceptions\BadRequestException 400: byte non-UTF-8 atau karakter di luar permittedURIChars).
+     * Pesan asli (memuat segmen mentah) hanya di log.
+     */
+    public const CLIENT_ERROR_MESSAGE = 'Permintaan tidak valid.';
+
+    public const SERVER_ERROR_MESSAGE = 'Terjadi kesalahan pada server.';
+
     public function handle(
         Throwable $exception,
         RequestInterface $request,
@@ -74,10 +83,13 @@ class ApiExceptionHandler extends BaseExceptionHandler implements ExceptionHandl
 
         $status = $fallbackStatus >= 400 && $fallbackStatus < 600 ? $fallbackStatus : 500;
 
+        // Error klien dari framework (mis. Router 400): pesan generik, segmen/nilai mentah tidak dipantulkan.
+        if ($status < 500) {
+            return [$status, ['status' => 'error', 'message' => self::CLIENT_ERROR_MESSAGE]];
+        }
+
         // Server error: tidak silent (ter-log oleh CI4), pesan detail hanya di luar production.
-        $message = ENVIRONMENT === 'production' || $status < 500
-            ? 'Terjadi kesalahan pada server.'
-            : $exception->getMessage();
+        $message = ENVIRONMENT === 'production' ? self::SERVER_ERROR_MESSAGE : $exception->getMessage();
 
         return [$status, ['status' => 'error', 'message' => $message]];
     }

@@ -23,9 +23,10 @@ use CodeIgniter\HTTP\ResponseInterface;
  * _remap() menangkap App\Exceptions\ApiException dari method mana pun dan mengubahnya ke envelope,
  * sehingga method controller tetap tipis (ADR-002) dan perilaku sama di feature test maupun runtime.
  *
- * CR-007 (prasyarat strictOn): input yang bukan UTF-8 valid (parameter route, query string, body) ditolak 422
+ * CR-007 (prasyarat strictOn): input yang bukan UTF-8 valid (query string, body, parameter route) ditolak 422
  * sebelum menyentuh DB, dan error data MySQL (ApiExceptionHandler::DATA_ERROR_CODES) diterjemahkan ke 422 generik
- * dengan detail hanya di log.
+ * dengan detail hanya di log. Segmen URL non-UTF-8 biasanya sudah ditolak Router CI4 lebih dulu (400 lewat
+ * ApiExceptionHandler); cek parameter route di sini lapis cadangan.
  */
 abstract class ApiController extends BaseController
 {

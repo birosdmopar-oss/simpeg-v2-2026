@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support\Controllers;
 
 use App\Controllers\Api\ApiController;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\HTTP\ResponseInterface;
 use InvalidArgumentException;
 
@@ -35,6 +36,24 @@ class DataErrorProbeController extends ApiController
             'terpotong'         => ['code' => 1265, 'table' => 'riwayat_dummy', 'row' => ['nip' => '1', 'id_jabatan' => '12abc']],
             'wajib-tanpa-nilai' => ['code' => 1364, 'table' => 'riwayat_dummy', 'row' => ['id_jabatan' => 1]],
             'duplikat'          => ['code' => 1062, 'table' => 'pegawai_dummy', 'row' => ['nip' => 'NIP-GANDA']],
+            'tabel-tidak-ada'   => ['code' => 1146, 'table' => 'probe_tidak_ada', 'row' => ['nip' => '1']],
+        ];
+    }
+
+    /**
+     * Kasus → kode error DB non-data yang sulit dipicu nyata secara deterministik di test (lock wait, deadlock, SIGNAL
+     * dari trigger, DatabaseException tanpa kode seperti "Reset password gagal disimpan."); dilempar apa adanya dari
+     * dalam controller seperti service produksi.
+     *
+     * @return array<string, int>
+     */
+    public static function simulatedServerErrorCases(): array
+    {
+        return [
+            'lock-wait'  => 1205,
+            'deadlock'   => 1213,
+            'signal'     => 1644,
+            'tanpa-kode' => 0,
         ];
     }
 
@@ -49,6 +68,17 @@ class DataErrorProbeController extends ApiController
         db_connect()->table($cases[$case]['table'])->insert($cases[$case]['row']);
 
         return $this->respondSuccess(['written' => true], 201);
+    }
+
+    public function throwDbError(string $case): never
+    {
+        $cases = self::simulatedServerErrorCases();
+
+        if (! isset($cases[$case])) {
+            throw new InvalidArgumentException("Kasus probe tidak dikenal: {$case}");
+        }
+
+        throw new DatabaseException("Simulasi error database: {$case}", $cases[$case]);
     }
 
     public function echoParam(string $value): ResponseInterface
