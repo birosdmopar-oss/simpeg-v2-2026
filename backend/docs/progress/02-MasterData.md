@@ -2,7 +2,7 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `02-MasterData.md`.
 
-**Terakhir diperbarui:** 24 September 2026 (DBV-001 disetujui & di-merge; G-10 FAQ pilot DBV-002/CR-003 diajukan, menunggu review)
+**Terakhir diperbarui:** 25 September 2026 (G-10 FAQ pilot DBV-002/CR-003 disetujui & di-merge)
 **Entry criteria:** Fase 1 sign-off dikonfirmasi user (21 Sep 2026).
 **Blocker utama:** DDL legacy 13 tabel Tier 0/1 belum ada → Trello **ISSUE-003** (FAQ tidak lagi: DDL-nya ada di `simpeg_prod.sql:949-1030`). Keputusan skema → `backend/docs/db-review/G-01-master-schema.md` Bagian 4; FAQ → `backend/docs/db-review/G-10-faq-schema.md` Bagian 4.
 
@@ -17,7 +17,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 | G-07 Data Umum & Wilayah | **IN_PROGRESS** | agama, jenis_pegawai, jenis_status, wilayah 4 level SELESAI (backend + FE + G-TC). `kantor` belum (blocked DDL) |
 | G-08 Hari Libur | TODO | Kolom ada di seed/Tech Spec; butuh migration `jenis_libur` + validasi overlap (tidak cocok engine generik murni) |
 | G-09 Web Config | TODO (blocked) | Konflik nama kolom `config_key` (seed) vs `config_name` (legacy); daftar key + tipe data belum ada |
-| G-10 FAQ | **IN_PROGRESS** (menunggu review) | Pilot skema legacy **DBV-002/CR-003** (branch `dbv-002/g10-faq-pilot`): 5 tabel FAQ (DDL legacy ditemukan), CRUD admin (engine generik) + baca/cari/rating pegawai (backend + FE) selesai & test hijau. ⏳ Menunggu approval DB Validator (DBV-002) dan review kode (CR-003); FK `faq_rate.nip` → `pegawai` ditunda ke B-01 |
+| G-10 FAQ | **IN_PROGRESS** (kode di main, menunggu QA) | Pilot skema legacy **DBV-002/CR-003** (branch `dbv-002/g10-faq-pilot`): 5 tabel FAQ (DDL legacy ditemukan), CRUD admin (engine generik) + baca/cari/rating pegawai (backend + FE) selesai & test hijau. ⏳ Menunggu approval DB Validator (DBV-002) dan review kode (CR-003); FK `faq_rate.nip` → `pegawai` ditunda ke B-01 |
 
 ## G-01 — IN_PROGRESS
 
@@ -27,7 +27,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - Dokumen review DB Validator: `backend/docs/db-review/G-01-master-schema.md`.
 - Dijalankan HANYA di DB lokal (`simpeg_v2`) & test (`simpeg_v2_testing`).
 - **DBV-001** `app/Database/Migrations/2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` — ALTER ke skema legacy (nama/tipe kolom legacy, status 1/2/10, kolom audit, `utf8mb4_unicode_ci`, UNIQUE nama, kode wilayah CHAR(2/4/7/10)). ✅ Disetujui DB Validator 24-09-2026 (PR #4, merge `633dbb0`); jalankan hanya saat ketujuh tabel kosong. Menyelesaikan ISSUE-008/009/010 untuk 7 tabel ini (sisa di luar tabel ini tetap dilacak di kartu masing-masing).
-- **DBV-002** (⏳ menunggu approval) `app/Database/Migrations/2026-09-24-000001_CreateFaq.php` — 5 tabel FAQ skema legacy. Dokumen review terpisah: `backend/docs/db-review/G-10-faq-schema.md`. Belum dijalankan di `simpeg_v2` (dev); hanya di DB test.
+- **DBV-002** (✅ disetujui 25-09-2026, merge `f958cb5`) `app/Database/Migrations/2026-09-24-000001_CreateFaq.php` — 5 tabel FAQ skema legacy. Dokumen review terpisah: `backend/docs/db-review/G-10-faq-schema.md`. Belum dijalankan di `simpeg_v2` (dev); hanya di DB test.
 
 **Belum**
 - ~~Approval DB Validator~~ → Batch 1 **DISETUJUI** 23-09-2026 (Keputusan #1, #3, #5 terisi). Keputusan #2, #4, #9 ditunda sampai seluruh Fase 2 selesai → **dikerjakan lebih awal di DBV-001** atas keputusan user 23-09-2026 (✅ disetujui 24-09-2026, G-01 Bagian 8.5; #3 dibalik); #6, #7, #8 masih menunggu DDL legacy (bagian FAQ dari #6 `faq_related_article` & #7 `faq_rate.nip` diajukan di DBV-002 ⏳, G-10 Bagian 5).
@@ -49,7 +49,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - `kantor` (blocked DDL: legacy FK ke 4 tabel wilayah).
 - G-TC #7 QA Lapis 1 vs Figma — desain belum ada.
 
-## G-10 — IN_PROGRESS (pilot DBV-002 / CR-003, menunggu review)
+## G-10 — IN_PROGRESS (pilot DBV-002 / CR-003 ✅, di main; menunggu QA)
 
 Key review `[DBV-002][CR-003]`, branch `dbv-002/g10-faq-pilot`: DB Validator hanya approve, merge oleh reviewer CR. Dokumen skema & keputusan: `backend/docs/db-review/G-10-faq-schema.md`.
 
@@ -62,11 +62,11 @@ Key review `[DBV-002][CR-003]`, branch `dbv-002/g10-faq-pilot`: DB Validator han
 - FE: menu "FAQ" untuk semua role (`/faq/:id?`, `?q=`), navigasi topik, pencarian, detail artikel (HTML lewat DOMPurify), widget rating (4 alasan baku legacy + "Lainnya"); form admin master mendukung field `html` (textarea + pratinjau) dan batas byte.
 - Test: `FaqSchemaTest`, `FaqTest`, `HtmlSanitizerTest`, G-TC generik (`MasterGenericTcTest`, `RbacMasterEndpointsTest`) mencakup 3 master FAQ; Vitest FAQ (service, schema, widget rating, view, sanitizeHtml). `composer check` & `npm run check` hijau (PHPUnit 239 test / 3365 assertion setelah tindak lanjut CR-003; Vitest 94 test) — rincian di G-10 Bagian 6.
 
-**Keputusan** (user 24-09-2026: U1 sanitasi HTML, U2 rating role 2/6/7, U3 status anak tidak ditulis ulang, U4 FK RESTRICT; usulan D1–D8 menunggu DBV) → G-10 Bagian 1 & 4.
+**Keputusan** (user 24-09-2026: U1 sanitasi HTML, U2 rating role 2/6/7, U3 status anak tidak ditulis ulang, U4 FK RESTRICT; usulan D1–D8 disetujui DBV 25-09-2026) → G-10 Bagian 1 & 4.
 
 **Belum**
-- ⏳ Approval DB Validator (DBV-002, 9 poin di G-10 Bagian 4) dan review kode (CR-003). Migration belum boleh dijalankan di Dev.
-- Verifikasi di MariaDB 10.4 (FULLTEXT & UNIQUE 1.024 byte) — G-10 Bagian 3 #7.
+- ~~Approval~~ ✅ DBV-002 disetujui 25-09-2026 (10 poin, G-10 Bagian 4) + CR-003 ✅; di-merge ke main (`f958cb5`). Sisa: QA fungsional/visual (QASMTASK-042).
+- Verifikasi di MariaDB 10.4 (FULLTEXT & UNIQUE 1.024 byte) tidak dilaporkan saat approval — G-10 Bagian 3 #7.
 - Uji visual/end-to-end halaman FAQ & form admin di browser dengan backend sungguhan (baru unit/komponen test).
 - Ditunda ke PR lain: editor WYSIWYG + upload gambar, upload ikon topik, rekap rating untuk admin, UI `faq_related_article`, FK `faq_rate.nip` (B-01), tab "Pertanyaan Umum/Panduan Pengguna" & "Chat Admin" (Redesign), migrasi data FAQ (catatan Mapping di G-10 Bagian 6.3: `stripslashes`, sanitasi ulang, gambar, `order`, duplikat, `nip` = `id_pegawai` legacy).
 - G-TC #7 QA Lapis 1 — frame Figma admin FAQ belum ada (QAUI-002 #042).
