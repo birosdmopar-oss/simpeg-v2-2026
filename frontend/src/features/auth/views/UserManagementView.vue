@@ -2,6 +2,7 @@
 /**
  * Halaman Manajemen Akun (A-12, MTC-004/005): tabel sort/search, form tambah/edit, modal konfirmasi nonaktifkan/hapus.
  * Hanya dirender untuk role 1 & 3 (route meta roles + menu di AppShell); scoping satker ditegakkan backend.
+ * Akun non-pegawai (DBV-010/CR-013) boleh tanpa NIP: baris milik sendiri dikenali lewat id_pengguna, bukan NIP.
  */
 import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Plus, Search, Trash2, UserCheck, UserX } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -48,6 +49,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.va
 
 const columns: Array<{ key: SortKey; label: string }> = [
   { key: 'username', label: 'Username' },
+  { key: 'name', label: 'Nama' },
   { key: 'nip', label: 'NIP' },
   { key: 'user_level', label: 'Role' },
   { key: 'status', label: 'Status' },
@@ -127,9 +129,14 @@ function askDelete(user: User): void {
   confirm.value = { open: true, kind: 'delete', user, loading: false }
 }
 
+/** Baris akun yang sedang login (aksi nonaktifkan/hapus dimatikan). Dibandingkan per id_pengguna: NIP bisa NULL. */
+function isSelf(user: User): boolean {
+  return auth.user !== null && user.id_pengguna === auth.user.id_pengguna
+}
+
 /** Aksi baris untuk menu titik tiga (aturan UI: semua aksi per baris lewat RowActionsMenu). */
 function userActions(user: User): RowAction[] {
-  const self = user.nip === auth.user?.nip
+  const self = isSelf(user)
   return [
     { key: 'edit', label: 'Edit', icon: Pencil },
     user.status === '1'
@@ -218,7 +225,7 @@ onMounted(() => {
         <input
           v-model="search"
           type="search"
-          placeholder="Cari username / NIP"
+          placeholder="Cari username / NIP / nama"
           class="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand-tertiary focus:outline-none focus:ring-2 focus:ring-brand-tertiary/40"
           data-testid="user-search"
         />
@@ -252,14 +259,15 @@ onMounted(() => {
         </thead>
         <tbody class="divide-y divide-slate-100">
           <tr v-if="loading">
-            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
+            <td colspan="8" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
           </tr>
           <tr v-else-if="items.length === 0">
-            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Tidak ada akun yang cocok.</td>
+            <td colspan="8" class="px-4 py-8 text-center text-slate-500">Tidak ada akun yang cocok.</td>
           </tr>
-          <tr v-for="u in items" v-else :key="u.id_pengguna" class="hover:bg-slate-50" :data-testid="`user-row-${u.nip}`">
+          <tr v-for="u in items" v-else :key="u.id_pengguna" class="hover:bg-slate-50" :data-testid="`user-row-${u.id_pengguna}`">
             <td class="px-4 py-3 font-medium text-slate-800">{{ u.username }}</td>
-            <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ u.nip }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ u.name ?? '—' }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ u.nip ?? '—' }}</td>
             <td class="px-4 py-3">{{ u.user_level }} — {{ ROLE_LABELS[u.user_level] }}</td>
             <td class="px-4 py-3">
               <span
@@ -276,7 +284,7 @@ onMounted(() => {
                 <RowActionsMenu
                   :actions="userActions(u)"
                   :label="`Aksi untuk ${u.username}`"
-                  :testid="`user-actions-${u.nip}`"
+                  :testid="`user-actions-${u.id_pengguna}`"
                   @select="onUserAction(u, $event)"
                 />
               </div>

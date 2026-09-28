@@ -161,9 +161,8 @@ const onSubmit = handleSubmit(async (values) => {
         v-model="username"
         name="username"
         label="Username / NIP"
-        placeholder="Masukkan NIP"
+        placeholder="Masukkan username atau NIP"
         autocomplete="username"
-        inputmode="numeric"
         required
         :error="errors.username"
       />
