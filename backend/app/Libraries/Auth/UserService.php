@@ -55,7 +55,9 @@ class UserService
         }
 
         if ($query->filled('search')) {
-            $s = $query->string('search');
+            // Teks biasa: `%`, `_`, dan `!` dari kata kunci di-escape supaya tidak jadi wildcard LIKE (ISSUE-019),
+            // helper yang sama dengan pencarian daftar master dan FaqService.
+            $s = ListQuery::likeLiteral($builder->db(), $query->string('search'));
             $builder->groupStart()->like('username', $s)->orLike('nip', $s)->groupEnd();
         }
 

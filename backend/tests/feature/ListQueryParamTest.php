@@ -23,7 +23,7 @@ use Tests\Support\MasterDataTestTrait;
  * (page - 1) * per_page meluap int → TypeError di BaseBuilder::limit() → 500. Keduanya sekarang 422 dengan
  * errors per key (ADR-001). Halaman valid yang melewati jumlah data tetap 200 dengan daftar kosong.
  *
- * Pencarian daftar master juga meng-escape wildcard LIKE (`%`, `_`, `!`) seperti FaqService, sehingga
+ * Pencarian kedua daftar juga meng-escape wildcard LIKE (`%`, `_`, `!`) seperti FaqService, sehingga
  * `?search=%` mencari karakter '%' dan tidak lagi mencocokkan seluruh baris.
  *
  * @internal
@@ -268,11 +268,28 @@ final class ListQueryParamTest extends CIUnitTestCase
         $page2 = array_column($this->data($this->asRole(Role::SUPER_ADMIN)->get(self::USERS, ['page' => '2', 'per_page' => '3']))['items'], 'username');
         $this->assertCount(3, $page1);
         $this->assertSame(array_slice($default, 0, 6), array_merge($page1, $page2));
+    }
 
-        // Karakter wildcard di pencarian akun tidak menimbulkan error (escaping LIKE di luar cakupan ISSUE-019).
-        foreach (['%', '_', '!'] as $needle) {
-            $this->asRole(Role::SUPER_ADMIN)->get(self::USERS, ['search' => $needle])->assertStatus(200);
-        }
+    public function testSearchWildcardsAreMatchedAsPlainTextOnUserList(): void
+    {
+        // Akun pembanding yang benar-benar memuat karakter wildcard di username.
+        $this->createAccount('200001012024011001', 'admin%satu');
+        $this->createAccount('200001012024011002', 'admin_dua');
+
+        // Sebelum ISSUE-019 `%` mencocokkan SELURUH akun dan `_` mencocokkan semua username berisi >= 1 karakter.
+        $this->assertSame(['admin%satu'], $this->usernames(['search' => '%']));
+        $this->assertSame(['admin_dua'], $this->usernames(['search' => '_']));
+        $this->assertSame(['admin%satu'], $this->usernames(['search' => 'admin%']));
+        $this->assertSame(['admin_dua'], $this->usernames(['search' => 'n_d']));
+
+        // `!` adalah ESCAPE char Query Builder CI4 — ikut di-escape, jadi teks biasa dan tidak merusak pola.
+        $this->assertSame([], $this->usernames(['search' => '!']));
+        $this->assertSame([], $this->usernames(['search' => '!%']));
+        $this->assertSame([], $this->usernames(['search' => '%!%']));
+
+        // Regresi: kata kunci biasa tetap cocok, baik lewat username maupun NIP.
+        $this->assertSame(['admin%satu', 'admin_dua'], $this->usernames(['search' => 'admin']));
+        $this->assertSame(['admin%satu'], $this->usernames(['search' => '200001012024011001']));
     }
 
     // ------------------------------------------------------------------
@@ -290,6 +307,38 @@ final class ListQueryParamTest extends CIUnitTestCase
         $data = $this->json($result)['data'];
 
         return $data;
+    }
+
+    /**
+     * Akun uji dengan username apa adanya (bukan NIP), untuk menguji pencocokan karakter wildcard.
+     */
+    private function createAccount(string $nip, string $username): void
+    {
+        $this->sendJson('POST', self::USERS, [
+            'nip'        => $nip,
+            'username'   => $username,
+            'password'   => 'AkunBaru2026',
+            'user_level' => Role::PEGAWAI,
+        ])->assertStatus(201);
+    }
+
+    /**
+     * Username hasil daftar akun, diurutkan agar assertion tidak bergantung pada urutan tampil
+     * (urutan sort/order diuji terpisah).
+     *
+     * @param array<string, mixed> $query
+     *
+     * @return list<string>
+     */
+    private function usernames(array $query): array
+    {
+        $items = $this->data($this->asRole(Role::SUPER_ADMIN)->get(self::USERS, $query))['items'];
+
+        /** @var list<array<string, mixed>> $items */
+        $names = array_map(static fn (array $row): string => (string) $row['username'], $items);
+        sort($names);
+
+        return $names;
     }
 
     /**
