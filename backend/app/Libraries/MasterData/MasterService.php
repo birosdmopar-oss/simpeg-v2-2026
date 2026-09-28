@@ -7,6 +7,7 @@ namespace App\Libraries\MasterData;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\CacheService;
+use App\Libraries\ListQuery;
 use App\Models\MasterData\MasterModel;
 use Closure;
 use CodeIgniter\Database\BaseBuilder;
@@ -88,8 +89,9 @@ class MasterService
      */
     public function list(MasterDefinition $def, array $filters = []): array
     {
-        $page    = max(1, (int) ($filters['page'] ?? 1));
-        $perPage = min(self::PER_PAGE_MAX, max(1, (int) ($filters['per_page'] ?? self::PER_PAGE_DEFAULT)));
+        $query   = ListQuery::from($filters, ['search', 'status', 'parent', 'page', 'per_page']);
+        $page    = $query->page();
+        $perPage = $query->perPage(self::PER_PAGE_DEFAULT, self::PER_PAGE_MAX);
 
         $builder = $this->db->table($def->table);
 
@@ -101,7 +103,7 @@ class MasterService
         }
 
         if ($def->hasStatus) {
-            $status = (string) ($filters['status'] ?? '');
+            $status = $query->string('status');
 
             if (in_array($status, [MasterModel::STATUS_ACTIVE, MasterModel::STATUS_INACTIVE, MasterModel::STATUS_DELETED], true)) {
                 $builder->where(MasterDefinition::STATUS_FIELD, $status);
@@ -111,16 +113,17 @@ class MasterService
             }
         }
 
-        if ($def->parentField !== null && isset($filters['parent']) && $filters['parent'] !== '') {
-            $builder->where($def->parentField, (string) $filters['parent']);
+        if ($def->parentField !== null && $query->filled('parent')) {
+            $builder->where($def->parentField, $query->string('parent'));
         }
 
         foreach ($this->filterValues($def, $filters) as $column => $value) {
             $builder->where($column, $value);
         }
 
-        if (isset($filters['search']) && trim((string) $filters['search']) !== '') {
-            $search = trim((string) $filters['search']);
+        if ($query->filled('search')) {
+            // Teks biasa: `%`, `_`, dan `!` dari kata kunci di-escape supaya tidak jadi wildcard LIKE (pola FaqService).
+            $search = ListQuery::likeLiteral($this->db, $query->string('search'));
             $builder->groupStart()->like($def->nameField, $search)->orLike($def->primaryKey, $search);
 
             foreach ($def->extraSearch as $column) {

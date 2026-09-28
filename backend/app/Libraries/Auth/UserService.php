@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\ListQuery;
 use App\Models\Auth\PenggunaModel;
 
 /**
@@ -22,6 +23,8 @@ use App\Models\Auth\PenggunaModel;
 class UserService
 {
     private const PER_PAGE_MAX = 100;
+
+    private const PER_PAGE_DEFAULT = 20;
 
     public function __construct(
         private PenggunaModel $pengguna,
@@ -39,35 +42,36 @@ class UserService
     {
         $this->assertAdmin($actor);
 
-        $page    = max(1, (int) ($filters['page'] ?? 1));
-        $perPage = min(self::PER_PAGE_MAX, max(1, (int) ($filters['per_page'] ?? 20)));
+        $query   = ListQuery::from($filters, ['search', 'user_level', 'status', 'id_satker', 'sort', 'order', 'page', 'per_page']);
+        $page    = $query->page();
+        $perPage = $query->perPage(self::PER_PAGE_DEFAULT, self::PER_PAGE_MAX);
 
         $builder = $this->pengguna->builder()->where('deleted_at', null);
 
         if ($actor->role() === Role::ADMIN_SATKER) {
             $builder->where('id_satker', $actor->idSatker());
-        } elseif (! empty($filters['id_satker'])) {
-            $builder->where('id_satker', (string) $filters['id_satker']);
+        } elseif ($query->filled('id_satker')) {
+            $builder->where('id_satker', $query->string('id_satker'));
         }
 
-        if (! empty($filters['search'])) {
-            $s = (string) $filters['search'];
+        if ($query->filled('search')) {
+            $s = $query->string('search');
             $builder->groupStart()->like('username', $s)->orLike('nip', $s)->groupEnd();
         }
 
-        if (isset($filters['user_level']) && $filters['user_level'] !== '') {
-            $builder->where('user_level', (int) $filters['user_level']);
+        if ($query->filled('user_level')) {
+            $builder->where('user_level', (int) $query->string('user_level'));
         }
 
-        if (isset($filters['status']) && $filters['status'] !== '') {
-            $builder->where('status', (string) $filters['status']);
+        if ($query->filled('status')) {
+            $builder->where('status', $query->string('status'));
         }
 
         $total = (clone $builder)->countAllResults();
 
         $sortable = ['username', 'nip', 'user_level', 'status', 'created_at', 'last_login_at'];
-        $sort     = in_array($filters['sort'] ?? '', $sortable, true) ? (string) $filters['sort'] : 'username';
-        $order    = strtolower((string) ($filters['order'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
+        $sort     = in_array($query->string('sort'), $sortable, true) ? $query->string('sort') : 'username';
+        $order    = strtolower($query->string('order')) === 'desc' ? 'DESC' : 'ASC';
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $builder->orderBy($sort, $order)->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();

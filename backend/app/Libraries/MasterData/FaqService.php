@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\ListQuery;
 use App\Models\MasterData\FaqRateModel;
 use App\Models\MasterData\MasterModel;
 use CodeIgniter\Database\BaseBuilder;
@@ -314,16 +315,14 @@ class FaqService
     }
 
     /**
-     * Fallback judul: LIKE %q% lewat Query Builder. Builder CI4 menambahkan ESCAPE '!' tetapi tidak meng-escape
-     * wildcard di nilai, jadi `!`, `%`, dan `_` dari kata kunci di-escape di sini agar dicari sebagai karakter biasa
-     * (tanda kutip tetap di-escape oleh binding builder).
+     * Fallback judul: LIKE %q% lewat Query Builder, dengan wildcard kata kunci di-escape (ListQuery::likeLiteral,
+     * dipakai bersama pencarian daftar master — ISSUE-019).
      *
      * @return list<array<string, mixed>>
      */
     private function titleSearch(string $search): array
     {
-        $escapeChar = $this->db->likeEscapeChar;
-        $literal    = str_replace([$escapeChar, '%', '_'], [$escapeChar . $escapeChar, $escapeChar . '%', $escapeChar . '_'], $search);
+        $literal = ListQuery::likeLiteral($this->db, $search);
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $this->chainBuilder()
