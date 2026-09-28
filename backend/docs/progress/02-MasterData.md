@@ -42,7 +42,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - Dropdown berjenjang wilayah 4 level: backend `master/{entity}/options?parent=` + FE `useCascadeOptions` (form & filter).
 - G-TC #1–#6 lolos otomatis: `tests/MasterData/MasterGenericTcTest.php`, `RbacMasterEndpointsTest.php`; skema DBV-001: `Batch1LegacySchemaTest.php`.
 - DBV-001: skema legacy (kolom `provinsi`, `agama`, …; `kd_area`, `kd_pos`, `status_pegawai`), status Aktif/Tidak Aktif/Dihapus + pulihkan, kode wilayah tepat 2/4/7/10 digit, kode agama/jenis_* otomatis.
-- FE: `/master/:entity?` (menu "Master Data" hanya role 1), toggle switch + badge Aktif hijau/Tidak Aktif abu/Dihapus merah, naik/turun urutan, form tambah/edit, konfirmasi hapus (soft).
+- FE: `/master/:entity?` (menu "Master Data" hanya role 1), badge Aktif hijau/Tidak Aktif abu/Dihapus merah, semua aksi baris (edit, aktif/nonaktif, naik/turun urutan, pulihkan, hapus) lewat menu titik tiga ⋮ (CR-015, aturan AGENTS.md), form tambah/edit, konfirmasi hapus (soft).
 - Diverifikasi manual di browser (lokal): tambah, duplikat nama ditolak di field, toggle status, reorder, edit (induk berjenjang ter-isi), hapus soft, role 2 → 403 & menu tersembunyi, tampilan mobile.
 
 **Belum**
