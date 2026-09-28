@@ -159,7 +159,9 @@ yang user pakai di browser. User mengonfirmasi: salah akun/workspace.
 
 ### Cara membuat ulang dengan benar
 
-1. **Jangan pakai konektor MCP Trello** untuk board ini (akunnya salah). Pakai tab trello.com yang sudah login
+0. **Aturan wajib user:** sebelum menulis ke layanan apa pun lewat login/konektor, verifikasi dulu identitas akun
+   + workspace tujuan dan konfirmasi ke user. Jangan langsung tulis.
+1. **Jangan pakai konektor MCP Trello** — itu akun coder lain ("Fajrin F") dan sudah dimatikan untuk sesi user. Pakai tab trello.com yang sudah login
    di browser user, lalu REST `fetch('/1/...')` dengan param `dsc` dari cookie (form-urlencoded) — pola yang
    sama dengan board "SIMPEG v2 — Timeline Pengembangan" (lihat memory `simpeg-v2-trello-sync`).
 2. Tanyakan user workspace tujuannya (kemungkinan sama dengan board "SIMPEG v2 — Timeline Pengembangan",
