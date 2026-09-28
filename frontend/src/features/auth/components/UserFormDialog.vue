@@ -5,6 +5,9 @@
  * Akun non-pegawai (DBV-010/CR-013): NIP wajib untuk role Pegawai/PTT/PPPK, opsional untuk role lain; akun tanpa NIP
  * wajib nama dan username. Saat edit, NIP yang sudah ada tampil read-only (ganti NIP = fitur B-06); akun tanpa NIP bisa
  * ditautkan ke pegawai dengan mengisi NIP.
+ *
+ * Admin Satker (legacy L_user): pilihan role hanya Pegawai/PTT/PPPK (ditambah role akun yang sedang diedit agar tetap
+ * tampil), dan role akunnya sendiri tidak bisa diubah. Backend UserService tetap penentu akhir (403).
  */
 import { toTypedSchema } from '@vee-validate/zod'
 import { X } from 'lucide-vue-next'
@@ -33,9 +36,17 @@ const formError = ref('')
 
 const roleOptions = computed(() =>
   (Object.keys(ROLE_LABELS).map(Number) as RoleCode[])
-    // Admin Satker tidak boleh membuat/memberi role Super Admin (aturan backend UserService).
-    .filter((code) => auth.role === Role.SUPER_ADMIN || code !== Role.SUPER_ADMIN)
+    // Admin Satker hanya boleh membuat/memberi role Pegawai/PTT/PPPK (aturan backend UserService, legacy L_user).
+    .filter(
+      (code) =>
+        auth.role === Role.SUPER_ADMIN || (UL_PEGAWAI as readonly number[]).includes(code) || code === props.user?.user_level,
+    )
     .map((code) => ({ value: code, label: `${code} — ${ROLE_LABELS[code]}` })),
+)
+
+/** Admin Satker mengedit akunnya sendiri: role dikunci (backend menolak perubahan role akun sendiri). */
+const roleLocked = computed(
+  () => auth.role === Role.ADMIN_SATKER && props.user !== null && props.user.id_pengguna === auth.user?.id_pengguna,
 )
 
 /** Nilai form (gabungan create/edit); validasi bentuk tetap dari skema Zod yang aktif. */
@@ -192,7 +203,17 @@ const onSubmit = handleSubmit(async (values) => {
             {{ formError }}
           </p>
 
-          <FormField v-model="user_level" name="user_level" label="Role" type="select" required :options="roleOptions" :error="errors.user_level" />
+          <FormField
+            v-model="user_level"
+            name="user_level"
+            label="Role"
+            type="select"
+            required
+            :disabled="roleLocked"
+            :hint="roleLocked ? 'Role akun sendiri tidak dapat diubah.' : ''"
+            :options="roleOptions"
+            :error="errors.user_level"
+          />
 
           <FormField
             v-if="isEdit && existingNip !== null"

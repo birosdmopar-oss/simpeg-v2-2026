@@ -78,6 +78,77 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
+/** Teks label field (termasuk penanda wajib " *"). */
+function labelOf(name: string): string {
+  const el = field(name)
+  const label = document.body.querySelector(`label[for="${el.id}"]`)
+  if (!label) throw new Error(`label ${name} tidak ditemukan`)
+  return (label.textContent ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function roleOptionValues(): string[] {
+  return Array.from(field<HTMLSelectElement>('user_level').options)
+    .map((o) => o.value)
+    .filter((v) => v !== '')
+}
+
+describe('UserFormDialog — penanda wajib (*) mengikuti role dan NIP', () => {
+  it('role 2 → NIP wajib; role 1 → NIP opsional, Nama & Username wajib; NIP terisi → Nama & Username opsional', async () => {
+    const wrapper = mountDialog(null)
+    await flushPromises()
+
+    await chooseRole('2')
+    expect(labelOf('nip')).toBe('NIP *')
+
+    await chooseRole('1')
+    expect(labelOf('nip')).toBe('NIP')
+    expect(labelOf('name')).toBe('Nama *')
+    expect(labelOf('username')).toBe('Username *')
+
+    typeInto('nip', '199002152015022002')
+    await flushPromises()
+    expect(labelOf('name')).toBe('Nama')
+    expect(labelOf('username')).toBe('Username')
+    wrapper.unmount()
+  })
+})
+
+describe('UserFormDialog — pilihan role per admin', () => {
+  it('Super Admin: role 1-8', async () => {
+    const wrapper = mountDialog(null)
+    await flushPromises()
+
+    expect(roleOptionValues()).toEqual(['1', '2', '3', '4', '5', '6', '7', '8'])
+    expect(field<HTMLSelectElement>('user_level').disabled).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('Admin Satker: hanya Pegawai/PTT/PPPK; akun lain ber-role 3 tetap menampilkan role-nya', async () => {
+    useAuthStore().setSession(account({ id_pengguna: 30, username: 'admin.s01', user_level: Role.ADMIN_SATKER }))
+    const wrapper = mountDialog(null)
+    await flushPromises()
+    expect(roleOptionValues()).toEqual(['2', '6', '7'])
+    wrapper.unmount()
+
+    const edit = mountDialog(account({ id_pengguna: 31, username: 'admin.lain', user_level: Role.ADMIN_SATKER }))
+    await flushPromises()
+    expect(roleOptionValues()).toEqual(['2', '3', '6', '7'])
+    expect(field<HTMLSelectElement>('user_level').disabled).toBe(false)
+    edit.unmount()
+  })
+
+  it('Admin Satker mengedit akunnya sendiri: role dikunci', async () => {
+    const self = account({ id_pengguna: 30, username: 'admin.s01', user_level: Role.ADMIN_SATKER })
+    useAuthStore().setSession(self)
+    const wrapper = mountDialog(self)
+    await flushPromises()
+
+    expect(field<HTMLSelectElement>('user_level').disabled).toBe(true)
+    expect(document.body.textContent).toContain('Role akun sendiri tidak dapat diubah.')
+    wrapper.unmount()
+  })
+})
+
 describe('UserFormDialog — tambah akun', () => {
   it('role 1 tanpa NIP + nama → payload nip null dan name', async () => {
     const wrapper = mountDialog(null)

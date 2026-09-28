@@ -39,3 +39,8 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   role Pegawai/PTT/PPPK (`UL_PEGAWAI`); akun tanpa NIP wajib nama dan username; email opsional; username ≤ 100
   (`USERNAME_MAX`, juga batas form login). Edit memakai `makeUserUpdateSchema(nipAkun)`: NIP yang sudah ada tampil
   read-only (ganti NIP = fitur B-06), akun tanpa NIP bisa ditautkan ke pegawai lewat isian "Tautkan NIP".
+- **Pilihan role:** Super Admin melihat role 1-8; Admin Satker hanya Pegawai/PTT/PPPK (ditambah role akun yang sedang
+  diedit agar tetap tampil) dan role akunnya sendiri dikunci — cermin aturan backend (legacy `L_user`), backend tetap
+  penentu akhir (403).
+- **Aksi baris** lewat menu ⋮ (`RowActionsMenu`, aturan AGENTS.md bagian 1) dengan testid `user-actions-<id_pengguna>` /
+  baris `user-row-<id_pengguna>` (NIP bisa `null`, jadi tidak dipakai sebagai id).
