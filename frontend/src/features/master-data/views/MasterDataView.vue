@@ -1,23 +1,24 @@
 <script setup lang="ts">
 /**
  * Halaman Master Data generik (Modul G, MTC-008/009) — role 1 saja. Daftar master & kolomnya dari GET /master/meta.
- * Fitur per master: cari, filter status, filter induk berjenjang, tabel urut `order`, toggle switch status,
+ * Fitur per master: cari, filter status, filter induk berjenjang, tabel urut `order`, aksi baris lewat menu titik tiga (CR-015),
  * badge Aktif (hijau)/Tidak Aktif (abu)/Dihapus (merah), naik/turun urutan (entri lain bergeser), tambah/edit,
  * hapus (soft delete → status 10) dan pulihkan. Status mengikuti legacy (DBV-001): 1 / 2 / 10.
- * CR-009: filter field allowlist master (meta `filters`, mis. jenis diklat), panah urutan hanya untuk mode shift dan
+ * CR-009: filter field allowlist master (meta `filters`, mis. jenis diklat), item Naikkan/Turunkan urutan di menu hanya untuk mode shift dan
  * hanya saat daftar menampilkan satu lingkup urutan utuh (induk + `order_scope` terpilih, tanpa filter lain); mode
  * manual (mis. level pangkat) diubah lewat Edit karena nilainya tidak menggeser entri lain.
  */
-import { ArrowDown, ArrowUp, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Pencil, Plus, Power, PowerOff, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
+import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
+import type { RowAction } from '@/shared/components/rowActions'
 
 import MasterFormDialog from '../components/MasterFormDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import StatusSwitch from '../components/StatusSwitch.vue'
 import { useCascadeOptions } from '../composables/useCascadeOptions'
 import { ancestorChain, isManualOrder } from '../schemas/master.schema'
 import { masterService } from '../services/master.service'
@@ -328,6 +329,37 @@ function askDelete(row: MasterRow): void {
   confirm.value = { open: true, row, loading: false }
 }
 
+/** Aksi baris untuk menu titik tiga (aturan UI: semua aksi per baris lewat RowActionsMenu). */
+function rowActions(row: MasterRow, index: number): RowAction[] {
+  const status = statusOf(row)
+  const busy = busyId.value !== ''
+  return [
+    { key: 'edit', label: 'Edit', icon: Pencil },
+    { key: 'deactivate', label: 'Nonaktifkan', icon: PowerOff, hidden: status !== '1', disabled: busy },
+    { key: 'activate', label: 'Aktifkan', icon: Power, hidden: status !== '2', disabled: busy },
+    { key: 'up', label: 'Naikkan urutan', icon: ArrowUp, hidden: !canReorder.value, disabled: busy || (page.value === 1 && index === 0) },
+    {
+      key: 'down',
+      label: 'Turunkan urutan',
+      icon: ArrowDown,
+      hidden: !canReorder.value,
+      disabled: busy || (page.value - 1) * perPage.value + index + 1 >= total.value,
+    },
+    { key: 'restore', label: 'Pulihkan', icon: RotateCcw, hidden: status !== '10', disabled: busy },
+    { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, hidden: status === '10' },
+  ]
+}
+
+function onRowAction(row: MasterRow, key: string): void {
+  if (key === 'edit') openEdit(row)
+  else if (key === 'deactivate') void toggleStatus(row, false)
+  else if (key === 'activate') void toggleStatus(row, true)
+  else if (key === 'up') void move(row, -1)
+  else if (key === 'down') void move(row, 1)
+  else if (key === 'restore') void restore(row)
+  else if (key === 'delete') askDelete(row)
+}
+
 async function onConfirmDelete(): Promise<void> {
   const row = confirm.value.row
   if (!row || !meta.value) return
@@ -458,64 +490,15 @@ onMounted(() => {
                 <td class="px-4 py-3 font-medium text-slate-800">{{ nameOf(row) }}</td>
                 <td v-if="meta.parent" class="px-4 py-3 text-slate-600">{{ row.parent_nama ?? '—' }}</td>
                 <td class="px-4 py-3">
-                  <div class="flex items-center gap-2">
-                    <StatusSwitch
-                      v-if="statusOf(row) !== '10'"
-                      :checked="statusOf(row) === '1'"
-                      :disabled="busyId === idOf(row)"
-                      :label="`Status ${nameOf(row)}`"
-                      @toggle="toggleStatus(row, $event)"
-                    />
-                    <StatusBadge :status="row.status ?? '1'" />
-                  </div>
+                  <StatusBadge :status="row.status ?? '1'" />
                 </td>
-                <td class="px-4 py-3">
-                  <div class="flex justify-end gap-1">
-                    <template v-if="canReorder">
-                      <button
-                        type="button"
-                        class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary disabled:opacity-30"
-                        title="Naikkan urutan"
-                        :disabled="busyId !== '' || (page === 1 && index === 0)"
-                        @click="move(row, -1)"
-                      >
-                        <ArrowUp class="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary disabled:opacity-30"
-                        title="Turunkan urutan"
-                        :disabled="busyId !== '' || (page - 1) * perPage + index + 1 >= total"
-                        @click="move(row, 1)"
-                      >
-                        <ArrowDown class="h-4 w-4" />
-                      </button>
-                    </template>
-                    <button
-                      v-if="statusOf(row) === '10'"
-                      type="button"
-                      class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-green-700 disabled:opacity-40"
-                      title="Pulihkan"
-                      :aria-label="`Pulihkan ${nameOf(row)}`"
-                      :disabled="busyId === idOf(row)"
-                      :data-testid="`master-restore-${idOf(row)}`"
-                      @click="restore(row)"
-                    >
-                      <RotateCcw class="h-4 w-4" />
-                    </button>
-                    <button type="button" class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary" title="Edit" @click="openEdit(row)">
-                      <Pencil class="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-40"
-                      title="Hapus"
-                      :disabled="statusOf(row) === '10'"
-                      @click="askDelete(row)"
-                    >
-                      <Trash2 class="h-4 w-4" />
-                    </button>
-                  </div>
+                <td class="px-4 py-3 text-right">
+                  <RowActionsMenu
+                    :actions="rowActions(row, index)"
+                    :label="`Aksi untuk ${nameOf(row)}`"
+                    :testid="`master-actions-${idOf(row)}`"
+                    @select="onRowAction(row, $event)"
+                  />
                 </td>
               </tr>
             </tbody>

@@ -8,6 +8,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
+import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
+import type { RowAction } from '@/shared/components/rowActions'
 
 import UserFormDialog from '../components/UserFormDialog.vue'
 import { usersService } from '../services/users.service'
@@ -123,6 +125,24 @@ function askToggle(user: User): void {
 
 function askDelete(user: User): void {
   confirm.value = { open: true, kind: 'delete', user, loading: false }
+}
+
+/** Aksi baris untuk menu titik tiga (aturan UI: semua aksi per baris lewat RowActionsMenu). */
+function userActions(user: User): RowAction[] {
+  const self = user.nip === auth.user?.nip
+  return [
+    { key: 'edit', label: 'Edit', icon: Pencil },
+    user.status === '1'
+      ? { key: 'toggle', label: 'Nonaktifkan', icon: UserX, disabled: self }
+      : { key: 'toggle', label: 'Aktifkan', icon: UserCheck, disabled: self },
+    { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, disabled: self },
+  ]
+}
+
+function onUserAction(user: User, key: string): void {
+  if (key === 'edit') openEdit(user)
+  else if (key === 'toggle') askToggle(user)
+  else if (key === 'delete') askDelete(user)
 }
 
 async function onConfirm(): Promise<void> {
@@ -252,30 +272,13 @@ onMounted(() => {
             <td class="px-4 py-3 text-slate-600">{{ formatDate(u.last_login_at) }}</td>
             <td class="px-4 py-3 text-slate-600">{{ u.id_satker ?? '—' }}</td>
             <td class="px-4 py-3">
-              <div class="flex justify-end gap-1">
-                <button type="button" class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary" title="Edit" @click="openEdit(u)">
-                  <Pencil class="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
-                  :class="u.status === '1' ? 'hover:text-amber-600' : 'hover:text-green-600'"
-                  :title="u.status === '1' ? 'Nonaktifkan' : 'Aktifkan'"
-                  :disabled="u.nip === auth.user?.nip"
-                  @click="askToggle(u)"
-                >
-                  <UserX v-if="u.status === '1'" class="h-4 w-4" />
-                  <UserCheck v-else class="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-40"
-                  title="Hapus"
-                  :disabled="u.nip === auth.user?.nip"
-                  @click="askDelete(u)"
-                >
-                  <Trash2 class="h-4 w-4" />
-                </button>
+              <div class="flex justify-end">
+                <RowActionsMenu
+                  :actions="userActions(u)"
+                  :label="`Aksi untuk ${u.username}`"
+                  :testid="`user-actions-${u.nip}`"
+                  @select="onUserAction(u, $event)"
+                />
               </div>
             </td>
           </tr>
