@@ -14,6 +14,9 @@ use Tests\Support\Database\Seeds\AuthSeeder;
 /**
  * A-08 — CRUD akun scoped (MTC-004): role 1 semua akun; role 3 hanya satkernya (di luar → 403); role lain 403.
  * A-10 — perubahan akun tercatat di audit_logs dengan actor.
+ * DBV-010/CR-013 — aturan akun non-pegawai: NIP wajib role 2/6/7, opsional role 1/3/4/5/8 (nama wajib bila tanpa NIP),
+ * NIP angka maks. 18 digit, email opsional, username default NIP / wajib bila NIP kosong / maks. 100, NIP hanya bisa
+ * diisi untuk akun yang belum punya NIP.
  *
  * @internal
  */
@@ -44,6 +47,7 @@ final class UserCrudScopedTest extends CIUnitTestCase
     protected function tearDown(): void
     {
         $this->clearAuthState();
+        $this->bersihkanDataDbv010();
         parent::tearDown();
     }
 
@@ -163,7 +167,7 @@ final class UserCrudScopedTest extends CIUnitTestCase
 
         $row = $this->db->table('pengguna')->where('id_pengguna', $id)->get()->getRowArray();
         $this->assertNotNull($row['deleted_at'], 'Soft delete');
-        $this->assertSame(0, $this->db->table('token')->where('nip', self::PEGAWAI_S02)->where('revoked', 0)->countAllResults());
+        $this->assertSame(0, $this->db->table('token')->where('id_pengguna', $id)->where('revoked', 0)->countAllResults());
         $this->seeInDatabase('audit_logs', ['entity' => 'pengguna', 'event' => 'delete', 'entity_id' => (string) $id, 'nip_actor' => self::SUPER_ADMIN]);
 
         $this->clearAuthState();
@@ -176,7 +180,7 @@ final class UserCrudScopedTest extends CIUnitTestCase
         $this->asNip(self::SUPER_ADMIN)->delete('api/v1/auth/users/' . $this->idOf(self::SUPER_ADMIN))->assertStatus(422);
 
         $bad = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->post('api/v1/auth/users', [
-            'nip' => '123', 'password' => 'lemah', 'user_level' => 9,
+            'nip' => 'ABC123', 'password' => 'lemah', 'user_level' => 9,
         ]);
         $bad->assertStatus(422);
         $errors = $this->json($bad)['errors'];
@@ -189,6 +193,110 @@ final class UserCrudScopedTest extends CIUnitTestCase
         ]);
         $dup->assertStatus(422);
         $this->assertArrayHasKey('nip', $this->json($dup)['errors']);
+    }
+
+    // ------------------------------------------------------------------
+    // DBV-010/CR-013: akun tanpa NIP (K2)
+    // ------------------------------------------------------------------
+
+    public function testCreateAppliesNipRulesPerRole(): void
+    {
+        $post = fn (array $body) => $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->post('api/v1/auth/users', $body + ['password' => self::NEW_PASSWORD]);
+
+        // Role 2/6/7 wajib NIP.
+        foreach ([Role::PEGAWAI, Role::PTT, Role::PPPK] as $role) {
+            $result = $post(['user_level' => $role, 'name' => 'Tanpa NIP', 'username' => 'tanpa.nip.' . $role]);
+            $result->assertStatus(422);
+            $this->assertSame(['NIP wajib diisi untuk role Pegawai/PTT/PPPK.'], $this->json($result)['errors']['nip'], "role {$role}");
+        }
+
+        // Role 1/3/4/5/8 tanpa NIP: nama dan username wajib.
+        $missing = $post(['user_level' => Role::MENTERI, 'nip' => null]);
+        $missing->assertStatus(422);
+        $this->assertSame(['Nama wajib diisi untuk akun tanpa NIP.'], $this->json($missing)['errors']['name']);
+        $this->assertArrayHasKey('username', $this->json($missing)['errors']);
+        $this->assertArrayNotHasKey('nip', $this->json($missing)['errors']);
+
+        $created = $post(['user_level' => Role::MENTERI, 'nip' => '', 'name' => 'Menteri Pariwisata', 'username' => 'menteri', 'email' => 'menteri@example.go.id']);
+        $created->assertStatus(201);
+        $data = $this->json($created)['data'];
+        $this->assertNull($data['nip']);
+        $this->assertSame('Menteri Pariwisata', $data['name']);
+        $this->assertSame('menteri@example.go.id', $data['email']);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $data['id_pengguna'], 'nip' => null, 'username' => 'menteri']);
+
+        // NIP ikut legacy: angka maks. 18 digit (NIK 16 digit Non-PNS diterima).
+        $post(['user_level' => Role::PTT, 'nip' => '3171012345678901'])->assertStatus(201);
+        $this->seeInDatabase('pengguna', ['nip' => '3171012345678901', 'username' => '3171012345678901']);
+
+        foreach (['1234567890123456789', '19900215A0150220', '1990-0215'] as $nip) {
+            $bad = $post(['user_level' => Role::PEGAWAI, 'nip' => $nip]);
+            $bad->assertStatus(422);
+            $this->assertSame(['NIP harus berupa angka, maksimal 18 digit.'], $this->json($bad)['errors']['nip'], $nip);
+        }
+
+        // Email opsional tetapi harus valid; nama maks. 150.
+        $this->assertArrayHasKey('email', $this->json($post(['user_level' => Role::PIMPINAN, 'name' => 'X', 'username' => 'pimpinan.x', 'email' => 'bukan-email']))['errors']);
+        $this->assertArrayHasKey('name', $this->json($post(['user_level' => Role::PIMPINAN, 'name' => str_repeat('n', 151), 'username' => 'pimpinan.y']))['errors']);
+
+        // Username maks. 100 dan unik dalam collation unicode_ci ('straße' = 'strasse').
+        $post(['user_level' => Role::ADMIN_VIEW_ESELON1, 'name' => 'Seratus', 'username' => str_repeat('u', 100)])->assertStatus(201);
+        $this->assertArrayHasKey('username', $this->json($post(['user_level' => Role::ADMIN_VIEW_ESELON1, 'name' => 'X', 'username' => str_repeat('u', 101)]))['errors']);
+
+        $post(['user_level' => Role::PIMPINAN, 'name' => 'Strasse', 'username' => 'strasse'])->assertStatus(201);
+        $dup = $post(['user_level' => Role::PIMPINAN, 'name' => 'Straße', 'username' => 'straße']);
+        $dup->assertStatus(422);
+        $this->assertSame(['Username sudah dipakai.'], $this->json($dup)['errors']['username']);
+    }
+
+    public function testUpdateOnlyLinksNipToAccountWithoutNip(): void
+    {
+        $akun    = $this->buatAkunTanpaNip('admin.view', Role::ADMIN_VIEW_ESELON1);
+        $id      = (int) $akun['id_pengguna'];
+        $session = $this->issueTokensForUser($akun);
+        $put     = fn (int $target, array $body) => $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $target, $body);
+
+        // Role → 2 tanpa NIP ditolak; mengosongkan nama akun tanpa NIP ditolak.
+        $this->assertArrayHasKey('nip', $this->json($put($id, ['user_level' => Role::PEGAWAI]))['errors']);
+        $this->assertArrayHasKey('name', $this->json($put($id, ['name' => '']))['errors']);
+
+        // NIP yang sudah dipakai akun lain ditolak.
+        $this->assertSame(['NIP sudah memiliki akun.'], $this->json($put($id, ['nip' => self::PEGAWAI_S01]))['errors']['nip']);
+
+        // Mengisi NIP (menautkan ke pegawai) + ubah nama/email → sesi akun dicabut (claims memuat nip).
+        $linked = $put($id, ['nip' => self::NEW_NIP, 'name' => 'Nama Baru', 'email' => 'baru@example.go.id']);
+        $linked->assertStatus(200);
+        $this->assertSame(self::NEW_NIP, $this->json($linked)['data']['nip']);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $id, 'nip' => self::NEW_NIP, 'name' => 'Nama Baru', 'email' => 'baru@example.go.id']);
+        $this->assertSame(0, $this->db->table('token')->where('id_pengguna', $id)->countAllResults());
+
+        $this->clearAuthState();
+        $this->setRefreshCookie($session['refresh_token']);
+        $this->post('api/v1/auth/refresh')->assertStatus(401);
+
+        // NIP yang sudah ada tidak bisa diubah/dihapus di sini (B-06); mengirim NIP yang sama = tanpa perubahan.
+        $this->clearAuthState();
+        $pegawai = $this->idOf(self::PEGAWAI_S01);
+
+        foreach (['200001012024011099', null, ''] as $nip) {
+            $this->assertSame(['NIP tidak dapat diubah di sini; gunakan fitur ganti NIP (B-06).'], $this->json($put($pegawai, ['nip' => $nip]))['errors']['nip']);
+        }
+
+        $put($pegawai, ['nip' => self::PEGAWAI_S01, 'name' => 'Siti'])->assertStatus(200);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $pegawai, 'nip' => self::PEGAWAI_S01, 'name' => 'Siti']);
+    }
+
+    public function testListSearchesAndSortsByName(): void
+    {
+        $this->buatAkunTanpaNip('budi', Role::MENTERI, ['name' => 'Budi Santoso']);
+
+        $found = $this->json($this->asNip(self::SUPER_ADMIN)->get('api/v1/auth/users?search=Santoso'));
+        $this->assertSame(1, $found['data']['total']);
+        $this->assertNull($found['data']['items'][0]['nip']);
+        $this->assertSame('Budi Santoso', $found['data']['items'][0]['name']);
+
+        $sorted = $this->json($this->asNip(self::SUPER_ADMIN)->get('api/v1/auth/users?sort=name&order=desc&per_page=1'));
+        $this->assertSame('Budi Santoso', $sorted['data']['items'][0]['name'], 'akun seed ber-NIP tanpa nama (NULL) berada di akhir urutan desc');
     }
 
     // ------------------------------------------------------------------

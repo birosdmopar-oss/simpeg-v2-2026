@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use App\Database\Migrations\AlterAuthKeUnicodeCi;
+use App\Database\Migrations\AlterIdentitasAkunIdPengguna;
+use App\Database\Migrations\AlterPenggunaAkunNonPegawai;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
@@ -18,7 +20,7 @@ use Throwable;
  * apa pun, dan down() kembali ke utf8mb4_general_ci dengan pengaman yang sama (backend/docs/db-review/A-01-auth-schema.md
  * Bagian 9).
  *
- * Keadaan "sebelum DBV-010" dicapai dengan menjalankan down() migration DBV-010 dari yang terakhir; tearDown()
+ * Keadaan "sebelum DBV-010" dicapai dengan menjalankan down() ketiga migration DBV-010 dari yang terakhir; tearDown()
  * mengosongkan data uji lalu menjalankan up() semuanya lagi (idempoten) agar migrate:refresh test berikutnya konsisten.
  *
  * @internal
@@ -89,14 +91,25 @@ final class AuthCollationMigrationTest extends CIUnitTestCase
      */
     public function testDownAndUpOnlyChangeCollation(): void
     {
-        $before = $this->snapshots();
+        $full = $this->snapshots();
 
-        $this->downAll();
+        // Keadaan tepat sebelum 130000: 130200 dan 130100 di-rollback dulu (urutan regress).
+        $chain = $this->chain();
+        $chain[2]->down();
+        $chain[1]->down();
+        $before = $this->snapshots();
+        $this->assertCollation(self::UNICODE);
+
+        $this->m1()->down();
         $this->assertCollation(self::GENERAL);
         $this->assertSame($this->withoutCollation($before), $this->withoutCollation($this->snapshots()));
 
-        $this->upAll();
+        $this->m1()->up();
         $this->assertSame($before, $this->snapshots());
+
+        $chain[1]->up();
+        $chain[2]->up();
+        $this->assertSame($full, $this->snapshots());
     }
 
     /**
@@ -287,7 +300,10 @@ final class AuthCollationMigrationTest extends CIUnitTestCase
      */
     private function chain(): array
     {
-        return [$this->m1()];
+        require_once APPPATH . 'Database/Migrations/2026-09-25-130100_AlterPenggunaAkunNonPegawai.php';
+        require_once APPPATH . 'Database/Migrations/2026-09-25-130200_AlterIdentitasAkunIdPengguna.php';
+
+        return [$this->m1(), new AlterPenggunaAkunNonPegawai(), new AlterIdentitasAkunIdPengguna()];
     }
 
     private function m1(): AlterAuthKeUnicodeCi

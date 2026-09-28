@@ -69,7 +69,7 @@ final class RbacFilterTest extends CIUnitTestCase
 
     public function testValidTokenViaHttpOnlyCookieReturns200(): void
     {
-        $token = service('jwt')->issueAccessToken(['sub' => '198501012010011001', 'role' => Role::PEGAWAI]);
+        $token = service('jwt')->issueAccessToken(['sub' => '7', 'nip' => '198501012010011001', 'role' => Role::PEGAWAI]);
 
         // Simulasi browser mengirim cookie httpOnly (CI4 membaca cookie lewat service superglobals).
         service('superglobals')->setCookie(config(JwtConfig::class)->accessCookie, $token);
@@ -78,6 +78,7 @@ final class RbacFilterTest extends CIUnitTestCase
 
         $result->assertStatus(200);
         $json = json_decode((string) $result->getJSON(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(7, $json['data']['id_pengguna']);
         $this->assertSame('198501012010011001', $json['data']['nip']);
         $this->assertSame(Role::PEGAWAI, $json['data']['role']);
     }
@@ -146,7 +147,7 @@ final class RbacFilterTest extends CIUnitTestCase
      */
     private function asRole(int $role): self
     {
-        $token = service('jwt')->issueAccessToken(['sub' => '19850101201001' . str_pad((string) $role, 4, '0', STR_PAD_LEFT), 'role' => $role]);
+        $token = service('jwt')->issueAccessToken(['sub' => (string) (1000 + $role), 'role' => $role]);
 
         return $this->withHeaders(['Authorization' => 'Bearer ' . $token]);
     }

@@ -189,13 +189,16 @@ abstract class BaseAuditableModel extends Model
     public function writeAudit(string $event, string|int $entityId, ?array $before, ?array $after, ?string $entity = null): void
     {
         try {
+            $actor = $this->currentActor();
+
             $this->auditLogModel()->record(
                 $entity ?? $this->table,
                 $entityId,
                 $event,
                 $this->maskSensitive($before),
                 $this->maskSensitive($after),
-                $this->currentActorNip(),
+                $actor['id'],
+                $actor['nip'],
             );
         } catch (Throwable $e) {
             // Fail-open: audit gagal tidak boleh menggagalkan transaksi bisnis utama.
@@ -228,13 +231,37 @@ abstract class BaseAuditableModel extends Model
         return $row;
     }
 
-    protected function currentActorNip(): ?string
+    /**
+     * Pelaku perubahan untuk request ini (DBV-010): id_pengguna (claim `sub`) dan NIP (claim `nip`, NULL untuk akun
+     * tanpa NIP). Keduanya NULL untuk proses sistem/CLI. Subclass bisa menimpa (PenggunaModel::withActor()).
+     *
+     * @return array{id: int|null, nip: string|null}
+     */
+    protected function currentActor(): array
     {
         try {
-            return service('authContext')->nip();
+            $auth = service('authContext');
+
+            return ['id' => $auth->idPengguna(), 'nip' => $auth->nip()];
         } catch (Throwable) {
-            return null;
+            return ['id' => null, 'nip' => null];
         }
+    }
+
+    /**
+     * id_pengguna pelaku (kolom `*_by` master, `audit_logs.id_pengguna_actor`).
+     */
+    protected function actorIdPengguna(): ?int
+    {
+        return $this->currentActor()['id'];
+    }
+
+    /**
+     * NIP pelaku (NULL untuk akun tanpa NIP). Dipertahankan untuk kompatibilitas; identitas pelaku = actorIdPengguna().
+     */
+    protected function currentActorNip(): ?string
+    {
+        return $this->currentActor()['nip'];
     }
 
     protected function auditLogModel(): AuditLogModel

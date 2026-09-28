@@ -65,12 +65,13 @@ final class LoginTest extends CIUnitTestCase
 
         // Access token yang dikembalikan valid dan claims sesuai akun.
         $claims = service('jwt')->verifyAccessToken($json['data']['access_token']);
-        $this->assertSame(self::NIP, $claims['sub']);
+        $this->assertSame((string) $json['data']['user']['id_pengguna'], $claims['sub'], 'sub = id_pengguna (DBV-010)');
+        $this->assertSame(self::NIP, $claims['nip']);
         $this->assertSame(2, $claims['role']);
         $this->assertSame('S01', $claims['id_satker']);
 
         // Refresh token tersimpan sebagai hash.
-        $this->seeInDatabase('token', ['nip' => self::NIP, 'token_hash' => hash('sha256', (string) $this->responseCookie($result, 'refresh_token')), 'revoked' => 0]);
+        $this->seeInDatabase('token', ['id_pengguna' => $json['data']['user']['id_pengguna'], 'nip' => self::NIP, 'token_hash' => hash('sha256', (string) $this->responseCookie($result, 'refresh_token')), 'revoked' => 0]);
         $this->seeInDatabase('login_attempts', ['username' => self::NIP, 'success' => 1]);
     }
 
@@ -104,6 +105,24 @@ final class LoginTest extends CIUnitTestCase
 
         $result->assertStatus(422);
         $this->assertArrayHasKey('password', $this->json($result)['errors']);
+    }
+
+    /**
+     * DBV-010 (D-5) — username maks. 100 karakter (legacy VARCHAR(100)): 100 karakter lolos validasi dan tercatat utuh di
+     * login_attempts (kolom VARCHAR(100), koneksi strict); 101 karakter → 422.
+     */
+    public function testUsernameUpTo100CharactersIsAccepted(): void
+    {
+        $username = str_repeat('u', 100);
+
+        $this->login($username, AuthSeeder::PASSWORD)->assertStatus(401);
+        $this->seeInDatabase('login_attempts', ['username' => $username, 'success' => 0]);
+
+        $this->clearAuthState();
+        $tooLong = $this->login($username . 'x', AuthSeeder::PASSWORD);
+        $tooLong->assertStatus(422);
+        $this->assertArrayHasKey('username', $this->json($tooLong)['errors']);
+        $this->assertSame(1, $this->db->table('login_attempts')->countAllResults());
     }
 
     // ------------------------------------------------------------------
@@ -351,9 +370,12 @@ final class LoginTest extends CIUnitTestCase
         $rows = $this->db->table('audit_logs')->where('id_log >', $lastId)->orderBy('id_log')->get()->getResultArray();
         $this->assertSame($expectedEvents, array_column($rows, 'event'));
 
+        $ownerId = (string) $this->db->table('pengguna')->where('nip', $nip)->get()->getRowArray()['id_pengguna'];
+
         foreach ($rows as $row) {
             $this->assertSame('pengguna', $row['entity']);
             $this->assertSame($nip, $row['nip_actor'], sprintf('Audit %s #%s saat login harus ber-actor pemilik akun', $row['event'], $row['id_log']));
+            $this->assertSame($ownerId, (string) $row['id_pengguna_actor'], sprintf('Audit %s #%s: id_pengguna_actor = pemilik akun', $row['event'], $row['id_log']));
         }
 
         $this->assertSame(0, $this->db->table('audit_logs')->where('nip_actor', null)->countAllResults(), 'Login tidak boleh menulis audit tanpa actor');

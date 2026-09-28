@@ -160,7 +160,6 @@ class ResetPasswordService
 
         // Hash Argon2id (lambat) dihitung di luar transaksi agar lock baris tidak lama.
         $hash    = $this->passwords->hash($newPassword);
-        $nip     = (string) $user['nip'];
         $userId  = (int) $user['id_pengguna'];
         $tokenId = (int) $row['id'];
 
@@ -182,7 +181,7 @@ class ResetPasswordService
             }
 
             // Tidak ada sesi login pada jalur reset → actor audit = pemilik akun (ISSUE-005).
-            $updated = $this->pengguna->withActor($nip, fn (): bool => $this->pengguna->update($userId, [
+            $updated = $this->pengguna->withActor($user, fn (): bool => $this->pengguna->update($userId, [
                 'password'            => $hash,
                 'password_legacy'     => null,
                 'password_changed_at' => date('Y-m-d H:i:s', $now),
@@ -192,7 +191,7 @@ class ResetPasswordService
             $invalidated = $this->attempts->invalidateOtherTokens((string) $row['username'], $tokenId, $now);
             $this->assertStep($invalidated >= 0, 'token reset lain tidak dapat dibatalkan');
 
-            $this->assertStep($this->jwt->revokeAllForNip($nip) >= 0, 'refresh token tidak dapat dicabut');
+            $this->assertStep($this->jwt->revokeAllForUser($userId) >= 0, 'refresh token tidak dapat dicabut');
 
             if (! $this->db->transStatus() || ! $this->db->transCommit()) {
                 throw new DatabaseException('Reset password gagal disimpan.');

@@ -18,7 +18,7 @@ class TokenModel extends Model
     protected $primaryKey    = 'id';
     protected $returnType    = 'array';
     protected $useTimestamps = false;
-    protected $allowedFields = ['nip', 'token_hash', 'claims_json', 'expires_at', 'revoked', 'revoked_at', 'created_at'];
+    protected $allowedFields = ['id_pengguna', 'nip', 'token_hash', 'claims_json', 'expires_at', 'revoked', 'revoked_at', 'created_at'];
 
     /**
      * Koneksi model — dipakai JwtService untuk membungkus rotasi (revoke + token baru) dalam satu transaksi.
@@ -100,15 +100,15 @@ class TokenModel extends Model
     }
 
     /**
-     * Tandai seluruh token aktif satu NIP `revoked=1` — KHUSUS reuse detection (JwtService::handleReuse). Baris
+     * Tandai seluruh token aktif satu akun (id_pengguna, DBV-010) `revoked=1` — KHUSUS reuse detection (JwtService::handleReuse). Baris
      * sengaja dipertahankan: token yang sudah dirotasi atau dicabut karena reuse tetap terbaca "reuse" bila dipakai
-     * lagi. Pencabutan massal biasa (ganti/reset password, perubahan akun oleh admin) memakai deleteAllForNip().
+     * lagi. Pencabutan massal biasa (ganti/reset password, perubahan akun oleh admin) memakai deleteAllForUser().
      *
      * @throws DatabaseException query gagal — juga saat DBDebug = false (pencabutan massal tidak boleh gagal diam-diam)
      */
-    public function revokeAllForNip(string $nip, int $now): int
+    public function revokeAllForUser(int $idPengguna, int $now): int
     {
-        $updated = $this->where('nip', $nip)->where('revoked', 0)->set([
+        $updated = $this->where('id_pengguna', $idPengguna)->where('revoked', 0)->set([
             'revoked'    => 1,
             'revoked_at' => date('Y-m-d H:i:s', $now),
         ])->update();
@@ -121,7 +121,7 @@ class TokenModel extends Model
     }
 
     /**
-     * Hapus fisik SELURUH refresh token satu NIP, termasuk yang sudah dirotasi (revoked=1) — pencabutan massal
+     * Hapus fisik SELURUH refresh token satu akun (id_pengguna, DBV-010), termasuk yang sudah dirotasi (revoked=1) — pencabutan massal
      * karena ganti/reset password atau perubahan/penghapusan akun oleh admin. Sama seperti logout: token lama yang
      * masih tersimpan di perangkat lain terbaca "tidak dikenal" (401), bukan "reuse" yang ikut mencabut sesi baru
      * pengguna setelah ia login ulang (T-01, QAFUNC-002-R1). Bersama deleteExpired() (token kedaluwarsa juga dihapus),
@@ -133,9 +133,9 @@ class TokenModel extends Model
      * @throws DatabaseException query gagal — juga saat DBDebug = false atau di dalam transaksi (reset password),
      *                           yang di CI4 hanya mengembalikan false
      */
-    public function deleteAllForNip(string $nip): int
+    public function deleteAllForUser(int $idPengguna): int
     {
-        $deleted = $this->where('nip', $nip)->delete();
+        $deleted = $this->where('id_pengguna', $idPengguna)->delete();
 
         if ($deleted === false) {
             throw $this->writeFailure('Gagal menghapus seluruh refresh token');

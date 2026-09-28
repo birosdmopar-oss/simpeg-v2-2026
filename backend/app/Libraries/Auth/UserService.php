@@ -18,6 +18,16 @@ use App\Models\Auth\PenggunaModel;
  *   Akun di luar satker → 403 (tidak muncul di daftar, tidak bisa dibaca/diubah/dihapus).
  *   Admin Satker juga tidak bisa membuat/mengubah akun menjadi role 1 (mencegah eskalasi hak; asumsi keamanan).
  * - Role lain: 403 di semua operasi (sudah dicegat RoleFilter; dicek ulang di sini sebagai lapis kedua).
+ *
+ * Akun non-pegawai (DBV-010/CR-013, K2, mengikuti legacy L_user):
+ * - Role 2/6/7 (Role::UL_PEGAWAI) wajib NIP; role 1/3/4/5/8 boleh tanpa NIP (legacy memaksa NULL, v2 membolehkan
+ *   NIP terisi [V2]).
+ * - NIP: angka saja, maksimal 18 digit (NIK 16 digit Non-PNS diterima). Akun tanpa NIP wajib punya nama.
+ * - Username default = NIP; wajib diisi bila NIP kosong; maks. PenggunaModel::USERNAME_MAX; unik (collation
+ *   unicode_ci: 'strasse' = 'straße').
+ * - Ubah akun: NIP hanya boleh DIISI untuk akun yang belum punya NIP (menautkan akun ke pegawai); mengubah/menghapus
+ *   NIP yang sudah ada adalah ranah fitur ganti NIP (B-06).
+ * - Identitas akun = id_pengguna: pencegahan hapus/nonaktifkan akun sendiri dan pencabutan sesi memakai id_pengguna.
  */
 class UserService
 {
@@ -52,7 +62,7 @@ class UserService
 
         if (! empty($filters['search'])) {
             $s = (string) $filters['search'];
-            $builder->groupStart()->like('username', $s)->orLike('nip', $s)->groupEnd();
+            $builder->groupStart()->like('username', $s)->orLike('nip', $s)->orLike('name', $s)->groupEnd();
         }
 
         if (isset($filters['user_level']) && $filters['user_level'] !== '') {
@@ -65,7 +75,7 @@ class UserService
 
         $total = (clone $builder)->countAllResults();
 
-        $sortable = ['username', 'nip', 'user_level', 'status', 'created_at', 'last_login_at'];
+        $sortable = ['username', 'nip', 'name', 'user_level', 'status', 'created_at', 'last_login_at'];
         $sort     = in_array($filters['sort'] ?? '', $sortable, true) ? (string) $filters['sort'] : 'username';
         $order    = strtolower((string) ($filters['order'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
 
@@ -91,7 +101,7 @@ class UserService
     }
 
     /**
-     * @param array<string, mixed> $data nip, username?, password, user_level, id_unit?, id_satker?, status?
+     * @param array<string, mixed> $data nip?, name?, email?, username?, password, user_level, id_unit?, id_satker?, status?
      *
      * @return array<string, mixed>
      */
@@ -99,21 +109,22 @@ class UserService
     {
         $this->assertAdmin($actor);
 
-        $nip      = trim((string) ($data['nip'] ?? ''));
-        $username = trim((string) ($data['username'] ?? '')) ?: $nip;
+        $nip      = self::nullableString($data['nip'] ?? null);
+        $name     = self::nullableString($data['name'] ?? null);
+        $email    = self::nullableString($data['email'] ?? null);
+        $username = self::nullableString($data['username'] ?? null) ?? $nip ?? '';
         $level    = (int) ($data['user_level'] ?? 0);
         $errors   = [];
 
-        if (preg_match('/^\d{18}$/', $nip) !== 1) {
-            $errors['nip'][] = 'NIP harus 18 digit angka.';
-        }
-
-        if ($username === '' || mb_strlen($username) > 30) {
-            $errors['username'][] = 'Username wajib diisi (maks. 30 karakter).';
-        }
+        self::validateNip($nip, $errors);
+        self::validateName($name, $errors);
+        self::validateEmail($email, $errors);
+        self::validateUsername($username, $errors);
 
         if (! Role::isValid($level)) {
             $errors['user_level'][] = 'Role tidak valid (1-8).';
+        } else {
+            self::validateAccountInvariant($level, $nip, $name, $errors);
         }
 
         $password = (string) ($data['password'] ?? '');
@@ -139,7 +150,7 @@ class UserService
             }
         }
 
-        if ($this->pengguna->withDeleted()->where('nip', $nip)->countAllResults() > 0) {
+        if ($nip !== null && $this->pengguna->withDeleted()->where('nip', $nip)->countAllResults() > 0) {
             throw new ValidationException('Validasi gagal.', ['nip' => ['NIP sudah memiliki akun.']]);
         }
 
@@ -150,6 +161,8 @@ class UserService
         $id = $this->pengguna->insert([
             'nip'                 => $nip,
             'username'            => $username,
+            'name'                => $name,
+            'email'               => $email,
             'password'            => $this->passwords->hash($password),
             'password_legacy'     => null,
             'user_level'          => $level,
@@ -163,7 +176,8 @@ class UserService
     }
 
     /**
-     * @param array<string, mixed> $data username?, user_level?, id_unit?, id_satker?, status?, password?
+     * @param array<string, mixed> $data nip? (hanya untuk akun tanpa NIP), name?, email?, username?, user_level?,
+     *                                   id_unit?, id_satker?, status?, password?
      *
      * @return array<string, mixed>
      */
@@ -174,15 +188,51 @@ class UserService
         $update = [];
         $errors = [];
 
+        if (array_key_exists('nip', $data)) {
+            $nip     = self::nullableString($data['nip']);
+            $current = self::nullableString($row['nip'] ?? null);
+
+            if ($current !== null) {
+                if ($nip !== $current) {
+                    $errors['nip'][] = 'NIP tidak dapat diubah di sini; gunakan fitur ganti NIP (B-06).';
+                }
+            } elseif ($nip !== null) {
+                // Menautkan akun tanpa NIP ke pegawai.
+                if (self::validateNip($nip, $errors)) {
+                    if ($this->pengguna->withDeleted()->where('nip', $nip)->countAllResults() > 0) {
+                        $errors['nip'][] = 'NIP sudah memiliki akun.';
+                    } else {
+                        $update['nip'] = $nip;
+                    }
+                }
+            }
+        }
+
+        if (array_key_exists('name', $data)) {
+            $name = self::nullableString($data['name']);
+
+            if (self::validateName($name, $errors)) {
+                $update['name'] = $name;
+            }
+        }
+
+        if (array_key_exists('email', $data)) {
+            $email = self::nullableString($data['email']);
+
+            if (self::validateEmail($email, $errors)) {
+                $update['email'] = $email;
+            }
+        }
+
         if (array_key_exists('username', $data)) {
             $username = trim((string) $data['username']);
 
-            if ($username === '' || mb_strlen($username) > 30) {
-                $errors['username'][] = 'Username wajib diisi (maks. 30 karakter).';
-            } elseif ($this->pengguna->withDeleted()->where('username', $username)->where('id_pengguna !=', $id)->countAllResults() > 0) {
-                $errors['username'][] = 'Username sudah dipakai.';
-            } else {
-                $update['username'] = $username;
+            if (self::validateUsername($username, $errors)) {
+                if ($this->pengguna->withDeleted()->where('username', $username)->where('id_pengguna !=', $id)->countAllResults() > 0) {
+                    $errors['username'][] = 'Username sudah dipakai.';
+                } else {
+                    $update['username'] = $username;
+                }
             }
         }
 
@@ -200,6 +250,10 @@ class UserService
 
         if (array_key_exists('status', $data)) {
             $update['status'] = (string) $data['status'] === PenggunaModel::STATUS_INACTIVE ? PenggunaModel::STATUS_INACTIVE : PenggunaModel::STATUS_ACTIVE;
+
+            if ($update['status'] === PenggunaModel::STATUS_INACTIVE && $id === $actor->idPengguna()) {
+                $errors['status'][] = 'Tidak dapat menonaktifkan akun sendiri.';
+            }
         }
 
         if (array_key_exists('id_unit', $data)) {
@@ -227,6 +281,18 @@ class UserService
             }
         }
 
+        // Invarian akun dicek pada hasil akhir bila role/NIP/nama ikut berubah (akun hasil impor yang belum memenuhi
+        // aturan tetap bisa dinonaktifkan/diubah field lain).
+        if ($errors === [] && array_intersect_key($update, ['user_level' => 1, 'nip' => 1, 'name' => 1]) !== []) {
+            $final = array_merge($row, $update);
+            self::validateAccountInvariant(
+                (int) $final['user_level'],
+                self::nullableString($final['nip'] ?? null),
+                self::nullableString($final['name'] ?? null),
+                $errors,
+            );
+        }
+
         if ($errors !== []) {
             throw new ValidationException('Validasi gagal.', $errors);
         }
@@ -235,9 +301,10 @@ class UserService
             $this->pengguna->update($id, $update);
         }
 
-        // Perubahan role/status/password/satker langsung berlaku: cabut sesi lama akun tsb (MTC-004).
-        if (isset($update['user_level']) || isset($update['status']) || isset($update['password']) || array_key_exists('id_satker', $update)) {
-            $this->jwt->revokeAllForNip((string) $row['nip']);
+        // Perubahan role/status/password/satker/NIP langsung berlaku: cabut sesi lama akun tsb (MTC-004). NIP ikut
+        // karena claims sesi memuat `nip`.
+        if (isset($update['user_level']) || isset($update['status']) || isset($update['password']) || isset($update['nip']) || array_key_exists('id_satker', $update)) {
+            $this->jwt->revokeAllForUser($id);
         }
 
         return PenggunaModel::toPublic($this->pengguna->find($id));
@@ -259,14 +326,14 @@ class UserService
     public function delete(AuthContext $actor, int $id): void
     {
         $this->assertAdmin($actor);
-        $row = $this->findInScope($actor, $id);
+        $this->findInScope($actor, $id);
 
-        if ((string) $row['nip'] === $actor->nip()) {
+        if ($id === $actor->idPengguna()) {
             throw new ValidationException('Tidak dapat menghapus akun sendiri.', ['id' => ['Tidak dapat menghapus akun sendiri.']]);
         }
 
         $this->pengguna->delete($id);
-        $this->jwt->revokeAllForNip((string) $row['nip']);
+        $this->jwt->revokeAllForUser($id);
     }
 
     // ------------------------------------------------------------------
@@ -299,5 +366,90 @@ class UserService
         }
 
         return $row;
+    }
+
+    private static function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+
+    /**
+     * NIP ikut legacy: angka saja, maksimal 18 digit (kolom VARCHAR(30)).
+     *
+     * @param array<string, list<string>> $errors
+     */
+    private static function validateNip(?string $nip, array &$errors): bool
+    {
+        if ($nip !== null && preg_match('/^\d{1,' . PenggunaModel::NIP_MAX_DIGITS . '}$/', $nip) !== 1) {
+            $errors['nip'][] = 'NIP harus berupa angka, maksimal ' . PenggunaModel::NIP_MAX_DIGITS . ' digit.';
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, list<string>> $errors
+     */
+    private static function validateName(?string $name, array &$errors): bool
+    {
+        if ($name !== null && mb_strlen($name) > PenggunaModel::NAME_MAX) {
+            $errors['name'][] = 'Nama maksimal ' . PenggunaModel::NAME_MAX . ' karakter.';
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, list<string>> $errors
+     */
+    private static function validateEmail(?string $email, array &$errors): bool
+    {
+        if ($email !== null && (mb_strlen($email) > PenggunaModel::EMAIL_MAX || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
+            $errors['email'][] = 'Email tidak valid (maks. ' . PenggunaModel::EMAIL_MAX . ' karakter).';
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, list<string>> $errors
+     */
+    private static function validateUsername(string $username, array &$errors): bool
+    {
+        if ($username === '' || mb_strlen($username) > PenggunaModel::USERNAME_MAX) {
+            $errors['username'][] = 'Username wajib diisi (maks. ' . PenggunaModel::USERNAME_MAX . ' karakter).';
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Role 2/6/7 wajib NIP; akun tanpa NIP wajib punya nama (legacy L_user: name wajib untuk role 1/3/4/5/8).
+     *
+     * @param array<string, list<string>> $errors
+     */
+    private static function validateAccountInvariant(int $level, ?string $nip, ?string $name, array &$errors): void
+    {
+        if ($nip === null && Role::wajibNip($level)) {
+            $errors['nip'][] = 'NIP wajib diisi untuk role Pegawai/PTT/PPPK.';
+        }
+
+        if ($nip === null && $name === null) {
+            $errors['name'][] = 'Nama wajib diisi untuk akun tanpa NIP.';
+        }
     }
 }
