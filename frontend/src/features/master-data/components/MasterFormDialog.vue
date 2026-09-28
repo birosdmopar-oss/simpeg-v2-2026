@@ -102,7 +102,10 @@ function isFieldVisible(field: MasterFieldMeta): boolean {
   return !field.other_for || isSystemField(field.other_for)
 }
 
-const visibleFields = computed(() => props.meta.fields.filter((field) => isFieldVisible(field)))
+/** Field yang tampil; isian `other_for` hanya tampil saat wajib, jadi ditandai wajib (tanda *). */
+const visibleFields = computed(() =>
+  props.meta.fields.filter((field) => isFieldVisible(field)).map((field) => (field.other_for ? { ...field, required: true } : field)),
+)
 
 /** Kosongkan isian `other_for` yang tersembunyi (field ref-nya bukan lagi LAIN-LAIN). */
 function clearHiddenOtherFields(): void {
@@ -483,7 +486,7 @@ const { levels } = cascade
               :name="field.name"
               :label="field.label"
               :type="fieldInputType(field)"
-              :required="field.required || Boolean(field.other_for)"
+              :required="field.required"
               :options="field.options ?? []"
               :placeholder="fieldPlaceholder(field)"
               :disabled="pendingFields.has(field.name)"

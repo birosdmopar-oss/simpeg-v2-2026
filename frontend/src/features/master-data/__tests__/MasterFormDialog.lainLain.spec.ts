@@ -109,6 +109,12 @@ async function type(name: string, value: string): Promise<void> {
   await flushPromises()
 }
 
+/** Teks label field (tanda wajib " *" ikut). */
+function labelOf(name: string): string {
+  const id = input(name)?.id ?? ''
+  return document.body.querySelector(`label[for="${id}"]`)?.textContent?.trim() ?? ''
+}
+
 function optionValues(name: string): string[] {
   return Array.from(select(name).options).map((o) => o.value)
 }
@@ -189,6 +195,8 @@ describe('MasterFormDialog — pilihan LAIN-LAIN kantor (CR-010)', () => {
     expect(masterService.options).not.toHaveBeenCalledWith('kabupaten-kota', '99')
     expect(masterService.options).not.toHaveBeenCalledWith('kecamatan', expect.anything())
     for (const name of LAIN) expect(input(name)).not.toBeNull()
+    for (const name of LAIN) expect(labelOf(name)).toMatch(/\*$/)
+    expect(labelOf('kode_pos')).not.toContain('*')
     expect(document.body.textContent).toContain('Wajib diisi karena Provinsi LAIN-LAIN.')
 
     await type('nama_kantor', 'KBRI Tokyo')
