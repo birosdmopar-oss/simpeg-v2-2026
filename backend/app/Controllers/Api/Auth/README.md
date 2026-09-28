@@ -14,6 +14,15 @@ Token: access token JWT 1 jam + refresh token 7 hari (rotating, single-use), ked
 (`access_token` path `/`, `refresh_token` path `/api/v1/auth`). Klien non-browser boleh memakai header
 `Authorization: Bearer <access_token>` dan body `refresh_token`.
 
+Identitas akun (DBV-010/CR-013 ⏳): akun role 1/3/4/5/8 boleh tanpa NIP (K2), jadi identitas akun = `id_pengguna`.
+- Claims JWT: `sub` = id_pengguna (string bilangan bulat), `nip` = NIP akun (null untuk akun tanpa NIP), `ver` = 2,
+  `role`, `id_unit`, `id_satker`. Token tanpa `ver` = 2 (format lama, `sub` = NIP) → 401.
+- Baris `token` menyimpan `id_pengguna` (+ `nip` sebagai jejak); pencabutan massal dan reuse detection per akun.
+- Saat deploy DBV-010 tabel `token` dikosongkan dan token lama ditolak: FE mendapat 401 → refresh 401 → halaman login,
+  sehingga setiap pengguna login ulang satu kali. `jwt.secret` tidak perlu dirotasi.
+- Koneksi aplikasi strict (`strictOn = true`) dan tabel auth `utf8mb4_unicode_ci`: username `strasse` dan `straße`
+  dianggap sama (UNIQUE).
+
 ## Endpoint
 
 | Method | Path | Role | Controller | Task |
@@ -38,10 +47,11 @@ Endpoint dummy `/_rbac/*` (Fase 0) tetap ada di non-production untuk regresi Rol
 
 ### POST /auth/login
 Request `{ "username": "198501012010011001", "password": "Password123!", "captcha_token": "<cf-turnstile-response>" }`
+`username` = NIP (akun pegawai, default A-09) atau username bebas (akun non-pegawai), maks. 100 karakter (legacy).
 
 | Status | Kapan | Body |
 |---|---|---|
-| 200 | sukses | `data: { user:{id_pengguna,nip,username,user_level,id_unit,id_satker,status,last_login_at,...}, access_token, access_expires_at, refresh_expires_at }` + Set-Cookie |
+| 200 | sukses | `data: { user:{id_pengguna,nip (null untuk akun tanpa NIP),username,name,email,user_level,id_unit,id_satker,status,last_login_at,...}, access_token, access_expires_at, refresh_expires_at }` + Set-Cookie |
 | 422 | captcha kosong/invalid (dicek SEBELUM kredensial) / field wajib kosong | `errors: { captcha_token:[...] }` |
 | 423 | akun terkunci (5x gagal berturut-turut, `auth.lockoutMaxAttempts`) | `message: "Akun terkunci sementara ... Coba lagi dalam N menit."` |
 | 401 | username tidak terdaftar / password salah / akun nonaktif | `message: "Username atau password salah."` (generik) |
@@ -50,7 +60,7 @@ Lazy rehash (A-02b): kalau `password` NULL, verifikasi ke `password_legacy` (MD5
 
 ### POST /auth/refresh
 Tanpa body (cookie `refresh_token`) atau `{ "refresh_token": "..." }`. 200 `data: { access_token, access_expires_at, refresh_expires_at }` + cookie baru.
-401 kalau token tidak ada / tidak dikenal (termasuk sudah di-logout atau dicabut massal) / kedaluwarsa / **sudah pernah dipakai (reuse) → seluruh sesi akun dicabut**.
+401 kalau token tidak ada / tidak dikenal (termasuk sudah di-logout, dicabut massal, atau berformat lama sebelum DBV-010 — barisnya dihapus) / kedaluwarsa / **sudah pernah dipakai (reuse) → seluruh sesi akun (per `id_pengguna`) dicabut**.
 Setiap 401 dari endpoint ini juga menghapus cookie `refresh_token` (Set-Cookie kedaluwarsa) agar tab/perangkat lama berhenti mengirim token mati; error lain (500) tidak menghapus cookie.
 
 Token kedaluwarsa yang ditolak (401 "Token sudah kedaluwarsa.") barisnya **dihapus** (bukan `revoked=1`); bila dikirim lagi (retry klien body, tab paralel) → 401 "Refresh token tidak dikenal." tanpa mencabut sesi lain.
@@ -62,7 +72,7 @@ Baris refresh token (cookie/body) **dihapus dari DB** (bukan `revoked=1`), cooki
 Replay token itu → 401 "Refresh token tidak dikenal."; sesi di perangkat lain tidak terpengaruh.
 
 ### GET /auth/me
-200 `data: { user, claims:{ role, id_unit, id_satker, exp } }`.
+200 `data: { user, claims:{ role, id_unit, id_satker, exp } }` — akun dicari per `id_pengguna` (claim `sub`).
 
 ### POST /auth/change-password
 Request `{ "old_password", "new_password", "new_password_confirmation" }`.
@@ -93,16 +103,21 @@ Dua request paralel untuk akun yang sama (token sama atau berbeda): hanya satu y
 500 bila penyimpanan gagal (error database: lock wait timeout, deadlock, dll.) — tidak ada yang tersimpan dan token belum terpakai, jadi bisa dicoba lagi.
 
 ### /auth/users (A-08)
-Query index: `search` (username/nip LIKE), `user_level`, `status`, `id_satker` (role 1 saja), `sort` (username|nip|user_level|status|created_at|last_login_at), `order`, `page`, `per_page` (≤100).
-Response index: `data: { items:[user...], total, page, per_page }`.
+Query index: `search` (username/nip/name LIKE), `user_level`, `status`, `id_satker` (role 1 saja), `sort` (username|nip|name|user_level|status|created_at|last_login_at), `order`, `page`, `per_page` (≤100).
+Response index: `data: { items:[user...], total, page, per_page }`; `user` = `{ id_pengguna, nip (null untuk akun tanpa NIP), username, name, email, user_level, id_unit, id_satker, status, last_login_at, created_at, updated_at }`.
 
-Create `{ nip (18 digit), username? (default = nip), password, user_level (1-8), id_unit?, id_satker?, status? }` → 201 `data: user`.
-Update `{ username?, user_level?, id_unit?, id_satker?, status?, password? }` → 200 `data: user`; perubahan role/status/password/satker mencabut seluruh sesi akun tsb (baris refresh token dihapus).
-Status `{ "status": "0"|"1" }`. Delete → soft delete (`deleted_at`) + sesi dicabut (baris refresh token dihapus); tidak boleh menghapus akun sendiri.
+Create `{ nip?, name?, email?, username?, password, user_level (1-8), id_unit?, id_satker?, status? }` → 201 `data: user`. Aturan akun (DBV-010/CR-013, ikut legacy `L_user`):
+- `nip` angka, maks. 18 digit (NIK 16 digit Non-PNS diterima); **wajib** untuk role 2/6/7 (UL_PEGAWAI), opsional untuk role 1/3/4/5/8 (`null`/kosong = akun tanpa NIP).
+- akun tanpa NIP wajib `name` (≤ 150) dan `username`; `username` default = NIP, maks. 100, unik.
+- `email` opsional, harus valid, ≤ 150 (tanpa UNIQUE).
+
+Update `{ nip?, name?, email?, username?, user_level?, id_unit?, id_satker?, status?, password? }` → 200 `data: user`. `nip` hanya boleh **diisi** untuk akun yang belum punya NIP (menautkan akun ke pegawai); mengubah/menghapus NIP yang sudah ada → 422 (ganti NIP = fitur B-06). Mengubah role ke 2/6/7 tanpa NIP atau mengosongkan nama akun tanpa NIP → 422. Mengisi NIP atau mengubah role/status/password/satker mencabut seluruh sesi akun tsb (baris refresh token dihapus).
+Status `{ "status": "0"|"1" }`. Delete → soft delete (`deleted_at`) + sesi dicabut (baris refresh token dihapus). Tidak boleh menghapus atau menonaktifkan akun sendiri (dibandingkan per `id_pengguna`).
 
 Scoping: role 3 hanya melihat/mengubah akun dengan `id_satker` = satker di claims JWT-nya; akun lain → **403**. Role 3 tidak dapat membuat/memberi role Super Admin (asumsi keamanan, perlu konfirmasi).
-Validasi: 422 `errors` per-field (nip 18 digit, nip/username unik, role valid, kebijakan password).
+Validasi: 422 `errors` per-field (nip, name, email, username, user_level, password, status).
 
 ## Audit trail (A-10)
-`audit_logs` — `login` dan `logout` ditulis eksplisit oleh `AuthService` (entity `pengguna`, `nip_actor` = akun ybs); ganti password, reset password, dan seluruh CRUD akun tercatat otomatis lewat `PenggunaModel` (turunan `BaseAuditableModel`) dengan kolom hash password dimasking `***`.
-Jalur tanpa sesi login memakai `nip_actor` = NIP pemilik akun (`PenggunaModel::withActor()`): reset password, serta update `last_login_at` dan lazy rehash saat login — setiap baris audit yang ditulis selama login ber-actor pemilik akun, bukan hanya event `login`. Pengecualian fail-open F0-04: bila INSERT audit reset gagal, reset ikut dibatalkan (500), karena di dalam transaksi kegagalannya tidak bisa dibedakan dari transaksi yang sudah di-rollback server.
+`audit_logs` — `login` dan `logout` ditulis eksplisit oleh `AuthService` (entity `pengguna`, pelaku = akun ybs); ganti password, reset password, dan seluruh CRUD akun tercatat otomatis lewat `PenggunaModel` (turunan `BaseAuditableModel`) dengan kolom hash password dimasking `***`.
+Pelaku (DBV-010): `id_pengguna_actor` = id_pengguna pelaku; `nip_actor` = NIP pelaku saat kejadian (null untuk akun tanpa NIP). Keduanya null untuk proses sistem/CLI.
+Jalur tanpa sesi login memakai pemilik akun sebagai pelaku (`PenggunaModel::withActor($row)`): reset password, serta update `last_login_at` dan lazy rehash saat login — setiap baris audit yang ditulis selama login ber-actor pemilik akun, bukan hanya event `login`. Pengecualian fail-open F0-04: bila INSERT audit reset gagal, reset ikut dibatalkan (500), karena di dalam transaksi kegagalannya tidak bisa dibedakan dari transaksi yang sudah di-rollback server.
