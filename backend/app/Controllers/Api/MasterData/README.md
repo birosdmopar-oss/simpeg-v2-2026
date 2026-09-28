@@ -92,11 +92,13 @@ Role selain 1 → `403 {status:'error', message:'Forbidden'}`; tanpa token → 4
 
 G-10 ⏳ = pilot DBV-002/CR-003, menunggu approval DB Validator & review kode (`backend/docs/db-review/G-10-faq-schema.md`). Kolom `faq_topic.icon` ada di tabel tetapi belum dikelola dan **tidak diekspos** (D6): tidak ada di form/meta dan tidak dikirim di respons admin mana pun (daftar, detail, hasil tambah/ubah/status/urutan/hapus) lewat `hiddenColumns`; nilainya di DB tidak disentuh.
 
-G-06 ⏳ = DBV-005/CR-012, menunggu approval DB Validator & review kode (`backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md` Bagian 2.7): kolom `order` TINYINT (maks. 127 entri tampil per lingkup urutan → 422 `order`), kolom audit hanya `updated_at`/`updated_by`; baris ber-ID hard-coded legacy (konket 2/4/5/6, `old_id` 8/10/13, tanda jasa 26/27/28/44, diklat 8) tidak dikunci.
-
 Master lain (jabatan, lokasi presensi, KP, pendidikan, diklat/hukdis/konket/tanda jasa, kantor, hari libur, web config) menyusul setelah skemanya disetujui DB Validator — lihat `backend/docs/progress/02-MasterData.md`.
 
 **Dropdown berjenjang wilayah 4 level:** `provinsi/options` → `kabupaten-kota/options?parent={id_provinsi}` → `kecamatan/options?parent={id_kabupaten_kota}` → `kelurahan/options?parent={id_kecamatan}`.
+
+**Dropdown berjenjang hukuman disiplin:** `tingkat-hukdis/options` → `jenis-hukdis/options?parent={id_tingkat_hukdis}` (hanya jenis yang tingkatnya aktif, `statusChain`). Pelatihan per jenis: `diklat/options?jenis_diklat={1..5}`.
+
+G-06 ⏳ = DBV-005/CR-012, menunggu approval DB Validator & review kode (`backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md` Bagian 2.7): kolom `order` TINYINT (maks. 127 entri tampil per lingkup urutan → 422 `order`), kolom audit hanya `updated_at`/`updated_by`; baris ber-ID hard-coded legacy (konket 2/4/5/6, `old_id` 8/10/13, tanda jasa 26/27/28/44, diklat 8) tidak dikunci.
 
 ## Payload & response
 
