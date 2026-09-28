@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
+use App\Exceptions\ValidationException;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
@@ -168,6 +169,8 @@ final class KenaikanPangkatTest extends CIUnitTestCase
             ['gol', ['gol' => 'iii'], 'Golongan tidak valid.'],
             ['ruang', ['ruang' => 'f'], 'Ruang tidak valid.'],
             ['ruang', ['ruang' => 'B'], 'Ruang tidak valid.'],
+            ['gol', ['gol' => ''], 'Golongan wajib diisi.'],
+            ['ruang', ['ruang' => ''], 'Ruang wajib diisi.'],
             ['pangkat', ['pangkat' => str_repeat('a', 51)], 'Pangkat maksimal 50 karakter.'],
             ['pangkat', ['pangkat' => ''], 'Pangkat wajib diisi.'],
             ['gol_ruang', ['gol_ruang' => 'CPNS III/bb'], 'Gol./Ruang maksimal 10 karakter.'],
@@ -184,6 +187,80 @@ final class KenaikanPangkatTest extends CIUnitTestCase
         // Tepat 10 karakter (label CPNS terpanjang) muat.
         $this->sendJson('POST', self::PANGKAT, $valid + ['gol_ruang' => 'CPNS III/b'])->assertStatus(201);
         $this->seeInDatabase('pangkat', ['gol_ruang' => 'CPNS III/b', 'cpns' => 1, 'gol' => 'III', 'ruang' => 'b', 'pangkat' => 'Penata Muda Tingkat I']);
+
+        // Pencarian daftar admin juga mencari nama pangkat (extraSearch), bukan hanya gol_ruang/kode.
+        $found = $this->json($this->get(self::PANGKAT, ['search' => 'Tingkat', 'cpns' => '2']))['data']['items'];
+        $this->assertSame(['14'], array_map('strval', array_column($found, 'id_pangkat')));
+    }
+
+    /**
+     * Nilai `order` yang dianggap kosong oleh rule permit_empty (' ', false) tidak pernah menjadi level 0: tambah =
+     * MAX+1, ubah = level tidak berubah; array → 422. Batas bawah juga dijaga service (lapis kedua controller). Mode
+     * geser (jenis KP): ubah dengan `order` kosong tidak memindah entri.
+     */
+    public function testPangkatEmptyOrderNeverStoresZero(): void
+    {
+        $payload = ['cpns' => '2', 'pangkat' => 'Pembina', 'gol' => 'IV', 'ruang' => 'a'];
+
+        foreach ([[' ', 'IV/a', 12], [false, 'IV/b', 13]] as [$order, $golRuang, $expected]) {
+            $result = $this->sendJson('POST', self::PANGKAT, $payload + ['gol_ruang' => $golRuang, 'order' => $order]);
+            $result->assertStatus(201);
+            $this->assertSame($expected, (int) $this->json($result)['data']['order'], $golRuang);
+
+            $this->sendJson('PUT', self::PANGKAT . '/14', ['order' => $order, 'pangkat' => "Penata Muda Tingkat I {$golRuang}"])->assertStatus(200);
+            $this->seeInDatabase('pangkat', ['id_pangkat' => 14, 'order' => 10, 'pangkat' => "Penata Muda Tingkat I {$golRuang}"]);
+        }
+
+        $result = $this->sendJson('POST', self::PANGKAT, $payload + ['gol_ruang' => 'IV/c', 'order' => []]);
+        $result->assertStatus(422);
+        $this->assertSame(['Urutan tidak valid.'], $this->json($result)['errors']['order']);
+        $this->dontSeeInDatabase('pangkat', ['order' => 0]);
+
+        $def = service('masterRegistry')->get('pangkat');
+
+        try {
+            service('masterService')->update($def, '14', ['order' => 0]);
+            $this->fail('Level pangkat 0 harus ditolak service.');
+        } catch (ValidationException $e) {
+            $this->assertSame(['order' => ['Urutan harus bilangan bulat minimal 1.']], $e->getErrors());
+        }
+
+        $this->seeInDatabase('pangkat', ['id_pangkat' => 14, 'order' => 10]);
+
+        $this->sendJson('PUT', 'api/v1/master/jenis-kp/3', ['order' => ' ', 'jenis_kp' => 'Reguler Baru'])->assertStatus(200);
+        $this->assertSame([1, 2, 3, 4], $this->orders('jenis_kp', 'id_jenis_kp', ['1', '2', '3', '5']));
+    }
+
+    /**
+     * C6 (mode manual): level pangkat yang dihapus tetap dipegang dan kembali saat dipulihkan, jadi tambah tanpa `order`
+     * = MAX+1 seluruh pangkat TERMASUK yang dihapus (tidak ada dua pangkat berlevel sama setelah pemulihan).
+     */
+    public function testPangkatAutoOrderCountsDeletedLevels(): void
+    {
+        $this->delete(self::PANGKAT . '/15')->assertStatus(200);
+
+        $created = $this->json($this->sendJson('POST', self::PANGKAT, ['cpns' => '2', 'pangkat' => 'Penata Tingkat I', 'gol' => 'III', 'ruang' => 'd', 'gol_ruang' => 'III/d']))['data'];
+        $this->assertSame(12, (int) $created['order']);
+
+        $this->sendJson('PATCH', self::PANGKAT . '/15/status', ['status' => '1'])->assertStatus(200);
+        $this->assertSame([11, 12], $this->orders('pangkat', 'id_pangkat', ['15', (string) $created['id_pangkat']]));
+    }
+
+    /**
+     * PK TINYINT signed yang habis (ID 127 terpakai; InnoDB mengulang nilai maksimum → 1062 PRIMARY): tambah → 422
+     * dengan penjelasan, bukan 500. Berlaku untuk semua master AUTO_INCREMENT (G-doc 6.3 #16).
+     */
+    public function testPangkatFullTinyintKeyGives422(): void
+    {
+        $this->db->table('pangkat')->insert(['id_pangkat' => 127, 'pangkat' => 'Pembina Utama', 'gol' => 'IV', 'ruang' => 'e', 'gol_ruang' => 'IV/e', 'cpns' => 2, 'order' => 17, 'status' => 1]);
+
+        $result = $this->sendJson('POST', self::PANGKAT, ['cpns' => '2', 'pangkat' => 'Pembina', 'gol' => 'IV', 'ruang' => 'a', 'gol_ruang' => 'IV/a', 'order' => 13]);
+        $result->assertStatus(422);
+        $this->assertSame(
+            'Kode Pangkat/Golongan sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.',
+            $this->json($result)['message'],
+        );
+        $this->dontSeeInDatabase('pangkat', ['gol_ruang' => 'IV/a']);
     }
 
     /**
@@ -329,6 +406,17 @@ final class KenaikanPangkatTest extends CIUnitTestCase
 
         $this->sendJson('PUT', 'api/v1/master/gol-pppk/9', ['keterangan' => ''])->assertStatus(200);
         $this->assertNull($this->golPppk(9)['keterangan']);
+
+        // Spasi saja = kosong (NULL, bukan ''); array/objek JSON → 422, bukan 500.
+        $this->sendJson('PUT', 'api/v1/master/gol-pppk/9', ['keterangan' => $fits])->assertStatus(200);
+        $this->sendJson('PUT', 'api/v1/master/gol-pppk/9', ['keterangan' => '   '])->assertStatus(200);
+        $this->assertNull($this->golPppk(9)['keterangan']);
+
+        foreach ([[], ['a']] as $value) {
+            $result = $this->sendJson('PUT', 'api/v1/master/gol-pppk/9', ['keterangan' => $value]);
+            $result->assertStatus(422);
+            $this->assertSame(['Keterangan tidak valid.'], $this->json($result)['errors']['keterangan']);
+        }
     }
 
     // ------------------------------------------------------------------

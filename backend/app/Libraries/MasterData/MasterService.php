@@ -373,7 +373,7 @@ class MasterService
 
             $this->assertNameUnique($def, $name, $parent, $scope);
             $this->assertFieldsUnique($def, $row, null);
-        });
+        }, $def);
 
         $this->invalidate($def);
 
@@ -660,7 +660,9 @@ class MasterService
     }
 
     /**
-     * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan).
+     * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan). Kosong mengikuti
+     * rule permit_empty controller (null, false, string yang kosong setelah trim, non-skalar): nilai itu lolos validasi
+     * tanpa dicek is_natural_no_zero, jadi tidak boleh menjadi (int) 0 — level pangkat 0 / posisi 1 (CR-011).
      *
      * @param array<string, mixed> $data
      */
@@ -668,7 +670,11 @@ class MasterService
     {
         $order = $data[MasterDefinition::ORDER_FIELD] ?? null;
 
-        return $def->hasOrder && $order !== null && $order !== '' ? (int) $order : null;
+        if (! $def->hasOrder || ! is_scalar($order) || trim((string) $order) === '') {
+            return null;
+        }
+
+        return (int) $order;
     }
 
     /**
@@ -750,7 +756,9 @@ class MasterService
     }
 
     /**
-     * Urutan berikutnya (MAX+1) dalam satu lingkup urutan, dijaga tidak melewati kapasitas kolom `order`.
+     * Urutan berikutnya (MAX+1) dalam satu lingkup urutan, dijaga tidak melewati kapasitas kolom `order`. Mode shift
+     * menghitung dari entri yang tidak dihapus (entri terhapus tidak punya posisi tampil). Mode manual menghitung dari
+     * SELURUH entri termasuk yang dihapus: level entri terhapus tetap dipegang dan kembali saat dipulihkan (CR-011).
      *
      * @param array<string, string|null> $scope
      */
@@ -758,7 +766,7 @@ class MasterService
     {
         $builder = $this->whereOrderScope($this->db->table($def->table)->selectMax(MasterDefinition::ORDER_FIELD, 'max_order'), $scope);
 
-        if ($def->hasStatus) {
+        if ($def->hasStatus && ! $def->isManualOrder()) {
             $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
         }
 
@@ -777,6 +785,11 @@ class MasterService
      */
     private function assertOrderFits(MasterDefinition $def, int $order): void
     {
+        // Lapis kedua rule controller is_natural_no_zero (mis. pemanggil service langsung): urutan/level minimal 1.
+        if ($order < 1) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, 'Urutan harus bilangan bulat minimal 1.');
+        }
+
         if ($order > $def->orderMax()) {
             throw ValidationException::forField(
                 MasterDefinition::ORDER_FIELD,
@@ -1145,14 +1158,23 @@ class MasterService
      * UNIQUE/PRIMARY index DB (1062) adalah lapis kedua keunikan. Kalau dua permintaan balapan lolos cek aplikasi,
      * pelanggaran index (DatabaseException dari MasterModel, transaksi sudah di-rollback) diterjemahkan ulang ke 422
      * lewat $recheck (cek aplikasi diulang: kode, nama, dan field uniqueFields).
+     *
+     * $insertDef (hanya tambah): 1062 pada PRIMARY master AUTO_INCREMENT yang lolos $recheck berarti counter sudah di
+     * batas tipe PK (mis. TINYINT 127: InnoDB mengulang nilai maksimum) → 422 dengan penjelasan, bukan 500 (CR-011).
      */
-    private function translateDuplicate(Closure $work, Closure $recheck): void
+    private function translateDuplicate(Closure $work, Closure $recheck, ?MasterDefinition $insertDef = null): void
     {
         try {
             $work();
         } catch (DatabaseException $e) {
             if ($e->getCode() === 1062) {
                 $recheck();
+
+                if ($insertDef !== null && $insertDef->autoIncrement && preg_match("/for key '(?:[^']*\.)?PRIMARY'/", $e->getMessage()) === 1) {
+                    throw new ValidationException(
+                        "Kode {$insertDef->label} sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.",
+                    );
+                }
             }
 
             throw $e;

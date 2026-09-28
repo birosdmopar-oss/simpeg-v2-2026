@@ -124,6 +124,46 @@ final class PendidikanTest extends CIUnitTestCase
     }
 
     /**
+     * Aturan field G-05 dari definisi (Config\MasterData): wajib & panjang maksimal per kolom (koneksi produksi tidak
+     * strict, jadi teks kepanjangan akan terpotong diam-diam tanpa rule ini) dan kolom pencarian tambahan (extraSearch).
+     */
+    public function testPendidikanFieldRulesAndExtraSearch(): void
+    {
+        $cases = [
+            [self::JENJANG, ['jenjang_pendidikan' => 'Jenjang Uji', 'jenjang_pendidikan_singkat' => ''], 'jenjang_pendidikan_singkat', 'Singkatan wajib diisi.'],
+            [self::JENJANG, ['jenjang_pendidikan' => 'Jenjang Uji', 'jenjang_pendidikan_singkat' => str_repeat('a', 51)], 'jenjang_pendidikan_singkat', 'Singkatan maksimal 50 karakter.'],
+            [self::BIDANG, ['bidang_pendidikan' => 'Bidang Uji', 'bidang_pendidikan_english' => str_repeat('a', 101)], 'bidang_pendidikan_english', 'Nama (Inggris) maksimal 100 karakter.'],
+            [self::JURUSAN, ['id_bidang_pendidikan' => '1', 'jurusan_pendidikan' => 'Jurusan Uji', 'S_1' => '1', 'jurusan_pendidikan_english' => str_repeat('a', 256)], 'jurusan_pendidikan_english', 'Nama (Inggris) maksimal 255 karakter.'],
+            [self::JURUSAN, ['id_bidang_pendidikan' => '1', 'jurusan_pendidikan' => 'Jurusan Uji', 'S_1' => '1', 'gelar' => str_repeat('a', 51)], 'gelar', 'Gelar maksimal 50 karakter.'],
+            [self::BIDANG, ['bidang_pendidikan' => 'Bidang Uji', 'bidang_pendidikan_english' => []], 'bidang_pendidikan_english', 'Nama (Inggris) tidak valid.'],
+            [self::JURUSAN, ['id_bidang_pendidikan' => '1', 'jurusan_pendidikan' => 'Jurusan Uji', 'S_1' => '1', 'gelar' => ['S.T.']], 'gelar', 'Gelar tidak valid.'],
+        ];
+
+        foreach ($cases as [$uri, $payload, $field, $message]) {
+            $result = $this->sendJson('POST', $uri, $payload);
+            $result->assertStatus(422);
+            $this->assertSame([$message], $this->json($result)['errors'][$field], "{$uri} {$field}");
+        }
+
+        $this->dontSeeInDatabase('jenjang_pendidikan', ['jenjang_pendidikan' => 'Jenjang Uji']);
+        $this->dontSeeInDatabase('bidang_pendidikan', ['bidang_pendidikan' => 'Bidang Uji']);
+        $this->dontSeeInDatabase('jurusan_pendidikan', ['jurusan_pendidikan' => 'Jurusan Uji']);
+
+        // Batas tepat muat; spasi saja di field opsional = NULL.
+        $this->sendJson('POST', self::JURUSAN, ['id_bidang_pendidikan' => '1', 'jurusan_pendidikan' => 'Jurusan Uji', 'S_1' => '1', 'gelar' => str_repeat('a', 50), 'jurusan_pendidikan_english' => '  '])->assertStatus(201);
+        $this->seeInDatabase('jurusan_pendidikan', ['jurusan_pendidikan' => 'Jurusan Uji', 'gelar' => str_repeat('a', 50), 'jurusan_pendidikan_english' => null]);
+
+        // Pencarian daftar admin: singkatan jenjang dan nama Inggris bidang/jurusan (extraSearch).
+        $this->sendJson('PUT', self::BIDANG . '/1', ['bidang_pendidikan_english' => 'Engineering'])->assertStatus(200);
+        $this->sendJson('PUT', self::JURUSAN . '/3', ['jurusan_pendidikan_english' => 'Accountancy'])->assertStatus(200);
+
+        foreach ([[self::JENJANG, 'SLTP', 'id_jenjang_pendidikan', ['2']], [self::BIDANG, 'Engineer', 'id_bidang_pendidikan', ['1']], [self::JURUSAN, 'Accountan', 'id_jurusan_pendidikan', ['3']]] as [$uri, $search, $pk, $ids]) {
+            $items = $this->json($this->get($uri, ['search' => $search]))['data']['items'];
+            $this->assertSame($ids, array_map('strval', array_column($items, $pk)), "{$uri}?search={$search}");
+        }
+    }
+
+    /**
      * P6/D5: `row_jurusan` = nama kolom flag di jurusan_pendidikan, dipilih dari daftar tetap (peka huruf; ditolak 422
      * sebelum CHECK DB); tidak dikirim / kosong = NULL, dan bisa dikosongkan lagi lewat ubah.
      */
@@ -150,6 +190,25 @@ final class PendidikanTest extends CIUnitTestCase
         $this->seeInDatabase('jenjang_pendidikan', ['id_jenjang_pendidikan' => 8, 'row_jurusan' => null]);
         $this->sendJson('PUT', self::JENJANG . '/8', ['row_jurusan' => 'S_1'])->assertStatus(200);
         $this->seeInDatabase('jenjang_pendidikan', ['id_jenjang_pendidikan' => 8, 'row_jurusan' => 'S_1']);
+
+        // Nilai yang dianggap kosong oleh permit_empty (spasi, tab, false) disimpan NULL — bukan '' yang ditolak CHECK
+        // (3819 → 500) — baik saat tambah maupun saat mengosongkan baris ber-'S_1'. Array/objek JSON → 422.
+        foreach ([' ', "\t", false] as $i => $blank) {
+            $this->sendJson('POST', self::JENJANG, ['jenjang_pendidikan' => "Jenjang Kosong {$i}", 'jenjang_pendidikan_singkat' => "JK{$i}", 'row_jurusan' => $blank])->assertStatus(201);
+            $this->seeInDatabase('jenjang_pendidikan', ['jenjang_pendidikan_singkat' => "JK{$i}", 'row_jurusan' => null]);
+
+            $this->sendJson('PUT', self::JENJANG . '/8', ['row_jurusan' => 'S_1'])->assertStatus(200);
+            $this->sendJson('PUT', self::JENJANG . '/8', ['row_jurusan' => $blank])->assertStatus(200);
+            $this->seeInDatabase('jenjang_pendidikan', ['id_jenjang_pendidikan' => 8, 'row_jurusan' => null]);
+        }
+
+        foreach ([[], ['S_1']] as $value) {
+            $result = $this->sendJson('POST', self::JENJANG, ['jenjang_pendidikan' => 'Jenjang Array', 'jenjang_pendidikan_singkat' => 'JA', 'row_jurusan' => $value]);
+            $result->assertStatus(422);
+            $this->assertSame(['Kolom Jurusan tidak valid.'], $this->json($result)['errors']['row_jurusan']);
+        }
+
+        $this->dontSeeInDatabase('jenjang_pendidikan', ['jenjang_pendidikan_singkat' => 'JA']);
 
         $fields = array_column($this->metaByKey()['jenjang-pendidikan']['fields'], null, 'name');
         $this->assertSame(['select', false], [$fields['row_jurusan']['type'], $fields['row_jurusan']['required']]);
@@ -245,6 +304,18 @@ final class PendidikanTest extends CIUnitTestCase
         $this->sendJson('PUT', self::JURUSAN . '/50', ['S_1' => '0'])->assertStatus(422);
         $this->seeInDatabase('jurusan_pendidikan', ['id_jurusan_pendidikan' => 50, 'S_1' => 1]);
 
+        // Dua ubah bersamaan: snapshot service (dibaca sebelum transaksi) masih S_1=1, S_2=1, padahal ubah lain sudah
+        // meng-commit S_2=0. Hook membaca ulang flag dengan kunci baris, jadi mematikan S_1 ditolak (bukan tujuh flag 0).
+        $stale = $this->db->table('jurusan_pendidikan')->where('id_jurusan_pendidikan', 1185)->get()->getRowArray();
+        $this->db->table('jurusan_pendidikan')->where('id_jurusan_pendidikan', 1185)->update(array_fill_keys(JurusanPendidikanHooks::FLAGS, 0) + ['S_1' => 1]);
+
+        try {
+            (new JurusanPendidikanHooks())->beforeWrite(['S_1' => 0], $stale);
+            $this->fail('Flag terkini (hanya S_1) harus dibaca dari DB, bukan dari snapshot.');
+        } catch (ValidationException $e) {
+            $this->assertSame(['D_I' => [JurusanPendidikanHooks::MESSAGE]], $e->getErrors());
+        }
+
         $fields = array_column($this->metaByKey()['jurusan-pendidikan']['fields'], null, 'name');
 
         foreach (JurusanPendidikanHooks::FLAGS as $flag) {
@@ -339,6 +410,28 @@ final class PendidikanTest extends CIUnitTestCase
             $result->assertStatus(422);
             $this->assertSame(['Bidang Pendidikan tidak ditemukan.'], $this->json($result)['errors']['id_bidang_pendidikan'], $bidang);
         }
+    }
+
+    /**
+     * `bidang_pendidikan` PK TINYINT [K] (produksi mulai ID 100, sisa 28 ID): setelah ID 127 terpakai, tambah → 422
+     * dengan penjelasan (1062 PRIMARY dari counter yang habis), bukan 500 (G-doc 6.3 #16).
+     */
+    public function testBidangFullTinyintKeyGives422(): void
+    {
+        $this->db->table('bidang_pendidikan')->insert(['id_bidang_pendidikan' => 127, 'bidang_pendidikan' => 'Kesehatan', 'order' => 4, 'status' => 1]);
+
+        $result = $this->sendJson('POST', self::BIDANG, ['bidang_pendidikan' => 'Baru Setelah 127']);
+        $result->assertStatus(422);
+        $this->assertSame(
+            'Kode Bidang Pendidikan sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.',
+            $this->json($result)['message'],
+        );
+        $this->dontSeeInDatabase('bidang_pendidikan', ['bidang_pendidikan' => 'Baru Setelah 127']);
+
+        // Nama ganda tetap dilaporkan sebagai nama ganda (cek aplikasi lebih dulu), bukan batas kode.
+        $result = $this->sendJson('POST', self::BIDANG, ['bidang_pendidikan' => 'kesehatan']);
+        $result->assertStatus(422);
+        $this->assertArrayHasKey('bidang_pendidikan', $this->json($result)['errors']);
     }
 
     // ------------------------------------------------------------------
