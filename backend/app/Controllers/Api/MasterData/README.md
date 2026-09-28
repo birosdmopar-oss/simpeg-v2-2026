@@ -201,14 +201,14 @@ Saat ubah, aturan hanya diperiksa ulang bila kolom wilayah/`*_lain`/`kode_pos` i
 
 | Method | Path | Role | Keterangan |
 |---|---|---|---|
-| GET | `/hari-libur` | **1, 4, 5, 8** | Daftar, urut `tgl_mulai DESC`. Query: `tahun` (4 digit 1900-2100, rentang yang beririsan dengan tahun itu; selain itu 422), `search` (nama, wildcard di-escape), `status` (`1`/`2`/`10`, **role 1 saja**; default tanpa `10`), `page`, `per_page` (≤100). Role 4/5/8 **hanya status 1** (`status` diabaikan) |
+| GET | `/hari-libur` | **1, 4, 5, 8** | Daftar, urut `tgl_mulai DESC`. Query: `tahun` (4 digit 1900-2100, rentang yang beririsan dengan tahun itu; selain itu 422), `search` (nama, ≤100 karakter, wildcard di-escape), `status` (`1`/`2`/`10`, **role 1 saja**; default tanpa `10`), `page` (dibatasi agar offset tidak meluap: halaman raksasa = kosong), `per_page` (≤100). Role 4/5/8 **hanya status 1** (`status` diabaikan) |
 | GET | `/hari-libur/{id}` | 1, 4, 5, 8 | Detail; id non-kanonik → 404; role 4/5/8 + status ≠ 1 → 404 |
 | POST | `/hari-libur` | 1 | Tambah → 201 |
 | PUT | `/hari-libur/{id}` | 1 | Ubah parsial; `status` `1`/`2` juga memulihkan status 10 |
 | PATCH | `/hari-libur/{id}/status` | 1 | `{ "status": "1"\|"2" }`; juga memulihkan status 10 |
 | DELETE | `/hari-libur/{id}` | 1 | Soft delete → status 10, `{ deleted: true, soft_delete: true, item }` |
 
-Baris: `{ id_libur, id_jenis_libur, jenis_libur (nama, LEFT JOIN — null bila tanpa jenis), tgl_mulai, tgl_akhir, nama_libur, keterangan, status, created_at, updated_at, updated_by }`; daftar `{ items, total, page, per_page }`. Role lain → 403; tanpa token → 401.
+Baris: `{ id_libur, id_jenis_libur, jenis_libur (nama, LEFT JOIN — null bila tanpa jenis), tgl_mulai, tgl_akhir, nama_libur, keterangan, status, created_at, updated_at, updated_by }`; kolom audit `created_at`/`updated_at`/`updated_by` hanya untuk role 1 (role 4/5/8 tidak menerimanya); daftar `{ items, total, page, per_page }`. Role lain → 403; tanpa token → 401.
 
 | Field | Aturan |
 |---|---|

@@ -6,7 +6,7 @@
 
 **Rujukan:** `02-MasterData.md` G-07 ("CRUD … kantor") dan G-08 (hari libur: `tgl_mulai <= tgl_akhir`, tidak boleh overlap), DDL produksi `simpeg_prod.sql:245-252` (`bidang_kursem`), `:1308-1321` (`hari_libur`), `:1435-1442` (`instansi_kursem`), ERD legacy `simpeg01.erd` (entity 61 `hari_libur`, 81 `jenis_libur`, 90 `kantor`, 11 `bidang_kursem`, 68 `instansi_kursem`; 5 nama FK), kode legacy (`libraries/hr/master/Lm_umum.php`, `controllers/hr/master/C_umum.php`, `views/hr/master/umum/kantor/form.php`, `libraries/hr/L_presensi.php`, `controllers/hr/Presensi.php`, `views/hr/employee/presensi/holiday/form.php`, `libraries/hr/rwy/L_seminar.php`, `libraries/hr/rwy/L_alamat.php`, `libraries/hr/L_user.php`, `controllers/Tester.php`), `G-01-master-schema.md` (Keputusan #5, Bagian 3, Bagian 7 #1, Bagian 8 / DBV-001), `G-10-faq-schema.md` (pola pilot DBV-002), keputusan user DBV-003 (25-09-2026).
 
-**Label sumber:** **[K]** terkonfirmasi — DDL `simpeg_prod.sql` (nomor baris), ERD `simpeg01.erd`, atau kode legacy (`berkas:baris`); **[V2]** tambahan/ubahan v2 yang disengaja (deviasi dari legacy — alasan di Bagian 3); **[I]** dugaan (tidak ada sumber langsung, wajib dikonfirmasi dengan dump produksi). **[I kuat]** = dugaan yang didukung beberapa bukti tidak langsung.
+**Label sumber:** **[K]** terkonfirmasi — DDL `simpeg_prod.sql` (nomor baris), ERD `simpeg01.erd`, atau kode legacy (`berkas:baris`); **[V2]** tambahan/ubahan v2 yang disengaja (deviasi dari legacy — alasan di Bagian 3); **[I]** dugaan (tidak ada sumber langsung, wajib dikonfirmasi dengan dump produksi). **[I kuat]** = dugaan yang didukung beberapa bukti tidak langsung. **[K turunan]** = tipe yang dipaksa oleh kolom FK [K] yang merujuknya (tipe dan signedness kolom FK wajib sama dengan PK induk).
 
 | File | Isi |
 |---|---|
@@ -180,16 +180,17 @@ File migration-nya ada di branch ini dan diajukan untuk approval bersama ketiga 
 | Tabel | PK | Induk | Nama | Kolom lain |
 |---|---|---|---|---|
 | `provinsi` | `'99'` | — | `LAIN-LAIN` | `order` 0, `status` 1, `created_at` = `UTC_TIMESTAMP()`, `updated_at`/`updated_by` NULL |
-| `kabupaten_kota` | `'9999'` | `id_provinsi` = `'99'` | `LAIN-LAIN` | `kd_area` NULL, sisanya sama |
+| `kabupaten_kota` | `'9999'` | `id_provinsi` = `'99'` | `LAIN-LAIN` | `kd_area` NULL [V2], sisanya sama |
 | `kecamatan` | `'9999999'` | `id_kabupaten_kota` = `'9999'` | `LAIN-LAIN` | sama |
-| `kelurahan` | `'9999999999'` | `id_kecamatan` = `'9999999'` | `LAIN-LAIN` | `kd_pos` NULL, sisanya sama |
+| `kelurahan` | `'9999999999'` | `id_kecamatan` = `'9999999'` | `LAIN-LAIN` | `kd_pos` NULL [V2], sisanya sama |
 
 Label dan bukti:
 - Kode [K]: `Lm_umum.php:1797-1831`, `kantor/form.php`, `controllers/simapi/v1/A_employee.php:438-441`.
-- Nama `LAIN-LAIN` dan status 1 **[I kuat]**: `L_user.php:4708-4739` menyalin nama wilayah untuk kode 99/9999/… ke kolom nama NOT NULL (`form_kesehatan.provinsi` :1217); `Tester.php:4009-4015` membandingkan nama salinan itu dengan `'lain-lain'`; filter `id_provinsi!='99'` dipasang di samping `status='1'` (`L_employee.php:18`, `L_user.php:4424, 5568`, `L_alamat.php:52`, `Lm_umum.php:1594`).
-- Rantai induk 99 → 9999 → 9999999 → 9999999999 [I kuat]: daftar kabupaten/kecamatan/kelurahan legacy hanya menyaring induk (`Local.php:9-49`), dan tidak pernah menampilkan sentinel di bawah wilayah riil.
+- Nama `LAIN-LAIN` **[I kuat]**: `L_user.php:4708-4739` menyalin nama wilayah untuk kode 99/9999/… ke kolom nama NOT NULL (`form_kesehatan.provinsi` :1217); `Tester.php:4009-4015` membandingkan nama salinan itu dengan `'lain-lain'`.
+- Status 1 **[I kuat] hanya untuk provinsi 99**: filter `id_provinsi!='99'` dipasang di samping `status='1'` (`L_employee.php:18`, `L_user.php:4424, 5568`, `L_alamat.php:52`, `Lm_umum.php:1594`). Status kabupaten 9999, kecamatan 9999999, dan kelurahan 9999999999 **[I]**: form kantor menulis opsi LAIN-LAIN level 2-4 secara hard-code tanpa membaca DB, dan `L_user.php:4708-4739` membaca wilayah tanpa filter status.
+- Rantai induk 99 → 9999 → 9999999 → 9999999999 **[I]**: daftar kabupaten/kecamatan/kelurahan legacy menyaring induk **dan** `status='1'` (`Local.php:18, 32, 46`), jadi tidak ada kode yang membuktikan induk sentinel; dicocokkan dengan dump produksi (3.1).
 - `order` 0 [V2] (D4): di luar urutan tampil; engine mengeluarkan sentinel dari lingkup urutan (Bagian 2.6).
-- `kd_pos` NULL [K]: kode pos untuk kelurahan sentinel diisi bebas di form (`kantor/form.php:189-190`).
+- `kd_pos` / `kd_area` NULL **[V2]**: v2 memilih NULL karena nilainya tidak pernah dipakai. Legacy tidak pernah membaca `kelurahan.kd_pos` untuk kode 9999999999: `Lm_umum.php:1620-1623` memakai `kode_pos` kantor untuk cabang sentinel (baru cabang lain membaca `kelurahan.kd_pos`), `kantor/form.php:189-190` memakai input teks bebas, dan JS `kelurahanSelected` (`form.php:392-393, 422-428`) hanya memanggil `list_kd_pos` bila kelurahan bukan 9999999999. `kd_area` hanya disentuh form kabupaten/kota (`Lm_umum.php:1079`, `kab_kota/form.php:85-87`), tidak pernah untuk 9999. Isi produksinya tidak diketahui (3.1).
 - UNIQUE nama wilayah (`uq_provinsi_nama`, dst.) tidak bentrok selama tidak ada wilayah riil bernama "Lain-lain" (perbandingan tidak peka huruf besar/kecil).
 
 Isi migration:
@@ -226,13 +227,15 @@ Saat ubah, aturan hanya diperiksa ulang bila kolom wilayah/`*_lain`/`kode_pos` i
 
 **Hari libur** (`HariLiburController` + `HariLiburService`, bukan entri engine; route `api/v1/hari-libur`):
 - Baca role 1/4/5/8, tulis role 1 (F6). Role 1 melihat status 1/2 (default) dan 10 lewat `?status=10`; role 4/5/8 **hanya status 1** (keputusan aplikasi: di legacy semua baris dihitung libur, padanannya di v2 status 1), detail status lain → 404.
-- Daftar LEFT JOIN `jenis_libur` (baris tanpa jenis tetap tampil, `jenis_libur` null), urut `tgl_mulai DESC, id_libur DESC`, `?tahun=` = rentang yang beririsan dengan tahun itu.
+- Daftar LEFT JOIN `jenis_libur` (baris tanpa jenis tetap tampil, `jenis_libur` null), urut `tgl_mulai DESC, id_libur DESC`, `?tahun=` = rentang yang beririsan dengan tahun itu. `per_page` ≤ 100, `search` ≤ 100 karakter (lebih → 422), dan `page` dibatasi `intdiv(PHP_INT_MAX, 100)` agar offset tidak meluap (halaman sebesar itu kosong, bukan 500).
+- Kolom audit (`created_at`, `updated_at`, `updated_by` = `id_pengguna` admin) hanya dikirim ke role 1; role 4/5/8 tidak menerimanya (pola bagian publik FAQ).
 - Validasi: tanggal tepat `YYYY-MM-DD`, tanggal kalender yang ada, tahun 1900-2100 (regex + `valid_date`, karena `valid_date` CI4 menerima `2026-1-1` dan koneksi `strictOn=false` akan menyimpan tanggal tidak valid sebagai `0000-00-00`); `tgl_akhir >= tgl_mulai`; `id_jenis_libur` wajib, ada, dan aktif (hanya bila berubah; F5); `nama_libur` ≤ 100 karakter (boleh sama, F4); `keterangan` ≤ 65.535 byte.
 - **Overlap (Paket A):** rentang inklusif tidak boleh beririsan dengan hari libur lain berstatus **apa pun**; bersebelahan boleh. Pesan menyebut entri yang bentrok dan menyarankan mengaktifkan/memulihkan bila entri itu status 2/10.
 - **Serialisasi tulis:** semua tulis (tambah, ubah, status, hapus) berjalan di dalam named lock `GET_LOCK('simpeg_hl_' + md5(nama DB + DBPrefix), 10)` lalu transaksi: cek overlap → tulis → commit → `RELEASE_LOCK` (di `finally`). Lock tidak didapat dalam 10 detik → **409** tanpa tulis. Named lock dipilih ketimbang `SELECT … FOR UPDATE` (Bagian 4 #15).
 - **Lapis DB → 422 di service:** 1062 `uq_hari_libur_tgl_mulai` → 422 `tgl_mulai` (pesan overlap bila entri bentrok ditemukan); CHECK `chk_hari_libur_rentang` 3819 (MySQL) / 4025 (MariaDB) → 422 `tgl_akhir`. Tidak ditambahkan ke daftar global error data CR-007 (Bagian 4 #16).
 - Soft delete (status 10) dan pulihkan lewat `PATCH status` 1/2 (tanpa cek overlap: Paket A menjamin rentangnya tidak dipakai entri lain). `updated_by` diisi saat tambah dan ubah (legacy `sp_holiday` :20561); audit create/update/delete.
 - **`HariLiburService::tanggalLibur(from, to)`**: daftar tanggal `Y-m-d` unik dan terurut dari hari libur **status 1** yang beririsan dengan [from, to], dipotong ke rentang itu; status jenis libur tidak berpengaruh. Satu-satunya sumber tanggal libur untuk presensi, tukin, uang makan, lama cuti, konket, dan LKH (Fase 5). Belum ada endpoint (belum ada konsumen).
+- FE `/hari-libur`: kolom Status hanya badge; semua aksi baris (Edit, Nonaktifkan/Aktifkan, Pulihkan, Hapus) lewat menu titik tiga ⋮ (`RowActionsMenu`, AGENTS.md bagian 1). Di form, tanggal selesai mengikuti tanggal mulai (libur satu hari) selama belum disentuh pengguna dan masih kosong atau sama dengan tanggal mulai sebelumnya, sehingga tahun yang diketik per digit tidak membeku di nilai setengah jadi; rentang yang sudah ada tidak ditimpa.
 
 **`orderColumnType` vs DDL (temuan QA CR-009).** `agama`, `jenis-pegawai`, `jenis-status` kini `tinyint` (kolom `order` TINYINT, DBV-001) dan wilayah `int unsigned` (`CreateWilayah`); FAQ tetap `int`. `MasterConfigSchemaTest` mencocokkan `orderColumnType`, `columnType` field int, field boolean, dan `auditColumns` setiap master di config dengan `information_schema`, termasuk master grup DBV lain setelah merge.
 
@@ -262,7 +265,7 @@ Saat ubah, aturan hanya diperiksa ulang bila kolom wilayah/`*_lain`/`kode_pos` i
 Butuh `mysqldump --no-data` untuk tabel di bawah **plus** data (atau hasil query audit Bagian 6.3):
 - `jenis_libur`: seluruh DDL (panjang nama, tipe `order`/`status`, kolom audit, index) dan isi datanya (apakah hanya 1 = Libur Nasional, 2 = Cuti Bersama, atau ada kategori lain — subjudul `Presensi.php:1027` "Daftar libur dan kegiatan pegawai" mengisyaratkan kemungkinan kategori ketiga).
 - `kantor`: tipe setiap kolom, urutan kolom, keberadaan `created_at`/`updated_at`, index, dan aksi keempat FK.
-- Keberadaan, nama, status, dan `order` 4 baris sentinel di tabel wilayah produksi.
+- Keberadaan, nama, status, `order`, rantai induk, serta `kd_area`/`kd_pos` 4 baris sentinel di tabel wilayah produksi.
 - DDL tabel wilayah produksi (sisa G-01 8.3).
 - `bidang_kursem`, `instansi_kursem`, `hari_libur`: skema [K]; yang perlu hanya datanya.
 
@@ -340,6 +343,12 @@ Mutation check (perubahan inti dibatalkan satu per satu → test harus gagal →
 - `KantorHooks`: tanpa LAIN-LAIN berjenjang, tanpa cek rantai, `*_lain` tidak wajib, `*_lain` tidak di-NULL-kan, `kode_pos` bebas, selalu diperiksa saat ubah, kolom provinsi tanpa `allowSystem` → `KantorTest` gagal.
 - Hari libur: tanpa `GET_LOCK`, overlap hanya status 1, `tanggalLibur()` semua status, tanpa regex tanggal, tanpa terjemahan 1062, tanpa terjemahan CHECK, overlap eksklusif, role baca melihat semua status, tahun tanpa batas, rentang tanpa cek di service → `HariLiburTest`/`HariLiburRulesTest` gagal.
 - FE: tanpa opsi LAIN-LAIN, tanpa LAIN-LAIN berjenjang, `*_lain` tersembunyi tidak dikosongkan, schema `*_lain` tidak wajib, tanpa tanda wajib `*_lain`, form hari libur tanpa cek rentang, menu Hari Libur hanya role 1, semua role bisa menulis → Vitest gagal.
+
+Tahap perbaikan review (28-09-2026, di-rebase ke `main` bdd87f6 yang memuat CR-015/AGENTS.md):
+- Halaman Hari Libur pindah ke menu aksi ⋮ (tanpa switch status dan tombol ikon per baris); test membuka menu dan memilih item lewat `data-action`.
+- Test baru: `page` raksasa (`9223372036854775807`, `1e18`) → 200 halaman kosong untuk role 1 dan 8; `per_page=1000` → 100; `search` 101 karakter → 422; role 4/5/8 tanpa kolom audit (daftar dan detail); data lama yang sudah beririsan tetap bisa diubah kolom non-tanggalnya, menggeser tanggalnya → 422; terjemahan 1062 memakai pesan overlap bila cek ulang menemukan entri yang bentrok; ubah parsial kantor LAIN-LAIN tanpa mengirim ulang `*_lain`; `kode_pos` tersimpan diperiksa ulang saat hanya kelurahan yang berubah; Vitest hapus lewat konfirmasi (berhasil & gagal), pencarian dengan debounce, paginasi, pesan simpan ubah/tambah, isi tanggal selesai saat tahun diketik per digit.
+- Mutation check tambahan, semuanya gagal sesuai harapan: `page` tanpa batas, kolom audit ikut terkirim ke role baca, overlap selalu dicek saat ubah, 1062 selalu pesan generik, `per_page` tanpa batas, `search` tanpa batas panjang (`HariLiburTest`); `kode_pos` dan `*_lain` dibaca dari data kiriman saja, bukan nilai akhir (`KantorTest`); hapus tanpa memanggil API, pencarian tanpa memuat ulang, paginasi rusak, pesan simpan salah, Hapus tampil untuk baris Dihapus, urutan menu salah, tanggal selesai hanya diisi saat kosong, tanggal selesai selalu ditimpa (Vitest).
+- Quality gate (langkah sama dengan `./check.sh`, PHPUnit dipecah 4 shard paralel): PHPStan `[OK] No errors`; PHP-CS-Fixer `Found 0 of 208 files that can be fixed`; PHPUnit `OK` di keempat shard (92 + 134 + 68 + 114 = 408 test, 12.417 assertion); ESLint dan vue-tsc bersih; Vitest `28 passed` file, `277 passed` test; build sukses.
 
 ### 6.3 Catatan migrasi data untuk Mapping
 

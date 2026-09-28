@@ -64,7 +64,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - `jenis-libur` lewat engine (`HariLiburController`, CRUD role 1, dropdown UL_ALL).
 - `api/v1/hari-libur` (`HariLiburController` + `HariLiburService`): daftar/detail role 1/4/5/8 (role 4/5/8 hanya status 1), tambah/ubah/status/hapus role 1, soft delete + pulihkan. Validasi tanggal `YYYY-MM-DD` (1900-2100), rentang, jenis wajib & aktif, overlap inklusif terhadap semua status dalam transaksi + named lock (`GET_LOCK`, 409 bila sibuk); 1062/CHECK (3819/4025) → 422. `updated_by` diisi saat tambah & ubah (legacy).
 - `HariLiburService::tanggalLibur(from, to)` — hanya status 1, dipotong ke rentang, unik & terurut: satu-satunya sumber tanggal libur untuk presensi/tukin/uang makan/cuti/konket/LKH (Fase 5).
-- FE: menu "Hari Libur" (role 1/4/5/8), halaman `/hari-libur` (filter tahun/nama, filter status role 1, tanggal Indonesia + jumlah hari, tombol tulis hanya role 1).
+- FE: menu "Hari Libur" (role 1/4/5/8), halaman `/hari-libur` (filter tahun/nama, filter status role 1, tanggal Indonesia + jumlah hari; tombol Tambah dan menu aksi baris ⋮ — Edit, Nonaktifkan/Aktifkan, Pulihkan, Hapus — hanya role 1, kolom Status hanya badge sesuai AGENTS.md).
 - Test: `HariLiburTest` (RBAC, validasi, overlap semua status, soft delete, balapan UNIQUE, CHECK, lock 409, `tanggalLibur()`), `HariLiburRulesTest`; Vitest schema/service/form/halaman/menu.
 
 **Belum**

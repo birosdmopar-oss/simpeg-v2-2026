@@ -15,10 +15,13 @@ use Throwable;
  * Dev/Production sebelum disetujui.
  *
  * Sumber: kode LAIN-LAIN legacy 99/9999/9999999/9999999999 [K] (`Lm_umum.php:1797-1831`, `kantor/form.php`,
- * `A_employee.php:438-441`). Nama `LAIN-LAIN` dan status 1 [I kuat] (`L_user.php:4708-4739` menyalin nama wilayah
- * untuk kode ini ke kolom NOT NULL; `Tester.php:4009-4015` membandingkannya dengan 'lain-lain'). Rantai induk
- * 99 → 9999 → 9999999 → 9999999999 [I kuat]. `order` 0 [V2]: di luar urutan tampil. `kd_area`/`kd_pos` NULL [K]
- * (kode pos kelurahan sentinel diisi bebas di form kantor).
+ * `A_employee.php:438-441`). Nama `LAIN-LAIN` [I kuat] (`L_user.php:4708-4739` menyalin nama wilayah untuk kode ini
+ * ke kolom NOT NULL; `Tester.php:4009-4015` membandingkannya dengan 'lain-lain'). Status 1 [I kuat] untuk provinsi 99
+ * (filter `id_provinsi!='99'` di samping `status='1'`), [I] untuk level 2-4. Rantai induk
+ * 99 → 9999 → 9999999 → 9999999999 [I]. `order` 0 [V2]: di luar urutan tampil. `kd_area`/`kd_pos` NULL [V2]: legacy
+ * tidak pernah membaca `kd_pos` kelurahan 9999999999 (kode pos kantor sentinel diisi bebas, `Lm_umum.php:1620-1623`,
+ * `kantor/form.php:189-190`) dan tidak ada kode yang menyentuh `kd_area` kabupaten 9999; nilai produksi dicocokkan
+ * dengan dump (G-doc Bagian 3.1).
  *
  * Di aplikasi keempat baris ini adalah baris sistem (opsi `systemIds` Config\MasterData, CR-010): tidak tampil di
  * options/daftar admin, tidak ikut urutan, tidak bisa diubah/dinonaktifkan/dihapus/menjadi induk, dan hanya bisa
