@@ -1,6 +1,6 @@
 # DB Validator Review — G-04 Kenaikan Pangkat & G-05 Pendidikan (skema legacy)
 
-**Key review:** `DBV-004` (review DB Validator, skema) + `CR-011` (review kode) — satu pull request, judul `[DBV-004][CR-011] …`, branch `dbv-004/g04-g05-pangkat-pendidikan`. DB Validator hanya me-review/approve; **merge dilakukan user** setelah kedua review menyatakan setuju. Bagian skema (2 migration + schema test + dokumen ini) dikerjakan lebih dulu; bagian kode CR-011 (definisi master, controller, FE, test fitur) menyusul setelah perluasan engine master CR-009 ada di `main` (branch di-rebase, timestamp migration ditetapkan ulang bila perlu).
+**Key review:** `DBV-004` (review DB Validator, skema) + `CR-011` (review kode) — satu pull request, judul `[DBV-004][CR-011] …`, branch `dbv-004/g04-g05-pangkat-pendidikan`. DB Validator hanya me-review/approve; **merge dilakukan user** setelah kedua review menyatakan setuju. Branch berbasis `main` yang sudah memuat perluasan engine master CR-009 (Gelombang 1); timestamp migration `2026-09-25-110000`/`110100` tetap (sesudah DBV-003, sebelum DBV-005). Isi: bagian skema DBV-004 (2 migration + schema test + dokumen ini) dan bagian kode CR-011 (definisi master di engine generik, 2 controller grup, 1 hook, test fitur, satu penyesuaian form FE).
 
 **Status:** ⏳ **MENUNGGU APPROVAL DB VALIDATOR (DBV-004) DAN REVIEW KODE (CR-011)**. Migration `2026-09-25-110000_CreateMasterKenaikanPangkat.php` dan `2026-09-25-110100_CreateMasterPendidikan.php` **JANGAN dijalankan di Dev/Production sebelum disetujui**. Approval final menunggu dump struktur produksi untuk nilai [I] (Bagian 7).
 
@@ -13,8 +13,13 @@
 | `app/Database/Migrations/2026-09-25-110000_CreateMasterKenaikanPangkat.php` | 3 tabel G-04: `pangkat`, `jenis_kp`, `gol_pppk` (SQL mentah, sadar prefix tabel; `down()` men-drop ketiganya) |
 | `app/Database/Migrations/2026-09-25-110100_CreateMasterPendidikan.php` | 3 tabel G-05: `jenjang_pendidikan`, `bidang_pendidikan`, `jurusan_pendidikan` (`down()` men-drop anak → induk) |
 | `tests/MasterData/PangkatPendidikanSchemaTest.php` | skema hasil kedua migration dibandingkan dengan Bagian 2 lewat `information_schema`, constraint DB, rollback & kegagalan `up()` per migration |
-
-Baris CR-011 (definisi master, controller, hooks, FE, fixture/seed test) ditambahkan ke tabel ini saat bagian kode selesai.
+| `app/Config/MasterData.php` (blok DBV-004) | CR-011: definisi 6 master di engine generik — nama, field, mode urutan, filter, keunikan singkatan, kolom tersembunyi, rantai status (Bagian 2.8) |
+| `app/Controllers/Api/MasterData/KpController.php`, `PendidikanController.php` | CR-011: controller grup G-04 / G-05; route & RBAC dibangkitkan dari config (CRUD role 1, dropdown semua role yang login) |
+| `app/Libraries/MasterData/JurusanPendidikanHooks.php` | CR-011: jurusan wajib punya minimal satu flag jenjang |
+| `tests/MasterData/KenaikanPangkatTest.php`, `PendidikanTest.php` | CR-011: test fitur per master (Bagian 6.2) |
+| `tests/_support/MasterDataTestTrait.php`, `tests/_support/Database/Seeds/MasterDataSeeder.php` (blok DBV-004) | fixture G-TC generik dan data uji dengan ID legacy bermakna (6.4) |
+| `tests/MasterData/MasterGenericTcTest.php`, `RbacMasterEndpointsTest.php` | penyesuaian test generik bersama: tabel tanpa `created_at` dan kolom nama pendek (Bagian 6.2) |
+| `frontend/src/features/master-data/components/MasterFormDialog.vue` (+ spec) | select opsional (`row_jurusan`) bisa dikosongkan lagi |
 
 ## 1. Latar belakang & keputusan
 
@@ -35,13 +40,13 @@ Perilaku legacy yang memengaruhi skema [K]:
 
 | # | Keputusan | Diterapkan |
 |---|---|---|
-| P1 | `pangkat`: kolom nama engine (nameField) dan UNIQUE = `gol_ruang`, tetap teks bebas seperti legacy (tidak diturunkan server) | `uq_pangkat_nama (gol_ruang)`; nameField di CR-011 |
-| P2 | `pangkat.order` = level pangkat; **mode order manual** (tidak digeser saat tambah/pindah, tidak dinomori ulang saat hapus) — fitur engine CR-009 | COMMENT kolom; opsi definisi di CR-011 |
+| P1 | `pangkat`: kolom nama engine (nameField) dan UNIQUE = `gol_ruang`, tetap teks bebas seperti legacy (tidak diturunkan server) | `uq_pangkat_nama (gol_ruang)`; `nameField` `gol_ruang` (CR-011) |
+| P2 | `pangkat.order` = level pangkat; **mode order manual** (tidak digeser saat tambah/pindah, tidak dinomori ulang saat hapus) — fitur engine CR-009 | COMMENT kolom; `orderMode: manual` + `orderColumnType: tinyint` (CR-011) |
 | P3 | `UNIQUE(cpns, order)` **DITUNDA** sampai data produksi terlihat (6.3 #5) | tidak dibuat; dibuktikan schema test |
 | P4 | `gol_pppk`: DDL [K]; `status` ENUM('1','2') → TINYINT 1/2/10 (deviasi wajib); UNIQUE nama | migration |
-| P5 | `gol_pppk.uang_makan` tetap DOUBLE [K], **bisa diedit Super Admin** (K5 c(ii)); sumber tarif ikut legacy (PPPK dari `gol_pppk`, PNS dari `web_config`) | skema [K]; field form di CR-011 |
-| P6 | `jenjang_pendidikan`: UNIQUE nama + UNIQUE singkatan (kode legacy membandingkan string singkatan); `row_jurusan` dipilih dari daftar tetap; `bobot_ipasn` disimpan tetapi disembunyikan | migration (+ CHECK D5); form di CR-011 |
-| P7 | `jurusan_pendidikan`: UNIQUE(`id_bidang_pendidikan`, `jurusan_pendidikan`) + audit duplikat; FK RESTRICT dengan nama legacy; dropdown mengikuti rantai status bidang → jurusan (pola FAQ U3) | migration; dropdown di CR-011 |
+| P5 | `gol_pppk.uang_makan` tetap DOUBLE [K], **bisa diedit Super Admin** (K5 c(ii)); sumber tarif ikut legacy (PPPK dari `gol_pppk`, PNS dari `web_config`) | skema [K]; field `uang_makan` wajib 0..10.000.000 (CR-011, C3 di 2.8) |
+| P6 | `jenjang_pendidikan`: UNIQUE nama + UNIQUE singkatan (kode legacy membandingkan string singkatan); `row_jurusan` dipilih dari daftar tetap; `bobot_ipasn` disimpan tetapi disembunyikan | migration (+ CHECK D5); `uniqueFields`, select `row_jurusan`, `hiddenColumns` (CR-011) |
+| P7 | `jurusan_pendidikan`: UNIQUE(`id_bidang_pendidikan`, `jurusan_pendidikan`) + audit duplikat; FK RESTRICT dengan nama legacy; dropdown mengikuti rantai status bidang → jurusan (pola FAQ U3) | migration; `statusChain` (CR-011) |
 | P8 | `bidang_pendidikan` & `jurusan_pendidikan` ditambah `order` [V2]; impor diisi urut nama ASC | migration |
 | P9 | PK TINYINT **signed** untuk `pangkat`, `jenis_kp`, `gol_pppk`, `bidang_pendidikan` | migration |
 | P10 | Flag `D_I`..`S_3` bernilai 1/0 dan `pangkat.cpns` 1/2 — nilai legacy (menjawab ISSUE-015 untuk grup ini) | migration |
@@ -65,7 +70,7 @@ Perilaku legacy yang memengaruhi skema [K]:
 | D10 | Tanpa KEY `order`/`status` tambahan (tidak ada bukti index legacy; tabel kecil) dan tanpa seed data di migration (ID datang dari impor; fixture test memakai ID yang sama) |
 | D11 | COMMENT status v2 `'1: Aktif, 2: Tidak Aktif, 10: Dihapus'` di 6 tabel (legacy bidang `'1: Active, 2: Inactive, 10: Deleted'`, gol_pppk `'1: Aktif, 2: Tidak Aktif'`); COMMENT `created_by`/`updated_by` [V2, preseden]; COMMENT semantik level di `pangkat.order` [V2] |
 | D12 | `pangkat.cpns` TINYINT NOT NULL DEFAULT 2 COMMENT `'1: CPNS, 2: PNS'` [I] (`simpegdev_local` `varchar(5) DEFAULT '2'`) |
-| D13 | `jenjang_pendidikan.bobot_ipasn` INT NULL DEFAULT 25 [I, `simpegdev_local`] — tetap ada di DB, tidak diekspos API/FE |
+| D13 | `jenjang_pendidikan.bobot_ipasn` INT NULL DEFAULT 25 [I, `simpegdev_local`] — tetap ada di DB, tidak diekspos API/FE. Default untuk jenjang yang dibuat lewat v2 diajukan ulang di Bagian 4 #16 (usulan `DEFAULT NULL`) |
 | D14 | Nilai AUTO_INCREMENT awal tidak ditulis (legacy bidang 100, gol_pppk 19; preseden DBV-001/002) |
 
 ## 2. Skema hasil DBV-004
@@ -183,18 +188,19 @@ Kunci: `PRIMARY (id_jurusan_pendidikan)`; **UNIQUE** `uq_jurusan_pendidikan_nama
 | bidang_pendidikan | `id_bidang_pendidikan` | `uq_bidang_pendidikan_nama` | – | – (induk) | – |
 | jurusan_pendidikan | `id_jurusan_pendidikan` | `uq_jurusan_pendidikan_nama (id_bidang_pendidikan, jurusan_pendidikan)` | `fk_id_bidang_pendidikan_jpend_to_bpend` | `fk_id_bidang_pendidikan_jpend_to_bpend` → bidang, RESTRICT/RESTRICT | – |
 
-### 2.8 Perilaku aplikasi yang bergantung pada skema (bahan CR-011)
+### 2.8 Perilaku aplikasi yang bergantung pada skema (CR-011)
 
-Rencana; dilengkapi dengan hasil akhir setelah CR-011 selesai (nama opsi mengikuti engine CR-009 yang masuk `main`).
+Definisi: blok DBV-004 di `app/Config/MasterData.php`. Rincian endpoint: `app/Controllers/Api/MasterData/README.md` (tabel master G-04/G-05). Butir C2–C6 adalah keputusan implementasi untuk review kode CR-011 (bukan pertanyaan DBV).
 
-- **Kelola master (role 1)** lewat engine master generik: `pangkat`, `jenis-kp`, `gol-pppk` (`KpController`) dan `jenjang-pendidikan`, `bidang-pendidikan`, `jurusan-pendidikan` (`PendidikanController`). Hapus = status 10, pulihkan lewat ubah status; aplikasi tidak pernah hard delete, jadi FK RESTRICT tidak terpicu dari aplikasi. Dropdown (options) terbuka untuk semua role karena dipakai form riwayat Fase 3.
-- **`pangkat` mode order manual (P2):** tambah/ubah/hapus/pulihkan tidak menggeser atau menomori ulang `order` entri lain; `order` diisi admin 1..127 (batas TINYINT signed; form legacy 1..100). Nilai `order` sama antara CPNS dan PNS diterima (P3). G-TC #4 (re-ordering menggeser entitas lain) **tidak berlaku** untuk `pangkat` (Bagian 3.1 #1).
-- **`pangkat` UNIQUE `gol_ruang` (P1):** nameField = `gol_ruang` ("Gol./Ruang", teks bebas maks. 10); duplikat beda kapitalisasi → 422. Dropdown bisa difilter `cpns` (1 CPNS / 2 PNS), sesuai filter jenis KP legacy.
-- **`gol_pppk`:** soft delete menyimpan 10 (regresi bug ENUM); `uang_makan` angka ≥ 0 dapat diubah role 1 (P5); `keterangan` maks. 255 byte (TINYTEXT); `created_by` saat tambah, `updated_by` saat ubah (pola FAQ E1).
-- **`jenjang_pendidikan`:** singkatan ganda → 422 di field singkatan; `row_jurusan` berupa select dari 7 kode (kosong = NULL, bukan string kosong — string kosong ditolak CHECK); CHECK menjadi lapis kedua. `bobot_ipasn` tidak dikirim di respons dan tidak bisa diubah lewat API; nilainya tidak berubah saat baris diubah.
-- **`jurusan_pendidikan`:** flag D_I..S_3 dinormalkan 1/0, minimal satu flag (422 bila ketujuhnya 0, legacy `Lm_pendidikan.php:584-587`); nama sama di bidang lain diterima; dropdown jurusan hanya menampilkan jurusan status 1 yang bidangnya status 1 (rantai status, P7) — memperbaiki bug legacy `Local.php:83, 87`, `L_pendidikan.php:77, 108`.
-- **Dropdown berjenjang (G-05 DoD):** bidang per jenjang dan jurusan per bidang + jenjang; `row_jurusan` dipetakan ke nama kolom lewat daftar tetap di kode (tidak pernah disisipkan mentah ke SQL seperti legacy); jenjang tanpa `row_jurusan` → daftar kosong.
-- **Kolom audit (D1):** 5 tabel tanpa `created_*` mengisi `updated_at`/`updated_by` saat tambah maupun ubah (perilaku Batch 1); `gol_pppk` pola FAQ. Waktu ditulis aplikasi dalam UTC.
+- **Kelola master (role 1)** lewat engine master generik: `pangkat`, `jenis-kp`, `gol-pppk` (`KpController`) dan `jenjang-pendidikan`, `bidang-pendidikan`, `jurusan-pendidikan` (`PendidikanController`). Hapus = status 10, pulihkan lewat ubah status; aplikasi tidak pernah hard delete, jadi FK RESTRICT tidak terpicu dari aplikasi. Dropdown (options) terbuka untuk semua role yang login karena dipakai form riwayat Fase 3; options hanya membaca kode, nama, dan induk (`uang_makan`/`bobot_ipasn` tidak ikut).
+- **`pangkat` urutan = level (P2):** `orderMode: manual`, `orderColumnType: tinyint` — `order` 1..127 (batas TINYINT signed; form legacy 1..100) disimpan apa adanya; tambah, ubah, PATCH order, hapus, dan pulihkan tidak menggeser atau menomori ulang pangkat lain dan tidak menulis audit untuk pangkat lain. Nilai `order` sama antara CPNS dan PNS diterima (P3). **C6:** tambah tanpa `order` = nilai terbesar seluruh pangkat + 1 (tanpa lingkup `cpns`, karena level legacy global: `L_employee.php:2434-2441`, daftar legacy `order ASC` tanpa pemisahan `cpns`); legacy mewajibkan `order` di form. G-TC #4 tidak berlaku untuk `pangkat` (Bagian 3.1 #1); lima master lain tetap mode geser.
+- **`pangkat` nama = `gol_ruang` (P1):** nameField "Gol./Ruang", teks bebas maks. 10 karakter (tidak diturunkan dari `cpns`/`gol`/`ruang`); duplikat beda kapitalisasi → 422, termasuk terhadap baris Tidak Aktif/Dihapus (dengan saran aktifkan/pulihkan). `cpns` (label legacy "Jenis Pangkat") pilihan 1 CPNS / 2 PNS, `gol` I–IV, `ruang` a–e — pilihan form legacy, peka huruf; `pangkat` wajib maks. 50. Dropdown & daftar admin bisa difilter `?cpns=1|2` (opsi `filters`), sesuai dropdown pangkat per jenis KP legacy (`L_kp.php:56, 67`); nilai lain → 422.
+- **`gol_pppk`:** soft delete menyimpan 10 dan bisa dipulihkan (regresi bug ENUM). **C3:** `uang_makan` field desimal **wajib** dengan batas 0..10.000.000 — kolom `DOUBLE NOT NULL`, jadi nilai kosong akan menjadi NULL (error 1048 → 500), dan angka raksasa menjadi INF (error SQL); batas atas adalah pengaman aplikasi, bukan aturan legacy. `keterangan` maks. 255 byte (TINYTEXT). Kolom audit pola FAQ E1: tambah mengisi `created_at`/`created_by` dan juga `updated_at` (Bagian 3 #12), `updated_by` terisi saat ubah.
+- **`jenjang_pendidikan`:** `uniqueFields: ['jenjang_pendidikan_singkat']` → singkatan ganda (case-insensitive, termasuk baris Tidak Aktif/Dihapus) 422 pada field singkatan, termasuk balapan yang baru ditolak `uq_jenjang_pendidikan_singkat` (1062). `row_jurusan` = select dari 7 kode (`D_I`..`S_3`, peka huruf) — kosong disimpan NULL, bukan string kosong; CHECK D5 menjadi lapis kedua. `hiddenColumns: ['bobot_ipasn']` → tidak ada di form, meta, daftar, detail, maupun hasil tulis; nilai yang dikirim diabaikan dan nilai DB tidak berubah; jenjang baru memakai default kolom (Bagian 4 #16). **C5:** label dropdown jenjang = nama jenjang (nameField); legacy memakai singkatan (`L_employee.php:11418-11422`) — engine belum punya opsi label dropdown terpisah, dicatat untuk Fase 3.
+- **`jurusan_pendidikan`:** flag `D_I`..`S_3` bertipe boolean (1/0, JSON `true`/`false` diterima, tidak dikirim saat tambah = 0). `JurusanPendidikanHooks`: minimal satu flag 1 → 422 `D_I` "Pilih minimal satu jenjang pendidikan." (legacy `Lm_pendidikan.php:584-587`). **C2:** diperiksa saat tambah dan saat ubah yang menyentuh flag; ubah yang tidak menyentuh flag (nama, bidang, status) tidak diperiksa ulang — pola E6 engine — sehingga baris impor yang ketujuh flag-nya 0 tetap bisa dirapikan (6.3 #12); legacy memeriksa setiap simpan form. Nama unik per bidang (P7); bidang wajib ada dan aktif saat tambah/pindah (E6); pindah bidang menaruh jurusan di akhir urutan bidang baru dan merapatkan bidang lama.
+- **Dropdown berjenjang (G-05 DoD "bidang → jurusan"), C4:** `bidang-pendidikan/options` → `jurusan-pendidikan/options?parent={id_bidang_pendidikan}` dengan `statusChain`: jurusan hanya tampil bila jurusan dan bidangnya status 1; status jurusan tidak diubah saat bidang dinonaktifkan/dihapus dan jurusan muncul lagi saat bidang dipulihkan — memperbaiki bug legacy `Local.php:83, 87`, `L_pendidikan.php:77, 108`. **Dropdown per jenjang** (legacy: bidang per jenjang, jurusan per bidang + flag menurut `row_jurusan`, `Local.php:83, 109`) **belum dibuat di CR-011**; dikerjakan bersama riwayat pendidikan Fase 3 lewat service khusus dengan daftar kolom flag tetap + `MasterService::whereActiveChain()` — `row_jurusan` tidak akan disisipkan mentah ke SQL seperti legacy.
+- **Kolom audit (D1):** 5 tabel tanpa `created_*` mengisi `updated_at`/`updated_by` saat tambah maupun ubah (perilaku Batch 1). Saudara yang hanya bergeser urutannya tidak di-stamp (`updated_at = updated_at`, sehingga `ON UPDATE CURRENT_TIMESTAMP` tidak terpicu). Waktu ditulis aplikasi dalam UTC.
+- **Form FE:** halaman Master Data generik memuat keenam master dari meta (filter `cpns` dari meta `filters`; urutan pangkat berlabel "Urutan (nilai tetap)" tanpa panah geser). Satu penyesuaian: select opsional (`row_jurusan`) bisa dikosongkan lagi (sebelumnya pilihan kosong hanya untuk field ref).
 
 ### 2.9 Konsekuensi untuk tabel anak Fase 3 / DBV-008
 
@@ -207,7 +213,7 @@ Kolom FK di tabel anak wajib bertipe persis sama dengan PK master: `id_pangkat`,
 | 1 | `gol_pppk.status` | `enum('1','2') … NOT NULL DEFAULT '1'` (:1283) | TINYINT NOT NULL DEFAULT 1, 1/2/10 (P4) | Soft delete v2 menulis 10. Uji di MySQL 8.0.30 (TEMPORARY table): ENUM('1','2') ← '10' dengan strict mati = string kosong (warning 1265), strict hidup = error. Koneksi aplikasi `strictOn=false` (`Config/Database.php:44`) akan merusak data diam-diam. Impor: `CAST(status AS CHAR)` (6.3 #3) |
 | 2 | UNIQUE nama | Tidak ada UNIQUE selain PK; keunikan hanya di aplikasi dengan filter berbeda (Bagian 1) | 7 UNIQUE (Bagian 2.7), berlaku juga untuk status 2/10, case-insensitive lewat collation | Aturan sama dengan DBV-001 #2. Konsekuensi: nama yang pernah dihapus (10) tidak bisa dibuat ulang, harus dipulihkan; **audit duplikat data legacy wajib sebelum impor** (6.3 #4) — terutama jurusan (legacy tanpa cek sama sekali) dan jenjang/bidang (legacy hanya mengecek baris status 1) |
 | 3 | Kunci unik `pangkat` | Aplikasi: (`cpns`, `gol`, `ruang`, `gol_ruang`) untuk `status!='10'` (`Lm_kp.php:193, 213`) | UNIQUE `gol_ruang` saja (P1) | `gol_ruang` adalah label dropdown dan kunci peta SIASN (`Siasn.php:2390, 2535`, awalan "CPNS "), sehingga harus unik agar peta tidak ambigu. Baris produksi dengan `gol_ruang` sama tetapi `cpns`/`gol`/`ruang` berbeda akan gagal impor → audit (6.3 #4, #9) |
-| 4 | `pangkat.order` | Level pangkat, tanpa cek unik/rentang di server (form klien 1–100) | Mode order manual (P2); UNIQUE(cpns, order) ditunda (P3) | Engine generik menggeser/menomori ulang `order` (`MasterService.php:421-427`); untuk pangkat itu merusak level. Keputusan UNIQUE(cpns, order) menunggu peta nilai `order` per `cpns` di produksi (6.3 #5) |
+| 4 | `pangkat.order` | Level pangkat, tanpa cek unik/rentang di server (form klien 1–100) | Mode order manual (P2); UNIQUE(cpns, order) ditunda (P3) | Engine generik mode geser menggeser/menomori ulang `order`; untuk pangkat itu merusak level, jadi `pangkat` memakai mode urutan manual CR-009 (Bagian 2.8). Keputusan UNIQUE(cpns, order) menunggu peta nilai `order` per `cpns` di produksi (6.3 #5) |
 | 5 | `order` bidang & jurusan | Tidak ada; urut nama ASC | INT NOT NULL DEFAULT 1 [V2] (P8), diisi urut nama saat impor | Keputusan #5 G-01. Tipe INT (preseden `faq_article.order`), bukan TINYINT, karena jurusan bisa ribuan baris |
 | 6 | Aksi FK jurusan → bidang | Tidak diketahui (ERD tanpa aksi FK; seed inferensi CASCADE) | RESTRICT/RESTRICT, nama legacy (D9) | Sama dengan DBV-001/002: aplikasi tidak pernah hard delete; RESTRICT lapis kedua. Hapus fisik manual harus anak → induk. MySQL 8 menampilkan `ON DELETE RESTRICT ON UPDATE RESTRICT` di `SHOW CREATE TABLE`; MariaDB bisa menghilangkannya (nilai default) — verifikasi lewat `REFERENTIAL_CONSTRAINTS` (schema test) |
 | 7 | CHECK `row_jurusan` | Tidak ada; nilai disisipkan mentah ke SQL (`Local.php:83`) | CHECK peka huruf (D5) | Nilai di luar 7 nama kolom membuat query dropdown gagal/salah. `COLLATE utf8mb4_bin` karena `utf8mb4_unicode_ci` menganggap 's_1' = 'S_1'. String kosong ditolak (harus NULL). CHECK ditegakkan MySQL ≥ 8.0.16 dan MariaDB ≥ 10.2 |
@@ -215,6 +221,7 @@ Kolom FK di tabel anak wajib bertipe persis sama dengan PK master: `id_pangkat`,
 | 9 | Tipe PK | `bidang` TINYINT [K]; `pangkat`/`jenis_kp` TINYINT [K dari kolom FK]; jenjang/jurusan tidak diketahui | Sama [K]; jenjang/jurusan INT signed [I] (D3) | TINYINT signed maks. 127: `bidang_pendidikan` tinggal ID 100..127 (AUTO_INCREMENT prod 100), `gol_pppk` tinggal ID 19..127 (prod 19). Risiko kapasitas diterima (P9); memperlebar berdampak ke tipe FK semua tabel anak |
 | 10 | COMMENT & AUTO_INCREMENT awal | COMMENT status legacy berbeda/tanpa 10; `AUTO_INCREMENT=100/19` | COMMENT v2 (D11); AUTO_INCREMENT awal tidak ditulis (D14) | Preseden DBV-001/002; impor ID eksplisit menaikkan counter otomatis |
 | 11 | Hapus | Hard DELETE (`MY_Model::delete`), termasuk bug hapus Golongan PPPK yang menghapus pangkat | Soft delete status 10 (P13) | Baris legacy yang pernah dihapus sudah hilang fisik; status 10 hanya muncul dari aplikasi v2 |
+| 12 | `gol_pppk.updated_at` saat tambah | NULL sampai baris diubah (DDL [K] :1285 `DEFAULT NULL ON UPDATE`) | Diisi jam tambah oleh engine (CI4 mengisi kolom waktu ubah saat insert) | Sama dengan G-10 #9 (FAQ, sudah disetujui). Penanda "belum pernah diubah" tetap ada: `updated_by` NULL sampai diubah. Diajukan di Bagian 4 #14 |
 
 Nilai **[I]** yang tersisa ada di Bagian 7. Nilai lain [K] atau keputusan user/proyek di Bagian 1.1.
 
@@ -222,7 +229,7 @@ Nilai **[I]** yang tersisa ada di Bagian 7. Nilai lain [K] atau keputusan user/p
 
 | # | Dokumen | Isi dokumen | Yang dipakai | Tindak lanjut |
 |---|---|---|---|---|
-| 1 | `02-MasterData.md` G-TC #4 | Re-ordering: ubah urutan 1 entitas, entitas lain ter-shift | `pangkat.order` mode manual (P2), tanpa geser | G-TC #4 dikecualikan untuk `pangkat`; test generik CR-011 mengecualikan master mode manual. Mohon DBV mencatatnya sebagai pengecualian yang disetujui (Bagian 4 #5) |
+| 1 | `02-MasterData.md` G-TC #4 | Re-ordering: ubah urutan 1 entitas, entitas lain ter-shift | `pangkat.order` mode manual (P2), tanpa geser | G-TC #4 dikecualikan untuk `pangkat`: test generik re-ordering tetap memakai master mode geser, perilaku pangkat dibuktikan `KenaikanPangkatTest::testPangkatManualOrderNeverShiftsOthers`. Mohon DBV mencatatnya sebagai pengecualian yang disetujui (Bagian 4 #5) |
 | 2 | Kode legacy (`Lm_kp.php:193, 213`) | Keunikan pangkat = (`cpns`, `gol`, `ruang`, `gol_ruang`) untuk `status!='10'` | UNIQUE `gol_ruang` (P1), didukung lookup `gol_ruang` di `Siasn.php:2390, 2535` [K] | Bagian 3 #3; audit 6.3 #4 |
 | 3 | Kode legacy (`Lm_pendidikan.php:178, 191, 376, 389, 569-590`) | Jurusan tanpa cek unik; jenjang/bidang unik hanya di antara status 1 | UNIQUE termasuk status 2/10 (P6, P7, P13) | Duplikat produksi wajib dirapikan sebelum impor (6.3 #4) |
 | 4 | `05-Presensi.md` D-09 | Tarif uang makan dari `web_config` | Legacy [K] + K5 c(ii): tarif PPPK dari `gol_pppk.uang_makan` (`L_presensi.php:4013-4021`), PNS dari `web_config` | Dicatat untuk modul Presensi (Fase 5) |
@@ -245,8 +252,9 @@ Nilai **[I]** yang tersisa ada di Bagian 7. Nilai lain [K] atau keputusan user/p
 | 11 | Tanpa CHECK `status`/`cpns`/flag (D6) | Setujui (konsisten DBV-001/002) | ⏳ |
 | 12 | `bobot_ipasn` disimpan tetapi tidak diekspos API/FE (P6/D13) | Setujui | ⏳ |
 | 13 | KEY FK jurusan dipertahankan walau berlebih (D8); tanpa KEY `order`/`status` (D10) | Setujui | ⏳ |
-| 14 | Status 10 + COMMENT v2 (D11); kolom audit diisi aplikasi (`id_pengguna`, UTC) | Setujui | ⏳ |
+| 14 | Status 10 + COMMENT v2 (D11); kolom audit diisi aplikasi (`id_pengguna`, UTC), termasuk `gol_pppk.updated_at` yang ikut terisi saat tambah (Bagian 3 #12) | Setujui (sama dengan G-10 #9) | ⏳ |
 | 15 | ID bermakna (6.4) dan butir audit data (6.3) sebagai prasyarat impor | Setujui | ⏳ |
+| 16 | Default `jenjang_pendidikan.bobot_ipasn` untuk jenjang yang dibuat lewat v2. Kolom disembunyikan (P6) sehingga admin tidak bisa melihat/mengoreksinya, sedangkan DDL sekarang `DEFAULT 25` [I, `simpegdev_local`, asal-usul belum pasti] dan `L_user.php:878-884` memakai nilai > 0 sebagai skor kualifikasi pendidikan IP ASN — jenjang baru dari v2 diam-diam mendapat skor 25 | Ubah ke `DEFAULT NULL` (tanpa skor sampai diisi lewat impor/DBA); baris impor tetap menyalin nilai legacy. Bila disetujui, migration `2026-09-25-110100`, schema test, dan D13 disesuaikan sebelum merge; bila ditolak, tetap 25 | ⏳ |
 
 ## 5. Status keputusan G-01 terkait
 
@@ -258,7 +266,7 @@ Nilai **[I]** yang tersisa ada di Bagian 7. Nilai lain [K] atau keputusan user/p
 | Bagian 3 | Master tanpa `order` di seed: `jenis_kp`, `gol_pppk`, `bidang`/`jurusan_pendidikan` | Menunggu DDL | Lihat baris Keputusan #5 di atas |
 | Bagian 7 #1 | Induk non-aktif tidak menurunkan status ke anak; `options()` tidak menyaring rantai | Belum diputuskan | Untuk jurusan: dropdown memakai rantai status bidang → jurusan (P7, CR-011 dengan fitur rantai status CR-009) |
 
-Penunjuk di G-01 ("→ lihat `G-04-G-05-pangkat-pendidikan-schema.md` (DBV-004)") ditambahkan bersama bagian kode CR-011, tanpa mengubah riwayat.
+Penunjuk di G-01 ("→ lihat `G-04-G-05-pangkat-pendidikan-schema.md` (DBV-004)") tidak ditambahkan di branch ini agar branch DBV-003/004/005 yang dikerjakan paralel tidak saling konflik di G-01; ditambahkan setelah ketiganya di-merge, tanpa mengubah riwayat.
 
 ## 6. Verifikasi developer (sebelum review DB Validator)
 
@@ -281,6 +289,39 @@ MySQL 8.0.30 lokal (Laragon), `sql_mode` server `STRICT_TRANS_TABLES,NO_ZERO_IN_
 
 Isi `PangkatPendidikanSchemaTest` (8 test): kolom & tipe persis Bagian 2 lewat `information_schema` (urutan, tanda signed, NULL), collation `utf8mb4_unicode_ci` per tabel & kolom string, InnoDB, seluruh index (tanpa KEY lain), satu-satunya FK dari/ke keenam tabel + kolom induk + `UPDATE_RULE`/`DELETE_RULE` = RESTRICT, satu-satunya CHECK; default & COMMENT `status`/`order`/`cpns`/kolom audit/flag/`row_jurusan`/`bobot_ipasn`/`uang_makan`, tanpa `created_*` di 5 tabel D1; `gol_pppk.status` menyimpan 10 dan 2; constraint DB menolak nama ganda beda kapitalisasi (termasuk terhadap baris status 10) di ketujuh UNIQUE, menerima nama & `order` sama CPNS/PNS (bukti tidak ada UNIQUE(cpns, order)) dan jurusan bernama sama di bidang lain; FK menolak orphan, hard delete bidang yang masih punya jurusan, dan ubah PK bidang yang dirujuk; CHECK menerima NULL dan ketujuh kode, menolak 'X', 's_1', string kosong, dan UPDATE ke 'S1'; flag default 0; PK TINYINT signed menolak ID 128; `down()`/`up()` per migration hanya menyentuh tabelnya sendiri dan mengembalikan skema yang sama; `up()` yang gagal di tengah (penghalang `gol_pppk` / `jurusan_pendidikan`) men-drop hanya tabel yang dibuat run itu, tabel penghalang tidak tersentuh, lalu `up()` bisa diulang.
 
+Bagian kode CR-011 (database test grup ini, `strictOn=true`):
+
+| Perintah | Hasil |
+|---|---|
+| `phpunit --no-coverage tests/MasterData/KenaikanPangkatTest.php tests/MasterData/PendidikanTest.php` | `OK (17 tests, 341 assertions)` |
+| `./check.sh` (root: PHPStan level 5, PHP-CS-Fixer, seluruh PHPUnit backend, ESLint, vue-tsc, Vitest, build) | `SEMUA CHECK LOLOS`: PHPStan `[OK] No errors`, PHP-CS-Fixer `Found 0 of 201 files`, PHPUnit `OK (394 tests, 12201 assertions)`, Vitest `21 passed (21)` / `211 passed (211)`, build selesai |
+| Mutation check (18 mutasi, tiap mutasi dibatalkan lagi dengan `git checkout`) | 18 dari 18 tertangkap (test terkait gagal), rincian di bawah |
+
+Isi test CR-011: `KenaikanPangkatTest` (9 test) — urutan pangkat mode manual (tambah/PUT/PATCH/hapus/pulihkan tidak menggeser pangkat lain, tanpa audit untuk pangkat lain, tambah tanpa `order` = MAX+1 seluruh pangkat), batas 127 termasuk MAX+1 otomatis, `gol_ruang` unik termasuk terhadap baris dihapus, pilihan `cpns`/`gol`/`ruang` peka huruf, panjang `pangkat`/`gol_ruang`, filter `?cpns=` di dropdown & daftar (nilai tidak sah 422, parameter lain diabaikan, cache ikut ter-invalidate, terbuka untuk pegawai), jenis KP tetap mode geser, `gol_pppk` menyimpan status 10 lalu bisa dipulihkan, `uang_makan` wajib 0..10.000.000 (desimal, notasi `1e9` dan angka raksasa ditolak, role 3 → 403), `keterangan` 255 byte, kolom audit pola D1 dan pola FAQ; `PendidikanTest` (8 test) — singkatan jenjang unik 422 pada field singkatan (termasuk baris Tidak Aktif/Dihapus dan balapan 1062), `row_jurusan` hanya dari 7 kode (kosong = NULL, bisa dikosongkan lagi), `bobot_ipasn` tidak ada di respons/meta/options mana pun dan nilainya tidak berubah, minimal satu flag jurusan (C2), nama jurusan unik per bidang + pindah bidang, dropdown jurusan ikut rantai status bidang (termasuk cache & role pegawai), bidang wajib aktif saat tambah/pindah, kolom audit tanpa `created_*` dan saudara yang hanya bergeser tidak di-stamp. Keenam master juga terdaftar di fixture G-TC generik, sehingga ikut `MasterGenericTcTest` (CRUD, duplikat, status, urutan, audit log, balapan, kolom audit) dan `RbacMasterEndpointsTest` (CRUD hanya role 1, dropdown semua role). Dua test bersama disesuaikan: `testLegacyAuditColumnsAreFilledWithActor` membaca kolom waktu yang memang ada di tabel (`created_at`, atau `updated_at` untuk tabel pola D1) dan `testSuperAdminPassesFilterOnEveryCrudEndpoint` memotong nama uji ke panjang kolom nama (`gol_ruang`/`gol_pppk` VARCHAR(10)).
+
+Mutation check CR-011:
+
+| # | Mutasi | Test yang gagal |
+|---|---|---|
+| 1 | `orderMode: manual` pangkat dihapus | `testPangkatManualOrderNeverShiftsOthers` |
+| 2 | `orderColumnType: tinyint` pangkat dihapus | `testPangkatOrderIsBoundedByTinyint` (order 128 → 422 generik tanpa `errors.order`) |
+| 3 | `filters: ['cpns']` dihapus | `testPangkatOptionsAndListFilterByCpns` |
+| 4 | `min`/`max` `uang_makan` dihapus | `testGolPppkUangMakanIsEditableAndValidated` |
+| 5 | `required` `uang_makan` dihapus | `testGolPppkUangMakanIsEditableAndValidated` |
+| 6 | `uniqueFields` jenjang dihapus | `testJenjangSingkatanIsUniqueOnItsField` (1062 lolos sebagai error) |
+| 7 | `hiddenColumns: ['bobot_ipasn']` dihapus | `testJenjangBobotIpasnIsNeverExposedOrChanged` |
+| 8 | `row_jurusan` select → teks bebas | `testJenjangRowJurusanIsChosenFromFixedList` (CHECK 3819 lolos sebagai error) |
+| 9 | `hooks` jurusan dihapus | `testJurusanRequiresAtLeastOneFlag` |
+| 10 | Hook memeriksa juga ubah yang tidak menyentuh flag (C2 dibuang) | `testJurusanRequiresAtLeastOneFlag` |
+| 11 | Hook: syarat flag dibalik | `testJurusanRequiresAtLeastOneFlag` |
+| 12 | `statusChain` jurusan `false` | `testJurusanOptionsFollowBidangStatusChain` |
+| 13 | `gol-pppk` dihapus dari `KpController::$entities` | `RbacMasterEndpointsTest::testSuperAdminPassesFilterOnEveryCrudEndpoint` (404) |
+| 14 | FE: `:allow-empty` field non-ref dihapus | `MasterFormDialog.spec.ts` (select opsional) |
+| 15 | `maxBytes` `keterangan` dihapus | `testGolPppkKeteranganIsLimitedTo255Bytes` |
+| 16 | Flag `S_1` bukan boolean | `testJurusanRequiresAtLeastOneFlag` |
+| 17 | Audit `gol_pppk` pola D1, bukan pola FAQ | `KenaikanPangkatTest::testAuditColumns` |
+| 18 | nameField pangkat = `pangkat` | `testPangkatGolRuangIsUniqueAndFieldsValidated` |
+
 ### 6.3 Catatan migrasi data untuk Mapping (audit sebelum impor)
 
 Salinan lokal hanya memuat `bidang_pendidikan` dan `gol_pppk` (skema); isi keenam master produksi belum terlihat, jadi semua butir di bawah diperiksa di data produksi.
@@ -296,7 +337,7 @@ Salinan lokal hanya memuat `bidang_pendidikan` dan `gol_pppk` (skema); isi keena
 9. **Bug tambah Golongan PPPK** (`C_kp.php:353, 367-383`: form & insert pangkat): cari baris `pangkat` yang `gol_ruang`-nya di luar 25 kunci standar ("CPNS I/a".."CPNS III/b", "I/a".."IV/e", `L_employee.php:2447`, `Siasn.php:2465`).
 10. **Orphan**: legacy hard delete dan salinan lokal tanpa FK (`pegawai_kp`, `pegawai_mutasi_jabatan`) → audit orphan semua kolom id master di tabel anak sebelum FK Fase 3 (Bagian 2.9).
 11. **`row_jurusan`**: nilai harus persis salah satu dari 7 kode (CHECK peka huruf; string kosong → NULL). Tentukan nilai untuk baris "Dokter"/"Apoteker" bila ada (kode legacy menyebut singkatan itu, `L_employee.php:1440`).
-12. **Jurusan dengan ketujuh flag 0** (hanya mungkin lewat SQL manual) tidak lolos aturan v2 saat diubah → rapikan saat impor.
+12. **Jurusan dengan ketujuh flag 0** (hanya mungkin lewat SQL manual): v2 tetap mengizinkan ubah kolom lain (nama, bidang, status), tetapi ubah yang menyentuh flag wajib menyisakan minimal satu flag 1 (C2, Bagian 2.8), dan jurusan itu tidak akan muncul di dropdown per jenjang → rapikan saat impor.
 13. **`bobot_ipasn`, `uang_makan`**: salin apa adanya (NULL/0 = tanpa skor/tarif).
 14. **`created_by`/`updated_by` legacy** berisi `user.id` akun legacy → petakan ke `id_pengguna` bila ID akun tidak dipertahankan (sama dengan G-10 6.3 #7). `updated_at`/`created_at` legacy jam server DB → konversi mengikuti keputusan zona waktu global (A-01).
 15. **Status**: legacy hard delete sehingga tidak ada baris status 10 hasil hapus; status 2 hanya mungkin di `pangkat`/`jenis_kp`/`gol_pppk` (form pendidikan tidak punya pilihan status). Salin langsung.
@@ -350,3 +391,4 @@ DBV-001 dan DBV-002 disetujui tanpa laporan verifikasi MariaDB terpisah. Untuk D
 6. UNIQUE `uq_jurusan_pendidikan_nama` 1.021 byte diterima (row format DYNAMIC, default MariaDB 10.4; periksa `innodb_default_row_format`).
 7. Bila memungkinkan, jalankan `vendor/bin/phpunit --no-coverage tests/MasterData/PangkatPendidikanSchemaTest.php` dengan database test MariaDB (helper test sudah menormalkan `tinyint(4)`, `current_timestamp()`, dan default `NULL` versi MariaDB).
 8. Laporkan versi persis server, `sql_mode`, `character_set_server`/`collation_server`.
+9. Bila memungkinkan, jalankan juga test fitur CR-011 `tests/MasterData/KenaikanPangkatTest.php` dan `tests/MasterData/PendidikanTest.php` dengan database test MariaDB (antara lain: `DOUBLE` `uang_makan` 41000.5, pesan 422 dari UNIQUE singkatan saat balapan 1062, dan `updated_at` saudara yang bergeser tidak berubah).
