@@ -2,7 +2,7 @@
 
 **Key review:** `DBV-005` (review DB Validator, skema) + `CR-012` (review kode) — satu pull request, judul `[DBV-005][CR-012] …`, branch `dbv-005/g06-diklat-hukdis-konket-tandajasa`. Merge hanya setelah **kedua** review setuju. DB Validator hanya me-review/approve; merge dilakukan **user** (aturan PR berisi CR + DBV, 24-09-2026). Catatan: G-10 menulis "merge oleh reviewer CR"; untuk G-06 yang berlaku aturan user di atas (Bagian 1.4 #6).
 
-**Status:** ⏳ **MENUNGGU APPROVAL DB VALIDATOR (DBV-005) DAN REVIEW KODE (CR-012).** Migration `2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa.php` JANGAN dijalankan di Dev/Production sebelum disetujui. Endpoint, Config, dan frontend menyusul setelah perluasan engine CR-009 masuk `main` (Bagian 2.7).
+**Status:** ⏳ **MENUNGGU APPROVAL DB VALIDATOR (DBV-005) DAN REVIEW KODE (CR-012).** Migration `2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa.php` JANGAN dijalankan di Dev/Production sebelum disetujui. PR ini juga memuat endpoint master G-06 lewat engine generik CR-009 (entri `Config\MasterData`, 4 controller, halaman Master Data generik) — perilakunya di Bagian 2.7.
 
 **Rujukan:** `02-MasterData.md` G-06 (:63-70) & G-TC (:115-127), Tech Spec G-06 (:805-817) dan §3.5 (:2097), `FSD_SIMPEG_v2.md:73,104`, `03-Kepegawaian.md:146`, `Mapping_Migrasi_Data_SIMPEG_v2.docx` Tier 1 ("diklat, tingkat_hukdis, jenis_hukdis, jenis_konket, tanda_jasa — sama — Copy langsung"), Matriks Role x Endpoint Modul G (`c_diklat`, `c_hukdis`, `c_konket`, `c_tj`, role 1), DDL produksi `simpeg_prod.sql:443-452` (`diklat`) & :33-69 (`absen_ijin`) (HeidiSQL, host 172.17.100.83, MySQL 8.0.21), ERD legacy `simpeg01.erd` (nama FK), kode legacy (`application/libraries/hr/master/Lm_{diklat,hukdis,konket,tj}.php`, `application/libraries/hr/rwy/L_{diklat,hukdis,konket,tj}.php`, `application/controllers/hr/master/C_{diklat,hukdis,konket,tj}.php`, `L_presensi.php`, `services/Siasn.php`), keputusan user K5 (25-09-2026), `G-01-master-schema.md` (Keputusan #5, Bagian 8 / DBV-001), `G-10-faq-schema.md` (pola pilot DBV-002).
 
@@ -12,6 +12,11 @@
 |---|---|
 | `app/Database/Migrations/2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa.php` | 5 tabel: `diklat`, `tingkat_hukdis`, `jenis_hukdis`, `jenis_konket`, `tanda_jasa` (SQL mentah, sadar prefix tabel; `down()` men-drop anak → induk; `up()` yang gagal di tengah membersihkan tabel yang dibuat pada run itu) |
 | `tests/MasterData/DiklatHukdisKonketSchemaTest.php` | skema hasil migration dibandingkan dengan Bagian 2 lewat `information_schema`, constraint DB (UNIQUE, FK, CHECK, NOT NULL, batas tipe), tanpa baris seed, rollback |
+| `app/Config/MasterData.php` (blok `DBV-005`) | 5 entri master: `diklat`, `tingkat-hukdis`, `jenis-hukdis`, `jenis-konket`, `tanda-jasa` + konstanta `AUDIT_G06` (Bagian 2.7) |
+| `app/Controllers/Api/MasterData/{Diklat,Hukdis,Konket,TandaJasa}Controller.php` | 4 controller grup (`02-MasterData.md` G-06), hanya mendaftarkan key master; route & RBAC dibangkitkan dari config |
+| `tests/_support/Database/Seeds/MasterDataSeeder.php`, `tests/_support/MasterDataTestTrait.php` (blok `DBV-005`) | seed G-06 (baris ber-ID hard-coded legacy, Bagian 2.6) dan fixture G-TC generik |
+| `tests/MasterData/DiklatHukdisKonketTest.php` | perilaku khusus G-06 lewat HTTP (9 test, Bagian 2.7) |
+| `tests/MasterData/MasterGenericTcTest.php` | `testLegacyAuditColumnsAreFilledWithActor`: memeriksa kolom waktu audit yang ada di tabel (`created_at` dan/atau `updated_at`; kelima tabel G-06 hanya `updated_at`) dan `updated_by` hanya bila kolomnya ada. Perubahan yang sama dibutuhkan DBV-003/DBV-004 (tabel tanpa `created_at`/`updated_by`); saat merge dipakai versi yang sudah ada di `main` selama kelima master G-06 tetap diperiksa `updated_at` + `updated_by` |
 
 ## 1. Latar belakang & keputusan
 
@@ -49,7 +54,7 @@ Perilaku legacy yang memengaruhi skema [K]:
 | B6 | Baris hard-coded (konket id 2/4/5/6, `old_id` 8/10/13, tanda jasa 26/27/28/44, diklat 8) didokumentasikan di dokumen ini dan fixture test, **tanpa** penguncian; ditinjau lagi di Fase 3 | 2.6 |
 | B7 | Filter konket per role dan opsi "Lain-lain" tanda jasa = tugas B-13/B-17, bukan master | 2.7 |
 | B8 | Tipe PK ikut legacy (termasuk TINYINT signed; `diklat` TINYINT signed). Impor wajib memakai ID legacy apa adanya. Nilai [I] boleh dipakai dengan label; approval final menunggu dump struktur penuh; tiap PR DBV meminta verifikasi MariaDB 10.4 eksplisit | semua, 6.3 |
-| B9 | `rumpun_sertifikasi`/`lembaga_sertifikasi` bukan bagian DBV-005 (DBV-010+ bersama B-11) | di luar lingkup |
+| B9 | `rumpun_sertifikasi`/`lembaga_sertifikasi` bukan bagian DBV-005 (DBV berikutnya bersama B-11; nomor DBV-010 kini dipakai collation auth & identitas `pengguna`) | di luar lingkup |
 | G2 | (DBV-001/002, disetujui) Status 1/2/10, hapus = soft delete, UNIQUE nama termasuk status 2/10 dan case-insensitive lewat collation, `utf8mb4_unicode_ci` per tabel, FK `ON DELETE RESTRICT ON UPDATE RESTRICT` dengan nama legacy, AUTO_INCREMENT awal tidak ditulis, kolom audit diisi aplikasi (UTC, `id_pengguna`); G-01 Keputusan #5: semua master wajib `order` + `status` | semua |
 
 ### 1.3 Usulan (diimplementasikan sesuai usulan, menunggu approval DBV — Bagian 4)
@@ -59,7 +64,7 @@ Perilaku legacy yang memengaruhi skema [K]:
 | D1 | PK `tingkat_hukdis`, `jenis_hukdis`, `jenis_konket`, `tanda_jasa` = **INT** signed AUTO_INCREMENT [I] (satu-satunya bukti tipe: `simpegdev_local`; aman untuk ID legacy berapa pun). Alternatif TINYINT seperti master kecil produksi (Bagian 4 #2) |
 | D2 | Kolom audit empat tabel [I] meniru `diklat` [K]: `updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`, `updated_by INT NULL`, tanpa `created_*` |
 | D3 | `masa_sanksi_bulan` TINYINT UNSIGNED (1–255 bulan), 0 ditolak CHECK (tanpa masa = NULL) |
-| D4 | 3 CHECK: `chk_diklat_jenis_diklat` (1–5), `chk_jenis_hukdis_masa_sanksi_bulan` (NULL atau ≥ 1), `chk_jenis_konket_affect_tukin` (1/2) |
+| D4 | 3 CHECK: `chk_diklat_jenis_diklat` (1–5), `chk_jenis_hukdis_masa_sanksi_bulan` (NULL atau ≥ 1), `chk_jenis_konket_affect_tukin` (1/2). Prefix `chk_` sama dengan DBV-003 (`chk_hari_libur_rentang`) dan DBV-004 (`chk_jenjang_pendidikan_row_jurusan`) |
 | D5 | UNIQUE nama `jenis_konket` (`uq_jenis_konket_nama`) — aturan umum UNIQUE nama master; cek legacy hanya saat tambah |
 | D6 | Tanpa baris seed/sentinel di migration (Bagian 2.6) |
 
@@ -187,24 +192,51 @@ Sengaja **tidak** dibuat:
 - Tidak ada seed di migration: seed akan bentrok PK/UNIQUE dengan impor "Copy langsung", nama/atribut baris-baris itu belum diketahui dari data produksi (kecuali 44), dan B6 memutuskan tanpa kunci. `DiklatHukdisKonketSchemaTest::testMigrationCreatesNoRows` memastikan migration tidak menulis baris.
 - Konsekuensi tanpa kunci: admin bisa mengganti nama atau menonaktifkan baris-baris ini; dampaknya ke B-13/B-17/D-06/SIASN ditinjau lagi di Fase 3.
 
-### 2.7 Perilaku aplikasi (bahan CR-012; aktif setelah CR-009 masuk `main`)
+### 2.7 Perilaku aplikasi (CR-012)
 
-Belum ada entri Config, controller, maupun frontend di PR ini: kelima tabel sengaja belum punya endpoint sampai perluasan engine CR-009 masuk `main`. Rencana (nama opsi mengikuti CR-009 final):
-- **Config per master** (blok "G-06 — DBV-005", `auditColumns ['updated_at','updated_by']`, semua `publicOptions` UL_ALL karena dropdown dipakai B-11/B-13/B-14/B-17 dan D-06; CRUD role 1):
-  - `diklat` — label "Pelatihan", `nameField nama_diklat`; field `jenis_diklat` select wajib 1 Struktural, 2 Teknis, 3 Fungsional, 4 Prajabatan, 5 Sertifikasi (B1); `uniqueScope` dan `orderScope` `['jenis_diklat']`; filter options per `jenis_diklat`.
-  - `tingkat-hukdis` — `hiddenColumns ['bobot_ipasn']` (B5): tidak ada di respons list/detail/tulis, nilai tidak berubah saat update.
-  - `jenis-hukdis` — induk `tingkat-hukdis` (rantai induk aktif); field `masa_sanksi_bulan` int opsional (kosong = NULL, 1–255).
-  - `jenis-konket` — label "Jenis Konfirmasi Ketidakhadiran"; field `old_id` int wajib, label "Kode Kategori", unik (`uniqueFields`, 1062 → 422, bukan 500); field `affect_tukin` select wajib 1 Ya / 2 Tidak, nilai awal 1.
-  - `tanda-jasa`.
-- **Controller** (sesuai `02-MasterData.md`, 4 controller): `DiklatController`, `HukdisController` (tingkat + jenis), `KonketController`, `TandaJasaController`, semuanya `extends BaseMasterController`.
-- **Fixture test**: baris ber-ID legacy dari 2.6 (diklat 8; konket 2/4/5/6 dengan `old_id` 8/10/13; tanda jasa 26/27/28/44 `LAIN-LAIN`).
-- **Catatan modul B/D** (bukan pekerjaan master):
-  - B-11: FK anak `riwayat_diklat.id_diklat` TINYINT signed; jenis 3 memakai `sub_group_jabatan` (`id_group_jabatan=2`), jenis 5 memakai rumpun/lembaga + nama bebas (1.4 #1).
-  - B-13: value pilihan = `old_id` (= `absen_ijin.kategori` INT); sembunyikan id 4/5 untuk semua, 2/6 untuk pegawai & role 3; `affect_tukin` pengajuan diisi awal dari master dan bisa diubah admin; salin nama ke `absen_ijin.jenis_konket`.
-  - B-14: FK anak INT (bila D1 disetujui); `masa_hukuman`/`akhir_hukdis` per SK; default `akhir_hukdis = tmt + masa_sanksi_bulan` bila tidak NULL; SIASN tetap mengisi masa per SK.
-  - B-17: opsi `LAIN-LAIN` (id 44) di luar daftar master aktif + wajib `tanda_jasa_lain`; logika memakai id 44.
-  - D-06: `kategori` 13 + `affect_tukin` 1 → uang makan (`L_presensi.php:2079`). `L_presensi.php:3721-3725` membangun peta `constJK[old_id]` dengan `ORDER BY old_id` — bila `old_id` produksi VARCHAR urutannya leksikografis ('10' < '8'), di v2 numerik; port D-06 jangan bergantung pada urutan ini.
-  - Riwayat menyimpan salinan nama master (`rwy/L_diklat.php:677-679`, `rwy/L_hukdis.php:478-484`, `rwy/L_tj.php:499-500`, `rwy/L_konket.php:1367-1368`); mengganti nama master tidak mengubah riwayat.
+Kelima tabel dikelola lewat endpoint master generik (README `app/Controllers/Api/MasterData/README.md`), dari entri `Config\MasterData` blok `DBV-005`. Engine, route, service, dan frontend tidak diubah: semua opsi yang dipakai sudah ada sejak CR-009.
+
+| Key (`master/{key}`) | Controller | Nama (panjang, label) | Induk | Kolom tambahan & aturan | Opsi engine |
+|---|---|---|---|---|---|
+| `diklat` | `DiklatController` | `nama_diklat` (≤255, "Nama Pelatihan") | — | `jenis_diklat` "Jenis Pelatihan": select **wajib** 1 Struktural, 2 Teknis, 3 Fungsional, 4 Prajabatan, 5 Sertifikasi (B1); nilai lain → 422 | `uniqueScope`, `orderScope`, `filters` = `['jenis_diklat']`; `idMaxLength` 3 |
+| `tingkat-hukdis` | `HukdisController` | `tingkat_hukdis` (≤100, "Tingkat Hukuman Disiplin") | — | `bobot_ipasn` tidak ada di form/meta/respons dan tidak bisa ditulis: tambah memakai default DB (5), ubah mempertahankan nilai lama (B5) | `hiddenColumns ['bobot_ipasn']` |
+| `jenis-hukdis` | `HukdisController` | `jenis_hukdis` (≤255, "Jenis Hukuman Disiplin") | `id_tingkat_hukdis` → `tingkat-hukdis` (wajib aktif) | `masa_sanksi_bulan` "Masa Sanksi (bulan)": int opsional 1–255; kosong/`null` = NULL; 0, 256, negatif, desimal, teks → 422 (K5b) | `statusChain` |
+| `jenis-konket` | `KonketController` | `jenis_konket` (≤255, "Jenis Konfirmasi Ketidakhadiran") | — | `old_id` "Kode Kategori": int **wajib** 1–2.147.483.647, unik global termasuk entri tidak aktif/dihapus (422 menyebut pemiliknya + saran aktifkan/pulihkan; balapan 1062 → 422), bisa diubah admin (B2). `affect_tukin` "Pengaruh ke Tukin": select **wajib** 1 Ya / 2 Tidak (K5a) | `uniqueFields ['old_id']` |
+| `tanda-jasa` | `TandaJasaController` | `tanda_jasa` (≤255, "Tanda Jasa") | — | — | — |
+
+Semua entri: `autoIncrement` (kode diberikan DB), `auditColumns ['updated_at','updated_by']` (konstanta `AUDIT_G06`), `orderColumnType 'tinyint'`, urutan mode `shift`, `publicOptions` bawaan (dropdown UL_ALL), tanpa hook.
+
+- **RBAC.** CRUD + `master/meta` = role 1; `{key}/options` = semua role login (dipakai B-11/B-13/B-14/B-17 dan D-06); tanpa token 401. Dibuktikan `RbacMasterEndpointsTest` untuk kelima key.
+- **Urutan.** `order` = posisi tampil 1..n per lingkup: `diklat` per jenis, `jenis-hukdis` per tingkat, lainnya global. Pindah jenis/tingkat = ditaruh di akhir lingkup baru, lingkup lama dirapatkan. Kolom `order` TINYINT: paling banyak 127 entri tampil per lingkup; tambah berikutnya (dengan atau tanpa `order`) → 422 `errors.order` "Urutan … sudah mencapai batas maksimal 127." (bukan 1264). Entri berstatus 10 tidak dihitung.
+- **Kolom audit.** Tambah, ubah, pindah urutan, ubah status, hapus, dan pulihkan mengisi `updated_at` (jam aplikasi, UTC) dan `updated_by` (`id_pengguna` aktor) pada baris yang diedit saja. Saudara yang hanya bergeser urutannya tidak di-stamp (ON UPDATE CURRENT_TIMESTAMP tidak terpicu), tetapi tetap tercatat di `audit_logs`. Tidak ada `created_*`.
+- **Nilai yang ditolak DB tidak sampai ke DB.** CR-007 hanya menerjemahkan 1406/1264/1366/1292/1265/1364 ke 422; 1048 (NOT NULL) dan pelanggaran CHECK (3819/4025) tetap 500. Karena itu `jenis_diklat`, `old_id`, dan `affect_tukin` wajib di validasi, dan `masa_sanksi_bulan` dibatasi 1–255, sehingga setiap nilai isian yang melanggar NOT NULL/CHECK sudah ditolak 422 pada field-nya (`DiklatHukdisKonketTest`).
+- **Dropdown & filter.** `diklat/options?jenis_diklat=1..5` dan daftar admin `diklat?jenis_diklat=` menyaring per jenis; nilai lain (termasuk bentuk array) → 422 "Filter Jenis Pelatihan tidak valid."; urut jenis → `order` → nama. `jenis-hukdis/options?parent=` hanya memuat jenis yang tingkatnya status 1 (legacy hanya menawarkan tingkat aktif, `Lm_hukdis.php:221`); status jenis itu sendiri tidak diubah, dan cache dropdown jenis ikut di-invalidate saat tingkat ditulis. Tambah/pindah jenis ke tingkat yang tidak aktif → 422 `id_tingkat_hukdis`.
+- **Frontend.** Halaman generik `/master/:entity` (menu Master Data, role 1) dibangun dari `master/meta`: select wajib `jenis_diklat`/`affect_tukin` tanpa nilai awal (placeholder "Pilih …", C1), input angka `old_id`/`masa_sanksi_bulan` dengan batas min/max dari meta, filter jenis pelatihan (panah urutan hanya aktif saat satu jenis dipilih), dropdown induk tingkat hukdis. `bobot_ipasn` tidak ada di meta, jadi tidak tampil.
+- **Fixture test** (`MasterDataSeeder::seedG06`, fixture blok `DBV-005`): baris ber-ID hard-coded 2.6 — diklat 8; konket id 2/4/5/6 dengan `old_id` 8/10/13; tanda jasa 26/27/28 dan 44 `LAIN-LAIN` — plus satu `diklat` berstatus 10 (contoh jalur `dm_diklat`). Nama contoh [I]; **pasangan id ↔ `old_id` konket fiktif** (data produksi belum ada). `DiklatHukdisKonketTest::testHardCodedLegacyRowsAreNotLocked` membuktikan baris itu tidak dikunci (B6).
+
+Batas yang diketahui (tidak diperbaiki di CR-012):
+1. **PK `diklat` habis.** Setelah id 127 terpakai, tambah pelatihan dijawab **500**: pelanggaran PRIMARY (1062) tidak diterjemahkan karena cek ulang nama/`uniqueFields` tidak menemukan duplikat (Bagian 3 #8, keputusan C5).
+2. **Input JSON bukan skalar di field angka opsional.** `masa_sanksi_bulan` yang dikirim sebagai `[]` atau `false` lolos `permit_empty` lalu dinormalkan menjadi 0 oleh `MasterField::normalize()`, sehingga melanggar CHECK → 500. Form FE tidak pernah mengirim bentuk ini. Akar masalahnya ada di engine (di `main`, `[]` untuk field teks opsional seperti `kd_area` juga berakhir 500); perbaikannya CR engine terpisah (anggap `[]`/`false` kosong seperti `''`).
+3. **Tabel daftar FE generik** hanya menampilkan urutan, kode, nama, induk, dan status. `jenis_diklat`, `old_id`, `affect_tukin`, dan `masa_sanksi_bulan` hanya terlihat di form Edit, dan daftar diklat tanpa filter mencampur jenis tanpa penanda (sama dengan `kd_area`/`kd_pos` master lain). Usulan issue FE generik: tampilkan field `order_scope`/select di tabel.
+
+Keputusan kode yang diminta dari reviewer CR-012:
+
+| # | Keputusan | Diimplementasikan | Alternatif |
+|---|---|---|---|
+| C1 | `affect_tukin` di form/API | Select **wajib**, tanpa nilai awal di form: engine belum punya opsi `default` untuk field, dan kosong → NULL → 1048 → 500. "DEFAULT 1" K5a = default kolom (impor/SQL) dan nilai awal pengajuan di B-13 | Opsi engine `default` (MasterField + meta + `MasterFormDialog`) sebagai CR generik terpisah — juga berguna untuk `pangkat.cpns` DBV-004 |
+| C2 | `old_id` bisa diubah admin | Ya (B2 "dikelola admin"); hint form memperingatkan bahwa mengubahnya memutus pengajuan lama yang memakai kode itu | Kunci setelah dipakai pengajuan → B-13 (tabel `absen_ijin` belum ada) |
+| C3 | Dropdown jenis hukdis mengikuti status tingkat | Ya, `statusChain` | — |
+| C4 | `old_id` minimal 1 | Ya (kode 0 dibaca "kosong" oleh PHP legacy); audit impor 6.5 #3 mencakup `old_id` ≤ 0 | Minimal 0 |
+| C5 | PK `diklat` habis → 500 | Diterima dan didokumentasikan (batas #1) | Hook cek `MAX(id_diklat)` sebelum tambah → 422 |
+| C6 | Label | Legacy: "Pelatihan"/"Nama Pelatihan"/"Jenis Pelatihan" (`Lm_diklat.php:55`, `master/diklat/form.php:38`), "Tingkat/Jenis Hukuman Disiplin" (`Lm_hukdis.php:56, 276`), "Jenis Konfirmasi Ketidakhadiran" (`Lm_konket.php:56`), "Pengaruh ke Tukin" (`rwy/konket/form_ad.php:112`); v2: "Kode Kategori", "Masa Sanksi (bulan)" | — |
+
+Catatan modul B/D (bukan pekerjaan master):
+- B-11: FK anak `riwayat_diklat.id_diklat` TINYINT signed; jenis 3 memakai `sub_group_jabatan` (`id_group_jabatan=2`), jenis 5 memakai rumpun/lembaga + nama bebas (1.4 #1). Dropdown pelatihan per jenis = `diklat/options?jenis_diklat=`.
+- B-13: value pilihan = `old_id` (= `absen_ijin.kategori` INT); sembunyikan id 4/5 untuk semua, 2/6 untuk pegawai & role 3; `affect_tukin` pengajuan diisi awal dari master dan bisa diubah admin; salin nama ke `absen_ijin.jenis_konket`; pertimbangkan mengunci `old_id` setelah dipakai pengajuan (C2).
+- B-14: FK anak INT (bila D1 disetujui); `masa_hukuman`/`akhir_hukdis` per SK; default `akhir_hukdis = tmt + masa_sanksi_bulan` bila tidak NULL; SIASN tetap mengisi masa per SK. Dropdown jenis = `jenis-hukdis/options?parent=` (sudah menyaring tingkat non-aktif).
+- B-17: opsi `LAIN-LAIN` (id 44) di luar daftar master aktif + wajib `tanda_jasa_lain`; logika memakai id 44, bukan nama.
+- D-06: `kategori` 13 + `affect_tukin` 1 → uang makan (`L_presensi.php:2079`). `L_presensi.php:3721-3725` membangun peta `constJK[old_id]` dengan `ORDER BY old_id` — bila `old_id` produksi VARCHAR urutannya leksikografis ('10' < '8'), di v2 numerik; port D-06 jangan bergantung pada urutan ini.
+- Riwayat menyimpan salinan nama master (`rwy/L_diklat.php:677-679`, `rwy/L_hukdis.php:478-484`, `rwy/L_tj.php:499-500`, `rwy/L_konket.php:1367-1368`); mengganti nama master tidak mengubah riwayat.
 
 ## 3. Deviasi dari legacy & nilai [I]
 
@@ -216,8 +248,8 @@ Belum ada entri Config, controller, maupun frontend di PR ini: kelima tabel seng
 | 4 | `jenis_konket.affect_tukin` | Tidak ada di master; hanya per pengajuan `absen_ijin.affect_tukin` 1 Yes / 2 No (`form_ad.php:116-122`) | Kolom baru TINYINT NOT NULL DEFAULT 1 (K5a) | Nilai awal pengajuan; admin tetap bisa mengubah per pengajuan |
 | 5 | `jenis_hukdis.masa_sanksi_bulan` | Tidak ada; `riwayat_hukdis.masa_hukuman` teks bebas + `akhir_hukdis` manual (`rwy/hukdis/form.php:122-130`); SIASN mengisi per SK (`Siasn.php:2940-2946`) | Kolom baru TINYINT UNSIGNED NULL (K5b, D3) | Default hitung `akhir_hukdis`; riwayat tetap menyimpan masa sendiri. Berbeda dengan Tech Spec §3.5 "bukan input manual" (1.4 #4) |
 | 6 | Aksi FK | Tidak tercatat (ERD hanya nama) → [I] | `ON DELETE RESTRICT ON UPDATE RESTRICT`, nama legacy | G2/B4. MySQL 8 menampilkan RESTRICT eksplisit di `SHOW CREATE TABLE`; MariaDB bisa menghilangkannya karena itu default — verifikasi lewat `information_schema.REFERENTIAL_CONSTRAINTS` (dilakukan schema test) |
-| 7 | 3 CHECK | Tidak ada | `chk_diklat_jenis_diklat`, `chk_jenis_hukdis_masa_sanksi_bulan`, `chk_jenis_konket_affect_tukin` (D4) | Menegakkan B1/K5 di lapis DB. MySQL ≥ 8.0.16 dan MariaDB ≥ 10.2.1 menegakkan CHECK (MySQL error 3819, MariaDB 4025), juga saat `sql_mode=''` (diuji di MySQL 8.0.30). Impor dengan nilai di luar rentang akan gagal → normalkan dulu (6.5 #5) |
-| 8 | Tipe PK | `diklat` TINYINT signed [K]; empat tabel lain tidak ada DDL | `diklat` TINYINT signed; empat lainnya INT [I] (D1) | TINYINT signed berhenti di 127: setelah id 127, insert berikutnya gagal (`1062 Duplicate entry '127' for key PRIMARY` di MySQL 8.0.30, diuji schema test). `diklat` produksi AUTO_INCREMENT=17 → sisa ± 110 ID seumur hidup (soft delete tidak membebaskan ID). Tipe PK menentukan tipe kolom FK `riwayat_*` di B-11/B-14/B-17 |
+| 7 | 3 CHECK | Tidak ada | `chk_diklat_jenis_diklat`, `chk_jenis_hukdis_masa_sanksi_bulan`, `chk_jenis_konket_affect_tukin` (D4, prefix `chk_` seperti DBV-003/004) | Menegakkan B1/K5 di lapis DB; aplikasi menolak nilai yang sama lebih dulu (422, 2.7). MySQL ≥ 8.0.16 dan MariaDB ≥ 10.2.1 menegakkan CHECK (MySQL error 3819, MariaDB 4025), juga saat `sql_mode=''` (diuji di MySQL 8.0.30). Impor dengan nilai di luar rentang akan gagal → normalkan dulu (6.5 #5) |
+| 8 | Tipe PK | `diklat` TINYINT signed [K]; empat tabel lain tidak ada DDL | `diklat` TINYINT signed; empat lainnya INT [I] (D1) | TINYINT signed berhenti di 127: setelah id 127, insert berikutnya gagal (`1062 Duplicate entry '127' for key PRIMARY` di MySQL 8.0.30, diuji schema test). `diklat` produksi AUTO_INCREMENT=17 → sisa ± 110 ID seumur hidup (soft delete tidak membebaskan ID). Aplikasi: tambah pelatihan setelah ID habis dijawab 500, bukan 422 (2.7 batas #1, C5); perluasan PK = migration ALTER baru + tipe kolom FK anak. Tipe PK menentukan tipe kolom FK `riwayat_*` di B-11/B-14/B-17 |
 | 9 | Kolom audit empat tabel | Kode hanya menulis `updated_by`; DDL tidak ada | Pola `diklat` [K]: `updated_at` NOT NULL ON UPDATE + `updated_by`, tanpa `created_*` [I] (D2) | `group_jabatan` membuktikan tabel dengan pustaka serupa bisa punya `created_at` dari default DB. Bila dump menunjukkan `created_at`, tambahkan lewat ALTER selagi tabel kosong |
 | 10 | Opsi `jenis_diklat` | COMMENT 1–5 [K]; form master hanya 4/1/2 (3 `disabled`, 5 tidak ada); riwayat jenis 3/5 tidak memakai baris master | 1–5 (B1) + CHECK | Konsekuensi untuk B-11 (1.4 #1, 2.7) |
 | 11 | `bobot_ipasn` | Dipakai skor IPASN (`L_user.php:1059-1070`), tidak ada di form | Disimpan INT NULL DEFAULT 5 [I], tidak dikelola (B5) | IPASN tidak ada di dokumen v2; nilai legacy disalin apa adanya |
@@ -240,11 +272,11 @@ Nilai **[I]** yang tersisa ada di Bagian 6.4.
 | 8 | `jenis_konket.affect_tukin` TINYINT NOT NULL DEFAULT 1, 1 Ya / 2 Tidak (K5a final) | Cek nama, tipe, dan COMMENT | ⏳ |
 | 9 | `jenis_hukdis.masa_sanksi_bulan` TINYINT UNSIGNED NULL (nullable final K5b; tipe usulan D3) | Setujui | ⏳ |
 | 10 | FK `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` RESTRICT/RESTRICT; `jenis_hukdis.id_tingkat_hukdis` NOT NULL | Setujui; audit NULL/yatim (6.5 #4) | ⏳ |
-| 11 | 3 CHECK [V2] (D4) | Setujui; verifikasi penegakan di MariaDB 10.4 (6.3 #3) | ⏳ |
+| 11 | 3 CHECK [V2] (D4): `chk_diklat_jenis_diklat`, `chk_jenis_hukdis_masa_sanksi_bulan`, `chk_jenis_konket_affect_tukin` (prefix `chk_` disamakan dengan DBV-003/004) | Setujui; verifikasi penegakan di MariaDB 10.4 (6.3 #3) | ⏳ |
 | 12 | `tingkat_hukdis.bobot_ipasn` INT NULL DEFAULT 5 disimpan, disembunyikan (B5) | Setujui | ⏳ |
 | 13 | COMMENT `jenis_diklat` legacy dipertahankan verbatim; COMMENT `status` diganti versi v2 | Setujui | ⏳ |
 | 14 | Tanpa seed/sentinel dan tanpa kunci baris hard-coded (B6); impor memakai ID legacy apa adanya | Setujui; DBV cek keberadaan & nama baris 2.6 di data produksi (6.5 #6) | ⏳ |
-| 15 | AUTO_INCREMENT awal tidak ditulis; batas TINYINT `diklat` (127) | Setujui; cek `MAX(id_diklat)` produksi ≤ 127 | ⏳ |
+| 15 | AUTO_INCREMENT awal tidak ditulis; batas TINYINT `diklat` (127). Setelah ID habis aplikasi menjawab 500 saat tambah pelatihan (2.7 batas #1); perluasan PK butuh migration ALTER + tipe kolom FK anak | Setujui; cek `MAX(id_diklat)` produksi ≤ 127 | ⏳ |
 
 Approval tanpa catatan per poin dicatat mengikuti kolom **Usulan** (preseden DBV-001/002). Koreksi setelah approval dilakukan lewat migration ALTER baru, bukan mengedit migration ini.
 
@@ -255,7 +287,7 @@ Approval tanpa catatan per poin dicatat mengikuti kolom **Usulan** (preseden DBV
 | Keputusan #5 | Semua master wajib `order` + `status`, termasuk `diklat`, `hukdis`, `konket`, `tanda_jasa` | ✅ YA (23-09-2026) | Dijalankan: `diklat.order` ternyata sudah ada di DDL legacy [K]; empat tabel lain `order` TINYINT [I] (kolom sudah dipakai kode legacy) |
 | Keputusan #2 / Bagian 6 #2 | UNIQUE index nama (ISSUE-009) | Dikerjakan untuk Batch 1 (DBV-001) | 6 UNIQUE di G-06 (Bagian 4 #6); audit duplikat wajib sebelum impor |
 | Keputusan #9 / Bagian 6 #3 | Collation `utf8mb4_unicode_ci` (ISSUE-010) | Selesai sebagian (DBV-001) | Kelima tabel `utf8mb4_unicode_ci` per tabel; `DBCollat` koneksi tetap belum diubah (DBV-010) |
-| Bagian 3 | "beberapa master (… diklat, hukdis, konket, tanda_jasa …) tanpa kolom `order`" | Menunggu DDL | Dijalankan untuk G-06. Rujukan di G-01 ditambahkan setelah CR-009 (dokumen G-01 tidak diubah di PR ini) |
+| Bagian 3 | "beberapa master (… diklat, hukdis, konket, tanda_jasa …) tanpa kolom `order`" | Menunggu DDL | Dijalankan untuk G-06. Rujukan di G-01 ditambahkan setelah ketiga PR grup (DBV-003/004/005) merge (dokumen G-01 tidak diubah di PR ini) |
 
 ## 6. Verifikasi developer (sebelum review DB Validator)
 
@@ -269,13 +301,13 @@ MySQL 8.0.30 lokal (Laragon, `sql_mode` STRICT_TRANS_TABLES, row format default 
 |---|---|
 | `php spark migrate --all` (DB scratch; state `main` sudah di batch 1) | `CreateDiklatHukdisKonketTandaJasa` masuk batch 2 tersendiri |
 | `php spark migrate:rollback` | hanya batch 2 yang dibatalkan: kelima tabel G-06 hilang; `provinsi`, `agama`, `faq_topic` tetap ada; tabel `migrations` kembali 13 baris, batch maks 1 |
-| `php spark migrate --all` (ulang) | kelima tabel dibuat lagi, batch 2 |
-| `information_schema` DB scratch | `TABLE_CONSTRAINTS`: 3 CHECK, 6 UNIQUE, 1 FK sesuai Bagian 2; `REFERENTIAL_CONSTRAINTS` `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` UPDATE/DELETE = RESTRICT |
+| `php spark migrate --all` (ulang) | kelima tabel dibuat lagi, batch 2 (`migrations` 14 baris) |
+| `information_schema` DB scratch | `TABLE_CONSTRAINTS` kelima tabel: 5 PRIMARY, 6 UNIQUE, 1 FK, 3 CHECK (nama `chk_…`) sesuai Bagian 2; `REFERENTIAL_CONSTRAINTS` `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` UPDATE/DELETE = RESTRICT; `SHOW CREATE TABLE` identik dengan blok di bawah |
 | `phpunit --no-coverage tests/MasterData/DiklatHukdisKonketSchemaTest.php` | `OK (6 tests, 184 assertions)` — kolom & tipe persis (termasuk `tinyint(1)` dan `tinyint unsigned`, tanpa `created_*`), collation `utf8mb4_unicode_ci` per tabel & kolom, InnoDB, index persis, 1 FK + kolom induk + RESTRICT/RESTRICT, `old_id` tanpa FK, 3 CHECK (nama); default & COMMENT (`status`, `order`, `updated_at` ON UPDATE, `updated_by`, `jenis_diklat` legacy, `bobot_ipasn` 5, `masa_sanksi_bulan` NULL, `affect_tukin` 1, `old_id` tanpa default); migration tidak menulis baris; constraint DB menolak nama ganda beda kapitalisasi (termasuk terhadap baris status 10), `jenis_diklat` 0/6, `id_diklat` 128 dan AUTO_INCREMENT setelah 127, `id_tingkat_hukdis` yatim/NULL, `masa_sanksi_bulan` 0/-1/256, `old_id` kosong/ganda, `affect_tukin` 0/3, hapus & ganti PK induk yang masih punya anak; lingkup UNIQUE per jenis/per tingkat; `down()` lalu `up()` mengembalikan skema yang sama tanpa menyentuh `provinsi`/`faq_topic`; `up()` yang gagal di tengah (penghalang `jenis_konket`) men-drop hanya tabel yang dibuat run itu lalu bisa diulang |
-| Uji mutasi manual pada migration (dipulihkan setelahnya) | 5/5 mutasi tertangkap: CHECK `affect_tukin` dilonggarkan, FK ON DELETE CASCADE, `jenis_diklat` tanpa `(1)`, `uq_jenis_konket_old_id` jadi KEY biasa, CHECK `masa_sanksi_bulan >= 0` |
-| `phpunit --no-coverage tests/MasterData` (regresi) | `OK (72 tests, 2691 assertions)` — `Batch1LegacySchemaTest`, `FaqSchemaTest`, `FaqTest`, `MasterGenericTcTest`, `RbacMasterEndpointsTest` tetap hijau bersama schema test baru (kelima tabel belum punya entri Config, jadi test generik tidak berubah) |
-| `php-cs-fixer fix --dry-run --diff` (2 file baru) | `Found 0 of 2 files that can be fixed` |
-| `phpstan analyse --memory-limit=1G` (2 file baru, level 5) | `[OK] No errors` |
+| Uji mutasi manual pada migration (dipulihkan setelahnya; diulang setelah nama CHECK diganti ke `chk_`) | 6/6 mutasi tertangkap: CHECK `affect_tukin` dilonggarkan, FK ON DELETE CASCADE, `jenis_diklat` tanpa `(1)`, `uq_jenis_konket_old_id` jadi KEY biasa, CHECK `masa_sanksi_bulan >= 0`, nama CHECK kembali ke `ck_diklat_jenis_diklat` |
+| `phpunit --no-coverage tests/MasterData/DiklatHukdisKonketTest.php` (CR-012) | `OK (9 tests, 283 assertions)` — meta kelima master (label, pilihan, batas angka, lingkup urutan & filter, induk + `statusChain`, batas urutan 127, tanpa `bobot_ipasn`); urutan & keunikan nama per jenis diklat + filter (nilai filter salah → 422); `bobot_ipasn` tidak pernah dikirim/ditulis; rantai status tingkat → jenis hukdis & `masa_sanksi_bulan` 1–255/NULL; `old_id` wajib/unik (termasuk entri non-aktif/dihapus)/bisa diubah; `affect_tukin` 1/2; baris hard-coded tidak dikunci; kapasitas urutan 127 → 422 `order`; stamp `updated_at`/`updated_by` hanya pada baris yang diedit. Setiap nilai isian yang ditolak NOT NULL/CHECK dijawab 422 pada field-nya dan jumlah baris tidak berubah |
+| Uji mutasi CR-012 (dipulihkan setelahnya) | 17/17 mutasi tertangkap: `uniqueScope`/`orderScope` diklat dihapus, `hiddenColumns` tingkat dihapus, `statusChain` false, `uniqueFields` dihapus (1062 → 500), `affect_tukin` tidak wajib, `min` `old_id` dihapus, `columnType` masa jadi `tinyint`/dihapus, `min` masa dihapus (0 → CHECK → 500), `orderColumnType` tanda jasa dihapus, `MasterGenericTcTest` dikembalikan ke versi `main` (`created_at` tidak ada → gagal pada `diklat`), `HukdisController` tanpa `jenis-hukdis`, pilihan `jenis_diklat` tanpa 5, `AUDIT_G06` tanpa `updated_by`, `jenis_diklat` tidak wajib + tanpa `orderScope`, `KonketController` kosong |
+| `./check.sh` penuh (root repo) | backend `composer check`: PHPStan `[OK] No errors`, PHP-CS-Fixer `Found 0 of 200 files that can be fixed`, PHPUnit `OK (384 tests, 11821 assertions)` (`MasterGenericTcTest` dan `RbacMasterEndpointsTest` kini juga menjalankan kelima key G-06); frontend `npm run check`: ESLint, vue-tsc, Vitest `21 passed` file / `208 passed` test, `vite build` — `SEMUA CHECK LOLOS` |
 
 `SHOW CREATE TABLE` di DB scratch (MySQL 8.0.30):
 
@@ -357,7 +389,8 @@ DBV-001 dan DBV-002 disetujui tanpa laporan verifikasi MariaDB terpisah. Untuk D
 4. FK RESTRICT dicek lewat `information_schema.REFERENTIAL_CONSTRAINTS` (`SHOW CREATE TABLE` MariaDB bisa menyembunyikan klausa RESTRICT).
 5. `COLUMN_TYPE` `tinyint(1)` pada `jenis_diklat`, `tinyint(3) unsigned` pada `masa_sanksi_bulan`, dan `updated_at` `DATETIME NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()`.
 6. UNIQUE 1.024 byte diterima (row format DYNAMIC, `innodb_large_prefix`/default MariaDB 10.4).
-7. Laporkan hasilnya di PR (poin mana yang lolos/gagal).
+7. Opsional (perilaku aplikasi di atas MariaDB): `vendor/bin/phpunit --no-coverage tests/MasterData/DiklatHukdisKonketTest.php` — memastikan setiap nilai yang ditolak NOT NULL/CHECK sudah dijawab 422 oleh validasi, juga di MariaDB.
+8. Laporkan hasilnya di PR (poin mana yang lolos/gagal).
 
 ### 6.4 Nilai [I] yang menunggu dump struktur produksi (`mysqldump --no-data` penuh simpeg01)
 
@@ -375,7 +408,7 @@ Salinan lokal kelima tabel berisi 0 baris (atau tidak ada), jadi semua butir di 
 
 1. **Audit duplikat** dengan perbandingan `utf8mb4_unicode_ci` (tidak peka huruf besar/kecil & aksen), setelah `stripslashes` (#2) dan trim, per lingkup UNIQUE: `diklat (jenis_diklat, nama_diklat)`, `tingkat_hukdis`, `jenis_hukdis (id_tingkat_hukdis, jenis_hukdis)`, `jenis_konket`, `jenis_konket.old_id`, `tanda_jasa` — **termasuk baris status 2/10** (`jenis_hukdis` dan `diklat` bisa punya status 10). Duplikat harus dirapikan dulu, karena impor akan gagal.
 2. **`stripslashes`** hanya untuk nama `diklat`, `tingkat_hukdis`, `jenis_konket`, `tanda_jasa` (di-`addslashes` legacy); **jangan** untuk `jenis_hukdis` (disimpan mentah). Nama `diklat` dari jalur `dm_diklat` juga mentah → `stripslashes` kondisional: audit pola `\'`, `\"`, `\\` per baris sebelum memutuskan.
-3. **`jenis_konket.old_id`**: baris dengan `old_id` NULL/kosong (dibuat lewat UI legacy), ganda, atau bukan angka → beri kode baru > MAX yang tidak dipakai `absen_ijin.kategori`/`d_konket.kategori`; cek setiap `absen_ijin.kategori` punya pasangan `old_id`.
+3. **`jenis_konket.old_id`**: baris dengan `old_id` NULL/kosong (dibuat lewat UI legacy), ≤ 0 (aplikasi mewajibkan ≥ 1, C4), ganda, atau bukan angka → beri kode baru > MAX yang tidak dipakai `absen_ijin.kategori`/`d_konket.kategori`; cek setiap `absen_ijin.kategori` punya pasangan `old_id`.
 4. **`jenis_hukdis.id_tingkat_hukdis`** NULL atau yatim (tingkat dihapus keras) → rapikan sebelum impor (FK + NOT NULL akan menolak).
 5. **Normalisasi nilai**: `jenis_diklat` di luar 1–5, `status` di luar 1/2/10, `order` bukan angka/0/> 127/ganda → normalkan (`order` 1..n per lingkup: diklat per jenis, jenis hukdis per tingkat, lainnya global).
 6. **Baris hard-coded (2.6)**: pastikan ada dengan ID tersebut dan namanya sesuai, khususnya tanda jasa 44 = `LAIN-LAIN`; `MAX(id_diklat)` ≤ 127.
