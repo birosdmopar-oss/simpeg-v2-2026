@@ -135,6 +135,7 @@ final class HariLiburTest extends CIUnitTestCase
         $this->assertSame(4, $list['total']);
         $items = array_column($list['items'], null, 'id_libur');
         $this->assertSame('Libur Nasional', $items[1]['jenis_libur']);
+        $this->assertArrayHasKey('updated_by', $items[1]);
         $this->assertNull($items[5]['jenis_libur']);
         $this->assertNull($items[5]['id_jenis_libur']);
 
@@ -148,11 +149,21 @@ final class HariLiburTest extends CIUnitTestCase
             $this->assertSame(['2', '1', '5'], $this->ids($this->listData(['status' => '10'])), "role {$role}");
             $this->get(self::BASE . '/3')->assertStatus(404);
             $this->get(self::BASE . '/4')->assertStatus(404);
-            $this->get(self::BASE . '/2')->assertStatus(200);
+            $detail = $this->get(self::BASE . '/2');
+            $detail->assertStatus(200);
+            $this->assertSame('Cuti Bersama Idul Fitri', $this->json($detail)['data']['nama_libur']);
+
+            // Kolom audit internal (id_pengguna admin pengubah, waktu) tidak dikirim ke role baca saja.
+            foreach ([...$this->listData()['items'], $this->json($detail)['data']] as $row) {
+                $this->assertSame([], array_values(array_intersect(['created_at', 'updated_at', 'updated_by'], array_keys($row))), "role {$role}");
+            }
         }
 
         $this->asRole(Role::SUPER_ADMIN);
-        $this->get(self::BASE . '/4')->assertStatus(200);
+        $admin = $this->get(self::BASE . '/4');
+        $admin->assertStatus(200);
+        $this->assertArrayHasKey('updated_by', $this->json($admin)['data']);
+        $this->assertArrayHasKey('created_at', $this->json($admin)['data']);
 
         foreach (['0', '01', '1e0', 'abc', '99'] as $id) {
             $this->get(self::BASE . "/{$id}")->assertStatus(404);
@@ -176,6 +187,27 @@ final class HariLiburTest extends CIUnitTestCase
         $page = $this->listData(['per_page' => '2', 'page' => '2']);
         $this->assertSame(['2', '1'], $this->ids($page));
         $this->assertSame([5, 2, 2], [$page['total'], $page['page'], $page['per_page']]);
+
+        // per_page dibatasi 100; page raksasa tidak meluap jadi float (500) melainkan halaman kosong.
+        $this->assertSame(100, $this->listData(['per_page' => '1000'])['per_page']);
+
+        foreach ([Role::SUPER_ADMIN, Role::PIMPINAN] as $role) {
+            $this->asRole($role);
+
+            foreach (['9223372036854775807', '1e18', '99999999999999999999'] as $huge) {
+                $far = $this->listData(['page' => $huge, 'per_page' => '100']);
+                $this->assertSame([], $far['items'], "page={$huge} role {$role}");
+                $this->assertSame(intdiv(PHP_INT_MAX, 100), $far['page'], "page={$huge} role {$role}");
+            }
+        }
+
+        $this->asRole(Role::SUPER_ADMIN);
+
+        // Kata kunci > 100 karakter ditolak (100 masih boleh).
+        $this->assertSame([], $this->listData(['search' => str_repeat('a', 100)])['items']);
+        $result = $this->get(self::BASE, ['search' => str_repeat('a', 101)]);
+        $result->assertStatus(422);
+        $this->assertSame(['Kata kunci pencarian maksimal 100 karakter.'], $this->json($result)['errors']['search']);
     }
 
     // ------------------------------------------------------------------
@@ -313,6 +345,19 @@ final class HariLiburTest extends CIUnitTestCase
         $result->assertStatus(422);
         $this->assertStringContainsString('Hari Lahir Pancasila', $this->json($result)['errors']['tgl_mulai'][0]);
         $this->seeInDatabase('hari_libur', ['id_libur' => 1, 'tgl_mulai' => '2026-01-01']);
+
+        // Data lama (impor legacy) yang sudah beririsan tetap bisa diubah kolom non-tanggalnya: overlap hanya dicek
+        // bila tanggal berubah (mengirim tanggal yang sama = tidak berubah).
+        $this->db->table('hari_libur')->insert(['id_jenis_libur' => 2, 'tgl_mulai' => '2026-04-30', 'tgl_akhir' => '2026-05-01', 'nama_libur' => 'Data Lama Beririsan', 'status' => 1]);
+        $legacyId = (string) $this->db->insertID();
+        $this->sendJson('PUT', self::BASE . "/{$legacyId}", ['nama_libur' => 'Data Lama Diubah', 'keterangan' => 'Impor', 'id_jenis_libur' => '1'])->assertStatus(200);
+        $this->sendJson('PUT', self::BASE . "/{$legacyId}", ['tgl_mulai' => '2026-04-30', 'tgl_akhir' => '2026-05-01'])->assertStatus(200);
+        $this->seeInDatabase('hari_libur', ['id_libur' => $legacyId, 'nama_libur' => 'Data Lama Diubah', 'keterangan' => 'Impor', 'tgl_akhir' => '2026-05-01']);
+
+        $result = $this->sendJson('PUT', self::BASE . "/{$legacyId}", ['tgl_mulai' => '2026-04-29']);
+        $result->assertStatus(422);
+        $this->assertStringContainsString('Hari Buruh Internasional', $this->json($result)['errors']['tgl_mulai'][0]);
+        $this->seeInDatabase('hari_libur', ['id_libur' => $legacyId, 'tgl_mulai' => '2026-04-30']);
     }
 
     public function testDeleteIsSoftAndEntryCanBeRestored(): void
@@ -365,6 +410,26 @@ final class HariLiburTest extends CIUnitTestCase
         $this->assertSame(5, $this->db->table('hari_libur')->countAllResults());
         $this->assertTrue($this->db->transStatus());
         $this->assertSame('1', (string) $this->db->query('SELECT IS_FREE_LOCK(?) AS f', [$service->lockName()])->getRowArray()['f']);
+
+        // Pemenang balapan terlihat saat 1062 diterjemahkan: cek pertama "kalah" (null), cek ulang menemukan entri yang
+        // bentrok → pesan overlap yang menyebut entri itu, bukan pesan generik.
+        $racing = new class () extends HariLiburService {
+            private int $calls = 0;
+
+            protected function findOverlap(string $mulai, string $akhir, ?int $exceptId): ?array
+            {
+                return $this->calls++ === 0 ? null : parent::findOverlap($mulai, $akhir, $exceptId);
+            }
+        };
+
+        try {
+            $racing->create($this->payload('2026-01-01', '2026-01-03', 'Pemenang Balapan'));
+            $this->fail('Pelanggaran UNIQUE tgl_mulai harus menjadi ValidationException (422).');
+        } catch (ValidationException $e) {
+            $this->assertSame(['tgl_mulai' => ['Rentang tanggal bentrok dengan hari libur "Tahun Baru 2026 Masehi" (2026-01-01 s.d. 2026-01-01).']], $e->getErrors());
+        }
+
+        $this->assertSame(5, $this->db->table('hari_libur')->countAllResults());
     }
 
     /**

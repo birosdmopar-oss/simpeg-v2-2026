@@ -61,6 +61,11 @@ class HariLiburService
     private const PER_PAGE_DEFAULT = 20;
     private const PER_PAGE_MAX     = 100;
 
+    /**
+     * Kolom audit internal (id_pengguna admin + waktu) yang tidak dikirim ke role baca saja (4/5/8).
+     */
+    private const AUDIT_COLUMNS = ['created_at', 'updated_at', 'updated_by'];
+
     private const ERR_DUPLICATE = 1062;
 
     /**
@@ -98,7 +103,8 @@ class HariLiburService
     /**
      * Daftar urut `tgl_mulai DESC` (terbaru dulu, legacy :20346-20351) dengan LEFT JOIN jenis libur, sehingga baris
      * tanpa jenis (impor legacy) tetap tampil. Filter: `tahun` (rentang yang beririsan dengan tahun itu), `search`
-     * (nama), `status` (role 1), `page`, `per_page` (≤ 100).
+     * (nama), `status` (role 1), `page` (dibatasi agar offset tidak meluap), `per_page` (≤ 100). Role baca saja tidak
+     * menerima kolom audit (AUDIT_COLUMNS).
      *
      * @param array<string, mixed> $query
      *
@@ -106,7 +112,9 @@ class HariLiburService
      */
     public function list(array $query, ?int $role): array
     {
-        $page    = max(1, (int) $this->scalar($query, 'page', '1'));
+        // Batas atas page: offset (page - 1) * per_page tetap int, tidak meluap ke float (TypeError → 500) untuk
+        // ?page=9223372036854775807; halaman sebesar itu memang selalu kosong.
+        $page    = min(intdiv(PHP_INT_MAX, self::PER_PAGE_MAX), max(1, (int) $this->scalar($query, 'page', '1')));
         $perPage = min(self::PER_PAGE_MAX, max(1, (int) $this->scalar($query, 'per_page', (string) self::PER_PAGE_DEFAULT)));
         $builder = $this->baseQuery();
 
@@ -157,7 +165,7 @@ class HariLiburService
             ->get()
             ->getResultArray();
 
-        return ['items' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+        return ['items' => array_map(fn (array $row): array => $this->visibleTo($row, $role), $rows), 'total' => $total, 'page' => $page, 'per_page' => $perPage];
     }
 
     /**
@@ -173,7 +181,20 @@ class HariLiburService
             throw new NotFoundException('Hari libur tidak ditemukan.');
         }
 
-        return $row;
+        return $this->visibleTo($row, $role);
+    }
+
+    /**
+     * Role baca saja (4/5/8) tidak butuh identitas admin pengubah (`updated_by` = id_pengguna) maupun waktu audit —
+     * pola bagian publik FaqService.
+     *
+     * @param array<string, mixed> $row
+     *
+     * @return array<string, mixed>
+     */
+    private function visibleTo(array $row, ?int $role): array
+    {
+        return self::canWrite($role) ? $row : array_diff_key($row, array_flip(self::AUDIT_COLUMNS));
     }
 
     /**

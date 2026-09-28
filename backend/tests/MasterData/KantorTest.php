@@ -163,16 +163,33 @@ final class KantorTest extends CIUnitTestCase
         $this->sendJson('POST', self::BASE, $lainLain)->assertStatus(201);
         $this->seeInDatabase('kantor', ['nama_kantor' => 'KBRI Tokyo', 'id_kelurahan' => '9999999999', 'kelurahan_lain' => 'Akasaka', 'kode_pos' => null]);
 
-        // Kantor LAIN-LAIN dipindah ke rantai riil: seluruh *_lain dikosongkan.
+        // Ubah parsial kantor LAIN-LAIN tanpa mengirim ulang *_lain: nilai tersimpan dipakai (tidak dianggap kosong).
+        $this->sendJson('PUT', self::BASE . '/2', ['kode_pos' => '12345'])->assertStatus(200);
+        $this->seeInDatabase('kantor', [
+            'id_kantor'      => 2, 'kode_pos' => '12345', 'provinsi_lain' => 'Jepang', 'kabupaten_lain' => 'Tokyo',
+            'kecamatan_lain' => 'Shinagawa', 'kelurahan_lain' => 'Higashi-Gotanda',
+        ]);
+        $result = $this->sendJson('PUT', self::BASE . '/2', ['provinsi_lain' => '']);
+        $result->assertStatus(422);
+        $this->assertSame(['Provinsi Lainnya wajib diisi bila Provinsi LAIN-LAIN.'], $this->json($result)['errors']['provinsi_lain']);
+        $this->seeInDatabase('kantor', ['id_kantor' => 2, 'provinsi_lain' => 'Jepang']);
+
+        // Kantor LAIN-LAIN dipindah ke rantai riil: seluruh *_lain dikosongkan; kode pos bebas (12345) kini harus
+        // salah satu kd_pos kelurahan riil (10150).
         $this->sendJson('PUT', self::BASE . '/2', [
-            'id_provinsi' => '31', 'id_kabupaten' => '3171', 'id_kecamatan' => '3171020', 'id_kelurahan' => '3171010002',
+            'id_provinsi' => '31', 'id_kabupaten' => '3171', 'id_kecamatan' => '3171020', 'id_kelurahan' => '3171010002', 'kode_pos' => '10150',
         ])->assertStatus(422);
-        $this->sendJson('PUT', self::BASE . '/2', [
+        $result = $this->sendJson('PUT', self::BASE . '/2', [
             'id_provinsi' => '31', 'id_kabupaten' => '3171', 'id_kecamatan' => '3171010', 'id_kelurahan' => '3171010002',
+        ]);
+        $result->assertStatus(422);
+        $this->assertSame(['Kode Pos harus salah satu kode pos kelurahan terpilih: 10150.'], $this->json($result)['errors']['kode_pos']);
+        $this->sendJson('PUT', self::BASE . '/2', [
+            'id_provinsi' => '31', 'id_kabupaten' => '3171', 'id_kecamatan' => '3171010', 'id_kelurahan' => '3171010002', 'kode_pos' => '10150',
         ])->assertStatus(200);
         $this->seeInDatabase('kantor', [
             'id_kantor'      => 2, 'id_kelurahan' => '3171010002', 'provinsi_lain' => null, 'kabupaten_lain' => null,
-            'kecamatan_lain' => null, 'kelurahan_lain' => null,
+            'kecamatan_lain' => null, 'kelurahan_lain' => null, 'kode_pos' => '10150',
         ]);
 
         // Mengubah hanya *_lain dari level riil tetap dibuang.
@@ -208,6 +225,14 @@ final class KantorTest extends CIUnitTestCase
         $result->assertStatus(422);
         $this->assertArrayHasKey('kode_pos', $this->json($result)['errors']);
         $this->seeInDatabase('kantor', ['id_kantor' => 1, 'kode_pos' => '10110']);
+
+        // Ganti kelurahan saja: kode pos tersimpan (10110) diperiksa ulang terhadap daftar kelurahan baru (10150).
+        $result = $this->sendJson('PUT', self::BASE . '/1', ['id_kelurahan' => '3171010002']);
+        $result->assertStatus(422);
+        $this->assertSame(['Kode Pos harus salah satu kode pos kelurahan terpilih: 10150.'], $this->json($result)['errors']['kode_pos']);
+        $this->seeInDatabase('kantor', ['id_kantor' => 1, 'id_kelurahan' => '3171010001', 'kode_pos' => '10110']);
+        $this->sendJson('PUT', self::BASE . '/1', ['id_kelurahan' => '3171010002', 'kode_pos' => '10150'])->assertStatus(200);
+        $this->seeInDatabase('kantor', ['id_kantor' => 1, 'id_kelurahan' => '3171010002', 'kode_pos' => '10150']);
     }
 
     /**
