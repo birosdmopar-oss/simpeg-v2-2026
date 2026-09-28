@@ -28,7 +28,8 @@ use Tests\Support\MasterDataTestTrait;
  *
  * Setiap nilai isian (teks/angka) yang ditolak kolom NOT NULL/CHECK di DB harus sudah ditolak validasi (422 pada
  * field-nya): CR-007 tidak menerjemahkan 1048 dan pelanggaran CHECK (3819/4025), jadi nilai itu akan menjadi 500 bila
- * lolos ke DB. Batas yang tersisa di engine (JSON `[]`/`false` untuk field int opsional) dicatat di G-06 Bagian 2.7.
+ * lolos ke DB. Nilai yang dianggap kosong oleh permit_empty (spasi/tab saja, JSON `false`) disimpan NULL. Batas yang
+ * tersisa di engine (JSON `[]` untuk field int opsional) dicatat di G-06 Bagian 2.7.
  *
  * @internal
  */
@@ -90,6 +91,9 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
                 $key,
             );
             $this->assertSame(127, service('masterRegistry')->get($key)->orderMax(), "{$key}: kolom order TINYINT");
+            // Panjang kode = batas rule induk/field ref yang merujuk master ini (mis. riwayat_diklat.id_diklat di B-11):
+            // `diklat` TINYINT signed → 3 karakter, empat lainnya INT → bawaan 11.
+            $this->assertSame($key === 'diklat' ? 3 : 11, $m['id_max_length'], "{$key}: id_max_length");
         }
 
         $field = static fn (string $name, string $label, string $type, bool $required, ?array $options = null, ?string $hint = null, ?int $min = null, ?int $max = null): array => [
@@ -125,6 +129,31 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
         $this->assertSame([], $meta['tanda-jasa']['fields']);
 
         $this->assertStringNotContainsString('bobot_ipasn', (string) json_encode(array_intersect_key($meta, array_flip(self::G06))));
+    }
+
+    /**
+     * Dropdown kelima master G-06 = UL_ALL (dipakai riwayat B-11/B-13/B-14/B-17 dan presensi D-06): setiap role login
+     * mendapat options berisi entri, termasuk saringan per jenis pelatihan dan per tingkat hukdis. Dikunci eksplisit di
+     * sini karena RbacMasterEndpointsTest membaca daftar master admin-only dari config itu sendiri.
+     */
+    public function testOptionsAreOpenToEveryRole(): void
+    {
+        foreach (self::G06 as $key) {
+            $this->assertTrue(service('masterRegistry')->get($key)->publicOptions, "{$key}: publicOptions");
+        }
+
+        foreach (Role::all() as $role) {
+            $this->asRole($role);
+
+            foreach (self::G06 as $key) {
+                $this->assertNotSame([], $this->optionIds($key), "{$key} role {$role}");
+            }
+
+            $this->assertSame(['1', '2'], $this->optionIds('diklat', null, ['jenis_diklat' => '1']), "diklat per jenis role {$role}");
+            $this->assertSame(['4'], $this->optionIds('jenis-hukdis', '2'), "jenis-hukdis per tingkat role {$role}");
+        }
+
+        $this->withHeaders(['Authorization' => ''])->get('api/v1/master/diklat/options')->assertStatus(401);
     }
 
     /**
@@ -285,6 +314,17 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
         $this->seeInDatabase('jenis_hukdis', ['jenis_hukdis' => 'Uji Masa Null', 'masa_sanksi_bulan' => null]);
         $this->sendJson('POST', $base, ['id_tingkat_hukdis' => '3', 'jenis_hukdis' => 'Uji Masa Angka JSON', 'masa_sanksi_bulan' => 36])->assertStatus(201);
         $this->seeInDatabase('jenis_hukdis', ['jenis_hukdis' => 'Uji Masa Angka JSON', 'masa_sanksi_bulan' => 36]);
+
+        // Kosong menurut rule permit_empty (spasi/tab saja, JSON false) lolos tanpa dicek is_natural, jadi harus disimpan
+        // NULL, bukan (int) 0 yang melanggar CHECK chk_jenis_hukdis_masa_sanksi_bulan (3819/4025 → 500).
+        foreach (['Spasi' => ' ', 'Tab' => "\t", 'False' => false] as $label => $blank) {
+            $this->sendJson('POST', $base, ['id_tingkat_hukdis' => '1', 'jenis_hukdis' => "Uji Masa {$label}", 'masa_sanksi_bulan' => $blank])->assertStatus(201);
+            $this->seeInDatabase('jenis_hukdis', ['jenis_hukdis' => "Uji Masa {$label}", 'masa_sanksi_bulan' => null]);
+        }
+
+        $this->sendJson('PUT', "{$base}/5", ['masa_sanksi_bulan' => " \t "])->assertStatus(200);
+        $this->seeInDatabase('jenis_hukdis', ['id_jenis_hukdis' => 5, 'masa_sanksi_bulan' => null]);
+        $this->sendJson('PUT', "{$base}/5", ['masa_sanksi_bulan' => '12'])->assertStatus(200);
 
         // Nilai di luar 1..255 atau bukan bilangan bulat → 422 (CHECK chk_jenis_hukdis_masa_sanksi_bulan / TINYINT UNSIGNED
         // tidak pernah tercapai).

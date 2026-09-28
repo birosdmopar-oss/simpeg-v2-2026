@@ -24,8 +24,8 @@ use Throwable;
  * kode kategori (= `absen_ijin.kategori`); PK AUTO_INCREMENT; collation utf8mb4_unicode_ci.
  *
  * Deviasi dari legacy (dicatat untuk DBV):
- *   - Status 1 Aktif / 2 Tidak Aktif / 10 Dihapus + COMMENT v2 di kelima tabel (legacy: tingkat, konket, dan tanda jasa
- *     hard delete; `jenis_hukdis` dan jalur mati `dm_diklat` memakai 10).
+ *   - Status 1 Aktif / 2 Tidak Aktif / 10 Dihapus + COMMENT v2 di kelima tabel (legacy: diklat (Lm_diklat), tingkat,
+ *     konket, dan tanda jasa hard delete; `jenis_hukdis` dan jalur mati `dm_diklat` memakai 10).
  *   - UNIQUE nama `diklat (jenis_diklat, nama_diklat)`, `tingkat_hukdis`, `jenis_hukdis (id_tingkat_hukdis,
  *     jenis_hukdis)`, `jenis_konket`, `tanda_jasa`, plus UNIQUE `jenis_konket.old_id`; berlaku juga untuk baris status 2/10.
  *   - FK jenis_hukdis → tingkat_hukdis ON DELETE RESTRICT ON UPDATE RESTRICT (aksi legacy tidak tercatat di ERD).

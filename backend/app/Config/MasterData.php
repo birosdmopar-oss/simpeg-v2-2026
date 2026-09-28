@@ -390,7 +390,7 @@ class MasterData extends BaseConfig
                     'min'      => 1,
                     'hint'     => 'Kode yang disimpan di pengajuan konket (absen_ijin.kategori). Unik. Mengubahnya memutus pengajuan lama yang memakai kode ini.',
                 ],
-                // K5a: nilai awal "Pengaruh ke Tukin" pengajuan (label legacy rwy/konket/form_ad.php:112). Wajib: kosong akan
+                // K5a: nilai awal "Pengaruh ke Tukin" pengajuan (label legacy rwy/konket/form_ad.php:113). Wajib: kosong akan
                 // menjadi NULL di kolom NOT NULL (1048 → 500). Default kolom 1 tetap berlaku untuk impor/SQL.
                 'affect_tukin' => [
                     'label'    => 'Pengaruh ke Tukin',
