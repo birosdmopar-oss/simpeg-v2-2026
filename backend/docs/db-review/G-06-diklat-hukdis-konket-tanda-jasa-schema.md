@@ -16,7 +16,7 @@
 | `app/Controllers/Api/MasterData/{Diklat,Hukdis,Konket,TandaJasa}Controller.php` | 4 controller grup (`02-MasterData.md` G-06), hanya mendaftarkan key master; route & RBAC dibangkitkan dari config |
 | `tests/_support/Database/Seeds/MasterDataSeeder.php`, `tests/_support/MasterDataTestTrait.php` (blok `DBV-005`) | seed G-06 (baris ber-ID hard-coded legacy, Bagian 2.6) dan fixture G-TC generik |
 | `tests/MasterData/DiklatHukdisKonketTest.php` | perilaku khusus G-06 lewat HTTP (9 test, Bagian 2.7) |
-| `tests/MasterData/MasterGenericTcTest.php` | `testLegacyAuditColumnsAreFilledWithActor`: memeriksa kolom waktu audit yang ada di tabel (`created_at` dan/atau `updated_at`; kelima tabel G-06 hanya `updated_at`) dan `updated_by` hanya bila kolomnya ada. Perubahan yang sama dibutuhkan DBV-003/DBV-004 (tabel tanpa `created_at`/`updated_by`); saat merge dipakai versi yang sudah ada di `main` selama kelima master G-06 tetap diperiksa `updated_at` + `updated_by` |
+| `tests/MasterData/MasterGenericTcTest.php` | `testLegacyAuditColumnsAreFilledWithActor` diperiksa sesuai `auditColumns` tiap tabel: `created_at`, atau `updated_at` bila tabel tanpa `created_at` (kelima tabel G-06); `updated_by` = aktor bila kolomnya ada; tanpa kolom `*_by` → respons tidak memuat kolom itu dan aktor tercatat di `audit_logs`. Teks sama persis dengan cabang DBV-003 dan DBV-004 (perubahan yang sama dibutuhkan ketiganya) |
 
 ## 1. Latar belakang & keputusan
 
