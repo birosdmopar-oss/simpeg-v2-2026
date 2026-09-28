@@ -14,8 +14,8 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 | G-04 Kenaikan Pangkat | TODO (blocked) | `gol_pppk` legacy memuat nominal uang makan — tidak ada di seed |
 | G-05 Pendidikan | TODO | Kolom ada di seed; perlu keputusan #5 (`order`) → bisa langsung pakai engine |
 | G-06 Diklat, Hukdis, Konket, Tanda Jasa | TODO | Kolom ada di seed; perlu keputusan #5 (`order`) → bisa langsung pakai engine |
-| G-07 Data Umum & Wilayah | **IN_PROGRESS** | agama, jenis_pegawai, jenis_status, wilayah 4 level SELESAI (backend + FE + G-TC). `kantor` belum (blocked DDL) |
-| G-08 Hari Libur | TODO | Kolom ada di seed/Tech Spec; butuh migration `jenis_libur` + validasi overlap (tidak cocok engine generik murni) |
+| G-07 Data Umum & Wilayah | **IN_PROGRESS** | agama, jenis_pegawai, jenis_status, wilayah 4 level SELESAI (backend + FE + G-TC). `kantor`, `bidang_kursem`, `instansi_kursem` + sentinel LAIN-LAIN wilayah: kode & test selesai di branch `dbv-003/g07-g08-libur-kantor-kursem`, ⏳ menunggu approval DB Validator (**DBV-003**) dan review kode (**CR-010**) |
+| G-08 Hari Libur | **IN_PROGRESS** | `jenis_libur` (engine) + `hari_libur` (controller + service khusus: overlap dengan lock, `tanggalLibur()` untuk Fase 5) + halaman FE: kode & test selesai di branch yang sama, ⏳ **DBV-003/CR-010** |
 | G-09 Web Config | TODO (blocked) | Konflik nama kolom `config_key` (seed) vs `config_name` (legacy); daftar key + tipe data belum ada |
 | G-10 FAQ | **IN_PROGRESS** (kode di main, menunggu QA) | Pilot skema legacy **DBV-002/CR-003** (branch `dbv-002/g10-faq-pilot`): 5 tabel FAQ (DDL legacy ditemukan), CRUD admin (engine generik) + baca/cari/rating pegawai (backend + FE) selesai & test hijau. ⏳ Menunggu approval DB Validator (DBV-002) dan review kode (CR-003); FK `faq_rate.nip` → `pegawai` ditunda ke B-01 |
 
@@ -45,9 +45,31 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - FE: `/master/:entity?` (menu "Master Data" hanya role 1), badge Aktif hijau/Tidak Aktif abu/Dihapus merah, semua aksi baris (edit, aktif/nonaktif, naik/turun urutan, pulihkan, hapus) lewat menu titik tiga ⋮ (CR-015, aturan AGENTS.md), form tambah/edit, konfirmasi hapus (soft).
 - Diverifikasi manual di browser (lokal): tambah, duplikat nama ditolak di field, toggle status, reorder, edit (induk berjenjang ter-isi), hapus soft, role 2 → 403 & menu tersembunyi, tampilan mobile.
 
+**DBV-003/CR-010 (⏳ menunggu approval DB Validator + review kode; branch `dbv-003/g07-g08-libur-kantor-kursem`)** — dokumen skema & keputusan: `backend/docs/db-review/G-07-G-08-kantor-hari-libur-kursem-schema.md`.
+- Migration `2026-09-25-100100_CreateKursem` (`bidang_kursem`, `instansi_kursem`: DDL legacy + `order` TINYINT, UNIQUE nama), `2026-09-25-100200_SeedWilayahLainLain` (4 baris sentinel LAIN-LAIN 99/9999/9999999/9999999999, `order` 0; `up()` menolak bila satu kode sudah ada, `down()` menolak selama masih dirujuk), `2026-09-25-100300_CreateKantor` (kolom dari kode legacy, 4 FK nama ERD RESTRICT, UNIQUE `nama_kantor` global).
+- Engine (generik): opsi `systemIds` (baris sistem: tidak tampil di options & daftar admin, tidak ikut urutan, tidak bisa diubah/dinonaktifkan/diurutkan/dihapus/menjadi induk → 422, detail tetap bisa dibaca), `allowSystem` (field ref boleh merujuk baris sistem; field lain "tidak ditemukan"), `otherFor` (isian "lainnya", metadata FE). Wilayah memakai `systemIds`.
+- Master `kantor` (field ref wilayah berjenjang + LAIN-LAIN; `KantorHooks`: LAIN-LAIN berjenjang, rantai konsisten untuk kode riil, `*_lain` wajib/NULL, `kode_pos` 5 digit dan salah satu `kelurahan.kd_pos` bila terisi; diperiksa ulang hanya bila kolom wilayah berubah), `bidang-kursem`, `instansi-kursem` (tanpa `*_by`) — `UmumController`, CRUD role 1, dropdown UL_ALL.
+- Temuan QA CR-009: `orderColumnType` agama/jenis-pegawai/jenis-status = `tinyint`, wilayah = `int unsigned`; `MasterConfigSchemaTest` mencocokkan semua definisi dengan DDL.
+- FE: master baru otomatis di `/master/:entity?`; form kantor punya pilihan LAIN-LAIN (berjenjang, level bawah terkunci) dan isian `*_lain` yang hanya tampil/wajib saat LAIN-LAIN.
+- Test: `WilayahSentinelTest`, `KantorTest`, `MasterConfigSchemaTest`, `LiburKantorKursemSchemaTest` (+ `testWilayahSentinelRows`), `Batch1LegacySchemaTest` (ikut melepas/memasang kantor & sentinel), G-TC generik mencakup 4 master baru; Vitest form LAIN-LAIN.
+
 **Belum**
-- `kantor` (blocked DDL: legacy FK ke 4 tabel wilayah).
+- Approval DBV-003 (+ verifikasi MariaDB 10.4, G-doc 6.4) dan review CR-010; audit data kantor legacy sebelum impor (G-doc 6.3).
 - G-TC #7 QA Lapis 1 vs Figma — desain belum ada.
+
+## G-08 — IN_PROGRESS (⏳ DBV-003/CR-010)
+
+**Sudah jalan (branch `dbv-003/g07-g08-libur-kantor-kursem`, belum di main)**
+- Migration `2026-09-25-100000_CreateHariLibur`: `jenis_libur` (kolom dari kode legacy) + `hari_libur` (DDL legacy + `status` 1/2/10, UNIQUE `tgl_mulai`, CHECK `tgl_akhir >= tgl_mulai`, FK RESTRICT; tanpa UNIQUE nama).
+- `jenis-libur` lewat engine (`HariLiburController`, CRUD role 1, dropdown UL_ALL).
+- `api/v1/hari-libur` (`HariLiburController` + `HariLiburService`): daftar/detail role 1/4/5/8 (role 4/5/8 hanya status 1), tambah/ubah/status/hapus role 1, soft delete + pulihkan. Validasi tanggal `YYYY-MM-DD` (1900-2100), rentang, jenis wajib & aktif, overlap inklusif terhadap semua status dalam transaksi + named lock (`GET_LOCK`, 409 bila sibuk); 1062/CHECK (3819/4025) → 422. `updated_by` diisi saat tambah & ubah (legacy).
+- `HariLiburService::tanggalLibur(from, to)` — hanya status 1, dipotong ke rentang, unik & terurut: satu-satunya sumber tanggal libur untuk presensi/tukin/uang makan/cuti/konket/LKH (Fase 5).
+- FE: menu "Hari Libur" (role 1/4/5/8), halaman `/hari-libur` (filter tahun/nama, filter status role 1, tanggal Indonesia + jumlah hari, tombol tulis hanya role 1).
+- Test: `HariLiburTest` (RBAC, validasi, overlap semua status, soft delete, balapan UNIQUE, CHECK, lock 409, `tanggalLibur()`), `HariLiburRulesTest`; Vitest schema/service/form/halaman/menu.
+
+**Belum**
+- Approval DBV-003 (+ verifikasi `GET_LOCK` dan CHECK 4025 di MariaDB 10.4) dan review CR-010.
+- Endpoint/konsumen `tanggalLibur()` baru ada di Fase 5; audit data `hari_libur` legacy sebelum impor (G-doc 6.3).
 
 ## G-10 — IN_PROGRESS (pilot DBV-002 / CR-003 ✅, di main; menunggu QA)
 
