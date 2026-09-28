@@ -145,7 +145,7 @@ Keputusan final user (25-09-2026), tidak dibuka ulang:
 | K3 | Kanal reset password = email (driver SMTP belum ada) | kolom `email` (tujuan tautan reset) |
 | B | `email` VARCHAR(150) NULL, `name`, `expired_at`; validasi NIP ikut legacy (angka, maks. 18, kolom 30); username tidak dibatasi ASCII dulu; collation + strict untuk 5 tabel auth + antrean, `migrations` dikecualikan, CONVERT untuk tabel tanpa JSON, MODIFY eksplisit untuk `token`/`audit_logs`, cek tabrakan UNIQUE & tanggal nol sebelum ALTER, `down()` kembali ke gen dengan cek yang sama, DBCollat uni dua grup, `strictOn` default true, `token_hash` ikut uni | seluruh Bagian 9 |
 
-Legacy yang dirujuk: `simpeg_prod_duplikat.pengguna` [K] (provenance DDL belum pasti): `id` INT AI, `username` VARCHAR(100) UNIQUE, `id_pegawai` VARCHAR(30) NULL berisi NIP (menjawab Bagian 8 #9), `name`/`email` VARCHAR(150) NULL, `expired_at` DATETIME NULL, semua uni. Kode `L_user.php` (validasi & `set_param` akun): role 1/4/5/8 → `name` wajib, `id_pegawai` NULL; role 2/6/7 (`UL_PEGAWAI`) → `id_pegawai` wajib; role 3 → `name` + unit wajib, `id_pegawai` NULL; email wajib di form admin. Login legacy hanya lewat `username`. `expired_at` = batas berlaku password (popup paksa ganti), tidak ada kode legacy yang mengisinya [I].
+Legacy yang dirujuk: `simpeg_prod_duplikat.pengguna` [K] (provenance DDL belum pasti): `id` INT AI, `username` VARCHAR(100) UNIQUE, `id_pegawai` VARCHAR(30) NULL berisi NIP (menjawab Bagian 8 #9), `name`/`email` VARCHAR(150) NULL, `expired_at` DATETIME NULL, semua uni. Kode `L_user.php` (validasi & `set_param` akun): role 1/4/5/8 → `name` wajib, `id_pegawai` NULL; role 2/6/7 (`UL_PEGAWAI`) → `id_pegawai` wajib; role 3 → `name` + unit wajib, `id_pegawai` NULL; email wajib di form admin. Login legacy hanya lewat `username`. `expired_at` = batas berlaku password [K]: dibaca popup paksa ganti password/FCP (`L_user.php:207/393/579`, `MY_Controller.php:225`) dan diisi skrip impor/injeksi akun legacy (`Tester.php` `inject_pppk_20231031` = '2024-10-31 23:59:59', `fix_tmp` = sekarang + 1 tahun); `simpeg_prod_duplikat.pengguna` berisi `expired_at` di semua baris (2027-09-01 14:45:07), tanda pengisian massal. Form admin (`L_user` add/edit) tidak mengisinya.
 
 ### 9.2 Skema sebelum / sesudah
 
@@ -153,8 +153,8 @@ Legacy yang dirujuk: `simpeg_prod_duplikat.pengguna` [K] (provenance DDL belum p
 
 | Kolom | Sebelum | Sesudah | Migration | Label |
 |---|---|---|---|---|
-| id_pengguna | INT UNSIGNED AI PK | tetap | — | [V2] (legacy `id`; impor memakai ID legacy) |
-| nip | VARCHAR(20) gen NOT NULL, UNIQUE `nip` | VARCHAR(30) uni **NULL** DEFAULT NULL COMMENT 'NIP pegawai (legacy id_pegawai); NULL untuk akun non-pegawai (role 1/3/4/5/8)', UNIQUE `nip` tetap | 130000, 130100 | [K] + K1/K2 |
+| id_pengguna | INT UNSIGNED AI PK | tetap | — | [V2] **tipe menyimpang dari legacy** (`id` INT signed; 37 kolom `*_by`/`id_pengguna` legacy juga INT signed) — D-12. Nilai = ID legacy saat impor |
+| nip | VARCHAR(20) gen NOT NULL, UNIQUE `nip` | VARCHAR(30) uni **NULL** DEFAULT NULL COMMENT 'NIP pegawai (legacy id_pegawai); NULL untuk akun non-pegawai (role 1/3/4/5/8)', UNIQUE `nip` tetap | 130000, 130100 | kolom/lebar/NULL [K] + K1/K2 (legacy `id_pegawai` VARCHAR(30) NULL); **UNIQUE `nip` [V2]** (legacy tanpa index dan tanpa cek duplikat di kode — `L_user` hanya mengecek `username`; UNIQUE berasal dari A-01 yang disetujui 21-09) → impor wajib audit duplikat `id_pegawai` (9.10) |
 | username | VARCHAR(30) gen NOT NULL, UNIQUE | VARCHAR(100) uni NOT NULL, UNIQUE | 130000, 130100 | [K] (D-5) |
 | name | — | VARCHAR(150) uni NULL COMMENT 'nama akun (legacy name); wajib diisi aplikasi untuk akun tanpa NIP', setelah `username` | 130100 | [K] |
 | email | — | VARCHAR(150) uni NULL COMMENT 'email akun (legacy); tujuan tautan reset password (K3)', setelah `name`; tanpa UNIQUE | 130100 | [K] (D-6) |
@@ -166,32 +166,39 @@ Index `pengguna` tetap: PRIMARY, UNIQUE `nip`, UNIQUE `username`, KEY `user_leve
 
 `token`
 
-| Kolom | Sebelum | Sesudah | Migration |
-|---|---|---|---|
-| id_pengguna | — | INT UNSIGNED NOT NULL COMMENT 'pemilik sesi (pengguna.id_pengguna)' setelah `id`, KEY `id_pengguna`, tanpa FK (D-7) | 130200 |
-| nip | VARCHAR(20) gen NOT NULL, KEY `nip` | VARCHAR(30) uni NULL COMMENT 'NIP pemilik saat token terbit (jejak); NULL untuk akun tanpa NIP'; KEY `nip` dihapus | 130000, 130200 |
-| token_hash | CHAR(64) gen NOT NULL, UNIQUE | CHAR(64) uni (D-2), sisanya sama | 130000 |
-| claims_json | JSON NULL | tidak disentuh (isi kini `sub` = id_pengguna, `nip`, `ver` = 2, `role`, `id_unit`, `id_satker`) | — |
+| Kolom | Sebelum | Sesudah | Migration | Label |
+|---|---|---|---|---|
+| id_pengguna | — | INT UNSIGNED NOT NULL COMMENT 'pemilik sesi (pengguna.id_pengguna)' setelah `id`, KEY `id_pengguna`, tanpa FK (D-7) | 130200 | [V2] (tipe = PK induk v2 UNSIGNED, D-12) |
+| nip | VARCHAR(20) gen NOT NULL, KEY `nip` | VARCHAR(30) uni NULL COMMENT 'NIP pemilik saat token terbit (jejak); NULL untuk akun tanpa NIP'; KEY `nip` dihapus | 130000, 130200 | [V2] (lebar ikut K1) |
+| token_hash | CHAR(64) gen NOT NULL, UNIQUE | CHAR(64) uni (D-2), sisanya sama | 130000 | [V2] |
+| claims_json | JSON NULL | tidak disentuh (isi kini `sub` = id_pengguna, `nip`, `ver` = 2, `role`, `id_unit`, `id_satker`) | — | [V2] |
 
 Isi `token` DIKOSONGKAN oleh 130200 `up()` (D-9). Tabel v2 murni, legacy `token` tidak dimigrasi (Bagian 8 #11).
 
 `audit_logs`
 
-| Kolom | Sebelum | Sesudah | Migration |
-|---|---|---|---|
-| id_pengguna_actor | — | INT UNSIGNED NULL COMMENT 'pelaku (pengguna.id_pengguna); NULL untuk proses sistem/CLI' setelah `id_log`, KEY `id_pengguna_actor`, tanpa FK (D-8); baris lama diisi dari `nip_actor` | 130200 |
-| nip_actor | VARCHAR(20) gen NULL, KEY | VARCHAR(30) uni NULL COMMENT 'NIP pelaku saat kejadian (jejak); NULL untuk akun tanpa NIP dan proses sistem/CLI', KEY tetap | 130000, 130200 |
-| entity, entity_id, event | gen | uni, definisi lain tetap | 130000 |
-| before_json, after_json | JSON NULL | tidak disentuh | — |
+| Kolom | Sebelum | Sesudah | Migration | Label |
+|---|---|---|---|---|
+| id_pengguna_actor | — | INT UNSIGNED NULL COMMENT 'pelaku (pengguna.id_pengguna); NULL untuk proses sistem/CLI' setelah `id_log`, KEY `id_pengguna_actor`, tanpa FK (D-8); baris lama diisi dari `nip_actor` | 130200 | [V2] (tipe = PK induk v2 UNSIGNED, D-12) |
+| nip_actor | VARCHAR(20) gen NULL, KEY | VARCHAR(30) uni NULL COMMENT 'NIP pelaku saat kejadian (jejak); NULL untuk akun tanpa NIP dan proses sistem/CLI', KEY tetap | 130000, 130200 | [V2] (lebar ikut K1) |
+| entity, entity_id, event | gen | uni, definisi lain tetap | 130000 | [V2] |
+| before_json, after_json | JSON NULL | tidak disentuh | — | [V2] |
 
-`login_attempts.username`, `forgot_attempts.username`: VARCHAR(30) gen → VARCHAR(100) uni NOT NULL (130000, 130100). Kolom string lain kedua tabel (`ip_address`, `forgot_attempts.token_hash`) → uni. `queue_jobs`, `queue_jobs_failed`: hanya collation (CONVERT), tipe/default/index tetap. Tabel `migrations` milik CI4 tidak disentuh (D-1).
+`login_attempts`, `forgot_attempts` (tabel v2 murni, tanpa padanan legacy):
+
+| Kolom | Sebelum | Sesudah | Migration | Label |
+|---|---|---|---|---|
+| username (kedua tabel) | VARCHAR(30) gen NOT NULL | VARCHAR(100) uni NOT NULL | 130000, 130100 | [V2] (lebar ikut `pengguna.username` legacy [K], D-5) |
+| ip_address (kedua tabel), forgot_attempts.token_hash | gen | uni, definisi lain tetap | 130000 | [V2] |
+
+Tabel lain: `queue_jobs`, `queue_jobs_failed`: hanya collation (CONVERT), tipe/default/index tetap. Tabel `migrations` milik CI4 tidak disentuh (D-1).
 
 ### 9.3 Migration, urutan & pengaman
 
 | # | File | Isi | `down()` |
 |---|---|---|---|
 | 130000 | `AlterAuthKeUnicodeCi` | collation 7 tabel. CONVERT untuk tabel tanpa JSON; `token`/`audit_logs`: `DEFAULT CHARACTER SET` + `MODIFY` eksplisit tiap kolom string dengan definisi sama persis (tipe, NULL/DEFAULT, COMMENT); kolom JSON tidak disentuh (MariaDB 10.4: LONGTEXT utf8mb4_bin + CHECK) | kembali ke gen secara eksplisit (bukan lewat DBCollat), dengan pengaman yang sama |
-| 130100 | `AlterPenggunaAkunNonPegawai` | `pengguna` (nip, username, name, email, expired_at) + `username` 100 di `login_attempts`/`forgot_attempts` | menolak akun tanpa NIP (termasuk soft-deleted), username > 30, NIP > 20; menghapus log login/forgot ber-username > 30; lalu MODIFY balik + DROP kolom tambahan |
+| 130100 | `AlterPenggunaAkunNonPegawai` | `pengguna` (nip, username, name, email, expired_at) + `username` 100 di `login_attempts`/`forgot_attempts` | menolak akun tanpa NIP (termasuk soft-deleted), username > 30, NIP > 20; menghapus log login/forgot ber-username > 30; lalu MODIFY balik + DROP kolom tambahan — **isi `name`/`email`/`expired_at` ikut hilang tanpa penolakan** (D-3; backup wajib, runbook langkah 10) |
 | 130200 | `AlterIdentitasAkunIdPengguna` | kosongkan `token`; `token.id_pengguna` + KEY, `nip` jejak, DROP KEY `nip`; `audit_logs.id_pengguna_actor` + KEY + backfill, `nip_actor` 30 | menolak baris audit berpelaku tanpa NIP atau NIP pelaku > 20; kosongkan `token`; DROP kolom/KEY baru, MODIFY balik |
 
 Pengaman 130000 (dijalankan SEBELUM ALTER apa pun; semua temuan dikumpulkan dalam satu exception `DBV-010: ...`, tidak ada ALTER yang jalan):
@@ -225,6 +232,10 @@ Kompatibilitas saat deploy (paksa login ulang, sekali): 130200 `up()` mengosongk
 - `name` wajib (≤ 150) untuk akun tanpa NIP; `email` opsional, valid, ≤ 150 (legacy mewajibkan email di form admin — D-6); username default = NIP, wajib bila NIP kosong, ≤ 100, unik dalam uni.
 - Ubah akun: `name`/`email` bisa diubah; `nip` hanya boleh DIISI untuk akun yang belum punya NIP (menautkan ke pegawai); mengubah/menghapus NIP yang ada → 422 (ranah B-06). Mengisi NIP / mengubah role, status, password, satker mencabut sesi akun. Invarian (role 2/6/7 ⇒ NIP; tanpa NIP ⇒ nama) dicek pada hasil akhir bila role/NIP/nama ikut berubah.
 - Hapus dan nonaktifkan akun sendiri ditolak (dibandingkan per `id_pengguna`; sebelumnya per NIP sehingga dengan NIP NULL semua akun tanpa NIP dianggap "diri sendiri").
+- Admin Satker (legacy `L_user::validate_param` [K]: "Pegawai admin hanya bisa menambah user dengan level pegawai atau PTT"): hanya boleh membuat akun / memberi role 2/6/7 dan tidak boleh mengubah role akunnya sendiri → 403. Sebelumnya v2 hanya melarang role 1, sehingga Admin Satker bisa membuat akun role 4/5/8 (kini cukup nama + username) atau menaikkan role akunnya sendiri ke role lintas satker. Role yang dikirim tapi tidak berubah (form edit) tetap diterima.
+- Username baru/diubah tidak boleh memuat karakter kontrol/tak terlihat (`\p{C}`: kontrol, zero-width, soft hyphen, BOM); unicode_ci mengabaikan sebagian karakter ini sehingga `ad<ZWSP>min` = `admin`. Pembatasan ASCII (legacy `ctype_alnum`) tetap ditunda sampai audit data produksi (keputusan B); homoglyph non-Latin (mis. `а` Kiril) masih bisa masuk dan menjadi bagian keputusan itu. Username lama (hasil impor) tidak dinilai ulang selama tidak diubah; login dan lupa password hanya membatasi panjang.
+- `nip`/`name`/`email`/`username` berupa array/objek → 422 "Isian harus berupa teks." (rule CI4 `permit_empty` meloloskan array kosong). Balapan cek-lalu-tulis NIP/username (1062 dari UNIQUE) → 422 per field lewat cek ulang, bukan 500.
+- Mengubah username membatalkan token reset password yang masih tertunda untuk username lama (token reset dipetakan ke akun lewat `forgot_attempts.username`; tanpa ini token akun A bisa dipakai untuk akun B yang kemudian memakai username lama A). Menyimpan `id_pengguna` di `forgot_attempts` (butuh kolom baru) tidak diambil di DBV-010.
 - Kode yang berubah: `JwtService`, `TokenModel`, `AuthContext` (`idPengguna()`, `nip()` dari claim), `AuthService`, `PasswordService`, `PasswordVerifier`, `ResetPasswordService`, `UserService`, `AccountProvisioner`, `PenggunaModel`, `AuditLogModel::record(..., ?int $actorId, ?string $actorNip)`, `BaseAuditableModel` (`currentActor()`, `actorIdPengguna()`), `MasterModel::currentActorId()`, controller Auth. `FaqService` tidak berubah (rating hanya role 2/6/7 yang selalu ber-NIP; `nip` kini dibaca dari claim).
 - FE Manajemen Akun: kolom Nama, NIP "—" bila kosong, isian Nama/Email, NIP wajib hanya untuk role 2/6/7, NIP read-only saat edit akun ber-NIP / "Tautkan NIP" untuk akun tanpa NIP, baris sendiri dikenali per `id_pengguna`; batas username login 100.
 
@@ -240,6 +251,7 @@ Test (backend):
 - `Tests\Database\CollationInvariantTest`: seluruh tabel ber-prefix (kecuali `migrations`) dan kolom stringnya uni. Jebakan SQL mentah tanpa `COLLATE` hanya efektif bila default database test bukan uni (mis. `simpeg_v2_testing` gen).
 - `Tests\Unit\Config\DatabaseConfigTest`, `Tests\Database\SqlModeTest`: grup default & tests strict + DBCollat uni (setelah override `.env`); koneksi dari konfigurasi grup default memuat `STRICT_ALL_TABLES` dan menolak isian terlalu panjang (1406) tanpa menyimpan baris terpotong.
 - `Tests\Auth\AkunTanpaNipTest` (feature): login username bebas, token/claims per id, audit login (rehash, last_login, login) berpelaku id dengan `nip_actor` NULL, refresh/reuse/logout per akun, ganti & reset password, stamp `updated_by` master oleh Super Admin tanpa NIP, CRUD akun teraudit, hapus/nonaktifkan diri ditolak per id, scoping Admin Satker, token & baris refresh format lama → 401.
+- `Tests\Auth\UserCrudScopedTest` (tambahan): validasi NIP/nama/email di jalur ubah akun, isian non-teks → 422 (create & update), username berkarakter kontrol/tak terlihat ditolak (username lama tidak dinilai ulang), balapan UNIQUE (model yang "tidak melihat" baris lain) → 422, rename membatalkan token reset tertunda, pembatasan role Admin Satker. `AkunNonPegawaiSchemaTest`: penolakan `down()` 130200 untuk NIP pelaku > 20 (dengan dan tanpa `id_pengguna_actor`) tanpa ALTER dan tanpa mengosongkan `token`.
 - Test lama diperbarui: `JwtServiceTest`, `TokenTest`, `SessionRevocationTest`, `RbacFilterTest`, `BaseAuditableModelTest`, `AuthSchemaTest`, `UserCrudScopedTest` (aturan 9.5), `AccountProvisionerTest`, `LoginTest` (username 100/101), `ResetTokenNotifierTest`, `RoleTest`.
 
 Hasil `./check.sh` dan mutation check: lihat deskripsi PR `[DBV-010][CR-013]`.
@@ -250,7 +262,7 @@ Hasil `./check.sh` dan mutation check: lihat deskripsi PR `[DBV-010][CR-013]`.
 |---|---|---|---|
 | D-1 | Cakupan collation | 5 tabel auth + `queue_jobs`/`queue_jobs_failed`; `migrations` dikecualikan | ⏳ |
 | D-2 | Metode & kolom hash | CONVERT (tabel tanpa JSON) + `DEFAULT CHARACTER SET` & MODIFY eksplisit `token`/`audit_logs`; `token_hash` ikut uni (bukan `ascii_bin`) | ⏳ |
-| D-3 | Semantik `down()` | 130000 kembali ke gen eksplisit dengan cek tabrakan & tanggal nol; 130100/130200 menolak data yang tidak bisa disimpan skema lama (akun tanpa NIP, username > 30, NIP > 20, audit berpelaku tanpa NIP), menghapus log login/forgot ber-username > 30 dan seluruh `token` | ⏳ |
+| D-3 | Semantik `down()` | 130000 kembali ke gen eksplisit dengan cek tabrakan & tanggal nol; 130100/130200 menolak data yang tidak bisa disimpan skema lama (akun tanpa NIP, username > 30, NIP > 20, audit berpelaku tanpa NIP atau NIP pelaku > 20), menghapus log login/forgot ber-username > 30 dan seluruh `token`. **130100 men-DROP `name`/`email`/`expired_at` tanpa penolakan**: setelah impor legacy semua akun bisa kehilangan email (satu-satunya kanal reset, K3), nama, dan `expired_at`. Usulan: tetap DROP (menolak rollback selama kolom itu terisi membuat rollback praktis tidak mungkin setelah impor), dengan syarat backup kolom tersebut sebelum rollback dan pemulihan dari backup bila `migrate` diulang (runbook langkah 10). Alternatif: tolak rollback selama `name`/`email`/`expired_at` terisi | ⏳ |
 | D-4 | `pengguna.nip` VARCHAR(30) NULL UNIQUE; CHECK role↔nip di DB? | Tanpa CHECK (data legacy bisa melanggar sehingga impor gagal); aturan di aplikasi + audit data sebelum impor | ⏳ |
 | D-5 | `username` 30 → 100 (legacy [K]) di `pengguna`/`login_attempts`/`forgot_attempts` | Ya, sekalian rebuild. Bila ditolak: hapus MODIFY `username` di 130100 dan ubah `PenggunaModel::USERNAME_MAX` + `USERNAME_MAX` FE ke 30 | ⏳ |
 | D-6 | `name`/`email` VARCHAR(150) NULL, `expired_at` DATETIME NULL; email tanpa UNIQUE & opsional | Ya. Legacy mewajibkan email di form admin → mohon konfirmasi TL apakah v2 ikut mewajibkan | ⏳ |
@@ -259,6 +271,7 @@ Hasil `./check.sh` dan mutation check: lihat deskripsi PR `[DBV-010][CR-013]`.
 | D-9 | 130200 `up()` mengosongkan `token` (paksa login ulang) | Ya. Alternatif backfill `id_pengguna` dari `nip` tidak berguna karena token lama tetap ditolak cek `ver` | ⏳ |
 | D-10 | `strictOn` default true + DBCollat uni dua grup; `ALTER DATABASE` oleh DBA; DB test dibiarkan default gen sebagai jebakan SQL mentah | Ya | ⏳ |
 | D-11 | Server target (README-deploy menyebut MySQL 8.x, validasi DBV sebelumnya di MariaDB 10.4) & `@@GLOBAL.sql_mode` | Konfirmasi engine/versi server Dev/Prod; minta NO_ZERO_DATE, NO_ZERO_IN_DATE, ERROR_FOR_DIVISION_BY_ZERO di level server (`strictOn` hanya menambah STRICT_ALL_TABLES) | ⏳ |
+| D-12 | Tipe identitas akun: `pengguna.id_pengguna` INT **UNSIGNED** (A-01, sudah di main) vs legacy `pengguna.id` INT signed; 37 kolom `*_by`/`id_pengguna` legacy (`simpeg_prod_duplikat`) dan kolom `created_by`/`updated_by` master v2 (Batch 1, FAQ, DBV-003..005) semuanya INT signed. Nilainya satu ruang (ID legacy positif), tipenya tidak: FK `*_by` (INT) → `pengguna.id_pengguna` (INT UNSIGNED) tidak bisa dibuat (errno 150/3780) | DBV-010 tidak mengubah PK (migration A-01 sudah di main); kolom baru `token.id_pengguna` dan `audit_logs.id_pengguna_actor` mengikuti tipe PK induk v2 (UNSIGNED) agar FK D-7/D-8 tetap mungkin. Penyelarasan ke INT signed (aturan "tipe PK ikut legacy") dijadwalkan bersama tipe legacy `pengguna` lain di DBV-009: PK + kedua kolom baru sekaligus. Alternatif: putuskan UNSIGNED sebagai [V2] permanen dan ubah `*_by` master ke UNSIGNED bila FK diperlukan | ⏳ |
 
 ### 9.8 Runbook server (Dev/Prod)
 
@@ -267,11 +280,17 @@ Hasil `./check.sh` dan mutation check: lihat deskripsi PR `[DBV-010][CR-013]`.
 3. DBA: `ALTER DATABASE <db> CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;` (hanya default tabel baru; data tidak berubah). Tidak dilakukan lewat migration.
 4. Pastikan `shared/backend.env` tidak meng-override `database.default.strictOn` / `database.default.DBCollat`.
 5. Backup: `mysqldump` tabel `pengguna`, `token`, `audit_logs`, `login_attempts`, `forgot_attempts`, `queue_jobs`, `queue_jobs_failed`.
-6. Pra-cek manual (sama dengan migration, agar deploy tidak gagal di hook): tabrakan uni di `pengguna.nip`/`username`, `token.token_hash`, `forgot_attempts.token_hash` (`SELECT col COLLATE utf8mb4_unicode_ci k, COUNT(*) n FROM t WHERE col IS NOT NULL GROUP BY k HAVING n > 1`); tanggal nol di kolom DATE/DATETIME/TIMESTAMP ketujuh tabel.
+6. Pra-cek manual (sama dengan migration, agar deploy tidak gagal di hook): tabrakan uni di `pengguna.nip`/`username`, `token.token_hash`, `forgot_attempts.token_hash` (`SELECT col COLLATE utf8mb4_unicode_ci k, COUNT(*) n FROM t WHERE col IS NOT NULL GROUP BY k HAVING n > 1`); tanggal nol di kolom DATE/DATETIME/TIMESTAMP ketujuh tabel (`WHERE MONTH(col) = 0 OR DAYOFMONTH(col) = 0`). Sebelum impor legacy (bukan saat deploy ini): di sumber legacy `SELECT id_pegawai COLLATE utf8mb4_unicode_ci k, COUNT(*) n FROM pengguna WHERE id_pegawai IS NOT NULL GROUP BY k HAVING n > 1` (semua status, termasuk 0/2) harus kosong, karena UNIQUE `nip` v2 [V2] menolak NIP ganda (1062).
 7. **Bersihkan data QA sebelum migrate:** `simpeg_v2` dev belum menjalankan DBV-001 dan tabel Batch 1 berisi data QA, sedangkan `AlterBatch1KeSkemaLegacy::up()` menolak tabel berisi data → kosongkan (urutan kelurahan, kecamatan, kabupaten_kota, provinsi, agama, jenis_pegawai, jenis_status). Akun QA di `pengguna` boleh tetap (semua ber-NIP).
 8. Jadwalkan di luar jam kerja dan umumkan: semua sesi berakhir, pengguna login ulang sekali (`token` dikosongkan; selama build, kode lama berjalan di atas skema baru → login bisa gagal sesaat).
 9. Deploy (hook `migrate --all`); verifikasi `php spark migrate:status`, `SHOW CREATE TABLE` ketujuh tabel, query `information_schema` (0 kolom non-uni selain `migrations`), `SELECT @@SESSION.sql_mode` dari koneksi aplikasi memuat STRICT_ALL_TABLES, lalu smoke: login akun ber-NIP dan tanpa NIP, refresh, logout, ganti password, tambah/ubah master.
-10. Rollback: `php spark migrate:rollback -b <batch>`; `down()` menolak bila ada akun tanpa NIP / audit berpelaku tanpa NIP (pesan menjelaskan); rollback membuat semua sesi berakhir lagi. Pra-cek dulu agar rollback tidak berhenti di tengah: `SELECT COUNT(*) FROM audit_logs WHERE id_pengguna_actor IS NOT NULL AND (nip_actor IS NULL OR CHAR_LENGTH(nip_actor) > 20)` dan `SELECT COUNT(*) FROM pengguna WHERE nip IS NULL OR CHAR_LENGTH(username) > 30 OR CHAR_LENGTH(nip) > 20` harus 0. CI4 me-rollback per migration: bila 130100 menolak, 130200 sudah ter-rollback dan keadaan tetap konsisten (skema lama untuk `token`/`audit_logs`, skema baru untuk `pengguna`); bereskan datanya lalu ulangi rollback, atau `migrate` untuk kembali ke skema baru.
+10. Rollback: `php spark migrate:rollback -b <batch>`; `down()` menolak bila ada akun tanpa NIP / audit berpelaku tanpa NIP (pesan menjelaskan); rollback membuat semua sesi berakhir lagi.
+    - **Backup dulu** `SELECT id_pengguna, name, email, expired_at FROM pengguna` (atau `mysqldump pengguna` langkah 5 yang diulang tepat sebelum rollback): 130100 `down()` men-DROP ketiga kolom itu tanpa penolakan (D-3). Bila kemudian `migrate` lagi, kolom kembali kosong dan isinya dipulihkan dari backup ini (email = kanal reset password, K3).
+    - Pra-cek (kondisinya sama persis dengan pengaman migration) agar rollback tidak berhenti di tengah; semua harus 0:
+      - 130200: `SELECT SUM(id_pengguna_actor IS NOT NULL AND nip_actor IS NULL), SUM(CHAR_LENGTH(nip_actor) > 20) FROM audit_logs` (kondisi kedua tanpa filter `id_pengguna_actor`).
+      - 130100: `SELECT SUM(nip IS NULL), SUM(CHAR_LENGTH(username) > 30), SUM(CHAR_LENGTH(nip) > 20) FROM pengguna` (termasuk akun soft-deleted).
+      - 130000 (kembali ke gen): query tabrakan langkah 6 dengan `COLLATE utf8mb4_general_ci` untuk `pengguna.nip`/`username`, `token.token_hash`, `forgot_attempts.token_hash` (contoh `admin`/`admın` beda di uni, sama di gen), dan query tanggal nol langkah 6.
+    - CI4 me-rollback per migration: bila 130100 menolak, 130200 sudah ter-rollback; bila 130000 menolak, 130200 dan 130100 sudah ter-rollback. Keadaan tetap konsisten (tabel yang sudah di-rollback ber-skema lama, sisanya ber-skema baru); bereskan datanya lalu ulangi rollback, atau `migrate` untuk kembali ke skema baru.
 
 ### 9.9 Permintaan verifikasi MariaDB 10.4 (eksplisit, kepada DB Validator)
 
@@ -287,5 +306,6 @@ DBV-001/002 belum pernah melaporkan verifikasi MariaDB 10.4 secara terpisah. Moh
 ### 9.10 Efek ke dokumen lain dan di luar cakupan
 
 - G-01 Bagian 8.5 dan G-10 D2 (catatan JOIN `pengguna` × `faq_rate` beda collation): setelah DBV-010 JOIN tersebut boleh. Dokumen G tidak diubah di PR ini (milik grup master); tindak lanjut satu baris setelah merge.
-- Di luar cakupan (usul CR/issue terpisah): perilaku paksa ganti password dari `expired_at` (FCP legacy); pembatasan legacy "Admin Satker hanya membuat akun UL_PEGAWAI" (`L_user.php`), v2 saat ini hanya melarang role 1; `pengguna.status` ENUM vs legacy TINYINT dan `id_unit`/`id_satker` VARCHAR(10) vs legacy INT (DBV-009, setelah DBV-008); FK `pengguna.nip`/`faq_rate.nip` → `pegawai` (B-01); penggantian NIP (B-06); `AppShell` menampilkan `name`.
-- Impor legacy tetap butuh audit data: username > 100 / non-ASCII / duplikat dalam uni, akun role 2/6/7 tanpa `id_pegawai`, tanggal nol.
+- `faq_rate.nip` masih disebut "JWT `sub`" di `backend/app/Controllers/Api/MasterData/README.md` (tabel `faq_rate`, kolom `nip`) dan `backend/docs/db-review/G-10-faq-schema.md` (kolom `nip` `faq_rate`). Setelah DBV-010 `sub` = id_pengguna dan NIP ada di claim `nip`: ganti "JWT `sub`" → "claim `nip`" di kedua dokumen setelah merge (milik grup master). Komentar di migration `2026-09-24-000001_CreateFaq` tidak diubah karena migration itu sudah di main.
+- Di luar cakupan (usul CR/issue terpisah): perilaku paksa ganti password dari `expired_at` (FCP legacy) — **harus diputuskan sebelum impor**, karena `expired_at` hasil impor sudah terisi di semua baris (9.1) dan akan langsung bermakna bila FCP diaktifkan; `pengguna.status` ENUM vs legacy TINYINT dan `id_unit`/`id_satker` VARCHAR(10) vs legacy INT (DBV-009, setelah DBV-008); tipe `pengguna.id_pengguna` UNSIGNED vs legacy INT signed beserta `token.id_pengguna`/`audit_logs.id_pengguna_actor` (D-12, DBV-009); FK `pengguna.nip`/`faq_rate.nip` → `pegawai` (B-01); penggantian NIP (B-06); `AppShell` menampilkan `name`; pembatasan username ASCII (keputusan B, setelah audit data).
+- Impor legacy tetap butuh audit data: username > 100 / non-ASCII / duplikat dalam uni / berkarakter kontrol, **duplikat `id_pegawai` dalam uni (termasuk akun status 0/2; UNIQUE `nip` v2 menolaknya, runbook langkah 6)**, akun role 2/6/7 tanpa `id_pegawai`, tanggal nol, dan `expired_at` yang sudah terisi (keputusan FCP di atas).
