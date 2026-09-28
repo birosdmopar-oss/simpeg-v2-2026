@@ -21,7 +21,8 @@ use Tests\Support\MasterDataTestTrait;
  *
  * Tipe yang lebih lebar dari kolom membuat batas aplikasi tidak pernah tercapai: tambah entri saat `order` sudah di
  * batas kolom berujung error 1264 (422 generik tanpa `errors` di koneksi strict) atau terpotong diam-diam (koneksi
- * default strictOn=false, urutan kembar). Test generik: ikut memeriksa setiap master baru grup DBV lain.
+ * default strictOn=false, urutan kembar). `auditColumns` juga wajib sama dengan kolom audit tabelnya. Test generik: ikut
+ * memeriksa setiap master baru grup DBV lain.
  *
  * @internal
  */
@@ -115,6 +116,60 @@ final class MasterConfigSchemaTest extends CIUnitTestCase
         foreach (['agama', 'jenis-pegawai', 'jenis-status'] as $key) {
             $this->assertContains($key, $covered);
         }
+    }
+
+    /**
+     * `auditColumns` setiap master = kolom audit yang benar-benar ada di tabelnya (DBV-003: kursem tanpa `*_by`,
+     * kantor dengan `created_by`). Kolom yang terlewat tidak pernah diisi aplikasi; kolom yang tidak ada membuat tulis
+     * gagal. Master tanpa `*_by` tidak mengarang kolom itu di respons, dan aktornya tetap tercatat di audit_logs.
+     */
+    public function testAuditColumnsMatchDdlAndActorIsAlwaysAudited(): void
+    {
+        $audit = [
+            MasterDefinition::AUDIT_CREATED_AT, MasterDefinition::AUDIT_CREATED_BY, MasterDefinition::AUDIT_UPDATED_AT,
+            MasterDefinition::AUDIT_UPDATED_BY, MasterDefinition::AUDIT_DELETED_AT,
+        ];
+
+        foreach (service('masterRegistry')->all() as $key => $def) {
+            foreach ($audit as $column) {
+                $this->assertSame($this->columnExists($def->table, $column), $def->hasAudit($column), "{$key}.{$column}: auditColumns vs DDL");
+            }
+        }
+
+        $this->asRole(Role::SUPER_ADMIN);
+        $withoutBy = 0;
+
+        foreach (self::masterFixtures() as $key => $fx) {
+            $def = service('masterRegistry')->get($key);
+
+            if ($def->hasAudit(MasterDefinition::AUDIT_CREATED_BY) || $def->hasAudit(MasterDefinition::AUDIT_UPDATED_BY)) {
+                continue;
+            }
+
+            $result = $this->sendJson('POST', "api/v1/master/{$key}", $fx['new']);
+            $result->assertStatus(201);
+            $created = $this->json($result)['data'];
+
+            $this->assertArrayNotHasKey(MasterDefinition::AUDIT_CREATED_BY, $created, $key);
+            $this->assertArrayNotHasKey(MasterDefinition::AUDIT_UPDATED_BY, $created, $key);
+            $this->seeInDatabase('audit_logs', [
+                'entity'    => $def->table,
+                'entity_id' => (string) $created[$def->primaryKey],
+                'event'     => 'create',
+                'nip_actor' => '198501012010011001',
+            ]);
+            $withoutBy++;
+        }
+
+        $this->assertGreaterThanOrEqual(2, $withoutBy, 'bidang-kursem & instansi-kursem tanpa *_by');
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        return $this->db->query(
+            'SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+            [$this->db->getDatabase(), $this->db->prefixTable($table), $column],
+        )->getRowArray()['n'] > 0;
     }
 
     /**
