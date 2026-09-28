@@ -28,7 +28,12 @@ const formError = ref('')
 const jenisOptions = ref<MasterOption[]>([])
 const jenisLoading = ref(false)
 
-const { values, handleSubmit, errors, resetForm, setFieldError, setFieldValue, submitCount } = useForm<HariLiburFormValues>({
+/**
+ * Tombol Simpan dikunci selama `isSubmitting` vee-validate (validasi skema + permintaan simpan), bukan hanya selama
+ * `submitting` (permintaan simpan saja, dipakai untuk label). Validasi skema di-debounce 5 ms sebelum handler jalan;
+ * klik kedua sebelum validasi itu selesai memulai submit kedua yang ikut lolos (create/update terkirim dua kali).
+ */
+const { values, handleSubmit, errors, resetForm, setFieldError, setFieldValue, submitCount, isSubmitting } = useForm<HariLiburFormValues>({
   validationSchema: toTypedSchema(hariLiburSchema) as unknown as TypedSchema<HariLiburFormValues>,
 })
 
@@ -227,7 +232,7 @@ const onSubmit = handleSubmit(async (form) => {
             <button
               type="submit"
               class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
-              :disabled="submitting"
+              :disabled="isSubmitting"
             >
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}
             </button>

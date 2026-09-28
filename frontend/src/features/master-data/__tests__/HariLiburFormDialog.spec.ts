@@ -1,10 +1,12 @@
 /**
  * G-08 Hari Libur (DBV-003/CR-010) — form tambah/ubah: pilihan jenis libur (aktif + jenis tersimpan yang non-aktif
- * bertanda), tanggal selesai mengikuti tanggal mulai, validasi klien, payload create/update, dan error 422/409 backend.
+ * bertanda), tanggal selesai mengikuti tanggal mulai, validasi klien, payload create/update, error 422/409 backend, dan
+ * tombol Simpan terkunci selama validasi + simpan (klik beruntun tidak mengirim dua kali).
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { AxiosError } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 vi.mock('../services/hariLibur.service', () => ({
   hariLiburService: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), setStatus: vi.fn(), remove: vi.fn(), jenisOptions: vi.fn() },
@@ -28,8 +30,26 @@ const legacyRow: HariLiburRow = {
   updated_by: null,
 }
 
-function mountDialog(row: HariLiburRow | null) {
-  return mount(HariLiburFormDialog, { props: { open: true, row }, attachTo: document.body })
+/**
+ * vee-validate 4.15 men-debounce validasi skema 5 ms (`debounceAsync`): panggilan baru di dalam jendela itu membatalkan
+ * timer yang tertunda dan SEMUA pemanggil menerima hasil validasi terakhir. Tanpa menunggu jendela ini, submit yang
+ * validasinya belum selesai bisa ikut lolos oleh perubahan field berikutnya (update terpanggil dua kali), dan error hasil
+ * validasi silent sesudah resetForm (field form ini tidak punya path state, jadi errornya tetap terisi) bisa masih menutupi
+ * hint. Karena itu setiap mount/interaksi di spec ini menunggu validasi tertunda tuntas sebelum assertion.
+ */
+const VEE_VALIDATE_DEBOUNCE_MS = 5
+
+async function settleValidation(): Promise<void> {
+  // Timer ini dipasang sesudah timer debounce yang tertunda dan lebih lama, jadi selalu berjalan sesudahnya; validasi Zod,
+  // handler submit, dan mock service setelah itu hanya microtask sehingga sudah tuntas saat timer ini jalan.
+  await new Promise((resolve) => setTimeout(resolve, VEE_VALIDATE_DEBOUNCE_MS * 4))
+  await flushPromises()
+}
+
+async function mountDialog(row: HariLiburRow | null) {
+  const wrapper = mount(HariLiburFormDialog, { props: { open: true, row }, attachTo: document.body })
+  await settleValidation()
+  return wrapper
 }
 
 function field<T extends HTMLElement>(selector: string): T {
@@ -42,12 +62,12 @@ async function setValue(selector: string, value: string, event: 'input' | 'chang
   const el = field<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(selector)
   el.value = value
   el.dispatchEvent(new Event(event))
-  await flushPromises()
+  await settleValidation()
 }
 
 async function submitForm(): Promise<void> {
   field<HTMLFormElement>('form[data-testid="hari-libur-form"]').dispatchEvent(new Event('submit', { cancelable: true }))
-  await flushPromises()
+  await settleValidation()
 }
 
 beforeEach(() => {
@@ -65,8 +85,7 @@ afterEach(() => {
 
 describe('HariLiburFormDialog', () => {
   it('tambah: tanggal selesai terisi dari tanggal mulai, jumlah hari tampil, payload create lengkap', async () => {
-    const wrapper = mountDialog(null)
-    await flushPromises()
+    const wrapper = await mountDialog(null)
 
     expect(Array.from(field<HTMLSelectElement>('select[name="id_jenis_libur"]').options).map((o) => o.value)).toEqual(['', '1', '2'])
     expect(field<HTMLSelectElement>('select[name="status"]').value).toBe('1')
@@ -79,7 +98,7 @@ describe('HariLiburFormDialog', () => {
     await setValue('input[name="nama_libur"]', '  Hari   Kemerdekaan ')
     await submitForm()
 
-    await vi.waitFor(() => expect(hariLiburService.create).toHaveBeenCalledTimes(1))
+    expect(hariLiburService.create).toHaveBeenCalledTimes(1)
     expect(hariLiburService.create).toHaveBeenCalledWith({
       tgl_mulai: '2026-08-17',
       tgl_akhir: '2026-08-18',
@@ -92,8 +111,7 @@ describe('HariLiburFormDialog', () => {
   })
 
   it('tanggal mulai diketik per digit: tanggal selesai ikut tahun akhir, berhenti mengikuti setelah disentuh', async () => {
-    const wrapper = mountDialog(null)
-    await flushPromises()
+    const wrapper = await mountDialog(null)
 
     // Urutan event `input` Chromium saat mengetik 0 8 1 7 2 0 2 6 di input tanggal.
     for (const value of ['0002-08-17', '0020-08-17', '0202-08-17', '2026-08-17']) {
@@ -106,13 +124,13 @@ describe('HariLiburFormDialog', () => {
     await setValue('input[name="tgl_mulai"]', '2026-08-16')
     expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('2026-08-17')
     expect(document.body.textContent).toContain('2 hari')
+    expect(document.body.textContent).not.toContain('Tanggal selesai harus tanggal yang valid')
     wrapper.unmount()
   })
 
   it('ubah rentang yang sudah ada: mengganti tanggal mulai tidak menimpa tanggal selesai', async () => {
     const row: HariLiburRow = { ...legacyRow, id_libur: 2, id_jenis_libur: 2, tgl_mulai: '2026-03-19', tgl_akhir: '2026-03-20' }
-    const wrapper = mountDialog(row)
-    await flushPromises()
+    const wrapper = await mountDialog(row)
 
     await setValue('input[name="tgl_mulai"]', '2026-03-18')
     expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('2026-03-20')
@@ -121,15 +139,14 @@ describe('HariLiburFormDialog', () => {
   })
 
   it('validasi klien: selesai sebelum mulai & jenis kosong tidak dikirim', async () => {
-    const wrapper = mountDialog(null)
-    await flushPromises()
+    const wrapper = await mountDialog(null)
 
     await setValue('input[name="tgl_mulai"]', '2026-08-18')
     await setValue('input[name="tgl_akhir"]', '2026-08-17')
     await setValue('input[name="nama_libur"]', 'Terbalik')
     await submitForm()
 
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Tanggal selesai tidak boleh sebelum tanggal mulai.'))
+    expect(document.body.textContent).toContain('Tanggal selesai tidak boleh sebelum tanggal mulai.')
     expect(document.body.textContent).toContain('Jenis libur wajib dipilih.')
     expect(hariLiburService.create).not.toHaveBeenCalled()
     wrapper.unmount()
@@ -151,35 +168,35 @@ describe('HariLiburFormDialog', () => {
         isNetworkError: false,
         original: new AxiosError('x'),
       })
-    const wrapper = mountDialog(null)
-    await flushPromises()
+    const wrapper = await mountDialog(null)
 
     await setValue('input[name="tgl_mulai"]', '2026-05-01')
     await setValue('select[name="id_jenis_libur"]', '1', 'change')
     await setValue('input[name="nama_libur"]', 'Hari Buruh')
     await submitForm()
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Rentang tanggal bentrok dengan hari libur "Hari Buruh"'))
+    expect(hariLiburService.create).toHaveBeenCalledTimes(1)
+    expect(document.body.textContent).toContain('Rentang tanggal bentrok dengan hari libur "Hari Buruh"')
 
     await submitForm()
-    await vi.waitFor(() => expect(field('[role="alert"]').textContent).toContain('Data hari libur sedang diubah pengguna lain. Coba lagi.'))
+    expect(hariLiburService.create).toHaveBeenCalledTimes(2)
+    expect(field('[role="alert"]').textContent).toContain('Data hari libur sedang diubah pengguna lain. Coba lagi.')
     expect(wrapper.emitted('saved')).toBeUndefined()
     wrapper.unmount()
   })
 
   it('ubah data impor tanpa jenis: jenis wajib dipilih; keterangan yang dikosongkan ikut terkirim', async () => {
-    const wrapper = mountDialog(legacyRow)
-    await flushPromises()
+    const wrapper = await mountDialog(legacyRow)
 
     expect(document.body.querySelector('select[name="status"]')).toBeNull()
     expect(field<HTMLInputElement>('input[name="nama_libur"]').value).toBe('Hari Raya Natal')
     await submitForm()
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Jenis libur wajib dipilih.'))
+    expect(document.body.textContent).toContain('Jenis libur wajib dipilih.')
     expect(hariLiburService.update).not.toHaveBeenCalled()
 
     await setValue('select[name="id_jenis_libur"]', '1', 'change')
     await setValue('textarea[name="keterangan"]', '')
     await submitForm()
-    await vi.waitFor(() => expect(hariLiburService.update).toHaveBeenCalledTimes(1))
+    expect(hariLiburService.update).toHaveBeenCalledTimes(1)
     expect(hariLiburService.update).toHaveBeenCalledWith('5', {
       tgl_mulai: '2025-12-25',
       tgl_akhir: '2025-12-25',
@@ -190,10 +207,34 @@ describe('HariLiburFormDialog', () => {
     wrapper.unmount()
   })
 
+  it('klik Simpan beruntun selama validasi masih berjalan: tombol terkunci, update terkirim sekali', async () => {
+    const wrapper = await mountDialog({ ...legacyRow, id_jenis_libur: 1, jenis_libur: 'Libur Nasional' })
+    const button = field<HTMLButtonElement>('button[type="submit"]')
+    expect(button.disabled).toBe(false)
+
+    button.click()
+    await nextTick()
+    // Validasi skema klik pertama masih tertunda (debounce), tetapi tombol sudah terkunci: klik kedua diabaikan.
+    expect(button.disabled).toBe(true)
+    button.click()
+    await settleValidation()
+
+    expect(hariLiburService.update).toHaveBeenCalledTimes(1)
+    expect(hariLiburService.update).toHaveBeenCalledWith('5', {
+      tgl_mulai: '2025-12-25',
+      tgl_akhir: '2025-12-25',
+      id_jenis_libur: '1',
+      nama_libur: 'Hari Raya Natal',
+      keterangan: 'Impor legacy',
+    })
+    expect(wrapper.emitted('saved')).toHaveLength(1)
+    expect(button.disabled).toBe(false)
+    wrapper.unmount()
+  })
+
   it('ubah: jenis tersimpan yang kini non-aktif tetap tampil bertanda', async () => {
     const row: HariLiburRow = { ...legacyRow, id_libur: 7, id_jenis_libur: 3, jenis_libur: 'Libur Daerah' }
-    const wrapper = mountDialog(row)
-    await flushPromises()
+    const wrapper = await mountDialog(row)
 
     const select = field<HTMLSelectElement>('select[name="id_jenis_libur"]')
     expect(select.value).toBe('3')
