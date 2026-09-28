@@ -160,6 +160,37 @@ final class AkunNonPegawaiSchemaTest extends CIUnitTestCase
     }
 
     /**
+     * `nip_actor` 30 → 20 saat rollback: NIP pelaku > 20 karakter (mis. hasil impor) harus ditolak SEBELUM ALTER apa pun,
+     * termasuk bila `id_pengguna_actor` kosong — tanpa pengaman ini `token` sudah dikosongkan/di-ALTER lalu MODIFY
+     * `nip_actor` gagal 1265/1406 di tengah jalan (koneksi strict).
+     */
+    public function testIdentityRollbackRejectsAuditActorNipLongerThanOldColumn(): void
+    {
+        foreach ([5, null] as $actorId) {
+            $this->db->table('audit_logs')->insert([
+                'id_pengguna_actor' => $actorId, 'nip_actor' => str_repeat('1', 21), 'entity' => 'uji', 'entity_id' => '1', 'event' => 'update', 'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            $this->db->table('token')->insert([
+                'id_pengguna' => 5, 'nip' => null, 'token_hash' => hash('sha256', 'uji-' . ($actorId ?? 'null')), 'claims_json' => '{}',
+                'expires_at'  => date('Y-m-d H:i:s', time() + 3600), 'created_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $error = $this->catchError(fn () => $this->m3()->down());
+
+            $label = 'id_pengguna_actor ' . ($actorId ?? 'NULL');
+            $this->assertInstanceOf(RuntimeException::class, $error, $label);
+            $this->assertStringContainsString('DBV-010: rollback ditolak', $error->getMessage());
+            $this->assertStringContainsString('1 baris audit dengan NIP pelaku > 20 karakter', $error->getMessage(), $label);
+            $this->assertArrayHasKey('id_pengguna_actor', $this->columns('audit_logs'), "{$label}: tidak ada ALTER yang jalan");
+            $this->assertArrayHasKey('id_pengguna', $this->columns('token'));
+            $this->assertSame(1, $this->db->table('token')->countAllResults(), "{$label}: token tidak dikosongkan");
+
+            $this->db->table('audit_logs')->emptyTable();
+            $this->db->table('token')->emptyTable();
+        }
+    }
+
+    /**
      * Rollback 130100 ditolak bila ada akun tanpa NIP (termasuk soft-deleted), username > 30, atau NIP > 20 karakter.
      */
     public function testAccountRollbackRejectsDataTheOldSchemaCannotStore(): void
