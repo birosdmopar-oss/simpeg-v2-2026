@@ -31,6 +31,9 @@ final class BaseAuditableModelTest extends CIUnitTestCase
     protected function tearDown(): void
     {
         service('authContext')->clear();
+        // Baris audit berpelaku tanpa NIP ditolak down() DBV-010: bersihkan (juga saat test gagal) agar regress test
+        // berikutnya berjalan.
+        $this->db->table('audit_logs')->where('id_pengguna_actor IS NOT NULL', null, false)->where('nip_actor', null)->delete();
         parent::tearDown();
     }
 
@@ -140,9 +143,6 @@ final class BaseAuditableModelTest extends CIUnitTestCase
         $log = $this->fetchLogs('dummy_items', (string) $id, 'create');
         $this->assertSame('77', (string) $log[0]['id_pengguna_actor']);
         $this->assertNull($log[0]['nip_actor']);
-
-        // Baris audit berpelaku tanpa NIP ditolak down() DBV-010: bersihkan agar regress test berikutnya berjalan.
-        $this->db->table('audit_logs')->where('id_pengguna_actor', 77)->delete();
     }
 
     /**

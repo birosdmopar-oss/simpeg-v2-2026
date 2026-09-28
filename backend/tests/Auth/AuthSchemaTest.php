@@ -20,6 +20,13 @@ final class AuthSchemaTest extends CIUnitTestCase
     protected $refresh   = true;
     protected $namespace = null;
 
+    protected function tearDown(): void
+    {
+        // down() DBV-010 menolak akun tanpa NIP: bersihkan (juga saat test gagal) agar regress test berikutnya berjalan.
+        $this->db->table('pengguna')->where('nip', null)->delete();
+        parent::tearDown();
+    }
+
     public function testAuthTablesExist(): void
     {
         foreach (['pengguna', 'login_attempts', 'forgot_attempts', 'token', 'audit_logs'] as $table) {
@@ -78,9 +85,6 @@ final class AuthSchemaTest extends CIUnitTestCase
         }
 
         $this->assertSame(2, $this->db->table('pengguna')->where('nip', null)->countAllResults());
-
-        // down() DBV-010 menolak akun tanpa NIP: bersihkan agar regress test berikutnya berjalan.
-        $this->db->table('pengguna')->where('nip', null)->delete();
     }
 
     public function testAuditEventEnumIncludesLoginLogout(): void
