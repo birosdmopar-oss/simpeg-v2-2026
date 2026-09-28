@@ -4,18 +4,20 @@
  * aktif-nonaktif/hapus/pulihkan hanya role 1. Role 4/5/8 hanya melihat hari libur Aktif (yang dihitung sebagai libur);
  * role 1 bisa menyaring status (default tanpa Dihapus). Filter tahun (bawaan tahun berjalan) menampilkan rentang yang
  * beririsan dengan tahun itu; urut tanggal mulai terbaru. Error 409 (penulisan lain sedang berjalan) tampil sebagai
- * pesan coba lagi.
+ * pesan coba lagi. Aksi baris (Edit, Aktifkan/Nonaktifkan, Pulihkan, Hapus) lewat menu titik tiga (AGENTS.md bagian 1);
+ * kolom Status hanya badge.
  */
-import { Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
+import { Pencil, Plus, Power, PowerOff, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
+import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
+import type { RowAction } from '@/shared/components/rowActions'
 
 import HariLiburFormDialog from '../components/HariLiburFormDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import StatusSwitch from '../components/StatusSwitch.vue'
 import { HARI_LIBUR_WRITE_ROLES, type HariLiburRow } from '../hariLibur.types'
 import { jumlahHari } from '../schemas/hariLibur.schema'
 import { hariLiburService } from '../services/hariLibur.service'
@@ -159,6 +161,27 @@ function askDelete(row: HariLiburRow): void {
   confirm.value = { open: true, row, loading: false }
 }
 
+/** Aksi baris untuk menu titik tiga (urutan & label sesuai AGENTS.md bagian 1). */
+function rowActions(row: HariLiburRow): RowAction[] {
+  const status = statusOf(row)
+  const busy = busyId.value !== ''
+  return [
+    { key: 'edit', label: 'Edit', icon: Pencil },
+    { key: 'deactivate', label: 'Nonaktifkan', icon: PowerOff, hidden: status !== '1', disabled: busy },
+    { key: 'activate', label: 'Aktifkan', icon: Power, hidden: status !== '2', disabled: busy },
+    { key: 'restore', label: 'Pulihkan', icon: RotateCcw, hidden: status !== '10', disabled: busy },
+    { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, hidden: status === '10' },
+  ]
+}
+
+function onRowAction(row: HariLiburRow, key: string): void {
+  if (key === 'edit') openEdit(row)
+  else if (key === 'deactivate') void toggleStatus(row, false)
+  else if (key === 'activate') void toggleStatus(row, true)
+  else if (key === 'restore') void restore(row)
+  else if (key === 'delete') askDelete(row)
+}
+
 async function onConfirmDelete(): Promise<void> {
   const row = confirm.value.row
   if (!row) return
@@ -260,53 +283,15 @@ onMounted(() => {
             <td class="px-4 py-3 text-slate-600">{{ row.jenis_libur ?? '—' }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.keterangan ?? '' }}</td>
             <td class="px-4 py-3">
-              <div class="flex items-center gap-2">
-                <StatusSwitch
-                  v-if="canWrite && statusOf(row) !== '10'"
-                  :checked="statusOf(row) === '1'"
-                  :disabled="busyId === idOf(row)"
-                  :label="`Status ${row.nama_libur}`"
-                  @toggle="toggleStatus(row, $event)"
-                />
-                <StatusBadge :status="row.status ?? '1'" />
-              </div>
+              <StatusBadge :status="row.status ?? '1'" />
             </td>
-            <td v-if="canWrite" class="px-4 py-3">
-              <div class="flex justify-end gap-1">
-                <button
-                  v-if="statusOf(row) === '10'"
-                  type="button"
-                  class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-green-700 disabled:opacity-40"
-                  title="Pulihkan"
-                  :aria-label="`Pulihkan ${row.nama_libur}`"
-                  :disabled="busyId === idOf(row)"
-                  :data-testid="`hari-libur-restore-${idOf(row)}`"
-                  @click="restore(row)"
-                >
-                  <RotateCcw class="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary"
-                  title="Ubah"
-                  :aria-label="`Ubah ${row.nama_libur}`"
-                  :data-testid="`hari-libur-edit-${idOf(row)}`"
-                  @click="openEdit(row)"
-                >
-                  <Pencil class="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-40"
-                  title="Hapus"
-                  :aria-label="`Hapus ${row.nama_libur}`"
-                  :disabled="statusOf(row) === '10'"
-                  :data-testid="`hari-libur-delete-${idOf(row)}`"
-                  @click="askDelete(row)"
-                >
-                  <Trash2 class="h-4 w-4" />
-                </button>
-              </div>
+            <td v-if="canWrite" class="px-4 py-3 text-right">
+              <RowActionsMenu
+                :actions="rowActions(row)"
+                :label="`Aksi untuk ${row.nama_libur}`"
+                :testid="`hari-libur-actions-${idOf(row)}`"
+                @select="onRowAction(row, $event)"
+              />
             </td>
           </tr>
         </tbody>
@@ -316,8 +301,24 @@ onMounted(() => {
     <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
       <span>{{ total }} data · halaman {{ page }} dari {{ totalPages }}</span>
       <div class="flex gap-1">
-        <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
-        <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40" :disabled="page >= totalPages" @click="goTo(page + 1)">Berikutnya</button>
+        <button
+          type="button"
+          class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40"
+          data-testid="hari-libur-prev"
+          :disabled="page <= 1"
+          @click="goTo(page - 1)"
+        >
+          Sebelumnya
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40"
+          data-testid="hari-libur-next"
+          :disabled="page >= totalPages"
+          @click="goTo(page + 1)"
+        >
+          Berikutnya
+        </button>
       </div>
     </div>
 

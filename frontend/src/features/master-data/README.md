@@ -24,4 +24,5 @@ master rujukan; LAIN-LAIN berjenjang ke semua level turunan (level bawah terkunc
 `other_for` (`*_lain`) hanya tampil & wajib saat field ref-nya LAIN-LAIN (tersembunyi = dikosongkan). Halaman Hari Libur
 (`views/HariLiburView.vue`, route `/hari-libur`, menu untuk role 1/4/5/8) memakai `services/hariLibur.service.ts`
 (`/hari-libur`), `schemas/hariLibur.schema.ts`, `components/HariLiburFormDialog.vue`, dan tipe di `hariLibur.types.ts`;
-tombol tambah/ubah/status/hapus/pulihkan dan filter status hanya untuk role 1 (role 4/5/8 hanya menerima status Aktif).
+tombol Tambah, menu aksi baris ⋮ (`RowActionsMenu`: Edit, Nonaktifkan/Aktifkan, Pulihkan, Hapus), dan filter status hanya
+untuk role 1 (role 4/5/8 hanya menerima status Aktif, tanpa kolom audit); kolom Status hanya badge.

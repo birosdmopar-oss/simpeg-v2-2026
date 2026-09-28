@@ -91,6 +91,35 @@ describe('HariLiburFormDialog', () => {
     wrapper.unmount()
   })
 
+  it('tanggal mulai diketik per digit: tanggal selesai ikut tahun akhir, berhenti mengikuti setelah disentuh', async () => {
+    const wrapper = mountDialog(null)
+    await flushPromises()
+
+    // Urutan event `input` Chromium saat mengetik 0 8 1 7 2 0 2 6 di input tanggal.
+    for (const value of ['0002-08-17', '0020-08-17', '0202-08-17', '2026-08-17']) {
+      await setValue('input[name="tgl_mulai"]', value)
+      expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe(value)
+    }
+
+    // Setelah tanggal selesai diubah pengguna, perubahan tanggal mulai tidak lagi menimpanya.
+    await setValue('input[name="tgl_akhir"]', '2026-08-17')
+    await setValue('input[name="tgl_mulai"]', '2026-08-16')
+    expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('2026-08-17')
+    expect(document.body.textContent).toContain('2 hari')
+    wrapper.unmount()
+  })
+
+  it('ubah rentang yang sudah ada: mengganti tanggal mulai tidak menimpa tanggal selesai', async () => {
+    const row: HariLiburRow = { ...legacyRow, id_libur: 2, id_jenis_libur: 2, tgl_mulai: '2026-03-19', tgl_akhir: '2026-03-20' }
+    const wrapper = mountDialog(row)
+    await flushPromises()
+
+    await setValue('input[name="tgl_mulai"]', '2026-03-18')
+    expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('2026-03-20')
+    expect(document.body.textContent).toContain('3 hari')
+    wrapper.unmount()
+  })
+
   it('validasi klien: selesai sebelum mulai & jenis kosong tidak dikirim', async () => {
     const wrapper = mountDialog(null)
     await flushPromises()

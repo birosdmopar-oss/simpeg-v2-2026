@@ -81,10 +81,17 @@ watch(
   { immediate: true },
 )
 
-/** Mengisi tanggal mulai saat tanggal selesai masih kosong = libur satu hari. */
+/**
+ * Tanggal selesai mengikuti tanggal mulai (libur satu hari) selama pengguna belum menyentuhnya dan nilainya masih kosong
+ * atau sama dengan tanggal mulai sebelumnya. Input tanggal Chromium memancarkan `input` per digit tahun yang diketik
+ * (0002-08-17 → 0020-… → 0202-… → 2026-08-17), jadi mengisi "hanya bila kosong" akan membekukan tahun setengah jadi.
+ * Rentang yang sudah ada (selesai ≠ mulai) tidak ditimpa.
+ */
 function onMulaiChange(value: string): void {
+  const mulaiSebelumnya = String(values.tgl_mulai ?? '')
+  const akhir = String(values.tgl_akhir ?? '')
   updateField('tgl_mulai', value)
-  if (String(values.tgl_akhir ?? '') === '') setFieldValue('tgl_akhir', value, false)
+  if (!interacted.value.has('tgl_akhir') && (akhir === '' || akhir === mulaiSebelumnya)) setFieldValue('tgl_akhir', value, false)
 }
 
 const durasi = computed(() => jumlahHari(String(values.tgl_mulai ?? ''), String(values.tgl_akhir ?? '')))

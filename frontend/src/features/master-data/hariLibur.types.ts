@@ -31,9 +31,10 @@ export interface HariLiburRow {
   keterangan: string | null
   /** 1 Aktif (dihitung sebagai libur), 2 Tidak Aktif, 10 Dihapus. */
   status: MasterStatus | number
-  created_at: string | null
-  updated_at: string | null
-  updated_by: number | string | null
+  /** Kolom audit: hanya dikirim ke role 1 (role 4/5/8 tidak menerimanya). */
+  created_at?: string | null
+  updated_at?: string | null
+  updated_by?: number | string | null
 }
 
 export interface HariLiburListQuery {
