@@ -662,7 +662,8 @@ class MasterService
     /**
      * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan). Kosong mengikuti
      * rule permit_empty controller (null, false, string yang kosong setelah trim, non-skalar): nilai itu lolos validasi
-     * tanpa dicek is_natural_no_zero, jadi tidak boleh menjadi (int) 0 — level pangkat 0 / posisi 1 (CR-011).
+     * tanpa dicek is_natural_no_zero, jadi tidak boleh menjadi (int) 0 — level pangkat 0 / posisi 1 (CR-011). Nilai
+     * terisi < 1 ditolak di sini juga (lapis kedua rule controller, mis. pemanggil service langsung).
      *
      * @param array<string, mixed> $data
      */
@@ -672,6 +673,10 @@ class MasterService
 
         if (! $def->hasOrder || ! is_scalar($order) || trim((string) $order) === '') {
             return null;
+        }
+
+        if ((int) $order < 1) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, 'Urutan harus bilangan bulat minimal 1.');
         }
 
         return (int) $order;
@@ -785,11 +790,6 @@ class MasterService
      */
     private function assertOrderFits(MasterDefinition $def, int $order): void
     {
-        // Lapis kedua rule controller is_natural_no_zero (mis. pemanggil service langsung): urutan/level minimal 1.
-        if ($order < 1) {
-            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, 'Urutan harus bilangan bulat minimal 1.');
-        }
-
         if ($order > $def->orderMax()) {
             throw ValidationException::forField(
                 MasterDefinition::ORDER_FIELD,
