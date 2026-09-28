@@ -251,7 +251,8 @@ final class PangkatPendidikanSchemaTest extends CIUnitTestCase
         $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->insert(['jenjang_pendidikan_singkat' => 'S1', 'jenjang_pendidikan' => 'STRATA 1']));
         $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->insert(['jenjang_pendidikan_singkat' => 's.1', 'jenjang_pendidikan' => 'Sarjana']));
 
-        // CHECK row_jurusan: NULL dan ketujuh nama kolom flag diterima; nilai lain (termasuk beda huruf) ditolak.
+        // CHECK row_jurusan: NULL dan ketujuh nama kolom flag diterima; nilai lain (termasuk beda huruf dan spasi di akhir,
+        // yang lolos perbandingan collation PAD SPACE) ditolak.
         $this->db->table('jenjang_pendidikan')->insert(['id_jenjang_pendidikan' => 1, 'jenjang_pendidikan_singkat' => 'SD', 'jenjang_pendidikan' => 'Sekolah Dasar', 'row_jurusan' => null]);
         $this->seeInDatabase('jenjang_pendidikan', ['id_jenjang_pendidikan' => 1, 'row_jurusan' => null]);
 
@@ -262,6 +263,8 @@ final class PangkatPendidikanSchemaTest extends CIUnitTestCase
         $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->insert(['jenjang_pendidikan_singkat' => 'X1', 'jenjang_pendidikan' => 'X1', 'row_jurusan' => 'X']));
         $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->insert(['jenjang_pendidikan_singkat' => 'X2', 'jenjang_pendidikan' => 'X2', 'row_jurusan' => 's_1']));
         $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->insert(['jenjang_pendidikan_singkat' => 'X3', 'jenjang_pendidikan' => 'X3', 'row_jurusan' => '']));
+        $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->insert(['jenjang_pendidikan_singkat' => 'X4', 'jenjang_pendidikan' => 'X4', 'row_jurusan' => 'S_1 ']));
+        $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->where('id_jenjang_pendidikan', 8)->update(['row_jurusan' => 'S_1  ']));
         $this->assertDbWriteFails(fn () => $this->db->table('jenjang_pendidikan')->where('id_jenjang_pendidikan', 8)->update(['row_jurusan' => 'S1']));
 
         // bidang_pendidikan: UNIQUE nama.

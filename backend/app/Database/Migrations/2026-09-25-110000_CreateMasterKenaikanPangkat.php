@@ -17,7 +17,8 @@ use Throwable;
  * Sumber [K]:
  *   - `gol_pppk`: DDL produksi `simpeg_prod.sql:1277-1289` (nama, tipe, default, urutan kolom).
  *   - `pangkat.id_pangkat` TINYINT signed: `dm_ak_jf.id_pangkat tinyint` + FK `fk_dm_ak_jf_ibfk_02` → `pangkat`
- *     (`simpeg_prod.sql:459, 468`); `jenis_kp.id_jenis_kp` TINYINT: `pegawai_kp.id_jenis_kp` (simpeg_prod_duplikat).
+ *     (`simpeg_prod.sql:459, 468`); `jenis_kp.id_jenis_kp` TINYINT: FK ERD `fk_id_jenis_kp_peg_kp_to_jenis_kp`
+ *     (`simpeg01.erd`, FK mewajibkan tipe & tanda sama) + `pegawai_kp.id_jenis_kp tinyint` (simpeg_prod_duplikat).
  *   - Nama kolom `pangkat` dan `jenis_kp`: kode admin legacy (`Lm_kp.php:226-241`, `:438-449`).
  * DDL `pangkat` dan `jenis_kp` tidak ada di dump produksi (terpotong di `jabatan`): panjang kolom teks (= kolom
  * snapshot `pegawai_kp`), tipe/default `cpns` dan `order`, serta kolom audit adalah nilai [I] (G-doc Bagian 7).
@@ -32,8 +33,11 @@ use Throwable;
  *   - `pangkat.order` = level pangkat (KP berikutnya = order + 1), bukan sekadar urutan tampil: aplikasi tidak
  *     menggeser maupun menomori ulang nilainya (mode order manual). UNIQUE(cpns, order) sengaja BELUM dibuat sampai
  *     data produksi terlihat.
- *   - Kolom audit `pangkat` dan `jenis_kp` = `updated_at` NOT NULL ON UPDATE + `updated_by` (pola `bidang_pendidikan`
- *     [K]), tanpa created_* [I]. `gol_pppk` memakai kolom audit DDL [K] apa adanya.
+ *   - Kolom audit `pangkat` dan `jenis_kp` = `updated_at` NOT NULL ON UPDATE + `updated_by`, tanpa created_* [I]:
+ *     tidak ada bukti library (saudara satu library `Lm_kp.php`, `gol_pppk`, justru memakai created_*); bukti legacy
+ *     terbelah — pola ini di `bidang_pendidikan`/`diklat`, pola created_at + updated_at NULL di `agama`/`group_jabatan`/
+ *     `jabatan`. Dipilih hanya demi keseragaman dengan jenjang/bidang/jurusan (G-doc Bagian 3 #8). `gol_pppk` memakai
+ *     kolom audit DDL [K] apa adanya.
  *   - Status v2 1 Aktif / 2 Tidak Aktif / 10 Dihapus (COMMENT disesuaikan); COMMENT kolom audit dan `pangkat.order`.
  *   - Tanpa FK: tabel perujuk (riwayat KP, dm_ak_jf, dst.) dibuat di Fase 3 / DBV-008 dan wajib memakai TINYINT signed.
  *
@@ -155,8 +159,9 @@ class CreateMasterKenaikanPangkat extends Migration
     }
 
     /**
-     * Kolom audit master yang kodenya hanya menulis updated_by (pola DDL legacy `bidang_pendidikan`,
-     * simpeg_prod.sql:262-263): tanpa created_*. updated_by berisi id_pengguna aktor, tanpa FK (preseden DBV-001).
+     * Kolom audit pola DDL legacy `bidang_pendidikan` (simpeg_prod.sql:262-263), tanpa created_* [I] — untuk `pangkat`/
+     * `jenis_kp` hanya demi keseragaman grup (G-doc Bagian 3 #8). updated_by berisi id_pengguna aktor, tanpa FK
+     * (preseden DBV-001).
      */
     private function auditUpdatedSql(): string
     {

@@ -28,13 +28,13 @@ use Throwable;
  *     singkatan), `uq_bidang_pendidikan_nama`, `uq_jurusan_pendidikan_nama (id_bidang_pendidikan, jurusan_pendidikan)`;
  *     berlaku juga untuk status 2/10, case-insensitive lewat collation. Legacy hanya mengecek di aplikasi (jurusan
  *     tidak sama sekali) — audit duplikat wajib sebelum impor.
- *   - CHECK `chk_jenjang_pendidikan_row_jurusan`: NULL atau persis salah satu nama kolom flag (peka huruf). Nilai ini
- *     menentukan kolom flag yang dibaca dropdown jurusan.
+ *   - CHECK `chk_jenjang_pendidikan_row_jurusan`: NULL atau persis salah satu nama kolom flag (perbandingan biner:
+ *     peka huruf dan spasi di akhir ikut dihitung). Nilai ini menentukan kolom flag yang dibaca dropdown jurusan.
  *   - `order` INT NOT NULL DEFAULT 1 di `bidang_pendidikan` dan `jurusan_pendidikan` (Keputusan #5 G-01; impor diisi
  *     urut nama ASC seperti dropdown legacy).
  *   - FK jurusan → bidang ON DELETE RESTRICT ON UPDATE RESTRICT, nama legacy (aksi legacy tidak diketahui).
  *   - Kolom audit `jenjang_pendidikan` dan `jurusan_pendidikan` = pola `bidang_pendidikan` [K] (`updated_at` NOT NULL
- *     ON UPDATE + `updated_by`, tanpa created_*) [I].
+ *     ON UPDATE + `updated_by`, tanpa created_*) [I]; satu library legacy (`Lm_pendidikan.php`) dengan `bidang_pendidikan`.
  *   - Status v2 1 Aktif / 2 Tidak Aktif / 10 Dihapus (COMMENT disesuaikan; legacy bidang '1: Active, 2: Inactive,
  *     10: Deleted'); COMMENT kolom audit, flag, `row_jurusan`, `bobot_ipasn`.
  *   - `bobot_ipasn` disimpan (dibaca skor IP ASN) tetapi tidak diekspos API/FE.
@@ -93,8 +93,9 @@ class CreateMasterPendidikan extends Migration
         $sql    = [];
 
         // Kolom dari kode legacy (Lm_pendidikan.php:204-213; row_jurusan & bobot_ipasn hanya dibaca, tidak ada di form).
-        // row_jurusan = nama kolom flag di jurusan_pendidikan yang dibaca dropdown jurusan untuk jenjang ini. CHECK memakai
-        // COLLATE utf8mb4_bin agar nilainya persis salah satu nama kolom flag ('s_1' ditolak).
+        // row_jurusan = nama kolom flag di jurusan_pendidikan yang dibaca dropdown jurusan untuk jenjang ini. CHECK
+        // membandingkan CAST(... AS BINARY) agar nilainya persis salah satu nama kolom flag: 's_1' ditolak, dan 'S_1 '
+        // juga ditolak (collation utf8mb4_bin bersifat PAD SPACE sehingga mengabaikan spasi di akhir; biner tidak).
         $sql['jenjang_pendidikan'] = "CREATE TABLE {$this->t('jenjang_pendidikan')} (
             `id_jenjang_pendidikan` INT NOT NULL AUTO_INCREMENT,
             `jenjang_pendidikan_singkat` VARCHAR(50) NOT NULL,
@@ -108,7 +109,7 @@ class CreateMasterPendidikan extends Migration
             UNIQUE KEY `uq_jenjang_pendidikan_nama` (`jenjang_pendidikan`),
             UNIQUE KEY `uq_jenjang_pendidikan_singkat` (`jenjang_pendidikan_singkat`),
             CONSTRAINT `chk_jenjang_pendidikan_row_jurusan` CHECK (`row_jurusan` IS NULL
-                OR `row_jurusan` COLLATE utf8mb4_bin IN ('D_I', 'D_II', 'D_III', 'D_IV', 'S_1', 'S_2', 'S_3'))
+                OR CAST(`row_jurusan` AS BINARY) IN ('D_I', 'D_II', 'D_III', 'D_IV', 'S_1', 'S_2', 'S_3'))
         ) " . self::TABLE_OPTIONS;
 
         // DDL [K] simpeg_prod.sql:257-265 + `order` [V2] (legacy urut bidang_pendidikan ASC).
@@ -125,8 +126,9 @@ class CreateMasterPendidikan extends Migration
 
         // Kolom dari kode legacy (Lm_pendidikan.php:592-607); id_bidang_pendidikan bertipe sama dengan PK induk (TINYINT
         // signed, syarat FK). Flag D_I..S_3 bernilai 1/0 seperti legacy. UNIQUE uq_jurusan_pendidikan_nama sudah diawali
-        // id_bidang_pendidikan (KEY FK secara teknis berlebih); KEY FK tetap dibuat dengan nama legacy (pola dump: setiap
-        // FK punya KEY bernama sama; preseden FAQ).
+        // id_bidang_pendidikan (KEY FK secara teknis berlebih); KEY FK tetap dibuat dengan nama legacy [I]: legacy jurusan
+        // tanpa UNIQUE, sehingga KEY bernama FK kemungkinan ada di produksi (di dump, FK tanpa KEY senama hanya yang
+        // kolomnya sudah diawali index lain); dipertahankan agar sebanding dengan produksi (preseden FAQ faq_article).
         $sql['jurusan_pendidikan'] = "CREATE TABLE {$this->t('jurusan_pendidikan')} (
             `id_jurusan_pendidikan` INT NOT NULL AUTO_INCREMENT,
             `id_bidang_pendidikan` TINYINT NOT NULL,
