@@ -146,50 +146,26 @@ Komponen di `src/shared/ui/`: `UiButton`, `UiTextField`, `UiSelect`, `UiCheckbox
 
 ---
 
-## 6. Board Trello "Frontend-UI"
+## 6. Board Trello "Frontend-UI" — ⚠️ BELUM DIBUAT DI AKUN USER
 
-URL: https://trello.com/b/hC81acIV/frontend-ui
-Board ARI: `ari:cloud:trello::board/workspace/6aacb3c87867946408fb705c/6aba119661783f16ef962e17`
-Workspace ARI: `ari:cloud:trello::workspace/6aacb3c87867946408fb705c`
+**Status: board ini dianggap BELUM ADA.** Sesi 28-09-2026 membuatnya lewat konektor MCP Trello, tapi konektor
+itu login sebagai akun **"Fajrin F"** (workspace "Trello Workspace" / `userworkspace28232935`) — bukan akun
+yang user pakai di browser. User mengonfirmasi: salah akun/workspace.
 
-**List = status implementasi** (urut kiri→kanan):
+- Board salah-akun: https://trello.com/b/hC81acIV/frontend-ui — **jangan dipakai, jangan diisi lagi**.
+  Jangan arsipkan/hapus tanpa izin user (bukan akun user).
+- **Isi lengkap board (list, label, 21 kartu beserta deskripsinya) sudah disimpan di
+  [`TRELLO-BOARD-SPEC.md`](TRELLO-BOARD-SPEC.md)** — pakai itu untuk membuat ulang, tidak perlu menyusun dari nol.
 
-| List | ARI (suffix setelah `…/list/workspace/6aacb3c87867946408fb705c/`) |
-| --- | --- |
-| 📌 Panduan dan Legenda | `6aba11aba2e39c66a9532985` |
-| ⚪ Not Started | `6aba11ad95827b1cf383dc74` |
-| 🟡 In Progress | `6aba11af282a063cd3697d7f` |
-| 🟢 UI Complete | `6aba11b1ce30f5ab56e8f94d` |
-| 🟢 UI Complete — Temporary Asset | `6aba11b5f04431814bd219d5` |
-| 🟠 Needs Revision | `6aba11b789c0a5a7c402e9dc` |
-| ⛔ Blocked | `6aba11b933604108fe58dc37` |
+### Cara membuat ulang dengan benar
 
-**Label**: MCP Trello tidak bisa membuat/mengganti nama label, jadi 6 label bawaan dipakai dengan makna
-tetap (didokumentasikan di kartu Panduan). Suffix ARI setelah `…/label/workspace/6aacb3c87867946408fb705c/`:
+1. **Jangan pakai konektor MCP Trello** untuk board ini (akunnya salah). Pakai tab trello.com yang sudah login
+   di browser user, lalu REST `fetch('/1/...')` dengan param `dsc` dari cookie (form-urlencoded) — pola yang
+   sama dengan board "SIMPEG v2 — Timeline Pengembangan" (lihat memory `simpeg-v2-trello-sync`).
+2. Tanyakan user workspace tujuannya (kemungkinan sama dengan board "SIMPEG v2 — Timeline Pengembangan",
+   id `6a9f7a8923c331ca107e0ccd`).
+3. Buat board `Frontend-UI` → 7 list → **beri nama** 6 label (lewat REST bisa) → 21 kartu sesuai SPEC, termasuk
+   label oranye "Asset: Temporary" di kartu yang Asset Status-nya Temporary.
+4. Sebelum membuat, sesuaikan status kartu dengan kondisi kode terbaru di branch (SPEC mengikuti commit `9dd8b1e`).
 
-| Warna | Arti | ARI suffix |
-| --- | --- | --- |
-| 🟣 purple | Design System / Fondasi | `6aba119661783f16ef962e21` |
-| 🔵 blue | Halaman Admin (§4.1) | `6aba119661783f16ef962e22` |
-| 🟢 green | Halaman Pengguna (§4.2) | `6aba119661783f16ef962e1d` |
-| 🟡 yellow | Reusable Component | `6aba119661783f16ef962e1e` |
-| 🟠 orange | Asset: Temporary (placeholder online) | `6aba119661783f16ef962e1f` |
-| 🔴 red | Needs Final Asset | `6aba119661783f16ef962e20` |
-
-**Format deskripsi kartu** (field yang diminta user, karena custom field tidak bisa dibuat lewat MCP):
-
-```
-Status: <nama list>
-Page / Screen: …
-Component: …
-Redesign Reference: Laporan Redesign §x.y, Gambar N (hal. cetak M / PDF hal. P)
-Implementation Status: Not Started | In Progress | Complete
-Asset Status: N/A | Temporary | Final
-Asset Source: …
-Needs Final Asset: Ya | Tidak
-Notes / Remaining Work: …
-Files: frontend/src/...
-```
-
-Kalau status kartu berubah: **pindahkan kartu ke list yang sesuai DAN ubah baris `Status:`** — aturan yang
-sama dengan board "SIMPEG v2 — Timeline Pengembangan".
+Kalau status kartu berubah: **pindahkan kartu ke list yang sesuai DAN ubah baris `Status:`**.
