@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use App\Constants\Role;
+use App\Libraries\Auth\UserService;
+use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Auth as AuthConfig;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 
@@ -16,7 +20,9 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  * A-10 — perubahan akun tercatat di audit_logs dengan actor.
  * DBV-010/CR-013 — aturan akun non-pegawai: NIP wajib role 2/6/7, opsional role 1/3/4/5/8 (nama wajib bila tanpa NIP),
  * NIP angka maks. 18 digit, email opsional, username default NIP / wajib bila NIP kosong / maks. 100, NIP hanya bisa
- * diisi untuk akun yang belum punya NIP.
+ * diisi untuk akun yang belum punya NIP. Isian non-teks → 422; username baru tanpa karakter kontrol/tak terlihat;
+ * balapan UNIQUE (1062) → 422; rename username membatalkan token reset tertunda; Admin Satker hanya role 2/6/7 dan tidak
+ * bisa mengubah role akunnya sendiri (legacy L_user).
  *
  * @internal
  */
@@ -286,6 +292,166 @@ final class UserCrudScopedTest extends CIUnitTestCase
         $this->seeInDatabase('pengguna', ['id_pengguna' => $pegawai, 'nip' => self::PEGAWAI_S01, 'name' => 'Siti']);
     }
 
+    /**
+     * Jalur tautkan NIP / ubah nama & email memakai validasi yang sama dengan create; nilai yang ditolak tidak tersimpan.
+     */
+    public function testUpdateValidatesNipNameAndEmail(): void
+    {
+        $akun = $this->buatAkunTanpaNip('admin.view', Role::ADMIN_VIEW_ESELON1, ['name' => 'Nama Lama', 'email' => 'lama@example.go.id']);
+        $id   = (int) $akun['id_pengguna'];
+        $put  = fn (array $body) => $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $id, $body);
+
+        foreach (['ABC', '1234567890123456789', '1990-0215'] as $nip) {
+            $bad = $put(['nip' => $nip]);
+            $bad->assertStatus(422);
+            $this->assertSame(['NIP harus berupa angka, maksimal 18 digit.'], $this->json($bad)['errors']['nip'], $nip);
+        }
+
+        $email = $put(['email' => 'bukan-email']);
+        $email->assertStatus(422);
+        $this->assertSame(['Email tidak valid (maks. 150 karakter).'], $this->json($email)['errors']['email']);
+
+        $name = $put(['name' => str_repeat('n', 151)]);
+        $name->assertStatus(422);
+        $this->assertSame(['Nama maksimal 150 karakter.'], $this->json($name)['errors']['name']);
+
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $id, 'nip' => null, 'name' => 'Nama Lama', 'email' => 'lama@example.go.id']);
+    }
+
+    /**
+     * Array/objek di field teks lolos rule `permit_empty|string` CI4 (array kosong); service harus menolaknya dengan 422,
+     * bukan 500 "Array to string conversion".
+     */
+    public function testNonTextFieldsAreRejectedWith422(): void
+    {
+        $akun = $this->buatAkunTanpaNip('admin.view', Role::ADMIN_VIEW_ESELON1);
+        $id   = (int) $akun['id_pengguna'];
+
+        foreach (['nip', 'name', 'email', 'username'] as $field) {
+            $body = ['user_level' => Role::MENTERI, 'name' => 'Menteri', 'username' => 'menteri', 'password' => self::NEW_PASSWORD];
+
+            $created = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->post('api/v1/auth/users', [$field => []] + $body);
+            $created->assertStatus(422);
+            $this->assertSame(['Isian harus berupa teks.'], $this->json($created)['errors'][$field], "create {$field}");
+
+            $updated = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $id, [$field => []]);
+            $updated->assertStatus(422);
+            $this->assertSame(['Isian harus berupa teks.'], $this->json($updated)['errors'][$field], "update {$field}");
+        }
+
+        $this->dontSeeInDatabase('pengguna', ['username' => 'menteri']);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $id, 'username' => 'admin.view', 'nip' => null, 'name' => 'Akun admin.view']);
+    }
+
+    /**
+     * Username baru/diubah tanpa karakter kontrol / tak terlihat (collation unicode_ci mengabaikan sebagian, mis.
+     * zero-width space: 'ad<ZWSP>min' = 'admin'). Username lama yang tidak diubah tidak dinilai ulang.
+     */
+    public function testUsernameRejectsControlAndInvisibleCharacters(): void
+    {
+        $post = fn (string $username) => $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->post('api/v1/auth/users', [
+            'user_level' => Role::MENTERI, 'name' => 'Menteri', 'username' => $username, 'password' => self::NEW_PASSWORD,
+        ]);
+        $message = ['Username tidak boleh berisi karakter kontrol atau karakter tak terlihat.'];
+
+        foreach (["ad\u{200B}min.baru", "admin.baru\x01", "admin\u{00AD}baru", "admin\u{FEFF}baru"] as $username) {
+            $bad = $post($username);
+            $bad->assertStatus(422);
+            $this->assertSame($message, $this->json($bad)['errors']['username'], bin2hex($username));
+        }
+        $this->assertSame(0, $this->db->table('pengguna')->where('name', 'Menteri')->countAllResults());
+
+        // Non-ASCII biasa tetap boleh (pembatasan ASCII ditunda sampai audit data produksi, keputusan B).
+        $post('menteri.ñoño')->assertStatus(201);
+
+        // Rename ke username tak terlihat ditolak; username lama (mis. hasil impor) yang tidak diubah tetap bisa disimpan.
+        $legacy = $this->buatAkunTanpaNip("legacy\u{200B}akun", Role::PIMPINAN);
+        $put    = fn (array $body) => $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $legacy['id_pengguna'], $body);
+
+        $this->assertSame($message, $this->json($put(['username' => "pimpinan\u{200B}"]))['errors']['username']);
+        $put(['username' => "legacy\u{200B}akun", 'name' => 'Pimpinan Lama'])->assertStatus(200);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $legacy['id_pengguna'], 'name' => 'Pimpinan Lama']);
+    }
+
+    /**
+     * Balapan cek-lalu-tulis: dua admin menautkan NIP / memakai username yang sama bersamaan. Cek aplikasi keduanya
+     * lolos (disimulasikan model yang "tidak melihat" baris lain), UNIQUE DB menolak yang kedua (1062) → 422 per field.
+     */
+    public function testUniqueRaceIsTranslatedTo422(): void
+    {
+        $akun = $this->buatAkunTanpaNip('admin.view', Role::ADMIN_VIEW_ESELON1);
+        $id   = (int) $akun['id_pengguna'];
+
+        $racy = new class () extends PenggunaModel {
+            public int $blind = 0;
+
+            public function countAllResults(bool $reset = true, bool $test = false)
+            {
+                $count = parent::countAllResults($reset, $test);
+
+                if ($this->blind > 0) {
+                    $this->blind--;
+
+                    return 0;
+                }
+
+                return $count;
+            }
+        };
+        $inject = static function (int $blind) use ($racy): void {
+            $racy->blind = $blind;
+            Services::injectMock('userService', new UserService($racy, service('passwordVerifier'), service('jwt')));
+        };
+
+        $inject(1);
+        $link = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $id, ['nip' => self::PEGAWAI_S01]);
+        $link->assertStatus(422);
+        $this->assertSame(['nip' => ['NIP sudah memiliki akun.']], $this->json($link)['errors']);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $id, 'nip' => null]);
+
+        $inject(1);
+        $rename = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $id, ['username' => self::PEGAWAI_S01]);
+        $rename->assertStatus(422);
+        $this->assertSame(['username' => ['Username sudah dipakai.']], $this->json($rename)['errors']);
+
+        $inject(2);
+        $created = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->post('api/v1/auth/users', [
+            'nip' => self::PEGAWAI_S01, 'username' => 'pegawai.kembar', 'password' => self::NEW_PASSWORD, 'user_level' => Role::PEGAWAI,
+        ]);
+        $created->assertStatus(422);
+        $this->assertSame(['nip' => ['NIP sudah memiliki akun.']], $this->json($created)['errors']);
+        $this->dontSeeInDatabase('pengguna', ['username' => 'pegawai.kembar']);
+    }
+
+    /**
+     * Token reset dipetakan ke akun lewat username. Rename oleh admin membatalkan token yang masih tertunda, sehingga
+     * token milik akun A tidak bisa dipakai untuk akun B yang kemudian memakai username lama A.
+     */
+    public function testRenamingUsernameInvalidatesPendingResetTokens(): void
+    {
+        config(AuthConfig::class)->exposeResetTokenInResponse = true;
+
+        $a = $this->buatAkunTanpaNip('operator1', Role::PIMPINAN);
+
+        $token = $this->json($this->forgotPassword('operator1'))['data']['token'];
+        $this->assertIsString($token);
+
+        $this->clearAuthState();
+        $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $a['id_pengguna'], ['username' => 'operator1lama'])->assertStatus(200);
+        $b = $this->buatAkunTanpaNip('Operator1', Role::PIMPINAN);
+
+        $this->clearAuthState();
+        $reset = $this->withBodyFormat('json')->post('api/v1/auth/reset-password', [
+            'token' => $token, 'new_password' => 'PasswordReset2026', 'new_password_confirmation' => 'PasswordReset2026',
+        ]);
+        $reset->assertStatus(422);
+        $this->assertSame(['Token reset sudah tidak berlaku lagi.'], $this->json($reset)['errors']['token']);
+
+        $this->clearAuthState();
+        $this->login('Operator1', 'PasswordReset2026')->assertStatus(401);
+        $this->assertSame((string) $b['password'], (string) $this->db->table('pengguna')->where('id_pengguna', $b['id_pengguna'])->get()->getRowArray()['password']);
+    }
+
     public function testListSearchesAndSortsByName(): void
     {
         $this->buatAkunTanpaNip('budi', Role::MENTERI, ['name' => 'Budi Santoso']);
@@ -360,6 +526,46 @@ final class UserCrudScopedTest extends CIUnitTestCase
         ])->assertStatus(403);
         $admin()->withBodyFormat('json')->put('api/v1/auth/users/' . $ownId, ['user_level' => Role::SUPER_ADMIN])->assertStatus(403);
         $admin()->withBodyFormat('json')->put('api/v1/auth/users/' . $ownId, ['id_satker' => 'S02'])->assertStatus(403);
+    }
+
+    /**
+     * Legacy L_user::validate_param: Admin Satker hanya menambah user level pegawai (UL_PEGAWAI 2/6/7). Role 1/3/4/5/8
+     * (termasuk akun tanpa NIP yang cukup nama+username) ditolak, begitu juga menaikkan role akun lain atau mengubah role
+     * akunnya sendiri (eskalasi ke role lintas satker).
+     */
+    public function testAdminSatkerLimitedToPegawaiRolesAndCannotChangeOwnRole(): void
+    {
+        $adminId = $this->idOf(self::ADMIN_S01);
+        $ownId   = $this->idOf(self::PEGAWAI_S01);
+        $admin   = fn () => $this->asNip(self::ADMIN_S01)->withBodyFormat('json');
+
+        foreach ([Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN] as $role) {
+            $result = $admin()->post('api/v1/auth/users', [
+                'name' => 'Akun ' . $role, 'username' => 'akun' . $role, 'password' => self::NEW_PASSWORD, 'user_level' => $role,
+            ]);
+            $result->assertStatus(403);
+            $this->assertSame('Admin Satker hanya dapat membuat akun Pegawai/PTT/PPPK.', $this->json($result)['message'], "role {$role}");
+            $this->dontSeeInDatabase('pengguna', ['username' => 'akun' . $role]);
+        }
+
+        foreach ([Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN] as $role) {
+            $admin()->put('api/v1/auth/users/' . $ownId, ['user_level' => $role])->assertStatus(403);
+        }
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $ownId, 'user_level' => Role::PEGAWAI]);
+
+        $own = $admin()->put('api/v1/auth/users/' . $adminId, ['user_level' => Role::MENTERI]);
+        $own->assertStatus(403);
+        $this->assertSame('Admin Satker tidak dapat mengubah role akunnya sendiri.', $this->json($own)['message']);
+        $admin()->put('api/v1/auth/users/' . $adminId, ['user_level' => Role::PEGAWAI])->assertStatus(403);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $adminId, 'user_level' => Role::ADMIN_SATKER]);
+
+        // Form edit selalu mengirim role: role yang tidak berubah tetap boleh (akun sendiri maupun akun lain).
+        $admin()->put('api/v1/auth/users/' . $adminId, ['user_level' => Role::ADMIN_SATKER, 'name' => 'Admin S01'])->assertStatus(200);
+        $this->seeInDatabase('pengguna', ['id_pengguna' => $adminId, 'name' => 'Admin S01']);
+
+        // Super Admin tidak dibatasi.
+        $this->clearAuthState();
+        $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $ownId, ['user_level' => Role::MENTERI])->assertStatus(200);
     }
 
     // ------------------------------------------------------------------

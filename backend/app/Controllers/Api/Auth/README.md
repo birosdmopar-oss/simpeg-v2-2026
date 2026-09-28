@@ -108,13 +108,15 @@ Response index: `data: { items:[user...], total, page, per_page }`; `user` = `{ 
 
 Create `{ nip?, name?, email?, username?, password, user_level (1-8), id_unit?, id_satker?, status? }` → 201 `data: user`. Aturan akun (DBV-010/CR-013, ikut legacy `L_user`):
 - `nip` angka, maks. 18 digit (NIK 16 digit Non-PNS diterima); **wajib** untuk role 2/6/7 (UL_PEGAWAI), opsional untuk role 1/3/4/5/8 (`null`/kosong = akun tanpa NIP).
-- akun tanpa NIP wajib `name` (≤ 150) dan `username`; `username` default = NIP, maks. 100, unik.
+- akun tanpa NIP wajib `name` (≤ 150) dan `username`; `username` default = NIP, maks. 100, unik, tanpa karakter
+  kontrol/tak terlihat (`\p{C}`, mis. zero-width space). Pembatasan ASCII ditunda sampai audit data produksi.
+- `nip`/`name`/`email`/`username` harus teks: array/objek → 422 `errors.<field>: ["Isian harus berupa teks."]`.
 - `email` opsional, harus valid, ≤ 150 (tanpa UNIQUE).
 
-Update `{ nip?, name?, email?, username?, user_level?, id_unit?, id_satker?, status?, password? }` → 200 `data: user`. `nip` hanya boleh **diisi** untuk akun yang belum punya NIP (menautkan akun ke pegawai); mengubah/menghapus NIP yang sudah ada → 422 (ganti NIP = fitur B-06). Mengubah role ke 2/6/7 tanpa NIP atau mengosongkan nama akun tanpa NIP → 422. Mengisi NIP atau mengubah role/status/password/satker mencabut seluruh sesi akun tsb (baris refresh token dihapus).
+Update `{ nip?, name?, email?, username?, user_level?, id_unit?, id_satker?, status?, password? }` → 200 `data: user`. `nip` hanya boleh **diisi** untuk akun yang belum punya NIP (menautkan akun ke pegawai); mengubah/menghapus NIP yang sudah ada → 422 (ganti NIP = fitur B-06). Mengubah role ke 2/6/7 tanpa NIP atau mengosongkan nama akun tanpa NIP → 422. Mengisi NIP atau mengubah role/status/password/satker mencabut seluruh sesi akun tsb (baris refresh token dihapus). Mengubah `username` membatalkan token reset password yang masih tertunda untuk username lama (token reset dipetakan ke akun lewat username). Username lama yang tidak diubah tidak dinilai ulang aturan karakter. Balapan dua admin memakai NIP/username yang sama → 422 per field (pelanggaran UNIQUE dicek ulang), bukan 500.
 Status `{ "status": "0"|"1" }`. Delete → soft delete (`deleted_at`) + sesi dicabut (baris refresh token dihapus). Tidak boleh menghapus atau menonaktifkan akun sendiri (dibandingkan per `id_pengguna`).
 
-Scoping: role 3 hanya melihat/mengubah akun dengan `id_satker` = satker di claims JWT-nya; akun lain → **403**. Role 3 tidak dapat membuat/memberi role Super Admin (asumsi keamanan, perlu konfirmasi).
+Scoping: role 3 hanya melihat/mengubah akun dengan `id_satker` = satker di claims JWT-nya; akun lain → **403**. Role 3 hanya dapat membuat akun / memberi role Pegawai/PTT/PPPK (2/6/7, legacy `L_user::validate_param`) dan tidak dapat mengubah role akunnya sendiri → **403**; role yang dikirim tanpa perubahan tetap diterima.
 Validasi: 422 `errors` per-field (nip, name, email, username, user_level, password, status).
 
 ## Audit trail (A-10)

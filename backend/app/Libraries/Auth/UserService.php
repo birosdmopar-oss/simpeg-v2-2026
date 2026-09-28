@@ -8,7 +8,10 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\PenggunaModel;
+use Closure;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 
 /**
  * CRUD akun pengguna dengan scoping per satker (A-08, ADR-005: scoping di Service, bukan Filter).
@@ -16,7 +19,9 @@ use App\Models\Auth\PenggunaModel;
  * - Role 1 (Super Admin): seluruh akun.
  * - Role 3 (Admin Satker): hanya akun dengan id_satker = id_satker miliknya (dari claims JWT).
  *   Akun di luar satker → 403 (tidak muncul di daftar, tidak bisa dibaca/diubah/dihapus).
- *   Admin Satker juga tidak bisa membuat/mengubah akun menjadi role 1 (mencegah eskalasi hak; asumsi keamanan).
+ *   Admin Satker hanya boleh membuat akun / memberi role Pegawai/PTT/PPPK (Role::UL_PEGAWAI, legacy L_user
+ *   validate_param: "Pegawai admin hanya bisa menambah user dengan level pegawai atau PTT") dan tidak boleh mengubah
+ *   role akunnya sendiri (mencegah eskalasi hak ke role lintas satker 1/4/5/8).
  * - Role lain: 403 di semua operasi (sudah dicegat RoleFilter; dicek ulang di sini sebagai lapis kedua).
  *
  * Akun non-pegawai (DBV-010/CR-013, K2, mengikuti legacy L_user):
@@ -28,6 +33,13 @@ use App\Models\Auth\PenggunaModel;
  * - Ubah akun: NIP hanya boleh DIISI untuk akun yang belum punya NIP (menautkan akun ke pegawai); mengubah/menghapus
  *   NIP yang sudah ada adalah ranah fitur ganti NIP (B-06).
  * - Identitas akun = id_pengguna: pencegahan hapus/nonaktifkan akun sendiri dan pencabutan sesi memakai id_pengguna.
+ * - nip/name/email/username harus teks (array/objek → 422, bukan 500). Username baru/diubah tidak boleh memuat karakter
+ *   kontrol/tak terlihat (\p{C}, mis. zero-width space yang diabaikan collation unicode_ci); pembatasan ASCII ditunda
+ *   sampai audit data produksi (keputusan B). Username lama hasil impor tidak dinilai ulang selama tidak diubah.
+ * - Balapan cek-lalu-tulis (dua admin menautkan NIP/username yang sama): pelanggaran UNIQUE (1062) diterjemahkan ulang
+ *   ke 422 per field lewat cek ulang.
+ * - Username diubah → token reset password yang masih tertunda untuk username lama dibatalkan (token dipetakan ke akun
+ *   lewat username; tanpa ini token bisa "berpindah" ke akun lain yang kemudian memakai username tersebut).
  */
 class UserService
 {
@@ -37,7 +49,9 @@ class UserService
         private PenggunaModel $pengguna,
         private PasswordVerifier $passwords,
         private JwtService $jwt,
+        private ?ForgotAttemptModel $forgotAttempts = null,
     ) {
+        $this->forgotAttempts ??= new ForgotAttemptModel();
     }
 
     /**
@@ -109,17 +123,25 @@ class UserService
     {
         $this->assertAdmin($actor);
 
-        $nip      = self::nullableString($data['nip'] ?? null);
-        $name     = self::nullableString($data['name'] ?? null);
-        $email    = self::nullableString($data['email'] ?? null);
-        $username = self::nullableString($data['username'] ?? null) ?? $nip ?? '';
-        $level    = (int) ($data['user_level'] ?? 0);
         $errors   = [];
+        $nip      = self::textInput($data, 'nip', $errors);
+        $name     = self::textInput($data, 'name', $errors);
+        $email    = self::textInput($data, 'email', $errors);
+        $username = self::textInput($data, 'username', $errors) ?? $nip ?? '';
+        $level    = (int) ($data['user_level'] ?? 0);
+
+        if ($errors !== []) {
+            // Isian bukan teks: aturan lain (wajib nama/NIP) tidak bermakna untuk nilai yang dibuang.
+            throw new ValidationException('Validasi gagal.', $errors);
+        }
 
         self::validateNip($nip, $errors);
         self::validateName($name, $errors);
         self::validateEmail($email, $errors);
-        self::validateUsername($username, $errors);
+
+        if (self::validateUsername($username, $errors)) {
+            self::validateUsernameChars($username, $errors);
+        }
 
         if (! Role::isValid($level)) {
             $errors['user_level'][] = 'Role tidak valid (1-8).';
@@ -137,7 +159,7 @@ class UserService
             throw new ValidationException('Validasi gagal.', $errors);
         }
 
-        // Scoping Admin Satker: akun baru wajib di satkernya sendiri, dan tidak boleh role Super Admin.
+        // Scoping Admin Satker: akun baru wajib di satkernya sendiri, dan hanya role Pegawai/PTT/PPPK (legacy).
         if ($actor->role() === Role::ADMIN_SATKER) {
             if (! empty($data['id_satker']) && (string) $data['id_satker'] !== $actor->idSatker()) {
                 throw new ForbiddenException('Admin Satker hanya dapat membuat akun di satkernya sendiri.');
@@ -145,8 +167,8 @@ class UserService
             $data['id_satker'] = $actor->idSatker();
             $data['id_unit']   = $data['id_unit'] ?? $actor->idUnit();
 
-            if ($level === Role::SUPER_ADMIN) {
-                throw new ForbiddenException('Admin Satker tidak dapat membuat akun Super Admin.');
+            if (! in_array($level, Role::UL_PEGAWAI, true)) {
+                throw new ForbiddenException('Admin Satker hanya dapat membuat akun Pegawai/PTT/PPPK.');
             }
         }
 
@@ -158,7 +180,7 @@ class UserService
             throw new ValidationException('Validasi gagal.', ['username' => ['Username sudah dipakai.']]);
         }
 
-        $id = $this->pengguna->insert([
+        $id = $this->translateDuplicate(fn () => $this->pengguna->insert([
             'nip'                 => $nip,
             'username'            => $username,
             'name'                => $name,
@@ -170,7 +192,7 @@ class UserService
             'id_satker'           => $data['id_satker'] ?? null,
             'status'              => (string) ($data['status'] ?? PenggunaModel::STATUS_ACTIVE) === PenggunaModel::STATUS_INACTIVE ? PenggunaModel::STATUS_INACTIVE : PenggunaModel::STATUS_ACTIVE,
             'password_changed_at' => date('Y-m-d H:i:s'),
-        ]);
+        ]), $nip, $username, null);
 
         return PenggunaModel::toPublic($this->pengguna->find((int) $id));
     }
@@ -189,10 +211,12 @@ class UserService
         $errors = [];
 
         if (array_key_exists('nip', $data)) {
-            $nip     = self::nullableString($data['nip']);
+            $nip     = self::textInput($data, 'nip', $errors);
             $current = self::nullableString($row['nip'] ?? null);
 
-            if ($current !== null) {
+            if (isset($errors['nip'])) {
+                // Bukan teks: pesan sudah dicatat textInput().
+            } elseif ($current !== null) {
                 if ($nip !== $current) {
                     $errors['nip'][] = 'NIP tidak dapat diubah di sini; gunakan fitur ganti NIP (B-06).';
                 }
@@ -209,25 +233,26 @@ class UserService
         }
 
         if (array_key_exists('name', $data)) {
-            $name = self::nullableString($data['name']);
+            $name = self::textInput($data, 'name', $errors);
 
-            if (self::validateName($name, $errors)) {
+            if (! isset($errors['name']) && self::validateName($name, $errors)) {
                 $update['name'] = $name;
             }
         }
 
         if (array_key_exists('email', $data)) {
-            $email = self::nullableString($data['email']);
+            $email = self::textInput($data, 'email', $errors);
 
-            if (self::validateEmail($email, $errors)) {
+            if (! isset($errors['email']) && self::validateEmail($email, $errors)) {
                 $update['email'] = $email;
             }
         }
 
         if (array_key_exists('username', $data)) {
-            $username = trim((string) $data['username']);
+            $username = self::textInput($data, 'username', $errors) ?? '';
+            $changed  = $username !== (string) $row['username'];
 
-            if (self::validateUsername($username, $errors)) {
+            if (! isset($errors['username']) && self::validateUsername($username, $errors) && (! $changed || self::validateUsernameChars($username, $errors))) {
                 if ($this->pengguna->withDeleted()->where('username', $username)->where('id_pengguna !=', $id)->countAllResults() > 0) {
                     $errors['username'][] = 'Username sudah dipakai.';
                 } else {
@@ -241,8 +266,12 @@ class UserService
 
             if (! Role::isValid($level)) {
                 $errors['user_level'][] = 'Role tidak valid (1-8).';
-            } elseif ($actor->role() === Role::ADMIN_SATKER && $level === Role::SUPER_ADMIN) {
-                throw new ForbiddenException('Admin Satker tidak dapat memberikan role Super Admin.');
+            } elseif ($level === (int) $row['user_level']) {
+                // Tidak berubah (form edit selalu mengirim role).
+            } elseif ($actor->role() === Role::ADMIN_SATKER && $id === $actor->idPengguna()) {
+                throw new ForbiddenException('Admin Satker tidak dapat mengubah role akunnya sendiri.');
+            } elseif ($actor->role() === Role::ADMIN_SATKER && ! in_array($level, Role::UL_PEGAWAI, true)) {
+                throw new ForbiddenException('Admin Satker hanya dapat memberikan role Pegawai/PTT/PPPK.');
             } else {
                 $update['user_level'] = $level;
             }
@@ -298,7 +327,17 @@ class UserService
         }
 
         if ($update !== []) {
-            $this->pengguna->update($id, $update);
+            $this->translateDuplicate(
+                fn () => $this->pengguna->update($id, $update),
+                isset($update['nip']) ? (string) $update['nip'] : null,
+                isset($update['username']) ? (string) $update['username'] : null,
+                $id,
+            );
+        }
+
+        // Token reset dipetakan ke akun lewat username: rename membatalkan token yang masih tertunda untuk username lama.
+        if (isset($update['username']) && $update['username'] !== (string) $row['username']) {
+            $this->forgotAttempts?->invalidatePendingTokens((string) $row['username'], time());
         }
 
         // Perubahan role/status/password/satker/NIP langsung berlaku: cabut sesi lama akun tsb (MTC-004). NIP ikut
@@ -368,6 +407,71 @@ class UserService
         return $row;
     }
 
+    /**
+     * Pelanggaran UNIQUE (1062) saat dua permintaan balapan lolos cek aplikasi → cek ulang lalu 422 per field
+     * (pola FaqService::rate / MasterService::translateDuplicate). Error DB lain tetap dilempar (500).
+     */
+    private function translateDuplicate(Closure $work, ?string $nip, ?string $username, ?int $exceptId): mixed
+    {
+        try {
+            return $work();
+        } catch (DatabaseException $e) {
+            if ($e->getCode() !== 1062) {
+                throw $e;
+            }
+
+            $errors = [];
+
+            if ($nip !== null && $this->countOthers('nip', $nip, $exceptId) > 0) {
+                $errors['nip'][] = 'NIP sudah memiliki akun.';
+            }
+
+            if ($username !== null && $this->countOthers('username', $username, $exceptId) > 0) {
+                $errors['username'][] = 'Username sudah dipakai.';
+            }
+
+            if ($errors === []) {
+                throw $e;
+            }
+
+            throw new ValidationException('Validasi gagal.', $errors);
+        }
+    }
+
+    /**
+     * Cek ulang keunikan langsung lewat query builder baru (termasuk akun soft-deleted), bukan lewat state model.
+     */
+    private function countOthers(string $column, string $value, ?int $exceptId): int
+    {
+        $builder = db_connect()->table('pengguna')->where($column, $value);
+
+        if ($exceptId !== null) {
+            $builder->where('id_pengguna !=', $exceptId);
+        }
+
+        return $builder->countAllResults();
+    }
+
+    /**
+     * Isian teks opsional dari payload: array/objek/boolean → error field (422), bukan "Array to string conversion"
+     * (500). Angka (JSON number) diterima sebagai teks.
+     *
+     * @param array<string, mixed>        $data
+     * @param array<string, list<string>> $errors
+     */
+    private static function textInput(array $data, string $field, array &$errors): ?string
+    {
+        $value = $data[$field] ?? null;
+
+        if ($value !== null && ! is_string($value) && ! is_int($value)) {
+            $errors[$field][] = 'Isian harus berupa teks.';
+
+            return null;
+        }
+
+        return self::nullableString($value);
+    }
+
     private static function nullableString(mixed $value): ?string
     {
         if ($value === null) {
@@ -430,6 +534,24 @@ class UserService
     {
         if ($username === '' || mb_strlen($username) > PenggunaModel::USERNAME_MAX) {
             $errors['username'][] = 'Username wajib diisi (maks. ' . PenggunaModel::USERNAME_MAX . ' karakter).';
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Username baru/diubah: tanpa karakter kontrol/format/tak terlihat (\p{C}: kontrol, zero-width, soft hyphen,
+     * private use, belum ditetapkan). unicode_ci mengabaikan sebagian karakter ini saat membandingkan, sehingga
+     * 'ad<U+200B>min' dianggap sama dengan 'admin' dan tampil sama di daftar akun/audit.
+     *
+     * @param array<string, list<string>> $errors
+     */
+    private static function validateUsernameChars(string $username, array &$errors): bool
+    {
+        if (preg_match('/\p{C}/u', $username) === 1) {
+            $errors['username'][] = 'Username tidak boleh berisi karakter kontrol atau karakter tak terlihat.';
 
             return false;
         }
