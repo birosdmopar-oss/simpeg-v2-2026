@@ -551,7 +551,7 @@ describe('MasterFormDialog — select opsional bisa dikosongkan (CR-011, row_jur
     wrapper.unmount()
   })
 
-  it('edit: mengosongkan row_jurusan → update() membawa row_jurusan kosong (backend menyimpan NULL)', async () => {
+  it('edit: pilihan kosong row_jurusan bisa dipilih lalu update() membawa row_jurusan kosong (backend menyimpan NULL)', async () => {
     const row: MasterRow = {
       id_jenjang_pendidikan: 8,
       jenjang_pendidikan: 'Strata 1',
@@ -565,8 +565,14 @@ describe('MasterFormDialog — select opsional bisa dikosongkan (CR-011, row_jur
     await flushPromises()
     expect(select('row_jurusan').value).toBe('S_1')
 
+    // Pilihan kosong harus aktif di form ubah: di jsdom `value = ''` tetap memilih option disabled, jadi pilih lewat
+    // option itu sendiri setelah memastikan tidak disabled (tanpa :allow-empty test ini gagal).
     const el = select('row_jurusan')
-    el.value = ''
+    const empty = el.options[0]
+    expect(empty?.value).toBe('')
+    expect(empty?.disabled).toBe(false)
+    if (!empty) throw new Error('pilihan kosong row_jurusan tidak ada')
+    empty.selected = true
     el.dispatchEvent(new Event('change'))
     await flushPromises()
     expect(select('row_jurusan').value).toBe('')
@@ -581,7 +587,7 @@ describe('MasterFormDialog — select opsional bisa dikosongkan (CR-011, row_jur
     wrapper.unmount()
   })
 
-  it('tambah: row_jurusan yang dibiarkan kosong tidak dikirim', async () => {
+  it('tambah: row_jurusan yang dibiarkan kosong tidak dikirim (perilaku payload yang sudah ada)', async () => {
     const wrapper = mountJenjang(null)
     await flushPromises()
 
