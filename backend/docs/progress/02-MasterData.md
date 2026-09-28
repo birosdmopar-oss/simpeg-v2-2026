@@ -13,7 +13,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 | G-03 Lokasi Presensi | TODO (blocked) | Kolom `lokasi_presensi` ada di seed; `user_lokasi_presensi` butuh `pegawai` (Fase 3) + `dm_user_lokasi_presensi` |
 | G-04 Kenaikan Pangkat | TODO (blocked) | `gol_pppk` legacy memuat nominal uang makan — tidak ada di seed |
 | G-05 Pendidikan | TODO | Kolom ada di seed; perlu keputusan #5 (`order`) → bisa langsung pakai engine |
-| G-06 Diklat, Hukdis, Konket, Tanda Jasa | **IN_PROGRESS** (⏳ DBV-005/CR-012) | 5 tabel skema legacy (`diklat` DDL [K], 4 tabel [I]) + K5 (`affect_tukin`, `masa_sanksi_bulan`); CRUD role 1 lewat engine generik (4 controller), dropdown UL_ALL; menunggu approval DB Validator & review kode — `backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md` |
+| G-06 Diklat, Hukdis, Konket, Tanda Jasa | **IN_PROGRESS** (⏳ DBV-005/CR-012) | 5 tabel skema legacy (`diklat` DDL [K], 4 tabel [I]) + K5 (`affect_tukin`, `masa_sanksi_bulan`); CRUD role 1 lewat engine generik (4 controller) dan halaman Master Data generik (aksi baris lewat menu ⋮), dropdown UL_ALL; menunggu approval DB Validator & review kode — `backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md` |
 | G-07 Data Umum & Wilayah | **IN_PROGRESS** | agama, jenis_pegawai, jenis_status, wilayah 4 level SELESAI (backend + FE + G-TC). `kantor` belum (blocked DDL) |
 | G-08 Hari Libur | TODO | Kolom ada di seed/Tech Spec; butuh migration `jenis_libur` + validasi overlap (tidak cocok engine generik murni) |
 | G-09 Web Config | TODO (blocked) | Konflik nama kolom `config_key` (seed) vs `config_name` (legacy); daftar key + tipe data belum ada |
