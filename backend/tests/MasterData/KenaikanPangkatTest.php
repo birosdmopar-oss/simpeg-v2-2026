@@ -248,7 +248,8 @@ final class KenaikanPangkatTest extends CIUnitTestCase
 
     /**
      * PK TINYINT signed yang habis (ID 127 terpakai; InnoDB mengulang nilai maksimum → 1062 PRIMARY): tambah → 422
-     * dengan penjelasan, bukan 500. Berlaku untuk semua master AUTO_INCREMENT (G-doc 6.3 #16).
+     * dengan penjelasan, bukan 500. Berlaku untuk semua master AUTO_INCREMENT (G-doc 6.3 #16). Di MariaDB 10.4 kasus
+     * yang sama nyata memberi 167 "Out of range value" dengan hasil 422 yang sama (simulasi di MasterGenericTcTest).
      */
     public function testPangkatFullTinyintKeyGives422(): void
     {

@@ -414,7 +414,8 @@ final class PendidikanTest extends CIUnitTestCase
 
     /**
      * `bidang_pendidikan` PK TINYINT [K] (produksi mulai ID 100, sisa 28 ID): setelah ID 127 terpakai, tambah → 422
-     * dengan penjelasan (1062 PRIMARY dari counter yang habis), bukan 500 (G-doc 6.3 #16).
+     * dengan penjelasan (1062 PRIMARY dari counter yang habis; MariaDB 10.4: 167 "Out of range value"), bukan 500
+     * (G-doc 6.3 #16).
      */
     public function testBidangFullTinyintKeyGives422(): void
     {

@@ -137,7 +137,7 @@ Contoh agama (kode otomatis): `{ "agama": "Kepercayaan" }`
 |---|---|---|
 | 201 | sukses | `data: { <kolom tabel>, order, status, parent_nama? }` |
 | 422 | kode dipakai / nama duplikat / induk tidak ada atau tidak aktif / format salah | `errors: { <field>: ["..."] }` — duplikat nama menyebut kode entri yang sudah ada (dan saran aktifkan kembali / pulihkan kalau entri itu tidak aktif / dihapus) |
-| 422 | master AUTO_INCREMENT yang PK-nya sudah di batas tipe kolom (mis. TINYINT 127; InnoDB memberi 1062 pada PRIMARY) | `message: "Kode <Master> sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database."` tanpa `errors` (CR-011) |
+| 422 | master AUTO_INCREMENT yang PK-nya sudah di batas tipe kolom (mis. TINYINT 127): MySQL 8 InnoDB memberi 1062 pada PRIMARY, MariaDB 10.4 memberi 167 `Out of range value for column '<pk>'` — keduanya diterjemahkan engine; 167 pada kolom lain dan di luar engine tetap 500 | `message: "Kode <Master> sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database."` tanpa `errors` (CR-011) |
 
 ### PUT /master/{entity}/{kode}
 Parsial; field yang dikirim wajib terisi. Pindah induk → entri ditaruh di akhir induk baru, urutan induk lama dirapikan. `order` (kalau dikirim) memindah posisi; untuk entri berstatus `10` ditolak 422 kecuali sekaligus dipulihkan (`status` 1/2). `status` yang dikirim wajib `1`/`2` (`null`/`''` → 422, bukan diam-diam diaktifkan).
