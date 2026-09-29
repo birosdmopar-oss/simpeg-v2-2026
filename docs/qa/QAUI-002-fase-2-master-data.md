@@ -10,6 +10,8 @@
 | **Hasil** | **1 grup master bisa diuji (G-07), 8 grup belum ada UI** |
 | **Status penulisan Trello** | Ditunda — pengembangan Fase 2 (prompt DEV-003 2/2) belum selesai karena ISSUE-003. Hanya temuan layout form yang dicatat (ISSUE-007). QA UI penuh diulang setelah G-01 s.d. G-10 selesai |
 
+> **Catatan tambahan 29-09-2026:** cara membaca kriteria #1 (layout form) dan #3 (toggle switch) diperbarui oleh keputusan user — lihat bagian "Catatan tambahan 29-09-2026" di akhir dokumen sebelum menjalankan ulang QA Lapis 1. Hasil QA 23-09-2026 di bawah tidak diubah.
+
 ## Keterbatasan acuan Figma
 
 File Figma dibuka dalam mode lihat (view-only). Halaman **Main** berisi: Dashboard Admin/Pimpinan, Daftar/Detail Pegawai, Laporan, Struktur Organisasi, Status Layanan, Chat Admin, FAQ (Topic List/Chat), Portal Berita, Notif, Analytics. Halaman **Component** berisi: Avatar, Dropdown, Checkbox, Input, dan palet warna (Primary, Semantic, Color).
@@ -53,3 +55,11 @@ Menurut `backend/docs/progress/02-MasterData.md`, UI yang sudah dibangun hanya *
 1. Layout form (kriteria #1) memakai komponen bersama `FormField` (label di atas). Perbaikan di satu komponen akan berlaku ke semua grup master, sesuai prinsip "polanya sama" di kartu QAUI-002. Perlu dipastikan dulu apakah Modul A (Login, Manajemen Akun) juga harus mengikuti pola label-kiri, karena komponen yang sama dipakai di sana.
 2. Data master di DB dev diisi dari nilai `MasterDataSeeder` untuk keperluan QA (agama Konghucu di-set Non-aktif agar kedua badge terlihat).
 3. Uji dilakukan di viewport desktop; tampilan mobile tidak termasuk kriteria QAUI-002 (ADR-028: modul admin cukup tablet ke atas).
+
+## Catatan tambahan 29-09-2026
+
+Dicatat CR-022 berdasarkan keputusan user 29-09-2026. Hasil, bukti, dan status per QASMTASK di atas (eksekusi 23-09-2026, commit `7494ce7`) tidak diubah; catatan ini hanya menetapkan cara membaca kriteria untuk QA Lapis 1 berikutnya.
+
+1. **Kriteria #1** ("grid 2 kolom, label kiri + input kanan") dibaca sesuai redesign: **label di atas input, dua field per baris** (grid 2 kolom berisi field). Keputusan user atas ISSUE-007: layout form admin (Master Data, FAQ admin, Hari Libur, Manajemen Akun) ikut redesign dan diselesaikan lewat kartu Frontend-UI **MIG-001b** di branch redesign (`FormField` → `UiTextField`/`UiSelect`/`UiCheckbox`), tidak dikerjakan terpisah di main. Ini juga menjawab Catatan #1 di atas soal Modul A: Manajemen Akun ikut pola yang sama. QA Lapis 1 dijalankan ulang dengan tafsir ini setelah MIG-001b masuk main.
+2. **Kriteria #3** ("toggle switch status aktif/non-aktif") dibaca sebagai **aksi status Aktifkan/Nonaktifkan lewat menu ⋮** per baris (CR-015, `AGENTS.md` §1); kolom Status hanya menampilkan badge Aktif / Tidak Aktif / Dihapus. Switch per baris yang diuji 23-09-2026 sudah diganti menu ⋮ di main.
+3. Rujukan: `backend/docs/progress/02-MasterData.md` bagian "Keputusan user 29-09-2026"; `docs/qa/QAFUNC-003-fase-2-g04-g08.md` bagian "Koreksi 29-09-2026".
