@@ -3,3 +3,58 @@
 @tailwind utilities;
 
 /* Design token global ditaruh di tailwind.config.js (theme.extend). Dark mode out of scope (ADR-028). */
+
+@layer base {
+  html {
+    /* Public Sans dimuat lewat <link> Google Fonts di index.html; fallback ada di fontFamily.sans. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-slate-50 font-sans text-body1 text-slate-700;
+  }
+
+  /* Prinsip desain 1.2 "Aksesibilitas dan Inklusivitas" (WCAG 2.1 AA): fokus keyboard harus selalu terlihat. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-tertiary/50 ring-offset-2 ring-offset-white;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Latar aplikasi redesign: gradasi lembut biru→oranye di belakang sidebar mengambang. */
+  .app-canvas {
+    background-image:
+      radial-gradient(60rem 32rem at -10% -8%, rgb(33 122 255 / 0.18), transparent 60%),
+      radial-gradient(44rem 28rem at -6% 78%, rgb(255 192 67 / 0.22), transparent 62%),
+      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+
+  /* Scrollbar tipis untuk panel yang bisa digulir (sidebar, daftar chat, riwayat kehadiran). */
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
