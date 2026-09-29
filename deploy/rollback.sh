@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
-# SIMPEG v2 — rollback release di server Dev (F0-18)
+# SIMPEG v2 — rollback / aktifkan release di server Dev (F0-18)
 #
 #   ./rollback.sh                 # kembali ke release `previous`
-#   ./rollback.sh <release-id>    # kembali ke release tertentu (lihat: ls releases/)
+#   ./rollback.sh <release-id>    # pindah ke release tertentu (lihat: ls releases/), termasuk mengaktifkan
+#                                 # release yang DITAHAN hook karena migration tertunda — hanya setelah
+#                                 # migrate manual lewat runbook selesai (README-deploy.md §3a, ISSUE-014)
 #
 # Hanya memindahkan symlink `current`; tidak menyentuh database.
-# Kalau release yang gagal sempat menjalankan migration baru, jalankan manual:
-#   cd current/backend && php spark migrate:rollback -b <batch>
+# Kalau release yang dibatalkan membawa migration yang sudah dijalankan dan harus dibatalkan, jalankan
+# rollback DB dari direktori release ITU (file migration + down() hanya ada di sana; dari release lama CI4
+# menolak dengan "gap in the migration sequence"):
+#   cd releases/<release-yang-membawa-migration>/backend && php spark migrate:rollback -b <batch>
 # =============================================================================
 set -euo pipefail
 
@@ -33,7 +37,13 @@ if [ ! -d "$target_dir" ]; then
     exit 1
 fi
 
-cur="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
+target_dir="$(readlink -f "$target_dir")"
+
+# `current` belum ada (mis. release pertama yang ditahan hook): jangan buat `previous` yang menunjuk ke `current`.
+cur=""
+if [ -L "$CURRENT_LINK" ]; then
+    cur="$(readlink -f "$CURRENT_LINK")"
+fi
 if [ -n "$cur" ] && [ "$cur" != "$target_dir" ]; then
     ln -sfn "$cur" "$PREVIOUS_LINK"
 fi
