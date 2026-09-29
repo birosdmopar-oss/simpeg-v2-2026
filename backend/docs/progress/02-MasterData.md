@@ -125,6 +125,8 @@ Perluasan engine di CR-009 (fondasi DBV-003/004/005, berlaku generik, tanpa mast
 - Scaffolding anti-konflik: blok `// --- DBV-00X ---` di `Config\MasterData`, `masterFixtures()`, `MasterDataSeeder`; daftar master admin-only di `RbacMasterEndpointsTest` dibaca dari config.
 - Belum: kunci baris ID "sakti" (E7), hook saat ubah status/pulihkan, kolom tambahan di options (E3) — menunggu keputusan grup masing-masing. Tabel daftar admin (`MasterDataView`) belum menampilkan field tambahan (ref/boolean/field lingkup urutan): tanpa filter lingkup terpilih, kolom "Urutan" master ber-`orderScope` menampilkan nomor per lingkup (1,2,3,1,2,…) tanpa kolom lingkupnya. `UNIQUE(cpns, order)` pangkat ditunda di DBV-004.
 
+Perbaikan engine CR-020 (ISSUE-020, temuan RACE-ORDER QAFUNC-002-R2; tanpa perubahan skema): semua tulis master (tambah, ubah, status/pulihkan, urutan, hapus) diserialkan named lock `GET_LOCK` per database + prefix + **tabel** (pola hari libur, batas tunggu 10 detik, sibuk → 409 "Data <Master> sedang diubah pengguna lain. Coba lagi." tanpa tulis), diambil sebelum transaksi dan dilepas sesudahnya — tambah/sisip/pindah lingkup/pulihkan paralel di lingkup urutan yang sama kini rapat 1..n tanpa kembar (sebelumnya 3 tambah paralel → `[1,2,3,3,3]`). Test: `tests/MasterData/MasterWriteLockTest` (409 deterministik + worker proses paralel `tests/_support/Scripts/master_write_worker.php`).
+
 ## Perubahan di luar folder Modul G (bug yang ditemukan — scope diperluas sesuai 00-INDEX)
 
 - `app/Models/BaseAuditableModel.php` — `rowKey()` meng-cast semua PK numerik ke int → kode `'01'` tercatat `1` di `audit_logs`. Diperbaiki: hanya integer kanonik yang di-cast.
