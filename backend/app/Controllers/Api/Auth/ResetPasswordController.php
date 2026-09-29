@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api\Auth;
 
 use App\Controllers\Api\ApiController;
+use App\Models\Auth\PenggunaModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
@@ -26,7 +27,7 @@ class ResetPasswordController extends ApiController
     public function forgot(): ResponseInterface
     {
         $data = $this->validateOrFail($this->payload(), [
-            'username'      => 'required|string|max_length[30]',
+            'username'      => 'required|string|max_length[' . PenggunaModel::USERNAME_MAX . ']',
             'captcha_token' => 'permit_empty|string',
         ]);
 

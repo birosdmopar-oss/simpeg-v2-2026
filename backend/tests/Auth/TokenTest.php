@@ -59,7 +59,9 @@ final class TokenTest extends CIUnitTestCase
         $result->assertStatus(200);
         $json = $this->json($result);
         $this->assertNotSame($access, $json['data']['access_token']);
-        $this->assertSame(self::NIP, service('jwt')->verifyAccessToken($json['data']['access_token'])['sub']);
+        $claims = service('jwt')->verifyAccessToken($json['data']['access_token']);
+        $this->assertSame(self::NIP, $claims['nip']);
+        $this->assertSame((string) $this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray()['id_pengguna'], $claims['sub']);
 
         $newRefresh = (string) $this->responseCookie($result, 'refresh_token');
         $this->assertNotSame($refresh, $newRefresh);
@@ -107,7 +109,7 @@ final class TokenTest extends CIUnitTestCase
     {
         $jwt = service('jwt');
         $jwt->setNow(time() - 7 * 86400 - 1);
-        $tokens = $jwt->issueTokenPair(['sub' => self::NIP, 'role' => 2]);
+        $tokens = $jwt->issueTokenPair($this->claimsForNip(self::NIP));
         $jwt->setNow(null);
 
         $this->setRefreshCookie($tokens['refresh_token']);
@@ -184,7 +186,7 @@ final class TokenTest extends CIUnitTestCase
     {
         $jwt = service('jwt');
         $jwt->setNow(time() - 3601);
-        $token = $jwt->issueAccessToken(['sub' => self::NIP, 'role' => 2]);
+        $token = $jwt->issueAccessToken($this->claimsForNip(self::NIP));
         $jwt->setNow(null);
 
         $this->withBearer($token)->get('api/v1/auth/me')->assertStatus(401);
@@ -258,7 +260,7 @@ final class TokenTest extends CIUnitTestCase
     {
         $jwt = service('jwt');
         $jwt->setNow(time() - 7 * 86400 - 1);
-        $tokens = $jwt->issueTokenPair(['sub' => self::NIP, 'role' => 2]);
+        $tokens = $jwt->issueTokenPair($this->claimsForNip(self::NIP));
         $jwt->setNow(null);
 
         return $tokens['refresh_token'];

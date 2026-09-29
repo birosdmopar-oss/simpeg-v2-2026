@@ -22,6 +22,14 @@ final class Role
     public const PIMPINAN           = 8;
 
     /**
+     * Role pegawai (konstanta legacy UL_PEGAWAI): akun role ini WAJIB punya NIP. Role lain (1/3/4/5/8) boleh tanpa NIP
+     * (K2, DBV-010) — legacy memaksa NIP-nya NULL, v2 membolehkan NIP terisi [V2].
+     *
+     * @var list<int>
+     */
+    public const UL_PEGAWAI = [self::PEGAWAI, self::PTT, self::PPPK];
+
+    /**
      * @var array<int, string>
      */
     private const LABELS = [
@@ -57,6 +65,14 @@ final class Role
     public static function label(int $role): string
     {
         return self::LABELS[$role] ?? 'Unknown';
+    }
+
+    /**
+     * Akun dengan role ini wajib punya NIP (UL_PEGAWAI).
+     */
+    public static function wajibNip(int $role): bool
+    {
+        return in_array($role, self::UL_PEGAWAI, true);
     }
 
     /**

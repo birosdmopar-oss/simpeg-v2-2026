@@ -22,9 +22,9 @@ class PasswordService
     ) {
     }
 
-    public function change(string $nip, string $oldPassword, string $newPassword, string $confirmation): void
+    public function change(int $idPengguna, string $oldPassword, string $newPassword, string $confirmation): void
     {
-        $user = $this->pengguna->findByNip($nip);
+        $user = $this->pengguna->find($idPengguna);
 
         if ($user === null) {
             throw new NotFoundException('Akun tidak ditemukan.');
@@ -36,14 +36,14 @@ class PasswordService
 
         $this->assertNewPassword($newPassword, $confirmation, $oldPassword);
 
-        $this->pengguna->update((int) $user['id_pengguna'], [
+        $this->pengguna->update($idPengguna, [
             'password'            => $this->passwords->hash($newPassword),
             'password_legacy'     => null,
             'password_changed_at' => date('Y-m-d H:i:s'),
         ]);
 
         // Seluruh sesi lama tidak berlaku lagi (MTC-006).
-        $this->jwt->revokeAllForNip($nip);
+        $this->jwt->revokeAllForUser($idPengguna);
     }
 
     /**
