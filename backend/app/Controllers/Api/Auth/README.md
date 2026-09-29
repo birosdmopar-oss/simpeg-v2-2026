@@ -14,7 +14,7 @@ Token: access token JWT 1 jam + refresh token 7 hari (rotating, single-use), ked
 (`access_token` path `/`, `refresh_token` path `/api/v1/auth`). Klien non-browser boleh memakai header
 `Authorization: Bearer <access_token>` dan body `refresh_token`.
 
-Identitas akun (DBV-010/CR-013 ⏳): akun role 1/3/4/5/8 boleh tanpa NIP (K2), jadi identitas akun = `id_pengguna`.
+Identitas akun (DBV-010/CR-013 ✅, di main `6bb29b5`): akun role 1/3/4/5/8 boleh tanpa NIP (K2), jadi identitas akun = `id_pengguna`.
 - Claims JWT: `sub` = id_pengguna (string bilangan bulat), `nip` = NIP akun (null untuk akun tanpa NIP), `ver` = 2,
   `role`, `id_unit`, `id_satker`. Token tanpa `ver` = 2 (format lama, `sub` = NIP) → 401.
 - Baris `token` menyimpan `id_pengguna` (+ `nip` sebagai jejak); pencabutan massal dan reuse detection per akun.
