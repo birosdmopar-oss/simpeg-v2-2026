@@ -14,7 +14,7 @@ use CodeIgniter\Exceptions\ConfigException;
 class MockResetTokenNotifier implements ResetTokenNotifierInterface
 {
     /**
-     * @var list<array{nip: string, username: string, token: string, reset_link: string, expires_at: string}>
+     * @var list<array{id_pengguna: int, nip: string|null, username: string, token: string, reset_link: string, expires_at: string}>
      */
     private array $sent = [];
 
@@ -28,18 +28,19 @@ class MockResetTokenNotifier implements ResetTokenNotifierInterface
     public function send(array $user, string $token, string $resetLink, string $expiresAt): void
     {
         $this->sent[] = [
-            'nip'        => (string) ($user['nip'] ?? ''),
-            'username'   => (string) ($user['username'] ?? ''),
-            'token'      => $token,
-            'reset_link' => $resetLink,
-            'expires_at' => $expiresAt,
+            'id_pengguna' => (int) ($user['id_pengguna'] ?? 0),
+            'nip'         => isset($user['nip']) && $user['nip'] !== '' ? (string) $user['nip'] : null,
+            'username'    => (string) ($user['username'] ?? ''),
+            'token'       => $token,
+            'reset_link'  => $resetLink,
+            'expires_at'  => $expiresAt,
         ];
     }
 
     /**
      * Seluruh tautan yang "terkirim" — untuk assert di test.
      *
-     * @return list<array{nip: string, username: string, token: string, reset_link: string, expires_at: string}>
+     * @return list<array{id_pengguna: int, nip: string|null, username: string, token: string, reset_link: string, expires_at: string}>
      */
     public function sent(): array
     {

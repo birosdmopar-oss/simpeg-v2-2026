@@ -97,10 +97,47 @@ final class AccountProvisionerTest extends CIUnitTestCase
         $this->assertSame(Role::PPPK, $result['pengguna']['user_level']);
     }
 
-    public function testInvalidNipIsRejected(): void
+    /**
+     * DBV-010 — NIP ikut legacy: angka saja, maksimal 18 digit. NIK 16 digit (Non-PNS) diterima; 19 digit, huruf, spasi,
+     * dan kosong ditolak.
+     */
+    public function testNipFollowsLegacyRule(): void
     {
-        $this->expectException(ValidationException::class);
-        $this->provisioner->provisionForPegawai(['nip' => '12345']);
+        foreach (['1234567890123456789', '19900215201502200A', '1990 0215', ''] as $nip) {
+            try {
+                $this->provisioner->provisionForPegawai(['nip' => $nip]);
+                $this->fail("NIP '{$nip}' harus ditolak");
+            } catch (ValidationException $e) {
+                $this->assertSame(['nip'], array_keys($e->getErrors() ?? []));
+            }
+        }
+
+        $nik    = '3171012345678901';
+        $result = $this->provisioner->provisionForPegawai(['nip' => $nik, 'name' => 'Pegawai Non-PNS', 'email' => 'nonpns@example.go.id'], Role::PTT);
+
+        $this->assertTrue($result['created']);
+        $this->assertSame($nik, $result['pengguna']['nip']);
+        $this->assertSame($nik, $result['pengguna']['username']);
+        $this->assertSame('Pegawai Non-PNS', $result['pengguna']['name']);
+        $this->assertSame('nonpns@example.go.id', $result['pengguna']['email']);
+    }
+
+    public function testNameAndEmailAreOptionalButValidated(): void
+    {
+        $result = $this->provisioner->provisionForPegawai(['nip' => self::NIP]);
+        $this->assertNull($result['pengguna']['name']);
+        $this->assertNull($result['pengguna']['email']);
+
+        foreach ([['email' => 'bukan-email'], ['name' => str_repeat('n', 151)]] as $extra) {
+            try {
+                $this->provisioner->provisionForPegawai(['nip' => '200101012025011002'] + $extra);
+                $this->fail('Harus ditolak: ' . json_encode($extra));
+            } catch (ValidationException $e) {
+                $this->assertSame(array_keys($extra), array_keys($e->getErrors() ?? []));
+            }
+        }
+
+        $this->dontSeeInDatabase('pengguna', ['nip' => '200101012025011002']);
     }
 
     public function testGeneratedPasswordSatisfiesPolicy(): void

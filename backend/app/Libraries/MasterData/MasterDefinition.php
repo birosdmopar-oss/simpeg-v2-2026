@@ -74,6 +74,12 @@ final class MasterDefinition
      * @param bool                        $statusChain     options hanya memuat entri yang SELURUH rantai induknya aktif
      *                                                     (pola U3 FAQ), mis. jurusan hilang dari dropdown saat bidangnya
      *                                                     tidak aktif (DBV-004 E6)
+     * @param list<string>                $systemIds       kode baris sistem (CR-010), mis. sentinel LAIN-LAIN wilayah
+     *                                                     (99/9999/9999999/9999999999, DBV-003): tidak tampil di options
+     *                                                     maupun daftar admin, tidak ikut urutan, tidak bisa diubah/
+     *                                                     dinonaktifkan/diurutkan/dihapus, tidak bisa menjadi induk, dan
+     *                                                     hanya bisa dirujuk field ref ber-allowSystem; tetap bisa dibaca
+     *                                                     lewat detail (GET {kode})
      */
     public function __construct(
         public readonly string $key,
@@ -105,6 +111,7 @@ final class MasterDefinition
         public readonly array $uniqueFields = [],
         public readonly array $filters = [],
         public readonly bool $statusChain = false,
+        public readonly array $systemIds = [],
     ) {
         if (! in_array($orderMode, [self::ORDER_SHIFT, self::ORDER_MANUAL], true)) {
             throw new LogicException("orderMode master {$key} tidak dikenal: {$orderMode}.");
@@ -119,7 +126,7 @@ final class MasterDefinition
      *     nameField: string, nameLabel: string, nameMaxLength: int,
      *     parent?: array{field: string, entity: string}|null,
      *     autoIncrement?: bool, hasOrder?: bool, hasStatus?: bool,
-     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool}>,
+     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool, allowSystem?: bool, otherFor?: string}>,
      *     extraSearch?: list<string>,
      *     idDigits?: int,
      *     uniqueScope?: list<string>,
@@ -133,7 +140,8 @@ final class MasterDefinition
      *     orderColumnType?: string,
      *     uniqueFields?: array<int|string, string|list<string>>,
      *     filters?: list<string>,
-     *     statusChain?: bool
+     *     statusChain?: bool,
+     *     systemIds?: list<string>
      * } $config
      */
     public static function fromConfig(string $key, array $config): self
@@ -185,12 +193,36 @@ final class MasterDefinition
             uniqueFields: $uniqueFields,
             filters: $config['filters'] ?? [],
             statusChain: $config['statusChain'] ?? false,
+            systemIds: array_map('strval', $config['systemIds'] ?? []),
         );
     }
 
     public function hasParent(): bool
     {
         return $this->parentField !== null && $this->parentEntity !== null;
+    }
+
+    /**
+     * Baris sistem (opsi systemIds, CR-010), mis. sentinel LAIN-LAIN wilayah.
+     */
+    public function isSystemId(string $id): bool
+    {
+        return in_array($id, $this->systemIds, true);
+    }
+
+    /**
+     * Bentuk kode yang sah: AUTO_INCREMENT = bilangan bulat positif tanpa nol di depan; kode wilayah = tepat N digit;
+     * kode lain = huruf/angka/titik/strip/garis bawah. Selain itu dianggap tidak ada (404), bukan alias entri lain.
+     */
+    public function isCanonicalId(string $id): bool
+    {
+        $pattern = match (true) {
+            $this->autoIncrement     => '/^[1-9][0-9]*\z/',
+            $this->idDigits !== null => '/^[0-9]{' . $this->idDigits . '}\z/',
+            default                  => '/^[A-Za-z0-9._-]+\z/',
+        };
+
+        return preg_match($pattern, $id) === 1;
     }
 
     public function hasAudit(string $column): bool
@@ -360,6 +392,8 @@ final class MasterDefinition
             'order_max'    => $this->isManualOrder() ? $this->orderMax() : null,
             'filters'      => $this->filters,
             'status_chain' => $this->statusChain,
+            // CR-010: kode baris sistem (sentinel LAIN-LAIN) — FE menambahkannya sebagai pilihan field ref ber-allow_system.
+            'system_ids' => $this->systemIds,
         ];
     }
 }

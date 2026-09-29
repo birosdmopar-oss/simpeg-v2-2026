@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Constants\Role;
 use App\Libraries\Auth\AuthService;
 use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Test\TestResponse;
@@ -29,7 +30,95 @@ trait AuthTestTrait
             throw new \RuntimeException("Akun {$nip} tidak ada di seed");
         }
 
+        return $this->issueTokensForUser($user);
+    }
+
+    /**
+     * Claims sesi (format DBV-010: sub = id_pengguna) untuk akun seed ber-NIP.
+     *
+     * @return array<string, mixed>
+     */
+    protected function claimsForNip(string $nip): array
+    {
+        $user = (new PenggunaModel())->withDeleted()->where('nip', $nip)->first();
+
+        if (! is_array($user)) {
+            throw new \RuntimeException("Akun {$nip} tidak ada di seed");
+        }
+
+        return AuthService::claimsFor($user);
+    }
+
+    /**
+     * Terbitkan pasangan token untuk row pengguna apa pun (termasuk akun tanpa NIP, DBV-010).
+     *
+     * @param array<string, mixed> $user
+     *
+     * @return array{access_token: string, refresh_token: string, access_expires_at: int, refresh_expires_at: int}
+     */
+    protected function issueTokensForUser(array $user): array
+    {
         return service('jwt')->issueTokenPair(AuthService::claimsFor($user));
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     *
+     * @return $this
+     */
+    protected function asUser(array $user): static
+    {
+        return $this->withHeaders(['Authorization' => 'Bearer ' . $this->issueTokensForUser($user)['access_token']]);
+    }
+
+    /**
+     * Akun tanpa NIP (role 1/3/4/5/8, K2) dengan password AuthSeeder::PASSWORD (Argon2id). Test yang memakainya WAJIB
+     * memanggil bersihkanDataDbv010() di tearDown(): down() migration DBV-010 menolak akun tanpa NIP.
+     *
+     * @param array<string, mixed> $overrides
+     *
+     * @return array<string, mixed> row pengguna
+     */
+    protected function buatAkunTanpaNip(string $username, int $role = Role::SUPER_ADMIN, array $overrides = []): array
+    {
+        $now  = date('Y-m-d H:i:s');
+        $data = array_merge([
+            'nip'        => null,
+            'username'   => $username,
+            'name'       => 'Akun ' . $username,
+            'email'      => null,
+            'password'   => password_hash(AuthSeeder::PASSWORD, PASSWORD_ARGON2ID),
+            'user_level' => $role,
+            'id_unit'    => 'U01',
+            'id_satker'  => 'S01',
+            'status'     => '1',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $overrides);
+
+        $this->db->table('pengguna')->insert($data);
+
+        /** @var array<string, mixed> $row */
+        $row = $this->db->table('pengguna')->where('id_pengguna', $this->db->insertID())->get()->getRowArray();
+
+        return $row;
+    }
+
+    /**
+     * Bersihkan data yang tidak bisa disimpan skema auth sebelum DBV-010, agar regress (down()) test berikutnya tidak
+     * ditolak: audit berpelaku akun tanpa NIP, akun tanpa NIP / username > 30 / NIP > 20 (hapus fisik).
+     */
+    protected function bersihkanDataDbv010(): void
+    {
+        $this->db->table('audit_logs')->where('id_pengguna_actor IS NOT NULL', null, false)->where('nip_actor', null)->delete();
+        $this->db->table('audit_logs')->where('CHAR_LENGTH(nip_actor) >', 20, false)->delete();
+        $this->db->table('pengguna')
+            ->groupStart()
+            ->where('nip', null)
+            ->orWhere('CHAR_LENGTH(username) >', 30, false)
+            ->orWhere('CHAR_LENGTH(nip) >', 20, false)
+            ->groupEnd()
+            ->delete();
     }
 
     /**

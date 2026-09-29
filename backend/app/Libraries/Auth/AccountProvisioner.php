@@ -16,6 +16,9 @@ use App\Models\Auth\PenggunaModel;
  * membuat password acak yang dikembalikan SEKALI ke pemanggil (Modul B menentukan cara penyampaian,
  * atau pegawai memakai alur lupa password A-07). Keputusan final perlu konfirmasi Tech Lead.
  * Regression test lintas modul dijalankan ulang di akhir Fase 3 (lihat B-05).
+ *
+ * NIP ikut legacy (DBV-010): angka saja, maksimal 18 digit — NIK 16 digit pegawai Non-PNS diterima. Nama dan email akun
+ * diisi dari data pegawai bila tersedia (opsional; akun ber-NIP tidak wajib bernama).
  */
 class AccountProvisioner
 {
@@ -26,7 +29,7 @@ class AccountProvisioner
     }
 
     /**
-     * @param array<string, mixed> $pegawai minimal ['nip' => ..., 'id_unit' => ?, 'id_satker' => ?]
+     * @param array<string, mixed> $pegawai minimal ['nip' => ..., 'id_unit' => ?, 'id_satker' => ?, 'name' => ?, 'email' => ?]
      *
      * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null}
      */
@@ -34,12 +37,23 @@ class AccountProvisioner
     {
         $nip = trim((string) ($pegawai['nip'] ?? ''));
 
-        if (preg_match('/^\d{18}$/', $nip) !== 1) {
-            throw ValidationException::forField('nip', 'NIP harus 18 digit angka.');
+        if (preg_match('/^\d{1,' . PenggunaModel::NIP_MAX_DIGITS . '}$/', $nip) !== 1) {
+            throw ValidationException::forField('nip', 'NIP harus berupa angka, maksimal ' . PenggunaModel::NIP_MAX_DIGITS . ' digit.');
         }
 
         if (! Role::isValid($userLevel)) {
             throw ValidationException::forField('user_level', 'Role tidak valid (1-8).');
+        }
+
+        $name  = trim((string) ($pegawai['name'] ?? ''));
+        $email = trim((string) ($pegawai['email'] ?? ''));
+
+        if (mb_strlen($name) > PenggunaModel::NAME_MAX) {
+            throw ValidationException::forField('name', 'Nama maksimal ' . PenggunaModel::NAME_MAX . ' karakter.');
+        }
+
+        if ($email !== '' && (mb_strlen($email) > PenggunaModel::EMAIL_MAX || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
+            throw ValidationException::forField('email', 'Email tidak valid (maks. ' . PenggunaModel::EMAIL_MAX . ' karakter).');
         }
 
         // Password awal dari pemanggil tunduk pada kebijakan yang sama dengan admin set password (K4).
@@ -60,6 +74,8 @@ class AccountProvisioner
         $id = $this->pengguna->insert([
             'nip'                 => $nip,
             'username'            => $nip,
+            'name'                => $name === '' ? null : $name,
+            'email'               => $email === '' ? null : $email,
             'password'            => $this->passwords->hash($plain),
             'password_legacy'     => null,
             'user_level'          => $userLevel,

@@ -21,13 +21,17 @@ namespace App\Controllers\Api\MasterData;
  *
  * Dropdown berjenjang wilayah 4 level: options provinsi → kabupaten-kota?parent={id_provinsi}
  * → kecamatan?parent={id_kabupaten_kota} → kelurahan?parent={id_kecamatan}.
+ * Sentinel LAIN-LAIN (99/9999/9999999/9999999999, DBV-003) = baris sistem: tidak tampil di options maupun daftar,
+ * tidak bisa diubah/dihapus/menjadi induk (422); hanya bisa dibaca lewat GET {kode} dan dirujuk kolom wilayah kantor.
  *
- * `kantor` menyusul — menunggu DDL legacy (Trello ISSUE-003).
+ * DBV-003/CR-010: `kantor` (kode wilayah berjenjang + LAIN-LAIN, aturan rantai/`*_lain`/kode pos di KantorHooks, nama
+ * unik global), `bidang-kursem`, `instansi-kursem` (DDL legacy, tanpa kolom *_by).
  */
 class UmumController extends BaseMasterController
 {
     protected array $entities = [
         'agama', 'jenis-pegawai', 'jenis-status',
         'provinsi', 'kabupaten-kota', 'kecamatan', 'kelurahan',
+        'kantor', 'bidang-kursem', 'instansi-kursem',
     ];
 }

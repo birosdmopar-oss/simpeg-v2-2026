@@ -22,12 +22,27 @@ use Throwable;
  * - Refresh token : string acak 256-bit, TTL 7 hari, cookie httpOnly; di DB hanya disimpan hash SHA-256.
  * - Refresh bersifat rotating: token lama langsung di-revoke saat dipakai; pemakaian ulang ditolak.
  *
- * Claims wajib: 'sub' (nip) dan 'role'. Claims opsional: 'id_unit', 'id_satker'.
- * Catatan: claims id_unit/id_satker disalin dari row refresh token saat refresh, sehingga bisa stale
+ * Claims wajib: 'sub' (id_pengguna, bilangan bulat positif sebagai string) dan 'role'. Claims opsional: 'nip' (NULL
+ * untuk akun tanpa NIP), 'id_unit', 'id_satker'. Setiap token membawa 'ver' = CLAIMS_VERSION.
+ * Catatan: claims nip/id_unit/id_satker disalin dari row refresh token saat refresh, sehingga bisa stale
  * selama window 7 hari kalau pegawai dimutasi (lihat catatan 00-INDEX.md).
+ *
+ * Format claims v2 (DBV-010/CR-013): identitas akun = id_pengguna, bukan NIP (akun role 1/3/4/5/8 boleh tanpa NIP).
+ * Token format lama (`sub` = NIP, tanpa 'ver') ditolak: access token -> 401, refresh token -> dihapus + 401 "tidak
+ * dikenal", sehingga setiap pengguna login ulang satu kali setelah deploy (tabel token juga dikosongkan migration DBV-010).
  */
 class JwtService
 {
+    /**
+     * Versi format claims. Naikkan bila arti claim berubah; token versi lain ditolak.
+     */
+    public const CLAIMS_VERSION = 2;
+
+    /**
+     * Batas atas `sub` = INT UNSIGNED `pengguna.id_pengguna`.
+     */
+    private const MAX_SUBJECT = 4294967295;
+
     private JwtConfig $config;
 
     private TokenModel $tokens;
@@ -62,24 +77,18 @@ class JwtService
     // ------------------------------------------------------------------
 
     /**
-     * @param array<string, mixed> $claims Wajib berisi 'sub' (nip) dan 'role'.
+     * @param array<string, mixed> $claims Wajib berisi 'sub' (id_pengguna) dan 'role'.
      */
     public function issueAccessToken(array $claims): string
     {
-        $this->assertClaims($claims);
-
         $now     = $this->now();
         $payload = [
-            'iss'       => $this->config->issuer,
-            'iat'       => $now,
-            'nbf'       => $now,
-            'exp'       => $now + $this->config->accessTtl,
-            'jti'       => bin2hex(random_bytes(8)),
-            'sub'       => (string) $claims['sub'],
-            'role'      => (int) $claims['role'],
-            'id_unit'   => $claims['id_unit'] ?? null,
-            'id_satker' => $claims['id_satker'] ?? null,
-        ];
+            'iss' => $this->config->issuer,
+            'iat' => $now,
+            'nbf' => $now,
+            'exp' => $now + $this->config->accessTtl,
+            'jti' => bin2hex(random_bytes(8)),
+        ] + $this->normalizeClaims($claims);
 
         return JWT::encode($payload, $this->config->secret, $this->config->algorithm);
     }
@@ -107,7 +116,8 @@ class JwtService
         /** @var array<string, mixed> $claims */
         $claims = json_decode(json_encode($decoded, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
 
-        if (($claims['iss'] ?? null) !== $this->config->issuer || ! isset($claims['sub'], $claims['role'])) {
+        // Format lama (sub = NIP, tanpa 'ver') atau sub bukan id_pengguna yang valid -> 401 generik (DBV-010).
+        if (($claims['iss'] ?? null) !== $this->config->issuer || ! isset($claims['role']) || ! self::isCurrentFormat($claims)) {
             throw AuthException::invalidToken();
         }
 
@@ -128,23 +138,18 @@ class JwtService
      */
     public function issueRefreshToken(array $claims): array
     {
-        $this->assertClaims($claims);
-
+        $claims    = $this->normalizeClaims($claims);
         $plain     = bin2hex(random_bytes(32));
         $expiresAt = $this->now() + $this->config->refreshTtl;
 
         $this->tokens->insert([
-            'nip'         => (string) $claims['sub'],
+            'id_pengguna' => (int) $claims['sub'],
+            'nip'         => $claims['nip'],
             'token_hash'  => self::hash($plain),
-            'claims_json' => json_encode([
-                'sub'       => (string) $claims['sub'],
-                'role'      => (int) $claims['role'],
-                'id_unit'   => $claims['id_unit'] ?? null,
-                'id_satker' => $claims['id_satker'] ?? null,
-            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-            'expires_at' => date('Y-m-d H:i:s', $expiresAt),
-            'revoked'    => 0,
-            'created_at' => date('Y-m-d H:i:s', $this->now()),
+            'claims_json' => json_encode($claims, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+            'expires_at'  => date('Y-m-d H:i:s', $expiresAt),
+            'revoked'     => 0,
+            'created_at'  => date('Y-m-d H:i:s', $this->now()),
         ]);
 
         return ['token' => $plain, 'expires_at' => $expiresAt];
@@ -188,8 +193,18 @@ class JwtService
             throw AuthException::unknownToken();
         }
 
+        $claims = json_decode((string) ($row['claims_json'] ?? ''), true);
+
+        if (! is_array($claims) || ! self::isCurrentFormat($claims)) {
+            // Baris format lama (sub = NIP, tanpa 'ver'; mis. ditulis kode lama selama jendela deploy DBV-010): tidak
+            // dikenal, bukan reuse. Dihapus seperti logout agar kiriman ulangnya tetap "tidak dikenal".
+            $this->tokens->deleteByHash(self::hash($refreshToken));
+
+            throw AuthException::unknownToken();
+        }
+
         if ((int) $row['revoked'] === 1) {
-            $this->handleReuse((string) $row['nip']);
+            $this->handleReuse((int) $row['id_pengguna']);
         }
 
         if (strtotime((string) $row['expires_at']) <= $this->now()) {
@@ -201,9 +216,6 @@ class JwtService
             throw AuthException::expiredToken();
         }
 
-        /** @var array<string, mixed> $claims */
-        $claims = json_decode((string) $row['claims_json'], true, 512, JSON_THROW_ON_ERROR);
-
         $pair = $this->rotate((int) $row['id'], $claims);
 
         if ($pair !== null) {
@@ -211,13 +223,13 @@ class JwtService
         }
 
         // Kalah race (affected rows 0). Transaksi sudah di-rollback, jadi baca ulang melihat data ter-commit terbaru.
-        // Baris hilang = token dihapus logout atau pencabutan massal (revokeAllForNip) di antara SELECT dan UPDATE →
+        // Baris hilang = token dihapus logout atau pencabutan massal (revokeAllForUser) di antara SELECT dan UPDATE →
         // sama dengan jalur berurutan (unknownToken), bukan reuse. Baris masih ada = sudah dirotasi request lain → reuse.
         if ($this->tokens->find((int) $row['id']) === null) {
             throw AuthException::unknownToken();
         }
 
-        $this->handleReuse((string) $row['nip']);
+        $this->handleReuse((int) $row['id_pengguna']);
     }
 
     /**
@@ -229,18 +241,19 @@ class JwtService
     }
 
     /**
-     * Cabut seluruh sesi milik satu NIP (force logout semua perangkat): ganti/reset password, perubahan atau
+     * Cabut seluruh sesi milik satu akun (force logout semua perangkat): ganti/reset password, perubahan atau
      * penghapusan akun oleh admin. Baris token DIHAPUS seperti logout (bukan `revoked=1`), sehingga refresh token lama
      * di perangkat lain → unknownToken (401) tanpa reuse detection — sesi baru setelah login ulang tidak ikut dicabut
-     * (T-01). Reuse detection sendiri tetap menandai `revoked=1` (handleReuse()).
+     * (T-01). Reuse detection sendiri tetap menandai `revoked=1` (handleReuse()). Kunci = id_pengguna (DBV-010), jadi
+     * akun-akun tanpa NIP tidak saling mencabut sesi.
      *
      * @return int jumlah baris token yang dihapus
      *
      * @throws DatabaseException penghapusan gagal
      */
-    public function revokeAllForNip(string $nip): int
+    public function revokeAllForUser(int $idPengguna): int
     {
-        return $this->tokens->deleteAllForNip($nip);
+        return $this->tokens->deleteAllForUser($idPengguna);
     }
 
     // ------------------------------------------------------------------
@@ -294,6 +307,32 @@ class JwtService
         return hash('sha256', $plain);
     }
 
+    /**
+     * id_pengguna dari claim `sub` (string/int bilangan bulat 1..4294967295 tanpa nol di depan); null bila bukan.
+     */
+    public static function subjectToId(mixed $sub): ?int
+    {
+        if (is_int($sub)) {
+            $sub = (string) $sub;
+        }
+
+        if (! is_string($sub) || preg_match('/^[1-9]\d{0,9}$/', $sub) !== 1 || (int) $sub > self::MAX_SUBJECT) {
+            return null;
+        }
+
+        return (int) $sub;
+    }
+
+    /**
+     * Claims berformat v2: 'ver' = CLAIMS_VERSION dan 'sub' = id_pengguna yang valid.
+     *
+     * @param array<string, mixed> $claims
+     */
+    public static function isCurrentFormat(array $claims): bool
+    {
+        return ($claims['ver'] ?? null) === self::CLAIMS_VERSION && self::subjectToId($claims['sub'] ?? null) !== null;
+    }
+
     private function makeCookie(string $name, string $value, int $ttl, string $path): Cookie
     {
         return new Cookie($name, $value, [
@@ -308,13 +347,30 @@ class JwtService
     }
 
     /**
+     * Claims yang ditandatangani / disimpan: sub (id_pengguna), nip, ver, role, id_unit, id_satker.
+     *
      * @param array<string, mixed> $claims
+     *
+     * @return array{sub: string, nip: string|null, ver: int, role: int, id_unit: mixed, id_satker: mixed}
      */
-    private function assertClaims(array $claims): void
+    private function normalizeClaims(array $claims): array
     {
-        if (! isset($claims['sub']) || (string) $claims['sub'] === '' || ! isset($claims['role'])) {
-            throw new InvalidArgumentException("Claims wajib berisi 'sub' (nip) dan 'role'.");
+        $id = self::subjectToId($claims['sub'] ?? null);
+
+        if ($id === null || ! isset($claims['role'])) {
+            throw new InvalidArgumentException("Claims wajib berisi 'sub' (id_pengguna, bilangan bulat positif) dan 'role'.");
         }
+
+        $nip = $claims['nip'] ?? null;
+
+        return [
+            'sub'       => (string) $id,
+            'nip'       => $nip === null || $nip === '' ? null : (string) $nip,
+            'ver'       => self::CLAIMS_VERSION,
+            'role'      => (int) $claims['role'],
+            'id_unit'   => $claims['id_unit'] ?? null,
+            'id_satker' => $claims['id_satker'] ?? null,
+        ];
     }
 
     /**
@@ -324,7 +380,7 @@ class JwtService
      * Cek revoked di refresh() hanya jalur cepat; UPDATE bersyarat revoked=0 yang menentukan pemenang. Lock baris
      * token lama dari UPDATE itu ditahan sampai token baru ter-commit, sehingga UPDATE request paralel yang kalah
      * menunggu lock, lalu mendapat affected rows 0 dan baru menjalankan reuse detection SETELAH token baru pemenang
-     * ada — revokeAllForNip ikut mencabutnya. Tanpa transaksi, pencabutan massal pihak kalah bisa jatuh di antara
+     * ada — pencabutan reuse ikut mencabutnya. Tanpa transaksi, pencabutan massal pihak kalah bisa jatuh di antara
      * UPDATE dan INSERT pemenang sehingga sesi pemenang lolos.
      *
      * Query gagal di dalam transaksi CI4 tidak melempar exception (apa pun DBDebug-nya), hanya mengembalikan false
@@ -383,14 +439,14 @@ class JwtService
 
     /**
      * Reuse detection (A-05): token yang sudah dirotasi dipakai lagi → indikasi pencurian token.
-     * Seluruh sesi (refresh token aktif) milik nip tersebut ikut dicabut dengan `revoked=1` (bukan dihapus), agar
-     * token hasil rotasi pihak lain tetap terbaca reuse bila dipakai (kontrak race CR-004).
+     * Seluruh sesi (refresh token aktif) milik akun tersebut (id_pengguna) ikut dicabut dengan `revoked=1` (bukan
+     * dihapus), agar token hasil rotasi pihak lain tetap terbaca reuse bila dipakai (kontrak race CR-004).
      *
      * @throws AuthException selalu (reusedToken → 401)
      */
-    private function handleReuse(string $nip): never
+    private function handleReuse(int $idPengguna): never
     {
-        $this->tokens->revokeAllForNip($nip, $this->now());
+        $this->tokens->revokeAllForUser($idPengguna, $this->now());
 
         throw AuthException::reusedToken();
     }

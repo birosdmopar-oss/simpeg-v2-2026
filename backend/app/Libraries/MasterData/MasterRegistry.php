@@ -12,8 +12,9 @@ use LogicException;
  * Registry definisi master (dari Config\MasterData). Dipakai service, controller, dan routing.
  *
  * Konfigurasi diperiksa saat registry dibangun (CR-009): rujukan antar-master (induk, field ref + dependsOn), field
- * yang disebut orderScope/uniqueFields/filters, dan rantai induk yang melingkar. Salah konfigurasi = LogicException,
- * sehingga ketahuan di test pertama, bukan saat data sudah tertulis.
+ * yang disebut orderScope/uniqueFields/filters, dan rantai induk yang melingkar; CR-010: kode systemIds, field ref
+ * ber-allowSystem, dan isian otherFor. Salah konfigurasi = LogicException, sehingga ketahuan di test pertama, bukan
+ * saat data sudah tertulis.
  */
 class MasterRegistry
 {
@@ -123,13 +124,37 @@ class MasterRegistry
             $fail('statusChain hanya untuk master berinduk.');
         }
 
+        // Baris sistem (CR-010): kode kanonik master ini (bentuk yang sama dengan kode entri biasa), tanpa duplikat.
+        foreach (array_count_values($def->systemIds) as $systemId => $count) {
+            if (! $def->isCanonicalId((string) $systemId)) {
+                $fail("systemIds {$systemId} bukan kode kanonik master ini.");
+            }
+
+            if ($count > 1) {
+                $fail("systemIds {$systemId} ditulis lebih dari sekali.");
+            }
+        }
+
         foreach ($def->fields as $field) {
+            // Isian "lainnya" (CR-010) milik field ref ber-allowSystem di master yang sama.
+            if ($field->otherFor !== null) {
+                $target = $def->field($field->otherFor);
+
+                if ($target === null || $target->type !== MasterField::TYPE_REF || ! $target->allowSystem) {
+                    $fail("otherFor field {$field->name} harus menunjuk field ref ber-allowSystem di master yang sama.");
+                }
+            }
+
             if ($field->type !== MasterField::TYPE_REF) {
                 continue;
             }
 
             if (! $this->has((string) $field->entity)) {
                 $fail("field ref {$field->name} merujuk master {$field->entity} yang tidak terdaftar.");
+            }
+
+            if ($field->allowSystem && $this->definitions[(string) $field->entity]->systemIds === []) {
+                $fail("allowSystem field {$field->name}: master {$field->entity} tidak punya systemIds.");
             }
 
             if ($field->dependsOn === null) {

@@ -97,6 +97,7 @@ final class ResetTokenNotifierTest extends CIUnitTestCase
         $sent = $this->notifier->sent();
         $this->assertCount(1, $sent);
         $this->assertSame(self::NIP, $sent[0]['nip']);
+        $this->assertSame((int) $this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray()['id_pengguna'], $sent[0]['id_pengguna']);
         $this->assertSame(self::NIP, $sent[0]['username']);
         // Token di fragment (#), bukan query: tidak dikirim browser ke server → tidak masuk access log / Referer.
         $this->assertSame(self::BASE . '#token=' . $sent[0]['token'], $sent[0]['reset_link']);

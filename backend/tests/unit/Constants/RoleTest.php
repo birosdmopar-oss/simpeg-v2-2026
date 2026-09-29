@@ -29,7 +29,25 @@ final class RoleTest extends CIUnitTestCase
     public function testAllReturnsExactlyEightRoles(): void
     {
         $this->assertSame([1, 2, 3, 4, 5, 6, 7, 8], Role::all());
-        $this->assertCount(8, (new \ReflectionClass(Role::class))->getReflectionConstants(\ReflectionClassConstant::IS_PUBLIC));
+
+        // Konstanta kode role = konstanta publik bernilai int (UL_PEGAWAI adalah daftar, bukan role).
+        $codes = array_filter(
+            (new \ReflectionClass(Role::class))->getReflectionConstants(\ReflectionClassConstant::IS_PUBLIC),
+            static fn (\ReflectionClassConstant $c): bool => is_int($c->getValue()),
+        );
+        $this->assertCount(8, $codes);
+    }
+
+    /**
+     * DBV-010 (K2): role pegawai (UL_PEGAWAI legacy 2/6/7) wajib ber-NIP; role 1/3/4/5/8 boleh tanpa NIP.
+     */
+    public function testUlPegawaiRolesRequireNip(): void
+    {
+        $this->assertSame([Role::PEGAWAI, Role::PTT, Role::PPPK], Role::UL_PEGAWAI);
+
+        foreach (Role::all() as $role) {
+            $this->assertSame(in_array($role, [2, 6, 7], true), Role::wajibNip($role), "role {$role}");
+        }
     }
 
     public function testIsValidAndLabel(): void

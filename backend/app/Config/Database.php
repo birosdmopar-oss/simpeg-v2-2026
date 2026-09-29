@@ -24,6 +24,15 @@ class Database extends Config
     /**
      * The default database connection.
      *
+     * DBV-010/CR-013 (ISSUE-008, ISSUE-010):
+     * - strictOn = true: sesi menambah STRICT_ALL_TABLES, nilai yang tidak muat / di luar rentang ditolak MySQL alih-alih
+     *   dipotong diam-diam. Prasyaratnya sudah di aplikasi: penjaga UTF-8 dan terjemahan error data 1406/1264/1366/
+     *   1292/1265/1364 → 422 (CR-007), batas angka per tipe kolom master (CR-009). NO_ZERO_DATE/NO_ZERO_IN_DATE/
+     *   ERROR_FOR_DIVISION_BY_ZERO tetap bergantung sql_mode server (runbook A-01 Bagian 9).
+     * - DBCollat = utf8mb4_unicode_ci: collation tabel yang dibuat Forge, sama dengan tabel legacy/master. Hanya berlaku
+     *   untuk CREATE TABLE lewat Forge; SQL mentah tetap wajib menulis COLLATE eksplisit.
+     * Jangan di-override di .env server (database.default.strictOn / DBCollat).
+     *
      * @var array<string, mixed>
      */
     public array $default = [
@@ -37,11 +46,11 @@ class Database extends Config
         'pConnect'     => false,
         'DBDebug'      => true,
         'charset'      => 'utf8mb4',
-        'DBCollat'     => 'utf8mb4_general_ci',
+        'DBCollat'     => 'utf8mb4_unicode_ci',
         'swapPre'      => '',
         'encrypt'      => false,
         'compress'     => false,
-        'strictOn'     => false,
+        'strictOn'     => true,
         'failover'     => [],
         'port'         => 3306,
         'numberNative' => false,
@@ -175,7 +184,7 @@ class Database extends Config
         'pConnect'     => false,
         'DBDebug'      => true,
         'charset'      => 'utf8mb4',
-        'DBCollat'     => 'utf8mb4_general_ci',
+        'DBCollat'     => 'utf8mb4_unicode_ci', // sama dengan grup default (DBV-010)
         'swapPre'      => '',
         'encrypt'      => false,
         'compress'     => false,

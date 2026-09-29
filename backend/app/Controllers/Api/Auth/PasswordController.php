@@ -28,7 +28,7 @@ class PasswordController extends ApiController
         $auth = service('authContext');
 
         service('passwordService')->change(
-            (string) $auth->nip(),
+            (int) $auth->idPengguna(),
             (string) $data['old_password'],
             (string) $data['new_password'],
             (string) $data['new_password_confirmation'],

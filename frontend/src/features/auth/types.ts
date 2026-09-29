@@ -31,10 +31,25 @@ export const ROLE_LABELS: Record<RoleCode, string> = {
 /** Role yang boleh membuka menu Manajemen Akun (user/index,add,edit,delete = 1, 3). */
 export const USER_MANAGEMENT_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]
 
+/**
+ * Role pegawai (UL_PEGAWAI legacy, backend Role::UL_PEGAWAI): akun WAJIB punya NIP. Role lain boleh tanpa NIP
+ * (DBV-010/CR-013), dengan nama wajib.
+ */
+export const UL_PEGAWAI: readonly RoleCode[] = [Role.PEGAWAI, Role.PTT, Role.PPPK]
+
+/** Batas kolom akun (backend PenggunaModel). */
+export const USERNAME_MAX = 100
+export const NIP_MAX_DIGITS = 18
+export const ACCOUNT_NAME_MAX = 150
+export const ACCOUNT_EMAIL_MAX = 150
+
+/** Identitas akun = id_pengguna; `nip` null untuk akun non-pegawai (role 1/3/4/5/8). */
 export interface User {
   id_pengguna: number
-  nip: string
+  nip: string | null
   username: string
+  name: string | null
+  email: string | null
   user_level: RoleCode
   id_unit: string | null
   id_satker: string | null
@@ -102,7 +117,7 @@ export interface UserListQuery {
   user_level?: RoleCode | ''
   status?: '0' | '1' | ''
   id_satker?: string
-  sort?: 'username' | 'nip' | 'user_level' | 'status' | 'created_at' | 'last_login_at'
+  sort?: 'username' | 'nip' | 'name' | 'user_level' | 'status' | 'created_at' | 'last_login_at'
   order?: 'asc' | 'desc'
   page?: number
   per_page?: number
@@ -116,7 +131,10 @@ export interface UserListResponse {
 }
 
 export interface UserCreatePayload {
-  nip: string
+  /** Wajib untuk role 2/6/7; null untuk akun non-pegawai. */
+  nip: string | null
+  name?: string | null
+  email?: string | null
   username?: string
   password: string
   user_level: RoleCode
@@ -125,4 +143,5 @@ export interface UserCreatePayload {
   status?: '0' | '1'
 }
 
-export type UserUpdatePayload = Partial<Omit<UserCreatePayload, 'nip'>>
+/** `nip` hanya dikirim untuk menautkan akun yang belum punya NIP (NIP yang sudah ada tidak bisa diubah, B-06). */
+export type UserUpdatePayload = Partial<UserCreatePayload>
