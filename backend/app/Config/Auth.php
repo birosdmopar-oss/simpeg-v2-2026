@@ -64,7 +64,8 @@ class Auth extends BaseConfig
 
     /**
      * Kalau true (HANYA development), token ikut dikembalikan di response forgot-password agar alur bisa diuji
-     * end-to-end tanpa kanal pengiriman. WAJIB false di production.
+     * end-to-end tanpa kanal pengiriman. DITOLAK di production (ISSUE-021): forgot-password gagal 500
+     * (ConfigException) yang sama untuk semua username; reset-password tidak terpengaruh.
      */
     public bool $exposeResetTokenInResponse = false;
 
@@ -91,6 +92,8 @@ class Auth extends BaseConfig
 
     /**
      * 'turnstile' = verifikasi ke Cloudflare (butuh secret key); 'mock' = untuk lokal/test, tanpa network.
+     * 'mock' DITOLAK di production (ISSUE-021, ConfigException): login, refresh/logout, dan lupa/reset password
+     * gagal 500 sampai .env diperbaiki.
      */
     public string $captchaDriver = 'turnstile';
 

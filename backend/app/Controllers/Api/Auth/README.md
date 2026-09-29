@@ -58,6 +58,8 @@ Request `{ "username": "198501012010011001", "password": "Password123!", "captch
 
 Lazy rehash (A-02b): kalau `password` NULL, verifikasi ke `password_legacy` (MD5); cocok → `password` diisi Argon2id, `password_legacy` NULL.
 
+Captcha (A-03) dipilih `auth.captchaDriver`: `turnstile` (Cloudflare, butuh `auth.turnstileSecretKey`; secret kosong → semua captcha ditolak 422 + log error) atau `mock` (lokal/test: token kosong/`invalid` ditolak, selain itu diterima). `mock` **ditolak di production** (ISSUE-021, ConfigException): login, refresh/logout, serta lupa/reset password gagal 500 sampai `.env` diperbaiki.
+
 ### POST /auth/refresh
 Tanpa body (cookie `refresh_token`) atau `{ "refresh_token": "..." }`. 200 `data: { access_token, access_expires_at, refresh_expires_at }` + cookie baru.
 401 kalau token tidak ada / tidak dikenal (termasuk sudah di-logout, dicabut massal, atau berformat lama sebelum DBV-010 — barisnya dihapus) / kedaluwarsa / **sudah pernah dipakai (reuse) → seluruh sesi akun (per `id_pengguna`) dicabut**.
@@ -81,7 +83,7 @@ Request `{ "old_password", "new_password", "new_password_confirmation" }`.
 Kebijakan password (K4, ikut legacy; satu sumber `App\Libraries\Auth\PasswordPolicy`, dicerminkan frontend `PASSWORD_RULES`): min `auth.passwordMinLength` (8) karakter, minimal 1 huruf besar, 1 huruf kecil, dan 1 angka; untuk ganti password juga harus beda dari password lama. Berlaku untuk semua jalur yang menetapkan password (ganti, reset, admin buat/ubah akun, password awal A-09). Login tidak memeriksa kebijakan: password lama yang tidak memenuhi aturan tetap bisa dipakai dan tidak dipaksa diganti.
 
 ### POST /auth/forgot-password
-Request `{ "username", "captcha_token": "<cf-turnstile-response>" }`. 200 selalu generik `data: { accepted:true, message }`; di development (`auth.exposeResetTokenInResponse=true`) ditambah `token`, `expires_at`.
+Request `{ "username", "captcha_token": "<cf-turnstile-response>" }`. 200 selalu generik `data: { accepted:true, message }`; di development (`auth.exposeResetTokenInResponse=true`) ditambah `token`, `expires_at`. Flag itu **ditolak di production** (ISSUE-021): sesudah captcha valid, forgot-password gagal 500 (ConfigException) yang sama untuk semua username tanpa menulis `forgot_attempts`; reset-password tidak terpengaruh.
 422 captcha kosong/invalid — dicek PALING AWAL seperti login, sehingga percobaan tanpa captcha valid tidak tercatat di `forgot_attempts` dan tidak menghabiskan kuota username korban.
 429 kalau > `auth.forgotMaxPerWindow` (3) permintaan per `auth.forgotWindowMinutes` (60) untuk username yang sama.
 

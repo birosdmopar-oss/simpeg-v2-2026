@@ -16,7 +16,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  *       development). Tautan reset dikirim lewat driver auth.resetTokenNotifier (ResetTokenNotifierInterface).
  *   422 captcha kosong/invalid (dicek SEBELUM rate limit, pola login) atau username kosong
  *   429 kalau melebihi rate limit forgot_attempts
- *   500 kanal pengiriman belum dikonfigurasi (mis. driver log/mock di production) — sama untuk semua username
+ *   500 kanal pengiriman belum dikonfigurasi (mis. driver log/mock di production) atau salah konfigurasi production
+ *       (captcha mock, exposeResetTokenInResponse=true) — sama untuk semua username
  * POST api/v1/auth/reset-password   { token, new_password, new_password_confirmation }
  *   200 { reset:true } — token reset lain milik akun dibatalkan, seluruh refresh token akun dicabut (satu transaksi)
  *   422 token invalid / sudah dipakai / tidak berlaku lagi (dibatalkan) / kedaluwarsa / kebijakan password
