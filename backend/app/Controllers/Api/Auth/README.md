@@ -109,6 +109,17 @@ Dua request paralel untuk akun yang sama (token sama atau berbeda): hanya satu y
 Query index: `search` (username/nip/name LIKE), `user_level`, `status`, `id_satker` (role 1 saja), `sort` (username|nip|name|user_level|status|created_at|last_login_at), `order`, `page`, `per_page` (≤100).
 Response index: `data: { items:[user...], total, page, per_page }`; `user` = `{ id_pengguna, nip (null untuk akun tanpa NIP), username, name, email, user_level, id_unit, id_satker, status, last_login_at, created_at, updated_at }`.
 
+Parameter daftar diperiksa `App\Libraries\ListQuery` — aturan sama persis dengan daftar master `/master/{entity}` (ISSUE-019/CR-016):
+
+| Aturan | Perilaku |
+|---|---|
+| **Nilai tunggal** | Setiap parameter daftar (`search`, `user_level`, `status`, `id_satker`, `sort`, `order`, `page`, `per_page`) hanya boleh berisi satu nilai teks/angka. Bentuk array atau objek — `?search[]=a`, `?status[]=1`, `?sort[]=nip`, yang sah menurut PHP — → **422** `message: "Parameter daftar tidak valid."`, `errors: { <key>: ["Parameter ini hanya boleh berisi satu nilai teks atau angka."] }`. Beberapa key salah sekaligus dikumpulkan jadi **satu** respons yang memuat semuanya. Sebelumnya 500 (`Array to string conversion`) |
+| **`page`** | Bilangan bulat **1..1.000.000**. Selain itu (0, negatif, bukan angka, atau nilai yang melewati jangkauan int seperti `?page=99999999999999999999`) → **422** `errors: { page: ["Halaman harus berupa angka bulat 1 sampai 1000000."] }`; sebelumnya nilai sebesar itu membuat offset `(page - 1) * per_page` meluap → 500. Tidak dikirim atau `?page=` kosong = halaman 1 |
+| **Halaman di luar data** | Halaman **valid** yang melewati jumlah data **bukan** error: tetap **200** dengan `items: []`, sedangkan `total` tetap berisi jumlah seluruh akun yang cocok |
+| **`per_page`** | **Dijepit** ke 1..100 (bawaan 20), tidak ditolak: `?per_page=9999` → 100, `?per_page=0` → 1 |
+| **`search`** | Dipangkas spasi di awal/akhir. `%`, `_`, dan `!` dicari sebagai **teks biasa**, bukan wildcard LIKE (`!` = ESCAPE char Query Builder CI4) — `?search=%` mencari karakter `%` dan tidak lagi mencocokkan seluruh akun |
+| **Filter lain** | `user_level`, `status`, dan `id_satker` dipangkas spasi; nilai kosong = tidak menyaring. `sort` di luar allowlist → `username`, `order` selain `desc` → `ASC` (tidak berubah) |
+
 Create `{ nip?, name?, email?, username?, password, user_level (1-8), id_unit?, id_satker?, status? }` → 201 `data: user`. Aturan akun (DBV-010/CR-013, ikut legacy `L_user`):
 - `nip` angka, maks. 18 digit (NIK 16 digit Non-PNS diterima); **wajib** untuk role 2/6/7 (UL_PEGAWAI), opsional untuk role 1/3/4/5/8 (`null`/kosong = akun tanpa NIP).
 - akun tanpa NIP wajib `name` (≤ 150) dan `username`; `username` default = NIP, maks. 100, unik, tanpa karakter

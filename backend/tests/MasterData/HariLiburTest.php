@@ -188,17 +188,23 @@ final class HariLiburTest extends CIUnitTestCase
         $this->assertSame(['2', '1'], $this->ids($page));
         $this->assertSame([5, 2, 2], [$page['total'], $page['page'], $page['per_page']]);
 
-        // per_page dibatasi 100; page raksasa tidak meluap jadi float (500) melainkan halaman kosong.
+        // per_page dijepit 1..100; page di luar 1..1.000.000 (termasuk nilai raksasa) → 422 seperti daftar master/akun
+        // (ISSUE-019/CR-016), bukan halaman kosong; page valid di luar data tetap 200 kosong.
         $this->assertSame(100, $this->listData(['per_page' => '1000'])['per_page']);
+        $this->assertSame(1, $this->listData(['per_page' => '0'])['per_page']);
 
         foreach ([Role::SUPER_ADMIN, Role::PIMPINAN] as $role) {
             $this->asRole($role);
 
-            foreach (['9223372036854775807', '1e18', '99999999999999999999'] as $huge) {
-                $far = $this->listData(['page' => $huge, 'per_page' => '100']);
-                $this->assertSame([], $far['items'], "page={$huge} role {$role}");
-                $this->assertSame(intdiv(PHP_INT_MAX, 100), $far['page'], "page={$huge} role {$role}");
+            foreach (['0', '-1', '1e18', '1000001', '9223372036854775807', '99999999999999999999'] as $bad) {
+                $result = $this->get(self::BASE, ['page' => $bad]);
+                $result->assertStatus(422);
+                $this->assertArrayHasKey('page', $this->json($result)['errors'], "page={$bad} role {$role}");
             }
+
+            $far = $this->listData(['page' => '1000000', 'per_page' => '100']);
+            $this->assertSame([], $far['items'], "role {$role}");
+            $this->assertSame(1000000, $far['page'], "role {$role}");
         }
 
         $this->asRole(Role::SUPER_ADMIN);
