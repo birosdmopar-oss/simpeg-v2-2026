@@ -22,7 +22,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  *
  * Role 1: seluruh akun. Role 3: hanya akun dengan id_satker miliknya (di luar itu → 403). Role lain → 403.
  * Setiap field body hanya boleh null/teks/angka bulat: array/objek/boolean → 422 "Isian harus berupa teks." per field
- * (validateTextOrFail, ISSUE-023/CR-019).
+ * (validateTextOrFail, ISSUE-023/CR-019). Email yang dipakai akun lain → 422 errors.email (syarat DBV-010 D-6, detail di
+ * UserService).
  */
 class UserController extends ApiController
 {

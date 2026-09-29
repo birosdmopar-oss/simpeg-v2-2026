@@ -24,6 +24,11 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  * NIP sudah dipakai sebagai username akun LAIN (username bebas akun non-pegawai, termasuk akun terhapus) → 422
  * errors.nip berpesan jelas, akun tidak dibuat dan tidak ditautkan ke akun itu (ISSUE-023/CR-019; sebelumnya 1062 →
  * 500). Balapan dua proses untuk NIP yang sama tetap idempoten (yang kalah menerima akun yang sudah ada, created=false).
+ *
+ * Email (syarat DBV-010 D-6, CR-019): email pegawai yang sudah dipakai akun lain yang belum dihapus (dibandingkan
+ * collation unicode_ci) TIDAK ikut disimpan — akun tetap dibuat tanpa email dan hasil memuat `email_skipped: true`
+ * agar pemanggil (B-05) memberi tahu admin. Pegawai tidak digagalkan karena email: satu orang bisa sudah punya akun
+ * non-pegawai dengan email yang sama. Perilaku final dikonfirmasi saat B-05.
  */
 class AccountProvisioner
 {
@@ -36,7 +41,7 @@ class AccountProvisioner
     /**
      * @param array<string, mixed> $pegawai minimal ['nip' => ..., 'id_unit' => ?, 'id_satker' => ?, 'name' => ?, 'email' => ?]
      *
-     * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null}
+     * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null, email_skipped: bool}
      */
     public function provisionForPegawai(array $pegawai, int $userLevel = Role::PEGAWAI, ?string $initialPassword = null): array
     {
@@ -71,13 +76,20 @@ class AccountProvisioner
         $existing = $this->pengguna->withDeleted()->where('nip', $nip)->first();
 
         if (is_array($existing)) {
-            return ['pengguna' => PenggunaModel::toPublic($existing), 'created' => false, 'initial_password' => null];
+            return ['pengguna' => PenggunaModel::toPublic($existing), 'created' => false, 'initial_password' => null, 'email_skipped' => false];
         }
 
         // ISSUE-023: username = NIP sudah dipegang akun lain (username bebas akun non-pegawai, termasuk akun terhapus —
         // UNIQUE username mencakup baris soft-deleted). Gagal dengan pesan jelas; akun tidak dibuat/ditautkan diam-diam.
         if ($this->pengguna->withDeleted()->where('username', $nip)->countAllResults() > 0) {
             throw self::usernameTaken();
+        }
+
+        // D-6: jangan menulis email duplikat; akun dibuat tanpa email dan pemanggil diberi penanda.
+        $emailSkipped = $email !== '' && $this->pengguna->emailTaken($email);
+
+        if ($emailSkipped) {
+            $email = '';
         }
 
         $plain = $initialPassword ?? self::generatePassword();
@@ -108,7 +120,7 @@ class AccountProvisioner
 
             if (is_array($raced)) {
                 // Proses lain lebih dulu membuat akun untuk NIP yang sama: tetap idempoten.
-                return ['pengguna' => PenggunaModel::toPublic($raced), 'created' => false, 'initial_password' => null];
+                return ['pengguna' => PenggunaModel::toPublic($raced), 'created' => false, 'initial_password' => null, 'email_skipped' => false];
             }
 
             if ($db->table('pengguna')->where('username', $nip)->countAllResults() > 0) {
@@ -121,7 +133,7 @@ class AccountProvisioner
         /** @var array<string, mixed> $row */
         $row = $this->pengguna->find((int) $id);
 
-        return ['pengguna' => PenggunaModel::toPublic($row), 'created' => true, 'initial_password' => $plain];
+        return ['pengguna' => PenggunaModel::toPublic($row), 'created' => true, 'initial_password' => $plain, 'email_skipped' => $emailSkipped];
     }
 
     /**

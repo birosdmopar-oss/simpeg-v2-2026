@@ -43,6 +43,10 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  *   sampai audit data produksi (keputusan B). Username lama hasil impor tidak dinilai ulang selama tidak diubah.
  * - Balapan cek-lalu-tulis (dua admin menautkan NIP/username yang sama): pelanggaran UNIQUE (1062) diterjemahkan ulang
  *   ke 422 per field lewat cek ulang.
+ * - Email (syarat DBV-010 D-6, CR-019): unik di antara akun yang belum dihapus (aktif maupun nonaktif), dibandingkan
+ *   collation unicode_ci → 422 errors.email. Kosong/NULL boleh untuk banyak akun. Saat ubah akun hanya dinilai bila
+ *   email berubah, jadi duplikat lama hasil impor tidak mengunci akun. Tanpa UNIQUE di DB (menunggu audit data legacy)
+ *   balapan dua admin menyimpan email yang sama bersamaan masih bisa lolos.
  * - Username diubah → token reset password yang masih tertunda untuk username lama dibatalkan (token dipetakan ke akun
  *   lewat username; tanpa ini token bisa "berpindah" ke akun lain yang kemudian memakai username tersebut).
  */
@@ -192,6 +196,11 @@ class UserService
             throw new ValidationException('Validasi gagal.', ['username' => ['Username sudah dipakai.']]);
         }
 
+        // DBV-010 D-6: email unik di antara akun yang belum dihapus (pesan generik, tanpa menyebut pemilik/satkernya).
+        if ($email !== null && $this->pengguna->emailTaken($email)) {
+            throw new ValidationException('Validasi gagal.', ['email' => ['Email sudah dipakai akun lain.']]);
+        }
+
         $id = $this->translateDuplicate(fn () => $this->pengguna->insert([
             'nip'                 => $nip,
             'username'            => $username,
@@ -263,7 +272,13 @@ class UserService
             $email = self::textInput($data, 'email', $errors);
 
             if (! isset($errors['email']) && self::validateEmail($email, $errors)) {
-                $update['email'] = $email;
+                // D-6 hanya untuk email yang BERUBAH menurut collation: form edit selalu mengirim email, jadi akun hasil
+                // impor yang sudah terlanjur berbagi email tetap bisa diubah field lain; ganti huruf besar/kecil saja lolos.
+                if ($email !== null && ! $this->pengguna->hasEmail($id, $email) && $this->pengguna->emailTaken($email, $id)) {
+                    $errors['email'][] = 'Email sudah dipakai akun lain.';
+                } else {
+                    $update['email'] = $email;
+                }
             }
         }
 
