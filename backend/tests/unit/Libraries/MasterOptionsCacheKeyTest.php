@@ -106,20 +106,32 @@ final class MasterOptionsCacheKeyTest extends CIUnitTestCase
     {
         $jurusan = $this->service->registry()->get('uji-jurusan');
 
-        foreach (['1_f' . md5('x'), '01', '1abc', ' 1'] as $parent) {
+        // Termasuk bentuk array/objek dari query string (`?parent[]=1`, `?parent[a]=1`, F-OPT/CR-024): dulu dibuang
+        // menjadi "tanpa induk" sehingga dropdown memuat seluruh entri lintas induk.
+        foreach (['1_f' . md5('x'), '01', '1abc', ' 1', ['1'], ['a' => '1'], [''], 1.0, true] as $parent) {
+            $label = (string) json_encode($parent);
+
             try {
                 $this->service->options($jurusan, $parent);
-                $this->fail("Induk non-kanonik harus ditolak: {$parent}");
+                $this->fail("Induk non-kanonik harus ditolak: {$label}");
             } catch (ValidationException $e) {
-                $this->assertSame(['parent' => ['Filter Bidang Uji tidak valid.']], $e->getErrors(), $parent);
+                $this->assertSame(['parent' => ['Filter Bidang Uji tidak valid.']], $e->getErrors(), $label);
             }
         }
 
         $this->assertSame([], $this->cache->keys);
 
-        $bidang = $this->service->registry()->get('uji-bidang');
+        // Kosong = tanpa filter; kode kanonik (juga int dari pemanggil internal) = filter induk itu.
+        $this->service->options($jurusan, '');
+        $this->service->options($jurusan, 1);
+        $this->service->options($jurusan, '1');
+        $this->assertSame(['master_opt_uji-jurusan_all', 'master_opt_uji-jurusan_p_1', 'master_opt_uji-jurusan_p_1'], $this->cache->keys);
+
+        $this->cache->keys = [];
+        $bidang            = $this->service->registry()->get('uji-bidang');
         $this->service->options($bidang);
         $this->service->options($bidang, 'apa-saja');
-        $this->assertSame(['master_opt_uji-bidang_all', 'master_opt_uji-bidang_all'], $this->cache->keys);
+        $this->service->options($bidang, ['1']);
+        $this->assertSame(['master_opt_uji-bidang_all', 'master_opt_uji-bidang_all', 'master_opt_uji-bidang_all'], $this->cache->keys);
     }
 }

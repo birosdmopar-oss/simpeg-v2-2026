@@ -211,22 +211,14 @@ class MasterService
      * meng-cast '1abc' menjadi 1 pada FK INT, sehingga tanpa cek ini id tersebut menjadi alias induk 1. Master tanpa
      * induk mengabaikan `parent`.
      *
-     * @param array<string, mixed> $query parameter query options (kolom filter; kunci lain diabaikan)
+     * @param mixed                $parent nilai `?parent=` apa adanya dari query string (lihat optionsParent())
+     * @param array<string, mixed> $query  parameter query options (kolom filter; kunci lain diabaikan)
      *
      * @return list<array{id: string, nama: string, parent: string|null}>
      */
-    public function options(MasterDefinition $def, ?string $parent = null, array $query = []): array
+    public function options(MasterDefinition $def, mixed $parent = null, array $query = []): array
     {
-        $parent = $parent === '' || ! $def->hasParent() ? null : $parent;
-
-        if ($parent !== null) {
-            $parentDef = $this->registry->get((string) $def->parentEntity);
-
-            if (! $this->isCanonicalId($parentDef, $parent)) {
-                throw ValidationException::forField('parent', "Filter {$parentDef->label} tidak valid.");
-            }
-        }
-
+        $parent  = $this->optionsParent($def, $parent);
         $filters = $this->filterValues($def, $query);
         $key     = $this->optionsCacheKey($def, $parent, $filters);
 
@@ -1218,6 +1210,28 @@ class MasterService
         }
 
         return $scope;
+    }
+
+    /**
+     * Filter induk options (`?parent=`): null = tanpa filter (tidak dikirim, kosong, atau master tanpa induk — bentuk
+     * apa pun diabaikan), selain itu kode induk kanonik. Nilai non-teks (`?parent[]=1`, `?parent[a]=1`) atau kode
+     * non-kanonik → 422 `parent` "Filter <Induk> tidak valid." (pola filterValues). Bentuk array dulu dibuang controller
+     * menjadi "tanpa induk", sehingga dropdown berjenjang diam-diam memuat seluruh entri lintas induk (F-OPT, ISSUE-019).
+     */
+    private function optionsParent(MasterDefinition $def, mixed $raw): ?string
+    {
+        if (! $def->hasParent() || $raw === null || $raw === '') {
+            return null;
+        }
+
+        $parentDef = $this->registry->get((string) $def->parentEntity);
+        $parent    = is_string($raw) || is_int($raw) ? (string) $raw : null;
+
+        if ($parent === null || ! $this->isCanonicalId($parentDef, $parent)) {
+            throw ValidationException::forField('parent', "Filter {$parentDef->label} tidak valid.");
+        }
+
+        return $parent;
     }
 
     /**

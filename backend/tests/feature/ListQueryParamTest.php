@@ -155,6 +155,58 @@ final class ListQueryParamTest extends CIUnitTestCase
         $this->asRole(Role::SUPER_ADMIN)->get($uri, ['kategori' => '9'])->assertStatus(422);
     }
 
+    /**
+     * F-OPT (QAFUNC-003, sisa ISSUE-019 / CR-024): `parent` options berbentuk array/objek (`?parent[]=3171`,
+     * `?parent[a]=3171`) dulu diubah controller menjadi "tanpa induk", sehingga dropdown berjenjang diam-diam
+     * mengembalikan SELURUH entri lintas induk (200). Sekarang 422 dengan pesan yang sama seperti `parent`
+     * non-kanonik ("Filter <Induk> tidak valid.", errors.parent), untuk semua role (options = UL_ALL).
+     * `?parent=` kosong tetap = tanpa filter; master tanpa induk tetap mengabaikan `parent` (bentuk apa pun).
+     */
+    public function testArrayShapedOptionsParentIsRejectedInsteadOfIgnored(): void
+    {
+        $uri     = self::KECAMATAN . '/options';
+        $message = 'Filter Kabupaten/Kota tidak valid.';
+
+        // Prasyarat: filter induk memang mempersempit dropdown, dan tanpa filter ada entri induk lain (3273) —
+        // kalau tidak, "seluruh data lintas induk" tidak bisa dibedakan dari hasil yang benar.
+        $this->assertSame(['3171010', '3171020'], $this->optionIds('kecamatan', '3171'));
+        $this->assertContains('3273010', $this->optionIds('kecamatan'));
+
+        $shapes = [
+            ['3171'],                // ?parent[]=3171
+            ['a' => '3171'],         // ?parent[a]=3171
+            ['3171', '3273'],        // ?parent[]=3171&parent[]=3273
+            [''],                    // ?parent[]= — array berisi kosong tetap bukan nilai tunggal
+            ['a' => ['3171']],       // ?parent[a][]=3171
+        ];
+
+        foreach ([Role::SUPER_ADMIN, Role::PEGAWAI] as $role) {
+            foreach ($shapes as $parent) {
+                $result = $this->asRole($role)->get($uri, ['parent' => $parent]);
+                $label  = "role {$role} ?parent=" . json_encode($parent);
+
+                $result->assertStatus(422);
+                $this->assertSame([
+                    'status'  => 'error',
+                    'message' => $message,
+                    'errors'  => ['parent' => [$message]],
+                ], $this->json($result), $label);
+            }
+        }
+
+        // Pesan sama persis dengan parent non-kanonik (pola yang diikuti).
+        $result = $this->asRole(Role::PEGAWAI)->get($uri, ['parent' => '03171']);
+        $result->assertStatus(422);
+        $this->assertSame(['parent' => [$message]], $this->json($result)['errors']);
+
+        // Tetap seperti sebelumnya: `?parent=` kosong = tanpa filter, master tanpa induk mengabaikan `parent`.
+        $this->asRole(Role::SUPER_ADMIN);
+        $this->assertSame($this->optionIds('kecamatan'), $this->optionIds('kecamatan', ''));
+        $agama = $this->optionIds('agama');
+        $this->assertCount(6, $agama);
+        $this->assertSame($agama, $this->optionIds('agama', null, ['parent' => ['1']]));
+    }
+
     // ------------------------------------------------------------------
     // 2. page: bukan angka positif / meluap → 422; halaman valid di luar data → 200 kosong
     // ------------------------------------------------------------------

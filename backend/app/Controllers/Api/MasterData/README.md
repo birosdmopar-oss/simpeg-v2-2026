@@ -68,7 +68,7 @@ Kode master (PK) **tidak bisa diubah** setelah dibuat. Dua bentuk:
 |---|---|---|---|
 | GET | `/master/meta` | 1 | Daftar master + metadata form/tabel (dipakai halaman Master Data FE) |
 | GET | `/master/{entity}` | 1 | Daftar, urut induk → `order` → nama. Default **tanpa** status `10` (seperti legacy). Query: `search`, `status` (`1`/`2`/`10`), `parent` (id induk), `page`, `per_page` (≤100), + field allowlist `filters` — aturan lengkap di [GET /master/{entity}](#get-masterentity-daftar). Kolom `listExclude` tidak dikirim (mis. `content`/`content_stripped` artikel FAQ) |
-| GET | `/master/{entity}/options` | **UL_ALL**; FAQ: **1** | Dropdown untuk modul lain: **hanya entri aktif** (master ber-`statusChain`: seluruh rantai induknya juga aktif), urut `order`. Query: `parent` + field allowlist opsi `filters` (mis. `?cpns=1`; field lain diabaikan, nilai tidak sah → 422). `parent` wajib bentuk kanonik kode induk (`1`, bukan `01`/`1abc`) → selain itu 422 `parent` "Filter <Induk> tidak valid." (MySQL meng-cast `1abc` ke 1); master tanpa induk mengabaikan `parent`. Di-cache per induk+filter (kunci tidak bisa bentrok antar kombinasi), invalidasi di setiap penulisan. Master ber-`publicOptions: false` (`faq-topic`, `faq-sub-topic`, `faq-article`) hanya role 1 — role lain 403 (lihat bagian FAQ) |
+| GET | `/master/{entity}/options` | **UL_ALL**; FAQ: **1** | Dropdown untuk modul lain: **hanya entri aktif** (master ber-`statusChain`: seluruh rantai induknya juga aktif), urut `order`. Query: `parent` + field allowlist opsi `filters` (mis. `?cpns=1`; field lain diabaikan, nilai tidak sah → 422). `parent` wajib bentuk kanonik kode induk (`1`, bukan `01`/`1abc`) → selain itu 422 `parent` "Filter <Induk> tidak valid." (MySQL meng-cast `1abc` ke 1); bentuk array/objek (`?parent[]=1`, `?parent[a]=1`) juga 422 yang sama (CR-024); `?parent=` kosong = tanpa filter; master tanpa induk mengabaikan `parent`. Aturan lengkap di [GET /master/{entity}/options](#get-masterentityoptions). Di-cache per induk+filter (kunci tidak bisa bentrok antar kombinasi), invalidasi di setiap penulisan. Master ber-`publicOptions: false` (`faq-topic`, `faq-sub-topic`, `faq-article`) hanya role 1 — role lain 403 (lihat bagian FAQ) |
 | POST | `/master/{entity}` | 1 | Tambah → 201 |
 | GET | `/master/{entity}/{kode}` | 1 | Detail (+ `parent_nama` untuk master berinduk) |
 | PUT | `/master/{entity}/{kode}` | 1 | Ubah parsial (nama, induk, order, status). Kode tidak ikut diubah |
@@ -172,6 +172,14 @@ Parsial; field yang dikirim wajib terisi. Pindah induk → entri ditaruh di akhi
 
 ### GET /master/{entity}/options
 `data: [ { "id": "3171010001", "nama": "Gambir", "parent": "3171010" }, … ]` — hanya `status=1`. Query hanya membaca kolom kode, nama, dan induk (kolom besar seperti isi artikel tidak ikut terbaca).
+
+Parameter options **tidak** memakai `ListQuery` (daftar admin): tiap parameter diperiksa sendiri, `parent` lebih dulu lalu field `filters`, dan respons 422 memuat **satu** key pertama yang salah dengan `message` = pesan key itu.
+
+| Query | Perilaku |
+|---|---|
+| **`parent`** | Kode induk **bentuk kanonik** persis seperti `{kode}` di URL (`1`, bukan `01`/`1abc`/`1.0`; **tidak** dipangkas spasi, jadi `1 ` ditolak — beda dengan daftar admin) → hanya anak induk itu; induk kanonik yang tidak ada → `data: []`. Tidak dikirim atau `?parent=` kosong = **tanpa filter** (seluruh entri aktif). Non-kanonik **atau berbentuk array/objek** — `?parent[]=3171`, `?parent[a]=3171`, `?parent[]=` — → **422** `message: "Filter <Induk> tidak valid."`, `errors: { parent: ["Filter <Induk> tidak valid."] }` (mis. `kecamatan/options` → "Filter Kabupaten/Kota tidak valid."), untuk semua role. Sebelum CR-024 bentuk array dibuang controller menjadi "tanpa induk", sehingga dropdown berjenjang diam-diam mengembalikan **200 berisi seluruh entri lintas induk** (F-OPT QAFUNC-003, ISSUE-019). Master tanpa induk mengabaikan `parent` dalam bentuk apa pun |
+| **field `filters`** | Hanya field allowlist master (mis. `pangkat` `?cpns=`, `diklat` `?jenis_diklat=`); tidak dikirim atau kosong = tanpa filter. Nilai yang tidak sah untuk tipe field-nya, hanya spasi, atau berbentuk array/objek (`?cpns[]=1`, `?jenis_diklat[a]=1`) → **422** `errors: { <field>: ["Filter <Label> tidak valid."] }` |
+| lainnya | Diabaikan (tidak ikut kunci cache) |
 
 ## FAQ untuk pegawai (G-10, ⏳ DBV-002/CR-003)
 

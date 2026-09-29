@@ -49,16 +49,17 @@ abstract class BaseMasterController extends ApiController
 
     /**
      * Dropdown: `?parent=` (induk) + filter kolom allowlist opsi `filters` master (mis. `?cpns=1`, CR-009).
+     * `parent` diteruskan apa adanya: bentuk array (`?parent[]=1`) ditolak 422 oleh service, bukan dibuang menjadi
+     * "tanpa induk" (F-OPT, ISSUE-019).
      */
     public function options(string $entity): ResponseInterface
     {
-        $parent = $this->request->getGet('parent');
         /** @var array<string, mixed> $query */
         $query = $this->request->getGet() ?? [];
 
         return $this->respondSuccess(service('masterService')->options(
             $this->definition($entity),
-            is_string($parent) ? $parent : null,
+            $query['parent'] ?? null,
             $query,
         ));
     }
