@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\MasterData;
 
+use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\CacheService;
@@ -12,6 +13,7 @@ use Closure;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
+use LogicException;
 use Throwable;
 
 /**
@@ -48,7 +50,9 @@ use Throwable;
  * tepat N digit) dan PK AUTO_INCREMENT (agama, jenis_pegawai, jenis_status). Kolom tambahan legacy per master
  * (kd_area, kd_pos, status_pegawai, …) didefinisikan sebagai MasterField.
  *
- * Semua penulisan dibungkus transaksi: pergeseran urutan + audit ikut rollback kalau gagal.
+ * Semua penulisan dibungkus transaksi: pergeseran urutan + audit ikut rollback kalau gagal. Penulisan ke satu tabel
+ * master diserialkan named lock per tabel (serialized(), CR-020/ISSUE-020), sehingga tambah/sisip/pindah/pulihkan yang
+ * paralel di lingkup urutan yang sama tetap menghasilkan urutan rapat 1..n tanpa kembar.
  */
 class MasterService
 {
@@ -70,6 +74,16 @@ class MasterService
     private const ERR_AUTOINC_RANGE = 167;
 
     /**
+     * Batas tunggu named lock tulis master (detik) sebelum menyerah dengan 409 — sama dengan hari libur.
+     */
+    public const LOCK_TIMEOUT = 10;
+
+    /**
+     * Pesan 409 saat named lock tulis tidak didapat (%s = label master).
+     */
+    public const LOCK_BUSY_MESSAGE = 'Data %s sedang diubah pengguna lain. Coba lagi.';
+
+    /**
      * @var array<string, MasterModel>
      */
     private array $models = [];
@@ -80,6 +94,7 @@ class MasterService
         private MasterRegistry $registry,
         private CacheService $cache,
         ?BaseConnection $db = null,
+        private int $lockTimeout = self::LOCK_TIMEOUT,
     ) {
         $this->db = $db ?? db_connect();
     }
@@ -289,11 +304,24 @@ class MasterService
     // ------------------------------------------------------------------
 
     /**
+     * Seluruh tulis publik (create/update/setStatus/delete/reorder) berjalan di dalam named lock tabel master
+     * (serialized()): cek keunikan, MAX+1, posisi sisip, dan penomoran ulang dibaca setelah penulis sebelumnya commit.
+     *
      * @param array<string, mixed> $data kode (kalau bukan auto increment), nama, induk, field tambahan, order?, status?
      *
      * @return array<string, mixed>
      */
     public function create(MasterDefinition $def, array $data): array
+    {
+        return $this->serialized($def, fn (): array => $this->createLocked($def, $data));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    private function createLocked(MasterDefinition $def, array $data): array
     {
         $id     = trim((string) ($data[$def->primaryKey] ?? ''));
         $name   = $this->normalizeName($data[$def->nameField] ?? '');
@@ -405,6 +433,16 @@ class MasterService
      * @return array<string, mixed>
      */
     public function update(MasterDefinition $def, string $id, array $data): array
+    {
+        return $this->serialized($def, fn (): array => $this->updateLocked($def, $id, $data));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    private function updateLocked(MasterDefinition $def, string $id, array $data): array
     {
         $current = $this->findOrFail($def, $id);
         $this->assertNotSystem($def, $id, $current);
@@ -526,6 +564,14 @@ class MasterService
      */
     public function setStatus(MasterDefinition $def, string $id, string $status): array
     {
+        return $this->serialized($def, fn (): array => $this->setStatusLocked($def, $id, $status));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function setStatusLocked(MasterDefinition $def, string $id, string $status): array
+    {
         $current = $this->findOrFail($def, $id);
         $this->assertNotSystem($def, $id, $current);
         $this->assertHasStatus($def);
@@ -545,6 +591,14 @@ class MasterService
      * @return array<string, mixed>
      */
     public function delete(MasterDefinition $def, string $id): array
+    {
+        return $this->serialized($def, fn (): array => $this->deleteLocked($def, $id));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function deleteLocked(MasterDefinition $def, string $id): array
     {
         $current = $this->findOrFail($def, $id);
         $this->assertNotSystem($def, $id, $current);
@@ -573,6 +627,14 @@ class MasterService
      * @return array<string, mixed>
      */
     public function reorder(MasterDefinition $def, string $id, int $position): array
+    {
+        return $this->serialized($def, fn (): array => $this->reorderLocked($def, $id, $position));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function reorderLocked(MasterDefinition $def, string $id, int $position): array
     {
         $current = $this->findOrFail($def, $id);
         $this->assertNotSystem($def, $id, $current);
@@ -1367,6 +1429,58 @@ class MasterService
                 $this->cache->invalidateMatching("master_opt_{$other->key}_*");
             }
         }
+    }
+
+    /**
+     * Jalankan satu tulis master di dalam named lock tabelnya (CR-020, ISSUE-020; pola HariLiburService::write()).
+     * GET_LOCK (milik sesi koneksi) diambil SEBELUM transaksi dibuka dan dilepas sesudah commit/rollback, sehingga
+     * seluruh pembacaan tulis ini (cek keunikan, MAX+1, posisi sisip, penomoran ulang) terjadi setelah penulis
+     * sebelumnya commit. Tanpa itu dua tambah/sisip/pulihkan paralel di lingkup urutan yang sama sama-sama membaca
+     * MAX(order)/posisi lama → urutan kembar atau bercelah (QAFUNC-002-R2 RACE-ORDER).
+     *
+     * Satu lock per TABEL, bukan per lingkup urutan: pindah induk/lingkup cukup satu lock (tanpa urutan akuisisi dua lock
+     * dan risiko ER_USER_LOCK_DEADLOCK), lingkup tidak perlu dibaca sebelum lock, dan tulis master hanya oleh Super
+     * Admin sehingga antrean per tabel dapat diabaikan. SELECT … FOR UPDATE tidak dipakai: gap lock pada lingkup kosong
+     * rawan deadlock 1213 (alasan DBV-003 #15) dan master tanpa induk tidak punya baris induk untuk dikunci.
+     *
+     * Lock tidak didapat dalam $lockTimeout detik (0 = timeout, NULL = error) → 409 tanpa tulis. Tidak boleh dipanggil di
+     * dalam transaksi pemanggil: lock akan lepas sebelum transaksi luar commit, jadi serialisasinya bocor → LogicException.
+     *
+     * @template T
+     *
+     * @param Closure(): T $work
+     *
+     * @return T
+     */
+    private function serialized(MasterDefinition $def, Closure $work): mixed
+    {
+        if ($this->db->transDepth > 0) {
+            throw new LogicException('Tulis master tidak boleh dijalankan di dalam transaksi pemanggil: named lock tabelnya lepas sebelum transaksi itu commit.');
+        }
+
+        $lock = $this->lockName($def);
+
+        /** @var array<string, mixed>|null $acquired */
+        $acquired = $this->db->query('SELECT GET_LOCK(?, ?) AS acquired', [$lock, $this->lockTimeout])->getRowArray();
+
+        if ((string) ($acquired['acquired'] ?? '') !== '1') {
+            throw new ApiException(sprintf(self::LOCK_BUSY_MESSAGE, $def->label), 409);
+        }
+
+        try {
+            return $work();
+        } finally {
+            $this->db->query('SELECT RELEASE_LOCK(?)', [$lock]);
+        }
+    }
+
+    /**
+     * Nama named lock tulis master (42 karakter, batas 64) per database + prefix + tabel: tabel lain dan database lain
+     * di server yang sama (mis. shard test) tidak saling kunci.
+     */
+    public function lockName(MasterDefinition $def): string
+    {
+        return 'simpeg_md_' . md5($this->db->getDatabase() . '|' . $this->db->getPrefix() . '|' . $def->table);
     }
 
     /**
