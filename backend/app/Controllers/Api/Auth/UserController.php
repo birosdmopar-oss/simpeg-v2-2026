@@ -21,6 +21,9 @@ use CodeIgniter\HTTP\ResponseInterface;
  * DELETE api/v1/auth/users/{id}         soft delete + sesi dicabut
  *
  * Role 1: seluruh akun. Role 3: hanya akun dengan id_satker miliknya (di luar itu → 403). Role lain → 403.
+ * Setiap field body hanya boleh null/teks/angka bulat: array/objek/boolean → 422 "Isian harus berupa teks." per field
+ * (validateTextOrFail, ISSUE-023/CR-019). Email yang dipakai akun lain → 422 errors.email (syarat DBV-010 D-6, detail di
+ * UserService).
  */
 class UserController extends ApiController
 {
@@ -39,7 +42,7 @@ class UserController extends ApiController
 
     public function create(): ResponseInterface
     {
-        $data = $this->validateOrFail($this->payload(), [
+        $data = $this->validateTextOrFail($this->payload(), [
             'nip'        => 'permit_empty|string',
             'name'       => 'permit_empty|string',
             'email'      => 'permit_empty|string',
@@ -56,7 +59,7 @@ class UserController extends ApiController
 
     public function update(int $id): ResponseInterface
     {
-        $data = $this->validateOrFail($this->payload(), [
+        $data = $this->validateTextOrFail($this->payload(), [
             'nip'        => 'permit_empty|string',
             'name'       => 'permit_empty|string',
             'email'      => 'permit_empty|string',
@@ -73,7 +76,7 @@ class UserController extends ApiController
 
     public function setStatus(int $id): ResponseInterface
     {
-        $data = $this->validateOrFail($this->payload(), [
+        $data = $this->validateTextOrFail($this->payload(), [
             'status' => 'required|in_list[0,1]',
         ]);
 

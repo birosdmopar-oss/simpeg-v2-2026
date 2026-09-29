@@ -34,6 +34,8 @@ final class AccountProvisionerTest extends CIUnitTestCase
 
     private const NIP = '200101012025011001';
 
+    private const USERNAME_TAKEN = 'NIP ini sudah dipakai sebagai username akun lain; ganti username akun tersebut sebelum membuat akun pegawai.';
+
     private AccountProvisioner $provisioner;
 
     protected function setUp(): void
@@ -47,6 +49,7 @@ final class AccountProvisionerTest extends CIUnitTestCase
     protected function tearDown(): void
     {
         $this->clearAuthState();
+        $this->bersihkanDataDbv010();
         parent::tearDown();
     }
 
@@ -138,6 +141,96 @@ final class AccountProvisionerTest extends CIUnitTestCase
         }
 
         $this->dontSeeInDatabase('pengguna', ['nip' => '200101012025011002']);
+    }
+
+    /**
+     * ISSUE-023 — NIP pegawai baru sudah dipakai sebagai username bebas akun lain (akun non-pegawai tanpa NIP, aktif
+     * maupun sudah dihapus; UNIQUE username mencakup baris soft-deleted). Sebelumnya insert gagal 1062 → 500. Sekarang
+     * 422 errors.nip berpesan jelas: akun tidak dibuat, tidak ditautkan ke akun itu, dan akun itu tidak berubah.
+     */
+    public function testNipAlreadyUsedAsUsernameOfAnotherAccountIsRejected(): void
+    {
+        foreach (['aktif' => null, 'terhapus' => date('Y-m-d H:i:s')] as $label => $deletedAt) {
+            $other = $this->buatAkunTanpaNip(self::NIP, Role::ADMIN_VIEW_ESELON1, ['deleted_at' => $deletedAt]);
+            $total = $this->db->table('pengguna')->countAllResults();
+
+            try {
+                $this->provisioner->provisionForPegawai(['nip' => self::NIP, 'name' => 'Pegawai Baru']);
+                $this->fail("akun {$label}: provisioning harus ditolak");
+            } catch (ValidationException $e) {
+                $this->assertSame(['nip' => [self::USERNAME_TAKEN]], $e->getErrors(), $label);
+            }
+
+            $this->assertSame($total, $this->db->table('pengguna')->countAllResults(), $label);
+            $this->assertSame($other, $this->db->table('pengguna')->where('id_pengguna', $other['id_pengguna'])->get()->getRowArray(), $label);
+            $this->dontSeeInDatabase('pengguna', ['nip' => self::NIP]);
+
+            $this->db->table('pengguna')->where('id_pengguna', $other['id_pengguna'])->delete();
+        }
+    }
+
+    /**
+     * Balapan cek-lalu-tulis (disimulasikan model yang "tidak melihat" baris lain pada cek awal):
+     * - proses lain lebih dulu membuat akun untuk NIP yang sama → tetap idempoten (created=false, akun yang sudah ada);
+     * - akun lain memakai username = NIP di sela cek dan insert → 422 errors.nip yang sama, bukan 1062 → 500.
+     */
+    public function testRaceIsIdempotentForSameNipAndRejectsUsernameTakenMeanwhile(): void
+    {
+        $racy = new class ($this->db) extends PenggunaModel {
+            public int $blind = 0;
+
+            public function first()
+            {
+                $row = parent::first();
+
+                if ($this->blind > 0) {
+                    $this->blind--;
+
+                    return null;
+                }
+
+                return $row;
+            }
+
+            public function countAllResults(bool $reset = true, bool $test = false)
+            {
+                $count = parent::countAllResults($reset, $test);
+
+                if ($this->blind > 0) {
+                    $this->blind--;
+
+                    return 0;
+                }
+
+                return $count;
+            }
+        };
+        $provisioner = new AccountProvisioner($racy, new PasswordVerifier($racy));
+
+        $first       = $this->provisioner->provisionForPegawai(['nip' => self::NIP]);
+        $racy->blind = 2;
+        $second      = $provisioner->provisionForPegawai(['nip' => self::NIP]);
+
+        $this->assertFalse($second['created']);
+        $this->assertNull($second['initial_password']);
+        $this->assertSame($first['pengguna']['id_pengguna'], $second['pengguna']['id_pengguna']);
+        $this->assertSame(1, $this->db->table('pengguna')->where('nip', self::NIP)->countAllResults());
+
+        $nip   = '200101012025011002';
+        $other = $this->buatAkunTanpaNip($nip, Role::PIMPINAN);
+        $total = $this->db->table('pengguna')->countAllResults();
+
+        $racy->blind = 2;
+
+        try {
+            $provisioner->provisionForPegawai(['nip' => $nip]);
+            $this->fail('username = NIP yang dipakai akun lain harus ditolak');
+        } catch (ValidationException $e) {
+            $this->assertSame(['nip' => [self::USERNAME_TAKEN]], $e->getErrors());
+        }
+
+        $this->assertSame($total, $this->db->table('pengguna')->countAllResults());
+        $this->assertSame($other, $this->db->table('pengguna')->where('id_pengguna', $other['id_pengguna'])->get()->getRowArray());
     }
 
     public function testGeneratedPasswordSatisfiesPolicy(): void

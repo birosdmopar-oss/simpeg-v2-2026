@@ -37,11 +37,16 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  * - Ubah akun: NIP hanya boleh DIISI untuk akun yang belum punya NIP (menautkan akun ke pegawai); mengubah/menghapus
  *   NIP yang sudah ada adalah ranah fitur ganti NIP (B-06).
  * - Identitas akun = id_pengguna: pencegahan hapus/nonaktifkan akun sendiri dan pencabutan sesi memakai id_pengguna.
- * - nip/name/email/username harus teks (array/objek → 422, bukan 500). Username baru/diubah tidak boleh memuat karakter
+ * - nip/name/email/username/user_level/status/id_unit/id_satker/password harus teks atau angka bulat (array/objek/
+ *   boolean → 422, bukan 500; ISSUE-023, lapis pertama UserController). Username baru/diubah tidak boleh memuat karakter
  *   kontrol/tak terlihat (\p{C}, mis. zero-width space yang diabaikan collation unicode_ci); pembatasan ASCII ditunda
  *   sampai audit data produksi (keputusan B). Username lama hasil impor tidak dinilai ulang selama tidak diubah.
  * - Balapan cek-lalu-tulis (dua admin menautkan NIP/username yang sama): pelanggaran UNIQUE (1062) diterjemahkan ulang
  *   ke 422 per field lewat cek ulang.
+ * - Email (syarat DBV-010 D-6, CR-019): unik di antara akun yang belum dihapus (aktif maupun nonaktif), dibandingkan
+ *   collation unicode_ci → 422 errors.email. Kosong/NULL boleh untuk banyak akun. Saat ubah akun hanya dinilai bila
+ *   email berubah, jadi duplikat lama hasil impor tidak mengunci akun. Tanpa UNIQUE di DB (menunggu audit data legacy)
+ *   balapan dua admin menyimpan email yang sama bersamaan masih bisa lolos.
  * - Username diubah → token reset password yang masih tertunda untuk username lama dibatalkan (token dipetakan ke akun
  *   lewat username; tanpa ini token bisa "berpindah" ke akun lain yang kemudian memakai username tersebut).
  */
@@ -138,6 +143,9 @@ class UserService
         $username = self::textInput($data, 'username', $errors) ?? $nip ?? '';
         $level    = (int) ($data['user_level'] ?? 0);
 
+        // Field yang di-cast langsung di bawah (ISSUE-023, lapis kedua setelah UserController::validateTextOrFail).
+        self::rejectNonTextFields($data, $errors);
+
         if ($errors !== []) {
             // Isian bukan teks: aturan lain (wajib nama/NIP) tidak bermakna untuk nilai yang dibuang.
             throw new ValidationException('Validasi gagal.', $errors);
@@ -188,6 +196,11 @@ class UserService
             throw new ValidationException('Validasi gagal.', ['username' => ['Username sudah dipakai.']]);
         }
 
+        // DBV-010 D-6: email unik di antara akun yang belum dihapus (pesan generik, tanpa menyebut pemilik/satkernya).
+        if ($email !== null && $this->pengguna->emailTaken($email)) {
+            throw new ValidationException('Validasi gagal.', ['email' => ['Email sudah dipakai akun lain.']]);
+        }
+
         $id = $this->translateDuplicate(fn () => $this->pengguna->insert([
             'nip'                 => $nip,
             'username'            => $username,
@@ -217,6 +230,13 @@ class UserService
         $row    = $this->findInScope($actor, $id);
         $update = [];
         $errors = [];
+
+        // Field yang di-cast langsung di bawah: tolak lebih dulu, sebelum cast memicu 500 (ISSUE-023).
+        self::rejectNonTextFields($data, $errors);
+
+        if ($errors !== []) {
+            throw new ValidationException('Validasi gagal.', $errors);
+        }
 
         if (array_key_exists('nip', $data)) {
             $nip     = self::textInput($data, 'nip', $errors);
@@ -252,7 +272,13 @@ class UserService
             $email = self::textInput($data, 'email', $errors);
 
             if (! isset($errors['email']) && self::validateEmail($email, $errors)) {
-                $update['email'] = $email;
+                // D-6 hanya untuk email yang BERUBAH menurut collation: form edit selalu mengirim email, jadi akun hasil
+                // impor yang sudah terlanjur berbagi email tetap bisa diubah field lain; ganti huruf besar/kecil saja lolos.
+                if ($email !== null && ! $this->pengguna->hasEmail($id, $email) && $this->pengguna->emailTaken($email, $id)) {
+                    $errors['email'][] = 'Email sudah dipakai akun lain.';
+                } else {
+                    $update['email'] = $email;
+                }
             }
         }
 
@@ -487,6 +513,21 @@ class UserService
         }
 
         return self::nullableString($value);
+    }
+
+    /**
+     * Pola textInput() untuk field yang nilainya dipakai/di-cast langsung (tanpa trim): `user_level`, `status`,
+     * `id_unit`, `id_satker`, `password`. Array/objek/boolean → error field (422) alih-alih "Array to string
+     * conversion" (500) atau cast diam-diam — `(int) ['5']` = 1 akan menjadi role Super Admin (ISSUE-023).
+     *
+     * @param array<string, mixed>        $data
+     * @param array<string, list<string>> $errors
+     */
+    private static function rejectNonTextFields(array $data, array &$errors): void
+    {
+        foreach (['user_level', 'status', 'id_unit', 'id_satker', 'password'] as $field) {
+            self::textInput($data, $field, $errors);
+        }
     }
 
     private static function nullableString(mixed $value): ?string

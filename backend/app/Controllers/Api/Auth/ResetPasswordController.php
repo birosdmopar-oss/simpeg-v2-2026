@@ -14,7 +14,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  * POST api/v1/auth/forgot-password  { username, captcha_token }
  *   200 selalu generik: { accepted:true, message } (+ token/expires_at HANYA kalau auth.exposeResetTokenInResponse=true,
  *       development). Tautan reset dikirim lewat driver auth.resetTokenNotifier (ResetTokenNotifierInterface).
- *   422 captcha kosong/invalid (dicek SEBELUM rate limit, pola login) atau username kosong
+ *   422 captcha kosong/invalid (dicek SEBELUM rate limit, pola login), username kosong, atau isian array/objek/boolean
+ *       ("Isian harus berupa teks.", ISSUE-023)
  *   429 kalau melebihi rate limit forgot_attempts
  *   500 kanal pengiriman belum dikonfigurasi (mis. driver log/mock di production) atau salah konfigurasi production
  *       (captcha mock, exposeResetTokenInResponse=true) — sama untuk semua username
@@ -27,7 +28,7 @@ class ResetPasswordController extends ApiController
 {
     public function forgot(): ResponseInterface
     {
-        $data = $this->validateOrFail($this->payload(), [
+        $data = $this->validateTextOrFail($this->payload(), [
             'username'      => 'required|string|max_length[' . PenggunaModel::USERNAME_MAX . ']',
             'captcha_token' => 'permit_empty|string',
         ]);

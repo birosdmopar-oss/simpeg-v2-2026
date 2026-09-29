@@ -80,6 +80,32 @@ class PenggunaModel extends BaseAuditableModel
     }
 
     /**
+     * Email sudah dipakai akun lain yang belum dihapus, aktif maupun nonaktif (syarat DBV-010 D-6: email unik selama
+     * menjadi kanal reset password; UNIQUE di DB menunggu audit data legacy). Dibandingkan MySQL dengan collation kolom
+     * `utf8mb4_unicode_ci` (huruf besar/kecil dianggap sama) — sengaja tidak di-lower-case di PHP. Akun terhapus tidak
+     * dihitung: tidak bisa login/reset dan belum ada fitur pulihkan akun (fitur itu nanti wajib mengecek ulang).
+     * Query builder baru, bukan state model.
+     */
+    public function emailTaken(string $email, ?int $exceptId = null): bool
+    {
+        $builder = $this->db->table($this->table)->where('email', $email)->where('deleted_at', null);
+
+        if ($exceptId !== null) {
+            $builder->where('id_pengguna !=', $exceptId);
+        }
+
+        return $builder->countAllResults() > 0;
+    }
+
+    /**
+     * Email tersimpan akun $id sama dengan $email menurut collation kolom (mis. hanya beda huruf besar/kecil).
+     */
+    public function hasEmail(int $id, string $email): bool
+    {
+        return $this->db->table($this->table)->where('id_pengguna', $id)->where('email', $email)->countAllResults() > 0;
+    }
+
+    /**
      * Jalankan $work dengan pelaku audit = akun $user (id_pengguna + NIP-nya, NIP boleh NULL). Dipakai jalur tanpa JWT
      * (AuthContext kosong: login, lazy rehash, reset password) agar audit tidak tercatat dengan actor NULL
      * (DEV-002 Bagian 8 #4 / ISSUE-005, T-02).
