@@ -14,6 +14,7 @@ use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\MasterDataTestTrait;
+use Tests\Support\MasterUjiTestTrait;
 
 /**
  * ISSUE-019 — parameter query endpoint daftar (MasterService::list dan UserService::list) lewat ListQuery.
@@ -34,6 +35,7 @@ final class ListQueryParamTest extends CIUnitTestCase
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
+    use MasterUjiTestTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -58,6 +60,9 @@ final class ListQueryParamTest extends CIUnitTestCase
 
     protected function tearDown(): void
     {
+        // Master UJI hanya dipasang di satu test, tetapi dilepas tanpa syarat: useMasterUji() mengubah
+        // RouteCollection & registry yang dipakai bersama antar test dalam satu proses.
+        $this->forgetMasterUji();
         $this->clearAuthState();
         parent::tearDown();
     }
@@ -110,13 +115,34 @@ final class ListQueryParamTest extends CIUnitTestCase
     }
 
     /**
-     * Parameter filter kolom allowlist master (opsi `filters`, mis. `?cpns=1`) juga tidak boleh 500.
+     * Filter kolom allowlist (opsi `filters` master, mis. `?cpns=1`) berbentuk array juga ditolak 422, bukan 500.
+     *
+     * Diuji lewat master UJI `uji-level` (filters: `kategori`) karena master yang punya `filters` di Config\MasterData
+     * baru masuk lewat DBV-004/005: memakai `agama` (tanpa `filters`) membuat parameter itu sekadar diabaikan,
+     * sehingga assertion tidak menguji apa pun (CR-016).
      */
-    public function testArrayShapedMasterColumnFilterIsStillRejectedAsValidationError(): void
+    public function testArrayShapedMasterColumnFilterIsRejectedAsValidationError(): void
     {
-        $result = $this->asRole(Role::SUPER_ADMIN)->get(self::MASTER, ['cpns' => ['1']]);
+        $this->useMasterUji();
+        $this->db->table('uji_level')->insertBatch([
+            ['id_level' => 1, 'level' => 'I/a', 'kategori' => 2, 'order' => 1, 'status' => 1],
+            ['id_level' => 2, 'level' => 'CPNS I/a', 'kategori' => 1, 'order' => 2, 'status' => 1],
+        ]);
 
-        $this->assertContains($result->response()->getStatusCode(), [200, 422], 'filter kolom tidak boleh 500');
+        $uri = 'api/v1/master/uji-level';
+
+        // Prasyarat: filter itu memang aktif di daftar (kalau tidak, 422 di bawah bisa datang dari sebab lain).
+        $filtered = $this->data($this->asRole(Role::SUPER_ADMIN)->get($uri, ['kategori' => '1']));
+        $this->assertSame(['2'], array_map('strval', array_column($filtered['items'], 'id_level')));
+        $this->assertSame(2, $this->data($this->asRole(Role::SUPER_ADMIN)->get($uri))['total']);
+
+        // Bentuk array -> 422 pada key filter itu (dulu `(string) $array` -> 500).
+        $result = $this->asRole(Role::SUPER_ADMIN)->get($uri, ['kategori' => ['1']]);
+        $result->assertStatus(422);
+        $this->assertSame(['Filter Kategori tidak valid.'], $this->json($result)['errors']['kategori']);
+
+        // Nilai di luar pilihan tetap ditolak seperti sebelumnya.
+        $this->asRole(Role::SUPER_ADMIN)->get($uri, ['kategori' => '9'])->assertStatus(422);
     }
 
     // ------------------------------------------------------------------
@@ -182,18 +208,26 @@ final class ListQueryParamTest extends CIUnitTestCase
     public function testSearchWildcardsAreMatchedAsPlainTextOnMasterList(): void
     {
         // Entri yang benar-benar memuat karakter wildcard, supaya "tidak cocok" bisa dibedakan dari "cocok literal".
-        $this->sendJson('POST', self::MASTER, ['agama' => 'Aliran 100% Baru'])->assertStatus(201);
-        $this->sendJson('POST', self::MASTER, ['agama' => 'Aliran_Lama'])->assertStatus(201);
+        // `Tanya!` (memuat ESCAPE char) dan `Diskon 100%` (BERAKHIR `%`) wajib ada: tanpa keduanya, menghapus `!`
+        // dari ListQuery::likeLiteral() tidak membuat satu assertion pun gagal (CR-016). Bila `!` tidak di-escape,
+        // `?search=!` menjadi pola `%!%` = "berakhir dengan %" -> `Diskon 100%`, dan `?search=!%` menjadi
+        // "memuat !" -> `Tanya!` — persis kebalikan hasil yang benar di bawah.
+        foreach (['Aliran 100% Baru', 'Aliran_Lama', 'Tanya!', 'Diskon 100%'] as $nama) {
+            $this->sendJson('POST', self::MASTER, ['agama' => $nama])->assertStatus(201);
+        }
 
         // `%` dan `_` dicari sebagai karakter biasa: hanya entri yang memuatnya yang cocok
-        // (sebelum ISSUE-019 `%` mencocokkan SEMUA baris dan `_` mencocokkan semua nama berisi ≥ 1 karakter).
-        $this->assertSame(['Aliran 100% Baru'], $this->names(['search' => '%']));
+        // (sebelum ISSUE-019 `%` mencocokkan SEMUA baris dan `_` mencocokkan semua nama berisi >= 1 karakter).
+        $this->assertSame(['Aliran 100% Baru', 'Diskon 100%'], $this->names(['search' => '%']));
         $this->assertSame(['Aliran_Lama'], $this->names(['search' => '_']));
-        $this->assertSame(['Aliran 100% Baru'], $this->names(['search' => '100%']));
+        $this->assertSame(['Aliran 100% Baru', 'Diskon 100%'], $this->names(['search' => '100%']));
 
-        // `!` adalah ESCAPE char Query Builder CI4 — ikut di-escape, jadi teks biasa dan tidak merusak pola.
-        $this->assertSame([], $this->names(['search' => '!']));
+        // `!` = ESCAPE char Query Builder CI4, ikut di-escape jadi teks biasa: `?search=!` HANYA mengembalikan
+        // baris yang memuat '!', bukan baris yang berakhir '%'.
+        $this->assertSame(['Tanya!'], $this->names(['search' => '!']));
+        $this->assertSame(['Tanya!'], $this->names(['search' => 'Tanya!']));
         $this->assertSame([], $this->names(['search' => '!%']));
+        $this->assertSame([], $this->names(['search' => '!!']));
         $this->assertSame([], $this->names(['search' => '%!%']));
 
         // Regresi: kata kunci biasa tetap cocok seperti sebelumnya.
@@ -275,6 +309,9 @@ final class ListQueryParamTest extends CIUnitTestCase
         // Akun pembanding yang benar-benar memuat karakter wildcard di username.
         $this->createAccount('200001012024011001', 'admin%satu');
         $this->createAccount('200001012024011002', 'admin_dua');
+        // `admin!tiga` mengunci escaping `!`: tanpanya, menghapus `!` dari ListQuery::likeLiteral() tidak membuat
+        // satu assertion pun gagal, karena tidak ada username yang memuat '!' atau berakhir '%' (CR-016).
+        $this->createAccount('200001012024011003', 'admin!tiga');
 
         // Sebelum ISSUE-019 `%` mencocokkan SELURUH akun dan `_` mencocokkan semua username berisi >= 1 karakter.
         $this->assertSame(['admin%satu'], $this->usernames(['search' => '%']));
@@ -282,13 +319,16 @@ final class ListQueryParamTest extends CIUnitTestCase
         $this->assertSame(['admin%satu'], $this->usernames(['search' => 'admin%']));
         $this->assertSame(['admin_dua'], $this->usernames(['search' => 'n_d']));
 
-        // `!` adalah ESCAPE char Query Builder CI4 — ikut di-escape, jadi teks biasa dan tidak merusak pola.
-        $this->assertSame([], $this->usernames(['search' => '!']));
+        // `!` = ESCAPE char Query Builder CI4, ikut di-escape jadi teks biasa: `?search=!` HANYA mengembalikan
+        // akun yang username-nya memuat '!'.
+        $this->assertSame(['admin!tiga'], $this->usernames(['search' => '!']));
+        $this->assertSame(['admin!tiga'], $this->usernames(['search' => 'admin!']));
         $this->assertSame([], $this->usernames(['search' => '!%']));
+        $this->assertSame([], $this->usernames(['search' => '!!']));
         $this->assertSame([], $this->usernames(['search' => '%!%']));
 
         // Regresi: kata kunci biasa tetap cocok, baik lewat username maupun NIP.
-        $this->assertSame(['admin%satu', 'admin_dua'], $this->usernames(['search' => 'admin']));
+        $this->assertSame(['admin!tiga', 'admin%satu', 'admin_dua'], $this->usernames(['search' => 'admin']));
         $this->assertSame(['admin%satu'], $this->usernames(['search' => '200001012024011001']));
     }
 
@@ -342,7 +382,8 @@ final class ListQueryParamTest extends CIUnitTestCase
     }
 
     /**
-     * Nama entri master (agama) hasil daftar dengan query tertentu.
+     * Nama entri master (agama) hasil daftar, diurutkan agar assertion tidak bergantung pada urutan tampil
+     * (urutan daftar diuji terpisah di testMasterSearchFilterAndPagingRegression).
      *
      * @param array<string, mixed> $query
      *
@@ -353,6 +394,9 @@ final class ListQueryParamTest extends CIUnitTestCase
         $items = $this->data($this->asRole(Role::SUPER_ADMIN)->get(self::MASTER, $query))['items'];
 
         /** @var list<array<string, mixed>> $items */
-        return array_map(static fn (array $row): string => (string) $row['agama'], $items);
+        $names = array_map(static fn (array $row): string => (string) $row['agama'], $items);
+        sort($names);
+
+        return $names;
     }
 }

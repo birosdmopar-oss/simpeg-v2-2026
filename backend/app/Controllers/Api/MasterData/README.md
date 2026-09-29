@@ -57,7 +57,7 @@ Kode master (PK) **tidak bisa diubah** setelah dibuat. Dua bentuk:
 | Method | Path | Role | Keterangan |
 |---|---|---|---|
 | GET | `/master/meta` | 1 | Daftar master + metadata form/tabel (dipakai halaman Master Data FE) |
-| GET | `/master/{entity}` | 1 | Daftar, urut induk → `order` → nama. Default **tanpa** status `10` (seperti legacy). Query: `search`, `status` (`1`/`2`/`10`), `parent` (id induk), `page`, `per_page` (≤100). Kolom `listExclude` tidak dikirim (mis. `content`/`content_stripped` artikel FAQ) |
+| GET | `/master/{entity}` | 1 | Daftar, urut induk → `order` → nama. Default **tanpa** status `10` (seperti legacy). Query: `search`, `status` (`1`/`2`/`10`), `parent` (id induk), `page`, `per_page` (≤100), + field allowlist `filters` — aturan lengkap di [GET /master/{entity}](#get-masterentity-daftar). Kolom `listExclude` tidak dikirim (mis. `content`/`content_stripped` artikel FAQ) |
 | GET | `/master/{entity}/options` | **UL_ALL**; FAQ: **1** | Dropdown untuk modul lain: **hanya entri aktif** (master ber-`statusChain`: seluruh rantai induknya juga aktif), urut `order`. Query: `parent` + field allowlist opsi `filters` (mis. `?cpns=1`; field lain diabaikan, nilai tidak sah → 422). `parent` wajib bentuk kanonik kode induk (`1`, bukan `01`/`1abc`) → selain itu 422 `parent` "Filter <Induk> tidak valid." (MySQL meng-cast `1abc` ke 1); master tanpa induk mengabaikan `parent`. Di-cache per induk+filter (kunci tidak bisa bentrok antar kombinasi), invalidasi di setiap penulisan. Master ber-`publicOptions: false` (`faq-topic`, `faq-sub-topic`, `faq-article`) hanya role 1 — role lain 403 (lihat bagian FAQ) |
 | POST | `/master/{entity}` | 1 | Tambah → 201 |
 | GET | `/master/{entity}/{kode}` | 1 | Detail (+ `parent_nama` untuk master berinduk) |
@@ -92,6 +92,19 @@ Master lain (jabatan, lokasi presensi, KP, pendidikan, diklat/hukdis/konket/tand
 **Dropdown berjenjang wilayah 4 level:** `provinsi/options` → `kabupaten-kota/options?parent={id_provinsi}` → `kecamatan/options?parent={id_kabupaten_kota}` → `kelurahan/options?parent={id_kecamatan}`.
 
 ## Payload & response
+
+### GET /master/{entity} (daftar)
+
+`data: { items: [...], total, page, per_page }`. Parameter daftar diperiksa `App\Libraries\ListQuery` — sama persis dengan `/auth/users` (ISSUE-019/CR-016).
+
+| Aturan | Perilaku |
+|---|---|
+| **Nilai tunggal** | Setiap parameter daftar (`search`, `status`, `parent`, `page`, `per_page`, dan field allowlist `filters`) hanya boleh berisi satu nilai teks/angka. Bentuk array atau objek — `?search[]=a`, `?status[]=1`, `?parent[]=31`, yang sah menurut PHP — → **422** `message: "Parameter daftar tidak valid."`, `errors: { <key>: ["Parameter ini hanya boleh berisi satu nilai teks atau angka."] }`. Beberapa key salah sekaligus dikumpulkan jadi **satu** respons yang memuat semuanya. Sebelumnya 500 (`Array to string conversion`) |
+| **`page`** | Bilangan bulat **1..1.000.000**. Selain itu (0, negatif, bukan angka, atau nilai yang melewati jangkauan int seperti `?page=99999999999999999999`) → **422** `errors: { page: ["Halaman harus berupa angka bulat 1 sampai 1000000."] }`; sebelumnya nilai sebesar itu membuat offset `(page - 1) * per_page` meluap → 500. Tidak dikirim atau `?page=` kosong = halaman 1 |
+| **Halaman di luar data** | Halaman **valid** yang melewati jumlah data **bukan** error: tetap **200** dengan `items: []`, sedangkan `total` tetap berisi jumlah seluruh baris yang cocok |
+| **`per_page`** | **Dijepit** ke 1..100 (bawaan 20), tidak ditolak: `?per_page=9999` → 100, `?per_page=0` → 1 |
+| **`search`** | Dipangkas spasi di awal/akhir. `%`, `_`, dan `!` dicari sebagai **teks biasa**, bukan wildcard LIKE (`!` = ESCAPE char Query Builder CI4) — `?search=%` mencari karakter `%` dan tidak lagi mencocokkan seluruh baris. Nilai kosong/hanya spasi = tidak menyaring |
+| **Filter lain** | `status`, `parent`, dan field `filters` juga dipangkas spasi. Nilai yang tidak sah untuk field-nya tetap 422 "Filter X tidak valid." (lihat `filters` di tabel opsi master) |
 
 ### POST /master/{entity}
 Contoh kelurahan: `{ "id_kelurahan": "3171010003", "id_kecamatan": "3171010", "kelurahan": "Petojo Utara", "kd_pos": "10130", "order": 2 }`
