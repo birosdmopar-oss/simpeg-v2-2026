@@ -97,9 +97,83 @@ trait MasterDataTestTrait
             // = urutan master di meta, lihat RbacMasterEndpointsTest). Tambah fixture hanya di dalam blok grup sendiri.
 
             // --- DBV-003 ---
+            // Kantor baru di rantai wilayah yang TIDAK disentuh fixture `existing` wilayah (32/3172/3171020/3171010002),
+            // karena test RBAC menghapus `existing` berurutan dan kode wilayah kantor wajib aktif.
+            'kantor' => [
+                'new' => [
+                    'nama_kantor'  => 'Kantor Wilayah Gambir',
+                    'alamat'       => 'Jl. Medan Merdeka Barat No. 17',
+                    'id_provinsi'  => '31',
+                    'id_kabupaten' => '3171',
+                    'id_kecamatan' => '3171010',
+                    'id_kelurahan' => '3171010001',
+                    'kode_pos'     => '10110',
+                ],
+                'duplicate' => 'KANTOR PUSAT',
+                'existing'  => '1',
+                'parent'    => null,
+            ],
+            'bidang-kursem' => [
+                'new'       => ['bidang_kursem' => 'Kearsipan'],
+                'duplicate' => 'manajemen',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'instansi-kursem' => [
+                'new'       => ['instansi_kursem' => 'Arsip Nasional Republik Indonesia'],
+                'duplicate' => 'LEMBAGA ADMINISTRASI NEGARA',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'jenis-libur' => [
+                'new'       => ['jenis_libur' => 'Libur Daerah'],
+                'duplicate' => 'libur nasional',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
             // --- /DBV-003 ---
 
             // --- DBV-004 ---
+            // G-04/G-05 (DBV-004/CR-011), seed MasterDataSeeder::seedKenaikanPangkat()/seedPendidikan(). Nama `new`
+            // pangkat & golongan PPPK pendek (kolom VARCHAR(10); test audit menambah " (ubah)"). `existing` bidang (2)
+            // bukan induk `new`/`existing` jurusan (1), karena test RBAC menghapus `existing` berurutan per master dan
+            // induk wajib aktif (E6). `new` jurusan wajib punya minimal satu flag (JurusanPendidikanHooks).
+            'pangkat' => [
+                'new'       => ['cpns' => '2', 'pangkat' => 'Juru Muda', 'gol' => 'I', 'ruang' => 'a', 'gol_ruang' => 'I/a'],
+                'duplicate' => 'iii/a',
+                'existing'  => '14',
+                'parent'    => null,
+            ],
+            'jenis-kp' => [
+                'new'       => ['jenis_kp' => 'Pilihan'],
+                'duplicate' => 'REGULER',
+                'existing'  => '5',
+                'parent'    => null,
+            ],
+            'gol-pppk' => [
+                'new'       => ['gol_pppk' => 'V', 'uang_makan' => '35000'],
+                'duplicate' => 'ix',
+                'existing'  => '9',
+                'parent'    => null,
+            ],
+            'jenjang-pendidikan' => [
+                'new'       => ['jenjang_pendidikan' => 'Strata 3', 'jenjang_pendidikan_singkat' => 'S.3', 'row_jurusan' => 'S_3'],
+                'duplicate' => 'strata 1',
+                'existing'  => '9',
+                'parent'    => null,
+            ],
+            'bidang-pendidikan' => [
+                'new'       => ['bidang_pendidikan' => 'Kesehatan'],
+                'duplicate' => 'TEKNIK',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'jurusan-pendidikan' => [
+                'new'       => ['id_bidang_pendidikan' => '1', 'jurusan_pendidikan' => 'Teknik Mesin', 'S_1' => '1'],
+                'duplicate' => 'teknik sipil',
+                'existing'  => '2',
+                'parent'    => ['id_bidang_pendidikan', '1'],
+            ],
             // --- /DBV-004 ---
 
             // --- DBV-005 ---

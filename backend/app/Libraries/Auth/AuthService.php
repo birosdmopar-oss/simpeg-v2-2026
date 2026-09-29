@@ -80,7 +80,7 @@ class AuthService
         // Lazy rehash di PasswordVerifier::verify() di atas memakai actor yang sama.
         $this->lockout->recordSuccess($username, $ip);
         $this->pengguna->withActor(
-            (string) $user['nip'],
+            $user,
             fn (): bool => $this->pengguna->update((int) $user['id_pengguna'], ['last_login_at' => date('Y-m-d H:i:s')]),
         );
 
@@ -93,7 +93,7 @@ class AuthService
             'ip_address'    => $ip,
             'password_path' => $result['path'],
             'rehashed'      => $result['rehashed'],
-        ], (string) $user['nip']);
+        ], (int) $user['id_pengguna'], self::nipOf($user));
 
         $fresh = $this->pengguna->find((int) $user['id_pengguna']) ?? $user;
 
@@ -101,7 +101,7 @@ class AuthService
     }
 
     /**
-     * Refresh rotating (A-05). Reuse → JwtService mencabut SELURUH sesi nip tsb lalu 401.
+     * Refresh rotating (A-05). Reuse → JwtService mencabut SELURUH sesi akun tsb (id_pengguna) lalu 401.
      *
      * @return array{access_token: string, refresh_token: string, access_expires_at: int, refresh_expires_at: int}
      */
@@ -111,9 +111,9 @@ class AuthService
     }
 
     /**
-     * Logout: hapus refresh token dari DB (bukan cuma hapus cookie) + audit logout.
+     * Logout: hapus refresh token dari DB (bukan cuma hapus cookie) + audit logout (pelaku = akun yang logout).
      */
-    public function logout(?string $refreshToken, ?string $actorNip, ?string $ip): bool
+    public function logout(?string $refreshToken, ?int $actorId, ?string $ip): bool
     {
         $deleted = false;
 
@@ -121,16 +121,17 @@ class AuthService
             $deleted = $this->jwt->deleteRefreshToken($refreshToken);
         }
 
-        if ($actorNip !== null) {
-            $user = $this->pengguna->findByNip($actorNip);
+        if ($actorId !== null) {
+            $user = $this->pengguna->withDeleted()->find($actorId);
 
             $this->audit->record(
                 'pengguna',
-                $user !== null ? (string) $user['id_pengguna'] : $actorNip,
+                (string) $actorId,
                 self::EVENT_LOGOUT,
                 null,
                 ['ip_address' => $ip, 'refresh_token_deleted' => $deleted],
-                $actorNip,
+                $actorId,
+                is_array($user) ? self::nipOf($user) : null,
             );
         }
 
@@ -138,6 +139,9 @@ class AuthService
     }
 
     /**
+     * Claims sesi (DBV-010/CR-013): `sub` = id_pengguna, `nip` = NIP akun (NULL untuk akun tanpa NIP). JwtService
+     * menambahkan `ver`.
+     *
      * @param array<string, mixed> $user
      *
      * @return array<string, mixed>
@@ -145,10 +149,21 @@ class AuthService
     public static function claimsFor(array $user): array
     {
         return [
-            'sub'       => (string) $user['nip'],
+            'sub'       => (string) (int) $user['id_pengguna'],
+            'nip'       => self::nipOf($user),
             'role'      => (int) $user['user_level'],
             'id_unit'   => $user['id_unit'] ?? null,
             'id_satker' => $user['id_satker'] ?? null,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    private static function nipOf(array $user): ?string
+    {
+        $nip = $user['nip'] ?? null;
+
+        return $nip === null || $nip === '' ? null : (string) $nip;
     }
 }

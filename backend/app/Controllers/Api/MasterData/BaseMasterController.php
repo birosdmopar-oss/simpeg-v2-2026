@@ -6,6 +6,7 @@ namespace App\Controllers\Api\MasterData;
 
 use App\Controllers\Api\ApiController;
 use App\Exceptions\NotFoundException;
+use App\Exceptions\ValidationException;
 use App\Libraries\MasterData\MasterDefinition;
 use App\Libraries\MasterData\MasterField;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -229,7 +230,8 @@ abstract class BaseMasterController extends ApiController
 
     /**
      * Payload tambah/ubah. Field boolean (CR-009) menerima JSON true/false selain '1'/'0': dikonversi dulu karena rule
-     * in_list membaca false sebagai string kosong.
+     * in_list membaca false sebagai string kosong. Kolom definisi bernilai array/objek JSON ditolak 422 (CR-011): rule
+     * permit_empty menganggap [] kosong sehingga rule lain tidak jalan, lalu normalisasi service akan gagal (500).
      *
      * @return array<string, mixed>
      */
@@ -243,6 +245,46 @@ abstract class BaseMasterController extends ApiController
             }
         }
 
+        $errors = [];
+
+        foreach ($this->inputLabels($def) as $column => $label) {
+            if (array_key_exists($column, $payload) && ! is_scalar($payload[$column]) && $payload[$column] !== null) {
+                $errors[$column] = ["{$label} tidak valid."];
+            }
+        }
+
+        if ($errors !== []) {
+            throw new ValidationException('Validasi gagal.', $errors);
+        }
+
         return $payload;
+    }
+
+    /**
+     * Kolom payload yang dibaca service untuk master ini => label pesan error.
+     *
+     * @return array<string, string>
+     */
+    private function inputLabels(MasterDefinition $def): array
+    {
+        $labels = [$def->primaryKey => 'Kode', $def->nameField => $def->nameLabel];
+
+        if ($def->parentField !== null) {
+            $labels[$def->parentField] = 'Induk';
+        }
+
+        foreach ($def->fields as $field) {
+            $labels[$field->name] = $field->label;
+        }
+
+        if ($def->hasOrder) {
+            $labels[MasterDefinition::ORDER_FIELD] = 'Urutan';
+        }
+
+        if ($def->hasStatus) {
+            $labels[MasterDefinition::STATUS_FIELD] = 'Status';
+        }
+
+        return $labels;
     }
 }

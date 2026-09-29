@@ -1,22 +1,25 @@
 <script setup lang="ts">
 /**
  * Layout aplikasi setelah login: header + navigasi. Menu "Manajemen Akun" hanya tampil untuk role 1 & 3 (A-12),
- * menu "Master Data" hanya role 1 (Modul G), menu "FAQ" untuk semua role login (G-10).
+ * menu "Master Data" hanya role 1 (Modul G), menu "Hari Libur" untuk role 1/4/5/8 (G-08, DBV-003/CR-010), menu "FAQ"
+ * untuk semua role login (G-10).
  * Menu pengguna (kanan): "Ganti Password" (A-06, ISSUE-006) untuk semua role, lalu "Keluar".
  * Tampilan menu = UX saja; backend tetap menegakkan RoleFilter (ADR-024).
  */
-import { CircleHelp, Database, KeyRound, LogOut, Users, Home } from 'lucide-vue-next'
+import { CalendarDays, CircleHelp, Database, KeyRound, LogOut, Users, Home } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
+import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 
 const auth = useAuthStore()
 const router = useRouter()
 const loggingOut = ref(false)
 
 const roleLabel = computed(() => (auth.role ? ROLE_LABELS[auth.role] : ''))
+const canReadHariLibur = computed(() => auth.role !== null && (HARI_LIBUR_READ_ROLES as readonly number[]).includes(auth.role))
 
 async function logout(): Promise<void> {
   loggingOut.value = true
@@ -38,7 +41,7 @@ async function logout(): Promise<void> {
           SIMPEG v2
         </RouterLink>
 
-        <!-- flex-wrap: 4 menu role 1 tidak muat satu baris di layar HP (±375px); tanpa wrap halaman melebar ke samping. -->
+        <!-- flex-wrap: 5 menu role 1 tidak muat satu baris di layar HP (±375px); tanpa wrap halaman melebar ke samping. -->
         <nav class="flex flex-wrap items-center gap-1 text-sm" aria-label="Navigasi utama" data-testid="nav-main">
           <RouterLink
             :to="{ name: 'home' }"
@@ -64,6 +67,15 @@ async function logout(): Promise<void> {
             data-testid="nav-master-data"
           >
             <Database class="h-4 w-4" /> Master Data
+          </RouterLink>
+          <RouterLink
+            v-if="canReadHariLibur"
+            :to="{ name: 'hari-libur' }"
+            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100"
+            active-class="bg-slate-100 text-brand-primary font-medium"
+            data-testid="nav-hari-libur"
+          >
+            <CalendarDays class="h-4 w-4" /> Hari Libur
           </RouterLink>
           <RouterLink
             :to="{ name: 'faq' }"

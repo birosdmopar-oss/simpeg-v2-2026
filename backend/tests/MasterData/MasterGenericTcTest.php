@@ -6,8 +6,11 @@ namespace Tests\MasterData;
 
 use App\Constants\Role;
 use App\Exceptions\ValidationException;
+use App\Libraries\ApiExceptionHandler;
 use App\Libraries\MasterData\MasterDefinition;
 use App\Libraries\MasterData\MasterService;
+use Closure;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
@@ -44,6 +47,8 @@ final class MasterGenericTcTest extends CIUnitTestCase
     protected $seed      = MasterDataSeeder::class;
 
     private const ADMIN_NIP = '198501012010011001';
+
+    private const MARIADB_167_TRIGGER = 'cr011_simulasi_mariadb_167';
 
     protected function setUp(): void
     {
@@ -346,6 +351,69 @@ final class MasterGenericTcTest extends CIUnitTestCase
         $created->assertStatus(201);
         $this->assertSame('7', (string) $this->json($created)['data']['id_agama']);
         $this->dontSeeInDatabase('agama', ['id_agama' => 99]);
+    }
+
+    /**
+     * CR-011, temuan DBV-004 di MariaDB 10.4: counter PK AUTO_INCREMENT yang habis (mis. TINYINT 127) ditolak MariaDB
+     * dengan ERROR 167 (22003) "Out of range value for column '<pk>' at row 1", bukan 1062 PRIMARY seperti MySQL 8
+     * (KenaikanPangkatTest::testPangkatFullTinyintKeyGives422, PendidikanTest::testBidangFullTinyintKeyGives422).
+     * Hasilnya harus sama di kedua engine: 422 dengan pesan batas kode, tanpa baris maupun audit tertulis — untuk
+     * SELURUH master AUTO_INCREMENT (engine bersama: pangkat, jenis KP, golongan PPPK, pendidikan, kursem, dst.).
+     *
+     * MySQL lokal tidak pernah memunculkan 167, jadi error persis MariaDB disimulasikan lewat trigger BEFORE INSERT
+     * (SIGNAL errno 167 + pesan MariaDB) — tetap lewat driver, MasterModel, dan transaksi engine yang sama dengan
+     * produksi. 167 pada kolom selain PK master itu bukan "PK habis": tidak diterjemahkan dan tetap error server (500).
+     */
+    public function testMariaDbAutoIncrementOutOfRangeGives422ForEveryAutoIncrementMaster(): void
+    {
+        $covered = [];
+
+        foreach (self::masterFixtures() as $key => $fixture) {
+            $def = service('masterRegistry')->get($key);
+
+            if (! $def->autoIncrement) {
+                continue;
+            }
+
+            $covered[] = $key;
+            $rows      = $this->db->table($def->table)->countAllResults();
+            $audits    = $this->db->table('audit_logs')->countAllResults();
+
+            $this->withMariaDbOutOfRange($def->table, $def->primaryKey, function () use ($key, $def, $fixture): void {
+                $result = $this->sendJson('POST', "api/v1/master/{$key}", $fixture['new']);
+
+                $result->assertStatus(422);
+                $this->assertSame(
+                    ['status' => 'error', 'message' => "Kode {$def->label} sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database."],
+                    $this->json($result),
+                    $key,
+                );
+            });
+
+            $this->assertSame($rows, $this->db->table($def->table)->countAllResults(), $key);
+            $this->assertSame($audits, $this->db->table('audit_logs')->countAllResults(), $key);
+            $this->assertTrue($this->db->transStatus(), $key);
+        }
+
+        // Seluruh master ber-PK TINYINT (maks. 127, paling cepat habis) ikut tercakup.
+        foreach (['agama', 'jenis-pegawai', 'jenis-status', 'bidang-kursem', 'instansi-kursem', 'jenis-libur', 'pangkat', 'jenis-kp', 'gol-pppk', 'bidang-pendidikan'] as $key) {
+            $this->assertContains($key, $covered);
+        }
+
+        // 167 pada kolom lain (bukan PK master) tidak dilabeli "PK habis": dilempar apa adanya → 500 (bukan 422 generik
+        // CR-007 juga, karena 167 bukan kesalahan isian).
+        $this->withMariaDbOutOfRange('pangkat', 'order', function (): void {
+            try {
+                $this->sendJson('POST', 'api/v1/master/pangkat', self::masterFixtures()['pangkat']['new']);
+                $this->fail('167 pada kolom selain PK harus tetap dilempar sebagai error server.');
+            } catch (DatabaseException $e) {
+                $this->assertSame(167, $e->getCode());
+                $this->assertStringContainsString("Out of range value for column 'order' at row 1", $e->getMessage());
+                $this->assertSame(500, ApiExceptionHandler::toEnvelope($e)[0]);
+            }
+        });
+
+        $this->dontSeeInDatabase('pangkat', ['gol_ruang' => self::masterFixtures()['pangkat']['new']['gol_ruang']]);
     }
 
     /**
@@ -766,6 +834,27 @@ final class MasterGenericTcTest extends CIUnitTestCase
         }
 
         return 'X' . substr($code, 1);
+    }
+
+    /**
+     * Jalankan $work selama trigger BEFORE INSERT pada $table menolak setiap INSERT persis seperti MariaDB 10.4 saat
+     * counter AUTO_INCREMENT melewati batas tipe kolom: ERROR 167 (22003) "Out of range value for column '<kolom>' at
+     * row 1". Trigger selalu di-drop sesudahnya.
+     */
+    private function withMariaDbOutOfRange(string $table, string $column, Closure $work): void
+    {
+        $this->db->query(sprintf(
+            "CREATE TRIGGER %s BEFORE INSERT ON %s FOR EACH ROW SIGNAL SQLSTATE '22003' SET MYSQL_ERRNO = 167, MESSAGE_TEXT = %s",
+            self::MARIADB_167_TRIGGER,
+            $this->db->escapeIdentifiers($this->db->prefixTable($table)),
+            $this->db->escape("Out of range value for column '{$column}' at row 1"),
+        ));
+
+        try {
+            $work();
+        } finally {
+            $this->db->query('DROP TRIGGER IF EXISTS ' . self::MARIADB_167_TRIGGER);
+        }
     }
 
     /**

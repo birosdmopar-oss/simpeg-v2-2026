@@ -40,11 +40,6 @@ class MasterModel extends BaseAuditableModel
     protected $useSoftDeletes = false;
     protected $dateFormat     = 'datetime';
 
-    /**
-     * @var array<string, int|null> nip => id_pengguna (cache per instance)
-     */
-    private array $actorIds = [];
-
     public function __construct(private MasterDefinition $definition, ?ConnectionInterface $db = null)
     {
         $this->table         = $definition->table;
@@ -209,19 +204,7 @@ class MasterModel extends BaseAuditableModel
 
     private function currentActorId(): ?int
     {
-        $nip = $this->currentActorNip();
-
-        if ($nip === null || $nip === '') {
-            return null;
-        }
-
-        if (! array_key_exists($nip, $this->actorIds)) {
-            /** @var array<string, mixed>|null $row */
-            $row = $this->db->table('pengguna')->select('id_pengguna')->where('nip', $nip)->get()->getRowArray();
-
-            $this->actorIds[$nip] = $row === null ? null : (int) $row['id_pengguna'];
-        }
-
-        return $this->actorIds[$nip];
+        // id_pengguna langsung dari sesi (DBV-010): akun tanpa NIP (mis. Super Admin legacy) tetap ter-stamp.
+        return $this->actorIdPengguna();
     }
 }

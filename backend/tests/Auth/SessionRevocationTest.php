@@ -159,7 +159,7 @@ final class SessionRevocationTest extends CIUnitTestCase
     {
         $jwt = service('jwt');
         $jwt->setNow(time() - 7 * 86400 - 1);
-        $expired = $jwt->issueTokenPair(['sub' => self::NIP, 'role' => Role::PEGAWAI])['refresh_token'];
+        $expired = $jwt->issueTokenPair($this->claimsForNip(self::NIP))['refresh_token'];
         $jwt->setNow(null);
 
         $this->clearAuthState();

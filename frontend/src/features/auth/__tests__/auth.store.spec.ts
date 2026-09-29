@@ -18,6 +18,8 @@ const user = (level: User['user_level']): User => ({
   id_pengguna: 1,
   nip: '198501012010011001',
   username: '198501012010011001',
+  name: null,
+  email: null,
   user_level: level,
   id_unit: 'U01',
   id_satker: 'S01',

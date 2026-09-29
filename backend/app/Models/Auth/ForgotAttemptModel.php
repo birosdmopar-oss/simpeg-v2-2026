@@ -88,6 +88,30 @@ class ForgotAttemptModel extends Model
     }
 
     /**
+     * Batalkan seluruh token reset milik username yang belum dipakai (DBV-010/CR-013), dipanggil saat username akun
+     * diubah admin: token dipetakan ke akun lewat username, jadi token yang terbit sebelum rename tidak boleh
+     * berpindah ke akun lain yang kemudian memakai username itu. Tanda "dibatalkan" sama dengan
+     * invalidateOtherTokens().
+     *
+     * @return int jumlah token yang dibatalkan
+     *
+     * @throws DatabaseException query gagal
+     */
+    public function invalidatePendingTokens(string $username, int $now): int
+    {
+        $at = date('Y-m-d H:i:s', $now);
+
+        $ok = $this->where('username', $username)
+            ->where('token_hash IS NOT NULL')
+            ->where('used_at', null)
+            ->set('used_at', $at)
+            ->set('expires_at', 'LEAST(expires_at, ' . $this->db->escape($at) . ')', false)
+            ->update();
+
+        return $this->affectedOrFail($ok, 'Gagal membatalkan token reset.');
+    }
+
+    /**
      * True bila token tidak berlaku karena dibatalkan invalidateOtherTokens(), bukan karena dipakai reset.
      *
      * @param array<string, mixed> $row

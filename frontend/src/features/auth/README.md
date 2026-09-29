@@ -30,3 +30,17 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   server, jadi tidak masuk access log web server maupun Referer); `?token=` gaya legacy tetap diterima sebagai cadangan.
   Token disimpan di memori lalu fragment/query-nya dihapus dari URL. Sukses →
   `/login?reason=password-reset`.
+
+## Manajemen Akun (A-12, DBV-010/CR-013)
+
+- **Identitas akun = `id_pengguna`.** `User.nip` bisa `null` (akun role 1/3/4/5/8 tanpa NIP, K2); baris milik sendiri di
+  tabel dikenali lewat `id_pengguna`, bukan NIP.
+- **Aturan form** (`schemas/user.schema.ts`, cermin backend `UserService`): NIP angka maks. 18 digit, wajib hanya untuk
+  role Pegawai/PTT/PPPK (`UL_PEGAWAI`); akun tanpa NIP wajib nama dan username; email opsional; username ≤ 100
+  (`USERNAME_MAX`, juga batas form login). Edit memakai `makeUserUpdateSchema(nipAkun)`: NIP yang sudah ada tampil
+  read-only (ganti NIP = fitur B-06), akun tanpa NIP bisa ditautkan ke pegawai lewat isian "Tautkan NIP".
+- **Pilihan role:** Super Admin melihat role 1-8; Admin Satker hanya Pegawai/PTT/PPPK (ditambah role akun yang sedang
+  diedit agar tetap tampil) dan role akunnya sendiri dikunci — cermin aturan backend (legacy `L_user`), backend tetap
+  penentu akhir (403).
+- **Aksi baris** lewat menu ⋮ (`RowActionsMenu`, aturan AGENTS.md bagian 1) dengan testid `user-actions-<id_pengguna>` /
+  baris `user-row-<id_pengguna>` (NIP bisa `null`, jadi tidak dipakai sebagai id).

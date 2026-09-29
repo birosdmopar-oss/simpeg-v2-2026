@@ -30,6 +30,7 @@ async function mountAs(role: RoleCode) {
       { path: '/users', name: 'users', component: stub },
       { path: '/master/:entity?', name: 'master-data', component: stub },
       { path: '/faq/:id?', name: 'faq', component: stub },
+      { path: '/hari-libur', name: 'hari-libur', component: stub },
       { path: '/ganti-password', name: 'change-password', component: stub },
     ],
   })
@@ -47,11 +48,11 @@ describe('AppShell', () => {
     setActivePinia(createPinia())
   })
 
-  it('Super Admin melihat 4 menu dan nav boleh membungkus (tidak melebar di layar HP)', async () => {
+  it('Super Admin melihat 5 menu dan nav boleh membungkus (tidak melebar di layar HP)', async () => {
     const wrapper = await mountAs(Role.SUPER_ADMIN)
     const nav = wrapper.get('[data-testid="nav-main"]')
 
-    expect(nav.findAll('a').map((a) => a.text())).toEqual(['Beranda', 'Manajemen Akun', 'Master Data', 'FAQ'])
+    expect(nav.findAll('a').map((a) => a.text())).toEqual(['Beranda', 'Manajemen Akun', 'Master Data', 'Hari Libur', 'FAQ'])
     expect(nav.classes()).toContain('flex-wrap')
   })
 
@@ -63,6 +64,20 @@ describe('AppShell', () => {
     expect(link.attributes('aria-label')).toBe('Ganti Password')
     // Bukan bagian nav utama: daftar menu per role tetap sama.
     expect(wrapper.get('[data-testid="nav-main"]').find('[data-testid="nav-change-password"]').exists()).toBe(false)
+  })
+
+  it.each([Role.ADMIN_VIEW_ESELON1, Role.MENTERI, Role.PIMPINAN])('role %i melihat Hari Libur tanpa Master Data (G-08)', async (role) => {
+    const wrapper = await mountAs(role)
+    const nav = wrapper.get('[data-testid="nav-main"]')
+
+    expect(nav.findAll('a').map((a) => a.text())).toEqual(['Beranda', 'Hari Libur', 'FAQ'])
+    expect(nav.get('[data-testid="nav-hari-libur"]').attributes('href')).toBe('/hari-libur')
+  })
+
+  it.each([Role.PEGAWAI, Role.ADMIN_SATKER, Role.PTT, Role.PPPK])('role %i tidak melihat Hari Libur', async (role) => {
+    const wrapper = await mountAs(role)
+
+    expect(wrapper.find('[data-testid="nav-hari-libur"]').exists()).toBe(false)
   })
 
   it('Pegawai hanya melihat Beranda dan FAQ', async () => {

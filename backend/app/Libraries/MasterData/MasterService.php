@@ -39,6 +39,10 @@ use Throwable;
  *  8. Kolom turunan & sanitasi lewat hook per master (MasterHooks, DBV-002 E2), mis. isi artikel FAQ; kolom besar
  *     bisa dikecualikan dari daftar admin (listExclude, E4); kolom yang tidak dikelola tidak pernah dikirim
  *     (hiddenColumns, mis. `icon` topik FAQ).
+ *  9. Baris sistem (opsi systemIds, CR-010), mis. sentinel LAIN-LAIN wilayah (DBV-003): tidak pernah tampil di
+ *     options maupun daftar admin, tidak ikut penomoran urutan, tidak bisa diubah/dinonaktifkan/diurutkan/dihapus
+ *     (422), tidak bisa menjadi induk, dan hanya bisa dirujuk field ref ber-allowSystem (field lain: "tidak
+ *     ditemukan", sama dengan kode yang tidak ada). Detail GET {kode} tetap bisa dibaca.
  *
  * Mendukung dua bentuk kode sesuai DDL legacy: PK string yang diinput admin (kode wilayah CHAR(2/4/7/10), wajib
  * tepat N digit) dan PK AUTO_INCREMENT (agama, jenis_pegawai, jenis_status). Kolom tambahan legacy per master
@@ -56,6 +60,14 @@ class MasterService
      * Segmen URL yang dipakai routing di level yang sama dengan kode entri — tidak boleh jadi kode.
      */
     private const RESERVED_IDS = ['options', 'meta'];
+
+    /**
+     * Kode error DB yang diterjemahkan translateDuplicate(): 1062 duplikat UNIQUE/PRIMARY (MySQL & MariaDB), dan 167
+     * AUTO_INCREMENT melewati batas tipe kolom (MariaDB 10.4, HA_ERR_AUTOINC_ERANGE, SQLSTATE 22003).
+     */
+    private const ERR_DUPLICATE = 1062;
+
+    private const ERR_AUTOINC_RANGE = 167;
 
     /**
      * @var array<string, MasterModel>
@@ -110,6 +122,9 @@ class MasterService
                 $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
             }
         }
+
+        // Baris sistem tidak pernah tampil di daftar admin (semua filter), hanya lewat detail.
+        $this->withoutSystemRows($builder, $def);
 
         if ($def->parentField !== null && isset($filters['parent']) && $filters['parent'] !== '') {
             $builder->where($def->parentField, (string) $filters['parent']);
@@ -213,6 +228,8 @@ class MasterService
             } elseif ($def->hasStatus) {
                 $builder->where(MasterDefinition::STATUS_FIELD, MasterModel::STATUS_ACTIVE);
             }
+
+            $this->withoutSystemRows($builder, $def);
 
             if ($def->parentField !== null && $parent !== null) {
                 $builder->where($def->parentField, $parent);
@@ -373,7 +390,7 @@ class MasterService
 
             $this->assertNameUnique($def, $name, $parent, $scope);
             $this->assertFieldsUnique($def, $row, null);
-        });
+        }, $def);
 
         $this->invalidate($def);
 
@@ -390,6 +407,7 @@ class MasterService
     public function update(MasterDefinition $def, string $id, array $data): array
     {
         $current = $this->findOrFail($def, $id);
+        $this->assertNotSystem($def, $id, $current);
         $changes = [];
 
         $parent        = $def->parentField !== null ? (string) $current[$def->parentField] : null;
@@ -509,6 +527,7 @@ class MasterService
     public function setStatus(MasterDefinition $def, string $id, string $status): array
     {
         $current = $this->findOrFail($def, $id);
+        $this->assertNotSystem($def, $id, $current);
         $this->assertHasStatus($def);
         $status = $this->normalizeStatus($status);
 
@@ -528,6 +547,7 @@ class MasterService
     public function delete(MasterDefinition $def, string $id): array
     {
         $current = $this->findOrFail($def, $id);
+        $this->assertNotSystem($def, $id, $current);
         $this->assertHasStatus($def);
 
         if ((string) $current[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_DELETED) {
@@ -555,6 +575,7 @@ class MasterService
     public function reorder(MasterDefinition $def, string $id, int $position): array
     {
         $current = $this->findOrFail($def, $id);
+        $this->assertNotSystem($def, $id, $current);
 
         if (! $def->hasOrder) {
             throw new ValidationException("{$def->label} tidak memakai urutan tampil.");
@@ -660,7 +681,10 @@ class MasterService
     }
 
     /**
-     * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan).
+     * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan). Kosong mengikuti
+     * rule permit_empty controller (null, false, string yang kosong setelah trim, non-skalar): nilai itu lolos validasi
+     * tanpa dicek is_natural_no_zero, jadi tidak boleh menjadi (int) 0 — level pangkat 0 / posisi 1 (CR-011). Nilai
+     * terisi < 1 ditolak di sini juga (lapis kedua rule controller, mis. pemanggil service langsung).
      *
      * @param array<string, mixed> $data
      */
@@ -668,7 +692,15 @@ class MasterService
     {
         $order = $data[MasterDefinition::ORDER_FIELD] ?? null;
 
-        return $def->hasOrder && $order !== null && $order !== '' ? (int) $order : null;
+        if (! $def->hasOrder || ! is_scalar($order) || trim((string) $order) === '') {
+            return null;
+        }
+
+        if ((int) $order < 1) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, 'Urutan harus bilangan bulat minimal 1.');
+        }
+
+        return (int) $order;
     }
 
     /**
@@ -715,10 +747,13 @@ class MasterService
     {
         $builder = $this->whereOrderScope($this->db->table($def->table)->select([$def->primaryKey, MasterDefinition::ORDER_FIELD]), $scope);
 
-        // Posisi dihitung dari entri yang tampil di daftar default (status 10 disembunyikan), sama dengan FE.
+        // Posisi dihitung dari entri yang tampil di daftar default (status 10 & baris sistem disembunyikan), sama
+        // dengan FE: `order` baris sistem (0) tidak pernah dinomori ulang.
         if ($def->hasStatus) {
             $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
         }
+
+        $this->withoutSystemRows($builder, $def);
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $builder
@@ -750,7 +785,9 @@ class MasterService
     }
 
     /**
-     * Urutan berikutnya (MAX+1) dalam satu lingkup urutan, dijaga tidak melewati kapasitas kolom `order`.
+     * Urutan berikutnya (MAX+1) dalam satu lingkup urutan, dijaga tidak melewati kapasitas kolom `order`. Mode shift
+     * menghitung dari entri yang tidak dihapus (entri terhapus tidak punya posisi tampil). Mode manual menghitung dari
+     * SELURUH entri termasuk yang dihapus: level entri terhapus tetap dipegang dan kembali saat dipulihkan (CR-011).
      *
      * @param array<string, string|null> $scope
      */
@@ -758,9 +795,11 @@ class MasterService
     {
         $builder = $this->whereOrderScope($this->db->table($def->table)->selectMax(MasterDefinition::ORDER_FIELD, 'max_order'), $scope);
 
-        if ($def->hasStatus) {
+        if ($def->hasStatus && ! $def->isManualOrder()) {
             $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
         }
+
+        $this->withoutSystemRows($builder, $def);
 
         $row  = $builder->get()->getRowArray();
         $next = (int) ($row['max_order'] ?? 0) + 1;
@@ -809,18 +848,11 @@ class MasterService
     }
 
     /**
-     * Bentuk kode yang sah: AUTO_INCREMENT = bilangan bulat positif tanpa nol di depan; kode wilayah = tepat N digit;
-     * kode lain = huruf/angka/titik/strip/garis bawah. Selain itu dianggap tidak ada (404), bukan alias entri lain.
+     * Bentuk kode yang sah (MasterDefinition::isCanonicalId). Selain itu dianggap tidak ada (404), bukan alias entri lain.
      */
     private function isCanonicalId(MasterDefinition $def, string $id): bool
     {
-        $pattern = match (true) {
-            $def->autoIncrement     => '/^[1-9][0-9]*\z/',
-            $def->idDigits !== null => '/^[0-9]{' . $def->idDigits . '}\z/',
-            default                 => '/^[A-Za-z0-9._-]+\z/',
-        };
-
-        return preg_match($pattern, $id) === 1;
+        return $def->isCanonicalId($id);
     }
 
     private function exists(MasterDefinition $def, string $id): bool
@@ -833,6 +865,33 @@ class MasterService
         if (! $def->hasStatus) {
             throw new ValidationException("{$def->label} tidak memakai kolom status.");
         }
+    }
+
+    /**
+     * Baris sistem (opsi systemIds, CR-010) tidak bisa diubah, dinonaktifkan, diurutkan, maupun dihapus: 422 sebelum
+     * ada tulis/audit apa pun.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function assertNotSystem(MasterDefinition $def, string $id, array $row): void
+    {
+        if ($def->isSystemId($id)) {
+            throw new ValidationException(
+                "{$def->label} {$row[$def->nameField]} (kode {$id}) adalah baris sistem dan tidak bisa diubah, dinonaktifkan, atau dihapus.",
+            );
+        }
+    }
+
+    /**
+     * Keluarkan baris sistem (opsi systemIds, CR-010) dari query daftar, options, dan lingkup urutan.
+     */
+    private function withoutSystemRows(BaseBuilder $builder, MasterDefinition $def): BaseBuilder
+    {
+        if ($def->systemIds !== []) {
+            $builder->whereNotIn($def->primaryKey, $def->systemIds);
+        }
+
+        return $builder;
     }
 
     /**
@@ -875,6 +934,11 @@ class MasterService
                 throw ValidationException::forField($field, "{$parentDef->label} tidak ditemukan.");
             }
 
+            // Baris sistem (sentinel LAIN-LAIN, CR-010) tidak pernah punya anak riil.
+            if ($parentDef->isSystemId($id)) {
+                throw ValidationException::forField($field, "{$parentDef->label} {$parent[$parentDef->nameField]} tidak bisa dipilih sebagai induk.");
+            }
+
             if ($parentDef->hasStatus && (string) $parent[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_ACTIVE) {
                 throw ValidationException::forField($field, "{$parentDef->label} {$parent[$parentDef->nameField]} sedang non-aktif.");
             }
@@ -915,7 +979,9 @@ class MasterService
             $value  = (string) $value;
             $refDef = $this->registry->get((string) $field->entity);
 
-            if (! $this->isCanonicalId($refDef, $value)) {
+            // Baris sistem hanya untuk field ber-allowSystem; bagi field lain sama dengan kode yang tidak ada (tidak
+            // pernah muncul di dropdown).
+            if (! $this->isCanonicalId($refDef, $value) || ($refDef->isSystemId($value) && ! $field->allowSystem)) {
                 throw ValidationException::forField($field->name, "{$field->label} tidak ditemukan.");
             }
 
@@ -979,9 +1045,18 @@ class MasterService
             return;
         }
 
+        $duplicateId = (string) $duplicate[$def->primaryKey];
+
+        if ($def->isSystemId($duplicateId)) {
+            throw ValidationException::forField(
+                $def->nameField,
+                "{$def->nameLabel} \"{$name}\" sudah dipakai baris sistem {$duplicate[$def->nameField]} (kode {$duplicateId}).",
+            );
+        }
+
         throw ValidationException::forField(
             $def->nameField,
-            "{$def->nameLabel} \"{$name}\" sudah ada dengan kode {$duplicate[$def->primaryKey]}{$this->statusHint($def, $duplicate)}.",
+            "{$def->nameLabel} \"{$name}\" sudah ada dengan kode {$duplicateId}{$this->statusHint($def, $duplicate)}.",
         );
     }
 
@@ -1145,18 +1220,51 @@ class MasterService
      * UNIQUE/PRIMARY index DB (1062) adalah lapis kedua keunikan. Kalau dua permintaan balapan lolos cek aplikasi,
      * pelanggaran index (DatabaseException dari MasterModel, transaksi sudah di-rollback) diterjemahkan ulang ke 422
      * lewat $recheck (cek aplikasi diulang: kode, nama, dan field uniqueFields).
+     *
+     * $insertDef (hanya tambah): PK master AUTO_INCREMENT yang sudah di batas tipe kolom (autoIncrementExhausted())
+     * dan lolos $recheck → 422 dengan penjelasan, bukan 500 (CR-011).
      */
-    private function translateDuplicate(Closure $work, Closure $recheck): void
+    private function translateDuplicate(Closure $work, Closure $recheck, ?MasterDefinition $insertDef = null): void
     {
         try {
             $work();
         } catch (DatabaseException $e) {
-            if ($e->getCode() === 1062) {
+            $keyExhausted = $insertDef !== null && $this->autoIncrementExhausted($insertDef, $e);
+
+            // Cek aplikasi diulang lebih dulu (juga untuk PK habis): nama/kode ganda hasil balapan tetap dilaporkan
+            // sebagai ganda, sama di MySQL dan MariaDB.
+            if ($e->getCode() === self::ERR_DUPLICATE || $keyExhausted) {
                 $recheck();
+            }
+
+            if ($keyExhausted) {
+                throw new ValidationException(
+                    "Kode {$insertDef->label} sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.",
+                );
             }
 
             throw $e;
         }
+    }
+
+    /**
+     * INSERT gagal karena counter PK AUTO_INCREMENT sudah di batas tipe kolom (mis. TINYINT 127). Kode error beda per
+     * engine (temuan DBV-004 di MariaDB 10.4):
+     *  - MySQL 8 InnoDB mengulang nilai maksimum → 1062 "Duplicate entry '127' for key '<tabel>.PRIMARY'".
+     *  - MariaDB 10.4 menolak → 167 (22003) "Out of range value for column '<pk>' at row 1".
+     * 167 pada kolom selain PK master ini tidak dianggap PK habis (tetap dilempar → 500).
+     */
+    private function autoIncrementExhausted(MasterDefinition $def, DatabaseException $e): bool
+    {
+        if (! $def->autoIncrement) {
+            return false;
+        }
+
+        return match ($e->getCode()) {
+            self::ERR_DUPLICATE     => preg_match("/for key '(?:[^']*\.)?PRIMARY'/", $e->getMessage()) === 1,
+            self::ERR_AUTOINC_RANGE => preg_match("/Out of range value for column '(?:[^']*\.)?" . preg_quote($def->primaryKey, '/') . "'/", $e->getMessage()) === 1,
+            default                 => false,
+        };
     }
 
     /**

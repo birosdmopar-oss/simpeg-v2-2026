@@ -25,12 +25,15 @@ final class BaseAuditableModelTest extends CIUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        service('authContext')->setClaims(['sub' => '198501012010011001', 'role' => 1]);
+        service('authContext')->setClaims(['sub' => '1', 'nip' => '198501012010011001', 'ver' => 2, 'role' => 1]);
     }
 
     protected function tearDown(): void
     {
         service('authContext')->clear();
+        // Baris audit berpelaku tanpa NIP ditolak down() DBV-010: bersihkan (juga saat test gagal) agar regress test
+        // berikutnya berjalan.
+        $this->db->table('audit_logs')->where('id_pengguna_actor IS NOT NULL', null, false)->where('nip_actor', null)->delete();
         parent::tearDown();
     }
 
@@ -44,7 +47,8 @@ final class BaseAuditableModelTest extends CIUnitTestCase
         $log = $this->fetchLogs('dummy_items', (string) $id, 'create');
         $this->assertCount(1, $log);
         $this->assertNull($log[0]['before_json']);
-        $this->assertSame('198501012010011001', $log[0]['nip_actor']);
+        $this->assertSame('1', (string) $log[0]['id_pengguna_actor'], 'pelaku = id_pengguna (DBV-010)');
+        $this->assertSame('198501012010011001', $log[0]['nip_actor'], 'NIP pelaku tetap dicatat sebagai jejak');
 
         $after = json_decode((string) $log[0]['after_json'], true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('Kursi', $after['name']);
@@ -122,6 +126,22 @@ final class BaseAuditableModelTest extends CIUnitTestCase
         $id    = $model->insert(['name' => 'CLI', 'qty' => 0]);
 
         $log = $this->fetchLogs('dummy_items', (string) $id, 'create');
+        $this->assertNull($log[0]['nip_actor']);
+        $this->assertNull($log[0]['id_pengguna_actor']);
+    }
+
+    /**
+     * DBV-010 — akun tanpa NIP (role 1/3/4/5/8): pelaku tetap tercatat lewat id_pengguna, nip_actor NULL.
+     */
+    public function testActorWithoutNipIsRecordedById(): void
+    {
+        service('authContext')->setClaims(['sub' => '77', 'nip' => null, 'ver' => 2, 'role' => 1]);
+
+        $model = new DummyAuditableModel($this->db);
+        $id    = $model->insert(['name' => 'Lemari', 'qty' => 1]);
+
+        $log = $this->fetchLogs('dummy_items', (string) $id, 'create');
+        $this->assertSame('77', (string) $log[0]['id_pengguna_actor']);
         $this->assertNull($log[0]['nip_actor']);
     }
 
