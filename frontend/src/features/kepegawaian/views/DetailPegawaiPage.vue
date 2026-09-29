@@ -6,7 +6,7 @@
  *
  * DATA CONTOH: memakai mock sampai B-03/B-20 tersedia. "Simpan Perubahan", cetak, arsip, dan hapus belum
  * tersambung — halaman memberi tahu dengan jelas, tidak berpura-pura berhasil. Hanya tab "Data Umum" yang berisi;
- * tab riwayat lain menyusul (task B-07…B-18) dan menampilkan keadaan kosong yang menyebutkan task-nya.
+ * tab riwayat lain dirender dari konfigurasi (riwayat/) dengan data contoh; perubahannya hanya sementara.
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -22,6 +22,9 @@ import DataUmumForm from '../components/DataUmumForm.vue'
 import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
 import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
 import { RIWAYAT_MENUS } from '../options'
+import RiwayatListSection from '../riwayat/RiwayatListSection.vue'
+import RiwayatRecordSection from '../riwayat/RiwayatRecordSection.vue'
+import { RIWAYAT_BY_KEY } from '../riwayat/riwayat.config'
 import { pegawaiService } from '../services/pegawai.service'
 import type { DataUmumForm as DataUmumValues } from '../schemas/dataUmum.schema'
 import type { ArsipItem, PegawaiDetail } from '../types'
@@ -52,6 +55,7 @@ const tab = computed<string>({
   set: (key) => void router.replace({ query: { ...route.query, tab: key } }),
 })
 const activeMenu = computed(() => RIWAYAT_MENUS.find((m) => m.key === tab.value) ?? RIWAYAT_MENUS[0])
+const riwayat = computed(() => RIWAYAT_BY_KEY[activeMenu.value.key])
 
 let requestId = 0
 async function load(): Promise<void> {
@@ -104,7 +108,7 @@ const crumbs = computed(() => [
 
         <RiwayatMenuTabs v-model="tab" :menus="RIWAYAT_MENUS" />
 
-        <template v-if="activeMenu.ready">
+        <template v-if="activeMenu.key === 'data-umum'">
           <UiCard title="Data Umum" subtitle="Kolom bertanda (*) wajib diisi" flush>
             <div class="mt-3 border-t border-slate-200">
               <DataUmumForm :initial="detail.data_umum" :readonly="!canEdit" @save="onSave" />
@@ -113,11 +117,8 @@ const crumbs = computed(() => [
           <ArsipTable :items="detail.arsip" :readonly="!canEdit" @add="notice = 'Tambah arsip belum tersambung ke backend (task B-18).'" @action="onArsipAction" />
         </template>
 
-        <UiCard v-else :title="activeMenu.label" data-testid="riwayat-placeholder">
-          <p class="text-body1 text-slate-600">
-            Bagian <strong>{{ activeMenu.label }}</strong> menyusul — dikerjakan pada task <strong>{{ activeMenu.task }}</strong>.
-          </p>
-        </UiCard>
+        <RiwayatRecordSection v-else-if="riwayat?.kind === 'record'" :key="`${detail.nip}-${riwayat.key}`" :nip="detail.nip" :config="riwayat" :readonly="!canEdit" />
+        <RiwayatListSection v-else-if="riwayat" :key="`${detail.nip}-${riwayat.key}`" :nip="detail.nip" :config="riwayat" :readonly="!canEdit" />
       </template>
     </div>
 

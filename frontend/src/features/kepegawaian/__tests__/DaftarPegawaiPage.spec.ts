@@ -262,6 +262,7 @@ describe('DaftarPegawaiPage — aksi & role', () => {
     confirm?.click()
     await flushPromises()
     expect(wrapper.get('[role="status"]').text()).toContain('B-05')
+    expect(wrapper.get('[role="status"]').text()).toContain(first.nama) // nama baris terpilih tidak hilang saat dialog menutup
     // Data tidak benar-benar berubah.
     expect(info(wrapper)).toBe('Showing 1 to 10 of 57 entries')
   })

@@ -33,25 +33,25 @@ export const JENIS_STATUS = opts(['Biasa', 'Perbantuan', 'Dipekerjakan'])
 
 /**
  * Tab riwayat Detail Pegawai (Gambar 22–24: tab tergulir + popup "Semua Menu"). Urutan mengikuti mockup.
- * Hanya `data-umum` yang punya isi pada Fase 3 tahap UI ini; sisanya dipenuhi task B-07…B-18 (kolom `task`).
+ * Semua tab sudah punya UI (riwayat/riwayat.config.ts, data contoh); `task` = task B-07…B-18 yang akan menyambungkannya ke backend.
  */
 export const RIWAYAT_MENUS: RiwayatMenu[] = [
   { key: 'data-umum', label: 'Data Umum', task: 'B-03', ready: true },
-  { key: 'data-alamat', label: 'Data Alamat', task: 'B-16', ready: false },
-  { key: 'data-keluarga', label: 'Data Keluarga', task: 'B-16', ready: false },
-  { key: 'riwayat-pendidikan', label: 'Riwayat Pendidikan', task: 'B-10', ready: false },
-  { key: 'riwayat-pelatihan', label: 'Riwayat Pelatihan', task: 'B-11', ready: false },
-  { key: 'kursus-seminar', label: 'Kursus/Seminar', task: 'B-11', ready: false },
-  { key: 'riwayat-organisasi', label: 'Riwayat Organisasi', task: 'B-17', ready: false },
-  { key: 'laporan-kerja-harian', label: 'Laporan Kerja Harian', task: 'B-12', ready: false },
-  { key: 'skp-tahunan', label: 'SKP Tahunan', task: 'B-12', ready: false },
-  { key: 'skp-periodik', label: 'SKP Periodik', task: 'B-12', ready: false },
-  { key: 'riwayat-jabatan', label: 'Riwayat Jabatan', task: 'B-07', ready: false },
-  { key: 'riwayat-pangkat', label: 'Riwayat Pangkat', task: 'B-08', ready: false },
-  { key: 'riwayat-kgb', label: 'Riwayat KGB', task: 'B-09', ready: false },
-  { key: 'riwayat-konket', label: 'Riwayat Konket', task: 'B-13', ready: false },
-  { key: 'riwayat-hukdis', label: 'Riwayat Hukdis', task: 'B-14', ready: false },
-  { key: 'angka-kredit', label: 'Angka Kredit', task: 'B-15', ready: false },
-  { key: 'karpeg-karis-karsu', label: 'Karpeg / Karis / Karsu', task: 'B-17', ready: false },
-  { key: 'tanda-jasa', label: 'Tanda Jasa', task: 'B-17', ready: false },
+  { key: 'data-alamat', label: 'Data Alamat', task: 'B-16', ready: true },
+  { key: 'data-keluarga', label: 'Data Keluarga', task: 'B-16', ready: true },
+  { key: 'riwayat-pendidikan', label: 'Riwayat Pendidikan', task: 'B-10', ready: true },
+  { key: 'riwayat-pelatihan', label: 'Riwayat Pelatihan', task: 'B-11', ready: true },
+  { key: 'kursus-seminar', label: 'Kursus/Seminar', task: 'B-11', ready: true },
+  { key: 'riwayat-organisasi', label: 'Riwayat Organisasi', task: 'B-17', ready: true },
+  { key: 'laporan-kerja-harian', label: 'Laporan Kerja Harian', task: 'B-12', ready: true },
+  { key: 'skp-tahunan', label: 'SKP Tahunan', task: 'B-12', ready: true },
+  { key: 'skp-periodik', label: 'SKP Periodik', task: 'B-12', ready: true },
+  { key: 'riwayat-jabatan', label: 'Riwayat Jabatan', task: 'B-07', ready: true },
+  { key: 'riwayat-pangkat', label: 'Riwayat Pangkat', task: 'B-08', ready: true },
+  { key: 'riwayat-kgb', label: 'Riwayat KGB', task: 'B-09', ready: true },
+  { key: 'riwayat-konket', label: 'Riwayat Konket', task: 'B-13', ready: true },
+  { key: 'riwayat-hukdis', label: 'Riwayat Hukdis', task: 'B-14', ready: true },
+  { key: 'angka-kredit', label: 'Angka Kredit', task: 'B-15', ready: true },
+  { key: 'karpeg-karis-karsu', label: 'Karpeg / Karis / Karsu', task: 'B-17', ready: true },
+  { key: 'tanda-jasa', label: 'Tanda Jasa', task: 'B-17', ready: true },
 ]

@@ -10,6 +10,7 @@ import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/r
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
 import { RIWAYAT_MENUS } from '../options'
+import { RIWAYAT_BY_KEY } from '../riwayat/riwayat.config'
 import { PEGAWAI_ROWS } from '../services/pegawai.mock'
 import DetailPegawaiPage from '../views/DetailPegawaiPage.vue'
 
@@ -84,26 +85,28 @@ describe('DetailPegawaiPage — tab riwayat', () => {
     expect((control(wrapper, 'Provinsi Lahir').element as HTMLSelectElement).value).toBe('Jawa Barat')
   })
 
-  it('memuat 18 menu riwayat; hanya Data Umum yang siap', () => {
+  it('memuat 18 menu riwayat; semuanya punya UI (Data Umum + 17 tab dari konfigurasi)', () => {
     expect(RIWAYAT_MENUS).toHaveLength(18)
-    expect(RIWAYAT_MENUS.filter((m) => m.ready).map((m) => m.key)).toEqual(['data-umum'])
+    expect(RIWAYAT_MENUS.every((m) => m.ready)).toBe(true)
     expect(new Set(RIWAYAT_MENUS.map((m) => m.key)).size).toBe(18)
+    for (const menu of RIWAYAT_MENUS.filter((m) => m.key !== 'data-umum')) expect(RIWAYAT_BY_KEY[menu.key], menu.key).toBeDefined()
   })
 
-  it('memilih tab lain mengganti isi dengan keadaan "menyusul" yang menyebut task-nya, dan menyimpan ?tab=', async () => {
+  it('memilih tab lain mengganti isi dengan tabel riwayat dari konfigurasi, dan menyimpan ?tab=', async () => {
     const { wrapper, router } = await mountDetail()
     const tab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Riwayat Pendidikan')
     await tab?.trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.query.tab).toBe('riwayat-pendidikan')
-    expect(wrapper.get('[data-testid="riwayat-placeholder"]').text()).toContain('B-10')
+    expect(wrapper.get('[data-testid="riwayat-section-riwayat-pendidikan"]').text()).toContain('Riwayat Pendidikan')
+    expect(wrapper.findAll('[data-testid^="riwayat-row-"]').length).toBeGreaterThan(0)
     expect(wrapper.find('[data-testid="data-umum-form"]').exists()).toBe(false)
   })
 
   it('tautan langsung ?tab=riwayat-kgb membuka tab tersebut; ?tab tidak valid kembali ke Data Umum', async () => {
     const kgb = await mountDetail(Role.SUPER_ADMIN, `/pegawai/${NIP}?tab=riwayat-kgb`)
-    expect(kgb.wrapper.get('[data-testid="riwayat-placeholder"]').text()).toContain('B-09')
+    expect(kgb.wrapper.find('[data-testid="riwayat-section-riwayat-kgb"]').exists()).toBe(true)
     kgb.wrapper.unmount()
 
     const bad = await mountDetail(Role.SUPER_ADMIN, `/pegawai/${NIP}?tab=ngawur`)
@@ -127,7 +130,7 @@ describe('DetailPegawaiPage — tab riwayat', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.query.tab).toBe('riwayat-hukdis')
-    expect(wrapper.get('[data-testid="riwayat-placeholder"]').text()).toContain('B-14')
+    expect(wrapper.find('[data-testid="riwayat-section-riwayat-hukdis"]').exists()).toBe(true)
   })
 
   it('"Semua Menu" tanpa hasil menampilkan "Menu tidak ditemukan."', async () => {

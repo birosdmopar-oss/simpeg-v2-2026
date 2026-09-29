@@ -52,6 +52,8 @@ const loadError = ref(false)
 
 const notice = ref<string | null>(null)
 const deleting = ref<PegawaiRow | null>(null)
+/** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
+const deleteOpen = ref(false)
 
 const PER_PAGE_OPTIONS = ['10', '25', '50'].map((v) => ({ value: v, label: v }))
 
@@ -104,12 +106,15 @@ onBeforeUnmount(() => {
 
 function onAction(key: 'detail' | 'hapus', row: PegawaiRow): void {
   if (key === 'detail') void router.push({ name: 'pegawai-detail', params: { nip: row.nip } })
-  else deleting.value = row
+  else {
+    deleting.value = row
+    deleteOpen.value = true
+  }
 }
 
 function confirmDelete(): void {
+  deleteOpen.value = false
   const name = deleting.value ? fullName(deleting.value) : ''
-  deleting.value = null
   notice.value = `Penghapusan pegawai (${name}) belum tersambung ke backend — akan aktif bersama task B-05.`
 }
 
@@ -170,12 +175,12 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
     </UiCard>
 
     <ConfirmDialog
-      :open="deleting !== null"
+      :open="deleteOpen"
       title="Hapus pegawai?"
       :description="deleting ? `Data ${fullName(deleting)} (${deleting.nip}) akan dihapus. Tindakan ini tidak dapat dibatalkan.` : ''"
       confirm-label="Ya, hapus"
       danger
-      @update:open="(v) => { if (!v) deleting = null }"
+      @update:open="(v) => (deleteOpen = v)"
       @confirm="confirmDelete"
     />
   </RedesignShell>
