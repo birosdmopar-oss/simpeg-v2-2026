@@ -5,13 +5,13 @@
  */
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
-import AppShell from '@/shared/components/AppShell.vue'
+import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 const auth = useAuthStore()
 </script>
 
 <template>
-  <AppShell>
+  <RedesignShell>
     <section class="rounded-lg border border-slate-200 bg-white p-6">
       <h1 class="text-xl font-semibold text-slate-900">Selamat datang, {{ auth.user?.username }}</h1>
       <p class="mt-1 text-sm text-slate-500">
@@ -23,5 +23,5 @@ const auth = useAuthStore()
       </p>
       <p class="mt-4 text-sm text-slate-600">Dashboard per role dikerjakan di Fase 7 (Modul F).</p>
     </section>
-  </AppShell>
+  </RedesignShell>
 </template>

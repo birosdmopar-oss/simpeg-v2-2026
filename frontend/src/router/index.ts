@@ -9,6 +9,7 @@ import { createRouter, createWebHistory, type NavigationGuard, type RouteRecordR
 import { passwordResetEnabled } from '@/features/auth/config'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
+import { PEGAWAI_LIST_ROLES } from '@/features/kepegawaian/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 
@@ -88,6 +89,27 @@ const routes: RouteRecordRaw[] = [
     name: 'hari-libur',
     component: () => import('@/features/master-data/views/HariLiburPage.vue'),
     meta: { roles: HARI_LIBUR_READ_ROLES, title: 'Hari Libur' },
+  },
+  {
+    // B-20 daftar pegawai (hr/employee/index = role 1,3,4,5,8).
+    path: '/pegawai',
+    name: 'pegawai-list',
+    component: () => import('@/features/kepegawaian/views/DaftarPegawaiPage.vue'),
+    meta: { roles: PEGAWAI_LIST_ROLES, title: 'Daftar Pegawai' },
+  },
+  {
+    // B-20 detail pegawai (hr/employee/detail/{nip} = semua role login).
+    path: '/pegawai/:nip',
+    name: 'pegawai-detail',
+    component: () => import('@/features/kepegawaian/views/DetailPegawaiPage.vue'),
+    meta: { title: 'Data Pegawai' },
+  },
+  {
+    // B-19 struktur organisasi (hr/so/full = semua role login).
+    path: '/struktur-organisasi',
+    name: 'org-structure',
+    component: () => import('@/features/kepegawaian/views/StrukturOrganisasiPage.vue'),
+    meta: { title: 'Struktur Organisasi' },
   },
   {
     path: '/403',

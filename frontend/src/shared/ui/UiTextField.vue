@@ -24,6 +24,7 @@ const props = withDefaults(
     readonly?: boolean
     autocomplete?: string
     name?: string
+    inputmode?: 'text' | 'numeric' | 'tel' | 'email' | 'search'
   }>(),
   {
     modelValue: '',
@@ -38,6 +39,7 @@ const props = withDefaults(
     readonly: false,
     autocomplete: undefined,
     name: undefined,
+    inputmode: undefined,
   },
 )
 
@@ -90,6 +92,7 @@ const controlClass = computed(() => [
         :disabled="disabled"
         :readonly="readonly"
         :autocomplete="autocomplete"
+        :inputmode="inputmode"
         :required="required"
         :class="controlClass"
         :aria-invalid="state === 'error' || undefined"

@@ -17,7 +17,7 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   huruf kecil, angka). Dipakai schema Zod (ganti/reset password, form akun admin) dan `PasswordRulesChecklist`
   (checklist real-time). Cermin backend `App\Libraries\Auth\PasswordPolicy` — id, urutan, dan pesan wajib diubah bersamaan
   (vektor uji `__tests__/password.schema.spec.ts` = `backend/tests/unit/Libraries/PasswordPolicyTest.php`).
-- **`/ganti-password`** (`ChangePasswordPage`, semua role login; tautan "Ganti Password" di menu pengguna AppShell).
+- **`/ganti-password`** (`ChangePasswordPage`, semua role login; tautan "Ganti Password" di menu pengguna (profil di sidebar) RedesignShell).
   Sukses → backend mencabut seluruh refresh token dan menghapus cookie; `auth.changePassword()` hanya mengosongkan sesi
   lokal (TANPA `/auth/logout`) lalu halaman pindah ke `/login?reason=password-changed`.
 - **Batas pencabutan sesi (ganti & reset):** backend hanya mencabut refresh token; access token yang sudah terbit di

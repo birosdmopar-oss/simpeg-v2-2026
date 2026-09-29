@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Pembungkus route /faq/:id?: FaqView di dalam AppShell.
-import AppShell from '@/shared/components/AppShell.vue'
+// Pembungkus route /faq/:id?: FaqView di dalam RedesignShell.
+import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 import FaqView from './FaqView.vue'
 </script>
 
 <template>
-  <AppShell>
+  <RedesignShell>
     <FaqView />
-  </AppShell>
+  </RedesignShell>
 </template>

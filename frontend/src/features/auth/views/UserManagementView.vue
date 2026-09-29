@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Halaman Manajemen Akun (A-12, MTC-004/005): tabel sort/search, form tambah/edit, modal konfirmasi nonaktifkan/hapus.
- * Hanya dirender untuk role 1 & 3 (route meta roles + menu di AppShell); scoping satker ditegakkan backend.
+ * Hanya dirender untuk role 1 & 3 (route meta roles + menu di RedesignShell); scoping satker ditegakkan backend.
  * Akun non-pegawai (DBV-010/CR-013) boleh tanpa NIP: baris milik sendiri dikenali lewat id_pengguna, bukan NIP.
  */
 import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Plus, Search, Trash2, UserCheck, UserX } from 'lucide-vue-next'

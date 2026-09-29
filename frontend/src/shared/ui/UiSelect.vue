@@ -21,6 +21,10 @@ const props = withDefaults(
     required?: boolean
     disabled?: boolean
     name?: string
+    /** true = opsi placeholder ('Semua …') bisa dipilih lagi untuk mengosongkan nilai (filter). */
+    clearable?: boolean
+    /** Label aksesibel bila tidak ada `label` yang terlihat (mis. pemilih jumlah baris). */
+    ariaLabel?: string
   }>(),
   {
     modelValue: '',
@@ -32,6 +36,8 @@ const props = withDefaults(
     required: false,
     disabled: false,
     name: undefined,
+    clearable: false,
+    ariaLabel: undefined,
   },
 )
 
@@ -60,6 +66,7 @@ const tone = computed(() => {
         :value="modelValue ?? ''"
         :disabled="disabled"
         :required="required"
+        :aria-label="label ? undefined : ariaLabel"
         class="h-11 w-full appearance-none rounded-lg border bg-white pl-3 pr-10 text-body1 text-slate-900 outline-none transition"
         :class="[
           tone.border,
@@ -71,7 +78,7 @@ const tone = computed(() => {
         :aria-describedby="helpText ? `${id}-help` : undefined"
         @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
       >
-        <option value="" disabled>{{ placeholder }}</option>
+        <option value="" :disabled="!clearable">{{ placeholder }}</option>
         <option v-for="opt in options" :key="opt.value" :value="opt.value" :disabled="opt.disabled">
           {{ opt.label }}
         </option>
