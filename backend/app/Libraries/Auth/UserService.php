@@ -19,6 +19,10 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  * - Role 1 (Super Admin): seluruh akun.
  * - Role 3 (Admin Satker): hanya akun dengan id_satker = id_satker miliknya (dari claims JWT).
  *   Akun di luar satker → 403 (tidak muncul di daftar, tidak bisa dibaca/diubah/dihapus).
+ *   Di dalam satkernya pun hanya akun Pegawai/PTT/PPPK (Role::UL_PEGAWAI) ditambah akunnya sendiri; akun role
+ *   1/3/4/5/8 lain → 403 dan tidak muncul di daftar (CR-017, legacy User::edit/delete menolak target selain level
+ *   pegawai; tanpa ini Admin Satker bisa mengganti password / menonaktifkan Super Admin satu satker). Level 7 (PPPK)
+ *   ikut boleh dikelola agar konsisten dengan aturan buat akun (legacy edit/delete hanya 2/6, tidak konsisten).
  *   Admin Satker hanya boleh membuat akun / memberi role Pegawai/PTT/PPPK (Role::UL_PEGAWAI, legacy L_user
  *   validate_param: "Pegawai admin hanya bisa menambah user dengan level pegawai atau PTT") dan tidak boleh mengubah
  *   role akunnya sendiri (mencegah eskalasi hak ke role lintas satker 1/4/5/8).
@@ -69,7 +73,11 @@ class UserService
         $builder = $this->pengguna->builder()->where('deleted_at', null);
 
         if ($actor->role() === Role::ADMIN_SATKER) {
-            $builder->where('id_satker', $actor->idSatker());
+            $builder->where('id_satker', $actor->idSatker())
+                ->groupStart()
+                ->whereIn('user_level', Role::UL_PEGAWAI)
+                ->orWhere('id_pengguna', $actor->idPengguna())
+                ->groupEnd();
         } elseif (! empty($filters['id_satker'])) {
             $builder->where('id_satker', (string) $filters['id_satker']);
         }
@@ -402,6 +410,15 @@ class UserService
         if ($actor->role() === Role::ADMIN_SATKER && (string) $row['id_satker'] !== $actor->idSatker()) {
             // Di luar scope satker → 403 (bukan 404) sesuai DoD A-08.
             throw new ForbiddenException('Akun berada di luar satker Anda.');
+        }
+
+        if (
+            $actor->role() === Role::ADMIN_SATKER
+            && $id !== $actor->idPengguna()
+            && ! in_array((int) $row['user_level'], Role::UL_PEGAWAI, true)
+        ) {
+            // CR-017: akun role 1/3/4/5/8 lain di satker yang sama (legacy User::edit/delete).
+            throw new ForbiddenException('Admin Satker hanya dapat mengelola akun Pegawai/PTT/PPPK dan akunnya sendiri.');
         }
 
         return $row;
