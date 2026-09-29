@@ -205,7 +205,7 @@ class MasterDataSeeder extends Seeder
     /**
      * G-05 (DBV-004): jenjang 1–3 (SD/SLTP/SLTA, tanpa jurusan) dan > 3, bidang 98 "Lainnya", jurusan 1185 "Lainnya"
      * dipakai apa adanya (G-doc 6.4). `order` bidang/jurusan = urut nama seperti aturan impor (P8). `bobot_ipasn`
-     * jenjang 8 = nilai uji (jenjang lain memakai default DB).
+     * jenjang 8 = nilai uji (jenjang lain memakai default DB, NULL).
      */
     private function seedPendidikan(): void
     {

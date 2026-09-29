@@ -219,7 +219,7 @@ final class PendidikanTest extends CIUnitTestCase
     /**
      * P6: `bobot_ipasn` (skor kualifikasi IP ASN, `L_user.php:878-884`) tidak ada di daftar, detail, hasil
      * tambah/ubah/status/urutan/hapus, meta, maupun options; nilai yang dikirim diabaikan dan nilai DB tidak berubah.
-     * Jenjang baru memakai default kolom DB (D13), tidak diisi aplikasi.
+     * Jenjang baru memakai default kolom DB (D13), tidak diisi aplikasi: NULL = belum ditetapkan (Bagian 4 #16).
      */
     public function testJenjangBobotIpasnIsNeverExposedOrChanged(): void
     {
@@ -245,7 +245,8 @@ final class PendidikanTest extends CIUnitTestCase
         $this->seeInDatabase('jenjang_pendidikan', ['id_jenjang_pendidikan' => 8, 'jenjang_pendidikan' => 'Strata Satu', 'bobot_ipasn' => 20]);
 
         $newId = (string) $responses['create'][0]['id_jenjang_pendidikan'];
-        $this->assertSame($this->columnDefault('jenjang_pendidikan', 'bobot_ipasn'), $this->db->table('jenjang_pendidikan')->where('id_jenjang_pendidikan', $newId)->get()->getRowArray()['bobot_ipasn']);
+        $this->assertNull($this->columnDefault('jenjang_pendidikan', 'bobot_ipasn'));
+        $this->assertNull($this->db->table('jenjang_pendidikan')->where('id_jenjang_pendidikan', $newId)->get()->getRowArray()['bobot_ipasn']);
 
         $meta = $this->metaByKey()['jenjang-pendidikan'];
         $this->assertNotContains('bobot_ipasn', array_column($meta['fields'], 'name'));

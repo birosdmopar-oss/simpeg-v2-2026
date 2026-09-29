@@ -198,7 +198,8 @@ final class PangkatPendidikanSchemaTest extends CIUnitTestCase
             'kolom flag jenjang di jurusan_pendidikan (D_I..S_3); NULL = jenjang tanpa jurusan',
             $this->commentOf('jenjang_pendidikan', 'row_jurusan'),
         );
-        $this->assertSame('25', $this->defaultOf('jenjang_pendidikan', 'bobot_ipasn'));
+        // Bagian 4 #16 (keputusan DBV): DEFAULT NULL = belum ditetapkan, bukan 25 dari simpegdev_local.
+        $this->assertNull($this->defaultOf('jenjang_pendidikan', 'bobot_ipasn'));
         $this->assertSame('skor kualifikasi pendidikan IP ASN', $this->commentOf('jenjang_pendidikan', 'bobot_ipasn'));
 
         foreach (self::FLAGS as $flag => $label) {

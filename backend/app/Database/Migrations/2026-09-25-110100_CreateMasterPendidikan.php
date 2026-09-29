@@ -37,7 +37,9 @@ use Throwable;
  *     ON UPDATE + `updated_by`, tanpa created_*) [I]; satu library legacy (`Lm_pendidikan.php`) dengan `bidang_pendidikan`.
  *   - Status v2 1 Aktif / 2 Tidak Aktif / 10 Dihapus (COMMENT disesuaikan; legacy bidang '1: Active, 2: Inactive,
  *     10: Deleted'); COMMENT kolom audit, flag, `row_jurusan`, `bobot_ipasn`.
- *   - `bobot_ipasn` disimpan (dibaca skor IP ASN) tetapi tidak diekspos API/FE.
+ *   - `bobot_ipasn` disimpan (dibaca skor IP ASN) tetapi tidak diekspos API/FE. DEFAULT NULL (keputusan DBV, G-doc
+ *     Bagian 4 #16; `simpegdev_local` DEFAULT 25): jenjang baru lewat v2 = "belum ditetapkan", bukan skor yang tidak
+ *     pernah ditinjau. Legacy memakai skor hanya bila > 0 (`L_user.php:878-884`).
  *
  * Kolom audit diisi aplikasi (waktu UTC, id_pengguna aktor). Nilai AUTO_INCREMENT awal tidak ditulis (legacy bidang
  * 100 — PK TINYINT signed menyisakan ID sampai 127): impor memakai ID legacy apa adanya karena kode legacy dan tabel
@@ -101,7 +103,7 @@ class CreateMasterPendidikan extends Migration
             `jenjang_pendidikan_singkat` VARCHAR(50) NOT NULL,
             `jenjang_pendidikan` VARCHAR(100) NOT NULL,
             `row_jurusan` VARCHAR(10) NULL DEFAULT NULL COMMENT 'kolom flag jenjang di jurusan_pendidikan (D_I..S_3); NULL = jenjang tanpa jurusan',
-            `bobot_ipasn` INT NULL DEFAULT 25 COMMENT 'skor kualifikasi pendidikan IP ASN',
+            `bobot_ipasn` INT NULL DEFAULT NULL COMMENT 'skor kualifikasi pendidikan IP ASN',
             `order` TINYINT NOT NULL DEFAULT 1,
             `status` TINYINT NOT NULL DEFAULT 1 {$status},
             {$audit},
