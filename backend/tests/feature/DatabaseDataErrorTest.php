@@ -155,9 +155,11 @@ final class DatabaseDataErrorTest extends CIUnitTestCase
         }
 
         // Kode lain (duplikat, lock wait, deadlock, SIGNAL, tanpa kode) tetap 500; begitu juga kode data di exception
-        // non-DB.
+        // non-DB. 167 (MariaDB: AUTO_INCREMENT melewati batas tipe PK) bukan kesalahan isian: di engine master
+        // diterjemahkan MasterService (CR-011), di luar engine tetap 500 seperti padanannya di MySQL (1062 PRIMARY).
         foreach ([
             'duplikat'   => new DatabaseException('Duplicate entry', 1062),
+            'PK habis'   => new DatabaseException("Out of range value for column 'id_libur' at row 1", 167),
             'lock wait'  => new DatabaseException('Lock wait timeout exceeded', 1205),
             'deadlock'   => new DatabaseException('Deadlock found', 1213),
             'signal'     => new DatabaseException('simulasi gagal', 1644),

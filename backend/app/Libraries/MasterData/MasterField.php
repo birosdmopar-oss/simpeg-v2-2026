@@ -316,7 +316,9 @@ final class MasterField
     }
 
     /**
-     * Normalisasi nilai sebelum disimpan (string kosong → NULL untuk field opsional; boolean kosong → 0).
+     * Normalisasi nilai sebelum disimpan (string kosong → NULL untuk field opsional; boolean kosong → 0). Kosong =
+     * definisi rule permit_empty: null, false, dan string yang kosong setelah trim (' ' → NULL, bukan '' yang misalnya
+     * ditolak CHECK row_jurusan → 500, CR-011).
      */
     public function normalize(mixed $value): int|float|string|null
     {
@@ -324,7 +326,11 @@ final class MasterField
             return in_array($value, [true, 1, '1'], true) ? 1 : 0;
         }
 
-        if ($value === null || $value === '') {
+        if (is_string($value)) {
+            $value = trim($value);
+        }
+
+        if ($value === null || $value === '' || $value === false) {
             return $this->required ? '' : null;
         }
 

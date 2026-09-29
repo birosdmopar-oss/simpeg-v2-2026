@@ -62,6 +62,14 @@ class MasterService
     private const RESERVED_IDS = ['options', 'meta'];
 
     /**
+     * Kode error DB yang diterjemahkan translateDuplicate(): 1062 duplikat UNIQUE/PRIMARY (MySQL & MariaDB), dan 167
+     * AUTO_INCREMENT melewati batas tipe kolom (MariaDB 10.4, HA_ERR_AUTOINC_ERANGE, SQLSTATE 22003).
+     */
+    private const ERR_DUPLICATE = 1062;
+
+    private const ERR_AUTOINC_RANGE = 167;
+
+    /**
      * @var array<string, MasterModel>
      */
     private array $models = [];
@@ -382,7 +390,7 @@ class MasterService
 
             $this->assertNameUnique($def, $name, $parent, $scope);
             $this->assertFieldsUnique($def, $row, null);
-        });
+        }, $def);
 
         $this->invalidate($def);
 
@@ -673,7 +681,10 @@ class MasterService
     }
 
     /**
-     * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan).
+     * `order` yang dikirim di payload tambah/ubah (null = tidak dikirim / kosong / master tanpa urutan). Kosong mengikuti
+     * rule permit_empty controller (null, false, string yang kosong setelah trim, non-skalar): nilai itu lolos validasi
+     * tanpa dicek is_natural_no_zero, jadi tidak boleh menjadi (int) 0 — level pangkat 0 / posisi 1 (CR-011). Nilai
+     * terisi < 1 ditolak di sini juga (lapis kedua rule controller, mis. pemanggil service langsung).
      *
      * @param array<string, mixed> $data
      */
@@ -681,7 +692,15 @@ class MasterService
     {
         $order = $data[MasterDefinition::ORDER_FIELD] ?? null;
 
-        return $def->hasOrder && $order !== null && $order !== '' ? (int) $order : null;
+        if (! $def->hasOrder || ! is_scalar($order) || trim((string) $order) === '') {
+            return null;
+        }
+
+        if ((int) $order < 1) {
+            throw ValidationException::forField(MasterDefinition::ORDER_FIELD, 'Urutan harus bilangan bulat minimal 1.');
+        }
+
+        return (int) $order;
     }
 
     /**
@@ -766,7 +785,9 @@ class MasterService
     }
 
     /**
-     * Urutan berikutnya (MAX+1) dalam satu lingkup urutan, dijaga tidak melewati kapasitas kolom `order`.
+     * Urutan berikutnya (MAX+1) dalam satu lingkup urutan, dijaga tidak melewati kapasitas kolom `order`. Mode shift
+     * menghitung dari entri yang tidak dihapus (entri terhapus tidak punya posisi tampil). Mode manual menghitung dari
+     * SELURUH entri termasuk yang dihapus: level entri terhapus tetap dipegang dan kembali saat dipulihkan (CR-011).
      *
      * @param array<string, string|null> $scope
      */
@@ -774,7 +795,7 @@ class MasterService
     {
         $builder = $this->whereOrderScope($this->db->table($def->table)->selectMax(MasterDefinition::ORDER_FIELD, 'max_order'), $scope);
 
-        if ($def->hasStatus) {
+        if ($def->hasStatus && ! $def->isManualOrder()) {
             $builder->where(MasterDefinition::STATUS_FIELD . ' !=', MasterModel::STATUS_DELETED);
         }
 
@@ -1199,18 +1220,51 @@ class MasterService
      * UNIQUE/PRIMARY index DB (1062) adalah lapis kedua keunikan. Kalau dua permintaan balapan lolos cek aplikasi,
      * pelanggaran index (DatabaseException dari MasterModel, transaksi sudah di-rollback) diterjemahkan ulang ke 422
      * lewat $recheck (cek aplikasi diulang: kode, nama, dan field uniqueFields).
+     *
+     * $insertDef (hanya tambah): PK master AUTO_INCREMENT yang sudah di batas tipe kolom (autoIncrementExhausted())
+     * dan lolos $recheck → 422 dengan penjelasan, bukan 500 (CR-011).
      */
-    private function translateDuplicate(Closure $work, Closure $recheck): void
+    private function translateDuplicate(Closure $work, Closure $recheck, ?MasterDefinition $insertDef = null): void
     {
         try {
             $work();
         } catch (DatabaseException $e) {
-            if ($e->getCode() === 1062) {
+            $keyExhausted = $insertDef !== null && $this->autoIncrementExhausted($insertDef, $e);
+
+            // Cek aplikasi diulang lebih dulu (juga untuk PK habis): nama/kode ganda hasil balapan tetap dilaporkan
+            // sebagai ganda, sama di MySQL dan MariaDB.
+            if ($e->getCode() === self::ERR_DUPLICATE || $keyExhausted) {
                 $recheck();
+            }
+
+            if ($keyExhausted) {
+                throw new ValidationException(
+                    "Kode {$insertDef->label} sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.",
+                );
             }
 
             throw $e;
         }
+    }
+
+    /**
+     * INSERT gagal karena counter PK AUTO_INCREMENT sudah di batas tipe kolom (mis. TINYINT 127). Kode error beda per
+     * engine (temuan DBV-004 di MariaDB 10.4):
+     *  - MySQL 8 InnoDB mengulang nilai maksimum → 1062 "Duplicate entry '127' for key '<tabel>.PRIMARY'".
+     *  - MariaDB 10.4 menolak → 167 (22003) "Out of range value for column '<pk>' at row 1".
+     * 167 pada kolom selain PK master ini tidak dianggap PK habis (tetap dilempar → 500).
+     */
+    private function autoIncrementExhausted(MasterDefinition $def, DatabaseException $e): bool
+    {
+        if (! $def->autoIncrement) {
+            return false;
+        }
+
+        return match ($e->getCode()) {
+            self::ERR_DUPLICATE     => preg_match("/for key '(?:[^']*\.)?PRIMARY'/", $e->getMessage()) === 1,
+            self::ERR_AUTOINC_RANGE => preg_match("/Out of range value for column '(?:[^']*\.)?" . preg_quote($def->primaryKey, '/') . "'/", $e->getMessage()) === 1,
+            default                 => false,
+        };
     }
 
     /**

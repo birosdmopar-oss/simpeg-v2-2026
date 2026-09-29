@@ -72,6 +72,8 @@ class MasterDataSeeder extends Seeder
         // --- /DBV-003 ---
 
         // --- DBV-004 ---
+        $this->seedKenaikanPangkat();
+        $this->seedPendidikan();
         // --- /DBV-004 ---
 
         // --- DBV-005 ---
@@ -169,6 +171,72 @@ class MasterDataSeeder extends Seeder
     // --- /DBV-003 ---
 
     // --- DBV-004 (method) ---
+    /**
+     * G-04 (DBV-004): ID yang di-hard-code kode legacy dipakai apa adanya (G-doc 6.4) — jenis_kp 1/2/3/5, gol_pppk
+     * 7/9–12. `pangkat.order` = level (III/a = 9 dst.); CPNS III/a dan III/a sengaja ber-order sama (UNIQUE(cpns, order)
+     * ditunda, P3). `uang_makan` = nilai uji.
+     */
+    private function seedKenaikanPangkat(): void
+    {
+        $this->db->table('pangkat')->insertBatch([
+            ['id_pangkat' => 7, 'pangkat' => 'Penata Muda', 'gol' => 'III', 'ruang' => 'a', 'gol_ruang' => 'CPNS III/a', 'cpns' => 1, 'order' => 9, 'status' => 1],
+            ['id_pangkat' => 13, 'pangkat' => 'Penata Muda', 'gol' => 'III', 'ruang' => 'a', 'gol_ruang' => 'III/a', 'cpns' => 2, 'order' => 9, 'status' => 1],
+            ['id_pangkat' => 14, 'pangkat' => 'Penata Muda Tingkat I', 'gol' => 'III', 'ruang' => 'b', 'gol_ruang' => 'III/b', 'cpns' => 2, 'order' => 10, 'status' => 1],
+            ['id_pangkat' => 15, 'pangkat' => 'Penata', 'gol' => 'III', 'ruang' => 'c', 'gol_ruang' => 'III/c', 'cpns' => 2, 'order' => 11, 'status' => 1],
+        ]);
+
+        // ID 4 dan 6 tidak di-seed: namanya belum diketahui ([I], G-doc 6.4).
+        $this->db->table('jenis_kp')->insertBatch([
+            ['id_jenis_kp' => 1, 'jenis_kp' => 'Pengangkatan CPNS', 'order' => 1, 'status' => 1],
+            ['id_jenis_kp' => 2, 'jenis_kp' => 'Pengangkatan PNS', 'order' => 2, 'status' => 1],
+            ['id_jenis_kp' => 3, 'jenis_kp' => 'Reguler', 'order' => 3, 'status' => 1],
+            ['id_jenis_kp' => 5, 'jenis_kp' => 'Penyesuaian Ijazah', 'order' => 4, 'status' => 1],
+        ]);
+
+        $this->db->table('gol_pppk')->insertBatch([
+            ['id_gol_pppk' => 7, 'gol_pppk' => 'VII', 'uang_makan' => 37000, 'order' => 1, 'status' => 1],
+            ['id_gol_pppk' => 9, 'gol_pppk' => 'IX', 'uang_makan' => 37000, 'order' => 2, 'status' => 1],
+            ['id_gol_pppk' => 10, 'gol_pppk' => 'X', 'uang_makan' => 37000, 'order' => 3, 'status' => 1],
+            ['id_gol_pppk' => 11, 'gol_pppk' => 'XI', 'uang_makan' => 41000, 'order' => 4, 'status' => 1],
+            ['id_gol_pppk' => 12, 'gol_pppk' => 'XII', 'uang_makan' => 41000, 'order' => 5, 'status' => 1],
+        ]);
+    }
+
+    /**
+     * G-05 (DBV-004): jenjang 1–3 (SD/SLTP/SLTA, tanpa jurusan) dan > 3, bidang 98 "Lainnya", jurusan 1185 "Lainnya"
+     * dipakai apa adanya (G-doc 6.4). `order` bidang/jurusan = urut nama seperti aturan impor (P8). `bobot_ipasn`
+     * jenjang 8 = nilai uji (jenjang lain memakai default DB, NULL).
+     */
+    private function seedPendidikan(): void
+    {
+        $this->db->table('jenjang_pendidikan')->insertBatch([
+            ['id_jenjang_pendidikan' => 1, 'jenjang_pendidikan_singkat' => 'SD', 'jenjang_pendidikan' => 'Sekolah Dasar', 'row_jurusan' => null, 'order' => 1, 'status' => 1],
+            ['id_jenjang_pendidikan' => 2, 'jenjang_pendidikan_singkat' => 'SLTP', 'jenjang_pendidikan' => 'Sekolah Lanjutan Tingkat Pertama', 'row_jurusan' => null, 'order' => 2, 'status' => 1],
+            ['id_jenjang_pendidikan' => 3, 'jenjang_pendidikan_singkat' => 'SLTA', 'jenjang_pendidikan' => 'Sekolah Lanjutan Tingkat Atas', 'row_jurusan' => null, 'order' => 3, 'status' => 1],
+            ['id_jenjang_pendidikan' => 9, 'jenjang_pendidikan_singkat' => 'S.2', 'jenjang_pendidikan' => 'Strata 2', 'row_jurusan' => 'S_2', 'order' => 5, 'status' => 1],
+        ]);
+        $this->db->table('jenjang_pendidikan')->insert(
+            ['id_jenjang_pendidikan' => 8, 'jenjang_pendidikan_singkat' => 'S.1', 'jenjang_pendidikan' => 'Strata 1', 'row_jurusan' => 'S_1', 'bobot_ipasn' => 20, 'order' => 4, 'status' => 1],
+        );
+
+        $this->db->table('bidang_pendidikan')->insertBatch([
+            ['id_bidang_pendidikan' => 1, 'bidang_pendidikan' => 'Teknik', 'order' => 3, 'status' => 1],
+            ['id_bidang_pendidikan' => 2, 'bidang_pendidikan' => 'Ekonomi', 'order' => 1, 'status' => 1],
+            ['id_bidang_pendidikan' => 98, 'bidang_pendidikan' => 'Lainnya', 'order' => 2, 'status' => 1],
+        ]);
+
+        $flags = static fn (string ...$on): array => array_combine(
+            ['D_I', 'D_II', 'D_III', 'D_IV', 'S_1', 'S_2', 'S_3'],
+            array_map(static fn (string $flag): int => (int) in_array($flag, $on, true), ['D_I', 'D_II', 'D_III', 'D_IV', 'S_1', 'S_2', 'S_3']),
+        );
+
+        $this->db->table('jurusan_pendidikan')->insertBatch([
+            ['id_jurusan_pendidikan' => 1, 'id_bidang_pendidikan' => 1, 'jurusan_pendidikan' => 'Teknik Sipil', 'order' => 2, 'status' => 1] + $flags('D_III', 'S_1'),
+            ['id_jurusan_pendidikan' => 2, 'id_bidang_pendidikan' => 1, 'jurusan_pendidikan' => 'Teknik Elektro', 'order' => 1, 'status' => 1] + $flags('S_1', 'S_2'),
+            ['id_jurusan_pendidikan' => 3, 'id_bidang_pendidikan' => 2, 'jurusan_pendidikan' => 'Akuntansi', 'order' => 1, 'status' => 1] + $flags('D_III', 'S_1'),
+            ['id_jurusan_pendidikan' => 1185, 'id_bidang_pendidikan' => 98, 'jurusan_pendidikan' => 'Lainnya', 'order' => 1, 'status' => 1] + $flags('D_I', 'D_II', 'D_III', 'D_IV', 'S_1', 'S_2', 'S_3'),
+        ]);
+    }
     // --- /DBV-004 ---
 
     // --- DBV-005 (method) ---
