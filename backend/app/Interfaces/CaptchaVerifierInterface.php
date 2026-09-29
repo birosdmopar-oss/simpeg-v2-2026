@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Interfaces;
 
 /**
- * Kontrak verifikasi captcha (A-03). Implementasi: TurnstileVerifier (Cloudflare), MockCaptchaVerifier (lokal/test).
+ * Kontrak verifikasi captcha (A-03). Implementasi: TurnstileVerifier (Cloudflare), MockCaptchaVerifier (lokal/test,
+ * ditolak di production).
  */
 interface CaptchaVerifierInterface
 {

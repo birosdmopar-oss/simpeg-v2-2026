@@ -41,6 +41,7 @@ cp backend/.env.example /var/www/simpeg-v2/shared/backend.env
 vi /var/www/simpeg-v2/shared/backend.env      # CI_ENVIRONMENT=development, database.*, jwt.secret, cors.allowedOrigins, dst.
 # Lupa password (ISSUE-006): auth.resetLinkBase = URL frontend server ini + /reset-password. Driver
 # auth.resetTokenNotifier=log menulis tautan reset ke writable/logs dan DITOLAK di production (driver email menyusul).
+# Di production juga DITOLAK: auth.captchaDriver=mock dan auth.exposeResetTokenInResponse=true (ISSUE-021).
 
 # (opsional) .env.local frontend — VITE_PASSWORD_RESET_ENABLED=true hanya kalau kanal reset di backend aktif
 printf 'VITE_API_BASE_URL=https://simpegdev.example.go.id/api/v1\n' > /var/www/simpeg-v2/shared/frontend.env.local

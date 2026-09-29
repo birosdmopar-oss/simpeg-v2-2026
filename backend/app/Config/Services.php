@@ -69,6 +69,11 @@ class Services extends BaseService
     // Modul A — Autentikasi & Akun (Fase 1)
     // ------------------------------------------------------------------
 
+    /**
+     * Captcha A-03 dari Config\Auth::$captchaDriver. Driver 'mock' ditolak di production (ConfigException dari
+     * MockCaptchaVerifier, ISSUE-021): authService dan resetPasswordService me-resolve captcha saat dibangun, sehingga
+     * login, refresh/logout, serta lupa/reset password gagal 500 (fail-closed) sampai .env diperbaiki.
+     */
     public static function captchaVerifier(bool $getShared = true): CaptchaVerifierInterface
     {
         if ($getShared) {

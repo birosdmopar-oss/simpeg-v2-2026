@@ -44,7 +44,8 @@ use Throwable;
  * Kanal pengiriman = email (K3); driver dipilih lewat auth.resetTokenNotifier (Config\Services::resetTokenNotifier):
  * 'log' (development, tautan ditulis ke log) atau 'mock' (test) — keduanya ditolak di production sampai driver email
  * tersedia. Log milik service ini TIDAK memuat token. Hanya jika Config\Auth::$exposeResetTokenInResponse = true
- * (development) token juga dikembalikan ke pemanggil.
+ * (development) token juga dikembalikan ke pemanggil; di production flag itu DITOLAK (ConfigException di request(),
+ * ISSUE-021) supaya token tidak pernah bocor lewat response. reset() tidak terpengaruh flag ini.
  */
 class ResetPasswordService
 {
@@ -60,6 +61,9 @@ class ResetPasswordService
         private ?BaseConnection $db = null,
         private ?CaptchaVerifierInterface $captcha = null,
         private ?ResetTokenNotifierInterface $notifier = null,
+        // Diisi eksplisit hanya oleh test untuk menyimulasikan production (konstanta ENVIRONMENT di PHPUnit selalu
+        // 'testing'), pola guard notifier CR-008.
+        private string $environment = ENVIRONMENT,
     ) {
         $this->config ??= config(AuthConfig::class);
         $this->db ??= db_connect();
@@ -84,8 +88,10 @@ class ResetPasswordService
             throw ValidationException::forField('captcha_token', 'Verifikasi captcha gagal. Silakan ulangi.');
         }
 
-        // Konfigurasi kanal diperiksa sebelum username dicari: salah konfigurasi (mis. driver log di production)
-        // gagal sama untuk semua username, jadi tidak membocorkan username mana yang terdaftar.
+        // Konfigurasi kanal diperiksa sebelum username dicari: salah konfigurasi (mis. driver log di production atau
+        // token ikut response di production) gagal sama untuk semua username, jadi tidak membocorkan username mana
+        // yang terdaftar, dan tidak menulis apa pun ke forgot_attempts.
+        $this->assertTokenNotExposedInProduction();
         $notifier = $this->notifier();
         $linkBase = $this->resetLinkBase();
         $now      = $this->now ?? time();
@@ -226,6 +232,21 @@ class ResetPasswordService
     private function notifier(): ResetTokenNotifierInterface
     {
         return $this->notifier ??= service('resetTokenNotifier');
+    }
+
+    /**
+     * auth.exposeResetTokenInResponse hanya untuk development (uji end-to-end tanpa kanal). Di production token hanya
+     * boleh sampai ke pengguna lewat kanal pengiriman, jadi flag true ditolak (ISSUE-021).
+     *
+     * @throws ConfigException
+     */
+    private function assertTokenNotExposedInProduction(): void
+    {
+        if ($this->environment === 'production' && $this->config->exposeResetTokenInResponse) {
+            throw new ConfigException(
+                'auth.exposeResetTokenInResponse = true tidak boleh dipakai di production (token reset akan bocor di response).',
+            );
+        }
     }
 
     /**

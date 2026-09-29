@@ -10,7 +10,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 | A-01 Migration tabel auth | DONE + ✅ DBV-010 | Skema awal disetujui 21-09-2026. DBV-010 (A-01 Bagian 9, ✅ 29-09-2026, main `6bb29b5`; D-11 ⏳ DBA): collation `utf8mb4_unicode_ci`, `pengguna.nip` VARCHAR(30) NULL, `username` 100, kolom legacy `name`/`email`/`expired_at`, `token.id_pengguna`, `audit_logs.id_pengguna_actor` |
 | A-02 Login | DONE (✅ CR-013) | Login lewat username (NIP atau username bebas untuk akun non-pegawai), maks. 100 karakter |
 | A-02b Lazy rehash MD5 → Argon2id | DONE | pelaku audit rehash = pemilik akun (T-02, per `id_pengguna` setelah CR-013) |
-| A-03 Captcha Turnstile | DONE | |
+| A-03 Captcha Turnstile | DONE | CR-018 (ISSUE-021): di production `auth.captchaDriver = mock` dan `auth.exposeResetTokenInResponse = true` (A-07) ditolak (ConfigException → 500, pola guard notifier CR-008); menunggu QA |
 | A-04 Lockout | DONE | kebijakan per IP masih terbuka (A-01 Bagian 8 #13) |
 | A-05 Refresh & logout | DONE (✅ CR-013, QA ulang) | race & T-01 selesai (QASMTASK-024 Pass di R2); CR-013: sesi, pencabutan massal, reuse per `id_pengguna`, token format lama → 401 (login ulang sekali saat deploy) |
 | A-06 Ganti password | DONE | |
