@@ -2,7 +2,7 @@
 
 **Key review:** `DBV-002` (review DB Validator, skema) + `CR-003` (review kode) — satu pull request, judul `[DBV-002][CR-003] …`, branch `dbv-002/g10-faq-pilot`. Merge hanya setelah **kedua** review menyatakan setuju. Aturan 24-09-2026 (G-01 Bagian 8): untuk PR dengan dua key [CR] & [DBV], DB Validator **hanya me-review/approve** (tidak merge); **merge dilakukan oleh reviewer CR**. (Key `CR-002` sudah dipakai PR #5.)
 
-**Status:** ✅ **DISETUJUI DB VALIDATOR (DBV-002, jjoseph48, komentar "DBV-002 ✅" di PR #10, 25-09-2026) DAN REVIEW KODE (CR-003, 24-09-2026)**; di-merge ke `main` (merge commit `f958cb5`). Migration `2026-09-24-000001_CreateFaq.php` boleh dijalankan di Dev; deploy otomatis ke server Dev tetap mengikuti Trello ISSUE-014 (HOLD).
+**Status:** ✅ **DISETUJUI DB VALIDATOR (DBV-002, jjoseph48, komentar "DBV-002 ✅" di PR #10, 25-09-2026) DAN REVIEW KODE (CR-003, 24-09-2026)**; di-merge ke `main` (merge commit `f958cb5`). Migration `2026-09-24-000001_CreateFaq.php` boleh dijalankan di Dev; di server Dev migration tidak dijalankan hook deploy, melainkan manual lewat runbook (ISSUE-014 opsi A, CR-021, `README-deploy.md` §3a).
 
 **Rujukan:** `02-MasterData.md` G-10, Tech Spec §2.3 G-10 ("DB Impact: faq_topic, faq_sub_topic, faq_article, faq_rate"), `Mapping_Migrasi_Data_SIMPEG_v2.docx` (FAQ: "sama / Copy langsung"), DDL produksi `simpeg_prod.sql:949-1030` (HeidiSQL, host 172.17.100.83, MySQL 8.0.21), ERD legacy `simpeg01.erd` (nama FK), kode legacy (`application/libraries/hr/L_faq.php`, `application/controllers/hr/Faq.php`, `application/controllers/hr/services/Local.php:4125-4222`, `application/views/hr/faq/**`), Matriks Role x Endpoint Modul G ("Lihat FAQ"), MTC-013/MTC-014, `G-01-master-schema.md` (Keputusan #5–#7, Bagian 8 / DBV-001).
 

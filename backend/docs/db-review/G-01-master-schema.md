@@ -130,7 +130,7 @@ Catatan #1: sebagian ditangani di DBV-002 (⏳) — tambah/pindah induk kini mem
 
 **Key review:** `DBV-001` (review DB Validator) + `CR-001` (review kode) — satu pull request, judul `[DBV-001][CR-001] …`, branch `dbv-001/g01-batch1-skema-legacy`. Merge hanya setelah **kedua** review menyatakan setuju. Aturan 24-09-2026: untuk PR dengan dua key [CR] & [DBV], DB Validator **hanya me-review/approve** (tidak merge); **merge dilakukan oleh reviewer CR**. Status: CR-001 ✅ (24-09-2026), DBV-001 ✅ (24-09-2026, jjoseph48 — komentar "DBV-001 ✅" di PR #4); di-merge ke `main` 24-09-2026 oleh reviewer CR (merge commit `633dbb0`).
 
-**Status:** ✅ DISETUJUI (24-09-2026). Migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` boleh dijalankan di Dev, dengan syarat ketujuh tabel Batch 1 **kosong** (`up()` menolak jalan bila berisi data). Deploy otomatis ke server Dev tetap mengikuti Trello ISSUE-014 (HOLD).
+**Status:** ✅ DISETUJUI (24-09-2026). Migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` boleh dijalankan di Dev, dengan syarat ketujuh tabel Batch 1 **kosong** (`up()` menolak jalan bila berisi data). Di server Dev migration tidak dijalankan hook deploy, melainkan manual lewat runbook (ISSUE-014 opsi A, CR-021, `README-deploy.md` §3a).
 
 ### 8.1 Latar belakang
 
