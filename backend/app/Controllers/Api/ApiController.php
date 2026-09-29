@@ -35,6 +35,11 @@ abstract class ApiController extends BaseController
     public const INVALID_ENCODING_FIELD_MESSAGE = 'Isian mengandung karakter yang tidak valid (bukan UTF-8).';
 
     /**
+     * Pesan 422 untuk isian yang bukan teks/angka bulat (array/objek/boolean) — sama dengan UserService::textInput().
+     */
+    public const NON_TEXT_FIELD_MESSAGE = 'Isian harus berupa teks.';
+
+    /**
      * Cast parameter route numerik ke int. Matikan untuk controller yang parameternya kode string
      * (mis. master data: kode '01' tidak boleh berubah jadi 1).
      */
@@ -231,5 +236,37 @@ abstract class ApiController extends BaseController
         }
 
         return array_intersect_key($data, $rules);
+    }
+
+    /**
+     * validateOrFail() untuk payload yang setiap field-nya bernilai tunggal: null, teks, atau angka bulat (pola
+     * UserService::textInput). Array/objek JSON — juga boolean/pecahan — ditolak lebih dulu dengan 422 per field
+     * NON_TEXT_FIELD_MESSAGE, semua field salah dalam satu respons (ISSUE-023). Tanpa penjaga ini `permit_empty` CI4
+     * menganggap `[]`/`{}` (dan `false`) kosong sehingga nilai itu lolos ke controller/service yang meng-cast-nya →
+     * "Array to string conversion" → 500. Array berisi memang sudah ditolak StrictRules (`string`, `in_list`,
+     * `integer`), tetapi dengan pesan bawaan CI4 yang berbeda per rule.
+     *
+     * @param array<string, mixed>                       $data
+     * @param array<string, array<string, mixed>|string> $rules
+     *
+     * @return array<string, mixed> data yang lolos validasi (hanya key di rules)
+     */
+    protected function validateTextOrFail(array $data, array $rules): array
+    {
+        $errors = [];
+
+        foreach (array_keys($rules) as $field) {
+            $value = $data[$field] ?? null;
+
+            if ($value !== null && ! is_string($value) && ! is_int($value)) {
+                $errors[$field] = [self::NON_TEXT_FIELD_MESSAGE];
+            }
+        }
+
+        if ($errors !== []) {
+            throw new ValidationException('Validasi gagal.', $errors);
+        }
+
+        return $this->validateOrFail($data, $rules);
     }
 }

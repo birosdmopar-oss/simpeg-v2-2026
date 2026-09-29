@@ -7,6 +7,7 @@ namespace App\Libraries\Auth;
 use App\Constants\Role;
 use App\Exceptions\ValidationException;
 use App\Models\Auth\PenggunaModel;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 
 /**
  * Lifecycle akun otomatis (A-09): saat pegawai baru dibuat di Modul B (B-05), akun `pengguna`
@@ -19,6 +20,10 @@ use App\Models\Auth\PenggunaModel;
  *
  * NIP ikut legacy (DBV-010): angka saja, maksimal 18 digit — NIK 16 digit pegawai Non-PNS diterima. Nama dan email akun
  * diisi dari data pegawai bila tersedia (opsional; akun ber-NIP tidak wajib bernama).
+ *
+ * NIP sudah dipakai sebagai username akun LAIN (username bebas akun non-pegawai, termasuk akun terhapus) → 422
+ * errors.nip berpesan jelas, akun tidak dibuat dan tidak ditautkan ke akun itu (ISSUE-023/CR-019; sebelumnya 1062 →
+ * 500). Balapan dua proses untuk NIP yang sama tetap idempoten (yang kalah menerima akun yang sudah ada, created=false).
  */
 class AccountProvisioner
 {
@@ -69,26 +74,66 @@ class AccountProvisioner
             return ['pengguna' => PenggunaModel::toPublic($existing), 'created' => false, 'initial_password' => null];
         }
 
+        // ISSUE-023: username = NIP sudah dipegang akun lain (username bebas akun non-pegawai, termasuk akun terhapus —
+        // UNIQUE username mencakup baris soft-deleted). Gagal dengan pesan jelas; akun tidak dibuat/ditautkan diam-diam.
+        if ($this->pengguna->withDeleted()->where('username', $nip)->countAllResults() > 0) {
+            throw self::usernameTaken();
+        }
+
         $plain = $initialPassword ?? self::generatePassword();
 
-        $id = $this->pengguna->insert([
-            'nip'                 => $nip,
-            'username'            => $nip,
-            'name'                => $name === '' ? null : $name,
-            'email'               => $email === '' ? null : $email,
-            'password'            => $this->passwords->hash($plain),
-            'password_legacy'     => null,
-            'user_level'          => $userLevel,
-            'id_unit'             => $pegawai['id_unit'] ?? null,
-            'id_satker'           => $pegawai['id_satker'] ?? null,
-            'status'              => PenggunaModel::STATUS_ACTIVE,
-            'password_changed_at' => null,
-        ]);
+        try {
+            $id = $this->pengguna->insert([
+                'nip'                 => $nip,
+                'username'            => $nip,
+                'name'                => $name === '' ? null : $name,
+                'email'               => $email === '' ? null : $email,
+                'password'            => $this->passwords->hash($plain),
+                'password_legacy'     => null,
+                'user_level'          => $userLevel,
+                'id_unit'             => $pegawai['id_unit'] ?? null,
+                'id_satker'           => $pegawai['id_satker'] ?? null,
+                'status'              => PenggunaModel::STATUS_ACTIVE,
+                'password_changed_at' => null,
+            ]);
+        } catch (DatabaseException $e) {
+            if ($e->getCode() !== 1062) {
+                throw $e;
+            }
+
+            // Balapan lolos cek di atas → cek ulang lewat query builder baru (bukan state model).
+            $db = db_connect();
+            /** @var array<string, mixed>|null $raced */
+            $raced = $db->table('pengguna')->where('nip', $nip)->get()->getRowArray();
+
+            if (is_array($raced)) {
+                // Proses lain lebih dulu membuat akun untuk NIP yang sama: tetap idempoten.
+                return ['pengguna' => PenggunaModel::toPublic($raced), 'created' => false, 'initial_password' => null];
+            }
+
+            if ($db->table('pengguna')->where('username', $nip)->countAllResults() > 0) {
+                throw self::usernameTaken();
+            }
+
+            throw $e;
+        }
 
         /** @var array<string, mixed> $row */
         $row = $this->pengguna->find((int) $id);
 
         return ['pengguna' => PenggunaModel::toPublic($row), 'created' => true, 'initial_password' => $plain];
+    }
+
+    /**
+     * 422 errors.nip. Pemanggil (B-05) membatalkan pembuatan pegawai; admin mengganti username akun pemegang NIP itu
+     * lebih dulu (akun yang sudah dihapus perlu ditangani admin basis data karena belum ada fitur pulihkan akun).
+     */
+    private static function usernameTaken(): ValidationException
+    {
+        return ValidationException::forField(
+            'nip',
+            'NIP ini sudah dipakai sebagai username akun lain; ganti username akun tersebut sebelum membuat akun pegawai.',
+        );
     }
 
     /**

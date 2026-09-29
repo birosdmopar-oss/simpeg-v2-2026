@@ -15,7 +15,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  *           username = NIP (akun pegawai, default A-09) atau username bebas (akun non-pegawai), maks. 100 karakter.
  * 200     : { status:'success', data:{ user, access_token, access_expires_at, refresh_expires_at } }
  *           + Set-Cookie access_token & refresh_token (httpOnly)
- * 422     : captcha kosong/invalid (sebelum kredensial dicek) atau field wajib kosong
+ * 422     : captcha kosong/invalid (sebelum kredensial dicek), field wajib kosong, atau isian array/objek/boolean
+ *           ("Isian harus berupa teks.", ISSUE-023)
  * 423     : akun terkunci sementara (lockout)
  * 401     : username/password salah (pesan generik)
  */
@@ -23,7 +24,7 @@ class LoginController extends ApiController
 {
     public function login(): ResponseInterface
     {
-        $data = $this->validateOrFail($this->payload(), [
+        $data = $this->validateTextOrFail($this->payload(), [
             'username'      => 'required|string|max_length[' . PenggunaModel::USERNAME_MAX . ']',
             'password'      => 'required|string',
             'captcha_token' => 'permit_empty|string',

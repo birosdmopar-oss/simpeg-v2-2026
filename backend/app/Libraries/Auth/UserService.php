@@ -37,7 +37,8 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  * - Ubah akun: NIP hanya boleh DIISI untuk akun yang belum punya NIP (menautkan akun ke pegawai); mengubah/menghapus
  *   NIP yang sudah ada adalah ranah fitur ganti NIP (B-06).
  * - Identitas akun = id_pengguna: pencegahan hapus/nonaktifkan akun sendiri dan pencabutan sesi memakai id_pengguna.
- * - nip/name/email/username harus teks (array/objek → 422, bukan 500). Username baru/diubah tidak boleh memuat karakter
+ * - nip/name/email/username/user_level/status/id_unit/id_satker/password harus teks atau angka bulat (array/objek/
+ *   boolean → 422, bukan 500; ISSUE-023, lapis pertama UserController). Username baru/diubah tidak boleh memuat karakter
  *   kontrol/tak terlihat (\p{C}, mis. zero-width space yang diabaikan collation unicode_ci); pembatasan ASCII ditunda
  *   sampai audit data produksi (keputusan B). Username lama hasil impor tidak dinilai ulang selama tidak diubah.
  * - Balapan cek-lalu-tulis (dua admin menautkan NIP/username yang sama): pelanggaran UNIQUE (1062) diterjemahkan ulang
@@ -138,6 +139,9 @@ class UserService
         $username = self::textInput($data, 'username', $errors) ?? $nip ?? '';
         $level    = (int) ($data['user_level'] ?? 0);
 
+        // Field yang di-cast langsung di bawah (ISSUE-023, lapis kedua setelah UserController::validateTextOrFail).
+        self::rejectNonTextFields($data, $errors);
+
         if ($errors !== []) {
             // Isian bukan teks: aturan lain (wajib nama/NIP) tidak bermakna untuk nilai yang dibuang.
             throw new ValidationException('Validasi gagal.', $errors);
@@ -217,6 +221,13 @@ class UserService
         $row    = $this->findInScope($actor, $id);
         $update = [];
         $errors = [];
+
+        // Field yang di-cast langsung di bawah: tolak lebih dulu, sebelum cast memicu 500 (ISSUE-023).
+        self::rejectNonTextFields($data, $errors);
+
+        if ($errors !== []) {
+            throw new ValidationException('Validasi gagal.', $errors);
+        }
 
         if (array_key_exists('nip', $data)) {
             $nip     = self::textInput($data, 'nip', $errors);
@@ -487,6 +498,21 @@ class UserService
         }
 
         return self::nullableString($value);
+    }
+
+    /**
+     * Pola textInput() untuk field yang nilainya dipakai/di-cast langsung (tanpa trim): `user_level`, `status`,
+     * `id_unit`, `id_satker`, `password`. Array/objek/boolean → error field (422) alih-alih "Array to string
+     * conversion" (500) atau cast diam-diam — `(int) ['5']` = 1 akan menjadi role Super Admin (ISSUE-023).
+     *
+     * @param array<string, mixed>        $data
+     * @param array<string, list<string>> $errors
+     */
+    private static function rejectNonTextFields(array $data, array &$errors): void
+    {
+        foreach (['user_level', 'status', 'id_unit', 'id_satker', 'password'] as $field) {
+            self::textInput($data, $field, $errors);
+        }
     }
 
     private static function nullableString(mixed $value): ?string
