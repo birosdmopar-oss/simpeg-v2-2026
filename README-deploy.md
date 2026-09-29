@@ -189,7 +189,7 @@ Migration dijalankan manual oleh operator, di luar hook:
    php spark migrate --all
    php spark migrate:status          # semua baris harus punya Batch (tidak ada `---`); exit code spark tidak cukup
    ```
-   Pastikan grup `database.default.*` di `shared/backend.env` menunjuk database target (`-g` tidak memindahkan koneksi).
+   Pastikan grup `database.default.*` di `releases/<release-id>/backend/.env` menunjuk database target (`-g` tidak memindahkan koneksi). File itu salinan `shared/backend.env` saat build — mengubah `shared/backend.env` sesudah release dibangun tidak berpengaruh ke release ini.
 3. Verifikasi sesuai runbook (mis. `SHOW CREATE TABLE`, query `information_schema`).
 4. Aktifkan release: `/var/www/simpeg-v2/rollback.sh <release-id>` (current -> release itu; release lama jadi `previous`; tanda `.deploy-ditahan` dihapus). `rollback.sh` menjalankan `migrate:status` dari release itu lebih dulu dan **menolak** (`DIBATALKAN`, `current` tidak diubah) bila masih ada migration tertunda atau status tidak bisa dibaca. Jadi langkah ini tidak bisa mendahului langkah 2.
 5. Smoke test sesuai runbook.

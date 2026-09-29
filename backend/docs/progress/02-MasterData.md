@@ -34,13 +34,11 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - Diselesaikan lewat kartu Frontend-UI **MIG-001b** di branch redesign user (restyle isi halaman lama: `FormField` → `UiTextField`/`UiSelect`/`UiCheckbox`). **Tidak dikerjakan di main sekarang** (menghindari kerja dua kali dan bentrok semantik dengan MIG-001b).
 - Kriteria "toggle switch status" di G-TC #7, QAUI-002 #3, dan MTC-009 dibaca sebagai **aksi status Aktifkan/Nonaktifkan lewat menu ⋮** (CR-015, AGENTS.md §1); kolom Status hanya badge Aktif/Tidak Aktif/Dihapus.
 - Akibatnya G-TC #7 QA Lapis 1 untuk G-04..G-07 baru bisa lolos setelah MIG-001b masuk main dan QA Lapis 1 dijalankan ulang dengan kriteria yang dibaca ulang di atas. Karena itu G-04, G-05, G-06, G-07 kembali **IN_PROGRESS** (QA fungsional sudah lolos); G-08 dan G-10 tetap DONE karena DoD kartunya (QASMTASK-040, 042) tidak memuat butir QA Lapis 1.
-- Konvensi status ini berlaku lintas modul: task yang DoD kartunya memuat QA Lapis 1 tetap **IN_PROGRESS** sampai butir itu lolos, walau QA fungsional sudah lolos. Fase 1 memakai konvensi yang sama (A-11/A-12 di `01-Auth.md`, QASMTASK-030/031 Todo).
+- Turunan pencatatan (bukan keputusan terpisah — penerapan pilihan koreksi label "Penuh"): konvensi status ini berlaku lintas modul: task yang DoD kartunya memuat QA Lapis 1 tetap **IN_PROGRESS** sampai butir itu lolos, walau QA fungsional sudah lolos. Fase 1 memakai konvensi yang sama (A-11/A-12 di `01-Auth.md`, QASMTASK-030/031 Todo).
 
 **Label kartu Trello (sinkron dengan dokumen ini):** QASMTASK-036/037/038 kembali **Marked** dan 039 tetap **Marked** (ISSUE-007); butir DoD "Seluruh G-TC … QA Lapis 1" di keempat kartu di-uncheck karena QA Lapis 1 SKIP. QASMTASK-034/035/041 **Marked** (ISSUE-015/ISSUE-003). QASMTASK-040 dan 042 tetap Done.
 
 ## Usulan tindak lanjut G-02 — options `satker` untuk Admin Satker (dari audit ISSUE-012, belum diputuskan user)
-
-Dikoreksi CR-022 (30-09-2026): versi sebelumnya menulis butir ini di bawah keputusan user sebagai pembatasan wajib untuk role 3. Keputusan user 29-09-2026 hanya opsi A di atas; butir ini usulan audit, dan legacy tidak membatasi tanpa syarat.
 
 Perilaku legacy `hr/services/local/list_satker` (`application/controllers/hr/services/Local.php:323-346`, satu-satunya `list_*` yang punya parameter `restrict`):
 - Syarat hanya login (tanpa cek role). Tanpa `restrict`: satker `status` 1 dengan `id_unit` = parameter `id_unit`, urut `order` — sama untuk semua role, termasuk Admin Satker (role 3).

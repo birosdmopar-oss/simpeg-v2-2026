@@ -126,7 +126,7 @@ if [ "$force" = "1" ]; then
 else
     if ! pending="$(cd "$target_dir/backend" && migration_tertunda)"; then
         echo "DIBATALKAN: status migration release $target_id tidak bisa dibaca — current tidak diubah." >&2
-        echo "    Periksa pesan di atas (koneksi database di shared/backend.env, atau format migrate:status yang tidak dikenal)." >&2
+        echo "    Periksa pesan di atas (koneksi database di $target_dir/backend/.env — salinan shared/backend.env saat build —, atau format migrate:status yang tidak dikenal)." >&2
         echo "    Darurat saja: rollback.sh --force $target_id (README-deploy.md §4)." >&2
         exit 1
     fi
