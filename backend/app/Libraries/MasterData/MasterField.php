@@ -39,7 +39,9 @@ final class MasterField
      * entri master `entity`; server memeriksa bentuk kanonik, keberadaan, dan status aktif (hanya bila nilainya
      * berubah). `dependsOn` = field ref lain di form yang sama yang menjadi induk entri rujukan (dropdown berjenjang):
      * nilai field ini wajib berada di bawah nilai field `dependsOn` (kecuali `checkDependsOn` false — rantai diperiksa
-     * hook, mis. sentinel LAIN-LAIN kantor).
+     * hook, mis. sentinel LAIN-LAIN kantor). `allowSystem` (CR-010) = field boleh merujuk baris sistem master rujukan
+     * (opsi master `systemIds`, mis. kode LAIN-LAIN wilayah untuk kantor); tanpa opsi ini baris sistem ditolak seperti
+     * kode yang tidak ada.
      */
     public const TYPE_REF = 'ref';
 
@@ -89,6 +91,11 @@ final class MasterField
      * @param string|null               $entity         key master rujukan (tipe ref)
      * @param string|null               $dependsOn      field ref lain yang menjadi induk entri rujukan (tipe ref)
      * @param bool                      $checkDependsOn false = konsistensi dengan `dependsOn` diperiksa hook, bukan engine
+     * @param bool                      $allowSystem    tipe ref: boleh merujuk baris sistem master rujukan (CR-010)
+     * @param string|null               $otherFor       tipe text/textarea: isian "lainnya" untuk field ref ber-allowSystem
+     *                                                  di master yang sama (mis. `provinsi_lain` → `id_provinsi`); hanya
+     *                                                  metadata form (tampil bila field ref itu bernilai kode sistem),
+     *                                                  wajib/NULL-nya ditegakkan hook master (CR-010)
      */
     public function __construct(
         public readonly string $name,
@@ -105,6 +112,8 @@ final class MasterField
         public readonly ?string $entity = null,
         public readonly ?string $dependsOn = null,
         public readonly bool $checkDependsOn = true,
+        public readonly bool $allowSystem = false,
+        public readonly ?string $otherFor = null,
     ) {
         if (! in_array($type, self::TYPES, true)) {
             throw new LogicException("Tipe field master {$name} tidak dikenal: {$type}.");
@@ -121,6 +130,14 @@ final class MasterField
         if ($type !== self::TYPE_REF && ($entity !== null || $dependsOn !== null)) {
             throw new LogicException("entity/dependsOn hanya untuk field bertipe ref ({$name}).");
         }
+
+        if ($allowSystem && $type !== self::TYPE_REF) {
+            throw new LogicException("allowSystem hanya untuk field bertipe ref ({$name}).");
+        }
+
+        if ($otherFor !== null && ! in_array($type, [self::TYPE_TEXT, self::TYPE_TEXTAREA], true)) {
+            throw new LogicException("otherFor hanya untuk field bertipe text/textarea ({$name}).");
+        }
     }
 
     /**
@@ -128,7 +145,8 @@ final class MasterField
      *     label: string, type?: string, required?: bool, rules?: string,
      *     options?: array<string|int, string>, hint?: string, maxBytes?: int,
      *     columnType?: string, min?: int|float, max?: int|float,
-     *     entity?: string, dependsOn?: string, checkDependsOn?: bool
+     *     entity?: string, dependsOn?: string, checkDependsOn?: bool,
+     *     allowSystem?: bool, otherFor?: string
      * } $config
      */
     public static function fromConfig(string $name, array $config): self
@@ -148,6 +166,8 @@ final class MasterField
             entity: $config['entity'] ?? null,
             dependsOn: $config['dependsOn'] ?? null,
             checkDependsOn: $config['checkDependsOn'] ?? true,
+            allowSystem: $config['allowSystem'] ?? false,
+            otherFor: $config['otherFor'] ?? null,
         );
     }
 
@@ -296,7 +316,9 @@ final class MasterField
     }
 
     /**
-     * Normalisasi nilai sebelum disimpan (string kosong → NULL untuk field opsional; boolean kosong → 0).
+     * Normalisasi nilai sebelum disimpan (string kosong → NULL untuk field opsional; boolean kosong → 0). Kosong =
+     * definisi rule permit_empty: null, false, dan string yang kosong setelah trim (' ' → NULL, bukan '' yang misalnya
+     * ditolak CHECK row_jurusan → 500, CR-011).
      */
     public function normalize(mixed $value): int|float|string|null
     {
@@ -304,7 +326,11 @@ final class MasterField
             return in_array($value, [true, 1, '1'], true) ? 1 : 0;
         }
 
-        if ($value === null || $value === '') {
+        if (is_string($value)) {
+            $value = trim($value);
+        }
+
+        if ($value === null || $value === '' || $value === false) {
             return $this->required ? '' : null;
         }
 
@@ -338,7 +364,7 @@ final class MasterField
     {
         [$min, $max] = $this->bounds();
 
-        return [
+        $meta = [
             'name'     => $this->name,
             'label'    => $this->label,
             'type'     => $this->type,
@@ -358,6 +384,18 @@ final class MasterField
             'entity'     => $this->entity,
             'depends_on' => $this->dependsOn,
         ];
+
+        // CR-010: kunci tipe-spesifik hanya dikirim untuk tipe yang relevan (ref: boleh pilih baris sistem LAIN-LAIN;
+        // text/textarea: isian "lainnya" milik field ref mana).
+        if ($this->type === self::TYPE_REF) {
+            $meta['allow_system'] = $this->allowSystem;
+        }
+
+        if (in_array($this->type, [self::TYPE_TEXT, self::TYPE_TEXTAREA], true)) {
+            $meta['other_for'] = $this->otherFor;
+        }
+
+        return $meta;
     }
 
     private static function numberLiteral(int|float $value): string

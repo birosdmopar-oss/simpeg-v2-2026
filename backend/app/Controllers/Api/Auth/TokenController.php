@@ -54,7 +54,7 @@ class TokenController extends ApiController
     {
         $auth = service('authContext');
 
-        service('authService')->logout($this->refreshTokenFromRequest(), $auth->nip(), $this->request->getIPAddress());
+        service('authService')->logout($this->refreshTokenFromRequest(), $auth->idPengguna(), $this->request->getIPAddress());
 
         foreach (service('jwt')->expiredCookies() as $cookie) {
             $this->response->setCookie($cookie);
@@ -68,7 +68,8 @@ class TokenController extends ApiController
     public function me(): ResponseInterface
     {
         $auth = service('authContext');
-        $user = (new PenggunaModel())->findByNip((string) $auth->nip());
+        $id   = $auth->idPengguna();
+        $user = $id === null ? null : (new PenggunaModel())->find($id);
 
         if ($user === null) {
             throw new NotFoundException('Akun tidak ditemukan.');

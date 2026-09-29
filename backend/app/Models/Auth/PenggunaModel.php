@@ -12,11 +12,27 @@ use CodeIgniter\Database\ResultInterface;
 /**
  * Tabel pengguna (A-01). Turunan BaseAuditableModel → seluruh create/update/delete akun otomatis
  * tercatat di audit_logs (A-10). Kolom hash password DIMASKING di JSON audit.
+ *
+ * DBV-010/CR-013 (K2): `nip` NULL untuk akun non-pegawai (role 1/3/4/5/8), kolom legacy `name`, `email`, `expired_at`.
+ * Identitas akun = `id_pengguna`.
  */
 class PenggunaModel extends BaseAuditableModel
 {
     public const STATUS_ACTIVE   = '1';
     public const STATUS_INACTIVE = '0';
+
+    /**
+     * Panjang maksimum username (kolom VARCHAR(100), legacy — D-5).
+     */
+    public const USERNAME_MAX = 100;
+
+    /**
+     * NIP: angka saja, maksimal 18 digit (NIP PNS 18 digit, NIK Non-PNS 16 digit; kolom VARCHAR(30) ikut legacy).
+     */
+    public const NIP_MAX_DIGITS = 18;
+
+    public const NAME_MAX  = 150;
+    public const EMAIL_MAX = 150;
 
     protected $table          = 'pengguna';
     protected $primaryKey     = 'id_pengguna';
@@ -28,16 +44,18 @@ class PenggunaModel extends BaseAuditableModel
     protected $updatedField   = 'updated_at';
     protected $deletedField   = 'deleted_at';
     protected $allowedFields  = [
-        'nip', 'username', 'password', 'password_legacy', 'user_level', 'id_unit', 'id_satker',
-        'status', 'last_login_at', 'password_changed_at',
+        'nip', 'username', 'name', 'email', 'password', 'password_legacy', 'user_level', 'id_unit', 'id_satker',
+        'status', 'last_login_at', 'password_changed_at', 'expired_at',
     ];
 
     protected array $auditMaskedFields = ['password', 'password_legacy'];
 
     /**
      * Actor audit eksplisit untuk operasi tanpa sesi login (mis. reset password via token) — lihat withActor().
+     *
+     * @var array{id: int|null, nip: string|null}|null
      */
-    private ?string $actorOverride = null;
+    private ?array $actorOverride = null;
 
     /**
      * @return array<string, mixed>|null
@@ -62,19 +80,26 @@ class PenggunaModel extends BaseAuditableModel
     }
 
     /**
-     * Jalankan $work dengan nip_actor audit = $nip. Dipakai jalur tanpa JWT (AuthContext kosong) agar audit tidak
-     * tercatat dengan actor NULL (DEV-002 Bagian 8 #4 / ISSUE-005).
+     * Jalankan $work dengan pelaku audit = akun $user (id_pengguna + NIP-nya, NIP boleh NULL). Dipakai jalur tanpa JWT
+     * (AuthContext kosong: login, lazy rehash, reset password) agar audit tidak tercatat dengan actor NULL
+     * (DEV-002 Bagian 8 #4 / ISSUE-005, T-02).
      *
      * @template T
      *
-     * @param Closure(): T $work
+     * @param array<string, mixed> $user  row pengguna (minimal id_pengguna, nip)
+     * @param Closure(): T         $work
      *
      * @return T
      */
-    public function withActor(string $nip, Closure $work): mixed
+    public function withActor(array $user, Closure $work): mixed
     {
+        $nip = $user['nip'] ?? null;
+
         $previous            = $this->actorOverride;
-        $this->actorOverride = $nip;
+        $this->actorOverride = [
+            'id'  => (int) $user['id_pengguna'],
+            'nip' => $nip === null || $nip === '' ? null : (string) $nip,
+        ];
 
         try {
             return $work();
@@ -120,8 +145,10 @@ class PenggunaModel extends BaseAuditableModel
     {
         return [
             'id_pengguna'   => (int) $row['id_pengguna'],
-            'nip'           => (string) $row['nip'],
+            'nip'           => isset($row['nip']) && $row['nip'] !== '' ? (string) $row['nip'] : null,
             'username'      => (string) $row['username'],
+            'name'          => $row['name'] ?? null,
+            'email'         => $row['email'] ?? null,
             'user_level'    => (int) $row['user_level'],
             'id_unit'       => $row['id_unit'] ?? null,
             'id_satker'     => $row['id_satker'] ?? null,
@@ -132,8 +159,11 @@ class PenggunaModel extends BaseAuditableModel
         ];
     }
 
-    protected function currentActorNip(): ?string
+    /**
+     * @return array{id: int|null, nip: string|null}
+     */
+    protected function currentActor(): array
     {
-        return $this->actorOverride ?? parent::currentActorNip();
+        return $this->actorOverride ?? parent::currentActor();
     }
 }

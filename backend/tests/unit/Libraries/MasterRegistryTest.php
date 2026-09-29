@@ -43,6 +43,35 @@ final class MasterRegistryTest extends CIUnitTestCase
         $this->assertSame([], $registry->ancestorsOf($registry->get('agama')));
     }
 
+    /**
+     * CR-010: kode sentinel LAIN-LAIN wilayah = baris sistem (config = satu-satunya sumber untuk aplikasi); field ref
+     * ber-allowSystem + isian otherFor-nya diterima registry.
+     */
+    public function testSystemIdsAndAllowSystemFieldsAreAccepted(): void
+    {
+        $registry = new MasterRegistry(new MasterDataConfig());
+
+        $expected = ['provinsi' => ['99'], 'kabupaten-kota' => ['9999'], 'kecamatan' => ['9999999'], 'kelurahan' => ['9999999999'], 'agama' => []];
+
+        foreach ($expected as $key => $ids) {
+            $this->assertSame($ids, $registry->get($key)->systemIds, $key);
+        }
+
+        $this->assertTrue($registry->get('provinsi')->isSystemId('99'));
+        $this->assertFalse($registry->get('provinsi')->isSystemId('31'));
+        $this->assertSame(['9999'], $registry->get('kabupaten-kota')->toMeta()['system_ids']);
+
+        $config                  = new MasterDataConfig();
+        $config->entities['uji'] = [...self::BASE, 'fields' => [
+            'id_provinsi'   => ['label' => 'Provinsi', 'type' => 'ref', 'entity' => 'provinsi', 'allowSystem' => true],
+            'provinsi_lain' => ['label' => 'Provinsi Lainnya', 'otherFor' => 'id_provinsi'],
+        ]];
+
+        $uji = (new MasterRegistry($config))->get('uji');
+        $this->assertTrue($uji->field('id_provinsi')?->allowSystem);
+        $this->assertSame('id_provinsi', $uji->field('provinsi_lain')?->otherFor);
+    }
+
     public function testInconsistentConfigsAreRejected(): void
     {
         $cases = [
@@ -98,6 +127,28 @@ final class MasterRegistryTest extends CIUnitTestCase
             },
             'Tipe kolom bilangan bulat tidak dikenal: byte' => static function (MasterDataConfig $c): void {
                 $c->entities['uji'] = [...self::BASE, 'orderColumnType' => 'byte'];
+            },
+            // CR-010: baris sistem & rujukannya.
+            'systemIds 9 bukan kode kanonik master ini' => static function (MasterDataConfig $c): void {
+                $c->entities['provinsi']['systemIds'] = ['9'];
+            },
+            'systemIds 0 bukan kode kanonik master ini' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'systemIds' => ['0']];
+            },
+            'systemIds 99 ditulis lebih dari sekali' => static function (MasterDataConfig $c): void {
+                $c->entities['provinsi']['systemIds'] = ['99', '99'];
+            },
+            'allowSystem field id_agama: master agama tidak punya systemIds' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'fields' => ['id_agama' => ['label' => 'Agama', 'type' => 'ref', 'entity' => 'agama', 'allowSystem' => true]]];
+            },
+            'otherFor field provinsi_lain harus menunjuk field ref ber-allowSystem' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'fields' => [
+                    'id_provinsi'   => ['label' => 'Provinsi', 'type' => 'ref', 'entity' => 'provinsi'],
+                    'provinsi_lain' => ['label' => 'Provinsi Lainnya', 'otherFor' => 'id_provinsi'],
+                ]];
+            },
+            'otherFor field kota_lain harus menunjuk field ref ber-allowSystem' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'fields' => ['kota_lain' => ['label' => 'Kota Lainnya', 'otherFor' => 'tidak_ada']]];
             },
         ];
 

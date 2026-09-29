@@ -32,6 +32,8 @@ use CodeIgniter\Config\BaseConfig;
  *                        columnType (tipe kolom int: tinyint/smallint/mediumint/int/bigint [+ ' unsigned'] → batas
  *                        nilai, bawaan 'int'), min/max (batas eksplisit int/decimal), entity + dependsOn +
  *                        checkDependsOn (tipe ref: master rujukan, field ref induknya di form, cek rantai oleh engine),
+ *                        allowSystem (tipe ref: boleh merujuk baris sistem master rujukan, CR-010), otherFor (tipe
+ *                        text/textarea: isian "lainnya" milik field ref ber-allowSystem, CR-010),
  *     'extraSearch'   => kolom tambahan yang ikut dicari (LIKE) di daftar admin,
  *     'uniqueScope'   => kolom tambahan pembentuk lingkup keunikan nama (selain induk),
  *     'auditColumns'  => kolom audit legacy yang ada di tabel (created_at, created_by, updated_at, updated_by,
@@ -49,6 +51,9 @@ use CodeIgniter\Config\BaseConfig;
  *                        ['kolom' => ['lingkup', ...]] → duplikat = 422 pada field itu (termasuk balapan 1062),
  *     'filters'       => field yang boleh dipakai filter `?kolom=nilai` di options & daftar admin (allowlist),
  *     'statusChain'   => true = options hanya memuat entri yang SELURUH rantai induknya aktif (pola U3 FAQ),
+ *     'systemIds'     => kode baris sistem (CR-010, mis. sentinel LAIN-LAIN wilayah): tidak tampil di options/daftar
+ *                        admin, tidak ikut urutan, tidak bisa diubah/dihapus/menjadi induk; hanya bisa dirujuk field
+ *                        ref ber-allowSystem,
  *   ]
  *
  * Keunikan nama berlaku per induk (mis. nama kecamatan unik dalam satu kabupaten/kota), termasuk entri tidak aktif
@@ -73,12 +78,52 @@ class MasterData extends BaseConfig
 
     // Konstanta bantu per grup DBV (CR-009): tambahkan hanya di dalam blok grup masing-masing.
     // --- DBV-003 (konstanta) ---
+
+    /**
+     * Kolom audit `kantor`: created_by diisi saat tambah, updated_by saat ubah (Lm_umum.php:1862, 1865).
+     */
+    private const AUDIT_KANTOR = ['created_at', 'created_by', 'updated_at', 'updated_by'];
+
+    /**
+     * Kursem tanpa kolom *_by (DDL simpeg_prod.sql:245-252, 1435-1442): aktor hanya tercatat di audit_logs.
+     */
+    private const AUDIT_KURSEM = ['created_at', 'updated_at'];
+
+    /**
+     * Kode wilayah kantor: dropdown berjenjang dari master wilayah, boleh LAIN-LAIN (baris sistem). Rantai antarlevel
+     * diperiksa KantorHooks (checkDependsOn false), karena level di bawah LAIN-LAIN juga LAIN-LAIN, bukan anak riil.
+     */
+    private const KANTOR_WILAYAH = ['type' => 'ref', 'required' => true, 'allowSystem' => true, 'checkDependsOn' => false];
+
+    /**
+     * Isian teks wilayah bila kodenya LAIN-LAIN (wajib/NULL ditegakkan KantorHooks).
+     */
+    private const KANTOR_LAIN = ['rules' => 'max_length[255]'];
+
     // --- /DBV-003 ---
 
     // --- DBV-004 (konstanta) ---
+    /**
+     * DBV-004 (D1): kolom audit pola `bidang_pendidikan` [K] (updated_at NOT NULL ON UPDATE + updated_by, tanpa
+     * created_*) untuk pangkat, jenis_kp, jenjang/bidang/jurusan pendidikan. gol_pppk memakai AUDIT_FAQ (DDL [K]).
+     */
+    private const DBV004_AUDIT = ['updated_at', 'updated_by'];
+
+    /**
+     * DBV-004 (P6/D5): pilihan jenjang_pendidikan.row_jurusan = nama kolom flag di jurusan_pendidikan (sama dengan
+     * CHECK chk_jenjang_pendidikan_row_jurusan dan JurusanPendidikanHooks::FLAGS).
+     */
+    private const DBV004_ROW_JURUSAN = [
+        'D_I' => 'D.I', 'D_II' => 'D.II', 'D_III' => 'D.III', 'D_IV' => 'D.IV', 'S_1' => 'S.1', 'S_2' => 'S.2', 'S_3' => 'S.3',
+    ];
     // --- /DBV-004 ---
 
     // --- DBV-005 (konstanta) ---
+    /**
+     * Kolom audit G-06 (pola DDL legacy `diklat`, simpeg_prod.sql:449-450): tanpa created_*, updated_at/updated_by diisi
+     * saat tambah maupun ubah (mode Batch 1).
+     */
+    private const AUDIT_G06 = ['updated_at', 'updated_by'];
     // --- /DBV-005 ---
 
     /**
@@ -94,7 +139,7 @@ class MasterData extends BaseConfig
      *     nameLabel: string,
      *     nameMaxLength: int,
      *     parent?: array{field: string, entity: string}|null,
-     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool}>,
+     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool, allowSystem?: bool, otherFor?: string}>,
      *     extraSearch?: list<string>,
      *     uniqueScope?: list<string>,
      *     auditColumns?: list<string>,
@@ -107,7 +152,8 @@ class MasterData extends BaseConfig
      *     orderColumnType?: string,
      *     uniqueFields?: array<int|string, string|list<string>>,
      *     filters?: list<string>,
-     *     statusChain?: bool
+     *     statusChain?: bool,
+     *     systemIds?: list<string>
      * }>
      */
     public array $entities = [
@@ -126,6 +172,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 30,
             'parent'        => null,
             'auditColumns'  => [...self::AUDIT, 'deleted_at'],
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'jenis-pegawai' => [
             'label'         => 'Jenis Pegawai',
@@ -139,6 +187,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 50,
             'parent'        => null,
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'jenis-status' => [
             'label'         => 'Jenis Status Pegawai',
@@ -163,6 +213,8 @@ class MasterData extends BaseConfig
             // Legacy: jenis_status unik per status_pegawai.
             'uniqueScope'  => ['status_pegawai'],
             'auditColumns' => self::AUDIT,
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'provinsi' => [
             'label'         => 'Provinsi',
@@ -175,6 +227,10 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => null,
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN legacy (DBV-003, migration 2026-09-25-100200): baris sistem, lihat 'systemIds'.
+            'systemIds' => ['99'],
         ],
         'kabupaten-kota' => [
             'label'         => 'Kabupaten/Kota',
@@ -190,6 +246,10 @@ class MasterData extends BaseConfig
                 'kd_area' => ['label' => 'Kode Area', 'rules' => 'max_length[4]', 'hint' => 'Kode area telepon, maksimal 4 karakter.'],
             ],
             'auditColumns' => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999'],
         ],
         'kecamatan' => [
             'label'         => 'Kecamatan',
@@ -202,6 +262,10 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => ['field' => 'id_kabupaten_kota', 'entity' => 'kabupaten-kota'],
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999999'],
         ],
         'kelurahan' => [
             'label'         => 'Kelurahan/Desa',
@@ -222,6 +286,10 @@ class MasterData extends BaseConfig
                 ],
             ],
             'auditColumns' => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999999999'],
         ],
 
         // ------------------------------------------------------------------
@@ -289,12 +357,379 @@ class MasterData extends BaseConfig
         // ------------------------------------------------------------------
 
         // --- DBV-003 (G-07 kantor, kursem, jenis libur; G-08 hari libur) ---
+        // G-07 kantor (legacy hr/master/c_umum, Lm_umum.php:1576-1870): kode wilayah = field ref berjenjang yang boleh
+        // LAIN-LAIN (99/9999/9999999/9999999999, teks di *_lain); rantai, *_lain, dan kode pos ditegakkan KantorHooks.
+        // Nama kantor unik global (uq_kantor_nama). Hari libur (G-08) bukan entri engine: HariLiburController +
+        // HariLiburService (route api/v1/hari-libur); master jenis-libur memakai engine di controller yang sama.
+        'kantor' => [
+            'label'         => 'Kantor',
+            'controller'    => 'UmumController',
+            'table'         => 'kantor',
+            'primaryKey'    => 'id_kantor',
+            'autoIncrement' => true,
+            'idMaxLength'   => 10,
+            'nameField'     => 'nama_kantor',
+            'nameLabel'     => 'Nama Kantor',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'fields'        => [
+                'alamat'         => ['label' => 'Alamat', 'type' => 'textarea', 'required' => true, 'maxBytes' => 65535],
+                'id_provinsi'    => ['label' => 'Provinsi', 'entity' => 'provinsi', ...self::KANTOR_WILAYAH],
+                'provinsi_lain'  => ['label' => 'Provinsi Lainnya', 'otherFor' => 'id_provinsi', ...self::KANTOR_LAIN],
+                'id_kabupaten'   => ['label' => 'Kabupaten/Kota', 'entity' => 'kabupaten-kota', 'dependsOn' => 'id_provinsi', ...self::KANTOR_WILAYAH],
+                'kabupaten_lain' => ['label' => 'Kabupaten/Kota Lainnya', 'otherFor' => 'id_kabupaten', ...self::KANTOR_LAIN],
+                'id_kecamatan'   => ['label' => 'Kecamatan', 'entity' => 'kecamatan', 'dependsOn' => 'id_kabupaten', ...self::KANTOR_WILAYAH],
+                'kecamatan_lain' => ['label' => 'Kecamatan Lainnya', 'otherFor' => 'id_kecamatan', ...self::KANTOR_LAIN],
+                'id_kelurahan'   => ['label' => 'Kelurahan/Desa', 'entity' => 'kelurahan', 'dependsOn' => 'id_kecamatan', ...self::KANTOR_WILAYAH],
+                'kelurahan_lain' => ['label' => 'Kelurahan/Desa Lainnya', 'otherFor' => 'id_kelurahan', ...self::KANTOR_LAIN],
+                'kode_pos'       => [
+                    'label' => 'Kode Pos',
+                    'rules' => 'max_length[5]|regex_match[/^[0-9]{5}\z/]',
+                    'hint'  => '5 digit angka; bila kelurahan punya daftar kode pos, pilih salah satunya.',
+                ],
+                'telp'   => ['label' => 'Telepon', 'rules' => 'max_length[50]'],
+                'faks'   => ['label' => 'Faks', 'rules' => 'max_length[50]'],
+                'remark' => ['label' => 'Keterangan', 'type' => 'textarea', 'maxBytes' => 65535],
+            ],
+            'extraSearch'  => ['alamat'],
+            'auditColumns' => self::AUDIT_KANTOR,
+            'hooks'        => \App\Libraries\MasterData\KantorHooks::class,
+        ],
+        // Kursem (DDL legacy, tanpa UI CRUD di legacy): dropdown riwayat kursus/seminar. `order` TINYINT [V2].
+        'bidang-kursem' => [
+            'label'           => 'Bidang Kursus/Seminar',
+            'controller'      => 'UmumController',
+            'table'           => 'bidang_kursem',
+            'primaryKey'      => 'id_bidang_kursem',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'bidang_kursem',
+            'nameLabel'       => 'Bidang Kursus/Seminar',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT_KURSEM,
+            'orderColumnType' => 'tinyint',
+        ],
+        'instansi-kursem' => [
+            'label'           => 'Instansi Penyelenggara Kursus/Seminar',
+            'controller'      => 'UmumController',
+            'table'           => 'instansi_kursem',
+            'primaryKey'      => 'id_instansi_kursem',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'instansi_kursem',
+            'nameLabel'       => 'Instansi Penyelenggara',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT_KURSEM,
+            'orderColumnType' => 'tinyint',
+        ],
+        // G-08 jenis libur (legacy L_presensi.php:20362): dropdown form hari libur, UL_ALL.
+        'jenis-libur' => [
+            'label'           => 'Jenis Libur',
+            'controller'      => 'HariLiburController',
+            'table'           => 'jenis_libur',
+            'primaryKey'      => 'id_jenis_libur',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'jenis_libur',
+            'nameLabel'       => 'Jenis Libur',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT,
+            'orderColumnType' => 'tinyint',
+        ],
         // --- /DBV-003 ---
 
         // --- DBV-004 (G-04 kenaikan pangkat, G-05 pendidikan) ---
+        // G-04 — Kenaikan Pangkat (KpController). Legacy: hr/master/c_kp (Lm_kp.php), DDL gol_pppk simpeg_prod.sql:1277-1289.
+        // G-05 — Pendidikan (PendidikanController). Legacy: hr/master/c_pendidikan (Lm_pendidikan.php), DDL
+        // bidang_pendidikan simpeg_prod.sql:257-265. Skema & keputusan: docs/db-review/G-04-G-05-pangkat-pendidikan-schema.md.
+        // Dropdown (options) terbuka untuk semua role (publicOptions bawaan): dipakai form riwayat KP/pendidikan Fase 3.
+        // ------------------------------------------------------------------
+        'pangkat' => [
+            'label'         => 'Pangkat/Golongan',
+            'controller'    => 'KpController',
+            'table'         => 'pangkat',
+            'primaryKey'    => 'id_pangkat',
+            'autoIncrement' => true,
+            'idMaxLength'   => 3,
+            // P1: label dropdown & kunci peta SIASN legacy = gol_ruang (teks bebas, mis. "CPNS III/b"), UNIQUE di DB.
+            'nameField'     => 'gol_ruang',
+            'nameLabel'     => 'Gol./Ruang',
+            'nameMaxLength' => 10,
+            'parent'        => null,
+            'fields'        => [
+                // Label & pilihan mengikuti form legacy views/hr/master/kp/form.php:37-81.
+                'cpns' => [
+                    'label'    => 'Jenis Pangkat',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'CPNS', 2 => 'PNS'],
+                ],
+                'pangkat' => ['label' => 'Pangkat', 'required' => true, 'rules' => 'max_length[50]'],
+                'gol'     => [
+                    'label'    => 'Golongan',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => ['I' => 'I', 'II' => 'II', 'III' => 'III', 'IV' => 'IV'],
+                ],
+                'ruang' => [
+                    'label'    => 'Ruang',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => ['a' => 'a', 'b' => 'b', 'c' => 'c', 'd' => 'd', 'e' => 'e'],
+                ],
+            ],
+            'extraSearch'  => ['pangkat'],
+            'auditColumns' => self::DBV004_AUDIT,
+            // P2: `order` = level pangkat (KP berikutnya = order + 1) — disimpan apa adanya, tidak pernah digeser. Tanpa
+            // orderScope: level legacy global (L_employee.php:2434-2441), tambah tanpa order = MAX+1 seluruh pangkat.
+            'orderMode'       => 'manual',
+            'orderColumnType' => 'tinyint',
+            // Dropdown pangkat per jenis KP legacy (L_kp.php:56, 67): ?cpns=1 (CPNS) / ?cpns=2 (PNS).
+            'filters' => ['cpns'],
+        ],
+        'jenis-kp' => [
+            'label'           => 'Jenis Kenaikan Pangkat',
+            'controller'      => 'KpController',
+            'table'           => 'jenis_kp',
+            'primaryKey'      => 'id_jenis_kp',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'jenis_kp',
+            'nameLabel'       => 'Jenis KP',
+            'nameMaxLength'   => 100,
+            'parent'          => null,
+            'auditColumns'    => self::DBV004_AUDIT,
+            'orderColumnType' => 'tinyint',
+        ],
+        'gol-pppk' => [
+            'label'         => 'Golongan PPPK',
+            'controller'    => 'KpController',
+            'table'         => 'gol_pppk',
+            'primaryKey'    => 'id_gol_pppk',
+            'autoIncrement' => true,
+            'idMaxLength'   => 3,
+            'nameField'     => 'gol_pppk',
+            'nameLabel'     => 'Golongan PPPK',
+            'nameMaxLength' => 10,
+            'parent'        => null,
+            'fields'        => [
+                // K5 c(ii): dapat diubah Super Admin (legacy hanya lewat impor). DOUBLE NOT NULL → wajib (kosong = 1048)
+                // dan dibatasi (angka raksasa = INF → error SQL) — batas atas pengaman aplikasi, bukan aturan legacy.
+                'uang_makan' => [
+                    'label'    => 'Uang Makan',
+                    'type'     => 'decimal',
+                    'required' => true,
+                    'min'      => 0,
+                    'max'      => 10000000,
+                    'hint'     => 'Tarif uang makan PPPK per hari dalam rupiah, 0 sampai 10.000.000. Isi 0 bila belum ada tarif.',
+                ],
+                'keterangan' => ['label' => 'Keterangan', 'type' => 'textarea', 'maxBytes' => 255],
+            ],
+            // DDL [K] berpola sama dengan FAQ: created_by saat tambah, updated_by saat ubah.
+            'auditColumns'    => self::AUDIT_FAQ,
+            'orderColumnType' => 'tinyint',
+        ],
+        'jenjang-pendidikan' => [
+            'label'         => 'Jenjang Pendidikan',
+            'controller'    => 'PendidikanController',
+            'table'         => 'jenjang_pendidikan',
+            'primaryKey'    => 'id_jenjang_pendidikan',
+            'autoIncrement' => true,
+            'nameField'     => 'jenjang_pendidikan',
+            'nameLabel'     => 'Jenjang Pendidikan',
+            'nameMaxLength' => 100,
+            'parent'        => null,
+            'fields'        => [
+                'jenjang_pendidikan_singkat' => [
+                    'label'    => 'Singkatan',
+                    'required' => true,
+                    'rules'    => 'max_length[50]',
+                    'hint'     => 'Mis. S.1. Dibandingkan sebagai kode oleh modul lain, jadi harus unik.',
+                ],
+                // P6/D5: nama kolom flag di jurusan_pendidikan, dari daftar tetap (CHECK DB lapis kedua). Kosong = NULL.
+                'row_jurusan' => [
+                    'label'   => 'Kolom Jurusan',
+                    'type'    => 'select',
+                    'options' => self::DBV004_ROW_JURUSAN,
+                    'hint'    => 'Jenjang pada daftar jurusan yang dipakai dropdown jurusan. Kosongkan untuk jenjang tanpa jurusan (SD/SLTP/SLTA).',
+                ],
+            ],
+            'extraSearch'  => ['jenjang_pendidikan_singkat'],
+            'uniqueFields' => ['jenjang_pendidikan_singkat'],
+            // P6: skor kualifikasi IP ASN (L_user.php:878-884) disimpan tetapi tidak dikelola/diekspos.
+            'hiddenColumns'   => ['bobot_ipasn'],
+            'auditColumns'    => self::DBV004_AUDIT,
+            'orderColumnType' => 'tinyint',
+        ],
+        'bidang-pendidikan' => [
+            'label'         => 'Bidang Pendidikan',
+            'controller'    => 'PendidikanController',
+            'table'         => 'bidang_pendidikan',
+            'primaryKey'    => 'id_bidang_pendidikan',
+            'autoIncrement' => true,
+            'idMaxLength'   => 3,
+            'nameField'     => 'bidang_pendidikan',
+            'nameLabel'     => 'Bidang Pendidikan',
+            'nameMaxLength' => 100,
+            'parent'        => null,
+            'fields'        => [
+                'bidang_pendidikan_english' => ['label' => 'Nama (Inggris)', 'rules' => 'max_length[100]'],
+            ],
+            'extraSearch'  => ['bidang_pendidikan_english'],
+            'auditColumns' => self::DBV004_AUDIT,
+        ],
+        'jurusan-pendidikan' => [
+            'label'         => 'Jurusan Pendidikan',
+            'controller'    => 'PendidikanController',
+            'table'         => 'jurusan_pendidikan',
+            'primaryKey'    => 'id_jurusan_pendidikan',
+            'autoIncrement' => true,
+            'nameField'     => 'jurusan_pendidikan',
+            'nameLabel'     => 'Jurusan Pendidikan',
+            'nameMaxLength' => 255,
+            'parent'        => ['field' => 'id_bidang_pendidikan', 'entity' => 'bidang-pendidikan'],
+            'fields'        => [
+                'jurusan_pendidikan_english' => ['label' => 'Nama (Inggris)', 'rules' => 'max_length[255]'],
+                'gelar'                      => ['label' => 'Gelar', 'rules' => 'max_length[50]'],
+                // P10: flag jenjang 1/0 (label checkbox legacy jurusan/form.php:59-93); minimal satu = JurusanPendidikanHooks.
+                'D_I'   => ['label' => 'D.I', 'type' => 'boolean', 'hint' => 'Centang minimal satu jenjang yang memiliki jurusan ini.'],
+                'D_II'  => ['label' => 'D.II', 'type' => 'boolean'],
+                'D_III' => ['label' => 'D.III', 'type' => 'boolean'],
+                'D_IV'  => ['label' => 'D.IV', 'type' => 'boolean'],
+                'S_1'   => ['label' => 'S.1', 'type' => 'boolean'],
+                'S_2'   => ['label' => 'S.2', 'type' => 'boolean'],
+                'S_3'   => ['label' => 'S.3', 'type' => 'boolean'],
+            ],
+            'extraSearch'  => ['jurusan_pendidikan_english'],
+            'auditColumns' => self::DBV004_AUDIT,
+            // FQCN (tanpa baris `use` baru) supaya kepala file tidak bentrok dengan grup DBV lain saat merge.
+            'hooks' => \App\Libraries\MasterData\JurusanPendidikanHooks::class,
+            // P7: dropdown jurusan hanya memuat jurusan aktif yang bidangnya juga aktif (memperbaiki Local.php:83, 87).
+            'statusChain' => true,
+        ],
         // --- /DBV-004 ---
 
         // --- DBV-005 (G-06 diklat, hukdis, konket, tanda jasa) ---
+        // G-06 (DBV-005/CR-012 ⏳). Legacy hr/master/c_diklat|c_hukdis|c_konket|c_tj (Lm_*.php), CRUD role 1; dropdown UL_ALL
+        // (riwayat B-11/B-13/B-14/B-17, presensi D-06). Skema: backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md.
+        // Baris ber-ID hard-coded legacy (G-06 Bagian 2.6) sengaja tidak dikunci (B6). Kolom `order` TINYINT → orderColumnType.
+        'diklat' => [
+            'label'         => 'Pelatihan',
+            'controller'    => 'DiklatController',
+            'table'         => 'diklat',
+            'primaryKey'    => 'id_diklat',
+            'autoIncrement' => true,
+            'idMaxLength'   => 3,
+            'nameField'     => 'nama_diklat',
+            'nameLabel'     => 'Nama Pelatihan',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'fields'        => [
+                // Pilihan = COMMENT kolom legacy [K] simpeg_prod.sql:445 (B1); CHECK chk_diklat_jenis_diklat 1..5.
+                'jenis_diklat' => [
+                    'label'    => 'Jenis Pelatihan',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'Struktural', 2 => 'Teknis', 3 => 'Fungsional', 4 => 'Prajabatan', 5 => 'Sertifikasi'],
+                ],
+            ],
+            // UNIQUE uq_diklat_nama (jenis_diklat, nama_diklat); urutan per jenis (Lm_diklat.php:13), daftar & dropdown bisa
+            // disaring per jenis (riwayat B-11 memuat pelatihan per jenis, rwy/L_diklat.php:67).
+            'uniqueScope'     => ['jenis_diklat'],
+            'orderScope'      => ['jenis_diklat'],
+            'filters'         => ['jenis_diklat'],
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'tingkat-hukdis' => [
+            'label'         => 'Tingkat Hukuman Disiplin',
+            'controller'    => 'HukdisController',
+            'table'         => 'tingkat_hukdis',
+            'primaryKey'    => 'id_tingkat_hukdis',
+            'autoIncrement' => true,
+            'nameField'     => 'tingkat_hukdis',
+            'nameLabel'     => 'Tingkat Hukuman Disiplin',
+            'nameMaxLength' => 100,
+            'parent'        => null,
+            // bobot_ipasn: skor IPASN legacy (L_user.php:1059-1070), disimpan tetapi tidak dikelola/dikirim (B5).
+            'hiddenColumns'   => ['bobot_ipasn'],
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'jenis-hukdis' => [
+            'label'         => 'Jenis Hukuman Disiplin',
+            'controller'    => 'HukdisController',
+            'table'         => 'jenis_hukdis',
+            'primaryKey'    => 'id_jenis_hukdis',
+            'autoIncrement' => true,
+            'nameField'     => 'jenis_hukdis',
+            'nameLabel'     => 'Jenis Hukuman Disiplin',
+            'nameMaxLength' => 255,
+            'parent'        => ['field' => 'id_tingkat_hukdis', 'entity' => 'tingkat-hukdis'],
+            'fields'        => [
+                // K5b: nullable, TINYINT UNSIGNED + CHECK >= 1 → 1..255; kosong = NULL (tanpa masa).
+                'masa_sanksi_bulan' => [
+                    'label'      => 'Masa Sanksi (bulan)',
+                    'type'       => 'int',
+                    'columnType' => 'tinyint unsigned',
+                    'min'        => 1,
+                    'hint'       => 'Opsional. Nilai awal hitung akhir hukuman (TMT + masa); kosongkan bila tanpa masa. Riwayat tetap menyimpan masa per SK.',
+                ],
+            ],
+            // Dropdown jenis hanya memuat jenis yang tingkatnya aktif (legacy hanya menawarkan tingkat status 1, Lm_hukdis.php:221).
+            'statusChain'     => true,
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'jenis-konket' => [
+            'label'         => 'Jenis Konfirmasi Ketidakhadiran',
+            'controller'    => 'KonketController',
+            'table'         => 'jenis_konket',
+            'primaryKey'    => 'id_jenis_konket',
+            'autoIncrement' => true,
+            'nameField'     => 'jenis_konket',
+            'nameLabel'     => 'Jenis Konfirmasi Ketidakhadiran',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'fields'        => [
+                // B2: kode kategori = absen_ijin.kategori (value pilihan pengajuan legacy), wajib & unik (uq_jenis_konket_old_id).
+                'old_id' => [
+                    'label'    => 'Kode Kategori',
+                    'type'     => 'int',
+                    'required' => true,
+                    'min'      => 1,
+                    'hint'     => 'Kode yang disimpan di pengajuan konket (absen_ijin.kategori). Unik. Mengubahnya memutus pengajuan lama yang memakai kode ini.',
+                ],
+                // K5a: nilai awal "Pengaruh ke Tukin" pengajuan (label legacy rwy/konket/form_ad.php:113). Wajib: kosong akan
+                // menjadi NULL di kolom NOT NULL (1048 → 500). Default kolom 1 tetap berlaku untuk impor/SQL.
+                'affect_tukin' => [
+                    'label'    => 'Pengaruh ke Tukin',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'Ya', 2 => 'Tidak'],
+                    'hint'     => 'Nilai awal saat pengajuan konket; admin tetap bisa mengubahnya per pengajuan.',
+                ],
+            ],
+            'uniqueFields'    => ['old_id'],
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
+        'tanda-jasa' => [
+            'label'           => 'Tanda Jasa',
+            'controller'      => 'TandaJasaController',
+            'table'           => 'tanda_jasa',
+            'primaryKey'      => 'id_tanda_jasa',
+            'autoIncrement'   => true,
+            'nameField'       => 'tanda_jasa',
+            'nameLabel'       => 'Tanda Jasa',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'orderColumnType' => 'tinyint',
+            'auditColumns'    => self::AUDIT_G06,
+        ],
         // --- /DBV-005 ---
     ];
 }

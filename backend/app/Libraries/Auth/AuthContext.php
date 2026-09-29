@@ -6,7 +6,10 @@ namespace App\Libraries\Auth;
 
 /**
  * Pemegang claims JWT untuk request yang sedang berjalan.
- * Diisi oleh JwtAuthFilter, dibaca oleh RoleFilter, Service, dan BaseAuditableModel (nip_actor).
+ * Diisi oleh JwtAuthFilter, dibaca oleh RoleFilter, Service, dan BaseAuditableModel (pelaku audit).
+ *
+ * Identitas akun = `id_pengguna` (claim `sub`, DBV-010/CR-013); NIP hanya atribut akun pegawai (claim `nip`, NULL untuk
+ * akun role 1/3/4/5/8 tanpa NIP).
  */
 class AuthContext
 {
@@ -38,14 +41,25 @@ class AuthContext
 
     public function isAuthenticated(): bool
     {
-        return isset($this->claims['sub']) && $this->claims['sub'] !== '';
+        return $this->idPengguna() !== null;
     }
 
+    /**
+     * id_pengguna akun yang login (claim `sub`); null bila tidak ada sesi atau `sub` bukan id yang valid.
+     */
+    public function idPengguna(): ?int
+    {
+        return JwtService::subjectToId($this->claims['sub'] ?? null);
+    }
+
+    /**
+     * NIP akun yang login (claim `nip`); null untuk akun tanpa NIP.
+     */
     public function nip(): ?string
     {
-        $sub = $this->claims['sub'] ?? null;
+        $nip = $this->claims['nip'] ?? null;
 
-        return $sub === null ? null : (string) $sub;
+        return $nip === null || $nip === '' ? null : (string) $nip;
     }
 
     public function role(): ?int

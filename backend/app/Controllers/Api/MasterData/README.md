@@ -28,7 +28,7 @@ Opsi definisi tambahan (CR-009, fondasi DBV-003/004/005; semua opsional, bawaan 
 
 | Opsi | Arti |
 |---|---|
-| `orderMode` | `shift` (bawaan): `order` = posisi tampil 1..n, tambah/pindah menggeser entri lain, hapus merapatkan. `manual`: `order` = nilai bisnis (mis. level pangkat, DBV-004) — disimpan apa adanya, **tidak pernah** menggeser/menomori ulang entri lain (tambah, ubah, PATCH order, hapus, pulihkan), boleh kembar; kosong saat tambah = MAX+1 |
+| `orderMode` | `shift` (bawaan): `order` = posisi tampil 1..n, tambah/pindah menggeser entri lain, hapus merapatkan. `manual`: `order` = nilai bisnis (mis. level pangkat, DBV-004) — disimpan apa adanya, **tidak pernah** menggeser/menomori ulang entri lain (tambah, ubah, PATCH order, hapus, pulihkan), boleh kembar; kosong saat tambah = MAX+1 dari seluruh entri lingkupnya **termasuk yang dihapus** (levelnya tetap dipegang dan kembali saat dipulihkan) |
 | `orderScope` | field **wajib** pembentuk lingkup urutan selain induk (mis. diklat per `jenis_diklat`, DBV-005), dan wajib ikut `filters` (daftar admin disaring per lingkup; tanpa itu daftar mencampur lingkup sehingga panah urutan FE salah hitung): nomor urut, penggeseran, MAX+1, dan pulihkan berlaku per nilai field itu; pindah nilai = ditaruh di akhir lingkup baru, lingkup lama dirapatkan. Daftar & dropdown diurutkan induk → field lingkup → `order` → nama |
 | `orderColumnType` | tipe kolom `order` (`tinyint`, `smallint`, `int` [bawaan], … `+ unsigned`): batas nilai urutan mode manual (422 "Urutan maksimal 127.") dan batas MAX+1 otomatis di kedua mode, termasuk tambah dengan `order` di lingkup mode shift yang sudah penuh (dicek sebelum insert; 422 "Urutan … sudah mencapai batas maksimal …", bukan 500/terpotong) |
 | `uniqueFields` | field selain nama yang ber-UNIQUE di DB: `['old_id']` (unik global) atau `['kode' => ['id_induk']]` (unik per lingkup). Dicek seperti nama (case-insensitive, termasuk entri tidak aktif/dihapus + saran pulihkan), nilai kosong/NULL tidak dibatasi; pelanggaran index (1062) saat balapan juga → 422 pada field itu |
@@ -39,6 +39,16 @@ Opsi definisi tambahan (CR-009, fondasi DBV-003/004/005; semua opsional, bawaan 
 | `fields.*.type = ref` + `entity` / `dependsOn` / `checkDependsOn` | rujukan ke master lain (dropdown `{entity}/options`). Kode wajib bentuk kanonik master rujukan (422 "X tidak ditemukan."), ada, dan aktif (hanya bila nilainya berubah, seperti induk E6). `dependsOn` = field ref lain di form yang menjadi induk entri rujukan (dropdown berjenjang, mis. kabupaten/kota ← provinsi): entri rujukan wajib berada di bawah nilai itu (422 "… tidak berada di bawah X yang dipilih." / "Pilih X terlebih dahulu."), diperiksa juga saat hanya `dependsOn`-nya yang berubah. `checkDependsOn: false` bila rantai diperiksa hook (mis. sentinel LAIN-LAIN kantor DBV-003): engine tidak memeriksa rantai maupun keberadaan nilai `dependsOn`, tetapi kanonik/ada/aktif tetap diperiksa. Meta field mengirim `entity`/`depends_on` |
 
 Konfigurasi diperiksa saat registry dibangun (`MasterRegistry`): induk/entity ref terdaftar, `dependsOn` menunjuk field ref yang entity-nya induk master rujukan, field `orderScope`/`uniqueFields`/`filters` ada (filter bukan `search`/`status`/`parent`/`page`/`per_page`; `orderScope` = field wajib dan ikut `filters`), `statusChain` hanya untuk master berinduk, tanpa rantai induk melingkar → selain itu `LogicException`. Meta master mengirim `order_mode`, `order_scope`, `order_max` (mode manual), `filters`, `status_chain`.
+
+Opsi definisi tambahan (CR-010, DBV-003; opsional, bawaan = perilaku lama):
+
+| Opsi | Arti |
+|---|---|
+| `systemIds` | kode **baris sistem** master itu (sentinel LAIN-LAIN wilayah: `provinsi` 99, `kabupaten-kota` 9999, `kecamatan` 9999999, `kelurahan` 9999999999, di-seed migration `2026-09-25-100200`). Tidak pernah tampil di options maupun daftar admin (filter apa pun), tidak ikut penomoran urutan (`order` 0 tidak disentuh reorder/MAX+1), `PUT`/`PATCH status`/`PATCH order`/`DELETE` → 422 "… adalah baris sistem dan tidak bisa diubah, dinonaktifkan, atau dihapus." tanpa tulis & audit, tidak bisa menjadi induk (422 "<Induk> LAIN-LAIN tidak bisa dipilih sebagai induk."), namanya tidak bisa dipakai entri riil (422 "… sudah dipakai baris sistem …"). `GET {kode}` tetap 200. Meta master mengirim `system_ids` |
+| `fields.*.allowSystem` | field `ref` boleh merujuk baris sistem master rujukannya (kolom wilayah `kantor`); field ref lain menolaknya dengan pesan kode tak dikenal ("X tidak ditemukan."). Kanonik/ada/aktif tetap diperiksa. Meta field ref mengirim `allow_system` |
+| `fields.*.otherFor` | field `text`/`textarea` = isian "lainnya" untuk field ref ber-`allowSystem` di master yang sama (mis. `provinsi_lain` → `id_provinsi`). Hanya metadata FE (tampil & wajib saat field ref-nya LAIN-LAIN); wajib/NULL ditegakkan hook master. Meta field text/textarea mengirim `other_for` |
+
+Registry menolak (`LogicException`) `systemIds` yang bukan kode kanonik master itu atau ditulis dobel, `allowSystem` ke master tanpa `systemIds` atau di luar tipe `ref`, dan `otherFor` yang tidak menunjuk field ref ber-`allowSystem`.
 
 **Blok per grup (CR-009).** `Config\MasterData` (entri & konstanta), `tests/_support/MasterDataTestTrait::masterFixtures()`, dan `tests/_support/Database/Seeds/MasterDataSeeder` (panggilan & method seed) punya blok bertanda `// --- DBV-003 ---` … `// --- /DBV-003 ---` (juga DBV-004, DBV-005). Setiap grup hanya menambah di dalam bloknya agar cabang paralel tidak konflik; urutan entri config = urutan fixture (dicek `RbacMasterEndpointsTest`). Daftar master ber-`publicOptions: false` di test RBAC dibaca dari config.
 
@@ -74,6 +84,17 @@ Role selain 1 → `403 {status:'error', message:'Forbidden'}`; tanpa token → 4
 
 | Task | Controller | `{entity}` | Tabel | PK | Nama | Induk | Kolom tambahan |
 |---|---|---|---|---|---|---|---|
+| G-04 ✅ | `KpController` | `pangkat` | pangkat | id_pangkat (AUTO_INCREMENT, TINYINT) | gol_ruang (≤10, label "Gol./Ruang", **unik**) | — | `cpns` wajib `1` CPNS / `2` PNS, `pangkat` wajib (≤50), `gol` wajib `I`–`IV`, `ruang` wajib `a`–`e`; `order` = level pangkat (mode urutan manual, 1–127); filter `?cpns=` |
+| G-04 ✅ | `KpController` | `jenis-kp` | jenis_kp | id_jenis_kp (AUTO_INCREMENT, TINYINT) | jenis_kp (≤100) | — | — |
+| G-04 ✅ | `KpController` | `gol-pppk` | gol_pppk | id_gol_pppk (AUTO_INCREMENT, TINYINT) | gol_pppk (≤10) | — | `uang_makan` wajib (desimal 0–10.000.000), `keterangan` (opsional, ≤255 byte) |
+| G-05 ✅ | `PendidikanController` | `jenjang-pendidikan` | jenjang_pendidikan | id_jenjang_pendidikan (AUTO_INCREMENT) | jenjang_pendidikan (≤100) | — | `jenjang_pendidikan_singkat` wajib (≤50, **unik**), `row_jurusan` opsional `D_I`/`D_II`/`D_III`/`D_IV`/`S_1`/`S_2`/`S_3` (kosong = NULL); kolom `bobot_ipasn` tidak diekspos |
+| G-05 ✅ | `PendidikanController` | `bidang-pendidikan` | bidang_pendidikan | id_bidang_pendidikan (AUTO_INCREMENT, TINYINT) | bidang_pendidikan (≤100) | — | `bidang_pendidikan_english` (opsional, ≤100) |
+| G-05 ✅ | `PendidikanController` | `jurusan-pendidikan` | jurusan_pendidikan | id_jurusan_pendidikan (AUTO_INCREMENT) | jurusan_pendidikan (≤255, unik per bidang) | `id_bidang_pendidikan` → bidang-pendidikan | `jurusan_pendidikan_english` (≤255), `gelar` (≤50), flag `D_I`…`S_3` (boolean 1/0, minimal satu bernilai 1) |
+| G-06 ✅ | `DiklatController` | `diklat` | diklat | id_diklat (AUTO_INCREMENT, TINYINT legacy: maks. 127) | nama_diklat (≤255, label "Nama Pelatihan") | — | `jenis_diklat` wajib `1`–`5` (Struktural, Teknis, Fungsional, Prajabatan, Sertifikasi); nama unik & urutan per jenis; filter `?jenis_diklat=` di daftar & options |
+| G-06 ✅ | `HukdisController` | `tingkat-hukdis` | tingkat_hukdis | id_tingkat_hukdis (AUTO_INCREMENT) | tingkat_hukdis (≤100) | — | `bobot_ipasn` (skor IPASN legacy) disimpan tetapi tidak dikelola & tidak diekspos (`hiddenColumns`) |
+| G-06 ✅ | `HukdisController` | `jenis-hukdis` | jenis_hukdis | id_jenis_hukdis (AUTO_INCREMENT) | jenis_hukdis (≤255) | `id_tingkat_hukdis` → tingkat-hukdis | `masa_sanksi_bulan` opsional `1`–`255` (kosong = NULL); options hanya jenis yang tingkatnya aktif (`statusChain`) |
+| G-06 ✅ | `KonketController` | `jenis-konket` | jenis_konket | id_jenis_konket (AUTO_INCREMENT) | jenis_konket (≤255, label "Jenis Konfirmasi Ketidakhadiran") | — | `old_id` ("Kode Kategori" = `absen_ijin.kategori`) wajib ≥1 & unik (`uniqueFields`); `affect_tukin` wajib `1` Ya / `2` Tidak |
+| G-06 ✅ | `TandaJasaController` | `tanda-jasa` | tanda_jasa | id_tanda_jasa (AUTO_INCREMENT) | tanda_jasa (≤255) | — | — |
 | G-07 | `UmumController` | `agama` | agama | id_agama (AUTO_INCREMENT) | agama (≤30) | — | — |
 | G-07 | `UmumController` | `jenis-pegawai` | jenis_pegawai | id_jenis_pegawai (AUTO_INCREMENT) | jenis_pegawai (≤50) | — | — |
 | G-07 | `UmumController` | `jenis-status` | jenis_status | id_jenis_status (AUTO_INCREMENT) | jenis_status (≤50) | — | `status_pegawai` wajib `1`/`2`; nama unik per status_pegawai |
@@ -81,15 +102,29 @@ Role selain 1 → `403 {status:'error', message:'Forbidden'}`; tanpa token → 4
 | G-07 | `UmumController` | `kabupaten-kota` | kabupaten_kota | id_kabupaten_kota (4 digit) | kabupaten_kota | `id_provinsi` → provinsi | `kd_area` (≤4) |
 | G-07 | `UmumController` | `kecamatan` | kecamatan | id_kecamatan (7 digit) | kecamatan | `id_kabupaten_kota` → kabupaten-kota | — |
 | G-07 | `UmumController` | `kelurahan` | kelurahan | id_kelurahan (10 digit) | kelurahan | `id_kecamatan` → kecamatan | `kd_pos` (kode pos 5 digit, boleh beberapa dipisah koma) |
+| G-07 ✅ | `UmumController` | `kantor` | kantor | id_kantor (AUTO_INCREMENT) | nama_kantor (≤255, unik **global**) | — | `alamat` (wajib, ≤65.535 byte); `id_provinsi`/`id_kabupaten`/`id_kecamatan`/`id_kelurahan` (ref wajib, berjenjang, boleh LAIN-LAIN) + `provinsi_lain`/`kabupaten_lain`/`kecamatan_lain`/`kelurahan_lain` (≤255); `kode_pos` (5 digit); `telp`, `faks` (≤50); `remark` — aturan lintas kolom di `KantorHooks` (bawah) |
+| G-07 ✅ | `UmumController` | `bidang-kursem` | bidang_kursem | id_bidang_kursem (AUTO_INCREMENT, TINYINT maks 127) | bidang_kursem (≤255) | — | — (tanpa `*_by`; aktor di `audit_logs`) |
+| G-07 ✅ | `UmumController` | `instansi-kursem` | instansi_kursem | id_instansi_kursem (AUTO_INCREMENT, TINYINT maks 127) | instansi_kursem (≤255) | — | — (tanpa `*_by`) |
+| G-08 ✅ | `HariLiburController` | `jenis-libur` | jenis_libur | id_jenis_libur (AUTO_INCREMENT, TINYINT maks 127) | jenis_libur (≤255) | — | — (dropdown form hari libur) |
 | G-10 ⏳ | `FaqController` | `faq-topic` | faq_topic | id_faq_topic (AUTO_INCREMENT) | faq_topic (≤255) | — | `remark` (opsional, ≤255 **byte**) |
 | G-10 ⏳ | `FaqController` | `faq-sub-topic` | faq_sub_topic | id_faq_sub_topic (AUTO_INCREMENT) | faq_sub_topic (≤255) | `id_faq_topic` → faq-topic | `remark` (opsional, ≤255 byte) |
 | G-10 ⏳ | `FaqController` | `faq-article` | faq_article | id_faq_article (AUTO_INCREMENT) | title (≤255, label "Judul Artikel") | `id_faq_sub_topic` → faq-sub-topic | `content` (tipe `html`, wajib, ≤1.000.000 byte, disanitasi server); `content_stripped` diisi server, bukan input. Daftar tidak mengirim `content`/`content_stripped`; pencarian daftar ikut mencari `content_stripped` |
 
 G-10 ⏳ = pilot DBV-002/CR-003, menunggu approval DB Validator & review kode (`backend/docs/db-review/G-10-faq-schema.md`). Kolom `faq_topic.icon` ada di tabel tetapi belum dikelola dan **tidak diekspos** (D6): tidak ada di form/meta dan tidak dikirim di respons admin mana pun (daftar, detail, hasil tambah/ubah/status/urutan/hapus) lewat `hiddenColumns`; nilainya di DB tidak disentuh.
 
-Master lain (jabatan, lokasi presensi, KP, pendidikan, diklat/hukdis/konket/tanda jasa, kantor, hari libur, web config) menyusul setelah skemanya disetujui DB Validator — lihat `backend/docs/progress/02-MasterData.md`.
+G-04/G-05 ✅ = DBV-004/CR-011, disetujui DB Validator & review kode, di main lewat PR #13 (merge `acd8693`; `backend/docs/db-review/G-04-G-05-pangkat-pendidikan-schema.md`). Perilaku khusus:
+- `pangkat`: `order` = **level pangkat** (mode urutan manual) — disimpan apa adanya 1–127, tidak pernah menggeser atau menomori ulang pangkat lain saat tambah/ubah/hapus/pulihkan (G-TC #4 tidak berlaku); tambah tanpa `order` = nilai terbesar seluruh pangkat (termasuk yang dihapus) + 1. Dropdown per jenis: `pangkat/options?cpns=1` (CPNS) / `?cpns=2` (PNS), label = `gol_ruang`; nilai `cpns` lain → 422 "Filter Jenis Pangkat tidak valid.". Daftar admin menerima filter yang sama.
+- `gol-pppk`: status 1/2/10 (legacy ENUM('1','2') tidak bisa menyimpan 10); `uang_makan` = tarif uang makan PPPK per hari, dapat diubah role 1.
+- `jenjang-pendidikan`: singkatan duplikat (case-insensitive, termasuk entri tidak aktif/dihapus) → 422 pada `jenjang_pendidikan_singkat`; `row_jurusan` hanya salah satu dari 7 kode (peka huruf; CHECK DB sebagai lapis kedua). Kolom `bobot_ipasn` tidak ada di form/meta/respons mana pun dan tidak bisa diubah lewat API.
+- `jurusan-pendidikan`: minimal satu flag jenjang bernilai 1, diperiksa saat tambah dan saat ubah yang menyentuh flag (flag terkini dibaca dengan kunci baris, jadi dua ubah bersamaan tidak bisa mematikan semua flag) → 422 `D_I` "Pilih minimal satu jenjang pendidikan.". **Dropdown berjenjang pendidikan:** `bidang-pendidikan/options` → `jurusan-pendidikan/options?parent={id_bidang_pendidikan}`; dropdown jurusan hanya memuat jurusan aktif yang bidangnya aktif (`statusChain`). Dropdown jurusan per jenjang (flag menurut `row_jurusan`) belum ada — dikerjakan bersama riwayat pendidikan (Fase 3).
+
+Master yang sudah ada di engine (tabel di atas): kenaikan pangkat (G-04), pendidikan (G-05), diklat/hukdis/konket/tanda jasa (G-06), data umum & wilayah termasuk kantor dan kursem (G-07), jenis libur (G-08; hari libur sendiri lewat endpoint khusus `api/v1/hari-libur`, bawah), dan FAQ (G-10). Master lain (jabatan/unit/satker G-02, lokasi presensi G-03, web config G-09) menyusul setelah DDL legacy tersedia dan skemanya disetujui DB Validator — lihat `backend/docs/progress/02-MasterData.md`.
 
 **Dropdown berjenjang wilayah 4 level:** `provinsi/options` → `kabupaten-kota/options?parent={id_provinsi}` → `kecamatan/options?parent={id_kabupaten_kota}` → `kelurahan/options?parent={id_kecamatan}`.
+
+**Dropdown berjenjang hukuman disiplin:** `tingkat-hukdis/options` → `jenis-hukdis/options?parent={id_tingkat_hukdis}` (hanya jenis yang tingkatnya aktif, `statusChain`). Pelatihan per jenis: `diklat/options?jenis_diklat={1..5}`.
+
+G-06 ✅ = DBV-005/CR-012, disetujui DB Validator & review kode, di main lewat PR #14 (merge `e602205`; `backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md` Bagian 2.7): kolom `order` TINYINT (maks. 127 entri tampil per lingkup urutan → 422 `order`), kolom audit hanya `updated_at`/`updated_by`; baris ber-ID hard-coded legacy (konket 2/4/5/6, `old_id` 8/10/13, tanda jasa 26/27/28/44, diklat 8) tidak dikunci.
 
 ## Payload & response
 
@@ -115,15 +150,16 @@ Contoh agama (kode otomatis): `{ "agama": "Kepercayaan" }`
 | PK (`id_*`) | wilayah: wajib, **tepat N digit angka** (2/4/7/10), unik; master AUTO_INCREMENT: tidak dikirim (diabaikan). `options`/`meta` dicadangkan |
 | induk (kalau ada) | wajib, harus ada **dan aktif — termasuk seluruh leluhurnya** (mis. kecamatan baru ditolak bila provinsi dari kabupatennya Tidak Aktif/Dihapus; artikel FAQ ditolak bila topik dari sub topiknya non-aktif). Berlaku saat tambah & pindah induk; ubah tanpa pindah induk tetap boleh. Id induk harus bentuk kanonik seperti `{kode}` di URL (induk AUTO_INCREMENT: `1`, bukan `01`/`1abc`/`1.0`) — selain itu 422 "`<Induk>` tidak ditemukan." (mis. "Topik FAQ tidak ditemukan.") |
 | nama | wajib, ≤ panjang kolom; spasi dirapikan; **unik per induk (+ `status_pegawai` untuk jenis status), case-insensitive, termasuk entri tidak aktif & dihapus** — ditegakkan juga oleh UNIQUE index DB |
-| kolom tambahan | sesuai tabel master di atas (`kd_area`, `kd_pos`, `status_pegawai`, `remark`, `content`). Batas byte (`max_bytes` di meta) dihitung dalam byte UTF-8, bukan karakter: 128 × `é` = 256 byte → 422 "Keterangan maksimal 255 byte." |
+| kolom tambahan | sesuai tabel master di atas (`kd_area`, `kd_pos`, `status_pegawai`, `remark`, `content`). Batas byte (`max_bytes` di meta) dihitung dalam byte UTF-8, bukan karakter: 128 × `é` = 256 byte → 422 "Keterangan maksimal 255 byte.". Kolom opsional yang kosong setelah trim (spasi saja) atau `false` disimpan NULL. Nilai array/objek JSON di kolom mana pun (kode, induk, nama, kolom tambahan, `order`, `status`) → 422 "`<Label>` tidak valid." |
 | `content` (faq-article) | HTML; disanitasi server dengan whitelist (p, br, strong, b, em, i, u, s, sub, sup, ul, ol, li, a[href\|title\|target], img[src\|alt\|width\|height], h2–h4, blockquote, pre, code, hr, table/thead/tbody/tr/th/td[colspan\|rowspan], span). Tanpa style/class/on*; URI http/https/mailto (+ tautan relatif); `img src` hanya URL absolut http/https; `target` hanya `_blank` + `rel="noopener noreferrer"` otomatis. Kosong setelah sanitasi → 422 "Isi artikel wajib diisi." |
-| `order` | opsional, bilangan ≥1 = posisi sisip, dijepit ke 1..(jumlah entri tampil di lingkup urutannya + 1); entri baru langsung ditulis di posisi itu (tidak di-update lagi, jadi `updated_by` tabel ber-`created_by` tetap NULL) dan hanya saudaranya yang bergeser. Kosong = paling akhir. Mode manual: disimpan apa adanya (≤ batas `orderColumnType`), kosong = MAX+1 |
+| `order` | opsional, bilangan ≥1 = posisi sisip, dijepit ke 1..(jumlah entri tampil di lingkup urutannya + 1); entri baru langsung ditulis di posisi itu (tidak di-update lagi, jadi `updated_by` tabel ber-`created_by` tetap NULL) dan hanya saudaranya yang bergeser. Kosong (tidak dikirim, `""`, spasi saja, `false`) = paling akhir; pada ubah = urutan tidak berubah. Mode manual: disimpan apa adanya (1 .. batas `orderColumnType`), kosong = MAX+1 termasuk entri terhapus |
 | `status` | opsional `'1'`/`'2'` (default `'1'`); `10` hanya lewat DELETE |
 
 | Status | Kapan | Body |
 |---|---|---|
 | 201 | sukses | `data: { <kolom tabel>, order, status, parent_nama? }` |
 | 422 | kode dipakai / nama duplikat / induk tidak ada atau tidak aktif / format salah | `errors: { <field>: ["..."] }` — duplikat nama menyebut kode entri yang sudah ada (dan saran aktifkan kembali / pulihkan kalau entri itu tidak aktif / dihapus) |
+| 422 | master AUTO_INCREMENT yang PK-nya sudah di batas tipe kolom (mis. TINYINT 127): MySQL 8 InnoDB memberi 1062 pada PRIMARY, MariaDB 10.4 memberi 167 `Out of range value for column '<pk>'` — keduanya diterjemahkan engine; 167 pada kolom lain dan di luar engine tetap 500 | `message: "Kode <Master> sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database."` tanpa `errors` (CR-011) |
 
 ### PUT /master/{entity}/{kode}
 Parsial; field yang dikirim wajib terisi. Pindah induk → entri ditaruh di akhir induk baru, urutan induk lama dirapikan. `order` (kalau dikirim) memindah posisi; untuk entri berstatus `10` ditolak 422 kecuali sekaligus dipulihkan (`status` 1/2). `status` yang dikirim wajib `1`/`2` (`null`/`''` → 422, bukan diam-diam diaktifkan).
@@ -184,6 +220,45 @@ Body `{ "rate": 1 | 2, "reason"?: string }` → **201** `data: { rated: true, ra
 
 FE: 4 alasan baku legacy (`views/hr/faq/detail.php:142-156`) + "Lainnya" (teks bebas); yang dikirim sebagai `reason` adalah teks alasannya.
 
+## Kantor, kursem, hari libur (G-07/G-08, ✅ DBV-003/CR-010)
+
+✅ = disetujui DB Validator (DBV-003) & review kode (CR-010), di main lewat PR #12 (merge `d1cf1b3`), dokumen `backend/docs/db-review/G-07-G-08-kantor-hari-libur-kursem-schema.md`. `order` agama/jenis-pegawai/jenis-status = `tinyint` dan wilayah = `int unsigned` (temuan QA CR-009, dicocokkan `MasterConfigSchemaTest`).
+
+**Kantor (`KantorHooks`).** Engine memeriksa tiap kode wilayah (kanonik, ada, aktif bila berubah; LAIN-LAIN hanya lewat field ber-`allowSystem`) dan nama unik global. Hook menambah, urut provinsi → kelurahan, error pertama → 422 pada field-nya:
+1. level di bawah LAIN-LAIN wajib LAIN-LAIN ("Kabupaten/Kota harus LAIN-LAIN bila Provinsi LAIN-LAIN.");
+2. pasangan level yang keduanya riil harus satu rantai ("Kecamatan X tidak berada di bawah Kabupaten/Kota yang dipilih."); induk riil + anak LAIN-LAIN boleh;
+3. `*_lain` wajib bila levelnya LAIN-LAIN ("Provinsi Lainnya wajib diisi bila Provinsi LAIN-LAIN."), dan dipaksa NULL bila bukan;
+4. `kode_pos` opsional, tepat 5 digit; bila kelurahan riil punya `kd_pos`, wajib salah satunya ("Kode Pos harus salah satu kode pos kelurahan terpilih: 10110, 10120.").
+
+Saat ubah, aturan hanya diperiksa ulang bila kolom wilayah/`*_lain`/`kode_pos` ikut berubah: data lama yang rantainya tidak konsisten tetap bisa diubah nama/alamatnya. Kantor: `created_by` saat tambah, `updated_by` saat ubah.
+
+**Hari libur** — bukan master engine (unik = `tgl_mulai`, urut `tgl_mulai DESC`, tanpa `order`). `HariLiburController` + `Libraries\MasterData\HariLiburService`, prefix `/api/v1/hari-libur`:
+
+| Method | Path | Role | Keterangan |
+|---|---|---|---|
+| GET | `/hari-libur` | **1, 4, 5, 8** | Daftar, urut `tgl_mulai DESC`. Query: `tahun` (4 digit 1900-2100, rentang yang beririsan dengan tahun itu; selain itu 422), `search` (nama, ≤100 karakter, wildcard di-escape), `status` (`1`/`2`/`10`, **role 1 saja**; default tanpa `10`), `page` (dibatasi agar offset tidak meluap: halaman raksasa = kosong), `per_page` (≤100). Role 4/5/8 **hanya status 1** (`status` diabaikan) |
+| GET | `/hari-libur/{id}` | 1, 4, 5, 8 | Detail; id non-kanonik → 404; role 4/5/8 + status ≠ 1 → 404 |
+| POST | `/hari-libur` | 1 | Tambah → 201 |
+| PUT | `/hari-libur/{id}` | 1 | Ubah parsial; `status` `1`/`2` juga memulihkan status 10 |
+| PATCH | `/hari-libur/{id}/status` | 1 | `{ "status": "1"\|"2" }`; juga memulihkan status 10 |
+| DELETE | `/hari-libur/{id}` | 1 | Soft delete → status 10, `{ deleted: true, soft_delete: true, item }` |
+
+Baris: `{ id_libur, id_jenis_libur, jenis_libur (nama, LEFT JOIN — null bila tanpa jenis), tgl_mulai, tgl_akhir, nama_libur, keterangan, status, created_at, updated_at, updated_by }`; kolom audit `created_at`/`updated_at`/`updated_by` hanya untuk role 1 (role 4/5/8 tidak menerimanya); daftar `{ items, total, page, per_page }`. Role lain → 403; tanpa token → 401.
+
+| Field | Aturan |
+|---|---|
+| `tgl_mulai`, `tgl_akhir` | wajib (ubah: bila dikirim), tepat `YYYY-MM-DD`, tanggal kalender yang ada, tahun 1900-2100; `tgl_akhir ≥ tgl_mulai` → selain itu 422 `tgl_akhir` "Tanggal selesai tidak boleh sebelum tanggal mulai." |
+| `id_jenis_libur` | wajib (legacy NULL di DB, F5), kanonik, ada, dan aktif (hanya bila berubah) → 422 "Jenis Libur tidak ditemukan." / "Jenis Libur X sedang non-aktif." |
+| `nama_libur` | wajib, ≤100 karakter, spasi dirapikan; **boleh sama** dengan tahun lain (tanpa UNIQUE nama) |
+| `keterangan` | opsional, ≤65.535 byte; kosong = NULL |
+| `status` | tambah: opsional `1`/`2` (default 1) |
+
+- **Overlap (Paket A):** rentang inklusif tidak boleh beririsan dengan hari libur lain berstatus **apa pun** (1/2/10); bersebelahan boleh → 422 `tgl_mulai` "Rentang tanggal bentrok dengan hari libur "X" (mulai s.d. akhir)" + saran aktifkan/pulihkan bila entri itu tidak aktif/dihapus. Dicek hanya bila tanggal berubah.
+- **Serialisasi tulis:** semua tulis berjalan di dalam named lock `GET_LOCK` (per database + prefix, batas tunggu 10 detik) + transaksi, sehingga dua tambah paralel tidak sama-sama lolos cek overlap. Lock tidak didapat → **409** "Data hari libur sedang diubah pengguna lain. Coba lagi." tanpa tulis.
+- **Lapis DB:** UNIQUE `tgl_mulai` (1062) → 422 `tgl_mulai`; CHECK `chk_hari_libur_rentang` (3819 MySQL / 4025 MariaDB) → 422 `tgl_akhir` — diterjemahkan di service, bukan daftar global CR-007.
+- `updated_by` diisi saat tambah **dan** ubah (legacy `sp_holiday`; tabel tanpa `created_by`); audit create/update/delete.
+- **`HariLiburService::tanggalLibur(from, to)`** (tanpa endpoint): daftar tanggal `Y-m-d` unik & terurut dari hari libur **status 1** yang beririsan dengan [from, to], dipotong ke rentang itu. Satu-satunya sumber tanggal libur untuk presensi, tukin, uang makan, lama cuti, konket, dan LKH (Fase 5) — legacy membaca `hari_libur` tanpa filter.
+
 ## G-TC → bukti otomatis
 
 | G-TC | Test |
@@ -196,8 +271,13 @@ FE: 4 alasan baku legacy (`views/hr/faq/detail.php:142-156`) + "Lainnya" (teks b
 | #6 Audit log | `testAuditLogIsRecordedForCreateUpdateDeleteWithActor`, `testLegacyAuditColumnsAreFilledWithActor`, `testLeadingZeroCodeIsPreservedInRouteAndAudit` |
 | Opsi engine CR-009 | `tests/MasterData/MasterEngineFeaturesTest` (master UJI `Tests\Support\Config\MasterDataUji`: urutan manual & batas `orderColumnType`, `orderScope`, filter allowlist + cache per filter, `uniqueFields` + balapan 1062 lewat koneksi DB kedua, batas int per tipe kolom, boolean, `statusChain` 2 & 5 level, ref + `dependsOn`/`checkDependsOn`, `parent` options kanonik + racun cache, kapasitas lingkup mode shift); `tests/unit/Libraries/MasterFieldTest`, `MasterRegistryTest` (validasi konfigurasi), `MasterOptionsCacheKeyTest` (kunci cache dropdown per induk+filter tidak bentrok) |
 | Skema DBV-001 | `tests/MasterData/Batch1LegacySchemaTest` (kolom legacy, collation, UNIQUE, FK legacy, rollback, tolak jalan saat tabel berisi data) |
+| DBV-003/CR-010 ✅ (G-07/G-08) | `tests/MasterData/LiburKantorKursemSchemaTest` (skema 5 tabel, CHECK portabel, constraint DB, rollback, `testWilayahSentinelRows`), `WilayahSentinelTest` (baris sistem di engine), `KantorTest` (`KantorHooks`), `HariLiburTest` (RBAC 1/4/5/8, validasi, overlap semua status, soft delete, balapan UNIQUE, CHECK, lock 409, `tanggalLibur()`), `MasterConfigSchemaTest` (`orderColumnType`/`columnType` vs DDL); `tests/unit/Libraries/HariLiburRulesTest`; G-TC generik di atas mencakup `kantor`, `bidang-kursem`, `instansi-kursem`, `jenis-libur` |
 | Rantai induk & batas byte (DBV-002) | `MasterGenericTcTest::testWholeParentChainMustBeActive`, `testMaxBytesFieldCountsBytesNotCharacters`; `testLegacyAuditColumnsAreFilledWithActor` (juga `created_by`) |
 | Skema DBV-002 (FAQ) | `tests/MasterData/FaqSchemaTest` (kolom & tipe, collation, UNIQUE, FULLTEXT, FK legacy RESTRICT + kolom induk FK, tanpa FK `faq_rate.nip`, rollback, `up()` gagal di tengah membersihkan tabel run itu) |
+| Skema DBV-004 (G-04/G-05) | `tests/MasterData/PangkatPendidikanSchemaTest` (kolom & tipe, collation, 7 UNIQUE termasuk singkatan jenjang, CHECK `row_jurusan` biner (peka huruf & spasi di akhir), FK RESTRICT jurusan → bidang, `gol_pppk.status` menyimpan 10, tanpa UNIQUE(cpns, order), rollback & `up()` gagal per migration) |
+| G-04/G-05 (DBV-004/CR-011) | `tests/MasterData/KenaikanPangkatTest` (urutan pangkat mode manual & batas 127, `order` kosong/array tidak menjadi level 0, MAX+1 termasuk pangkat terhapus, PK TINYINT habis → 422, `gol_ruang` unik, pilihan `cpns`/`gol`/`ruang`, filter `?cpns=` + cache, jenis KP tetap mode geser, status 10 & `uang_makan`/`keterangan` golongan PPPK (spasi = NULL, array → 422), kolom audit), `PendidikanTest` (singkatan unik + balapan 1062, `row_jurusan` pilihan tetap (spasi/`false` = NULL, array → 422), wajib/panjang maksimal & `extraSearch` per master, `bobot_ipasn` tidak diekspos/diubah, minimal satu flag jurusan (termasuk flag terkini terkunci), PK bidang TINYINT habis → 422, nama jurusan unik per bidang, rantai status bidang → jurusan, induk aktif, kolom audit tanpa `created_*`); keenam master juga masuk G-TC generik (`MasterGenericTcTest`, `RbacMasterEndpointsTest`) |
 | FAQ baca & rating (G-10) | `tests/MasterData/FaqTest` (8 role, rantai status, pencarian FULLTEXT + fallback, urutan relevansi lalu id, batas 50 di kedua jalur, sanitasi, list tanpa `content`, `icon` tidak diekspos, options FAQ role 1, induk kanonik, UTF-8 tidak valid → 422, `created_by`/`updated_by`, `updated_at` detail, rating role 2/6/7 + audit, 403/404/422, balapan PK); `tests/unit/Libraries/HtmlSanitizerTest` |
+| Skema DBV-005 (G-06) | `tests/MasterData/DiklatHukdisKonketSchemaTest` (kolom & tipe legacy `diklat` + [I], collation, 6 UNIQUE, FK legacy RESTRICT, 3 CHECK `chk_`, tanpa seed, batas PK TINYINT, rollback, `up()` gagal di tengah) |
+| Perilaku G-06 (CR-012) | `tests/MasterData/DiklatHukdisKonketTest` (meta 5 master termasuk `id_max_length`, dropdown UL_ALL role 1–8, urutan & keunikan per jenis diklat + filter, `bobot_ipasn` tidak diekspos, statusChain & masa sanksi jenis hukdis (spasi/`false` = NULL), `old_id` wajib/unik/bisa diubah, `affect_tukin` 1/2, baris hard-coded tidak dikunci, kapasitas urutan 127, PK TINYINT `diklat` habis → 422, stamp audit hanya baris yang diedit; nilai yang ditolak NOT NULL/CHECK DB, termasuk JSON array/objek, → 422, bukan 500); FE `frontend/src/features/master-data/__tests__/MasterDataView.g06.spec.ts` (menu aksi baris ⋮ kelima master: urutan & label item baku, item urutan per jenis pelatihan/per tingkat/global, Status hanya badge) |
 | #7 QA Lapis 1 (Figma) | **Belum bisa** — desain Figma belum ada (item terbuka 00-INDEX) |
 | Penjaga UTF-8 & error data DB (CR-007) | `tests/feature/InvalidUtf8InputTest` (body form login, lupa sandi, create/update akun & master — update lewat `_method=PUT`; query string; field bersarang & key non-UTF-8; JSON tetap 400; segmen route non-UTF-8 → Router 400 envelope lewat handler global tanpa `Accept` JSON + lapis cadangan `_remap()`), `tests/feature/DatabaseDataErrorTest` (6 kode error data nyata di koneksi strict → 422 generik + log, tulis gagal di engine master di-rollback, error DB lain — 1062, 1146, lock wait, deadlock, SIGNAL, tanpa kode — tetap dilempar ke handler global/500 tanpa log "diterjemahkan ke 422"), `tests/unit/Config/ExceptionsTest` (deteksi request API walau `indexPage` terisi), `tests/unit/Libraries/ApiExceptionHandlerTest` (4xx framework → "Permintaan tidak valid.") |

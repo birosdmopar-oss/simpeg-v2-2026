@@ -44,6 +44,10 @@ export interface MasterFieldMeta {
   entity?: string | null
   /** Tipe ref: field ref lain di form yang menjadi induk entri rujukan (pilihan disaring `?parent=` nilainya). */
   depends_on?: string | null
+  /** CR-010 tipe ref: boleh memilih baris sistem LAIN-LAIN master rujukan (kode dari `system_ids` master itu). */
+  allow_system?: boolean
+  /** CR-010 tipe text/textarea: isian "lainnya" milik field ref ini; tampil & wajib hanya bila field itu LAIN-LAIN. */
+  other_for?: string | null
 }
 
 /**
@@ -79,6 +83,8 @@ export interface MasterMeta {
   filters?: string[]
   /** Dropdown hanya memuat entri yang seluruh rantai induknya aktif (pola FAQ). */
   status_chain?: boolean
+  /** CR-010: kode baris sistem (sentinel LAIN-LAIN wilayah) — tidak ada di options/daftar, dipilih lewat field ber-allow_system. */
+  system_ids?: string[]
 }
 
 /** Baris master: kolom dinamis per tabel + kolom standar order/status (+ parent_nama untuk master berinduk). */
