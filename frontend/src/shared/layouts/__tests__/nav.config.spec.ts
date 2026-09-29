@@ -1,6 +1,6 @@
 /**
  * nav.config — menu sidebar redesign per role & fase aktif. Hak akses mengikuti Matriks Role x Endpoint;
- * menu modul fase > ACTIVE_PHASE (3) sengaja tidak tampil karena halamannya belum ada.
+ * menu modul fase > ACTIVE_PHASE (8) sengaja tidak tampil karena halamannya belum ada.
  */
 import { describe, expect, it } from 'vitest'
 
@@ -12,12 +12,12 @@ const labels = (role: Parameters<typeof buildNav>[0], phase?: number): string[] 
   buildNav(role, phase).flatMap((g) => g.items.map((i) => i.label))
 
 describe('buildNav', () => {
-  it('fase aktif = 3 (UI redesign dikerjakan sampai Kepegawaian Core)', () => {
-    expect(ACTIVE_PHASE).toBe(3)
+  it('fase aktif = 8 (UI redesign eksperimental mencakup Halo Simpeg)', () => {
+    expect(ACTIVE_PHASE).toBe(8)
   })
 
-  it('Super Admin melihat semua menu fase 0–3', () => {
-    expect(labels(Role.SUPER_ADMIN)).toEqual([
+  it('Super Admin melihat semua menu fase 0–3 (fase aktif dibatasi 3)', () => {
+    expect(labels(Role.SUPER_ADMIN, 3)).toEqual([
       'Dashboards',
       'Daftar Pegawai',
       'Struktur Organisasi',
@@ -28,15 +28,20 @@ describe('buildNav', () => {
     ])
   })
 
-  it('menu fase 4+ (Layanan, Presensi, Laporan, Portal Berita, Halo Simpeg…) belum tampil untuk siapa pun', () => {
-    const all = Object.values(Role).flatMap((r) => labels(r))
+  it('menu fase 4+ belum tampil pada fase aktif 3; Presensi/Arsip/E-Kinerja/E-Talenta belum ada UI-nya pada fase 8', () => {
+    const all = Object.values(Role).flatMap((r) => labels(r, 3))
     for (const later of ['Layanan', 'Presensi', 'Laporan', 'Arsip', 'E-Kinerja', 'E-Talenta', 'Portal Berita', 'Halo Simpeg']) {
       expect(all).not.toContain(later)
+    }
+    const all8 = Object.values(Role).flatMap((r) => labels(r))
+    for (const later of ['Presensi', 'Arsip', 'E-Kinerja', 'E-Talenta']) {
+      expect(all8).not.toContain(later)
     }
   })
 
   it('Pegawai tidak melihat Daftar Pegawai (hr/employee/index hanya role 1,3,4,5,8) tapi boleh Struktur & FAQ', () => {
-    expect(labels(Role.PEGAWAI)).toEqual(['Dashboards', 'Struktur Organisasi', 'FAQ'])
+    expect(labels(Role.PEGAWAI, 3)).toEqual(['Dashboards', 'Struktur Organisasi', 'FAQ'])
+    expect(labels(Role.PEGAWAI)).toEqual(['Dashboards', 'Struktur Organisasi', 'Layanan', 'Portal Berita', 'Halo Simpeg', 'FAQ'])
   })
 
   it.each([Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI, Role.PIMPINAN])(
@@ -65,16 +70,17 @@ describe('buildNav', () => {
   })
 
   it('tanpa role hanya menu tak-terbatas (tanpa item ber-roles)', () => {
-    expect(labels(null)).toEqual(['Dashboards', 'Struktur Organisasi', 'FAQ'])
+    expect(labels(null)).toEqual(['Dashboards', 'Struktur Organisasi', 'Portal Berita', 'FAQ'])
   })
 
   it('grup tanpa item dibuang (Pegawai tidak punya grup Pengaturan)', () => {
     const keys = buildNav(Role.PEGAWAI).map((g) => g.key)
-    expect(keys).toEqual(['main', 'kepegawaian', 'bantuan'])
+    expect(keys).toEqual(['main', 'kepegawaian', 'berita', 'bantuan'])
   })
 
   it('menaikkan fase aktif memunculkan menu berikutnya lengkap dengan submenu (Laporan → 3 anak)', () => {
     expect(labels(Role.SUPER_ADMIN, 4)).toContain('Layanan')
+    expect(labels(Role.PIMPINAN)).not.toContain('Layanan')
     const laporan = buildNav(Role.SUPER_ADMIN, 7)
       .flatMap((g) => g.items)
       .find((i) => i.key === 'laporan')

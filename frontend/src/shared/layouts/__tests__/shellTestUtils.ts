@@ -26,6 +26,10 @@ export function createShellRouter(): Router {
       { path: '/pegawai', name: 'pegawai-list', component: stub },
       { path: '/pegawai/:nip', name: 'pegawai-detail', component: stub },
       { path: '/struktur-organisasi', name: 'org-structure', component: stub },
+      { path: '/layanan/status', name: 'layanan-status', component: stub },
+      { path: '/laporan/:tipe', name: 'laporan', component: stub },
+      { path: '/berita', name: 'news', component: stub },
+      { path: '/halo-simpeg/admin', name: 'halo-admin', component: stub },
       // Menu fase lanjutan memakai path string, tidak perlu nama route.
     ],
   })

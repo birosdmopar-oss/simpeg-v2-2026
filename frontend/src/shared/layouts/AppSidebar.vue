@@ -54,7 +54,7 @@ function isActivePath(path: string | null): boolean {
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 
-const isActive = (item: NavItem): boolean => isActivePath(pathOf(item.to))
+const isActive = (item: NavItem): boolean => (item.activeWhen ? item.activeWhen(route) : isActivePath(pathOf(item.to)))
 const isChildActive = (child: NavChild): boolean => isActivePath(pathOf(child.to))
 const hasActiveChild = (item: NavItem): boolean => (item.children ?? []).some(isChildActive)
 

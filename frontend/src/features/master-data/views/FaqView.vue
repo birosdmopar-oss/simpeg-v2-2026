@@ -8,7 +8,7 @@
  */
 import { ArrowLeft, ChevronDown, ChevronRight, FileText, Mail, MessageCircle, Search } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
+import { type RouteLocationRaw, RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isApiError } from '@/lib/axios'
@@ -367,15 +367,15 @@ onBeforeUnmount(cancelSearchTimer)
           <span class="block text-body1 text-slate-500">Kirim ke email kami</span>
         </a>
         <!-- Chat Admin = Halo Simpeg (Fase 8): belum ada halamannya, jadi tidak dibuat seolah-olah bisa diklik. -->
-        <div
-          class="rounded-card border border-slate-200 bg-white/70 px-6 py-8 shadow-card"
-          aria-disabled="true"
+        <RouterLink
+          :to="{ name: 'faq', query: { chat: '1' } }"
+          class="block rounded-card border border-slate-200 bg-white px-6 py-8 shadow-card transition hover:border-brand-tertiary"
           data-testid="faq-contact-chat"
         >
-          <span class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-100 text-slate-400"><MessageCircle class="h-6 w-6" aria-hidden="true" /></span>
-          <span class="block text-h5 text-slate-500">Chat Admin</span>
-          <span class="block text-body1 text-slate-400">Segera hadir (Halo Simpeg)</span>
-        </div>
+          <span class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-brand-tertiary/10 text-brand-tertiary"><MessageCircle class="h-6 w-6" aria-hidden="true" /></span>
+          <span class="block text-h5 text-slate-900">Chat Admin</span>
+          <span class="block text-body1 text-slate-500">Halo Simpeg — tanya langsung ke admin</span>
+        </RouterLink>
       </div>
     </section>
   </section>

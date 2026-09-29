@@ -11,7 +11,7 @@ const props = withDefaults(
   defineProps<{
     value: number
     max?: number
-    tone?: 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'violet'
+    tone?: 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'violet' | 'navy' | 'sky'
     size?: 'xs' | 'sm' | 'md'
     label?: string
   }>(),
@@ -25,6 +25,8 @@ const TONES = {
   warning: 'bg-warning',
   danger: 'bg-danger',
   violet: 'bg-[#7367F0]',
+  navy: 'bg-[#224A8A]',
+  sky: 'bg-[#A9C9FF]',
 } as const
 
 const HEIGHTS = { xs: 'h-1', sm: 'h-1.5', md: 'h-2.5' } as const

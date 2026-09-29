@@ -6,7 +6,7 @@
  *
  * Reusable. Komponen ini hanya memilih format; eksekusi ekspor tetap tanggung jawab halaman lewat event `select`.
  */
-import { FileSpreadsheet, FileText, Upload } from 'lucide-vue-next'
+import { FileSpreadsheet, FileText, Printer, Upload } from 'lucide-vue-next'
 import {
   DropdownMenuContent,
   DropdownMenuItem,
@@ -17,7 +17,7 @@ import {
 
 import UiButton from './UiButton.vue'
 
-export type ExportFormat = { key: 'pdf' | 'xlsx'; label: string }
+export type ExportFormat = { key: 'pdf' | 'xlsx' | 'print'; label: string }
 
 withDefaults(defineProps<{ formats?: ExportFormat[]; label?: string; disabled?: boolean }>(), {
   formats: () => [{ key: 'pdf', label: 'Export PDF' }],
@@ -52,7 +52,8 @@ defineEmits<{ select: [format: ExportFormat['key']] }>()
           @select="$emit('select', format.key)"
         >
           <FileText v-if="format.key === 'pdf'" class="h-4 w-4 text-danger" aria-hidden="true" />
-          <FileSpreadsheet v-else class="h-4 w-4 text-success" aria-hidden="true" />
+          <FileSpreadsheet v-else-if="format.key === 'xlsx'" class="h-4 w-4 text-success" aria-hidden="true" />
+          <Printer v-else class="h-4 w-4 text-brand-tertiary" aria-hidden="true" />
           {{ format.label }}
         </DropdownMenuItem>
       </DropdownMenuContent>

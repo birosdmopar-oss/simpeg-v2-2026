@@ -2,9 +2,9 @@
  * Konfigurasi menu sidebar redesign (Laporan Redesign §4, Gambar 12/25: grup KEPEGAWAIAN, KARIER, BERITA,
  * PUSAT BANTUAN). Satu sumber untuk seluruh menu supaya urutan, ikon, dan hak akses tidak tersebar di komponen.
  *
- * `phase` = fase pengembangan modul tujuan menu (00-INDEX.md). Menu dengan `phase > ACTIVE_PHASE` sengaja tidak
- * ditampilkan: UI redesign dikerjakan bertahap sampai Fase 3 (Kepegawaian Core), dan halaman tujuannya belum ada.
- * Menaikkan ACTIVE_PHASE saat fase berikutnya selesai cukup untuk memunculkan menunya.
+ * `phase` = fase pengembangan modul tujuan menu (00-INDEX.md). Menu dengan `phase > ACTIVE_PHASE` tidak ditampilkan.
+ * Menu tanpa halaman tujuan (tanpa `to` dan tanpa submenu berisi: Arsip, Presensi, E-Kinerja, E-Talenta) juga
+ * disembunyikan sampai halamannya ada — mockup tidak menggambarkannya.
  *
  * Hak akses per role mengikuti Matriks Role x Endpoint (hr/employee/index = 1,3,4,5,8; detail & struktur = semua
  * role login). Tampilan menu hanya UX — RoleFilter backend tetap yang menegakkan (ADR-024).
@@ -28,15 +28,18 @@ import {
   Users,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
-import type { RouteLocationRaw } from 'vue-router'
+import type { RouteLocationNormalizedLoaded, RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
+import { HALO_ADMIN_ROLES, HALO_USER_ROLES } from '@/features/halo-simpeg/types'
 import { PEGAWAI_LIST_ROLES } from '@/features/kepegawaian/types'
+import { LAPORAN_ROLES } from '@/features/laporan/types'
+import { LAYANAN_ROLES } from '@/features/layanan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 
 /** Fase tertinggi yang UI redesign-nya sudah dikerjakan. */
-export const ACTIVE_PHASE = 3
+export const ACTIVE_PHASE = 8
 
 export interface NavChild {
   key: string
@@ -55,6 +58,8 @@ export interface NavItem {
   /** Kosong = semua role login. */
   roles?: readonly RoleCode[]
   phase: number
+  /** Menggantikan pencocokan path bila dua menu menuju path yang sama (FAQ vs Halo Simpeg: ?chat=1). */
+  activeWhen?: (route: RouteLocationNormalizedLoaded) => boolean
 }
 
 export interface NavGroup {
@@ -83,7 +88,8 @@ const NAV: NavGroup[] = [
         label: 'Layanan',
         icon: MousePointerClick,
         phase: 4,
-        children: [{ key: 'layanan-status', label: 'Status Layanan', to: '/layanan/status' }],
+        roles: LAYANAN_ROLES,
+        children: [{ key: 'layanan-status', label: 'Status Layanan', to: { name: 'layanan-status' } }],
       },
       // Fase 5 (Presensi & Remunerasi).
       { key: 'presensi', label: 'Presensi', icon: AlarmClock, phase: 5, children: [] },
@@ -93,10 +99,11 @@ const NAV: NavGroup[] = [
         label: 'Laporan',
         icon: FileText,
         phase: 7,
+        roles: LAPORAN_ROLES,
         children: [
-          { key: 'laporan-unit', label: 'Unit Kerja', to: '/laporan/unit-kerja' },
-          { key: 'laporan-jk', label: 'Jenis Kelamin', to: '/laporan/jenis-kelamin' },
-          { key: 'laporan-struktural', label: 'Struktural', to: '/laporan/struktural' },
+          { key: 'laporan-unit', label: 'Unit Kerja', to: { name: 'laporan', params: { tipe: 'unit-kerja' } } },
+          { key: 'laporan-jk', label: 'Jenis Kelamin', to: { name: 'laporan', params: { tipe: 'jenis-kelamin' } } },
+          { key: 'laporan-struktural', label: 'Struktural', to: { name: 'laporan', params: { tipe: 'struktural' } } },
         ],
       },
     ],
@@ -113,7 +120,7 @@ const NAV: NavGroup[] = [
   {
     key: 'berita',
     title: 'Berita',
-    items: [{ key: 'berita', label: 'Portal Berita', icon: Newspaper, phase: 7 }],
+    items: [{ key: 'berita', label: 'Portal Berita', icon: Newspaper, to: { name: 'news' }, phase: 7 }],
   },
   {
     key: 'pengaturan',
@@ -129,8 +136,10 @@ const NAV: NavGroup[] = [
     title: 'Pusat Bantuan',
     items: [
       // Fase 8 (Halo Simpeg).
-      { key: 'halo', label: 'Halo Simpeg', icon: MessageCircle, phase: 8 },
-      { key: 'faq', label: 'FAQ', icon: CircleHelp, to: { name: 'faq' }, phase: 2 },
+      // Pengguna: drawer chat di halaman FAQ (Gambar 31). Admin: inbox terpisah (Gambar 32).
+      { key: 'halo', label: 'Halo Simpeg', icon: MessageCircle, to: { name: 'faq', query: { chat: '1' } }, roles: HALO_USER_ROLES, phase: 8, activeWhen: (r) => r.name === 'faq' && r.query.chat === '1' },
+      { key: 'halo-admin', label: 'Halo Simpeg', icon: MessageCircle, to: { name: 'halo-admin' }, roles: HALO_ADMIN_ROLES, phase: 8 },
+      { key: 'faq', label: 'FAQ', icon: CircleHelp, to: { name: 'faq' }, phase: 2, activeWhen: (r) => r.name === 'faq' && r.query.chat !== '1' },
     ],
   },
 ]
@@ -140,7 +149,10 @@ export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHA
   return NAV.map((group) => ({
     ...group,
     items: group.items.filter(
-      (item) => item.phase <= activePhase && (!item.roles || (role !== null && item.roles.includes(role))),
+      (item) =>
+        item.phase <= activePhase &&
+        Boolean(item.to || (item.children && item.children.length > 0)) &&
+        (!item.roles || (role !== null && item.roles.includes(role))),
     ),
   })).filter((group) => group.items.length > 0)
 }

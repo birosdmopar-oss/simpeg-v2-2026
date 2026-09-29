@@ -42,17 +42,17 @@ beforeEach(() => {
 })
 
 describe('RedesignShell — menu', () => {
-  it('Super Admin melihat menu fase 0–3 dan slot konten dirender di <main>', async () => {
+  it('Super Admin melihat semua menu aktif dan slot konten dirender di <main>', async () => {
     const { wrapper } = await mountShell(Role.SUPER_ADMIN)
     const links = wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())
 
-    expect(links).toEqual(['Dashboards', 'Daftar Pegawai', 'Struktur Organisasi', 'Master Data', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
+    expect(links).toEqual(['Dashboards', 'Daftar Pegawai', 'Struktur Organisasi', 'Portal Berita', 'Master Data', 'Hari Libur', 'Manajemen Akun', 'Halo Simpeg', 'FAQ'])
     expect(wrapper.get('main#main-content [data-testid="content"]').text()).toBe('isi halaman')
   })
 
-  it('Pegawai hanya melihat Dashboards, Struktur Organisasi, FAQ', async () => {
+  it('Pegawai melihat Dashboards, Struktur Organisasi, Portal Berita, Halo Simpeg, FAQ', async () => {
     const { wrapper } = await mountShell(Role.PEGAWAI)
-    expect(wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())).toEqual(['Dashboards', 'Struktur Organisasi', 'FAQ'])
+    expect(wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())).toEqual(['Dashboards', 'Struktur Organisasi', 'Portal Berita', 'Halo Simpeg', 'FAQ'])
     expect(wrapper.find('[data-testid="nav-pegawai"]').exists()).toBe(false)
   })
 
