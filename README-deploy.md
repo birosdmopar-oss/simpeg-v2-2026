@@ -2,7 +2,7 @@
 
 Pipeline deploy dev memakai **git bare repo + hook `post-receive`** (Tech Spec 1.4 [P]). Tidak ada CI/CD server (ADR-017): quality gate dijalankan lokal lewat `./check.sh` sebelum merge ke `main`.
 
-**Gerbang migration (ISSUE-014 opsi A, keputusan user 29-09-2026; CR-021):** server Dev hanya dideploy dari `main`, hook **tidak menjalankan migration** (`RUN_MIGRATIONS=0` default), dan migration dijalankan manual lewat runbook setelah approval DB Validator. Release yang membawa migration tertunda dibangun tetapi **ditahan** (tidak diaktifkan) sampai migrate manual selesai, supaya kode baru tidak berjalan di atas skema lama.
+**Gerbang migration (ISSUE-014 opsi A, keputusan user 29-09-2026; CR-021):** server Dev hanya dideploy dari `main` (tetap di hook, tidak bisa dikonfigurasi), hook **tidak menjalankan migration** (`RUN_MIGRATIONS=0` default), dan migration dijalankan manual lewat runbook setelah approval DB Validator. Release yang membawa migration tertunda dibangun tetapi **ditahan** (tidak diaktifkan) sampai migrate manual selesai, supaya kode baru tidak berjalan di atas skema lama; `rollback.sh` juga menolak mengaktifkan release yang migration-nya masih tertunda.
 
 ```
 operator ── git push dev (main) ──▶ bare repo (server dev) ── hook post-receive ──▶ build release baru
@@ -18,7 +18,7 @@ File terkait di repo ini:
 | File | Fungsi |
 |---|---|
 | `deploy/post-receive` | Hook yang dipasang di `<BARE_REPO>/hooks/post-receive` di server dev |
-| `deploy/rollback.sh` | Pindahkan symlink `current` ke release sebelumnya / release tertentu (juga untuk mengaktifkan release yang ditahan) |
+| `deploy/rollback.sh` | Pindahkan symlink `current` ke release sebelumnya / release tertentu (juga untuk mengaktifkan release yang ditahan); menolak release yang migration-nya masih tertunda |
 | `check.sh` | Quality gate lokal (wajib lolos sebelum merge) |
 
 ---
@@ -33,6 +33,9 @@ Database: koneksi aplikasi berjalan strict (`strictOn = true`) dan tabel memakai
 # 1) Bare repo
 sudo mkdir -p /srv/git/simpeg-v2.git && cd /srv/git/simpeg-v2.git
 sudo git init --bare
+# main di server Dev hanya boleh maju: tolak force-push dan penghapusan branch
+sudo git config receive.denyNonFastForwards true
+sudo git config receive.denyDeletes true
 sudo chown -R deploy:deploy /srv/git/simpeg-v2.git
 
 # 2) Struktur aplikasi
@@ -57,19 +60,23 @@ cp deploy/post-receive /srv/git/simpeg-v2.git/hooks/post-receive
 chmod +x /srv/git/simpeg-v2.git/hooks/post-receive
 cat > /srv/git/simpeg-v2.git/hooks/deploy.env <<'EOF'
 DEPLOY_ROOT=/var/www/simpeg-v2
-# ISSUE-014: server Dev hanya dideploy dari main (branch yang sudah lolos review CR/DBV)
-DEPLOY_BRANCH=main
 KEEP_RELEASES=5
 # 0 = hook tidak menjalankan migration; migrate manual lewat runbook setelah approval DBV (§3a)
 RUN_MIGRATIONS=0
 # PHP_BIN=/usr/bin/php8.3  COMPOSER_BIN=/usr/local/bin/composer  NPM_BIN=/usr/bin/npm
+# Tidak ada DEPLOY_BRANCH: hook selalu mendeploy main (ISSUE-014)
 EOF
 
-# 6) rollback helper
+# 6) rollback helper + konfigurasi yang sama dengan hook (DEPLOY_ROOT, PHP_BIN)
 cp deploy/rollback.sh /var/www/simpeg-v2/rollback.sh && chmod +x /var/www/simpeg-v2/rollback.sh
+ln -sfn /srv/git/simpeg-v2.git/hooks/deploy.env /var/www/simpeg-v2/deploy.env
 ```
 
-`DEPLOY_BRANCH` dan `RUN_MIGRATIONS` hanya dibaca dari `deploy.env`; nilai dari environment proses git diabaikan. `RUN_MIGRATIONS` selain `0`/`1`, atau `RUN_MIGRATIONS=1` dengan `DEPLOY_BRANCH` selain `main`, membuat hook menolak deploy (`DIBATALKAN`, tanpa build dan tanpa menyentuh database). `RUN_MIGRATIONS=1` (hook menjalankan `php spark migrate --all` setelah build) hanya untuk kasus khusus, mis. server uji sekali pakai tanpa prasyarat runbook; server Dev memakai `0`.
+`RUN_MIGRATIONS` hanya dibaca dari `deploy.env`; nilai dari environment proses git diabaikan. `RUN_MIGRATIONS` selain `0`/`1` membuat hook menolak deploy (`DIBATALKAN`, tanpa build dan tanpa menyentuh database). `RUN_MIGRATIONS=1` (hook menjalankan `php spark migrate --all` setelah build) hanya untuk kasus khusus, mis. server uji sekali pakai tanpa prasyarat runbook; server Dev memakai `0`.
+
+Branch yang dideploy selalu `main` dan tidak bisa diubah. `deploy.env` lama yang masih berisi `DEPLOY_BRANCH` dengan nilai selain `main` (dulu default hook `dev`) juga membuat hook menolak deploy (`DIBATALKAN`); hapus barisnya.
+
+`rollback.sh` membaca `deploy.env` di sampingnya (symlink langkah 6) sama seperti hook: `DEPLOY_ROOT` dan `PHP_BIN` diambil dari sana. Tanpa file itu, `DEPLOY_ROOT` = direktori tempat `rollback.sh` dipasang; nilai `DEPLOY_ROOT` dari environment shell diabaikan.
 
 Web server mengarah ke symlink `current` (di-resolve ulang tiap request, tidak perlu reload saat deploy):
 
@@ -124,9 +131,9 @@ Output hook tampil langsung di terminal `git push` (`remote: ==> [deploy] ...`).
 | `==> [deploy] SUKSES: current -> <release-id>` | tidak ada migration tertunda, release baru aktif | smoke test |
 | `==> [deploy] DITAHAN: release <release-id> ...` | ada migration tertunda; release dibangun tetapi tidak aktif, `current` tetap | §3a |
 | `==> [deploy] GAGAL ...` | build atau migrate gagal; `current` tetap | §3 |
-| `==> [deploy] DIBATALKAN: ...` | `deploy.env` tidak valid; tidak ada yang dibangun | perbaiki `deploy.env` |
+| `==> [deploy] DIBATALKAN: ...` | `deploy.env` tidak valid (`RUN_MIGRATIONS` bukan `0`/`1`, atau `DEPLOY_BRANCH` selain `main`); tidak ada yang dibangun | perbaiki `deploy.env` |
 
-Push ke branch selain `DEPLOY_BRANCH` (`main`) **tidak** memicu build.
+Push ke branch selain `main` **tidak** memicu build. Bare repo menolak force-push dan penghapusan branch (`receive.denyNonFastForwards`, `receive.denyDeletes`, §1), jadi `main` di server Dev hanya bisa maju; kalau push ditolak `non-fast-forward`, `main` lokal/`origin/main` Anda tertinggal atau berbeda — `git fetch origin` lalu ulangi, jangan dipaksa.
 
 ---
 
@@ -159,11 +166,11 @@ Langkah:
 2. Ikuti bagian rollback di runbook dokumen DBV migration itu (`backend/docs/db-review/`, mis. A-01 Bagian 9.8 langkah 10). Sisa perubahan dari migration yang gagal tidak tercatat, jadi tidak ikut dibatalkan `migrate:rollback`; bereskan sesuai runbook. Batch yang sudah tercatat dibatalkan dari release ini: `php spark migrate:rollback -b <N>` (kembali ke batch N).
 3. Jangan aktifkan release ini sebelum `migrate:status` bersih dan runbook terpenuhi. Perbaikan migration masuk lewat PR DBV baru ke `main`, lalu deploy ulang.
 
-Tangani segera: release yang disimpan ikut dipangkas (`KEEP_RELEASES`) setelah beberapa deploy sukses berikutnya.
+Tangani segera: release yang disimpan ikut dipangkas (`KEEP_RELEASES`) setelah beberapa deploy sukses berikutnya. Release ini tidak bertanda `.deploy-ditahan`, jadi tidak ikut dihapus saat release baru ditahan (§3a). `rollback.sh` menolak mengaktifkannya selama `migrate:status`-nya masih punya baris `---`.
 
 ## 3a. Migration tertunda: release DITAHAN (`RUN_MIGRATIONS=0`, default)
 
-Bila `migrate:status` menemukan migration yang belum dijalankan, hook mencetak daftarnya dan menahan release:
+Bila `migrate:status` menemukan migration yang belum dijalankan, hook mencetak daftarnya dan menahan release. Release itu diberi tanda `releases/<release-id>/.deploy-ditahan` (isinya daftar migration tertunda saat ditahan):
 
 ```
 remote: !!  Ada migration tertunda:
@@ -184,10 +191,17 @@ Migration dijalankan manual oleh operator, di luar hook:
    ```
    Pastikan grup `database.default.*` di `shared/backend.env` menunjuk database target (`-g` tidak memindahkan koneksi).
 3. Verifikasi sesuai runbook (mis. `SHOW CREATE TABLE`, query `information_schema`).
-4. Aktifkan release: `/var/www/simpeg-v2/rollback.sh <release-id>` (current -> release itu; release lama jadi `previous`).
+4. Aktifkan release: `/var/www/simpeg-v2/rollback.sh <release-id>` (current -> release itu; release lama jadi `previous`; tanda `.deploy-ditahan` dihapus). `rollback.sh` menjalankan `migrate:status` dari release itu lebih dulu dan **menolak** (`DIBATALKAN`, `current` tidak diubah) bila masih ada migration tertunda atau status tidak bisa dibaca. Jadi langkah ini tidak bisa mendahului langkah 2.
 5. Smoke test sesuai runbook.
 
-Kalau langkah 2 gagal: jangan aktifkan release; ikuti §3b. Selama langkah 2–4, kode lama (`current`) berjalan di atas skema baru; karena itu runbook menjadwalkan migration di luar jam kerja.
+Kalau langkah 2 gagal: jangan aktifkan release; ikuti §3 bagian **b** (gagal saat atau setelah migrate). Selama langkah 2–4, kode lama (`current`) berjalan di atas skema baru; karena itu runbook menjadwalkan migration di luar jam kerja.
+
+**Selama menunggu approval DBV atau langkah DBA, server Dev tidak menerima kode baru.** Setiap push `main` berikutnya, termasuk perbaikan CR saja, juga `DITAHAN`, karena release barunya memuat migration yang sama. Supaya release yang ditahan tidak menumpuk, hook menghapus release `DITAHAN` yang lebih lama setiap kali release baru ditahan atau diaktifkan. Yang dihapus hanya release bertanda `.deploy-ditahan` dengan id lebih lama. `current`, `previous`, release yang disimpan karena migrate gagal (§3 bagian b), dan release yang sudah diaktifkan tidak disentuh. Aman karena `main` di server Dev hanya maju (§1), jadi release terbaru memuat semua commit dan migration release yang digantikannya. Akibatnya:
+
+- Selalu pakai release-id dari pesan `DITAHAN` **terakhir**.
+- **Jangan push ke server Dev selama langkah 2–4 berjalan**, karena release yang sedang dipakai untuk migrate bisa terhapus. Kalau release itu terhapus setelah migrate, `rollback.sh` hanya gagal dengan `Release tidak ditemukan` (tidak ada yang diaktifkan). Kalau terhapus di tengah migrate, migrate bisa berhenti di tengah; perlakukan sebagai §3 bagian b. Dalam kedua kasus, lanjutkan langkah 2–4 dari release `DITAHAN` terbaru. Release itu memuat migration yang sama, dan migration yang sudah tercatat tidak dijalankan ulang.
+
+Membersihkan manual release yang tidak dipakai lagi (mis. release yang disimpan karena migrate gagal, setelah DB dibereskan): pastikan bukan target `current`/`previous` (`readlink -f current previous`), lalu `rm -rf /var/www/simpeg-v2/releases/<release-id>`. Log build di `logs/` boleh tetap ada.
 
 ## 4. Rollback (release yang sudah aktif ternyata bermasalah)
 
@@ -198,7 +212,10 @@ Setiap deploy sukses menyimpan release sebelumnya di symlink `previous`, dan `KE
 cd /var/www/simpeg-v2
 ./rollback.sh                          # current -> previous
 ./rollback.sh 20260916120000-9f8e7d6c  # atau ke release tertentu (ls releases/)
+./rollback.sh --force <release-id>     # DARURAT: lewati pemeriksaan migration (lihat di bawah)
 ```
+
+Sebelum memindah symlink, `rollback.sh` menjalankan `php spark migrate:status` dari release tujuan dan menolak bila ada migration tertunda. Rollback ke release lama tetap lolos, karena semua migration release lama sudah tercatat di database. Pemeriksaan ini fail-closed: kalau status tidak bisa dibaca (mis. database mati) atau formatnya tidak dikenal, `rollback.sh` juga menolak. Dalam keadaan darurat (DB tidak terjangkau tetapi kode harus dikembalikan), pakai `--force`. Opsi ini melewati pemeriksaan, jadi operator sendiri yang memastikan skema database cocok dengan release tujuan. Jangan pakai `--force` untuk mengaktifkan release `DITAHAN` sebelum migrate (§3a).
 
 Rollback hanya memindahkan symlink (detik). **Database tidak ikut di-rollback**: kalau release bermasalah membawa migration yang harus dibatalkan, ikuti runbook DBV-nya dan jalankan dari direktori release **yang membawa migration itu**. Dari release lama CI4 menolak dengan `There is a gap in the migration sequence`, karena file migration-nya tidak ada di sana.
 
@@ -219,25 +236,39 @@ Alur di atas bisa disimulasikan di mesin lokal (dipakai saat validasi F0-18 dan 
 ```bash
 BARE=/tmp/simpeg-bare.git; ROOT=/tmp/simpeg-deploy
 git init --bare "$BARE"
+git -C "$BARE" config receive.denyNonFastForwards true && git -C "$BARE" config receive.denyDeletes true
 mkdir -p "$ROOT/shared/writable" && cp -r backend/writable/. "$ROOT/shared/writable/"
 cp backend/.env.example "$ROOT/shared/backend.env"   # isi database.default.* (DB uji kosong) & jwt.secret lokal
 cp deploy/post-receive "$BARE/hooks/post-receive" && chmod +x "$BARE/hooks/post-receive"
 cp deploy/rollback.sh "$ROOT/rollback.sh"
-printf 'DEPLOY_ROOT=%s\n' "$ROOT" > "$BARE/hooks/deploy.env"   # DEPLOY_BRANCH=main, RUN_MIGRATIONS=0 (default)
+printf 'DEPLOY_ROOT=%s\n' "$ROOT" > "$BARE/hooks/deploy.env"   # main, RUN_MIGRATIONS=0 (default)
+ln -s "$BARE/hooks/deploy.env" "$ROOT/deploy.env"             # rollback.sh membaca konfigurasi yang sama
 git push "$BARE" HEAD:refs/heads/main   # DB kosong → semua migration tertunda → DITAHAN
 ls "$ROOT/releases"                     # release ada, symlink current belum ada
 ```
 
-Di Windows (Git Bash), jalankan dengan `export MSYS=winsymlinks:nativestrict` (Developer Mode aktif) agar `ln -s` membuat symlink asli, dan pakai path gaya `/tmp/...` untuk `DEPLOY_ROOT` agar hasil `readlink -f` sebanding.
+Di Windows (Git Bash), jalankan dengan `export MSYS=winsymlinks:nativestrict` (Developer Mode aktif) agar `ln -s` membuat symlink asli, dan pakai path gaya `/tmp/...` untuk `DEPLOY_ROOT` agar hasil `readlink -f` sebanding. Hapus database uji dengan nama persis (``DROP DATABASE `<nama>` ``, bukan pola `LIKE`) dan hapus folder simulasi (berisi salinan `.env`) setelah selesai.
 
-Skenario minimal yang diuji ulang bila hook diubah:
+`migration_tertunda` (parser `migrate:status`) sengaja disalin identik di `deploy/post-receive` dan `deploy/rollback.sh`, karena keduanya dipasang terpisah. Setelah mengubah salah satunya, pastikan keduanya masih sama:
+
+```bash
+diff <(sed -n '/^migration_tertunda() {/,/^}/p' deploy/post-receive) <(sed -n '/^migration_tertunda() {/,/^}/p' deploy/rollback.sh)
+```
+
+Skenario minimal yang diuji ulang bila hook atau `rollback.sh` diubah:
 
 | Skenario | Cara | Harapan |
 |---|---|---|
-| Push biasa, ada migration tertunda | `RUN_MIGRATIONS` tidak diisi | `DITAHAN`; migration tidak dijalankan; `current` tidak berubah |
-| Migrate manual + aktifkan | §3a langkah 2 dan 4 dari release yang ditahan | migrate bersih; `current` -> release itu, `previous` tidak dibuat bila sebelumnya belum ada `current` |
+| Push biasa, ada migration tertunda | `RUN_MIGRATIONS` tidak diisi | `DITAHAN`; migration tidak dijalankan; `current` tidak berubah; ada `.deploy-ditahan` |
+| Push lagi saat masih ditahan | commit apa pun | `DITAHAN`; release `DITAHAN` lama dihapus, release yang disimpan karena migrate gagal tetap ada |
+| Aktifkan sebelum migrate | `rollback.sh <release-ditahan>` | `DIBATALKAN` berisi daftar migration tertunda; `current` tidak berubah |
+| Migrate manual + aktifkan | §3a langkah 2 dan 4 dari release yang ditahan | migrate bersih; `current` -> release itu; `previous` tidak dibuat bila sebelumnya belum ada `current`; tanda `.deploy-ditahan` hilang |
 | Push biasa tanpa migration baru | commit tanpa migration | `SUKSES`; tabel `migrations` tidak berubah |
+| Rollback ke release lama | `rollback.sh` tanpa argumen setelah release pembawa migration aktif | lolos pemeriksaan (migration release lama sudah tercatat) |
+| Status tidak terbaca / format asing | DB release tidak ada; `PHP_BIN` palsu yang mengganti header `Batch` | hook: `GAGAL ... sebelum migrate`; `rollback.sh`: `DIBATALKAN`; `--force` melewati pemeriksaan |
 | Build gagal | commit dengan impor modul frontend yang tidak ada, `RUN_MIGRATIONS=1`, plus migration baru | `GAGAL ... database tidak diubah`; release dihapus; migration baru tidak jalan |
 | `RUN_MIGRATIONS=1` eksplisit | `deploy.env` berisi `RUN_MIGRATIONS=1` | migrate setelah build, lalu `SUKSES` |
-| Migration gagal di tengah | `RUN_MIGRATIONS=1`, migration yang melempar exception | `GAGAL saat/setelah migrate`; release disimpan; `current` tetap |
-| Branch lain / konfigurasi salah | push ke `dev`; `RUN_MIGRATIONS=1` + `DEPLOY_BRANCH=dev`; `RUN_MIGRATIONS=1` hanya di environment `git push` | dilewati; `DIBATALKAN`; diabaikan (tetap `0`) |
+| Migration gagal di tengah | `RUN_MIGRATIONS=1`, migration yang melempar exception | `GAGAL saat/setelah migrate`; release disimpan tanpa `.deploy-ditahan`; `current` tetap |
+| Branch lain / konfigurasi salah | push ke branch lain; `DEPLOY_BRANCH=dev` di `deploy.env`; `RUN_MIGRATIONS=yes`; `RUN_MIGRATIONS=1`/`DEPLOY_BRANCH=dev` hanya di environment `git push` | dilewati; `DIBATALKAN`; `DIBATALKAN`; diabaikan (tetap `main`, `0`) |
+| Force-push / hapus branch | `git push --force ... HEAD~1:refs/heads/main`; `git push ... :refs/heads/main` | ditolak bare repo (`non-fast-forward`, `deletion prohibited`) |
+| `DEPLOY_ROOT` rollback | panggil `rollback.sh` dengan `DEPLOY_ROOT=/salah` di environment, dengan dan tanpa symlink `deploy.env` | environment diabaikan; root dari `deploy.env` atau lokasi skrip |

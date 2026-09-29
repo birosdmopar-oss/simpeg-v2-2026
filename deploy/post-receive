@@ -3,38 +3,41 @@
 # SIMPEG v2 — git hook `post-receive` untuk server Dev (F0-18; ISSUE-014 opsi A, CR-021)
 #
 # Dipasang di bare repo server dev:  <BARE_REPO>/hooks/post-receive  (chmod +x)
-# Hanya push ke branch $DEPLOY_BRANCH (default: main) yang dideploy. Urutan:
+# Hanya push ke branch `main` yang dideploy (tetap, tidak bisa dikonfigurasi — ISSUE-014). Urutan:
 #   1. checkout commit ke releases/<timestamp>-<sha>
 #   2. backend : salin .env bersama (shared/backend.env) -> composer install --no-dev
 #   3. frontend: salin .env.local bersama (opsional)     -> npm ci -> npm run build
 #      Langkah 1-3 tidak menyentuh database: build yang gagal di sini tidak mengubah DB.
 #   4. database: `php spark migrate:status` (hanya membaca) mendaftar migration yang tertunda.
 #        RUN_MIGRATIONS=0 (default): migration TIDAK dijalankan. Bila ada yang tertunda, release DITAHAN
-#          (sudah dibangun, tidak diaktifkan) dan hook mencetak langkah manual: migrate lewat runbook setelah
-#          approval DB Validator, lalu aktifkan dengan rollback.sh <release-id> (README-deploy.md §3a).
-#        RUN_MIGRATIONS=1 (hanya dari deploy.env, hanya untuk DEPLOY_BRANCH=main): `php spark migrate --all`,
-#          lalu migrate:status dicek ulang, karena spark tetap keluar 0 walau migration gagal.
+#          (sudah dibangun, tidak diaktifkan, diberi tanda .deploy-ditahan) dan hook mencetak langkah manual:
+#          migrate lewat runbook setelah approval DB Validator, lalu aktifkan dengan rollback.sh <release-id>
+#          (README-deploy.md §3a). Release DITAHAN yang lebih lama dihapus (digantikan yang terbaru).
+#        RUN_MIGRATIONS=1 (hanya dari deploy.env): `php spark migrate --all`, lalu migrate:status dicek ulang,
+#          karena spark tetap keluar 0 walau migration gagal.
 #   5. symlink `current` -> release baru (atomic), release sebelumnya disimpan di `previous`
 #   6. gagal sebelum langkah 4 selesai: release baru dihapus, `current` tidak diubah, DB tidak diubah.
 #      gagal saat/setelah migrate: `current` tidak diubah, release DISIMPAN (berisi down() migration untuk
 #      rollback manual) dan DB bisa sudah berubah sebagian (DDL MySQL auto-commit) — README-deploy.md §3.
 #
-# Konfigurasi di <BARE_REPO>/hooks/deploy.env (di-source di bawah):
+# Konfigurasi di <BARE_REPO>/hooks/deploy.env (di-source di bawah; rollback.sh membaca file yang sama):
 #   DEPLOY_ROOT     : direktori aplikasi di server, mis. /var/www/simpeg-v2
-#   DEPLOY_BRANCH   : branch yang dideploy (default: main — ISSUE-014: server Dev hanya dari main)
 #   KEEP_RELEASES   : jumlah release yang disimpan untuk rollback (default: 5)
 #   PHP_BIN, COMPOSER_BIN, NPM_BIN : path binary (default: php, composer, npm)
 #   RUN_MIGRATIONS  : 0 = migration manual lewat runbook (default); 1 = `php spark migrate --all` otomatis
-# DEPLOY_BRANCH dan RUN_MIGRATIONS hanya dibaca dari deploy.env; nilai dari environment proses git diabaikan.
+# RUN_MIGRATIONS hanya dibaca dari deploy.env; nilai dari environment proses git diabaikan.
+# DEPLOY_BRANCH bukan lagi pilihan: deploy.env yang masih mengisinya dengan nilai selain `main` (dulu
+# default `dev`) membuat hook menolak deploy (DIBATALKAN), supaya konfigurasi lama tidak lolos diam-diam.
 #
 # Struktur DEPLOY_ROOT:
-#   releases/<id>/{backend,frontend}   snapshot tiap deploy
+#   releases/<id>/{backend,frontend}   snapshot tiap deploy (releases/<id>/.deploy-ditahan = release DITAHAN)
 #   shared/backend.env                 .env backend (berisi secret — dibuat manual sekali, TIDAK dari git)
 #   shared/frontend.env.local          .env.local frontend (opsional)
 #   shared/writable/                   writable/ backend yang persisten (cache, logs, uploads)
 #   current -> releases/<id>           yang disajikan web server (document root: current/backend/public
 #                                      untuk API, current/frontend/dist untuk SPA)
 #   previous -> releases/<id-lama>     target rollback cepat (deploy/rollback.sh)
+#   rollback.sh, deploy.env            helper rollback/aktivasi + symlink ke deploy.env hook (README §1)
 #   logs/deploy-<id>.log               log tiap build
 # =============================================================================
 set -euo pipefail
@@ -47,9 +50,15 @@ unset DEPLOY_BRANCH RUN_MIGRATIONS
 # shellcheck disable=SC1091
 [ -f "$HOOK_DIR/deploy.env" ] && source "$HOOK_DIR/deploy.env"
 
+config_error=""
+# Keputusan user 29-09-2026: server Dev hanya dideploy dari main. Nilai lain di deploy.env ditolak, bukan diabaikan.
+if [ -n "${DEPLOY_BRANCH+x}" ] && [ "$DEPLOY_BRANCH" != "main" ]; then
+    config_error="DEPLOY_BRANCH tidak bisa diubah, server Dev hanya dideploy dari main (deploy.env berisi DEPLOY_BRANCH='$DEPLOY_BRANCH'; hapus barisnya)"
+fi
+
 export BARE_REPO
 export DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/simpeg-v2}"
-export DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
+export DEPLOY_BRANCH=main
 export KEEP_RELEASES="${KEEP_RELEASES:-5}"
 export PHP_BIN="${PHP_BIN:-php}"
 export COMPOSER_BIN="${COMPOSER_BIN:-composer}"
@@ -61,12 +70,11 @@ export SHARED_DIR="$DEPLOY_ROOT/shared"
 export LOG_DIR="$DEPLOY_ROOT/logs"
 export CURRENT_LINK="$DEPLOY_ROOT/current"
 export PREVIOUS_LINK="$DEPLOY_ROOT/previous"
+# Tanda release DITAHAN (berisi daftar migration tertunda saat ditahan); dihapus rollback.sh saat release diaktifkan.
+export HELD_MARKER=".deploy-ditahan"
 
-config_error=""
-if [ "$RUN_MIGRATIONS" != "0" ] && [ "$RUN_MIGRATIONS" != "1" ]; then
+if [ -z "$config_error" ] && [ "$RUN_MIGRATIONS" != "0" ] && [ "$RUN_MIGRATIONS" != "1" ]; then
     config_error="RUN_MIGRATIONS harus 0 atau 1 (deploy.env berisi '$RUN_MIGRATIONS')"
-elif [ "$RUN_MIGRATIONS" = "1" ] && [ "$DEPLOY_BRANCH" != "main" ]; then
-    config_error="RUN_MIGRATIONS=1 hanya diizinkan untuk DEPLOY_BRANCH=main (deploy.env berisi DEPLOY_BRANCH=$DEPLOY_BRANCH)"
 fi
 if [ -n "$config_error" ]; then
     cat > /dev/null   # habiskan daftar ref dari git
@@ -81,22 +89,45 @@ mkdir -p "$RELEASES_DIR" "$SHARED_DIR" "$LOG_DIR"
 # Cetak migration yang belum dijalankan, satu per baris "<namespace>  <version>  <nama>", dari
 # `php spark migrate:status` (dijalankan di direktori backend release). Perintah itu tidak menjalankan
 # migration; satu-satunya efeknya: pada DB yang belum punya tabel `migrations`, CI4 membuat tabel
-# pencatat itu (kosong). Return 1 bila status tidak bisa dibaca (mis. DB tidak terjangkau) — pemanggil
-# menghentikan deploy (fail-closed).
+# pencatat itu (kosong). Return 1 (fail-closed) bila status tidak bisa dibaca (mis. DB tidak terjangkau)
+# atau formatnya tidak dikenal: kolom dicari dari baris header CLI::table (Namespace, Version, Filename,
+# Batch), setiap baris data wajib punya jumlah kolom yang sama, dan Batch wajib `---` (tertunda) atau angka.
+# FUNGSI INI IDENTIK di deploy/post-receive dan deploy/rollback.sh — ubah keduanya bersamaan (README §5).
 # -----------------------------------------------------------------------------
 migration_tertunda() {
-    local out rc rows
+    local out rc parsed
     out="$("$PHP_BIN" spark migrate:status --no-header 2>&1)" && rc=0 || rc=$?
-    # Tabel CLI::table: baris data diawali "|", baris pertama = header, kolom terakhir = Batch ("---" = belum).
-    rows="$(printf '%s\n' "$out" | sed 's/\x1b\[[0-9;]*m//g' | grep '^|' | tail -n +2)" || true
-    if [ "$rc" -ne 0 ] || [ -z "$rows" ]; then
-        echo "!!  status migration tidak bisa dibaca (php spark migrate:status, exit $rc):" >&2
-        printf '%s\n' "$out" >&2
-        return 1
+    parsed=""
+    if [ "$rc" -eq 0 ] && parsed="$(printf '%s\n' "$out" | sed 's/\x1b\[[0-9;]*m//g' | awk -F'|' '
+        function trim(s) { gsub(/^[ \t\r]+|[ \t\r]+$/, "", s); return s }
+        !/^[|]/ { next }
+        !hdr {
+            hdr = 1; nf = NF
+            for (i = 2; i < NF; i++) col[trim($i)] = i
+            if (!("Namespace" in col) || !("Version" in col) || !("Filename" in col) || !("Batch" in col)) {
+                bad = "header tanpa kolom Namespace/Version/Filename/Batch: " $0; exit 2
+            }
+            cn = col["Namespace"]; cv = col["Version"]; cf = col["Filename"]; cb = col["Batch"]
+            next
+        }
+        NF != nf { bad = "jumlah kolom baris berbeda dari header: " $0; exit 2 }
+        {
+            rows++; b = trim($cb)
+            if (b == "---") pending = pending sprintf("      %s  %s  %s\n", trim($cn), trim($cv), trim($cf))
+            else if (b !~ /^[0-9]+$/) { bad = "nilai Batch tidak dikenal: " $0; exit 2 }
+        }
+        END {
+            if (bad == "" && !hdr) bad = "tabel status tidak ditemukan"
+            if (bad == "" && rows == 0) bad = "tabel status tanpa baris migration"
+            if (bad != "") { print "format tidak dikenal (" bad ")"; exit 2 }
+            printf "%s", pending
+        }')"; then
+        [ -n "$parsed" ] && printf '%s\n' "$parsed"
+        return 0
     fi
-    printf '%s\n' "$rows" | awk -F'|' '
-        function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
-        trim($(NF-1)) == "---" { printf "      %s  %s  %s\n", trim($2), trim($3), trim($4) }'
+    echo "!!  status migration tidak bisa dibaca (php spark migrate:status, exit $rc)${parsed:+: $parsed}" >&2
+    printf '%s\n' "$out" >&2
+    return 1
 }
 
 # -----------------------------------------------------------------------------
@@ -162,6 +193,7 @@ build_release() {
         fi
         echo "    migrate selesai, tidak ada migration tertunda"
     else
+        printf '%s\n' "$pending" > "$release_dir/$HELD_MARKER"
         echo held > "$state_file"
         cat <<EOF
 !!  Ada migration tertunda:
@@ -175,6 +207,10 @@ $pending
       2. cd $release_dir/backend
          $PHP_BIN spark migrate --all && $PHP_BIN spark migrate:status   # semua baris harus punya Batch
       3. Verifikasi sesuai runbook, lalu aktifkan release: $DEPLOY_ROOT/rollback.sh $release_id
+         (rollback.sh menolak bila release ini masih punya migration tertunda)
+    Selama menunggu, setiap push main berikutnya juga DITAHAN dan menggantikan release ini (release
+    DITAHAN yang lebih lama dihapus): pakai release-id dari pesan DITAHAN terakhir, dan jangan push ke
+    server Dev selama langkah 2-3 berjalan.
 EOF
         return 0
     fi
@@ -218,11 +254,13 @@ deploy_ref() {
     # `active` ditulis tepat setelah symlink dipindah: release ini sudah disajikan, jangan dihapus.
     if [ "$state" = "active" ]; then
         echo "==> [deploy] SUKSES: current -> $release_id"
+        prune_ditahan "$release_id"
         prune_releases
         return 0
     fi
 
     if [ "$rc" -eq 0 ] && [ "$state" = "held" ]; then
+        prune_ditahan "$release_id"
         echo "==> [deploy] DITAHAN: release $release_id sudah dibangun tetapi TIDAK diaktifkan — ada migration tertunda," >&2
         echo "    jalankan manual lewat runbook setelah approval DBV (langkah di atas / README-deploy.md §3a). current tetap -> $current_now" >&2
         return 1
@@ -242,13 +280,36 @@ deploy_ref() {
     return 1
 }
 
+prune_ditahan() {
+    # Release DITAHAN (bertanda $HELD_MARKER) yang lebih tua dari <release-id> sudah digantikan: release baru
+    # dibangun dari main yang hanya maju (receive.denyNonFastForwards, README §1), jadi memuat semua commit dan
+    # migration-nya. Hapus supaya release DITAHAN tidak menumpuk selama menunggu approval DBV / langkah DBA.
+    # Tidak menyentuh current/previous, release yang disimpan karena migrate gagal (tanpa tanda), atau
+    # release DITAHAN yang lebih baru (push bersamaan).
+    local newest="$1" cur prev dir id
+    cur="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
+    prev="$(readlink -f "$PREVIOUS_LINK" 2>/dev/null || true)"
+    for dir in "$RELEASES_DIR"/*/; do
+        dir="${dir%/}"
+        [ -f "$dir/$HELD_MARKER" ] || continue
+        id="$(basename "$dir")"
+        [[ "$id" < "$newest" ]] || continue
+        dir="$(readlink -f "$dir")"
+        if [ "$dir" = "$cur" ] || [ "$dir" = "$prev" ]; then
+            continue
+        fi
+        echo "--- hapus release DITAHAN lama $id (digantikan $newest)"
+        rm -rf "$dir"
+    done
+}
+
 prune_releases() {
     # Simpan KEEP_RELEASES terbaru; jangan hapus yang sedang ditunjuk current/previous.
     local keep="$KEEP_RELEASES" cur prev
     cur="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
     prev="$(readlink -f "$PREVIOUS_LINK" 2>/dev/null || true)"
     ls -1dt "$RELEASES_DIR"/*/ 2>/dev/null | tail -n +"$((keep + 1))" | while read -r old; do
-        old="${old%/}"
+        old="$(readlink -f "${old%/}")"
         if [ "$old" != "$cur" ] && [ "$old" != "$prev" ]; then
             echo "--- prune $old"
             rm -rf "$old"
