@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\ListQuery;
 use App\Models\MasterData\HariLiburModel;
 use App\Models\MasterData\MasterModel;
 use Closure;
@@ -112,14 +113,15 @@ class HariLiburService
      */
     public function list(array $query, ?int $role): array
     {
-        // Batas atas page: offset (page - 1) * per_page tetap int, tidak meluap ke float (TypeError → 500) untuk
-        // ?page=9223372036854775807; halaman sebesar itu memang selalu kosong.
-        $page    = min(intdiv(PHP_INT_MAX, self::PER_PAGE_MAX), max(1, (int) $this->scalar($query, 'page', '1')));
-        $perPage = min(self::PER_PAGE_MAX, max(1, (int) $this->scalar($query, 'per_page', (string) self::PER_PAGE_DEFAULT)));
+        // Parameter daftar lewat ListQuery (ISSUE-019/CR-016), aturan sama dengan daftar master & akun: array/objek → 422,
+        // page di luar 1..1.000.000 → 422, per_page dijepit 1..100.
+        $params  = ListQuery::from($query, ['search', 'status', 'tahun', 'page', 'per_page']);
+        $page    = $params->page();
+        $perPage = $params->perPage(self::PER_PAGE_DEFAULT, self::PER_PAGE_MAX);
         $builder = $this->baseQuery();
 
         if (self::canWrite($role)) {
-            $status = $this->scalar($query, 'status', '');
+            $status = $params->string('status');
 
             if (in_array($status, [MasterModel::STATUS_ACTIVE, MasterModel::STATUS_INACTIVE, MasterModel::STATUS_DELETED], true)) {
                 $builder->where('hari_libur.status', $status);
@@ -131,7 +133,7 @@ class HariLiburService
             $builder->where('hari_libur.status', MasterModel::STATUS_ACTIVE);
         }
 
-        $tahun = $this->scalar($query, 'tahun', '');
+        $tahun = $params->string('tahun');
 
         if ($tahun !== '') {
             if (preg_match('/^[0-9]{4}\z/', $tahun) !== 1 || (int) $tahun < HariLiburRules::YEAR_MIN || (int) $tahun > HariLiburRules::YEAR_MAX) {
@@ -142,17 +144,15 @@ class HariLiburService
             $builder->where('hari_libur.tgl_mulai <=', "{$tahun}-12-31")->where('hari_libur.tgl_akhir >=', "{$tahun}-01-01");
         }
 
-        $search = trim($this->scalar($query, 'search', ''));
+        $search = $params->string('search');
 
         if ($search !== '') {
             if (mb_strlen($search) > 100) {
                 throw ValidationException::forField('search', 'Kata kunci pencarian maksimal 100 karakter.');
             }
 
-            // Builder CI4 tidak meng-escape wildcard di nilai LIKE (pola FaqService): `%`, `_`, dan karakter escape
-            // dicari sebagai karakter biasa.
-            $escape = $this->db->likeEscapeChar;
-            $builder->like('hari_libur.nama_libur', str_replace([$escape, '%', '_'], [$escape . $escape, $escape . '%', $escape . '_'], $search));
+            // `%`, `_`, dan karakter escape dicari sebagai karakter biasa (helper yang sama dengan master & akun).
+            $builder->like('hari_libur.nama_libur', ListQuery::likeLiteral($this->db, $search));
         }
 
         $total = (clone $builder)->countAllResults();
@@ -579,26 +579,6 @@ class HariLiburService
         return $this->db->table('hari_libur')
             ->select(self::COLUMNS)
             ->join('jenis_libur', 'jenis_libur.id_jenis_libur = hari_libur.id_jenis_libur', 'left');
-    }
-
-    /**
-     * Nilai query string skalar (array seperti `?status[]=1` → 422, bukan diam-diam diabaikan).
-     *
-     * @param array<string, mixed> $query
-     */
-    private function scalar(array $query, string $key, string $default): string
-    {
-        $value = $query[$key] ?? null;
-
-        if ($value === null) {
-            return $default;
-        }
-
-        if (! is_string($value) && ! is_int($value)) {
-            throw ValidationException::forField($key, "Parameter {$key} tidak valid.");
-        }
-
-        return (string) $value;
     }
 
     private function jenisId(mixed $value): string

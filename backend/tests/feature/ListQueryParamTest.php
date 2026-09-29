@@ -17,7 +17,8 @@ use Tests\Support\MasterDataTestTrait;
 use Tests\Support\MasterUjiTestTrait;
 
 /**
- * ISSUE-019 — parameter query endpoint daftar (MasterService::list dan UserService::list) lewat ListQuery.
+ * ISSUE-019 — parameter query endpoint daftar (MasterService::list, UserService::list, HariLiburService::list)
+ * lewat ListQuery.
  *
  * Sebelumnya query string berbentuk array (`?search[]=a`, PHP sah) jatuh ke `(string) $array` →
  * ErrorException "Array to string conversion" → 500, dan `?page=99999999999999999999` membuat offset
@@ -49,6 +50,9 @@ final class ListQueryParamTest extends CIUnitTestCase
     private const KECAMATAN = 'api/v1/master/kecamatan';
 
     private const USERS = 'api/v1/auth/users';
+
+    /** Daftar hari libur (G-07) memakai aturan parameter yang sama sejak CR-016. */
+    private const HARI_LIBUR = 'api/v1/hari-libur';
 
     protected function setUp(): void
     {
@@ -87,6 +91,12 @@ final class ListQueryParamTest extends CIUnitTestCase
             [self::USERS, ['order' => ['desc']], ['order']],
             [self::USERS, ['page' => ['1']], ['page']],
             [self::USERS, ['per_page' => ['10']], ['per_page']],
+            [self::HARI_LIBUR, ['search' => ['a']], ['search']],
+            [self::HARI_LIBUR, ['status' => ['1']], ['status']],
+            [self::HARI_LIBUR, ['tahun' => ['2026']], ['tahun']],
+            [self::HARI_LIBUR, ['page' => ['1']], ['page']],
+            [self::HARI_LIBUR, ['per_page' => ['10']], ['per_page']],
+            [self::HARI_LIBUR, ['search' => ['a'], 'tahun' => ['2026']], ['search', 'tahun']],
             // Array bersarang juga bukan nilai tunggal.
             [self::MASTER, ['search' => ['a' => ['b']]], ['search']],
             // Beberapa parameter salah sekaligus → SATU 422 yang memuat seluruh key bermasalah.
@@ -164,7 +174,7 @@ final class ListQueryParamTest extends CIUnitTestCase
             (string) (ListQuery::PAGE_MAX + 1),
         ];
 
-        foreach ([self::MASTER, self::USERS] as $uri) {
+        foreach ([self::MASTER, self::USERS, self::HARI_LIBUR] as $uri) {
             foreach ($invalid as $page) {
                 $result = $this->asRole(Role::SUPER_ADMIN)->get($uri, ['page' => $page]);
                 $label  = $uri . ' ?page=' . $page;
