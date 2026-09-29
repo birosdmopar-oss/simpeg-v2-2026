@@ -28,8 +28,9 @@ use Tests\Support\MasterDataTestTrait;
  *
  * Setiap nilai isian (teks/angka) yang ditolak kolom NOT NULL/CHECK di DB harus sudah ditolak validasi (422 pada
  * field-nya): CR-007 tidak menerjemahkan 1048 dan pelanggaran CHECK (3819/4025), jadi nilai itu akan menjadi 500 bila
- * lolos ke DB. Nilai yang dianggap kosong oleh permit_empty (spasi/tab saja, JSON `false`) disimpan NULL. Batas yang
- * tersisa di engine (JSON `[]` untuk field int opsional) dicatat di G-06 Bagian 2.7.
+ * lolos ke DB. Nilai yang dianggap kosong oleh permit_empty (spasi/tab saja, JSON `false`) disimpan NULL; JSON
+ * array/objek ditolak 422 oleh engine (CR-011). PK `diklat` TINYINT yang habis juga dijawab 422 (G-06 Bagian 2.7,
+ * batas #1 dan #2 yang tertutup setelah merge DBV-004/CR-011).
  *
  * @internal
  */
@@ -213,7 +214,7 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
         $this->seeInDatabase('diklat', ['id_diklat' => $otherId, 'jenis_diklat' => 4]);
 
         // Jenis wajib salah satu pilihan 1–5 (CHECK chk_diklat_jenis_diklat tidak pernah tercapai).
-        foreach (['0', '6', '', 'abc', '1.0', null] as $invalid) {
+        foreach (['0', '6', '', 'abc', '1.0', null, [], ['1']] as $invalid) {
             $this->rejected('POST', $base, ['jenis_diklat' => $invalid, 'nama_diklat' => 'Pelatihan Jenis Salah'], 'jenis_diklat');
         }
 
@@ -229,6 +230,42 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
         // Jenis 5 (Sertifikasi) sah walau form legacy tidak menawarkannya (keputusan B1).
         $this->sendJson('POST', $base, ['jenis_diklat' => 5, 'nama_diklat' => 'Sertifikasi Manajemen Risiko'])->assertStatus(201);
         $this->assertSame(['5', (string) ($count + 2)], $this->optionIds('diklat', null, ['jenis_diklat' => '5']));
+    }
+
+    /**
+     * PK `diklat` TINYINT signed (G-06 Bagian 3 #8): setelah id 127 terpakai, tambah pelatihan dijawab 422 dengan
+     * penjelasan, bukan 500 — MySQL 8 memberi 1062 PRIMARY (jalur di sini), MariaDB 10.4 memberi 167 (disimulasikan untuk
+     * semua master AUTO_INCREMENT di MasterGenericTcTest::testMariaDbAutoIncrementOutOfRangeGives422ForEveryAutoIncrementMaster).
+     * Engine CR-011 (DBV-004); menutup batas #1 / C5 G-06 Bagian 2.7. Tanpa baris, audit, maupun geseran urutan yang
+     * tertinggal; nama ganda tetap dilaporkan sebagai ganda.
+     */
+    public function testDiklatFullTinyintKeyGives422(): void
+    {
+        $base = 'api/v1/master/diklat';
+        $this->db->table('diklat')->insert(['id_diklat' => 127, 'jenis_diklat' => 2, 'nama_diklat' => 'Pelatihan Batas Atas', 'order' => 2, 'status' => 1]);
+        $rows   = $this->db->table('diklat')->countAllResults();
+        $audits = $this->db->table('audit_logs')->countAllResults();
+
+        // Tanpa order (akhir jenis 1) dan dengan order (sisip di awal jenis 2: saudaranya sempat digeser).
+        foreach ([['jenis_diklat' => '1', 'nama_diklat' => 'Diklatpim Tingkat II'], ['jenis_diklat' => '2', 'nama_diklat' => 'Pelatihan Teknis Baru', 'order' => 1]] as $body) {
+            $result = $this->sendJson('POST', $base, $body);
+            $result->assertStatus(422);
+            $this->assertSame(
+                ['status' => 'error', 'message' => 'Kode Pelatihan sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.'],
+                $this->json($result),
+            );
+            $this->dontSeeInDatabase('diklat', ['nama_diklat' => $body['nama_diklat']]);
+        }
+
+        $this->rejected('POST', $base, ['jenis_diklat' => '1', 'nama_diklat' => 'DIKLATPIM TINGKAT IV'], 'nama_diklat');
+
+        $this->assertSame($rows, $this->db->table('diklat')->countAllResults());
+        $this->assertSame($audits, $this->db->table('audit_logs')->countAllResults());
+        $this->assertSame([1, 2], $this->orders('diklat', 'id_diklat', ['3', '127']));
+        $this->assertTrue($this->db->transStatus());
+
+        // Entri yang sudah ada tetap bisa diubah.
+        $this->sendJson('PUT', "{$base}/127", ['nama_diklat' => 'Pelatihan Batas Atas Diubah'])->assertStatus(200);
     }
 
     /**
@@ -336,6 +373,16 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
             $this->rejected('POST', $base, ['id_tingkat_hukdis' => '1', 'jenis_hukdis' => 'Masa Salah', 'masa_sanksi_bulan' => $invalid], 'masa_sanksi_bulan');
         }
 
+        // JSON array/objek lolos permit_empty tanpa dicek is_natural; engine menolaknya 422 sebelum dinormalkan (CR-011),
+        // jadi tidak lagi menjadi (int) 0/1 yang melanggar CHECK (dulu 500, G-06 Bagian 2.7 batas #2).
+        foreach ([[], ['3'], ['bulan' => 3]] as $invalid) {
+            $this->assertSame(
+                ['Masa Sanksi (bulan) tidak valid.'],
+                $this->rejected('POST', $base, ['id_tingkat_hukdis' => '1', 'jenis_hukdis' => 'Masa Array', 'masa_sanksi_bulan' => $invalid], 'masa_sanksi_bulan'),
+            );
+            $this->assertSame(['Masa Sanksi (bulan) tidak valid.'], $this->rejected('PUT', "{$base}/4", ['masa_sanksi_bulan' => $invalid], 'masa_sanksi_bulan'));
+        }
+
         $this->rejected('PUT', "{$base}/4", ['masa_sanksi_bulan' => '0'], 'masa_sanksi_bulan');
         $this->assertSame($count, $this->db->table('jenis_hukdis')->countAllResults());
         $this->seeInDatabase('jenis_hukdis', ['id_jenis_hukdis' => 4, 'masa_sanksi_bulan' => 6]);
@@ -369,7 +416,7 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
         $this->assertSame(['Kode Kategori minimal 1.'], $this->rejected('POST', $base, $valid + ['old_id' => '0'], 'old_id'));
         $this->assertSame(['Kode Kategori maksimal 2.147.483.647.'], $this->rejected('POST', $base, $valid + ['old_id' => '2147483648'], 'old_id'));
 
-        foreach (['', null, '-1', 'abc', '1.5', 0] as $invalid) {
+        foreach (['', null, '-1', 'abc', '1.5', 0, [], ['8']] as $invalid) {
             $this->rejected('POST', $base, $valid + ['old_id' => $invalid], 'old_id');
         }
 
@@ -408,7 +455,7 @@ final class DiklatHukdisKonketTest extends CIUnitTestCase
 
         $this->assertSame(['Pengaruh ke Tukin wajib diisi.'], $this->rejected('POST', $base, ['old_id' => '30', 'jenis_konket' => 'Tanpa Pengaruh'], 'affect_tukin'));
 
-        foreach (['', null, '0', '3', 'ya', 0] as $invalid) {
+        foreach (['', null, '0', '3', 'ya', 0, [], ['1']] as $invalid) {
             $this->rejected('POST', $base, ['old_id' => '30', 'jenis_konket' => 'Pengaruh Salah', 'affect_tukin' => $invalid], 'affect_tukin');
         }
 
