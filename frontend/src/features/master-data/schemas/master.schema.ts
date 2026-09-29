@@ -20,6 +20,21 @@ export function formatMasterNumber(value: number): string {
   return value.toLocaleString('id-ID', { maximumFractionDigits: 10 })
 }
 
+/** Nama tampilan baris sistem (sentinel LAIN-LAIN wilayah legacy, CR-010). */
+export const MASTER_SYSTEM_LABEL = 'LAIN-LAIN'
+
+/** Kode baris sistem master `entity` (meta `system_ids`), mis. ['99'] untuk provinsi. */
+export function systemIdsOf(entity: string | null | undefined, all: MasterMeta[]): string[] {
+  if (!entity) return []
+  return all.find((m) => m.key === entity)?.system_ids ?? []
+}
+
+/** Nilai field ref (di form master `meta`) adalah kode baris sistem master rujukannya. */
+export function isSystemValue(meta: MasterMeta, fieldName: string, value: string, all: MasterMeta[]): boolean {
+  const field = meta.fields.find((f) => f.name === fieldName)
+  return value !== '' && field?.type === 'ref' && systemIdsOf(field.entity, all).includes(value)
+}
+
 /** Mode urutan manual (CR-009): nilai `order` disimpan apa adanya, entri lain tidak digeser. */
 export function isManualOrder(meta: MasterMeta): boolean {
   return meta.has_order && meta.order_mode === 'manual'
@@ -121,7 +136,11 @@ export function fieldsMissingFromRow(meta: MasterMeta, row: MasterRow | null): M
   return meta.fields.filter((field) => !Object.prototype.hasOwnProperty.call(row, field.name))
 }
 
-export function buildMasterSchema(meta: MasterMeta, isEdit: boolean) {
+/**
+ * @param all seluruh meta master (untuk kode sistem master rujukan field ref, CR-010). Isian `other_for` wajib hanya
+ *            bila field ref-nya bernilai kode sistem (LAIN-LAIN); selain itu opsional (backend mengosongkannya).
+ */
+export function buildMasterSchema(meta: MasterMeta, isEdit: boolean, all: MasterMeta[] = []) {
   const shape: Record<string, z.ZodTypeAny> = {
     [meta.name_field]: z
       .string({ required_error: `${meta.name_label} wajib diisi.` })
@@ -158,7 +177,18 @@ export function buildMasterSchema(meta: MasterMeta, isEdit: boolean) {
     shape[field.name] = fieldSchema(field)
   }
 
-  return z.object(shape)
+  const otherFields = meta.fields.filter((f) => f.other_for)
+  if (otherFields.length === 0) return z.object(shape)
+
+  return z.object(shape).superRefine((values: Record<string, unknown>, ctx) => {
+    for (const field of otherFields) {
+      const target = field.other_for ?? ''
+      const targetValue = String(values[target] ?? '')
+      if (isSystemValue(meta, target, targetValue, all) && String(values[field.name] ?? '').trim() === '') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field.name], message: `${field.label} wajib diisi.` })
+      }
+    }
+  })
 }
 
 /**

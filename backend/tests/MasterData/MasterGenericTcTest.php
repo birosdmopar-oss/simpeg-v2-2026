@@ -663,8 +663,10 @@ final class MasterGenericTcTest extends CIUnitTestCase
     }
 
     /**
-     * Kolom audit legacy (created_at, updated_at, updated_by) diisi aplikasi (UTC), bukan default DB:
-     * waktu dibekukan ke nilai yang jauh dari jam server, updated_by = id_pengguna aktor.
+     * Kolom audit legacy diisi aplikasi (UTC), bukan default DB: waktu dibekukan ke nilai yang jauh dari jam server,
+     * *_by = id_pengguna aktor. Diperiksa sesuai kolom audit tiap tabel (auditColumns): created_at (atau updated_at
+     * bila tabel tanpa created_at); created_by → updated_by NULL; hanya updated_by → terisi; tanpa *_by (kursem, DDL
+     * legacy) → respons tidak memuat kolom *_by dan aktor tercatat di audit_logs.
      */
     public function testLegacyAuditColumnsAreFilledWithActor(): void
     {
@@ -683,14 +685,27 @@ final class MasterGenericTcTest extends CIUnitTestCase
             $def     = service('masterRegistry')->get($entity);
             $created = $this->json($this->sendJson('POST', "api/v1/master/{$entity}", $fx['new']))['data'];
 
-            $this->assertSame('2020-01-02 03:04:05', $created['created_at'], $entity);
+            $stamp = $def->hasAudit(MasterDefinition::AUDIT_CREATED_AT) ? MasterDefinition::AUDIT_CREATED_AT : MasterDefinition::AUDIT_UPDATED_AT;
+            $this->assertTrue($def->hasAudit($stamp), "{$entity}: tabel master wajib punya created_at atau updated_at");
+            $this->assertSame('2020-01-02 03:04:05', $created[$stamp], $entity);
 
             if ($def->hasAudit(MasterDefinition::AUDIT_CREATED_BY)) {
-                // Tabel ber-created_by (FAQ, legacy L_faq.php): created_by saat tambah, updated_by baru terisi saat ubah.
+                // Tabel ber-created_by (FAQ, kantor; legacy): created_by saat tambah, updated_by baru terisi saat ubah.
                 $this->assertSame($adminId, (int) $created['created_by'], $entity);
                 $this->assertNull($created['updated_by'], $entity);
-            } else {
+            } elseif ($def->hasAudit(MasterDefinition::AUDIT_UPDATED_BY)) {
                 $this->assertSame($adminId, (int) $created['updated_by'], $entity);
+                $this->assertArrayNotHasKey('created_by', $created, $entity);
+            } else {
+                // Tanpa kolom *_by (kursem): tidak ada kolom yang dikarang, aktor tetap tercatat di audit_logs.
+                $this->assertArrayNotHasKey('created_by', $created, $entity);
+                $this->assertArrayNotHasKey('updated_by', $created, $entity);
+                $this->seeInDatabase('audit_logs', [
+                    'entity'    => $def->table,
+                    'entity_id' => (string) $created[$def->primaryKey],
+                    'event'     => 'create',
+                    'nip_actor' => '198001012005011077',
+                ]);
             }
         }
 

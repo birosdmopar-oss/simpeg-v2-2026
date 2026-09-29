@@ -142,13 +142,42 @@ final class MasterFieldTest extends CIUnitTestCase
         $this->assertSame([255, null, null, null, null], [$meta['max_bytes'], $meta['min'], $meta['max'], $meta['entity'], $meta['depends_on']]);
     }
 
+    /**
+     * CR-010: allowSystem (ref boleh merujuk baris sistem, mis. LAIN-LAIN wilayah) dan otherFor (isian "lainnya" milik
+     * field ref itu). Kunci meta tipe-spesifik hanya dikirim untuk tipe yang relevan (meta field lain tidak berubah).
+     */
+    public function testAllowSystemAndOtherForAreTypeSpecificMeta(): void
+    {
+        $ref = MasterField::fromConfig('id_provinsi', ['label' => 'Provinsi', 'type' => 'ref', 'entity' => 'provinsi', 'allowSystem' => true]);
+        $this->assertTrue($ref->allowSystem);
+        $this->assertSame(true, $ref->toMeta()['allow_system']);
+        $this->assertArrayNotHasKey('other_for', $ref->toMeta());
+
+        $plainRef = new MasterField('id_agama', 'Agama', MasterField::TYPE_REF, entity: 'agama');
+        $this->assertFalse($plainRef->allowSystem);
+        $this->assertSame(false, $plainRef->toMeta()['allow_system']);
+
+        $other = MasterField::fromConfig('provinsi_lain', ['label' => 'Provinsi Lainnya', 'rules' => 'max_length[255]', 'otherFor' => 'id_provinsi']);
+        $this->assertSame('id_provinsi', $other->otherFor);
+        $this->assertSame('id_provinsi', $other->toMeta()['other_for']);
+        $this->assertArrayNotHasKey('allow_system', $other->toMeta());
+        $this->assertNull((new MasterField('remark', 'Keterangan', MasterField::TYPE_TEXTAREA))->toMeta()['other_for']);
+
+        $html = (new MasterField('content', 'Isi', MasterField::TYPE_HTML))->toMeta();
+        $this->assertArrayNotHasKey('allow_system', $html);
+        $this->assertArrayNotHasKey('other_for', $html);
+    }
+
     public function testInvalidDefinitionsAreRejected(): void
     {
         $cases = [
-            'Tipe field master a tidak dikenal: angka'         => static fn () => new MasterField('a', 'A', 'angka'),
-            'columnType field master a tidak dikenal: integer' => static fn () => new MasterField('a', 'A', MasterField::TYPE_INT, columnType: 'integer'),
-            'Field ref a wajib menyebut entity'                => static fn () => new MasterField('a', 'A', MasterField::TYPE_REF),
-            'hanya untuk field bertipe ref (a)'                => static fn () => new MasterField('a', 'A', MasterField::TYPE_SELECT, entity: 'provinsi'),
+            'Tipe field master a tidak dikenal: angka'             => static fn () => new MasterField('a', 'A', 'angka'),
+            'columnType field master a tidak dikenal: integer'     => static fn () => new MasterField('a', 'A', MasterField::TYPE_INT, columnType: 'integer'),
+            'Field ref a wajib menyebut entity'                    => static fn () => new MasterField('a', 'A', MasterField::TYPE_REF),
+            'hanya untuk field bertipe ref (a)'                    => static fn () => new MasterField('a', 'A', MasterField::TYPE_SELECT, entity: 'provinsi'),
+            'allowSystem hanya untuk field bertipe ref (a)'        => static fn () => new MasterField('a', 'A', MasterField::TYPE_SELECT, allowSystem: true),
+            'otherFor hanya untuk field bertipe text/textarea (a)' => static fn () => new MasterField('a', 'A', MasterField::TYPE_REF, entity: 'provinsi', otherFor: 'b'),
+            'otherFor hanya untuk field bertipe text/textarea (b)' => static fn () => new MasterField('b', 'B', MasterField::TYPE_INT, otherFor: 'a'),
         ];
 
         foreach ($cases as $expected => $make) {

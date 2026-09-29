@@ -9,6 +9,7 @@ import { createRouter, createWebHistory, type NavigationGuard, type RouteRecordR
 import { passwordResetEnabled } from '@/features/auth/config'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
+import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 
 declare module 'vue-router' {
@@ -80,6 +81,13 @@ const routes: RouteRecordRaw[] = [
     name: 'faq',
     component: () => import('@/features/master-data/views/FaqPage.vue'),
     meta: { title: 'FAQ' },
+  },
+  {
+    // G-08 Hari Libur (DBV-003/CR-010): baca role 1/4/5/8, tambah/ubah/hapus role 1 (tombol hanya tampil untuk role 1).
+    path: '/hari-libur',
+    name: 'hari-libur',
+    component: () => import('@/features/master-data/views/HariLiburPage.vue'),
+    meta: { roles: HARI_LIBUR_READ_ROLES, title: 'Hari Libur' },
   },
   {
     path: '/403',
