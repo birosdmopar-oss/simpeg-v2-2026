@@ -22,7 +22,8 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  * NIP angka maks. 18 digit, email opsional, username default NIP / wajib bila NIP kosong / maks. 100, NIP hanya bisa
  * diisi untuk akun yang belum punya NIP. Isian non-teks → 422; username baru tanpa karakter kontrol/tak terlihat;
  * balapan UNIQUE (1062) → 422; rename username membatalkan token reset tertunda; Admin Satker hanya role 2/6/7 dan tidak
- * bisa mengubah role akunnya sendiri (legacy L_user).
+ * bisa mengubah role akunnya sendiri (legacy L_user). CR-017: Admin Satker hanya mengelola akun 2/6/7 + akunnya sendiri
+ * di satkernya (akun 1/3/4/5/8 lain → 403, tidak di daftar; legacy User::edit/delete).
  *
  * @internal
  */
@@ -566,6 +567,73 @@ final class UserCrudScopedTest extends CIUnitTestCase
         // Super Admin tidak dibatasi.
         $this->clearAuthState();
         $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $ownId, ['user_level' => Role::MENTERI])->assertStatus(200);
+    }
+
+    /**
+     * CR-017 (legacy User::edit/delete): di satkernya sendiri pun Admin Satker hanya mengelola akun Pegawai/PTT/PPPK dan
+     * akunnya sendiri. Akun role 1/3/4/5/8 lain (ber-NIP maupun tanpa NIP) tidak muncul di daftar, dan baca/ubah
+     * (termasuk ganti password)/status/hapus → 403 tanpa perubahan data — mencegah Admin Satker mengambil alih akun
+     * Super Admin satu satker.
+     */
+    public function testAdminSatkerCannotManageNonPegawaiAccountsInOwnSatker(): void
+    {
+        $targets = [
+            'super admin'       => $this->idOf(self::SUPER_ADMIN),
+            'admin view'        => $this->idOf('197805202005011004'),
+            'menteri'           => $this->idOf('196511101990011005'),
+            'pimpinan'          => $this->idOf('197212122008121008'),
+            'admin satker lain' => (int) $this->buatAkunTanpaNip('admin.s01.lain', Role::ADMIN_SATKER)['id_pengguna'],
+            'super admin nnip'  => (int) $this->buatAkunTanpaNip('super.tanpa.nip', Role::SUPER_ADMIN)['id_pengguna'],
+        ];
+        $before = fn (int $id): array => $this->db->table('pengguna')->where('id_pengguna', $id)->get()->getRowArray();
+        $admin  = fn () => $this->asNip(self::ADMIN_S01);
+        $pesan  = 'Admin Satker hanya dapat mengelola akun Pegawai/PTT/PPPK dan akunnya sendiri.';
+
+        foreach ($targets as $label => $id) {
+            $row = $before($id);
+
+            $admin()->get('api/v1/auth/users/' . $id)->assertStatus(403);
+
+            $put = $admin()->withBodyFormat('json')->put('api/v1/auth/users/' . $id, ['password' => self::NEW_PASSWORD, 'name' => 'Diambil alih']);
+            $put->assertStatus(403);
+            $this->assertSame($pesan, $this->json($put)['message'], $label);
+
+            $admin()->withBodyFormat('json')->patch('api/v1/auth/users/' . $id . '/status', ['status' => '0'])->assertStatus(403);
+            $admin()->delete('api/v1/auth/users/' . $id)->assertStatus(403);
+
+            $this->assertSame($row, $before($id), "{$label}: data tidak berubah");
+        }
+
+        // Daftar hanya berisi akun 2/6/7 satker S01 ditambah akun admin sendiri.
+        $items = $this->json($admin()->get('api/v1/auth/users?per_page=100'))['data']['items'];
+        $ids   = array_map('intval', array_column($items, 'id_pengguna'));
+
+        foreach ($targets as $label => $id) {
+            $this->assertNotContains($id, $ids, "{$label} tidak boleh muncul di daftar Admin Satker");
+        }
+        $this->assertContains($this->idOf(self::ADMIN_S01), $ids, 'akun sendiri tetap tampil');
+
+        foreach ($items as $item) {
+            $this->assertSame('S01', $item['id_satker']);
+            $this->assertTrue(
+                in_array((int) $item['user_level'], Role::UL_PEGAWAI, true) || $item['nip'] === self::ADMIN_S01,
+                'role ' . $item['user_level'] . ' tidak boleh tampil',
+            );
+        }
+
+        // Filter role 1 dari query tidak membuka akun yang disembunyikan.
+        $this->assertSame(0, $this->json($admin()->get('api/v1/auth/users?user_level=1'))['data']['total']);
+
+        // Akun Pegawai/PTT/PPPK satker sendiri dan akun sendiri tetap bisa dikelola.
+        $pegawai = $this->idOf(self::PEGAWAI_S01);
+        $admin()->withBodyFormat('json')->put('api/v1/auth/users/' . $pegawai, ['password' => self::NEW_PASSWORD])->assertStatus(200);
+        $admin()->withBodyFormat('json')->patch('api/v1/auth/users/' . $pegawai . '/status', ['status' => '0'])->assertStatus(200);
+        $admin()->get('api/v1/auth/users/' . $this->idOf(self::ADMIN_S01))->assertStatus(200);
+        $admin()->withBodyFormat('json')->put('api/v1/auth/users/' . $this->idOf(self::ADMIN_S01), ['name' => 'Admin S01'])->assertStatus(200);
+
+        // Super Admin tetap bisa mengelola semua akun tersebut.
+        $this->clearAuthState();
+        $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $targets['pimpinan'], ['name' => 'Pimpinan'])->assertStatus(200);
     }
 
     // ------------------------------------------------------------------
