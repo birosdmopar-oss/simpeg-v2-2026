@@ -77,6 +77,7 @@ class MasterDataSeeder extends Seeder
         // --- /DBV-004 ---
 
         // --- DBV-005 ---
+        $this->seedG06();
         // --- /DBV-005 ---
     }
 
@@ -240,5 +241,65 @@ class MasterDataSeeder extends Seeder
     // --- /DBV-004 ---
 
     // --- DBV-005 (method) ---
+    /**
+     * G-06 (DBV-005/CR-012): diklat, tingkat & jenis hukdis, jenis konket, tanda jasa. Nama contoh [I] (data produksi
+     * belum ada). ID yang di-hard-code kode legacy dipakai apa adanya (G-06 Bagian 2.6, tidak dikunci): diklat 8 (tidak
+     * dikirim ke SIASN), konket id 2/4/5/6 dan old_id 8 (Dinas), 10 (sakit), 13 (lain-lain), tanda jasa 26/27/28 (SLKS)
+     * dan 44 `LAIN-LAIN`. Pasangan id ↔ old_id konket di sini FIKTIF: di legacy keduanya kode terpisah dan pasangannya
+     * baru diketahui dari data produksi.
+     *
+     * Kolom audit: updated_at tetap 2024-01-01 (kolom NOT NULL ON UPDATE, jadi test bisa membuktikan saudara yang hanya
+     * bergeser urutannya tidak ikut di-stamp), updated_by NULL.
+     */
+    private function seedG06(): void
+    {
+        $audit = ['status' => 1, 'updated_at' => '2024-01-01 00:00:00', 'updated_by' => null];
+
+        $this->db->table('diklat')->insertBatch(array_map(static fn (array $r): array => [
+            'id_diklat' => $r[0], 'jenis_diklat' => $r[1], 'nama_diklat' => $r[2], 'order' => $r[3],
+        ] + ($r[4] ?? []) + $audit, [
+            [1, 1, 'Diklatpim Tingkat IV', 1],
+            [2, 1, 'Diklatpim Tingkat III', 2],
+            [3, 2, 'Pelatihan Teknis Pengadaan Barang/Jasa', 1],
+            [4, 3, 'Pelatihan Fungsional Analis Kepegawaian', 1],
+            [5, 5, 'Sertifikasi Ahli Pengadaan', 1],
+            // Status 10: contoh baris hasil jalur legacy dm_diklat (soft delete, rwy/L_diklat.php:966-971).
+            [6, 2, 'Pelatihan Teknis Lama', 2, ['status' => 10]],
+            [8, 4, 'Pelatihan Dasar CPNS', 1],
+        ]));
+
+        $this->db->table('tingkat_hukdis')->insertBatch([
+            ['id_tingkat_hukdis' => 1, 'tingkat_hukdis' => 'Ringan', 'bobot_ipasn' => 5, 'order' => 1] + $audit,
+            ['id_tingkat_hukdis' => 2, 'tingkat_hukdis' => 'Sedang', 'bobot_ipasn' => 3, 'order' => 2] + $audit,
+            ['id_tingkat_hukdis' => 3, 'tingkat_hukdis' => 'Berat', 'bobot_ipasn' => 1, 'order' => 3] + $audit,
+        ]);
+
+        $this->db->table('jenis_hukdis')->insertBatch(array_map(static fn (array $r): array => [
+            'id_jenis_hukdis' => $r[0], 'id_tingkat_hukdis' => $r[1], 'jenis_hukdis' => $r[2], 'masa_sanksi_bulan' => $r[3], 'order' => $r[4],
+        ] + $audit, [
+            [1, 1, 'Teguran Lisan', null, 1],
+            [2, 1, 'Teguran Tertulis', null, 2],
+            [3, 1, 'Pernyataan Tidak Puas Secara Tertulis', null, 3],
+            [4, 2, 'Pemotongan Tunjangan Kinerja 25% Selama 6 Bulan', 6, 1],
+            [5, 3, 'Penurunan Jabatan Setingkat Lebih Rendah Selama 12 Bulan', 12, 1],
+        ]));
+
+        $this->db->table('jenis_konket')->insertBatch(array_map(static fn (array $r): array => [
+            'id_jenis_konket' => $r[0], 'old_id' => $r[1], 'jenis_konket' => $r[2], 'affect_tukin' => $r[3], 'order' => $r[4],
+        ] + $audit, [
+            [1, 1, 'Izin Terlambat', 1, 1],
+            [2, 8, 'Dinas', 2, 2],
+            [4, 10, 'Sakit', 1, 3],
+            [5, 13, 'Lain-lain', 1, 4],
+            [6, 5, 'Cuti', 2, 5],
+        ]));
+
+        $this->db->table('tanda_jasa')->insertBatch([
+            ['id_tanda_jasa' => 26, 'tanda_jasa' => 'Satyalancana Karya Satya XXX Tahun', 'order' => 1] + $audit,
+            ['id_tanda_jasa' => 27, 'tanda_jasa' => 'Satyalancana Karya Satya XX Tahun', 'order' => 2] + $audit,
+            ['id_tanda_jasa' => 28, 'tanda_jasa' => 'Satyalancana Karya Satya X Tahun', 'order' => 3] + $audit,
+            ['id_tanda_jasa' => 44, 'tanda_jasa' => 'LAIN-LAIN', 'order' => 4] + $audit,
+        ]);
+    }
     // --- /DBV-005 ---
 }

@@ -395,10 +395,20 @@ final class MasterGenericTcTest extends CIUnitTestCase
             $this->assertTrue($this->db->transStatus(), $key);
         }
 
-        // Seluruh master ber-PK TINYINT (maks. 127, paling cepat habis) ikut tercakup.
-        foreach (['agama', 'jenis-pegawai', 'jenis-status', 'bidang-kursem', 'instansi-kursem', 'jenis-libur', 'pangkat', 'jenis-kp', 'gol-pppk', 'bidang-pendidikan'] as $key) {
-            $this->assertContains($key, $covered);
-        }
+        // Seluruh master ber-PK TINYINT (maks. 127, paling cepat habis) ikut tercakup, termasuk `diklat` G-06 (DBV-005).
+        // Daftar dicocokkan dua arah dengan tipe kolom PK di DDL, jadi master TINYINT baru tidak bisa terlewat diam-diam.
+        $tinyintPk = array_values(array_filter($covered, function (string $key): bool {
+            $def = service('masterRegistry')->get($key);
+
+            return $this->db->query(
+                'SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+                [$this->db->prefixTable($def->table), $def->primaryKey],
+            )->getRowArray()['DATA_TYPE'] === 'tinyint';
+        }));
+        $this->assertEqualsCanonicalizing(
+            ['agama', 'jenis-pegawai', 'jenis-status', 'bidang-kursem', 'instansi-kursem', 'jenis-libur', 'pangkat', 'jenis-kp', 'gol-pppk', 'bidang-pendidikan', 'diklat'],
+            $tinyintPk,
+        );
 
         // 167 pada kolom lain (bukan PK master) tidak dilabeli "PK habis": dilempar apa adanya → 500 (bukan 422 generik
         // CR-007 juga, karena 167 bukan kesalahan isian).

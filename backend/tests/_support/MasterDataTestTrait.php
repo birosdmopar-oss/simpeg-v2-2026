@@ -177,6 +177,40 @@ trait MasterDataTestTrait
             // --- /DBV-004 ---
 
             // --- DBV-005 ---
+            // G-06 (seed MasterDataSeeder::seedG06). Nama `duplicate` diklat berada di lingkup jenis 1 (uniqueScope).
+            'diklat' => [
+                'new'       => ['jenis_diklat' => '1', 'nama_diklat' => 'Diklatpim Tingkat II'],
+                'duplicate' => 'DIKLATPIM TINGKAT IV',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'tingkat-hukdis' => [
+                'new'       => ['tingkat_hukdis' => 'Tingkat Uji'],
+                'duplicate' => 'SEDANG',
+                'existing'  => '3',
+                'parent'    => null,
+            ],
+            // `new`/`existing` di tingkat 1: test RBAC menghapus `existing` tingkat (3) sebelum jenis diproses, dan induk
+            // wajib aktif (E6).
+            'jenis-hukdis' => [
+                'new'       => ['id_tingkat_hukdis' => '1', 'jenis_hukdis' => 'Teguran Uji', 'masa_sanksi_bulan' => '3'],
+                'duplicate' => 'teguran lisan',
+                'existing'  => '2',
+                'parent'    => ['id_tingkat_hukdis', '1'],
+            ],
+            // Cek nama jalan sebelum cek old_id (MasterService::create), jadi `duplicate` + old_id `new` tetap 422 pada nama.
+            'jenis-konket' => [
+                'new'       => ['old_id' => '20', 'jenis_konket' => 'Tugas Belajar Uji', 'affect_tukin' => '2'],
+                'duplicate' => 'dinas',
+                'existing'  => '6',
+                'parent'    => null,
+            ],
+            'tanda-jasa' => [
+                'new'       => ['tanda_jasa' => 'Satyalancana Wira Karya'],
+                'duplicate' => 'lain-lain',
+                'existing'  => '27',
+                'parent'    => null,
+            ],
             // --- /DBV-005 ---
         ];
     }
