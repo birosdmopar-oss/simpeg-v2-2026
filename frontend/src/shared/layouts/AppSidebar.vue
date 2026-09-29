@@ -97,7 +97,7 @@ const itemActive = 'bg-brand-primary text-white shadow-float'
     aria-label="Sidebar"
     data-testid="app-sidebar"
   >
-    <div class="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-white/70 bg-white/85 shadow-panel backdrop-blur">
+    <div class="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-white/70 bg-white shadow-panel lg:bg-white/85 lg:backdrop-blur">
       <!-- Logo + collapse -->
       <div class="flex items-center justify-between gap-2 px-5 pb-3 pt-5">
         <div class="flex min-w-0 items-center gap-3">
