@@ -2,7 +2,25 @@
 
 **Key review:** `DBV-005` (review DB Validator, skema) + `CR-012` (review kode) — satu pull request, judul `[DBV-005][CR-012] …`, branch `dbv-005/g06-diklat-hukdis-konket-tandajasa`. Merge hanya setelah **kedua** review setuju. DB Validator hanya me-review/approve; merge dilakukan **user (reviewer CR)** (aturan PR berisi CR + DBV, 24-09-2026; `AGENTS.md` bagian 2). Urutan merge grup: DBV-003 → DBV-004 → DBV-005 (DBV-010 bebas).
 
-**Status:** ⏳ **MENUNGGU APPROVAL DB VALIDATOR (DBV-005) DAN REVIEW KODE (CR-012).** Migration `2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa.php` JANGAN dijalankan di Dev/Production sebelum disetujui. PR ini juga memuat endpoint master G-06 lewat engine generik CR-009 (entri `Config\MasterData`, 4 controller, halaman Master Data generik) — perilakunya di Bagian 2.7.
+**Status:** ✅ **DISETUJUI DB VALIDATOR (DBV-005, jjoseph48, komentar PR #14, 29-09-2026) DAN REVIEW KODE (CR-012)**; di-merge ke `main` oleh reviewer CR 29-09-2026 (merge commit `e602205`). Keputusan Bagian 4 no. 1–15 disetujui seluruhnya, termasuk butir [I], **dengan syarat**: audit data sebelum impor (6.5) dan penyalinan counter AUTO_INCREMENT legacy (6.5 #10) wajib menjadi langkah runbook impor. Migration `2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa.php` boleh dijalankan di Dev. Endpoint master G-06 lewat engine generik CR-009 (entri `Config\MasterData`, 4 controller, halaman Master Data generik) ikut di-merge — perilakunya di Bagian 2.7. Nilai [I] tetap wajib dicocokkan dengan dump struktur produksi (6.4); koreksi lewat migration ALTER baru.
+
+Verifikasi DB Validator di MariaDB 10.4 (komentar PR #14, 29-09-2026; butir mengikuti 6.3):
+
+| # | Butir | Hasil |
+|---|---|---|
+| 1 | `migrate` → `migrate:rollback` → `migrate` | ✅ G-06 masuk batch tersendiri; rollback hanya menghapus kelima tabel G-06 — daftar tabel setelah rollback identik dengan sebelum G-06; `migrate` ulang bersih |
+| 2 | `DiklatHukdisKonketSchemaTest` | ✅ `OK (6 tests, 184 assertions)` |
+| 3 | CHECK | ✅ 3 `chk_…` terdaftar di `TABLE_CONSTRAINTS`; ditegakkan dengan error 4025: `jenis_diklat` = 6, `affect_tukin` = 3, `masa_sanksi_bulan` = 0 |
+| 4 | FK RESTRICT | ✅ `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` UPDATE/DELETE = RESTRICT di `REFERENTIAL_CONSTRAINTS`; hapus induk yang punya anak ditolak 1451 |
+| 5 | Tipe kolom | ✅ `tinyint(1)` `jenis_diklat`, `tinyint(3) unsigned` `masa_sanksi_bulan`, `datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()`, `int(11)` `updated_by`, PK/`order`/`status` TINYINT signed. Beda tampilan lebar (4)/(11) hanya gaya MariaDB, setara dengan 6.2 |
+| 6 | UNIQUE 1.024 byte | ✅ Terbesar `uq_diklat_nama` dan `uq_jenis_hukdis_nama` = 1.024 byte, diterima (batas InnoDB 3.072) |
+| 7 | `DiklatHukdisKonketTest` (opsional) | ✅ `OK (10 tests, 415 assertions)` — head PR sebelum merge `main` `acd8693`; test ke-11 `testDiklatFullTinyintKeyGives422` dan jalur 167 untuk `diklat` (2.7 batas #1) belum dijalankan di MariaDB (opsional) |
+| + | Tambahan | ✅ `MasterGenericTcTest` + `RbacMasterEndpointsTest` `OK (33 tests, 2.662 assertions)`. Constraint kelima tabel: 5 PK, 6 UNIQUE, 1 FK, 3 CHECK, semua InnoDB + `utf8mb4_unicode_ci` — cocok dengan 6.2 |
+
+Catatan DB Validator (tidak memblokir):
+- **Zona waktu stempel waktu.** Default `CURRENT_TIMESTAMP` memakai jam server (terukur WIB 11:36:43), sedangkan aplikasi menulis UTC (04:36:43) — selisih 7 jam di kolom yang sama. Ini mengikuti legacy [K], tetapi setiap penulisan di luar aplikasi (impor, perbaikan manual, `ON UPDATE` dari SQL manual) memakai WIB. Usul DBV: set `time_zone = '+00:00'` di server DB Dev/Prod, atau catat eksplisit di runbook impor. Tindak lanjut: Trello **ISSUE-022** (lihat juga 6.5 #8).
+- **Lingkungan reviewer.** Bila database test sebelumnya dipakai branch lain yang punya migration lebih baru (mis. DBV-010), PHPUnit gagal "There is a gap in the migration sequence". Bersihkan database test dulu saat berpindah branch. Bukan cacat PR.
+- PK TINYINT `diklat` habis di MariaDB → error 167; ditangani perbaikan engine DBV-004/CR-011 (di `main` `acd8693`, 2.7 batas #1).
 
 **Rujukan:** `02-MasterData.md` G-06 (:63-70) & G-TC (:115-127), Tech Spec G-06 (:805-817) dan §3.5 (:2097), `FSD_SIMPEG_v2.md:73,104`, `03-Kepegawaian.md:146`, `Mapping_Migrasi_Data_SIMPEG_v2.docx` Tier 1 ("diklat, tingkat_hukdis, jenis_hukdis, jenis_konket, tanda_jasa — sama — Copy langsung"), Matriks Role x Endpoint Modul G (`c_diklat`, `c_hukdis`, `c_konket`, `c_tj`, role 1), DDL produksi `simpeg_prod.sql:443-452` (`diklat`) & :33-69 (`absen_ijin`) (HeidiSQL, host 172.17.100.83, MySQL 8.0.21), ERD legacy `simpeg01.erd` (nama FK), kode legacy (`application/libraries/hr/master/Lm_{diklat,hukdis,konket,tj}.php`, `application/libraries/hr/rwy/L_{diklat,hukdis,konket,tj}.php`, `application/controllers/hr/master/C_{diklat,hukdis,konket,tj}.php`, `L_presensi.php`, `services/Siasn.php`), keputusan user K5 (25-09-2026), `G-01-master-schema.md` (Keputusan #5, Bagian 8 / DBV-001), `G-10-faq-schema.md` (pola pilot DBV-002).
 
@@ -59,7 +77,7 @@ Perilaku legacy yang memengaruhi skema [K]:
 | B9 | `rumpun_sertifikasi`/`lembaga_sertifikasi` bukan bagian DBV-005 (DBV berikutnya bersama B-11; nomor DBV-010 kini dipakai collation auth & identitas `pengguna`) | di luar lingkup |
 | G2 | (DBV-001/002, disetujui) Status 1/2/10, hapus = soft delete, UNIQUE nama termasuk status 2/10 dan case-insensitive lewat collation, `utf8mb4_unicode_ci` per tabel, FK `ON DELETE RESTRICT ON UPDATE RESTRICT` dengan nama legacy, AUTO_INCREMENT awal tidak ditulis, kolom audit diisi aplikasi (UTC, `id_pengguna`); G-01 Keputusan #5: semua master wajib `order` + `status` | semua |
 
-### 1.3 Usulan (diimplementasikan sesuai usulan, menunggu approval DBV — Bagian 4)
+### 1.3 Usulan (diimplementasikan sesuai usulan, ✅ disetujui DBV-005 29-09-2026 — Bagian 4)
 
 | # | Usulan |
 |---|---|
@@ -264,23 +282,25 @@ Nilai **[I]** yang tersisa ada di Bagian 6.4.
 
 | # | Pertanyaan | Usulan | Keputusan |
 |---|---|---|---|
-| 1 | Setujui skema Bagian 2 + migration `2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa` untuk dijalankan di Dev | Setujui, setelah `migrate` → `migrate:rollback` → `migrate` dan schema test lolos di MariaDB 10.4 (6.3) | ⏳ |
-| 2 | PK empat tabel [I] INT (vs TINYINT pola master kecil produksi) — D1 | INT: satu-satunya bukti (`simpegdev_local`) dan aman untuk ID legacy berapa pun; cocokkan dengan dump. Tipe FK `riwayat_*` (B-11/14/17) mengikuti | ⏳ |
-| 3 | Kolom audit [I] = pola `diklat` (`updated_at` NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE, `updated_by`), tanpa `created_*` — D2 | Setujui; bila dump menunjukkan `created_at`, ALTER selagi kosong | ⏳ |
-| 4 | Panjang/NOT NULL kolom nama [I] (`tingkat_hukdis` 100, `jenis_hukdis`/`jenis_konket`/`tanda_jasa` 255, semua NOT NULL) | Setujui | ⏳ |
-| 5 | `order`/`status` TINYINT NOT NULL DEFAULT 1 untuk tabel [I] (konket `simpegdev_local` `status` VARCHAR(10)) | Setujui (status 1/2/10 TINYINT seperti DBV-001/002) | ⏳ |
-| 6 | 6 UNIQUE (`uq_diklat_nama`, `uq_tingkat_hukdis_nama`, `uq_jenis_hukdis_nama`, `uq_jenis_konket_nama`, `uq_jenis_konket_old_id`, `uq_tanda_jasa_nama`), termasuk baris status 2/10 | Setujui; audit duplikat `utf8mb4_unicode_ci` wajib sebelum impor (6.5 #1) | ⏳ |
-| 7 | `jenis_konket.old_id` INT NOT NULL UNIQUE tanpa FK fisik (B2 final; 1.4 #2) | Konfirmasi tipe dengan dump; audit NULL/ganda/bukan angka (6.5 #3) | ⏳ |
-| 8 | `jenis_konket.affect_tukin` TINYINT NOT NULL DEFAULT 1, 1 Ya / 2 Tidak (K5a final) | Cek nama, tipe, dan COMMENT | ⏳ |
-| 9 | `jenis_hukdis.masa_sanksi_bulan` TINYINT UNSIGNED NULL (nullable final K5b; tipe usulan D3) | Setujui | ⏳ |
-| 10 | FK `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` RESTRICT/RESTRICT; `jenis_hukdis.id_tingkat_hukdis` NOT NULL | Setujui; audit NULL/yatim (6.5 #4) | ⏳ |
-| 11 | 3 CHECK [V2] (D4): `chk_diklat_jenis_diklat`, `chk_jenis_hukdis_masa_sanksi_bulan`, `chk_jenis_konket_affect_tukin` (prefix `chk_` disamakan dengan DBV-003/004) | Setujui; verifikasi penegakan di MariaDB 10.4 (6.3 #3) | ⏳ |
-| 12 | `tingkat_hukdis.bobot_ipasn` INT NULL DEFAULT 5 disimpan, disembunyikan (B5) | Setujui | ⏳ |
-| 13 | COMMENT `jenis_diklat` legacy dipertahankan verbatim; COMMENT `status` diganti versi v2 | Setujui | ⏳ |
-| 14 | Tanpa seed/sentinel dan tanpa kunci baris hard-coded (B6); impor memakai ID legacy apa adanya | Setujui; DBV cek keberadaan & nama baris 2.6 di data produksi (6.5 #6) | ⏳ |
-| 15 | AUTO_INCREMENT awal tidak ditulis di migration, counter legacy disalin saat impor (6.5 #10); batas TINYINT `diklat` (127). Setelah ID habis aplikasi menjawab 422 dengan penjelasan saat tambah pelatihan (2.7 batas #1; saat diajukan 500, tertutup engine CR-011 setelah merge `main`); perluasan PK butuh migration ALTER + tipe kolom FK anak | Setujui; cek `MAX(id_diklat)` dan counter `diklat` produksi ≤ 127 | ⏳ |
+| 1 | Setujui skema Bagian 2 + migration `2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa` untuk dijalankan di Dev | Setujui, setelah `migrate` → `migrate:rollback` → `migrate` dan schema test lolos di MariaDB 10.4 (6.3) | ✅ Setuju (29-09-2026, jjoseph48). Terverifikasi di MariaDB 10.4: batch tersendiri, rollback hanya kelima tabel G-06, `migrate` ulang bersih; schema test lolos (6.3 #1–#2) |
+| 2 | PK empat tabel [I] INT (vs TINYINT pola master kecil produksi) — D1 | INT: satu-satunya bukti (`simpegdev_local`) dan aman untuk ID legacy berapa pun; cocokkan dengan dump. Tipe FK `riwayat_*` (B-11/14/17) mengikuti | ✅ Setuju INT [I] (disebut eksplisit DBV); tetap dicocokkan dengan dump (6.4). Tipe FK `riwayat_*` (B-11/14/17) mengikuti |
+| 3 | Kolom audit [I] = pola `diklat` (`updated_at` NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE, `updated_by`), tanpa `created_*` — D2 | Setujui; bila dump menunjukkan `created_at`, ALTER selagi kosong | ✅ Setuju [I] (disebut eksplisit DBV); bila dump menunjukkan `created_at`, ALTER selagi kosong |
+| 4 | Panjang/NOT NULL kolom nama [I] (`tingkat_hukdis` 100, `jenis_hukdis`/`jenis_konket`/`tanda_jasa` 255, semua NOT NULL) | Setujui | ✅ Disetujui sesuai usulan* |
+| 5 | `order`/`status` TINYINT NOT NULL DEFAULT 1 untuk tabel [I] (konket `simpegdev_local` `status` VARCHAR(10)) | Setujui (status 1/2/10 TINYINT seperti DBV-001/002) | ✅ Disetujui sesuai usulan*; tipe terverifikasi (PK/`order`/`status` TINYINT signed, 6.3 #5) |
+| 6 | 6 UNIQUE (`uq_diklat_nama`, `uq_tingkat_hukdis_nama`, `uq_jenis_hukdis_nama`, `uq_jenis_konket_nama`, `uq_jenis_konket_old_id`, `uq_tanda_jasa_nama`), termasuk baris status 2/10 | Setujui; audit duplikat `utf8mb4_unicode_ci` wajib sebelum impor (6.5 #1) | ✅ Setuju; audit duplikat sebelum impor (6.5 #1) **wajib jadi langkah runbook impor**. Terverifikasi: UNIQUE 1.024 byte diterima (6.3 #6) |
+| 7 | `jenis_konket.old_id` INT NOT NULL UNIQUE tanpa FK fisik (B2 final; 1.4 #2) | Konfirmasi tipe dengan dump; audit NULL/ganda/bukan angka (6.5 #3) | ✅ Setuju INT (disebut eksplisit DBV); tipe tetap dicocokkan dengan dump; audit NULL/ganda/bukan angka (6.5 #3) wajib jadi langkah runbook impor |
+| 8 | `jenis_konket.affect_tukin` TINYINT NOT NULL DEFAULT 1, 1 Ya / 2 Tidak (K5a final) | Cek nama, tipe, dan COMMENT | ✅ Disetujui sesuai usulan*; CHECK menolak `affect_tukin` = 3 (4025, 6.3 #3) |
+| 9 | `jenis_hukdis.masa_sanksi_bulan` TINYINT UNSIGNED NULL (nullable final K5b; tipe usulan D3) | Setujui | ✅ Disetujui sesuai usulan*; terverifikasi `tinyint(3) unsigned`, CHECK menolak 0 (4025, 6.3 #3, #5) |
+| 10 | FK `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` RESTRICT/RESTRICT; `jenis_hukdis.id_tingkat_hukdis` NOT NULL | Setujui; audit NULL/yatim (6.5 #4) | ✅ Setuju; terverifikasi RESTRICT di `REFERENTIAL_CONSTRAINTS` dan hapus induk yang punya anak ditolak 1451 (6.3 #4); audit NULL/yatim (6.5 #4) wajib jadi langkah runbook impor |
+| 11 | 3 CHECK [V2] (D4): `chk_diklat_jenis_diklat`, `chk_jenis_hukdis_masa_sanksi_bulan`, `chk_jenis_konket_affect_tukin` (prefix `chk_` disamakan dengan DBV-003/004) | Setujui; verifikasi penegakan di MariaDB 10.4 (6.3 #3) | ✅ Setuju, termasuk penamaan `chk_…` (disebut eksplisit DBV). Terverifikasi: ketiganya terdaftar di `TABLE_CONSTRAINTS` dan ditegakkan dengan 4025 (6.3 #3) |
+| 12 | `tingkat_hukdis.bobot_ipasn` INT NULL DEFAULT 5 disimpan, disembunyikan (B5) | Setujui | ✅ Disetujui sesuai usulan* |
+| 13 | COMMENT `jenis_diklat` legacy dipertahankan verbatim; COMMENT `status` diganti versi v2 | Setujui | ✅ Disetujui sesuai usulan* |
+| 14 | Tanpa seed/sentinel dan tanpa kunci baris hard-coded (B6); impor memakai ID legacy apa adanya | Setujui; DBV cek keberadaan & nama baris 2.6 di data produksi (6.5 #6) | ✅ Disetujui sesuai usulan*; keberadaan & nama baris 2.6 dicek di data produksi saat audit impor (6.5 #6) |
+| 15 | AUTO_INCREMENT awal tidak ditulis di migration, counter legacy disalin saat impor (6.5 #10); batas TINYINT `diklat` (127). Setelah ID habis aplikasi menjawab 422 dengan penjelasan saat tambah pelatihan (2.7 batas #1; saat diajukan 500, tertutup engine CR-011 setelah merge `main`); perluasan PK butuh migration ALTER + tipe kolom FK anak | Setujui; cek `MAX(id_diklat)` dan counter `diklat` produksi ≤ 127 | ✅ Setuju (disebut eksplisit DBV) **dengan syarat**: penyalinan counter AUTO_INCREMENT legacy (6.5 #10) wajib jadi langkah runbook impor; cek `MAX(id_diklat)` dan counter `diklat` produksi ≤ 127 |
 
 Approval tanpa catatan per poin dicatat mengikuti kolom **Usulan** (preseden DBV-001/002). Koreksi setelah approval dilakukan lewat migration ALTER baru, bukan mengedit migration ini.
+
+\* Sumber keputusan: komentar DB Validator (jjoseph48) di PR #14, 29-09-2026 — "setuju seluruhnya" untuk no. 1–15, termasuk butir [I] yang disebut eksplisit (#2 PK INT empat tabel, #3 pola audit tanpa `created_*`, #7 `old_id` INT, #11 penamaan `chk_…`, #15 AUTO_INCREMENT tidak ditulis di migration dengan counter legacy disalin saat impor). **Syarat:** audit data sebelum impor (6.5) dan penyalinan counter (6.5 #10) wajib menjadi langkah runbook impor. Kesimpulan DBV: dari sisi skema layak disetujui, tidak ada temuan yang memblokir; catatan zona waktu bersifat tindak lanjut (Trello ISSUE-022, bagian Status).
 
 ## 5. Status keputusan G-01 terkait
 
@@ -295,7 +315,7 @@ Approval tanpa catatan per poin dicatat mengikuti kolom **Usulan** (preseden DBV
 
 ### 6.1 Lingkungan
 
-MySQL 8.0.30 lokal (Laragon, `sql_mode` STRICT_TRANS_TABLES, row format default DYNAMIC). Database test `simpeg_v2_t_dbv005x7` (DBPrefix `t_`, `strictOn=true`; migration dijalankan otomatis oleh PHPUnit lewat `migrate:refresh`). Database scratch `simpeg_v2_s_dbv005x7` (koneksi default, tanpa prefix) untuk siklus `migrate` → `migrate:rollback` → `migrate`. Database dev `simpeg_v2` **tidak** dijalankan migration ini. **Belum diverifikasi di MariaDB 10.4.**
+MySQL 8.0.30 lokal (Laragon, `sql_mode` STRICT_TRANS_TABLES, row format default DYNAMIC). Database test `simpeg_v2_t_dbv005x7` (DBPrefix `t_`, `strictOn=true`; migration dijalankan otomatis oleh PHPUnit lewat `migrate:refresh`). Database scratch `simpeg_v2_s_dbv005x7` (koneksi default, tanpa prefix) untuk siklus `migrate` → `migrate:rollback` → `migrate`. Database dev `simpeg_v2` **tidak** dijalankan migration ini. Verifikasi di MariaDB 10.4 dilakukan DB Validator saat review (29-09-2026): hasil di bagian Status dan 6.3. Catatan lingkungan (DBV): database test yang sebelumnya dipakai branch dengan migration lebih baru membuat PHPUnit gagal "There is a gap in the migration sequence" — bersihkan database test saat berpindah branch.
 
 ### 6.2 Hasil
 
@@ -388,14 +408,25 @@ CREATE TABLE `tanda_jasa` (
 ### 6.3 Permintaan verifikasi MariaDB 10.4 (lingkungan DB Validator) — WAJIB sebelum approval
 
 DBV-001 dan DBV-002 disetujui tanpa laporan verifikasi MariaDB terpisah. Untuk DBV-005 mohon hasil berikut dilaporkan di PR:
+
+**Hasil (DB Validator jjoseph48, komentar PR #14, 29-09-2026, MariaDB 10.4)** dicatat per butir di bawah.
+
 1. `php spark migrate` → `php spark migrate:rollback` → `php spark migrate` (migration ini masuk batch tersendiri; rollback hanya membatalkan batch ini).
+    - ✅ **Hasil DBV:** G-06 masuk batch tersendiri; rollback hanya menghapus kelima tabel G-06 (daftar tabel setelah rollback identik dengan sebelum G-06); `migrate` ulang bersih.
 2. `vendor/bin/phpunit --no-coverage tests/MasterData/DiklatHukdisKonketSchemaTest.php` di database test MariaDB (helper test sudah menormalkan lebar tampilan `tinyint(4)`/`tinyint(3) unsigned`/`int(11)` dan default `'NULL'`/`current_timestamp()` MariaDB).
+    - ✅ **Hasil DBV:** `OK (6 tests, 184 assertions)`.
 3. CHECK ditegakkan (MariaDB error 4025, MySQL 3819) dan terlihat di `information_schema.TABLE_CONSTRAINTS` dengan `CONSTRAINT_TYPE = 'CHECK'`.
+    - ✅ **Hasil DBV:** 3 `chk_…` terdaftar di `TABLE_CONSTRAINTS`; ditegakkan dengan 4025 untuk `jenis_diklat` = 6, `affect_tukin` = 3, `masa_sanksi_bulan` = 0.
 4. FK RESTRICT dicek lewat `information_schema.REFERENTIAL_CONSTRAINTS` (`SHOW CREATE TABLE` MariaDB bisa menyembunyikan klausa RESTRICT).
+    - ✅ **Hasil DBV:** `fk_id_tingkat_hukdis_jenhukdis_to_tkhukdis` UPDATE/DELETE = RESTRICT; hapus induk yang punya anak ditolak 1451.
 5. `COLUMN_TYPE` `tinyint(1)` pada `jenis_diklat`, `tinyint(3) unsigned` pada `masa_sanksi_bulan`, dan `updated_at` `DATETIME NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()`.
+    - ✅ **Hasil DBV:** sesuai, plus `int(11)` `updated_by` dan PK/`order`/`status` TINYINT signed; beda tampilan lebar (4)/(11) hanya gaya MariaDB, setara dengan 6.2.
 6. UNIQUE 1.024 byte diterima (row format DYNAMIC, `innodb_large_prefix`/default MariaDB 10.4).
+    - ✅ **Hasil DBV:** terbesar `uq_diklat_nama` dan `uq_jenis_hukdis_nama` = 1.024 byte, diterima (batas InnoDB 3.072).
 7. Opsional (perilaku aplikasi di atas MariaDB): `vendor/bin/phpunit --no-coverage tests/MasterData/DiklatHukdisKonketTest.php` — memastikan setiap nilai yang ditolak NOT NULL/CHECK sudah dijawab 422 oleh validasi, juga di MariaDB.
+    - ✅ **Hasil DBV:** `OK (10 tests, 415 assertions)` pada head PR sebelum merge `main` `acd8693`. Test ke-11 (`testDiklatFullTinyintKeyGives422`, jalur 1062/167 PK `diklat` habis, 2.7 batas #1) ditambahkan setelahnya; menjalankannya di MariaDB bersifat opsional (belum dilaporkan). Tambahan DBV: `MasterGenericTcTest` + `RbacMasterEndpointsTest` `OK (33 tests, 2.662 assertions)`; constraint kelima tabel 5 PK, 6 UNIQUE, 1 FK, 3 CHECK, semua InnoDB + `utf8mb4_unicode_ci` — cocok dengan 6.2.
 8. Laporkan hasilnya di PR (poin mana yang lolos/gagal).
+    - ✅ **Hasil DBV:** dilaporkan di PR #14; semua butir lolos, dengan dua catatan tidak memblokir (zona waktu → Trello ISSUE-022, dan lingkungan database test) di bagian Status.
 
 ### 6.4 Nilai [I] yang menunggu dump struktur produksi (`mysqldump --no-data` penuh simpeg01)
 
@@ -411,6 +442,8 @@ Bila dump berbeda: koreksi lewat migration ALTER baru selagi tabel masih kosong 
 
 Salinan lokal kelima tabel berisi 0 baris (atau tidak ada), jadi semua butir di bawah hanya bisa diperiksa di data produksi.
 
+**Syarat approval DBV-005 (29-09-2026):** audit data sebelum impor (butir di bawah) dan penyalinan counter AUTO_INCREMENT legacy (#10) **wajib menjadi langkah runbook impor**.
+
 1. **Audit duplikat** dengan perbandingan `utf8mb4_unicode_ci` (tidak peka huruf besar/kecil & aksen), setelah `stripslashes` (#2) dan trim, per lingkup UNIQUE: `diklat (jenis_diklat, nama_diklat)`, `tingkat_hukdis`, `jenis_hukdis (id_tingkat_hukdis, jenis_hukdis)`, `jenis_konket`, `jenis_konket.old_id`, `tanda_jasa` — **termasuk baris status 2/10** (`jenis_hukdis` dan `diklat` bisa punya status 10). Duplikat harus dirapikan dulu, karena impor akan gagal.
 2. **`stripslashes`** hanya untuk nama `diklat`, `tingkat_hukdis`, `jenis_konket`, `tanda_jasa` (di-`addslashes` legacy); **jangan** untuk `jenis_hukdis` (disimpan mentah). Nama `diklat` dari jalur `dm_diklat` juga mentah → `stripslashes` kondisional: audit pola `\'`, `\"`, `\\` per baris sebelum memutuskan.
 3. **`jenis_konket.old_id`**: baris dengan `old_id` NULL/kosong (dibuat lewat UI legacy), ≤ 0 (aplikasi mewajibkan ≥ 1, C4), ganda, atau bukan angka → beri kode baru > MAX yang tidak dipakai `absen_ijin.kategori`/`d_konket.kategori`; cek setiap `absen_ijin.kategori` punya pasangan `old_id`.
@@ -418,7 +451,7 @@ Salinan lokal kelima tabel berisi 0 baris (atau tidak ada), jadi semua butir di 
 5. **Normalisasi nilai**: `jenis_diklat` di luar 1–5, `status` di luar 1/2/10, `order` bukan angka/0/> 127/ganda → normalkan (`order` 1..n per lingkup: diklat per jenis, jenis hukdis per tingkat, lainnya global).
 6. **Baris hard-coded (2.6)**: pastikan ada dengan ID tersebut dan namanya sesuai, khususnya tanda jasa 44 = `LAIN-LAIN`; `MAX(id_diklat)` ≤ 127.
 7. **Kolom baru**: `affect_tukin` diisi 1 (default legacy per pengajuan) lalu ditinjau admin; opsional usulkan nilai dari modus `absen_ijin.affect_tukin` per kategori. `masa_sanksi_bulan` NULL, diisi admin.
-8. **Audit & status**: `updated_by` legacy = `user.id` akun legacy → petakan ke `id_pengguna`; `updated_at` jam server → konversi mengikuti keputusan zona waktu global (A-01). Baris status 2 legacy tidak bisa diaktifkan lagi di UI lama (Bagian 1) → kemungkinan baris "macet", tinjau bersama admin.
+8. **Audit & status**: `updated_by` legacy = `user.id` akun legacy → petakan ke `id_pengguna`; `updated_at` jam server → konversi mengikuti keputusan zona waktu global (A-01). Catatan DBV-005: default `CURRENT_TIMESTAMP` di server memakai WIB sedangkan aplikasi menulis UTC, sehingga penulisan di luar aplikasi (impor, perbaikan manual, `ON UPDATE` dari SQL manual) bercampur zona; set `time_zone = '+00:00'` di server DB atau catat eksplisit di runbook impor (Trello ISSUE-022). Baris status 2 legacy tidak bisa diaktifkan lagi di UI lama (Bagian 1) → kemungkinan baris "macet", tinjau bersama admin.
 9. **Salinan nama di riwayat** (`riwayat_diklat.nama_diklat`, `riwayat_hukdis.tingkat_hukdis/jenis_hukdis`, `riwayat_tanda_jasa.tanda_jasa`, `absen_ijin.jenis_konket`) disalin apa adanya, jangan di-join ulang ke master.
 10. **Counter AUTO_INCREMENT.** Impor dengan ID eksplisit hanya menaikkan counter ke `MAX(id)+1`. Legacy menghapus keras baris `diklat` (`Lm_diklat.php:134`), `tingkat_hukdis` (`Lm_hukdis.php:134`), `jenis_konket` (`Lm_konket.php:134`), dan `tanda_jasa` (`Lm_tj.php:134`), sehingga ID tertinggi yang pernah dihapus bisa dipakai ulang entri baru, sementara `siasn_simpeg.LATIHAN_STRUKTURAL_ID.id_diklat` (`Siasn.php:1677-1678`), `JENIS_HUKUMAN_ID.id_jenis_hukdis` (:2895-2897), dan `HARGA_ID.id_tanda_jasa` (:5958-5959) masih menyimpan ID lama tanpa FK. Setelah impor tiap tabel G-06 (kelimanya, termasuk `jenis_hukdis`), bila counter legacy (dump 6.4 #1 atau `SHOW TABLE STATUS`) lebih besar dari `MAX(id)+1`, jalankan `ALTER TABLE <tabel> AUTO_INCREMENT = <counter legacy>`. Migration tetap tidak menulis AUTO_INCREMENT (Bagian 3 #12). Untuk `diklat`, counter legacy juga menentukan sisa ID (3 #8).
 

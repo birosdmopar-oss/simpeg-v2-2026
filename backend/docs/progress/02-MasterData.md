@@ -2,20 +2,20 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `02-MasterData.md`.
 
-**Terakhir diperbarui:** 25 September 2026 (G-10 FAQ pilot DBV-002/CR-003 disetujui & di-merge; perluasan engine CR-009 untuk DBV-003/004/005)
+**Terakhir diperbarui:** 29 September 2026 (DBV-003/CR-010, DBV-004/CR-011, DBV-005/CR-012 disetujui DB Validator & di-merge ke main — `d1cf1b3`, `acd8693`, `e602205`; G-04..G-08 menunggu QA)
 **Entry criteria:** Fase 1 sign-off dikonfirmasi user (21 Sep 2026).
-**Blocker utama:** DDL legacy 13 tabel Tier 0/1 belum ada → Trello **ISSUE-003** (FAQ tidak lagi: DDL-nya ada di `simpeg_prod.sql:949-1030`). Keputusan skema → `backend/docs/db-review/G-01-master-schema.md` Bagian 4; FAQ → `backend/docs/db-review/G-10-faq-schema.md` Bagian 4.
+**Blocker utama:** DDL legacy 13 tabel Tier 0/1 belum ada → Trello **ISSUE-003** (FAQ tidak lagi: DDL-nya ada di `simpeg_prod.sql:949-1030`). Keputusan skema → `backend/docs/db-review/G-01-master-schema.md` Bagian 4; FAQ → `backend/docs/db-review/G-10-faq-schema.md` Bagian 4; G-04/G-05 → `G-04-G-05-pangkat-pendidikan-schema.md`, G-06 → `G-06-diklat-hukdis-konket-tanda-jasa-schema.md`, G-07/G-08 → `G-07-G-08-kantor-hari-libur-kursem-schema.md` (Bagian 4 masing-masing, semuanya ✅ 29-09-2026).
 
 | Task | Status | Ringkas |
 |---|---|---|
-| G-01 Migration tabel master | **IN_PROGRESS** | Batch 1 (7 tabel Tier 0) **disetujui DB Validator 23-09-2026**; revisi ke skema legacy **DBV-001 disetujui 24-09-2026 & sudah di main** (G-01 Bagian 8); 5 tabel FAQ diajukan di **DBV-002 ⏳** (G-10); sisa tabel lain menunggu DDL legacy |
+| G-01 Migration tabel master | **IN_PROGRESS** | **28 tabel** master disetujui DB Validator & sudah di main: Batch 1 **7** (disetujui 23-09-2026, revisi skema legacy **DBV-001** 24-09-2026, G-01 Bagian 8) + FAQ **5** (**DBV-002**, 25-09-2026, G-10) + G-04..G-08 **16** (**DBV-003** 5, **DBV-004** 6, **DBV-005** 5; 29-09-2026). Sisa: G-02 jabatan/unit/satker (menunggu dump ISSUE-003, DBV-008), G-03 lokasi presensi (DBV-007), G-09 web config (DBV-006) |
 | G-02 Jabatan, Unit & Satker | TODO (blocked) | Butuh DDL `jabatan` (5 FK di legacy), `kelas_jabatan`, `peta_jabatan` |
 | G-03 Lokasi Presensi | TODO (blocked) | Kolom `lokasi_presensi` ada di seed; `user_lokasi_presensi` butuh `pegawai` (Fase 3) + `dm_user_lokasi_presensi` |
-| G-04 Kenaikan Pangkat | **IN_PROGRESS** | ⏳ **DBV-004/CR-011** (branch `dbv-004/g04-g05-pangkat-pendidikan`): 3 tabel skema legacy (`pangkat`, `jenis_kp`, `gol_pppk` — DDL `gol_pppk` ditemukan) + CRUD admin engine generik (`KpController`): urutan pangkat = level (mode urutan manual), dropdown pangkat `?cpns=1\|2`, `uang_makan` bisa diubah role 1 (K5), hapus `gol_pppk` menyimpan status 10; test hijau. Menunggu approval DB Validator (DBV-004) dan review kode (CR-011): `backend/docs/db-review/G-04-G-05-pangkat-pendidikan-schema.md` |
-| G-05 Pendidikan | **IN_PROGRESS** | ⏳ **DBV-004/CR-011** (branch sama dengan G-04): 3 tabel skema legacy (`jenjang_pendidikan`, `bidang_pendidikan` — DDL ditemukan, `jurusan_pendidikan`) + CRUD admin engine generik (`PendidikanController`): singkatan jenjang unik, `row_jurusan` pilihan tetap, `bobot_ipasn` tidak diekspos, jurusan minimal satu flag jenjang, dropdown bidang → jurusan mengikuti rantai status; test hijau. Dropdown jurusan per jenjang dikerjakan bersama riwayat pendidikan (Fase 3). Menunggu DBV-004 & CR-011 |
-| G-06 Diklat, Hukdis, Konket, Tanda Jasa | **IN_PROGRESS** (⏳ DBV-005/CR-012) | 5 tabel skema legacy (`diklat` DDL [K], 4 tabel [I]) + K5 (`affect_tukin`, `masa_sanksi_bulan`); CRUD role 1 lewat engine generik (4 controller) dan halaman Master Data generik (aksi baris lewat menu ⋮), dropdown UL_ALL; menunggu approval DB Validator & review kode — `backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md` |
-| G-07 Data Umum & Wilayah | **IN_PROGRESS** | agama, jenis_pegawai, jenis_status, wilayah 4 level SELESAI (backend + FE + G-TC). `kantor`, `bidang_kursem`, `instansi_kursem` + sentinel LAIN-LAIN wilayah: kode & test selesai di branch `dbv-003/g07-g08-libur-kantor-kursem`, ⏳ menunggu approval DB Validator (**DBV-003**) dan review kode (**CR-010**) |
-| G-08 Hari Libur | **IN_PROGRESS** | `jenis_libur` (engine) + `hari_libur` (controller + service khusus: overlap dengan lock, `tanggalLibur()` untuk Fase 5) + halaman FE: kode & test selesai di branch yang sama, ⏳ **DBV-003/CR-010** |
+| G-04 Kenaikan Pangkat | **IN_PROGRESS** (kode di main, menunggu QA) | ✅ **DBV-004/CR-011** disetujui DB Validator & review kode, di main lewat PR #13 (merge `acd8693`; termasuk perbaikan MariaDB 167 → 422 dan `bobot_ipasn` DEFAULT NULL sesuai keputusan DBV): 3 tabel skema legacy (`pangkat`, `jenis_kp`, `gol_pppk` — DDL `gol_pppk` ditemukan) + CRUD admin engine generik (`KpController`): urutan pangkat = level (mode urutan manual), dropdown pangkat `?cpns=1\|2`, `uang_makan` bisa diubah role 1 (K5), hapus `gol_pppk` menyimpan status 10; test hijau. Sisa: QA (QASMTASK-036). Dokumen: `backend/docs/db-review/G-04-G-05-pangkat-pendidikan-schema.md` |
+| G-05 Pendidikan | **IN_PROGRESS** (kode di main, menunggu QA) | ✅ **DBV-004/CR-011** (PR #13, merge `acd8693`, sama dengan G-04): 3 tabel skema legacy (`jenjang_pendidikan`, `bidang_pendidikan` — DDL ditemukan, `jurusan_pendidikan`) + CRUD admin engine generik (`PendidikanController`): singkatan jenjang unik, `row_jurusan` pilihan tetap, `bobot_ipasn` tidak diekspos (default NULL), jurusan minimal satu flag jenjang, dropdown bidang → jurusan mengikuti rantai status; test hijau. Dropdown jurusan per jenjang dikerjakan bersama riwayat pendidikan (Fase 3). Sisa: QA (QASMTASK-037) |
+| G-06 Diklat, Hukdis, Konket, Tanda Jasa | **IN_PROGRESS** (kode di main, menunggu QA) | ✅ **DBV-005/CR-012** disetujui DB Validator & review kode, di main lewat PR #14 (merge `e602205`): 5 tabel skema legacy (`diklat` DDL [K], 4 tabel [I]) + K5 (`affect_tukin`, `masa_sanksi_bulan`); CRUD role 1 lewat engine generik (4 controller) dan halaman Master Data generik (aksi baris lewat menu ⋮), dropdown UL_ALL. Syarat DBV: audit data & penyalinan counter AUTO_INCREMENT legacy jadi langkah runbook impor. Sisa: QA (QASMTASK-038) — `backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md` |
+| G-07 Data Umum & Wilayah | **IN_PROGRESS** (kode di main, menunggu QA) | agama, jenis_pegawai, jenis_status, wilayah 4 level SELESAI (backend + FE + G-TC). `kantor`, `bidang_kursem`, `instansi_kursem` + sentinel LAIN-LAIN wilayah: ✅ **DBV-003/CR-010** disetujui DB Validator & review kode, di main lewat PR #12 (merge `d1cf1b3`). Sisa: QA (QASMTASK-039) |
+| G-08 Hari Libur | **IN_PROGRESS** (kode di main, menunggu QA) | `jenis_libur` (engine) + `hari_libur` (controller + service khusus: overlap dengan lock, `tanggalLibur()` untuk Fase 5) + halaman FE: ✅ **DBV-003/CR-010** di main (PR #12, merge `d1cf1b3`). Sisa: QA (QASMTASK-040) |
 | G-09 Web Config | TODO (blocked) | Konflik nama kolom `config_key` (seed) vs `config_name` (legacy); daftar key + tipe data belum ada |
 | G-10 FAQ | **IN_PROGRESS** (kode di main, menunggu QA) | Pilot skema legacy **DBV-002/CR-003** (branch `dbv-002/g10-faq-pilot`): 5 tabel FAQ (DDL legacy ditemukan), CRUD admin (engine generik) + baca/cari/rating pegawai (backend + FE) selesai & test hijau. ⏳ Menunggu approval DB Validator (DBV-002) dan review kode (CR-003); FK `faq_rate.nip` → `pegawai` ditunda ke B-01 |
 
@@ -28,14 +28,18 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - Dijalankan HANYA di DB lokal (`simpeg_v2`) & test (`simpeg_v2_testing`).
 - **DBV-001** `app/Database/Migrations/2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` — ALTER ke skema legacy (nama/tipe kolom legacy, status 1/2/10, kolom audit, `utf8mb4_unicode_ci`, UNIQUE nama, kode wilayah CHAR(2/4/7/10)). ✅ Disetujui DB Validator 24-09-2026 (PR #4, merge `633dbb0`); jalankan hanya saat ketujuh tabel kosong. Menyelesaikan ISSUE-008/009/010 untuk 7 tabel ini (sisa di luar tabel ini tetap dilacak di kartu masing-masing).
 - **DBV-002** (✅ disetujui 25-09-2026, merge `f958cb5`) `app/Database/Migrations/2026-09-24-000001_CreateFaq.php` — 5 tabel FAQ skema legacy. Dokumen review terpisah: `backend/docs/db-review/G-10-faq-schema.md`. Belum dijalankan di `simpeg_v2` (dev); hanya di DB test.
+- **DBV-003** (✅ disetujui 29-09-2026, PR #12, merge `d1cf1b3`) `app/Database/Migrations/2026-09-25-100000_CreateHariLibur.php`, `…-100100_CreateKursem.php`, `…-100200_SeedWilayahLainLain.php`, `…-100300_CreateKantor.php` — 5 tabel (`jenis_libur`, `hari_libur`, `bidang_kursem`, `instansi_kursem`, `kantor`) + 4 baris sentinel LAIN-LAIN wilayah; keempat migration wajib satu batch. Dokumen: `backend/docs/db-review/G-07-G-08-kantor-hari-libur-kursem-schema.md`.
+- **DBV-004** (✅ disetujui 29-09-2026, PR #13, merge `acd8693`) `app/Database/Migrations/2026-09-25-110000_CreateMasterKenaikanPangkat.php`, `…-110100_CreateMasterPendidikan.php` — 6 tabel (`pangkat`, `jenis_kp`, `gol_pppk`, `jenjang_pendidikan`, `bidang_pendidikan`, `jurusan_pendidikan`). Dokumen: `backend/docs/db-review/G-04-G-05-pangkat-pendidikan-schema.md`.
+- **DBV-005** (✅ disetujui 29-09-2026, PR #14, merge `e602205`) `app/Database/Migrations/2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa.php` — 5 tabel (`diklat`, `tingkat_hukdis`, `jenis_hukdis`, `jenis_konket`, `tanda_jasa`). Dokumen: `backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md`.
+- Ringkasan: **28 tabel** master disetujui DB Validator & di main — Batch 1 7 + FAQ 5 + G-04..G-08 16. DBV-003/004/005 diverifikasi DB Validator di MariaDB 10.4 (hasil di dokumen masing-masing); nilai [I] tetap wajib dicocokkan dengan dump struktur produksi.
 
 **Belum**
 - ~~Approval DB Validator~~ → Batch 1 **DISETUJUI** 23-09-2026 (Keputusan #1, #3, #5 terisi). Keputusan #2, #4, #9 ditunda sampai seluruh Fase 2 selesai → **dikerjakan lebih awal di DBV-001** atas keputusan user 23-09-2026 (✅ disetujui 24-09-2026, G-01 Bagian 8.5; #3 dibalik); #6, #7, #8 masih menunggu DDL legacy (bagian FAQ dari #6 `faq_related_article` & #7 `faq_rate.nip` diajukan di DBV-002 ⏳, G-10 Bagian 5).
 - Wajib sebelum impor data master legacy: ~~panjang kode wilayah, UNIQUE index nama, collation~~ → dikerjakan di DBV-001 (✅ disetujui 24-09-2026); tersisa strict mode koneksi (A-01) + audit duplikat data legacy + pencocokan nilai dugaan dengan dump struktur produksi (G-01 Bagian 8.3).
-- ~38 tabel Tier 0/1 sisanya — menunggu hasil `mysqldump --no-data simpeg01 …` (ISSUE-003). Tabel FAQ sudah keluar dari daftar ini (DDL ada, diajukan di DBV-002).
-- Berhenti di: menunggu DDL. Langkah berikut: tulis migration per grup (G-02..G-10) mengikuti DDL legacy, tambah entri di `Config\MasterData`. G-10 sudah diajukan sebagai pilot (DBV-002); polanya dipakai untuk grup berikutnya setelah disetujui.
+- Tabel Tier 0/1 sisanya — menunggu hasil `mysqldump --no-data simpeg01 …` (ISSUE-003). Tabel FAQ (DBV-002) dan G-04..G-08 (DBV-003/004/005) sudah keluar dari daftar ini. Sisa per grup: G-02 jabatan/unit/satker (menunggu dump ISSUE-003, DBV-008), G-03 lokasi presensi (DBV-007), G-09 web config (DBV-006).
+- Berhenti di: menunggu DDL. Langkah berikut: tulis migration G-02, G-03, G-09 mengikuti DDL legacy, tambah entri di `Config\MasterData`, dengan pola pilot G-10 (DBV-002) yang sudah dipakai DBV-003..005. Pencocokan nilai [I] G-04..G-08 dengan dump struktur produksi dilakukan saat dump tersedia (koreksi lewat migration ALTER baru).
 
-## G-07 — IN_PROGRESS
+## G-07 — IN_PROGRESS (kantor/kursem DBV-003/CR-010 ✅, di main; menunggu QA)
 
 **Sudah jalan (DoD terpenuhi untuk 7 master ini)**
 - CRUD agama, jenis pegawai, jenis status, provinsi, kabupaten/kota, kecamatan, kelurahan — `UmumController` (engine generik).
@@ -45,7 +49,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - FE: `/master/:entity?` (menu "Master Data" hanya role 1), badge Aktif hijau/Tidak Aktif abu/Dihapus merah, semua aksi baris (edit, aktif/nonaktif, naik/turun urutan, pulihkan, hapus) lewat menu titik tiga ⋮ (CR-015, aturan AGENTS.md), form tambah/edit, konfirmasi hapus (soft).
 - Diverifikasi manual di browser (lokal): tambah, duplikat nama ditolak di field, toggle status, reorder, edit (induk berjenjang ter-isi), hapus soft, role 2 → 403 & menu tersembunyi, tampilan mobile.
 
-**DBV-003/CR-010 (⏳ menunggu approval DB Validator + review kode; branch `dbv-003/g07-g08-libur-kantor-kursem`)** — dokumen skema & keputusan: `backend/docs/db-review/G-07-G-08-kantor-hari-libur-kursem-schema.md`.
+**DBV-003/CR-010 (✅ disetujui DB Validator 29-09-2026 + review kode; di main lewat PR #12, merge `d1cf1b3`; branch `dbv-003/g07-g08-libur-kantor-kursem`)** — dokumen skema & keputusan: `backend/docs/db-review/G-07-G-08-kantor-hari-libur-kursem-schema.md`.
 - Migration `2026-09-25-100100_CreateKursem` (`bidang_kursem`, `instansi_kursem`: DDL legacy + `order` TINYINT, UNIQUE nama), `2026-09-25-100200_SeedWilayahLainLain` (4 baris sentinel LAIN-LAIN 99/9999/9999999/9999999999, `order` 0; `up()` menolak bila satu kode sudah ada, `down()` menolak selama masih dirujuk), `2026-09-25-100300_CreateKantor` (kolom dari kode legacy, 4 FK nama ERD RESTRICT, UNIQUE `nama_kantor` global).
 - Engine (generik): opsi `systemIds` (baris sistem: tidak tampil di options & daftar admin, tidak ikut urutan, tidak bisa diubah/dinonaktifkan/diurutkan/dihapus/menjadi induk → 422, detail tetap bisa dibaca), `allowSystem` (field ref boleh merujuk baris sistem; field lain "tidak ditemukan"), `otherFor` (isian "lainnya", metadata FE). Wilayah memakai `systemIds`.
 - Master `kantor` (field ref wilayah berjenjang + LAIN-LAIN; `KantorHooks`: LAIN-LAIN berjenjang, rantai konsisten untuk kode riil, `*_lain` wajib/NULL, `kode_pos` 5 digit dan salah satu `kelurahan.kd_pos` bila terisi; diperiksa ulang hanya bila kolom wilayah berubah), `bidang-kursem`, `instansi-kursem` (tanpa `*_by`) — `UmumController`, CRUD role 1, dropdown UL_ALL.
@@ -54,12 +58,13 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - Test: `WilayahSentinelTest`, `KantorTest`, `MasterConfigSchemaTest`, `LiburKantorKursemSchemaTest` (+ `testWilayahSentinelRows`), `Batch1LegacySchemaTest` (ikut melepas/memasang kantor & sentinel), G-TC generik mencakup 4 master baru; Vitest form LAIN-LAIN.
 
 **Belum**
-- Approval DBV-003 (+ verifikasi MariaDB 10.4, G-doc 6.4) dan review CR-010; audit data kantor legacy sebelum impor (G-doc 6.3).
+- ~~Approval DBV-003 (+ verifikasi MariaDB 10.4, G-doc 6.4) dan review CR-010~~ → ✅ DBV-003 disetujui 29-09-2026 (16 poin, verifikasi MariaDB 10.4 lolos — G-doc Status & 6.4) + CR-010 ✅; di main (`d1cf1b3`). Sisa: QA fungsional/visual kantor, kursem, dan sentinel LAIN-LAIN (QASMTASK-039).
+- Audit data kantor legacy sebelum impor (G-doc 6.3); nilai [I] `kantor` wajib dicocokkan dengan dump struktur produksi (G-doc 3.1, DBV-003 #9).
 - G-TC #7 QA Lapis 1 vs Figma — desain belum ada.
 
-## G-08 — IN_PROGRESS (⏳ DBV-003/CR-010)
+## G-08 — IN_PROGRESS (DBV-003/CR-010 ✅, di main; menunggu QA)
 
-**Sudah jalan (branch `dbv-003/g07-g08-libur-kantor-kursem`, belum di main)**
+**Sudah jalan (di main lewat PR #12, merge `d1cf1b3`; branch `dbv-003/g07-g08-libur-kantor-kursem`)**
 - Migration `2026-09-25-100000_CreateHariLibur`: `jenis_libur` (kolom dari kode legacy) + `hari_libur` (DDL legacy + `status` 1/2/10, UNIQUE `tgl_mulai`, CHECK `tgl_akhir >= tgl_mulai`, FK RESTRICT; tanpa UNIQUE nama).
 - `jenis-libur` lewat engine (`HariLiburController`, CRUD role 1, dropdown UL_ALL).
 - `api/v1/hari-libur` (`HariLiburController` + `HariLiburService`): daftar/detail role 1/4/5/8 (role 4/5/8 hanya status 1), tambah/ubah/status/hapus role 1, soft delete + pulihkan. Validasi tanggal `YYYY-MM-DD` (1900-2100), rentang, jenis wajib & aktif, overlap inklusif terhadap semua status dalam transaksi + named lock (`GET_LOCK`, 409 bila sibuk); 1062/CHECK (3819/4025) → 422. `updated_by` diisi saat tambah & ubah (legacy).
@@ -68,8 +73,8 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 - Test: `HariLiburTest` (RBAC, validasi, overlap semua status, soft delete, balapan UNIQUE, CHECK, lock 409, `tanggalLibur()`), `HariLiburRulesTest`; Vitest schema/service/form/halaman/menu.
 
 **Belum**
-- Approval DBV-003 (+ verifikasi `GET_LOCK` dan CHECK 4025 di MariaDB 10.4) dan review CR-010.
-- Endpoint/konsumen `tanggalLibur()` baru ada di Fase 5; audit data `hari_libur` legacy sebelum impor (G-doc 6.3).
+- ~~Approval DBV-003 (+ verifikasi `GET_LOCK` dan CHECK 4025 di MariaDB 10.4) dan review CR-010~~ → ✅ DBV-003 disetujui 29-09-2026 + CR-010 ✅; `GET_LOCK` antar sesi dan CHECK 4025 → 422 terverifikasi di MariaDB 10.4 (G-doc 6.4 j, k); di main (`d1cf1b3`). Sisa: QA fungsional/visual hari libur & jenis libur (QASMTASK-040).
+- Endpoint/konsumen `tanggalLibur()` baru ada di Fase 5; audit data `hari_libur` legacy sebelum impor (G-doc 6.3), termasuk memastikan tidak ada baris `id_jenis_libur` NULL yang lolos tanpa disadari (catatan DBV-003 #6/#7); nilai [I] `jenis_libur` wajib dicocokkan dengan dump (G-doc 3.1).
 
 ## G-10 — IN_PROGRESS (pilot DBV-002 / CR-003 ✅, di main; menunggu QA)
 
