@@ -1,4 +1,4 @@
-# QAFUNC-004 (G-04..G-08): QA Master Data Gelombang 2 — QASMTASK-036, 037, 038, 039, 040
+# QAFUNC-003 (G-04..G-08): QA Master Data Gelombang 2 — QASMTASK-036, 037, 038, 039, 040
 
 | | |
 |---|---|
