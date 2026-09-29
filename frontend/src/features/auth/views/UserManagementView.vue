@@ -11,6 +11,7 @@ import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
+import { formatApiDateTime } from '@/shared/utils/dateTime'
 
 import UserFormDialog from '../components/UserFormDialog.vue'
 import { usersService } from '../services/users.service'
@@ -186,10 +187,10 @@ const confirmText = computed(() => {
     : { title: `Aktifkan akun ${u.username}?`, description: 'Akun akan bisa dipakai login kembali.' }
 })
 
+/** CR-023 (ISSUE-022): last_login_at dari API = UTC tanpa zona → dibaca sebagai UTC, tampil di zona browser. */
 function formatDate(value: string | null): string {
   if (!value) return '—'
-  const d = new Date(value.replace(' ', 'T'))
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+  return formatApiDateTime(value) ?? value
 }
 
 onMounted(() => {

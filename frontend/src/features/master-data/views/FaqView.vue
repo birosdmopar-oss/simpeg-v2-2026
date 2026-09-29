@@ -13,6 +13,7 @@ import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isApiError } from '@/lib/axios'
 import SafeHtml from '@/shared/components/SafeHtml.vue'
+import { formatApiDateTime } from '@/shared/utils/dateTime'
 
 import FaqRatingWidget from '../components/FaqRatingWidget.vue'
 import { FAQ_SEARCH_MAX_LENGTH, faqService } from '../services/faq.service'
@@ -122,12 +123,9 @@ function onRated(rate: FaqRate): void {
   if (article.value) article.value.rating = { can_rate: false, rated: true, rate }
 }
 
-/** Tanggal diperbarui (backend menulis timestamp UTC "YYYY-MM-DD HH:MM:SS"). */
+/** Tanggal diperbarui (backend menulis timestamp UTC "YYYY-MM-DD HH:MM:SS"; dibaca lewat helper bersama CR-023). */
 function formatUpdated(value: string | null): string {
-  if (!value) return ''
-  const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(value) ? `${value.replace(' ', 'T')}Z` : value
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  return formatApiDateTime(value, { day: 'numeric', month: 'long', year: 'numeric' }) ?? ''
 }
 
 watch(

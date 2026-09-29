@@ -236,3 +236,47 @@ describe('UserManagementView — akun tanpa NIP (DBV-010/CR-013)', () => {
     expect(usersService.list).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name', order: 'asc' }))
   })
 })
+
+/**
+ * CR-023 (ISSUE-022) — last_login_at dikirim backend dalam UTC tanpa zona ("2026-09-29 11:01:00"). Sebelumnya dibaca
+ * sebagai jam lokal sehingga login 18.01 WIB tampil 11.01. Zona browser dikunci ke Asia/Jakarta lewat TZ.
+ */
+describe('UserManagementView — kolom Login terakhir (CR-023)', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'Asia/Jakarta')
+    vi.mocked(usersService.list).mockResolvedValue({
+      items: [
+        self,
+        { ...active, last_login_at: '2026-09-29 11:01:00' },
+        { ...inactive, last_login_at: 'bukan-tanggal' },
+      ],
+      total: 3,
+      page: 1,
+      per_page: 10,
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  function loginCell(wrapper: Awaited<ReturnType<typeof mountView>>, id: number): string {
+    const index = wrapper.findAll('th').findIndex((th) => th.text().startsWith('Login terakhir'))
+    if (index < 0) throw new Error('kolom Login terakhir tidak ditemukan')
+    return wrapper.get(`[data-testid="user-row-${id}"]`).findAll('td')[index]?.text() ?? ''
+  }
+
+  it('stempel waktu UTC dari API tampil dalam jam WIB (11.01 UTC → 18.01)', async () => {
+    expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe('Asia/Jakarta')
+    const wrapper = await mountView()
+
+    expect(loginCell(wrapper, active.id_pengguna)).toBe('29 Sep 2026, 18.01')
+  })
+
+  it('belum pernah login → "—"; nilai yang tidak bisa dibaca ditampilkan apa adanya', async () => {
+    const wrapper = await mountView()
+
+    expect(loginCell(wrapper, self.id_pengguna)).toBe('—')
+    expect(loginCell(wrapper, inactive.id_pengguna)).toBe('bukan-tanggal')
+  })
+})
