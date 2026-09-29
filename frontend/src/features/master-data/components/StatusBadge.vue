@@ -14,14 +14,14 @@ const value = computed<MasterStatus>(() => {
 })
 
 const CLASSES: Record<MasterStatus, string> = {
-  '1': 'bg-green-100 text-green-800',
-  '2': 'bg-slate-200 text-slate-600',
-  '10': 'bg-red-100 text-red-700',
+  '1': 'bg-success-soft text-[#1c7a4a]',
+  '2': 'bg-slate-100 text-slate-600',
+  '10': 'bg-danger-soft text-[#a52b2c]',
 }
 </script>
 
 <template>
-  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium" :class="CLASSES[value]" :data-status="value">
+  <span class="inline-flex rounded-full px-2 py-0.5 text-caption font-medium" :class="CLASSES[value]" :data-status="value">
     {{ MASTER_STATUS_LABELS[value] }}
   </span>
 </template>

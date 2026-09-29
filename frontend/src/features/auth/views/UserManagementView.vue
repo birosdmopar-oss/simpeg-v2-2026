@@ -201,14 +201,14 @@ onMounted(() => {
   <section class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl font-semibold text-slate-900">Manajemen Akun</h1>
+        <h1 class="text-h4 text-slate-900">Manajemen Akun</h1>
         <p class="text-sm text-slate-500">
           {{ auth.role === Role.ADMIN_SATKER ? `Akun di satker ${auth.user?.id_satker ?? ''}` : 'Seluruh akun pengguna' }}
         </p>
       </div>
       <button
         type="button"
-        class="flex items-center gap-1.5 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90"
+        class="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] px-4 text-body1 font-medium"
         data-testid="user-add"
         @click="openCreate"
       >
@@ -216,34 +216,34 @@ onMounted(() => {
       </button>
     </div>
 
-    <p v-if="notice" class="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800" role="status">{{ notice }}</p>
-    <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
+    <p v-if="notice" class="rounded-xl border border-success/30 bg-success-soft px-3 py-2 text-sm text-[#1c7a4a]" role="status">{{ notice }}</p>
+    <p v-if="error" class="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]" role="alert">{{ error }}</p>
 
-    <div class="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
+    <div class="flex flex-wrap gap-3 rounded-card border border-slate-200 bg-white p-4 shadow-card">
       <label class="relative flex-1 min-w-[200px]">
-        <Search class="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           v-model="search"
           type="search"
           placeholder="Cari username / NIP / nama"
-          class="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand-tertiary focus:outline-none focus:ring-2 focus:ring-brand-tertiary/40"
+          class="h-11 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25"
           data-testid="user-search"
         />
       </label>
-      <select v-model="roleFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+      <select v-model="roleFilter" class="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25">
         <option value="">Semua role</option>
         <option v-for="(label, code) in ROLE_LABELS" :key="code" :value="Number(code)">{{ code }} — {{ label }}</option>
       </select>
-      <select v-model="statusFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+      <select v-model="statusFilter" class="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25">
         <option value="">Semua status</option>
         <option value="1">Aktif</option>
         <option value="0">Nonaktif</option>
       </select>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div class="scrollbar-slim overflow-x-auto rounded-card border border-slate-200 bg-white shadow-card">
       <table class="min-w-full text-sm">
-        <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+        <thead class="border-b border-slate-200 bg-white text-left text-sm font-semibold text-slate-900">
           <tr>
             <th v-for="col in columns" :key="col.key" class="px-4 py-3">
               <button type="button" class="flex items-center gap-1 hover:text-slate-800" @click="toggleSort(col.key)">
@@ -257,22 +257,22 @@ onMounted(() => {
             <th class="px-4 py-3 text-right">Aksi</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
+        <tbody class="divide-y divide-slate-200">
           <tr v-if="loading">
             <td colspan="8" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
           </tr>
           <tr v-else-if="items.length === 0">
             <td colspan="8" class="px-4 py-8 text-center text-slate-500">Tidak ada akun yang cocok.</td>
           </tr>
-          <tr v-for="u in items" v-else :key="u.id_pengguna" class="hover:bg-slate-50" :data-testid="`user-row-${u.id_pengguna}`">
+          <tr v-for="u in items" v-else :key="u.id_pengguna" class="transition-colors hover:bg-slate-50/70" :data-testid="`user-row-${u.id_pengguna}`">
             <td class="px-4 py-3 font-medium text-slate-800">{{ u.username }}</td>
             <td class="px-4 py-3 text-slate-700">{{ u.name ?? '—' }}</td>
             <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ u.nip ?? '—' }}</td>
             <td class="px-4 py-3">{{ u.user_level }} — {{ ROLE_LABELS[u.user_level] }}</td>
             <td class="px-4 py-3">
               <span
-                class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="u.status === '1' ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'"
+                class="inline-flex rounded-full px-2 py-0.5 text-caption font-medium"
+                :class="u.status === '1' ? 'bg-success-soft text-[#1c7a4a]' : 'bg-slate-200 text-slate-600'"
               >
                 {{ u.status === '1' ? 'Aktif' : 'Nonaktif' }}
               </span>
@@ -297,8 +297,8 @@ onMounted(() => {
     <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
       <span>{{ total }} akun · halaman {{ page }} dari {{ totalPages }}</span>
       <div class="flex gap-1">
-        <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
-        <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40" :disabled="page >= totalPages" @click="goTo(page + 1)">Berikutnya</button>
+        <button type="button" class="rounded-lg bg-slate-100 px-3 py-1.5 text-slate-700 transition hover:bg-slate-200 disabled:opacity-40" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
+        <button type="button" class="rounded-lg bg-slate-100 px-3 py-1.5 text-slate-700 transition hover:bg-slate-200 disabled:opacity-40" :disabled="page >= totalPages" @click="goTo(page + 1)">Berikutnya</button>
       </div>
     </div>
 

@@ -140,7 +140,7 @@ const onSubmit = handleSubmit(async (form) => {
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
       >
         <div class="mb-4 flex items-start justify-between">
           <div>
@@ -149,13 +149,13 @@ const onSubmit = handleSubmit(async (form) => {
               Rentang tanggal tidak boleh bentrok dengan hari libur lain, termasuk yang tidak aktif atau dihapus.
             </DialogDescription>
           </div>
-          <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+          <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
             <X class="h-5 w-5" />
           </DialogClose>
         </div>
 
         <form class="space-y-4" novalidate data-testid="hari-libur-form" @submit="onSubmit">
-          <p v-if="formError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ formError }}</p>
+          <p v-if="formError" class="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]" role="alert">{{ formError }}</p>
 
           <div class="grid gap-4 sm:grid-cols-2">
             <FormField
@@ -228,10 +228,10 @@ const onSubmit = handleSubmit(async (form) => {
           />
 
           <div class="flex justify-end gap-2 pt-2">
-            <DialogClose class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</DialogClose>
+            <DialogClose class="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200">Batal</DialogClose>
             <button
               type="submit"
-              class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
+              class="rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] px-4 py-2 text-sm font-medium disabled:opacity-60"
               :disabled="isSubmitting"
             >
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}

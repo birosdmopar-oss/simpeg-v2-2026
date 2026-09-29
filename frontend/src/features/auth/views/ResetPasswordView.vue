@@ -98,7 +98,7 @@ const onSubmit = handleSubmit(async (values) => {
 <template>
   <AuthCardLayout>
     <form
-      class="space-y-4 rounded-xl bg-white p-6 shadow-xl"
+      class="space-y-4 rounded-2xl bg-white p-6 shadow-float sm:p-8"
       novalidate
       data-testid="reset-form"
       @submit="onSubmit"
@@ -114,7 +114,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <div
         v-if="tokenRejected"
-        class="space-y-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700"
+        class="space-y-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]"
         role="alert"
         data-testid="reset-token-error"
       >
@@ -130,7 +130,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <div
         v-else-if="banner"
-        class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700"
+        class="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]"
         role="alert"
         data-testid="reset-error"
       >
@@ -182,7 +182,7 @@ const onSubmit = handleSubmit(async (values) => {
 
         <button
           type="submit"
-          class="flex w-full items-center justify-center rounded-md bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          class="flex h-11 w-full items-center justify-center rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] text-body1 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="submitting || tokenRejected !== null"
           data-testid="reset-submit"
         >

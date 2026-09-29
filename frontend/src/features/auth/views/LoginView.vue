@@ -54,11 +54,11 @@ const [password] = defineField('password')
 const bannerClass = computed(() => {
   switch (banner.value?.kind) {
     case 'locked':
-      return 'border-amber-300 bg-amber-50 text-amber-800'
+      return 'border-warning/40 bg-warning-soft text-[#8a4f0f]'
     case 'network':
       return 'border-slate-300 bg-slate-50 text-slate-700'
     default:
-      return 'border-red-300 bg-red-50 text-red-700'
+      return 'border-danger/30 bg-danger-soft text-[#a52b2c]'
   }
 })
 
@@ -118,7 +118,7 @@ const onSubmit = handleSubmit(async (values) => {
 <template>
   <AuthCardLayout>
     <form
-      class="space-y-4 rounded-xl bg-white p-6 shadow-xl"
+      class="space-y-4 rounded-2xl bg-white p-6 shadow-float sm:p-8"
       novalidate
       data-testid="login-form"
       @submit="onSubmit"
@@ -127,7 +127,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <div
         v-if="notice && !banner"
-        class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+        class="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
         role="status"
         data-testid="login-notice"
       >
@@ -136,7 +136,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <div
         v-if="banner"
-        class="rounded-md border px-3 py-2 text-sm"
+        class="rounded-lg border px-3 py-2 text-sm"
         :class="bannerClass"
         role="alert"
         :data-testid="`login-error-${banner.kind}`"
@@ -184,14 +184,14 @@ const onSubmit = handleSubmit(async (values) => {
           @expired="onCaptchaExpired"
           @error="onCaptchaExpired"
         />
-        <p v-if="submitCount > 0 && errors.captcha_token" class="text-xs text-red-600" role="alert">
+        <p v-if="submitCount > 0 && errors.captcha_token" class="text-caption text-danger" role="alert">
           {{ errors.captcha_token }}
         </p>
       </div>
 
       <button
         type="submit"
-        class="flex w-full items-center justify-center rounded-md bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        class="flex h-11 w-full items-center justify-center rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] text-body1 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="submitting"
         data-testid="login-submit"
       >
