@@ -103,6 +103,29 @@ class AuthSeeder extends Seeder
             'updated_at'      => $now,
         ];
 
+        $this->seedPegawai(array_column($rows, 'nip'));
         $this->db->table('pengguna')->insertBatch($rows);
+    }
+
+    /**
+     * DBV-012: FK `pengguna.nip` → `pegawai.nip` (A-01 #4) mewajibkan baris pegawai untuk setiap akun ber-NIP. Baris
+     * minimal (kolom NOT NULL tanpa default); dilewati bila tabel pegawai belum ada (migration sebelum B-01).
+     *
+     * @param list<string> $nips
+     */
+    private function seedPegawai(array $nips): void
+    {
+        // tableExists(..., false) tidak menambah DBPrefix (CI 4.7): kirim nama ber-prefix.
+        if (! $this->db->tableExists($this->db->prefixTable('pegawai'), false)) {
+            return;
+        }
+
+        $rows = [];
+
+        foreach ($nips as $nip) {
+            $rows[] = ['nip' => $nip, 'nama' => 'Pegawai Uji ' . $nip, 'tgl_lahir' => '1980-01-01'];
+        }
+
+        $this->db->table('pegawai')->ignore(true)->insertBatch($rows);
     }
 }
