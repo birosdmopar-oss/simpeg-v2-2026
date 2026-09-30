@@ -14,6 +14,8 @@
  * di akhir daftar seperti legacy). Memilih LAIN-LAIN mengisi LAIN-LAIN di semua level turunan; level di bawah
  * LAIN-LAIN terkunci pada LAIN-LAIN tanpa memanggil API. Field ber-`other_for` hanya tampil (dan wajib) bila field
  * ref-nya LAIN-LAIN; saat disembunyikan nilainya dikosongkan.
+ * CR-026 (kelas jabatan, DBV-008): master `code_as_name` (kode = nama) hanya punya input kode (berlabel nama master,
+ * dibatasi `id_range`) saat tambah dan tanpa input nama; nilai nama terkirim = kode, jadi kode tidak berubah saat edit.
  */
 import { toTypedSchema } from '@vee-validate/zod'
 import { X } from 'lucide-vue-next'
@@ -275,7 +277,9 @@ function refPlaceholder(field: MasterFieldMeta): string {
 }
 
 function refSelectOptions(field: MasterFieldMeta): Array<{ value: string; label: string }> {
-  return (refState.value[field.name]?.options ?? []).map((o) => ({ value: o.id, label: `${o.nama} (${o.id})` }))
+  // Rujukan ke master code_as_name (CR-026, mis. kelas jabatan): nama = kode, cukup ditampilkan sekali.
+  const codeAsName = props.allMeta.some((m) => m.key === field.entity && m.code_as_name === true)
+  return (refState.value[field.name]?.options ?? []).map((o) => ({ value: o.id, label: codeAsName && o.nama === o.id ? o.nama : `${o.nama} (${o.id})` }))
 }
 
 async function onLevelChange(index: number, value: string): Promise<void> {
@@ -387,11 +391,15 @@ const orderHint = computed(() => {
     : `Kosongkan = ditaruh paling akhir${orderScopeText.value}.`
 })
 
-const codeHint = computed(() =>
-  props.meta.id_digits !== null
-    ? `Tepat ${props.meta.id_digits} digit angka, tanpa titik (kode wilayah legacy).`
-    : `Maksimal ${props.meta.id_max_length} karakter, tanpa spasi.`,
-)
+const codeHint = computed(() => {
+  if (props.meta.id_digits !== null) return `Tepat ${props.meta.id_digits} digit angka, tanpa titik (kode wilayah legacy).`
+  const range = props.meta.id_range ?? null
+  if (range !== null) return `Bilangan bulat ${range[0]} sampai ${range[1]}, tanpa nol di depan.`
+  return `Maksimal ${props.meta.id_max_length} karakter, tanpa spasi.`
+})
+
+/** CR-026: master code_as_name (kode = nama, mis. kelas jabatan) memakai label nama untuk input kode. */
+const codeLabel = computed(() => (props.meta.code_as_name ? props.meta.name_label : 'Kode'))
 
 const { levels } = cascade
 </script>
@@ -431,7 +439,7 @@ const { levels } = cascade
             v-if="!isEdit && !meta.auto_increment"
             :model-value="values[meta.primary_key]"
             :name="meta.primary_key"
-            label="Kode"
+            :label="codeLabel"
             required
             :hint="codeHint"
             :error="fieldError(meta.primary_key)"
@@ -456,6 +464,7 @@ const { levels } = cascade
           </template>
 
           <FormField
+            v-if="!meta.code_as_name"
             :model-value="values[meta.name_field]"
             :name="meta.name_field"
             :label="meta.name_label"

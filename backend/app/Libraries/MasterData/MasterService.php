@@ -46,6 +46,8 @@ use Throwable;
  *     options maupun daftar admin, tidak ikut penomoran urutan, tidak bisa diubah/dinonaktifkan/diurutkan/dihapus
  *     (422), tidak bisa menjadi induk, dan hanya bisa dirujuk field ref ber-allowSystem (field lain: "tidak
  *     ditemukan", sama dengan kode yang tidak ada). Detail GET {kode} tetap bisa dibaca.
+ * 10. Kode sebagai nama (opsi codeAsName, CR-026), mis. kelas jabatan (PK alami tanpa kolom nama, DBV-008): nama = kode,
+ *     keunikannya = keunikan kode, dan nama yang dikirim saat ubah wajib sama dengan kode (kode tidak bisa diubah, 422).
  *
  * Mendukung dua bentuk kode sesuai DDL legacy: PK string yang diinput admin (kode wilayah CHAR(2/4/7/10), wajib
  * tepat N digit) dan PK AUTO_INCREMENT (agama, jenis_pegawai, jenis_status). Kolom tambahan legacy per master
@@ -318,8 +320,9 @@ class MasterService
      */
     private function createLocked(MasterDefinition $def, array $data): array
     {
-        $id     = trim((string) ($data[$def->primaryKey] ?? ''));
-        $name   = $this->normalizeName($data[$def->nameField] ?? '');
+        $id = trim((string) ($data[$def->primaryKey] ?? ''));
+        // codeAsName (CR-026): nama = kode (kolom yang sama), keunikannya = keunikan kode (exists() di bawah).
+        $name   = $def->codeAsName ? $id : $this->normalizeName($data[$def->nameField] ?? '');
         $parent = $def->parentField !== null ? trim((string) ($data[$def->parentField] ?? '')) : null;
 
         if (! $def->autoIncrement) {
@@ -460,10 +463,19 @@ class MasterService
         $name = (string) $current[$def->nameField];
 
         if (array_key_exists($def->nameField, $data)) {
-            $name = $this->normalizeName($data[$def->nameField]);
+            $sent = $this->normalizeName($data[$def->nameField]);
 
-            if ($name !== (string) $current[$def->nameField]) {
-                $changes[$def->nameField] = $name;
+            if ($def->codeAsName) {
+                // CR-026: nama = kode (PK), yang tidak pernah berubah — nilai sama boleh dikirim (form edit), lainnya 422.
+                if ($sent !== $name) {
+                    throw ValidationException::forField($def->primaryKey, "{$def->nameLabel} adalah kode entri dan tidak dapat diubah.");
+                }
+            } else {
+                $name = $sent;
+
+                if ($name !== (string) $current[$def->nameField]) {
+                    $changes[$def->nameField] = $name;
+                }
             }
         }
 
@@ -1081,6 +1093,11 @@ class MasterService
      */
     private function assertNameUnique(MasterDefinition $def, string $name, ?string $parent, array $scope = [], ?string $exceptId = null): void
     {
+        // codeAsName (CR-026): nama = PK, keunikannya ditegakkan cek kode (exists()) dan PRIMARY KEY.
+        if ($def->codeAsName) {
+            return;
+        }
+
         $builder = $this->db->table($def->table)->where($def->nameField, $name);
 
         if ($def->parentField !== null) {

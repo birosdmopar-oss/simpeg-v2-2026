@@ -19,8 +19,10 @@ trait MasterDataTestTrait
      *   duplicate : nama yang SUDAH ada di lingkup yang sama (induk / uniqueScope) di seed MasterDataSeeder
      *   existing  : kode entri seed (untuk update/status/delete)
      *   parent    : [field, id induk] atau null
+     *   update    : (opsional, CR-026) payload PUT pengganti "ubah nama" di test generik — untuk master yang namanya tidak
+     *               bisa diubah (codeAsName, mis. kelas jabatan: nama = kode). Bawaan: nama + " (ubah)"
      *
-     * @return array<string, array{new: array<string, string>, duplicate: string, existing: string, parent: array{0: string, 1: string}|null}>
+     * @return array<string, array{new: array<string, string>, duplicate: string, existing: string, parent: array{0: string, 1: string}|null, update?: array<string, string>}>
      */
     public static function masterFixtures(): array
     {
@@ -212,6 +214,54 @@ trait MasterDataTestTrait
                 'parent'    => null,
             ],
             // --- /DBV-005 ---
+
+            // --- DBV-008 ---
+            // G-02 (seed MasterDataSeeder::seedG02). Test RBAC memproses master berurutan dan menghapus `existing` tiap
+            // master sebelum master berikutnya, dan induk/rujukan wajib aktif (E6): `new` satker/sub group/jabatan memakai
+            // unit 1, group 1, sub group 1, satker 1, kelas 13 — bukan `existing` (unit 2, satker 2, group 4, sub group 2,
+            // kelas 9). Nama `duplicate` berada di lingkup yang sama dengan `new` (unit 1 / group 1 / sub group 1 + satker 1).
+            'unit' => [
+                'new'       => ['unit' => 'Deputi Bidang Uji', 'is_upt' => '0'],
+                'duplicate' => 'sekretariat kementerian',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'satker' => [
+                'new'       => ['id_unit' => '1', 'satker' => 'Biro Uji', 'zonasi' => '0'],
+                'duplicate' => 'BIRO UMUM',
+                'existing'  => '2',
+                'parent'    => ['id_unit', '1'],
+            ],
+            'group-jabatan' => [
+                'new'       => ['group_jabatan' => 'Jabatan Uji'],
+                'duplicate' => 'struktural',
+                'existing'  => '4',
+                'parent'    => null,
+            ],
+            'sub-group-jabatan' => [
+                'new'       => ['id_group_jabatan' => '1', 'sub_group_jabatan' => 'Pengawas', 'need_satker' => '1'],
+                'duplicate' => 'ADMINISTRATOR',
+                'existing'  => '2',
+                'parent'    => ['id_group_jabatan', '1'],
+            ],
+            // codeAsName: kode = nama, jadi `duplicate` = nomor kelas yang sudah ada dan ubah memakai `update` (tukin).
+            'kelas-jabatan' => [
+                'new'       => ['kelas_jabatan' => '15', 'tukin' => '17064000'],
+                'duplicate' => '7',
+                'existing'  => '9',
+                'parent'    => null,
+                'update'    => ['tukin' => '17100000'],
+            ],
+            'jabatan' => [
+                'new' => [
+                    'id_group_jabatan' => '1', 'id_sub_group_jabatan' => '1', 'id_satker' => '1', 'kelas_jabatan' => '13',
+                    'jabatan'          => 'Kepala Biro Uji',
+                ],
+                'duplicate' => 'KEPALA BIRO SUMBER DAYA MANUSIA',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            // --- /DBV-008 ---
         ];
     }
 

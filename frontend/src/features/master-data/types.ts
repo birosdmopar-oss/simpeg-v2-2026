@@ -85,6 +85,13 @@ export interface MasterMeta {
   status_chain?: boolean
   /** CR-010: kode baris sistem (sentinel LAIN-LAIN wilayah) — tidak ada di options/daftar, dipilih lewat field ber-allow_system. */
   system_ids?: string[]
+  /**
+   * CR-026: kode (PK) sekaligus nama tampilan (mis. kelas jabatan: nomor kelas, DBV-008) — `name_field` = `primary_key`,
+   * form tidak merender input nama terpisah dan kode tidak bisa diubah.
+   */
+  code_as_name?: boolean
+  /** CR-026: kode manual = bilangan bulat tanpa nol di depan dalam rentang [min, max] (mis. kelas jabatan 1–20). */
+  id_range?: [number, number] | null
 }
 
 /** Baris master: kolom dinamis per tabel + kolom standar order/status (+ parent_nama untuk master berinduk). */
