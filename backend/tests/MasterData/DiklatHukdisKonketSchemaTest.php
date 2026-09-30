@@ -7,6 +7,7 @@ namespace Tests\MasterData;
 use App\Database\Migrations\CreateDiklatHukdisKonketTandaJasa;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
  * DBV-005 — skema G-06 hasil migration 2026-09-25-120000_CreateDiklatHukdisKonketTandaJasa harus sama dengan skema
@@ -15,11 +16,16 @@ use CodeIgniter\Test\DatabaseTestTrait;
  * `old_id`, FK RESTRICT, 3 CHECK, `affect_tukin` & `masa_sanksi_bulan` keputusan K5). Migration tidak menulis baris
  * apa pun dan bisa di-rollback.
  *
+ * Migration B-01/B-02 (DBV-012/013) merujuk tabel master ini dengan FK RESTRICT, sehingga down() master di tengah
+ * test ditolak MySQL selama migration itu terpasang; setUp() melepasnya dan tearDown() memasangnya ulang
+ * (Tests\Support\LepasMigrationKepegawaianTrait). Assertion master tidak berubah.
+ *
  * @internal
  */
 final class DiklatHukdisKonketSchemaTest extends CIUnitTestCase
 {
     use DatabaseTestTrait;
+    use LepasMigrationKepegawaianTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -118,6 +124,13 @@ final class DiklatHukdisKonketSchemaTest extends CIUnitTestCase
      * G-06 harus dibuat lagi (termasuk membuang tabel penghalang simulasi) agar migrate:refresh test berikutnya
      * konsisten dengan tabel migrations.
      */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->lepasMigrationKepegawaian();
+    }
+
     protected function tearDown(): void
     {
         foreach (self::TABLES as $table) {
@@ -129,6 +142,8 @@ final class DiklatHukdisKonketSchemaTest extends CIUnitTestCase
                 break;
             }
         }
+
+        $this->pasangUlangMigrationKepegawaian();
 
         parent::tearDown();
     }

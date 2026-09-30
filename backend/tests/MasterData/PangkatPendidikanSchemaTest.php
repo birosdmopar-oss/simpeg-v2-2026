@@ -9,6 +9,7 @@ use App\Database\Migrations\CreateMasterPendidikan;
 use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
  * DBV-004 — skema G-04 Kenaikan Pangkat (`pangkat`, `jenis_kp`, `gol_pppk`) dan G-05 Pendidikan (`jenjang_pendidikan`,
@@ -18,11 +19,16 @@ use CodeIgniter\Test\DatabaseTestTrait;
  * kolom dari kode legacy + tipe [I], deviasi v2 (status TINYINT gol_pppk, UNIQUE nama, CHECK row_jurusan, FK RESTRICT,
  * `order` bidang/jurusan), dan bisa di-rollback per migration.
  *
+ * Migration B-01/B-02 (DBV-012/013) merujuk tabel master ini dengan FK RESTRICT, sehingga down() master di tengah
+ * test ditolak MySQL selama migration itu terpasang; setUp() melepasnya dan tearDown() memasangnya ulang
+ * (Tests\Support\LepasMigrationKepegawaianTrait). Assertion master tidak berubah.
+ *
  * @internal
  */
 final class PangkatPendidikanSchemaTest extends CIUnitTestCase
 {
     use DatabaseTestTrait;
+    use LepasMigrationKepegawaianTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -140,6 +146,13 @@ final class PangkatPendidikanSchemaTest extends CIUnitTestCase
      * grup harus dibuat lagi (termasuk membuang tabel penghalang simulasi) agar migrate:refresh test berikutnya
      * konsisten dengan tabel migrations.
      */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->lepasMigrationKepegawaian();
+    }
+
     protected function tearDown(): void
     {
         foreach ([[self::TABLES_KP, $this->kpMigration()], [self::TABLES_PENDIDIKAN, $this->pendidikanMigration()]] as [$tables, $migration]) {
@@ -152,6 +165,8 @@ final class PangkatPendidikanSchemaTest extends CIUnitTestCase
                 }
             }
         }
+
+        $this->pasangUlangMigrationKepegawaian();
 
         parent::tearDown();
     }
