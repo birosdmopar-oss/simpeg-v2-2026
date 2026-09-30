@@ -45,8 +45,9 @@ sudo chown -R deploy:deploy /var/www/simpeg-v2
 # 3) .env backend (berisi secret — TIDAK dari git). Isi dari backend/.env.example
 cp backend/.env.example /var/www/simpeg-v2/shared/backend.env
 vi /var/www/simpeg-v2/shared/backend.env      # CI_ENVIRONMENT=development, database.*, jwt.secret, cors.allowedOrigins, dst.
-# Lupa password (ISSUE-006): auth.resetLinkBase = URL frontend server ini + /reset-password. Driver
-# auth.resetTokenNotifier=log menulis tautan reset ke writable/logs dan DITOLAK di production (driver email menyusul).
+# Lupa password (ISSUE-006): auth.resetLinkBase = URL frontend server ini + /reset-password (production: https).
+# Driver auth.resetTokenNotifier=log menulis tautan reset ke writable/logs dan DITOLAK di production; production memakai
+# auth.resetTokenNotifier=email + blok email.* + encryption.key + worker antrean (§1a).
 # Di production juga DITOLAK: auth.captchaDriver=mock dan auth.exposeResetTokenInResponse=true (ISSUE-021).
 
 # (opsional) .env.local frontend — VITE_PASSWORD_RESET_ENABLED=true hanya kalau kanal reset di backend aktif
@@ -105,6 +106,42 @@ server {
 ```
 
 > Catatan infrastruktur (ADR Bagian 5): BSrE (10.10.100.132) dan server Arsip (172.17.100.84) berada di jaringan internal — server dev harus berada di jaringan yang sama / VPN saat integrasi real (Fase 6).
+
+### 1a. Email tautan reset password (CR-014, ISSUE-006)
+
+Driver `auth.resetTokenNotifier = email` **tidak** mengirim SMTP di dalam request forgot-password: request hanya memasukkan job terenkripsi ke queue `email` (tabel `queue_jobs`), lalu worker antrean yang mengirim. **Tanpa worker, email reset tidak pernah terkirim** (respons forgot-password tetap sukses generik).
+
+1. Isi di `shared/backend.env` (jangan commit; kredensial SMTP legacy di `constants.php` lama **tidak dipakai ulang** dan wajib dirotasi):
+
+   ```ini
+   auth.resetTokenNotifier = email
+   auth.resetLinkBase = https://simpegdev.example.go.id/reset-password
+   encryption.key = <keluaran php spark key:generate --show, sudah berawalan hex2bin:>   # minimal 32 byte; SAMA untuk web dan worker
+   email.protocol = smtp
+   email.fromEmail = <alamat pengirim domain instansi>
+   email.fromName = SIMPEG
+   email.SMTPHost = <host relay instansi>
+   email.SMTPPort = 587          # 587 + tls (STARTTLS) atau 465 + '' (TLS implisit)
+   email.SMTPCrypto = tls
+   email.SMTPUser = <akun SMTP>  # kosongkan bersama SMTPPass bila relay per IP
+   email.SMTPPass = <password SMTP>
+   email.SMTPTimeout = 10
+   ```
+
+   `.env` disalin hook ke setiap release saat deploy, jadi perubahan `shared/backend.env` baru berlaku sesudah deploy berikutnya (atau salin manual ke `current/backend/.env`). Salah konfigurasi membuat forgot-password gagal 500 yang sama untuk semua username (pesan log hanya menyebut nama key). Pengirim wajib domain instansi lewat relay instansi (Gmail dengan `fromEmail` domain kementerian gagal SPF/DKIM dan masuk spam). Sertifikat server SMTP harus valid: jangan mematikan verifikasi TLS.
+
+2. Worker lewat cron user `deploy` (pakai symlink `current`, jadi kode baru ikut terpakai sesudah deploy; `flock` mencegah dua worker berjalan bersamaan):
+
+   ```bash
+   # /etc/cron.d/simpeg-v2-queue-email
+   * * * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-queue-email.lock php spark queue:work email --stop-when-empty --max-time 55 >> /var/www/simpeg-v2/logs/queue-email.log 2>&1
+   ```
+
+   Job dicoba ulang tiap 60 detik sampai 5 percobaan (masih di dalam masa berlaku token 30 menit). Setiap percobaan memeriksa ulang token (belum dipakai/kedaluwarsa) dan akun (aktif, email valid); akun tanpa email dilewati dengan log `warning` "tidak memiliki email valid" — bahan admin melengkapi email akun.
+
+3. Smoke test sesudah konfigurasi: `cd /var/www/simpeg-v2/current/backend && php spark email:test <alamat uji>` (email uji tanpa token; hanya mencetak hasil dan ringkasan balasan SMTP, tidak pernah password). Lalu uji alur penuh dari halaman lupa password dan periksa `php spark queue:failed` (job gagal permanen; isi tetap terenkripsi). Setelah gagal diperbaiki: `php spark queue:retry all -queue email` aman karena pemeriksaan token diulang.
+
+4. Pantau: baris `queue_jobs` queue `email` yang lebih tua dari 10 menit berarti worker tidak berjalan. `VITE_PASSWORD_RESET_ENABLED=true` di frontend baru dinyalakan setelah kirim nyata lolos di Dev. Hook `post-receive` tidak menjalankan worker (ranah CR-021).
 
 ---
 

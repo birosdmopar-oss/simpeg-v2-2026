@@ -7,10 +7,12 @@ namespace App\Interfaces;
 /**
  * Kontrak pengiriman tautan reset password ke pemilik akun (A-07, ISSUE-006, ADR-015).
  *
- * Kanal final = email (K3, keputusan user 25-09-2026). Implementasi: MockResetTokenNotifier (test),
- * LogResetTokenNotifier (development; menulis tautan ke log). Keduanya ditolak di production. Driver email (SMTP)
- * menyusul tanpa mengubah ResetPasswordService; driver itu WAJIB menjadwalkan pengiriman lewat Queue (ADR-013)
- * supaya waktu respons forgot-password tetap seragam dan tidak membocorkan username mana yang terdaftar.
+ * Kanal final = email (K3, keputusan user 25-09-2026). Implementasi: EmailResetTokenNotifier (production, CR-014),
+ * MockResetTokenNotifier (test), LogResetTokenNotifier (development; menulis tautan ke log) — dua terakhir ditolak di
+ * production. Driver email menjadwalkan pengiriman lewat Queue (ADR-013; job ResetPasswordEmailJob, worker
+ * `php spark queue:work email`) supaya waktu respons forgot-password tetap seragam dan tidak membocorkan username mana
+ * yang terdaftar. Implementasi wajib menandai $token dan $resetLink dengan #[\SensitiveParameter] dan tidak menulis
+ * keduanya ke log production.
  *
  * Hanya dipanggil untuk akun aktif yang dikenal, setelah hash token tersimpan di forgot_attempts.
  * Kegagalan kirim cukup dilempar sebagai exception: ResetPasswordService mencatatnya di log dan tetap mengembalikan

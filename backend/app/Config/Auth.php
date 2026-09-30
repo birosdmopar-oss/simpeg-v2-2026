@@ -71,18 +71,22 @@ class Auth extends BaseConfig
 
     /**
      * Driver pengiriman tautan reset (App\Interfaces\ResetTokenNotifierInterface, dipilih di Config\Services):
+     * - 'email': production (K3, CR-014) — tautan dimasukkan ke queue `email` (isi terenkripsi) lalu dikirim SMTP oleh
+     *            worker `php spark queue:work email` (cron). Butuh email.* (Config\Email), encryption.key (≥ 32 byte,
+     *            sama untuk web dan worker), dan worker yang berjalan; salah konfigurasi → ConfigException (500 sama
+     *            untuk semua username). Production wajib SMTP terenkripsi.
      * - 'log'  : development — tautan reset (berisi token) ditulis ke log lokal. DITOLAK di production.
      * - 'mock' : test — tautan disimpan di memori untuk di-assert. DITOLAK di production.
-     * Kanal final = email (K3, keputusan user 25-09-2026); driver 'email' menyusul setelah akun SMTP tersedia.
-     * Selama driver email belum ada, production menolak permintaan lupa password (ConfigException → 500) dan
-     * frontend menyembunyikan halamannya (VITE_PASSWORD_RESET_ENABLED=false → "Hubungi Admin").
+     * Default 'log' sengaja fail-closed di production sampai .env diisi 'email'. Frontend menyembunyikan halaman lupa
+     * password (VITE_PASSWORD_RESET_ENABLED=false → "Hubungi Admin") sampai kirim nyata lolos di Dev.
      */
     public string $resetTokenNotifier = 'log';
 
     /**
      * URL absolut halaman reset password di FRONTEND (backend tidak tahu URL frontend). Tautan yang dikirim:
      * {resetLinkBase}#token=<token> — token di fragment agar tidak ikut ke access log web server maupun Referer.
-     * Tanpa query/fragment. WAJIB diisi URL production (https) lewat .env auth.resetLinkBase.
+     * Tanpa query/fragment. Production WAJIB https (CR-014; http → ConfigException, sama untuk semua username) lewat
+     * .env auth.resetLinkBase.
      */
     public string $resetLinkBase = 'http://localhost:5173/reset-password';
 

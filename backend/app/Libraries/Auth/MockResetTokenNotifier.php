@@ -6,6 +6,7 @@ namespace App\Libraries\Auth;
 
 use App\Interfaces\ResetTokenNotifierInterface;
 use CodeIgniter\Exceptions\ConfigException;
+use SensitiveParameter;
 
 /**
  * Notifier reset password untuk test (auth.resetTokenNotifier = mock): tautan disimpan di memori, tanpa log dan
@@ -25,8 +26,14 @@ class MockResetTokenNotifier implements ResetTokenNotifierInterface
         }
     }
 
-    public function send(array $user, string $token, string $resetLink, string $expiresAt): void
-    {
+    public function send(
+        array $user,
+        #[SensitiveParameter]
+        string $token,
+        #[SensitiveParameter]
+        string $resetLink,
+        string $expiresAt,
+    ): void {
         $this->sent[] = [
             'id_pengguna' => (int) ($user['id_pengguna'] ?? 0),
             'nip'         => isset($user['nip']) && $user['nip'] !== '' ? (string) $user['nip'] : null,
