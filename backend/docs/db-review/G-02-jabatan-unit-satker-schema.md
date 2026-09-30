@@ -313,9 +313,7 @@ Approval tanpa catatan per poin akan dicatat mengikuti kolom **Usulan** (presede
 
 ### 6.1 Lingkungan
 
-MySQL 8.0.30 lokal (Laragon, `sql_mode` STRICT_TRANS_TABLES, row format default DYNAMIC). Database test per shard `simpeg_v2_t_dbv08…` (DBPrefix `t_`, `strictOn=true`; migration dijalankan PHPUnit lewat `migrate:refresh`, dibuat & di-drop dengan nama persis). Database scratch `simpeg_v2_s_dbv008x1` (koneksi default, tanpa prefix) untuk siklus `migrate` → `migrate:rollback` → `migrate`, di-drop setelahnya. Verifikasi MariaDB 10.4 diminta dari DB Validator (6.3).
-
-Catatan jujur lingkungan: saat menyiapkan siklus scratch (30-09-2026), override nama database lewat variabel lingkungan tidak terbaca oleh `spark`, sehingga beberapa perintah `migrate`/`migrate:rollback` sempat mengenai **database dev lokal developer `simpeg_v2`** (bukan server Dev) — termasuk migration ini. Kejadian itu sudah dilaporkan ke user untuk dipulihkan; tidak mengubah skema yang diajukan maupun hasil di bawah (yang dijalankan ulang di database scratch dengan `.env` salinan worktree).
+MySQL 8.0.30 lokal (Laragon, `sql_mode` STRICT_TRANS_TABLES, row format default DYNAMIC). Database test per shard `simpeg_v2_t_dbv08…` (DBPrefix `t_`, `strictOn=true`; migration dijalankan PHPUnit lewat `migrate:refresh`, dibuat & di-drop dengan nama persis). Database scratch `simpeg_v2_s_dbv08c1` (koneksi default, tanpa prefix; nama database diatur di `.env` salinan worktree, lalu `php spark migrate:status` dipastikan membaca database kosong itu sebelum `migrate` dijalankan) untuk siklus `migrate` → `migrate:rollback` → `migrate`, di-drop setelahnya. Verifikasi MariaDB 10.4 diminta dari DB Validator (6.3).
 
 ### 6.2 Hasil
 
@@ -329,7 +327,7 @@ Catatan jujur lingkungan: saat menyiapkan siklus scratch (30-09-2026), override 
 | `phpunit tests/MasterData/JabatanUnitSatkerTest.php` (CR-026) | `OK (12 tests, 404 assertions)` — Bagian 2.9 |
 | `phpunit` `MasterGenericTcTest`, `RbacMasterEndpointsTest`, `MasterConfigSchemaTest`, `tests/unit/Libraries/MasterRegistryTest` | `OK` — G-TC #1–#6 generik mencakup keenam key G-02 (fixture blok `DBV-008`); `orderColumnType`/`columnType`/boolean cocok dengan DDL; `group-jabatan` ikut uji batas urutan TINYINT 127; registry menerima `codeAsName`/`idRange` kelas jabatan dan menolak 7 konfigurasi salah |
 | `vitest run src/features/master-data` | `16 passed` file / `145 passed` test (termasuk `MasterDataView.g02.spec.ts`, 10 test) |
-| Quality gate penuh (`fastcheck.py`, langkah = `./check.sh`: PHPStan level 5, PHP-CS-Fixer, PHPUnit 2 shard, ESLint, vue-tsc, Vitest, build) | lihat laporan commit/PR (dijalankan ulang setelah rebase sebelum merge) |
+| Quality gate penuh (`fastcheck.py`, langkah = `./check.sh`: PHPStan level 5, PHP-CS-Fixer, PHPUnit 2 shard, ESLint, vue-tsc, Vitest, build) | **lolos** (30-09-2026, basis `origin/main` `89ea98d`): PHPStan `[OK] No errors`; PHP-CS-Fixer `Found 0 of 244`; PHPUnit `OK (290 tests, 10272 assertions)` + `OK (264 tests, 8669 assertions)` = 554 test; Vitest `32 passed` file / `331 passed` test; build lolos. Wajib dijalankan ulang setelah rebase sebelum merge |
 
 `SHOW CREATE TABLE` di DB scratch (MySQL 8.0.30):
 
