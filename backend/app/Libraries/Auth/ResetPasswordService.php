@@ -14,6 +14,7 @@ use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Exceptions\ConfigException;
 use Config\Auth as AuthConfig;
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -42,10 +43,12 @@ use Throwable;
  *   F0-04) karena kegagalannya tidak bisa dibedakan dari transaksi yang sudah di-rollback server.
  *
  * Kanal pengiriman = email (K3); driver dipilih lewat auth.resetTokenNotifier (Config\Services::resetTokenNotifier):
- * 'log' (development, tautan ditulis ke log) atau 'mock' (test) — keduanya ditolak di production sampai driver email
- * tersedia. Log milik service ini TIDAK memuat token. Hanya jika Config\Auth::$exposeResetTokenInResponse = true
- * (development) token juga dikembalikan ke pemanggil; di production flag itu DITOLAK (ConfigException di request(),
- * ISSUE-021) supaya token tidak pernah bocor lewat response. reset() tidak terpengaruh flag ini.
+ * 'email' (production, CR-014: hanya memasukkan job ke antrean, SMTP dikerjakan worker — waktu respons tidak
+ * membedakan username), 'log' (development, tautan ditulis ke log) atau 'mock' (test) — dua terakhir ditolak di
+ * production. Di production auth.resetLinkBase wajib https (CR-014). Log milik service ini TIDAK memuat token. Hanya
+ * jika Config\Auth::$exposeResetTokenInResponse = true (development) token juga dikembalikan ke pemanggil; di
+ * production flag itu DITOLAK (ConfigException di request(), ISSUE-021) supaya token tidak pernah bocor lewat response.
+ * reset() tidak terpengaruh flag ini.
  */
 class ResetPasswordService
 {
@@ -217,8 +220,15 @@ class ResetPasswordService
      *
      * @param array<string, mixed> $user
      */
-    private function deliver(ResetTokenNotifierInterface $notifier, array $user, string $token, string $link, string $expiresAt): void
-    {
+    private function deliver(
+        ResetTokenNotifierInterface $notifier,
+        array $user,
+        #[SensitiveParameter]
+        string $token,
+        #[SensitiveParameter]
+        string $link,
+        string $expiresAt,
+    ): void {
         try {
             $notifier->send($user, $token, $link, $expiresAt);
         } catch (Throwable $e) {
@@ -251,6 +261,7 @@ class ResetPasswordService
 
     /**
      * auth.resetLinkBase wajib URL absolut http(s) tanpa query/fragment; token ditambahkan sebagai fragment #token=….
+     * Di production wajib https (CR-014, untuk semua driver): tautan berisi token tidak boleh dibuka lewat http.
      *
      * @throws ConfigException
      */
@@ -260,6 +271,10 @@ class ResetPasswordService
 
         if (preg_match('#^https?://[^\s?\#]+$#i', $base) !== 1) {
             throw new ConfigException('auth.resetLinkBase wajib berisi URL absolut (http/https, tanpa query) halaman reset password frontend.');
+        }
+
+        if ($this->environment === 'production' && preg_match('#^https://#i', $base) !== 1) {
+            throw new ConfigException('auth.resetLinkBase wajib https di production (tautan reset berisi token).');
         }
 
         return $base;

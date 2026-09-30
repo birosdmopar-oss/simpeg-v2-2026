@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use App\Interfaces\ResetTokenNotifierInterface;
+use App\Libraries\Auth\EmailResetTokenNotifier;
 use App\Libraries\Auth\LogResetTokenNotifier;
 use App\Libraries\Auth\MockResetTokenNotifier;
 use App\Libraries\Auth\PasswordService;
@@ -18,15 +19,18 @@ use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestLogger;
 use Config\Auth as AuthConfig;
+use Config\Email as EmailConfig;
 use Config\Services;
 use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\ResetEmailTestTrait;
 
 /**
- * ISSUE-006 — kanal tautan reset password lewat ResetTokenNotifierInterface (driver mock/log, dipilih lewat
- * auth.resetTokenNotifier; keduanya ditolak di production), tautan dari auth.resetLinkBase, dan captcha Turnstile di
- * forgot-password (pola login: dicek sebelum rate limit).
+ * ISSUE-006 — kanal tautan reset password lewat ResetTokenNotifierInterface (driver mock/log/email, dipilih lewat
+ * auth.resetTokenNotifier; mock/log ditolak di production), tautan dari auth.resetLinkBase, dan captcha Turnstile di
+ * forgot-password (pola login: dicek sebelum rate limit). Driver email (CR-014): EmailResetTokenNotifierTest dan
+ * ResetPasswordEmailJobTest.
  *
  * @internal
  */
@@ -35,6 +39,7 @@ final class ResetTokenNotifierTest extends CIUnitTestCase
     use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
+    use ResetEmailTestTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -213,20 +218,40 @@ final class ResetTokenNotifierTest extends CIUnitTestCase
         $this->config->resetTokenNotifier = 'log';
         $this->assertInstanceOf(LogResetTokenNotifier::class, service('resetTokenNotifier', false));
 
+        // CR-014: driver email tersedia; guard dijalankan saat di-resolve (tanpa koneksi jaringan).
         $this->config->resetTokenNotifier = 'email';
-        $this->expectException(ConfigException::class);
-        service('resetTokenNotifier', false);
+        $this->configureEmailDriver();
+        $this->assertInstanceOf(EmailResetTokenNotifier::class, service('resetTokenNotifier', false));
+
+        config(EmailConfig::class)->fromEmail = '';
+
+        try {
+            service('resetTokenNotifier', false);
+            $this->fail('Driver email tanpa email.fromEmail yang valid harus ditolak');
+        } catch (ConfigException $e) {
+            $this->assertStringContainsString('email.fromEmail', $e->getMessage());
+        }
+
+        $this->config->resetTokenNotifier = 'whatsapp';
+
+        try {
+            service('resetTokenNotifier', false);
+            $this->fail('Driver yang tidak dikenal harus ditolak');
+        } catch (ConfigException $e) {
+            $this->assertStringContainsString("auth.resetTokenNotifier 'whatsapp' tidak dikenal", $e->getMessage());
+        }
     }
 
     /**
-     * Driver kanal yang ditolak (setara log/mock di production, atau driver email yang belum ada) di-resolve lewat
+     * Driver kanal yang ditolak (setara log/mock di production, atau driver yang tidak dikenal) di-resolve lewat
      * service('resetTokenNotifier') SEBELUM username dicari: gagal SAMA (ConfigException) untuk username terdaftar
      * maupun tidak, dan tidak menulis apa pun ke forgot_attempts. Service sengaja dibangun TANPA notifier eksplisit
-     * supaya jalur resolusi yang dipakai production ikut diuji.
+     * supaya jalur resolusi yang dipakai production ikut diuji. Driver email yang salah konfigurasi: lihat
+     * EmailResetTokenNotifierTest.
      */
     public function testRejectedNotifierDriverFailsForEveryUsernameBeforeLookup(): void
     {
-        $this->config->resetTokenNotifier = 'email';
+        $this->config->resetTokenNotifier = 'whatsapp';
         Services::resetSingle('resetTokenNotifier');
 
         $outcome = [];

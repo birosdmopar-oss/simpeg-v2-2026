@@ -18,14 +18,17 @@ use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
+use Config\Email as EmailConfig;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\ResetEmailTestTrait;
 
 /**
  * ISSUE-021 (CR-018) — guard konfigurasi production, pola guard notifier log/mock CR-008:
  * - auth.captchaDriver = mock → MockCaptchaVerifier menolak dibangun di production (ConfigException);
  * - auth.exposeResetTokenInResponse = true → forgot-password ditolak di production sesudah captcha, sebelum rate limit
  *   dan lookup username (gagal sama untuk semua username, tanpa baris forgot_attempts); reset-password tidak terpengaruh.
+ * - CR-014: auth.resetLinkBase http ditolak di production; guard driver email berjalan sesudah captcha.
  *
  * Konstanta ENVIRONMENT di PHPUnit selalu 'testing' dan tidak bisa didefinisikan ulang, jadi production disimulasikan
  * lewat argumen constructor $environment (default ENVIRONMENT), seperti ResetTokenNotifierTest.
@@ -37,6 +40,7 @@ final class ProductionConfigGuardTest extends CIUnitTestCase
     use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
+    use ResetEmailTestTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -165,6 +169,81 @@ final class ProductionConfigGuardTest extends CIUnitTestCase
 
         $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', (string) $result['token']);
         $this->assertSame($this->notifier->sent()[0]['token'], $result['token']);
+    }
+
+    /**
+     * CR-014: di production auth.resetLinkBase wajib https (semua driver) — tautan berisi token tidak boleh dibuka
+     * lewat http. Gagal sama untuk semua username, sebelum rate limit/lookup; di luar production http tetap boleh.
+     */
+    public function testHttpResetLinkBaseIsRejectedInProductionForEveryUsername(): void
+    {
+        $this->config->resetLinkBase = 'http://simpeg.example.go.id/reset-password';
+        $outcome                     = [];
+
+        foreach ([self::NIP, self::UNKNOWN] as $username) {
+            try {
+                $this->service('production')->request($username, 'ok', null);
+                $outcome[$username] = 'accepted';
+            } catch (ConfigException $e) {
+                $this->assertStringContainsString('auth.resetLinkBase wajib https di production', $e->getMessage());
+                $outcome[$username] = 'ConfigException';
+            }
+        }
+
+        $this->assertSame([self::NIP => 'ConfigException', self::UNKNOWN => 'ConfigException'], $outcome);
+        $this->assertSame(0, $this->db->table('forgot_attempts')->countAllResults());
+        $this->assertSame([], $this->notifier->sent());
+
+        $this->notifier = new MockResetTokenNotifier();
+        $this->service('development')->request(self::NIP, 'ok', null);
+        $sent = $this->notifier->sent();
+        $this->assertCount(1, $sent);
+        $this->assertStringStartsWith('http://simpeg.example.go.id/reset-password#token=', $sent[0]['reset_link']);
+    }
+
+    /**
+     * CR-014: driver email yang salah konfigurasi tetap dicek SESUDAH captcha (captcha invalid → 422 dulu, tanpa baris
+     * forgot_attempts), lalu gagal sama untuk semua username sebelum lookup. Notifier di-resolve lewat Services seperti
+     * production.
+     */
+    public function testCaptchaIsCheckedBeforeEmailDriverGuard(): void
+    {
+        $this->config->resetTokenNotifier = 'email';
+        $this->configureEmailDriver();
+        config(EmailConfig::class)->SMTPHost = '';
+
+        $pengguna = new PenggunaModel($this->db);
+        $verifier = new PasswordVerifier($pengguna, $this->config);
+        $service  = new ResetPasswordService(
+            $pengguna,
+            new ForgotAttemptModel($this->db),
+            $verifier,
+            new PasswordService($pengguna, $verifier, service('jwt')),
+            service('jwt'),
+            $this->config,
+            $this->db,
+            new MockCaptchaVerifier(),
+            null,
+            'production',
+        );
+
+        try {
+            $service->request(self::NIP, MockCaptchaVerifier::REJECT_TOKEN, null);
+            $this->fail('Captcha invalid harus ditolak lebih dulu');
+        } catch (ValidationException $e) {
+            $this->assertSame(['Verifikasi captcha gagal. Silakan ulangi.'], $e->getErrors()['captcha_token']);
+        }
+
+        foreach ([self::NIP, self::UNKNOWN] as $username) {
+            try {
+                $service->request($username, 'ok', null);
+                $this->fail('Driver email tanpa email.SMTPHost harus ditolak');
+            } catch (ConfigException $e) {
+                $this->assertStringContainsString('email.SMTPHost', $e->getMessage());
+            }
+        }
+
+        $this->assertSame(0, $this->db->table('forgot_attempts')->countAllResults());
     }
 
     public function testResetPasswordIsNotAffectedByExposeFlagInProduction(): void
