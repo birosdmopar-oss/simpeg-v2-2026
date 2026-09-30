@@ -80,6 +80,12 @@ final class MasterDefinition
      *                                                     dinonaktifkan/diurutkan/dihapus, tidak bisa menjadi induk, dan
      *                                                     hanya bisa dirujuk field ref ber-allowSystem; tetap bisa dibaca
      *                                                     lewat detail (GET {kode})
+     * @param bool                        $codeAsName      kode (PK) sekaligus nama tampilan (CR-026), mis. `kelas_jabatan`
+     *                                                     (PK alami TINYINT tanpa kolom nama, DBV-008): nameField =
+     *                                                     primaryKey, kode diinput saat tambah dan tidak pernah berubah,
+     *                                                     keunikan nama = keunikan kode
+     * @param array{0: int, 1: int}|null  $idRange         kode manual berupa bilangan bulat dalam rentang [min, max] (CR-026),
+     *                                                     tanpa nol di depan (mis. kelas jabatan 1–20, mask form legacy)
      */
     public function __construct(
         public readonly string $key,
@@ -112,12 +118,18 @@ final class MasterDefinition
         public readonly array $filters = [],
         public readonly bool $statusChain = false,
         public readonly array $systemIds = [],
+        public readonly bool $codeAsName = false,
+        public readonly ?array $idRange = null,
     ) {
         if (! in_array($orderMode, [self::ORDER_SHIFT, self::ORDER_MANUAL], true)) {
             throw new LogicException("orderMode master {$key} tidak dikenal: {$orderMode}.");
         }
 
         MasterField::intRange($orderColumnType);
+
+        if ($idRange !== null && ($idRange[0] < 1 || $idRange[0] > $idRange[1])) {
+            throw new LogicException("idRange master {$key} harus [min, max] bilangan bulat dengan 1 <= min <= max.");
+        }
     }
 
     /**
@@ -141,7 +153,9 @@ final class MasterDefinition
      *     uniqueFields?: array<int|string, string|list<string>>,
      *     filters?: list<string>,
      *     statusChain?: bool,
-     *     systemIds?: list<string>
+     *     systemIds?: list<string>,
+     *     codeAsName?: bool,
+     *     idRange?: array{0: int, 1: int}
      * } $config
      */
     public static function fromConfig(string $key, array $config): self
@@ -194,6 +208,8 @@ final class MasterDefinition
             filters: $config['filters'] ?? [],
             statusChain: $config['statusChain'] ?? false,
             systemIds: array_map('strval', $config['systemIds'] ?? []),
+            codeAsName: $config['codeAsName'] ?? false,
+            idRange: $config['idRange'] ?? null,
         );
     }
 
@@ -211,15 +227,16 @@ final class MasterDefinition
     }
 
     /**
-     * Bentuk kode yang sah: AUTO_INCREMENT = bilangan bulat positif tanpa nol di depan; kode wilayah = tepat N digit;
-     * kode lain = huruf/angka/titik/strip/garis bawah. Selain itu dianggap tidak ada (404), bukan alias entri lain.
+     * Bentuk kode yang sah: AUTO_INCREMENT dan kode ber-idRange (CR-026) = bilangan bulat positif tanpa nol di depan;
+     * kode wilayah = tepat N digit; kode lain = huruf/angka/titik/strip/garis bawah. Selain itu dianggap tidak ada (404),
+     * bukan alias entri lain (MySQL meng-cast '07' menjadi 7 pada PK TINYINT).
      */
     public function isCanonicalId(string $id): bool
     {
         $pattern = match (true) {
-            $this->autoIncrement     => '/^[1-9][0-9]*\z/',
-            $this->idDigits !== null => '/^[0-9]{' . $this->idDigits . '}\z/',
-            default                  => '/^[A-Za-z0-9._-]+\z/',
+            $this->autoIncrement || $this->idRange !== null => '/^[1-9][0-9]*\z/',
+            $this->idDigits !== null                        => '/^[0-9]{' . $this->idDigits . '}\z/',
+            default                                         => '/^[A-Za-z0-9._-]+\z/',
         };
 
         return preg_match($pattern, $id) === 1;
@@ -361,7 +378,8 @@ final class MasterDefinition
             $columns[] = self::AUDIT_DELETED_AT;
         }
 
-        return $columns;
+        // codeAsName (CR-026): nameField = primaryKey, jangan didaftarkan dua kali.
+        return array_values(array_unique($columns));
     }
 
     /**
@@ -394,6 +412,9 @@ final class MasterDefinition
             'status_chain' => $this->statusChain,
             // CR-010: kode baris sistem (sentinel LAIN-LAIN) — FE menambahkannya sebagai pilihan field ref ber-allow_system.
             'system_ids' => $this->systemIds,
+            // CR-026: kode = nama tampilan (FE tidak merender input nama terpisah) dan rentang kode angka (validasi form).
+            'code_as_name' => $this->codeAsName,
+            'id_range'     => $this->idRange,
         ];
     }
 }
