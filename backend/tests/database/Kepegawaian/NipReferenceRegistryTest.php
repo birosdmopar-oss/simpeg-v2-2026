@@ -17,14 +17,14 @@ use Throwable;
  *   1. Daftar FK yang merujuk `pegawai(nip)` di skema = self::REGISTRY untuk migration yang sudah jalan (per versi, agar
  *      pemecahan PR DBV-012/DBV-013 tidak mengubah isi test). FK baru ke `pegawai` wajib didaftarkan di sini.
  *   2. Setiap FK itu RESTRICT/RESTRICT, kolomnya VARCHAR(30) utf8mb4_unicode_ci, dan NOT NULL kecuali yang tercatat di
- *      self::NULLABLE (akun non-pegawai K2, `nip_atasan` LKH [K-m]).
+ *      self::NULLABLE (akun non-pegawai K2, `nip_atasan` LKH [K] D1).
  *   3. Setiap kolom bernama NIP (`nip`, `NIP`, `nip_*`, `*_nip`, `*_nip_*`) di tabel aplikasi harus tercatat: sebagai
  *      FK di registry atau di self::NON_FK beserta alasannya. Kolom NIP baru tanpa klasifikasi = test gagal, sehingga
  *      B-06 tidak kehilangan kolom yang perlu diarahkan ulang.
  *
  * Ditambah pra-cek orphan fail-closed migration 2026-09-30-120200_AddFkPegawaiDiPenggunaFaqRate.
  *
- * Dokumen: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 2.0.8, 2.1.6, 7).
+ * Dokumen: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 4.3, 7).
  *
  * @internal
  */
@@ -38,7 +38,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
 
     /**
      * FK → `pegawai(nip)` per versi migration: versi => [nama FK => [tabel, kolom]]. DBV-012 = 120000..120200;
-     * DBV-013 = 130100..130900 (nama FK [K-erd], rencana B-02 Bagian 5).
+     * DBV-013 = 130100..130900 (nama FK = D1 [K]).
      */
     private const REGISTRY = [
         '2026-09-30-120000' => [
@@ -54,6 +54,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
             'fk_nip_pegdiklat_to_pegawai'   => ['pegawai_diklat', 'nip'],
             'fk_nip_peghukdis_to_pegawai'   => ['pegawai_hukdis', 'nip'],
             'fk_nip_cak_to_peg'             => ['pegawai_ak', 'nip'],
+            'fk_nip_peg_ak_siasn_01'        => ['pegawai_ak_siasn', 'nip'],
             'fk_nip_pegkeluarga_to_pegawai' => ['pegawai_keluarga', 'nip'],
             'fk_nip_pegalamat_to_pegawai'   => ['pegawai_alamat', 'nip'],
             'pegawai_alamat_kantor_ibfk_6'  => ['pegawai_alamat_kantor', 'nip'],
@@ -113,7 +114,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
      */
     private const NULLABLE = [
         'pengguna.nip'            => 'K2/DBV-010: akun non-pegawai tanpa NIP',
-        'riwayat_lckh.nip_atasan' => '[K-m] d_lkh.nip_atasan DEFAULT NULL',
+        'riwayat_lckh.nip_atasan' => '[K] D1 riwayat_lckh.nip_atasan DEFAULT NULL',
     ];
 
     /**

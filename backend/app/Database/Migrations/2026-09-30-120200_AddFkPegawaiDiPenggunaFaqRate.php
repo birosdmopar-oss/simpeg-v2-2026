@@ -12,7 +12,7 @@ use Throwable;
 
 /**
  * DITAHAN — JANGAN taruh di app/Database/Migrations sebelum prasyaratnya terpenuhi (dokumen
- * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md Bagian 2.1.5 dan keputusan B01-1):
+ * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md Bagian 7 dan keputusan 8 #14):
  *   (1) `pegawai` sudah terisi di lingkungan target (impor Tier 2 / B-05), karena `pengguna` di Dev sudah berisi akun
  *       ber-NIP dan migration ini fail-closed selama ada NIP yang tidak ada di `pegawai`;
  *   (2) pembuatan/ubah akun ber-NIP (A-09 AccountProvisioner, Manajemen Akun) memvalidasi NIP ada di `pegawai` (422),
@@ -22,13 +22,13 @@ use Throwable;
  *
  * DBV-012 — B-01: FK masuk ke `pegawai.nip` dari dua tabel yang sudah ada di `main` dan sengaja ditunda sampai
  * `pegawai` dibuat:
- *   - `fk_id_pegawai_pengguna_to_pegawai` [K-erd]: `pengguna.nip` (NULL untuk akun non-pegawai, K2/DBV-010) →
+ *   - `fk_id_pegawai_pengguna_to_pegawai` [K D1]: `pengguna.nip` (NULL untuk akun non-pegawai, K2/DBV-010) →
  *     `pegawai.nip` (A-01 #4). Memakai UNIQUE `nip` yang sudah ada, tanpa KEY baru.
- *   - `fk_nip_faqrate_to_peg` [K-erd]: `faq_rate.nip` → `pegawai.nip` (G-10 D2). KEY dengan nama ini sudah dibuat
+ *   - `fk_nip_faqrate_to_peg` [K D1]: `faq_rate.nip` → `pegawai.nip` (G-10 D2). KEY dengan nama ini sudah dibuat
  *     migration FAQ, jadi cukup ADD CONSTRAINT.
  * Keduanya ON DELETE RESTRICT ON UPDATE RESTRICT (legacy `faq_rate` CASCADE; ganti NIP lewat B-06, K1).
  *
- * Review DB Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 2.1.5) — JANGAN dijalankan
+ * Review DB Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 7) — JANGAN dijalankan
  * di Dev/Production sebelum disetujui DBV-012.
  *
  * up() fail-closed: sebelum ALTER apa pun, baris yang NIP-nya tidak ada di `pegawai` (orphan) dihitung; bila ada,
@@ -71,7 +71,7 @@ class AddFkPegawaiDiPenggunaFaqRate extends Migration
                 try {
                     $this->db->query("ALTER TABLE {$this->t($table)} DROP FOREIGN KEY `{$name}`");
                 } catch (Throwable) {
-                    // Error asli tetap dilempar; sisa FK dibersihkan manual (dokumen Bagian 6.6).
+                    // Error asli tetap dilempar; sisa FK dibersihkan manual (dokumen Bagian 9.3).
                 }
             }
 

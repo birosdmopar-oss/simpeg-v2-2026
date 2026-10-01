@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Database\Kepegawaian;
 
+use App\Database\Migrations\AddFkSnapshotKeRiwayat;
 use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use RuntimeException;
+use Tests\Support\Kepegawaian\SkemaD1;
 use Throwable;
 
 /**
- * DBV-013 — migration 2026-09-30-131000_AddFkSnapshotKeRiwayat: 13 FK snapshot `pegawai_*` → tabel riwayat asalnya
- * (nama [K-erd], RESTRICT/RESTRICT), memakai KEY yang sudah dibuat migration snapshot (DBV-012), pra-cek orphan
- * fail-closed tanpa FK terpasang sebagian, dan up()/down() aman diulang.
+ * DBV-013 — migration 2026-09-30-131000_AddFkSnapshotKeRiwayat: 14 FK snapshot `pegawai_*` → tabel riwayat asalnya
+ * (nama, kolom, induk = D1 [K]; aksi [V2] RESTRICT/RESTRICT), memakai index yang sudah ada di DDL snapshot (DBV-012),
+ * pra-cek orphan fail-closed tanpa FK terpasang sebagian, dan up()/down() aman diulang. Daftar FK dicocokkan dengan
+ * ekspektasi D1 (Tests\Support\Kepegawaian\SkemaD1::B01, jenis `RWY`).
  *
  * File test ini ikut PR DBV-013 (bergantung pada tabel riwayat kelompok 2-4).
  *
@@ -34,6 +37,7 @@ final class SnapshotRiwayatFkTest extends CIUnitTestCase
      */
     private const FOREIGN_KEYS = [
         'fk_id_riwayat_ak_cak_to_rak'                    => ['pegawai_ak', 'id_riwayat_ak', 'riwayat_ak', 'id_riwayat_ak'],
+        'fk_id_riwayat_ak_siasn_peg_ak_siasn_02'         => ['pegawai_ak_siasn', 'id_riwayat_ak_siasn', 'riwayat_ak_siasn', 'id_riwayat_ak_siasn'],
         'fk_id_riwayat_alamat_pegalamat_riwalamat'       => ['pegawai_alamat', 'id_riwayat_alamat', 'riwayat_alamat', 'id_riwayat_alamat'],
         'fk_id_riwayat_diklat_pegdiklat_to_rwydiklat'    => ['pegawai_diklat', 'id_riwayat_diklat', 'riwayat_diklat', 'id_riwayat_diklat'],
         'fk_id_riwayat_hukdis_peg_hukdis_to_rwy_hukdis'  => ['pegawai_hukdis', 'id_riwayat_hukdis', 'riwayat_hukdis', 'id_riwayat_hukdis'],
@@ -70,6 +74,23 @@ final class SnapshotRiwayatFkTest extends CIUnitTestCase
     {
         $this->assertSame(self::FOREIGN_KEYS, $this->riwayatForeignKeys(true));
 
+        // Daftar = FK snapshot → riwayat di D1 dan = konstanta migration.
+        $d1 = [];
+
+        foreach (SkemaD1::B01 as $spec) {
+            foreach ($spec['later'] as $name => [$jenis, $table, $column, $parent, $parentColumn]) {
+                if ($jenis === 'RWY') {
+                    $d1[$name] = [$table, $column, $parent, $parentColumn];
+                }
+            }
+        }
+
+        ksort($d1, SORT_STRING | SORT_FLAG_CASE);
+        $this->assertSame(self::FOREIGN_KEYS, $d1, 'FK snapshot → riwayat = D1');
+        $migration = AddFkSnapshotKeRiwayat::FOREIGN_KEYS;
+        ksort($migration, SORT_STRING | SORT_FLAG_CASE);
+        $this->assertSame(self::FOREIGN_KEYS, $migration, 'FK snapshot → riwayat = konstanta migration 131000');
+
         // Tipe kolom snapshot = PK riwayat (INT signed).
         foreach (self::FOREIGN_KEYS as $name => [$table, $column, $parent, $parentColumn]) {
             $this->assertSame(
@@ -84,15 +105,15 @@ final class SnapshotRiwayatFkTest extends CIUnitTestCase
     {
         $this->db->table('pegawai')->insert(['nip' => self::NIP, 'nama' => 'Ahmad Wijaya', 'tgl_lahir' => '1985-01-01']);
 
-        $this->assertDbError([1452], fn () => $this->db->table('pegawai_kgb')->insert(['nip' => self::NIP, 'tmtsk' => '2024-04-01', 'id_riwayat_kgb' => 424242]));
+        $this->assertDbError([1452], fn () => $this->db->table('pegawai_kgb')->insert(['nip' => self::NIP, 'tmtsk' => '2024-04-01', 'tgl_sk' => '2024-03-01', 'id_riwayat_kgb' => 424242]));
         $this->assertDbError([1452], fn () => $this->db->table('pegawai_alamat_kantor')->insert(['nip' => self::NIP, 'id_riwayat_alamat' => 424242]));
-        $this->db->table('pegawai_kgb')->insert(['nip' => self::NIP, 'tmtsk' => '2024-04-01', 'id_riwayat_kgb' => null]);
+        $this->db->table('pegawai_kgb')->insert(['nip' => self::NIP, 'tmtsk' => '2024-04-01', 'tgl_sk' => '2024-03-01', 'id_riwayat_kgb' => null]);
         $this->seeInDatabase('pegawai_kgb', ['nip' => self::NIP, 'id_riwayat_kgb' => null]);
     }
 
     /**
      * up() menolak jalan bila snapshot merujuk riwayat yang tidak ada (jumlah per FK), tanpa FK terpasang sebagian;
-     * setelah dibereskan, ke-13 FK terpasang; up()/down() aman diulang dan KEY milik migration snapshot tetap.
+     * setelah dibereskan, ke-14 FK terpasang; up()/down() aman diulang dan KEY milik migration snapshot tetap.
      */
     public function testRefusesOrphansBeforeAnyAlter(): void
     {
@@ -102,7 +123,7 @@ final class SnapshotRiwayatFkTest extends CIUnitTestCase
         $this->assertSame([], $this->riwayatForeignKeys(false), 'prasyarat: FK snapshot → riwayat terlepas');
 
         $this->db->table('pegawai')->insert(['nip' => self::NIP, 'nama' => 'Ahmad Wijaya', 'tgl_lahir' => '1985-01-01']);
-        $this->db->table('pegawai_kgb')->insert(['nip' => self::NIP, 'tmtsk' => '2024-04-01', 'id_riwayat_kgb' => 424242]);
+        $this->db->table('pegawai_kgb')->insert(['nip' => self::NIP, 'tmtsk' => '2024-04-01', 'tgl_sk' => '2024-03-01', 'id_riwayat_kgb' => 424242]);
 
         $error = null;
 
@@ -127,8 +148,8 @@ final class SnapshotRiwayatFkTest extends CIUnitTestCase
         $migration->down();
         $this->assertSame([], $this->riwayatForeignKeys(false));
 
-        foreach (self::FOREIGN_KEYS as $name => [$table]) {
-            $this->assertTrue($this->indexExists($table, $name), "KEY {$table}.{$name} tetap setelah down()");
+        foreach (self::FOREIGN_KEYS as $name => [$table, $column]) {
+            $this->assertTrue($this->indexExists($table, $column), "index D1 untuk {$table}.{$column} ({$name}) tetap setelah down()");
         }
 
         $migration->up();
@@ -185,11 +206,14 @@ final class SnapshotRiwayatFkTest extends CIUnitTestCase
         return (string) preg_replace('/^(tinyint|smallint|mediumint|int|bigint)\((?!1\))\d+\)/', '$1', strtolower($type));
     }
 
-    private function indexExists(string $table, string $index): bool
+    /**
+     * Ada index (dari DDL D1) dengan kolom terdepan = $column; nama index D1 tidak selalu = nama FK.
+     */
+    private function indexExists(string $table, string $column): bool
     {
         return (int) $this->db->query(
-            'SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?',
-            [$this->db->getDatabase(), $this->db->prefixTable($table), $index],
+            'SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND SEQ_IN_INDEX = 1',
+            [$this->db->getDatabase(), $this->db->prefixTable($table), $column],
         )->getRowArray()['n'] > 0;
     }
 

@@ -10,38 +10,25 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-012 (1/2) — B-01: `pegawai`, `pegawai_hist`, `pegawai_foto` dengan skema SIMPEG legacy (Mapping Migrasi Prinsip
- * #1, Tier 2 "Copy langsung"). Review DB Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md
- * (Bagian 2.1) — JANGAN dijalankan di
+ * DBV-012 — B-01: `pegawai`, `pegawai_hist`, `pegawai_foto`.
+ * Review DB Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md — JANGAN dijalankan di
  * Dev/Production sebelum disetujui DBV-012.
  *
- * Sumber per tabel:
- *   - `pegawai`: SHOW CREATE TABLE salinan lokal `simpeg_prod_duplikat` [L] (nama, tipe, NULL, default, urutan kolom,
- *     KEY `status`) + nama FK master dari ERD `simpeg01.erd` [K-erd]. `created_at` wajib ikut diimpor: laporan presensi
- *     legacy memfilter `peg.created_at` (L_presensi.php:8255).
- *   - `pegawai_hist`: kode legacy [I] — baris hist = salinan baris `pegawai` (`$param + $peg`, tanpa `deleted_at`)
- *     + `email` + kolom workflow (L_employee.php:431-490); proses setuju/tolak menyalin baris hist kembali ke `pegawai`
- *     setelah membuang kolom workflow (sp_process :1172-1178). `flag_update` 1 Diajukan / 2 Ditolak-dibatalkan /
- *     3 Disetujui (:445, :1022, :1175). Stub [L] 4 kolom bertentangan dengan kode, tidak dipakai. Nama FK [K-erd]
- *     `fk_peg_hist_ibfk_01..06`.
- *   - `pegawai_foto`: nama FK [K-erd] `fk_nip_pegfoto_to_peg`; kolom yang dibaca kode [I] (`id_pegawai_foto`, `nip`,
- *     `foto`: L_employee.php:44, views/hr/employee/form.php:894-895). Tidak ada titik tulis PHP (kemungkinan diisi
- *     trigger); `created_at` [V2]. Kolom lain menunggu SHOW CREATE TABLE produksi.
+ * Sumber [K]: dump struktur produksi `simpeg01` 01-10-2026 (D1, `simpeg01_struktur_lengkap_20261001.sql`,
+ * di luar repo). Kolom, tipe, NULL, default, ON UPDATE, AUTO_INCREMENT, COMMENT, urutan kolom, PRIMARY/UNIQUE/KEY,
+ * dan nama FK disalin persis dari D1:
+ *   - `pegawai` — D1:2497-2550; 40 kolom; 5 FK di CREATE; 3 CHECK [V2].
+ *   - `pegawai_hist` — D1:2938-3003; 48 kolom; 6 FK di CREATE; 3 CHECK [V2].
+ *   - `pegawai_foto` — D1:2924-2933; 4 kolom; 1 FK di CREATE.
  *
- * Deviasi dari legacy (dicatat untuk DBV):
- *   - Semua FK ON DELETE RESTRICT ON UPDATE RESTRICT (legacy [L]/seed: nip CASCADE/CASCADE; ERD tidak mencatat aksi).
- *     Ganti NIP lewat B-06 (salin baris → arahkan ulang anak → hapus baris lama), bukan ON UPDATE CASCADE (K1).
- *   - `pegawai_hist.nip` NOT NULL (legacy NULL): setiap pengajuan milik satu pegawai.
- *   - `pegawai_hist.flag_update` DEFAULT 1 (Diajukan) + COMMENT (legacy stub DEFAULT 0 — nilai 0 tidak pernah ditulis
- *     kode untuk hist).
- *   - CHECK [V2]: `pegawai.status` 1/2/10, `pegawai.flag_update` 0..3, `pegawai.jenis_kelamin` 1/2; hist: `flag_update`
- *     1/2/3, `status` 1/2/10, `jenis_kelamin` 1/2 (hist adalah salinan baris pegawai).
- *   - COMMENT `status` v2 "10: Dihapus" (legacy "10: Deleted"), COMMENT `flag_update`, `updated_by`, `approved_by` [V2].
- *   - Blok workflow `pegawai_hist` mengikuti konvensi bersama B-01/B-02 (`show_notif` TINYINT NOT NULL DEFAULT 0,
- *     `show_ua_*` TINYINT NULL); tipe INT vs TINYINT masih menunggu keputusan (dokumen Bagian 4 #3).
+ * Deviasi [V2] (rinci per tabel di dokumen Bagian 3):
+ *   - FK ON DELETE RESTRICT ON UPDATE RESTRICT (D1: CASCADE/CASCADE atau SET NULL/CASCADE). Ganti NIP lewat B-06.
+ *   - CHECK domain status/flag (D1 tanpa CHECK); nilai legacy di luar domain dinormalkan saat impor (Bagian 6).
+ *   - `COLLATE utf8mb4_unicode_ci` per kolom di D1 sama dengan collation tabel, jadi diwarisi dari tabel; nilai
+ *     AUTO_INCREMENT awal dan ROW_FORMAT=DYNAMIC (default InnoDB) tidak ditulis.
+ *   - Trigger legacy pada tabel ini tidak dibawa; padanannya aturan aplikasi v2 (dokumen Bagian 5).
  *
- * Kolom audit diisi aplikasi (waktu UTC, `updated_by`/`approved_by` = id_pengguna tanpa FK, preseden DBV-001/010);
- * default DB hanya cadangan. Nilai AUTO_INCREMENT awal tidak ditulis. Tanpa baris seed.
+ * Kolom audit diisi aplikasi (waktu UTC, `*_by` = id_pengguna tanpa FK); default DB hanya cadangan. Tanpa baris seed.
  *
  * DDL MySQL/MariaDB ter-commit per statement dan migration yang gagal tidak tercatat di tabel `migrations`: bila salah
  * satu CREATE gagal, up() men-drop tabel yang sempat dibuat PADA RUN ITU (urutan terbalik) lalu melempar ulang error,
@@ -49,28 +36,168 @@ use Throwable;
  */
 class CreatePegawai extends Migration
 {
-    public const STATUS_COMMENT = '1: Aktif, 2: Tidak Aktif, 10: Dihapus';
-
-    public const FLAG_UPDATE_COMMENT = '0: Tidak ada pengajuan, 1: Diajukan, 2: Ditolak/Dibatalkan, 3: Disetujui';
-
-    public const HIST_FLAG_UPDATE_COMMENT = '1: Diajukan, 2: Ditolak/Dibatalkan, 3: Disetujui';
-
-    private const TABLE_OPTIONS = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
-
-    private const RESTRICT = 'ON DELETE RESTRICT ON UPDATE RESTRICT';
+    /**
+     * Urutan CREATE (induk → anak); down() men-drop dengan urutan terbalik.
+     */
+    public const TABLES = ['pegawai', 'pegawai_hist', 'pegawai_foto'];
 
     /**
-     * Urutan down(): anak (`pegawai_foto`, `pegawai_hist`) sebelum induk (`pegawai`).
+     * DDL per tabel; `{{nama}}` diganti nama tabel ber-prefix (DBPrefix) yang sudah di-escape.
+     *
+     * @var array<string, string>
      */
-    private const TABLES = ['pegawai_foto', 'pegawai_hist', 'pegawai'];
+    private const DDL = [
+        'pegawai' => <<<'SQL'
+            CREATE TABLE {{pegawai}} (
+              `nip` varchar(30) NOT NULL,
+              `id_provinsi_lahir` char(2) DEFAULT NULL,
+              `id_kabupaten_kota_lahir` char(4) DEFAULT NULL,
+              `id_agama` tinyint DEFAULT NULL,
+              `id_jenis_pegawai` tinyint DEFAULT NULL,
+              `id_jenis_status` tinyint DEFAULT NULL,
+              `nip_lama` varchar(18) DEFAULT NULL,
+              `nama` varchar(100) NOT NULL,
+              `glr_awal` varchar(50) DEFAULT NULL,
+              `glr_akhir` varchar(50) DEFAULT NULL,
+              `tgl_lahir` date NOT NULL,
+              `provinsi_lahir` varchar(255) DEFAULT NULL,
+              `provinsi_lahir_lain` varchar(255) DEFAULT NULL,
+              `kabupaten_kota_lahir` varchar(255) DEFAULT NULL,
+              `kabupaten_kota_lahir_lain` varchar(255) DEFAULT NULL,
+              `agama` varchar(30) DEFAULT NULL,
+              `jenis_kelamin` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1: Laki-laki, 2: Perempuan',
+              `npwp` varchar(20) DEFAULT NULL,
+              `nik` varchar(20) DEFAULT NULL,
+              `bpjs_kes` varchar(50) DEFAULT NULL,
+              `bpjs_ket` varchar(50) DEFAULT NULL,
+              `no_taspen` varchar(50) DEFAULT NULL,
+              `no_hp` varchar(20) DEFAULT NULL,
+              `jenis_kerabat` varchar(100) DEFAULT NULL,
+              `no_telp_kerabat` varchar(20) DEFAULT NULL,
+              `status_pernikahan` tinyint(1) DEFAULT NULL COMMENT '1: Menikah, 2: Tidak Menikah',
+              `jenis_pegawai` varchar(255) DEFAULT NULL,
+              `jenis_status` varchar(100) DEFAULT NULL,
+              `tmt_status` date DEFAULT NULL,
+              `foto` varchar(255) DEFAULT NULL,
+              `keterangan` tinytext,
+              `status` tinyint NOT NULL DEFAULT '1' COMMENT '1: Aktif, 2: Tidak Aktif, 10: Deleted',
+              `flag_update` tinyint NOT NULL DEFAULT '0' COMMENT '0: No Update, 1: Update Exist, 2: Update Rejected, 3: Update Approved',
+              `id_pns_siasn` varchar(100) DEFAULT NULL COMMENT 'ID PNS from SIASN',
+              `siasn_flag` tinyint DEFAULT '0',
+              `siasn_lu` datetime DEFAULT NULL,
+              `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              `updated_by` int DEFAULT NULL,
+              `deleted_at` datetime DEFAULT NULL,
+              PRIMARY KEY (`nip`),
+              KEY `fk_id_provinsi_lahir_peg_to_prov` (`id_provinsi_lahir`),
+              KEY `fk_id_kabupaten_kota_lahir_peg_to_kab_kota` (`id_kabupaten_kota_lahir`),
+              KEY `fk_id_agama_peg_to_agama` (`id_agama`),
+              KEY `fk_id_jenis_pegawai_peg_to_jenis_pegawai` (`id_jenis_pegawai`),
+              KEY `fk_id_jenis_status_peg_to_jenis_status` (`id_jenis_status`),
+              KEY `status` (`status`),
+              CONSTRAINT `fk_id_agama_peg_to_agama` FOREIGN KEY (`id_agama`) REFERENCES {{agama}} (`id_agama`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_id_jenis_pegawai_peg_to_jenis_pegawai` FOREIGN KEY (`id_jenis_pegawai`) REFERENCES {{jenis_pegawai}} (`id_jenis_pegawai`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_id_jenis_status_peg_to_jenis_status` FOREIGN KEY (`id_jenis_status`) REFERENCES {{jenis_status}} (`id_jenis_status`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_id_kabupaten_kota_lahir_peg_to_kab_kota` FOREIGN KEY (`id_kabupaten_kota_lahir`) REFERENCES {{kabupaten_kota}} (`id_kabupaten_kota`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_id_provinsi_lahir_peg_to_prov` FOREIGN KEY (`id_provinsi_lahir`) REFERENCES {{provinsi}} (`id_provinsi`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `chk_pegawai_status` CHECK (`status` IN (1, 2, 10)),
+              CONSTRAINT `chk_pegawai_flag_update` CHECK (`flag_update` IN (0, 1, 2, 3)),
+              CONSTRAINT `chk_pegawai_jenis_kelamin` CHECK (`jenis_kelamin` IN (1, 2))
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            SQL,
+        'pegawai_hist' => <<<'SQL'
+            CREATE TABLE {{pegawai_hist}} (
+              `id_pegawai_hist` int NOT NULL AUTO_INCREMENT,
+              `nip` varchar(30) NOT NULL,
+              `id_provinsi_lahir` char(2) DEFAULT NULL,
+              `id_kabupaten_kota_lahir` char(4) DEFAULT NULL,
+              `id_agama` tinyint DEFAULT NULL,
+              `id_jenis_pegawai` tinyint DEFAULT NULL,
+              `id_jenis_status` tinyint DEFAULT NULL,
+              `nip_lama` varchar(18) DEFAULT NULL,
+              `nama` varchar(100) NOT NULL,
+              `glr_awal` varchar(12) DEFAULT NULL,
+              `glr_akhir` varchar(24) DEFAULT NULL,
+              `tgl_lahir` date NOT NULL,
+              `provinsi_lahir` varchar(255) DEFAULT NULL,
+              `provinsi_lahir_lain` varchar(255) DEFAULT NULL,
+              `kabupaten_kota_lahir` varchar(255) DEFAULT NULL,
+              `kabupaten_kota_lahir_lain` varchar(255) DEFAULT NULL,
+              `agama` varchar(30) DEFAULT NULL,
+              `jenis_kelamin` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1: Laki-laki, 2: Perempuan',
+              `npwp` varchar(20) DEFAULT NULL,
+              `nik` varchar(20) DEFAULT NULL,
+              `bpjs_kes` varchar(50) DEFAULT NULL,
+              `bpjs_ket` varchar(50) DEFAULT NULL,
+              `no_taspen` varchar(50) DEFAULT NULL,
+              `no_hp` varchar(20) DEFAULT NULL,
+              `jenis_kerabat` varchar(100) DEFAULT NULL,
+              `no_telp_kerabat` varchar(20) DEFAULT NULL,
+              `status_pernikahan` tinyint(1) DEFAULT NULL COMMENT '1: Menikah, 2: Tidak Menikah',
+              `jenis_pegawai` varchar(255) DEFAULT NULL,
+              `jenis_status` varchar(100) DEFAULT NULL,
+              `tmt_status` date DEFAULT NULL,
+              `foto` varchar(255) DEFAULT NULL,
+              `keterangan` tinytext,
+              `email` varchar(256) DEFAULT NULL,
+              `status` tinyint NOT NULL DEFAULT '1' COMMENT '1: Aktif, 2: Tidak Aktif, 10: Deleted',
+              `flag_update` tinyint NOT NULL DEFAULT '0' COMMENT '0: No Update, 1: Update Exist, 2: Update Rejected, 3: Update Approved',
+              `id_pns_siasn` varchar(100) DEFAULT NULL,
+              `siasn_flag` tinyint DEFAULT '0',
+              `siasn_lu` datetime DEFAULT NULL,
+              `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              `updated_by` int DEFAULT NULL,
+              `approved_by` int DEFAULT NULL,
+              `reason_note` tinytext,
+              `show_notif` tinyint NOT NULL DEFAULT '0' COMMENT '0: Not Show, 1: Show, 3: Viewed',
+              `notif_date` datetime DEFAULT NULL,
+              `show_ua_upt` tinyint NOT NULL DEFAULT '0',
+              `show_ua_deputi` tinyint NOT NULL DEFAULT '0',
+              `show_ua_biro` tinyint NOT NULL DEFAULT '0',
+              PRIMARY KEY (`id_pegawai_hist`),
+              KEY `fk_peg_hist_ibfk_01` (`nip`),
+              KEY `fk_peg_hist_ibfk_02` (`id_provinsi_lahir`),
+              KEY `fk_peg_hist_ibfk_03` (`id_kabupaten_kota_lahir`),
+              KEY `fk_peg_hist_ibfk_04` (`id_agama`),
+              KEY `fk_peg_hist_ibfk_05` (`id_jenis_pegawai`),
+              KEY `fk_peg_hist_ibfk_06` (`id_jenis_status`),
+              KEY `flag_update` (`flag_update`),
+              KEY `status` (`status`),
+              KEY `show_notif` (`show_notif`),
+              CONSTRAINT `fk_peg_hist_ibfk_01` FOREIGN KEY (`nip`) REFERENCES {{pegawai}} (`nip`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_peg_hist_ibfk_02` FOREIGN KEY (`id_provinsi_lahir`) REFERENCES {{provinsi}} (`id_provinsi`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_peg_hist_ibfk_03` FOREIGN KEY (`id_kabupaten_kota_lahir`) REFERENCES {{kabupaten_kota}} (`id_kabupaten_kota`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_peg_hist_ibfk_04` FOREIGN KEY (`id_agama`) REFERENCES {{agama}} (`id_agama`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_peg_hist_ibfk_05` FOREIGN KEY (`id_jenis_pegawai`) REFERENCES {{jenis_pegawai}} (`id_jenis_pegawai`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_peg_hist_ibfk_06` FOREIGN KEY (`id_jenis_status`) REFERENCES {{jenis_status}} (`id_jenis_status`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `chk_pegawai_hist_status` CHECK (`status` IN (1, 2, 10)),
+              CONSTRAINT `chk_pegawai_hist_flag_update` CHECK (`flag_update` IN (0, 1, 2, 3)),
+              CONSTRAINT `chk_pegawai_hist_jenis_kelamin` CHECK (`jenis_kelamin` IN (1, 2))
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            SQL,
+        'pegawai_foto' => <<<'SQL'
+            CREATE TABLE {{pegawai_foto}} (
+              `id_pegawai_foto` int NOT NULL AUTO_INCREMENT,
+              `nip` varchar(30) NOT NULL,
+              `foto` varchar(255) NOT NULL,
+              `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id_pegawai_foto`),
+              KEY `fk_nip_pegfoto_to_peg` (`nip`),
+              KEY `foto` (`foto`),
+              CONSTRAINT `fk_nip_pegfoto_to_peg` FOREIGN KEY (`nip`) REFERENCES {{pegawai}} (`nip`) ON DELETE RESTRICT ON UPDATE RESTRICT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            SQL,
+    ];
 
     public function up(): void
     {
         $created = [];
 
         try {
-            foreach ($this->createStatements() as $table => $sql) {
-                $this->exec($sql);
+            foreach (self::TABLES as $table) {
+                $this->exec($this->ddl($table));
                 $created[] = $table;
             }
         } catch (Throwable $e) {
@@ -82,183 +209,24 @@ class CreatePegawai extends Migration
 
     public function down(): void
     {
-        foreach (self::TABLES as $table) {
+        foreach (array_reverse(self::TABLES) as $table) {
             $this->exec("DROP TABLE IF EXISTS {$this->t($table)}");
         }
     }
 
-    /**
-     * CREATE TABLE per tabel, urut induk → anak.
-     *
-     * @return array<string, string> tabel => SQL
-     */
-    private function createStatements(): array
+    private function ddl(string $table): string
     {
-        $status    = "COMMENT '" . self::STATUS_COMMENT . "'";
-        $biodata   = $this->biodataColumnsSql();
-        $pegawaiFk = $this->masterForeignKeysSql([
-            'fk_id_provinsi_lahir_peg_to_prov',
-            'fk_id_kabupaten_kota_lahir_peg_to_kab_kota',
-            'fk_id_agama_peg_to_agama',
-            'fk_id_jenis_pegawai_peg_to_jenis_pegawai',
-            'fk_id_jenis_status_peg_to_jenis_status',
-        ]);
-        $histFk = $this->masterForeignKeysSql([
-            'fk_peg_hist_ibfk_02',
-            'fk_peg_hist_ibfk_03',
-            'fk_peg_hist_ibfk_04',
-            'fk_peg_hist_ibfk_05',
-            'fk_peg_hist_ibfk_06',
-        ]);
-        $sql = [];
-
-        // [L] simpeg_prod_duplikat.pegawai (urutan kolom persis) + FK [K-erd]. PK nip VARCHAR(30) (K1).
-        $sql['pegawai'] = "CREATE TABLE {$this->t('pegawai')} (
-            `nip` VARCHAR(30) NOT NULL,
-            {$biodata},
-            `status` TINYINT NOT NULL DEFAULT 1 {$status},
-            `flag_update` TINYINT NOT NULL DEFAULT 0 COMMENT '" . self::FLAG_UPDATE_COMMENT . "',
-            `id_pns_siasn` VARCHAR(100) NULL DEFAULT NULL,
-            `siasn_flag` TINYINT NULL DEFAULT 0,
-            `siasn_lu` DATETIME NULL DEFAULT NULL,
-            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            `updated_by` INT NULL DEFAULT NULL COMMENT 'id_pengguna yang terakhir mengubah',
-            `deleted_at` DATETIME NULL DEFAULT NULL,
-            PRIMARY KEY (`nip`),
-            KEY `status` (`status`),
-            KEY `fk_id_provinsi_lahir_peg_to_prov` (`id_provinsi_lahir`),
-            KEY `fk_id_kabupaten_kota_lahir_peg_to_kab_kota` (`id_kabupaten_kota_lahir`),
-            KEY `fk_id_agama_peg_to_agama` (`id_agama`),
-            KEY `fk_id_jenis_pegawai_peg_to_jenis_pegawai` (`id_jenis_pegawai`),
-            KEY `fk_id_jenis_status_peg_to_jenis_status` (`id_jenis_status`),
-            {$pegawaiFk},
-            CONSTRAINT `chk_pegawai_status` CHECK (`status` IN (1, 2, 10)),
-            CONSTRAINT `chk_pegawai_flag_update` CHECK (`flag_update` IN (0, 1, 2, 3)),
-            CONSTRAINT `chk_pegawai_jenis_kelamin` CHECK (`jenis_kelamin` IN (1, 2))
-        ) " . self::TABLE_OPTIONS;
-
-        // [I] salinan kolom pegawai (tipe identik, tanpa deleted_at) + email + blok workflow; FK [K-erd].
-        $sql['pegawai_hist'] = "CREATE TABLE {$this->t('pegawai_hist')} (
-            `id_pegawai_hist` INT NOT NULL AUTO_INCREMENT,
-            `nip` VARCHAR(30) NOT NULL,
-            {$biodata},
-            `status` TINYINT NOT NULL DEFAULT 1 {$status},
-            `flag_update` TINYINT NOT NULL DEFAULT 1 COMMENT '" . self::HIST_FLAG_UPDATE_COMMENT . "',
-            `id_pns_siasn` VARCHAR(100) NULL DEFAULT NULL,
-            `siasn_flag` TINYINT NULL DEFAULT 0,
-            `siasn_lu` DATETIME NULL DEFAULT NULL,
-            `email` VARCHAR(150) NULL DEFAULT NULL COMMENT 'email akun yang diajukan; disalin ke pengguna.email saat disetujui',
-            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            `updated_by` INT NULL DEFAULT NULL COMMENT 'id_pengguna yang terakhir mengubah',
-            `approved_by` INT NULL DEFAULT NULL COMMENT 'id_pengguna yang memproses (setuju/tolak)',
-            `reason_note` MEDIUMTEXT NULL,
-            `show_notif` TINYINT NOT NULL DEFAULT 0,
-            `notif_date` DATETIME NULL DEFAULT NULL,
-            `show_ua_upt` TINYINT NULL DEFAULT NULL,
-            `show_ua_deputi` TINYINT NULL DEFAULT NULL,
-            `show_ua_biro` TINYINT NULL DEFAULT NULL,
-            PRIMARY KEY (`id_pegawai_hist`),
-            KEY `nip` (`nip`),
-            KEY `flag_update` (`flag_update`),
-            KEY `show_notif` (`show_notif`, `notif_date`),
-            KEY `fk_peg_hist_ibfk_02` (`id_provinsi_lahir`),
-            KEY `fk_peg_hist_ibfk_03` (`id_kabupaten_kota_lahir`),
-            KEY `fk_peg_hist_ibfk_04` (`id_agama`),
-            KEY `fk_peg_hist_ibfk_05` (`id_jenis_pegawai`),
-            KEY `fk_peg_hist_ibfk_06` (`id_jenis_status`),
-            CONSTRAINT `fk_peg_hist_ibfk_01` FOREIGN KEY (`nip`)
-                REFERENCES {$this->t('pegawai')} (`nip`) " . self::RESTRICT . ",
-            {$histFk},
-            CONSTRAINT `chk_pegawai_hist_flag_update` CHECK (`flag_update` IN (1, 2, 3)),
-            CONSTRAINT `chk_pegawai_hist_status` CHECK (`status` IN (1, 2, 10)),
-            CONSTRAINT `chk_pegawai_hist_jenis_kelamin` CHECK (`jenis_kelamin` IN (1, 2))
-        ) " . self::TABLE_OPTIONS;
-
-        // [K-erd] + [I] kolom yang dibaca kode; created_at [V2]. Galeri foto per pegawai (banyak baris per nip).
-        $sql['pegawai_foto'] = "CREATE TABLE {$this->t('pegawai_foto')} (
-            `id_pegawai_foto` INT NOT NULL AUTO_INCREMENT,
-            `nip` VARCHAR(30) NOT NULL,
-            `foto` VARCHAR(255) NOT NULL COMMENT 'path berkas foto (format = pegawai.foto)',
-            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id_pegawai_foto`),
-            KEY `fk_nip_pegfoto_to_peg` (`nip`),
-            CONSTRAINT `fk_nip_pegfoto_to_peg` FOREIGN KEY (`nip`)
-                REFERENCES {$this->t('pegawai')} (`nip`) " . self::RESTRICT . '
-        ) ' . self::TABLE_OPTIONS;
-
-        return $sql;
-    }
-
-    /**
-     * Kolom biodata `pegawai` [L] dari `id_provinsi_lahir` s.d. `keterangan` (urutan persis); dipakai juga oleh
-     * `pegawai_hist` agar tipe salinannya identik.
-     */
-    private function biodataColumnsSql(): string
-    {
-        return "`id_provinsi_lahir` CHAR(2) NULL DEFAULT NULL,
-            `id_kabupaten_kota_lahir` CHAR(4) NULL DEFAULT NULL,
-            `id_agama` TINYINT NULL DEFAULT NULL,
-            `id_jenis_pegawai` TINYINT NULL DEFAULT NULL,
-            `id_jenis_status` TINYINT NULL DEFAULT NULL,
-            `nip_lama` VARCHAR(18) NULL DEFAULT NULL,
-            `nama` VARCHAR(100) NOT NULL,
-            `glr_awal` VARCHAR(50) NULL DEFAULT NULL,
-            `glr_akhir` VARCHAR(50) NULL DEFAULT NULL,
-            `tgl_lahir` DATE NOT NULL,
-            `provinsi_lahir` VARCHAR(255) NULL DEFAULT NULL,
-            `provinsi_lahir_lain` VARCHAR(255) NULL DEFAULT NULL,
-            `kabupaten_kota_lahir` VARCHAR(255) NULL DEFAULT NULL,
-            `kabupaten_kota_lahir_lain` VARCHAR(255) NULL DEFAULT NULL,
-            `agama` VARCHAR(30) NULL DEFAULT NULL,
-            `jenis_kelamin` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1: Laki-laki, 2: Perempuan',
-            `npwp` VARCHAR(20) NULL DEFAULT NULL,
-            `nik` VARCHAR(20) NULL DEFAULT NULL,
-            `bpjs_kes` VARCHAR(50) NULL DEFAULT NULL,
-            `bpjs_ket` VARCHAR(50) NULL DEFAULT NULL,
-            `no_taspen` VARCHAR(50) NULL DEFAULT NULL,
-            `no_hp` VARCHAR(20) NULL DEFAULT NULL,
-            `jenis_kerabat` VARCHAR(100) NULL DEFAULT NULL,
-            `no_telp_kerabat` VARCHAR(20) NULL DEFAULT NULL,
-            `status_pernikahan` TINYINT(1) NULL DEFAULT NULL COMMENT '1: Menikah, 2: Tidak Menikah',
-            `jenis_pegawai` VARCHAR(255) NULL DEFAULT NULL,
-            `jenis_status` VARCHAR(100) NULL DEFAULT NULL,
-            `tmt_status` DATE NULL DEFAULT NULL,
-            `foto` VARCHAR(255) NULL DEFAULT NULL,
-            `keterangan` TINYTEXT NULL";
-    }
-
-    /**
-     * FK master biodata (target sudah ada di `main`: wilayah DBV-001, agama/jenis_pegawai/jenis_status DBV-001),
-     * urutan kolom: provinsi lahir, kabupaten/kota lahir, agama, jenis pegawai, jenis status.
-     *
-     * @param array{0: string, 1: string, 2: string, 3: string, 4: string} $names nama FK sesuai urutan kolom
-     */
-    private function masterForeignKeysSql(array $names): string
-    {
-        $targets = [
-            ['id_provinsi_lahir', 'provinsi', 'id_provinsi'],
-            ['id_kabupaten_kota_lahir', 'kabupaten_kota', 'id_kabupaten_kota'],
-            ['id_agama', 'agama', 'id_agama'],
-            ['id_jenis_pegawai', 'jenis_pegawai', 'id_jenis_pegawai'],
-            ['id_jenis_status', 'jenis_status', 'id_jenis_status'],
-        ];
-
-        $sql = [];
-
-        foreach ($targets as $i => [$column, $parent, $parentColumn]) {
-            $sql[] = "CONSTRAINT `{$names[$i]}` FOREIGN KEY (`{$column}`)
-                REFERENCES {$this->t($parent)} (`{$parentColumn}`) " . self::RESTRICT;
-        }
-
-        return implode(",\n            ", $sql);
+        return (string) preg_replace_callback(
+            '/\{\{([a-z_]+)\}\}/',
+            fn (array $m): string => $this->t($m[1]),
+            self::DDL[$table],
+        );
     }
 
     /**
      * Pembersihan setelah up() gagal: drop tabel yang dibuat pada run ini, urutan terbalik (anak dulu). Kegagalan
-     * drop tidak menutupi error asli (yang dilempar ulang pemanggil) — sisa tabel lalu dibersihkan manual (dokumen
-     * Bagian 6.6).
+     * drop tidak menutupi error asli (yang dilempar ulang pemanggil); sisa tabel dibersihkan manual (dokumen
+     * Bagian 9.3).
      *
      * @param list<string> $created
      */
@@ -291,7 +259,7 @@ class CreatePegawai extends Migration
         if ($this->db->query($sql) === false) {
             $error = $this->db->error();
 
-            throw new RuntimeException('DBV-012: DDL pegawai gagal (' . $error['code'] . '): ' . $error['message']);
+            throw new RuntimeException('DBV-012: DDL CreatePegawai gagal (' . $error['code'] . '): ' . $error['message']);
         }
     }
 }

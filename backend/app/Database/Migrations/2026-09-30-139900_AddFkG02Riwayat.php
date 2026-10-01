@@ -12,14 +12,14 @@ use Throwable;
 /**
  * DBV-013 — B-02 keranjang (d): FK dari tabel riwayat/penugasan B-02 ke master G-02 (`group_jabatan`,
  * `sub_group_jabatan`, `unit`, `satker`, `jabatan`, `jabatan_koordinasi`, `rumpun_jabatan`). Review DB Validator:
- * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 2.2.9, 7) — JANGAN dijalankan di Dev/Production sebelum disetujui DBV-013
+ * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 4.1, 7) — JANGAN dijalankan di Dev/Production sebelum disetujui DBV-013
  * dan sebelum migration G-02 (DBV-008) ada di `main`.
  *
  * DITAHAN: file ini TIDAK ikut PR B-01/B-02. Disimpan di branch lokal `dbv-012/fk-ditahan` sampai DBV-008 merge; timestamp
  * ditetapkan ulang saat rebase agar lebih besar dari migration G-02. Semua KEY bernama FK sudah dibuat oleh migration
  * Create B-02 (kelompok 2: `130100`; kelompok 3: `130400`, `130600`), sehingga di sini cukup ADD CONSTRAINT.
  *
- * Nama FK = nama legacy ERD `simpeg01.erd` [K-erd] persis. Aksi legacy [L]/seed ON DELETE SET NULL ON UPDATE CASCADE →
+ * Nama, kolom, induk FK = dump struktur produksi 01-10-2026 (D1) [K] persis. Aksi D1 ON DELETE SET NULL ON UPDATE CASCADE →
  * v2 RESTRICT/RESTRICT (K1; master G-02 memakai soft delete status 10).
  *
  * Dua kelompok konstanta:
@@ -61,7 +61,7 @@ class AddFkG02Riwayat extends Migration
         ['pegawai_plt', 'fk_id_satker_plt_to_satker', 'id_satker', 'satker', 'id_satker'],
         ['pegawai_plt', 'fk_id_satker_plt_plt_to_satker', 'id_satker_plt', 'satker', 'id_satker'],
         ['pegawai_plt', 'fk_id_jabatan_plt_to_jabatan', 'id_jabatan', 'jabatan', 'id_jabatan'],
-        // Kelompok 2 — pegawai_plh (9 dari 10; pemetaan nomor ibfk -> kolom [I], lihat 130100)
+        // Kelompok 2 — pegawai_plh (9 dari 10; pemetaan nomor ibfk -> kolom = D1)
         ['pegawai_plh', 'fk_pegawai_plh_ibfk_02', 'id_jabatan', 'jabatan', 'id_jabatan'],
         ['pegawai_plh', 'fk_pegawai_plh_ibfk_04', 'id_group_jabatan', 'group_jabatan', 'id_group_jabatan'],
         ['pegawai_plh', 'fk_pegawai_plh_ibfk_05', 'id_sub_group_jabatan', 'sub_group_jabatan', 'id_sub_group_jabatan'],
@@ -71,7 +71,7 @@ class AddFkG02Riwayat extends Migration
         ['pegawai_plh', 'fk_pegawai_plh_ibfk_09', 'id_sub_group_jabatan_plh', 'sub_group_jabatan', 'id_sub_group_jabatan'],
         ['pegawai_plh', 'fk_pegawai_plh_ibfk_10', 'id_unit_plh', 'unit', 'id_unit'],
         ['pegawai_plh', 'fk_pegawai_plh_ibfk_11', 'id_satker_plh', 'satker', 'id_satker'],
-        // Kelompok 3 — nama & kolom dari ERD; cocokkan dengan migration 130400/130600 sebelum branch ini di-rebase.
+        // Kelompok 3 — nama & kolom = D1.
         ['riwayat_lckh', 'fk_riwayat_lckh_ibfk_03', 'id_unit', 'unit', 'id_unit'],
         ['riwayat_lckh', 'fk_riwayat_lckh_ibfk_04', 'id_satker', 'satker', 'id_satker'],
         ['riwayat_ak', 'fk_id_jabatan_rak_to_jab', 'id_jabatan', 'jabatan', 'id_jabatan'],

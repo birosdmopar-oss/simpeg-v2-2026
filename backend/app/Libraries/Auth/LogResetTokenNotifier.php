@@ -6,6 +6,7 @@ namespace App\Libraries\Auth;
 
 use App\Interfaces\ResetTokenNotifierInterface;
 use CodeIgniter\Exceptions\ConfigException;
+use SensitiveParameter;
 
 /**
  * Notifier reset password untuk development (auth.resetTokenNotifier = log): tautan reset — BERISI TOKEN — ditulis ke
@@ -27,8 +28,14 @@ class LogResetTokenNotifier implements ResetTokenNotifierInterface
         }
     }
 
-    public function send(array $user, string $token, string $resetLink, string $expiresAt): void
-    {
+    public function send(
+        array $user,
+        #[SensitiveParameter]
+        string $token,
+        #[SensitiveParameter]
+        string $resetLink,
+        string $expiresAt,
+    ): void {
         log_message('info', self::LOG_PREFIX . ' tautan reset untuk username={username} (berlaku s.d. {exp}): {link}', [
             'username' => (string) ($user['username'] ?? ''),
             'exp'      => $expiresAt,

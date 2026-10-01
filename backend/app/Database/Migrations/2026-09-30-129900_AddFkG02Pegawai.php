@@ -14,14 +14,14 @@ use Throwable;
  * DITAHAN — JANGAN taruh di app/Database/Migrations sebelum DBV-008 (G-02) merge ke `main`.
  * Disimpan di branch lokal `dbv-012/fk-ditahan` (dokumen Bagian 7); timestamp ditetapkan ulang agar lebih besar dari migration G-02.
  *
- * DBV-012 — B-01: FK snapshot `pegawai_*` (2026-09-30-120100) → tabel master G-02 (DBV-008). KEY untuk setiap kolom
- * sudah dibuat migration snapshot dengan nama FK yang sama, jadi di sini cukup ADD CONSTRAINT. Nama FK = ERD
- * `simpeg01.erd` [K-erd]; aksi ON DELETE RESTRICT ON UPDATE RESTRICT (legacy [L]: SET NULL/CASCADE). Review DB
+ * DBV-012 — B-01: FK snapshot `pegawai_*` (2026-09-30-120100) → tabel master G-02 (DBV-008). Index untuk setiap kolom
+ * sudah ada di DDL snapshot (D1), jadi di sini cukup ADD CONSTRAINT. Nama, kolom, induk FK = dump struktur produksi
+ * 01-10-2026 (D1) [K]; aksi ON DELETE RESTRICT ON UPDATE RESTRICT [V2] (D1: SET NULL/CASCADE). Review DB
  * Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md — JANGAN dijalankan di Dev/Production sebelum
  * disetujui DBV-012.
  *
- * Cakupan: 10 FK ke tabel yang ada di draf DBV-008 (group_jabatan, sub_group_jabatan, unit, satker, jabatan; PK INT).
- * 4 FK lain [K-erd] BELUM bisa dipasang karena tabel induknya belum ada di draf DBV-008 (dicek 30-09-2026) — lihat
+ * Cakupan: 11 FK ke tabel yang ada di draf DBV-008 (group_jabatan, sub_group_jabatan, unit, satker, jabatan; PK INT).
+ * 4 FK lain [K D1] BELUM bisa dipasang karena tabel induknya belum ada di draf DBV-008 (dicek 30-09-2026) — lihat
  * self::MENUNGGU_TABEL; dipasang migration terpisah setelah tabelnya dibuat (DBV-008 atau DBV lain).
  *
  * up() fail-closed: tabel/kolom induk wajib ada, dan tidak boleh ada orphan (pesan menyebut jumlah per FK). FK yang
@@ -45,11 +45,12 @@ class AddFkG02Pegawai extends Migration
         'fk_id_atasan_es_3_pmj_to_jabatan'   => ['pegawai_mutasi_jabatan', 'id_atasan_es_3', 'jabatan', 'id_jabatan'],
         'fk_id_atasan_es_4_pmj_to_jabatan'   => ['pegawai_mutasi_jabatan', 'id_atasan_es_4', 'jabatan', 'id_jabatan'],
         'fk_id_jabatan_cak_to_jab'           => ['pegawai_ak', 'id_jabatan', 'jabatan', 'id_jabatan'],
+        'fk_id_jabatan_peg_ak_siasn_03'      => ['pegawai_ak_siasn', 'id_jabatan', 'jabatan', 'id_jabatan'],
     ];
 
     /**
-     * FK [K-erd] yang tabel induknya belum ada di draf DBV-008 — TIDAK dipasang migration ini.
-     * nama FK => [tabel snapshot, kolom, tabel induk (nama ERD), kolom PK; id_jabatan_koordinasi [I] L_jabatan.php:2194].
+     * FK [K D1] yang tabel induknya belum ada di draf DBV-008 — TIDAK dipasang migration ini.
+     * nama FK => [tabel snapshot, kolom, tabel induk, kolom PK; nama/kolom/induk = D1].
      *
      * @var array<string, array{0: string, 1: string, 2: string, 3: string}>
      */
