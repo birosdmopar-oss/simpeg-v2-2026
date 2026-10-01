@@ -2,7 +2,7 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `03-Kepegawaian.md`. Aturan kalkulasi dan tanggal bisnis: `backend/app/Libraries/Kepegawaian/README.md`.
 
-**Terakhir diperbarui:** 30 September 2026 (CR-025: persiapan tanpa skema — kalkulasi murni periode KP, jarak KGB, akhir hukdis, dan masa kerja untuk B-21; branch `cr-025/aturan-kepegawaian-fase3`, belum di main)
+**Terakhir diperbarui:** 1 Oktober 2026 (CR-029: CR-025 sudah di main — merge `a540703` (commit `5852270`) 30-09-2026. Sebelumnya CR-025: persiapan tanpa skema — kalkulasi murni periode KP, jarak KGB, akhir hukdis, dan masa kerja untuk B-21; branch `cr-025/aturan-kepegawaian-fase3`)
 **Entry criteria:** Fase 1 + Fase 2 DONE — belum terpenuhi (G-01/G-02/G-03/G-09 masih terbuka di `02-MasterData.md`). Pekerjaan di file ini sampai entry criteria terpenuhi hanya **persiapan yang tidak butuh tabel baru**, dikerjakan paralel sambil skema Fase 3 menunggu review DB Validator.
 
 | Task | Status | Ringkas |
@@ -15,7 +15,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 
 ## Persiapan tanpa skema
 
-### CR-025 — kalkulasi murni Kepegawaian (bagian B-21) — pra-review internal sisi CR
+### CR-025 — kalkulasi murni Kepegawaian (bagian B-21) — pra-review internal sisi CR; di main lewat merge `a540703` 30-09-2026
 
 Key review **CR-025** (CR saja). Tidak mengubah skema, jadi tidak ada dokumen `docs/db-review/` dan tidak perlu review DB Validator. Tanpa migration, tanpa FE, tanpa endpoint.
 
