@@ -461,7 +461,8 @@ final class JabatanUnitSatkerTest extends CIUnitTestCase
     }
 
     /**
-     * `jabatan.id_jenjang_jf` (tabel jenjang_jf ditunda) disimpan tetapi tidak dikirim maupun ditulis lewat API.
+     * `jabatan.id_jenjang_jf` (FK ke jenjang_jf DBV-018, tanpa CRUD) disimpan tetapi tidak dikirim maupun ditulis lewat API.
+     * Nilai 5 = jenjang seed MasterDataSeeder::seedG02b.
      */
     public function testJenjangJfColumnIsNotManaged(): void
     {

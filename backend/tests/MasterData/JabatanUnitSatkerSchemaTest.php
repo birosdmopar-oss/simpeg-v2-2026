@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\MasterData;
 
+use App\Database\Migrations\AddFkJabatanJenjangJf;
+use App\Database\Migrations\CreateMasterJabatanSisa;
 use App\Database\Migrations\CreateMasterJabatanUnitSatker;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
@@ -12,7 +14,8 @@ use CodeIgniter\Test\DatabaseTestTrait;
  * DBV-008 — skema G-02 hasil migration 2026-09-30-100000_CreateMasterJabatanUnitSatker harus sama dengan skema yang
  * diajukan ke DB Validator (backend/docs/db-review/G-02-jabatan-unit-satker-schema.md Bagian 2): DDL keenam tabel dari
  * dump struktur produksi lengkap D1 `simpeg01_struktur_lengkap_20261001.sql` [K] (revisi 01-10-2026), plus
- * deviasi v2 (status 10, 5 UNIQUE nama, FK RESTRICT, FK jenjang_jf ditunda, 5 CHECK). Migration tidak menulis baris apa
+ * deviasi v2 (status 10, 5 UNIQUE nama, FK RESTRICT, 5 CHECK). FK `jabatan → jenjang_jf` dibuat migration DBV-018; tabel
+ * DBV-018 merujuk tabel G-02, jadi down() G-02 di test ini dijalankan setelah kedua migration DBV-018 di-down. Migration tidak menulis baris apa
  * pun dan bisa di-rollback.
  *
  * @internal
@@ -119,7 +122,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
     /**
      * Seluruh FK dari/ke keenam tabel, urut nama: [tabel anak, kolom, tabel induk, kolom induk, UPDATE_RULE, DELETE_RULE].
      * Nama legacy (D1:1468, :1470-1472, :6903, :7194); aksi RESTRICT/RESTRICT [V2]. FK `fk_id_jenjang_jf_jab_to_jenjang_jf`
-     * sengaja tidak ada di migration ini (dibuat migration DBV-018 bersama tabel jenjang_jf, G-02 Bagian 4 #4).
+     * bukan bagian migration ini (dibuat migration DBV-018 bersama tabel jenjang_jf, G-02 Bagian 4 #4).
      */
     private const FOREIGN_KEYS = [
         'fk_id_group_jabatan_jabatan_to_gj'        => ['jabatan', 'id_group_jabatan', 'group_jabatan', 'id_group_jabatan', 'RESTRICT', 'RESTRICT'],
@@ -155,8 +158,10 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         foreach (self::TABLES as $table) {
             if (! $this->tableExists($table) || $this->columns($table) !== self::COLUMNS[$table]) {
                 $migration = $this->migration();
+                $this->downDependents();
                 $migration->down();
                 $migration->up();
+                $this->upDependents();
 
                 break;
             }
@@ -249,6 +254,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
     public function testMigrationRollsBackAndUpAgain(): void
     {
         $migration = $this->migration();
+        $this->downDependents();
         $migration->down();
 
         foreach (self::TABLES as $table) {
@@ -260,6 +266,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         }
 
         $migration->up();
+        $this->upDependents();
         $this->assertSchema();
     }
 
@@ -271,6 +278,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
     public function testFailedUpDropsOnlyTablesCreatedInThatRun(): void
     {
         $migration = $this->migration();
+        $this->downDependents();
         $migration->down();
 
         $blocker = $this->db->escapeIdentifiers($this->db->prefixTable('kelas_jabatan'));
@@ -297,6 +305,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         // Setelah penyebabnya dibereskan, up() bisa langsung diulang.
         $this->db->query("DROP TABLE {$blocker}");
         $migration->up();
+        $this->upDependents();
         $this->assertSchema();
     }
 
@@ -392,8 +401,8 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         $this->assertDbWriteFails(fn () => $this->db->table('jabatan')->insert(['id_satker' => 99, 'jabatan' => 'Satker Yatim']));
         $this->assertDbWriteFails(fn () => $this->db->table('jabatan')->insert(['kelas_jabatan' => 11, 'jabatan' => 'Kelas Yatim']));
 
-        // id_jenjang_jf tanpa FK (tabel jenjang_jf ditunda): nilai apa pun diterima DB.
-        $this->db->table('jabatan')->insert(['id_jenjang_jf' => 5, 'jabatan' => 'Jenjang Tanpa Tabel']);
+        // id_jenjang_jf: FK ke jenjang_jf (migration DBV-018) menolak nilai yatim; tabel jenjang_jf kosong di test ini.
+        $this->assertDbWriteFails(fn () => $this->db->table('jabatan')->insert(['id_jenjang_jf' => 5, 'jabatan' => 'Jenjang Yatim']));
 
         // Nama wajib.
         $this->assertDbWriteFails(fn () => $this->db->table('jabatan')->insert(['id_satker' => 37, 'jabatan' => null] + $base));
@@ -422,7 +431,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         }
 
         $this->assertSame(self::FOREIGN_KEYS, $this->foreignKeys());
-        $this->assertSame([], $this->foreignKeysOn('jabatan', 'id_jenjang_jf'), 'jabatan.id_jenjang_jf tanpa FK (jenjang_jf ditunda)');
+        $this->assertSame(['fk_id_jenjang_jf_jab_to_jenjang_jf'], $this->foreignKeysOn('jabatan', 'id_jenjang_jf'), 'FK jabatan → jenjang_jf dibuat DBV-018');
         $this->assertSame(self::CHECKS, $this->checkConstraints());
     }
 
@@ -437,6 +446,37 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         }
 
         $this->assertTrue($failed, 'Constraint DB harus menolak penulisan ini.');
+    }
+
+    /**
+     * DBV-018: migration yang FK-nya merujuk tabel G-02 (urut up). down() G-02 hanya bisa jalan setelah keduanya di-down.
+     *
+     * @return list<AddFkJabatanJenjangJf|CreateMasterJabatanSisa>
+     */
+    private function dependents(): array
+    {
+        require_once APPPATH . 'Database/Migrations/2026-09-30-100100_CreateMasterJabatanSisa.php';
+        require_once APPPATH . 'Database/Migrations/2026-09-30-100200_AddFkJabatanJenjangJf.php';
+
+        return [new CreateMasterJabatanSisa(), new AddFkJabatanJenjangJf()];
+    }
+
+    private function downDependents(): void
+    {
+        foreach (array_reverse($this->dependents()) as $migration) {
+            try {
+                $migration->down();
+            } catch (\Throwable) {
+                // Sudah di-down (mis. tearDown setelah test gagal di tengah): lanjut.
+            }
+        }
+    }
+
+    private function upDependents(): void
+    {
+        foreach ($this->dependents() as $migration) {
+            $migration->up();
+        }
     }
 
     private function migration(): CreateMasterJabatanUnitSatker
@@ -569,7 +609,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
     }
 
     /**
-     * Seluruh FK dari/ke tabel G-02: nama => [tabel anak, kolom, tabel induk, kolom induk, UPDATE_RULE, DELETE_RULE],
+     * Seluruh FK di antara keenam tabel G-02 (FK dari/ke tabel DBV-018 diuji JabatanSisaSchemaTest): nama => [tabel anak, kolom, tabel induk, kolom induk, UPDATE_RULE, DELETE_RULE],
      * urut nama.
      *
      * @return array<string, array{0: string, 1: string, 2: string, 3: string, 4: string, 5: string}>
@@ -583,7 +623,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
              FROM information_schema.KEY_COLUMN_USAGE k
              JOIN information_schema.REFERENTIAL_CONSTRAINTS r
                ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME AND r.TABLE_NAME = k.TABLE_NAME
-             WHERE k.TABLE_SCHEMA = ? AND k.REFERENCED_TABLE_NAME IS NOT NULL AND (k.TABLE_NAME IN ? OR k.REFERENCED_TABLE_NAME IN ?)
+             WHERE k.TABLE_SCHEMA = ? AND k.REFERENCED_TABLE_NAME IS NOT NULL AND k.TABLE_NAME IN ? AND k.REFERENCED_TABLE_NAME IN ?
              ORDER BY k.CONSTRAINT_NAME',
             [$this->db->getDatabase(), $tables, $tables],
         )->getResultArray();

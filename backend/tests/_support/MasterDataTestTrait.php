@@ -262,6 +262,37 @@ trait MasterDataTestTrait
                 'parent'    => null,
             ],
             // --- /DBV-008 ---
+
+            // --- DBV-018 ---
+            // G-02 sisa (seed MasterDataSeeder::seedG02b). Test RBAC menghapus `existing` tiap master sebelum master
+            // berikutnya: `new` sub rumpun memakai rumpun 1, bukan `existing` rumpun 2. Periode = tahun (hook), jadi
+            // ubah memakai fixture `update`.
+            'rumpun-jabatan' => [
+                'new'       => ['rumpun_jabatan' => 'Kesehatan'],
+                'duplicate' => 'MANAJEMEN',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'subrumpun-jabatan' => [
+                'new'       => ['id_rumpun_jabatan' => '1', 'subrumpun_jabatan' => 'Manajemen Aset'],
+                'duplicate' => 'manajemen sumber daya manusia',
+                'existing'  => '2',
+                'parent'    => ['id_rumpun_jabatan', '1'],
+            ],
+            'jabatan-akademik' => [
+                'new'       => ['jabatan_akademik' => 'Lektor Kepala', 'is_atasan' => '2'],
+                'duplicate' => 'LEKTOR',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'periode-struktur-jabatan' => [
+                'new'       => ['periode_struktur_jabatan' => '2027'],
+                'duplicate' => '2021',
+                'existing'  => '2',
+                'parent'    => null,
+                'update'    => ['periode_struktur_jabatan' => '2030'],
+            ],
+            // --- /DBV-018 ---
         ];
     }
 

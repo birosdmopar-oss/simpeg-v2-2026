@@ -16,9 +16,18 @@ namespace App\Controllers\Api\MasterData;
  *   - `kelas-jabatan/options` (id = nama = nomor kelas, codeAsName CR-026).
  * `satker.zonasi` (offset jam presensi dari WIB, 0–120 menit) wajib. `satker.logo_uns` dan `jabatan.id_jenjang_jf`
  * disimpan tetapi tidak dikelola/diekspos (hiddenColumns). Pindah group sub group yang sudah dirujuk jabatan ditolak
- * (SubGroupJabatanHooks). Peta jabatan & tabel jabatan lain: DBV-018 (G-02b).
+ * (SubGroupJabatanHooks).
+ *
+ * G-02 sisa (DBV-018/CR-032 ⏳): rumpun jabatan (`rumpun-jabatan`), sub rumpun (`subrumpun-jabatan`, induk rumpun,
+ * statusChain), jabatan akademik (`jabatan-akademik`), periode struktur (`periode-struktur-jabatan`, nama = tahun,
+ * PeriodeStrukturJabatanHooks). Peta jabatan, struktur jabatan, dan jabatan koordinasi butuh halaman khusus; jenjang JF
+ * tanpa CRUD (G-02b Bagian 4 #9-#12).
  */
 class JabatanController extends BaseMasterController
 {
-    protected array $entities = ['unit', 'satker', 'group-jabatan', 'sub-group-jabatan', 'kelas-jabatan', 'jabatan'];
+    protected array $entities = [
+        'unit', 'satker', 'group-jabatan', 'sub-group-jabatan', 'kelas-jabatan', 'jabatan',
+        // DBV-018/CR-032 (G-02 sisa)
+        'rumpun-jabatan', 'subrumpun-jabatan', 'jabatan-akademik', 'periode-struktur-jabatan',
+    ];
 }
