@@ -20,7 +20,7 @@ import type { RowAction } from '@/shared/components/rowActions'
 import MasterFormDialog from '../components/MasterFormDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useCascadeOptions } from '../composables/useCascadeOptions'
-import { ancestorChain, isManualOrder } from '../schemas/master.schema'
+import { ancestorChain, formatDerivedName, isManualOrder } from '../schemas/master.schema'
 import { masterService } from '../services/master.service'
 import type { MasterFieldMeta, MasterMeta, MasterOption, MasterRow, MasterStatus } from '../types'
 
@@ -162,7 +162,10 @@ function idOf(row: MasterRow): string {
 }
 
 function nameOf(row: MasterRow): string {
-  return meta.value ? String(row[meta.value.name_field] ?? '') : ''
+  if (!meta.value) return ''
+  const name = String(row[meta.value.name_field] ?? '')
+  // Nama turunan (G-03 aturan lokasi presensi): `*_desc` legacy berupa JSON array nama → tampil "A, B".
+  return meta.value.name_required === false ? formatDerivedName(name) : name
 }
 
 async function loadMeta(): Promise<void> {

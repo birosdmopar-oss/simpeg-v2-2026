@@ -19,8 +19,10 @@ trait MasterDataTestTrait
      *   duplicate : nama yang SUDAH ada di lingkup yang sama (induk / uniqueScope) di seed MasterDataSeeder
      *   existing  : kode entri seed (untuk update/status/delete)
      *   parent    : [field, id induk] atau null
+     *   update    : (opsional) payload ubah untuk G-TC audit; default = ganti nama. Dipakai master yang namanya turunan
+     *               (nameRequired false, mis. aturan lokasi presensi)
      *
-     * @return array<string, array{new: array<string, string>, duplicate: string, existing: string, parent: array{0: string, 1: string}|null}>
+     * @return array<string, array{new: array<string, string>, duplicate: string, existing: string, parent: array{0: string, 1: string}|null, update?: array<string, string>}>
      */
     public static function masterFixtures(): array
     {
@@ -212,6 +214,22 @@ trait MasterDataTestTrait
                 'parent'    => null,
             ],
             // --- /DBV-005 ---
+
+            // --- DBV-007 ---
+            // Aturan: nama (target_lp_desc) turunan hook — G-TC mengubah `keterangan` (kunci `update`), bukan nama.
+            'lokasi-presensi' => [
+                'new'       => ['nama_lokasi' => 'Kantor Uji', 'latitude' => '-7.250445', 'longitude' => '112.768845', 'radius' => '25'],
+                'duplicate' => 'Kantor Pusat', 'existing' => '1', 'parent' => null,
+            ],
+            'aturan-lokasi-presensi' => [
+                'new' => [
+                    'target_lp_desc' => '["Gedung Sapta Pesona"]', 'target_lp' => '["2"]', 'target_uns' => '["0"]', 'target_jp' => '["1"]',
+                    'hari_berlaku'   => '1,3,5', 'keterangan' => 'Aturan uji',
+                ],
+                'update'    => ['keterangan' => 'Aturan uji (ubah)'],
+                'duplicate' => '["Gedung Sapta Pesona"]', 'existing' => '1', 'parent' => null,
+            ],
+            // --- /DBV-007 ---
         ];
     }
 

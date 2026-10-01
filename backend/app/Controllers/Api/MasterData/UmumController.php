@@ -33,5 +33,6 @@ class UmumController extends BaseMasterController
         'agama', 'jenis-pegawai', 'jenis-status',
         'provinsi', 'kabupaten-kota', 'kecamatan', 'kelurahan',
         'kantor', 'bidang-kursem', 'instansi-kursem',
+        'lokasi-presensi', 'aturan-lokasi-presensi',
     ];
 }

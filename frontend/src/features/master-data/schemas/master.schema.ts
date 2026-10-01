@@ -141,12 +141,12 @@ export function fieldsMissingFromRow(meta: MasterMeta, row: MasterRow | null): M
  *            bila field ref-nya bernilai kode sistem (LAIN-LAIN); selain itu opsional (backend mengosongkannya).
  */
 export function buildMasterSchema(meta: MasterMeta, isEdit: boolean, all: MasterMeta[] = []) {
+  const nameSchema = z
+    .string({ required_error: `${meta.name_label} wajib diisi.` })
+    .trim()
+    .max(meta.name_max_length, `${meta.name_label} maksimal ${meta.name_max_length} karakter.`)
   const shape: Record<string, z.ZodTypeAny> = {
-    [meta.name_field]: z
-      .string({ required_error: `${meta.name_label} wajib diisi.` })
-      .trim()
-      .min(1, `${meta.name_label} wajib diisi.`)
-      .max(meta.name_max_length, `${meta.name_label} maksimal ${meta.name_max_length} karakter.`),
+    [meta.name_field]: meta.name_required === false ? nameSchema.optional() : nameSchema.min(1, `${meta.name_label} wajib diisi.`),
   }
 
   if (meta.has_order) {
@@ -206,4 +206,20 @@ export function ancestorChain(meta: MasterMeta, all: MasterMeta[]): MasterMeta[]
     current = current.parent ? byKey.get(current.parent.entity) : undefined
   }
   return chain
+}
+
+/**
+ * Nama turunan berformat JSON array nama (kolom `*_desc` legacy G-03, mis. `["Kantor Pusat","Gedung A"]`) → teks
+ * "Kantor Pusat, Gedung A". Nilai yang bukan JSON array (data lama berupa teks biasa) ditampilkan apa adanya.
+ */
+export function formatDerivedName(value: string): string {
+  const text = value.trim()
+  if (!text.startsWith('[')) return value
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (!Array.isArray(parsed)) return value
+    return parsed.map((item) => String(item)).join(', ')
+  } catch {
+    return value
+  }
 }

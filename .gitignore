@@ -11,3 +11,5 @@ Thumbs.db
 *.env
 !*.env.example
 !.env.example
+# Crash dump keluaran shell/tool lokal, bukan artefak proyek.
+*.stackdump

@@ -512,6 +512,10 @@ class MasterService
         $orderScopeMoved = $def->hasOrder && $newOrderScope !== $oldOrderScope;
         $final           = $changes + $current;
 
+        if ($def->hasStatus && isset($changes[MasterDefinition::STATUS_FIELD])) {
+            $this->applyStatusHooks($def, $final, (string) $current[MasterDefinition::STATUS_FIELD], (string) $changes[MasterDefinition::STATUS_FIELD]);
+        }
+
         $this->translateDuplicate(fn () => $this->transactional(function () use ($def, $id, $current, $changes, $requested, $oldOrderScope, $newOrderScope, $orderScopeMoved): void {
             if ($def->isManualOrder()) {
                 // Mode manual: nilai urutan diganti langsung (di-stamp seperti ubah biasa), entri lain tidak digeser.
@@ -573,6 +577,7 @@ class MasterService
         $status = $this->normalizeStatus($status);
 
         if ((string) $current[MasterDefinition::STATUS_FIELD] !== $status) {
+            $this->applyStatusHooks($def, $current, (string) $current[MasterDefinition::STATUS_FIELD], $status);
             $this->model($def)->update($id, $this->statusChanges($def, $current, $status));
             $this->invalidate($def);
         }
@@ -600,6 +605,7 @@ class MasterService
         $this->assertHasStatus($def);
 
         if ((string) $current[MasterDefinition::STATUS_FIELD] !== MasterModel::STATUS_DELETED) {
+            $this->applyStatusHooks($def, $current, (string) $current[MasterDefinition::STATUS_FIELD], MasterModel::STATUS_DELETED);
             $this->transactional(function () use ($def, $id, $current): void {
                 $this->model($def)->softDelete($id);
 
@@ -1081,6 +1087,9 @@ class MasterService
      */
     private function assertNameUnique(MasterDefinition $def, string $name, ?string $parent, array $scope = [], ?string $exceptId = null): void
     {
+        if (! $def->nameRequired) {
+            return;
+        }
         $builder = $this->db->table($def->table)->where($def->nameField, $name);
 
         if ($def->parentField !== null) {
@@ -1406,6 +1415,21 @@ class MasterService
         $hooks = $def->hooks();
 
         return $hooks === null ? $row : $hooks->beforeWrite($row, $existing);
+    }
+
+    /**
+     * Jalankan hook perubahan status (MasterStatusHooks, CR-031) bila hook master mengimplementasikannya. Master lain
+     * tidak terpengaruh.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function applyStatusHooks(MasterDefinition $def, array $row, string $from, string $to): void
+    {
+        $hooks = $def->hooks();
+
+        if ($hooks instanceof MasterStatusHooks) {
+            $hooks->beforeStatusChange($row, $from, $to);
+        }
     }
 
     private function model(MasterDefinition $def): MasterModel

@@ -68,6 +68,8 @@ export interface MasterMeta {
   name_field: string
   name_label: string
   name_max_length: number
+  /** Nama dibuat otomatis dari field terstruktur; tidak perlu diisi pengguna. */
+  name_required?: boolean
   has_order: boolean
   has_status: boolean
   parent: { field: string; entity: string } | null
