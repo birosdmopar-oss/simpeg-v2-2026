@@ -104,6 +104,17 @@ trait MasterDataTestTrait
 
             // --- DBV-005 ---
             // --- /DBV-005 ---
+
+            // --- DBV-007 ---
+            'lokasi-presensi' => [
+                'new' => ['nama_lokasi' => 'Kantor Uji', 'latitude' => '-6.175400', 'longitude' => '106.827200', 'radius' => '25'],
+                'duplicate' => 'Kantor Pusat', 'existing' => '1', 'parent' => null,
+            ],
+            'aturan-lokasi-presensi' => [
+                'new' => ['target_lp' => '["1"]', 'target_lp_desc' => 'Kantor Pusat', 'target_uns' => '["0"]', 'target_jp' => '["1"]', 'hari_berlaku' => '1,3,5', 'keterangan' => 'Aturan uji'],
+                'duplicate' => 'Kantor Pusat', 'existing' => '1', 'parent' => null,
+            ],
+            // --- /DBV-007 ---
         ];
     }
 

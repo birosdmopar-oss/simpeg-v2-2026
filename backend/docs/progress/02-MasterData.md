@@ -10,7 +10,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 |---|---|---|
 | G-01 Migration tabel master | **IN_PROGRESS** | Batch 1 (7 tabel Tier 0) **disetujui DB Validator 23-09-2026**; revisi ke skema legacy **DBV-001 disetujui 24-09-2026 & sudah di main** (G-01 Bagian 8); 5 tabel FAQ diajukan di **DBV-002 ⏳** (G-10); sisa tabel lain menunggu DDL legacy |
 | G-02 Jabatan, Unit & Satker | TODO (blocked) | Butuh DDL `jabatan` (5 FK di legacy), `kelas_jabatan`, `peta_jabatan` |
-| G-03 Lokasi Presensi | TODO (blocked) | Kolom `lokasi_presensi` ada di seed; `user_lokasi_presensi` butuh `pegawai` (Fase 3) + `dm_user_lokasi_presensi` |
+| G-03 Lokasi Presensi | Implementasi kode (menunggu review DBV-007/CR-031) | `lokasi_presensi` dan `dm_user_lokasi_presensi` tersedia; ekspansi `user_lokasi_presensi` serta target/pengecualian per NIP ditunda ke Fase 3 |
 | G-04 Kenaikan Pangkat | TODO (blocked) | `gol_pppk` legacy memuat nominal uang makan — tidak ada di seed |
 | G-05 Pendidikan | TODO | Kolom ada di seed; perlu keputusan #5 (`order`) → bisa langsung pakai engine |
 | G-06 Diklat, Hukdis, Konket, Tanda Jasa | TODO | Kolom ada di seed; perlu keputusan #5 (`order`) → bisa langsung pakai engine |

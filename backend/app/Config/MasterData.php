@@ -6,6 +6,8 @@ namespace Config;
 
 use App\Libraries\MasterData\FaqArticleHooks;
 use App\Libraries\MasterData\MasterHooks;
+use App\Libraries\MasterData\LokasiPresensiHooks;
+use App\Libraries\MasterData\AturanLokasiPresensiHooks;
 use CodeIgniter\Config\BaseConfig;
 
 /**
@@ -296,5 +298,34 @@ class MasterData extends BaseConfig
 
         // --- DBV-005 (G-06 diklat, hukdis, konket, tanda jasa) ---
         // --- /DBV-005 ---
+
+        // --- DBV-007 (G-03 Master Lokasi Presensi) ---
+        'lokasi-presensi' => [
+            'label' => 'Lokasi Presensi', 'controller' => 'UmumController',
+            'table' => 'lokasi_presensi', 'primaryKey' => 'id_lokasi_presensi', 'autoIncrement' => true,
+            'nameField' => 'nama_lokasi', 'nameLabel' => 'Nama Lokasi', 'nameMaxLength' => 255,
+            'hasOrder' => false, 'auditColumns' => ['created_at', 'created_by', 'updated_at', 'updated_by'],
+            'hooks' => LokasiPresensiHooks::class,
+            'fields' => [
+                'latitude' => ['label' => 'Latitude', 'type' => 'decimal', 'required' => true, 'min' => -90, 'max' => 90],
+                'longitude' => ['label' => 'Longitude', 'type' => 'decimal', 'required' => true, 'min' => -180, 'max' => 180],
+                'radius' => ['label' => 'Radius (meter)', 'type' => 'decimal', 'required' => true, 'min' => 10, 'hint' => 'Radius minimal 10 meter.'],
+            ],
+        ],
+        'aturan-lokasi-presensi' => [
+            'label' => 'Aturan Lokasi Presensi', 'controller' => 'UmumController',
+            'table' => 'dm_user_lokasi_presensi', 'primaryKey' => 'id_dm_user_lokasi_presensi', 'autoIncrement' => true,
+            'nameField' => 'target_lp_desc', 'nameLabel' => 'Target Lokasi', 'nameMaxLength' => 65535,
+            'hasOrder' => false, 'auditColumns' => ['created_at', 'created_by', 'updated_at', 'updated_by'],
+            'hooks' => AturanLokasiPresensiHooks::class,
+            'fields' => [
+                'target_lp' => ['label' => 'Target Lokasi (JSON)', 'type' => 'textarea', 'required' => true],
+                'target_uns' => ['label' => 'Target Unit/Satker (JSON)', 'type' => 'textarea', 'required' => true],
+                'target_jp' => ['label' => 'Jenis Pegawai (JSON)', 'type' => 'textarea', 'required' => true],
+                'hari_berlaku' => ['label' => 'Hari Berlaku', 'type' => 'text', 'rules' => 'regex_match[/^(?:[1-7](?:,[1-7])*)?$/]', 'hint' => 'Angka unik 1–7 dipisah koma; kosong berarti setiap hari.'],
+                'keterangan' => ['label' => 'Keterangan', 'type' => 'textarea'],
+            ],
+        ],
+        // --- /DBV-007 ---
     ];
 }

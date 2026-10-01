@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\MasterData;
 
+use App\Libraries\MasterData\MasterDefinition;
+
 /**
  * G-07 — Master Data Umum & Wilayah. Legacy: hr/master/c_umum/* (role 1).
  *
@@ -29,5 +31,16 @@ class UmumController extends BaseMasterController
     protected array $entities = [
         'agama', 'jenis-pegawai', 'jenis-status',
         'provinsi', 'kabupaten-kota', 'kecamatan', 'kelurahan',
+        'lokasi-presensi', 'aturan-lokasi-presensi',
     ];
+
+    /** Target location description is derived from target_lp, but the generic engine validates the name field first. */
+    protected function input(MasterDefinition $def): array
+    {
+        $payload = parent::input($def);
+        if ($def->key === 'aturan-lokasi-presensi' && isset($payload['target_lp']) && ! isset($payload['target_lp_desc'])) {
+            $payload['target_lp_desc'] = (string) $payload['target_lp'];
+        }
+        return $payload;
+    }
 }
