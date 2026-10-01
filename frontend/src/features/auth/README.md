@@ -25,8 +25,10 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   memeriksa pencabutan. Teks halaman sengaja berbunyi "berakhir paling lambat 60 menit", bukan "langsung diakhiri".
 - **`/lupa-password` & `/reset-password`** (tamu saja) aktif hanya kalau `VITE_PASSWORD_RESET_ENABLED=true`; default
   `false` → route dialihkan ke login dan halaman login tetap menampilkan "Hubungi Admin". Nyalakan hanya kalau backend
-  punya kanal aktif (development: `auth.resetTokenNotifier=log`, tautan dibaca dari log backend; production: menunggu
-  driver email). Tautan reset dari backend = `/reset-password#token=…` (token di fragment: tidak dikirim browser ke
+  punya kanal aktif (development: `auth.resetTokenNotifier=log`, tautan dibaca dari log backend; production: driver
+  email CR-014 — nyalakan setelah kirim nyata lolos di Dev). Halaman reset **tidak** memanggil API saat dibuka (token baru
+  dipakai saat submit), sehingga pemindai tautan email (SafeLinks dsb.) tidak menghabiskan token; pertahankan itu.
+  Tautan reset dari backend = `/reset-password#token=…` (token di fragment: tidak dikirim browser ke
   server, jadi tidak masuk access log web server maupun Referer); `?token=` gaya legacy tetap diterima sebagai cadangan.
   Token disimpan di memori lalu fragment/query-nya dihapus dari URL. Sukses →
   `/login?reason=password-reset`.
