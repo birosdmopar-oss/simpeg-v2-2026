@@ -14,16 +14,16 @@ use CodeIgniter\Test\DatabaseTestTrait;
  *   1. Daftar FK yang merujuk `pegawai(nip)` di skema = self::REGISTRY untuk migration yang sudah jalan (per versi, agar
  *      pemecahan PR DBV-012/DBV-013 tidak mengubah isi test). FK baru ke `pegawai` wajib didaftarkan di sini.
  *   2. Setiap FK itu RESTRICT/RESTRICT, kolomnya VARCHAR(30) utf8mb4_unicode_ci, dan NOT NULL kecuali yang tercatat di
- *      self::NULLABLE (`nip_atasan` LKH [K-m]; akun non-pegawai K2 saat FK masuk diaktifkan).
+ *      self::NULLABLE (`nip_atasan` LKH [K] D1; akun non-pegawai K2 saat FK masuk diaktifkan).
  *   3. Setiap kolom bernama NIP (`nip`, `NIP`, `nip_*`, `*_nip`, `*_nip_*`) di tabel aplikasi harus tercatat: sebagai
  *      FK di registry atau di self::NON_FK beserta alasannya. Kolom NIP baru tanpa klasifikasi = test gagal, sehingga
  *      B-06 tidak kehilangan kolom yang perlu diarahkan ulang.
  *
  * FK masuk `pengguna.nip`/`faq_rate.nip` → `pegawai` (migration AddFkPegawaiDiPenggunaFaqRate) DITAHAN di luar folder
- * Migrations sampai prasyaratnya terpenuhi (dokumen Bagian 2.1.5, keputusan B01-1); selama itu kedua kolom tercatat di
+ * Migrations sampai prasyaratnya terpenuhi (dokumen Bagian 7); selama itu kedua kolom tercatat di
  * self::NON_FK. Test pra-cek orphan migration itu ikut disimpan bersama migration yang ditahan.
  *
- * Dokumen: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 2.0.8 registry NIP).
+ * Dokumen: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 4.3 registry NIP).
  *
  * @internal
  */
@@ -37,7 +37,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
 
     /**
      * FK → `pegawai(nip)` per versi migration: versi => [nama FK => [tabel, kolom]]. DBV-012 = 120000..120100;
-     * DBV-013 = 130100..130900 (nama FK [K-erd]).
+     * DBV-013 = 130100..130900 (nama FK = D1 [K]).
      */
     private const REGISTRY = [
         '2026-09-30-120000' => [
@@ -53,6 +53,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
             'fk_nip_pegdiklat_to_pegawai'   => ['pegawai_diklat', 'nip'],
             'fk_nip_peghukdis_to_pegawai'   => ['pegawai_hukdis', 'nip'],
             'fk_nip_cak_to_peg'             => ['pegawai_ak', 'nip'],
+            'fk_nip_peg_ak_siasn_01'        => ['pegawai_ak_siasn', 'nip'],
             'fk_nip_pegkeluarga_to_pegawai' => ['pegawai_keluarga', 'nip'],
             'fk_nip_pegalamat_to_pegawai'   => ['pegawai_alamat', 'nip'],
             'pegawai_alamat_kantor_ibfk_6'  => ['pegawai_alamat_kantor', 'nip'],
@@ -107,7 +108,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
      * Kolom FK ke pegawai yang boleh NULL: tabel.kolom => alasan.
      */
     private const NULLABLE = [
-        'riwayat_lckh.nip_atasan' => '[K-m] d_lkh.nip_atasan DEFAULT NULL',
+        'riwayat_lckh.nip_atasan' => '[K] D1 riwayat_lckh.nip_atasan DEFAULT NULL',
     ];
 
     /**
@@ -118,8 +119,8 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
         'pegawai.nip'                             => 'PK induk registry',
         'pegawai.nip_lama'                        => 'NIP lama (data historis), bukan rujukan',
         'pegawai_hist.nip_lama'                   => 'salinan pegawai.nip_lama',
-        'pengguna.nip'                            => 'FK fk_id_pegawai_pengguna_to_pegawai DITAHAN (dokumen 2.1.5, B01-1)',
-        'faq_rate.nip'                            => 'FK fk_nip_faqrate_to_peg DITAHAN (dokumen 2.1.5, B01-1)',
+        'pengguna.nip'                            => 'FK fk_id_pegawai_pengguna_to_pegawai DITAHAN (dokumen Bagian 7)',
+        'faq_rate.nip'                            => 'FK fk_nip_faqrate_to_peg DITAHAN (dokumen Bagian 7)',
         'token.nip'                               => 'jejak NIP pemilik saat token terbit (A-01 D-7)',
         'audit_logs.nip_actor'                    => 'jejak NIP pelaku saat kejadian (A-01 D-8)',
         'riwayat_skp.nip_penilai'                 => 'legacy tanpa FK (penilai bisa di luar instansi)',
