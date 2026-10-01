@@ -7,86 +7,119 @@ namespace App\Database\Migrations;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Migration;
 use RuntimeException;
+use Throwable;
 
 /**
- * DBV-013 — B-02 (kelompok 4): lampiran riwayat `document_attachment` (dipakai B-18 upload lampiran dan arsip Fase 7)
- * dengan skema SIMPEG legacy. Review DB Validator:
- * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 2.4) — JANGAN dijalankan di Dev/Production sebelum disetujui DBV-013.
+ * DBV-013 — B-02: lampiran riwayat `document_attachment`.
+ * Review DB Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md — JANGAN dijalankan di
+ * Dev/Production sebelum disetujui DBV-013.
  *
- * Sumber: DDL produksi `simpeg_prod.sql:497-519` [K] persis — kolom (termasuk nama `NIP` huruf besar), tipe, NULL,
- * default, KEY `fk_NIP_da_to_pegawai` dan `id_riwayat_id_entri`, nama FK `fk_NIP_da_to_pegawai`. Kolom per-kolom
- * `CHARACTER SET … COLLATE utf8mb4_unicode_ci` di DDL legacy = collation tabel, jadi diwarisi dari tabel.
+ * Sumber [K]: dump struktur produksi `simpeg01` 01-10-2026 (D1, `simpeg01_struktur_lengkap_20261001.sql`,
+ * di luar repo). Kolom, tipe, NULL, default, ON UPDATE, AUTO_INCREMENT, COMMENT, urutan kolom, PRIMARY/UNIQUE/KEY,
+ * dan nama FK disalin persis dari D1:
+ *   - `document_attachment` — D1:498-520; 17 kolom; 1 FK di CREATE, 1 FK [V2].
  *
- * Kolom polimorfik legacy (TIDAK ada kolom `id_parent`/`jenis_rwy` seperti ditulis Mapping/Tech Spec/B-18):
- *   - `id_riwayat` INT = kode jenis lampiran (`ARSIP_RWY`, `config/constants.php:193-214`), kini lookup `jenis_rwy`
- *     (migration 130000); 0 = arsip belum ditautkan ke riwayat.
- *   - `id_entri` VARCHAR(100) = id baris di tabel `jenis_rwy.tabel_entri` (NULL untuk kode 37/38). Tanpa FK (satu kolom
- *     merujuk banyak tabel); integritas dijaga service B-18.
+ * Deviasi [V2] (rinci per tabel di dokumen Bagian 3):
+ *   - FK ON DELETE RESTRICT ON UPDATE RESTRICT (D1: CASCADE/CASCADE atau SET NULL/CASCADE). Ganti NIP lewat B-06.
+ *   - `COLLATE utf8mb4_unicode_ci` per kolom di D1 sama dengan collation tabel, jadi diwarisi dari tabel; nilai
+ *     AUTO_INCREMENT awal dan ROW_FORMAT=DYNAMIC (default InnoDB) tidak ditulis.
+ *   - Trigger legacy pada tabel ini tidak dibawa; padanannya aturan aplikasi v2 (dokumen Bagian 5).
  *
- * Deviasi dari legacy (dicatat untuk DBV):
- *   - FK `fk_NIP_da_to_pegawai` CASCADE/CASCADE → RESTRICT/RESTRICT (K1: ganti NIP lewat B-06, hapus pegawai tidak
- *     menghapus lampiran diam-diam).
- *   - FK baru [V2] `fk_id_riwayat_da_to_jenis_rwy` (`id_riwayat` → `jenis_rwy.id_jenis_rwy`) RESTRICT/RESTRICT, memakai
- *     KEY legacy `id_riwayat_id_entri` (kolom terdepan = `id_riwayat`) sehingga tidak ada KEY baru.
- *   - Trigger arsip hapus → `da_deleted` [K-m] (`simpeg_prod.sql:350-368`) tidak ditiru: jejak lewat `audit_logs`.
+ * Kolom audit diisi aplikasi (waktu UTC, `*_by` = id_pengguna tanpa FK); default DB hanya cadangan. Tanpa baris seed.
  *
- * DDL MySQL/MariaDB ter-commit per statement dan migration yang gagal tidak tercatat di tabel `migrations`: bila CREATE
- * gagal tidak ada tabel yang tertinggal; down() men-drop tabel ini saja.
+ * DDL MySQL/MariaDB ter-commit per statement dan migration yang gagal tidak tercatat di tabel `migrations`: bila salah
+ * satu CREATE gagal, up() men-drop tabel yang sempat dibuat PADA RUN ITU (urutan terbalik) lalu melempar ulang error,
+ * sehingga `php spark migrate` bisa langsung diulang. Tabel yang sudah ada sebelum run tidak disentuh.
  */
 class CreateDocumentAttachment extends Migration
 {
-    private const TABLE_OPTIONS = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
-
-    private const RESTRICT = 'ON DELETE RESTRICT ON UPDATE RESTRICT';
-
-    private const TABLE = 'document_attachment';
+    /**
+     * Urutan CREATE (induk → anak); down() men-drop dengan urutan terbalik.
+     */
+    public const TABLES = ['document_attachment'];
 
     /**
-     * Satu CREATE TABLE: bila gagal, tabel tidak terbentuk sehingga tidak perlu pembersihan (dropCreated) seperti
-     * migration multi-tabel.
+     * DDL per tabel; `{{nama}}` diganti nama tabel ber-prefix (DBPrefix) yang sudah di-escape.
+     *
+     * @var array<string, string>
      */
+    private const DDL = [
+        'document_attachment' => <<<'SQL'
+            CREATE TABLE {{document_attachment}} (
+              `id_attachment` int NOT NULL AUTO_INCREMENT,
+              `NIP` varchar(30) NOT NULL,
+              `document_id` int DEFAULT NULL,
+              `filename` varchar(200) DEFAULT NULL,
+              `id_riwayat` int DEFAULT NULL,
+              `nama_riwayat` varchar(255) DEFAULT NULL,
+              `id_entri` varchar(100) DEFAULT NULL,
+              `tag` varchar(255) DEFAULT NULL,
+              `path` varchar(200) DEFAULT NULL,
+              `url` varchar(200) DEFAULT NULL,
+              `basename` varchar(200) DEFAULT NULL,
+              `display_name` varchar(200) DEFAULT NULL,
+              `file_size` int DEFAULT NULL,
+              `file_ext` varchar(100) DEFAULT NULL,
+              `file_type` varchar(100) DEFAULT NULL,
+              `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+              `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id_attachment`),
+              KEY `fk_NIP_da_to_pegawai` (`NIP`),
+              KEY `id_riwayat_id_entri` (`id_riwayat`,`id_entri`),
+              CONSTRAINT `fk_NIP_da_to_pegawai` FOREIGN KEY (`NIP`) REFERENCES {{pegawai}} (`nip`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `fk_id_riwayat_da_to_jenis_rwy` FOREIGN KEY (`id_riwayat`) REFERENCES {{jenis_rwy}} (`id_jenis_rwy`) ON DELETE RESTRICT ON UPDATE RESTRICT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            SQL,
+    ];
+
     public function up(): void
     {
-        $this->exec($this->createSql());
+        $created = [];
+
+        try {
+            foreach (self::TABLES as $table) {
+                $this->exec($this->ddl($table));
+                $created[] = $table;
+            }
+        } catch (Throwable $e) {
+            $this->dropCreated($created);
+
+            throw $e;
+        }
     }
 
     public function down(): void
     {
-        $this->exec("DROP TABLE IF EXISTS {$this->t(self::TABLE)}");
+        foreach (array_reverse(self::TABLES) as $table) {
+            $this->exec("DROP TABLE IF EXISTS {$this->t($table)}");
+        }
+    }
+
+    private function ddl(string $table): string
+    {
+        return (string) preg_replace_callback(
+            '/\{\{([a-z_]+)\}\}/',
+            fn (array $m): string => $this->t($m[1]),
+            self::DDL[$table],
+        );
     }
 
     /**
-     * [K] simpeg_prod.sql:497-519 persis + FK [V2] ke jenis_rwy. Tanpa nilai AUTO_INCREMENT awal (legacy 169499):
-     * impor memakai ID legacy apa adanya lalu counter disesuaikan (dokumen B-02 6.5).
+     * Pembersihan setelah up() gagal: drop tabel yang dibuat pada run ini, urutan terbalik (anak dulu). Kegagalan
+     * drop tidak menutupi error asli (yang dilempar ulang pemanggil); sisa tabel dibersihkan manual (dokumen
+     * Bagian 9.3).
+     *
+     * @param list<string> $created
      */
-    private function createSql(): string
+    private function dropCreated(array $created): void
     {
-        return "CREATE TABLE {$this->t(self::TABLE)} (
-            `id_attachment` INT NOT NULL AUTO_INCREMENT,
-            `NIP` VARCHAR(30) NOT NULL,
-            `document_id` INT NULL DEFAULT NULL,
-            `filename` VARCHAR(200) NULL DEFAULT NULL,
-            `id_riwayat` INT NULL DEFAULT NULL,
-            `nama_riwayat` VARCHAR(255) NULL DEFAULT NULL,
-            `id_entri` VARCHAR(100) NULL DEFAULT NULL,
-            `tag` VARCHAR(255) NULL DEFAULT NULL,
-            `path` VARCHAR(200) NULL DEFAULT NULL,
-            `url` VARCHAR(200) NULL DEFAULT NULL,
-            `basename` VARCHAR(200) NULL DEFAULT NULL,
-            `display_name` VARCHAR(200) NULL DEFAULT NULL,
-            `file_size` INT NULL DEFAULT NULL,
-            `file_ext` VARCHAR(100) NULL DEFAULT NULL,
-            `file_type` VARCHAR(100) NULL DEFAULT NULL,
-            `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id_attachment`),
-            KEY `fk_NIP_da_to_pegawai` (`NIP`),
-            KEY `id_riwayat_id_entri` (`id_riwayat`, `id_entri`),
-            CONSTRAINT `fk_NIP_da_to_pegawai` FOREIGN KEY (`NIP`)
-                REFERENCES {$this->t('pegawai')} (`nip`) " . self::RESTRICT . ",
-            CONSTRAINT `fk_id_riwayat_da_to_jenis_rwy` FOREIGN KEY (`id_riwayat`)
-                REFERENCES {$this->t('jenis_rwy')} (`id_jenis_rwy`) " . self::RESTRICT . '
-        ) ' . self::TABLE_OPTIONS;
+        foreach (array_reverse($created) as $table) {
+            try {
+                $this->db->query("DROP TABLE IF EXISTS {$this->t($table)}");
+            } catch (Throwable) {
+                // Lanjut ke tabel berikutnya; error asli tetap dilempar oleh up().
+            }
+        }
     }
 
     /**
@@ -107,7 +140,7 @@ class CreateDocumentAttachment extends Migration
         if ($this->db->query($sql) === false) {
             $error = $this->db->error();
 
-            throw new RuntimeException('DBV-013: DDL document_attachment gagal (' . $error['code'] . '): ' . $error['message']);
+            throw new RuntimeException('DBV-013: DDL CreateDocumentAttachment gagal (' . $error['code'] . '): ' . $error['message']);
         }
     }
 }

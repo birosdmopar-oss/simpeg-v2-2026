@@ -11,16 +11,17 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-013 — B-02: 13 FK snapshot `pegawai_*` (DBV-012, 2026-09-30-120100) → tabel riwayat asalnya (DBV-013,
+ * DBV-013 — B-02: 14 FK snapshot `pegawai_*` (DBV-012, 2026-09-30-120100) → tabel riwayat asalnya (DBV-013,
  * 2026-09-30-130100..130800). Dipisah dari CREATE TABLE snapshot karena tabel riwayat dibuat sesudahnya; KEY untuk
- * setiap kolom `id_riwayat_*` sudah dibuat migration snapshot dengan nama FK yang sama, jadi di sini cukup ADD
- * CONSTRAINT. Nama FK = ERD `simpeg01.erd` [K-erd]. Review DB Validator:
+ * setiap kolom `id_riwayat_*` sudah ada di DDL snapshot (D1) dengan nama FK yang sama, jadi di sini cukup ADD
+ * CONSTRAINT. Nama, kolom, dan induk FK = dump struktur produksi 01-10-2026 (D1) [K]. Review DB Validator:
  * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md — JANGAN dijalankan di Dev/Production sebelum disetujui
  * DBV-013.
  *
- * Deviasi dari legacy: ON DELETE RESTRICT ON UPDATE RESTRICT (seed rekonstruksi/[L] SET NULL/CASCADE; ERD tidak
- * mencatat aksi). Riwayat v2 dihapus lunak (status 10), jadi baris riwayat yang masih menjadi snapshot tidak pernah
- * dihapus keras; penghapusan keras (mis. B-06 atau pembersihan) wajib mengosongkan/menyinkronkan snapshot dulu.
+ * Deviasi dari legacy [V2]: ON DELETE RESTRICT ON UPDATE RESTRICT (D1: CASCADE/CASCADE, kecuali `pegawai_ak`,
+ * `pegawai_ak_siasn`, `pegawai_mutasi_jabatan` SET NULL/CASCADE). Riwayat v2 dihapus lunak (status 10), jadi baris
+ * riwayat yang masih menjadi snapshot tidak pernah dihapus keras; penghapusan keras (mis. B-06 atau pembersihan) wajib
+ * mengosongkan/menyinkronkan snapshot dulu.
  *
  * up() fail-closed, sebelum ALTER apa pun: (1) tabel & kolom induk wajib ada (migration riwayat DBV-013 sudah jalan);
  * (2) tidak boleh ada nilai `id_riwayat_*` snapshot yang tidak ada di riwayat (orphan) — pesan menyebut jumlah per
@@ -43,6 +44,7 @@ class AddFkSnapshotKeRiwayat extends Migration
         'fk_id_riwayat_diklat_pegdiklat_to_rwydiklat'    => ['pegawai_diklat', 'id_riwayat_diklat', 'riwayat_diklat', 'id_riwayat_diklat'],
         'fk_id_riwayat_hukdis_peg_hukdis_to_rwy_hukdis'  => ['pegawai_hukdis', 'id_riwayat_hukdis', 'riwayat_hukdis', 'id_riwayat_hukdis'],
         'fk_id_riwayat_ak_cak_to_rak'                    => ['pegawai_ak', 'id_riwayat_ak', 'riwayat_ak', 'id_riwayat_ak'],
+        'fk_id_riwayat_ak_siasn_peg_ak_siasn_02'         => ['pegawai_ak_siasn', 'id_riwayat_ak_siasn', 'riwayat_ak_siasn', 'id_riwayat_ak_siasn'],
         'fk_id_riwayat_keluarga_pegkeluarga_rwykeluarga' => ['pegawai_keluarga', 'id_riwayat_keluarga', 'riwayat_keluarga', 'id_riwayat_keluarga'],
         'fk_id_riwayat_alamat_pegalamat_riwalamat'       => ['pegawai_alamat', 'id_riwayat_alamat', 'riwayat_alamat', 'id_riwayat_alamat'],
         'pegawai_alamat_kantor_ibfk_5'                   => ['pegawai_alamat_kantor', 'id_riwayat_alamat', 'riwayat_alamat', 'id_riwayat_alamat'],
@@ -74,7 +76,7 @@ class AddFkSnapshotKeRiwayat extends Migration
                 try {
                     $this->db->query("ALTER TABLE {$this->t($table)} DROP FOREIGN KEY `{$name}`");
                 } catch (Throwable) {
-                    // Error asli tetap dilempar; sisa FK dibersihkan manual (dokumen Bagian 6.6).
+                    // Error asli tetap dilempar; sisa FK dibersihkan manual (dokumen Bagian 9.3).
                 }
             }
 

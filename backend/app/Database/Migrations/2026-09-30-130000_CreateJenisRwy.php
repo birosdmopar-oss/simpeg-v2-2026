@@ -12,8 +12,9 @@ use Throwable;
 /**
  * DBV-013 — B-02 (kelompok 4): lookup `jenis_rwy` [V2] + seed 21 baris. Tabel ini mengganti konstanta PHP legacy yang
  * menjadi kode jenis lampiran `document_attachment.id_riwayat` (DoD B-02: mapping jenis_rwy sebagai lookup eksplisit,
- * bukan hard-code). Review DB Validator:
- * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 2.4) — JANGAN dijalankan di Dev/Production sebelum disetujui DBV-013.
+ * bukan hard-code). Tidak ada di D1 (legacy hanya konstanta PHP). Review DB Validator:
+ * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 3.5) — JANGAN dijalankan di Dev/Production
+ * sebelum disetujui DBV-013.
  *
  * Sumber:
  *   - Kode (PK) dan kunci `kode` = `ARSIP_RWY` legacy (`config/constants.php:193-214`) [I]; label `jenis_rwy` dan
@@ -146,7 +147,7 @@ class CreateJenisRwy extends Migration
 
     /**
      * Pembersihan setelah seed gagal: drop tabel yang dibuat pada run ini. Kegagalan drop tidak menutupi error asli
-     * (yang dilempar ulang up()) — sisa tabel lalu dibersihkan manual (dokumen B-02 Bagian 6.6).
+     * (yang dilempar ulang up()) — sisa tabel lalu dibersihkan manual (dokumen B-02 Bagian 9.3).
      */
     private function dropCreated(): void
     {

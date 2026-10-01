@@ -10,43 +10,92 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-013 — B-02 (kelompok 3): riwayat konfirmasi ketidakhadiran / konket (`absen_ijin`, B-13; dipakai Presensi Fase 5)
- * dengan skema SIMPEG legacy (Mapping Migrasi Prinsip #1).
- * Sumber: DDL produksi `simpeg_prod.sql:33-69` [K] persis — kolom, tipe, default, COMMENT, nama KEY (`nip`,
- * `date_start`, `show_notif`, `status`, `affect_tukin`) dan nama FK `fk_nip_abijin_to_pegawai`. Tabel arsip hapus
- * `d_konket` (:639-668, trigger `absen_ijin_beDel` :1476-1482) identik kolom demi kolom. Penulis legacy:
- * `libraries/hr/rwy/L_konket.php` (insert/update :244-580, `set_param` :1734-1777, proses :1800-2027; hapus keras
- * :890-980). Review DB Validator:
- * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 2.3) — JANGAN dijalankan di Dev/Production sebelum disetujui
- * DBV-013.
+ * DBV-013 — B-02: konket `absen_ijin`.
+ * Review DB Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md — JANGAN dijalankan di
+ * Dev/Production sebelum disetujui DBV-013.
  *
- * Nilai legacy yang dipertahankan: status CHAR(2) 'W' Waiting / 'V' Approved / 'X' Rejected / '10' Deleted (bukan pola
- * riwayat 0/1/2/10); kolom ganda `date_created`/`last_updated` di samping `created_at`/`updated_at`; kolom workflow
- * INT/MEDIUMTEXT persis DDL; berkas bukti di `file_bukti`..`file_bukti_5` (bukan document_attachment); `kategori` =
- * `jenis_konket.old_id` dan `id_parent` = induk dinas gabungan, keduanya tanpa FK (legacy juga tanpa FK).
+ * Sumber [K]: dump struktur produksi `simpeg01` 01-10-2026 (D1, `simpeg01_struktur_lengkap_20261001.sql`,
+ * di luar repo). Kolom, tipe, NULL, default, ON UPDATE, AUTO_INCREMENT, COMMENT, urutan kolom, PRIMARY/UNIQUE/KEY,
+ * dan nama FK disalin persis dari D1:
+ *   - `absen_ijin` — D1:33-69; 28 kolom; 1 FK di CREATE; 3 CHECK [V2].
  *
- * Deviasi dari legacy (dicatat untuk DBV):
- *   - FK `fk_nip_abijin_to_pegawai` ON DELETE RESTRICT ON UPDATE RESTRICT (legacy CASCADE/CASCADE; K1).
- *   - 3 CHECK [V2]: status IN ('W','V','X','10'), affect_tukin IN (1,2), jenis_dinas NULL/0/1.
- *   - Trigger `absen_ijin_beDel` → `d_konket` tidak ditiru (jejak hapus lewat `audit_logs`).
- *   - AUTO_INCREMENT awal (326331) dan collation per kolom tidak ditulis (kolom mewarisi utf8mb4_unicode_ci tabel).
+ * Deviasi [V2] (rinci per tabel di dokumen Bagian 3):
+ *   - FK ON DELETE RESTRICT ON UPDATE RESTRICT (D1: CASCADE/CASCADE atau SET NULL/CASCADE). Ganti NIP lewat B-06.
+ *   - CHECK domain status/flag (D1 tanpa CHECK); nilai legacy di luar domain dinormalkan saat impor (Bagian 6).
+ *   - `COLLATE utf8mb4_unicode_ci` per kolom di D1 sama dengan collation tabel, jadi diwarisi dari tabel; nilai
+ *     AUTO_INCREMENT awal dan ROW_FORMAT=DYNAMIC (default InnoDB) tidak ditulis.
+ *   - Trigger legacy pada tabel ini tidak dibawa; padanannya aturan aplikasi v2 (dokumen Bagian 5).
  *
- * DDL MySQL/MariaDB ter-commit per statement dan migration yang gagal tidak tercatat di tabel `migrations`: bila CREATE
- * gagal, up() men-drop tabel yang sempat dibuat PADA RUN ITU lalu melempar ulang error.
+ * Kolom audit diisi aplikasi (waktu UTC, `*_by` = id_pengguna tanpa FK); default DB hanya cadangan. Tanpa baris seed.
+ *
+ * DDL MySQL/MariaDB ter-commit per statement dan migration yang gagal tidak tercatat di tabel `migrations`: bila salah
+ * satu CREATE gagal, up() men-drop tabel yang sempat dibuat PADA RUN ITU (urutan terbalik) lalu melempar ulang error,
+ * sehingga `php spark migrate` bisa langsung diulang. Tabel yang sudah ada sebelum run tidak disentuh.
  */
 class CreateAbsenIjin extends Migration
 {
-    private const TABLE_OPTIONS = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+    /**
+     * Urutan CREATE (induk → anak); down() men-drop dengan urutan terbalik.
+     */
+    public const TABLES = ['absen_ijin'];
 
-    private const TABLES = ['absen_ijin'];
+    /**
+     * DDL per tabel; `{{nama}}` diganti nama tabel ber-prefix (DBPrefix) yang sudah di-escape.
+     *
+     * @var array<string, string>
+     */
+    private const DDL = [
+        'absen_ijin' => <<<'SQL'
+            CREATE TABLE {{absen_ijin}} (
+              `id` int NOT NULL AUTO_INCREMENT,
+              `nip` varchar(30) NOT NULL,
+              `date_start` datetime NOT NULL,
+              `date_end` datetime NOT NULL,
+              `kategori` int NOT NULL,
+              `jenis_konket` varchar(255) DEFAULT NULL,
+              `jenis_dinas` tinyint(1) DEFAULT NULL COMMENT '0: Dinas Pribadi, 1: Dinas Gabungan',
+              `affect_tukin` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1: Yes, 2: No',
+              `id_parent` int DEFAULT NULL,
+              `alasan` mediumtext NOT NULL,
+              `file_bukti` varchar(255) DEFAULT NULL,
+              `file_bukti_2` varchar(255) DEFAULT NULL,
+              `file_bukti_3` varchar(255) DEFAULT NULL,
+              `file_bukti_4` varchar(255) DEFAULT NULL,
+              `file_bukti_5` varchar(255) DEFAULT NULL,
+              `date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              `last_updated` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              `status` char(2) NOT NULL DEFAULT 'W' COMMENT 'W: Waiting, V: Approved, X: Rejected, 10: Deleted',
+              `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+              `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              `updated_by` int DEFAULT NULL,
+              `approved_by` int DEFAULT NULL,
+              `reason_note` mediumtext,
+              `show_notif` int DEFAULT '0',
+              `notif_date` datetime DEFAULT NULL,
+              `show_ua_upt` int DEFAULT '0',
+              `show_ua_deputi` int DEFAULT '0',
+              `show_ua_biro` int DEFAULT '0',
+              PRIMARY KEY (`id`),
+              KEY `nip` (`nip`),
+              KEY `date_start` (`date_start`,`date_end`),
+              KEY `show_notif` (`show_notif`,`notif_date`),
+              KEY `status` (`status`),
+              KEY `affect_tukin` (`affect_tukin`),
+              CONSTRAINT `fk_nip_abijin_to_pegawai` FOREIGN KEY (`nip`) REFERENCES {{pegawai}} (`nip`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+              CONSTRAINT `chk_absen_ijin_status` CHECK (`status` IN ('W', 'V', 'X', '10')),
+              CONSTRAINT `chk_absen_ijin_affect_tukin` CHECK (`affect_tukin` IN (1, 2)),
+              CONSTRAINT `chk_absen_ijin_jenis_dinas` CHECK (`jenis_dinas` IN (0, 1))
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            SQL,
+    ];
 
     public function up(): void
     {
         $created = [];
 
         try {
-            foreach ($this->createStatements() as $table => $sql) {
-                $this->exec($sql);
+            foreach (self::TABLES as $table) {
+                $this->exec($this->ddl($table));
                 $created[] = $table;
             }
         } catch (Throwable $e) {
@@ -58,66 +107,24 @@ class CreateAbsenIjin extends Migration
 
     public function down(): void
     {
-        foreach (self::TABLES as $table) {
+        foreach (array_reverse(self::TABLES) as $table) {
             $this->exec("DROP TABLE IF EXISTS {$this->t($table)}");
         }
     }
 
-    /**
-     * @return array<string, string> tabel => SQL
-     */
-    private function createStatements(): array
+    private function ddl(string $table): string
     {
-        $sql = [];
-
-        // [K] simpeg_prod.sql:33-69 persis. FK memakai KEY legacy `nip` (tanpa KEY baru bernama FK, konvensi 2.0.6).
-        $sql['absen_ijin'] = "CREATE TABLE {$this->t('absen_ijin')} (
-            `id` INT NOT NULL AUTO_INCREMENT,
-            `nip` VARCHAR(30) NOT NULL,
-            `date_start` DATETIME NOT NULL,
-            `date_end` DATETIME NOT NULL,
-            `kategori` INT NOT NULL,
-            `jenis_konket` VARCHAR(255) NULL DEFAULT NULL,
-            `jenis_dinas` TINYINT(1) NULL DEFAULT NULL COMMENT '0: Dinas Pribadi, 1: Dinas Gabungan',
-            `affect_tukin` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1: Yes, 2: No',
-            `id_parent` INT NULL DEFAULT NULL,
-            `alasan` MEDIUMTEXT NOT NULL,
-            `file_bukti` VARCHAR(255) NULL DEFAULT NULL,
-            `file_bukti_2` VARCHAR(255) NULL DEFAULT NULL,
-            `file_bukti_3` VARCHAR(255) NULL DEFAULT NULL,
-            `file_bukti_4` VARCHAR(255) NULL DEFAULT NULL,
-            `file_bukti_5` VARCHAR(255) NULL DEFAULT NULL,
-            `date_created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `last_updated` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            `status` CHAR(2) NOT NULL DEFAULT 'W' COMMENT 'W: Waiting, V: Approved, X: Rejected, 10: Deleted',
-            `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            `updated_by` INT NULL DEFAULT NULL,
-            `approved_by` INT NULL DEFAULT NULL,
-            `reason_note` MEDIUMTEXT NULL,
-            `show_notif` INT NULL DEFAULT 0,
-            `notif_date` DATETIME NULL DEFAULT NULL,
-            `show_ua_upt` INT NULL DEFAULT 0,
-            `show_ua_deputi` INT NULL DEFAULT 0,
-            `show_ua_biro` INT NULL DEFAULT 0,
-            PRIMARY KEY (`id`),
-            KEY `nip` (`nip`),
-            KEY `date_start` (`date_start`, `date_end`),
-            KEY `show_notif` (`show_notif`, `notif_date`),
-            KEY `status` (`status`),
-            KEY `affect_tukin` (`affect_tukin`),
-            CONSTRAINT `fk_nip_abijin_to_pegawai` FOREIGN KEY (`nip`)
-                REFERENCES {$this->t('pegawai')} (`nip`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-            CONSTRAINT `chk_absen_ijin_status` CHECK (`status` IN ('W', 'V', 'X', '10')),
-            CONSTRAINT `chk_absen_ijin_affect_tukin` CHECK (`affect_tukin` IN (1, 2)),
-            CONSTRAINT `chk_absen_ijin_jenis_dinas` CHECK (`jenis_dinas` IS NULL OR `jenis_dinas` IN (0, 1))
-        ) " . self::TABLE_OPTIONS;
-
-        return $sql;
+        return (string) preg_replace_callback(
+            '/\{\{([a-z_]+)\}\}/',
+            fn (array $m): string => $this->t($m[1]),
+            self::DDL[$table],
+        );
     }
 
     /**
-     * Pembersihan setelah up() gagal: drop tabel yang dibuat pada run ini. Kegagalan drop tidak menutupi error asli.
+     * Pembersihan setelah up() gagal: drop tabel yang dibuat pada run ini, urutan terbalik (anak dulu). Kegagalan
+     * drop tidak menutupi error asli (yang dilempar ulang pemanggil); sisa tabel dibersihkan manual (dokumen
+     * Bagian 9.3).
      *
      * @param list<string> $created
      */
@@ -127,7 +134,7 @@ class CreateAbsenIjin extends Migration
             try {
                 $this->db->query("DROP TABLE IF EXISTS {$this->t($table)}");
             } catch (Throwable) {
-                // Error asli tetap dilempar oleh up().
+                // Lanjut ke tabel berikutnya; error asli tetap dilempar oleh up().
             }
         }
     }
@@ -150,7 +157,7 @@ class CreateAbsenIjin extends Migration
         if ($this->db->query($sql) === false) {
             $error = $this->db->error();
 
-            throw new RuntimeException('DBV-013: DDL B-02 absen_ijin gagal (' . $error['code'] . '): ' . $error['message']);
+            throw new RuntimeException('DBV-013: DDL CreateAbsenIjin gagal (' . $error['code'] . '): ' . $error['message']);
         }
     }
 }
