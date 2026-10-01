@@ -76,18 +76,6 @@ class MasterDataSeeder extends Seeder
 
         // --- DBV-005 ---
         // --- /DBV-005 ---
-
-        // --- DBV-007 ---
-        $this->db->table('lokasi_presensi')->insert([
-            'id_lokasi_presensi' => 1, 'nama_lokasi' => 'Kantor Pusat', 'latitude' => '-6.175392',
-            'longitude' => '106.824964', 'radius' => 50, 'status' => 1,
-        ]);
-        $this->db->table('dm_user_lokasi_presensi')->insert([
-            'id_dm_user_lokasi_presensi' => 1, 'target_lp' => '["1"]', 'target_lp_desc' => 'Kantor Pusat',
-            'target_uns' => '["0"]', 'target_uns_desc' => 'Seluruh Kementerian', 'target_jp' => '["1"]',
-            'target_jp_desc' => 'Pegawai Negeri Sipil', 'hari_berlaku' => null, 'status' => 1,
-        ]);
-        // --- /DBV-007 ---
     }
 
     /**
