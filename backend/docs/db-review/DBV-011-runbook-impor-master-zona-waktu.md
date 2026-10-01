@@ -2,20 +2,28 @@
 
 **Key review:** `DBV-011` saja. Tidak ada key CR karena unit ini tidak mengubah kode maupun migration; isinya hanya dokumen dan skrip SQL baca-saja. PR berjudul `[DBV-011] …` dari branch `dbv-011/runbook-impor-dedupe-zona-waktu`. Menurut aturan PR yang hanya ber-key `[DBV]` (`AGENTS.md` bagian 2), DB Validator yang me-review dan me-merge.
 
-**Status:** ⏳ **MENUNGGU REVIEW DB VALIDATOR (DBV-011).**
-- **Bagian A (ISSUE-009)** diajukan untuk disetujui sebagai langkah wajib runbook impor data master legacy. Bagian ini sekaligus memenuhi syarat approval DBV-005 (audit data sebelum impor + penyalinan counter AUTO_INCREMENT).
-- **Bagian B (ISSUE-022 + D-11)** berisi **usulan**. DB Validator diminta meneruskannya ke TL/DBA sebagai satu paket. **Keputusan final soal zona waktu dan `sql_mode` server ada di TL/DBA** (A-01 Bagian 8 #7, 9.7 D-11).
-- Kedua skrip SQL **belum pernah dijalankan ke server mana pun**, karena mesin developer tidak punya salinan DATA legacy. Skrip baru diuji sintaks dan hasilnya di database scratch lokal (Bagian 6). Eksekusi sesungguhnya menunggu salinan data produksi (bersama ISSUE-003).
-- Sebelum diajukan, dokumen dan kedua skrip melewati 4 putaran **pra-review internal** (reviewer CR, bukan DB Validator); temuan tiap putaran beserta perbaikannya dicatat di 6.2–6.5. Branch sudah disinkronkan dengan `main` terbaru (berisi CR-021..024).
+**Status:** ⏳ **MENUNGGU REVIEW DB VALIDATOR (DBV-011).** Diperluas 01-10-2026 (putaran 5; ringkasannya di 1.4, buktinya di 6.6).
+- **Konteks 01-10-2026:** rencana in-place yang dikaji 30-09 **dibatalkan**. v2 memakai DB terpisah yang diisi lewat impor (ADR-007 Opsi B), dan ID legacy diimpor apa adanya. Karena itu bagian impor dokumen ini **berlaku penuh**. Salinan untuk impor final = **dump final saat freeze**, mengikuti Cutover Plan (1.4 butir e).
+- **Bagian A (ISSUE-009)** diajukan untuk disetujui sebagai langkah wajib runbook impor data master legacy. Bagian ini sekaligus memenuhi syarat approval DBV-005 (audit data sebelum impor + penyalinan counter AUTO_INCREMENT). Sejak putaran 5, Bagian A juga memuat pembersihan salinan (trigger dan `password_decode` dibuang), audit format hash dan akun tanpa email, serta selisih terhadap dump struktur prod 01-10 (2.9).
+- **Bagian B (ISSUE-022 + D-11) DITAHAN** sampai kartu ISSUE-024 di board tim terjawab (parameter server DB produksi: versi, `sql_mode`, `time_zone`, `table_rows`). Putaran 5 tidak memutuskan Bagian B. Yang berubah hanya isi permintaannya: `sql_mode` dan `time_zone` GLOBAL tidak diminta diubah; strict mode dan `time_zone = '+00:00'` dipasang per sesi koneksi (1.4 butir a). **Keputusan final soal zona waktu dan `sql_mode` tetap di TL/DBA** (A-01 Bagian 8 #7, 9.7 D-11).
+- Kedua skrip SQL **belum pernah dijalankan ke data legacy**, karena mesin developer tidak punya salinan DATA legacy. Skrip diuji sintaks dan hasilnya di database scratch lokal (Bagian 6); sejak putaran 5 juga pada struktur dump prod 01-10 (tanpa data) ditambah data sintetis. Eksekusi sesungguhnya menunggu salinan data produksi.
+- Sebelum diajukan, dokumen dan kedua skrip melewati 4 putaran **pra-review internal** (reviewer CR, bukan DB Validator); temuan tiap putaran beserta perbaikannya dicatat di 6.2–6.5. Perluasan putaran 5 (6.6) **belum** melalui pra-review internal maupun review DB Validator. Branch disinkronkan dengan `main` `cc553be` (berisi CR-014 dan CR-025) lewat merge, bukan rebase.
 
 **Rujukan:**
 - Keputusan user 29-09-2026: ISSUE-009 (runbook + skrip audit untuk review DBV), ISSUE-022 (usulan ke TL/DBA lewat DBV, satu paket dengan D-11), ISSUE-014 opsi A (hook deploy Dev `RUN_MIGRATIONS=0` bawaan, `migrate` manual lewat runbook setelah approval DBV).
 - Butir audit impor yang digabung ke sini: `G-01-master-schema.md` 8.3 dan 8.4 #2–#3; `G-04-G-05-pangkat-pendidikan-schema.md` 6.3 dan Bagian 7; `G-06-diklat-hukdis-konket-tanda-jasa-schema.md` Bagian 3, 6.4, 6.5 (syarat DBV-005) dan catatan zona waktu di bagian Status; `G-07-G-08-kantor-hari-libur-kursem-schema.md` 3.1 dan 6.3; `G-10-faq-schema.md` Bagian 3 dan 6.3; `A-01-auth-schema.md` Bagian 8 #7, 9.7 D-4/D-6/D-11/D-12, 9.8 langkah 6, dan 9.10.
-- Migration di `main` (`ff74bf9`; sama dengan `0f6268a`, karena PR #11/CR-016 tidak mengubah migration), `MasterService::normalizeName()`, `MasterService::createLocked()` (trim kode & induk), `MasterField::normalize()`, `HariLiburService::nama()`, `UserService` (email D-6, CR-019). Sejak putaran 4 branch ini di-rebase ke `ff74bf9`; PR #11 tidak mengubah fungsi normalisasi tersebut (`git diff 0f6268a ff74bf9`).
+- Migration di `main` (`ff74bf9`; sama dengan `0f6268a`, karena PR #11/CR-016 tidak mengubah migration), `MasterService::normalizeName()`, `MasterService::createLocked()` (trim kode & induk), `MasterField::normalize()`, `HariLiburService::nama()`, `UserService` (email D-6, CR-019). Sejak putaran 4 branch ini di-rebase ke `ff74bf9`; PR #11 tidak mengubah fungsi normalisasi tersebut (`git diff 0f6268a ff74bf9`). Di putaran 5 `main` `cc553be` di-merge ke branch ini: migration tetap sama dengan `ff74bf9`, dan fungsi normalisasi yang dirujuk tidak berubah (perubahan `MasterService` di CR-024 hanya menyangkut filter `parent` options).
 - DDL produksi `simpeg_prod.sql`, kode legacy (`Lm_umum.php`, `config/config.php`), dan audit issue 29-09-2026.
+- Sejak putaran 5:
+  - keputusan user 01-10-2026: DB v2 terpisah + impor (ADR-007 Opsi B), rencana in-place 30-09 dibatalkan, ID legacy apa adanya;
+  - asumsi PRD (dokumen privat tim) AS-02 (engine dan instance DB v2) dan AS-12 (zona waktu dan `sql_mode` per sesi);
+  - Cutover Plan (Adendum Operasional Privat, dokumen privat tim);
+  - **dump struktur prod 01-10**: struktur penuh `simpeg01` tanpa data (header MySQL 8.0.21), disimpan di luar repo;
+  - kartu ISSUE-024 di board tim (parameter server DB produksi).
 
 **Label sumber:**
-- **[K]** terkonfirmasi (DDL, kode, atau hasil ukur).
+- **[K]** terkonfirmasi (DDL produksi, kode, atau hasil ukur). Sejak putaran 5, DDL produksi diambil dari dump struktur prod 01-10.
+- **[L]** rekonstruksi lokal (`simpeg_prod_duplikat`, `simpegdev_local`), belum tentu sama dengan produksi.
 - **[V2]** keputusan v2.
 - **[I]** dugaan.
 
@@ -24,7 +32,7 @@ Kolom `cek` pada hasil skrip memakai tiga awalan: **WAJIB_0**, **PERIKSA**, dan 
 | File | Isi |
 |---|---|
 | `backend/docs/db-review/DBV-011-runbook-impor-master-zona-waktu.md` | dokumen ini |
-| `backend/docs/db-review/sql/DBV-011-audit-duplikat-master-legacy.sql` | Audit **baca-saja** pada salinan data legacy (dijalankan pemegang akses): 106 kueri tetap + 2 kueri dinamis (ditambah 2 SELECT penyusun dan 4 SELECT pencetak teks kueri/daftar entri terlewat). Isinya: duplikat untuk seluruh 28 UNIQUE master v2 dan UNIQUE akun, integritas pendukung (termasuk pasangan `kategori` ↔ `old_id`, kolom kode NOT NULL, panjang kolom akun, serta kode wilayah ganda setelah trim dan panjang/format kode wilayah), profil per tabel termasuk status NULL dan counter AUTO_INCREMENT, nama yang NULL/berubah/tidak muat, tanggal nol, dan daftar kolom TIMESTAMP legacy |
+| `backend/docs/db-review/sql/DBV-011-audit-duplikat-master-legacy.sql` | Audit **baca-saja** pada salinan data legacy (dijalankan pemegang akses): 111 kueri tetap + 2 kueri dinamis (ditambah 2 SELECT penyusun dan 4 SELECT pencetak teks kueri/daftar entri terlewat). Isinya: prasyarat salinan (kolom `password_decode` dan trigger sudah dibuang; putaran 5), duplikat untuk seluruh 28 UNIQUE master v2 dan UNIQUE akun, format hash `pengguna.password` dan akun tanpa email (putaran 5), integritas pendukung (termasuk pasangan `kategori` ↔ `old_id`, kolom kode NOT NULL, panjang kolom akun, serta kode wilayah ganda setelah trim dan panjang/format kode wilayah), profil per tabel termasuk status NULL dan counter AUTO_INCREMENT, nama yang NULL/berubah/tidak muat, tanggal nol, dan daftar kolom TIMESTAMP legacy |
 | `backend/docs/db-review/sql/DBV-011-counter-auto-increment-v2.sql` | Skrip **baca-saja** di DB v2 setelah impor. Membandingkan counter AUTO_INCREMENT v2 dengan counter legacy, lalu **mencetak** perintah `ALTER TABLE … AUTO_INCREMENT` untuk ditinjau (syarat DBV-005 6.5 #10). Berjalan tanpa error di MySQL 8 maupun MariaDB. Kesetiaan counter salinan terhadap sumber dicek dulu (2.4 langkah 1) |
 | `backend/docs/progress/02-MasterData.md` | satu baris rujukan di G-01 bagian "Belum". Dua baris basi di atasnya (DBV-002 ⏳, strict mode) dibersihkan CR-022, jadi tidak disentuh di sini |
 | `backend/docs/progress/01-Auth.md` | rujukan ke Bagian 3 pada butir D-11 |
@@ -51,7 +59,7 @@ Kolom `cek` pada hasil skrip memakai tiga awalan: **WAJIB_0**, **PERIKSA**, dan 
   - D-4: tanpa CHECK role↔NIP, dan duplikat `id_pegawai` wajib diaudit sebelum impor.
   - D-6: email tanpa UNIQUE di DB; keunikan ditegakkan aplikasi. Bagian aplikasinya sudah di `main` lewat CR-019.
   - D-10: `strictOn = true`.
-  - D-11 ⏳ masih menunggu DBA.
+  - D-11 ⏳ masih menunggu DBA. Isi permintaannya direvisi di putaran 5 (1.4 butir a).
 
 ### 1.3 Lingkup
 
@@ -61,11 +69,14 @@ Kolom `cek` pada hasil skrip memakai tiga awalan: **WAJIB_0**, **PERIKSA**, dan 
 - Syarat DBV-005 6.5.
 - Prosedur dedupe dan penyalinan counter.
 - Usulan zona waktu dan `sql_mode` sesi.
+- Sejak putaran 5: pembersihan salinan (trigger dan kolom `password_decode` dibuang), audit format hash `pengguna.password`, dan akun tanpa email.
 
 **Tidak masuk:**
 - Perubahan kode atau migration. Bila opsi 3.3 disetujui, implementasinya menjadi unit DBV+CR terpisah.
 - Skrip ekspor/transformasi impor itu sendiri.
 - Tabel G-02/G-03/G-09. UNIQUE dan butir auditnya ditambahkan saat DBV-006..008.
+- Runbook impor tabel Tier 2–9 dan rekonsiliasi jumlah baris (dokumen DBV terpisah, DBV-014).
+- Pengosongan `password_decode` di DB legacy produksi saat freeze. Langkah itu milik Cutover Plan (dokumen privat tim), bukan runbook ini.
 - Perbaikan tampilan "Login terakhir" (Bagian 7).
 
 **Mengapa belum bisa dijalankan** (audit 29-09-2026, hanya baca):
@@ -73,7 +84,27 @@ Kolom `cek` pada hasil skrip memakai tiga awalan: **WAJIB_0**, **PERIKSA**, dan 
 - `simpeg_prod_duplikat` dan `simpegdev_local` hanya berisi baris contoh atau rekonstruksi.
 - DB lokal `production` adalah aplikasi lain.
 
-Jadi tidak ada data legacy nyata untuk diaudit.
+Jadi tidak ada data legacy nyata untuk diaudit. Sejak 01-10-2026 struktur produksi lengkap sudah tersedia (dump struktur prod 01-10), tetapi datanya belum.
+
+### 1.4 Perluasan 01-10-2026 (putaran 5)
+
+**Dasar:** keputusan user 01-10-2026.
+- v2 memakai DB terpisah yang diisi impor dari dump legacy (ADR-007 Opsi B).
+- Rencana in-place yang dikaji 30-09 **dibatalkan**, sehingga bagian impor dokumen ini berlaku.
+- ID legacy diimpor apa adanya.
+
+Lingkup dokumen tetap master + `pengguna`.
+
+| # | Perluasan | Isi | Tempat |
+|---|---|---|---|
+| a | **Revisi permintaan A-01 9.8 langkah 2** (baris 285 di `main` `cc553be`) | Permintaan "DBA memastikan `sql_mode` GLOBAL memuat …" **ditarik**. `sql_mode` dan `time_zone` GLOBAL server **tidak diubah**. Strict mode (`STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION`) dan `time_zone = '+00:00'` dipasang **per sesi koneksi**:<br>• sesi impor dan SQL manual: sekarang, lewat runbook 2.4 langkah 6 (R4);<br>• koneksi aplikasi: setelah keputusan Bagian B (3.3–3.4).<br>Alasannya, instance DB produksi dipakai bersama aplikasi lain, sehingga perubahan global ikut mengubah perilaku aplikasi itu. Teks A-01 **tidak** diubah di PR ini; koreksinya lewat DBV-017 terpisah | 2.4 langkah 6; 3.4–3.6; Bagian 4 #12 |
+| b | **Syarat engine** | Syarat "MySQL ≥ 8.0.30" diganti: versi **mengikuti keputusan AS-02** (asumsi PRD tentang engine dan instance DB v2; pemilik TL + DBA). Header dump struktur prod 01-10 menulis MySQL 8.0.21. Parameter server terkini menunggu kartu ISSUE-024 di board tim. Salinan tetap wajib MySQL 8 (alasan teknis di 2.4 langkah 1); di versi selain 8.0.30, uji deteksi data sintetis dijalankan dulu | 2.4 langkah 1; kepala skrip audit; Bagian 4 #13 |
+| c | **`password_decode`** | Kolom password plaintext legacy ini tidak pernah diimpor. Kolomnya dibuang dari **semua** tabel salinan segera setelah restore, sebelum audit dan sebelum langkah lain. Trigger legacy ikut dibuang (2.9). Bagian 0 skrip audit memeriksa keduanya (WAJIB_0) | 2.4 langkah 1; skrip bagian 0; Bagian 4 #14 |
+| d | **Audit hash dan email** | Format `pengguna.password`: tepat 32 karakter heksadesimal → `password_legacy` VARCHAR(32) (A-02b); format lain dilaporkan per akun (PERIKSA). Akun tanpa email (A-01 D-6) diringkas per role dan status (PERIKSA). Email ganda sudah diaudit sejak putaran 1 | skrip A6; 2.3; 2.4 langkah 5; 2.5; Bagian 4 #15 |
+| e | **Salinan untuk impor final** | = **dump final yang diambil saat freeze**, mengikuti Cutover Plan (Adendum Operasional Privat). Salinan dari dump sebelum freeze hanya untuk audit awal dan gladi; audit, dedupe, dan log 2.8 diulang pada dump final | 2.4 langkah 1 dan 10; Bagian 4 #17 |
+| f | **Selisih dump struktur prod 01-10** | DDL `pengguna` dan beberapa master berbeda dari asumsi dokumen. Selisihnya dicatat, dan tindak lanjutnya tidak mengedit migration di `main` | 2.9; Bagian 4 #16 |
+
+**Bagian B tetap ditahan** sampai kartu ISSUE-024 terjawab. Putaran 5 tidak memilih opsi zona waktu (3.5) dan tidak memastikan offset R1a. Yang berubah hanya isi permintaan (butir a).
 
 ## 2. Bagian A — Audit & dedupe duplikat master legacy (ISSUE-009)
 
@@ -125,6 +156,7 @@ PK kode wilayah (`provinsi`, `kabupaten_kota`, `kecamatan`, `kelurahan`), kolom 
 1. **Collation.** Kunci dibandingkan dengan `COLLATE utf8mb4_unicode_ci`: tidak peka huruf besar/kecil dan aksen, serta PAD SPACE (spasi di akhir diabaikan). Kolom legacy selalu di-`CONVERT(… USING utf8mb4)` dulu.
    - Legacy `agama.agama` memakai `utf8mb4_0900_ai_ci` NO PAD di tabel latin1 (`simpeg_prod.sql:175-186`) [K].
    - Akibatnya, `'Islam'` dan `'islam '` berbeda di legacy tetapi bertabrakan di v2. Kasus ini terbukti di 6.2.
+   - Dump struktur prod 01-10 [K] menunjukkan tiga tabel lain dengan collation berbeda: `jenis_status` dan `jenis_kp` (collation tabel `utf8mb4_0900_ai_ci`, NO PAD), serta `pangkat` (charset `utf8` mb3, `utf8_general_ci`). Pembandingnya tetap benar karena semua kolom di-`CONVERT` lalu di-`COLLATE utf8mb4_unicode_ci` (2.9).
 2. **Normalisasi = aplikasi.** Kunci meniru nilai yang akan disimpan aplikasi v2:
    - **nama**: `MasterService::normalizeName()` / `HariLiburService::nama()` → `preg_replace('/\s+/u', ' ')` lalu trim.
    - **field unik lain** (kunci "kode": `jenjang_pendidikan_singkat`, `username`, `id_pegawai`/`nip`, `email`): `MasterField::normalize()` / `UserService` → `trim()` PHP. SQL meniru kelas karakternya persis (spasi, `\t`, `\n`, `\r`, `\0`, `\x0B`) dengan pola `@dbv011_trim` = `^[ \t\n\r\x{0B}\x{00}]+|[ \t\n\r\x{0B}\x{00}]+$`, bukan `[[:space:]]` yang ikut membuang NBSP, `\f`, dan U+2000–U+3000 (lapor-lebih). Pola itu berisi **escape regex** yang disusun dengan `CHAR(92)`, bukan karakter kontrol asli; alasannya di 2.2 #6. Diuji identik dengan `trim()` PHP 8.4 pada 73 string di tiga `sql_mode`, langsung maupun lewat tabel turunan + WHERE (6.5). Kueri tabrakan akun 2.4 langkah 6 memakai pola yang sama.
@@ -180,9 +212,9 @@ Arti awalan kolom `cek`:
 
 | Bagian | Isi | Awalan | Butir asal |
 |---|---|---|---|
-| 0 | Jam dan `sql_mode` sesi instance salinan | INFO | ISSUE-022 / D-11 |
+| 0 | Jam dan `sql_mode` sesi instance salinan (INFO). Sejak putaran 5 juga prasyarat salinan: kolom `password_decode` di tabel mana pun dan trigger di skema salinan (WAJIB_0, 2.4 langkah 1) | INFO / WAJIB_0 | ISSUE-022 / D-11; 1.4 butir c |
 | A1–A5 | Duplikat untuk 28 UNIQUE master (satu kueri per index). Kolom `anggota` = `id:status:nilai legacy` (status NULL tampil sebagai `NULL`; wilayah ditambah kode induk mentah). Lingkup `jenis_status.status_pegawai` = nilai impor sebagai bilangan (2.2 #5); lingkup wilayah = kode induk hasil trim (2.2 #7) | WAJIB_0 | G-01 8.4 #2, G-10 6.3 #5, G-07 6.3 #2–#3, G-04 6.3 #4, G-06 6.5 #1/#3 |
-| A6 | Duplikat `username` dan `id_pegawai` (WAJIB_0); nilai impor yang melebihi kolom v2: `username` > 100, `nip` > 30, `name`/`email` > 150 (WAJIB_0, strict → 1406); email ganda dan akun role 2/6/7 tanpa `id_pegawai` (PERIKSA) | WAJIB_0 / PERIKSA | A-01 9.8 langkah 6, 9.10, D-4, D-6 |
+| A6 | Duplikat `username` dan `id_pegawai` (WAJIB_0); nilai impor yang melebihi kolom v2: `username` > 100, `nip` > 30, `name`/`email` > 150 (WAJIB_0, strict → 1406); email ganda dan akun role 2/6/7 tanpa `id_pegawai` (PERIKSA). Sejak putaran 5:<br>• profil format hash `pengguna.password` per kelas: tepat 32 heks = INFO, kelas lain = PERIKSA;<br>• daftar akun yang hash-nya bukan 32 heks, tanpa nilai hash (PERIKSA);<br>• akun tanpa email per role dan status (PERIKSA) | WAJIB_0 / PERIKSA / INFO | A-01 9.1, 9.8 langkah 6, 9.10, D-4, D-6; A-02b |
 | B1 | Kode wilayah legacy (hasil trim, 2.2 #7) yang sama dengan sentinel LAIN-LAIN v2 | PERIKSA | G-07 2.5, 6.3 #5 |
 | B2 | Rujukan yatim untuk semua FK antar-master v2: rantai wilayah (kode hasil trim di kedua sisi, 2.2 #7), FAQ (termasuk tabel anak `faq_rate.id_faq_article`, `faq_related_article.id_article_main`/`id_article_related`), jurusan→bidang, jenis_hukdis→tingkat (termasuk NULL), hari_libur→jenis_libur, kantor→wilayah (kode hasil trim; kode sentinel dilewati, kode NULL dilaporkan). `hari_libur` tanpa jenis dan `faq_related_article` yang merujuk dirinya sendiri = PERIKSA | WAJIB_0 / PERIKSA | G-06 6.5 #4, G-07 6.3 #2/#4, G-10 6.3 #10 |
 | B3 | `hari_libur`: rentang terbalik (CHECK) = WAJIB_0; rentang tumpang tindih = PERIKSA | WAJIB_0 / PERIKSA | G-07 6.3 #2 |
@@ -207,10 +239,35 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
 ### 2.4 Langkah runbook impor
 
 1. **Siapkan salinan.**
+   - **Sumber salinan (putaran 5).** Untuk impor final, salinan = **dump final yang diambil saat freeze** legacy, mengikuti Cutover Plan (Adendum Operasional Privat, dokumen privat tim). Saat itu `password_decode` di produksi sudah dikosongkan lewat langkah Cutover Plan, bukan lewat runbook ini. Salinan dari dump sebelum freeze hanya dipakai untuk audit awal dan gladi. Langkah 1–10 diulang pada dump final, dan hasil audit, log 2.8, serta keluaran counter yang dilampirkan ke kartu harus berasal dari dump final.
    - Restore dump data dan struktur penuh `simpeg01` ke **skema tersendiri**, terpisah dari produksi dan dari skema v2. Instance-nya tidak harus terpisah: boleh instance yang sama dengan DB v2 bila engine-nya memenuhi syarat di bawah (kueri tabrakan akun di langkah 6 dan skrip counter di langkah 8 memanfaatkan itu). Bila instance v2 tidak memenuhi syarat (mis. MariaDB, D-11), salinan di-restore di instance MySQL 8 lain, lalu dipakai jalur fallback di langkah 6 dan 8.
-   - Engine: **MySQL 8, versi ≥ 8.0.30** (versi tempat skrip diuji, 6.1). Dump memakai `utf8mb4_0900_ai_ci`, yang tidak dikenal MariaDB 10.4. Produksi legacy tercatat MySQL 8.0.21 (G-06); dump 8.0.21 bisa di-restore ke 8.0.30. Bila salinan terpaksa memakai 8.0.21, jalankan dulu uji deteksi data sintetis seperti 6.2 di instance itu sebelum hasil audit dipakai.
+   - **Engine: MySQL 8; versinya mengikuti keputusan AS-02** (putaran 5; sampai putaran 4 syaratnya ≥ 8.0.30).
+     - AS-02 = asumsi PRD tentang engine dan instance DB v2, dengan pemilik TL + DBA. Header dump struktur prod 01-10 menulis MySQL 8.0.21. Versi terkini dan parameter server lain (`sql_mode`, `time_zone`, `table_rows`) menunggu kartu ISSUE-024 di board tim.
+     - Salinan tetap wajib MySQL 8: dump memakai `utf8mb4_0900_ai_ci` yang tidak dikenal MariaDB 10.4, dan tiruan stripslashes memakai rujukan grup `$1` (2.2 #3).
+     - Skrip diuji di 8.0.30 (6.1). Bila salinan memakai versi lain (mis. 8.0.21 seperti produksi), jalankan dulu uji deteksi data sintetis seperti 6.2/6.5 di instance itu sebelum hasil audit dipakai, lalu catat versinya di log 2.8.
    - Dump dibuat dengan `mysqldump` bawaan (`--tz-utc` aktif; **jangan** `--skip-tz-utc`), agar instan kolom TIMESTAMP terjaga saat restore (R1b). Bila dump terlanjur dibuat dengan `--skip-tz-utc`, zona sesi restore harus sama dengan zona server produksi.
    - Bila dump dibuat dengan alat selain `mysqldump` (mis. HeidiSQL, yang membuat dump struktur `simpeg_prod.sql`), perilaku zona TIMESTAMP-nya belum diketahui. Sebelum R1b dipakai, bandingkan contoh `SELECT <pk>, UNIX_TIMESTAMP(<kolom_timestamp>)` untuk beberapa baris per kolom TIMESTAMP (daftar dari E2) di sumber (dijalankan pemegang akses produksi, hanya baca) dan di salinan. Nilainya harus sama; bila berbeda, restore ulang dengan `mysqldump` atau catat selisihnya di log 2.8 dan koreksi di transformasi.
+   - **Bersihkan salinan segera setelah restore, sebelum langkah lain (putaran 5).** Langkah ini hanya untuk salinan; tidak pernah dijalankan di produksi maupun di v2.
+     1. Buang semua **trigger** salinan. Trigger legacy menulis ke tabel lain, termasuk ke skema aplikasi lain di instance yang sama (2.9). Tanpa langkah ini, UPDATE/DELETE di salinan kerja (2.5) bisa mengubah data di luar salinan, atau gagal bila skema tujuannya tidak ada.
+     2. Buang kolom **`password_decode`** dari semua tabel salinan: `pengguna` dan tabel arsip/cadangan akun. Tabelnya dicari lewat `information_schema`, bukan dari daftar tetap. Kolom ini berisi password plaintext legacy, tidak pernah diimpor, dan tidak dibaca oleh langkah mana pun.
+
+     Caranya:
+     - Simpan kueri berikut sebagai `cetak_bersihkan.sql`.
+     - Jalankan `mysql -N -B -r --default-character-set=utf8mb4 --user=<akun_salinan> -p <db_salinan> < cetak_bersihkan.sql > bersihkan_salinan.sql`. `<akun_salinan>` adalah akun pemilik skema salinan, bukan akun baca audit.
+     - Tinjau isinya. Baris pertama menyebut skema dan versi; pastikan itu skema salinan.
+     - Jalankan `mysql --default-character-set=utf8mb4 --user=<akun_salinan> -p <db_salinan> < bersihkan_salinan.sql`.
+     ```sql
+     SELECT perintah FROM (
+               SELECT 0 urut, CONCAT('-- salinan: ', DATABASE(), ', ', VERSION()) perintah
+     UNION ALL SELECT 1, CONCAT('DROP TRIGGER `', TRIGGER_NAME, '`;')
+                 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE()
+     UNION ALL SELECT 2, CONCAT('ALTER TABLE `', TABLE_NAME, '` DROP COLUMN `', COLUMN_NAME, '`;')
+                 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'password_decode') x
+      ORDER BY urut, perintah;
+     ```
+     - **Bukti selesai:** bagian 0 skrip audit tidak menghasilkan baris `WAJIB_0 kolom password_decode …` maupun `WAJIB_0 trigger …`.
+     - Uji putaran 5 (6.6): `ALTER TABLE … DROP COLUMN` tidak mengubah counter AUTO_INCREMENT. Meski begitu, kesetiaan counter (butir berikut) tetap dicek **sesudah** pembersihan.
+     - Dump sebelum freeze masih memuat isi `password_decode`. Berkas dump dan salinannya diperlakukan sebagai data rahasia: disimpan terenkripsi, aksesnya dibatasi, dan dihapus sesuai retensi di Cutover Plan.
    - **Kesetiaan counter AUTO_INCREMENT salinan** (syarat DBV-005 6.5 #10, 2.7). Skrip counter langkah 8 dan kolom `counter_ai` bagian C membaca counter **salinan**. `mysqldump` bawaan menyertakan opsi tabel `AUTO_INCREMENT=`, tetapi dump data-saja (`--no-create-info`) ke tabel yang dibuat terpisah, atau alat yang tidak menyertakan opsi itu, membuat counter salinan = `MAX(id)+1`. Akibatnya counter legacy yang lebih tinggi (ID yang pernah dihapus keras) hilang dan langkah 8 diam-diam menyalin terlalu sedikit. Karena itu, pada saat yang sama dengan pembuatan dump, pemegang akses produksi menjalankan kueri berikut di sumber (hanya baca; `SET SESSION` hanya berlaku di sesinya). Kueri yang sama lalu dijalankan di salinan:
      ```sql
      SET @dbv011_s = IF(VERSION() LIKE '%MariaDB%', 'DO 0', 'SET SESSION information_schema_stats_expiry = 0');
@@ -230,7 +287,7 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
      - Bila berbeda: catat di log 2.8. Selisih karena entri baru di produksi setelah dump berarti salinan basi, jadi buat dump ulang. Selisih karena cara restore (counter salinan lebih kecil) diperbaiki dengan menyamakan counter di salinan (bukan produksi): `ALTER TABLE <tabel> AUTO_INCREMENT = <counter sumber>`, lalu kueri di atas diulang. Cara lain, perintah langkah 8 ditulis manual dari counter sumber dengan aturan 2.7.
      - Diuji di 6.5: salinan `mysqldump` bawaan identik dengan sumber (23 tabel); salinan data-saja berbeda tepat di 4 tabel yang counter-nya melebihi `MAX(id)+1`.
    - Siapkan akun baca untuk audit.
-   - Dump struktur penuh (DDL) dari sumber yang sama dipakai untuk mencocokkan nilai [I] (ISSUE-003). Pencocokan ini **prasyarat impor** (langkah 6), bukan sekadar catatan.
+   - Dump struktur penuh (DDL) dari sumber yang sama dipakai untuk mencocokkan nilai [I] (ISSUE-003). Pencocokan ini **prasyarat impor** (langkah 6), bukan sekadar catatan. Dump struktur prod 01-10 sudah tersedia dan selisihnya dicatat di 2.9; pencocokan diulang terhadap struktur dump final.
 2. **Jalankan audit** (hasilnya dilampirkan ke kartu ISSUE-009 / DBV-011):
    ```
    mysql --force --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_salinan> \
@@ -255,7 +312,12 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
    - pemetaan `created_by`/`updated_by`;
    - sanitasi konten FAQ;
    - konversi stempel waktu **R1a/R1b, R2, R3** (3.2) di sesi baca `+00:00` (**R4**): DATETIME dikonversi, TIMESTAMP tidak;
-   - salinan nama di riwayat disalin apa adanya (G-06 6.5 #9).
+   - salinan nama di riwayat disalin apa adanya (G-06 6.5 #9);
+   - `pengguna` (putaran 5):
+     - `password` yang masuk kelas 32 heks (A6) → `password_legacy` apa adanya, dengan `password` v2 NULL. Verifier menyamakan huruf besar/kecil, jadi heks huruf besar tidak perlu diubah;
+     - akun dengan format hash lain diperlakukan sesuai keputusan di log 2.8 (2.5);
+     - `password_decode` tidak pernah dipilih; kolomnya sudah dibuang di langkah 1;
+     - pemetaan kolom akun lain (`id` → `id_pengguna`, `id_pegawai` → `nip`, `UserLevel` → `user_level`, status) mengikuti A-01 dan DBV-009.
 6. **Impor ke DB v2** (Dev dulu). Ini penulisan manual setelah approval DBV (ISSUE-014).
    - **Prasyarat: D-12 tuntas** (A-01 9.7, keputusan Bagian 4 #11). Tipe `pengguna.id_pengguna` v2 (INT UNSIGNED) berbeda dengan legacy `pengguna.id` dan kolom `*_by`/`id_pengguna` legacy (INT signed). DBV-010 menetapkan penyelarasannya di DBV-009 dan **"wajib tuntas sebelum FK `*_by` dibuat atau data legacy diimpor"**. Runbook ini ikut mengimpor `pengguna` dan `created_by`/`updated_by` master, jadi migration DBV-009 (PK + `token.id_pengguna` + `audit_logs.id_pengguna_actor`) harus sudah disetujui DBV dan dijalankan.
    - **Prasyarat: semua nilai [I] tabel yang diimpor sudah dicocokkan dengan DDL dump** (langkah 1; keputusan Bagian 4 #11): G-01 8.3, G-04 Bagian 7, G-06 Bagian 3 dan 6.4, G-07 3.1, G-10 Bagian 3. Selisih dikoreksi lewat migration ALTER baru + review DBV (migration di `main` tidak diedit). Setelah itu angka panjang di katalog D/A6/B9 disesuaikan dengan tipe hasil koreksi, lalu audit (langkah 2–4) dijalankan ulang. Tanpa langkah ini, WAJIB_0 "lebih dari kolom v2" bisa keliru diselesaikan dengan memotong atau mengganti nama data, padahal yang salah adalah dugaan tipe v2.
@@ -290,8 +352,14 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
        3. Jalankan kueri tabrakan di atas (termasuk kedua baris `SET`) dengan `FROM <kerja>.akun_v2 v` sebagai ganti `FROM pengguna v`. Diuji di 6.4 dan diulang di 6.5 dengan pola putaran 4: hasilnya sama dengan kueri satu instance, dan tanpa `-r` username berisi kutip/backslash menghasilkan INSERT yang rusak.
        4. Setelah keputusan dicatat di log 2.8, hapus `akun_v2.sql` dan `DROP TABLE <kerja>.akun_v2`. Isinya data akun, jadi jangan dilampirkan ke kartu.
    - Pakai ID legacy apa adanya.
-   - Sesi tulis diawali `SET time_zone = '+00:00'` (**R4**).
-   - Pakai koneksi strict (`STRICT_ALL_TABLES`).
+   - **Setiap sesi impor diawali pengaturan per sesi** (putaran 5, 1.4 butir a), di sisi baca maupun sisi tulis. `sql_mode` dan `time_zone` GLOBAL tidak diubah:
+     ```sql
+     SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+     SET SESSION time_zone = '+00:00';
+     SELECT @@SESSION.sql_mode, @@SESSION.time_zone, NOW() = UTC_TIMESTAMP() utc_ok;
+     ```
+     - Hasil kueri terakhir dicatat di log 2.8; `utc_ok` harus 1.
+     - `time_zone` sesi = aturan **R4** (3.2), yang sudah wajib apa pun opsi Bagian B. Strict mode sesi menggantikan butir "koneksi strict (`STRICT_ALL_TABLES`)" sebelum putaran 5, dan menambah mode tanggal nol sehingga tanggal nol yang lolos R3 ditolak 1292.
    - Urutan: induk → anak.
    - Kode sentinel wilayah (dikenali dari kode hasil trim, 2.2 #7) dilewati, karena barisnya sudah dibuat migration `100200`.
 7. **Verifikasi pasca-impor.**
@@ -303,7 +371,7 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
    - Jalankan perintah `ALTER` itu secara manual.
    - Jalankan ulang skrip sampai setiap baris berisi "tidak perlu" atau INFO. Baris PERIKSA dicatat.
 9. Jalankan `ANALYZE TABLE faq_article` (G-10 6.3 #12).
-10. **Catat di kartu:** hasil audit awal dan akhir (semua WAJIB_0 kosong), log dedupe 2.8, keluaran skrip counter sebelum dan sesudah `ALTER`, serta pelaksana dan waktunya.
+10. **Catat di kartu:** hasil audit awal dan akhir (semua WAJIB_0 kosong), log dedupe 2.8, keluaran skrip counter sebelum dan sesudah `ALTER`, serta pelaksana dan waktunya. Sejak putaran 5 juga: asal dump (dump final saat freeze, atau dump gladi), versi engine salinan, dan bukti pembersihan salinan (bagian 0 audit kosong).
 
 ### 2.5 Prosedur dedupe
 
@@ -337,6 +405,9 @@ Ejaan nama penyintas disepakati pemilik proses; boleh diambil dari baris lain.
 - **`kategori` tanpa pasangan `old_id`** (PERIKSA B5): pemilik proses memilih, per kategori, antara memetakan ke `jenis_konket` yang sudah ada (mengisi `old_id` yang kosong/tidak valid dengan kode itu) atau membuat entri `jenis_konket` baru ber-`old_id` tersebut. Jumlah baris pengajuan per kategori ikut dicatat di log 2.8.
 - **`hari_libur.tgl_mulai` ganda:** gabungkan (nama/keterangan disatukan) atau betulkan tanggalnya.
 - **`id_pegawai` ganda di `pengguna`:** tentukan per akun. Biasanya akun aktif terbaru tetap tertaut NIP. Akun lain tidak diimpor, atau diimpor tanpa NIP berstatus nonaktif (nama wajib, A-01 9.5).
+- **`username` ganda di `pengguna`** (putaran 5; produksi tanpa UNIQUE `username`, 2.9): tentukan per akun dengan aturan yang sama seperti `id_pegawai` ganda. Akun yang tetap diimpor diberi `username` pembeda yang disepakati, lalu pemiliknya diberi tahu, karena login v2 memakai `username`.
+- **Akun dengan hash bukan 32 heks** (PERIKSA A6, putaran 5): akun ini tidak bisa masuk lewat jalur A-02b. Pilihannya per akun: diimpor tanpa `password_legacy` (masuk lewat lupa password atau reset admin), atau dinonaktifkan. Merapikan spasi atau baris baru di tepi hash adalah keputusan PERBAIKI yang dicatat, bukan transformasi otomatis.
+- **Akun tanpa email** (PERIKSA A6, putaran 5): tidak bisa memakai lupa password (A-01 D-6, K3), sehingga setelah window `password_legacy` berakhir hanya bisa direset admin. Jumlahnya per role dan status dicatat di log 2.8, sebagai bahan komunikasi pengguna di Cutover Plan.
 
 **Pengalihan rujukan** (di salinan kerja):
 
@@ -431,7 +502,42 @@ Setelah setiap putaran perbaikan, jalankan ulang skrip audit **sampai semua WAJI
 |---|---|---|---|---|---|---|---|---|
 | … | … | … | … | … | … | … | … | … |
 
-## 3. Bagian B — Zona waktu & `sql_mode` sesi (ISSUE-022, D-11) — USULAN; keputusan final TL/DBA
+### 2.9 Selisih dump struktur prod 01-10 terhadap asumsi dokumen (putaran 5)
+
+Dump struktur prod 01-10 berisi struktur penuh `simpeg01` tanpa data (285 tabel, 313 FK, 101 trigger, 1 function). Tabel di bawah membandingkannya dengan asumsi dokumen dan skrip sampai putaran 4, khusus untuk 28 tabel master lingkup dokumen ini, `pengguna`, dan tabel pendukung yang dibaca skrip. Semua isi kolom "Dump" berlabel [K].
+
+Koreksi skema v2 lewat **migration ALTER baru + review DBV** (migration di `main` tidak diedit). Koreksi teks dokumen DBV yang sudah disetujui lewat **DBV-017**, bukan PR ini.
+
+| # | Objek | Asumsi sampai putaran 4 | Dump struktur prod 01-10 | Akibat dan tindak lanjut |
+|---|---|---|---|---|
+| 1 | `pengguna.username` | VARCHAR(100) **UNIQUE** [L] (`simpeg_prod_duplikat`; dirujuk A-01 9.1 dan D-5 sebagai [K], dan dipakai uji 6.2) | VARCHAR(255) NOT NULL, **tanpa UNIQUE** | Duplikat `username` memang bisa ada di produksi, jadi kueri duplikat A6 kini relevan (uji 6.6 dengan duplikat tertanam). Kasusnya diputuskan di 2.5. `username` > 100 → WAJIB_0 A6 |
+| 2 | `pengguna.name`, `email` | VARCHAR(150) NULL [L] | `name` VARCHAR(255) **NOT NULL**; `email` VARCHAR(255) NULL | Nilai > 150 → WAJIB_0 A6. Lebar v2 diputuskan DBV setelah audit data: dipertahankan bila data muat, atau dilebarkan lewat migration ALTER baru + DBV. Koreksi teks A-01 (rujukan [K] `simpeg_prod_duplikat` di 9.1, D-5 "ikut legacy [K]") lewat DBV-017 |
+| 3 | `pengguna.status` | Komentar skrip C: "status legacy 0/1/2" | INT NULL DEFAULT 1; komentar kolom "1 aktif, 2 tidak aktif, 3 dihapus" | Nilai nyata dibaca dari profil C (`st_1`, `st_2`, `st_lain`, `st_null`). Pemetaannya ke v2 di DBV-009 dan runbook `pengguna` (DBV-014). Komentar skrip disesuaikan |
+| 4 | `pengguna.expired_at` | DATETIME NULL [L] | DATETIME **NOT NULL**, diisi trigger legacy saat akun dibuat dan saat password berubah | Bahan keputusan paksa ganti password dari `expired_at` (A-01 9.10), yang wajib diputuskan sebelum impor `pengguna` |
+| 5 | `pengguna.id_pegawai` | VARCHAR(30) NULL, tanpa FK | VARCHAR(30) NULL + **FK fisik** ke `pegawai.nip` (ON DELETE SET NULL), tanpa UNIQUE | NIP yatim kecil kemungkinannya. Akun yang pegawainya dihapus menjadi NULL, sehingga PERIKSA "role 2/6/7 tanpa `id_pegawai`" relevan. Duplikat tetap mungkin (A6) |
+| 6 | `pengguna.id` | INT signed (A-01 D-12) | INT signed | Cocok. D-12/DBV-009 tetap prasyarat impor (2.4 langkah 6) |
+| 7 | `password_decode` | Hanya di `pengguna` (A-01 9.1) | Ada di `pengguna` dan beberapa tabel arsip/cadangan akun | Dibuang dari semua tabel salinan berdasarkan `information_schema` (2.4 langkah 1); bagian 0 skrip memeriksanya |
+| 8 | Kolom `pengguna` tanpa padanan di A-01 | — | `is_admin`, `id_kode_unit_instansi` | Nasibnya diputuskan di runbook `pengguna` (DBV-014). Tidak memengaruhi audit |
+| 9 | Trigger | Tidak dibahas | 101 trigger. Yang ada di tabel lingkup dokumen ini:<br>• `pangkat`: menulis ke skema aplikasi lain di instance yang sama;<br>• `pengguna`: menulis tabel antrean sinkron di skema yang sama dan mengisi `expired_at` | Dibuang dari salinan (2.4 langkah 1); bagian 0 skrip memeriksanya |
+| 10 | `jenis_pegawai.jenis_pegawai`, `jenis_status.jenis_status` | v2 VARCHAR(50) [I] (G-01 8.3 #1; katalog D) | VARCHAR(255) dan VARCHAR(100) | v2 lebih sempit dari legacy. Data > 50 → WAJIB_0 D, diselesaikan dengan migration ALTER baru + DBV (aturan 2.3), bukan dengan memotong data. Katalog D tetap memakai lebar v2 di `main` |
+| 11 | Collation | Hanya `agama` yang berbeda (`utf8mb4_0900_ai_ci` NO PAD di tabel latin1) | Juga `jenis_status` dan `jenis_kp` (tabel `utf8mb4_0900_ai_ci`), serta `pangkat` (`utf8` mb3, `utf8_general_ci`) | Pembanding audit tidak berubah (CONVERT + COLLATE, 2.2 #1). Collation dikonversi saat impor |
+| 12 | `jenis_konket.old_id` | VARCHAR di rekonstruksi lokal [L] (DB uji 6.1) | INT NULL, tanpa UNIQUE | Di produksi hanya NULL dan ≤ 0 yang mungkin. B5 tetap utuh |
+| 13 | `jenis_status.status_pegawai`, `pangkat.cpns` | Tipe [I] (B8) | TINYINT(1) NOT NULL | Hanya cabang "di luar 1/2" B8 yang mungkin muncul. B8 tetap utuh |
+| 14 | Kode wilayah (PK, kolom induk, `kantor`) | v2 CHAR(2/4/7/10) [I] (G-01 8.3, G-07 3.1, ISSUE-008) | CHAR(2/4/7/10) `utf8mb4_unicode_ci`; kolom induk dan kode wilayah `kantor` NULL dengan FK SET NULL | Tipe cocok, jadi "lebih dari CHAR(N)" di B9 tidak mungkin muncul. Induk NULL dilaporkan B2 |
+| 15 | Kolom `status` master | Status NULL dicek (`st_null`) | Semua kolom `status` NOT NULL: TINYINT, kecuali `faq_topic` INT dan `gol_pppk` ENUM('1','2'). `hari_libur`, `faq_rate`, dan `faq_related_article` tanpa kolom status | `st_null` diperkirakan 0. Ceknya tetap ada |
+| 16 | Counter AUTO_INCREMENT | — | Saat dump diambil, tidak ada tabel ber-PK TINYINT yang counter-nya ≥ 128; tertinggi `bidang_pendidikan` 100 | Tidak ada PERIKSA counter yang diperkirakan. Tetap dicek ulang pada dump final (2.4 langkah 1) |
+| 17 | Kolom TIMESTAMP | 3.1: 5 kolom, dari dump parsial | 13 kolom di 8 tabel; tidak satu pun di 28 master + `pengguna` | R1b tidak berlaku untuk tabel lingkup dokumen ini. Daftar lengkapnya dari E2 |
+| 18 | Nama tabel/kolom yang dirujuk skrip | Sebagian [I] | Semua ada | Skrip audit pada struktur dump: 0 error, `INFO D: ke-27 …`, `INFO E: ke-29 …` (6.6) |
+
+## 3. Bagian B — Zona waktu & `sql_mode` sesi (ISSUE-022, D-11) — USULAN; keputusan final TL/DBA; DITAHAN menunggu ISSUE-024
+
+**Status (01-10-2026): DITAHAN.** Bagian ini menunggu jawaban kartu ISSUE-024 di board tim, yaitu versi engine, `sql_mode`, `time_zone`, dan `table_rows` server DB produksi. Putaran 5 **tidak** memutuskan Bagian B: opsi 3.5 belum dipilih, dan offset R1a belum dipastikan.
+
+Yang berubah di putaran 5 hanya isi permintaan (1.4 butir a):
+- `sql_mode` dan `time_zone` GLOBAL tidak diminta diubah;
+- strict mode dan `'+00:00'` dipasang per sesi koneksi (3.4, 3.5, 3.6).
+
+Aturan R1–R6 (3.2) tetap wajib untuk impor dan SQL manual, karena penyimpanan UTC sudah final (1.2).
 
 ### 3.1 Kondisi sekarang
 
@@ -440,7 +546,7 @@ Setelah setiap putaran perbaikan, jalankan ulang skrip audit **sampai semua WAJI
 | Aplikasi | `appTimezone = 'UTC'` (`app/Config/App.php`). Stempel ditulis eksplisit dari jam PHP (`AuthService`, `JwtService`, `ResetPasswordService`, `PasswordService`, `FaqService`, `MasterModel`). `MasterModel::shiftOrder` memakai `updated_at = updated_at` agar ON UPDATE tidak terpicu. Di `app/` tidak ada `NOW()`/`CURDATE()`/`CURRENT_TIMESTAMP` selain di definisi migration; `SeedWilayahLainLain` memakai `UTC_TIMESTAMP()` | [K] |
 | Skema v2 | Semua kolom waktu bertipe **DATETIME**; **0 TIMESTAMP** (diukur di `information_schema` DB scratch). DATE hanya ada di `hari_libur.tgl_mulai`/`tgl_akhir`. Antrean memakai INT epoch. `DEFAULT CURRENT_TIMESTAMP`/`ON UPDATE CURRENT_TIMESTAMP` ada di tabel Batch 1, FAQ, DBV-003/004/005 | [K] |
 | Legacy | `date_default_timezone_set("Asia/Jakarta")` (`application/config/config.php:4`). Ada 209 kemunculan `NOW()`/`CURDATE()`/`CURRENT_TIMESTAMP` di 18 berkas PHP `application/` (grep peka huruf besar/kecil `NOW\(\)\|CURDATE\(\)\|CURRENT_TIMESTAMP`, 30-09-2026; grep tidak peka huruf memberi 211 di 19 berkas karena ikut menghitung fungsi PHP `getWibNow()` di `libraries/hr/Lsl_gaji.php:80, 85`). Artinya kolom **DATETIME** legacy berisi jam dinding WIB, dan legacy bergantung pada jam sesi DB | [K] |
-| Legacy: tipe kolom waktu | Dump produksi punya kolom **TIMESTAMP**: `firebase_message_logs.created_at`/`updated_at`, `firebase_token.created_at`/`updated_at`, dan `forgot_attempts.attempt_time` (`simpeg_prod.sql:1147-1171`). Dari 12 tabel lingkup DBV-011 yang DDL-nya ada di dump (`agama`, lima tabel FAQ, `hari_libur`, `bidang_kursem`, `instansi_kursem`, `gol_pppk`, `bidang_pendidikan`, `diklat`), tidak ada yang ber-TIMESTAMP. Tipe kolom tabel [I] lainnya dibaca dari E2 skrip audit. TIMESTAMP disimpan UTC dan ditampilkan mengikuti zona sesi. `mysqldump` bawaan (`--tz-utc`) mempertahankan instannya | [K] / [I] |
+| Legacy: tipe kolom waktu | Dump produksi punya kolom **TIMESTAMP**: `firebase_message_logs.created_at`/`updated_at`, `firebase_token.created_at`/`updated_at`, dan `forgot_attempts.attempt_time` (`simpeg_prod.sql:1147-1171`). Dari 12 tabel lingkup DBV-011 yang DDL-nya ada di dump (`agama`, lima tabel FAQ, `hari_libur`, `bidang_kursem`, `instansi_kursem`, `gol_pppk`, `bidang_pendidikan`, `diklat`), tidak ada yang ber-TIMESTAMP. Tipe kolom tabel [I] lainnya dibaca dari E2 skrip audit. TIMESTAMP disimpan UTC dan ditampilkan mengikuti zona sesi. `mysqldump` bawaan (`--tz-utc`) mempertahankan instannya. Putaran 5: dump struktur prod 01-10 memuat 13 kolom TIMESTAMP di 8 tabel, tidak satu pun di 28 master + `pengguna` (2.9 #17) | [K] / [I] |
 | Catatan DBV (G-06 Status) | Default DB terukur 11:36:43 WIB, sedangkan aplikasi menulis 04:36:43 UTC di kolom yang sama | [K] |
 | MySQL 8.0.30 lokal (diukur 29-09-2026, hanya sesi / DB scratch) | `@@GLOBAL.time_zone = SYSTEM` (SE Asia Standard Time); `mysql.time_zone_name` 0 baris; `SET time_zone = 'UTC'` → **1298**; `CONVERT_TZ(…, 'Asia/Jakarta', 'UTC')` → NULL; `CONVERT_TZ('2026-09-29 11:36:43', '+07:00', '+00:00')` → `04:36:43`; `SET time_zone = '+00:00'` → `NOW() = UTC_TIMESTAMP()`. `DEFAULT CURRENT_TIMESTAMP`: sesi SYSTEM menulis 23:59:26, sesi `+00:00` menulis 16:59:26 (selisih 420 menit); `ON UPDATE` juga UTC. Kolom **DATETIME** yang sudah tersimpan tidak berubah saat `time_zone` sesi diganti. Kolom **TIMESTAMP** ditulis 11:36:43 di sesi WIB, dibaca 04:36:43 di sesi `+00:00`. `CONVERT_TZ('0000-00-00 00:00:00', …)` → NULL | [K] |
 | CI4 4.7.4 | Tidak ada opsi `time_zone` untuk koneksi. `strictOn` dipasang lewat `MYSQLI_INIT_COMMAND` (`system/Database/MySQLi/Connection.php`). Driver kustom FQCN didukung (pola `tests/_support/Database/CommitFailing`). `.env.example` menulis `DBDriver = MySQLi`, sehingga `.env` server bisa menimpa driver kustom | [K] |
@@ -487,7 +593,7 @@ Setiap koneksi yang dibuka aplikasi — web, `spark migrate`/`db:seed`, worker a
 | `GET_LOCK` (CR-020), transaksi, `strictOn` | Tidak terpengaruh. `strictOn` tetap lewat init command |
 | Implementasi (unit DBV+CR terpisah setelah keputusan) | Driver kustom FQCN, mis. `App\Database\MySQLiSesi\Connection`, subclass MySQLi dengan `connect()` = parent + `SET time_zone` (+ `sql_mode` bila 3.4 dipilih). Perlu kelas pembungkus `Builder`/`Forge`/`Result`/`Utils`/`PreparedQuery`, `DBDriver` di `Config\Database` dan `.env.example`, penjagaan di `DatabaseConfigTest`, dan larangan menimpa `DBDriver` di runbook A-01 9.8 langkah 4. Test yang diperlukan: `@@session.time_zone = '+00:00'`; INSERT tanpa `created_at` ≈ `UTC_TIMESTAMP()`; `ON UPDATE` dalam UTC; tetap berlaku setelah reconnect. File yang disentuh berada di wilayah DBV-010 dan tidak bersinggungan dengan PR #11 |
 
-### 3.4 Opsional: `sql_mode` sesi (D-11b)
+### 3.4 `sql_mode` sesi (D-11b; opsional sampai putaran 4, permintaan utama sejak putaran 5)
 
 **Isi.** Dalam init yang sama, tambahkan `NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO` ke `@@sql_mode` sesi. `strictOn` sudah menambah `STRICT_ALL_TABLES`.
 
@@ -497,26 +603,34 @@ Setiap koneksi yang dibuka aplikasi — web, `spark migrate`/`db:seed`, worker a
 - `ALTER` lewat migration atas tabel yang berisi tanggal nol akan gagal. Ini selaras dengan pengaman DBV-010 `130000`.
 - MySQL 8.0.30 tidak memberi peringatan bila mode ini dipasang bersama strict (diuji). Mode ini berstatus *deprecated* di MySQL 8 tetapi tetap berfungsi.
 
-**Posisi:** fallback, bukan pengganti D-11 (DBV-010 memutuskan "minta DBA"). Dipakai hanya bila jawaban DBA lambat, atau bila server Dev/Prod ternyata MariaDB tanpa mode tersebut.
+**Posisi (direvisi putaran 5, 1.4 butir a):** **permintaan utama**, menggantikan permintaan mengubah `sql_mode` GLOBAL di A-01 9.8 langkah 2 (D-11 versi DBV-010: "minta DBA").
+- Alasannya sama dengan kekurangan opsi C di 3.5: perubahan global ikut mengubah aplikasi lain di instance yang sama.
+- Untuk sesi impor dan SQL manual, mode ini sudah dipasang lewat runbook 2.4 langkah 6.
+- Untuk koneksi aplikasi, implementasinya tetap menunggu keputusan Bagian B (ISSUE-024, TL/DBA).
+- Teks A-01 dikoreksi lewat DBV-017, bukan PR ini.
+
+Sampai putaran 4, posisinya fallback: hanya dipakai bila jawaban DBA lambat, atau bila server Dev/Prod ternyata MariaDB tanpa mode tersebut.
 
 ### 3.5 Opsi & rekomendasi
 
 | Opsi | Isi | Kelebihan | Kekurangan |
 |---|---|---|---|
-| **A (rekomendasi)** | UTC + R1–R6 + `SET time_zone = '+00:00'` per koneksi aplikasi (3.3), D-11b opsional. `time_zone` global `'+00:00'` hanya bila DBA memastikan instance v2 tidak dipakai bersama legacy | Menutup impor/SQL manual (R4) dan default DB dari aplikasi (seed/migrate). Tanpa risiko data; tidak menyentuh legacy | Butuh satu unit kode kecil (driver kustom + test) lewat DBV+CR |
+| **A (rekomendasi)** | UTC + R1–R6 + `SET time_zone = '+00:00'` per koneksi aplikasi (3.3) + `sql_mode` sesi (3.4). Sejak putaran 5, `sql_mode` dan `time_zone` GLOBAL tidak diubah (1.4 butir a). Sampai putaran 4: D-11b opsional, dan `time_zone` global `'+00:00'` hanya bila DBA memastikan instance v2 tidak dipakai bersama legacy | Menutup impor/SQL manual (R4) dan default DB dari aplikasi (seed/migrate). Tanpa risiko data; tidak menyentuh legacy | Butuh satu unit kode kecil (driver kustom + test) lewat DBV+CR |
 | B | UTC + R1–R6 saja, tanpa kode | Tanpa perubahan kode | Default DB dari koneksi aplikasi (seed, migrate, jalur yang lupa mengisi stempel) tetap WIB tanpa terdeteksi |
-| C | Hanya `time_zone` global `'+00:00'` di server (DBA) | Menutup juga SQL manual yang lupa R4 | Bila instance juga dipakai SIMPEG legacy, 209 pemakaian `NOW()`/`CURDATE()`/`CURRENT_TIMESTAMP` legacy (3.1) bergeser ke UTC sehingga data dan logika legacy rusak. R1–R3 tetap perlu |
+| C | Hanya `time_zone` global `'+00:00'` di server (DBA) | Menutup juga SQL manual yang lupa R4 | Bila instance juga dipakai SIMPEG legacy, 209 pemakaian `NOW()`/`CURDATE()`/`CURRENT_TIMESTAMP` legacy (3.1) bergeser ke UTC sehingga data dan logika legacy rusak. R1–R3 tetap perlu. Sejak putaran 5 bertentangan dengan permintaan yang direvisi (perubahan global ditarik, 1.4 butir a); tetap dicantumkan sebagai pembanding untuk keputusan TL/DBA |
 | D | Beralih ke WIB (`appTimezone = 'Asia/Jakarta'` + sesi `+07:00`) | Impor tanpa konversi | Membalik keputusan UTC di DBV-001..005/G-10 dan belasan test `Time::setTestNow('UTC')`. Kontrak API dan FE (mis. `FaqView` yang menambah `Z`) ikut berubah |
 
-**Rekomendasi: A.** Keputusan final ada di TL/DBA.
+**Rekomendasi: A.** Keputusan final ada di TL/DBA, setelah kartu ISSUE-024 terjawab.
 
 ### 3.6 Pertanyaan ke DBA/TL (paket D-11)
 
-1. Engine dan versi server Dev/Prod v2? README-deploy menyebut MySQL 8.x, sedangkan validasi DBV dilakukan di MariaDB 10.4.
-2. Apakah `@@GLOBAL.sql_mode` Dev/Prod memuat `STRICT_TRANS_TABLES`, `NO_ZERO_IN_DATE`, `NO_ZERO_DATE`, dan `ERROR_FOR_DIVISION_BY_ZERO` (runbook A-01 9.8 langkah 1–2)?
+Pertanyaan 1–4 sebagian sudah diminta lewat kartu ISSUE-024 di board tim (parameter server DB produksi). Jawabannya dicatat di sana dan dirujuk di sini.
+
+1. Engine dan versi server Dev/Prod v2? README-deploy menyebut MySQL 8.x, sedangkan validasi DBV dilakukan di MariaDB 10.4. Putaran 5: keputusan ini mengikuti AS-02; header dump struktur prod 01-10 menulis MySQL 8.0.21.
+2. Apakah `@@GLOBAL.sql_mode` Dev/Prod memuat `STRICT_TRANS_TABLES`, `NO_ZERO_IN_DATE`, `NO_ZERO_DATE`, dan `ERROR_FOR_DIVISION_BY_ZERO` (runbook A-01 9.8 langkah 1–2)? Sejak putaran 5 nilai ini **hanya dicatat**; mengubahnya tidak diminta lagi (1.4 butir a).
 3. Jam server **produksi legacy**: jalankan `SELECT @@GLOBAL.time_zone, @@system_time_zone, NOW(), UTC_TIMESTAMP();` (hanya baca). Jawaban ini memastikan offset +07 di R1.
-4. Berapa `@@GLOBAL.time_zone` server v2 Dev/Prod? Apakah instance (mysqld) v2 dipakai bersama SIMPEG legacy atau aplikasi lain? Jawaban ini menentukan boleh tidaknya opsi C.
-5. Keputusan: opsi A/B/C/D. Bila A, apakah D-11b ikut dipasang?
+4. Berapa `@@GLOBAL.time_zone` server v2 Dev/Prod? Apakah instance (mysqld) v2 dipakai bersama SIMPEG legacy atau aplikasi lain? Jawaban ini menentukan boleh tidaknya opsi C, dan sejak putaran 5 juga menjadi masukan AS-02.
+5. Keputusan: opsi A/B/C/D. Sejak putaran 5, opsi C bertentangan dengan permintaan yang direvisi (1.4 butir a), sehingga hanya relevan bila TL/DBA menolak revisi itu. Bila A, `sql_mode` sesi (3.4) ikut dipasang sesuai revisi putaran 5.
 
 ## 4. Keputusan yang diminta dari DB Validator (DBV-011)
 
@@ -530,9 +644,15 @@ Setiap koneksi yang dibuka aplikasi — web, `spark migrate`/`db:seed`, worker a
 | 6 | Counter AUTO_INCREMENT (2.7): disalin untuk semua master AUTO_INCREMENT dan `pengguna` (G-06 wajib, sisanya usulan); tidak pernah diturunkan; counter ≥ 128 di tabel ber-PK TINYINT = PERIKSA (tidak disalin); counter salinan dicocokkan dulu dengan sumber produksi (2.4 langkah 1) | Setujui | ⏳ |
 | 7 | Email ganda legacy (D-6) = PERIKSA. Tidak memblokir impor karena tanpa UNIQUE di DB; diputuskan per akun sebelum driver SMTP (CR-014) aktif | Setujui | ⏳ |
 | 8 | Aturan R1–R6 (3.2) wajib di runbook impor dan SQL manual, apa pun opsi zona waktunya. R1 dibedakan per tipe kolom sumber: DATETIME dikonversi +07 → +00 (R1a); TIMESTAMP dibaca di sesi `+00:00` dan tidak dikonversi lagi (R1b). Zona sesi `+00:00` dipasang di sisi baca dan sisi tulis (R4) | Setujui | ⏳ |
-| 9 | Teruskan usulan opsi A (3.3) + D-11b opsional (3.4) beserta pertanyaan 3.6 ke TL/DBA. Implementasi lewat unit DBV+CR terpisah setelah keputusan | Setujui untuk diteruskan; keputusan final di TL/DBA | ⏳ |
+| 9 | Teruskan usulan opsi A (3.3) + `sql_mode` sesi (3.4; sejak putaran 5 bagian dari permintaan, bukan opsional) beserta pertanyaan 3.6 ke TL/DBA. Implementasi lewat unit DBV+CR terpisah setelah keputusan | Setujui untuk diteruskan; keputusan final di TL/DBA. **Ditahan** sampai kartu ISSUE-024 terjawab | ⏳ |
 | 10 | Prasyarat impor (2.4 langkah 6): tabel target v2 kosong, kecuali 4 sentinel wilayah dan akun yang disepakati. Nasib akun v2 yang sudah ada diputuskan per akun dengan kueri tabrakan 2.4 langkah 6 | **Dev:** data QA master dikosongkan (backup dulu); akun QA yang bertabrakan (ID, `username`, atau NIP) dihapus lalu dibuat ulang setelah impor dengan `username`/NIP yang tidak bertabrakan. Rujukan `audit_logs.id_pengguna_actor` dan `token` ikut diperhitungkan. **Prod:** impor dijalankan sebelum akun admin awal dibuat. Bila akun admin sudah terlanjur dibuat, `id_pengguna`-nya harus > counter legacy dan lolos kueri tabrakan. Bila salinan legacy tidak satu instance dengan v2, kueri tabrakan dijalankan lewat fallback 2.4 langkah 6 (identitas akun v2 disalin ke skema kerja di instance salinan) | ⏳ |
 | 11 | Prasyarat impor lain (2.4 langkah 6): D-12 tuntas (penyelarasan tipe `pengguna.id_pengguna` di DBV-009, A-01 9.7 "wajib tuntas sebelum … data legacy diimpor") dan semua nilai [I] tabel yang diimpor sudah dicocokkan dengan DDL dump lalu dikoreksi lewat migration ALTER + DBV | Setujui sebagai gerbang impor; hasil pencocokan dicatat di kartu ISSUE-003/ISSUE-015 dan dirujuk di log 2.8 | ⏳ |
+| 12 | **Putaran 5.** Revisi permintaan A-01 9.8 langkah 2 (1.4 butir a): `sql_mode`/`time_zone` GLOBAL tidak diubah; strict mode dan `'+00:00'` dipasang per sesi koneksi. Sesi impor dan SQL manual: sekarang (2.4 langkah 6). Koneksi aplikasi: setelah keputusan Bagian B. Teks A-01 dikoreksi lewat DBV-017 | Setujui | ⏳ |
+| 13 | **Putaran 5.** Engine salinan (2.4 langkah 1): MySQL 8, versi mengikuti AS-02; di versi selain 8.0.30, uji deteksi data sintetis dijalankan dulu | Setujui. Bila memungkinkan, verifikasi DB Validator juga dijalankan di MySQL 8.0.x target | ⏳ |
+| 14 | **Putaran 5.** Pembersihan salinan (2.4 langkah 1): trigger dan kolom `password_decode` dibuang segera setelah restore, sebelum audit; bagian 0 skrip = WAJIB_0 | Setujui | ⏳ |
+| 15 | **Putaran 5.** Audit format hash dan akun tanpa email (A6): tepat 32 heks → `password_legacy`; format lain dan akun tanpa email = PERIKSA, diputuskan per akun (2.5) | Setujui | ⏳ |
+| 16 | **Putaran 5.** Selisih dump struktur prod 01-10 (2.9): lebar `pengguna.username`/`name`/`email` dan `jenis_pegawai`/`jenis_status` diputuskan setelah audit data (dipertahankan bila data muat, atau migration ALTER baru + DBV); koreksi teks dokumen yang sudah disetujui lewat DBV-017 | Setujui sebagai tindak lanjut; tidak memblokir approval runbook | ⏳ |
+| 17 | **Putaran 5.** Salinan untuk impor final = dump final saat freeze (Cutover Plan); hasil audit dari dump sebelum freeze hanya untuk audit awal dan gladi (2.4 langkah 1) | Setujui | ⏳ |
 
 ## 5. Checklist verifikasi DB Validator
 
@@ -551,11 +671,12 @@ Setiap koneksi yang dibuka aplikasi — web, `spark migrate`/`db:seed`, worker a
   ```
   Jalankan di DB v2 hasil `migrate --all`.
 - [ ] **Skrip audit di MariaDB 10.4**, pada DB berisi `migrate --all` (dan seed test bila ada). Harapannya:
-  - error 1054 hanya pada 6 kueri (5 kueri akun A6 dan profil `pengguna`), karena kolom legacy `id`/`id_pegawai` tidak ada di v2;
+  - error 1054 hanya pada 8 kueri (5 kueri akun A6 lama, 2 kueri A6 putaran 5 — daftar hash bukan 32 heks dan akun tanpa email — serta profil `pengguna`), karena kolom legacy `id`/`id_pegawai`/`UserLevel` tidak ada di v2. Profil format hash berjalan, karena hanya membaca `password` dan `status`;
+  - bagian 0 kosong (v2 tanpa trigger dan tanpa `password_decode`);
   - error 1146 hanya pada 3 kueri B5 yang membaca `absen_ijin`/`d_konket` (tabel presensi legacy, tidak ada di v2);
   - **tidak ada** error 1193: penyetelan `information_schema_stats_expiry` bersyarat engine (`DO 0` di MariaDB);
   - **tidak ada** error 1139 (atau error regex lain) di A4 singkatan, A6, B1, B2 wilayah/`kantor`, B9, dan D: `@dbv011_trim` kini berisi escape regex, bukan byte NUL (2.2 #6);
-  - 0 baris WAJIB_0; PERIKSA hanya 4 sentinel wilayah (B1); baris `INFO D: ke-27 entri katalog diperiksa` serta `INFO E: ke-29 tabel daftar ada di salinan`;
+  - 0 baris WAJIB_0; PERIKSA hanya 4 sentinel wilayah (B1), ditambah baris profil format hash bila DB berisi akun (Argon2id atau NULL; bukan temuan); baris `INFO D: ke-27 entri katalog diperiksa` serta `INFO E: ke-29 tabel daftar ada di salinan`;
   - kueri dinamis D dan E jalan.
 
   Cek cepat pola di MariaDB (satu sesi, setelah kedua baris `SET @dbv011_kls`/`SET @dbv011_trim` dari kepala skrip audit):
@@ -569,9 +690,10 @@ Setiap koneksi yang dibuka aplikasi — web, `spark migrate`/`db:seed`, worker a
   Poin terakhir penting: kompatibilitas `REGEXP_REPLACE` (PCRE), pola regex dari variabel sesi yang disusun dengan `CHAR()` (termasuk escape `\t`, `\n`, `\r`, `\x{0B}`, `\x{00}` di kelas karakter `@dbv011_trim`), `GROUP_CONCAT … INTO @a, @b`, dan `PREPARE` (termasuk `PREPARE … FROM 'DO 0'`) di MariaDB 10.4 **belum diuji developer**. Catatan: tiruan stripslashes memakai rujukan grup `$1` (MySQL 8/ICU). Di MariaDB, `$1` tidak dikenali (MariaDB memakai `\\1`), sehingga kunci nilai ber-backslash berbeda. DB v2 bersih tidak berisi backslash, jadi hasil uji ini tidak terpengaruh; salinan legacy tetap wajib MySQL 8 (2.4 langkah 1).
 - [ ] Opsional: uji deteksi di DB scratch tanpa UNIQUE berisi duplikat sintetis, seperti di 6.2 dan 6.5 (kode wilayah berspasi, status NULL).
 - [ ] **Kesetiaan counter salinan** (2.4 langkah 1): kueri counter sumber vs salinan dipahami dan disetujui sebagai langkah wajib sebelum langkah 8.
+- [ ] **Pembersihan salinan** (2.4 langkah 1, putaran 5): kueri pencetak `DROP TRIGGER` dan `ALTER TABLE … DROP COLUMN password_decode` dipahami dan disetujui. Kueri ini hanya dijalankan di salinan, dan buktinya bagian 0 audit kosong.
 - [ ] **Skrip counter di MariaDB 10.4**, dengan cara pakai 2.7 (`--init-command="SET @legacy = '<skema lain di instance yang sama>'"` + stdin, tanpa `--force`), dan juga cara lama `-e "SET @legacy = …;` + `SOURCE`. Keluarannya harus tanpa ERROR, baris `legacy = …, v2 = …`, lalu satu baris per tabel AUTO_INCREMENT dengan perintah atau "tidak perlu". Tanpa `@legacy`, atau dengan nama skema yang tidak ada, keluarannya hanya `BERHENTI: …` lalu Empty set.
 - [ ] Opsional, **MariaDB 10.4: `AUTO_INCREMENT = 128` pada tabel ber-PK TINYINT** di DB scratch (mis. `ALTER TABLE jenis_kp AUTO_INCREMENT = 128` lalu INSERT lewat API atau SQL). Catat error yang muncul (1467, 167, atau lainnya) dan apakah API memberi 422 atau 500. Hasilnya melengkapi alasan 2.7; keputusan "tidak disalin" tidak bergantung padanya.
-- [ ] Putuskan butir Bagian 4, lalu teruskan Bagian 3 (3.6) ke TL/DBA.
+- [ ] Putuskan butir Bagian 4. Teruskan Bagian 3 (3.6) ke TL/DBA setelah kartu ISSUE-024 terjawab.
 - [ ] Laporkan hasilnya di PR.
 
 ## 6. Verifikasi developer
@@ -716,6 +838,40 @@ Pra-review internal putaran 3 (commit `2cb6d71`) memberi verdict **approve** den
 | Cek hanya-baca Bagian 5 (`grep -ciE …`) | 0 untuk kedua berkas; teks SQL di luar komentar tanpa backslash |
 | Gate `fastcheck --only backend` (prefix `dbv11d`, setara `./check.sh backend`) | `SEMUA CHECK LOLOS`: PHPStan `[OK] No errors`, PHP-CS-Fixer `Found 0 of 239 files that can be fixed`, PHPUnit `OK` di keempat shard (133 + 129 + 146 + 126 = 534 test, 17.177 assertion; jumlah test naik dari 526 karena test PR #11 di `ff74bf9`). Revisi ini hanya menyentuh dokumen dan skrip SQL |
 
+### 6.6 Revisi putaran 5 (01-10-2026): perluasan setelah keputusan 01-10
+
+Putaran ini bukan tindak lanjut pra-review. Isinya perluasan yang mengikuti keputusan user 01-10-2026 (1.4), dan **belum** melalui pra-review internal maupun review DB Validator.
+
+**Sinkronisasi branch.** `origin/main` `cc553be` (CR-014, CR-025) di-merge ke branch ini, bukan di-rebase, supaya riwayat PR tidak ditulis ulang. Merge berjalan tanpa konflik. Kedua CR itu tidak menyentuh migration maupun fungsi normalisasi yang dirujuk (Rujukan).
+
+| Butir 1.4 | Perubahan |
+|---|---|
+| a | 1.4; 2.4 langkah 6 (`SET SESSION sql_mode`/`time_zone` + kueri bukti); 3.4 (posisi menjadi permintaan utama); 3.5 opsi A/C; 3.6 #2, #4, #5; Bagian 4 #9, #12. A-01 tidak diubah (koreksi lewat DBV-017) |
+| b | 2.4 langkah 1 (engine mengikuti AS-02); kepala skrip audit; 3.6 #1; Bagian 4 #13 |
+| c | 2.4 langkah 1 (pembersihan salinan + kueri pencetak); skrip bagian 0 (2 kueri WAJIB_0); 2.3; Bagian 4 #14; Bagian 5 |
+| d | Skrip A6 (3 kueri baru: profil format hash, daftar akun hash bukan 32 heks, akun tanpa email); 2.3; 2.4 langkah 5; 2.5 kasus khusus; Bagian 4 #15 |
+| e | Status; 1.4; 2.4 langkah 1 dan 10; Bagian 4 #17; Bagian 7 |
+| f | 2.9 (18 butir); 2.2 #1; 3.1; komentar skrip A6, B5, B8, B9, C (`pengguna`), dan D; Bagian 4 #16 |
+
+**Lingkungan uji** (MySQL 8.0.30 lokal; dibuat lalu di-DROP dengan nama persis):
+- **`simpeg_v2_s_dbv011el`**: struktur dump struktur prod 01-10 (285 tabel; trigger dan function tidak ikut, tanpa data), ditambah 12 akun sintetis di `pengguna`, 1 baris `d_user`, dan 2 trigger uji (`pengguna`, `pangkat`). Semua nilai fiktif.
+- **`simpeg_v2_s_dbv011ev`**: salinan struktur (`CREATE TABLE … LIKE`, tanpa awalan `t_`, tanpa data) dari DB shard gate `simpeg_v2_t_dbv011c_s0`, yang dimigrasi test PHPUnit dari branch ini. Dipakai untuk menguji skrip pada skema v2; kedua DB, beserta shard lain, di-DROP setelahnya.
+
+| Uji | Hasil |
+|---|---|
+| Audit sebelum pembersihan | rc 0, 0 error. Bagian 0: 7 baris `WAJIB_0 kolom password_decode` (`pengguna` dan 6 tabel arsip/cadangan akun) dan 2 baris `WAJIB_0 trigger` |
+| Kueri pencetak pembersihan (2.4 langkah 1), di `sql_mode` global lokal dan di ANSI_QUOTES + NO_BACKSLASH_ESCAPES + PIPES_AS_CONCAT | Keluaran identik: 1 baris komentar skema/versi, 2 `DROP TRIGGER`, 7 `ALTER TABLE … DROP COLUMN`. Setelah dijalankan: 0 kolom `password_decode`, 0 trigger. Counter AUTO_INCREMENT `pengguna`, `pangkat`, `agama`, dan `bidang_pendidikan` sama sebelum dan sesudah (dibaca dengan `information_schema_stats_expiry = 0`) |
+| Audit sesudah pembersihan, tiga `sql_mode` yang sama dengan putaran 2–4 | rc 0, **0 error**, 117 result set (111 kueri tetap + 4 cetak + 2 EXECUTE). Baris data identik di ketiga mode. Bagian 0 kosong. `INFO D: ke-27 entri katalog diperiksa` dan `INFO E: ke-29 tabel daftar ada di salinan`, jadi semua tabel dan kolom yang dirujuk skrip ada di struktur produksi |
+| Format hash (12 akun) | INFO `md5 (32 heks)` = 5, termasuk heks huruf besar. PERIKSA: `bcrypt`, `argon2`, `kosong atau spasi saja`, `heks 40 karakter`, `lain, 32 karakter` (32 karakter non-heks), dan `lain, 33 karakter` × 2 (md5 + spasi, md5 + baris baru). Daftar akun memuat 7 akun itu dengan panjang hash, tanpa nilai hash. Versi awal kelas "heks N" memakai `REGEXP '^[0-9a-fA-F]+$'`; `$` ICU juga cocok sebelum baris baru di akhir, sehingga md5 + baris baru terbaca "heks 33". Kini dihitung dengan `CHAR_LENGTH(REGEXP_REPLACE(…, '[0-9a-fA-F]', '')) = 0` |
+| Akun tanpa email | Role 2 status 1: 3 (email `''`, NULL, NULL). Role 3 status NULL: 1 (email berisi TAB saja). Akun dengan email berspasi di tepi tidak ikut |
+| Duplikat `username` (mungkin di produksi karena tanpa UNIQUE, 2.9 #1) | `admin` vs `Admin ` → WAJIB_0. Putaran 1–4 tidak bisa menanam kasus ini karena DB uji memakai rekonstruksi lokal ber-UNIQUE |
+| Panjang akun | `username` 101 dan `name` 151 karakter → WAJIB_0 A6 |
+| Profil C `pengguna` | `st_1` 9, `st_2` 1, `st_null` 1, `st_lain` 2 (NULL dan status 3), `PERIKSA status NULL` |
+| Pengaturan sesi impor (2.4 langkah 6) | Tanpa peringatan; `@@SESSION.sql_mode` sesuai, `time_zone` `+00:00`, `utc_ok` = 1; `@@GLOBAL.time_zone` tetap `SYSTEM` |
+| Skrip audit pada skema v2 | Tabel shard gate memakai awalan `t_`, jadi strukturnya disalin dengan `CREATE TABLE … LIKE` ke **`simpeg_v2_s_dbv011ev`** tanpa awalan dan tanpa data. Hasil: 106 result set; error hanya 8 × 1054 (5 kueri akun A6 lama, 2 kueri A6 putaran 5, profil `pengguna`) dan 3 × 1146 (`absen_ijin`/`d_konket`), sesuai harapan Bagian 5 yang diperbarui. Bagian 0 kosong; profil format hash berjalan tanpa error (0 baris karena tanpa akun). 0 baris WAJIB_0; `INFO D: ke-27 …` dan `INFO E: ke-29 …` tercetak |
+| Cek hanya-baca Bagian 5 (`grep -ciE …`) | 0 untuk kedua berkas; teks SQL di luar komentar tanpa backslash |
+| Gate `fastcheck --only backend` (prefix `dbv011c`; worktree tanpa `backend/.env`, sesuai aturan kerja) | PHPStan `[OK] No errors`; PHP-CS-Fixer `Found 0 of 265 files that can be fixed`. PHPUnit **gagal**: 76 test (Auth/token/reset, mis. login 422), **identik** dengan gate branch dokumen lain yang juga berbasis `cc553be` dan juga dijalankan tanpa `.env`. Kegagalan ini berasal dari lingkungan (konfigurasi test yang biasanya diisi `.env`), bukan dari putaran ini: PR ini hanya menyentuh dokumen dan skrip SQL, yang tidak dimuat PHPUnit. Gate penuh perlu diulang di lingkungan dengan konfigurasi test lengkap sebelum merge |
+
 ## 7. Efek ke dokumen lain & di luar cakupan
 
 **Diubah di PR ini:**
@@ -723,12 +879,18 @@ Pra-review internal putaran 3 (commit `2cb6d71`) memberi verdict **approve** den
 - `A-01-auth-schema.md` Bagian 8 #7 dan 9.7 D-11: satu kalimat rujukan ke Bagian 3.
 - `G-06-diklat-hukdis-konket-tanda-jasa-schema.md` 6.5 (di bawah syarat approval DBV-005) dan `G-01-master-schema.md` (di bawah tabel 8.4): satu kalimat "Langkah runbook: DBV-011" (putaran 3, nit pra-review internal putaran 2). Isi keputusan yang sudah disetujui tidak diubah.
 - `01-Auth.md` butir D-11: rujukan ke 3.4–3.6.
+- Putaran 5 hanya mengubah dokumen ini dan skrip audit. A-01 **tidak** diubah lagi: revisi permintaan A-01 9.8 langkah 2 dicatat di 1.4 butir a, dan koreksi teksnya lewat DBV-017.
 
 **Tidak diubah:** isi G-01/G-04/G-06/G-07/G-10 selain kalimat rujukan di atas. Butir audit impor masing-masing tetap berlaku; dokumen ini hanya menggabungkannya menjadi satu runbook.
 
+**Di luar PR ini (tindak lanjut putaran 5):**
+- DBV-017: koreksi teks dokumen DBV yang sudah disetujui, yaitu A-01 9.8 langkah 2 (1.4 butir a), A-01 9.1 dan D-5 (rujukan [K] `simpeg_prod_duplikat`), serta label [I] yang kini [K] (2.9).
+- Migration ALTER baru + DBV untuk selisih lebar kolom di 2.9 #1, #2, dan #10, bila audit data membutuhkannya.
+- DBV-014: runbook impor Tier 2–9 dan `pengguna` lengkap (status, `is_admin`, `id_kode_unit_instansi`), serta rekonsiliasi jumlah baris.
+
 **Setelah approval:**
-- Kartu ISSUE-009: runbook tercatat, eksekusi menunggu salinan data produksi (bersama ISSUE-003).
-- Kartu ISSUE-022 dan D-11: menunggu keputusan TL/DBA atas 3.5/3.6.
+- Kartu ISSUE-009: runbook tercatat, eksekusi menunggu salinan data produksi (dump final saat freeze untuk impor final).
+- Kartu ISSUE-022 dan D-11: menunggu keputusan TL/DBA atas 3.5/3.6, setelah kartu ISSUE-024 terjawab.
 - Bila opsi A dipilih, implementasinya menjadi unit DBV+CR baru.
 
-**Di luar cakupan (temuan terkait, bukan DBV):** kolom "Login terakhir" di Manajemen Akun tampil 7 jam lebih awal. Penyebabnya, `formatDate` di `frontend/src/features/auth/views/UserManagementView.vue` mem-parse string UTC dari API sebagai jam lokal. Perbaikannya lewat CR frontend terpisah, dengan memperhatikan branch redesign user.
+**Di luar cakupan (temuan terkait, bukan DBV):** kolom "Login terakhir" di Manajemen Akun tampil 7 jam lebih awal, karena string UTC dari API di-parse sebagai jam lokal. Sudah diperbaiki CR-023 (di `main` sejak `228c1f6`).

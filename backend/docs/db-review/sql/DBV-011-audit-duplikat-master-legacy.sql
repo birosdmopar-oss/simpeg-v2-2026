@@ -4,13 +4,17 @@
 -- Dokumen: backend/docs/db-review/DBV-011-runbook-impor-master-zona-waktu.md (Bagian 2). Skrip ini langkah wajib
 -- runbook impor: syarat approval DBV-005 (G-06 6.5), G-01 8.4 #2, G-04/G-05 6.3 #4-#5, G-07/G-08 6.3 #2-#6,
 -- G-10 6.3 #5/#10, A-01 9.8 langkah 6, 9.10. Revisi putaran 2, 3, dan 4 (30-09-2026): dokumen 6.3, 6.4, dan 6.5.
+-- Perluasan putaran 5 (01-10-2026): prasyarat salinan di bagian 0 (password_decode & trigger sudah dibuang), audit
+-- format hash dan akun tanpa email di A6, komentar disesuaikan dengan dump struktur prod 01-10 — dokumen 2.9 dan 6.6.
 --
 -- STATUS: BELUM PERNAH DIJALANKAN ke data legacy. Mesin developer tidak punya salinan DATA legacy; skrip hanya diuji
--- sintaks & hasilnya di database scratch lokal (migrate + seed + data sintetis) — dokumen Bagian 6.
+-- sintaks & hasilnya di database scratch lokal (migrate + seed + data sintetis, dan sejak putaran 5 juga struktur dump
+-- prod 01-10 tanpa data) — dokumen Bagian 6.
 --
--- SIAPA & DI MANA: pemegang akses, pada SALINAN data produksi simpeg01 (dump di-restore ke skema tersendiri, MySQL
--- >= 8.0.30; dokumen 2.4 langkah 1). BUKAN di server produksi dan BUKAN di skema v2. Akun baca saja cukup (SELECT
--- skema salinan + information_schema).
+-- SIAPA & DI MANA: pemegang akses, pada SALINAN data produksi simpeg01. Untuk impor final, salinan = dump final saat
+-- freeze (Cutover Plan); dump di-restore ke skema tersendiri di MySQL 8, versi mengikuti keputusan AS-02, lalu
+-- trigger dan kolom password_decode dibuang SEBELUM skrip ini dijalankan (dokumen 2.4 langkah 1). BUKAN di server
+-- produksi dan BUKAN di skema v2. Akun baca saja cukup (SELECT skema salinan + information_schema).
 --
 --   mysql --force --table -vvv --default-character-set=utf8mb4 --user=<akun_baca> -p <db_salinan> \
 --         < DBV-011-audit-duplikat-master-legacy.sql > hasil_audit.txt 2>&1
@@ -28,8 +32,10 @@
 -- WAJIB_0 panjang/tipe (D, B8, B9, A6 panjang akun) pada kolom berlabel [I] → cocokkan dulu tipe kolom v2 dengan DDL
 -- dump produksi (G-01 8.3, G-04 7, G-06 3/6.4, G-07 3.1, G-10 3). Bila dugaan v2 yang salah, SKEMA dikoreksi lewat
 -- migration ALTER + review DBV; data baru diubah bila tipe v2 memang benar (dokumen 2.3 dan 2.4 langkah 6).
--- Skrip ini ditulis dan diuji untuk MySQL 8 (≥ 8.0.30; dokumen 2.4 langkah 1). Tiruan stripslashes memakai rujukan
--- grup '$1' (ICU); di MariaDB rujukan grup ditulis '\\1', sehingga hasil untuk nilai ber-backslash berbeda.
+-- Skrip ini ditulis untuk MySQL 8 dan diuji di 8.0.30; versi salinan mengikuti keputusan AS-02 (header dump struktur
+-- prod 01-10 = 8.0.21), dan di versi lain uji deteksi data sintetis dijalankan dulu (dokumen 2.4 langkah 1). Tiruan
+-- stripslashes memakai rujukan grup '$1' (ICU); di MariaDB rujukan grup ditulis '\\1', sehingga hasil untuk nilai
+-- ber-backslash berbeda.
 --
 -- Skrip ini hanya berisi SELECT, SET SESSION/variabel, transaksi READ ONLY, PREPARE/EXECUTE atas SELECT yang disusun
 -- dari information_schema (teks kueri hasil susunan ikut dicetak sebelum dijalankan), dan satu PREPARE/EXECUTE atas
@@ -97,11 +103,26 @@ EXECUTE dbv011_s;
 DEALLOCATE PREPARE dbv011_s;
 START TRANSACTION READ ONLY;
 
--- ---------------------------------------------------------------------------------------------------------- 0. Sesi
+-- -------------------------------------------------------------------------------------- 0. Sesi & prasyarat salinan
 -- Jam & sql_mode instance SALINAN (bukan produksi). Untuk D-11/ISSUE-022, DBA menjalankan baris yang sama di server
 -- produksi legacy (dokumen 3.6).
 SELECT 'INFO sesi' cek, DATABASE() db, VERSION() versi, @@SESSION.time_zone tz_sesi, @@system_time_zone tz_sistem,
        NOW() jam_sesi, UTC_TIMESTAMP() jam_utc, @@SESSION.sql_mode sql_mode_sesi;
+
+-- Prasyarat salinan (dokumen 2.4 langkah 1, putaran 5). Keduanya harus 0 baris sebelum hasil audit dipakai:
+--   * kolom password_decode (password plaintext legacy) dibuang dari SEMUA tabel salinan segera setelah restore. Kolom
+--     ini tidak pernah diimpor; isinya tidak dibaca di sini, hanya keberadaan kolomnya.
+--   * trigger legacy dibuang dari salinan. Trigger legacy menulis ke tabel lain, termasuk skema lain di instance yang
+--     sama (dokumen 2.9), sehingga UPDATE/DELETE di salinan kerja (dedupe 2.5) bisa mengubah data di luar salinan.
+SELECT 'WAJIB_0 kolom password_decode masih ada di salinan' cek, TABLE_NAME tabel, COLUMN_NAME kolom
+  FROM information_schema.COLUMNS
+ WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'password_decode'
+ ORDER BY TABLE_NAME;
+SELECT 'WAJIB_0 trigger masih ada di salinan' cek, EVENT_OBJECT_TABLE tabel, TRIGGER_NAME nama_trigger,
+       ACTION_TIMING waktu, EVENT_MANIPULATION aksi
+  FROM information_schema.TRIGGERS
+ WHERE TRIGGER_SCHEMA = DATABASE()
+ ORDER BY EVENT_OBJECT_TABLE, TRIGGER_NAME;
 
 -- ===================================================================================================== A. DUPLIKAT
 -- Satu kueri per UNIQUE v2 di tabel master (28 index) — WAJIB_0. Kolom `anggota` = id:status:nilai legacy (QUOTE);
@@ -271,13 +292,15 @@ SELECT 'WAJIB_0 duplikat uq_tanda_jasa_nama' cek, 'tanda_jasa' tabel, '' lingkup
   FROM tanda_jasa GROUP BY kunci HAVING COUNT(*) > 1;
 
 -- ---------------------------------------------------------------- A6. Akun (DBV-010: A-01 9.8 langkah 6, D-4, D-6)
--- Kolom legacy `pengguna`: id, username, UserLevel, id_pegawai (berisi NIP → v2 `nip`), name, email, status.
+-- Kolom legacy `pengguna`: id, username, UserLevel, id_pegawai (berisi NIP → v2 `nip`), name, email, status, password.
+-- Dump struktur prod 01-10 [K] (dokumen 2.9): username VARCHAR(255) NOT NULL TANPA UNIQUE (rekonstruksi lokal [L]
+-- VARCHAR(100) UNIQUE), sehingga duplikat username di bawah ini memang bisa ada di produksi.
 SELECT 'WAJIB_0 duplikat pengguna.username' cek, 'pengguna' tabel, '' lingkup,
        REGEXP_REPLACE(CONVERT(username USING utf8mb4), @dbv011_trim, '') COLLATE utf8mb4_unicode_ci kunci,
        COUNT(*) jumlah, GROUP_CONCAT(CONCAT(id, ':', IFNULL(CAST(status AS CHAR), 'NULL'), ':', QUOTE(username)) ORDER BY id SEPARATOR ' | ') anggota
   FROM pengguna GROUP BY kunci HAVING COUNT(*) > 1;
 
--- UNIQUE `nip` v2 [V2]: legacy tidak punya UNIQUE di id_pegawai (A-01 9.2); semua status, termasuk 0/2.
+-- UNIQUE `nip` v2 [V2]: legacy tidak punya UNIQUE di id_pegawai (A-01 9.2); semua status, termasuk nonaktif/terhapus.
 SELECT 'WAJIB_0 duplikat pengguna.id_pegawai (UNIQUE nip v2)' cek, 'pengguna' tabel, '' lingkup,
        REGEXP_REPLACE(CONVERT(id_pegawai USING utf8mb4), @dbv011_trim, '') COLLATE utf8mb4_unicode_ci kunci,
        COUNT(*) jumlah, GROUP_CONCAT(CONCAT(id, ':', IFNULL(CAST(status AS CHAR), 'NULL'), ':', QUOTE(username)) ORDER BY id SEPARATOR ' | ') anggota
@@ -301,8 +324,10 @@ SELECT 'PERIKSA akun role 2/6/7 tanpa id_pegawai' cek, id, username, UserLevel, 
    AND (id_pegawai IS NULL OR REGEXP_REPLACE(CONVERT(id_pegawai USING utf8mb4), @dbv011_trim, '') = '');
 
 -- A-01 9.10: nilai impor (trim() PHP, seperti UserService) yang melebihi kolom v2 → strict 1406. v2: username
--- VARCHAR(100) NOT NULL, nip VARCHAR(30), name/email VARCHAR(150). Legacy [K] simpeg_prod_duplikat sama lebarnya
--- (provenance DDL belum pasti); temuan di sini berarti DDL produksi berbeda → cocokkan dulu dengan dump (dokumen 2.3).
+-- VARCHAR(100) NOT NULL, nip VARCHAR(30), name/email VARCHAR(150). Lebar ini diambil dari rekonstruksi lokal [L]
+-- (simpeg_prod_duplikat); dump struktur prod 01-10 [K]: username/name/email VARCHAR(255), id_pegawai VARCHAR(30)
+-- (dokumen 2.9). Temuan di sini = keputusan DBV: lebarkan kolom v2 lewat migration ALTER baru + review DBV, atau
+-- perbaiki datanya. Jangan memotong data diam-diam (dokumen 2.3).
 SELECT 'WAJIB_0 pengguna kolom lebih dari v2 (username 100, nip 30, name/email 150)' cek, x.id, QUOTE(x.username) username,
        CHAR_LENGTH(x.u) p_username, CHAR_LENGTH(x.n) p_nip, CHAR_LENGTH(x.nm) p_name, CHAR_LENGTH(x.e) p_email
   FROM (SELECT id, username,
@@ -312,6 +337,39 @@ SELECT 'WAJIB_0 pengguna kolom lebih dari v2 (username 100, nip 30, name/email 1
                REGEXP_REPLACE(CONVERT(email USING utf8mb4), @dbv011_trim, '') e
           FROM pengguna) x
  WHERE CHAR_LENGTH(x.u) > 100 OR CHAR_LENGTH(x.n) > 30 OR CHAR_LENGTH(x.nm) > 150 OR CHAR_LENGTH(x.e) > 150;
+
+-- K7 / A-02b (A-01 9.1, putaran 5): hash legacy diimpor ke `password_legacy` VARCHAR(32) dengan `password` v2 NULL.
+-- PasswordVerifier membandingkan strtolower(password_legacy) dengan md5(), jadi yang bisa diimpor hanya tepat 32
+-- karakter heksadesimal (huruf besar/kecil), tanpa spasi atau baris baru. Format lain (kosong, heks dengan panjang
+-- lain, bcrypt, Argon2, karakter lain) tidak bisa dipakai login di v2 → PERIKSA, diputuskan per akun sebelum impor
+-- (dokumen 2.5). Nilai hash TIDAK PERNAH ditampilkan; yang dicetak hanya kelas format dan panjangnya.
+-- Profil per kelas format (kolom yang dibaca hanya password & status, jadi berjalan juga di DB v2).
+SELECT IF(x.format = 'md5 (32 heks)', 'INFO format hash pengguna.password', 'PERIKSA format hash pengguna.password') cek,
+       x.format, COUNT(*) jumlah, SUM(CAST(x.status AS CHAR) = '1') st_1, SUM(x.status IS NULL) st_null
+  FROM (SELECT status,
+               CASE WHEN password IS NULL THEN 'NULL'
+                    WHEN password = '' THEN 'kosong atau spasi saja'
+                    WHEN CHAR_LENGTH(password) = 32 AND CONVERT(password USING utf8mb4) REGEXP '^[0-9a-fA-F]{32}$' THEN 'md5 (32 heks)'
+                    WHEN CHAR_LENGTH(REGEXP_REPLACE(CONVERT(password USING utf8mb4), '[0-9a-fA-F]', '')) = 0 THEN CONCAT('heks ', CHAR_LENGTH(password), ' karakter')
+                    WHEN LEFT(password, 4) IN ('$2y$', '$2a$', '$2b$') THEN 'bcrypt'
+                    WHEN LEFT(password, 7) = '$argon2' THEN 'argon2'
+                    ELSE CONCAT('lain, ', CHAR_LENGTH(password), ' karakter') END format
+          FROM pengguna) x
+ GROUP BY x.format ORDER BY x.format;
+-- Daftar akun yang hash-nya bukan 32 heks (tanpa nilai hash).
+SELECT 'PERIKSA akun dengan hash bukan md5 32 heks' cek, id, username, UserLevel, CAST(status AS CHAR) status,
+       CHAR_LENGTH(password) panjang_hash
+  FROM pengguna
+ WHERE password IS NULL OR NOT (CHAR_LENGTH(password) = 32 AND CONVERT(password USING utf8mb4) REGEXP '^[0-9a-fA-F]{32}$')
+ ORDER BY id;
+
+-- A-01 D-6 / K3 (putaran 5): email = kanal reset password. Akun tanpa email (NULL atau kosong setelah trim() PHP)
+-- tidak bisa memakai lupa password; setelah window password_legacy berakhir hanya bisa direset admin. Ringkasan per
+-- role & status (bukan daftar akun); daftar per akun disusun saat keputusan dibuat (dokumen 2.5).
+SELECT 'PERIKSA akun tanpa email (D-6)' cek, UserLevel, CAST(status AS CHAR) st, COUNT(*) jumlah
+  FROM pengguna
+ WHERE email IS NULL OR REGEXP_REPLACE(CONVERT(email USING utf8mb4), @dbv011_trim, '') = ''
+ GROUP BY UserLevel, st ORDER BY UserLevel, st;
 
 -- ========================================================================================= B. INTEGRITAS PENDUKUNG
 -- ---------------------------------------------------------------- B1. Sentinel LAIN-LAIN wilayah (G-07/G-08 2.5, 6.3 #5)
@@ -414,6 +472,8 @@ SELECT 'WAJIB_0 jenjang_pendidikan.row_jurusan di luar 7 kode (CHECK chk_jenjang
 
 -- ---------------------------------------------------------------- B5. jenis_konket.old_id (G-06 6.5 #3, C4)
 -- v2: INT NOT NULL UNIQUE, aplikasi mewajibkan 1..2147483647. NULL/kosong/bukan angka/<= 0/terlalu besar → kode baru.
+-- Legacy produksi: INT NULL (dump struktur prod 01-10 [K]; VARCHAR hanya di rekonstruksi lokal [L]), jadi yang mungkin
+-- muncul di produksi adalah NULL dan <= 0.
 SELECT 'WAJIB_0 jenis_konket.old_id tidak valid' cek, id_jenis_konket, QUOTE(old_id) old_id, jenis_konket
   FROM jenis_konket
  WHERE old_id IS NULL
@@ -506,8 +566,10 @@ SELECT 'INFO hard_coded gol_pppk' cek, x.id, t.gol_pppk nama, CAST(t.status AS C
 -- jenis_status.status_pegawai (lingkup uq_jenis_status_nama) dan pangkat.cpns: TINYINT NOT NULL di v2, pilihan
 -- aplikasi 1/2 (Config\MasterData). Nilai impor = di-trim lalu di-cast ke bilangan ('01', ' 1', '+1' = 1; sama dengan
 -- lingkup A1 dan B6). NULL / bukan bilangan / di luar TINYINT = WAJIB_0 (strict → 1048/1366/1264); bilangan lain di
--- luar 1/2 = PERIKSA (DB menerima, form v2 tidak punya pilihannya). Tipe legacy kedua kolom [I]. Kolom lingkup UNIQUE
--- lain sudah dicek di B2 (induk NULL = yatim), B4 (jenis_diklat), dan B5 (old_id).
+-- luar 1/2 = PERIKSA (DB menerima, form v2 tidak punya pilihannya). Tipe legacy kedua kolom: TINYINT(1) NOT NULL
+-- (dump struktur prod 01-10 [K]), jadi di produksi hanya cabang "di luar 1/2" yang mungkin muncul; cabang lain tetap
+-- dipertahankan untuk salinan yang menyimpang. Kolom lingkup UNIQUE lain sudah dicek di B2 (induk NULL = yatim), B4
+-- (jenis_diklat), dan B5 (old_id).
 SELECT CASE WHEN x.v IS NULL OR x.v NOT REGEXP '^[-+]?[0-9]+$' OR CAST(x.v AS SIGNED) NOT BETWEEN -128 AND 127
             THEN 'WAJIB_0 jenis_status.status_pegawai NULL/bukan bilangan/di luar TINYINT'
             ELSE 'PERIKSA jenis_status.status_pegawai di luar pilihan 1/2' END cek,
@@ -541,8 +603,8 @@ SELECT 'WAJIB_0 kode wilayah ganda setelah trim (PK kecamatan)' cek, 'kecamatan'
 SELECT 'WAJIB_0 kode wilayah ganda setelah trim (PK kelurahan)' cek, 'kelurahan' tabel, REGEXP_REPLACE(CONVERT(id_kelurahan USING utf8mb4), @dbv011_trim, '') COLLATE utf8mb4_unicode_ci kode_impor,
        COUNT(*) jumlah, GROUP_CONCAT(CONCAT(QUOTE(id_kelurahan), ':', IFNULL(CAST(status AS CHAR), 'NULL'), ':', QUOTE(kelurahan)) ORDER BY id_kelurahan SEPARATOR ' | ') anggota
   FROM kelurahan GROUP BY kode_impor HAVING COUNT(*) > 1;
--- (2) Panjang & format. v2 CHAR(2/4/7/10) [I] (G-01 8.3, G-07 3.1; dugaan dari form_kesehatan), aplikasi mewajibkan
--- tepat N digit (ISSUE-008). Lebih panjang dari CHAR(N) = WAJIB_0 (strict → 1406): JANGAN dipotong — cocokkan dulu
+-- (2) Panjang & format. v2 CHAR(2/4/7/10) (G-01 8.3, G-07 3.1; semula dugaan [I], kini sama dengan legacy CHAR(2/4/7/10)
+-- di dump struktur prod 01-10 [K]), aplikasi mewajibkan tepat N digit (ISSUE-008). Lebih panjang dari CHAR(N) = WAJIB_0 (strict → 1406): JANGAN dipotong — cocokkan dulu
 -- tipe kolom v2 dengan DDL dump (dokumen 2.3). Bukan tepat N digit (titik, huruf, lebih pendek) = PERIKSA: DB
 -- menerima, tetapi aplikasi v2 tidak bisa membuat kode seperti itu. Kode yang berubah oleh trim (spasi/tab/LF/CR/VT/NUL
 -- di awal/akhir) = PERIKSA: diimpor sebagai hasil trim, jadi tabrakan dan rujukannya sudah dihitung di A1/B2/B9 (1).
@@ -666,9 +728,10 @@ SELECT CASE WHEN LOCATE('WAJIB_0', x.peringatan) > 0 THEN 'WAJIB_0 profil' WHEN 
 -- faq_related_article berisi data, salin apa adanya).
 SELECT 'INFO profil' cek, 'faq_rate' tabel, COUNT(*) baris, NULL st_1, NULL st_2, NULL st_10, NULL st_null, NULL st_lain, NULL non_10, NULL id_maks, NULL counter_ai, 'PK (id_faq_article, nip)' pk_v2, '' peringatan FROM faq_rate;
 SELECT 'INFO profil' cek, 'faq_related_article' tabel, COUNT(*) baris, NULL st_1, NULL st_2, NULL st_10, NULL st_null, NULL st_lain, NULL non_10, NULL id_maks, NULL counter_ai, 'PK (id_article_main, id_article_related)' pk_v2, '' peringatan FROM faq_related_article;
--- pengguna: status legacy 0/1/2 (bukan pola master; pemetaannya di A-01), jadi st_lain berisi status 0 dan tidak
--- diberi peringatan. Status NULL tetap PERIKSA (kolom status v2 NOT NULL). Counter = ruang id_pengguna (A-01 9.4,
--- dokumen 2.7).
+-- pengguna: status legacy bukan pola master 1/2/10 (dump struktur prod 01-10 [K]: INT NULL DEFAULT 1, komentar kolom
+-- 1 aktif / 2 tidak aktif / 3 dihapus; rekonstruksi lokal [L] berbeda), pemetaannya di A-01/DBV-009. Jadi st_lain
+-- berisi nilai lain itu dan tidak diberi peringatan. Status NULL tetap PERIKSA (kolom status v2 NOT NULL). Counter =
+-- ruang id_pengguna (A-01 9.4, dokumen 2.7).
 SELECT CASE WHEN LOCATE('WAJIB_0', x.peringatan) > 0 THEN 'WAJIB_0 profil' WHEN x.peringatan <> '' THEN 'PERIKSA profil' ELSE 'INFO profil' END cek, x.* FROM (SELECT 'pengguna' tabel, COUNT(*) baris, SUM(CAST(status AS CHAR) = '1') st_1, SUM(CAST(status AS CHAR) = '2') st_2, SUM(CAST(status AS CHAR) = '10') st_10, SUM(status IS NULL) st_null, SUM(status IS NULL OR CAST(status AS CHAR) NOT IN ('1','2','10')) st_lain, NULL non_10, MAX(id) id_maks,
        (SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pengguna') counter_ai, 'INT UNSIGNED' pk_v2,
        CONCAT_WS('; ', IF(SUM(status IS NULL) > 0, 'PERIKSA status NULL (v2 NOT NULL)', NULL)) peringatan FROM pengguna) x;
@@ -683,6 +746,9 @@ SELECT CASE WHEN LOCATE('WAJIB_0', x.peringatan) > 0 THEN 'WAJIB_0 profil' WHEN 
 --            PHP sebelum grup duplikat A diputuskan (dokumen 2.5).
 -- Katalog (tabel, PK, kolom, panjang v2, normalisasi). Entri yang tabel/kolom/PK-nya tidak ada di salinan tidak bisa
 -- diperiksa; daftarnya dicetak sebagai "PERIKSA D: … terlewat" (audit belum lengkap bila tabelnya ada di salinan).
+-- Panjang = kolom v2 di `main`. Dua kolom lebih sempit dari legacy produksi (dump struktur prod 01-10 [K], dokumen 2.9):
+-- jenis_pegawai 50 vs legacy 255, jenis_status 50 vs legacy 100. Temuan WAJIB_0 di keduanya diselesaikan dengan koreksi
+-- skema (migration ALTER baru + review DBV), bukan memotong data (dokumen 2.3).
 SET @q = NULL, @d_lewat = NULL;
 SELECT GROUP_CONCAT(IF(c.COLUMN_NAME IS NULL OR p.COLUMN_NAME IS NULL, NULL,
          CONCAT('SELECT IF(`', k.kolom, '` IS NULL OR v = '''' OR CHAR_LENGTH(v) > ', k.maks, ', ''WAJIB_0 nama_null_kosong_atau_lebih_dari_kolom_v2'', ''PERIKSA nama_berubah_atau_masih_ber_backslash'') cek, ',
