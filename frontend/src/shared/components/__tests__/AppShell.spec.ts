@@ -1,5 +1,5 @@
 /**
- * AppShell — menu per role (A-12, Modul G, G-10), tautan "Ganti Password" untuk semua role (ISSUE-006), dan navigasi
+ * AppShell — menu per role (A-12, Modul G termasuk Web Config G-09, G-10), tautan "Ganti Password" untuk semua role (ISSUE-006), dan navigasi
  * yang boleh membungkus di layar HP.
  * Layout sungguhan tidak bisa diukur di jsdom; pengecekan lebar 375px dilakukan di browser (uji UI CR-003),
  * test ini mengunci syarat CSS-nya: nav wajib `flex-wrap`, bukan satu baris kaku.
@@ -31,6 +31,7 @@ async function mountAs(role: RoleCode) {
       { path: '/master/:entity?', name: 'master-data', component: stub },
       { path: '/faq/:id?', name: 'faq', component: stub },
       { path: '/hari-libur', name: 'hari-libur', component: stub },
+      { path: '/web-config', name: 'web-config', component: stub },
       { path: '/ganti-password', name: 'change-password', component: stub },
     ],
   })
@@ -48,11 +49,12 @@ describe('AppShell', () => {
     setActivePinia(createPinia())
   })
 
-  it('Super Admin melihat 5 menu dan nav boleh membungkus (tidak melebar di layar HP)', async () => {
+  it('Super Admin melihat 6 menu dan nav boleh membungkus (tidak melebar di layar HP)', async () => {
     const wrapper = await mountAs(Role.SUPER_ADMIN)
     const nav = wrapper.get('[data-testid="nav-main"]')
 
-    expect(nav.findAll('a').map((a) => a.text())).toEqual(['Beranda', 'Manajemen Akun', 'Master Data', 'Hari Libur', 'FAQ'])
+    expect(nav.findAll('a').map((a) => a.text())).toEqual(['Beranda', 'Manajemen Akun', 'Master Data', 'Web Config', 'Hari Libur', 'FAQ'])
+    expect(nav.get('[data-testid="nav-web-config"]').attributes('href')).toBe('/web-config')
     expect(nav.classes()).toContain('flex-wrap')
   })
 
@@ -85,5 +87,11 @@ describe('AppShell', () => {
 
     expect(wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())).toEqual(['Beranda', 'FAQ'])
     expect(wrapper.find('[data-testid="nav-master-data"]').exists()).toBe(false)
+  })
+
+  it.each(Object.values(Role).filter((r) => r !== Role.SUPER_ADMIN))('role %i tidak melihat Web Config (G-09, role 1 saja)', async (role) => {
+    const wrapper = await mountAs(role)
+
+    expect(wrapper.find('[data-testid="nav-web-config"]').exists()).toBe(false)
   })
 })

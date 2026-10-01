@@ -90,6 +90,13 @@ const routes: RouteRecordRaw[] = [
     meta: { roles: HARI_LIBUR_READ_ROLES, title: 'Hari Libur' },
   },
   {
+    // G-09 Web Config (DBV-006/CR-030): role 1 saja (Matriks Modul G).
+    path: '/web-config',
+    name: 'web-config',
+    component: () => import('@/features/master-data/views/WebConfigPage.vue'),
+    meta: { roles: MASTER_DATA_ROLES, title: 'Web Config' },
+  },
+  {
     path: '/403',
     name: 'forbidden',
     component: () => import('@/shared/views/ForbiddenView.vue'),
