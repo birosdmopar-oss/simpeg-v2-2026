@@ -32,7 +32,7 @@ final class TanggalBisnis
     public const ZONA = 'Asia/Jakarta';
 
     /**
-     * Nama bulan untuk pesan pengguna [K] legacy `config/constants.php:269`.
+     * Nama bulan untuk pesan pengguna [K] legacy `config/constants.php:267` (`LIST_MONTHS_LOCAL`, commit `39b6b15`).
      */
     public const NAMA_BULAN = [
         1  => 'Januari',
