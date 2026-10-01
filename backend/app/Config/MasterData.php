@@ -132,12 +132,12 @@ class MasterData extends BaseConfig
 
     // --- DBV-008 (konstanta) ---
     /**
-     * DBV-008 (G-02): flag UPT unit & satker — TINYINT(1) 1/0 [L] + CHECK chk_*_is_upt. Legacy form: radio YA/TIDAK.
+     * DBV-008 (G-02): flag UPT unit & satker — TINYINT(1) 1/0 [K] D1:6890, :7508 + CHECK chk_*_is_upt. Legacy form: radio YA/TIDAK.
      */
     private const DBV008_IS_UPT = ['label' => 'UPT', 'type' => 'boolean', 'hint' => 'Centang bila merupakan Unit Pelaksana Teknis (UPT).'];
 
     /**
-     * DBV-008 (G-02): kolom kop dokumen & KPPN unit/satker [L] (label legacy `unit/form.php`, `satker/form.php`; legacy
+     * DBV-008 (G-02): kolom kop dokumen & KPPN unit/satker [K] D1 (label legacy `unit/form.php`, `satker/form.php`; legacy
      * salah memberi label "Tembusan KPPN" pada `lokasi_kppn`).
      */
     private const DBV008_TEMBUSAN_KPPN = ['label' => 'Tembusan KPPN', 'rules' => 'max_length[256]'];
@@ -759,7 +759,7 @@ class MasterData extends BaseConfig
         // G-02 (DBV-008/CR-026 ⏳). Legacy hr/master/c_jabatan (Lm_jabatan.php), CRUD role 1; dropdown UL_ALL (ISSUE-012,
         // tanpa parameter `restrict` — usulan G-02 Bagian 8). Skema: backend/docs/db-review/G-02-jabatan-unit-satker-schema.md.
         // Baris ber-ID hard-coded legacy (G-02 Bagian 2.8) sengaja tidak dikunci. `peta_jabatan` dan tabel jabatan lain
-        // tanpa DDL ditunda (Bagian 7). Kolom audit keenam tabel = self::AUDIT (created_at/updated_at/updated_by [K]/[L]).
+        // tanpa DDL ditunda (Bagian 7). Kolom audit keenam tabel = self::AUDIT (created_at/updated_at/updated_by [K] D1).
         'unit' => [
             'label'         => 'Unit Kerja',
             'controller'    => 'JabatanController',
@@ -824,7 +824,7 @@ class MasterData extends BaseConfig
             'auditColumns'    => self::AUDIT,
             'orderColumnType' => 'tinyint',
         ],
-        // Sub group per group (tabel [I]): nama unik per group, urutan per group [V2], dropdown hanya sub group aktif yang
+        // Sub group per group ([K] D1:7183-7195): nama unik per group, urutan per group [V2], dropdown hanya sub group aktif yang
         // group-nya aktif (statusChain). Pindah group ditolak bila sudah dirujuk jabatan (SubGroupJabatanHooks).
         'sub-group-jabatan' => [
             'label'         => 'Sub Group Jabatan',
@@ -852,7 +852,7 @@ class MasterData extends BaseConfig
             'orderColumnType' => 'tinyint',
             'statusChain'     => true,
         ],
-        // Kelas jabatan: PK alami = nomor kelas (TINYINT [L], bukan AUTO_INCREMENT) tanpa kolom nama → kode = nama
+        // Kelas jabatan: PK alami = nomor kelas (TINYINT [K] D1:2028, bukan AUTO_INCREMENT) tanpa kolom nama → kode = nama
         // (codeAsName, CR-026), nomor 1-20 (mask form legacy kelas/form.php:73-74, CHECK chk_kelas_jabatan_kelas_jabatan).
         // Nomor kelas tidak bisa diubah; hanya `tukin` & status. Tanpa `order` (urutan alami = nomor kelas).
         'kelas-jabatan' => [

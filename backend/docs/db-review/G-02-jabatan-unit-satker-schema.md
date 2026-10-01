@@ -2,15 +2,15 @@
 
 **Key review:** `DBV-008` (review DB Validator, skema) + `CR-026` (review kode) — satu pull request, judul `[DBV-008][CR-026] …`, branch `dbv-008/g02-jabatan-unit-satker`. Merge hanya setelah **kedua** review setuju. DB Validator hanya me-review/approve; merge dilakukan **user (reviewer CR)** (aturan PR berisi CR + DBV, `AGENTS.md` bagian 2).
 
-**Status:** ⏳ **MENUNGGU REVIEW DB VALIDATOR (DBV-008)** dan review kode (CR-026). Dokumen, migration, dan kode sudah melewati **pra-review internal sisi CR** (bukan review DB Validator). Migration `2026-09-30-100000_CreateMasterJabatanUnitSatker.php` **jangan dijalankan di Dev/Production** sebelum disetujui. G-02 tetap **IN_PROGRESS**: unit ini mengerjakan 6 tabel; `peta_jabatan` (DoD "peta formasi") dan tabel jabatan lain yang tidak punya DDL ditunda ke unit lanjutan (Bagian 7).
+**Status:** ⏳ **MENUNGGU REVIEW DB VALIDATOR (DBV-008)** dan review kode (CR-026). Dokumen, migration, dan kode sudah melewati **pra-review internal sisi CR** (bukan review DB Validator). **Revisi 01-10-2026:** keenam tabel dicocokkan dengan dump struktur produksi lengkap D1 (Bagian 1.4); label [L]/[I] naik ke [K] D1, `sub_group_jabatan` diselaraskan, dan keputusan baru #20–#24 di Bagian 4. Migration `2026-09-30-100000_CreateMasterJabatanUnitSatker.php` **jangan dijalankan di Dev/Production** sebelum disetujui. G-02 tetap **IN_PROGRESS**: unit ini mengerjakan 6 tabel; `peta_jabatan` (DoD "peta formasi") dan tabel jabatan lain yang tidak punya DDL ditunda ke unit lanjutan (Bagian 7).
 
-**Rujukan:** `02-MasterData.md` G-02 & G-TC, kartu Trello QASMTASK-034 (DoD G-02), `Mapping_Migrasi_Data_SIMPEG_v2.docx` Tier 1 ("Copy langsung"), Matriks Role x Endpoint Modul G (`hr/master/c_jabatan/*`, role 1), DDL produksi `simpeg_prod.sql` (`group_jabatan` :1294-1303, `jabatan` :1447-1472, `dm_ak_jf` :457-469; HeidiSQL, MySQL 8.0.21), ERD `simpeg01.erd` (nama entity & FK, tanpa kolom), salinan lokal `simpeg_prod_duplikat` (`SHOW CREATE TABLE unit/satker/kelas_jabatan`), kode legacy (`application/libraries/hr/master/Lm_jabatan.php`, `application/controllers/hr/master/C_jabatan.php`, `application/views/hr/master/jabatan/**`, `application/controllers/hr/services/Local.php`, `L_user.php`, `L_employee.php`, `Lsl_gaji.php`), keputusan user 29-09-2026 (ISSUE-012, ISSUE-007, DBV-009 sesudah DBV-008), `G-01-master-schema.md` (Keputusan #5, #8, Bagian 3), preseden `G-06-diklat-hukdis-konket-tanda-jasa-schema.md` (DBV-005, disetujui 29-09-2026).
+**Rujukan:** `02-MasterData.md` G-02 & G-TC, kartu Trello QASMTASK-034 (DoD G-02), `Mapping_Migrasi_Data_SIMPEG_v2.docx` Tier 1 ("Copy langsung"), Matriks Role x Endpoint Modul G (`hr/master/c_jabatan/*`, role 1), DDL produksi `simpeg_prod.sql` (`group_jabatan` :1294-1303, `jabatan` :1447-1472, `dm_ak_jf` :457-469; HeidiSQL, MySQL 8.0.21), ERD `simpeg01.erd` (nama entity & FK, tanpa kolom), salinan lokal `simpeg_prod_duplikat` (`SHOW CREATE TABLE unit/satker/kelas_jabatan`), kode legacy (`application/libraries/hr/master/Lm_jabatan.php`, `application/controllers/hr/master/C_jabatan.php`, `application/views/hr/master/jabatan/**`, `application/controllers/hr/services/Local.php`, `L_user.php`, `L_employee.php`, `Lsl_gaji.php`), keputusan user 29-09-2026 (ISSUE-012, ISSUE-007, DBV-009 sesudah DBV-008), `G-01-master-schema.md` (Keputusan #5, #8, Bagian 3), preseden `G-06-diklat-hukdis-konket-tanda-jasa-schema.md` (DBV-005, disetujui 29-09-2026). **D1** = dump struktur produksi lengkap `simpeg01_struktur_lengkap_20261001.sql` (HeidiSQL, MySQL 8.0.21, tanpa data, termasuk trigger; berkas di luar repo), dirujuk `D1:baris`.
 
 **Label sumber:**
-- **[K]** terkonfirmasi — DDL `simpeg_prod.sql` (nomor baris), ERD `simpeg01.erd`, atau kode legacy (`berkas:baris`).
-- **[L]** (label baru, diusulkan di Bagian 4 #1) — `SHOW CREATE TABLE` salinan lokal `simpeg_prod_duplikat`. Asal-usul salinan belum pasti, tetapi tipenya dicek silang dengan [K] (Bagian 1). Dokumen G-04/G-05 memasukkan `SHOW CREATE TABLE` DB lokal ke [K]; di G-02 dipisahkan eksplisit karena tiga tabel sepenuhnya bergantung padanya.
+- **[K]** terkonfirmasi — DDL produksi D1 (`D1:baris`), `simpeg_prod.sql` (nomor baris), ERD `simpeg01.erd`, atau kode legacy (`berkas:baris`). Sejak revisi 01-10-2026 **keenam tabel G-02 berlabel [K] D1**.
+- **[L]** (riwayat, tidak dipakai lagi) — `SHOW CREATE TABLE` salinan lokal `simpeg_prod_duplikat`; dipakai versi awal dokumen untuk `unit`, `satker`, `kelas_jabatan`, kini terbukti sama dengan D1 (Bagian 1.4).
 - **[V2]** tambahan/ubahan v2 yang disengaja (deviasi dari legacy — alasan di Bagian 3).
-- **[I]** dugaan (tidak ada DDL; wajib dicocokkan dengan dump struktur produksi).
+- **[I]** dugaan — versi awal dokumen memakainya untuk `sub_group_jabatan`; kini tidak ada nilai [I] tersisa di G-02 bagian ini.
 
 | File | Isi |
 |---|---|
@@ -30,20 +30,16 @@
 
 ## 1. Latar belakang & keputusan
 
-Sumber per tabel (salinan lain dibandingkan: `simpeg01` identik dengan dump untuk `group_jabatan`/`jabatan`/`dm_ak_jf`; `simpegdev_local` berisi versi seed lama dengan PK VARCHAR, kolom `bup`/`order`, dan status ENUM — **tidak dipakai**, bertentangan dengan [K]):
+Sumber per tabel. Versi awal (30-09-2026) memakai `simpeg_prod.sql` untuk `group_jabatan`/`jabatan`, salinan lokal `simpeg_prod_duplikat` [L] untuk `unit`/`satker`/`kelas_jabatan`, dan kode legacy [I] untuk `sub_group_jabatan`. Sejak 01-10-2026 semuanya dicocokkan dengan D1 (`simpegdev_local` berisi versi seed lama dengan PK VARCHAR, kolom `bup`/`order`, dan status ENUM — **tidak dipakai**, bertentangan dengan [K]):
 
 | Tabel | DDL | Keterangan |
 |---|---|---|
-| `group_jabatan` | [K] `simpeg_prod.sql:1294-1303` (AUTO_INCREMENT=7) | ERD: 10 FK masuk |
-| `jabatan` | [K] `simpeg_prod.sql:1447-1472` (AUTO_INCREMENT=2203; 5 FK :1467-1471, semuanya ON DELETE SET NULL ON UPDATE CASCADE) | FK ke `jenjang_jf` dan `sub_group_jabatan` yang tabelnya tidak ada di dump → dump diimpor dengan FOREIGN_KEY_CHECKS=0 |
-| `unit` | [L] 11 kolom | tidak ada di dump (dump berhenti di `jabatan`, urut alfabet) |
-| `satker` | [L] 14 kolom, FK `fk_id_unit_satker_to_unit` (SET NULL/CASCADE) | nama FK juga ada di ERD |
-| `kelas_jabatan` | [L] PK `kelas_jabatan` TINYINT (bukan AUTO_INCREMENT), `tukin` INT NOT NULL | tipe PK cocok dengan `jabatan.kelas_jabatan` TINYINT + FK [K] :1453/:1471 |
-| `sub_group_jabatan` | **tidak ada** di salinan mana pun | [I] (Bagian 2.4); tipe PK dari kolom anak [K] `jabatan.id_sub_group_jabatan` INT :1450 dan `d_riwayat_cuti.id_sub_group_jabatan` INT :710 |
-
-Bukti silang [K] untuk [L]: `d_user.id_unit/id_satker` INT (:774-775) dan `d_lkh.id_unit/id_satker` INT (:675-676) → PK INT; salinan nama `d_lkh.unit/satker` VARCHAR(150) (:680-681) → sama dengan [L] 150; salinan `pegawai_mutasi_jabatan.group_jabatan` VARCHAR(45) di salinan lokal = [K] :1296 (pola salinan nama terbukti), sehingga `pegawai_mutasi_jabatan.sub_group_jabatan` VARCHAR(100) menjadi dasar panjang [I] sub group.
-
-Asal-usul [L]: `simpeg_prod_duplikat` berisi 1 unit, 1 satker, dan 4 kelas jabatan (`created_at` 2026-09-01 14:28) — data dev fitur slip gaji. DDL-nya berkolom legacy lengkap, persis kolom yang ditulis `Lm_jabatan.php` (`set_param_unit` :1407, `set_param_satker` :1743), sehingga dipakai sebagai dasar skema dengan label [L].
+| `group_jabatan` | [K] D1:1295-1304 (= `simpeg_prod.sql:1294-1303`), AUTO_INCREMENT=7 | ERD: 10 FK masuk |
+| `jabatan` | [K] D1:1448-1473 (= `simpeg_prod.sql:1447-1472`), AUTO_INCREMENT=2204 di D1; 5 FK D1:1468-1472, semuanya ON DELETE SET NULL ON UPDATE CASCADE | trigger AFTER INSERT/UPDATE/DELETE D1:7743-7816 (Bagian 4 #22) |
+| `unit` | [K] D1:7505-7518 (11 kolom), AUTO_INCREMENT=27 | sama dengan [L] versi awal |
+| `satker` | [K] D1:6886-6904 (14 kolom), FK `fk_id_unit_satker_to_unit` SET NULL/CASCADE D1:6903, AUTO_INCREMENT=172 | sama dengan [L]; trigger D1:10530-10576 (Bagian 4 #22) |
+| `kelas_jabatan` | [K] D1:2027-2035; PK `kelas_jabatan` TINYINT (bukan AUTO_INCREMENT), `tukin` INT NOT NULL; tabel `COLLATE utf8mb4_0900_ai_ci` tanpa kolom string | sama dengan [L] |
+| `sub_group_jabatan` | [K] D1:7183-7195 (8 kolom), AUTO_INCREMENT=84 | **berselisih** dengan [I] versi awal → diselaraskan (Bagian 1.4) |
 
 Perilaku legacy yang memengaruhi skema [K] (`hr/master/c_jabatan`, semua aksi `userAuth(['1'])`):
 - **Hapus keras** untuk semua master G-02 (mis. jabatan `Lm_jabatan.php:167`, unit :1337, satker :1669, group :726, sub group :938, kelas :1146). Hanya `jabatan_koordinasi` yang soft delete (status 2, :514-518).
@@ -66,10 +62,10 @@ Perilaku legacy yang memengaruhi skema [K] (`hr/master/c_jabatan`, semua aksi `u
 
 | # | Usulan |
 |---|---|
-| U1 | Label [L] untuk `unit`, `satker`, `kelas_jabatan` sebagai dasar skema (Bagian 4 #1) |
-| U2 | Lingkup: 6 tabel sekarang; `peta_jabatan`, `dm_ak_jf`, `jenjang_jf`, dan tabel tanpa DDL ke unit lanjutan (Bagian 4 #2, #14) |
-| U3 | `sub_group_jabatan` [I] minimal + FK dari `jabatan` (Opsi A, Bagian 4 #3) |
-| U4 | Kolom `jabatan.id_jenjang_jf` + KEY legacy tetap ada, FK ditunda (Opsi B, Bagian 4 #4) |
+| U1 | ~~Label [L] untuk `unit`, `satker`, `kelas_jabatan`~~ — selesai oleh D1: label [K] (Bagian 4 #1) |
+| U2 | Lingkup: 6 tabel sekarang; `peta_jabatan`, `jenjang_jf`, dan 6 tabel jabatan lain ke **DBV-018** (`G-02b-jabatan-sisa-schema.md`, branch bertumpuk di atas branch ini); `dm_ak_jf` ke B-12 (Bagian 4 #2, #14) |
+| U3 | `sub_group_jabatan` [K] D1 + FK dari `jabatan` (Opsi A, Bagian 4 #3, #20) |
+| U4 | Kolom `jabatan.id_jenjang_jf` + KEY legacy ada; tabel `jenjang_jf` + FK dibuat migration DBV-018 (Bagian 4 #4) |
 | U5 | 5 CHECK [V2] `chk_…` (Bagian 4 #8, #9, #10) |
 | U6 | Kelas jabatan dikelola engine generik lewat opsi CR baru `codeAsName` + `idRange` (KJ-1, Bagian 4 #10) |
 
@@ -77,60 +73,74 @@ Perilaku legacy yang memengaruhi skema [K] (`hr/master/c_jabatan`, semua aksi `u
 
 | # | Konflik | Sikap |
 |---|---|---|
-| 1 | G-01 Keputusan #5 "semua master wajib `order` + `status`" vs `jabatan` [K] dan `kelas_jabatan` [L] tanpa `order` | `jabatan` & `kelas_jabatan` tanpa `order` (Bagian 4 #7): ±2.200 jabatan tanpa semantik urutan (legacy urut kelas/id), kelas = urutan alami nomor. `sub_group_jabatan` [I] diberi `order` [V2] |
-| 2 | DoD QASMTASK-034 menyebut `peta_jabatan` | ditunda (Bagian 4 #2, Bagian 7); G-02 tetap IN_PROGRESS |
+| 1 | G-01 Keputusan #5 "semua master wajib `order` + `status`" vs `jabatan` [K] dan `kelas_jabatan` [K] D1 tanpa `order` | `jabatan` & `kelas_jabatan` tanpa `order` (Bagian 4 #7): ±2.200 jabatan tanpa semantik urutan (legacy urut kelas/id), kelas = urutan alami nomor. `sub_group_jabatan` (D1 tanpa `order`) diberi `order` [V2] |
+| 2 | DoD QASMTASK-034 menyebut `peta_jabatan` | dikerjakan di DBV-018/CR-032 (Bagian 4 #2, Bagian 7); G-02 tetap IN_PROGRESS sampai DBV-018 disetujui |
 | 3 | Rencana riset DBV-008 (30-09-2026) memasukkan `dm_ak_jf` [K] ke migration ini | **ditunda** (Bagian 4 #14): FK `dm_ak_jf → pangkat` membuat `down()` migration DBV-004 gagal dijalankan sendiri selama `dm_ak_jf` ada (test rollback G-04/G-05 ikut patah), padahal tabelnya tanpa API/UI sampai B-12 |
-| 4 | `Bahan Baku SIMPEG/simpeg_v2_local_seed_legacy.sql:404, :431` melabeli `unit`/`satker` sebagai [K] | salah label: DDL itu tidak ada di dump produksi; file tidak diubah (bukan sumber kebenaran) |
-| 5 | Dokumen DBV-011 (branch `dbv-011/…`, runbook :471) dan `02-MasterData.md` bagian engine menyebut `offset_zona_menit` (nama kolom seed lama) | kolom legacy adalah `satker.zonasi` [L]; catatan koreksi untuk penulis DBV-011 (branch itu tidak diubah di sini) |
+| 4 | `Bahan Baku SIMPEG/simpeg_v2_local_seed_legacy.sql:404, :431` melabeli `unit`/`satker` sebagai [K] | sebelum D1 tidak terbukti; D1 kini mengonfirmasi kolomnya. File tidak diubah (bukan sumber kebenaran) |
+| 5 | Dokumen DBV-011 (branch `dbv-011/…`, runbook :471) dan `02-MasterData.md` bagian engine menyebut `offset_zona_menit` (nama kolom seed lama) | kolom legacy adalah `satker.zonasi` [K] D1:6895; catatan koreksi untuk penulis DBV-011 (branch itu tidak diubah di sini) |
 | 6 | `simpegdev_local` punya `unit`/`satker`/`jabatan`/`jenjang_jf` dengan PK VARCHAR dan status ENUM | rekonstruksi seed lama, bertentangan dengan [K] → hanya pembanding |
+
+### 1.4 Pencocokan dengan dump struktur produksi D1 (revisi 01-10-2026)
+
+Perbandingan kolom (tipe, NULL, default), KEY/UNIQUE, FK (nama, kolom, aksi), CHECK, dan collation antara D1 dan `information_schema` hasil migration ini:
+
+| Tabel | Hasil | Tindakan |
+|---|---|---|
+| `unit` | Cocok. Selisih hanya deviasi [V2] yang sudah tercatat (UNIQUE `uq_unit_nama`, CHECK `chk_unit_is_upt`, COMMENT) | [L] → [K] D1:7505-7518; COMMENT `is_upt` ditambahkan (D1 `'0: No, 1: Yes'`, Bagian 4 #23) |
+| `satker` | Cocok. Selisih: UNIQUE `uq_satker_nama`, 2 CHECK, aksi FK RESTRICT (semuanya [V2] tercatat) | [L] → [K] D1:6886-6904; COMMENT `is_upt` (#23) |
+| `kelas_jabatan` | Cocok (`tukin` INT NOT NULL, PK TINYINT tanpa AUTO_INCREMENT). Tabel D1 `utf8mb4_0900_ai_ci` tanpa kolom string → v2 `utf8mb4_unicode_ci` tidak mengubah perilaku | [L] → [K] D1:2027-2035 |
+| `group_jabatan`, `jabatan` | Cocok dengan `simpeg_prod.sql` (baris D1 bergeser +1). D1 memuat FK `fk_id_jenjang_jf_jab_to_jenjang_jf` (D1:1469) yang kini bisa dibuat karena `jenjang_jf` ada di D1 | FK dibuat migration DBV-018 bersama tabel `jenjang_jf` (#4) |
+| `sub_group_jabatan` | **Berselisih** dengan [I]: `id_group_jabatan` **NOT NULL** (D1:7185, [I] NULL); `sub_group_jabatan` **NULL** (D1:7186, [I] NOT NULL); `need_satker` **TINYINT(1) DEFAULT 2** (D1:7187, [I] TINYINT DEFAULT 1); tidak ada kolom `order`; KEY bernama `id_group_jabatan_idx` (D1:7193, [I] `fk_id_group_jabatan_sgj_to_gj`); FK ON DELETE NO ACTION ON UPDATE CASCADE (D1:7194) | Diselaraskan ke D1: NOT NULL, TINYINT(1) DEFAULT 2, KEY `id_group_jabatan_idx` (#20). Dipertahankan sebagai [V2]: nama NOT NULL (#21), kolom `order` (#7), FK RESTRICT (#5) |
+
+Trigger: `jabatan` (3 trigger AFTER, D1:7743-7816) dan `satker` (3 trigger AFTER, D1:10530-10576) menyalin perubahan ke tabel aplikasi lain di schema lain (lintas schema). Tidak dibuat di v2 (#22).
 
 ## 2. Skema hasil DBV-008
 
 Berlaku untuk keenam tabel:
 - `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`; kolom string mewarisi collation tabel (legacy menulis collation per kolom, hasilnya sama).
 - Nama index/constraint **tanpa** prefix tabel (DBPrefix hanya untuk nama tabel, mis. `t_` di DB test).
-- `status TINYINT NOT NULL DEFAULT 1 COMMENT '1: Aktif, 2: Tidak Aktif, 10: Dihapus'` — tipe & default [K]/[L]; COMMENT [V2] juga untuk tabel [K] (legacy `'1: Active, 2: Inactive, 10: Deleted'` — `simpeg_prod.sql` baris 1297 & 1456 — bermakna sama; preseden `diklat` DBV-005). `group_jabatan.status` tetap `TINYINT(1)` [K].
-- Kolom audit pola [K] `group_jabatan`/`jabatan` (sama di ketiga tabel [L]): `created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`, `updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`, `updated_by INT NULL COMMENT 'id_pengguna yang terakhir mengubah'` (COMMENT [V2]). Tanpa `created_by` dan tanpa FK (preseden DBV-001). Engine (`auditColumns` = `created_at/updated_at/updated_by`) mengisi `created_at` + `updated_at` + `updated_by` saat tambah dan `updated_at` + `updated_by` saat ubah; saudara yang hanya bergeser urutannya tidak di-stamp.
-- Nilai `AUTO_INCREMENT` awal tidak ditulis [V2] (legacy `group_jabatan`=7, `jabatan`=2203). Legacy menghapus keras, jadi counter disalin saat impor (6.5 #9).
+- `status TINYINT NOT NULL DEFAULT 1 COMMENT '1: Aktif, 2: Tidak Aktif, 10: Dihapus'` — tipe & default [K] D1; COMMENT [V2] (legacy `'1: Active, 2: Inactive, 10: Deleted'` di keenam tabel D1, bermakna sama; preseden `diklat` DBV-005). `group_jabatan.status` tetap `TINYINT(1)` [K].
+- Kolom audit pola [K] D1 (sama di keenam tabel): `created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`, `updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`, `updated_by INT NULL COMMENT 'id_pengguna yang terakhir mengubah'` (COMMENT [V2]). Tanpa `created_by` dan tanpa FK (preseden DBV-001). Engine (`auditColumns` = `created_at/updated_at/updated_by`) mengisi `created_at` + `updated_at` + `updated_by` saat tambah dan `updated_at` + `updated_by` saat ubah; saudara yang hanya bergeser urutannya tidak di-stamp.
+- Nilai `AUTO_INCREMENT` awal tidak ditulis [V2] (D1: `unit`=27, `satker`=172, `group_jabatan`=7, `sub_group_jabatan`=84, `jabatan`=2204). Legacy menghapus keras, jadi counter disalin saat impor (6.5 #9).
 - UNIQUE nama berlaku juga untuk baris status 2/10, tidak peka huruf besar/kecil maupun aksen [V2, G2]. Key terpanjang `uq_jabatan_nama` = 4 + 4 + 250 × 4 = **1.008 byte** (batas InnoDB 3.072, row format DYNAMIC).
 - Tanpa CHECK pada `status` (konsisten dengan DBV-001..005; nilai dijaga engine).
 
-### 2.1 unit — [L] `simpeg_prod_duplikat`
+### 2.1 unit — [K] D1:7505-7518
 
 | Kolom (urut) | Tipe | Sumber |
 |---|---|---|
-| `id_unit` | INT NOT NULL AUTO_INCREMENT | [L]; tipe [K] `d_user.id_unit` INT :774 |
-| `unit` | VARCHAR(150) NOT NULL | [L]; [K] salinan `d_lkh.unit` VARCHAR(150) :680 |
-| `is_upt` | TINYINT(1) NOT NULL DEFAULT 0 | [L]; 1 = UPT, 0 = bukan (konsumen `User.php:470-479`, `Ib.php:402`, `Tb.php:403` memakai `== '1'`) |
-| `alamat_pdf_header` | TINYTEXT NULL | [L] (kop dokumen PDF) |
-| `tembusan_kppn` | VARCHAR(256) NULL | [L] |
-| `lokasi_kppn` | VARCHAR(50) NULL | [L] |
-| `order` | INT NOT NULL DEFAULT 1 | [L]; urutan global (form legacy "Urutan", mask 1–100) |
-| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [L]; COMMENT [V2] |
-| `created_at`, `updated_at`, `updated_by` | pola audit di atas | [L] |
+| `id_unit` | INT NOT NULL AUTO_INCREMENT | [K] D1:7506 |
+| `unit` | VARCHAR(150) NOT NULL | [K] D1:7507 |
+| `is_upt` | TINYINT(1) NOT NULL DEFAULT 0, COMMENT `'0: Bukan UPT, 1: UPT'` | [K] D1:7508; COMMENT [V2] (D1 `'0: No, 1: Yes'`); 1 = UPT, 0 = bukan (konsumen `User.php:470-479`, `Ib.php:402`, `Tb.php:403` memakai `== '1'`) |
+| `alamat_pdf_header` | TINYTEXT NULL | [K] D1:7509 (kop dokumen PDF) |
+| `tembusan_kppn` | VARCHAR(256) NULL | [K] D1:7510 |
+| `lokasi_kppn` | VARCHAR(50) NULL | [K] D1:7511 |
+| `order` | INT NOT NULL DEFAULT 1 | [K] D1:7512; urutan global (form legacy "Urutan", mask 1–100) |
+| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [K] D1:7513; COMMENT [V2] |
+| `created_at`, `updated_at`, `updated_by` | pola audit di atas | [K] D1:7514-7516 |
 
-Kunci: `PRIMARY (id_unit)` [L]; **UNIQUE** `uq_unit_nama (unit)` [V2]; **CHECK** `chk_unit_is_upt` (`is_upt IN (0, 1)`) [V2].
+Kunci: `PRIMARY (id_unit)` [K]; **UNIQUE** `uq_unit_nama (unit)` [V2]; **CHECK** `chk_unit_is_upt` (`is_upt IN (0, 1)`) [V2].
 
-### 2.2 satker — [L] `simpeg_prod_duplikat`
+### 2.2 satker — [K] D1:6886-6904
 
 | Kolom (urut) | Tipe | Sumber |
 |---|---|---|
-| `id_satker` | INT NOT NULL AUTO_INCREMENT | [L]; [K] `d_user.id_satker` INT :775 |
-| `id_unit` | INT NULL | [L] (NULL-able mengikuti FK legacy SET NULL); wajib di aplikasi |
-| `satker` | VARCHAR(150) NOT NULL | [L]; [K] `d_lkh.satker` :681 |
-| `is_upt` | TINYINT(1) NOT NULL DEFAULT 0 | [L] |
-| `alamat_pdf_header` | TEXT NULL | [L] (unit TINYTEXT, satker TEXT — beda di salinan, diikuti apa adanya) |
-| `tembusan_kppn` | VARCHAR(256) NULL | [L] |
-| `lokasi_kppn` | VARCHAR(50) NULL | [L] |
-| `logo_uns` | VARCHAR(256) NULL | [L]; legacy unggah JPG (form 0,08 MB `satker/form.php:98`, server 838.860 byte `Lm_jabatan.php:1478`); disimpan, belum dikelola v2 |
-| `zonasi` | INT NOT NULL DEFAULT 0, COMMENT `'offset jam presensi dari WIB dalam menit: 0 WIB, 60 WITA, 120 WIT'` | [L]; COMMENT [V2] (`simpegdev_local` punya COMMENT serupa). Form legacy "WIB + N menit", mask 0–120 (`satker/form.php:48-58, :131-135`) |
-| `order` | SMALLINT NOT NULL DEFAULT 1 | [L]; urutan per unit |
-| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [L] |
-| `created_at`, `updated_at`, `updated_by` | pola audit | [L] |
+| `id_satker` | INT NOT NULL AUTO_INCREMENT | [K] D1:6887 |
+| `id_unit` | INT NULL | [K] D1:6888 (NULL-able mengikuti FK legacy SET NULL); wajib di aplikasi |
+| `satker` | VARCHAR(150) NOT NULL | [K] D1:6889 |
+| `is_upt` | TINYINT(1) NOT NULL DEFAULT 0, COMMENT `'0: Bukan UPT, 1: UPT'` | [K] D1:6890; COMMENT [V2] |
+| `alamat_pdf_header` | TEXT NULL | [K] D1:6891 (unit TINYTEXT, satker TEXT — beda di D1, diikuti apa adanya) |
+| `tembusan_kppn` | VARCHAR(256) NULL | [K] D1:6892 |
+| `lokasi_kppn` | VARCHAR(50) NULL | [K] D1:6893 |
+| `logo_uns` | VARCHAR(256) NULL | [K] D1:6894; legacy unggah JPG (form 0,08 MB `satker/form.php:98`, server 838.860 byte `Lm_jabatan.php:1478`); disimpan, belum dikelola v2 |
+| `zonasi` | INT NOT NULL DEFAULT 0, COMMENT `'offset jam presensi dari WIB dalam menit: 0 WIB, 60 WITA, 120 WIT'` | [K] D1:6895 (COMMENT legacy `'Perbedaan Menit Dengan Zonasi WIB'`); COMMENT [V2]. Form legacy "WIB + N menit", mask 0–120 (`satker/form.php:48-58, :131-135`) |
+| `order` | SMALLINT NOT NULL DEFAULT 1 | [K] D1:6896; urutan per unit |
+| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [K] D1:6897 |
+| `created_at`, `updated_at`, `updated_by` | pola audit | [K] D1:6898-6900 |
 
-Kunci: `PRIMARY (id_satker)` [L]; **UNIQUE** `uq_satker_nama (id_unit, satker)` [V2]; `KEY fk_id_unit_satker_to_unit (id_unit)` [L]; **FK** `fk_id_unit_satker_to_unit` → `unit(id_unit)` ON DELETE RESTRICT ON UPDATE RESTRICT (nama [L]/ERD, aksi [V2]; legacy SET NULL/CASCADE); **CHECK** `chk_satker_is_upt` (0/1) dan `chk_satker_zonasi` (`zonasi BETWEEN 0 AND 120`) [V2].
+Kunci: `PRIMARY (id_satker)` [K]; **UNIQUE** `uq_satker_nama (id_unit, satker)` [V2]; `KEY fk_id_unit_satker_to_unit (id_unit)` [K] D1:6902; **FK** `fk_id_unit_satker_to_unit` → `unit(id_unit)` ON DELETE RESTRICT ON UPDATE RESTRICT (nama [K] D1:6903, aksi [V2]; legacy SET NULL/CASCADE); **CHECK** `chk_satker_is_upt` (0/1) dan `chk_satker_zonasi` (`zonasi BETWEEN 0 AND 120`) [V2].
 
-### 2.3 group_jabatan — `simpeg_prod.sql:1294-1303` [K]
+### 2.3 group_jabatan — [K] D1:1295-1304 (= `simpeg_prod.sql:1294-1303`)
 
 | Kolom (urut) | Tipe | Sumber |
 |---|---|---|
@@ -142,32 +152,32 @@ Kunci: `PRIMARY (id_satker)` [L]; **UNIQUE** `uq_satker_nama (id_unit, satker)` 
 
 Kunci: `PRIMARY (id_group_jabatan)` [K]; **UNIQUE** `uq_group_jabatan_nama (group_jabatan)` [V2].
 
-### 2.4 sub_group_jabatan — [I] (ERD entity + FK; kode `Lm_jabatan.php:938-1018`, form `sub_group/form.php`)
+### 2.4 sub_group_jabatan — [K] D1:7183-7195 (diselaraskan 01-10-2026)
 
 | Kolom (urut) | Tipe | Sumber |
 |---|---|---|
-| `id_sub_group_jabatan` | INT NOT NULL AUTO_INCREMENT | [I]; tipe dari kolom anak [K] :1450, :710 |
-| `id_group_jabatan` | INT NULL | [I] kolom dari kode (form & `set_param_sub_group` :1011); NULL-able seperti kolom FK lain di keluarga ini; wajib di aplikasi |
-| `sub_group_jabatan` | VARCHAR(100) NOT NULL | [I]; panjang dari salinan [L] `pegawai_mutasi_jabatan.sub_group_jabatan` VARCHAR(100) |
-| `need_satker` | TINYINT NOT NULL DEFAULT 1, COMMENT `'1: Ya, 2: Tidak (jabatan dipilih per satuan kerja di riwayat jabatan)'` | kolom & nilai [K] kode (`:973`, `:1015` → `'2'` atau `'1'`; form radio YA=1/TIDAK=2); tipe [I] |
-| `order` | TINYINT NOT NULL DEFAULT 1 | **[V2]** (legacy tanpa `order`: dropdown group 1 urut id, lainnya urut nama — `Local.php:294-307`) |
-| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [I] (kode membaca `status`) |
-| `created_at`, `updated_at`, `updated_by` | pola audit | [I] (meniru `group_jabatan` [K]; kode hanya menulis `updated_by`) |
+| `id_sub_group_jabatan` | INT NOT NULL AUTO_INCREMENT | [K] D1:7184 |
+| `id_group_jabatan` | INT **NOT NULL** | [K] D1:7185 (versi awal [I] NULL) |
+| `sub_group_jabatan` | VARCHAR(100) **NOT NULL** | panjang [K] D1:7186; NOT NULL **[V2]** (D1 NULL — Bagian 4 #21) |
+| `need_satker` | **TINYINT(1)** NOT NULL **DEFAULT 2**, COMMENT `'1: Ya, 2: Tidak (jabatan dipilih per satuan kerja di riwayat jabatan)'` | [K] D1:7187 (COMMENT legacy `'1: Yes, 2: No'`; COMMENT [V2]); nilai kode `:973`, `:1015`; aplikasi tetap mewajibkan pilihan |
+| `order` | TINYINT NOT NULL DEFAULT 1 | **[V2]** (tidak ada di D1: dropdown group 1 urut id, lainnya urut nama — `Local.php:294-307`) |
+| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [K] D1:7188 |
+| `created_at`, `updated_at`, `updated_by` | pola audit | [K] D1:7189-7191 |
 
-Kunci: `PRIMARY` [I]; **UNIQUE** `uq_sub_group_jabatan_nama (id_group_jabatan, sub_group_jabatan)` [V2]; `KEY` + **FK** `fk_id_group_jabatan_sgj_to_gj` → `group_jabatan` RESTRICT/RESTRICT (nama ERD [K], aksi [V2]); **CHECK** `chk_sub_group_jabatan_need_satker` (`need_satker IN (1, 2)`) [V2].
+Kunci: `PRIMARY` [K] D1:7192; **UNIQUE** `uq_sub_group_jabatan_nama (id_group_jabatan, sub_group_jabatan)` [V2]; `KEY id_group_jabatan_idx (id_group_jabatan)` [K] D1:7193 (index FK); **FK** `fk_id_group_jabatan_sgj_to_gj` → `group_jabatan` RESTRICT/RESTRICT (nama [K] D1:7194, aksi [V2]; legacy NO ACTION/CASCADE); **CHECK** `chk_sub_group_jabatan_need_satker` (`need_satker IN (1, 2)`) [V2].
 
-### 2.5 kelas_jabatan — [L] `simpeg_prod_duplikat`
+### 2.5 kelas_jabatan — [K] D1:2027-2035
 
 | Kolom (urut) | Tipe | Sumber |
 |---|---|---|
-| `kelas_jabatan` | TINYINT NOT NULL (PK alami, **bukan** AUTO_INCREMENT) | [L]; tipe cocok FK [K] `jabatan.kelas_jabatan` TINYINT :1453/:1471 |
-| `tukin` | INT NOT NULL | [L] (nominal tunjangan kinerja per bulan) |
-| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [L] |
-| `created_at`, `updated_at`, `updated_by` | pola audit | [L] |
+| `kelas_jabatan` | TINYINT NOT NULL (PK alami, **bukan** AUTO_INCREMENT) | [K] D1:2028; tipe cocok FK `jabatan.kelas_jabatan` TINYINT D1:1454/:1472 |
+| `tukin` | INT NOT NULL | [K] D1:2029 (nominal tunjangan kinerja per bulan) |
+| `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [K] D1:2030 |
+| `created_at`, `updated_at`, `updated_by` | pola audit | [K] D1:2031-2033 |
 
-Kunci: `PRIMARY (kelas_jabatan)` [L]; **CHECK** `chk_kelas_jabatan_kelas_jabatan` (`kelas_jabatan BETWEEN 1 AND 20`) [V2] — mask form legacy 1–20 (`kelas/form.php:73-74`). Tanpa kolom nama dan tanpa `order`.
+Kunci: `PRIMARY (kelas_jabatan)` [K] D1:2034; **CHECK** `chk_kelas_jabatan_kelas_jabatan` (`kelas_jabatan BETWEEN 1 AND 20`) [V2] — mask form legacy 1–20 (`kelas/form.php:73-74`). Tanpa kolom nama dan tanpa `order`. Collation tabel D1 `utf8mb4_0900_ai_ci` (tanpa kolom string) → v2 `utf8mb4_unicode_ci` seperti tabel lain.
 
-### 2.6 jabatan — `simpeg_prod.sql:1447-1472` [K]
+### 2.6 jabatan — [K] D1:1448-1473 (= `simpeg_prod.sql:1447-1472`)
 
 | Kolom (urut) | Tipe | Sumber |
 |---|---|---|
@@ -182,15 +192,14 @@ Kunci: `PRIMARY (kelas_jabatan)` [L]; **CHECK** `chk_kelas_jabatan_kelas_jabatan
 | `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | [K] :1456; COMMENT [V2] |
 | `created_at`, `updated_at`, `updated_by` | pola audit | [K] :1457-1459 |
 
-Kunci: `PRIMARY (id_jabatan)` [K]; **UNIQUE** `uq_jabatan_nama (id_sub_group_jabatan, id_satker, jabatan)` [V2]; `KEY jabatan (jabatan)` [K] :1461; KEY FK legacy [K] :1462-1466 (`fk_id_group_jabatan_jabatan_to_gj`, `fk_id_sub_group_jabatan_jabatan_to_sgj`, `fk_id_satker_jabatan_to_satker`, `fk_kelas_jabatan_jabatan_to_kelasjabatan`, `fk_id_jenjang_jf_jab_to_jenjang_jf`); **4 FK** RESTRICT/RESTRICT (nama [K] :1467-1471, aksi [V2]) ke `group_jabatan`, `sub_group_jabatan`, `satker`, `kelas_jabatan`. FK `fk_id_jenjang_jf_jab_to_jenjang_jf` **tidak dibuat** (Bagian 4 #4).
+Kunci: `PRIMARY (id_jabatan)` [K]; **UNIQUE** `uq_jabatan_nama (id_sub_group_jabatan, id_satker, jabatan)` [V2]; `KEY jabatan (jabatan)` [K] :1461; KEY FK legacy [K] :1462-1466 (`fk_id_group_jabatan_jabatan_to_gj`, `fk_id_sub_group_jabatan_jabatan_to_sgj`, `fk_id_satker_jabatan_to_satker`, `fk_kelas_jabatan_jabatan_to_kelasjabatan`, `fk_id_jenjang_jf_jab_to_jenjang_jf`); **4 FK** RESTRICT/RESTRICT (nama [K] :1467-1471, aksi [V2]) ke `group_jabatan`, `sub_group_jabatan`, `satker`, `kelas_jabatan`. FK `fk_id_jenjang_jf_jab_to_jenjang_jf` [K] D1:1469 **tidak dibuat di migration ini**; dibuat migration DBV-018 bersama tabel `jenjang_jf` (Bagian 4 #4).
 
 UNIQUE tidak menegakkan baris ber-`id_satker` NULL (MySQL/MariaDB menganggap NULL berbeda): keunikan nama jabatan tanpa satker per sub group hanya dijaga aplikasi (engine `WHERE id_satker IS NULL` di dalam named lock tabel), dibuktikan `JabatanUnitSatkerSchemaTest` (DB menerima dua baris NULL bernama sama) dan `JabatanUnitSatkerTest` (aplikasi menolaknya). Hal yang sama untuk `satker.id_unit` NULL.
 
 ### 2.7 Tabel yang tidak dibuat di DBV-008
 
 - `dm_ak_jf` [K] `simpeg_prod.sql:457-469` (PK komposit `id_jabatan` + `id_pangkat`, FK CASCADE ke `jabatan` & `pangkat`) — ditunda ke B-12 (AK JF) (Bagian 4 #14, 1.3 #3).
-- `jenjang_jf` (tanpa DDL; FK dari `jabatan`) — ditunda (Bagian 4 #4, Bagian 7).
-- `peta_jabatan`, `rumpun_jabatan`, `subrumpun_jabatan`, `jabatan_akademik`, `struktur_jabatan`, `periode_struktur_jabatan`, `jabatan_koordinasi` (tanpa DDL, ISSUE-003) — riset [I] di Bagian 7.
+- `jenjang_jf`, `peta_jabatan`, `rumpun_jabatan`, `subrumpun_jabatan`, `jabatan_akademik`, `struktur_jabatan`, `periode_struktur_jabatan`, `jabatan_koordinasi` — DDL [K] kini ada di D1; diajukan di **DBV-018** (`G-02b-jabatan-sisa-schema.md`, branch `dbv-018/g02-sisa-jabatan` yang bertumpuk di atas branch ini), termasuk FK `jabatan` → `jenjang_jf`.
 
 ### 2.8 Baris yang di-hard-code kode legacy (didokumentasikan, TIDAK dikunci — pola B6 G-06)
 
@@ -227,7 +236,7 @@ Semua entri: `auditColumns ['created_at','updated_at','updated_by']`, urutan mod
 - **Zonasi presensi (catatan Fase 5).** Legacy membaca `pegawai_mutasi_jabatan.id_satker` → `satker.zonasi` **tanpa filter status** lalu `$dtNow->modify("+{$zonasi} minutes")` (`Local.php:1761-1777`, `:1909-1923`, `L_user.php:2058-2067`). Fase 5 wajib membaca `satker.zonasi` langsung (termasuk satker Tidak Aktif/Dihapus), bukan dari options.
 - **Tukin (catatan Fase 5).** `L_employee.php:4470, 5159, 6478, 11591` LEFT JOIN `kelas_jabatan` tanpa filter status; `Lsl_gaji.php:217-232` (fitur 2026-09) memakai `status=1`. Legacy tidak konsisten; diputuskan di Fase 5, bukan G-02.
 - **Frontend.** Halaman generik `/master/:entity` dibangun dari `master/meta`: kolom Urutan dan item "Naikkan/Turunkan urutan" di menu ⋮ hanya untuk master ber-`order` (unit & group global, satker per unit, sub group per group; jabatan & kelas tidak pernah); filter 4 ref untuk jabatan; form satker dengan dropdown unit berjenjang dan input angka `zonasi` + hint; form jabatan dengan sub group terkunci sampai group dipilih; form kelas jabatan hanya punya input nomor kelas (berlabel "Kelas Jabatan", validasi 1–20) saat tambah dan tanpa input nama; pilihan ref kelas menampilkan nomor sekali. Dikunci `MasterDataView.g02.spec.ts`. Layout form tidak diubah (ISSUE-007).
-- **Fixture test** (`MasterDataSeeder::seedG02`, fixture blok `DBV-008`): 2 unit, 3 satker (satu UPT zonasi 60), 4 group, 5 sub group, kelas 7/9/11/13 dengan tukin [L] 5.079.200 / 6.335.750 / 8.757.600 / 10.936.000, 4 jabatan. Nama contoh [I]; ID kecil, bukan ID hard-coded 2.8.
+- **Fixture test** (`MasterDataSeeder::seedG02`, fixture blok `DBV-008`): 2 unit, 3 satker (satu UPT zonasi 60), 4 group, 5 sub group, kelas 7/9/11/13 dengan tukin contoh dari salinan lokal 5.079.200 / 6.335.750 / 8.757.600 / 10.936.000, 4 jabatan. Nama contoh [I]; ID kecil, bukan ID hard-coded 2.8.
 
 Perluasan engine CR-026 (generik, bawaan = perilaku lama; README engine "Opsi definisi tambahan (CR-026)"):
 - `MasterDefinition`: properti `codeAsName` & `idRange` (+ `fromConfig`, meta `code_as_name`/`id_range`); `columns()` tidak mendaftarkan kolom PK = nama dua kali; kode kanonik `idRange` = `/^[1-9][0-9]*\z/`; konstruktor menolak `idRange` dengan min < 1 atau min > max.
@@ -255,49 +264,56 @@ Catatan modul B/Fase lanjut (bukan pekerjaan master):
 - FK masuk (ERD) yang tipenya wajib cocok nanti (B-01/B-07/Fase 4–7): `pegawai_mutasi_jabatan`/`riwayat_mutasi_jabatan` (group, sub group, unit, satker, jabatan, atasan es1–4), `pegawai_plt`/`plh`, `jabatan_plt`, `pa_layanan`, `news`, `konv_ak`, `riwayat_lckh*`, `peta_jabatan`, `dm_ak_jf`, `pegawai_ak`, `riwayat_ak(_siasn)`. Tipe final: `id_unit`/`id_satker`/`id_jabatan`/`id_group_jabatan`/`id_sub_group_jabatan` **INT signed**; `kelas_jabatan` & `id_jenjang_jf` **TINYINT signed**.
 - DBV-009: `pengguna.id_unit/id_satker` VARCHAR(10) (`2026-09-17-000001_CreatePengguna.php:30-31`) vs legacy `d_user` INT [K :774-775]. Yang perlu disesuaikan saat itu: `AuthSeeder` & test Auth memakai `'S01'`/`'S02'` (mis. `SessionRevocationTest.php:102`), claims JWT `id_unit/id_satker`, dan scoping role 3 di `UserService` yang membandingkan string.
 
-## 3. Deviasi dari legacy & nilai [I]/[L]
+## 3. Deviasi dari legacy
 
 | # | Item | Legacy | v2 | Alasan / konsekuensi |
 |---|---|---|---|---|
 | 1 | Status 10 & COMMENT | Hapus keras semua master G-02; COMMENT `group_jabatan`/`jabatan` `'1: Active, 2: Inactive, 10: Deleted'` | Status 1/2/10 di keenam tabel, hapus = soft delete, COMMENT v2 | Aturan DBV-001/002/005 (G2). Tidak ada hard delete dari aplikasi, jadi FK RESTRICT tidak terpicu dari aplikasi |
 | 2 | UNIQUE nama (5 index) | Tidak ada UNIQUE selain PK; cek duplikat hanya status 1; cek jabatan dikomentari | 5 UNIQUE termasuk status 2/10, case-insensitive | **Audit duplikat wajib sebelum impor** (6.5 #1), terutama `jabatan` (cek dikomentari) dan baris status 2 legacy |
 | 3 | Lingkup UNIQUE jabatan | — | `(id_sub_group_jabatan, id_satker, jabatan)`; baris ber-`id_satker` NULL hanya dijaga aplikasi | JF/pelaksana tanpa satker; nama jabatan fungsional sama boleh di sub group berbeda |
-| 4 | Aksi FK | `jabatan` 5 FK SET NULL/CASCADE [K]; `satker → unit` SET NULL/CASCADE [L] | RESTRICT/RESTRICT, nama legacy | G2; CASCADE/SET NULL hanya berefek pada SQL manual. MariaDB bisa menyembunyikan RESTRICT di `SHOW CREATE TABLE` → diverifikasi lewat `REFERENTIAL_CONSTRAINTS` |
-| 5 | FK `jabatan → jenjang_jf` | Ada [K] :1468 | Tidak dibuat; kolom + KEY tetap | Tabel `jenjang_jf` tanpa DDL, tanpa CRUD legacy, di luar DoD (Bagian 4 #4) |
+| 4 | Aksi FK | `jabatan` 5 FK SET NULL/CASCADE [K]; `satker → unit` SET NULL/CASCADE, `sub_group_jabatan → group_jabatan` NO ACTION/CASCADE [K] D1 | RESTRICT/RESTRICT, nama legacy | G2; CASCADE/SET NULL hanya berefek pada SQL manual. MariaDB bisa menyembunyikan RESTRICT di `SHOW CREATE TABLE` → diverifikasi lewat `REFERENTIAL_CONSTRAINTS` |
+| 5 | FK `jabatan → jenjang_jf` | Ada [K] D1:1469 | Tidak dibuat di migration ini; kolom + KEY ada | Dibuat migration DBV-018 bersama tabel `jenjang_jf` [K] D1:1787-1796 (Bagian 4 #4) |
 | 6 | 5 CHECK | Tidak ada | `chk_unit_is_upt`, `chk_satker_is_upt`, `chk_satker_zonasi`, `chk_sub_group_jabatan_need_satker`, `chk_kelas_jabatan_kelas_jabatan` | Menegakkan domain form legacy di lapis DB (MySQL 3819 / MariaDB 4025); aplikasi menolak lebih dulu (422). Impor dengan nilai di luar rentang gagal → normalkan (6.5 #3) |
 | 7 | `is_upt` unit | Form mengirim `2` untuk "TIDAK" (`unit/form.php:44`), list menganggap ≠0 = YES | 1/0 + CHECK | Konsumen legacy memakai `== '1'`; impor memetakan 2 → 0 |
-| 8 | `sub_group_jabatan` | Tanpa DDL | Tabel [I] minimal + FK dari `jabatan` + `order` [V2] | Masuk DoD CRUD; kolom lengkap dari form/validasi legacy; `order` diisi saat impor (6.5 #5) |
-| 9 | `order` jabatan & kelas | Tidak ada di [K]/[L] | Tidak ditambah (`hasOrder false`) | G-01 #5 dikecualikan (1.3 #1) |
+| 8 | `sub_group_jabatan` | [K] D1:7183-7195 tanpa `order` | Ikut D1 + `order` [V2] + nama NOT NULL [V2] | Masuk DoD CRUD; `order` diisi saat impor (6.5 #5); nama NULL legacy diaudit (6.5 #2) |
+| 9 | `order` jabatan & kelas | Tidak ada di [K] D1 | Tidak ditambah (`hasOrder false`) | G-01 #5 dikecualikan (1.3 #1) |
 | 10 | Kelas jabatan | Edit hanya `tukin` (:1200-1211) | Sama: nomor kelas tidak bisa diubah | Nomor = PK alami yang dirujuk jabatan |
-| 11 | `need_satker` tipe | Tanpa DDL | TINYINT (tanpa lebar tampilan) | Nilai 1/2 bukan boolean; [I] |
-| 12 | AUTO_INCREMENT awal | `group_jabatan`=7, `jabatan`=2203 | Tidak ditulis | Preseden G2; counter disalin saat impor (6.5 #9) |
-| 13 | Kolom FK NULL-able | `satker.id_unit`, `jabatan.id_group_jabatan/id_sub_group_jabatan/id_satker/kelas_jabatan` NULL [K]/[L] | Tetap NULL-able (Salin langsung); wajib di aplikasi kecuali satker/kelas jabatan | Audit NULL/yatim sebelum impor (6.5 #2) |
+| 11 | `need_satker` | TINYINT(1) NOT NULL DEFAULT 2 [K] D1:7187 | Sama + CHECK 1/2 | Nilai 1/2 bukan boolean meskipun bertipe TINYINT(1); tipe & default ikut D1 (versi awal [I] TINYINT DEFAULT 1) |
+| 12 | AUTO_INCREMENT awal | D1: `unit`=27, `satker`=172, `group_jabatan`=7, `sub_group_jabatan`=84, `jabatan`=2204 | Tidak ditulis | Preseden G2; counter disalin saat impor (6.5 #9) |
+| 13 | Kolom FK NULL-able | `satker.id_unit`, `jabatan.id_group_jabatan/id_sub_group_jabatan/id_satker/kelas_jabatan` NULL [K] D1; `sub_group_jabatan.id_group_jabatan` NOT NULL [K] D1 | Ikut D1 (Salin langsung); wajib di aplikasi kecuali satker/kelas jabatan | Audit NULL/yatim sebelum impor (6.5 #2) |
+| 14 | Nama sub group NULL | `sub_group_jabatan.sub_group_jabatan` NULL [K] D1:7186 | NOT NULL | Nama = label dropdown & kunci UNIQUE (NULL lolos UNIQUE berkali-kali); form legacy mewajibkannya. Baris NULL legacy diaudit dan diisi sebelum impor (6.5 #2) |
+| 15 | Trigger `jabatan`/`satker` | 6 trigger AFTER menyalin ke tabel aplikasi lain lintas schema (D1:7743-7816, :10530-10576) | Tidak ada | v2 berada di DB terpisah; integrasi ke aplikasi lain ditangani rencana pengalihan konsumen (Bagian 4 #22) |
 
-Nilai **[I]/[L]** yang tersisa ada di Bagian 6.4.
+Tidak ada lagi nilai [I]/[L] di keenam tabel (Bagian 1.4, 6.4).
 
 ## 4. Keputusan yang diminta dari DB Validator (DBV-008)
 
 | # | Pertanyaan | Usulan | Keputusan |
 |---|---|---|---|
-| 1 | Label [L] untuk `unit`, `satker`, `kelas_jabatan` | Terima [L] sebagai dasar skema (bukti silang [K] Bagian 1); cocokkan dengan dump penuh (6.4); koreksi lewat ALTER baru | ⏳ |
-| 2 | Lingkup DBV-008 | 6 tabel sekarang; `peta_jabatan` + 6 tabel tanpa DDL + `jenjang_jf` ke unit lanjutan (key DBV berikutnya); G-02 tetap IN_PROGRESS. Peta tidak cocok engine (tanpa kolom nama, keunikan memakai `kebutuhan`) dan butuh halaman khusus → setelah MIG-001b (ISSUE-007) | ⏳ |
-| 3 | FK `jabatan → sub_group_jabatan` | **Opsi A (diimplementasikan):** tabel `sub_group_jabatan` [I] minimal (2.4) + FK. Opsi B: KEY saja, FK ditunda | ⏳ |
-| 4 | `jenjang_jf` | **Opsi B (diimplementasikan):** kolom `jabatan.id_jenjang_jf` TINYINT + KEY legacy, FK + tabel ditunda, kolom tidak dikelola engine (`hiddenColumns`). Opsi A: tabel [I] + engine (urutan manual per `kategori_jf`) — nilai `kategori_jf` belum diketahui, tanpa CRUD legacy, di luar DoD | ⏳ |
+| 1 | ~~Label [L] untuk `unit`, `satker`, `kelas_jabatan`~~ | **Gugur (01-10-2026):** D1 mengonfirmasi ketiganya sama persis → label [K] D1 (Bagian 1.4) | ✅ selesai oleh D1 (tidak perlu keputusan) |
+| 2 | Lingkup DBV-008 | 6 tabel di PR ini; `peta_jabatan`, `jenjang_jf`, dan 6 tabel jabatan lain di **DBV-018/CR-032** (dokumen `G-02b-jabatan-sisa-schema.md`, branch bertumpuk, PR setelah PR ini); G-02 tetap IN_PROGRESS sampai DBV-018 disetujui | ⏳ |
+| 3 | FK `jabatan → sub_group_jabatan` | **Opsi A (diimplementasikan):** tabel `sub_group_jabatan` (kini [K] D1, 2.4) + FK [K] D1:1471 | ⏳ |
+| 4 | `jenjang_jf` | Kolom `jabatan.id_jenjang_jf` TINYINT + KEY legacy di PR ini (kolom tidak dikelola engine, `hiddenColumns`). **Diperbarui 01-10-2026:** tabel `jenjang_jf` [K] D1:1787-1796 dan FK `fk_id_jenjang_jf_jab_to_jenjang_jf` (D1:1469, RESTRICT) dibuat migration DBV-018 terpisah, sehingga migration ini tidak perlu diubah lagi | ⏳ |
 | 5 | Aksi FK | RESTRICT/RESTRICT dengan nama legacy (deviasi dari SET NULL/CASCADE) | ⏳ |
 | 6 | 5 UNIQUE [V2] | `uq_unit_nama`, `uq_satker_nama (id_unit, satker)`, `uq_group_jabatan_nama`, `uq_sub_group_jabatan_nama (id_group_jabatan, sub_group_jabatan)`, `uq_jabatan_nama (id_sub_group_jabatan, id_satker, jabatan)` (1.008 byte); baris NULL hanya dijaga aplikasi; audit duplikat wajib sebelum impor (6.5 #1) | ⏳ |
-| 7 | Kolom `order` vs G-01 #5 | `order` TINYINT [V2] di `sub_group_jabatan` (per group); `jabatan` & `kelas_jabatan` tanpa `order` | ⏳ |
-| 8 | `satker.zonasi` | INT NOT NULL DEFAULT 0 [L]; wajib di form; 0–120 menit; CHECK `chk_satker_zonasi` [V2]; audit nilai di luar rentang sebelum impor | ⏳ |
-| 9 | `is_upt` unit & satker | TINYINT(1) NOT NULL DEFAULT 0 [L] + CHECK IN (0,1) [V2]; impor memetakan `unit.is_upt=2` → 0 | ⏳ |
-| 10 | `kelas_jabatan` | PK alami TINYINT [L] + CHECK 1–20 [V2]; dikelola engine lewat opsi CR-026 `codeAsName` + `idRange` (KJ-1, C1) | ⏳ |
+| 7 | Kolom `order` vs G-01 #5 | `order` TINYINT [V2] di `sub_group_jabatan` (per group; D1 tanpa `order`); `jabatan` & `kelas_jabatan` tanpa `order` | ⏳ |
+| 8 | `satker.zonasi` | INT NOT NULL DEFAULT 0 [K] D1:6895; wajib di form; 0–120 menit; CHECK `chk_satker_zonasi` [V2]; audit nilai di luar rentang sebelum impor | ⏳ |
+| 9 | `is_upt` unit & satker | TINYINT(1) NOT NULL DEFAULT 0 [K] D1 + CHECK IN (0,1) [V2]; impor memetakan `unit.is_upt=2` → 0 (CHECK aman setelah normalisasi) | ⏳ |
+| 10 | `kelas_jabatan` | PK alami TINYINT [K] D1 + CHECK 1–20 [V2]; dikelola engine lewat opsi CR-026 `codeAsName` + `idRange` (KJ-1, C1) | ⏳ |
 | 11 | `satker.logo_uns` | Disimpan, tidak dikelola/diekspos sampai ada fitur unggah (pola `faq_topic.icon` D6) | ⏳ |
 | 12 | `statusChain` | Dropdown `satker` (unit aktif) dan `sub-group-jabatan` (group aktif) memakai rantai status [V2] (pola U3); legacy hanya menyaring status baris sendiri | ⏳ |
 | 13 | Pindah group sub group | Ditolak bila sudah dirujuk jabatan (`SubGroupJabatanHooks`, 422) [V2] | ⏳ |
 | 14 | `dm_ak_jf` [K] | **Diubah dari rencana riset: ditunda ke B-12 (AK JF)** — FK `dm_ak_jf → pangkat` membuat `down()` migration DBV-004 tidak bisa dijalankan sendiri (test rollback G-04/G-05 patah), tabel tanpa API/UI, CRUD legacy rusak (`delete_akjf`). Alternatif: buat sekarang (DDL [K], FK RESTRICT) + sesuaikan `PangkatPendidikanSchemaTest` | ⏳ |
-| 15 | Kolom FK NULL-able | Tetap NULL-able ikut [K]/[L] (Salin langsung); wajib di aplikasi; audit NULL/yatim sebelum impor (6.5 #2) | ⏳ |
+| 15 | Kolom FK NULL-able | Ikut [K] D1 (Salin langsung; `sub_group_jabatan.id_group_jabatan` NOT NULL); wajib di aplikasi; audit NULL/yatim sebelum impor (6.5 #2) | ⏳ |
 | 16 | COMMENT | COMMENT status v2 di keenam tabel termasuk [K] (preseden `diklat` DBV-005); COMMENT `updated_by`, `zonasi`, `need_satker` [V2]. Rencana riset semula mempertahankan COMMENT legacy di tabel [K] — diganti demi konsistensi | ⏳ |
 | 17 | ID hard-coded & counter | Tidak dikunci (B6); impor membawa ID legacy + menyalin AUTO_INCREMENT (6.5 #9) | ⏳ |
 | 18 | Hubungan dengan DBV-009 | ALTER `pengguna.id_unit/id_satker` → INT + FK RESTRICT hanya setelah DBV-008 di main | ⏳ (keputusan user final; dicatat) |
 | 19 | Options `satker` opt-in setara `restrict` untuk role 3 | **Tidak diimplementasikan** — usulan, belum diputuskan user (Bagian 8) | ⏳ (butuh keputusan user) |
+| 20 | **(baru 01-10)** Penyelarasan `sub_group_jabatan` dengan D1 | Ikut D1: `id_group_jabatan` INT NOT NULL, `need_satker` TINYINT(1) NOT NULL DEFAULT 2, KEY `id_group_jabatan_idx`. Migration ini masih di PR (belum di `main`), jadi diedit langsung, bukan lewat ALTER | ⏳ |
+| 21 | **(baru 01-10)** `sub_group_jabatan.sub_group_jabatan` NOT NULL | Deviasi [V2] dari D1 (NULL): nama wajib di form legacy dan kunci UNIQUE; impor mengaudit baris NULL/kosong (6.5 #2) dan mengisinya bersama admin. Alternatif: ikut D1 (NULL) dan hanya dijaga aplikasi | ⏳ |
+| 22 | **(baru 01-10)** Trigger `jabatan_af*`/`satker_af*` | Tidak dibuat di v2 (DB terpisah; trigger lintas schema mengikat v2 ke schema aplikasi lain). Sinkron ke aplikasi konsumen masuk rencana pengalihan konsumen (J3), bukan skema | ⏳ |
+| 23 | **(baru 01-10)** COMMENT `is_upt` | COMMENT [V2] `'0: Bukan UPT, 1: UPT'` (padanan D1 `'0: No, 1: Yes'`), pola #16 | ⏳ |
+| 24 | **(baru 01-10)** Counter AUTO_INCREMENT D1 | Nilai counter D1 dicatat sebagai acuan langkah impor 6.5 #9 (`unit` 27, `satker` 172, `group_jabatan` 7, `sub_group_jabatan` 84, `jabatan` 2204); counter final dibaca ulang dari dump saat cutover | ⏳ |
 
 Approval tanpa catatan per poin akan dicatat mengikuti kolom **Usulan** (preseden DBV-001/002/005). Koreksi setelah approval dilakukan lewat migration ALTER baru, bukan mengedit migration ini.
 
@@ -306,8 +322,8 @@ Approval tanpa catatan per poin akan dicatat mengikuti kolom **Usulan** (presede
 | G-01 | Isi | Sebelumnya | Dengan DBV-008 (⏳) |
 |---|---|---|---|
 | Keputusan #5 | Semua master wajib `order` + `status` | ✅ YA (23-09-2026) | Dijalankan untuk unit/satker/group/sub group; `jabatan` & `kelas_jabatan` dikecualikan (Bagian 4 #7) |
-| Keputusan #8 | Tipe `pengguna.id_unit/id_satker` | BELUM DIPUTUSKAN | Tipe induk kini INT (unit/satker [L]); ALTER di DBV-009 setelah DBV-008 di main |
-| Bagian 3 | Daftar tabel tanpa DDL | menunggu dump (ISSUE-003) | `unit`, `satker`, `kelas_jabatan` [L] dan `sub_group_jabatan` [I] keluar dari daftar bila disetujui; `peta_jabatan`, `rumpun_jabatan`, `subrumpun_jabatan`, `jabatan_akademik`, `struktur_jabatan`, `periode_struktur_jabatan`, `jabatan_koordinasi`, `jenjang_jf` tetap. Dokumen G-01 tidak diubah di PR ini |
+| Keputusan #8 | Tipe `pengguna.id_unit/id_satker` | BELUM DIPUTUSKAN | Tipe induk INT [K] D1 (unit/satker); ALTER di DBV-009 setelah DBV-008 di main |
+| Bagian 3 | Daftar tabel tanpa DDL | menunggu dump (ISSUE-003) | D1 tersedia (01-10-2026): keenam tabel G-02 [K] D1; 8 tabel jabatan sisa [K] D1 diajukan di DBV-018. Dokumen G-01 tidak diubah di PR ini |
 
 ## 6. Verifikasi developer (sebelum review DB Validator)
 
@@ -327,15 +343,17 @@ MySQL 8.0.30 lokal (Laragon, `sql_mode` STRICT_TRANS_TABLES, row format default 
 | `phpunit tests/MasterData/JabatanUnitSatkerTest.php` (CR-026) | `OK (12 tests, 404 assertions)` — Bagian 2.9 |
 | `phpunit` `MasterGenericTcTest`, `RbacMasterEndpointsTest`, `MasterConfigSchemaTest`, `tests/unit/Libraries/MasterRegistryTest` | `OK` — G-TC #1–#6 generik mencakup keenam key G-02 (fixture blok `DBV-008`); `orderColumnType`/`columnType`/boolean cocok dengan DDL; `group-jabatan` ikut uji batas urutan TINYINT 127; registry menerima `codeAsName`/`idRange` kelas jabatan dan menolak 7 konfigurasi salah |
 | `vitest run src/features/master-data` | `16 passed` file / `145 passed` test (termasuk `MasterDataView.g02.spec.ts`, 10 test) |
+| **Revisi 01-10-2026** — siklus di DB scratch `simpeg_v2_scr_dbv008r` (nama database dicek sebelum `spark`, di-drop setelahnya; basis `origin/main` `cc553be` di-merge ke branch) | `migrate --all` (24 migration) → `migrate:rollback` (0 tabel G-02, 0 baris `migrations`) → `migrate --all`: keenam tabel kembali; `TABLE_CONSTRAINTS` 6 PRIMARY, 5 UNIQUE, 6 FOREIGN KEY, 5 CHECK; seluruh FK RESTRICT/RESTRICT; `sub_group_jabatan` sesuai D1 (`SHOW CREATE TABLE` di bawah) |
+| **Revisi 01-10-2026** — `phpunit JabatanUnitSatkerSchemaTest` | `OK (6 tests, 254 assertions)` (tambahan: `id_group_jabatan` NOT NULL, nama sub group NULL ditolak, default `need_satker` 2, KEY `id_group_jabatan_idx`, COMMENT `is_upt`); `JabatanUnitSatkerTest` + `MasterConfigSchemaTest` `OK (15 tests, 706 assertions)` |
 | Quality gate penuh (`fastcheck.py`, langkah = `./check.sh`: PHPStan level 5, PHP-CS-Fixer, PHPUnit 2 shard, ESLint, vue-tsc, Vitest, build) | **lolos** (30-09-2026, basis `origin/main` `89ea98d`): PHPStan `[OK] No errors`; PHP-CS-Fixer `Found 0 of 244`; PHPUnit `OK (290 tests, 10272 assertions)` + `OK (264 tests, 8669 assertions)` = 554 test; Vitest `32 passed` file / `331 passed` test; build lolos. Wajib dijalankan ulang setelah rebase sebelum merge |
 
-`SHOW CREATE TABLE` di DB scratch (MySQL 8.0.30):
+`SHOW CREATE TABLE` di DB scratch (MySQL 8.0.30; diperbarui setelah revisi 01-10-2026):
 
 ```sql
 CREATE TABLE `unit` (
   `id_unit` int NOT NULL AUTO_INCREMENT,
   `unit` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `is_upt` tinyint(1) NOT NULL DEFAULT '0',
+  `is_upt` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0: Bukan UPT, 1: UPT',
   `alamat_pdf_header` tinytext COLLATE utf8mb4_unicode_ci,
   `tembusan_kppn` varchar(256) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `lokasi_kppn` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -353,7 +371,7 @@ CREATE TABLE `satker` (
   `id_satker` int NOT NULL AUTO_INCREMENT,
   `id_unit` int DEFAULT NULL,
   `satker` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `is_upt` tinyint(1) NOT NULL DEFAULT '0',
+  `is_upt` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0: Bukan UPT, 1: UPT',
   `alamat_pdf_header` text COLLATE utf8mb4_unicode_ci,
   `tembusan_kppn` varchar(256) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `lokasi_kppn` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -386,9 +404,9 @@ CREATE TABLE `group_jabatan` (
 
 CREATE TABLE `sub_group_jabatan` (
   `id_sub_group_jabatan` int NOT NULL AUTO_INCREMENT,
-  `id_group_jabatan` int DEFAULT NULL,
+  `id_group_jabatan` int NOT NULL,
   `sub_group_jabatan` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `need_satker` tinyint NOT NULL DEFAULT '1' COMMENT '1: Ya, 2: Tidak (jabatan dipilih per satuan kerja di riwayat jabatan)',
+  `need_satker` tinyint(1) NOT NULL DEFAULT '2' COMMENT '1: Ya, 2: Tidak (jabatan dipilih per satuan kerja di riwayat jabatan)',
   `order` tinyint NOT NULL DEFAULT '1',
   `status` tinyint NOT NULL DEFAULT '1' COMMENT '1: Aktif, 2: Tidak Aktif, 10: Dihapus',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -396,7 +414,7 @@ CREATE TABLE `sub_group_jabatan` (
   `updated_by` int DEFAULT NULL COMMENT 'id_pengguna yang terakhir mengubah',
   PRIMARY KEY (`id_sub_group_jabatan`),
   UNIQUE KEY `uq_sub_group_jabatan_nama` (`id_group_jabatan`,`sub_group_jabatan`),
-  KEY `fk_id_group_jabatan_sgj_to_gj` (`id_group_jabatan`),
+  KEY `id_group_jabatan_idx` (`id_group_jabatan`),
   CONSTRAINT `fk_id_group_jabatan_sgj_to_gj` FOREIGN KEY (`id_group_jabatan`) REFERENCES `group_jabatan` (`id_group_jabatan`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `chk_sub_group_jabatan_need_satker` CHECK ((`need_satker` in (1,2)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -452,15 +470,15 @@ Mohon hasil berikut dilaporkan di PR (poin mana yang lolos/gagal):
 6. UNIQUE 1.008 byte `uq_jabatan_nama` diterima (row format DYNAMIC).
 7. Opsional (perilaku aplikasi di atas MariaDB): `vendor/bin/phpunit --no-coverage tests/MasterData/JabatanUnitSatkerTest.php` dan `MasterGenericTcTest.php` + `RbacMasterEndpointsTest.php`.
 
-### 6.4 Nilai [I]/[L] yang menunggu dump struktur produksi (`mysqldump --no-data` penuh simpeg01)
+### 6.4 Pencocokan dengan dump struktur produksi — selesai (01-10-2026)
 
-1. `SHOW CREATE TABLE unit`, `satker`, `kelas_jabatan` produksi: pastikan sama dengan [L] (tipe/panjang, `alamat_pdf_header` TINYTEXT vs TEXT, `order` INT vs SMALLINT, `zonasi`, `logo_uns`, aksi FK `satker → unit`), counter AUTO_INCREMENT.
-2. `SHOW CREATE TABLE sub_group_jabatan`: tipe PK, panjang nama (100 [I]), `need_satker` (tipe, default), keberadaan `order`/`created_at`, aksi FK `fk_id_group_jabatan_sgj_to_gj`, nullability `id_group_jabatan`.
-3. `jenjang_jf` dan tabel Bagian 7 (untuk unit lanjutan).
-4. Tipe kolom anak yang merujuk tabel G-02 (daftar FK masuk di 2.9 "Catatan modul B").
-5. Data: 6.5.
+Dump struktur lengkap D1 diterima 01-10-2026. Hasil per butir rencana semula:
 
-Bila dump berbeda: koreksi lewat migration ALTER baru selagi tabel masih kosong (migration ini tidak diedit setelah disetujui).
+1. `unit`, `satker`, `kelas_jabatan`: sama dengan [L] (tipe/panjang, `alamat_pdf_header` TINYTEXT vs TEXT, `order` INT vs SMALLINT, `zonasi`, `logo_uns`, aksi FK `satker → unit` SET NULL/CASCADE). Counter: `unit` 27, `satker` 172 (Bagian 1.4).
+2. `sub_group_jabatan`: berselisih; diselaraskan (Bagian 1.4, Bagian 4 #20–#21).
+3. `jenjang_jf` dan tabel Bagian 7: DDL [K] di D1 → DBV-018.
+4. Tipe kolom anak yang merujuk tabel G-02: dicocokkan per modul B saat DDL-nya diajukan (DBV-012/013).
+5. Data: tetap 6.5 (D1 tanpa data).
 
 ### 6.5 Audit sebelum impor (SQL baca-saja di salinan data legacy)
 
@@ -485,6 +503,7 @@ Memenuhi janji `DBV-011` (runbook, "UNIQUE dan butir auditnya ditambahkan saat D
    ```sql
    SELECT id_satker FROM satker s WHERE id_unit IS NULL OR NOT EXISTS (SELECT 1 FROM unit u WHERE u.id_unit = s.id_unit);
    SELECT id_sub_group_jabatan FROM sub_group_jabatan s WHERE id_group_jabatan IS NULL OR NOT EXISTS (SELECT 1 FROM group_jabatan g WHERE g.id_group_jabatan = s.id_group_jabatan);
+   SELECT id_sub_group_jabatan FROM sub_group_jabatan WHERE sub_group_jabatan IS NULL OR TRIM(sub_group_jabatan) = ''; -- v2 NOT NULL (Bagian 4 #21)
    SELECT id_jabatan FROM jabatan j WHERE id_group_jabatan IS NULL OR id_sub_group_jabatan IS NULL
        OR NOT EXISTS (SELECT 1 FROM group_jabatan g WHERE g.id_group_jabatan = j.id_group_jabatan)
        OR NOT EXISTS (SELECT 1 FROM sub_group_jabatan s WHERE s.id_sub_group_jabatan = j.id_sub_group_jabatan)
@@ -513,7 +532,7 @@ Memenuhi janji `DBV-011` (runbook, "UNIQUE dan butir auditnya ditambahkan saat D
 6. **`stripslashes`** kolom teks yang di-`addslashes` legacy (`unit`, `satker`, `alamat_pdf_header`, `tembusan_kppn`, `lokasi_kppn`, `sub_group_jabatan`, `group_jabatan`, `jabatan`): audit pola `\'`, `\"`, `\\` per baris sebelum memutuskan (pola G-06 6.5 #2).
 7. **Baris hard-coded 2.8** ada dengan ID tersebut dan namanya sesuai arti di kode legacy.
 8. **Audit & zona waktu**: `updated_by` legacy = `user.id` akun legacy → petakan ke `id_pengguna`; `created_at`/`updated_at` jam server → konversi mengikuti keputusan zona waktu global (DBV-011 R1–R4).
-9. **Counter AUTO_INCREMENT**: impor dengan ID eksplisit hanya menaikkan counter ke `MAX(id)+1`. Legacy menghapus keras semua master G-02, jadi setelah impor `unit`, `satker`, `group_jabatan` (legacy 7), `sub_group_jabatan`, dan `jabatan` (legacy 2203), bila counter legacy (`SHOW TABLE STATUS` / dump 6.4) lebih besar dari `MAX(id)+1`, jalankan `ALTER TABLE <tabel> AUTO_INCREMENT = <counter legacy>`. `kelas_jabatan` tanpa AUTO_INCREMENT.
+9. **Counter AUTO_INCREMENT**: impor dengan ID eksplisit hanya menaikkan counter ke `MAX(id)+1`. Legacy menghapus keras semua master G-02, jadi setelah impor `unit` (D1 27), `satker` (D1 172), `group_jabatan` (D1 7), `sub_group_jabatan` (D1 84), dan `jabatan` (D1 2204), bila counter legacy (`SHOW TABLE STATUS` saat cutover; nilai D1 hanya acuan) lebih besar dari `MAX(id)+1`, jalankan `ALTER TABLE <tabel> AUTO_INCREMENT = <counter legacy>`. `kelas_jabatan` tanpa AUTO_INCREMENT.
 10. **Salinan nama di riwayat** (`pegawai_mutasi_jabatan.group_jabatan/sub_group_jabatan/unit/satker/jabatan`, `d_lkh.unit/satker`) disalin apa adanya, jangan di-join ulang ke master.
 
 ### 6.6 Pemulihan bila `up()` gagal di tengah
@@ -522,7 +541,7 @@ DDL MySQL/MariaDB ter-commit per statement dan migration yang gagal tidak tercat
 
 ## 7. Tabel ditunda — hasil riset [I] untuk unit lanjutan
 
-Semua tanpa DDL (ISSUE-003). Tiap tabel akan diajukan dengan key DBV berikutnya setelah dump tersedia atau keputusan [I] diambil; G-02 tetap IN_PROGRESS sampai `peta_jabatan` selesai.
+**Diperbarui 01-10-2026:** DDL [K] kedelapan tabel di bawah (kecuali `dm_ak_jf`) ada di D1 dan diajukan sebagai CREATE di **DBV-018** (`G-02b-jabatan-sisa-schema.md`). Riset [I] di bawah dipertahankan sebagai catatan perilaku legacy; skema final mengikuti D1.
 
 | Tabel | Kolom dari kode legacy [I] | FK (ERD) | Konsumen / catatan |
 |---|---|---|---|

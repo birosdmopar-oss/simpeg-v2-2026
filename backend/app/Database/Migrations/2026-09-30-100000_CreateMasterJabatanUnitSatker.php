@@ -12,14 +12,12 @@ use Throwable;
 /**
  * DBV-008 — G-02: master unit kerja, satuan kerja, group & sub group jabatan, kelas jabatan, dan jabatan dengan skema
  * SIMPEG legacy (Mapping Migrasi Prinsip #1, Tier 1 "Copy langsung").
- * Sumber:
- *   - `group_jabatan` = DDL produksi `simpeg_prod.sql:1294-1303` [K]; `jabatan` = `simpeg_prod.sql:1447-1472` [K].
- *   - `unit`, `satker`, `kelas_jabatan` = `SHOW CREATE TABLE` salinan lokal `simpeg_prod_duplikat` [L] (asal-usul salinan
- *     belum pasti; tipe dicek silang dengan [K]: `d_user.id_unit/id_satker` INT :774-775, `d_lkh.unit/satker`
- *     VARCHAR(150) :680-681, FK `jabatan.kelas_jabatan` TINYINT :1453/:1471).
- *   - `sub_group_jabatan` tidak punya DDL di mana pun → [I] dari kode legacy (`Lm_jabatan.php:938-1018`, form
- *     `views/hr/master/jabatan/sub_group/form.php`), ERD `simpeg01.erd` (nama FK), dan tipe kolom anak [K]
- *     (`jabatan.id_sub_group_jabatan` INT :1450).
+ * Sumber: dump struktur produksi lengkap `simpeg01_struktur_lengkap_20261001.sql` (D1, MySQL 8.0.21) [K] untuk keenam
+ * tabel: `unit` D1:7505-7518, `satker` D1:6886-6904, `group_jabatan` D1:1295-1304, `sub_group_jabatan` D1:7183-7195,
+ * `kelas_jabatan` D1:2027-2035, `jabatan` D1:1448-1473 (`group_jabatan`/`jabatan` sama dengan `simpeg_prod.sql`
+ * :1294-1303/:1447-1472). Revisi 01-10-2026: `unit`/`satker`/`kelas_jabatan` semula [L] salinan lokal (cocok dengan D1)
+ * dan `sub_group_jabatan` semula [I] dari kode; `sub_group_jabatan` diselaraskan dengan D1 (`id_group_jabatan` NOT
+ * NULL, `need_satker` TINYINT(1) DEFAULT 2, KEY legacy `id_group_jabatan_idx`).
  * Review DB Validator: backend/docs/db-review/G-02-jabatan-unit-satker-schema.md — JANGAN dijalankan di Dev/Production
  * sebelum disetujui.
  *
@@ -32,11 +30,14 @@ use Throwable;
  *   - UNIQUE nama: `unit`, `satker (id_unit, satker)`, `group_jabatan`, `sub_group_jabatan (id_group_jabatan,
  *     sub_group_jabatan)`, `jabatan (id_sub_group_jabatan, id_satker, jabatan)`; berlaku juga untuk baris status 2/10.
  *   - FK ON DELETE RESTRICT ON UPDATE RESTRICT dengan nama legacy (legacy SET NULL / CASCADE).
- *   - FK `jabatan.id_jenjang_jf` → `jenjang_jf` TIDAK dibuat (tabel `jenjang_jf` tanpa DDL, ditunda); kolom + KEY-nya
- *     tetap ada.
+ *   - FK `jabatan.id_jenjang_jf` → `jenjang_jf` [K] D1:1469 TIDAK dibuat di sini; tabel `jenjang_jf` + FK-nya
+ *     ditambahkan migration DBV-018 (G-02 sisa). Kolom + KEY-nya sudah ada.
  *   - 5 CHECK: `is_upt` 0/1 (unit, satker), `satker.zonasi` 0..120 menit, `sub_group_jabatan.need_satker` 1/2,
  *     `kelas_jabatan` 1..20.
- *   - Kolom `order` TINYINT [V2] di `sub_group_jabatan` (tabel [I]); `jabatan` dan `kelas_jabatan` tanpa `order`.
+ *   - Kolom `order` TINYINT [V2] di `sub_group_jabatan` (tidak ada di D1); `jabatan` dan `kelas_jabatan` tanpa `order`.
+ *   - `sub_group_jabatan.sub_group_jabatan` NOT NULL [V2] (D1 NULL): nama tampilan wajib dan bagian kunci UNIQUE.
+ *   - Trigger legacy `jabatan_af*`/`satker_af*` (D1:7743-7816, :10530-10576; menulis lintas schema ke aplikasi lain)
+ *     tidak dibuat: integrasi itu ditangani rencana pengalihan konsumen, bukan skema v2.
  *
  * Kolom audit diisi aplikasi (waktu UTC, id_pengguna aktor); default DB hanya cadangan untuk penulisan di luar
  * aplikasi. Nilai AUTO_INCREMENT awal tidak ditulis (legacy group_jabatan AUTO_INCREMENT=7, jabatan=2203; counter
@@ -92,12 +93,12 @@ class CreateMasterJabatanUnitSatker extends Migration
         $restrict = 'ON DELETE RESTRICT ON UPDATE RESTRICT';
         $sql      = [];
 
-        // [L] simpeg_prod_duplikat. is_upt: 1 UPT / 0 bukan (konsumen legacy memakai == '1'; form unit legacy mengirim 2
+        // [K] D1:7505-7518. is_upt: 1 UPT / 0 bukan (konsumen legacy memakai == '1'; form unit legacy mengirim 2
         // untuk "TIDAK", dinormalkan ke 0 saat impor).
         $sql['unit'] = "CREATE TABLE {$this->t('unit')} (
             `id_unit` INT NOT NULL AUTO_INCREMENT,
             `unit` VARCHAR(150) NOT NULL,
-            `is_upt` TINYINT(1) NOT NULL DEFAULT 0,
+            `is_upt` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0: Bukan UPT, 1: UPT',
             `alamat_pdf_header` TINYTEXT NULL,
             `tembusan_kppn` VARCHAR(256) NULL DEFAULT NULL,
             `lokasi_kppn` VARCHAR(50) NULL DEFAULT NULL,
@@ -109,13 +110,13 @@ class CreateMasterJabatanUnitSatker extends Migration
             CONSTRAINT `chk_unit_is_upt` CHECK (`is_upt` IN (0, 1))
         ) " . self::TABLE_OPTIONS;
 
-        // [L] simpeg_prod_duplikat. zonasi = selisih jam presensi dari WIB dalam menit (form legacy "WIB + N menit",
+        // [K] D1:6886-6904. zonasi = selisih jam presensi dari WIB dalam menit (form legacy "WIB + N menit",
         // mask 0-120, satker/form.php:48-58, :131-135). logo_uns disimpan, belum dikelola v2.
         $sql['satker'] = "CREATE TABLE {$this->t('satker')} (
             `id_satker` INT NOT NULL AUTO_INCREMENT,
             `id_unit` INT NULL DEFAULT NULL,
             `satker` VARCHAR(150) NOT NULL,
-            `is_upt` TINYINT(1) NOT NULL DEFAULT 0,
+            `is_upt` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0: Bukan UPT, 1: UPT',
             `alamat_pdf_header` TEXT NULL,
             `tembusan_kppn` VARCHAR(256) NULL DEFAULT NULL,
             `lokasi_kppn` VARCHAR(50) NULL DEFAULT NULL,
@@ -133,7 +134,7 @@ class CreateMasterJabatanUnitSatker extends Migration
             CONSTRAINT `chk_satker_zonasi` CHECK (`zonasi` BETWEEN 0 AND 120)
         ) " . self::TABLE_OPTIONS;
 
-        // [K] simpeg_prod.sql:1294-1303 (urutan kolom legacy: status sebelum order; status TINYINT(1)).
+        // [K] D1:1295-1304 (urutan kolom legacy: status sebelum order; status TINYINT(1)).
         $sql['group_jabatan'] = "CREATE TABLE {$this->t('group_jabatan')} (
             `id_group_jabatan` INT NOT NULL AUTO_INCREMENT,
             `group_jabatan` VARCHAR(45) NOT NULL,
@@ -144,24 +145,25 @@ class CreateMasterJabatanUnitSatker extends Migration
             UNIQUE KEY `uq_group_jabatan_nama` (`group_jabatan`)
         ) " . self::TABLE_OPTIONS;
 
-        // [I] tanpa DDL. need_satker 1 Ya / 2 Tidak (Lm_jabatan.php:1015); order [V2] (urutan dropdown per group).
+        // [K] D1:7183-7195. need_satker 1 Ya / 2 Tidak (Lm_jabatan.php:1015); order [V2] (urutan dropdown per group);
+        // nama NOT NULL [V2] (D1 NULL). KEY legacy id_group_jabatan_idx menjadi index FK.
         $sql['sub_group_jabatan'] = "CREATE TABLE {$this->t('sub_group_jabatan')} (
             `id_sub_group_jabatan` INT NOT NULL AUTO_INCREMENT,
-            `id_group_jabatan` INT NULL DEFAULT NULL,
+            `id_group_jabatan` INT NOT NULL,
             `sub_group_jabatan` VARCHAR(100) NOT NULL,
-            `need_satker` TINYINT NOT NULL DEFAULT 1 COMMENT '1: Ya, 2: Tidak (jabatan dipilih per satuan kerja di riwayat jabatan)',
+            `need_satker` TINYINT(1) NOT NULL DEFAULT 2 COMMENT '1: Ya, 2: Tidak (jabatan dipilih per satuan kerja di riwayat jabatan)',
             `order` TINYINT NOT NULL DEFAULT 1,
             `status` TINYINT NOT NULL DEFAULT 1 {$status},
             {$audit},
             PRIMARY KEY (`id_sub_group_jabatan`),
             UNIQUE KEY `uq_sub_group_jabatan_nama` (`id_group_jabatan`, `sub_group_jabatan`),
-            KEY `fk_id_group_jabatan_sgj_to_gj` (`id_group_jabatan`),
+            KEY `id_group_jabatan_idx` (`id_group_jabatan`),
             CONSTRAINT `fk_id_group_jabatan_sgj_to_gj` FOREIGN KEY (`id_group_jabatan`)
                 REFERENCES {$this->t('group_jabatan')} (`id_group_jabatan`) {$restrict},
             CONSTRAINT `chk_sub_group_jabatan_need_satker` CHECK (`need_satker` IN (1, 2))
         ) " . self::TABLE_OPTIONS;
 
-        // [L] simpeg_prod_duplikat: PK alami = nomor kelas (bukan AUTO_INCREMENT), tanpa kolom nama/order.
+        // [K] D1:2027-2035 (legacy COLLATE 0900, tanpa kolom string; v2 unicode_ci seperti tabel lain): PK alami = nomor kelas (bukan AUTO_INCREMENT), tanpa kolom nama/order.
         $sql['kelas_jabatan'] = "CREATE TABLE {$this->t('kelas_jabatan')} (
             `kelas_jabatan` TINYINT NOT NULL,
             `tukin` INT NOT NULL,
@@ -171,7 +173,7 @@ class CreateMasterJabatanUnitSatker extends Migration
             CONSTRAINT `chk_kelas_jabatan_kelas_jabatan` CHECK (`kelas_jabatan` BETWEEN 1 AND 20)
         ) " . self::TABLE_OPTIONS;
 
-        // [K] simpeg_prod.sql:1447-1472. FK ke jenjang_jf tidak dibuat (tabel tanpa DDL, ditunda); KEY-nya tetap.
+        // [K] D1:1448-1473. FK ke jenjang_jf (D1:1469) ditambahkan migration DBV-018 bersama tabelnya; KEY-nya sudah ada.
         $sql['jabatan'] = "CREATE TABLE {$this->t('jabatan')} (
             `id_jabatan` INT NOT NULL AUTO_INCREMENT,
             `id_group_jabatan` INT NULL DEFAULT NULL,
@@ -222,7 +224,7 @@ class CreateMasterJabatanUnitSatker extends Migration
     }
 
     /**
-     * Kolom audit pola `group_jabatan`/`jabatan` [K] (sama di tabel [L]): created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     * Kolom audit pola D1 keenam tabel [K]: created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
      * updated_at NULL ON UPDATE, updated_by = id_pengguna aktor tanpa FK (preseden DBV-001).
      */
     private function auditColumnsSql(): string

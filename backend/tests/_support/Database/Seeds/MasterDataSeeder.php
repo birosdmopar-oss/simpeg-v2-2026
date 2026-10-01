@@ -310,7 +310,7 @@ class MasterDataSeeder extends Seeder
     // --- DBV-008 (method) ---
     /**
      * G-02 (DBV-008/CR-026): 2 unit, 3 satker (satu UPT ber-zonasi 60 = WITA), 4 group, 5 sub group (`need_satker` 1/2),
-     * 4 kelas jabatan dengan tukin salinan lokal [L] (kelas 7/9/11/13), 4 jabatan (struktural ber-satker, JF/pelaksana
+     * 4 kelas jabatan dengan tukin contoh dari salinan lokal (kelas 7/9/11/13), 4 jabatan (struktural ber-satker, JF/pelaksana
      * tanpa satker). Nama contoh [I] (data produksi belum ada); ID kecil, bukan ID hard-coded legacy (G-02 Bagian 2.8).
      */
     private function seedG02(): void

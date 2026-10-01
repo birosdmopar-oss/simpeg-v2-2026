@@ -10,8 +10,8 @@ use CodeIgniter\Test\DatabaseTestTrait;
 
 /**
  * DBV-008 — skema G-02 hasil migration 2026-09-30-100000_CreateMasterJabatanUnitSatker harus sama dengan skema yang
- * diajukan ke DB Validator (backend/docs/db-review/G-02-jabatan-unit-satker-schema.md Bagian 2): DDL legacy
- * `group_jabatan` & `jabatan` [K], `unit`/`satker`/`kelas_jabatan` salinan lokal [L], `sub_group_jabatan` [I], plus
+ * diajukan ke DB Validator (backend/docs/db-review/G-02-jabatan-unit-satker-schema.md Bagian 2): DDL keenam tabel dari
+ * dump struktur produksi lengkap D1 `simpeg01_struktur_lengkap_20261001.sql` [K] (revisi 01-10-2026), plus
  * deviasi v2 (status 10, 5 UNIQUE nama, FK RESTRICT, FK jenjang_jf ditunda, 5 CHECK). Migration tidak menulis baris apa
  * pun dan bisa di-rollback.
  *
@@ -63,8 +63,8 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
             'created_at'       => 'datetime', 'updated_at' => 'datetime null', 'updated_by' => 'int null',
         ],
         'sub_group_jabatan' => [
-            'id_sub_group_jabatan' => 'int', 'id_group_jabatan' => 'int null', 'sub_group_jabatan' => 'varchar(100)',
-            'need_satker'          => 'tinyint', 'order' => 'tinyint', 'status' => 'tinyint', 'created_at' => 'datetime',
+            'id_sub_group_jabatan' => 'int', 'id_group_jabatan' => 'int', 'sub_group_jabatan' => 'varchar(100)',
+            'need_satker'          => 'tinyint(1)', 'order' => 'tinyint', 'status' => 'tinyint', 'created_at' => 'datetime',
             'updated_at'           => 'datetime null', 'updated_by' => 'int null',
         ],
         'kelas_jabatan' => [
@@ -97,9 +97,9 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
             'uq_group_jabatan_nama' => [0, 'BTREE', ['group_jabatan']],
         ],
         'sub_group_jabatan' => [
-            'PRIMARY'                       => [0, 'BTREE', ['id_sub_group_jabatan']],
-            'uq_sub_group_jabatan_nama'     => [0, 'BTREE', ['id_group_jabatan', 'sub_group_jabatan']],
-            'fk_id_group_jabatan_sgj_to_gj' => [1, 'BTREE', ['id_group_jabatan']],
+            'PRIMARY'                   => [0, 'BTREE', ['id_sub_group_jabatan']],
+            'uq_sub_group_jabatan_nama' => [0, 'BTREE', ['id_group_jabatan', 'sub_group_jabatan']],
+            'id_group_jabatan_idx'      => [1, 'BTREE', ['id_group_jabatan']],
         ],
         'kelas_jabatan' => [
             'PRIMARY' => [0, 'BTREE', ['kelas_jabatan']],
@@ -118,8 +118,8 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
 
     /**
      * Seluruh FK dari/ke keenam tabel, urut nama: [tabel anak, kolom, tabel induk, kolom induk, UPDATE_RULE, DELETE_RULE].
-     * Nama legacy (simpeg_prod.sql:1467-1471, ERD simpeg01, salinan lokal satker); aksi RESTRICT/RESTRICT [V2]. FK
-     * `fk_id_jenjang_jf_jab_to_jenjang_jf` sengaja tidak ada (tabel jenjang_jf ditunda, G-02 Bagian 4 #4).
+     * Nama legacy (D1:1468, :1470-1472, :6903, :7194); aksi RESTRICT/RESTRICT [V2]. FK `fk_id_jenjang_jf_jab_to_jenjang_jf`
+     * sengaja tidak ada di migration ini (dibuat migration DBV-018 bersama tabel jenjang_jf, G-02 Bagian 4 #4).
      */
     private const FOREIGN_KEYS = [
         'fk_id_group_jabatan_jabatan_to_gj'        => ['jabatan', 'id_group_jabatan', 'group_jabatan', 'id_group_jabatan', 'RESTRICT', 'RESTRICT'],
@@ -198,7 +198,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
             $this->assertStringContainsString('auto_increment', strtolower((string) $this->columnInfo($table, $pk)['EXTRA']), "{$table}.{$pk}");
         }
 
-        // kelas_jabatan: PK alami tanpa AUTO_INCREMENT dan tanpa default [L].
+        // kelas_jabatan: PK alami tanpa AUTO_INCREMENT dan tanpa default [K] D1:2028.
         $kelas = $this->columnInfo('kelas_jabatan', 'kelas_jabatan');
         $this->assertStringNotContainsString('auto_increment', strtolower((string) $kelas['EXTRA']));
         $this->assertNull($kelas['COLUMN_DEFAULT']);
@@ -206,6 +206,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
 
         foreach (['unit', 'satker'] as $table) {
             $this->assertSame('0', $this->unquote($this->columnInfo($table, 'is_upt')['COLUMN_DEFAULT']), "{$table}.is_upt default 0");
+            $this->assertSame('0: Bukan UPT, 1: UPT', $this->columnInfo($table, 'is_upt')['COLUMN_COMMENT'], "{$table}.is_upt COMMENT");
         }
 
         $zonasi = $this->columnInfo('satker', 'zonasi');
@@ -213,7 +214,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         $this->assertSame('offset jam presensi dari WIB dalam menit: 0 WIB, 60 WITA, 120 WIT', $zonasi['COLUMN_COMMENT']);
 
         $needSatker = $this->columnInfo('sub_group_jabatan', 'need_satker');
-        $this->assertSame('1', $this->unquote($needSatker['COLUMN_DEFAULT']));
+        $this->assertSame('2', $this->unquote($needSatker['COLUMN_DEFAULT']), 'need_satker default 2 (Tidak) [K] D1:7187');
         $this->assertSame('1: Ya, 2: Tidak (jabatan dipilih per satuan kerja di riwayat jabatan)', $needSatker['COLUMN_COMMENT']);
 
         $this->assertTrue($this->isNullDefault($this->columnInfo('satker', 'logo_uns')['COLUMN_DEFAULT']), 'logo_uns default NULL');
@@ -322,7 +323,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         $this->assertDbWriteFails(fn () => $this->db->table('satker')->insert(['id_unit' => 7, 'satker' => 'Zona Lewat', 'zonasi' => 121]));
         $this->assertDbWriteFails(fn () => $this->db->table('satker')->insert(['id_unit' => 7, 'satker' => 'UPT Dua', 'is_upt' => 2]));
 
-        // id_unit NULL [L]: UNIQUE (id_unit, satker) tidak membandingkan NULL — hanya ditegakkan aplikasi (Bagian 4 #6).
+        // id_unit NULL [K] D1:6888: UNIQUE (id_unit, satker) tidak membandingkan NULL — hanya ditegakkan aplikasi (Bagian 4 #6).
         $this->db->table('satker')->insert(['id_unit' => null, 'satker' => 'Satker Yatim']);
         $this->db->table('satker')->insert(['id_unit' => null, 'satker' => 'Satker Yatim']);
         $this->assertSame(2, $this->db->table('satker')->where('satker', 'Satker Yatim')->countAllResults());
@@ -341,10 +342,13 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
 
         // Sub group: FK ke group, nama unik per group, need_satker 1/2.
         $this->db->table('sub_group_jabatan')->insert(['id_sub_group_jabatan' => 57, 'id_group_jabatan' => 1, 'sub_group_jabatan' => 'Tenaga Ahli']);
-        $this->seeInDatabase('sub_group_jabatan', ['id_sub_group_jabatan' => 57, 'need_satker' => 1, 'order' => 1, 'status' => 1]);
+        $this->seeInDatabase('sub_group_jabatan', ['id_sub_group_jabatan' => 57, 'need_satker' => 2, 'order' => 1, 'status' => 1]);
         $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 2, 'sub_group_jabatan' => 'tenaga ahli', 'need_satker' => 2]);
         $this->assertDbWriteFails(fn () => $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 1, 'sub_group_jabatan' => 'TENAGA AHLI']));
         $this->assertDbWriteFails(fn () => $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 99, 'sub_group_jabatan' => 'Tanpa Group']));
+        // id_group_jabatan NOT NULL [K] D1:7185; nama NOT NULL [V2] (D1:7186 NULL).
+        $this->assertDbWriteFails(fn () => $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => null, 'sub_group_jabatan' => 'Group Kosong']));
+        $this->assertDbWriteFails(fn () => $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 1, 'sub_group_jabatan' => null]));
         $this->assertDbWriteFails(fn () => $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 1, 'sub_group_jabatan' => 'Butuh Nol', 'need_satker' => 0]));
         $this->assertDbWriteFails(fn () => $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 1, 'sub_group_jabatan' => 'Butuh Tiga', 'need_satker' => 3]));
 

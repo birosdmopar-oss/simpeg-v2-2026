@@ -16,7 +16,7 @@ namespace App\Controllers\Api\MasterData;
  *   - `kelas-jabatan/options` (id = nama = nomor kelas, codeAsName CR-026).
  * `satker.zonasi` (offset jam presensi dari WIB, 0–120 menit) wajib. `satker.logo_uns` dan `jabatan.id_jenjang_jf`
  * disimpan tetapi tidak dikelola/diekspos (hiddenColumns). Pindah group sub group yang sudah dirujuk jabatan ditolak
- * (SubGroupJabatanHooks). Peta jabatan & tabel jabatan lain tanpa DDL ditunda (G-02 Bagian 7).
+ * (SubGroupJabatanHooks). Peta jabatan & tabel jabatan lain: DBV-018 (G-02b).
  */
 class JabatanController extends BaseMasterController
 {
