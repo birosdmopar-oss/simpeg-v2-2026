@@ -94,9 +94,20 @@ Pengiriman tautan (ISSUE-006, kanal final = email/K3): untuk akun aktif, tautan 
 |---|---|---|
 | `log` (default) | development | tautan (berisi token) ditulis ke `writable/logs` — **ditolak di production** |
 | `mock` | test (PHPUnit) | tautan disimpan di memori — **ditolak di production** |
-| `email` | production | belum ada; menunggu akun SMTP (driver wajib async lewat Queue) |
+| `email` | production (CR-014) | job terenkripsi ke queue `email`, dikirim SMTP oleh worker `php spark queue:work email` (cron, `README-deploy.md` §1a); butuh `email.*` + `encryption.key` |
 
-Selama driver email belum ada, production menolak forgot-password dengan 500 (ConfigException) yang sama untuk semua username, dan frontend menyembunyikan halamannya (`VITE_PASSWORD_RESET_ENABLED=false` → "Hubungi Admin"). `auth.resetLinkBase` wajib URL absolut http(s) halaman `/reset-password` frontend tanpa query/fragment. Log milik service tidak memuat token; kegagalan kirim dicatat di log dan respons tetap generik.
+Driver email (CR-014, `App\Libraries\Auth\EmailResetTokenNotifier`):
+
+- Request forgot-password **tidak** menghubungi SMTP: hanya INSERT job `reset-password-email` ke `queue_jobs` (queue `email`), sehingga waktu respons tidak membedakan username terdaftar dan hasil SMTP tidak pernah mengubah respons. Antrean gagal → dicatat di log (tanpa pesan DB), respons tetap generik.
+- Isi job terenkripsi (CI4 Encryption, `encryption.key`, sama untuk web dan worker; rotasi lewat `encryption.previousKeys`): `queue_jobs` dan `queue_jobs_failed` tidak memuat token, tautan, maupun alamat email. Alamat dibaca ulang worker dari `pengguna.email`.
+- Worker memeriksa ulang **setiap percobaan**: token masih ada, belum dipakai/dibatalkan, belum kedaluwarsa, pemiliknya (lewat username baris token) = akun job; akun belum dihapus dan aktif; email valid. Gagal syarat → tidak dikirim, tidak dicoba ulang. **Akun aktif tanpa email** tetap di-enqueue (respons identik) lalu dilewati worker dengan log `warning` "tidak memiliki email valid" — bahan admin melengkapi email.
+- SMTP gagal → dicoba ulang tiap 60 detik sampai 5 percobaan (di dalam TTL 30 menit), lalu pindah ke `queue_jobs_failed` dengan exception tersanitasi (ringkasan balasan SMTP, tanpa tautan/alamat). `php spark queue:retry` aman karena pemeriksaan diulang.
+- Email HTML + teks Bahasa Indonesia, subjek "Permohonan Reset Password SIMPEG": sapaan nama akun (atau "Bapak/Ibu"), username, tombol + tautan utuh, masa berlaku (menit dan jam WIB), sekali pakai, abaikan bila tidak meminta, jangan diteruskan. Tanpa gambar eksternal; nilai di-escape.
+- Guard konfigurasi (ConfigException saat driver di-resolve, sebelum lookup username → 500 sama untuk semua username; pesan hanya menyebut nama key): `email.protocol` = smtp, `email.SMTPHost`, `email.SMTPPort` 1..65535, `email.fromEmail` valid, `email.SMTPUser`/`email.SMTPPass` keduanya atau tidak sama sekali, `email.SMTPTimeout` 1..30, `email.SMTPAuthMethod` login/plain, port 465 tidak boleh + `tls`, `encryption.key` ≥ 32 byte. Production: transport terenkripsi (587 + `tls` atau 465) dan `email.fromName` wajib.
+- Log tidak pernah memuat token, tautan, isi email, atau `email.SMTPPass`; alamat dimasking (`b***@domain`). Jangan memasang listener `Events::on('email')` (archive event itu memuat SMTPPass dan isi email).
+- Smoke test dari server: `php spark email:test <alamat>` (email uji tanpa token).
+
+`auth.resetLinkBase` wajib URL absolut http(s) halaman `/reset-password` frontend tanpa query/fragment; **production wajib https** (CR-014, untuk semua driver; http → 500 sama untuk semua username). Log milik service tidak memuat token; kegagalan kirim dicatat di log dan respons tetap generik. Frontend menyembunyikan halaman lupa password (`VITE_PASSWORD_RESET_ENABLED=false` → "Hubungi Admin") sampai kirim nyata lolos di Dev.
 
 ### POST /auth/reset-password
 Request `{ "token", "new_password", "new_password_confirmation" }`. 200 `data: { reset:true }`.

@@ -12,6 +12,7 @@ use App\Interfaces\SiasnGatewayInterface;
 use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Auth\AuthService;
+use App\Libraries\Auth\EmailResetTokenNotifier;
 use App\Libraries\Auth\JwtService;
 use App\Libraries\Auth\LockoutService;
 use App\Libraries\Auth\LogResetTokenNotifier;
@@ -151,8 +152,10 @@ class Services extends BaseService
     }
 
     /**
-     * Kanal pengiriman tautan reset password (A-07, ISSUE-006) dari Config\Auth::$resetTokenNotifier.
-     * Driver email (K3) belum ada — menunggu akun SMTP.
+     * Kanal pengiriman tautan reset password (A-07, ISSUE-006) dari Config\Auth::$resetTokenNotifier:
+     * 'email' (production, CR-014: antrean `email` + worker `php spark queue:work email`, guard email.* dan
+     * encryption.key di constructor), 'log' (development), 'mock' (test). Driver yang salah konfigurasi atau tidak
+     * dikenal → ConfigException saat di-resolve (ResetPasswordService::request(), sebelum username dicari).
      */
     public static function resetTokenNotifier(bool $getShared = true): ResetTokenNotifierInterface
     {
@@ -163,9 +166,10 @@ class Services extends BaseService
         $driver = config(Auth::class)->resetTokenNotifier;
 
         return match ($driver) {
+            'email' => new EmailResetTokenNotifier(config(Email::class), config(Encryption::class)),
             'mock'  => new MockResetTokenNotifier(),
             'log'   => new LogResetTokenNotifier(),
-            default => throw new ConfigException("Driver auth.resetTokenNotifier '{$driver}' belum tersedia (driver email menunggu akun SMTP)."),
+            default => throw new ConfigException("Driver auth.resetTokenNotifier '{$driver}' tidak dikenal (log|mock|email)."),
         };
     }
 
