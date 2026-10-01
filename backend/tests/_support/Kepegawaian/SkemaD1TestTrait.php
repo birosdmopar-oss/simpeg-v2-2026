@@ -89,12 +89,14 @@ trait SkemaD1TestTrait
                 continue;
             }
 
+            $numeric = preg_match('/^(tinyint|smallint|mediumint|int|bigint|decimal|double|float)/', $type) === 1;
+
             $row[$column] = match (true) {
                 str_starts_with($type, 'datetime') => '2024-01-02 03:04:05',
                 str_starts_with($type, 'date')     => '2024-01-02',
                 str_starts_with($type, 'year')     => 2024,
-                (bool) preg_match('/^(tinyint|smallint|mediumint|int|bigint|decimal|double|float)/', $type) => 1,
-                default => 'x',
+                $numeric                           => 1,
+                default                            => 'x',
             };
         }
 
