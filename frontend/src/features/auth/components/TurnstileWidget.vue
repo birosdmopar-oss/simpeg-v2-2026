@@ -104,13 +104,13 @@ function onMockChange(event: Event): void {
 <template>
   <div>
     <div v-if="siteKey" ref="container" class="min-h-[65px]" data-testid="turnstile-container"></div>
-    <p v-if="siteKey && loadFailed" class="mt-1 text-xs text-red-600">
+    <p v-if="siteKey && loadFailed" class="mt-1 text-caption text-danger">
       Widget captcha gagal dimuat. Periksa koneksi lalu muat ulang halaman.
     </p>
 
     <label
       v-else-if="!siteKey"
-      class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+      class="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600"
       data-testid="captcha-mock"
     >
       <input type="checkbox" :checked="mockChecked" class="h-4 w-4 accent-brand-primary" @change="onMockChange" />

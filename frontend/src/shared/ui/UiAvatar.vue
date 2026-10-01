@@ -14,12 +14,14 @@ const props = withDefaults(
   defineProps<{
     name?: string
     src?: string | null
-    size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+    size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+    /** `rounded` = kotak membulat (foto profil pada header Detail Pegawai §4.1.6). */
+    shape?: 'circle' | 'rounded'
     status?: 'none' | 'online' | 'offline'
     /** Alt kosong = avatar dekoratif (nama sudah ditulis di sebelahnya). */
     alt?: string
   }>(),
-  { name: '', src: null, size: 'md', status: 'none', alt: undefined },
+  { name: '', src: null, size: 'md', shape: 'circle', status: 'none', alt: undefined },
 )
 
 const SIZES = {
@@ -28,6 +30,7 @@ const SIZES = {
   md: { box: 'h-11 w-11 text-body2', dot: 'h-3 w-3' },
   lg: { box: 'h-14 w-14 text-body1', dot: 'h-3.5 w-3.5' },
   xl: { box: 'h-20 w-20 text-h5', dot: 'h-4 w-4' },
+  '2xl': { box: 'h-24 w-24 text-h4', dot: 'h-4 w-4' },
 } as const
 
 const failed = ref(false)
@@ -38,15 +41,21 @@ watch(
   },
 )
 
-const initials = computed(() =>
-  props.name
-    .split(/\s+/)
-    .filter((part) => /[a-z]/i.test(part[0] ?? ''))
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || '?',
+/**
+ * Inisial dari maksimal dua kata pertama yang murni huruf. Gelar ("Dr.", "S.Kom", "(Dr.)") mengandung tanda baca
+ * sehingga otomatis dilewati: "Dr. Budi Santoso, M.Si" → "BS".
+ */
+const initials = computed(
+  () =>
+    props.name
+      .split(/[\s,]+/)
+      .filter((part) => /^[A-Za-z][A-Za-z'’-]*$/.test(part))
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join('') || '?',
 )
 
+const radius = computed(() => (props.shape === 'rounded' ? 'rounded-2xl' : 'rounded-full'))
 const showImage = computed(() => Boolean(props.src) && !failed.value)
 </script>
 
@@ -57,14 +66,14 @@ const showImage = computed(() => Boolean(props.src) && !failed.value)
       :src="src ?? undefined"
       :alt="alt ?? name"
       loading="lazy"
-      class="rounded-full bg-slate-100 object-cover ring-2 ring-white"
-      :class="SIZES[size].box"
+      class="bg-slate-100 object-cover ring-2 ring-white"
+      :class="[SIZES[size].box, radius]"
       @error="failed = true"
     />
     <span
       v-else
-      class="inline-flex items-center justify-center rounded-full bg-brand-tertiary/10 font-semibold text-brand-tertiary ring-2 ring-white"
-      :class="SIZES[size].box"
+      class="inline-flex items-center justify-center bg-brand-tertiary/10 font-semibold text-brand-tertiary ring-2 ring-white"
+      :class="[SIZES[size].box, radius]"
       :aria-label="name || undefined"
       role="img"
     >

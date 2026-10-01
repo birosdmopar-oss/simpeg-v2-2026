@@ -49,10 +49,10 @@ const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
 const id = useId()
 const previewing = ref(false)
 const inputClass = computed(() => [
-  'block w-full rounded-md border px-3 py-2 text-sm shadow-sm outline-none transition',
-  'focus:ring-2 focus:ring-brand-tertiary/40 focus:border-brand-tertiary',
-  'disabled:cursor-not-allowed disabled:bg-slate-100',
-  props.error ? 'border-red-500 bg-red-50' : 'border-slate-300 bg-white',
+  'block w-full rounded-lg border px-3 py-2.5 text-body1 text-slate-900 outline-none transition placeholder:text-slate-400',
+  'focus:ring-2 focus:ring-brand-tertiary/25',
+  'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400',
+  props.error ? 'border-danger bg-white focus:border-danger focus:ring-danger/20' : 'border-slate-300 bg-white focus:border-brand-tertiary',
 ])
 
 function onInput(event: Event): void {
@@ -74,25 +74,25 @@ function onCheck(event: Event): void {
         :name="name"
         type="checkbox"
         :checked="checked"
-        class="h-4 w-4 rounded border-slate-300 text-brand-primary focus:ring-2 focus:ring-brand-tertiary/40 disabled:cursor-not-allowed"
+        class="h-5 w-5 rounded-md border-slate-300 text-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/40 disabled:cursor-not-allowed"
         :disabled="disabled"
         :aria-invalid="Boolean(error)"
         :aria-describedby="error ? `${id}-error` : undefined"
         @change="onCheck"
         @blur="emit('blur')"
       />
-      <label :for="id" class="text-sm font-medium text-slate-700">
+      <label :for="id" class="text-body1" :class="error ? 'text-danger' : 'text-slate-700'">
         {{ label }}<span v-if="required" class="text-red-600"> *</span>
       </label>
     </div>
 
     <div v-else-if="type === 'html'" class="flex items-center justify-between gap-2">
-      <label :for="id" class="block text-sm font-medium text-slate-700">
+      <label :for="id" class="block text-body2 font-medium" :class="error ? 'text-danger' : 'text-slate-700'">
         {{ label }}<span v-if="required" class="text-red-600"> *</span>
       </label>
       <button
         type="button"
-        class="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        class="rounded-lg border border-slate-300 px-2.5 py-1 text-caption font-medium text-slate-700 hover:bg-slate-50"
         :aria-pressed="previewing"
         :aria-controls="previewing ? `${id}-preview` : undefined"
         data-testid="html-preview-toggle"
@@ -101,7 +101,7 @@ function onCheck(event: Event): void {
         {{ previewing ? 'Tutup pratinjau' : 'Pratinjau' }}
       </button>
     </div>
-    <label v-else :for="id" class="block text-sm font-medium text-slate-700">
+    <label v-else :for="id" class="block text-body2 font-medium" :class="error ? 'text-danger' : 'text-slate-700'">
       {{ label }}<span v-if="required" class="text-red-600"> *</span>
     </label>
 
@@ -181,7 +181,7 @@ function onCheck(event: Event): void {
       <slot name="suffix" />
     </div>
 
-    <p v-if="error" :id="`${id}-error`" class="text-xs text-red-600" role="alert">{{ error }}</p>
-    <p v-else-if="hint" class="text-xs text-slate-500">{{ hint }}</p>
+    <p v-if="error" :id="`${id}-error`" class="text-caption text-danger" role="alert">{{ error }}</p>
+    <p v-else-if="hint" class="text-caption text-slate-500">{{ hint }}</p>
   </div>
 </template>

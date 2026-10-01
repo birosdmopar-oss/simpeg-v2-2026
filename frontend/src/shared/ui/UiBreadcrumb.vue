@@ -26,7 +26,7 @@ defineProps<{ items: Crumb[] }>()
           <House v-if="index === 0" class="h-4 w-4" aria-hidden="true" />
           {{ item.label }}
         </RouterLink>
-        <span v-else class="inline-flex items-center gap-1.5 px-1 text-slate-600" aria-current="page">
+        <span v-else class="inline-flex items-center gap-1.5 px-1 text-slate-600" :aria-current="index === items.length - 1 ? 'page' : undefined">
           <House v-if="index === 0" class="h-4 w-4" aria-hidden="true" />
           {{ item.label }}
         </span>

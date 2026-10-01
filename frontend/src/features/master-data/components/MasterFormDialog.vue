@@ -10,6 +10,10 @@
  * memuat ulang turunannya; nilai tersimpan yang kini non-aktif tetap tampil sebagai pilihan bertanda), field
  * `boolean` = checkbox 1/0, field angka memakai batas min/max meta, dan urutan mode manual (nilai tetap, entri lain
  * tidak bergeser, dibatasi `order_max`).
+ * CR-010 (kantor, DBV-003): field ref ber-`allow_system` mendapat pilihan LAIN-LAIN (kode `system_ids` master rujukan,
+ * di akhir daftar seperti legacy). Memilih LAIN-LAIN mengisi LAIN-LAIN di semua level turunan; level di bawah
+ * LAIN-LAIN terkunci pada LAIN-LAIN tanpa memanggil API. Field ber-`other_for` hanya tampil (dan wajib) bila field
+ * ref-nya LAIN-LAIN; saat disembunyikan nilainya dikosongkan.
  */
 import { toTypedSchema } from '@vee-validate/zod'
 import { X } from 'lucide-vue-next'
@@ -21,7 +25,16 @@ import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 
 import { resolveAncestorPath, useCascadeOptions } from '../composables/useCascadeOptions'
-import { ancestorChain, buildMasterSchema, fieldsMissingFromRow, formatMasterNumber, isManualOrder } from '../schemas/master.schema'
+import {
+  ancestorChain,
+  buildMasterSchema,
+  fieldsMissingFromRow,
+  formatMasterNumber,
+  isManualOrder,
+  isSystemValue,
+  MASTER_SYSTEM_LABEL,
+  systemIdsOf,
+} from '../schemas/master.schema'
 import { masterService } from '../services/master.service'
 import type { MasterFieldMeta, MasterFormValues, MasterMeta, MasterOption, MasterRow } from '../types'
 
@@ -47,7 +60,7 @@ function dependentsOf(name: string): MasterFieldMeta[] {
 }
 
 const schema = computed(
-  () => toTypedSchema(buildMasterSchema(props.meta, isEdit.value)) as unknown as TypedSchema<MasterFormValues>,
+  () => toTypedSchema(buildMasterSchema(props.meta, isEdit.value, props.allMeta)) as unknown as TypedSchema<MasterFormValues>,
 )
 
 const { values, handleSubmit, errors, resetForm, setFieldError, setFieldValue, submitCount } = useForm<MasterFormValues>({
@@ -71,6 +84,35 @@ function updateField(field: string, value: string): void {
 }
 
 const rowId = computed(() => (props.row ? String(props.row[props.meta.primary_key] ?? '') : ''))
+
+/** Pilihan LAIN-LAIN (baris sistem master rujukan) untuk field ref ber-allow_system; null bila tidak berlaku. */
+function systemOption(field: MasterFieldMeta): MasterOption | null {
+  if (field.type !== 'ref' || !field.allow_system) return null
+  const id = systemIdsOf(field.entity, props.allMeta)[0]
+  return id ? { id, nama: MASTER_SYSTEM_LABEL, parent: null } : null
+}
+
+/** Nilai field ref `name` saat ini adalah LAIN-LAIN. */
+function isSystemField(name: string): boolean {
+  return isSystemValue(props.meta, name, String(values[name] ?? ''), props.allMeta)
+}
+
+/** Field `other_for` hanya tampil bila field ref-nya LAIN-LAIN; field lain selalu tampil. */
+function isFieldVisible(field: MasterFieldMeta): boolean {
+  return !field.other_for || isSystemField(field.other_for)
+}
+
+/** Field yang tampil; isian `other_for` hanya tampil saat wajib, jadi ditandai wajib (tanda *). */
+const visibleFields = computed(() =>
+  props.meta.fields.filter((field) => isFieldVisible(field)).map((field) => (field.other_for ? { ...field, required: true } : field)),
+)
+
+/** Kosongkan isian `other_for` yang tersembunyi (field ref-nya bukan lagi LAIN-LAIN). */
+function clearHiddenOtherFields(): void {
+  for (const field of props.meta.fields) {
+    if (field.other_for && !isFieldVisible(field) && String(values[field.name] ?? '') !== '') setFieldValue(field.name, '', false)
+  }
+}
 
 /** Entri berstatus 10 (Dihapus) tidak punya urutan tampil (backend menolak 422); urutan diatur setelah dipulihkan. */
 const showOrder = computed(() => props.meta.has_order && String(props.row?.status ?? '') !== '10')
@@ -148,6 +190,12 @@ async function loadRefOptions(field: MasterFieldMeta): Promise<void> {
     refState.value[field.name] = { options: [], loading: false }
     return
   }
+  const lainLain = systemOption(field)
+  if (lainLain && field.depends_on && isSystemField(field.depends_on)) {
+    // Induk LAIN-LAIN: level ini hanya bisa LAIN-LAIN (legacy kantor/form.php:280-299), tanpa memanggil API.
+    refState.value[field.name] = { options: [lainLain], loading: false }
+    return
+  }
   refState.value[field.name] = { options: refState.value[field.name]?.options ?? [], loading: true }
   let options: MasterOption[] = []
   let loaded = true
@@ -157,6 +205,7 @@ async function loadRefOptions(field: MasterFieldMeta): Promise<void> {
     loaded = false
     formError.value = `Gagal memuat pilihan ${field.label}. ${isApiError(err) ? err.message : ''}`.trim()
   }
+  if (lainLain) options = [...options, lainLain]
   const current = String(values[field.name] ?? '')
   if (current !== '' && !options.some((o) => o.id === current)) {
     // Pilihan gagal dimuat: nilai tersimpan tetap dipertahankan, tanpa tanda non-aktif (statusnya tidak diketahui).
@@ -187,15 +236,21 @@ async function initRefOptions(): Promise<void> {
   for (const root of refFields.value.filter((f) => !f.depends_on)) await load(root)
 }
 
-/** Ganti pilihan field ref: field yang bergantung padanya (berjenjang) dikosongkan lalu pilihannya dimuat ulang. */
+/**
+ * Ganti pilihan field ref: field yang bergantung padanya (berjenjang) dikosongkan lalu pilihannya dimuat ulang. Bila
+ * pilihan baru LAIN-LAIN, turunan ber-allow_system langsung ikut LAIN-LAIN.
+ */
 async function onRefChange(field: MasterFieldMeta, value: string): Promise<void> {
   updateField(field.name, value)
   await resetDependents(field.name)
+  clearHiddenOtherFields()
 }
 
 async function resetDependents(name: string): Promise<void> {
+  const parentIsSystem = isSystemField(name)
   for (const child of dependentsOf(name)) {
-    setFieldValue(child.name, '', false)
+    const lainLain = parentIsSystem ? systemOption(child) : null
+    setFieldValue(child.name, lainLain ? lainLain.id : '', false)
     await loadRefOptions(child)
     await resetDependents(child.name)
   }
@@ -203,6 +258,11 @@ async function resetDependents(name: string): Promise<void> {
 
 function refBlocked(field: MasterFieldMeta): boolean {
   return Boolean(field.depends_on) && String(values[field.depends_on ?? ''] ?? '') === ''
+}
+
+/** Level di bawah LAIN-LAIN terkunci pada LAIN-LAIN. */
+function refLocked(field: MasterFieldMeta): boolean {
+  return systemOption(field) !== null && Boolean(field.depends_on) && isSystemField(field.depends_on ?? '')
 }
 
 function refPlaceholder(field: MasterFieldMeta): string {
@@ -291,6 +351,10 @@ function fieldPlaceholder(field: MasterFieldMeta): string | undefined {
 
 function fieldHint(field: MasterFieldMeta): string {
   if (field.hint) return field.hint
+  if (field.other_for) {
+    const target = props.meta.fields.find((f) => f.name === field.other_for)?.label ?? field.other_for
+    return `Wajib diisi karena ${target} ${MASTER_SYSTEM_LABEL}.`
+  }
   if (field.type === 'int' || field.type === 'decimal') {
     const min = field.min ?? null
     const max = field.max ?? null
@@ -337,7 +401,7 @@ const { levels } = cascade
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
         :class="hasHtmlField ? 'max-w-3xl' : 'max-w-lg'"
       >
         <div class="mb-4 flex items-start justify-between">
@@ -353,13 +417,13 @@ const { levels } = cascade
               }}
             </DialogDescription>
           </div>
-          <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+          <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
             <X class="h-5 w-5" />
           </DialogClose>
         </div>
 
         <form class="space-y-4" novalidate data-testid="master-form" @submit="onSubmit">
-          <p v-if="formError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          <p v-if="formError" class="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]" role="alert">
             {{ formError }}
           </p>
 
@@ -400,7 +464,7 @@ const { levels } = cascade
             @update:model-value="updateField(meta.name_field, $event)"
           />
 
-          <template v-for="field in meta.fields" :key="field.name">
+          <template v-for="field in visibleFields" :key="field.name">
             <FormField
               v-if="field.type === 'ref'"
               :model-value="values[field.name]"
@@ -411,7 +475,7 @@ const { levels } = cascade
               :allow-empty="!field.required"
               :options="refSelectOptions(field)"
               :placeholder="refPlaceholder(field)"
-              :disabled="Boolean(refState[field.name]?.loading) || refBlocked(field)"
+              :disabled="Boolean(refState[field.name]?.loading) || refBlocked(field) || refLocked(field)"
               :hint="field.hint ?? ''"
               :error="fieldError(field.name)"
               @update:model-value="onRefChange(field, $event)"
@@ -444,10 +508,10 @@ const { levels } = cascade
           />
 
           <div class="flex justify-end gap-2 pt-2">
-            <DialogClose class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</DialogClose>
+            <DialogClose class="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200">Batal</DialogClose>
             <button
               type="submit"
-              class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
+              class="rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] px-4 py-2 text-sm font-medium disabled:opacity-60"
               :disabled="submitting || pendingFields.size > 0 || detailFailed"
             >
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}

@@ -39,11 +39,11 @@ const [username] = defineField('username')
 const bannerClass = computed(() => {
   switch (banner.value?.kind) {
     case 'rate-limit':
-      return 'border-amber-300 bg-amber-50 text-amber-800'
+      return 'border-warning/40 bg-warning-soft text-[#8a4f0f]'
     case 'network':
       return 'border-slate-300 bg-slate-50 text-slate-700'
     default:
-      return 'border-red-300 bg-red-50 text-red-700'
+      return 'border-danger/30 bg-danger-soft text-[#a52b2c]'
   }
 })
 
@@ -95,7 +95,7 @@ const onSubmit = handleSubmit(async (values) => {
 
 <template>
   <AuthCardLayout>
-    <div v-if="result" class="space-y-4 rounded-xl bg-white p-6 shadow-xl" data-testid="forgot-result">
+    <div v-if="result" class="space-y-4 rounded-2xl bg-white p-6 shadow-float sm:p-8" data-testid="forgot-result">
       <div class="flex items-start gap-3">
         <MailCheck class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
         <div>
@@ -110,7 +110,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <div
         v-if="devToken"
-        class="rounded-md border border-dashed border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+        class="rounded-lg border border-dashed border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900"
         data-testid="forgot-dev-token"
       >
         <p class="font-semibold">Mode pengembangan</p>
@@ -135,7 +135,7 @@ const onSubmit = handleSubmit(async (values) => {
 
     <form
       v-else
-      class="space-y-4 rounded-xl bg-white p-6 shadow-xl"
+      class="space-y-4 rounded-2xl bg-white p-6 shadow-float sm:p-8"
       novalidate
       data-testid="forgot-form"
       @submit="onSubmit"
@@ -149,7 +149,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <div
         v-if="banner"
-        class="rounded-md border px-3 py-2 text-sm"
+        class="rounded-lg border px-3 py-2 text-sm"
         :class="bannerClass"
         role="alert"
         :data-testid="`forgot-error-${banner.kind}`"
@@ -161,9 +161,8 @@ const onSubmit = handleSubmit(async (values) => {
         v-model="username"
         name="username"
         label="Username / NIP"
-        placeholder="Masukkan NIP"
+        placeholder="Masukkan username atau NIP"
         autocomplete="username"
-        inputmode="numeric"
         required
         :error="errors.username"
       />
@@ -175,14 +174,14 @@ const onSubmit = handleSubmit(async (values) => {
           @expired="onCaptchaExpired"
           @error="onCaptchaExpired"
         />
-        <p v-if="submitCount > 0 && errors.captcha_token" class="text-xs text-red-600" role="alert">
+        <p v-if="submitCount > 0 && errors.captcha_token" class="text-caption text-danger" role="alert">
           {{ errors.captcha_token }}
         </p>
       </div>
 
       <button
         type="submit"
-        class="flex w-full items-center justify-center rounded-md bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        class="flex h-11 w-full items-center justify-center rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] text-body1 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="submitting"
         data-testid="forgot-submit"
       >

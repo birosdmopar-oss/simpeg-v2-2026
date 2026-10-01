@@ -20,6 +20,13 @@ final class AuthSchemaTest extends CIUnitTestCase
     protected $refresh   = true;
     protected $namespace = null;
 
+    protected function tearDown(): void
+    {
+        // down() DBV-010 menolak akun tanpa NIP: bersihkan (juga saat test gagal) agar regress test berikutnya berjalan.
+        $this->db->table('pengguna')->where('nip', null)->delete();
+        parent::tearDown();
+    }
+
     public function testAuthTablesExist(): void
     {
         foreach (['pengguna', 'login_attempts', 'forgot_attempts', 'token', 'audit_logs'] as $table) {
@@ -50,7 +57,10 @@ final class AuthSchemaTest extends CIUnitTestCase
         $this->fail('Kolom password tidak ditemukan');
     }
 
-    public function testNipIsUniqueAndNotNull(): void
+    /**
+     * DBV-010 (K2) — nip UNIQUE tetapi NULLABLE (akun role 1/3/4/5/8 tanpa NIP); banyak NULL diterima UNIQUE.
+     */
+    public function testNipIsUniqueAndNullable(): void
     {
         $indexes = $this->db->getIndexData('pengguna');
         $unique  = [];
@@ -66,9 +76,15 @@ final class AuthSchemaTest extends CIUnitTestCase
 
         foreach ($this->db->getFieldData('pengguna') as $field) {
             if ($field->name === 'nip') {
-                $this->assertFalse((bool) $field->nullable);
+                $this->assertTrue((bool) $field->nullable);
             }
         }
+
+        foreach (['tanpa_nip_a', 'tanpa_nip_b'] as $username) {
+            $this->db->table('pengguna')->insert(['nip' => null, 'username' => $username, 'name' => $username, 'user_level' => 1, 'status' => '1']);
+        }
+
+        $this->assertSame(2, $this->db->table('pengguna')->where('nip', null)->countAllResults());
     }
 
     public function testAuditEventEnumIncludesLoginLogout(): void

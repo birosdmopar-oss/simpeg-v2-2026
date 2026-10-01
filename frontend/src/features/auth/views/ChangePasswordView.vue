@@ -83,7 +83,7 @@ const onSubmit = handleSubmit(async (values) => {
 <template>
   <section class="mx-auto max-w-lg space-y-4">
     <div>
-      <h1 class="text-xl font-semibold text-slate-800">Ganti Password</h1>
+      <h1 class="text-h4 text-slate-900">Ganti Password</h1>
       <!--
         Backend hanya mencabut refresh token; access token yang sudah terbit di perangkat lain tetap sah sampai
         kedaluwarsa (jwt.accessTtl, default 3600 detik). Jangan menjanjikan sesi lain langsung terputus.
@@ -95,14 +95,14 @@ const onSubmit = handleSubmit(async (values) => {
     </div>
 
     <form
-      class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      class="space-y-4 rounded-card border border-slate-200 bg-white p-6 shadow-card"
       novalidate
       data-testid="change-password-form"
       @submit="onSubmit"
     >
       <div
         v-if="banner"
-        class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700"
+        class="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]"
         role="alert"
         data-testid="change-password-error"
       >
@@ -155,7 +155,7 @@ const onSubmit = handleSubmit(async (values) => {
 
       <button
         type="submit"
-        class="flex w-full items-center justify-center rounded-md bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        class="flex h-11 w-full items-center justify-center rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] text-body1 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="submitting"
         data-testid="change-password-submit"
       >

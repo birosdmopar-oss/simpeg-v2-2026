@@ -15,6 +15,7 @@ use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use Config\Database;
 use Config\Jwt as JwtConfig;
+use Firebase\JWT\JWT;
 use Throwable;
 
 /**
@@ -35,9 +36,11 @@ final class JwtServiceTest extends CIUnitTestCase
     private JwtConfig $config;
 
     /**
+     * Claims v2 (DBV-010): sub = id_pengguna, nip = atribut akun pegawai.
+     *
      * @var array<string, mixed>
      */
-    private array $claims = ['sub' => '198501012010011001', 'role' => Role::ADMIN_SATKER, 'id_unit' => 'U01', 'id_satker' => 'S01'];
+    private array $claims = ['sub' => '1', 'nip' => '198501012010011001', 'role' => Role::ADMIN_SATKER, 'id_unit' => 'U01', 'id_satker' => 'S01'];
 
     /**
      * Koneksi DB tambahan (request/proses lain) yang dibuka test; ditutup di tearDown.
@@ -94,7 +97,7 @@ final class JwtServiceTest extends CIUnitTestCase
      */
     public static function tokenWriteModes(): iterable
     {
-        foreach (['revoke', 'revokeAllForNip', 'deleteAllForNip', 'deleteExpired'] as $method) {
+        foreach (['revoke', 'revokeAllForUser', 'deleteAllForUser', 'deleteExpired'] as $method) {
             yield $method . ' DBDebug=true' => [$method, true];
 
             yield $method . ' DBDebug=false' => [$method, false];
@@ -106,7 +109,9 @@ final class JwtServiceTest extends CIUnitTestCase
         $token  = $this->jwt->issueAccessToken($this->claims);
         $claims = $this->jwt->verifyAccessToken($token);
 
-        $this->assertSame('198501012010011001', $claims['sub']);
+        $this->assertSame('1', $claims['sub']);
+        $this->assertSame('198501012010011001', $claims['nip']);
+        $this->assertSame(JwtService::CLAIMS_VERSION, $claims['ver']);
         $this->assertSame(Role::ADMIN_SATKER, $claims['role']);
         $this->assertSame('U01', $claims['id_unit']);
         $this->assertSame('S01', $claims['id_satker']);
@@ -135,7 +140,7 @@ final class JwtServiceTest extends CIUnitTestCase
         $token = $this->jwt->issueAccessToken($this->claims);
         $this->jwt->setNow(null);
 
-        $this->assertSame('198501012010011001', $this->jwt->verifyAccessToken($token)['sub']);
+        $this->assertSame('1', $this->jwt->verifyAccessToken($token)['sub']);
     }
 
     public function testTamperedOrForeignTokenIsRejected(): void
@@ -165,7 +170,7 @@ final class JwtServiceTest extends CIUnitTestCase
         $this->jwt->setNow(null);
 
         $this->assertSame(64, strlen($refresh['token']));
-        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $refresh['token']), 'nip' => '198501012010011001', 'revoked' => 0]);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $refresh['token']), 'id_pengguna' => 1, 'nip' => '198501012010011001', 'revoked' => 0]);
         $this->dontSeeInDatabase('token', ['token_hash' => $refresh['token']]);
 
         $row = $this->db->table('token')->get()->getRowArray();
@@ -183,7 +188,8 @@ final class JwtServiceTest extends CIUnitTestCase
         $this->assertNotSame($pair['access_token'], $new['access_token']);
 
         $claims = $this->jwt->verifyAccessToken($new['access_token']);
-        $this->assertSame('198501012010011001', $claims['sub']);
+        $this->assertSame('1', $claims['sub']);
+        $this->assertSame('198501012010011001', $claims['nip']);
         $this->assertSame(Role::ADMIN_SATKER, $claims['role']);
 
         // Token lama sudah revoked, token baru aktif.
@@ -233,7 +239,7 @@ final class JwtServiceTest extends CIUnitTestCase
         $this->assertNotNull($winner);
         $this->assertSame(2, $this->db->table('token')->countAllResults());
         $this->seeInDatabase('token', ['token_hash' => hash('sha256', $winner['refresh_token']), 'revoked' => 1]);
-        $this->dontSeeInDatabase('token', ['nip' => '198501012010011001', 'revoked' => 0]);
+        $this->dontSeeInDatabase('token', ['id_pengguna' => 1, 'revoked' => 0]);
 
         try {
             $this->jwt->refresh($winner['refresh_token']);
@@ -323,7 +329,7 @@ final class JwtServiceTest extends CIUnitTestCase
             $this->assertSame(AuthException::REASON_REUSED, $e->getReason());
         }
 
-        $this->dontSeeInDatabase('token', ['nip' => '198501012010011001', 'revoked' => 0]);
+        $this->dontSeeInDatabase('token', ['id_pengguna' => 1, 'revoked' => 0]);
 
         try {
             $this->jwt->refresh($winner['refresh_token']);
@@ -368,7 +374,7 @@ final class JwtServiceTest extends CIUnitTestCase
         $fresh = null;
 
         $racing = new JwtService($this->config, $this->modelWithHookAfterFind($this->db, function () use (&$fresh): void {
-            $this->jwt->revokeAllForNip('198501012010011001');
+            $this->jwt->revokeAllForUser(1);
             $fresh = $this->jwt->issueRefreshToken($this->claims);
         }));
 
@@ -401,11 +407,11 @@ final class JwtServiceTest extends CIUnitTestCase
         $model = new class ($db) extends TokenModel {
             public int $revokeAllCalls = 0;
 
-            public function revokeAllForNip(string $nip, int $now): int
+            public function revokeAllForUser(int $idPengguna, int $now): int
             {
                 $this->revokeAllCalls++;
 
-                return parent::revokeAllForNip($nip, $now);
+                return parent::revokeAllForUser($idPengguna, $now);
             }
         };
         $jwt = new JwtService($this->config, $model);
@@ -524,12 +530,12 @@ final class JwtServiceTest extends CIUnitTestCase
         try {
             if ($method === 'revoke') {
                 $model->revoke($id, time());
-            } elseif ($method === 'revokeAllForNip') {
-                $model->revokeAllForNip('198501012010011001', time());
+            } elseif ($method === 'revokeAllForUser') {
+                $model->revokeAllForUser(1, time());
             } elseif ($method === 'deleteExpired') {
                 $model->deleteExpired($id, time() + $this->config->refreshTtl + 60);
             } else {
-                $model->deleteAllForNip('198501012010011001');
+                $model->deleteAllForUser(1);
             }
 
             $this->fail($method . '() harus melempar DatabaseException saat query gagal');
@@ -629,12 +635,12 @@ final class JwtServiceTest extends CIUnitTestCase
         $this->jwt->refresh(bin2hex(random_bytes(32)));
     }
 
-    public function testRevokeAllForNipInvalidatesEveryActiveToken(): void
+    public function testRevokeAllForUserInvalidatesEveryActiveToken(): void
     {
         $a = $this->jwt->issueRefreshToken($this->claims);
         $b = $this->jwt->issueRefreshToken($this->claims);
 
-        $this->assertSame(2, $this->jwt->revokeAllForNip('198501012010011001'));
+        $this->assertSame(2, $this->jwt->revokeAllForUser(1));
 
         $this->expectException(AuthException::class);
         $this->jwt->refresh($a['token']);
@@ -643,18 +649,18 @@ final class JwtServiceTest extends CIUnitTestCase
 
     /**
      * T-01 (QAFUNC-002-R1 24-09) — pencabutan massal (ganti/reset password, perubahan/hapus akun oleh admin) MENGHAPUS
-     * seluruh baris token nip tsb, termasuk token yang sudah dirotasi (revoked=1). Token lama di perangkat lain →
+     * seluruh baris token akun tsb (id_pengguna), termasuk token yang sudah dirotasi (revoked=1). Token lama di perangkat lain →
      * unknownToken, bukan reuse, sehingga sesi yang terbit sesudahnya (login ulang) tidak ikut dicabut.
      */
-    public function testRevokeAllForNipDeletesEveryTokenSoStaleTokensAreUnknownNotReuse(): void
+    public function testRevokeAllForUserDeletesEveryTokenSoStaleTokensAreUnknownNotReuse(): void
     {
         $rotated = $this->jwt->issueTokenPair($this->claims);
         $current = $this->jwt->refresh($rotated['refresh_token']); // token lama revoked=1, token baru aktif
         $other   = $this->jwt->issueRefreshToken($this->claims);  // perangkat lain
-        $foreign = $this->jwt->issueRefreshToken(['sub' => '199002152015022002', 'role' => Role::PEGAWAI]);
+        $foreign = $this->jwt->issueRefreshToken(['sub' => '2', 'nip' => '199002152015022002', 'role' => Role::PEGAWAI]);
 
-        $this->assertSame(3, $this->jwt->revokeAllForNip('198501012010011001'));
-        $this->dontSeeInDatabase('token', ['nip' => '198501012010011001']);
+        $this->assertSame(3, $this->jwt->revokeAllForUser(1));
+        $this->dontSeeInDatabase('token', ['id_pengguna' => 1]);
         $this->seeInDatabase('token', ['token_hash' => hash('sha256', $foreign['token']), 'revoked' => 0]);
 
         $fresh = $this->jwt->issueRefreshToken($this->claims); // login ulang di perangkat B
@@ -670,6 +676,119 @@ final class JwtServiceTest extends CIUnitTestCase
 
         $this->seeInDatabase('token', ['token_hash' => hash('sha256', $fresh['token']), 'revoked' => 0]);
         $this->seeInDatabase('token', ['token_hash' => hash('sha256', $foreign['token']), 'revoked' => 0]);
+    }
+
+    /**
+     * DBV-010 — akun tanpa NIP: claim `nip` null, baris token ber-id_pengguna dengan `nip` NULL; pencabutan massal dan
+     * reuse detection per id_pengguna tidak menyentuh akun tanpa NIP lain.
+     */
+    public function testAccountsWithoutNipAreSeparatedById(): void
+    {
+        $a = ['sub' => '41', 'nip' => null, 'role' => Role::SUPER_ADMIN];
+        $b = ['sub' => '42', 'role' => Role::MENTERI];
+
+        $claims = $this->jwt->verifyAccessToken($this->jwt->issueAccessToken($a));
+        $this->assertSame('41', $claims['sub']);
+        $this->assertNull($claims['nip']);
+
+        $pairA = $this->jwt->issueTokenPair($a);
+        $pairB = $this->jwt->issueTokenPair($b);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $pairA['refresh_token']), 'id_pengguna' => 41, 'nip' => null]);
+        // Kolom JSON MySQL menormalkan urutan key: bandingkan tanpa bergantung urutan.
+        $stored   = json_decode((string) $this->db->table('token')->where('token_hash', hash('sha256', $pairB['refresh_token']))->get()->getRowArray()['claims_json'], true);
+        $expected = ['sub' => '42', 'nip' => null, 'ver' => JwtService::CLAIMS_VERSION, 'role' => Role::MENTERI, 'id_unit' => null, 'id_satker' => null];
+        ksort($stored);
+        ksort($expected);
+        $this->assertSame($expected, $stored);
+
+        // Reuse di akun A hanya mencabut sesi A.
+        $this->jwt->refresh($pairA['refresh_token']);
+
+        try {
+            $this->jwt->refresh($pairA['refresh_token']);
+            $this->fail('Reuse harus ditolak');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_REUSED, $e->getReason());
+        }
+
+        $this->dontSeeInDatabase('token', ['id_pengguna' => 41, 'revoked' => 0]);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $pairB['refresh_token']), 'revoked' => 0]);
+
+        // Pencabutan massal akun B tidak menyentuh baris akun A.
+        $this->assertSame(1, $this->jwt->revokeAllForUser(42));
+        $this->assertSame(2, $this->db->table('token')->where('id_pengguna', 41)->countAllResults());
+    }
+
+    /**
+     * DBV-010 — claims wajib sub = id_pengguna (bilangan bulat 1..4294967295). NIP 18 digit, nol di depan, atau kosong
+     * sebagai `sub` ditolak saat menerbitkan token.
+     */
+    public function testIssueRejectsSubjectThatIsNotAnAccountId(): void
+    {
+        foreach (['198501012010011001', '0', '01', '', 'abc', '4294967296', null] as $sub) {
+            try {
+                $this->jwt->issueAccessToken(['sub' => $sub, 'role' => Role::PEGAWAI]);
+                $this->fail('sub ' . var_export($sub, true) . ' harus ditolak');
+            } catch (\InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
+        $this->assertSame('4294967295', $this->jwt->verifyAccessToken($this->jwt->issueAccessToken(['sub' => 4294967295, 'role' => 1]))['sub']);
+    }
+
+    /**
+     * DBV-010 — token format lama (sub = NIP, tanpa 'ver'; ditandatangani secret yang sama) ditolak 401 generik, begitu
+     * juga 'ver' lain.
+     */
+    public function testLegacyFormatAccessTokenIsRejected(): void
+    {
+        $now  = time();
+        $base = ['iss' => $this->config->issuer, 'iat' => $now, 'nbf' => $now, 'exp' => $now + 3600, 'role' => Role::SUPER_ADMIN];
+
+        foreach ([
+            'format lama' => $base + ['sub' => '198501012010011001'],
+            'tanpa ver'   => $base + ['sub' => '1'],
+            'ver lain'    => $base + ['sub' => '1', 'ver' => 1],
+            'sub NIP'     => $base + ['sub' => '198501012010011001', 'ver' => JwtService::CLAIMS_VERSION],
+        ] as $label => $payload) {
+            try {
+                $this->jwt->verifyAccessToken(JWT::encode($payload, $this->config->secret, $this->config->algorithm));
+                $this->fail($label . ' harus ditolak');
+            } catch (AuthException $e) {
+                $this->assertSame(AuthException::REASON_INVALID, $e->getReason(), $label);
+            }
+        }
+    }
+
+    /**
+     * DBV-010 — baris refresh token format lama (claims tanpa 'ver', mis. ditulis kode lama selama jendela deploy):
+     * "tidak dikenal" (bukan reuse), barisnya dihapus, sesi akun lain tidak tersentuh.
+     */
+    public function testLegacyFormatRefreshRowIsUnknownAndDeleted(): void
+    {
+        $plain = bin2hex(random_bytes(32));
+        $other = $this->jwt->issueRefreshToken($this->claims);
+
+        $this->db->table('token')->insert([
+            'id_pengguna' => 0,
+            'nip'         => '198501012010011001',
+            'token_hash'  => hash('sha256', $plain),
+            'claims_json' => json_encode(['sub' => '198501012010011001', 'role' => 1, 'id_unit' => null, 'id_satker' => null]),
+            'expires_at'  => date('Y-m-d H:i:s', time() + 3600),
+            'revoked'     => 0,
+            'created_at'  => date('Y-m-d H:i:s'),
+        ]);
+
+        try {
+            $this->jwt->refresh($plain);
+            $this->fail('Refresh token format lama harus ditolak');
+        } catch (AuthException $e) {
+            $this->assertSame(AuthException::REASON_NOT_FOUND, $e->getReason());
+        }
+
+        $this->dontSeeInDatabase('token', ['token_hash' => hash('sha256', $plain)]);
+        $this->seeInDatabase('token', ['token_hash' => hash('sha256', $other['token']), 'revoked' => 0]);
     }
 
     public function testCookiesAreHttpOnly(): void

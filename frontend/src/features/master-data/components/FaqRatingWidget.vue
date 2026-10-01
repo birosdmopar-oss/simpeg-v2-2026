@@ -86,8 +86,8 @@ async function submitReason(): Promise<void> {
 </script>
 
 <template>
-  <section v-if="visible" class="rounded-lg border border-slate-200 bg-slate-50 p-4" aria-live="polite" data-testid="faq-rating">
-    <p v-if="step === 'done'" class="flex items-center gap-2 text-sm font-medium text-green-700" data-testid="faq-rating-done">
+  <section v-if="visible" class="rounded-xl border border-slate-200 bg-slate-50 p-4" aria-live="polite" data-testid="faq-rating">
+    <p v-if="step === 'done'" class="flex items-center gap-2 text-sm font-medium text-[#1c7a4a]" data-testid="faq-rating-done">
       <CircleCheck class="h-5 w-5 shrink-0" /> {{ doneMessage }}
     </p>
 
@@ -97,7 +97,7 @@ async function submitReason(): Promise<void> {
       <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-md border border-green-300 bg-white px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-60"
+          class="flex items-center gap-1.5 rounded-lg border border-success/40 bg-white px-3 py-2 text-sm font-medium text-[#1c7a4a] hover:bg-success-soft disabled:opacity-60"
           :disabled="submitting"
           data-testid="faq-rate-yes"
           @click="send(1)"
@@ -106,7 +106,7 @@ async function submitReason(): Promise<void> {
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 disabled:opacity-60"
           :disabled="submitting"
           data-testid="faq-rate-no"
           @click="openReason"
@@ -134,32 +134,32 @@ async function submitReason(): Promise<void> {
             maxlength="255"
             placeholder="Tuliskan alasan Anda"
             aria-label="Alasan lainnya"
-            class="block w-full rounded-md border px-3 py-2 text-sm shadow-sm outline-none focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/40"
-            :class="fieldErrors.other ? 'border-red-500 bg-red-50' : 'border-slate-300 bg-white'"
+            class="block w-full rounded-lg border px-3 py-2 text-sm shadow-sm outline-none focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/40"
+            :class="fieldErrors.other ? 'border-danger bg-white' : 'border-slate-300 bg-white'"
             :aria-invalid="Boolean(fieldErrors.other)"
             :aria-describedby="fieldErrors.other ? `${radioName}-other-error` : undefined"
             data-testid="faq-reason-other"
           />
-          <p v-if="fieldErrors.other" :id="`${radioName}-other-error`" class="mt-1 text-xs text-red-600" role="alert">{{ fieldErrors.other }}</p>
+          <p v-if="fieldErrors.other" :id="`${radioName}-other-error`" class="mt-1 text-caption text-danger" role="alert">{{ fieldErrors.other }}</p>
         </div>
-        <p v-if="fieldErrors.choice" :id="`${radioName}-error`" class="text-xs text-red-600" role="alert">{{ fieldErrors.choice }}</p>
+        <p v-if="fieldErrors.choice" :id="`${radioName}-error`" class="text-caption text-danger" role="alert">{{ fieldErrors.choice }}</p>
       </fieldset>
       <div class="flex gap-2">
         <button
           type="submit"
-          class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
+          class="rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] px-4 py-2 text-sm font-medium disabled:opacity-60"
           :disabled="submitting"
           data-testid="faq-reason-submit"
         >
           {{ submitting ? 'Mengirim...' : 'Kirim' }}
         </button>
-        <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white" :disabled="submitting" @click="cancelReason">
+        <button type="button" class="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200" :disabled="submitting" @click="cancelReason">
           Batal
         </button>
       </div>
     </form>
 
-    <p v-if="serverError" class="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert" data-testid="faq-rating-error">
+    <p v-if="serverError" class="mt-3 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]" role="alert" data-testid="faq-rating-error">
       {{ serverError }}
     </p>
   </section>

@@ -12,6 +12,7 @@ use CodeIgniter\HTTP\ResponseInterface;
  * A-02 / A-03 / A-04 — POST api/v1/auth/login (Publik/Guest).
  *
  * Payload : { username: string, password: string, captcha_token: string }
+ *           username = NIP (akun pegawai, default A-09) atau username bebas (akun non-pegawai), maks. 100 karakter.
  * 200     : { status:'success', data:{ user, access_token, access_expires_at, refresh_expires_at } }
  *           + Set-Cookie access_token & refresh_token (httpOnly)
  * 422     : captcha kosong/invalid (sebelum kredensial dicek) atau field wajib kosong
@@ -23,7 +24,7 @@ class LoginController extends ApiController
     public function login(): ResponseInterface
     {
         $data = $this->validateOrFail($this->payload(), [
-            'username'      => 'required|string|max_length[30]',
+            'username'      => 'required|string|max_length[' . PenggunaModel::USERNAME_MAX . ']',
             'password'      => 'required|string',
             'captcha_token' => 'permit_empty|string',
         ]);

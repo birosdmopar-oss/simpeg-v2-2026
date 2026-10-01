@@ -9,6 +9,11 @@ import { createRouter, createWebHistory, type NavigationGuard, type RouteRecordR
 import { passwordResetEnabled } from '@/features/auth/config'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
+import { HALO_ADMIN_ROLES } from '@/features/halo-simpeg/types'
+import { PEGAWAI_LIST_ROLES } from '@/features/kepegawaian/types'
+import { LAPORAN_ROLES } from '@/features/laporan/types'
+import { LAYANAN_ROLES } from '@/features/layanan/types'
+import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 
 declare module 'vue-router' {
@@ -80,6 +85,62 @@ const routes: RouteRecordRaw[] = [
     name: 'faq',
     component: () => import('@/features/master-data/views/FaqPage.vue'),
     meta: { title: 'FAQ' },
+  },
+  {
+    // G-08 Hari Libur (DBV-003/CR-010): baca role 1/4/5/8, tambah/ubah/hapus role 1 (tombol hanya tampil untuk role 1).
+    path: '/hari-libur',
+    name: 'hari-libur',
+    component: () => import('@/features/master-data/views/HariLiburPage.vue'),
+    meta: { roles: HARI_LIBUR_READ_ROLES, title: 'Hari Libur' },
+  },
+  {
+    // B-20 daftar pegawai (hr/employee/index = role 1,3,4,5,8).
+    path: '/pegawai',
+    name: 'pegawai-list',
+    component: () => import('@/features/kepegawaian/views/DaftarPegawaiPage.vue'),
+    meta: { roles: PEGAWAI_LIST_ROLES, title: 'Daftar Pegawai' },
+  },
+  {
+    // B-20 detail pegawai (hr/employee/detail/{nip} = semua role login).
+    path: '/pegawai/:nip',
+    name: 'pegawai-detail',
+    component: () => import('@/features/kepegawaian/views/DetailPegawaiPage.vue'),
+    meta: { title: 'Data Pegawai' },
+  },
+  {
+    // B-19 struktur organisasi (hr/so/full = semua role login).
+    path: '/struktur-organisasi',
+    name: 'org-structure',
+    component: () => import('@/features/kepegawaian/views/StrukturOrganisasiPage.vue'),
+    meta: { title: 'Struktur Organisasi' },
+  },
+  {
+    // Status Layanan (hr/rwy/layanan/index = role 1–7).
+    path: '/layanan/status',
+    name: 'layanan-status',
+    component: () => import('@/features/layanan/views/LayananStatusPage.vue'),
+    meta: { roles: LAYANAN_ROLES, title: 'Status Layanan' },
+  },
+  {
+    // Laporan statistik (hr/chart/* = role 1,3,4,5,8): unit-kerja | jenis-kelamin | struktural.
+    path: '/laporan/:tipe(unit-kerja|jenis-kelamin|struktural)',
+    name: 'laporan',
+    component: () => import('@/features/laporan/views/LaporanPage.vue'),
+    meta: { roles: LAPORAN_ROLES, title: 'Laporan' },
+  },
+  {
+    // News Portal (lihat: semua role login; kelola: role 1 & 3).
+    path: '/berita',
+    name: 'news',
+    component: () => import('@/features/berita/views/NewsPage.vue'),
+    meta: { title: 'News Portal' },
+  },
+  {
+    // Admin Halo Simpeg (inbox percakapan) — tanpa sidebar.
+    path: '/halo-simpeg/admin',
+    name: 'halo-admin',
+    component: () => import('@/features/halo-simpeg/views/AdminHaloPage.vue'),
+    meta: { roles: HALO_ADMIN_ROLES, title: 'Admin Halo Simpeg' },
   },
   {
     path: '/403',

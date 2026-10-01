@@ -386,13 +386,13 @@ onMounted(() => {
   <section class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl font-semibold text-slate-900">Master Data</h1>
+        <h1 class="text-h4 text-slate-900">Master Data</h1>
         <p class="text-sm text-slate-500">Referensi yang dipakai dropdown seluruh modul. Hanya Super Admin.</p>
       </div>
       <button
         v-if="meta"
         type="button"
-        class="flex items-center gap-1.5 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90"
+        class="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] px-4 text-body1 font-medium"
         data-testid="master-add"
         @click="openCreate"
       >
@@ -400,16 +400,16 @@ onMounted(() => {
       </button>
     </div>
 
-    <p v-if="metaError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ metaError }}</p>
+    <p v-if="metaError" class="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]" role="alert">{{ metaError }}</p>
 
     <div class="grid gap-4 lg:grid-cols-[220px_1fr]">
-      <nav class="flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 lg:flex-col" aria-label="Daftar master">
+      <nav class="flex gap-1 scrollbar-slim overflow-x-auto rounded-card border border-slate-200 bg-white shadow-card p-2 lg:flex-col" aria-label="Daftar master">
         <button
           v-for="m in metas"
           :key="m.key"
           type="button"
-          class="whitespace-nowrap rounded-md px-3 py-2 text-left text-sm"
-          :class="m.key === activeKey ? 'bg-slate-100 font-medium text-brand-primary' : 'text-slate-600 hover:bg-slate-50'"
+          class="whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm"
+          :class="m.key === activeKey ? 'bg-brand-tertiary/10 font-medium text-brand-tertiary' : 'text-slate-600 hover:bg-slate-50'"
           :aria-current="m.key === activeKey ? 'page' : undefined"
           :data-testid="`master-nav-${m.key}`"
           @click="activeKey = m.key"
@@ -419,17 +419,17 @@ onMounted(() => {
       </nav>
 
       <div v-if="meta" class="min-w-0 space-y-4">
-        <p v-if="notice" class="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800" role="status">{{ notice }}</p>
-        <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
+        <p v-if="notice" class="rounded-xl border border-success/30 bg-success-soft px-3 py-2 text-sm text-[#1c7a4a]" role="status">{{ notice }}</p>
+        <p v-if="error" class="rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-[#a52b2c]" role="alert">{{ error }}</p>
 
-        <div class="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div class="flex flex-wrap gap-3 rounded-card border border-slate-200 bg-white p-4 shadow-card">
           <label class="relative min-w-[200px] flex-1">
-            <Search class="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               v-model="search"
               type="search"
               :placeholder="`Cari kode / ${meta.name_label.toLowerCase()}`"
-              class="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand-tertiary focus:outline-none focus:ring-2 focus:ring-brand-tertiary/40"
+              class="h-11 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25"
               data-testid="master-search"
             />
           </label>
@@ -437,7 +437,7 @@ onMounted(() => {
             v-for="(level, index) in filterLevels"
             :key="level.meta.key"
             :value="level.value"
-            class="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+            class="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25 disabled:bg-slate-100"
             :disabled="level.loading || (index > 0 && !filterLevels[index - 1]?.value)"
             :aria-label="`Filter ${level.meta.label}`"
             @change="onFilterLevel(index, ($event.target as HTMLSelectElement).value)"
@@ -449,7 +449,7 @@ onMounted(() => {
             v-for="field in filterFields"
             :key="field.name"
             :value="fieldFilters[field.name] ?? ''"
-            class="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            class="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25"
             :aria-label="`Filter ${field.label}`"
             :data-testid="`master-filter-${field.name}`"
             @change="onFieldFilter(field.name, ($event.target as HTMLSelectElement).value)"
@@ -457,7 +457,7 @@ onMounted(() => {
             <option value="">Semua {{ field.label }}</option>
             <option v-for="o in filterOptions(field)" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
-          <select v-model="statusFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm" aria-label="Filter status">
+          <select v-model="statusFilter" class="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25" aria-label="Filter status">
             <option value="">Aktif &amp; Tidak Aktif</option>
             <option value="1">Aktif</option>
             <option value="2">Tidak Aktif</option>
@@ -465,9 +465,9 @@ onMounted(() => {
           </select>
         </div>
 
-        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div class="scrollbar-slim overflow-x-auto rounded-card border border-slate-200 bg-white shadow-card">
           <table class="min-w-full text-sm">
-            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead class="border-b border-slate-200 bg-white text-left text-sm font-semibold text-slate-900">
               <tr>
                 <th v-if="meta.has_order" class="w-16 px-4 py-3">Urutan</th>
                 <th class="px-4 py-3">Kode</th>
@@ -477,14 +477,14 @@ onMounted(() => {
                 <th class="px-4 py-3 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-200">
               <tr v-if="loading">
                 <td colspan="6" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
               </tr>
               <tr v-else-if="items.length === 0">
                 <td colspan="6" class="px-4 py-8 text-center text-slate-500">Belum ada data yang cocok.</td>
               </tr>
-              <tr v-for="(row, index) in items" v-else :key="idOf(row)" class="hover:bg-slate-50" :data-testid="`master-row-${idOf(row)}`">
+              <tr v-for="(row, index) in items" v-else :key="idOf(row)" class="transition-colors hover:bg-slate-50/70" :data-testid="`master-row-${idOf(row)}`">
                 <td v-if="meta.has_order" class="px-4 py-3 text-slate-600">{{ row.order }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ idOf(row) }}</td>
                 <td class="px-4 py-3 font-medium text-slate-800">{{ nameOf(row) }}</td>
@@ -510,8 +510,8 @@ onMounted(() => {
         <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
           <span>{{ total }} data · halaman {{ page }} dari {{ totalPages }}</span>
           <div class="flex gap-1">
-            <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
-            <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40" :disabled="page >= totalPages" @click="goTo(page + 1)">Berikutnya</button>
+            <button type="button" class="rounded-lg bg-slate-100 px-3 py-1.5 text-slate-700 transition hover:bg-slate-200 disabled:opacity-40" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>
+            <button type="button" class="rounded-lg bg-slate-100 px-3 py-1.5 text-slate-700 transition hover:bg-slate-200 disabled:opacity-40" :disabled="page >= totalPages" @click="goTo(page + 1)">Berikutnya</button>
           </div>
         </div>
       </div>

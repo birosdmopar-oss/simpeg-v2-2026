@@ -34,6 +34,8 @@ use CodeIgniter\Config\BaseConfig;
  *                        columnType (tipe kolom int: tinyint/smallint/mediumint/int/bigint [+ ' unsigned'] → batas
  *                        nilai, bawaan 'int'), min/max (batas eksplisit int/decimal), entity + dependsOn +
  *                        checkDependsOn (tipe ref: master rujukan, field ref induknya di form, cek rantai oleh engine),
+ *                        allowSystem (tipe ref: boleh merujuk baris sistem master rujukan, CR-010), otherFor (tipe
+ *                        text/textarea: isian "lainnya" milik field ref ber-allowSystem, CR-010),
  *     'extraSearch'   => kolom tambahan yang ikut dicari (LIKE) di daftar admin,
  *     'uniqueScope'   => kolom tambahan pembentuk lingkup keunikan nama (selain induk),
  *     'auditColumns'  => kolom audit legacy yang ada di tabel (created_at, created_by, updated_at, updated_by,
@@ -51,6 +53,9 @@ use CodeIgniter\Config\BaseConfig;
  *                        ['kolom' => ['lingkup', ...]] → duplikat = 422 pada field itu (termasuk balapan 1062),
  *     'filters'       => field yang boleh dipakai filter `?kolom=nilai` di options & daftar admin (allowlist),
  *     'statusChain'   => true = options hanya memuat entri yang SELURUH rantai induknya aktif (pola U3 FAQ),
+ *     'systemIds'     => kode baris sistem (CR-010, mis. sentinel LAIN-LAIN wilayah): tidak tampil di options/daftar
+ *                        admin, tidak ikut urutan, tidak bisa diubah/dihapus/menjadi induk; hanya bisa dirujuk field
+ *                        ref ber-allowSystem,
  *   ]
  *
  * Keunikan nama berlaku per induk (mis. nama kecamatan unik dalam satu kabupaten/kota), termasuk entri tidak aktif
@@ -75,6 +80,28 @@ class MasterData extends BaseConfig
 
     // Konstanta bantu per grup DBV (CR-009): tambahkan hanya di dalam blok grup masing-masing.
     // --- DBV-003 (konstanta) ---
+
+    /**
+     * Kolom audit `kantor`: created_by diisi saat tambah, updated_by saat ubah (Lm_umum.php:1862, 1865).
+     */
+    private const AUDIT_KANTOR = ['created_at', 'created_by', 'updated_at', 'updated_by'];
+
+    /**
+     * Kursem tanpa kolom *_by (DDL simpeg_prod.sql:245-252, 1435-1442): aktor hanya tercatat di audit_logs.
+     */
+    private const AUDIT_KURSEM = ['created_at', 'updated_at'];
+
+    /**
+     * Kode wilayah kantor: dropdown berjenjang dari master wilayah, boleh LAIN-LAIN (baris sistem). Rantai antarlevel
+     * diperiksa KantorHooks (checkDependsOn false), karena level di bawah LAIN-LAIN juga LAIN-LAIN, bukan anak riil.
+     */
+    private const KANTOR_WILAYAH = ['type' => 'ref', 'required' => true, 'allowSystem' => true, 'checkDependsOn' => false];
+
+    /**
+     * Isian teks wilayah bila kodenya LAIN-LAIN (wajib/NULL ditegakkan KantorHooks).
+     */
+    private const KANTOR_LAIN = ['rules' => 'max_length[255]'];
+
     // --- /DBV-003 ---
 
     // --- DBV-004 (konstanta) ---
@@ -96,7 +123,7 @@ class MasterData extends BaseConfig
      *     nameLabel: string,
      *     nameMaxLength: int,
      *     parent?: array{field: string, entity: string}|null,
-     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool}>,
+     *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool, allowSystem?: bool, otherFor?: string}>,
      *     extraSearch?: list<string>,
      *     uniqueScope?: list<string>,
      *     auditColumns?: list<string>,
@@ -109,7 +136,8 @@ class MasterData extends BaseConfig
      *     orderColumnType?: string,
      *     uniqueFields?: array<int|string, string|list<string>>,
      *     filters?: list<string>,
-     *     statusChain?: bool
+     *     statusChain?: bool,
+     *     systemIds?: list<string>
      * }>
      */
     public array $entities = [
@@ -128,6 +156,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 30,
             'parent'        => null,
             'auditColumns'  => [...self::AUDIT, 'deleted_at'],
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'jenis-pegawai' => [
             'label'         => 'Jenis Pegawai',
@@ -141,6 +171,8 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 50,
             'parent'        => null,
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'jenis-status' => [
             'label'         => 'Jenis Status Pegawai',
@@ -165,6 +197,8 @@ class MasterData extends BaseConfig
             // Legacy: jenis_status unik per status_pegawai.
             'uniqueScope'  => ['status_pegawai'],
             'auditColumns' => self::AUDIT,
+            // Kolom `order` TINYINT (DBV-001): urutan maksimal 127 (CR-010, temuan QA CR-009).
+            'orderColumnType' => 'tinyint',
         ],
         'provinsi' => [
             'label'         => 'Provinsi',
@@ -177,6 +211,10 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => null,
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN legacy (DBV-003, migration 2026-09-25-100200): baris sistem, lihat 'systemIds'.
+            'systemIds' => ['99'],
         ],
         'kabupaten-kota' => [
             'label'         => 'Kabupaten/Kota',
@@ -192,6 +230,10 @@ class MasterData extends BaseConfig
                 'kd_area' => ['label' => 'Kode Area', 'rules' => 'max_length[4]', 'hint' => 'Kode area telepon, maksimal 4 karakter.'],
             ],
             'auditColumns' => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999'],
         ],
         'kecamatan' => [
             'label'         => 'Kecamatan',
@@ -204,6 +246,10 @@ class MasterData extends BaseConfig
             'nameMaxLength' => 255,
             'parent'        => ['field' => 'id_kabupaten_kota', 'entity' => 'kabupaten-kota'],
             'auditColumns'  => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999999'],
         ],
         'kelurahan' => [
             'label'         => 'Kelurahan/Desa',
@@ -224,6 +270,10 @@ class MasterData extends BaseConfig
                 ],
             ],
             'auditColumns' => self::AUDIT,
+            // Kolom `order` wilayah INT UNSIGNED (CreateWilayah, tidak diubah DBV-001).
+            'orderColumnType' => 'int unsigned',
+            // Sentinel LAIN-LAIN (DBV-003): baris sistem.
+            'systemIds' => ['9999999999'],
         ],
 
         // ------------------------------------------------------------------
@@ -291,6 +341,88 @@ class MasterData extends BaseConfig
         // ------------------------------------------------------------------
 
         // --- DBV-003 (G-07 kantor, kursem, jenis libur; G-08 hari libur) ---
+        // G-07 kantor (legacy hr/master/c_umum, Lm_umum.php:1576-1870): kode wilayah = field ref berjenjang yang boleh
+        // LAIN-LAIN (99/9999/9999999/9999999999, teks di *_lain); rantai, *_lain, dan kode pos ditegakkan KantorHooks.
+        // Nama kantor unik global (uq_kantor_nama). Hari libur (G-08) bukan entri engine: HariLiburController +
+        // HariLiburService (route api/v1/hari-libur); master jenis-libur memakai engine di controller yang sama.
+        'kantor' => [
+            'label'         => 'Kantor',
+            'controller'    => 'UmumController',
+            'table'         => 'kantor',
+            'primaryKey'    => 'id_kantor',
+            'autoIncrement' => true,
+            'idMaxLength'   => 10,
+            'nameField'     => 'nama_kantor',
+            'nameLabel'     => 'Nama Kantor',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'fields'        => [
+                'alamat'         => ['label' => 'Alamat', 'type' => 'textarea', 'required' => true, 'maxBytes' => 65535],
+                'id_provinsi'    => ['label' => 'Provinsi', 'entity' => 'provinsi', ...self::KANTOR_WILAYAH],
+                'provinsi_lain'  => ['label' => 'Provinsi Lainnya', 'otherFor' => 'id_provinsi', ...self::KANTOR_LAIN],
+                'id_kabupaten'   => ['label' => 'Kabupaten/Kota', 'entity' => 'kabupaten-kota', 'dependsOn' => 'id_provinsi', ...self::KANTOR_WILAYAH],
+                'kabupaten_lain' => ['label' => 'Kabupaten/Kota Lainnya', 'otherFor' => 'id_kabupaten', ...self::KANTOR_LAIN],
+                'id_kecamatan'   => ['label' => 'Kecamatan', 'entity' => 'kecamatan', 'dependsOn' => 'id_kabupaten', ...self::KANTOR_WILAYAH],
+                'kecamatan_lain' => ['label' => 'Kecamatan Lainnya', 'otherFor' => 'id_kecamatan', ...self::KANTOR_LAIN],
+                'id_kelurahan'   => ['label' => 'Kelurahan/Desa', 'entity' => 'kelurahan', 'dependsOn' => 'id_kecamatan', ...self::KANTOR_WILAYAH],
+                'kelurahan_lain' => ['label' => 'Kelurahan/Desa Lainnya', 'otherFor' => 'id_kelurahan', ...self::KANTOR_LAIN],
+                'kode_pos'       => [
+                    'label' => 'Kode Pos',
+                    'rules' => 'max_length[5]|regex_match[/^[0-9]{5}\z/]',
+                    'hint'  => '5 digit angka; bila kelurahan punya daftar kode pos, pilih salah satunya.',
+                ],
+                'telp'   => ['label' => 'Telepon', 'rules' => 'max_length[50]'],
+                'faks'   => ['label' => 'Faks', 'rules' => 'max_length[50]'],
+                'remark' => ['label' => 'Keterangan', 'type' => 'textarea', 'maxBytes' => 65535],
+            ],
+            'extraSearch'  => ['alamat'],
+            'auditColumns' => self::AUDIT_KANTOR,
+            'hooks'        => \App\Libraries\MasterData\KantorHooks::class,
+        ],
+        // Kursem (DDL legacy, tanpa UI CRUD di legacy): dropdown riwayat kursus/seminar. `order` TINYINT [V2].
+        'bidang-kursem' => [
+            'label'           => 'Bidang Kursus/Seminar',
+            'controller'      => 'UmumController',
+            'table'           => 'bidang_kursem',
+            'primaryKey'      => 'id_bidang_kursem',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'bidang_kursem',
+            'nameLabel'       => 'Bidang Kursus/Seminar',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT_KURSEM,
+            'orderColumnType' => 'tinyint',
+        ],
+        'instansi-kursem' => [
+            'label'           => 'Instansi Penyelenggara Kursus/Seminar',
+            'controller'      => 'UmumController',
+            'table'           => 'instansi_kursem',
+            'primaryKey'      => 'id_instansi_kursem',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'instansi_kursem',
+            'nameLabel'       => 'Instansi Penyelenggara',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT_KURSEM,
+            'orderColumnType' => 'tinyint',
+        ],
+        // G-08 jenis libur (legacy L_presensi.php:20362): dropdown form hari libur, UL_ALL.
+        'jenis-libur' => [
+            'label'           => 'Jenis Libur',
+            'controller'      => 'HariLiburController',
+            'table'           => 'jenis_libur',
+            'primaryKey'      => 'id_jenis_libur',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'jenis_libur',
+            'nameLabel'       => 'Jenis Libur',
+            'nameMaxLength'   => 255,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT,
+            'orderColumnType' => 'tinyint',
+        ],
         // --- /DBV-003 ---
 
         // --- DBV-004 (G-04 kenaikan pangkat, G-05 pendidikan) ---

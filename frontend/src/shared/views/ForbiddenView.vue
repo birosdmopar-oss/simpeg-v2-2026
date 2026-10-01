@@ -7,7 +7,7 @@
     <p class="text-5xl font-bold text-brand-primary">403</p>
     <h1 class="text-lg font-semibold text-slate-800">Akses ditolak</h1>
     <p class="text-sm text-slate-500">Role akun Anda tidak memiliki hak akses ke halaman ini.</p>
-    <RouterLink :to="{ name: 'home' }" class="mt-2 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white">
+    <RouterLink :to="{ name: 'home' }" class="mt-2 rounded-lg bg-brand-tertiary text-white transition hover:bg-[#1667e0] px-4 py-2 text-sm font-medium">
       Kembali ke Beranda
     </RouterLink>
   </main>

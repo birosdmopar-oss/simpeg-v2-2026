@@ -91,7 +91,7 @@ class PasswordVerifier
         // membuktikan password-nya sendiri, jadi actor audit = pemilik akun. Saat login AuthContext masih kosong;
         // tanpa withActor() audit rehash tercatat dengan actor NULL (T-02).
         $this->pengguna->withActor(
-            (string) $user['nip'],
+            $user,
             fn (): bool => $this->pengguna->update((int) $user['id_pengguna'], ['password' => $hash, 'password_legacy' => null]),
         );
     }

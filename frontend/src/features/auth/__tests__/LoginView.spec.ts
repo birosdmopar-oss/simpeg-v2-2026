@@ -72,3 +72,11 @@ describe('LoginView — banner ?reason=', () => {
     expect((await mountAt('/login')).find('[data-testid="login-notice"]').exists()).toBe(false)
   })
 })
+
+describe('LoginView — isian username (DBV-010/CR-013)', () => {
+  it('menerima username bebas akun non-pegawai: bukan keyboard angka, placeholder username atau NIP', async () => {
+    const input = (await mountAt('/login')).get('input[name="username"]')
+    expect(input.attributes('inputmode')).toBeUndefined()
+    expect(input.attributes('placeholder')).toBe('Masukkan username atau NIP')
+  })
+})

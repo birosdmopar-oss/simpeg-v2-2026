@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Pembungkus route /master/:entity?: MasterDataView di dalam AppShell.
-import AppShell from '@/shared/components/AppShell.vue'
+// Pembungkus route /master/:entity?: MasterDataView di dalam RedesignShell.
+import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 import MasterDataView from './MasterDataView.vue'
 </script>
 
 <template>
-  <AppShell>
+  <RedesignShell>
     <MasterDataView />
-  </AppShell>
+  </RedesignShell>
 </template>

@@ -74,6 +74,22 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
         }
     });
 
+    // --- DBV-003 (G-08 hari libur) ---
+    // G-08 — Hari libur (DBV-003/CR-010): daftar & detail role 1/4/5/8 (legacy Presensi.php:1015), tambah/ubah/status/
+    // hapus role 1. Role diambil dari konstanta HariLiburService (satu sumber). Master jenis libur: master/jenis-libur.
+    $routes->group('hari-libur', ['namespace' => 'App\Controllers\Api\MasterData'], static function (RouteCollection $routes): void {
+        $read  = ['filter' => ['jwt', Role::filter(...\App\Libraries\MasterData\HariLiburService::READ_ROLES)]];
+        $write = ['filter' => ['jwt', Role::filter(...\App\Libraries\MasterData\HariLiburService::WRITE_ROLES)]];
+
+        $routes->get('/', 'HariLiburController::liburIndex', $read);
+        $routes->get('(:segment)', 'HariLiburController::liburShow/$1', $read);
+        $routes->post('/', 'HariLiburController::liburCreate', $write);
+        $routes->put('(:segment)', 'HariLiburController::liburUpdate/$1', $write);
+        $routes->patch('(:segment)/status', 'HariLiburController::liburStatus/$1', $write);
+        $routes->delete('(:segment)', 'HariLiburController::liburDelete/$1', $write);
+    });
+    // --- /DBV-003 ---
+
     // ------------------------------------------------------------------
     // G-10 — FAQ untuk pegawai (DBV-002): baca = UL_ALL (wajib login, D8), rating = UL_PEGAWAI (2, 6, 7; U2).
     // Kelola konten: master/faq-topic|faq-sub-topic|faq-article (role 1). Tidak ada endpoint faq_related_article.

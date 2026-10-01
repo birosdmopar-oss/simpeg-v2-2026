@@ -4,12 +4,15 @@
  */
 import { z } from 'zod'
 
+import { USERNAME_MAX } from '../types'
+
 export const loginSchema = z.object({
+  // Username = NIP (akun pegawai) atau username bebas (akun non-pegawai, DBV-010); kolom legacy VARCHAR(100).
   username: z
     .string({ message: 'Username / NIP wajib diisi.' })
     .trim()
     .min(1, 'Username / NIP wajib diisi.')
-    .max(30, 'Username maksimal 30 karakter.'),
+    .max(USERNAME_MAX, `Username maksimal ${USERNAME_MAX} karakter.`),
   password: z.string({ message: 'Password wajib diisi.' }).min(1, 'Password wajib diisi.'),
   captcha_token: z
     .string({ message: 'Selesaikan verifikasi captcha terlebih dahulu.' })

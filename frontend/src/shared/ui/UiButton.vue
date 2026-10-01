@@ -14,7 +14,7 @@ import type { RouteLocationRaw } from 'vue-router'
 const props = withDefaults(
   defineProps<{
     variant?: 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' | 'brand'
-    appearance?: 'solid' | 'outline' | 'ghost'
+    appearance?: 'solid' | 'outline' | 'ghost' | 'soft'
     size?: 'sm' | 'md' | 'lg'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -66,6 +66,17 @@ const GHOST: Record<NonNullable<typeof props.variant>, string> = {
   brand: 'text-brand-primary hover:bg-brand-primary/10',
 }
 
+/** Latar abu/tint lembut tanpa border — tombol "Export" / "Cetak" pada mockup bab 4. */
+const SOFT: Record<NonNullable<typeof props.variant>, string> = {
+  primary: 'bg-brand-tertiary/10 text-brand-tertiary hover:bg-brand-tertiary/20',
+  secondary: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+  error: 'bg-danger-soft text-danger hover:bg-danger/20',
+  warning: 'bg-warning-soft text-warning hover:bg-warning/20',
+  info: 'bg-info-soft text-info hover:bg-info/20',
+  success: 'bg-success-soft text-success hover:bg-success/20',
+  brand: 'bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20',
+}
+
 const SIZES = {
   sm: 'h-8 gap-1.5 rounded-lg px-3 text-body2',
   md: 'h-10 gap-2 rounded-lg px-4 text-body1',
@@ -76,7 +87,7 @@ const classes = computed(() => [
   'inline-flex select-none items-center justify-center font-medium transition',
   'disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
   SIZES[props.size],
-  props.appearance === 'solid' ? SOLID[props.variant] : props.appearance === 'outline' ? OUTLINE[props.variant] : GHOST[props.variant],
+  { solid: SOLID, outline: OUTLINE, ghost: GHOST, soft: SOFT }[props.appearance][props.variant],
   props.block ? 'w-full' : '',
 ])
 

@@ -48,9 +48,10 @@ class RbacProbeController extends ApiController
         $auth = service('authContext');
 
         return $this->respondSuccess([
-            'pattern' => $pattern,
-            'nip'     => $auth->nip(),
-            'role'    => $auth->role(),
+            'pattern'     => $pattern,
+            'id_pengguna' => $auth->idPengguna(),
+            'nip'         => $auth->nip(),
+            'role'        => $auth->role(),
         ]);
     }
 }
