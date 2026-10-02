@@ -4,6 +4,8 @@
  * disabled kosong (abu), disabled tercentang (biru pudar).
  *
  * Reusable. Input asli disembunyikan secara visual (bukan display:none) agar tetap fokusable.
+ * CR-028: dibungkus FormField.vue untuk tipe `checkbox` (flag 1/0 master); `invalid` + `describedBy` meneruskan
+ * aria-invalid/aria-describedby ke <input> agar pesan error FormField terbaca pembaca layar.
  */
 import { Check } from 'lucide-vue-next'
 import { useId } from 'vue'
@@ -14,8 +16,10 @@ withDefaults(
     label?: string
     disabled?: boolean
     name?: string
+    invalid?: boolean
+    describedBy?: string
   }>(),
-  { modelValue: false, label: '', disabled: false, name: undefined },
+  { modelValue: false, label: '', disabled: false, name: undefined, invalid: false, describedBy: undefined },
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
@@ -37,6 +41,8 @@ const id = useId()
         class="peer absolute inset-0 h-full w-full opacity-0 disabled:cursor-not-allowed"
         :checked="modelValue"
         :disabled="disabled"
+        :aria-invalid="invalid || undefined"
+        :aria-describedby="describedBy"
         @change="emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
       />
       <span
@@ -48,7 +54,9 @@ const id = useId()
               : 'border-transparent bg-brand-tertiary'
             : disabled
               ? 'border-slate-200 bg-slate-100'
-              : 'border-slate-300 bg-white',
+              : invalid
+                ? 'border-danger bg-white'
+                : 'border-slate-300 bg-white',
           'peer-focus-visible:ring-2 peer-focus-visible:ring-brand-tertiary/50 peer-focus-visible:ring-offset-2',
         ]"
       >

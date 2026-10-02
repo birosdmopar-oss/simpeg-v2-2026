@@ -607,3 +607,18 @@ describe('MasterFormDialog — select opsional bisa dikosongkan (CR-011, row_jur
     wrapper.unmount()
   })
 })
+
+describe('MasterFormDialog — tata letak redesign (CR-028 / ISSUE-007)', () => {
+  it('form grid dua kolom di layar lebar; field html memakai dua kolom penuh; Batal/Simpan memakai UiButton', async () => {
+    mountDialog(null)
+    await flushPromises()
+    const form = document.body.querySelector<HTMLFormElement>('form[data-testid="master-form"]')
+    expect(form?.classList).toContain('md:grid-cols-2')
+    const title = document.body.querySelector<HTMLInputElement>('input[name="title"]')
+    expect(title?.closest('form > *')?.classList).not.toContain('md:col-span-2')
+    expect(contentTextarea().closest('form > *')?.classList).toContain('md:col-span-2')
+    const actions = submitButton().parentElement
+    expect(actions?.classList).toContain('md:col-span-2')
+    expect(Array.from(actions?.querySelectorAll('button') ?? []).map((b) => b.textContent?.trim())).toEqual(['Batal', 'Simpan'])
+  })
+})

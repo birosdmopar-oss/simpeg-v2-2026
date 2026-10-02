@@ -267,3 +267,17 @@ describe('UserFormDialog — edit akun', () => {
     wrapper.unmount()
   })
 })
+
+describe('UserFormDialog — tata letak redesign (CR-028 / ISSUE-007)', () => {
+  it('form grid dua kolom di layar lebar; tiap field sel grid langsung dengan label di atas', async () => {
+    mountDialog(null)
+    await flushPromises()
+    const form = document.body.querySelector<HTMLFormElement>('form[data-testid="user-form"]')
+    expect(form?.classList).toContain('md:grid-cols-2')
+    for (const name of ['user_level', 'nip', 'name', 'email', 'username', 'password', 'id_unit', 'id_satker', 'status']) {
+      const cell = field(name).closest('form > *')
+      expect(cell?.parentElement, name).toBe(form)
+      expect(cell?.querySelector('label')?.compareDocumentPosition(field(name)), name).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    }
+  })
+})

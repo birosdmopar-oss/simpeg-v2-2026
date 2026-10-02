@@ -4,6 +4,8 @@
  * state default / error / success / disabled + help text (persis pola §3.4).
  *
  * Reusable. Memakai <select> native supaya keyboard & screen reader (WCAG 2.1 AA) ikut gratis.
+ * CR-028: dibungkus FormField.vue untuk tipe `select`; wajib ditandai `aria-required` (validasi tetap milik Zod), pesan
+ * error memakai role="alert", dan event `blur` diteruskan.
  */
 import { ChevronDown } from 'lucide-vue-next'
 import { computed, useId } from 'vue'
@@ -41,12 +43,15 @@ const props = withDefaults(
   },
 )
 
-const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
 
 const id = useId()
 
 const tone = computed(() => {
-  if (props.disabled) return { border: 'border-slate-200', label: 'text-slate-400', help: 'text-slate-400' }
+  // Field terkunci tetap menampilkan pesan error berwarna merah (mis. dropdown induk belum dipilih saat form dikirim).
+  if (props.disabled) {
+    return { border: 'border-slate-200', label: 'text-slate-400', help: props.state === 'error' ? 'text-danger' : 'text-slate-400' }
+  }
   if (props.state === 'error') return { border: 'border-danger', label: 'text-danger', help: 'text-danger' }
   if (props.state === 'success') return { border: 'border-success', label: 'text-success', help: 'text-success' }
   return { border: 'border-slate-300', label: 'text-slate-700', help: 'text-slate-500' }
@@ -65,7 +70,7 @@ const tone = computed(() => {
         :name="name"
         :value="modelValue ?? ''"
         :disabled="disabled"
-        :required="required"
+        :aria-required="required || undefined"
         :aria-label="label ? undefined : ariaLabel"
         class="h-11 w-full appearance-none rounded-lg border bg-white pl-3 pr-10 text-body1 text-slate-900 outline-none transition"
         :class="[
@@ -77,6 +82,7 @@ const tone = computed(() => {
         :aria-invalid="state === 'error' || undefined"
         :aria-describedby="helpText ? `${id}-help` : undefined"
         @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
+        @blur="emit('blur')"
       >
         <option value="" :disabled="!clearable">{{ placeholder }}</option>
         <option v-for="opt in options" :key="opt.value" :value="opt.value" :disabled="opt.disabled">
@@ -90,6 +96,14 @@ const tone = computed(() => {
       />
     </div>
 
-    <p v-if="helpText" :id="`${id}-help`" class="mt-1 text-caption" :class="tone.help">{{ helpText }}</p>
+    <p
+      v-if="helpText"
+      :id="`${id}-help`"
+      class="mt-1 text-caption"
+      :class="tone.help"
+      :role="state === 'error' ? 'alert' : undefined"
+    >
+      {{ helpText }}
+    </p>
   </div>
 </template>
