@@ -178,6 +178,10 @@ abstract class BaseMasterController extends ApiController
             ],
         ];
 
+        if (! $def->nameRequired) {
+            $rules[$def->nameField]['rules'] = $creating ? 'permit_empty|string|max_length[' . $def->nameMaxLength . ']' : 'if_exist|permit_empty|string|max_length[' . $def->nameMaxLength . ']';
+        }
+
         foreach ($def->fields as $field) {
             // Field ref: panjang maksimal mengikuti kode master rujukannya (bentuk kanonik & keberadaan dicek service).
             $refIdMaxLength = $field->type === MasterField::TYPE_REF

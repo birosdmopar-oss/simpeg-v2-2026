@@ -99,7 +99,8 @@ final class RbacMasterEndpointsTest extends CIUnitTestCase
             $this->sendJson('POST', "api/v1/master/{$entity}", $fx['new'])->assertStatus(201);
             $this->get("api/v1/master/{$entity}/{$fx['existing']}")->assertStatus(200);
             $this->sendJson('PUT', "api/v1/master/{$entity}/{$fx['existing']}", [$def->nameField => mb_substr('Nama Uji ' . $entity, 0, $def->nameMaxLength)])->assertStatus(200);
-            $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/order", ['order' => 1])->assertStatus(200);
+            // Master tanpa kolom `order` (lokasi presensi, DBV-007): lolos filter, ditolak 422 oleh controller.
+            $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/order", ['order' => 1])->assertStatus($def->hasOrder ? 200 : 422);
             $this->sendJson('PATCH', "api/v1/master/{$entity}/{$fx['existing']}/status", ['status' => '2'])->assertStatus(200);
             $this->delete("api/v1/master/{$entity}/{$fx['existing']}")->assertStatus(200);
         }

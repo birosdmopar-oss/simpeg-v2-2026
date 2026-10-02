@@ -105,7 +105,12 @@ final class MasterGenericTcTest extends CIUnitTestCase
                 $this->assertArrayHasKey($def->primaryKey, $this->json($result)['errors'], $entity);
             }
 
-            // Nama duplikat (case-insensitive) di lingkup yang sama (induk / uniqueScope).
+            // Nama duplikat (case-insensitive) di lingkup yang sama (induk / uniqueScope). Master bernama turunan
+            // (nameRequired false, aturan lokasi presensi) tidak punya keunikan nama: dua aturan boleh menargetkan
+            // lokasi yang sama (CR-031 C4).
+            if (! $def->nameRequired) {
+                continue;
+            }
             $dupName = $fx['new'];
 
             if (! $def->autoIncrement) {
@@ -722,7 +727,7 @@ final class MasterGenericTcTest extends CIUnitTestCase
             $created = $this->json($this->sendJson('POST', "api/v1/master/{$entity}", $fx['new']))['data'];
             $id      = (string) $created[$def->primaryKey];
 
-            $this->sendJson('PUT', "api/v1/master/{$entity}/{$id}", [$def->nameField => $fx['new'][$def->nameField] . ' (ubah)'])->assertStatus(200);
+            $this->sendJson('PUT', "api/v1/master/{$entity}/{$id}", $fx['update'] ?? [$def->nameField => $fx['new'][$def->nameField] . ' (ubah)'])->assertStatus(200);
             $this->delete("api/v1/master/{$entity}/{$id}")->assertStatus(200);
 
             foreach (['create', 'update', 'delete'] as $event) {

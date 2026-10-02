@@ -40,6 +40,8 @@ import {
 import { masterService } from '../services/master.service'
 import type { MasterFieldMeta, MasterFormValues, MasterMeta, MasterOption, MasterRow } from '../types'
 
+import CheckboxGroupField from './CheckboxGroupField.vue'
+
 const props = defineProps<{ open: boolean; meta: MasterMeta; allMeta: MasterMeta[]; row: MasterRow | null }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: MasterRow] }>()
 
@@ -53,6 +55,107 @@ const cascade = useCascadeOptions(chain)
 /** Pilihan dropdown field ref per nama field (CR-009), dari `{entity}/options?parent=<nilai depends_on>`. */
 const refState = ref<Record<string, { options: MasterOption[]; loading: boolean }>>({})
 const refTokens: Record<string, number> = {}
+/**
+ * G-03 aturan lokasi presensi (CR-031): target disimpan backend sebagai JSON array (format legacy); form tidak
+ * menampilkan JSON mentah. Target lokasi/unit-satker/jenis pegawai dipilih lewat daftar centang dari endpoint options,
+ * hari berlaku lewat centang Senin..Minggu (disimpan "1,3,5"). Kolom *_desc diisi backend.
+ */
+const isAturanLokasi = computed(() => props.meta.key === 'aturan-lokasi-presensi')
+const ATURAN_TARGET_FIELDS = ['target_lp', 'target_uns', 'target_jp']
+const HARI = [
+  { value: '1', label: 'Senin' },
+  { value: '2', label: 'Selasa' },
+  { value: '3', label: 'Rabu' },
+  { value: '4', label: 'Kamis' },
+  { value: '5', label: 'Jumat' },
+  { value: '6', label: 'Sabtu' },
+  { value: '7', label: 'Minggu' },
+]
+/** Kode `target_uns` untuk seluruh kementerian (legacy P-5). */
+const SELURUH_KEMENTERIAN = { value: '0', label: 'Seluruh Kementerian' }
+/** Jenis pegawai yang tidak dapat dipilih (K-8, legacy Lm_lokasi.php:276). */
+const JENIS_PEGAWAI_DIKECUALIKAN = '7'
+
+type ChoiceOption = { value: string; label: string }
+const aturanOptions = ref<Record<string, ChoiceOption[]>>({})
+const aturanOptionsLoading = ref(false)
+/** Unit/satker belum punya master di v2 (G-02): selama itu hanya "Seluruh Kementerian" yang bisa dipilih. */
+const unitSatkerAvailable = computed(() => props.allMeta.some((m) => m.key === 'unit' || m.key === 'satker'))
+
+/** Nilai JSON array tersimpan → daftar teks; nilai rusak/kosong → []. */
+function parseJsonList(raw: unknown): string[] {
+  try {
+    const parsed: unknown = JSON.parse(String(raw ?? ''))
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string' || typeof v === 'number').map(String) : []
+  } catch {
+    return []
+  }
+}
+
+function selectedTargets(field: string): string[] {
+  return parseJsonList(values[field])
+}
+
+function setTargets(field: string, selected: string[]): void {
+  updateField(field, selected.length > 0 ? JSON.stringify(selected) : '')
+}
+
+function selectedDays(): string[] {
+  return String(values.hari_berlaku ?? '')
+    .split(',')
+    .filter((d) => d !== '')
+}
+
+/** Hari berlaku: angka ISO unik dan terurut (sama dengan normalisasi backend). */
+function setDays(selected: string[]): void {
+  updateField('hari_berlaku', [...new Set(selected)].sort().join(','))
+}
+
+/** Pilihan target + nilai tersimpan yang tidak ada di pilihan aktif (tetap tampil, bertanda, agar bisa dilepas). */
+function targetOptions(field: string): ChoiceOption[] {
+  const options = aturanOptions.value[field] ?? []
+  const missing = selectedTargets(field)
+    .filter((v) => !options.some((o) => o.value === v))
+    .map((v) => ({ value: v, label: `${v} — tidak aktif / tidak dikenal` }))
+  return [...options, ...missing]
+}
+
+function targetHint(field: string): string {
+  if (aturanOptionsLoading.value) return 'Memuat pilihan...'
+  if (field === 'target_uns' && !unitSatkerAvailable.value) {
+    return 'Data unit/satker belum tersedia di SIMPEG v2; sementara hanya Seluruh Kementerian yang dapat dipilih.'
+  }
+  if (field === 'target_lp') return 'Hanya lokasi presensi aktif. Pilih minimal satu.'
+  return 'Pilih minimal satu.'
+}
+
+async function loadAturanOptions(): Promise<void> {
+  if (!isAturanLokasi.value) return
+  aturanOptionsLoading.value = true
+  try {
+    const hasUnit = props.allMeta.some((m) => m.key === 'unit')
+    const hasSatker = props.allMeta.some((m) => m.key === 'satker')
+    const [locations, jenisPegawai, units, satkers] = await Promise.all([
+      masterService.options('lokasi-presensi'),
+      masterService.options('jenis-pegawai'),
+      hasUnit ? masterService.options('unit') : Promise.resolve([]),
+      hasSatker ? masterService.options('satker') : Promise.resolve([]),
+    ])
+    aturanOptions.value = {
+      target_lp: locations.map((o) => ({ value: o.id, label: o.nama })),
+      target_uns: [
+        SELURUH_KEMENTERIAN,
+        ...units.map((o) => ({ value: o.id, label: o.nama })),
+        ...satkers.map((o) => ({ value: `sat_${o.id}`, label: o.nama })),
+      ],
+      target_jp: jenisPegawai.filter((o) => o.id !== JENIS_PEGAWAI_DIKECUALIKAN).map((o) => ({ value: o.id, label: o.nama })),
+    }
+  } catch (err) {
+    formError.value = `Gagal memuat pilihan aturan lokasi presensi. ${isApiError(err) ? err.message : ''}`.trim()
+  } finally {
+    aturanOptionsLoading.value = false
+  }
+}
 
 const refFields = computed(() => props.meta.fields.filter((f) => f.type === 'ref'))
 
@@ -169,6 +272,7 @@ watch(
     detailFailed.value = false
     if (row && missing.length > 0) void loadMissingFields(row, missing, detailToken)
     void initRefOptions()
+    void loadAturanOptions()
 
     if (m.parent) {
       const directParent = row ? String(row[m.parent.field] ?? '') : ''
@@ -463,6 +567,7 @@ const { levels } = cascade
           </template>
 
           <FormField
+            v-if="meta.name_required !== false"
             :model-value="values[meta.name_field]"
             :name="meta.name_field"
             :label="meta.name_label"
@@ -472,8 +577,33 @@ const { levels } = cascade
           />
 
           <template v-for="field in visibleFields" :key="field.name">
+            <CheckboxGroupField
+              v-if="isAturanLokasi && ATURAN_TARGET_FIELDS.includes(field.name)"
+              :model-value="selectedTargets(field.name)"
+              :name="field.name"
+              :label="field.label"
+              :required="field.required"
+              :options="targetOptions(field.name)"
+              :empty-text="aturanOptionsLoading ? 'Memuat pilihan...' : 'Belum ada pilihan aktif.'"
+              :hint="targetHint(field.name)"
+              :error="fieldError(field.name)"
+              :class="FORM_WIDE_CLASS"
+              @update:model-value="setTargets(field.name, $event)"
+            />
+            <CheckboxGroupField
+              v-else-if="isAturanLokasi && field.name === 'hari_berlaku'"
+              :model-value="selectedDays()"
+              :name="field.name"
+              :label="field.label"
+              :options="HARI"
+              :columns="4"
+              hint="Kosongkan semua untuk berlaku setiap hari."
+              :error="fieldError(field.name)"
+              :class="FORM_WIDE_CLASS"
+              @update:model-value="setDays($event)"
+            />
             <FormField
-              v-if="field.type === 'ref'"
+              v-else-if="field.type === 'ref'"
               :model-value="values[field.name]"
               :name="field.name"
               :label="field.label"
