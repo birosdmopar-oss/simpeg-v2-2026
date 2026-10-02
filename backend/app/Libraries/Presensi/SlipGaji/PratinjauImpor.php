@@ -183,6 +183,8 @@ final class PratinjauImpor
      *   kunci (NIP/periode tidak valid) tidak dipasangkan tetapi tetap dilaporkan sebagai galat: di akhir kelompok
      *   periodenya, atau paling akhir bila periodenya tidak valid.
      * - Filter periode: baris dengan periode lain dibuang sebelum validasi; tidak ada sisa → `periode_tidak_ada_di_berkas`.
+     *   Baris yang periodenya tidak terbaca tidak bisa dipastikan berada di luar filter, jadi tetap dilaporkan sebagai
+     *   galat (legacy membuangnya diam-diam).
      *
      * `nilai` = `array{baris: list<array{kunci: ?string, sheet: string, nomor_baris: int, nip: ?string,
      * periode: ?PeriodeSlip, status: string, galat: list<array{kode: string, pesan: string}>, nominal: array<string, int>}>,
@@ -193,7 +195,7 @@ final class PratinjauImpor
      * @param list<BarisSheet>                                       $tk
      * @param array<int|string, array{nama: string, id_satker: ?string}> $pegawai       per NIP (kunci NIP numerik menjadi int di array PHP)
      * @param array<string, true>                                    $kunciSudahAda kunci {@see self::kunci()} di DB
-     * @param ?string                                                $cakupanSatker null = semua pegawai (role 1)
+     * @param ?string                                                $cakupanSatker null = semua pegawai, **hanya** untuk role 1; role 3 wajib mengoper satker akunnya (`''` bila kosong → semua ditolak), jangan pernah null
      */
     public static function susun(
         array $gpp,

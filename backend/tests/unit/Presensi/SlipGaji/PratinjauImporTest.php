@@ -306,6 +306,24 @@ final class PratinjauImporTest extends CIUnitTestCase
         $this->assertSame('Tidak ada baris data untuk periode November 2026 pada berkas ini.', $kosong->pesan);
     }
 
+    public function testFilterPeriodeTetapMelaporkanBarisBerperiodeTidakValid(): void
+    {
+        // Periode baris 4 tidak terbaca, jadi tidak bisa dipastikan berada di luar filter: tetap dilaporkan sebagai galat
+        // (legacy membuangnya diam-diam), dan berkas tidak dianggap "tanpa data periode itu".
+        $gpp = self::urai('GPP', [2 => self::kunci(self::NIP_A, 9), 4 => self::kunci(self::NIP_B, 'Agt')]);
+        $tk  = self::urai('TK', [2 => self::kunci(self::NIP_A, 9)]);
+
+        $hasil = PratinjauImpor::susun($gpp, $tk, self::PEGAWAI, [], PeriodeSlip::buat(2026, 11));
+
+        $this->assertTrue($hasil->valid);
+        $this->assertIsArray($hasil->nilai);
+        $this->assertCount(1, $hasil->nilai['baris']);
+        $this->assertSame(4, $hasil->nilai['baris'][0]['nomor_baris']);
+        $this->assertSame(['bulan_tidak_valid'], self::kodeGalat($hasil->nilai));
+        $this->assertSame(0, $hasil->nilai['jumlah_valid']);
+        $this->assertSame(1, $hasil->nilai['jumlah_galat']);
+    }
+
     public function testFilterDariMasukan(): void
     {
         $this->assertSame('filter_periode_tidak_lengkap', PratinjauImpor::filterDariMasukan(10, null)->kode);

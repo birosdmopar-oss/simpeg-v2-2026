@@ -76,7 +76,13 @@ final class BarisImporTest extends CIUnitTestCase
         }
 
         $this->assertSame(12, BarisImpor::bulan('Desember')->nilai);
-        $this->assertSame(1, BarisImpor::bulan(1)->nilai);
+
+        // Batas angka 1 dan 12 lewat jalur angka (bukan nama bulan).
+        foreach ([1 => [1, '1', '01', 1.0], 12 => [12, '12', 12.0]] as $harapan => $daftar) {
+            foreach ($daftar as $nilai) {
+                $this->assertSame($harapan, BarisImpor::bulan($nilai)->nilai, var_export($nilai, true));
+            }
+        }
 
         foreach (['Agu', 'August', '8.7', 8.5, '1e1', '13', '0', '', null, 0, -1, true, '008', NAN] as $nilai) {
             $this->assertSame('bulan_tidak_valid', BarisImpor::bulan($nilai)->kode, var_export($nilai, true));
@@ -89,6 +95,11 @@ final class BarisImporTest extends CIUnitTestCase
             $hasil = BarisImpor::tahun($nilai);
             $this->assertTrue($hasil->valid, var_export($nilai, true));
             $this->assertSame(2026, $hasil->nilai);
+        }
+
+        // Batas inklusif 1900 dan 2100 (HariLiburRules::YEAR_MIN/MAX).
+        foreach ([1900, '1900', 1900.0, 2100, '2100', 2100.0] as $nilai) {
+            $this->assertSame((int) $nilai, BarisImpor::tahun($nilai)->nilai, var_export($nilai, true));
         }
 
         foreach (['2026abc', '2,026', 2026.5, '1899', '2101', '', null, 1899, 2101, '26', INF] as $nilai) {

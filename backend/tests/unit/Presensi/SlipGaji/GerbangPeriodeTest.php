@@ -91,6 +91,12 @@ final class GerbangPeriodeTest extends CIUnitTestCase
         $this->assertSame([], GerbangPeriode::daftarTersedia(self::wib('2024-01-04 09:59:59')));
         $this->assertNull(GerbangPeriode::terbaru(self::wib('2024-01-04 09:59:59')));
 
+        // Jam yang jauh sebelum periode awal (mis. jam server salah) → kosong, bukan exception periode < 1900.
+        foreach (['2023-12-31 23:59:59', '1900-01-01 00:00:00', '1500-06-15 12:00:00'] as $waktu) {
+            $this->assertNull(GerbangPeriode::terbaru(self::wib($waktu)), $waktu);
+            $this->assertSame([], GerbangPeriode::daftarTersedia(self::wib($waktu)), $waktu);
+        }
+
         $daftar = GerbangPeriode::daftarTersedia(self::wib('2024-01-04 10:00:00'));
         $this->assertCount(1, $daftar);
         $this->assertSame('2024-01', $daftar[0]->kunci());

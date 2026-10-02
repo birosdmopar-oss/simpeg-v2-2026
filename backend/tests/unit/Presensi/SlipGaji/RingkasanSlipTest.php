@@ -6,6 +6,7 @@ namespace Tests\Unit\Presensi\SlipGaji;
 
 use App\Libraries\Presensi\SlipGaji\RingkasanSlip;
 use CodeIgniter\Test\CIUnitTestCase;
+use InvalidArgumentException;
 
 /**
  * CR-027 (R-1..R-4) — ringkasan slip setia legacy: total = bersih GPP + bersih TK (rumus final menunggu Biro
@@ -85,5 +86,22 @@ final class RingkasanSlipTest extends CIUnitTestCase
         $this->assertSame(346_052_500, $peringatan[0]['harapan']);
         $this->assertSame(346_052_400, $peringatan[0]['nilai']);
         $this->assertSame('Gaji Bersih (GPP) 3.460.524 tidak sama dengan hasil hitung 3.460.525.', $peringatan[0]['pesan']);
+    }
+
+    public function testNilaiBukanIntSenDitolak(): void
+    {
+        // Nilai mentah DB (`DECIMAL` sebagai teks) atau float wajib dikonversi lewat NominalGaji dulu, bukan dijumlah langsung.
+        foreach (['4500000.00', 4_500_000.0] as $mentah) {
+            $slip               = self::slipSintetis();
+            $slip['bersih_gpp'] = $mentah;
+
+            try {
+                // Sengaja melanggar tipe untuk menguji penjaga runtime.
+                RingkasanSlip::hitung($slip); // @phpstan-ignore argument.type
+                $this->fail('Nilai bukan int sen harus ditolak: ' . var_export($mentah, true));
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('bersih_gpp', $e->getMessage());
+            }
+        }
     }
 }

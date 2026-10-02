@@ -83,6 +83,7 @@ final class SlipGajiMurniTest extends CIUnitTestCase
                 public function j(): string { return date_create_immutable('now')->format('Y'); }
                 public function k(): int { return $this->time() + self::date() + $this->random_int(); }
                 public function l(string $s): string { return TanggalBisnis::hariIni($s); }
+                public function m(): string { return \gmdate('Y') . \random_int(1, 9) . \Foo\time(); }
             }
             PHP;
 
@@ -92,7 +93,7 @@ final class SlipGajiMurniTest extends CIUnitTestCase
             'date()', 'strtotime()', 'db_connect()', 'model()', 'CodeIgniter\Database\BaseConnection', 'CodeIgniter\I18n\Time',
             'PhpOffice\PhpSpreadsheet\IOFactory', 'Time::parse', 'new \DateTimeImmutable', 'random_bytes()', 'random_int()',
             'mt_rand()', '::createFromFormat', 'hariIni() tanpa argumen', '$_GET', '$_SERVER', 'file_put_contents()',
-            'log_message()', 'date_create_immutable()',
+            'log_message()', 'date_create_immutable()', '\gmdate()',
         ];
 
         foreach ($harapan as $potongan) {
@@ -106,8 +107,10 @@ final class SlipGajiMurniTest extends CIUnitTestCase
         // bukan pelanggaran.
         $this->assertCount(1, array_filter($hasil, static fn (string $p): bool => str_ends_with($p, ' date()')));
         $this->assertCount(1, array_filter($hasil, static fn (string $p): bool => str_ends_with($p, ' random_int()')));
+        $this->assertCount(1, array_filter($hasil, static fn (string $p): bool => str_ends_with($p, ' \random_int()')));
         $this->assertCount(1, array_filter($hasil, static fn (string $p): bool => str_contains($p, 'hariIni()')));
-        $this->assertSame([], array_filter($hasil, static fn (string $p): bool => str_ends_with($p, ' time()')));
+        // Fungsi bernama sama di namespace lain (`\Foo\time()`) juga bukan pelanggaran.
+        $this->assertSame([], array_filter($hasil, static fn (string $p): bool => str_ends_with($p, ' time()') || str_ends_with($p, '\time()')));
     }
 
     /**
@@ -135,8 +138,16 @@ final class SlipGajiMurniTest extends CIUnitTestCase
             $pemanggilanMethod = is_array($sebelum)
                 && in_array($sebelum[0], [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION], true);
 
-            if ($id === T_STRING && $sesudah === '(' && ! $pemanggilanMethod
-                && in_array(strtolower($teks), self::FUNGSI_TERLARANG, true)) {
+            // `\date()` ditokenisasi sebagai T_NAME_FULLY_QUALIFIED, bukan T_STRING; tanpa ini pemindai bisa dilewati
+            // cukup dengan awalan `\`.
+            $namaFungsi = match ($id) {
+                T_STRING               => $teks,
+                T_NAME_FULLY_QUALIFIED => substr($teks, 1),
+                default                => null,
+            };
+
+            if ($namaFungsi !== null && $sesudah === '(' && ! $pemanggilanMethod
+                && in_array(strtolower($namaFungsi), self::FUNGSI_TERLARANG, true)) {
                 $pelanggaran[] = "{$lokasi} {$teks}()";
             }
 

@@ -105,12 +105,19 @@ final class GerbangPeriode
 
     /**
      * Periode terbaru yang tersedia: bulan berjalan (WIB) bila sudah rilis, selain itu bulan sebelumnya; `null` bila
-     * hasilnya lebih tua dari periode awal (mis. 1–4 Januari 2024 sebelum 10:00 WIB).
+     * hasilnya lebih tua dari periode awal (mis. 1–4 Januari 2024 sebelum 10:00 WIB). Tahun sebelum periode awal langsung
+     * `null` tanpa membentuk {@see PeriodeSlip} (tahun di bawah 1900 tidak sah sebagai periode).
      */
     public static function terbaru(DateTimeInterface $sekarang): ?PeriodeSlip
     {
-        $wib      = self::jamDindingWib($sekarang);
-        $berjalan = PeriodeSlip::buat((int) substr($wib, 0, 4), (int) substr($wib, 5, 2));
+        $wib   = self::jamDindingWib($sekarang);
+        $tahun = (int) substr($wib, 0, 4);
+
+        if ($tahun < self::TAHUN_AWAL) {
+            return null;
+        }
+
+        $berjalan = PeriodeSlip::buat($tahun, (int) substr($wib, 5, 2));
         $terbaru  = self::sudahRilis($berjalan, $sekarang) ? $berjalan : $berjalan->sebelumnya();
 
         return $terbaru->indeks() < self::periodeAwal()->indeks() ? null : $terbaru;
