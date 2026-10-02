@@ -406,7 +406,7 @@ final class MasterGenericTcTest extends CIUnitTestCase
             )->getRowArray()['DATA_TYPE'] === 'tinyint';
         }));
         $this->assertEqualsCanonicalizing(
-            ['agama', 'jenis-pegawai', 'jenis-status', 'bidang-kursem', 'instansi-kursem', 'jenis-libur', 'pangkat', 'jenis-kp', 'gol-pppk', 'bidang-pendidikan', 'diklat'],
+            ['agama', 'jenis-pegawai', 'jenis-status', 'bidang-kursem', 'instansi-kursem', 'jenis-libur', 'pangkat', 'jenis-kp', 'gol-pppk', 'bidang-pendidikan', 'diklat', 'rumpun-jabatan', 'subrumpun-jabatan'],
             $tinyintPk,
         );
 
