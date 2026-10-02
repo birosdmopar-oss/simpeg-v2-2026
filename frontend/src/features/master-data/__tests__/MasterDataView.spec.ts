@@ -389,9 +389,13 @@ describe('MasterDataView — tata letak sempit & label daftar master (CR-038)', 
   it('F-UI-2: header & sel Aksi menempel di kanan (sticky) berlatar sama dengan baris; header utuh "Aksi"', async () => {
     const wrapper = await mountMaster('kabupaten-kota')
 
-    const header = wrapper.get('[data-testid="master-actions-header"]')
+    const header = wrapper.get('[data-testid="master-col-actions"]')
     expect(header.text()).toBe('Aksi')
     expect(header.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'bg-slate-50', 'whitespace-nowrap']))
+    // INFO-6 (CR-040): selektor prefiks tombol baris tidak boleh mengenai header kolom.
+    for (const el of wrapper.findAll('[data-testid^="master-actions-"]')) {
+      expect(el.element.tagName).not.toBe('TH')
+    }
 
     const cell = wrapper.get('[data-testid="master-actions-1"]').element.closest('td') as HTMLElement
     expect([...cell.classList]).toEqual(expect.arrayContaining(['sticky', 'right-0', 'bg-white', 'group-hover:bg-slate-50']))
@@ -402,7 +406,7 @@ describe('MasterDataView — tata letak sempit & label daftar master (CR-038)', 
   it('F-UI-2: bayangan pemisah hanya selama masih ada kolom tergulir di bawah kolom Aksi', async () => {
     const wrapper = await mountMaster('kabupaten-kota')
     const scroller = wrapper.get('[data-testid="master-table-scroll"]')
-    const header = () => wrapper.get('[data-testid="master-actions-header"]')
+    const header = () => wrapper.get('[data-testid="master-col-actions"]')
     const cell = () => wrapper.get('[data-testid="master-actions-1"]').element.closest('td') as HTMLElement
     expect(header().classes()).not.toContain('shadow-sticky-end')
 

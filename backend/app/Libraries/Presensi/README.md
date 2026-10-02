@@ -133,7 +133,7 @@ Keamanan dan kerahasiaan (ditegakkan di server pada setiap endpoint terkait; FE 
 ### Terjawab dari legacy (CR-039, 02-10-2026)
 
 Semua butir yang dulu menunggu Biro Keuangan (TUNGGU-BK) atau user/reviewer CR (TUNGGU-USER) terjawab dari kode legacy
-`39b6b15`, kecuali U-8. Rujukan rinci ada di tabel aturan di atas.
+`39b6b15`; U-8 (teknis, reviewer CR) selesai di CR-040. Rujukan rinci ada di tabel aturan di atas.
 
 | # | Butir | Jawaban |
 |---|---|---|
@@ -154,8 +154,10 @@ Semua butir yang dulu menunggu Biro Keuangan (TUNGGU-BK) atau user/reviewer CR (
 | U-7 | Positif palsu substring pencocokan nama | [K] tetap (disengaja longgar) |
 | U-9 / G-2 | Periode tertua Januari 2024 | [K] `PERIODE_START_DATE = '2024-01-01'`; AS-05 semua baris produksi diimpor |
 
-Masih terbuka (tidak memblokir): **U-8** ekstraksi pemindai kemurnian `KalkulasiMurniTest`/`SlipGajiMurniTest` ke
-`tests/_support/Libraries/` (keputusan teknis reviewer CR; usul: biarkan salinan sampai ada pemakai ketiga).
+**U-8 selesai (CR-040):** pemindai kemurnian ketiga penjaga (`KalkulasiMurniTest` Kepegawaian, `SlipGajiMurniTest`,
+`KalkulasiMurniTest` Tukin) diekstrak ke `tests/_support/Libraries/PemindaiKemurnian.php` dengan daftar larangan gabungan
+(tidak ada yang dilonggarkan); uji dirinya di `tests/unit/Libraries/PemindaiKemurnianTest.php`. Slip Gaji memakai
+konfigurasi bawaan tanpa pengecualian.
 
 ### Menunggu Fase 5 (bukan bagian CR-027)
 

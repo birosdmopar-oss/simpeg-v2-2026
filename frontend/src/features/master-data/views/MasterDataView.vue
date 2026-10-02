@@ -508,7 +508,7 @@ onMounted(() => {
                 <th
                   class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right"
                   :class="{ 'shadow-sticky-end': actionsShadow }"
-                  data-testid="master-actions-header"
+                  data-testid="master-col-actions"
                 >
                   Aksi
                 </th>

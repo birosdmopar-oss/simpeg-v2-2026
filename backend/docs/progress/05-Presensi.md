@@ -46,6 +46,6 @@ Key review **CR-027** (CR saja). Tidak mengubah skema, jadi tidak ada dokumen `d
 
 **Keputusan**
 - Butir Biro Keuangan dan user/reviewer CR terjawab dari kode legacy (CR-039; README modul, bagian "Terjawab dari legacy").
-- Masih terbuka, tidak memblokir: ekstraksi pemindai kemurnian ke `tests/_support/Libraries/` (U-8, reviewer CR).
+- U-8 selesai di CR-040: pemindai kemurnian bersama `tests/_support/Libraries/PemindaiKemurnian.php` (daftar larangan gabungan ketiga penjaga, tanpa pelonggaran) dipakai `SlipGajiMurniTest`, `KalkulasiMurniTest` Tukin, dan `KalkulasiMurniTest` Kepegawaian.
 
 **Catatan lokasi test:** kontrak D-13 menyebut `tests/Presensi/`. Test logika murni ditaruh di `tests/unit/Presensi/` mengikuti konvensi repo (sama dengan CR-025); test integrasi ber-DB D-13 tetap di `tests/Presensi/`.
