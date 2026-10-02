@@ -193,6 +193,8 @@ Kalau dump berbeda, koreksi lewat migration ALTER berikutnya (selagi tabel masih
 
 \* Approval DBV-001 berupa satu komentar menyeluruh ("DBV-001 ✅", jjoseph48, PR #4, 24-09-2026) tanpa catatan per poin, sehingga keputusan no. 1–4 dicatat mengikuti kolom **Usulan**. Bila DB Validator bermaksud lain, koreksi lewat PR lanjutan. Catatan no. 1 (pencocokan nilai [I] Bagian 8.3 dengan dump struktur produksi) dilacak di Trello ISSUE-015 (checklist dump).
 
+Langkah runbook: audit duplikat no. 2 (termasuk status 10) dan aturan stempel waktu no. 3 untuk impor/SQL manual ada di `DBV-011-runbook-impor-master-zona-waktu.md` Bagian 2 dan 3.2; pencocokan 8.3 menjadi prasyarat impor di 2.4 langkah 6 (⏳ DBV-011).
+
 ### 8.5 Status keputusan & temuan sebelumnya setelah DBV-001
 
 | Item | Sebelumnya | Setelah DBV-001 |
