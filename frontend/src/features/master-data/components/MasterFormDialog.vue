@@ -23,6 +23,8 @@ import { computed, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
+import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
+import UiButton from '@/shared/ui/UiButton.vue'
 
 import { resolveAncestorPath, useCascadeOptions } from '../composables/useCascadeOptions'
 import {
@@ -330,6 +332,11 @@ const onSubmit = handleSubmit(async (formValues) => {
   }
 })
 
+/** CR-028: field teks panjang (textarea/html) memakai dua kolom penuh pada grid form. */
+function isWideField(field: MasterFieldMeta): boolean {
+  return field.type === 'textarea' || field.type === 'html'
+}
+
 /** Pemetaan tipe field backend → tipe input FormField. */
 function fieldInputType(field: MasterFieldMeta): 'text' | 'number' | 'select' | 'date' | 'textarea' | 'html' | 'checkbox' {
   // Desimal (mis. koordinat) memakai input teks: input number menolak sebagian ketikan tanda minus.
@@ -401,12 +408,12 @@ const { levels } = cascade
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
-        :class="hasHtmlField ? 'max-w-3xl' : 'max-w-lg'"
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
+        :class="hasHtmlField ? 'max-w-3xl' : 'max-w-2xl'"
       >
         <div class="mb-4 flex items-start justify-between">
           <div>
-            <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEdit ? `Edit ${meta.label}` : `Tambah ${meta.label}` }}</DialogTitle>
+            <DialogTitle class="text-h5 font-semibold text-slate-900">{{ isEdit ? `Edit ${meta.label}` : `Tambah ${meta.label}` }}</DialogTitle>
             <DialogDescription class="text-sm text-slate-500">
               {{
                 isEdit
@@ -417,13 +424,13 @@ const { levels } = cascade
               }}
             </DialogDescription>
           </div>
-          <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+          <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
             <X class="h-5 w-5" />
           </DialogClose>
         </div>
 
-        <form class="space-y-4" novalidate data-testid="master-form" @submit="onSubmit">
-          <p v-if="formError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+        <form :class="FORM_GRID_CLASS" novalidate data-testid="master-form" @submit="onSubmit">
+          <p v-if="formError" :class="FORM_ALERT_CLASS" role="alert">
             {{ formError }}
           </p>
 
@@ -492,6 +499,7 @@ const { levels } = cascade
               :allow-empty="!field.required"
               :disabled="pendingFields.has(field.name)"
               :hint="fieldHint(field)"
+              :class="isWideField(field) ? FORM_WIDE_CLASS : ''"
               :error="fieldError(field.name)"
               @update:model-value="updateField(field.name, $event)"
             />
@@ -508,15 +516,13 @@ const { levels } = cascade
             @update:model-value="updateField('order', $event)"
           />
 
-          <div class="flex justify-end gap-2 pt-2">
-            <DialogClose class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</DialogClose>
-            <button
-              type="submit"
-              class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
-              :disabled="submitting || pendingFields.size > 0 || detailFailed"
-            >
+          <div :class="FORM_ACTIONS_CLASS">
+            <DialogClose as-child>
+              <UiButton variant="secondary" appearance="soft">Batal</UiButton>
+            </DialogClose>
+            <UiButton type="submit" :disabled="submitting || pendingFields.size > 0 || detailFailed">
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}
-            </button>
+            </UiButton>
           </div>
         </form>
       </DialogContent>

@@ -1,0 +1,32 @@
+/**
+ * Barrel komponen design system redesign (Laporan Redesign bab 3).
+ * Semua komponen di sini bersifat reusable dan bebas dari logika domain kepegawaian.
+ */
+export { default as UiAvatar } from './UiAvatar.vue'
+export { default as UiBadge } from './UiBadge.vue'
+export { default as UiBreadcrumb } from './UiBreadcrumb.vue'
+export { default as UiButton } from './UiButton.vue'
+export { default as UiCard } from './UiCard.vue'
+export { default as UiCheckbox } from './UiCheckbox.vue'
+export { default as UiDonutChart } from './UiDonutChart.vue'
+export { default as UiExportMenu } from './UiExportMenu.vue'
+export { default as UiFileField } from './UiFileField.vue'
+export { default as UiNotice } from './UiNotice.vue'
+export { default as UiPagination } from './UiPagination.vue'
+export { default as UiRadioGroup } from './UiRadioGroup.vue'
+export { default as UiProgressBar } from './UiProgressBar.vue'
+export { default as UiSearchInput } from './UiSearchInput.vue'
+export { default as UiSelect } from './UiSelect.vue'
+export { default as UiSparkline } from './UiSparkline.vue'
+export { default as UiStatTile } from './UiStatTile.vue'
+export { default as UiStepper } from './UiStepper.vue'
+export { default as UiTabs } from './UiTabs.vue'
+export { default as UiTextField } from './UiTextField.vue'
+
+export type { ExportFormat } from './UiExportMenu.vue'
+export type { RadioOption } from './UiRadioGroup.vue'
+export type { Crumb } from './UiBreadcrumb.vue'
+export type { DonutSlice } from './UiDonutChart.vue'
+export type { SelectOption } from './UiSelect.vue'
+export type { Step } from './UiStepper.vue'
+export type { TabItem } from './UiTabs.vue'
