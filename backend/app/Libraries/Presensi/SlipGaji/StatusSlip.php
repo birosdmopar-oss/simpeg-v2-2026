@@ -51,7 +51,7 @@ final class StatusSlip
     }
 
     /**
-     * Pegawai boleh mencetak selama status dibuka (aturan server legacy `Sl_gaji.php:169-171`; usul S-4 TUNGGU-USER).
+     * Pegawai boleh mencetak selama status dibuka (aturan server legacy `Sl_gaji.php:169-171`; S-4 terjawab dari legacy).
      */
     public static function bolehCetakPegawai(?string $dibukaPada): bool
     {

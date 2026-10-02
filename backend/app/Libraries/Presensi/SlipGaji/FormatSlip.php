@@ -21,7 +21,7 @@ final class FormatSlip
 
     /**
      * Tanggal cetak "4 Oktober 2026" (tanggal WIB, tanpa jam) [K] `libraries/hr/Lsl_gaji.php:366-369`; templat menambah
-     * "Jakarta, ". Perlu jam atau tidak: TUNGGU-USER (P-5).
+     * "Jakarta, ", tanpa jam (P-5, terjawab dari legacy).
      */
     public static function tanggalCetak(DateTimeInterface $sekarang): string
     {
@@ -29,16 +29,17 @@ final class FormatSlip
     }
 
     /**
-     * Stempel waktu (mis. `viewed_at` UTC dari DB, sudah dijadikan objek waktu oleh service) → "4 Oktober 2026 10:00 WIB".
-     * Legacy memakai tiga format berbeda, salah satunya dengan nama bulan Inggris (P-6, PERBAIKI; format final
-     * TUNGGU-USER).
+     * Stempel waktu (mis. `viewed_at` UTC dari DB, sudah dijadikan objek waktu oleh service) → "4 Oktober 2026, 10:00 WIB".
+     * [K] format halaman pegawai `views/hr/employee/sl_gaji/list.php:208` (`d F Y, H:i` + " WIB", dengan koma) dengan
+     * nama bulan Indonesia; legacy memakai nama bulan Inggris di sana dan `d-m-Y H:i WIB` di admin/verifikasi (P-6,
+     * PERBAIKI: satu format di semua keluaran).
      */
     public static function waktuWib(DateTimeInterface $waktu): string
     {
         $wib = DateTimeImmutable::createFromInterface($waktu)->setTimezone(new DateTimeZone(TanggalBisnis::ZONA));
 
         return sprintf(
-            '%d %s %s %s WIB',
+            '%d %s %s, %s WIB',
             (int) $wib->format('j'),
             TanggalBisnis::NAMA_BULAN[(int) $wib->format('n')],
             $wib->format('Y'),

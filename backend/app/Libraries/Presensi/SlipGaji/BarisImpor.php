@@ -121,7 +121,7 @@ final class BarisImpor
      *
      * Galat per sel dikumpulkan (bukan berhenti di galat pertama) dengan pesan yang menyebut sheet, nomor baris, dan
      * kolom Excel. Nominal: kolom wajib terisi kosong → `nominal_wajib`; kolom lain kosong → 0 [K]; negatif →
-     * `nominal_negatif` (interim N-5).
+     * `nominal_negatif` (N-5).
      *
      * @param array<string, mixed> $sel
      */

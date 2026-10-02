@@ -425,6 +425,9 @@ final class PratinjauImporTest extends CIUnitTestCase
         $this->assertSame('sisip', PratinjauImpor::rencanaCommit('valid', true));
         $this->assertSame('sisip', PratinjauImpor::rencanaCommit('valid', false));
 
+        // Opsi timpa bawaan tercentang seperti legacy (`admin_import.php:54`) → duplikat diperbarui.
+        $this->assertSame('perbarui', PratinjauImpor::rencanaCommit('duplikat', PratinjauImpor::TIMPA_BAWAAN));
+
         $this->expectException(InvalidArgumentException::class);
         PratinjauImpor::rencanaCommit('error', true);
     }

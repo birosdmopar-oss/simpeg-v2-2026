@@ -10,7 +10,7 @@ namespace App\Libraries\Presensi\SlipGaji;
  *
  * Kelonggaran pencocokan disengaja [K] (`libraries/hr/Lsl_gaji.php:715-737`): yang dikejar adalah NIP salah ketik yang
  * kebetulan milik orang lain, bukan beda penulisan nama. Konsekuensinya nama pendek yang menjadi bagian nama lain
- * dianggap cocok ("Ani" ~ "Daniel"); evaluasi lewat log ketidakcocokan (M-3, TUNGGU-USER/BK).
+ * dianggap cocok ("Ani" ~ "Daniel"); disengaja longgar seperti legacy, evaluasi lewat log ketidakcocokan (M-3, terjawab dari legacy).
  */
 final class PencocokanNama
 {
@@ -45,7 +45,7 @@ final class PencocokanNama
     /**
      * Nama bergelar `"{gelar awal} {nama}, {gelar akhir}"` setara `formatNamaGelar` legacy
      * (`helpers/function_helper.php:102-108`); setiap bagian di-trim dan bagian kosong dilewati, jadi gelar akhir yang
-     * hanya spasi tidak menghasilkan koma menggantung (P-9, usul — format final TUNGGU-USER). Pembersihan `stripslashes`
+     * hanya spasi tidak menghasilkan koma menggantung (P-9 [K] helper aplikasi `formatNamaGelar`, satu format di semua keluaran). Pembersihan `stripslashes`
      * adalah urusan migrasi data, bukan fungsi ini.
      */
     public static function denganGelar(?string $gelarAwal, string $nama, ?string $gelarAkhir): string

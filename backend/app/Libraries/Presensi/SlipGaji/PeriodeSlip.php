@@ -86,7 +86,7 @@ final readonly class PeriodeSlip
     }
 
     /**
-     * Bulan sebelumnya (`2027-01` → `2026-12`); dipakai untuk label uang makan bulan−1 (P-8, pemakaian TUNGGU-BK).
+     * Bulan sebelumnya (`2027-01` → `2026-12`); tidak dipakai untuk slip karena legacy tidak punya label uang makan bulan−1 (P-8).
      */
     public function sebelumnya(): self
     {

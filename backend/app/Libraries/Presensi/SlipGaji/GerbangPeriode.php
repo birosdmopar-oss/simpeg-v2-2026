@@ -37,7 +37,7 @@ final class GerbangPeriode
 
     /**
      * Periode tertua yang pernah tersedia [K] `Lsl_gaji.php:9` (`PERIODE_START_DATE = '2024-01-01'`). Bisa berubah oleh
-     * keputusan volume histori D-01 (TUNGGU-USER/DBV).
+     * keputusan volume histori D-01 (AS-05: semua baris produksi diimpor; terjawab dari legacy).
      */
     public const TAHUN_AWAL = 2024;
 

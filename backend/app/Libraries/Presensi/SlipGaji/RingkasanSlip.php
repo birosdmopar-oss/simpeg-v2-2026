@@ -9,7 +9,8 @@ use InvalidArgumentException;
 /**
  * CR-027 (K-CR027-8) — ringkasan dan total slip gaji, int sen tanpa float.
  *
- * Interim setia legacy (`libraries/hr/Lsl_gaji.php:234-261`) sampai Biro Keuangan memutuskan rumus (R-4, TUNGGU-BK):
+ * Setia legacy (`libraries/hr/Lsl_gaji.php:234-261`; terjawab dari legacy, CR-039). Legacy tidak punya cek invarian
+ * `bersih_*`, jadi tidak ada peringatan konsistensi:
  * - `jumlah_penghasilan_gpp` = Σ 13 field penghasilan GPP; `jumlah_potongan_gpp` = Σ 8 field potongan GPP (legacy
  *   menghitung keduanya tetapi tidak menampilkannya);
  * - `bersih_gpp`, `bersih_tk`, `bersih_2` = nilai berkas apa adanya, tidak dihitung ulang;
@@ -42,47 +43,6 @@ final class RingkasanSlip
             'bersih_2'               => self::ambil($sen, 'bersih_2'),
             'total_penghasilan'      => $bersihGpp + $bersihTk,
         ];
-    }
-
-    /**
-     * Cek konsistensi usulan (R-4 #4, **belum aktif**: dipakai sebagai peringatan pratinjau yang tidak memblokir hanya
-     * setelah Biro Keuangan mengonfirmasi invariannya): `bersih_gpp = Σpenghasilan − Σpotongan`,
-     * `bersih_tk = kotor − potongan`, `bersih_2 = bersih_tk − pajak + tunj_pajak`.
-     *
-     * @param array<string, int> $sen
-     *
-     * @return list<array{kode: string, pesan: string, harapan: int, nilai: int}>
-     */
-    public static function periksaKonsistensi(array $sen): array
-    {
-        $ringkasan = self::hitung($sen);
-        $aturan    = [
-            'bersih_gpp' => $ringkasan['jumlah_penghasilan_gpp'] - $ringkasan['jumlah_potongan_gpp'],
-            'bersih_tk'  => self::ambil($sen, 'kotor') - self::ambil($sen, 'potongan'),
-            'bersih_2'   => $ringkasan['bersih_tk'] - self::ambil($sen, 'pajak') + self::ambil($sen, 'tunj_pajak'),
-        ];
-
-        $peringatan = [];
-
-        foreach ($aturan as $field => $harapan) {
-            $nilai = self::ambil($sen, $field);
-
-            if ($nilai !== $harapan) {
-                $peringatan[] = [
-                    'kode'  => "{$field}_tidak_konsisten",
-                    'pesan' => sprintf(
-                        '%s %s tidak sama dengan hasil hitung %s.',
-                        KolomGaji::GPP[$field] ?? KolomGaji::TK[$field] ?? $field,
-                        NominalGaji::formatAngka($nilai),
-                        NominalGaji::formatAngka($harapan),
-                    ),
-                    'harapan' => $harapan,
-                    'nilai'   => $nilai,
-                ];
-            }
-        }
-
-        return $peringatan;
     }
 
     /**

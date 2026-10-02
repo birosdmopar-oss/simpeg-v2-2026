@@ -7,21 +7,22 @@ namespace App\Libraries\Presensi\Tukin;
 use InvalidArgumentException;
 
 /**
- * Evaluator status satu hari kerja mengikuti precedence `laporan_tukin` legacy (:4611-4810):
+ * Evaluator status satu hari kerja mengikuti precedence rekap legacy `laporan_tukin_us_skp` (:12744-13020):
  * akhir pekan → tugas belajar → cuti → konket `affect_tukin=1` → presensi (TK / hadir / TPM / TPP).
- * Hari libur sudah disingkirkan `HariKerja`; potongan bulanan (TB, cuti besar/melahirkan/alasan penting) dan urutan
- * cuti sakit dihitung `KalkulasiTukin` karena butuh konteks periode.
+ * Hari libur dan hari di luar masa kerja sudah disingkirkan `KalkulasiTukin`; urutan cuti sakit, jadwal cuti
+ * besar/melahirkan, SKP, dan pemutihan TB dihitung `KalkulasiTukin` karena butuh konteks periode.
+ *
+ * Semua potongan harian = tarif `web_config` × faktor presensi 0,2 (`KonfigurasiTukin::potonganHarian`).
  *
  * Input harian (semua opsional):
- * - `tugas_belajar`: true | array{mulai?: string, perpanjangan?: bool, id?: string}
- * - `cuti`: array{jenis: string, mulai?: string, akhir?: string, lama?: int, anak_sebelumnya?: int}
+ * - `tugas_belajar`: true | array (isi tidak dipakai untuk potongan)
+ * - `cuti`: array{jenis: string, mulai?: string, akhir?: string, lama?: int}
  * - `konket`: array{affect_tukin: int|string, kategori?: int|string}
  * - `presensi`: array{masuk?: string|null, pulang?: string|null} (`HH:MM` atau `HH:MM:SS`)
- * - `wajibLkh`: bool (sub group jabatan ≠ 1), `lkhTerisi`: bool (LKH berstatus disetujui)
  */
 final class StatusHarian
 {
-    /** Kode jenis cuti v2 → `id_jenis_cuti` legacy (`rwy/L_cuti.php:295-375`). */
+    /** Kode jenis cuti v2 → `id_jenis_cuti` legacy (`rwy/L_cuti.php:295-375`, rekap :12240-12266). */
     public const JENIS_CUTI = [
         'tahunan'        => 1,
         'besar'          => 2,
@@ -31,7 +32,7 @@ final class StatusHarian
         'cltn'           => 6,
     ];
 
-    /** Cuti sakit mulai dipotong pada hari kerja berurutan ke-15 (legacy :4691 `> 14`). */
+    /** Cuti sakit mulai dipotong pada hari kerja berurutan ke-15 (legacy :12799 `> 14`). */
     public const BATAS_HARI_CUTI_SAKIT = 14;
 
     /**
@@ -48,8 +49,11 @@ final class StatusHarian
 
         $jenisCuti = self::jenisCuti($input);
         if ($jenisCuti !== null) {
+            // Hanya cuti sakit hari ke-15+ yang dipotong harian (:12796-12804); jenis lain tanpa potongan harian.
             if ($jenisCuti === 'sakit' && $hariSakitBerurutan > self::BATAS_HARI_CUTI_SAKIT) {
-                return new HasilHarian('cuti', $config->tarif('CUTI_SAKIT'), ['CS'], jenisCuti: $jenisCuti);
+                $potongan = $config->potonganHarian('CUTI_SAKIT');
+
+                return new HasilHarian('cuti', $potongan, ['CS'], jenisCuti: $jenisCuti, rincian: ['CUTI' => $potongan]);
             }
 
             return new HasilHarian('cuti', jenisCuti: $jenisCuti);
@@ -92,22 +96,14 @@ final class StatusHarian
     }
 
     /**
-     * @param array<string, mixed> $input
-     */
-    public static function adaKonket(array $input): bool
-    {
-        return isset($input['konket']) && is_array($input['konket']);
-    }
-
-    /**
-     * Konket bebas potongan cukup `affect_tukin = 1` (legacy :4758). `kategori = 13` hanya menentukan uang makan
-     * (:4763), bukan potongan.
+     * Konket bebas potongan cukup `affect_tukin = 1` (rekap hanya memuat konket `affect_tukin='1'`, :12346).
+     * `kategori = 13` hanya menentukan uang makan (:12836), bukan potongan.
      *
      * @param array<string, mixed> $input
      */
     public static function konketBebas(array $input): bool
     {
-        return self::adaKonket($input) && (string) ($input['konket']['affect_tukin'] ?? '') === '1';
+        return isset($input['konket']) && is_array($input['konket']) && (string) ($input['konket']['affect_tukin'] ?? '') === '1';
     }
 
     /**
@@ -118,38 +114,41 @@ final class StatusHarian
         $presensi = is_array($input['presensi'] ?? null) ? $input['presensi'] : [];
         $masuk    = self::jam($presensi['masuk'] ?? null);
         $pulang   = self::jam($presensi['pulang'] ?? null);
-        $lkh      = self::potonganLkh($input, $config);
 
         if ($masuk === null && $pulang === null) {
-            return new HasilHarian('TK', $config->tarif('TK'), self::denganLkh(['TK'], $lkh), potonganLkh: $lkh);
+            // TK (:12853-12859).
+            $tk = $config->potonganHarian('TK');
+
+            return new HasilHarian('TK', $tk, ['TK'], rincian: ['TK' => $tk]);
         }
 
         $standar = JamKerja::untuk($tanggal, $config);
-        // TL positif = datang terlambat; PSW positif = pulang sebelum waktunya (legacy :4835-4847).
+        // TL positif = datang terlambat; PSW positif = pulang sebelum waktunya (:12871-12883).
         $tl  = $masuk === null ? 0 : JamKerja::selisihMenit($standar['masuk'], $masuk);
         $psw = $pulang === null ? 0 : JamKerja::selisihMenit($pulang, $standar['pulang']);
+        $ta  = $config->potonganHarian('TA');
 
         if ($masuk === null) {
-            // TPM: TA + denda PSW satu arah (:4910-4935).
+            // TPM: TA + denda PSW satu arah (:12933-12976).
             [$kodePsw, $tarifPsw] = self::golongan('PSW', $psw, $config);
 
-            return new HasilHarian('TPM', $config->tarif('TA') + $tarifPsw, self::denganLkh(array_merge(['TPM'], $kodePsw), $lkh), 0, $psw, $lkh);
+            return new HasilHarian('TPM', $ta + $tarifPsw, array_merge(['TPM'], $kodePsw), 0, $psw, rincian: self::rincian(['TA' => $ta, 'PSW' => $tarifPsw]));
         }
         if ($pulang === null) {
-            // TPP: TA + denda TL satu arah, tanpa kompensasi jam pulang (:4968-4993).
+            // TPP: TA + denda TL satu arah, tanpa kompensasi jam pulang (:12978-13020).
             [$kodeTl, $tarifTl] = self::golongan('TL', $tl, $config);
 
-            return new HasilHarian('TPP', $config->tarif('TA') + $tarifTl, self::denganLkh(array_merge(['TPP'], $kodeTl), $lkh), $tl, 0, $lkh);
+            return new HasilHarian('TPP', $ta + $tarifTl, array_merge(['TPP'], $kodeTl), $tl, 0, rincian: self::rincian(['TA' => $ta, 'TL' => $tarifTl]));
         }
 
-        // Hadir lengkap: TL1/TL2 gugur bila pulang cukup lambat (:4851-4864); TL3 tidak pernah gugur.
+        // Hadir lengkap: TL1/TL2 gugur bila pulang cukup lambat (:12888-12907); TL3 tidak pernah gugur.
         [$kodeTl, $tarifTl] = self::golongan('TL', $tl, $config);
         if (($kodeTl === ['TL2'] && $psw <= -60) || ($kodeTl === ['TL1'] && $psw <= -30)) {
             [$kodeTl, $tarifTl] = [[], 0];
         }
         [$kodePsw, $tarifPsw] = self::golongan('PSW', $psw, $config);
 
-        return new HasilHarian('hadir', $tarifTl + $tarifPsw, self::denganLkh(array_merge($kodeTl, $kodePsw), $lkh), $tl, $psw, $lkh);
+        return new HasilHarian('hadir', $tarifTl + $tarifPsw, array_merge($kodeTl, $kodePsw), $tl, $psw, rincian: self::rincian(['TL' => $tarifTl, 'PSW' => $tarifPsw]));
     }
 
     /**
@@ -161,31 +160,20 @@ final class StatusHarian
     {
         return match (true) {
             $menit <= 0  => [[], 0],
-            $menit <= 30 => [[$prefix . '1'], $config->tarif('TL1/PSW1')],
-            $menit <= 60 => [[$prefix . '2'], $config->tarif('TL2/PSW2')],
-            default      => [[$prefix . '3'], $config->tarif('TL3/PSW3')],
+            $menit <= 30 => [[$prefix . '1'], $config->potonganHarian('TL1/PSW1')],
+            $menit <= 60 => [[$prefix . '2'], $config->potonganHarian('TL2/PSW2')],
+            default      => [[$prefix . '3'], $config->potonganHarian('TL3/PSW3')],
         };
     }
 
     /**
-     * LKH dikenakan pada baris presensi (TK, hadir, TPM, TPP) bila pegawai wajib LKH dan LKH hari itu belum disetujui
-     * (legacy :4804, :4888, :4946, :5004, ekspresi `potongan_lkh` yang dikomentari).
+     * @param array<string, int> $rincian
      *
-     * @param array<string, mixed> $input
+     * @return array<string, int>
      */
-    private static function potonganLkh(array $input, KonfigurasiTukin $config): int
+    private static function rincian(array $rincian): array
     {
-        return ($input['wajibLkh'] ?? false) === true && ($input['lkhTerisi'] ?? false) !== true ? $config->tarif('LKH') : 0;
-    }
-
-    /**
-     * @param list<string> $kategori
-     *
-     * @return list<string>
-     */
-    private static function denganLkh(array $kategori, int $potonganLkh): array
-    {
-        return $potonganLkh > 0 ? [...$kategori, 'LKH'] : $kategori;
+        return array_filter($rincian, static fn (int $nilai): bool => $nilai > 0);
     }
 
     private static function jam(mixed $jam): ?string

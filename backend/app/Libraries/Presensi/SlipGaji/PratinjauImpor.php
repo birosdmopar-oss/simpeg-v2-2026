@@ -174,7 +174,7 @@ final class PratinjauImpor
      * - Kunci ganda dalam satu sheet: baris pertama dipertahankan dan diberi galat `baris_ganda` yang menyebut kedua
      *   nomor baris; baris berikutnya dibuang (I-8).
      * - Setiap kunci wajib ada di kedua sheet (`tidak_ada_di_gpp`/`tidak_ada_di_tk`, I-9).
-     * - NIP wajib terdaftar (`nip_tidak_terdaftar`) dan, bila `$cakupanSatker` diisi (admin role 3, I-13 TUNGGU-USER),
+     * - NIP wajib terdaftar (`nip_tidak_terdaftar`) dan, bila `$cakupanSatker` diisi (admin role 3, I-13 [V2] PRD SG-2),
      *   satkernya sama menurut {@see AksesSlip::dalamCakupan()} (`nip_di_luar_cakupan`, fail-closed; nama pegawai di luar
      *   cakupan tidak pernah dibandingkan atau dikutip).
      * - Setiap sheet yang punya kolom `nama` dicek sendiri (M-6, PERBAIKI): kosong → `nama_kosong`; tidak cocok →
@@ -359,10 +359,14 @@ final class PratinjauImpor
         ]);
     }
 
+    /** Opsi timpa impor bawaan tercentang [K] `views/hr/employee/sl_gaji/admin_import.php:54` (I-12, U-6). */
+    public const TIMPA_BAWAAN = true;
+
     /**
      * Rencana commit per kunci (I-12): galat → `gagal`; duplikat → `perbarui` bila timpa, selain itu `lewati`; valid →
      * `sisip`. Commit parsial per kunci; `perbarui` hanya mengganti 28 kolom nominal, tidak menyentuh status dibuka atau
-     * token (S-6 TUNGGU-BK/USER).
+     * token (S-6 [K]: legacy mengizinkan timpa slip yang sudah dibuka, `Lsl_gaji.php:1041-1071`). Nilai bawaan opsi timpa
+     * = `TIMPA_BAWAAN` (tercentang).
      */
     public static function rencanaCommit(string $status, bool $timpa): string
     {

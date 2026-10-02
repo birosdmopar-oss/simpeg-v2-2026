@@ -8,12 +8,12 @@ use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use InvalidArgumentException;
 
 /**
- * Jam kerja standar dan selisih menit (legacy `laporan_tukin` :4597-4600, :4828-4847).
+ * Jam kerja standar dan selisih menit (rekap legacy `laporan_tukin_us_skp` :12722-12725, :12866-12884).
  */
 final class JamKerja
 {
     /**
-     * Jam masuk/pulang standar `HH:MM:SS`. Rentang puasa inklusif di kedua ujung (legacy :4597).
+     * Jam masuk/pulang standar `HH:MM:SS`. Rentang puasa inklusif di kedua ujung (legacy :12722).
      *
      * @return array{masuk: string, pulang: string}
      */
@@ -55,7 +55,7 @@ final class JamKerja
 
     /**
      * Selisih `aktual - standar` dalam menit penuh. Sisa detik dibuang ke arah nol, sama dengan legacy yang memakai
-     * `DateInterval::h/i` lalu memberi tanda negatif bila aktual lebih awal (:4835-4839, :4843-4847).
+     * `DateInterval::h/i` lalu memberi tanda negatif bila aktual lebih awal (:12871-12875, :12879-12883).
      */
     public static function selisihMenit(string $standar, string $aktual): int
     {

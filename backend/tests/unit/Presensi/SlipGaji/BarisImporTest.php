@@ -170,7 +170,7 @@ final class BarisImporTest extends CIUnitTestCase
         $this->assertSame(0, $baris->nominal['tjistri']);
     }
 
-    public function testUraiNominalNegatifDitolakInterim(): void
+    public function testUraiNominalNegatifDitolak(): void
     {
         $baris = BarisImpor::urai(self::selGpp(['potlain' => '-1.000']), 'GPP', 5);
 

@@ -1,4 +1,4 @@
-# CR-037 — Kalkulasi Tukin murni
+# CR-037/CR-039 — Kalkulasi Tukin murni
 
 Library ini menerima seluruh data dan konfigurasi sebagai argumen. Library tidak membaca DB, HTTP, session, jam sistem,
 atau `web_config`; "hari ini" diinjeksikan lewat parameter `hariIni`. Kemurnian dijaga
@@ -6,130 +6,123 @@ atau `web_config`; "hari ini" diinjeksikan lewat parameter `hariIni`. Kemurnian 
 
 ## Acuan
 
-- Baseline legacy `9545385`, `application/libraries/hr/L_presensi.php`, method aktif **`laporan_tukin` (:3628–5054)**.
-  Method `rekap_full_xls_2222` bukan acuan.
-- **Baseline 9545385 belum dicocokkan dengan kode produksi** yang sedang berjalan (asumsi AS-09). Setiap aturan di bawah
-  bersumber dari baseline tersebut.
-- Di baseline, kolom `potongan_absen` dan `potongan_lkh` baris presensi pada `laporan_tukin` **dikomentari**
-  (:4801-4804, :4885-4888, :4943-4946, :5001-5004); laporan aktif hanya menampilkan uang makan, sedangkan rumus TL/PSW/
-  TPM/TPP tetap dihitung (:4825-4993). Rumus potongan diambil dari ekspresi tersebut dan dicocokkan dengan
-  `laporan_tukin_us_skp` (:11752), method rekap yang dipanggil controller.
+- Legacy `HEAD = 39b6b15` (Tukin identik dengan `9545385`), `application/libraries/hr/L_presensi.php`, method rekap
+  **`laporan_tukin_us_skp` (:11752–13492)**. Ini jalur aktif Tukin sejak April 2024: controller
+  `controllers/hr/Presensi.php:248-257` memakai `tukinVer = 'skp'` sebagai bawaan, periode ≤ Maret 2024 dialihkan ke
+  `original` (`:353-361`), dan `skp` → `laporan_tukin_skp` (`:396-401`). Rekap admin "Laporan Tukin Baru"
+  (`views/hr/employee/presensi/list_lt.php:8-13`, `Presensi.php:151`, `:488-566`) → `laporan_tukin_us_skp`, yang
+  diekspor ke Excel untuk pembayaran (kolom TL, PSW, TK, TA, CUTI, TB, total presensi, total SKP, total potongan,
+  `:13380-13392`).
+- **K-1 (keputusan user 02-10-2026): v2 ikut rekap `laporan_tukin_us_skp`** bila rekap dan laporan per pegawai
+  `laporan_tukin_skp` (:6510–7752) berbeda (lihat tabel perbedaan di bawah).
+- CR-037 sebelumnya mengacu `laporan_tukin` (:3628). Itu **jalur lama** (tab "Uang Makan"/"Lama", periode ≤ Maret
+  2024); kolom potongannya dikomentari. Bukan acuan lagi.
+- Rujukan baris belum dicocokkan dengan kode produksi yang sedang berjalan (asumsi AS-09).
 - Label: **[K]** ikut legacy, **[V2]** sengaja berbeda dari legacy (alasan dicatat).
 
 ## Tabel aturan
 
-| Aturan | Sumber baseline | Label | Implementasi |
+| Aturan | Sumber rekap | Label | Implementasi |
 |---|---|---|---|
-| Periode 16 bulan sebelumnya – 15 bulan berjalan, atau periode BKN | `:5162-5180` (`laporan_tukin_skp_2`) | [V2] | `PeriodeTukin::dariBulan`. `laporan_tukin` sendiri memakai bulan kalender (:4046-4054); PRD S-1 menetapkan 16–15. Periode BKN diinjeksikan dan akhirnya wajib berada di (tahun, bulan) yang diminta |
-| Hari kerja: libur dan Sabtu/Minggu disingkirkan paling awal | `:4611-4641` | [K] | `HariKerja`; libur di akhir pekan tidak dihitung ganda |
-| Batas akhir = hari ini (inklusif) | `:4051-4053` | [K] | Parameter `hariIni` |
-| Jam normal 07:30–16:00, Jumat 16:30; puasa 08:00–15:00, Jumat 15:30 | `:4597-4600` | [K] | `JamKerja`; nilai dari `KonfigurasiTukin` |
-| Rentang puasa inklusif | `:4069-4070`, `:4597` | [V2] | Dari konfigurasi (`puasaMulai`/`puasaSelesai`, divalidasi), bukan hard-code per tahun |
-| Precedence: libur/akhir pekan → TB → cuti → konket → presensi | `:4611-4810` | [K] | `StatusHarian::evaluasi` + `KalkulasiTukin` |
-| Konket bebas potongan cukup `affect_tukin = 1` | `:4758` | [K] | `kategori = 13` hanya untuk uang makan (`:4763`), tidak memengaruhi potongan. Konket `affect_tukin = 2` diteruskan ke penilaian presensi |
-| Selisih menit: `DateInterval` (detik dibuang ke arah nol) | `:4835-4847` | [K] | `JamKerja::selisihMenit`; jam menerima `HH:MM` dan `HH:MM:SS` |
-| TL: 1–30 = TL1, 31–60 = TL2, > 60 = TL3 | `:4851-4864` | [K] | Batas inklusif 30 → TL1, 31 → TL2, 60 → TL2, 61 → TL3 |
-| Kompensasi TL oleh jam pulang | `:4856`, `:4861` | [K] | TL2 gugur bila pulang ≥ 60 menit setelah standar (`psw <= -60`); TL1 gugur bila ≥ 30 menit (`psw <= -30`); TL3 tidak pernah gugur |
-| PSW analog, satu arah | `:4866-4877` | [K] | Pulang lebih lambat / datang lebih awal tidak didenda |
-| TPM = TA + denda PSW; TPP = TA + denda TL (tanpa kompensasi) | `:4910-4935`, `:4968-4993` | [K] | Denda dicatat juga di kolom PSW/TL (`kategori`) |
-| TK = tarif TK | `:4803` | [K] | Hari kerja tanpa presensi dan tanpa status pembebas |
-| LKH: tarif LKH bila wajib (sub group jabatan ≠ 1) dan LKH belum disetujui | `:4012`, `:4804`, `:4888`, `:4946`, `:5004` | [K] | Hanya pada baris presensi (TK, hadir, TPM, TPP); input `wajibLkh`, `lkhTerisi` |
-| Cuti sakit: 1% per hari mulai hari kerja berurutan ke-15 | `:4671-4693` | [K] | Urutan dihitung internal per hari kerja; libur/akhir pekan/TB tidak memutus, cuti lain/konket (apa pun `affect_tukin`)/presensi memutus (`:4681`, `:4742`, `:4779`). Urutan dari sebelum periode dibaca dari input harian sebelum `awal` (`:4573-4590`) |
-| Cuti alasan penting: lama > 14 hari → 50% sekali | `:4310-4356` | [K] | Pada hari kerja pertama bulan dengan hari kerja cuti terbanyak |
-| Cuti besar: bulan ke-1/2/3 = 50/75/90%, ke-2 bila > 35 hari kalender, ke-3 bila > 65 | `:4430-4478` | [K] | Sekali per bulan pada tanggal 1; bulan ke-1 = bulan mulai bila tanggal mulai ≤ ⌊hari dalam bulan ÷ 2⌋, selain itu bulan berikutnya (`:4436-4447`) |
-| Cuti melahirkan anak ke-4 dst.: 60/30/20%, ke-2 bila lama ≥ 32, ke-3 bila ≥ 62 | `:4488-4548` | [K] | Syarat `anak_sebelumnya >= 3` (`:4501`); anak ke-1 s.d. ke-3 tidak dipotong |
-| Cuti tahunan dan CLTN tidak dipotong | `:4725-4733` | [K] | — |
-| Tugas belajar: 25% sekali per bulan kalender; bulan mulai bebas bila mulai > tanggal 1 (kecuali perpanjangan) | `:4136-4178`, `:4645-4652` | [K] | Setelah potongan TB pertama (`isPegTB`), seluruh hari berikutnya dan potongan cuti bulanan berikutnya dikecualikan (`:4605`, `:4775`) |
-| Total = presensi + LKH + TB + cuti | view `laporan_tukin.php:293-295` | [K] | `HasilTukin::totalPotongan`; `totalPresensi` dan `totalPresensiLkh` mengikuti kolom `total_presensi`/`total_presensi_lkh` (`:12653-12656`) |
+| Periode = baris `bkn_periode_ekinper`, atau 16 bulan lalu – 15 bulan berjalan bila tidak ada | `:11852-11876` | [K] | `PeriodeTukin::dariBulan`; periode BKN diinjeksikan dan akhirnya wajib di (tahun, bulan) yang diminta |
+| Januari: awal selalu 16 Desember tahun lalu walau ada baris BKN | `:11859-11862` | [K] | `PeriodeTukin::dariBulan` |
+| Loop harian dipotong ke hari ini | `:11881-11885`, `:12612-12616` | [K] | Parameter opsional `hariIni`; `null` = tidak dipotong |
+| Hari kerja: libur dan Sabtu/Minggu dilewati | `:12749-12757` | [K] | `HariKerja`; libur di akhir pekan tidak dihitung ganda |
+| Precedence: masa kerja → libur/akhir pekan → TB → cuti → konket → presensi | `:12739-12849` | [K] | `KalkulasiTukin::hitung` + `StatusHarian::evaluasi` |
+| Jam normal 07:30–16:00, Jumat 16:30; puasa 08:00–15:00, Jumat 15:30; rentang puasa inklusif | `:12722-12725` | [K] | `JamKerja`; nilai dari `KonfigurasiTukin` |
+| Selisih menit `DateInterval` (detik dibuang ke arah nol) | `:12871-12883` | [K] | `JamKerja::selisihMenit` |
+| TL/PSW: 1–30 = 1, 31–60 = 2, > 60 = 3; satu arah | `:12888-12931` | [K] | `StatusHarian::golongan` |
+| Kompensasi TL hadir lengkap: TL2 gugur bila `psw <= -60`, TL1 bila `psw <= -30`; TL3 tidak pernah gugur | `:12895`, `:12902` | [K] | `StatusHarian::presensi` |
+| TPM = TA + denda PSW; TPP = TA + denda TL tanpa kompensasi; tanpa jam masuk & pulang = TK | `:12853-12859`, `:12933-13020` | [K] | `StatusHarian::presensi`; `rincian` per kolom TL/PSW/TA/TK/CUTI |
+| **Faktor presensi 0,2** untuk TL/PSW/TA/TK | `:12854`, `:12889-13015` | [K] | `KonfigurasiTukin::potonganHarian` (tarif bp × 20/100; wajib bulat, tarif yang tidak bulat ditolak saat konstruksi) |
+| Konket bebas cukup `affect_tukin = 1`; `kategori = 13` hanya uang makan | `:12346`, `:12828-12846` | [K] | `StatusHarian::konketBebas` |
+| **Tanpa potongan LKH** (`total_lkh` tidak pernah ditambah) | `:12654` | [K] | LKH dihapus dari kunci wajib, status harian, dan total |
+| Cuti sakit: 1% × 0,2 per hari kerja mulai hari ke-15 berurutan | `:12796-12804` | [K] | `CUTI_SAKIT` × faktor |
+| Urutan cuti sakit naik pada cuti sakit, direset **hanya** oleh baris presensi; cuti lain, konket, TB, libur tidak memutus | `:12798`, `:12828-12849` | [K] (K-1) | `KalkulasiTukin::hitung` |
+| Lookback cuti sakit 1 periode: periode lalu = 16 dua bulan lalu – 15 bulan lalu; dibawa hanya bila hari kerja terakhir periode lalu **dan** hari kerja pertama periode ini sakit; di periode lalu hari selain cuti sakit memutus | `:11890-11891`, `:12686-12697` | [K] | `KalkulasiTukin::sakitSebelumPeriode` |
+| Cuti tahunan, besar, melahirkan, alasan penting, CLTN tanpa potongan harian | `:12807-12820` | [K] | `StatusHarian::evaluasi` |
+| **Cuti alasan penting tidak dipotong** (`$listPotonganCuti` dihitung tetapi tidak dipakai) | `:12415-12466` | [K] | Jadwal alasan penting dihapus |
+| **Tugas belajar tanpa potongan 25%** (`$potonganTB` tidak pernah ditambahkan; `$isPegTB` direset tiap hari sehingga tidak berefek) | `:12296-12330`, `:12720`, `:12761-12778` | [K] | Hari TB bebas; potongan TB dan `isPegTB` dihapus |
+| **Pemutihan TB**: bila tanggal terakhir yang diproses berstatus TB atau hari kerja terakhirnya TB, total = 0 | `:12726-12735`, `:13026-13030` | [K] (K-1) | Penanda di-set pada tanggal TB apa pun (termasuk akhir pekan) dan direset oleh hari kerja tanpa TB |
+| **Cuti besar 5 / 5 / 5**: tanggal potong ke-1 = tgl 16 bulan `mulai` bila hari ≥ 16, selain itu tgl 16 bulan sebelumnya; ke-2/ke-3 bila `lama_cuti` > 35 / > 65; hanya cuti yang beririsan dengan periode | `:12470-12523` | [K] | `PotonganCutiPeriode`; berlaku bila tanggal potong = awal periode |
+| **Cuti melahirkan 40 / 70 / 80**, hanya bila jumlah anak > 3; jadwal sama dengan cuti besar | `:12527-12575` | [K] | `PotonganCutiPeriode`; jumlah anak dari `DataPegawaiTukin::jumlahAnak` |
+| Jumlah anak = `detail_anak` dengan `tgl_lahir` ≤ akhir periode pada `riwayat_keluarga` aktif | `:12170-12198` | [K] (K-1) | Dihitung adapter |
+| **SKP periodik**: "sangat baik"/"baik"/"butuh perbaikan" = 0, "kurang" = 16, lainnya atau tidak ada data = 32 (`strtolower`, tanpa trim) | `:12394-12410`, `:12636` | [K] (K-1) | `DataPegawaiTukin::potonganSkp`; tarif `SKP_KURANG`/`SKP_TIDAK_ADA` |
+| **Cuti sepanjang periode**: semua hari kerja (dalam masa kerja) cuti jenis apa pun → SKP = 0; tanpa hari kerja juga dianggap sepanjang periode (`0 == 0`) | `:12664-12680` | [K] | `KalkulasiTukin::cutiSepanjangPeriode` |
+| **Urutan pengganti total**: pemutihan TB (0) → cuti besar (presensi = 5, SKP 0) → cuti melahirkan (total = 40/70/80) → cuti sepanjang periode (SKP 0) → presensi + SKP | `:13026-13057` | [K] | `HasilTukin::alasan` |
+| Total tanpa batas 100% | `:13053-13057` | [K] | — |
+| Pegawai baru: hari sebelum TMT (`tmtsk_pangkat`) dilewati tanpa potongan, bila CPNS (`gol_ruang` diawali "CPNS") atau PPPK dengan TMT setelah hari kerja pertama | `:12699-12716`, `:12738-12742` | [K] | `DataPegawaiTukin::tmtMasuk` (syarat CPNS/PPPK diputuskan adapter) |
+| Pegawai keluar (`status = 2`) di tengah periode: hari ≥ `tmt_status` dikecualikan | Rekap memasukkan pegawai bila `tmt_status > awal periode` (`L_employee.php:6414`), tetapi presensi/cuti/TB/konket hanya dimuat bila `tmt_status > akhir periode` (`:12209` dst.), sehingga semua hari kerja menjadi TK | **[V2]** | `DataPegawaiTukin::tmtKeluar`. Perbaikan bug: legacy memotong TK pada hari yang masih masa kerja |
 | Potongan dalam integer basis poin | — | [V2] | Lihat "Presisi" |
 
-Tarif yang di legacy di-hard-code (cuti, TB) menjadi kunci konfigurasi opsional dengan nilai bawaan baseline
-(`KonfigurasiTukin::TARIF_BAWAAN`): `CUTI_SAKIT`, `CUTI_ALASAN_PENTING`, `CUTI_BESAR_1..3`, `CUTI_MELAHIRKAN_1..3`, `TB`.
-
-## Precedence (urutan tertulis)
-
-Per tanggal kalender dalam `[awal, min(akhir, hariIni)]`:
-
-1. Potongan cuti bulanan yang dijadwalkan pada tanggal itu, bila belum `isPegTB`.
-2. Hari libur atau Sabtu/Minggu → dilewati (tidak dihitung hari kerja).
-3. Tugas belajar → tanpa potongan harian; potongan TB bulanan; set `isPegTB`.
-4. Bila `isPegTB` → hari dikecualikan (`dikecualikan_tb`).
-5. Cuti (jenis apa pun) → potongan hanya cuti sakit hari ke-15+.
-6. Konket `affect_tukin = 1` → tanpa potongan.
-7. Presensi: tanpa jam masuk & pulang → TK; lengkap → TL/PSW; salah satu → TPM/TPP. LKH ditambahkan di langkah ini.
+Tarif yang di rekap di-hard-code menjadi kunci konfigurasi opsional dengan nilai bawaan rekap
+(`KonfigurasiTukin::TARIF_BAWAAN`): `CUTI_SAKIT` = 1 (× 0,2), `CUTI_BESAR_1..3` = 5, `CUTI_MELAHIRKAN_1..3` =
+40/70/80, `SKP_KURANG` = 16, `SKP_TIDAK_ADA` = 32. Kunci `web_config` wajib: `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`,
+`TA`, `TK` (`LKH` tidak dipakai).
 
 ## Kontrak data
 
-- `KalkulasiTukin::hitung(PeriodeTukin, list<string> $hariLibur, array $harian, KonfigurasiTukin, ?string $hariIni)`.
-- Input harian per tanggal: `tugas_belajar` (`true` atau `{id?, mulai?, perpanjangan?}`), `cuti`
-  (`{jenis, mulai?, akhir?, lama?, anak_sebelumnya?}`), `konket` (`{affect_tukin, kategori?}`), `presensi`
-  (`{masuk?, pulang?}`), `wajibLkh`, `lkhTerisi`.
+- `KalkulasiTukin::hitung(PeriodeTukin, list<string> $hariLibur, array $harian, KonfigurasiTukin, ?string $hariIni = null, ?DataPegawaiTukin $pegawai = null)`.
+- Input harian per tanggal: `tugas_belajar` (`true` atau array), `cuti` (`{jenis, mulai?, akhir?, lama?}`), `konket`
+  (`{affect_tukin, kategori?}`), `presensi` (`{masuk?, pulang?}`).
 - Jenis cuti: `tahunan` (1), `besar` (2), `sakit` (3), `melahirkan` (4), `alasan_penting` (5), `cltn` (6) sesuai
-  `id_jenis_cuti` legacy (`rwy/L_cuti.php:295-375`). Jenis lain ditolak.
-- Cuti besar wajib `mulai`/`akhir`; melahirkan wajib `mulai`/`akhir`/`lama`/`anak_sebelumnya`; alasan penting wajib
-  `mulai`/`akhir`/`lama` (`lama` = `riwayat_cuti.lama_cuti`).
-- Input harian boleh memuat tanggal di luar periode (untuk urutan cuti sakit dan riwayat cuti bulanan); `hariLibur` perlu
-  mencakup rentang tersebut.
-- `HasilTukin`: `hariKerja`, `jumlah` (TL1–3, PSW1–3, TPM, TPP, TK, LKH, CS), `potonganPresensi`, `potonganLkh`,
-  `potonganTb`, `potonganCuti`, `totalPresensi`, `totalPresensiLkh`, `totalPotongan`, dan `harian` per hari kerja.
+  `id_jenis_cuti` legacy. Jenis lain ditolak. Cuti besar dan melahirkan wajib `mulai`/`akhir`/`lama`
+  (`riwayat_cuti.lama_cuti`).
+- Adapter menyertakan: periode sebelumnya (16 dua bulan lalu – 15 bulan lalu) untuk urutan cuti sakit; seluruh hari
+  periode (termasuk setelah `hariIni`) untuk cek cuti sepanjang periode dan irisan cuti besar/melahirkan; libur pada
+  rentang tersebut.
+- `DataPegawaiTukin`: `predikatSkp` (`riwayat_skp_periodik.hasil_akhir` periode BKN; `null` bila tidak ada baris BKN
+  atau tidak ada data), `jumlahAnak`, `tmtMasuk`, `tmtKeluar`.
+- `HasilTukin`: `hariKerja`, `jumlah` (TL1–3, PSW1–3, TPM, TPP, TK, CS), `rincian` (TL, PSW, TK, TA, CUTI),
+  `potonganPresensi` (jumlah harian sebelum pengganti), `totalPresensi`, `totalSkp`, `totalPotongan`, `alasan`
+  (`pemutihan_tb`, `cuti_besar`, `cuti_melahirkan`, `cuti_sepanjang_periode`, atau `null`), dan `harian`.
 
 ## Presisi dan pembulatan
 
 - Tarif dimasukkan dalam **persen** seperti `web_config` legacy (int atau string desimal, titik atau koma), lalu
   dikonversi **tepat** ke basis poin integer (1% = 100 bp) lewat parsing string. Float ditolak; nilai dengan lebih dari
   dua desimal atau negatif ditolak, bukan dibulatkan.
-- Setelah konversi, seluruh perhitungan adalah penjumlahan integer, sehingga tidak ada pembulatan. Total tidak dibatasi
-  100% (legacy juga tidak membatasi).
+- Faktor 0,2 diterapkan sebagai `bp × 20 / 100`. Bila hasilnya tidak bulat (mis. tarif `0.01`), konstruksi
+  `KonfigurasiTukin` melempar `InvalidArgumentException`; tidak ada pembulatan diam-diam.
+- Setelah konversi, seluruh perhitungan adalah penjumlahan integer. Total tidak dibatasi 100%.
 
-## Perbedaan antarvarian legacy (untuk perbandingan)
+## Perbedaan rekap (acuan) dengan laporan per pegawai `laporan_tukin_skp`
 
-| Aturan | `laporan_tukin` (acuan) | `laporan_tukin_us_skp` (:11752, rekap) | `laporan_tukin_us_skp_2` (:9669, tidak dipanggil controller) |
-|---|---|---|---|
-| Periode | Bulan kalender | 16–15 / BKN | 16–15 / BKN |
-| Tarif TL/PSW/TA/TK | `web_config` | `web_config` × 0,2 (:12854 dst.) | — |
-| Cuti besar per bulan | 50 / 75 / 90 | 5 / 5 / 5 pada tanggal 16 (:12474-12523) | 25 / 25 / 25 (:10602-10663) |
-| Cuti melahirkan per bulan | 60 / 30 / 20, anak sebelumnya ≥ 3 | 40 / 70 / 80, anak > 3 (:12527-12575) | 40 / 70 / 20, anak ≥ 3 (:10670-10720) |
-| Syarat bulan ke-2/3 | besar > 35/65 hari kalender; melahirkan lama ≥ 32/62 | lama > 35/65 | sama dengan acuan |
+| Aturan | Rekap `laporan_tukin_us_skp` (acuan, K-1) | Per pegawai `laporan_tukin_skp` |
+|---|---|---|
+| Pemutihan TB | Hari kerja terakhir yang diproses masih TB (`:12726-12735`) | TB menutup seluruh periode (`:6654-6702`, `:7660-7665`) |
+| SKP tanpa data | Selalu 32 (`:12636`) | 32 hanya setelah batas pengisian BKN lewat, sebelumnya 0 "Data Belum Tersedia" (`:6854-6880`) |
+| Jumlah anak cuti melahirkan | `detail_anak` lahir s.d. akhir periode (`:12170-12198`) | `SUM(riwayat_keluarga.jumlah_anak)` (`:6886-6893`) |
+| Konket memutus urutan cuti sakit | Tidak (`:12828-12846`) | Ya (`:7425`) |
+| Dipotong sampai hari ini | Ya (`:11881-11885`) | Ya (`:6640-6643`, `:7124-7128`) — tidak berbeda |
 
-PRD TK-FR-08 menyebut 40/70/80% (sama dengan `laporan_tukin_us_skp` untuk melahirkan). Library memakai angka acuan
-`laporan_tukin` sebagai bawaan; angka lain cukup diinjeksikan lewat konfigurasi.
+Perhitungan lain (faktor 0,2, tanpa LKH, tanpa TB 25%, cuti besar/melahirkan, urutan pengganti, cuti sepanjang
+periode, tanpa batas 100%) sama di kedua method.
 
 ## Perbedaan disengaja [V2]
 
-1. **Periode 16–15** (PRD S-1), bukan bulan kalender seperti `laporan_tukin`. Akibatnya TB yang aktif sepanjang periode
-   terpotong dua kali (bulan kalender awal dan akhir periode), karena aturan TB legacy per bulan kalender.
-2. **Rentang puasa dari konfigurasi** dan divalidasi (tanggal valid, mulai ≤ selesai), bukan hard-code per tahun
-   (`:4059-4070`).
-3. **Integer basis poin** untuk tarif dan potongan, bukan float/string persen.
-4. **Pengecualian per ID riwayat cuti** yang di-hard-code (`:4370-4426`) dan daftar NIP
-   penyesuaian SKP (`:3643-3711`) tidak di-port; keduanya data, bukan aturan.
-5. **Varian `tukinVer = perbaikan`** (semua konket membebaskan, `:4748-4756`) dan varian SKP/US belum di-port (PRD X-4).
-6. **Konfigurasi wajib lengkap**: kunci `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK`, `LKH` wajib ada; legacy diam-diam
+1. **Pegawai keluar di tengah periode**: hari kerja ≥ `tmt_status` dikecualikan (bug rekap, lihat tabel).
+2. **Cuti sepanjang periode** dihitung atas hari kerja periode tukin (`PeriodeTukin`, tidak dipotong `hariIni`) dalam
+   masa kerja `DataPegawaiTukin`. Rekap menghitungnya atas `perBKN_st..perBKN_en` (`:11960-11974`): tanpa override
+   Januari, dan bila tidak ada baris BKN rentangnya menjadi "hari ini" saja (`new DateTime('')`), sehingga hasilnya
+   bergantung pada tanggal ekspor. Rekap juga memakai `tmtsk_pangkat` untuk **semua** pegawai (`:12668`), sehingga
+   kenaikan pangkat di tengah periode ikut memangkas hari yang dihitung; v2 hanya memakai TMT masuk pegawai baru.
+3. **Rentang puasa dari konfigurasi** dan divalidasi (tanggal valid, mulai ≤ selesai), bukan hard-code per tahun
+   (`:12588-12601`). Nilainya data operasional per tahun; tempat simpan diputuskan Fase 5.
+4. **Integer basis poin** untuk tarif dan potongan, bukan float.
+5. **Daftar NIP penyesuaian tukin** yang di-hard-code (`:11755-11805`, hanya keterangan "+X%"/"-X%") tidak di-port;
+   itu data, bukan aturan.
+6. **Konfigurasi wajib lengkap**: kunci `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK` wajib ada; legacy diam-diam
    memakai nilai kosong.
 
-## Pertanyaan untuk Biro SDM/Keuangan
+Tidak di-port karena di luar lingkup kalkulasi potongan: uang makan, varian `perbaikan`/`original`, varian Instansi
+Lain (`laporan_tukin_us_skp_il`), dan method yang tidak dipanggil controller aktif (`laporan_tukin_us_skp_2`,
+`laporan_tukin_skp_2`, `rekap_full_xls_*`).
 
-1. **Periode**: laporan memakai 16–15/BKN (PRD) atau bulan kalender (`laporan_tukin`)? Bila 16–15, apakah TB dan cuti
-   bulanan tetap dihitung per bulan kalender (TB bisa terpotong dua kali per periode)?
-2. **Tarif cuti besar/melahirkan**: mana yang berlaku — 50/75/90 & 60/30/20 (`laporan_tukin`), 5/5/5 & 40/70/80
-   (`laporan_tukin_us_skp`), 25/25/25 & 40/70/20 (`laporan_tukin_us_skp_2`), atau 40/70/80 (PRD)? Nilainya persen
-   tukin. Syarat melahirkan: anak sebelumnya ≥ 3 atau > 3?
-3. **Tarif rekap × 0,2**: `laporan_tukin_us_skp` mengalikan tarif TL/PSW/TA/TK dengan 0,2. Apakah faktor ini berlaku
-   untuk rekap pembayaran?
-4. **Kompensasi TL**: TL1 gugur bila pulang ≥ 30 menit lebih lambat, TL2 bila ≥ 60 menit. Apakah juga berlaku untuk
-   TPP (legacy: tidak) dan hari Jumat/puasa (legacy: ya, terhadap jam standar hari itu)?
-5. **Rentang puasa**: sumber resminya (kunci `web_config` per tahun atau tabel tersendiri), dan apakah kedua ujung
-   inklusif?
-6. **Tugas belajar**: PRD TK-FR-05 menyebut TB bebas potongan, legacy memotong 25% per bulan dan membebaskan bulan mulai
-   bila TB dimulai setelah tanggal 1. Mana yang berlaku? Apakah setelah TB seluruh hari berikutnya dalam periode
-   memang dikecualikan (`isPegTB`)?
-7. **Cuti sakit**: ambang hari ke-15 dihitung per hari kerja (legacy) atau hari kalender; tarif 1% per hari tetap?
-8. **Cuti alasan penting**: legenda view menyebut 1,75% per hari maksimal 25% per bulan, kode memotong 50% sekali
-   bila lama > 14 hari. Mana yang berlaku?
-9. **LKH**: potongan per hari kerja bila LKH belum disetujui (status menunggu dihitung belum terisi). Apakah LKH juga
-   dikenakan pada hari TK/TPM/TPP (legacy: ya)?
-10. **Batas total**: apakah total potongan dibatasi 100%?
-11. Perlakuan hari kerja di luar masa kerja pegawai (masuk/pensiun di tengah periode).
+## Pertanyaan
 
-Uji memakai data sintetis saja. Implementasi ini tidak mencakup tabel, endpoint, uang makan, PDF/Excel, atau varian
-laporan.
+Terjawab dari legacy (CR-039). Pertanyaan 1–11 README CR-037 dijawab dari jalur aktif di atas; satu-satunya
+pertentangan antarjalur (K-1) diputuskan user pada 02-10-2026: ikut rekap. Tidak ada pertanyaan terbuka untuk Biro
+SDM/Keuangan.
+
+Uji memakai data sintetis saja. Implementasi ini tidak mencakup tabel, endpoint, uang makan, atau PDF/Excel.

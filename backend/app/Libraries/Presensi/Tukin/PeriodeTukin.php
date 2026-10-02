@@ -20,8 +20,9 @@ final readonly class PeriodeTukin
 
     /**
      * Periode tukin bulan (tahun, bulan): default 16 bulan sebelumnya s.d. 15 bulan berjalan, atau periode
-     * `bkn_periode_ekinper` yang diinjeksikan (legacy `L_presensi.php:5162-5180`). Periode BKN wajib berakhir di
-     * (tahun, bulan) yang diminta, karena legacy mengambil baris BKN berdasarkan tahun & bulan tersebut.
+     * `bkn_periode_ekinper` yang diinjeksikan (rekap legacy `L_presensi.php:11852-11876`). Periode BKN wajib berakhir
+     * di (tahun, bulan) yang diminta, karena legacy mengambil baris BKN berdasarkan tahun & bulan tersebut.
+     * Untuk Januari, awal periode selalu 16 Desember tahun sebelumnya walau ada baris BKN (`:11859-11862`).
      *
      * @param array{awal?: string, akhir?: string}|null $periodeBkn
      */
@@ -42,7 +43,7 @@ final readonly class PeriodeTukin
                 throw new InvalidArgumentException('Akhir periode BKN tidak berada pada tahun dan bulan yang diminta.');
             }
 
-            return $periode;
+            return $bulan === 1 ? new self(sprintf('%04d-12-16', $tahun - 1), $periode->akhir) : $periode;
         }
         $tahunSebelumnya = $bulan === 1 ? $tahun - 1 : $tahun;
         $bulanSebelumnya = $bulan === 1 ? 12 : $bulan - 1;

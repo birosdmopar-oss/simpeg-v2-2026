@@ -107,7 +107,7 @@ final class NominalGaji
     }
 
     /**
-     * Interim N-5 (TUNGGU-BK): nominal negatif ditolak di impor dan koreksi (`nominal_negatif`); `null` bila ≥ 0.
+     * N-5 (terjawab dari legacy: koreksi legacy menolak `< 0`, `Lsl_gaji.php:597-598`; celah impor ditutup): nominal negatif ditolak di impor dan koreksi (`nominal_negatif`); `null` bila ≥ 0.
      */
     public static function periksaNonNegatif(int $sen, string $label = 'Nominal'): ?HasilSlip
     {

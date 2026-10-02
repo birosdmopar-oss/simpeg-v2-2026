@@ -9,8 +9,8 @@ use CodeIgniter\Test\CIUnitTestCase;
 use InvalidArgumentException;
 
 /**
- * CR-027 (R-1..R-4) — ringkasan slip setia legacy: total = bersih GPP + bersih TK (rumus final menunggu Biro
- * Keuangan). Nominal karangan dalam rupiah, dikali 100 menjadi sen.
+ * CR-027 (R-1..R-4) — ringkasan slip setia legacy: total = bersih GPP + bersih TK (terjawab dari legacy, CR-039;
+ * legacy tidak punya cek invarian `bersih_*`). Nominal karangan dalam rupiah, dikali 100 menjadi sen.
  *
  * @internal
  */
@@ -69,23 +69,6 @@ final class RingkasanSlipTest extends CIUnitTestCase
             'bersih_2'               => 0,
             'total_penghasilan'      => 5_000,
         ], RingkasanSlip::hitung(['bersih_tk' => 5_000]));
-    }
-
-    public function testPeriksaKonsistensi(): void
-    {
-        // Data sintetis konsisten untuk GPP dan TK; bersih_2 = bersih_tk − pajak + tunj_pajak juga terpenuhi (0 − 0).
-        $this->assertSame([], RingkasanSlip::periksaKonsistensi(self::slipSintetis()));
-
-        $slip               = self::slipSintetis();
-        $slip['bersih_gpp'] = 346_052_400;
-        $slip['pajak']      = 10_000;
-
-        $peringatan = RingkasanSlip::periksaKonsistensi($slip);
-
-        $this->assertSame(['bersih_gpp_tidak_konsisten', 'bersih_2_tidak_konsisten'], array_column($peringatan, 'kode'));
-        $this->assertSame(346_052_500, $peringatan[0]['harapan']);
-        $this->assertSame(346_052_400, $peringatan[0]['nilai']);
-        $this->assertSame('Gaji Bersih (GPP) 3.460.524 tidak sama dengan hasil hitung 3.460.525.', $peringatan[0]['pesan']);
     }
 
     public function testNilaiBukanIntSenDitolak(): void

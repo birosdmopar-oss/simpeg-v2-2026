@@ -13,32 +13,42 @@ use InvalidArgumentException;
  * Tarif diterima dalam **persen** seperti nilai `web_config` legacy (int atau string desimal, mis. `'1.75'`) lalu
  * dikonversi tepat ke **basis poin** integer (1% = 100 bp) tanpa float. Presisi maksimal dua desimal; nilai dengan
  * lebih dari dua desimal ditolak, bukan dibulatkan.
+ *
+ * Potongan harian (TL/PSW/TA/TK dan cuti sakit) dikalikan faktor presensi 0,2 seperti rekap legacy
+ * `laporan_tukin_us_skp` (`L_presensi.php:12799`, `:12854`, `:12888-13016`). Hasil perkalian wajib bulat dalam basis
+ * poin; tarif yang tidak habis dibagi (mis. `0.01`) ditolak saat konstruksi, bukan dibulatkan diam-diam.
  */
 final readonly class KonfigurasiTukin
 {
-    /** Kunci `web_config` legacy (`L_presensi.php:3990`); wajib ada. */
-    public const KUNCI_WAJIB = ['TL1/PSW1', 'TL2/PSW2', 'TL3/PSW3', 'TA', 'TK', 'LKH'];
+    /** Kunci `web_config` legacy (`L_presensi.php:11812`); wajib ada. `LKH` tidak dipakai jalur aktif. */
+    public const KUNCI_WAJIB = ['TL1/PSW1', 'TL2/PSW2', 'TL3/PSW3', 'TA', 'TK'];
 
     /**
-     * Tarif yang di `laporan_tukin` legacy di-hard-code (persen). Boleh ditimpa lewat konfigurasi.
+     * Tarif yang di rekap legacy di-hard-code (persen). Boleh ditimpa lewat konfigurasi.
      *
-     * - `CUTI_SAKIT`           :4691 (1% per hari mulai hari ke-15 berurutan)
-     * - `CUTI_ALASAN_PENTING`  :4355 (sekali bila lama cuti > 14 hari)
-     * - `CUTI_BESAR_1..3`      :4449, :4461, :4473
-     * - `CUTI_MELAHIRKAN_1..3` :4516, :4528, :4540 (anak ke-4 dan seterusnya)
-     * - `TB`                   :4142, :4174 (tugas belajar, sekali per bulan kalender)
+     * - `CUTI_SAKIT`           :12799 (0,2% = 1% × faktor presensi, per hari kerja mulai hari ke-15 berurutan)
+     * - `CUTI_BESAR_1..3`      :12502-12518 (menggantikan total presensi pada periode jadwal)
+     * - `CUTI_MELAHIRKAN_1..3` :12555-12571 (menggantikan total potongan pada periode jadwal)
+     * - `SKP_KURANG`           :12406 (predikat SKP periodik "kurang")
+     * - `SKP_TIDAK_ADA`        :12400, :12636 (predikat lain atau tidak ada data)
      */
     public const TARIF_BAWAAN = [
-        'CUTI_SAKIT'          => 1,
-        'CUTI_ALASAN_PENTING' => 50,
-        'CUTI_BESAR_1'        => 50,
-        'CUTI_BESAR_2'        => 75,
-        'CUTI_BESAR_3'        => 90,
-        'CUTI_MELAHIRKAN_1'   => 60,
-        'CUTI_MELAHIRKAN_2'   => 30,
-        'CUTI_MELAHIRKAN_3'   => 20,
-        'TB'                  => 25,
+        'CUTI_SAKIT'        => 1,
+        'CUTI_BESAR_1'      => 5,
+        'CUTI_BESAR_2'      => 5,
+        'CUTI_BESAR_3'      => 5,
+        'CUTI_MELAHIRKAN_1' => 40,
+        'CUTI_MELAHIRKAN_2' => 70,
+        'CUTI_MELAHIRKAN_3' => 80,
+        'SKP_KURANG'        => 16,
+        'SKP_TIDAK_ADA'     => 32,
     ];
+
+    /** Faktor presensi rekap legacy (`* 0.2`), dalam persen. */
+    public const FAKTOR_PRESENSI_PERSEN = 20;
+
+    /** Kunci tarif yang dikalikan faktor presensi. */
+    public const KUNCI_BERFAKTOR = ['TL1/PSW1', 'TL2/PSW2', 'TL3/PSW3', 'TA', 'TK', 'CUTI_SAKIT'];
 
     /** @var array<string, int> Tarif dalam basis poin (1% = 100). */
     public array $tarif;
@@ -77,6 +87,12 @@ final readonly class KonfigurasiTukin
         }
         $this->tarif = $tarif;
 
+        foreach (self::KUNCI_BERFAKTOR as $kunci) {
+            if ($tarif[$kunci] * self::FAKTOR_PRESENSI_PERSEN % 100 !== 0) {
+                throw new InvalidArgumentException("Tarif {$kunci} dikali faktor presensi 0,2 tidak bulat dalam basis poin.");
+            }
+        }
+
         $this->jamMasukNormal       = JamKerja::normalisasiJam($jamMasukNormal);
         $this->jamPulangNormal      = JamKerja::normalisasiJam($jamPulangNormal);
         $this->jamPulangJumatNormal = JamKerja::normalisasiJam($jamPulangJumatNormal);
@@ -100,6 +116,16 @@ final readonly class KonfigurasiTukin
     public function tarif(string $kunci): int
     {
         return $this->tarif[$kunci] ?? throw new InvalidArgumentException("Tarif {$kunci} tidak tersedia.");
+    }
+
+    /** Potongan harian dalam basis poin: tarif × faktor presensi 0,2 (sudah dipastikan bulat saat konstruksi). */
+    public function potonganHarian(string $kunci): int
+    {
+        if (! in_array($kunci, self::KUNCI_BERFAKTOR, true)) {
+            throw new InvalidArgumentException("Tarif {$kunci} bukan potongan harian.");
+        }
+
+        return intdiv($this->tarif($kunci) * self::FAKTOR_PRESENSI_PERSEN, 100);
     }
 
     /**

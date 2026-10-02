@@ -32,9 +32,9 @@ final class FormatSlipTest extends CIUnitTestCase
     {
         $utc = new DateTime('2026-10-04 03:00:00', new DateTimeZone('UTC'));
 
-        $this->assertSame('4 Oktober 2026 10:00 WIB', FormatSlip::waktuWib($utc));
+        $this->assertSame('4 Oktober 2026, 10:00 WIB', FormatSlip::waktuWib($utc));
         $this->assertSame('UTC', $utc->getTimezone()->getName());
-        $this->assertSame('1 Januari 2027 06:59 WIB', FormatSlip::waktuWib(new DateTimeImmutable('2026-12-31T23:59:00Z')));
+        $this->assertSame('1 Januari 2027, 06:59 WIB', FormatSlip::waktuWib(new DateTimeImmutable('2026-12-31T23:59:00Z')));
     }
 
     public function testLabelTotal(): void

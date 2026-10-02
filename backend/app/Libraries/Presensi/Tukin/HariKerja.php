@@ -10,7 +10,7 @@ use InvalidArgumentException;
 
 /**
  * Deret tanggal kalender dan hari kerja. Hari libur dan Sabtu/Minggu disingkirkan paling awal, seperti legacy
- * (`laporan_tukin` :4611-4641); libur yang jatuh di akhir pekan tidak dihitung dua kali.
+ * (rekap `laporan_tukin_us_skp` :12749-12757); libur yang jatuh di akhir pekan tidak dihitung dua kali.
  */
 final class HariKerja
 {
