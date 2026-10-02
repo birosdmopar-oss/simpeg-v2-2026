@@ -13,13 +13,14 @@ use CodeIgniter\HTTP\ResponseInterface;
  * Payload : { old_password, new_password, new_password_confirmation }
  * 200     : { status:'success', data:{ changed:true, sessions_revoked:true } } — seluruh refresh token dicabut,
  *           klien harus login ulang (cookie sesi ini ikut dihapus).
- * 422     : password lama salah / kebijakan password baru / konfirmasi tidak cocok
+ * 422     : isian bukan teks (array/objek/angka → "Isian harus berupa teks.", CR-038) / password lama salah /
+ *           kebijakan password baru / konfirmasi tidak cocok
  */
 class PasswordController extends ApiController
 {
     public function change(): ResponseInterface
     {
-        $data = $this->validateOrFail($this->payload(), [
+        $data = $this->validateTextOrFail($this->payload(), [
             'old_password'              => 'required|string',
             'new_password'              => 'required|string',
             'new_password_confirmation' => 'required|string',

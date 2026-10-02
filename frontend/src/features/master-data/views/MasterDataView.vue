@@ -9,7 +9,7 @@
  * manual (mis. level pangkat) diubah lewat Edit karena nilainya tidak menggeser entri lain.
  */
 import { ArrowDown, ArrowUp, Pencil, Plus, Power, PowerOff, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/lib/axios'
@@ -53,6 +53,29 @@ const editing = ref<MasterRow | null>(null)
 const confirm = ref<{ open: boolean; row: MasterRow | null; loading: boolean }>({ open: false, row: null, loading: false })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.value)))
+
+/**
+ * CR-038 (F-UI-2): kolom Aksi menempel di kanan area tabel (`sticky right-0`) supaya tombol ⋮ selalu terlihat di layar
+ * sempit. Bayangan pemisah hanya tampil selama masih ada kolom yang tersembunyi di bawahnya (tabel bisa digeser).
+ */
+const tableScroller = ref<HTMLElement | null>(null)
+const actionsShadow = ref(false)
+let tableResizeObserver: ResizeObserver | null = null
+
+function updateActionsShadow(): void {
+  const el = tableScroller.value
+  actionsShadow.value = el !== null && el.scrollWidth - el.clientWidth - el.scrollLeft > 1
+}
+
+watch(tableScroller, (el, previous) => {
+  if (tableResizeObserver && previous) tableResizeObserver.disconnect()
+  if (el && typeof ResizeObserver !== 'undefined') {
+    tableResizeObserver ??= new ResizeObserver(updateActionsShadow)
+    tableResizeObserver.observe(el)
+    if (el.firstElementChild) tableResizeObserver.observe(el.firstElementChild)
+  }
+  updateActionsShadow()
+})
 
 /**
  * Keterangan hapus. Status turunan tidak ditulis ulang (DBV-002 U3). Penyaringan rantai status untuk tampilan
@@ -377,7 +400,15 @@ async function onConfirmDelete(): Promise<void> {
   }
 }
 
+watch([items, loading, meta], () => void nextTick(updateActionsShadow))
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateActionsShadow)
+  tableResizeObserver?.disconnect()
+})
+
 onMounted(() => {
+  window.addEventListener('resize', updateActionsShadow)
   void loadMeta()
 })
 </script>
@@ -408,7 +439,7 @@ onMounted(() => {
           v-for="m in metas"
           :key="m.key"
           type="button"
-          class="whitespace-nowrap rounded-md px-3 py-2 text-left text-sm"
+          class="whitespace-nowrap rounded-md px-3 py-2 text-left text-sm lg:whitespace-normal lg:break-words"
           :class="m.key === activeKey ? 'bg-slate-100 font-medium text-brand-primary' : 'text-slate-600 hover:bg-slate-50'"
           :aria-current="m.key === activeKey ? 'page' : undefined"
           :data-testid="`master-nav-${m.key}`"
@@ -465,7 +496,7 @@ onMounted(() => {
           </select>
         </div>
 
-        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div ref="tableScroller" class="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="master-table-scroll" @scroll.passive="updateActionsShadow">
           <table class="min-w-full text-sm">
             <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -474,7 +505,13 @@ onMounted(() => {
                 <th class="px-4 py-3">{{ meta.name_label }}</th>
                 <th v-if="meta.parent" class="px-4 py-3">{{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'Induk' }}</th>
                 <th class="px-4 py-3">Status</th>
-                <th class="px-4 py-3 text-right">Aksi</th>
+                <th
+                  class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right"
+                  :class="{ 'shadow-sticky-end': actionsShadow }"
+                  data-testid="master-actions-header"
+                >
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -484,7 +521,7 @@ onMounted(() => {
               <tr v-else-if="items.length === 0">
                 <td colspan="6" class="px-4 py-8 text-center text-slate-500">Belum ada data yang cocok.</td>
               </tr>
-              <tr v-for="(row, index) in items" v-else :key="idOf(row)" class="hover:bg-slate-50" :data-testid="`master-row-${idOf(row)}`">
+              <tr v-for="(row, index) in items" v-else :key="idOf(row)" class="group hover:bg-slate-50" :data-testid="`master-row-${idOf(row)}`">
                 <td v-if="meta.has_order" class="px-4 py-3 text-slate-600">{{ row.order }}</td>
                 <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ idOf(row) }}</td>
                 <td class="px-4 py-3 font-medium text-slate-800">{{ nameOf(row) }}</td>
@@ -492,7 +529,7 @@ onMounted(() => {
                 <td class="px-4 py-3">
                   <StatusBadge :status="row.status ?? '1'" />
                 </td>
-                <td class="px-4 py-3 text-right">
+                <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50" :class="{ 'shadow-sticky-end': actionsShadow }">
                   <RowActionsMenu
                     :actions="rowActions(row, index)"
                     :label="`Aksi untuk ${nameOf(row)}`"

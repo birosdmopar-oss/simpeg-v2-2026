@@ -161,11 +161,15 @@ abstract class BaseMasterController extends ApiController
         }
 
         if ($def->parentField !== null && $def->parentEntity !== null) {
-            $parentLength = service('masterRegistry')->get($def->parentEntity)->idMaxLength;
+            $parentDef = service('masterRegistry')->get($def->parentEntity);
 
+            // Pesan memakai label master induk, sama dengan label dropdown di form (CR-038, F-UI-3).
             $rules[$def->parentField] = [
-                'rules'  => "{$required}|max_length[{$parentLength}]",
-                'errors' => ['required' => 'Induk wajib dipilih.', 'max_length' => 'Induk tidak valid.'],
+                'rules'  => "{$required}|max_length[{$parentDef->idMaxLength}]",
+                'errors' => [
+                    'required'   => "{$parentDef->label} wajib dipilih.",
+                    'max_length' => "{$parentDef->label} tidak valid.",
+                ],
             ];
         }
 
