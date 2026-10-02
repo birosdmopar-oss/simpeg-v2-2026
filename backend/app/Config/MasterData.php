@@ -759,7 +759,7 @@ class MasterData extends BaseConfig
         // G-02 (DBV-008/CR-026 ⏳). Legacy hr/master/c_jabatan (Lm_jabatan.php), CRUD role 1; dropdown UL_ALL (ISSUE-012,
         // tanpa parameter `restrict` — usulan G-02 Bagian 8). Skema: backend/docs/db-review/G-02-jabatan-unit-satker-schema.md.
         // Baris ber-ID hard-coded legacy (G-02 Bagian 2.8) sengaja tidak dikunci. `peta_jabatan` dan tabel jabatan lain
-        // tanpa DDL ditunda (Bagian 7). Kolom audit keenam tabel = self::AUDIT (created_at/updated_at/updated_by [K] D1).
+        // → DBV-018 (blok di bawah, G-02b). Kolom audit keenam tabel = self::AUDIT (created_at/updated_at/updated_by [K] D1).
         'unit' => [
             'label'         => 'Unit Kerja',
             'controller'    => 'JabatanController',
@@ -882,7 +882,7 @@ class MasterData extends BaseConfig
         // Jabatan [K]: group & sub group wajib (dropdown berjenjang, sub group harus di bawah group yang dipilih), satker
         // dan kelas opsional (JF/Pelaksana tanpa satker, legacy form.php). Nama unik per (sub group, satker) — termasuk
         // satker kosong, yang hanya ditegakkan aplikasi (UNIQUE DB tidak membandingkan NULL). Tanpa `order` (legacy
-        // urut kelas/id). `id_jenjang_jf` belum dikelola (tabel jenjang_jf ditunda, G-02 Bagian 7).
+        // urut kelas/id). `id_jenjang_jf` tidak dikelola engine (FK ke jenjang_jf dibuat DBV-018, tanpa CRUD — G-02b Bagian 4 #12).
         'jabatan' => [
             'label'         => 'Jabatan',
             'controller'    => 'JabatanController',
@@ -925,5 +925,84 @@ class MasterData extends BaseConfig
             'auditColumns'  => self::AUDIT,
         ],
         // --- /DBV-008 ---
+
+        // --- DBV-018 (G-02 sisa) ---
+        // G-02 sisa (DBV-018/CR-032 ⏳). Legacy hr/master/c_jabatan rumpun/subrumpun/jabaka/periode (Lm_jabatan.php), CRUD
+        // role 1, dropdown UL_ALL. Skema: backend/docs/db-review/G-02b-jabatan-sisa-schema.md. Tabel DBV-018 lain
+        // (`jenjang_jf` tanpa UI legacy; `peta_jabatan`, `struktur_jabatan`, `jabatan_koordinasi` tidak cocok engine
+        // generik) tidak didaftarkan di sini — G-02b Bagian 2.9.
+        // Rumpun jabatan [K] D1:6678-6688: urutan global (legacy "Urutan" 1-100), created_by diisi saat tambah (legacy).
+        'rumpun-jabatan' => [
+            'label'           => 'Rumpun Jabatan',
+            'controller'      => 'JabatanController',
+            'table'           => 'rumpun_jabatan',
+            'primaryKey'      => 'id_rumpun_jabatan',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'rumpun_jabatan',
+            'nameLabel'       => 'Rumpun Jabatan',
+            'nameMaxLength'   => 50,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT_FAQ,
+            'orderColumnType' => 'tinyint',
+        ],
+        // Sub rumpun per rumpun [K] D1:7165-7178: nama unik per rumpun, urutan per rumpun, dropdown hanya sub rumpun aktif
+        // yang rumpunnya aktif (statusChain; legacy list_subrumpun_jabatan dipakai riwayat jabatan B-07).
+        'subrumpun-jabatan' => [
+            'label'           => 'Sub Rumpun Jabatan',
+            'controller'      => 'JabatanController',
+            'table'           => 'subrumpun_jabatan',
+            'primaryKey'      => 'id_subrumpun_jabatan',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'subrumpun_jabatan',
+            'nameLabel'       => 'Sub Rumpun Jabatan',
+            'nameMaxLength'   => 255,
+            'parent'          => ['field' => 'id_rumpun_jabatan', 'entity' => 'rumpun-jabatan'],
+            'auditColumns'    => self::AUDIT_FAQ,
+            'orderColumnType' => 'tinyint',
+            'statusChain'     => true,
+        ],
+        // Jabatan akademik [K] D1:1495-1505: tanpa `order` (legacy urut nama). is_atasan wajib (radio legacy YA/TIDAK,
+        // akademik/form.php:39-50); CHECK chk_jabatan_akademik_is_atasan lapis kedua.
+        'jabatan-akademik' => [
+            'label'         => 'Jabatan Akademik',
+            'controller'    => 'JabatanController',
+            'table'         => 'jabatan_akademik',
+            'primaryKey'    => 'id_jabatan_akademik',
+            'autoIncrement' => true,
+            'nameField'     => 'jabatan_akademik',
+            'nameLabel'     => 'Jabatan Akademik',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'hasOrder'      => false,
+            'fields'        => [
+                'is_atasan' => [
+                    'label'    => 'Jabatan Atasan',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'Ya', 2 => 'Tidak'],
+                ],
+            ],
+            'auditColumns' => self::AUDIT_FAQ,
+        ],
+        // Periode struktur jabatan [K] D1:3880-3888: nama = tahun periode (legacy mask 2000-3000, periode/form.php:43,
+        // :66-69) — ditegakkan PeriodeStrukturJabatanHooks. Tanpa `order`. Dipakai struktur jabatan (konsumen legacy
+        // mengambil periode aktif terbaru).
+        'periode-struktur-jabatan' => [
+            'label'         => 'Periode Struktur Jabatan',
+            'controller'    => 'JabatanController',
+            'table'         => 'periode_struktur_jabatan',
+            'primaryKey'    => 'id_periode_struktur_jabatan',
+            'autoIncrement' => true,
+            'nameField'     => 'periode_struktur_jabatan',
+            'nameLabel'     => 'Periode Struktur',
+            'nameMaxLength' => 45,
+            'parent'        => null,
+            'hasOrder'      => false,
+            'hooks'         => \App\Libraries\MasterData\PeriodeStrukturJabatanHooks::class,
+            'auditColumns'  => self::AUDIT,
+        ],
+        // --- /DBV-018 ---
     ];
 }
