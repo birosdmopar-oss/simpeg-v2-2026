@@ -69,12 +69,16 @@ class MasterService
     private const RESERVED_IDS = ['options', 'meta'];
 
     /**
-     * Kode error DB yang diterjemahkan translateDuplicate(): 1062 duplikat UNIQUE/PRIMARY (MySQL & MariaDB), dan 167
-     * AUTO_INCREMENT melewati batas tipe kolom (MariaDB 10.4, HA_ERR_AUTOINC_ERANGE, SQLSTATE 22003).
+     * Kode error DB yang diterjemahkan translateDuplicate(): 1062 duplikat UNIQUE/PRIMARY (MySQL & MariaDB), 167
+     * AUTO_INCREMENT melewati batas tipe kolom (MariaDB 10.4, HA_ERR_AUTOINC_ERANGE, SQLSTATE 22003), dan 1467 counter
+     * AUTO_INCREMENT di atas batas tipe kolom (MySQL 8 InnoDB, ER_AUTOINC_READ_FAILED, mis. setelah
+     * `ALTER TABLE … AUTO_INCREMENT = 128` pada PK TINYINT; CR-041).
      */
     private const ERR_DUPLICATE = 1062;
 
     private const ERR_AUTOINC_RANGE = 167;
+
+    private const ERR_AUTOINC_READ = 1467;
 
     /**
      * Batas tunggu named lock tulis master (detik) sebelum menyerah dengan 409 — sama dengan hari libur.
@@ -1318,7 +1322,7 @@ class MasterService
      * lewat $recheck (cek aplikasi diulang: kode, nama, dan field uniqueFields).
      *
      * $insertDef (hanya tambah): PK master AUTO_INCREMENT yang sudah di batas tipe kolom (autoIncrementExhausted())
-     * dan lolos $recheck → 422 dengan penjelasan, bukan 500 (CR-011).
+     * dan lolos $recheck → 422 dengan penjelasan, bukan 500 (CR-011, CR-041). Pesan DB hanya ke log.
      */
     private function translateDuplicate(Closure $work, Closure $recheck, ?MasterDefinition $insertDef = null): void
     {
@@ -1334,6 +1338,13 @@ class MasterService
             }
 
             if ($keyExhausted) {
+                // Detail DB (kode, pesan) hanya di log — exception ini ditelan di sini sehingga tidak dicatat handler global.
+                log_message('error', 'Kapasitas AUTO_INCREMENT master {table} habis, diterjemahkan ke 422: [{code}] {message}', [
+                    'table'   => $insertDef->table,
+                    'code'    => $e->getCode(),
+                    'message' => $e->getMessage(),
+                ]);
+
                 throw new ValidationException(
                     "Kode {$insertDef->label} sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.",
                 );
@@ -1345,9 +1356,14 @@ class MasterService
 
     /**
      * INSERT gagal karena counter PK AUTO_INCREMENT sudah di batas tipe kolom (mis. TINYINT 127). Kode error beda per
-     * engine (temuan DBV-004 di MariaDB 10.4):
-     *  - MySQL 8 InnoDB mengulang nilai maksimum → 1062 "Duplicate entry '127' for key '<tabel>.PRIMARY'".
-     *  - MariaDB 10.4 menolak → 167 (22003) "Out of range value for column '<pk>' at row 1".
+     * engine (temuan DBV-004 di MariaDB 10.4, T-1 review DBV-011):
+     *  - MySQL 8 InnoDB, id maksimum sudah terpakai: nilai maksimum diulang → 1062 "Duplicate entry '127' for key
+     *    '<tabel>.PRIMARY'".
+     *  - MySQL 8 InnoDB, counter di atas batas (mis. `AUTO_INCREMENT = 128` tersalin dari legacy) → 1467 "Failed to read
+     *    auto-increment value from storage engine" (CR-041). Pesannya tanpa nama kolom; di jalur tambah hanya INSERT
+     *    tabel master ini yang meminta nilai AUTO_INCREMENT (audit fail-open), jadi kodenya saja sudah cukup.
+     *  - MariaDB 10.4 menolak keduanya (id maksimum terpakai maupun counter 128) → 167 (22003) "Out of range value for
+     *    column '<pk>' at row 1".
      * 167 pada kolom selain PK master ini tidak dianggap PK habis (tetap dilempar → 500).
      */
     private function autoIncrementExhausted(MasterDefinition $def, DatabaseException $e): bool
@@ -1359,6 +1375,7 @@ class MasterService
         return match ($e->getCode()) {
             self::ERR_DUPLICATE     => preg_match("/for key '(?:[^']*\.)?PRIMARY'/", $e->getMessage()) === 1,
             self::ERR_AUTOINC_RANGE => preg_match("/Out of range value for column '(?:[^']*\.)?" . preg_quote($def->primaryKey, '/') . "'/", $e->getMessage()) === 1,
+            self::ERR_AUTOINC_READ  => true,
             default                 => false,
         };
     }

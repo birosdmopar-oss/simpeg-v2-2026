@@ -26,8 +26,8 @@ class ApiExceptionHandler extends BaseExceptionHandler implements ExceptionHandl
      *   1406 terlalu panjang · 1264 di luar rentang · 1366 nilai/encoding tidak valid · 1292 tanggal/angka tidak valid
      *   1265 data terpotong (ENUM, angka berekor teks) · 1364 kolom NOT NULL tanpa default tidak diisi
      * Error DB lain (1062 yang tidak diterjemahkan service, lock wait, deadlock, koneksi) tetap 500. Termasuk 167
-     * MariaDB (AUTO_INCREMENT melewati batas tipe PK): bukan kesalahan isian — di engine master diterjemahkan
-     * MasterService (CR-011), di luar engine tetap 500 seperti padanannya di MySQL (1062 PRIMARY).
+     * MariaDB dan 1467 MySQL 8 (AUTO_INCREMENT melewati batas tipe PK): bukan kesalahan isian — di engine master
+     * diterjemahkan MasterService (CR-011, CR-041), di luar engine tetap 500 seperti padanannya di MySQL (1062 PRIMARY).
      */
     public const DATA_ERROR_CODES = [1406, 1264, 1366, 1292, 1265, 1364];
 
