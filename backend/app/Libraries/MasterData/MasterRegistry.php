@@ -13,7 +13,8 @@ use LogicException;
  *
  * Konfigurasi diperiksa saat registry dibangun (CR-009): rujukan antar-master (induk, field ref + dependsOn), field
  * yang disebut orderScope/uniqueFields/filters, dan rantai induk yang melingkar; CR-010: kode systemIds, field ref
- * ber-allowSystem, dan isian otherFor. Salah konfigurasi = LogicException, sehingga ketahuan di test pertama, bukan
+ * ber-allowSystem, dan isian otherFor; CR-026: codeAsName (nameField = primaryKey, kode manual) dan idRange (kode
+ * manual tanpa idDigits). Salah konfigurasi = LogicException, sehingga ketahuan di test pertama, bukan
  * saat data sudah tertulis.
  */
 class MasterRegistry
@@ -122,6 +123,20 @@ class MasterRegistry
 
         if ($def->statusChain && ! $def->hasParent()) {
             $fail('statusChain hanya untuk master berinduk.');
+        }
+
+        // CR-026: kode sebagai nama (PK alami tanpa kolom nama, mis. kelas_jabatan). nameField = primaryKey tanpa opsi ini
+        // membuat rule nama menimpa rule kode dan ubah nama mengganti PK.
+        if ($def->codeAsName && ($def->nameField !== $def->primaryKey || $def->autoIncrement)) {
+            $fail('codeAsName hanya untuk master ber-kode manual dengan nameField = primaryKey.');
+        }
+
+        if (! $def->codeAsName && $def->nameField === $def->primaryKey) {
+            $fail('nameField sama dengan primaryKey hanya boleh dengan codeAsName.');
+        }
+
+        if ($def->idRange !== null && ($def->autoIncrement || $def->idDigits !== null)) {
+            $fail('idRange hanya untuk kode manual tanpa idDigits.');
         }
 
         // Baris sistem (CR-010): kode kanonik master ini (bentuk yang sama dengan kode entri biasa), tanpa duplikat.

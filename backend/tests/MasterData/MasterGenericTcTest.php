@@ -733,7 +733,8 @@ final class MasterGenericTcTest extends CIUnitTestCase
             $created = $this->json($this->sendJson('POST', "api/v1/master/{$entity}", $fx['new']))['data'];
             $id      = (string) $created[$def->primaryKey];
 
-            $this->sendJson('PUT', "api/v1/master/{$entity}/{$id}", [$def->nameField => $fx['new'][$def->nameField] . ' (ubah)'])->assertStatus(200);
+            // Fixture `update` (CR-026): master yang namanya = kode (kelas jabatan) mengubah kolom lain.
+            $this->sendJson('PUT', "api/v1/master/{$entity}/{$id}", $fx['update'] ?? [$def->nameField => $fx['new'][$def->nameField] . ' (ubah)'])->assertStatus(200);
             $this->delete("api/v1/master/{$entity}/{$id}")->assertStatus(200);
 
             foreach (['create', 'update', 'delete'] as $event) {
