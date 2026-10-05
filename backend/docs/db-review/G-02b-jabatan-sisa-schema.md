@@ -125,7 +125,7 @@ Kunci: `PRIMARY` [K]; **UNIQUE** `uq_rumpun_jabatan_nama (rumpun_jabatan)` [V2].
 | `status` | TINYINT NOT NULL DEFAULT 1, COMMENT v2 | legacy `ENUM('1','2')` D1:7170 → **TINYINT [V2]** |
 | `created_at`, `created_by`, `updated_at`, `updated_by` | pola audit | [K] D1:7171-7174 |
 
-Kunci: `PRIMARY` [K]; **UNIQUE** `uq_subrumpun_jabatan_nama (id_rumpun_jabatan, subrumpun_jabatan)` [V2]; `KEY subrumpun_jabatan_ibfk_01` [K] D1:7176; **FK** `subrumpun_jabatan_ibfk_01` → `rumpun_jabatan` RESTRICT/RESTRICT (nama [K] D1:7177, aksi [V2]; legacy CASCADE/CASCADE).
+Kunci: `PRIMARY` [K]; **UNIQUE** `uq_subrumpun_jabatan_nama (id_rumpun_jabatan, subrumpun_jabatan)` [V2] (`id_rumpun_jabatan` NULL-able → baris ber-NULL hanya dijaga aplikasi; Bagian 4 #5); `KEY subrumpun_jabatan_ibfk_01` [K] D1:7176; **FK** `subrumpun_jabatan_ibfk_01` → `rumpun_jabatan` RESTRICT/RESTRICT (nama [K] D1:7177, aksi [V2]; legacy CASCADE/CASCADE).
 
 ### 2.4 jabatan_akademik — [K] D1:1495-1505
 
@@ -242,7 +242,7 @@ Empat master dengan UI admin legacy yang cocok dengan engine master generik (pun
 | 2 | FK `jabatan → jenjang_jf` | Migration terpisah `2026-09-30-100200` (ALTER ADD CONSTRAINT nama legacy, RESTRICT); migration DBV-008 tidak diedit lagi. Impor wajib mengaudit `jabatan.id_jenjang_jf` yatim (G-02 6.5 #2) | ⏳ |
 | 3 | Kolom `status` [V2] di `jenjang_jf` dan `struktur_jabatan` (legacy tanpa status) | Tambah (TINYINT 1/2/10, impor = 1) demi pola G2 dan soft delete saat halaman struktur dibuat. Alternatif: ikut D1 tanpa status | ⏳ |
 | 4 | ENUM('1','2') status rumpun/sub rumpun | → TINYINT 1/2/10 (preseden `gol_pppk` DBV-004) | ⏳ |
-| 5 | 6 UNIQUE [V2] | Bagian 3 #2; `uq_struktur_jabatan` tidak menegakkan baris ber-NULL (hanya aplikasi); audit duplikat sebelum impor | ⏳ |
+| 5 | 6 UNIQUE [V2] | Bagian 3 #2; `uq_struktur_jabatan` dan `uq_subrumpun_jabatan_nama` tidak menahan baris ber-NULL (kolom lingkupnya NULL-able: `id_periode_struktur_jabatan`/`id_jabatan`/`id_jabatan_atasan` dan `id_rumpun_jabatan`; UNIQUE menganggap setiap NULL berbeda) — keunikan baris itu hanya dijaga aplikasi; audit duplikat sebelum impor (6.5 #1) untuk kedua index memakai GROUP BY yang menyatukan NULL dalam satu kelompok (catatan C-1 review DB Validator 05-10-2026) | ⏳ |
 | 6 | UNIQUE `peta_jabatan` & `jabatan_koordinasi` | **Tidak dibuat sekarang.** Peta: keunikan legacy memakai `kebutuhan` (jabatan yang sama boleh berulang dengan kebutuhan beda) — aturan v2 diputuskan bersama halaman peta. Koordinasi: legacy tanpa cek duplikat. Ditambah lewat ALTER setelah audit (6.5 #1) bila diperlukan | ⏳ |
 | 7 | `jabatan_koordinasi.kelas_jabatan` tanpa FK | Ikut D1 (tanpa FK); validasi di aplikasi saat halaman koordinasi dibuat. Alternatif: FK [V2] ke `kelas_jabatan` setelah audit | ⏳ |
 | 8 | 4 CHECK [V2] | Bagian 3 #4 | ⏳ |
@@ -304,7 +304,7 @@ Pola DBV-008 (G-02 6.6): `up()` men-drop tabel DBV-018 yang sempat dibuat **pada
 
 Ditambahkan ke runbook impor (DBV-011) bersama butir G-02 6.5. Setiap sesi diawali `SET time_zone = '+00:00';`.
 
-1. **Duplikat** per lingkup UNIQUE (perbandingan `utf8mb4_unicode_ci`, setelah trim & `stripslashes`, **termasuk semua status**):
+1. **Duplikat** per lingkup UNIQUE (perbandingan `utf8mb4_unicode_ci`, setelah trim & `stripslashes`, **termasuk semua status**). GROUP BY menyatukan NULL dalam satu kelompok (berbeda dengan UNIQUE), jadi duplikat ber-NULL di lingkup `uq_subrumpun_jabatan_nama` (`id_rumpun_jabatan`) dan `uq_struktur_jabatan` (ketiga kolom ID) ikut terdeteksi dan ditangani seperti duplikat lain, walau index tidak akan menolaknya saat impor (Bagian 4 #5):
    ```sql
    SELECT kategori_jf, TRIM(jenjang_jf) COLLATE utf8mb4_unicode_ci AS nama, COUNT(*) n, GROUP_CONCAT(id_jenjang_jf) ids
      FROM jenjang_jf GROUP BY kategori_jf, TRIM(jenjang_jf) COLLATE utf8mb4_unicode_ci HAVING n > 1;
@@ -368,5 +368,6 @@ Ditambahkan ke runbook impor (DBV-011) bersama butir G-02 6.5. Setiap sesi diawa
 ## 7. Tindak lanjut
 
 - **CR halaman peta jabatan** (DoD "peta formasi", Bagian 4 #9): service + endpoint + halaman khusus, menu ⋮ `RowActionsMenu` (Edit → Aktifkan/Nonaktifkan → Hapus `danger`, `ConfirmDialog`), kolom "B" setelah B-01. Key CR menunggu user.
+- **Aturan keunikan `peta_jabatan`** (catatan C-2 review DB Validator 05-10-2026; Bagian 4 #6): diputuskan **sebelum** halaman peta formasi dibuat (Fase 3), termasuk apakah `kebutuhan` ikut lingkup keunikan seperti cek legacy. Bahan: blok informasi `peta_jabatan` di audit 6.5 #1. Bila diputuskan perlu UNIQUE, ditambah lewat migration ALTER baru setelah audit (migration DBV-018 tidak diedit).
 - **Struktur jabatan & jabatan koordinasi** (Bagian 4 #10, #11): bersama B-19 / B-07.
 - **DBV-012 (B-01/B-02):** FK `pegawai_mutasi_jabatan`/`riwayat_mutasi_jabatan` ke `rumpun_jabatan`/`jabatan_koordinasi` (nama [K] D1, draf `dbv-012/fk-ditahan`) kini punya tabel induk.
