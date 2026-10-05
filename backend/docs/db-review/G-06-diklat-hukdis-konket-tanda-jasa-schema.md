@@ -444,6 +444,8 @@ Salinan lokal kelima tabel berisi 0 baris (atau tidak ada), jadi semua butir di 
 
 **Syarat approval DBV-005 (29-09-2026):** audit data sebelum impor (butir di bawah) dan penyalinan counter AUTO_INCREMENT legacy (#10) **wajib menjadi langkah runbook impor**.
 
+Langkah runbook: `DBV-011-runbook-impor-master-zona-waktu.md` Bagian 2 (pemetaan butir #1–#10 di 2.6; skrip audit dan skrip counter di `sql/`; ⏳ DBV-011).
+
 1. **Audit duplikat** dengan perbandingan `utf8mb4_unicode_ci` (tidak peka huruf besar/kecil & aksen), setelah `stripslashes` (#2) dan trim, per lingkup UNIQUE: `diklat (jenis_diklat, nama_diklat)`, `tingkat_hukdis`, `jenis_hukdis (id_tingkat_hukdis, jenis_hukdis)`, `jenis_konket`, `jenis_konket.old_id`, `tanda_jasa` — **termasuk baris status 2/10** (`jenis_hukdis` dan `diklat` bisa punya status 10). Duplikat harus dirapikan dulu, karena impor akan gagal.
 2. **`stripslashes`** hanya untuk nama `diklat`, `tingkat_hukdis`, `jenis_konket`, `tanda_jasa` (di-`addslashes` legacy); **jangan** untuk `jenis_hukdis` (disimpan mentah). Nama `diklat` dari jalur `dm_diklat` juga mentah → `stripslashes` kondisional: audit pola `\'`, `\"`, `\\` per baris sebelum memutuskan.
 3. **`jenis_konket.old_id`**: baris dengan `old_id` NULL/kosong (dibuat lewat UI legacy), ≤ 0 (aplikasi mewajibkan ≥ 1, C4), ganda, atau bukan angka → beri kode baru > MAX yang tidak dipakai `absen_ijin.kategori`/`d_konket.kategori`; cek setiap `absen_ijin.kategori` punya pasangan `old_id`.
