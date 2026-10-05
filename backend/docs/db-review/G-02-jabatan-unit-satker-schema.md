@@ -541,7 +541,7 @@ DDL MySQL/MariaDB ter-commit per statement dan migration yang gagal tidak tercat
 
 ## 7. Tabel ditunda — hasil riset [I] untuk unit lanjutan
 
-**Diperbarui 01-10-2026:** DDL [K] kedelapan tabel di bawah (kecuali `dm_ak_jf`) ada di D1 dan diajukan sebagai CREATE di **DBV-018** (`G-02b-jabatan-sisa-schema.md`). Riset [I] di bawah dipertahankan sebagai catatan perilaku legacy; skema final mengikuti D1.
+**Diperbarui 01-10-2026:** DDL [K] kedelapan tabel di bawah (kecuali `dm_ak_jf`) ada di D1 dan diajukan sebagai CREATE di **DBV-018** (`G-02b-jabatan-sisa-schema.md`; CRUD engine untuk rumpun, sub rumpun, jabatan akademik, periode struktur; peta/struktur/koordinasi menunggu halaman khusus). Riset [I] di bawah dipertahankan sebagai catatan perilaku legacy; skema final mengikuti D1.
 
 | Tabel | Kolom dari kode legacy [I] | FK (ERD) | Konsumen / catatan |
 |---|---|---|---|
