@@ -215,6 +215,17 @@ final class MasterGenericTcTest extends CIUnitTestCase
         $result->assertStatus(422);
         $this->assertArrayHasKey('id_kabupaten_kota', $this->json($result)['errors']);
 
+        // CR-038 (F-UI-3): induk kosong / terlalu panjang memakai label master induk, bukan "Induk wajib dipilih.".
+        $result = $this->sendJson('POST', 'api/v1/master/kecamatan', ['id_kecamatan' => '3171099', 'kecamatan' => 'Tanpa Induk']);
+        $result->assertStatus(422);
+        $this->assertSame(['Kabupaten/Kota wajib dipilih.'], $this->json($result)['errors']['id_kabupaten_kota']);
+        $result = $this->sendJson('PUT', 'api/v1/master/kecamatan/3171010', ['id_kabupaten_kota' => '']);
+        $result->assertStatus(422);
+        $this->assertSame(['Kabupaten/Kota wajib dipilih.'], $this->json($result)['errors']['id_kabupaten_kota']);
+        $result = $this->sendJson('POST', 'api/v1/master/kecamatan', ['id_kecamatan' => '3171099', 'id_kabupaten_kota' => '31710', 'kecamatan' => 'Panjang']);
+        $result->assertStatus(422);
+        $this->assertSame(['Kabupaten/Kota tidak valid.'], $this->json($result)['errors']['id_kabupaten_kota']);
+
         // Kode (PK) tidak ikut diubah walaupun dikirim — kode manual maupun AUTO_INCREMENT.
         $this->sendJson('PUT', 'api/v1/master/provinsi/32', ['id_provinsi' => '39', 'provinsi' => 'Jabar'])->assertStatus(200);
         $this->seeInDatabase('provinsi', ['id_provinsi' => '32', 'provinsi' => 'Jabar']);

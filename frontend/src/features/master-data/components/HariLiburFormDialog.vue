@@ -13,6 +13,8 @@ import { computed, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
+import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
+import UiButton from '@/shared/ui/UiButton.vue'
 
 import type { HariLiburFormValues, HariLiburPayload, HariLiburRow } from '../hariLibur.types'
 import { hariLiburSchema, jumlahHari } from '../schemas/hariLibur.schema'
@@ -140,44 +142,42 @@ const onSubmit = handleSubmit(async (form) => {
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
       >
         <div class="mb-4 flex items-start justify-between">
           <div>
-            <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEdit ? 'Ubah Hari Libur' : 'Tambah Hari Libur' }}</DialogTitle>
+            <DialogTitle class="text-h5 font-semibold text-slate-900">{{ isEdit ? 'Ubah Hari Libur' : 'Tambah Hari Libur' }}</DialogTitle>
             <DialogDescription class="text-sm text-slate-500">
               Rentang tanggal tidak boleh bentrok dengan hari libur lain, termasuk yang tidak aktif atau dihapus.
             </DialogDescription>
           </div>
-          <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+          <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
             <X class="h-5 w-5" />
           </DialogClose>
         </div>
 
-        <form class="space-y-4" novalidate data-testid="hari-libur-form" @submit="onSubmit">
-          <p v-if="formError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ formError }}</p>
+        <form :class="FORM_GRID_CLASS" novalidate data-testid="hari-libur-form" @submit="onSubmit">
+          <p v-if="formError" :class="FORM_ALERT_CLASS" role="alert">{{ formError }}</p>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <FormField
-              :model-value="values.tgl_mulai"
-              name="tgl_mulai"
-              label="Tanggal Mulai"
-              type="date"
-              required
-              :error="fieldError('tgl_mulai')"
-              @update:model-value="onMulaiChange"
-            />
-            <FormField
-              :model-value="values.tgl_akhir"
-              name="tgl_akhir"
-              label="Tanggal Selesai"
-              type="date"
-              required
-              :hint="durasi > 0 ? `${durasi} hari` : ''"
-              :error="fieldError('tgl_akhir')"
-              @update:model-value="updateField('tgl_akhir', $event)"
-            />
-          </div>
+          <FormField
+            :model-value="values.tgl_mulai"
+            name="tgl_mulai"
+            label="Tanggal Mulai"
+            type="date"
+            required
+            :error="fieldError('tgl_mulai')"
+            @update:model-value="onMulaiChange"
+          />
+          <FormField
+            :model-value="values.tgl_akhir"
+            name="tgl_akhir"
+            label="Tanggal Selesai"
+            type="date"
+            required
+            :hint="durasi > 0 ? `${durasi} hari` : ''"
+            :error="fieldError('tgl_akhir')"
+            @update:model-value="updateField('tgl_akhir', $event)"
+          />
 
           <FormField
             :model-value="values.id_jenis_libur"
@@ -207,6 +207,7 @@ const onSubmit = handleSubmit(async (form) => {
             name="keterangan"
             label="Keterangan"
             type="textarea"
+            :class="FORM_WIDE_CLASS"
             :error="fieldError('keterangan')"
             @update:model-value="updateField('keterangan', $event)"
           />
@@ -227,15 +228,13 @@ const onSubmit = handleSubmit(async (form) => {
             @update:model-value="updateField('status', $event)"
           />
 
-          <div class="flex justify-end gap-2 pt-2">
-            <DialogClose class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</DialogClose>
-            <button
-              type="submit"
-              class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
-              :disabled="isSubmitting"
-            >
+          <div :class="FORM_ACTIONS_CLASS">
+            <DialogClose as-child>
+              <UiButton variant="secondary" appearance="soft">Batal</UiButton>
+            </DialogClose>
+            <UiButton type="submit" :disabled="isSubmitting">
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}
-            </button>
+            </UiButton>
           </div>
         </form>
       </DialogContent>

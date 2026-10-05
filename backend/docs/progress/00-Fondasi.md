@@ -2,13 +2,13 @@
 
 Catatan progres Fase 0 yang masih terbuka. Hasil QA seluruh task Fase 0: `docs/qa/QAFUNC-001-fase-0-fondasi.md` (17 dari 18 QASMTASK Pass; sisa QASMTASK-018). Panduan deploy: `README-deploy.md`.
 
-**Terakhir diperbarui:** 30 September 2026 (CR-021: ISSUE-014 opsi A di branch `cr-021/deploy-migrate-manual`, CR saja tanpa DBV; temuan review adversarial sudah ditangani, menunggu review ulang)
+**Terakhir diperbarui:** 1 Oktober 2026 (CR-029: status CR-021 diperbarui — ISSUE-014 opsi A sudah di main lewat merge `eb6d5b5` 30-09-2026, koreksi integrasi `89ea98d`. Sebelumnya CR-021: branch `cr-021/deploy-migrate-manual`, CR saja tanpa DBV; temuan review adversarial ditangani)
 
 | Task | Status | Ringkas |
 |---|---|---|
 | F0-18 Deploy Dev (bare repo + hook `post-receive`) | IN_PROGRESS | Hook + README + `rollback.sh` ada di main; push-trigger build terbukti lewat simulasi lokal. QASMTASK-018 tetap Todo sampai hook diuji di server Dev (server belum ada). CR-021: hook tidak lagi menjalankan migration, deploy hanya dari `main`, `rollback.sh` menolak release yang migration-nya tertunda (ISSUE-014) |
 
-## CR-021 — ISSUE-014 opsi A: migration Dev manual lewat runbook (branch `cr-021/deploy-migrate-manual`, menunggu review)
+## CR-021 — ISSUE-014 opsi A: migration Dev manual lewat runbook (branch `cr-021/deploy-migrate-manual`, CR saja tanpa DBV; di main lewat merge `eb6d5b5` 30-09-2026)
 
 Keputusan user 29-09-2026 membuka HOLD ISSUE-014 (sejak 23-09) dengan opsi A: `RUN_MIGRATIONS=0` default di hook deploy Dev, deploy hanya dari `main`, migrate manual lewat runbook setelah approval DB Validator.
 
@@ -105,6 +105,6 @@ Uji unit tambahan: parser dengan 14 kasus output palsu, dijalankan untuk fungsi 
 
 Sisa:
 
-- Review CR-021 (CR saja → merge ke `main` setelah quality gate).
+- ~~Review CR-021 (CR saja → merge ke `main` setelah quality gate).~~ ✅ di main lewat merge `eb6d5b5` (30-09-2026), koreksi integrasi `89ea98d`.
 - Server Dev (QASMTASK-018).
 - Keputusan D-11 (`sql_mode`) dan zona waktu (ISSUE-022) lewat DBV.

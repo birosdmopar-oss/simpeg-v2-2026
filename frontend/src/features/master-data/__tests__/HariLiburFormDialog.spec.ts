@@ -242,3 +242,15 @@ describe('HariLiburFormDialog', () => {
     wrapper.unmount()
   })
 })
+
+describe('HariLiburFormDialog — tata letak redesign (CR-028 / ISSUE-007)', () => {
+  it('form grid dua kolom di layar lebar; Keterangan dan baris tombol memakai dua kolom penuh', async () => {
+    await mountDialog(null)
+    const form = field<HTMLFormElement>('form[data-testid="hari-libur-form"]')
+    expect(form.classList).toContain('md:grid-cols-2')
+    // Tanggal Mulai & Selesai menjadi sel grid langsung (sebaris), bukan dibungkus grid terpisah.
+    expect(field('input[name="tgl_mulai"]').closest('form > *')?.parentElement).toBe(form)
+    expect(field('textarea[name="keterangan"]').closest('form > *')?.classList).toContain('md:col-span-2')
+    expect(field('button[type="submit"]').parentElement?.classList).toContain('md:col-span-2')
+  })
+})

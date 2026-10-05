@@ -183,7 +183,11 @@ export function buildMasterSchema(meta: MasterMeta, isEdit: boolean, all: Master
   }
 
   if (meta.parent) {
-    shape[meta.parent.field] = z.string({ required_error: 'Induk wajib dipilih.' }).min(1, 'Induk wajib dipilih.')
+    // Pesan memakai label master induk = label dropdown di form, mis. "Kecamatan wajib dipilih." (CR-038, F-UI-3).
+    const parentEntity = meta.parent.entity
+    const parentLabel = all.find((m) => m.key === parentEntity)?.label ?? 'Induk'
+    const message = `${parentLabel} wajib dipilih.`
+    shape[meta.parent.field] = z.string({ required_error: message }).min(1, message)
   }
 
   for (const field of meta.fields) {

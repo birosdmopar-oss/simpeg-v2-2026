@@ -54,6 +54,30 @@ final class ChangePasswordTest extends CIUnitTestCase
         $this->assertNull($this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray()['password']);
     }
 
+    /**
+     * CR-038 (F-R1-1): isian array/objek/angka → 422 "Isian harus berupa teks." (Bahasa Indonesia), bukan pesan bawaan
+     * CI4 "The old_password field must be a valid string."; password tidak berubah.
+     */
+    public function testNonTextFieldsUseIndonesianMessage(): void
+    {
+        $valid = [
+            'old_password'              => AuthSeeder::PASSWORD,
+            'new_password'              => self::NEW,
+            'new_password_confirmation' => self::NEW,
+        ];
+
+        foreach (['old_password', 'new_password', 'new_password_confirmation'] as $field) {
+            foreach (['array kosong' => [], 'array berisi' => ['x'], 'objek' => ['a' => 1], 'angka' => 123] as $label => $value) {
+                $result = $this->asNip(self::NIP)->withBodyFormat('json')->post('api/v1/auth/change-password', [$field => $value] + $valid);
+
+                $result->assertStatus(422);
+                $this->assertSame([$field => ['Isian harus berupa teks.']], $this->json($result)['errors'], "{$field} {$label}");
+            }
+        }
+
+        $this->assertNull($this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray()['password']);
+    }
+
     public function testWeakOrMismatchedNewPasswordIsRejected(): void
     {
         $result = $this->asNip(self::NIP)->withBodyFormat('json')->post('api/v1/auth/change-password', [

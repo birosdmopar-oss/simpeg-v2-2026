@@ -17,6 +17,8 @@ import { computed, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
+import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS } from '@/shared/components/formLayout'
+import UiButton from '@/shared/ui/UiButton.vue'
 
 import { PASSWORD_POLICY_HINT } from '../schemas/password.schema'
 import { makeUserUpdateSchema, userCreateSchema } from '../schemas/user.schema'
@@ -184,22 +186,22 @@ const onSubmit = handleSubmit(async (values) => {
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
       >
         <div class="mb-4 flex items-start justify-between">
           <div>
-            <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEdit ? 'Edit Akun' : 'Tambah Akun' }}</DialogTitle>
+            <DialogTitle class="text-h5 font-semibold text-slate-900">{{ isEdit ? 'Edit Akun' : 'Tambah Akun' }}</DialogTitle>
             <DialogDescription class="text-sm text-slate-500">
               {{ isEdit ? (user?.nip ? `NIP ${user.nip}` : 'Akun tanpa NIP') : 'Username default sama dengan NIP.' }}
             </DialogDescription>
           </div>
-          <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+          <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
             <X class="h-5 w-5" />
           </DialogClose>
         </div>
 
-        <form class="space-y-4" novalidate data-testid="user-form" @submit="onSubmit">
-          <p v-if="formError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+        <form :class="FORM_GRID_CLASS" novalidate data-testid="user-form" @submit="onSubmit">
+          <p v-if="formError" :class="FORM_ALERT_CLASS" role="alert">
             {{ formError }}
           </p>
 
@@ -262,18 +264,16 @@ const onSubmit = handleSubmit(async (values) => {
             :hint="isEdit ? `Kosongkan jika tidak diganti. ${PASSWORD_POLICY_HINT} Mengganti password mencabut seluruh sesi akun.` : PASSWORD_POLICY_HINT"
             :error="errors.password"
           />
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField v-model="id_unit" name="id_unit" label="Unit" placeholder="mis. U01" :error="errors.id_unit" />
-            <FormField
-              v-model="id_satker"
-              name="id_satker"
-              label="Satker"
-              placeholder="mis. S01"
-              :disabled="auth.role === Role.ADMIN_SATKER"
-              :hint="auth.role === Role.ADMIN_SATKER ? 'Admin Satker hanya dapat mengelola satkernya sendiri.' : ''"
-              :error="errors.id_satker"
-            />
-          </div>
+          <FormField v-model="id_unit" name="id_unit" label="Unit" placeholder="mis. U01" :error="errors.id_unit" />
+          <FormField
+            v-model="id_satker"
+            name="id_satker"
+            label="Satker"
+            placeholder="mis. S01"
+            :disabled="auth.role === Role.ADMIN_SATKER"
+            :hint="auth.role === Role.ADMIN_SATKER ? 'Admin Satker hanya dapat mengelola satkernya sendiri.' : ''"
+            :error="errors.id_satker"
+          />
           <FormField
             v-model="status"
             name="status"
@@ -286,15 +286,13 @@ const onSubmit = handleSubmit(async (values) => {
             :error="errors.status"
           />
 
-          <div class="flex justify-end gap-2 pt-2">
-            <DialogClose class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</DialogClose>
-            <button
-              type="submit"
-              class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
-              :disabled="submitting"
-            >
+          <div :class="FORM_ACTIONS_CLASS">
+            <DialogClose as-child>
+              <UiButton variant="secondary" appearance="soft">Batal</UiButton>
+            </DialogClose>
+            <UiButton type="submit" :disabled="submitting">
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}
-            </button>
+            </UiButton>
           </div>
         </form>
       </DialogContent>
