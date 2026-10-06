@@ -46,6 +46,8 @@ use Throwable;
  *     options maupun daftar admin, tidak ikut penomoran urutan, tidak bisa diubah/dinonaktifkan/diurutkan/dihapus
  *     (422), tidak bisa menjadi induk, dan hanya bisa dirujuk field ref ber-allowSystem (field lain: "tidak
  *     ditemukan", sama dengan kode yang tidak ada). Detail GET {kode} tetap bisa dibaca.
+ * 10. Kode sebagai nama (opsi codeAsName, CR-026), mis. kelas jabatan (PK alami tanpa kolom nama, DBV-008): nama = kode,
+ *     keunikannya = keunikan kode, dan nama yang dikirim saat ubah wajib sama dengan kode (kode tidak bisa diubah, 422).
  *
  * Mendukung dua bentuk kode sesuai DDL legacy: PK string yang diinput admin (kode wilayah CHAR(2/4/7/10), wajib
  * tepat N digit) dan PK AUTO_INCREMENT (agama, jenis_pegawai, jenis_status). Kolom tambahan legacy per master
@@ -67,12 +69,16 @@ class MasterService
     private const RESERVED_IDS = ['options', 'meta'];
 
     /**
-     * Kode error DB yang diterjemahkan translateDuplicate(): 1062 duplikat UNIQUE/PRIMARY (MySQL & MariaDB), dan 167
-     * AUTO_INCREMENT melewati batas tipe kolom (MariaDB 10.4, HA_ERR_AUTOINC_ERANGE, SQLSTATE 22003).
+     * Kode error DB yang diterjemahkan translateDuplicate(): 1062 duplikat UNIQUE/PRIMARY (MySQL & MariaDB), 167
+     * AUTO_INCREMENT melewati batas tipe kolom (MariaDB 10.4, HA_ERR_AUTOINC_ERANGE, SQLSTATE 22003), dan 1467 counter
+     * AUTO_INCREMENT di atas batas tipe kolom (MySQL 8 InnoDB, ER_AUTOINC_READ_FAILED, mis. setelah
+     * `ALTER TABLE … AUTO_INCREMENT = 128` pada PK TINYINT; CR-041).
      */
     private const ERR_DUPLICATE = 1062;
 
     private const ERR_AUTOINC_RANGE = 167;
+
+    private const ERR_AUTOINC_READ = 1467;
 
     /**
      * Batas tunggu named lock tulis master (detik) sebelum menyerah dengan 409 — sama dengan hari libur.
@@ -318,8 +324,9 @@ class MasterService
      */
     private function createLocked(MasterDefinition $def, array $data): array
     {
-        $id     = trim((string) ($data[$def->primaryKey] ?? ''));
-        $name   = $this->normalizeName($data[$def->nameField] ?? '');
+        $id = trim((string) ($data[$def->primaryKey] ?? ''));
+        // codeAsName (CR-026): nama = kode (kolom yang sama), keunikannya = keunikan kode (exists() di bawah).
+        $name   = $def->codeAsName ? $id : $this->normalizeName($data[$def->nameField] ?? '');
         $parent = $def->parentField !== null ? trim((string) ($data[$def->parentField] ?? '')) : null;
 
         if (! $def->autoIncrement) {
@@ -460,10 +467,19 @@ class MasterService
         $name = (string) $current[$def->nameField];
 
         if (array_key_exists($def->nameField, $data)) {
-            $name = $this->normalizeName($data[$def->nameField]);
+            $sent = $this->normalizeName($data[$def->nameField]);
 
-            if ($name !== (string) $current[$def->nameField]) {
-                $changes[$def->nameField] = $name;
+            if ($def->codeAsName) {
+                // CR-026: nama = kode (PK), yang tidak pernah berubah — nilai sama boleh dikirim (form edit), lainnya 422.
+                if ($sent !== $name) {
+                    throw ValidationException::forField($def->primaryKey, "{$def->nameLabel} adalah kode entri dan tidak dapat diubah.");
+                }
+            } else {
+                $name = $sent;
+
+                if ($name !== (string) $current[$def->nameField]) {
+                    $changes[$def->nameField] = $name;
+                }
             }
         }
 
@@ -1087,9 +1103,12 @@ class MasterService
      */
     private function assertNameUnique(MasterDefinition $def, string $name, ?string $parent, array $scope = [], ?string $exceptId = null): void
     {
-        if (! $def->nameRequired) {
+        // codeAsName (CR-026): nama = PK, keunikannya ditegakkan cek kode (exists()) dan PRIMARY KEY.
+        // Nama turunan (nameRequired false, mis. aturan lokasi presensi DBV-007) tidak wajib unik.
+        if ($def->codeAsName || ! $def->nameRequired) {
             return;
         }
+
         $builder = $this->db->table($def->table)->where($def->nameField, $name);
 
         if ($def->parentField !== null) {
@@ -1310,7 +1329,7 @@ class MasterService
      * lewat $recheck (cek aplikasi diulang: kode, nama, dan field uniqueFields).
      *
      * $insertDef (hanya tambah): PK master AUTO_INCREMENT yang sudah di batas tipe kolom (autoIncrementExhausted())
-     * dan lolos $recheck → 422 dengan penjelasan, bukan 500 (CR-011).
+     * dan lolos $recheck → 422 dengan penjelasan, bukan 500 (CR-011, CR-041). Pesan DB hanya ke log.
      */
     private function translateDuplicate(Closure $work, Closure $recheck, ?MasterDefinition $insertDef = null): void
     {
@@ -1326,6 +1345,13 @@ class MasterService
             }
 
             if ($keyExhausted) {
+                // Detail DB (kode, pesan) hanya di log — exception ini ditelan di sini sehingga tidak dicatat handler global.
+                log_message('error', 'Kapasitas AUTO_INCREMENT master {table} habis, diterjemahkan ke 422: [{code}] {message}', [
+                    'table'   => $insertDef->table,
+                    'code'    => $e->getCode(),
+                    'message' => $e->getMessage(),
+                ]);
+
                 throw new ValidationException(
                     "Kode {$insertDef->label} sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database.",
                 );
@@ -1337,9 +1363,14 @@ class MasterService
 
     /**
      * INSERT gagal karena counter PK AUTO_INCREMENT sudah di batas tipe kolom (mis. TINYINT 127). Kode error beda per
-     * engine (temuan DBV-004 di MariaDB 10.4):
-     *  - MySQL 8 InnoDB mengulang nilai maksimum → 1062 "Duplicate entry '127' for key '<tabel>.PRIMARY'".
-     *  - MariaDB 10.4 menolak → 167 (22003) "Out of range value for column '<pk>' at row 1".
+     * engine (temuan DBV-004 di MariaDB 10.4, T-1 review DBV-011):
+     *  - MySQL 8 InnoDB, id maksimum sudah terpakai: nilai maksimum diulang → 1062 "Duplicate entry '127' for key
+     *    '<tabel>.PRIMARY'".
+     *  - MySQL 8 InnoDB, counter di atas batas (mis. `AUTO_INCREMENT = 128` tersalin dari legacy) → 1467 "Failed to read
+     *    auto-increment value from storage engine" (CR-041). Pesannya tanpa nama kolom; di jalur tambah hanya INSERT
+     *    tabel master ini yang meminta nilai AUTO_INCREMENT (audit fail-open), jadi kodenya saja sudah cukup.
+     *  - MariaDB 10.4 menolak keduanya (id maksimum terpakai maupun counter 128) → 167 (22003) "Out of range value for
+     *    column '<pk>' at row 1".
      * 167 pada kolom selain PK master ini tidak dianggap PK habis (tetap dilempar → 500).
      */
     private function autoIncrementExhausted(MasterDefinition $def, DatabaseException $e): bool
@@ -1351,6 +1382,7 @@ class MasterService
         return match ($e->getCode()) {
             self::ERR_DUPLICATE     => preg_match("/for key '(?:[^']*\.)?PRIMARY'/", $e->getMessage()) === 1,
             self::ERR_AUTOINC_RANGE => preg_match("/Out of range value for column '(?:[^']*\.)?" . preg_quote($def->primaryKey, '/') . "'/", $e->getMessage()) === 1,
+            self::ERR_AUTOINC_READ  => true,
             default                 => false,
         };
     }

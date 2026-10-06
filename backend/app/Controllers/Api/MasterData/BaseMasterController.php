@@ -139,44 +139,60 @@ abstract class BaseMasterController extends ApiController
 
         // Kode diinput admin hanya untuk master ber-PK string; PK AUTO_INCREMENT diberikan DB.
         if ($creating && ! $def->autoIncrement) {
-            $rules[$def->primaryKey] = $def->idDigits !== null
+            $rules[$def->primaryKey] = match (true) {
                 // Kode wilayah legacy: tepat N digit angka tanpa titik (CHAR(N) di DB, ISSUE-008).
-                ? [
+                $def->idDigits !== null => [
                     // \z, bukan $: '$' PCRE juga cocok sebelum newline di akhir ("31\n" akan lolos).
                     'rules'  => "required|regex_match[/^[0-9]{{$def->idDigits}}\\z/]",
                     'errors' => [
                         'required'    => 'Kode wajib diisi.',
                         'regex_match' => "Kode harus tepat {$def->idDigits} digit angka (tanpa titik atau spasi).",
                     ],
-                ]
+                ],
+                // Kode angka dalam rentang (CR-026, mis. kelas jabatan 1–20).
+                $def->idRange !== null => $this->rangeCodeRule($def, $def->idRange),
                 // Kode umum: huruf/angka/titik/strip/garis bawah, tanpa spasi.
-                : [
+                default => [
                     'rules'  => "required|max_length[{$def->idMaxLength}]|regex_match[/^[A-Za-z0-9._-]+\\z/]",
                     'errors' => [
                         'required'    => 'Kode wajib diisi.',
                         'max_length'  => "Kode maksimal {$def->idMaxLength} karakter.",
                         'regex_match' => 'Kode hanya boleh huruf, angka, titik, strip, atau garis bawah (tanpa spasi).',
                     ],
-                ];
+                ],
+            };
         }
 
         if ($def->parentField !== null && $def->parentEntity !== null) {
-            $parentLength = service('masterRegistry')->get($def->parentEntity)->idMaxLength;
+            $parentDef = service('masterRegistry')->get($def->parentEntity);
 
+            // Pesan memakai label master induk, sama dengan label dropdown di form (CR-038, F-UI-3).
             $rules[$def->parentField] = [
-                'rules'  => "{$required}|max_length[{$parentLength}]",
-                'errors' => ['required' => 'Induk wajib dipilih.', 'max_length' => 'Induk tidak valid.'],
+                'rules'  => "{$required}|max_length[{$parentDef->idMaxLength}]",
+                'errors' => [
+                    'required'   => "{$parentDef->label} wajib dipilih.",
+                    'max_length' => "{$parentDef->label} tidak valid.",
+                ],
             ];
         }
 
-        $rules[$def->nameField] = [
-            'rules'  => "{$required}|string|max_length[{$def->nameMaxLength}]",
-            'errors' => [
-                'required'   => "{$def->nameLabel} wajib diisi.",
-                'string'     => "{$def->nameLabel} harus teks.",
-                'max_length' => "{$def->nameLabel} maksimal {$def->nameMaxLength} karakter.",
-            ],
-        ];
+        // codeAsName (CR-026): nama = kode (key sama). Saat tambah hanya rule kode di atas yang dipasang (rule nama akan
+        // menimpanya). Saat ubah nilai yang dikirim tetap diteruskan (permit_empty) agar MasterService menolak nilai yang
+        // berbeda dari kode (kode tidak bisa diganti); tanpa rule, key itu dibuang validateOrFail dan PUT lolos 200.
+        if ($def->codeAsName) {
+            if (! $creating) {
+                $rules[$def->nameField] = ['rules' => 'if_exist|permit_empty', 'errors' => []];
+            }
+        } else {
+            $rules[$def->nameField] = [
+                'rules'  => "{$required}|string|max_length[{$def->nameMaxLength}]",
+                'errors' => [
+                    'required'   => "{$def->nameLabel} wajib diisi.",
+                    'string'     => "{$def->nameLabel} harus teks.",
+                    'max_length' => "{$def->nameLabel} maksimal {$def->nameMaxLength} karakter.",
+                ],
+            ];
+        }
 
         if (! $def->nameRequired) {
             $rules[$def->nameField]['rules'] = $creating ? 'permit_empty|string|max_length[' . $def->nameMaxLength . ']' : 'if_exist|permit_empty|string|max_length[' . $def->nameMaxLength . ']';
@@ -211,6 +227,30 @@ abstract class BaseMasterController extends ApiController
         }
 
         return $rules;
+    }
+
+    /**
+     * Rule kode angka dalam rentang (opsi `idRange`, CR-026): bilangan bulat tanpa nol di depan ('07' akan di-cast MySQL
+     * menjadi 7 pada PK TINYINT, lalu detail entri barunya 404) dalam [min, max]. Master codeAsName memakai label nama.
+     *
+     * @param array{0: int, 1: int} $range
+     *
+     * @return array{rules: string, errors: array<string, string>}
+     */
+    protected function rangeCodeRule(MasterDefinition $def, array $range): array
+    {
+        [$min, $max] = $range;
+        $label       = $def->codeAsName ? $def->nameLabel : 'Kode';
+
+        return [
+            'rules'  => "required|regex_match[/^[1-9][0-9]*\\z/]|greater_than_equal_to[{$min}]|less_than_equal_to[{$max}]",
+            'errors' => [
+                'required'              => "{$label} wajib diisi.",
+                'regex_match'           => "{$label} harus bilangan bulat {$min} sampai {$max} (tanpa nol di depan).",
+                'greater_than_equal_to' => "{$label} minimal {$min}.",
+                'less_than_equal_to'    => "{$label} maksimal {$max}.",
+            ],
+        ];
     }
 
     /**

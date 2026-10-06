@@ -80,6 +80,14 @@ class MasterDataSeeder extends Seeder
         $this->seedG06();
         // --- /DBV-005 ---
 
+        // --- DBV-008 ---
+        $this->seedG02();
+        // --- /DBV-008 ---
+
+        // --- DBV-018 ---
+        $this->seedG02b();
+        // --- /DBV-018 ---
+
         // --- DBV-007 ---
         // Lokasi 1 tidak dirujuk aturan (fixture G-TC: boleh dinonaktifkan/dihapus); lokasi 2 dirujuk aturan aktif 1 (K-5).
         // Format target/desc = JSON array seperti legacy (Lm_lokasi::set_param_dm).
@@ -316,4 +324,109 @@ class MasterDataSeeder extends Seeder
         ]);
     }
     // --- /DBV-005 ---
+
+    // --- DBV-008 (method) ---
+    /**
+     * G-02 (DBV-008/CR-026): 2 unit, 3 satker (satu UPT ber-zonasi 60 = WITA), 4 group, 5 sub group (`need_satker` 1/2),
+     * 4 kelas jabatan dengan tukin contoh dari salinan lokal (kelas 7/9/11/13), 4 jabatan (struktural ber-satker, JF/pelaksana
+     * tanpa satker). Nama contoh [I] (data produksi belum ada); ID kecil, bukan ID hard-coded legacy (G-02 Bagian 2.8).
+     */
+    private function seedG02(): void
+    {
+        $this->db->table('unit')->insertBatch([
+            ['id_unit' => 1, 'unit' => 'Sekretariat Kementerian', 'is_upt' => 0, 'order' => 1, 'status' => 1],
+            ['id_unit' => 2, 'unit' => 'Deputi Bidang Sumber Daya dan Kelembagaan', 'is_upt' => 0, 'order' => 2, 'status' => 1],
+        ]);
+
+        $this->db->table('satker')->insertBatch(array_map(static fn (array $r): array => [
+            'id_satker' => $r[0], 'id_unit' => $r[1], 'satker' => $r[2], 'zonasi' => $r[3], 'is_upt' => $r[4], 'order' => $r[5], 'status' => 1,
+        ], [
+            [1, 1, 'Biro Sumber Daya Manusia', 0, 0, 1],
+            [2, 1, 'Biro Umum', 0, 0, 2],
+            [3, 2, 'Politeknik Pariwisata Makassar', 60, 1, 1],
+        ]));
+
+        $this->db->table('group_jabatan')->insertBatch([
+            ['id_group_jabatan' => 1, 'group_jabatan' => 'Struktural', 'order' => 1, 'status' => 1],
+            ['id_group_jabatan' => 2, 'group_jabatan' => 'Fungsional', 'order' => 2, 'status' => 1],
+            ['id_group_jabatan' => 3, 'group_jabatan' => 'Pelaksana', 'order' => 3, 'status' => 1],
+            ['id_group_jabatan' => 4, 'group_jabatan' => 'Kabinet', 'order' => 4, 'status' => 1],
+        ]);
+
+        $this->db->table('sub_group_jabatan')->insertBatch(array_map(static fn (array $r): array => [
+            'id_sub_group_jabatan' => $r[0], 'id_group_jabatan' => $r[1], 'sub_group_jabatan' => $r[2], 'need_satker' => $r[3], 'order' => $r[4], 'status' => 1,
+        ], [
+            [1, 1, 'Pimpinan Tinggi Pratama', 1, 1],
+            [2, 1, 'Administrator', 1, 2],
+            [3, 2, 'Fungsional Keahlian', 2, 1],
+            [4, 3, 'Pelaksana', 2, 1],
+            [5, 4, 'Staf Khusus Menteri', 2, 1],
+        ]));
+
+        $this->db->table('kelas_jabatan')->insertBatch([
+            ['kelas_jabatan' => 7, 'tukin' => 5079200, 'status' => 1],
+            ['kelas_jabatan' => 9, 'tukin' => 6335750, 'status' => 1],
+            ['kelas_jabatan' => 11, 'tukin' => 8757600, 'status' => 1],
+            ['kelas_jabatan' => 13, 'tukin' => 10936000, 'status' => 1],
+        ]);
+
+        $this->db->table('jabatan')->insertBatch(array_map(static fn (array $r): array => [
+            'id_jabatan' => $r[0], 'id_group_jabatan' => $r[1], 'id_sub_group_jabatan' => $r[2], 'id_satker' => $r[3], 'kelas_jabatan' => $r[4], 'jabatan' => $r[5], 'status' => 1,
+        ], [
+            [1, 1, 1, 1, 13, 'Kepala Biro Sumber Daya Manusia'],
+            [2, 1, 2, 1, 11, 'Kepala Bagian Mutasi'],
+            [3, 2, 3, null, 9, 'Analis Sumber Daya Manusia Aparatur Ahli Pertama'],
+            [4, 3, 4, null, 7, 'Pengadministrasi Perkantoran'],
+        ]));
+    }
+    // --- /DBV-008 ---
+
+    // --- DBV-018 (method) ---
+    /**
+     * G-02 sisa (DBV-018/CR-032): 8 jenjang JF (4 Ahli, 4 Terampil; dirujuk FK jabatan.id_jenjang_jf), 3 rumpun, 4 sub
+     * rumpun (2 per rumpun 1 & 2), 3 jabatan akademik, 2 periode struktur. Nama contoh [I] (data produksi tidak ada di
+     * repo); ID kecil.
+     */
+    private function seedG02b(): void
+    {
+        $this->db->table('jenjang_jf')->insertBatch(array_map(static fn (array $r): array => [
+            'id_jenjang_jf' => $r[0], 'kategori_jf' => $r[1], 'jenjang_jf' => $r[2], 'extra_nama_jab' => $r[2], 'order' => $r[3], 'status' => 1,
+        ], [
+            [1, 'Ahli', 'Ahli Pertama', 1],
+            [2, 'Ahli', 'Ahli Muda', 2],
+            [3, 'Ahli', 'Ahli Madya', 3],
+            [4, 'Ahli', 'Ahli Utama', 4],
+            [5, 'Terampil', 'Pemula', 1],
+            [6, 'Terampil', 'Terampil', 2],
+            [7, 'Terampil', 'Mahir', 3],
+            [8, 'Terampil', 'Penyelia', 4],
+        ]));
+
+        $this->db->table('rumpun_jabatan')->insertBatch([
+            ['id_rumpun_jabatan' => 1, 'rumpun_jabatan' => 'Manajemen', 'order' => 1, 'status' => 1],
+            ['id_rumpun_jabatan' => 2, 'rumpun_jabatan' => 'Pariwisata', 'order' => 2, 'status' => 1],
+            ['id_rumpun_jabatan' => 3, 'rumpun_jabatan' => 'Teknik', 'order' => 3, 'status' => 1],
+        ]);
+
+        $this->db->table('subrumpun_jabatan')->insertBatch(array_map(static fn (array $r): array => [
+            'id_subrumpun_jabatan' => $r[0], 'id_rumpun_jabatan' => $r[1], 'subrumpun_jabatan' => $r[2], 'order' => $r[3], 'status' => 1,
+        ], [
+            [1, 1, 'Manajemen Sumber Daya Manusia', 1],
+            [2, 1, 'Manajemen Keuangan', 2],
+            [3, 2, 'Pemasaran Pariwisata', 1],
+            [4, 2, 'Destinasi Pariwisata', 2],
+        ]));
+
+        $this->db->table('jabatan_akademik')->insertBatch([
+            ['id_jabatan_akademik' => 1, 'jabatan_akademik' => 'Asisten Ahli', 'is_atasan' => 2, 'status' => 1],
+            ['id_jabatan_akademik' => 2, 'jabatan_akademik' => 'Lektor', 'is_atasan' => 2, 'status' => 1],
+            ['id_jabatan_akademik' => 3, 'jabatan_akademik' => 'Guru Besar', 'is_atasan' => 1, 'status' => 1],
+        ]);
+
+        $this->db->table('periode_struktur_jabatan')->insertBatch([
+            ['id_periode_struktur_jabatan' => 1, 'periode_struktur_jabatan' => '2021', 'status' => 1],
+            ['id_periode_struktur_jabatan' => 2, 'periode_struktur_jabatan' => '2024', 'status' => 1],
+        ]);
+    }
+    // --- /DBV-018 ---
 }

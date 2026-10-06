@@ -2,9 +2,9 @@
 
 Service/business logic modul ini (`App\Libraries\Kepegawaian\*`). Kalkulasi, business rule, dan scoping data (mis. per satker) ditulis di sini — bukan di Controller/Filter (ADR-005).
 
-## Kalkulasi murni (`Kalkulasi/`, CR-025, B-21)
+## Kalkulasi murni (`Kalkulasi/`, CR-025 + CR-036, B-21)
 
-Aturan tanggal Kepegawaian yang **tidak butuh tabel baru**: periode KP, jarak KGB, akhir hukuman disiplin, dan masa kerja golongan. Semua kelas `final` dengan method statis, **tanpa DB, HTTP, session, atau jam**, kecuali `TanggalBisnis::hariIni()` (K-CR025-1; dijaga `KalkulasiMurniTest`). Tanpa migration dan tanpa perubahan FE. Service ber-DB (B-08/B-09/B-14/B-19) memanggil kelas ini lalu memetakan hasil gagal ke 422.
+Aturan tanggal Kepegawaian yang **tidak butuh tabel baru**: periode KP, jarak KGB, akhir hukuman disiplin, dan masa kerja golongan (CR-025), ditambah BUP dan TMT pensiun (CR-036). Semua kelas `final` dengan method statis, **tanpa DB, HTTP, session, atau jam**, kecuali `TanggalBisnis::hariIni()` (K-CR025-1; dijaga `KalkulasiMurniTest`). Tanpa migration dan tanpa perubahan FE. Service ber-DB (B-08/B-09/B-14/B-19) memanggil kelas ini lalu memetakan hasil gagal ke 422.
 
 Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[V2]** = aturan baru dari dokumen v2 (SRS/FSD/MTC), yang tidak ada di legacy.
 
@@ -18,6 +18,7 @@ Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[
 | `JenisReferensiTmt`, `ReferensiTmt` | acuan jarak KGB (KGB > KP > CPNS > awal PPPK bila TMT sama) |
 | `HukumanDisiplin` | `masaBerlaku`, `hitungTanggalBerakhir`, `validasiTanggalBerakhir`, `masaTeks` |
 | `MasaKerja` | `selisih`, `tambah` (MKG), `tmtCpnsDariNip`, `format` ("02 Tahun 05 Bulan") |
+| `Pensiun` (CR-036) | `batasUsia` (BUP 58/60/`umur_pensiun` jabatan), `tanggalPensiun` (tanggal 1 bulan sesudah ulang tahun ke-BUP) |
 
 ### Aturan tanggal bisnis dan zona waktu (wajib untuk B-08/B-09/B-14/B-19)
 
@@ -37,10 +38,12 @@ Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[
 | Proyeksi KGB | `next_kgb` (`L_employee.php:4023-4045`): < 24 bl → acuan + 2 th; 24–36 bl → hari ini; > 36 bl → acuan + 4 th lalu + 2 th sampai ≥ sekarang. Acuan = KGB terakhir, diganti TMT CPNS (PNS) atau TMT jabatan (PPPK) bila lebih baru (:3984-4020); **KP tidak dipakai** | — | `proyeksiBerikutnya($acuan, TanggalBisnis::hariIni())`, `detail.status` ∈ `belum_jatuh_tempo`/`jatuh_tempo`/`siklus_terlewat` |
 | Akhir hukdis | Manual: `masa_hukuman` teks + `akhir_hukdis` wajib diisi (`libraries/hr/rwy/L_hukdis.php:400-407`); SIASN mengisi dari SK (`controllers/hr/services/Siasn.php:2940-2946`) | SRS-FR-027 + MTC-021: TMT + masa sanksi; K5b: masa SK diutamakan, lalu `jenis_hukdis.masa_sanksi_bulan` | `hitungTanggalBerakhir($tmt, $masaSk, $masaBawaan)`; keduanya NULL → `tanpa_masa` (akhir manual, `validasiTanggalBerakhir`: harus > TMT) |
 | Masa kerja golongan | Kalender murni: MKG lama + bulan penuh TMT lama → baru (`L_employee.php:2673-2698`); tanpa MKG lama dari NIP digit 9–14 | — | `MasaKerja::tambah`, `tmtCpnsDariNip`, `format` (`helpers/function_helper.php:270-275`) |
+| BUP dan TMT pensiun (CR-036) | `getTanggalPensiun` (`helpers/function_helper.php:2400-2418`): `jabatan.umur_pensiun` > 0, selain itu Struktural Eselon I/II 60, selain itu 58; hasil = lahir + BUP tahun + 1 bulan, format `Y-m-01`. Hanya PNS (`L_employee.php:1226-1273`, dashboard `L_user.php:705-720`); PPPK memakai `mhpk_akhir` (:2207-2225) | SRS-FR-033, FSD-FN-H-08: proyeksi usia 58/60/65 sesuai jenis jabatan | `Pensiun::batasUsia`, `tanggalPensiun` (dari awal bulan lahir) |
 
 **Deviasi terdokumentasi dari legacy** (K-CR025-3, K-CR025-8):
 - Selisih bulan penuh konsisten dengan penjepitan (`2024-02-29` → `2026-02-28` = 24 bulan; `DateTime::diff` legacy = 23). Berbeda hanya bila hari awal 29–31; TMT legacy praktis selalu tanggal 1.
 - Proyeksi KGB tanpa jam: bila acuan + 4 tahun = hari ini, hasilnya hari ini (legacy meloncat 2 tahun karena membandingkan dengan jam). Acuan di masa depan → acuan + 2 tahun dengan masa 0/0 (legacy memakai selisih absolut).
+- TMT pensiun (CR-036, K-CR036-6): legacy meluap untuk tanggal lahir 29–31 dan terlambat satu bulan (31-01-1968 + 58 → legacy 01-03-2026, v2 01-02-2026; 29-02-1968 → legacy 01-04-2026, v2 01-03-2026; 31-03-1968 → legacy 01-05-2026, v2 01-04-2026). Untuk tanggal lahir 1–28 hasilnya identik (diuji 1950–1975 × BUP 58/60/65).
 
 ### Dua jenis kesalahan (K-CR025-4)
 
@@ -79,11 +82,82 @@ Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[
 - **B-14 hukdis**: `akhir_hukdis` kosong → `HukumanDisiplin::hitungTanggalBerakhir($tmt, $masaSk, $jenis->masa_sanksi_bulan)`; hasil `tanpa_masa` → akhir wajib manual atau boleh NULL (keputusan B-14/B-02); diisi manual → `validasiTanggalBerakhir`. Kolom masa numerik per SK di `riwayat_hukdis` (K5b) adalah keputusan skema B-02 (DB Validator).
 - **B-19/H-08**: `proyeksiReguler`, `proyeksiPercepatan`, `proyeksiBerikutnya` untuk dashboard/notifikasi. Syarat kelayakan KP (maks. golongan per pendidikan/eselon, `L_employee.php:1888-1906`) dan aturan cron kelipatan 4 tahun `get_all_kp` (:2560-2568) diputuskan di H-08.
 - ID `jenis_kp` 4 = "Pilihan" (`L_employee.php:2647`) belum tercatat di G-04 6.4; dicatat di dokumen B-08/B-01.
+- **Pensiun (CR-036)**: hanya untuk PNS (`id_jenis_pegawai = 1`). `Pensiun::tanggalPensiun($tglLahir, Pensiun::batasUsia($jabatan->umur_pensiun, $pmj->id_group_jabatan, $pmj->id_sub_group_jabatan))`, dengan jabatan dari snapshot `pegawai_mutasi_jabatan`. Sisa masa sampai pensiun: `MasaKerja::selisih(TanggalBisnis::hariIni(), $tmtPensiun)`. Dipakai prediksi dashboard (B-19/B-20), cron `rekomendasi_pensiun` (H-08), dan daftar pensiun (F-09). Pegawai tanpa jabatan aktif tidak diberi tanggal pensiun, sama dengan legacy `get_pensiun`.
 
 ### Test
 
-`tests/unit/Kepegawaian/Kalkulasi/` (tanpa DB; konvensi `tests/unit` untuk kelas murni — test ber-DB B-21 seperti cascade NIP dan snapshot sync ada di `tests/Kepegawaian/`):
+`tests/unit/Kepegawaian/Kalkulasi/` dan `tests/unit/Kepegawaian/Nip/` berjalan tanpa DB, sesuai konvensi `tests/unit` untuk kelas murni. Test ber-DB B-21, seperti cascade NIP dan snapshot sync, ada di `tests/Kepegawaian/`. `KalkulasiMurniTest` menjaga kedua folder murni.
 
 ```bash
 cd backend && vendor/bin/phpunit --no-coverage tests/unit/Kepegawaian
 ```
+
+## Registry kolom NIP dan format NIP (`Nip/`, CR-036, B-06)
+
+Bahan murni untuk koreksi NIP (B-06), disiapkan lebih awal sebagai pengecualian urutan fase yang disetujui user pada 01-10-2026. Tidak ada migration, endpoint, atau FE. PK `pegawai` adalah `nip` VARCHAR(30) (K1), dan FK v2 memakai `ON UPDATE RESTRICT`. Karena itu B-06 (`NipCascadeService`) menjalankan koreksi dalam **satu transaksi**: salin baris `pegawai` ke NIP baru, arahkan ulang setiap kolom di registry, lalu hapus baris lama. Legacy cukup menjalankan `UPDATE pegawai SET nip`, karena FK-nya `ON UPDATE CASCADE` (`libraries/hr/L_employee.php:586-587`).
+
+Label sumber registry: **[K]** = DDL dump struktur produksi 01-10-2026 (D1, 285 tabel), **[K-kode]** = kode legacy (path relatif ke `application/`), **[V2]** = dokumen v2. Di bagian Kalkulasi di atas, [K] berarti kode legacy.
+
+| Kelas | Isi |
+|---|---|
+| `TabelAnakNip` | Registry statis 79 entri. Method: `semua`, `perFase(n)`, `sampaiFase(n)` (cakupan B-06 setelah fase n selesai), `perJenis`, `perKeberadaan` |
+| `RujukanNip` | Satu entri: `tabel`, `kolom` (nama legacy), `kolomDiV2()`, `jenis`, `sumber`, `namaFkLegacy`, `nullable` (legacy), `keberadaan`, `fase`, `pemilik` (task migration), `catatan`, `kunci()` |
+| `JenisRujukanNip` | `FkLegacy`, `NonFkUbahNipLegacy`, `NonFkSlipGaji`, `NonFkFkV2`; `diubahLegacy()` |
+| `KeberadaanV2` | `Ada` (fase dan pemilik diketahui), `TidakDiimpor`, `BelumDiputuskan` |
+| `FormatNip` | `valid` (1–18 digit ASCII), `periksa` (input → `HasilKalkulasi`, kode `nip_wajib`/`nip_tidak_valid`), `periksaKoreksi` (B-06, kode `nip_lama_wajib`/`nip_baru_sama`) |
+
+### Isi registry
+
+| Jenis | Jumlah | Sumber | Ubah NIP legacy |
+|---|---|---|---|
+| FK legacy `REFERENCES pegawai (nip)` | 75 kolom, 70 tabel | [K]; semuanya `ON UPDATE CASCADE`, nama FK legacy dicatat per entri | Ikut berubah (cascade) |
+| Non-FK yang diganti kode Ubah NIP | 1 (`pengguna.username`) | [K-kode] `L_employee.php:589-599`: `username` = NIP baru, ditambah reset `password` = md5(NIP baru) dan `password_decode` | Ikut berubah (kode) |
+| Non-FK Slip Gaji | 1 (`gaji_pegawai.nip`) | [K] tanpa FK, `UNIQUE (nip, bulan, tahun)` | **Tidak** berubah, sehingga slip lama yatim |
+| Non-FK yang wajib FK di v2 | 2 (`riwayat_cuti.nip_atasan_langsung`, `nip_yang_menyetujui`) | [K] tanpa FK, VARCHAR(50); [V2] DoD C-01 (`04-Layanan.md:21`), SRS :161 | **Tidak** berubah |
+
+Status v2 per entri berasal dari `0x-*.md`, Mapping Migrasi, dan draf DBV-012/DBV-013. Draf itu baru pra-review internal dan belum disetujui DB Validator.
+
+| Keberadaan | Jumlah | Rincian |
+|---|---|---|
+| `Ada` | 61 | Fase 0: 1 (`token`, F0-06) · Fase 1: 2 (`pengguna.id_pegawai` → `pengguna.nip`, `pengguna.username`; A-01) · Fase 2: 2 (`faq_rate` G-10, `user_lokasi_presensi` G-03) · Fase 3: 40 (B-01: 16, B-02: 24, sama dengan registry draf DBV-012/013 revisi D1, termasuk `pegawai_ak_siasn` dari keputusan DBV-012 8 #6 yang belum disetujui) · Fase 4: 8 (C-01) · Fase 5: 2 (`dh_online`, `gaji_pegawai`; D-01) · Fase 6: 1 (`esign_hist`, H-01) · Fase 7: 5 (F-01) |
+| `TidakDiimpor` | 11 | Tabel cadangan bertanggal (2), `riwayat_lckh_2019..2022` (8 kolom), dan `riwayat_layanan` yang tidak dipakai kode legacy |
+| `BelumDiputuskan` | 7 | `email_pool`, `email_retry`, `email_sent`, `layanan_pegawai`, `login_mysapk`, `riwayat_cuti_notif_kt`, `user_geo` |
+
+`sampaiFase(3)` = 45 entri, yaitu cakupan B-06 di Fase 3. Fase berikutnya menambah entri tanpa mengubah kode B-06. Kecocokan registry dengan skema nyata (`information_schema.KEY_COLUMN_USAGE` dan kolom NIP tanpa FK) **menyusul sebagai test ber-DB B-21** di `tests/Kepegawaian/` setelah tabel B-01/B-02 ada. Test unit `TabelAnakNipTest` hanya memeriksa kelengkapan data: tidak ada duplikat, label sumber, nama FK, fase/pemilik, dan jumlah per kategori.
+
+### Kolom NIP tanpa FK di luar registry (keputusan B-06)
+
+Legacy tidak mengganti kolom-kolom ini saat Ubah NIP. Kolom ini masuk registry hanya bila B-06 memutuskan untuk ikut mengoreksinya:
+- Tabel v2 Fase 3 (draf DBV-013, tetap tanpa FK): `riwayat_skp.nip_penilai`, `riwayat_skp.nip_atasan_penilai`, `riwayat_skp_periodik.nip`, `riwayat_skp_periodik.pegawai_atasan_nip`.
+- Tabel v2 lain menurut Mapping Migrasi: `petugas_layanan.nip` (Tier 3, C-01 menurut draf DBV-012), `inbox.nip` (C-01), `firebase_token.nip` (H-01, disiapkan kosong), `simapi_update.nip` (H-01, log).
+- Jejak di `main` (A-01): `audit_logs.nip_actor` (D-8), `login_attempts.username`, `forgot_attempts.username` (legacy `forgot_attempts.nip`), dan `token.nip` (terdaftar sebagai FK legacy, tetapi di v2 menjadi jejak D-7).
+- Bukan rujukan: `pegawai.nip_lama`, `pegawai_hist.nip_lama` (NIP lama).
+- Tabel legacy lain yang tidak ada di Mapping (17 kolom): `absen_real`, `andr_topic_queue`, `dh_online_coordinate`, `fd_dig`, `firebase_message_logs`, `form_kesehatan`, `ina`, `jabatan_koordinasi`, `jabatan_plt.nip_plt`, `kda_pegawai`, `pa_layanan`, `peg_email`, `pegawai_jabatan`, `riwayat_jabatan`, `riwayat_mutasi_req`, `siasn_upload_arsip`, `simapi_ch`. Ditambah 103 kolom bernama NIP di tabel cadangan, staging, dan uji (`*_YYYYMMDD`, `d_*`, `test_*`, `sapk_*_src`).
+
+Di dump D1, cabang trigger yang bereaksi pada perubahan NIP (`IF OLD.nip != NEW.nip` di `pegawai_afUpd` dan `riwayat_*_afUpd`) hanya menentukan NIP mana yang ditulis ke log sinkron SIMAPI (`simapi_update`, `simapi_ch`). Cabang itu tidak mengubah kolom NIP di tabel lain. Log ini tidak di-port ke B-06; perannya diputuskan di H-05..H-07.
+
+### Format NIP
+
+Aturannya sama dengan akun DBV-010: angka ASCII saja, 1–18 digit. NIP PNS 18 digit, NIK 16 digit pegawai Non-PNS, dan nomor pendek pegawai lama semuanya diterima. Spasi di ujung dibuang. Nilai yang bukan string, misalnya angka JSON yang kehilangan nol di depan atau array, ditolak dengan 422, bukan 500. Legacy tidak memvalidasi format di server: Ubah NIP hanya memakai inputmask 18 digit (`views/hr/employee/form_nip.php:62`) dan menolak isian kosong (`L_employee.php:561-568`).
+
+Auth sudah memegang aturan ini di `PenggunaModel::NIP_MAX_DIGITS`, `UserService::validateNip()` (private), dan `AccountProvisioner`. Tidak ada versi publik yang bisa dipanggil kelas murni. Karena itu `FormatNip` menjadi pintu Kepegawaian, dan `FormatNipTest::testSelarasDenganAturanAkunAuth` membandingkan konstanta serta perilaku `UserService::validateNip` pada kasus batas. Bila salah satu berubah, test gagal. Auth tidak diubah di CR-036.
+
+### Keputusan rancangan CR-036 (pra-review internal sisi CR)
+
+| # | Keputusan |
+|---|---|
+| K-CR036-1 | Registry = data statis murni di `Nip/`, dijaga `KalkulasiMurniTest`. Nama tabel/kolom legacy dipakai apa adanya; kecocokan dengan skema nyata diuji test ber-DB B-21 |
+| K-CR036-2 | Cakupan: FK legacy (75), non-FK yang diganti Ubah NIP legacy (1), `gaji_pegawai.nip` (1), dan non-FK legacy yang wajib FK di v2 (2). Kolom NIP non-FK lain masuk setelah ada keputusan B-06 |
+| K-CR036-3 | Keberadaan v2 hanya diisi dari dokumen (`0x-*.md`, Mapping Migrasi, draf DBV-012/013). Yang tidak tertulis berstatus `BelumDiputuskan`, tidak ditebak |
+| K-CR036-4 | Format NIP = aturan akun DBV-010, tanpa memuat Model. Keselarasan dengan Auth dijaga test; penyatuan kode Auth ke `FormatNip` ditunda ke CR terpisah |
+| K-CR036-5 | Cek murni koreksi NIP: NIP lama wajib; NIP baru wajib, formatnya valid, dan berbeda dari NIP lama. Keunikan NIP baru di `pegawai` (legacy :569-575) dan sebagai `username` akun lain (ISSUE-023) dicek service ber-DB |
+| K-CR036-6 | BUP setia legacy. TMT pensiun dihitung dari awal bulan lahir, sehingga deviasi tanggal 29–31 di atas terdokumentasi. Hanya untuk PNS; pemanggil yang menyaring |
+
+### Pertanyaan terbuka CR-036 (keputusan user/SME/DBV)
+
+1. **`pengguna.username` saat koreksi NIP.** Legacy menimpa username tanpa syarat dan mereset password ke md5(NIP baru). Usulan: ganti username hanya bila username = NIP lama, dan jangan sentuh password (K4; `password_decode` tidak ada di v2).
+2. **`gaji_pegawai.nip` dan `riwayat_cuti.nip_atasan_langsung`/`nip_yang_menyetujui`.** Legacy tidak mengubahnya. Di v2, kedua kolom `riwayat_cuti` **wajib** ikut dikoreksi, karena FK RESTRICT akan menolak penghapusan baris pegawai lama. Untuk `gaji_pegawai`, usulannya ikut dikoreksi agar slip lama tetap terlihat pegawai (keputusan D-01: FK atau tidak).
+3. **Kolom non-FK di luar registry** (daftar di atas), terutama `riwayat_skp_periodik.nip` milik pegawai sendiri. Usulan: diputuskan per kolom di B-06 bersama DBV-013. Kolom jejak (`audit_logs.nip_actor`, `token.nip`, `*_attempts.username`) tidak diubah.
+4. **Tujuh tabel `BelumDiputuskan`** perlu keputusan impor: email legacy, `layanan_pegawai`, `login_mysapk`, `riwayat_cuti_notif_kt` (Mapping: masuk inbox), dan `user_geo`.
+5. **Penyatuan registry.** Draf DBV-012 punya konstanta registry sendiri di `NipReferenceRegistryTest`. Usulan: setelah draf itu masuk, test tersebut membaca `TabelAnakNip::sampaiFase(3)`.
+6. **Pensiun PPPK.** Legacy memakai akhir masa perjanjian kerja (`mhpk_akhir`), bukan BUP. Ini perlu dikonfirmasi untuk dashboard v2.

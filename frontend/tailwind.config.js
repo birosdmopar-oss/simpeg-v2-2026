@@ -51,6 +51,8 @@ export default {
         card: '0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06)',
         panel: '0 8px 24px -8px rgb(16 24 40 / 0.12)',
         float: '0 12px 32px -12px rgb(28 57 100 / 0.28)',
+        // Pemisah kolom yang menempel di kanan tabel (kolom Aksi sticky, CR-038) saat ada isi tergulir di bawahnya.
+        'sticky-end': '-8px 0 8px -8px rgb(16 24 40 / 0.18)',
       },
       transitionDuration: {
         DEFAULT: '150ms',

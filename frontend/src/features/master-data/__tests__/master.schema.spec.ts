@@ -123,6 +123,27 @@ describe('buildMasterSchema', () => {
     expect(noParent.success).toBe(false)
     if (!noParent.success) expect(noParent.error.issues[0]?.path[0]).toBe('id_kecamatan')
   })
+
+  it('pesan induk kosong memakai label master induk, bukan "Induk wajib dipilih." (CR-038, F-UI-3)', () => {
+    const labelled = [{ ...kab, label: 'Kabupaten/Kota' }, { ...kec, label: 'Kecamatan' }]
+    for (const [child, field, expected] of [
+      [kec, 'id_kabupaten_kota', 'Kabupaten/Kota wajib dipilih.'],
+      [kel, 'id_kecamatan', 'Kecamatan wajib dipilih.'],
+    ] as const) {
+      for (const value of ['', undefined]) {
+        const result = buildMasterSchema(child, true, labelled).safeParse({ [child.name_field]: 'Nama', [field]: value })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          const issue = result.error.issues.find((i) => i.path[0] === field)
+          expect(issue?.message).toBe(expected)
+        }
+      }
+    }
+    // Meta induk tidak tersedia (cadangan): tetap berpesan, dengan kata "Induk".
+    const fallback = buildMasterSchema(kel, true).safeParse({ kelurahan: 'Petojo', id_kecamatan: '' })
+    expect(fallback.success).toBe(false)
+    if (!fallback.success) expect(fallback.error.issues[0]?.message).toBe('Induk wajib dipilih.')
+  })
 })
 
 describe('ancestorChain', () => {

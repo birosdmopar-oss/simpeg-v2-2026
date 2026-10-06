@@ -5,137 +5,62 @@ declare(strict_types=1);
 namespace Tests\Unit\Kepegawaian\Kalkulasi;
 
 use CodeIgniter\Test\CIUnitTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\Libraries\PemindaiKemurnian;
 
 /**
- * CR-025 (K-CR025-1) — penjaga arsitektur: kelas di `app/Libraries/Kepegawaian/Kalkulasi/` murni (tanpa DB, HTTP,
- * session, atau jam). Jam hanya boleh dibaca `TanggalBisnis::hariIni()` lewat `Time::now()`. Komentar diabaikan (dipindai
- * per token), dan pemindai diuji dulu dengan contoh pelanggaran agar penjaga ini tidak lolos karena kosong.
+ * CR-025 (K-CR025-1) — penjaga arsitektur: kelas di `app/Libraries/Kepegawaian/Kalkulasi/` dan (CR-036)
+ * `app/Libraries/Kepegawaian/Nip/` murni (tanpa DB, HTTP, session, jam, angka acak, lingkungan, atau I/O).
+ *
+ * CR-040 (U-8): pemindai dipindah ke `Tests\Support\Libraries\PemindaiKemurnian` (uji dirinya di
+ * `Tests\Unit\Libraries\PemindaiKemurnianTest`) dengan daftar larangan gabungan ketiga modul. Pengecualian modul ini:
+ * jam hanya boleh dibaca `TanggalBisnis::hariIni()` lewat `Time::now()` (impor `CodeIgniter\I18n\Time` hanya di
+ * `TanggalBisnis.php`); `::createFromFormat` tetap dilarang seluruhnya.
  *
  * @internal
  */
 final class KalkulasiMurniTest extends CIUnitTestCase
 {
     /**
-     * Fungsi global yang membaca jam/zona, DB, atau konteks request.
+     * Folder kelas murni → jumlah berkas minimum (penjaga tidak boleh lolos karena folder kosong/salah path).
      */
-    private const FUNGSI_TERLARANG = [
-        'date', 'gmdate', 'time', 'mktime', 'strtotime', 'microtime', 'hrtime', 'date_create', 'date_default_timezone_get',
-        'date_default_timezone_set', 'cal_days_in_month', 'db_connect', 'model', 'session', 'service', 'request',
+    private const FOLDER_MURNI = [
+        'Kalkulasi' => 10, // CR-025 (9) + CR-036 Pensiun
+        'Nip'       => 5,  // CR-036
     ];
 
     /**
-     * Potongan nama kelas/namespace yang menandakan akses DB/HTTP/session.
+     * @return iterable<string, array{string, int}>
      */
-    private const NAMA_TERLARANG = ['Database', 'Model', 'Session', 'Request', 'Services', 'Cache'];
-
-    public function testSemuaKelasKalkulasiMurni(): void
+    public static function folderMurni(): iterable
     {
-        $berkas = glob(APPPATH . 'Libraries/Kepegawaian/Kalkulasi/*.php');
-
-        $this->assertIsArray($berkas);
-        $this->assertGreaterThanOrEqual(9, count($berkas), 'Kelas kalkulasi CR-025 tidak ditemukan');
-
-        $pelanggaran = [];
-
-        foreach ($berkas as $path) {
-            $kode = file_get_contents($path);
-            $this->assertIsString($kode);
-
-            array_push($pelanggaran, ...self::pindai($kode, basename($path)));
+        foreach (self::FOLDER_MURNI as $folder => $minimum) {
+            yield $folder => [$folder, $minimum];
         }
-
-        $this->assertSame([], $pelanggaran);
     }
 
-    public function testPemindaiMenangkapPelanggaran(): void
+    #[DataProvider('folderMurni')]
+    public function testSemuaKelasKalkulasiMurni(string $folder, int $minimum): void
     {
-        $contoh = <<<'PHP'
-            <?php
-            // date('Y') di komentar diabaikan
-            use CodeIgniter\Database\BaseConnection;
-            use CodeIgniter\I18n\Time;
-            final class Contoh {
-                public function a(): string { return date('Y-m-d') . strtotime('now'); }
-                public function b(): string { return Time::now('UTC')->format('Y-m-d'); }
-                public function c(): void { $db = db_connect(); $m = model('X'); }
-                public function d(): string { return (new \DateTime('now'))->format('Y'); }
-                public function e(): int { return $this->time() + self::date(); }
-            }
-            PHP;
+        $hasil = self::pemindai()->pindaiFolder(APPPATH . "Libraries/Kepegawaian/{$folder}");
 
-        $hasil = self::pindai($contoh, 'Contoh.php');
-
-        foreach (['date()', 'strtotime()', 'db_connect()', 'model()', 'CodeIgniter\Database\BaseConnection', 'Time::now', 'new \DateTime'] as $harapan) {
-            $this->assertNotEmpty(
-                array_filter($hasil, static fn (string $p): bool => str_contains($p, $harapan)),
-                "Pemindai tidak menangkap {$harapan}: " . implode('; ', $hasil),
-            );
-        }
-
-        // Pemanggilan method bernama sama ($this->time(), self::date()) dan komentar bukan pelanggaran.
-        $this->assertCount(1, array_filter($hasil, static fn (string $p): bool => str_contains($p, 'date()')));
-        $this->assertSame([], array_filter($hasil, static fn (string $p): bool => str_contains($p, 'time()') && ! str_contains($p, 'strtotime()')));
-
-        // Time::now di luar hariIni() TanggalBisnis tetap pelanggaran walau di berkas TanggalBisnis.
-        $this->assertNotSame([], self::pindai("<?php\nfunction lain() { return Time::now(); }", 'TanggalBisnis.php'));
+        $this->assertGreaterThanOrEqual($minimum, $hasil['jumlahBerkas'], "Kelas murni di {$folder}/ tidak ditemukan");
+        $this->assertSame([], $hasil['pelanggaran']);
     }
 
-    /**
-     * @return list<string>
-     */
-    private static function pindai(string $kode, string $namaBerkas): array
+    public function testPengecualianHanyaTimeNowDiHariIniTanggalBisnis(): void
     {
-        $token = array_values(array_filter(
-            token_get_all($kode),
-            static fn ($t): bool => ! is_array($t) || ! in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true),
-        ));
+        $pemindai = self::pemindai();
 
-        $pelanggaran = [];
-        $fungsi      = null;
+        $this->assertSame([], $pemindai->pindai("<?php\nuse CodeIgniter\\I18n\\Time;\nfunction hariIni(\$s = null) { return Time::now(); }", 'TanggalBisnis.php'));
+        $this->assertSame([], $pemindai->pindai("<?php\nfunction hariIni(\$s = null) { return \\CodeIgniter\\I18n\\Time::now(); }", 'TanggalBisnis.php'));
+        $this->assertNotSame([], $pemindai->pindai("<?php\nfunction lain() { return Time::now(); }", 'TanggalBisnis.php'));
+        $this->assertNotSame([], $pemindai->pindai("<?php\nfunction hariIni(\$s = null) { return Time::now(); }", 'Pensiun.php'));
+        $this->assertNotSame([], $pemindai->pindai("<?php\n\$d = \\DateTimeImmutable::createFromFormat('!Y-m-d', \$t);", 'Pensiun.php'));
+    }
 
-        foreach ($token as $i => $t) {
-            if (! is_array($t)) {
-                continue;
-            }
-
-            [$id, $teks, $baris] = $t;
-            $sebelum             = $token[$i - 1] ?? null;
-            $sesudah             = $token[$i + 1] ?? null;
-            $lokasi              = "{$namaBerkas}:{$baris}";
-
-            if ($id === T_FUNCTION && is_array($sesudah) && $sesudah[0] === T_STRING) {
-                $fungsi = $sesudah[1];
-            }
-
-            $pemanggilanMethod = is_array($sebelum)
-                && in_array($sebelum[0], [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION], true);
-
-            if ($id === T_STRING && $sesudah === '(' && ! $pemanggilanMethod
-                && in_array(strtolower($teks), self::FUNGSI_TERLARANG, true)) {
-                $pelanggaran[] = "{$lokasi} {$teks}()";
-            }
-
-            if (in_array($id, [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true) && ! $pemanggilanMethod) {
-                foreach (self::NAMA_TERLARANG as $nama) {
-                    if (preg_match('/(^|\\\\)' . $nama . '/', $teks) === 1) {
-                        $pelanggaran[] = "{$lokasi} {$teks}";
-                    }
-                }
-            }
-
-            if ($id === T_NEW && is_array($sesudah) && preg_match('/^\\\\?DateTime(Immutable)?$/', $sesudah[1]) === 1) {
-                $pelanggaran[] = "{$lokasi} new {$sesudah[1]}";
-            }
-
-            if ($id === T_STRING && $teks === 'Time' && is_array($sesudah) && $sesudah[0] === T_DOUBLE_COLON) {
-                $method = $token[$i + 2][1] ?? '';
-
-                if (! ($namaBerkas === 'TanggalBisnis.php' && $fungsi === 'hariIni' && $method === 'now')) {
-                    $pelanggaran[] = "{$lokasi} Time::{$method} di luar TanggalBisnis::hariIni()";
-                }
-            }
-        }
-
-        return $pelanggaran;
+    private static function pemindai(): PemindaiKemurnian
+    {
+        return new PemindaiKemurnian(izinTime: [['berkas' => 'TanggalBisnis.php', 'fungsi' => 'hariIni', 'method' => 'now']]);
     }
 }

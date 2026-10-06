@@ -120,6 +120,33 @@ final class UserInputShapeTest extends CIUnitTestCase
     }
 
     /**
+     * CR-038 (F-R1-1): angka JSON di field teks lolos penjaga bentuk lalu ditolak rule `string` StrictRules. Pesannya
+     * kini Bahasa Indonesia yang sama ("Isian harus berupa teks."), bukan bawaan CI4 "The name field must be a valid
+     * string.".
+     */
+    public function testNumberInTextFieldUsesIndonesianMessage(): void
+    {
+        $id     = $this->idOf(self::PEGAWAI_S01);
+        $before = $this->row($id);
+
+        foreach (['name', 'email', 'username', 'nip'] as $field) {
+            $body         = $this->validCreateBody();
+            $body[$field] = 123;
+
+            $created = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->post('api/v1/auth/users', $body);
+            $created->assertStatus(422);
+            $this->assertSame([$field => self::MESSAGE], $this->json($created)['errors'], "POST {$field} angka");
+
+            $updated = $this->asNip(self::SUPER_ADMIN)->withBodyFormat('json')->put('api/v1/auth/users/' . $id, [$field => 123]);
+            $updated->assertStatus(422);
+            $this->assertSame([$field => self::MESSAGE], $this->json($updated)['errors'], "PUT {$field} angka");
+        }
+
+        $this->dontSeeInDatabase('pengguna', ['nip' => self::NEW_NIP]);
+        $this->assertSame($before, $this->row($id));
+    }
+
+    /**
      * Nilai sah (angka bulat JSON untuk role, teks untuk status/unit/satker) tetap diterima.
      */
     public function testScalarValuesStillAccepted(): void

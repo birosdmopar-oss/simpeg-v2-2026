@@ -72,6 +72,34 @@ final class MasterRegistryTest extends CIUnitTestCase
         $this->assertSame('id_provinsi', $uji->field('provinsi_lain')?->otherFor);
     }
 
+    /**
+     * CR-026 (DBV-008): kelas jabatan = kode sebagai nama (PK alami TINYINT tanpa kolom nama) dengan rentang kode 1–20.
+     * Kode kanonik = bilangan bulat tanpa nol di depan ('07' bukan alias 7); kolom PK = kolom nama didaftarkan sekali.
+     */
+    public function testCodeAsNameWithIdRangeIsAccepted(): void
+    {
+        $kelas = (new MasterRegistry(new MasterDataConfig()))->get('kelas-jabatan');
+
+        $this->assertTrue($kelas->codeAsName);
+        $this->assertSame([1, 20], $kelas->idRange);
+        $this->assertSame($kelas->primaryKey, $kelas->nameField);
+
+        foreach (['7', '20', '99'] as $id) {
+            $this->assertTrue($kelas->isCanonicalId($id), $id);
+        }
+
+        foreach (['07', '0', '-1', '7a', ' 7', '7 '] as $id) {
+            $this->assertFalse($kelas->isCanonicalId($id), $id);
+        }
+
+        $this->assertSame(['kelas_jabatan', 'tukin', 'status'], $kelas->columns());
+        $this->assertSame([true, [1, 20], false], [$kelas->toMeta()['code_as_name'], $kelas->toMeta()['id_range'], $kelas->toMeta()['has_order']]);
+
+        // Master lain: code_as_name false, id_range null (kunci meta selalu ada).
+        $agama = (new MasterRegistry(new MasterDataConfig()))->get('agama');
+        $this->assertSame([false, null], [$agama->toMeta()['code_as_name'], $agama->toMeta()['id_range']]);
+    }
+
     public function testInconsistentConfigsAreRejected(): void
     {
         $cases = [
@@ -149,6 +177,25 @@ final class MasterRegistryTest extends CIUnitTestCase
             },
             'otherFor field kota_lain harus menunjuk field ref ber-allowSystem' => static function (MasterDataConfig $c): void {
                 $c->entities['uji'] = [...self::BASE, 'fields' => ['kota_lain' => ['label' => 'Kota Lainnya', 'otherFor' => 'tidak_ada']]];
+            },
+            // CR-026: kode sebagai nama & rentang kode angka.
+            'codeAsName hanya untuk master ber-kode manual dengan nameField = primaryKey' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'codeAsName' => true];
+            },
+            'master uji tidak valid: codeAsName hanya untuk master ber-kode manual' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'nameField' => 'id_uji', 'codeAsName' => true];
+            },
+            'nameField sama dengan primaryKey hanya boleh dengan codeAsName' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'autoIncrement' => false, 'nameField' => 'id_uji'];
+            },
+            'idRange hanya untuk kode manual tanpa idDigits' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'idRange' => [1, 20]];
+            },
+            'idRange master uji harus [min, max] bilangan bulat dengan 1 <= min <= max' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'autoIncrement' => false, 'idRange' => [0, 20]];
+            },
+            'idRange master uji harus [min, max]' => static function (MasterDataConfig $c): void {
+                $c->entities['uji'] = [...self::BASE, 'autoIncrement' => false, 'idRange' => [20, 1]];
             },
         ];
 

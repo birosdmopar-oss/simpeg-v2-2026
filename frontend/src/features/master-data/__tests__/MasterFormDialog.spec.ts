@@ -463,6 +463,20 @@ describe('MasterFormDialog — field ref berjenjang, boolean, urutan manual (CR-
       expect(Array.from(select('id_kecamatan').options).map((o) => o.textContent?.trim())).toContain('Gambir (3171010)')
       wrapper.unmount()
     })
+
+    it('tambah kecamatan tanpa induk → pesan memakai label induk "Kabupaten/Kota wajib dipilih." (CR-038, F-UI-3)', async () => {
+      const wrapper = mount(MasterFormDialog, {
+        props: { open: true, meta: { ...kecMeta, auto_increment: false }, allMeta: [provinsiMeta, kabMeta, kecMeta], row: null },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      await submitForm()
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Kabupaten/Kota wajib dipilih.'))
+      expect(document.body.textContent).not.toContain('Induk wajib dipilih.')
+      expect(masterService.create).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
   })
 
   it('edit: pilihan ref gagal dimuat → nilai tersimpan tetap dipertahankan tanpa ditandai non-aktif', async () => {
