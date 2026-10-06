@@ -636,7 +636,7 @@ class MasterData extends BaseConfig
         // --- /DBV-004 ---
 
         // --- DBV-005 (G-06 diklat, hukdis, konket, tanda jasa) ---
-        // G-06 (DBV-005/CR-012 ⏳). Legacy hr/master/c_diklat|c_hukdis|c_konket|c_tj (Lm_*.php), CRUD role 1; dropdown UL_ALL
+        // G-06 (DBV-005/CR-012 ✅, di main). Legacy hr/master/c_diklat|c_hukdis|c_konket|c_tj (Lm_*.php), CRUD role 1; dropdown UL_ALL
         // (riwayat B-11/B-13/B-14/B-17, presensi D-06). Skema: backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md.
         // Baris ber-ID hard-coded legacy (G-06 Bagian 2.6) sengaja tidak dikunci (B6). Kolom `order` TINYINT → orderColumnType.
         'diklat' => [
@@ -756,7 +756,7 @@ class MasterData extends BaseConfig
         // --- /DBV-005 ---
 
         // --- DBV-008 (G-02 jabatan, unit, satker) ---
-        // G-02 (DBV-008/CR-026 ⏳). Legacy hr/master/c_jabatan (Lm_jabatan.php), CRUD role 1; dropdown UL_ALL (ISSUE-012,
+        // G-02 (DBV-008/CR-026 ✅, di main lewat PR #17). Legacy hr/master/c_jabatan (Lm_jabatan.php), CRUD role 1; dropdown UL_ALL (ISSUE-012,
         // tanpa parameter `restrict` — usulan G-02 Bagian 8). Skema: backend/docs/db-review/G-02-jabatan-unit-satker-schema.md.
         // Baris ber-ID hard-coded legacy (G-02 Bagian 2.8) sengaja tidak dikunci. `peta_jabatan` dan tabel jabatan lain
         // → DBV-018 (blok di bawah, G-02b). Kolom audit keenam tabel = self::AUDIT (created_at/updated_at/updated_by [K] D1).
@@ -927,7 +927,7 @@ class MasterData extends BaseConfig
         // --- /DBV-008 ---
 
         // --- DBV-018 (G-02 sisa) ---
-        // G-02 sisa (DBV-018/CR-032 ⏳). Legacy hr/master/c_jabatan rumpun/subrumpun/jabaka/periode (Lm_jabatan.php), CRUD
+        // G-02 sisa (DBV-018/CR-032 ✅, di main lewat PR #18). Legacy hr/master/c_jabatan rumpun/subrumpun/jabaka/periode (Lm_jabatan.php), CRUD
         // role 1, dropdown UL_ALL. Skema: backend/docs/db-review/G-02b-jabatan-sisa-schema.md. Tabel DBV-018 lain
         // (`jenjang_jf` tanpa UI legacy; `peta_jabatan`, `struktur_jabatan`, `jabatan_koordinasi` tidak cocok engine
         // generik) tidak didaftarkan di sini — G-02b Bagian 2.9.
