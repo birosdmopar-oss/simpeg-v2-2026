@@ -108,6 +108,11 @@ describe('WebConfigView', () => {
 
     const input = document.body.querySelector<HTMLInputElement>('input[name="config_value"]')
     if (!input) throw new Error('input nilai tidak ada')
+    // Tata letak form admin redesign (CR-028 / ISSUE-007): grid form, field dan baris tombol dua kolom penuh.
+    const form = document.body.querySelector<HTMLFormElement>('form[data-testid="web-config-form"]')
+    expect(form?.classList).toContain('md:grid-cols-2')
+    expect(input.closest('form > *')?.classList).toContain('md:col-span-2')
+    expect(document.body.querySelector('form[data-testid="web-config-form"] button[type="submit"]')?.parentElement?.classList).toContain('md:col-span-2')
     input.value = '1,5'
     input.dispatchEvent(new Event('input'))
     dialogButton('Simpan').click()
