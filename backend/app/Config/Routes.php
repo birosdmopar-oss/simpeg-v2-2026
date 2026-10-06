@@ -90,6 +90,17 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
     });
     // --- /DBV-003 ---
 
+    // --- DBV-006 (G-09 web config) ---
+    // G-09 — Web Config key-value bertipe (DBV-006/CR-030): seluruh endpoint role 1 (Matriks Modul G
+    // `hr/master/web_config/*`). Tidak ada endpoint baca publik. (:any) karena key legacy boleh mengandung `/`.
+    $routes->group('web-config', ['namespace' => 'App\Controllers\Api\MasterData', 'filter' => ['jwt', Role::filter(...\App\Libraries\MasterData\WebConfigService::WRITE_ROLES)]], static function (RouteCollection $routes): void {
+        $routes->get('/', 'WebConfigController::index');
+        $routes->get('(:any)', 'WebConfigController::show/$1');
+        $routes->put('(:any)', 'WebConfigController::update/$1');
+        $routes->delete('(:any)', 'WebConfigController::delete/$1');
+    });
+    // --- /DBV-006 ---
+
     // ------------------------------------------------------------------
     // G-10 — FAQ untuk pegawai (DBV-002): baca = UL_ALL (wajib login, D8), rating = UL_PEGAWAI (2, 6, 7; U2).
     // Kelola konten: master/faq-topic|faq-sub-topic|faq-article (role 1). Tidak ada endpoint faq_related_article.

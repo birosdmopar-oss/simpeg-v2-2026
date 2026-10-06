@@ -141,7 +141,7 @@ G-04/G-05 ✅ = DBV-004/CR-011, disetujui DB Validator & review kode, di main le
 - `jenjang-pendidikan`: singkatan duplikat (case-insensitive, termasuk entri tidak aktif/dihapus) → 422 pada `jenjang_pendidikan_singkat`; `row_jurusan` hanya salah satu dari 7 kode (peka huruf; CHECK DB sebagai lapis kedua). Kolom `bobot_ipasn` tidak ada di form/meta/respons mana pun dan tidak bisa diubah lewat API.
 - `jurusan-pendidikan`: minimal satu flag jenjang bernilai 1, diperiksa saat tambah dan saat ubah yang menyentuh flag (flag terkini dibaca dengan kunci baris, jadi dua ubah bersamaan tidak bisa mematikan semua flag) → 422 `D_I` "Pilih minimal satu jenjang pendidikan.". **Dropdown berjenjang pendidikan:** `bidang-pendidikan/options` → `jurusan-pendidikan/options?parent={id_bidang_pendidikan}`; dropdown jurusan hanya memuat jurusan aktif yang bidangnya aktif (`statusChain`). Dropdown jurusan per jenjang (flag menurut `row_jurusan`) belum ada — dikerjakan bersama riwayat pendidikan (Fase 3).
 
-Master yang sudah ada di engine (tabel di atas): jabatan/unit/satker (G-02 ⏳, sebagian; rumpun, sub rumpun, jabatan akademik, periode struktur = DBV-018/CR-032 ⏳), kenaikan pangkat (G-04), pendidikan (G-05), diklat/hukdis/konket/tanda jasa (G-06), data umum & wilayah termasuk kantor dan kursem (G-07), jenis libur (G-08; hari libur sendiri lewat endpoint khusus `api/v1/hari-libur`, bawah), dan FAQ (G-10). Master lain (peta jabatan, struktur jabatan, dan jabatan koordinasi G-02 — tabelnya dibuat DBV-018 tetapi butuh halaman khusus; lokasi presensi G-03, web config G-09) menyusul setelah DDL legacy tersedia dan skemanya disetujui DB Validator — lihat `backend/docs/progress/02-MasterData.md`.
+Master yang sudah ada di engine (tabel di atas): jabatan/unit/satker (G-02 ⏳, sebagian; rumpun, sub rumpun, jabatan akademik, periode struktur = DBV-018/CR-032 ⏳), kenaikan pangkat (G-04), pendidikan (G-05), diklat/hukdis/konket/tanda jasa (G-06), data umum & wilayah termasuk kantor dan kursem (G-07), jenis libur (G-08; hari libur sendiri lewat endpoint khusus `api/v1/hari-libur`, bawah), dan FAQ (G-10). Web config (G-09) bukan master engine: endpoint khusus `api/v1/web-config` (bagian "Web Config" di bawah). Master lain (peta jabatan, struktur jabatan, dan jabatan koordinasi G-02 — tabelnya dibuat DBV-018 tetapi butuh halaman khusus; lokasi presensi G-03) menyusul setelah DDL legacy tersedia dan skemanya disetujui DB Validator — lihat `backend/docs/progress/02-MasterData.md`.
 
 G-02 ⏳ = DBV-008/CR-026, **menunggu review DB Validator** dan review kode (`backend/docs/db-review/G-02-jabatan-unit-satker-schema.md` Bagian 2.9). **Dropdown berjenjang G-02 (UL_ALL):** `unit/options` → `satker/options?parent={id_unit}` (satker aktif yang unitnya aktif); `group-jabatan/options` → `sub-group-jabatan/options?parent={id_group_jabatan}` (sub group aktif yang group-nya aktif); `jabatan/options?id_sub_group_jabatan=&id_satker=` (legacy `list_jabatan_sub_satker`; tanpa urutan, diurutkan nama); `kelas-jabatan/options` (`id` = `nama` = nomor kelas, urut numerik). Tanpa parameter `restrict` untuk Admin Satker (usulan G-02 Bagian 8, belum diputuskan).
 
@@ -292,6 +292,19 @@ Baris: `{ id_libur, id_jenis_libur, jenis_libur (nama, LEFT JOIN — null bila t
 - **Lapis DB:** UNIQUE `tgl_mulai` (1062) → 422 `tgl_mulai`; CHECK `chk_hari_libur_rentang` (3819 MySQL / 4025 MariaDB) → 422 `tgl_akhir` — diterjemahkan di service, bukan daftar global CR-007.
 - `updated_by` diisi saat tambah **dan** ubah (legacy `sp_holiday`; tabel tanpa `created_by`); audit create/update/delete.
 - **`HariLiburService::tanggalLibur(from, to)`** (tanpa endpoint): daftar tanggal `Y-m-d` unik & terurut dari hari libur **status 1** yang beririsan dengan [from, to], dipotong ke rentang itu. Satu-satunya sumber tanggal libur untuk presensi, tukin, uang makan, lama cuti, konket, dan LKH (Fase 5) — legacy membaca `hari_libur` tanpa filter.
+
+## Web Config (G-09, ✅ DBV-006/CR-030 disetujui DB Validator 06-10-2026, di main lewat PR #19)
+
+Key-value bertipe, **bukan** master engine (tanpa `order`/`status`). `WebConfigController` + `Libraries\MasterData\WebConfigService`, prefix `/api/v1/web-config`, **semua role 1** (Matriks Modul G `hr/master/web_config/*`). Tidak ada endpoint baca publik: modul lain membaca lewat `service('webConfigService')->value($key)` / `values()` (nilai bertipe, cache diinvalidasi setiap tulis). Katalog key + tipe: `Config\WebConfig`; skema & keputusan: `backend/docs/db-review/G-09-web-config-schema.md`.
+
+| Method | Path | Keterangan |
+|---|---|---|
+| GET | `/web-config` | `{ items }`: seluruh key katalog (urut katalog) lalu key tak dikenal hasil impor (urut nama) |
+| GET | `/web-config/{config_name}` | Satu key; tidak ada di katalog maupun tabel → 404 |
+| PUT | `/web-config/{config_name}` | `{ config_value, remark? }` → upsert (201 bila baris baru, 200 bila ubah). Nilai dinormalisasi per tipe; kosong/tipe salah → 422 `errors.config_value`; key tak dikenal yang ada di tabel → 422 (read-only) |
+| DELETE | `/web-config/{config_name}` | Hard delete baris → nilai kembali ke bawaan katalog; `{ deleted: true, item }`; tanpa baris → 404 |
+
+`config_name` legacy boleh mengandung `/` (`TL1/PSW1`), jadi route memakai `(:any)`; FE meng-encode tiap segmen terpisah. Item: `{ config_name, id_web_config, config_value, remark, updated_at, updated_by, is_default, known, label, group, type, description, default, effective, valid, personal, constraints }` — `effective` = nilai tersimpan bila sah, selain itu bawaan.
 
 ## G-TC → bukti otomatis
 
