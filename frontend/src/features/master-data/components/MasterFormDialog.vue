@@ -81,7 +81,10 @@ const JENIS_PEGAWAI_DIKECUALIKAN = '7'
 type ChoiceOption = { value: string; label: string }
 const aturanOptions = ref<Record<string, ChoiceOption[]>>({})
 const aturanOptionsLoading = ref(false)
-/** Unit/satker belum punya master di v2 (G-02): selama itu hanya "Seluruh Kementerian" yang bisa dipilih. */
+/**
+ * Opsi unit/satker (D-1, ikut legacy K-7) muncul bila master unit/satker (G-02) terdaftar; tanpa master itu hanya
+ * "Seluruh Kementerian" yang bisa dipilih.
+ */
 const unitSatkerAvailable = computed(() => props.allMeta.some((m) => m.key === 'unit' || m.key === 'satker'))
 
 /** Nilai JSON array tersimpan → daftar teks; nilai rusak/kosong → []. */
@@ -148,7 +151,11 @@ async function loadAturanOptions(): Promise<void> {
       target_uns: [
         SELURUH_KEMENTERIAN,
         ...units.map((o) => ({ value: o.id, label: o.nama })),
-        ...satkers.map((o) => ({ value: `sat_${o.id}`, label: o.nama })),
+        // Nama satker unik per unit saja: label diberi nama unit agar satker bernama sama bisa dibedakan.
+        ...satkers.map((o) => {
+          const unit = units.find((u) => u.id === o.parent)
+          return { value: `sat_${o.id}`, label: unit ? `${o.nama} (${unit.nama})` : o.nama }
+        }),
       ],
       target_jp: jenisPegawai.filter((o) => o.id !== JENIS_PEGAWAI_DIKECUALIKAN).map((o) => ({ value: o.id, label: o.nama })),
     }

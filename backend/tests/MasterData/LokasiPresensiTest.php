@@ -38,11 +38,16 @@ final class LokasiPresensiTest extends CIUnitTestCase
     private const ATURAN = 'api/v1/master/aturan-lokasi-presensi';
 
     /**
-     * Tabel bantuan (unit/satker/web_config belum ada di main) yang dibuat test ini dan wajib dibuang.
+     * Tabel bantuan (web_config selama G-09 belum di main) yang dibuat test ini dan wajib dibuang.
      *
      * @var list<string>
      */
     private array $tempTables = [];
+
+    /**
+     * Nama sementara tabel `web_config` (G-09) yang disingkirkan test D-2; dipulihkan di tearDown.
+     */
+    private ?string $hiddenWebConfig = null;
 
     protected function setUp(): void
     {
@@ -59,6 +64,14 @@ final class LokasiPresensiTest extends CIUnitTestCase
         }
 
         $this->tempTables = [];
+
+        if ($this->hiddenWebConfig !== null) {
+            $webConfig = $this->db->escapeIdentifiers($this->db->prefixTable('web_config'));
+            $this->db->query('DROP TABLE IF EXISTS ' . $webConfig);
+            $this->db->query('RENAME TABLE ' . $this->db->escapeIdentifiers($this->hiddenWebConfig) . ' TO ' . $webConfig);
+            $this->hiddenWebConfig = null;
+        }
+
         $this->clearAuthState();
         parent::tearDown();
     }
@@ -320,58 +333,105 @@ final class LokasiPresensiTest extends CIUnitTestCase
     }
 
     /**
-     * Tabel unit/satker/web_config belum ada di main (G-02/G-09): hanya `0` yang diterima, desc "Seluruh Kementerian".
+     * D-1 diaktifkan ikut legacy (K-7, keputusan user 06-10-2026): setelah G-02 di main, `target_uns` menerima `0`, id
+     * unit aktif, dan `sat_<id>` satker aktif yang unitnya aktif; `target_uns_desc` berisi nama unit/satker.
+     * Seed G-02: unit 1 "Sekretariat Kementerian", unit 2 "Deputi Bidang Sumber Daya dan Kelembagaan"; satker 1 "Biro
+     * Sumber Daya Manusia" & 2 "Biro Umum" (unit 1), satker 3 "Politeknik Pariwisata Makassar" (unit 2).
      */
-    public function testTargetUnitSatkerOnlyAcceptsWholeMinistryWhileUnitTablesAreMissing(): void
+    public function testTargetUnitSatkerAcceptsActiveUnitAndSatkerWithNames(): void
     {
-        $this->assertFalse($this->db->tableExists($this->db->prefixTable('unit'), false));
-        $this->assertFalse($this->db->tableExists($this->db->prefixTable('satker'), false));
+        // id unit 1 dan satker 1 sama angkanya: desc tetap memakai nama yang benar per jenis, urut input.
+        $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["sat_1","1","sat_3"]']));
+        $result->assertStatus(201);
+        $data = $this->json($result)['data'];
+        $desc = '["Biro Sumber Daya Manusia","Sekretariat Kementerian","Politeknik Pariwisata Makassar"]';
+        $this->assertSame('["sat_1","1","sat_3"]', $data['target_uns']);
+        $this->assertSame($desc, $data['target_uns_desc']);
+        $this->seeInDatabase('dm_user_lokasi_presensi', ['id_dm_user_lokasi_presensi' => $data['id_dm_user_lokasi_presensi'], 'target_uns_desc' => $desc]);
 
-        foreach (['["5"]', '["sat_1"]', '["5","sat_1"]'] as $value) {
-            $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => $value]));
-            $result->assertStatus(422);
-            $this->assertStringContainsString('tidak dikenal', $this->json($result)['errors']['target_uns'][0]);
-        }
-
-        foreach (['["sat_"]', '["sat_x"]', '["satker_1"]', '["abc"]', '["0x1"]'] as $value) {
-            $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => $value]));
-            $result->assertStatus(422);
-            $this->assertArrayHasKey('target_uns', $this->json($result)['errors']);
-        }
+        // Ubah target unit/satker aturan seed: desc dihitung ulang dari nama master.
+        $this->sendJson('PUT', self::ATURAN . '/1', ['target_uns' => '["2","sat_2"]'])->assertStatus(200);
+        $this->seeInDatabase('dm_user_lokasi_presensi', [
+            'id_dm_user_lokasi_presensi' => 1, 'target_uns' => '["2","sat_2"]',
+            'target_uns_desc'            => '["Deputi Bidang Sumber Daya dan Kelembagaan","Biro Umum"]',
+        ]);
 
         // Legacy: "Seluruh Kementerian" (0) menghapus pilihan unit/satker lain.
         $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["sat_1", 0]']));
+        $result->assertStatus(201);
+        $this->assertSame('["0"]', $this->json($result)['data']['target_uns']);
+    }
+
+    public function testTargetUnitSatkerRejectsUnknownOrInactiveUnitAndSatker(): void
+    {
+        // Id yang tidak ada.
+        $this->assertTargetRejected('target_uns', '["99"]', '99');
+        $this->assertTargetRejected('target_uns', '["sat_99"]', 'sat_99');
+        $this->assertTargetRejected('target_uns', '["1","sat_99"]', 'sat_99');
+
+        // Bentuk id tidak sah.
+        foreach (['["sat_"]', '["sat_x"]', '["satker_1"]', '["abc"]', '["0x1"]', '["sat_0"]', '["-1"]'] as $value) {
+            $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => $value]));
+            $result->assertStatus(422);
+            $this->assertArrayHasKey('target_uns', $this->json($result)['errors'], $value);
+        }
+
+        // Unit nonaktif, satker dihapus, dan satker aktif yang unitnya nonaktif (statusChain) → 422.
+        $this->db->table('unit')->where('id_unit', 2)->update(['status' => 2]);
+        $this->db->table('satker')->where('id_satker', 2)->update(['status' => 10]);
+
+        $this->assertTargetRejected('target_uns', '["2"]', '2');
+        $this->assertTargetRejected('target_uns', '["sat_2"]', 'sat_2');
+        $this->assertTargetRejected('target_uns', '["sat_3"]', 'sat_3');
+        $this->assertTargetRejected('target_uns', '["1","sat_3"]', 'sat_3');
+        $this->sendJson('PUT', self::ATURAN . '/1', ['target_uns' => '["sat_2"]'])->assertStatus(422);
+
+        $this->assertSame(1, $this->db->table('dm_user_lokasi_presensi')->countAllResults());
+        $this->seeInDatabase('dm_user_lokasi_presensi', ['id_dm_user_lokasi_presensi' => 1, 'target_uns' => '["0"]']);
+    }
+
+    /**
+     * D-2: tabel `web_config` belum ada (G-09 belum di main) → desc kode `0` = "Seluruh Kementerian". Bila tabel sudah
+     * dibuat migration G-09, tabel itu disingkirkan sementara selama test ini lalu dipulihkan di tearDown.
+     */
+    public function testWholeMinistryDescFallsBackWhenWebConfigTableIsMissing(): void
+    {
+        $this->hideWebConfigTable();
+        $this->assertFalse($this->db->tableExists($this->db->prefixTable('web_config'), false));
+
+        $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["0"]']));
         $result->assertStatus(201);
         $this->assertSame(['["0"]', '["Seluruh Kementerian"]'], [$this->json($result)['data']['target_uns'], $this->json($result)['data']['target_uns_desc']]);
     }
 
     /**
-     * Setelah tabel unit/satker/web_config tersedia (G-02/G-09), id unit, `sat_<id>`, dan nama kementerian dibaca dari
-     * tabelnya — desc berisi nama, tidak pernah "Satker <id>".
+     * D-2: tabel `web_config` ada (dibuat sementara bila G-09 belum di main, memakai tabel migration G-09 bila sudah) →
+     * nama dari `nama_kementerian`; baris tidak ada atau nilainya kosong → tetap "Seluruh Kementerian".
      */
-    public function testTargetUnitSatkerUsesUnitSatkerAndWebConfigNamesWhenAvailable(): void
+    public function testWholeMinistryDescUsesWebConfigWhenTableExists(): void
     {
-        $this->createTempTable('unit', '`id_unit` INT NOT NULL PRIMARY KEY, `unit` VARCHAR(150) NOT NULL, `status` TINYINT NOT NULL DEFAULT 1');
-        $this->createTempTable('satker', '`id_satker` INT NOT NULL PRIMARY KEY, `id_unit` INT NULL, `satker` VARCHAR(150) NOT NULL, `status` TINYINT NOT NULL DEFAULT 1');
-        $this->createTempTable('web_config', '`id_web_config` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, `config_name` VARCHAR(255) NOT NULL, `config_value` TEXT NULL');
+        if (! $this->db->tableExists($this->db->prefixTable('web_config'), false)) {
+            $this->createTempTable('web_config', '`id_web_config` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, `config_name` VARCHAR(255) NOT NULL, `config_value` TEXT NULL');
+        }
 
-        $this->db->table('unit')->insertBatch([['id_unit' => 3, 'unit' => 'Sekretariat Kementerian', 'status' => 1], ['id_unit' => 4, 'unit' => 'Unit Nonaktif', 'status' => 2]]);
-        $this->db->table('satker')->insertBatch([['id_satker' => 3, 'id_unit' => 3, 'satker' => 'Biro SDM', 'status' => 1], ['id_satker' => 9, 'id_unit' => 3, 'satker' => 'Satker Dihapus', 'status' => 10]]);
+        $this->db->table('web_config')->where('config_name', 'nama_kementerian')->delete();
 
-        // id unit 3 dan satker 3 sama angkanya: desc tetap memakai nama yang benar per jenis.
-        $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["sat_3","3"]']));
-        $result->assertStatus(201);
-        $this->assertSame('["sat_3","3"]', $this->json($result)['data']['target_uns']);
-        $this->assertSame('["Biro SDM","Sekretariat Kementerian"]', $this->json($result)['data']['target_uns_desc']);
-
-        $this->assertTargetRejected('target_uns', '["4"]', '4');
-        $this->assertTargetRejected('target_uns', '["sat_9"]', 'sat_9');
-        $this->assertTargetRejected('target_uns', '["sat_4"]', 'sat_4');
-
-        // `0` → nama kementerian dari web_config (bila terisi), selain itu teks bawaan.
-        $this->db->table('web_config')->insert(['config_name' => 'nama_kementerian', 'config_value' => 'Kementerian Uji Coba']);
+        // Baris belum ada.
+        $this->sendJson('PUT', self::ATURAN . '/1', ['target_uns' => '["sat_1"]'])->assertStatus(200);
         $this->sendJson('PUT', self::ATURAN . '/1', ['target_uns' => '[0]'])->assertStatus(200);
-        $this->seeInDatabase('dm_user_lokasi_presensi', ['id_dm_user_lokasi_presensi' => 1, 'target_uns' => '["0"]', 'target_uns_desc' => '["Kementerian Uji Coba"]']);
+        $this->seeInDatabase('dm_user_lokasi_presensi', ['id_dm_user_lokasi_presensi' => 1, 'target_uns' => '["0"]', 'target_uns_desc' => '["Seluruh Kementerian"]']);
+
+        // Nilai kosong/spasi.
+        $this->db->table('web_config')->insert(['config_name' => 'nama_kementerian', 'config_value' => '   ']);
+        $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["0"]']));
+        $result->assertStatus(201);
+        $this->assertSame('["Seluruh Kementerian"]', $this->json($result)['data']['target_uns_desc']);
+
+        // Nilai terisi.
+        $this->db->table('web_config')->where('config_name', 'nama_kementerian')->update(['config_value' => 'Kementerian Uji Coba']);
+        $result = $this->sendJson('POST', self::ATURAN, $this->aturan(['target_uns' => '["0"]']));
+        $result->assertStatus(201);
+        $this->assertSame('["Kementerian Uji Coba"]', $this->json($result)['data']['target_uns_desc']);
     }
 
     public function testRuleUpdateOnlyRecomputesChangedTargetsAndIgnoresClientDescriptions(): void
@@ -453,6 +513,18 @@ final class LokasiPresensiTest extends CIUnitTestCase
         $message = $this->json($result)['errors'][$field][0] ?? '';
         $this->assertStringContainsString('tidak dikenal atau tidak aktif', $message, "{$field} = {$value}");
         $this->assertStringContainsString($unknown, $message);
+    }
+
+    private function hideWebConfigTable(): void
+    {
+        $table = $this->db->prefixTable('web_config');
+
+        if (! $this->db->tableExists($table, false)) {
+            return;
+        }
+
+        $this->hiddenWebConfig = $table . '_lp_uji';
+        $this->db->query('RENAME TABLE ' . $this->db->escapeIdentifiers($table) . ' TO ' . $this->db->escapeIdentifiers($this->hiddenWebConfig));
     }
 
     private function createTempTable(string $table, string $columns): void

@@ -18,9 +18,10 @@ use CodeIgniter\Database\BaseConnection;
  * Validasi (422 per field, tidak pernah 500 untuk input apa pun):
  *  - target: string JSON berupa array (list) tak kosong berisi skalar; JSON kosong/rusak/objek/bersarang → 422;
  *  - `target_lp` (P-1): id lokasi presensi yang ada dan aktif;
- *  - `target_uns` (P-5): `0` (seluruh kementerian), id unit, atau `sat_<id>` satker yang ada dan aktif. Bila `0`
- *    dipilih, isinya dinormalkan menjadi `["0"]` seperti legacy (pilihan lain diabaikan). Tabel `unit`/`satker` belum
- *    ada di SIMPEG v2 (G-02 belum di main) → selama itu hanya `0` yang diterima;
+ *  - `target_uns` (P-5, D-1 diaktifkan ikut legacy K-7): `0` (seluruh kementerian), id unit aktif, atau `sat_<id>`
+ *    satker aktif yang unitnya aktif (sama dengan dropdown `satker/options`, statusChain G-02). Bila `0` dipilih,
+ *    isinya dinormalkan menjadi `["0"]` seperti legacy (pilihan lain diabaikan). `target_uns_desc` berisi nama
+ *    unit/satker (`unit.unit`, `satker.satker`);
  *  - `target_jp` (P-3, K-8): id jenis pegawai yang ada dan aktif, kecuali id 7 (legacy `Lm_lokasi.php:276`);
  *  - `hari_berlaku` (G3-FR-13): bentuk divalidasi rule field; di sini dinormalkan unik + terurut ("5,1,3,3" → "1,3,5").
  *
@@ -180,11 +181,11 @@ final class AturanLokasiPresensiHooks implements MasterHooks, MasterStatusHooks
 
         $names = [];
 
-        foreach ($this->activeNames('unit', 'id_unit', 'unit', $unitIds) as $id => $name) {
+        foreach ($this->activeUnitNames($unitIds) as $id => $name) {
             $names[(string) $id] = $name;
         }
 
-        foreach ($this->activeNames('satker', 'id_satker', 'satker', $satkerIds) as $id => $name) {
+        foreach ($this->activeSatkerNames($satkerIds) as $id => $name) {
             $names['sat_' . $id] = $name;
         }
 
@@ -267,27 +268,50 @@ final class AturanLokasiPresensiHooks implements MasterHooks, MasterStatusHooks
     }
 
     /**
-     * Nama entri aktif tabel unit/satker. Tabel belum ada di SIMPEG v2 → [] (semua id ditolak sebagai tidak dikenal).
+     * Nama unit aktif (G-02, DBV-008) per id.
      *
      * @param list<string> $ids
      *
      * @return array<string, string>
      */
-    private function activeNames(string $table, string $pk, string $nameColumn, array $ids): array
+    private function activeUnitNames(array $ids): array
     {
-        if ($ids === [] || ! $this->tableExists($table)) {
+        if ($ids === []) {
             return [];
         }
 
-        $rows = $this->db()->table($table)->select("{$pk}, {$nameColumn}")
-            ->whereIn($pk, array_map('intval', $ids))->where('status', 1)
+        $rows = $this->db()->table('unit')->select('id_unit, unit')
+            ->whereIn('id_unit', array_map('intval', $ids))->where('status', 1)
             ->get()->getResultArray();
 
-        return array_map('strval', array_column($rows, $nameColumn, $pk));
+        return array_map('strval', array_column($rows, 'unit', 'id_unit'));
     }
 
     /**
-     * Legacy: `web_config.nama_kementerian`. Tabel/baris belum ada (G-09 belum di main) → teks "Seluruh Kementerian".
+     * Nama satker aktif yang unitnya juga aktif (statusChain, sama dengan dropdown `satker/options`) per id satker.
+     *
+     * @param list<string> $ids
+     *
+     * @return array<string, string>
+     */
+    private function activeSatkerNames(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $db   = $this->db();
+        $rows = $db->table('satker s')->select('s.id_satker, s.satker')
+            ->join('unit u', 'u.id_unit = s.id_unit', 'inner')
+            ->whereIn('s.id_satker', array_map('intval', $ids))->where('s.status', 1)->where('u.status', 1)
+            ->get()->getResultArray();
+
+        return array_map('strval', array_column($rows, 'satker', 'id_satker'));
+    }
+
+    /**
+     * Legacy: `web_config.nama_kementerian`. Tabel belum ada (G-09 belum di main) atau baris/nilainya kosong → teks
+     * "Seluruh Kementerian" (D-2).
      */
     private function namaKementerian(): string
     {
@@ -305,7 +329,7 @@ final class AturanLokasiPresensiHooks implements MasterHooks, MasterStatusHooks
     }
 
     /**
-     * Cek tabel tanpa cache daftar tabel koneksi (tabel G-02/G-09 bisa dibuat setelah koneksi dibuka). Mode tanpa cache
+     * Cek tabel tanpa cache daftar tabel koneksi (tabel G-09 bisa dibuat setelah koneksi dibuka). Mode tanpa cache
      * CI4 tidak menambahkan DBPrefix sendiri.
      */
     private function tableExists(string $table): bool

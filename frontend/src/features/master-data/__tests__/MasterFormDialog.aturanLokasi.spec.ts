@@ -48,7 +48,10 @@ const OPTIONS: Record<string, MasterOption[]> = {
     { id: '7', nama: 'Jenis Tujuh', parent: null },
   ],
   unit: [{ id: '3', nama: 'Sekretariat Kementerian', parent: null }],
-  satker: [{ id: '3', nama: 'Biro SDM', parent: null }],
+  satker: [
+    { id: '3', nama: 'Biro SDM', parent: '3' },
+    { id: '4', nama: 'Bagian Umum', parent: '9' },
+  ],
 }
 
 function mountDialog(row: MasterRow | null, allMeta: MasterMeta[] = [aturanMeta]) {
@@ -205,8 +208,13 @@ describe('MasterFormDialog — aturan lokasi presensi (G-03)', () => {
 
     expect(masterService.options).toHaveBeenCalledWith('unit')
     expect(masterService.options).toHaveBeenCalledWith('satker')
-    expect(optionValues('target_uns')).toEqual(['0', '3', 'sat_3'])
-    expect(document.body.querySelector('[data-testid="target_uns-option-sat_3"]')?.textContent).toContain('Biro SDM')
+    expect(optionValues('target_uns')).toEqual(['0', '3', 'sat_3', 'sat_4'])
+    // Label satker memuat nama unitnya (nama satker hanya unik per unit); unit tak ada di opsi → nama satker saja.
+    expect(document.body.querySelector('[data-testid="target_uns-option-sat_3"]')?.textContent).toContain(
+      'Biro SDM (Sekretariat Kementerian)',
+    )
+    expect(document.body.querySelector('[data-testid="target_uns-option-sat_4"]')?.textContent?.trim()).toContain('Bagian Umum')
+    expect(document.body.querySelector('[data-testid="target_uns-option-sat_4"]')?.textContent).not.toContain('(')
     expect(document.body.textContent).not.toContain('Data unit/satker belum tersedia')
 
     await tick('target_uns', 'sat_3')

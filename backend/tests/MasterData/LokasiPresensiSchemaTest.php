@@ -7,6 +7,7 @@ namespace Tests\MasterData;
 use App\Database\Migrations\CreateLokasiPresensi;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\Libraries\TipeKolomSkema;
 
 /**
  * DBV-007 — skema G-03 hasil migration 2026-10-01-000001_CreateLokasiPresensi harus sama dengan dokumen DB Validator
@@ -30,8 +31,8 @@ final class LokasiPresensiSchemaTest extends CIUnitTestCase
     private const STATUS_COMMENT = '1: Aktif, 2: Tidak Aktif, 10: Dihapus';
 
     /**
-     * Kolom: tabel => [kolom => [COLUMN_TYPE, nullable, default, komentar]] urut posisi. Default `null` = tidak ada
-     * default / DEFAULT NULL.
+     * Kolom: tabel => [kolom => [COLUMN_TYPE ternormal (TipeKolomSkema), nullable, default, komentar]] urut posisi.
+     * Default `null` = tidak ada default / DEFAULT NULL.
      */
     private const COLUMNS = [
         'lokasi_presensi' => [
@@ -150,7 +151,8 @@ final class LokasiPresensiSchemaTest extends CIUnitTestCase
                 [$type, $nullable, $default, $comment] = $expected[$row['COLUMN_NAME']];
                 $label                                 = "{$table}.{$row['COLUMN_NAME']}";
 
-                $this->assertSame($type, strtolower((string) $row['COLUMN_TYPE']), "{$label}: tipe");
+                // MariaDB menulis lebar tampilan (int(11), tinyint(4)); dibuang sebelum dibandingkan (T-1 review DBV-007).
+                $this->assertSame($type, TipeKolomSkema::normalisasi((string) $row['COLUMN_TYPE']), "{$label}: tipe");
                 $this->assertSame($nullable ? 'YES' : 'NO', $row['IS_NULLABLE'], "{$label}: nullable");
                 $this->assertSame($default, $this->normalizeDefault($row['COLUMN_DEFAULT']), "{$label}: default");
                 $this->assertSame($comment, $row['COLUMN_COMMENT'], "{$label}: komentar");
