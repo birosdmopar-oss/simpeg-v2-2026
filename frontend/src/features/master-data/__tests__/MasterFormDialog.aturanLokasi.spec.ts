@@ -159,8 +159,11 @@ describe('MasterFormDialog — aturan lokasi presensi (G-03)', () => {
     await flushPromises()
 
     expect(masterService.create).not.toHaveBeenCalled()
+    // Validasi skema berjalan async (vee-validate + zod): tunggu pesan tampil, jangan bergantung pada urutan test.
     for (const field of ['target_lp', 'target_uns', 'target_jp']) {
-      expect(document.body.querySelector(`[data-testid="checkbox-group-${field}"] [role="alert"]`)?.textContent).toContain('wajib')
+      await vi.waitFor(() =>
+        expect(document.body.querySelector(`[data-testid="checkbox-group-${field}"] [role="alert"]`)?.textContent).toContain('wajib'),
+      )
     }
     wrapper.unmount()
   })
