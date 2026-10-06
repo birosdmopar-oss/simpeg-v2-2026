@@ -11,6 +11,7 @@ use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use RuntimeException;
+use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
  * DBV-001 — skema G-01 Batch 1 hasil migration 2026-09-23-000000_AlterBatch1KeSkemaLegacy harus sama dengan skema
@@ -21,13 +22,16 @@ use RuntimeException;
  * sesudah DBV-001 yang bergantung pada tabel wilayah (DBV-003) menghalangi itu: FK `kantor` → wilayah membuat down()
  * ditolak MySQL (error 1833 saat MODIFY kolom yang dirujuk, 3780 saat CONVERT collation), dan baris sentinel
  * LAIN-LAIN (tahap CR-010) membuat up() menolak jalan (assertTablesEmpty). Karena itu dependen tersebut dilepas di
- * setUp() dan dipasang ulang di tearDown(); assertion DBV-001 tidak berubah.
+ * setUp() dan dipasang ulang di tearDown(); assertion DBV-001 tidak berubah. Migration B-01/B-02 (DBV-012/013) juga
+ * merujuk wilayah/agama/jenis pegawai/jenis status dengan FK RESTRICT, jadi ikut dilepas lebih dulu
+ * (Tests\Support\LepasMigrationKepegawaianTrait) dan dipasang ulang paling akhir.
  *
  * @internal
  */
 final class Batch1LegacySchemaTest extends CIUnitTestCase
 {
     use DatabaseTestTrait;
+    use LepasMigrationKepegawaianTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -111,6 +115,8 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
     {
         parent::setUp();
 
+        $this->lepasMigrationKepegawaian();
+
         foreach (array_keys(self::WILAYAH_DEPENDENTS) as $file) {
             $this->dependent($file)->down();
             $this->detached[] = $file;
@@ -137,6 +143,8 @@ final class Batch1LegacySchemaTest extends CIUnitTestCase
         }
 
         $this->detached = [];
+
+        $this->pasangUlangMigrationKepegawaian();
 
         parent::tearDown();
     }
