@@ -10,7 +10,7 @@
 | Key review | CR-046 (S0-A), CR-048..CR-052 (milestone WS-1) — lihat §7.1 |
 | Mitra | WS-2 (Qoder-2) — lihat `PRD_WS2.md` |
 | Briefing Sprint 0 | `docs/fase3/BRIEFING_S0A_Qoder1_backend.md` |
-| Acuan Fase 3 | Kontrak task `docs/fase3/03-Kepegawaian.md`; hak akses `docs/fase3/MATRIKS_ROLE_MODUL_B.md`; library PDF `docs/adr/ADR-033-library-pdf-mpdf.md` |
+| Acuan Fase 3 | Kontrak task `docs/fase3/03-Kepegawaian.md`; hak akses `docs/fase3/MATRIKS_ROLE_MODUL_B.md`; library PDF `docs/adr/ADR-033-library-pdf-tcpdf.md` |
 
 ---
 
@@ -181,7 +181,7 @@ Key yang sudah terpakai sebelum Fase 3: CR-044 (CI), CR-045 (PHPUnit cepat + MyS
 | WS-2 M2 | WS-2 | B-06 Koreksi NIP + B-03 Biodata (+ backend dasar B-20) | CR-054 |
 | WS-2 M3 | WS-2 | B-04 Approval biodata + B-05 Tambah/Hapus | CR-055 |
 | WS-2 M4 | WS-2 | B-07 Jabatan + B-19 Struktur | CR-056 |
-| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR-033 PDF (mPDF) | CR-057 |
+| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR-033 PDF (TCPDF) | CR-057 |
 | WS-2 M6 | WS-2 | B-20 penutup | CR-058 |
 
 Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. B-12a pindah ke WS-2), task ikut key paket tujuan. Kebutuhan skema baru di luar build memakai key DBV baru (DBV-020 dst.) yang dialokasikan sesi utama.
@@ -210,7 +210,7 @@ Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. B-1
 | 4 | Hak akses ikut Matriks v2 (Hukdis 1/3, Jabatan & AK sesuai Matriks, Karpeg/Karis 1,2,4,5,7 sesuai DoD), kecuali approver LKH = atasan langsung (legacy). Izin disimpan sebagai data di Definisi per jenis | §2, Definisi |
 | 5 | (05-10) Konket & Karpeg/Karis = halaman usulan mandiri, layout legacy, style redesign | §3.7 |
 | 6 | Batas lampiran per jenis 1/2/5 MB ikut legacy | §4, aturan lampiran Definisi |
-| 7 | PDF: mPDF (ikut legacy) via ADR-033 (`docs/adr/ADR-033-library-pdf-mpdf.md`; lisensi GPL-2.0, pemakaian internal); fallback dompdf bila lisensi ditolak | Milik WS-2 (composer) |
+| 7 | PDF: TCPDF (ikut legacy) via ADR-033 (`docs/adr/ADR-033-library-pdf-tcpdf.md`; lisensi LGPL-3.0, sama dengan legacy); cadangan dompdf bila TCPDF bermasalah| Milik WS-2 (composer) |
 | 8 | Status 3 "Diproses" di belakang flag, nonaktif default | `StatusRiwayat`, engine |
 | 9 | Unit/feature test yang diwajibkan DoD (B-06/08/09/14, B-21) + gate = bagian build; QA Lapis 1/review/sesi QA tidak | §4 |
 | 10 | Default ikut legacy: acuan KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy (+ `jabatan_koordinasi.nip`); masa hukdis = `masa_sanksi_bulan`; lingkup unit destinasi 21/unit lain 7 ikut legacy | B-09, B-14 |

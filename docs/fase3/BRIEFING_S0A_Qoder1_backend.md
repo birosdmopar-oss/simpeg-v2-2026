@@ -7,7 +7,7 @@
 | Branch | `ws1/cr-046-s0a-kontrak-backend-fase3`, dibuat dari `origin/main` terbaru |
 | Estimasi | **±1 hari-agen** (hari 0–1 Sprint 0) |
 | Berjalan paralel dengan | S0-B Qoder-2 (fondasi frontend, CR-047) — lihat `BRIEFING_S0B_Qoder2_frontend.md` |
-| Acuan | `docs/fase3/PRD_WS1.md`, `docs/fase3/PRD_WS2.md`, `AGENTS.md`, `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md` (skema B-01/B-02, aturan snapshot §5.1), `backend/docs/progress/03-Kepegawaian.md`, `backend/app/Libraries/Kepegawaian/README.md`, `docs/fase3/03-Kepegawaian.md` (kontrak task Fase 3), `docs/fase3/MATRIKS_ROLE_MODUL_B.md` (hak akses Modul B), `docs/adr/ADR-033-library-pdf-mpdf.md` (library PDF) |
+| Acuan | `docs/fase3/PRD_WS1.md`, `docs/fase3/PRD_WS2.md`, `AGENTS.md`, `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md` (skema B-01/B-02, aturan snapshot §5.1), `backend/docs/progress/03-Kepegawaian.md`, `backend/app/Libraries/Kepegawaian/README.md`, `docs/fase3/03-Kepegawaian.md` (kontrak task Fase 3), `docs/fase3/MATRIKS_ROLE_MODUL_B.md` (hak akses Modul B), `docs/adr/ADR-033-library-pdf-tcpdf.md` (library PDF) |
 | Hasil yang diserahkan | Satu branch berisi commit CR-046, lolos gate penuh, diserahkan ke reviewer CR. **Jangan push ke `main`.** |
 
 ---
@@ -204,13 +204,11 @@ Qoder-2 **tidak** menyentuh backend di S0; Anda **tidak** menyentuh frontend.
 4. Hak akses mengikuti Matriks v2 (`docs/fase3/MATRIKS_ROLE_MODUL_B.md`; Hukdis role 1/3; Jabatan & AK sesuai Matriks; Karpeg/Karis role 1, 2, 4, 5, 7 sesuai DoD), **kecuali** approver LKH = atasan langsung (ikut legacy). Izin disimpan sebagai data di Definisi per jenis.
 5. Konket dan Karpeg/Karis = halaman usulan mandiri (bukan tab), layout legacy, style redesign.
 6. Batas lampiran per jenis 1/2/5 MB ikut legacy.
-7. PDF memakai mPDF (ikut legacy) lewat ADR-033 (`docs/adr/ADR-033-library-pdf-mpdf.md`; lisensi GPL-2.0, pemakaian internal); fallback dompdf bila lisensi ditolak — urusan WS-2.
-8. Status 3 "Diproses" di belakang flag, nonaktif default.
-9. Unit/feature test yang diwajibkan DoD (B-06/08/09/14, B-21) + gate = bagian build; QA Lapis 1/review/sesi QA tidak.
+7. PDF memakai TCPDF (ikut legacy) lewat ADR-033 (`docs/adr/ADR-033-library-pdf-tcpdf.md`; lisensi LGPL-3.0, sama dengan legacy); cadangan dompdf bila TCPDF bermasalah) + gate = bagian build; QA Lapis 1/review/sesi QA tidak.
 10. Default ikut legacy: acuan jarak KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy (+ `jabatan_koordinasi.nip`); masa hukdis = `masa_sanksi_bulan`; aturan lingkup unit destinasi 21 / unit lain 7 ikut legacy.
 11. Key: satu key CR per paket milestone per WS; S0-A = **CR-046**. Peta lengkap di PRD §7.1.
 12. Aturan proyek yang berlaku: PK pegawai = `nip`; status data 1/2/10 (riwayat 0/1/2/10); collation `utf8mb4_unicode_ci`; skema ikut DDL legacy; migration di `main` tidak diedit; perubahan skema lewat key DBV dan review DB Validator; snapshot hanya disinkronkan di approval final (ADR-006), termasuk saat baris aktif ditolak/dihapus; trigger legacy tidak dibawa (menjadi aturan aplikasi); hanya `LocalStorageAdapter` (arsip remote legacy tidak disalin).
 13. Serah-terima (keputusan 07-10-2026): cara serah = **push branch fitur `ws1/…` ke `origin`** (tidak ke `main`); review CR dilakukan oleh sesi utama, yang kemudian memasukkan paket ke `main` (alur CR-only).
 14. Menu Fase 3 tersembunyi dengan `ACTIVE_PHASE = 2` sampai B-20 penutup (keputusan 07-10-2026); WS-2 yang menaikkan ke 3.
 15. Slug `{jenis}` dan signature interface boleh diperhalus Qoder-1 selama S0 (dicatat di README kontrak §3.7, disetujui reviewer CR), lalu dibekukan di akhir S0 (§6).
-16. Acuan di repo: kontrak task Fase 3 `docs/fase3/03-Kepegawaian.md`, matriks role Modul B `docs/fase3/MATRIKS_ROLE_MODUL_B.md`, ADR library PDF `docs/adr/ADR-033-library-pdf-mpdf.md`.
+16. Acuan di repo: kontrak task Fase 3 `docs/fase3/03-Kepegawaian.md`, matriks role Modul B `docs/fase3/MATRIKS_ROLE_MODUL_B.md`, ADR library PDF `docs/adr/ADR-033-library-pdf-tcpdf.md`.

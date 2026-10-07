@@ -11,7 +11,7 @@ Folder ini menyimpan ADR yang ditulis setelah dokumen utama dan perlu dibaca cod
 | ADR-001 … ADR-030 | (lihat dokumen utama) | — | `SIMPEG_v2_ADR.docx` (di luar repo) |
 | ADR-031 | Cutover S1 & read-only legacy | — | Di luar repo (bersama dokumen utama) |
 | ADR-032 | Library PDF/Excel/QR & pola rute publik (Slip Gaji Fase 5) | Draf, belum diputus | Di luar repo (bersama dokumen utama) |
-| [ADR-033](ADR-033-library-pdf-mpdf.md) | Library PDF: mPDF untuk Fase 3 (LKH, Cetak DRH) | Diterima 07-10-2026 | Repo |
+| [ADR-033](ADR-033-library-pdf-tcpdf.md) | Library PDF: TCPDF untuk Fase 3 (LKH, Cetak DRH) | Diterima 07-10-2026 | Repo |
 
 ## Format
 
