@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Diterima 07-10-2026** (keputusan user; semula diusulkan mPDF, dikoreksi ke TCPDF setelah pengecekan kode legacy menunjukkan mesin nyata = TCPDF; keputusan #7 di `docs/fase3/PRD_WS1.md` §9 dan `docs/fase3/PRD_WS2.md` §9) |
+| **Status** | **Diterima 07-10-2026** (keputusan user; semula diusulkan mPDF, dikoreksi ke TCPDF setelah pengecekan kode legacy menunjukkan mesin nyata = TCPDF; keputusan #7 di `docs/fase3/WS1.md` §3.10 dan `docs/fase3/WS2.md` §3.10) |
 | **Cakupan** | PDF Fase 3: LKH (B-12b) dan Cetak DRH (B-20). Modul lain yang butuh PDF menyusul lewat ADR atau addendum sendiri |
 | **Pemilik pelaksanaan** | WS-2, milestone M5 (MAKE-013) |
 | **Terkait** | ADR-005 (logika di Library/service), draf ADR-032 (library PDF/Excel/QR & rute publik untuk Slip Gaji Fase 5, di luar repo, belum diputus) |

@@ -1,4 +1,4 @@
-> Salinan kontrak task Fase 3 (sumber: Bahan Baku SIMPEG, disalin 07-10-2026); keputusan pelaksanaan ada di PRD_WS1/PRD_WS2.
+> Salinan kontrak task Fase 3 (sumber: Bahan Baku SIMPEG, disalin 07-10-2026); keputusan pelaksanaan ada di `docs/fase3/WS1.md` dan `docs/fase3/WS2.md` (Sprint 0: `SPRINT0_1_backend.md`, `SPRINT0_2_frontend.md`).
 
 # Fase 3 — Modul B: Kepegawaian Core
 

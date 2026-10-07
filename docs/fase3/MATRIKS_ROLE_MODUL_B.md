@@ -5,7 +5,7 @@
 | Sumber | `Matriks_Role_x_Endpoint_SIMPEG_v2.docx` versi 1.0, status "Final — hasil review & keputusan Horii", berkas terakhir diubah 08-09-2026 (dokumen proyek di luar repo, folder Bahan Baku SIMPEG). Disalin ke repo 07-10-2026 |
 | Cakupan salinan | Bagian 1 (definisi role), Bagian 2 Modul B (tabel endpoint), Bagian 3 butir 2–3 (konstanta role & pola akses). Modul lain tidak disalin |
 | Keputusan 07-10-2026 | Hak akses Fase 3 **ikut Matriks v2** (tabel di bawah), **kecuali approver LKH = atasan langsung** (ikut legacy) |
-| Dipakai oleh | `docs/fase3/PRD_WS1.md`, `docs/fase3/PRD_WS2.md`, `docs/fase3/BRIEFING_S0A_Qoder1_backend.md`, `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`, kontrak task `docs/fase3/03-Kepegawaian.md` |
+| Dipakai oleh | `docs/fase3/SPRINT0_1_backend.md`, `docs/fase3/SPRINT0_2_frontend.md`, `docs/fase3/WS1.md`, `docs/fase3/WS2.md`, kontrak task `docs/fase3/03-Kepegawaian.md` |
 
 Isi tabel disalin apa adanya dari dokumen sumber. Bila sumber berubah, perbarui berkas ini dan catat tanggalnya di atas.
 
@@ -144,5 +144,5 @@ Catatan berikut menandai sel yang tidak bisa dibaca tunggal dari sumber. Isi tab
 5. **Hukdis tanpa view pegawai.** `hr/rwy/hukdis/*` hanya role 1, 3. Sumber tidak menyebut apakah pegawai yang bersangkutan boleh melihat riwayatnya sendiri.
 6. **Detail pegawai vs tab riwayat.** `hr/employee/detail/{nip}` = `UL_ALL` dengan keterangan "tabulasi riwayat", sedangkan sebagian riwayat tidak mencantumkan role 4, 5, 6, atau 8. Sumber tidak menyebut tab mana yang tampil untuk role tersebut di halaman detail.
 7. **`hr/employee/delete/{nip}`.** Keterangan "Soft/hard delete" tidak memilih salah satu. Kontrak task B-05 (`docs/fase3/03-Kepegawaian.md`) menyebut soft delete.
-8. **Konket.** Keterangan "Kondisi kerja (Dinas Luar/WFH/WFO)" berbeda dengan arti modul Konket di legacy. `docs/fase3/PRD_WS2.md` mencatat bahwa build mengikuti arti legacy.
+8. **Konket.** Keterangan "Kondisi kerja (Dinas Luar/WFH/WFO)" berbeda dengan arti modul Konket di legacy. `docs/fase3/WS2.md` (§3.4.3) mencatat bahwa build mengikuti arti legacy.
 9. **`hr/so/full` vs `hr/rwy/jabatan/so`.** Yang pertama ditulis `Session Logged In`, yang kedua `UL_ALL`. Menurut legenda keduanya setara (semua role yang sudah login).
