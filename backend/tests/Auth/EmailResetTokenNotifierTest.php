@@ -17,14 +17,13 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Exceptions\ConfigException;
 use CodeIgniter\Queue\Interfaces\QueueInterface;
 use CodeIgniter\Queue\QueuePushResult;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
 use Config\Email as EmailConfig;
 use Config\Encryption as EncryptionConfig;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\ResetEmailTestTrait;
 
 /**
@@ -36,17 +35,13 @@ use Tests\Support\ResetEmailTestTrait;
  *
  * @internal
  */
-final class EmailResetTokenNotifierTest extends CIUnitTestCase
+final class EmailResetTokenNotifierTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use ResetEmailTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP      = '199002152015022002';
     private const NIP_LAIN = '198501012010011001';

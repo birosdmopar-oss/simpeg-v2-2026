@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Database\Migrations\CreateDiklatHukdisKonketTandaJasa;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
@@ -22,14 +22,11 @@ use Tests\Support\LepasMigrationKepegawaianTrait;
  *
  * @internal
  */
-final class DiklatHukdisKonketSchemaTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class DiklatHukdisKonketSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use LepasMigrationKepegawaianTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     private const TABLES = ['diklat', 'tingkat_hukdis', 'jenis_hukdis', 'jenis_konket', 'tanda_jasa'];
 

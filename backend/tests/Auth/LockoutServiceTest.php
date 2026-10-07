@@ -6,23 +6,16 @@ namespace Tests\Auth;
 
 use App\Libraries\Auth\LockoutService;
 use App\Models\Auth\LoginAttemptModel;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use Config\Auth as AuthConfig;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-04 — unit test boundary lockout: N-1 kali gagal masih boleh, N kali terkunci; sukses mereset.
  *
  * @internal
  */
-final class LockoutServiceTest extends CIUnitTestCase
+final class LockoutServiceTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private LockoutService $lockout;
 
     private AuthConfig $config;

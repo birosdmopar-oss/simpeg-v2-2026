@@ -9,11 +9,10 @@ use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\PasswordVerifier;
 use App\Models\Auth\PenggunaModel;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-09 — provisioning akun otomatis: pegawai baru → pengguna dengan username = NIP.
@@ -21,16 +20,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class AccountProvisionerTest extends CIUnitTestCase
+final class AccountProvisionerTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP = '200101012025011001';
 

@@ -7,8 +7,8 @@ namespace Tests\MasterData;
 use App\Database\Migrations\CreateMasterKenaikanPangkat;
 use App\Database\Migrations\CreateMasterPendidikan;
 use CodeIgniter\Database\Migration;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
@@ -25,14 +25,11 @@ use Tests\Support\LepasMigrationKepegawaianTrait;
  *
  * @internal
  */
-final class PangkatPendidikanSchemaTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class PangkatPendidikanSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use LepasMigrationKepegawaianTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     private const TABLES_KP = ['pangkat', 'jenis_kp', 'gol_pppk'];
 

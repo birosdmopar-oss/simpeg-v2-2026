@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -19,17 +18,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class InvalidJsonBodyTest extends CIUnitTestCase
+final class InvalidJsonBodyTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const URI = 'api/v1/master/provinsi';
 

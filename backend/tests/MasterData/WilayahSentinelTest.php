@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -27,17 +26,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class WilayahSentinelTest extends CIUnitTestCase
+final class WilayahSentinelTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     /**
      * Sentinel per master wilayah: key => [tabel, kolom PK, kode, kolom nama].

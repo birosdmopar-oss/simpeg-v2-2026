@@ -8,12 +8,11 @@ use App\Constants\Role;
 use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\PasswordVerifier;
 use App\Models\Auth\PenggunaModel;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * Syarat DBV-010 D-6 (ISSUE-006, CR-019) — selama email menjadi kanal reset password, buat/ubah akun menolak email
@@ -24,16 +23,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class EmailUnikTest extends CIUnitTestCase
+final class EmailUnikTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const SUPER_ADMIN = '198501012010011001'; // S01
     private const ADMIN_S01   = '198703102012031003'; // role 3, S01

@@ -6,9 +6,9 @@ namespace Tests\Auth;
 
 use App\Database\Migrations\AlterIdentitasAkunIdPengguna;
 use App\Database\Migrations\AlterPenggunaAkunNonPegawai;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\DatabaseTestCase;
 use Throwable;
 
 /**
@@ -22,14 +22,9 @@ use Throwable;
  *
  * @internal
  */
-final class AkunNonPegawaiSchemaTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class AkunNonPegawaiSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const UNICODE = 'utf8mb4_unicode_ci';
 
     /**

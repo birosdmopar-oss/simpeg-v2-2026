@@ -6,8 +6,8 @@ namespace Tests\MasterData;
 
 use App\Database\Migrations\AddFkJabatanJenjangJf;
 use App\Database\Migrations\CreateMasterJabatanSisa;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * DBV-018 — skema G-02 sisa hasil migration 2026-09-30-100100_CreateMasterJabatanSisa dan 2026-09-30-100200
@@ -19,14 +19,8 @@ use CodeIgniter\Test\DatabaseTestTrait;
  *
  * @internal
  */
-final class JabatanSisaSchemaTest extends CIUnitTestCase
+final class JabatanSisaSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const TABLES = [
         'jenjang_jf', 'rumpun_jabatan', 'subrumpun_jabatan', 'jabatan_akademik', 'periode_struktur_jabatan',
         'struktur_jabatan', 'peta_jabatan', 'jabatan_koordinasi',
@@ -312,6 +306,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
      * tidak tersentuh, KEY legacy `fk_id_jenjang_jf_jab_to_jenjang_jf` di jabatan tetap ada. up() mengembalikan skema
      * yang sama.
      */
+    #[Group('db-isolasi-penuh')]
     public function testMigrationRollsBackAndUpAgain(): void
     {
         $this->fkMigration()->down();
@@ -341,6 +336,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
      * Bila salah satu CREATE gagal di tengah up(), tabel yang dibuat PADA RUN ITU di-drop (urutan terbalik) lalu error
      * dilempar ulang. Disimulasikan dengan tabel penghalang `peta_jabatan` (CREATE ke-7 gagal, 1050).
      */
+    #[Group('db-isolasi-penuh')]
     public function testFailedUpDropsOnlyTablesCreatedInThatRun(): void
     {
         $this->fkMigration()->down();

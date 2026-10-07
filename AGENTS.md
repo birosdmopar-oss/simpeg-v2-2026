@@ -97,3 +97,22 @@ Tambahan:
 - **Satu gate penuh pada satu waktu** per mesin; gate paralel di satu MySQL membuat semuanya lambat. Tunggu gate lain selesai.
 - Reviewer/verifikator **tidak** menjalankan gate penuh — cukup test terarah; gate penuh dijalankan sekali oleh yang akan push.
 - Gate memakai **database test/scratch tersendiri**, bukan database dev; jangan menyalin `.env` dev ke worktree lain.
+- Instance MySQL test terpisah (port 3307, durability dilonggarkan) bisa dipakai agar gate tidak membebani MySQL dev:
+  `tools/mysql-test/` (README, `start.ps1`/`stop.ps1`); arahkan `.env` uji ke `database.tests.hostname = 127.0.0.1`,
+  `database.tests.port = 3307`.
+
+**Menulis test database (MAKE-001).**
+
+- Test yang memakai DB **wajib** `extends Tests\Support\DatabaseTestCase` (bukan `CIUnitTestCase` + `use DatabaseTestTrait`
+  + `$refresh = true`). Cukup isi `$seed` bila perlu. Migrate jalan sekali per proses; seed ditulis sekali per kelas;
+  tiap test berjalan di dalam transaksi yang di-rollback (AUTO_INCREMENT ikut dipulihkan), jadi tidak perlu bersih-bersih
+  data di `tearDown()`.
+- Transaksi aplikasi (`transStart()`/`transBegin()`) tetap berperilaku sama (dijalankan sebagai SAVEPOINT).
+- Tandai `#[Group('db-isolasi-penuh')]` (di method, atau di kelas bila semua test-nya) bila test: menjalankan DDL
+  (`down()`/`up()` migration, CREATE/ALTER/DROP/TRUNCATE/RENAME, trigger, `ALTER TABLE … AUTO_INCREMENT`), memakai
+  koneksi DB kedua atau proses worker yang harus melihat/menunggu/menulis data test, atau memakai FULLTEXT atas data
+  yang ditulis test. Test bertanda menulis & commit sungguhan, lalu database dipulihkan sebelum test berikutnya.
+- DDL tanpa tanda memutus transaksi uji; test itu gagal dengan pesan "memutus bingkai transaksi uji". Jangan
+  "memperbaikinya" dengan melonggarkan assertion — tambahkan tandanya.
+- Atribut PHPUnit di sebuah method mematikan anotasi docblock (`@dataProvider` dst.) di method itu: saat menambah
+  `#[Group]`, ubah anotasinya menjadi atribut (`#[DataProvider('…')]`).

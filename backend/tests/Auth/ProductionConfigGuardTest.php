@@ -14,13 +14,12 @@ use App\Libraries\Auth\ResetPasswordService;
 use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Exceptions\ConfigException;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
 use Config\Email as EmailConfig;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\ResetEmailTestTrait;
 
 /**
@@ -35,17 +34,13 @@ use Tests\Support\ResetEmailTestTrait;
  *
  * @internal
  */
-final class ProductionConfigGuardTest extends CIUnitTestCase
+final class ProductionConfigGuardTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use ResetEmailTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP     = '199002152015022002';
     private const UNKNOWN = '000000000000000000';

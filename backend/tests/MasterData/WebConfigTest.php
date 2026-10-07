@@ -7,8 +7,6 @@ namespace Tests\MasterData;
 use App\Constants\Role;
 use App\Libraries\CacheService;
 use App\Libraries\MasterData\WebConfigService;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
 use Config\Services;
@@ -16,6 +14,7 @@ use Config\WebConfig;
 use InvalidArgumentException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * G-09 — Web Config (DBV-006/CR-030): RBAC role 1 saja (tanpa endpoint baca publik), daftar katalog + nilai bawaan,
@@ -24,16 +23,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class WebConfigTest extends CIUnitTestCase
+final class WebConfigTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const BASE = 'api/v1/web-config';
 

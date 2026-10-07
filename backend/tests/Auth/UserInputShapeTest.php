@@ -7,12 +7,11 @@ namespace Tests\Auth;
 use App\Constants\Role;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * ISSUE-023/CR-019 — isian body berbentuk array/objek (juga boolean) di CRUD akun (A-08) dan login/lupa password →
@@ -22,16 +21,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class UserInputShapeTest extends CIUnitTestCase
+final class UserInputShapeTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const SUPER_ADMIN = '198501012010011001'; // S01
     private const ADMIN_S01   = '198703102012031003'; // role 3, S01

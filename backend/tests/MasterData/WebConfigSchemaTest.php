@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Database\Migrations\CreateWebConfig;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * DBV-006 — skema G-09 hasil migration 2026-10-01-100000_CreateWebConfig harus sama dengan skema yang diajukan ke DB
@@ -16,14 +16,8 @@ use CodeIgniter\Test\DatabaseTestTrait;
  *
  * @internal
  */
-final class WebConfigSchemaTest extends CIUnitTestCase
+final class WebConfigSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const FILE = '2026-10-01-100000_CreateWebConfig.php';
 
     /**
@@ -115,6 +109,7 @@ final class WebConfigSchemaTest extends CIUnitTestCase
         $this->assertNotNull($row['updated_at']);
     }
 
+    #[Group('db-isolasi-penuh')]
     public function testMigrationRollsBackAndUpAgain(): void
     {
         $migration = $this->migration();

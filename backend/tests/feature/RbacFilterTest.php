@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Jwt as JwtConfig;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * F0-06 (JwtAuthFilter) + F0-08 (RoleFilter) — endpoint dummy: role berhak 200, tidak berhak 403.
@@ -16,14 +15,10 @@ use Config\Jwt as JwtConfig;
  *
  * @internal
  */
-final class RbacFilterTest extends CIUnitTestCase
+final class RbacFilterTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     protected function setUp(): void
     {

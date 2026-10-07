@@ -11,11 +11,12 @@ use App\Models\Auth\TokenModel;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Database\Exceptions\DatabaseException;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use Config\Database;
 use Config\Jwt as JwtConfig;
 use Firebase\JWT\JWT;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Throwable;
 
 /**
@@ -23,14 +24,8 @@ use Throwable;
  *
  * @internal
  */
-final class JwtServiceTest extends CIUnitTestCase
+final class JwtServiceTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private JwtService $jwt;
 
     private JwtConfig $config;
@@ -258,6 +253,7 @@ final class JwtServiceTest extends CIUnitTestCase
      * mencabut sesi sebelum token baru pemenang ada. Setelah pemenang commit, pihak kalah melanjutkan dengan baris
      * yang sudah ia baca → affected rows 0 → reuse → seluruh sesi, termasuk hasil rotasi pemenang, dicabut.
      */
+    #[Group('db-isolasi-penuh')]
     public function testRaceLoserCannotRevokeAllBetweenWinnerUpdateAndInsert(): void
     {
         $pair  = $this->jwt->issueTokenPair($this->claims);
@@ -395,8 +391,9 @@ final class JwtServiceTest extends CIUnitTestCase
      * transaksi di-rollback, token lama tetap berlaku — BUKAN dibaca "kalah race" lalu dianggap reuse (cabut semua sesi,
      * 401). Di dalam transaksi CI4 query gagal hanya mengembalikan false apa pun DBDebug-nya; diuji di kedua mode.
      *
-     * @dataProvider dbDebugModes
      */
+    #[DataProvider('dbDebugModes')]
+    #[Group('db-isolasi-penuh')]
     public function testDatabaseErrorDuringRevokeIsNotTreatedAsReuse(bool $dbDebug): void
     {
         $pair  = $this->jwt->issueTokenPair($this->claims);
@@ -441,8 +438,9 @@ final class JwtServiceTest extends CIUnitTestCase
      * melempar exception di dalam transaksi dan transCommit() tidak memeriksa transStatus, jadi tanpa cek eksplisit
      * revoke token lama ikut ter-commit dan klien menerima refresh token yang tidak ada di DB (sesi hilang).
      *
-     * @dataProvider dbDebugModes
      */
+    #[DataProvider('dbDebugModes')]
+    #[Group('db-isolasi-penuh')]
     public function testFailedInsertDuringRotationRollsBackRevoke(bool $dbDebug): void
     {
         $pair    = $this->jwt->issueTokenPair($this->claims);
@@ -519,8 +517,9 @@ final class JwtServiceTest extends CIUnitTestCase
      * Query tulis TokenModel yang gagal harus dilempar sebagai DatabaseException di kedua mode DBDebug — dengan
      * DBDebug=false CI4 hanya mengembalikan false (affected rows -1) yang kalau diabaikan terbaca "0 baris".
      *
-     * @dataProvider tokenWriteModes
      */
+    #[DataProvider('tokenWriteModes')]
+    #[Group('db-isolasi-penuh')]
     public function testTokenModelWriteErrorIsThrownNotReportedAsZeroRows(string $method, bool $dbDebug): void
     {
         $refresh = $this->jwt->issueRefreshToken($this->claims);

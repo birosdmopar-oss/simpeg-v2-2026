@@ -9,14 +9,13 @@ use App\Exceptions\ValidationException;
 use App\Libraries\MasterData\HariLiburService;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\I18n\Time;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -30,17 +29,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class HariLiburTest extends CIUnitTestCase
+final class HariLiburTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const BASE = 'api/v1/hari-libur';
 

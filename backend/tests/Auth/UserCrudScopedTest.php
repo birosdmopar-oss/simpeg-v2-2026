@@ -7,13 +7,12 @@ namespace Tests\Auth;
 use App\Constants\Role;
 use App\Libraries\Auth\UserService;
 use App\Models\Auth\PenggunaModel;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-08 — CRUD akun scoped (MTC-004): role 1 semua akun; role 3 hanya satkernya (di luar → 403); role lain 403.
@@ -27,16 +26,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class UserCrudScopedTest extends CIUnitTestCase
+final class UserCrudScopedTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const SUPER_ADMIN  = '198501012010011001'; // S01
     private const ADMIN_S01    = '198703102012031003'; // role 3, S01

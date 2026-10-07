@@ -6,9 +6,9 @@ namespace Tests\Database\Kepegawaian;
 
 use App\Database\Migrations\AddFkSnapshotKeRiwayat;
 use CodeIgniter\Database\Migration;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\SkemaD1;
 use Throwable;
 
@@ -22,14 +22,8 @@ use Throwable;
  *
  * @internal
  */
-final class SnapshotRiwayatFkTest extends CIUnitTestCase
+final class SnapshotRiwayatFkTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const VERSION = '2026-09-30-131000';
 
     /**
@@ -115,6 +109,7 @@ final class SnapshotRiwayatFkTest extends CIUnitTestCase
      * up() menolak jalan bila snapshot merujuk riwayat yang tidak ada (jumlah per FK), tanpa FK terpasang sebagian;
      * setelah dibereskan, ke-14 FK terpasang; up()/down() aman diulang dan KEY milik migration snapshot tetap.
      */
+    #[Group('db-isolasi-penuh')]
     public function testRefusesOrphansBeforeAnyAlter(): void
     {
         $migration = $this->migrationInstance();

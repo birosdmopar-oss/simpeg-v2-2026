@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Database\Migrations\CreateLokasiPresensi;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Libraries\TipeKolomSkema;
 
 /**
@@ -18,14 +18,9 @@ use Tests\Support\Libraries\TipeKolomSkema;
  *
  * @internal
  */
-final class LokasiPresensiSchemaTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class LokasiPresensiSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const TABLES = ['lokasi_presensi', 'dm_user_lokasi_presensi'];
 
     private const STATUS_COMMENT = '1: Aktif, 2: Tidak Aktif, 10: Dihapus';

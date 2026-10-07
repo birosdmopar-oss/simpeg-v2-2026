@@ -17,8 +17,6 @@ use Closure;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\ConnectionInterface;
 use CodeIgniter\Database\Exceptions\DatabaseException;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
 use Config\Database;
@@ -27,9 +25,11 @@ use InvalidArgumentException;
 use mysqli;
 use mysqli_result;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\CommitFailing\Connection as CommitFailingConnection;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 use Throwable;
 
 /**
@@ -42,16 +42,13 @@ use Throwable;
  *
  * @internal
  */
-final class ResetPasswordTransactionTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class ResetPasswordTransactionTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP     = '199002152015022002';
     private const NEW     = 'PasswordReset789';

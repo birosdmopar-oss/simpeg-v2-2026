@@ -6,11 +6,10 @@ namespace Tests\MasterData;
 
 use App\Constants\Role;
 use CodeIgniter\I18n\Time;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -34,17 +33,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class DiklatHukdisKonketTest extends CIUnitTestCase
+final class DiklatHukdisKonketTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const ADMIN_NIP = '198501012010011001';
 

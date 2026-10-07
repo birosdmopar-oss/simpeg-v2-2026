@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Database\Migrations\CreateFaq;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * DBV-002 — skema G-10 FAQ hasil migration 2026-09-24-000001_CreateFaq harus sama dengan skema yang diajukan ke DB
@@ -15,14 +15,8 @@ use CodeIgniter\Test\DatabaseTestTrait;
  *
  * @internal
  */
-final class FaqSchemaTest extends CIUnitTestCase
+final class FaqSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const TABLES = ['faq_topic', 'faq_sub_topic', 'faq_article', 'faq_rate', 'faq_related_article'];
 
     /**
@@ -175,6 +169,7 @@ final class FaqSchemaTest extends CIUnitTestCase
     /**
      * down() menghapus kelima tabel (urutan anak → induk), up() membuatnya kembali persis.
      */
+    #[Group('db-isolasi-penuh')]
     public function testMigrationRollsBackAndUpAgain(): void
     {
         $migration = $this->migration();
@@ -197,6 +192,7 @@ final class FaqSchemaTest extends CIUnitTestCase
      * sehingga `migrate` bisa langsung diulang tanpa DDL manual. Tabel yang sudah ada sebelum run tidak disentuh.
      * Kegagalan disimulasikan dengan tabel penghalang bernama `faq_rate` (CREATE ke-4 gagal, error 1050).
      */
+    #[Group('db-isolasi-penuh')]
     public function testFailedUpDropsOnlyTablesCreatedInThatRun(): void
     {
         $migration = $this->migration();

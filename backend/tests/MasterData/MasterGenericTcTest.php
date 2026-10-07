@@ -12,15 +12,15 @@ use App\Libraries\MasterData\MasterService;
 use Closure;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\I18n\Time;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestLogger;
+use PHPUnit\Framework\Attributes\Group;
 use ReflectionMethod;
 use ReflectionProperty;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 use Throwable;
 
@@ -36,17 +36,13 @@ use Throwable;
  *
  * @internal
  */
-final class MasterGenericTcTest extends CIUnitTestCase
+final class MasterGenericTcTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const ADMIN_NIP = '198501012010011001';
 
@@ -382,6 +378,7 @@ final class MasterGenericTcTest extends CIUnitTestCase
      * (SIGNAL errno 167 + pesan MariaDB) — tetap lewat driver, MasterModel, dan transaksi engine yang sama dengan
      * produksi. 167 pada kolom selain PK master itu bukan "PK habis": tidak diterjemahkan dan tetap error server (500).
      */
+    #[Group('db-isolasi-penuh')]
     public function testMariaDbAutoIncrementOutOfRangeGives422ForEveryAutoIncrementMaster(): void
     {
         $covered = [];
@@ -452,6 +449,7 @@ final class MasterGenericTcTest extends CIUnitTestCase
      * (dibaca dari DDL): isi tabel (baris, urutan saudara, kolom audit) dan audit_logs tidak berubah walau `order`
      * dikirim, transaksi bersih, named lock dilepas, pesan DB hanya di log. Counter dikembalikan sesudahnya.
      */
+    #[Group('db-isolasi-penuh')]
     public function testAutoIncrementCounterBeyondTinyintPkGives422ForEveryTinyintMaster(): void
     {
         $service = service('masterService');

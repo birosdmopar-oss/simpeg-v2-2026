@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Libraries\UjiJurusanHooks;
 use Tests\Support\MasterDataTestTrait;
 use Tests\Support\MasterUjiTestTrait;
@@ -29,18 +29,14 @@ use Tests\Support\MasterUjiTestTrait;
  *
  * @internal
  */
-final class MasterEngineFeaturesTest extends CIUnitTestCase
+final class MasterEngineFeaturesTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
     use MasterUjiTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const ADMIN_NIP = '198501012010011001';
 
@@ -351,6 +347,7 @@ final class MasterEngineFeaturesTest extends CIUnitTestCase
      * Balapan: permintaan lain meng-commit nilai yang sama SETELAH cek aplikasi lolos (disimulasikan hook lewat koneksi
      * DB kedua). UNIQUE index menolak tulisan (1062); tambah & ubah harus 422 pada field itu, bukan 500.
      */
+    #[Group('db-isolasi-penuh')]
     public function testUniqueFieldRaceIsTranslatedTo422(): void
     {
         $base = 'api/v1/master/uji-jurusan';

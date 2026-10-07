@@ -6,13 +6,12 @@ namespace Tests\Feature;
 
 use App\Constants\Role;
 use App\Libraries\ListQuery;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 use Tests\Support\MasterUjiTestTrait;
 
@@ -30,18 +29,14 @@ use Tests\Support\MasterUjiTestTrait;
  *
  * @internal
  */
-final class ListQueryParamTest extends CIUnitTestCase
+final class ListQueryParamTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
     use MasterUjiTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     /** Master tanpa induk (6 entri seed). */
     private const MASTER = 'api/v1/master/agama';

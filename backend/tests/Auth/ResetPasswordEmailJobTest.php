@@ -13,16 +13,17 @@ use CodeIgniter\Exceptions\ConfigException;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Queue\Entities\QueueJob;
 use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\Mock\MockEmail;
 use Config\Auth as AuthConfig;
 use Config\Email as EmailConfig;
 use Config\Encryption as EncryptionConfig;
 use Config\Queue as QueueConfig;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\ResetEmailTestTrait;
 use Throwable;
 
@@ -36,17 +37,13 @@ use Throwable;
  *
  * @internal
  */
-final class ResetPasswordEmailJobTest extends CIUnitTestCase
+final class ResetPasswordEmailJobTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use ResetEmailTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP      = '199002152015022002';
     private const NIP_LAIN = '198501012010011001';
@@ -176,6 +173,7 @@ final class ResetPasswordEmailJobTest extends CIUnitTestCase
      * Token sudah dipakai, kedaluwarsa, akun nonaktif/terhapus, atau username sudah diganti → tidak kirim, tanpa
      * exception (job selesai, tidak dicoba ulang).
      */
+    #[Group('db-isolasi-penuh')]
     public function testSkipsWithoutSendingWhenTokenOrAccountNoLongerValid(): void
     {
         $this->setAkun(self::NIP, ['email' => self::EMAIL]);
@@ -221,6 +219,7 @@ final class ResetPasswordEmailJobTest extends CIUnitTestCase
         $this->assertNull($mock->archive);
     }
 
+    #[Group('db-isolasi-penuh')]
     public function testAccountWithoutValidEmailIsSkippedWithWarning(): void
     {
         $mock = $this->mockEmailService();

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Database\Kepegawaian;
 
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * DBV-012 — registry kolom NIP, landasan B-06 (ganti NIP = salin baris pegawai → arahkan ulang setiap kolom yang
@@ -27,14 +26,8 @@ use CodeIgniter\Test\DatabaseTestTrait;
  *
  * @internal
  */
-final class NipReferenceRegistryTest extends CIUnitTestCase
+final class NipReferenceRegistryTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     /**
      * FK → `pegawai(nip)` per versi migration: versi => [nama FK => [tabel, kolom]]. DBV-012 = 120000..120100;
      * DBV-013 = 130100..130900 (nama FK = D1 [K]).

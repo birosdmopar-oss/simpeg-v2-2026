@@ -8,15 +8,15 @@ use App\Constants\Role;
 use App\Exceptions\ValidationException;
 use App\Libraries\ApiExceptionHandler;
 use CodeIgniter\Database\Exceptions\DatabaseException;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestLogger;
 use Config\Services;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Controllers\DataErrorProbeController;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -29,17 +29,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class DatabaseDataErrorTest extends CIUnitTestCase
+final class DatabaseDataErrorTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const PROBE_URI = 'api/v1/_probe/write/';
 
@@ -173,6 +169,7 @@ final class DatabaseDataErrorTest extends CIUnitTestCase
         $this->assertSame(422, ApiExceptionHandler::toEnvelope(new ValidationException())[0]);
     }
 
+    #[Group('db-isolasi-penuh')]
     public function testMasterEngineWriteFailureIsRolledBackAndReturns422(): void
     {
         // Simulasikan master yang batas validasinya lebih longgar dari kolom (risiko R2 DBV-003..005): kolom nama agama

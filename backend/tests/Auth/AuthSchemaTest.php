@@ -4,22 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Auth;
 
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-01 — verifikasi eksplisit skema tabel auth (DoD: password_decode tidak ada, password >= 255).
  *
  * @internal
  */
-final class AuthSchemaTest extends CIUnitTestCase
+final class AuthSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     protected function tearDown(): void
     {
         // down() DBV-010 menolak akun tanpa NIP: bersihkan (juga saat test gagal) agar regress test berikutnya berjalan.
