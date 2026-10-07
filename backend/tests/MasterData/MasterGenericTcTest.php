@@ -107,7 +107,12 @@ final class MasterGenericTcTest extends CIUnitTestCase
                 $this->assertArrayHasKey($def->primaryKey, $this->json($result)['errors'], $entity);
             }
 
-            // Nama duplikat (case-insensitive) di lingkup yang sama (induk / uniqueScope).
+            // Nama duplikat (case-insensitive) di lingkup yang sama (induk / uniqueScope). Master bernama turunan
+            // (nameRequired false, aturan lokasi presensi) tidak punya keunikan nama: dua aturan boleh menargetkan
+            // lokasi yang sama (CR-031 C4).
+            if (! $def->nameRequired) {
+                continue;
+            }
             $dupName = $fx['new'];
 
             if (! $def->autoIncrement) {

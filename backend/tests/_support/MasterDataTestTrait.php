@@ -20,7 +20,8 @@ trait MasterDataTestTrait
      *   existing  : kode entri seed (untuk update/status/delete)
      *   parent    : [field, id induk] atau null
      *   update    : (opsional, CR-026) payload PUT pengganti "ubah nama" di test generik — untuk master yang namanya tidak
-     *               bisa diubah (codeAsName, mis. kelas jabatan: nama = kode). Bawaan: nama + " (ubah)"
+     *               bisa diubah (codeAsName, mis. kelas jabatan: nama = kode) atau turunan (nameRequired false, mis.
+     *               aturan lokasi presensi DBV-007). Bawaan: nama + " (ubah)"
      *
      * @return array<string, array{new: array<string, string>, duplicate: string, existing: string, parent: array{0: string, 1: string}|null, update?: array<string, string>}>
      */
@@ -293,6 +294,22 @@ trait MasterDataTestTrait
                 'update'    => ['periode_struktur_jabatan' => '2030'],
             ],
             // --- /DBV-018 ---
+
+            // --- DBV-007 ---
+            // Aturan: nama (target_lp_desc) turunan hook — G-TC mengubah `keterangan` (kunci `update`), bukan nama.
+            'lokasi-presensi' => [
+                'new'       => ['nama_lokasi' => 'Kantor Uji', 'latitude' => '-7.250445', 'longitude' => '112.768845', 'radius' => '25'],
+                'duplicate' => 'Kantor Pusat', 'existing' => '1', 'parent' => null,
+            ],
+            'aturan-lokasi-presensi' => [
+                'new' => [
+                    'target_lp_desc' => '["Gedung Sapta Pesona"]', 'target_lp' => '["2"]', 'target_uns' => '["0"]', 'target_jp' => '["1"]',
+                    'hari_berlaku'   => '1,3,5', 'keterangan' => 'Aturan uji',
+                ],
+                'update'    => ['keterangan' => 'Aturan uji (ubah)'],
+                'duplicate' => '["Gedung Sapta Pesona"]', 'existing' => '1', 'parent' => null,
+            ],
+            // --- /DBV-007 ---
         ];
     }
 

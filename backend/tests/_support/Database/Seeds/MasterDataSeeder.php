@@ -87,6 +87,20 @@ class MasterDataSeeder extends Seeder
         // --- DBV-018 ---
         $this->seedG02b();
         // --- /DBV-018 ---
+
+        // --- DBV-007 ---
+        // Lokasi 1 tidak dirujuk aturan (fixture G-TC: boleh dinonaktifkan/dihapus); lokasi 2 dirujuk aturan aktif 1 (K-5).
+        // Format target/desc = JSON array seperti legacy (Lm_lokasi::set_param_dm).
+        $this->db->table('lokasi_presensi')->insertBatch([
+            ['id_lokasi_presensi' => 1, 'nama_lokasi' => 'Kantor Pusat', 'latitude' => '-6.175392', 'longitude' => '106.824964', 'radius' => 50, 'status' => 1],
+            ['id_lokasi_presensi' => 2, 'nama_lokasi' => 'Gedung Sapta Pesona', 'latitude' => '-6.175400', 'longitude' => '106.827200', 'radius' => 100, 'status' => 1],
+        ]);
+        $this->db->table('dm_user_lokasi_presensi')->insert([
+            'id_dm_user_lokasi_presensi' => 1, 'target_lp' => '["2"]', 'target_lp_desc' => '["Gedung Sapta Pesona"]',
+            'target_uns'                 => '["0"]', 'target_uns_desc' => '["Seluruh Kementerian"]', 'target_jp' => '["1"]',
+            'target_jp_desc'             => '["Pegawai Negeri Sipil"]', 'keterangan' => 'Aturan kantor pusat', 'hari_berlaku' => null, 'status' => 1,
+        ]);
+        // --- /DBV-007 ---
     }
 
     /**

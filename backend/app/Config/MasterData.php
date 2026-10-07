@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Config;
 
+use App\Libraries\MasterData\AturanLokasiPresensiHooks;
 use App\Libraries\MasterData\FaqArticleHooks;
+use App\Libraries\MasterData\LokasiPresensiHooks;
 use App\Libraries\MasterData\MasterHooks;
 use CodeIgniter\Config\BaseConfig;
 
@@ -157,6 +159,7 @@ class MasterData extends BaseConfig
      *     nameField: string,
      *     nameLabel: string,
      *     nameMaxLength: int,
+     *     nameRequired?: bool,
      *     parent?: array{field: string, entity: string}|null,
      *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool, allowSystem?: bool, otherFor?: string}>,
      *     extraSearch?: list<string>,
@@ -1004,5 +1007,35 @@ class MasterData extends BaseConfig
             'auditColumns'  => self::AUDIT,
         ],
         // --- /DBV-018 ---
+
+        // --- DBV-007 (G-03 Master Lokasi Presensi) ---
+        'lokasi-presensi' => [
+            'label'     => 'Lokasi Presensi', 'controller' => 'UmumController',
+            'table'     => 'lokasi_presensi', 'primaryKey' => 'id_lokasi_presensi', 'autoIncrement' => true,
+            'nameField' => 'nama_lokasi', 'nameLabel' => 'Nama Lokasi', 'nameMaxLength' => 255,
+            'hasOrder'  => false, 'auditColumns' => ['created_at', 'created_by', 'updated_at', 'updated_by'],
+            'hooks'     => LokasiPresensiHooks::class,
+            'fields'    => [
+                'latitude'  => ['label' => 'Latitude', 'type' => 'decimal', 'required' => true, 'min' => -90, 'max' => 90],
+                'longitude' => ['label' => 'Longitude', 'type' => 'decimal', 'required' => true, 'min' => -180, 'max' => 180],
+                'radius'    => ['label' => 'Radius (meter)', 'type' => 'decimal', 'required' => true, 'min' => 10, 'hint' => 'Radius minimal 10 meter.'],
+            ],
+        ],
+        'aturan-lokasi-presensi' => [
+            'label'     => 'Aturan Lokasi Presensi', 'controller' => 'UmumController',
+            'table'     => 'dm_user_lokasi_presensi', 'primaryKey' => 'id_dm_user_lokasi_presensi', 'autoIncrement' => true,
+            'nameField' => 'target_lp_desc', 'nameLabel' => 'Target Lokasi', 'nameMaxLength' => 65535, 'nameRequired' => false,
+            'hasOrder'  => false, 'auditColumns' => ['created_at', 'created_by', 'updated_at', 'updated_by'],
+            'hooks'     => AturanLokasiPresensiHooks::class,
+            'fields'    => [
+                // Disimpan sebagai JSON array kompatibel legacy (K-7); form menyusun JSON dari pilihan, *_desc dihitung hook.
+                'target_lp'    => ['label' => 'Target Lokasi', 'type' => 'textarea', 'required' => true],
+                'target_uns'   => ['label' => 'Target Unit/Satker', 'type' => 'textarea', 'required' => true],
+                'target_jp'    => ['label' => 'Jenis Pegawai', 'type' => 'textarea', 'required' => true],
+                'hari_berlaku' => ['label' => 'Hari Berlaku', 'type' => 'text', 'rules' => 'regex_match[/^(?:[1-7](?:,[1-7])*)?$/]', 'hint' => 'Angka unik 1–7 dipisah koma; kosong berarti setiap hari.'],
+                'keterangan'   => ['label' => 'Keterangan', 'type' => 'textarea'],
+            ],
+        ],
+        // --- /DBV-007 ---
     ];
 }

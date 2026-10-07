@@ -97,6 +97,7 @@ final class MasterDefinition
         public readonly string $nameField,
         public readonly string $nameLabel,
         public readonly int $nameMaxLength,
+        public readonly bool $nameRequired = true,
         public readonly ?string $parentField = null,
         public readonly ?string $parentEntity = null,
         public readonly bool $autoIncrement = false,
@@ -135,7 +136,7 @@ final class MasterDefinition
     /**
      * @param array{
      *     label: string, controller: string, table: string, primaryKey: string, idMaxLength?: int,
-     *     nameField: string, nameLabel: string, nameMaxLength: int,
+     *     nameField: string, nameLabel: string, nameMaxLength: int, nameRequired?: bool,
      *     parent?: array{field: string, entity: string}|null,
      *     autoIncrement?: bool, hasOrder?: bool, hasStatus?: bool,
      *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool, allowSystem?: bool, otherFor?: string}>,
@@ -187,6 +188,7 @@ final class MasterDefinition
             nameField: $config['nameField'],
             nameLabel: $config['nameLabel'],
             nameMaxLength: $config['nameMaxLength'],
+            nameRequired: $config['nameRequired'] ?? true,
             parentField: $config['parent']['field'] ?? null,
             parentEntity: $config['parent']['entity'] ?? null,
             autoIncrement: $config['autoIncrement'] ?? false,
@@ -399,6 +401,7 @@ final class MasterDefinition
             'name_field'      => $this->nameField,
             'name_label'      => $this->nameLabel,
             'name_max_length' => $this->nameMaxLength,
+            'name_required'   => $this->nameRequired,
             'has_order'       => $this->hasOrder,
             'has_status'      => $this->hasStatus,
             'parent'          => $this->hasParent() ? ['field' => $this->parentField, 'entity' => $this->parentEntity] : null,
