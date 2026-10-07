@@ -463,6 +463,20 @@ describe('MasterFormDialog — field ref berjenjang, boolean, urutan manual (CR-
       expect(Array.from(select('id_kecamatan').options).map((o) => o.textContent?.trim())).toContain('Gambir (3171010)')
       wrapper.unmount()
     })
+
+    it('tambah kecamatan tanpa induk → pesan memakai label induk "Kabupaten/Kota wajib dipilih." (CR-038, F-UI-3)', async () => {
+      const wrapper = mount(MasterFormDialog, {
+        props: { open: true, meta: { ...kecMeta, auto_increment: false }, allMeta: [provinsiMeta, kabMeta, kecMeta], row: null },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      await submitForm()
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Kabupaten/Kota wajib dipilih.'))
+      expect(document.body.textContent).not.toContain('Induk wajib dipilih.')
+      expect(masterService.create).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
   })
 
   it('edit: pilihan ref gagal dimuat → nilai tersimpan tetap dipertahankan tanpa ditandai non-aktif', async () => {
@@ -605,5 +619,20 @@ describe('MasterFormDialog — select opsional bisa dikosongkan (CR-011, row_jur
       status_pegawai: '1',
     })
     wrapper.unmount()
+  })
+})
+
+describe('MasterFormDialog — tata letak redesign (CR-028 / ISSUE-007)', () => {
+  it('form grid dua kolom di layar lebar; field html memakai dua kolom penuh; Batal/Simpan memakai UiButton', async () => {
+    mountDialog(null)
+    await flushPromises()
+    const form = document.body.querySelector<HTMLFormElement>('form[data-testid="master-form"]')
+    expect(form?.classList).toContain('md:grid-cols-2')
+    const title = document.body.querySelector<HTMLInputElement>('input[name="title"]')
+    expect(title?.closest('form > *')?.classList).not.toContain('md:col-span-2')
+    expect(contentTextarea().closest('form > *')?.classList).toContain('md:col-span-2')
+    const actions = submitButton().parentElement
+    expect(actions?.classList).toContain('md:col-span-2')
+    expect(Array.from(actions?.querySelectorAll('button') ?? []).map((b) => b.textContent?.trim())).toEqual(['Batal', 'Simpan'])
   })
 })

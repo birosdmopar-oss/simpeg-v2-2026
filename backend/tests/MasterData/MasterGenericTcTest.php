@@ -15,7 +15,9 @@ use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\TestLogger;
 use ReflectionMethod;
+use ReflectionProperty;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
@@ -105,7 +107,12 @@ final class MasterGenericTcTest extends CIUnitTestCase
                 $this->assertArrayHasKey($def->primaryKey, $this->json($result)['errors'], $entity);
             }
 
-            // Nama duplikat (case-insensitive) di lingkup yang sama (induk / uniqueScope).
+            // Nama duplikat (case-insensitive) di lingkup yang sama (induk / uniqueScope). Master bernama turunan
+            // (nameRequired false, aturan lokasi presensi) tidak punya keunikan nama: dua aturan boleh menargetkan
+            // lokasi yang sama (CR-031 C4).
+            if (! $def->nameRequired) {
+                continue;
+            }
             $dupName = $fx['new'];
 
             if (! $def->autoIncrement) {
@@ -214,6 +221,17 @@ final class MasterGenericTcTest extends CIUnitTestCase
         ]);
         $result->assertStatus(422);
         $this->assertArrayHasKey('id_kabupaten_kota', $this->json($result)['errors']);
+
+        // CR-038 (F-UI-3): induk kosong / terlalu panjang memakai label master induk, bukan "Induk wajib dipilih.".
+        $result = $this->sendJson('POST', 'api/v1/master/kecamatan', ['id_kecamatan' => '3171099', 'kecamatan' => 'Tanpa Induk']);
+        $result->assertStatus(422);
+        $this->assertSame(['Kabupaten/Kota wajib dipilih.'], $this->json($result)['errors']['id_kabupaten_kota']);
+        $result = $this->sendJson('PUT', 'api/v1/master/kecamatan/3171010', ['id_kabupaten_kota' => '']);
+        $result->assertStatus(422);
+        $this->assertSame(['Kabupaten/Kota wajib dipilih.'], $this->json($result)['errors']['id_kabupaten_kota']);
+        $result = $this->sendJson('POST', 'api/v1/master/kecamatan', ['id_kecamatan' => '3171099', 'id_kabupaten_kota' => '31710', 'kecamatan' => 'Panjang']);
+        $result->assertStatus(422);
+        $this->assertSame(['Kabupaten/Kota tidak valid.'], $this->json($result)['errors']['id_kabupaten_kota']);
 
         // Kode (PK) tidak ikut diubah walaupun dikirim — kode manual maupun AUTO_INCREMENT.
         $this->sendJson('PUT', 'api/v1/master/provinsi/32', ['id_provinsi' => '39', 'provinsi' => 'Jabar'])->assertStatus(200);
@@ -406,7 +424,7 @@ final class MasterGenericTcTest extends CIUnitTestCase
             )->getRowArray()['DATA_TYPE'] === 'tinyint';
         }));
         $this->assertEqualsCanonicalizing(
-            ['agama', 'jenis-pegawai', 'jenis-status', 'bidang-kursem', 'instansi-kursem', 'jenis-libur', 'pangkat', 'jenis-kp', 'gol-pppk', 'bidang-pendidikan', 'diklat'],
+            ['agama', 'jenis-pegawai', 'jenis-status', 'bidang-kursem', 'instansi-kursem', 'jenis-libur', 'pangkat', 'jenis-kp', 'gol-pppk', 'bidang-pendidikan', 'diklat', 'rumpun-jabatan', 'subrumpun-jabatan'],
             $tinyintPk,
         );
 
@@ -424,6 +442,73 @@ final class MasterGenericTcTest extends CIUnitTestCase
         });
 
         $this->dontSeeInDatabase('pangkat', ['gol_ruang' => self::masterFixtures()['pangkat']['new']['gol_ruang']]);
+    }
+
+    /**
+     * CR-041, temuan T-1 review DB Validator PR #16 (DBV-011 2.7): counter AUTO_INCREMENT yang sudah DI ATAS batas tipe
+     * PK — mis. counter legacy 128 yang tersalin ke tabel ber-PK TINYINT — ditolak engine DB tanpa simulasi: MySQL 8
+     * dengan 1467 "Failed to read auto-increment value from storage engine" (dulu lolos sebagai 500), MariaDB 10.4
+     * dengan 167. Keduanya → 422 yang sama dengan PK habis (CR-011) untuk SELURUH master AUTO_INCREMENT ber-PK TINYINT
+     * (dibaca dari DDL): isi tabel (baris, urutan saudara, kolom audit) dan audit_logs tidak berubah walau `order`
+     * dikirim, transaksi bersih, named lock dilepas, pesan DB hanya di log. Counter dikembalikan sesudahnya.
+     */
+    public function testAutoIncrementCounterBeyondTinyintPkGives422ForEveryTinyintMaster(): void
+    {
+        $service = service('masterService');
+        $covered = [];
+        $mariaDb = str_contains($this->db->getVersion(), 'MariaDB');
+
+        foreach (self::masterFixtures() as $key => $fixture) {
+            $def = service('masterRegistry')->get($key);
+
+            if (! $def->autoIncrement || $this->pkDataType($def) !== 'tinyint') {
+                continue;
+            }
+
+            $covered[] = $key;
+            $table     = $this->db->escapeIdentifiers($this->db->prefixTable($def->table));
+            $before    = $this->db->table($def->table)->orderBy($def->primaryKey)->get()->getResultArray();
+            $audits    = $this->db->table('audit_logs')->countAllResults();
+
+            // `order` 1 = jalur sisip (mode geser) / nilai level (mode manual).
+            $payload = $def->hasOrder ? $fixture['new'] + [MasterDefinition::ORDER_FIELD => 1] : $fixture['new'];
+
+            // Catatan log yang diharapkan dari engine ini, lengkap dengan kode error aslinya (bukan simulasi trigger).
+            $logEntry = "Kapasitas AUTO_INCREMENT master {$def->table} habis, diterjemahkan ke 422: " . ($mariaDb
+                ? "[167] Penulisan master data gagal: Out of range value for column '{$def->primaryKey}'"
+                : '[1467] Penulisan master data gagal: Failed to read auto-increment value from storage engine');
+            $logs = self::errorLogCount($logEntry);
+
+            $this->db->query("ALTER TABLE {$table} AUTO_INCREMENT = 128");
+
+            try {
+                $result = $this->sendJson('POST', "api/v1/master/{$key}", $payload);
+
+                $result->assertStatus(422);
+                $this->assertSame(
+                    ['status' => 'error', 'message' => "Kode {$def->label} sudah mencapai batas maksimal tipe kolom, sehingga entri baru tidak bisa ditambahkan. Hubungi admin database."],
+                    $this->json($result),
+                    $key,
+                );
+            } finally {
+                // Nilai di bawah MAX(id)+1 dijepit ke MAX(id)+1: counter kembali normal, tidak mencemari test lain.
+                $this->db->query("ALTER TABLE {$table} AUTO_INCREMENT = 1");
+            }
+
+            // Tepat satu catatan baru dari POST ini. Log TestLogger statis tidak di-reset antar test, dan test 167
+            // simulasi di atas sudah mencatat tabel yang sama, jadi assertLogContains() saja bisa lolos tanpa log ini.
+            $this->assertSame($logs + 1, self::errorLogCount($logEntry), "{$key}: {$logEntry}");
+            $this->assertSame($before, $this->db->table($def->table)->orderBy($def->primaryKey)->get()->getResultArray(), $key);
+            $this->assertSame($audits, $this->db->table('audit_logs')->countAllResults(), $key);
+            $this->assertTrue($this->db->transStatus(), $key);
+            $this->assertSame('1', (string) $this->db->query('SELECT IS_FREE_LOCK(?) AS free', [$service->lockName($def)])->getRow()->free, $key);
+        }
+
+        // Kasus T-1 tercakup; master ber-PK TINYINT baru otomatis ikut karena daftarnya dibaca dari DDL.
+        $this->assertContains('jenis-kp', $covered);
+
+        // Counter sudah dikembalikan: tambah yang sama kini berhasil, jadi 422 tadi murni karena counter.
+        $this->sendJson('POST', 'api/v1/master/jenis-kp', self::masterFixtures()['jenis-kp']['new'])->assertStatus(201);
     }
 
     /**
@@ -722,7 +807,8 @@ final class MasterGenericTcTest extends CIUnitTestCase
             $created = $this->json($this->sendJson('POST', "api/v1/master/{$entity}", $fx['new']))['data'];
             $id      = (string) $created[$def->primaryKey];
 
-            $this->sendJson('PUT', "api/v1/master/{$entity}/{$id}", [$def->nameField => $fx['new'][$def->nameField] . ' (ubah)'])->assertStatus(200);
+            // Fixture `update` (CR-026): master yang namanya = kode (kelas jabatan) mengubah kolom lain.
+            $this->sendJson('PUT', "api/v1/master/{$entity}/{$id}", $fx['update'] ?? [$def->nameField => $fx['new'][$def->nameField] . ' (ubah)'])->assertStatus(200);
             $this->delete("api/v1/master/{$entity}/{$id}")->assertStatus(200);
 
             foreach (['create', 'update', 'delete'] as $event) {
@@ -865,6 +951,31 @@ final class MasterGenericTcTest extends CIUnitTestCase
         } finally {
             $this->db->query('DROP TRIGGER IF EXISTS ' . self::MARIADB_167_TRIGGER);
         }
+    }
+
+    /**
+     * Tipe kolom PK master di DDL (information_schema.COLUMNS.DATA_TYPE), mis. `tinyint`.
+     */
+    private function pkDataType(MasterDefinition $def): string
+    {
+        return (string) $this->db->query(
+            'SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+            [$this->db->prefixTable($def->table), $def->primaryKey],
+        )->getRowArray()['DATA_TYPE'];
+    }
+
+    /**
+     * Jumlah catatan log level error yang memuat $needle sejauh ini (log TestLogger statis, terkumpul lintas test).
+     */
+    private static function errorLogCount(string $needle): int
+    {
+        /** @var list<array{level: mixed, message: string, file: string|null}> $logs */
+        $logs = (new ReflectionProperty(TestLogger::class, 'op_logs'))->getValue();
+
+        return count(array_filter(
+            $logs,
+            static fn (array $log): bool => strtolower((string) $log['level']) === 'error' && str_contains($log['message'], $needle),
+        ));
     }
 
     /**

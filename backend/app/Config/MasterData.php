@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Config;
 
+use App\Libraries\MasterData\AturanLokasiPresensiHooks;
 use App\Libraries\MasterData\FaqArticleHooks;
+use App\Libraries\MasterData\LokasiPresensiHooks;
 use App\Libraries\MasterData\MasterHooks;
 use CodeIgniter\Config\BaseConfig;
 
@@ -54,6 +56,10 @@ use CodeIgniter\Config\BaseConfig;
  *     'systemIds'     => kode baris sistem (CR-010, mis. sentinel LAIN-LAIN wilayah): tidak tampil di options/daftar
  *                        admin, tidak ikut urutan, tidak bisa diubah/dihapus/menjadi induk; hanya bisa dirujuk field
  *                        ref ber-allowSystem,
+ *     'hasOrder'      => false bila tabel tanpa kolom `order` (bawaan true; mis. jabatan & kelas jabatan, DBV-008),
+ *     'codeAsName'    => kode (PK) sekaligus nama tampilan: nameField = primaryKey, tidak bisa diubah (CR-026, mis.
+ *                        kelas_jabatan — PK alami tanpa kolom nama),
+ *     'idRange'       => [min, max]: kode manual berupa bilangan bulat tanpa nol di depan dalam rentang itu (CR-026),
  *   ]
  *
  * Keunikan nama berlaku per induk (mis. nama kecamatan unik dalam satu kabupaten/kota), termasuk entri tidak aktif
@@ -126,6 +132,21 @@ class MasterData extends BaseConfig
     private const AUDIT_G06 = ['updated_at', 'updated_by'];
     // --- /DBV-005 ---
 
+    // --- DBV-008 (konstanta) ---
+    /**
+     * DBV-008 (G-02): flag UPT unit & satker — TINYINT(1) 1/0 [K] D1:6890, :7508 + CHECK chk_*_is_upt. Legacy form: radio YA/TIDAK.
+     */
+    private const DBV008_IS_UPT = ['label' => 'UPT', 'type' => 'boolean', 'hint' => 'Centang bila merupakan Unit Pelaksana Teknis (UPT).'];
+
+    /**
+     * DBV-008 (G-02): kolom kop dokumen & KPPN unit/satker [K] D1 (label legacy `unit/form.php`, `satker/form.php`; legacy
+     * salah memberi label "Tembusan KPPN" pada `lokasi_kppn`).
+     */
+    private const DBV008_TEMBUSAN_KPPN = ['label' => 'Tembusan KPPN', 'rules' => 'max_length[256]'];
+
+    private const DBV008_LOKASI_KPPN = ['label' => 'Lokasi KPPN', 'rules' => 'max_length[50]'];
+    // --- /DBV-008 ---
+
     /**
      * @var array<string, array{
      *     label: string,
@@ -138,6 +159,7 @@ class MasterData extends BaseConfig
      *     nameField: string,
      *     nameLabel: string,
      *     nameMaxLength: int,
+     *     nameRequired?: bool,
      *     parent?: array{field: string, entity: string}|null,
      *     fields?: array<string, array{label: string, type?: string, required?: bool, rules?: string, options?: array<string|int, string>, hint?: string, maxBytes?: int, columnType?: string, min?: int|float, max?: int|float, entity?: string, dependsOn?: string, checkDependsOn?: bool, allowSystem?: bool, otherFor?: string}>,
      *     extraSearch?: list<string>,
@@ -153,7 +175,11 @@ class MasterData extends BaseConfig
      *     uniqueFields?: array<int|string, string|list<string>>,
      *     filters?: list<string>,
      *     statusChain?: bool,
-     *     systemIds?: list<string>
+     *     systemIds?: list<string>,
+     *     hasOrder?: bool,
+     *     hasStatus?: bool,
+     *     codeAsName?: bool,
+     *     idRange?: array{0: int, 1: int}
      * }>
      */
     public array $entities = [
@@ -613,7 +639,7 @@ class MasterData extends BaseConfig
         // --- /DBV-004 ---
 
         // --- DBV-005 (G-06 diklat, hukdis, konket, tanda jasa) ---
-        // G-06 (DBV-005/CR-012 ⏳). Legacy hr/master/c_diklat|c_hukdis|c_konket|c_tj (Lm_*.php), CRUD role 1; dropdown UL_ALL
+        // G-06 (DBV-005/CR-012 ✅, di main). Legacy hr/master/c_diklat|c_hukdis|c_konket|c_tj (Lm_*.php), CRUD role 1; dropdown UL_ALL
         // (riwayat B-11/B-13/B-14/B-17, presensi D-06). Skema: backend/docs/db-review/G-06-diklat-hukdis-konket-tanda-jasa-schema.md.
         // Baris ber-ID hard-coded legacy (G-06 Bagian 2.6) sengaja tidak dikunci (B6). Kolom `order` TINYINT → orderColumnType.
         'diklat' => [
@@ -731,5 +757,285 @@ class MasterData extends BaseConfig
             'auditColumns'    => self::AUDIT_G06,
         ],
         // --- /DBV-005 ---
+
+        // --- DBV-008 (G-02 jabatan, unit, satker) ---
+        // G-02 (DBV-008/CR-026 ✅, di main lewat PR #17). Legacy hr/master/c_jabatan (Lm_jabatan.php), CRUD role 1; dropdown UL_ALL (ISSUE-012,
+        // tanpa parameter `restrict` — usulan G-02 Bagian 8). Skema: backend/docs/db-review/G-02-jabatan-unit-satker-schema.md.
+        // Baris ber-ID hard-coded legacy (G-02 Bagian 2.8) sengaja tidak dikunci. `peta_jabatan` dan tabel jabatan lain
+        // → DBV-018 (blok di bawah, G-02b). Kolom audit keenam tabel = self::AUDIT (created_at/updated_at/updated_by [K] D1).
+        'unit' => [
+            'label'         => 'Unit Kerja',
+            'controller'    => 'JabatanController',
+            'table'         => 'unit',
+            'primaryKey'    => 'id_unit',
+            'autoIncrement' => true,
+            'nameField'     => 'unit',
+            'nameLabel'     => 'Unit Kerja',
+            'nameMaxLength' => 150,
+            'parent'        => null,
+            'fields'        => [
+                'is_upt'            => self::DBV008_IS_UPT,
+                'alamat_pdf_header' => ['label' => 'Alamat PDF Header', 'type' => 'textarea', 'maxBytes' => 255, 'hint' => 'Alamat unit pada kop dokumen PDF. Maksimal 255 byte.'],
+                'tembusan_kppn'     => self::DBV008_TEMBUSAN_KPPN,
+                'lokasi_kppn'       => self::DBV008_LOKASI_KPPN,
+            ],
+            'auditColumns'    => self::AUDIT,
+            'orderColumnType' => 'int',
+        ],
+        // Satker per unit: nama unik per unit (uq_satker_nama), urutan per unit, dropdown `satker/options?parent={id_unit}`
+        // hanya memuat satker aktif yang unitnya aktif (statusChain). `logo_uns` disimpan, belum dikelola (hiddenColumns).
+        'satker' => [
+            'label'         => 'Satuan Kerja',
+            'controller'    => 'JabatanController',
+            'table'         => 'satker',
+            'primaryKey'    => 'id_satker',
+            'autoIncrement' => true,
+            'nameField'     => 'satker',
+            'nameLabel'     => 'Satuan Kerja',
+            'nameMaxLength' => 150,
+            'parent'        => ['field' => 'id_unit', 'entity' => 'unit'],
+            'fields'        => [
+                // DoD G-02: offset waktu presensi (legacy "WIB + N menit", mask 0-120); CHECK chk_satker_zonasi lapis kedua.
+                'zonasi' => [
+                    'label'    => 'Zonasi Presensi (menit)',
+                    'type'     => 'int',
+                    'required' => true,
+                    'min'      => 0,
+                    'max'      => 120,
+                    'hint'     => 'Selisih jam presensi dari WIB dalam menit: 0 = WIB, 60 = WITA, 120 = WIT.',
+                ],
+                'is_upt'            => self::DBV008_IS_UPT,
+                'alamat_pdf_header' => ['label' => 'Alamat PDF Header', 'type' => 'textarea', 'maxBytes' => 65535, 'hint' => 'Alamat satker pada kop dokumen PDF.'],
+                'tembusan_kppn'     => self::DBV008_TEMBUSAN_KPPN,
+                'lokasi_kppn'       => self::DBV008_LOKASI_KPPN,
+            ],
+            'hiddenColumns'   => ['logo_uns'],
+            'auditColumns'    => self::AUDIT,
+            'orderColumnType' => 'smallint',
+            'statusChain'     => true,
+        ],
+        'group-jabatan' => [
+            'label'           => 'Group Jabatan',
+            'controller'      => 'JabatanController',
+            'table'           => 'group_jabatan',
+            'primaryKey'      => 'id_group_jabatan',
+            'autoIncrement'   => true,
+            'nameField'       => 'group_jabatan',
+            'nameLabel'       => 'Group Jabatan',
+            'nameMaxLength'   => 45,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT,
+            'orderColumnType' => 'tinyint',
+        ],
+        // Sub group per group ([K] D1:7183-7195): nama unik per group, urutan per group [V2], dropdown hanya sub group aktif yang
+        // group-nya aktif (statusChain). Pindah group ditolak bila sudah dirujuk jabatan (SubGroupJabatanHooks).
+        'sub-group-jabatan' => [
+            'label'         => 'Sub Group Jabatan',
+            'controller'    => 'JabatanController',
+            'table'         => 'sub_group_jabatan',
+            'primaryKey'    => 'id_sub_group_jabatan',
+            'autoIncrement' => true,
+            'nameField'     => 'sub_group_jabatan',
+            'nameLabel'     => 'Sub Group Jabatan',
+            'nameMaxLength' => 100,
+            'parent'        => ['field' => 'id_group_jabatan', 'entity' => 'group-jabatan'],
+            'fields'        => [
+                // Legacy radio YA/TIDAK wajib (Lm_jabatan.php:973, :1015); dipakai riwayat jabatan (B-07).
+                'need_satker' => [
+                    'label'    => 'Butuh Satuan Kerja',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'Ya', 2 => 'Tidak'],
+                    'hint'     => 'Ya = jabatan pada sub group ini dipilih per satuan kerja di riwayat jabatan.',
+                ],
+            ],
+            // FQCN (tanpa baris `use` baru) supaya kepala file tidak bentrok dengan grup DBV lain saat merge.
+            'hooks'           => \App\Libraries\MasterData\SubGroupJabatanHooks::class,
+            'auditColumns'    => self::AUDIT,
+            'orderColumnType' => 'tinyint',
+            'statusChain'     => true,
+        ],
+        // Kelas jabatan: PK alami = nomor kelas (TINYINT [K] D1:2028, bukan AUTO_INCREMENT) tanpa kolom nama → kode = nama
+        // (codeAsName, CR-026), nomor 1-20 (mask form legacy kelas/form.php:73-74, CHECK chk_kelas_jabatan_kelas_jabatan).
+        // Nomor kelas tidak bisa diubah; hanya `tukin` & status. Tanpa `order` (urutan alami = nomor kelas).
+        'kelas-jabatan' => [
+            'label'         => 'Kelas Jabatan',
+            'controller'    => 'JabatanController',
+            'table'         => 'kelas_jabatan',
+            'primaryKey'    => 'kelas_jabatan',
+            'idMaxLength'   => 2,
+            'idRange'       => [1, 20],
+            'codeAsName'    => true,
+            'nameField'     => 'kelas_jabatan',
+            'nameLabel'     => 'Kelas Jabatan',
+            'nameMaxLength' => 2,
+            'parent'        => null,
+            'hasOrder'      => false,
+            'fields'        => [
+                'tukin' => [
+                    'label'    => 'Tunjangan Kinerja',
+                    'type'     => 'int',
+                    'required' => true,
+                    'min'      => 0,
+                    'hint'     => 'Nominal tunjangan kinerja per bulan (rupiah) untuk kelas jabatan ini.',
+                ],
+            ],
+            'auditColumns' => self::AUDIT,
+        ],
+        // Jabatan [K]: group & sub group wajib (dropdown berjenjang, sub group harus di bawah group yang dipilih), satker
+        // dan kelas opsional (JF/Pelaksana tanpa satker, legacy form.php). Nama unik per (sub group, satker) — termasuk
+        // satker kosong, yang hanya ditegakkan aplikasi (UNIQUE DB tidak membandingkan NULL). Tanpa `order` (legacy
+        // urut kelas/id). `id_jenjang_jf` tidak dikelola engine (FK ke jenjang_jf dibuat DBV-018, tanpa CRUD — G-02b Bagian 4 #12).
+        'jabatan' => [
+            'label'         => 'Jabatan',
+            'controller'    => 'JabatanController',
+            'table'         => 'jabatan',
+            'primaryKey'    => 'id_jabatan',
+            'autoIncrement' => true,
+            'nameField'     => 'jabatan',
+            'nameLabel'     => 'Jabatan',
+            'nameMaxLength' => 250,
+            'parent'        => null,
+            'hasOrder'      => false,
+            'fields'        => [
+                'id_group_jabatan'     => ['label' => 'Group Jabatan', 'type' => 'ref', 'entity' => 'group-jabatan', 'required' => true],
+                'id_sub_group_jabatan' => [
+                    'label'     => 'Sub Group Jabatan',
+                    'type'      => 'ref',
+                    'entity'    => 'sub-group-jabatan',
+                    'required'  => true,
+                    'dependsOn' => 'id_group_jabatan',
+                ],
+                'id_satker' => [
+                    'label'  => 'Satuan Kerja',
+                    'type'   => 'ref',
+                    'entity' => 'satker',
+                    'hint'   => 'Kosongkan untuk jabatan yang tidak terikat satuan kerja (mis. jabatan fungsional/pelaksana).',
+                ],
+                'kelas_jabatan' => ['label' => 'Kelas Jabatan', 'type' => 'ref', 'entity' => 'kelas-jabatan'],
+                // Legacy mask 50-80 (views/hr/master/jabatan/form.php:164-168), opsional.
+                'umur_pensiun' => [
+                    'label' => 'Umur Pensiun',
+                    'type'  => 'int',
+                    'min'   => 50,
+                    'max'   => 80,
+                    'hint'  => 'Opsional, 50 sampai 80. Kosongkan bila mengikuti batas usia pensiun umum.',
+                ],
+            ],
+            'uniqueScope'   => ['id_sub_group_jabatan', 'id_satker'],
+            'filters'       => ['id_group_jabatan', 'id_sub_group_jabatan', 'id_satker', 'kelas_jabatan'],
+            'hiddenColumns' => ['id_jenjang_jf'],
+            'auditColumns'  => self::AUDIT,
+        ],
+        // --- /DBV-008 ---
+
+        // --- DBV-018 (G-02 sisa) ---
+        // G-02 sisa (DBV-018/CR-032 ✅, di main lewat PR #18). Legacy hr/master/c_jabatan rumpun/subrumpun/jabaka/periode (Lm_jabatan.php), CRUD
+        // role 1, dropdown UL_ALL. Skema: backend/docs/db-review/G-02b-jabatan-sisa-schema.md. Tabel DBV-018 lain
+        // (`jenjang_jf` tanpa UI legacy; `peta_jabatan`, `struktur_jabatan`, `jabatan_koordinasi` tidak cocok engine
+        // generik) tidak didaftarkan di sini — G-02b Bagian 2.9.
+        // Rumpun jabatan [K] D1:6678-6688: urutan global (legacy "Urutan" 1-100), created_by diisi saat tambah (legacy).
+        'rumpun-jabatan' => [
+            'label'           => 'Rumpun Jabatan',
+            'controller'      => 'JabatanController',
+            'table'           => 'rumpun_jabatan',
+            'primaryKey'      => 'id_rumpun_jabatan',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'rumpun_jabatan',
+            'nameLabel'       => 'Rumpun Jabatan',
+            'nameMaxLength'   => 50,
+            'parent'          => null,
+            'auditColumns'    => self::AUDIT_FAQ,
+            'orderColumnType' => 'tinyint',
+        ],
+        // Sub rumpun per rumpun [K] D1:7165-7178: nama unik per rumpun, urutan per rumpun, dropdown hanya sub rumpun aktif
+        // yang rumpunnya aktif (statusChain; legacy list_subrumpun_jabatan dipakai riwayat jabatan B-07).
+        'subrumpun-jabatan' => [
+            'label'           => 'Sub Rumpun Jabatan',
+            'controller'      => 'JabatanController',
+            'table'           => 'subrumpun_jabatan',
+            'primaryKey'      => 'id_subrumpun_jabatan',
+            'autoIncrement'   => true,
+            'idMaxLength'     => 3,
+            'nameField'       => 'subrumpun_jabatan',
+            'nameLabel'       => 'Sub Rumpun Jabatan',
+            'nameMaxLength'   => 255,
+            'parent'          => ['field' => 'id_rumpun_jabatan', 'entity' => 'rumpun-jabatan'],
+            'auditColumns'    => self::AUDIT_FAQ,
+            'orderColumnType' => 'tinyint',
+            'statusChain'     => true,
+        ],
+        // Jabatan akademik [K] D1:1495-1505: tanpa `order` (legacy urut nama). is_atasan wajib (radio legacy YA/TIDAK,
+        // akademik/form.php:39-50); CHECK chk_jabatan_akademik_is_atasan lapis kedua.
+        'jabatan-akademik' => [
+            'label'         => 'Jabatan Akademik',
+            'controller'    => 'JabatanController',
+            'table'         => 'jabatan_akademik',
+            'primaryKey'    => 'id_jabatan_akademik',
+            'autoIncrement' => true,
+            'nameField'     => 'jabatan_akademik',
+            'nameLabel'     => 'Jabatan Akademik',
+            'nameMaxLength' => 255,
+            'parent'        => null,
+            'hasOrder'      => false,
+            'fields'        => [
+                'is_atasan' => [
+                    'label'    => 'Jabatan Atasan',
+                    'type'     => 'select',
+                    'required' => true,
+                    'options'  => [1 => 'Ya', 2 => 'Tidak'],
+                ],
+            ],
+            'auditColumns' => self::AUDIT_FAQ,
+        ],
+        // Periode struktur jabatan [K] D1:3880-3888: nama = tahun periode (legacy mask 2000-3000, periode/form.php:43,
+        // :66-69) — ditegakkan PeriodeStrukturJabatanHooks. Tanpa `order`. Dipakai struktur jabatan (konsumen legacy
+        // mengambil periode aktif terbaru).
+        'periode-struktur-jabatan' => [
+            'label'         => 'Periode Struktur Jabatan',
+            'controller'    => 'JabatanController',
+            'table'         => 'periode_struktur_jabatan',
+            'primaryKey'    => 'id_periode_struktur_jabatan',
+            'autoIncrement' => true,
+            'nameField'     => 'periode_struktur_jabatan',
+            'nameLabel'     => 'Periode Struktur',
+            'nameMaxLength' => 45,
+            'parent'        => null,
+            'hasOrder'      => false,
+            'hooks'         => \App\Libraries\MasterData\PeriodeStrukturJabatanHooks::class,
+            'auditColumns'  => self::AUDIT,
+        ],
+        // --- /DBV-018 ---
+
+        // --- DBV-007 (G-03 Master Lokasi Presensi) ---
+        'lokasi-presensi' => [
+            'label'     => 'Lokasi Presensi', 'controller' => 'UmumController',
+            'table'     => 'lokasi_presensi', 'primaryKey' => 'id_lokasi_presensi', 'autoIncrement' => true,
+            'nameField' => 'nama_lokasi', 'nameLabel' => 'Nama Lokasi', 'nameMaxLength' => 255,
+            'hasOrder'  => false, 'auditColumns' => ['created_at', 'created_by', 'updated_at', 'updated_by'],
+            'hooks'     => LokasiPresensiHooks::class,
+            'fields'    => [
+                'latitude'  => ['label' => 'Latitude', 'type' => 'decimal', 'required' => true, 'min' => -90, 'max' => 90],
+                'longitude' => ['label' => 'Longitude', 'type' => 'decimal', 'required' => true, 'min' => -180, 'max' => 180],
+                'radius'    => ['label' => 'Radius (meter)', 'type' => 'decimal', 'required' => true, 'min' => 10, 'hint' => 'Radius minimal 10 meter.'],
+            ],
+        ],
+        'aturan-lokasi-presensi' => [
+            'label'     => 'Aturan Lokasi Presensi', 'controller' => 'UmumController',
+            'table'     => 'dm_user_lokasi_presensi', 'primaryKey' => 'id_dm_user_lokasi_presensi', 'autoIncrement' => true,
+            'nameField' => 'target_lp_desc', 'nameLabel' => 'Target Lokasi', 'nameMaxLength' => 65535, 'nameRequired' => false,
+            'hasOrder'  => false, 'auditColumns' => ['created_at', 'created_by', 'updated_at', 'updated_by'],
+            'hooks'     => AturanLokasiPresensiHooks::class,
+            'fields'    => [
+                // Disimpan sebagai JSON array kompatibel legacy (K-7); form menyusun JSON dari pilihan, *_desc dihitung hook.
+                'target_lp'    => ['label' => 'Target Lokasi', 'type' => 'textarea', 'required' => true],
+                'target_uns'   => ['label' => 'Target Unit/Satker', 'type' => 'textarea', 'required' => true],
+                'target_jp'    => ['label' => 'Jenis Pegawai', 'type' => 'textarea', 'required' => true],
+                'hari_berlaku' => ['label' => 'Hari Berlaku', 'type' => 'text', 'rules' => 'regex_match[/^(?:[1-7](?:,[1-7])*)?$/]', 'hint' => 'Angka unik 1–7 dipisah koma; kosong berarti setiap hari.'],
+                'keterangan'   => ['label' => 'Keterangan', 'type' => 'textarea'],
+            ],
+        ],
+        // --- /DBV-007 ---
     ];
 }

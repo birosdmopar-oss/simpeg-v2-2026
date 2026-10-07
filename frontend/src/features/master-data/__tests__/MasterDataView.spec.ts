@@ -377,3 +377,70 @@ describe('MasterDataView — menu aksi baris ⋮ per status (CR-015)', () => {
     wrapper.unmount()
   })
 })
+
+describe('MasterDataView — tata letak sempit & label daftar master (CR-038)', () => {
+  /** Ukuran area gulir tabel (jsdom tidak menghitung tata letak). */
+  function setScrollSize(el: HTMLElement, size: { scrollWidth: number; clientWidth: number; scrollLeft: number }): void {
+    Object.defineProperty(el, 'scrollWidth', { configurable: true, value: size.scrollWidth })
+    Object.defineProperty(el, 'clientWidth', { configurable: true, value: size.clientWidth })
+    Object.defineProperty(el, 'scrollLeft', { configurable: true, writable: true, value: size.scrollLeft })
+  }
+
+  it('F-UI-2: header & sel Aksi menempel di kanan (sticky) berlatar sama dengan baris; header utuh "Aksi"', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+
+    const header = wrapper.get('[data-testid="master-col-actions"]')
+    expect(header.text()).toBe('Aksi')
+    expect(header.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'bg-slate-50', 'whitespace-nowrap']))
+    // INFO-6 (CR-040): selektor prefiks tombol baris tidak boleh mengenai header kolom.
+    for (const el of wrapper.findAll('[data-testid^="master-actions-"]')) {
+      expect(el.element.tagName).not.toBe('TH')
+    }
+
+    const cell = wrapper.get('[data-testid="master-actions-1"]').element.closest('td') as HTMLElement
+    expect([...cell.classList]).toEqual(expect.arrayContaining(['sticky', 'right-0', 'bg-white', 'group-hover:bg-slate-50']))
+    expect(cell.closest('tr')?.classList.contains('group')).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('F-UI-2: bayangan pemisah hanya selama masih ada kolom tergulir di bawah kolom Aksi', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const scroller = wrapper.get('[data-testid="master-table-scroll"]')
+    const header = () => wrapper.get('[data-testid="master-col-actions"]')
+    const cell = () => wrapper.get('[data-testid="master-actions-1"]').element.closest('td') as HTMLElement
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+
+    // Layar sempit: tabel 700px di area 390px, belum digeser → ada isi di bawah kolom Aksi.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 700, clientWidth: 390, scrollLeft: 0 })
+    await scroller.trigger('scroll')
+    expect(header().classes()).toContain('shadow-sticky-end')
+    expect(cell().classList.contains('shadow-sticky-end')).toBe(true)
+
+    // Digeser sampai ujung kanan → tidak ada yang tertutup lagi.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 700, clientWidth: 390, scrollLeft: 310 })
+    await scroller.trigger('scroll')
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+
+    // Layar lebar setelah resize jendela: tabel muat → tanpa bayangan.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 900, clientWidth: 600, scrollLeft: 0 })
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+    expect(header().classes()).toContain('shadow-sticky-end')
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 900, clientWidth: 900, scrollLeft: 0 })
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+    wrapper.unmount()
+  })
+
+  it('F-UI-1: label master panjang boleh turun baris di kolom kiri layar lebar (tidak dipotong)', async () => {
+    vi.mocked(masterService.meta).mockResolvedValue([...metas, metaOf('kursem-instansi', 'Instansi Penyelenggara Kursus/Seminar')])
+    const wrapper = await mountMaster('provinsi')
+
+    const item = wrapper.get('[data-testid="master-nav-kursem-instansi"]')
+    expect(item.text()).toBe('Instansi Penyelenggara Kursus/Seminar')
+    expect(item.classes()).toEqual(expect.arrayContaining(['lg:whitespace-normal', 'lg:break-words']))
+    expect(item.classes()).not.toContain('truncate')
+    wrapper.unmount()
+  })
+})

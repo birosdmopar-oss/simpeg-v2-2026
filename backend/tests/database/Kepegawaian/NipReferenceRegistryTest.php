@@ -131,6 +131,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
         'riwayat_skp.nip_atasan_penilai'          => 'legacy tanpa FK (atasan penilai bisa di luar instansi)',
         'riwayat_skp_periodik.nip'                => 'data API BKN e-Kinerja, tanpa FK',
         'riwayat_skp_periodik.pegawai_atasan_nip' => 'data API BKN e-Kinerja, tanpa FK',
+        'jabatan_koordinasi.nip'                  => 'legacy tanpa FK (D1; DBV-018), pejabat koordinasi — tetap diarahkan ulang di B-06',
     ];
 
     /**

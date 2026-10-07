@@ -3,7 +3,14 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { ancestorChain, buildMasterSchema, fieldsMissingFromRow, isManualOrder, MASTER_HTML_MAX_BYTES } from '../schemas/master.schema'
+import {
+  ancestorChain,
+  buildMasterSchema,
+  fieldsMissingFromRow,
+  formatDerivedName,
+  isManualOrder,
+  MASTER_HTML_MAX_BYTES,
+} from '../schemas/master.schema'
 import type { MasterMeta } from '../types'
 
 const meta = (
@@ -55,6 +62,18 @@ const kodeBebas = meta('kode-bebas', 'id_kode', 'nama_kode', null, { id_max_leng
 const all = [agama, provinsi, kab, kec, kel]
 
 describe('buildMasterSchema', () => {
+  it('allows derived names for structured G-03 rules', () => {
+    const aturan: MasterMeta = {
+      ...agama,
+      key: 'aturan-lokasi-presensi',
+      name_field: 'target_lp_desc',
+      name_label: 'Target Lokasi',
+      name_required: false,
+      fields: [],
+    }
+
+    expect(buildMasterSchema(aturan, false).safeParse({}).success).toBe(true)
+  })
   it('create master AUTO_INCREMENT: kode tidak diminta, nama wajib, order opsional', () => {
     const schema = buildMasterSchema(agama, false)
     expect(schema.safeParse({ agama: 'Kepercayaan', order: '' }).success).toBe(true)
@@ -103,6 +122,27 @@ describe('buildMasterSchema', () => {
     const noParent = schema.safeParse({ kelurahan: 'Petojo', id_kecamatan: '' })
     expect(noParent.success).toBe(false)
     if (!noParent.success) expect(noParent.error.issues[0]?.path[0]).toBe('id_kecamatan')
+  })
+
+  it('pesan induk kosong memakai label master induk, bukan "Induk wajib dipilih." (CR-038, F-UI-3)', () => {
+    const labelled = [{ ...kab, label: 'Kabupaten/Kota' }, { ...kec, label: 'Kecamatan' }]
+    for (const [child, field, expected] of [
+      [kec, 'id_kabupaten_kota', 'Kabupaten/Kota wajib dipilih.'],
+      [kel, 'id_kecamatan', 'Kecamatan wajib dipilih.'],
+    ] as const) {
+      for (const value of ['', undefined]) {
+        const result = buildMasterSchema(child, true, labelled).safeParse({ [child.name_field]: 'Nama', [field]: value })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          const issue = result.error.issues.find((i) => i.path[0] === field)
+          expect(issue?.message).toBe(expected)
+        }
+      }
+    }
+    // Meta induk tidak tersedia (cadangan): tetap berpesan, dengan kata "Induk".
+    const fallback = buildMasterSchema(kel, true).safeParse({ kelurahan: 'Petojo', id_kecamatan: '' })
+    expect(fallback.success).toBe(false)
+    if (!fallback.success) expect(fallback.error.issues[0]?.message).toBe('Induk wajib dipilih.')
   })
 })
 
@@ -255,5 +295,15 @@ describe('CR-009 — batas angka, boolean, ref, urutan manual', () => {
     expect(buildMasterSchema(shift, false).safeParse({ agama: 'X', order: '500' }).success).toBe(true)
     // Meta lama tanpa order_mode = shift.
     expect(isManualOrder(agama)).toBe(false)
+  })
+})
+
+describe('formatDerivedName (G-03 *_desc legacy)', () => {
+  it('JSON array nama → teks dipisah koma; nilai lain apa adanya', () => {
+    expect(formatDerivedName('["Kantor Pusat","Gedung Sapta Pesona"]')).toBe('Kantor Pusat, Gedung Sapta Pesona')
+    expect(formatDerivedName('[]')).toBe('')
+    expect(formatDerivedName('Kantor Pusat')).toBe('Kantor Pusat')
+    expect(formatDerivedName('[rusak')).toBe('[rusak')
+    expect(formatDerivedName('{"a":1}')).toBe('{"a":1}')
   })
 })

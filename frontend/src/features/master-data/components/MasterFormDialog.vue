@@ -14,6 +14,8 @@
  * di akhir daftar seperti legacy). Memilih LAIN-LAIN mengisi LAIN-LAIN di semua level turunan; level di bawah
  * LAIN-LAIN terkunci pada LAIN-LAIN tanpa memanggil API. Field ber-`other_for` hanya tampil (dan wajib) bila field
  * ref-nya LAIN-LAIN; saat disembunyikan nilainya dikosongkan.
+ * CR-026 (kelas jabatan, DBV-008): master `code_as_name` (kode = nama) hanya punya input kode (berlabel nama master,
+ * dibatasi `id_range`) saat tambah dan tanpa input nama; nilai nama terkirim = kode, jadi kode tidak berubah saat edit.
  */
 import { toTypedSchema } from '@vee-validate/zod'
 import { X } from 'lucide-vue-next'
@@ -23,6 +25,8 @@ import { computed, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
+import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
+import UiButton from '@/shared/ui/UiButton.vue'
 
 import { resolveAncestorPath, useCascadeOptions } from '../composables/useCascadeOptions'
 import {
@@ -38,6 +42,8 @@ import {
 import { masterService } from '../services/master.service'
 import type { MasterFieldMeta, MasterFormValues, MasterMeta, MasterOption, MasterRow } from '../types'
 
+import CheckboxGroupField from './CheckboxGroupField.vue'
+
 const props = defineProps<{ open: boolean; meta: MasterMeta; allMeta: MasterMeta[]; row: MasterRow | null }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: MasterRow] }>()
 
@@ -51,6 +57,114 @@ const cascade = useCascadeOptions(chain)
 /** Pilihan dropdown field ref per nama field (CR-009), dari `{entity}/options?parent=<nilai depends_on>`. */
 const refState = ref<Record<string, { options: MasterOption[]; loading: boolean }>>({})
 const refTokens: Record<string, number> = {}
+/**
+ * G-03 aturan lokasi presensi (CR-031): target disimpan backend sebagai JSON array (format legacy); form tidak
+ * menampilkan JSON mentah. Target lokasi/unit-satker/jenis pegawai dipilih lewat daftar centang dari endpoint options,
+ * hari berlaku lewat centang Senin..Minggu (disimpan "1,3,5"). Kolom *_desc diisi backend.
+ */
+const isAturanLokasi = computed(() => props.meta.key === 'aturan-lokasi-presensi')
+const ATURAN_TARGET_FIELDS = ['target_lp', 'target_uns', 'target_jp']
+const HARI = [
+  { value: '1', label: 'Senin' },
+  { value: '2', label: 'Selasa' },
+  { value: '3', label: 'Rabu' },
+  { value: '4', label: 'Kamis' },
+  { value: '5', label: 'Jumat' },
+  { value: '6', label: 'Sabtu' },
+  { value: '7', label: 'Minggu' },
+]
+/** Kode `target_uns` untuk seluruh kementerian (legacy P-5). */
+const SELURUH_KEMENTERIAN = { value: '0', label: 'Seluruh Kementerian' }
+/** Jenis pegawai yang tidak dapat dipilih (K-8, legacy Lm_lokasi.php:276). */
+const JENIS_PEGAWAI_DIKECUALIKAN = '7'
+
+type ChoiceOption = { value: string; label: string }
+const aturanOptions = ref<Record<string, ChoiceOption[]>>({})
+const aturanOptionsLoading = ref(false)
+/**
+ * Opsi unit/satker (D-1, ikut legacy K-7) muncul bila master unit/satker (G-02) terdaftar; tanpa master itu hanya
+ * "Seluruh Kementerian" yang bisa dipilih.
+ */
+const unitSatkerAvailable = computed(() => props.allMeta.some((m) => m.key === 'unit' || m.key === 'satker'))
+
+/** Nilai JSON array tersimpan → daftar teks; nilai rusak/kosong → []. */
+function parseJsonList(raw: unknown): string[] {
+  try {
+    const parsed: unknown = JSON.parse(String(raw ?? ''))
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string' || typeof v === 'number').map(String) : []
+  } catch {
+    return []
+  }
+}
+
+function selectedTargets(field: string): string[] {
+  return parseJsonList(values[field])
+}
+
+function setTargets(field: string, selected: string[]): void {
+  updateField(field, selected.length > 0 ? JSON.stringify(selected) : '')
+}
+
+function selectedDays(): string[] {
+  return String(values.hari_berlaku ?? '')
+    .split(',')
+    .filter((d) => d !== '')
+}
+
+/** Hari berlaku: angka ISO unik dan terurut (sama dengan normalisasi backend). */
+function setDays(selected: string[]): void {
+  updateField('hari_berlaku', [...new Set(selected)].sort().join(','))
+}
+
+/** Pilihan target + nilai tersimpan yang tidak ada di pilihan aktif (tetap tampil, bertanda, agar bisa dilepas). */
+function targetOptions(field: string): ChoiceOption[] {
+  const options = aturanOptions.value[field] ?? []
+  const missing = selectedTargets(field)
+    .filter((v) => !options.some((o) => o.value === v))
+    .map((v) => ({ value: v, label: `${v} — tidak aktif / tidak dikenal` }))
+  return [...options, ...missing]
+}
+
+function targetHint(field: string): string {
+  if (aturanOptionsLoading.value) return 'Memuat pilihan...'
+  if (field === 'target_uns' && !unitSatkerAvailable.value) {
+    return 'Data unit/satker belum tersedia di SIMPEG v2; sementara hanya Seluruh Kementerian yang dapat dipilih.'
+  }
+  if (field === 'target_lp') return 'Hanya lokasi presensi aktif. Pilih minimal satu.'
+  return 'Pilih minimal satu.'
+}
+
+async function loadAturanOptions(): Promise<void> {
+  if (!isAturanLokasi.value) return
+  aturanOptionsLoading.value = true
+  try {
+    const hasUnit = props.allMeta.some((m) => m.key === 'unit')
+    const hasSatker = props.allMeta.some((m) => m.key === 'satker')
+    const [locations, jenisPegawai, units, satkers] = await Promise.all([
+      masterService.options('lokasi-presensi'),
+      masterService.options('jenis-pegawai'),
+      hasUnit ? masterService.options('unit') : Promise.resolve([]),
+      hasSatker ? masterService.options('satker') : Promise.resolve([]),
+    ])
+    aturanOptions.value = {
+      target_lp: locations.map((o) => ({ value: o.id, label: o.nama })),
+      target_uns: [
+        SELURUH_KEMENTERIAN,
+        ...units.map((o) => ({ value: o.id, label: o.nama })),
+        // Nama satker unik per unit saja: label diberi nama unit agar satker bernama sama bisa dibedakan.
+        ...satkers.map((o) => {
+          const unit = units.find((u) => u.id === o.parent)
+          return { value: `sat_${o.id}`, label: unit ? `${o.nama} (${unit.nama})` : o.nama }
+        }),
+      ],
+      target_jp: jenisPegawai.filter((o) => o.id !== JENIS_PEGAWAI_DIKECUALIKAN).map((o) => ({ value: o.id, label: o.nama })),
+    }
+  } catch (err) {
+    formError.value = `Gagal memuat pilihan aturan lokasi presensi. ${isApiError(err) ? err.message : ''}`.trim()
+  } finally {
+    aturanOptionsLoading.value = false
+  }
+}
 
 const refFields = computed(() => props.meta.fields.filter((f) => f.type === 'ref'))
 
@@ -167,6 +281,7 @@ watch(
     detailFailed.value = false
     if (row && missing.length > 0) void loadMissingFields(row, missing, detailToken)
     void initRefOptions()
+    void loadAturanOptions()
 
     if (m.parent) {
       const directParent = row ? String(row[m.parent.field] ?? '') : ''
@@ -275,7 +390,9 @@ function refPlaceholder(field: MasterFieldMeta): string {
 }
 
 function refSelectOptions(field: MasterFieldMeta): Array<{ value: string; label: string }> {
-  return (refState.value[field.name]?.options ?? []).map((o) => ({ value: o.id, label: `${o.nama} (${o.id})` }))
+  // Rujukan ke master code_as_name (CR-026, mis. kelas jabatan): nama = kode, cukup ditampilkan sekali.
+  const codeAsName = props.allMeta.some((m) => m.key === field.entity && m.code_as_name === true)
+  return (refState.value[field.name]?.options ?? []).map((o) => ({ value: o.id, label: codeAsName && o.nama === o.id ? o.nama : `${o.nama} (${o.id})` }))
 }
 
 async function onLevelChange(index: number, value: string): Promise<void> {
@@ -329,6 +446,11 @@ const onSubmit = handleSubmit(async (formValues) => {
     submitting.value = false
   }
 })
+
+/** CR-028: field teks panjang (textarea/html) memakai dua kolom penuh pada grid form. */
+function isWideField(field: MasterFieldMeta): boolean {
+  return field.type === 'textarea' || field.type === 'html'
+}
 
 /** Pemetaan tipe field backend → tipe input FormField. */
 function fieldInputType(field: MasterFieldMeta): 'text' | 'number' | 'select' | 'date' | 'textarea' | 'html' | 'checkbox' {
@@ -387,11 +509,15 @@ const orderHint = computed(() => {
     : `Kosongkan = ditaruh paling akhir${orderScopeText.value}.`
 })
 
-const codeHint = computed(() =>
-  props.meta.id_digits !== null
-    ? `Tepat ${props.meta.id_digits} digit angka, tanpa titik (kode wilayah legacy).`
-    : `Maksimal ${props.meta.id_max_length} karakter, tanpa spasi.`,
-)
+const codeHint = computed(() => {
+  if (props.meta.id_digits !== null) return `Tepat ${props.meta.id_digits} digit angka, tanpa titik (kode wilayah legacy).`
+  const range = props.meta.id_range ?? null
+  if (range !== null) return `Bilangan bulat ${range[0]} sampai ${range[1]}, tanpa nol di depan.`
+  return `Maksimal ${props.meta.id_max_length} karakter, tanpa spasi.`
+})
+
+/** CR-026: master code_as_name (kode = nama, mis. kelas jabatan) memakai label nama untuk input kode. */
+const codeLabel = computed(() => (props.meta.code_as_name ? props.meta.name_label : 'Kode'))
 
 const { levels } = cascade
 </script>
@@ -401,12 +527,12 @@ const { levels } = cascade
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-white p-6 shadow-xl focus:outline-none"
-        :class="hasHtmlField ? 'max-w-3xl' : 'max-w-lg'"
+        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
+        :class="hasHtmlField ? 'max-w-3xl' : 'max-w-2xl'"
       >
         <div class="mb-4 flex items-start justify-between">
           <div>
-            <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEdit ? `Edit ${meta.label}` : `Tambah ${meta.label}` }}</DialogTitle>
+            <DialogTitle class="text-h5 font-semibold text-slate-900">{{ isEdit ? `Edit ${meta.label}` : `Tambah ${meta.label}` }}</DialogTitle>
             <DialogDescription class="text-sm text-slate-500">
               {{
                 isEdit
@@ -417,13 +543,13 @@ const { levels } = cascade
               }}
             </DialogDescription>
           </div>
-          <DialogClose class="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+          <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
             <X class="h-5 w-5" />
           </DialogClose>
         </div>
 
-        <form class="space-y-4" novalidate data-testid="master-form" @submit="onSubmit">
-          <p v-if="formError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+        <form :class="FORM_GRID_CLASS" novalidate data-testid="master-form" @submit="onSubmit">
+          <p v-if="formError" :class="FORM_ALERT_CLASS" role="alert">
             {{ formError }}
           </p>
 
@@ -431,7 +557,7 @@ const { levels } = cascade
             v-if="!isEdit && !meta.auto_increment"
             :model-value="values[meta.primary_key]"
             :name="meta.primary_key"
-            label="Kode"
+            :label="codeLabel"
             required
             :hint="codeHint"
             :error="fieldError(meta.primary_key)"
@@ -456,6 +582,7 @@ const { levels } = cascade
           </template>
 
           <FormField
+            v-if="meta.name_required !== false && !meta.code_as_name"
             :model-value="values[meta.name_field]"
             :name="meta.name_field"
             :label="meta.name_label"
@@ -465,8 +592,33 @@ const { levels } = cascade
           />
 
           <template v-for="field in visibleFields" :key="field.name">
+            <CheckboxGroupField
+              v-if="isAturanLokasi && ATURAN_TARGET_FIELDS.includes(field.name)"
+              :model-value="selectedTargets(field.name)"
+              :name="field.name"
+              :label="field.label"
+              :required="field.required"
+              :options="targetOptions(field.name)"
+              :empty-text="aturanOptionsLoading ? 'Memuat pilihan...' : 'Belum ada pilihan aktif.'"
+              :hint="targetHint(field.name)"
+              :error="fieldError(field.name)"
+              :class="FORM_WIDE_CLASS"
+              @update:model-value="setTargets(field.name, $event)"
+            />
+            <CheckboxGroupField
+              v-else-if="isAturanLokasi && field.name === 'hari_berlaku'"
+              :model-value="selectedDays()"
+              :name="field.name"
+              :label="field.label"
+              :options="HARI"
+              :columns="4"
+              hint="Kosongkan semua untuk berlaku setiap hari."
+              :error="fieldError(field.name)"
+              :class="FORM_WIDE_CLASS"
+              @update:model-value="setDays($event)"
+            />
             <FormField
-              v-if="field.type === 'ref'"
+              v-else-if="field.type === 'ref'"
               :model-value="values[field.name]"
               :name="field.name"
               :label="field.label"
@@ -492,6 +644,7 @@ const { levels } = cascade
               :allow-empty="!field.required"
               :disabled="pendingFields.has(field.name)"
               :hint="fieldHint(field)"
+              :class="isWideField(field) ? FORM_WIDE_CLASS : ''"
               :error="fieldError(field.name)"
               @update:model-value="updateField(field.name, $event)"
             />
@@ -508,15 +661,13 @@ const { levels } = cascade
             @update:model-value="updateField('order', $event)"
           />
 
-          <div class="flex justify-end gap-2 pt-2">
-            <DialogClose class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</DialogClose>
-            <button
-              type="submit"
-              class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary/90 disabled:opacity-60"
-              :disabled="submitting || pendingFields.size > 0 || detailFailed"
-            >
+          <div :class="FORM_ACTIONS_CLASS">
+            <DialogClose as-child>
+              <UiButton variant="secondary" appearance="soft">Batal</UiButton>
+            </DialogClose>
+            <UiButton type="submit" :disabled="submitting || pendingFields.size > 0 || detailFailed">
               {{ submitting ? 'Menyimpan...' : 'Simpan' }}
-            </button>
+            </UiButton>
           </div>
         </form>
       </DialogContent>

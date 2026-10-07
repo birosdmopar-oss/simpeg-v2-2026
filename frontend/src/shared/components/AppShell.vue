@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
  * Layout aplikasi setelah login: header + navigasi. Menu "Manajemen Akun" hanya tampil untuk role 1 & 3 (A-12),
- * menu "Master Data" hanya role 1 (Modul G), menu "Hari Libur" untuk role 1/4/5/8 (G-08, DBV-003/CR-010), menu "FAQ"
+ * menu "Master Data" dan "Web Config" hanya role 1 (Modul G), menu "Hari Libur" untuk role 1/4/5/8 (G-08, DBV-003/CR-010), menu "FAQ"
  * untuk semua role login (G-10).
  * Menu pengguna (kanan): "Ganti Password" (A-06, ISSUE-006) untuk semua role, lalu "Keluar".
  * Tampilan menu = UX saja; backend tetap menegakkan RoleFilter (ADR-024).
  */
-import { CalendarDays, CircleHelp, Database, KeyRound, LogOut, Users, Home } from 'lucide-vue-next'
+import { CalendarDays, CircleHelp, Database, KeyRound, LogOut, Settings, Users, Home } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -67,6 +67,15 @@ async function logout(): Promise<void> {
             data-testid="nav-master-data"
           >
             <Database class="h-4 w-4" /> Master Data
+          </RouterLink>
+          <RouterLink
+            v-if="auth.canManageMasterData"
+            :to="{ name: 'web-config' }"
+            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100"
+            active-class="bg-slate-100 text-brand-primary font-medium"
+            data-testid="nav-web-config"
+          >
+            <Settings class="h-4 w-4" /> Web Config
           </RouterLink>
           <RouterLink
             v-if="canReadHariLibur"

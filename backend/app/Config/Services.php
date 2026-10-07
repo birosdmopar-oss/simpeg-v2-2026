@@ -226,6 +226,19 @@ class Services extends BaseService
     }
 
     /**
+     * G-09 — web config bertipe (DBV-006/CR-030): CRUD role 1 + value()/values() untuk modul lain (cache diinvalidasi saat
+     * tulis).
+     */
+    public static function webConfigService(bool $getShared = true): \App\Libraries\MasterData\WebConfigService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('webConfigService');
+        }
+
+        return new \App\Libraries\MasterData\WebConfigService(static::cacheService());
+    }
+
+    /**
      * G-10 — baca FAQ (UL_ALL) + rating artikel (UL_PEGAWAI). CRUD admin FAQ tetap lewat masterService.
      */
     public static function faqService(bool $getShared = true): FaqService

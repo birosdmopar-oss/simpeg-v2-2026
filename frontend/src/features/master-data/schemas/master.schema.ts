@@ -12,6 +12,9 @@ import type { MasterFieldMeta, MasterMeta, MasterRow } from '../types'
 /** Sama dengan regex backend: huruf/angka/titik/strip/garis bawah, tanpa spasi. */
 export const MASTER_CODE_PATTERN = /^[A-Za-z0-9._-]+$/
 
+/** CR-026: kode angka ber-`id_range` — bilangan bulat positif tanpa nol di depan (sama dengan regex backend). */
+export const MASTER_RANGE_CODE_PATTERN = /^[1-9][0-9]*$/
+
 /** Batas bawaan field `html` bila meta tidak menyebut `max_bytes` (SPEC DBV-002 E3: 1.000.000 byte). */
 export const MASTER_HTML_MAX_BYTES = 1_000_000
 
@@ -141,12 +144,12 @@ export function fieldsMissingFromRow(meta: MasterMeta, row: MasterRow | null): M
  *            bila field ref-nya bernilai kode sistem (LAIN-LAIN); selain itu opsional (backend mengosongkannya).
  */
 export function buildMasterSchema(meta: MasterMeta, isEdit: boolean, all: MasterMeta[] = []) {
+  const nameSchema = z
+    .string({ required_error: `${meta.name_label} wajib diisi.` })
+    .trim()
+    .max(meta.name_max_length, `${meta.name_label} maksimal ${meta.name_max_length} karakter.`)
   const shape: Record<string, z.ZodTypeAny> = {
-    [meta.name_field]: z
-      .string({ required_error: `${meta.name_label} wajib diisi.` })
-      .trim()
-      .min(1, `${meta.name_label} wajib diisi.`)
-      .max(meta.name_max_length, `${meta.name_label} maksimal ${meta.name_max_length} karakter.`),
+    [meta.name_field]: meta.name_required === false ? nameSchema.optional() : nameSchema.min(1, `${meta.name_label} wajib diisi.`),
   }
 
   if (meta.has_order) {
@@ -157,20 +160,34 @@ export function buildMasterSchema(meta: MasterMeta, isEdit: boolean, all: Master
     shape.order = z.union([z.literal(''), order]).optional()
   }
 
-  // Kode hanya diinput saat tambah dan hanya untuk master ber-PK string (AUTO_INCREMENT diberikan database).
+  // Kode hanya diinput saat tambah dan hanya untuk master ber-PK string (AUTO_INCREMENT diberikan database). Master
+  // code_as_name (CR-026): key kode = key nama, jadi rule kode di bawah menggantikan rule nama saat tambah.
   if (!isEdit && !meta.auto_increment) {
-    const code = z.string({ required_error: 'Kode wajib diisi.' }).trim().min(1, 'Kode wajib diisi.')
+    const codeLabel = meta.code_as_name ? meta.name_label : 'Kode'
+    const code = z.string({ required_error: `${codeLabel} wajib diisi.` }).trim().min(1, `${codeLabel} wajib diisi.`)
+    const range = meta.id_range ?? null
     shape[meta.primary_key] =
       meta.id_digits !== null
         ? // Kode wilayah legacy: tepat N digit angka tanpa titik (sama dengan rules backend).
           code.regex(new RegExp(`^[0-9]{${meta.id_digits}}$`), `Kode harus tepat ${meta.id_digits} digit angka.`)
-        : code
-            .max(meta.id_max_length, `Kode maksimal ${meta.id_max_length} karakter.`)
-            .regex(MASTER_CODE_PATTERN, 'Kode hanya boleh huruf, angka, titik, strip, atau garis bawah (tanpa spasi).')
+        : range !== null
+          ? // Kode angka dalam rentang (CR-026): tanpa nol di depan ('07' bukan 7), lalu batas [min, max].
+            code
+              .regex(MASTER_RANGE_CODE_PATTERN, `${codeLabel} harus bilangan bulat ${range[0]} sampai ${range[1]} (tanpa nol di depan).`)
+              .refine((v) => !MASTER_RANGE_CODE_PATTERN.test(v) || (Number(v) >= range[0] && Number(v) <= range[1]), {
+                message: `${codeLabel} harus bilangan bulat ${range[0]} sampai ${range[1]}.`,
+              })
+          : code
+              .max(meta.id_max_length, `Kode maksimal ${meta.id_max_length} karakter.`)
+              .regex(MASTER_CODE_PATTERN, 'Kode hanya boleh huruf, angka, titik, strip, atau garis bawah (tanpa spasi).')
   }
 
   if (meta.parent) {
-    shape[meta.parent.field] = z.string({ required_error: 'Induk wajib dipilih.' }).min(1, 'Induk wajib dipilih.')
+    // Pesan memakai label master induk = label dropdown di form, mis. "Kecamatan wajib dipilih." (CR-038, F-UI-3).
+    const parentEntity = meta.parent.entity
+    const parentLabel = all.find((m) => m.key === parentEntity)?.label ?? 'Induk'
+    const message = `${parentLabel} wajib dipilih.`
+    shape[meta.parent.field] = z.string({ required_error: message }).min(1, message)
   }
 
   for (const field of meta.fields) {
@@ -206,4 +223,20 @@ export function ancestorChain(meta: MasterMeta, all: MasterMeta[]): MasterMeta[]
     current = current.parent ? byKey.get(current.parent.entity) : undefined
   }
   return chain
+}
+
+/**
+ * Nama turunan berformat JSON array nama (kolom `*_desc` legacy G-03, mis. `["Kantor Pusat","Gedung A"]`) → teks
+ * "Kantor Pusat, Gedung A". Nilai yang bukan JSON array (data lama berupa teks biasa) ditampilkan apa adanya.
+ */
+export function formatDerivedName(value: string): string {
+  const text = value.trim()
+  if (!text.startsWith('[')) return value
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (!Array.isArray(parsed)) return value
+    return parsed.map((item) => String(item)).join(', ')
+  } catch {
+    return value
+  }
 }

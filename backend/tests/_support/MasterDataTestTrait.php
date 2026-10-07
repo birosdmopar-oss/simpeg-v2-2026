@@ -19,8 +19,11 @@ trait MasterDataTestTrait
      *   duplicate : nama yang SUDAH ada di lingkup yang sama (induk / uniqueScope) di seed MasterDataSeeder
      *   existing  : kode entri seed (untuk update/status/delete)
      *   parent    : [field, id induk] atau null
+     *   update    : (opsional, CR-026) payload PUT pengganti "ubah nama" di test generik — untuk master yang namanya tidak
+     *               bisa diubah (codeAsName, mis. kelas jabatan: nama = kode) atau turunan (nameRequired false, mis.
+     *               aturan lokasi presensi DBV-007). Bawaan: nama + " (ubah)"
      *
-     * @return array<string, array{new: array<string, string>, duplicate: string, existing: string, parent: array{0: string, 1: string}|null}>
+     * @return array<string, array{new: array<string, string>, duplicate: string, existing: string, parent: array{0: string, 1: string}|null, update?: array<string, string>}>
      */
     public static function masterFixtures(): array
     {
@@ -212,6 +215,101 @@ trait MasterDataTestTrait
                 'parent'    => null,
             ],
             // --- /DBV-005 ---
+
+            // --- DBV-008 ---
+            // G-02 (seed MasterDataSeeder::seedG02). Test RBAC memproses master berurutan dan menghapus `existing` tiap
+            // master sebelum master berikutnya, dan induk/rujukan wajib aktif (E6): `new` satker/sub group/jabatan memakai
+            // unit 1, group 1, sub group 1, satker 1, kelas 13 — bukan `existing` (unit 2, satker 2, group 4, sub group 2,
+            // kelas 9). Nama `duplicate` berada di lingkup yang sama dengan `new` (unit 1 / group 1 / sub group 1 + satker 1).
+            'unit' => [
+                'new'       => ['unit' => 'Deputi Bidang Uji', 'is_upt' => '0'],
+                'duplicate' => 'sekretariat kementerian',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'satker' => [
+                'new'       => ['id_unit' => '1', 'satker' => 'Biro Uji', 'zonasi' => '0'],
+                'duplicate' => 'BIRO UMUM',
+                'existing'  => '2',
+                'parent'    => ['id_unit', '1'],
+            ],
+            'group-jabatan' => [
+                'new'       => ['group_jabatan' => 'Jabatan Uji'],
+                'duplicate' => 'struktural',
+                'existing'  => '4',
+                'parent'    => null,
+            ],
+            'sub-group-jabatan' => [
+                'new'       => ['id_group_jabatan' => '1', 'sub_group_jabatan' => 'Pengawas', 'need_satker' => '1'],
+                'duplicate' => 'ADMINISTRATOR',
+                'existing'  => '2',
+                'parent'    => ['id_group_jabatan', '1'],
+            ],
+            // codeAsName: kode = nama, jadi `duplicate` = nomor kelas yang sudah ada dan ubah memakai `update` (tukin).
+            'kelas-jabatan' => [
+                'new'       => ['kelas_jabatan' => '15', 'tukin' => '17064000'],
+                'duplicate' => '7',
+                'existing'  => '9',
+                'parent'    => null,
+                'update'    => ['tukin' => '17100000'],
+            ],
+            'jabatan' => [
+                'new' => [
+                    'id_group_jabatan' => '1', 'id_sub_group_jabatan' => '1', 'id_satker' => '1', 'kelas_jabatan' => '13',
+                    'jabatan'          => 'Kepala Biro Uji',
+                ],
+                'duplicate' => 'KEPALA BIRO SUMBER DAYA MANUSIA',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            // --- /DBV-008 ---
+
+            // --- DBV-018 ---
+            // G-02 sisa (seed MasterDataSeeder::seedG02b). Test RBAC menghapus `existing` tiap master sebelum master
+            // berikutnya: `new` sub rumpun memakai rumpun 1, bukan `existing` rumpun 2. Periode = tahun (hook), jadi
+            // ubah memakai fixture `update`.
+            'rumpun-jabatan' => [
+                'new'       => ['rumpun_jabatan' => 'Kesehatan'],
+                'duplicate' => 'MANAJEMEN',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'subrumpun-jabatan' => [
+                'new'       => ['id_rumpun_jabatan' => '1', 'subrumpun_jabatan' => 'Manajemen Aset'],
+                'duplicate' => 'manajemen sumber daya manusia',
+                'existing'  => '2',
+                'parent'    => ['id_rumpun_jabatan', '1'],
+            ],
+            'jabatan-akademik' => [
+                'new'       => ['jabatan_akademik' => 'Lektor Kepala', 'is_atasan' => '2'],
+                'duplicate' => 'LEKTOR',
+                'existing'  => '2',
+                'parent'    => null,
+            ],
+            'periode-struktur-jabatan' => [
+                'new'       => ['periode_struktur_jabatan' => '2027'],
+                'duplicate' => '2021',
+                'existing'  => '2',
+                'parent'    => null,
+                'update'    => ['periode_struktur_jabatan' => '2030'],
+            ],
+            // --- /DBV-018 ---
+
+            // --- DBV-007 ---
+            // Aturan: nama (target_lp_desc) turunan hook — G-TC mengubah `keterangan` (kunci `update`), bukan nama.
+            'lokasi-presensi' => [
+                'new'       => ['nama_lokasi' => 'Kantor Uji', 'latitude' => '-7.250445', 'longitude' => '112.768845', 'radius' => '25'],
+                'duplicate' => 'Kantor Pusat', 'existing' => '1', 'parent' => null,
+            ],
+            'aturan-lokasi-presensi' => [
+                'new' => [
+                    'target_lp_desc' => '["Gedung Sapta Pesona"]', 'target_lp' => '["2"]', 'target_uns' => '["0"]', 'target_jp' => '["1"]',
+                    'hari_berlaku'   => '1,3,5', 'keterangan' => 'Aturan uji',
+                ],
+                'update'    => ['keterangan' => 'Aturan uji (ubah)'],
+                'duplicate' => '["Gedung Sapta Pesona"]', 'existing' => '1', 'parent' => null,
+            ],
+            // --- /DBV-007 ---
         ];
     }
 
