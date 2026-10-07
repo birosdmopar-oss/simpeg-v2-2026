@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Pembungkus route /ganti-password: ChangePasswordView di dalam AppShell.
-import AppShell from '@/shared/components/AppShell.vue'
+// Pembungkus route /ganti-password: ChangePasswordView di dalam RedesignShell.
+import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 import ChangePasswordView from './ChangePasswordView.vue'
 </script>
 
 <template>
-  <AppShell>
+  <RedesignShell>
     <ChangePasswordView />
-  </AppShell>
+  </RedesignShell>
 </template>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Pembungkus route /akun: UserManagementView di dalam AppShell.
-import AppShell from '@/shared/components/AppShell.vue'
+// Pembungkus route /akun: UserManagementView di dalam RedesignShell.
+import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 import UserManagementView from './UserManagementView.vue'
 </script>
 
 <template>
-  <AppShell>
+  <RedesignShell>
     <UserManagementView />
-  </AppShell>
+  </RedesignShell>
 </template>
