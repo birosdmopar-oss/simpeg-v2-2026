@@ -52,6 +52,12 @@ Tujuannya supaya satu perubahan tidak di-gate penuh berulang kali (PHPUnit penuh
 **Gate penuh — hanya SEKALI, tepat sebelum push ke `main`**, pada commit yang benar-benar akan di-push (untuk PR:
 commit merge-nya). `./check.sh` / setara: PHPStan, PHP-CS-Fixer, **PHPUnit penuh**, ESLint, vue-tsc, Vitest, build.
 
+**Gate penuh di CI (CR-044).** Workflow `.github/workflows/quality-gate.yml` (GitHub Actions) menjalankan gate penuh
+pada setiap push ke branch mana pun dan PR dari fork: PHPStan + CS-Fixer, frontend, dan PHPUnit ter-shard di
+**MySQL 8.0** dan **MariaDB 10.4**. Gate CI ini **menggantikan** gate penuh lokal — di lokal cukup gate cepat. Push
+branch dulu, tunggu CI **hijau** untuk SHA itu, baru push SHA yang sama ke `main` / merge PR. **Jangan push/merge ke
+`main` bila CI merah atau belum selesai.** Perubahan yang hanya dokumen (`*.md`, `docs/**`) tidak memicu CI.
+
 **Gate cepat — untuk tahap lain** (mengerjakan PR, perbaikan review, sinkron branch dengan `main`), ±5–10 menit:
 
 1. PHPStan level 5 + PHP-CS-Fixer dry-run (`cd backend && composer analyse && composer cs-check`).

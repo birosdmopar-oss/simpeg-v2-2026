@@ -1,0 +1,208 @@
+# CR-044 — quality gate penuh di CI (setara ./check.sh), paralel:
+#   static   : PHPStan level 5 + PHP-CS-Fixer dry-run + verifikasi cakupan shard PHPUnit
+#   frontend : npm ci + npm run check (ESLint -> vue-tsc -> Vitest -> build)
+#   phpunit  : matriks DB (MySQL 8.0 = produksi, MariaDB 10.4 = DB Validator) x shard file test
+# Database hanya container sekali pakai di runner (root tanpa password, port lokal runner); tidak ada rahasia nyata.
+name: Quality gate
+
+# Push ke SEMUA branch: commit diuji di branch dulu sebelum SHA yang sama di-push ke main (alur CR-only tanpa PR).
+# pull_request hanya dijalankan untuk PR dari fork (PR dari repo ini sudah teruji lewat event push pada SHA yang sama).
+on:
+  push:
+    branches: ['**']
+    paths-ignore: ['**/*.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**/*.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.4'
+  PHP_EXTENSIONS: intl, mbstring, mysqli, curl, gd, zip, sodium, fileinfo
+  NODE_VERSION: '22'
+  # Jumlah shard PHPUnit per DB. Ubah BERSAMAAN dengan matrix.shard di job phpunit (dicek otomatis di job itu).
+  PHPUNIT_SHARDS: 4
+
+jobs:
+  static:
+    name: PHPStan + PHP-CS-Fixer
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Lokasi cache Composer
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
+
+      - name: Verifikasi cakupan shard PHPUnit (setiap file test tepat satu shard)
+        run: php tests/_support/ci/shard.php --verify "$PHPUNIT_SHARDS"
+
+      - name: composer install
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHPStan level 5
+        run: composer analyse
+
+      - name: PHP-CS-Fixer (dry-run)
+        run: composer cs-check
+
+  frontend:
+    name: Frontend (ESLint, vue-tsc, Vitest, build)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: npm run check
+        run: npm run check
+
+  phpunit:
+    name: PHPUnit ${{ matrix.db }} shard ${{ matrix.shard }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [mysql-8.0, mariadb-10.4]
+        shard: [1, 2, 3, 4]
+        include:
+          # Setelan performa KHUSUS CI (data di tmpfs, tanpa doublewrite/binlog, flush log per detik).
+          # Jangan ditiru di server: hanya aman untuk DB sekali pakai.
+          - db: mysql-8.0
+            image: mysql:8.0
+            db_args: >-
+              --innodb-flush-log-at-trx-commit=2 --innodb-doublewrite=OFF --skip-log-bin
+              --innodb-use-native-aio=0 --innodb-buffer-pool-size=512M --performance-schema=OFF
+          - db: mariadb-10.4
+            image: mariadb:10.4
+            db_args: >-
+              --innodb-flush-log-at-trx-commit=2 --innodb-doublewrite=OFF
+              --innodb-use-native-aio=0 --innodb-buffer-pool-size=512M
+    env:
+      # CI4 membaca override config dari environment (database.tests.* -> database_tests_*); tanpa berkas .env.
+      database_tests_hostname: 127.0.0.1
+      database_tests_port: 3306
+      database_tests_database: simpeg_v2_testing
+      database_tests_username: root
+      database_tests_password: ''
+      auth_captchaDriver: mock
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Cek jumlah shard konsisten dengan matriks
+        working-directory: .
+        env:
+          JOB_TOTAL: ${{ strategy.job-total }}
+        run: |
+          expected=$((2 * PHPUNIT_SHARDS))
+          if [ "$JOB_TOTAL" -ne "$expected" ]; then
+            echo "::error::matrix phpunit berisi $JOB_TOTAL job, seharusnya 2 DB x PHPUNIT_SHARDS=$PHPUNIT_SHARDS = $expected"
+            exit 1
+          fi
+
+      - name: Jalankan ${{ matrix.image }} (tmpfs, utf8mb4_unicode_ci)
+        working-directory: .
+        env:
+          DB_IMAGE: ${{ matrix.image }}
+          DB_ARGS: ${{ matrix.db_args }}
+        run: |
+          # shellcheck disable=SC2086 # DB_ARGS sengaja dipecah per spasi menjadi argumen mysqld
+          docker run -d --name db -p 127.0.0.1:3306:3306 --tmpfs /var/lib/mysql:rw \
+            -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
+            "$DB_IMAGE" --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci $DB_ARGS
+
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Lokasi cache Composer
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
+
+      - name: composer install
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Tunggu DB siap lalu buat database test
+        working-directory: .
+        run: |
+          # mysqladmin ping bisa lolos saat server inisialisasi sementara (tanpa TCP); uji lewat TCP.
+          for _ in $(seq 1 90); do
+            if docker exec db mysql --protocol=tcp -h127.0.0.1 -uroot -e 'SELECT 1' >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          docker exec db mysql --protocol=tcp -h127.0.0.1 -uroot -e "
+            CREATE DATABASE simpeg_v2_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            SELECT VERSION() AS versi, @@collation_server AS collation_server,
+                   @@innodb_flush_log_at_trx_commit AS flush_log, @@innodb_doublewrite AS doublewrite;"
+
+      - name: Kunci sekali pakai (jwt.secret, encryption.key)
+        run: |
+          # Acak per run, tidak disimpan di mana pun. Nama bertitik dioper lewat `env` di langkah PHPUnit.
+          echo "CI_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "encryption_key=hex2bin:$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Daftar file shard ${{ matrix.shard }}/${{ env.PHPUNIT_SHARDS }}
+        run: |
+          php tests/_support/ci/shard.php "${{ matrix.shard }}" "$PHPUNIT_SHARDS" > "$RUNNER_TEMP/shard-files.txt"
+          wc -l < "$RUNNER_TEMP/shard-files.txt"
+          cat "$RUNNER_TEMP/shard-files.txt"
+
+      - name: PHPUnit
+        run: |
+          mapfile -t files < "$RUNNER_TEMP/shard-files.txt"
+          env "jwt.secret=$CI_JWT_SECRET" vendor/bin/phpunit --no-coverage "${files[@]}"
+
+      - name: Log DB bila gagal
+        if: failure()
+        working-directory: .
+        run: docker logs db 2>&1 | tail -n 100
