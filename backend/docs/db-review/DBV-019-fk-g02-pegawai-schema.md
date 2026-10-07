@@ -301,7 +301,7 @@ Koreksi setelah approval dilakukan lewat migration baru, bukan dengan mengedit m
 ### 8.1 Lingkungan
 
 MySQL 8.0.30 (Laragon lokal), PHP 8.4.2, CodeIgniter 4.7.4, PHPUnit 10.5. Worktree branch `dbv-019/fk-g02-pegawai`
-setelah merge `origin/main` `6ca4bb9` (07-10-2026; merge berikutnya `805dc00` hanya dokumen `docs/fase3`). Semua uji database memakai **DB scratch bernama eksplisit** (dibuat
+setelah merge `origin/main` `6ca4bb9` (07-10-2026). Merge berikutnya `2cfc2e4` hanya menambah dokumen, workflow CI, dan `tests/_support/ci/shard.php` — tidak bersinggungan dengan migration/test unit ini. Semua uji database memakai **DB scratch bernama eksplisit** (dibuat
 lalu di-DROP dengan nama persis): `simpeg_v2_scr_d19` untuk siklus migrate, `simpeg_v2_t_d19` untuk PHPUnit. `.env` khusus
 uji di worktree (tidak di-commit) menunjuk DB scratch, dicek lewat `php spark db:table --show` sebelum `spark migrate`.
 Tidak ada uji di DB pengembangan bersama, DB test bersama, maupun DB legacy.
