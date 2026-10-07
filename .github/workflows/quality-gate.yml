@@ -108,11 +108,14 @@ jobs:
           # Jangan ditiru di server: hanya aman untuk DB sekali pakai.
           - db: mysql-8.0
             image: mysql:8.0
+            queue_skip_locked: 'true'
             db_args: >-
               --innodb-flush-log-at-trx-commit=2 --innodb-doublewrite=OFF --skip-log-bin
               --innodb-use-native-aio=0 --innodb-buffer-pool-size=512M --performance-schema=OFF
+          # MariaDB < 10.6 tidak mendukung SKIP LOCKED; produksi MySQL 8 tetap true (nilai default Config\Queue).
           - db: mariadb-10.4
             image: mariadb:10.4
+            queue_skip_locked: 'false'
             db_args: >-
               --innodb-flush-log-at-trx-commit=2 --innodb-doublewrite=OFF
               --innodb-use-native-aio=0 --innodb-buffer-pool-size=512M
@@ -124,6 +127,8 @@ jobs:
       database_tests_username: root
       database_tests_password: ''
       auth_captchaDriver: mock
+      # Config\Queue::$database['skipLocked'] (env CI4 queue.database.skipLocked); false hanya di job MariaDB 10.4.
+      queue_database_skipLocked: ${{ matrix.queue_skip_locked }}
     defaults:
       run:
         working-directory: backend
