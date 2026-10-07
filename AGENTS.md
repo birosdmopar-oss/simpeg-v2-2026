@@ -34,11 +34,18 @@ Wajib:
 
 ## 2. Aturan proyek yang sudah berlaku (ringkas)
 
-- **Commit & PR:** pesan Bahasa Indonesia gaya `feat(scope): …` / `fix(scope): …` dengan key review (`CR-###`,
-  `DBV-###`). Jangan menyebut AI/assistant/tool apa pun dan jangan menambah trailer `Co-Authored-By`.
+- **Commit & PR:** pesan Bahasa Indonesia gaya `feat(scope): …` / `fix(scope): …` dengan key pekerjaan. Jangan menyebut
+  AI/assistant/tool apa pun dan jangan menambah trailer `Co-Authored-By`.
+- **Key pekerjaan (berlaku sejak 07-10-2026):**
+  - `MAKE-###` — pekerjaan **baru**: fitur/task fase, tooling, CI, infrastruktur test, dokumen/rencana (mis.
+    `feat(kepegawaian): MAKE-004 …`). Penomoran berurutan mulai `MAKE-001`.
+  - `CR-###` — **hanya** perbaikan hasil code review / QA (temuan review, kartu ISSUE, temuan QA). Key CR lama
+    (`CR-001`..`CR-044`) tetap seperti di riwayat; nomor CR berikutnya `CR-045`.
+  - `DBV-###` — perubahan skema yang direview DB Validator (tidak berubah).
 - **Rahasia:** jangan commit `.env`, kredensial, token, password, atau API key.
-- **Alur merge:** hanya `[CR]` → langsung ke `main` setelah quality gate lolos; `[CR]` + `[DBV]` → PR, DB Validator
-  review/approve, reviewer CR yang merge; hanya `[DBV]` → PR, DB Validator yang merge.
+- **Alur merge:** hanya `[CR]` dan/atau `[MAKE]` (tanpa skema) → langsung ke `main` setelah quality gate lolos; bila ada
+  `[DBV]` bersama `[CR]`/`[MAKE]` → PR, DB Validator review/approve, reviewer CR yang merge; hanya `[DBV]` → PR, DB
+  Validator yang merge.
 - **Quality gate:** `./check.sh` (PHPStan level 5, PHP-CS-Fixer, PHPUnit, ESLint, vue-tsc, Vitest, build) harus lolos
   sebelum push ke `main` — cara menjalankannya secara efisien ada di bagian 3.
 - **Skema database:** ikut kode & DDL legacy (label `[K]` / `[V2]` / `[I]`), status 1 / 2 / 10, collation

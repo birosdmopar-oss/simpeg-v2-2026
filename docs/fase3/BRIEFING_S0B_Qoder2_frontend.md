@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | Penerima | Qoder-2 (pelaksana WS-2 "Pegawai Inti, Organisasi & Alur Khusus") |
-| Key review | **CR-047** (CR saja) |
-| Branch | `ws2/cr-047-s0b-fondasi-frontend-fase3`, dibuat dari `origin/main` terbaru |
+| Key review | **MAKE-003** (CR saja) |
+| Branch | `ws2/make-003-s0b-fondasi-frontend-fase3`, dibuat dari `origin/main` terbaru |
 | Estimasi | **±1,5 hari-agen** (hari 0–1,5 Sprint 0) |
-| Berjalan paralel dengan | S0-A Qoder-1 (kontrak backend, CR-046) — lihat `BRIEFING_S0A_Qoder1_backend.md` |
+| Berjalan paralel dengan | S0-A Qoder-1 (kontrak backend, MAKE-002) — lihat `BRIEFING_S0A_Qoder1_backend.md` |
 | Sumber port | Commit `3420e1a` di branch `origin/feat/frontend-ui-redesign` ("17 tab riwayat Detail Pegawai … dengan data contoh") |
 | Acuan | `docs/fase3/PRD_WS2.md`, `docs/fase3/PRD_WS1.md`, `AGENTS.md` (§1 menu ⋮, §3 gate), `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md` (kolom DDL), migration `backend/app/Database/Migrations/2026-09-30-12*`/`13*`, `docs/fase3/03-Kepegawaian.md` (kontrak task Fase 3), `docs/fase3/MATRIKS_ROLE_MODUL_B.md` (hak akses Modul B), `docs/adr/ADR-033-library-pdf-tcpdf.md` (library PDF) |
-| Hasil yang diserahkan | Satu branch berisi commit CR-047, lolos gate penuh, diserahkan ke reviewer CR. **Jangan push ke `main`.** |
+| Hasil yang diserahkan | Satu branch berisi commit MAKE-003, lolos gate penuh, diserahkan ke reviewer CR. **Jangan push ke `main`.** |
 
 ---
 
@@ -123,14 +123,14 @@ Implementasi halaman Konket/LKH/Karpeg-Karis (placeholder saja), tersambungnya A
 | Pembungkus halaman yang memakai `AppShell` (§3.2), `frontend/src/shared/README.md` (catatan shell/registry) | `.env`, berkas kredensial apa pun; `composer.json` |
 
 ## 6. Kontrak yang dibekukan di akhir S0
-Setelah CR-047 di-merge, berikut hanya berubah **aditif** dan **oleh pemiliknya**:
+Setelah MAKE-003 di-merge, berikut hanya berubah **aditif** dan **oleh pemiliknya**:
 1. Bentuk `RiwayatTabDescriptor` (sama dengan backend S0-A) dan props `RiwayatTabHost` (`nip`, `descriptor`, `config`) — pemilik WS-1.
 2. Mekanisme registry `riwayat/jenis/<slug>.ts` + `import.meta.glob` dan daftar slug — pemilik WS-1.
 3. Props/emit `StatusBadge` dan `ApprovalDialog` — pemilik WS-2 (perubahan dari WS-1 diajukan ke WS-2).
 4. `routes.pegawai.ts` (WS-2) / `routes.riwayat.ts` (WS-1); `router/index.ts` dan `nav.config.ts` milik WS-2.
 
 ## 7. Definition of Done
-- [ ] Port per berkas §3.1 selesai; tidak ada merge/cherry-pick dari branch redesign; `git log` branch hanya berisi commit CR-047 Anda.
+- [ ] Port per berkas §3.1 selesai; tidak ada merge/cherry-pick dari branch redesign; `git log` branch hanya berisi commit MAKE-003 Anda.
 - [ ] `AppShell` pensiun; semua halaman lama tampil di `RedesignShell`; semua menu `main` (termasuk Web Config) ada di `nav.config`.
 - [ ] `routes.pegawai.ts`/`routes.riwayat.ts` diimpor sekali dari `router/index.ts`; menu Fase 3 terdaftar dengan `phase: 3`, tersembunyi pada `ACTIVE_PHASE = 2`.
 - [ ] Registry per jenis (15 berkas sesuai tabel §3.5) + loader `import.meta.glob`; `DetailPegawaiPage` merender tab dari descriptor; tab Konket & Karpeg/Karis tidak ada.
@@ -146,10 +146,10 @@ Setelah CR-047 di-merge, berikut hanya berubah **aditif** dan **oleh pemiliknya*
 2. **DB scratch sendiri** untuk bagian PHPUnit gate penuh: mis. `simpeg_v2_ws2_dev` dan `simpeg_v2_ws2_testing` (collation `utf8mb4_unicode_ci`). Tulis `.env` worktree sendiri dari `backend/.env.example`; **jangan menyalin `.env` dev** dari tempat lain.
 3. **Gate cepat** selama kerja: `cd frontend && npm run check` (ESLint, vue-tsc, Vitest, build). Backend tidak berubah di S0-B, jadi PHPUnit terarah tidak diperlukan selama kerja.
 4. **Gate penuh sekali** sebelum serah, pada commit yang diserahkan, **sebagai proses lepas** dengan log ke berkas, mis. `nohup ./check.sh > gate.log 2>&1 &` (atau `Start-Process` di PowerShell, lihat AGENTS.md §3). Satu gate penuh pada satu waktu per mesin; bila setelah gate hanya dokumen yang berubah, gate tidak perlu diulang.
-5. **Commit**: Bahasa Indonesia, gaya `feat(kepegawaian): CR-047 …` / `refactor(frontend-ui): CR-047 …` / `test(kepegawaian): CR-047 …`. **Tanpa** trailer `Co-Authored-By` dan tanpa menyebut AI/assistant/tool apa pun di pesan commit, komentar, atau dokumen.
+5. **Commit**: Bahasa Indonesia, gaya `feat(kepegawaian): MAKE-003 …` / `refactor(frontend-ui): MAKE-003 …` / `test(kepegawaian): MAKE-003 …`. **Tanpa** trailer `Co-Authored-By` dan tanpa menyebut AI/assistant/tool apa pun di pesan commit, komentar, atau dokumen.
 6. **Rahasia & repo publik**: jangan commit `.env`, kredensial, token, password, API key; jangan menulis IP/host internal, nama server, atau detail celah keamanan.
 7. **UI**: semua aksi baris tabel lewat satu tombol ⋮ (`RowActionsMenu`), urutan Edit → ubah status → urutan → aksi lain (Setujui/Tolak/Pulihkan) → Hapus (`danger: true`), label kata kerja Bahasa Indonesia, aksi berisiko memakai `ConfirmDialog` (AGENTS.md §1).
-8. **Tidak push ke `main`.** Serahkan dengan push branch fitur `ws2/…` (mis. `ws2/cr-047-s0b-fondasi-frontend-fase3`) ke `origin`. Review CR dilakukan oleh sesi utama, yang kemudian memasukkan ke `main` (alur CR-only).
+8. **Tidak push ke `main`.** Serahkan dengan push branch fitur `ws2/…` (mis. `ws2/make-003-s0b-fondasi-frontend-fase3`) ke `origin`. Review CR dilakukan oleh sesi utama, yang kemudian memasukkan ke `main` (alur CR-only).
 9. Bila ada aturan di briefing ini yang bertentangan dengan AGENTS.md atau kode di `main`, **tanyakan reviewer CR** sebelum menyimpang.
 
 ## 9. Estimasi
@@ -169,7 +169,7 @@ Setelah CR-047 di-merge, berikut hanya berubah **aditif** dan **oleh pemiliknya*
 |---|---|---|
 | ±jam ke-2 | Terima draf bentuk descriptor, daftar slug `{jenis}`, dan bentuk endpoint riwayat/lampiran dari README kontrak Qoder-1; sesuaikan tipe, nama berkas registry, dan klien API | Qoder-1 → Qoder-2 |
 | ±jam ke-4 | Konfirmasi payload snake_case = kolom DDL (Anda menyamakan `types.ts` dari DDL yang sama) | dua arah |
-| Akhir S0 | Kedua branch diserahkan; reviewer CR memasukkan CR-046 (kontrak backend) lebih dulu, lalu CR-047 | — |
+| Akhir S0 | Kedua branch diserahkan; reviewer CR memasukkan MAKE-002 (kontrak backend) lebih dulu, lalu MAKE-003 | — |
 | Setelah S0 | Permintaan perubahan kontrak diajukan ke pemiliknya (§6), tidak mengedit berkas WS lain | dua arah |
 
 Anda **tidak** menyentuh backend di S0; Qoder-1 **tidak** menyentuh frontend.
@@ -183,7 +183,7 @@ Anda **tidak** menyentuh backend di S0; Qoder-1 **tidak** menyentuh frontend.
 6. Batas lampiran per jenis 1/2/5 MB ikut legacy.
 7. PDF (LKH, DRH) memakai TCPDF lewat ADR-033 (`docs/adr/ADR-033-library-pdf-tcpdf.md`; lisensi LGPL-3.0, sama dengan legacy); cadangan dompdf bila TCPDF bermasalah; QA Lapis 1/review/sesi QA tidak.
 10. Default ikut legacy: acuan jarak KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy (+ `jabatan_koordinasi.nip`); masa hukdis = `masa_sanksi_bulan`; aturan lingkup unit destinasi 21 / unit lain 7.
-11. Key: satu key CR per paket milestone per WS; S0-B = **CR-047**. Peta lengkap di PRD §7.1.
+11. Key: satu key CR per paket milestone per WS; S0-B = **MAKE-003**. Peta lengkap di PRD §7.1.
 12. Data contoh tidak masuk `main` sebelum tersambung API.
 13. Aturan proyek: aksi baris lewat ⋮ (AGENTS.md §1); skema ikut DDL legacy, snake_case = nama kolom; migration di `main` tidak diedit; repo publik (tanpa IP/host internal).
 14. Serah-terima (keputusan 07-10-2026): cara serah = **push branch fitur `ws2/…` ke `origin`** (tidak ke `main`); review CR dilakukan oleh sesi utama, yang kemudian memasukkan paket ke `main` (alur CR-only).

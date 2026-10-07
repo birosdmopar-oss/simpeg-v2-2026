@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | Penerima | Qoder-1 (pelaksana WS-1 "Mesin Riwayat & Riwayat Karier/Administrasi") |
-| Key review | **CR-046** (CR saja, tanpa perubahan skema) |
-| Branch | `ws1/cr-046-s0a-kontrak-backend-fase3`, dibuat dari `origin/main` terbaru |
+| Key review | **MAKE-002** (CR saja, tanpa perubahan skema) |
+| Branch | `ws1/make-002-s0a-kontrak-backend-fase3`, dibuat dari `origin/main` terbaru |
 | Estimasi | **±1 hari-agen** (hari 0–1 Sprint 0) |
-| Berjalan paralel dengan | S0-B Qoder-2 (fondasi frontend, CR-047) — lihat `BRIEFING_S0B_Qoder2_frontend.md` |
+| Berjalan paralel dengan | S0-B Qoder-2 (fondasi frontend, MAKE-003) — lihat `BRIEFING_S0B_Qoder2_frontend.md` |
 | Acuan | `docs/fase3/PRD_WS1.md`, `docs/fase3/PRD_WS2.md`, `AGENTS.md`, `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md` (skema B-01/B-02, aturan snapshot §5.1), `backend/docs/progress/03-Kepegawaian.md`, `backend/app/Libraries/Kepegawaian/README.md`, `docs/fase3/03-Kepegawaian.md` (kontrak task Fase 3), `docs/fase3/MATRIKS_ROLE_MODUL_B.md` (hak akses Modul B), `docs/adr/ADR-033-library-pdf-tcpdf.md` (library PDF) |
-| Hasil yang diserahkan | Satu branch berisi commit CR-046, lolos gate penuh, diserahkan ke reviewer CR. **Jangan push ke `main`.** |
+| Hasil yang diserahkan | Satu branch berisi commit MAKE-002, lolos gate penuh, diserahkan ke reviewer CR. **Jangan push ke `main`.** |
 
 ---
 
@@ -89,7 +89,7 @@ Dihitung dari izin Definisi × role pemanggil × `PegawaiScope`. Frontend merend
 ### 3.6 Fixture `tests/_support/Kepegawaian/PegawaiFixtureTrait.php` (berkas baru)
 - Membuat: baris master G-02 yang dirujuk (unit kerja, satker, jabatan, dan master lain yang dirujuk kolom terisi) → `pegawai` → snapshot `pegawai_mutasi_jabatan` ber-unit/satker → akun `pengguna` tertaut NIP. Helper minimal: `buatPegawai(array $override = []): string` (mengembalikan NIP), `buatAkunUntuk(string $nip, int $role): int`, `buatPegawaiDiSatker(...)` untuk test lingkup role 3.
 - **Wajib mematuhi FK DBV-019** (FK G-02 ↔ pegawai/riwayat yang sedang dipasang sesi utama): jangan mengisi kolom FK dengan ID master yang tidak ada; buat baris masternya di fixture.
-- **Wajib cocok dengan base case CR-045** (base case test DB baru: migrate sekali + transaksi per test, dikerjakan sesi utama paralel): fixture **hanya INSERT** lewat query builder, tanpa DDL, tanpa `migrate`, tanpa commit eksplisit, tanpa `TRUNCATE`. Bila CR-045 sudah masuk `main` saat Anda mulai/selesai, rebase dan pakai base case-nya; bila belum, tulis fixture agar bisa dipakai base case itu tanpa perubahan, dan catat di deskripsi serah.
+- **Wajib cocok dengan base case MAKE-001** (base case test DB baru: migrate sekali + transaksi per test, dikerjakan sesi utama paralel): fixture **hanya INSERT** lewat query builder, tanpa DDL, tanpa `migrate`, tanpa commit eksplisit, tanpa `TRUNCATE`. Bila MAKE-001 sudah masuk `main` saat Anda mulai/selesai, rebase dan pakai base case-nya; bila belum, tulis fixture agar bisa dipakai base case itu tanpa perubahan, dan catat di deskripsi serah.
 - Gunakan NIP sintetis 18 digit (bukan data asli).
 
 ### 3.7 Kontrak API — `backend/app/Controllers/Api/Kepegawaian/README.md`
@@ -117,7 +117,7 @@ Aturan kontrak:
 ### 3.8 Progres — `backend/docs/progress/03-Kepegawaian.md`
 - Pecah tabel status menjadi **satu baris per task** (B-01..B-21) dengan kolom **WS** (WS-1/WS-2/selesai) dan **Key** (sesuai peta key di PRD §7.1). Tiap WS hanya mengubah barisnya sendiri setelah ini.
 - Perbarui baris "Entry criteria": Fase 1 + Fase 2 DONE (Fase 2 sign-off 07-10-2026), skema B-01/B-02 di `main`.
-- Tambahkan bagian singkat "S0-A — CR-046" (apa yang dibekukan).
+- Tambahkan bagian singkat "S0-A — MAKE-002" (apa yang dibekukan).
 
 ### 3.9 Test minimum S0-A
 - Unit: `StatusRiwayat` (nilai, flag status 3 mati default), auto-discovery Definisi (Definisi contoh terbaca; folder kosong aman), descriptor dari Definisi contoh × role.
@@ -125,7 +125,7 @@ Aturan kontrak:
 - Route: kedua berkas route termuat (`php spark routes` tidak error); endpoint yang didaftarkan di S0 tidak menghasilkan 500.
 
 ## 4. Di luar cakupan S0-A
-SnapshotSync, RiwayatEngine, BaseRiwayatController (milestone WS-1 M1, CR-048); Definisi jenis nyata; implementasi nyata `PegawaiScope`/lampiran (WS-2); semua frontend; migration/perubahan skema apa pun.
+SnapshotSync, RiwayatEngine, BaseRiwayatController (milestone WS-1 M1, MAKE-004); Definisi jenis nyata; implementasi nyata `PegawaiScope`/lampiran (WS-2); semua frontend; migration/perubahan skema apa pun.
 
 ## 5. Berkas
 
@@ -134,7 +134,7 @@ SnapshotSync, RiwayatEngine, BaseRiwayatController (milestone WS-1 M1, CR-048); 
 | `backend/app/Config/Routing.php` (hanya `$routeFiles`) | **Semua migration yang sudah ada di `main`** (`app/Database/Migrations/*`) — tidak diedit, tidak dihapus |
 | `backend/app/Config/RoutesRiwayat.php`, `RoutesPegawai.php` (baru; isi `RoutesPegawai.php` hanya kerangka) | `backend/app/Config/Routes.php` |
 | `backend/app/Config/Services.php` (sekali, §3.2) | `_support` milik PR #20: `tests/_support/LepasMigrationKepegawaianTrait.php`, `tests/_support/SkemaKepegawaianTestTrait.php`, `tests/_support/Kepegawaian/SkemaD1.php`, `tests/_support/Kepegawaian/SkemaD1TestTrait.php` |
-| `backend/app/Config/Kepegawaian.php` (baru) | Berkas base case CR-045 dan migration DBV-019 (milik sesi utama) |
+| `backend/app/Config/Kepegawaian.php` (baru) | Berkas base case MAKE-001 dan migration DBV-019 (milik sesi utama) |
 | `backend/app/Interfaces/Kepegawaian/**` (baru) | `app/Libraries/Kepegawaian/Kalkulasi/**`, `app/Libraries/Kepegawaian/Nip/**` (sudah di `main`, CR-025/CR-036; hanya dipakai) |
 | `backend/app/Libraries/Kepegawaian/Riwayat/**` (kerangka: Definisi, StatusRiwayat, Registry stub) | `composer.json`/`composer.lock` (milik WS-2) |
 | `backend/app/Libraries/Kepegawaian/Stub/**` (baru) | Seluruh `frontend/**` (milik S0-B) |
@@ -145,7 +145,7 @@ SnapshotSync, RiwayatEngine, BaseRiwayatController (milestone WS-1 M1, CR-048); 
 Butuh perubahan skema? **Jangan** membuat migration. Catat kebutuhan di deskripsi serah; sesi utama mengalokasikan key DBV baru.
 
 ## 6. Kontrak yang dibekukan di akhir S0
-Setelah CR-046 di-merge, berikut hanya boleh berubah **secara aditif** dan **oleh pemiliknya**:
+Setelah MAKE-002 di-merge, berikut hanya boleh berubah **secara aditif** dan **oleh pemiliknya**:
 1. `PegawaiScopeInterface` (pemilik implementasi: WS-2)
 2. `AttachmentServiceInterface` / `StorageAdapterInterface` / `AturanLampiran` (pemilik: WS-2)
 3. `RiwayatDefinisi` + API engine (pemilik: WS-1)
@@ -157,7 +157,7 @@ Perubahan non-aditif setelah beku harus disetujui reviewer CR dan diberitahukan 
 ## 7. Definition of Done
 - [ ] §3.1–§3.8 selesai; `php spark routes` memuat kedua berkas route.
 - [ ] Semua service §3.2 terdaftar, bertipe interface, stub fail-closed; fake hanya di `tests/_support`.
-- [ ] `PegawaiFixtureTrait` membuat data yang lolos FK (termasuk FK DBV-019 bila sudah di `main`) dan cocok dengan base case CR-045.
+- [ ] `PegawaiFixtureTrait` membuat data yang lolos FK (termasuk FK DBV-019 bila sudah di `main`) dan cocok dengan base case MAKE-001.
 - [ ] README kontrak API lengkap (endpoint, descriptor, slug, kode status, snake_case, audit `update`).
 - [ ] Progres 03-Kepegawaian dipecah per task dengan kolom WS & Key.
 - [ ] Test §3.9 hijau.
@@ -170,9 +170,9 @@ Perubahan non-aditif setelah beku harus disetujui reviewer CR dan diberitahukan 
 2. **DB scratch sendiri**: buat database khusus, mis. `simpeg_v2_ws1_dev` dan `simpeg_v2_ws1_testing` (collation `utf8mb4_unicode_ci`). Tulis `.env` worktree sendiri dari `backend/.env.example`; **jangan menyalin `.env` dev** dari tempat lain. Pastikan `database.default` dan `database.tests` menunjuk DB scratch Anda sebelum menjalankan `spark migrate` atau PHPUnit.
 3. **Gate cepat** selama kerja (±5–10 menit): `cd backend && composer analyse && composer cs-check`; PHPUnit hanya berkas/folder yang Anda sentuh, mis. `vendor/bin/phpunit --no-coverage tests/Kepegawaian tests/unit/Kepegawaian`.
 4. **Gate penuh sekali** sebelum serah, pada commit yang diserahkan, **sebagai proses lepas** dengan log ke berkas, mis. `nohup ./check.sh > gate.log 2>&1 &` (atau `Start-Process` di PowerShell, lihat AGENTS.md §3). Jangan jalankan gate penuh berulang; satu gate penuh pada satu waktu per mesin. Bila setelah gate hanya dokumen yang berubah, gate tidak perlu diulang.
-5. **Commit**: Bahasa Indonesia, gaya `feat(kepegawaian): CR-046 …` / `test(kepegawaian): CR-046 …` / `docs(kepegawaian): CR-046 …`. **Tanpa** trailer `Co-Authored-By` dan tanpa menyebut AI/assistant/tool apa pun di pesan commit, komentar, atau dokumen.
+5. **Commit**: Bahasa Indonesia, gaya `feat(kepegawaian): MAKE-002 …` / `test(kepegawaian): MAKE-002 …` / `docs(kepegawaian): MAKE-002 …`. **Tanpa** trailer `Co-Authored-By` dan tanpa menyebut AI/assistant/tool apa pun di pesan commit, komentar, atau dokumen.
 6. **Rahasia & repo publik**: jangan commit `.env`, kredensial, token, password, API key; jangan menulis IP/host internal, nama server, atau detail celah keamanan di kode/dokumen.
-7. **Tidak push ke `main`.** Serahkan dengan push branch fitur `ws1/…` (mis. `ws1/cr-046-s0a-kontrak-backend-fase3`) ke `origin`. Review CR dilakukan oleh sesi utama, yang kemudian memasukkan ke `main` (alur CR-only).
+7. **Tidak push ke `main`.** Serahkan dengan push branch fitur `ws1/…` (mis. `ws1/make-002-s0a-kontrak-backend-fase3`) ke `origin`. Review CR dilakukan oleh sesi utama, yang kemudian memasukkan ke `main` (alur CR-only).
 8. **UI** (tidak relevan untuk S0-A, berlaku di milestone berikutnya): aksi baris tabel lewat menu ⋮ (`RowActionsMenu`, AGENTS.md §1).
 9. Bila ada aturan di briefing ini yang bertentangan dengan AGENTS.md atau kode di `main`, **tanyakan reviewer CR** sebelum menyimpang.
 
@@ -182,17 +182,17 @@ Perubahan non-aditif setelah beku harus disetujui reviewer CR dan diberitahukan 
 | Routing + Services + stub | 1,5 |
 | Interface + fake + StatusRiwayat + Config flag | 2 |
 | RiwayatDefinisi + discovery + Registry stub + descriptor | 1,5 |
-| PegawaiFixtureTrait (FK G-02/DBV-019, base case CR-045) | 1,5 |
+| PegawaiFixtureTrait (FK G-02/DBV-019, base case MAKE-001) | 1,5 |
 | README kontrak + progres | 1 |
 | Test + gate cepat + gate penuh (lepas) | 0,5 + waktu gate |
-| **Total** | **±1 hari-agen** (gate penuh berjalan sendiri ±80 menit, bisa lebih cepat setelah CR-045) |
+| **Total** | **±1 hari-agen** (gate penuh berjalan sendiri ±80 menit, bisa lebih cepat setelah MAKE-001) |
 
 ## 10. Titik koordinasi dengan Qoder-2 (S0-B)
 | Kapan | Apa | Arah |
 |---|---|---|
 | ±jam ke-2 | Kirim draf **bentuk descriptor tab** + **daftar slug `{jenis}`** + bentuk endpoint riwayat/lampiran (cukup isi §3.5/§3.7 README di branch Anda) | Qoder-1 → Qoder-2 (Qoder-2 menyelaraskan tipe TS, nama berkas `riwayat/jenis/<slug>.ts`, dan klien API) |
 | ±jam ke-4 | Konfirmasi bentuk payload snake_case = kolom DDL (Qoder-2 menyamakan `types.ts` dengan DDL yang sama) | dua arah |
-| Akhir S0 | Kedua branch diserahkan; reviewer CR memasukkan CR-046 lebih dulu (kontrak), lalu CR-047 | — |
+| Akhir S0 | Kedua branch diserahkan; reviewer CR memasukkan MAKE-002 lebih dulu (kontrak), lalu MAKE-003 | — |
 | Setelah S0 | Permintaan perubahan kontrak/hook diajukan ke pemiliknya (§6), tidak mengedit berkas WS lain | dua arah |
 
 Qoder-2 **tidak** menyentuh backend di S0; Anda **tidak** menyentuh frontend.
@@ -206,7 +206,7 @@ Qoder-2 **tidak** menyentuh backend di S0; Anda **tidak** menyentuh frontend.
 6. Batas lampiran per jenis 1/2/5 MB ikut legacy.
 7. PDF memakai TCPDF (ikut legacy) lewat ADR-033 (`docs/adr/ADR-033-library-pdf-tcpdf.md`; lisensi LGPL-3.0, sama dengan legacy); cadangan dompdf bila TCPDF bermasalah) + gate = bagian build; QA Lapis 1/review/sesi QA tidak.
 10. Default ikut legacy: acuan jarak KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy (+ `jabatan_koordinasi.nip`); masa hukdis = `masa_sanksi_bulan`; aturan lingkup unit destinasi 21 / unit lain 7 ikut legacy.
-11. Key: satu key CR per paket milestone per WS; S0-A = **CR-046**. Peta lengkap di PRD §7.1.
+11. Key: satu key CR per paket milestone per WS; S0-A = **MAKE-002**. Peta lengkap di PRD §7.1.
 12. Aturan proyek yang berlaku: PK pegawai = `nip`; status data 1/2/10 (riwayat 0/1/2/10); collation `utf8mb4_unicode_ci`; skema ikut DDL legacy; migration di `main` tidak diedit; perubahan skema lewat key DBV dan review DB Validator; snapshot hanya disinkronkan di approval final (ADR-006), termasuk saat baris aktif ditolak/dihapus; trigger legacy tidak dibawa (menjadi aturan aplikasi); hanya `LocalStorageAdapter` (arsip remote legacy tidak disalin).
 13. Serah-terima (keputusan 07-10-2026): cara serah = **push branch fitur `ws1/…` ke `origin`** (tidak ke `main`); review CR dilakukan oleh sesi utama, yang kemudian memasukkan paket ke `main` (alur CR-only).
 14. Menu Fase 3 tersembunyi dengan `ACTIVE_PHASE = 2` sampai B-20 penutup (keputusan 07-10-2026); WS-2 yang menaikkan ke 3.

@@ -7,7 +7,7 @@
 | Estimasi | ≈24 hari-agen (relatif, bukan tanggal kalender) |
 | Cakupan | Build saja (BE + FE + test yang diwajibkan DoD + `check.sh`). QA Lapis 1, review independen, dan sesi QA di luar cakupan |
 | Basis & alur merge | Branch sendiri dari `main`; masuk `main` **per milestone** sebagai CR-only setelah review CR; gate penuh sekali sebelum push (AGENTS.md §3). Tidak ada branch integrasi/trunk |
-| Key review | CR-047 (S0-B), CR-053..CR-058 (milestone WS-2) — lihat §7.1 |
+| Key review | MAKE-003 (S0-B), MAKE-009..MAKE-014 (milestone WS-2) — lihat §7.1 |
 | Mitra | WS-1 (Qoder-1) — lihat `PRD_WS1.md` |
 | Briefing Sprint 0 | `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md` |
 | Acuan Fase 3 | Kontrak task `docs/fase3/03-Kepegawaian.md`; hak akses `docs/fase3/MATRIKS_ROLE_MODUL_B.md`; library PDF `docs/adr/ADR-033-library-pdf-tcpdf.md` |
@@ -21,7 +21,7 @@
 | P-1 | Fase 2 sign-off | **Selesai 07-10-2026** |
 | P-2 | Skema B-01/B-02 (PR #20, DBV-012/013), G-02 (PR #17/#18), G-03 (PR #21), G-09 (PR #19) di `main` | **Selesai** — build berangkat dari `main`, bukan dari draf |
 | P-3 | CR-044 — CI GitHub Actions | Dikerjakan sesi utama paralel dengan Sprint 0 |
-| P-4 | CR-045 — PHPUnit cepat + base case test DB baru (migrate sekali + transaksi per test) | Dikerjakan sesi utama paralel. Fixture/test Fase 3 **wajib** memakai base case ini begitu masuk `main` |
+| P-4 | MAKE-001 — PHPUnit cepat + base case test DB baru (migrate sekali + transaksi per test) | Dikerjakan sesi utama paralel. Fixture/test Fase 3 **wajib** memakai base case ini begitu masuk `main` |
 | P-5 | DBV-019 — FK G-02 ↔ pegawai/riwayat (PR #23) | Dikerjakan sesi utama paralel. Fixture/test Fase 3 **wajib** mematuhi FK ini (baris master unit/satker/jabatan disediakan fixture) |
 
 Alur: setiap WS bekerja di branch sendiri dari `main` dan rebase ke `main` saat paket milestone lain sudah masuk. Serah-terima antar-WS terjadi **lewat `main`**, bukan lewat branch integrasi.
@@ -61,7 +61,7 @@ Hak akses mengikuti **Matriks v2** (`docs/fase3/MATRIKS_ROLE_MODUL_B.md`; keputu
 
 ## 3. Kebutuhan fungsional
 
-### 3.1 Sprint 0 — fondasi frontend (S0-B, CR-047, ±h0–1,5)
+### 3.1 Sprint 0 — fondasi frontend (S0-B, MAKE-003, ±h0–1,5)
 Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 1. Port **per berkas** dari commit `3420e1a` (branch `origin/feat/frontend-ui-redesign`) ke branch di atas `main`: `shared/layouts/*` dan `features/kepegawaian/**`; AppShell dipensiunkan, 6 pembungkus halaman dipindah. Merge langsung dilarang (3 commit bertrailer terlarang 9dd8b1e/265aba1/ad2fc91, banyak konflik).
 2. Pecah `riwayat.config.ts`, `RIWAYAT_MENUS`, `riwayat.spec.ts` menjadi `riwayat/jenis/<key>.ts` dengan registry `import.meta.glob`; `DetailPegawaiPage` merender tab dari registry. **Tab Konket dan Karpeg/Karis tidak di-port** (keputusan #5).
@@ -105,7 +105,7 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 - Audit untuk semua perubahan data dan approval.
 - Arsip remote legacy tidak disalin (repo publik); hanya `LocalStorageAdapter`.
 - Kualitas: `./check.sh` lolos. Test wajib DoD (bagian dari build, keputusan #9): B-06 dan butir cascade B-21.
-- Test ber-DB memakai base case CR-045 (bila sudah di `main`) dan fixture yang mematuhi FK DBV-019.
+- Test ber-DB memakai base case MAKE-001 (bila sudah di `main`) dan fixture yang mematuhi FK DBV-019.
 
 ---
 
@@ -113,7 +113,7 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 
 | Milik WS-2 | Tidak boleh disentuh WS-2 |
 |---|---|
-| `RoutesPegawai.php`, `PegawaiScope`, `Attachment*`/`StorageAdapter`, `NipCascadeService`, `TabelAnakNip`, `composer.json` (termasuk library PDF), Auth, `Definisi/Jabatan.php`, layanan biodata/struktur/LKH/Konket, `routes.pegawai.ts`, `router/index.ts`, `nav.config.ts`, `DetailPegawaiPage`, `StatusBadge`, `ApprovalDialog`, halaman Daftar Pegawai/Struktur/Konket/LKH | Engine, SnapshotSync, `BaseSnapshotModel`, Definisi selain Jabatan, `RoutesRiwayat.php`, `routes.riwayat.ts`, `Routes.php`/`Services.php` (setelah S0), **semua migration yang sudah ada di `main`**, `_support` milik PR #20 (`LepasMigrationKepegawaianTrait.php`, `SkemaKepegawaianTestTrait.php`, `Kepegawaian/SkemaD1*.php`), berkas base case CR-045 |
+| `RoutesPegawai.php`, `PegawaiScope`, `Attachment*`/`StorageAdapter`, `NipCascadeService`, `TabelAnakNip`, `composer.json` (termasuk library PDF), Auth, `Definisi/Jabatan.php`, layanan biodata/struktur/LKH/Konket, `routes.pegawai.ts`, `router/index.ts`, `nav.config.ts`, `DetailPegawaiPage`, `StatusBadge`, `ApprovalDialog`, halaman Daftar Pegawai/Struktur/Konket/LKH | Engine, SnapshotSync, `BaseSnapshotModel`, Definisi selain Jabatan, `RoutesRiwayat.php`, `routes.riwayat.ts`, `Routes.php`/`Services.php` (setelah S0), **semua migration yang sudah ada di `main`**, `_support` milik PR #20 (`LepasMigrationKepegawaianTrait.php`, `SkemaKepegawaianTestTrait.php`, `Kepegawaian/SkemaD1*.php`), berkas base case MAKE-001 |
 
 ---
 
@@ -121,12 +121,12 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 
 | WS-2 butuh | Dari | Butuh / siap | Cara melepas |
 |---|---|---|---|
-| Interface Scope/Lampiran + fixture | WS-1 S0-A (CR-046) | h1,5 / h1 | Kontrak S0 di `main` |
+| Interface Scope/Lampiran + fixture | WS-1 S0-A (MAKE-002) | h1,5 / h1 | Kontrak S0 di `main` |
 | Descriptor tab | WS-1 | h7 / S0 (stub) | Kontrak beku; tab muncul otomatis saat WS-1 mendaftarkan jenis |
-| **engine-v1 beku** (B-07) | WS-1 M2 (CR-049) | **h12,5 / h9,5** | Slack 3 hari; fallback tukar B-07 dengan Konket/LKH |
+| **engine-v1 beku** (B-07) | WS-1 M2 (MAKE-005) | **h12,5 / h9,5** | Slack 3 hari; fallback tukar B-07 dengan Konket/LKH |
 | Tabel riwayat WS-1 (DRH) | WS-1 | h21,5 / `main` | Hanya baca |
 | Snapshot pmj | `main` | h1,5 | Fixture S0-A |
-| Base case test (CR-045), FK DBV-019 | Sesi utama | S0 | Fixture hanya-INSERT; rebase saat masuk `main` |
+| Base case test (MAKE-001), FK DBV-019 | Sesi utama | S0 | Fixture hanya-INSERT; rebase saat masuk `main` |
 
 | WS-1 butuh dari WS-2 | Siap |
 |---|---|
@@ -141,33 +141,33 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 ## 7. Milestone & kriteria selesai
 | Milestone | Key | ±Hari | Kriteria |
 |---|---|---|---|
-| S0-B fondasi FE | CR-047 | h1,5 | Port per berkas, registry tab, route/nav, StatusBadge/ApprovalDialog di `main` tanpa data contoh runtime |
-| M1 Scope + Lampiran nyata | CR-053 | h5 | Test lingkup role 2/3/4/5/8 + UL_PEGAWAI hijau; simpan/hapus transaksional + kompensasi berkas hijau; masuk `main` untuk WS-1 |
-| M2 Koreksi NIP + detail pegawai live | CR-054 | h9,5 | Cascade + rollback penuh teruji (B-21); list/detail + descriptor tab tersambung |
-| M3 Approval biodata + tambah/hapus | CR-055 | h12,5 | B-04/B-05 tersambung; regresi A-09 hijau |
-| M4 Jabatan + Struktur live | CR-056 | h17,5 | B-07 di atas engine-v1, snapshot pmj benar; B-19 tersambung |
-| M5 Konket + LKH | CR-057 | h21,5 | Halaman Konket & Verifikasi LKH tersambung; ADR-033 (TCPDF) disetujui |
-| M6 Selesai | CR-058 | h24 | B-20 penutup tersambung, `ACTIVE_PHASE` = 3; `check.sh` hijau |
+| S0-B fondasi FE | MAKE-003 | h1,5 | Port per berkas, registry tab, route/nav, StatusBadge/ApprovalDialog di `main` tanpa data contoh runtime |
+| M1 Scope + Lampiran nyata | MAKE-009 | h5 | Test lingkup role 2/3/4/5/8 + UL_PEGAWAI hijau; simpan/hapus transaksional + kompensasi berkas hijau; masuk `main` untuk WS-1 |
+| M2 Koreksi NIP + detail pegawai live | MAKE-010 | h9,5 | Cascade + rollback penuh teruji (B-21); list/detail + descriptor tab tersambung |
+| M3 Approval biodata + tambah/hapus | MAKE-011 | h12,5 | B-04/B-05 tersambung; regresi A-09 hijau |
+| M4 Jabatan + Struktur live | MAKE-012 | h17,5 | B-07 di atas engine-v1, snapshot pmj benar; B-19 tersambung |
+| M5 Konket + LKH | MAKE-013 | h21,5 | Halaman Konket & Verifikasi LKH tersambung; ADR-033 (TCPDF) disetujui |
+| M6 Selesai | MAKE-014 | h24 | B-20 penutup tersambung, `ACTIVE_PHASE` = 3; `check.sh` hijau |
 
 ### 7.1 Peta key CR Fase 3 (keputusan #11: satu key per paket milestone per WS)
 
-Key yang sudah terpakai sebelum Fase 3: CR-044 (CI), CR-045 (PHPUnit cepat + MySQL test), DBV-019 (FK G-02↔pegawai, PR #23).
+Key yang sudah terpakai sebelum Fase 3: CR-044 (CI), MAKE-001 (PHPUnit cepat + MySQL test), DBV-019 (FK G-02↔pegawai, PR #23).
 
 | Paket | WS | Isi | Key |
 |---|---|---|---|
-| S0-A | WS-1 | Kontrak backend | CR-046 |
-| S0-B | WS-2 | Fondasi frontend | CR-047 |
-| WS-1 M1 | WS-1 | SnapshotSync + RiwayatEngine BE | CR-048 |
-| WS-1 M2 | WS-1 | B-10 + B-08 + freeze engine-v1 | CR-049 |
-| WS-1 M3 | WS-1 | FE mesin riwayat + B-09 + B-14 | CR-050 |
-| WS-1 M4 | WS-1 | B-16 + B-11 + B-17 (+ halaman Karpeg/Karis) | CR-051 |
-| WS-1 M5 | WS-1 | B-12a SKP + B-15 AK + B-21 butir snapshot | CR-052 |
-| WS-2 M1 | WS-2 | PegawaiScope + B-18 Lampiran | CR-053 |
-| WS-2 M2 | WS-2 | B-06 Koreksi NIP + B-03 Biodata (+ backend dasar B-20) | CR-054 |
-| WS-2 M3 | WS-2 | B-04 Approval biodata + B-05 Tambah/Hapus | CR-055 |
-| WS-2 M4 | WS-2 | B-07 Jabatan + B-19 Struktur | CR-056 |
-| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR-033 PDF (TCPDF) | CR-057 |
-| WS-2 M6 | WS-2 | B-20 penutup | CR-058 |
+| S0-A | WS-1 | Kontrak backend | MAKE-002 |
+| S0-B | WS-2 | Fondasi frontend | MAKE-003 |
+| WS-1 M1 | WS-1 | SnapshotSync + RiwayatEngine BE | MAKE-004 |
+| WS-1 M2 | WS-1 | B-10 + B-08 + freeze engine-v1 | MAKE-005 |
+| WS-1 M3 | WS-1 | FE mesin riwayat + B-09 + B-14 | MAKE-006 |
+| WS-1 M4 | WS-1 | B-16 + B-11 + B-17 (+ halaman Karpeg/Karis) | MAKE-007 |
+| WS-1 M5 | WS-1 | B-12a SKP + B-15 AK + B-21 butir snapshot | MAKE-008 |
+| WS-2 M1 | WS-2 | PegawaiScope + B-18 Lampiran | MAKE-009 |
+| WS-2 M2 | WS-2 | B-06 Koreksi NIP + B-03 Biodata (+ backend dasar B-20) | MAKE-010 |
+| WS-2 M3 | WS-2 | B-04 Approval biodata + B-05 Tambah/Hapus | MAKE-011 |
+| WS-2 M4 | WS-2 | B-07 Jabatan + B-19 Struktur | MAKE-012 |
+| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR-033 PDF (TCPDF) | MAKE-013 |
+| WS-2 M6 | WS-2 | B-20 penutup | MAKE-014 |
 
 Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. Konket pindah ke WS-1), task ikut key paket tujuan. Kebutuhan skema baru di luar build memakai key DBV baru (DBV-020 dst.) yang dialokasikan sesi utama.
 
@@ -182,7 +182,7 @@ Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. Kon
 | TCPDF bermasalah saat port template | ADR-033 sudah diputus; cadangan dompdf di balik antarmuka tipis; LKH/DRH di ekor |
 | Kontrak beda dengan skema/legacy (`status 0` vs `flag_update`, `id_parent` vs `id_entri`+`id_riwayat`, arti Konket) | Build ikut skema/legacy; deviasi dicatat di progres |
 | Port FE bentrok dengan halaman yang berubah di `main` sejak redesign (Web Config, Lokasi Presensi, master) | Port per berkas hanya `shared/layouts/*` + `features/kepegawaian/**`; versi `main` menang untuk berkas lain; route file terpisah |
-| Antrian merge per milestone (gate penuh ±80 menit) menunda serah-terima Scope/B-18 | Paket M1 diserahkan begitu siap; gate penuh sekali pada commit yang diserahkan (AGENTS.md §3); CR-045 mempercepat PHPUnit |
+| Antrian merge per milestone (gate penuh ±80 menit) menunda serah-terima Scope/B-18 | Paket M1 diserahkan begitu siap; gate penuh sekali pada commit yang diserahkan (AGENTS.md §3); MAKE-001 mempercepat PHPUnit |
 
 ---
 
@@ -200,7 +200,7 @@ Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. Kon
 | 8 | Status 3 "Diproses" di belakang flag, nonaktif default | Engine (WS-1); LKH memakai status 3 = Revisi sesuai legacy |
 | 9 | Unit/feature test yang diwajibkan DoD (B-06/08/09/14, B-21) + gate = bagian build; QA Lapis 1/review/sesi QA tidak | §4 |
 | 10 | Default ikut legacy: acuan KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy + `jabatan_koordinasi.nip` (TabelAnakNip CR-036 memuatnya); masa hukdis = `masa_sanksi_bulan`; lingkup unit destinasi 21 / unit lain 7 ikut legacy | B-06, PegawaiScope |
-| 11 | Satu key CR per paket milestone per WS; key WS mulai CR-046 | §7.1 |
+| 11 | Satu key CR per paket milestone per WS; key WS mulai MAKE-002 | §7.1 |
 
 ## 10. Aturan kerja
 Worktree + DB scratch sendiri (`simpeg_v2_ws2*`, tanpa salin `.env` dev), `composer install` + `npm ci`, commit Bahasa Indonesia `feat(scope): CR-0xx …` dengan key paket (§7.1) **tanpa** trailer `Co-Authored-By`/penyebutan AI, tanpa `.env`/kredensial, repo publik tanpa IP/host internal. Gate cepat selama kerja; gate penuh **sekali** pada commit yang diserahkan, dijalankan sebagai proses lepas (AGENTS.md §3). Tidak push ke `main` — branch diserahkan untuk review CR. Hanya mengedit berkas milik WS-2; aksi baris lewat ⋮ (AGENTS.md §1).

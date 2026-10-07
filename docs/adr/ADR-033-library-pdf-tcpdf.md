@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | **Diterima 07-10-2026** (keputusan user; semula diusulkan mPDF, dikoreksi ke TCPDF setelah pengecekan kode legacy menunjukkan mesin nyata = TCPDF; keputusan #7 di `docs/fase3/PRD_WS1.md` §9 dan `docs/fase3/PRD_WS2.md` §9) |
 | **Cakupan** | PDF Fase 3: LKH (B-12b) dan Cetak DRH (B-20). Modul lain yang butuh PDF menyusul lewat ADR atau addendum sendiri |
-| **Pemilik pelaksanaan** | WS-2, milestone M5 (CR-057) |
+| **Pemilik pelaksanaan** | WS-2, milestone M5 (MAKE-013) |
 | **Terkait** | ADR-005 (logika di Library/service), draf ADR-032 (library PDF/Excel/QR & rute publik untuk Slip Gaji Fase 5, di luar repo, belum diputus) |
 
 ## 1. Konteks
@@ -26,7 +26,7 @@
 1. v2 memakai **TCPDF ^6.6** (`tecnickcom/tcpdf`) sebagai pembangkit PDF untuk LKH dan Cetak DRH — mesin yang sama dengan jalur LKH/DRH/slip legacy (`PdfCreator extends TCPDF`).
 2. Template cetak legacy (view HTML LKH dan DRH untuk `writeHTML`) dipakai ulang sebagai titik awal template v2, dengan penyesuaian seperlunya (kop, data dari service v2, escape output).
 3. TCPDF dibungkus **antarmuka tipis** (mis. `PdfRendererInterface` di `app/Interfaces/`, implementasi di `app/Libraries/`). Controller dan service LKH/DRH hanya bergantung pada antarmuka, sehingga penggantian library tidak menyentuh kode LKH/DRH (lihat §4).
-4. Paket ditambahkan ke `backend/composer.json` oleh WS-2 di M5 (CR-057).
+4. Paket ditambahkan ke `backend/composer.json` oleh WS-2 di M5 (MAKE-013).
 
 ## 3. Lisensi
 
@@ -44,7 +44,7 @@
 
 ## 5. Konsekuensi
 
-- **Satu pemilik `composer.json`**: hanya WS-2 yang menambah dependensi PDF, di M5 (CR-057). WS-1 tidak menyentuh `composer.json` untuk keperluan PDF. Bila draf ADR-032 kelak diputus berbeda untuk Fase 5, keputusan itu harus menyelaraskan diri dengan ADR ini (satu library PDF untuk seluruh aplikasi) atau mencatat alasan memakai dua library.
+- **Satu pemilik `composer.json`**: hanya WS-2 yang menambah dependensi PDF, di M5 (MAKE-013). WS-1 tidak menyentuh `composer.json` untuk keperluan PDF. Bila draf ADR-032 kelak diputus berbeda untuk Fase 5, keputusan itu harus menyelaraskan diri dengan ADR ini (satu library PDF untuk seluruh aplikasi) atau mencatat alasan memakai dua library.
 - **Font dan aset**: font yang dibutuhkan template (termasuk logo kop) disediakan lokal di repo/deploy, tanpa unduhan saat runtime. Path aset relatif terhadap penyimpanan aset v2 (lihat catatan logo PDF di `backend/docs/db-review/G-09-web-config-schema.md`). Direktori cache/temp TCPDF (`K_PATH_CACHE`) diarahkan ke `WRITEPATH`.
 - **Pengujian PDF**: test memeriksa bahwa keluaran adalah PDF valid (header `%PDF`), tipe konten, nama berkas, dan penegakan role (Matriks v2 / atasan langsung untuk LKH). Isi visual diperiksa di QA Lapis 1, bukan di unit test.
 - **Gate**: penambahan paket diuji dengan `./check.sh` penuh (PHPStan level 5 termasuk kode pembungkus).
