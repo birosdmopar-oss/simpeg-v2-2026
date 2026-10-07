@@ -4,10 +4,10 @@
 |---|---|
 | Penerima | Qoder-1 (pelaksana WS-1 "Mesin Riwayat & Riwayat Karier/Administrasi") |
 | Key review | **CR-046** (CR saja, tanpa perubahan skema) |
-| Branch | `cr-046/s0a-kontrak-backend-fase3`, dibuat dari `origin/main` terbaru |
+| Branch | `ws1/cr-046-s0a-kontrak-backend-fase3`, dibuat dari `origin/main` terbaru |
 | Estimasi | **±1 hari-agen** (hari 0–1 Sprint 0) |
 | Berjalan paralel dengan | S0-B Qoder-2 (fondasi frontend, CR-047) — lihat `BRIEFING_S0B_Qoder2_frontend.md` |
-| Acuan | `docs/fase3/PRD_WS1.md`, `docs/fase3/PRD_WS2.md`, `AGENTS.md`, `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md` (skema B-01/B-02, aturan snapshot §5.1), `backend/docs/progress/03-Kepegawaian.md`, `backend/app/Libraries/Kepegawaian/README.md` |
+| Acuan | `docs/fase3/PRD_WS1.md`, `docs/fase3/PRD_WS2.md`, `AGENTS.md`, `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md` (skema B-01/B-02, aturan snapshot §5.1), `backend/docs/progress/03-Kepegawaian.md`, `backend/app/Libraries/Kepegawaian/README.md`, `docs/fase3/03-Kepegawaian.md` (kontrak task Fase 3), `docs/fase3/MATRIKS_ROLE_MODUL_B.md` (hak akses Modul B), `docs/adr/ADR-033-library-pdf-mpdf.md` (library PDF) |
 | Hasil yang diserahkan | Satu branch berisi commit CR-046, lolos gate penuh, diserahkan ke reviewer CR. **Jangan push ke `main`.** |
 
 ---
@@ -67,7 +67,7 @@ Implementasi nyata `PegawaiScope` dan `AttachmentService`/`StorageAdapter` **mil
 - `RiwayatDefinisi`: **satu berkas per jenis** di `app/Libraries/Kepegawaian/Riwayat/Definisi/*.php`, dibaca lewat **auto-discovery** (memindai folder; tidak ada daftar terpusat yang harus diedit WS lain). Isi kontrak (sebagai data, bukan kode khusus per jenis):
   - kunci jenis (slug URL, lihat §3.7), label, tabel + PK, kolom `nip`;
   - field (pola `App\Libraries\MasterData\MasterField`);
-  - **izin per aksi per role** (lihat/tambah/ubah/hapus/proses) — hak akses mengikuti Matriks v2 dan disimpan di sini, sehingga perubahan cukup satu baris;
+  - **izin per aksi per role** (lihat/tambah/ubah/hapus/proses) — hak akses mengikuti Matriks v2 (`docs/fase3/MATRIKS_ROLE_MODUL_B.md`) dan disimpan di sini, sehingga perubahan cukup satu baris;
   - alur: `self-service` (pegawai mengajukan, status 0), `admin` (input langsung status 1), `usulan` (halaman usulan mandiri);
   - pemetaan domain status;
   - aturan snapshot sebagai data: tabel target, filter, urutan (mengacu dok DBV-012 §5.1), multi-target;
@@ -172,7 +172,7 @@ Perubahan non-aditif setelah beku harus disetujui reviewer CR dan diberitahukan 
 4. **Gate penuh sekali** sebelum serah, pada commit yang diserahkan, **sebagai proses lepas** dengan log ke berkas, mis. `nohup ./check.sh > gate.log 2>&1 &` (atau `Start-Process` di PowerShell, lihat AGENTS.md §3). Jangan jalankan gate penuh berulang; satu gate penuh pada satu waktu per mesin. Bila setelah gate hanya dokumen yang berubah, gate tidak perlu diulang.
 5. **Commit**: Bahasa Indonesia, gaya `feat(kepegawaian): CR-046 …` / `test(kepegawaian): CR-046 …` / `docs(kepegawaian): CR-046 …`. **Tanpa** trailer `Co-Authored-By` dan tanpa menyebut AI/assistant/tool apa pun di pesan commit, komentar, atau dokumen.
 6. **Rahasia & repo publik**: jangan commit `.env`, kredensial, token, password, API key; jangan menulis IP/host internal, nama server, atau detail celah keamanan di kode/dokumen.
-7. **Tidak push ke `main`.** Serahkan branch (push ke branch fitur `cr-046/...` bila diberi akses, atau sesuai instruksi reviewer) untuk review CR. Reviewer CR yang memasukkan ke `main` (alur CR-only).
+7. **Tidak push ke `main`.** Serahkan dengan push branch fitur `ws1/…` (mis. `ws1/cr-046-s0a-kontrak-backend-fase3`) ke `origin`. Review CR dilakukan oleh sesi utama, yang kemudian memasukkan ke `main` (alur CR-only).
 8. **UI** (tidak relevan untuk S0-A, berlaku di milestone berikutnya): aksi baris tabel lewat menu ⋮ (`RowActionsMenu`, AGENTS.md §1).
 9. Bila ada aturan di briefing ini yang bertentangan dengan AGENTS.md atau kode di `main`, **tanyakan reviewer CR** sebelum menyimpang.
 
@@ -201,12 +201,16 @@ Qoder-2 **tidak** menyentuh backend di S0; Anda **tidak** menyentuh frontend.
 1. Build berangkat dari `main` (skema B-01/B-02 PR #20, G-02, G-03, G-09 sudah di `main`; Fase 2 sign-off 07-10-2026).
 2. Tidak ada branch integrasi: tiap WS branch sendiri dari `main`, masuk `main` per milestone sebagai CR-only; gate penuh sekali sebelum push.
 3. Pembagian: B-18 di WS-2, B-15 di WS-1, B-12 dipecah (SKP WS-1, LKH WS-2), B-20 dipecah (dasar di B-03, penutup di akhir WS-2).
-4. Hak akses mengikuti Matriks v2 (Hukdis role 1/3; Jabatan & AK sesuai Matriks; Karpeg/Karis role 1, 2, 4, 5, 7 sesuai DoD), **kecuali** approver LKH = atasan langsung (ikut legacy). Izin disimpan sebagai data di Definisi per jenis.
+4. Hak akses mengikuti Matriks v2 (`docs/fase3/MATRIKS_ROLE_MODUL_B.md`; Hukdis role 1/3; Jabatan & AK sesuai Matriks; Karpeg/Karis role 1, 2, 4, 5, 7 sesuai DoD), **kecuali** approver LKH = atasan langsung (ikut legacy). Izin disimpan sebagai data di Definisi per jenis.
 5. Konket dan Karpeg/Karis = halaman usulan mandiri (bukan tab), layout legacy, style redesign.
 6. Batas lampiran per jenis 1/2/5 MB ikut legacy.
-7. PDF memakai mPDF (ikut legacy) lewat ADR baru (lisensi GPL-2.0, pemakaian internal); fallback dompdf bila lisensi ditolak — urusan WS-2.
+7. PDF memakai mPDF (ikut legacy) lewat ADR-033 (`docs/adr/ADR-033-library-pdf-mpdf.md`; lisensi GPL-2.0, pemakaian internal); fallback dompdf bila lisensi ditolak — urusan WS-2.
 8. Status 3 "Diproses" di belakang flag, nonaktif default.
 9. Unit/feature test yang diwajibkan DoD (B-06/08/09/14, B-21) + gate = bagian build; QA Lapis 1/review/sesi QA tidak.
 10. Default ikut legacy: acuan jarak KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy (+ `jabatan_koordinasi.nip`); masa hukdis = `masa_sanksi_bulan`; aturan lingkup unit destinasi 21 / unit lain 7 ikut legacy.
 11. Key: satu key CR per paket milestone per WS; S0-A = **CR-046**. Peta lengkap di PRD §7.1.
 12. Aturan proyek yang berlaku: PK pegawai = `nip`; status data 1/2/10 (riwayat 0/1/2/10); collation `utf8mb4_unicode_ci`; skema ikut DDL legacy; migration di `main` tidak diedit; perubahan skema lewat key DBV dan review DB Validator; snapshot hanya disinkronkan di approval final (ADR-006), termasuk saat baris aktif ditolak/dihapus; trigger legacy tidak dibawa (menjadi aturan aplikasi); hanya `LocalStorageAdapter` (arsip remote legacy tidak disalin).
+13. Serah-terima (keputusan 07-10-2026): cara serah = **push branch fitur `ws1/…` ke `origin`** (tidak ke `main`); review CR dilakukan oleh sesi utama, yang kemudian memasukkan paket ke `main` (alur CR-only).
+14. Menu Fase 3 tersembunyi dengan `ACTIVE_PHASE = 2` sampai B-20 penutup (keputusan 07-10-2026); WS-2 yang menaikkan ke 3.
+15. Slug `{jenis}` dan signature interface boleh diperhalus Qoder-1 selama S0 (dicatat di README kontrak §3.7, disetujui reviewer CR), lalu dibekukan di akhir S0 (§6).
+16. Acuan di repo: kontrak task Fase 3 `docs/fase3/03-Kepegawaian.md`, matriks role Modul B `docs/fase3/MATRIKS_ROLE_MODUL_B.md`, ADR library PDF `docs/adr/ADR-033-library-pdf-mpdf.md`.

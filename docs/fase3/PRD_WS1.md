@@ -10,6 +10,7 @@
 | Key review | CR-046 (S0-A), CR-048..CR-052 (milestone WS-1) — lihat §7.1 |
 | Mitra | WS-2 (Qoder-2) — lihat `PRD_WS2.md` |
 | Briefing Sprint 0 | `docs/fase3/BRIEFING_S0A_Qoder1_backend.md` |
+| Acuan Fase 3 | Kontrak task `docs/fase3/03-Kepegawaian.md`; hak akses `docs/fase3/MATRIKS_ROLE_MODUL_B.md`; library PDF `docs/adr/ADR-033-library-pdf-mpdf.md` |
 
 ---
 
@@ -50,9 +51,9 @@ Sebagian besar data Modul B berpola sama: **baris riwayat ber-approval yang meny
 | UL_PEGAWAI (pegawai) | Mengajukan riwayat milik sendiri (status 0), melihat status dan alasan tolak |
 | Admin (1, dan role lain sesuai Definisi) | Input langsung (status 1), menyetujui/menolak usulan, menghapus (status 10) |
 | Role 3 | Sama dengan admin, terbatas lingkup unit/satker via `PegawaiScope` (disediakan WS-2) |
-| Karpeg & Karis/Karsu | Role 1, 2, 4, 5, 7 (DoD B-17, Matriks v2); pembagian per aksi (ajukan, daftar/antrian, proses) mengikuti Matriks v2 Bagian 2 Modul B |
+| Karpeg & Karis/Karsu | Role 1, 2, 4, 5, 7 (DoD B-17, Matriks v2); pembagian per aksi (ajukan, daftar/antrian, proses) mengikuti Matriks v2 Bagian 2 Modul B (`docs/fase3/MATRIKS_ROLE_MODUL_B.md`) |
 
-Hak akses mengikuti **Matriks v2** (keputusan #4): Hukdis role 1/3, AK sesuai Matriks, Karpeg/Karis role 1, 2, 4, 5, 7 sesuai DoD, Tanda Jasa role 1, 3 (admin) dan 2, 4, 5 (lihat), Organisasi role 1, 2, 3, 7. Izin per aksi per role disimpan **sebagai data di Definisi** tiap jenis, sehingga perubahan cukup satu baris Definisi. Pengecualian (approver LKH = atasan langsung, ikut legacy) ada di WS-2.
+Hak akses mengikuti **Matriks v2** (`docs/fase3/MATRIKS_ROLE_MODUL_B.md`; keputusan #4): Hukdis role 1/3, AK sesuai Matriks, Karpeg/Karis role 1, 2, 4, 5, 7 sesuai DoD, Tanda Jasa role 1, 3 (admin) dan 2, 4, 5 (lihat), Organisasi role 1, 2, 3, 7. Izin per aksi per role disimpan **sebagai data di Definisi** tiap jenis, sehingga perubahan cukup satu baris Definisi. Pengecualian (approver LKH = atasan langsung, ikut legacy) ada di WS-2.
 
 ---
 
@@ -180,7 +181,7 @@ Key yang sudah terpakai sebelum Fase 3: CR-044 (CI), CR-045 (PHPUnit cepat + MyS
 | WS-2 M2 | WS-2 | B-06 Koreksi NIP + B-03 Biodata (+ backend dasar B-20) | CR-054 |
 | WS-2 M3 | WS-2 | B-04 Approval biodata + B-05 Tambah/Hapus | CR-055 |
 | WS-2 M4 | WS-2 | B-07 Jabatan + B-19 Struktur | CR-056 |
-| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR PDF (mPDF) | CR-057 |
+| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR-033 PDF (mPDF) | CR-057 |
 | WS-2 M6 | WS-2 | B-20 penutup | CR-058 |
 
 Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. B-12a pindah ke WS-2), task ikut key paket tujuan. Kebutuhan skema baru di luar build memakai key DBV baru (DBV-020 dst.) yang dialokasikan sesi utama.
@@ -209,7 +210,7 @@ Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. B-1
 | 4 | Hak akses ikut Matriks v2 (Hukdis 1/3, Jabatan & AK sesuai Matriks, Karpeg/Karis 1,2,4,5,7 sesuai DoD), kecuali approver LKH = atasan langsung (legacy). Izin disimpan sebagai data di Definisi per jenis | §2, Definisi |
 | 5 | (05-10) Konket & Karpeg/Karis = halaman usulan mandiri, layout legacy, style redesign | §3.7 |
 | 6 | Batas lampiran per jenis 1/2/5 MB ikut legacy | §4, aturan lampiran Definisi |
-| 7 | PDF: mPDF (ikut legacy) via ADR baru (lisensi GPL-2.0, pemakaian internal); fallback dompdf bila lisensi ditolak | Milik WS-2 (composer) |
+| 7 | PDF: mPDF (ikut legacy) via ADR-033 (`docs/adr/ADR-033-library-pdf-mpdf.md`; lisensi GPL-2.0, pemakaian internal); fallback dompdf bila lisensi ditolak | Milik WS-2 (composer) |
 | 8 | Status 3 "Diproses" di belakang flag, nonaktif default | `StatusRiwayat`, engine |
 | 9 | Unit/feature test yang diwajibkan DoD (B-06/08/09/14, B-21) + gate = bagian build; QA Lapis 1/review/sesi QA tidak | §4 |
 | 10 | Default ikut legacy: acuan KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy (+ `jabatan_koordinasi.nip`); masa hukdis = `masa_sanksi_bulan`; lingkup unit destinasi 21/unit lain 7 ikut legacy | B-09, B-14 |

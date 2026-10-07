@@ -10,6 +10,7 @@
 | Key review | CR-047 (S0-B), CR-053..CR-058 (milestone WS-2) — lihat §7.1 |
 | Mitra | WS-1 (Qoder-1) — lihat `PRD_WS1.md` |
 | Briefing Sprint 0 | `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md` |
+| Acuan Fase 3 | Kontrak task `docs/fase3/03-Kepegawaian.md`; hak akses `docs/fase3/MATRIKS_ROLE_MODUL_B.md`; library PDF `docs/adr/ADR-033-library-pdf-mpdf.md` |
 
 ---
 
@@ -54,7 +55,7 @@ Di luar pola riwayat standar, Modul B punya data inti pegawai dan alur dengan me
 | UL_PEGAWAI | Hanya data NIP sendiri; mengajukan Konket dan LKH |
 | Atasan (`nip_atasan`) | Approver LKH (ikut legacy) |
 
-Hak akses mengikuti **Matriks v2** (keputusan #4), termasuk Jabatan tambah/hapus sesuai Matriks, **kecuali approver LKH = atasan langsung** (ikut legacy). Izin disimpan sebagai data di Definisi per jenis (Jabatan) atau di konfigurasi service masing-masing alur non-engine.
+Hak akses mengikuti **Matriks v2** (`docs/fase3/MATRIKS_ROLE_MODUL_B.md`; keputusan #4), termasuk Jabatan tambah/hapus sesuai Matriks, **kecuali approver LKH = atasan langsung** (ikut legacy). Izin disimpan sebagai data di Definisi per jenis (Jabatan) atau di konfigurasi service masing-masing alur non-engine.
 
 ---
 
@@ -82,7 +83,7 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 | 8 | **B-07 Jabatan/Mutasi + Plt/Plh** | `Definisi/Jabatan.php` di atas **engine-v1** + aturan snapshot pmj (`jenis_jabatan≠3`, seri ≥); dropdown & salinan nama G-02 (termasuk `jabatan_koordinasi`/`rumpun_jabatan`); Plt/Plh tanpa approval; izin sesuai Matriks v2; tab FE. Hanya menulis Definisi + controller; hook baru diajukan ke WS-1 | 3 | 12,5–15,5 |
 | 9 | B-19 Struktur Organisasi | Tree unit→satker→jabatan→pegawai (+Plt/Plh); `so/full` = sesi login; `jabatan/so` = UL_ALL; halaman tersambung | 2 | 15,5–17,5 |
 | 10 | B-13 Konket *(katup)* | Lihat §3.3 | 1,5 | 17,5–19 |
-| 11 | B-12b LKH | Approver atasan langsung (`nip_atasan`, ikut legacy — pengecualian keputusan #4); status 3 = Revisi; tanggal minimum 4 hari kerja (HariLiburService); unit/satker/atasan dari pmj; PDF dengan **mPDF** (keputusan #7, ADR baru); `aa_lkh` ditunda (DBV #13) | 2,5 | 19–21,5 |
+| 11 | B-12b LKH | Approver atasan langsung (`nip_atasan`, ikut legacy — pengecualian keputusan #4); status 3 = Revisi; tanggal minimum 4 hari kerja (HariLiburService); unit/satker/atasan dari pmj; PDF dengan **mPDF** (keputusan #7, ADR-033); `aa_lkh` ditunda (DBV #13) | 2,5 | 19–21,5 |
 | 12 | B-20 penutup | Advanced search (role 1,3,4,5; panel filter disembunyikan untuk 8), export, Cetak DRH PDF (1,2,3,4,5; mPDF), integrasi semua tab; naikkan `ACTIVE_PHASE` ke 3 | 2,5 | 21,5–24 |
 
 ### 3.3 Halaman Usulan Konket (keputusan #5, 05-10)
@@ -90,10 +91,10 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 - **Halaman sendiri**, bukan tab di Detail Pegawai.
 - **Layout ikut legacy** (`Konket.php`): index untuk UL_PEGAWAI, daftar/antrian `list_ad`, alur proses; izin per aksi mengikuti Matriks v2 (keputusan #4).
 - **Style ikut redesign**: token + komponen shared, aksi baris lewat ⋮.
-- Catatan: `03-Kepegawaian.md` menyebut B-13 "Kondisi Kerja: Dinas Luar/WFH/WFO"; build mengikuti arti legacy (`absen_ijin`), deviasi dicatat di progres.
+- Catatan: `docs/fase3/03-Kepegawaian.md` menyebut B-13 "Kondisi Kerja: Dinas Luar/WFH/WFO"; build mengikuti arti legacy (`absen_ijin`), deviasi dicatat di progres.
 
 ### 3.4 Library PDF (keputusan #7)
-- **mPDF** (sama dengan legacy), ditambahkan ke `composer.json` oleh WS-2 dengan **ADR baru** yang mencatat lisensi GPL-2.0 dan dasar pemakaian internal. ADR disetujui sebelum ±h19.
+- **mPDF** (sama dengan legacy), ditambahkan ke `composer.json` oleh WS-2 dengan **ADR-033** (`docs/adr/ADR-033-library-pdf-mpdf.md`) yang mencatat lisensi GPL-2.0 dan dasar pemakaian internal. ADR disetujui sebelum ±h19.
 - Fallback: **dompdf** bila lisensi mPDF ditolak; antarmuka pembangkit PDF dibuat tipis agar penggantian tidak menyentuh LKH/DRH.
 
 ---
@@ -133,7 +134,7 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 | B-18 Lampiran nyata + helper kolom berkas | h5 (paket WS-2 M1) |
 | Port FE + router/nav + detail B-03 | h1,5 (S0-B) / h9,5 (WS-2 M2) |
 
-**Eksternal:** G-02 (#17/#18), G-03 (#21), G-09 (#19) — semuanya sudah di `main`; DBV-009 (tipe `id_satker`, cast sementara); DBV-019 (PR #23, FK G-02↔pegawai); library PDF (ADR mPDF sebelum ±h19).
+**Eksternal:** G-02 (#17/#18), G-03 (#21), G-09 (#19) — semuanya sudah di `main`; DBV-009 (tipe `id_satker`, cast sementara); DBV-019 (PR #23, FK G-02↔pegawai); library PDF (ADR-033, mPDF sebelum ±h19).
 
 ---
 
@@ -145,7 +146,7 @@ Rincian siap-serah: `docs/fase3/BRIEFING_S0B_Qoder2_frontend.md`.
 | M2 Koreksi NIP + detail pegawai live | CR-054 | h9,5 | Cascade + rollback penuh teruji (B-21); list/detail + descriptor tab tersambung |
 | M3 Approval biodata + tambah/hapus | CR-055 | h12,5 | B-04/B-05 tersambung; regresi A-09 hijau |
 | M4 Jabatan + Struktur live | CR-056 | h17,5 | B-07 di atas engine-v1, snapshot pmj benar; B-19 tersambung |
-| M5 Konket + LKH | CR-057 | h21,5 | Halaman Konket & Verifikasi LKH tersambung; ADR mPDF disetujui |
+| M5 Konket + LKH | CR-057 | h21,5 | Halaman Konket & Verifikasi LKH tersambung; ADR-033 (mPDF) disetujui |
 | M6 Selesai | CR-058 | h24 | B-20 penutup tersambung, `ACTIVE_PHASE` = 3; `check.sh` hijau |
 
 ### 7.1 Peta key CR Fase 3 (keputusan #11: satu key per paket milestone per WS)
@@ -165,7 +166,7 @@ Key yang sudah terpakai sebelum Fase 3: CR-044 (CI), CR-045 (PHPUnit cepat + MyS
 | WS-2 M2 | WS-2 | B-06 Koreksi NIP + B-03 Biodata (+ backend dasar B-20) | CR-054 |
 | WS-2 M3 | WS-2 | B-04 Approval biodata + B-05 Tambah/Hapus | CR-055 |
 | WS-2 M4 | WS-2 | B-07 Jabatan + B-19 Struktur | CR-056 |
-| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR PDF (mPDF) | CR-057 |
+| WS-2 M5 | WS-2 | B-13 Konket + B-12b LKH + ADR-033 PDF (mPDF) | CR-057 |
 | WS-2 M6 | WS-2 | B-20 penutup | CR-058 |
 
 Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. Konket pindah ke WS-1), task ikut key paket tujuan. Kebutuhan skema baru di luar build memakai key DBV baru (DBV-020 dst.) yang dialokasikan sesi utama.
@@ -195,7 +196,7 @@ Perbaikan hasil review memakai key paket yang sama. Bila katup dipakai (mis. Kon
 | 4 | Hak akses ikut Matriks v2 (Hukdis 1/3, Jabatan & AK sesuai Matriks, Karpeg/Karis 1,2,4,5,7 sesuai DoD), **kecuali approver LKH = atasan langsung** (legacy). Izin disimpan sebagai data | §2, B-07, LKH |
 | 5 | (05-10) Konket & Karpeg/Karis = halaman usulan mandiri, layout legacy, style redesign | §3.3; tab tidak di-port |
 | 6 | Batas lampiran per jenis 1/2/5 MB ikut legacy | B-18 |
-| 7 | PDF: mPDF via ADR baru (lisensi GPL-2.0, pemakaian internal); fallback dompdf | §3.4 |
+| 7 | PDF: mPDF via ADR-033 (`docs/adr/ADR-033-library-pdf-mpdf.md`; lisensi GPL-2.0, pemakaian internal); fallback dompdf | §3.4 |
 | 8 | Status 3 "Diproses" di belakang flag, nonaktif default | Engine (WS-1); LKH memakai status 3 = Revisi sesuai legacy |
 | 9 | Unit/feature test yang diwajibkan DoD (B-06/08/09/14, B-21) + gate = bagian build; QA Lapis 1/review/sesi QA tidak | §4 |
 | 10 | Default ikut legacy: acuan KGB = KP/KGB terakhir; cascade NIP ikut `update_nip` legacy + `jabatan_koordinasi.nip` (TabelAnakNip CR-036 memuatnya); masa hukdis = `masa_sanksi_bulan`; lingkup unit destinasi 21 / unit lain 7 ikut legacy | B-06, PegawaiScope |
