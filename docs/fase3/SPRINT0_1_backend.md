@@ -163,9 +163,9 @@ README kontrak (§2.3.7) dan disetujui reviewer CR sebelum dibekukan.
 | Interface | Isi minimum | Fake (test) |
 |---|---|---|
 | `PegawaiScopeInterface` | `bolehLihat(AuthContext, string $nip): bool`; `bolehUbah(AuthContext, string $nip): bool`; `terapkanKeQuery(BaseBuilder, AuthContext, string $kolomNip = 'nip'): void` (filter daftar sesuai lingkup); semantik: di luar lingkup → pemanggil mengembalikan 403 | `FakePegawaiScope` — izinkan semua, atau dikonfigurasi per test (daftar NIP yang diizinkan) |
-| `AttachmentServiceInterface` | `simpan(nip, idRiwayat /*kode jenis_rwy*/, idEntri, UploadedFile, AturanLampiran): array` (baris `document_attachment`); `hapus(int $idAttachment): void` (hapus keras + audit); `daftar(nip, idRiwayat, idEntri): list<array>`; dipanggil **di dalam transaksi pemanggil**; kompensasi berkas bila transaksi rollback | `FakeAttachmentService` (memori) |
+| `AttachmentServiceInterface` | `simpan(nip, idRiwayat /*kode jenis_rwy*/, idEntri, UploadedFile, AturanLampiran): array` (baris `document_attachment`); `ambil(string $nip, int $id): array{lampiran, isi}` dan `hapus(string $nip, int $id): void` (hapus keras + audit; lampiran bukan milik `$nip` → 404); `daftar(nip, idRiwayat, idEntri): list<array>`; izin dicek per jenis pemilik `id_riwayat`; dipanggil **di dalam transaksi pemanggil**; kompensasi berkas bila transaksi rollback | `FakeAttachmentService` (memori) |
 | `StorageAdapterInterface` | `simpan(string $path, string $isi): void`, `hapus(string $path): void`, `ada(string $path): bool`, `baca(string $path): string` | `FakeStorageAdapter` (memori) |
-| `AturanLampiran` (value object, bukan interface) | wajib/tidak, kode `jenis_rwy`, batas MB **per jenis (1/2/5 MB ikut legacy)**, daftar ekstensi | — |
+| `AturanLampiran` (value object, bukan interface; di `app/Libraries/Kepegawaian/Riwayat/`, pemilik WS-1) | wajib/tidak, kode `jenis_rwy`, batas MB **per jenis (1/2/5 MB ikut legacy)**, daftar ekstensi | — |
 
 Implementasi nyata `PegawaiScope` dan `AttachmentService`/`StorageAdapter` **milik WS-2** (bukan pekerjaan Anda).
 
@@ -181,7 +181,8 @@ Implementasi nyata `PegawaiScope` dan `AttachmentService`/`StorageAdapter` **mil
     mandiri);
   - pemetaan domain status;
   - aturan snapshot sebagai data: tabel target, filter, urutan (mengacu dok DBV-012 §5.1), multi-target;
-  - aturan lampiran (`AturanLampiran`);
+  - aturan lampiran: `lampiran(): list<AturanLampiran>`, satu per kode `jenis_rwy` (mis. pendidikan 14/39/40,
+    jabatan 9/36/41); registry menolak kode ganda dan menyediakan `definisiUntukLampiran(int)` / `aturanLampiran(int)`;
   - hook opsional: `validate`, `beforeSave`, `afterApprove`.
 
   S0 cukup menghasilkan kelas abstrak/interface + **satu Definisi contoh untuk test** (di `tests/_support`), bukan
@@ -279,7 +280,7 @@ DBV baru.
 ### 2.6 Kontrak yang dibekukan di akhir S0
 Setelah MAKE-002 di-merge, berikut hanya boleh berubah **secara aditif** dan **oleh pemiliknya**:
 1. `PegawaiScopeInterface` (pemilik implementasi: WS-2)
-2. `AttachmentServiceInterface` / `StorageAdapterInterface` / `AturanLampiran` (pemilik: WS-2)
+2. `AttachmentServiceInterface` / `StorageAdapterInterface` (pemilik: WS-2); `AturanLampiran` (pemilik: WS-1)
 3. `RiwayatDefinisi` + API engine (pemilik: WS-1)
 4. Descriptor tab (§2.3.5) + daftar slug `{jenis}` (pemilik: WS-1) — frontend membekukan pasangan props
    `RiwayatTabHost` di S0-B
