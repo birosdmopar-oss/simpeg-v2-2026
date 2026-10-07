@@ -18,23 +18,22 @@ use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Interfaces\Kepegawaian\StorageAdapterInterface;
 use App\Interfaces\Kepegawaian\StrukturServiceInterface;
 use App\Libraries\Auth\AuthContext;
-use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
-use App\Libraries\Kepegawaian\Stub\BelumTersediaException;
-use App\Libraries\Kepegawaian\Stub\StubPegawaiScope;
+use CodeIgniter\Config\Factories;
 use CodeIgniter\Test\CIUnitTestCase;
-use Config\Database;
+use Config\Kepegawaian;
 use Config\Services;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use ReflectionMethod;
 use ReflectionNamedType;
-use Tests\Support\Kepegawaian\Definisi\ContohPendidikan;
 use Tests\Support\Kepegawaian\FakePegawaiScope;
 
 /**
- * S0-A (MAKE-002) — 12 service Fase 3 terdaftar sekali di Config\Services, bertipe interface, stub fail-closed; fake
- * hanya di tests/_support dan disuntik lewat Services::injectMock().
+ * S0-A (MAKE-002) — 12 service Fase 3 terdaftar sekali di Config\Services, bertipe interface, shared; wiring registry
+ * mengikuti scope yang disuntik. Test ini TIDAK mengunci kelas di balik service (stub atau nyata), sehingga pemilik
+ * yang mengganti stub tidak perlu mengubahnya; perilaku fail-closed stub diuji langsung per kelas di
+ * tests/unit/Kepegawaian/Stub/StubFailClosedTest.php.
  *
  * @internal
  */
@@ -45,6 +44,7 @@ final class ServicesKontrakTest extends CIUnitTestCase
     protected function tearDown(): void
     {
         Services::reset(true);
+        Factories::reset('config');
 
         parent::tearDown();
     }
@@ -95,56 +95,28 @@ final class ServicesKontrakTest extends CIUnitTestCase
         $this->assertNotSame($shared, $baru);
     }
 
-    public function testStubPegawaiScopeMenolakSemua(): void
+    public function testRegistrySharedMengikutiScopeYangDisuntik(): void
     {
-        $scope = service('pegawaiScope');
-        $this->assertInstanceOf(StubPegawaiScope::class, $scope);
+        // Folder Definisi diarahkan ke Definisi contoh (pendidikan = tab untuk role 1).
+        $config                           = new Kepegawaian();
+        $config->definisiRiwayatPath      = SUPPORTPATH . 'Kepegawaian/Definisi';
+        $config->definisiRiwayatNamespace = 'Tests\Support\Kepegawaian\Definisi';
+        Factories::injectMock('config', Kepegawaian::class, $config);
 
-        foreach (Role::all() as $role) {
-            $auth = $this->auth($role);
-            $this->assertFalse($scope->bolehLihat($auth, self::NIP), "lihat role {$role}");
-            $this->assertFalse($scope->bolehUbah($auth, self::NIP), "ubah role {$role}");
-        }
+        $auth = new AuthContext();
+        $auth->setClaims(['sub' => '1', 'role' => Role::SUPER_ADMIN, 'nip' => self::NIP]);
 
-        $builder = Database::connect('tests')->table('pegawai');
-        $scope->terapkanKeQuery($builder, $this->auth(Role::SUPER_ADMIN));
-        $this->assertStringContainsString('1 = 0', $builder->getCompiledSelect());
-    }
+        Services::injectMock('pegawaiScope', FakePegawaiScope::izinkanSemua());
+        $registry = service('riwayatRegistry');
+        $this->assertCount(1, $registry->descriptorUntuk($auth, self::NIP));
 
-    public function testStubServiceMenjawab501(): void
-    {
-        $auth = $this->auth(Role::SUPER_ADMIN);
+        // Registry shared yang SAMA mengikuti scope yang disuntik kemudian (tanpa resetSingle).
+        Services::injectMock('pegawaiScope', FakePegawaiScope::tolakSemua());
+        $this->assertSame($registry, service('riwayatRegistry'));
+        $this->assertSame([], $registry->descriptorUntuk($auth, self::NIP));
 
-        $panggilan = [
-            'riwayatService.daftar' => static fn () => service('riwayatService')->daftar($auth, self::NIP, 'pendidikan'),
-            'riwayatService.proses' => static fn () => service('riwayatService')->proses($auth, self::NIP, 'pendidikan', 1, 'setujui', null),
-            'snapshotSync'          => static fn () => service('snapshotSync')->sinkronkan(new ContohPendidikan(), self::NIP),
-            'attachmentService'     => static fn () => service('attachmentService')->daftar(self::NIP, 14, 1),
-            'storageAdapter'        => static fn () => service('storageAdapter')->ada('x.pdf'),
-        ];
-
-        foreach ($panggilan as $nama => $panggil) {
-            try {
-                $panggil();
-                $this->fail("{$nama} harus melempar BelumTersediaException");
-            } catch (BelumTersediaException $e) {
-                $this->assertSame(501, $e->getStatusCode(), $nama);
-            }
-        }
-    }
-
-    public function testRegistryProduksiMemakaiScopeYangDisuntik(): void
-    {
-        $this->assertInstanceOf(RiwayatRegistry::class, service('riwayatRegistry'));
-
-        // Pola test WS: suntik fake scope, registry baru membaca scope itu.
-        $fake = FakePegawaiScope::izinkanSemua();
-        Services::injectMock('pegawaiScope', $fake);
-        $this->assertSame($fake, service('pegawaiScope'));
-
-        $registry = new RiwayatRegistry(service('pegawaiScope'), [new ContohPendidikan()]);
-        $this->assertCount(1, $registry->descriptorUntuk($this->auth(Role::SUPER_ADMIN), self::NIP));
-        $this->assertNotSame([], $fake->panggilan);
+        Services::injectMock('pegawaiScope', FakePegawaiScope::izinkanSemua());
+        $this->assertCount(1, $registry->descriptorUntuk($auth, self::NIP));
     }
 
     public function testKodeProduksiTidakMerujukTestSupport(): void
@@ -159,13 +131,5 @@ final class ServicesKontrakTest extends CIUnitTestCase
         }
 
         $this->assertSame([], $pelanggar);
-    }
-
-    private function auth(int $role): AuthContext
-    {
-        $auth = new AuthContext();
-        $auth->setClaims(['sub' => '1', 'role' => $role, 'nip' => self::NIP]);
-
-        return $auth;
     }
 }

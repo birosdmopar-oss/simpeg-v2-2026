@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\AlurRiwayat;
+use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Libraries\Kepegawaian\Riwayat\JenisRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
@@ -117,6 +118,46 @@ final class RiwayatRegistryTest extends CIUnitTestCase
         }
     }
 
+    public function testLookupLampiranPerKodeJenisRwy(): void
+    {
+        $registry = $this->registryContoh(FakePegawaiScope::izinkanSemua());
+
+        foreach ([14, 39, 40] as $kode) {
+            $this->assertInstanceOf(ContohPendidikan::class, $registry->definisiUntukLampiran($kode), "kode {$kode}");
+            $this->assertSame($kode, $registry->aturanLampiran($kode)?->idRiwayat);
+        }
+
+        $this->assertTrue($registry->aturanLampiran(14)?->wajib);
+        $this->assertFalse($registry->aturanLampiran(40)?->wajib);
+
+        // Kode yang tidak dimiliki jenis terdaftar (mis. 9 jabatan di registry contoh, 0 belum_terhubung) → null.
+        foreach ([0, 9, 999] as $kode) {
+            $this->assertNull($registry->definisiUntukLampiran($kode));
+            $this->assertNull($registry->aturanLampiran($kode));
+        }
+    }
+
+    public function testKodeLampiranGandaAntarDefinisiDitolak(): void
+    {
+        $lain = $this->definisi('kp', ['lihat' => [Role::SUPER_ADMIN]], 'riwayat_kp', [new AturanLampiran(39, false, 1, ['pdf'])]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('jenis_rwy 39');
+        new RiwayatRegistry(FakePegawaiScope::izinkanSemua(), [new ContohPendidikan(), $lain]);
+    }
+
+    public function testScopeClosureDipanggilSetiapDescriptor(): void
+    {
+        $scope    = FakePegawaiScope::izinkanSemua();
+        $registry = new RiwayatRegistry(static function () use (&$scope): FakePegawaiScope {
+            return $scope;
+        }, [new ContohPendidikan()]);
+
+        $this->assertCount(1, $registry->descriptorUntuk($this->auth(Role::SUPER_ADMIN), self::NIP));
+        $scope = FakePegawaiScope::tolakSemua();
+        $this->assertSame([], $registry->descriptorUntuk($this->auth(Role::SUPER_ADMIN), self::NIP));
+    }
+
     public function testDaftarSlugBeku(): void
     {
         $this->assertSame(
@@ -183,7 +224,9 @@ final class RiwayatRegistryTest extends CIUnitTestCase
         $this->assertSame('nip', $d->kolomNip());
         $this->assertTrue($d->kunciBarisDisetujui());
         $this->assertSame([0, 1, 2, 10], array_keys($d->pemetaanStatus()));
-        $this->assertSame(14, $d->lampiran()->idRiwayat);
+        $this->assertSame([14, 39, 40], array_map(static fn (AturanLampiran $a): int => $a->idRiwayat, $d->lampiran()));
+        $this->assertSame([5, 5, 5], array_map(static fn (AturanLampiran $a): int => $a->batasMb, $d->lampiran()));
+        $this->assertSame([], (new ContohKarpeg())->lampiran());
         $this->assertSame('pegawai_pendidikan', $d->snapshot()[0]->tabel);
     }
 
@@ -202,15 +245,22 @@ final class RiwayatRegistryTest extends CIUnitTestCase
 
     /**
      * @param array<string, list<int>> $izin
+     * @param list<AturanLampiran>     $lampiran
      */
-    private function definisi(string $jenis, array $izin, string $tabel = 'riwayat_kp'): RiwayatDefinisi
+    private function definisi(string $jenis, array $izin, string $tabel = 'riwayat_kp', array $lampiran = []): RiwayatDefinisi
     {
-        return new class ($jenis, $izin, $tabel) extends RiwayatDefinisi {
+        return new class ($jenis, $izin, $tabel, $lampiran) extends RiwayatDefinisi {
             /**
              * @param array<string, list<int>> $izinJenis
+             * @param list<AturanLampiran>     $lampiranJenis
              */
-            public function __construct(private string $slug, private array $izinJenis, private string $tabelJenis)
+            public function __construct(private string $slug, private array $izinJenis, private string $tabelJenis, private array $lampiranJenis)
             {
+            }
+
+            public function lampiran(): array
+            {
+                return $this->lampiranJenis;
             }
 
             public function jenis(): string

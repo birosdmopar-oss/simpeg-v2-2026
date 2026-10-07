@@ -341,7 +341,13 @@ class Services extends BaseService
 
         $config = config(Kepegawaian::class);
 
-        return RiwayatRegistry::dariFolder(static::pegawaiScope(), $config->definisiRiwayatPath, $config->definisiRiwayatNamespace);
+        // Scope di-resolve setiap dipakai (bukan ditangkap sekali) agar Services::injectMock('pegawaiScope') di test
+        // berlaku juga untuk registry shared yang sudah ter-resolve.
+        return RiwayatRegistry::dariFolder(
+            static fn (): PegawaiScopeInterface => static::pegawaiScope(),
+            $config->definisiRiwayatPath,
+            $config->definisiRiwayatNamespace,
+        );
     }
 
     /**

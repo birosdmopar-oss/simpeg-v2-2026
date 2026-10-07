@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Tests\Kepegawaian;
 
 use App\Constants\Role;
+use RuntimeException;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * S0-A (MAKE-002) — PegawaiFixtureTrait: pegawai + snapshot jabatan + akun yang lolos FK (termasuk kolom FK DBV-019
- * `pegawai_mutasi_jabatan` → G-02 dan `pengguna.nip` → `pegawai`, terpasang atau belum), dan berjalan di base case
- * MAKE-001 DatabaseTestCase tanpa tanda isolasi penuh (hanya INSERT; data hilang saat bingkai transaksi uji di-rollback).
+ * snapshot/riwayat → G-02 dan `pengguna.nip` → `pegawai`, terpasang atau belum), dan berjalan di base case MAKE-001
+ * DatabaseTestCase tanpa tanda isolasi penuh (hanya INSERT; data hilang saat bingkai transaksi uji di-rollback).
  *
  * @internal
  */
@@ -20,8 +21,16 @@ final class PegawaiFixtureTest extends DatabaseTestCase
     use PegawaiFixtureTrait;
 
     /**
-     * Kolom FK anak → [tabel induk, kolom induk] yang diisi fixture: FK G-02 DBV-019 (`pegawai_mutasi_jabatan`),
-     * FK `pegawai_mutasi_jabatan.nip` (DBV-012), dan `pengguna.nip` → `pegawai` (DBV-019).
+     * Prefiks kelas migration DBV-019 (PR #24, `AddFkG02Pegawai`, `AddFkG02Riwayat`): bila sudah di main dan termuat oleh
+     * migrate, daftar FOREIGN_KEYS-nya ikut dicek.
+     */
+    private const PREFIKS_MIGRATION_DBV019 = 'App\Database\Migrations\AddFkG02';
+
+    /**
+     * Kolom FK anak → [tabel induk, kolom induk] yang diisi fixture: FK G-02 DBV-019 (snapshot & riwayat jabatan),
+     * FK snapshot yang sudah di main (DBV-012/013), master G-02, dan `pengguna.nip` → `pegawai` (DBV-019).
+     *
+     * @var list<array{0: string, 1: string, 2: string, 3: string}>
      */
     private const RUJUKAN = [
         ['pegawai_mutasi_jabatan', 'nip', 'pegawai', 'nip'],
@@ -39,6 +48,18 @@ final class PegawaiFixtureTest extends DatabaseTestCase
         ['pegawai_mutasi_jabatan', 'id_atasan_es_4_koord', 'jabatan_koordinasi', 'id_jabatan_koordinasi'],
         ['pegawai_mutasi_jabatan', 'id_rumpun_jabatan', 'rumpun_jabatan', 'id_rumpun_jabatan'],
         ['pegawai_mutasi_jabatan', 'id_riwayat_mutasi_jabatan', 'riwayat_mutasi_jabatan', 'id_riwayat_mutasi_jabatan'],
+        ['pegawai_mutasi_jabatan', 'id_gol_pppk', 'gol_pppk', 'id_gol_pppk'],
+        ['riwayat_mutasi_jabatan', 'nip', 'pegawai', 'nip'],
+        ['riwayat_mutasi_jabatan', 'id_group_jabatan', 'group_jabatan', 'id_group_jabatan'],
+        ['riwayat_mutasi_jabatan', 'id_sub_group_jabatan', 'sub_group_jabatan', 'id_sub_group_jabatan'],
+        ['riwayat_mutasi_jabatan', 'id_unit', 'unit', 'id_unit'],
+        ['riwayat_mutasi_jabatan', 'id_satker', 'satker', 'id_satker'],
+        ['riwayat_mutasi_jabatan', 'id_jabatan', 'jabatan', 'id_jabatan'],
+        ['riwayat_mutasi_jabatan', 'id_jabatan_koord', 'jabatan_koordinasi', 'id_jabatan_koordinasi'],
+        ['riwayat_mutasi_jabatan', 'id_rumpun_jabatan', 'rumpun_jabatan', 'id_rumpun_jabatan'],
+        ['riwayat_mutasi_jabatan', 'id_gol_pppk', 'gol_pppk', 'id_gol_pppk'],
+        ['jabatan_koordinasi', 'id_unit', 'unit', 'id_unit'],
+        ['jabatan_koordinasi', 'id_satker', 'satker', 'id_satker'],
         ['satker', 'id_unit', 'unit', 'id_unit'],
         ['jabatan', 'id_satker', 'satker', 'id_satker'],
         ['jabatan', 'id_group_jabatan', 'group_jabatan', 'id_group_jabatan'],
@@ -63,12 +84,13 @@ final class PegawaiFixtureTest extends DatabaseTestCase
         $pmj = $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->get()->getRowArray();
         $this->assertIsArray($pmj);
 
-        foreach (['id_unit', 'id_satker', 'id_group_jabatan', 'id_sub_group_jabatan', 'id_jabatan'] as $kolom) {
+        foreach (['id_unit', 'id_satker', 'id_group_jabatan', 'id_sub_group_jabatan', 'id_jabatan', 'unit', 'satker', 'jabatan', 'group_jabatan', 'sub_group_jabatan'] as $kolom) {
             $this->assertNotNull($pmj[$kolom], "pmj.{$kolom} terisi");
         }
 
         $satker = $this->db->table('satker')->where('id_satker', $pmj['id_satker'])->get()->getRowArray();
         $this->assertSame((int) $pmj['id_unit'], (int) $satker['id_unit'], 'satker berada di unit pmj');
+        $this->assertSame($satker['satker'], $pmj['satker'], 'kolom teks snapshot = nama master');
 
         $akun = $this->db->table('pengguna')->where('id_pengguna', $idAkun)->get()->getRowArray();
         $this->assertSame($nip, $akun['nip']);
@@ -107,18 +129,85 @@ final class PegawaiFixtureTest extends DatabaseTestCase
         $this->assertSame([], $this->yatim());
     }
 
+    public function testIdJabatanDiberikanMenurunkanRantai(): void
+    {
+        $jabatan = $this->buatJabatan();
+        $nip     = $this->buatPegawai([], ['id_jabatan' => $jabatan['id_jabatan']]);
+
+        $pmj = $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->get()->getRowArray();
+
+        foreach ($jabatan as $kolom => $id) {
+            $this->assertSame($id, (int) $pmj[$kolom], "pmj.{$kolom} diturunkan dari jabatan");
+        }
+
+        $this->assertNotNull($pmj['unit']);
+        $idAkun = $this->buatAkunUntuk($nip, Role::PEGAWAI);
+        $this->assertSame((string) $jabatan['id_satker'], $this->authUntukAkun($idAkun)->idSatker());
+    }
+
+    public function testHelperMasterDbv019DanRiwayatMutasiJabatan(): void
+    {
+        $idSatker = $this->buatSatker();
+        $idKoord  = $this->buatJabatanKoordinasi($idSatker);
+        $idRumpun = $this->buatRumpunJabatan();
+        $atasan   = $this->buatJabatan($idSatker)['id_jabatan'];
+        $nip      = $this->buatPegawai([], [
+            'id_satker'         => $idSatker,
+            'id_jabatan_koord'  => $idKoord,
+            'id_rumpun_jabatan' => $idRumpun,
+            'id_atasan_es_2'    => $atasan,
+        ]);
+
+        $idRmj = $this->buatRiwayatMutasiJabatan($nip, ['id_jabatan_koord' => $idKoord]);
+        $rmj   = $this->db->table('riwayat_mutasi_jabatan')->where('id_riwayat_mutasi_jabatan', $idRmj)->get()->getRowArray();
+        $pmj   = $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->get()->getRowArray();
+
+        $this->assertSame($nip, $rmj['nip']);
+        $this->assertSame(1, (int) $rmj['status']);
+        $this->assertSame((int) $pmj['id_jabatan'], (int) $rmj['id_jabatan'], 'riwayat memakai jabatan snapshot');
+        $this->assertSame($idSatker, (int) $rmj['id_satker']);
+
+        $this->assertSame([], $this->yatim());
+    }
+
+    public function testTglLahirNipPendekDanNik(): void
+    {
+        foreach (['12345', '060012345', '3201010101900001', '199013452015011001'] as $nip) {
+            $this->buatPegawai(['nip' => $nip]);
+            $tgl = $this->db->table('pegawai')->select('tgl_lahir')->where('nip', $nip)->get()->getRowArray()['tgl_lahir'];
+            $this->assertSame('1990-01-01', $tgl, "NIP {$nip}");
+        }
+
+        $this->buatPegawai(['nip' => '198512312010011001']);
+        $this->assertSame('1985-12-31', $this->db->table('pegawai')->select('tgl_lahir')->where('nip', '198512312010011001')->get()->getRowArray()['tgl_lahir']);
+    }
+
+    public function testAkunUntukNipTanpaPegawaiDitolak(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('tidak ada');
+        $this->buatAkunUntuk('999999999999999999', Role::PEGAWAI);
+    }
+
+    public function testRiwayatUntukNipTanpaPegawaiDitolak(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->buatRiwayatMutasiJabatan('999999999999999999');
+    }
+
     public function testRollbackTransaksiMenghapusDataFixture(): void
     {
         // Transaksi aplikasi di dalam bingkai uji MAKE-001 (SAVEPOINT): semua tulisan fixture ikut rollback.
         $hitung = fn (): array => array_map(
             fn (string $tabel): int => $this->db->table($tabel)->countAllResults(),
-            ['pegawai', 'pegawai_mutasi_jabatan', 'pengguna', 'unit', 'satker', 'jabatan'],
+            ['pegawai', 'pegawai_mutasi_jabatan', 'pengguna', 'unit', 'satker', 'jabatan', 'riwayat_mutasi_jabatan'],
         );
         $awal = $hitung();
 
         $this->db->transBegin();
         $nip = $this->buatPegawai();
         $this->buatAkunUntuk($nip, Role::PPPK);
+        $this->buatRiwayatMutasiJabatan($nip);
         $this->assertNotSame($awal, $hitung());
         $this->db->transRollback();
 
@@ -134,21 +223,37 @@ final class PegawaiFixtureTest extends DatabaseTestCase
             token_get_all($sumber),
         ));
 
-        foreach (['->delete(', '->update(', '->replace(', '->emptyTable(', '->truncate(', '->query(', 'transCommit', 'transBegin', 'forge', 'migrate', 'TRUNCATE', 'DELETE ', 'DROP '] as $terlarang) {
-            $this->assertStringNotContainsString($terlarang, $kode, "fixture tidak boleh memakai {$terlarang}");
+        $terlarang = [
+            '->delete(', '->deleteBatch(', '->update(', '->updateBatch(', '->replace(', '->upsert(', '->upsertBatch(',
+            '->emptyTable(', '->truncate(', '->query(', '->simpleQuery(', 'transCommit', 'transBegin', 'transComplete',
+            'forge', 'migrate', 'TRUNCATE', 'DELETE ', 'DROP ', 'ALTER ', 'CREATE ',
+        ];
+
+        foreach ($terlarang as $token) {
+            $this->assertStringNotContainsString($token, $kode, "fixture tidak boleh memakai {$token}");
         }
     }
 
     /**
-     * Nilai FK yang tidak NULL dan tidak ada di induknya.
+     * Nilai FK yang tidak NULL dan tidak ada di induknya (daftar RUJUKAN + FK migration DBV-019 bila sudah termuat).
      *
      * @return list<string>
      */
     private function yatim(): array
     {
+        $rujukan = self::RUJUKAN;
+
+        foreach (get_declared_classes() as $kelas) {
+            if (str_starts_with($kelas, self::PREFIKS_MIGRATION_DBV019) && defined($kelas . '::FOREIGN_KEYS')) {
+                /** @var array<string, array{0: string, 1: string, 2: string, 3: string}> $fks */
+                $fks = constant($kelas . '::FOREIGN_KEYS');
+                array_push($rujukan, ...array_values($fks));
+            }
+        }
+
         $masalah = [];
 
-        foreach (self::RUJUKAN as [$tabel, $kolom, $induk, $kolomInduk]) {
+        foreach ($rujukan as [$tabel, $kolom, $induk, $kolomInduk]) {
             $anak = $this->db->prefixTable($tabel);
             $ref  = $this->db->prefixTable($induk);
             $n    = (int) ($this->db->query(

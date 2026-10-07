@@ -15,13 +15,16 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  * (base case MAKE-001; `$this->db`, koneksi group tests).
  *
  * Membuat, berurutan: baris master G-02 yang dirujuk (unit → satker → group/sub group jabatan → jabatan) → `pegawai`
- * → snapshot `pegawai_mutasi_jabatan` ber-unit/satker/jabatan → akun `pengguna` tertaut NIP. Setiap kolom FK diisi ID
- * master yang dibuat fixture ini (patuh FK DBV-019 `pegawai_mutasi_jabatan` → G-02 dan `pengguna.nip` → `pegawai`,
- * terpasang atau belum); kolom FK lain dibiarkan NULL.
+ * → snapshot `pegawai_mutasi_jabatan` ber-unit/satker/jabatan (ID + kolom teks snapshot) → akun `pengguna` tertaut
+ * NIP. Setiap kolom FK diisi ID master yang dibuat fixture ini (patuh FK DBV-019 snapshot/riwayat → G-02 dan
+ * `pengguna.nip` → `pegawai`, terpasang atau belum); kolom FK lain dibiarkan NULL kecuali diberikan pemanggil.
  *
- * Berjalan di bingkai transaksi uji MAKE-001 tanpa tanda `db-isolasi-penuh`: HANYA INSERT lewat query builder —
+ * Berjalan di bingkai transaksi uji MAKE-001 tanpa tanda `db-isolasi-penuh`: HANYA INSERT/SELECT lewat query builder —
  * tanpa DDL, tanpa migrate, tanpa commit eksplisit, tanpa TRUNCATE/DELETE. NIP sintetis 18 digit (bukan data asli),
  * unik terhadap `pegawai` dan `pengguna` yang sudah ada.
+ *
+ * Kepemilikan setelah S0: berkas bersama — WS mana pun boleh MENAMBAH helper (aditif, satu helper per commit, dicatat
+ * di commit milestone-nya); mengubah perilaku helper yang ada butuh persetujuan reviewer CR.
  */
 trait PegawaiFixtureTrait
 {
@@ -111,11 +114,50 @@ trait PegawaiFixtureTrait
     }
 
     /**
-     * Pegawai baru + snapshot jabatan aktif (unit/satker/jabatan baru kecuali $pmj menyebut id_satker).
+     * Master `jabatan_koordinasi` (FK DBV-019 `id_jabatan_koord`, `id_atasan_es_3_koord`, `id_atasan_es_4_koord`) di
+     * satker $idSatker (null → unit + satker baru).
+     *
+     * @param array<string, mixed> $override kolom tabel `jabatan_koordinasi`
+     */
+    protected function buatJabatanKoordinasi(?int $idSatker = null, array $override = []): int
+    {
+        $idSatker ??= $this->buatSatker();
+
+        return $this->fixtureInsert('jabatan_koordinasi', array_merge([
+            'id_unit'   => $this->idUnitSatker($idSatker),
+            'id_satker' => $idSatker,
+            'jenis'     => 1,
+            'jabatan'   => 'Jabatan Koordinasi Fixture ' . $this->fixtureNomor(),
+            'status'    => 1,
+        ], $override));
+    }
+
+    /**
+     * Master `rumpun_jabatan` (FK DBV-019 `id_rumpun_jabatan`).
+     *
+     * @param array<string, mixed> $override kolom tabel `rumpun_jabatan`
+     */
+    protected function buatRumpunJabatan(array $override = []): int
+    {
+        return $this->fixtureInsert('rumpun_jabatan', array_merge([
+            'rumpun_jabatan' => 'Rumpun Fixture ' . $this->fixtureNomor(),
+            'status'         => 1,
+        ], $override));
+    }
+
+    /**
+     * Pegawai baru + snapshot jabatan aktif.
+     *
+     * Rantai jabatan snapshot: `$pmj['id_jabatan']` diberikan → id_satker/id_unit/id_group_jabatan/id_sub_group_jabatan
+     * diturunkan dari baris `jabatan` itu; hanya `$pmj['id_satker']` → jabatan baru di satker itu; tidak keduanya →
+     * unit + satker + jabatan baru. Kolom teks snapshot (`unit`, `satker`, `jabatan`, `group_jabatan`,
+     * `sub_group_jabatan`) diisi nama masternya. Nilai di $pmj selalu menang atas turunan.
+     *
+     * tgl_lahir default diturunkan dari 8 digit pertama NIP bila NIP 18 digit dan tanggalnya valid; selain itu
+     * 1990-01-01 (mis. NIP pendek/NIK untuk test koreksi NIP).
      *
      * @param array<string, mixed> $override kolom tabel `pegawai` (mis. nip, nama, status)
-     * @param array<string, mixed> $pmj      kolom tabel `pegawai_mutasi_jabatan`; id_satker tanpa id_jabatan → jabatan
-     *                                       baru di satker itu
+     * @param array<string, mixed> $pmj      kolom tabel `pegawai_mutasi_jabatan`
      *
      * @return string NIP
      */
@@ -126,18 +168,18 @@ trait PegawaiFixtureTrait
         $this->db->table('pegawai')->insert(array_merge([
             'nip'           => $nip,
             'nama'          => 'Pegawai Fixture ' . substr($nip, -3),
-            'tgl_lahir'     => substr($nip, 0, 4) . '-' . substr($nip, 4, 2) . '-' . substr($nip, 6, 2),
+            'tgl_lahir'     => $this->tglLahirDariNip($nip),
             'jenis_kelamin' => 1,
             'status'        => 1,
         ], $override, ['nip' => $nip]));
 
-        $jabatan = isset($pmj['id_jabatan'])
-            ? []
-            : $this->buatJabatan(isset($pmj['id_satker']) ? (int) $pmj['id_satker'] : null);
+        $idJabatan = isset($pmj['id_jabatan'])
+            ? (int) $pmj['id_jabatan']
+            : $this->buatJabatan(isset($pmj['id_satker']) ? (int) $pmj['id_satker'] : null)['id_jabatan'];
 
         $this->db->table('pegawai_mutasi_jabatan')->insert(array_merge(
             ['nip' => $nip, 'jenis_jabatan' => 1, 'jenis_mutasi' => 1, 'tmtsk' => '2015-01-01'],
-            $jabatan,
+            $this->rantaiJabatan($idJabatan),
             $pmj,
             ['nip' => $nip],
         ));
@@ -156,8 +198,41 @@ trait PegawaiFixtureTrait
     }
 
     /**
-     * Akun `pengguna` aktif tertaut NIP $nip (username = NIP, password AuthSeeder::PASSWORD). id_unit/id_satker akun
-     * diambil dari snapshot jabatan pegawai itu.
+     * Baris `riwayat_mutasi_jabatan` untuk pegawai $nip (wajib sudah ada). Default: rantai jabatan snapshot pegawai itu
+     * (atau jabatan baru bila belum ada snapshot), status 1 Disetujui, TMT 2015-01-01. Snapshot TIDAK disinkronkan.
+     *
+     * @param array<string, mixed> $override kolom tabel `riwayat_mutasi_jabatan`; id_jabatan → rantai diturunkan dari
+     *                                       jabatan itu
+     *
+     * @return int id_riwayat_mutasi_jabatan
+     */
+    protected function buatRiwayatMutasiJabatan(string $nip, array $override = []): int
+    {
+        $this->pastikanPegawaiAda($nip);
+
+        if (isset($override['id_jabatan'])) {
+            $idJabatan = (int) $override['id_jabatan'];
+        } else {
+            $pmj       = $this->db->table('pegawai_mutasi_jabatan')->select('id_jabatan')->where('nip', $nip)->get()->getRowArray();
+            $idJabatan = isset($pmj['id_jabatan']) ? (int) $pmj['id_jabatan'] : $this->buatJabatan()['id_jabatan'];
+        }
+
+        $rantai = array_intersect_key($this->rantaiJabatan($idJabatan), array_flip([
+            'id_group_jabatan', 'id_sub_group_jabatan', 'id_unit', 'id_satker', 'id_jabatan', 'unit', 'satker', 'jabatan',
+        ]));
+
+        return $this->fixtureInsert('riwayat_mutasi_jabatan', array_merge(
+            ['nip' => $nip, 'jenis_jabatan' => 1, 'jenis_mutasi' => 1, 'tmtsk' => '2015-01-01', 'status' => 1],
+            $rantai,
+            $override,
+            ['nip' => $nip],
+        ));
+    }
+
+    /**
+     * Akun `pengguna` aktif tertaut NIP $nip (username = NIP, password AuthSeeder::PASSWORD). Pegawai $nip wajib sudah
+     * ada (prasyarat FK `pengguna.nip` → `pegawai` DBV-019). id_unit/id_satker akun diambil dari snapshot jabatan
+     * pegawai itu.
      *
      * @param array<string, mixed> $override kolom tabel `pengguna`
      *
@@ -168,6 +243,8 @@ trait PegawaiFixtureTrait
         if (! Role::isValid($role)) {
             throw new RuntimeException("Role {$role} tidak dikenal.");
         }
+
+        $this->pastikanPegawaiAda($nip);
 
         $pmj = $this->db->table('pegawai_mutasi_jabatan')->select('id_unit, id_satker')->where('nip', $nip)->get()->getRowArray();
         $now = date('Y-m-d H:i:s');
@@ -204,6 +281,65 @@ trait PegawaiFixtureTrait
         $auth->setClaims(AuthService::claimsFor($akun));
 
         return $auth;
+    }
+
+    /**
+     * ID + kolom teks snapshot untuk jabatan $idJabatan (satker/unit/group/sub group diturunkan dari baris jabatan).
+     *
+     * @return array<string, int|string|null>
+     */
+    private function rantaiJabatan(int $idJabatan): array
+    {
+        $jabatan = $this->db->table('jabatan')->where('id_jabatan', $idJabatan)->get()->getRowArray();
+
+        if (! is_array($jabatan)) {
+            throw new RuntimeException("Jabatan {$idJabatan} tidak ada.");
+        }
+
+        $idSatker = $jabatan['id_satker'] === null ? null : (int) $jabatan['id_satker'];
+        $idUnit   = $idSatker === null ? null : $this->idUnitSatker($idSatker);
+        $idGroup  = $jabatan['id_group_jabatan'] === null ? null : (int) $jabatan['id_group_jabatan'];
+        $idSub    = $jabatan['id_sub_group_jabatan'] === null ? null : (int) $jabatan['id_sub_group_jabatan'];
+
+        return [
+            'id_unit'              => $idUnit,
+            'id_satker'            => $idSatker,
+            'id_group_jabatan'     => $idGroup,
+            'id_sub_group_jabatan' => $idSub,
+            'id_jabatan'           => $idJabatan,
+            'unit'                 => $this->namaMaster('unit', 'id_unit', 'unit', $idUnit),
+            'satker'               => $this->namaMaster('satker', 'id_satker', 'satker', $idSatker),
+            'group_jabatan'        => $this->namaMaster('group_jabatan', 'id_group_jabatan', 'group_jabatan', $idGroup),
+            'sub_group_jabatan'    => $this->namaMaster('sub_group_jabatan', 'id_sub_group_jabatan', 'sub_group_jabatan', $idSub),
+            'jabatan'              => (string) $jabatan['jabatan'],
+        ];
+    }
+
+    private function namaMaster(string $table, string $pk, string $kolom, ?int $id): ?string
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        $row = $this->db->table($table)->select($kolom)->where($pk, $id)->get()->getRowArray();
+
+        return is_array($row) ? (string) $row[$kolom] : null;
+    }
+
+    private function tglLahirDariNip(string $nip): string
+    {
+        if (preg_match('/^(\d{4})(\d{2})(\d{2})\d{10}$/', $nip, $m) === 1 && checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            return "{$m[1]}-{$m[2]}-{$m[3]}";
+        }
+
+        return '1990-01-01';
+    }
+
+    private function pastikanPegawaiAda(string $nip): void
+    {
+        if ($this->db->table('pegawai')->where('nip', $nip)->countAllResults() === 0) {
+            throw new RuntimeException("Pegawai {$nip} tidak ada — buat dulu dengan buatPegawai().");
+        }
     }
 
     /**

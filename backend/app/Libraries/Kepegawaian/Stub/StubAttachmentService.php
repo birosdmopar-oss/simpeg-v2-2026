@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Kepegawaian\Stub;
 
+use App\Exceptions\BelumTersediaException;
 use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use CodeIgniter\HTTP\Files\UploadedFile;
@@ -20,7 +21,12 @@ final class StubAttachmentService implements AttachmentServiceInterface
         throw new BelumTersediaException(self::FITUR);
     }
 
-    public function hapus(int $idAttachment): void
+    public function ambil(string $nip, int $idAttachment): array
+    {
+        throw new BelumTersediaException(self::FITUR);
+    }
+
+    public function hapus(string $nip, int $idAttachment): void
     {
         throw new BelumTersediaException(self::FITUR);
     }

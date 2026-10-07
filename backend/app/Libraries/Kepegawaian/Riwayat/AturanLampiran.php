@@ -7,10 +7,10 @@ namespace App\Libraries\Kepegawaian\Riwayat;
 use InvalidArgumentException;
 
 /**
- * Aturan lampiran satu jenis riwayat (value object, kontrak beku S0-A MAKE-002). Dipakai Definisi riwayat dan
- * AttachmentServiceInterface::simpan().
+ * Aturan lampiran untuk SATU kode `jenis_rwy` (value object, kontrak beku S0-A MAKE-002; pemilik berkas WS-1, dipakai
+ * WS-2 lewat AttachmentServiceInterface::simpan()). Satu Definisi riwayat memuat daftar aturan ini, satu per kode.
  *
- * Batas ukuran per jenis ikut legacy: 1, 2, atau 5 MB (keputusan #6 Sprint 0).
+ * Batas ukuran per kode ikut legacy: 1, 2, atau 5 MB (keputusan #6 Sprint 0).
  */
 final class AturanLampiran
 {
@@ -26,7 +26,8 @@ final class AturanLampiran
 
     /**
      * @param int          $idRiwayat kode `jenis_rwy.id_jenis_rwy` (kolom `document_attachment.id_riwayat`)
-     * @param bool         $wajib     lampiran wajib saat tambah baris riwayat
+     * @param bool         $wajib     lampiran wajib: ditegakkan RiwayatService::tambah()/ubah() (baris wajib punya
+     *                                lampiran kode ini setelah request) dalam transaksi engine yang sama
      * @param int          $batasMb   1, 2, atau 5
      * @param list<string> $ekstensi  ekstensi tanpa titik, mis. ['pdf']; dinormalkan huruf kecil
      */

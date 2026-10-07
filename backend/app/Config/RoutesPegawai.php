@@ -10,17 +10,20 @@ use CodeIgniter\Router\RouteCollection;
  *
  * Kontrak endpoint (beku): app/Controllers/Api/Kepegawaian/README.md bagian "Kontrak API Modul B". Endpoint nyata
  * didaftarkan WS-2 di milestone-nya di dalam grup di bawah, mis.:
- *   GET    pegawai                                   daftar (filter lingkup)    — role sesuai Matriks v2 (Role::filter)
+ *   GET    pegawai                                   daftar (filter lingkup)    — role sesuai Matriks v2, mis.
+ *          $routes->get('pegawai', 'PegawaiController::index', ['filter' => \App\Constants\Role::filter(1, 3, 4, 5, 8)]);
  *   GET    pegawai/(:segment)                        detail + tabs (descriptor) — UL_ALL + PegawaiScope
  *   GET    pegawai/(:segment)/lampiran               daftar lampiran
  *   POST   pegawai/(:segment)/lampiran               unggah lampiran
  *   GET    pegawai/(:segment)/lampiran/(:num)/unduh  unduh
  *   DELETE pegawai/(:segment)/lampiran/(:num)        hapus keras + audit
- * NIP memakai (:segment), bukan (:any), agar tidak menelan path riwayat milik RoutesRiwayat.php. Selama belum
- * didaftarkan, path di atas menjawab 404 terkendali (envelope error), bukan 500.
+ * Filter 'jwt' dipasang di level GRUP; filter `role:*` per route DIGABUNG dengan jwt (bukan menggantinya). Endpoint
+ * lampiran memeriksa izin Definisi pemilik `id_riwayat` + PegawaiScope di service (README kontrak). NIP memakai
+ * (:segment), bukan (:any), agar tidak menelan path riwayat milik RoutesRiwayat.php. Selama belum didaftarkan, path di
+ * atas menjawab 404 terkendali (envelope error). Test penjaga: tests/Kepegawaian/RoutePegawaiKontrakTest.php.
  *
  * @var RouteCollection $routes
  */
-$routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian'], static function (RouteCollection $routes): void {
+$routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'filter' => 'jwt'], static function (RouteCollection $routes): void {
     // WS-2: endpoint pegawai/lampiran/biodata/NIP/struktur/Konket/LKH ditambahkan di sini.
 });

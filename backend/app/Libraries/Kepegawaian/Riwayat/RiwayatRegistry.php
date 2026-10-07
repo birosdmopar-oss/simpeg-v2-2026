@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
 use App\Libraries\Auth\AuthContext;
+use Closure;
 use LogicException;
 use ReflectionClass;
 
@@ -17,7 +18,12 @@ use ReflectionClass;
  * temukan() memindai satu folder: setiap `*.php` = satu kelas `<namespace>\<nama berkas>` turunan RiwayatDefinisi
  * (kelas abstrak dilewati, boleh dipakai sebagai basis bersama). Definisi yang salah bentuk — slug di luar
  * JenisRiwayat::SLUG, slug ganda, nama tabel/kolom tidak valid, aksi/role izin tidak dikenal — ditolak LogicException
- * saat registry dibangun (kesalahan kode, gagal keras, bukan diam-diam).
+ * saat registry dibangun (kesalahan kode, gagal keras, bukan diam-diam). Kode lampiran `jenis_rwy` juga wajib unik
+ * antar-Definisi.
+ *
+ * Scope boleh diberikan sebagai Closure yang dipanggil setiap descriptorUntuk(): Config\Services memakai
+ * `static fn () => service('pegawaiScope')` sehingga `Services::injectMock('pegawaiScope', $fake)` berlaku juga untuk
+ * registry shared yang sudah ter-resolve.
  */
 final class RiwayatRegistry implements RiwayatRegistryInterface
 {
@@ -29,9 +35,15 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
     private array $definisi = [];
 
     /**
-     * @param list<RiwayatDefinisi> $definisi
+     * @var array<int, array{0: RiwayatDefinisi, 1: AturanLampiran}> kode jenis_rwy => [definisi pemilik, aturan]
      */
-    public function __construct(private readonly PegawaiScopeInterface $scope, array $definisi)
+    private array $lampiran = [];
+
+    /**
+     * @param PegawaiScopeInterface|Closure(): PegawaiScopeInterface $scope
+     * @param list<RiwayatDefinisi>                                  $definisi
+     */
+    public function __construct(private readonly PegawaiScopeInterface|Closure $scope, array $definisi)
     {
         foreach ($definisi as $d) {
             self::periksa($d);
@@ -41,6 +53,16 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
             }
 
             $this->definisi[$d->jenis()] = $d;
+
+            foreach ($d->lampiran() as $aturan) {
+                if (isset($this->lampiran[$aturan->idRiwayat])) {
+                    $pemilik = $this->lampiran[$aturan->idRiwayat][0]->jenis();
+
+                    throw new LogicException("Kode lampiran jenis_rwy {$aturan->idRiwayat} dipakai '{$pemilik}' dan '{$d->jenis()}'.");
+                }
+
+                $this->lampiran[$aturan->idRiwayat] = [$d, $aturan];
+            }
         }
 
         uasort(
@@ -49,7 +71,10 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
         );
     }
 
-    public static function dariFolder(PegawaiScopeInterface $scope, string $folder, string $namespace): self
+    /**
+     * @param PegawaiScopeInterface|Closure(): PegawaiScopeInterface $scope
+     */
+    public static function dariFolder(PegawaiScopeInterface|Closure $scope, string $folder, string $namespace): self
     {
         return new self($scope, self::temukan($folder, $namespace));
     }
@@ -105,9 +130,20 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
         return $this->definisi[$jenis] ?? null;
     }
 
+    public function definisiUntukLampiran(int $idRiwayat): ?RiwayatDefinisi
+    {
+        return $this->lampiran[$idRiwayat][0] ?? null;
+    }
+
+    public function aturanLampiran(int $idRiwayat): ?AturanLampiran
+    {
+        return $this->lampiran[$idRiwayat][1] ?? null;
+    }
+
     public function descriptorUntuk(AuthContext $auth, string $nip): array
     {
-        $role = $auth->role();
+        $role  = $auth->role();
+        $scope = $this->scope instanceof Closure ? ($this->scope)() : $this->scope;
         // Lingkup ditanya sekali per permintaan, bukan per jenis.
         $lihat = null;
         $ubah  = null;
@@ -118,7 +154,7 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
                 continue;
             }
 
-            $lihat ??= $this->scope->bolehLihat($auth, $nip);
+            $lihat ??= $scope->bolehLihat($auth, $nip);
 
             if (! $lihat) {
                 continue;
@@ -130,7 +166,7 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
                 $boleh = $d->boleh($aksi, $role);
 
                 if ($boleh && $aksi->mengubah()) {
-                    $ubah ??= $this->scope->bolehUbah($auth, $nip);
+                    $ubah ??= $scope->bolehUbah($auth, $nip);
                     $boleh = $ubah;
                 }
 

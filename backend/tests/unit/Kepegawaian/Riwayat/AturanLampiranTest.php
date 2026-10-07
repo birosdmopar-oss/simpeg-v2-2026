@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Tests\Unit\Kepegawaian\Riwayat;
 
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
-use App\Libraries\Kepegawaian\Riwayat\AturanSnapshot;
 use CodeIgniter\Test\CIUnitTestCase;
 use InvalidArgumentException;
 
 /**
- * S0-A (MAKE-002) — value object AturanLampiran (batas 1/2/5 MB ikut legacy) dan AturanSnapshot.
+ * S0-A (MAKE-002) — value object AturanLampiran (batas 1/2/5 MB ikut legacy).
  *
  * @internal
  */
@@ -49,27 +48,6 @@ final class AturanLampiranTest extends CIUnitTestCase
             try {
                 new AturanLampiran(1, false, 1, $ekstensi);
                 $this->fail('ekstensi ' . json_encode($ekstensi) . ' harus ditolak');
-            } catch (InvalidArgumentException) {
-                $this->addToAssertionCount(1);
-            }
-        }
-    }
-
-    public function testAturanSnapshotMenolakBentukSalah(): void
-    {
-        $ok = new AturanSnapshot('pegawai_kp', ['id_riwayat_kp'], ['id_jenis_kp !=' => 6], ['tmtsk' => 'DESC']);
-        $this->assertSame('nip', $ok->kunci);
-
-        $salah = [
-            static fn () => new AturanSnapshot('riwayat_kp', ['id_riwayat_kp']),
-            static fn () => new AturanSnapshot('pegawai_kp', []),
-            static fn () => new AturanSnapshot('pegawai_kp', ['id_riwayat_kp'], [], ['tmtsk' => 'desc']),
-        ];
-
-        foreach ($salah as $i => $buat) {
-            try {
-                $buat();
-                $this->fail("aturan #{$i} harus ditolak");
             } catch (InvalidArgumentException) {
                 $this->addToAssertionCount(1);
             }

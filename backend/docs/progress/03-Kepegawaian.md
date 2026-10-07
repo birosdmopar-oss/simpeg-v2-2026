@@ -3,13 +3,13 @@
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `03-Kepegawaian.md`. Aturan kalkulasi dan tanggal bisnis: `backend/app/Libraries/Kepegawaian/README.md`.
 
 **Terakhir diperbarui:** 7 Oktober 2026 — S0-A (MAKE-002, Sprint 0-1): kontrak backend Fase 3 dibekukan, tabel status dipecah per task dengan kolom WS & Key. Riwayat sebelumnya: CR-036 (2 Oktober 2026, registry kolom NIP, format NIP, BUP pensiun) dan CR-025 (di main lewat merge `a540703` 30-09-2026, kalkulasi murni KP/KGB/hukdis/masa kerja) — rincian di bagian "Persiapan tanpa skema".
-**Entry criteria:** **terpenuhi** — Fase 1 + Fase 2 DONE (Fase 2 sign-off 07-10-2026); skema B-01/B-02 (44 tabel, DBV-012/DBV-013, PR #20) dan master G-02/G-03/G-09 sudah di `main`. FK G-02 ↔ pegawai/riwayat = DBV-019 (PR #23, menunggu review DB Validator).
+**Entry criteria:** **terpenuhi** — Fase 1 + Fase 2 DONE (Fase 2 sign-off 07-10-2026); skema B-01/B-02 (44 tabel, DBV-012/DBV-013, PR #20) dan master G-02/G-03/G-09 sudah di `main`. FK G-02 ↔ pegawai/riwayat = DBV-019 (PR #24, menunggu review DB Validator).
 
 Pembagian kerja Fase 3: WS-1 (mesin riwayat + riwayat karier/administrasi, `docs/fase3/WS1.md`) dan WS-2 (lingkup, lampiran, NIP, biodata, jabatan/struktur, Konket, LKH, halaman pegawai, `docs/fase3/WS2.md`). Key per paket milestone = peta `docs/fase3/WS1.md` §3.8.1. **Setiap WS hanya mengubah baris miliknya** di tabel ini.
 
 | Task | WS | Key | Status | Ringkas |
 |---|---|---|---|---|
-| B-01 Migration tabel pegawai & snapshot | selesai | DBV-012 (+ DBV-019 FK G-02) | DONE (skema) | Tabel `pegawai` + snapshot `pegawai_*` di `main` (PR #20). FK snapshot → master G-02 = DBV-019 (PR #23) |
+| B-01 Migration tabel pegawai & snapshot | selesai | DBV-012 (+ DBV-019 FK G-02) | DONE (skema) | Tabel `pegawai` + snapshot `pegawai_*` di `main` (PR #20). FK snapshot → master G-02 = DBV-019 (PR #24) |
 | B-02 Migration tabel riwayat | selesai | DBV-013 | DONE (skema) | Tabel `riwayat_*`, `jenis_rwy`, `document_attachment` di `main` (PR #20) |
 | B-03 CRUD biodata (dua jalur) | WS-2 | MAKE-010 | TODO | Termasuk backend dasar B-20 |
 | B-04 Approval draft biodata | WS-2 | MAKE-011 | TODO | |
@@ -38,11 +38,12 @@ Paket lintas task: S0-A kontrak backend (MAKE-002, bagian di bawah), S0-B fondas
 Branch `ws1/make-002-s0a-kontrak-backend`; tanpa perubahan skema. Kontrak lengkap: `app/Controllers/Api/Kepegawaian/README.md` bagian "Kontrak API Modul B". Yang dibekukan saat MAKE-002 masuk `main` (hanya berubah aditif, oleh pemiliknya):
 
 - **Route terpisah:** `Config/RoutesRiwayat.php` (WS-1) dan `Config/RoutesPegawai.php` (WS-2) lewat `Routing::$routeFiles`; `Routes.php` tidak disentuh lagi. Kerangka grup `api/v1`, path kontrak yang belum didaftarkan menjawab 404 terkendali.
-- **Service:** 12 service didaftarkan sekali di `Config\Services` dengan tipe kembalian interface — `pegawaiScope`, `attachmentService`, `storageAdapter`, `riwayatRegistry`, `riwayatService`, `snapshotSync`, `pegawaiService`, `biodataService`, `nipCascade`, `strukturService`, `lkhService`, `konketService`. Stub fail-closed di `App\Libraries\Kepegawaian\Stub` (scope menolak semua; lainnya 501); fake hanya di `tests/_support/Kepegawaian`.
+- **Service:** 12 service didaftarkan sekali di `Config\Services` dengan tipe kembalian interface — `pegawaiScope`, `attachmentService`, `storageAdapter`, `riwayatRegistry`, `riwayatService`, `snapshotSync`, `pegawaiService`, `biodataService`, `nipCascade`, `strukturService`, `lkhService`, `konketService`. Stub fail-closed di `App\Libraries\Kepegawaian\Stub` (scope menolak semua; lainnya `App\Exceptions\BelumTersediaException` 501); fake hanya di `tests/_support/Kepegawaian`.
 - **Interface lintas-WS:** `PegawaiScopeInterface`, `AttachmentServiceInterface`, `StorageAdapterInterface`, value object `AturanLampiran` (milik WS-2); `RiwayatRegistryInterface`, `RiwayatServiceInterface`, `SnapshotSyncInterface` (milik WS-1); interface penanda service WS-2 lain.
 - **Mesin riwayat sebagai data:** `RiwayatDefinisi` (satu berkas per jenis, auto-discovery `RiwayatRegistry`), `StatusRiwayat` (0/1/2/10; 3 di belakang flag `Config\Kepegawaian::$statusDiprosesAktif`, nonaktif default), `AksiRiwayat`, `AlurRiwayat`, `AturanSnapshot`, daftar slug `{jenis}` (`JenisRiwayat::SLUG`), descriptor tab.
 - **Fixture bersama:** `Tests\Support\Kepegawaian\PegawaiFixtureTrait` — master G-02 → `pegawai` → `pegawai_mutasi_jabatan` → `pengguna`; hanya INSERT, dipakai di test `DatabaseTestCase` (base case MAKE-001, sudah di `main`), patuh FK DBV-019, NIP sintetis 18 digit.
-- **Test:** `tests/unit/Kepegawaian/Riwayat/` (StatusRiwayat, AturanLampiran/AturanSnapshot, registry + descriptor) dan `tests/Kepegawaian/` (service bertipe interface + stub fail-closed, route, fixture lolos FK + rollback).
+- **Revisi review CR (07-10-2026):** lampiran = daftar `AturanLampiran` per kode `jenis_rwy` + lookup registry `definisiUntukLampiran()`/`aturanLampiran()`; lampiran satu request dengan tambah/ubah riwayat (`$berkas`, `wajib` ditegakkan engine); `AttachmentService` terikat NIP (`ambil`/`hapus(nip, id)`) + aturan izin per jenis; filter `jwt` di level grup kedua berkas route (izin riwayat di service — penyimpangan §2.3.1 disetujui reviewer CR); scope registry di-resolve tiap dipakai; fixture menolak akun tanpa pegawai, menurunkan rantai dari `id_jabatan`, helper `buatJabatanKoordinasi`/`buatRumpunJabatan`/`buatRiwayatMutasiJabatan`.
+- **Test:** `tests/unit/Kepegawaian/` (StatusRiwayat, AturanLampiran, AturanSnapshot, registry + descriptor + lookup lampiran, stub fail-closed reflektif, fake lampiran) dan `tests/Kepegawaian/` (service bertipe interface + wiring scope, route riwayat/pegawai ber-`jwt` per pemilik, fixture lolos FK + rollback).
 
 ## Persiapan tanpa skema
 

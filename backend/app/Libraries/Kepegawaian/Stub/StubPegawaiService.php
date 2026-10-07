@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Kepegawaian\Stub;
 
+use App\Exceptions\BelumTersediaException;
 use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
 
 /**

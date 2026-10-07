@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Kepegawaian\Stub;
 
+use App\Exceptions\BelumTersediaException;
 use App\Interfaces\Kepegawaian\RiwayatServiceInterface;
 use App\Libraries\Auth\AuthContext;
 
@@ -24,12 +25,12 @@ final class StubRiwayatService implements RiwayatServiceInterface
         throw new BelumTersediaException(self::FITUR);
     }
 
-    public function tambah(AuthContext $auth, string $nip, string $jenis, array $data): array
+    public function tambah(AuthContext $auth, string $nip, string $jenis, array $data, array $berkas = []): array
     {
         throw new BelumTersediaException(self::FITUR);
     }
 
-    public function ubah(AuthContext $auth, string $nip, string $jenis, int $id, array $data): array
+    public function ubah(AuthContext $auth, string $nip, string $jenis, int $id, array $data, array $berkas = []): array
     {
         throw new BelumTersediaException(self::FITUR);
     }

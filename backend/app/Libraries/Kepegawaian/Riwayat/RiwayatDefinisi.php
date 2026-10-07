@@ -74,6 +74,10 @@ abstract class RiwayatDefinisi
      * Pemetaan domain status: nilai kolom status => StatusRiwayat. Default = nilai StatusRiwayat yang berlaku
      * (0/1/2/10, plus 3 bila flag status Diproses aktif). Override bila tabel legacy memakai nilai lain.
      *
+     * WAJIB override tanpa 3 untuk tabel yang CHECK status-nya `IN (0, 1, 2, 10)` di DDL main: `riwayat_ak`,
+     * `riwayat_ak_siasn`, `riwayat_alamat`, `riwayat_karpeg`, `riwayat_kariskarsu`, `riwayat_skp_periodik` — kalau
+     * tidak, flag status Diproses aktif membuat tulis status 3 ditolak DB.
+     *
      * @return array<int, StatusRiwayat>
      */
     public function pemetaanStatus(): array
@@ -107,11 +111,17 @@ abstract class RiwayatDefinisi
     }
 
     /**
-     * Aturan lampiran; null = jenis tanpa lampiran.
+     * Aturan lampiran, SATU entri per kode `jenis_rwy` (kolom `document_attachment.id_riwayat`); [] = jenis tanpa
+     * lampiran. Satu tabel riwayat bisa memakai beberapa kode, mis. `riwayat_pendidikan` = 14 pendidikan,
+     * 39 pencantuman_gelar, 40 transkrip_nilai; `riwayat_mutasi_jabatan` = 9 jabatan, 36 jabatan_pjft,
+     * 41 perjanjian_kerja (seed `jenis_rwy` di main). Satu kode hanya boleh dimiliki satu Definisi (RiwayatRegistry
+     * menolak kode ganda).
+     *
+     * @return list<AturanLampiran>
      */
-    public function lampiran(): ?AturanLampiran
+    public function lampiran(): array
     {
-        return null;
+        return [];
     }
 
     /**

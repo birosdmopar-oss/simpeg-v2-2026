@@ -14,7 +14,7 @@ use App\Libraries\MasterData\MasterField;
 /**
  * Definisi CONTOH untuk test S0-A (MAKE-002) — bukan Definisi nyata B-10 (milik WS-1 M2). Menunjukkan bentuk data
  * kontrak: izin per role (Matriks v2 `hr/rwy/pendidikan/*` = 1, 2, 3, 6, 7), alur self-service, snapshot (dok DBV-012
- * §5.1), dan lampiran (`jenis_rwy` 14 pendidikan).
+ * §5.1), dan lampiran per kode `jenis_rwy` (14 pendidikan, 39 pencantuman gelar, 40 transkrip nilai; 5 MB).
  */
 final class ContohPendidikan extends RiwayatDefinisi
 {
@@ -78,9 +78,14 @@ final class ContohPendidikan extends RiwayatDefinisi
         ];
     }
 
-    public function lampiran(): AturanLampiran
+    public function lampiran(): array
     {
-        return new AturanLampiran(14, true, 2, ['pdf']);
+        // Kode jenis_rwy riwayat_pendidikan (seed main) — legacy L_pendidikan.php: tiga arsip per entri, masing-masing 5 MB.
+        return [
+            new AturanLampiran(14, true, 5, ['pdf']),  // pendidikan (ijazah)
+            new AturanLampiran(39, false, 5, ['pdf']), // pencantuman_gelar
+            new AturanLampiran(40, false, 5, ['pdf']), // transkrip_nilai
+        ];
     }
 
     public function urutanTab(): int

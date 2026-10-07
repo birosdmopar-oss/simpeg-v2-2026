@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Interfaces\Kepegawaian;
 
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 
 /**
@@ -23,6 +24,18 @@ interface RiwayatRegistryInterface
      * Definisi untuk slug `{jenis}`; null bila tidak terdaftar (→ 404).
      */
     public function definisi(string $jenis): ?RiwayatDefinisi;
+
+    /**
+     * Definisi pemilik kode lampiran `jenis_rwy` $idRiwayat (kolom `document_attachment.id_riwayat`); null bila kode
+     * tidak dimiliki jenis terdaftar mana pun (→ 404 di endpoint lampiran). Dipakai endpoint lampiran untuk memeriksa
+     * izin Definisi pemilik kode dan tabel tempat `id_entri` harus berada.
+     */
+    public function definisiUntukLampiran(int $idRiwayat): ?RiwayatDefinisi;
+
+    /**
+     * Aturan lampiran untuk kode `jenis_rwy` $idRiwayat; null bila tidak terdaftar.
+     */
+    public function aturanLampiran(int $idRiwayat): ?AturanLampiran;
 
     /**
      * Descriptor tab Detail Pegawai untuk pemanggil atas pegawai $nip (bentuk beku, README kontrak):
