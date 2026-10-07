@@ -13,12 +13,7 @@ import { computed, ref, useId, watch } from 'vue'
 
 import { UiButton } from '@/shared/ui'
 
-export type ApprovalAksi = 'setujui' | 'tolak'
-
-export interface ApprovalPayload {
-  aksi: ApprovalAksi
-  reason_note: string
-}
+import type { ApprovalAksi, ApprovalPayload } from './approvalActions'
 
 const REASON_MAX_BYTES = 255
 

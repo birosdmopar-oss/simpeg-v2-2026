@@ -1,77 +1,86 @@
 /**
- * Layanan riwayat pegawai (B-07…B-18).
+ * Klien endpoint riwayat engine (README kontrak Kepegawaian; pemilik WS-1), lewat klien `api` (`@/lib/axios`, ADR-022):
+ *   GET    pegawai/{nip}/riwayat/{jenis}                daftar (semua status kecuali 10)
+ *   POST   pegawai/{nip}/riwayat/{jenis}                tambah — multipart: field kolom DDL + berkas[<id_riwayat>];
+ *                                                         JSON hanya bila tidak ada berkas (jenis tanpa lampiran wajib)
+ *   PUT    pegawai/{nip}/riwayat/{jenis}/{id}           ubah — JSON; dengan berkas: POST multipart + _method=PUT
+ *   DELETE pegawai/{nip}/riwayat/{jenis}/{id}           hapus lunak (status 10)
+ *   POST   pegawai/{nip}/riwayat/{jenis}/{id}/process   { aksi, reason_note }
  *
- * SEMENTARA MEMAKAI DATA CONTOH di memori: tanda tangan fungsi adalah kontrak yang akan diisi pemanggilan `api`
- * dari `@/lib/axios` (ADR-022). Perubahan hanya hidup selama modul dimuat (hilang saat halaman di-refresh) dan
- * tidak pernah menyentuh backend. Setiap tambah/ubah membuat status verifikasi "Menunggu Verifikasi" (alur B-04).
+ * TODO(kontrak): apakah daftar lampiran ikut di respons riwayat belum ditetapkan — baca lampiran lewat lampiran.service.
  */
-import { RIWAYAT_BY_KEY } from './riwayat.config'
-import { type RiwayatRow, seedRows } from './riwayat.mock'
+import { api } from '@/lib/axios'
 
-const store = new Map<string, RiwayatRow[]>()
-let nextId = 1000
+import type { JenisEngine, ProcessRiwayatPayload, RiwayatRow } from '../types'
 
-const slot = (nip: string, key: string): string => `${nip}::${key}`
+import type { FieldDef } from './riwayat.config'
 
-function rowsOf(nip: string, key: string): RiwayatRow[] {
-  const id = slot(nip, key)
-  if (!store.has(id)) store.set(id, seedRows(key))
-  return store.get(id) ?? []
-}
-
-function assertKey(key: string): void {
-  if (!RIWAYAT_BY_KEY[key]) throw new Error(`Tab riwayat tidak dikenal: ${key}`)
-}
-
+/** Nilai form (string, seperti input HTML). */
 export type RiwayatValues = Record<string, string>
+/** Berkas per kode `jenis_rwy` (`document_attachment.id_riwayat`). */
+export type BerkasMap = Record<number, File>
+
+const base = (nip: string, jenis: JenisEngine): string => `/pegawai/${encodeURIComponent(nip)}/riwayat/${jenis}`
+const item = (nip: string, jenis: JenisEngine, id: number | string): string => `${base(nip, jenis)}/${encodeURIComponent(String(id))}`
+
+/** Payload JSON: kolom kosong → null (kolom DDL nullable), angka → number. */
+export function toJsonPayload(fields: readonly FieldDef[], values: RiwayatValues): Record<string, string | number | null> {
+  const payload: Record<string, string | number | null> = {}
+  for (const f of fields) {
+    const raw = (values[f.name] ?? '').trim()
+    if (raw === '') payload[f.name] = null
+    else payload[f.name] = f.type === 'number' ? Number(raw) : raw
+  }
+  return payload
+}
+
+/**
+ * Payload multipart: field kolom DDL + `berkas[<id_riwayat>]`. `method` = 'PUT' menambah `_method=PUT` (spoofing CI4).
+ * TODO(kontrak): representasi NULL di multipart belum ditetapkan — sementara kolom kosong dikirim sebagai string kosong.
+ */
+export function toFormData(fields: readonly FieldDef[], values: RiwayatValues, berkas: BerkasMap, method?: 'PUT'): FormData {
+  const form = new FormData()
+  if (method) form.append('_method', method)
+  for (const f of fields) form.append(f.name, (values[f.name] ?? '').trim())
+  for (const [idRiwayat, file] of Object.entries(berkas)) form.append(`berkas[${idRiwayat}]`, file, file.name)
+  return form
+}
+
+const hasBerkas = (berkas: BerkasMap): boolean => Object.keys(berkas).length > 0
 
 export const riwayatService = {
-  async list(nip: string, key: string): Promise<RiwayatRow[]> {
-    assertKey(key)
-    return rowsOf(nip, key).map((r) => ({ ...r }))
+  async list(nip: string, jenis: JenisEngine): Promise<RiwayatRow[]> {
+    const { data } = await api.get<RiwayatRow[]>(base(nip, jenis))
+    return data
   },
 
-  async create(nip: string, key: string, values: RiwayatValues): Promise<RiwayatRow> {
-    assertKey(key)
-    const row = { ...values, id: ++nextId, status_verifikasi: 'Menunggu Verifikasi' } as RiwayatRow
-    rowsOf(nip, key).unshift(row)
-    return { ...row }
+  async create(nip: string, jenis: JenisEngine, fields: readonly FieldDef[], values: RiwayatValues, berkas: BerkasMap = {}): Promise<RiwayatRow> {
+    const body = hasBerkas(berkas) ? toFormData(fields, values, berkas) : toJsonPayload(fields, values)
+    const { data } = await api.post<RiwayatRow>(base(nip, jenis), body)
+    return data
   },
 
-  async update(nip: string, key: string, id: number, values: RiwayatValues): Promise<RiwayatRow> {
-    assertKey(key)
-    const rows = rowsOf(nip, key)
-    const index = rows.findIndex((r) => r.id === id)
-    if (index === -1) throw new Error('Riwayat tidak ditemukan')
-    rows[index] = { ...values, id, status_verifikasi: 'Menunggu Verifikasi' } as RiwayatRow
-    return { ...rows[index] }
+  async update(
+    nip: string,
+    jenis: JenisEngine,
+    id: number | string,
+    fields: readonly FieldDef[],
+    values: RiwayatValues,
+    berkas: BerkasMap = {},
+  ): Promise<RiwayatRow> {
+    // PHP tidak mem-parse multipart pada PUT: dengan berkas → POST multipart + _method=PUT (huruf besar).
+    const { data } = hasBerkas(berkas)
+      ? await api.post<RiwayatRow>(item(nip, jenis, id), toFormData(fields, values, berkas, 'PUT'))
+      : await api.put<RiwayatRow>(item(nip, jenis, id), toJsonPayload(fields, values))
+    return data
   },
 
-  async remove(nip: string, key: string, id: number): Promise<void> {
-    assertKey(key)
-    const rows = rowsOf(nip, key)
-    const index = rows.findIndex((r) => r.id === id)
-    if (index !== -1) rows.splice(index, 1)
+  async remove(nip: string, jenis: JenisEngine, id: number | string): Promise<void> {
+    await api.delete(item(nip, jenis, id))
   },
 
-  /** Tab "record" (Data Alamat): satu rekaman; belum ada → objek kosong. */
-  async getRecord(nip: string, key: string): Promise<RiwayatValues> {
-    assertKey(key)
-    const first = rowsOf(nip, key)[0]
-    if (!first) return {}
-    const values: RiwayatValues = {}
-    for (const [k, v] of Object.entries(first)) if (k !== 'id' && k !== 'status_verifikasi') values[k] = String(v)
-    return values
-  },
-
-  async saveRecord(nip: string, key: string, values: RiwayatValues): Promise<void> {
-    assertKey(key)
-    store.set(slot(nip, key), [{ ...values, id: 1, status_verifikasi: 'Menunggu Verifikasi' } as RiwayatRow])
-  },
-
-  /** Hanya untuk test: kosongkan perubahan. */
-  reset(): void {
-    store.clear()
-    nextId = 1000
+  async process(nip: string, jenis: JenisEngine, id: number | string, payload: ProcessRiwayatPayload): Promise<RiwayatRow> {
+    const { data } = await api.post<RiwayatRow>(`${item(nip, jenis, id)}/process`, payload)
+    return data
   },
 }

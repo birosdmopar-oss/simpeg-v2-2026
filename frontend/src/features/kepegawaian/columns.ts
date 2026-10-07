@@ -1,9 +1,11 @@
 /**
  * Kolom tabel Daftar Pegawai (§4.1.5) — sumber tunggal untuk header, isi sel, filter per kolom, dan popup
  * "Filter Kolom" (Gambar 20/21: daftar kolom dikelompokkan per huruf awal, bisa dicari).
- * Kolom `nama_nip` (avatar + nama + NIP) selalu tampil dan tidak muncul di popup.
+ * Kolom `nama_nip` (avatar + nama + NIP) selalu tampil dan tidak muncul di popup. Nilai kolom = kolom DDL `pegawai`.
+ * TODO(B-20, WS-2): kolom snapshot (KP/Gol, Jabatan, Satuan Kerja, Unit, Eselon) ditambahkan setelah bentuk respons
+ * `GET pegawai` ditetapkan.
  */
-import type { PegawaiRow } from './types'
+import type { PegawaiListItem } from './types'
 
 export interface PegawaiColumn {
   key: string
@@ -11,31 +13,28 @@ export interface PegawaiColumn {
   /** Kolom terkunci selalu tampil dan tidak ada di popup Filter Kolom. */
   locked?: boolean
   /** Teks yang dipakai untuk filter kolom & isi sel. */
-  value: (row: PegawaiRow) => string
+  value: (row: PegawaiListItem) => string
 }
 
-export const fullName = (row: PegawaiRow): string =>
-  [row.gelar_awal, row.nama].filter(Boolean).join(' ') + (row.gelar_akhir ? `, ${row.gelar_akhir}` : '')
+export const fullName = (row: Pick<PegawaiListItem, 'glr_awal' | 'nama' | 'glr_akhir'>): string =>
+  [row.glr_awal, row.nama].filter(Boolean).join(' ') + (row.glr_akhir ? `, ${row.glr_akhir}` : '')
+
+const JENIS_KELAMIN: Record<number, string> = { 1: 'Laki-laki', 2: 'Perempuan' }
+
+const text = (value: string | null | undefined): string => value ?? ''
 
 export const COLUMNS: PegawaiColumn[] = [
   { key: 'nama_nip', label: 'Nama/NIP', locked: true, value: (r) => `${fullName(r)} ${r.nip}` },
-  { key: 'nip_lama', label: 'NIP Lama', value: (r) => r.nip_lama },
-  { key: 'golongan', label: 'KP (Gol)', value: (r) => r.golongan },
-  { key: 'tmt_golongan', label: 'KP (TMT)', value: (r) => r.tmt_golongan },
-  { key: 'jabatan', label: 'Jabatan', value: (r) => r.jabatan },
-  { key: 'satuan_kerja', label: 'Satuan Kerja', value: (r) => r.satuan_kerja },
-  { key: 'unit', label: 'Unit', value: (r) => r.unit },
-  { key: 'eselon', label: 'Eselon', value: (r) => r.eselon },
-  { key: 'jenis_pegawai', label: 'Jenis Pegawai', value: (r) => r.jenis_pegawai },
-  { key: 'status_pegawai', label: 'Status Pegawai', value: (r) => r.status_pegawai },
-  { key: 'jenis_kelamin', label: 'Jenis Kelamin', value: (r) => r.jenis_kelamin },
-  { key: 'agama', label: 'Agama', value: (r) => r.agama },
-  { key: 'alamat', label: 'Alamat', value: (r) => r.alamat },
-  { key: 'email', label: 'Email', value: (r) => r.email },
+  { key: 'nip_lama', label: 'NIP Lama', value: (r) => text(r.nip_lama) },
+  { key: 'jenis_pegawai', label: 'Jenis Pegawai', value: (r) => text(r.jenis_pegawai) },
+  { key: 'jenis_status', label: 'Jenis Status', value: (r) => text(r.jenis_status) },
+  { key: 'tmt_status', label: 'TMT Status', value: (r) => text(r.tmt_status) },
+  { key: 'jenis_kelamin', label: 'Jenis Kelamin', value: (r) => JENIS_KELAMIN[r.jenis_kelamin] ?? '' },
+  { key: 'agama', label: 'Agama', value: (r) => text(r.agama) },
 ]
 
-/** Kolom bawaan sesuai Gambar 18. */
-export const DEFAULT_COLUMN_KEYS: string[] = ['nama_nip', 'golongan', 'jabatan', 'satuan_kerja', 'unit']
+/** Kolom bawaan (sementara, sampai kolom snapshot B-20 tersedia). */
+export const DEFAULT_COLUMN_KEYS: string[] = ['nama_nip', 'jenis_pegawai', 'jenis_status']
 
 export const COLUMN_BY_KEY: Record<string, PegawaiColumn> = Object.fromEntries(COLUMNS.map((c) => [c.key, c]))
 

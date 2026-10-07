@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
- * Halaman Daftar Pegawai (§4.1.5, Gambar 18–21) — Fase 3, B-20.
- * Panel filter (bisa disembunyikan), pencarian, "Filter Kolom", tabel dengan filter per kolom, paginasi.
- * Akses: role 1, 3, 4, 5, 8 (hr/employee/index); tombol "+ Data Pegawai" dan aksi "Hapus" hanya role 1.
+ * Halaman Daftar Pegawai (§4.1.5, Gambar 18–21) — Fase 3, B-20 (pemilik WS-2). Data dari `GET pegawai` (disaring
+ * lingkup pemanggil di backend). Pencarian, "Filter Kolom", tabel, paginasi.
+ * Akses: role 1, 3, 4, 5, 8; tombol "+ Data Pegawai" dan aksi "Hapus" hanya role 1.
  *
- * DATA CONTOH: layanan memakai mock sampai backend B-20 ada. Tambah/Hapus/Export belum tersambung —
- * halaman menampilkan pesan yang jelas, bukan berpura-pura berhasil.
+ * Tanpa data contoh: selama endpoint masih stub (404/501) halaman menampilkan keadaan galat yang jelas.
+ * TODO(B-20, WS-2): panel filter (unit, jenis/status pegawai, jabatan) & filter per kolom dikembalikan setelah
+ * parameter `GET pegawai` ditetapkan. Tambah/Hapus/Export belum tersambung (B-05/B-20) — halaman memberi tahu.
  */
-import { Filter, Plus } from 'lucide-vue-next'
+import { Plus } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -18,40 +19,29 @@ import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiExportMenu, UiNotice, UiPagination, UiSearchInput, UiSelect } from '@/shared/ui'
 
 import PegawaiColumnPicker from '../components/PegawaiColumnPicker.vue'
-import PegawaiFilterPanel, { type PegawaiFilters } from '../components/PegawaiFilterPanel.vue'
 import PegawaiTable from '../components/PegawaiTable.vue'
 import { DEFAULT_COLUMN_KEYS, fullName } from '../columns'
+import { describeApiError, type ApiFailure } from '../services/apiErrors'
 import { pegawaiService } from '../services/pegawai.service'
-import type { PegawaiFacets, PegawaiRow } from '../types'
+import type { PegawaiListItem } from '../types'
 
 const auth = useAuthStore()
 const router = useRouter()
 
 const isSuperAdmin = computed(() => auth.role === Role.SUPER_ADMIN)
 
-const facets = ref<PegawaiFacets | null>(null)
-const filters = ref<PegawaiFilters>({
-  periode_skp: '2025-09',
-  unit: '',
-  status_pegawai: '',
-  jenis_pegawai: '',
-  group_jabatan: '',
-  sub_group_jabatan: '',
-})
-const showFilters = ref(true)
 const search = ref('')
-const columnFilters = ref<Record<string, string>>({})
 const columnKeys = ref<string[]>([...DEFAULT_COLUMN_KEYS])
 const perPage = ref('10')
 const page = ref(1)
 
-const rows = ref<PegawaiRow[]>([])
+const rows = ref<PegawaiListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
-const loadError = ref(false)
+const failure = ref<ApiFailure | null>(null)
 
 const notice = ref<string | null>(null)
-const deleting = ref<PegawaiRow | null>(null)
+const deleting = ref<PegawaiListItem | null>(null)
 /** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
 const deleteOpen = ref(false)
 
@@ -63,25 +53,18 @@ let timer: ReturnType<typeof setTimeout> | null = null
 async function load(): Promise<void> {
   const current = ++requestId
   loading.value = true
-  loadError.value = false
+  failure.value = null
   try {
-    const result = await pegawaiService.list({
-      page: page.value,
-      per_page: Number(perPage.value),
-      search: search.value || undefined,
-      unit: filters.value.unit || undefined,
-      status_pegawai: filters.value.status_pegawai || undefined,
-      jenis_pegawai: filters.value.jenis_pegawai || undefined,
-      group_jabatan: filters.value.group_jabatan || undefined,
-      sub_group_jabatan: filters.value.sub_group_jabatan || undefined,
-      columns: columnFilters.value,
-    })
-    // Abaikan respons yang sudah basi (pengguna keburu mengubah filter).
+    const result = await pegawaiService.list({ page: page.value, per_page: Number(perPage.value), search: search.value || undefined })
+    // Abaikan respons yang sudah basi (pengguna keburu mengubah pencarian).
     if (current !== requestId) return
     rows.value = result.items
     total.value = result.total
-  } catch {
-    if (current === requestId) loadError.value = true
+  } catch (error) {
+    if (current !== requestId) return
+    rows.value = []
+    total.value = 0
+    failure.value = describeApiError(error)
   } finally {
     if (current === requestId) loading.value = false
   }
@@ -93,18 +76,15 @@ function schedule(resetPage: boolean): void {
   timer = setTimeout(load, 250)
 }
 
-watch([filters, search, columnFilters, perPage], () => schedule(true), { deep: true })
+watch([search, perPage], () => schedule(true))
 watch(page, () => schedule(false))
 
-onMounted(async () => {
-  facets.value = await pegawaiService.facets()
-  await load()
-})
+onMounted(load)
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer)
 })
 
-function onAction(key: 'detail' | 'hapus', row: PegawaiRow): void {
+function onAction(key: 'detail' | 'hapus', row: PegawaiListItem): void {
   if (key === 'detail') void router.push({ name: 'pegawai-detail', params: { nip: row.nip } })
   else {
     deleting.value = row
@@ -115,7 +95,7 @@ function onAction(key: 'detail' | 'hapus', row: PegawaiRow): void {
 function confirmDelete(): void {
   deleteOpen.value = false
   const name = deleting.value ? fullName(deleting.value) : ''
-  notice.value = `Penghapusan pegawai (${name}) belum tersambung ke backend — akan aktif bersama task B-05.`
+  notice.value = `Penghapusan pegawai (${name}) belum tersedia — akan aktif bersama task B-05.`
 }
 
 const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawai' }]
@@ -131,22 +111,10 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
           <template #icon-left><Plus class="h-4 w-4" aria-hidden="true" /></template>
           Data Pegawai
         </UiButton>
-        <UiExportMenu @select="notice = 'Export belum tersambung ke backend — akan aktif bersama task B-20.'" />
-        <UiButton
-          appearance="outline"
-          class="!w-10 !px-0"
-          :aria-label="showFilters ? 'Sembunyikan filter' : 'Tampilkan filter'"
-          :aria-pressed="showFilters"
-          data-testid="toggle-filter"
-          @click="showFilters = !showFilters"
-        >
-          <Filter class="h-4 w-4" aria-hidden="true" />
-        </UiButton>
+        <UiExportMenu @select="notice = 'Export belum tersedia — akan aktif bersama task B-20.'" />
       </template>
 
       <div class="mt-2 space-y-5 pb-5">
-        <PegawaiFilterPanel v-if="showFilters && facets" v-model="filters" :facets="facets" />
-
         <div class="flex flex-wrap items-center justify-between gap-3 px-5">
           <div class="w-24">
             <UiSelect v-model="perPage" :options="PER_PAGE_OPTIONS" placeholder="10" aria-label="Jumlah baris" />
@@ -157,10 +125,9 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
           </div>
         </div>
 
-        <UiNotice v-if="loadError" tone="danger" class="mx-5">Data pegawai gagal dimuat. Coba lagi.</UiNotice>
+        <UiNotice v-if="failure" :tone="failure.kind === 'unavailable' ? 'info' : 'danger'" class="mx-5" data-testid="pegawai-failure">{{ failure.message }}</UiNotice>
 
         <PegawaiTable
-          v-model:filters="columnFilters"
           :rows="rows"
           :column-keys="columnKeys"
           :loading="loading"
@@ -177,7 +144,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
     <ConfirmDialog
       :open="deleteOpen"
       title="Hapus pegawai?"
-      :description="deleting ? `Data ${fullName(deleting)} (${deleting.nip}) akan dihapus. Tindakan ini tidak dapat dibatalkan.` : ''"
+      :description="deleting ? `Data ${fullName(deleting)} (${deleting.nip}) akan dihapus.` : ''"
       confirm-label="Ya, hapus"
       danger
       @update:open="(v) => (deleteOpen = v)"

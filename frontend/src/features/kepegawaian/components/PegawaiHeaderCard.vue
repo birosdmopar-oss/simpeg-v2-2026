@@ -5,7 +5,8 @@
  *  - "Arsip Kepegawaian" (tombol biru sendiri),
  *  - "Cetak" (menu: Cetak Data Umum, Cetak DRH — role 1,2,3,4,5),
  *  - "⋯" khusus "Hapus Pegawai" (role 1) karena jarang dipakai dan berisiko.
- * ASET SEMENTARA: foto memakai avatar placeholder dari registry (lihat placeholderAssets.ts).
+ * Foto: avatar inisial; URL foto pegawai belum ada di kontrak (TODO B-20, WS-2). Status = kolom `pegawai.status`
+ * (1 Aktif, 2 Tidak Aktif, 10 Dihapus — COMMENT DDL).
  */
 import { Calendar, FolderOpen, IdCard, MoreHorizontal, Trash2, Upload, UserRound } from 'lucide-vue-next'
 import {
@@ -18,11 +19,10 @@ import {
 import { computed } from 'vue'
 
 import { UiAvatar, UiBadge, UiButton } from '@/shared/ui'
-import { placeholderAvatar } from '@/shared/ui/placeholderAssets'
 
-import type { PegawaiDetail } from '../types'
+import type { Pegawai } from '../types'
 
-const props = defineProps<{ detail: PegawaiDetail; canPrint: boolean; canDelete: boolean }>()
+const props = defineProps<{ detail: Pegawai; canPrint: boolean; canDelete: boolean }>()
 
 const emit = defineEmits<{
   arsip: []
@@ -30,10 +30,16 @@ const emit = defineEmits<{
   delete: []
 }>()
 
-const du = computed(() => props.detail.data_umum)
-const statusTone = computed(() =>
-  props.detail.status_pegawai === 'Aktif' ? 'success' : props.detail.status_pegawai === 'Tugas Belajar' ? 'info' : 'neutral',
-)
+const STATUS: Record<number, { label: string; tone: 'success' | 'neutral' }> = {
+  1: { label: 'Aktif', tone: 'success' },
+  2: { label: 'Tidak Aktif', tone: 'neutral' },
+  10: { label: 'Dihapus', tone: 'neutral' },
+}
+const status = computed(() => STATUS[props.detail.status] ?? null)
+const tanggalLahir = computed(() => {
+  const d = new Date(`${props.detail.tgl_lahir.slice(0, 10)}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? props.detail.tgl_lahir : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+})
 
 const menuItem =
   'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-slate-700 outline-none data-[highlighted]:bg-slate-100'
@@ -48,8 +54,7 @@ const menuItem =
 
     <div class="flex flex-wrap items-start gap-5 px-5 pb-5">
       <UiAvatar
-        :name="du.nama"
-        :src="placeholderAvatar(detail.foto_seed)"
+        :name="detail.nama"
         size="2xl"
         shape="rounded"
         alt=""
@@ -59,17 +64,17 @@ const menuItem =
       <div class="min-w-0 flex-1 pt-3">
         <div class="flex flex-wrap items-center gap-3">
           <h1 class="text-h5 text-slate-900" data-testid="pegawai-name">
-            {{ [du.gelar_awal, du.nama].filter(Boolean).join(' ') }}<template v-if="du.gelar_akhir"
-              >, <span class="text-brand-tertiary">{{ du.gelar_akhir }}</span></template
+            {{ [detail.glr_awal, detail.nama].filter(Boolean).join(' ') }}<template v-if="detail.glr_akhir"
+              >, <span class="text-brand-tertiary">{{ detail.glr_akhir }}</span></template
             >
           </h1>
-          <UiBadge :tone="statusTone">{{ detail.status_pegawai }}</UiBadge>
+          <UiBadge v-if="status" :tone="status.tone" data-testid="pegawai-status">{{ status.label }}</UiBadge>
         </div>
 
         <ul class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-body2 text-slate-600">
           <li class="inline-flex items-center gap-2"><IdCard class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.nip }}</li>
-          <li class="inline-flex items-center gap-2"><UserRound class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.jenis_pegawai }}</li>
-          <li class="inline-flex items-center gap-2"><Calendar class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.tanggal_lahir_label }}</li>
+          <li class="inline-flex items-center gap-2"><UserRound class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.jenis_pegawai || '—' }}</li>
+          <li class="inline-flex items-center gap-2"><Calendar class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ tanggalLahir }}</li>
         </ul>
       </div>
 

@@ -1,33 +1,33 @@
 <script setup lang="ts">
 /**
- * Halaman Detail Pegawai (§4.1.6, Gambar 22–24) — Fase 3, B-20. Akses detail: semua role login (hr/employee/detail).
- * Hak ubah biodata: role 1 & 3; role 2/6/7 hanya untuk NIP-nya sendiri; role lain hanya melihat.
- * Cetak: role 1,2,3,4,5. Hapus: role 1.
+ * Halaman Detail Pegawai (§4.1.6) — Fase 3, B-20 (pemilik WS-2). Data dari `GET pegawai/{nip}`.
  *
- * DATA CONTOH: memakai mock sampai B-03/B-20 tersedia. "Simpan Perubahan", cetak, arsip, dan hapus belum
- * tersambung — halaman memberi tahu dengan jelas, tidak berpura-pura berhasil. Hanya tab "Data Umum" yang berisi;
- * tab riwayat lain dirender dari konfigurasi (riwayat/) dengan data contoh; perubahannya hanya sementara.
+ * Tab: "Data Umum" (biodata, hanya-lihat sampai B-03/B-04) lalu tab riwayat dari DESCRIPTOR backend (`data.tabs`,
+ * urutan backend) yang punya berkas registry `riwayat/jenis/<slug>.ts` dan `can_view = true`. Tombol tambah/ubah/
+ * hapus/proses di setiap tab mengikuti `can_*` descriptor (RiwayatTabHost → RiwayatListSection).
+ *
+ * Galat: 403 (izin/lingkup — termasuk NIP yang tidak ada bagi role ber-lingkup), 404, 501 (stub) ditampilkan sebagai
+ * keadaan halaman, tidak pernah sebagai data contoh. Cetak, arsip, dan hapus pegawai belum tersambung (B-18/B-20/B-05).
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
-import { Role, UL_PEGAWAI } from '@/features/auth/types'
+import { Role } from '@/features/auth/types'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiNotice } from '@/shared/ui'
 
-import ArsipTable from '../components/ArsipTable.vue'
-import DataUmumForm from '../components/DataUmumForm.vue'
+import DataUmumView from '../components/DataUmumView.vue'
 import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
 import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
-import { RIWAYAT_MENUS } from '../options'
-import RiwayatListSection from '../riwayat/RiwayatListSection.vue'
-import RiwayatRecordSection from '../riwayat/RiwayatRecordSection.vue'
-import { RIWAYAT_BY_KEY } from '../riwayat/riwayat.config'
+import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
+import { tabsFromDescriptors } from '../riwayat/registry'
+import { describeApiError, type ApiFailure } from '../services/apiErrors'
 import { pegawaiService } from '../services/pegawai.service'
-import type { DataUmumForm as DataUmumValues } from '../schemas/dataUmum.schema'
-import type { ArsipItem, PegawaiDetail } from '../types'
+import type { PegawaiDetail, RiwayatMenu } from '../types'
+
+const DATA_UMUM = 'data-umum'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,46 +36,60 @@ const auth = useAuthStore()
 const nip = computed(() => String(route.params.nip ?? ''))
 const detail = ref<PegawaiDetail | null>(null)
 const loading = ref(true)
+const failure = ref<ApiFailure | null>(null)
 const notice = ref<string | null>(null)
 const confirmDelete = ref(false)
 
 const role = computed(() => auth.role)
-const canEdit = computed(() => {
-  if (role.value === Role.SUPER_ADMIN || role.value === Role.ADMIN_SATKER) return true
-  return role.value !== null && (UL_PEGAWAI as readonly number[]).includes(role.value) && auth.user?.nip === nip.value
-})
 const canPrint = computed(() => role.value !== null && [Role.SUPER_ADMIN, Role.PEGAWAI, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI].includes(role.value as 1 | 2 | 3 | 4 | 5))
 const canDelete = computed(() => role.value === Role.SUPER_ADMIN)
+
+const riwayatTabs = computed(() => tabsFromDescriptors(detail.value?.tabs ?? []))
+const menus = computed<RiwayatMenu[]>(() => [
+  { key: DATA_UMUM, label: 'Data Umum' },
+  ...riwayatTabs.value.map((t) => ({ key: t.descriptor.jenis, label: t.descriptor.label })),
+])
 
 const tab = computed<string>({
   get: () => {
     const q = String(route.query.tab ?? '')
-    return RIWAYAT_MENUS.some((m) => m.key === q) ? q : 'data-umum'
+    return menus.value.some((m) => m.key === q) ? q : DATA_UMUM
   },
   set: (key) => void router.replace({ query: { ...route.query, tab: key } }),
 })
-const activeMenu = computed(() => RIWAYAT_MENUS.find((m) => m.key === tab.value) ?? RIWAYAT_MENUS[0])
-const riwayat = computed(() => RIWAYAT_BY_KEY[activeMenu.value.key])
+const activeTab = computed(() => riwayatTabs.value.find((t) => t.descriptor.jenis === tab.value) ?? null)
 
 let requestId = 0
 async function load(): Promise<void> {
   const current = ++requestId
   loading.value = true
-  const result = await pegawaiService.detail(nip.value)
-  if (current !== requestId) return
-  detail.value = result
-  loading.value = false
+  failure.value = null
+  try {
+    const result = await pegawaiService.detail(nip.value)
+    if (current !== requestId) return
+    detail.value = result
+  } catch (error) {
+    if (current !== requestId) return
+    detail.value = null
+    failure.value = describeApiError(error)
+  } finally {
+    if (current === requestId) loading.value = false
+  }
 }
 watch(nip, load, { immediate: true })
 
-function onSave(values: DataUmumValues): void {
-  if (detail.value) detail.value = { ...detail.value, data_umum: { ...values } }
-  notice.value = 'Perubahan hanya tersimpan sementara di halaman ini — belum tersambung ke backend (task B-03).'
-}
-
-function onArsipAction(key: 'buka' | 'edit' | 'hapus', item: ArsipItem): void {
-  notice.value = `Aksi "${key}" untuk arsip ${item.jenis} belum tersambung ke backend (task B-18).`
-}
+const failureTitle = computed(() => {
+  switch (failure.value?.kind) {
+    case 'not-found':
+      return 'Pegawai tidak ditemukan'
+    case 'forbidden':
+      return 'Akses ditolak'
+    case 'unavailable':
+      return 'Data pegawai belum tersedia'
+    default:
+      return 'Data pegawai gagal dimuat'
+  }
+})
 
 const crumbs = computed(() => [
   { label: 'Home', to: { name: 'home' } },
@@ -91,9 +105,12 @@ const crumbs = computed(() => [
 
       <div v-if="loading" class="h-40 animate-pulse rounded-card bg-white/70" aria-busy="true" aria-label="Memuat data pegawai" />
 
-      <UiCard v-else-if="!detail" title="Pegawai tidak ditemukan" data-testid="pegawai-not-found">
-        <p class="text-body1 text-slate-600">Tidak ada pegawai dengan NIP <strong>{{ nip }}</strong>.</p>
-        <UiButton class="mt-4" variant="primary" appearance="soft" :to="{ name: 'pegawai-list' }">Kembali ke Daftar Pegawai</UiButton>
+      <UiCard v-else-if="failure || !detail" :title="failureTitle" data-testid="pegawai-failure" :data-kind="failure?.kind">
+        <p class="text-body1 text-slate-600">{{ failure?.message }}</p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <UiButton v-if="failure?.kind === 'other' || failure?.kind === 'network'" variant="primary" data-testid="pegawai-retry" @click="load">Coba lagi</UiButton>
+          <UiButton variant="primary" appearance="soft" :to="{ name: 'pegawai-list' }">Kembali ke Daftar Pegawai</UiButton>
+        </div>
       </UiCard>
 
       <template v-else>
@@ -101,35 +118,37 @@ const crumbs = computed(() => [
           :detail="detail"
           :can-print="canPrint"
           :can-delete="canDelete"
-          @arsip="notice = 'Arsip Kepegawaian belum tersambung ke backend (task B-18).'"
-          @print="(kind) => (notice = `Cetak ${kind === 'drh' ? 'DRH' : 'Data Umum'} belum tersambung ke backend (task B-20).`)"
+          @arsip="notice = 'Arsip Kepegawaian belum tersedia (task B-18).'"
+          @print="(kind) => (notice = `Cetak ${kind === 'drh' ? 'DRH' : 'Data Umum'} belum tersedia (task B-20).`)"
           @delete="confirmDelete = true"
         />
 
-        <RiwayatMenuTabs v-model="tab" :menus="RIWAYAT_MENUS" />
+        <RiwayatMenuTabs v-model="tab" :menus="menus" />
 
-        <template v-if="activeMenu.key === 'data-umum'">
-          <UiCard title="Data Umum" subtitle="Kolom bertanda (*) wajib diisi" flush>
-            <div class="mt-3 border-t border-slate-200">
-              <DataUmumForm :initial="detail.data_umum" :readonly="!canEdit" @save="onSave" />
-            </div>
-          </UiCard>
-          <ArsipTable :items="detail.arsip" :readonly="!canEdit" @add="notice = 'Tambah arsip belum tersambung ke backend (task B-18).'" @action="onArsipAction" />
-        </template>
+        <UiCard v-if="tab === DATA_UMUM" title="Data Umum" subtitle="Biodata pegawai" flush>
+          <div class="mt-3 border-t border-slate-200">
+            <DataUmumView :pegawai="detail" />
+          </div>
+        </UiCard>
 
-        <RiwayatRecordSection v-else-if="riwayat?.kind === 'record'" :key="`${detail.nip}-${riwayat.key}`" :nip="detail.nip" :config="riwayat" :readonly="!canEdit" />
-        <RiwayatListSection v-else-if="riwayat" :key="`${detail.nip}-${riwayat.key}`" :nip="detail.nip" :config="riwayat" :readonly="!canEdit" />
+        <RiwayatTabHost
+          v-else-if="activeTab"
+          :key="`${detail.nip}-${activeTab.descriptor.jenis}`"
+          :nip="detail.nip"
+          :descriptor="activeTab.descriptor"
+          :config="activeTab.config"
+        />
       </template>
     </div>
 
     <ConfirmDialog
       :open="confirmDelete"
       title="Hapus pegawai?"
-      :description="detail ? `Data ${detail.data_umum.nama} (${detail.nip}) akan dihapus. Tindakan ini tidak dapat dibatalkan.` : ''"
+      :description="detail ? `Data ${detail.nama} (${detail.nip}) akan dihapus.` : ''"
       confirm-label="Ya, hapus"
       danger
       @update:open="(v) => (confirmDelete = v)"
-      @confirm="() => { confirmDelete = false; notice = 'Penghapusan pegawai belum tersambung ke backend (task B-05).' }"
+      @confirm="() => { confirmDelete = false; notice = 'Penghapusan pegawai belum tersedia (task B-05).' }"
     />
   </RedesignShell>
 </template>

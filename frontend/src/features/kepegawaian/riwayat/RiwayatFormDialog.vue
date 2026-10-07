@@ -1,16 +1,25 @@
 <script setup lang="ts">
 /**
  * Dialog tambah/ubah satu riwayat (Radix Vue Dialog, pola sama dengan dialog Akun/Master Data). Isinya
- * RiwayatFieldForm yang dirender dari konfigurasi tab. `initial` null = tambah, ada = ubah.
+ * RiwayatFieldForm yang dirender dari konfigurasi jenis. `initial` null = tambah, ada = ubah.
  */
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 
-import RiwayatFieldForm from './RiwayatFieldForm.vue'
-import type { RiwayatConfig } from './riwayat.config'
+import type { RiwayatValidationErrors } from '../services/apiErrors'
 
-defineProps<{ open: boolean; config: RiwayatConfig; initial: Record<string, string> | null }>()
-const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Record<string, string>] }>()
+import RiwayatFieldForm from './RiwayatFieldForm.vue'
+import type { RiwayatJenisConfig } from './riwayat.config'
+import type { BerkasMap } from './riwayat.service'
+
+defineProps<{
+  open: boolean
+  config: RiwayatJenisConfig
+  initial: Record<string, string> | null
+  serverErrors?: RiwayatValidationErrors | null
+  busy?: boolean
+}>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Record<string, string>, berkas: BerkasMap] }>()
 </script>
 
 <template>
@@ -24,9 +33,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
         <div class="mb-5 flex items-start justify-between gap-3">
           <div>
             <DialogTitle class="text-h5 text-slate-900">{{ initial ? 'Edit' : 'Tambah' }} {{ config.singular }}</DialogTitle>
-            <DialogDescription class="text-body2 text-slate-500">
-              Kolom bertanda (*) wajib diisi. Perubahan menunggu verifikasi sebelum berlaku.
-            </DialogDescription>
+            <DialogDescription class="text-body2 text-slate-500">Kolom bertanda (*) wajib diisi.</DialogDescription>
           </div>
           <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
             <X class="h-5 w-5" aria-hidden="true" />
@@ -35,11 +42,15 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
 
         <RiwayatFieldForm
           :fields="config.fields"
+          :lampiran="config.lampiran"
+          :mode="initial ? 'edit' : 'create'"
           :initial="initial ?? {}"
+          :server-errors="serverErrors ?? null"
+          :busy="busy"
           :submit-label="initial ? 'Simpan Perubahan' : 'Simpan'"
           cancel-label="Batal"
           testid="riwayat"
-          @submit="emit('submit', $event)"
+          @submit="(values, berkas) => emit('submit', values, berkas)"
           @cancel="emit('update:open', false)"
         />
       </DialogContent>

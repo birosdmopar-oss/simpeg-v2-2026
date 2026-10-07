@@ -1,6 +1,14 @@
 import type { RowAction } from './rowActions'
 import { STATUS_RIWAYAT, type StatusRiwayat } from './statusRiwayat'
 
+export type ApprovalAksi = 'setujui' | 'tolak'
+
+/** Payload `confirm` ApprovalDialog = body `POST …/{id}/process`. */
+export interface ApprovalPayload {
+  aksi: ApprovalAksi
+  reason_note: string
+}
+
 export interface ApprovalActionOptions {
   /** Hak proses (descriptor `can_process`). Tanpa hak → item disembunyikan. */
   canProcess: boolean
