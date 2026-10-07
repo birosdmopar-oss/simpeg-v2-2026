@@ -39,7 +39,48 @@ Wajib:
 - **Rahasia:** jangan commit `.env`, kredensial, token, password, atau API key.
 - **Alur merge:** hanya `[CR]` → langsung ke `main` setelah quality gate lolos; `[CR]` + `[DBV]` → PR, DB Validator
   review/approve, reviewer CR yang merge; hanya `[DBV]` → PR, DB Validator yang merge.
-- **Quality gate:** `./check.sh` (PHPStan level 5, PHP-CS-Fixer, PHPUnit, ESLint, vue-tsc, Vitest, build) harus lolos.
+- **Quality gate:** `./check.sh` (PHPStan level 5, PHP-CS-Fixer, PHPUnit, ESLint, vue-tsc, Vitest, build) harus lolos
+  sebelum push ke `main` — cara menjalankannya secara efisien ada di bagian 3.
 - **Skema database:** ikut kode & DDL legacy (label `[K]` / `[V2]` / `[I]`), status 1 / 2 / 10, collation
   `utf8mb4_unicode_ci`, migration yang sudah ada di `main` tidak diedit, dan setiap perubahan skema direview DB
   Validator lewat dokumen di `backend/docs/db-review/`.
+
+## 3. Quality gate efisien (gate penuh sekali, gate cepat di tahap lain)
+
+Tujuannya supaya satu perubahan tidak di-gate penuh berulang kali (PHPUnit penuh ±80 menit di mesin lokal).
+
+**Gate penuh — hanya SEKALI, tepat sebelum push ke `main`**, pada commit yang benar-benar akan di-push (untuk PR:
+commit merge-nya). `./check.sh` / setara: PHPStan, PHP-CS-Fixer, **PHPUnit penuh**, ESLint, vue-tsc, Vitest, build.
+
+**Gate cepat — untuk tahap lain** (mengerjakan PR, perbaikan review, sinkron branch dengan `main`), ±5–10 menit:
+
+1. PHPStan level 5 + PHP-CS-Fixer dry-run (`cd backend && composer analyse && composer cs-check`).
+2. Frontend bila ada perubahan frontend (`cd frontend && npm run check`).
+3. PHPUnit **hanya file/folder yang disentuh** dan area yang bersinggungan, mis.
+   `cd backend && vendor/bin/phpunit --no-coverage tests/MasterData/LokasiPresensiTest.php tests/MasterData/MasterGenericTcTest.php`.
+
+**Kapan gate penuh TIDAK perlu diulang:**
+
+- `main` bergeser **hanya karena dokumen** (`*.md`, `docs/**`) setelah gate penuh lolos → cukup rebase/merge, tanpa gate ulang.
+- Tree commit yang akan di-push **identik** dengan commit yang sudah lolos gate penuh (cek `git diff --stat <commit-gate> HEAD` kosong,
+  atau hanya berisi dokumen).
+- `main` bergeser karena **kode** → cukup PHPUnit terarah pada area yang bersinggungan dengan perubahan baru di `main`;
+  gate penuh ulang hanya bila keduanya menyentuh berkas/modul yang sama.
+
+**Jalankan gate panjang sebagai proses lepas (detached).** Jangan jalankan gate penuh sebagai proses anak yang bisa
+terhenti oleh batas waktu terminal/agen (umumnya 60–120 menit) — gate yang terpotong harus diulang dari awal.
+Jalankan sebagai proses terpisah dengan output ke berkas log, lalu pantau lognya, mis.:
+
+```powershell
+Start-Process -FilePath bash -ArgumentList '-lc', './check.sh > gate.log 2>&1; echo "EXIT=$?" >> gate.log' -WindowStyle Hidden
+```
+
+```bash
+nohup ./check.sh > gate.log 2>&1 &
+```
+
+Tambahan:
+
+- **Satu gate penuh pada satu waktu** per mesin; gate paralel di satu MySQL membuat semuanya lambat. Tunggu gate lain selesai.
+- Reviewer/verifikator **tidak** menjalankan gate penuh — cukup test terarah; gate penuh dijalankan sekali oleh yang akan push.
+- Gate memakai **database test/scratch tersendiri**, bukan database dev; jangan menyalin `.env` dev ke worktree lain.
