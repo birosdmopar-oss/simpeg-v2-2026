@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Database\Kepegawaian;
 
+use App\Database\Migrations\AddFkPegawaiDiPenggunaFaqRate;
+use CodeIgniter\Database\Migration;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use RuntimeException;
+use Throwable;
 
 /**
  * DBV-012 — registry kolom NIP, landasan B-06 (ganti NIP = salin baris pegawai → arahkan ulang setiap kolom yang
@@ -19,11 +23,12 @@ use CodeIgniter\Test\DatabaseTestTrait;
  *      FK di registry atau di self::NON_FK beserta alasannya. Kolom NIP baru tanpa klasifikasi = test gagal, sehingga
  *      B-06 tidak kehilangan kolom yang perlu diarahkan ulang.
  *
- * FK masuk `pengguna.nip`/`faq_rate.nip` → `pegawai` (migration AddFkPegawaiDiPenggunaFaqRate) DITAHAN di luar folder
- * Migrations sampai prasyaratnya terpenuhi (dokumen Bagian 7); selama itu kedua kolom tercatat di
- * self::NON_FK. Test pra-cek orphan migration itu ikut disimpan bersama migration yang ditahan.
+ * FK masuk `pengguna.nip`/`faq_rate.nip` → `pegawai` DITAHAN (DBV-019 keputusan #4): migration-nya disimpan di
+ * app/Database/MigrationsDitahan (tidak dijalankan `spark migrate`) sampai prasyaratnya terpenuhi; selama itu kedua kolom
+ * tercatat di self::NON_FK. Test pra-cek orphan memasang migration itu sementara lalu melepasnya lagi.
  *
- * Dokumen: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 4.3 registry NIP).
+ * Dokumen: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 4.3, 7) dan
+ * backend/docs/db-review/DBV-019-fk-g02-pegawai-schema.md (FK masuk).
  *
  * @internal
  */
@@ -37,7 +42,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
 
     /**
      * FK → `pegawai(nip)` per versi migration: versi => [nama FK => [tabel, kolom]]. DBV-012 = 120000..120100;
-     * DBV-013 = 130100..130900 (nama FK = D1 [K]).
+     * DBV-013 = 130100..130900 (nama FK = D1 [K]). FK masuk yang ditahan: self::FK_MASUK.
      */
     private const REGISTRY = [
         '2026-09-30-120000' => [
@@ -108,6 +113,7 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
      * Kolom FK ke pegawai yang boleh NULL: tabel.kolom => alasan.
      */
     private const NULLABLE = [
+        'pengguna.nip'            => 'K2/DBV-010: akun non-pegawai tanpa NIP',
         'riwayat_lckh.nip_atasan' => '[K] D1 riwayat_lckh.nip_atasan DEFAULT NULL',
     ];
 
@@ -119,8 +125,8 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
         'pegawai.nip'                             => 'PK induk registry',
         'pegawai.nip_lama'                        => 'NIP lama (data historis), bukan rujukan',
         'pegawai_hist.nip_lama'                   => 'salinan pegawai.nip_lama',
-        'pengguna.nip'                            => 'FK fk_id_pegawai_pengguna_to_pegawai DITAHAN (dokumen Bagian 7)',
-        'faq_rate.nip'                            => 'FK fk_nip_faqrate_to_peg DITAHAN (dokumen Bagian 7)',
+        'pengguna.nip'                            => 'FK fk_id_pegawai_pengguna_to_pegawai DITAHAN (DBV-019 keputusan #4)',
+        'faq_rate.nip'                            => 'FK fk_nip_faqrate_to_peg DITAHAN (DBV-019 keputusan #4)',
         'token.nip'                               => 'jejak NIP pemilik saat token terbit (A-01 D-7)',
         'audit_logs.nip_actor'                    => 'jejak NIP pelaku saat kejadian (A-01 D-8)',
         'riwayat_skp.nip_penilai'                 => 'legacy tanpa FK (penilai bisa di luar instansi)',
@@ -134,6 +140,39 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
      * Tabel test (namespace Tests\Support) yang punya kolom nip; bukan tabel aplikasi.
      */
     private const TEST_SUPPORT_TABLES = ['riwayat_dummy', 'pegawai_dummy'];
+
+    /**
+     * FK masuk yang ditahan (app/Database/MigrationsDitahan/AddFkPegawaiDiPenggunaFaqRate.php): nama => [tabel, kolom].
+     */
+    private const FK_MASUK = [
+        'fk_id_pegawai_pengguna_to_pegawai' => ['pengguna', 'nip'],
+        'fk_nip_faqrate_to_peg'             => ['faq_rate', 'nip'],
+    ];
+
+    private const NIP_ORPHAN = '199912312099121001';
+
+    private const USERNAME_NON_PEGAWAI = 'nonpegawai.uji';
+
+    /**
+     * FK masuk yang dipasang sementara oleh test pra-cek orphan; dilepas lagi di tearDown bila test gagal di tengah.
+     */
+    private ?Migration $fkMasuk = null;
+
+    /**
+     * Akun tanpa NIP ditolak down() DBV-010 saat regress test berikutnya: selalu dibersihkan. FK masuk yang ditahan
+     * selalu dilepas lagi agar skema sesuai tabel migrations (FK itu tidak tercatat di sana).
+     */
+    protected function tearDown(): void
+    {
+        $this->db->table('pengguna')->where('username', self::USERNAME_NON_PEGAWAI)->delete();
+
+        if ($this->fkMasuk !== null) {
+            $this->fkMasuk->down();
+            $this->fkMasuk = null;
+        }
+
+        parent::tearDown();
+    }
 
     public function testForeignKeysToPegawaiMatchRegistry(): void
     {
@@ -204,6 +243,66 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
         foreach (['token' => 'nip', 'audit_logs' => 'nip_actor'] as $table => $column) {
             $this->assertArrayNotHasKey("{$table}.{$column}", $fkColumns, "{$table}.{$column} tanpa FK (A-01)");
         }
+    }
+
+    /**
+     * Migration FK masuk yang ditahan menolak jalan (sebelum ALTER apa pun) bila ada NIP yang tidak ada di pegawai, dengan
+     * jumlah per tabel; setelah orphan dibereskan, up() memasang kedua FK; up()/down() aman diulang. Di akhir FK dilepas
+     * lagi (tetap ditahan).
+     */
+    public function testFkMasukRefusesOrphansBeforeAnyAlter(): void
+    {
+        $migration     = $this->fkMasukInstance();
+        $this->fkMasuk = $migration;
+
+        $this->assertSame(self::FK_MASUK, array_map(static fn (array $fk): array => [$fk[0], $fk[1]], $migration::FOREIGN_KEYS));
+        $this->assertSame([], $this->fkNamesOn(['pengguna', 'faq_rate']), 'prasyarat: FK masuk belum terpasang (ditahan)');
+
+        $this->db->table('pengguna')->insert(['nip' => self::NIP_ORPHAN, 'username' => 'orphan.uji', 'user_level' => 2]);
+        $this->db->table('faq_topic')->insert(['faq_topic' => 'Topik Uji']);
+        $this->db->table('faq_sub_topic')->insert(['id_faq_topic' => $this->db->insertID(), 'faq_sub_topic' => 'Sub Uji']);
+        $this->db->table('faq_article')->insert([
+            'id_faq_sub_topic' => $this->db->insertID(), 'title' => 'Artikel Uji', 'content' => '<p>x</p>', 'content_stripped' => 'x',
+        ]);
+        $this->db->table('faq_rate')->insert(['id_faq_article' => $this->db->insertID(), 'nip' => self::NIP_ORPHAN, 'rate' => 1]);
+
+        // Akun non-pegawai (nip NULL, K2) bukan orphan.
+        $this->db->table('pengguna')->insert(['nip' => null, 'username' => self::USERNAME_NON_PEGAWAI, 'user_level' => 1]);
+
+        $error = null;
+
+        try {
+            $migration->up();
+        } catch (Throwable $e) {
+            $error = $e;
+        }
+
+        $this->assertInstanceOf(RuntimeException::class, $error, 'up() harus fail-closed');
+        $this->assertStringContainsString('pengguna.nip: 1 ', $error->getMessage());
+        $this->assertStringContainsString('faq_rate.nip: 1 ', $error->getMessage());
+        $this->assertSame([], $this->fkNamesOn(['pengguna', 'faq_rate']), 'tidak ada FK yang terpasang sebagian');
+
+        // Setelah pegawai-nya ada, FK terpasang; akun non-pegawai tetap boleh.
+        $this->db->table('pegawai')->insert(['nip' => self::NIP_ORPHAN, 'nama' => 'Pegawai Uji', 'tgl_lahir' => '1999-12-31']);
+        $migration->up();
+        $migration->up();
+
+        $this->assertSame(
+            ['fk_id_pegawai_pengguna_to_pegawai', 'fk_nip_faqrate_to_peg'],
+            $this->fkNamesOn(['pengguna', 'faq_rate']),
+        );
+
+        // FK aktif: pengguna/faq_rate dengan NIP asing ditolak (1452); pegawai yang dirujuk tidak bisa dihapus (1451).
+        $this->assertDbError([1452], fn () => $this->db->table('pengguna')->insert(['nip' => '199912312099121002', 'username' => 'asing.uji', 'user_level' => 2]));
+        $this->assertDbError([1451], fn () => $this->db->table('pegawai')->where('nip', self::NIP_ORPHAN)->delete());
+
+        // down() melepas FK tanpa membuang index lama (UNIQUE pengguna.nip, KEY faq_rate G-10), aman diulang.
+        $migration->down();
+        $migration->down();
+        $this->assertSame([], $this->fkNamesOn(['pengguna', 'faq_rate']));
+        $this->assertTrue($this->indexExists('pengguna', 'nip'), 'UNIQUE pengguna.nip tetap');
+        $this->assertTrue($this->indexExists('faq_rate', 'fk_nip_faqrate_to_peg'), 'KEY faq_rate G-10 tetap');
+        $this->fkMasuk = null;
     }
 
     /**
@@ -281,6 +380,32 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
     }
 
     /**
+     * @param list<string> $tables
+     *
+     * @return list<string> nama FK ke pegawai pada tabel-tabel ini, urut nama
+     */
+    private function fkNamesOn(array $tables): array
+    {
+        $names = [];
+
+        foreach ($this->foreignKeysToPegawai() as $name => $fk) {
+            if (in_array($fk['table'], $tables, true)) {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    private function indexExists(string $table, string $index): bool
+    {
+        return (int) $this->db->query(
+            'SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?',
+            [$this->db->getDatabase(), $this->db->prefixTable($table), $index],
+        )->getRowArray()['n'] > 0;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function columnInfo(string $table, string $column): array
@@ -290,6 +415,45 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
              WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
             [$this->db->getDatabase(), $this->db->prefixTable($table), $column],
         )->getRowArray() ?? [];
+    }
+
+    /**
+     * Migration FK masuk yang ditahan (di luar app/Database/Migrations, jadi dimuat manual).
+     */
+    private function fkMasukInstance(): AddFkPegawaiDiPenggunaFaqRate
+    {
+        $file = APPPATH . 'Database/MigrationsDitahan/AddFkPegawaiDiPenggunaFaqRate.php';
+
+        if (! is_file($file)) {
+            throw new RuntimeException("File migration ditahan {$file} tidak ditemukan.");
+        }
+
+        require_once $file;
+
+        return new AddFkPegawaiDiPenggunaFaqRate();
+    }
+
+    private function assertDbError(array $codes, callable $write): void
+    {
+        $code = null;
+
+        try {
+            if ($write() === false) {
+                $code = (int) ($this->db->error()['code'] ?? 0);
+            }
+        } catch (Throwable $e) {
+            for ($t = $e; $t !== null; $t = $t->getPrevious()) {
+                if (in_array((int) $t->getCode(), $codes, true)) {
+                    $code = (int) $t->getCode();
+
+                    break;
+                }
+            }
+
+            $code ??= (int) $e->getCode();
+        }
+
+        $this->assertContains($code, $codes, 'kode error DB yang diharapkan: ' . implode('/', $codes));
     }
 
     private function stripPrefix(string $table): string

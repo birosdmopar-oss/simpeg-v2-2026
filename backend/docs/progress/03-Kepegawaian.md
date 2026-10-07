@@ -14,6 +14,16 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task len
 | B-21 Unit test Modul Kepegawaian | **IN_PROGRESS** | 3 dari 5 butir DoD lolos sebagai unit test murni (periode KP, jarak KGB, akhir hukdis). Sisa: cascade koreksi NIP + rollback (B-06) dan snapshot sync hanya di approval final (B-03), keduanya butuh tabel B-01/B-02. Registry NIP untuk butir cascade sudah ada; test ber-DB yang mencocokkannya dengan `information_schema` menyusul |
 | B-01..B-05, B-07, B-10..B-13, B-15..B-20 | TODO | Belum dimulai. BUP/TMT pensiun untuk prediksi dashboard B-19/B-20 sudah tersedia (CR-036) |
 
+## Skema Fase 3 (review DB Validator)
+
+- **DBV-012/DBV-013 (B-01/B-02)** — di `main` lewat PR #20 (`957729f`, perbaikan `96fcca2`); dokumen
+  `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md`.
+- **DBV-019 (lanjutan DBV-012/013)** — PR #23, branch `dbv-019/fk-g02-pegawai`, ⏳ menunggu review DB Validator: 55 FK
+  snapshot/riwayat → master G-02, `jabatan_koordinasi`, `rumpun_jabatan` (migration `2026-10-07-100000`/`100100`, RESTRICT,
+  pra-cek nilai yatim fail-closed); 2 FK masuk `pengguna.nip`/`faq_rate.nip` → `pegawai.nip` ikut diajukan tetapi tetap
+  ditahan (`app/Database/MigrationsDitahan/`) sampai `pegawai` diimpor dan validasi NIP 422 di Manajemen Akun ada
+  (keputusan #4); dokumen `backend/docs/db-review/DBV-019-fk-g02-pegawai-schema.md`.
+
 ## Persiapan tanpa skema
 
 ### CR-025 — kalkulasi murni Kepegawaian (bagian B-21) — pra-review internal sisi CR; di main lewat merge `a540703` 30-09-2026

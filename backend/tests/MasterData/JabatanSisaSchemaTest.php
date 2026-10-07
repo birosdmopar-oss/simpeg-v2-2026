@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\MasterData;
 
+use App\Database\Migrations\AddFkG02Pegawai;
+use App\Database\Migrations\AddFkG02Riwayat;
 use App\Database\Migrations\AddFkJabatanJenjangJf;
 use App\Database\Migrations\CreateMasterJabatanSisa;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
  * DBV-018 — skema G-02 sisa hasil migration 2026-09-30-100100_CreateMasterJabatanSisa dan 2026-09-30-100200
@@ -15,13 +18,15 @@ use CodeIgniter\Test\DatabaseTestTrait;
  * (backend/docs/db-review/G-02b-jabatan-sisa-schema.md Bagian 2): DDL kedelapan tabel dari dump struktur produksi
  * lengkap D1 `simpeg01_struktur_lengkap_20261001.sql` [K], plus deviasi v2 (status 1/2/10, 6 UNIQUE, FK RESTRICT nama
  * legacy, 4 CHECK, collation utf8mb4_unicode_ci) dan FK `jabatan.id_jenjang_jf` → `jenjang_jf`. Migration tidak menulis
- * baris apa pun dan bisa di-rollback.
+ * baris apa pun dan bisa di-rollback. FK DBV-019 (snapshot/riwayat → `jabatan_koordinasi`/`rumpun_jabatan`) dilepas
+ * sebelum down() dan dipasang ulang setelah up() (Tests\Support\LepasMigrationKepegawaianTrait::lepasFkG02()).
  *
  * @internal
  */
 final class JabatanSisaSchemaTest extends CIUnitTestCase
 {
     use DatabaseTestTrait;
+    use LepasMigrationKepegawaianTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -176,7 +181,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
     {
         foreach (self::TABLES as $table) {
             if (! $this->tableExists($table) || $this->columns($table) !== self::COLUMNS[$table]) {
-                foreach ([fn () => $this->fkMigration()->down(), fn () => $this->migration()->down()] as $step) {
+                foreach ([fn () => $this->lepasFkG02(), fn () => $this->fkMigration()->down(), fn () => $this->migration()->down()] as $step) {
                     try {
                         $step();
                     } catch (\Throwable) {
@@ -187,6 +192,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
                 $this->dropIfExists('peta_jabatan');
                 $this->migration()->up();
                 $this->fkMigration()->up();
+                $this->pasangUlangMigrationKepegawaian();
 
                 break;
             }
@@ -314,6 +320,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
      */
     public function testMigrationRollsBackAndUpAgain(): void
     {
+        $this->lepasFkG02();
         $this->fkMigration()->down();
         $this->assertSame([], $this->foreignKeysOn('jabatan', 'id_jenjang_jf'));
         $keyCount = (int) $this->db->query(
@@ -334,6 +341,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
 
         $this->migration()->up();
         $this->fkMigration()->up();
+        $this->pasangUlangMigrationKepegawaian();
         $this->assertSchema();
     }
 
@@ -343,6 +351,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
      */
     public function testFailedUpDropsOnlyTablesCreatedInThatRun(): void
     {
+        $this->lepasFkG02();
         $this->fkMigration()->down();
         $this->migration()->down();
 
@@ -369,6 +378,7 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
         $this->db->query("DROP TABLE {$blocker}");
         $this->migration()->up();
         $this->fkMigration()->up();
+        $this->pasangUlangMigrationKepegawaian();
         $this->assertSchema();
     }
 
@@ -573,8 +583,14 @@ final class JabatanSisaSchemaTest extends CIUnitTestCase
         )->getResultArray();
 
         $fks = [];
+        // FK masuk dari snapshot/riwayat B-01/B-02 (DBV-019) bukan bagian skema G-02b; dikunci FkG02Test.
+        $dbv019 = AddFkG02Pegawai::FOREIGN_KEYS + AddFkG02Riwayat::FOREIGN_KEYS;
 
         foreach ($rows as $row) {
+            if (isset($dbv019[(string) $row['CONSTRAINT_NAME']])) {
+                continue;
+            }
+
             $fks[(string) $row['CONSTRAINT_NAME']] = [
                 $this->stripPrefix((string) $row['TABLE_NAME']),
                 (string) $row['COLUMN_NAME'],

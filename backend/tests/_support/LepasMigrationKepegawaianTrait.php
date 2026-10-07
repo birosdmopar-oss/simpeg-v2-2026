@@ -17,6 +17,10 @@ use RuntimeException;
  * melepas migration B-01/B-02 di setUp() (urut versi menurun) dan memasangnya ulang di tearDown() (urut menaik), pola
  * yang sama dengan `WILAYAH_DEPENDENTS` di Batch1LegacySchemaTest; assertion test master tidak berubah.
  *
+ * DBV-019: FK snapshot/riwayat → master G-02, `jabatan_koordinasi`, `rumpun_jabatan` (migration 2026-10-07-100000 dan
+ * 2026-10-07-100100) juga menahan down() migration master G-02 (DBV-008/DBV-018). Test skema G-02 cukup melepas kedua
+ * migration FK itu lewat lepasFkG02() (tabel B-01/B-02 tetap), lalu pasangUlangMigrationKepegawaian().
+ *
  * Dipakai bersama DatabaseTestTrait (`$this->db`, tabel `migrations` ber-prefix).
  */
 trait LepasMigrationKepegawaianTrait
@@ -29,12 +33,35 @@ trait LepasMigrationKepegawaianTrait
     private array $migrationKepegawaianDilepas = [];
 
     /**
+     * Migration DBV-019 yang memasang FK ke tabel master G-02 (urut versi menaik).
+     *
+     * @var list<string>
+     */
+    private static array $versiFkG02 = ['2026-10-07-100000', '2026-10-07-100100'];
+
+    /**
      * Lepas (down) semua migration App B-01/B-02 yang sudah jalan, urut versi menurun. Tanpa efek bila belum ada.
      */
     protected function lepasMigrationKepegawaian(): void
     {
         $rows = $this->db->table('migrations')->select('version')->where('namespace', 'App')
             ->where('version >=', '2026-09-30-120000')->orderBy('version', 'DESC')->get()->getResultArray();
+
+        foreach ($rows as $row) {
+            $migration = $this->migrationKepegawaian((string) $row['version']);
+            $migration->down();
+            $this->migrationKepegawaianDilepas[] = $migration;
+        }
+    }
+
+    /**
+     * Lepas (down) hanya migration FK DBV-019 ke master G-02 yang sudah jalan, urut versi menurun. down() migration itu
+     * aman diulang (FK yang sudah lepas dilewati).
+     */
+    protected function lepasFkG02(): void
+    {
+        $rows = $this->db->table('migrations')->select('version')->where('namespace', 'App')
+            ->whereIn('version', self::$versiFkG02)->orderBy('version', 'DESC')->get()->getResultArray();
 
         foreach ($rows as $row) {
             $migration = $this->migrationKepegawaian((string) $row['version']);

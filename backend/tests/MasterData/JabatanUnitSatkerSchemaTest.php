@@ -9,6 +9,7 @@ use App\Database\Migrations\CreateMasterJabatanSisa;
 use App\Database\Migrations\CreateMasterJabatanUnitSatker;
 use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
  * DBV-008 — skema G-02 hasil migration 2026-09-30-100000_CreateMasterJabatanUnitSatker harus sama dengan skema yang
@@ -16,13 +17,15 @@ use CodeIgniter\Test\DatabaseTestTrait;
  * dump struktur produksi lengkap D1 `simpeg01_struktur_lengkap_20261001.sql` [K] (revisi 01-10-2026), plus
  * deviasi v2 (status 10, 5 UNIQUE nama, FK RESTRICT, 5 CHECK). FK `jabatan → jenjang_jf` dibuat migration DBV-018; tabel
  * DBV-018 merujuk tabel G-02, jadi down() G-02 di test ini dijalankan setelah kedua migration DBV-018 di-down. Migration tidak menulis baris apa
- * pun dan bisa di-rollback.
+ * pun dan bisa di-rollback. FK DBV-019 (snapshot/riwayat → G-02) dilepas lebih dulu dan dipasang ulang paling akhir
+ * (Tests\Support\LepasMigrationKepegawaianTrait::lepasFkG02()).
  *
  * @internal
  */
 final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
 {
     use DatabaseTestTrait;
+    use LepasMigrationKepegawaianTrait;
 
     protected $migrate   = true;
     protected $refresh   = true;
@@ -463,6 +466,8 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
 
     private function downDependents(): void
     {
+        $this->lepasFkG02();
+
         foreach (array_reverse($this->dependents()) as $migration) {
             try {
                 $migration->down();
@@ -477,6 +482,8 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
         foreach ($this->dependents() as $migration) {
             $migration->up();
         }
+
+        $this->pasangUlangMigrationKepegawaian();
     }
 
     private function migration(): CreateMasterJabatanUnitSatker

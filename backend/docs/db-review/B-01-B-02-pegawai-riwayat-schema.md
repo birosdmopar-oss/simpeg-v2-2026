@@ -659,6 +659,12 @@ adanya). Saat diaktifkan, timestamp ditetapkan ulang agar lebih besar dari migra
 Daftar 54 FK G-02/koordinasi/rumpun di branch itu sama persis dengan D1 (nama, kolom, induk) kecuali tambahan
 `fk_id_jabatan_peg_ak_siasn_03`; 2 FK masuk juga ada di D1. Uji pemasangan FK G-02 di atas tabel PR #17: Bagian 9.2.
 
+**Tindak lanjut (07-10-2026, catatan C-2 review DB Validator PR #20):** ketiga migration di tabel ini diajukan sebagai unit
+lanjutan **DBV-019** (PR #23) — `AddFkG02Pegawai` (15 FK) dan `AddFkG02Riwayat` (40 FK) dengan timestamp baru
+`2026-10-07-100000`/`100100`; `AddFkPegawaiDiPenggunaFaqRate` (2 FK masuk) ikut di PR itu tetapi tetap ditahan di
+`app/Database/MigrationsDitahan/` sesuai keputusan #14 (status prasyarat: DBV-019 Bagian 1.2). Dokumen
+`DBV-019-fk-g02-pegawai-schema.md`. Keputusan Bagian 8 tidak berubah.
+
 ## 8. Keputusan yang diminta dari DB Validator / user
 
 | # | Pertanyaan | Usulan (pra-review CR) | Keputusan |
