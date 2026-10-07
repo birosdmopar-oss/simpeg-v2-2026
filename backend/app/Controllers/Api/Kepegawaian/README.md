@@ -157,10 +157,11 @@ Didaftarkan **sekali** di `Config\Services` (S0-A); tipe kembalian = interface. 
 (`AturanLampiran`: kode `jenis_rwy`, wajib, batas 1/2/5 MB, ekstensi), `urutanTab()`, dan hook opsional `validate`,
 `beforeSave`, `afterApprove`.
 
-**Fixture test** `Tests\Support\Kepegawaian\PegawaiFixtureTrait` (bersama, dipakai dengan `DatabaseTestTrait`):
+**Fixture test** `Tests\Support\Kepegawaian\PegawaiFixtureTrait` (bersama, dipakai di test turunan
+`Tests\Support\DatabaseTestCase` MAKE-001):
 `buatPegawai(array $override = [], array $pmj = []): string`, `buatPegawaiDiSatker(int $idSatker, …): string`,
 `buatAkunUntuk(string $nip, int $role, …): int`, `buatUnit()`, `buatSatker()`, `buatJabatan()`, `authUntukAkun(int)`.
-Hanya INSERT (cocok base case transaksi per test MAKE-001), NIP sintetis 18 digit, kolom FK diisi master G-02 yang
+Hanya INSERT (berjalan di bingkai transaksi uji MAKE-001 tanpa `db-isolasi-penuh`), NIP sintetis 18 digit, kolom FK diisi master G-02 yang
 dibuat fixture (patuh FK DBV-019).
 
 ### Route

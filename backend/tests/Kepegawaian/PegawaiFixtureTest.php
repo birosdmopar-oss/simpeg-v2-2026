@@ -5,25 +5,19 @@ declare(strict_types=1);
 namespace Tests\Kepegawaian;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * S0-A (MAKE-002) — PegawaiFixtureTrait: pegawai + snapshot jabatan + akun yang lolos FK (termasuk kolom FK DBV-019
- * `pegawai_mutasi_jabatan` → G-02 dan `pengguna.nip` → `pegawai`, terpasang atau belum), dan cocok dengan base case
- * MAKE-001 (hanya INSERT; data hilang saat transaksi test di-rollback).
+ * `pegawai_mutasi_jabatan` → G-02 dan `pengguna.nip` → `pegawai`, terpasang atau belum), dan berjalan di base case
+ * MAKE-001 DatabaseTestCase tanpa tanda isolasi penuh (hanya INSERT; data hilang saat bingkai transaksi uji di-rollback).
  *
  * @internal
  */
-final class PegawaiFixtureTest extends CIUnitTestCase
+final class PegawaiFixtureTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use PegawaiFixtureTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     /**
      * Kolom FK anak → [tabel induk, kolom induk] yang diisi fixture: FK G-02 DBV-019 (`pegawai_mutasi_jabatan`),
@@ -115,7 +109,7 @@ final class PegawaiFixtureTest extends CIUnitTestCase
 
     public function testRollbackTransaksiMenghapusDataFixture(): void
     {
-        // Simulasi base case MAKE-001 (transaksi per test): semua tulisan fixture ikut rollback.
+        // Transaksi aplikasi di dalam bingkai uji MAKE-001 (SAVEPOINT): semua tulisan fixture ikut rollback.
         $hitung = fn (): array => array_map(
             fn (string $tabel): int => $this->db->table($tabel)->countAllResults(),
             ['pegawai', 'pegawai_mutasi_jabatan', 'pengguna', 'unit', 'satker', 'jabatan'],

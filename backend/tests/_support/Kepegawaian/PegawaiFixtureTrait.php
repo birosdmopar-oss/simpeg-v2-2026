@@ -11,17 +11,17 @@ use RuntimeException;
 use Tests\Support\Database\Seeds\AuthSeeder;
 
 /**
- * Fixture pegawai bersama Fase 3 (S0-A MAKE-002), dipakai WS-1 dan WS-2. Dipakai bersama DatabaseTestTrait
- * (`$this->db`, koneksi group tests).
+ * Fixture pegawai bersama Fase 3 (S0-A MAKE-002), dipakai WS-1 dan WS-2 di test turunan Tests\Support\DatabaseTestCase
+ * (base case MAKE-001; `$this->db`, koneksi group tests).
  *
  * Membuat, berurutan: baris master G-02 yang dirujuk (unit → satker → group/sub group jabatan → jabatan) → `pegawai`
  * → snapshot `pegawai_mutasi_jabatan` ber-unit/satker/jabatan → akun `pengguna` tertaut NIP. Setiap kolom FK diisi ID
  * master yang dibuat fixture ini (patuh FK DBV-019 `pegawai_mutasi_jabatan` → G-02 dan `pengguna.nip` → `pegawai`,
  * terpasang atau belum); kolom FK lain dibiarkan NULL.
  *
- * Cocok dengan base case PHPUnit cepat MAKE-001 (migrate sekali + transaksi per test): HANYA INSERT lewat query
- * builder — tanpa DDL, tanpa migrate, tanpa commit eksplisit, tanpa TRUNCATE/DELETE. NIP sintetis 18 digit (bukan data
- * asli), unik terhadap `pegawai` dan `pengguna` yang sudah ada.
+ * Berjalan di bingkai transaksi uji MAKE-001 tanpa tanda `db-isolasi-penuh`: HANYA INSERT lewat query builder —
+ * tanpa DDL, tanpa migrate, tanpa commit eksplisit, tanpa TRUNCATE/DELETE. NIP sintetis 18 digit (bukan data asli),
+ * unik terhadap `pegawai` dan `pengguna` yang sudah ada.
  */
 trait PegawaiFixtureTrait
 {
