@@ -6,6 +6,18 @@ namespace Config;
 
 use App\Interfaces\CaptchaVerifierInterface;
 use App\Interfaces\EsignGatewayInterface;
+use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
+use App\Interfaces\Kepegawaian\BiodataServiceInterface;
+use App\Interfaces\Kepegawaian\KonketServiceInterface;
+use App\Interfaces\Kepegawaian\LkhServiceInterface;
+use App\Interfaces\Kepegawaian\NipCascadeInterface;
+use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
+use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
+use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
+use App\Interfaces\Kepegawaian\RiwayatServiceInterface;
+use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
+use App\Interfaces\Kepegawaian\StorageAdapterInterface;
+use App\Interfaces\Kepegawaian\StrukturServiceInterface;
 use App\Interfaces\PushNotifGatewayInterface;
 use App\Interfaces\ResetTokenNotifierInterface;
 use App\Interfaces\SiasnGatewayInterface;
@@ -26,6 +38,18 @@ use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Html\HtmlSanitizer;
+use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
+use App\Libraries\Kepegawaian\Stub\StubAttachmentService;
+use App\Libraries\Kepegawaian\Stub\StubBiodataService;
+use App\Libraries\Kepegawaian\Stub\StubKonketService;
+use App\Libraries\Kepegawaian\Stub\StubLkhService;
+use App\Libraries\Kepegawaian\Stub\StubNipCascade;
+use App\Libraries\Kepegawaian\Stub\StubPegawaiScope;
+use App\Libraries\Kepegawaian\Stub\StubPegawaiService;
+use App\Libraries\Kepegawaian\Stub\StubRiwayatService;
+use App\Libraries\Kepegawaian\Stub\StubSnapshotSync;
+use App\Libraries\Kepegawaian\Stub\StubStorageAdapter;
+use App\Libraries\Kepegawaian\Stub\StubStrukturService;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
 use App\Libraries\MasterData\MasterService;
@@ -260,6 +284,160 @@ class Services extends BaseService
         }
 
         return new HtmlSanitizer();
+    }
+
+    // ------------------------------------------------------------------
+    // Modul B — Kepegawaian Core (Fase 3). Didaftarkan sekali di S0-A (MAKE-002); kontrak:
+    // app/Controllers/Api/Kepegawaian/README.md. Tipe kembalian = interface. Setelah S0-A, satu-satunya perubahan yang
+    // diizinkan di sini: pemilik service mengganti `new Stub...` dengan kelas nyata (dicatat di commit milestone-nya).
+    // Stub di App\Libraries\Kepegawaian\Stub fail-closed (scope menolak semua, service lain → 501); fake untuk test
+    // hanya di tests/_support/Kepegawaian, disuntik lewat Services::injectMock().
+    // ------------------------------------------------------------------
+
+    /**
+     * Lingkup akses pegawai — WS-2 (MAKE-009).
+     */
+    public static function pegawaiScope(bool $getShared = true): PegawaiScopeInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('pegawaiScope');
+        }
+
+        return new StubPegawaiScope();
+    }
+
+    /**
+     * Lampiran riwayat B-18 — WS-2 (MAKE-009).
+     */
+    public static function attachmentService(bool $getShared = true): AttachmentServiceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('attachmentService');
+        }
+
+        return new StubAttachmentService();
+    }
+
+    /**
+     * Penyimpanan berkas lampiran (LocalStorageAdapter) — WS-2 (MAKE-009).
+     */
+    public static function storageAdapter(bool $getShared = true): StorageAdapterInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('storageAdapter');
+        }
+
+        return new StubStorageAdapter();
+    }
+
+    /**
+     * Registry Definisi riwayat (auto-discovery folder Config\Kepegawaian::$definisiRiwayatPath) — WS-1.
+     */
+    public static function riwayatRegistry(bool $getShared = true): RiwayatRegistryInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('riwayatRegistry');
+        }
+
+        $config = config(Kepegawaian::class);
+
+        return RiwayatRegistry::dariFolder(static::pegawaiScope(), $config->definisiRiwayatPath, $config->definisiRiwayatNamespace);
+    }
+
+    /**
+     * RiwayatEngine — WS-1 (MAKE-004).
+     */
+    public static function riwayatService(bool $getShared = true): RiwayatServiceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('riwayatService');
+        }
+
+        return new StubRiwayatService();
+    }
+
+    /**
+     * SnapshotSync — WS-1 (MAKE-004).
+     */
+    public static function snapshotSync(bool $getShared = true): SnapshotSyncInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('snapshotSync');
+        }
+
+        return new StubSnapshotSync();
+    }
+
+    /**
+     * Daftar & detail pegawai — WS-2 (MAKE-010/MAKE-014).
+     */
+    public static function pegawaiService(bool $getShared = true): PegawaiServiceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('pegawaiService');
+        }
+
+        return new StubPegawaiService();
+    }
+
+    /**
+     * Biodata dua jalur + approval draft B-03/B-04 — WS-2 (MAKE-010/MAKE-011).
+     */
+    public static function biodataService(bool $getShared = true): BiodataServiceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('biodataService');
+        }
+
+        return new StubBiodataService();
+    }
+
+    /**
+     * Koreksi NIP cascade B-06 — WS-2 (MAKE-010).
+     */
+    public static function nipCascade(bool $getShared = true): NipCascadeInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('nipCascade');
+        }
+
+        return new StubNipCascade();
+    }
+
+    /**
+     * Struktur organisasi B-19 — WS-2 (MAKE-012).
+     */
+    public static function strukturService(bool $getShared = true): StrukturServiceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('strukturService');
+        }
+
+        return new StubStrukturService();
+    }
+
+    /**
+     * LKH B-12b — WS-2 (MAKE-013).
+     */
+    public static function lkhService(bool $getShared = true): LkhServiceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('lkhService');
+        }
+
+        return new StubLkhService();
+    }
+
+    /**
+     * Konket B-13 — WS-2 (MAKE-013).
+     */
+    public static function konketService(bool $getShared = true): KonketServiceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('konketService');
+        }
+
+        return new StubKonketService();
     }
 
     // ------------------------------------------------------------------
