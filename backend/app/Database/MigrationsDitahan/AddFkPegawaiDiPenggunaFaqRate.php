@@ -11,25 +11,24 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DITAHAN — JANGAN taruh di app/Database/Migrations sebelum prasyaratnya terpenuhi (dokumen
- * backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md Bagian 7 dan keputusan 8 #14):
- *   (1) `pegawai` sudah terisi di lingkungan target (impor Tier 2 / B-05), karena `pengguna` di Dev sudah berisi akun
- *       ber-NIP dan migration ini fail-closed selama ada NIP yang tidak ada di `pegawai`;
+ * DITAHAN (DBV-019, keputusan #4; sebelumnya DBV-012 keputusan #14) — file ini sengaja di luar app/Database/Migrations
+ * sehingga TIDAK dijalankan `php spark migrate`. Dipindah ke app/Database/Migrations dengan nama
+ * `<timestamp>_AddFkPegawaiDiPenggunaFaqRate.php` (timestamp lebih besar dari migration terakhir di lingkungan target)
+ * setelah prasyaratnya terpenuhi (dokumen backend/docs/db-review/DBV-019-fk-g02-pegawai-schema.md Bagian 1.2):
+ *   (1) `pegawai` sudah terisi di lingkungan target (impor Tier 2 / B-05): `pengguna` berisi akun ber-NIP dan migration
+ *       ini fail-closed selama ada NIP yang tidak ada di `pegawai`;
  *   (2) pembuatan/ubah akun ber-NIP (A-09 AccountProvisioner, Manajemen Akun) memvalidasi NIP ada di `pegawai` (422),
  *       supaya FK tidak berubah menjadi error server;
  *   (3) seed & test yang membuat akun/rating ber-NIP menyisipkan `pegawai` lebih dulu.
- * Timestamp ditetapkan ulang saat diaktifkan (lebih besar dari migration yang sudah jalan di lingkungan target).
+ * Isi dan pra-cek orphan tetap diuji Tests\Database\Kepegawaian\NipReferenceRegistryTest (dipasang lalu dilepas di test).
  *
- * DBV-012 — B-01: FK masuk ke `pegawai.nip` dari dua tabel yang sudah ada di `main` dan sengaja ditunda sampai
- * `pegawai` dibuat:
+ * DBV-012 — B-01: FK masuk ke `pegawai.nip` dari dua tabel yang sudah ada di `main` sebelum `pegawai` dibuat:
  *   - `fk_id_pegawai_pengguna_to_pegawai` [K D1]: `pengguna.nip` (NULL untuk akun non-pegawai, K2/DBV-010) →
  *     `pegawai.nip` (A-01 #4). Memakai UNIQUE `nip` yang sudah ada, tanpa KEY baru.
  *   - `fk_nip_faqrate_to_peg` [K D1]: `faq_rate.nip` → `pegawai.nip` (G-10 D2). KEY dengan nama ini sudah dibuat
  *     migration FAQ, jadi cukup ADD CONSTRAINT.
- * Keduanya ON DELETE RESTRICT ON UPDATE RESTRICT (legacy `faq_rate` CASCADE; ganti NIP lewat B-06, K1).
- *
- * Review DB Validator: backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md (Bagian 7) — JANGAN dijalankan
- * di Dev/Production sebelum disetujui DBV-012.
+ * Keduanya ON DELETE RESTRICT ON UPDATE RESTRICT (legacy `pengguna` SET NULL/CASCADE, `faq_rate` CASCADE/CASCADE;
+ * ganti NIP lewat B-06, K1).
  *
  * up() fail-closed: sebelum ALTER apa pun, baris yang NIP-nya tidak ada di `pegawai` (orphan) dihitung; bila ada,
  * migration berhenti dengan pesan jumlah per tabel (impor `pegawai` dulu, atau perbaiki/hapus baris orphan). FK yang
@@ -71,7 +70,7 @@ class AddFkPegawaiDiPenggunaFaqRate extends Migration
                 try {
                     $this->db->query("ALTER TABLE {$this->t($table)} DROP FOREIGN KEY `{$name}`");
                 } catch (Throwable) {
-                    // Error asli tetap dilempar; sisa FK dibersihkan manual (dokumen Bagian 9.3).
+                    // Error asli tetap dilempar; sisa FK dibersihkan manual (dokumen DBV-019 Bagian 4.1).
                 }
             }
 
@@ -111,7 +110,7 @@ class AddFkPegawaiDiPenggunaFaqRate extends Migration
 
         if ($problems !== []) {
             throw new RuntimeException(
-                'DBV-012: FK ke pegawai.nip tidak dipasang — ' . implode('; ', $problems)
+                'DBV-019: FK ke pegawai.nip tidak dipasang — ' . implode('; ', $problems)
                 . '. Impor pegawai dulu atau perbaiki/hapus baris tersebut, lalu jalankan ulang migrate.',
             );
         }
@@ -138,7 +137,7 @@ class AddFkPegawaiDiPenggunaFaqRate extends Migration
         if (! $result instanceof ResultInterface) {
             $error = $this->connection()->error();
 
-            throw new RuntimeException('DBV-012: query gagal (' . $error['code'] . '): ' . $error['message']);
+            throw new RuntimeException('DBV-019: query gagal (' . $error['code'] . '): ' . $error['message']);
         }
 
         return $result->getRowArray() ?? [];
@@ -155,7 +154,7 @@ class AddFkPegawaiDiPenggunaFaqRate extends Migration
     private function connection(): BaseConnection
     {
         if (! $this->db instanceof BaseConnection) {
-            throw new RuntimeException('DBV-012: koneksi database tidak mendukung prefix tabel.');
+            throw new RuntimeException('DBV-019: koneksi database tidak mendukung prefix tabel.');
         }
 
         return $this->db;
@@ -167,7 +166,7 @@ class AddFkPegawaiDiPenggunaFaqRate extends Migration
         if ($this->connection()->query($sql) === false) {
             $error = $this->connection()->error();
 
-            throw new RuntimeException('DBV-012: ALTER FK pegawai gagal (' . $error['code'] . '): ' . $error['message']);
+            throw new RuntimeException('DBV-019: ALTER FK pegawai gagal (' . $error['code'] . '): ' . $error['message']);
         }
     }
 }
