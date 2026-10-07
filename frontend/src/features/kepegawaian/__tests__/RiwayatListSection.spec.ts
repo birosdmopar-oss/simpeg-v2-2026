@@ -175,7 +175,8 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     await setInput('[data-field="id_jenjang_pendidikan"] select, select[data-field="id_jenjang_pendidikan"]', '7')
     await setInput('input[data-field="tgl_lulus"], [data-field="tgl_lulus"] input', '2012-08-30')
     await submitForm()
-    expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Ijazah wajib diunggah.')
+    // Validasi VeeValidate/Zod asinkron: tunggu hasilnya, bukan jumlah tick tetap (runner CI lebih lambat).
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Ijazah wajib diunggah.'))
     expect(svc.create).not.toHaveBeenCalled()
   })
 
@@ -189,7 +190,8 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     await chooseFile(14, pdf)
     await submitForm()
 
-    expect(svc.create).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
+    await flushPromises()
     const [nip, jenis, fields, values, berkas] = svc.create.mock.calls[0]
     expect([nip, jenis, fields]).toEqual([NIP, 'pendidikan', pendidikan.fields])
     expect(values).toMatchObject({ id_jenjang_pendidikan: '7', tgl_lulus: '2012-08-30' })
@@ -204,6 +206,8 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     await selectRowAction(wrapper, 'riwayat-actions-1', 'edit')
     expect(q<HTMLInputElement>('input[data-field="no_ijazah"], [data-field="no_ijazah"] input')?.value).toBe('IJZ-1')
     await submitForm()
+    await vi.waitFor(() => expect(svc.update).toHaveBeenCalled())
+    await flushPromises()
     expect(svc.update).toHaveBeenCalledWith(NIP, 'pendidikan', '1', pendidikan.fields, expect.objectContaining({ no_ijazah: 'IJZ-1' }), {})
     expect(wrapper.get('[data-testid="riwayat-notice"]').text()).toContain('tersimpan')
   })
