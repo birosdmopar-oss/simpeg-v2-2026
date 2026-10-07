@@ -2,17 +2,47 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `03-Kepegawaian.md`. Aturan kalkulasi dan tanggal bisnis: `backend/app/Libraries/Kepegawaian/README.md`.
 
-**Terakhir diperbarui:** 2 Oktober 2026. CR-036 menambah persiapan tanpa skema: registry kolom NIP untuk B-06, format NIP, dan BUP pensiun. Branch `cr-036/aturan-murni-fase3-lanjutan`, belum di main (sudah di-rebase ke main 2 Oktober 2026). Persiapan ini pengecualian urutan fase yang disetujui user 01-10-2026. Sebelumnya CR-029 (1 Oktober 2026): CR-025 sudah di main — merge `a540703` (commit `5852270`) 30-09-2026. CR-025 menambah kalkulasi murni periode KP, jarak KGB, akhir hukdis, dan masa kerja untuk B-21 (branch `cr-025/aturan-kepegawaian-fase3`).
-**Entry criteria:** Fase 1 + Fase 2 DONE — belum terpenuhi (G-01/G-02/G-03/G-09 masih terbuka di `02-MasterData.md`). Pekerjaan di file ini sampai entry criteria terpenuhi hanya **persiapan yang tidak butuh tabel baru**, dikerjakan paralel sambil skema Fase 3 menunggu review DB Validator.
+**Terakhir diperbarui:** 7 Oktober 2026 — S0-A (MAKE-002, Sprint 0-1): kontrak backend Fase 3 dibekukan, tabel status dipecah per task dengan kolom WS & Key. Riwayat sebelumnya: CR-036 (2 Oktober 2026, registry kolom NIP, format NIP, BUP pensiun) dan CR-025 (di main lewat merge `a540703` 30-09-2026, kalkulasi murni KP/KGB/hukdis/masa kerja) — rincian di bagian "Persiapan tanpa skema".
+**Entry criteria:** **terpenuhi** — Fase 1 + Fase 2 DONE (Fase 2 sign-off 07-10-2026); skema B-01/B-02 (44 tabel, DBV-012/DBV-013, PR #20) dan master G-02/G-03/G-09 sudah di `main`. FK G-02 ↔ pegawai/riwayat = DBV-019 (PR #23, menunggu review DB Validator).
 
-| Task | Status | Ringkas |
-|---|---|---|
-| B-08 Riwayat KP | TODO | Validasi TMT 1 April/1 Oktober sudah tersedia sebagai kalkulasi murni (CR-025); CRUD, snapshot, dan pemanggilan dari service menunggu B-02 |
-| B-09 Riwayat KGB | TODO | Validasi jarak 2 tahun sudah tersedia (CR-025); isi daftar acuan (KP ikut atau tidak) menunggu pertanyaan terbuka #3 |
-| B-14 Riwayat Hukdis | TODO | Hitung tanggal berakhir dari masa sanksi sudah tersedia (CR-025); kolom masa numerik per SK = keputusan skema B-02 |
-| B-06 Koreksi NIP (Cascade) | TODO | Bahan murni sudah ada (CR-036): registry 79 kolom yang merujuk NIP (`TabelAnakNip::sampaiFase(3)` = 45 untuk Fase 3) dan cek format/koreksi NIP. `NipCascadeService`, transaksi, rollback, dan cek keunikan menunggu B-01/B-02 dan keputusan README CR-036 #1–#3 |
-| B-21 Unit test Modul Kepegawaian | **IN_PROGRESS** | 3 dari 5 butir DoD lolos sebagai unit test murni (periode KP, jarak KGB, akhir hukdis). Sisa: cascade koreksi NIP + rollback (B-06) dan snapshot sync hanya di approval final (B-03), keduanya butuh tabel B-01/B-02. Registry NIP untuk butir cascade sudah ada; test ber-DB yang mencocokkannya dengan `information_schema` menyusul |
-| B-01..B-05, B-07, B-10..B-13, B-15..B-20 | TODO | Belum dimulai. BUP/TMT pensiun untuk prediksi dashboard B-19/B-20 sudah tersedia (CR-036) |
+Pembagian kerja Fase 3: WS-1 (mesin riwayat + riwayat karier/administrasi, `docs/fase3/WS1.md`) dan WS-2 (lingkup, lampiran, NIP, biodata, jabatan/struktur, Konket, LKH, halaman pegawai, `docs/fase3/WS2.md`). Key per paket milestone = peta `docs/fase3/WS1.md` §3.8.1. **Setiap WS hanya mengubah baris miliknya** di tabel ini.
+
+| Task | WS | Key | Status | Ringkas |
+|---|---|---|---|---|
+| B-01 Migration tabel pegawai & snapshot | selesai | DBV-012 (+ DBV-019 FK G-02) | DONE (skema) | Tabel `pegawai` + snapshot `pegawai_*` di `main` (PR #20). FK snapshot → master G-02 = DBV-019 (PR #23) |
+| B-02 Migration tabel riwayat | selesai | DBV-013 | DONE (skema) | Tabel `riwayat_*`, `jenis_rwy`, `document_attachment` di `main` (PR #20) |
+| B-03 CRUD biodata (dua jalur) | WS-2 | MAKE-010 | TODO | Termasuk backend dasar B-20 |
+| B-04 Approval draft biodata | WS-2 | MAKE-011 | TODO | |
+| B-05 Tambah & hapus pegawai | WS-2 | MAKE-011 | TODO | |
+| B-06 Koreksi NIP (cascade) | WS-2 | MAKE-010 | TODO | Bahan murni sudah ada (CR-036): registry 79 kolom NIP (`TabelAnakNip::sampaiFase(3)` = 45), `FormatNip`. Service `nipCascade` terdaftar (stub S0-A) |
+| B-07 Riwayat jabatan / mutasi | WS-2 | MAKE-012 | TODO | Slug `jabatan` |
+| B-08 Riwayat KP | WS-1 | MAKE-005 | TODO | Validasi TMT 1 April/1 Oktober sudah ada (CR-025) |
+| B-09 Riwayat KGB | WS-1 | MAKE-006 | TODO | Validasi jarak 2 tahun sudah ada (CR-025); acuan jarak = KP/KGB terakhir (keputusan #10) |
+| B-10 Riwayat pendidikan | WS-1 | MAKE-005 | TODO | Bersama freeze engine-v1 |
+| B-11 Riwayat diklat & seminar | WS-1 | MAKE-007 | TODO | |
+| B-12 Riwayat SKP & LKH | WS-1 (B-12a SKP) / WS-2 (B-12b LKH) | MAKE-008 / MAKE-013 | TODO | Approver LKH = atasan langsung (ikut legacy) |
+| B-13 Riwayat Konket | WS-2 | MAKE-013 | TODO | Halaman usulan mandiri, bukan jenis engine |
+| B-14 Riwayat hukdis | WS-1 | MAKE-006 | TODO | Akhir hukdis dari masa sanksi sudah ada (CR-025) |
+| B-15 Riwayat angka kredit | WS-1 | MAKE-008 | TODO | Slug `ak`, `ak-siasn` |
+| B-16 Riwayat keluarga & alamat | WS-1 | MAKE-007 | TODO | |
+| B-17 Karpeg, Karis/Karsu, tanda jasa, organisasi | WS-1 | MAKE-007 | TODO | Karpeg/Karis = halaman usulan mandiri |
+| B-18 Upload lampiran | WS-2 | MAKE-009 | TODO | Batas 1/2/5 MB per jenis (ikut legacy); interface beku S0-A |
+| B-19 Struktur organisasi | WS-2 | MAKE-012 | TODO | |
+| B-20 Detail pegawai & pencarian (frontend) | WS-2 | MAKE-003 (fondasi) / MAKE-010 (dasar) / MAKE-014 (penutup) | TODO | Menu Fase 3 tersembunyi (`ACTIVE_PHASE = 2`) sampai penutup |
+| B-21 Unit test Modul Kepegawaian | WS-1 (snapshot) / WS-2 (cascade NIP) | MAKE-008 / MAKE-010 | **IN_PROGRESS** | 3 dari 5 butir DoD lolos (CR-025: periode KP, jarak KGB, akhir hukdis). Sisa: snapshot sync hanya di approval final (WS-1) dan cascade NIP + rollback (WS-2) |
+
+Paket lintas task: S0-A kontrak backend (MAKE-002, bagian di bawah), S0-B fondasi frontend (MAKE-003, WS-2), WS-1 M1 SnapshotSync + RiwayatEngine (MAKE-004).
+
+## S0-A — MAKE-002 (kontrak backend Fase 3)
+
+Branch `ws1/make-002-s0a-kontrak-backend`; tanpa perubahan skema. Kontrak lengkap: `app/Controllers/Api/Kepegawaian/README.md` bagian "Kontrak API Modul B". Yang dibekukan saat MAKE-002 masuk `main` (hanya berubah aditif, oleh pemiliknya):
+
+- **Route terpisah:** `Config/RoutesRiwayat.php` (WS-1) dan `Config/RoutesPegawai.php` (WS-2) lewat `Routing::$routeFiles`; `Routes.php` tidak disentuh lagi. Kerangka grup `api/v1`, path kontrak yang belum didaftarkan menjawab 404 terkendali.
+- **Service:** 12 service didaftarkan sekali di `Config\Services` dengan tipe kembalian interface — `pegawaiScope`, `attachmentService`, `storageAdapter`, `riwayatRegistry`, `riwayatService`, `snapshotSync`, `pegawaiService`, `biodataService`, `nipCascade`, `strukturService`, `lkhService`, `konketService`. Stub fail-closed di `App\Libraries\Kepegawaian\Stub` (scope menolak semua; lainnya 501); fake hanya di `tests/_support/Kepegawaian`.
+- **Interface lintas-WS:** `PegawaiScopeInterface`, `AttachmentServiceInterface`, `StorageAdapterInterface`, value object `AturanLampiran` (milik WS-2); `RiwayatRegistryInterface`, `RiwayatServiceInterface`, `SnapshotSyncInterface` (milik WS-1); interface penanda service WS-2 lain.
+- **Mesin riwayat sebagai data:** `RiwayatDefinisi` (satu berkas per jenis, auto-discovery `RiwayatRegistry`), `StatusRiwayat` (0/1/2/10; 3 di belakang flag `Config\Kepegawaian::$statusDiprosesAktif`, nonaktif default), `AksiRiwayat`, `AlurRiwayat`, `AturanSnapshot`, daftar slug `{jenis}` (`JenisRiwayat::SLUG`), descriptor tab.
+- **Fixture bersama:** `Tests\Support\Kepegawaian\PegawaiFixtureTrait` — master G-02 → `pegawai` → `pegawai_mutasi_jabatan` → `pengguna`; hanya INSERT (cocok base case MAKE-001), patuh FK DBV-019, NIP sintetis 18 digit.
+- **Test:** `tests/unit/Kepegawaian/Riwayat/` (StatusRiwayat, AturanLampiran/AturanSnapshot, registry + descriptor) dan `tests/Kepegawaian/` (service bertipe interface + stub fail-closed, route, fixture lolos FK + rollback).
 
 ## Persiapan tanpa skema
 
