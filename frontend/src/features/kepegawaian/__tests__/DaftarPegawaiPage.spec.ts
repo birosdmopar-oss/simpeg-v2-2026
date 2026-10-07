@@ -75,11 +75,14 @@ describe('DaftarPegawaiPage — data', () => {
   it.each([
     [501, 'Fitur ini belum tersedia di server.'],
     [404, 'Data tidak ditemukan.'],
-  ])('galat %i → pesan jelas, tabel kosong tanpa data contoh', async (status, message) => {
+  ])('galat %i → pesan jelas tanpa tabel/keadaan kosong dan tanpa data contoh', async (status, message) => {
     list.mockRejectedValue(apiError(status))
     const { wrapper } = await mountList()
     expect(wrapper.get('[data-testid="pegawai-failure"]').text()).toBe(message)
-    expect(rows(wrapper)).toHaveLength(0)
+    // Saat galat: tabel, keadaan kosong "Tidak ada pegawai yang cocok", dan paginasi disembunyikan.
+    expect(wrapper.find('[data-testid="pegawai-table"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pegawai-empty"]').exists()).toBe(false)
+    expect(wrapper.find('nav[aria-label="Paginasi"]').exists()).toBe(false)
   })
 })
 

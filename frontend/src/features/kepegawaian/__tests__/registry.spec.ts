@@ -3,7 +3,7 @@
  * `import.meta.glob`; nama berkas = slug beku; karpeg/kariskarsu/konket bukan tab; tab dirender dari descriptor.
  * Juga skema Zod dinamis form riwayat.
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RIWAYAT_REGISTRY, configFor, tabsFromDescriptors } from '../riwayat/registry'
 import { buildRiwayatSchema } from '../riwayat/riwayat.schema'
@@ -56,15 +56,16 @@ describe('registry riwayat', () => {
     }
   })
 
-  it('pendidikan: lampiran 14 (ijazah, wajib), 39, 40 — pdf maks. 5 MB', () => {
-    expect(configFor('pendidikan')?.lampiran.map((l) => [l.id_riwayat, l.wajib, l.batas_mb, l.ekstensi])).toEqual([
-      [14, true, 5, ['pdf']],
-      [39, false, 5, ['pdf']],
-      [40, false, 5, ['pdf']],
-    ])
+  it('aturan lampiran belum diisi di FE sampai disalin dari Definisi backend (tidak menebak dari fixture test)', () => {
+    for (const config of Object.values(RIWAYAT_REGISTRY)) expect(config.lampiran, config.jenis).toEqual([])
   })
 
-  it('tabsFromDescriptors: urutan backend, hanya can_view, jenis tanpa berkas registry dibuang', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('tabsFromDescriptors: urutan backend, hanya can_view, jenis tanpa berkas registry dibuang (+ peringatan dev)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const tabs = tabsFromDescriptors([
       descriptor('kgb', 'Riwayat KGB'),
       descriptor('pendidikan', 'Riwayat Pendidikan', { can_view: false }),
@@ -74,6 +75,9 @@ describe('registry riwayat', () => {
     ])
     expect(tabs.map((t) => t.descriptor.jenis)).toEqual(['kgb', 'jabatan', 'lkh'])
     expect(tabs[0].config.jenis).toBe('kgb')
+    // Hanya karpeg (tanpa berkas) yang diperingatkan; pendidikan dibuang karena can_view=false, tanpa peringatan.
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).toContain('"karpeg"')
   })
 })
 

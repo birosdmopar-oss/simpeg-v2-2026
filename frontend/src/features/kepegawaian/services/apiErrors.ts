@@ -44,21 +44,28 @@ export function describeApiError(error: unknown): ApiFailure {
 export interface RiwayatValidationErrors {
   /** errors.<kolom DDL> → pesan pertama. */
   fields: Record<string, string>
-  /** errors["berkas.<id_riwayat>"] (endpoint riwayat) → pesan pertama, kunci = kode jenis_rwy. */
+  /** errors["berkas.<id_riwayat>"] (endpoint riwayat) untuk kode yang ada di form → pesan pertama, kunci = kode jenis_rwy. */
   berkas: Record<number, string>
-  /** errors.berkas (endpoint lampiran) atau kunci lain yang tidak dikenali form. */
+  /** errors.berkas (endpoint lampiran), berkas.<id> untuk kode yang tidak ada di form, atau kunci lain yang tidak dikenali. */
   general: string[]
 }
 
-/** Pecah `errors` 422 menjadi galat per kolom, per kode lampiran, dan umum. */
-export function splitValidationErrors(error: unknown, knownFields: readonly string[] = []): RiwayatValidationErrors {
+/**
+ * Pecah `errors` 422 menjadi galat per kolom, per kode lampiran, dan umum. Kolom/kode yang tidak dikenal form
+ * (tidak ada di `knownFields` / `knownBerkas`) masuk `general` supaya tetap tampil, tidak hilang tanpa pesan.
+ */
+export function splitValidationErrors(
+  error: unknown,
+  knownFields: readonly string[] = [],
+  knownBerkas: readonly number[] = [],
+): RiwayatValidationErrors {
   const out: RiwayatValidationErrors = { fields: {}, berkas: {}, general: [] }
   if (!isApiError(error) || error.status !== 422 || !error.errors) return out
   for (const [key, messages] of Object.entries(error.errors)) {
     const first = messages?.[0]
     if (!first) continue
     const berkas = /^berkas\.(\d+)$/.exec(key)
-    if (berkas) out.berkas[Number(berkas[1])] = first
+    if (berkas && knownBerkas.includes(Number(berkas[1]))) out.berkas[Number(berkas[1])] = first
     else if (knownFields.includes(key)) out.fields[key] = first
     else out.general.push(first)
   }

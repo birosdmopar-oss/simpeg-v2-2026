@@ -47,14 +47,5 @@ export const lampiranService = {
     await api.delete(`${base(nip)}/${idAttachment}`)
   },
 
-  /**
-   * Ganti lampiran.
-   * TODO(kontrak): semantik "ganti" belum ditetapkan — sementara = unggah baru lalu hapus yang lama (bila unggah gagal,
-   * lampiran lama tetap ada).
-   */
-  async replace(nip: string, target: LampiranTarget, oldIdAttachment: number, berkas: File): Promise<DocumentAttachment> {
-    const created = await this.upload(nip, target, berkas)
-    await this.remove(nip, oldIdAttachment)
-    return created
-  },
+  // TODO(kontrak, WS-2 MAKE-009): semantik "ganti" lampiran belum ditetapkan — sengaja belum ada fungsi ganti.
 }

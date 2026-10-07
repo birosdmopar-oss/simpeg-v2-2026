@@ -28,10 +28,6 @@ export default defineRiwayatJenis({
     N('nem', 'NEM'),
     A('keterangan', 'Keterangan', { max: 255 }),
   ],
-  // Ikut legacy L_pendidikan (README kontrak): 14 ijazah (wajib), 39 pencantuman gelar, 40 transkrip nilai — pdf, maks. 5 MB.
-  lampiran: [
-    { id_riwayat: 14, label: 'Ijazah', wajib: true, batas_mb: 5, ekstensi: ['pdf'] },
-    { id_riwayat: 39, label: 'Pencantuman Gelar', wajib: false, batas_mb: 5, ekstensi: ['pdf'] },
-    { id_riwayat: 40, label: 'Transkrip Nilai', wajib: false, batas_mb: 5, ekstensi: ['pdf'] },
-  ],
+  // TODO(WS-1 Definisi pendidikan): aturan lampiran disalin dari Definisi backend; legacy: 14/39/40 opsional, jpg|jpeg|png|gif|pdf, 5 MB
+  lampiran: [],
 })

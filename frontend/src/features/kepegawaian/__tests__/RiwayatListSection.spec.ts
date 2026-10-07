@@ -24,11 +24,18 @@ import pendidikan from '../riwayat/jenis/pendidikan'
 import lkh from '../riwayat/jenis/lkh'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { riwayatService } from '../riwayat/riwayat.service'
+import type { RiwayatJenisConfig } from '../riwayat/riwayat.config'
 import type { RiwayatTabDescriptor } from '../types'
 
 import { apiError, descriptor, NIP, pendidikanRow } from './fixtures'
 
 const svc = vi.mocked(riwayatService)
+
+/** Konfigurasi KHUSUS TEST: pendidikan + satu lampiran wajib (aturan nyata disalin dari Definisi backend oleh WS-1). */
+const pendidikanBerlampiran: RiwayatJenisConfig = {
+  ...pendidikan,
+  lampiran: [{ id_riwayat: 14, label: 'Ijazah', wajib: true, batas_mb: 5, ekstensi: ['pdf'] }],
+}
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -168,8 +175,8 @@ describe('RiwayatListSection — proses (Setujui/Tolak)', () => {
 describe('RiwayatListSection — tambah/ubah/hapus', () => {
   const pdf = new File(['%PDF'], 'ijazah.pdf', { type: 'application/pdf' })
 
-  it('tambah tanpa ijazah (lampiran wajib 14) → pesan, tidak memanggil API', async () => {
-    const wrapper = await mountTab()
+  it('tambah tanpa lampiran wajib (kode 14) → pesan, tidak memanggil API', async () => {
+    const wrapper = await mountTab({}, pendidikanBerlampiran)
     await wrapper.get('[data-testid="riwayat-add"]').trigger('click')
     await flushPromises()
     await setInput('[data-field="id_jenjang_pendidikan"] select, select[data-field="id_jenjang_pendidikan"]', '7')
@@ -182,7 +189,7 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
 
   it('tambah lengkap → create(nip, jenis, fields, values, { 14: File }); galat 422 dipetakan ke kolom & berkas', async () => {
     svc.create.mockRejectedValueOnce(apiError(422, { tgl_lulus: ['Tanggal lulus wajib diisi.'], 'berkas.14': ['Berkas harus pdf.'] }))
-    const wrapper = await mountTab()
+    const wrapper = await mountTab({}, pendidikanBerlampiran)
     await wrapper.get('[data-testid="riwayat-add"]').trigger('click')
     await flushPromises()
     await setInput('[data-field="id_jenjang_pendidikan"] select, select[data-field="id_jenjang_pendidikan"]', '7')
@@ -198,6 +205,22 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     expect(berkas).toEqual({ 14: pdf })
     expect(q('[data-testid="riwayat-dialog"]')?.textContent).toContain('Tanggal lulus wajib diisi.')
     expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Berkas harus pdf.')
+  })
+
+  it('422 berkas.<id> untuk kode yang tidak ada di form → tampil di notice form, dialog tetap terbuka', async () => {
+    svc.create.mockRejectedValueOnce(apiError(422, { 'berkas.14': ['Lampiran wajib diunggah.'] }))
+    const wrapper = await mountTab() // pendidikan: lampiran [] di FE
+    await wrapper.get('[data-testid="riwayat-add"]').trigger('click')
+    await flushPromises()
+    expect(q('[data-testid="riwayat-berkas-14"]')).toBeNull()
+    await setInput('[data-field="id_jenjang_pendidikan"] select, select[data-field="id_jenjang_pendidikan"]', '7')
+    await setInput('input[data-field="tgl_lulus"], [data-field="tgl_lulus"] input', '2012-08-30')
+    await submitForm()
+
+    await vi.waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-general-error"]')?.textContent).toContain('Lampiran wajib diunggah.'))
+    expect(svc.create.mock.calls[0][4]).toEqual({}) // tanpa berkas → JSON
+    expect(q('[data-testid="riwayat-dialog"]')).not.toBeNull()
   })
 
   it('edit: dialog terisi nilai baris (kolom DDL); simpan → update(…, id, …); berkas tidak wajib saat ubah', async () => {

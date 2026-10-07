@@ -3,8 +3,7 @@
  * - pegawai: GET pegawai (params), GET pegawai/{nip}.
  * - riwayat: tambah = multipart (field kolom DDL + berkas[<id_riwayat>]) atau JSON bila tanpa berkas; ubah = PUT JSON,
  *   dengan berkas = POST multipart + _method=PUT; hapus; process { aksi, reason_note }.
- * - lampiran: GET ?id_riwayat=&id_entri=, POST multipart (berkas, id_riwayat, id_entri), unduh (blob), DELETE,
- *   ganti sementara = unggah baru lalu hapus lama.
+ * - lampiran: GET ?id_riwayat=&id_entri=, POST multipart (berkas, id_riwayat, id_entri), unduh (blob), DELETE.
  * - galat: urutan 401/404/403/422/501 → jenis keadaan; 422 dipecah ke kolom, berkas.<id>, dan umum.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -181,17 +180,8 @@ describe('lampiranService', () => {
     expect(del).toHaveBeenCalledWith(`/pegawai/${NIP}/lampiran/5`)
   })
 
-  it('ganti (sementara): unggah baru dulu, baru hapus yang lama; unggah gagal → yang lama tidak dihapus', async () => {
-    post.mockResolvedValueOnce({ data: { id_attachment: 7 } })
-    del.mockResolvedValue({ data: null })
-    await lampiranService.replace(NIP, target, 5, pdf('baru.pdf'))
-    expect(post.mock.invocationCallOrder[0]).toBeLessThan(del.mock.invocationCallOrder[0])
-    expect(del).toHaveBeenCalledWith(`/pegawai/${NIP}/lampiran/5`)
-
-    del.mockClear()
-    post.mockRejectedValueOnce(apiError(422, { berkas: ['Berkas harus pdf.'] }))
-    await expect(lampiranService.replace(NIP, target, 5, pdf('salah.pdf'))).rejects.toBeTruthy()
-    expect(del).not.toHaveBeenCalled()
+  it('belum ada fungsi ganti lampiran (semantik belum ditetapkan kontrak)', () => {
+    expect('replace' in lampiranService).toBe(false)
   })
 })
 
@@ -212,17 +202,27 @@ describe('apiErrors', () => {
     expect(describeApiError(apiError(403)).message).toBe('Anda tidak berhak mengakses data ini.')
   })
 
-  it('422 riwayat: errors.<kolom> → fields, errors["berkas.<id>"] → berkas, sisanya → general', () => {
+  it('422 riwayat: errors.<kolom> → fields, errors["berkas.<id>"] kode dikenal → berkas, sisanya → general', () => {
     const error = apiError(422, {
       tgl_lulus: ['Tanggal lulus wajib diisi.'],
       'berkas.14': ['Lampiran wajib diunggah.'],
       kolom_asing: ['Tidak dikenal.'],
     })
-    expect(splitValidationErrors(error, ['tgl_lulus'])).toEqual({
+    expect(splitValidationErrors(error, ['tgl_lulus'], [14])).toEqual({
       fields: { tgl_lulus: 'Tanggal lulus wajib diisi.' },
       berkas: { 14: 'Lampiran wajib diunggah.' },
       general: ['Tidak dikenal.'],
     })
+  })
+
+  it('422 berkas.<id> untuk kode yang tidak ada di form → general (tidak hilang tanpa pesan)', () => {
+    const error = apiError(422, { 'berkas.14': ['Lampiran wajib diunggah.'], 'berkas.39': ['Berkas terlalu besar.'] })
+    expect(splitValidationErrors(error, [], [39])).toEqual({
+      fields: {},
+      berkas: { 39: 'Berkas terlalu besar.' },
+      general: ['Lampiran wajib diunggah.'],
+    })
+    expect(splitValidationErrors(error).general).toEqual(['Lampiran wajib diunggah.', 'Berkas terlalu besar.'])
   })
 
   it('422 lampiran: errors.berkas → general; status selain 422 → kosong', () => {

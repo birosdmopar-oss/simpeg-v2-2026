@@ -128,6 +128,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
         <UiNotice v-if="failure" :tone="failure.kind === 'unavailable' ? 'info' : 'danger'" class="mx-5" data-testid="pegawai-failure">{{ failure.message }}</UiNotice>
 
         <PegawaiTable
+          v-if="!failure"
           :rows="rows"
           :column-keys="columnKeys"
           :loading="loading"
@@ -135,7 +136,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
           @action="onAction"
         />
 
-        <div class="px-5">
+        <div v-if="!failure" class="px-5">
           <UiPagination v-model:page="page" :per-page="Number(perPage)" :total="total" />
         </div>
       </div>

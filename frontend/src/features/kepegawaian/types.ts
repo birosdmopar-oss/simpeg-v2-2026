@@ -480,7 +480,7 @@ export interface RiwayatKeluarga extends RiwayatBase {
   keterangan: string | null
 }
 
-/** `riwayat_alamat` (slug `alamat`). `alamat_utama` 1/2, `jenis_alamat` 1/2 (legacy). */
+/** `riwayat_alamat` (slug `alamat`). `alamat_utama` 1 Ya / 2 Tidak, `jenis_alamat` 1 KTP / 2 Domisili / 3 Kantor (COMMENT DDL). */
 export interface RiwayatAlamat extends RiwayatBase {
   id_riwayat_alamat: number
   id_provinsi: string | null

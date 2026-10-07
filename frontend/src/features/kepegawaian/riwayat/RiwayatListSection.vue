@@ -164,7 +164,7 @@ async function onSubmit(values: Record<string, string>, berkas: BerkasMap): Prom
     notice.value = { tone: 'success', text: `Data ${props.config.singular} tersimpan.` }
     await load()
   } catch (error) {
-    const split = splitValidationErrors(error, fieldNames.value)
+    const split = splitValidationErrors(error, fieldNames.value, props.config.lampiran.map((l) => l.id_riwayat))
     const failed = describeApiError(error)
     formErrors.value = failed.kind === 'validation' ? split : { fields: {}, berkas: {}, general: [failed.message] }
   } finally {

@@ -33,7 +33,12 @@ export function configFor(jenis: JenisTab | string): RiwayatJenisConfig | undefi
 /** Pasangan descriptor (urutan backend) × konfigurasi; hanya tab `can_view` yang punya berkas registry. */
 export function tabsFromDescriptors(tabs: RiwayatTabDescriptor[]): Array<{ descriptor: RiwayatTabDescriptor; config: RiwayatJenisConfig }> {
   return tabs.flatMap((descriptor) => {
-    const config = descriptor.can_view ? configFor(descriptor.jenis) : undefined
-    return config ? [{ descriptor, config }] : []
+    if (!descriptor.can_view) return []
+    const config = configFor(descriptor.jenis)
+    if (!config) {
+      if (import.meta.env.DEV) console.warn(`[riwayat] tab "${descriptor.jenis}" dari descriptor dibuang: belum ada berkas riwayat/jenis/${descriptor.jenis}.ts`)
+      return []
+    }
+    return [{ descriptor, config }]
   })
 }
