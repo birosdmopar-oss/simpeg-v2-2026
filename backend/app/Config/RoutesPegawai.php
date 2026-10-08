@@ -25,5 +25,11 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'filter' => 'jwt'], static function (RouteCollection $routes): void {
+    // B-18 lampiran riwayat (MAKE-009): izin Definisi pemilik kode + PegawaiScope di OtorisasiLampiran (jwt saja).
+    $routes->get('pegawai/(:segment)/lampiran', 'LampiranController::index/$1');
+    $routes->post('pegawai/(:segment)/lampiran', 'LampiranController::create/$1');
+    $routes->get('pegawai/(:segment)/lampiran/(:num)/unduh', 'LampiranController::unduh/$1/$2');
+    $routes->delete('pegawai/(:segment)/lampiran/(:num)', 'LampiranController::delete/$1/$2');
+
     // WS-2: endpoint pegawai/lampiran/biodata/NIP/struktur/Konket/LKH ditambahkan di sini.
 });

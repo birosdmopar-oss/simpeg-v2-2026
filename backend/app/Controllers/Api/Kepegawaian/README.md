@@ -106,6 +106,11 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
   `berkas.<id_riwayat>` (endpoint riwayat).
 - **Respons lampiran** = baris `document_attachment` apa adanya (kunci `NIP` huruf besar, `id_riwayat`, `id_entri`,
   `display_name`, `file_size`, `file_ext`, …); `path` internal tidak dikirim ke klien.
+- **Rincian endpoint (MAKE-009, aditif):** `GET lampiran` mewajibkan query `id_riwayat` dan `id_entri` (422
+  `errors.id_riwayat` / `errors.id_entri`); `POST` selalu **menambah** lampiran — "ganti" = unggah baru lalu hapus yang
+  lama; `DELETE` menjawab `{ deleted: true, soft_delete: false, item: <baris> }`; unduh = isi berkas dengan
+  `Content-Type` = `file_type`, `Content-Disposition: attachment` (nama = `display_name`), `X-Content-Type-Options:
+  nosniff`, `Cache-Control: private, no-store`.
 
 ### Descriptor tab (beku)
 

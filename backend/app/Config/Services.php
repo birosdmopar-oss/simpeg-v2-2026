@@ -38,17 +38,17 @@ use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Html\HtmlSanitizer;
+use App\Libraries\Kepegawaian\Lampiran\AttachmentService;
+use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
-use App\Libraries\Kepegawaian\Stub\StubAttachmentService;
+use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Kepegawaian\Stub\StubBiodataService;
 use App\Libraries\Kepegawaian\Stub\StubKonketService;
 use App\Libraries\Kepegawaian\Stub\StubLkhService;
 use App\Libraries\Kepegawaian\Stub\StubNipCascade;
-use App\Libraries\Kepegawaian\Stub\StubPegawaiScope;
 use App\Libraries\Kepegawaian\Stub\StubPegawaiService;
 use App\Libraries\Kepegawaian\Stub\StubRiwayatService;
 use App\Libraries\Kepegawaian\Stub\StubSnapshotSync;
-use App\Libraries\Kepegawaian\Stub\StubStorageAdapter;
 use App\Libraries\Kepegawaian\Stub\StubStrukturService;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
@@ -303,7 +303,7 @@ class Services extends BaseService
             return static::getSharedInstance('pegawaiScope');
         }
 
-        return new StubPegawaiScope();
+        return new PegawaiScope();
     }
 
     /**
@@ -315,7 +315,7 @@ class Services extends BaseService
             return static::getSharedInstance('attachmentService');
         }
 
-        return new StubAttachmentService();
+        return new AttachmentService(static::storageAdapter());
     }
 
     /**
@@ -327,7 +327,7 @@ class Services extends BaseService
             return static::getSharedInstance('storageAdapter');
         }
 
-        return new StubStorageAdapter();
+        return new LocalStorageAdapter();
     }
 
     /**
