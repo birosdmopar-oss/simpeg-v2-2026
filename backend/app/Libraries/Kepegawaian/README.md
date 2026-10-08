@@ -161,3 +161,39 @@ Auth sudah memegang aturan ini di `PenggunaModel::NIP_MAX_DIGITS`, `UserService:
 4. **Tujuh tabel `BelumDiputuskan`** perlu keputusan impor: email legacy, `layanan_pegawai`, `login_mysapk`, `riwayat_cuti_notif_kt` (Mapping: masuk inbox), dan `user_geo`.
 5. **Penyatuan registry.** Draf DBV-012 punya konstanta registry sendiri di `NipReferenceRegistryTest`. Usulan: setelah draf itu masuk, test tersebut membaca `TabelAnakNip::sampaiFase(3)`.
 6. **Pensiun PPPK.** Legacy memakai akhir masa perjanjian kerja (`mhpk_akhir`), bukan BUP. Ini perlu dikonfirmasi untuk dashboard v2.
+
+## Lingkup akses pegawai (`Scope/`, MAKE-009)
+
+`PegawaiScope` = implementasi nyata `PegawaiScopeInterface` (service `pegawaiScope`). Semua endpoint Modul B memeriksa
+lingkup lewat service ini (403 di luar lingkup); daftar disaring dengan `terapkanKeQuery($builder, $auth, 'p.nip')`.
+
+| Role | Lihat | Ubah |
+|---|---|---|
+| 1 | semua | semua |
+| 4, 5, 8 | semua | — |
+| 2, 6, 7 | NIP sendiri | NIP sendiri |
+| 3 | pegawai dengan `pegawai_mutasi_jabatan.id_satker` = satker akun (akun tanpa satker: `id_unit` = unit akun), plus NIP sendiri | sama |
+
+Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai ini dalam lingkup pemanggil". Pegawai
+tanpa snapshot jabatan/satker tidak masuk lingkup role 3 (deviasi [V2] dari legacy yang meloloskannya). Aturan legacy
+"unit destinasi 21 / unit lain 7" belum diterapkan (sumbernya belum tersedia, lihat progres 03-Kepegawaian).
+
+## Lampiran B-18 (`Lampiran/`, MAKE-009)
+
+| Kelas | Isi |
+|---|---|
+| `LocalStorageAdapter` | `StorageAdapterInterface` di disk lokal (`writable/uploads/lampiran`); path relatif `[A-Za-z0-9._-]` per segmen, tulis atomik |
+| `AttachmentService` | `AttachmentServiceInterface` atas `document_attachment` (model `DocumentAttachmentModel`, audit otomatis create/delete); `path` tidak pernah dikembalikan |
+| `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil) |
+| `PenjagaBerkas` | Kompensasi berkas di luar transaksi DB: setelah transaksi selesai, berkas tercatat dipertahankan hanya bila masih dirujuk `tabel.kolom = path` |
+| `KolomBerkas` | Helper tabel yang menyimpan berkas di kolomnya sendiri (`riwayat_karpeg.file_1..5`, LKH, Konket) |
+| `OtorisasiLampiran` | Urutan otorisasi endpoint lampiran: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → `id_entri` milik NIP |
+
+**Pemakaian dari RiwayatEngine (WS-1).** Panggil `service('attachmentService')->simpan(...)`/`hapus(...)` DI DALAM transaksi
+engine; tidak perlu kode kompensasi sendiri. Setelah commit/rollback, panggil `selesaikan()` bila service-nya
+`AttachmentService` (opsional: tanpa itu rekonsiliasi terjadi pada operasi lampiran berikutnya atau saat proses PHP
+berakhir). Otorisasi lampiran tetap tanggung jawab pemanggil (kontrak interface); `OtorisasiLampiran` boleh dipakai ulang.
+
+**Pemakaian `KolomBerkas`.** `simpan()` mengembalikan path untuk ditulis ke kolom; `hapus()` menandai berkas lama;
+`selesaikan()` WAJIB dipanggil setelah transaksi (juga di jalur rollback) — tidak ada rekonsiliasi oportunistik karena
+path baru belum dirujuk sampai kolomnya ditulis. Contoh lengkap di docblock kelas.
