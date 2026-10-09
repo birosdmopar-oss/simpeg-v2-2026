@@ -41,6 +41,11 @@ final class DefinisiDefaultLegacyTest extends CIUnitTestCase
         $this->assertSame(StatusRiwayat::Disetujui, $d->statusSetelahUbah(Role::ADMIN_SATKER, StatusRiwayat::Menunggu));
         $this->assertSame(StatusRiwayat::Ditolak, $d->statusSetelahUbah(Role::SUPER_ADMIN, StatusRiwayat::Ditolak));
         $this->assertSame(StatusRiwayat::Disetujui, (new UjiKp())->statusSetelahUbah(Role::PEGAWAI, StatusRiwayat::Disetujui));
+
+        // Status NULL (data lama) = seperti 0 Menunggu; role 1 membiarkannya (null = kolom status tidak ditulis).
+        $this->assertSame(StatusRiwayat::Menunggu, $d->statusSetelahUbah(Role::PEGAWAI, null));
+        $this->assertSame(StatusRiwayat::Disetujui, $d->statusSetelahUbah(Role::ADMIN_SATKER, null));
+        $this->assertNull($d->statusSetelahUbah(Role::SUPER_ADMIN, null));
     }
 
     public function testKunciDanUrutanBawaan(): void

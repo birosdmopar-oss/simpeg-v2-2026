@@ -127,8 +127,12 @@ abstract class RiwayatDefinisi
      * Status baris setelah diubah role $role (aditif MAKE-004). Default ikut legacy (`controllers/hr/rwy/
      * Pendidikan.php:255-260`, `Kp.php:196-198`): UL_PEGAWAI pada alur self-service/usulan → 0 (diajukan ulang);
      * role 3 → 1; role lain (1) → status tidak berubah.
+     *
+     * $lama null = baris lama berstatus NULL (data impor, mis. `riwayat_pendidikan.status` INT NULL) atau nilai yang
+     * tidak dikenal: diperlakukan seperti 0 Menunggu, jadi UL_PEGAWAI → 0 dan role 3 → 1; role 1 tetap tidak mengubah
+     * status (tetap NULL, sama dengan legacy yang tidak mengirim kolom status). Hasil null = status tidak ditulis.
      */
-    public function statusSetelahUbah(int $role, StatusRiwayat $lama): StatusRiwayat
+    public function statusSetelahUbah(int $role, ?StatusRiwayat $lama): ?StatusRiwayat
     {
         if (in_array($role, Role::UL_PEGAWAI, true)) {
             return $this->alur() === AlurRiwayat::Admin ? $lama : StatusRiwayat::Menunggu;
@@ -138,7 +142,9 @@ abstract class RiwayatDefinisi
     }
 
     /**
-     * Urutan daftar riwayat (aditif MAKE-004): kolom tabel riwayat => ASC|DESC, berurutan prioritas. Default PK terbaru.
+     * Urutan daftar riwayat (aditif MAKE-004): kolom tabel riwayat => ASC|DESC, berurutan prioritas. Default PK terbaru
+     * = [V2], bukan perilaku legacy (legacy KP: `ORDER BY status ASC, tmtsk ASC`, `libraries/hr/rwy/L_kp.php:27`);
+     * Definisi jenis nyata meng-override sesuai legacy jenisnya (M2 dst.).
      *
      * @return array<string, string>
      */

@@ -32,18 +32,16 @@ final class SnapshotSyncTest extends DatabaseTestCase
         $this->kp  = new UjiKp();
         $this->nip = $this->buatPegawai();
 
-        foreach ([1 => 'CPNS', 2 => 'PNS', 3 => 'Reguler', 6 => 'Lainnya'] as $id => $nama) {
-            $this->buatJenisKp($id, $nama);
-        }
+        $this->siapkanMasterKp();
     }
 
     public function testMultiTargetKpCpnsPns(): void
     {
-        $cpns = $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(1, '2010-03-01') + ['status' => 1]);
-        $pns  = $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(2, '2011-04-01') + ['status' => 1]);
-        $reg  = $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(3, '2015-04-01') + ['status' => 1]);
-        $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(6, '2020-10-01') + ['status' => 1]);
-        $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(3, '2024-04-01') + ['status' => 0]);
+        $cpns = $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(1, '2010-03-01') + ['status' => 1]);
+        $pns  = $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(2, '2011-04-01') + ['status' => 1]);
+        $reg  = $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(3, '2015-04-01') + ['status' => 1]);
+        $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(6, '2020-10-01') + ['status' => 1]);
+        $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(3, '2024-04-01') + ['status' => 0]);
 
         (new SnapshotSync())->sinkronkan($this->kp, $this->nip);
 
@@ -55,8 +53,8 @@ final class SnapshotSyncTest extends DatabaseTestCase
 
     public function testPilihUlangDanHapusSnapshotBilaTidakAdaBaris(): void
     {
-        $lama = $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(3, '2015-04-01') + ['status' => 1]);
-        $baru = $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(3, '2019-04-01') + ['status' => 1]);
+        $lama = $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(3, '2015-04-01') + ['status' => 1]);
+        $baru = $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(3, '2019-04-01') + ['status' => 1]);
         $sync = new SnapshotSync();
         $sync->sinkronkan($this->kp, $this->nip);
         $this->assertSame((string) $baru, (string) $this->snapshotUji('pegawai_kp', $this->nip)['id_riwayat_kp']);
@@ -75,7 +73,7 @@ final class SnapshotSyncTest extends DatabaseTestCase
     public function testAuditManualCreateUpdateDeleteDenganPelaku(): void
     {
         [, $auth, $akun] = $this->aktor(Role::SUPER_ADMIN);
-        $id              = $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(3, '2015-04-01') + ['status' => 1]);
+        $id              = $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(3, '2015-04-01') + ['status' => 1]);
         $sync            = new SnapshotSync();
 
         $sync->sinkronkan($this->kp, $this->nip, $auth);
@@ -120,7 +118,7 @@ final class SnapshotSyncTest extends DatabaseTestCase
 
     public function testDiLuarTransaksiPemanggilTetapAtomik(): void
     {
-        $this->sisipRiwayat($this->kp, $this->nip, $this->dataKp(1, '2010-03-01') + ['status' => 1]);
+        $this->sisipRiwayat($this->kp, $this->nip, $this->barisKp(1, '2010-03-01') + ['status' => 1]);
         $this->assertSame(0, $this->db->transDepth);
 
         (new SnapshotSync())->sinkronkan($this->kp, $this->nip);

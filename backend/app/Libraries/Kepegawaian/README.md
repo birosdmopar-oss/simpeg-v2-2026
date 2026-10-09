@@ -102,7 +102,7 @@ API Modul B" dan "Rincian engine riwayat").
 |---|---|
 | `RiwayatEngine` | `RiwayatServiceInterface` (service `riwayatService`): daftar, detail, tambah, ubah, hapus lunak, proses. Satu transaksi per tulisan (riwayat + snapshot + lampiran), baris `pegawai` dikunci `FOR UPDATE`, audit lewat `RiwayatModel`, event `riwayatNotifikasi` sesudah commit |
 | `SnapshotSync` | `SnapshotSyncInterface` (service `snapshotSync`): per `AturanSnapshot` pilih ulang baris Disetujui → INSERT/UPDATE (dilewati bila sama) atau DELETE snapshot; audit manual per tulisan |
-| `PemilihSnapshot` | Fungsi murni pemilih baris snapshot: status Disetujui (lewat `pemetaanStatus()`), filter dengan logika tiga nilai SQL (`!=`/`NOT IN` tidak memilih NULL), urutan berprioritas (NULL terkecil seperti MySQL, angka sebagai angka), seri → PK terbesar |
+| `PemilihSnapshot` | Fungsi murni pemilih baris snapshot: status Disetujui (lewat `pemetaanStatus()`), filter dengan logika tiga nilai SQL (`!=`/`NOT IN` tidak memilih NULL), urutan berprioritas (NULL terkecil seperti MySQL, angka sebagai angka), seri → PK terbesar ([V2]) |
 | `ValidasiRiwayat` | Validasi + normalisasi payload dari `RiwayatDefinisi::fields()` (rules `MasterField`, nilai tunggal, ref master ada/aktif/berjenjang) |
 | `App\Models\Kepegawaian\RiwayatModel` | Model generik `riwayat_*` dari Definisi (turunan `BaseAuditableModel`, pola `MasterModel`); kolom sistem ditulis hanya bila ada di tabel; pelaku audit = `AuthContext` pemanggil (`withActor`) |
 
@@ -110,12 +110,23 @@ API Modul B" dan "Rincian engine riwayat").
 proses `setujui`, tambah langsung oleh admin, ubah oleh role 3 (legacy menyetujui otomatis), ubah data baris yang sudah
 disetujui (setara trigger `afUpd`), dan hapus/keluar dari status 1 (dihitung ulang, DELETE bila kosong). Pengajuan
 pegawai dan penolakan baris yang belum disetujui tidak menyentuh snapshot. Pemecah seri PK terbesar adalah keputusan
-[V2]: legacy `ORDER BY … LIMIT 1` tanpa pemecah seri tidak deterministik; dok §5.1 meminta mutasi bertanggal sama yang
-disetujui belakangan menang.
+[V2] (legacy `ORDER BY … LIMIT 1` tanpa pemecah seri tidak deterministik): PK terbesar = baris yang **dibuat**
+belakangan, bukan yang disetujui belakangan. Untuk "mutasi bertanggal sama yang disetujui belakangan menang" (dok §5.1,
+B-07), Definisi menaruh kolom waktu persetujuan (mis. `notif_date`/`updated_at` DESC) di urutan sebelum pemecah seri.
+
+**Salin nama master = hook `beforeSave`** (WS1 §3.4.3). Kolom teks turunan master di tabel riwayat (mis. `jenis_kp`,
+`gol`, `ruang`, `gol_ruang`, `pangkat` di `riwayat_kp`, legacy `L_kp.php:551-560`) diisi server di
+`RiwayatDefinisi::beforeSave()` dari ID rujukan yang dikirim klien, bukan field yang diisi klien. Hook dipanggil di dalam
+transaksi engine dan hanya menurunkan kolom yang rujukannya ada di payload (ubah parsial tanpa rujukan tidak menyentuh
+kolom turunan). Contoh templat: `tests/_support/Kepegawaian/Riwayat/UjiKp.php`.
+
+**Tanpa TOCTOU.** Setiap tulisan (ubah/hapus/proses) mengunci baris `pegawai` lalu membaca ulang baris riwayat
+`FOR UPDATE` di dalam transaksi; guard kunci baris Disetujui (403), guard status proses (422), serta status lama/baru
+dihitung dari baca ulang itu. Pemeriksaan sebelum transaksi hanya jalan cepat.
 
 **Ikut legacy [K]** (data di Definisi, bisa di-override per jenis): status awal 0 untuk UL_PEGAWAI di alur
 self-service/usulan, selain itu 1 (`controllers/hr/rwy/Pendidikan.php:146`); ubah oleh UL_PEGAWAI → 0, role 3 → 1, role
-1 → tetap (`Pendidikan.php:255-260`, `Kp.php:196-198`); UL_PEGAWAI tidak bisa mengubah/menghapus baris disetujui dan
+1 → tetap (`Pendidikan.php:255-260`, `Kp.php:196-198`), status NULL (data lama) diperlakukan seperti 0; UL_PEGAWAI tidak bisa mengubah/menghapus baris disetujui dan
 role 3 tidak bisa menghapusnya (`Pendidikan.php:471-484`, `Kp.php:379-387`); `approved_by`/`updated_by`/`show_ua_*` saat
 proses (`libraries/hr/rwy/L_kp.php:649-668`); `show_notif`/`notif_date` pada transisi 0 → 1/2 (trigger `<tabel>_beUpd`,
 dok DBV-012 §5.2); tipe notifikasi 1/2/3 (`helpers/function_helper.php:588`).
@@ -123,7 +134,10 @@ dok DBV-012 §5.2); tipe notifikasi 1/2/3 (`helpers/function_helper.php:588`).
 **Deviasi [V2] dari legacy.** Hapus = lunak (status 10 + audit `delete`), bukan `DELETE` baris + lampiran; lampiran baris
 yang dihapus tetap tersimpan. Penanda baca notifikasi (`show_notif = 3` saat detail dibuka dari notifikasi, legacy
 `L_kp.php:84-87`) belum dibawa — milik fitur notifikasi (H-0x), bukan GET riwayat. Push FCM tidak dikirim engine:
-engine hanya memicu event `riwayatNotifikasi` (token perangkat `firebase_token` = H-01).
+engine hanya memicu event `riwayatNotifikasi` (token perangkat `firebase_token` = H-01). Proses hanya dari status 0/3
+(422 `errors.status`) — legacy tidak menjaganya. Urutan daftar default PK DESC (`urutanDaftar()`) — legacy KP
+`ORDER BY status ASC, tmtsk ASC` dan hanya status 0/1 (`L_kp.php:27`); Definisi jenis nyata meng-override sesuai legacy
+jenisnya mulai M2.
 
 **Pemakaian lampiran nyata (setelah MAKE-009).** Engine memanggil `attachmentService->simpan()` di dalam transaksi,
 lalu `selesaikan()` (bila implementasinya punya) setelah commit atau rollback.

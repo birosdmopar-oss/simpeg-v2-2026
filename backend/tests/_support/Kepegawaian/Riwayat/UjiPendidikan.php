@@ -11,6 +11,7 @@ use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Libraries\Kepegawaian\Riwayat\AturanSnapshot;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\MasterData\MasterField;
+use Closure;
 
 /**
  * Definisi UJI engine M1 (MAKE-004) — bukan Definisi nyata B-10 (M2). Self-service (pegawai mengajukan, admin
@@ -30,6 +31,14 @@ final class UjiPendidikan extends RiwayatDefinisi
     public array $errorValidate = [];
 
     public bool $lampiranWajib = false;
+
+    /**
+     * Dipanggil di dalam hook validate() — dipakai test untuk mensimulasikan tulisan paralel di antara baca awal dan
+     * transaksi engine (TOCTOU).
+     *
+     * @var (Closure(array<string, mixed>|null): void)|null
+     */
+    public ?Closure $saatValidate = null;
 
     public function jenis(): string
     {
@@ -103,6 +112,10 @@ final class UjiPendidikan extends RiwayatDefinisi
     public function validate(array $data, ?array $lama, AuthContext $auth): array
     {
         $this->panggilanHook[] = ['validate', $data];
+
+        if ($this->saatValidate !== null) {
+            ($this->saatValidate)($lama);
+        }
 
         return $this->errorValidate;
     }

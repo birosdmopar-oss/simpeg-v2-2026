@@ -53,7 +53,7 @@ ada Definisi jenis nyata (mulai M2: B-10 + B-08), jadi endpoint riwayat di produ
 ditemukan" sampai Definisi pertama masuk. Rincian: `app/Libraries/Kepegawaian/README.md` bagian "Mesin riwayat".
 
 - **SnapshotSync** (`Riwayat/SnapshotSync.php`) + **PemilihSnapshot** (fungsi murni): pilih ulang baris status 1 per
-  `AturanSnapshot` (filter logika tiga nilai SQL, urutan berprioritas termasuk kolom tabel join, seri → PK terbesar),
+  `AturanSnapshot` (filter logika tiga nilai SQL, urutan berprioritas termasuk kolom tabel join, seri → PK terbesar [V2]),
   multi-target, DELETE bila kosong, audit manual create/update/delete (entity = tabel snapshot), di transaksi pemanggil.
 - **RiwayatEngine** (`Riwayat/RiwayatEngine.php`, service `riwayatService`): daftar/detail/tambah/ubah/hapus (status
   10)/proses; urutan pemeriksaan kontrak (jenis → izin Definisi → PegawaiScope → NIP → baris milik NIP); status awal/ubah

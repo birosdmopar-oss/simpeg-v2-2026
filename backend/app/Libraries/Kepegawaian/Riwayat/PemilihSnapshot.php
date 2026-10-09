@@ -18,8 +18,10 @@ use InvalidArgumentException;
  *     `IS NULL` / `IS NOT NULL`.
  *  3. Urutan AturanSnapshot::$urutan berprioritas; NULL dianggap terkecil (MySQL: NULL pertama pada ASC, terakhir pada
  *     DESC). Angka dibandingkan sebagai angka, selain itu sebagai teks (tanggal `Y-m-d` aman dibandingkan teks).
- *  4. Seri pada semua kolom urutan → PK terbesar menang (baris yang dicatat belakangan). Legacy `LIMIT 1` tanpa
- *     pemecah seri tidak deterministik; untuk mutasi jabatan dok §5.1 meminta "yang disetujui belakangan menang" (B-07).
+ *  4. [V2] Seri pada semua kolom urutan → PK terbesar menang, yaitu baris yang DIBUAT belakangan (bukan yang disetujui
+ *     belakangan). Legacy `LIMIT 1` tanpa pemecah seri tidak deterministik. Jenis yang butuh "disetujui belakangan
+ *     menang" (B-07 mutasi jabatan, dok §5.1) menaruh kolom waktu persetujuan (mis. `notif_date`/`updated_at` DESC) di
+ *     urutan sebelum pemecah seri PK.
  *
  * Kolom urutan tabel join ditulis `tabel.kolom` dan harus ada sebagai key yang sama di baris kandidat (SnapshotSync
  * menyediakannya).

@@ -33,10 +33,12 @@ use Throwable;
  * Urutan pemeriksaan: jenis terdaftar (404) → izin Definisi × role (403) → PegawaiScope (403) → NIP ada (404) → baris
  * milik NIP (404) → validasi (422). Tulis riwayat + snapshot + lampiran dalam SATU transaksi; baris `pegawai` dikunci
  * (`FOR UPDATE`) di awal transaksi tulis sehingga tulisan paralel untuk pegawai yang sama berurutan dan pemilihan
- * snapshot tidak balapan.
+ * snapshot tidak balapan. Sesudah kunci itu baris riwayat DIBACA ULANG (`FOR UPDATE`) dan guard kunci/status serta
+ * status lama/baru dihitung dari hasil baca ulang; pemeriksaan sebelum transaksi hanya jalan cepat (tanpa TOCTOU).
  *
  * Status (ikut legacy, data di Definisi): tambah → RiwayatDefinisi::statusAwal(); ubah →
- * RiwayatDefinisi::statusSetelahUbah(); hapus → 10; proses → 1/2 hanya dari 0 (atau 3 bila flag Diproses aktif).
+ * RiwayatDefinisi::statusSetelahUbah(); hapus → 10; proses → 1/2 hanya dari 0 (atau 3 bila flag Diproses aktif) —
+ * penjagaan proses ini [V2], legacy tidak menjaganya.
  * Baris Disetujui terkunci untuk UL_PEGAWAI (ubah/hapus) bila kunciBarisDisetujui(), dan untuk hapus oleh
  * roleKunciHapusDisetujui() (default role 3).
  *
@@ -151,21 +153,25 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
     public function ubah(AuthContext $auth, string $nip, string $jenis, int $id, array $data, array $berkas = []): array
     {
-        $d          = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Ubah);
-        $role       = (int) $auth->role();
-        $lama       = $this->baris($d, $nip, $id);
-        $statusLama = $this->statusDari($d, $lama);
+        $d    = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Ubah);
+        $role = (int) $auth->role();
+        $lama = $this->baris($d, $nip, $id);
 
-        if ($statusLama === StatusRiwayat::Disetujui && $d->kunciBarisDisetujui() && in_array($role, Role::UL_PEGAWAI, true)) {
-            throw new ForbiddenException('Data yang sudah disetujui tidak dapat diubah.');
-        }
+        // Jalan cepat sebelum validasi; diulang di dalam transaksi atas baris yang dibaca ulang (terkunci).
+        $this->jagaUbah($d, $role, $this->statusDari($d, $lama));
 
         $data = $this->validasi($d, $auth, $data, $lama);
         $this->periksaBerkas($d, $nip, $id, $berkas);
-        $statusBaru = $statusLama === null ? null : $d->statusSetelahUbah($role, $statusLama);
 
-        $row = $this->transaksi(function () use ($d, $auth, $nip, $id, $data, $berkas, $lama, $statusLama, $statusBaru): array {
+        [$row, $statusBaru] = $this->transaksi(function () use ($d, $auth, $role, $nip, $id, $data, $berkas): array {
             $this->kunciPegawai($nip);
+
+            // Baca ulang SESUDAH kunci: guard dan status baru dihitung dari keadaan terkini, bukan hasil baca sebelum
+            // transaksi (ubah/proses/hapus paralel tidak bisa menyelinap di antaranya).
+            $lama       = $this->barisTerkunci($d, $nip, $id);
+            $statusLama = $this->statusDari($d, $lama);
+            $this->jagaUbah($d, $role, $statusLama);
+            $statusBaru = $d->statusSetelahUbah($role, $statusLama);
 
             $data = $d->beforeSave($data, $lama, $auth);
             unset($data[$d->primaryKey()], $data[$d->kolomNip()], $data[$d->kolomStatus()]);
@@ -192,7 +198,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
                 $d->afterApprove($this->baris($d, $nip, $id), $auth);
             }
 
-            return $this->baris($d, $nip, $id);
+            return [$this->baris($d, $nip, $id), $statusBaru];
         });
 
         if ($statusBaru === StatusRiwayat::Menunggu) {
@@ -204,17 +210,16 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
     public function hapus(AuthContext $auth, string $nip, string $jenis, int $id): void
     {
-        $d          = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Hapus);
-        $role       = (int) $auth->role();
-        $statusLama = $this->statusDari($d, $this->baris($d, $nip, $id));
+        $d    = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Hapus);
+        $role = (int) $auth->role();
 
-        if ($statusLama === StatusRiwayat::Disetujui
-            && (($d->kunciBarisDisetujui() && in_array($role, Role::UL_PEGAWAI, true)) || in_array($role, $d->roleKunciHapusDisetujui(), true))) {
-            throw new ForbiddenException('Data yang sudah disetujui tidak dapat dihapus.');
-        }
+        $this->jagaHapus($d, $role, $this->statusDari($d, $this->baris($d, $nip, $id)));
 
-        $this->transaksi(function () use ($d, $auth, $nip, $id, $statusLama): void {
+        $this->transaksi(function () use ($d, $auth, $role, $nip, $id): void {
             $this->kunciPegawai($nip);
+
+            $statusLama = $this->statusDari($d, $this->barisTerkunci($d, $nip, $id));
+            $this->jagaHapus($d, $role, $statusLama);
 
             $data  = $this->stempelPelaku($d, $auth, [$d->kolomStatus() => $this->nilaiStatus($d, StatusRiwayat::Dihapus)]);
             $model = $this->model($d);
@@ -230,15 +235,14 @@ final class RiwayatEngine implements RiwayatServiceInterface
     {
         $d = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Proses);
 
+        // Urutan kontrak: baris milik NIP (404) lebih dulu, baru validasi isi request (422).
+        $statusLama = $this->statusDari($d, $this->baris($d, $nip, $id));
+
         if (! in_array($aksi, [self::AKSI_SETUJUI, self::AKSI_TOLAK], true)) {
             throw ValidationException::forField('aksi', 'Aksi harus setujui atau tolak.');
         }
 
-        $statusLama = $this->statusDari($d, $this->baris($d, $nip, $id));
-
-        if (! in_array($statusLama, [StatusRiwayat::Menunggu, StatusRiwayat::Diproses], true)) {
-            throw ValidationException::forField('status', 'Hanya data berstatus Menunggu yang dapat diproses.');
-        }
+        $this->jagaProses($statusLama);
 
         $catatan = trim((string) $reasonNote);
 
@@ -252,8 +256,11 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
         $statusBaru = $aksi === self::AKSI_SETUJUI ? StatusRiwayat::Disetujui : StatusRiwayat::Ditolak;
 
-        $row = $this->transaksi(function () use ($d, $auth, $nip, $id, $catatan, $statusLama, $statusBaru): array {
+        $row = $this->transaksi(function () use ($d, $auth, $nip, $id, $catatan, $statusBaru): array {
             $this->kunciPegawai($nip);
+
+            $statusLama = $this->statusDari($d, $this->barisTerkunci($d, $nip, $id));
+            $this->jagaProses($statusLama);
 
             $data = $this->tandaiNotifikasi($d, $statusLama, $statusBaru, [
                 $d->kolomStatus() => $this->nilaiStatus($d, $statusBaru),
@@ -322,6 +329,62 @@ final class RiwayatEngine implements RiwayatServiceInterface
         }
 
         return $row;
+    }
+
+    /**
+     * Baris $id milik $nip dibaca `FOR UPDATE` di dalam transaksi tulis (sesudah kunciPegawai()), sehingga guard dan
+     * status lama memakai keadaan terkini. Status 10 = 404.
+     *
+     * @return array<string, mixed>
+     */
+    private function barisTerkunci(RiwayatDefinisi $d, string $nip, int $id): array
+    {
+        $db = $this->db();
+
+        /** @var array<string, mixed>|null $row */
+        $row = $db->query(
+            'SELECT * FROM ' . $db->protectIdentifiers($d->tabel(), true)
+            . ' WHERE ' . $db->protectIdentifiers($d->primaryKey()) . ' = ? AND ' . $db->protectIdentifiers($d->kolomNip()) . ' = ? FOR UPDATE',
+            [$id, $nip],
+        )->getRowArray();
+
+        if ($row === null || $this->statusDari($d, $row) === StatusRiwayat::Dihapus) {
+            throw new NotFoundException($d->label() . ' tidak ditemukan.');
+        }
+
+        return $row;
+    }
+
+    /**
+     * Baris Disetujui terkunci untuk UL_PEGAWAI (bila kunciBarisDisetujui()) → 403.
+     */
+    private function jagaUbah(RiwayatDefinisi $d, int $role, ?StatusRiwayat $status): void
+    {
+        if ($status === StatusRiwayat::Disetujui && $d->kunciBarisDisetujui() && in_array($role, Role::UL_PEGAWAI, true)) {
+            throw new ForbiddenException('Data yang sudah disetujui tidak dapat diubah.');
+        }
+    }
+
+    /**
+     * Baris Disetujui tidak boleh dihapus UL_PEGAWAI (bila kunciBarisDisetujui()) dan roleKunciHapusDisetujui() → 403.
+     */
+    private function jagaHapus(RiwayatDefinisi $d, int $role, ?StatusRiwayat $status): void
+    {
+        if ($status === StatusRiwayat::Disetujui
+            && (($d->kunciBarisDisetujui() && in_array($role, Role::UL_PEGAWAI, true)) || in_array($role, $d->roleKunciHapusDisetujui(), true))) {
+            throw new ForbiddenException('Data yang sudah disetujui tidak dapat dihapus.');
+        }
+    }
+
+    /**
+     * [V2] Hanya baris 0 Menunggu (atau 3 bila flag Diproses aktif) yang dapat diproses → 422 `errors.status`; legacy
+     * tidak menjaga ini.
+     */
+    private function jagaProses(?StatusRiwayat $status): void
+    {
+        if (! in_array($status, [StatusRiwayat::Menunggu, StatusRiwayat::Diproses], true)) {
+            throw ValidationException::forField('status', 'Hanya data berstatus Menunggu yang dapat diproses.');
+        }
     }
 
     /**

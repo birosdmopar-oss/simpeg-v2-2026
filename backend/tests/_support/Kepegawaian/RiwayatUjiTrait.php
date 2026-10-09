@@ -31,6 +31,7 @@ trait RiwayatUjiTrait
     protected FakeAttachmentService $lampiranUji;
     protected UjiPendidikan $pendidikanUji;
     protected UjiKp $kpUji;
+    protected int $idPangkatUji = 0;
 
     /**
      * @var list<array<string, mixed>> payload event RiwayatEngine::EVENT_NOTIFIKASI
@@ -121,7 +122,20 @@ trait RiwayatUjiTrait
     }
 
     /**
-     * Data KP lengkap untuk UjiKp.
+     * Master KP untuk UjiKp: jenis_kp 1 CPNS, 2 PNS, 3 Reguler, 6 Lainnya + satu pangkat III/a ($this->idPangkatUji).
+     */
+    protected function siapkanMasterKp(): void
+    {
+        foreach ([1 => 'CPNS', 2 => 'PNS', 3 => 'Reguler', 6 => 'Lainnya'] as $id => $nama) {
+            $this->buatJenisKp($id, $nama);
+        }
+
+        $this->db->table('pangkat')->insert(['pangkat' => 'Penata Muda', 'gol' => 'III', 'ruang' => 'a', 'gol_ruang' => 'III/a', 'order' => 9, 'status' => 1]);
+        $this->idPangkatUji = (int) $this->db->insertID();
+    }
+
+    /**
+     * Payload KP dari klien untuk UjiKp (rujukan master saja; nama master diturunkan beforeSave).
      *
      * @return array<string, int|string>
      */
@@ -129,14 +143,26 @@ trait RiwayatUjiTrait
     {
         return [
             'id_jenis_kp' => $idJenisKp,
+            'id_pangkat'  => $this->idPangkatUji,
             'tmtsk'       => $tmt,
             'tgl_sk'      => $tmt,
             'no_sk'       => 'SK/' . $tmt,
-            'jenis_kp'    => 'Jenis ' . $idJenisKp,
-            'gol'         => 'III',
-            'ruang'       => 'a',
-            'gol_ruang'   => 'III/a',
-            'pangkat'     => 'Penata Muda',
+        ];
+    }
+
+    /**
+     * Baris `riwayat_kp` siap-INSERT (payload + kolom teks master), untuk menyiapkan data tanpa engine.
+     *
+     * @return array<string, int|string>
+     */
+    protected function barisKp(int $idJenisKp, string $tmt): array
+    {
+        return $this->dataKp($idJenisKp, $tmt) + [
+            'jenis_kp'  => 'Jenis ' . $idJenisKp,
+            'gol'       => 'III',
+            'ruang'     => 'a',
+            'gol_ruang' => 'III/a',
+            'pangkat'   => 'Penata Muda',
         ];
     }
 

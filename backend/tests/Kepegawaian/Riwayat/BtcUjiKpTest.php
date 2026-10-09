@@ -30,9 +30,7 @@ final class BtcUjiKpTest extends DatabaseTestCase
 
         $this->pasangEngine();
 
-        foreach ([1 => 'CPNS', 2 => 'PNS', 3 => 'Reguler', 6 => 'Lainnya'] as $id => $nama) {
-            $this->buatJenisKp($id, $nama);
-        }
+        $this->siapkanMasterKp();
     }
 
     protected function tearDown(): void
@@ -54,6 +52,6 @@ final class BtcUjiKpTest extends DatabaseTestCase
 
     protected function btcBaris(string $nip): array
     {
-        return $this->btcPayload($nip);
+        return $this->barisKp(3, '2015-04-01');
     }
 }

@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Libraries\ApiExceptionHandler;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatUjiTrait;
@@ -47,6 +48,18 @@ final class RiwayatEndpointTest extends DatabaseTestCase
         $this->lepasEngine();
 
         parent::tearDown();
+    }
+
+    /**
+     * Isi $_FILES untuk request berikutnya. CI 4.7 membaca berkas dari service `superglobals` (snapshot bersama), jadi
+     * keduanya diisi.
+     *
+     * @param array<string, array<string, array<int|string, int|string>>> $files
+     */
+    private function unggah(array $files): void
+    {
+        $_FILES = $files;
+        service('superglobals')->setFilesArray($files);
     }
 
     public function testTanpaToken401(): void
@@ -126,13 +139,13 @@ final class RiwayatEndpointTest extends DatabaseTestCase
         $path = (string) tempnam(sys_get_temp_dir(), 'rwy');
         file_put_contents($path, '%PDF-1.4');
 
-        $_FILES = ['berkas' => [
+        $this->unggah(['berkas' => [
             'name'     => ['abc' => 'a.pdf', '14' => 'b.pdf'],
             'type'     => ['abc' => 'application/pdf', '14' => 'application/pdf'],
             'tmp_name' => ['abc' => $path, '14' => $path],
             'error'    => ['abc' => UPLOAD_ERR_OK, '14' => UPLOAD_ERR_INI_SIZE],
             'size'     => ['abc' => 8, '14' => 0],
-        ]];
+        ]]);
 
         $result = $this->asUser($this->admin)->post("api/v1/pegawai/{$this->nip}/riwayat/pendidikan", ['tgl_lulus' => '2012-08-30']);
 
@@ -141,15 +154,51 @@ final class RiwayatEndpointTest extends DatabaseTestCase
         $this->assertSame(0, $this->db->table('riwayat_pendidikan')->where('nip', $this->nip)->countAllResults());
     }
 
-    public function testBerkasKosongDilewati(): void
+    public function testUbahMultipartLewatPostMethodPut(): void
     {
-        $_FILES = ['berkas' => [
+        // Kontrak: ubah dengan berkas = POST multipart + _method=PUT (PHP tidak mem-parse multipart pada PUT).
+        $id   = $this->sisipRiwayat($this->pendidikanUji, $this->nip, ['tgl_lulus' => '2012-08-30', 'status' => 1]);
+        $path = "api/v1/pegawai/{$this->nip}/riwayat/pendidikan/{$id}";
+
+        $this->unggah(['berkas' => [
             'name'     => ['39' => ''],
             'type'     => ['39' => ''],
             'tmp_name' => ['39' => ''],
             'error'    => ['39' => UPLOAD_ERR_NO_FILE],
             'size'     => ['39' => 0],
-        ]];
+        ]]);
+        $ubah = $this->asUser($this->admin)->post($path, ['_method' => 'PUT', 'glr_akhir' => 'S.Ak.']);
+        $ubah->assertStatus(200);
+        $this->assertSame('S.Ak.', $this->json($ubah)['data']['glr_akhir']);
+
+        // Berkas yang gagal diunggah pada jalur yang sama → 422 berkunci kode, baris tidak berubah. (Unggahan valid
+        // tidak bisa dibuat di PHPUnit karena is_uploaded_file(); penyimpanan berkas diuji di RiwayatEngineTest.)
+        $tmp = (string) tempnam(sys_get_temp_dir(), 'rwy');
+        file_put_contents($tmp, '%PDF-1.4');
+        $this->unggah(['berkas' => [
+            'name'     => ['14' => 'ijazah.pdf'],
+            'type'     => ['14' => 'application/pdf'],
+            'tmp_name' => ['14' => $tmp],
+            'error'    => ['14' => UPLOAD_ERR_PARTIAL],
+            'size'     => ['14' => 8],
+        ]]);
+        // Router shared dari panggilan pertama menyimpan verb lama; FeatureTestTrait tidak membangunnya ulang untuk spoofing.
+        Services::resetSingle('router');
+        $gagal = $this->asUser($this->admin)->post($path, ['_method' => 'PUT', 'glr_akhir' => 'M.Ak.']);
+        $gagal->assertStatus(422);
+        $this->assertSame(['berkas.14'], array_keys($this->json($gagal)['errors']));
+        $this->assertSame('S.Ak.', $this->db->table('riwayat_pendidikan')->where('id_riwayat_pendidikan', $id)->get()->getRow()->glr_akhir);
+    }
+
+    public function testBerkasKosongDilewati(): void
+    {
+        $this->unggah(['berkas' => [
+            'name'     => ['39' => ''],
+            'type'     => ['39' => ''],
+            'tmp_name' => ['39' => ''],
+            'error'    => ['39' => UPLOAD_ERR_NO_FILE],
+            'size'     => ['39' => 0],
+        ]]);
 
         $this->asUser($this->admin)->post("api/v1/pegawai/{$this->nip}/riwayat/pendidikan", ['tgl_lulus' => '2012-08-30'])->assertStatus(201);
         $this->assertSame([], $this->lampiranUji->baris);

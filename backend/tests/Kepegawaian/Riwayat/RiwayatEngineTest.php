@@ -45,9 +45,7 @@ final class RiwayatEngineTest extends DatabaseTestCase
         [, $this->admin, $akun]      = $this->aktor(Role::SUPER_ADMIN);
         $this->idAdmin               = (int) $akun['id_pengguna'];
 
-        foreach ([1 => 'CPNS', 2 => 'PNS', 3 => 'Reguler', 6 => 'Lainnya'] as $id => $nama) {
-            $this->buatJenisKp($id, $nama);
-        }
+        $this->siapkanMasterKp();
     }
 
     protected function tearDown(): void
@@ -243,6 +241,80 @@ final class RiwayatEngineTest extends DatabaseTestCase
 
         $this->assertSame((string) $aktif, (string) $this->snapshotUji('pegawai_pendidikan', $this->nip)['id_riwayat_pendidikan']);
         $this->assertCount($jumlahAudit, $this->auditUji('pegawai_pendidikan', $this->nip));
+    }
+
+    public function testGuardUbahMemakaiStatusTerkiniDiDalamTransaksi(): void
+    {
+        // F1 (TOCTOU): baris dibaca berstatus 0, lalu disetujui "paralel" sebelum transaksi engine → pegawai ditolak 403
+        // oleh guard yang diulang atas baca ulang terkunci; data dan snapshot tidak berubah.
+        $id = (int) $this->engine()->tambah($this->pegawai, $this->nip, 'pendidikan', ['tgl_lulus' => '2010-08-30'])['id_riwayat_pendidikan'];
+        $this->engine()->proses($this->admin, $this->nip, 'pendidikan', $id, 'setujui', null);
+        $snap = $this->snapshotUji('pegawai_pendidikan', $this->nip);
+        $this->db->table('riwayat_pendidikan')->where('id_riwayat_pendidikan', $id)->update(['status' => 0]);
+
+        $this->pendidikanUji->saatValidate = function (): void {
+            $this->db->table('riwayat_pendidikan')->where('nip', $this->nip)->update(['status' => 1]);
+        };
+
+        $this->assertStatus(403, fn () => $this->engine()->ubah($this->pegawai, $this->nip, 'pendidikan', $id, ['glr_akhir' => 'X']));
+
+        $row = $this->db->table('riwayat_pendidikan')->where('id_riwayat_pendidikan', $id)->get()->getRowArray();
+        $this->assertSame('1', (string) $row['status']);
+        $this->assertNull($row['glr_akhir'], 'data yang belum disetujui tidak masuk ke baris berstatus 1');
+        $this->assertSame($snap, $this->snapshotUji('pegawai_pendidikan', $this->nip));
+        $this->assertSame(0, $this->db->transDepth);
+    }
+
+    public function testUbahBarisYangDihapusParalel404(): void
+    {
+        $id = (int) $this->engine()->tambah($this->pegawai, $this->nip, 'pendidikan', ['tgl_lulus' => '2010-08-30'])['id_riwayat_pendidikan'];
+
+        $this->pendidikanUji->saatValidate = function (): void {
+            $this->db->table('riwayat_pendidikan')->where('nip', $this->nip)->update(['status' => 10]);
+        };
+
+        $this->assertStatus(404, fn () => $this->engine()->ubah($this->pegawai, $this->nip, 'pendidikan', $id, ['glr_akhir' => 'X']));
+    }
+
+    public function testStatusBaruDariBacaUlangBukanBacaAwal(): void
+    {
+        // Role 3 mengubah baris yang (paralel) sudah ditolak: status baru dihitung dari keadaan terkini.
+        [, $adminSatker] = $this->aktor(Role::ADMIN_SATKER);
+        $id              = $this->sisipRiwayat($this->pendidikanUji, $this->nip, ['tgl_lulus' => '2010-08-30', 'status' => 0]);
+
+        $this->pendidikanUji->saatValidate = function (): void {
+            $this->db->table('riwayat_pendidikan')->where('nip', $this->nip)->update(['status' => 2]);
+        };
+
+        $row = $this->engine()->ubah($adminSatker, $this->nip, 'pendidikan', $id, ['glr_akhir' => 'S.E.']);
+
+        $this->assertSame('1', (string) $row['status']);
+        $this->assertSame('0', (string) $row['show_notif'], 'transisi 2 → 1 bukan dari Menunggu');
+        $this->assertSame((string) $id, (string) $this->snapshotUji('pegawai_pendidikan', $this->nip)['id_riwayat_pendidikan']);
+    }
+
+    public function testStatusNullDataLamaSaatDiubah(): void
+    {
+        // F3: status NULL diperlakukan seperti 0 (legacy Pendidikan.php:255-260); role 1 tidak mengubah status.
+        $a               = $this->sisipRiwayat($this->pendidikanUji, $this->nip, ['tgl_lulus' => '2010-08-30', 'status' => null]);
+        $b               = $this->sisipRiwayat($this->pendidikanUji, $this->nip, ['tgl_lulus' => '2011-08-30', 'status' => null]);
+        $c               = $this->sisipRiwayat($this->pendidikanUji, $this->nip, ['tgl_lulus' => '2012-08-30', 'status' => null]);
+        [, $adminSatker] = $this->aktor(Role::ADMIN_SATKER);
+
+        $this->assertSame('0', (string) $this->engine()->ubah($this->pegawai, $this->nip, 'pendidikan', $a, ['glr_akhir' => 'A'])['status']);
+        $this->assertSame(RiwayatEngine::NOTIF_DIUBAH, end($this->notifikasiUji)['tipe']);
+
+        $rowB = $this->engine()->ubah($adminSatker, $this->nip, 'pendidikan', $b, ['glr_akhir' => 'B']);
+        $this->assertSame('1', (string) $rowB['status']);
+        $this->assertSame((string) $b, (string) $this->snapshotUji('pegawai_pendidikan', $this->nip)['id_riwayat_pendidikan']);
+
+        $this->assertNull($this->engine()->ubah($this->admin, $this->nip, 'pendidikan', $c, ['glr_akhir' => 'C'])['status']);
+    }
+
+    public function testProses404SebelumValidasiAksi(): void
+    {
+        // F6: urutan kontrak — baris tidak ada (404) mendahului aksi tidak dikenal (422).
+        $this->assertStatus(404, fn () => $this->engine()->proses($this->admin, $this->nip, 'pendidikan', 999999, 'hapus', null));
     }
 
     // ------------------------------------------------------------------
