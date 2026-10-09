@@ -142,7 +142,18 @@ jenisnya mulai M2.
 **Pemakaian lampiran nyata (setelah MAKE-009).** Engine memanggil `attachmentService->simpan()` di dalam transaksi,
 lalu `selesaikan()` (bila implementasinya punya) setelah commit atau rollback.
 
-**Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB).
+**Definisi nyata (M2, MAKE-005).**
+
+| Definisi | Isi (sumber [K] di docblock kelas) |
+|---|---|
+| `Pendidikan` (B-10) | Self-service; izin 1, 2, 3, 6, 7 (proses 1, 3); jenjang di luar 1-3 → bidang & jurusan wajib, kode 98/1185 → isian "lain" wajib; tanggal ijazah tidak kembar (status selain 2/10); nama jenjang/bidang/jurusan dan nem/ipk diturunkan `beforeSave` (`L_pendidikan.php` `sp()`); Ijazah (14) wajib, transkrip (40) & SK pencantuman gelar (39) opsional, 5 MB, jpg/jpeg/png/gif/pdf; snapshot jenjang tertinggi; daftar `status ASC, tgl_lulus ASC` |
+| `Kp` (B-08) | Alur admin; izin lihat 1, 2, 3, 4, 5, tulis/proses 1, 3 (Matriks v2; legacy juga membuka lihat untuk 8); field wajib legacy (`validate_param()`); pengangkatan CPNS/PNS sekali, TMT tidak kembar (status selain 2/10); [V2] TMT 1 April/1 Oktober kecuali pengangkatan (CR-025, hanya bila tambah atau TMT/jenis berubah); nama jenis/pangkat dari `beforeSave`; SK (11) wajib, 5 MB; snapshot `pegawai_kp`/`_cpns`/`_pns`; daftar `status ASC, tmtsk ASC` |
+
+Hook `validate()` menerima kolom NIP pemilik di `$data` (aditif MAKE-005) agar cek per pegawai (tanggal kembar, CPNS
+sekali) juga jalan saat tambah.
+
+**Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
+`PendidikanTest`, `KpTest` = B-TC + aturan per jenis).
 Trait B-TC generik `Tests\Support\Kepegawaian\RiwayatBtcTrait` + helper `RiwayatUjiTrait`: setiap jenis riwayat
 nyata membuat satu kelas test `use RiwayatBtcTrait` dan mengisi `btcDefinisi()`, `btcPayload()`, `btcBaris()`.
 

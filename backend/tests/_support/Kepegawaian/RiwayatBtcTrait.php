@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Support\Kepegawaian;
 
 use App\Constants\Role;
+use App\Exceptions\ApiException;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\AlurRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Models\AuditLogModel;
+use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Services;
 
 /**
@@ -55,19 +57,19 @@ trait RiwayatBtcTrait
 
     public function testBtcPegawaiInputMandiriStatus0(): void
     {
-        $d               = $this->btcDefinisi();
-        [$nip, , $akun]  = $this->aktor(Role::PEGAWAI);
-        $snapshotSebelum = $this->btcSnapshot($nip);
-        $result          = $this->asUser($akun)->withBodyFormat('json')->post($this->btcPath($nip), $this->btcPayload($nip));
+        $d                = $this->btcDefinisi();
+        [$nip, , $akun]   = $this->aktor(Role::PEGAWAI);
+        $snapshotSebelum  = $this->btcSnapshot($nip);
+        [$status, $baris] = $this->btcTambah($akun, $nip);
 
         if ($d->alur() === AlurRiwayat::Admin || ! $d->boleh(AksiRiwayat::Tambah, Role::PEGAWAI)) {
-            $result->assertStatus(403);
+            $this->assertSame(403, $status);
 
             return;
         }
 
-        $result->assertStatus(201);
-        $this->assertSame('0', (string) $this->json($result)['data'][$d->kolomStatus()]);
+        $this->assertSame(201, $status);
+        $this->assertSame('0', (string) ($baris[$d->kolomStatus()] ?? null));
         $this->assertSame($snapshotSebelum, $this->btcSnapshot($nip), 'pengajuan tidak mengubah snapshot');
     }
 
@@ -168,6 +170,44 @@ trait RiwayatBtcTrait
             if ($this->snapshotUji($aturan->tabel, $nip) !== null) {
                 $this->assertNotSame([], $this->auditUji($aturan->tabel, $nip), "audit snapshot {$aturan->tabel}");
             }
+        }
+    }
+
+    /**
+     * Berkas yang wajib menyertai tambah (kode `jenis_rwy` => UploadedFile). Default tanpa berkas.
+     *
+     * @return array<int, UploadedFile>
+     */
+    protected function btcBerkas(): array
+    {
+        return [];
+    }
+
+    /**
+     * Tambah riwayat sebagai $akun. Tanpa berkas: lewat HTTP JSON. Dengan berkas: lewat service `riwayatService`
+     * (unggahan valid tidak bisa dibuat di PHPUnit karena `is_uploaded_file()`), kode status dari ApiException.
+     *
+     * @param array<string, mixed> $akun baris `pengguna`
+     *
+     * @return array{0: int, 1: array<string, mixed>|null}
+     */
+    protected function btcTambah(array $akun, string $nip): array
+    {
+        $berkas = $this->btcBerkas();
+
+        if ($berkas === []) {
+            $result = $this->asUser($akun)->withBodyFormat('json')->post($this->btcPath($nip), $this->btcPayload($nip));
+            $status = $result->response()->getStatusCode();
+
+            return [$status, $status === 201 ? $this->json($result)['data'] : null];
+        }
+
+        try {
+            $row = service('riwayatService')->tambah($this->authUntukAkun((int) $akun['id_pengguna']), $nip, $this->btcDefinisi()->jenis(), $this->btcPayload($nip), $berkas);
+
+            return [201, $row];
+        } catch (ApiException $e) {
+            return [$e->getStatusCode(), null];
         }
     }
 

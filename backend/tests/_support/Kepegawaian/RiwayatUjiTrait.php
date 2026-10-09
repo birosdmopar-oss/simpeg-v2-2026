@@ -110,6 +110,31 @@ trait RiwayatUjiTrait
     }
 
     /**
+     * Master pendidikan untuk Definisi B-10: jenjang 1 SD (tanpa jurusan), 6 S1, 7 S2 (order = id); bidang 1 Pariwisata
+     * dan 98 Lainnya; jurusan 10 Perhotelan (bidang 1) dan 1185 Lainnya (bidang 98).
+     */
+    protected function siapkanMasterPendidikan(): void
+    {
+        foreach ([1 => 'SD', 6 => 'S1', 7 => 'S2'] as $id => $singkat) {
+            $this->db->table('jenjang_pendidikan')->insert([
+                'id_jenjang_pendidikan' => $id, 'jenjang_pendidikan_singkat' => $singkat,
+                'jenjang_pendidikan'    => 'Jenjang ' . $singkat, 'order' => $id, 'status' => 1,
+            ]);
+        }
+
+        foreach ([1 => 'Pariwisata', 98 => 'Lainnya'] as $id => $nama) {
+            $this->db->table('bidang_pendidikan')->insert(['id_bidang_pendidikan' => $id, 'bidang_pendidikan' => $nama, 'order' => $id, 'status' => 1]);
+        }
+
+        foreach ([[10, 1, 'Perhotelan'], [1185, 98, 'Lainnya']] as [$id, $bidang, $nama]) {
+            $this->db->table('jurusan_pendidikan')->insert([
+                'id_jurusan_pendidikan' => $id, 'id_bidang_pendidikan' => $bidang, 'jurusan_pendidikan' => $nama,
+                'S_1'                   => 1, 'S_2' => 1, 'order' => 1, 'status' => 1,
+            ]);
+        }
+    }
+
+    /**
      * Baris riwayat langsung (tanpa engine), mis. data impor atau pengajuan yang menunggu.
      *
      * @param array<string, mixed> $data

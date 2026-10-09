@@ -118,7 +118,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
         $d    = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Tambah);
         $role = (int) $auth->role();
 
-        $data = $this->validasi($d, $auth, $data, null);
+        $data = $this->validasi($d, $auth, $nip, $data, null);
         $this->periksaBerkas($d, $nip, null, $berkas);
         $status = $d->statusAwal($role);
 
@@ -160,7 +160,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
         // Jalan cepat sebelum validasi; diulang di dalam transaksi atas baris yang dibaca ulang (terkunci).
         $this->jagaUbah($d, $role, $this->statusDari($d, $lama));
 
-        $data = $this->validasi($d, $auth, $data, $lama);
+        $data = $this->validasi($d, $auth, $nip, $data, $lama);
         $this->periksaBerkas($d, $nip, $id, $berkas);
 
         [$row, $statusBaru] = $this->transaksi(function () use ($d, $auth, $role, $nip, $id, $data, $berkas): array {
@@ -397,12 +397,13 @@ final class RiwayatEngine implements RiwayatServiceInterface
      *
      * @return array<string, mixed>
      */
-    private function validasi(RiwayatDefinisi $d, AuthContext $auth, array $data, ?array $lama): array
+    private function validasi(RiwayatDefinisi $d, AuthContext $auth, string $nip, array $data, ?array $lama): array
     {
         [$bersih, $errors] = (new ValidasiRiwayat(service('masterRegistry'), $this->db()))->periksa($d, $data, $lama);
 
         if ($errors === []) {
-            $errors = $d->validate($bersih, $lama, $auth);
+            // Hook menerima kolom NIP pemilik juga (mis. cek duplikat per pegawai saat tambah, ketika $lama null).
+            $errors = $d->validate($bersih + [$d->kolomNip() => $nip], $lama, $auth);
         }
 
         if ($errors !== []) {

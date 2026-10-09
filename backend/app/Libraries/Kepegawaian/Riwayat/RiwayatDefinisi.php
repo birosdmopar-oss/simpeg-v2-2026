@@ -186,7 +186,10 @@ abstract class RiwayatDefinisi
     }
 
     /**
-     * Hook validasi tambahan setelah validasi field. $lama = baris sebelum diubah (null saat tambah).
+     * Hook validasi tambahan setelah validasi field. $lama = baris sebelum diubah (null saat tambah). $data = field yang
+     * dikirim (ternormalisasi; saat ubah hanya yang dikirim) ditambah kolom NIP pemilik (aditif MAKE-005), sehingga
+     * aturan per pegawai (mis. duplikat tanggal) bisa diperiksa juga saat tambah. Gabungkan `$data + ($lama ?? [])` untuk
+     * nilai akhir baris.
      *
      * @param array<string, mixed>      $data
      * @param array<string, mixed>|null $lama
