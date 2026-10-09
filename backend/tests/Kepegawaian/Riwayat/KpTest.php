@@ -188,6 +188,41 @@ final class KpTest extends DatabaseTestCase
         $this->assertSame('SK-X', $this->snapshotUji('pegawai_kp', $this->nip)['no_sk']);
     }
 
+    public function testRole1MemilihStatusSaatUbah(): void
+    {
+        // Legacy kp/form.php:59-74 (keputusan user 09-10-2026): role 1 memilih status saat edit.
+        $id = (int) $this->tambah($this->dataKpNyata(3, '2015-04-01'))['id_riwayat_kp'];
+
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => '2']);
+        $this->assertSame('2', (string) $row['status']);
+        $this->assertNull($this->snapshotUji('pegawai_kp', $this->nip), 'keluar dari status 1 → snapshot dihitung ulang');
+
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => 0]);
+        $this->assertSame('0', (string) $row['status']);
+
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => '1', 'no_sk' => 'SK-OK']);
+        $this->assertSame('1', (string) $row['status']);
+        $this->assertSame('1', (string) $row['show_notif'], 'transisi 0 → 1 menandai notifikasi');
+        $this->assertSame('SK-OK', $this->snapshotUji('pegawai_kp', $this->nip)['no_sk']);
+
+        // Tanpa field status: tidak berubah.
+        $this->assertSame('1', (string) $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['no_sk' => 'SK-2'])['status']);
+
+        // 10, nilai asing, dan 3 saat flag Diproses nonaktif → 422.
+        foreach (['10', '9', '3', 'x'] as $nilai) {
+            $this->assertErrors(['status'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => $nilai]));
+        }
+    }
+
+    public function testRole3TidakMemilihStatus(): void
+    {
+        // Role 3 mengikuti statusSetelahUbah() (→ 1); field status dari klien diabaikan.
+        $id = $this->sisipRiwayat($this->d, $this->nip, array_merge($this->btcBaris($this->nip), ['status' => 0]));
+        $this->lampiranUji->simpan($this->nip, Kp::LAMPIRAN_SK_KP, $id, $this->berkasUji('sk.pdf'), $this->d->lampiran()[0]);
+
+        $this->assertSame('1', (string) $this->engine()->ubah($this->adminSatker, $this->nip, 'kp', $id, ['status' => '2'])['status']);
+    }
+
     public function testDaftarUrutStatusLaluTmt(): void
     {
         $a = $this->tambah($this->dataKpNyata(3, '2019-04-01'));

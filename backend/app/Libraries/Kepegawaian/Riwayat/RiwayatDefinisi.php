@@ -142,6 +142,19 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Role yang boleh MEMILIH status baris saat ubah lewat field `status` payload (aditif MAKE-005). Default kosong:
+     * status saat ubah dihitung statusSetelahUbah() dan `status` dari klien diabaikan. Untuk role di daftar ini, `status`
+     * yang dikirim (0, 1, 2, atau 3 bila flag Diproses aktif; bukan 10) menggantikan statusSetelahUbah(); tidak dikirim =
+     * aturan bawaan. Transisi yang terjadi diperlakukan sama (snapshot, penanda notifikasi, afterApprove).
+     *
+     * @return list<int>
+     */
+    public function rolePilihStatusSaatUbah(): array
+    {
+        return [];
+    }
+
+    /**
      * Urutan daftar riwayat (aditif MAKE-004): kolom tabel riwayat => ASC|DESC, berurutan prioritas. Default PK terbaru
      * = [V2], bukan perilaku legacy (legacy KP: `ORDER BY status ASC, tmtsk ASC`, `libraries/hr/rwy/L_kp.php:27`);
      * Definisi jenis nyata meng-override sesuai legacy jenisnya (M2 dst.).

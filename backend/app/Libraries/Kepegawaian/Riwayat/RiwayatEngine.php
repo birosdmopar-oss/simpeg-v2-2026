@@ -160,10 +160,11 @@ final class RiwayatEngine implements RiwayatServiceInterface
         // Jalan cepat sebelum validasi; diulang di dalam transaksi atas baris yang dibaca ulang (terkunci).
         $this->jagaUbah($d, $role, $this->statusDari($d, $lama));
 
-        $data = $this->validasi($d, $auth, $nip, $data, $lama);
+        $pilihan = $this->statusPilihan($d, $role, $data);
+        $data    = $this->validasi($d, $auth, $nip, $data, $lama);
         $this->periksaBerkas($d, $nip, $id, $berkas);
 
-        [$row, $statusBaru] = $this->transaksi(function () use ($d, $auth, $role, $nip, $id, $data, $berkas): array {
+        [$row, $statusBaru] = $this->transaksi(function () use ($d, $auth, $role, $nip, $id, $data, $berkas, $pilihan): array {
             $this->kunciPegawai($nip);
 
             // Baca ulang SESUDAH kunci: guard dan status baru dihitung dari keadaan terkini, bukan hasil baca sebelum
@@ -171,7 +172,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
             $lama       = $this->barisTerkunci($d, $nip, $id);
             $statusLama = $this->statusDari($d, $lama);
             $this->jagaUbah($d, $role, $statusLama);
-            $statusBaru = $d->statusSetelahUbah($role, $statusLama);
+            $statusBaru = $pilihan ?? $d->statusSetelahUbah($role, $statusLama);
 
             $data = $d->beforeSave($data, $lama, $auth);
             unset($data[$d->primaryKey()], $data[$d->kolomNip()], $data[$d->kolomStatus()]);
@@ -333,6 +334,30 @@ final class RiwayatEngine implements RiwayatServiceInterface
         }
 
         return $row;
+    }
+
+    /**
+     * Status yang dipilih pemanggil lewat field status payload, hanya untuk RiwayatDefinisi::rolePilihStatusSaatUbah();
+     * null = tidak dipilih (aturan statusSetelahUbah()). Nilai di luar status berlaku (atau 10) → 422 `errors.status`.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function statusPilihan(RiwayatDefinisi $d, int $role, array $data): ?StatusRiwayat
+    {
+        $kolom = $d->kolomStatus();
+
+        if (! in_array($role, $d->rolePilihStatusSaatUbah(), true) || ! array_key_exists($kolom, $data) || $data[$kolom] === null || $data[$kolom] === '') {
+            return null;
+        }
+
+        $nilai  = $data[$kolom];
+        $status = is_int($nilai) || is_string($nilai) ? StatusRiwayat::dariNilai($nilai) : null;
+
+        if ($status === null || $status === StatusRiwayat::Dihapus || ! isset($d->pemetaanStatus()[$status->value])) {
+            throw ValidationException::forField($kolom, 'Status tidak valid.');
+        }
+
+        return $status;
     }
 
     /**

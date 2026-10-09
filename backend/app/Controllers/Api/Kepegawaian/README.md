@@ -200,7 +200,7 @@ data di Definisi; default di bawah ikut legacy.
 | Hal | Ketetapan |
 |---|---|
 | NULL di payload | String kosong (setelah trim) pada field **opsional** = `NULL` — sama untuk JSON, form, dan multipart, jadi klien boleh mengirim `""`. Field wajib kosong → 422. Field yang tidak dikirim saat `PUT` = tidak diubah (parsial) |
-| Kolom sistem | `status`, `approved_by`, `reason_note`, `updated_by`, `show_*`, PK, `nip` dari klien **diabaikan** (dikelola engine). Hanya field Definisi yang ditulis |
+| Kolom sistem | `status`, `approved_by`, `reason_note`, `updated_by`, `show_*`, PK, `nip` dari klien **diabaikan** (dikelola engine). Hanya field Definisi yang ditulis. Pengecualian aditif (MAKE-005): role di `RiwayatDefinisi::rolePilihStatusSaatUbah()` boleh mengirim `status` saat `PUT` (0/1/2, 3 bila flag aktif; lainnya 422 `errors.status`) — `kp`: role 1, ikut legacy form edit KP |
 | Lampiran di respons riwayat | **Tidak** ikut. Respons riwayat = kolom DDL tabel riwayat saja; lampiran dibaca lewat `GET pegawai/{nip}/lampiran?id_riwayat=&id_entri=` (WS-2) |
 | `reason_note` saat setujui | Opsional; `""`/spasi = `NULL`, isi lain disimpan (legacy `L_kp.php:652`). Saat tolak wajib (422 `errors.reason_note`); maksimal 255 byte (TINYTEXT) |
 | Proses | Hanya baris berstatus 0 Menunggu (atau 3 bila flag Diproses aktif) → selain itu 422 `errors.status` ([V2]; legacy tidak menjaganya). Urutan: baris milik NIP (404) → `aksi` (422) → status (422) → `reason_note` (422). `aksi` selain `setujui`/`tolak` → 422 `errors.aksi`. Mengisi `approved_by` + `updated_by` = id_pengguna pemroses, `show_ua_biro` (role 1) / `show_ua_upt` (role 3 bersatker) / `show_ua_deputi` (role 3 tanpa satker), `show_notif = 1`, `notif_date` (UTC) |

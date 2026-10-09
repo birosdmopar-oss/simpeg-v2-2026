@@ -109,6 +109,15 @@ final class Kp extends RiwayatDefinisi
     }
 
     /**
+     * Legacy: role 1 memilih status saat edit KP (`views/hr/employee/rwy/kp/form.php:59-74`, pilihan Disetujui/Ditolak/
+     * Diproses/Waiting; keputusan user 09-10-2026 ikut legacy). Diproses hanya bila flag status 3 aktif.
+     */
+    public function rolePilihStatusSaatUbah(): array
+    {
+        return [Role::SUPER_ADMIN];
+    }
+
+    /**
      * Legacy `list()` :27 `ORDER BY status ASC, tmtsk ASC` (legacy hanya status 0/1; kontrak v2 semua kecuali 10).
      */
     public function urutanDaftar(): array
