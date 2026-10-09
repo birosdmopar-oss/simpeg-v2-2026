@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Interfaces\Kepegawaian;
 
+use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 
 /**
@@ -15,5 +16,8 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
  */
 interface SnapshotSyncInterface
 {
-    public function sinkronkan(RiwayatDefinisi $definisi, string $nip): void;
+    /**
+     * @param AuthContext|null $pelaku pelaku audit (aditif MAKE-004); null = sesi request (`service('authContext')`)
+     */
+    public function sinkronkan(RiwayatDefinisi $definisi, string $nip, ?AuthContext $pelaku = null): void;
 }

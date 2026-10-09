@@ -45,6 +45,32 @@ Branch `ws1/make-002-s0a-kontrak-backend`; tanpa perubahan skema. Kontrak lengka
 - **Revisi review CR (07-10-2026):** lampiran = daftar `AturanLampiran` per kode `jenis_rwy` + lookup registry `definisiUntukLampiran()`/`aturanLampiran()`; lampiran satu request dengan tambah/ubah riwayat (`$berkas`, `wajib` ditegakkan engine); `AttachmentService` terikat NIP (`ambil`/`hapus(nip, id)`) + aturan izin per jenis; filter `jwt` di level grup kedua berkas route (izin riwayat di service — penyimpangan §2.3.1 disetujui reviewer CR); scope registry di-resolve tiap dipakai; fixture menolak akun tanpa pegawai, menurunkan rantai dari `id_jabatan`, helper `buatJabatanKoordinasi`/`buatRumpunJabatan`/`buatRiwayatMutasiJabatan`.
 - **Test:** `tests/unit/Kepegawaian/` (StatusRiwayat, AturanLampiran, AturanSnapshot, registry + descriptor + lookup lampiran, stub fail-closed reflektif, fake lampiran) dan `tests/Kepegawaian/` (service bertipe interface + wiring scope, route riwayat/pegawai ber-`jwt` per pemilik, fixture lolos FK + rollback).
 
+## WS-1 M1 — MAKE-004 (SnapshotSync + RiwayatEngine backend)
+
+Branch `ws1/make-004-m1-engine-be`; tanpa perubahan skema/migration. `Config\Services`: baris stub `riwayatService` dan
+`snapshotSync` diganti kelas nyata (`RiwayatEngine`, `SnapshotSync`; kelas stub tetap ada untuk test fail-closed). Belum
+ada Definisi jenis nyata (mulai M2: B-10 + B-08), jadi endpoint riwayat di produksi menjawab 404 "Jenis riwayat tidak
+ditemukan" sampai Definisi pertama masuk. Rincian: `app/Libraries/Kepegawaian/README.md` bagian "Mesin riwayat".
+
+- **SnapshotSync** (`Riwayat/SnapshotSync.php`) + **PemilihSnapshot** (fungsi murni): pilih ulang baris status 1 per
+  `AturanSnapshot` (filter logika tiga nilai SQL, urutan berprioritas termasuk kolom tabel join, seri → PK terbesar),
+  multi-target, DELETE bila kosong, audit manual create/update/delete (entity = tabel snapshot), di transaksi pemanggil.
+- **RiwayatEngine** (`Riwayat/RiwayatEngine.php`, service `riwayatService`): daftar/detail/tambah/ubah/hapus (status
+  10)/proses; urutan pemeriksaan kontrak (jenis → izin Definisi → PegawaiScope → NIP → baris milik NIP); status awal/ubah
+  ikut legacy (data di Definisi); kunci baris Disetujui; validasi field `MasterField` + ref master; hook
+  validate/beforeSave/afterApprove; lampiran satu transaksi (`berkas.<id_riwayat>`); kunci baris `pegawai` `FOR UPDATE`;
+  `approved_by`, `reason_note`, `show_ua_*`, `show_notif`/`notif_date` UTC; event notifikasi `riwayatNotifikasi` sesudah
+  commit. Model generik `App\Models\Kepegawaian\RiwayatModel` (audit otomatis, hapus lunak = event `delete`).
+- **HTTP:** `RiwayatController` (`BaseRiwayatController`) + loop route per slug `JenisRiwayat::SLUG` di
+  `Config/RoutesRiwayat.php`.
+- **Kontrak (aditif):** `SnapshotSyncInterface::sinkronkan(..., ?AuthContext $pelaku = null)`; `RiwayatDefinisi::statusAwal()`,
+  `statusSetelahUbah()`, `roleKunciHapusDisetujui()`, `urutanDaftar()`; README kontrak API bagian "Rincian engine (M1)".
+- **Test:** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (pemilih murni per aturan dok DBV-012 §5.1),
+  `tests/Kepegawaian/Riwayat/SnapshotSyncTest.php`, `RiwayatEngineTest.php` (draft → setujui/tolak → snapshot → audit →
+  lingkup, kunci, validasi, lampiran, rollback), `RiwayatEndpointTest.php`, dan trait B-TC generik
+  `Tests\Support\Kepegawaian\RiwayatBtcTrait` (dipakai `BtcUjiPendidikanTest`, `BtcUjiKpTest`; jenis nyata memakainya
+  mulai M2) dengan Definisi uji `tests/_support/Kepegawaian/Riwayat/` dan fake scope/lampiran S0.
+
 ## Persiapan tanpa skema
 
 ### CR-025 — kalkulasi murni Kepegawaian (bagian B-21) — pra-review internal sisi CR; di main lewat merge `a540703` 30-09-2026

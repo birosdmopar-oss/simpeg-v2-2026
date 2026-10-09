@@ -101,6 +101,53 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Role selain UL_PEGAWAI yang juga tidak boleh MENGHAPUS baris berstatus Disetujui (aditif MAKE-004). Default role 3
+     * ikut legacy: Admin Satker ditolak menghapus data yang sudah disetujui (`controllers/hr/rwy/Kp.php:379-387`,
+     * `Pendidikan.php:476-484`); role 1 boleh.
+     *
+     * @return list<int>
+     */
+    public function roleKunciHapusDisetujui(): array
+    {
+        return [Role::ADMIN_SATKER];
+    }
+
+    /**
+     * Status awal baris yang ditambahkan role $role (aditif MAKE-004). Default ikut legacy (`controllers/hr/rwy/
+     * Pendidikan.php:146`): UL_PEGAWAI pada alur self-service/usulan → 0 Menunggu; selain itu → 1 Disetujui.
+     */
+    public function statusAwal(int $role): StatusRiwayat
+    {
+        return $this->alur() !== AlurRiwayat::Admin && in_array($role, Role::UL_PEGAWAI, true)
+            ? StatusRiwayat::Menunggu
+            : StatusRiwayat::Disetujui;
+    }
+
+    /**
+     * Status baris setelah diubah role $role (aditif MAKE-004). Default ikut legacy (`controllers/hr/rwy/
+     * Pendidikan.php:255-260`, `Kp.php:196-198`): UL_PEGAWAI pada alur self-service/usulan → 0 (diajukan ulang);
+     * role 3 → 1; role lain (1) → status tidak berubah.
+     */
+    public function statusSetelahUbah(int $role, StatusRiwayat $lama): StatusRiwayat
+    {
+        if (in_array($role, Role::UL_PEGAWAI, true)) {
+            return $this->alur() === AlurRiwayat::Admin ? $lama : StatusRiwayat::Menunggu;
+        }
+
+        return $role === Role::ADMIN_SATKER ? StatusRiwayat::Disetujui : $lama;
+    }
+
+    /**
+     * Urutan daftar riwayat (aditif MAKE-004): kolom tabel riwayat => ASC|DESC, berurutan prioritas. Default PK terbaru.
+     *
+     * @return array<string, string>
+     */
+    public function urutanDaftar(): array
+    {
+        return [$this->primaryKey() => 'DESC'];
+    }
+
+    /**
      * Aturan snapshot `pegawai_*` (boleh lebih dari satu target; kosong = jenis tanpa snapshot).
      *
      * @return list<AturanSnapshot>
@@ -159,7 +206,8 @@ abstract class RiwayatDefinisi
     }
 
     /**
-     * Hook setelah baris disetujui (approval final), di dalam transaksi engine, setelah SnapshotSync.
+     * Hook setelah baris disetujui (approval final), di dalam transaksi engine, setelah SnapshotSync. Dipanggil pada
+     * transisi MASUK status Disetujui: proses `setujui`, tambah langsung oleh admin, atau ubah oleh role 3.
      *
      * @param array<string, mixed> $baris
      */

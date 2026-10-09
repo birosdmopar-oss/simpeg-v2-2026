@@ -38,7 +38,9 @@ use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Html\HtmlSanitizer;
+use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
+use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use App\Libraries\Kepegawaian\Stub\StubAttachmentService;
 use App\Libraries\Kepegawaian\Stub\StubBiodataService;
 use App\Libraries\Kepegawaian\Stub\StubKonketService;
@@ -46,8 +48,6 @@ use App\Libraries\Kepegawaian\Stub\StubLkhService;
 use App\Libraries\Kepegawaian\Stub\StubNipCascade;
 use App\Libraries\Kepegawaian\Stub\StubPegawaiScope;
 use App\Libraries\Kepegawaian\Stub\StubPegawaiService;
-use App\Libraries\Kepegawaian\Stub\StubRiwayatService;
-use App\Libraries\Kepegawaian\Stub\StubSnapshotSync;
 use App\Libraries\Kepegawaian\Stub\StubStorageAdapter;
 use App\Libraries\Kepegawaian\Stub\StubStrukturService;
 use App\Libraries\MasterData\FaqService;
@@ -359,7 +359,7 @@ class Services extends BaseService
             return static::getSharedInstance('riwayatService');
         }
 
-        return new StubRiwayatService();
+        return new RiwayatEngine();
     }
 
     /**
@@ -371,7 +371,7 @@ class Services extends BaseService
             return static::getSharedInstance('snapshotSync');
         }
 
-        return new StubSnapshotSync();
+        return new SnapshotSync();
     }
 
     /**

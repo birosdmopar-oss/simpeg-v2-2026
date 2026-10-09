@@ -6,6 +6,7 @@ namespace App\Libraries\Kepegawaian\Stub;
 
 use App\Exceptions\BelumTersediaException;
 use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
+use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 
 /**
@@ -14,7 +15,7 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
  */
 final class StubSnapshotSync implements SnapshotSyncInterface
 {
-    public function sinkronkan(RiwayatDefinisi $definisi, string $nip): void
+    public function sinkronkan(RiwayatDefinisi $definisi, string $nip, ?AuthContext $pelaku = null): void
     {
         throw new BelumTersediaException('sinkron snapshot');
     }

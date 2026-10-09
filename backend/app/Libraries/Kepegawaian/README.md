@@ -92,6 +92,46 @@ Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[
 cd backend && vendor/bin/phpunit --no-coverage tests/unit/Kepegawaian
 ```
 
+## Mesin riwayat (`Riwayat/`, WS-1 M1 MAKE-004)
+
+Satu mesin generik untuk semua jenis riwayat; perilaku per jenis = berkas Definisi (`Riwayat/Definisi/*.php`,
+auto-discovery). Kontrak endpoint dan ketetapan perilaku: `app/Controllers/Api/Kepegawaian/README.md` (bagian "Kontrak
+API Modul B" dan "Rincian engine riwayat").
+
+| Kelas | Isi |
+|---|---|
+| `RiwayatEngine` | `RiwayatServiceInterface` (service `riwayatService`): daftar, detail, tambah, ubah, hapus lunak, proses. Satu transaksi per tulisan (riwayat + snapshot + lampiran), baris `pegawai` dikunci `FOR UPDATE`, audit lewat `RiwayatModel`, event `riwayatNotifikasi` sesudah commit |
+| `SnapshotSync` | `SnapshotSyncInterface` (service `snapshotSync`): per `AturanSnapshot` pilih ulang baris Disetujui → INSERT/UPDATE (dilewati bila sama) atau DELETE snapshot; audit manual per tulisan |
+| `PemilihSnapshot` | Fungsi murni pemilih baris snapshot: status Disetujui (lewat `pemetaanStatus()`), filter dengan logika tiga nilai SQL (`!=`/`NOT IN` tidak memilih NULL), urutan berprioritas (NULL terkecil seperti MySQL, angka sebagai angka), seri → PK terbesar |
+| `ValidasiRiwayat` | Validasi + normalisasi payload dari `RiwayatDefinisi::fields()` (rules `MasterField`, nilai tunggal, ref master ada/aktif/berjenjang) |
+| `App\Models\Kepegawaian\RiwayatModel` | Model generik `riwayat_*` dari Definisi (turunan `BaseAuditableModel`, pola `MasterModel`); kolom sistem ditulis hanya bila ada di tabel; pelaku audit = `AuthContext` pemanggil (`withActor`) |
+
+**Aturan snapshot (ADR-006, dok DBV-012 §5.1).** Snapshot hanya disentuh engine bila status lama atau baru = Disetujui:
+proses `setujui`, tambah langsung oleh admin, ubah oleh role 3 (legacy menyetujui otomatis), ubah data baris yang sudah
+disetujui (setara trigger `afUpd`), dan hapus/keluar dari status 1 (dihitung ulang, DELETE bila kosong). Pengajuan
+pegawai dan penolakan baris yang belum disetujui tidak menyentuh snapshot. Pemecah seri PK terbesar adalah keputusan
+[V2]: legacy `ORDER BY … LIMIT 1` tanpa pemecah seri tidak deterministik; dok §5.1 meminta mutasi bertanggal sama yang
+disetujui belakangan menang.
+
+**Ikut legacy [K]** (data di Definisi, bisa di-override per jenis): status awal 0 untuk UL_PEGAWAI di alur
+self-service/usulan, selain itu 1 (`controllers/hr/rwy/Pendidikan.php:146`); ubah oleh UL_PEGAWAI → 0, role 3 → 1, role
+1 → tetap (`Pendidikan.php:255-260`, `Kp.php:196-198`); UL_PEGAWAI tidak bisa mengubah/menghapus baris disetujui dan
+role 3 tidak bisa menghapusnya (`Pendidikan.php:471-484`, `Kp.php:379-387`); `approved_by`/`updated_by`/`show_ua_*` saat
+proses (`libraries/hr/rwy/L_kp.php:649-668`); `show_notif`/`notif_date` pada transisi 0 → 1/2 (trigger `<tabel>_beUpd`,
+dok DBV-012 §5.2); tipe notifikasi 1/2/3 (`helpers/function_helper.php:588`).
+
+**Deviasi [V2] dari legacy.** Hapus = lunak (status 10 + audit `delete`), bukan `DELETE` baris + lampiran; lampiran baris
+yang dihapus tetap tersimpan. Penanda baca notifikasi (`show_notif = 3` saat detail dibuka dari notifikasi, legacy
+`L_kp.php:84-87`) belum dibawa — milik fitur notifikasi (H-0x), bukan GET riwayat. Push FCM tidak dikirim engine:
+engine hanya memicu event `riwayatNotifikasi` (token perangkat `firebase_token` = H-01).
+
+**Pemakaian lampiran nyata (setelah MAKE-009).** Engine memanggil `attachmentService->simpan()` di dalam transaksi,
+lalu `selesaikan()` (bila implementasinya punya) setelah commit atau rollback.
+
+**Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB).
+Trait B-TC generik `Tests\Support\Kepegawaian\RiwayatBtcTrait` + helper `RiwayatUjiTrait`: setiap jenis riwayat
+nyata membuat satu kelas test `use RiwayatBtcTrait` dan mengisi `btcDefinisi()`, `btcPayload()`, `btcBaris()`.
+
 ## Registry kolom NIP dan format NIP (`Nip/`, CR-036, B-06)
 
 Bahan murni untuk koreksi NIP (B-06), disiapkan lebih awal sebagai pengecualian urutan fase yang disetujui user pada 01-10-2026. Tidak ada migration, endpoint, atau FE. PK `pegawai` adalah `nip` VARCHAR(30) (K1), dan FK v2 memakai `ON UPDATE RESTRICT`. Karena itu B-06 (`NipCascadeService`) menjalankan koreksi dalam **satu transaksi**: salin baris `pegawai` ke NIP baru, arahkan ulang setiap kolom di registry, lalu hapus baris lama. Legacy cukup menjalankan `UPDATE pegawai SET nip`, karena FK-nya `ON UPDATE CASCADE` (`libraries/hr/L_employee.php:586-587`).

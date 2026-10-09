@@ -175,6 +175,27 @@ Tabel yang CHECK status-nya `IN (0, 1, 2, 10)` di DDL main (`riwayat_ak`, `riway
 `riwayat_karpeg`, `riwayat_kariskarsu`, `riwayat_skp_periodik`): Definisi-nya **wajib** override `pemetaanStatus()`
 tanpa 3.
 
+### Rincian engine riwayat (M1, MAKE-004, aditif)
+
+Ketetapan perilaku `RiwayatEngine` yang melengkapi kontrak di atas (catatan review Sprint 0). Perilaku per jenis tetap
+data di Definisi; default di bawah ikut legacy.
+
+| Hal | Ketetapan |
+|---|---|
+| NULL di payload | String kosong (setelah trim) pada field **opsional** = `NULL` — sama untuk JSON, form, dan multipart, jadi klien boleh mengirim `""`. Field wajib kosong → 422. Field yang tidak dikirim saat `PUT` = tidak diubah (parsial) |
+| Kolom sistem | `status`, `approved_by`, `reason_note`, `updated_by`, `show_*`, PK, `nip` dari klien **diabaikan** (dikelola engine). Hanya field Definisi yang ditulis |
+| Lampiran di respons riwayat | **Tidak** ikut. Respons riwayat = kolom DDL tabel riwayat saja; lampiran dibaca lewat `GET pegawai/{nip}/lampiran?id_riwayat=&id_entri=` (WS-2) |
+| `reason_note` saat setujui | Opsional; `""`/spasi = `NULL`, isi lain disimpan (legacy `L_kp.php:652`). Saat tolak wajib (422 `errors.reason_note`); maksimal 255 byte (TINYTEXT) |
+| Proses | Hanya baris berstatus 0 Menunggu (atau 3 bila flag Diproses aktif) → selain itu 422 `errors.status`. `aksi` selain `setujui`/`tolak` → 422 `errors.aksi`. Mengisi `approved_by` + `updated_by` = id_pengguna pemroses, `show_ua_biro` (role 1) / `show_ua_upt` (role 3 bersatker) / `show_ua_deputi` (role 3 tanpa satker), `show_notif = 1`, `notif_date` (UTC) |
+| Status saat tambah | `RiwayatDefinisi::statusAwal()`: UL_PEGAWAI (2/6/7) pada alur self-service/usulan → 0; selain itu → 1 (snapshot langsung disinkron) |
+| Status saat ubah | `RiwayatDefinisi::statusSetelahUbah()`: UL_PEGAWAI → 0 (diajukan ulang); role 3 → 1; role lain (1) → tidak berubah (legacy `controllers/hr/rwy/Pendidikan.php:255-260`) |
+| Kunci baris Disetujui | Ubah/hapus oleh UL_PEGAWAI → 403 (bila `kunciBarisDisetujui()`); hapus oleh `roleKunciHapusDisetujui()` (default role 3, legacy `Kp.php:384`) → 403 |
+| Hapus | Lunak → status 10 (audit `delete`); lampiran baris itu tidak dihapus. Respons `{ "deleted": true, "soft_delete": true }`. Baris status 10 = 404 di detail/ubah/proses |
+| Daftar | Semua baris NIP itu kecuali status 10 (baris lama ber-status NULL ikut tampil), urut `RiwayatDefinisi::urutanDaftar()` (default PK terbaru) |
+| Snapshot | Disinkron bila status lama **atau** baru = 1 (termasuk ubah data baris Disetujui); pengajuan dan penolakan baris yang belum disetujui tidak menyentuhnya |
+| Notifikasi | Event aplikasi `riwayatNotifikasi` sesudah commit, payload `{tipe, jenis, label, nip, id, status, aksi, reason_note}`; `tipe` 1 = diajukan, 2 = diproses, 3 = diubah (legacy `fcmQueue_rwy`). Pengirim push (FCM, H-01) berlangganan event ini |
+| Berkas | `berkas[<id_riwayat>]` satu berkas per kode; kode bukan angka, unggahan gagal, atau kode di luar `lampiran()` → 422 `errors.berkas.<kode>`; slot kosong (`UPLOAD_ERR_NO_FILE`) dilewati |
+
 ### Kontrak backend (interface & service)
 
 Didaftarkan **sekali** di `Config\Services` (S0-A); tipe kembalian = interface. Stub produksi di
@@ -190,8 +211,8 @@ ter-resolve (tanpa `resetSingle`).
 | `attachmentService` | `AttachmentServiceInterface`: `simpan(nip, idRiwayat, idEntri, UploadedFile, AturanLampiran): array`, `ambil(nip, idAttachment): array{lampiran, isi}`, `hapus(nip, idAttachment)`, `daftar(nip, idRiwayat, idEntri): list` — lampiran bukan milik `nip` → 404; di dalam transaksi pemanggil, kompensasi berkas bila rollback | WS-2 (MAKE-009) |
 | `storageAdapter` | `StorageAdapterInterface`: `simpan`, `hapus`, `ada`, `baca` (path relatif) | WS-2 (MAKE-009) |
 | `riwayatRegistry` | `RiwayatRegistryInterface`: `semua()`, `definisi(jenis)`, `definisiUntukLampiran(idRiwayat)`, `aturanLampiran(idRiwayat)`, `descriptorUntuk(AuthContext, nip)` — sudah nyata (`RiwayatRegistry`, auto-discovery) | WS-1 |
-| `riwayatService` | `RiwayatServiceInterface`: `daftar`, `detail`, `tambah(…, array $data, array $berkas = [])`, `ubah(…, array $data, array $berkas = [])`, `hapus`, `proses` — `$berkas` = kode `jenis_rwy` ⇒ `UploadedFile` | WS-1 (MAKE-004) |
-| `snapshotSync` | `SnapshotSyncInterface`: `sinkronkan(RiwayatDefinisi, nip)` | WS-1 (MAKE-004) |
+| `riwayatService` | `RiwayatServiceInterface`: `daftar`, `detail`, `tambah(…, array $data, array $berkas = [])`, `ubah(…, array $data, array $berkas = [])`, `hapus`, `proses` — `$berkas` = kode `jenis_rwy` ⇒ `UploadedFile` | WS-1 (MAKE-004) — `RiwayatEngine` |
+| `snapshotSync` | `SnapshotSyncInterface`: `sinkronkan(RiwayatDefinisi, nip, ?AuthContext pelaku = null)` (parameter pelaku audit aditif MAKE-004) | WS-1 (MAKE-004) — `SnapshotSync` |
 | `pegawaiService`, `biodataService`, `nipCascade`, `strukturService`, `lkhService`, `konketService` | Interface penanda tanpa method; method ditetapkan pemiliknya di milestone-nya (aditif) | WS-2 (MAKE-010..014) |
 
 **Definisi riwayat** (`App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi`, pemilik WS-1): satu berkas per jenis di
