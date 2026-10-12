@@ -44,7 +44,7 @@ interface RiwayatServiceInterface
      * Setiap AturanLampiran ber-`wajib` milik jenis ini harus ada di $berkas → 422 `errors.berkas.<id_riwayat>`.
      *
      * @param array<string, mixed>      $data
-     * @param array<int, UploadedFile>  $berkas kode jenis_rwy => berkas
+     * @param array<int|string, UploadedFile>  $berkas kode jenis_rwy => berkas; kunci string = kolom berkas Definisi (aditif MAKE-007)
      *
      * @return array<string, mixed> baris tersimpan
      */
@@ -55,7 +55,7 @@ interface RiwayatServiceInterface
      * harus punya minimal satu lampiran untuk baris ini (yang sudah ada atau yang baru) → 422 bila tidak.
      *
      * @param array<string, mixed>     $data
-     * @param array<int, UploadedFile> $berkas kode jenis_rwy => berkas
+     * @param array<int|string, UploadedFile> $berkas kode jenis_rwy => berkas; kunci string = kolom berkas Definisi (aditif MAKE-007)
      *
      * @return array<string, mixed> baris tersimpan
      */

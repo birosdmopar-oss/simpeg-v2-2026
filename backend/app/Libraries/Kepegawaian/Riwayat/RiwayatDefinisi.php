@@ -215,6 +215,30 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Berkas yang disimpan langsung di kolom tabel riwayat (aditif MAKE-007, engine-v1), mis. `riwayat_karpeg.file_1..5`:
+     * kolom => aturan (batas MB, ekstensi; `idRiwayat` tidak dipakai, isi 0). Dikirim sebagai `berkas[<kolom>]`
+     * (multipart), ditulis engine lewat KolomBerkas (MAKE-009) di transaksi tambah/ubah; berkas lama yang diganti dihapus
+     * setelah commit. Galat 422 `errors["berkas.<kolom>"]`. Kolom ini BUKAN field Definisi (tidak bisa diisi teks).
+     *
+     * @return array<string, AturanLampiran>
+     */
+    public function kolomBerkas(): array
+    {
+        return [];
+    }
+
+    /**
+     * Kolom berkas $kolom wajib untuk baris bernilai akhir $nilai (aditif MAKE-007): wajib = harus ada di request atau
+     * sudah terisi di baris. Bawaan = `$aturan->wajib`.
+     *
+     * @param array<string, mixed> $nilai data tervalidasi (+ baris lama saat ubah)
+     */
+    public function kolomBerkasWajib(string $kolom, AturanLampiran $aturan, array $nilai): bool
+    {
+        return $aturan->wajib;
+    }
+
+    /**
      * Entri lampiran kode $kode yang BUKAN baris tabel riwayat ini, melainkan baris tabel anak (aditif MAKE-007,
      * engine-v1), mis. akte lahir (kode 3) per `detail_anak` milik `riwayat_keluarga`. Null (bawaan) = `id_entri` lampiran
      * kode itu adalah PK baris `tabel()`.

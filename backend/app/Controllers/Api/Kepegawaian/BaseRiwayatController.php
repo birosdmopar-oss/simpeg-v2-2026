@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Controllers\Api\Kepegawaian;
 
 use App\Controllers\Api\ApiController;
+use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\RiwayatServiceInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\Mimes;
 
 /**
  * Controller generik riwayat pegawai `api/v1/pegawai/{nip}/riwayat/{jenis}` (WS-1 M1 MAKE-004; kontrak README
@@ -17,7 +20,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  * yang memeriksa jenis, izin Definisi × role, PegawaiScope, keberadaan data, dan validasi.
  *
  * Parameter route: NIP dan slug jenis selalu string (NIP berawalan nol tidak boleh di-cast), `{id}` angka (`(:num)`).
- * Berkas lampiran dikirim sebagai `berkas[<id_riwayat>]` (multipart), satu berkas per kode.
+ * Berkas lampiran dikirim sebagai `berkas[<id_riwayat>]` (multipart), satu berkas per kode; berkas kolom (aditif
+ * MAKE-007, `RiwayatDefinisi::kolomBerkas()`) sebagai `berkas[<kolom>]`, diunduh lewat `.../{id}/berkas/{kolom}`.
  */
 abstract class BaseRiwayatController extends ApiController
 {
@@ -73,6 +77,29 @@ abstract class BaseRiwayatController extends ApiController
         return $this->respondSuccess($this->service()->proses($this->auth(), $nip, $jenis, (int) $id, $aksi, $note));
     }
 
+    /**
+     * `GET pegawai/{nip}/riwayat/{jenis}/{id}/berkas/{kolom}` — unduh berkas kolom (aditif MAKE-007).
+     */
+    public function unduhBerkas(string $nip, string $jenis, string $id, string $kolom): ResponseInterface
+    {
+        $service = $this->service();
+
+        if (! $service instanceof RiwayatEngine) {
+            throw new NotFoundException('Berkas tidak ditemukan.');
+        }
+
+        $hasil = $service->unduhKolomBerkas($this->auth(), $nip, $jenis, (int) $id, $kolom);
+        $mime  = (string) (Mimes::guessTypeFromExtension(pathinfo($hasil['nama'], PATHINFO_EXTENSION)) ?? 'application/octet-stream');
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setContentType($mime)
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $hasil['nama'] . '"')
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('Cache-Control', 'private, no-store')
+            ->setBody($hasil['isi']);
+    }
+
     protected function service(): RiwayatServiceInterface
     {
         return service('riwayatService');
@@ -87,7 +114,7 @@ abstract class BaseRiwayatController extends ApiController
      * Berkas `berkas[<id_riwayat>]` dari multipart: kode angka, satu berkas per kode, unggahan valid. Kode yang tidak
      * diunggah (UPLOAD_ERR_NO_FILE) dilewati.
      *
-     * @return array<int, UploadedFile>
+     * @return array<int|string, UploadedFile>
      */
     protected function berkas(): array
     {
@@ -105,9 +132,12 @@ abstract class BaseRiwayatController extends ApiController
         $errors = [];
 
         foreach ($files['berkas'] as $kode => $file) {
-            $kode = (string) $kode;
+            $kode  = (string) $kode;
+            $kolom = preg_match('/^[a-z][a-z0-9_]{0,63}$/', $kode) === 1;
 
-            if (! ctype_digit($kode)) {
+            // Kunci angka = kode jenis_rwy lampiran; kunci nama kolom = kolom berkas Definisi (aditif MAKE-007, divalidasi
+            // engine terhadap kolomBerkas()).
+            if (! ctype_digit($kode) && ! $kolom) {
                 $errors["berkas.{$kode}"] = ['Kode lampiran tidak valid.'];
 
                 continue;
@@ -129,7 +159,7 @@ abstract class BaseRiwayatController extends ApiController
                 continue;
             }
 
-            $hasil[(int) $kode] = $file;
+            $hasil[ctype_digit($kode) ? (int) $kode : $kode] = $file;
         }
 
         if ($errors !== []) {

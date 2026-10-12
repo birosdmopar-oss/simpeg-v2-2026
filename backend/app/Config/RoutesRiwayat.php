@@ -37,6 +37,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
         $routes->put("{$dasar}/(:num)", "RiwayatController::update/\$1/{$jenis}/\$2");
         $routes->delete("{$dasar}/(:num)", "RiwayatController::delete/\$1/{$jenis}/\$2");
         $routes->post("{$dasar}/(:num)/process", "RiwayatController::process/\$1/{$jenis}/\$2");
+        // M4 (MAKE-007, aditif): unduh berkas kolom (RiwayatDefinisi::kolomBerkas()).
+        $routes->get("{$dasar}/(:num)/berkas/(:segment)", "RiwayatController::unduhBerkas/\$1/{$jenis}/\$2/\$3");
     }
 
     // M3 (MAKE-006, aditif): descriptor tab riwayat pegawai { tabs } = RiwayatRegistry::descriptorUntuk().
@@ -48,6 +50,12 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->post($anak, 'AnakKeluargaController::create/$1/$2');
     $routes->put("{$anak}/(:num)", 'AnakKeluargaController::update/$1/$2/$3');
     $routes->delete("{$anak}/(:num)", 'AnakKeluargaController::delete/$1/$2/$3');
+
+    // M4 (MAKE-007, aditif): halaman usulan mandiri Karpeg/Karis (prefix usulan/{jenis} dicadangkan README kontrak).
+    foreach (['karpeg', 'kariskarsu'] as $usulan) {
+        $routes->get("usulan/{$usulan}", "UsulanController::antrean/{$usulan}");
+        $routes->get("usulan/{$usulan}/saya", "UsulanController::saya/{$usulan}");
+    }
 
     // WS-1: endpoint riwayat tambahan (mis. usulan Karpeg/Karis M4) ditambahkan di sini.
 });

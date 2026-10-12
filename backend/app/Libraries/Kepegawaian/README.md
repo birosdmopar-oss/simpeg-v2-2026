@@ -172,6 +172,10 @@ Perubahan sesudah beku (aditif / konsistensi, WS-1):
 - MAKE-006: `RiwayatRegistry::descriptorUntuk()` mengisi `can_process` dengan `PegawaiScope::bolehProses` (jalur proses
   CR-045, sama dengan `RiwayatEngine::proses()`), bukan `bolehUbah` — perubahan konsistensi, bentuk descriptor tetap.
 - MAKE-006: endpoint aditif `GET pegawai/{nip}/riwayat` → `{ tabs }` (sumber = `descriptorUntuk`).
+- MAKE-007 (hook aditif, ikut beku sejak masuk `main`): `RiwayatDefinisi::lampiranWajib(aturan, nilai)`,
+  `entriLampiran(kode)` (lampiran per baris tabel anak; OtorisasiLampiran WS-2 membacanya), `kolomBerkas()` +
+  `kolomBerkasWajib()` (berkas di kolom tabel lewat KolomBerkas MAKE-009, `selesaikan()` sesudah commit/rollback),
+  `RiwayatEngine::unduhKolomBerkas()`; endpoint aditif `…/{id}/berkas/{kolom}`, `…/keluarga/{id}/anak`, `usulan/{jenis}`.
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata

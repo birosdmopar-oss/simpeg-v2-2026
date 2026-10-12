@@ -334,8 +334,9 @@ final class PendidikanTest extends DatabaseTestCase
             'App\Libraries\Kepegawaian\Riwayat\Definisi',
         );
 
-        // Urut urutanTab(): kp 20, kgb 30 (MAKE-006), pendidikan 40, hukdis 90 (MAKE-006).
-        $this->assertSame(['kp', 'kgb', 'pendidikan', 'hukdis'], array_map(static fn (RiwayatDefinisi $d): string => $d->jenis(), $registry->semua()));
+        // Urut urutanTab() (seri → slug): kp 20, kgb 30, pendidikan 40, keluarga 50, alamat 55, diklat 60, seminar 65,
+        // tanda-jasa 70, organisasi 75, hukdis 90, lalu usulan karpeg/kariskarsu (bawaan 100) — MAKE-005..007.
+        $this->assertSame(['kp', 'kgb', 'pendidikan', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi', 'hukdis', 'kariskarsu', 'karpeg'], array_map(static fn (RiwayatDefinisi $d): string => $d->jenis(), $registry->semua()));
         $this->assertSame('pendidikan', $registry->definisiUntukLampiran(14)?->jenis());
         $this->assertSame('kp', $registry->definisiUntukLampiran(11)?->jenis());
 

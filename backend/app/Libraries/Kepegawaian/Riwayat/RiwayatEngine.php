@@ -14,6 +14,7 @@ use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
 use App\Interfaces\Kepegawaian\RiwayatServiceInterface;
 use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Models\Kepegawaian\RiwayatModel;
 use Closure;
 use CodeIgniter\Database\BaseConnection;
@@ -77,6 +78,11 @@ final class RiwayatEngine implements RiwayatServiceInterface
      */
     private array $kolom = [];
 
+    /**
+     * Helper kolom berkas transaksi berjalan (MAKE-007); direset sesudah selesaikanLampiran().
+     */
+    private ?KolomBerkas $kolomBerkas = null;
+
     public function __construct(
         private readonly ?RiwayatRegistryInterface $registry = null,
         private readonly ?PegawaiScopeInterface $scope = null,
@@ -127,6 +133,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
             $data = $d->beforeSave($data, null, $auth);
             unset($data[$d->primaryKey()]);
+            $data                    = $this->tulisKolomBerkas($d, $berkas, $data, null);
             $data[$d->kolomNip()]    = $nip;
             $data[$d->kolomStatus()] = $this->nilaiStatus($d, $status);
             $data                    = $this->stempelPelaku($d, $auth, $data);
@@ -176,6 +183,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
             $data = $d->beforeSave($data, $lama, $auth);
             unset($data[$d->primaryKey()], $data[$d->kolomNip()], $data[$d->kolomStatus()]);
+            $data = $this->tulisKolomBerkas($d, $berkas, $data, $lama);
 
             if ($statusBaru !== null && $statusBaru !== $statusLama) {
                 $data[$d->kolomStatus()] = $this->nilaiStatus($d, $statusBaru);
@@ -481,7 +489,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
      * (`RiwayatDefinisi::lampiranWajib()`, aditif MAKE-007; bawaan = `wajib`) harus punya berkas di request ini atau (saat
      * ubah) lampiran yang sudah ada.
      *
-     * @param array<int, UploadedFile> $berkas
+     * @param array<int|string, UploadedFile> $berkas
      * @param array<string, mixed>     $nilai  nilai akhir baris (data tervalidasi + baris lama saat ubah)
      */
     private function periksaBerkas(RiwayatDefinisi $d, string $nip, ?int $id, array $berkas, array $nilai): void
@@ -497,7 +505,23 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
         $errors = [];
 
+        $kolomBerkas = $d->kolomBerkas();
+
+        foreach ($kolomBerkas as $kolom => $a) {
+            if ($d->kolomBerkasWajib($kolom, $a, $nilai) && ! isset($berkas[$kolom]) && trim((string) ($nilai[$kolom] ?? '')) === '') {
+                $errors["berkas.{$kolom}"] = ['Berkas wajib diunggah.'];
+            }
+        }
+
         foreach (array_keys($berkas) as $kode) {
+            if (is_string($kode)) {
+                if (! isset($kolomBerkas[$kode])) {
+                    $errors["berkas.{$kode}"] = ['Kolom berkas tidak dikenal untuk ' . $d->label() . '.'];
+                }
+
+                continue;
+            }
+
             if (! isset($aturan[$kode])) {
                 $errors["berkas.{$kode}"] = ['Jenis lampiran tidak dikenal untuk ' . $d->label() . '.'];
             }
@@ -519,7 +543,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
     // ------------------------------------------------------------------
 
     /**
-     * @param array<int, UploadedFile> $berkas
+     * @param array<int|string, UploadedFile> $berkas
      */
     private function simpanBerkas(RiwayatDefinisi $d, string $nip, int $id, array $berkas): void
     {
@@ -530,6 +554,10 @@ final class RiwayatEngine implements RiwayatServiceInterface
         }
 
         foreach ($berkas as $kode => $file) {
+            if (is_string($kode)) {
+                continue; // kolom berkas (kolomBerkas()), ditulis tulisKolomBerkas()
+            }
+
             try {
                 $this->lampiran()->simpan($nip, $kode, $id, $file, $aturan[$kode]);
             } catch (ValidationException $e) {
@@ -690,6 +718,59 @@ final class RiwayatEngine implements RiwayatServiceInterface
         if (method_exists($lampiran, 'selesaikan')) {
             $lampiran->selesaikan();
         }
+
+        // Kolom berkas (MAKE-007): rekonsiliasi berkas baru/lama dengan isi kolom setelah commit/rollback.
+        $this->kolomBerkas?->selesaikan();
+        $this->kolomBerkas = null;
+    }
+
+    /**
+     * Tulis berkas kolom (`kolomBerkas()`, aditif MAKE-007) lewat KolomBerkas (MAKE-009) di dalam transaksi: path baru
+     * masuk $data, berkas lama ditandai untuk dihapus bila tidak lagi dirujuk. Galat berkas 422 `berkas.<kolom>`.
+     *
+     * @param array<int|string, UploadedFile> $berkas
+     * @param array<string, mixed>            $data
+     * @param array<string, mixed>|null       $lama
+     *
+     * @return array<string, mixed>
+     */
+    private function tulisKolomBerkas(RiwayatDefinisi $d, array $berkas, array $data, ?array $lama): array
+    {
+        $aturan = $d->kolomBerkas();
+
+        foreach ($berkas as $kolom => $file) {
+            if (! is_string($kolom) || ! isset($aturan[$kolom])) {
+                continue;
+            }
+
+            $this->kolomBerkas ??= new KolomBerkas();
+            $data[$kolom] = $this->kolomBerkas->simpan($file, $aturan[$kolom], $d->tabel(), $kolom, "berkas.{$kolom}");
+
+            if ($lama !== null) {
+                $this->kolomBerkas->hapus(isset($lama[$kolom]) ? (string) $lama[$kolom] : null, $d->tabel(), $kolom);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Isi berkas kolom `$kolom` baris $id milik {nip} (aditif MAKE-007): izin `lihat` + PegawaiScope, baris bukan status
+     * 10, kolom terdaftar di `kolomBerkas()` dan terisi; selain itu 404.
+     *
+     * @return array{isi: string, nama: string}
+     */
+    public function unduhKolomBerkas(AuthContext $auth, string $nip, string $jenis, int $id, string $kolom): array
+    {
+        $d    = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Lihat);
+        $row  = $this->baris($d, $nip, $id);
+        $path = isset($d->kolomBerkas()[$kolom]) ? trim((string) ($row[$kolom] ?? '')) : '';
+
+        if ($path === '' || ! ($helper = new KolomBerkas())->ada($path)) {
+            throw new NotFoundException('Berkas tidak ditemukan.');
+        }
+
+        return ['isi' => $helper->baca($path), 'nama' => $kolom . '.' . pathinfo($path, PATHINFO_EXTENSION)];
     }
 
     // ------------------------------------------------------------------
