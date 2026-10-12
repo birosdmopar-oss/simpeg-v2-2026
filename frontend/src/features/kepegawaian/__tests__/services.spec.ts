@@ -123,7 +123,7 @@ describe('riwayatService', () => {
     expect(post.mock.calls[0][1]).toMatchObject({ tgl_lulus: '2012-08-30', ipk: 3.5 })
   })
 
-  it('multipart: kolom kosong dikirim sebagai string kosong (representasi NULL belum ditetapkan — TODO kontrak)', () => {
+  it('multipart: kolom kosong dikirim sebagai string kosong (= NULL, kontrak engine MAKE-004)', () => {
     const sent = entries(toFormData(pendidikan.fields, values, {}))
     expect(sent).toContainEqual(['no_ijazah', ''])
   })

@@ -2,6 +2,8 @@
 // `Riwayat/Definisi/Hukdis.php` (MAKE-006; legacy `L_hukdis.php` validate_param()/set_param()).
 import { A, D, R, T, defineRiwayatJenis } from '../riwayat.config'
 
+const HITUNG_ULANG = ['tmtsk', 'id_jenis_hukdis']
+
 export default defineRiwayatJenis({
   jenis: 'hukdis',
   engine: true,
@@ -25,12 +27,14 @@ export default defineRiwayatJenis({
     T('no_sk', 'Nomor SK', { required: true, max: 100 }),
     D('tgl_sk', 'Tanggal SK', { required: true }),
     // Isian hitung [V2] (SRS-FR-027): dikosongkan = diisi server dari masa sanksi jenis; jenis tanpa masa → wajib diisi.
-    A('masa_hukuman', 'Masa Hukuman', { max: 255, hint: 'Kosongkan untuk diisi otomatis dari masa sanksi jenis hukuman.' }),
-    D('akhir_hukdis', 'Tanggal Berakhir', { hint: 'Kosongkan untuk dihitung otomatis: TMT + masa sanksi jenis hukuman.' }),
+    // Mengubah TMT atau jenis mengosongkan keduanya supaya dihitung ulang (kecuali diisi lagi).
+    A('masa_hukuman', 'Masa Hukuman', { max: 255, hint: 'Kosongkan untuk diisi otomatis dari masa sanksi jenis hukuman.', resetOn: HITUNG_ULANG }),
+    D('akhir_hukdis', 'Tanggal Berakhir', { hint: 'Kosongkan untuk dihitung otomatis: TMT + masa sanksi jenis hukuman.', resetOn: HITUNG_ULANG }),
     A('aturan_dilanggar', 'Aturan yang Dilanggar', { required: true, max: 255 }),
     A('alasan_hukuman', 'Alasan Hukuman', { required: true, max: 255 }),
     A('keterangan', 'Keterangan', { max: 255 }),
   ],
   // Hukdis::lampiran(): SK wajib (saat tambah, dan saat ubah bila belum ada); 5 MB.
   lampiran: [{ id_riwayat: 7, label: 'SK Hukuman Disiplin', wajib: true, batas_mb: 5, ekstensi: ['jpg', 'jpeg', 'png', 'gif', 'pdf'] }],
+  // Hapus hanya role 1 (Hukdis::izin, ikut legacy) → can_delete role 3 false; tidak perlu kunci per baris.
 })

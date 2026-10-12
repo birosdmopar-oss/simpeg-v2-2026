@@ -22,6 +22,8 @@ use App\Libraries\MasterData\MasterField;
  * `views/hr/employee/rwy/hukdis/form.php`. Snapshot `pegawai_hukdis`: dok DBV-012 §5.1 (status 1, `MAX(tmtsk)`).
  *
  * - Hak akses: Matriks v2 `hr/rwy/hukdis/*` = role 1, 3 (legacy hanya role 1). Tanpa lihat pegawai (Matriks §5).
+ *   [K] Hapus hanya role 1, ikut legacy `Hukdis.php:171-190` (`delete` userAuth(['1'])) — keputusan user 12-10-2026,
+ *   deviasi dari Matriks v2 yang menulis 1, 3 untuk `hr/rwy/hukdis/*`.
  * - Status selalu 1 (DBV #10; legacy menulis `status = '1'` saat tambah dan ubah, `Hukdis.php:73`, :130). Legacy tidak
  *   punya alur proses (setujui/tolak), jadi izin `proses` kosong.
  * - [V2] SRS-FR-027 (DoD B-14, keputusan #10 / K5b): `akhir_hukdis` yang dikosongkan dihitung otomatis = TMT + masa
@@ -90,7 +92,8 @@ final class Hukdis extends RiwayatDefinisi
             'lihat'  => $admin,
             'tambah' => $admin,
             'ubah'   => $admin,
-            'hapus'  => $admin,
+            // [K] legacy Hukdis.php:171-190 (keputusan user 12-10-2026); lihat docblock kelas.
+            'hapus' => [Role::SUPER_ADMIN],
         ];
     }
 

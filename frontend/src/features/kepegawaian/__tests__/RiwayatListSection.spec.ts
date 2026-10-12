@@ -418,3 +418,62 @@ describe('RiwayatListSection — isian berjenjang, bersyarat, dan status', () =>
     expect(field('no_sk')).not.toBeNull()
   })
 })
+
+describe('RiwayatListSection — kunci baris Disetujui & isian hitung', () => {
+  it('role 3 pada KP: Hapus baris Disetujui tampil nonaktif; baris Menunggu tetap bisa dihapus (kunciHapusDisetujuiRole)', async () => {
+    useAuthStore().setSession(akun(Role.ADMIN_SATKER))
+    svc.list.mockResolvedValue([{ id_riwayat_kp: 1, status: 1, tmtsk: '2015-04-01' }, { id_riwayat_kp: 2, status: 0, tmtsk: '2016-04-01' }])
+    const wrapper = await mountTab({ can_process: true }, kp)
+    const disetujui = await rowMenuActions(wrapper, 'riwayat-actions-1')
+    expect(disetujui.find((i) => i.key === 'hapus')?.disabled).toBe(true)
+    expect(disetujui.find((i) => i.key === 'edit')?.disabled).toBe(false)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-2')).find((i) => i.key === 'hapus')?.disabled).toBe(false)
+  })
+
+  it('role 1 pada KP: Hapus baris Disetujui aktif', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_kp: 1, status: 1, tmtsk: '2015-04-01' }])
+    const wrapper = await mountTab({}, kp)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-1')).find((i) => i.key === 'hapus')?.disabled).toBe(false)
+  })
+
+  it('pegawai (role 2) pada pendidikan: Edit & Hapus baris Disetujui nonaktif (kunciBarisDisetujui)', async () => {
+    useAuthStore().setSession(akun(Role.PEGAWAI))
+    const wrapper = await mountTab({}, pendidikan)
+    const items = await rowMenuActions(wrapper, 'riwayat-actions-1')
+    expect(items.filter((i) => ['edit', 'hapus'].includes(i.key)).map((i) => i.disabled)).toEqual([true, true])
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-2')).find((i) => i.key === 'edit')?.disabled).toBe(false)
+  })
+
+  it('hukdis edit: mengubah TMT atau jenis mengosongkan akhir & masa (dihitung ulang server), kecuali diisi lagi', async () => {
+    svc.update.mockResolvedValue({})
+    lampiranSvc.list.mockResolvedValue([{ id_attachment: 1 } as never])
+    svc.list.mockResolvedValue([
+      { id_riwayat_hukdis: 4, status: 1, id_tingkat_hukdis: 7, id_jenis_hukdis: 71, id_pangkat: 7, tmtsk: '2026-01-01', tgl_sk: '2026-01-01', no_sk: 'SK', masa_hukuman: '1 Tahun', akhir_hukdis: '2027-01-01', aturan_dilanggar: 'P', alasan_hukuman: 'A' },
+    ])
+    const wrapper = await mountTab({}, hukdis)
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['2027-01-01', '1 Tahun'])
+
+    await setInput('tmtsk', '2026-02-01')
+    expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['', ''])
+
+    await setInput('akhir_hukdis', '2026-08-01') // diisi lagi manual → dipertahankan
+    await submitForm()
+    await vi.waitFor(() => expect(svc.update).toHaveBeenCalledTimes(1))
+    expect(svc.update.mock.calls[0][4]).toMatchObject({ tmtsk: '2026-02-01', akhir_hukdis: '2026-08-01', masa_hukuman: '' })
+  })
+
+  it('hukdis edit: mengganti jenis (atau tingkat yang mengosongkan jenis) juga mengosongkan akhir', async () => {
+    lampiranSvc.list.mockResolvedValue([{ id_attachment: 1 } as never])
+    options.mockImplementation(async (entity: string, parent?: string | null) =>
+      entity === 'jenis-hukdis' ? [{ id: '71', nama: 'J1', parent: '7' }, { id: '72', nama: 'J2', parent: '7' }] : [{ id: '7', nama: entity, parent: parent ?? null }],
+    )
+    svc.list.mockResolvedValue([{ id_riwayat_hukdis: 4, status: 1, id_tingkat_hukdis: 7, id_jenis_hukdis: 71, tmtsk: '2026-01-01', akhir_hukdis: '2027-01-01' }])
+    const wrapper = await mountTab({}, hukdis)
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    await setInput('id_jenis_hukdis', '72')
+    expect(field('akhir_hukdis')?.value).toBe('')
+  })
+})

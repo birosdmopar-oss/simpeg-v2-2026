@@ -58,6 +58,11 @@ export interface FieldDef {
    * menampilkan petunjuk ini di bawah isian.
    */
   hint?: string
+  /**
+   * Isian hitung yang dikosongkan saat pengguna mengubah salah satu isian ini (mis. tanggal berakhir hukdis saat TMT atau
+   * jenis berganti), supaya server menghitung ulang — kecuali pengguna mengisinya lagi.
+   */
+  resetOn?: readonly string[]
 }
 
 export interface ColumnDef {
@@ -97,6 +102,14 @@ export interface RiwayatJenisConfig {
    * legacy). Form edit role ini menampilkan isian `status` (Disetujui/Ditolak/Menunggu, bawaan Disetujui).
    */
   pilihStatusSaatUbah?: readonly RoleCode[]
+  /**
+   * Role yang tidak boleh MENGHAPUS baris berstatus Disetujui (salinan Definisi: `roleKunciHapusDisetujui()`, ditambah
+   * UL_PEGAWAI bila `kunciBarisDisetujui()`). Item ⋮ "Hapus" baris itu tampil nonaktif (AGENTS.md §1.4); server tetap
+   * menegakkan (403).
+   */
+  kunciHapusDisetujuiRole?: readonly RoleCode[]
+  /** Role yang tidak boleh MENGUBAH baris berstatus Disetujui (UL_PEGAWAI bila `kunciBarisDisetujui()`); "Edit" nonaktif. */
+  kunciUbahDisetujuiRole?: readonly RoleCode[]
 }
 
 /**

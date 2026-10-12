@@ -1,6 +1,6 @@
 // Tab riwayat `pendidikan` — tabel `riwayat_pendidikan`, B-10 (pemilik WS-1). Isian, syarat, dan lampiran disalin dari
 // Definisi backend `Riwayat/Definisi/Pendidikan.php` (MAKE-005; legacy `L_pendidikan.php` vp()/sp()).
-import { Role } from '@/features/auth/types'
+import { Role, UL_PEGAWAI } from '@/features/auth/types'
 
 import { A, D, N, R, T, defineRiwayatJenis, type FieldCondition } from '../riwayat.config'
 
@@ -46,4 +46,7 @@ export default defineRiwayatJenis({
   ],
   // Pendidikan::rolePilihStatusSaatUbah() — legacy pendidikan/form.php:59-76 (keputusan user 12-10-2026).
   pilihStatusSaatUbah: [Role.SUPER_ADMIN],
+  // Baris Disetujui: roleKunciHapusDisetujui() bawaan [3] + kunciBarisDisetujui() untuk UL_PEGAWAI (ubah & hapus).
+  kunciHapusDisetujuiRole: [Role.ADMIN_SATKER, ...UL_PEGAWAI],
+  kunciUbahDisetujuiRole: UL_PEGAWAI,
 })

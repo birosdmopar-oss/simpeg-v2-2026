@@ -53,12 +53,14 @@ final class HukdisTest extends DatabaseTestCase
         parent::setUp();
 
         $this->d = new Hukdis();
-        $this->pasangEngine(null, [$this->d]);
+        $this->pasangEngineNyata([$this->d]);
         $this->siapkanMasterKp();
         $this->siapkanMasterHukdis();
-        $this->nip         = $this->buatPegawai();
+        // Admin satker di satker yang sama dengan pegawai (PegawaiScope nyata: lingkup = satker akun).
+        $idSatker          = $this->buatSatker();
+        $this->nip         = $this->buatPegawaiDiSatker($idSatker);
         $this->admin       = $this->aktor(Role::SUPER_ADMIN)[1];
-        $this->adminSatker = $this->aktor(Role::ADMIN_SATKER)[1];
+        $this->adminSatker = $this->aktor(Role::ADMIN_SATKER, [], $idSatker)[1];
     }
 
     protected function tearDown(): void
@@ -86,12 +88,20 @@ final class HukdisTest extends DatabaseTestCase
     }
 
     /**
+     * Scope produksi (PegawaiScope MAKE-009) yang sudah terpasang (pola KpTest).
+     */
+    protected function btcScopeRole3(array $nipDalam): null
+    {
+        return null;
+    }
+
+    /**
      * Pengganti B-TC #2/#3: tanpa proses (legacy) — role 1/3 menambah langsung berstatus 1 dan snapshot terisi;
      * proses dijawab 403.
      */
     public function testBtcApprovalRole1DanRole3SnapshotSetelahApprovalFinal(): void
     {
-        $nip = $this->buatPegawai();
+        $nip = $this->nip;
 
         foreach ([$this->admin, $this->adminSatker] as $i => $auth) {
             $this->assertFalse($this->d->boleh(AksiRiwayat::Proses, $auth->role()), 'legacy: hukdis tanpa proses');
@@ -123,14 +133,17 @@ final class HukdisTest extends DatabaseTestCase
 
     // ---- Aturan B-14 ---------------------------------------------------
 
-    public function testIzinMatriksV2Role1Dan3Saja(): void
+    public function testIzinMatriksV2Role1Dan3HapusHanyaRole1(): void
     {
         foreach (Role::all() as $role) {
             $admin = in_array($role, [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true);
 
-            foreach ([AksiRiwayat::Lihat, AksiRiwayat::Tambah, AksiRiwayat::Ubah, AksiRiwayat::Hapus] as $aksi) {
+            foreach ([AksiRiwayat::Lihat, AksiRiwayat::Tambah, AksiRiwayat::Ubah] as $aksi) {
                 $this->assertSame($admin, $this->d->boleh($aksi, $role), "{$aksi->value} {$role}");
             }
+
+            // [K] hapus ikut legacy Hukdis.php:171-190 userAuth(['1']) — keputusan user 12-10-2026 (deviasi Matriks v2).
+            $this->assertSame($role === Role::SUPER_ADMIN, $this->d->boleh(AksiRiwayat::Hapus, $role), "hapus {$role}");
 
             $this->assertFalse($this->d->boleh(AksiRiwayat::Proses, $role), "proses {$role}");
         }
@@ -225,11 +238,14 @@ final class HukdisTest extends DatabaseTestCase
         $this->assertErrors(['berkas.7'], fn () => $this->engine()->tambah($this->admin, $this->nip, 'hukdis', $this->dataHukdis('2024-01-01')));
     }
 
-    public function testAdminSatkerTidakBisaMenghapusBarisDisetujui(): void
+    public function testHapusHanyaRole1(): void
     {
         $id = (int) $this->tambah($this->dataHukdis('2024-01-01'))['id_riwayat_hukdis'];
 
+        // Role 3 ditolak di izin Definisi (bukan kunci baris Disetujui), juga untuk baris impor berstatus 0.
         $this->assertStatusApi(403, fn () => $this->engine()->hapus($this->adminSatker, $this->nip, 'hukdis', $id));
+        $impor = $this->sisipRiwayat($this->d, $this->nip, $this->btcBaris($this->nip) + ['status' => 0, 'tmtsk' => '2025-01-01']);
+        $this->assertStatusApi(403, fn () => $this->engine()->hapus($this->adminSatker, $this->nip, 'hukdis', $impor));
 
         $this->engine()->hapus($this->admin, $this->nip, 'hukdis', $id);
         $this->assertNull($this->snapshotUji('pegawai_hukdis', $this->nip));

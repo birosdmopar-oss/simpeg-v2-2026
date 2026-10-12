@@ -32,4 +32,6 @@ export default defineRiwayatJenis({
   lampiran: [{ id_riwayat: 10, label: 'SK KGB', wajib: true, batas_mb: 5, ekstensi: ['jpg', 'jpeg', 'png', 'gif', 'pdf'] }],
   // Kgb::rolePilihStatusSaatUbah() — legacy kgb/form.php:59-74.
   pilihStatusSaatUbah: [Role.SUPER_ADMIN],
+  // RiwayatDefinisi::roleKunciHapusDisetujui() bawaan [3] (legacy Kp.php/Kgb.php delete): Hapus baris Disetujui nonaktif.
+  kunciHapusDisetujuiRole: [Role.ADMIN_SATKER],
 })

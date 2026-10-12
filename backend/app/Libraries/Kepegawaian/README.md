@@ -168,6 +168,11 @@ Sejak MAKE-005 di `main`, permukaan berikut **beku**: hanya boleh berubah **adit
 | Hook `RiwayatDefinisi` | `jenis`, `label`, `tabel`, `primaryKey`, `fields`, `izin`, `alur`, `kolomNip`, `kolomStatus`, `pemetaanStatus`, `kunciBarisDisetujui`, `roleKunciHapusDisetujui`, `statusAwal`, `statusSetelahUbah`, `rolePilihStatusSaatUbah`, `bolehAksiUntuk`, `urutanDaftar`, `snapshot`, `lampiran`, `urutanTab`, `validate` (dengan NIP), `beforeSave`, `afterApprove` |
 | Kontrak HTTP | README `Controllers/Api/Kepegawaian` (endpoint, descriptor, "Rincian engine riwayat") |
 
+Perubahan sesudah beku (aditif / konsistensi, WS-1):
+- MAKE-006: `RiwayatRegistry::descriptorUntuk()` mengisi `can_process` dengan `PegawaiScope::bolehProses` (jalur proses
+  CR-045, sama dengan `RiwayatEngine::proses()`), bukan `bolehUbah` — perubahan konsistensi, bentuk descriptor tetap.
+- MAKE-006: endpoint aditif `GET pegawai/{nip}/riwayat` → `{ tabs }` (sumber = `descriptorUntuk`).
+
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata
 lewat `RiwayatUjiTrait::pasangEngineNyata()`; Definisi uji M1 tetap memakai fake S0 lewat `pasangEngine()`).

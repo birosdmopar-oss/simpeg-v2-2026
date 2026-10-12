@@ -44,11 +44,13 @@ final class KgbTest extends DatabaseTestCase
         parent::setUp();
 
         $this->d = new Kgb();
-        $this->pasangEngine(null, [$this->d, new Kp()]);
+        $this->pasangEngineNyata([$this->d, new Kp()]);
         $this->siapkanMasterKp();
-        $this->nip         = $this->buatPegawai();
+        // Admin satker di satker yang sama dengan pegawai (PegawaiScope nyata: lingkup = satker akun).
+        $idSatker          = $this->buatSatker();
+        $this->nip         = $this->buatPegawaiDiSatker($idSatker);
         $this->admin       = $this->aktor(Role::SUPER_ADMIN)[1];
-        $this->adminSatker = $this->aktor(Role::ADMIN_SATKER)[1];
+        $this->adminSatker = $this->aktor(Role::ADMIN_SATKER, [], $idSatker)[1];
     }
 
     protected function tearDown(): void
@@ -73,6 +75,14 @@ final class KgbTest extends DatabaseTestCase
     protected function btcBaris(string $nip): array
     {
         return $this->dataKgb('2016-04-01');
+    }
+
+    /**
+     * Scope produksi (PegawaiScope MAKE-009) yang sudah terpasang (pola KpTest).
+     */
+    protected function btcScopeRole3(array $nipDalam): null
+    {
+        return null;
     }
 
     // ---- Aturan B-09 ---------------------------------------------------

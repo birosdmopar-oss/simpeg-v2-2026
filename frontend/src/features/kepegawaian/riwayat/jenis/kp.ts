@@ -34,4 +34,6 @@ export default defineRiwayatJenis({
   lampiran: [{ id_riwayat: 11, label: 'SK Kenaikan Pangkat', wajib: true, batas_mb: 5, ekstensi: ['jpg', 'jpeg', 'png', 'gif', 'pdf'] }],
   // Kp::rolePilihStatusSaatUbah() — legacy kp/form.php:59-74 (keputusan user 09-10-2026).
   pilihStatusSaatUbah: [Role.SUPER_ADMIN],
+  // RiwayatDefinisi::roleKunciHapusDisetujui() bawaan [3] (legacy Kp.php/Kgb.php delete): Hapus baris Disetujui nonaktif.
+  kunciHapusDisetujuiRole: [Role.ADMIN_SATKER],
 })

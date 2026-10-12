@@ -152,13 +152,18 @@ function rowLabel(row: RiwayatRow): string {
   return text && text !== '—' ? text : props.config.title
 }
 
+/** Baris Disetujui terkunci untuk role pengguna (salinan aturan Definisi di konfigurasi jenis). */
+function terkunci(row: RiwayatRow, roles: readonly number[] | undefined): boolean {
+  return rowStatus(row) === STATUS_RIWAYAT.DISETUJUI && auth.role !== null && (roles ?? []).includes(auth.role)
+}
+
 function rowActions(row: RiwayatRow): RowAction[] {
   const busy = processBusy.value && processing.value === row
   return [
-    { key: 'edit', label: 'Edit', hidden: !canEdit.value },
+    { key: 'edit', label: 'Edit', hidden: !canEdit.value, disabled: terkunci(row, props.config.kunciUbahDisetujuiRole) },
     ...approvalRowActions({ canProcess: props.descriptor.can_process, status: rowStatus(row), busy }),
     { key: 'lampiran', label: 'Lampiran', hidden: !hasLampiran.value },
-    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.descriptor.can_delete },
+    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.descriptor.can_delete, disabled: terkunci(row, props.config.kunciHapusDisetujuiRole) },
   ]
 }
 

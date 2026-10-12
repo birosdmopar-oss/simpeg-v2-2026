@@ -7,7 +7,8 @@
  *   mengganti induk mengosongkan dan memuat ulang turunannya.
  * - Isian ber-`showWhen` hanya tampil (dan hanya wajib) bila syaratnya terpenuhi; saat kirim, isian tersembunyi
  *   dikirim kosong (= NULL).
- * - Isian ber-`hint` (isian hitung) menampilkan petunjuk, mis. "dikosongkan = dihitung otomatis".
+ * - Isian ber-`hint` (isian hitung) menampilkan petunjuk, mis. "dikosongkan = dihitung otomatis"; isian ber-`resetOn`
+ *   dikosongkan saat pengguna mengubah isian pemicunya (dihitung ulang server kecuali diisi lagi).
  *
  * Lampiran: satu isian berkas per kode `jenis_rwy` (`berkas[<id_riwayat>]`). Lampiran ber-`wajib` harus dipilih saat
  * TAMBAH, dan saat UBAH bila baris itu belum punya lampiran kode tersebut (`lampiranTersimpan[<kode>] === 0`, ikut legacy
@@ -84,12 +85,22 @@ watch(
   },
 )
 
+/** Isian hitung yang `resetOn`-nya memuat isian yang baru diubah pengguna dikosongkan (dihitung ulang server). */
+function onEdited(name: string): void {
+  for (const g of props.fields) {
+    const model = models[g.name]
+    if (model && g.resetOn?.includes(name)) model.value = ''
+  }
+}
+
 async function onRefChange(f: FieldDef, value: string): Promise<void> {
   const model = models[f.name]
   if (model) model.value = value
+  onEdited(f.name)
   for (const name of await refs.select(f.name, value)) {
     const turunan = models[name]
     if (turunan) turunan.value = ''
+    onEdited(name)
   }
 }
 
@@ -180,6 +191,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :state="fieldError(f.name) ? 'error' : 'default'"
             :help-text="helpText(f)"
             :data-field="f.name"
+            @update:model-value="onEdited(f.name)"
           />
           <UiTextField
             v-else
@@ -193,6 +205,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :state="fieldError(f.name) ? 'error' : 'default'"
             :help-text="helpText(f)"
             :data-field="f.name"
+            @update:model-value="onEdited(f.name)"
           />
         </div>
       </template>

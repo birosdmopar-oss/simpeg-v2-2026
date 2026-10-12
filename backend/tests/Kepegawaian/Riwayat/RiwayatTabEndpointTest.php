@@ -111,6 +111,8 @@ final class RiwayatTabEndpointTest extends DatabaseTestCase
         $tabs = $this->json($this->asUser($adminSatker)->get("api/v1/pegawai/{$dalam}/riwayat"))['data']['tabs'];
         $this->assertSame(['kp', 'kgb', 'pendidikan', 'hukdis'], array_column($tabs, 'jenis'));
         $this->assertTrue($tabs[0]['can_process']);
+        // Hukdis: hapus hanya role 1 (ikut legacy, keputusan user 12-10-2026).
+        $this->assertSame(['hukdis', false, true], [$tabs[3]['jenis'], $tabs[3]['can_delete'], $tabs[3]['can_edit']]);
 
         $this->asUser($adminSatker)->get("api/v1/pegawai/{$luar}/riwayat")->assertStatus(403);
         $this->asUser($adminSatker)->get('api/v1/pegawai/' . self::NIP_TIDAK_ADA . '/riwayat')->assertStatus(403);
