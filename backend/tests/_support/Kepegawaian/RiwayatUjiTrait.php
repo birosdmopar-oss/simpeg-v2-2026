@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Tests\Support\Kepegawaian;
 
 use App\Constants\Role;
+use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
+use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Lampiran\AttachmentService;
+use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
@@ -13,13 +17,17 @@ use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use CodeIgniter\Events\Events;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Services;
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Tests\Support\Kepegawaian\Riwayat\UjiKp;
 use Tests\Support\Kepegawaian\Riwayat\UjiPendidikan;
 
 /**
  * Helper test mesin riwayat (WS-1 M1 MAKE-004) untuk test turunan Tests\Support\DatabaseTestCase: memasang engine
- * dengan registry berisi Definisi uji (atau Definisi nyata di milestone berikutnya), fake PegawaiScope/lampiran, dan
- * pencatat event notifikasi. Hanya INSERT (cocok bingkai transaksi MAKE-001).
+ * dengan registry berisi Definisi uji atau nyata, PegawaiScope/lampiran fake S0 (pasangEngine) atau nyata MAKE-009
+ * (pasangEngineNyata: PegawaiScope produksi + AttachmentService di atas LocalStorageAdapter berakar folder sementara),
+ * dan pencatat event notifikasi. Hanya INSERT (cocok bingkai transaksi MAKE-001).
  *
  * Panggil lepasEngine() di tearDown() (mencabut pendengar event).
  */
@@ -27,8 +35,9 @@ trait RiwayatUjiTrait
 {
     use PegawaiFixtureTrait;
 
-    protected FakePegawaiScope $scopeUji;
-    protected FakeAttachmentService $lampiranUji;
+    protected PegawaiScopeInterface $scopeUji;
+    protected AttachmentServiceInterface $lampiranUji;
+    protected ?string $akarLampiranRiwayatUji = null;
     protected UjiPendidikan $pendidikanUji;
     protected UjiKp $kpUji;
     protected int $idPangkatUji = 0;
@@ -63,10 +72,70 @@ trait RiwayatUjiTrait
         });
     }
 
+    /**
+     * Engine dengan PegawaiScope produksi (service `pegawaiScope`, tidak disuntik) dan AttachmentService + PenjagaBerkas
+     * nyata di atas LocalStorageAdapter berakar folder sementara ($this->akarLampiranRiwayatUji, dihapus lepasEngine()).
+     *
+     * @param list<RiwayatDefinisi> $definisi
+     */
+    protected function pasangEngineNyata(array $definisi): void
+    {
+        $this->akarLampiranRiwayatUji = sys_get_temp_dir() . '/simpeg-riwayat-uji-' . bin2hex(random_bytes(6));
+        $this->scopeUji               = service('pegawaiScope');
+        $this->lampiranUji            = new AttachmentService(new LocalStorageAdapter($this->akarLampiranRiwayatUji));
+        $this->pendidikanUji          = new UjiPendidikan();
+        $this->kpUji                  = new UjiKp();
+
+        Services::injectMock('attachmentService', $this->lampiranUji);
+        Services::injectMock('riwayatRegistry', new RiwayatRegistry(static fn () => service('pegawaiScope'), $definisi));
+        Services::injectMock('snapshotSync', new SnapshotSync());
+        Services::injectMock('riwayatService', new RiwayatEngine());
+
+        $this->notifikasiUji = [];
+        Events::on(RiwayatEngine::EVENT_NOTIFIKASI, function (array $payload): void {
+            $this->notifikasiUji[] = $payload;
+        });
+    }
+
     protected function lepasEngine(): void
     {
         Events::removeAllListeners(RiwayatEngine::EVENT_NOTIFIKASI);
         Services::reset(true);
+
+        if ($this->akarLampiranRiwayatUji !== null && is_dir($this->akarLampiranRiwayatUji)) {
+            foreach ($this->berkasLampiranRiwayatUji(true) as $item) {
+                is_dir($item) ? rmdir($item) : unlink($item);
+            }
+
+            rmdir($this->akarLampiranRiwayatUji);
+        }
+
+        $this->akarLampiranRiwayatUji = null;
+    }
+
+    /**
+     * Berkas (dan, bila $denganFolder, folder) di akar lampiran uji, anak lebih dulu.
+     *
+     * @return list<string> path absolut
+     */
+    protected function berkasLampiranRiwayatUji(bool $denganFolder = false): array
+    {
+        if ($this->akarLampiranRiwayatUji === null || ! is_dir($this->akarLampiranRiwayatUji)) {
+            return [];
+        }
+
+        $hasil = [];
+
+        foreach (new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($this->akarLampiranRiwayatUji, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        ) as $item) {
+            if ($denganFolder || $item->isFile()) {
+                $hasil[] = $item->getPathname();
+            }
+        }
+
+        return $hasil;
     }
 
     /**

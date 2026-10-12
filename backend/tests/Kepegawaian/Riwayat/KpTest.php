@@ -23,8 +23,8 @@ use Tests\Support\Kepegawaian\RiwayatUjiTrait;
 
 /**
  * B-08 Riwayat Kenaikan Pangkat (WS-1 M2 MAKE-005): B-TC generik, snapshot multi-target kp/cpns/pns, validasi TMT
- * periode (CR-025, DoD B-08) dan aturan legacy `L_kp.php` lewat Definisi nyata. PegawaiScope & lampiran masih fake S0
- * (⛔ TITIK TUNGGU 3).
+ * periode (CR-025, DoD B-08) dan aturan legacy `L_kp.php` lewat Definisi nyata. PegawaiScope +
+ * AttachmentService/LocalStorageAdapter nyata (MAKE-009), lewat RiwayatUjiTrait::pasangEngineNyata().
  *
  * @internal
  */
@@ -45,11 +45,13 @@ final class KpTest extends DatabaseTestCase
         parent::setUp();
 
         $this->d = new Kp();
-        $this->pasangEngine(null, [$this->d, new Pendidikan()]);
+        $this->pasangEngineNyata([$this->d, new Pendidikan()]);
         $this->siapkanMasterKp();
-        $this->nip         = $this->buatPegawai();
+        // Admin satker di satker yang sama dengan pegawai (PegawaiScope nyata: lingkup = satker akun).
+        $idSatker          = $this->buatSatker();
+        $this->nip         = $this->buatPegawaiDiSatker($idSatker);
         $this->admin       = $this->aktor(Role::SUPER_ADMIN)[1];
-        $this->adminSatker = $this->aktor(Role::ADMIN_SATKER)[1];
+        $this->adminSatker = $this->aktor(Role::ADMIN_SATKER, [], $idSatker)[1];
     }
 
     protected function tearDown(): void
@@ -74,6 +76,14 @@ final class KpTest extends DatabaseTestCase
     protected function btcBaris(string $nip): array
     {
         return $this->dataKpNyata(3, '2015-04-01') + ['jenis_kp' => 'Reguler', 'gol' => 'III', 'ruang' => 'a', 'gol_ruang' => 'III/a', 'pangkat' => 'Penata Muda'];
+    }
+
+    /**
+     * Scope produksi (PegawaiScope MAKE-009) yang sudah terpasang.
+     */
+    protected function btcScopeRole3(array $nipDalam): null
+    {
+        return null;
     }
 
     // ---- Aturan B-08 ---------------------------------------------------

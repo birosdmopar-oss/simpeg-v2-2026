@@ -11,6 +11,7 @@ use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
+use Tests\Support\Kepegawaian\FakeAttachmentService;
 use Tests\Support\Kepegawaian\RiwayatUjiTrait;
 
 /**
@@ -201,6 +202,7 @@ final class RiwayatEndpointTest extends DatabaseTestCase
         ]]);
 
         $this->asUser($this->admin)->post("api/v1/pegawai/{$this->nip}/riwayat/pendidikan", ['tgl_lulus' => '2012-08-30'])->assertStatus(201);
+        $this->assertInstanceOf(FakeAttachmentService::class, $this->lampiranUji);
         $this->assertSame([], $this->lampiranUji->baris);
     }
 }

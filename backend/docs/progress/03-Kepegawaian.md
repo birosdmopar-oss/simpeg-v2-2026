@@ -16,9 +16,9 @@ Pembagian kerja Fase 3: WS-1 (mesin riwayat + riwayat karier/administrasi, `docs
 | B-05 Tambah & hapus pegawai | WS-2 | MAKE-011 | TODO | |
 | B-06 Koreksi NIP (cascade) | WS-2 | MAKE-010 | TODO | Bahan murni sudah ada (CR-036): registry 79 kolom NIP (`TabelAnakNip::sampaiFase(3)` = 45), `FormatNip`. Service `nipCascade` terdaftar (stub S0-A) |
 | B-07 Riwayat jabatan / mutasi | WS-2 | MAKE-012 | TODO | Slug `jabatan` |
-| B-08 Riwayat KP | WS-1 | MAKE-005 | **IN_PROGRESS** | Definisi `kp` (multi-target kp/cpns/pns, TMT periode CR-025, CPNS/PNS sekali, TMT tidak kembar, SK wajib); test dengan scope/lampiran fake — uji ulang dengan versi nyata setelah MAKE-009 (WS1 ⛔3) |
+| B-08 Riwayat KP | WS-1 | MAKE-005 | **REVIEW** | Definisi `kp` (multi-target kp/cpns/pns, TMT periode CR-025, CPNS/PNS sekali, TMT tidak kembar, SK wajib); role 1 memilih status saat ubah (ikut legacy, keputusan user 09-10); B-TC + test jenis dengan PegawaiScope + lampiran nyata (MAKE-009); freeze engine-v1 menunggu review (WS1 ⛔4) |
 | B-09 Riwayat KGB | WS-1 | MAKE-006 | TODO | Validasi jarak 2 tahun sudah ada (CR-025); acuan jarak = KP/KGB terakhir (keputusan #10) |
-| B-10 Riwayat pendidikan | WS-1 | MAKE-005 | **IN_PROGRESS** | Definisi `pendidikan` (self-service, snapshot jenjang tertinggi, bidang/jurusan bersyarat, Ijazah wajib); freeze engine-v1 setelah MAKE-009 + review (WS1 ⛔3/⛔4) |
+| B-10 Riwayat pendidikan | WS-1 | MAKE-005 | **REVIEW** | Definisi `pendidikan` (self-service, snapshot jenjang tertinggi, bidang/jurusan bersyarat, Ijazah wajib); B-TC + test jenis dengan PegawaiScope + lampiran nyata (MAKE-009); freeze engine-v1 menunggu review (WS1 ⛔4) |
 | B-11 Riwayat diklat & seminar | WS-1 | MAKE-007 | TODO | |
 | B-12 Riwayat SKP & LKH | WS-1 (B-12a SKP) / WS-2 (B-12b LKH) | MAKE-008 / MAKE-013 | TODO | Approver LKH = atasan langsung (ikut legacy) |
 | B-13 Riwayat Konket | WS-2 | MAKE-013 | TODO | Halaman usulan mandiri, bukan jenis engine |

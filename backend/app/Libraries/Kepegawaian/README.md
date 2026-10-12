@@ -153,7 +153,13 @@ Hook `validate()` menerima kolom NIP pemilik di `$data` (aditif MAKE-005) agar c
 sekali) juga jalan saat tambah.
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
-`PendidikanTest`, `KpTest` = B-TC + aturan per jenis).
+`PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata
+lewat `RiwayatUjiTrait::pasangEngineNyata()`; Definisi uji M1 tetap memakai fake S0 lewat `pasangEngine()`).
+
+**Retensi lampiran baris status 10 (keputusan WS-1, M2).** Hapus riwayat = status 10; baris `document_attachment` dan
+berkasnya **dipertahankan** (jejak audit/pemulihan; legacy menghapus keras keduanya). Endpoint lampiran MAKE-009
+menjawab 404 untuk baris status 10, jadi berkas itu tidak lagi bisa diunduh/diubah lewat API. Pembersihan berkala (bila
+perlu) diputuskan terpisah.
 Trait B-TC generik `Tests\Support\Kepegawaian\RiwayatBtcTrait` + helper `RiwayatUjiTrait`: setiap jenis riwayat
 nyata membuat satu kelas test `use RiwayatBtcTrait` dan mengisi `btcDefinisi()`, `btcPayload()`, `btcBaris()`.
 

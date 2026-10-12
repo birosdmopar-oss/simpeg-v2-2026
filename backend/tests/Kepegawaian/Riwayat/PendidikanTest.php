@@ -6,6 +6,7 @@ namespace Tests\Kepegawaian\Riwayat;
 
 use App\Constants\Role;
 use App\Exceptions\ValidationException;
+use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Kp;
@@ -16,6 +17,8 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use Closure;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
+use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatBtcTrait;
@@ -23,7 +26,7 @@ use Tests\Support\Kepegawaian\RiwayatUjiTrait;
 
 /**
  * B-10 Riwayat Pendidikan (WS-1 M2 MAKE-005): B-TC generik + aturan legacy `L_pendidikan.php` lewat Definisi nyata.
- * PegawaiScope & lampiran masih fake S0 (⛔ TITIK TUNGGU 3: dijalankan ulang dengan versi nyata setelah MAKE-009).
+ * PegawaiScope + AttachmentService/LocalStorageAdapter nyata (MAKE-009), lewat RiwayatUjiTrait::pasangEngineNyata().
  *
  * @internal
  */
@@ -44,7 +47,7 @@ final class PendidikanTest extends DatabaseTestCase
         parent::setUp();
 
         $this->d = new Pendidikan();
-        $this->pasangEngine(null, [$this->d, new Kp()]);
+        $this->pasangEngineNyata([$this->d, new Kp()]);
         $this->siapkanMasterPendidikan();
         [$this->nip, $this->pegawai] = $this->aktor(Role::PEGAWAI);
         $this->admin                 = $this->aktor(Role::SUPER_ADMIN)[1];
@@ -79,6 +82,14 @@ final class PendidikanTest extends DatabaseTestCase
         return [Pendidikan::LAMPIRAN_IJAZAH => $this->berkasUji()];
     }
 
+    /**
+     * Scope produksi (PegawaiScope MAKE-009) yang sudah terpasang.
+     */
+    protected function btcScopeRole3(array $nipDalam): null
+    {
+        return null;
+    }
+
     // ---- Aturan B-10 ---------------------------------------------------
 
     public function testIzinMatriksV2(): void
@@ -110,6 +121,44 @@ final class PendidikanTest extends DatabaseTestCase
 
         // Ubah tanpa berkas baru: Ijazah sudah ada (legacy vp() edit hanya mewajibkan bila belum ada).
         $this->engine()->ubah($this->pegawai, $this->nip, 'pendidikan', (int) $id, ['institusi_pendidikan' => 'Politeknik Pariwisata']);
+    }
+
+    public function testLampiranNyataTersimpanDanDibersihkanSaatRollback(): void
+    {
+        // Lampiran nyata (AttachmentService + LocalStorageAdapter): commit → berkas ada & baris document_attachment;
+        // rollback (snapshot gagal) → baris riwayat & lampiran batal, berkas di disk direkonsiliasi selesaikan().
+        $row = $this->tambah($this->admin, $this->dataS1());
+        $this->assertCount(1, $this->berkasLampiranRiwayatUji());
+        $this->assertSame(1, $this->db->table('document_attachment')->where('NIP', $this->nip)->where('id_entri', (string) $row['id_riwayat_pendidikan'])->countAllResults());
+
+        Services::injectMock('snapshotSync', new class () implements SnapshotSyncInterface {
+            public function sinkronkan(RiwayatDefinisi $definisi, string $nip, ?AuthContext $pelaku = null): void
+            {
+                throw new RuntimeException('snapshot gagal');
+            }
+        });
+
+        try {
+            $this->tambah($this->admin, $this->dataS1(['tgl_lulus' => '2018-08-30']));
+            $this->fail('exception diharapkan');
+        } catch (RuntimeException $e) {
+            $this->assertSame('snapshot gagal', $e->getMessage());
+        }
+
+        $this->assertCount(1, $this->berkasLampiranRiwayatUji(), 'berkas unggahan transaksi gagal dihapus');
+        $this->assertSame(1, $this->db->table('document_attachment')->where('NIP', $this->nip)->countAllResults());
+        $this->assertSame(1, $this->db->table('riwayat_pendidikan')->where('nip', $this->nip)->countAllResults());
+    }
+
+    public function testHapusLunakMempertahankanLampiran(): void
+    {
+        // Keputusan WS-1 (retensi): hapus riwayat = status 10, lampiran baris itu tetap tersimpan (audit/pemulihan);
+        // endpoint lampiran MAKE-009 menjawab 404 untuk baris status 10.
+        $row = $this->tambah($this->pegawai, $this->dataS1());
+        $this->engine()->hapus($this->pegawai, $this->nip, 'pendidikan', (int) $row['id_riwayat_pendidikan']);
+
+        $this->assertCount(1, $this->berkasLampiranRiwayatUji());
+        $this->assertSame(1, $this->db->table('document_attachment')->where('NIP', $this->nip)->countAllResults());
     }
 
     public function testBatasLampiran5Mb(): void

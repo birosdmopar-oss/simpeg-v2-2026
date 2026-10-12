@@ -6,6 +6,7 @@ namespace Tests\Support\Kepegawaian;
 
 use App\Constants\Role;
 use App\Exceptions\ApiException;
+use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\AlurRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
@@ -120,7 +121,11 @@ trait RiwayatBtcTrait
         $dalam             = $this->buatPegawaiDiSatker($idSatker);
         $luar              = $this->buatPegawaiDiSatker($this->buatSatker());
         [, , $adminSatker] = $this->aktor(Role::ADMIN_SATKER, [], $idSatker);
-        Services::injectMock('pegawaiScope', $this->btcScopeRole3([$dalam]));
+        $scope             = $this->btcScopeRole3([$dalam]);
+
+        if ($scope !== null) {
+            Services::injectMock('pegawaiScope', $scope);
+        }
 
         $this->asUser($adminSatker)->get($this->btcPath($dalam))->assertStatus(200);
         $this->asUser($adminSatker)->get($this->btcPath($luar))->assertStatus(403);
@@ -137,7 +142,8 @@ trait RiwayatBtcTrait
             [, , $akun] = $this->aktor($role);
 
             $lihat = $this->asUser($akun)->get($this->btcPath($nip));
-            $this->assertSame($d->boleh(AksiRiwayat::Lihat, $role) ? 200 : 403, $lihat->response()->getStatusCode(), "lihat role {$role}");
+            $boleh = $d->boleh(AksiRiwayat::Lihat, $role) && service('pegawaiScope')->bolehLihat($this->authUntukAkun((int) $akun['id_pengguna']), $nip);
+            $this->assertSame($boleh ? 200 : 403, $lihat->response()->getStatusCode(), "lihat role {$role}");
 
             if (! $d->boleh(AksiRiwayat::Proses, $role)) {
                 $this->asUser($akun)->withBodyFormat('json')->post($this->btcPath($nip, $id) . '/process', ['aksi' => 'setujui'])->assertStatus(403);
@@ -212,12 +218,13 @@ trait RiwayatBtcTrait
     }
 
     /**
-     * Scope untuk butir lingkup role 3. Default: fake S0 yang hanya mengizinkan $nipDalam. Setelah MAKE-009 di main,
-     * jenis boleh menimpa ini dengan PegawaiScope nyata.
+     * Scope untuk butir lingkup role 3. Default: fake S0 yang hanya mengizinkan $nipDalam (Definisi uji). Kembalikan
+     * null untuk memakai scope yang sudah terpasang — jenis nyata memakai PegawaiScope produksi (MAKE-009) lewat
+     * RiwayatUjiTrait::pasangEngineNyata(): admin satker hanya melihat pegawai di satkernya.
      *
      * @param list<string> $nipDalam
      */
-    protected function btcScopeRole3(array $nipDalam): FakePegawaiScope
+    protected function btcScopeRole3(array $nipDalam): ?PegawaiScopeInterface
     {
         return FakePegawaiScope::izinkanHanya($nipDalam);
     }
