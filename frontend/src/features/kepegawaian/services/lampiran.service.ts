@@ -5,7 +5,10 @@
  *   GET    pegawai/{nip}/lampiran/{id}/unduh             unduh berkas
  *   DELETE pegawai/{nip}/lampiran/{id}                   hapus keras
  * Lampiran milik NIP lain dijawab 404. Baris lampiran = `document_attachment` (kunci `NIP` huruf besar, tanpa `path`).
- * Galat 422 endpoint ini berkunci `errors.berkas`.
+ * Galat 422 endpoint ini berkunci `errors.berkas` (berkas), `errors.id_riwayat` / `errors.id_entri` (target).
+ *
+ * Ditetapkan MAKE-009: query `id_riwayat` dan `id_entri` WAJIB pada daftar (422 bila kosong); unggah selalu MENAMBAH
+ * lampiran — "ganti" = unggah yang baru lalu hapus yang lama (tidak ada endpoint ganti).
  */
 import { api } from '@/lib/axios'
 
@@ -21,7 +24,6 @@ export interface LampiranTarget {
 const base = (nip: string): string => `/pegawai/${encodeURIComponent(nip)}/lampiran`
 
 export const lampiranService = {
-  /** TODO(kontrak): wajib-tidaknya query `id_riwayat`/`id_entri` belum ditetapkan — sementara selalu dikirim keduanya. */
   async list(nip: string, target: LampiranTarget): Promise<DocumentAttachment[]> {
     const { data } = await api.get<DocumentAttachment[]>(base(nip), {
       params: { id_riwayat: target.id_riwayat, id_entri: String(target.id_entri) },
@@ -46,6 +48,4 @@ export const lampiranService = {
   async remove(nip: string, idAttachment: number): Promise<void> {
     await api.delete(`${base(nip)}/${idAttachment}`)
   },
-
-  // TODO(kontrak, WS-2 MAKE-009): semantik "ganti" lampiran belum ditetapkan — sengaja belum ada fungsi ganti.
 }

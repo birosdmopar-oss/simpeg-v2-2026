@@ -26,12 +26,23 @@ Pembagian kerja Fase 3: WS-1 (mesin riwayat + riwayat karier/administrasi, `docs
 | B-15 Riwayat angka kredit | WS-1 | MAKE-008 | TODO | Slug `ak`, `ak-siasn` |
 | B-16 Riwayat keluarga & alamat | WS-1 | MAKE-007 | TODO | |
 | B-17 Karpeg, Karis/Karsu, tanda jasa, organisasi | WS-1 | MAKE-007 | TODO | Karpeg/Karis = halaman usulan mandiri |
-| B-18 Upload lampiran | WS-2 | MAKE-009 | TODO | Batas 1/2/5 MB per jenis (ikut legacy); interface beku S0-A |
+| B-18 Upload lampiran | WS-2 | MAKE-009 | **REVIEW** | AttachmentService + LocalStorageAdapter + kompensasi berkas, helper kolom berkas, endpoint `pegawai/{nip}/lampiran*`, `ArsipTable`; bagian "WS-2 M1" di bawah |
 | B-19 Struktur organisasi | WS-2 | MAKE-012 | TODO | |
 | B-20 Detail pegawai & pencarian (frontend) | WS-2 | MAKE-003 (fondasi) / MAKE-010 (dasar) / MAKE-014 (penutup) | TODO | Menu Fase 3 tersembunyi (`ACTIVE_PHASE = 2`) sampai penutup |
 | B-21 Unit test Modul Kepegawaian | WS-1 (snapshot) / WS-2 (cascade NIP) | MAKE-008 / MAKE-010 | **IN_PROGRESS** | 3 dari 5 butir DoD lolos (CR-025: periode KP, jarak KGB, akhir hukdis). Sisa: snapshot sync hanya di approval final (WS-1) dan cascade NIP + rollback (WS-2) |
 
-Paket lintas task: S0-A kontrak backend (MAKE-002, bagian di bawah), S0-B fondasi frontend (MAKE-003, WS-2), WS-1 M1 SnapshotSync + RiwayatEngine (MAKE-004).
+Paket lintas task: S0-A kontrak backend (MAKE-002, bagian di bawah), S0-B fondasi frontend (MAKE-003, WS-2), WS-1 M1 SnapshotSync + RiwayatEngine (MAKE-004), WS-2 M1 PegawaiScope + B-18 (MAKE-009, bagian di bawah).
+
+## WS-2 M1 — MAKE-009 (PegawaiScope nyata + B-18 Lampiran)
+
+Branch `ws2/make-009-m1-scope-lampiran`; tanpa perubahan skema/migration. `Config\Services`: baris stub `pegawaiScope`, `attachmentService`, `storageAdapter` diganti kelas nyata (kelas stub tetap ada untuk test fail-closed).
+
+- **PegawaiScope** (`App\Libraries\Kepegawaian\Scope\PegawaiScope`): role 1 lihat+ubah semua; 4/5/8 lihat semua, ubah tidak; 2/6/7 hanya NIP sendiri; role 3 = port `validateAccess_AP` [K] (`helpers/function_helper.php`, konstanta `UNIT_DESTINASI` 21 / `UNIT_LAIN` 7 / `SATKER_BPO` 37,38,41 di `config/constants.php`) atas `pegawai_mutasi_jabatan`: admin bersatker → `id_satker` = satker admin; admin tanpa satker unit 21 → `id_unit = 21 OR (id_unit = 7 AND id_satker IN (37,38,41))`; admin tanpa satker unit lain → `id_unit` = unit admin; tanpa pengecualian NIP sendiri; tanpa sesi/role dikenal → tidak ada. Satu predikat untuk `bolehLihat`/`bolehUbah` dan `terapkanKeQuery()` (daftar = detail, diuji per role termasuk 21/7). Pegawai tanpa snapshot pmj tidak masuk lingkup role 3 (sama dengan legacy).
+- **Deviasi [V2]:** legacy meloloskan admin role 3 tanpa satker dan tanpa unit (`null == ''`) dan daftar legacy tidak konsisten dengan detail; v2 fail-closed dan daftar = detail = `validateAccess_AP`. Cast claim `id_satker`/`id_unit` VARCHAR → INT hanya untuk angka kanonik (`'012'` ditolak) = [V2] sementara sampai DBV-009.
+- **Sumber legacy 21/7:** `validateAccess_AP` (`function_helper.php:72-95`) dan konstanta (`constants.php:312-314`) dikutip reviewer CR; salinan legacy yang tersedia di mesin pengembang lebih lama (`constants.php` tanpa `UNIT_DESTINASI`/`UNIT_LAIN`/`SATKER_BPO`), jadi diimplementasikan dari spesifikasi review CR.
+- **B-18:** `LocalStorageAdapter` (akar `writable/uploads/lampiran`, path relatif tervalidasi, tulis atomik), `AttachmentService` (validasi dari isi berkas lewat finfo, batas MB `AturanLampiran`, nama/path simpan dari server, `path` tidak pernah dikembalikan, terikat NIP → 404, hapus keras + audit lewat `DocumentAttachmentModel`), `PenjagaBerkas` (kompensasi: berkas direkonsiliasi dengan DB setelah transaksi pemanggil selesai — rollback menghapus unggahan dan mempertahankan berkas yang "dihapus"), `KolomBerkas` (helper kolom berkas `file_1..5` dsb.), `OtorisasiLampiran` + `LampiranController` (daftar/unggah: kode → izin Definisi → lingkup → keterikatan `id_entri` → kunci baris Disetujui untuk UL_PEGAWAI; unduh/hapus: lingkup lihat → baris lampiran → izin Definisi + lingkup ubah; baris status 10 → 404; lampiran terakhir kode `wajib` tidak bisa dihapus → 422 `errors.berkas`).
+- **Frontend:** `components/ArsipTable.vue` (daftar/unggah/unduh/hapus, menu ⋮ Unduh → Hapus, ConfirmDialog); TODO kontrak lampiran diselesaikan (query wajib, "ganti" = unggah baru dulu, lalu hapus yang lama; Hapus disabled untuk lampiran terakhir kode `wajib`).
+- **Test:** `tests/Kepegawaian/PegawaiScopeTest.php` (role 1/2/3/4/5/6/7/8 + unit 21/7 + fail-closed + filter daftar), `AttachmentServiceTest.php` (validasi, NIP, audit, rollback simpan/hapus, rekonsiliasi), `KolomBerkasTest.php`, `LampiranEndpointTest.php` (feature, Definisi contoh pendidikan; 403 di luar lingkup untuk id ada/tidak ada, kunci baris Disetujui, baris dihapus 404, lampiran wajib terakhir 422), `tests/unit/Kepegawaian/Lampiran/LocalStorageAdapterTest.php`; Vitest `ArsipTable.spec.ts`.
 
 ## S0-A — MAKE-002 (kontrak backend Fase 3)
 
