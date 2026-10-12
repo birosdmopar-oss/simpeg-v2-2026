@@ -307,13 +307,19 @@ Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai 
 | `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil) |
 | `PenjagaBerkas` | Kompensasi berkas di luar transaksi DB: setelah transaksi selesai, berkas tercatat dipertahankan hanya bila masih dirujuk `tabel.kolom = path` |
 | `KolomBerkas` | Helper tabel yang menyimpan berkas di kolomnya sendiri (`riwayat_karpeg.file_1..5`, LKH, Konket) |
-| `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → izin aksi di Definisi berlampiran mana pun (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi → baris riwayat bukan status 10 (404) (+ `bolehUbah`, kunci baris, lampiran wajib terakhir 422 untuk hapus). Tulis diulang di dalam transaksi: `kunciUnggah()`/`kunciHapus()` (pegawai `FOR UPDATE`, baca ulang terkunci, hitung ulang lampiran wajib) |
+| `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → (unggah) izin per pegawai `bolehAksiUntuk()` atas aksi `tambah`/`ubah` yang diizinkan role (403, CR-046) → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → izin aksi di Definisi berlampiran mana pun (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi → (hapus) `bolehUbah` + `bolehAksiUntuk()` atas `hapus`/`ubah` (403, CR-046) → baris riwayat bukan status 10 (404) (+ kunci baris, lampiran wajib terakhir 422 untuk hapus). Tulis diulang di dalam transaksi: `kunciUnggah()`/`kunciHapus()` (pegawai `FOR UPDATE`, baca ulang terkunci, hitung ulang lampiran wajib) |
 
 **Lampiran wajib & "ganti".** Lampiran terakhir kode ber-`wajib` pada satu baris tidak bisa dihapus (422
 `errors.berkas`); "ganti" = unggah berkas baru dulu, lalu hapus yang lama. Baris riwayat berstatus 1 Disetujui terkunci
 untuk UL_PEGAWAI (`kunciBarisDisetujui()`): unggah/hapus lampirannya 403; baris status 10 Dihapus → 404 (juga unduh).
 Hitungan "lampiran terakhir" diulang di dalam transaksi hapus dengan baris `pegawai` terkunci, jadi dua hapus paralel
 tidak bisa menghabiskan lampiran wajib.
+
+**Izin per pegawai di endpoint lampiran (CR-046).** Unggah dan hapus memanggil `RiwayatDefinisi::bolehAksiUntuk()` sama
+dengan engine, sesudah izin role dan `bolehUbah` (status pegawai di luar lingkup tidak bocor); contoh Pendidikan: role 2
+hanya selama CPNS, jadi pegawai PNS tidak bisa mengunggah/menghapus lampiran pendidikannya (403), sementara daftar dan
+unduh tetap boleh. Seperti izin role, pemeriksaan ini tidak diulang di `kunciUnggah()`/`kunciHapus()` (engine juga hanya
+memeriksanya sekali di `siapkan()`).
 
 **Deviasi [V2] lampiran.** Endpoint lampiran tidak mengubah status baris riwayat (legacy mengunggah lampiran hanya lewat
 form edit riwayat, yang mengembalikan status baris ke 0/1); kunci baris Disetujui untuk `DELETE` lampiran lebih ketat

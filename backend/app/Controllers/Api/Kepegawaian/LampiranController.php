@@ -21,7 +21,8 @@ use Throwable;
  *   GET    pegawai/{nip}/lampiran/{id}/unduh              unduh berkas (izin lihat)
  *   DELETE pegawai/{nip}/lampiran/{id}                    hapus keras + audit (izin hapus/ubah)
  *
- * Otorisasi: OtorisasiLampiran — daftar/unggah: Definisi pemilik kode × role → PegawaiScope → keterikatan id_entri
+ * Otorisasi: OtorisasiLampiran — daftar/unggah: Definisi pemilik kode × role → PegawaiScope (+ izin per pegawai
+ * RiwayatDefinisi::bolehAksiUntuk untuk unggah dan hapus, CR-046) → keterikatan id_entri
  * (+ kunci baris Disetujui untuk UL_PEGAWAI); unduh/hapus: PegawaiScope lihat → izin di Definisi mana pun → baris lampiran
  * → izin Definisi → baris riwayat (+ lingkup ubah, kunci baris, lampiran wajib terakhir untuk hapus). Unggah/hapus
  * mengulang pemeriksaan tulis di dalam transaksi (OtorisasiLampiran::kunciUnggah/kunciHapus, pegawai `FOR UPDATE`). NIP dari route selalu string (castNumericParams mati: NIP

@@ -25,6 +25,8 @@ use LogicException;
  *  1. `id_riwayat` → Definisi pemilik kode (tidak terdaftar → 404);
  *  2. izin Definisi × role: lihat = `lihat`; unggah = `tambah` atau `ubah` (403);
  *  3. PegawaiScope `bolehLihat` (baca) / `bolehUbah` (tulis) atas {nip} (403);
+ *  3a. unggah: izin per pegawai `RiwayatDefinisi::bolehAksiUntuk()` (CR-046) — salah satu aksi `tambah`/`ubah` yang
+ *     diizinkan role JUGA harus lolos hook untuk {nip} (mis. Pendidikan: role 2 hanya selama CPNS) (403); daftar tidak;
  *  4. `id_entri` = baris milik {nip} di `tabel()` Definisi (`<pk> = id_entri AND <kolomNip> = nip`), bukan berstatus
  *     Dihapus (404);
  *  5. tulis: baris Disetujui terkunci untuk UL_PEGAWAI bila `kunciBarisDisetujui()` (403).
@@ -35,7 +37,8 @@ use LogicException;
  *  b. role tanpa izin aksi itu (unduh = `lihat`; hapus = `hapus`/`ubah`) di Definisi berlampiran MANA PUN → 403, juga
  *     sebelum baris lampiran dibaca (tidak ada oracle keberadaan id bagi role yang tidak pernah boleh);
  *  c. baris `document_attachment` {id} milik {nip} (404);
- *  d. izin Definisi pemilik `id_riwayat` baris itu: unduh = `lihat`; hapus = `hapus` atau `ubah`, plus `bolehUbah` (403);
+ *  d. izin Definisi pemilik `id_riwayat` baris itu: unduh = `lihat`; hapus = `hapus` atau `ubah`, plus `bolehUbah`, lalu
+ *     (hapus saja, CR-046) `bolehAksiUntuk()` atas {nip} untuk aksi `hapus`/`ubah` yang diizinkan role (403);
  *  e. baris riwayat `id_entri` milik {nip} dan bukan status 10 Dihapus (404) — unduh hanya membaca (tanpa kunci baris);
  *     hapus juga menegakkan kunci baris Disetujui (403), lalu lampiran terakhir kode ber-`wajib` tidak boleh dihapus
  *     (422 `errors.berkas`; "ganti" = unggah baru dulu, lalu hapus yang lama).
@@ -75,6 +78,7 @@ final class OtorisasiLampiran
         $definisi = $this->definisi($idRiwayat);
         $this->izin($definisi, $auth, [AksiRiwayat::Tambah, AksiRiwayat::Ubah]);
         $this->lingkup($auth, $nip, true);
+        $this->izinUntukPegawai($definisi, $auth, $nip, [AksiRiwayat::Tambah, AksiRiwayat::Ubah]);
         $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri));
 
         return $this->aturan($idRiwayat);
@@ -112,6 +116,7 @@ final class OtorisasiLampiran
         $definisi  = $this->definisi($idRiwayat);
         $this->izin($definisi, $auth, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
         $this->lingkup($auth, $nip, true);
+        $this->izinUntukPegawai($definisi, $auth, $nip, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
         $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, (string) $row['id_entri']));
         $this->bukanLampiranWajibTerakhir($nip, $idRiwayat, (string) $row['id_entri'], false);
 
@@ -193,6 +198,26 @@ final class OtorisasiLampiran
         }
 
         throw new ForbiddenException('Anda tidak berhak mengakses lampiran ini.');
+    }
+
+    /**
+     * Izin per pegawai sasaran (CR-046, hook aditif MAKE-005 `RiwayatDefinisi::bolehAksiUntuk()`, sama dengan
+     * RiwayatEngine::siapkan()): lolos bila ADA aksi di $salahSatu yang diizinkan role DAN lolos hook untuk {nip}; selain
+     * itu 403. Dipanggil SESUDAH izin role dan PegawaiScope tulis, supaya keadaan pegawai di luar lingkup (mis. status
+     * CPNS) tidak bocor. Tidak diulang di kunciUnggah()/kunciHapus(): pola file ini (dan engine) tidak mengulang izin di
+     * jalur terkunci.
+     *
+     * @param list<AksiRiwayat> $salahSatu
+     */
+    private function izinUntukPegawai(RiwayatDefinisi $definisi, AuthContext $auth, string $nip, array $salahSatu): void
+    {
+        foreach ($salahSatu as $aksi) {
+            if ($definisi->boleh($aksi, $auth->role()) && $definisi->bolehAksiUntuk($auth, $aksi, $nip)) {
+                return;
+            }
+        }
+
+        throw new ForbiddenException('Anda tidak berhak mengubah lampiran ' . $definisi->label() . ' untuk pegawai ini.');
     }
 
     /**

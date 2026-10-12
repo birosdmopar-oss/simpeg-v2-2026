@@ -12,6 +12,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\AttachmentService;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Libraries\Kepegawaian\Lampiran\OtorisasiLampiran;
+use App\Libraries\Kepegawaian\Riwayat\Definisi\Pendidikan;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -28,6 +29,8 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
  * izin Definisi → lingkup → keterikatan id_entri → kunci baris Disetujui; unduh/hapus = lingkup lihat → izin di
  * Definisi mana pun → baris lampiran → izin Definisi → baris riwayat (+ lingkup ubah, kunci baris, lampiran wajib
  * terakhir untuk hapus). Unggah/hapus diulang di dalam transaksi (kunciUnggah/kunciHapus).
+ * CR-046: unggah/hapus juga memeriksa izin per pegawai `RiwayatDefinisi::bolehAksiUntuk()` sesudah lingkup tulis — diuji
+ * dengan Definisi Pendidikan NYATA (registry produksi): role 2 hanya selama CPNS.
  *
  * @internal
  */
@@ -74,6 +77,9 @@ final class LampiranEndpointTest extends DatabaseTestCase
     public function testAlurUnggahDaftarUnduhHapusOlehPegawaiSendiri(): void
     {
         $pegawai = $this->akun($this->nip, Role::PEGAWAI);
+        // Definisi contoh tanpa override bolehAksiUntuk (default true): pegawai tanpa snapshot pegawai_kp (bukan CPNS)
+        // tetap boleh unggah/hapus — CR-046 tidak mengubah Definisi tanpa hook.
+        $this->assertSame(0, $this->db->table('pegawai_kp')->where('nip', $this->nip)->countAllResults());
         // Pegawai hanya mengelola lampiran baris yang belum disetujui (baris Disetujui terkunci, kunciBarisDisetujui()).
         $idEntri = (string) $this->buatRiwayatPendidikanUji($this->nip, 0);
 
@@ -108,6 +114,67 @@ final class LampiranEndpointTest extends DatabaseTestCase
         $this->assertCount(1, $this->berkasDiAkarUji());
 
         $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$baru}")->assertStatus(422);
+    }
+
+    public function testRole2PnsTidakBolehUnggahHapusLampiranPendidikanNyata(): void
+    {
+        $this->pakaiDefinisiProduksi();
+        $pegawai = $this->akun($this->nip, Role::PEGAWAI);
+        $idEntri = (string) $this->buatRiwayatPendidikanUji($this->nip, 0);
+
+        // Selama CPNS: aturan lama (boleh unggah & hapus lampiran baris sendiri yang belum disetujui).
+        $this->jadikanCpns($this->nip, true);
+        $ijazah = (int) $this->json($this->unggah($pegawai, $this->nip, Pendidikan::LAMPIRAN_IJAZAH, $idEntri, $this->berkasPdf()))['data']['id_attachment'];
+        $gelar  = (int) $this->json($this->unggah($pegawai, $this->nip, Pendidikan::LAMPIRAN_PENCANTUMAN_GELAR, $idEntri, $this->berkasPdf()))['data']['id_attachment'];
+        $sisa   = (int) $this->json($this->unggah($pegawai, $this->nip, Pendidikan::LAMPIRAN_TRANSKRIP_NILAI, $idEntri, $this->berkasPdf()))['data']['id_attachment'];
+        $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$sisa}")->assertStatus(200);
+
+        // Sudah PNS, lalu tanpa snapshot pegawai_kp (= bukan CPNS): unggah & hapus 403, berkas tidak berubah.
+        $keadaan = [
+            'pns'            => fn () => $this->jadikanCpns($this->nip, false),
+            'tanpa snapshot' => fn () => $this->db->table('pegawai_kp')->where('nip', $this->nip)->delete(),
+        ];
+
+        foreach ($keadaan as $label => $siapkan) {
+            $siapkan();
+            $this->unggah($pegawai, $this->nip, Pendidikan::LAMPIRAN_PENCANTUMAN_GELAR, $idEntri, $this->berkasPdf())->assertStatus(403);
+            $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$gelar}")->assertStatus(403);
+            $this->assertSame(2, $this->db->table('document_attachment')->where('NIP', $this->nip)->countAllResults(), $label);
+            $this->assertCount(2, $this->berkasDiAkarUji(), $label);
+
+            // Daftar & unduh tidak dibatasi hook (hanya tambah/ubah/hapus).
+            $this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=14&id_entri={$idEntri}")->assertStatus(200);
+            $this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/lampiran/{$ijazah}/unduh")->assertStatus(200);
+
+            // Urutan kontrak tetap: id lampiran tidak ada → 404 (dibaca sebelum izin per pegawai).
+            $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/999999999")->assertStatus(404);
+        }
+
+        // Kembali CPNS → boleh lagi.
+        $this->jadikanCpns($this->nip, true);
+        $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$gelar}")->assertStatus(200);
+    }
+
+    public function testIzinPerPegawaiPendidikanTidakMembatasiAdmin(): void
+    {
+        $this->pakaiDefinisiProduksi();
+        $this->jadikanCpns($this->nip, false);
+        $entri = (string) $this->idEntri;
+
+        $superAdmin  = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $adminSatker = $this->akun($this->buatPegawaiDiSatker($this->satker), Role::ADMIN_SATKER);
+
+        foreach ([$superAdmin, $adminSatker] as $admin) {
+            $unggah = $this->unggah($admin, $this->nip, Pendidikan::LAMPIRAN_PENCANTUMAN_GELAR, $entri, $this->berkasPdf());
+            $unggah->assertStatus(201);
+            $id = (int) $this->json($unggah)['data']['id_attachment'];
+            $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$id}")->assertStatus(200);
+        }
+
+        // Pegawai CPNS lain (di luar lingkupnya): tetap 403 lingkup — status CPNS dirinya tidak membuka pegawai lain.
+        $pegawaiLain = $this->akun($this->buatPegawaiDiSatker($this->satker), Role::PEGAWAI);
+        $this->jadikanCpns((string) $pegawaiLain['nip'], true);
+        $this->unggah($pegawaiLain, $this->nip, Pendidikan::LAMPIRAN_PENCANTUMAN_GELAR, $entri, $this->berkasPdf())->assertStatus(403);
     }
 
     public function testAdminSatkerHanyaDiSatkernya(): void
@@ -334,6 +401,45 @@ final class LampiranEndpointTest extends DatabaseTestCase
             $this->db->transRollback();
             $this->db->resetTransStatus();
         }
+    }
+
+    /**
+     * Registry produksi (Definisi Pendidikan & KP nyata; kode 14/39/40 milik Pendidikan) + PegawaiScope nyata.
+     */
+    private function pakaiDefinisiProduksi(): void
+    {
+        Services::injectMock('riwayatRegistry', RiwayatRegistry::dariFolder(
+            static fn (): PegawaiScopeInterface => service('pegawaiScope'),
+            APPPATH . 'Libraries/Kepegawaian/Riwayat/Definisi',
+            'App\Libraries\Kepegawaian\Riwayat\Definisi',
+        ));
+        $this->assertInstanceOf(Pendidikan::class, service('riwayatRegistry')->definisiUntukLampiran(Pendidikan::LAMPIRAN_IJAZAH));
+    }
+
+    /**
+     * Snapshot `pegawai_kp` $nip berpangkat CPNS (`pangkat.cpns = 1`) atau PNS (`cpns = 2`), sama dengan
+     * RiwayatUjiTrait::jadikanPegawaiCpns() (trait itu tidak dipakai di sini: nama berkasUji() bentrok dengan
+     * LampiranUjiTrait).
+     */
+    private function jadikanCpns(string $nip, bool $cpns): void
+    {
+        $golRuang = $cpns ? 'C-II/a' : 'P-II/a';
+        $pangkat  = $this->db->table('pangkat')->where('gol_ruang', $golRuang)->get()->getRowArray();
+
+        if ($pangkat === null) {
+            $this->db->table('pangkat')->insert([
+                'pangkat' => 'Pengatur Muda', 'gol' => 'II', 'ruang' => 'a', 'gol_ruang' => $golRuang,
+                'cpns'    => $cpns ? 1 : 2, 'order' => 5, 'status' => 1,
+            ]);
+            $pangkat = $this->db->table('pangkat')->where('gol_ruang', $golRuang)->get()->getRowArray();
+        }
+
+        $this->db->table('pegawai_kp')->where('nip', $nip)->delete();
+        $this->db->table('pegawai_kp')->insert([
+            'nip'       => $nip, 'id_pangkat' => $pangkat['id_pangkat'], 'tmtsk' => '2020-03-01', 'tgl_sk' => '2020-02-01',
+            'jenis_kp'  => $cpns ? 'Pengangkatan CPNS' : 'Pengangkatan PNS', 'gol' => 'II', 'ruang' => 'a',
+            'gol_ruang' => $golRuang, 'pangkat' => 'Pengatur Muda',
+        ]);
     }
 
     /**

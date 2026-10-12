@@ -43,6 +43,9 @@ Urutan pemeriksaan (wajib, endpoint riwayat dan lampiran):
 3. `PegawaiScope` atas `{nip}` (`bolehLihat` untuk baca, `bolehUbah` untuk tulis, `bolehProses` untuk Setujui/Tolak) → 403. Bagi pemanggil ber-lingkup, NIP
    yang tidak ada dan NIP di luar lingkup dijawab **sama (403)** — keberadaan NIP tidak bocor.
 4. Keberadaan data: NIP (404 bila lingkup pemanggil mencakupnya), baris `{id}` milik `{nip}` → 404.
+   Izin per pegawai sasaran `RiwayatDefinisi::bolehAksiUntuk()` (tambah/ubah/hapus) → 403 diperiksa di tengah langkah
+   ini: riwayat sesudah keberadaan NIP, sebelum baris `{id}`; lampiran `POST`/`DELETE` (CR-046) sesudah `bolehUbah`
+   (`DELETE`: sesudah baris lampiran `{id}` dibaca), sebelum baris riwayat `id_entri`. `GET`/unduh tidak memanggilnya.
 
 ### Endpoint
 
@@ -100,7 +103,9 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
   (tidak terdaftar → 404); izin Definisi × role: `GET`/unduh = `lihat`, `POST` = `tambah` atau `ubah`, `DELETE` = `hapus`
   atau `ubah` (403); `PegawaiScope` `bolehLihat`/`bolehUbah` (403); `id_entri` wajib baris milik `{nip}` di
   `tabel()` Definisi itu (404). Contoh: role 2 tidak bisa membaca/mengunggah lampiran `hukdis` miliknya sendiri karena
-  izin `hukdis` hanya role 1, 3.
+  izin `hukdis` hanya role 1, 3. `POST`/`DELETE` juga memeriksa izin per pegawai `bolehAksiUntuk()` (CR-046): salah satu
+  aksi yang diizinkan role (`POST` `tambah`/`ubah`; `DELETE` `hapus`/`ubah`) harus lolos hook untuk `{nip}` (403) —
+  mis. role 2 tidak bisa mengunggah/menghapus lampiran Pendidikan miliknya setelah bukan CPNS lagi.
 - **Berkas**: ekstensi/MIME divalidasi dari **isi** berkas (bukan nama kiriman), batas MB dari `AturanLampiran`; nama &
   path simpan dibangkitkan server, nama asli hanya `display_name`. Error 422 berkunci `berkas` (endpoint lampiran) atau
   `berkas.<id_riwayat>` (endpoint riwayat).
@@ -113,7 +118,8 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
   `DELETE` → 403), baris status 10 → 404. Urutan unduh/hapus per `{id}`: `PegawaiScope::bolehLihat({nip})` (403,
   sebelum baris dibaca — pemanggil di luar lingkup mendapat 403 untuk id yang ada maupun tidak) → role tanpa izin aksi
   itu (unduh `lihat`; hapus `hapus`/`ubah`) di Definisi berlampiran mana pun (403, juga sebelum baris dibaca) → baris
-  lampiran milik `{nip}` (404) → izin Definisi pemilik `id_riwayat` baris itu (+ `bolehUbah` untuk hapus) (403) →
+  lampiran milik `{nip}` (404) → izin Definisi pemilik `id_riwayat` baris itu (+ `bolehUbah` dan `bolehAksiUntuk()`
+  untuk hapus, CR-046) (403) →
   baris riwayat `id_entri` milik `{nip}`, bukan status 10 (404; unduh hanya membaca, tanpa kunci baris Disetujui) →
   hapus: kunci baris Disetujui (403) → lampiran wajib terakhir (422). `POST`/`DELETE` mengulang pemeriksaan tulis di
   dalam transaksi (baris `pegawai` `FOR UPDATE`, lampiran & baris riwayat dibaca ulang terkunci, hitungan lampiran
