@@ -119,7 +119,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
         $role = (int) $auth->role();
 
         $data = $this->validasi($d, $auth, $nip, $data, null);
-        $this->periksaBerkas($d, $nip, null, $berkas);
+        $this->periksaBerkas($d, $nip, null, $berkas, $data);
         $status = $d->statusAwal($role);
 
         $row = $this->transaksi(function () use ($d, $auth, $nip, $data, $berkas, $status): array {
@@ -162,7 +162,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
         [$pilihan, $alasanPilihan] = $this->statusPilihan($d, $role, $data);
         $data                      = $this->validasi($d, $auth, $nip, $data, $lama);
-        $this->periksaBerkas($d, $nip, $id, $berkas);
+        $this->periksaBerkas($d, $nip, $id, $berkas, $data + $lama);
 
         [$row, $statusBaru] = $this->transaksi(function () use ($d, $auth, $role, $nip, $id, $data, $berkas, $pilihan, $alasanPilihan): array {
             $this->kunciPegawai($nip);
@@ -477,12 +477,14 @@ final class RiwayatEngine implements RiwayatServiceInterface
     }
 
     /**
-     * Kode `berkas[<id_riwayat>]` harus milik Definisi; setiap AturanLampiran ber-`wajib` harus punya berkas di request
-     * ini atau (saat ubah) lampiran yang sudah ada.
+     * Kode `berkas[<id_riwayat>]` harus milik Definisi; setiap AturanLampiran yang wajib untuk nilai akhir baris
+     * (`RiwayatDefinisi::lampiranWajib()`, aditif MAKE-007; bawaan = `wajib`) harus punya berkas di request ini atau (saat
+     * ubah) lampiran yang sudah ada.
      *
      * @param array<int, UploadedFile> $berkas
+     * @param array<string, mixed>     $nilai  nilai akhir baris (data tervalidasi + baris lama saat ubah)
      */
-    private function periksaBerkas(RiwayatDefinisi $d, string $nip, ?int $id, array $berkas): void
+    private function periksaBerkas(RiwayatDefinisi $d, string $nip, ?int $id, array $berkas, array $nilai): void
     {
         $aturan = [];
 
@@ -499,7 +501,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
         }
 
         foreach ($aturan as $kode => $a) {
-            if ($a->wajib && ! isset($berkas[$kode]) && ($id === null || $this->lampiran()->daftar($nip, $kode, $id) === [])) {
+            if ($d->lampiranWajib($a, $nilai) && ! isset($berkas[$kode]) && ($id === null || $this->lampiran()->daftar($nip, $kode, $id) === [])) {
                 $errors["berkas.{$kode}"] = ['Lampiran wajib diunggah.'];
             }
         }

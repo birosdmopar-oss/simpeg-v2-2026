@@ -203,6 +203,18 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Lampiran $aturan wajib untuk baris bernilai akhir $nilai (aditif MAKE-007, engine-v1). Bawaan = `$aturan->wajib`.
+     * Override bila wajibnya bergantung isi baris, mis. KTP alamat tidak wajib untuk alamat kantor (legacy
+     * `L_alamat.php` vp()). Dipanggil engine saat tambah/ubah sebelum transaksi.
+     *
+     * @param array<string, mixed> $nilai data tervalidasi (+ baris lama saat ubah)
+     */
+    public function lampiranWajib(AturanLampiran $aturan, array $nilai): bool
+    {
+        return $aturan->wajib;
+    }
+
+    /**
      * Urutan tab di Detail Pegawai (kecil lebih dulu; seri diurutkan slug).
      */
     public function urutanTab(): int
