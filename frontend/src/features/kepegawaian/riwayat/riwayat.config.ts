@@ -26,6 +26,9 @@ export interface FieldCondition {
   field: string
   in?: readonly string[]
   notIn?: readonly string[]
+  /** Nilai angka isian syarat ≥ min / ≤ max (mis. skema SKP menurut tahun). */
+  min?: number
+  max?: number
 }
 
 export interface FieldDef {
@@ -71,6 +74,11 @@ export interface FieldDef {
   extraOptions?: readonly FieldOption[]
   /** `text`: saran nilai dari nama master (`<datalist>`); nilai bebas tetap boleh (mis. bidang/instansi kursus). */
   suggestEntity?: string
+  /**
+   * Isian hitung di form (hanya-baca): nilainya dihitung dari isian lain setiap kali berubah, mis. nilai SKP 60% dan
+   * kategori (legacy menghitungnya di peramban, `skp/form.php`). Hasil '' = kosong.
+   */
+  compute?: (values: Record<string, string>) => string
 }
 
 export interface ColumnDef {
@@ -81,6 +89,18 @@ export interface ColumnDef {
   format?: 'date'
   /** Kolom berkode (mis. `jenis_alamat`): tampilkan label opsi, bukan kodenya. */
   options?: FieldOption[]
+}
+
+/** Berkas yang disimpan di kolom tabel riwayat (`berkas[<kolom>]`, `RiwayatDefinisi::kolomBerkas()`, MAKE-007). */
+export interface BerkasKolomDef {
+  kolom: string
+  label: string
+  wajib: boolean
+  /** Wajib hanya bila syarat ini terpenuhi (salinan `kolomBerkasWajib()`). */
+  wajibBila?: FieldCondition
+  /** Batas & ekstensi (salinan AturanLampiran kolom itu); kosong = ikut pemanggil. */
+  batas_mb?: number
+  ekstensi?: string[]
 }
 
 /** Aturan lampiran + label isian berkas. Kunci form/422 = `berkas.<id_riwayat>`. */
@@ -122,6 +142,11 @@ export interface RiwayatJenisConfig {
   kunciUbahDisetujuiRole?: readonly RoleCode[]
   /** Jenis punya sub-resource anak (`keluarga`): item ⋮ "Anak" membuka KeluargaAnakDialog. */
   kelolaAnak?: boolean
+  /**
+   * Berkas kolom Definisi (`kolomBerkas()`, MAKE-008, mis. arsip SKP periodik): diunggah lewat form Edit
+   * (`berkas[<kolom>]`), diunduh lewat item ⋮ "Berkas". Jenis tanpa isian tetapi ber-berkas kolom tetap punya Edit.
+   */
+  berkasKolom?: BerkasKolomDef[]
 }
 
 /**
@@ -135,6 +160,12 @@ export function fieldVisible(field: FieldDef, values: Record<string, string | un
   if (value === '') return false
   if (cond.in && !cond.in.includes(value)) return false
   if (cond.notIn && cond.notIn.includes(value)) return false
+  if (cond.min !== undefined || cond.max !== undefined) {
+    const angka = Number(value)
+    if (!Number.isFinite(angka)) return false
+    if (cond.min !== undefined && angka < cond.min) return false
+    if (cond.max !== undefined && angka > cond.max) return false
+  }
   return true
 }
 

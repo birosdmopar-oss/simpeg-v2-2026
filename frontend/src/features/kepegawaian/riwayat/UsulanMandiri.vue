@@ -11,8 +11,7 @@
  *
  * Berkas kolom diunduh lewat `…/{id}/berkas/{kolom}`. Hapus = status 10 (ConfirmDialog). Pesan galat baku (apiErrors).
  */
-import { FileSearch, Plus, X } from 'lucide-vue-next'
-import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
+import { FileSearch, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -29,6 +28,7 @@ import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { describeApiError, splitValidationErrors, type ApiFailure } from '../services/apiErrors'
 import { STATUS_RIWAYAT, STATUS_RIWAYAT_LABELS, type RiwayatRow } from '../types'
 
+import BerkasKolomDialog from './BerkasKolomDialog.vue'
 import { riwayatService, type BerkasMap } from './riwayat.service'
 import type { UsulanConfig } from './usulan.config'
 import UsulanFormDialog from './UsulanFormDialog.vue'
@@ -197,22 +197,6 @@ async function onProcess(payload: ApprovalPayload): Promise<void> {
   }
 }
 
-async function unduh(row: RiwayatRow, kolom: string, label: string): Promise<void> {
-  try {
-    const blob = await usulanService.unduh(rowNip(row), props.config.jenis, rowId(row), kolom)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${label}.${String(row[kolom] ?? '').split('.').pop() ?? 'bin'}`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (error) {
-    notice.value = { tone: 'danger', text: describeApiError(error).message }
-  }
-}
-
 const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b) => String(row[b.kolom] ?? '') !== '').length
 </script>
 
@@ -293,38 +277,16 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
 
     <UsulanFormDialog v-model:open="formOpen" :config="config" :row="editing" :busy="saving" :server-errors="formErrors" @submit="onSubmit" />
 
-    <DialogRoot :open="berkasOpen" @update:open="(v) => (berkasOpen = v)">
-      <DialogPortal>
-        <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
-        <DialogContent
-          class="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
-          data-testid="usulan-berkas-dialog"
-          :aria-describedby="undefined"
-        >
-          <div class="mb-4 flex items-start justify-between gap-3">
-            <DialogTitle class="text-h5 text-slate-900">Berkas {{ berkasRow ? rowLabel(berkasRow) : '' }}</DialogTitle>
-            <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
-              <X class="h-5 w-5" aria-hidden="true" />
-            </DialogClose>
-          </div>
-          <ul v-if="berkasRow" class="divide-y divide-slate-200 rounded-lg border border-slate-200">
-            <li v-for="b in config.berkas" :key="b.kolom" class="flex items-center justify-between gap-3 px-4 py-2.5 text-body2">
-              <span class="text-slate-800">{{ b.label }}</span>
-              <UiButton
-                v-if="berkasRow[b.kolom]"
-                variant="secondary"
-                appearance="soft"
-                :data-testid="`usulan-unduh-${b.kolom}`"
-                @click="unduh(berkasRow, b.kolom, b.label)"
-              >
-                Unduh
-              </UiButton>
-              <span v-else class="text-slate-400">—</span>
-            </li>
-          </ul>
-        </DialogContent>
-      </DialogPortal>
-    </DialogRoot>
+    <BerkasKolomDialog
+      v-if="berkasRow"
+      v-model:open="berkasOpen"
+      :nip="rowNip(berkasRow)"
+      :jenis="config.jenis"
+      :id-baris="rowId(berkasRow)"
+      :row="berkasRow"
+      :berkas="config.berkas"
+      :subject="rowLabel(berkasRow)"
+    />
 
     <ApprovalDialog
       v-model:open="processOpen"

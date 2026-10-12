@@ -19,6 +19,7 @@ defineProps<{
   initial: Record<string, string> | null
   fields?: FieldDef[]
   lampiranTersimpan?: Record<number, number>
+  kolomTerisi?: Record<string, boolean>
   serverErrors?: RiwayatValidationErrors | null
   busy?: boolean
 }>()
@@ -50,6 +51,8 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
           :mode="initial ? 'edit' : 'create'"
           :initial="initial ?? {}"
           :lampiran-tersimpan="lampiranTersimpan ?? {}"
+          :berkas-kolom="config.berkasKolom ?? []"
+          :kolom-terisi="kolomTerisi ?? {}"
           :server-errors="serverErrors ?? null"
           :busy="busy"
           :submit-label="initial ? 'Simpan Perubahan' : 'Simpan'"

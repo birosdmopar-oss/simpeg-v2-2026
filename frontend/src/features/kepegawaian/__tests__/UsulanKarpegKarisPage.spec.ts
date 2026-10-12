@@ -7,10 +7,10 @@
 import { DOMWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../riwayat/usulan.service', () => ({ usulanService: { saya: vi.fn(), antrean: vi.fn(), unduh: vi.fn() } }))
+vi.mock('../riwayat/usulan.service', () => ({ usulanService: { saya: vi.fn(), antrean: vi.fn() } }))
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
-  return { ...actual, riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn() } }
+  return { ...actual, riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn() } }
 })
 
 import { Role, type RoleCode } from '@/features/auth/types'
@@ -162,15 +162,15 @@ describe('Usulan Karpeg/Karis — pengusul (role 2)', () => {
   })
 
   it('berkas: dialog daftar kolom; Unduh memanggil GET …/berkas/{kolom}', async () => {
-    usulan.unduh.mockResolvedValue(new Blob(['x']))
+    riwayat.unduhKolomBerkas.mockResolvedValue(new Blob(['x']))
     globalThis.URL.createObjectURL = vi.fn(() => 'blob:x')
     globalThis.URL.revokeObjectURL = vi.fn()
     await mountPage(Role.PEGAWAI)
     await selectRowAction(body(), 'usulan-actions-1', 'berkas')
-    expect(q('[data-testid="usulan-unduh-file_surat_hilang"]')).toBeNull()
-    q<HTMLButtonElement>('[data-testid="usulan-unduh-file_1"]')?.click()
+    expect(q('[data-testid="berkas-unduh-file_surat_hilang"]')).toBeNull()
+    q<HTMLButtonElement>('[data-testid="berkas-unduh-file_1"]')?.click()
     await flushPromises()
-    expect(usulan.unduh).toHaveBeenCalledWith(NIP, 'karpeg', '1', 'file_1')
+    expect(riwayat.unduhKolomBerkas).toHaveBeenCalledWith(NIP, 'karpeg', '1', 'file_1')
   })
 })
 

@@ -24,7 +24,7 @@ import { UiButton, UiFileField, UiSelect, UiTextField } from '@/shared/ui'
 
 import type { RiwayatValidationErrors } from '../services/apiErrors'
 
-import { fieldVisible, type FieldDef, type LampiranDef } from './riwayat.config'
+import { fieldVisible, type BerkasKolomDef, type FieldDef, type LampiranDef } from './riwayat.config'
 import { buildRiwayatSchema } from './riwayat.schema'
 import type { BerkasMap } from './riwayat.service'
 import { useRiwayatRefOptions } from './riwayatCascade'
@@ -37,6 +37,10 @@ const props = withDefaults(
     initial?: Record<string, string>
     /** Jumlah lampiran yang sudah tersimpan per kode (mode edit); kode tanpa entri = tidak diketahui. */
     lampiranTersimpan?: Record<number, number>
+    /** Berkas kolom Definisi (`berkas[<kolom>]`, MAKE-008). */
+    berkasKolom?: BerkasKolomDef[]
+    /** Kolom berkas yang sudah terisi di baris (mode edit) — tidak diwajibkan lagi; pilihan baru MENGGANTI. */
+    kolomTerisi?: Record<string, boolean>
     serverErrors?: RiwayatValidationErrors | null
     busy?: boolean
     submitLabel?: string
@@ -49,6 +53,8 @@ const props = withDefaults(
     mode: 'create',
     initial: () => ({}),
     lampiranTersimpan: () => ({}),
+    berkasKolom: () => [],
+    kolomTerisi: () => ({}),
     serverErrors: null,
     busy: false,
     submitLabel: 'Simpan',
@@ -70,7 +76,7 @@ const models: Record<string, Ref<string>> = {}
 for (const f of props.fields) models[f.name] = defineField(f.name)[0] as Ref<string>
 
 const berkas = reactive<BerkasMap>({})
-const berkasError = reactive<Record<number, string>>({})
+const berkasError = reactive<Record<number | string, string>>({})
 
 const refs = useRiwayatRefOptions(props.fields)
 onMounted(() => void refs.init(blank()))
@@ -114,6 +120,22 @@ async function onRefChange(f: FieldDef, value: string): Promise<void> {
 
 const visible = (f: FieldDef): boolean => fieldVisible(f, values as Record<string, string | undefined>)
 
+// Isian hitung (`compute`): diperbarui setiap kali isian lain berubah; hanya-baca di form.
+const hitung = props.fields.filter((f) => f.compute)
+if (hitung.length) {
+  watch(
+    () => ({ ...values }) as Record<string, string>,
+    (sekarang) => {
+      for (const f of hitung) {
+        const model = models[f.name]
+        const hasil = f.compute?.(sekarang) ?? ''
+        if (model && model.value !== hasil) model.value = hasil
+      }
+    },
+    { deep: true, immediate: true },
+  )
+}
+
 function onFile(def: LampiranDef, file: File | null): void {
   delete berkasError[def.id_riwayat]
   if (file) berkas[def.id_riwayat] = file
@@ -125,8 +147,25 @@ const fileRequired = (def: LampiranDef): boolean =>
   (!def.wajibBila || fieldVisible({ name: '', label: '', type: 'text', showWhen: def.wajibBila }, values as Record<string, string | undefined>)) &&
   (props.mode === 'create' || props.lampiranTersimpan[def.id_riwayat] === 0)
 
+const kolomWajib = (def: BerkasKolomDef): boolean =>
+  def.wajib &&
+  (!def.wajibBila || fieldVisible({ name: '', label: '', type: 'text', showWhen: def.wajibBila }, values as Record<string, string | undefined>)) &&
+  !props.kolomTerisi[def.kolom]
+
+function onFileKolom(def: BerkasKolomDef, file: File | null): void {
+  delete berkasError[def.kolom]
+  if (file) berkas[def.kolom] = file
+  else delete berkas[def.kolom]
+}
+
 function missingWajib(): boolean {
   let missing = false
+  for (const def of props.berkasKolom) {
+    if (kolomWajib(def) && !berkas[def.kolom]) {
+      berkasError[def.kolom] = `${def.label} wajib diunggah.`
+      missing = true
+    }
+  }
   for (const def of props.lampiran) {
     if (fileRequired(def) && !berkas[def.id_riwayat]) {
       berkasError[def.id_riwayat] = `${def.label} wajib diunggah.`
@@ -211,6 +250,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :label="f.label"
             :required="f.required"
             :disabled="busy"
+            :readonly="Boolean(f.compute)"
             :type="f.type === 'date' ? 'date' : 'text'"
             :inputmode="f.type === 'number' ? 'numeric' : undefined"
             :placeholder="f.placeholder"
@@ -240,6 +280,30 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
           />
           <p v-if="fileError(def.id_riwayat)" role="alert" class="mt-1 text-caption text-danger" :data-testid="`${testid}-berkas-error-${def.id_riwayat}`">
             {{ fileError(def.id_riwayat) }}
+          </p>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset v-if="berkasKolom.length" class="mt-6 border-t border-slate-200 pt-5">
+      <legend class="mb-3 text-body1 font-semibold text-slate-900">Berkas</legend>
+      <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
+        <div v-for="def in berkasKolom" :key="def.kolom" :data-testid="`${testid}-berkas-${def.kolom}`">
+          <UiFileField
+            :label="kolomWajib(def) ? `${def.label} *` : def.label"
+            :allowed="def.ekstensi ?? ['pdf']"
+            :max-mb="def.batas_mb ?? 5"
+            :disabled="busy"
+            @change="(file) => onFileKolom(def, file)"
+          />
+          <p v-if="kolomTerisi[def.kolom]" class="mt-1 text-caption text-slate-500">Sudah ada; pilih berkas untuk mengganti.</p>
+          <p
+            v-if="berkasError[def.kolom] || serverErrors?.fields[`berkas.${def.kolom}`]"
+            role="alert"
+            class="mt-1 text-caption text-danger"
+            :data-testid="`${testid}-berkas-error-${def.kolom}`"
+          >
+            {{ berkasError[def.kolom] || serverErrors?.fields[`berkas.${def.kolom}`] }}
           </p>
         </div>
       </div>

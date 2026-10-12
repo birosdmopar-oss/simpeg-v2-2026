@@ -73,7 +73,8 @@ describe('registry riwayat', () => {
     expect(ringkas('seminar')).toEqual([[22, true, 1, ext]])
     expect(ringkas('tanda-jasa')).toEqual([[23, true, 5, ext]])
     expect(ringkas('organisasi')).toEqual([[13, true, 5, ext]])
-    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi']
+    expect(ringkas('skp')).toEqual([[32, true, 5, ext]]) // MAKE-008
+    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi', 'skp']
     for (const config of Object.values(RIWAYAT_REGISTRY)) {
       if (!berlampiran.includes(config.jenis)) expect(config.lampiran, config.jenis).toEqual([])
     }

@@ -5,16 +5,9 @@
  */
 import type { JenisEngine } from '../types'
 
-import { S, type FieldCondition, type FieldDef } from './riwayat.config'
+import { S, type BerkasKolomDef, type FieldDef } from './riwayat.config'
 
-/** Berkas yang disimpan di kolom tabel riwayat (`berkas[<kolom>]`, `RiwayatDefinisi::kolomBerkas()`). */
-export interface BerkasKolomDef {
-  kolom: string
-  label: string
-  wajib: boolean
-  /** Wajib hanya bila syarat ini terpenuhi (salinan `kolomBerkasWajib()`). */
-  wajibBila?: FieldCondition
-}
+export type { BerkasKolomDef } from './riwayat.config'
 
 export interface UsulanConfig {
   jenis: JenisEngine

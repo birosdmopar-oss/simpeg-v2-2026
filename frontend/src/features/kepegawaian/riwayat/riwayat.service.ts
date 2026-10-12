@@ -93,6 +93,12 @@ export const riwayatService = {
     await api.delete(item(nip, jenis, id))
   },
 
+  /** `GET pegawai/{nip}/riwayat/{jenis}/{id}/berkas/{kolom}` — unduh berkas kolom (aditif MAKE-007). */
+  async unduhKolomBerkas(nip: string, jenis: JenisEngine, id: number | string, kolom: string): Promise<Blob> {
+    const { data } = await api.get<Blob>(`${item(nip, jenis, id)}/berkas/${encodeURIComponent(kolom)}`, { responseType: 'blob' })
+    return data
+  },
+
   async process(nip: string, jenis: JenisEngine, id: number | string, payload: ProcessRiwayatPayload): Promise<RiwayatRow> {
     const { data } = await api.post<RiwayatRow>(`${item(nip, jenis, id)}/process`, payload)
     return data

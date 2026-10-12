@@ -33,6 +33,7 @@ import { lampiranService } from '../services/lampiran.service'
 import { STATUS_RIWAYAT, STATUS_RIWAYAT_LABELS, type JenisEngine, type RiwayatRow, type RiwayatTabDescriptor } from '../types'
 
 import RiwayatFormDialog from './RiwayatFormDialog.vue'
+import BerkasKolomDialog from './BerkasKolomDialog.vue'
 import KeluargaAnakDialog from './KeluargaAnakDialog.vue'
 import RiwayatLampiranDialog from './RiwayatLampiranDialog.vue'
 import { A, S, type ColumnDef, type FieldDef, type RiwayatJenisConfig } from './riwayat.config'
@@ -80,6 +81,14 @@ const lampiranOpen = ref(false)
 const anakRow = ref<RiwayatRow | null>(null)
 const anakOpen = ref(false)
 
+const berkasRow = ref<RiwayatRow | null>(null)
+const berkasOpen = ref(false)
+
+/** Kolom berkas yang sudah terisi pada baris yang diedit (tidak diwajibkan lagi). */
+const kolomTerisi = computed<Record<string, boolean>>(() =>
+  Object.fromEntries(berkasKolom.value.map((b) => [b.kolom, String(editing.value?.[b.kolom] ?? '').trim() !== ''])),
+)
+
 const deleting = ref<RiwayatRow | null>(null)
 /** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
 const deleteOpen = ref(false)
@@ -90,11 +99,14 @@ const processMode = ref<ApprovalAksi>('setujui')
 const processBusy = ref(false)
 const processError = ref('')
 
-const canCreate = computed(() => props.descriptor.can_create && props.config.fields.length > 0)
-const canEdit = computed(() => props.descriptor.can_edit && props.config.fields.length > 0)
+// Jenis tanpa isian tetapi ber-berkas kolom (mis. SKP periodik) tetap punya Edit (unggah berkas), tidak punya Tambah.
+const punyaIsian = computed(() => props.config.fields.length > 0)
+const berkasKolom = computed(() => props.config.berkasKolom ?? [])
+const canCreate = computed(() => props.descriptor.can_create && punyaIsian.value)
+const canEdit = computed(() => props.descriptor.can_edit && (punyaIsian.value || berkasKolom.value.length > 0))
 const hasLampiran = computed(() => props.config.lampiran.length > 0)
 const hasActions = computed(
-  () => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value || Boolean(props.config.kelolaAnak),
+  () => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value || Boolean(props.config.kelolaAnak) || berkasKolom.value.length > 0,
 )
 
 const pilihStatus = computed(() => editing.value !== null && auth.role !== null && (props.config.pilihStatusSaatUbah ?? []).includes(auth.role))
@@ -170,6 +182,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
     ...approvalRowActions({ canProcess: props.descriptor.can_process, status: rowStatus(row), busy }),
     { key: 'lampiran', label: 'Lampiran', hidden: !hasLampiran.value },
     { key: 'anak', label: 'Anak', hidden: !props.config.kelolaAnak },
+    { key: 'berkas', label: 'Berkas', hidden: berkasKolom.value.length === 0 },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.descriptor.can_delete, disabled: terkunci(row, props.config.kunciHapusDisetujuiRole) },
   ]
 }
@@ -210,6 +223,9 @@ function onAction(key: string, row: RiwayatRow): void {
   } else if (key === 'anak') {
     anakRow.value = row
     anakOpen.value = true
+  } else if (key === 'berkas') {
+    berkasRow.value = row
+    berkasOpen.value = true
   } else if (key === 'setujui' || key === 'tolak') {
     processing.value = row
     processMode.value = key
@@ -240,7 +256,11 @@ async function onSubmit(values: Record<string, string>, berkas: BerkasMap): Prom
     notice.value = { tone: 'success', text: `Data ${props.config.singular} tersimpan.` }
     await load()
   } catch (error) {
-    const split = splitValidationErrors(error, fieldNames.value, props.config.lampiran.map((l) => l.id_riwayat))
+    const split = splitValidationErrors(
+      error,
+      [...fieldNames.value, ...berkasKolom.value.map((b) => `berkas.${b.kolom}`)],
+      props.config.lampiran.map((l) => l.id_riwayat),
+    )
     const failed = describeApiError(error)
     formErrors.value = failed.kind === 'validation' ? split : { fields: {}, berkas: {}, general: [failed.message] }
   } finally {
@@ -360,6 +380,7 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :fields="formFields"
       :initial="initialValues"
       :lampiran-tersimpan="lampiranTersimpan"
+      :kolom-terisi="kolomTerisi"
       :server-errors="formErrors"
       :busy="saving"
       @submit="onSubmit"
@@ -385,6 +406,17 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :terkunci-ubah="terkunci(anakRow, config.kunciUbahDisetujuiRole)"
       :terkunci-hapus="terkunci(anakRow, config.kunciHapusDisetujuiRole)"
       @changed="load"
+    />
+
+    <BerkasKolomDialog
+      v-if="berkasRow"
+      v-model:open="berkasOpen"
+      :nip="nip"
+      :jenis="jenis"
+      :id-baris="rowId(berkasRow)"
+      :row="berkasRow"
+      :berkas="berkasKolom"
+      :subject="rowLabel(berkasRow)"
     />
 
     <ApprovalDialog

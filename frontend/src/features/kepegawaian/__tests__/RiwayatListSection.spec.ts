@@ -33,6 +33,7 @@ import diklat from '../riwayat/jenis/diklat'
 import hukdis from '../riwayat/jenis/hukdis'
 import keluarga from '../riwayat/jenis/keluarga'
 import seminar from '../riwayat/jenis/seminar'
+import skp from '../riwayat/jenis/skp'
 import kp from '../riwayat/jenis/kp'
 import lkh from '../riwayat/jenis/lkh'
 import pendidikan from '../riwayat/jenis/pendidikan'
@@ -558,5 +559,32 @@ describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LA
     lepasLama([{ id: 'd1', nama: 'Diklat 1 (lama)', parent: null }])
     await flushPromises()
     expect([...(field('id_diklat') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'd2'])
+  })
+})
+
+describe('RiwayatListSection — isian hitung SKP (MAKE-008, rumus form legacy)', () => {
+  beforeEach(() => svc.list.mockResolvedValue([]))
+
+  it('≤2021: 60%/40%, nilai prestasi, kategori (skala 120 mulai 2021); ≥2022: predikat dari matriks rating', async () => {
+    const wrapper = await mountTab({}, skp)
+    await openCreate(wrapper)
+    await setInput('tahun', '2021')
+    expect(field('rating_skp')).toBeNull()
+    await setInput('nilai_skp', '100')
+    await setInput('nilai_perilaku', '90')
+    expect([field('nilai_skp_60_persen')?.value, field('nilai_perilaku_40_persen')?.value, field('nilai_prestasi_kerja')?.value]).toEqual(['60', '36', '96'])
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Baik')
+    expect(field('kategori_nilai_prestasi')?.hasAttribute('readonly')).toBe(true)
+
+    await setInput('tahun', '2020') // skala 100: 96 → Sangat Baik
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik')
+
+    await setInput('tahun', '2022')
+    expect(field('nilai_skp')).toBeNull()
+    await setInput('rating_skp', '3')
+    await setInput('rating_perilaku', '1')
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Kurang / Miss Conduct')
+    await setInput('rating_perilaku', '3')
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik')
   })
 })
