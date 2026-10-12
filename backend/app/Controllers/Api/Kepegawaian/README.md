@@ -40,7 +40,7 @@ Urutan pemeriksaan (wajib, endpoint riwayat dan lampiran):
 
 1. `{jenis}` terdaftar (lampiran: `id_riwayat` dimiliki Definisi terdaftar) → 404.
 2. Izin Definisi × role pemanggil untuk aksinya → 403.
-3. `PegawaiScope` atas `{nip}` (`bolehLihat` untuk baca, `bolehUbah` untuk tulis) → 403. Bagi pemanggil ber-lingkup, NIP
+3. `PegawaiScope` atas `{nip}` (`bolehLihat` untuk baca, `bolehUbah` untuk tulis, `bolehProses` untuk Setujui/Tolak) → 403. Bagi pemanggil ber-lingkup, NIP
    yang tidak ada dan NIP di luar lingkup dijawab **sama (403)** — keberadaan NIP tidak bocor.
 4. Keberadaan data: NIP (404 bila lingkup pemanggil mencakupnya), baris `{id}` milik `{nip}` → 404.
 
@@ -215,6 +215,19 @@ data di Definisi; default di bawah ikut legacy.
 
 ### Kontrak backend (interface & service)
 
+Lingkup `pegawaiScope` per jalur (CR-045, keputusan user 12-10-2026, ikut legacy): untuk Admin Satker (role 3) **tanpa
+satker** jalur daftar, detail/ubah, dan proses memakai predikat berbeda; untuk role lain dan role 3 bersatker ketiganya
+sama (`bolehProses` = `bolehUbah`). Rujukan legacy berkas:baris di README `Libraries/Kepegawaian`, bagian Scope.
+
+| Admin role 3 tanpa satker | Daftar (`terapkanKeQuery`) | Detail/ubah/arsip/lampiran (`bolehLihat`, `bolehUbah`) | Setujui/Tolak + antrean (`bolehProses`) |
+|---|---|---|---|
+| unit 20 | `pmj.id_unit IN (20, 6)` | `pmj.id_unit = 20` | `pmj.id_unit = 20` |
+| unit 21 | `pmj.id_unit = 21 OR pmj.id_satker IN (37, 38, 41)` | `pmj.id_unit = 21 OR (pmj.id_unit = 7 AND pmj.id_satker IN (37, 38, 41))` | `pmj.id_unit = 21 OR pmj.id_satker IN (37, 38, 41)` |
+| unit lain | `pmj.id_unit` = unit admin | sama | sama |
+
+Akibatnya pegawai yang tampil di daftar bisa 403 di detail (UPT untuk admin unit 20), dan riwayat yang bisa diproses
+bisa 403 di ubah/detail (satker BPO unit bukan 7 untuk admin unit 21). Pegawai tanpa snapshot pmj ditolak di semua jalur.
+
 Didaftarkan **sekali** di `Config\Services` (S0-A); tipe kembalian = interface. Stub produksi di
 `App\Libraries\Kepegawaian\Stub` **fail-closed** (`StubPegawaiScope` menolak semua; setiap method stub lain melempar
 `App\Exceptions\BelumTersediaException` → 501). Fake test hanya di `tests/_support/Kepegawaian` (`FakePegawaiScope`,
@@ -224,7 +237,7 @@ ter-resolve (tanpa `resetSingle`).
 
 | Service | Interface (`App\Interfaces\Kepegawaian\…`) | Pemilik implementasi |
 |---|---|---|
-| `pegawaiScope` | `PegawaiScopeInterface`: `bolehLihat(AuthContext, nip)`, `bolehUbah(AuthContext, nip)`, `terapkanKeQuery(BaseBuilder, AuthContext, kolomNip = 'nip')` | WS-2 (MAKE-009) |
+| `pegawaiScope` | `PegawaiScopeInterface`: `bolehLihat(AuthContext, nip)`, `bolehUbah(AuthContext, nip)`, `bolehProses(AuthContext, nip)` (aditif CR-045: Setujui/Tolak + antrean approval), `terapkanKeQuery(BaseBuilder, AuthContext, kolomNip = 'nip')` | WS-2 (MAKE-009) |
 | `attachmentService` | `AttachmentServiceInterface`: `simpan(nip, idRiwayat, idEntri, UploadedFile, AturanLampiran): array`, `ambil(nip, idAttachment): array{lampiran, isi}`, `hapus(nip, idAttachment)`, `daftar(nip, idRiwayat, idEntri): list` — lampiran bukan milik `nip` → 404; di dalam transaksi pemanggil, kompensasi berkas bila rollback | WS-2 (MAKE-009) |
 | `storageAdapter` | `StorageAdapterInterface`: `simpan`, `hapus`, `ada`, `baca` (path relatif) | WS-2 (MAKE-009) |
 | `riwayatRegistry` | `RiwayatRegistryInterface`: `semua()`, `definisi(jenis)`, `definisiUntukLampiran(idRiwayat)`, `aturanLampiran(idRiwayat)`, `descriptorUntuk(AuthContext, nip)` — sudah nyata (`RiwayatRegistry`, auto-discovery) | WS-1 |

@@ -12,9 +12,9 @@ use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
- * MAKE-009 — PegawaiScope nyata (DoD M1: lingkup role 2/3/4/5/8 + UL_PEGAWAI; role 3 = validateAccess_AP termasuk unit
- * destinasi 21 / unit lain 7). Setiap kasus juga memastikan terapkanKeQuery() menyaring daftar persis sama dengan
- * bolehLihat().
+ * MAKE-009 + CR-045 — PegawaiScope nyata (DoD M1: lingkup role 2/3/4/5/8 + UL_PEGAWAI). Role 3 tanpa satker memakai
+ * predikat per jalur ikut legacy (keputusan user 12-10-2026): daftar (terapkanKeQuery), detail/ubah (bolehLihat,
+ * bolehUbah = validateAccess_AP), proses (bolehProses). Setiap kasus memeriksa keempat jalur per pegawai fixture.
  *
  * @internal
  */
@@ -43,6 +43,16 @@ final class PegawaiScopeTest extends DatabaseTestCase
 
         $this->scope = new PegawaiScope($this->db);
 
+        // Unit/satker [K] dipasang lebih dulu dengan id eksplisit supaya id AUTO_INCREMENT fixture lain (> 41) tidak
+        // pernah bertabrakan dengan 6/7/20/21/37/38/41.
+        foreach ([PegawaiScope::UNIT_UPT, PegawaiScope::UNIT_LAIN, PegawaiScope::UNIT_KELEMBAGAAN, PegawaiScope::UNIT_DESTINASI] as $idUnit) {
+            $this->pastikanUnit($idUnit);
+        }
+
+        foreach (PegawaiScope::SATKER_BPO as $idSatker) {
+            $this->pastikanSatker($idSatker, PegawaiScope::UNIT_LAIN);
+        }
+
         $this->unitA    = $this->buatUnit();
         $this->satkerA1 = $this->buatSatker($this->unitA);
         $this->satkerA2 = $this->buatSatker($this->unitA);
@@ -55,8 +65,11 @@ final class PegawaiScopeTest extends DatabaseTestCase
             'b'        => $this->buatPegawaiDiSatker($this->satkerB),
         ];
 
-        // Pegawai tanpa satker/unit di snapshot jabatan: tidak cocok predikat validateAccess_AP mana pun (sama dengan legacy).
+        // Pegawai tanpa satker/unit di snapshot jabatan, dan pegawai tanpa baris pmj sama sekali: tidak cocok predikat
+        // jalur mana pun untuk role 3 (fail-closed; jalur proses legacy meloloskannya = deviasi [V2]).
         $this->nip['tanpa_satker'] = $this->buatPegawai([], ['id_satker' => null, 'id_unit' => null, 'satker' => null, 'unit' => null]);
+        $this->nip['tanpa_pmj']    = $this->buatPegawai();
+        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $this->nip['tanpa_pmj'])->delete();
     }
 
     /**
@@ -75,14 +88,11 @@ final class PegawaiScopeTest extends DatabaseTestCase
     #[DataProvider('roleLihatSemuaProvider')]
     public function testRoleLintasSatkerMelihatSemua(int $role): void
     {
-        $auth = $this->authAkunDi($this->satkerB, $role);
+        $auth  = $this->authAkunDi($this->satkerB, $role);
+        $ubah  = $role === Role::SUPER_ADMIN;
+        $harap = array_map(static fn (): array => [true, true, $ubah, $ubah], $this->nip);
 
-        foreach ($this->nip as $label => $nip) {
-            $this->assertTrue($this->scope->bolehLihat($auth, $nip), "lihat {$label}");
-            $this->assertSame($role === Role::SUPER_ADMIN, $this->scope->bolehUbah($auth, $nip), "ubah {$label}");
-        }
-
-        $this->assertDaftarSamaDenganLihat($auth);
+        $this->assertJalur($auth, $harap);
     }
 
     /**
@@ -100,15 +110,15 @@ final class PegawaiScopeTest extends DatabaseTestCase
     #[DataProvider('rolePegawaiProvider')]
     public function testUlPegawaiHanyaNipSendiri(int $role): void
     {
-        $auth = $this->authUntukAkun($this->buatAkunUntuk($this->nip['a1'], $role));
+        $auth  = $this->authUntukAkun($this->buatAkunUntuk($this->nip['a1'], $role));
+        $harap = [];
 
-        foreach ($this->nip as $label => $nip) {
-            $sendiri = $label === 'a1';
-            $this->assertSame($sendiri, $this->scope->bolehLihat($auth, $nip), "lihat {$label}");
-            $this->assertSame($sendiri, $this->scope->bolehUbah($auth, $nip), "ubah {$label}");
+        foreach (array_keys($this->nip) as $label) {
+            $sendiri       = $label === 'a1';
+            $harap[$label] = [$sendiri, $sendiri, $sendiri, $sendiri];
         }
 
-        $this->assertDaftarSamaDenganLihat($auth);
+        $this->assertJalur($auth, $harap);
     }
 
     public function testUlPegawaiTanpaNipTidakMelihatApaPun(): void
@@ -117,6 +127,7 @@ final class PegawaiScopeTest extends DatabaseTestCase
         $auth->setClaims(['sub' => '999999', 'role' => Role::PEGAWAI, 'nip' => null]);
 
         $this->assertFalse($this->scope->bolehLihat($auth, $this->nip['a1']));
+        $this->assertFalse($this->scope->bolehProses($auth, $this->nip['a1']));
         $this->assertSame([], $this->nipTerfilter($auth));
     }
 
@@ -124,25 +135,15 @@ final class PegawaiScopeTest extends DatabaseTestCase
     {
         $auth = $this->authAkunDi($this->satkerA1, Role::ADMIN_SATKER);
 
-        foreach (['a1' => true, 'a1_kedua' => true, 'a2' => false, 'b' => false, 'tanpa_satker' => false] as $label => $harap) {
-            $this->assertSame($harap, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
-            $this->assertSame($harap, $this->scope->bolehUbah($auth, $this->nip[$label]), "ubah {$label}");
-        }
-
-        $this->assertDaftarSamaDenganLihat($auth);
+        $this->assertJalur($auth, $this->semuaJalur(['a1', 'a1_kedua']));
     }
 
     public function testAdminSatkerTanpaSatkerMemakaiUnit(): void
     {
-        // Admin di unit A tanpa satker (legacy: lingkup unit) — satker A1 dan A2, bukan B.
+        // Admin di unit A tanpa satker (legacy: lingkup unit) — satker A1 dan A2, bukan B; keempat jalur sama.
         $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) $this->unitA, 'id_satker' => null]);
 
-        foreach (['a1' => true, 'a1_kedua' => true, 'a2' => true, 'b' => false, 'tanpa_satker' => false] as $label => $harap) {
-            $this->assertSame($harap, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
-            $this->assertSame($harap, $this->scope->bolehUbah($auth, $this->nip[$label]), "ubah {$label}");
-        }
-
-        $this->assertDaftarSamaDenganLihat($auth);
+        $this->assertJalur($auth, $this->semuaJalur(['a1', 'a1_kedua', 'a2']));
     }
 
     public function testAdminSatkerTidakMendapatPengecualianNipSendiri(): void
@@ -154,36 +155,56 @@ final class PegawaiScopeTest extends DatabaseTestCase
 
         $this->nip['admin'] = $nipAdmin;
 
-        $this->assertFalse($this->scope->bolehLihat($auth, $nipAdmin));
-        $this->assertFalse($this->scope->bolehUbah($auth, $nipAdmin));
-        $this->assertTrue($this->scope->bolehLihat($auth, $this->nip['a1']));
-        $this->assertDaftarSamaDenganLihat($auth);
+        $this->assertJalur($auth, $this->semuaJalur(['a1', 'a1_kedua']));
     }
 
-    public function testAdminUnitDestinasiTanpaSatkerMelihatUnit21DanSatkerBpoUnit7(): void
+    /**
+     * CR-045: admin unit 21 tanpa satker. Daftar & proses = `id_unit = 21 OR id_satker IN BPO` (legacy L_employee
+     * "APPROVAL BPO", L_notification::get_na_ap_unit, rwy/*::process); detail/ubah = validateAccess_AP (satker BPO
+     * hanya bila unit 7).
+     */
+    public function testAdminUnitDestinasiTanpaSatkerPerJalur(): void
     {
         $this->buatPegawaiUnitDestinasi();
 
         $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_DESTINASI, 'id_satker' => null]);
 
-        $harap = [
-            'u21'             => true,
-            'u7_bpo37'        => true,
-            'u7_bpo38'        => true,
-            'u7_bpo41'        => true,
-            'u7_bukan_bpo'    => false,
-            'bpo37_unit_lain' => false, // satker 37 dengan unit selain 7
-            'a1'              => false,
-            'b'               => false,
-            'tanpa_satker'    => false,
-        ];
+        $this->assertJalur($auth, [
+            // label             => [daftar, lihat, ubah, proses]
+            'u21'             => [true, true, true, true],
+            'u7_bpo37'        => [true, true, true, true],
+            'u7_bpo38'        => [true, true, true, true],
+            'u7_bpo41'        => [true, true, true, true],
+            'u7_bukan_bpo'    => [false, false, false, false], // unit 7 satker lain
+            'bpo37_unit_lain' => [true, false, false, true],   // satker BPO, unit bukan 7
+            'bpo38_unit_lain' => [true, false, false, true],
+            'u20'             => [false, false, false, false],
+            'u6_upt'          => [false, false, false, false],
+            'a1'              => [false, false, false, false],
+            'a1_kedua'        => [false, false, false, false],
+            'a2'              => [false, false, false, false],
+            'b'               => [false, false, false, false],
+            'tanpa_satker'    => [false, false, false, false],
+            'tanpa_pmj'       => [false, false, false, false],
+        ]);
+    }
 
-        foreach ($harap as $label => $boleh) {
-            $this->assertSame($boleh, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
-            $this->assertSame($boleh, $this->scope->bolehUbah($auth, $this->nip[$label]), "ubah {$label}");
-        }
+    /**
+     * CR-045: admin unit 20 (UNIT_KELEMBAGAAN) tanpa satker. Daftar = `id_unit IN (20, 6)` (legacy "APPROVAL UPT");
+     * detail/ubah dan proses hanya unit 20 (validateAccess_AP, get_na_ap_unit, rwy/*::process).
+     */
+    public function testAdminUnitKelembagaanTanpaSatkerPerJalur(): void
+    {
+        $this->buatPegawaiUnitDestinasi();
 
-        $this->assertDaftarSamaDenganLihat($auth);
+        $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_KELEMBAGAAN, 'id_satker' => null]);
+
+        $harap = array_map(static fn (): array => [false, false, false, false], $this->nip);
+
+        $harap['u20']    = [true, true, true, true];
+        $harap['u6_upt'] = [true, false, false, false];
+
+        $this->assertJalur($auth, $harap);
     }
 
     public function testAdminUnitLainTanpaSatkerHanyaUnit7(): void
@@ -192,25 +213,27 @@ final class PegawaiScopeTest extends DatabaseTestCase
 
         $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_LAIN, 'id_satker' => null]);
 
-        foreach (['u21' => false, 'u7_bpo37' => true, 'u7_bukan_bpo' => true, 'bpo37_unit_lain' => false, 'a1' => false] as $label => $boleh) {
-            $this->assertSame($boleh, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
-        }
-
-        $this->assertDaftarSamaDenganLihat($auth);
+        $this->assertJalur($auth, $this->semuaJalur(['u7_bpo37', 'u7_bpo38', 'u7_bpo41', 'u7_bukan_bpo']));
     }
 
     public function testAdminBersatkerDiUnitDestinasiHanyaSatkernya(): void
     {
         $this->buatPegawaiUnitDestinasi();
 
-        // Satker akun menang atas unit: hanya pmj.id_satker = 37, berapa pun unit snapshot-nya.
+        // Satker akun menang atas unit: semua jalur hanya pmj.id_satker = 37, berapa pun unit snapshot-nya.
         $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_DESTINASI, 'id_satker' => '37']);
 
-        foreach (['u21' => false, 'u7_bpo37' => true, 'u7_bpo38' => false, 'bpo37_unit_lain' => true, 'b' => false] as $label => $boleh) {
-            $this->assertSame($boleh, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
-        }
+        $this->assertJalur($auth, $this->semuaJalur(['u7_bpo37', 'bpo37_unit_lain']));
+    }
 
-        $this->assertDaftarSamaDenganLihat($auth);
+    public function testAdminBersatkerDiUnitKelembagaanHanyaSatkernya(): void
+    {
+        $nip = $this->buatPegawaiUnitDestinasi();
+
+        $idSatkerUpt = (int) $this->db->table('pegawai_mutasi_jabatan')->select('id_satker')->where('nip', $nip['u6_upt'])->get()->getRow('id_satker');
+        $auth        = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_KELEMBAGAAN, 'id_satker' => (string) $idSatkerUpt]);
+
+        $this->assertJalur($auth, $this->semuaJalur(['u6_upt']));
     }
 
     /**
@@ -229,12 +252,16 @@ final class PegawaiScopeTest extends DatabaseTestCase
             'unit bukan angka'           => [null, 'U01'],
             'satker spasi + unit'        => ['  ', '1'],
             'satker spasi'               => ['  ', null],
+            'satker spasi + unit 21'     => ['  ', '21'],
+            'satker spasi + unit 20'     => ['  ', '20'],
         ];
     }
 
     #[DataProvider('lingkupAdminTidakValidProvider')]
     public function testAdminSatkerTanpaLingkupValidFailClosed(?string $idSatker, ?string $idUnit): void
     {
+        $this->buatPegawaiUnitDestinasi();
+
         if ($idUnit === '1') {
             $idUnit = (string) $this->unitA;
         }
@@ -242,12 +269,7 @@ final class PegawaiScopeTest extends DatabaseTestCase
         $auth = new AuthContext();
         $auth->setClaims(['sub' => '999999', 'role' => Role::ADMIN_SATKER, 'nip' => null, 'id_satker' => $idSatker, 'id_unit' => $idUnit]);
 
-        foreach ($this->nip as $label => $nip) {
-            $this->assertFalse($this->scope->bolehLihat($auth, $nip), "lihat {$label}");
-            $this->assertFalse($this->scope->bolehUbah($auth, $nip), "ubah {$label}");
-        }
-
-        $this->assertSame([], $this->nipTerfilter($auth));
+        $this->assertJalur($auth, $this->semuaJalur([]));
     }
 
     public function testTanpaSesiAtauRoleTidakDikenalFailClosed(): void
@@ -263,11 +285,16 @@ final class PegawaiScopeTest extends DatabaseTestCase
         foreach ([$tanpaSesi, $roleAneh, $tanpaRole] as $auth) {
             $this->assertFalse($this->scope->bolehLihat($auth, $this->nip['a1']));
             $this->assertFalse($this->scope->bolehUbah($auth, $this->nip['a1']));
+            $this->assertFalse($this->scope->bolehProses($auth, $this->nip['a1']));
             $this->assertSame([], $this->nipTerfilter($auth));
         }
 
         $admin = $this->authAkunDi($this->satkerA1, Role::SUPER_ADMIN);
         $this->assertFalse($this->scope->bolehLihat($admin, ''), 'NIP kosong');
+        $this->assertFalse($this->scope->bolehProses($admin, ''), 'NIP kosong');
+
+        $adminUnit = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_DESTINASI, 'id_satker' => null]);
+        $this->assertFalse($this->scope->bolehProses($adminUnit, ''), 'NIP kosong role 3');
     }
 
     public function testFilterMenerimaKolomBeralias(): void
@@ -285,21 +312,17 @@ final class PegawaiScopeTest extends DatabaseTestCase
     }
 
     /**
-     * Pegawai fixture unit destinasi 21 / unit lain 7 (`validateAccess_AP` [K]); label => NIP, ditambahkan ke $this->nip.
+     * Pegawai fixture unit destinasi 21 / unit lain 7 / unit kelembagaan 20 / UPT 6; label => NIP, ditambahkan ke
+     * $this->nip.
      *
      * @return array<string, string>
      */
     private function buatPegawaiUnitDestinasi(): array
     {
-        $this->pastikanUnit(PegawaiScope::UNIT_DESTINASI);
-        $this->pastikanUnit(PegawaiScope::UNIT_LAIN);
-
-        foreach (PegawaiScope::SATKER_BPO as $idSatker) {
-            $this->pastikanSatker($idSatker, PegawaiScope::UNIT_LAIN);
-        }
-
         $satker21        = $this->buatSatker(PegawaiScope::UNIT_DESTINASI);
         $satker7BukanBpo = $this->buatSatker(PegawaiScope::UNIT_LAIN);
+        $satker20        = $this->buatSatker(PegawaiScope::UNIT_KELEMBAGAAN);
+        $satkerUpt       = $this->buatSatker(PegawaiScope::UNIT_UPT);
 
         $baru = [
             'u21'             => $this->buatPegawai([], ['id_satker' => $satker21, 'id_unit' => PegawaiScope::UNIT_DESTINASI]),
@@ -308,6 +331,9 @@ final class PegawaiScopeTest extends DatabaseTestCase
             'u7_bpo41'        => $this->buatPegawai([], ['id_satker' => 41, 'id_unit' => PegawaiScope::UNIT_LAIN]),
             'u7_bukan_bpo'    => $this->buatPegawai([], ['id_satker' => $satker7BukanBpo, 'id_unit' => PegawaiScope::UNIT_LAIN]),
             'bpo37_unit_lain' => $this->buatPegawai([], ['id_satker' => 37, 'id_unit' => $this->unitA]),
+            'bpo38_unit_lain' => $this->buatPegawai([], ['id_satker' => 38, 'id_unit' => $this->unitA]),
+            'u20'             => $this->buatPegawai([], ['id_satker' => $satker20, 'id_unit' => PegawaiScope::UNIT_KELEMBAGAAN]),
+            'u6_upt'          => $this->buatPegawai([], ['id_satker' => $satkerUpt, 'id_unit' => PegawaiScope::UNIT_UPT]),
         ];
 
         $this->nip = array_merge($this->nip, $baru);
@@ -340,6 +366,52 @@ final class PegawaiScopeTest extends DatabaseTestCase
     }
 
     /**
+     * Harapan [daftar, lihat, ubah, proses] = true untuk label $boleh, false untuk sisa $this->nip.
+     *
+     * @param list<string> $boleh
+     *
+     * @return array<string, array{0: bool, 1: bool, 2: bool, 3: bool}>
+     */
+    private function semuaJalur(array $boleh): array
+    {
+        $harap = [];
+
+        foreach (array_keys($this->nip) as $label) {
+            $ya            = in_array($label, $boleh, true);
+            $harap[$label] = [$ya, $ya, $ya, $ya];
+        }
+
+        return $harap;
+    }
+
+    /**
+     * Cek keempat jalur untuk SETIAP pegawai fixture: label => [daftar, lihat, ubah, proses]. Label $this->nip yang
+     * tidak disebut $harap membuat test gagal (harapan wajib lengkap).
+     *
+     * @param array<string, array{0: bool, 1: bool, 2: bool, 3: bool}> $harap
+     */
+    private function assertJalur(AuthContext $auth, array $harap): void
+    {
+        $this->assertSame([], array_values(array_diff(array_keys($this->nip), array_keys($harap))), 'harapan tidak lengkap');
+
+        $harapDaftar = [];
+
+        foreach ($harap as $label => [$daftar, $lihat, $ubah, $proses]) {
+            $nip = $this->nip[$label];
+            $this->assertSame($lihat, $this->scope->bolehLihat($auth, $nip), "lihat {$label}");
+            $this->assertSame($ubah, $this->scope->bolehUbah($auth, $nip), "ubah {$label}");
+            $this->assertSame($proses, $this->scope->bolehProses($auth, $nip), "proses {$label}");
+
+            if ($daftar) {
+                $harapDaftar[] = $nip;
+            }
+        }
+
+        sort($harapDaftar);
+        $this->assertSame($harapDaftar, $this->nipTerfilter($auth), 'daftar (terapkanKeQuery)');
+    }
+
+    /**
      * NIP fixture test ini yang lolos terapkanKeQuery().
      *
      * @return list<string>
@@ -353,13 +425,5 @@ final class PegawaiScopeTest extends DatabaseTestCase
         sort($hasil);
 
         return $hasil;
-    }
-
-    private function assertDaftarSamaDenganLihat(AuthContext $auth): void
-    {
-        $harap = array_values(array_filter($this->nip, fn (string $nip): bool => $this->scope->bolehLihat($auth, $nip)));
-        sort($harap);
-
-        $this->assertSame($harap, $this->nipTerfilter($auth), 'terapkanKeQuery() = bolehLihat()');
     }
 }

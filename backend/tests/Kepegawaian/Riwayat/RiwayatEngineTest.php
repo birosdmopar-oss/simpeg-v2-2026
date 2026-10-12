@@ -13,6 +13,7 @@ use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
+use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Models\AuditLogModel;
 use Closure;
 use Config\Services;
@@ -366,6 +367,45 @@ final class RiwayatEngineTest extends DatabaseTestCase
         $this->assertStatus(403, fn () => $this->engine()->tambah($this->admin, $this->nip, 'pendidikan', ['tgl_lulus' => '2010-08-30']), 'lihat saja, tanpa ubah');
         // NIP yang tidak ada dijawab sama dengan di luar lingkup bagi pemanggil ber-lingkup.
         $this->assertStatus(403, fn () => $this->engine()->daftar($this->admin, '999999999999999999', 'pendidikan'));
+    }
+
+    /**
+     * CR-045 (PegawaiScope NYATA): proses memakai bolehProses(), ubah/detail memakai bolehUbah()/bolehLihat(). Admin
+     * unit 21 tanpa satker memproses riwayat pegawai satker BPO yang unitnya bukan 7 (legacy rwy/*::process), tetapi
+     * tidak bisa membuka/mengubahnya (validateAccess_AP).
+     */
+    public function testProsesMemakaiLingkupJalurProsesScopeNyata(): void
+    {
+        foreach ([PegawaiScope::UNIT_LAIN, PegawaiScope::UNIT_DESTINASI] as $idUnit) {
+            if ($this->db->table('unit')->where('id_unit', $idUnit)->countAllResults() === 0) {
+                $this->db->table('unit')->insert(['id_unit' => $idUnit, 'unit' => "Unit Fixture {$idUnit}", 'status' => 1]);
+            }
+        }
+
+        if ($this->db->table('satker')->where('id_satker', 38)->countAllResults() === 0) {
+            $this->db->table('satker')->insert(['id_satker' => 38, 'id_unit' => PegawaiScope::UNIT_LAIN, 'satker' => 'Satker Fixture 38', 'status' => 1]);
+        }
+
+        $nipBpo        = $this->buatPegawai([], ['id_satker' => 38, 'id_unit' => $this->buatUnit()]);
+        $nipU7BukanBpo = $this->buatPegawai([], ['id_satker' => $this->buatSatker(PegawaiScope::UNIT_LAIN), 'id_unit' => PegawaiScope::UNIT_LAIN]);
+        [, $admin21]   = $this->aktor(Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_DESTINASI, 'id_satker' => null]);
+
+        Services::injectMock('pegawaiScope', new PegawaiScope());
+
+        $a = $this->sisipRiwayat($this->pendidikanUji, $nipBpo, ['tgl_lulus' => '2012-08-30', 'status' => 0]);
+        $b = $this->sisipRiwayat($this->pendidikanUji, $nipBpo, ['tgl_lulus' => '2013-08-30', 'status' => 0]);
+        $c = $this->sisipRiwayat($this->pendidikanUji, $nipU7BukanBpo, ['tgl_lulus' => '2012-08-30', 'status' => 0]);
+
+        $row = $this->engine()->proses($admin21, $nipBpo, 'pendidikan', $a, 'setujui', null);
+        $this->assertSame('1', (string) $row['status']);
+        $this->assertSame((string) $a, (string) $this->snapshotUji('pegawai_pendidikan', $nipBpo)['id_riwayat_pendidikan']);
+
+        $this->assertSame('2', (string) $this->engine()->proses($admin21, $nipBpo, 'pendidikan', $b, 'tolak', 'perbaiki')['status']);
+
+        $this->assertStatus(403, fn () => $this->engine()->ubah($admin21, $nipBpo, 'pendidikan', $b, ['institusi_pendidikan' => 'X']), 'ubah di luar validateAccess_AP');
+        $this->assertStatus(403, fn () => $this->engine()->detail($admin21, $nipBpo, 'pendidikan', $a), 'detail di luar validateAccess_AP');
+        $this->assertStatus(403, fn () => $this->engine()->daftar($admin21, $nipBpo, 'pendidikan'));
+        $this->assertStatus(403, fn () => $this->engine()->proses($admin21, $nipU7BukanBpo, 'pendidikan', $c, 'setujui', null), 'unit 7 satker bukan BPO');
     }
 
     public function testNipTidakAdaDanBarisMilikNipLain404(): void

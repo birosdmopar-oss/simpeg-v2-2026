@@ -69,6 +69,16 @@ final class FakePegawaiScope implements PegawaiScopeInterface
         return $this->nipUbah === null || in_array($nip, $this->nipUbah, true);
     }
 
+    /**
+     * Ikut konfigurasi bolehUbah() (NIP $nipUbah).
+     */
+    public function bolehProses(AuthContext $auth, string $nip): bool
+    {
+        $this->panggilan[] = ['bolehProses', $nip];
+
+        return $this->nipUbah === null || in_array($nip, $this->nipUbah, true);
+    }
+
     public function terapkanKeQuery(BaseBuilder $builder, AuthContext $auth, string $kolomNip = 'nip'): void
     {
         if ($this->nipLihat === null) {

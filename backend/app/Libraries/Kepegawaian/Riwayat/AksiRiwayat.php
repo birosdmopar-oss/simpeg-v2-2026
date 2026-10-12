@@ -30,7 +30,7 @@ enum AksiRiwayat: string
     }
 
     /**
-     * Aksi yang mengubah data (butuh PegawaiScopeInterface::bolehUbah()).
+     * Aksi yang mengubah data (butuh PegawaiScopeInterface::bolehUbah(); Proses di engine: bolehProses()).
      */
     public function mengubah(): bool
     {

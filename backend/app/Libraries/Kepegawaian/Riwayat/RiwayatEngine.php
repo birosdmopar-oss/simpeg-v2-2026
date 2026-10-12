@@ -302,7 +302,11 @@ final class RiwayatEngine implements RiwayatServiceInterface
         }
 
         $scope = $this->scope();
-        $boleh = $aksi->mengubah() ? $scope->bolehUbah($auth, $nip) : $scope->bolehLihat($auth, $nip);
+        $boleh = match (true) {
+            $aksi === AksiRiwayat::Proses => $scope->bolehProses($auth, $nip),
+            $aksi->mengubah()             => $scope->bolehUbah($auth, $nip),
+            default                       => $scope->bolehLihat($auth, $nip),
+        };
 
         if (! $boleh) {
             throw new ForbiddenException('Anda tidak berhak mengakses data pegawai ini.');

@@ -41,6 +41,7 @@ final class StubFailClosedTest extends CIUnitTestCase
             $auth = $this->auth($role);
             $this->assertFalse($scope->bolehLihat($auth, self::NIP), "lihat role {$role}");
             $this->assertFalse($scope->bolehUbah($auth, self::NIP), "ubah role {$role}");
+            $this->assertFalse($scope->bolehProses($auth, self::NIP), "proses role {$role}");
         }
 
         $builder = Database::connect('tests')->table('pegawai');

@@ -22,14 +22,22 @@ interface PegawaiScopeInterface
     public function bolehLihat(AuthContext $auth, string $nip): bool;
 
     /**
-     * Pemanggil boleh mengubah (tambah/ubah/hapus/proses) data pegawai ber-NIP $nip. Hak aksi per jenis riwayat tetap
+     * Pemanggil boleh mengubah (tambah/ubah/hapus) data pegawai ber-NIP $nip. Hak aksi per jenis riwayat tetap
      * ditentukan Definisi riwayat × role; method ini hanya lingkup pegawainya.
      */
     public function bolehUbah(AuthContext $auth, string $nip): bool;
 
     /**
-     * Saring query daftar ke pegawai dalam lingkup pemanggil. $kolomNip = kolom NIP pada builder (boleh beralias,
-     * mis. 'p.nip').
+     * Pemanggil boleh memproses (Setujui/Tolak) pengajuan riwayat pegawai ber-NIP $nip — jalur proses dan antrean
+     * approval (aditif CR-045). Untuk role selain Admin Satker (3) sama dengan bolehUbah(). Admin Satker tanpa satker
+     * memakai pembagian jalur legacy yang bisa lebih luas dari bolehUbah() (README `Libraries/Kepegawaian`, bagian
+     * Scope); pemanggil jalur proses memakai method ini, BUKAN bolehUbah().
+     */
+    public function bolehProses(AuthContext $auth, string $nip): bool;
+
+    /**
+     * Saring query daftar ke pegawai dalam lingkup pemanggil (jalur daftar; untuk Admin Satker tanpa satker bisa lebih
+     * luas dari bolehLihat(), ikut legacy). $kolomNip = kolom NIP pada builder (boleh beralias, mis. 'p.nip').
      */
     public function terapkanKeQuery(BaseBuilder $builder, AuthContext $auth, string $kolomNip = 'nip'): void;
 }

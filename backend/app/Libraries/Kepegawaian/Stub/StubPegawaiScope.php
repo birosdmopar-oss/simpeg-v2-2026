@@ -24,6 +24,11 @@ final class StubPegawaiScope implements PegawaiScopeInterface
         return false;
     }
 
+    public function bolehProses(AuthContext $auth, string $nip): bool
+    {
+        return false;
+    }
+
     public function terapkanKeQuery(BaseBuilder $builder, AuthContext $auth, string $kolomNip = 'nip'): void
     {
         $builder->where('1 = 0', null, false);

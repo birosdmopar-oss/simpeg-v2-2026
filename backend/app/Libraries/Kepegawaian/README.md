@@ -221,24 +221,34 @@ Auth sudah memegang aturan ini di `PenggunaModel::NIP_MAX_DIGITS`, `UserService:
 `PegawaiScope` = implementasi nyata `PegawaiScopeInterface` (service `pegawaiScope`). Semua endpoint Modul B memeriksa
 lingkup lewat service ini (403 di luar lingkup); daftar disaring dengan `terapkanKeQuery($builder, $auth, 'p.nip')`.
 
-| Role | Lihat | Ubah |
-|---|---|---|
-| 1 | semua | semua |
-| 4, 5, 8 | semua | — |
-| 2, 6, 7 | NIP sendiri | NIP sendiri |
-| 3 | `validateAccess_AP` atas `pegawai_mutasi_jabatan` (pmj), lihat di bawah | sama |
+| Role | Lihat | Ubah | Proses (`bolehProses`, CR-045) |
+|---|---|---|---|
+| 1 | semua | semua | = ubah |
+| 4, 5, 8 | semua | — | = ubah |
+| 2, 6, 7 | NIP sendiri | NIP sendiri | = ubah |
+| 3 | jalur detail atas `pegawai_mutasi_jabatan` (pmj), lihat di bawah | sama dengan lihat | jalur proses |
 
-Role 3 = port `validateAccess_AP` [K] (fungsi `helpers/function_helper.php:72-98`, literal `['37', '38', '41']` di :85;
-konstanta `UNIT_DESTINASI` / `UNIT_LAIN` / `LIST_SATKER_BPO` di `config/constants.php:312/314/316`):
+Role 3, admin **punya satker** → semua jalur `pmj.id_satker` = satker admin. Admin **tanpa satker** → predikat per
+jalur, **[K] ikut legacy, keputusan user 12-10-2026 (CR-045)** — legacy memang memakai predikat berbeda untuk daftar,
+detail, dan proses:
 
-- admin punya satker → `pmj.id_satker` = satker admin;
-- admin tanpa satker, unit `UNIT_DESTINASI` (21) → `pmj.id_unit = 21 OR (pmj.id_unit = UNIT_LAIN (7) AND pmj.id_satker
-  IN SATKER_BPO (37, 38, 41))` — satker BPO dengan unit selain 7 tidak termasuk;
-- admin tanpa satker, unit lain → `pmj.id_unit` = unit admin.
+| Admin tanpa satker | Daftar (`terapkanKeQuery`) | Detail/ubah riwayat, arsip, lampiran (`bolehLihat`, `bolehUbah`) | Setujui/Tolak + antrean approval (`bolehProses`) |
+|---|---|---|---|
+| unit 20 (`UNIT_KELEMBAGAAN`) | `pmj.id_unit IN (20, 6)` — `libraries/hr/L_employee.php:6231-6239` ("APPROVAL UPT") | `pmj.id_unit = 20` — `validateAccess_AP` | `pmj.id_unit = 20` — `libraries/hr/L_notification.php:1897-1901` (`get_na_ap_unit`), `controllers/hr/rwy/Kp.php:462-484` |
+| unit 21 (`UNIT_DESTINASI`) | `pmj.id_unit = 21 OR pmj.id_satker IN (37, 38, 41)` — `L_employee.php:6221-6229` ("APPROVAL BPO") | `pmj.id_unit = 21 OR (pmj.id_unit = 7 AND pmj.id_satker IN (37, 38, 41))` — `validateAccess_AP` | `pmj.id_unit = 21 OR pmj.id_satker IN (37, 38, 41)` — `L_notification.php:1899-1901`, `rwy/Kp.php:466-470` (pola sama di `rwy/*::process` lain) |
+| unit lain | `pmj.id_unit` = unit admin | sama | sama |
 
-Konstanta [K] `PegawaiScope::UNIT_DESTINASI`, `UNIT_LAIN`, `SATKER_BPO`. Satu predikat dipakai `bolehLihat`/`bolehUbah`
-dan `terapkanKeQuery`, jadi isi daftar = hasil cek detail. Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak
-cocok predikat mana pun untuk admin **berlingkup** (punya satker atau unit valid) — sama dengan legacy. Role 3 tidak
+`validateAccess_AP` = `helpers/function_helper.php:72-98` (literal `['37', '38', '41']` di :85); konstanta
+`UNIT_DESTINASI` / `UNIT_KELEMBAGAAN` / `UNIT_LAIN` / `LIST_SATKER_BPO` di `config/constants.php:312-316`, unit UPT =
+literal `'6'` di `L_employee.php:6232`. Konstanta [K] `PegawaiScope::UNIT_DESTINASI`, `UNIT_KELEMBAGAAN`, `UNIT_LAIN`,
+`UNIT_UPT`, `SATKER_BPO`.
+
+Konsekuensi yang **disengaja** (sama dengan legacy): pegawai UPT (unit 6) muncul di daftar admin unit 20 tetapi
+detailnya 403; pegawai satker BPO dengan unit bukan 7 bisa disetujui/ditolak admin unit 21 tetapi tidak bisa dibuka atau
+diubah. `RiwayatEngine::proses()` memakai `bolehProses`; descriptor tab tetap memakai `bolehUbah` untuk `can_process`
+(descriptor hanya ada bila `bolehLihat`, dan untuk pegawai yang lolos detail jalur proses = jalur ubah).
+
+Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak cocok predikat jalur mana pun untuk admin role 3. Role 3 tidak
 punya pengecualian NIP sendiri (legacy juga tidak). Satker akun dianggap "ada" bila bukan NULL dan bukan `''` **tanpa
 trim** (legacy `$idSatker_AP != ''`: string spasi masuk cabang satker dan tidak cocok pmj mana pun); nilai yang ada
 tetapi bukan angka kanonik ditolak, tidak jatuh ke cabang unit.
@@ -247,9 +257,9 @@ Deviasi [V2]:
 
 - Legacy meloloskan admin role 3 **tanpa satker dan tanpa unit** (perbandingan `null == ''`) ke pegawai tanpa pmj
   atau dengan `pmj.id_unit` NULL. v2 fail-closed (admin tanpa lingkup valid → tidak ada pegawai).
-- Isi daftar (menunggu konfirmasi PM): daftar pegawai legacy (`libraries/hr/L_employee.php:6220-6239`) untuk admin
-  unit 20 (`UNIT_KELEMBAGAAN`) ikut memuat pegawai unit 6 (UPT), dan untuk admin unit 21 memuat satker 37/38/41 tanpa
-  syarat unit 7 — keduanya tidak lolos `validateAccess_AP` di detail. v2 daftar = detail = `validateAccess_AP`.
+- Jalur proses legacy (`rwy/*::process`, mis. `rwy/Kp.php:462-484`) **meloloskan** pegawai tanpa baris pmj, serta
+  pegawai dengan `pmj.id_satker` kosong (admin bersatker) atau `pmj.id_unit` kosong (admin tanpa satker). v2 tetap
+  fail-closed di **semua** jalur, termasuk `bolehProses` (CR-045).
 - Sementara sampai DBV-009 (tipe `id_satker`/`id_unit` akun VARCHAR vs pmj INT): claim di-cast ke int hanya bila angka
   kanonik; bentuk non-kanonik seperti `'012'` ditolak (fail-closed). Ditinjau ulang saat DBV-009 diputus.
 
