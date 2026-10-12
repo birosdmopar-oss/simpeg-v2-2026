@@ -142,10 +142,22 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Izin aksi yang bergantung pada pegawai sasaran (aditif MAKE-005, engine-v1). Dipanggil engine SESUDAH izin role
+     * (`izin()`), PegawaiScope, dan keberadaan NIP; false → 403. Descriptor tab memakainya juga (`can_*`; `can_view`
+     * false = tab tidak tampil). Default true. Contoh: Pendidikan — role 2 hanya boleh tambah/ubah/hapus bila pegawai
+     * masih CPNS (legacy `controllers/hr/rwy/Pendidikan.php`).
+     */
+    public function bolehAksiUntuk(AuthContext $auth, AksiRiwayat $aksi, string $nip): bool
+    {
+        return true;
+    }
+
+    /**
      * Role yang boleh MEMILIH status baris saat ubah lewat field `status` payload (aditif MAKE-005). Default kosong:
      * status saat ubah dihitung statusSetelahUbah() dan `status` dari klien diabaikan. Untuk role di daftar ini, `status`
      * yang dikirim (0, 1, 2, atau 3 bila flag Diproses aktif; bukan 10) menggantikan statusSetelahUbah(); tidak dikirim =
-     * aturan bawaan. Transisi yang terjadi diperlakukan sama (snapshot, penanda notifikasi, afterApprove).
+     * aturan bawaan. Transisi yang terjadi diperlakukan sama (snapshot, penanda notifikasi, afterApprove). Memilih 2
+     * Ditolak mewajibkan `reason_note` (maks 255 byte, sama dengan tolak di proses) → 422 `errors.reason_note`.
      *
      * @return list<int>
      */

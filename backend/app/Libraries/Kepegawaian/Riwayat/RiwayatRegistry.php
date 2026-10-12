@@ -156,7 +156,7 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
 
             $lihat ??= $scope->bolehLihat($auth, $nip);
 
-            if (! $lihat) {
+            if (! $lihat || ! $d->bolehAksiUntuk($auth, AksiRiwayat::Lihat, $nip)) {
                 continue;
             }
 
@@ -169,6 +169,9 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
                     $ubah ??= $scope->bolehUbah($auth, $nip);
                     $boleh = $ubah;
                 }
+
+                // Izin per pegawai sasaran (RiwayatDefinisi::bolehAksiUntuk, aditif MAKE-005).
+                $boleh = $boleh && $d->bolehAksiUntuk($auth, $aksi, $nip);
 
                 $descriptor[$aksi->kunciDescriptor()] = $boleh;
             }

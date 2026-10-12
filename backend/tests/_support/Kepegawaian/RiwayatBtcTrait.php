@@ -58,8 +58,9 @@ trait RiwayatBtcTrait
 
     public function testBtcPegawaiInputMandiriStatus0(): void
     {
-        $d                = $this->btcDefinisi();
-        [$nip, , $akun]   = $this->aktor(Role::PEGAWAI);
+        $d              = $this->btcDefinisi();
+        [$nip, , $akun] = $this->aktor(Role::PEGAWAI);
+        $this->btcSiapkanPegawaiMandiri($nip);
         $snapshotSebelum  = $this->btcSnapshot($nip);
         [$status, $baris] = $this->btcTambah($akun, $nip);
 
@@ -142,7 +143,8 @@ trait RiwayatBtcTrait
             [, , $akun] = $this->aktor($role);
 
             $lihat = $this->asUser($akun)->get($this->btcPath($nip));
-            $boleh = $d->boleh(AksiRiwayat::Lihat, $role) && service('pegawaiScope')->bolehLihat($this->authUntukAkun((int) $akun['id_pengguna']), $nip);
+            $boleh = $this->btcHarapanLihat($role)
+                ?? ($d->boleh(AksiRiwayat::Lihat, $role) && service('pegawaiScope')->bolehLihat($this->authUntukAkun((int) $akun['id_pengguna']), $nip));
             $this->assertSame($boleh ? 200 : 403, $lihat->response()->getStatusCode(), "lihat role {$role}");
 
             if (! $d->boleh(AksiRiwayat::Proses, $role)) {
@@ -177,6 +179,22 @@ trait RiwayatBtcTrait
                 $this->assertNotSame([], $this->auditUji($aturan->tabel, $nip), "audit snapshot {$aturan->tabel}");
             }
         }
+    }
+
+    /**
+     * Siapkan pegawai role 2 sebelum butir input mandiri (mis. Pendidikan: pegawai masih CPNS). Default tidak ada.
+     */
+    protected function btcSiapkanPegawaiMandiri(string $nip): void
+    {
+    }
+
+    /**
+     * Harapan eksplisit "lihat" daftar riwayat pegawai lain (tidak satu satker dengan akun) oleh $role: true = 200,
+     * false = 403. Null = dihitung dari izin Definisi × PegawaiScope terpasang (Definisi uji dengan fake S0).
+     */
+    protected function btcHarapanLihat(int $role): ?bool
+    {
+        return null;
     }
 
     /**

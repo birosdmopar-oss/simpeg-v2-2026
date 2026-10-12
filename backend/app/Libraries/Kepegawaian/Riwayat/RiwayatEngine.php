@@ -160,11 +160,11 @@ final class RiwayatEngine implements RiwayatServiceInterface
         // Jalan cepat sebelum validasi; diulang di dalam transaksi atas baris yang dibaca ulang (terkunci).
         $this->jagaUbah($d, $role, $this->statusDari($d, $lama));
 
-        $pilihan = $this->statusPilihan($d, $role, $data);
-        $data    = $this->validasi($d, $auth, $nip, $data, $lama);
+        [$pilihan, $alasanPilihan] = $this->statusPilihan($d, $role, $data);
+        $data                      = $this->validasi($d, $auth, $nip, $data, $lama);
         $this->periksaBerkas($d, $nip, $id, $berkas);
 
-        [$row, $statusBaru] = $this->transaksi(function () use ($d, $auth, $role, $nip, $id, $data, $berkas, $pilihan): array {
+        [$row, $statusBaru] = $this->transaksi(function () use ($d, $auth, $role, $nip, $id, $data, $berkas, $pilihan, $alasanPilihan): array {
             $this->kunciPegawai($nip);
 
             // Baca ulang SESUDAH kunci: guard dan status baru dihitung dari keadaan terkini, bukan hasil baca sebelum
@@ -180,6 +180,10 @@ final class RiwayatEngine implements RiwayatServiceInterface
             if ($statusBaru !== null && $statusBaru !== $statusLama) {
                 $data[$d->kolomStatus()] = $this->nilaiStatus($d, $statusBaru);
                 $data                    = $this->tandaiNotifikasi($d, $statusLama, $statusBaru, $data);
+            }
+
+            if ($pilihan === StatusRiwayat::Ditolak) {
+                $data = $this->saringKolom($d, $data + ['reason_note' => $alasanPilihan]);
             }
 
             $data  = $this->stempelPelaku($d, $auth, $data);
@@ -245,11 +249,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
         $this->jagaProses($statusLama);
 
-        $catatan = trim((string) $reasonNote);
-
-        if ($aksi === self::AKSI_TOLAK && $catatan === '') {
-            throw ValidationException::forField('reason_note', 'Alasan penolakan wajib diisi.');
-        }
+        $catatan = $aksi === self::AKSI_TOLAK ? $this->alasanTolak($reasonNote) : trim((string) $reasonNote);
 
         if (strlen($catatan) > self::REASON_NOTE_MAX_BYTES) {
             throw ValidationException::forField('reason_note', 'Alasan maksimal ' . self::REASON_NOTE_MAX_BYTES . ' byte.');
@@ -317,6 +317,12 @@ final class RiwayatEngine implements RiwayatServiceInterface
             throw new NotFoundException('Pegawai tidak ditemukan.');
         }
 
+        // Izin per pegawai sasaran (mis. role 2 hanya selama CPNS, Pendidikan) — sesudah lingkup & keberadaan NIP agar
+        // keadaan pegawai di luar lingkup tidak bocor.
+        if (! $d->bolehAksiUntuk($auth, $aksi, $nip)) {
+            throw new ForbiddenException('Anda tidak berhak atas aksi ini pada ' . $d->label() . ' untuk pegawai ini.');
+        }
+
         return $d;
     }
 
@@ -338,16 +344,20 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
     /**
      * Status yang dipilih pemanggil lewat field status payload, hanya untuk RiwayatDefinisi::rolePilihStatusSaatUbah();
-     * null = tidak dipilih (aturan statusSetelahUbah()). Nilai di luar status berlaku (atau 10) → 422 `errors.status`.
+     * [null, null] = tidak dipilih (aturan statusSetelahUbah()). Nilai di luar status berlaku (atau 10) → 422
+     * `errors.status`. Memilih 2 Ditolak mewajibkan `reason_note` (aturan sama dengan tolak di proses) → 422
+     * `errors.reason_note`; alasan dikembalikan sebagai elemen kedua.
      *
      * @param array<string, mixed> $data
+     *
+     * @return array{0: StatusRiwayat|null, 1: string|null}
      */
-    private function statusPilihan(RiwayatDefinisi $d, int $role, array $data): ?StatusRiwayat
+    private function statusPilihan(RiwayatDefinisi $d, int $role, array $data): array
     {
         $kolom = $d->kolomStatus();
 
         if (! in_array($role, $d->rolePilihStatusSaatUbah(), true) || ! array_key_exists($kolom, $data) || $data[$kolom] === null || $data[$kolom] === '') {
-            return null;
+            return [null, null];
         }
 
         $nilai  = $data[$kolom];
@@ -357,7 +367,35 @@ final class RiwayatEngine implements RiwayatServiceInterface
             throw ValidationException::forField($kolom, 'Status tidak valid.');
         }
 
-        return $status;
+        if ($status !== StatusRiwayat::Ditolak) {
+            return [$status, null];
+        }
+
+        $catatan = $data['reason_note'] ?? null;
+
+        if ($catatan !== null && ! is_string($catatan)) {
+            throw ValidationException::forField('reason_note', ValidasiRiwayat::PESAN_BUKAN_TEKS);
+        }
+
+        return [$status, $this->alasanTolak($catatan)];
+    }
+
+    /**
+     * Alasan penolakan: wajib, maksimal REASON_NOTE_MAX_BYTES (proses `tolak` dan pilihan status 2 saat ubah).
+     */
+    private function alasanTolak(?string $catatan): string
+    {
+        $catatan = trim((string) $catatan);
+
+        if ($catatan === '') {
+            throw ValidationException::forField('reason_note', 'Alasan penolakan wajib diisi.');
+        }
+
+        if (strlen($catatan) > self::REASON_NOTE_MAX_BYTES) {
+            throw ValidationException::forField('reason_note', 'Alasan maksimal ' . self::REASON_NOTE_MAX_BYTES . ' byte.');
+        }
+
+        return $catatan;
     }
 
     /**

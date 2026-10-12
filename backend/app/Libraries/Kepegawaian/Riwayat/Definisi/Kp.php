@@ -151,6 +151,7 @@ final class Kp extends RiwayatDefinisi
     /**
      * - Pengangkatan CPNS/PNS hanya satu per pegawai (status selain 2/10) — legacy :473-483, :510-520.
      * - TMT tidak boleh kembar (status selain 2/10) — legacy :486-493, :523-530.
+     *   Keduanya atas nilai akhir baris di setiap tambah/ubah (baris sendiri dikecualikan).
      * - [V2] TMT periode 1 April/1 Oktober (CR-025) bila tambah atau `tmtsk`/`id_jenis_kp` berubah.
      */
     public function validate(array $data, ?array $lama, AuthContext $auth): array
@@ -160,7 +161,9 @@ final class Kp extends RiwayatDefinisi
         $jenis  = (int) $nilai['id_jenis_kp'];
         $errors = [];
 
-        if (array_key_exists('id_jenis_kp', $data) && in_array($jenis, [JenisKp::PENGANGKATAN_CPNS, JenisKp::PENGANGKATAN_PNS], true)) {
+        // Cek duplikat atas NILAI AKHIR setiap tambah/ubah (legacy validate_param() memeriksa di setiap add/edit), juga
+        // PUT parsial tanpa field itu — mis. baris ditolak yang diaktifkan kembali.
+        if (in_array($jenis, [JenisKp::PENGANGKATAN_CPNS, JenisKp::PENGANGKATAN_PNS], true)) {
             $ada = $this->barisAktif($nip, $lama)->where('id_jenis_kp', $jenis)->get()->getRowArray();
 
             if ($ada !== null) {
@@ -169,10 +172,8 @@ final class Kp extends RiwayatDefinisi
             }
         }
 
-        if (array_key_exists('tmtsk', $data)) {
-            if ($this->barisAktif($nip, $lama)->where('tmtsk', $data['tmtsk'])->countAllResults() > 0) {
-                $errors['tmtsk'] = ['Riwayat KP dengan TMT SK ini sudah terdaftar. Gunakan TMT SK yang berbeda.'];
-            }
+        if (($nilai['tmtsk'] ?? '') !== '' && $this->barisAktif($nip, $lama)->where('tmtsk', $nilai['tmtsk'])->countAllResults() > 0) {
+            $errors['tmtsk'] = ['Riwayat KP dengan TMT SK ini sudah terdaftar. Gunakan TMT SK yang berbeda.'];
         }
 
         $berubah = $lama === null

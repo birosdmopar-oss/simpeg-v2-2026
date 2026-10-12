@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Kepegawaian\Riwayat;
 
 use App\Constants\Role;
+use App\Exceptions\ApiException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Libraries\Auth\AuthContext;
@@ -38,6 +39,7 @@ final class PendidikanTest extends DatabaseTestCase
     use RiwayatUjiTrait;
 
     private Pendidikan $d;
+    private int $idSatker;
     private string $nip;
     private AuthContext $pegawai;
     private AuthContext $admin;
@@ -49,8 +51,11 @@ final class PendidikanTest extends DatabaseTestCase
         $this->d = new Pendidikan();
         $this->pasangEngineNyata([$this->d, new Kp()]);
         $this->siapkanMasterPendidikan();
-        [$this->nip, $this->pegawai] = $this->aktor(Role::PEGAWAI);
+        $this->idSatker              = $this->buatSatker();
+        [$this->nip, $this->pegawai] = $this->aktor(Role::PEGAWAI, [], $this->idSatker);
         $this->admin                 = $this->aktor(Role::SUPER_ADMIN)[1];
+        // Legacy: role 2 hanya boleh mengisi pendidikan selama masih CPNS (bolehAksiUntuk).
+        $this->jadikanPegawaiCpns($this->nip);
     }
 
     protected function tearDown(): void
@@ -90,6 +95,19 @@ final class PendidikanTest extends DatabaseTestCase
         return null;
     }
 
+    protected function btcSiapkanPegawaiMandiri(string $nip): void
+    {
+        $this->jadikanPegawaiCpns($nip);
+    }
+
+    /**
+     * Lihat riwayat pegawai lain di satker lain: izin Matriks v2 (1, 2, 3, 6, 7) × PegawaiScope — hanya role 1.
+     */
+    protected function btcHarapanLihat(int $role): bool
+    {
+        return $role === Role::SUPER_ADMIN;
+    }
+
     // ---- Aturan B-10 ---------------------------------------------------
 
     public function testIzinMatriksV2(): void
@@ -101,6 +119,81 @@ final class PendidikanTest extends DatabaseTestCase
             $this->assertSame($semua, $this->d->boleh(AksiRiwayat::Tambah, $role), "tambah {$role}");
             $this->assertSame(in_array($role, [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true), $this->d->boleh(AksiRiwayat::Proses, $role), "proses {$role}");
         }
+    }
+
+    public function testRole2HanyaSelamaCpns(): void
+    {
+        // M-1 (keputusan user 12-10, legacy Pendidikan.php:70-72, :127-131, :226-231, :460-465).
+        $id = (int) $this->tambah($this->pegawai, $this->dataS1())['id_riwayat_pendidikan'];
+
+        $this->jadikanPegawaiCpns($this->nip, false);
+        $this->assertStatus(403, fn () => $this->tambah($this->pegawai, $this->dataS1(['tgl_lulus' => '2019-08-30'])));
+        $this->assertStatus(403, fn () => $this->engine()->ubah($this->pegawai, $this->nip, 'pendidikan', $id, ['institusi_pendidikan' => 'X']));
+        $this->assertStatus(403, fn () => $this->engine()->hapus($this->pegawai, $this->nip, 'pendidikan', $id));
+        $this->assertCount(1, $this->engine()->daftar($this->pegawai, $this->nip, 'pendidikan'), 'lihat tetap boleh');
+
+        // Tanpa snapshot pegawai_kp = bukan CPNS (legacy $isCPNS false).
+        $this->db->table('pegawai_kp')->where('nip', $this->nip)->delete();
+        $this->assertStatus(403, fn () => $this->tambah($this->pegawai, $this->dataS1(['tgl_lulus' => '2019-08-30'])));
+
+        // Descriptor mengikuti hook: tab tampil, tombol tulis mati.
+        $tab = array_column(service('riwayatRegistry')->descriptorUntuk($this->pegawai, $this->nip), null, 'jenis')['pendidikan'];
+        $this->assertSame([true, false, false, false], [$tab['can_view'], $tab['can_create'], $tab['can_edit'], $tab['can_delete']]);
+
+        // Admin & role 7 (PPPK) tidak terpengaruh.
+        [, $adminSatker] = $this->aktor(Role::ADMIN_SATKER, [], $this->idSatker);
+        $this->tambah($this->admin, $this->dataS1(['tgl_lulus' => '2019-08-30']));
+        $this->engine()->ubah($adminSatker, $this->nip, 'pendidikan', $id, ['institusi_pendidikan' => 'Y']);
+        [$nipPppk, $pppk] = $this->aktor(Role::PPPK);
+        $this->engine()->tambah($pppk, $nipPppk, 'pendidikan', $this->dataS1(), [Pendidikan::LAMPIRAN_IJAZAH => $this->berkasUji()]);
+    }
+
+    public function testRole1MemilihStatusSaatUbahDanTolakWajibAlasan(): void
+    {
+        // M-2 + L-1 (keputusan user 12-10; legacy views/hr/employee/rwy/pendidikan/form.php:59-76).
+        $id = (int) $this->tambah($this->pegawai, $this->dataS1())['id_riwayat_pendidikan'];
+
+        $this->assertErrors(['reason_note'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'pendidikan', $id, ['status' => '2']));
+        $this->assertErrors(['reason_note'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'pendidikan', $id, ['status' => '2', 'reason_note' => str_repeat('x', 256)]));
+
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'pendidikan', $id, ['status' => '2', 'reason_note' => ' Ijazah tidak sah ']);
+        $this->assertSame(['2', 'Ijazah tidak sah'], [(string) $row['status'], $row['reason_note']]);
+
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'pendidikan', $id, ['status' => 1]);
+        $this->assertSame('1', (string) $row['status']);
+        $this->assertSame((string) $id, (string) $this->snapshotUji('pegawai_pendidikan', $this->nip)['id_riwayat_pendidikan']);
+
+        // Role 3 tidak memilih status (→ 1, field status diabaikan).
+        [, $adminSatker] = $this->aktor(Role::ADMIN_SATKER, [], $this->idSatker);
+        $this->assertSame('1', (string) $this->engine()->ubah($adminSatker, $this->nip, 'pendidikan', $id, ['status' => '0'])['status']);
+    }
+
+    public function testStatusNullDataLamaDenganDefinisiNyata(): void
+    {
+        // L-4: baris impor ber-status NULL diperlakukan seperti 0 (UL_PEGAWAI → 0, role 3 → 1, role 1 tetap NULL).
+        $baris = [];
+
+        foreach (['2001-06-30', '2005-06-30', '2009-06-30'] as $tgl) {
+            $id = $this->sisipRiwayat($this->d, $this->nip, array_merge($this->btcBaris($this->nip), ['tgl_lulus' => $tgl, 'status' => null]));
+            $this->lampiranUji->simpan($this->nip, Pendidikan::LAMPIRAN_IJAZAH, $id, $this->berkasUji(), $this->d->lampiran()[0]);
+            $baris[] = $id;
+        }
+
+        [, $adminSatker] = $this->aktor(Role::ADMIN_SATKER, [], $this->idSatker);
+
+        $this->assertSame('0', (string) $this->engine()->ubah($this->pegawai, $this->nip, 'pendidikan', $baris[0], ['no_ijazah' => 'A'])['status']);
+        $this->assertSame('1', (string) $this->engine()->ubah($adminSatker, $this->nip, 'pendidikan', $baris[1], ['no_ijazah' => 'B'])['status']);
+        $this->assertSame((string) $baris[1], (string) $this->snapshotUji('pegawai_pendidikan', $this->nip)['id_riwayat_pendidikan']);
+        $this->assertNull($this->engine()->ubah($this->admin, $this->nip, 'pendidikan', $baris[2], ['no_ijazah' => 'C'])['status']);
+    }
+
+    public function testDuplikatDiperiksaAtasNilaiAkhirSaatBarisDitolakDiaktifkan(): void
+    {
+        // M-3: baris ditolak bertanggal sama dengan baris aktif; PUT parsial tanpa tgl_lulus yang mengaktifkannya → 422.
+        $this->tambah($this->admin, $this->dataS1());
+        $ditolak = $this->sisipRiwayat($this->d, $this->nip, $this->btcBaris($this->nip) + ['status' => 2, 'reason_note' => 'x']);
+
+        $this->assertErrors(['tgl_lulus'], fn () => $this->engine()->ubah($this->pegawai, $this->nip, 'pendidikan', $ditolak, ['institusi_pendidikan' => 'Z']));
     }
 
     public function testIjazahWajibTranskripDanGelarOpsional(): void
@@ -287,6 +380,19 @@ final class PendidikanTest extends DatabaseTestCase
     private function tambah(AuthContext $auth, array $data, ?array $berkas = null): array
     {
         return $this->engine()->tambah($auth, $this->nip, 'pendidikan', $data, $berkas ?? [Pendidikan::LAMPIRAN_IJAZAH => $this->berkasUji()]);
+    }
+
+    private function assertStatus(int $kode, Closure $aksi): void
+    {
+        try {
+            $aksi();
+        } catch (ApiException $e) {
+            $this->assertSame($kode, $e->getStatusCode(), $e->getMessage());
+
+            return;
+        }
+
+        $this->fail("Diharapkan {$kode}.");
     }
 
     private function engine(): RiwayatEngine

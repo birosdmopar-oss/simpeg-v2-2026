@@ -6,6 +6,7 @@ namespace App\Libraries\Kepegawaian\Riwayat\Definisi;
 
 use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\AlurRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Libraries\Kepegawaian\Riwayat\AturanSnapshot;
@@ -108,6 +109,36 @@ final class Pendidikan extends RiwayatDefinisi
     }
 
     /**
+     * Legacy: role 2 (Pegawai PNS) hanya boleh tambah/ubah/hapus selama pegawai sasaran masih CPNS — `$isCPNS` =
+     * `pangkat.cpns = 1` dari snapshot `pegawai_kp` (`controllers/hr/rwy/Pendidikan.php:49-54, :70-72, :121-131,
+     * :220-231, :454-465`). Role 6/7 dan admin tidak dibatasi; lihat/proses tidak terpengaruh. Keputusan user 12-10-2026.
+     */
+    public function bolehAksiUntuk(AuthContext $auth, AksiRiwayat $aksi, string $nip): bool
+    {
+        if ($auth->role() !== Role::PEGAWAI || ! in_array($aksi, [AksiRiwayat::Tambah, AksiRiwayat::Ubah, AksiRiwayat::Hapus], true)) {
+            return true;
+        }
+
+        $cpns = db_connect()->table('pegawai_kp')
+            ->select('pangkat.cpns')
+            ->join('pangkat', 'pangkat.id_pangkat = pegawai_kp.id_pangkat', 'left')
+            ->where('pegawai_kp.nip', $nip)
+            ->get()
+            ->getRow();
+
+        return $cpns !== null && (string) $cpns->cpns === '1';
+    }
+
+    /**
+     * Legacy: role 1 memilih status saat edit pendidikan (`views/hr/employee/rwy/pendidikan/form.php:59-76`,
+     * keputusan user 12-10-2026). Diproses hanya bila flag status 3 aktif; Ditolak wajib alasan.
+     */
+    public function rolePilihStatusSaatUbah(): array
+    {
+        return [Role::SUPER_ADMIN];
+    }
+
+    /**
      * Legacy `list()` :30 `ORDER BY status ASC, tgl_lulus ASC` (legacy hanya menampilkan status 0/1; kontrak v2
      * menampilkan semua kecuali 10 agar baris ditolak + alasannya terlihat).
      */
@@ -174,7 +205,8 @@ final class Pendidikan extends RiwayatDefinisi
             }
         }
 
-        if (array_key_exists('tgl_lulus', $data) && $this->tanggalKembar((string) $nilai[$this->kolomNip()], (string) $data['tgl_lulus'], $lama)) {
+        // Atas NILAI AKHIR setiap tambah/ubah (legacy vp() memeriksa di setiap add/edit), juga PUT parsial tanpa tgl_lulus.
+        if (! self::kosong($nilai['tgl_lulus'] ?? null) && $this->tanggalKembar((string) $nilai[$this->kolomNip()], (string) $nilai['tgl_lulus'], $lama)) {
             $errors['tgl_lulus'] = ['Riwayat pendidikan dengan Tanggal Dikeluarkan Ijazah ini sudah terdaftar. Gunakan tanggal yang berbeda.'];
         }
 

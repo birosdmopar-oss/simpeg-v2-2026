@@ -204,6 +204,31 @@ trait RiwayatUjiTrait
     }
 
     /**
+     * Snapshot `pegawai_kp` untuk $nip berpangkat CPNS (`pangkat.cpns = 1`) atau PNS (`cpns = 2`) — syarat izin role 2
+     * Pendidikan (legacy `$isCPNS`). Snapshot lama $nip diganti.
+     */
+    protected function jadikanPegawaiCpns(string $nip, bool $cpns = true): void
+    {
+        $golRuang = $cpns ? 'C-II/a' : 'P-II/a';
+        $pangkat  = $this->db->table('pangkat')->where('gol_ruang', $golRuang)->get()->getRowArray();
+
+        if ($pangkat === null) {
+            $this->db->table('pangkat')->insert([
+                'pangkat' => 'Pengatur Muda', 'gol' => 'II', 'ruang' => 'a', 'gol_ruang' => $golRuang,
+                'cpns'    => $cpns ? 1 : 2, 'order' => 5, 'status' => 1,
+            ]);
+            $pangkat = $this->db->table('pangkat')->where('gol_ruang', $golRuang)->get()->getRowArray();
+        }
+
+        $this->db->table('pegawai_kp')->where('nip', $nip)->delete();
+        $this->db->table('pegawai_kp')->insert([
+            'nip'       => $nip, 'id_pangkat' => $pangkat['id_pangkat'], 'tmtsk' => '2020-03-01', 'tgl_sk' => '2020-02-01',
+            'jenis_kp'  => $cpns ? 'Pengangkatan CPNS' : 'Pengangkatan PNS', 'gol' => 'II', 'ruang' => 'a',
+            'gol_ruang' => $golRuang, 'pangkat' => 'Pengatur Muda',
+        ]);
+    }
+
+    /**
      * Baris riwayat langsung (tanpa engine), mis. data impor atau pengajuan yang menunggu.
      *
      * @param array<string, mixed> $data

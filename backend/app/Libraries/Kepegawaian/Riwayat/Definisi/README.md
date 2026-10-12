@@ -9,5 +9,8 @@ kode legacy [K] atau label [V2] di docblock-nya.
 
 Mesin yang membaca Definisi: `RiwayatEngine` + `SnapshotSync` (M1, MAKE-004). Selain method wajib, Definisi boleh
 meng-override default ikut legacy: `statusAwal()`, `statusSetelahUbah()`, `kunciBarisDisetujui()`,
-`roleKunciHapusDisetujui()`, `urutanDaftar()`, `pemetaanStatus()`, dan hook `validate`/`beforeSave`/`afterApprove`.
+`roleKunciHapusDisetujui()`, `rolePilihStatusSaatUbah()` (role yang boleh memilih `status` saat ubah; Ditolak wajib
+alasan), `bolehAksiUntuk()` (izin per pegawai sasaran, mis. role 2 Pendidikan hanya selama CPNS; dipakai engine dan
+descriptor), `urutanDaftar()`, `pemetaanStatus()`, dan hook `validate` (menerima NIP pemilik)/`beforeSave`/
+`afterApprove`. Permukaan ini beku sejak engine-v1 (MAKE-005): perubahan hanya aditif oleh WS-1.
 Setiap jenis nyata wajib punya test B-TC (`Tests\Support\Kepegawaian\RiwayatBtcTrait`).

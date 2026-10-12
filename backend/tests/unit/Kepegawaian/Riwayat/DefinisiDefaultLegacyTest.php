@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Kepegawaian\Riwayat;
 
 use App\Constants\Role;
+use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\StatusRiwayat;
 use CodeIgniter\Test\CIUnitTestCase;
 use Tests\Support\Kepegawaian\Riwayat\UjiKp;
@@ -55,5 +57,7 @@ final class DefinisiDefaultLegacyTest extends CIUnitTestCase
         $this->assertTrue($d->kunciBarisDisetujui());
         $this->assertSame([Role::ADMIN_SATKER], $d->roleKunciHapusDisetujui());
         $this->assertSame(['id_riwayat_pendidikan' => 'DESC'], $d->urutanDaftar());
+        $this->assertSame([], $d->rolePilihStatusSaatUbah());
+        $this->assertTrue($d->bolehAksiUntuk(new AuthContext(), AksiRiwayat::Tambah, '199001012015011001'));
     }
 }

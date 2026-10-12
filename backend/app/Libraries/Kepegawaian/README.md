@@ -63,7 +63,7 @@ Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[
 | K-CR025-7 | Acuan jarak KGB = pendahulu terakhir (TMT ≤ TMT baru), seri → KGB > KP > CPNS > awal PPPK; isi daftar acuan ditentukan pemanggil (baris yang diedit dikeluarkan; status `NOT IN (2, 10)` seperti cek TMT kembar legacy) |
 | K-CR025-8 | Proyeksi KGB setia legacy dengan dua deviasi di atas |
 | K-CR025-9 | Masa hukdis = masa SK ?? masa bawaan jenis; akhir = TMT + masa (literal SRS-FR-027); masa 1–255 (CHECK `chk_jenis_hukdis_masa_sanksi_bulan`, TINYINT UNSIGNED) |
-| K-CR025-10 | Validasi KP/KGB hanya untuk input pengguna (create, atau update yang mengubah `tmtsk`); impor legacy dan sinkron SIASN tidak melewatinya |
+| K-CR025-10 | Validasi KP/KGB hanya untuk input pengguna (create, atau update yang mengubah `tmtsk` atau `id_jenis_kp`); impor legacy dan sinkron SIASN tidak melewatinya |
 | K-CR025-11 | "Hari ini" = Asia/Jakarta; hanya `TanggalBisnis::hariIni()` yang membaca jam |
 | K-CR025-12 | Hari kerja (Senin–Jumat dikurangi `hari_libur`, legacy `helpers/function_helper.php:2175-2213`) ditunda ke Fase 5; signature rencana `HariKerja::hitung(string $mulai, string $akhir, list<string> $tanggalLibur): int` dengan `HariLiburService::tanggalLibur()` |
 
@@ -146,11 +146,27 @@ lalu `selesaikan()` (bila implementasinya punya) setelah commit atau rollback.
 
 | Definisi | Isi (sumber [K] di docblock kelas) |
 |---|---|
-| `Pendidikan` (B-10) | Self-service; izin 1, 2, 3, 6, 7 (proses 1, 3); jenjang di luar 1-3 → bidang & jurusan wajib, kode 98/1185 → isian "lain" wajib; tanggal ijazah tidak kembar (status selain 2/10); nama jenjang/bidang/jurusan dan nem/ipk diturunkan `beforeSave` (`L_pendidikan.php` `sp()`); Ijazah (14) wajib, transkrip (40) & SK pencantuman gelar (39) opsional, 5 MB, jpg/jpeg/png/gif/pdf; snapshot jenjang tertinggi; daftar `status ASC, tgl_lulus ASC` |
-| `Kp` (B-08) | Alur admin; izin lihat 1, 2, 3, 4, 5, tulis/proses 1, 3 (Matriks v2; legacy juga membuka lihat untuk 8); field wajib legacy (`validate_param()`); pengangkatan CPNS/PNS sekali, TMT tidak kembar (status selain 2/10); [V2] TMT 1 April/1 Oktober kecuali pengangkatan (CR-025, hanya bila tambah atau TMT/jenis berubah); nama jenis/pangkat dari `beforeSave`; SK (11) wajib, 5 MB; snapshot `pegawai_kp`/`_cpns`/`_pns`; daftar `status ASC, tmtsk ASC`; role 1 boleh memilih `status` saat ubah (legacy `kp/form.php:59-74`) |
+| `Pendidikan` (B-10) | Self-service; izin 1, 2, 3, 6, 7 (proses 1, 3); jenjang di luar 1-3 → bidang & jurusan wajib, kode 98/1185 → isian "lain" wajib; tanggal ijazah tidak kembar (status selain 2/10, atas nilai akhir setiap tambah/ubah); nama jenjang/bidang/jurusan dan nem/ipk diturunkan `beforeSave` (`L_pendidikan.php` `sp()`); Ijazah (14) wajib, transkrip (40) & SK pencantuman gelar (39) opsional, 5 MB, jpg/jpeg/png/gif/pdf; snapshot jenjang tertinggi; daftar `status ASC, tgl_lulus ASC`; role 2 hanya tambah/ubah/hapus selama pegawai CPNS (`bolehAksiUntuk`, legacy `$isCPNS`); role 1 memilih status saat ubah (legacy `pendidikan/form.php:59-76`) |
+| `Kp` (B-08) | Alur admin; izin lihat 1, 2, 3, 4, 5, tulis/proses 1, 3 (Matriks v2; legacy juga membuka lihat untuk 8); field wajib legacy (`validate_param()`); pengangkatan CPNS/PNS sekali, TMT tidak kembar (status selain 2/10, atas nilai akhir setiap tambah/ubah); [V2] TMT 1 April/1 Oktober kecuali pengangkatan (CR-025, hanya bila tambah atau TMT/jenis berubah); nama jenis/pangkat dari `beforeSave`; SK (11) wajib, 5 MB; snapshot `pegawai_kp`/`_cpns`/`_pns`; daftar `status ASC, tmtsk ASC`; role 1 boleh memilih `status` saat ubah (legacy `kp/form.php:59-74`) |
 
 Hook `validate()` menerima kolom NIP pemilik di `$data` (aditif MAKE-005) agar cek per pegawai (tanggal kembar, CPNS
 sekali) juga jalan saat tambah.
+
+Hook `beforeSave()` saat tambah menerima `$data` tanpa kolom NIP dan `$lama = null` (I-1); NIP pemilik ditulis engine
+sesudah hook. Hook yang butuh NIP saat tambah memakai `validate()` (yang menerima NIP) atau menunggu keperluan aditif.
+
+### Engine-v1 beku (MAKE-005)
+
+Sejak MAKE-005 di `main`, permukaan berikut **beku**: hanya boleh berubah **aditif** dan **oleh WS-1**; permintaan WS-2
+(mis. hook baru untuk B-07 Jabatan) diajukan sebagai usulan ke WS-1.
+
+| Permukaan | Isi beku |
+|---|---|
+| `RiwayatServiceInterface` / `RiwayatEngine` | `daftar`, `detail`, `tambah`, `ubah`, `hapus`, `proses`; urutan pemeriksaan (jenis → izin role → PegawaiScope `bolehLihat`/`bolehUbah`/`bolehProses` → NIP → `bolehAksiUntuk` → baris → validasi), satu transaksi + kunci pegawai + baca ulang terkunci, event `riwayatNotifikasi` |
+| `SnapshotSyncInterface` / `SnapshotSync`, `PemilihSnapshot` | `sinkronkan(definisi, nip, ?pelaku)`; aturan pilih (status 1, filter tiga nilai SQL, urutan + join, seri PK terbesar) |
+| `AturanSnapshot`, `AturanLampiran` | Value object (konstruktor & properti) |
+| Hook `RiwayatDefinisi` | `jenis`, `label`, `tabel`, `primaryKey`, `fields`, `izin`, `alur`, `kolomNip`, `kolomStatus`, `pemetaanStatus`, `kunciBarisDisetujui`, `roleKunciHapusDisetujui`, `statusAwal`, `statusSetelahUbah`, `rolePilihStatusSaatUbah`, `bolehAksiUntuk`, `urutanDaftar`, `snapshot`, `lampiran`, `urutanTab`, `validate` (dengan NIP), `beforeSave`, `afterApprove` |
+| Kontrak HTTP | README `Controllers/Api/Kepegawaian` (endpoint, descriptor, "Rincian engine riwayat") |
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata

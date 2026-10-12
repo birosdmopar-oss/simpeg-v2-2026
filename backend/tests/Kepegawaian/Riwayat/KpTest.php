@@ -14,8 +14,10 @@ use App\Libraries\Kepegawaian\Riwayat\Definisi\Pendidikan;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use Closure;
+use CodeIgniter\Config\Factories;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Kepegawaian;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatBtcTrait;
@@ -84,6 +86,15 @@ final class KpTest extends DatabaseTestCase
     protected function btcScopeRole3(array $nipDalam): null
     {
         return null;
+    }
+
+    /**
+     * Lihat riwayat pegawai lain di satker lain: izin Matriks v2 (1, 2, 3, 4, 5) × PegawaiScope (1, 4, 5, 8 semua;
+     * 2/6/7 NIP sendiri; 3 satkernya) — role 1, 4, 5.
+     */
+    protected function btcHarapanLihat(int $role): bool
+    {
+        return in_array($role, [Role::SUPER_ADMIN, Role::ADMIN_VIEW_ESELON1, Role::MENTERI], true);
     }
 
     // ---- Aturan B-08 ---------------------------------------------------
@@ -203,7 +214,7 @@ final class KpTest extends DatabaseTestCase
         // Legacy kp/form.php:59-74 (keputusan user 09-10-2026): role 1 memilih status saat edit.
         $id = (int) $this->tambah($this->dataKpNyata(3, '2015-04-01'))['id_riwayat_kp'];
 
-        $row = $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => '2']);
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => '2', 'reason_note' => 'Tidak sesuai SK']);
         $this->assertSame('2', (string) $row['status']);
         $this->assertNull($this->snapshotUji('pegawai_kp', $this->nip), 'keluar dari status 1 → snapshot dihitung ulang');
 
@@ -222,6 +233,44 @@ final class KpTest extends DatabaseTestCase
         foreach (['10', '9', '3', 'x'] as $nilai) {
             $this->assertErrors(['status'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => $nilai]));
         }
+
+        // L-1: memilih Ditolak wajib alasan (aturan sama dengan tolak di proses).
+        $this->assertErrors(['reason_note'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => '2', 'reason_note' => '  ']));
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => '2', 'reason_note' => 'SK salah']);
+        $this->assertSame(['2', 'SK salah'], [(string) $row['status'], $row['reason_note']]);
+    }
+
+    public function testRole1MemilihStatusDiprosesBilaFlagAktif(): void
+    {
+        // L-4: status 3 hanya berlaku bila Config\Kepegawaian::$statusDiprosesAktif; dari 3 baris bisa diproses.
+        $config                      = config(Kepegawaian::class);
+        $config->statusDiprosesAktif = true;
+        Factories::injectMock('config', Kepegawaian::class, $config);
+
+        try {
+            $id  = (int) $this->tambah($this->dataKpNyata(3, '2015-04-01'))['id_riwayat_kp'];
+            $row = $this->engine()->ubah($this->admin, $this->nip, 'kp', $id, ['status' => '3']);
+            $this->assertSame('3', (string) $row['status']);
+            $this->assertNull($this->snapshotUji('pegawai_kp', $this->nip), 'keluar dari status 1');
+
+            $row = $this->engine()->proses($this->adminSatker, $this->nip, 'kp', $id, 'setujui', null);
+            $this->assertSame('1', (string) $row['status']);
+            $this->assertSame('1', (string) $row['show_notif'], 'transisi 3 → 1 menandai notifikasi');
+        } finally {
+            Factories::reset('config');
+        }
+    }
+
+    public function testDuplikatDiperiksaAtasNilaiAkhirSaatBarisDitolakDiaktifkan(): void
+    {
+        // M-3: PUT parsial tanpa tmtsk/id_jenis_kp yang mengaktifkan baris ditolak tetap memeriksa duplikat.
+        $this->tambah($this->dataKpNyata(1, '2010-03-01'));
+        $this->tambah($this->dataKpNyata(3, '2015-04-01'));
+        $cpns = $this->sisipRiwayat($this->d, $this->nip, array_merge($this->btcBaris($this->nip), ['id_jenis_kp' => 1, 'tmtsk' => '2010-05-01', 'status' => 2]));
+        $tmt  = $this->sisipRiwayat($this->d, $this->nip, array_merge($this->btcBaris($this->nip), ['status' => 2]));
+
+        $this->assertErrors(['id_jenis_kp'], fn () => $this->engine()->ubah($this->adminSatker, $this->nip, 'kp', $cpns, ['no_sk' => 'SK-A']));
+        $this->assertErrors(['tmtsk'], fn () => $this->engine()->ubah($this->adminSatker, $this->nip, 'kp', $tmt, ['no_sk' => 'SK-B']));
     }
 
     public function testRole3TidakMemilihStatus(): void
