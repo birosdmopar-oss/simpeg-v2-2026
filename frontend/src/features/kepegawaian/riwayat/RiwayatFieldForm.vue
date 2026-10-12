@@ -152,6 +152,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :error="fieldError(f.name)"
             :hint="f.hint"
             :placeholder="f.placeholder"
+            :data-field="f.name"
           />
           <UiSelect
             v-else-if="f.type === 'ref'"

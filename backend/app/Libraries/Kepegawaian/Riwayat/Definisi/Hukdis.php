@@ -150,10 +150,12 @@ final class Hukdis extends RiwayatDefinisi
         $nip    = (string) $nilai[$this->kolomNip()];
         $errors = [];
 
-        if (array_key_exists('tmtsk', $data)) {
+        // Cek duplikat atas NILAI AKHIR (pola Kp, MAKE-005): ubah selalu menulis status 1, jadi baris lama berstatus 0/2
+        // yang diubah ikut diperiksa walau tmtsk tidak dikirim.
+        if (($nilai['tmtsk'] ?? '') !== '') {
             $kembar = db_connect()->table($this->tabel())
                 ->where($this->kolomNip(), $nip)
-                ->where('tmtsk', $data['tmtsk'])
+                ->where('tmtsk', $nilai['tmtsk'])
                 ->whereNotIn($this->kolomStatus(), [StatusRiwayat::Ditolak->value, StatusRiwayat::Dihapus->value]);
 
             if ($lama !== null) {

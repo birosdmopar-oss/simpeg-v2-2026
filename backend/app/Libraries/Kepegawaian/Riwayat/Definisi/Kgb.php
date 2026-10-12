@@ -144,18 +144,18 @@ final class Kgb extends RiwayatDefinisi
      */
     public function validate(array $data, ?array $lama, AuthContext $auth): array
     {
-        if (! array_key_exists('tmtsk', $data)) {
-            return [];
-        }
+        $nilai = $data + ($lama ?? []);
+        $nip   = (string) $nilai[$this->kolomNip()];
+        $tmt   = (string) ($nilai['tmtsk'] ?? '');
 
-        $nip = (string) ($data[$this->kolomNip()] ?? $lama[$this->kolomNip()] ?? '');
-        $tmt = (string) $data['tmtsk'];
-
-        if ($this->barisKgbAktif($nip, $lama)->where('tmtsk', $tmt)->countAllResults() > 0) {
+        // Cek duplikat atas NILAI AKHIR setiap tambah/ubah (pola Kp, MAKE-005), juga PUT parsial tanpa tmtsk — mis. baris
+        // ditolak yang diaktifkan kembali lewat pilihan status role 1.
+        if ($tmt !== '' && $this->barisKgbAktif($nip, $lama)->where('tmtsk', $tmt)->countAllResults() > 0) {
             return ['tmtsk' => ['Riwayat KGB dengan TMT SK ini sudah terdaftar. Gunakan TMT SK yang berbeda.']];
         }
 
-        if ($lama !== null && $tmt === (string) $lama['tmtsk']) {
+        // K-CR025-10: jarak hanya untuk input pengguna — tambah, atau ubah yang mengubah tmtsk.
+        if ($lama !== null && (! array_key_exists('tmtsk', $data) || $tmt === (string) $lama['tmtsk'])) {
             return [];
         }
 

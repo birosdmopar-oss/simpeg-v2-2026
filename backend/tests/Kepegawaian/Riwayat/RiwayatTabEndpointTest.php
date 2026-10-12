@@ -7,6 +7,7 @@ namespace Tests\Kepegawaian\Riwayat;
 use App\Constants\Role;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Hukdis;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Kgb;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Kp;
@@ -78,7 +79,7 @@ final class RiwayatTabEndpointTest extends DatabaseTestCase
 
     public function testPegawaiMilikSendiriLihatSajaUntukKpKgb(): void
     {
-        [$nip, , $pegawai] = $this->aktor(Role::PEGAWAI);
+        [$nip, $auth, $pegawai] = $this->aktor(Role::PEGAWAI);
 
         $tabs = $this->json($this->asUser($pegawai)->get("api/v1/pegawai/{$nip}/riwayat"))['data']['tabs'];
 
@@ -86,7 +87,8 @@ final class RiwayatTabEndpointTest extends DatabaseTestCase
         $this->assertSame(['kp', 'kgb', 'pendidikan'], array_column($tabs, 'jenis'));
         $this->assertFalse($tabs[0]['can_create']);
         $this->assertFalse($tabs[1]['can_edit']);
-        $this->assertTrue($tabs[2]['can_create']);
+        // Pendidikan role 2: tambah hanya selama CPNS (RiwayatDefinisi::bolehAksiUntuk, MAKE-005) — descriptor ikut hook.
+        $this->assertSame((new Pendidikan())->bolehAksiUntuk($auth, AksiRiwayat::Tambah, $nip), $tabs[2]['can_create']);
         $this->assertFalse($tabs[2]['can_process']);
     }
 

@@ -1,5 +1,7 @@
 // Tab riwayat `pendidikan` — tabel `riwayat_pendidikan`, B-10 (pemilik WS-1). Isian, syarat, dan lampiran disalin dari
 // Definisi backend `Riwayat/Definisi/Pendidikan.php` (MAKE-005; legacy `L_pendidikan.php` vp()/sp()).
+import { Role } from '@/features/auth/types'
+
 import { A, D, N, R, T, defineRiwayatJenis, type FieldCondition } from '../riwayat.config'
 
 /** Jenjang tanpa bidang/jurusan (SD, SMP, SMA sederajat) = `Pendidikan::JENJANG_TANPA_JURUSAN`. */
@@ -42,4 +44,6 @@ export default defineRiwayatJenis({
     { id_riwayat: 39, label: 'SK Pencantuman Gelar', wajib: false, batas_mb: 5, ekstensi: EKSTENSI },
     { id_riwayat: 40, label: 'Transkrip Nilai', wajib: false, batas_mb: 5, ekstensi: EKSTENSI },
   ],
+  // Pendidikan::rolePilihStatusSaatUbah() — legacy pendidikan/form.php:59-76 (keputusan user 12-10-2026).
+  pilihStatusSaatUbah: [Role.SUPER_ADMIN],
 })

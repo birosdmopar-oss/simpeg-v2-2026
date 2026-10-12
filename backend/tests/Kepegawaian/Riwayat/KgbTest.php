@@ -183,11 +183,23 @@ final class KgbTest extends DatabaseTestCase
         // Legacy kgb/form.php:59-74: role 1 memilih status saat edit; role 3 → 1 (Kgb.php edit).
         $id = (int) $this->tambah($this->dataKgb('2016-04-01'))['id_riwayat_kgb'];
 
-        $this->assertSame('2', (string) $this->engine()->ubah($this->admin, $this->nip, 'kgb', $id, ['status' => '2'])['status']);
+        // Memilih 2 Ditolak mewajibkan reason_note (engine-v1 MAKE-005).
+        $this->assertErrors(['reason_note'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'kgb', $id, ['status' => '2']));
+        $this->assertSame('2', (string) $this->engine()->ubah($this->admin, $this->nip, 'kgb', $id, ['status' => '2', 'reason_note' => 'SK keliru'])['status']);
         $this->assertNull($this->snapshotUji('pegawai_kgb', $this->nip));
 
         $this->assertSame('1', (string) $this->engine()->ubah($this->adminSatker, $this->nip, 'kgb', $id, ['status' => '2'])['status']);
         $this->assertNotNull($this->snapshotUji('pegawai_kgb', $this->nip));
+    }
+
+    public function testMengaktifkanKembaliBarisDitolakDiperiksaDuplikatNilaiAkhir(): void
+    {
+        // Pola Kp (MAKE-005): PUT parsial tanpa tmtsk tetap memeriksa duplikat atas nilai akhir.
+        $this->tambah($this->dataKgb('2016-04-01'));
+        $ditolak = $this->sisipRiwayat($this->d, $this->nip, $this->dataKgb('2016-04-01') + ['status' => 2]);
+        $this->lampiranUji->simpan($this->nip, Kgb::LAMPIRAN_SK_KGB, $ditolak, $this->berkasUji('sk.pdf'), $this->d->lampiran()[0]);
+
+        $this->assertErrors(['tmtsk'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'kgb', $ditolak, ['status' => '1']), 'sudah terdaftar');
     }
 
     public function testAdminSatkerTidakBisaMenghapusBarisDisetujui(): void

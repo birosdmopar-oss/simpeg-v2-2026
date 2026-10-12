@@ -52,6 +52,7 @@ const uji: RiwayatJenisConfig = {
   ...pendidikan,
   fields: [R('id_jenjang_pendidikan', 'Jenjang Pendidikan', 'jenjang-pendidikan', { required: true }), T('no_ijazah', 'Nomor Ijazah'), D('tgl_lulus', 'Tanggal Lulus', { required: true })],
   lampiran: [],
+  pilihStatusSaatUbah: undefined,
 }
 const ujiBerlampiran: RiwayatJenisConfig = { ...uji, lampiran: [{ id_riwayat: 14, label: 'Ijazah', wajib: true, batas_mb: 5, ekstensi: ['pdf'] }] }
 
@@ -381,7 +382,7 @@ describe('RiwayatListSection — isian berjenjang, bersyarat, dan status', () =>
     expect(svc.create.mock.calls[0][3]).toMatchObject({ id_jenjang_pendidikan: '3', id_bidang_pendidikan: '', id_jurusan_pendidikan: '', ipk: '' })
   })
 
-  it('role 1 edit KP: isian status (bawaan Disetujui) ikut dikirim; 422 errors.status dipetakan ke isian', async () => {
+  it('role 1 edit KP: isian status (bawaan Disetujui), alasan wajib bila Ditolak; 422 errors.status dipetakan ke isian', async () => {
     svc.list.mockResolvedValue([{ id_riwayat_kp: 9, status: 0, id_jenis_kp: 7, id_pangkat: 7, tmtsk: '2015-04-01', no_sk: 'SK', tgl_sk: '2015-04-01', gaji_pokok: 1, mker_th: 1, mker_bl: 1, gol_ruang: 'III/a' }])
     lampiranSvc.list.mockResolvedValue([{ id_attachment: 1 } as never])
     svc.update.mockRejectedValueOnce(apiError(422, { status: ['Status tidak valid.'] }))
@@ -391,12 +392,19 @@ describe('RiwayatListSection — isian berjenjang, bersyarat, dan status', () =>
     expect(field('status')?.value).toBe('1')
     expect([...(field('status') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', '1', '2', '0'])
 
+    expect(field('reason_note')).toBeNull() // alasan hanya untuk Ditolak
     await setInput('status', '2')
+    expect(field('reason_note')).not.toBeNull()
+    await submitForm()
+    await vi.waitFor(() => expect(q('[data-field="reason_note"]')?.textContent).toContain('Alasan Penolakan wajib diisi'))
+    expect(svc.update).not.toHaveBeenCalled()
+
+    await setInput('reason_note', 'SK keliru')
     await submitForm()
     await vi.waitFor(() => expect(svc.update).toHaveBeenCalledTimes(1))
     const [, , , fields, values] = svc.update.mock.calls[0]
-    expect(fields.map((f) => f.name)).toContain('status')
-    expect(values).toMatchObject({ status: '2', no_sk: 'SK' })
+    expect(fields.map((f) => f.name)).toEqual(expect.arrayContaining(['status', 'reason_note']))
+    expect(values).toMatchObject({ status: '2', reason_note: 'SK keliru', no_sk: 'SK' })
     await vi.waitFor(() => expect(q('[data-field="status"]')?.textContent).toContain('Status tidak valid.'))
   })
 

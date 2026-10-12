@@ -11,8 +11,9 @@
  * Jenis tanpa `fields` di konfigurasinya (mis. `skp-periodik` sampai Definisi-nya ditetapkan) tidak menampilkan
  * Tambah/Edit walaupun descriptor mengizinkan — tidak ada isian yang bisa dikirim.
  *
- * Role di `config.pilihStatusSaatUbah` (KP/KGB role 1, ikut legacy) mendapat isian `status` di form Edit (bawaan
- * Disetujui, sama dengan form legacy); role lain tidak mengirim status (server menghitungnya).
+ * Role di `config.pilihStatusSaatUbah` (KP/KGB/Pendidikan role 1, ikut legacy) mendapat isian `status` di form Edit
+ * (bawaan Disetujui, sama dengan form legacy) dan `reason_note` yang wajib bila memilih Ditolak; role lain tidak
+ * mengirim status (server menghitungnya).
  */
 import { FileSearch, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -33,20 +34,26 @@ import { STATUS_RIWAYAT, STATUS_RIWAYAT_LABELS, type JenisEngine, type RiwayatRo
 
 import RiwayatFormDialog from './RiwayatFormDialog.vue'
 import RiwayatLampiranDialog from './RiwayatLampiranDialog.vue'
-import { S, type ColumnDef, type FieldDef, type RiwayatJenisConfig } from './riwayat.config'
+import { A, S, type ColumnDef, type FieldDef, type RiwayatJenisConfig } from './riwayat.config'
 import { riwayatService, type BerkasMap } from './riwayat.service'
 
 const props = defineProps<{ nip: string; config: RiwayatJenisConfig; descriptor: RiwayatTabDescriptor }>()
 
 const PER_PAGE = 5
 
-/** Isian status form Edit untuk role pemilih status (nilai = kolom `status`; Diproses tidak ditawarkan selama flag nonaktif). */
-const STATUS_FIELD: FieldDef = S(
-  'status',
-  'Status',
-  [STATUS_RIWAYAT.DISETUJUI, STATUS_RIWAYAT.DITOLAK, STATUS_RIWAYAT.MENUNGGU].map((v) => ({ value: String(v), label: STATUS_RIWAYAT_LABELS[v] })),
-  { required: true },
-)
+/**
+ * Isian status form Edit untuk role pemilih status (nilai = kolom `status`; Diproses tidak ditawarkan selama flag
+ * nonaktif) + alasan yang wajib bila memilih Ditolak (engine-v1 MAKE-005: 422 `errors.reason_note`, maks 255 byte).
+ */
+const STATUS_FIELDS: FieldDef[] = [
+  S(
+    'status',
+    'Status',
+    [STATUS_RIWAYAT.DISETUJUI, STATUS_RIWAYAT.DITOLAK, STATUS_RIWAYAT.MENUNGGU].map((v) => ({ value: String(v), label: STATUS_RIWAYAT_LABELS[v] })),
+    { required: true },
+  ),
+  A('reason_note', 'Alasan Penolakan', { required: true, max: 255, showWhen: { field: 'status', in: [String(STATUS_RIWAYAT.DITOLAK)] } }),
+]
 
 const auth = useAuthStore()
 
@@ -85,7 +92,7 @@ const hasLampiran = computed(() => props.config.lampiran.length > 0)
 const hasActions = computed(() => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value)
 
 const pilihStatus = computed(() => editing.value !== null && auth.role !== null && (props.config.pilihStatusSaatUbah ?? []).includes(auth.role))
-const formFields = computed<FieldDef[]>(() => (pilihStatus.value ? [STATUS_FIELD, ...props.config.fields] : props.config.fields))
+const formFields = computed<FieldDef[]>(() => (pilihStatus.value ? [...STATUS_FIELDS, ...props.config.fields] : props.config.fields))
 const fieldNames = computed(() => formFields.value.map((f) => f.name))
 
 const rowId = (row: RiwayatRow): string => String(row[props.config.primaryKey] ?? '')
@@ -204,7 +211,7 @@ const initialValues = computed<Record<string, string> | null>(() => {
   if (!row) return null
   const values = Object.fromEntries(props.config.fields.map((f) => [f.name, row[f.name] === null || row[f.name] === undefined ? '' : String(row[f.name])]))
   // Form legacy memilih "Disetujui" sebagai bawaan isian status (kp/form.php, kgb/form.php).
-  return pilihStatus.value ? { status: String(STATUS_RIWAYAT.DISETUJUI), ...values } : values
+  return pilihStatus.value ? { status: String(STATUS_RIWAYAT.DISETUJUI), reason_note: '', ...values } : values
 })
 
 async function onSubmit(values: Record<string, string>, berkas: BerkasMap): Promise<void> {
