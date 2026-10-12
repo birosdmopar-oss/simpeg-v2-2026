@@ -33,6 +33,7 @@ import { lampiranService } from '../services/lampiran.service'
 import { STATUS_RIWAYAT, STATUS_RIWAYAT_LABELS, type JenisEngine, type RiwayatRow, type RiwayatTabDescriptor } from '../types'
 
 import RiwayatFormDialog from './RiwayatFormDialog.vue'
+import KeluargaAnakDialog from './KeluargaAnakDialog.vue'
 import RiwayatLampiranDialog from './RiwayatLampiranDialog.vue'
 import { A, S, type ColumnDef, type FieldDef, type RiwayatJenisConfig } from './riwayat.config'
 import { riwayatService, type BerkasMap } from './riwayat.service'
@@ -76,6 +77,9 @@ const lampiranTersimpan = ref<Record<number, number>>({})
 const lampiranRow = ref<RiwayatRow | null>(null)
 const lampiranOpen = ref(false)
 
+const anakRow = ref<RiwayatRow | null>(null)
+const anakOpen = ref(false)
+
 const deleting = ref<RiwayatRow | null>(null)
 /** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
 const deleteOpen = ref(false)
@@ -89,7 +93,9 @@ const processError = ref('')
 const canCreate = computed(() => props.descriptor.can_create && props.config.fields.length > 0)
 const canEdit = computed(() => props.descriptor.can_edit && props.config.fields.length > 0)
 const hasLampiran = computed(() => props.config.lampiran.length > 0)
-const hasActions = computed(() => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value)
+const hasActions = computed(
+  () => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value || Boolean(props.config.kelolaAnak),
+)
 
 const pilihStatus = computed(() => editing.value !== null && auth.role !== null && (props.config.pilihStatusSaatUbah ?? []).includes(auth.role))
 const formFields = computed<FieldDef[]>(() => (pilihStatus.value ? [...STATUS_FIELDS, ...props.config.fields] : props.config.fields))
@@ -163,6 +169,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
     { key: 'edit', label: 'Edit', hidden: !canEdit.value, disabled: terkunci(row, props.config.kunciUbahDisetujuiRole) },
     ...approvalRowActions({ canProcess: props.descriptor.can_process, status: rowStatus(row), busy }),
     { key: 'lampiran', label: 'Lampiran', hidden: !hasLampiran.value },
+    { key: 'anak', label: 'Anak', hidden: !props.config.kelolaAnak },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.descriptor.can_delete, disabled: terkunci(row, props.config.kunciHapusDisetujuiRole) },
   ]
 }
@@ -200,6 +207,9 @@ function onAction(key: string, row: RiwayatRow): void {
   } else if (key === 'lampiran') {
     lampiranRow.value = row
     lampiranOpen.value = true
+  } else if (key === 'anak') {
+    anakRow.value = row
+    anakOpen.value = true
   } else if (key === 'setujui' || key === 'tolak') {
     processing.value = row
     processMode.value = key
@@ -363,6 +373,17 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :descriptor="descriptor"
       :id-entri="rowId(lampiranRow)"
       :subject="rowLabel(lampiranRow)"
+    />
+
+    <KeluargaAnakDialog
+      v-if="anakRow"
+      v-model:open="anakOpen"
+      :nip="nip"
+      :id-keluarga="rowId(anakRow)"
+      :subject="rowLabel(anakRow)"
+      :boleh-ubah="descriptor.can_edit && !terkunci(anakRow, config.kunciUbahDisetujuiRole)"
+      :boleh-hapus="descriptor.can_edit && !terkunci(anakRow, config.kunciHapusDisetujuiRole)"
+      @changed="load"
     />
 
     <ApprovalDialog

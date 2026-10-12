@@ -29,6 +29,8 @@ const props = withDefaults(
     autocomplete?: string
     name?: string
     inputmode?: 'text' | 'numeric' | 'tel' | 'email' | 'search'
+    /** id `<datalist>` saran nilai (aditif MAKE-007); nilai bebas tetap boleh. */
+    list?: string
   }>(),
   {
     modelValue: '',
@@ -44,6 +46,7 @@ const props = withDefaults(
     autocomplete: undefined,
     name: undefined,
     inputmode: undefined,
+    list: undefined,
   },
 )
 
@@ -102,6 +105,7 @@ const controlClass = computed(() => [
         :readonly="readonly"
         :autocomplete="autocomplete"
         :inputmode="inputmode"
+        :list="list"
         :aria-required="required || undefined"
         :class="controlClass"
         :aria-invalid="state === 'error' || undefined"

@@ -85,12 +85,21 @@ watch(
   },
 )
 
-/** Isian hitung yang `resetOn`-nya memuat isian yang baru diubah pengguna dikosongkan (dihitung ulang server). */
+/**
+ * Sesudah pengguna mengubah isian $name: isian hitung ber-`resetOn` pemicu itu dikosongkan (dihitung ulang server), dan
+ * isian ref ber-`optionsFilter` dari isian itu dimuat ulang lalu dikosongkan.
+ */
 function onEdited(name: string): void {
   for (const g of props.fields) {
     const model = models[g.name]
     if (model && g.resetOn?.includes(name)) model.value = ''
   }
+  void refs.pemicu(name, values as Record<string, string>).then((terpicu) => {
+    for (const n of terpicu) {
+      const model = models[n]
+      if (model) model.value = ''
+    }
+  })
 }
 
 async function onRefChange(f: FieldDef, value: string): Promise<void> {
@@ -112,7 +121,10 @@ function onFile(def: LampiranDef, file: File | null): void {
   else delete berkas[def.id_riwayat]
 }
 
-const fileRequired = (def: LampiranDef): boolean => def.wajib && (props.mode === 'create' || props.lampiranTersimpan[def.id_riwayat] === 0)
+const fileRequired = (def: LampiranDef): boolean =>
+  def.wajib &&
+  (!def.wajibBila || fieldVisible({ name: '', label: '', type: 'text', showWhen: def.wajibBila }, values as Record<string, string | undefined>)) &&
+  (props.mode === 'create' || props.lampiranTersimpan[def.id_riwayat] === 0)
 
 function missingWajib(): boolean {
   let missing = false
@@ -196,6 +208,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
           <UiTextField
             v-else
             v-model="models[f.name].value"
+            :list="f.suggestEntity ? `${testid}-saran-${f.name}` : undefined"
             :label="f.label"
             :required="f.required"
             :disabled="busy"
@@ -207,6 +220,9 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :data-field="f.name"
             @update:model-value="onEdited(f.name)"
           />
+          <datalist v-if="f.suggestEntity" :id="`${testid}-saran-${f.name}`">
+            <option v-for="s in refs.saran(f.name)" :key="s" :value="s" />
+          </datalist>
         </div>
       </template>
     </div>

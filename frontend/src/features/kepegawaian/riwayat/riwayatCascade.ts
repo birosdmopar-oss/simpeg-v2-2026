@@ -6,10 +6,16 @@
  *
  * Metadata master lengkap (`GET master/meta`) hanya untuk role 1, jadi rantai dibangun dari FieldDef: composable cukup
  * membutuhkan key entity per level (`metaRujukan`). Satu induk hanya boleh punya satu anak (rantai lurus).
+ *
+ * Isian ref ber-`optionsParent` (induk tetap) atau `optionsFilter` (filter dari nilai isian lain, mis. diklat per jenis)
+ * dimuat sendiri lewat `masterOptions` dan dimuat ulang saat isian pemicunya berubah (`pemicu()`). `extraOptions`
+ * ditambahkan di akhir daftar (mis. LAIN-LAIN wilayah yang tidak ikut `options`). Isian teks ber-`suggestEntity` memuat
+ * saran nama master (`saran()`).
  */
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 
 import { useCascadeOptions } from '@/shared/composables/useCascadeOptions'
+import { masterOptions } from '@/shared/services/masterOptions'
 
 import type { FieldDef, FieldOption } from './riwayat.config'
 
@@ -34,9 +40,11 @@ export function metaRujukan(entity: string): MetaRujukan {
   }
 }
 
+const mandiri = (f: FieldDef): boolean => f.optionsParent !== undefined || f.optionsFilter !== undefined
+
 /** Rantai isian ref: akar (tanpa `dependsOn` ke isian ref lain) diikuti anak-anaknya berurutan. */
 export function refChains(fields: readonly FieldDef[]): FieldDef[][] {
-  const refs = fields.filter((f) => f.type === 'ref' && f.entity)
+  const refs = fields.filter((f) => f.type === 'ref' && f.entity && !mandiri(f))
   const names = new Set(refs.map((f) => f.name))
   return refs
     .filter((f) => !f.dependsOn || !names.has(f.dependsOn))
@@ -51,8 +59,9 @@ export function refChains(fields: readonly FieldDef[]): FieldDef[][] {
 
 /**
  * State opsi semua isian ref satu form. `init(values)` memuat ulang dari nilai awal; `select(name, value)` mengganti
- * pilihan satu isian dan mengembalikan nama isian turunan yang harus dikosongkan. Gagal memuat → opsi kosong (form
- * tetap bisa dibuka; server memvalidasi).
+ * pilihan satu isian berjenjang dan mengembalikan nama isian turunan yang harus dikosongkan; `pemicu(name, values)`
+ * memuat ulang isian ber-`optionsFilter` dari isian itu dan mengembalikan namanya (dikosongkan). Gagal memuat → opsi
+ * kosong (form tetap bisa dibuka; server memvalidasi).
  */
 export function useRiwayatRefOptions(fields: readonly FieldDef[]) {
   const chains = refChains(fields).map((chain) => ({
@@ -62,14 +71,48 @@ export function useRiwayatRefOptions(fields: readonly FieldDef[]) {
   const posisi = new Map<string, { c: number; i: number }>()
   chains.forEach(({ chain }, c) => chain.forEach((f, i) => posisi.set(f.name, { c, i })))
 
+  const sendiri = fields.filter((f) => f.type === 'ref' && f.entity && mandiri(f))
+  const opsiSendiri = reactive<Record<string, FieldOption[]>>({})
+  const saranTeks = reactive<Record<string, string[]>>({})
+
+  const extra = (name: string): FieldOption[] => [...(fields.find((f) => f.name === name)?.extraOptions ?? [])]
+
   function options(name: string): FieldOption[] {
+    if (name in opsiSendiri) return [...(opsiSendiri[name] ?? []), ...extra(name)]
     const p = posisi.get(name)
     const level = p ? chains[p.c]?.cascade.levels.value[p.i] : undefined
-    return (level?.options ?? []).map((o) => ({ value: String(o.id), label: o.nama }))
+    return [...(level?.options ?? []).map((o) => ({ value: String(o.id), label: o.nama })), ...extra(name)]
+  }
+
+  async function muatSendiri(f: FieldDef, values: Record<string, string>): Promise<void> {
+    const nilaiFilter = f.optionsFilter ? (values[f.optionsFilter.field] ?? '') : ''
+    if (f.optionsFilter && nilaiFilter === '') {
+      opsiSendiri[f.name] = []
+      return
+    }
+    try {
+      const filters = f.optionsFilter ? { [f.optionsFilter.param]: nilaiFilter } : undefined
+      opsiSendiri[f.name] = (await masterOptions(f.entity as string, f.optionsParent ?? null, filters)).map((o) => ({ value: String(o.id), label: o.nama }))
+    } catch {
+      opsiSendiri[f.name] = []
+    }
   }
 
   async function init(values: Record<string, string>): Promise<void> {
-    await Promise.all(chains.map(({ chain, cascade }) => cascade.init(chain.map((f) => values[f.name] ?? '')).catch(() => undefined)))
+    for (const f of sendiri) opsiSendiri[f.name] = []
+    await Promise.all([
+      ...chains.map(({ chain, cascade }) => cascade.init(chain.map((f) => values[f.name] ?? '')).catch(() => undefined)),
+      ...sendiri.map((f) => muatSendiri(f, values)),
+      ...fields
+        .filter((f) => f.suggestEntity)
+        .map(async (f) => {
+          try {
+            saranTeks[f.name] = (await masterOptions(f.suggestEntity as string)).map((o) => o.nama)
+          } catch {
+            saranTeks[f.name] = []
+          }
+        }),
+    ])
   }
 
   async function select(name: string, value: string): Promise<string[]> {
@@ -81,5 +124,13 @@ export function useRiwayatRefOptions(fields: readonly FieldDef[]) {
     return turunan
   }
 
-  return { options, init, select }
+  async function pemicu(name: string, values: Record<string, string>): Promise<string[]> {
+    const terpicu = sendiri.filter((f) => f.optionsFilter?.field === name)
+    await Promise.all(terpicu.map((f) => muatSendiri(f, values)))
+    return terpicu.map((f) => f.name)
+  }
+
+  const saran = (name: string): string[] => saranTeks[name] ?? []
+
+  return { options, init, select, pemicu, saran }
 }

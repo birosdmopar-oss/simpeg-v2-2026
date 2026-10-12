@@ -57,7 +57,7 @@ describe('registry riwayat', () => {
     }
   })
 
-  it('aturan lampiran = salinan Definisi backend (kode jenis_rwy, wajib, 5 MB, jpg|jpeg|png|gif|pdf); jenis lain kosong', () => {
+  it('aturan lampiran = salinan Definisi backend (kode jenis_rwy, wajib, batas MB, jpg|jpeg|png|gif|pdf); jenis lain kosong', () => {
     const ext = ['jpg', 'jpeg', 'png', 'gif', 'pdf']
     const ringkas = (jenis: string) => configFor(jenis)?.lampiran.map((l) => [l.id_riwayat, l.wajib, l.batas_mb, l.ekstensi])
     // Pendidikan.php, Kp.php (MAKE-005), Kgb.php, Hukdis.php (MAKE-006).
@@ -65,7 +65,15 @@ describe('registry riwayat', () => {
     expect(ringkas('kp')).toEqual([[11, true, 5, ext]])
     expect(ringkas('kgb')).toEqual([[10, true, 5, ext]])
     expect(ringkas('hukdis')).toEqual([[7, true, 5, ext]])
-    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis']
+    // MAKE-007: Keluarga (akte kode 3 per anak, bukan di sini), Alamat (KTP wajib kecuali kantor), Diklat/Seminar 1 MB.
+    expect(ringkas('keluarga')).toEqual([[20, true, 5, ext]])
+    expect(ringkas('alamat')).toEqual([[1, true, 5, ext]])
+    expect(configFor('alamat')?.lampiran[0]?.wajibBila).toEqual({ field: 'jenis_alamat', notIn: ['3'] })
+    expect(ringkas('diklat')).toEqual([[5, true, 1, ext]])
+    expect(ringkas('seminar')).toEqual([[22, true, 1, ext]])
+    expect(ringkas('tanda-jasa')).toEqual([[23, true, 5, ext]])
+    expect(ringkas('organisasi')).toEqual([[13, true, 5, ext]])
+    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi']
     for (const config of Object.values(RIWAYAT_REGISTRY)) {
       if (!berlampiran.includes(config.jenis)) expect(config.lampiran, config.jenis).toEqual([])
     }
@@ -104,7 +112,8 @@ describe('registry riwayat', () => {
 
 describe('buildRiwayatSchema', () => {
   const schema = buildRiwayatSchema(configFor('alamat')?.fields ?? [])
-  const valid = { jenis_alamat: '1', alamat_utama: '2', alamat: 'Jl. Contoh 1', id_provinsi: '', id_kabupaten_kota: '', id_kecamatan: '', id_kelurahan: '', kd_pos: '', keterangan: '' }
+  const kosong = Object.fromEntries((configFor('alamat')?.fields ?? []).map((f) => [f.name, '']))
+  const valid = { ...kosong, jenis_alamat: '1', alamat_utama: '2', alamat: 'Jl. Contoh 1', id_provinsi: '31', id_kabupaten_kota: '3171', id_kecamatan: '3171010', id_kelurahan: '3171010001' }
 
   it('nilai valid (opsional boleh kosong) lolos', () => {
     expect(schema.safeParse(valid).success).toBe(true)

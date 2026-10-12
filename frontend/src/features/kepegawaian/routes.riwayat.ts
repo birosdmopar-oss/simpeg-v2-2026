@@ -9,7 +9,7 @@ import { KARPEG_KARIS_ROLES } from './roles'
 export const riwayatRoutes: RouteRecordRaw[] = [
   {
     // B-17 Usulan Karpeg/Karis/Karsu (hr/rwy/karpeg/*, hr/rwy/kariskarsu/* = role 1, 2, 4, 5, 7) — halaman usulan
-    // mandiri; placeholder sampai dibangun WS-1.
+    // mandiri (UsulanMandiri, MAKE-007).
     path: '/karpeg-karis',
     name: 'karpeg-karis-usulan',
     component: () => import('./views/UsulanKarpegKarisPage.vue'),

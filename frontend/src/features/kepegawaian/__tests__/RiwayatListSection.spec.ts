@@ -28,7 +28,11 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { masterService } from '@/features/master-data/services/master.service'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
+import alamat from '../riwayat/jenis/alamat'
+import diklat from '../riwayat/jenis/diklat'
 import hukdis from '../riwayat/jenis/hukdis'
+import keluarga from '../riwayat/jenis/keluarga'
+import seminar from '../riwayat/jenis/seminar'
 import kp from '../riwayat/jenis/kp'
 import lkh from '../riwayat/jenis/lkh'
 import pendidikan from '../riwayat/jenis/pendidikan'
@@ -475,5 +479,67 @@ describe('RiwayatListSection — kunci baris Disetujui & isian hitung', () => {
     await flushPromises()
     await setInput('id_jenis_hukdis', '72')
     expect(field('akhir_hukdis')?.value).toBe('')
+  })
+})
+
+describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LAIN, saran)', () => {
+  beforeEach(() => svc.list.mockResolvedValue([]))
+
+  it('diklat: opsi nama diklat disaring jenis_diklat dan dimuat ulang + dikosongkan saat jenis berganti; sub-group = group 2', async () => {
+    options.mockImplementation(async (entity: string, parent?: string | null, filters?: Record<string, string>) =>
+      entity === 'diklat' ? [{ id: `d${filters?.jenis_diklat}`, nama: `Diklat ${filters?.jenis_diklat}`, parent: null }] : [{ id: 's1', nama: `${entity}-${parent}`, parent: parent ?? null }],
+    )
+    const wrapper = await mountTab({}, diklat)
+    await openCreate(wrapper)
+    expect(field('id_diklat')).toBeNull() // jenis belum dipilih
+
+    await setInput('jenis_diklat', '1')
+    await vi.waitFor(() => expect(options).toHaveBeenCalledWith('diklat', null, { jenis_diklat: '1' }))
+    await flushPromises()
+    await setInput('id_diklat', 'd1')
+    expect(field('id_diklat')?.value).toBe('d1')
+
+    await setInput('jenis_diklat', '2')
+    await vi.waitFor(() => expect(options).toHaveBeenCalledWith('diklat', null, { jenis_diklat: '2' }))
+    await flushPromises()
+    expect(field('id_diklat')?.value).toBe('')
+
+    await setInput('jenis_diklat', '3')
+    expect(options).toHaveBeenCalledWith('sub-group-jabatan', '2', undefined)
+    expect(field('id_sub_group_jabatan')).not.toBeNull()
+    expect(field('id_diklat')).toBeNull()
+  })
+
+  it('alamat: opsi LAIN-LAIN ditambahkan; memilihnya memunculkan isian lainnya; KTP tidak wajib untuk kantor', async () => {
+    const wrapper = await mountTab({}, alamat)
+    await openCreate(wrapper)
+    const opsiProvinsi = [...(field('id_provinsi') as HTMLSelectElement).options].map((o) => o.value)
+    expect(opsiProvinsi).toEqual(['', '7', '99'])
+
+    await setInput('id_provinsi', '99')
+    expect(field('provinsi_lain')).not.toBeNull()
+
+    await setInput('jenis_alamat', '1')
+    expect(q('[data-testid="riwayat-berkas-1"]')?.textContent).toContain('KTP *')
+    await setInput('jenis_alamat', '3')
+    expect(q('[data-testid="riwayat-berkas-1"]')?.textContent).not.toContain('KTP *')
+    expect(field('nama_kantor')).not.toBeNull()
+    expect(field('alamat_utama')).toBeNull()
+  })
+
+  it('seminar: bidang & instansi = teks bebas dengan saran nama master (datalist)', async () => {
+    options.mockImplementation(async (entity: string) => [{ id: '1', nama: entity === 'bidang-kursem' ? 'Pariwisata' : 'Kemenparekraf', parent: null }])
+    const wrapper = await mountTab({}, seminar)
+    await openCreate(wrapper)
+    await flushPromises()
+    expect(field('bidang_seminar')?.getAttribute('list')).toBe('riwayat-saran-bidang_seminar')
+    expect([...document.querySelectorAll('#riwayat-saran-bidang_seminar option')].map((o) => o.getAttribute('value'))).toEqual(['Pariwisata'])
+    expect([...document.querySelectorAll('#riwayat-saran-instansi_penyelenggara option')].map((o) => o.getAttribute('value'))).toEqual(['Kemenparekraf'])
+  })
+
+  it('keluarga: item ⋮ Anak (sesudah Lampiran) membuka dialog anak', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_keluarga: 5, status: 0, nama_pasangan: 'Pasangan', urutan_perkawinan: 1 }])
+    const wrapper = await mountTab({ can_process: true }, keluarga)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-5')).map((i) => i.key)).toEqual(['edit', 'setujui', 'tolak', 'lampiran', 'anak', 'hapus'])
   })
 })

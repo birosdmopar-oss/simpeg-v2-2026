@@ -19,8 +19,11 @@ import type { FieldDef } from './riwayat.config'
 
 /** Nilai form (string, seperti input HTML). */
 export type RiwayatValues = Record<string, string>
-/** Berkas per kode `jenis_rwy` (`document_attachment.id_riwayat`). */
-export type BerkasMap = Record<number, File>
+/**
+ * Berkas per kode `jenis_rwy` (`document_attachment.id_riwayat`), atau per nama kolom berkas Definisi (`berkas[file_1]`,
+ * aditif MAKE-007, mis. usulan Karpeg).
+ */
+export type BerkasMap = Record<number | string, File>
 
 const base = (nip: string, jenis: JenisEngine): string => `/pegawai/${encodeURIComponent(nip)}/riwayat/${jenis}`
 const item = (nip: string, jenis: JenisEngine, id: number | string): string => `${base(nip, jenis)}/${encodeURIComponent(String(id))}`

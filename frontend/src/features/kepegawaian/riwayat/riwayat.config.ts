@@ -63,6 +63,14 @@ export interface FieldDef {
    * jenis berganti), supaya server menghitung ulang — kecuali pengguna mengisinya lagi.
    */
   resetOn?: readonly string[]
+  /** `ref`: induk tetap opsi master (`?parent=`), mis. sub-group jabatan fungsional = group 2 (legacy Diklat). */
+  optionsParent?: string
+  /** `ref`: opsi disaring nilai isian lain lewat filter master (`?<param>=<nilai isian>`), mis. diklat per `jenis_diklat`. */
+  optionsFilter?: { param: string; field: string }
+  /** `ref`: opsi tambahan di akhir daftar master, mis. baris sistem LAIN-LAIN wilayah yang tidak ikut `options`. */
+  extraOptions?: readonly FieldOption[]
+  /** `text`: saran nilai dari nama master (`<datalist>`); nilai bebas tetap boleh (mis. bidang/instansi kursus). */
+  suggestEntity?: string
 }
 
 export interface ColumnDef {
@@ -78,6 +86,8 @@ export interface ColumnDef {
 /** Aturan lampiran + label isian berkas. Kunci form/422 = `berkas.<id_riwayat>`. */
 export interface LampiranDef extends AturanLampiran {
   label: string
+  /** `wajib` hanya bila syarat ini terpenuhi (salinan `RiwayatDefinisi::lampiranWajib()`, mis. KTP bukan untuk kantor). */
+  wajibBila?: FieldCondition
 }
 
 export interface RiwayatJenisConfig {
@@ -110,6 +120,8 @@ export interface RiwayatJenisConfig {
   kunciHapusDisetujuiRole?: readonly RoleCode[]
   /** Role yang tidak boleh MENGUBAH baris berstatus Disetujui (UL_PEGAWAI bila `kunciBarisDisetujui()`); "Edit" nonaktif. */
   kunciUbahDisetujuiRole?: readonly RoleCode[]
+  /** Jenis punya sub-resource anak (`keluarga`): item ⋮ "Anak" membuka KeluargaAnakDialog. */
+  kelolaAnak?: boolean
 }
 
 /**
