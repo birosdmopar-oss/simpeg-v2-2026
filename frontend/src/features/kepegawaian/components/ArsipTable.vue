@@ -8,7 +8,9 @@
  * di sini hanya UX; validasi yang mengikat ada di backend (jenis dibaca dari isi berkas).
  *
  * Unggah selalu MENAMBAH lampiran; "ganti" = unggah yang baru dulu, lalu hapus yang lama (tidak ada endpoint ganti).
- * Lampiran terakhir kode ber-`wajib` tidak bisa dihapus (server 422 `errors.berkas`): item Hapus-nya disabled.
+ * Lampiran terakhir kode ber-`wajib` tidak bisa dihapus (server 422 `errors.berkas`): item Hapus-nya disabled. Selama
+ * satu aksi berjalan (unduh/hapus), SEMUA item Hapus disabled supaya dua hapus tidak bisa menghabiskan lampiran wajib;
+ * 422 dari server (mis. hitungan di server berbeda) tampil dengan pesan `errors.berkas`-nya.
  * Aksi baris lewat menu ⋮ (AGENTS.md §1): Unduh → Hapus.
  */
 import { FileSearch, Upload } from 'lucide-vue-next'
@@ -100,9 +102,11 @@ const terakhirWajib = computed(() => Boolean(props.aturan?.wajib) && rows.value.
 
 function rowActions(row: DocumentAttachment): RowAction[] {
   const busy = busyId.value === row.id_attachment
+  // Hapus dikunci untuk semua baris selama ada aksi yang berjalan (bukan hanya baris itu).
+  const adaProses = busyId.value !== null
   return [
     { key: 'unduh', label: 'Unduh', disabled: busy },
-    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete, disabled: busy || terakhirWajib.value },
+    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete, disabled: adaProses || terakhirWajib.value },
   ]
 }
 
@@ -184,7 +188,9 @@ async function confirmDelete(): Promise<void> {
     await load()
     emit('changed', rows.value)
   } catch (error) {
-    notice.value = { tone: 'danger', text: describeApiError(error).message }
+    const failed = describeApiError(error)
+    const split = splitValidationErrors(error)
+    notice.value = { tone: 'danger', text: failed.kind === 'validation' ? (split.general[0] ?? failed.message) : failed.message }
   } finally {
     busyId.value = null
   }

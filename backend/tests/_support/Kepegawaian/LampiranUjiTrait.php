@@ -98,7 +98,7 @@ trait LampiranUjiTrait
     }
 
     /**
-     * @return list<string> path relatif semua berkas di akar uji
+     * @return list<string> path relatif (pemisah '/') semua berkas di akar uji
      */
     protected function berkasDiAkarUji(): array
     {
@@ -112,7 +112,8 @@ trait LampiranUjiTrait
 
         foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($akar, FilesystemIterator::SKIP_DOTS)) as $item) {
             if ($item->isFile()) {
-                $hasil[] = substr($item->getPathname(), strlen($akar) + 1);
+                // Pemisah direktori dinormalkan ke '/' supaya hasil sama di Windows dan Linux.
+                $hasil[] = str_replace(DIRECTORY_SEPARATOR, '/', substr($item->getPathname(), strlen($akar) + 1));
             }
         }
 

@@ -22,20 +22,30 @@ use CodeIgniter\Database\ConnectionInterface;
  * | 2/6/7 (UL_PEGAWAI)         | NIP sendiri (claim `nip`)               | NIP sendiri             |
  * | 3 Admin Satker             | `validateAccess_AP` atas pmj            | sama dengan lihat       |
  *
- * Role 3 = port `validateAccess_AP` [K] (`helpers/function_helper.php`, konstanta `config/constants.php`) atas
+ * Role 3 = port `validateAccess_AP` [K] (`helpers/function_helper.php:72-98`, konstanta `config/constants.php`) atas
  * snapshot jabatan `pegawai_mutasi_jabatan` (pmj):
  *  - admin punya satker → `pmj.id_satker` = satker admin;
  *  - admin tanpa satker, unit UNIT_DESTINASI (21) → `pmj.id_unit = 21 OR (pmj.id_unit = UNIT_LAIN (7) AND
  *    pmj.id_satker IN SATKER_BPO (37, 38, 41))`;
  *  - admin tanpa satker, unit lain → `pmj.id_unit` = unit admin.
- * Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak pernah cocok — sama dengan legacy.
+ * Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak pernah cocok untuk admin BERLINGKUP (punya satker atau unit
+ * valid) — sama dengan legacy. Admin tanpa satker DAN tanpa unit: lihat deviasi [V2] di bawah.
+ *
+ * Rujukan [K]: fungsi `validateAccess_AP` `helpers/function_helper.php:72-98` (literal `['37', '38', '41']` di :85),
+ * konstanta `UNIT_DESTINASI` / `UNIT_LAIN` / `LIST_SATKER_BPO` `config/constants.php:312/314/316`. Satker akun "ada"
+ * bila bukan NULL dan bukan '' (tanpa trim, legacy `$idSatker_AP != ''`); nilai yang ada tetapi bukan angka kanonik
+ * ditolak, tidak jatuh ke cabang unit.
  *
  * SATU predikat (lingkupAdminSatker() → terapkanPredikat()) dipakai bolehLihat()/bolehUbah() dan terapkanKeQuery(),
  * jadi isi daftar = hasil cek detail.
  *
- * Deviasi [V2] (README `Libraries/Kepegawaian`): legacy meloloskan admin role 3 tanpa satker DAN tanpa unit
- * (`null == ''`) dan daftar legacy tidak konsisten dengan detail; v2 fail-closed (admin tanpa lingkup valid → tidak
- * ada) dan daftar = detail = `validateAccess_AP`. Role 3 tidak mendapat pengecualian NIP sendiri (tidak ada di legacy).
+ * Deviasi [V2] (README `Libraries/Kepegawaian`):
+ *  - legacy meloloskan admin role 3 tanpa satker DAN tanpa unit (`null == ''`) ke pegawai tanpa pmj atau dengan
+ *    `pmj.id_unit` NULL; v2 fail-closed (admin tanpa lingkup valid → tidak ada pegawai);
+ *  - isi daftar: daftar legacy (`libraries/hr/L_employee.php:6220-6239`) untuk admin unit 20 (UNIT_KELEMBAGAAN) ikut
+ *    memuat pegawai unit 6 (UPT) dan untuk admin unit 21 memuat satker 37/38/41 tanpa syarat unit 7, padahal detail
+ *    (`validateAccess_AP`) tidak; v2 daftar = detail = `validateAccess_AP` — menunggu konfirmasi PM.
+ * Role 3 tidak mendapat pengecualian NIP sendiri (tidak ada di legacy).
  *
  * Claim `id_satker`/`id_unit` akun bertipe VARCHAR (`pengguna`, DBV-009 belum diputus) sedangkan kolom pmj INT: nilai
  * claim di-cast ke int hanya bila berupa angka kanonik; selain itu dianggap kosong (fail-closed). Penolakan bentuk
@@ -184,8 +194,10 @@ final class PegawaiScope implements PegawaiScopeInterface
             return ['satker' => $idSatker];
         }
 
-        // Akun ber-satker yang nilainya bukan angka (data VARCHAR rusak) TIDAK jatuh ke lingkup unit: tolak.
-        if ($auth->idSatker() !== null && trim($auth->idSatker()) !== '') {
+        // Satker "ada" = bukan NULL dan bukan '' TANPA trim, sama dengan legacy `$idSatker_AP != ''` (string spasi
+        // masuk cabang satker dan tidak cocok pmj mana pun). Satker ada tetapi bukan angka kanonik (spasi, '012',
+        // data VARCHAR rusak) TIDAK jatuh ke lingkup unit: tolak.
+        if ($auth->idSatker() !== null && $auth->idSatker() !== '') {
             return null;
         }
 
@@ -219,16 +231,15 @@ final class PegawaiScope implements PegawaiScopeInterface
     }
 
     /**
-     * Cast VARCHAR → INT sementara sampai DBV-009: hanya angka kanonik positif ('12', bukan '012', '12a', ''). Menolak
-     * '012' = [V2] sementara (legacy membandingkan string longgar); ditinjau ulang saat DBV-009 memutus tipe kolom.
+     * Cast VARCHAR → INT sementara sampai DBV-009: hanya angka kanonik positif ('12', bukan '012', '12a', ' 12', '').
+     * Tanpa trim: spasi = bukan angka kanonik. Menolak '012' = [V2] sementara (legacy membandingkan string longgar);
+     * ditinjau ulang saat DBV-009 memutus tipe kolom.
      */
     private static function keInt(?string $nilai): ?int
     {
         if ($nilai === null) {
             return null;
         }
-
-        $nilai = trim($nilai);
 
         if ($nilai === '' || ! ctype_digit($nilai) || (string) (int) $nilai !== $nilai || (int) $nilai <= 0) {
             return null;

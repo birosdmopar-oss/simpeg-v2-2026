@@ -228,7 +228,8 @@ lingkup lewat service ini (403 di luar lingkup); daftar disaring dengan `terapka
 | 2, 6, 7 | NIP sendiri | NIP sendiri |
 | 3 | `validateAccess_AP` atas `pegawai_mutasi_jabatan` (pmj), lihat di bawah | sama |
 
-Role 3 = port `validateAccess_AP` [K] (`helpers/function_helper.php`, konstanta `config/constants.php`):
+Role 3 = port `validateAccess_AP` [K] (fungsi `helpers/function_helper.php:72-98`, literal `['37', '38', '41']` di :85;
+konstanta `UNIT_DESTINASI` / `UNIT_LAIN` / `LIST_SATKER_BPO` di `config/constants.php:312/314/316`):
 
 - admin punya satker → `pmj.id_satker` = satker admin;
 - admin tanpa satker, unit `UNIT_DESTINASI` (21) → `pmj.id_unit = 21 OR (pmj.id_unit = UNIT_LAIN (7) AND pmj.id_satker
@@ -237,13 +238,18 @@ Role 3 = port `validateAccess_AP` [K] (`helpers/function_helper.php`, konstanta 
 
 Konstanta [K] `PegawaiScope::UNIT_DESTINASI`, `UNIT_LAIN`, `SATKER_BPO`. Satu predikat dipakai `bolehLihat`/`bolehUbah`
 dan `terapkanKeQuery`, jadi isi daftar = hasil cek detail. Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak
-cocok predikat mana pun — sama dengan legacy. Role 3 tidak punya pengecualian NIP sendiri (legacy juga tidak).
+cocok predikat mana pun untuk admin **berlingkup** (punya satker atau unit valid) — sama dengan legacy. Role 3 tidak
+punya pengecualian NIP sendiri (legacy juga tidak). Satker akun dianggap "ada" bila bukan NULL dan bukan `''` **tanpa
+trim** (legacy `$idSatker_AP != ''`: string spasi masuk cabang satker dan tidak cocok pmj mana pun); nilai yang ada
+tetapi bukan angka kanonik ditolak, tidak jatuh ke cabang unit.
 
 Deviasi [V2]:
 
-- Legacy meloloskan admin role 3 **tanpa satker dan tanpa unit** (perbandingan `null == ''`), dan daftar pegawai legacy
-  tidak konsisten dengan pemeriksaan detail. v2 fail-closed (admin tanpa lingkup valid → tidak ada pegawai) dan
-  daftar = detail = `validateAccess_AP`.
+- Legacy meloloskan admin role 3 **tanpa satker dan tanpa unit** (perbandingan `null == ''`) ke pegawai tanpa pmj
+  atau dengan `pmj.id_unit` NULL. v2 fail-closed (admin tanpa lingkup valid → tidak ada pegawai).
+- Isi daftar (menunggu konfirmasi PM): daftar pegawai legacy (`libraries/hr/L_employee.php:6220-6239`) untuk admin
+  unit 20 (`UNIT_KELEMBAGAAN`) ikut memuat pegawai unit 6 (UPT), dan untuk admin unit 21 memuat satker 37/38/41 tanpa
+  syarat unit 7 — keduanya tidak lolos `validateAccess_AP` di detail. v2 daftar = detail = `validateAccess_AP`.
 - Sementara sampai DBV-009 (tipe `id_satker`/`id_unit` akun VARCHAR vs pmj INT): claim di-cast ke int hanya bila angka
   kanonik; bentuk non-kanonik seperti `'012'` ditolak (fail-closed). Ditinjau ulang saat DBV-009 diputus.
 
@@ -258,11 +264,17 @@ Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai 
 | `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil) |
 | `PenjagaBerkas` | Kompensasi berkas di luar transaksi DB: setelah transaksi selesai, berkas tercatat dipertahankan hanya bila masih dirujuk `tabel.kolom = path` |
 | `KolomBerkas` | Helper tabel yang menyimpan berkas di kolomnya sendiri (`riwayat_karpeg.file_1..5`, LKH, Konket) |
-| `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi (+ `bolehUbah`, keterikatan & kunci baris, lampiran wajib terakhir 422 untuk hapus) |
+| `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → izin aksi di Definisi berlampiran mana pun (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi → baris riwayat bukan status 10 (404) (+ `bolehUbah`, kunci baris, lampiran wajib terakhir 422 untuk hapus). Tulis diulang di dalam transaksi: `kunciUnggah()`/`kunciHapus()` (pegawai `FOR UPDATE`, baca ulang terkunci, hitung ulang lampiran wajib) |
 
 **Lampiran wajib & "ganti".** Lampiran terakhir kode ber-`wajib` pada satu baris tidak bisa dihapus (422
 `errors.berkas`); "ganti" = unggah berkas baru dulu, lalu hapus yang lama. Baris riwayat berstatus 1 Disetujui terkunci
-untuk UL_PEGAWAI (`kunciBarisDisetujui()`): unggah/hapus lampirannya 403; baris status 10 Dihapus → 404.
+untuk UL_PEGAWAI (`kunciBarisDisetujui()`): unggah/hapus lampirannya 403; baris status 10 Dihapus → 404 (juga unduh).
+Hitungan "lampiran terakhir" diulang di dalam transaksi hapus dengan baris `pegawai` terkunci, jadi dua hapus paralel
+tidak bisa menghabiskan lampiran wajib.
+
+**Deviasi [V2] lampiran.** Endpoint lampiran tidak mengubah status baris riwayat (legacy mengunggah lampiran hanya lewat
+form edit riwayat, yang mengembalikan status baris ke 0/1); kunci baris Disetujui untuk `DELETE` lampiran lebih ketat
+dari `delete_da` legacy.
 
 **Pemakaian dari RiwayatEngine (WS-1).** Panggil `service('attachmentService')->simpan(...)`/`hapus(...)` DI DALAM transaksi
 engine; tidak perlu kode kompensasi sendiri. Setelah commit/rollback, panggil `selesaikan()` bila service-nya

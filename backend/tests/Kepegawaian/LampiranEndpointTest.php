@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Tests\Kepegawaian;
 
 use App\Constants\Role;
+use App\Exceptions\NotFoundException;
+use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
+use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\AttachmentService;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
+use App\Libraries\Kepegawaian\Lampiran\OtorisasiLampiran;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -21,8 +25,9 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 /**
  * MAKE-009 — endpoint `pegawai/{nip}/lampiran*` dengan PegawaiScope + AttachmentService nyata dan Definisi contoh
  * pendidikan (kode 14 wajib, 39/40 tidak wajib; izin 1,2,3,6,7; hapus 1,3). Urutan otorisasi: daftar/unggah = kode →
- * izin Definisi → lingkup → keterikatan id_entri → kunci baris Disetujui; unduh/hapus = lingkup lihat → baris lampiran →
- * izin Definisi (+ lingkup ubah, keterikatan & kunci baris, lampiran wajib terakhir untuk hapus).
+ * izin Definisi → lingkup → keterikatan id_entri → kunci baris Disetujui; unduh/hapus = lingkup lihat → izin di
+ * Definisi mana pun → baris lampiran → izin Definisi → baris riwayat (+ lingkup ubah, kunci baris, lampiran wajib
+ * terakhir untuk hapus). Unggah/hapus diulang di dalam transaksi (kunciUnggah/kunciHapus).
  *
  * @internal
  */
@@ -200,7 +205,59 @@ final class LampiranEndpointTest extends DatabaseTestCase
         $this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=39&id_entri={$entri}")->assertStatus(404);
         $this->unggah($admin, $this->nip, 39, $entri, $this->berkasPdf())->assertStatus(404);
         $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$id}")->assertStatus(404);
+        // Unduh juga 404: lampiran baris riwayat yang sudah dihapus tidak bisa diambil lagi.
+        $this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/lampiran/{$id}/unduh")->assertStatus(404);
         $this->assertSame(1, $this->db->table('document_attachment')->where('id_attachment', $id)->countAllResults());
+    }
+
+    public function testRoleTanpaIzinLampiranDiDefinisiManaPun403UntukIdAdaMaupunTidak(): void
+    {
+        $admin = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $id    = (int) $this->json($this->unggah($admin, $this->nip, 39, (string) $this->idEntri, $this->berkasPdf()))['data']['id_attachment'];
+
+        // Role 4 melihat semua pegawai (lingkup), tetapi tidak punya izin lihat/hapus/ubah di Definisi berlampiran mana
+        // pun: 403 sebelum baris lampiran dibaca, sama untuk id yang ada maupun tidak.
+        $adminView = $this->akun($this->buatPegawai(), Role::ADMIN_VIEW_ESELON1);
+
+        foreach ([$id, 999999999] as $idUji) {
+            $this->asUser($adminView)->get("api/v1/pegawai/{$this->nip}/lampiran/{$idUji}/unduh")->assertStatus(403);
+            $this->asUser($adminView)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$idUji}")->assertStatus(403);
+        }
+
+        $this->assertSame(1, $this->db->table('document_attachment')->where('id_attachment', $id)->countAllResults());
+    }
+
+    public function testHapusDihitungUlangDiDalamTransaksi(): void
+    {
+        $admin = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $entri = (string) $this->idEntri;
+        $auth  = new AuthContext();
+        $auth->setClaims(['sub' => (string) $admin['id_pengguna'], 'role' => Role::SUPER_ADMIN, 'nip' => $admin['nip']]);
+        $otorisasi = new OtorisasiLampiran(service('riwayatRegistry'), service('pegawaiScope'));
+
+        $pertama = (int) $this->json($this->unggah($admin, $this->nip, 14, $entri, $this->berkasPdf()))['data']['id_attachment'];
+        $kedua   = (int) $this->json($this->unggah($admin, $this->nip, 14, $entri, $this->berkasPdf()))['data']['id_attachment'];
+
+        // Cek cepat lolos (dua lampiran kode wajib) ...
+        $otorisasi->bolehHapus($auth, $this->nip, $pertama);
+        // ... lalu hapus paralel menyalip sebelum transaksi: tinggal satu lampiran.
+        $this->db->table('document_attachment')->where('id_attachment', $kedua)->delete();
+
+        $this->assertGagalDalamTransaksi(fn () => $otorisasi->kunciHapus($auth, $this->nip, $pertama), ValidationException::class);
+
+        // Lampiran target sendiri hilang di antara cek cepat dan transaksi → 404.
+        $ketiga = (int) $this->json($this->unggah($admin, $this->nip, 14, $entri, $this->berkasPdf()))['data']['id_attachment'];
+        $otorisasi->bolehHapus($auth, $this->nip, $ketiga);
+        $this->db->table('document_attachment')->where('id_attachment', $ketiga)->delete();
+
+        $this->assertGagalDalamTransaksi(fn () => $otorisasi->kunciHapus($auth, $this->nip, $ketiga), NotFoundException::class);
+
+        // Baris riwayat dihapus (status 10) di antara cek cepat unggah dan transaksi → 404.
+        $otorisasi->bolehUnggah($auth, $this->nip, 39, $entri);
+        $this->db->table('riwayat_pendidikan')->where('id_riwayat_pendidikan', $this->idEntri)->update(['status' => 10]);
+
+        $this->assertGagalDalamTransaksi(fn () => $otorisasi->kunciUnggah($auth, $this->nip, 39, $entri), NotFoundException::class);
+        $this->assertSame(1, $this->db->table('document_attachment')->where('id_attachment', $pertama)->countAllResults());
     }
 
     public function testPegawaiLainDanRoleTanpaIzinDitolak(): void
@@ -256,6 +313,27 @@ final class LampiranEndpointTest extends DatabaseTestCase
     public function testTanpaToken401(): void
     {
         $this->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=14&id_entri={$this->idEntri}")->assertStatus(401);
+    }
+
+    /**
+     * Jalankan $kerja di dalam transaksi tulis (seperti LampiranController) dan pastikan gagal dengan $kelas.
+     *
+     * @param callable(): mixed              $kerja
+     * @param class-string<\Throwable>       $kelas
+     */
+    private function assertGagalDalamTransaksi(callable $kerja, string $kelas): void
+    {
+        $this->db->transBegin();
+
+        try {
+            $kerja();
+            $this->fail('Diharapkan ' . $kelas);
+        } catch (\Throwable $e) {
+            $this->assertInstanceOf($kelas, $e);
+        } finally {
+            $this->db->transRollback();
+            $this->db->resetTransStatus();
+        }
     }
 
     /**

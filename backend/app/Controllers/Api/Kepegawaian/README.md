@@ -111,8 +111,15 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
   hapus yang lama; lampiran terakhir kode ber-`wajib` pada satu baris tidak bisa dihapus (`DELETE` → 422
   `errors.berkas`); baris riwayat status 1 Disetujui terkunci untuk UL_PEGAWAI bila `kunciBarisDisetujui()` (`POST`/
   `DELETE` → 403), baris status 10 → 404. Urutan unduh/hapus per `{id}`: `PegawaiScope::bolehLihat({nip})` (403,
-  sebelum baris dibaca — pemanggil di luar lingkup mendapat 403 untuk id yang ada maupun tidak) → baris lampiran milik
-  `{nip}` (404) → izin Definisi pemilik `id_riwayat` baris itu (+ `bolehUbah` untuk hapus) (403); `DELETE` menjawab
+  sebelum baris dibaca — pemanggil di luar lingkup mendapat 403 untuk id yang ada maupun tidak) → role tanpa izin aksi
+  itu (unduh `lihat`; hapus `hapus`/`ubah`) di Definisi berlampiran mana pun (403, juga sebelum baris dibaca) → baris
+  lampiran milik `{nip}` (404) → izin Definisi pemilik `id_riwayat` baris itu (+ `bolehUbah` untuk hapus) (403) →
+  baris riwayat `id_entri` milik `{nip}`, bukan status 10 (404; unduh hanya membaca, tanpa kunci baris Disetujui) →
+  hapus: kunci baris Disetujui (403) → lampiran wajib terakhir (422). `POST`/`DELETE` mengulang pemeriksaan tulis di
+  dalam transaksi (baris `pegawai` `FOR UPDATE`, lampiran & baris riwayat dibaca ulang terkunci, hitungan lampiran
+  wajib diulang): hasil tetap 404/403/422 bila keadaan berubah di antaranya. [V2] endpoint lampiran tidak mengubah
+  status baris riwayat (legacy mengunggah hanya lewat form edit yang mengembalikan status ke 0/1), dan kunci baris
+  Disetujui untuk `DELETE` lebih ketat dari `delete_da` legacy. `DELETE` menjawab
   `{ deleted: true, soft_delete: false, item: <baris> }`; unduh = isi berkas dengan
   `Content-Type` = `file_type`, `Content-Disposition: attachment` (nama = `display_name`), `X-Content-Type-Options:
   nosniff`, `Cache-Control: private, no-store`.

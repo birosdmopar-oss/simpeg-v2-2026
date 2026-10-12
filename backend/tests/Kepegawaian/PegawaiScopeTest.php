@@ -214,6 +214,8 @@ final class PegawaiScopeTest extends DatabaseTestCase
     }
 
     /**
+     * Satker berisi spasi: legacy `'  ' != ''` → cabang satker (tidak cocok pmj mana pun), TIDAK jatuh ke lingkup unit.
+     *
      * @return array<string, array{0: string|null, 1: string|null}>
      */
     public static function lingkupAdminTidakValidProvider(): array
@@ -225,6 +227,8 @@ final class PegawaiScopeTest extends DatabaseTestCase
             'satker bukan angka + unit'  => ['S01', '1'],
             'satker berawalan nol'       => ['01', null],
             'unit bukan angka'           => [null, 'U01'],
+            'satker spasi + unit'        => ['  ', '1'],
+            'satker spasi'               => ['  ', null],
         ];
     }
 

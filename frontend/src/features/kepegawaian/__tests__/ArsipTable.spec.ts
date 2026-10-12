@@ -1,7 +1,8 @@
 /**
  * ArsipTable (B-18, MAKE-009) — daftar lampiran satu baris riwayat dari `GET pegawai/{nip}/lampiran`, unggah (cek awal
  * jenis/ukuran dari aturan, galat 422 `errors.berkas` tampil), menu ⋮ Unduh → Hapus (Hapus hanya bila boleh, lewat
- * ConfirmDialog; disabled untuk lampiran terakhir kode wajib), dan keadaan galat 403.
+ * ConfirmDialog; disabled untuk lampiran terakhir kode wajib dan untuk semua baris selama satu aksi berjalan; 422
+ * `errors.berkas` tampil), dan keadaan galat 403.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -160,6 +161,32 @@ describe('ArsipTable — menu ⋮', () => {
     expect(svc.remove).toHaveBeenCalledWith(NIP, 1)
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Ijazah 1.pdf dihapus.')
     expect(wrapper.emitted('changed')?.[0]?.[0]).toHaveLength(1)
+  })
+
+  it('selama satu hapus berjalan, Hapus di SEMUA baris disabled', async () => {
+    let selesai: () => void = () => undefined
+    svc.remove.mockImplementation(() => new Promise<void>((resolve) => (selesai = resolve)))
+    svc.list.mockResolvedValue([lampiran(1), lampiran(2), lampiran(3)])
+    const wrapper = await mountTable()
+    await selectRowAction(wrapper, 'lampiran-actions-1', 'hapus')
+    ;[...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ya, hapus')?.click()
+    await flushPromises()
+    expect(svc.remove).toHaveBeenCalledWith(NIP, 1)
+    expect((await rowMenuActions(wrapper, 'lampiran-actions-2')).find((i) => i.key === 'hapus')?.disabled).toBe(true)
+    expect((await rowMenuActions(wrapper, 'lampiran-actions-3')).find((i) => i.key === 'hapus')?.disabled).toBe(true)
+    selesai()
+    await flushPromises()
+    expect((await rowMenuActions(wrapper, 'lampiran-actions-2')).find((i) => i.key === 'hapus')?.disabled).toBe(false)
+  })
+
+  it('hapus ditolak 422 → pesan errors.berkas dari server tampil, bukan pesan generik', async () => {
+    svc.remove.mockRejectedValue(apiError(422, { berkas: ['Lampiran wajib tidak boleh dihapus semua.'] }))
+    svc.list.mockResolvedValue([lampiran(1), lampiran(2)])
+    const wrapper = await mountTable()
+    await selectRowAction(wrapper, 'lampiran-actions-1', 'hapus')
+    ;[...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ya, hapus')?.click()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Lampiran wajib tidak boleh dihapus semua.')
   })
 })
 

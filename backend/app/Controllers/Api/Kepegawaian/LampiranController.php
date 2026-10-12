@@ -22,8 +22,9 @@ use Throwable;
  *   DELETE pegawai/{nip}/lampiran/{id}                    hapus keras + audit (izin hapus/ubah)
  *
  * Otorisasi: OtorisasiLampiran — daftar/unggah: Definisi pemilik kode × role → PegawaiScope → keterikatan id_entri
- * (+ kunci baris Disetujui untuk UL_PEGAWAI); unduh/hapus: PegawaiScope lihat → baris lampiran → izin Definisi (+ lingkup
- * ubah, kunci baris, lampiran wajib terakhir untuk hapus). NIP dari route selalu string (castNumericParams mati: NIP
+ * (+ kunci baris Disetujui untuk UL_PEGAWAI); unduh/hapus: PegawaiScope lihat → izin di Definisi mana pun → baris lampiran
+ * → izin Definisi → baris riwayat (+ lingkup ubah, kunci baris, lampiran wajib terakhir untuk hapus). Unggah/hapus
+ * mengulang pemeriksaan tulis di dalam transaksi (OtorisasiLampiran::kunciUnggah/kunciHapus, pegawai `FOR UPDATE`). NIP dari route selalu string (castNumericParams mati: NIP
  * 18 digit tidak boleh menjadi int).
  */
 class LampiranController extends ApiController
@@ -43,14 +44,21 @@ class LampiranController extends ApiController
     {
         [$idRiwayat, $idEntri] = $this->kodeDanEntri($this->payload());
 
-        $aturan = $this->otorisasi()->bolehUnggah(service('authContext'), $nip, $idRiwayat, $idEntri);
-        $berkas = $this->request->getFile('berkas');
+        $auth      = service('authContext');
+        $otorisasi = $this->otorisasi();
+        $aturan    = $otorisasi->bolehUnggah($auth, $nip, $idRiwayat, $idEntri);
+        $berkas    = $this->request->getFile('berkas');
 
         if (! $berkas instanceof UploadedFile) {
             throw ValidationException::forField('berkas', 'Berkas wajib diunggah.');
         }
 
-        $row = $this->dalamTransaksi(fn (): array => $this->lampiran()->simpan($nip, $idRiwayat, $idEntri, $berkas, $aturan));
+        $row = $this->dalamTransaksi(function () use ($otorisasi, $auth, $nip, $idRiwayat, $idEntri, $berkas, $aturan): array {
+            // Ulang di dalam transaksi (pegawai terkunci): baris riwayat bisa dihapus/disetujui sesudah cek cepat.
+            $otorisasi->kunciUnggah($auth, $nip, $idRiwayat, $idEntri);
+
+            return $this->lampiran()->simpan($nip, $idRiwayat, $idEntri, $berkas, $aturan);
+        });
 
         return $this->respondSuccess($row, 201);
     }
@@ -74,9 +82,14 @@ class LampiranController extends ApiController
 
     public function delete(string $nip, string $id): ResponseInterface
     {
-        $row = $this->otorisasi()->bolehHapus(service('authContext'), $nip, (int) $id);
+        $auth      = service('authContext');
+        $otorisasi = $this->otorisasi();
+        $row       = $otorisasi->bolehHapus($auth, $nip, (int) $id);
 
-        $this->dalamTransaksi(function () use ($nip, $id): void {
+        $this->dalamTransaksi(function () use ($otorisasi, $auth, $nip, $id): void {
+            // Ulang di dalam transaksi (pegawai + lampiran terkunci): hitungan lampiran wajib tidak bisa disalip hapus
+            // paralel; lampiran yang sudah hilang → 404.
+            $otorisasi->kunciHapus($auth, $nip, (int) $id);
             $this->lampiran()->hapus($nip, (int) $id);
         });
 
@@ -134,10 +147,12 @@ class LampiranController extends ApiController
             }
 
             $db->transCommit();
+            $db->resetTransStatus();
 
             return $hasil;
         } catch (Throwable $e) {
             $db->transRollback();
+            $db->resetTransStatus();
 
             throw $e;
         } finally {
