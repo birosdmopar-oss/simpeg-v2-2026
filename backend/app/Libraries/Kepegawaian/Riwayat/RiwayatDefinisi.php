@@ -215,6 +215,22 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Entri lampiran kode $kode yang BUKAN baris tabel riwayat ini, melainkan baris tabel anak (aditif MAKE-007,
+     * engine-v1), mis. akte lahir (kode 3) per `detail_anak` milik `riwayat_keluarga`. Null (bawaan) = `id_entri` lampiran
+     * kode itu adalah PK baris `tabel()`.
+     *
+     * Bila diisi: `tabel` = tabel anak, `pk` = PK-nya (`id_entri`), `induk` = kolom FK ke PK `tabel()`. Pemilik & status
+     * entri dibaca dari baris induk (`kolomNip()`, `kolomStatus()`). Engine tidak mewajibkan/menerima berkas kode ini di
+     * `POST/PUT riwayat` (berkas diunggah lewat endpoint tabel anak atau `POST lampiran`).
+     *
+     * @return array{tabel: string, pk: string, induk: string}|null
+     */
+    public function entriLampiran(int $kode): ?array
+    {
+        return null;
+    }
+
+    /**
      * Urutan tab di Detail Pegawai (kecil lebih dulu; seri diurutkan slug).
      */
     public function urutanTab(): int

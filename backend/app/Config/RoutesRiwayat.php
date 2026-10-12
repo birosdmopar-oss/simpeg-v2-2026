@@ -42,5 +42,12 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     // M3 (MAKE-006, aditif): descriptor tab riwayat pegawai { tabs } = RiwayatRegistry::descriptorUntuk().
     $routes->get('pegawai/(:segment)/riwayat', 'RiwayatTabController::index/$1');
 
+    // M4 (MAKE-007, aditif): anak riwayat keluarga (tabel detail_anak) — service AnakKeluarga.
+    $anak = 'pegawai/(:segment)/riwayat/keluarga/(:num)/anak';
+    $routes->get($anak, 'AnakKeluargaController::index/$1/$2');
+    $routes->post($anak, 'AnakKeluargaController::create/$1/$2');
+    $routes->put("{$anak}/(:num)", 'AnakKeluargaController::update/$1/$2/$3');
+    $routes->delete("{$anak}/(:num)", 'AnakKeluargaController::delete/$1/$2/$3');
+
     // WS-1: endpoint riwayat tambahan (mis. usulan Karpeg/Karis M4) ditambahkan di sini.
 });

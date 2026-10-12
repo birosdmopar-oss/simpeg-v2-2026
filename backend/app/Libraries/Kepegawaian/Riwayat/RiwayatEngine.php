@@ -489,7 +489,10 @@ final class RiwayatEngine implements RiwayatServiceInterface
         $aturan = [];
 
         foreach ($d->lampiran() as $a) {
-            $aturan[$a->idRiwayat] = $a;
+            // Kode yang entrinya baris tabel anak (entriLampiran(), MAKE-007) bukan lampiran baris riwayat ini.
+            if ($d->entriLampiran($a->idRiwayat) === null) {
+                $aturan[$a->idRiwayat] = $a;
+            }
         }
 
         $errors = [];

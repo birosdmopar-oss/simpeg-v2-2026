@@ -28,7 +28,8 @@ use LogicException;
  *  3a. unggah: izin per pegawai `RiwayatDefinisi::bolehAksiUntuk()` (CR-046) — salah satu aksi `tambah`/`ubah` yang
  *     diizinkan role JUGA harus lolos hook untuk {nip} (mis. Pendidikan: role 2 hanya selama CPNS) (403); daftar tidak;
  *  4. `id_entri` = baris milik {nip} di `tabel()` Definisi (`<pk> = id_entri AND <kolomNip> = nip`), bukan berstatus
- *     Dihapus (404);
+ *     Dihapus (404); untuk kode yang entrinya baris tabel anak (`RiwayatDefinisi::entriLampiran()`, aditif MAKE-007 WS-1,
+ *     mis. akte `detail_anak`), baris anak itu harus milik baris induk `tabel()` yang memenuhi syarat yang sama;
  *  5. tulis: baris Disetujui terkunci untuk UL_PEGAWAI bila `kunciBarisDisetujui()` (403).
  *
  * Unduh & hapus (per `{id}` lampiran):
@@ -67,7 +68,7 @@ final class OtorisasiLampiran
         $definisi = $this->definisi($idRiwayat);
         $this->izin($definisi, $auth, [AksiRiwayat::Lihat]);
         $this->lingkup($auth, $nip, false);
-        $this->entriMilik($definisi, $nip, $idEntri);
+        $this->entriMilik($definisi, $nip, $idEntri, false, $idRiwayat);
     }
 
     /**
@@ -79,7 +80,7 @@ final class OtorisasiLampiran
         $this->izin($definisi, $auth, [AksiRiwayat::Tambah, AksiRiwayat::Ubah]);
         $this->lingkup($auth, $nip, true);
         $this->izinUntukPegawai($definisi, $auth, $nip, [AksiRiwayat::Tambah, AksiRiwayat::Ubah]);
-        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri));
+        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri, false, $idRiwayat));
 
         return $this->aturan($idRiwayat);
     }
@@ -97,7 +98,7 @@ final class OtorisasiLampiran
         $definisi = $this->definisi((int) $row['id_riwayat']);
         $this->izin($definisi, $auth, [AksiRiwayat::Lihat]);
         // Baca saja (tanpa kunci baris Disetujui): baris riwayat yang sudah dihapus (status 10) → 404.
-        $this->entriMilik($definisi, $nip, (string) $row['id_entri']);
+        $this->entriMilik($definisi, $nip, (string) $row['id_entri'], false, (int) $row['id_riwayat']);
 
         return AttachmentService::untukKlien($row);
     }
@@ -117,7 +118,7 @@ final class OtorisasiLampiran
         $this->izin($definisi, $auth, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
         $this->lingkup($auth, $nip, true);
         $this->izinUntukPegawai($definisi, $auth, $nip, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
-        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, (string) $row['id_entri']));
+        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, (string) $row['id_entri'], false, $idRiwayat));
         $this->bukanLampiranWajibTerakhir($nip, $idRiwayat, (string) $row['id_entri'], false);
 
         return AttachmentService::untukKlien($row);
@@ -132,7 +133,7 @@ final class OtorisasiLampiran
         $this->wajibDalamTransaksi();
         $definisi = $this->definisi($idRiwayat);
         $this->kunciPegawai($nip);
-        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri, true));
+        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri, true, $idRiwayat));
     }
 
     /**
@@ -148,7 +149,7 @@ final class OtorisasiLampiran
         $idRiwayat = (int) $row['id_riwayat'];
         $idEntri   = (string) $row['id_entri'];
         $definisi  = $this->definisi($idRiwayat);
-        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri, true));
+        $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri, true, $idRiwayat));
         $this->bukanLampiranWajibTerakhir($nip, $idRiwayat, $idEntri, true);
     }
 
@@ -253,19 +254,28 @@ final class OtorisasiLampiran
     }
 
     /**
-     * Status baris riwayat $idEntri milik {nip}; 404 bila tidak ada, milik NIP lain, atau berstatus Dihapus.
+     * Status baris riwayat $idEntri milik {nip}; 404 bila tidak ada, milik NIP lain, atau berstatus Dihapus. Kode
+     * $idRiwayat yang entrinya baris tabel anak (`entriLampiran()`, aditif MAKE-007): $idEntri = PK baris anak, status &
+     * pemilik dari baris induknya.
      */
-    private function entriMilik(RiwayatDefinisi $definisi, string $nip, string $idEntri, bool $kunci = false): ?StatusRiwayat
+    private function entriMilik(RiwayatDefinisi $definisi, string $nip, string $idEntri, bool $kunci = false, ?int $idRiwayat = null): ?StatusRiwayat
     {
-        $db = $this->koneksi();
+        $db    = $this->koneksi();
+        $anak  = $idRiwayat === null ? null : $definisi->entriLampiran($idRiwayat);
+        $induk = $db->protectIdentifiers($definisi->tabel(), true);
+
+        if ($anak === null) {
+            $sql = 'SELECT ' . $db->protectIdentifiers($definisi->kolomStatus()) . ' AS status_baris FROM ' . $induk
+                . ' WHERE ' . $db->protectIdentifiers($definisi->primaryKey()) . ' = ? AND ' . $db->protectIdentifiers($definisi->kolomNip()) . ' = ?';
+        } else {
+            $tabelAnak = $db->protectIdentifiers($anak['tabel'], true);
+            $sql       = 'SELECT i.' . $db->protectIdentifiers($definisi->kolomStatus()) . ' AS status_baris FROM ' . $tabelAnak . ' a'
+                . ' JOIN ' . $induk . ' i ON i.' . $db->protectIdentifiers($definisi->primaryKey()) . ' = a.' . $db->protectIdentifiers($anak['induk'])
+                . ' WHERE a.' . $db->protectIdentifiers($anak['pk']) . ' = ? AND i.' . $db->protectIdentifiers($definisi->kolomNip()) . ' = ?';
+        }
 
         /** @var array<string, mixed>|null $row */
-        $row = $db->query(
-            'SELECT ' . $db->protectIdentifiers($definisi->kolomStatus()) . ' AS status_baris FROM ' . $db->protectIdentifiers($definisi->tabel(), true)
-            . ' WHERE ' . $db->protectIdentifiers($definisi->primaryKey()) . ' = ? AND ' . $db->protectIdentifiers($definisi->kolomNip()) . ' = ?'
-            . ($kunci ? ' FOR UPDATE' : ''),
-            [$idEntri, $nip],
-        )->getRowArray();
+        $row = $db->query($sql . ($kunci ? ' FOR UPDATE' : ''), [$idEntri, $nip])->getRowArray();
 
         $status = is_array($row) && $row['status_baris'] !== null ? ($definisi->pemetaanStatus()[(int) $row['status_baris']] ?? null) : null;
 
