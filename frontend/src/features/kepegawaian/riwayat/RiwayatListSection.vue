@@ -6,10 +6,18 @@
  *
  * Hak aksi HANYA dari descriptor tab (`can_create/can_edit/can_delete/can_process`); penguncian per baris (mis. baris
  * Disetujui untuk UL_PEGAWAI) ditegakkan server — galatnya ditampilkan. Aksi baris lewat menu ⋮ (AGENTS.md §1):
- * Edit → Setujui/Tolak → Hapus.
+ * Edit → Setujui/Tolak → Lampiran → Hapus. "Lampiran" (jenis berlampiran) membuka ArsipTable per kode `jenis_rwy`.
+ *
+ * Jenis tanpa `fields` di konfigurasinya (mis. `skp-periodik` sampai Definisi-nya ditetapkan) tidak menampilkan
+ * Tambah/Edit walaupun descriptor mengizinkan — tidak ada isian yang bisa dikirim.
+ *
+ * Role di `config.pilihStatusSaatUbah` (KP/KGB role 1, ikut legacy) mendapat isian `status` di form Edit (bawaan
+ * Disetujui, sama dengan form legacy); role lain tidak mengirim status (server menghitungnya).
  */
 import { FileSearch, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
+
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 import ApprovalDialog from '@/shared/components/ApprovalDialog.vue'
 import { approvalRowActions, type ApprovalAksi, type ApprovalPayload } from '@/shared/components/approvalActions'
@@ -20,18 +28,29 @@ import StatusBadge from '@/shared/components/StatusBadge.vue'
 import { UiButton, UiCard, UiNotice, UiPagination, UiSearchInput } from '@/shared/ui'
 
 import { describeApiError, splitValidationErrors, type ApiFailure, type RiwayatValidationErrors } from '../services/apiErrors'
-import { STATUS_RIWAYAT, type JenisEngine, type RiwayatRow, type RiwayatTabDescriptor } from '../types'
+import { lampiranService } from '../services/lampiran.service'
+import { STATUS_RIWAYAT, STATUS_RIWAYAT_LABELS, type JenisEngine, type RiwayatRow, type RiwayatTabDescriptor } from '../types'
 
 import RiwayatFormDialog from './RiwayatFormDialog.vue'
-import type { ColumnDef, RiwayatJenisConfig } from './riwayat.config'
+import RiwayatLampiranDialog from './RiwayatLampiranDialog.vue'
+import { S, type ColumnDef, type FieldDef, type RiwayatJenisConfig } from './riwayat.config'
 import { riwayatService, type BerkasMap } from './riwayat.service'
 
 const props = defineProps<{ nip: string; config: RiwayatJenisConfig; descriptor: RiwayatTabDescriptor }>()
 
 const PER_PAGE = 5
 
+/** Isian status form Edit untuk role pemilih status (nilai = kolom `status`; Diproses tidak ditawarkan selama flag nonaktif). */
+const STATUS_FIELD: FieldDef = S(
+  'status',
+  'Status',
+  [STATUS_RIWAYAT.DISETUJUI, STATUS_RIWAYAT.DITOLAK, STATUS_RIWAYAT.MENUNGGU].map((v) => ({ value: String(v), label: STATUS_RIWAYAT_LABELS[v] })),
+  { required: true },
+)
+
+const auth = useAuthStore()
+
 const jenis = computed(() => props.config.jenis as JenisEngine)
-const fieldNames = computed(() => props.config.fields.map((f) => f.name))
 
 const rows = ref<RiwayatRow[]>([])
 const loading = ref(true)
@@ -44,6 +63,11 @@ const formOpen = ref(false)
 const editing = ref<RiwayatRow | null>(null)
 const saving = ref(false)
 const formErrors = ref<RiwayatValidationErrors | null>(null)
+/** Jumlah lampiran tersimpan per kode wajib baris yang sedang diedit (untuk wajib-saat-ubah legacy). */
+const lampiranTersimpan = ref<Record<number, number>>({})
+
+const lampiranRow = ref<RiwayatRow | null>(null)
+const lampiranOpen = ref(false)
 
 const deleting = ref<RiwayatRow | null>(null)
 /** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
@@ -57,7 +81,12 @@ const processError = ref('')
 
 const canCreate = computed(() => props.descriptor.can_create && props.config.fields.length > 0)
 const canEdit = computed(() => props.descriptor.can_edit && props.config.fields.length > 0)
-const hasActions = computed(() => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process)
+const hasLampiran = computed(() => props.config.lampiran.length > 0)
+const hasActions = computed(() => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value)
+
+const pilihStatus = computed(() => editing.value !== null && auth.role !== null && (props.config.pilihStatusSaatUbah ?? []).includes(auth.role))
+const formFields = computed<FieldDef[]>(() => (pilihStatus.value ? [STATUS_FIELD, ...props.config.fields] : props.config.fields))
+const fieldNames = computed(() => formFields.value.map((f) => f.name))
 
 const rowId = (row: RiwayatRow): string => String(row[props.config.primaryKey] ?? '')
 const rowStatus = (row: RiwayatRow): number => Number(row.status ?? STATUS_RIWAYAT.MENUNGGU)
@@ -121,6 +150,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
   return [
     { key: 'edit', label: 'Edit', hidden: !canEdit.value },
     ...approvalRowActions({ canProcess: props.descriptor.can_process, status: rowStatus(row), busy }),
+    { key: 'lampiran', label: 'Lampiran', hidden: !hasLampiran.value },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.descriptor.can_delete },
   ]
 }
@@ -131,11 +161,33 @@ function openCreate(): void {
   formOpen.value = true
 }
 
+async function muatLampiranTersimpan(row: RiwayatRow): Promise<void> {
+  const id = rowId(row)
+  const hasil: Record<number, number> = {}
+  await Promise.all(
+    props.config.lampiran
+      .filter((def) => def.wajib)
+      .map(async (def) => {
+        try {
+          hasil[def.id_riwayat] = (await lampiranService.list(props.nip, { id_riwayat: def.id_riwayat, id_entri: id })).length
+        } catch {
+          // Tidak diketahui → tidak diwajibkan di form; server tetap menegakkan (422 berkas.<id>).
+        }
+      }),
+  )
+  if (editing.value === row) lampiranTersimpan.value = hasil
+}
+
 function onAction(key: string, row: RiwayatRow): void {
   if (key === 'edit') {
     editing.value = row
     formErrors.value = null
+    lampiranTersimpan.value = {}
     formOpen.value = true
+    void muatLampiranTersimpan(row)
+  } else if (key === 'lampiran') {
+    lampiranRow.value = row
+    lampiranOpen.value = true
   } else if (key === 'setujui' || key === 'tolak') {
     processing.value = row
     processMode.value = key
@@ -150,15 +202,17 @@ function onAction(key: string, row: RiwayatRow): void {
 const initialValues = computed<Record<string, string> | null>(() => {
   const row = editing.value
   if (!row) return null
-  return Object.fromEntries(props.config.fields.map((f) => [f.name, row[f.name] === null || row[f.name] === undefined ? '' : String(row[f.name])]))
+  const values = Object.fromEntries(props.config.fields.map((f) => [f.name, row[f.name] === null || row[f.name] === undefined ? '' : String(row[f.name])]))
+  // Form legacy memilih "Disetujui" sebagai bawaan isian status (kp/form.php, kgb/form.php).
+  return pilihStatus.value ? { status: String(STATUS_RIWAYAT.DISETUJUI), ...values } : values
 })
 
 async function onSubmit(values: Record<string, string>, berkas: BerkasMap): Promise<void> {
   saving.value = true
   formErrors.value = null
   try {
-    if (editing.value) await riwayatService.update(props.nip, jenis.value, rowId(editing.value), props.config.fields, values, berkas)
-    else await riwayatService.create(props.nip, jenis.value, props.config.fields, values, berkas)
+    if (editing.value) await riwayatService.update(props.nip, jenis.value, rowId(editing.value), formFields.value, values, berkas)
+    else await riwayatService.create(props.nip, jenis.value, formFields.value, values, berkas)
     formOpen.value = false
     page.value = 1
     notice.value = { tone: 'success', text: `Data ${props.config.singular} tersimpan.` }
@@ -281,10 +335,22 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
     <RiwayatFormDialog
       v-model:open="formOpen"
       :config="config"
+      :fields="formFields"
       :initial="initialValues"
+      :lampiran-tersimpan="lampiranTersimpan"
       :server-errors="formErrors"
       :busy="saving"
       @submit="onSubmit"
+    />
+
+    <RiwayatLampiranDialog
+      v-if="lampiranRow"
+      v-model:open="lampiranOpen"
+      :nip="nip"
+      :config="config"
+      :descriptor="descriptor"
+      :id-entri="rowId(lampiranRow)"
+      :subject="rowLabel(lampiranRow)"
     />
 
     <ApprovalDialog

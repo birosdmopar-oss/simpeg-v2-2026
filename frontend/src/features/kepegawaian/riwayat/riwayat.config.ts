@@ -7,6 +7,8 @@
  * Isian per jenis adalah titik awal; pemilik jenis menyempurnakannya bersama Definisi backend-nya (validasi, opsi,
  * lampiran). Field rujukan master (`ref`) mengambil opsi dari `GET master/{entity}/options`.
  */
+import type { RoleCode } from '@/features/auth/types'
+
 import type { AturanLampiran, JenisTab } from '../types'
 
 export type FieldType = 'text' | 'date' | 'number' | 'select' | 'textarea' | 'ref'
@@ -14,6 +16,16 @@ export type FieldType = 'text' | 'date' | 'number' | 'select' | 'textarea' | 're
 export interface FieldOption {
   value: string
   label: string
+}
+
+/**
+ * Syarat tampil sebuah isian dari nilai isian lain (pola aturan bersyarat Definisi, mis. bidang/jurusan pendidikan
+ * hanya untuk jenjang di atas SMA). `in` / `notIn` = nilai (string) isian `field`.
+ */
+export interface FieldCondition {
+  field: string
+  in?: readonly string[]
+  notIn?: readonly string[]
 }
 
 export interface FieldDef {
@@ -31,6 +43,21 @@ export interface FieldDef {
   placeholder?: string
   /** Lebar penuh (2 kolom) pada form. */
   wide?: boolean
+  /**
+   * Isian `ref` induk (sama dengan `MasterField::dependsOn` Definisi): opsi isian ini disaring `?parent=<nilai induk>`
+   * dan dikosongkan saat induk berganti (dropdown berjenjang lewat `useCascadeOptions`).
+   */
+  dependsOn?: string
+  /**
+   * Isian hanya tampil (dan hanya wajib) bila syarat terpenuhi; isian tersembunyi dikirim kosong (= NULL). Validasi
+   * yang mengikat tetap aturan bersyarat Definisi backend (422).
+   */
+  showWhen?: FieldCondition
+  /**
+   * Isian hitung: dikosongkan = dihitung server (mis. tanggal berakhir hukdis dari masa sanksi jenis). Form
+   * menampilkan petunjuk ini di bawah isian.
+   */
+  hint?: string
 }
 
 export interface ColumnDef {
@@ -65,6 +92,25 @@ export interface RiwayatJenisConfig {
   fields: FieldDef[]
   /** Lampiran per kode `jenis_rwy`; kosong = jenis tanpa lampiran (atau belum ditetapkan Definisi-nya). */
   lampiran: LampiranDef[]
+  /**
+   * Role yang memilih status saat Edit (= `RiwayatDefinisi::rolePilihStatusSaatUbah()`, mis. KP/KGB role 1 ikut
+   * legacy). Form edit role ini menampilkan isian `status` (Disetujui/Ditolak/Menunggu, bawaan Disetujui).
+   */
+  pilihStatusSaatUbah?: readonly RoleCode[]
+}
+
+/**
+ * Isian tampil menurut `showWhen` terhadap nilai form saat ini (tanpa `showWhen` = selalu tampil). Isian syarat yang
+ * masih kosong = belum tampil (mis. bidang pendidikan baru muncul setelah jenjang dipilih).
+ */
+export function fieldVisible(field: FieldDef, values: Record<string, string | undefined>): boolean {
+  const cond = field.showWhen
+  if (!cond) return true
+  const value = String(values[cond.field] ?? '').trim()
+  if (value === '') return false
+  if (cond.in && !cond.in.includes(value)) return false
+  if (cond.notIn && cond.notIn.includes(value)) return false
+  return true
 }
 
 export const T = (name: string, label: string, extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'text', ...extra })

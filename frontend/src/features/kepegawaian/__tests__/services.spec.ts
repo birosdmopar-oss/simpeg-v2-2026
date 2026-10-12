@@ -71,6 +71,13 @@ describe('pegawaiService', () => {
 })
 
 describe('riwayatService', () => {
+  it('tabs: GET /pegawai/{nip}/riwayat → data.tabs (halaman riwayat sementara, MAKE-006)', async () => {
+    const tabs = [{ jenis: 'kgb', label: 'Riwayat KGB', can_view: true, can_create: false, can_edit: false, can_delete: false, can_process: false }]
+    get.mockResolvedValue({ data: { tabs } })
+    await expect(riwayatService.tabs(NIP)).resolves.toEqual(tabs)
+    expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}/riwayat`)
+  })
+
   it('daftar: GET /pegawai/{nip}/riwayat/{jenis}', async () => {
     get.mockResolvedValue({ data: [] })
     await riwayatService.list(NIP, 'pendidikan')
@@ -78,17 +85,19 @@ describe('riwayatService', () => {
   })
 
   it('payload JSON: nama kolom DDL, kosong → null, angka → number, teks dipangkas', () => {
+    // Hanya isian konfigurasi (= field Definisi); kolom lain di nilai form (mis. glr_akhir) tidak ikut.
     expect(toJsonPayload(pendidikan.fields, values)).toEqual({
       id_jenjang_pendidikan: '7',
+      id_bidang_pendidikan: null,
+      bidang_pendidikan_lain: null,
       id_jurusan_pendidikan: null,
+      jurusan_pendidikan_lain: null,
       institusi_pendidikan: 'Universitas Contoh',
-      tgl_lulus: '2012-08-30',
       no_ijazah: null,
-      glr_awal: null,
-      glr_akhir: 'S.E.',
+      tgl_lulus: '2012-08-30',
       no_sk_penc_glr: null,
-      ipk: 3.5,
       nem: null,
+      ipk: 3.5,
       keterangan: null,
     })
   })
@@ -122,7 +131,7 @@ describe('riwayatService', () => {
   it('ubah tanpa berkas: PUT JSON ke /{id}', async () => {
     put.mockResolvedValue({ data: {} })
     await riwayatService.update(NIP, 'pendidikan', 12, pendidikan.fields, values)
-    expect(put).toHaveBeenCalledWith(`/pegawai/${NIP}/riwayat/pendidikan/12`, expect.objectContaining({ glr_akhir: 'S.E.' }))
+    expect(put).toHaveBeenCalledWith(`/pegawai/${NIP}/riwayat/pendidikan/12`, expect.objectContaining({ institusi_pendidikan: 'Universitas Contoh' }))
     expect(post).not.toHaveBeenCalled()
   })
 

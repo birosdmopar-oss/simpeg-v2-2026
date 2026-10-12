@@ -1,40 +1,75 @@
 /**
  * RiwayatListSection / RiwayatTabHost — tab riwayat engine dari API dengan hak aksi HANYA dari descriptor:
- * tombol tambah (can_create), menu ⋮ Edit → Setujui/Tolak (can_process, baris Menunggu) → Hapus (can_delete),
- * proses lewat ApprovalDialog, galat 422 (errors.<kolom>, errors["berkas.<id>"]) di form, lampiran wajib saat tambah,
- * dan keadaan galat 403/501. Tab non-engine (lkh) → "belum tersedia".
+ * tombol tambah (can_create), menu ⋮ Edit → Setujui/Tolak (can_process, baris Menunggu) → Lampiran → Hapus
+ * (can_delete), proses lewat ApprovalDialog, galat 422 (errors.<kolom>, errors["berkas.<id>"]) di form, lampiran wajib
+ * saat tambah dan saat ubah bila baris belum punya lampiran, isian bersyarat & berjenjang, isian status untuk role
+ * pemilih status, dan keadaan galat 403/501. Tab non-engine (lkh) → "belum tersedia".
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return {
     ...actual,
-    riwayatService: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn() },
+    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn() },
   }
 })
-vi.mock('@/shared/services/masterOptions', () => ({
-  masterOptions: vi.fn().mockResolvedValue([{ id: '7', nama: 'S1', parent: null }]),
+vi.mock('../services/lampiran.service', () => ({
+  lampiranService: { list: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn() },
+}))
+vi.mock('@/features/master-data/services/master.service', () => ({
+  masterService: { options: vi.fn() },
 }))
 
+import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { Role, type RoleCode, type User } from '@/features/auth/types'
+import { masterService } from '@/features/master-data/services/master.service'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
-import pendidikan from '../riwayat/jenis/pendidikan'
+import hukdis from '../riwayat/jenis/hukdis'
+import kp from '../riwayat/jenis/kp'
 import lkh from '../riwayat/jenis/lkh'
+import pendidikan from '../riwayat/jenis/pendidikan'
+import { D, R, T, type RiwayatJenisConfig } from '../riwayat/riwayat.config'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { riwayatService } from '../riwayat/riwayat.service'
-import type { RiwayatJenisConfig } from '../riwayat/riwayat.config'
+import { lampiranService } from '../services/lampiran.service'
 import type { RiwayatTabDescriptor } from '../types'
 
 import { apiError, descriptor, NIP, pendidikanRow } from './fixtures'
 
 const svc = vi.mocked(riwayatService)
+const lampiranSvc = vi.mocked(lampiranService)
+const options = vi.mocked(masterService.options)
 
-/** Konfigurasi KHUSUS TEST: pendidikan + satu lampiran wajib (aturan nyata disalin dari Definisi backend oleh WS-1). */
-const pendidikanBerlampiran: RiwayatJenisConfig = {
+/**
+ * Konfigurasi KHUSUS TEST untuk perilaku generik mesin (isian sedikit, kolom = fixture pendidikanRow); aturan nyata per
+ * jenis diuji lewat berkas `jenis/<slug>.ts` di bawah.
+ */
+const uji: RiwayatJenisConfig = {
   ...pendidikan,
-  lampiran: [{ id_riwayat: 14, label: 'Ijazah', wajib: true, batas_mb: 5, ekstensi: ['pdf'] }],
+  fields: [R('id_jenjang_pendidikan', 'Jenjang Pendidikan', 'jenjang-pendidikan', { required: true }), T('no_ijazah', 'Nomor Ijazah'), D('tgl_lulus', 'Tanggal Lulus', { required: true })],
+  lampiran: [],
+}
+const ujiBerlampiran: RiwayatJenisConfig = { ...uji, lampiran: [{ id_riwayat: 14, label: 'Ijazah', wajib: true, batas_mb: 5, ekstensi: ['pdf'] }] }
+
+function akun(level: RoleCode): User {
+  return {
+    id_pengguna: 1,
+    nip: null,
+    username: 'akun',
+    name: 'Akun Uji',
+    email: null,
+    user_level: level,
+    id_unit: null,
+    id_satker: null,
+    status: '1',
+    last_login_at: null,
+    created_at: null,
+    updated_at: null,
+  }
 }
 
 afterEach(() => {
@@ -43,11 +78,17 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 beforeEach(() => {
+  setActivePinia(createPinia())
+  useAuthStore().setSession(akun(Role.SUPER_ADMIN))
   for (const fn of Object.values(svc)) fn.mockReset()
+  for (const fn of Object.values(lampiranSvc)) fn.mockReset()
+  options.mockReset()
+  options.mockImplementation(async (entity: string, parent?: string | null) => [{ id: parent ? `${parent}1` : '7', nama: `${entity}${parent ? `-${parent}` : ''}`, parent: parent ?? null }])
+  lampiranSvc.list.mockResolvedValue([])
   svc.list.mockResolvedValue([pendidikanRow(1, { status: 1 }), pendidikanRow(2, { status: 0 }), pendidikanRow(3, { status: 2, reason_note: 'Ijazah buram' })])
 })
 
-async function mountTab(desc: Partial<RiwayatTabDescriptor> = {}, config = pendidikan) {
+async function mountTab(desc: Partial<RiwayatTabDescriptor> = {}, config: RiwayatJenisConfig = uji) {
   const wrapper = mount(RiwayatTabHost, {
     props: { nip: NIP, descriptor: descriptor(config.jenis, config.title, desc), config },
     attachTo: document.body,
@@ -57,10 +98,11 @@ async function mountTab(desc: Partial<RiwayatTabDescriptor> = {}, config = pendi
 }
 
 const q = <T extends Element = HTMLElement>(sel: string) => document.body.querySelector<T>(sel)
+const field = (name: string) => q<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`[data-field="${name}"] select, [data-field="${name}"] input, [data-field="${name}"] textarea, select[data-field="${name}"], input[data-field="${name}"]`)
 
-async function setInput(selector: string, value: string): Promise<void> {
-  const el = q<HTMLInputElement | HTMLSelectElement>(selector)
-  if (!el) throw new Error(`isian ${selector} tidak ada`)
+async function setInput(name: string, value: string): Promise<void> {
+  const el = field(name)
+  if (!el) throw new Error(`isian ${name} tidak ada`)
   el.value = value
   el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input'))
   await flushPromises()
@@ -78,6 +120,11 @@ async function submitForm(): Promise<void> {
   q('[data-testid="riwayat-form"]')?.dispatchEvent(new Event('submit'))
   await flushPromises()
   await new Promise((r) => setTimeout(r, 0))
+  await flushPromises()
+}
+
+async function openCreate(wrapper: Awaited<ReturnType<typeof mountTab>>): Promise<void> {
+  await wrapper.get('[data-testid="riwayat-add"]').trigger('click')
   await flushPromises()
 }
 
@@ -110,6 +157,12 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-belum-tersedia"]').text()).toContain('Laporan Kerja Harian')
     expect(svc.list).not.toHaveBeenCalled()
   })
+
+  it('jenis tanpa isian: Tambah/Edit tidak tampil walau descriptor mengizinkan', async () => {
+    const wrapper = await mountTab({ can_process: true }, { ...uji, fields: [] })
+    expect(wrapper.find('[data-testid="riwayat-add"]').exists()).toBe(false)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-2')).map((i) => i.key)).toEqual(['setujui', 'tolak', 'hapus'])
+  })
 })
 
 describe('RiwayatListSection — hak dari descriptor & menu ⋮', () => {
@@ -122,16 +175,26 @@ describe('RiwayatListSection — hak dari descriptor & menu ⋮', () => {
     expect(wrapper.get('[data-testid="riwayat-actions-2"]').attributes('aria-label')).toBe('Aksi untuk S1')
   })
 
+  it('jenis berlampiran: item Lampiran sesudah Setujui/Tolak, sebelum Hapus', async () => {
+    const wrapper = await mountTab({ can_process: true }, ujiBerlampiran)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-2')).map((i) => i.label)).toEqual(['Edit', 'Setujui', 'Tolak', 'Lampiran', 'Hapus'])
+  })
+
   it('baris Disetujui: Setujui/Tolak tidak tampil', async () => {
     const wrapper = await mountTab({ can_process: true })
     expect((await rowMenuActions(wrapper, 'riwayat-actions-1')).map((i) => i.key)).toEqual(['edit', 'hapus'])
   })
 
-  it('tanpa hak apa pun: tanpa tombol tambah dan tanpa kolom Aksi', async () => {
+  it('tanpa hak apa pun: tanpa tombol tambah dan tanpa kolom Aksi (jenis tanpa lampiran)', async () => {
     const wrapper = await mountTab({ can_create: false, can_edit: false, can_delete: false, can_process: false })
     expect(wrapper.find('[data-testid="riwayat-add"]').exists()).toBe(false)
     expect(wrapper.findAll('thead th').map((th) => th.text())).not.toContain('Aksi')
     expect(wrapper.find('[data-testid="riwayat-row-1"]').exists()).toBe(true)
+  })
+
+  it('lihat saja pada jenis berlampiran: menu hanya Lampiran (unduh arsip)', async () => {
+    const wrapper = await mountTab({ can_create: false, can_edit: false, can_delete: false, can_process: false }, ujiBerlampiran)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-1')).map((i) => i.key)).toEqual(['lampiran'])
   })
 
   it('hanya can_process: menu berisi Setujui/Tolak saja', async () => {
@@ -176,11 +239,10 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
   const pdf = new File(['%PDF'], 'ijazah.pdf', { type: 'application/pdf' })
 
   it('tambah tanpa lampiran wajib (kode 14) → pesan, tidak memanggil API', async () => {
-    const wrapper = await mountTab({}, pendidikanBerlampiran)
-    await wrapper.get('[data-testid="riwayat-add"]').trigger('click')
-    await flushPromises()
-    await setInput('[data-field="id_jenjang_pendidikan"] select, select[data-field="id_jenjang_pendidikan"]', '7')
-    await setInput('input[data-field="tgl_lulus"], [data-field="tgl_lulus"] input', '2012-08-30')
+    const wrapper = await mountTab({}, ujiBerlampiran)
+    await openCreate(wrapper)
+    await setInput('id_jenjang_pendidikan', '7')
+    await setInput('tgl_lulus', '2012-08-30')
     await submitForm()
     // Validasi VeeValidate/Zod asinkron: tunggu hasilnya, bukan jumlah tick tetap (runner CI lebih lambat).
     await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Ijazah wajib diunggah.'))
@@ -189,18 +251,17 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
 
   it('tambah lengkap → create(nip, jenis, fields, values, { 14: File }); galat 422 dipetakan ke kolom & berkas', async () => {
     svc.create.mockRejectedValueOnce(apiError(422, { tgl_lulus: ['Tanggal lulus wajib diisi.'], 'berkas.14': ['Berkas harus pdf.'] }))
-    const wrapper = await mountTab({}, pendidikanBerlampiran)
-    await wrapper.get('[data-testid="riwayat-add"]').trigger('click')
-    await flushPromises()
-    await setInput('[data-field="id_jenjang_pendidikan"] select, select[data-field="id_jenjang_pendidikan"]', '7')
-    await setInput('input[data-field="tgl_lulus"], [data-field="tgl_lulus"] input', '2012-08-30')
+    const wrapper = await mountTab({}, ujiBerlampiran)
+    await openCreate(wrapper)
+    await setInput('id_jenjang_pendidikan', '7')
+    await setInput('tgl_lulus', '2012-08-30')
     await chooseFile(14, pdf)
     await submitForm()
 
     await vi.waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
     await flushPromises()
     const [nip, jenis, fields, values, berkas] = svc.create.mock.calls[0]
-    expect([nip, jenis, fields]).toEqual([NIP, 'pendidikan', pendidikan.fields])
+    expect([nip, jenis, fields]).toEqual([NIP, 'pendidikan', uji.fields])
     expect(values).toMatchObject({ id_jenjang_pendidikan: '7', tgl_lulus: '2012-08-30' })
     expect(berkas).toEqual({ 14: pdf })
     expect(q('[data-testid="riwayat-dialog"]')?.textContent).toContain('Tanggal lulus wajib diisi.')
@@ -209,12 +270,11 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
 
   it('422 berkas.<id> untuk kode yang tidak ada di form → tampil di notice form, dialog tetap terbuka', async () => {
     svc.create.mockRejectedValueOnce(apiError(422, { 'berkas.14': ['Lampiran wajib diunggah.'] }))
-    const wrapper = await mountTab() // pendidikan: lampiran [] di FE
-    await wrapper.get('[data-testid="riwayat-add"]').trigger('click')
-    await flushPromises()
+    const wrapper = await mountTab()
+    await openCreate(wrapper)
     expect(q('[data-testid="riwayat-berkas-14"]')).toBeNull()
-    await setInput('[data-field="id_jenjang_pendidikan"] select, select[data-field="id_jenjang_pendidikan"]', '7')
-    await setInput('input[data-field="tgl_lulus"], [data-field="tgl_lulus"] input', '2012-08-30')
+    await setInput('id_jenjang_pendidikan', '7')
+    await setInput('tgl_lulus', '2012-08-30')
     await submitForm()
 
     await vi.waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
@@ -223,16 +283,30 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     expect(q('[data-testid="riwayat-dialog"]')).not.toBeNull()
   })
 
-  it('edit: dialog terisi nilai baris (kolom DDL); simpan → update(…, id, …); berkas tidak wajib saat ubah', async () => {
+  it('edit: dialog terisi nilai baris (kolom DDL); simpan → update(…, id, …); lampiran wajib yang sudah ada tidak diwajibkan lagi', async () => {
     svc.update.mockResolvedValue({})
-    const wrapper = await mountTab()
+    lampiranSvc.list.mockResolvedValue([{ id_attachment: 5 } as never])
+    const wrapper = await mountTab({}, ujiBerlampiran)
     await selectRowAction(wrapper, 'riwayat-actions-1', 'edit')
-    expect(q<HTMLInputElement>('input[data-field="no_ijazah"], [data-field="no_ijazah"] input')?.value).toBe('IJZ-1')
+    await flushPromises()
+    expect(lampiranSvc.list).toHaveBeenCalledWith(NIP, { id_riwayat: 14, id_entri: '1' })
+    expect(field('no_ijazah')?.value).toBe('IJZ-1')
+    expect(field('status')).toBeNull() // jenis tanpa pilihStatusSaatUbah
     await submitForm()
     await vi.waitFor(() => expect(svc.update).toHaveBeenCalled())
     await flushPromises()
-    expect(svc.update).toHaveBeenCalledWith(NIP, 'pendidikan', '1', pendidikan.fields, expect.objectContaining({ no_ijazah: 'IJZ-1' }), {})
+    expect(svc.update).toHaveBeenCalledWith(NIP, 'pendidikan', '1', uji.fields, expect.objectContaining({ no_ijazah: 'IJZ-1' }), {})
     expect(wrapper.get('[data-testid="riwayat-notice"]').text()).toContain('tersimpan')
+  })
+
+  it('edit baris tanpa lampiran wajib (data impor) → berkas wajib diunggah (legacy vp())', async () => {
+    lampiranSvc.list.mockResolvedValue([])
+    const wrapper = await mountTab({}, ujiBerlampiran)
+    await selectRowAction(wrapper, 'riwayat-actions-1', 'edit')
+    await flushPromises()
+    await submitForm()
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Ijazah wajib diunggah.'))
+    expect(svc.update).not.toHaveBeenCalled()
   })
 
   it('hapus: konfirmasi → DELETE; galat 403 tampil sebagai pesan', async () => {
@@ -244,5 +318,95 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     await flushPromises()
     expect(svc.remove).toHaveBeenCalledWith(NIP, 'pendidikan', '3')
     expect(wrapper.get('[data-testid="riwayat-notice"]').text()).toBe('Anda tidak berhak mengakses data ini.')
+  })
+
+  it('Lampiran: dialog berisi ArsipTable per kode (GET lampiran baris itu)', async () => {
+    const wrapper = await mountTab({}, pendidikan)
+    await selectRowAction(wrapper, 'riwayat-actions-2', 'lampiran')
+    await flushPromises()
+    expect(q('[data-testid="riwayat-lampiran-dialog"]')?.textContent).toContain('Lampiran S1')
+    for (const kode of [14, 39, 40]) {
+      expect(q(`[data-testid="arsip-${kode}-2"]`)).not.toBeNull()
+      expect(lampiranSvc.list).toHaveBeenCalledWith(NIP, { id_riwayat: kode, id_entri: '2' })
+    }
+  })
+})
+
+describe('RiwayatListSection — isian berjenjang, bersyarat, dan status', () => {
+  it('ref berjenjang (hukdis): jenis memuat opsi ?parent=tingkat; ganti tingkat mengosongkan jenis', async () => {
+    svc.list.mockResolvedValue([])
+    const wrapper = await mountTab({}, hukdis)
+    await openCreate(wrapper)
+    expect(options).toHaveBeenCalledWith('tingkat-hukdis', null)
+    expect(options).not.toHaveBeenCalledWith('jenis-hukdis', expect.anything())
+
+    await setInput('id_tingkat_hukdis', '7')
+    expect(options).toHaveBeenCalledWith('jenis-hukdis', '7')
+    await setInput('id_jenis_hukdis', '71')
+    expect(field('id_jenis_hukdis')?.value).toBe('71')
+
+    await setInput('id_tingkat_hukdis', '')
+    expect(field('id_jenis_hukdis')?.value).toBe('')
+    expect(q('[data-field="akhir_hukdis"]')?.textContent).toContain('Kosongkan untuk dihitung otomatis')
+  })
+
+  it('isian bersyarat (pendidikan): bidang/jurusan hanya untuk jenjang di atas SMA; tersembunyi dikirim kosong', async () => {
+    options.mockImplementation(async (entity: string, parent?: string | null) =>
+      entity === 'jenjang-pendidikan'
+        ? [{ id: '3', nama: 'SMA', parent: null }, { id: '7', nama: 'S1', parent: null }]
+        : [{ id: parent ? `${parent}1` : '7', nama: entity, parent: parent ?? null }],
+    )
+    const wrapper = await mountTab({}, pendidikan)
+    await openCreate(wrapper)
+    expect(field('id_bidang_pendidikan')).toBeNull() // jenjang belum dipilih
+
+    await setInput('id_jenjang_pendidikan', '7')
+    expect(field('id_bidang_pendidikan')).not.toBeNull()
+    expect(field('nem')).toBeNull()
+    await submitForm()
+    await vi.waitFor(() => expect(q('[data-field="id_bidang_pendidikan"]')?.textContent).toContain('Bidang Pendidikan wajib diisi'))
+
+    await setInput('id_bidang_pendidikan', '7')
+    await setInput('id_jurusan_pendidikan', '71')
+    await setInput('ipk', '3.5')
+    // Jenjang SMA (kode 3): bidang/jurusan/ipk tersembunyi; NEM tampil.
+    await setInput('id_jenjang_pendidikan', '3')
+    expect(field('id_bidang_pendidikan')).toBeNull()
+    expect(field('nem')).not.toBeNull()
+
+    for (const [name, value] of [['institusi_pendidikan', 'SMA 1'], ['no_ijazah', 'IJZ'], ['tgl_lulus', '2008-06-30']]) await setInput(name, value)
+    await chooseFile(14, new File(['%PDF'], 'ijazah.pdf', { type: 'application/pdf' }))
+    await submitForm()
+    await vi.waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
+    expect(svc.create.mock.calls[0][3]).toMatchObject({ id_jenjang_pendidikan: '3', id_bidang_pendidikan: '', id_jurusan_pendidikan: '', ipk: '' })
+  })
+
+  it('role 1 edit KP: isian status (bawaan Disetujui) ikut dikirim; 422 errors.status dipetakan ke isian', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_kp: 9, status: 0, id_jenis_kp: 7, id_pangkat: 7, tmtsk: '2015-04-01', no_sk: 'SK', tgl_sk: '2015-04-01', gaji_pokok: 1, mker_th: 1, mker_bl: 1, gol_ruang: 'III/a' }])
+    lampiranSvc.list.mockResolvedValue([{ id_attachment: 1 } as never])
+    svc.update.mockRejectedValueOnce(apiError(422, { status: ['Status tidak valid.'] }))
+    const wrapper = await mountTab({}, kp)
+    await selectRowAction(wrapper, 'riwayat-actions-9', 'edit')
+    await flushPromises()
+    expect(field('status')?.value).toBe('1')
+    expect([...(field('status') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', '1', '2', '0'])
+
+    await setInput('status', '2')
+    await submitForm()
+    await vi.waitFor(() => expect(svc.update).toHaveBeenCalledTimes(1))
+    const [, , , fields, values] = svc.update.mock.calls[0]
+    expect(fields.map((f) => f.name)).toContain('status')
+    expect(values).toMatchObject({ status: '2', no_sk: 'SK' })
+    await vi.waitFor(() => expect(q('[data-field="status"]')?.textContent).toContain('Status tidak valid.'))
+  })
+
+  it('role 3 edit KP: tanpa isian status', async () => {
+    useAuthStore().setSession(akun(Role.ADMIN_SATKER))
+    svc.list.mockResolvedValue([{ id_riwayat_kp: 9, status: 0, tmtsk: '2015-04-01' }])
+    const wrapper = await mountTab({}, kp)
+    await selectRowAction(wrapper, 'riwayat-actions-9', 'edit')
+    await flushPromises()
+    expect(field('status')).toBeNull()
+    expect(field('no_sk')).not.toBeNull()
   })
 })

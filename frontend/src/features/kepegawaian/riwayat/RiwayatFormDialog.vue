@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * Dialog tambah/ubah satu riwayat (Radix Vue Dialog, pola sama dengan dialog Akun/Master Data). Isinya
- * RiwayatFieldForm yang dirender dari konfigurasi jenis. `initial` null = tambah, ada = ubah.
+ * RiwayatFieldForm yang dirender dari konfigurasi jenis. `initial` null = tambah, ada = ubah. `fields` menimpa isian
+ * konfigurasi (mis. ditambah isian `status` untuk role yang memilih status saat ubah).
  */
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
@@ -9,13 +10,15 @@ import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPor
 import type { RiwayatValidationErrors } from '../services/apiErrors'
 
 import RiwayatFieldForm from './RiwayatFieldForm.vue'
-import type { RiwayatJenisConfig } from './riwayat.config'
+import type { FieldDef, RiwayatJenisConfig } from './riwayat.config'
 import type { BerkasMap } from './riwayat.service'
 
 defineProps<{
   open: boolean
   config: RiwayatJenisConfig
   initial: Record<string, string> | null
+  fields?: FieldDef[]
+  lampiranTersimpan?: Record<number, number>
   serverErrors?: RiwayatValidationErrors | null
   busy?: boolean
 }>()
@@ -41,10 +44,12 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
         </div>
 
         <RiwayatFieldForm
-          :fields="config.fields"
+          :key="(fields ?? config.fields).map((f) => f.name).join()"
+          :fields="fields ?? config.fields"
           :lampiran="config.lampiran"
           :mode="initial ? 'edit' : 'create'"
           :initial="initial ?? {}"
+          :lampiran-tersimpan="lampiranTersimpan ?? {}"
           :server-errors="serverErrors ?? null"
           :busy="busy"
           :submit-label="initial ? 'Simpan Perubahan' : 'Simpan'"

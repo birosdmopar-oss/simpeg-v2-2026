@@ -1,11 +1,17 @@
 <script setup lang="ts">
 /**
  * Form generik riwayat: dirender dari FieldDef (dua kolom, label di atas, tanda (*) merah), divalidasi skema Zod
- * dinamis lewat VeeValidate (ADR-026). Nama isian = kolom DDL. Field `ref` mengambil opsi master
- * (`GET master/{entity}/options`) lewat re-export `@/shared/services/masterOptions`.
+ * dinamis lewat VeeValidate (ADR-026). Nama isian = kolom DDL.
  *
- * Lampiran: satu isian berkas per kode `jenis_rwy` (`berkas[<id_riwayat>]`). Saat TAMBAH, lampiran ber-`wajib` harus
- * dipilih; saat UBAH berkas bersifat tambahan (server yang memastikan baris tetap punya lampiran wajib).
+ * - Isian `ref` memuat opsi master lewat `useCascadeOptions` (riwayatCascade.ts): isian ber-`dependsOn` berjenjang —
+ *   mengganti induk mengosongkan dan memuat ulang turunannya.
+ * - Isian ber-`showWhen` hanya tampil (dan hanya wajib) bila syaratnya terpenuhi; saat kirim, isian tersembunyi
+ *   dikirim kosong (= NULL).
+ * - Isian ber-`hint` (isian hitung) menampilkan petunjuk, mis. "dikosongkan = dihitung otomatis".
+ *
+ * Lampiran: satu isian berkas per kode `jenis_rwy` (`berkas[<id_riwayat>]`). Lampiran ber-`wajib` harus dipilih saat
+ * TAMBAH, dan saat UBAH bila baris itu belum punya lampiran kode tersebut (`lampiranTersimpan[<kode>] === 0`, ikut legacy
+ * `vp()`); selain itu berkas saat ubah bersifat tambahan. Server tetap yang menegakkan (422 `berkas.<id>`).
  * Galat server 422 (`errors.<kolom>`, `errors["berkas.<id>"]`) diteruskan lewat prop `serverErrors`.
  */
 import { toTypedSchema } from '@vee-validate/zod'
@@ -13,14 +19,14 @@ import { useForm } from 'vee-validate'
 import { onMounted, reactive, type Ref, watch } from 'vue'
 
 import FormField from '@/shared/components/FormField.vue'
-import { masterOptions } from '@/shared/services/masterOptions'
 import { UiButton, UiFileField, UiSelect, UiTextField } from '@/shared/ui'
 
 import type { RiwayatValidationErrors } from '../services/apiErrors'
 
-import type { FieldDef, FieldOption, LampiranDef } from './riwayat.config'
+import { fieldVisible, type FieldDef, type LampiranDef } from './riwayat.config'
 import { buildRiwayatSchema } from './riwayat.schema'
 import type { BerkasMap } from './riwayat.service'
+import { useRiwayatRefOptions } from './riwayatCascade'
 
 const props = withDefaults(
   defineProps<{
@@ -28,6 +34,8 @@ const props = withDefaults(
     lampiran?: LampiranDef[]
     mode?: 'create' | 'edit'
     initial?: Record<string, string>
+    /** Jumlah lampiran yang sudah tersimpan per kode (mode edit); kode tanpa entri = tidak diketahui. */
+    lampiranTersimpan?: Record<number, number>
     serverErrors?: RiwayatValidationErrors | null
     busy?: boolean
     submitLabel?: string
@@ -39,6 +47,7 @@ const props = withDefaults(
     lampiran: () => [],
     mode: 'create',
     initial: () => ({}),
+    lampiranTersimpan: () => ({}),
     serverErrors: null,
     busy: false,
     submitLabel: 'Simpan',
@@ -51,7 +60,7 @@ const emit = defineEmits<{ submit: [values: Record<string, string>, berkas: Berk
 
 const blank = (): Record<string, string> => Object.fromEntries(props.fields.map((f) => [f.name, props.initial[f.name] ?? '']))
 
-const { errors, handleSubmit, resetForm, defineField } = useForm<Record<string, string>>({
+const { errors, values, handleSubmit, resetForm, defineField } = useForm<Record<string, string>>({
   validationSchema: toTypedSchema(buildRiwayatSchema(props.fields)),
   initialValues: blank(),
 })
@@ -62,30 +71,29 @@ for (const f of props.fields) models[f.name] = defineField(f.name)[0] as Ref<str
 const berkas = reactive<BerkasMap>({})
 const berkasError = reactive<Record<number, string>>({})
 
+const refs = useRiwayatRefOptions(props.fields)
+onMounted(() => void refs.init(blank()))
+
 watch(
   () => props.initial,
   () => {
     resetForm({ values: blank() })
     for (const key of Object.keys(berkas)) delete berkas[Number(key)]
+    for (const key of Object.keys(berkasError)) delete berkasError[Number(key)]
+    void refs.init(blank())
   },
 )
 
-// Opsi field rujukan master. Gagal memuat → daftar kosong (form tetap bisa dibuka; server memvalidasi).
-const refOptions = reactive<Record<string, FieldOption[]>>({})
-onMounted(async () => {
-  await Promise.all(
-    props.fields
-      .filter((f) => f.type === 'ref' && f.entity)
-      .map(async (f) => {
-        try {
-          const options = await masterOptions(f.entity as string)
-          refOptions[f.name] = options.map((o) => ({ value: String(o.id), label: o.nama }))
-        } catch {
-          refOptions[f.name] = []
-        }
-      }),
-  )
-})
+async function onRefChange(f: FieldDef, value: string): Promise<void> {
+  const model = models[f.name]
+  if (model) model.value = value
+  for (const name of await refs.select(f.name, value)) {
+    const turunan = models[name]
+    if (turunan) turunan.value = ''
+  }
+}
+
+const visible = (f: FieldDef): boolean => fieldVisible(f, values as Record<string, string | undefined>)
 
 function onFile(def: LampiranDef, file: File | null): void {
   delete berkasError[def.id_riwayat]
@@ -93,11 +101,12 @@ function onFile(def: LampiranDef, file: File | null): void {
   else delete berkas[def.id_riwayat]
 }
 
+const fileRequired = (def: LampiranDef): boolean => def.wajib && (props.mode === 'create' || props.lampiranTersimpan[def.id_riwayat] === 0)
+
 function missingWajib(): boolean {
   let missing = false
-  if (props.mode !== 'create') return false
   for (const def of props.lampiran) {
-    if (def.wajib && !berkas[def.id_riwayat]) {
+    if (fileRequired(def) && !berkas[def.id_riwayat]) {
       berkasError[def.id_riwayat] = `${def.label} wajib diunggah.`
       missing = true
     }
@@ -106,9 +115,11 @@ function missingWajib(): boolean {
 }
 
 const submit = handleSubmit(
-  (values) => {
+  (submitted) => {
     if (missingWajib()) return
-    emit('submit', values, { ...berkas })
+    // Isian bersyarat yang tersembunyi dikirim kosong (= NULL), bukan nilai lama yang tak terlihat.
+    const out = Object.fromEntries(props.fields.map((f) => [f.name, visible(f) ? (submitted[f.name] ?? '') : '']))
+    emit('submit', out, { ...berkas })
   },
   () => {
     missingWajib()
@@ -122,51 +133,68 @@ function cancel(): void {
 
 const fieldError = (name: string): string => errors.value[name] ?? props.serverErrors?.fields[name] ?? ''
 const fileError = (id: number): string => berkasError[id] ?? props.serverErrors?.berkas[id] ?? ''
-const fileRequired = (def: LampiranDef): boolean => def.wajib && props.mode === 'create'
+const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
 </script>
 
 <template>
   <form novalidate :data-testid="`${testid}-form`" @submit.prevent="submit">
     <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
-      <div v-for="f in fields" :key="f.name" :class="f.wide ? 'md:col-span-2' : ''">
-        <FormField
-          v-if="f.type === 'textarea'"
-          v-model="models[f.name].value"
-          type="textarea"
-          :name="f.name"
-          :label="f.label"
-          :required="f.required"
-          :disabled="busy"
-          :error="fieldError(f.name)"
-          :placeholder="f.placeholder"
-        />
-        <UiSelect
-          v-else-if="f.type === 'select' || f.type === 'ref'"
-          v-model="models[f.name].value"
-          :label="f.label"
-          :required="f.required"
-          :disabled="busy"
-          :options="f.type === 'ref' ? (refOptions[f.name] ?? []) : (f.options ?? [])"
-          :placeholder="`Pilih ${f.label.toLowerCase()}...`"
-          :clearable="!f.required"
-          :state="fieldError(f.name) ? 'error' : 'default'"
-          :help-text="fieldError(f.name)"
-          :data-field="f.name"
-        />
-        <UiTextField
-          v-else
-          v-model="models[f.name].value"
-          :label="f.label"
-          :required="f.required"
-          :disabled="busy"
-          :type="f.type === 'date' ? 'date' : 'text'"
-          :inputmode="f.type === 'number' ? 'numeric' : undefined"
-          :placeholder="f.placeholder"
-          :state="fieldError(f.name) ? 'error' : 'default'"
-          :help-text="fieldError(f.name)"
-          :data-field="f.name"
-        />
-      </div>
+      <template v-for="f in fields" :key="f.name">
+        <div v-if="visible(f)" :class="f.wide ? 'md:col-span-2' : ''">
+          <FormField
+            v-if="f.type === 'textarea'"
+            v-model="models[f.name].value"
+            type="textarea"
+            :name="f.name"
+            :label="f.label"
+            :required="f.required"
+            :disabled="busy"
+            :error="fieldError(f.name)"
+            :hint="f.hint"
+            :placeholder="f.placeholder"
+          />
+          <UiSelect
+            v-else-if="f.type === 'ref'"
+            :model-value="models[f.name].value"
+            :label="f.label"
+            :required="f.required"
+            :disabled="busy"
+            :options="refs.options(f.name)"
+            :placeholder="`Pilih ${f.label.toLowerCase()}...`"
+            :clearable="!f.required"
+            :state="fieldError(f.name) ? 'error' : 'default'"
+            :help-text="helpText(f)"
+            :data-field="f.name"
+            @update:model-value="(v) => onRefChange(f, v)"
+          />
+          <UiSelect
+            v-else-if="f.type === 'select'"
+            v-model="models[f.name].value"
+            :label="f.label"
+            :required="f.required"
+            :disabled="busy"
+            :options="f.options ?? []"
+            :placeholder="`Pilih ${f.label.toLowerCase()}...`"
+            :clearable="!f.required"
+            :state="fieldError(f.name) ? 'error' : 'default'"
+            :help-text="helpText(f)"
+            :data-field="f.name"
+          />
+          <UiTextField
+            v-else
+            v-model="models[f.name].value"
+            :label="f.label"
+            :required="f.required"
+            :disabled="busy"
+            :type="f.type === 'date' ? 'date' : 'text'"
+            :inputmode="f.type === 'number' ? 'numeric' : undefined"
+            :placeholder="f.placeholder"
+            :state="fieldError(f.name) ? 'error' : 'default'"
+            :help-text="helpText(f)"
+            :data-field="f.name"
+          />
+        </div>
+      </template>
     </div>
 
     <fieldset v-if="lampiran.length" class="mt-6 border-t border-slate-200 pt-5">

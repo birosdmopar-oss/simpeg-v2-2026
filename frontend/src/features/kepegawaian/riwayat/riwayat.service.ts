@@ -7,11 +7,13 @@
  *   DELETE pegawai/{nip}/riwayat/{jenis}/{id}           hapus lunak (status 10)
  *   POST   pegawai/{nip}/riwayat/{jenis}/{id}/process   { aksi, reason_note }
  *
- * TODO(kontrak): apakah daftar lampiran ikut di respons riwayat belum ditetapkan — baca lampiran lewat lampiran.service.
+ * Kontrak engine (README backend `Controllers/Api/Kepegawaian`, "Rincian engine riwayat"): respons riwayat = kolom DDL
+ * tabel riwayat saja, lampiran TIDAK ikut (baca lewat lampiran.service / ArsipTable); galat 422 berkunci kolom DDL dan
+ * `berkas.<id_riwayat>`; `reason_note` opsional saat setujui, wajib saat tolak (maks 255 byte).
  */
 import { api } from '@/lib/axios'
 
-import type { JenisEngine, ProcessRiwayatPayload, RiwayatRow } from '../types'
+import type { JenisEngine, ProcessRiwayatPayload, RiwayatRow, RiwayatTabDescriptor } from '../types'
 
 import type { FieldDef } from './riwayat.config'
 
@@ -36,7 +38,7 @@ export function toJsonPayload(fields: readonly FieldDef[], values: RiwayatValues
 
 /**
  * Payload multipart: field kolom DDL + `berkas[<id_riwayat>]`. `method` = 'PUT' menambah `_method=PUT` (spoofing CI4).
- * TODO(kontrak): representasi NULL di multipart belum ditetapkan — sementara kolom kosong dikirim sebagai string kosong.
+ * Kolom kosong dikirim sebagai string kosong = NULL (kontrak engine: '' pada field opsional = NULL di JSON/form/multipart).
  */
 export function toFormData(fields: readonly FieldDef[], values: RiwayatValues, berkas: BerkasMap, method?: 'PUT'): FormData {
   const form = new FormData()
@@ -49,6 +51,15 @@ export function toFormData(fields: readonly FieldDef[], values: RiwayatValues, b
 const hasBerkas = (berkas: BerkasMap): boolean => Object.keys(berkas).length > 0
 
 export const riwayatService = {
+  /**
+   * `GET pegawai/{nip}/riwayat` → descriptor tab (aditif MAKE-006; sumber sama dengan `data.tabs` detail pegawai).
+   * Dipakai halaman riwayat sementara sampai `GET pegawai/{nip}` (MAKE-010) tersedia.
+   */
+  async tabs(nip: string): Promise<RiwayatTabDescriptor[]> {
+    const { data } = await api.get<{ tabs: RiwayatTabDescriptor[] }>(`/pegawai/${encodeURIComponent(nip)}/riwayat`)
+    return data.tabs
+  },
+
   async list(nip: string, jenis: JenisEngine): Promise<RiwayatRow[]> {
     const { data } = await api.get<RiwayatRow[]>(base(nip, jenis))
     return data

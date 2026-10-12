@@ -13,6 +13,7 @@ import { descriptor } from './fixtures'
 
 const EXPECTED = [
   'ak',
+  'ak-siasn',
   'alamat',
   'diklat',
   'hukdis',
@@ -30,7 +31,7 @@ const EXPECTED = [
 ]
 
 describe('registry riwayat', () => {
-  it('15 berkas sesuai tabel §2.3.5 (ak-siasn ditambah WS-1 kemudian)', () => {
+  it('16 berkas: tabel §2.3.5 + ak-siasn (WS-1 M3)', () => {
     expect(Object.keys(RIWAYAT_REGISTRY).sort()).toEqual(EXPECTED)
   })
 
@@ -56,8 +57,28 @@ describe('registry riwayat', () => {
     }
   })
 
-  it('aturan lampiran belum diisi di FE sampai disalin dari Definisi backend (tidak menebak dari fixture test)', () => {
-    for (const config of Object.values(RIWAYAT_REGISTRY)) expect(config.lampiran, config.jenis).toEqual([])
+  it('aturan lampiran = salinan Definisi backend (kode jenis_rwy, wajib, 5 MB, jpg|jpeg|png|gif|pdf); jenis lain kosong', () => {
+    const ext = ['jpg', 'jpeg', 'png', 'gif', 'pdf']
+    const ringkas = (jenis: string) => configFor(jenis)?.lampiran.map((l) => [l.id_riwayat, l.wajib, l.batas_mb, l.ekstensi])
+    // Pendidikan.php, Kp.php (MAKE-005), Kgb.php, Hukdis.php (MAKE-006).
+    expect(ringkas('pendidikan')).toEqual([[14, true, 5, ext], [39, false, 5, ext], [40, false, 5, ext]])
+    expect(ringkas('kp')).toEqual([[11, true, 5, ext]])
+    expect(ringkas('kgb')).toEqual([[10, true, 5, ext]])
+    expect(ringkas('hukdis')).toEqual([[7, true, 5, ext]])
+    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis']
+    for (const config of Object.values(RIWAYAT_REGISTRY)) {
+      if (!berlampiran.includes(config.jenis)) expect(config.lampiran, config.jenis).toEqual([])
+    }
+  })
+
+  it('dependsOn menunjuk isian ref lain di jenis yang sama; showWhen menunjuk isian yang ada', () => {
+    for (const config of Object.values(RIWAYAT_REGISTRY)) {
+      const names = config.fields.map((f) => f.name)
+      for (const f of config.fields) {
+        if (f.dependsOn) expect(config.fields.find((g) => g.name === f.dependsOn)?.type, `${config.jenis}.${f.name}`).toBe('ref')
+        if (f.showWhen) expect(names, `${config.jenis}.${f.name}`).toContain(f.showWhen.field)
+      }
+    }
   })
 
   afterEach(() => {
@@ -102,6 +123,19 @@ describe('buildRiwayatSchema', () => {
     const result = kgb.safeParse({ no_sk: '', tgl_sk: '2024-13', tmtsk: '2024-01-01', mker_gol_th: 'abc', gaji_pokok: '', jym: '', keterangan: '' })
     const messages = result.success ? [] : result.error.issues.map((i) => i.message)
     expect(messages).toContain('Tanggal SK tidak valid')
-    expect(messages).toContain('Masa Kerja Golongan (tahun) harus berupa angka')
+    expect(messages).toContain('Masa Kerja Golongan (Tahun) harus berupa angka')
+  })
+
+  it('isian bersyarat (showWhen): wajib hanya saat tampil', () => {
+    const schema = buildRiwayatSchema(configFor('pendidikan')?.fields ?? [])
+    const dasar = { id_jenjang_pendidikan: '3', id_bidang_pendidikan: '', bidang_pendidikan_lain: '', id_jurusan_pendidikan: '', jurusan_pendidikan_lain: '', institusi_pendidikan: 'SMA 1', no_ijazah: 'X', tgl_lulus: '2008-06-30', no_sk_penc_glr: '', nem: '', ipk: '', keterangan: '' }
+    expect(schema.safeParse(dasar).success).toBe(true) // SMA: bidang/jurusan tersembunyi
+
+    const s1 = schema.safeParse({ ...dasar, id_jenjang_pendidikan: '7' })
+    const paths = s1.success ? [] : s1.error.issues.map((i) => i.path.join('.'))
+    expect(paths).toEqual(['id_bidang_pendidikan', 'id_jurusan_pendidikan'])
+
+    const lain = schema.safeParse({ ...dasar, id_jenjang_pendidikan: '7', id_bidang_pendidikan: '98', id_jurusan_pendidikan: '10' })
+    expect(lain.success ? [] : lain.error.issues.map((i) => i.message)).toEqual(['Bidang Pendidikan Lain wajib diisi'])
   })
 })

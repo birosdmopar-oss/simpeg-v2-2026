@@ -1,5 +1,11 @@
-// Tab riwayat `pendidikan` — tabel `riwayat_pendidikan`, B-10 (pemilik WS-1).
-import { A, D, N, R, T, defineRiwayatJenis } from '../riwayat.config'
+// Tab riwayat `pendidikan` — tabel `riwayat_pendidikan`, B-10 (pemilik WS-1). Isian, syarat, dan lampiran disalin dari
+// Definisi backend `Riwayat/Definisi/Pendidikan.php` (MAKE-005; legacy `L_pendidikan.php` vp()/sp()).
+import { A, D, N, R, T, defineRiwayatJenis, type FieldCondition } from '../riwayat.config'
+
+/** Jenjang tanpa bidang/jurusan (SD, SMP, SMA sederajat) = `Pendidikan::JENJANG_TANPA_JURUSAN`. */
+const TANPA_JURUSAN = ['1', '2', '3']
+const BERJURUSAN: FieldCondition = { field: 'id_jenjang_pendidikan', notIn: TANPA_JURUSAN }
+const EKSTENSI = ['jpg', 'jpeg', 'png', 'gif', 'pdf']
 
 export default defineRiwayatJenis({
   jenis: 'pendidikan',
@@ -17,17 +23,23 @@ export default defineRiwayatJenis({
   ],
   fields: [
     R('id_jenjang_pendidikan', 'Jenjang Pendidikan', 'jenjang-pendidikan', { required: true }),
-    R('id_jurusan_pendidikan', 'Jurusan', 'jurusan-pendidikan'),
-    T('institusi_pendidikan', 'Institusi Pendidikan', { wide: true }),
-    D('tgl_lulus', 'Tanggal Lulus', { required: true }),
-    T('no_ijazah', 'No. Ijazah', { max: 100 }),
-    T('glr_awal', 'Gelar Depan', { max: 50 }),
-    T('glr_akhir', 'Gelar Belakang', { max: 50 }),
-    T('no_sk_penc_glr', 'No. SK Pencantuman Gelar', { max: 100 }),
-    N('ipk', 'IPK'),
-    N('nem', 'NEM'),
+    R('id_bidang_pendidikan', 'Bidang Pendidikan', 'bidang-pendidikan', { required: true, showWhen: BERJURUSAN }),
+    // Kode "lainnya" legacy: bidang 98, jurusan 1185 (Pendidikan::BIDANG_LAIN / JURUSAN_LAIN).
+    T('bidang_pendidikan_lain', 'Bidang Pendidikan Lain', { required: true, max: 100, showWhen: { field: 'id_bidang_pendidikan', in: ['98'] } }),
+    R('id_jurusan_pendidikan', 'Jurusan Pendidikan', 'jurusan-pendidikan', { required: true, dependsOn: 'id_bidang_pendidikan', showWhen: BERJURUSAN }),
+    T('jurusan_pendidikan_lain', 'Jurusan Pendidikan Lain', { required: true, showWhen: { field: 'id_jurusan_pendidikan', in: ['1185'] } }),
+    T('institusi_pendidikan', 'Nama Institusi', { required: true, wide: true }),
+    T('no_ijazah', 'Nomor Ijazah', { required: true, max: 100 }),
+    D('tgl_lulus', 'Tanggal Dikeluarkan Ijazah', { required: true }),
+    T('no_sk_penc_glr', 'Nomor SK Pencantuman Gelar', { max: 100 }),
+    N('nem', 'NEM', { showWhen: { field: 'id_jenjang_pendidikan', in: TANPA_JURUSAN } }),
+    N('ipk', 'IPK', { showWhen: BERJURUSAN }),
     A('keterangan', 'Keterangan', { max: 255 }),
   ],
-  // TODO(WS-1 Definisi pendidikan): aturan lampiran disalin dari Definisi backend; legacy: 14/39/40 opsional, jpg|jpeg|png|gif|pdf, 5 MB
-  lampiran: [],
+  // Pendidikan::lampiran(): Ijazah wajib (saat tambah, dan saat ubah bila belum ada), lainnya opsional; 5 MB.
+  lampiran: [
+    { id_riwayat: 14, label: 'Ijazah', wajib: true, batas_mb: 5, ekstensi: EKSTENSI },
+    { id_riwayat: 39, label: 'SK Pencantuman Gelar', wajib: false, batas_mb: 5, ekstensi: EKSTENSI },
+    { id_riwayat: 40, label: 'Transkrip Nilai', wajib: false, batas_mb: 5, ekstensi: EKSTENSI },
+  ],
 })
