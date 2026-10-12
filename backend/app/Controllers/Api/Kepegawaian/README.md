@@ -53,6 +53,7 @@ Urutan pemeriksaan (wajib, endpoint riwayat dan lampiran):
 |---|---|---|
 | `GET pegawai` | WS-2 | Daftar pegawai, disaring lingkup (`PegawaiScope::terapkanKeQuery`) |
 | `GET pegawai/{nip}` | WS-2 | Detail pegawai + `tabs` (array [descriptor tab](#descriptor-tab-beku)) |
+| `GET pegawai/{nip}/riwayat` | WS-1 | **Aditif M3 (MAKE-006).** `{ "tabs": [descriptor…] }` = descriptor tab riwayat engine untuk pemanggil atas `{nip}` — fungsi yang sama dengan `data.tabs` `GET pegawai/{nip}` (`RiwayatRegistryInterface::descriptorUntuk`). Urutan: 401 → 403 lingkup (`bolehLihat`; NIP tidak ada bagi role ber-lingkup = 403) → 404 NIP. Role tanpa izin lihat jenis apa pun → `tabs: []` |
 | `GET pegawai/{nip}/riwayat/{jenis}` | WS-1 | Daftar baris riwayat (semua status kecuali 10 Dihapus) |
 | `GET pegawai/{nip}/riwayat/{jenis}/{id}` | WS-1 | Satu baris |
 | `POST pegawai/{nip}/riwayat/{jenis}` | WS-1 | Tambah, **satu request**: `multipart/form-data` berisi field data (kolom DDL) + berkas `berkas[<id_riwayat>]` per kode lampiran; JSON boleh bila jenis tanpa lampiran wajib. Status awal **0 Menunggu** untuk UL_PEGAWAI (role 2/6/7) pada alur self-service, **1 Disetujui** untuk admin. Lampiran ber-`wajib` yang tidak dikirim → 422 `errors.berkas.<id_riwayat>` |
@@ -148,8 +149,9 @@ non-engine tidak boleh sama dengan slug engine.
 Descriptor engine:
 
 - `can_view` = role pemanggil ada di izin `lihat` Definisi **dan** `PegawaiScope::bolehLihat`.
-- `can_create` / `can_edit` / `can_delete` / `can_process` = izin `tambah` / `ubah` / `hapus` / `proses` **dan**
-  `PegawaiScope::bolehUbah`.
+- `can_create` / `can_edit` / `can_delete` = izin `tambah` / `ubah` / `hapus` **dan** `PegawaiScope::bolehUbah`;
+  `can_process` = izin `proses` **dan** `PegawaiScope::bolehProses` (jalur proses CR-045, sama dengan
+  `RiwayatEngine::proses()`; aditif MAKE-006).
 - Jenis yang `can_view`-nya false **tidak** dimasukkan; jenis ber-alur `usulan` (`karpeg`, `kariskarsu`) tidak pernah
   menjadi tab.
 - `can_edit`/`can_delete` adalah hak umum atas jenis itu; penguncian per baris (baris Disetujui untuk UL_PEGAWAI)

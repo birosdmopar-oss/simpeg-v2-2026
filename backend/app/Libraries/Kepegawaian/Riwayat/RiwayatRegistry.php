@@ -145,9 +145,10 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
         $role  = $auth->role();
         $scope = $this->scope instanceof Closure ? ($this->scope)() : $this->scope;
         // Lingkup ditanya sekali per permintaan, bukan per jenis.
-        $lihat = null;
-        $ubah  = null;
-        $hasil = [];
+        $lihat  = null;
+        $ubah   = null;
+        $proses = null;
+        $hasil  = [];
 
         foreach ($this->definisi as $d) {
             if ($d->alur() === AlurRiwayat::Usulan || ! $d->boleh(AksiRiwayat::Lihat, $role)) {
@@ -165,7 +166,11 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
             foreach (AksiRiwayat::cases() as $aksi) {
                 $boleh = $d->boleh($aksi, $role);
 
-                if ($boleh && $aksi->mengubah()) {
+                // can_process memakai jalur proses (bolehProses, CR-045) — sama dengan RiwayatEngine::proses().
+                if ($boleh && $aksi === AksiRiwayat::Proses) {
+                    $proses ??= $scope->bolehProses($auth, $nip);
+                    $boleh = $proses;
+                } elseif ($boleh && $aksi->mengubah()) {
                     $ubah ??= $scope->bolehUbah($auth, $nip);
                     $boleh = $ubah;
                 }

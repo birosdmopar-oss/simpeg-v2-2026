@@ -39,5 +39,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
         $routes->post("{$dasar}/(:num)/process", "RiwayatController::process/\$1/{$jenis}/\$2");
     }
 
+    // M3 (MAKE-006, aditif): descriptor tab riwayat pegawai { tabs } = RiwayatRegistry::descriptorUntuk().
+    $routes->get('pegawai/(:segment)/riwayat', 'RiwayatTabController::index/$1');
+
     // WS-1: endpoint riwayat tambahan (mis. usulan Karpeg/Karis M4) ditambahkan di sini.
 });

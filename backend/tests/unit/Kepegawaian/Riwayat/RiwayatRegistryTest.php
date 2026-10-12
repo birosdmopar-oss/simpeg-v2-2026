@@ -208,8 +208,8 @@ final class RiwayatRegistryTest extends CIUnitTestCase
             [['jenis' => 'pendidikan', 'label' => 'Riwayat Pendidikan', 'can_view' => true, 'can_create' => false, 'can_edit' => false, 'can_delete' => false, 'can_process' => false]],
             $this->registryContoh($hanyaLihat)->descriptorUntuk($this->auth(Role::ADMIN_SATKER), self::NIP),
         );
-        // Lingkup ditanya sekali per permintaan.
-        $this->assertSame([['bolehLihat', self::NIP], ['bolehUbah', self::NIP]], $hanyaLihat->panggilan);
+        // Lingkup ditanya sekali per jalur per permintaan; can_process memakai jalur proses (bolehProses, CR-045).
+        $this->assertSame([['bolehLihat', self::NIP], ['bolehUbah', self::NIP], ['bolehProses', self::NIP]], $hanyaLihat->panggilan);
     }
 
     public function testIzinDefinisi(): void
