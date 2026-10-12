@@ -194,6 +194,38 @@ final class KeluargaTest extends DatabaseTestCase
         $this->asUser($this->akunAdmin)->delete("{$base}/{$a}")->assertStatus(200);
     }
 
+    public function testPegawaiMengubahAnakMemicuNotifikasiDiubah(): void
+    {
+        // Sama dengan RiwayatEngine::ubah(): keluarga diajukan ulang (status 0) → event riwayatNotifikasi tipe 3 sesudah commit.
+        [$nipPegawai, $pegawai] = $this->aktor(Role::PEGAWAI);
+        $kel                    = (int) $this->engine()->tambah($pegawai, $nipPegawai, 'keluarga', $this->dataKeluarga('2017-07-07'), [20 => $this->berkasUji('nikah.pdf')])['id_riwayat_keluarga'];
+        $this->notifikasiUji    = [];
+
+        $this->anak()->tambah($pegawai, $nipPegawai, $kel, $this->dataAnak(1), $this->berkasUji('akte.pdf'));
+
+        $this->assertCount(1, $this->notifikasiUji);
+        $this->assertSame(
+            [RiwayatEngine::NOTIF_DIUBAH, 'keluarga', $nipPegawai, $kel, 0],
+            [$this->notifikasiUji[0]['tipe'], $this->notifikasiUji[0]['jenis'], $this->notifikasiUji[0]['nip'], (int) $this->notifikasiUji[0]['id'], $this->notifikasiUji[0]['status']],
+        );
+
+        // Admin mengubah anak: tanpa notifikasi diajukan ulang.
+        $this->notifikasiUji = [];
+        $this->anak()->tambah($this->admin, $nipPegawai, $kel, $this->dataAnak(2), $this->berkasUji('akte.pdf'));
+        $this->assertSame([], $this->notifikasiUji);
+    }
+
+    public function testKeluargaDihapusAnakDanAkte404(): void
+    {
+        $kel = (int) $this->tambahKeluarga('2015-05-05')['id_riwayat_keluarga'];
+        $a   = (int) $this->anak()->tambah($this->admin, $this->nip, $kel, $this->dataAnak(1), $this->berkasUji('akte.pdf'))['id_detail_anak'];
+        $this->engine()->hapus($this->admin, $this->nip, 'keluarga', $kel);
+
+        $this->asUser($this->akunAdmin)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=3&id_entri={$a}")->assertStatus(404);
+        $this->asUser($this->akunAdmin)->get("api/v1/pegawai/{$this->nip}/riwayat/keluarga/{$kel}/anak")->assertStatus(404);
+        $this->assertStatusApi(404, fn () => $this->anak()->ubah($this->admin, $this->nip, $kel, $a, ['nama' => 'X'], null));
+    }
+
     /**
      * @return array<string, int|string>
      */

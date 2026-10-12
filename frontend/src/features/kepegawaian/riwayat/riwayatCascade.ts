@@ -84,18 +84,23 @@ export function useRiwayatRefOptions(fields: readonly FieldDef[]) {
     return [...(level?.options ?? []).map((o) => ({ value: String(o.id), label: o.nama })), ...extra(name)]
   }
 
+  /** Token request terakhir per isian: respons yang lebih lama dari request terbaru diabaikan (tidak menimpa). */
+  const token = new Map<string, number>()
+
   async function muatSendiri(f: FieldDef, values: Record<string, string>): Promise<void> {
+    const t = (token.get(f.name) ?? 0) + 1
+    token.set(f.name, t)
+    opsiSendiri[f.name] = []
     const nilaiFilter = f.optionsFilter ? (values[f.optionsFilter.field] ?? '') : ''
-    if (f.optionsFilter && nilaiFilter === '') {
-      opsiSendiri[f.name] = []
-      return
-    }
+    if (f.optionsFilter && nilaiFilter === '') return
+    let hasil: FieldOption[] = []
     try {
       const filters = f.optionsFilter ? { [f.optionsFilter.param]: nilaiFilter } : undefined
-      opsiSendiri[f.name] = (await masterOptions(f.entity as string, f.optionsParent ?? null, filters)).map((o) => ({ value: String(o.id), label: o.nama }))
+      hasil = (await masterOptions(f.entity as string, f.optionsParent ?? null, filters)).map((o) => ({ value: String(o.id), label: o.nama }))
     } catch {
-      opsiSendiri[f.name] = []
+      hasil = []
     }
+    if (token.get(f.name) === t) opsiSendiri[f.name] = hasil
   }
 
   async function init(values: Record<string, string>): Promise<void> {
@@ -124,9 +129,13 @@ export function useRiwayatRefOptions(fields: readonly FieldDef[]) {
     return turunan
   }
 
-  async function pemicu(name: string, values: Record<string, string>): Promise<string[]> {
+  /**
+   * Isian ber-`optionsFilter` dari isian $name: opsinya langsung dikosongkan lalu dimuat ulang (tanpa ditunggu); nama
+   * isiannya dikembalikan SINKRON supaya pemanggil mengosongkan nilainya sebelum opsi baru datang.
+   */
+  function pemicu(name: string, values: Record<string, string>): string[] {
     const terpicu = sendiri.filter((f) => f.optionsFilter?.field === name)
-    await Promise.all(terpicu.map((f) => muatSendiri(f, values)))
+    for (const f of terpicu) void muatSendiri(f, values)
     return terpicu.map((f) => f.name)
   }
 

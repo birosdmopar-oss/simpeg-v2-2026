@@ -5,8 +5,9 @@
  * anak belum punya akte), arsip akte per anak (ArsipTable), dan hapus (ConfirmDialog). Aksi baris lewat menu ⋮
  * (AGENTS.md §1): Edit → Akte → Hapus.
  *
- * Hak dari pemanggil (descriptor + kunci baris Disetujui): `bolehUbah` = tambah/ubah/akte, `bolehHapus` = hapus anak.
- * Server tetap menegakkan izin, lingkup, dan kunci baris (galatnya ditampilkan).
+ * Hak dari pemanggil (AGENTS.md §1.4): `izinUbah` (descriptor `can_edit`) menentukan aksi tampil (hidden bila tidak berhak);
+ * `terkunciUbah`/`terkunciHapus` (keluarga Disetujui terkunci untuk role pengguna, salinan aturan Definisi) membuat aksi
+ * tampil nonaktif. Server tetap menegakkan izin, lingkup, dan kunci baris (galatnya ditampilkan).
  */
 import { FileSearch, Plus, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
@@ -33,8 +34,12 @@ const props = defineProps<{
   nip: string
   idKeluarga: string
   subject: string
-  bolehUbah: boolean
-  bolehHapus: boolean
+  /** Berhak mengubah keluarga (izin `ubah` + lingkup): tambah/ubah/hapus anak & akte tampil. */
+  izinUbah: boolean
+  /** Keluarga Disetujui terkunci untuk mengubah anak/akte (aksi tampil nonaktif). */
+  terkunciUbah?: boolean
+  /** Keluarga Disetujui terkunci untuk menghapus anak (aksi tampil nonaktif). */
+  terkunciHapus?: boolean
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; changed: [] }>()
 
@@ -91,9 +96,9 @@ watch(
 
 function rowActions(): RowAction[] {
   return [
-    { key: 'edit', label: 'Edit', hidden: !props.bolehUbah },
+    { key: 'edit', label: 'Edit', hidden: !props.izinUbah, disabled: props.terkunciUbah },
     { key: 'akte', label: 'Akte' },
-    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.bolehHapus },
+    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.izinUbah, disabled: props.terkunciHapus },
   ]
 }
 
@@ -194,7 +199,7 @@ function tanggal(value: unknown): string {
 
         <template v-if="mode === 'daftar'">
           <div class="mb-3 flex justify-end">
-            <UiButton v-if="bolehUbah" data-testid="anak-add" @click="openCreate">
+            <UiButton v-if="izinUbah" :disabled="terkunciUbah" data-testid="anak-add" @click="openCreate">
               <template #icon-left><Plus class="h-4 w-4" aria-hidden="true" /></template>
               Tambah Anak
             </UiButton>
@@ -258,8 +263,8 @@ function tanggal(value: unknown): string {
             :target="{ id_riwayat: AKTE.id_riwayat, id_entri: idAnak(editing) }"
             :aturan="AKTE"
             :title="`Akte Lahir ${namaAnak(editing)}`"
-            :can-upload="bolehUbah"
-            :can-delete="bolehUbah"
+            :can-upload="izinUbah && !terkunciUbah"
+            :can-delete="izinUbah && !terkunciUbah"
           />
           <div class="flex justify-end"><UiButton variant="secondary" appearance="soft" data-testid="anak-kembali" @click="mode = 'daftar'">Kembali</UiButton></div>
         </div>

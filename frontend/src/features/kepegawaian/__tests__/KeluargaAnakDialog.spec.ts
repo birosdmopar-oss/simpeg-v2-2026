@@ -37,9 +37,9 @@ beforeEach(() => {
   lampiran.list.mockResolvedValue([])
 })
 
-async function mountDialog(hak: { bolehUbah?: boolean; bolehHapus?: boolean } = {}) {
+async function mountDialog(hak: { izinUbah?: boolean; terkunciUbah?: boolean; terkunciHapus?: boolean } = {}) {
   const wrapper = mount(KeluargaAnakDialog, {
-    props: { open: true, nip: NIP, idKeluarga: '5', subject: 'Pasangan', bolehUbah: hak.bolehUbah ?? true, bolehHapus: hak.bolehHapus ?? true },
+    props: { open: true, nip: NIP, idKeluarga: '5', subject: 'Pasangan', izinUbah: hak.izinUbah ?? true, terkunciUbah: hak.terkunciUbah, terkunciHapus: hak.terkunciHapus },
     attachTo: document.body,
   })
   await flushPromises()
@@ -74,10 +74,16 @@ describe('KeluargaAnakDialog', () => {
     expect(q('[data-testid="anak-actions-1"]')?.getAttribute('aria-label')).toBe('Aksi untuk Anak Satu')
   })
 
-  it('tanpa hak ubah/hapus: tanpa Tambah, menu hanya Akte', async () => {
-    await mountDialog({ bolehUbah: false, bolehHapus: false })
+  it('tanpa izin ubah: tanpa Tambah, menu hanya Akte (hidden)', async () => {
+    await mountDialog({ izinUbah: false })
     expect(q('[data-testid="anak-add"]')).toBeNull()
     expect((await rowMenuActions(body(), 'anak-actions-1')).map((i) => i.key)).toEqual(['akte'])
+  })
+
+  it('keluarga Disetujui terkunci: Tambah/Edit/Hapus tampil nonaktif (AGENTS §1.4)', async () => {
+    await mountDialog({ terkunciUbah: true, terkunciHapus: true })
+    expect(q<HTMLButtonElement>('[data-testid="anak-add"]')?.disabled).toBe(true)
+    expect((await rowMenuActions(body(), 'anak-actions-1')).map((i) => [i.key, i.disabled])).toEqual([['edit', true], ['akte', false], ['hapus', true]])
   })
 
   it('tambah tanpa akte → pesan wajib, tidak memanggil API; 422 errors.berkas tampil di isian akte', async () => {

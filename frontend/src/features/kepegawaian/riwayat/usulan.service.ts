@@ -37,7 +37,7 @@ export const usulanService = {
   },
 
   async unduh(nip: string, jenis: JenisEngine, id: number | string, kolom: string): Promise<Blob> {
-    const { data } = await api.get<Blob>(`/pegawai/${encodeURIComponent(nip)}/riwayat/${jenis}/${encodeURIComponent(String(id))}/berkas/${kolom}`, {
+    const { data } = await api.get<Blob>(`/pegawai/${encodeURIComponent(nip)}/riwayat/${jenis}/${encodeURIComponent(String(id))}/berkas/${encodeURIComponent(kolom)}`, {
       responseType: 'blob',
     })
     return data

@@ -381,8 +381,9 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :nip="nip"
       :id-keluarga="rowId(anakRow)"
       :subject="rowLabel(anakRow)"
-      :boleh-ubah="descriptor.can_edit && !terkunci(anakRow, config.kunciUbahDisetujuiRole)"
-      :boleh-hapus="descriptor.can_edit && !terkunci(anakRow, config.kunciHapusDisetujuiRole)"
+      :izin-ubah="descriptor.can_edit"
+      :terkunci-ubah="terkunci(anakRow, config.kunciUbahDisetujuiRole)"
+      :terkunci-hapus="terkunci(anakRow, config.kunciHapusDisetujuiRole)"
       @changed="load"
     />
 

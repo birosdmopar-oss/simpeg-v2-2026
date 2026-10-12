@@ -16,6 +16,7 @@ use App\Models\Kepegawaian\RiwayatModel;
 use Closure;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
+use CodeIgniter\Events\Events;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Throwable;
 
@@ -39,6 +40,13 @@ final class AnakKeluarga
 {
     public const TABEL = 'detail_anak';
     public const PK    = 'id_detail_anak';
+
+    /**
+     * Keluarga yang diajukan ulang UL_PEGAWAI di transaksi berjalan: notifikasi "diubah" dipicu sesudah commit.
+     *
+     * @var array{0: RiwayatDefinisi, 1: string, 2: int}|null
+     */
+    private ?array $notifTertunda = null;
 
     public function __construct(private readonly ?BaseConnection $db = null)
     {
@@ -315,8 +323,13 @@ final class AnakKeluarga
         $induk = $this->induk($d, $nip, $idKeluarga, true);
         $data  = ['jumlah_anak' => Keluarga::hitungAnak($idKeluarga), 'updated_by' => $auth->idPengguna()];
 
-        if (in_array((int) $auth->role(), Role::UL_PEGAWAI, true) && $this->status($d, $induk) !== StatusRiwayat::Menunggu) {
-            $data[$d->kolomStatus()] = StatusRiwayat::Menunggu->value;
+        if (in_array((int) $auth->role(), Role::UL_PEGAWAI, true)) {
+            if ($this->status($d, $induk) !== StatusRiwayat::Menunggu) {
+                $data[$d->kolomStatus()] = StatusRiwayat::Menunggu->value;
+            }
+
+            // Sama dengan RiwayatEngine::ubah(): status baru Menunggu → notifikasi NOTIF_DIUBAH sesudah commit.
+            $this->notifTertunda = [$d, $nip, $idKeluarga];
         }
 
         $model = new RiwayatModel($d, $this->koneksi()->getFieldNames($d->tabel()), $this->koneksi());
@@ -356,7 +369,8 @@ final class AnakKeluarga
      */
     private function transaksi(Closure $work): mixed
     {
-        $db = $this->koneksi();
+        $db                  = $this->koneksi();
+        $this->notifTertunda = null;
         $db->transBegin();
 
         try {
@@ -365,6 +379,7 @@ final class AnakKeluarga
             $db->transRollback();
             $db->resetTransStatus();
             $this->selesaikanLampiran();
+            $this->notifTertunda = null;
 
             throw $e;
         }
@@ -374,14 +389,47 @@ final class AnakKeluarga
             $db->transRollback();
             $db->resetTransStatus();
             $this->selesaikanLampiran();
+            $this->notifTertunda = null;
 
             throw new DatabaseException('Penulisan data anak gagal: ' . $error['message'], (int) $error['code']);
         }
 
         $db->transCommit();
+        $db->resetTransStatus();
         $this->selesaikanLampiran();
+        $this->kirimNotifikasi();
 
         return $hasil;
+    }
+
+    /**
+     * Event `riwayatNotifikasi` tipe NOTIF_DIUBAH untuk keluarga yang diajukan ulang (payload sama dengan
+     * RiwayatEngine::notifikasi()); kegagalan pendengar tidak menggagalkan respons (data sudah tersimpan).
+     */
+    private function kirimNotifikasi(): void
+    {
+        if ($this->notifTertunda === null) {
+            return;
+        }
+
+        [$d, $nip, $idKeluarga] = $this->notifTertunda;
+        $this->notifTertunda    = null;
+
+        try {
+            $row = $this->induk($d, $nip, $idKeluarga, false);
+            Events::trigger(RiwayatEngine::EVENT_NOTIFIKASI, [
+                'tipe'        => RiwayatEngine::NOTIF_DIUBAH,
+                'jenis'       => $d->jenis(),
+                'label'       => $d->label(),
+                'nip'         => $nip,
+                'id'          => $row[$d->primaryKey()],
+                'status'      => $this->status($d, $row)?->value,
+                'aksi'        => null,
+                'reason_note' => $row['reason_note'] ?? null,
+            ]);
+        } catch (Throwable $e) {
+            log_message('error', '[riwayat] notifikasi anak keluarga #{id} gagal: {msg}', ['id' => (string) $idKeluarga, 'msg' => $e->getMessage()]);
+        }
     }
 
     private function selesaikanLampiran(): void

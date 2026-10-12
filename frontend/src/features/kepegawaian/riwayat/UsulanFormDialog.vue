@@ -67,7 +67,14 @@ function submit(): void {
   for (const f of props.config.fields) if (f.required && (values[f.name] ?? '').trim() === '') next[f.name] = `${f.label} wajib diisi`
   for (const def of props.config.berkas) if (wajib(def) && !berkas[def.kolom]) next[`berkas.${def.kolom}`] = `${def.label} wajib diunggah.`
   errors.value = next
-  if (Object.keys(next).length === 0) emit('submit', { ...values }, { ...berkas })
+  if (Object.keys(next).length > 0) return
+  // Berkas bersyarat yang syaratnya tidak terpenuhi (mis. surat hilang untuk permohonan pertama) tidak dikirim.
+  const kirim: BerkasMap = {}
+  for (const def of props.config.berkas) {
+    const file = berkas[def.kolom]
+    if (file && (!def.wajibBila || fieldVisible({ name: '', label: '', type: 'text', showWhen: def.wajibBila }, values))) kirim[def.kolom] = file
+  }
+  emit('submit', { ...values }, kirim)
 }
 
 const error = (key: string): string => errors.value[key] ?? props.serverErrors?.fields[key] ?? ''

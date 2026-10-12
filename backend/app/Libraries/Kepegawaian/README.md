@@ -176,6 +176,11 @@ Perubahan sesudah beku (aditif / konsistensi, WS-1):
   `entriLampiran(kode)` (lampiran per baris tabel anak; OtorisasiLampiran WS-2 membacanya), `kolomBerkas()` +
   `kolomBerkasWajib()` (berkas di kolom tabel lewat KolomBerkas MAKE-009, `selesaikan()` sesudah commit/rollback),
   `RiwayatEngine::unduhKolomBerkas()`; endpoint aditif `…/{id}/berkas/{kolom}`, `…/keluarga/{id}/anak`, `usulan/{jenis}`.
+- Isu cutover (MAKE-007): kolom berkas data impor legacy (mis. `riwayat_karpeg.file_*`) berisi path arsip remote legacy
+  (diawali `/`, berspasi) yang tidak ada di storage v2 — unduh menjawab 404 (bukan 500) sampai berkas arsip dipindahkan
+  saat cutover.
+- [V2] Diklat (MAKE-007): `id_diklat` wajib milik `jenis_diklat` terpilih (legacy `L_diklat.php:527-536` hanya memeriksa
+  keberadaannya).
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata

@@ -542,4 +542,21 @@ describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LA
     const wrapper = await mountTab({ can_process: true }, keluarga)
     expect((await rowMenuActions(wrapper, 'riwayat-actions-5')).map((i) => i.key)).toEqual(['edit', 'setujui', 'tolak', 'lampiran', 'anak', 'hapus'])
   })
+
+  it('diklat: respons opsi lama tidak menimpa yang baru; nilai turunan dikosongkan sinkron saat pemicu berubah', async () => {
+    let lepasLama: (v: Array<{ id: string; nama: string; parent: null }>) => void = () => undefined
+    options.mockImplementation((entity: string, _parent?: string | null, filters?: Record<string, string>) =>
+      entity === 'diklat' && filters?.jenis_diklat === '1'
+        ? new Promise((resolve) => (lepasLama = resolve))
+        : Promise.resolve([{ id: `d${filters?.jenis_diklat ?? ''}`, nama: `Diklat ${filters?.jenis_diklat ?? ''}`, parent: null }]),
+    )
+    const wrapper = await mountTab({}, diklat)
+    await openCreate(wrapper)
+    await setInput('jenis_diklat', '1')
+    await setInput('jenis_diklat', '2')
+    await flushPromises()
+    lepasLama([{ id: 'd1', nama: 'Diklat 1 (lama)', parent: null }])
+    await flushPromises()
+    expect([...(field('id_diklat') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'd2'])
+  })
 })

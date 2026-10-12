@@ -28,6 +28,8 @@ use App\Libraries\MasterData\MasterField;
  * [V2] (keputusan user 12-10-2026):
  * - Status mengikuti aturan engine (UL_PEGAWAI 0, admin 1, role 1 memilih status saat ubah). Legacy `set_param()` tidak
  *   pernah menyimpan `status` (bug: semua baris 0, pilihan role 1 diabaikan).
+ * - Diklat terpilih wajib milik jenis terpilih (`diklat.jenis_diklat`) — lebih ketat dari legacy yang hanya memeriksa
+ *   keberadaan `id_diklat` (`L_diklat.php:527-536`); dropdown legacy memang sudah disaring per jenis.
  * - Jenis 5: rumpun & lembaga sertifikasi diisi TEKS (`rumpun_sertifikasi`, `instansi_penyelenggara`), `id_rumpun_
  *   sertifikasi`/`id_lembaga_sertifikasi` NULL — master `rumpun_sertifikasi`/`lembaga_sertifikasi` belum ada di v2
  *   (kebutuhan skema, DBV baru).
@@ -157,7 +159,7 @@ final class Diklat extends RiwayatDefinisi
     }
 
     /**
-     * Legacy `validate_param()`: isian wajib per jenis; diklat milik jenisnya; sub-group jabatan di group fungsional;
+     * Legacy `validate_param()`: isian wajib per jenis; [V2] diklat milik jenisnya; sub-group jabatan di group fungsional;
      * duplikat hanya jenis 1 (nip + tanggal + diklat, status selain 2/10) — atas nilai akhir baris.
      */
     public function validate(array $data, ?array $lama, AuthContext $auth): array

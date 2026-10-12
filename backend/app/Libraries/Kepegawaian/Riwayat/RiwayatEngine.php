@@ -23,6 +23,7 @@ use CodeIgniter\Events\Events;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\I18n\Time;
 use Config\Kepegawaian;
+use InvalidArgumentException;
 use LogicException;
 use Throwable;
 
@@ -766,11 +767,17 @@ final class RiwayatEngine implements RiwayatServiceInterface
         $row  = $this->baris($d, $nip, $id);
         $path = isset($d->kolomBerkas()[$kolom]) ? trim((string) ($row[$kolom] ?? '')) : '';
 
-        if ($path === '' || ! ($helper = new KolomBerkas())->ada($path)) {
+        try {
+            if ($path === '' || ! ($helper = new KolomBerkas())->ada($path)) {
+                throw new NotFoundException('Berkas tidak ditemukan.');
+            }
+
+            return ['isi' => $helper->baca($path), 'nama' => $kolom . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+        } catch (InvalidArgumentException) {
+            // Path legacy (arsip remote, mis. diawali '/' atau berspasi) ditolak LocalStorageAdapter → 404, bukan 500.
+            // Akses berkas arsip legacy = isu cutover (README Libraries/Kepegawaian).
             throw new NotFoundException('Berkas tidak ditemukan.');
         }
-
-        return ['isi' => $helper->baca($path), 'nama' => $kolom . '.' . pathinfo($path, PATHINFO_EXTENSION)];
     }
 
     // ------------------------------------------------------------------

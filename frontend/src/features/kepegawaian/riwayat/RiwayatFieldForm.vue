@@ -94,12 +94,11 @@ function onEdited(name: string): void {
     const model = models[g.name]
     if (model && g.resetOn?.includes(name)) model.value = ''
   }
-  void refs.pemicu(name, values as Record<string, string>).then((terpicu) => {
-    for (const n of terpicu) {
-      const model = models[n]
-      if (model) model.value = ''
-    }
-  })
+  // Dikosongkan sinkron sebelum opsi baru dimuat (respons lama tidak menimpa — token per isian di riwayatCascade).
+  for (const n of refs.pemicu(name, values as Record<string, string>)) {
+    const model = models[n]
+    if (model) model.value = ''
+  }
 }
 
 async function onRefChange(f: FieldDef, value: string): Promise<void> {

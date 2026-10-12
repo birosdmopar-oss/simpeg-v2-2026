@@ -10,14 +10,20 @@ use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
+use App\Libraries\Kepegawaian\Riwayat\AlurRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Kariskarsu;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Karpeg;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Keluarga;
+use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use Closure;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatUjiTrait;
@@ -175,6 +181,110 @@ final class UsulanKarpegKarisTest extends DatabaseTestCase
     public function testUsulanBukanTab(): void
     {
         $this->assertSame(['keluarga'], array_column(service('riwayatRegistry')->descriptorUntuk($this->admin, $this->nip), 'jenis'));
+    }
+
+    public function testUnduhBerkasBarisDihapusDanPathLegacy404(): void
+    {
+        $id = (int) $this->ajukan()['id_riwayat_karpeg'];
+        $this->engine()->hapus($this->pegawai, $this->nip, 'karpeg', $id);
+        $this->asUser($this->akunAdmin)->get("api/v1/pegawai/{$this->nip}/riwayat/karpeg/{$id}/berkas/file_1")->assertStatus(404);
+
+        // Data impor legacy: path arsip remote (diawali '/', berspasi) → 404, bukan 500 (isu cutover).
+        $legacy = $this->sisipRiwayat(new Karpeg(), $this->nip, [
+            'jenis_permohonan' => Karpeg::PERTAMA, 'file_1' => '/arsip/' . $this->nip . '/karpeg/sk cpns.pdf', 'file_2' => 'x', 'file_3' => 'x',
+            'file_4'           => 'x', 'file_5' => 'x', 'status' => 0,
+        ]);
+        $this->asUser($this->akunAdmin)->get("api/v1/pegawai/{$this->nip}/riwayat/karpeg/{$legacy}/berkas/file_1")->assertStatus(404);
+    }
+
+    public function testRollbackMenghapusBerkasKolomBaru(): void
+    {
+        // Definisi uji: pola Karpeg, tetapi tambah langsung Disetujui dan afterApprove gagal → transaksi engine rollback.
+        $gagal = new class () extends RiwayatDefinisi {
+            public function jenis(): string
+            {
+                return 'karpeg';
+            }
+
+            public function label(): string
+            {
+                return 'Karpeg Uji Gagal';
+            }
+
+            public function tabel(): string
+            {
+                return 'riwayat_karpeg';
+            }
+
+            public function primaryKey(): string
+            {
+                return 'id_riwayat_karpeg';
+            }
+
+            public function fields(): array
+            {
+                return (new Karpeg())->fields();
+            }
+
+            public function izin(): array
+            {
+                return ['tambah' => [Role::PEGAWAI]];
+            }
+
+            public function alur(): AlurRiwayat
+            {
+                return AlurRiwayat::Admin;
+            }
+
+            public function pemetaanStatus(): array
+            {
+                return Karpeg::statusTanpaDiproses();
+            }
+
+            public function kolomBerkas(): array
+            {
+                return (new Karpeg())->kolomBerkas();
+            }
+
+            public function afterApprove(array $baris, AuthContext $auth): void
+            {
+                throw new RuntimeException('gagal sesudah tulis');
+            }
+        };
+        $this->lepasEngine();
+        $this->pasangEngineNyata([$gagal]);
+        $this->storage = new LocalStorageAdapter((string) $this->akarLampiranRiwayatUji);
+        Services::injectMock('storageAdapter', $this->storage);
+
+        try {
+            $this->engine()->tambah($this->pegawai, $this->nip, 'karpeg', ['jenis_permohonan' => Karpeg::PERTAMA], $this->berkasLengkap());
+            $this->fail('RuntimeException diharapkan');
+        } catch (RuntimeException $e) {
+            $this->assertSame('gagal sesudah tulis', $e->getMessage());
+        }
+
+        $this->assertSame(0, $this->db->table('riwayat_karpeg')->where('nip', $this->nip)->countAllResults());
+        $this->assertSame([], $this->berkasDiStorage(), 'berkas baru dihapus setelah rollback');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function berkasDiStorage(): array
+    {
+        $akar = (string) $this->akarLampiranRiwayatUji;
+
+        if (! is_dir($akar)) {
+            return [];
+        }
+
+        $hasil = [];
+
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($akar, FilesystemIterator::SKIP_DOTS)) as $berkas) {
+            $hasil[] = (string) $berkas;
+        }
+
+        return $hasil;
     }
 
     /**

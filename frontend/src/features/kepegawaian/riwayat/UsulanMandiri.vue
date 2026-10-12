@@ -16,6 +16,7 @@ import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, Di
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { Role, type RoleCode } from '@/features/auth/types'
 import ApprovalDialog from '@/shared/components/ApprovalDialog.vue'
 import { approvalRowActions, type ApprovalAksi, type ApprovalPayload } from '@/shared/components/approvalActions'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
@@ -37,7 +38,8 @@ const props = defineProps<{ config: UsulanConfig }>()
 
 const auth = useAuthStore()
 
-const PENGUSUL = [2, 7]
+/** Pengusul = role ber-izin `tambah` Definisi Karpeg/Karis (pemilik usulan, legacy userAuth 2, 7). */
+const PENGUSUL: readonly RoleCode[] = [Role.PEGAWAI, Role.PPPK]
 const modeSaya = computed(() => auth.role !== null && PENGUSUL.includes(auth.role))
 
 const saya = ref<UsulanSaya | null>(null)
@@ -111,9 +113,10 @@ function rowActions(row: RiwayatRow): RowAction[] {
       { key: 'hapus', label: 'Hapus', danger: true, hidden: !saya.value?.can_delete, disabled: disetujui },
     ]
   }
+  // AGENTS.md §1: Setujui/Tolak lebih dulu, lalu aksi lain (Berkas).
   return [
-    { key: 'berkas', label: 'Berkas' },
     ...approvalRowActions({ canProcess: Boolean(antrean.value?.can_process), status: rowStatus(row), busy: processBusy.value && processing.value === row }),
+    { key: 'berkas', label: 'Berkas' },
   ]
 }
 
@@ -167,7 +170,8 @@ async function confirmDelete(): Promise<void> {
   const row = deleting.value
   if (!row) return
   try {
-    await riwayatService.remove(rowNip(row), props.config.jenis, rowId(row))
+    // Mode pengusul: NIP pemilik dari identitas sesi (usulan/saya), bukan dari baris.
+    await riwayatService.remove(saya.value?.pegawai.nip ?? rowNip(row), props.config.jenis, rowId(row))
     notice.value = { tone: 'success', text: 'Usulan dihapus.' }
     await load()
   } catch (error) {

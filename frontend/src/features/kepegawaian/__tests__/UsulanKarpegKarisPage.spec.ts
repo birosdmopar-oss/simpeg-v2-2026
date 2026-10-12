@@ -123,6 +123,35 @@ describe('Usulan Karpeg/Karis — pengusul (role 2)', () => {
     expect(usulan.saya).toHaveBeenCalledTimes(2)
   })
 
+  it('berkas bersyarat yang syaratnya tidak terpenuhi tidak dikirim (surat hilang untuk permohonan pertama)', async () => {
+    riwayat.create.mockResolvedValue({})
+    await mountPage(Role.PEGAWAI)
+    q<HTMLButtonElement>('[data-testid="usulan-add"]')?.click()
+    await flushPromises()
+    const select = q<HTMLSelectElement>('[data-field="jenis_permohonan"] select')!
+    select.value = 'Permohonan Pertama'
+    select.dispatchEvent(new Event('change'))
+    for (const kolom of ['file_1', 'file_2', 'file_3', 'file_4', 'file_5', 'file_surat_hilang']) {
+      const input = q<HTMLInputElement>(`[data-testid="usulan-berkas-${kolom}"] input[type="file"]`)!
+      Object.defineProperty(input, 'files', { value: [new File(['%PDF'], `${kolom}.pdf`, { type: 'application/pdf' })], configurable: true })
+      input.dispatchEvent(new Event('change'))
+    }
+    await flushPromises()
+    q('[data-testid="usulan-form"]')?.dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(Object.keys(riwayat.create.mock.calls[0]![4] ?? {}).sort()).toEqual(['file_1', 'file_2', 'file_3', 'file_4', 'file_5'])
+  })
+
+  it('hapus (pengusul): NIP dari identitas usulan/saya', async () => {
+    usulan.saya.mockResolvedValue(saya({ items: [baris(2, 0, { nip: 'NIP-BARIS-LAIN' })] }))
+    riwayat.remove.mockResolvedValue()
+    await mountPage(Role.PEGAWAI)
+    await selectRowAction(body(), 'usulan-actions-2', 'hapus')
+    ;[...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ya, hapus')?.click()
+    await flushPromises()
+    expect(riwayat.remove).toHaveBeenCalledWith(NIP, 'karpeg', '2')
+  })
+
   it('Karis/Karsu: judul menurut jenis kelamin; tanpa riwayat keluarga → Ajukan nonaktif + keterangan', async () => {
     usulan.saya.mockResolvedValue(saya({ syarat_terpenuhi: false, items: [] }))
     await mountPage(Role.PEGAWAI, '?jenis=kariskarsu')
@@ -158,7 +187,8 @@ describe('Usulan Karpeg/Karis — antrean', () => {
     await flushPromises()
     expect(usulan.antrean).toHaveBeenLastCalledWith('karpeg', '0')
 
-    expect((await rowMenuActions(body(), 'usulan-actions-2')).map((i) => i.key)).toEqual(['berkas', 'setujui', 'tolak'])
+    // AGENTS.md §1: Setujui/Tolak → Berkas.
+    expect((await rowMenuActions(body(), 'usulan-actions-2')).map((i) => i.key)).toEqual(['setujui', 'tolak', 'berkas'])
     await selectRowAction(body(), 'usulan-actions-2', 'setujui')
     q<HTMLButtonElement>('[data-testid="approval-confirm"]')?.click()
     await flushPromises()
