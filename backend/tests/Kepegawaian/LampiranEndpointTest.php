@@ -20,8 +20,9 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * MAKE-009 — endpoint `pegawai/{nip}/lampiran*` dengan PegawaiScope + AttachmentService nyata dan Definisi contoh
- * pendidikan (kode 14/39/40, izin 1,2,3,6,7; hapus 1,3). Urutan otorisasi sesuai kontrak: kode → izin Definisi →
- * lingkup → keterikatan id_entri.
+ * pendidikan (kode 14 wajib, 39/40 tidak wajib; izin 1,2,3,6,7; hapus 1,3). Urutan otorisasi: daftar/unggah = kode →
+ * izin Definisi → lingkup → keterikatan id_entri → kunci baris Disetujui; unduh/hapus = lingkup lihat → baris lampiran →
+ * izin Definisi (+ lingkup ubah, keterikatan & kunci baris, lampiran wajib terakhir untuk hapus).
  *
  * @internal
  */
@@ -34,6 +35,9 @@ final class LampiranEndpointTest extends DatabaseTestCase
 
     private string $nip;
 
+    /**
+     * Baris riwayat pendidikan status 1 Disetujui milik $nip (dibuat admin).
+     */
     private int $idEntri;
 
     private int $satker;
@@ -51,7 +55,7 @@ final class LampiranEndpointTest extends DatabaseTestCase
 
         $this->satker  = $this->buatSatker();
         $this->nip     = $this->buatPegawaiDiSatker($this->satker);
-        $this->idEntri = $this->buatRiwayatPendidikanUji($this->nip);
+        $this->idEntri = $this->buatRiwayatPendidikanUji($this->nip, 1);
     }
 
     protected function tearDown(): void
@@ -65,8 +69,10 @@ final class LampiranEndpointTest extends DatabaseTestCase
     public function testAlurUnggahDaftarUnduhHapusOlehPegawaiSendiri(): void
     {
         $pegawai = $this->akun($this->nip, Role::PEGAWAI);
+        // Pegawai hanya mengelola lampiran baris yang belum disetujui (baris Disetujui terkunci, kunciBarisDisetujui()).
+        $idEntri = (string) $this->buatRiwayatPendidikanUji($this->nip, 0);
 
-        $unggah = $this->unggah($pegawai, $this->nip, 14, (string) $this->idEntri, $this->berkasPdf('Ijazah S1 ✓.pdf'));
+        $unggah = $this->unggah($pegawai, $this->nip, 14, $idEntri, $this->berkasPdf('Ijazah S1 ✓.pdf'));
         $this->assertSame(201, $unggah->response()->getStatusCode(), (string) $unggah->response()->getBody());
         $row = $this->json($unggah)['data'];
         $this->assertArrayNotHasKey('path', $row);
@@ -74,7 +80,7 @@ final class LampiranEndpointTest extends DatabaseTestCase
         $this->assertSame('Ijazah S1 ✓.pdf', $row['display_name']);
         $id = (int) $row['id_attachment'];
 
-        $daftar = $this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=14&id_entri={$this->idEntri}");
+        $daftar = $this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=14&id_entri={$idEntri}");
         $daftar->assertStatus(200);
         $this->assertSame([$id], array_map('intval', array_column($this->json($daftar)['data'], 'id_attachment')));
         $this->assertArrayNotHasKey('path', $this->json($daftar)['data'][0]);
@@ -86,12 +92,17 @@ final class LampiranEndpointTest extends DatabaseTestCase
         $this->assertStringContainsString("filename*=UTF-8''Ijazah%20S1%20%E2%9C%93.pdf", $unduh->response()->getHeaderLine('Content-Disposition'));
         $this->assertSame('nosniff', $unduh->response()->getHeaderLine('X-Content-Type-Options'));
 
+        // "Ganti" = unggah baru dulu, lalu hapus yang lama (kode 14 wajib: lampiran terakhir tidak boleh dihapus).
+        $baru = (int) $this->json($this->unggah($pegawai, $this->nip, 14, $idEntri, $this->berkasPdf('Ijazah baru.pdf')))['data']['id_attachment'];
+
         // Izin hapus Definisi pendidikan hanya role 1, 3 — tetapi `ubah` mencakup role 2, jadi hapus lampiran boleh.
         $hapus = $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$id}");
         $hapus->assertStatus(200);
         $this->assertTrue($this->json($hapus)['data']['deleted']);
         $this->assertSame(0, $this->db->table('document_attachment')->where('id_attachment', $id)->countAllResults());
-        $this->assertSame([], $this->berkasDiAkarUji());
+        $this->assertCount(1, $this->berkasDiAkarUji());
+
+        $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$baru}")->assertStatus(422);
     }
 
     public function testAdminSatkerHanyaDiSatkernya(): void
@@ -99,18 +110,97 @@ final class LampiranEndpointTest extends DatabaseTestCase
         $adminSendiri = $this->akun($this->buatPegawaiDiSatker($this->satker), Role::ADMIN_SATKER);
         $adminLain    = $this->akun($this->buatPegawaiDiSatker($this->buatSatker()), Role::ADMIN_SATKER);
 
-        $this->unggah($adminLain, $this->nip, 14, (string) $this->idEntri, $this->berkasPdf())->assertStatus(403);
+        $this->unggah($adminLain, $this->nip, 39, (string) $this->idEntri, $this->berkasPdf())->assertStatus(403);
         $this->assertSame([], $this->berkasDiAkarUji());
 
-        $row = $this->json($this->unggah($adminSendiri, $this->nip, 14, (string) $this->idEntri, $this->berkasPdf()))['data'];
+        // Admin berizin tetap boleh mengelola lampiran baris Disetujui (kunci hanya untuk UL_PEGAWAI).
+        $row = $this->json($this->unggah($adminSendiri, $this->nip, 39, (string) $this->idEntri, $this->berkasPdf()))['data'];
         $id  = (int) $row['id_attachment'];
 
-        $this->asUser($adminLain)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=14&id_entri={$this->idEntri}")->assertStatus(403);
+        $this->asUser($adminLain)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=39&id_entri={$this->idEntri}")->assertStatus(403);
         $this->asUser($adminLain)->get("api/v1/pegawai/{$this->nip}/lampiran/{$id}/unduh")->assertStatus(403);
         $this->asUser($adminLain)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$id}")->assertStatus(403);
         $this->assertSame(1, $this->db->table('document_attachment')->where('id_attachment', $id)->countAllResults());
 
         $this->asUser($adminSendiri)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$id}")->assertStatus(200);
+    }
+
+    public function testUnduhHapusDiLuarLingkup403UntukIdAdaMaupunTidak(): void
+    {
+        $admin = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $id    = (int) $this->json($this->unggah($admin, $this->nip, 39, (string) $this->idEntri, $this->berkasPdf()))['data']['id_attachment'];
+
+        $adminLain   = $this->akun($this->buatPegawaiDiSatker($this->buatSatker()), Role::ADMIN_SATKER);
+        $pegawaiLain = $this->akun($this->buatPegawaiDiSatker($this->satker), Role::PEGAWAI);
+
+        foreach (['admin satker lain' => $adminLain, 'pegawai lain' => $pegawaiLain] as $label => $akun) {
+            foreach ([$id, 999999999] as $idUji) {
+                $this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/lampiran/{$idUji}/unduh")->assertStatus(403);
+                $this->asUser($akun)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$idUji}")->assertStatus(403);
+            }
+
+            $this->assertSame(1, $this->db->table('document_attachment')->where('id_attachment', $id)->countAllResults(), $label);
+        }
+
+        // Pemanggil yang lingkupnya mencakup {nip}: id tidak ada → 404.
+        $this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/lampiran/999999999/unduh")->assertStatus(404);
+        $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/999999999")->assertStatus(404);
+    }
+
+    public function testLampiranWajibTerakhirTidakBolehDihapus(): void
+    {
+        $admin = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $entri = (string) $this->idEntri;
+
+        $pertama = (int) $this->json($this->unggah($admin, $this->nip, 14, $entri, $this->berkasPdf()))['data']['id_attachment'];
+
+        $tolak = $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$pertama}");
+        $tolak->assertStatus(422);
+        $this->assertArrayHasKey('berkas', $this->json($tolak)['errors']);
+        $this->assertSame(1, $this->db->table('document_attachment')->where('id_attachment', $pertama)->countAllResults());
+        $this->assertCount(1, $this->berkasDiAkarUji());
+
+        // Ganti: unggah baru dulu, lalu hapus yang lama; yang tersisa kembali terlindungi.
+        $kedua = (int) $this->json($this->unggah($admin, $this->nip, 14, $entri, $this->berkasPdf()))['data']['id_attachment'];
+        $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$pertama}")->assertStatus(200);
+        $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$kedua}")->assertStatus(422);
+
+        // Kode tidak wajib (39): lampiran terakhir boleh dihapus.
+        $gelar = (int) $this->json($this->unggah($admin, $this->nip, 39, $entri, $this->berkasPdf()))['data']['id_attachment'];
+        $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$gelar}")->assertStatus(200);
+    }
+
+    public function testBarisDisetujuiTerkunciUntukPegawai(): void
+    {
+        $admin   = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $pegawai = $this->akun($this->nip, Role::PEGAWAI);
+        $entri   = (string) $this->idEntri; // status 1 Disetujui
+
+        $ada = (int) $this->json($this->unggah($admin, $this->nip, 39, $entri, $this->berkasPdf()))['data']['id_attachment'];
+        $this->unggah($admin, $this->nip, 39, $entri, $this->berkasPdf())->assertStatus(201);
+
+        $this->unggah($pegawai, $this->nip, 39, $entri, $this->berkasPdf())->assertStatus(403);
+        $this->asUser($pegawai)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$ada}")->assertStatus(403);
+        $this->assertSame(2, $this->db->table('document_attachment')->where('NIP', $this->nip)->countAllResults());
+        $this->assertCount(2, $this->berkasDiAkarUji());
+
+        // Baca tetap boleh.
+        $this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=39&id_entri={$entri}")->assertStatus(200);
+        $this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/lampiran/{$ada}/unduh")->assertStatus(200);
+    }
+
+    public function testBarisRiwayatDihapus404(): void
+    {
+        $admin = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $entri = (string) $this->idEntri;
+        $id    = (int) $this->json($this->unggah($admin, $this->nip, 39, $entri, $this->berkasPdf()))['data']['id_attachment'];
+
+        $this->db->table('riwayat_pendidikan')->where('id_riwayat_pendidikan', $this->idEntri)->update(['status' => 10]);
+
+        $this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=39&id_entri={$entri}")->assertStatus(404);
+        $this->unggah($admin, $this->nip, 39, $entri, $this->berkasPdf())->assertStatus(404);
+        $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/lampiran/{$id}")->assertStatus(404);
+        $this->assertSame(1, $this->db->table('document_attachment')->where('id_attachment', $id)->countAllResults());
     }
 
     public function testPegawaiLainDanRoleTanpaIzinDitolak(): void
@@ -132,7 +222,7 @@ final class LampiranEndpointTest extends DatabaseTestCase
 
         // id_entri milik pegawai lain / tidak ada.
         $nipLain = $this->buatPegawai();
-        $this->unggah($admin, $this->nip, 14, (string) $this->buatRiwayatPendidikanUji($nipLain), $this->berkasPdf())->assertStatus(404);
+        $this->unggah($admin, $this->nip, 14, (string) $this->buatRiwayatPendidikanUji($nipLain, 1), $this->berkasPdf())->assertStatus(404);
         $this->unggah($admin, $this->nip, 14, '999999999', $this->berkasPdf())->assertStatus(404);
 
         // Lampiran milik NIP lain lewat path NIP ini → 404 (tanpa IDOR).

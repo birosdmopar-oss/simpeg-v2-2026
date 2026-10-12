@@ -107,8 +107,13 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
 - **Respons lampiran** = baris `document_attachment` apa adanya (kunci `NIP` huruf besar, `id_riwayat`, `id_entri`,
   `display_name`, `file_size`, `file_ext`, …); `path` internal tidak dikirim ke klien.
 - **Rincian endpoint (MAKE-009, aditif):** `GET lampiran` mewajibkan query `id_riwayat` dan `id_entri` (422
-  `errors.id_riwayat` / `errors.id_entri`); `POST` selalu **menambah** lampiran — "ganti" = unggah baru lalu hapus yang
-  lama; `DELETE` menjawab `{ deleted: true, soft_delete: false, item: <baris> }`; unduh = isi berkas dengan
+  `errors.id_riwayat` / `errors.id_entri`); `POST` selalu **menambah** lampiran — "ganti" = unggah baru **dulu**, lalu
+  hapus yang lama; lampiran terakhir kode ber-`wajib` pada satu baris tidak bisa dihapus (`DELETE` → 422
+  `errors.berkas`); baris riwayat status 1 Disetujui terkunci untuk UL_PEGAWAI bila `kunciBarisDisetujui()` (`POST`/
+  `DELETE` → 403), baris status 10 → 404. Urutan unduh/hapus per `{id}`: `PegawaiScope::bolehLihat({nip})` (403,
+  sebelum baris dibaca — pemanggil di luar lingkup mendapat 403 untuk id yang ada maupun tidak) → baris lampiran milik
+  `{nip}` (404) → izin Definisi pemilik `id_riwayat` baris itu (+ `bolehUbah` untuk hapus) (403); `DELETE` menjawab
+  `{ deleted: true, soft_delete: false, item: <baris> }`; unduh = isi berkas dengan
   `Content-Type` = `file_type`, `Content-Disposition: attachment` (nama = `display_name`), `X-Content-Type-Options:
   nosniff`, `Cache-Control: private, no-store`.
 

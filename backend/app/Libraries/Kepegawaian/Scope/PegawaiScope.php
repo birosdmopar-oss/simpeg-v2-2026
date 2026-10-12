@@ -20,18 +20,26 @@ use CodeIgniter\Database\ConnectionInterface;
  * | 1 Super Admin              | semua pegawai                           | semua pegawai           |
  * | 4 Admin View, 5 Menteri, 8 | semua pegawai (view lintas satker)      | tidak ada               |
  * | 2/6/7 (UL_PEGAWAI)         | NIP sendiri (claim `nip`)               | NIP sendiri             |
- * | 3 Admin Satker             | pegawai di satker/unit admin + diri     | sama dengan lihat       |
+ * | 3 Admin Satker             | `validateAccess_AP` atas pmj            | sama dengan lihat       |
  *
- * Role 3 = port pemeriksaan akses legacy `hr/employee/edit|detail` [K] (`controllers/hr/Employee.php`): admin yang punya
- * `id_satker` hanya mengakses pegawai yang snapshot jabatannya (`pegawai_mutasi_jabatan`) di satker itu; admin tanpa
- * satker → pegawai di unit admin. Admin tanpa satker dan unit → tidak ada (fail-closed).
+ * Role 3 = port `validateAccess_AP` [K] (`helpers/function_helper.php`, konstanta `config/constants.php`) atas
+ * snapshot jabatan `pegawai_mutasi_jabatan` (pmj):
+ *  - admin punya satker → `pmj.id_satker` = satker admin;
+ *  - admin tanpa satker, unit UNIT_DESTINASI (21) → `pmj.id_unit = 21 OR (pmj.id_unit = UNIT_LAIN (7) AND
+ *    pmj.id_satker IN SATKER_BPO (37, 38, 41))`;
+ *  - admin tanpa satker, unit lain → `pmj.id_unit` = unit admin.
+ * Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak pernah cocok — sama dengan legacy.
  *
- * Deviasi [V2] dari legacy (dicatat di progres 03-Kepegawaian): legacy MELOLOSKAN pegawai yang snapshot jabatannya
- * kosong (`$dataset['id_satker'] != ''`) ke semua admin satker; v2 menolaknya (pegawai tanpa pmj / satker NULL hanya
- * terlihat oleh role 1/4/5/8).
+ * SATU predikat (lingkupAdminSatker() → terapkanPredikat()) dipakai bolehLihat()/bolehUbah() dan terapkanKeQuery(),
+ * jadi isi daftar = hasil cek detail.
+ *
+ * Deviasi [V2] (README `Libraries/Kepegawaian`): legacy meloloskan admin role 3 tanpa satker DAN tanpa unit
+ * (`null == ''`) dan daftar legacy tidak konsisten dengan detail; v2 fail-closed (admin tanpa lingkup valid → tidak
+ * ada) dan daftar = detail = `validateAccess_AP`. Role 3 tidak mendapat pengecualian NIP sendiri (tidak ada di legacy).
  *
  * Claim `id_satker`/`id_unit` akun bertipe VARCHAR (`pengguna`, DBV-009 belum diputus) sedangkan kolom pmj INT: nilai
- * claim di-cast ke int hanya bila berupa angka kanonik; selain itu dianggap kosong (fail-closed).
+ * claim di-cast ke int hanya bila berupa angka kanonik; selain itu dianggap kosong (fail-closed). Penolakan bentuk
+ * non-kanonik (mis. '012') = [V2] sementara sampai DBV-009.
  */
 final class PegawaiScope implements PegawaiScopeInterface
 {
@@ -48,6 +56,23 @@ final class PegawaiScope implements PegawaiScopeInterface
      * @var list<int>
      */
     public const ROLE_UBAH_SEMUA = [Role::SUPER_ADMIN];
+
+    /**
+     * Unit destinasi [K] (`UNIT_DESTINASI`, legacy `config/constants.php`).
+     */
+    public const UNIT_DESTINASI = 21;
+
+    /**
+     * Unit lain [K] (`UNIT_LAIN`) — satker BPO di bawahnya ikut lingkup admin unit destinasi.
+     */
+    public const UNIT_LAIN = 7;
+
+    /**
+     * Satker BPO [K] (`SATKER_BPO`) di bawah UNIT_LAIN yang masuk lingkup admin UNIT_DESTINASI.
+     *
+     * @var list<int>
+     */
+    public const SATKER_BPO = [37, 38, 41];
 
     private const TABEL_PMJ = 'pegawai_mutasi_jabatan';
 
@@ -97,9 +122,9 @@ final class PegawaiScope implements PegawaiScopeInterface
             return;
         }
 
-        $nipSendiri = $auth->nip();
-
         if ($role !== null && in_array($role, Role::UL_PEGAWAI, true)) {
+            $nipSendiri = $auth->nip();
+
             $nipSendiri === null
                 ? $builder->where('1 = 0', null, false)
                 : $builder->where($kolomNip, $nipSendiri);
@@ -110,24 +135,9 @@ final class PegawaiScope implements PegawaiScopeInterface
         if ($role === Role::ADMIN_SATKER) {
             $lingkup = $this->lingkupAdminSatker($auth);
 
-            if ($lingkup === null) {
-                $nipSendiri === null
-                    ? $builder->where('1 = 0', null, false)
-                    : $builder->where($kolomNip, $nipSendiri);
-
-                return;
-            }
-
-            [$kolom, $id] = $lingkup;
-
-            $builder->groupStart()
-                ->whereIn($kolomNip, static fn (BaseBuilder $sub): BaseBuilder => $sub->select('nip')->from(self::TABEL_PMJ)->where($kolom, $id));
-
-            if ($nipSendiri !== null) {
-                $builder->orWhere($kolomNip, $nipSendiri);
-            }
-
-            $builder->groupEnd();
+            $lingkup === null
+                ? $builder->where('1 = 0', null, false)
+                : $builder->whereIn($kolomNip, fn (BaseBuilder $sub): BaseBuilder => $this->terapkanPredikat($sub->select('nip')->from(self::TABEL_PMJ), $lingkup));
 
             return;
         }
@@ -140,10 +150,10 @@ final class PegawaiScope implements PegawaiScopeInterface
      */
     private function dalamLingkupTerbatas(AuthContext $auth, int $role, string $nip): bool
     {
-        $nipSendiri = $auth->nip();
+        if (in_array($role, Role::UL_PEGAWAI, true)) {
+            $nipSendiri = $auth->nip();
 
-        if ($nipSendiri !== null && $nipSendiri === $nip) {
-            return in_array($role, Role::UL_PEGAWAI, true) || $role === Role::ADMIN_SATKER;
+            return $nipSendiri !== null && $nipSendiri === $nip;
         }
 
         if ($role !== Role::ADMIN_SATKER) {
@@ -156,26 +166,22 @@ final class PegawaiScope implements PegawaiScopeInterface
             return false;
         }
 
-        [$kolom, $id] = $lingkup;
+        $builder = $this->koneksi()->table(self::TABEL_PMJ)->where('nip', $nip);
 
-        return $this->koneksi()->table(self::TABEL_PMJ)
-            ->where('nip', $nip)
-            ->where($kolom, $id)
-            ->countAllResults() > 0;
+        return $this->terapkanPredikat($builder, $lingkup)->countAllResults() > 0;
     }
 
     /**
-     * Kolom pmj + nilai lingkup admin satker: `id_satker` bila akun punya satker, selain itu `id_unit`; null bila
-     * keduanya kosong/tidak valid.
+     * Lingkup admin satker (`validateAccess_AP` [K]) dari claim akun; null bila tidak ada lingkup valid (fail-closed).
      *
-     * @return array{0: string, 1: int}|null
+     * @return array{satker: int}|array{unit: int}|null
      */
     private function lingkupAdminSatker(AuthContext $auth): ?array
     {
         $idSatker = self::keInt($auth->idSatker());
 
         if ($idSatker !== null) {
-            return ['id_satker', $idSatker];
+            return ['satker' => $idSatker];
         }
 
         // Akun ber-satker yang nilainya bukan angka (data VARCHAR rusak) TIDAK jatuh ke lingkup unit: tolak.
@@ -185,11 +191,36 @@ final class PegawaiScope implements PegawaiScopeInterface
 
         $idUnit = self::keInt($auth->idUnit());
 
-        return $idUnit === null ? null : ['id_unit', $idUnit];
+        return $idUnit === null ? null : ['unit' => $idUnit];
     }
 
     /**
-     * Cast VARCHAR → INT sementara sampai DBV-009: hanya angka kanonik positif ('12', bukan '012', '12a', '').
+     * Predikat `validateAccess_AP` atas kolom pmj `id_satker`/`id_unit` builder $builder (tabel pmj tanpa alias).
+     *
+     * @param array{satker: int}|array{unit: int} $lingkup
+     */
+    private function terapkanPredikat(BaseBuilder $builder, array $lingkup): BaseBuilder
+    {
+        if (isset($lingkup['satker'])) {
+            return $builder->where('id_satker', $lingkup['satker']);
+        }
+
+        if ($lingkup['unit'] !== self::UNIT_DESTINASI) {
+            return $builder->where('id_unit', $lingkup['unit']);
+        }
+
+        return $builder->groupStart()
+            ->where('id_unit', self::UNIT_DESTINASI)
+            ->orGroupStart()
+            ->where('id_unit', self::UNIT_LAIN)
+            ->whereIn('id_satker', self::SATKER_BPO)
+            ->groupEnd()
+            ->groupEnd();
+    }
+
+    /**
+     * Cast VARCHAR → INT sementara sampai DBV-009: hanya angka kanonik positif ('12', bukan '012', '12a', ''). Menolak
+     * '012' = [V2] sementara (legacy membandingkan string longgar); ditinjau ulang saat DBV-009 memutus tipe kolom.
      */
     private static function keInt(?string $nilai): ?int
     {

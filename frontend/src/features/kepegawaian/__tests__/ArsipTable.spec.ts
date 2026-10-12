@@ -1,7 +1,7 @@
 /**
  * ArsipTable (B-18, MAKE-009) — daftar lampiran satu baris riwayat dari `GET pegawai/{nip}/lampiran`, unggah (cek awal
  * jenis/ukuran dari aturan, galat 422 `errors.berkas` tampil), menu ⋮ Unduh → Hapus (Hapus hanya bila boleh, lewat
- * ConfirmDialog), dan keadaan galat 403.
+ * ConfirmDialog; disabled untuk lampiran terakhir kode wajib), dan keadaan galat 403.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -110,18 +110,43 @@ describe('ArsipTable — menu ⋮', () => {
     expect(wrapper.find('[data-testid="arsip-upload"]').exists()).toBe(false)
   })
 
-  it('Unduh memanggil endpoint unduh dengan id lampiran', async () => {
+  it('Unduh memanggil endpoint unduh dengan id lampiran; URL blob dicabut tertunda', async () => {
     svc.download.mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }))
     URL.createObjectURL = vi.fn(() => 'blob:uji')
     URL.revokeObjectURL = vi.fn()
     const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const timer = vi.spyOn(globalThis, 'setTimeout')
     const wrapper = await mountTable()
-    await selectRowAction(wrapper, 'lampiran-actions-2', 'unduh')
-    await flushPromises()
-    expect(svc.download).toHaveBeenCalledWith(NIP, 2)
-    expect(URL.createObjectURL).toHaveBeenCalled()
-    expect(klik).toHaveBeenCalledOnce()
-    klik.mockRestore()
+    try {
+      await selectRowAction(wrapper, 'lampiran-actions-2', 'unduh')
+      await flushPromises()
+      expect(svc.download).toHaveBeenCalledWith(NIP, 2)
+      expect(URL.createObjectURL).toHaveBeenCalled()
+      expect(klik).toHaveBeenCalledOnce()
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+      const tunda = timer.mock.calls.find(([, ms]) => ms === 1000)
+      expect(tunda).toBeDefined()
+      ;(tunda?.[0] as () => void)()
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:uji')
+    } finally {
+      timer.mockRestore()
+      klik.mockRestore()
+    }
+  })
+
+  it('lampiran terakhir kode wajib: Hapus disabled; kode tidak wajib atau masih ada pengganti: aktif', async () => {
+    svc.list.mockResolvedValue([lampiran(1)])
+    const wajib = await mountTable()
+    expect((await rowMenuActions(wajib, 'lampiran-actions-1')).find((i) => i.key === 'hapus')?.disabled).toBe(true)
+    wajib.unmount()
+
+    const tidakWajib = await mountTable({ aturan: { ...ATURAN, wajib: false } })
+    expect((await rowMenuActions(tidakWajib, 'lampiran-actions-1')).find((i) => i.key === 'hapus')?.disabled).toBe(false)
+    tidakWajib.unmount()
+
+    svc.list.mockResolvedValue([lampiran(1), lampiran(2)])
+    const duaBerkas = await mountTable()
+    expect((await rowMenuActions(duaBerkas, 'lampiran-actions-1')).find((i) => i.key === 'hapus')?.disabled).toBe(false)
   })
 
   it('Hapus lewat ConfirmDialog lalu memuat ulang daftar', async () => {

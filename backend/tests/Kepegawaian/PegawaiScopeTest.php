@@ -12,8 +12,9 @@ use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
- * MAKE-009 — PegawaiScope nyata (DoD M1: lingkup role 2/3/4/5/8 + UL_PEGAWAI). Setiap kasus juga memastikan
- * terapkanKeQuery() menyaring daftar persis sama dengan bolehLihat().
+ * MAKE-009 — PegawaiScope nyata (DoD M1: lingkup role 2/3/4/5/8 + UL_PEGAWAI; role 3 = validateAccess_AP termasuk unit
+ * destinasi 21 / unit lain 7). Setiap kasus juga memastikan terapkanKeQuery() menyaring daftar persis sama dengan
+ * bolehLihat().
  *
  * @internal
  */
@@ -54,7 +55,7 @@ final class PegawaiScopeTest extends DatabaseTestCase
             'b'        => $this->buatPegawaiDiSatker($this->satkerB),
         ];
 
-        // Pegawai tanpa satker di snapshot jabatan (legacy meloloskannya ke semua admin satker; v2 menolak).
+        // Pegawai tanpa satker/unit di snapshot jabatan: tidak cocok predikat validateAccess_AP mana pun (sama dengan legacy).
         $this->nip['tanpa_satker'] = $this->buatPegawai([], ['id_satker' => null, 'id_unit' => null, 'satker' => null, 'unit' => null]);
     }
 
@@ -144,24 +145,72 @@ final class PegawaiScopeTest extends DatabaseTestCase
         $this->assertDaftarSamaDenganLihat($auth);
     }
 
-    public function testAdminSatkerMelihatDirinyaSendiriDiLuarSatker(): void
+    public function testAdminSatkerTidakMendapatPengecualianNipSendiri(): void
     {
-        // Admin ber-NIP yang akunnya menunjuk satker A1 sementara snapshot jabatannya di satker B.
+        // Admin ber-NIP yang akunnya menunjuk satker A1 sementara snapshot jabatannya di satker B: legacy tidak punya
+        // pengecualian NIP sendiri untuk role 3 — dirinya di luar lingkup.
         $nipAdmin = $this->buatPegawaiDiSatker($this->satkerB);
         $auth     = $this->authUntukAkun($this->buatAkunUntuk($nipAdmin, Role::ADMIN_SATKER, ['id_satker' => (string) $this->satkerA1]));
 
-        $this->assertTrue($this->scope->bolehLihat($auth, $nipAdmin));
-        $this->assertTrue($this->scope->bolehUbah($auth, $nipAdmin));
-        $this->assertTrue($this->scope->bolehLihat($auth, $this->nip['a1']));
-        $this->assertFalse($this->scope->bolehLihat($auth, $this->nip['b']));
+        $this->nip['admin'] = $nipAdmin;
 
-        $builder = $this->db->table('pegawai')->select('nip')->whereIn('nip', [$nipAdmin, $this->nip['a1'], $this->nip['b']]);
-        $this->scope->terapkanKeQuery($builder, $auth);
-        $hasil = array_column($builder->get()->getResultArray(), 'nip');
-        sort($hasil);
-        $harap = [$nipAdmin, $this->nip['a1']];
-        sort($harap);
-        $this->assertSame($harap, $hasil);
+        $this->assertFalse($this->scope->bolehLihat($auth, $nipAdmin));
+        $this->assertFalse($this->scope->bolehUbah($auth, $nipAdmin));
+        $this->assertTrue($this->scope->bolehLihat($auth, $this->nip['a1']));
+        $this->assertDaftarSamaDenganLihat($auth);
+    }
+
+    public function testAdminUnitDestinasiTanpaSatkerMelihatUnit21DanSatkerBpoUnit7(): void
+    {
+        $this->buatPegawaiUnitDestinasi();
+
+        $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_DESTINASI, 'id_satker' => null]);
+
+        $harap = [
+            'u21'             => true,
+            'u7_bpo37'        => true,
+            'u7_bpo38'        => true,
+            'u7_bpo41'        => true,
+            'u7_bukan_bpo'    => false,
+            'bpo37_unit_lain' => false, // satker 37 dengan unit selain 7
+            'a1'              => false,
+            'b'               => false,
+            'tanpa_satker'    => false,
+        ];
+
+        foreach ($harap as $label => $boleh) {
+            $this->assertSame($boleh, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
+            $this->assertSame($boleh, $this->scope->bolehUbah($auth, $this->nip[$label]), "ubah {$label}");
+        }
+
+        $this->assertDaftarSamaDenganLihat($auth);
+    }
+
+    public function testAdminUnitLainTanpaSatkerHanyaUnit7(): void
+    {
+        $this->buatPegawaiUnitDestinasi();
+
+        $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_LAIN, 'id_satker' => null]);
+
+        foreach (['u21' => false, 'u7_bpo37' => true, 'u7_bukan_bpo' => true, 'bpo37_unit_lain' => false, 'a1' => false] as $label => $boleh) {
+            $this->assertSame($boleh, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
+        }
+
+        $this->assertDaftarSamaDenganLihat($auth);
+    }
+
+    public function testAdminBersatkerDiUnitDestinasiHanyaSatkernya(): void
+    {
+        $this->buatPegawaiUnitDestinasi();
+
+        // Satker akun menang atas unit: hanya pmj.id_satker = 37, berapa pun unit snapshot-nya.
+        $auth = $this->authAkunDi($this->satkerB, Role::ADMIN_SATKER, ['id_unit' => (string) PegawaiScope::UNIT_DESTINASI, 'id_satker' => '37']);
+
+        foreach (['u21' => false, 'u7_bpo37' => true, 'u7_bpo38' => false, 'bpo37_unit_lain' => true, 'b' => false] as $label => $boleh) {
+            $this->assertSame($boleh, $this->scope->bolehLihat($auth, $this->nip[$label]), "lihat {$label}");
+        }
+
+        $this->assertDaftarSamaDenganLihat($auth);
     }
 
     /**
@@ -229,6 +278,51 @@ final class PegawaiScopeTest extends DatabaseTestCase
         $harap = [$this->nip['a1'], $this->nip['a1_kedua']];
         sort($harap);
         $this->assertSame($harap, $hasil);
+    }
+
+    /**
+     * Pegawai fixture unit destinasi 21 / unit lain 7 (`validateAccess_AP` [K]); label => NIP, ditambahkan ke $this->nip.
+     *
+     * @return array<string, string>
+     */
+    private function buatPegawaiUnitDestinasi(): array
+    {
+        $this->pastikanUnit(PegawaiScope::UNIT_DESTINASI);
+        $this->pastikanUnit(PegawaiScope::UNIT_LAIN);
+
+        foreach (PegawaiScope::SATKER_BPO as $idSatker) {
+            $this->pastikanSatker($idSatker, PegawaiScope::UNIT_LAIN);
+        }
+
+        $satker21        = $this->buatSatker(PegawaiScope::UNIT_DESTINASI);
+        $satker7BukanBpo = $this->buatSatker(PegawaiScope::UNIT_LAIN);
+
+        $baru = [
+            'u21'             => $this->buatPegawai([], ['id_satker' => $satker21, 'id_unit' => PegawaiScope::UNIT_DESTINASI]),
+            'u7_bpo37'        => $this->buatPegawai([], ['id_satker' => 37, 'id_unit' => PegawaiScope::UNIT_LAIN]),
+            'u7_bpo38'        => $this->buatPegawai([], ['id_satker' => 38, 'id_unit' => PegawaiScope::UNIT_LAIN]),
+            'u7_bpo41'        => $this->buatPegawai([], ['id_satker' => 41, 'id_unit' => PegawaiScope::UNIT_LAIN]),
+            'u7_bukan_bpo'    => $this->buatPegawai([], ['id_satker' => $satker7BukanBpo, 'id_unit' => PegawaiScope::UNIT_LAIN]),
+            'bpo37_unit_lain' => $this->buatPegawai([], ['id_satker' => 37, 'id_unit' => $this->unitA]),
+        ];
+
+        $this->nip = array_merge($this->nip, $baru);
+
+        return $baru;
+    }
+
+    private function pastikanUnit(int $idUnit): void
+    {
+        if ($this->db->table('unit')->where('id_unit', $idUnit)->countAllResults() === 0) {
+            $this->db->table('unit')->insert(['id_unit' => $idUnit, 'unit' => "Unit Fixture {$idUnit}", 'status' => 1]);
+        }
+    }
+
+    private function pastikanSatker(int $idSatker, int $idUnit): void
+    {
+        if ($this->db->table('satker')->where('id_satker', $idSatker)->countAllResults() === 0) {
+            $this->db->table('satker')->insert(['id_satker' => $idSatker, 'id_unit' => $idUnit, 'satker' => "Satker Fixture {$idSatker}", 'status' => 1]);
+        }
     }
 
     /**

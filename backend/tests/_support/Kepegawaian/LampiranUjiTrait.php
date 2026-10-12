@@ -63,11 +63,12 @@ trait LampiranUjiTrait
     }
 
     /**
-     * Baris `riwayat_pendidikan` milik $nip (status 1) sebagai pemilik `id_entri`.
+     * Baris `riwayat_pendidikan` milik $nip berstatus $status sebagai pemilik `id_entri`. Status 1 Disetujui terkunci
+     * untuk UL_PEGAWAI (`kunciBarisDisetujui()`): alur lampiran oleh pegawai sendiri memakai baris status 0 Menunggu.
      */
-    protected function buatRiwayatPendidikanUji(string $nip): int
+    protected function buatRiwayatPendidikanUji(string $nip, int $status): int
     {
-        $this->db->table('riwayat_pendidikan')->insert(['nip' => $nip, 'tgl_lulus' => '2012-08-30', 'status' => 1]);
+        $this->db->table('riwayat_pendidikan')->insert(['nip' => $nip, 'tgl_lulus' => '2012-08-30', 'status' => $status]);
 
         return (int) $this->db->insertID();
     }

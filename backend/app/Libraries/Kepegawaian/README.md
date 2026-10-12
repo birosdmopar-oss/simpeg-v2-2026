@@ -172,11 +172,28 @@ lingkup lewat service ini (403 di luar lingkup); daftar disaring dengan `terapka
 | 1 | semua | semua |
 | 4, 5, 8 | semua | — |
 | 2, 6, 7 | NIP sendiri | NIP sendiri |
-| 3 | pegawai dengan `pegawai_mutasi_jabatan.id_satker` = satker akun (akun tanpa satker: `id_unit` = unit akun), plus NIP sendiri | sama |
+| 3 | `validateAccess_AP` atas `pegawai_mutasi_jabatan` (pmj), lihat di bawah | sama |
 
-Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai ini dalam lingkup pemanggil". Pegawai
-tanpa snapshot jabatan/satker tidak masuk lingkup role 3 (deviasi [V2] dari legacy yang meloloskannya). Aturan legacy
-"unit destinasi 21 / unit lain 7" belum diterapkan (sumbernya belum tersedia, lihat progres 03-Kepegawaian).
+Role 3 = port `validateAccess_AP` [K] (`helpers/function_helper.php`, konstanta `config/constants.php`):
+
+- admin punya satker → `pmj.id_satker` = satker admin;
+- admin tanpa satker, unit `UNIT_DESTINASI` (21) → `pmj.id_unit = 21 OR (pmj.id_unit = UNIT_LAIN (7) AND pmj.id_satker
+  IN SATKER_BPO (37, 38, 41))` — satker BPO dengan unit selain 7 tidak termasuk;
+- admin tanpa satker, unit lain → `pmj.id_unit` = unit admin.
+
+Konstanta [K] `PegawaiScope::UNIT_DESTINASI`, `UNIT_LAIN`, `SATKER_BPO`. Satu predikat dipakai `bolehLihat`/`bolehUbah`
+dan `terapkanKeQuery`, jadi isi daftar = hasil cek detail. Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak
+cocok predikat mana pun — sama dengan legacy. Role 3 tidak punya pengecualian NIP sendiri (legacy juga tidak).
+
+Deviasi [V2]:
+
+- Legacy meloloskan admin role 3 **tanpa satker dan tanpa unit** (perbandingan `null == ''`), dan daftar pegawai legacy
+  tidak konsisten dengan pemeriksaan detail. v2 fail-closed (admin tanpa lingkup valid → tidak ada pegawai) dan
+  daftar = detail = `validateAccess_AP`.
+- Sementara sampai DBV-009 (tipe `id_satker`/`id_unit` akun VARCHAR vs pmj INT): claim di-cast ke int hanya bila angka
+  kanonik; bentuk non-kanonik seperti `'012'` ditolak (fail-closed). Ditinjau ulang saat DBV-009 diputus.
+
+Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai ini dalam lingkup pemanggil".
 
 ## Lampiran B-18 (`Lampiran/`, MAKE-009)
 
@@ -187,7 +204,11 @@ tanpa snapshot jabatan/satker tidak masuk lingkup role 3 (deviasi [V2] dari lega
 | `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil) |
 | `PenjagaBerkas` | Kompensasi berkas di luar transaksi DB: setelah transaksi selesai, berkas tercatat dipertahankan hanya bila masih dirujuk `tabel.kolom = path` |
 | `KolomBerkas` | Helper tabel yang menyimpan berkas di kolomnya sendiri (`riwayat_karpeg.file_1..5`, LKH, Konket) |
-| `OtorisasiLampiran` | Urutan otorisasi endpoint lampiran: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → `id_entri` milik NIP |
+| `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi (+ `bolehUbah`, keterikatan & kunci baris, lampiran wajib terakhir 422 untuk hapus) |
+
+**Lampiran wajib & "ganti".** Lampiran terakhir kode ber-`wajib` pada satu baris tidak bisa dihapus (422
+`errors.berkas`); "ganti" = unggah berkas baru dulu, lalu hapus yang lama. Baris riwayat berstatus 1 Disetujui terkunci
+untuk UL_PEGAWAI (`kunciBarisDisetujui()`): unggah/hapus lampirannya 403; baris status 10 Dihapus → 404.
 
 **Pemakaian dari RiwayatEngine (WS-1).** Panggil `service('attachmentService')->simpan(...)`/`hapus(...)` DI DALAM transaksi
 engine; tidak perlu kode kompensasi sendiri. Setelah commit/rollback, panggil `selesaikan()` bila service-nya

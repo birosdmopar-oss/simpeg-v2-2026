@@ -46,7 +46,7 @@ final class AttachmentServiceTest extends DatabaseTestCase
         $this->service = new AttachmentService($this->storage, $this->db);
         $this->aturan  = new AturanLampiran(self::KODE_IJAZAH, true, 1, ['pdf']);
         $this->nip     = $this->buatPegawai();
-        $this->idEntri = $this->buatRiwayatPendidikanUji($this->nip);
+        $this->idEntri = $this->buatRiwayatPendidikanUji($this->nip, 1);
     }
 
     protected function tearDown(): void

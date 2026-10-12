@@ -7,7 +7,8 @@
  * tetap menegakkan izin Definisi pemilik kode + lingkup pegawai — galatnya ditampilkan. Pemeriksaan jenis & ukuran
  * di sini hanya UX; validasi yang mengikat ada di backend (jenis dibaca dari isi berkas).
  *
- * Unggah selalu MENAMBAH lampiran; "ganti" = unggah yang baru lalu hapus yang lama (tidak ada endpoint ganti).
+ * Unggah selalu MENAMBAH lampiran; "ganti" = unggah yang baru dulu, lalu hapus yang lama (tidak ada endpoint ganti).
+ * Lampiran terakhir kode ber-`wajib` tidak bisa dihapus (server 422 `errors.berkas`): item Hapus-nya disabled.
  * Aksi baris lewat menu ⋮ (AGENTS.md §1): Unduh → Hapus.
  */
 import { FileSearch, Upload } from 'lucide-vue-next'
@@ -94,11 +95,14 @@ function ukuran(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`
 }
 
+/** Lampiran terakhir kode wajib: harus diganti (unggah baru dulu), bukan dihapus. */
+const terakhirWajib = computed(() => Boolean(props.aturan?.wajib) && rows.value.length <= 1)
+
 function rowActions(row: DocumentAttachment): RowAction[] {
   const busy = busyId.value === row.id_attachment
   return [
     { key: 'unduh', label: 'Unduh', disabled: busy },
-    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete, disabled: busy },
+    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete, disabled: busy || terakhirWajib.value },
   ]
 }
 
@@ -160,7 +164,8 @@ async function download(row: DocumentAttachment): Promise<void> {
     document.body.appendChild(link)
     link.click()
     link.remove()
-    URL.revokeObjectURL(url)
+    // Dicabut tertunda: sebagian browser baru membaca blob setelah click() kembali.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch (error) {
     notice.value = { tone: 'danger', text: describeApiError(error).message }
   } finally {

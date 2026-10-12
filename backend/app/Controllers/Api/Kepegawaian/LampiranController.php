@@ -21,8 +21,10 @@ use Throwable;
  *   GET    pegawai/{nip}/lampiran/{id}/unduh              unduh berkas (izin lihat)
  *   DELETE pegawai/{nip}/lampiran/{id}                    hapus keras + audit (izin hapus/ubah)
  *
- * Otorisasi: OtorisasiLampiran (Definisi pemilik kode × role → PegawaiScope → keterikatan id_entri). NIP dari route
- * selalu string (castNumericParams mati: NIP 18 digit tidak boleh menjadi int).
+ * Otorisasi: OtorisasiLampiran — daftar/unggah: Definisi pemilik kode × role → PegawaiScope → keterikatan id_entri
+ * (+ kunci baris Disetujui untuk UL_PEGAWAI); unduh/hapus: PegawaiScope lihat → baris lampiran → izin Definisi (+ lingkup
+ * ubah, kunci baris, lampiran wajib terakhir untuk hapus). NIP dari route selalu string (castNumericParams mati: NIP
+ * 18 digit tidak boleh menjadi int).
  */
 class LampiranController extends ApiController
 {
@@ -55,8 +57,7 @@ class LampiranController extends ApiController
 
     public function unduh(string $nip, string $id): ResponseInterface
     {
-        $row = $this->otorisasi()->barisMilik($nip, (int) $id);
-        $this->otorisasi()->bolehUnduh(service('authContext'), $nip, $row);
+        $this->otorisasi()->bolehUnduh(service('authContext'), $nip, (int) $id);
 
         $hasil = $this->lampiran()->ambil($nip, (int) $id);
         $nama  = (string) ($hasil['lampiran']['display_name'] ?? 'lampiran');
@@ -73,8 +74,7 @@ class LampiranController extends ApiController
 
     public function delete(string $nip, string $id): ResponseInterface
     {
-        $row = $this->otorisasi()->barisMilik($nip, (int) $id);
-        $this->otorisasi()->bolehHapus(service('authContext'), $nip, $row);
+        $row = $this->otorisasi()->bolehHapus(service('authContext'), $nip, (int) $id);
 
         $this->dalamTransaksi(function () use ($nip, $id): void {
             $this->lampiran()->hapus($nip, (int) $id);
