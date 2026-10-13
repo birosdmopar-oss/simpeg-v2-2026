@@ -71,9 +71,16 @@ describe('DataUmumForm — isian per role', () => {
     expect(q('[data-testid="data-umum-save"]')?.textContent).toContain('Simpan')
   })
 
-  it('Pegawai: tanpa nama/gelar/tgl lahir/jenis pegawai/jenis status; tombol "Ajukan Perubahan"', async () => {
+  it('Pegawai: nama/gelar/tgl lahir READONLY (form legacy); tanpa jenis pegawai/jenis status; tombol "Ajukan Perubahan"', async () => {
     await mountForm(Role.PEGAWAI, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false } }))
-    for (const name of ['nama', 'glr_awal', 'tgl_lahir', 'id_jenis_pegawai', 'id_jenis_status', 'tmt_status']) {
+    const ro = q('[data-testid="data-umum-readonly"]')
+    for (const name of ['nama', 'glr_awal', 'glr_akhir', 'tgl_lahir']) {
+      const input = ro?.querySelector<HTMLInputElement>(`[data-field="${name}"] input, input[data-field="${name}"]`)
+      expect(input?.readOnly, name).toBe(true)
+      expect(q(`[data-testid="data-umum-form"] form [data-field="${name}"]`), `${name} tidak di form kirim`).toBeNull()
+    }
+    expect((ro?.querySelector<HTMLInputElement>('[data-field="nama"] input, input[data-field="nama"]'))?.value).toBe('Budi Contoh')
+    for (const name of ['id_jenis_pegawai', 'id_jenis_status', 'tmt_status']) {
       expect(q(`[data-field="${name}"]`), name).toBeNull()
     }
     expect(q('[data-field="npwp"]')).not.toBeNull()
@@ -81,10 +88,16 @@ describe('DataUmumForm — isian per role', () => {
     expect(q('[data-testid="data-umum-form"]')?.textContent).toContain('berlaku setelah disetujui admin')
   })
 
-  it('Admin Satker: jenis pegawai ada, nama tidak', async () => {
+  it('Admin Satker: jenis pegawai ada, nama hanya readonly', async () => {
     await mountForm(Role.ADMIN_SATKER, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false } }))
     expect(q('[data-field="id_jenis_pegawai"]')).not.toBeNull()
-    expect(q('[data-field="nama"]')).toBeNull()
+    expect(q('[data-testid="data-umum-form"] form [data-field="nama"]')).toBeNull()
+    expect(q('[data-testid="data-umum-readonly"] [data-field="nama"]')).not.toBeNull()
+  })
+
+  it('Super Admin tanpa isian readonly terpisah (nama dapat diubah)', async () => {
+    await mountForm(Role.SUPER_ADMIN, lengkap())
+    expect(q('[data-testid="data-umum-readonly"]')).toBeNull()
   })
 })
 
@@ -112,6 +125,31 @@ describe('DataUmumForm — kirim', () => {
     await vi.waitFor(() => expect(q('[data-field="npwp"]')?.textContent ?? '').toContain('Wajib diisi (angka).'))
     expect(q('[data-testid="data-umum-berkas-error-0"]')?.textContent).toContain('Foto pegawai wajib diunggah.')
     expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  it('Super Admin + pengajuan menunggu: peringatan; simpan minta konfirmasi dulu, baru kirim setelah "Ya, simpan"', async () => {
+    const menunggu = { id_pegawai_hist: 9, flag_update: 1, reason_note: null, created_at: null, updated_at: null, notif_date: null }
+    await mountForm(Role.SUPER_ADMIN, lengkap({ pengajuan: menunggu }))
+    expect(q('[data-testid="data-umum-peringatan-pengajuan"]')?.textContent).toContain('menolak')
+
+    await submit()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Menyimpan akan menolak pengajuan pegawai yang menunggu'))
+    expect(update).not.toHaveBeenCalled()
+
+    const ya = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Ya, simpan'))
+    expect(ya).toBeDefined()
+    ya?.click()
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+  })
+
+  it('pengaju dengan pengajuan menunggu: diberi tahu pengajuan lama akan diganti; tanpa konfirmasi', async () => {
+    const menunggu = { id_pegawai_hist: 9, flag_update: 1, reason_note: null, created_at: null, updated_at: null, notif_date: null }
+    await mountForm(Role.PEGAWAI, lengkap({ pengajuan: menunggu, aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false } }))
+    expect(q('[data-testid="data-umum-pengajuan-diganti"]')?.textContent).toContain('akan diganti')
+    expect(q('[data-testid="data-umum-peringatan-pengajuan"]')).toBeNull()
+
+    await submit()
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
   })
 
   it('foto wajib dipilih bila pegawai belum punya foto (legacy)', async () => {

@@ -55,7 +55,11 @@ async function muatFoto(): Promise<void> {
 }
 
 watch(() => [props.detail.nip, props.detail.ada_foto, props.detail.flag_update], () => void muatFoto(), { immediate: true })
-onBeforeUnmount(lepasFoto)
+onBeforeUnmount(() => {
+  // Batalkan muatan foto yang masih berjalan agar tidak membuat object URL sesudah komponen dilepas.
+  fotoToken++
+  lepasFoto()
+})
 
 const STATUS: Record<number, { label: string; tone: 'success' | 'neutral' }> = {
   1: { label: 'Aktif', tone: 'success' },

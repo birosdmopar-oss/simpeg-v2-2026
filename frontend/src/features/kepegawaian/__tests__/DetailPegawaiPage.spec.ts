@@ -97,10 +97,10 @@ describe('DetailPegawaiPage — data', () => {
     await new Promise((r) => setTimeout(r, 0))
     await flushPromises()
 
-    expect(updateBiodata).toHaveBeenCalledWith(NIP, expect.objectContaining({ no_telp_kerabat: '4' }), null)
-    expect(wrapper.text()).toContain('berhasil diajukan dan menunggu verifikasi admin')
-    expect(detail).toHaveBeenCalledTimes(2)
-    expect(wrapper.find('[data-testid="data-umum-form"]').exists()).toBe(false)
+    await vi.waitFor(() => expect(updateBiodata).toHaveBeenCalledWith(NIP, expect.objectContaining({ no_telp_kerabat: '4' }), null))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('berhasil diajukan dan menunggu verifikasi admin'))
+    await vi.waitFor(() => expect(detail).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="data-umum-form"]').exists()).toBe(false))
   })
 
   it.each([
