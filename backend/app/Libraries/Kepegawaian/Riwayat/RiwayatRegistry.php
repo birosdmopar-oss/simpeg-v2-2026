@@ -206,6 +206,19 @@ final class RiwayatRegistry implements RiwayatRegistryInterface
             }
         }
 
+        // Isian mentah (MAKE-019): nama sah, tidak bentrok dengan field fields() maupun kolom sistem.
+        $terpakai = [...array_map(static fn ($field): string => $field->name, $d->fields()), $d->kolomNip(), $d->kolomStatus(), $d->primaryKey()];
+
+        foreach ($d->isianMentah() as $kunci) {
+            if (preg_match(self::IDENTIFIER, $kunci) !== 1) {
+                throw new LogicException("Definisi {$nama}: nama isian mentah '{$kunci}' tidak valid.");
+            }
+
+            if (in_array($kunci, $terpakai, true)) {
+                throw new LogicException("Definisi {$nama}: isian mentah '{$kunci}' bentrok dengan field atau kolom sistem.");
+            }
+        }
+
         foreach ($d->izin() as $aksi => $roles) {
             if (AksiRiwayat::tryFrom($aksi) === null) {
                 throw new LogicException("Definisi {$nama}: aksi izin '{$aksi}' tidak dikenal.");

@@ -33,6 +33,14 @@ final class UjiPendidikan extends RiwayatDefinisi
     public bool $lampiranWajib = false;
 
     /**
+     * Isian mentah uji (MAKE-019); diatur SEBELUM registry dibuat. `pilihan_uji` dipindah beforeSave ke kolom nyata
+     * `institusi_pendidikan` (gabung `***`, pola subrumpun jabatan legacy).
+     *
+     * @var list<string>
+     */
+    public array $mentah = [];
+
+    /**
      * Dipanggil di dalam hook validate() — dipakai test untuk mensimulasikan tulisan paralel di antara baca awal dan
      * transaksi engine (TOCTOU).
      *
@@ -101,6 +109,11 @@ final class UjiPendidikan extends RiwayatDefinisi
         ];
     }
 
+    public function isianMentah(): array
+    {
+        return $this->mentah;
+    }
+
     public function lampiran(): array
     {
         return [
@@ -123,6 +136,11 @@ final class UjiPendidikan extends RiwayatDefinisi
     public function beforeSave(array $data, ?array $lama, AuthContext $auth): array
     {
         $this->panggilanHook[] = ['beforeSave', $data];
+
+        if (array_key_exists('pilihan_uji', $data)) {
+            $pilihan                      = is_array($data['pilihan_uji']) ? $data['pilihan_uji'] : array_filter([(string) $data['pilihan_uji']]);
+            $data['institusi_pendidikan'] = $pilihan === [] ? null : implode('***', $pilihan);
+        }
 
         // Kolom turunan (pola legacy set_param: teks dari master).
         if (array_key_exists('id_jenjang_pendidikan', $data)) {
