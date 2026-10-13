@@ -14,10 +14,12 @@ use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Libraries\Kepegawaian\Pegawai\BiodataService;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Models\Kepegawaian\PegawaiHistModel;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
 use Config\Services;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\LampiranUjiTrait;
@@ -222,14 +224,62 @@ final class BiodataTest extends DatabaseTestCase
         $this->service()->foto($this->auth(Role::SUPER_ADMIN), $nip);
     }
 
-    public function testRollbackMengompensasiBerkasFoto(): void
+    #[Group('db-isolasi-penuh')]
+    public function testRollbackSesudahFotoDisimpanMengompensasiBerkas(): void
     {
-        $nip   = $this->pegawaiLengkap(['foto' => null]);
-        $super = $this->auth(Role::SUPER_ADMIN);
+        // Gagal SESUDAH KolomBerkas::simpan() menulis berkas: trigger menolak INSERT pegawai_foto (langkah terakhir jalur
+        // langsung). Transaksi di-rollback (pegawai.foto tetap NULL) dan berkas yang sempat ditulis dibuang.
+        $nip     = $this->pegawaiLengkap(['foto' => null]);
+        $super   = $this->auth(Role::SUPER_ADMIN);
+        $trigger = 'trg_uji_make011_pegawai_foto';
+        $tabel   = $this->db->escapeIdentifiers($this->db->prefixTable('pegawai_foto'));
 
-        // Validasi gagal SESUDAH foto ditulis tidak mungkin (validasi lebih dulu); paksa gagal di tulis pegawai.
-        $this->assertErrors(['email'], fn () => $this->service()->ubah($super, $nip, $this->isian(['email' => '']), $this->berkasPng()));
-        $this->assertSame([], $this->berkasDiAkarUji());
+        $this->db->query("CREATE TRIGGER {$trigger} BEFORE INSERT ON {$tabel} FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'simulasi gagal (test MAKE-011)'");
+
+        try {
+            $this->service()->ubah($super, $nip, $this->isian(), $this->berkasPng());
+            $this->fail('Ubah biodata seharusnya gagal.');
+        } catch (DatabaseException) {
+            $this->addToAssertionCount(1);
+        } finally {
+            $this->db->query("DROP TRIGGER IF EXISTS {$trigger}");
+        }
+
+        $this->assertNull($this->pegawai($nip)['foto']);
+        $this->assertSame([], $this->berkasDiAkarUji(), 'berkas foto dikompensasi');
+    }
+
+    public function testPengajuanUlangDenganFotoBaruMembuangFotoPengajuanLama(): void
+    {
+        [$nip, $auth] = $this->aktor(Role::PEGAWAI);
+
+        $this->service()->ubah($auth, $nip, $this->isian(), $this->berkasPng('foto1.png'));
+        $fotoLama = (string) $this->db->table('pegawai_hist')->where('nip', $nip)->get()->getRow()->foto;
+        $this->assertContains($fotoLama, $this->berkasDiAkarUji());
+
+        $this->service()->ubah($auth, $nip, $this->isian(), $this->berkasPng('foto2.png'));
+        $fotoBaru = (string) $this->db->table('pegawai_hist')->where('nip', $nip)->get()->getRow()->foto;
+
+        $this->assertNotSame($fotoLama, $fotoBaru);
+        $this->assertSame([$fotoBaru], $this->berkasDiAkarUji(), 'foto pengajuan lama dibuang, foto pegawai tidak tersentuh');
+    }
+
+    public function testGelarTerlaluPanjangUntukPengajuan(): void
+    {
+        // Sementara sampai DBV-020: pegawai_hist.glr_awal VARCHAR(12), glr_akhir VARCHAR(24) [K].
+        $nip  = $this->pegawaiLengkap([], ['glr_awal' => 'Prof. Dr. Ir. H.', 'glr_akhir' => 'S.E., M.M., M.B.A., Ph.D., CPA']);
+        $auth = $this->authUntukAkun($this->buatAkunUntuk($nip, Role::PEGAWAI));
+
+        try {
+            $this->service()->ubah($auth, $nip, $this->isian());
+            $this->fail('Seharusnya 422');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('hubungi admin', $e->getErrors()['glr_awal'][0]);
+            $this->assertStringContainsString('maks. 24', $e->getErrors()['glr_akhir'][0]);
+        }
+
+        // Super Admin (jalur langsung ke pegawai, VARCHAR 50) tidak dibatasi.
+        $this->assertSame('langsung', $this->service()->ubah($this->auth(Role::SUPER_ADMIN), $nip, $this->isian())['jalur']);
     }
 
     public function testEndpointJsonDanMultipart(): void

@@ -202,6 +202,15 @@ final class BiodataService implements BiodataServiceInterface
 
         if ($adaFoto) {
             $param['foto'] = $kolom->simpan($foto, self::aturanFoto(), 'pegawai_hist', 'foto', 'foto');
+
+            // Foto pengajuan aktif sebelumnya diganti: berkasnya dibuang setelah transaksi, kecuali masih foto pegawai
+            // atau ada di galeri `pegawai_foto` (PenjagaBerkas hanya memeriksa pegawai_hist.foto).
+            $fotoLama = is_array($aktif) ? (string) ($aktif['foto'] ?? '') : '';
+
+            if ($fotoLama !== '' && $fotoLama !== (string) ($pegawai['foto'] ?? '')
+                && $db->table('pegawai_foto')->where('foto', $fotoLama)->countAllResults() === 0) {
+                $kolom->hapus($fotoLama, 'pegawai_hist', 'foto');
+            }
         }
 
         $pegawaiModel->withActor($auth, static fn () => $pegawaiModel->update($nip, [

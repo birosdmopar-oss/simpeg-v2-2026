@@ -64,6 +64,11 @@ final class ValidasiBiodata
     public const ISIAN_SUPER_ADMIN = ['nama', 'glr_awal', 'glr_akhir', 'tgl_lahir', 'id_jenis_status', 'tmt_status'];
 
     /**
+     * Panjang kolom gelar `pegawai_hist` [K] D1 (sementara sampai DBV-020).
+     */
+    public const BATAS_GELAR_PENGAJUAN = ['glr_awal' => 12, 'glr_akhir' => 24];
+
+    /**
      * Kolom digit saja: kolom => [panjang maks DDL, wajib].
      */
     private const DIGIT = [
@@ -172,6 +177,8 @@ final class ValidasiBiodata
 
         if ($role === Role::SUPER_ADMIN) {
             $this->isianSuperAdmin($nilai, $pegawai, $param);
+        } else {
+            $this->gelarMuatPengajuan($pegawai);
         }
 
         if ($this->errors !== []) {
@@ -345,6 +352,22 @@ final class ValidasiBiodata
 
             if (! $cocok) {
                 $this->gagal('id_jenis_status', 'Jenis status tidak sesuai dengan status pegawai.');
+            }
+        }
+    }
+
+    /**
+     * Jalur pengajuan menyalin gelar `pegawai` (VARCHAR 50) ke `pegawai_hist` yang kolomnya lebih pendek [K] D1:
+     * `glr_awal` VARCHAR(12), `glr_akhir` VARCHAR(24). Sampai DBV-020 melebarkannya (keputusan user 13-10-2026), gelar
+     * yang lebih panjang ditolak dengan pesan yang jelas — gelar bukan isian pegawai, jadi arahannya ke admin.
+     *
+     * @param array<string, mixed> $pegawai
+     */
+    private function gelarMuatPengajuan(array $pegawai): void
+    {
+        foreach (self::BATAS_GELAR_PENGAJUAN as $kolom => $maks) {
+            if (mb_strlen((string) ($pegawai[$kolom] ?? '')) > $maks) {
+                $this->gagal($kolom, "Gelar terlalu panjang untuk pengajuan (maks. {$maks} karakter); hubungi admin untuk memperbaikinya.");
             }
         }
     }

@@ -31,6 +31,9 @@ use CodeIgniter\Database\BaseConnection;
  * `PegawaiScope::bolehLihat`. `tabs` = descriptor engine `RiwayatRegistryInterface::descriptorUntuk()` (fungsi yang
  * sama dengan `GET pegawai/{nip}/riwayat` WS-1). Path `pegawai.foto` tidak pernah dikirim (diganti `ada_foto`; berkas
  * lewat `GET pegawai/{nip}/foto`).
+ *
+ * TODO(B-20 penutup, MAKE-014): data sensitif (NIK, NPWP, BPJS, TASPEN, no. HP, kerabat) untuk role 4/5/8 sementara ikut
+ * legacy (ditampilkan penuh, `UL_ES1`); dibahas ulang di MAKE-014 (keputusan user 13-10-2026).
  */
 final class PegawaiService implements PegawaiServiceInterface
 {
