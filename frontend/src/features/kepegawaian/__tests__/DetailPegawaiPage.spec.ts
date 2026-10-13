@@ -10,6 +10,9 @@ vi.mock('../services/pegawai.service', () => ({
   pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn(), pengajuan: vi.fn(), prosesPengajuan: vi.fn(), hapus: vi.fn(), fotoPengajuan: vi.fn() },
 }))
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
+vi.mock('../services/lkh.service', () => ({
+  lkhService: { list: vi.fn().mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0 } }), opsi: vi.fn().mockResolvedValue(null), pdf: vi.fn(), remove: vi.fn() },
+}))
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return { ...actual, riwayatService: { list: vi.fn().mockResolvedValue([]), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn() } }
@@ -18,6 +21,7 @@ vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
 import { Role, type RoleCode } from '@/features/auth/types'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
+import { lkhService } from '../services/lkh.service'
 import { pegawaiService } from '../services/pegawai.service'
 import DetailPegawaiPage from '../views/DetailPegawaiPage.vue'
 
@@ -135,9 +139,11 @@ describe('DetailPegawaiPage — tab dari descriptor', () => {
     expect(wrapper.find('[data-testid="riwayat-section-pendidikan"]').exists()).toBe(true)
   })
 
-  it('?tab=lkh membuka tab non-engine ("belum tersedia"); ?tab yang tidak ada di descriptor kembali ke Data Umum', async () => {
+  it('?tab=lkh membuka tab non-engine LKH (GET lkh?nip=, MAKE-014); ?tab yang tidak ada di descriptor kembali ke Data Umum', async () => {
     const lkh = await mountDetail(`/pegawai/${NIP}?tab=lkh`)
-    expect(lkh.wrapper.find('[data-testid="riwayat-belum-tersedia"]').exists()).toBe(true)
+    expect(lkh.wrapper.find('[data-testid="riwayat-belum-tersedia"]').exists()).toBe(false)
+    expect(lkh.wrapper.find('[data-testid="lkh-tab-table"]').exists()).toBe(true)
+    expect(vi.mocked(lkhService.list)).toHaveBeenCalledWith({ page: 1, per_page: 20, nip: NIP })
     lkh.wrapper.unmount()
 
     const { wrapper } = await mountDetail(`/pegawai/${NIP}?tab=kgb`)

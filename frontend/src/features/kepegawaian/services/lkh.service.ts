@@ -19,6 +19,8 @@ import type { LkhItem, LkhKegiatan, LkhListResponse, LkhOpsi } from '../types'
 export type AksiLkh = 'setujui' | 'tolak' | 'revisi'
 
 export interface LkhIsian {
+  /** Pegawai sasaran (role 1/3 untuk pegawai lain); bawaan diri sendiri. */
+  nip?: string
   tgl_laporan: string
   kegiatan: LkhKegiatan[]
   /** Hanya Super Admin: timpa atasan otomatis (NIP pegawai aktif). */
@@ -26,8 +28,11 @@ export interface LkhIsian {
 }
 
 export const lkhService = {
-  async list(query: { page: number; per_page: number }): Promise<LkhListResponse> {
-    const { data } = await api.get<LkhListResponse>('/lkh', { params: query })
+  /** `nip` = pegawai lain (role 1/3 dalam lingkup; tab LKH Detail Pegawai, MAKE-014); bawaan diri sendiri. */
+  async list(query: { page: number; per_page: number; nip?: string }): Promise<LkhListResponse> {
+    const params: Record<string, string | number> = { page: query.page, per_page: query.per_page }
+    if (query.nip) params.nip = query.nip
+    const { data } = await api.get<LkhListResponse>('/lkh', { params })
     return data
   },
 
@@ -38,8 +43,8 @@ export const lkhService = {
     return data
   },
 
-  async opsi(): Promise<LkhOpsi> {
-    const { data } = await api.get<LkhOpsi>('/lkh/opsi')
+  async opsi(nip?: string): Promise<LkhOpsi> {
+    const { data } = await api.get<LkhOpsi>('/lkh/opsi', { params: nip ? { nip } : {} })
     return data
   },
 

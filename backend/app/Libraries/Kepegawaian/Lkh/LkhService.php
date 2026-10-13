@@ -304,6 +304,33 @@ final class LkhService implements LkhServiceInterface
      * NIP yang dikelola pemanggil: pegawai → selalu NIP sendiri (NIP lain → 403); role 1 → NIP apa pun yang ada;
      * role 3 → dalam lingkup PegawaiScope. Kosong → NIP sendiri.
      */
+    public function descriptorTab(AuthContext $auth, string $nip): ?array
+    {
+        if (! in_array($auth->role(), self::ROLE_LKH, true)) {
+            return null;
+        }
+
+        $sendiri = (string) $auth->nip() !== '' && (string) $auth->nip() === $nip;
+        $admin   = in_array($auth->role(), [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true);
+
+        if (! $sendiri && ! ($admin && $this->scope()->bolehLihat($auth, $nip))) {
+            return null;
+        }
+
+        // Tambah/ubah/hapus mengikuti nipSasaran(tulis); hak per baris tetap dari `aksi` daftar.
+        $tulis = $sendiri || $auth->role() === Role::SUPER_ADMIN || $this->scope()->bolehUbah($auth, $nip);
+
+        return [
+            'jenis'       => 'lkh',
+            'label'       => 'Laporan Kerja Harian',
+            'can_view'    => true,
+            'can_create'  => $tulis,
+            'can_edit'    => $tulis,
+            'can_delete'  => $tulis,
+            'can_process' => false,
+        ];
+    }
+
     private function nipSasaran(AuthContext $auth, mixed $nip, bool $tulis): string
     {
         $sendiri = (string) $auth->nip();

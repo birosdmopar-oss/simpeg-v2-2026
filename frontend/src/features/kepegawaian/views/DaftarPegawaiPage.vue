@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
  * Halaman Daftar Pegawai (§4.1.5, Gambar 18–21) — Fase 3, B-20 (pemilik WS-2). Data dari `GET pegawai` (disaring
- * lingkup pemanggil di backend). Pencarian, "Filter Kolom", tabel, paginasi.
+ * lingkup pemanggil di backend). Pencarian, panel filter (status, unit → satker, jenis pegawai, urutan; MAKE-014 —
+ * disembunyikan untuk role 8 sesuai WS2 §3.4.2 #12), "Filter Kolom", tabel, paginasi.
  * Akses: role 1, 3, 4, 5, 8; tombol "+ Data Pegawai" dan aksi "Hapus" hanya role 1.
  *
  * Tanpa data contoh: selama endpoint masih stub (404/501) halaman menampilkan keadaan galat yang jelas.
  * Tambah (TambahPegawaiDialog) dan Hapus (⋮ → ConfirmDialog → `DELETE pegawai/{nip}`, hapus PERMANEN ikut legacy;
- * 422 bila pegawai masih punya data terkait) tersambung B-05 (MAKE-011). TODO(B-20 penutup, MAKE-014): panel filter, filter per kolom, export.
+ * 422 bila pegawai masih punya data terkait) tersambung B-05 (MAKE-011).
  */
 import { Plus } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -20,6 +21,7 @@ import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiExportMenu, UiNotice, UiPagination, UiSearchInput, UiSelect } from '@/shared/ui'
 
 import PegawaiColumnPicker from '../components/PegawaiColumnPicker.vue'
+import PegawaiFilterPanel, { type PegawaiFilter } from '../components/PegawaiFilterPanel.vue'
 import PegawaiTable from '../components/PegawaiTable.vue'
 import TambahPegawaiDialog from '../components/TambahPegawaiDialog.vue'
 import { DEFAULT_COLUMN_KEYS, fullName } from '../columns'
@@ -31,6 +33,10 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const isSuperAdmin = computed(() => auth.role === Role.SUPER_ADMIN)
+/** WS2 §3.4.2 #12: panel filter disembunyikan untuk role 8 (Pimpinan); pencarian tetap ada. */
+const bolehFilter = computed(() => auth.role !== Role.PIMPINAN)
+/** Status bawaan Aktif (legacy list.php initComplete; keputusan user 13-10-2026 Q-M6-3). */
+const filter = ref<PegawaiFilter>({ status: '1', id_unit: '', id_satker: '', id_jenis_pegawai: '', sort: 'nama', order: 'asc' })
 
 const search = ref('')
 const columnKeys = ref<string[]>([...DEFAULT_COLUMN_KEYS])
@@ -59,7 +65,12 @@ async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    const result = await pegawaiService.list({ page: page.value, per_page: Number(perPage.value), search: search.value || undefined })
+    const result = await pegawaiService.list({
+      page: page.value,
+      per_page: Number(perPage.value),
+      search: search.value || undefined,
+      ...(bolehFilter.value ? filter.value : {}),
+    })
     // Abaikan respons yang sudah basi (pengguna keburu mengubah pencarian).
     if (current !== requestId) return
     rows.value = result.items
@@ -80,7 +91,7 @@ function schedule(resetPage: boolean): void {
   timer = setTimeout(load, 250)
 }
 
-watch([search, perPage], () => schedule(true))
+watch([search, perPage, filter], () => schedule(true))
 watch(page, () => schedule(false))
 
 onMounted(load)
@@ -149,6 +160,8 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
             <PegawaiColumnPicker v-model="columnKeys" />
           </div>
         </div>
+
+        <div v-if="bolehFilter" class="px-5"><PegawaiFilterPanel v-model="filter" /></div>
 
         <UiNotice v-if="failure" :tone="failure.kind === 'unavailable' ? 'info' : 'danger'" class="mx-5" data-testid="pegawai-failure">{{ failure.message }}</UiNotice>
 

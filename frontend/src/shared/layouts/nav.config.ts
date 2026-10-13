@@ -44,10 +44,10 @@ import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
 /**
- * Fase tertinggi yang menunya ditampilkan. Tetap 2 sampai halaman Fase 3 tersambung API (B-20 penutup, WS-2);
- * menu Fase 3 sudah terdaftar di bawah tetapi tersembunyi.
+ * Fase tertinggi yang menunya ditampilkan. 3 sejak B-20 penutup (WS-2 MAKE-014): semua halaman Modul B tersambung API.
+ * Menu fase 4+ sudah terdaftar di bawah tetapi tersembunyi.
  */
-export const ACTIVE_PHASE = 2
+export const ACTIVE_PHASE = 3
 
 export interface NavChild {
   key: string

@@ -43,20 +43,25 @@ beforeEach(() => {
 })
 
 describe('RedesignShell — menu', () => {
-  it('Super Admin melihat semua menu main (fase aktif 2) dan slot konten dirender di <main>', async () => {
+  it('Super Admin melihat menu Fase 3 + menu main dan slot konten dirender di <main>', async () => {
     const { wrapper } = await mountShell(Role.SUPER_ADMIN)
     const links = wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())
 
-    expect(links).toEqual(['Beranda', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
+    expect(links).toEqual([
+      'Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH',
+      'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ',
+    ])
     expect(wrapper.get('[data-testid="nav-web-config"]').attributes('href')).toBe('/web-config')
     expect(wrapper.get('main#main-content [data-testid="content"]').text()).toBe('isi halaman')
   })
 
-  it('Pegawai hanya melihat Beranda dan FAQ; menu Fase 3 belum tampil', async () => {
+  it('Pegawai melihat menu Fase 3 miliknya tanpa Daftar Pegawai', async () => {
     const { wrapper } = await mountShell(Role.PEGAWAI)
-    expect(wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())).toEqual(['Beranda', 'FAQ'])
+    expect(wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())).toEqual([
+      'Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'FAQ',
+    ])
     expect(wrapper.find('[data-testid="nav-pegawai"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="nav-struktur"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="nav-struktur"]').attributes('href')).toBe('/struktur-organisasi')
   })
 
   it('item aktif memakai aria-current="page"; halaman anak tetap menandai menu induknya', async () => {

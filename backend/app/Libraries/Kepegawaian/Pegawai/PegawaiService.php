@@ -7,6 +7,7 @@ namespace App\Libraries\Kepegawaian\Pegawai;
 use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
+use App\Interfaces\Kepegawaian\LkhServiceInterface;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
 use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
@@ -80,6 +81,7 @@ final class PegawaiService implements PegawaiServiceInterface
         private readonly ?PegawaiScopeInterface $scope = null,
         private readonly ?RiwayatRegistryInterface $registry = null,
         private readonly ?KolomBerkas $berkas = null,
+        private readonly ?LkhServiceInterface $lkh = null,
     ) {
     }
 
@@ -162,7 +164,13 @@ final class PegawaiService implements PegawaiServiceInterface
                 && in_array($auth->role(), [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true)
                 && $scope->bolehProses($auth, $nip),
         ];
+        // Descriptor engine lalu non-engine WS-2 (README kontrak "Descriptor tab"): `lkh` (MAKE-014).
         $hasil['tabs'] = $this->registry()->descriptorUntuk($auth, $nip);
+        $lkh           = $this->lkh()->descriptorTab($auth, $nip);
+
+        if ($lkh !== null) {
+            $hasil['tabs'][] = $lkh;
+        }
 
         return $hasil;
     }
@@ -233,6 +241,11 @@ final class PegawaiService implements PegawaiServiceInterface
     private function scope(): PegawaiScopeInterface
     {
         return $this->scope ?? service('pegawaiScope');
+    }
+
+    private function lkh(): LkhServiceInterface
+    {
+        return $this->lkh ?? service('lkhService');
     }
 
     private function registry(): RiwayatRegistryInterface

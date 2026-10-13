@@ -13,8 +13,19 @@ export const PEGAWAI_LIST_ROLES: readonly RoleCode[] = [
   Role.PIMPINAN,
 ]
 
-/** Usulan Konket (`hr/rwy/konket/*` = 1, 2, 3, 6, 7). */
-export const KONKET_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.PEGAWAI, Role.ADMIN_SATKER, Role.PTT, Role.PPPK]
+/**
+ * Usulan Konket (`hr/rwy/konket/*` = 1, 2, 3, 6, 7) + [K] role 4, 5 lihat saja (legacy list_ad/detail; keputusan user
+ * 13-10-2026, MAKE-013): antrean + detail tanpa Tambah/aksi (server `can_create`/`aksi`).
+ */
+export const KONKET_ROLES: readonly RoleCode[] = [
+  Role.SUPER_ADMIN,
+  Role.PEGAWAI,
+  Role.ADMIN_SATKER,
+  Role.ADMIN_VIEW_ESELON1,
+  Role.MENTERI,
+  Role.PTT,
+  Role.PPPK,
+]
 
 /**
  * Verifikasi LKH (`hr/rwy/lkh/*` = 1, 2, 3, 6, 7). Approver = atasan langsung (ikut legacy) — penentuan atasan

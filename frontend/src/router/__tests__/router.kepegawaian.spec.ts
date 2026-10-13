@@ -117,7 +117,7 @@ describe('router — placeholder halaman Fase 3 (Matriks v2)', () => {
   })
 
   it('Konket & LKH = role 1, 2, 3, 6, 7; Karpeg/Karis = role 1, 2, 4, 5, 7', () => {
-    expect(KONKET_ROLES).toEqual([1, 2, 3, 6, 7])
+    expect(KONKET_ROLES).toEqual([1, 2, 3, 4, 5, 6, 7])
     expect(LKH_ROLES).toEqual([1, 2, 3, 6, 7])
     expect(KARPEG_KARIS_ROLES).toEqual([1, 2, 4, 5, 7])
   })

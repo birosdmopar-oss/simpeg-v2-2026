@@ -5,7 +5,7 @@
  *    PDF → Hapus (ConfirmDialog);
  *  - "Verifikasi Bawahan": antrean atasan langsung (`nip_atasan` = saya; legacy notifikasi need_approval), ⋮ Verifikasi
  *    → Unduh PDF.
- * PDF dibangkitkan server (TCPDF). Tab LKH di Detail Pegawai diintegrasikan di M6 (B-20 penutup).
+ * PDF dibangkitkan server (TCPDF). Tab LKH di Detail Pegawai = `components/LkhTab.vue` (MAKE-014).
  */
 import { Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'

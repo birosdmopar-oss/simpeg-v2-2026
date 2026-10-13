@@ -16,6 +16,9 @@ vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
     riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn(), pratinjau: vi.fn() },
   }
 })
+vi.mock('../services/lkh.service', () => ({
+  lkhService: { list: vi.fn().mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0 } }), opsi: vi.fn(), pdf: vi.fn(), remove: vi.fn() },
+}))
 vi.mock('../services/lampiran.service', () => ({
   lampiranService: { list: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn() },
 }))
@@ -161,9 +164,10 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-failure"]').text()).toBe('Anda tidak berhak mengakses data ini.')
   })
 
-  it('tab non-engine (lkh) → "belum tersedia" tanpa memanggil API riwayat', async () => {
+  it('tab non-engine (lkh) → LkhTab WS-2 (MAKE-014) tanpa memanggil API riwayat engine', async () => {
     const wrapper = await mountTab({}, lkh)
-    expect(wrapper.get('[data-testid="riwayat-belum-tersedia"]').text()).toContain('Laporan Kerja Harian')
+    expect(wrapper.find('[data-testid="lkh-tab-table"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="riwayat-belum-tersedia"]').exists()).toBe(false)
     expect(svc.list).not.toHaveBeenCalled()
   })
 

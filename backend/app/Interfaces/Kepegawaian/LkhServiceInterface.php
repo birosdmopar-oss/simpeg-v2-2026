@@ -74,4 +74,12 @@ interface LkhServiceInterface
      * @return array{isi: string, nama: string}
      */
     public function pdf(AuthContext $auth, int $id): array;
+
+    /**
+     * Descriptor tab non-engine `lkh` untuk Detail Pegawai (MAKE-014; bentuk sama dengan descriptor engine), atau null
+     * bila pemanggil tidak boleh melihat LKH pegawai itu (hak = `daftar(['nip' => $nip])`).
+     *
+     * @return array{jenis: string, label: string, can_view: bool, can_create: bool, can_edit: bool, can_delete: bool, can_process: bool}|null
+     */
+    public function descriptorTab(AuthContext $auth, string $nip): ?array;
 }

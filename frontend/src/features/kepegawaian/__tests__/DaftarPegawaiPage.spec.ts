@@ -13,6 +13,8 @@ import { Role, type RoleCode } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
+import { masterService } from '@/features/master-data/services/master.service'
+
 import { pegawaiService } from '../services/pegawai.service'
 import DaftarPegawaiPage from '../views/DaftarPegawaiPage.vue'
 
@@ -54,7 +56,7 @@ beforeEach(() => {
 describe('DaftarPegawaiPage — data', () => {
   it('GET pegawai halaman 1 / 10 baris; header kolom bawaan + Aksi paling kanan', async () => {
     const { wrapper } = await mountList()
-    expect(list).toHaveBeenCalledWith({ page: 1, per_page: 10, search: undefined })
+    expect(list).toHaveBeenCalledWith({ page: 1, per_page: 10, search: undefined, status: '1', id_unit: '', id_satker: '', id_jenis_pegawai: '', sort: 'nama', order: 'asc' })
     expect(rows(wrapper)).toHaveLength(10)
     expect(headers(wrapper)).toEqual(['Nama/NIP', 'Jabatan', 'Satuan Kerja', 'KP (Gol)', 'Jenis Pegawai', 'Aksi'])
   })
@@ -71,7 +73,46 @@ describe('DaftarPegawaiPage — data', () => {
     const { wrapper } = await mountList()
     await wrapper.get('input[type="search"]').setValue('budi')
     await settle()
-    expect(list).toHaveBeenLastCalledWith({ page: 1, per_page: 10, search: 'budi' })
+    expect(list).toHaveBeenLastCalledWith({ page: 1, per_page: 10, search: 'budi', status: '1', id_unit: '', id_satker: '', id_jenis_pegawai: '', sort: 'nama', order: 'asc' })
+  })
+
+  it('panel filter (MAKE-014): status, unit → satker bertingkat, jenis, urutan dikirim ke server; halaman kembali 1', async () => {
+    const options = vi.mocked(masterService.options)
+    options.mockImplementation(async (entity: string, parent?: string | null) => {
+      if (entity === 'unit') return [{ id: '5', nama: 'Unit A', parent: null }]
+      if (entity === 'satker') return parent === '5' ? [{ id: '50', nama: 'Satker A1', parent: '5' }] : []
+      return [{ id: '1', nama: 'PNS', parent: null }]
+    })
+    const { wrapper } = await mountList()
+    const pilih = async (testid: string, nilai: string) => {
+      await wrapper.get(`[data-testid="${testid}"] select`).setValue(nilai)
+      await flushPromises()
+    }
+    expect(wrapper.get('[data-testid="pegawai-filter-satker"] select').attributes('disabled')).toBeDefined()
+
+    await pilih('pegawai-filter-status', '2')
+    await pilih('pegawai-filter-unit', '5')
+    expect(options).toHaveBeenCalledWith('satker', '5')
+    await pilih('pegawai-filter-satker', '50')
+    await pilih('pegawai-filter-jenis', '1')
+    await pilih('pegawai-filter-sort', 'gol_ruang')
+    await pilih('pegawai-filter-order', 'desc')
+    await settle()
+
+    expect(list).toHaveBeenLastCalledWith({ page: 1, per_page: 10, search: undefined, status: '2', id_unit: '5', id_satker: '50', id_jenis_pegawai: '1', sort: 'gol_ruang', order: 'desc' })
+
+    // Ganti unit → satker yang tidak cocok dikosongkan.
+    await pilih('pegawai-filter-unit', '')
+    await settle()
+    expect(list.mock.lastCall?.[0]).toMatchObject({ id_unit: '', id_satker: '' })
+    options.mockReset()
+    options.mockResolvedValue([])
+  })
+
+  it('role 8 (Pimpinan): panel filter disembunyikan, pencarian tetap', async () => {
+    const { wrapper } = await mountList(Role.PIMPINAN)
+    expect(wrapper.find('[data-testid="pegawai-filter"]').exists()).toBe(false)
+    expect(list).toHaveBeenCalledWith({ page: 1, per_page: 10, search: undefined })
   })
 
   it.each([

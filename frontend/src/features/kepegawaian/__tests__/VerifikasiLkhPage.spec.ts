@@ -86,6 +86,7 @@ describe('VerifikasiLkhPage', () => {
 
     expect(svc.create).toHaveBeenCalledWith({
       tgl_laporan: '2026-10-13',
+      nip: '198001012005011001',
       kegiatan: [{ kegiatan: 'Menyusun laporan', output: 'Draf', jumlah_diselesaikan: '1', jam_mulai: '08:00', jam_selesai: '09:00' }],
     })
     expect(w.get('[data-testid="lkh-notice"]').text()).toContain('disimpan')

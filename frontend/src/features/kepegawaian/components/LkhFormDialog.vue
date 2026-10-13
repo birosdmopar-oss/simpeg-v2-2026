@@ -71,6 +71,8 @@ async function simpan(): Promise<void> {
       tgl_laporan: isian.tgl_laporan,
       kegiatan: isian.kegiatan.map((k) => ({ kegiatan: k.kegiatan, output: k.output, jumlah_diselesaikan: k.jumlah_diselesaikan, jam_mulai: k.jam_mulai, jam_selesai: k.jam_selesai })),
       ...(bolehTimpaAtasan.value && isian.nip_atasan.trim() ? { nip_atasan: isian.nip_atasan.trim() } : {}),
+      // Tambah untuk pegawai sasaran opsi (tab LKH Detail Pegawai, role 1/3); ubah memakai pemilik baris.
+      ...(!props.row && props.opsi?.nip ? { nip: props.opsi.nip } : {}),
     }
     const row = props.row ? await lkhService.update(props.row.id, data) : await lkhService.create(data)
     emit('saved', row)
