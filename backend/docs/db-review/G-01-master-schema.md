@@ -152,7 +152,7 @@ Keputusan user yang ikut dieksekusi di DBV-001 (23-09-2026):
 
 ### 8.2 Skema hasil DBV-001
 
-Sumber: **[K]** terkonfirmasi — DDL produksi `simpeg_prod.sql` (HeidiSQL, host 172.17.100.83, MySQL 8.0.21) atau code legacy (`application/libraries/hr/master/Lm_umum.php`, `views/hr/master/umum/*`); **[I]** dugaan (DDL tabel tersebut tidak ada di sumber lokal).
+Sumber: **[K]** terkonfirmasi — DDL produksi `simpeg_prod.sql` (HeidiSQL, server DB produksi, MySQL 8.0.21) atau code legacy (`application/libraries/hr/master/Lm_umum.php`, `views/hr/master/umum/*`); **[I]** dugaan (DDL tabel tersebut tidak ada di sumber lokal).
 
 Semua tabel: `ENGINE=InnoDB`, `utf8mb4` / `utf8mb4_unicode_ci`; `status TINYINT NOT NULL DEFAULT 1` (1/2/10) [K agama; wilayah & jenis_* nilai 1/2/10 K dari code]; `created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`, `updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`, `updated_by INT NULL` [K agama DDL; tabel lain K `updated_by` ditulis code, tipe I].
 
