@@ -107,6 +107,11 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
   `aturanLampiran(int)` memetakan kode → Definisi/aturan.
 - **`wajib`** ditegakkan `RiwayatService::tambah()/ubah()`: setelah request, baris wajib punya minimal satu lampiran
   untuk setiap kode ber-`wajib`.
+- **Arsip Data Umum** (MAKE-014, `Lampiran/ArsipDataUmum`): kode 38 `arsip_du` dan 37 `status_du` tanpa Definisi;
+  `id_entri` = NIP (baris legacy `id_entri` NULL ikut di daftar). Lihat/unduh = `bolehLihat`. Unggah/hapus 38: role 1,
+  role 3 (`bolehUbah`), role 2/6/7 NIP sendiri — `POST` + `jenis_arsip` (KTP, Paspor, BPJS, Taspen, KARIS, KARSU, KARPEG,
+  NPWP, atau `Lain-lain` + `nama_arsip_lain`) → `tag`; jpg/jpeg/png/pdf 5 MB. Unggah/hapus 37: role 1 — `nama_arsip`
+  opsional (bawaan "Arsip Status") → `tag`; jpg/jpeg/png/gif/pdf/doc/docx/xls/xlsx 5 MB. Tanpa lampiran wajib.
 - **Otorisasi endpoint lampiran** (ditegakkan pemanggil sebelum `AttachmentService`): `id_riwayat` → Definisi pemilik
   (tidak terdaftar → 404); izin Definisi × role: `GET`/unduh = `lihat`, `POST` = `tambah` atau `ubah`, `DELETE` = `hapus`
   atau `ubah` (403); `PegawaiScope` `bolehLihat`/`bolehUbah` (403); `id_entri` wajib baris milik `{nip}` di
@@ -160,6 +165,23 @@ tanpa alasan, `show_notif` 1, legacy `L_employee.php:410-418`); role 2/3/6/7 →
 `biodata/pengajuan*`). Super Admin juga mengubah `status` pegawai 1/2 di biodata (ikut form legacy); 1 → 2
 menonaktifkan akun user_level 2 (PNS) dan mencabut sesinya [K] trigger `pegawai_afUpd`; 2 → 1 tidak mengaktifkan ulang.
 `GET pegawai/{nip}` → `aksi.proses_biodata` (MAKE-011) = ada pengajuan menunggu yang boleh diproses pemanggil.
+
+### B-20 penutup: pencarian lanjutan, ekspor, DRH, Arsip Kepegawaian, tab LKH (WS-2 M6, MAKE-014, aditif)
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET pegawai/export?format=csv\|xlsx&kolom=&<filter daftar>` | 1, 3, 4, 5, 8 (`Role::filter`) | Ekspor daftar dengan filter & lingkup sama dengan `GET pegawai` (legacy DataTables sisi klien; keputusan user Q-M6-2). `kolom` = kunci kolom Daftar Pegawai FE dipisah koma (`nip_lama`, `jabatan`, `satker`, `unit`, `gol_ruang`, `pangkat`, `jenis_pegawai`, `jenis_status`, `tmt_status`, `jenis_kelamin`, `agama`; Nama + NIP selalu paling kiri). CSV UTF-8 BOM / XLSX (sel teks, NIP tidak berubah angka); nilai diawali `= + - @` TAB CR diberi apostrof (cegah formula injection). Maks 20.000 baris (lebih → 422 `kolom`); `format`/`kolom` tidak dikenal → 422 |
+| `GET pegawai/pencarian/katalog` | 1, 3, 4, 5 | `{ jenis: [{ key, label, jenis_data: ['last'?, 'rwy'], atribut: [{ field, label, pilihan, hanya_rwy }] }], operator }` — whitelist port `L_employee::advsearch` (`$const_rwy`/`$const_attr`/`$const_dm`/`$const_opr`); `pilihan` = entity master options atau daftar tetap |
+| `POST pegawai/pencarian` | 1, 3, 4, 5 | `{ kriteria: [{ jenis_rwy, jenis_data: last\|rwy, atribut, operator, nilai, hubung: AND\|OR }], page, per_page, sort, order }` (1–10 kriteria; IN/NOT IN dipisah koma ≤ 50) → bentuk sama dengan `GET pegawai`. Pegawai status 1 saja (legacy); kriteria riwayat = `EXISTS` baris status 1 (snapshot `pegawai_*` tanpa kolom status); [V2] role 3 dibatasi lingkup jalur daftar (legacy tidak). Atribut/operator/jenis di luar whitelist → 422 `kriteria.<i>.<kunci>` |
+| `POST pegawai/pencarian/export` | 1, 3, 4, 5 | `{ format, kolom, kriteria }` → berkas seperti `GET pegawai/export` dari hasil pencarian lanjutan |
+| `GET pegawai/{nip}/drh?inline=1` | UL_ALL: 2/6/7 NIP sendiri; 1/3/4/5/8 `bolehLihat` | Cetak DRH PDF (TCPDF) bagian A–L legacy `print_drh` (riwayat status 1); `attachment` `drh_<nip>_<Ymd>.pdf`. [V2] PDF saja (legacy juga HTML/DOCX + `drh_generator` ZIP role 1 — tidak dibuat). 403 di luar hak, 404 NIP |
+| `GET lkh/rekap?bulan=YYYY-MM` | 1, 2, 3, 6, 7 (siapa pun yang punya bawahan) | Rekap LKH bawahan langsung per bulan: `{ bulan, ds, de, items: [{ nip, nama, jabatan, satker, menunggu, disetujui, ditolak, revisi, total }] }`; bawahan = legacy `list_rekap` (atasan terdekat per sub group / jabatan koordinasi) [V2] + pegawai ber-LKH dengan `nip_atasan` pemanggil pada bulan itu. Bulan salah/masa depan → 422 `bulan` |
+| `GET lkh/rekap/{nip}?bulan=` | sama | `{ bulan, pegawai, items: [LKH bulan itu, semua status kecuali dihapus] }`; bukan bawahan → 403 |
+
+`GET pegawai/{nip}` → `tabs` = descriptor engine **diikuti** descriptor non-engine `lkh` (`LkhServiceInterface::descriptorTab`:
+pemilik, role 1, role 3 dalam lingkup; role 4/5/8 tidak). **Arsip Kepegawaian** = endpoint lampiran dengan `id_riwayat`
+38 (`arsip_du`) atau 37 (`status_du`) dan `id_entri` = NIP (bagian Lampiran). [K] data sensitif detail (NIK, NPWP, BPJS,
+TASPEN, HP, kerabat) tampil penuh untuk 4/5/8 (legacy tanpa penyamaran; keputusan user Q3).
 
 ### Jabatan, Plt/Plh, struktur organisasi (WS-2 M4, MAKE-012, aditif)
 

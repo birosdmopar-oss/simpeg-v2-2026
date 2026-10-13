@@ -558,3 +558,15 @@ berakhir). Otorisasi lampiran tetap tanggung jawab pemanggil (kontrak interface)
 **Pemakaian `KolomBerkas`.** `simpan()` mengembalikan path untuk ditulis ke kolom; `hapus()` menandai berkas lama;
 `selesaikan()` WAJIB dipanggil setelah transaksi (juga di jalur rollback) — tidak ada rekonsiliasi oportunistik karena
 path baru belum dirujuk sampai kolomnya ditulis. Contoh lengkap di docblock kelas.
+
+## B-20 penutup (MAKE-014)
+
+- `Pegawai/PencarianLanjutan` — whitelist advsearch legacy (jenis × data terakhir/riwayat × atribut × operator), terapkan ke
+  builder daftar (`EXISTS` per kriteria riwayat, status pegawai 1). `Pegawai/EksporTabel` — CSV BOM & XLSX minimal tanpa
+  library baru, escape formula. Keduanya dipakai `PegawaiService::pencarian/ekspor` dengan builder & lingkup daftar.
+- `Pegawai/DrhPegawai` — Cetak DRH (port `L_employee::print_drh` + `drh_pdf.php`), templat `app/Views/pdf/drh.php`, hak
+  UL_ALL (2/6/7 sendiri). Dibuat langsung di controller (tanpa entri Services.php).
+- `Lampiran/ArsipDataUmum` — aturan arsip Data Umum kode 37/38 (cabang tanpa Definisi di `OtorisasiLampiran`).
+- `Lkh/LkhService::descriptorTab/rekap/rekapBawahan` — tab LKH Detail Pegawai dan rekap LKH bawahan.
+- Daftar periksa cutover tambahan: berkas arsip Data Umum legacy (`document_attachment` 37/38, `id_entri` NULL) terbaca di
+  daftar tetapi unduhnya 404 sampai berkas dimigrasikan (sama dengan lampiran lain).
