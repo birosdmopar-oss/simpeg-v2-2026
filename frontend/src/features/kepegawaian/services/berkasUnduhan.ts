@@ -11,6 +11,7 @@ export interface BerkasUnduhan {
 
 const EKSTENSI: Record<string, string> = {
   'application/pdf': '.pdf',
+  'text/csv': '.csv',
   'image/jpeg': '.jpg',
   'image/png': '.png',
   'image/gif': '.gif',
@@ -39,6 +40,12 @@ export function namaBerkas(headers: unknown, blob: Blob, dasar: string): string 
 /** GET biner + nama berkas. */
 export async function ambilBerkas(url: string, dasar: string, params?: Record<string, string>): Promise<BerkasUnduhan> {
   const res = await api.get<Blob>(url, { params, responseType: 'blob' })
+  return { blob: res.data, nama: namaBerkas(res.headers, res.data, dasar) }
+}
+
+/** POST JSON → biner + nama berkas (mis. ekspor hasil pencarian lanjutan). */
+export async function kirimBerkas(url: string, body: unknown, dasar: string): Promise<BerkasUnduhan> {
+  const res = await api.post<Blob>(url, body, { responseType: 'blob' })
   return { blob: res.data, nama: namaBerkas(res.headers, res.data, dasar) }
 }
 

@@ -2,14 +2,16 @@
 /**
  * Halaman Daftar Pegawai (§4.1.5, Gambar 18–21) — Fase 3, B-20 (pemilik WS-2). Data dari `GET pegawai` (disaring
  * lingkup pemanggil di backend). Pencarian, panel filter (status, unit → satker, jenis pegawai, urutan; MAKE-014 —
- * disembunyikan untuk role 8 sesuai WS2 §3.4.2 #12), "Filter Kolom", tabel, paginasi.
+ * disembunyikan untuk role 8 sesuai WS2 §3.4.2 #12), "Filter Kolom", tabel, paginasi. Pencarian lanjutan (role 1, 3, 4, 5;
+ * legacy advsearch) mengganti sumber daftar dengan `POST pegawai/pencarian`; Export CSV/XLSX mengikuti sumber aktif
+ * (filter atau kriteria) dan kolom yang sedang tampil (`GET pegawai/export` / `POST pegawai/pencarian/export`).
  * Akses: role 1, 3, 4, 5, 8; tombol "+ Data Pegawai" dan aksi "Hapus" hanya role 1.
  *
  * Tanpa data contoh: selama endpoint masih stub (404/501) halaman menampilkan keadaan galat yang jelas.
  * Tambah (TambahPegawaiDialog) dan Hapus (⋮ → ConfirmDialog → `DELETE pegawai/{nip}`, hapus PERMANEN ikut legacy;
  * 422 bila pegawai masih punya data terkait) tersambung B-05 (MAKE-011).
  */
-import { Plus } from 'lucide-vue-next'
+import { Plus, SlidersHorizontal } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -22,12 +24,14 @@ import { UiButton, UiCard, UiExportMenu, UiNotice, UiPagination, UiSearchInput, 
 
 import PegawaiColumnPicker from '../components/PegawaiColumnPicker.vue'
 import PegawaiFilterPanel, { type PegawaiFilter } from '../components/PegawaiFilterPanel.vue'
+import PencarianLanjutanPanel from '../components/PencarianLanjutanPanel.vue'
 import PegawaiTable from '../components/PegawaiTable.vue'
 import TambahPegawaiDialog from '../components/TambahPegawaiDialog.vue'
 import { DEFAULT_COLUMN_KEYS, fullName } from '../columns'
 import { describeApiError, type ApiFailure } from '../services/apiErrors'
+import { simpanBerkas } from '../services/berkasUnduhan'
 import { pegawaiService } from '../services/pegawai.service'
-import type { PegawaiListItem } from '../types'
+import type { KriteriaPencarian, PegawaiListItem } from '../types'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -36,6 +40,16 @@ const isSuperAdmin = computed(() => auth.role === Role.SUPER_ADMIN)
 /** WS2 §3.4.2 #12: panel filter disembunyikan untuk role 8 (Pimpinan); pencarian tetap ada. */
 const bolehFilter = computed(() => auth.role !== Role.PIMPINAN)
 /** Status bawaan Aktif (legacy list.php initComplete; keputusan user 13-10-2026 Q-M6-3). */
+/** Pencarian lanjutan: role 1, 3, 4, 5 (legacy advsearch). */
+const bolehLanjutan = computed(() => ([Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI] as number[]).includes(auth.role ?? 0))
+const lanjutanOpen = ref(false)
+const kriteria = ref<KriteriaPencarian[] | null>(null)
+const galatKriteria = ref<Record<string, string>>({})
+const mengekspor = ref(false)
+const EXPORT_FORMATS = [
+  { key: 'xlsx' as const, label: 'Export Excel (.xlsx)' },
+  { key: 'csv' as const, label: 'Export CSV' },
+]
 const filter = ref<PegawaiFilter>({ status: '1', id_unit: '', id_satker: '', id_jenis_pegawai: '', sort: 'nama', order: 'asc' })
 
 const search = ref('')
@@ -65,12 +79,14 @@ async function load(): Promise<void> {
   loading.value = true
   failure.value = null
   try {
-    const result = await pegawaiService.list({
-      page: page.value,
-      per_page: Number(perPage.value),
-      search: search.value || undefined,
-      ...(bolehFilter.value ? filter.value : {}),
-    })
+    const result = kriteria.value
+      ? await pegawaiService.pencarian(kriteria.value, { page: page.value, per_page: Number(perPage.value), sort: filter.value.sort, order: filter.value.order })
+      : await pegawaiService.list({
+          page: page.value,
+          per_page: Number(perPage.value),
+          search: search.value || undefined,
+          ...(bolehFilter.value ? filter.value : {}),
+        })
     // Abaikan respons yang sudah basi (pengguna keburu mengubah pencarian).
     if (current !== requestId) return
     rows.value = result.items
@@ -79,6 +95,10 @@ async function load(): Promise<void> {
     if (current !== requestId) return
     rows.value = []
     total.value = 0
+    if (kriteria.value && isApiError(error) && error.status === 422 && error.errors) {
+      galatKriteria.value = Object.fromEntries(Object.entries(error.errors).map(([k, v]) => [k, v?.[0] ?? '']))
+      return
+    }
     failure.value = describeApiError(error)
   } finally {
     if (current === requestId) loading.value = false
@@ -98,6 +118,38 @@ onMounted(load)
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer)
 })
+
+function cariLanjutan(isi: KriteriaPencarian[]): void {
+  galatKriteria.value = {}
+  kriteria.value = isi
+  page.value = 1
+  void load()
+}
+
+function tutupLanjutan(): void {
+  galatKriteria.value = {}
+  kriteria.value = null
+  lanjutanOpen.value = false
+  page.value = 1
+  void load()
+}
+
+async function ekspor(format: 'pdf' | 'xlsx' | 'csv'): Promise<void> {
+  if (format === 'pdf') return
+  mengekspor.value = true
+  // Kolom tampil tanpa Nama/NIP (server selalu menyertakannya paling kiri).
+  const kolom = columnKeys.value.filter((k) => k !== 'nama_nip')
+  try {
+    const berkas = kriteria.value
+      ? await pegawaiService.eksporPencarian(format, kolom, kriteria.value)
+      : await pegawaiService.ekspor(format, kolom, { search: search.value || undefined, ...(bolehFilter.value ? filter.value : {}) })
+    simpanBerkas(berkas)
+  } catch (error) {
+    notice.value = `Gagal mengekspor: ${pesanServer(error)}`
+  } finally {
+    mengekspor.value = false
+  }
+}
 
 function onAction(key: 'detail' | 'hapus', row: PegawaiListItem): void {
   if (key === 'detail') void router.push({ name: 'pegawai-detail', params: { nip: row.nip } })
@@ -147,7 +199,11 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
           <template #icon-left><Plus class="h-4 w-4" aria-hidden="true" /></template>
           Data Pegawai
         </UiButton>
-        <UiExportMenu @select="notice = 'Export belum tersedia — akan aktif bersama task B-20.'" />
+        <UiButton v-if="bolehLanjutan" variant="secondary" appearance="soft" data-testid="pencarian-toggle" @click="lanjutanOpen = !lanjutanOpen">
+          <template #icon-left><SlidersHorizontal class="h-4 w-4" aria-hidden="true" /></template>
+          Pencarian Lanjutan
+        </UiButton>
+        <UiExportMenu :formats="EXPORT_FORMATS" :disabled="mengekspor" @select="ekspor" />
       </template>
 
       <div class="mt-2 space-y-5 pb-5">
@@ -161,7 +217,13 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
           </div>
         </div>
 
-        <div v-if="bolehFilter" class="px-5"><PegawaiFilterPanel v-model="filter" /></div>
+        <div v-if="bolehLanjutan && lanjutanOpen" class="px-5">
+          <PencarianLanjutanPanel :errors="galatKriteria" @cari="cariLanjutan" @reset="tutupLanjutan" />
+        </div>
+        <UiNotice v-if="kriteria" tone="info" class="mx-5" data-testid="pencarian-aktif">
+          Menampilkan hasil pencarian lanjutan (pegawai aktif); filter dan pencarian biasa tidak dipakai.
+        </UiNotice>
+        <div v-else-if="bolehFilter" class="px-5"><PegawaiFilterPanel v-model="filter" /></div>
 
         <UiNotice v-if="failure" :tone="failure.kind === 'unavailable' ? 'info' : 'danger'" class="mx-5" data-testid="pegawai-failure">{{ failure.message }}</UiNotice>
 

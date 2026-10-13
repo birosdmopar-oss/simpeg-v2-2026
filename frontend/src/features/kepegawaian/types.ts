@@ -241,6 +241,27 @@ export interface PegawaiListItem
   pangkat: string | null
 }
 
+/** Kriteria pencarian lanjutan (B-20 penutup, MAKE-014; legacy advsearch). */
+export interface KriteriaPencarian {
+  jenis_rwy: string
+  jenis_data: 'last' | 'rwy'
+  atribut: string
+  operator: string
+  nilai: string
+  /** Penghubung dengan kriteria sebelumnya (diabaikan untuk kriteria pertama). */
+  hubung: 'AND' | 'OR'
+}
+
+export interface KatalogPencarian {
+  jenis: {
+    key: string
+    label: string
+    jenis_data: Array<'last' | 'rwy'>
+    atribut: { field: string; label: string; pilihan: string | { id: string; nama: string }[] | null; hanya_rwy: boolean }[]
+  }[]
+  operator: string[]
+}
+
 export interface PegawaiListQuery {
   page: number
   per_page: number

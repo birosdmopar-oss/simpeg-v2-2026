@@ -6,7 +6,9 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/pegawai.service', () => ({ pegawaiService: { list: vi.fn(), detail: vi.fn(), hapus: vi.fn(), tambah: vi.fn() } }))
+vi.mock('../services/pegawai.service', () => ({
+  pegawaiService: { list: vi.fn(), detail: vi.fn(), hapus: vi.fn(), tambah: vi.fn(), ekspor: vi.fn(), eksporPencarian: vi.fn(), pencarian: vi.fn(), katalogPencarian: vi.fn() },
+}))
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
 
 import { Role, type RoleCode } from '@/features/auth/types'
@@ -51,6 +53,100 @@ enableAutoUnmount(afterEach)
 beforeEach(() => {
   list.mockReset()
   list.mockResolvedValue({ items: ITEMS, total: 57, page: 1, per_page: 10 })
+})
+
+const KATALOG = {
+  jenis: [
+    { key: 'umum', label: 'Umum', jenis_data: ['rwy' as const], atribut: [{ field: 'nama', label: 'Nama Pegawai', pilihan: null, hanya_rwy: false }, { field: 'jenis_kelamin', label: 'Jenis Kelamin', pilihan: [{ id: '1', nama: 'Laki-laki' }, { id: '2', nama: 'Perempuan' }], hanya_rwy: false }] },
+    { key: 'jabatan', label: 'Jabatan', jenis_data: ['last' as const, 'rwy' as const], atribut: [{ field: 'jabatan', label: 'Jabatan', pilihan: null, hanya_rwy: false }] },
+  ],
+  operator: ['=', '!=', 'LIKE', 'IN'],
+}
+
+async function pilihFormat(format: 'xlsx' | 'csv'): Promise<void> {
+  ;(document.body.querySelector('[data-testid="export-trigger"]') as HTMLElement).click()
+  await flushPromises()
+  ;(document.body.querySelector(`[data-testid="export-menu"] [data-format="${format}"]`) as HTMLElement).click()
+  await flushPromises()
+}
+
+describe('DaftarPegawaiPage — ekspor & pencarian lanjutan (MAKE-014)', () => {
+  beforeEach(() => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() })
+    vi.mocked(pegawaiService.katalogPencarian).mockResolvedValue(KATALOG)
+    vi.mocked(pegawaiService.pencarian).mockResolvedValue({ items: ITEMS.slice(0, 2), total: 2, page: 1, per_page: 10 })
+  })
+
+  it('Export Excel/CSV memakai filter aktif dan kolom tampil; nama berkas dari server', async () => {
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    vi.mocked(pegawaiService.ekspor).mockResolvedValue({ blob: new Blob(['x']), nama: 'daftar_pegawai_1.xlsx' })
+    await mountList()
+
+    await pilihFormat('xlsx')
+    expect(pegawaiService.ekspor).toHaveBeenCalledWith('xlsx', ['jabatan', 'satker', 'gol_ruang', 'jenis_pegawai'], {
+      search: undefined, status: '1', id_unit: '', id_satker: '', id_jenis_pegawai: '', sort: 'nama', order: 'asc',
+    })
+    await pilihFormat('csv')
+    expect(vi.mocked(pegawaiService.ekspor).mock.lastCall?.[0]).toBe('csv')
+    expect(klik).toHaveBeenCalledTimes(2)
+    klik.mockRestore()
+  })
+
+  it('Pencarian Lanjutan (role 1): kriteria → POST pegawai/pencarian; 422 per baris; export memakai kriteria; kembali ke daftar', async () => {
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    vi.mocked(pegawaiService.eksporPencarian).mockResolvedValue({ blob: new Blob(['x']), nama: 'pencarian.csv' })
+    const { wrapper } = await mountList()
+    await wrapper.get('[data-testid="pencarian-toggle"]').trigger('click')
+    await flushPromises()
+
+    const baris0 = () => wrapper.get('[data-testid="pencarian-baris-0"]')
+    await baris0().get('[data-field="jenis_rwy"] select').setValue('umum')
+    await baris0().get('[data-field="atribut"] select').setValue('nama')
+    await baris0().get('[data-field="operator"] select').setValue('LIKE')
+    await baris0().get('[data-field="nilai"] input').setValue('budi')
+    await wrapper.get('[data-testid="pencarian-tambah"]').trigger('click')
+    const baris1 = wrapper.get('[data-testid="pencarian-baris-1"]')
+    await baris1.get('[data-field="hubung"] select').setValue('OR')
+    await baris1.get('[data-field="jenis_rwy"] select').setValue('jabatan')
+    expect(baris1.findAll('[data-field="jenis_data"] option').map((o) => o.text())).toContain('Data Terakhir')
+    await baris1.get('[data-field="atribut"] select').setValue('jabatan')
+    await baris1.get('[data-field="nilai"] input').setValue('Analis')
+    await wrapper.get('[data-testid="pencarian-lanjutan"]').trigger('submit')
+    await flushPromises()
+
+    const kriteria = [
+      { jenis_rwy: 'umum', jenis_data: 'rwy', atribut: 'nama', operator: 'LIKE', nilai: 'budi', hubung: 'AND' },
+      { jenis_rwy: 'jabatan', jenis_data: 'last', atribut: 'jabatan', operator: '=', nilai: 'Analis', hubung: 'OR' },
+    ]
+    expect(pegawaiService.pencarian).toHaveBeenCalledWith(kriteria, { page: 1, per_page: 10, sort: 'nama', order: 'asc' })
+    expect(wrapper.find('[data-testid="pencarian-aktif"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pegawai-filter"]').exists()).toBe(false)
+    expect(rows(wrapper)).toHaveLength(2)
+
+    await pilihFormat('csv')
+    expect(pegawaiService.eksporPencarian).toHaveBeenCalledWith('csv', ['jabatan', 'satker', 'gol_ruang', 'jenis_pegawai'], kriteria)
+
+    // Atribut berpilihan → pilihan tetap; 422 server tampil di baris.
+    await baris0().get('[data-field="operator"] select').setValue('=')
+    await baris0().get('[data-field="atribut"] select').setValue('jenis_kelamin')
+    expect(baris0().findAll('[data-field="nilai"] option').map((o) => o.text())).toEqual(['Pilih', 'Laki-laki', 'Perempuan'])
+    vi.mocked(pegawaiService.pencarian).mockRejectedValueOnce(apiError(422, { 'kriteria.0.nilai': ['Nilai wajib diisi (maksimal 255 karakter).'] }))
+    await wrapper.get('[data-testid="pencarian-lanjutan"]').trigger('submit')
+    await flushPromises()
+    expect(baris0().text()).toContain('Nilai wajib diisi')
+
+    await wrapper.get('[data-testid="pencarian-reset"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pencarian-aktif"]').exists()).toBe(false)
+    expect(list).toHaveBeenCalledTimes(2)
+    klik.mockRestore()
+  })
+
+  it.each([Role.PIMPINAN])('role %i: tanpa tombol Pencarian Lanjutan, Export tetap ada', async (role) => {
+    const { wrapper } = await mountList(role)
+    expect(wrapper.find('[data-testid="pencarian-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-trigger"]').exists()).toBe(true)
+  })
 })
 
 describe('DaftarPegawaiPage — data', () => {
