@@ -24,4 +24,24 @@ final class StubBiodataService implements BiodataServiceInterface
     {
         throw new BelumTersediaException('foto pegawai');
     }
+
+    public function antreanPengajuan(AuthContext $auth, array $filter = []): array
+    {
+        throw new BelumTersediaException('antrean pengajuan biodata');
+    }
+
+    public function pengajuan(AuthContext $auth, int $idHist): array
+    {
+        throw new BelumTersediaException('pengajuan biodata');
+    }
+
+    public function fotoPengajuan(AuthContext $auth, int $idHist): array
+    {
+        throw new BelumTersediaException('foto pengajuan biodata');
+    }
+
+    public function prosesPengajuan(AuthContext $auth, int $idHist, string $aksi, ?string $reasonNote): array
+    {
+        throw new BelumTersediaException('proses pengajuan biodata');
+    }
 }

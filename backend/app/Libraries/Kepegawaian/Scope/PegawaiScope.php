@@ -6,6 +6,7 @@ namespace App\Libraries\Kepegawaian\Scope;
 
 use App\Constants\Role;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
+use App\Interfaces\Kepegawaian\PegawaiScopeProsesInterface;
 use App\Libraries\Auth\AuthContext;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\ConnectionInterface;
@@ -54,7 +55,7 @@ use CodeIgniter\Database\ConnectionInterface;
  * claim di-cast ke int hanya bila berupa angka kanonik; selain itu dianggap kosong (fail-closed). Penolakan bentuk
  * non-kanonik (mis. '012') = [V2] sementara sampai DBV-009.
  */
-final class PegawaiScope implements PegawaiScopeInterface
+final class PegawaiScope implements PegawaiScopeInterface, PegawaiScopeProsesInterface
 {
     /**
      * Role yang melihat seluruh pegawai.
@@ -179,6 +180,41 @@ final class PegawaiScope implements PegawaiScopeInterface
             $lingkup === null
                 ? $builder->where('1 = 0', null, false)
                 : $builder->whereIn($kolomNip, fn (BaseBuilder $sub): BaseBuilder => $this->terapkanPredikat($sub->select('nip')->from(self::TABEL_PMJ), $lingkup, self::JALUR_DAFTAR));
+
+            return;
+        }
+
+        $builder->where('1 = 0', null, false);
+    }
+
+    /**
+     * Jalur proses (MAKE-011, PegawaiScopeProsesInterface) = predikat `bolehProses`: role 1 semua; role 3 predikat jalur
+     * proses atas pmj; UL_PEGAWAI NIP sendiri (sama dengan bolehUbah); role 4/5/8 dan lainnya tidak ada.
+     */
+    public function terapkanKeQueryProses(BaseBuilder $builder, AuthContext $auth, string $kolomNip = 'nip'): void
+    {
+        $role = $this->role($auth);
+
+        if ($role !== null && in_array($role, self::ROLE_UBAH_SEMUA, true)) {
+            return;
+        }
+
+        if ($role !== null && in_array($role, Role::UL_PEGAWAI, true)) {
+            $nipSendiri = $auth->nip();
+
+            $nipSendiri === null
+                ? $builder->where('1 = 0', null, false)
+                : $builder->where($kolomNip, $nipSendiri);
+
+            return;
+        }
+
+        if ($role === Role::ADMIN_SATKER) {
+            $lingkup = $this->lingkupAdminSatker($auth);
+
+            $lingkup === null
+                ? $builder->where('1 = 0', null, false)
+                : $builder->whereIn($kolomNip, fn (BaseBuilder $sub): BaseBuilder => $this->terapkanPredikat($sub->select('nip')->from(self::TABEL_PMJ), $lingkup, self::JALUR_PROSES));
 
             return;
         }
