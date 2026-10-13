@@ -37,6 +37,8 @@ final class AccountProvisionerTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
+        // MAKE-015: NIP akun baru di test ini wajib terdaftar sebagai pegawai.
+        $this->daftarkanPegawai(self::NIP, '200101012025011002', '3171012345678901');
         $pengguna          = new PenggunaModel($this->db);
         $this->provisioner = new AccountProvisioner($pengguna, new PasswordVerifier($pengguna));
     }

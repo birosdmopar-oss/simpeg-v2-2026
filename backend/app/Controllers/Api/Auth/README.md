@@ -133,6 +133,7 @@ Parameter daftar diperiksa `App\Libraries\ListQuery` — aturan sama persis deng
 
 Create `{ nip?, name?, email?, username?, password, user_level (1-8), id_unit?, id_satker?, status? }` → 201 `data: user`. Aturan akun (DBV-010/CR-013, ikut legacy `L_user`):
 - `nip` angka, maks. 18 digit (NIK 16 digit Non-PNS diterima); **wajib** untuk role 2/6/7 (UL_PEGAWAI), opsional untuk role 1/3/4/5/8 (`null`/kosong = akun tanpa NIP).
+- `nip` yang diisi harus terdaftar di tabel `pegawai` → bila tidak, 422 `errors.nip: ["NIP tidak terdaftar sebagai pegawai."]` (MAKE-015, prasyarat FK masuk DBV-019; berlaku juga saat menautkan NIP lewat Update).
 - akun tanpa NIP wajib `name` (≤ 150) dan `username`; `username` default = NIP, maks. 100, unik, tanpa karakter
   kontrol/tak terlihat (`\p{C}`, mis. zero-width space). Pembatasan ASCII ditunda sampai audit data produksi.
 - setiap field (`nip`, `name`, `email`, `username`, `password`, `user_level`, `id_unit`, `id_satker`, `status`) harus teks atau angka bulat: array/objek/boolean → 422 `errors.<field>: ["Isian harus berupa teks."]` (juga di Update dan PATCH status; `UserService` menolak ulang untuk pemanggil selain controller — tanpa itu `user_level: ["5"]` ter-cast menjadi role 1).

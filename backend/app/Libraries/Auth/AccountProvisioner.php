@@ -25,6 +25,10 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  * errors.nip berpesan jelas, akun tidak dibuat dan tidak ditautkan ke akun itu (ISSUE-023/CR-019; sebelumnya 1062 →
  * 500). Balapan dua proses untuk NIP yang sama tetap idempoten (yang kalah menerima akun yang sudah ada, created=false).
  *
+ * NIP wajib sudah ada di `pegawai.nip` (MAKE-015, prasyarat FK masuk DBV-019): pemanggil (B-05) menyisipkan baris
+ * `pegawai` lebih dulu di transaksi yang sama. NIP asing → 422 errors.nip PenggunaModel::NIP_TIDAK_TERDAFTAR sebelum
+ * insert; 1452 (FK aktif, baris pegawai hilang di antara cek dan tulis) diterjemahkan ke 422 yang sama, bukan 500.
+ *
  * Email (syarat DBV-010 D-6, CR-019): email pegawai yang sudah dipakai akun lain yang belum dihapus (dibandingkan
  * collation unicode_ci) TIDAK ikut disimpan — akun tetap dibuat tanpa email dan hasil memuat `email_skipped: true`
  * agar pemanggil (B-05) memberi tahu admin. Pegawai tidak digagalkan karena email: satu orang bisa sudah punya akun
@@ -85,6 +89,10 @@ class AccountProvisioner
             throw self::usernameTaken();
         }
 
+        if (! $this->pengguna->nipTerdaftarPegawai($nip)) {
+            throw self::nipTidakTerdaftar();
+        }
+
         // D-6: jangan menulis email duplikat; akun dibuat tanpa email dan pemanggil diberi penanda.
         $emailSkipped = $email !== '' && $this->pengguna->emailTaken($email);
 
@@ -109,6 +117,10 @@ class AccountProvisioner
                 'password_changed_at' => null,
             ]);
         } catch (DatabaseException $e) {
+            if ($e->getCode() === PenggunaModel::ER_FK_TANPA_INDUK && ! $this->pengguna->nipTerdaftarPegawai($nip)) {
+                throw self::nipTidakTerdaftar();
+            }
+
             if ($e->getCode() !== 1062) {
                 throw $e;
             }
@@ -146,6 +158,11 @@ class AccountProvisioner
             'nip',
             'NIP ini sudah dipakai sebagai username akun lain; ganti username akun tersebut sebelum membuat akun pegawai.',
         );
+    }
+
+    private static function nipTidakTerdaftar(): ValidationException
+    {
+        return ValidationException::forField('nip', PenggunaModel::NIP_TIDAK_TERDAFTAR);
     }
 
     /**

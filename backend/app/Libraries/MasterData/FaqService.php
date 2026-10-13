@@ -206,6 +206,9 @@ class FaqService
 
         $reason = $rate === FaqRateModel::RATE_NOT_HELPFUL ? $this->normalizeReason($reason) : null;
 
+        // MAKE-015: `nip` selalu dari claim sesi akun (bukan input), dan NIP akun sudah divalidasi terdaftar di `pegawai`
+        // saat akun dibuat/ditautkan, jadi FK masuk DBV-019 `fk_nip_faqrate_to_peg` tidak butuh cek terpisah di sini.
+
         try {
             $this->rates()->record([
                 'id_faq_article' => $articleId,
