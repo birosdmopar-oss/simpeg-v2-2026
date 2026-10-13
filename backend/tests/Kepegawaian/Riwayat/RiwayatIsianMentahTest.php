@@ -100,12 +100,21 @@ final class RiwayatIsianMentahTest extends DatabaseTestCase
 
     public function testDefinisiTanpaPemindahanTidakMenulisKunciMentah(): void
     {
-        // Definisi mengabaikan kunci mentah (tidak memindahkannya): engine tetap membuangnya → tanpa galat kolom.
-        $this->d->mentah = ['pilihan_lain'];
+        // Kunci mentah bernama kolom DDL nyata yang BUKAN field/berkas/sistem (`no_ijazah`): Definisi tidak
+        // memindahkannya, jadi hanya buangMentah() yang mencegahnya tertulis (tanpa itu kolomnya akan terisi).
+        $this->d->mentah = ['no_ijazah'];
         $this->pasangEngine(null, [$this->d]);
 
-        $this->kirim('post', true, ['tgl_lulus' => '2012-08-30', 'pilihan_lain' => ['X']])->assertStatus(201);
-        $this->assertSame(['X'], $this->hook('beforeSave')['pilihan_lain']);
+        $buat = $this->kirim('post', true, ['tgl_lulus' => '2012-08-30', 'no_ijazah' => 'IJZ-MENTAH']);
+        $buat->assertStatus(201);
+        $this->assertSame('IJZ-MENTAH', $this->hook('beforeSave')['no_ijazah']);
+        $id = (int) $this->json($buat)['data']['id_riwayat_pendidikan'];
+        $this->assertNull($this->db->table('riwayat_pendidikan')->where('id_riwayat_pendidikan', $id)->get()->getRowArray()['no_ijazah'], 'tambah');
+
+        $this->kirim('put', true, ['glr_akhir' => 'S.T.', 'no_ijazah' => 'IJZ-UBAH'], $id)->assertStatus(200);
+        $this->assertSame('IJZ-UBAH', $this->hook('beforeSave')['no_ijazah']);
+        $row = $this->db->table('riwayat_pendidikan')->where('id_riwayat_pendidikan', $id)->get()->getRowArray();
+        $this->assertSame([null, 'S.T.'], [$row['no_ijazah'], $row['glr_akhir']], 'ubah');
     }
 
     public function testJenisTanpaIsianMentahTidakBerubah(): void
@@ -131,6 +140,7 @@ final class RiwayatIsianMentahTest extends DatabaseTestCase
             'kolom NIP'      => ['nip'],
             'kolom status'   => ['status'],
             'PK'             => ['id_riwayat_pendidikan'],
+            'kolom berkas'   => ['file_uji'],
             'nama tidak sah' => ['pilihan uji'],
         ];
     }
@@ -138,8 +148,9 @@ final class RiwayatIsianMentahTest extends DatabaseTestCase
     #[DataProvider('bentrokProvider')]
     public function testNamaBentrokDitolakRegistry(string $kunci): void
     {
-        $d         = new UjiPendidikan();
-        $d->mentah = [$kunci];
+        $d              = new UjiPendidikan();
+        $d->mentah      = [$kunci];
+        $d->berkasKolom = ['file_uji'];
 
         $this->expectException(LogicException::class);
 
