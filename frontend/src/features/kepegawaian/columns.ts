@@ -1,9 +1,9 @@
 /**
  * Kolom tabel Daftar Pegawai (§4.1.5) — sumber tunggal untuk header, isi sel, filter per kolom, dan popup
  * "Filter Kolom" (Gambar 20/21: daftar kolom dikelompokkan per huruf awal, bisa dicari).
- * Kolom `nama_nip` (avatar + nama + NIP) selalu tampil dan tidak muncul di popup. Nilai kolom = kolom DDL `pegawai`.
- * TODO(B-20, WS-2): kolom snapshot (KP/Gol, Jabatan, Satuan Kerja, Unit, Eselon) ditambahkan setelah bentuk respons
- * `GET pegawai` ditetapkan.
+ * Kolom `nama_nip` (avatar + nama + NIP) selalu tampil dan tidak muncul di popup. Nilai kolom = kolom respons
+ * `GET pegawai` (MAKE-010): biodata `pegawai` + snapshot jabatan (`pegawai_mutasi_jabatan`) + pangkat (`pegawai_kp`).
+ * Kolom legacy lain (90 kolom `L_employee::list`) menyusul bersama pencarian lanjut/export B-20 penutup.
  */
 import type { PegawaiListItem } from './types'
 
@@ -26,6 +26,11 @@ const text = (value: string | null | undefined): string => value ?? ''
 export const COLUMNS: PegawaiColumn[] = [
   { key: 'nama_nip', label: 'Nama/NIP', locked: true, value: (r) => `${fullName(r)} ${r.nip}` },
   { key: 'nip_lama', label: 'NIP Lama', value: (r) => text(r.nip_lama) },
+  { key: 'jabatan', label: 'Jabatan', value: (r) => text(r.jabatan) },
+  { key: 'satker', label: 'Satuan Kerja', value: (r) => text(r.satker) },
+  { key: 'unit', label: 'Unit Kerja', value: (r) => text(r.unit) },
+  { key: 'gol_ruang', label: 'KP (Gol)', value: (r) => text(r.gol_ruang) },
+  { key: 'pangkat', label: 'Pangkat', value: (r) => text(r.pangkat) },
   { key: 'jenis_pegawai', label: 'Jenis Pegawai', value: (r) => text(r.jenis_pegawai) },
   { key: 'jenis_status', label: 'Jenis Status', value: (r) => text(r.jenis_status) },
   { key: 'tmt_status', label: 'TMT Status', value: (r) => text(r.tmt_status) },
@@ -33,8 +38,8 @@ export const COLUMNS: PegawaiColumn[] = [
   { key: 'agama', label: 'Agama', value: (r) => text(r.agama) },
 ]
 
-/** Kolom bawaan (sementara, sampai kolom snapshot B-20 tersedia). */
-export const DEFAULT_COLUMN_KEYS: string[] = ['nama_nip', 'jenis_pegawai', 'jenis_status']
+/** Kolom bawaan. */
+export const DEFAULT_COLUMN_KEYS: string[] = ['nama_nip', 'jabatan', 'satker', 'gol_ruang', 'jenis_pegawai']
 
 export const COLUMN_BY_KEY: Record<string, PegawaiColumn> = Object.fromEntries(COLUMNS.map((c) => [c.key, c]))
 

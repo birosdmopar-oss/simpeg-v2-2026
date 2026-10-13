@@ -6,7 +6,10 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/pegawai.service', () => ({ pegawaiService: { detail: vi.fn(), list: vi.fn() } }))
+vi.mock('../services/pegawai.service', () => ({
+  pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn() },
+}))
+vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return { ...actual, riwayatService: { list: vi.fn().mockResolvedValue([]), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn() } }
@@ -21,6 +24,8 @@ import DetailPegawaiPage from '../views/DetailPegawaiPage.vue'
 import { apiError, descriptor, NIP, pegawaiDetail } from './fixtures'
 
 const detail = vi.mocked(pegawaiService.detail)
+const updateBiodata = vi.mocked(pegawaiService.updateBiodata)
+const koreksiNip = vi.mocked(pegawaiService.koreksiNip)
 
 const TABS = [
   descriptor('jabatan', 'Riwayat Jabatan'),
@@ -61,7 +66,8 @@ describe('DetailPegawaiPage — data', () => {
     expect(wrapper.get('[data-testid="pegawai-header"]').text()).toContain('1 Januari 1990')
   })
 
-  it('tab Data Umum (bawaan) menampilkan biodata kolom pegawai, hanya-lihat (tanpa tombol simpan)', async () => {
+  it('tab Data Umum (bawaan) menampilkan biodata kolom pegawai, hanya-lihat sampai "Ubah Data Umum" dipilih', async () => {
+    detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: false } }))
     const { wrapper } = await mountDetail()
     const du = wrapper.get('[data-testid="data-umum"]')
     expect(du.get('[data-field="bpjs_kes"]').text()).toContain('0001234567890')
@@ -69,6 +75,32 @@ describe('DetailPegawaiPage — data', () => {
     expect(du.get('[data-field="status_pernikahan"]').text()).toContain('Menikah')
     expect(du.get('[data-field="npwp"]').text()).toContain('—')
     expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-ubah-data-umum"]').exists()).toBe(false)
+  })
+
+  it('"Ubah Data Umum" (aksi.ubah_biodata) membuka form; pengajuan → pemberitahuan + detail dimuat ulang', async () => {
+    detail.mockResolvedValue(
+      pegawaiDetail(TABS, { npwp: '1', bpjs_kes: '2', no_taspen: '3', jenis_kerabat: 'Anak', no_telp_kerabat: '4', ada_foto: true }, {
+        aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false },
+        pengajuan: { id_pegawai_hist: 9, flag_update: 2, reason_note: 'Lengkapi NPWP', created_at: null, updated_at: null, notif_date: null },
+      }),
+    )
+    updateBiodata.mockResolvedValue({ jalur: 'pengajuan', pegawai: pegawaiDetail(), pengajuan: null })
+    const { wrapper } = await mountDetail(`/pegawai/${NIP}`, Role.PEGAWAI)
+
+    expect(wrapper.get('[data-testid="pengajuan-status"]').text()).toContain('ditolak: Lengkapi NPWP')
+    await wrapper.get('[data-testid="btn-ubah-data-umum"]').trigger('click')
+    expect(wrapper.find('[data-testid="data-umum-form"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="data-umum-form"] form').trigger('submit')
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 0))
+    await flushPromises()
+
+    expect(updateBiodata).toHaveBeenCalledWith(NIP, expect.objectContaining({ no_telp_kerabat: '4' }), null)
+    expect(wrapper.text()).toContain('berhasil diajukan dan menunggu verifikasi admin')
+    expect(detail).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-testid="data-umum-form"]').exists()).toBe(false)
   })
 
   it.each([
@@ -123,11 +155,43 @@ describe('DetailPegawaiPage — aksi kartu', () => {
       [Role.PTT, false, false],
       [Role.PIMPINAN, false, false],
     ] as const) {
+      detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: role === Role.SUPER_ADMIN } }))
       const { wrapper } = await mountDetail(`/pegawai/${NIP}`, role)
       expect(wrapper.find('[data-testid="btn-cetak"]').exists(), `cetak role ${role}`).toBe(print)
       expect(wrapper.find('[data-testid="btn-more"]').exists(), `hapus role ${role}`).toBe(more)
       wrapper.unmount()
     }
+  })
+
+  it('Koreksi NIP (⋯, aksi.koreksi_nip): isi → tinjau → konfirmasi → pindah ke URL NIP baru', async () => {
+    const BARU = '199001012015011999'
+    koreksiNip.mockResolvedValue({ nip_lama: NIP, nip_baru: BARU, tabel: {}, dilewati: [], sesi_dicabut: 0 })
+    const { wrapper, router } = await mountDetail()
+
+    await wrapper.get('[data-testid="btn-more"]').trigger('click')
+    await flushPromises()
+    const item = document.body.querySelector<HTMLElement>('[data-action="koreksi-nip"]')
+    expect(item).not.toBeNull()
+    item?.click()
+    await flushPromises()
+
+    const dialog = () => document.body.querySelector('[data-testid="koreksi-nip-dialog"]')
+    expect(dialog()).not.toBeNull()
+    const input = document.body.querySelector<HTMLInputElement>('[data-testid="koreksi-nip-input"] input, input[data-testid="koreksi-nip-input"]')
+    expect(input).not.toBeNull()
+    if (input) {
+      input.value = BARU
+      input.dispatchEvent(new Event('input'))
+    }
+    await flushPromises()
+    document.body.querySelector<HTMLElement>('[data-testid="koreksi-nip-lanjut"]')?.click()
+    await flushPromises()
+    expect(document.body.querySelector('[data-testid="koreksi-nip-tinjau"]')?.textContent).toContain(BARU)
+    document.body.querySelector<HTMLElement>('[data-testid="koreksi-nip-konfirmasi"]')?.click()
+    await flushPromises()
+
+    expect(koreksiNip).toHaveBeenCalledWith(NIP, BARU)
+    expect(router.currentRoute.value.params.nip).toBe(BARU)
   })
 
   it('"Arsip Kepegawaian" memberi tahu belum tersedia (B-18)', async () => {

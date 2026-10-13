@@ -68,6 +68,37 @@ describe('pegawaiService', () => {
     await expect(pegawaiService.detail(NIP)).resolves.toEqual(detail)
     expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}`)
   })
+
+  it('list: filter status/id_unit/id_satker/sort ikut dikirim bila diisi (MAKE-010)', async () => {
+    get.mockResolvedValue({ data: { items: [], total: 0, page: 1, per_page: 10 } })
+    await pegawaiService.list({ page: 1, per_page: 10, status: '1', id_satker: '12', sort: 'jabatan', order: 'desc' })
+    expect(get).toHaveBeenCalledWith('/pegawai', { params: { page: 1, per_page: 10, status: '1', id_satker: '12', sort: 'jabatan', order: 'desc' } })
+  })
+
+  it('ubah biodata: PUT JSON tanpa foto; dengan foto POST multipart + _method=PUT + berkas foto', async () => {
+    put.mockResolvedValue({ data: { jalur: 'pengajuan' } })
+    await pegawaiService.updateBiodata(NIP, { no_hp: '0812' })
+    expect(put).toHaveBeenCalledWith(`/pegawai/${NIP}/biodata`, { no_hp: '0812' })
+
+    post.mockResolvedValue({ data: { jalur: 'langsung' } })
+    const foto = new File(['x'], 'foto.png', { type: 'image/png' })
+    await pegawaiService.updateBiodata(NIP, { no_hp: '0812' }, foto)
+    const [url, body] = post.mock.calls[0] as [string, FormData]
+    expect(url).toBe(`/pegawai/${NIP}/biodata`)
+    expect(body.get('_method')).toBe('PUT')
+    expect(body.get('no_hp')).toBe('0812')
+    expect((body.get('foto') as File).name).toBe('foto.png')
+  })
+
+  it('foto: GET /foto sebagai blob; koreksi NIP: POST /koreksi-nip { nip_baru }', async () => {
+    get.mockResolvedValue({ data: new Blob(['x']) })
+    await pegawaiService.foto(NIP)
+    expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}/foto`, { responseType: 'blob' })
+
+    post.mockResolvedValue({ data: { nip_baru: '1' } })
+    await pegawaiService.koreksiNip(NIP, '199001012015011999')
+    expect(post).toHaveBeenCalledWith(`/pegawai/${NIP}/koreksi-nip`, { nip_baru: '199001012015011999' })
+  })
 })
 
 describe('riwayatService', () => {

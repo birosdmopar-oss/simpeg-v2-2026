@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * Tab "Data Umum" Detail Pegawai — biodata dari kolom `pegawai` (DDL B-01), hanya-lihat.
- * Ubah biodata (form + alur verifikasi B-04 dengan perbandingan di ApprovalDialog slot `diff`) dibangun WS-2 di
- * B-03/B-04; sampai itu tidak ada tombol simpan agar halaman tidak berpura-pura menyimpan.
+ * Tab "Data Umum" Detail Pegawai — biodata dari kolom `pegawai` (DDL B-01), hanya-lihat. Ubah biodata = DataUmumForm
+ * (B-03, MAKE-010); verifikasi pengajuan dengan perbandingan di ApprovalDialog slot `diff` = B-04 (MAKE-011).
  * Kode `jenis_kelamin` / `status_pernikahan` mengikuti COMMENT DDL.
  */
 import { computed } from 'vue'

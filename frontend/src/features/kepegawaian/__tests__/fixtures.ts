@@ -49,7 +49,7 @@ export function pegawai(overrides: Partial<Pegawai> = {}): Pegawai {
     jenis_pegawai: 'PNS',
     jenis_status: 'Biasa',
     tmt_status: '2015-01-01',
-    foto: null,
+    ada_foto: false,
     keterangan: null,
     status: 1,
     flag_update: 0,
@@ -62,8 +62,21 @@ export function descriptor(jenis: RiwayatTabDescriptor['jenis'], label: string, 
   return { jenis, label, can_view: true, can_create: true, can_edit: true, can_delete: true, can_process: false, ...overrides }
 }
 
-export function pegawaiDetail(tabs: RiwayatTabDescriptor[] = [], overrides: Partial<Pegawai> = {}): PegawaiDetail {
-  return { ...pegawai(overrides), tabs }
+export function pegawaiDetail(
+  tabs: RiwayatTabDescriptor[] = [],
+  overrides: Partial<Pegawai> = {},
+  extra: Partial<Omit<PegawaiDetail, keyof Pegawai | 'tabs'>> = {},
+): PegawaiDetail {
+  return {
+    ...pegawai(overrides),
+    email: 'budi@contoh.test',
+    jabatan_aktif: null,
+    pangkat_aktif: null,
+    pengajuan: null,
+    aksi: { ubah_biodata: true, ubah_langsung: true, koreksi_nip: true },
+    ...extra,
+    tabs,
+  }
 }
 
 export function listItem(i: number): PegawaiListItem {
@@ -78,6 +91,20 @@ export function listItem(i: number): PegawaiListItem {
     jenis_pegawai: i % 3 === 0 ? 'PPPK' : 'PNS',
     jenis_status: 'Biasa',
     tmt_status: null,
+    tgl_lahir: '1990-01-01',
+    id_jenis_pegawai: 1,
+    status: 1,
+    flag_update: 0,
+    ada_foto: false,
+    id_unit: 1,
+    unit: 'Unit Contoh',
+    id_satker: 2,
+    satker: 'Satker Contoh',
+    id_jabatan: 3,
+    jabatan: `Jabatan ${i}`,
+    tmt_jabatan: '2020-01-01',
+    gol_ruang: 'III/a',
+    pangkat: 'Penata Muda',
   }
 }
 

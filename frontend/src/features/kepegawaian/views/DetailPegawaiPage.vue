@@ -2,12 +2,14 @@
 /**
  * Halaman Detail Pegawai (§4.1.6) — Fase 3, B-20 (pemilik WS-2). Data dari `GET pegawai/{nip}`.
  *
- * Tab: "Data Umum" (biodata, hanya-lihat sampai B-03/B-04) lalu tab riwayat dari DESCRIPTOR backend (`data.tabs`,
- * urutan backend) yang punya berkas registry `riwayat/jenis/<slug>.ts` dan `can_view = true`. Tombol tambah/ubah/
- * hapus/proses di setiap tab mengikuti `can_*` descriptor (RiwayatTabHost → RiwayatListSection).
+ * Tab: "Data Umum" (biodata; tombol "Ubah Data Umum" bila `aksi.ubah_biodata`, form DataUmumForm B-03 MAKE-010:
+ * Super Admin langsung, role lain lewat pengajuan + status pengajuan dari `pengajuan`) lalu tab riwayat dari DESCRIPTOR
+ * backend (`data.tabs`, urutan backend) yang punya berkas registry `riwayat/jenis/<slug>.ts` dan `can_view = true`.
+ * Tombol tambah/ubah/hapus/proses di setiap tab mengikuti `can_*` descriptor (RiwayatTabHost → RiwayatListSection).
+ * Koreksi NIP (B-06, `aksi.koreksi_nip`) lewat menu ⋯ kartu identitas; sukses → pindah ke URL NIP baru.
  *
  * Galat: 403 (izin/lingkup — termasuk NIP yang tidak ada bagi role ber-lingkup), 404, 501 (stub) ditampilkan sebagai
- * keadaan halaman, tidak pernah sebagai data contoh. Cetak, arsip, dan hapus pegawai belum tersambung (B-18/B-20/B-05).
+ * keadaan halaman, tidak pernah sebagai data contoh. Cetak, arsip, dan hapus pegawai belum tersambung (B-20/B-05).
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -18,14 +20,16 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiNotice } from '@/shared/ui'
 
+import DataUmumForm from '../components/DataUmumForm.vue'
 import DataUmumView from '../components/DataUmumView.vue'
+import KoreksiNipDialog from '../components/KoreksiNipDialog.vue'
 import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
 import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { tabsFromDescriptors } from '../riwayat/registry'
 import { describeApiError, type ApiFailure } from '../services/apiErrors'
 import { pegawaiService } from '../services/pegawai.service'
-import type { PegawaiDetail, RiwayatMenu } from '../types'
+import type { BiodataResult, KoreksiNipResult, PegawaiDetail, RiwayatMenu } from '../types'
 
 const DATA_UMUM = 'data-umum'
 
@@ -39,6 +43,8 @@ const loading = ref(true)
 const failure = ref<ApiFailure | null>(null)
 const notice = ref<string | null>(null)
 const confirmDelete = ref(false)
+const editing = ref(false)
+const koreksiOpen = ref(false)
 
 const role = computed(() => auth.role)
 const canPrint = computed(() => role.value !== null && [Role.SUPER_ADMIN, Role.PEGAWAI, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI].includes(role.value as 1 | 2 | 3 | 4 | 5))
@@ -76,7 +82,25 @@ async function load(): Promise<void> {
     if (current === requestId) loading.value = false
   }
 }
-watch(nip, load, { immediate: true })
+watch(nip, () => {
+  editing.value = false
+  void load()
+}, { immediate: true })
+
+const pengajuan = computed(() => detail.value?.pengajuan ?? null)
+
+function onSaved(result: BiodataResult): void {
+  editing.value = false
+  notice.value = result.jalur === 'langsung'
+    ? 'Data umum pegawai berhasil disimpan.'
+    : 'Perubahan data umum berhasil diajukan dan menunggu verifikasi admin.'
+  void load()
+}
+
+function onKoreksi(result: KoreksiNipResult): void {
+  notice.value = `NIP berhasil dikoreksi dari ${result.nip_lama} menjadi ${result.nip_baru}.`
+  void router.replace({ name: 'pegawai-detail', params: { nip: result.nip_baru }, query: route.query })
+}
 
 const failureTitle = computed(() => {
   switch (failure.value?.kind) {
@@ -118,6 +142,8 @@ const crumbs = computed(() => [
           :detail="detail"
           :can-print="canPrint"
           :can-delete="canDelete"
+          :can-koreksi-nip="detail.aksi?.koreksi_nip ?? false"
+          @koreksi-nip="koreksiOpen = true"
           @arsip="notice = 'Arsip Kepegawaian belum tersedia (task B-18).'"
           @print="(kind) => (notice = `Cetak ${kind === 'drh' ? 'DRH' : 'Data Umum'} belum tersedia (task B-20).`)"
           @delete="confirmDelete = true"
@@ -126,8 +152,20 @@ const crumbs = computed(() => [
         <RiwayatMenuTabs v-model="tab" :menus="menus" />
 
         <UiCard v-if="tab === DATA_UMUM" title="Data Umum" subtitle="Biodata pegawai" flush>
+          <template v-if="detail.aksi?.ubah_biodata && !editing" #actions>
+            <UiButton data-testid="btn-ubah-data-umum" @click="editing = true">Ubah Data Umum</UiButton>
+          </template>
           <div class="mt-3 border-t border-slate-200">
-            <DataUmumView :pegawai="detail" />
+            <UiNotice v-if="pengajuan?.flag_update === 1" tone="info" class="mx-5 mt-4" data-testid="pengajuan-status">
+              Pengajuan perubahan data umum sedang menunggu verifikasi admin.
+            </UiNotice>
+            <UiNotice v-else-if="pengajuan?.flag_update === 2" tone="danger" class="mx-5 mt-4" data-testid="pengajuan-status">
+              Pengajuan perubahan data umum ditolak{{ pengajuan.reason_note ? `: ${pengajuan.reason_note}` : '.' }}
+            </UiNotice>
+            <div v-if="editing" class="px-5 py-5">
+              <DataUmumForm :detail="detail" @saved="onSaved" @cancel="editing = false" />
+            </div>
+            <DataUmumView v-else :pegawai="detail" />
           </div>
         </UiCard>
 
@@ -140,6 +178,14 @@ const crumbs = computed(() => [
         />
       </template>
     </div>
+
+    <KoreksiNipDialog
+      v-if="detail"
+      v-model:open="koreksiOpen"
+      :nip="detail.nip"
+      :nama="detail.nama"
+      @done="onKoreksi"
+    />
 
     <ConfirmDialog
       :open="confirmDelete"

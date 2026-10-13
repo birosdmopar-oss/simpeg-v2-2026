@@ -205,9 +205,9 @@ Label sumber registry: **[K]** = DDL dump struktur produksi 01-10-2026 (D1, 285 
 
 | Kelas | Isi |
 |---|---|
-| `TabelAnakNip` | Registry statis 79 entri. Method: `semua`, `perFase(n)`, `sampaiFase(n)` (cakupan B-06 setelah fase n selesai), `perJenis`, `perKeberadaan` |
+| `TabelAnakNip` | Registry statis 80 entri. Method: `semua`, `perFase(n)`, `sampaiFase(n)` (cakupan B-06 setelah fase n selesai), `perJenis`, `perKeberadaan` |
 | `RujukanNip` | Satu entri: `tabel`, `kolom` (nama legacy), `kolomDiV2()`, `jenis`, `sumber`, `namaFkLegacy`, `nullable` (legacy), `keberadaan`, `fase`, `pemilik` (task migration), `catatan`, `kunci()` |
-| `JenisRujukanNip` | `FkLegacy`, `NonFkUbahNipLegacy`, `NonFkSlipGaji`, `NonFkFkV2`; `diubahLegacy()` |
+| `JenisRujukanNip` | `FkLegacy`, `NonFkUbahNipLegacy`, `NonFkSlipGaji`, `NonFkFkV2`, `NonFkKeputusanV2` (MAKE-010: tanpa FK, tidak diganti legacy, ikut dikoreksi atas keputusan v2 — `jabatan_koordinasi.nip`, keputusan #10); `diubahLegacy()` |
 | `KeberadaanV2` | `Ada` (fase dan pemilik diketahui), `TidakDiimpor`, `BelumDiputuskan` |
 | `FormatNip` | `valid` (1–18 digit ASCII), `periksa` (input → `HasilKalkulasi`, kode `nip_wajib`/`nip_tidak_valid`), `periksaKoreksi` (B-06, kode `nip_lama_wajib`/`nip_baru_sama`) |
 
@@ -219,16 +219,17 @@ Label sumber registry: **[K]** = DDL dump struktur produksi 01-10-2026 (D1, 285 
 | Non-FK yang diganti kode Ubah NIP | 1 (`pengguna.username`) | [K-kode] `L_employee.php:589-599`: `username` = NIP baru, ditambah reset `password` = md5(NIP baru) dan `password_decode` | Ikut berubah (kode) |
 | Non-FK Slip Gaji | 1 (`gaji_pegawai.nip`) | [K] tanpa FK, `UNIQUE (nip, bulan, tahun)` | **Tidak** berubah, sehingga slip lama yatim |
 | Non-FK yang wajib FK di v2 | 2 (`riwayat_cuti.nip_atasan_langsung`, `nip_yang_menyetujui`) | [K] tanpa FK, VARCHAR(50); [V2] DoD C-01 (`04-Layanan.md:21`), SRS :161 | **Tidak** berubah |
+| Non-FK keputusan v2 (MAKE-010) | 1 (`jabatan_koordinasi.nip`, fase 2 G-02) | [K] tanpa FK (D1:1510-1545, DBV-018); [V2] keputusan #10 WS2.md | **Tidak** berubah (v2 ikut mengoreksi) |
 
 Status v2 per entri berasal dari `0x-*.md`, Mapping Migrasi, dan draf DBV-012/DBV-013. Draf itu baru pra-review internal dan belum disetujui DB Validator.
 
 | Keberadaan | Jumlah | Rincian |
 |---|---|---|
-| `Ada` | 61 | Fase 0: 1 (`token`, F0-06) · Fase 1: 2 (`pengguna.id_pegawai` → `pengguna.nip`, `pengguna.username`; A-01) · Fase 2: 2 (`faq_rate` G-10, `user_lokasi_presensi` G-03) · Fase 3: 40 (B-01: 16, B-02: 24, sama dengan registry draf DBV-012/013 revisi D1, termasuk `pegawai_ak_siasn` dari keputusan DBV-012 8 #6 yang belum disetujui) · Fase 4: 8 (C-01) · Fase 5: 2 (`dh_online`, `gaji_pegawai`; D-01) · Fase 6: 1 (`esign_hist`, H-01) · Fase 7: 5 (F-01) |
+| `Ada` | 62 | Fase 0: 1 (`token`, F0-06) · Fase 1: 2 (`pengguna.id_pegawai` → `pengguna.nip`, `pengguna.username`; A-01) · Fase 2: 3 (`faq_rate` G-10, `user_lokasi_presensi` G-03, `jabatan_koordinasi.nip` G-02, MAKE-010) · Fase 3: 40 (B-01: 16, B-02: 24, sama dengan registry draf DBV-012/013 revisi D1, termasuk `pegawai_ak_siasn` dari keputusan DBV-012 8 #6 yang belum disetujui) · Fase 4: 8 (C-01) · Fase 5: 2 (`dh_online`, `gaji_pegawai`; D-01) · Fase 6: 1 (`esign_hist`, H-01) · Fase 7: 5 (F-01) |
 | `TidakDiimpor` | 11 | Tabel cadangan bertanggal (2), `riwayat_lckh_2019..2022` (8 kolom), dan `riwayat_layanan` yang tidak dipakai kode legacy |
 | `BelumDiputuskan` | 7 | `email_pool`, `email_retry`, `email_sent`, `layanan_pegawai`, `login_mysapk`, `riwayat_cuti_notif_kt`, `user_geo` |
 
-`sampaiFase(3)` = 45 entri, yaitu cakupan B-06 di Fase 3. Fase berikutnya menambah entri tanpa mengubah kode B-06. Kecocokan registry dengan skema nyata (`information_schema.KEY_COLUMN_USAGE` dan kolom NIP tanpa FK) **menyusul sebagai test ber-DB B-21** di `tests/Kepegawaian/` setelah tabel B-01/B-02 ada. Test unit `TabelAnakNipTest` hanya memeriksa kelengkapan data: tidak ada duplikat, label sumber, nama FK, fase/pemilik, dan jumlah per kategori.
+`sampaiFase(3)` = 46 entri, yaitu cakupan B-06 di Fase 3 (dipakai `NipCascadeService`, MAKE-010). Fase berikutnya menambah entri tanpa mengubah kode B-06. Kecocokan registry dengan skema nyata (`information_schema.KEY_COLUMN_USAGE` dan kolom NIP tanpa FK) **menyusul sebagai test ber-DB B-21** di `tests/Kepegawaian/` setelah tabel B-01/B-02 ada. Test unit `TabelAnakNipTest` hanya memeriksa kelengkapan data: tidak ada duplikat, label sumber, nama FK, fase/pemilik, dan jumlah per kategori.
 
 ### Kolom NIP tanpa FK di luar registry (keputusan B-06)
 
@@ -260,12 +261,57 @@ Auth sudah memegang aturan ini di `PenggunaModel::NIP_MAX_DIGITS`, `UserService:
 
 ### Pertanyaan terbuka CR-036 (keputusan user/SME/DBV)
 
-1. **`pengguna.username` saat koreksi NIP.** Legacy menimpa username tanpa syarat dan mereset password ke md5(NIP baru). Usulan: ganti username hanya bila username = NIP lama, dan jangan sentuh password (K4; `password_decode` tidak ada di v2).
+1. ~~**`pengguna.username` saat koreksi NIP.**~~ **Diputus user 13-10-2026 (MAKE-010): ikut legacy penuh** — username = NIP baru dan password direset ke NIP baru (hash Argon2id v2, bukan md5); lihat bagian Koreksi NIP B-06.
 2. **`gaji_pegawai.nip` dan `riwayat_cuti.nip_atasan_langsung`/`nip_yang_menyetujui`.** Legacy tidak mengubahnya. Di v2, kedua kolom `riwayat_cuti` **wajib** ikut dikoreksi, karena FK RESTRICT akan menolak penghapusan baris pegawai lama. Untuk `gaji_pegawai`, usulannya ikut dikoreksi agar slip lama tetap terlihat pegawai (keputusan D-01: FK atau tidak).
 3. **Kolom non-FK di luar registry** (daftar di atas), terutama `riwayat_skp_periodik.nip` milik pegawai sendiri. Usulan: diputuskan per kolom di B-06 bersama DBV-013. Kolom jejak (`audit_logs.nip_actor`, `token.nip`, `*_attempts.username`) tidak diubah.
 4. **Tujuh tabel `BelumDiputuskan`** perlu keputusan impor: email legacy, `layanan_pegawai`, `login_mysapk`, `riwayat_cuti_notif_kt` (Mapping: masuk inbox), dan `user_geo`.
 5. **Penyatuan registry.** Draf DBV-012 punya konstanta registry sendiri di `NipReferenceRegistryTest`. Usulan: setelah draf itu masuk, test tersebut membaca `TabelAnakNip::sampaiFase(3)`.
 6. **Pensiun PPPK.** Legacy memakai akhir masa perjanjian kerja (`mhpk_akhir`), bukan BUP. Ini perlu dikonfirmasi untuk dashboard v2.
+
+## Koreksi NIP B-06 (`NipCascadeService`, MAKE-010)
+
+`NipCascadeService` (service `nipCascade`, di luar `Nip/` karena memakai DB) menjalankan koreksi NIP dalam **satu
+transaksi** ikut `update_nip` legacy (`libraries/hr/L_employee.php:550-619`, keputusan #10):
+
+1. role 1 saja (403); format `FormatNip::periksaKoreksi` (422 `nip_lama`/`nip_baru`); pegawai lama ada (404);
+2. kunci `pegawai` lama `FOR UPDATE`; NIP baru belum dipakai pegawai lain [K] (:569-575, pesan memuat nama pemiliknya)
+   dan bukan username/NIP akun lain (ISSUE-023) → 422 `nip_baru`;
+3. salin baris `pegawai` ke NIP baru → `UPDATE <tabel> SET <kolom> = baru WHERE <kolom> = lama` untuk setiap entri
+   `TabelAnakNip::sampaiFase(3)` → hapus baris lama (FK RESTRICT = jaring pengaman: tabel anak di luar registry
+   menggagalkan DELETE dan seluruh koreksi di-rollback) → audit `audit_logs` (`pegawai`, `update`, before/after NIP +
+   jumlah baris per `tabel.kolom`). Setiap langkah yang gagal (juga saat DBDebug mati) melempar DatabaseException →
+   rollback penuh.
+
+Perlakuan khusus:
+
+- **Akun [K] ikut legacy penuh** (:589-599, keputusan user 13-10-2026, menutup pertanyaan CR-036 #1): `username` akun
+  pegawai itu selalu = NIP baru dan password direset ke NIP baru, di-hash Argon2id (`PasswordVerifier`, bukan md5;
+  `password_decode` tidak ada di v2), `password_legacy` NULL, `password_changed_at` NULL (seperti akun baru
+  AccountProvisioner). Penanda "wajib ganti password" belum ada di skema v2 (kebutuhan skema, laporan MAKE-010).
+- **Sesi [V2]**: refresh token menyimpan claims termasuk `nip` saat terbit, jadi seluruh sesi akun itu dicabut
+  (`JwtService::revokeAllForUser`) di transaksi yang sama. `token.nip` (jejak A-01 D-7) tidak diarahkan ulang.
+- **Tabel registry yang belum ada di skema** dilewati dan dilaporkan di `dilewati`; `NipCascadeTest` mengunci daftarnya
+  (`user_lokasi_presensi` — G-03 membuat `dm_user_lokasi_presensi`; temuan registry untuk sesi utama).
+- `jabatan_koordinasi.nip` ikut dikoreksi (keputusan #10) lewat entri registry `NonFkKeputusanV2`.
+
+Test DoD B-06 + butir cascade B-21: `tests/Kepegawaian/NipCascadeTest.php` (data dummy di setiap tabel registry yang
+ada — 40+ tabel —, rollback penuh dengan entri registry rusak di urutan terakhir, akun & login NIP baru, sesi dicabut,
+registry ⊇ semua FK ke `pegawai(nip)` di skema, endpoint).
+
+## Pegawai & biodata (`Pegawai/`, MAKE-010)
+
+| Kelas | Isi |
+|---|---|
+| `PegawaiService` | `pegawaiService`: daftar (role 1, 3, 4, 5, 8; `status IN (1, 2)`; lingkup jalur daftar) dan detail (`bolehLihat`, `tabs` = `descriptorUntuk`, `aksi`, `pengajuan`) |
+| `BiodataService` | `biodataService`: B-03 dua jalur dalam satu transaksi (pegawai `FOR UPDATE`) + foto profil lewat `KolomBerkas` (`pegawai.foto` + `pegawai_foto` pada jalur langsung; `pegawai_hist.foto` pada jalur pengajuan) |
+| `ValidasiBiodata` | Isian per role ikut form legacy, normalisasi `set_param` (digit, nama master turunan, "Kerabat Lain"), kewajiban `validate_param`; [V2] format email/tanggal, panjang DDL, master aktif bila berubah, kabupaten milik provinsi (kecuali 9999), jenis status milik status pegawai; isian tanpa hak yang nilainya berbeda → 422 (keputusan reviewer 13-10-2026; nilai sama diterima karena form legacy mengirim isian readonly apa adanya) |
+| `App\Models\Kepegawaian\PegawaiModel`, `PegawaiHistModel`, `PegawaiFotoModel` | Model auditable + `PelakuAuditTrait` (pelaku = AuthContext pemanggil, tulis gagal → DatabaseException) |
+
+Keputusan [K]/[V2] B-03: role 1 menimpa pengajuan aktif → `flag_update` 2 TANPA alasan + `show_notif`/`notif_date`
+(trigger `pegawai_hist_beUpd`, keputusan user 13-10-2026); kolom `status` pegawai tidak dibuka di biodata (B-05, MAKE-011);
+arsip status/arsip data umum (`document_attachment` ARSIP_RWY `status_du`/`arsip_du`) ditunda ke M6; pegawai status 10
+tidak bisa diubah [V2]; email akun hanya disinkron pada jalur langsung (jalur pengajuan menyimpannya di `pegawai_hist.email`
+sampai disetujui B-04).
 
 ## Lingkup akses pegawai (`Scope/`, MAKE-009)
 
@@ -322,7 +368,7 @@ Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai 
 |---|---|
 | `LocalStorageAdapter` | `StorageAdapterInterface` di disk lokal (`writable/uploads/lampiran`); path relatif `[A-Za-z0-9._-]` per segmen, tulis atomik |
 | `AttachmentService` | `AttachmentServiceInterface` atas `document_attachment` (model `DocumentAttachmentModel`, audit otomatis create/delete); `path` tidak pernah dikembalikan |
-| `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil) |
+| `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil). Dokumen Office (MAKE-010): `docx`/`xlsx` wajib paket OOXML (`[Content_Types].xml` + bagian di `word/`/`xl/`), `doc`/`xls` wajib tanda tangan OLE — ZIP biasa bernama `.docx` ditolak walau `Config\Mimes` memetakan `application/zip` ke ekstensi itu |
 | `PenjagaBerkas` | Kompensasi berkas di luar transaksi DB: setelah transaksi selesai, berkas tercatat dipertahankan hanya bila masih dirujuk `tabel.kolom = path` |
 | `KolomBerkas` | Helper tabel yang menyimpan berkas di kolomnya sendiri (`riwayat_karpeg.file_1..5`, LKH, Konket) |
 | `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → (unggah) izin per pegawai `bolehAksiUntuk()` atas aksi `tambah`/`ubah` yang diizinkan role (403, CR-046) → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → izin aksi di Definisi berlampiran mana pun (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi → (hapus) `bolehUbah` + `bolehAksiUntuk()` atas `hapus`/`ubah` (403, CR-046) → baris riwayat bukan status 10 (404) (+ kunci baris, lampiran wajib terakhir 422 untuk hapus). Tulis diulang di dalam transaksi: `kunciUnggah()`/`kunciHapus()` (pegawai `FOR UPDATE`, baca ulang terkunci, hitung ulang lampiran wajib) |

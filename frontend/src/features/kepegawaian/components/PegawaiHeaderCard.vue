@@ -4,11 +4,11 @@
  * badge status, ringkasan NIP/jenis/tanggal lahir, lalu tiga kelompok aksi yang DIPISAHKAN sesuai anotasi dokumen:
  *  - "Arsip Kepegawaian" (tombol biru sendiri),
  *  - "Cetak" (menu: Cetak Data Umum, Cetak DRH — role 1,2,3,4,5),
- *  - "⋯" khusus "Hapus Pegawai" (role 1) karena jarang dipakai dan berisiko.
- * Foto: avatar inisial; URL foto pegawai belum ada di kontrak (TODO B-20, WS-2). Status = kolom `pegawai.status`
- * (1 Aktif, 2 Tidak Aktif, 10 Dihapus — COMMENT DDL).
+ *  - "⋯" untuk aksi jarang & berisiko (role 1): "Koreksi NIP" (B-06) lalu "Hapus Pegawai" paling bawah (merah).
+ * Foto: `GET pegawai/{nip}/foto` (blob → object URL) bila `ada_foto`; gagal/tidak ada → avatar inisial. Status = kolom
+ * `pegawai.status` (1 Aktif, 2 Tidak Aktif, 10 Dihapus — COMMENT DDL).
  */
-import { Calendar, FolderOpen, IdCard, MoreHorizontal, Trash2, Upload, UserRound } from 'lucide-vue-next'
+import { Calendar, FolderOpen, IdCard, MoreHorizontal, PencilLine, Trash2, Upload, UserRound } from 'lucide-vue-next'
 import {
   DropdownMenuContent,
   DropdownMenuItem,
@@ -16,19 +16,46 @@ import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
 } from 'radix-vue'
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import { UiAvatar, UiBadge, UiButton } from '@/shared/ui'
 
+import { pegawaiService } from '../services/pegawai.service'
 import type { Pegawai } from '../types'
 
-const props = defineProps<{ detail: Pegawai; canPrint: boolean; canDelete: boolean }>()
+const props = withDefaults(defineProps<{ detail: Pegawai; canPrint: boolean; canDelete: boolean; canKoreksiNip?: boolean }>(), {
+  canKoreksiNip: false,
+})
 
 const emit = defineEmits<{
   arsip: []
   print: [kind: 'data-umum' | 'drh']
+  'koreksi-nip': []
   delete: []
 }>()
+
+const fotoUrl = ref<string | null>(null)
+let fotoToken = 0
+
+function lepasFoto(): void {
+  if (fotoUrl.value) URL.revokeObjectURL(fotoUrl.value)
+  fotoUrl.value = null
+}
+
+async function muatFoto(): Promise<void> {
+  const token = ++fotoToken
+  lepasFoto()
+  if (!props.detail.ada_foto) return
+  try {
+    const blob = await pegawaiService.foto(props.detail.nip)
+    if (token === fotoToken) fotoUrl.value = URL.createObjectURL(blob)
+  } catch {
+    // Foto arsip legacy yang belum dipindah (404) atau galat lain → avatar inisial.
+  }
+}
+
+watch(() => [props.detail.nip, props.detail.ada_foto, props.detail.flag_update], () => void muatFoto(), { immediate: true })
+onBeforeUnmount(lepasFoto)
 
 const STATUS: Record<number, { label: string; tone: 'success' | 'neutral' }> = {
   1: { label: 'Aktif', tone: 'success' },
@@ -55,6 +82,7 @@ const menuItem =
     <div class="flex flex-wrap items-start gap-5 px-5 pb-5">
       <UiAvatar
         :name="detail.nama"
+        :src="fotoUrl"
         size="2xl"
         shape="rounded"
         alt=""
@@ -99,7 +127,7 @@ const menuItem =
           </DropdownMenuPortal>
         </DropdownMenuRoot>
 
-        <DropdownMenuRoot v-if="canDelete" :modal="false">
+        <DropdownMenuRoot v-if="canDelete || canKoreksiNip" :modal="false">
           <DropdownMenuTrigger
             class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition hover:bg-slate-200 data-[state=open]:bg-slate-200"
             aria-label="Menu lainnya"
@@ -109,7 +137,11 @@ const menuItem =
           </DropdownMenuTrigger>
           <DropdownMenuPortal>
             <DropdownMenuContent align="end" :side-offset="6" class="z-50 min-w-48 rounded-xl border border-slate-200 bg-white p-1 text-body2 shadow-panel">
+              <DropdownMenuItem v-if="canKoreksiNip" :class="menuItem" data-action="koreksi-nip" @select="emit('koreksi-nip')">
+                <PencilLine class="h-4 w-4" aria-hidden="true" /> Koreksi NIP
+              </DropdownMenuItem>
               <DropdownMenuItem
+                v-if="canDelete"
                 class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-danger outline-none data-[highlighted]:bg-danger-soft"
                 data-action="hapus-pegawai"
                 @select="emit('delete')"

@@ -13,13 +13,15 @@ use InvalidArgumentException;
  * transaksi: salin baris pegawai ke NIP baru → arahkan ulang setiap kolom di registry ini → hapus baris lama. Legacy
  * cukup `UPDATE pegawai SET nip` karena FK-nya `ON UPDATE CASCADE` (`libraries/hr/L_employee.php:586-587`).
  *
- * Isi (79 entri):
+ * Isi (80 entri):
  * - {@see JenisRujukanNip::FkLegacy} (75): semua `REFERENCES pegawai (nip)` di dump struktur produksi 01-10-2026 (D1,
  *   285 tabel), 70 tabel. Semuanya `ON UPDATE CASCADE`; nama FK legacy dicatat.
  * - {@see JenisRujukanNip::NonFkUbahNipLegacy} (1): `pengguna.username`, diganti kode Ubah NIP legacy.
  * - {@see JenisRujukanNip::NonFkSlipGaji} (1): `gaji_pegawai.nip`.
  * - {@see JenisRujukanNip::NonFkFkV2} (2): `riwayat_cuti.nip_atasan_langsung`/`nip_yang_menyetujui`, tanpa FK di legacy
  *   tetapi wajib FK di v2 (DoD C-01).
+ * - {@see JenisRujukanNip::NonFkKeputusanV2} (1): `jabatan_koordinasi.nip`, tanpa FK dan tidak diganti legacy, ikut
+ *   dikoreksi atas keputusan #10 WS2.md (MAKE-010).
  *
  * Label sumber: **[K]** = DDL dump struktur produksi D1; **[K-kode]** = kode legacy (path relatif ke `application/`);
  * **[V2]** = dokumen v2. Fase/pemilik diambil dari `0x-*.md`, Mapping Migrasi, dan draf DBV-012/DBV-013 (belum
@@ -139,6 +141,12 @@ final class TabelAnakNip
             'riwayat_cuti', 'nip_yang_menyetujui', JenisRujukanNip::NonFkFkV2,
             '[K] tanpa FK, VARCHAR(50); [V2] 04-Layanan.md:21 (DoD C-01), SRS :161', true, KeberadaanV2::Ada, 4, 'C-01',
             'NIP pejabat yang menyetujui; FK v2 menuntut VARCHAR(30) dan audit orphan sebelum impor',
+        ],
+        [
+            'jabatan_koordinasi', 'nip', JenisRujukanNip::NonFkKeputusanV2,
+            '[K] jabatan_koordinasi.nip tanpa FK, VARCHAR(30) DEFAULT NULL (D1:1510-1545, DBV-018); [V2] keputusan #10 WS2.md',
+            true, KeberadaanV2::Ada, 2, 'G-02',
+            'Pejabat koordinasi (master G-02b); legacy tidak menggantinya saat Ubah NIP, v2 ikut mengoreksi (MAKE-010)',
         ],
     ];
 
