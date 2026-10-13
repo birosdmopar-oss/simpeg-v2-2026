@@ -7,10 +7,10 @@
  * Metadata master lengkap (`GET master/meta`) hanya untuk role 1, jadi rantai dibangun dari FieldDef: composable cukup
  * membutuhkan key entity per level (`metaRujukan`). Satu induk hanya boleh punya satu anak (rantai lurus).
  *
- * Isian ref ber-`optionsParent` (induk tetap) atau `optionsFilter` (filter dari nilai isian lain, mis. diklat per jenis)
- * dimuat sendiri lewat `masterOptions` dan dimuat ulang saat isian pemicunya berubah (`pemicu()`). `extraOptions`
- * ditambahkan di akhir daftar (mis. LAIN-LAIN wilayah yang tidak ikut `options`). Isian teks ber-`suggestEntity` memuat
- * saran nama master (`saran()`).
+ * Isian ref ber-`optionsParent` (induk tetap), `optionsQuery` (filter tetap) atau `optionsFilter` (filter dari nilai
+ * isian lain, mis. diklat per jenis) dimuat sendiri lewat `masterOptions` dan dimuat ulang saat isian pemicunya berubah
+ * (`pemicu()`). `extraOptions` ditambahkan di akhir daftar (mis. LAIN-LAIN wilayah yang tidak ikut `options`). Isian
+ * teks ber-`suggestEntity` memuat saran nama master (`saran()`).
  */
 import { reactive, ref } from 'vue'
 
@@ -40,7 +40,8 @@ export function metaRujukan(entity: string): MetaRujukan {
   }
 }
 
-const mandiri = (f: FieldDef): boolean => f.optionsParent !== undefined || f.optionsFilter !== undefined
+const mandiri = (f: FieldDef): boolean =>
+  f.optionsParent !== undefined || f.optionsFilter !== undefined || f.optionsQuery !== undefined
 
 /** Rantai isian ref: akar (tanpa `dependsOn` ke isian ref lain) diikuti anak-anaknya berurutan. */
 export function refChains(fields: readonly FieldDef[]): FieldDef[][] {
@@ -95,7 +96,9 @@ export function useRiwayatRefOptions(fields: readonly FieldDef[]) {
     if (f.optionsFilter && nilaiFilter === '') return
     let hasil: FieldOption[] = []
     try {
-      const filters = f.optionsFilter ? { [f.optionsFilter.param]: nilaiFilter } : undefined
+      const filters = f.optionsFilter || f.optionsQuery
+        ? { ...f.optionsQuery, ...(f.optionsFilter ? { [f.optionsFilter.param]: nilaiFilter } : {}) }
+        : undefined
       hasil = (await masterOptions(f.entity as string, f.optionsParent ?? null, filters)).map((o) => ({ value: String(o.id), label: o.nama }))
     } catch {
       hasil = []

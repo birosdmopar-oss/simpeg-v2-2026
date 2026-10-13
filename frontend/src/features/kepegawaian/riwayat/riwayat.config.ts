@@ -70,6 +70,8 @@ export interface FieldDef {
   optionsParent?: string
   /** `ref`: opsi disaring nilai isian lain lewat filter master (`?<param>=<nilai isian>`), mis. diklat per `jenis_diklat`. */
   optionsFilter?: { param: string; field: string }
+  /** `ref`: filter master tetap (`?<kolom>=<nilai>`), mis. jabatan JF tertentu `{ id_group_jabatan: '2' }` (AK SIASN). */
+  optionsQuery?: Readonly<Record<string, string>>
   /** `ref`: opsi tambahan di akhir daftar master, mis. baris sistem LAIN-LAIN wilayah yang tidak ikut `options`. */
   extraOptions?: readonly FieldOption[]
   /** `text`: saran nilai dari nama master (`<datalist>`); nilai bebas tetap boleh (mis. bidang/instansi kursus). */

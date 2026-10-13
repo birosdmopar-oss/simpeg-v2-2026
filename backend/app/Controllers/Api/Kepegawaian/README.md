@@ -58,7 +58,7 @@ Urutan pemeriksaan (wajib, endpoint riwayat dan lampiran):
 | `GET/POST pegawai/{nip}/riwayat/keluarga/{id}/anak`, `PUT/DELETE …/anak/{idAnak}` | WS-1 | **Aditif M4 (MAKE-007).** Anak (`detail_anak`) milik baris keluarga (service `AnakKeluarga`): urutan pemeriksaan sama dengan engine (izin `lihat`/`ubah` keluarga → lingkup → NIP → `bolehAksiUntuk` → keluarga milik NIP, bukan 10 → anak milik keluarga, 404). Akte lahir = multipart `berkas` (kode 3; wajib saat tambah dan saat ubah bila belum ada, 422 `errors.berkas`); ubah dengan berkas = `POST` + `_method=PUT`. Satu transaksi: `jumlah_anak` dihitung ulang, UL_PEGAWAI mengembalikan keluarga ke status 0, snapshot `pegawai_keluarga` bila keluarga Disetujui; kunci baris Disetujui (UL_PEGAWAI; hapus anak juga role 3). Hapus anak = hapus keras + akte (legacy) |
 | `GET usulan/{karpeg,kariskarsu}` | WS-1 | **Aditif M4 (MAKE-007).** Antrean usulan (legacy `list_ad`): role ber-izin `lihat` bukan UL_PEGAWAI (1, 4, 5), tanpa lingkup (keputusan user 12-10-2026), baris status ≠ 10 + `nama`/`unit`/`satker`; `?status=` (0/1/2) opsional; `{ can_process, items }` |
 | `GET usulan/{karpeg,kariskarsu}/saya` | WS-1 | **Aditif M4 (MAKE-007).** Usulan milik pemanggil (role ber-izin `tambah`: 2, 7): `{ pegawai{nip,nama,glr_*,jenis_kelamin}, can_create, can_edit, can_delete, syarat_terpenuhi, items }`. Ajukan/ubah/hapus/proses lewat endpoint riwayat engine `{jenis}` |
-| `GET pegawai/{nip}/riwayat/{jenis}` | WS-1 | Daftar baris riwayat (semua status kecuali 10 Dihapus) |
+| `GET pegawai/{nip}/riwayat/{jenis}` | WS-1 | Daftar baris riwayat (semua status kecuali 10 Dihapus; Definisi boleh menyaring lagi lewat `saringDaftar()`, aditif MAKE-008) |
 | `GET pegawai/{nip}/riwayat/{jenis}/{id}` | WS-1 | Satu baris |
 | `POST pegawai/{nip}/riwayat/{jenis}` | WS-1 | Tambah, **satu request**: `multipart/form-data` berisi field data (kolom DDL) + berkas `berkas[<id_riwayat>]` per kode lampiran; JSON boleh bila jenis tanpa lampiran wajib. Status awal **0 Menunggu** untuk UL_PEGAWAI (role 2/6/7) pada alur self-service, **1 Disetujui** untuk admin. Lampiran ber-`wajib` yang tidak dikirim → 422 `errors.berkas.<id_riwayat>` |
 | `PUT pegawai/{nip}/riwayat/{jenis}/{id}` | WS-1 | Ubah. JSON; dengan berkas: `POST` multipart + field `_method=PUT` (PHP tidak mem-parse multipart pada PUT; CI4 method spoofing). Berkas menambah lampiran baris itu. Baris berstatus 1 Disetujui terkunci untuk UL_PEGAWAI (`RiwayatDefinisi::kunciBarisDisetujui()`, default ya) |
@@ -221,11 +221,12 @@ data di Definisi; default di bawah ikut legacy.
 | Status saat ubah | `RiwayatDefinisi::statusSetelahUbah()`: UL_PEGAWAI → 0 (diajukan ulang); role 3 → 1; role lain (1) → tidak berubah (legacy `controllers/hr/rwy/Pendidikan.php:255-260`). Baris lama ber-status NULL diperlakukan seperti 0 (role 1 membiarkannya NULL) |
 | Kunci baris Disetujui | Ubah/hapus oleh UL_PEGAWAI → 403 (bila `kunciBarisDisetujui()`); hapus oleh `roleKunciHapusDisetujui()` (default role 3, legacy `Kp.php:384`) → 403 |
 | Hapus | Lunak → status 10 (audit `delete`); lampiran baris itu tidak dihapus. Respons `{ "deleted": true, "soft_delete": true }`. Baris status 10 = 404 di detail/ubah/proses |
-| Daftar | Semua baris NIP itu kecuali status 10 (baris lama ber-status NULL ikut tampil), urut `RiwayatDefinisi::urutanDaftar()` (default PK terbaru = [V2]; jenis nyata meng-override sesuai legacy) |
+| Daftar | Semua baris NIP itu kecuali status 10 (baris lama ber-status NULL ikut tampil), disaring lagi oleh `RiwayatDefinisi::saringDaftar(BaseBuilder)` (aditif MAKE-008; mis. SKP periodik hanya status 1, AK status 0/1 ikut legacy; detail/ubah per baris tidak ikut disaring), urut `RiwayatDefinisi::urutanDaftar()` (default PK terbaru = [V2]; jenis nyata meng-override sesuai legacy) |
 | Snapshot | Disinkron bila status lama **atau** baru = 1 (termasuk ubah data baris Disetujui); pengajuan dan penolakan baris yang belum disetujui tidak menyentuhnya |
 | Notifikasi | Event aplikasi `riwayatNotifikasi` sesudah commit, payload `{tipe, jenis, label, nip, id, status, aksi, reason_note}`; `tipe` 1 = diajukan, 2 = diproses, 3 = diubah (legacy `fcmQueue_rwy`). Pengirim push (FCM, H-01) berlangganan event ini |
 | Berkas | `berkas[<id_riwayat>]` satu berkas per kode; kode bukan angka (kecuali nama kolom di `kolomBerkas()`, baris berikut), unggahan gagal, atau kode di luar `lampiran()` → 422 `errors.berkas.<kode>`; slot kosong (`UPLOAD_ERR_NO_FILE`) dilewati |
 | Berkas kolom (aditif MAKE-007) | `berkas[<kolom>]` untuk kolom di `RiwayatDefinisi::kolomBerkas()` (path disimpan di kolom tabel riwayat lewat KolomBerkas MAKE-009; berkas lama yang diganti dihapus setelah commit); wajib per `kolomBerkasWajib()` (ada di request atau kolom sudah terisi); kolom tak dikenal → 422 `errors.berkas.<kolom>` |
+| beforeSave saat tambah (aditif MAKE-008) | `$data` berisi juga kolom NIP pemilik, agar isian turunan per pegawai bisa diisi server (mis. AK: jabatan, pangkat, TMT, masa kerja, AK kumulatif) |
 | Lampiran bersyarat & entri anak (aditif MAKE-007) | `lampiranWajib(aturan, nilai akhir)` menentukan wajib per baris (mis. KTP alamat bukan untuk kantor); kode dengan `entriLampiran()` (mis. akte 3 = `detail_anak`) tidak diminta/diterima di `POST/PUT riwayat` — diunggah lewat endpoint anak atau `POST lampiran` (`id_entri` = PK baris anak, pemilik lewat baris induk) |
 
 ### Kontrak backend (interface & service)
@@ -266,7 +267,8 @@ ter-resolve (tanpa `resetSingle`).
 `hapus`/`proses` → role), `alur()` (`self-service`/`admin`/`usulan`), `pemetaanStatus()`, `kunciBarisDisetujui()`,
 `snapshot()` (`AturanSnapshot`: tabel target, kolom, filter, urutan, join — multi-target), `lampiran()` (**daftar**
 `AturanLampiran`, satu per kode `jenis_rwy`: wajib, batas 1/2/5 MB, ekstensi), `urutanTab()`, dan hook opsional
-`validate`, `beforeSave`, `afterApprove`.
+`validate`, `beforeSave`, `afterApprove`. Aditif engine-v1: `lampiranWajib`, `kolomBerkas`/`kolomBerkasWajib`,
+`entriLampiran` (MAKE-007), `saringDaftar` (MAKE-008).
 
 **Fixture test** `Tests\Support\Kepegawaian\PegawaiFixtureTrait` (bersama, dipakai di test turunan
 `Tests\Support\DatabaseTestCase` MAKE-001): `buatPegawai(array $override = [], array $pmj = []): string`,

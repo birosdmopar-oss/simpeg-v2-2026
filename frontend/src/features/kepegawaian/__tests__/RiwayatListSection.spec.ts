@@ -3,7 +3,7 @@
  * tombol tambah (can_create), menu ⋮ Edit → Setujui/Tolak (can_process, baris Menunggu) → Lampiran → Hapus
  * (can_delete), proses lewat ApprovalDialog, galat 422 (errors.<kolom>, errors["berkas.<id>"]) di form, lampiran wajib
  * saat tambah dan saat ubah bila baris belum punya lampiran, isian bersyarat & berjenjang, isian status untuk role
- * pemilih status, dan keadaan galat 403/501. Tab non-engine (lkh) → "belum tersedia".
+ * pemilih status, berkas kolom (`berkasKolom`, MAKE-008), dan keadaan galat 403/501. Tab non-engine (lkh) → "belum tersedia".
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -13,7 +13,7 @@ vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return {
     ...actual,
-    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn() },
+    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn() },
   }
 })
 vi.mock('../services/lampiran.service', () => ({
@@ -28,12 +28,15 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { masterService } from '@/features/master-data/services/master.service'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
+import ak from '../riwayat/jenis/ak'
+import akSiasn from '../riwayat/jenis/ak-siasn'
 import alamat from '../riwayat/jenis/alamat'
 import diklat from '../riwayat/jenis/diklat'
 import hukdis from '../riwayat/jenis/hukdis'
 import keluarga from '../riwayat/jenis/keluarga'
 import seminar from '../riwayat/jenis/seminar'
 import skp from '../riwayat/jenis/skp'
+import skpPeriodik from '../riwayat/jenis/skp-periodik'
 import kp from '../riwayat/jenis/kp'
 import lkh from '../riwayat/jenis/lkh'
 import pendidikan from '../riwayat/jenis/pendidikan'
@@ -586,5 +589,68 @@ describe('RiwayatListSection — isian hitung SKP (MAKE-008, rumus form legacy)'
     expect(field('kategori_nilai_prestasi')?.value).toBe('Kurang / Miss Conduct')
     await setInput('rating_perilaku', '3')
     expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik')
+  })
+})
+
+async function chooseKolom(kolom: string, file: File): Promise<void> {
+  const input = q<HTMLInputElement>(`[data-testid="riwayat-berkas-${kolom}"] input[type="file"]`)
+  if (!input) throw new Error(`isian berkas ${kolom} tidak ada`)
+  Object.defineProperty(input, 'files', { value: [file], configurable: true })
+  input.dispatchEvent(new Event('change'))
+  await flushPromises()
+}
+
+describe('RiwayatListSection — SKP periodik, AK, AK SIASN (MAKE-008)', () => {
+  const pdf = () => new File(['%PDF-1.4'], 'arsip.pdf', { type: 'application/pdf' })
+
+  it('SKP periodik: tanpa Tambah; Edit = unggah arsip saja (wajib bila kosong) → update(…, [], {}, { f_arsip_1 }); ⋮ Berkas mengunduh', async () => {
+    svc.list.mockResolvedValue([
+      { id_riwayat_skp_periodik: 9, nip: NIP, tahun_skp: 2024, status: 1, f_arsip_1: null },
+      { id_riwayat_skp_periodik: 10, nip: NIP, tahun_skp: 2023, status: 1, f_arsip_1: 'arsip/x/skp.pdf' },
+    ] as never)
+    svc.update.mockResolvedValue({})
+    svc.unduhKolomBerkas.mockResolvedValue(new Blob(['%PDF']))
+    URL.createObjectURL = vi.fn(() => 'blob:uji')
+    URL.revokeObjectURL = vi.fn()
+    const wrapper = await mountTab({ can_create: false, can_delete: false, can_process: false }, skpPeriodik)
+
+    expect(wrapper.find('[data-testid="riwayat-add"]').exists()).toBe(false)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-9')).map((a) => a.key)).toEqual(['edit', 'berkas'])
+    await selectRowAction(wrapper, 'riwayat-actions-9', 'edit')
+    await flushPromises()
+    expect(document.body.querySelectorAll('[data-field]').length).toBe(0)
+    await submitForm()
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-f_arsip_1"]')?.textContent).toContain('wajib'))
+    expect(svc.update).not.toHaveBeenCalled()
+
+    const file = pdf()
+    await chooseKolom('f_arsip_1', file)
+    await submitForm()
+    await vi.waitFor(() => expect(svc.update).toHaveBeenCalledWith(NIP, 'skp-periodik', '9', [], {}, { f_arsip_1: file }))
+
+    await selectRowAction(wrapper, 'riwayat-actions-10', 'berkas')
+    await flushPromises()
+    q<HTMLButtonElement>('[data-testid="berkas-unduh-f_arsip_1"]')?.click()
+    await vi.waitFor(() => expect(svc.unduhKolomBerkas).toHaveBeenCalledWith(NIP, 'skp-periodik', '10', 'f_arsip_1'))
+  })
+
+  it('AK: jumlah AK = AK lama + AK baru (isian hitung); File PAK wajib saat tambah', async () => {
+    svc.list.mockResolvedValue([])
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await setInput('ak_terakhir', '25')
+    await setInput('pengajuan_ak', '12.5')
+    expect(field('nilai_ak')?.value).toBe('37.5')
+    expect(field('nilai_ak')?.hasAttribute('readonly')).toBe(true)
+    expect(q('[data-testid="riwayat-berkas-file_pak"]')?.textContent).toContain('File PAK *')
+  })
+
+  it('AK SIASN: pilihan Jabatan SIMPEG hanya jabatan fungsional tertentu (?id_group_jabatan=2)', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_ak_siasn: 4, nip: NIP, no_sk: 'SK-1', status: 1, id_jabatan: null }] as never)
+    const wrapper = await mountTab({ can_create: false }, akSiasn)
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    expect(options).toHaveBeenCalledWith('jabatan', null, { id_group_jabatan: '2' })
+    expect(field('id_jabatan')).not.toBeNull()
   })
 })
