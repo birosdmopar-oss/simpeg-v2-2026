@@ -751,6 +751,13 @@ describe('RiwayatListSection — pratinjau isian turunan AK (MAKE-017)', () => {
     await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-07-15' }))
     await flushPromises()
     expect(field('ak_terakhir')?.value).toBe('40') // isian pengguna tidak ditimpa
+
+    // Dikosongkan pengguna = tetap disentuh: muat ulang pratinjau tidak mengisinya lagi.
+    await setInput('ak_terakhir', '')
+    await setInput('tgl_pak', '2024-08-01')
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-08-01' }))
+    await flushPromises()
+    expect(field('ak_terakhir')?.value).toBe('')
   })
 
   it('galat pratinjau tampil sebagai pesan; form tetap bisa diisi. Edit tidak memuat pratinjau', async () => {

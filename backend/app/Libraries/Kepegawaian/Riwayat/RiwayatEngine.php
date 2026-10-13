@@ -761,12 +761,6 @@ final class RiwayatEngine implements RiwayatServiceInterface
     }
 
     /**
-     * Isi berkas kolom `$kolom` baris $id milik {nip} (aditif MAKE-007): izin `lihat` + PegawaiScope, baris bukan status
-     * 10, kolom terdaftar di `kolomBerkas()` dan terisi; selain itu 404.
-     *
-     * @return array{isi: string, nama: string}
-     */
-    /**
      * Pratinjau isian turunan form tambah (aditif MAKE-017): izin, lingkup, dan izin per pegawai = aksi TAMBAH; jenis
      * tanpa `RiwayatDefinisi::pratinjauTambah()` → 404.
      *
@@ -781,6 +775,12 @@ final class RiwayatEngine implements RiwayatServiceInterface
         return $d->pratinjauTambah($nip, $query) ?? throw new NotFoundException('Pratinjau tidak tersedia untuk ' . $d->label() . '.');
     }
 
+    /**
+     * Isi berkas kolom `$kolom` baris $id milik {nip} (aditif MAKE-007): izin `lihat` + PegawaiScope, baris bukan status
+     * 10, kolom terdaftar di `kolomBerkas()` dan terisi; selain itu 404.
+     *
+     * @return array{isi: string, nama: string}
+     */
     public function unduhKolomBerkas(AuthContext $auth, string $nip, string $jenis, int $id, string $kolom): array
     {
         $d    = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Lihat);

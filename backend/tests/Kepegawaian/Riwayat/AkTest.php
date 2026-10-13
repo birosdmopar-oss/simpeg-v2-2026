@@ -217,7 +217,14 @@ final class AkTest extends DatabaseTestCase
     public function testPratinjauIzinTambahDanValidasi(): void
     {
         [, , $super] = $this->aktor(Role::SUPER_ADMIN);
-        $this->asUser($super)->get("api/v1/pegawai/{$this->nip}/riwayat/ak/pratinjau?tgl_pak=15-07-2024")->assertStatus(422);
+        foreach (['tgl_pak=15-07-2024', 'tgl_pak=2024-02-30', 'tgl_pak[]=2024-07-15'] as $query) {
+            $result = $this->asUser($super)->get("api/v1/pegawai/{$this->nip}/riwayat/ak/pratinjau?{$query}");
+            $result->assertStatus(422);
+            $this->assertArrayHasKey('tgl_pak', $this->json($result)['errors'], $query);
+        }
+
+        // NIP tidak ada (role 1, lingkup mencakup semua) → 404.
+        $this->asUser($super)->get('api/v1/pegawai/199912312099121999/riwayat/ak/pratinjau')->assertStatus(404);
         // Izin aksi tambah lebih dulu: AK SIASN tanpa izin tambah → 403.
         $this->asUser($super)->get("api/v1/pegawai/{$this->nip}/riwayat/ak-siasn/pratinjau")->assertStatus(403);
 

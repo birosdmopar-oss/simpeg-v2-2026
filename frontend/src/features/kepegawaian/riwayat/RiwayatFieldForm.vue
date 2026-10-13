@@ -91,17 +91,22 @@ watch(
   () => props.initial,
   () => {
     resetForm({ values: blank() })
+    disentuh.clear()
     for (const key of Object.keys(berkas)) delete berkas[Number(key)]
     for (const key of Object.keys(berkasError)) delete berkasError[Number(key)]
     void refs.init(blank())
   },
 )
 
+/** Isian yang pernah diubah pengguna (isi otomatis pratinjau tidak menyentuhnya lagi). */
+const disentuh = new Set<string>()
+
 /**
  * Sesudah pengguna mengubah isian $name: isian hitung ber-`resetOn` pemicu itu dikosongkan (dihitung ulang server), dan
  * isian ref ber-`optionsFilter` dari isian itu dimuat ulang lalu dikosongkan.
  */
 function onEdited(name: string): void {
+  disentuh.add(name)
   for (const g of props.fields) {
     const model = models[g.name]
     if (model && g.resetOn?.includes(name)) model.value = ''
@@ -148,7 +153,7 @@ if (hitung.length) {
 }
 
 // Pratinjau isian turunan (MAKE-017): dimuat saat form tambah dibuka dan saat isian query berubah; respons lama
-// diabaikan (token). Isian `isiOtomatis` diisi selama masih kosong (pengguna tetap bisa mengubahnya).
+// diabaikan (token). Isian `isiOtomatis` diisi selama belum pernah diubah pengguna (setelah itu tidak ditimpa lagi).
 const hasilPratinjau = ref<Record<string, unknown> | null>(null)
 const galatPratinjau = ref('')
 let tokenPratinjau = 0
@@ -164,7 +169,7 @@ async function muatPratinjau(vals: Record<string, string>): Promise<void> {
     for (const [field, kunci] of Object.entries(p.def.isiOtomatis)) {
       const model = models[field]
       const nilai = hasil[kunci]
-      if (model && model.value === '' && nilai !== null && nilai !== undefined) model.value = String(nilai)
+      if (model && !disentuh.has(field) && nilai !== null && nilai !== undefined) model.value = String(nilai)
     }
   } catch {
     if (t === tokenPratinjau) galatPratinjau.value = 'Data pegawai untuk isian otomatis tidak dapat dimuat; isian tetap diisi server saat simpan.'

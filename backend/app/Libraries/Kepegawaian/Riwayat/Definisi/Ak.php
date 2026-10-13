@@ -275,7 +275,14 @@ final class Ak extends RiwayatDefinisi
      */
     public function pratinjauTambah(string $nip, array $query): array
     {
-        $tglPak = trim((string) ($query['tgl_pak'] ?? ''));
+        $mentah = $query['tgl_pak'] ?? '';
+
+        // Nilai non-teks (mis. `?tgl_pak[]=x`) ditolak sebelum di-cast (tanpa warning/500).
+        if (! is_string($mentah)) {
+            throw ValidationException::forField('tgl_pak', 'Tanggal PAK harus berformat YYYY-MM-DD.');
+        }
+
+        $tglPak = trim($mentah);
 
         if ($tglPak !== '' && ! self::tanggalValid($tglPak)) {
             throw ValidationException::forField('tgl_pak', 'Tanggal PAK harus berformat YYYY-MM-DD.');

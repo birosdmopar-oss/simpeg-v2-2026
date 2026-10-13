@@ -56,7 +56,8 @@ const hasBerkas = (berkas: BerkasMap): boolean => Object.keys(berkas).length > 0
 export const riwayatService = {
   /**
    * `GET pegawai/{nip}/riwayat` → descriptor tab (aditif MAKE-006; sumber sama dengan `data.tabs` detail pegawai).
-   * Dipakai halaman riwayat sementara sampai `GET pegawai/{nip}` (MAKE-010) tersedia.
+   * Tidak lagi dipakai halaman (halaman sementara dialihkan ke Detail Pegawai, MAKE-016); dipertahankan sebagai klien
+   * kontrak endpoint aditif.
    */
   async tabs(nip: string): Promise<RiwayatTabDescriptor[]> {
     const { data } = await api.get<{ tabs: RiwayatTabDescriptor[] }>(`/pegawai/${encodeURIComponent(nip)}/riwayat`)
