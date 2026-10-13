@@ -116,7 +116,7 @@ final class KonketService implements KonketServiceInterface
 
         return [
             'mode'       => $admin ? 'admin' : 'pegawai',
-            'items'      => array_map(fn (array $r): array => $this->bentuk($r), $rows),
+            'items'      => array_map(fn (array $r): array => $this->bentuk($r) + ['aksi' => $this->aksi($auth, $r)], $rows),
             'meta'       => ['page' => $page, 'per_page' => $perPage, 'total' => $total],
             'can_create' => true,
             'rentang'    => $admin ? array_combine(['ds', 'de'], $this->rentang($filter)) : null,

@@ -836,3 +836,54 @@ export interface PenugasanListResponse {
   meta: { page: number; per_page: number; total: number }
   can_create: boolean
 }
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * Konket — Konfirmasi Ketidakhadiran (B-13, `konket/*`, MAKE-013); tabel `absen_ijin`
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/** W Menunggu, V Disetujui, X Ditolak (10 Dihapus tidak dikirim API). */
+export type StatusKonket = 'W' | 'V' | 'X'
+
+export interface KonketAksi {
+  ubah: boolean
+  hapus: boolean
+  proses: boolean
+}
+
+export interface KonketItem {
+  id: number
+  nip: string
+  nama_lengkap: string
+  date_start: string
+  date_end: string
+  kategori: number
+  jenis_konket: string | null
+  jenis_dinas: number | null
+  affect_tukin: number
+  id_parent: number | null
+  alasan: string
+  status: StatusKonket
+  reason_note: string | null
+  unit: string | null
+  satker: string | null
+  ada_berkas: boolean
+  aksi: KonketAksi
+  peserta?: { nip: string; nama_lengkap: string; pemohon: boolean }[]
+}
+
+export interface KonketListResponse {
+  mode: 'pegawai' | 'admin'
+  items: KonketItem[]
+  meta: { page: number; per_page: number; total: number }
+  can_create: boolean
+  rentang: { ds: string; de: string } | null
+}
+
+export interface KonketOpsi {
+  mode: 'pegawai' | 'admin'
+  tanggal_minimal: string
+  hari_ini: string
+  kategori_dinas: number
+  kategori_sakit: number
+  jenis: { kategori: number; jenis_konket: string; affect_tukin: number }[]
+}
