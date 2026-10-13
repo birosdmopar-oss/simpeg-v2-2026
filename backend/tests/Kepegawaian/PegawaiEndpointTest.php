@@ -86,6 +86,19 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->asUser($super)->get('api/v1/pegawai?page=abc')->assertStatus(422);
     }
 
+    public function testDaftarRole4Dan5TanpaBatasLingkup(): void
+    {
+        $a = $this->buatPegawaiDiSatker($this->buatSatker());
+        $b = $this->buatPegawaiDiSatker($this->buatSatker());
+
+        foreach ([Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN] as $role) {
+            [, , $akun] = $this->aktor($role);
+            $nips       = array_column($this->json($this->asUser($akun)->get('api/v1/pegawai?per_page=100'))['data']['items'], 'nip');
+            $this->assertContains($a, $nips, "role {$role}");
+            $this->assertContains($b, $nips, "role {$role}");
+        }
+    }
+
     public function testDaftarAdminSatkerHanyaLingkup(): void
     {
         $idSatker        = $this->buatSatker();

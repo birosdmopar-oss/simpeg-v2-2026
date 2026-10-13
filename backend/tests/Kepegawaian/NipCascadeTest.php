@@ -37,10 +37,16 @@ final class NipCascadeTest extends DatabaseTestCase
     private const NIP_BARU = '198801012010011999';
 
     /**
-     * Tabel registry Fase 3 yang belum ada di skema `main` (temuan registry MAKE-010; G-03 membuat
-     * `dm_user_lokasi_presensi`). Bila tabel ini dibuat, perbarui daftar ini (koreksi NIP mulai mengarahkannya).
+     * Tabel registry Fase 3 yang belum ada di skema `main`. Sejak MAKE-011 kosong: `user_lokasi_presensi` tidak dibuat di
+     * v2 (diganti JSON `dm_user_lokasi_presensi`, entri registry TidakDiimpor). Tabel registry baru yang belum dibuat
+     * akan muncul di sini dan menggagalkan test sebagai sinyal.
      */
-    private const TERLEWAT = ['user_lokasi_presensi.nip'];
+    private const TERLEWAT = [];
+
+    /**
+     * Kolom JSON array NIP (diuji terpisah di testJsonDmUserLokasiPresensi).
+     */
+    private const KOLOM_JSON = ['dm_user_lokasi_presensi.target_peg', 'dm_user_lokasi_presensi.excl_peg'];
 
     protected function setUp(): void
     {
@@ -138,6 +144,60 @@ final class NipCascadeTest extends DatabaseTestCase
         $this->login($lama, self::NIP_BARU)->assertStatus(401);
         $this->clearAuthState();
         $this->login(self::NIP_BARU, self::NIP_BARU)->assertStatus(200);
+    }
+
+    public function testJsonDmUserLokasiPresensi(): void
+    {
+        // Keputusan user 13-10-2026 (MAKE-011): NIP di JSON target_peg/excl_peg (+ awalan *_desc) ikut dikoreksi.
+        [$lama, $super] = $this->siapkan();
+        $lain           = $this->buatPegawai();
+        $aturan         = fn (array $isi): int => $this->sisip('dm_user_lokasi_presensi', array_merge(['target_lp' => '["1"]', 'target_lp_desc' => '["Kantor"]', 'status' => 1], $isi));
+
+        $a = $aturan([
+            'target_peg'      => json_encode([$lain, $lama]),
+            'target_peg_desc' => json_encode(["{$lain} - Pegawai Lain", "{$lama} - Budi"]),
+            'excl_peg'        => json_encode([$lama]),
+            'excl_peg_desc'   => json_encode(["{$lama} - Budi"]),
+        ]);
+        $b = $aturan(['target_peg' => json_encode([$lain]), 'target_peg_desc' => json_encode(["{$lain} - Pegawai Lain"])]);
+        // NIP lama hanya sebagai bagian NIP lain (awalan sama) tidak boleh ikut berubah.
+        $c = $aturan(['target_peg' => json_encode([$lama . '9']), 'target_peg_desc' => json_encode(["{$lama}9 - Mirip"])]);
+
+        $hasil = (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
+
+        $baris = fn (int $id): array => (array) $this->db->table('dm_user_lokasi_presensi')->where('id_dm_user_lokasi_presensi', $id)->get()->getRowArray();
+        $this->assertSame([$lain, self::NIP_BARU], json_decode((string) $baris($a)['target_peg'], true));
+        $this->assertSame(["{$lain} - Pegawai Lain", self::NIP_BARU . ' - Budi'], json_decode((string) $baris($a)['target_peg_desc'], true));
+        $this->assertSame([self::NIP_BARU], json_decode((string) $baris($a)['excl_peg'], true));
+        $this->assertSame([self::NIP_BARU . ' - Budi'], json_decode((string) $baris($a)['excl_peg_desc'], true));
+        $this->assertSame([$lain], json_decode((string) $baris($b)['target_peg'], true));
+        $this->assertSame([$lama . '9'], json_decode((string) $baris($c)['target_peg'], true));
+        $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.target_peg']);
+        $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.excl_peg']);
+    }
+
+    public function testUsernameKustomIkutLegacyDitimpaDanAkunLainTidakBerubah(): void
+    {
+        // [K] L_employee.php:589-599: username akun pegawai SELALU diganti NIP baru, termasuk username kustom. Bentrok
+        // dengan username akun lain dicegah cek keunikan sebelumnya (NIP baru tidak boleh jadi username akun lain).
+        $lama        = $this->buatPegawai();
+        $idAkun      = $this->buatAkunUntuk($lama, Role::PEGAWAI, ['username' => 'nama.kustom']);
+        $lain        = $this->buatPegawai();
+        $idLain      = $this->buatAkunUntuk($lain, Role::PEGAWAI);
+        $sebelumLain = $this->db->table('pengguna')->where('id_pengguna', $idLain)->get()->getRowArray();
+        [, $super]   = $this->siapkan();
+
+        (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
+
+        $akun = $this->db->table('pengguna')->where('id_pengguna', $idAkun)->get()->getRowArray();
+        $this->assertSame(self::NIP_BARU, $akun['username']);
+        $this->assertSame($sebelumLain, $this->db->table('pengguna')->where('id_pengguna', $idLain)->get()->getRowArray(), 'akun lain tidak berubah');
+
+        $audit = $this->db->table('audit_logs')->where('entity', 'pengguna')->where('entity_id', (string) $idAkun)->get()->getRowArray();
+        $this->assertIsArray($audit);
+        $this->assertSame(['nip' => $lama, 'username' => 'nama.kustom'], json_decode((string) $audit['before_json'], true));
+        $this->assertSame('***', json_decode((string) $audit['after_json'], true)['password']);
+        $this->assertNotNull($audit['id_pengguna_actor']);
     }
 
     public function testRole1Saja(): void
@@ -295,7 +355,7 @@ final class NipCascadeTest extends DatabaseTestCase
         foreach (TabelAnakNip::sampaiFase(3) as $r) {
             $kunci = $r->tabel . '.' . $r->kolomDiV2();
 
-            if (isset($khusus[$kunci]) || ! $this->tabelAda($r->tabel) || in_array($r->kunci(), ['token.nip', 'pengguna.username'], true)) {
+            if (isset($khusus[$kunci]) || ! $this->tabelAda($r->tabel) || in_array($r->kunci(), ['token.nip', 'pengguna.username'], true) || in_array($kunci, self::KOLOM_JSON, true)) {
                 continue;
             }
 

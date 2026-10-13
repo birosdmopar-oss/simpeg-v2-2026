@@ -41,14 +41,22 @@ enum JenisRujukanNip: string
     case NonFkKeputusanV2 = 'non_fk_keputusan_v2';
 
     /**
+     * Kolom teks berisi JSON array NIP (bukan kolom NIP tunggal), mis. `dm_user_lokasi_presensi.target_peg`/`excl_peg`
+     * (legacy `libraries/hr/master/Lm_lokasi.php:694-756`). Pasangan `<kolom>_desc` berisi JSON array "NIP - Nama". Legacy
+     * tidak menggantinya saat Ubah NIP; v2 mengganti elemen array di transaksi koreksi (keputusan user 13-10-2026,
+     * MAKE-011).
+     */
+    case JsonArrayNip = 'json_array_nip';
+
+    /**
      * Apakah Ubah NIP legacy ikut mengganti nilai kolom ini (lewat cascade FK atau kode). `false` berarti setelah Ubah NIP
      * legacy, baris lama menunjuk NIP yang sudah tidak ada.
      */
     public function diubahLegacy(): bool
     {
         return match ($this) {
-            self::FkLegacy, self::NonFkUbahNipLegacy                     => true,
-            self::NonFkSlipGaji, self::NonFkFkV2, self::NonFkKeputusanV2 => false,
+            self::FkLegacy, self::NonFkUbahNipLegacy                                         => true,
+            self::NonFkSlipGaji, self::NonFkFkV2, self::NonFkKeputusanV2, self::JsonArrayNip => false,
         };
     }
 }
