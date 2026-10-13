@@ -63,6 +63,16 @@ export const riwayatService = {
     return data.tabs
   },
 
+  /**
+   * `GET pegawai/{nip}/riwayat/{jenis}/pratinjau?<query>` → isian turunan yang akan diisi server saat tambah (aditif
+   * MAKE-017; izin = aksi tambah).
+   */
+  async pratinjau(nip: string, jenis: JenisEngine, query: Record<string, string>): Promise<Record<string, unknown>> {
+    const params = Object.fromEntries(Object.entries(query).filter(([, v]) => v !== ''))
+    const { data } = await api.get<Record<string, unknown>>(`${base(nip, jenis)}/pratinjau`, { params })
+    return data
+  },
+
   async list(nip: string, jenis: JenisEngine): Promise<RiwayatRow[]> {
     const { data } = await api.get<RiwayatRow[]>(base(nip, jenis))
     return data

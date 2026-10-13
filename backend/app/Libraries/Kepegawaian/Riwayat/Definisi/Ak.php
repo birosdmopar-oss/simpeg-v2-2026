@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Kepegawaian\Riwayat\Definisi;
 
 use App\Constants\Role;
+use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\AlurRiwayat;
@@ -267,6 +268,28 @@ final class Ak extends RiwayatDefinisi
     }
 
     /**
+     * Pratinjau isian turunan form tambah (MAKE-017; keputusan Q4 MAKE-008, legacy form() :312-478 menampilkannya sebelum
+     * simpan): nilai yang sama dengan yang diisi beforeSave saat tambah (turunan()), masa kerja sampai `tgl_pak` (query,
+     * opsional — kosong = null), dan `ak_terakhir` bawaan "AK Lama" = AK terakhir jabatan + pangkat sama (legacy
+     * `ak_terakhir` form :201 = akSebelumnya). Saat simpan, AK Lama tetap isian pengguna.
+     */
+    public function pratinjauTambah(string $nip, array $query): array
+    {
+        $tglPak = trim((string) ($query['tgl_pak'] ?? ''));
+
+        if ($tglPak !== '' && ! self::tanggalValid($tglPak)) {
+            throw ValidationException::forField('tgl_pak', 'Tanggal PAK harus berformat YYYY-MM-DD.');
+        }
+
+        $turunan                                             = self::turunan($nip);
+        [$turunan['mker_th_jab'], $turunan['mker_bl_jab']]   = self::masaKerja($turunan['tmt_jab'], $tglPak);
+        [$turunan['mker_th_pang'], $turunan['mker_bl_pang']] = self::masaKerja($turunan['tmt_pang'], $tglPak);
+        $turunan['ak_terakhir']                              = self::akTerakhir($nip, $turunan['id_jabatan'], $turunan['id_pangkat']);
+
+        return $turunan;
+    }
+
+    /**
      * Legacy process_ak() :1240-1244 mengisi `appr_at`/`appr_by` (tabel tanpa `approved_by`) untuk setujui DAN tolak.
      */
     public function afterProses(string $aksi, array $baris, AuthContext $auth): void
@@ -363,6 +386,16 @@ final class Ak extends RiwayatDefinisi
     }
 
     /**
+     * AK terakhir pegawai untuk jabatan + pangkat yang sama = `pegawai_ak.nilai_ak` (legacy form() :357-363 `akSebelumnya`;
+     * dipakai pengurang AK kumulatif dan bawaan "AK Lama" di form), 0 bila tidak ada.
+     */
+    public static function akTerakhir(string $nip, ?int $idJabatan, ?int $idPangkat): float
+    {
+        return (float) (db_connect()->table('pegawai_ak')->select('nilai_ak')->where('nip', $nip)
+            ->where('id_jabatan', $idJabatan)->where('id_pangkat', $idPangkat)->get()->getRowArray()['nilai_ak'] ?? 0);
+    }
+
+    /**
      * AK kumulatif untuk KP dan jenjang berikutnya dari master `dm_ak_jf` (legacy form() :357-405), dikurangi AK
      * terakhir di snapshot `pegawai_ak` untuk jabatan + pangkat yang sama.
      *
@@ -399,8 +432,7 @@ final class Ak extends RiwayatDefinisi
             }
         }
 
-        $sebelumnya = (float) ($db->table('pegawai_ak')->select('nilai_ak')->where('nip', $nip)
-            ->where('id_jabatan', $idJabatan)->where('id_pangkat', $idPangkat)->get()->getRowArray()['nilai_ak'] ?? 0);
+        $sebelumnya = self::akTerakhir($nip, $idJabatan, $idPangkat);
 
         return [
             'ak_kum_kp'       => $kumKp > 0 ? $kumKp - $sebelumnya : $kumKp,
@@ -420,6 +452,13 @@ final class Ak extends RiwayatDefinisi
             'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
             [$db->prefixTable('dm_ak_jf')],
         )->getRow() !== null;
+    }
+
+    private static function tanggalValid(string $tanggal): bool
+    {
+        $dt = DateTimeImmutable::createFromFormat('!Y-m-d', $tanggal);
+
+        return $dt !== false && $dt->format('Y-m-d') === $tanggal;
     }
 
     /**

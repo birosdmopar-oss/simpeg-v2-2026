@@ -110,6 +110,19 @@ export interface BerkasKolomDef {
   ekstensi?: string[]
 }
 
+/**
+ * Pratinjau isian yang diisi server saat TAMBAH (`GET pegawai/{nip}/riwayat/{jenis}/pratinjau`, hook backend
+ * `pratinjauTambah()`, MAKE-017). Dimuat saat form tambah dibuka dan saat isian `query` berubah.
+ */
+export interface PratinjauDef {
+  /** Isian form yang dikirim sebagai query (mis. `tgl_pak` → masa kerja sampai tanggal PAK). */
+  query: readonly string[]
+  /** Isian form ← kunci pratinjau yang diisi otomatis selama isian masih kosong (mis. AK Lama). */
+  isiOtomatis: Readonly<Record<string, string>>
+  /** Baris tampilan hanya-baca (label + nilai dari hasil pratinjau). */
+  tampil: readonly { label: string; nilai: (p: Readonly<Record<string, unknown>>) => string }[]
+}
+
 /** Aturan lampiran + label isian berkas. Kunci form/422 = `berkas.<id_riwayat>`. */
 export interface LampiranDef extends AturanLampiran {
   label: string
@@ -154,6 +167,8 @@ export interface RiwayatJenisConfig {
    * (`berkas[<kolom>]`), diunduh lewat item ⋮ "Berkas". Jenis tanpa isian tetapi ber-berkas kolom tetap punya Edit.
    */
   berkasKolom?: BerkasKolomDef[]
+  /** Pratinjau isian turunan di form tambah (MAKE-017, mis. AK: jabatan, pangkat, masa kerja, AK kumulatif, AK lama). */
+  pratinjau?: PratinjauDef
 }
 
 /**

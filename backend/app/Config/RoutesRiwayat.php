@@ -39,6 +39,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
         $routes->post("{$dasar}/(:num)/process", "RiwayatController::process/\$1/{$jenis}/\$2");
         // M4 (MAKE-007, aditif): unduh berkas kolom (RiwayatDefinisi::kolomBerkas()).
         $routes->get("{$dasar}/(:num)/berkas/(:segment)", "RiwayatController::unduhBerkas/\$1/{$jenis}/\$2/\$3");
+        // MAKE-017 (aditif): pratinjau isian turunan form tambah (RiwayatDefinisi::pratinjauTambah(); tanpa hook → 404).
+        $routes->get("{$dasar}/pratinjau", "RiwayatController::pratinjau/\$1/{$jenis}");
     }
 
     // M3 (MAKE-006, aditif): descriptor tab riwayat pegawai { tabs } = RiwayatRegistry::descriptorUntuk().

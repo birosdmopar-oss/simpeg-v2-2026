@@ -766,6 +766,21 @@ final class RiwayatEngine implements RiwayatServiceInterface
      *
      * @return array{isi: string, nama: string}
      */
+    /**
+     * Pratinjau isian turunan form tambah (aditif MAKE-017): izin, lingkup, dan izin per pegawai = aksi TAMBAH; jenis
+     * tanpa `RiwayatDefinisi::pratinjauTambah()` → 404.
+     *
+     * @param array<string, mixed> $query
+     *
+     * @return array<string, mixed>
+     */
+    public function pratinjauTambah(AuthContext $auth, string $nip, string $jenis, array $query): array
+    {
+        $d = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Tambah);
+
+        return $d->pratinjauTambah($nip, $query) ?? throw new NotFoundException('Pratinjau tidak tersedia untuk ' . $d->label() . '.');
+    }
+
     public function unduhKolomBerkas(AuthContext $auth, string $nip, string $jenis, int $id, string $kolom): array
     {
         $d    = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Lihat);

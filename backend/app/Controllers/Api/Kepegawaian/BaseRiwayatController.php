@@ -78,6 +78,23 @@ abstract class BaseRiwayatController extends ApiController
     }
 
     /**
+     * `GET pegawai/{nip}/riwayat/{jenis}/pratinjau` — pratinjau isian turunan form tambah (aditif MAKE-017).
+     */
+    public function pratinjau(string $nip, string $jenis): ResponseInterface
+    {
+        $service = $this->service();
+
+        if (! $service instanceof RiwayatEngine) {
+            throw new NotFoundException('Pratinjau tidak tersedia.');
+        }
+
+        /** @var array<string, mixed> $query */
+        $query = $this->request->getGet() ?? [];
+
+        return $this->respondSuccess($service->pratinjauTambah($this->auth(), $nip, $jenis, $query));
+    }
+
+    /**
      * `GET pegawai/{nip}/riwayat/{jenis}/{id}/berkas/{kolom}` — unduh berkas kolom (aditif MAKE-007).
      */
     public function unduhBerkas(string $nip, string $jenis, string $id, string $kolom): ResponseInterface
