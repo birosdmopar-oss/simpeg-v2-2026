@@ -68,5 +68,14 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->post('konket/(:num)/process', 'KonketController::process/$1');
     $routes->get('konket/(:num)/berkas', 'KonketController::berkasBukti/$1');
 
-    // WS-2: endpoint LKH ditambahkan di sini.
+    // B-12b LKH (MAKE-013): role 1, 2, 3, 6, 7; verifikasi = atasan langsung (nip_atasan); hak & lingkup di LkhService.
+    $routes->get('lkh', 'LkhController::index');
+    $routes->get('lkh/opsi', 'LkhController::opsi');
+    $routes->get('lkh/verifikasi', 'LkhController::verifikasi');
+    $routes->post('lkh', 'LkhController::create');
+    $routes->get('lkh/(:num)', 'LkhController::show/$1');
+    $routes->put('lkh/(:num)', 'LkhController::update/$1');
+    $routes->delete('lkh/(:num)', 'LkhController::delete/$1');
+    $routes->post('lkh/(:num)/process', 'LkhController::process/$1');
+    $routes->get('lkh/(:num)/pdf', 'LkhController::pdf/$1');
 });

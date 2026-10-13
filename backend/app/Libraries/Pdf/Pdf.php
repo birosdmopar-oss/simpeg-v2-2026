@@ -41,6 +41,23 @@ final class Pdf
     }
 
     /**
+     * Tag `<img>` kode QR (PNG tersemat, `src="@<base64>"` writeHTML TCPDF) untuk $teks — pengganti QRBuilder legacy
+     * (`###QRCODE###` di template LKH). Tanpa GD/Imagick → teks kodenya saja (dokumen tetap terbit).
+     */
+    public static function qrImg(string $teks, int $tinggiPx = 100): string
+    {
+        $png = (extension_loaded('gd') || extension_loaded('imagick'))
+            ? (new \TCPDF2DBarcode($teks, 'QRCODE,M'))->getBarcodePngData(4, 4, [0, 0, 0])
+            : false;
+
+        if (! is_string($png) || $png === '') {
+            return '<span style="font-size:7pt;">' . esc($teks) . '</span>';
+        }
+
+        return '<img src="@' . base64_encode($png) . '" height="' . $tinggiPx . '" alt="Kode QR" />';
+    }
+
+    /**
      * Respons unduhan/pratinjau PDF: `application/pdf`, `Content-Disposition` (inline = pratinjau di peramban),
      * `nosniff`, `no-store` (dokumen berisi data pribadi).
      */

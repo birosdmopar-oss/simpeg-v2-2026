@@ -44,6 +44,16 @@ final class TcpdfRendererTest extends CIUnitTestCase
         $this->assertStringContainsString('Laporan Uji', $isi);
     }
 
+    public function testKodeQrTersematDalamPdf(): void
+    {
+        $tag = Pdf::qrImg('12345260123', 80);
+        $this->assertStringStartsWith('<img src="@', $tag);
+
+        $isi = (new TcpdfRenderer())->render(new DokumenPdf('QR', "<p>Kode:</p>{$tag}"));
+        $this->assertStringStartsWith('%PDF-', $isi);
+        $this->assertMatchesRegularExpression('/\/Subtype\s*\/Image/', $isi, 'gambar QR ikut tertanam');
+    }
+
     public function testLanskapDanOrientasiTidakValid(): void
     {
         $this->assertStringStartsWith('%PDF-', (new TcpdfRenderer())->render(new DokumenPdf('L', '<p>x</p>', orientasi: 'L', ukuran: 'F4')));
