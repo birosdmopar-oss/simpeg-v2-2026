@@ -10,13 +10,15 @@ import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPor
 import type { RiwayatValidationErrors } from '../services/apiErrors'
 
 import RiwayatFieldForm from './RiwayatFieldForm.vue'
-import type { FieldDef, RiwayatJenisConfig } from './riwayat.config'
+import type { FieldDef, PratinjauDef, RiwayatJenisConfig } from './riwayat.config'
 import type { BerkasMap } from './riwayat.service'
 
 defineProps<{
   open: boolean
   config: RiwayatJenisConfig
   initial: Record<string, string> | null
+  /** Pratinjau isian turunan form tambah (MAKE-017). */
+  pratinjau?: { def: PratinjauDef; muat: (query: Record<string, string>) => Promise<Record<string, unknown>> } | null
   /** Baris yang diedit (diteruskan ke isian hitung `compute`). */
   baris?: Readonly<Record<string, unknown>> | null
   fields?: FieldDef[]
@@ -53,6 +55,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
           :mode="initial ? 'edit' : 'create'"
           :initial="initial ?? {}"
           :baris="baris ?? null"
+          :pratinjau="pratinjau ?? null"
           :lampiran-tersimpan="lampiranTersimpan ?? {}"
           :berkas-kolom="config.berkasKolom ?? []"
           :kolom-terisi="kolomTerisi ?? {}"

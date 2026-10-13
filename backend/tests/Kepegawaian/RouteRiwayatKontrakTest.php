@@ -97,6 +97,7 @@ final class RouteRiwayatKontrakTest extends CIUnitTestCase
             'ubah riwayat'   => ['PUT', "api/v1/pegawai/{$nip}/riwayat/pendidikan/1"],
             'hapus riwayat'  => ['DELETE', "api/v1/pegawai/{$nip}/riwayat/pendidikan/1"],
             'proses riwayat' => ['POST', "api/v1/pegawai/{$nip}/riwayat/pendidikan/1/process"],
+            'pratinjau'      => ['GET', "api/v1/pegawai/{$nip}/riwayat/ak/pratinjau"],
         ];
     }
 

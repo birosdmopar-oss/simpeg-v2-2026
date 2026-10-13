@@ -237,6 +237,13 @@ function onAction(key: string, row: RiwayatRow): void {
   }
 }
 
+/** Pratinjau isian turunan form tambah (MAKE-017) — hanya saat tambah dan jenis punya `pratinjau`. */
+const pratinjauForm = computed(() =>
+  props.config.pratinjau && !editing.value
+    ? { def: props.config.pratinjau, muat: (query: Record<string, string>) => riwayatService.pratinjau(props.nip, jenis.value, query) }
+    : null,
+)
+
 const initialValues = computed<Record<string, string> | null>(() => {
   const row = editing.value
   if (!row) return null
@@ -380,6 +387,7 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :fields="formFields"
       :initial="initialValues"
       :baris="editing"
+      :pratinjau="pratinjauForm"
       :lampiran-tersimpan="lampiranTersimpan"
       :kolom-terisi="kolomTerisi"
       :server-errors="formErrors"
