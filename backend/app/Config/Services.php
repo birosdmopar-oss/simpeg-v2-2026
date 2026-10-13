@@ -38,6 +38,7 @@ use App\Libraries\Auth\UserService;
 use App\Libraries\CacheService;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Html\HtmlSanitizer;
+use App\Libraries\Kepegawaian\Konket\KonketService;
 use App\Libraries\Kepegawaian\Lampiran\AttachmentService;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Libraries\Kepegawaian\NipCascadeService;
@@ -48,7 +49,6 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
-use App\Libraries\Kepegawaian\Stub\StubKonketService;
 use App\Libraries\Kepegawaian\Stub\StubLkhService;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
@@ -443,7 +443,7 @@ class Services extends BaseService
             return static::getSharedInstance('konketService');
         }
 
-        return new StubKonketService();
+        return new KonketService();
     }
 
     // ------------------------------------------------------------------

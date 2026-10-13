@@ -58,5 +58,15 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->delete('penugasan/(plt|plh)/(:num)', 'PenugasanController::delete/$1/$2');
     $routes->get('penugasan/(plt|plh)/(:num)/lampiran', 'PenugasanController::unduhLampiran/$1/$2');
 
-    // WS-2: endpoint Konket/LKH ditambahkan di sini.
+    // B-13 Konket (MAKE-013): hak akses & lingkup di KonketService (role 1, 2, 3, 6, 7; proses 1, 3).
+    $routes->get('konket', 'KonketController::index');
+    $routes->get('konket/opsi', 'KonketController::opsi');
+    $routes->post('konket', 'KonketController::create');
+    $routes->get('konket/(:num)', 'KonketController::show/$1');
+    $routes->put('konket/(:num)', 'KonketController::update/$1');
+    $routes->delete('konket/(:num)', 'KonketController::delete/$1');
+    $routes->post('konket/(:num)/process', 'KonketController::process/$1');
+    $routes->get('konket/(:num)/berkas', 'KonketController::berkasBukti/$1');
+
+    // WS-2: endpoint LKH ditambahkan di sini.
 });
