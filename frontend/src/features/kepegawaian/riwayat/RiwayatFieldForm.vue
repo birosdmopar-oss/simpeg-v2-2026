@@ -17,14 +17,14 @@
  */
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
-import { onMounted, reactive, type Ref, watch } from 'vue'
+import { onMounted, reactive, ref, type Ref, watch } from 'vue'
 
 import FormField from '@/shared/components/FormField.vue'
 import { UiButton, UiFileField, UiSelect, UiTextField } from '@/shared/ui'
 
 import type { RiwayatValidationErrors } from '../services/apiErrors'
 
-import { fieldVisible, type BerkasKolomDef, type FieldDef, type LampiranDef } from './riwayat.config'
+import { fieldVisible, type BerkasKolomDef, type FieldDef, type LampiranDef, type PratinjauDef } from './riwayat.config'
 import { buildRiwayatSchema } from './riwayat.schema'
 import type { BerkasMap } from './riwayat.service'
 import { useRiwayatRefOptions } from './riwayatCascade'
@@ -35,6 +35,8 @@ const props = withDefaults(
     lampiran?: LampiranDef[]
     mode?: 'create' | 'edit'
     initial?: Record<string, string>
+    /** Pratinjau isian turunan (mode tambah, MAKE-017): definisi + pemuat (nip/jenis diikat pemanggil). */
+    pratinjau?: { def: PratinjauDef; muat: (query: Record<string, string>) => Promise<Record<string, unknown>> } | null
     /** Baris yang diedit (mode edit) — diteruskan ke `compute` (mis. `jenis_ak` AK). */
     baris?: Readonly<Record<string, unknown>> | null
     /** Jumlah lampiran yang sudah tersimpan per kode (mode edit); kode tanpa entri = tidak diketahui. */
@@ -55,6 +57,7 @@ const props = withDefaults(
     mode: 'create',
     initial: () => ({}),
     baris: null,
+    pratinjau: null,
     lampiranTersimpan: () => ({}),
     berkasKolom: () => [],
     kolomTerisi: () => ({}),
@@ -88,17 +91,22 @@ watch(
   () => props.initial,
   () => {
     resetForm({ values: blank() })
+    disentuh.clear()
     for (const key of Object.keys(berkas)) delete berkas[Number(key)]
     for (const key of Object.keys(berkasError)) delete berkasError[Number(key)]
     void refs.init(blank())
   },
 )
 
+/** Isian yang pernah diubah pengguna (isi otomatis pratinjau tidak menyentuhnya lagi). */
+const disentuh = new Set<string>()
+
 /**
  * Sesudah pengguna mengubah isian $name: isian hitung ber-`resetOn` pemicu itu dikosongkan (dihitung ulang server), dan
  * isian ref ber-`optionsFilter` dari isian itu dimuat ulang lalu dikosongkan.
  */
 function onEdited(name: string): void {
+  disentuh.add(name)
   for (const g of props.fields) {
     const model = models[g.name]
     if (model && g.resetOn?.includes(name)) model.value = ''
@@ -141,6 +149,37 @@ if (hitung.length) {
       }
     },
     { deep: true, immediate: true },
+  )
+}
+
+// Pratinjau isian turunan (MAKE-017): dimuat saat form tambah dibuka dan saat isian query berubah; respons lama
+// diabaikan (token). Isian `isiOtomatis` diisi selama belum pernah diubah pengguna (setelah itu tidak ditimpa lagi).
+const hasilPratinjau = ref<Record<string, unknown> | null>(null)
+const galatPratinjau = ref('')
+let tokenPratinjau = 0
+async function muatPratinjau(vals: Record<string, string>): Promise<void> {
+  const p = props.pratinjau
+  if (!p || props.mode !== 'create') return
+  const t = ++tokenPratinjau
+  try {
+    const hasil = await p.muat(Object.fromEntries(p.def.query.map((k) => [k, vals[k] ?? ''])))
+    if (t !== tokenPratinjau) return
+    hasilPratinjau.value = hasil
+    galatPratinjau.value = ''
+    for (const [field, kunci] of Object.entries(p.def.isiOtomatis)) {
+      const model = models[field]
+      const nilai = hasil[kunci]
+      if (model && !disentuh.has(field) && nilai !== null && nilai !== undefined) model.value = String(nilai)
+    }
+  } catch {
+    if (t === tokenPratinjau) galatPratinjau.value = 'Data pegawai untuk isian otomatis tidak dapat dimuat; isian tetap diisi server saat simpan.'
+  }
+}
+if (props.pratinjau) {
+  watch(
+    () => (props.pratinjau?.def.query ?? []).map((k) => (values as Record<string, string>)[k] ?? '').join('|'),
+    () => void muatPratinjau(values as Record<string, string>),
+    { immediate: true },
   )
 }
 
@@ -290,6 +329,18 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
         </div>
       </template>
     </div>
+
+    <section v-if="pratinjau && mode === 'create'" class="mt-6 border-t border-slate-200 pt-5" :data-testid="`${testid}-pratinjau`">
+      <h3 class="mb-3 text-body1 font-semibold text-slate-900">Diisi otomatis dari data pegawai</h3>
+      <p v-if="galatPratinjau" role="alert" class="text-body2 text-danger" :data-testid="`${testid}-pratinjau-galat`">{{ galatPratinjau }}</p>
+      <dl v-else-if="hasilPratinjau" class="grid gap-x-6 gap-y-2 text-body2 md:grid-cols-2">
+        <div v-for="t in pratinjau.def.tampil" :key="t.label">
+          <dt class="text-slate-500">{{ t.label }}</dt>
+          <dd class="text-slate-900">{{ t.nilai(hasilPratinjau) || '—' }}</dd>
+        </div>
+      </dl>
+      <p v-else class="text-body2 text-slate-500">Memuat…</p>
+    </section>
 
     <fieldset v-if="lampiran.length" class="mt-6 border-t border-slate-200 pt-5">
       <legend class="mb-3 text-body1 font-semibold text-slate-900">Lampiran</legend>

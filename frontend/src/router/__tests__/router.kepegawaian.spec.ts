@@ -1,7 +1,8 @@
 /**
  * Router — route Modul B Kepegawaian (Fase 3): /pegawai (hr/employee/index = role 1,3,4,5,8), /pegawai/:nip
  * (hr/employee/detail = semua role login), /struktur-organisasi (hr/so/full = semua role login), serta placeholder
- * Usulan Konket, Verifikasi LKH (routes.pegawai.ts, WS-2) dan Usulan Karpeg/Karis (routes.riwayat.ts, WS-1).
+ * Usulan Konket, Verifikasi LKH (routes.pegawai.ts, WS-2) dan Usulan Karpeg/Karis (routes.riwayat.ts, WS-1), serta alamat
+ * lama /pegawai/:nip/riwayat yang dialihkan ke Detail Pegawai (MAKE-016).
  * Guard FE hanya UX; RoleFilter backend yang menegakkan (ADR-024/005).
  */
 import { createPinia, setActivePinia } from 'pinia'
@@ -81,6 +82,23 @@ describe('router — /pegawai/:nip dan /struktur-organisasi', () => {
     loginAs(Role.SUPER_ADMIN)
     await router.push('/struktur-organisasi')
     expect(document.title).toBe('Struktur Organisasi · SIMPEG v2')
+  })
+})
+
+describe('router — alamat lama /pegawai/:nip/riwayat (MAKE-016)', () => {
+  it('dialihkan ke Detail Pegawai dengan NIP dan query tab yang sama', async () => {
+    loginAs(Role.PEGAWAI)
+    await router.push('/pegawai/197001011995011001/riwayat?tab=kp')
+    expect(router.currentRoute.value.name).toBe('pegawai-detail')
+    expect(router.currentRoute.value.params.nip).toBe('197001011995011001')
+    expect(router.currentRoute.value.query).toEqual({ tab: 'kp' })
+  })
+
+  it('tanpa query → Detail Pegawai tanpa query', async () => {
+    loginAs(Role.SUPER_ADMIN)
+    await router.push('/pegawai/197001011995011001/riwayat')
+    expect(router.currentRoute.value.name).toBe('pegawai-detail')
+    expect(router.currentRoute.value.fullPath).toBe('/pegawai/197001011995011001')
   })
 })
 

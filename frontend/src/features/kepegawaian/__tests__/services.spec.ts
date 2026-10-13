@@ -109,6 +109,14 @@ describe('riwayatService', () => {
     expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}/riwayat`)
   })
 
+  it('pratinjau: GET /pegawai/{nip}/riwayat/{jenis}/pratinjau, query kosong tidak dikirim (MAKE-017)', async () => {
+    get.mockResolvedValue({ data: { jabatan: 'Analis' } })
+    await expect(riwayatService.pratinjau(NIP, 'ak', { tgl_pak: '2024-07-15' })).resolves.toEqual({ jabatan: 'Analis' })
+    expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}/riwayat/ak/pratinjau`, { params: { tgl_pak: '2024-07-15' } })
+    await riwayatService.pratinjau(NIP, 'ak', { tgl_pak: '' })
+    expect(get).toHaveBeenLastCalledWith(`/pegawai/${NIP}/riwayat/ak/pratinjau`, { params: {} })
+  })
+
   it('daftar: GET /pegawai/{nip}/riwayat/{jenis}', async () => {
     get.mockResolvedValue({ data: [] })
     await riwayatService.list(NIP, 'pendidikan')

@@ -13,7 +13,7 @@ vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return {
     ...actual,
-    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn() },
+    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn(), pratinjau: vi.fn() },
   }
 })
 vi.mock('../services/lampiran.service', () => ({
@@ -723,5 +723,57 @@ describe('RiwayatListSection — aturan form legacy SKP & AK Current (perbaikan 
     await flushPromises()
     await setInput('pengajuan_ak', '20')
     expect(field('nilai_ak')?.value).toBe('45')
+  })
+})
+
+describe('RiwayatListSection — pratinjau isian turunan AK (MAKE-017)', () => {
+  const hasil = {
+    nama: 'Dr. Budi Uji, M.Si.', jabatan: 'Analis Kebijakan Ahli Pertama', no_induk_jf: 'JF-0001', tmt_jab: '2018-01-01', mker_th_jab: 6, mker_bl_jab: 6,
+    pangkat: 'Penata Muda', gol_ruang: 'III/a', tmt_pang: '2019-01-01', mker_th_pang: 5, mker_bl_pang: 6, ak_kum_kp: 70, ak_kum_next_jen: 120, ak_terakhir: 30,
+  }
+
+  it('tambah: pratinjau dimuat (lalu dimuat ulang saat tanggal PAK berubah), tampil hanya-baca, AK Lama diisi otomatis', async () => {
+    svc.list.mockResolvedValue([])
+    svc.pratinjau.mockResolvedValue(hasil)
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenCalledWith(NIP, 'ak', { tgl_pak: '' }))
+    await flushPromises()
+    const panel = q('[data-testid="riwayat-pratinjau"]')
+    expect(panel?.textContent).toContain('Analis Kebijakan Ahli Pertama')
+    expect(panel?.textContent).toContain('Penata Muda / III/a')
+    expect(panel?.textContent).toContain('6 tahun 6 bulan')
+    expect(panel?.querySelector('input')).toBeNull()
+    expect(field('ak_terakhir')?.value).toBe('30')
+
+    await setInput('ak_terakhir', '40')
+    await setInput('tgl_pak', '2024-07-15')
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-07-15' }))
+    await flushPromises()
+    expect(field('ak_terakhir')?.value).toBe('40') // isian pengguna tidak ditimpa
+
+    // Dikosongkan pengguna = tetap disentuh: muat ulang pratinjau tidak mengisinya lagi.
+    await setInput('ak_terakhir', '')
+    await setInput('tgl_pak', '2024-08-01')
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-08-01' }))
+    await flushPromises()
+    expect(field('ak_terakhir')?.value).toBe('')
+  })
+
+  it('galat pratinjau tampil sebagai pesan; form tetap bisa diisi. Edit tidak memuat pratinjau', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_ak: 4, nip: NIP, jenis_ak: 2, no_hpak: 'PAK-2', tgl_pak: '2021-01-01', ak_terakhir: 25, pengajuan_ak: 12.5, nilai_ak: 37.5, file_pak: 'x.pdf', status: 1 }] as never)
+    svc.pratinjau.mockRejectedValue(apiError(403))
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-pratinjau-galat"]')?.textContent).toContain('tidak dapat dimuat'))
+    expect(field('ak_terakhir')?.value).toBe('')
+    q<HTMLButtonElement>('[data-testid="riwayat-cancel"]')?.click()
+    await flushPromises()
+
+    svc.pratinjau.mockClear()
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    expect(svc.pratinjau).not.toHaveBeenCalled()
+    expect(q('[data-testid="riwayat-pratinjau"]')).toBeNull()
   })
 })

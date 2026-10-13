@@ -13,6 +13,7 @@ use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Ak;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\AkSiasn;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Kp;
+use App\Libraries\Kepegawaian\Riwayat\Definisi\Skp;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use Closure;
@@ -170,19 +171,7 @@ final class AkTest extends DatabaseTestCase
      */
     public function testIsianTurunanDiisiServer(): void
     {
-        $this->siapkanMasterKp();
-        $this->db->table('pegawai')->where('nip', $this->nip)->update(['glr_awal' => 'Dr.', 'nama' => 'Budi Uji', 'glr_akhir' => 'M.Si.']);
-        $idJabatan = (int) $this->pmj($this->nip)['id_jabatan'];
-        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $this->nip)->update(['tmtsk' => '2020-06-01', 'no_induk_jft' => 'JF-0001']);
-        // Rantai TMT jabatan: 2018-01-01 (jabatan sama) ← 2016-01-01 (jabatan lain, berhenti di sini).
-        $this->buatRiwayatMutasiJabatan($this->nip, ['tmtsk' => '2018-01-01']);
-        $this->buatRiwayatMutasiJabatan($this->nip, ['tmtsk' => '2016-01-01', 'id_jabatan' => $this->buatJabatan()['id_jabatan']]);
-        $this->buatRiwayatMutasiJabatan($this->nip, ['tmtsk' => '2015-01-01']);
-        // TMT pangkat: KP disetujui pertama berpangkat sama (2019-01-01), bukan TMT snapshot (2021-04-01).
-        $this->db->table('pegawai_kp')->insert(['nip' => $this->nip, 'id_pangkat' => $this->idPangkatUji, 'tmtsk' => '2021-04-01', 'tgl_sk' => '2021-03-01',
-            'jenis_kp'                                => 'Reguler', 'gol' => 'III', 'ruang' => 'a', 'gol_ruang' => 'III/a', 'pangkat' => 'Penata Muda']);
-        $this->sisipRiwayat(new Kp(), $this->nip, $this->barisKp(3, '2019-01-01') + ['status' => 1]);
-        $this->sisipRiwayat(new Kp(), $this->nip, $this->barisKp(3, '2018-01-01') + ['status' => 2]);
+        $idJabatan = $this->siapkanIsianTurunan();
 
         $row = $this->tambah($this->dataAk('2024-01-01', '2024-06-30') + [
             'nama' => 'Palsu', 'jabatan' => 'Palsu', 'nilai_ak' => 999, 'ak_kum_kp' => 999, 'jenis_ak' => 1, 'tmt_jab' => '2000-01-01',
@@ -195,6 +184,67 @@ final class AkTest extends DatabaseTestCase
         $this->assertSame(['6', '6', '5', '6'], [(string) $row['mker_th_jab'], (string) $row['mker_bl_jab'], (string) $row['mker_th_pang'], (string) $row['mker_bl_pang']]);
         $this->assertSame([37.5, 0.0, 2, (string) $this->admin->idPengguna()], [(float) $row['nilai_ak'], (float) $row['ak_kum_kp'], (int) $row['jenis_ak'], (string) $row['created_by']]);
         $this->assertSame((string) $row['id_riwayat_ak'], (string) $this->snapshotUji('pegawai_ak', $this->nip)['id_riwayat_ak']);
+    }
+
+    /**
+     * MAKE-017: pratinjau isian turunan form tambah = nilai yang diisi server saat tambah (logika bersama), masa kerja
+     * sampai tgl_pak query, AK Lama bawaan = AK terakhir jabatan + pangkat sama.
+     */
+    public function testPratinjauSamaDenganIsianTurunanTambah(): void
+    {
+        $idJabatan = $this->siapkanIsianTurunan();
+        $idRak     = $this->sisipRiwayat($this->d, $this->nip, array_merge($this->btcBaris($this->nip), ['status' => 1, 'id_jabatan' => $idJabatan, 'id_pangkat' => $this->idPangkatUji, 'nilai_ak' => 30]));
+        $this->db->table('pegawai_ak')->insert(['nip' => $this->nip, 'id_riwayat_ak' => $idRak, 'id_jabatan' => $idJabatan, 'id_pangkat' => $this->idPangkatUji, 'nilai_ak' => 30]);
+        [, , $akun] = $this->aktor(Role::SUPER_ADMIN);
+
+        $result = $this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/riwayat/ak/pratinjau?tgl_pak=2024-07-15");
+        $result->assertStatus(200);
+        $p = $this->json($result)['data'];
+
+        $this->assertSame(['Dr. Budi Uji, M.Si.', '2018-01-01', '2019-01-01', 30], [$p['nama'], $p['tmt_jab'], $p['tmt_pang'], (int) $p['ak_terakhir']]);
+        $this->assertSame([6, 6, 5, 6], [$p['mker_th_jab'], $p['mker_bl_jab'], $p['mker_th_pang'], $p['mker_bl_pang']]);
+
+        $row = $this->tambah(['ak_terakhir' => $p['ak_terakhir']] + $this->dataAk('2024-01-01', '2024-06-30'));
+        foreach (['nama', 'id_jabatan', 'jabatan', 'no_induk_jf', 'tmt_jab', 'id_pangkat', 'pangkat', 'gol_ruang', 'tmt_pang', 'mker_th_jab', 'mker_bl_jab', 'mker_th_pang', 'mker_bl_pang', 'ak_kum_kp', 'ak_kum_next_jen'] as $kolom) {
+            $this->assertSame((string) $row[$kolom], (string) $p[$kolom], "pratinjau {$kolom} = nilai simpan");
+        }
+
+        // Tanpa tgl_pak: masa kerja null.
+        $tanpa = $this->json($this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/riwayat/ak/pratinjau"))['data'];
+        $this->assertNull($tanpa['mker_th_jab']);
+    }
+
+    public function testPratinjauIzinTambahDanValidasi(): void
+    {
+        [, , $super] = $this->aktor(Role::SUPER_ADMIN);
+        foreach (['tgl_pak=15-07-2024', 'tgl_pak=2024-02-30', 'tgl_pak[]=2024-07-15'] as $query) {
+            $result = $this->asUser($super)->get("api/v1/pegawai/{$this->nip}/riwayat/ak/pratinjau?{$query}");
+            $result->assertStatus(422);
+            $this->assertArrayHasKey('tgl_pak', $this->json($result)['errors'], $query);
+        }
+
+        // NIP tidak ada (role 1, lingkup mencakup semua) → 404.
+        $this->asUser($super)->get('api/v1/pegawai/199912312099121999/riwayat/ak/pratinjau')->assertStatus(404);
+        // Izin aksi tambah lebih dulu: AK SIASN tanpa izin tambah → 403.
+        $this->asUser($super)->get("api/v1/pegawai/{$this->nip}/riwayat/ak-siasn/pratinjau")->assertStatus(403);
+
+        // Izin = aksi tambah: role 3 (tanpa izin tambah AK) dan pegawai JFT sendiri → 403.
+        $idSatker          = $this->buatSatker();
+        $dalam             = $this->buatPegawaiDiSatker($idSatker);
+        [, , $adminSatker] = $this->aktor(Role::ADMIN_SATKER, [], $idSatker);
+        $this->asUser($adminSatker)->get("api/v1/pegawai/{$dalam}/riwayat/ak/pratinjau")->assertStatus(403);
+        [$nip, , $pegawai] = $this->aktor(Role::PEGAWAI);
+        $this->jadikanGroup($nip, Ak::GROUP_JFT);
+        $this->asUser($pegawai)->get("api/v1/pegawai/{$nip}/riwayat/ak/pratinjau")->assertStatus(403);
+
+        // Kelompok jabatan bukan JF (syarat tambah legacy) → 403.
+        $this->jadikanGroup($this->nip, 1);
+        $this->asUser($super)->get("api/v1/pegawai/{$this->nip}/riwayat/ak/pratinjau")->assertStatus(403);
+
+        // Jenis ber-izin tambah tanpa hook pratinjauTambah() → 404.
+        $this->lepasEngine();
+        $this->pasangEngineNyata([new Skp()]);
+        $this->asUser($super)->get("api/v1/pegawai/{$this->nip}/riwayat/skp/pratinjau")->assertStatus(404);
     }
 
     public function testPeriodeBeririsanDanSatuPengajuanMenungguPerJabatan(): void
@@ -294,6 +344,31 @@ final class AkTest extends DatabaseTestCase
         $this->assertSame([3, 6], Ak::masaKerja('2020-01-01', '2023-07-01'));
         $this->assertSame([0, 0], Ak::masaKerja('2024-01-01', '2023-07-01'));
         $this->assertSame([null, null], Ak::masaKerja(null, '2023-07-01'));
+    }
+
+    /**
+     * Data pegawai untuk isian turunan: nama bergelar, rantai TMT jabatan (2018-01-01), TMT pangkat dari KP disetujui
+     * pertama berpangkat sama (2019-01-01, bukan TMT snapshot 2021-04-01), no induk JF.
+     *
+     * @return int id_jabatan pegawai saat ini
+     */
+    private function siapkanIsianTurunan(): int
+    {
+        $this->siapkanMasterKp();
+        $this->db->table('pegawai')->where('nip', $this->nip)->update(['glr_awal' => 'Dr.', 'nama' => 'Budi Uji', 'glr_akhir' => 'M.Si.']);
+        $idJabatan = (int) $this->pmj($this->nip)['id_jabatan'];
+        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $this->nip)->update(['tmtsk' => '2020-06-01', 'no_induk_jft' => 'JF-0001']);
+        // Rantai TMT jabatan: 2018-01-01 (jabatan sama) ← 2016-01-01 (jabatan lain, berhenti di sini).
+        $this->buatRiwayatMutasiJabatan($this->nip, ['tmtsk' => '2018-01-01']);
+        $this->buatRiwayatMutasiJabatan($this->nip, ['tmtsk' => '2016-01-01', 'id_jabatan' => $this->buatJabatan()['id_jabatan']]);
+        $this->buatRiwayatMutasiJabatan($this->nip, ['tmtsk' => '2015-01-01']);
+        // TMT pangkat: KP disetujui pertama berpangkat sama (2019-01-01), bukan TMT snapshot (2021-04-01).
+        $this->db->table('pegawai_kp')->insert(['nip' => $this->nip, 'id_pangkat' => $this->idPangkatUji, 'tmtsk' => '2021-04-01', 'tgl_sk' => '2021-03-01',
+            'jenis_kp'                                => 'Reguler', 'gol' => 'III', 'ruang' => 'a', 'gol_ruang' => 'III/a', 'pangkat' => 'Penata Muda']);
+        $this->sisipRiwayat(new Kp(), $this->nip, $this->barisKp(3, '2019-01-01') + ['status' => 1]);
+        $this->sisipRiwayat(new Kp(), $this->nip, $this->barisKp(3, '2018-01-01') + ['status' => 2]);
+
+        return $idJabatan;
     }
 
     /**

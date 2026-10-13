@@ -325,6 +325,21 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Pratinjau isian yang akan diisi server saat TAMBAH (aditif MAKE-017, engine-v1): `GET
+     * pegawai/{nip}/riwayat/{jenis}/pratinjau?<query>` dengan izin & lingkup aksi tambah. Null (bawaan) = jenis tanpa
+     * pratinjau → 404. Logika wajib dipakai bersama dengan beforeSave (jangan diduplikasi), mis. AK: jabatan, pangkat,
+     * TMT, masa kerja, AK kumulatif, AK lama.
+     *
+     * @param array<string, mixed> $query parameter query request
+     *
+     * @return array<string, mixed>|null
+     */
+    public function pratinjauTambah(string $nip, array $query): ?array
+    {
+        return null;
+    }
+
+    /**
      * Role $role punya izin $aksi pada jenis ini (tanpa memeriksa lingkup pegawai).
      */
     final public function boleh(AksiRiwayat $aksi, ?int $role): bool

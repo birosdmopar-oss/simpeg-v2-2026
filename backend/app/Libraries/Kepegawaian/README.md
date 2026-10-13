@@ -185,6 +185,9 @@ Perubahan sesudah beku (aditif / konsistensi, WS-1):
   daftar; detail/ubah tidak ikut disaring), `beforeSave()` saat tambah menerima kolom NIP pemilik di `$data`,
   `afterProses(aksi, baris, auth)` (dipanggil di transaksi `proses` untuk setujui DAN tolak, sesudah status ditulis;
   default no-op — AK mengisi `appr_at`/`appr_by`).
+- MAKE-017 (hook aditif): `RiwayatDefinisi::pratinjauTambah(nip, query)` + `RiwayatEngine::pratinjauTambah()` + endpoint
+  `GET …/riwayat/{jenis}/pratinjau` (izin aksi tambah; default null → 404). AK memakainya untuk isian turunan form tambah
+  (logika bersama `Ak::turunan()`/`masaKerja()`/`akTerakhir()` dengan beforeSave).
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata

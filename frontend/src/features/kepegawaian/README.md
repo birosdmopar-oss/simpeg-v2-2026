@@ -18,7 +18,7 @@ Kontrak backend yang diikuti: `backend/app/Controllers/Api/Kepegawaian/README.md
 | Berkas | Isi | Pemilik |
 |---|---|---|
 | `routes.pegawai.ts` | Daftar/Detail Pegawai, Struktur Organisasi, Usulan Konket, Verifikasi LKH | WS-2 |
-| `routes.riwayat.ts` | Usulan Karpeg/Karis; **sementara** `/pegawai/:nip/riwayat` (`views/RiwayatPegawaiPage.vue`) sampai MAKE-010 | WS-1 |
+| `routes.riwayat.ts` | Usulan Karpeg/Karis; alamat lama `/pegawai/:nip/riwayat` = redirect ke Detail Pegawai (`pegawai-detail`, query `tab` dipertahankan; MAKE-016) | WS-1 |
 | `roles.ts` | Role menu/route per Matriks v2 | WS-2 |
 | `types.ts` | Tipe = kolom DDL (pegawai, `riwayat_*`, `document_attachment` dengan kunci `NIP`), slug `{jenis}` (engine ∪ non-engine), `RiwayatTabDescriptor`, `StatusRiwayat` | bersama (aditif) |
 | `riwayat/jenis/<slug>.ts` | Satu konfigurasi per jenis tab (kolom & isian = kolom DDL, lampiran per kode `jenis_rwy`) | WS-1 (kecuali `jabatan.ts`, `lkh.ts`: WS-2) |
@@ -39,7 +39,6 @@ Kontrak backend yang diikuti: `backend/app/Controllers/Api/Kepegawaian/README.md
 | `components/KoreksiNipDialog.vue` | Koreksi NIP B-06 (MAKE-010, role 1): isi → tinjau (peringatan reset username/password + sesi dicabut) → konfirmasi; sukses → URL NIP baru | WS-2 |
 | `services/apiErrors.ts` | 401 → 404 jenis → 403 izin/lingkup → 404 data; 422 `errors.<kolom>` / `errors["berkas.<id>"]` / `errors.berkas`; 501 stub | bersama |
 | `views/DetailPegawaiPage.vue` | Tersambung `GET pegawai/{nip}` (MAKE-010): tab Data Umum (lihat + "Ubah Data Umum" bila `aksi.ubah_biodata`, status pengajuan dari `pengajuan`) + tab dari descriptor; foto profil dari `GET …/foto`; ⋯ "Koreksi NIP" bila `aksi.koreksi_nip` | WS-2 |
-| `views/RiwayatPegawaiPage.vue` | **SEMENTARA sampai MAKE-010** (disetujui reviewer CR 12-10-2026): tab riwayat dari `GET pegawai/{nip}/riwayat` (descriptor sama dengan `data.tabs`), tanpa entri menu. Setelah MAKE-010 di `main`: dialihkan ke Detail Pegawai (tab yang sama) atau dihapus oleh WS-1 | WS-1 |
 
 Tidak ada data contoh di runtime: fixture hanya di `__tests__/fixtures.ts` (dijaga `__tests__/noRuntimeMock.spec.ts`).
 
