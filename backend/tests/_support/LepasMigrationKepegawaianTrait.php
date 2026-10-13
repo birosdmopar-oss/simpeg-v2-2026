@@ -21,6 +21,9 @@ use RuntimeException;
  * 2026-10-07-100100) juga menahan down() migration master G-02 (DBV-008/DBV-018). Test skema G-02 cukup melepas kedua
  * migration FK itu lewat lepasFkG02() (tabel B-01/B-02 tetap), lalu pasangUlangMigrationKepegawaian().
  *
+ * DBV-020: `dm_ak_jf` (migration 2026-10-13-100100) merujuk `jabatan` dan `pangkat` dengan FK RESTRICT, jadi ikut dilepas
+ * lepasFkG02() (tabel dibuang lalu dibuat ulang kosong) dan lepasMigrationKepegawaian() (versi >= 120000).
+ *
  * Dipakai bersama DatabaseTestTrait (`$this->db`, tabel `migrations` ber-prefix).
  */
 trait LepasMigrationKepegawaianTrait
@@ -33,11 +36,12 @@ trait LepasMigrationKepegawaianTrait
     private array $migrationKepegawaianDilepas = [];
 
     /**
-     * Migration DBV-019 yang memasang FK ke tabel master G-02 (urut versi menaik).
+     * Migration yang memasang FK ke tabel master G-02 (urut versi menaik): DBV-019 (snapshot/riwayat) dan DBV-020
+     * (`dm_ak_jf` → `jabatan`).
      *
      * @var list<string>
      */
-    private static array $versiFkG02 = ['2026-10-07-100000', '2026-10-07-100100'];
+    private static array $versiFkG02 = ['2026-10-07-100000', '2026-10-07-100100', '2026-10-13-100100'];
 
     /**
      * Lepas (down) semua migration App B-01/B-02 yang sudah jalan, urut versi menurun. Tanpa efek bila belum ada.
@@ -55,8 +59,8 @@ trait LepasMigrationKepegawaianTrait
     }
 
     /**
-     * Lepas (down) hanya migration FK DBV-019 ke master G-02 yang sudah jalan, urut versi menurun. down() migration itu
-     * aman diulang (FK yang sudah lepas dilewati).
+     * Lepas (down) hanya migration yang ber-FK ke master G-02 (DBV-019, DBV-020 `dm_ak_jf`) yang sudah jalan, urut versi
+     * menurun. down() migration itu aman diulang (FK/tabel yang sudah lepas dilewati).
      */
     protected function lepasFkG02(): void
     {
