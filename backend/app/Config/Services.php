@@ -40,15 +40,15 @@ use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Html\HtmlSanitizer;
 use App\Libraries\Kepegawaian\Lampiran\AttachmentService;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
+use App\Libraries\Kepegawaian\NipCascadeService;
+use App\Libraries\Kepegawaian\Pegawai\BiodataService;
+use App\Libraries\Kepegawaian\Pegawai\PegawaiService;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
-use App\Libraries\Kepegawaian\Stub\StubBiodataService;
 use App\Libraries\Kepegawaian\Stub\StubKonketService;
 use App\Libraries\Kepegawaian\Stub\StubLkhService;
-use App\Libraries\Kepegawaian\Stub\StubNipCascade;
-use App\Libraries\Kepegawaian\Stub\StubPegawaiService;
 use App\Libraries\Kepegawaian\Stub\StubStrukturService;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
@@ -383,7 +383,7 @@ class Services extends BaseService
             return static::getSharedInstance('pegawaiService');
         }
 
-        return new StubPegawaiService();
+        return new PegawaiService();
     }
 
     /**
@@ -395,7 +395,7 @@ class Services extends BaseService
             return static::getSharedInstance('biodataService');
         }
 
-        return new StubBiodataService();
+        return new BiodataService();
     }
 
     /**
@@ -407,7 +407,7 @@ class Services extends BaseService
             return static::getSharedInstance('nipCascade');
         }
 
-        return new StubNipCascade();
+        return new NipCascadeService();
     }
 
     /**

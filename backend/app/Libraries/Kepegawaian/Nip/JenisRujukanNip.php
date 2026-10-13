@@ -35,14 +35,20 @@ enum JenisRujukanNip: string
     case NonFkFkV2 = 'non_fk_fk_v2';
 
     /**
+     * Tanpa FK di legacy dan tidak diganti Ubah NIP legacy, tetapi ikut dikoreksi B-06 atas keputusan v2 (keputusan #10
+     * WS2.md: `jabatan_koordinasi.nip`, MAKE-010).
+     */
+    case NonFkKeputusanV2 = 'non_fk_keputusan_v2';
+
+    /**
      * Apakah Ubah NIP legacy ikut mengganti nilai kolom ini (lewat cascade FK atau kode). `false` berarti setelah Ubah NIP
      * legacy, baris lama menunjuk NIP yang sudah tidak ada.
      */
     public function diubahLegacy(): bool
     {
         return match ($this) {
-            self::FkLegacy, self::NonFkUbahNipLegacy => true,
-            self::NonFkSlipGaji, self::NonFkFkV2     => false,
+            self::FkLegacy, self::NonFkUbahNipLegacy                     => true,
+            self::NonFkSlipGaji, self::NonFkFkV2, self::NonFkKeputusanV2 => false,
         };
     }
 }

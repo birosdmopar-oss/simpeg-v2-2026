@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Constants\Role;
 use CodeIgniter\Router\RouteCollection;
 
 /**
@@ -31,5 +32,12 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->get('pegawai/(:segment)/lampiran/(:num)/unduh', 'LampiranController::unduh/$1/$2');
     $routes->delete('pegawai/(:segment)/lampiran/(:num)', 'LampiranController::delete/$1/$2');
 
-    // WS-2: endpoint pegawai/lampiran/biodata/NIP/struktur/Konket/LKH ditambahkan di sini.
+    // B-20 dasar + B-03 biodata + B-06 koreksi NIP (MAKE-010). Detail/biodata/foto: izin & lingkup di service (jwt saja).
+    $routes->get('pegawai', 'PegawaiController::index', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN)]);
+    $routes->get('pegawai/(:segment)', 'PegawaiController::show/$1');
+    $routes->put('pegawai/(:segment)/biodata', 'PegawaiController::updateBiodata/$1');
+    $routes->get('pegawai/(:segment)/foto', 'PegawaiController::foto/$1');
+    $routes->post('pegawai/(:segment)/koreksi-nip', 'PegawaiController::koreksiNip/$1', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
+
+    // WS-2: endpoint struktur/Konket/LKH ditambahkan di sini.
 });

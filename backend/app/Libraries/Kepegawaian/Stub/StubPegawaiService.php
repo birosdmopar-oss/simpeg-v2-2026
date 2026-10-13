@@ -6,11 +6,21 @@ namespace App\Libraries\Kepegawaian\Stub;
 
 use App\Exceptions\BelumTersediaException;
 use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
+use App\Libraries\Auth\AuthContext;
 
 /**
- * Stub S0-A (MAKE-002) sampai implementasi nyata WS-2 (MAKE-010/MAKE-014). Interface belum punya method; method yang ditambahkan
- * pemiliknya pada stub ini wajib fail-closed (lempar BelumTersediaException → 501).
+ * Stub S0-A (MAKE-002). Implementasi nyata `App\Libraries\Kepegawaian\Pegawai\PegawaiService` sejak MAKE-010 (dipasang
+ * di Services.php); stub tetap fail-closed (BelumTersediaException → 501).
  */
 final class StubPegawaiService implements PegawaiServiceInterface
 {
+    public function daftar(AuthContext $auth, array $filter = []): array
+    {
+        throw new BelumTersediaException('daftar pegawai');
+    }
+
+    public function detail(AuthContext $auth, string $nip): array
+    {
+        throw new BelumTersediaException('detail pegawai');
+    }
 }
