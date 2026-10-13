@@ -10,6 +10,7 @@ vi.mock('../services/pegawai.service', () => ({
   pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn(), pengajuan: vi.fn(), prosesPengajuan: vi.fn(), hapus: vi.fn(), fotoPengajuan: vi.fn() },
 }))
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
+vi.mock('../services/lampiran.service', () => ({ lampiranService: { list: vi.fn().mockResolvedValue([]), upload: vi.fn(), download: vi.fn(), remove: vi.fn() } }))
 vi.mock('../services/lkh.service', () => ({
   lkhService: { list: vi.fn().mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0 } }), opsi: vi.fn().mockResolvedValue(null), pdf: vi.fn(), remove: vi.fn() },
 }))
@@ -21,6 +22,7 @@ vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
 import { Role, type RoleCode } from '@/features/auth/types'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
+import { lampiranService } from '../services/lampiran.service'
 import { lkhService } from '../services/lkh.service'
 import { pegawaiService } from '../services/pegawai.service'
 import DetailPegawaiPage from '../views/DetailPegawaiPage.vue'
@@ -304,9 +306,30 @@ describe('DetailPegawaiPage — aksi kartu', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('pegawai-list'))
   })
 
-  it('"Arsip Kepegawaian" memberi tahu belum tersedia (B-18)', async () => {
+  it('"Arsip Kepegawaian" membuka arsip Data Umum (38) & Arsip Status (37) dengan id_entri = NIP (MAKE-014)', async () => {
     const { wrapper } = await mountDetail()
     await wrapper.get('[data-testid="btn-arsip"]').trigger('click')
-    expect(wrapper.text()).toContain('Arsip Kepegawaian belum tersedia (task B-18).')
+    await flushPromises()
+
+    expect(document.body.querySelector('[data-testid="arsip-kepegawaian"]')).not.toBeNull()
+    expect(vi.mocked(lampiranService.list)).toHaveBeenCalledWith(NIP, { id_riwayat: 38, id_entri: NIP })
+    expect(vi.mocked(lampiranService.list)).toHaveBeenCalledWith(NIP, { id_riwayat: 37, id_entri: NIP })
+    // Super Admin: unggah arsip DU ditahan sampai jenis dipilih.
+    const unggah = document.body.querySelector<HTMLButtonElement>(`[data-testid="arsip-38-${NIP}"] [data-testid="arsip-upload"]`)
+    expect(unggah?.disabled).toBe(true)
+    const jenis = document.body.querySelector<HTMLSelectElement>('[data-testid="arsip-du-jenis"] select')
+    if (jenis) {
+      jenis.value = 'KTP'
+      jenis.dispatchEvent(new Event('change'))
+    }
+    await flushPromises()
+    expect(unggah?.disabled).toBe(false)
+  })
+
+  it('Arsip Kepegawaian: role 4 hanya melihat (tanpa unggah)', async () => {
+    const { wrapper } = await mountDetail(`/pegawai/${NIP}`, Role.ADMIN_VIEW_ESELON1)
+    await wrapper.get('[data-testid="btn-arsip"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector('[data-testid="arsip-kepegawaian"] [data-testid="arsip-upload"]')).toBeNull()
   })
 })

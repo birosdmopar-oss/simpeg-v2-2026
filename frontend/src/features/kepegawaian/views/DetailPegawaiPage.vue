@@ -24,6 +24,7 @@ import { UiButton, UiCard, UiNotice } from '@/shared/ui'
 import DataUmumForm from '../components/DataUmumForm.vue'
 import DataUmumView from '../components/DataUmumView.vue'
 import KoreksiNipDialog from '../components/KoreksiNipDialog.vue'
+import ArsipKepegawaianDialog from '../components/ArsipKepegawaianDialog.vue'
 import PengajuanBiodataDialog from '../components/PengajuanBiodataDialog.vue'
 import PerubahanBiodataTabel from '../components/PerubahanBiodataTabel.vue'
 import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
@@ -96,6 +97,8 @@ watch(nip, () => {
 }, { immediate: true })
 
 const pengajuan = computed(() => detail.value?.pengajuan ?? null)
+/** Arsip Kepegawaian = arsip Data Umum (MAKE-014). */
+const arsipOpen = ref(false)
 
 /** Pemilik/pengaju melihat perubahan yang diajukannya (MAKE-014; `GET biodata/pengajuan/{id}` mengizinkan pemilik). */
 const perubahanSaya = ref<PerubahanBiodata[] | null>(null)
@@ -200,7 +203,7 @@ const crumbs = computed(() => [
           :can-koreksi-nip="detail.aksi?.koreksi_nip ?? false"
           :deleting="busyDelete"
           @koreksi-nip="koreksiOpen = true"
-          @arsip="notice = 'Arsip Kepegawaian belum tersedia (task B-18).'"
+          @arsip="arsipOpen = true"
           @print="(kind) => (notice = `Cetak ${kind === 'drh' ? 'DRH' : 'Data Umum'} belum tersedia (task B-20).`)"
           @delete="confirmDelete = true"
         />
@@ -256,6 +259,8 @@ const crumbs = computed(() => [
       :nama="detail.nama"
       @processed="onProcessed"
     />
+
+    <ArsipKepegawaianDialog v-if="detail" v-model:open="arsipOpen" :nip="detail.nip" :nama="detail.nama" />
 
     <KoreksiNipDialog
       v-if="detail"

@@ -196,7 +196,7 @@ describe('ArsipTable — unggah', () => {
     const wrapper = await mountTable()
     const file = new File(['%PDF-1.4'], 'ijazah.pdf', { type: 'application/pdf' })
     await pilihBerkas(wrapper, file)
-    expect(svc.upload).toHaveBeenCalledWith(NIP, TARGET, file)
+    expect(svc.upload).toHaveBeenCalledWith(NIP, TARGET, file, {})
     expect(svc.list).toHaveBeenCalledTimes(2)
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('ijazah.pdf diunggah.')
   })

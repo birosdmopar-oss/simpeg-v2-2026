@@ -36,8 +36,14 @@ const props = withDefaults(
     canDelete?: boolean
     /** Judul kecil di atas tabel, mis. "Arsip Ijazah". */
     title?: string
+    /** Kolom tambahan saat unggah (aditif MAKE-014, mis. jenis arsip Data Umum → `tag`). */
+    isianUnggah?: Record<string, string>
+    /** Unggah ditahan (mis. jenis arsip belum dipilih); `alasan` tampil sebagai petunjuk. */
+    unggahDitahan?: string
+    /** Tampilkan kolom "Jenis" (`tag`). */
+    tampilTag?: boolean
   }>(),
-  { aturan: null, canUpload: false, canDelete: false, title: 'Arsip' },
+  { aturan: null, canUpload: false, canDelete: false, title: 'Arsip', isianUnggah: () => ({}), unggahDitahan: '', tampilTag: false },
 )
 
 const emit = defineEmits<{ changed: [rows: DocumentAttachment[]] }>()
@@ -144,7 +150,7 @@ async function onPick(event: Event): Promise<void> {
   uploading.value = true
   notice.value = null
   try {
-    await lampiranService.upload(props.nip, props.target, file)
+    await lampiranService.upload(props.nip, props.target, file, props.isianUnggah)
     notice.value = { tone: 'success', text: `${file.name} diunggah.` }
     await load()
     emit('changed', rows.value)
@@ -196,7 +202,7 @@ async function confirmDelete(): Promise<void> {
   }
 }
 
-const colspan = 4
+const colspan = computed(() => (props.tampilTag ? 5 : 4))
 </script>
 
 <template>
@@ -208,7 +214,7 @@ const colspan = 4
       </div>
       <template v-if="canUpload">
         <input ref="fileInput" type="file" class="sr-only" :accept="accept" data-testid="arsip-input" :aria-label="`Pilih berkas ${title}`" @change="onPick" />
-        <UiButton variant="secondary" :loading="uploading" data-testid="arsip-upload" @click="pickFile">
+        <UiButton variant="secondary" :loading="uploading" :disabled="Boolean(unggahDitahan)" :title="unggahDitahan || undefined" data-testid="arsip-upload" @click="pickFile">
           <template #icon-left><Upload class="h-4 w-4" aria-hidden="true" /></template>
           Unggah berkas
         </UiButton>
@@ -223,6 +229,7 @@ const colspan = 4
       <table class="w-full min-w-[32rem] border-collapse text-left text-body2" data-testid="arsip-table">
         <thead>
           <tr class="border-b border-slate-200 font-semibold text-slate-900">
+            <th v-if="tampilTag" scope="col" class="px-4 py-2.5">Jenis</th>
             <th scope="col" class="px-4 py-2.5">Nama berkas</th>
             <th scope="col" class="px-4 py-2.5">Ukuran</th>
             <th scope="col" class="px-4 py-2.5">Diunggah</th>
@@ -243,6 +250,7 @@ const colspan = 4
           </tr>
           <template v-else>
             <tr v-for="row in rows" :key="row.id_attachment" :data-testid="`arsip-row-${row.id_attachment}`">
+              <td v-if="tampilTag" class="px-4 py-2.5 text-slate-800">{{ row.tag || '—' }}</td>
               <td class="max-w-72 truncate px-4 py-2.5 text-slate-800" :title="nama(row)">{{ nama(row) }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ ukuran(row.file_size) }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ formatApiDateTime(row.created_at) || '—' }}</td>
