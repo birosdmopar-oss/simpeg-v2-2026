@@ -2,7 +2,8 @@
 /**
  * Dialog Koreksi NIP (B-06, MAKE-010; role 1) tersambung `POST pegawai/{nip}/koreksi-nip`. Aksi berisiko: seluruh data
  * riwayat/snapshot berpindah ke NIP baru dalam satu transaksi, username akun menjadi NIP baru, password akun direset ke
- * NIP baru, dan sesi akun itu dicabut (ikut legacy `update_nip`, keputusan user 13-10-2026). Konfirmasi dua langkah:
+ * NIP baru, dan sesi akun itu dicabut (ikut legacy `update_nip`, keputusan user 13-10-2026; pemilik akun diminta segera
+ * mengganti password — penanda wajib ganti password menyusul DBV-020). Dialog tidak bisa ditutup selama proses. Konfirmasi dua langkah:
  * isi NIP baru → tinjau ringkasan → Ya, koreksi. Galat 422 `errors.nip_baru` ditampilkan di isian.
  */
 import { X } from 'lucide-vue-next'
@@ -64,7 +65,7 @@ async function koreksi(): Promise<void> {
 </script>
 
 <template>
-  <DialogRoot :open="open" @update:open="emit('update:open', $event)">
+  <DialogRoot :open="open" @update:open="(v) => !busy && emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
@@ -76,7 +77,7 @@ async function koreksi(): Promise<void> {
             <DialogTitle class="text-h5 text-slate-900">Koreksi NIP</DialogTitle>
             <DialogDescription class="text-body2 text-slate-500">{{ nama }} — NIP sekarang {{ nip }}</DialogDescription>
           </div>
-          <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
+          <DialogClose :disabled="busy" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50" aria-label="Tutup">
             <X class="h-5 w-5" aria-hidden="true" />
           </DialogClose>
         </div>
@@ -102,7 +103,7 @@ async function koreksi(): Promise<void> {
           <UiNotice tone="warning">
             NIP {{ nip }} akan diganti menjadi <strong>{{ nipBaru.trim() }}</strong>. Seluruh data riwayat dan lampiran ikut
             berpindah. Username akun pegawai menjadi NIP baru, password akun direset ke NIP baru, dan semua sesi login akun
-            itu diakhiri.
+            itu diakhiri. Beri tahu pemilik akun agar segera mengganti password setelah masuk dengan NIP baru.
           </UiNotice>
           <p v-if="generalError" role="alert" class="mt-3 text-body2 text-danger" data-testid="koreksi-nip-error">{{ generalError }}</p>
           <div class="mt-6 flex justify-end gap-3">

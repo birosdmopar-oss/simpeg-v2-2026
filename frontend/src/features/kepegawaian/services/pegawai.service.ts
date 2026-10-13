@@ -6,11 +6,26 @@
  *   PUT  pegawai/{nip}/biodata       ubah biodata dua jalur (JSON; dengan foto: POST multipart + `_method=PUT`)
  *   GET  pegawai/{nip}/foto          foto profil terkini (blob)
  *   POST pegawai/{nip}/koreksi-nip   koreksi NIP (role 1)
+ *   POST pegawai / DELETE pegawai/{nip}   tambah (multipart + foto) / hapus lunak (role 1, B-05 MAKE-011)
+ *   GET  biodata/pengajuan[/{id}[/foto]], POST biodata/pengajuan/{id}/process   approval biodata (B-04 MAKE-011)
  * Tidak ada data contoh di runtime — fixture hanya di `__tests__/`.
  */
 import { api } from '@/lib/axios'
 
-import type { BiodataPayload, BiodataResult, KoreksiNipResult, PegawaiDetail, PegawaiListQuery, PegawaiListResponse } from '../types'
+import type { ApprovalPayload } from '@/shared/components/approvalActions'
+
+import type {
+  BiodataPayload,
+  BiodataResult,
+  KoreksiNipResult,
+  Pegawai,
+  PegawaiDetail,
+  PegawaiListQuery,
+  PegawaiListResponse,
+  PengajuanBiodataDetail,
+  PengajuanBiodataItem,
+  TambahPegawaiResult,
+} from '../types'
 
 const item = (nip: string): string => `/pegawai/${encodeURIComponent(nip)}`
 
@@ -46,6 +61,42 @@ export const pegawaiService = {
 
   async foto(nip: string): Promise<Blob> {
     const { data } = await api.get<Blob>(`${item(nip)}/foto`, { responseType: 'blob' })
+    return data
+  },
+
+  /** Tambah pegawai (role 1): selalu multipart karena foto wajib. */
+  async tambah(payload: BiodataPayload, foto: File): Promise<TambahPegawaiResult> {
+    const form = new FormData()
+    for (const [key, value] of Object.entries(payload)) form.append(key, value)
+    form.append('foto', foto, foto.name)
+    const { data } = await api.post<TambahPegawaiResult>('/pegawai', form)
+    return data
+  },
+
+  async hapus(nip: string): Promise<{ deleted: boolean; soft_delete: boolean; item: Pegawai }> {
+    const { data } = await api.delete<{ deleted: boolean; soft_delete: boolean; item: Pegawai }>(item(nip))
+    return data
+  },
+
+  async antreanPengajuan(query: { page: number; per_page: number; search?: string }): Promise<{ items: PengajuanBiodataItem[]; total: number; page: number; per_page: number }> {
+    const { data } = await api.get<{ items: PengajuanBiodataItem[]; total: number; page: number; per_page: number }>('/biodata/pengajuan', {
+      params: { page: query.page, per_page: query.per_page, ...(query.search ? { search: query.search } : {}) },
+    })
+    return data
+  },
+
+  async pengajuan(id: number): Promise<PengajuanBiodataDetail> {
+    const { data } = await api.get<PengajuanBiodataDetail>(`/biodata/pengajuan/${id}`)
+    return data
+  },
+
+  async fotoPengajuan(id: number): Promise<Blob> {
+    const { data } = await api.get<Blob>(`/biodata/pengajuan/${id}/foto`, { responseType: 'blob' })
+    return data
+  },
+
+  async prosesPengajuan(id: number, payload: ApprovalPayload): Promise<PengajuanBiodataDetail> {
+    const { data } = await api.post<PengajuanBiodataDetail>(`/biodata/pengajuan/${id}/process`, payload)
     return data
   },
 

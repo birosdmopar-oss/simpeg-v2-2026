@@ -11,6 +11,7 @@
     },
     "require": {
         "php": "^8.2",
+        "ext-zip": "*",
         "codeigniter4/framework": "^4.7",
         "codeigniter4/queue": "^1.0",
         "ezyang/htmlpurifier": "^4.17",

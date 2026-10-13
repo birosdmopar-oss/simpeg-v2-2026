@@ -49,6 +49,33 @@ class AccountProvisioner
      */
     public function provisionForPegawai(array $pegawai, int $userLevel = Role::PEGAWAI, ?string $initialPassword = null): array
     {
+        return $this->provision($pegawai, $userLevel, $initialPassword, false);
+    }
+
+    /**
+     * Jalur ADITIF B-05 Tambah Pegawai (MAKE-011): password awal = NIP [K] ikut legacy `libraries/hr/L_employee.php:157-166`
+     * (keputusan user 13-10-2026). Sengaja MELEWATI PasswordPolicy (K4 menolak NIP) — hanya untuk akun pegawai baru yang
+     * dibuat Super Admin; pemilik akun wajib segera mengganti password (penanda "wajib ganti password" menunggu DBV-020).
+     * Hash tetap v2 (Argon2id lewat PasswordVerifier), bukan md5; `password_decode` tidak ada. Validasi lain (format NIP,
+     * NIP terdaftar di `pegawai` MAKE-015, username dipakai akun lain, email D-6, idempoten) sama dengan
+     * provisionForPegawai(). Jalur provisioning lain tetap password acak yang lolos kebijakan.
+     *
+     * @param array<string, mixed> $pegawai sama dengan provisionForPegawai()
+     *
+     * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null, email_skipped: bool}
+     */
+    public function provisionDenganPasswordNip(array $pegawai, int $userLevel = Role::PEGAWAI): array
+    {
+        return $this->provision($pegawai, $userLevel, trim((string) ($pegawai['nip'] ?? '')), true);
+    }
+
+    /**
+     * @param array<string, mixed> $pegawai
+     *
+     * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null, email_skipped: bool}
+     */
+    private function provision(array $pegawai, int $userLevel, ?string $initialPassword, bool $lewatiKebijakan): array
+    {
         $nip = trim((string) ($pegawai['nip'] ?? ''));
 
         if (preg_match('/^\d{1,' . PenggunaModel::NIP_MAX_DIGITS . '}$/', $nip) !== 1) {
@@ -71,7 +98,7 @@ class AccountProvisioner
         }
 
         // Password awal dari pemanggil tunduk pada kebijakan yang sama dengan admin set password (K4).
-        $policyErrors = $initialPassword === null ? [] : $this->passwords->policyErrors($initialPassword);
+        $policyErrors = $initialPassword === null || $lewatiKebijakan ? [] : $this->passwords->policyErrors($initialPassword);
 
         if ($policyErrors !== []) {
             throw new ValidationException('Validasi gagal.', ['password' => $policyErrors]);

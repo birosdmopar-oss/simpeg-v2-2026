@@ -86,6 +86,19 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->asUser($super)->get('api/v1/pegawai?page=abc')->assertStatus(422);
     }
 
+    public function testDaftarRole4Dan5TanpaBatasLingkup(): void
+    {
+        $a = $this->buatPegawaiDiSatker($this->buatSatker());
+        $b = $this->buatPegawaiDiSatker($this->buatSatker());
+
+        foreach ([Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN] as $role) {
+            [, , $akun] = $this->aktor($role);
+            $nips       = array_column($this->json($this->asUser($akun)->get('api/v1/pegawai?per_page=100'))['data']['items'], 'nip');
+            $this->assertContains($a, $nips, "role {$role}");
+            $this->assertContains($b, $nips, "role {$role}");
+        }
+    }
+
     public function testDaftarAdminSatkerHanyaLingkup(): void
     {
         $idSatker        = $this->buatSatker();
@@ -133,7 +146,7 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->assertSame('pegawai@contoh.test', $data['email']);
         $this->assertTrue($data['ada_foto']);
         $this->assertArrayNotHasKey('foto', $data);
-        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => true, 'koreksi_nip' => true], $data['aksi']);
+        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => true, 'koreksi_nip' => true, 'proses_biodata' => false], $data['aksi']);
         $this->assertNotNull($data['jabatan_aktif']);
         $this->assertNull($data['pengajuan']);
     }
@@ -146,7 +159,7 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->get("api/v1/pegawai/{$lain}")->assertStatus(401);
 
         $milik = $this->json($this->asUser($pegawai)->get("api/v1/pegawai/{$diri}"))['data'];
-        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => false, 'koreksi_nip' => false], $milik['aksi']);
+        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => false, 'koreksi_nip' => false, 'proses_biodata' => false], $milik['aksi']);
 
         $this->asUser($pegawai)->get("api/v1/pegawai/{$lain}")->assertStatus(403);
         $this->asUser($pegawai)->get('api/v1/pegawai/' . self::NIP_TIDAK_ADA)->assertStatus(403);

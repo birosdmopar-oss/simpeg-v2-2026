@@ -22,6 +22,8 @@ const props = defineProps<{
   columnKeys: string[]
   loading: boolean
   canDelete: boolean
+  /** NIP yang sedang dihapus: item "Hapus" baris itu nonaktif (AGENTS.md §1.4). */
+  busyNip?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -30,10 +32,10 @@ const emit = defineEmits<{
 
 const columns = computed(() => props.columnKeys.map((k) => COLUMN_BY_KEY[k]).filter(Boolean))
 
-function actionsFor(): RowAction[] {
+function actionsFor(row: PegawaiListItem): RowAction[] {
   return [
     { key: 'detail', label: 'Lihat detail' },
-    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete },
+    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete, disabled: props.busyNip === row.nip },
   ]
 }
 </script>
@@ -89,7 +91,7 @@ function actionsFor(): RowAction[] {
 
           <td class="sticky right-0 bg-white px-4 py-3 text-right align-middle">
             <RowActionsMenu
-              :actions="actionsFor()"
+              :actions="actionsFor(row)"
               :label="`Aksi untuk ${row.nama}`"
               :testid="`pegawai-actions-${row.nip}`"
               @select="(key) => emit('action', key as 'detail' | 'hapus', row)"

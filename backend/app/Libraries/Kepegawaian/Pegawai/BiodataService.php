@@ -14,6 +14,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Models\AuditLogModel;
+use App\Models\Auth\PenggunaModel;
 use App\Models\Kepegawaian\PegawaiFotoModel;
 use App\Models\Kepegawaian\PegawaiHistModel;
 use App\Models\Kepegawaian\PegawaiModel;
@@ -125,6 +126,43 @@ final class BiodataService implements BiodataServiceInterface
             throw new NotFoundException('Foto pegawai tidak tersedia.');
         }
 
+        return ['isi' => $isi, 'mime' => self::mime($isi), 'nama' => 'foto_' . $nip . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+    }
+
+    public function antreanPengajuan(AuthContext $auth, array $filter = []): array
+    {
+        return $this->approval()->antrean($auth, $filter);
+    }
+
+    public function pengajuan(AuthContext $auth, int $idHist): array
+    {
+        return $this->approval()->detail($auth, $idHist);
+    }
+
+    public function fotoPengajuan(AuthContext $auth, int $idHist): array
+    {
+        $path = $this->approval()->pathFoto($auth, $idHist);
+        $isi  = ApprovalBiodata::bacaFoto($this->berkas ?? new KolomBerkas(), $path);
+
+        if ($isi === null) {
+            throw new NotFoundException('Foto pengajuan tidak tersedia.');
+        }
+
+        return ['isi' => $isi, 'mime' => self::mime($isi), 'nama' => 'foto_pengajuan_' . $idHist . '.' . pathinfo((string) $path, PATHINFO_EXTENSION)];
+    }
+
+    public function prosesPengajuan(AuthContext $auth, int $idHist, string $aksi, ?string $reasonNote): array
+    {
+        return $this->approval()->proses($auth, $idHist, $aksi, $reasonNote);
+    }
+
+    private function approval(): ApprovalBiodata
+    {
+        return new ApprovalBiodata($this->koneksi(), $this->scope());
+    }
+
+    private static function mime(string $isi): string
+    {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime  = $finfo === false ? false : finfo_buffer($finfo, $isi);
 
@@ -132,13 +170,13 @@ final class BiodataService implements BiodataServiceInterface
             finfo_close($finfo);
         }
 
-        return ['isi' => $isi, 'mime' => is_string($mime) ? $mime : 'application/octet-stream', 'nama' => 'foto_' . $nip . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+        return is_string($mime) ? $mime : 'application/octet-stream';
     }
 
     /**
      * @param array<string, mixed> $data
      *
-     * @return array{jalur: 'langsung'|'pengajuan', pegawai: array<string, mixed>, pengajuan: array<string, mixed>|null}
+     * @return array{jalur: 'langsung'|'pengajuan', pegawai: array<string, mixed>, pengajuan: array<string, mixed>|null, email_skipped: bool}
      */
     private function dalamTransaksi(BaseConnection $db, KolomBerkas $kolom, AuthContext $auth, int $role, string $nip, array $data, ?UploadedFile $foto): array
     {
@@ -163,6 +201,15 @@ final class BiodataService implements BiodataServiceInterface
             throw ValidationException::forField('foto', 'Foto pegawai wajib diunggah.');
         }
 
+        // Email akun unik (A-01 D-6): pengajuan ditolak bila email dipakai akun lain; jalur langsung tetap menyimpan
+        // biodata tetapi sinkron email akun dilewati (`email_skipped`).
+        $emailBentrok = $email !== '' && (string) (is_array($akun) ? $akun['email'] : '') !== $email
+            && (new PenggunaModel($db))->emailTaken($email, is_array($akun) ? (int) $akun['id_pengguna'] : null);
+
+        if ($emailBentrok && $role !== Role::SUPER_ADMIN) {
+            throw ValidationException::forField('email', 'Email sudah dipakai akun lain; gunakan email yang berbeda.');
+        }
+
         $sekarang     = gmdate('Y-m-d H:i:s');
         $pegawaiModel = new PegawaiModel($db);
         $histModel    = new PegawaiHistModel($db);
@@ -178,6 +225,11 @@ final class BiodataService implements BiodataServiceInterface
             $param['updated_at']  = $sekarang;
             $param['updated_by']  = $auth->idPengguna();
             $pegawaiModel->withActor($auth, static fn () => $pegawaiModel->update($nip, $param));
+
+            // B-05 [K] trigger pegawai_afUpd (D1:7975): status 1 → 2 menonaktifkan akun UserLevel 2 (PNS) + sesi dicabut.
+            if ((int) $pegawai['status'] === 1 && (int) ($param['status'] ?? 1) === 2) {
+                AkunPegawai::nonaktifkan($db, $auth, $nip, [Role::PEGAWAI], 'status pegawai 1 -> 2');
+            }
 
             if (isset($param['foto']) && $db->table('pegawai_foto')->where('nip', $nip)->where('foto', $param['foto'])->countAllResults() === 0) {
                 $fotoModel = new PegawaiFotoModel($db);
@@ -195,13 +247,24 @@ final class BiodataService implements BiodataServiceInterface
                 ]));
             }
 
-            $this->sinkronEmail($db, $auth, is_array($akun) ? $akun : null, $email);
+            if (! $emailBentrok) {
+                $this->sinkronEmail($db, $auth, is_array($akun) ? $akun : null, $email);
+            }
 
-            return ['jalur' => 'langsung', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => null];
+            return ['jalur' => 'langsung', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => null, 'email_skipped' => $emailBentrok];
         }
 
         if ($adaFoto) {
             $param['foto'] = $kolom->simpan($foto, self::aturanFoto(), 'pegawai_hist', 'foto', 'foto');
+
+            // Foto pengajuan aktif sebelumnya diganti: berkasnya dibuang setelah transaksi, kecuali masih foto pegawai
+            // atau ada di galeri `pegawai_foto` (PenjagaBerkas hanya memeriksa pegawai_hist.foto).
+            $fotoLama = is_array($aktif) ? (string) ($aktif['foto'] ?? '') : '';
+
+            if ($fotoLama !== '' && $fotoLama !== (string) ($pegawai['foto'] ?? '')
+                && $db->table('pegawai_foto')->where('foto', $fotoLama)->countAllResults() === 0) {
+                $kolom->hapus($fotoLama, 'pegawai_hist', 'foto');
+            }
         }
 
         $pegawaiModel->withActor($auth, static fn () => $pegawaiModel->update($nip, [
@@ -240,7 +303,7 @@ final class BiodataService implements BiodataServiceInterface
             ->select('id_pegawai_hist, flag_update, reason_note, created_at, updated_at, notif_date')
             ->where('id_pegawai_hist', $id)->get()->getRowArray();
 
-        return ['jalur' => 'pengajuan', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => is_array($hist) ? $hist : null];
+        return ['jalur' => 'pengajuan', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => is_array($hist) ? $hist : null, 'email_skipped' => false];
     }
 
     /**

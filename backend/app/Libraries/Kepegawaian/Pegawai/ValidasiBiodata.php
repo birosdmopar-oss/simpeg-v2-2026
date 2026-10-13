@@ -7,6 +7,7 @@ namespace App\Libraries\Kepegawaian\Pegawai;
 use App\Constants\Role;
 use App\Exceptions\ValidationException;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
+use App\Libraries\Kepegawaian\Nip\FormatNip;
 use CodeIgniter\Database\BaseConnection;
 
 /**
@@ -26,8 +27,9 @@ use CodeIgniter\Database\BaseConnection;
  * Normalisasi [K] `set_param`: nomor identitas/telepon hanya digit; nama master (`provinsi_lahir`, `agama`, …) diturunkan
  * dari ID; "Kerabat Lain" → `jenis_kerabat` = isian `jenis_kerabat_lain`. Deviasi [V2]: format email, tanggal, panjang
  * kolom DDL, ID master wajib ada (aktif bila berubah), kabupaten wajib milik provinsi terpilih (kecuali 9999 LAIN-LAIN),
- * jenis status wajib milik status pegawai sekarang — legacy tidak memeriksanya. Kolom `status` pegawai (1/2) tidak
- * dibuka di sini: perubahan status ikut B-05 (MAKE-011) karena menonaktifkan akun.
+ * jenis status wajib milik status pegawai (akhir) — legacy tidak memeriksanya. Kolom `status` pegawai 1/2 hanya Super
+ * Admin (form legacy :388-400, B-05 MAKE-011); 10 Dihapus hanya lewat hapus pegawai. Mode tambah (B-05): NIP wajib
+ * (format FormatNip, belum terdaftar) dan pegawai baru dianggap status 1.
  */
 final class ValidasiBiodata
 {
@@ -61,7 +63,12 @@ final class ValidasiBiodata
     /**
      * @var list<string>
      */
-    public const ISIAN_SUPER_ADMIN = ['nama', 'glr_awal', 'glr_akhir', 'tgl_lahir', 'id_jenis_status', 'tmt_status'];
+    public const ISIAN_SUPER_ADMIN = ['nama', 'glr_awal', 'glr_akhir', 'tgl_lahir', 'status', 'id_jenis_status', 'tmt_status'];
+
+    /**
+     * Panjang kolom gelar `pegawai_hist` [K] D1 (sementara sampai DBV-020).
+     */
+    public const BATAS_GELAR_PENGAJUAN = ['glr_awal' => 12, 'glr_akhir' => 24];
 
     /**
      * Kolom digit saja: kolom => [panjang maks DDL, wajib].
@@ -83,6 +90,44 @@ final class ValidasiBiodata
 
     public function __construct(private readonly BaseConnection $db)
     {
+    }
+
+    /**
+     * Mode tambah pegawai (B-05, role 1): NIP baru wajib valid dan belum terdaftar; biodata divalidasi sebagai Super
+     * Admin atas baris kosong berstatus 1 (legacy `validate_param(..., 'add')` :891-911).
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array{nip: string, param: array<string, mixed>, email: string}
+     */
+    public function periksaTambah(array $data): array
+    {
+        $periksa = FormatNip::periksa($data['nip'] ?? null);
+        $nip     = $periksa->valid ? (string) $periksa->detail['nip'] : '';
+        $error   = [];
+
+        if (! $periksa->valid) {
+            $error['nip'] = [(string) $periksa->pesan];
+        } elseif ($this->db->table('pegawai')->where('nip', $nip)->countAllResults() > 0) {
+            $error['nip'] = ['NIP sudah terdaftar di dalam sistem; gunakan NIP yang berbeda.'];
+        }
+
+        $kosong = array_fill_keys([...self::ISIAN_UMUM, ...self::ISIAN_ADMIN_SATKER, ...self::ISIAN_SUPER_ADMIN], null);
+        $kosong = array_merge($kosong, ['nip' => $nip, 'status' => 1]);
+        unset($data['nip']);
+        $data['status'] = '1'; // pegawai baru selalu Aktif (MAKE-011)
+
+        try {
+            $hasil = $this->periksa(Role::SUPER_ADMIN, $data, $kosong, null);
+        } catch (ValidationException $e) {
+            throw new ValidationException('Validasi gagal.', $error + (array) $e->getErrors());
+        }
+
+        if ($error !== []) {
+            throw new ValidationException('Validasi gagal.', $error);
+        }
+
+        return ['nip' => $nip] + $hasil;
     }
 
     /**
@@ -172,6 +217,8 @@ final class ValidasiBiodata
 
         if ($role === Role::SUPER_ADMIN) {
             $this->isianSuperAdmin($nilai, $pegawai, $param);
+        } else {
+            $this->gelarMuatPengajuan($pegawai);
         }
 
         if ($this->errors !== []) {
@@ -335,16 +382,40 @@ final class ValidasiBiodata
             $param['tmt_status'] = $tmt === '' ? null : $tmt;
         }
 
+        $status = (string) ($nilai['status'] ?? '');
+
+        if (! in_array($status, ['1', '2'], true)) {
+            $this->gagal('status', 'Status pegawai harus Aktif (1) atau Tidak Aktif (2).');
+        } else {
+            $param['status'] = (int) $status;
+        }
+
         $this->master('id_jenis_status', 'jenis_status', 'id_jenis_status', 'jenis_status', 'Jenis status', $nilai, $pegawai, $param);
 
-        if (isset($param['id_jenis_status'])) {
+        if (isset($param['id_jenis_status'], $param['status'])) {
             $cocok = $this->db->table('jenis_status')
                 ->where('id_jenis_status', $param['id_jenis_status'])
-                ->where('status_pegawai', (int) $pegawai['status'])
+                ->where('status_pegawai', $param['status'])
                 ->countAllResults() > 0;
 
             if (! $cocok) {
                 $this->gagal('id_jenis_status', 'Jenis status tidak sesuai dengan status pegawai.');
+            }
+        }
+    }
+
+    /**
+     * Jalur pengajuan menyalin gelar `pegawai` (VARCHAR 50) ke `pegawai_hist` yang kolomnya lebih pendek [K] D1:
+     * `glr_awal` VARCHAR(12), `glr_akhir` VARCHAR(24). Sampai DBV-020 melebarkannya (keputusan user 13-10-2026), gelar
+     * yang lebih panjang ditolak dengan pesan yang jelas — gelar bukan isian pegawai, jadi arahannya ke admin.
+     *
+     * @param array<string, mixed> $pegawai
+     */
+    private function gelarMuatPengajuan(array $pegawai): void
+    {
+        foreach (self::BATAS_GELAR_PENGAJUAN as $kolom => $maks) {
+            if (mb_strlen((string) ($pegawai[$kolom] ?? '')) > $maks) {
+                $this->gagal($kolom, "Gelar terlalu panjang untuk pengajuan (maks. {$maks} karakter); hubungi admin untuk memperbaikinya.");
             }
         }
     }

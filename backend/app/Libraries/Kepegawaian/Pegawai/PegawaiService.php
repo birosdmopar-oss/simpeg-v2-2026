@@ -11,10 +11,12 @@ use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
 use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\ListQuery;
 use App\Models\Kepegawaian\PegawaiHistModel;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\HTTP\Files\UploadedFile;
 
 /**
  * B-20 dasar (MAKE-010): daftar & detail pegawai — implementasi nyata PegawaiServiceInterface (service
@@ -31,6 +33,9 @@ use CodeIgniter\Database\BaseConnection;
  * `PegawaiScope::bolehLihat`. `tabs` = descriptor engine `RiwayatRegistryInterface::descriptorUntuk()` (fungsi yang
  * sama dengan `GET pegawai/{nip}/riwayat` WS-1). Path `pegawai.foto` tidak pernah dikirim (diganti `ada_foto`; berkas
  * lewat `GET pegawai/{nip}/foto`).
+ *
+ * TODO(B-20 penutup, MAKE-014): data sensitif (NIK, NPWP, BPJS, TASPEN, no. HP, kerabat) untuk role 4/5/8 sementara ikut
+ * legacy (ditampilkan penuh, `UL_ES1`); dibahas ulang di MAKE-014 (keputusan user 13-10-2026).
  */
 final class PegawaiService implements PegawaiServiceInterface
 {
@@ -74,6 +79,7 @@ final class PegawaiService implements PegawaiServiceInterface
         private readonly ?BaseConnection $db = null,
         private readonly ?PegawaiScopeInterface $scope = null,
         private readonly ?RiwayatRegistryInterface $registry = null,
+        private readonly ?KolomBerkas $berkas = null,
     ) {
     }
 
@@ -151,6 +157,10 @@ final class PegawaiService implements PegawaiServiceInterface
             'ubah_biodata'  => $bolehUbah,
             'ubah_langsung' => $bolehUbah && $auth->role() === Role::SUPER_ADMIN,
             'koreksi_nip'   => $auth->role() === Role::SUPER_ADMIN,
+            // B-04 (MAKE-011): pengajuan menunggu bisa diproses pemanggil (role 1/3 + jalur proses).
+            'proses_biodata' => (int) ($hasil['pengajuan']['flag_update'] ?? 0) === PegawaiHistModel::FLAG_DIAJUKAN
+                && in_array($auth->role(), [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true)
+                && $scope->bolehProses($auth, $nip),
         ];
         $hasil['tabs'] = $this->registry()->descriptorUntuk($auth, $nip);
 
@@ -201,6 +211,23 @@ final class PegawaiService implements PegawaiServiceInterface
             $nilai = $query->string($kunci);
             ctype_digit($nilai) ? $builder->where($kolom, (int) $nilai) : $builder->where('1 = 0', null, false);
         }
+    }
+
+    public function tambah(AuthContext $auth, array $data, ?UploadedFile $foto): array
+    {
+        return $this->siklus()->tambah($auth, $data, $foto);
+    }
+
+    public function hapus(AuthContext $auth, string $nip): array
+    {
+        return $this->siklus()->hapus($auth, $nip);
+    }
+
+    private function siklus(): SiklusPegawai
+    {
+        $db = $this->koneksi();
+
+        return new SiklusPegawai($db, $this->berkas ?? new KolomBerkas(null, $db), service('accountProvisioner'));
     }
 
     private function scope(): PegawaiScopeInterface

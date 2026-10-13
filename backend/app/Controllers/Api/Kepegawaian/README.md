@@ -145,11 +145,20 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
 | `GET pegawai/{nip}` | UL_ALL + `bolehLihat` | Kolom `pegawai` (tanpa `foto`/`siasn_flag`/`siasn_lu`/`deleted_at`) + `ada_foto`, `email` (akun), `jabatan_aktif` (pmj), `pangkat_aktif` (`pegawai_kp`), `pengajuan` (pengajuan biodata terakhir bila `flag_update` 1/2: `id_pegawai_hist`, `flag_update`, `reason_note`, `created_at`, `updated_at`, `notif_date`; selain itu `null`), `aksi` `{ ubah_biodata, ubah_langsung, koreksi_nip }`, `tabs` (= `descriptorUntuk`, fungsi yang sama dengan `GET pegawai/{nip}/riwayat`). Urutan 401 → 403 lingkup (NIP tidak ada bagi role ber-lingkup = 403) → 404 |
 | `PUT pegawai/{nip}/biodata` | 1, 2, 3, 6, 7 + `bolehUbah` | B-03 dua jalur. JSON kolom DDL `pegawai` + `email` + `jenis_kerabat_lain`; dengan foto: `POST` multipart + `_method=PUT`, berkas `foto` (jpg/jpeg/png, 5 MB). Patch: kolom yang tidak dikirim memakai nilai sekarang, kewajiban legacy diperiksa atas nilai akhir. Isian tanpa hak role yang nilainya berbeda → 422 `errors.<kolom>` (nama/gelar/tgl lahir/jenis status/TMT status hanya role 1; jenis pegawai role 1/3; `status`, `nip`, `flag_update` tidak pernah). Respons `{ jalur: 'langsung'\|'pengajuan', pegawai, pengajuan }` |
 | `GET pegawai/{nip}/foto` | UL_ALL + `bolehLihat` | Foto profil terkini (`Content-Type` dari isi, `inline`, `nosniff`, `no-store`); tanpa foto atau path arsip remote legacy → 404 |
+| `POST pegawai` | 1 (`Role::filter`) | B-05 (MAKE-011) tambah: multipart isian Super Admin + `nip` + `email` + berkas `foto` (wajib) → 201 `{ pegawai, akun: { id_pengguna, username, user_level, created, initial_password, email_skipped } }`, `Cache-Control: no-store`; status awal selalu 1. Satu transaksi: pegawai (status 1) → `pegawai_foto` → akun A-09 dengan password awal = NIP [K] (`AccountProvisioner::provisionDenganPasswordNip`). 422 `errors.nip` (format/terdaftar/username akun lain), kolom biodata, `foto` |
+| `DELETE pegawai/{nip}` | 1 (`Role::filter`) | B-05 (MAKE-011) hapus FISIK ikut legacy (keputusan user 13-10-2026) → `{ deleted: true, soft_delete: false, item }`. Masih ada data turunan (FK RESTRICT ke `pegawai.nip`) → 422 `errors.nip`; akun ber-NIP dilepas (`nip` NULL, nonaktif, sesi dicabut); 404 NIP |
+| `GET biodata/pengajuan?search=&page=&per_page=` | 1, 3 (`Role::filter`) | B-04 (MAKE-011) antrean pengajuan menunggu (`flag_update` 1), lingkup jalur PROSES (`PegawaiScopeProsesInterface`: unit 20 tanpa UPT, unit 21 + satker BPO); item `id_pegawai_hist`, `nip`, `nama`, `glr_*`, `unit`, `satker`, `jabatan`, `tgl_permohonan` |
+| `GET biodata/pengajuan/{id}` | pemroses (1/3 + `bolehProses`) atau pemilik (UL_PEGAWAI NIP sendiri) | `{ pengajuan, pegawai, perubahan: [{ kolom, lama, baru }], can_process }` (path foto tidak dikirim; `perubahan.foto` = ada/tidak) |
+| `GET biodata/pengajuan/{id}/foto` | sama dengan detail | Foto pada pengajuan; tanpa foto/berkas → 404 |
+| `POST biodata/pengajuan/{id}/process` | 1, 3 (`Role::filter`) | `{ aksi: 'setujui'\|'tolak', reason_note }`. Urutan 403 role → 404 → 403 lingkup proses → 422 (`aksi`, `reason_note` wajib saat tolak, pengajuan sudah diproses). Setujui: biodata disalin ke `pegawai`, `flag_update` 3, email akun disinkron, foto ke galeri; tolak: `flag_update` 2, `pegawai` tidak berubah |
 | `POST pegawai/{nip}/koreksi-nip` | 1 (`Role::filter`) | B-06 `{ nip_baru }` → `{ nip_lama, nip_baru, tabel: { "tabel.kolom": n }, dilewati: [...], sesi_dicabut }`. 422 `errors.nip_baru` (kosong/format/sama/sudah dipakai pegawai atau akun lain), 404 NIP lama |
 
 Jalur biodata: role 1 → `pegawai` langsung (`flag_update` 0, email akun disinkron; pengajuan aktif → `flag_update` 2
 tanpa alasan, `show_notif` 1, legacy `L_employee.php:410-418`); role 2/3/6/7 → `pegawai.flag_update` 1 + satu
-`pegawai_hist` diajukan per NIP (pengajuan aktif diperbarui). Approval pengajuan = B-04 (MAKE-011).
+`pegawai_hist` diajukan per NIP (pengajuan aktif diperbarui). Approval pengajuan = B-04 (MAKE-011, endpoint
+`biodata/pengajuan*`). Super Admin juga mengubah `status` pegawai 1/2 di biodata (ikut form legacy); 1 → 2
+menonaktifkan akun user_level 2 (PNS) dan mencabut sesinya [K] trigger `pegawai_afUpd`; 2 → 1 tidak mengaktifkan ulang.
+`GET pegawai/{nip}` → `aksi.proses_biodata` (MAKE-011) = ada pengajuan menunggu yang boleh diproses pemanggil.
 
 ### Descriptor tab (beku)
 
@@ -276,8 +285,8 @@ ter-resolve (tanpa `resetSingle`).
 | `riwayatRegistry` | `RiwayatRegistryInterface`: `semua()`, `definisi(jenis)`, `definisiUntukLampiran(idRiwayat)`, `aturanLampiran(idRiwayat)`, `descriptorUntuk(AuthContext, nip)` — sudah nyata (`RiwayatRegistry`, auto-discovery) | WS-1 |
 | `riwayatService` | `RiwayatServiceInterface`: `daftar`, `detail`, `tambah(…, array $data, array $berkas = [])`, `ubah(…, array $data, array $berkas = [])`, `hapus`, `proses` — `$berkas` = kode `jenis_rwy` ⇒ `UploadedFile` | WS-1 (MAKE-004) — `RiwayatEngine` |
 | `snapshotSync` | `SnapshotSyncInterface`: `sinkronkan(RiwayatDefinisi, nip, ?AuthContext pelaku = null)` (parameter pelaku audit aditif MAKE-004) | WS-1 (MAKE-004) — `SnapshotSync` |
-| `pegawaiService` | `PegawaiServiceInterface`: `daftar(AuthContext, filter): {items,total,page,per_page}`, `detail(AuthContext, nip)` — `PegawaiService` | WS-2 (MAKE-010) |
-| `biodataService` | `BiodataServiceInterface`: `ubah(AuthContext, nip, data, ?UploadedFile foto)`, `foto(AuthContext, nip)` — `BiodataService` (approval B-04 menyusul MAKE-011) | WS-2 (MAKE-010) |
+| `pegawaiService` | `PegawaiServiceInterface`: `daftar(AuthContext, filter): {items,total,page,per_page}`, `detail(AuthContext, nip)`; aditif MAKE-011: `tambah(AuthContext, data, ?UploadedFile)`, `hapus(AuthContext, nip)` — `PegawaiService` + `SiklusPegawai` | WS-2 (MAKE-010/011) |
+| `biodataService` | `BiodataServiceInterface`: `ubah(AuthContext, nip, data, ?UploadedFile foto)`, `foto(AuthContext, nip)`; aditif MAKE-011: `antreanPengajuan`, `pengajuan`, `fotoPengajuan`, `prosesPengajuan` — `BiodataService` + `ApprovalBiodata` | WS-2 (MAKE-010/011) |
 | `nipCascade` | `NipCascadeInterface`: `koreksi(AuthContext, nipLama, mixed nipBaru)` — `NipCascadeService` | WS-2 (MAKE-010) |
 | `strukturService`, `lkhService`, `konketService` | Interface penanda tanpa method; method ditetapkan pemiliknya di milestone-nya (aditif) | WS-2 (MAKE-012..013) |
 

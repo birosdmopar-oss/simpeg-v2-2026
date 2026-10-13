@@ -13,6 +13,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Auth\JwtService;
 use App\Libraries\Auth\PasswordVerifier;
 use App\Libraries\Kepegawaian\Nip\FormatNip;
+use App\Libraries\Kepegawaian\Nip\JenisRujukanNip;
 use App\Libraries\Kepegawaian\Nip\RujukanNip;
 use App\Libraries\Kepegawaian\Nip\TabelAnakNip;
 use App\Models\AuditLogModel;
@@ -47,8 +48,12 @@ use Throwable;
  *  - Sesi [V2]: refresh token menyimpan claims (termasuk `nip`) saat terbit, jadi seluruh sesi akun pegawai itu dicabut
  *    (`JwtService::revokeAllForUser`, baris token dihapus) di transaksi yang sama; pemilik login ulang dengan NIP baru.
  *    Kolom jejak `token.nip` (A-01 D-7) karena itu tidak diarahkan ulang.
- *  - Tabel registry yang belum ada di skema (mis. `user_lokasi_presensi`, G-03 memakai `dm_user_lokasi_presensi`)
- *    dilewati dan dilaporkan di `dilewati`; test B-21 mengunci daftarnya.
+ *  - Kolom JSON array NIP (`JenisRujukanNip::JsonArrayNip`: `dm_user_lokasi_presensi.target_peg`/`excl_peg`, pengganti
+ *    `user_lokasi_presensi` yang tidak dibuat di v2) — elemen NIP lama diganti, begitu pula awalan "NIP - " di
+ *    `*_desc` (keputusan user 13-10-2026, MAKE-011).
+ *  - Tabel registry yang belum ada di skema dilewati dan dilaporkan di `dilewati`; test B-21 mengunci daftarnya.
+ *  - Audit: `pegawai` (NIP + jumlah baris per tabel) dan setiap akun `pengguna` yang direset (password dimasking).
+ *  - Balapan NIP baru didaftarkan proses lain (1062 pada salinan `pegawai`) → 422 `nip_baru`.
  *  - `gaji_pegawai.nip` dan `riwayat_cuti.*` (Fase 4/5) belum masuk cakupan: registry menambahkannya per fase tanpa
  *    mengubah kelas ini.
  */
@@ -66,6 +71,11 @@ final class NipCascadeService implements NipCascadeInterface
         'token.nip'         => 'jejak NIP pemilik token (A-01 D-7); sesi akun dicabut',
         'pengguna.username' => 'ditangani khusus: username akun = NIP baru + reset password (legacy :589-599)',
     ];
+
+    /**
+     * PK tabel yang punya kolom JSON array NIP (`JenisRujukanNip::JsonArrayNip`).
+     */
+    private const PK_JSON = ['dm_user_lokasi_presensi' => 'id_dm_user_lokasi_presensi'];
 
     /**
      * @var list<RujukanNip>
@@ -144,7 +154,16 @@ final class NipCascadeService implements NipCascadeInterface
         $salinan['nip']        = $baru;
         $salinan['updated_at'] = $sekarang;
         $salinan['updated_by'] = $auth->idPengguna();
-        $this->wajibBerhasil($db, $db->table('pegawai')->insert($salinan), 'pegawai (salin)');
+        try {
+            $this->wajibBerhasil($db, $db->table('pegawai')->insert($salinan), 'pegawai (salin)');
+        } catch (DatabaseException $e) {
+            // Balapan: NIP baru didaftarkan proses lain sesudah cek keunikan → 422, bukan 500.
+            if ((int) $e->getCode() === 1062) {
+                throw ValidationException::forField('nip_baru', 'NIP baru sudah terdaftar; gunakan NIP lain.');
+            }
+
+            throw $e;
+        }
 
         $tabel    = [];
         $dilewati = [];
@@ -163,11 +182,18 @@ final class NipCascadeService implements NipCascadeInterface
                 continue;
             }
 
+            if ($rujukan->jenis === JenisRujukanNip::JsonArrayNip) {
+                $tabel[$kunci] = $this->arahkanJson($db, $rujukan, $lama, $baru);
+
+                continue;
+            }
+
             $this->wajibBerhasil($db, $db->table($rujukan->tabel)->where($rujukan->kolomDiV2(), $lama)->update([$rujukan->kolomDiV2() => $baru]), $kunci);
             $tabel[$kunci] = $db->affectedRows();
         }
 
         // Akun pegawai: username = NIP baru + password = NIP baru [K] (L_employee.php:589-599, keputusan user 13-10-2026).
+        $akunLama    = $db->table('pengguna')->select('id_pengguna, username, nip')->where('nip', $baru)->get()->getResultArray();
         $akunDiganti = $db->table('pengguna')->where('nip', $baru)->update([
             'username'            => $baru,
             'password'            => $this->passwords()->hash($baru),
@@ -177,6 +203,19 @@ final class NipCascadeService implements NipCascadeInterface
         ]);
         $this->wajibBerhasil($db, $akunDiganti, 'pengguna.username');
         $tabel['pengguna.username'] = $db->affectedRows();
+
+        // Audit akun (reset password karena koreksi NIP): `pengguna` tidak punya kolom updated_by, pelaku dicatat di audit.
+        foreach ($akunLama as $akun) {
+            (new AuditLogModel($db))->record(
+                'pengguna',
+                (int) $akun['id_pengguna'],
+                AuditLogModel::EVENT_UPDATE,
+                ['nip' => $lama, 'username' => $akun['username']],
+                ['nip' => $baru, 'username' => $baru, 'password' => '***', 'alasan' => 'koreksi NIP (reset password = NIP baru)'],
+                $auth->idPengguna(),
+                $auth->nip(),
+            );
+        }
 
         $sesi = 0;
 
@@ -223,6 +262,50 @@ final class NipCascadeService implements NipCascadeInterface
         if ($akunLain > 0) {
             throw ValidationException::forField('nip_baru', 'NIP baru sudah dipakai akun lain (username/NIP); gunakan NIP lain.');
         }
+    }
+
+    /**
+     * Kolom JSON array NIP (`JsonArrayNip`): ganti elemen = NIP lama di `<kolom>` dan awalan "NIP lama - " di pasangan
+     * `<kolom>_desc` (format legacy `Lm_lokasi.php`: "NIP - Nama"). Baris dikunci `FOR UPDATE`; JSON ditulis ulang dengan
+     * format hook G-03 (UNESCAPED_UNICODE|UNESCAPED_SLASHES). Nilai yang bukan JSON array dibiarkan (data rusak tidak
+     * diperbaiki di sini). Mengembalikan jumlah baris yang berubah.
+     */
+    private function arahkanJson(BaseConnection $db, RujukanNip $rujukan, string $lama, string $baru): int
+    {
+        $kolom = $rujukan->kolomDiV2();
+        $desc  = $kolom . '_desc';
+        $pk    = self::PK_JSON[$rujukan->tabel] ?? throw new \LogicException("PK tabel JSON NIP {$rujukan->tabel} belum didaftarkan.");
+        $t     = $db->escapeIdentifiers($db->prefixTable($rujukan->tabel));
+        $rows  = $db->query(
+            "SELECT {$db->escapeIdentifiers($pk)} AS pk, {$db->escapeIdentifiers($kolom)} AS isi, {$db->escapeIdentifiers($desc)} AS deskripsi FROM {$t} WHERE {$db->escapeIdentifiers($kolom)} LIKE ? FOR UPDATE",
+            ['%' . $db->escapeLikeString($lama) . '%'],
+        )->getResultArray();
+        $flags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+        $ubah  = 0;
+
+        foreach ($rows as $row) {
+            $isi = json_decode((string) $row['isi'], true);
+
+            if (! is_array($isi) || ! in_array($lama, array_map('strval', $isi), true)) {
+                continue;
+            }
+
+            $baris = [$kolom => (string) json_encode(array_map(static fn ($n): string => (string) $n === $lama ? $baru : (string) $n, array_values($isi)), $flags)];
+            $d     = json_decode((string) $row['deskripsi'], true);
+
+            if (is_array($d)) {
+                $awalan       = $lama . ' - ';
+                $baris[$desc] = (string) json_encode(array_map(
+                    static fn ($v): string => str_starts_with((string) $v, $awalan) ? $baru . ' - ' . substr((string) $v, strlen($awalan)) : (string) $v,
+                    array_values($d),
+                ), $flags);
+            }
+
+            $this->wajibBerhasil($db, $db->table($rujukan->tabel)->where($pk, $row['pk'])->update($baris), $rujukan->tabel . '.' . $kolom);
+            $ubah++;
+        }
+
+        return $ubah;
     }
 
     /**

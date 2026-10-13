@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Interfaces\Kepegawaian;
 
 use App\Libraries\Auth\AuthContext;
+use CodeIgniter\HTTP\Files\UploadedFile;
 
 /**
  * Daftar & detail pegawai (B-20 dasar, `GET api/v1/pegawai`, `GET api/v1/pegawai/{nip}`) — milik WS-2.
@@ -31,4 +32,22 @@ interface PegawaiServiceInterface
      * @return array<string, mixed>
      */
     public function detail(AuthContext $auth, string $nip): array;
+
+    /**
+     * B-05 (MAKE-011, role 1): tambah pegawai + foto + akun A-09 dalam satu transaksi. 403 → 422 (`nip`, kolom biodata,
+     * `foto`).
+     *
+     * @param array<string, mixed> $data kolom DDL `pegawai` + `nip` + `email` + `jenis_kerabat_lain`
+     *
+     * @return array{pegawai: array<string, mixed>, akun: array<string, mixed>}
+     */
+    public function tambah(AuthContext $auth, array $data, ?UploadedFile $foto): array;
+
+    /**
+     * B-05 (MAKE-011, role 1): hapus FISIK ikut legacy (keputusan user 13-10-2026). 403 → 404 → 422 `errors.nip` bila
+     * masih ada data terkait (FK RESTRICT ke pegawai, akun ber-NIP).
+     *
+     * @return array<string, mixed> baris pegawai sebelum dihapus
+     */
+    public function hapus(AuthContext $auth, string $nip): array;
 }

@@ -7,6 +7,7 @@ namespace App\Libraries\Kepegawaian\Stub;
 use App\Exceptions\BelumTersediaException;
 use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
 use App\Libraries\Auth\AuthContext;
+use CodeIgniter\HTTP\Files\UploadedFile;
 
 /**
  * Stub S0-A (MAKE-002). Implementasi nyata `App\Libraries\Kepegawaian\Pegawai\PegawaiService` sejak MAKE-010 (dipasang
@@ -22,5 +23,15 @@ final class StubPegawaiService implements PegawaiServiceInterface
     public function detail(AuthContext $auth, string $nip): array
     {
         throw new BelumTersediaException('detail pegawai');
+    }
+
+    public function tambah(AuthContext $auth, array $data, ?UploadedFile $foto): array
+    {
+        throw new BelumTersediaException('tambah pegawai');
+    }
+
+    public function hapus(AuthContext $auth, string $nip): array
+    {
+        throw new BelumTersediaException('hapus pegawai');
     }
 }

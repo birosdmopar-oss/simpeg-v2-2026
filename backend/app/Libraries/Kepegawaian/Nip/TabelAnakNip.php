@@ -13,7 +13,7 @@ use InvalidArgumentException;
  * transaksi: salin baris pegawai ke NIP baru → arahkan ulang setiap kolom di registry ini → hapus baris lama. Legacy
  * cukup `UPDATE pegawai SET nip` karena FK-nya `ON UPDATE CASCADE` (`libraries/hr/L_employee.php:586-587`).
  *
- * Isi (80 entri):
+ * Isi (82 entri):
  * - {@see JenisRujukanNip::FkLegacy} (75): semua `REFERENCES pegawai (nip)` di dump struktur produksi 01-10-2026 (D1,
  *   285 tabel), 70 tabel. Semuanya `ON UPDATE CASCADE`; nama FK legacy dicatat.
  * - {@see JenisRujukanNip::NonFkUbahNipLegacy} (1): `pengguna.username`, diganti kode Ubah NIP legacy.
@@ -22,6 +22,9 @@ use InvalidArgumentException;
  *   tetapi wajib FK di v2 (DoD C-01).
  * - {@see JenisRujukanNip::NonFkKeputusanV2} (1): `jabatan_koordinasi.nip`, tanpa FK dan tidak diganti legacy, ikut
  *   dikoreksi atas keputusan #10 WS2.md (MAKE-010).
+ * - {@see JenisRujukanNip::JsonArrayNip} (2): `dm_user_lokasi_presensi.target_peg`/`excl_peg` (JSON array NIP, pasangan
+ *   `*_desc` "NIP - Nama"), pengganti `user_lokasi_presensi` yang tidak dibuat di v2 (keputusan user 13-10-2026,
+ *   MAKE-011).
  *
  * Label sumber: **[K]** = DDL dump struktur produksi D1; **[K-kode]** = kode legacy (path relatif ke `application/`);
  * **[V2]** = dokumen v2. Fase/pemilik diambil dari `0x-*.md`, Mapping Migrasi, dan draf DBV-012/DBV-013 (belum
@@ -113,7 +116,7 @@ final class TabelAnakNip
         ['user_banner', 'nip', 'fk_nip_usbanner_to_pegawai', false, KeberadaanV2::Ada, 7, 'F-01', 'Banner per pegawai'],
         ['user_form_digital', 'nip', 'fk_nip_user_fd_to_pegawai', false, KeberadaanV2::Ada, 7, 'F-01', 'Penugasan form digital'],
         ['user_geo', 'nip', 'fk_nip_usergeo_to_pegawai', false, KeberadaanV2::BelumDiputuskan, null, null, 'Log koordinat (controllers/hr/services/Local.php); tidak ada di Mapping Migrasi'],
-        ['user_lokasi_presensi', 'nip', 'fk_user_lokasi_presensi_01', false, KeberadaanV2::Ada, 2, 'G-03', 'Pemetaan pegawai ke lokasi presensi (DoD G-03; Mapping Tier 3)'],
+        ['user_lokasi_presensi', 'nip', 'fk_user_lokasi_presensi_01', false, KeberadaanV2::TidakDiimpor, null, null, 'Tidak dibuat di v2, diganti JSON dm_user_lokasi_presensi (target_peg/excl_peg; G-03 DBV-007, keputusan user 13-10-2026)'],
         ['user_popup', 'nip', 'fk_nip_userpopup_to_pegawai', false, KeberadaanV2::Ada, 7, 'F-01', 'Popup per pegawai'],
     ];
 
@@ -147,6 +150,18 @@ final class TabelAnakNip
             '[K] jabatan_koordinasi.nip tanpa FK, VARCHAR(30) DEFAULT NULL (D1:1510-1545, DBV-018); [V2] keputusan #10 WS2.md',
             true, KeberadaanV2::Ada, 2, 'G-02',
             'Pejabat koordinasi (master G-02b); legacy tidak menggantinya saat Ubah NIP, v2 ikut mengoreksi (MAKE-010)',
+        ],
+        [
+            'dm_user_lokasi_presensi', 'target_peg', JenisRujukanNip::JsonArrayNip,
+            '[K-kode] libraries/hr/master/Lm_lokasi.php:694-756 (JSON array NIP, target_peg_desc "NIP - Nama")',
+            true, KeberadaanV2::Ada, 2, 'G-03',
+            'Target aturan lokasi presensi per NIP; elemen array (+ awalan target_peg_desc) diganti saat koreksi NIP (MAKE-011)',
+        ],
+        [
+            'dm_user_lokasi_presensi', 'excl_peg', JenisRujukanNip::JsonArrayNip,
+            '[K-kode] libraries/hr/master/Lm_lokasi.php:720-758 (JSON array NIP, excl_peg_desc "NIP - Nama")',
+            true, KeberadaanV2::Ada, 2, 'G-03',
+            'Pengecualian aturan lokasi presensi per NIP; elemen array (+ awalan excl_peg_desc) diganti saat koreksi NIP (MAKE-011)',
         ],
     ];
 
