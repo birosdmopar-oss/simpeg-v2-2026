@@ -79,4 +79,6 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->delete('lkh/(:num)', 'LkhController::delete/$1');
     $routes->post('lkh/(:num)/process', 'LkhController::process/$1');
     $routes->get('lkh/(:num)/pdf', 'LkhController::pdf/$1');
+
+    // WS-2: endpoint tambahan ditambahkan di sini.
 });

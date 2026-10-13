@@ -168,13 +168,37 @@ ada (`pegawai/{nip}/riwayat/jabatan…`); tidak ada endpoint khusus. Endpoint ba
 
 | Method & path | Role | Isi |
 |---|---|---|
-| `GET struktur-organisasi?id_unit_satker=` | semua pengguna login (jwt) | B-19 ikut templat legacy so_012025 (keputusan user 13-10-2026): `{ periode, tanggal, id_unit_satker, kementerian, pilihan, judul, format, data }`. `id_unit_satker` '0' (bawaan, kementerian) / `<id_unit>` / `sat_<id_satker>` (hanya pilihan legacy; selain itu 422 `errors.id_unit_satker`). `format` ∈ `kementerian`, `sesmen`, `deputi`, `inspektorat_unit`, `inspektorat`, `pusat`, `bpo`, `upt`; `data` = dataset legacy (kotak `{ id_jabatan, jabatan, pejabat, is_plt, jenis, satker? }`). `pilihan` = `[{ value, label, level, disabled }]`. Pejabat pada `tanggal` (hari ini): definitif dari riwayat jabatan, lalu Plt, lalu Plh |
+| `GET struktur-organisasi?id_unit_satker=&bulan=` | semua pengguna login (jwt) | B-19 ikut templat legacy so_012025 (keputusan user 13-10-2026): `{ periode, tanggal, id_unit_satker, kementerian, pilihan, judul, format, data }`. `id_unit_satker` '0' (bawaan, kementerian) / `<id_unit>` / `sat_<id_satker>` (hanya pilihan legacy; selain itu 422 `errors.id_unit_satker`). `format` ∈ `kementerian`, `sesmen`, `deputi`, `inspektorat_unit`, `inspektorat`, `pusat`, `bpo`, `upt`; `data` = dataset legacy (kotak `{ id_jabatan, jabatan, pejabat, is_plt, jenis, satker? }`). `pilihan` = `[{ value, label, level, disabled }]`. Pejabat pada `tanggal` (bulan berjalan: hari ini; bulan lalu: akhir bulan; `bulan` YYYY-MM sejak 2022-01, di luar itu 422 `errors.bulan`; `bulan_tersedia` = daftar pilihan): definitif dari riwayat jabatan, lalu Plt, lalu Plh |
+| `GET struktur-organisasi/pdf?id_unit_satker=&bulan=&inline=1` | semua pengguna login | MAKE-013: PDF (TCPDF) tabel hierarki jabatan–pejabat sesuai format bagan; `application/pdf`, `attachment` (atau `inline`), `no-store` |
 | `GET penugasan/{plt\|plh}?search=&status=&page=&per_page=` | 1, 3 (lingkup satker akun, atau unit bila tanpa satker), 4, 5 | `{ items, meta: { page, per_page, total }, can_create }`. Item = kolom `pegawai_plt\|plh` (tanpa path `lampiran`) + `id`, `nip`, `nama_lengkap`, `jabatan`, `jabatan_koord`, `unit`, `satker`, `ada_lampiran` |
 | `GET penugasan/{plt\|plh}/{id}` | sama | satu item; 404 di luar lingkup |
 | `POST penugasan/{plt\|plh}` | 1 | Tambah tanpa approval (JSON, atau multipart dengan berkas `lampiran` opsional 5 MB jpg/jpeg/png/gif/pdf/xls/xlsx/doc/docx) → 201. Isian legacy `validate_param_off_plt`: `status` 1/2, `jenis_jabatan` 1 (group, sub group, jabatan) atau 2 (`jenis_jabatan_koord` 1/2 + `id_jabatan_koord` yang jenisnya sama), `tgl_mulai` ≤ `tgl_akhir`, `id_unit`, `id_satker`, `id_group_jabatan_<jenis>`, `id_sub_group_jabatan_<jenis>`, `id_unit_<jenis>`, `id_satker_<jenis>`, `nip_<jenis>` (pegawai ada), `keterangan` ≤ 255; 422 per kolom |
 | `PUT penugasan/{plt\|plh}/{id}` | 1 | Ubah (isian lengkap; dengan berkas: `POST` multipart + `_method=PUT`). Berkas lama diganti sesudah commit |
 | `DELETE penugasan/{plt\|plh}/{id}` | 1 | Hapus PERMANEN ikut legacy (keputusan user 13-10-2026) → `{ deleted: true, soft_delete: false, id }`; audit_logs mencatat "before", berkas lampiran dibuang sesudah commit |
 | `GET penugasan/{plt\|plh}/{id}/lampiran` | 1, 3, 4, 5 | Unduh (`attachment`, `nosniff`, `no-store`); tanpa berkas / path arsip legacy → 404 |
+
+### Konket, LKH, PDF (WS-2 M5, MAKE-013, aditif)
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET konket?ds=&de=&status=&search=&page=&per_page=` | 1, 2, 3, 6, 7 | B-13. Pegawai: pengajuan sendiri (`mode: pegawai`, urut tanggal mulai turun). Role 1/3: antrean `list_ad` rentang `ds`–`de` (bawaan bulan berjalan), pegawai aktif, lingkup PegawaiScope (`mode: admin`, `rentang`). Item = kolom `absen_ijin` (tanpa path berkas) + `nama_lengkap`, `unit`, `satker`, `ada_berkas`, `aksi {ubah, hapus, proses}`; `status` W/V/X |
+| `GET konket/opsi` | 1, 2, 3, 6, 7 | `{ mode, tanggal_minimal, hari_ini, kategori_dinas: 8, kategori_sakit: 10, jenis: [{ kategori, jenis_konket, affect_tukin }] }` (jenis per role: pegawai & role 3 tanpa id 2/4/5/6, role 1 tanpa 4/5) |
+| `GET konket/{id}` | pemilik / role 1 / role 3 lingkup | + `peserta` (dinas gabungan), `aksi`; tidak terlihat → 404 |
+| `POST konket` | 1, 2, 3, 6, 7 | Multipart `date_start`, `date_end`, `kategori`, `alasan`, `jenis_dinas` (kategori 8), `peserta[]` (gabungan), `affect_tukin` (role 1/3), `nip` (role 1/3), berkas `file_bukti` (wajib, 5 MB) → 201, status W. 422 per kolom (tanggal minimal, irisan, sakit, peserta) |
+| `PUT konket/{id}` | pemilik (status W) / role 1 / role 3 lingkup | Ubah (multipart `_method=PUT`); pegawai → kembali W; baris peserta → 422 `id_parent` |
+| `DELETE konket/{id}` | pemilik / role 1 / role 3 lingkup | Status 10; dinas gabungan bersama pesertanya → `{ deleted, id, ids }` |
+| `POST konket/{id}/process` | 1, 3 (lingkup proses) | `{ aksi: setujui\|tolak, reason_note }` → V/X (peserta ikut); alasan wajib saat tolak; hanya W |
+| `GET konket/{id}/berkas` | yang boleh melihat | Unduh berkas bukti; path arsip legacy → 404 |
+| `GET lkh?nip=&page=&per_page=` | 1, 2, 3, 6, 7 | B-12b LKH milik sendiri (role 1/3: `nip` lain dalam lingkup). Status 2/10 tidak ditampilkan; urut Revisi → Menunggu → Disetujui. Item: `id`, `nip`, `nama`, `tgl_laporan`, `nip_atasan`, `nama_atasan`, `status`, `catatan`, `jumlah`, `aksi {ubah, hapus, proses}` |
+| `GET lkh/opsi?nip=` | 1, 2, 3, 6, 7 | `{ nip, tanggal_minimal, tanggal_maksimal, atasan: { nip, nama } \| null, punya_jabatan }` |
+| `GET lkh/verifikasi?status=&ds=&de=&search=` | siapa pun (1, 2, 3, 6, 7) yang menjadi atasan langsung | Antrean `nip_atasan` = NIP pemanggil; bawaan status 0 |
+| `POST lkh` | 1, 2, 3, 6, 7 | `{ nip?, tgl_laporan, kegiatan: [{ kegiatan, output, jumlah_diselesaikan, jam_mulai, jam_selesai }] }` → 201, status 0; atasan, nama, unit/satker diisi server; 422 `tgl_laporan`, `kegiatan`, `kegiatan.<i>`, `nip_atasan`, `nip` |
+| `GET/PUT/DELETE lkh/{id}` | pemilik / atasan (lihat) / role 1 / role 3 lingkup | Detail + `kegiatan`; ubah (selain role 1 → status 0); hapus status 10; kunci tukin 422 `tgl_laporan`; pegawai tidak bisa mengubah/menghapus Disetujui (403) |
+| `POST lkh/{id}/process` | atasan langsung | `{ aksi: setujui\|tolak\|revisi, catatan }` → 1/2/3; catatan wajib saat tolak/revisi; hanya status 0; bukan atasan → 404 |
+| `GET lkh/{id}/pdf` | yang boleh melihat | PDF LKH (TCPDF, QR kode LKH) |
+| `GET usulan/{karpeg\|kariskarsu}/{id}/tanda-terima` | hak `detail` engine | PDF tanda terima usulan Disetujui (aditif di RoutesRiwayat/UsulanController WS-1); selain Disetujui → 422 `status` |
+
+PDF memakai `App\Libraries\Pdf\Pdf::renderer()` (antarmuka `PdfRendererInterface`, ADR-033) dan `Pdf::respon()`.
 
 ### Descriptor tab (beku)
 
@@ -304,8 +328,9 @@ ter-resolve (tanpa `resetSingle`).
 | `pegawaiService` | `PegawaiServiceInterface`: `daftar(AuthContext, filter): {items,total,page,per_page}`, `detail(AuthContext, nip)`; aditif MAKE-011: `tambah(AuthContext, data, ?UploadedFile)`, `hapus(AuthContext, nip)` — `PegawaiService` + `SiklusPegawai` | WS-2 (MAKE-010/011) |
 | `biodataService` | `BiodataServiceInterface`: `ubah(AuthContext, nip, data, ?UploadedFile foto)`, `foto(AuthContext, nip)`; aditif MAKE-011: `antreanPengajuan`, `pengajuan`, `fotoPengajuan`, `prosesPengajuan` — `BiodataService` + `ApprovalBiodata` | WS-2 (MAKE-010/011) |
 | `nipCascade` | `NipCascadeInterface`: `koreksi(AuthContext, nipLama, mixed nipBaru)` — `NipCascadeService` | WS-2 (MAKE-010) |
-| `strukturService` | `StrukturServiceInterface`: `pohon(AuthContext, filter)` — `Struktur\StrukturService` | WS-2 (MAKE-012) |
-| `lkhService`, `konketService` | Interface penanda tanpa method; method ditetapkan pemiliknya di milestone-nya (aditif) | WS-2 (MAKE-013) |
+| `strukturService` | `StrukturServiceInterface`: `pohon(AuthContext, filter)`, `pdf(AuthContext, filter)` (MAKE-013) — `Struktur\StrukturService` | WS-2 (MAKE-012/013) |
+| `lkhService` | `LkhServiceInterface`: `daftar`, `verifikasi`, `opsi`, `detail`, `tambah`, `ubah`, `hapus`, `proses`, `pdf` — `Lkh\LkhService` | WS-2 (MAKE-013) |
+| `konketService` | `KonketServiceInterface`: `daftar`, `opsi`, `detail`, `tambah`, `ubah`, `hapus`, `proses`, `berkas` — `Konket\KonketService` | WS-2 (MAKE-013) |
 
 **Definisi riwayat** (`App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi`, pemilik WS-1): satu berkas per jenis di
 `app/Libraries/Kepegawaian/Riwayat/Definisi/`, ditemukan otomatis. Isinya data: `jenis()` (slug), `label()`, `tabel()`,

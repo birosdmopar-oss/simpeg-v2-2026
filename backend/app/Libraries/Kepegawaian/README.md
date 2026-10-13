@@ -391,10 +391,54 @@ berkas lampiran dibuang sesudah commit; lampiran kolom `lampiran` lewat KolomBer
 (unit 6/7/16/19, satker 37/38/41/49/50/104, jabatan 2060) jadi konstanta [K]. Pejabat pada tanggal acuan (hari ini;
 siap untuk parameter bulan): definitif ikut aturan legacy (riwayat jabatan status 1 jenis 1, TMT ≤ tanggal, status
 pegawai), lalu Plt [V2] hanya status 1 Aktif (legacy getPLT tanpa saring status; keputusan user 13-10-2026), lalu [V2] Plh bila tidak ada definitif maupun Plt (disetujui user). Pilihan `disabled` (unit 6) dan nilai non-string ditolak 422. [V2] simpul hanya periode struktur aktif;
-format `pusat` (legacy 2025 tanpa view) dirender seperti UPT. Riwayat per bulan & ekspor PDF: M5/M6 (TCPDF).
+format `pusat` (legacy 2025 tanpa view) dirender seperti UPT. Riwayat per bulan & ekspor PDF: MAKE-013 (lihat bagian M5).
 
 Test: `tests/Kepegawaian/Riwayat/JabatanTest.php` (`use RiwayatBtcTrait` + `pasangEngineNyata`),
 `tests/Kepegawaian/PenugasanTest.php`, `tests/Kepegawaian/StrukturOrganisasiTest.php`.
+
+## Konket B-13, LKH B-12b, PDF (MAKE-013)
+
+**PDF (ADR-033)** — `app/Libraries/Pdf/`: `PdfRendererInterface` (`app/Interfaces/`), `DokumenPdf` (judul, HTML badan, kop
+halaman pertama, kaki setiap halaman, orientasi, ukuran), `TcpdfRenderer` (TCPDF ^6.6, LGPL-3.0-or-later, via Composer;
+font inti helvetica; cache `WRITEPATH/cache/tcpdf/`), `Pdf::renderer()` / `Pdf::pakai()` (ganti renderer, mis. dompdf
+cadangan atau test) / `Pdf::respon()` / `Pdf::qrImg()` (QR PNG tersemat lewat `TCPDF2DBarcode`). Services.php tidak ditambah
+entri (aturan kepemilikan Fase 3). Template di `app/Views/pdf/` dan wajib `esc()`.
+
+Pemakaian oleh WS-1 (contoh: tanda terima Karpeg/Karis, sudah dibuat di `Usulan/TandaTerimaUsulan.php`):
+
+```php
+$html = view('pdf/nama_template', $data);                       // data sudah di-escape di template
+$isi  = Pdf::renderer()->render(new DokumenPdf('Judul', $html, kopHtml: $kop, kakiHtml: 'SIMPEG v2, ...'));
+return Pdf::respon($this->response, $isi, 'nama.pdf');          // controller
+```
+
+**Konket B-13** (`Konket/KonketService.php`, tabel `absen_ijin` W/V/X/10, `KonketAturan` murni): service tipis di luar
+engine. Hak: lihat Matriks v2 1/2/3/6/7 ([V2] role 4/5 tidak dibuka meski legacy list_ad/detail membukanya); tulis/proses
+legacy (pegawai: diri sendiri, ubah selama W, hapus tanpa syarat status; role 1 semua; role 3 PegawaiScope; proses 1/3
+jalur proses). Aturan legacy validate_param: tanggal ≤ hari ini, mulai ≥ tanggal minimal (konket_min_date, termasuk
+pengecualian bulan), akhir ≥ mulai, jenis & alasan & berkas wajib, tidak beririsan dengan W/V, konket sakit (kategori 10)
+selain PTT maksimal 1 hari kerja dan tidak berturut-turut (efek legacy: hanya hari kerja sebelumnya), Dinas Luar
+(kategori 8) gabungan dengan baris peserta (`id_parent`) yang ikut diubah/diproses/dihapus. [V2]: jenis dibatasi per role
+di server, hapus status 10, alasan wajib saat tolak, baris peserta tidak diubah/diproses sendiri, tanpa pengecualian akun
+pengembang.
+
+**LKH B-12b** (`Lkh/LkhService.php`, tabel `riwayat_lckh` 0/1/2/3/10, `LkhAturan` murni, `AtasanLangsung` = port getAL):
+approver = atasan langsung (`nip_atasan`, diisi server dari snapshot jabatan: subkoordinator → Es.IV → koordinator → Es.III
+→ Es.II → Es.I, pemegang aktif atau Plt; Es.I → Menteri tanpa NIP sehingga tidak bisa diajukan). Rentang tanggal = 4 hari
+kerja terakhir (hari libur & akhir pekan dilewati), mulai tanggal 5 tidak sebelum tanggal 1; unik per tanggal; kegiatan
+JSON sejajar; kunci tukin ubah/hapus legacy; Revisi (3) → pegawai ubah → Menunggu. [V2]: verifikasi tidak dibatasi role 2,
+baris kegiatan setengah terisi 422, catatan wajib tolak/revisi, hapus status 10, PDF dibangkitkan saat diminta (bukan
+`file_lckh`), kop tanpa logo. Rekap LKH bawahan (legacy list_rekap) belum dibawa.
+
+**Tanda terima usulan** (`Usulan/TandaTerimaUsulan.php`): PDF untuk usulan Karpeg/Karis Disetujui, port tt_pdf legacy
+(no tiket & kode permohonan legacy, QR), dibangkitkan saat diminta.
+
+**Struktur organisasi per bulan** (MAKE-013): `bulan` sejak 2022-01, pejabat pada tanggal acuan; Plt/Plh & golongan
+dimuat sekaligus (tanpa N+1); ekspor PDF tabel hierarki. [V2] bulan sebelum Jan 2025 tetap memakai templat so_012025 +
+struktur periode aktif (templat so_062023/so_before_062023 legacy belum di-port).
+
+Test: `tests/unit/Pdf/TcpdfRendererTest.php`, `tests/unit/Kepegawaian/{Konket,Lkh}/*AturanTest.php`,
+`tests/Kepegawaian/{KonketTest,LkhTest,TandaTerimaUsulanTest,StrukturOrganisasiTest}.php`.
 
 ## Lingkup akses pegawai (`Scope/`, MAKE-009)
 

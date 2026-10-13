@@ -34,9 +34,10 @@ class Cors extends BaseConfig
         'allowedOriginsPatterns' => [],
         'supportsCredentials'    => true,
         'allowedHeaders'         => ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-        'exposedHeaders'         => [],
-        'allowedMethods'         => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        'maxAge'                 => 7200,
+        // Aditif WS-2 MAKE-013: nama berkas unduhan (PDF/lampiran) dibaca FE dari Content-Disposition lintas origin.
+        'exposedHeaders' => ['Content-Disposition'],
+        'allowedMethods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        'maxAge'         => 7200,
     ];
 
     public function __construct()
