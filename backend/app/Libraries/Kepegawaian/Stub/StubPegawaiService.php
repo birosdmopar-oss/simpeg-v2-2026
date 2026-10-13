@@ -34,4 +34,19 @@ final class StubPegawaiService implements PegawaiServiceInterface
     {
         throw new BelumTersediaException('hapus pegawai');
     }
+
+    public function pencarian(AuthContext $auth, array $data): array
+    {
+        throw new BelumTersediaException('pencarian pegawai');
+    }
+
+    public function katalogPencarian(AuthContext $auth): array
+    {
+        throw new BelumTersediaException('pencarian pegawai');
+    }
+
+    public function ekspor(AuthContext $auth, array $filter, bool $lanjutan = false): array
+    {
+        throw new BelumTersediaException('ekspor pegawai');
+    }
 }

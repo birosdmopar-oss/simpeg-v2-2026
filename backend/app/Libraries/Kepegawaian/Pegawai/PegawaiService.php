@@ -7,12 +7,14 @@ namespace App\Libraries\Kepegawaian\Pegawai;
 use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
+use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\LkhServiceInterface;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
 use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
+use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\ListQuery;
 use App\Models\Kepegawaian\PegawaiHistModel;
 use CodeIgniter\Database\BaseBuilder;
@@ -25,9 +27,10 @@ use CodeIgniter\HTTP\Files\UploadedFile;
  *
  * Daftar [K] `libraries/hr/L_employee.php:6170-6247` (`list`): role 1, 3, 4, 5, 8 (`controllers/hr/Employee.php:16`),
  * `pegawai.status IN (1, 2)`, lingkup role 3 lewat PegawaiScope jalur daftar (CR-045). Kolom = biodata inti +
- * snapshot jabatan (`pegawai_mutasi_jabatan`) + pangkat (`pegawai_kp`); 90 kolom legacy, pencarian lanjut, dan export
- * menyusul di B-20 penutup (MAKE-014). Deviasi [V2]: urutan bawaan nama (legacy mengurutkan per unit/satker/eselon di
- * `get_all_pegawai`), tanpa pengecualian `NIP_TESTER`/`USR_DEVELOPER`, paginasi server.
+ * snapshot jabatan (`pegawai_mutasi_jabatan`) + pangkat (`pegawai_kp`). Deviasi [V2]: urutan bawaan nama (legacy
+ * mengurutkan per unit/satker/eselon di `get_all_pegawai`), tanpa pengecualian `NIP_TESTER`/`USR_DEVELOPER`, paginasi
+ * server. B-20 penutup (MAKE-014): pencarian lanjutan (`PencarianLanjutan`, role 1, 3, 4, 5) dan ekspor CSV/XLSX
+ * (`EksporTabel`; legacy DataTables sisi klien) memakai builder, filter, dan lingkup yang sama dengan daftar.
  *
  * Detail [K] `controllers/hr/Employee.php:254-287` (`detail`) + `L_employee.php:68-77`: biodata `pegawai` + email akun
  * `pengguna`. Hak lihat ikut Matriks v2 (`hr/employee/detail` = UL_ALL; legacy `UL_ES1`) dengan lingkup
@@ -35,8 +38,8 @@ use CodeIgniter\HTTP\Files\UploadedFile;
  * sama dengan `GET pegawai/{nip}/riwayat` WS-1). Path `pegawai.foto` tidak pernah dikirim (diganti `ada_foto`; berkas
  * lewat `GET pegawai/{nip}/foto`).
  *
- * TODO(B-20 penutup, MAKE-014): data sensitif (NIK, NPWP, BPJS, TASPEN, no. HP, kerabat) untuk role 4/5/8 sementara ikut
- * legacy (ditampilkan penuh, `UL_ES1`); dibahas ulang di MAKE-014 (keputusan user 13-10-2026).
+ * [K] Data sensitif (NIK, NPWP, BPJS, TASPEN, no. HP, kerabat) ditampilkan penuh untuk semua role yang boleh melihat,
+ * termasuk 4/5/8 — legacy `Employee::detail` (UL_ES1) tanpa penyamaran (keputusan user 13-10-2026, Q3 MAKE-014).
  */
 final class PegawaiService implements PegawaiServiceInterface
 {
@@ -54,8 +57,38 @@ final class PegawaiService implements PegawaiServiceInterface
      */
     public const ROLE_UBAH_BIODATA = [Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::PTT, Role::PPPK];
 
+    /**
+     * Role pencarian lanjutan (legacy `Employee::advsearch` userAuth ['1', '3', '4', '5']).
+     *
+     * @var list<int>
+     */
+    public const ROLE_PENCARIAN = [Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI];
+
     public const PER_PAGE_DEFAULT = 10;
     public const PER_PAGE_MAX     = 100;
+
+    /** Batas baris satu ekspor (persempit filter bila lebih). */
+    public const MAKS_EKSPOR = 20000;
+
+    /**
+     * Kolom ekspor = kunci kolom Daftar Pegawai FE (`columns.ts`) => label. `nama_nip` dipecah Nama + NIP.
+     *
+     * @var array<string, string>
+     */
+    public const KOLOM_EKSPOR = [
+        'nama_nip'      => 'Nama',
+        'nip_lama'      => 'NIP Lama',
+        'jabatan'       => 'Jabatan',
+        'satker'        => 'Satuan Kerja',
+        'unit'          => 'Unit Kerja',
+        'gol_ruang'     => 'KP (Gol)',
+        'pangkat'       => 'Pangkat',
+        'jenis_pegawai' => 'Jenis Pegawai',
+        'jenis_status'  => 'Jenis Status',
+        'tmt_status'    => 'TMT Status',
+        'jenis_kelamin' => 'Jenis Kelamin',
+        'agama'         => 'Agama',
+    ];
 
     /**
      * Kolom `pegawai` yang tidak dikirim ke klien (path berkas & kolom internal sinkron SIASN/soft delete).
@@ -91,28 +124,84 @@ final class PegawaiService implements PegawaiServiceInterface
             throw new ForbiddenException('Anda tidak berhak melihat daftar pegawai.');
         }
 
-        $query   = ListQuery::from($filter, ['search', 'status', 'id_unit', 'id_satker', 'id_jenis_pegawai', 'sort', 'order', 'page', 'per_page']);
-        $page    = $query->page();
-        $perPage = $query->perPage(self::PER_PAGE_DEFAULT, self::PER_PAGE_MAX);
-        $db      = $this->koneksi();
-        $foto    = $db->escapeIdentifiers($db->prefixTable('pegawai')) . '.' . $db->escapeIdentifiers('foto');
+        return $this->halaman($auth, $filter, null);
+    }
 
-        $builder = $db->table('pegawai')
-            ->select('pegawai.nip, pegawai.nip_lama, pegawai.nama, pegawai.glr_awal, pegawai.glr_akhir, pegawai.jenis_kelamin, pegawai.tgl_lahir, pegawai.agama, pegawai.id_jenis_pegawai, pegawai.jenis_pegawai, pegawai.jenis_status, pegawai.tmt_status, pegawai.status, pegawai.flag_update')
-            ->select("({$foto} IS NOT NULL AND {$foto} <> '') AS ada_foto", false)
-            ->select('pegawai_mutasi_jabatan.id_unit, pegawai_mutasi_jabatan.unit, pegawai_mutasi_jabatan.id_satker, pegawai_mutasi_jabatan.satker, pegawai_mutasi_jabatan.id_jabatan, pegawai_mutasi_jabatan.jabatan, pegawai_mutasi_jabatan.tmtsk AS tmt_jabatan')
-            ->select('pegawai_kp.gol_ruang, pegawai_kp.pangkat')
-            ->join('pegawai_mutasi_jabatan', 'pegawai_mutasi_jabatan.nip = pegawai.nip', 'left')
-            ->join('pegawai_kp', 'pegawai_kp.nip = pegawai.nip', 'left');
+    public function pencarian(AuthContext $auth, array $data): array
+    {
+        $this->wajibPencarian($auth);
 
-        $this->scope()->terapkanKeQuery($builder, $auth, 'pegawai.nip');
-        $this->terapkanFilter($builder, $query, $db);
+        return $this->halaman($auth, $data, PencarianLanjutan::normalisasi($data['kriteria'] ?? null));
+    }
+
+    public function katalogPencarian(AuthContext $auth): array
+    {
+        $this->wajibPencarian($auth);
+
+        return PencarianLanjutan::katalog();
+    }
+
+    public function ekspor(AuthContext $auth, array $filter, bool $lanjutan = false): array
+    {
+        if (! in_array($auth->role(), self::ROLE_DAFTAR, true) || ! $auth->isAuthenticated()) {
+            throw new ForbiddenException('Anda tidak berhak melihat daftar pegawai.');
+        }
+
+        $kriteria = null;
+
+        if ($lanjutan) {
+            $this->wajibPencarian($auth);
+            $kriteria = PencarianLanjutan::normalisasi($filter['kriteria'] ?? null);
+        }
+
+        $format = is_string($filter['format'] ?? null) ? strtolower($filter['format']) : EksporTabel::XLSX;
+
+        if (! isset(EksporTabel::MIME[$format])) {
+            throw ValidationException::forField('format', 'Format ekspor harus csv atau xlsx.');
+        }
+
+        $kolom     = $this->kolomEkspor($filter['kolom'] ?? null);
+        $query     = ListQuery::from($filter, ['search', 'status', 'id_unit', 'id_satker', 'id_jenis_pegawai', 'sort', 'order']);
+        [$builder] = $this->builderDaftar($auth, $query, $kriteria);
+
+        if ((clone $builder)->countAllResults() > self::MAKS_EKSPOR) {
+            throw ValidationException::forField('kolom', 'Data terlalu banyak untuk diekspor (maksimal ' . self::MAKS_EKSPOR . ' baris); persempit filter.');
+        }
+
+        $rows   = $this->urutkan($builder, $query)->get()->getResultArray();
+        $header = [];
+
+        foreach ($kolom as $k) {
+            array_push($header, ...($k === 'nama_nip' ? ['Nama', 'NIP'] : [self::KOLOM_EKSPOR[$k]]));
+        }
+
+        $baris = array_map(fn (array $r): array => $this->barisEkspor($r, $kolom), $rows);
+        $nama  = 'daftar_pegawai_' . date('Ymd_His') . '.' . $format;
+
+        return [
+            'isi'  => $format === EksporTabel::CSV ? EksporTabel::csv($header, $baris) : EksporTabel::xlsx($header, $baris, 'Daftar Pegawai'),
+            'nama' => $nama,
+            'mime' => EksporTabel::MIME[$format],
+        ];
+    }
+
+    /**
+     * Satu halaman daftar (filter biasa, atau kriteria pencarian lanjutan).
+     *
+     * @param array<string, mixed> $filter
+     * @param list<array{jenis_rwy: string, tabel: string, atribut: string, operator: string, nilai: string|list<string>, hubung: string}>|null $kriteria
+     *
+     * @return array<string, mixed>
+     */
+    private function halaman(AuthContext $auth, array $filter, ?array $kriteria): array
+    {
+        $query     = ListQuery::from($filter, ['search', 'status', 'id_unit', 'id_satker', 'id_jenis_pegawai', 'sort', 'order', 'page', 'per_page']);
+        $page      = $query->page();
+        $perPage   = $query->perPage(self::PER_PAGE_DEFAULT, self::PER_PAGE_MAX);
+        [$builder] = $this->builderDaftar($auth, $query, $kriteria);
 
         $total = (clone $builder)->countAllResults();
-
-        $urut = self::URUT[$query->string('sort')] ?? 'pegawai.nama';
-        $arah = strtolower($query->string('order')) === 'desc' ? 'DESC' : 'ASC';
-        $rows = $builder->orderBy($urut, $arah)->orderBy('pegawai.nip', 'ASC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+        $rows  = $this->urutkan($builder, $query)->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
 
         return [
             'items' => array_map(static function (array $row): array {
@@ -124,6 +213,98 @@ final class PegawaiService implements PegawaiServiceInterface
             'page'     => $page,
             'per_page' => $perPage,
         ];
+    }
+
+    /**
+     * Builder daftar pegawai: kolom daftar + snapshot jabatan & pangkat, lingkup PegawaiScope jalur daftar, filter biasa
+     * atau kriteria pencarian lanjutan (status pegawai 1; filter biasa selain pencarian diabaikan).
+     *
+     * @param list<array{jenis_rwy: string, tabel: string, atribut: string, operator: string, nilai: string|list<string>, hubung: string}>|null $kriteria
+     *
+     * @return array{0: BaseBuilder}
+     */
+    private function builderDaftar(AuthContext $auth, ListQuery $query, ?array $kriteria): array
+    {
+        $db   = $this->koneksi();
+        $foto = $db->escapeIdentifiers($db->prefixTable('pegawai')) . '.' . $db->escapeIdentifiers('foto');
+
+        $builder = $db->table('pegawai')
+            ->select('pegawai.nip, pegawai.nip_lama, pegawai.nama, pegawai.glr_awal, pegawai.glr_akhir, pegawai.jenis_kelamin, pegawai.tgl_lahir, pegawai.agama, pegawai.id_jenis_pegawai, pegawai.jenis_pegawai, pegawai.jenis_status, pegawai.tmt_status, pegawai.status, pegawai.flag_update')
+            ->select("({$foto} IS NOT NULL AND {$foto} <> '') AS ada_foto", false)
+            ->select('pegawai_mutasi_jabatan.id_unit, pegawai_mutasi_jabatan.unit, pegawai_mutasi_jabatan.id_satker, pegawai_mutasi_jabatan.satker, pegawai_mutasi_jabatan.id_jabatan, pegawai_mutasi_jabatan.jabatan, pegawai_mutasi_jabatan.tmtsk AS tmt_jabatan')
+            ->select('pegawai_kp.gol_ruang, pegawai_kp.pangkat')
+            ->join('pegawai_mutasi_jabatan', 'pegawai_mutasi_jabatan.nip = pegawai.nip', 'left')
+            ->join('pegawai_kp', 'pegawai_kp.nip = pegawai.nip', 'left');
+
+        $this->scope()->terapkanKeQuery($builder, $auth, 'pegawai.nip');
+        $kriteria === null ? $this->terapkanFilter($builder, $query, $db) : PencarianLanjutan::terapkan($builder, $kriteria, $db);
+
+        return [$builder];
+    }
+
+    private function urutkan(BaseBuilder $builder, ListQuery $query): BaseBuilder
+    {
+        $urut = self::URUT[$query->string('sort')] ?? 'pegawai.nama';
+        $arah = strtolower($query->string('order')) === 'desc' ? 'DESC' : 'ASC';
+
+        return $builder->orderBy($urut, $arah)->orderBy('pegawai.nip', 'ASC');
+    }
+
+    private function wajibPencarian(AuthContext $auth): void
+    {
+        if (! in_array($auth->role(), self::ROLE_PENCARIAN, true) || ! $auth->isAuthenticated()) {
+            throw new ForbiddenException('Anda tidak berhak memakai pencarian lanjutan.');
+        }
+    }
+
+    /**
+     * Kolom ekspor dari `kolom` (daftar kunci dipisah koma atau array); bawaan = kolom bawaan Daftar Pegawai FE.
+     *
+     * @return list<string>
+     */
+    private function kolomEkspor(mixed $kolom): array
+    {
+        $daftar = is_array($kolom) ? $kolom : (is_string($kolom) && trim($kolom) !== '' ? explode(',', $kolom) : ['nama_nip', 'jabatan', 'satker', 'gol_ruang', 'jenis_pegawai']);
+        $hasil  = [];
+
+        foreach ($daftar as $k) {
+            $k = is_scalar($k) ? trim((string) $k) : '';
+
+            if (! isset(self::KOLOM_EKSPOR[$k])) {
+                throw ValidationException::forField('kolom', "Kolom ekspor tidak dikenal: {$k}.");
+            }
+
+            $hasil[$k] = $k;
+        }
+
+        // Nama/NIP selalu ada (kolom terkunci di FE), paling kiri.
+        return array_values(['nama_nip' => 'nama_nip'] + $hasil);
+    }
+
+    /**
+     * @param array<string, mixed> $r
+     * @param list<string>         $kolom
+     *
+     * @return list<string>
+     */
+    private function barisEkspor(array $r, array $kolom): array
+    {
+        $nilai = [];
+
+        foreach ($kolom as $k) {
+            if ($k === 'nama_nip') {
+                array_push($nilai, StrukturService::namaGelar($r['glr_awal'] ?? null, (string) $r['nama'], $r['glr_akhir'] ?? null), (string) $r['nip']);
+
+                continue;
+            }
+
+            $nilai[] = match ($k) {
+                'jenis_kelamin' => [1 => 'Laki-laki', 2 => 'Perempuan'][(int) ($r['jenis_kelamin'] ?? 0)] ?? '',
+                default         => (string) ($r[$k] ?? ''),
+            };
+        }
+
+        return $nilai;
     }
 
     public function detail(AuthContext $auth, string $nip): array

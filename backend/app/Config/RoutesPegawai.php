@@ -34,6 +34,13 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
 
     // B-20 dasar + B-03 biodata + B-06 koreksi NIP (MAKE-010). Detail/biodata/foto: izin & lingkup di service (jwt saja).
     $routes->get('pegawai', 'PegawaiController::index', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN)]);
+    // B-20 penutup (MAKE-014): ekspor & pencarian lanjutan — didaftarkan sebelum pegawai/(:segment).
+    $daftar    = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN)];
+    $pencarian = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI)];
+    $routes->get('pegawai/export', 'PegawaiController::ekspor', $daftar);
+    $routes->get('pegawai/pencarian/katalog', 'PegawaiController::katalogPencarian', $pencarian);
+    $routes->post('pegawai/pencarian', 'PegawaiController::pencarian', $pencarian);
+    $routes->post('pegawai/pencarian/export', 'PegawaiController::eksporPencarian', $pencarian);
     $routes->get('pegawai/(:segment)', 'PegawaiController::show/$1');
     // B-05 tambah & hapus pegawai (MAKE-011, role 1).
     $routes->post('pegawai', 'PegawaiController::create', ['filter' => Role::filter(Role::SUPER_ADMIN)]);

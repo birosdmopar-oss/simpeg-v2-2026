@@ -15,6 +15,10 @@ use CodeIgniter\HTTP\ResponseInterface;
  * Endpoint pegawai WS-2 (MAKE-010) — kontrak: README.md bagian "Kontrak API Modul B" dan "Pegawai, biodata, koreksi NIP".
  *
  *   GET  pegawai                        daftar disaring lingkup (role 1, 3, 4, 5, 8)        — B-20 dasar
+ *   GET  pegawai/export                 ekspor csv|xlsx daftar terfilter (role 1, 3, 4, 5, 8)  — B-20 penutup
+ *   GET  pegawai/pencarian/katalog      katalog pencarian lanjutan (role 1, 3, 4, 5)           — B-20 penutup
+ *   POST pegawai/pencarian              pencarian lanjutan `{ kriteria[], page, … }`           — B-20 penutup
+ *   POST pegawai/pencarian/export       ekspor hasil pencarian lanjutan `{ kriteria[], format, kolom }`
  *   GET  pegawai/{nip}                  detail + `tabs` descriptor (UL_ALL + PegawaiScope)   — B-20 dasar
  *   POST pegawai                        tambah pegawai + foto + akun (role 1; multipart `foto`) — B-05
  *   DELETE pegawai/{nip}                hapus fisik ikut legacy; 422 bila ada data terkait (role 1) — B-05
@@ -39,6 +43,42 @@ class PegawaiController extends ApiController
         $query = $this->request->getGet();
 
         return $this->respondSuccess($this->pegawai()->daftar(service('authContext'), is_array($query) ? $query : []));
+    }
+
+    public function ekspor(): ResponseInterface
+    {
+        $query = $this->request->getGet();
+
+        return $this->kirimEkspor($this->pegawai()->ekspor(service('authContext'), is_array($query) ? $query : []));
+    }
+
+    public function katalogPencarian(): ResponseInterface
+    {
+        return $this->respondSuccess($this->pegawai()->katalogPencarian(service('authContext')));
+    }
+
+    public function pencarian(): ResponseInterface
+    {
+        return $this->respondSuccess($this->pegawai()->pencarian(service('authContext'), $this->payload()));
+    }
+
+    public function eksporPencarian(): ResponseInterface
+    {
+        return $this->kirimEkspor($this->pegawai()->ekspor(service('authContext'), $this->payload(), true));
+    }
+
+    /**
+     * @param array{isi: string, nama: string, mime: string} $berkas
+     */
+    private function kirimEkspor(array $berkas): ResponseInterface
+    {
+        return $this->response
+            ->setStatusCode(200)
+            ->setHeader('Content-Type', $berkas['mime'])
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $berkas['nama'] . '"')
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('Cache-Control', 'no-store')
+            ->setBody($berkas['isi']);
     }
 
     public function show(string $nip): ResponseInterface

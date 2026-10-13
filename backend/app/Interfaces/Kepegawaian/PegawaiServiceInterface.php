@@ -26,6 +26,34 @@ interface PegawaiServiceInterface
     public function daftar(AuthContext $auth, array $filter = []): array;
 
     /**
+     * Pencarian lanjutan (B-20 penutup, MAKE-014; role 1, 3, 4, 5): `kriteria` = daftar `{ jenis_rwy, jenis_data,
+     * atribut, operator, nilai, hubung }` (whitelist `PencarianLanjutan`; 422 `kriteria.<i>.<kunci>`) + `page`,
+     * `per_page`, `sort`, `order`. Bentuk respons = daftar().
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array{items: list<array<string, mixed>>, total: int, page: int, per_page: int}
+     */
+    public function pencarian(AuthContext $auth, array $data): array;
+
+    /**
+     * Katalog form pencarian lanjutan (jenis, atribut, pilihan, operator) — role 1, 3, 4, 5.
+     *
+     * @return array<string, mixed>
+     */
+    public function katalogPencarian(AuthContext $auth): array;
+
+    /**
+     * Ekspor daftar (`format` csv|xlsx, `kolom` kunci kolom dipisah koma; filter daftar, atau `kriteria` bila
+     * `$lanjutan`) dengan lingkup sama — role daftar (1, 3, 4, 5, 8); pencarian lanjutan role 1, 3, 4, 5.
+     *
+     * @param array<string, mixed> $filter
+     *
+     * @return array{isi: string, nama: string, mime: string}
+     */
+    public function ekspor(AuthContext $auth, array $filter, bool $lanjutan = false): array;
+
+    /**
      * Detail pegawai + `tabs` (descriptor `RiwayatRegistryInterface::descriptorUntuk`) — UL_ALL dalam lingkup
      * `bolehLihat`. Urutan: 403 lingkup (NIP tidak ada bagi role ber-lingkup juga 403) → 404 NIP.
      *
