@@ -50,6 +50,9 @@ use LogicException;
  * hitungan lampiran wajib diulang — dua hapus paralel tidak bisa menghabiskan lampiran wajib (TOCTOU).
  *
  * Dipakai juga oleh RiwayatEngine WS-1 bila perlu.
+ *
+ * Arsip Data Umum (kode 37/38, `ArsipDataUmum`, MAKE-014): tanpa Definisi; `id_entri` = NIP; lihat/unduh = PegawaiScope
+ * lihat; unggah/hapus = `ArsipDataUmum::bolehTulis()` + PegawaiScope ubah (403); tanpa kunci baris & lampiran wajib.
  */
 final class OtorisasiLampiran
 {
@@ -65,6 +68,13 @@ final class OtorisasiLampiran
      */
     public function bolehDaftar(AuthContext $auth, string $nip, int $idRiwayat, string $idEntri): void
     {
+        if (ArsipDataUmum::kode($idRiwayat)) {
+            $this->lingkup($auth, $nip, false);
+            $this->entriDataUmum($nip, $idEntri);
+
+            return;
+        }
+
         $definisi = $this->definisi($idRiwayat);
         $this->izin($definisi, $auth, [AksiRiwayat::Lihat]);
         $this->lingkup($auth, $nip, false);
@@ -76,6 +86,13 @@ final class OtorisasiLampiran
      */
     public function bolehUnggah(AuthContext $auth, string $nip, int $idRiwayat, string $idEntri): AturanLampiran
     {
+        if (ArsipDataUmum::kode($idRiwayat)) {
+            $this->tulisDataUmum($auth, $nip, $idRiwayat);
+            $this->entriDataUmum($nip, $idEntri);
+
+            return ArsipDataUmum::aturan($idRiwayat);
+        }
+
         $definisi = $this->definisi($idRiwayat);
         $this->izin($definisi, $auth, [AksiRiwayat::Tambah, AksiRiwayat::Ubah]);
         $this->lingkup($auth, $nip, true);
@@ -93,8 +110,12 @@ final class OtorisasiLampiran
     public function bolehUnduh(AuthContext $auth, string $nip, int $idAttachment): array
     {
         $this->lingkup($auth, $nip, false);
-        $this->izinDiDefinisiManaPun($auth, [AksiRiwayat::Lihat]);
-        $row      = $this->barisMilik($nip, $idAttachment);
+        $row = $this->barisAtauTolak($auth, $nip, $idAttachment, [AksiRiwayat::Lihat]);
+
+        if (ArsipDataUmum::kode((int) $row['id_riwayat'])) {
+            return AttachmentService::untukKlien($row);
+        }
+
         $definisi = $this->definisi((int) $row['id_riwayat']);
         $this->izin($definisi, $auth, [AksiRiwayat::Lihat]);
         // Baca saja (tanpa kunci baris Disetujui): baris riwayat yang sudah dihapus (status 10) → 404.
@@ -111,10 +132,16 @@ final class OtorisasiLampiran
     public function bolehHapus(AuthContext $auth, string $nip, int $idAttachment): array
     {
         $this->lingkup($auth, $nip, false);
-        $this->izinDiDefinisiManaPun($auth, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
-        $row       = $this->barisMilik($nip, $idAttachment);
+        $row       = $this->barisAtauTolak($auth, $nip, $idAttachment, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
         $idRiwayat = (int) $row['id_riwayat'];
-        $definisi  = $this->definisi($idRiwayat);
+
+        if (ArsipDataUmum::kode($idRiwayat)) {
+            $this->tulisDataUmum($auth, $nip, $idRiwayat);
+
+            return AttachmentService::untukKlien($row);
+        }
+
+        $definisi = $this->definisi($idRiwayat);
         $this->izin($definisi, $auth, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
         $this->lingkup($auth, $nip, true);
         $this->izinUntukPegawai($definisi, $auth, $nip, [AksiRiwayat::Hapus, AksiRiwayat::Ubah]);
@@ -131,6 +158,13 @@ final class OtorisasiLampiran
     public function kunciUnggah(AuthContext $auth, string $nip, int $idRiwayat, string $idEntri): void
     {
         $this->wajibDalamTransaksi();
+
+        if (ArsipDataUmum::kode($idRiwayat)) {
+            $this->kunciPegawai($nip);
+
+            return;
+        }
+
         $definisi = $this->definisi($idRiwayat);
         $this->kunciPegawai($nip);
         $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri, true, $idRiwayat));
@@ -148,7 +182,12 @@ final class OtorisasiLampiran
         $row       = $this->barisMilik($nip, $idAttachment, true);
         $idRiwayat = (int) $row['id_riwayat'];
         $idEntri   = (string) $row['id_entri'];
-        $definisi  = $this->definisi($idRiwayat);
+
+        if (ArsipDataUmum::kode($idRiwayat)) {
+            return;
+        }
+
+        $definisi = $this->definisi($idRiwayat);
         $this->bukanBarisTerkunci($definisi, $auth, $this->entriMilik($definisi, $nip, $idEntri, true, $idRiwayat));
         $this->bukanLampiranWajibTerakhir($nip, $idRiwayat, $idEntri, true);
     }
@@ -175,6 +214,57 @@ final class OtorisasiLampiran
         }
 
         return $row;
+    }
+
+    /**
+     * Baris lampiran untuk unduh/hapus dengan urutan anti-oracle: role tanpa aksi $salahSatu di Definisi berlampiran
+     * mana pun hanya boleh mendapat baris Arsip Data Umum (kode 37/38); selain itu 403 — juga untuk id yang tidak ada.
+     *
+     * @param list<AksiRiwayat> $salahSatu
+     *
+     * @return array<string, mixed>
+     */
+    private function barisAtauTolak(AuthContext $auth, string $nip, int $idAttachment, array $salahSatu): array
+    {
+        try {
+            $this->izinDiDefinisiManaPun($auth, $salahSatu);
+        } catch (ForbiddenException $e) {
+            try {
+                $row = $this->barisMilik($nip, $idAttachment);
+            } catch (NotFoundException) {
+                throw $e;
+            }
+
+            if (! ArsipDataUmum::kode((int) $row['id_riwayat'])) {
+                throw $e;
+            }
+
+            return $row;
+        }
+
+        return $this->barisMilik($nip, $idAttachment);
+    }
+
+    /**
+     * Unggah/hapus Arsip Data Umum: hak role per kode lalu PegawaiScope ubah (403).
+     */
+    private function tulisDataUmum(AuthContext $auth, string $nip, int $idRiwayat): void
+    {
+        if (! ArsipDataUmum::bolehTulis($auth, $idRiwayat, $nip)) {
+            throw new ForbiddenException('Anda tidak berhak mengubah arsip data umum pegawai ini.');
+        }
+
+        $this->lingkup($auth, $nip, true);
+    }
+
+    /**
+     * `id_entri` Arsip Data Umum harus NIP pegawai itu (404 bila pegawai tidak ada / entri lain).
+     */
+    private function entriDataUmum(string $nip, string $idEntri): void
+    {
+        if ($idEntri !== $nip || $this->koneksi()->table('pegawai')->where('nip', $nip)->countAllResults() === 0) {
+            throw new NotFoundException('Data pegawai tidak ditemukan.');
+        }
     }
 
     private function definisi(int $idRiwayat): RiwayatDefinisi

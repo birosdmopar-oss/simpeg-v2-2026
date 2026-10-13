@@ -139,11 +139,17 @@ final class AttachmentService implements AttachmentServiceInterface
 
     public function daftar(string $nip, int $idRiwayat, int|string $idEntri): array
     {
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $this->koneksi()->table('document_attachment')
+        $builder = $this->koneksi()->table('document_attachment')
             ->where('NIP', $nip)
-            ->where('id_riwayat', $idRiwayat)
-            ->where('id_entri', (string) $idEntri)
+            ->where('id_riwayat', $idRiwayat);
+
+        // Arsip Data Umum (MAKE-014): id_entri = NIP; baris legacy ber-id_entri NULL ikut.
+        ArsipDataUmum::kode($idRiwayat)
+            ? $builder->groupStart()->where('id_entri', (string) $idEntri)->orWhere('id_entri', null)->groupEnd()
+            : $builder->where('id_entri', (string) $idEntri);
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $builder
             ->orderBy('id_attachment', 'ASC')
             ->get()
             ->getResultArray();

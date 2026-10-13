@@ -60,7 +60,7 @@ final class StubLkhService implements LkhServiceInterface
 
     public function descriptorTab(AuthContext $auth, string $nip): ?array
     {
-        return null;
+        throw new BelumTersediaException('lkh');
     }
 
     public function rekap(AuthContext $auth, ?string $bulan = null): array
