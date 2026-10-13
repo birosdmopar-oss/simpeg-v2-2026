@@ -4,7 +4,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES, PENUGASAN_ROLES } from './roles'
+import { BIODATA_PROSES_ROLES, KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES, PENUGASAN_ROLES } from './roles'
 
 export const pegawaiRoutes: RouteRecordRaw[] = [
   {
@@ -20,6 +20,13 @@ export const pegawaiRoutes: RouteRecordRaw[] = [
     name: 'pegawai-detail',
     component: () => import('./views/DetailPegawaiPage.vue'),
     meta: { title: 'Data Pegawai' },
+  },
+  {
+    // B-04 antrean pengajuan perubahan Data Umum (role 1, 3; MAKE-014).
+    path: '/biodata/pengajuan',
+    name: 'biodata-antrean',
+    component: () => import('./views/AntreanBiodataPage.vue'),
+    meta: { roles: BIODATA_PROSES_ROLES, title: 'Pengajuan Data Umum' },
   },
   {
     // B-19 struktur organisasi (hr/so/full = semua role login).

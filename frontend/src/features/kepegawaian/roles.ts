@@ -42,6 +42,9 @@ export const KARPEG_KARIS_ROLES: readonly RoleCode[] = [
   Role.PPPK,
 ]
 
+/** Antrean pengajuan perubahan Data Umum (B-04 `biodata/pengajuan` = role 1, 3; legacy process userAuth ['1', '3']). */
+export const BIODATA_PROSES_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]
+
 /**
  * Penugasan Plt/Plh (`hr/rwy/jabatan/list_off_plt|plh`, B-07 MAKE-012): lihat 1, 3 (lingkup satker/unit), 4, 5;
  * tambah/ubah/hapus hanya role 1 (legacy userAuth ['1']). Server tetap yang menegakkan.

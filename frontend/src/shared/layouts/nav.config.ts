@@ -31,6 +31,7 @@ import {
   Newspaper,
   Settings,
   TrendingUp,
+  UserCheck,
   UserCog,
   Users,
 } from 'lucide-vue-next'
@@ -38,7 +39,14 @@ import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
-import { KARPEG_KARIS_ROLES, KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES, PENUGASAN_ROLES } from '@/features/kepegawaian/roles'
+import {
+  BIODATA_PROSES_ROLES,
+  KARPEG_KARIS_ROLES,
+  KONKET_ROLES,
+  LKH_ROLES,
+  PEGAWAI_LIST_ROLES,
+  PENUGASAN_ROLES,
+} from '@/features/kepegawaian/roles'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
@@ -85,6 +93,8 @@ const NAV: NavGroup[] = [
     title: 'Kepegawaian',
     items: [
       { key: 'pegawai', label: 'Daftar Pegawai', icon: Users, to: { name: 'pegawai-list' }, roles: PEGAWAI_LIST_ROLES, phase: 3 },
+      // B-04 antrean pengajuan perubahan Data Umum (MAKE-014).
+      { key: 'biodata-antrean', label: 'Pengajuan Data Umum', icon: UserCheck, to: { name: 'biodata-antrean' }, roles: BIODATA_PROSES_ROLES, phase: 3 },
       { key: 'struktur', label: 'Struktur Organisasi', icon: Network, to: { name: 'org-structure' }, phase: 3 },
       // B-07 penugasan Plt/Plh (legacy hr/rwy/jabatan/list_off_plt|plh; MAKE-012).
       { key: 'penugasan', label: 'Plt/Plh', icon: UserCog, to: { name: 'penugasan' }, roles: PENUGASAN_ROLES, phase: 3 },

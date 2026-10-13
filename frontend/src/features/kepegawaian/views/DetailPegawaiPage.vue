@@ -25,6 +25,7 @@ import DataUmumForm from '../components/DataUmumForm.vue'
 import DataUmumView from '../components/DataUmumView.vue'
 import KoreksiNipDialog from '../components/KoreksiNipDialog.vue'
 import PengajuanBiodataDialog from '../components/PengajuanBiodataDialog.vue'
+import PerubahanBiodataTabel from '../components/PerubahanBiodataTabel.vue'
 import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
 import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
@@ -33,7 +34,7 @@ import { describeApiError, type ApiFailure } from '../services/apiErrors'
 import { pegawaiService } from '../services/pegawai.service'
 import type { ApprovalAksi } from '@/shared/components/approvalActions'
 
-import type { BiodataResult, KoreksiNipResult, PegawaiDetail, PengajuanBiodataDetail, RiwayatMenu } from '../types'
+import type { BiodataResult, KoreksiNipResult, PegawaiDetail, PengajuanBiodataDetail, PerubahanBiodata, RiwayatMenu } from '../types'
 
 const DATA_UMUM = 'data-umum'
 
@@ -95,6 +96,28 @@ watch(nip, () => {
 }, { immediate: true })
 
 const pengajuan = computed(() => detail.value?.pengajuan ?? null)
+
+/** Pemilik/pengaju melihat perubahan yang diajukannya (MAKE-014; `GET biodata/pengajuan/{id}` mengizinkan pemilik). */
+const perubahanSaya = ref<PerubahanBiodata[] | null>(null)
+const galatPerubahan = ref('')
+watch(pengajuan, () => {
+  perubahanSaya.value = null
+  galatPerubahan.value = ''
+})
+
+async function lihatPerubahan(): Promise<void> {
+  if (!pengajuan.value) return
+  if (perubahanSaya.value) {
+    perubahanSaya.value = null
+    return
+  }
+  galatPerubahan.value = ''
+  try {
+    perubahanSaya.value = (await pegawaiService.pengajuan(pengajuan.value.id_pegawai_hist)).perubahan
+  } catch (error) {
+    galatPerubahan.value = describeApiError(error).message
+  }
+}
 
 function onSaved(result: BiodataResult): void {
   editing.value = false
@@ -199,6 +222,15 @@ const crumbs = computed(() => [
             <UiNotice v-else-if="pengajuan?.flag_update === 2" tone="danger" class="mx-5 mt-4" data-testid="pengajuan-status">
               Pengajuan perubahan data umum ditolak{{ pengajuan.reason_note ? `: ${pengajuan.reason_note}` : '.' }}
             </UiNotice>
+            <div v-if="pengajuan && !detail.aksi?.proses_biodata" class="mx-5 mt-2">
+              <button type="button" class="text-body2 font-medium text-brand-tertiary hover:underline" data-testid="btn-lihat-perubahan" @click="lihatPerubahan">
+                {{ perubahanSaya ? 'Sembunyikan perubahan yang diajukan' : 'Lihat perubahan yang diajukan' }}
+              </button>
+              <UiNotice v-if="galatPerubahan" tone="danger" class="mt-2">{{ galatPerubahan }}</UiNotice>
+              <div v-if="perubahanSaya" class="mt-2 rounded-lg border border-slate-200 p-3" data-testid="perubahan-saya">
+                <PerubahanBiodataTabel :perubahan="perubahanSaya" />
+              </div>
+            </div>
             <div v-if="editing" class="px-5 py-5">
               <DataUmumForm :detail="detail" @saved="onSaved" @cancel="editing = false" />
             </div>

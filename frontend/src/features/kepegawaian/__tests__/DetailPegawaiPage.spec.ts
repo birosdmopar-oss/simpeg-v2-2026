@@ -241,6 +241,27 @@ describe('DetailPegawaiPage — aksi kartu', () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain('Pengajuan perubahan data umum ditolak.'))
   })
 
+  it('MAKE-014: pemilik melihat perubahan yang diajukannya (tanpa tombol proses)', async () => {
+    const menunggu = { id_pegawai_hist: 9, flag_update: 1, reason_note: null, created_at: null, updated_at: null, notif_date: null }
+    detail.mockResolvedValue(pegawaiDetail(TABS, {}, { pengajuan: menunggu, aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false, proses_biodata: false } }))
+    pengajuanDetail.mockResolvedValue({
+      pengajuan: { ...menunggu, nip: NIP, nama: 'Budi Contoh', ada_foto: false },
+      pegawai: { nip: NIP, nama: 'Budi Contoh', ada_foto: false, email: null },
+      perubahan: [{ kolom: 'no_hp', lama: '0811', baru: '0822' }],
+      can_process: false,
+    })
+    const { wrapper } = await mountDetail(`/pegawai/${NIP}`, Role.PEGAWAI)
+
+    expect(wrapper.find('[data-testid="btn-tolak-pengajuan"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="btn-lihat-perubahan"]').trigger('click')
+    await flushPromises()
+    expect(pengajuanDetail).toHaveBeenCalledWith(9)
+    expect(wrapper.get('[data-testid="perubahan-saya"] [data-kolom="no_hp"]').text()).toContain('0822')
+
+    await wrapper.get('[data-testid="btn-lihat-perubahan"]').trigger('click')
+    expect(wrapper.find('[data-testid="perubahan-saya"]').exists()).toBe(false)
+  })
+
   it('B-04: foto pengajuan tampil (object URL dicabut saat ditutup); can_process false → peringatan + tombol nonaktif', async () => {
     const create = vi.fn(() => 'blob:pengajuan')
     const revoke = vi.fn()

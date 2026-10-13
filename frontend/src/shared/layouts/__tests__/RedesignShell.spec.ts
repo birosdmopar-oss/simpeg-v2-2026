@@ -48,7 +48,7 @@ describe('RedesignShell — menu', () => {
     const links = wrapper.get('[data-testid="nav-main"]').findAll('a').map((a) => a.text())
 
     expect(links).toEqual([
-      'Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH',
+      'Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH',
       'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ',
     ])
     expect(wrapper.get('[data-testid="nav-web-config"]').attributes('href')).toBe('/web-config')

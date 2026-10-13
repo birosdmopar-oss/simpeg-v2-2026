@@ -14,7 +14,7 @@ const labels = (role: Parameters<typeof buildNav>[0], phase?: number): string[] 
 
 const rolesWith = (menu: string, phase?: number): RoleCode[] => Object.values(Role).filter((r) => labels(r, phase).includes(menu))
 
-const FASE3_MENUS = ['Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH']
+const FASE3_MENUS = ['Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH']
 
 describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
   it('ACTIVE_PHASE = 3 sejak halaman Fase 3 tersambung API', () => {
@@ -25,7 +25,7 @@ describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
   it.each([
     [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ']],
     [Role.PEGAWAI, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'FAQ']],
-    [Role.ADMIN_SATKER, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Manajemen Akun', 'FAQ']],
+    [Role.ADMIN_SATKER, ['Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Manajemen Akun', 'FAQ']],
     [Role.ADMIN_VIEW_ESELON1, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Hari Libur', 'FAQ']],
     [Role.MENTERI, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Hari Libur', 'FAQ']],
     [Role.PTT, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Verifikasi LKH', 'FAQ']],
@@ -42,6 +42,10 @@ describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
   it('Struktur Organisasi untuk semua role login (dan tanpa role)', () => {
     expect(rolesWith('Struktur Organisasi')).toEqual(Object.values(Role))
     expect(labels(null)).toEqual(['Beranda', 'Struktur Organisasi', 'FAQ'])
+  })
+
+  it('Pengajuan Data Umum (antrean B-04) = role 1, 3', () => {
+    expect(rolesWith('Pengajuan Data Umum')).toEqual([1, 3])
   })
 
   it('Plt/Plh = role 1, 3, 4, 5', () => {
@@ -77,6 +81,7 @@ describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
     expect(Object.fromEntries(items.map((i) => [i.key, i.to]))).toEqual({
       home: { name: 'home' },
       pegawai: { name: 'pegawai-list' },
+      'biodata-antrean': { name: 'biodata-antrean' },
       struktur: { name: 'org-structure' },
       penugasan: { name: 'penugasan' },
       konket: { name: 'konket-usulan' },
