@@ -8,6 +8,8 @@ use App\Controllers\Api\ApiController;
 use App\Interfaces\Kepegawaian\BiodataServiceInterface;
 use App\Interfaces\Kepegawaian\NipCascadeInterface;
 use App\Interfaces\Kepegawaian\PegawaiServiceInterface;
+use App\Libraries\Kepegawaian\Pegawai\DrhPegawai;
+use App\Libraries\Pdf\Pdf;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -25,6 +27,7 @@ use CodeIgniter\HTTP\ResponseInterface;
  *   PUT  pegawai/{nip}/biodata          ubah biodata dua jalur (role 1, 2, 3, 6, 7)          — B-03
  *        (dengan foto: POST multipart + `_method=PUT`, berkas `foto`)
  *   GET  pegawai/{nip}/foto             foto profil terkini (UL_ALL + PegawaiScope)
+ *   GET  pegawai/{nip}/drh              Cetak DRH PDF (UL_ALL; 2/6/7 sendiri, lainnya PegawaiScope) — B-20 penutup
  *   POST pegawai/{nip}/koreksi-nip      `{ nip_baru }` (role 1)                              — B-06
  *   GET  biodata/pengajuan              antrean pengajuan menunggu (role 1, 3; lingkup jalur proses) — B-04
  *   GET  biodata/pengajuan/{id}         detail + perubahan (pemroses dalam lingkup / pemilik)
@@ -108,6 +111,13 @@ class PegawaiController extends ApiController
         $foto = $this->request->getFile('foto');
 
         return $this->respondSuccess($this->biodata()->ubah(service('authContext'), $nip, $data, $foto instanceof UploadedFile ? $foto : null));
+    }
+
+    public function drh(string $nip): ResponseInterface
+    {
+        $pdf = (new DrhPegawai())->pdf(service('authContext'), $nip);
+
+        return Pdf::respon($this->response, $pdf['isi'], $pdf['nama'], $this->request->getGet('inline') === '1');
     }
 
     public function foto(string $nip): ResponseInterface

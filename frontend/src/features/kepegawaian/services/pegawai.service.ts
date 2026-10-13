@@ -131,6 +131,11 @@ export const pegawaiService = {
     return data
   },
 
+  /** Cetak DRH PDF (MAKE-014; nama berkas dari server). */
+  drh(nip: string): Promise<BerkasUnduhan> {
+    return ambilBerkas(`${item(nip)}/drh`, `drh_${nip}`)
+  },
+
   async koreksiNip(nip: string, nipBaru: string): Promise<KoreksiNipResult> {
     const { data } = await api.post<KoreksiNipResult>(`${item(nip)}/koreksi-nip`, { nip_baru: nipBaru })
     return data

@@ -23,10 +23,22 @@ import { UiAvatar, UiBadge, UiButton } from '@/shared/ui'
 import { pegawaiService } from '../services/pegawai.service'
 import type { Pegawai } from '../types'
 
-const props = withDefaults(defineProps<{ detail: Pegawai; canPrint: boolean; canDelete: boolean; canKoreksiNip?: boolean; deleting?: boolean }>(), {
-  canKoreksiNip: false,
-  deleting: false,
-})
+const props = withDefaults(
+  defineProps<{
+    detail: Pegawai
+    canPrint: boolean
+    canDelete: boolean
+    canKoreksiNip?: boolean
+    deleting?: boolean
+    /** Jenis cetak yang tersedia (aditif MAKE-014: DRH tersambung; Cetak Data Umum belum). */
+    printKinds?: Array<'data-umum' | 'drh'>
+  }>(),
+  {
+    canKoreksiNip: false,
+    deleting: false,
+    printKinds: () => ['data-umum', 'drh'],
+  },
+)
 
 const emit = defineEmits<{
   arsip: []
@@ -126,8 +138,8 @@ const menuItem =
           </DropdownMenuTrigger>
           <DropdownMenuPortal>
             <DropdownMenuContent align="end" :side-offset="6" class="z-50 min-w-48 rounded-xl border border-slate-200 bg-white p-1 text-body2 shadow-panel">
-              <DropdownMenuItem :class="menuItem" data-action="cetak-data-umum" @select="emit('print', 'data-umum')">Cetak Data Umum</DropdownMenuItem>
-              <DropdownMenuItem :class="menuItem" data-action="cetak-drh" @select="emit('print', 'drh')">Cetak DRH</DropdownMenuItem>
+              <DropdownMenuItem v-if="printKinds.includes('data-umum')" :class="menuItem" data-action="cetak-data-umum" @select="emit('print', 'data-umum')">Cetak Data Umum</DropdownMenuItem>
+              <DropdownMenuItem v-if="printKinds.includes('drh')" :class="menuItem" data-action="cetak-drh" @select="emit('print', 'drh')">Cetak DRH</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenuPortal>
         </DropdownMenuRoot>

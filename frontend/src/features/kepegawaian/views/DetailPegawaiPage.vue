@@ -9,7 +9,7 @@
  * Koreksi NIP (B-06, `aksi.koreksi_nip`) lewat menu ⋯ kartu identitas; sukses → pindah ke URL NIP baru.
  *
  * Galat: 403 (izin/lingkup — termasuk NIP yang tidak ada bagi role ber-lingkup), 404, 501 (stub) ditampilkan sebagai
- * keadaan halaman, tidak pernah sebagai data contoh. Cetak, arsip, dan hapus pegawai belum tersambung (B-20/B-05).
+ * keadaan halaman, tidak pernah sebagai data contoh. Cetak DRH, Arsip Kepegawaian (MAKE-014) dan hapus pegawai (B-05) tersambung; Cetak Data Umum belum.
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -32,6 +32,7 @@ import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { tabsFromDescriptors } from '../riwayat/registry'
 import { describeApiError, type ApiFailure } from '../services/apiErrors'
+import { simpanBerkas } from '../services/berkasUnduhan'
 import { pegawaiService } from '../services/pegawai.service'
 import type { ApprovalAksi } from '@/shared/components/approvalActions'
 
@@ -56,7 +57,28 @@ const prosesMode = ref<ApprovalAksi>('setujui')
 const busyDelete = ref(false)
 
 const role = computed(() => auth.role)
-const canPrint = computed(() => role.value !== null && [Role.SUPER_ADMIN, Role.PEGAWAI, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI].includes(role.value as 1 | 2 | 3 | 4 | 5))
+/**
+ * Cetak DRH (MAKE-014, legacy print_drh UL_ALL; keputusan user Q-M6-5): role 2/6/7 hanya DRH sendiri, role lain yang boleh
+ * melihat pegawai (lingkup ditegakkan server).
+ */
+const canPrint = computed(() => {
+  if (role.value === null) return false
+  if (([Role.PEGAWAI, Role.PTT, Role.PPPK] as number[]).includes(role.value)) return auth.user?.nip === nip.value
+  return true
+})
+const mencetak = ref(false)
+
+async function cetakDrh(): Promise<void> {
+  if (!detail.value || mencetak.value) return
+  mencetak.value = true
+  try {
+    simpanBerkas(await pegawaiService.drh(detail.value.nip))
+  } catch (error) {
+    notice.value = `Gagal mencetak DRH: ${describeApiError(error).message}`
+  } finally {
+    mencetak.value = false
+  }
+}
 const canDelete = computed(() => role.value === Role.SUPER_ADMIN)
 
 const riwayatTabs = computed(() => tabsFromDescriptors(detail.value?.tabs ?? []))
@@ -204,7 +226,8 @@ const crumbs = computed(() => [
           :deleting="busyDelete"
           @koreksi-nip="koreksiOpen = true"
           @arsip="arsipOpen = true"
-          @print="(kind) => (notice = `Cetak ${kind === 'drh' ? 'DRH' : 'Data Umum'} belum tersedia (task B-20).`)"
+          :print-kinds="['drh']"
+          @print="(kind) => kind === 'drh' && cetakDrh()"
           @delete="confirmDelete = true"
         />
 

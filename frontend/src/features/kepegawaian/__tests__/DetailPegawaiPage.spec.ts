@@ -7,7 +7,7 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/pegawai.service', () => ({
-  pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn(), pengajuan: vi.fn(), prosesPengajuan: vi.fn(), hapus: vi.fn(), fotoPengajuan: vi.fn() },
+  pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn(), pengajuan: vi.fn(), prosesPengajuan: vi.fn(), hapus: vi.fn(), fotoPengajuan: vi.fn(), drh: vi.fn() },
 }))
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
 vi.mock('../services/lampiran.service', () => ({ lampiranService: { list: vi.fn().mockResolvedValue([]), upload: vi.fn(), download: vi.fn(), remove: vi.fn() } }))
@@ -45,8 +45,8 @@ const TABS = [
   descriptor('lkh', 'Laporan Kerja Harian'),
 ]
 
-async function mountDetail(path = `/pegawai/${NIP}`, role: RoleCode = Role.SUPER_ADMIN) {
-  loginAs(role)
+async function mountDetail(path = `/pegawai/${NIP}`, role: RoleCode = Role.SUPER_ADMIN, nipAkun: string | null = null) {
+  loginAs(role, { nip: nipAkun })
   const router = createShellRouter()
   await router.push(path)
   await router.isReady()
@@ -160,19 +160,35 @@ describe('DetailPegawaiPage — tab dari descriptor', () => {
 })
 
 describe('DetailPegawaiPage — aksi kartu', () => {
-  it('Cetak: role 1,2,3,4,5 ya; PTT/PPPK/Pimpinan tidak; Hapus (⋯) hanya Super Admin', async () => {
-    for (const [role, print, more] of [
-      [Role.SUPER_ADMIN, true, true],
-      [Role.PEGAWAI, true, false],
-      [Role.PTT, false, false],
-      [Role.PIMPINAN, false, false],
+  it('Cetak DRH (legacy UL_ALL): 1/3/4/5/8 ya; 2/6/7 hanya miliknya; Hapus (⋯) hanya Super Admin', async () => {
+    for (const [role, nipAkun, print, more] of [
+      [Role.SUPER_ADMIN, null, true, true],
+      [Role.PIMPINAN, null, true, false],
+      [Role.PEGAWAI, NIP, true, false],
+      [Role.PEGAWAI, '198501012010011002', false, false],
+      [Role.PTT, null, false, false],
     ] as const) {
       detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: role === Role.SUPER_ADMIN, proses_biodata: false } }))
-      const { wrapper } = await mountDetail(`/pegawai/${NIP}`, role)
+      const { wrapper } = await mountDetail(`/pegawai/${NIP}`, role, nipAkun)
       expect(wrapper.find('[data-testid="btn-cetak"]').exists(), `cetak role ${role}`).toBe(print)
       expect(wrapper.find('[data-testid="btn-more"]').exists(), `hapus role ${role}`).toBe(more)
       wrapper.unmount()
     }
+  })
+
+  it('Cetak → DRH: unduh PDF dari server (nama berkas dari Content-Disposition); Cetak Data Umum tidak ditawarkan', async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:drh'), revokeObjectURL: vi.fn() })
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    vi.mocked(pegawaiService.drh).mockResolvedValue({ blob: new Blob(['%PDF']), nama: `drh_${NIP}_20261013.pdf` })
+    const { wrapper } = await mountDetail()
+    await wrapper.get('[data-testid="btn-cetak"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector('[data-action="cetak-data-umum"]')).toBeNull()
+    document.body.querySelector<HTMLElement>('[data-action="cetak-drh"]')?.click()
+    await flushPromises()
+    expect(pegawaiService.drh).toHaveBeenCalledWith(NIP)
+    expect(klik).toHaveBeenCalled()
+    klik.mockRestore()
   })
 
   it('Koreksi NIP (⋯, aksi.koreksi_nip): isi → tinjau → konfirmasi → pindah ke URL NIP baru', async () => {

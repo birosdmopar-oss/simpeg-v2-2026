@@ -47,6 +47,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->delete('pegawai/(:segment)', 'PegawaiController::delete/$1', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
     $routes->put('pegawai/(:segment)/biodata', 'PegawaiController::updateBiodata/$1');
     $routes->get('pegawai/(:segment)/foto', 'PegawaiController::foto/$1');
+    // B-20 penutup (MAKE-014): Cetak DRH PDF — hak di DrhPegawai (UL_ALL; 2/6/7 sendiri).
+    $routes->get('pegawai/(:segment)/drh', 'PegawaiController::drh/$1');
     $routes->post('pegawai/(:segment)/koreksi-nip', 'PegawaiController::koreksiNip/$1', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
 
     // B-04 approval pengajuan biodata (MAKE-011). Detail/foto: pemroses atau pemilik (service); antrean/proses role 1, 3.
