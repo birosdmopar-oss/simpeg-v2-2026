@@ -92,7 +92,11 @@ function setAtribut(b: Baris, atribut: string): void {
   if (typeof pilihan === 'string') void muatPilihan(pilihan)
 }
 
-const tambah = (): void => void baris.value.push(kosong())
+/** Batas server (`PencarianLanjutan::MAKS_KRITERIA`). */
+const MAKS_KRITERIA = 10
+const tambah = (): void => {
+  if (baris.value.length < MAKS_KRITERIA) baris.value.push(kosong())
+}
 function hapus(i: number): void {
   baris.value.splice(i, 1)
   if (baris.value.length === 0) baris.value.push(kosong())
@@ -202,7 +206,7 @@ const galatUmum = computed(() => props.errors?.kriteria ?? '')
     </div>
     <p v-if="galatUmum" role="alert" class="text-caption text-danger">{{ galatUmum }}</p>
     <div class="flex flex-wrap gap-2">
-      <UiButton type="button" variant="secondary" data-testid="pencarian-tambah" @click="tambah"><Plus class="h-4 w-4" aria-hidden="true" /> Tambah kriteria</UiButton>
+      <UiButton type="button" variant="secondary" :disabled="baris.length >= MAKS_KRITERIA" data-testid="pencarian-tambah" @click="tambah"><Plus class="h-4 w-4" aria-hidden="true" /> Tambah kriteria</UiButton>
       <UiButton type="submit" data-testid="pencarian-cari">Cari</UiButton>
       <UiButton type="button" variant="secondary" appearance="soft" data-testid="pencarian-reset" @click="reset">Kembali ke daftar</UiButton>
     </div>

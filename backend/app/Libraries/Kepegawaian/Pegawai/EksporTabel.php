@@ -10,8 +10,9 @@ use ZipArchive;
 /**
  * Penulis tabel ekspor (B-20 penutup, MAKE-014; keputusan user 13-10-2026 Q-M6-2): CSV UTF-8 ber-BOM (pemisah `,`,
  * dibuka Excel tanpa salah enkode) dan XLSX minimal (OOXML SpreadsheetML lewat ZipArchive, tanpa library baru). Semua sel
- * teks (`inlineStr`) sehingga NIP 18 digit tidak berubah menjadi angka ilmiah. Nilai yang diawali `=`, `+`, `-`, `@`,
- * TAB, atau CR diberi apostrof (cegah CSV/formula injection, OWASP).
+ * teks (`inlineStr`) sehingga NIP 18 digit tidak berubah menjadi angka ilmiah dan tidak pernah dievaluasi sebagai rumus.
+ * CSV: nilai yang (setelah spasi awal) diawali `=`, `+`, `-`, `@`, atau diawali TAB/CR diberi apostrof (cegah CSV/formula
+ * injection, OWASP).
  */
 final class EksporTabel
 {
@@ -23,10 +24,12 @@ final class EksporTabel
         self::XLSX => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ];
 
-    /** Nilai sel aman dari formula injection. */
+    /** Nilai sel CSV aman dari formula injection. */
     public static function aman(string $nilai): string
     {
-        return $nilai !== '' && str_contains("=+-@\t\r", $nilai[0]) ? "'" . $nilai : $nilai;
+        $awal = ltrim($nilai);
+
+        return ($awal !== '' && str_contains('=+-@', $awal[0])) || ($nilai !== '' && str_contains("\t\r", $nilai[0])) ? "'" . $nilai : $nilai;
     }
 
     /**
@@ -114,7 +117,7 @@ final class EksporTabel
             $gaya = $i === 0 ? ' s="1"' : '';
 
             foreach ($r as $j => $v) {
-                $sel .= '<c r="' . self::kolom($j) . $n . '" t="inlineStr"' . $gaya . '><is><t xml:space="preserve">' . self::esc(self::aman($v)) . '</t></is></c>';
+                $sel .= '<c r="' . self::kolom($j) . $n . '" t="inlineStr"' . $gaya . '><is><t xml:space="preserve">' . self::esc($v) . '</t></is></c>';
             }
 
             $rows .= '<row r="' . $n . '">' . $sel . '</row>';

@@ -135,7 +135,15 @@ describe('DaftarPegawaiPage — ekspor & pencarian lanjutan (MAKE-014)', () => {
     await flushPromises()
     expect(baris0().text()).toContain('Nilai wajib diisi')
 
-    await wrapper.get('[data-testid="pencarian-reset"]').trigger('click')
+    // Batas 10 kriteria di UI (sesuai server).
+    for (let i = 0; i < 8; i++) await wrapper.get('[data-testid="pencarian-tambah"]').trigger('click')
+    expect(wrapper.findAll('[data-testid^="pencarian-baris-"]')).toHaveLength(10)
+    expect(wrapper.get('[data-testid="pencarian-tambah"]').attributes('disabled')).toBeDefined()
+
+    // Panel ditutup → kriteria aktif tetap bisa direset dari pemberitahuan.
+    await wrapper.get('[data-testid="pencarian-toggle"]').trigger('click')
+    expect(wrapper.find('[data-testid="pencarian-lanjutan"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="pencarian-aktif-reset"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[data-testid="pencarian-aktif"]').exists()).toBe(false)
     expect(list).toHaveBeenCalledTimes(2)

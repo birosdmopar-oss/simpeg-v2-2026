@@ -11,8 +11,9 @@ use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 
 /**
  * Arsip Kepegawaian = arsip Data Umum (B-20 penutup × B-18, MAKE-014; keputusan user 13-10-2026 Q-M6-6), lewat endpoint
- * lampiran `pegawai/{nip}/lampiran*` dengan `id_entri` = NIP (data umum tidak punya baris riwayat; baris legacy
- * ber-`id_entri` NULL ikut terbaca). Kode `jenis_rwy` legacy `ARSIP_RWY`:
+ * lampiran `pegawai/{nip}/lampiran*` dengan `id_entri` = NIP di request (data umum tidak punya baris riwayat). Disimpan
+ * ikut legacy (`L_employee` :289-304): `id_entri` NULL, terikat kolom `NIP` (ikut koreksi NIP); daftar = NIP + kode.
+ * Kode `jenis_rwy` legacy `ARSIP_RWY`:
  *  - 38 `arsip_du` (legacy `Employee::add_adu`/`delete_adu` userAuth ['1','2','3','6','7']): unggah & hapus role 1 (semua),
  *    role 3 (PegawaiScope ubah), role 2/6/7 hanya NIP sendiri; `tag` = jenis arsip (KTP, Paspor, …, atau "Lain-lain" +
  *    nama); jpg/jpeg/png/pdf 5 MB (legacy L_employee :224-262);

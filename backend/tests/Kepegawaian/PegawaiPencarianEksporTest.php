@@ -147,6 +147,34 @@ final class PegawaiPencarianEksporTest extends DatabaseTestCase
         $this->assertSame([], $this->cari($super, [$this->k('umum', 'rwy', 'nama', 'LIKE', '%')]), 'wildcard LIKE di-escape');
     }
 
+    public function testRegresiPembentukanSqlPencarian(): void
+    {
+        [, , $super] = $this->aktor(Role::SUPER_ADMIN);
+        $kriteria    = [
+            $this->k('umum', 'rwy', 'nama', '=', 'OR (SELECT 1 FROM pengguna LIMIT 1)=1 OR'),
+            $this->k('alamat', 'rwy', 'alamat', '=', 'q:pegawai.nama:q', 'OR'),
+        ];
+        $res = $this->asUser($super)->withBodyFormat('json')->post('api/v1/pegawai/pencarian', ['kriteria' => $kriteria]);
+        $this->assertArrayHasKey('kriteria.1.nilai', $this->galat422($res));
+
+        // Titik dua tunggal tetap boleh.
+        $this->assertSame([], $this->cari($super, [$this->k('alamat', 'rwy', 'alamat', '=', 'Jl. A: 5')]));
+
+        // Tanpa penolakan pola pun, nilai tidak pernah menjadi teks SQL: builder ber-named-bind tidak tersentuh.
+        $mentah = [
+            ['jenis_rwy' => 'umum', 'tabel' => 'pegawai', 'atribut' => 'nama', 'operator' => '=', 'nilai' => 'OR (SELECT 1 FROM pengguna LIMIT 1)=1 OR', 'hubung' => 'AND'],
+            ['jenis_rwy' => 'alamat', 'tabel' => 'riwayat_alamat', 'atribut' => 'alamat', 'operator' => '=', 'nilai' => 'q:pegawai.status:q', 'hubung' => 'OR'],
+            ['jenis_rwy' => 'umum', 'tabel' => 'pegawai', 'atribut' => 'nama', 'operator' => 'LIKE', 'nilai' => "%' OR 1=1 -- :pegawai.status:", 'hubung' => 'OR'],
+        ];
+        [$sql] = PencarianLanjutan::sqlNip($mentah, $this->db);
+        $this->assertStringNotContainsString('pengguna', $sql);
+        $this->assertStringNotContainsString(':pegawai', $sql);
+
+        $builder = $this->db->table('pegawai')->select('pegawai.nip')->where('pegawai.status', 1);
+        PencarianLanjutan::terapkan($builder, $mentah, $this->db);
+        $this->assertSame([], array_column($builder->get()->getResultArray(), 'nip'));
+    }
+
     // ---- Ekspor --------------------------------------------------------
 
     public function testEksporCsvKolomTampilLingkupDanEscapeFormula(): void
@@ -184,7 +212,8 @@ final class PegawaiPencarianEksporTest extends DatabaseTestCase
         $this->assertStringContainsString('<t xml:space="preserve">' . $this->dalam . '</t>', $sheet, 'NIP sel teks');
         $this->assertStringContainsString('t="inlineStr"', $sheet);
         $this->assertStringNotContainsString('<f>', $sheet);
-        $this->assertStringContainsString('&apos;=HYPERLINK', $sheet);
+        // XLSX: sel teks inlineStr tidak pernah dievaluasi → tanpa apostrof.
+        $this->assertStringContainsString('preserve">=HYPERLINK', $sheet);
 
         foreach ([['format=pdf', 'format'], ['kolom=password', 'kolom']] as [$q, $kunci]) {
             $this->assertArrayHasKey($kunci, $this->galat422($this->asUser($super)->get("api/v1/pegawai/export?{$q}")));
@@ -212,7 +241,7 @@ final class PegawaiPencarianEksporTest extends DatabaseTestCase
 
     public function testPenulisTabelUnit(): void
     {
-        $this->assertSame(["'=1+1", "'+62", "'-x", "'@a", "'\tt", 'biasa', ''], array_map(EksporTabel::aman(...), ['=1+1', '+62', '-x', '@a', "\tt", 'biasa', '']));
+        $this->assertSame(["'=1+1", "'+62", "'-x", "'@a", "'\tt", "' =1", 'biasa', ''], array_map(EksporTabel::aman(...), ['=1+1', '+62', '-x', '@a', "\tt", ' =1', 'biasa', '']));
         $this->assertSame(['A', 'Z', 'AA', 'AZ', 'BA'], array_map(EksporTabel::kolom(...), [0, 25, 26, 51, 52]));
         $sheet = $this->sheet(EksporTabel::xlsx(['Nama'], [["A & <B>\x01"]]));
         $this->assertStringContainsString('A &amp; &lt;B&gt;</t>', $sheet, 'XML di-escape dan karakter kontrol dibuang');

@@ -157,7 +157,7 @@ async function onPick(event: Event): Promise<void> {
   } catch (error) {
     const failed = describeApiError(error)
     const split = splitValidationErrors(error)
-    notice.value = { tone: 'danger', text: failed.kind === 'validation' ? (split.general[0] ?? failed.message) : failed.message }
+    notice.value = { tone: 'danger', text: failed.kind === 'validation' ? (split.general[0] ?? Object.values(split.fields)[0] ?? failed.message) : failed.message }
   } finally {
     uploading.value = false
   }
@@ -196,7 +196,7 @@ async function confirmDelete(): Promise<void> {
   } catch (error) {
     const failed = describeApiError(error)
     const split = splitValidationErrors(error)
-    notice.value = { tone: 'danger', text: failed.kind === 'validation' ? (split.general[0] ?? failed.message) : failed.message }
+    notice.value = { tone: 'danger', text: failed.kind === 'validation' ? (split.general[0] ?? Object.values(split.fields)[0] ?? failed.message) : failed.message }
   } finally {
     busyId.value = null
   }
@@ -214,11 +214,26 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
       </div>
       <template v-if="canUpload">
         <input ref="fileInput" type="file" class="sr-only" :accept="accept" data-testid="arsip-input" :aria-label="`Pilih berkas ${title}`" @change="onPick" />
-        <UiButton variant="secondary" :loading="uploading" :disabled="Boolean(unggahDitahan)" :title="unggahDitahan || undefined" data-testid="arsip-upload" @click="pickFile">
+        <UiButton
+          variant="secondary"
+          :loading="uploading"
+          :disabled="Boolean(unggahDitahan)"
+          :aria-describedby="unggahDitahan ? `arsip-tahan-${target.id_riwayat}` : undefined"
+          data-testid="arsip-upload"
+          @click="pickFile"
+        >
           <template #icon-left><Upload class="h-4 w-4" aria-hidden="true" /></template>
           Unggah berkas
         </UiButton>
       </template>
+      <p
+        v-if="canUpload && unggahDitahan"
+        :id="`arsip-tahan-${target.id_riwayat}`"
+        class="w-full text-right text-caption text-slate-500"
+        data-testid="arsip-tahan"
+      >
+        {{ unggahDitahan }}
+      </p>
     </div>
 
     <UiNotice v-if="notice" :tone="notice.tone" dismissible data-testid="arsip-notice" @dismiss="notice = null">{{ notice.text }}</UiNotice>

@@ -318,10 +318,6 @@ final class LkhService implements LkhServiceInterface
 
     // ------------------------------------------------------------------
 
-    /**
-     * NIP yang dikelola pemanggil: pegawai → selalu NIP sendiri (NIP lain → 403); role 1 → NIP apa pun yang ada;
-     * role 3 → dalam lingkup PegawaiScope. Kosong → NIP sendiri.
-     */
     public function descriptorTab(AuthContext $auth, string $nip): ?array
     {
         if (! in_array($auth->role(), self::ROLE_LKH, true)) {
@@ -443,14 +439,22 @@ final class LkhService implements LkhServiceInterface
                 ->where('pegawai.status', 1)->where('pegawai_mutasi_jabatan.nip !=', $saya);
             $ok = true;
 
-            if ((int) ($pmj['id_group_jabatan'] ?? 0) === 1 && in_array((int) ($pmj['id_sub_group_jabatan'] ?? 0), [1, 2, 3, 4], true)) {
-                $es = (int) $pmj['id_sub_group_jabatan'];
+            $es = (int) ($pmj['id_sub_group_jabatan'] ?? 0);
+
+            // Legacy: group struktural (1) hanya sub group 1–4; selain group 1 → jabatan koordinasi. Jabatan kosong → tidak ada.
+            if ((int) ($pmj['id_group_jabatan'] ?? 0) === 1) {
+                $ok = in_array($es, [1, 2, 3, 4], true) && ($pmj['id_jabatan'] ?? null) !== null;
+            }
+
+            if ($ok && (int) ($pmj['id_group_jabatan'] ?? 0) === 1) {
                 $b->where("pegawai_mutasi_jabatan.id_atasan_es_{$es}", (int) $pmj['id_jabatan']);
 
                 // Level di bawah pemanggil harus kosong (legacy L_lkh::list_rekap :1276-1287).
                 foreach (self::KOSONG_REKAP[$es] as $kolom) {
                     $b->where("pegawai_mutasi_jabatan.{$kolom}", null);
                 }
+            } elseif ((int) ($pmj['id_group_jabatan'] ?? 0) === 1) {
+                $ok = false;
             } elseif ((string) ($pmj['jenis_jabatan_koord'] ?? '') === '2' && ($pmj['id_jabatan_koord'] ?? null) !== null) {
                 $b->where('pegawai_mutasi_jabatan.id_atasan_es_4_koord', (int) $pmj['id_jabatan_koord']);
             } elseif ((string) ($pmj['jenis_jabatan_koord'] ?? '') === '1' && ($pmj['id_jabatan_koord'] ?? null) !== null) {
@@ -492,6 +496,10 @@ final class LkhService implements LkhServiceInterface
         return $hasil;
     }
 
+    /**
+     * NIP yang dikelola pemanggil: pegawai → selalu NIP sendiri (NIP lain → 403); role 1 → NIP apa pun yang ada;
+     * role 3 → dalam lingkup PegawaiScope. Kosong → NIP sendiri.
+     */
     private function nipSasaran(AuthContext $auth, mixed $nip, bool $tulis): string
     {
         $sendiri = (string) $auth->nip();

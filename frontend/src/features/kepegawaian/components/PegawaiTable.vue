@@ -2,7 +2,8 @@
 /**
  * Tabel Daftar Pegawai (§4.1.5, Gambar 18–21): kolom dinamis (dipilih lewat "Filter Kolom"), sel Nama/NIP berisi
  * avatar inisial + nama (tautan ke detail) + NIP.
- * TODO(B-20, WS-2): baris filter per kolom (Gambar 18) dikembalikan setelah parameter filter `GET pegawai` ditetapkan.
+ * Filter daftar = panel filter + pencarian lanjutan di halaman (MAKE-014); baris filter per kolom (Gambar 18) belum dibawa
+ * (kartu lanjutan).
  *
  * Penyimpangan disengaja dari mockup: tombol ⋮ berada di kolom "Aksi" paling KANAN (menempel saat digulir),
  * bukan di kiri seperti Gambar 18 — aturan proyek AGENTS.md §1 mewajibkan semua tabel seragam. Menunggu keputusan.

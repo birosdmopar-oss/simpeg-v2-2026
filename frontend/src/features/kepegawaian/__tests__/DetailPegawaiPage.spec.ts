@@ -333,6 +333,10 @@ describe('DetailPegawaiPage — aksi kartu', () => {
     // Super Admin: unggah arsip DU ditahan sampai jenis dipilih.
     const unggah = document.body.querySelector<HTMLButtonElement>(`[data-testid="arsip-38-${NIP}"] [data-testid="arsip-upload"]`)
     expect(unggah?.disabled).toBe(true)
+    // Alasan ditahan tampil sebagai teks dan dirujuk aria-describedby.
+    const alasan = document.body.querySelector(`[data-testid="arsip-38-${NIP}"] [data-testid="arsip-tahan"]`)
+    expect(alasan?.textContent).toContain('Pilih jenis arsip dulu.')
+    expect(unggah?.getAttribute('aria-describedby')).toBe(alasan?.id)
     const jenis = document.body.querySelector<HTMLSelectElement>('[data-testid="arsip-du-jenis"] select')
     if (jenis) {
       jenis.value = 'KTP'

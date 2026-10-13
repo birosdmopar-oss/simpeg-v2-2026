@@ -7,7 +7,7 @@
  * (filter atau kriteria) dan kolom yang sedang tampil (`GET pegawai/export` / `POST pegawai/pencarian/export`).
  * Akses: role 1, 3, 4, 5, 8; tombol "+ Data Pegawai" dan aksi "Hapus" hanya role 1.
  *
- * Tanpa data contoh: selama endpoint masih stub (404/501) halaman menampilkan keadaan galat yang jelas.
+ * Tanpa data contoh: galat endpoint (mis. 404/501) tampil sebagai keadaan galat yang jelas.
  * Tambah (TambahPegawaiDialog) dan Hapus (⋮ → ConfirmDialog → `DELETE pegawai/{nip}`, hapus PERMANEN ikut legacy;
  * 422 bila pegawai masih punya data terkait) tersambung B-05 (MAKE-011).
  */
@@ -91,6 +91,7 @@ async function load(): Promise<void> {
     if (current !== requestId) return
     rows.value = result.items
     total.value = result.total
+    galatKriteria.value = {}
   } catch (error) {
     if (current !== requestId) return
     rows.value = []
@@ -222,6 +223,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
         </div>
         <UiNotice v-if="kriteria" tone="info" class="mx-5" data-testid="pencarian-aktif">
           Menampilkan hasil pencarian lanjutan (pegawai aktif); filter dan pencarian biasa tidak dipakai.
+          <button type="button" class="ml-2 font-medium underline" data-testid="pencarian-aktif-reset" @click="tutupLanjutan">Kembali ke daftar</button>
         </UiNotice>
         <div v-else-if="bolehFilter" class="px-5"><PegawaiFilterPanel v-model="filter" /></div>
 

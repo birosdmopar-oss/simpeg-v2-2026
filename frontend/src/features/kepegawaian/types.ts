@@ -295,7 +295,7 @@ export interface KoreksiNipResult {
   sesi_dicabut: number
 }
 
-/** Konvensi daftar ber-paginasi proyek (sama dengan Manajemen Akun/Master Data). TODO(B-20): konfirmasi. */
+/** Konvensi daftar ber-paginasi proyek (sama dengan Manajemen Akun/Master Data). Dikonfirmasi `PegawaiService::daftar` (MAKE-010/014). */
 export interface PegawaiListResponse {
   items: PegawaiListItem[]
   total: number

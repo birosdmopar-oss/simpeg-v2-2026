@@ -413,7 +413,7 @@ font inti helvetica; cache `WRITEPATH/cache/tcpdf/`), `Pdf::renderer()` / `Pdf::
 cadangan atau test) / `Pdf::respon()` / `Pdf::qrImg()` (QR PNG tersemat lewat `TCPDF2DBarcode`). Services.php tidak ditambah
 entri (aturan kepemilikan Fase 3). Template di `app/Views/pdf/` dan wajib `esc()`. **Deploy:** TCPDF butuh ekstensi
 PHP `gd` (QR/gambar PNG) dan `curl` — dideklarasikan `ext-gd` / `ext-curl` di `composer.json` (composer install gagal bila
-belum aktif).
+belum aktif). Ekspor XLSX Daftar Pegawai (MAKE-014) butuh `ext-zip` (ZipArchive; sudah di `composer.json`).
 
 Pemakaian oleh WS-1 (contoh: tanda terima Karpeg/Karis, sudah dibuat di `Usulan/TandaTerimaUsulan.php`):
 
@@ -465,7 +465,7 @@ menolak wkhtmltopdf yang dipakai legacy untuk bagan).
   tata letak berbeda — informasikan ke pengguna; tidak perlu menyalin `file_lckh`/tanda terima lama untuk baris baru.
 - Struktur organisasi sebelum 2025-01 belum tersedia (templat legacy lama belum di-port) — gunakan legacy/arsip bila
   diperlukan sampai MAKE susulan.
-- Server produksi: aktifkan ekstensi PHP `gd` dan `curl` (TCPDF); folder `WRITEPATH/cache/tcpdf/` dapat ditulis.
+- Server produksi: aktifkan ekstensi PHP `gd` dan `curl` (TCPDF) serta `zip` (ekspor XLSX); folder `WRITEPATH/cache/tcpdf/` dapat ditulis.
 
 **Struktur organisasi per bulan** (MAKE-013): `bulan` sejak 2022-01, pejabat pada tanggal acuan; Plt/Plh & golongan
 dimuat sekaligus (tanpa N+1); ekspor PDF tabel hierarki. [V2] bulan sebelum Jan 2025 tetap memakai templat so_012025 +
@@ -568,5 +568,7 @@ path baru belum dirujuk sampai kolomnya ditulis. Contoh lengkap di docblock kela
   UL_ALL (2/6/7 sendiri). Dibuat langsung di controller (tanpa entri Services.php).
 - `Lampiran/ArsipDataUmum` — aturan arsip Data Umum kode 37/38 (cabang tanpa Definisi di `OtorisasiLampiran`).
 - `Lkh/LkhService::descriptorTab/rekap/rekapBawahan` — tab LKH Detail Pegawai dan rekap LKH bawahan.
-- Daftar periksa cutover tambahan: berkas arsip Data Umum legacy (`document_attachment` 37/38, `id_entri` NULL) terbaca di
-  daftar tetapi unduhnya 404 sampai berkas dimigrasikan (sama dengan lampiran lain).
+- Daftar periksa cutover tambahan: berkas arsip Data Umum legacy (`document_attachment` 37/38, `id_entri` NULL seperti
+  baris v2) terbaca di daftar tetapi unduhnya 404 sampai berkas dimigrasikan (sama dengan lampiran lain).
+- [V2] pencarian lanjutan: setiap kriteria riwayat dievaluasi sendiri (`EXISTS` per kriteria); legacy menggabung kriteria
+  pada baris JOIN yang sama.

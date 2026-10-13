@@ -48,7 +48,9 @@ async function muat(): Promise<void> {
   memuat.value = true
   try {
     const hasil = await lkhService.list({ page: page.value, per_page: PER_PAGE, nip: props.nip })
-    if (saya === token) data.value = hasil
+    if (saya !== token) return
+    data.value = hasil
+    if (notice.value?.tone === 'danger') notice.value = null
   } catch (e) {
     if (saya !== token) return
     data.value = null

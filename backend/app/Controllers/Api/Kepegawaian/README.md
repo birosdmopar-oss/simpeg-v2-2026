@@ -108,7 +108,8 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
 - **`wajib`** ditegakkan `RiwayatService::tambah()/ubah()`: setelah request, baris wajib punya minimal satu lampiran
   untuk setiap kode ber-`wajib`.
 - **Arsip Data Umum** (MAKE-014, `Lampiran/ArsipDataUmum`): kode 38 `arsip_du` dan 37 `status_du` tanpa Definisi;
-  `id_entri` = NIP (baris legacy `id_entri` NULL ikut di daftar). Lihat/unduh = `bolehLihat`. Unggah/hapus 38: role 1,
+  `id_entri` = NIP di request; disimpan ikut legacy dengan `id_entri` NULL (terikat kolom `NIP`, ikut koreksi NIP) dan
+  daftar = NIP + kode. Lihat/unduh = `bolehLihat`. Unggah/hapus 38: role 1,
   role 3 (`bolehUbah`), role 2/6/7 NIP sendiri — `POST` + `jenis_arsip` (KTP, Paspor, BPJS, Taspen, KARIS, KARSU, KARPEG,
   NPWP, atau `Lain-lain` + `nama_arsip_lain`) → `tag`; jpg/jpeg/png/pdf 5 MB. Unggah/hapus 37: role 1 — `nama_arsip`
   opsional (bawaan "Arsip Status") → `tag`; jpg/jpeg/png/gif/pdf/doc/docx/xls/xlsx 5 MB. Tanpa lampiran wajib.

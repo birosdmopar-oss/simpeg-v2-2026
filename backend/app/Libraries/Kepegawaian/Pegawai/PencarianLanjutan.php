@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Libraries\Kepegawaian\Pegawai;
 
 use App\Exceptions\ValidationException;
-use App\Libraries\ListQuery;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use LogicException;
 
 /**
  * Pencarian lanjutan pegawai (B-20 penutup, MAKE-014) — port legacy `L_employee::advsearch` (:10900-11557,
@@ -244,7 +244,12 @@ final class PencarianLanjutan
 
             $isi = is_scalar($nilai) ? trim((string) $nilai) : '';
 
-            if (! isset($err['operator'], $err['nilai']) && in_array($op, ['IN', 'NOT IN'], true)) {
+            // Perkuat pembentukan SQL: pola `:nama:` ditolak (titik dua tunggal tetap boleh, mis. "Jl. A: 5").
+            if (! isset($err['nilai']) && preg_match('/:[A-Za-z0-9_.\-]+:/', $isi) === 1) {
+                $err['nilai'] = 'Nilai tidak boleh memuat pola :kata:.';
+            }
+
+            if (! isset($err['operator']) && ! isset($err['nilai']) && in_array($op, ['IN', 'NOT IN'], true)) {
                 $isi = array_values(array_filter(array_map('trim', explode(',', $isi)), static fn (string $v): bool => $v !== ''));
 
                 if ($isi === [] || count($isi) > self::MAKS_NILAI_IN) {
@@ -278,53 +283,77 @@ final class PencarianLanjutan
     /**
      * Terapkan kriteria (sudah dinormalisasi) ke builder daftar pegawai (`pegawai` sebagai tabel utama).
      *
+     * Dua tahap: NIP yang cocok dicari dengan SQL ber-bind posisi (`?`) yang dirakit dari whitelist (identifier) dan
+     * hanya placeholder (tanpa literal nilai), lalu builder daftar disaring `whereIn` NIP itu — teks SQL kriteria tidak
+     * pernah digabung ke builder lain.
+     *
      * @param list<array{jenis_rwy: string, tabel: string, atribut: string, operator: string, nilai: string|list<string>, hubung: string}> $kriteria
      */
     public static function terapkan(BaseBuilder $builder, array $kriteria, BaseConnection $db): void
     {
-        // Legacy: hanya pegawai status 1.
-        $builder->where('pegawai.status', 1);
-        $builder->groupStart();
+        [$sql, $binds] = self::sqlNip($kriteria, $db);
+        $nip           = array_column($db->query($sql, $binds)->getResultArray(), 'nip');
 
-        foreach ($kriteria as $i => $k) {
-            $atau = $i > 0 && $k['hubung'] === 'OR';
-
-            if ($k['tabel'] === 'pegawai') {
-                $atau ? $builder->orGroupStart() : $builder->groupStart();
-                self::kondisi($builder, "pegawai.{$k['atribut']}", $k['operator'], $k['nilai'], $db);
-                $builder->groupEnd();
-
-                continue;
-            }
-
-            $sub = $db->table($k['tabel'])->select('1', false)
-                ->where($db->prefixTable($k['tabel']) . '.nip = ' . $db->prefixTable('pegawai') . '.nip', null, false);
-
-            // Riwayat: baris status 1 (legacy). [V2] snapshot `pegawai_*` tidak punya kolom status (baris = data terakhir).
-            if (str_starts_with($k['tabel'], 'riwayat_')) {
-                $sub->where("{$k['tabel']}.status", 1);
-            }
-
-            self::kondisi($sub, "{$k['tabel']}.{$k['atribut']}", $k['operator'], $k['nilai'], $db);
-            $sql = 'EXISTS (' . $sub->getCompiledSelect() . ')';
-            $atau ? $builder->orWhere($sql, null, false) : $builder->where($sql, null, false);
-        }
-
-        $builder->groupEnd();
+        $nip === [] ? $builder->where('1 = 0', null, false) : $builder->whereIn('pegawai.nip', array_map('strval', $nip));
     }
 
     /**
-     * @param list<string>|string $nilai
+     * SQL pencarian NIP (pegawai status 1, legacy) + bind posisi. Identifier hanya dari whitelist JENIS/ATRIBUT.
+     *
+     * @param list<array{jenis_rwy: string, tabel: string, atribut: string, operator: string, nilai: string|list<string>, hubung: string}> $kriteria
+     *
+     * @return array{0: string, 1: list<int|string>}
      */
-    private static function kondisi(BaseBuilder $b, string $kolom, string $op, array|string $nilai, BaseConnection $db): void
+    public static function sqlNip(array $kriteria, BaseConnection $db): array
     {
-        match ($op) {
-            'IN'     => $b->whereIn($kolom, (array) $nilai),
-            'NOT IN' => $b->whereNotIn($kolom, (array) $nilai),
-            'LIKE'   => $b->like($kolom, ListQuery::likeLiteral($db, (string) $nilai)),
-            '='      => $b->where($kolom, (string) $nilai),
-            default  => $b->where("{$kolom} {$op}", (string) $nilai),
-        };
+        $id     = static fn (string $nama): string => $db->escapeIdentifiers($nama);
+        $peg    = $id($db->prefixTable('pegawai'));
+        $binds  = [1];
+        $syarat = '';
+
+        foreach ($kriteria as $i => $k) {
+            if (! isset(self::JENIS[$k['jenis_rwy']], self::ATRIBUT[$k['jenis_rwy']][$k['atribut']]) || ! in_array($k['operator'], self::OPERATOR, true)) {
+                throw new LogicException('Kriteria pencarian belum dinormalisasi.');
+            }
+
+            [$op, $nilai] = self::operasi($k['operator'], $k['nilai']);
+            array_push($binds, ...$nilai);
+
+            if ($k['tabel'] === 'pegawai') {
+                $kondisi = "p.{$id($k['atribut'])} {$op}";
+            } else {
+                $status  = str_starts_with($k['tabel'], 'riwayat_') ? ' AND r.' . $id('status') . ' = 1' : '';
+                $kondisi = 'EXISTS (SELECT 1 FROM ' . $id($db->prefixTable($k['tabel'])) . ' r WHERE r.' . $id('nip') . ' = p.' . $id('nip')
+                    . $status . " AND r.{$id($k['atribut'])} {$op})";
+            }
+
+            $syarat .= ($i === 0 ? '' : ($k['hubung'] === 'OR' ? ' OR ' : ' AND ')) . "({$kondisi})";
+        }
+
+        return ["SELECT p.{$id('nip')} AS nip FROM {$peg} p WHERE p.{$id('status')} = ? AND ({$syarat})", $binds];
+    }
+
+    /**
+     * Operator → potongan SQL ber-placeholder + nilai bind.
+     *
+     * @param list<string>|string $nilai
+     *
+     * @return array{0: string, 1: list<string>}
+     */
+    private static function operasi(string $op, array|string $nilai): array
+    {
+        if (in_array($op, ['IN', 'NOT IN'], true)) {
+            $daftar = array_map('strval', is_array($nilai) ? $nilai : [$nilai]);
+
+            return [$op . ' (' . implode(', ', array_fill(0, count($daftar), '?')) . ')', $daftar];
+        }
+
+        if ($op === 'LIKE') {
+            // Kata kunci literal (legacy `%nilai%`): wildcard di dalam nilai di-escape.
+            return ["LIKE ? ESCAPE '!'", ['%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], (string) $nilai) . '%']];
+        }
+
+        return ["{$op} ?", [(string) $nilai]];
     }
 
     private static function teks(mixed $v): string

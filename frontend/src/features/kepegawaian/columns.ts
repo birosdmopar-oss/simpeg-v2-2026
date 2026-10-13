@@ -3,7 +3,7 @@
  * "Filter Kolom" (Gambar 20/21: daftar kolom dikelompokkan per huruf awal, bisa dicari).
  * Kolom `nama_nip` (avatar + nama + NIP) selalu tampil dan tidak muncul di popup. Nilai kolom = kolom respons
  * `GET pegawai` (MAKE-010): biodata `pegawai` + snapshot jabatan (`pegawai_mutasi_jabatan`) + pangkat (`pegawai_kp`).
- * Kolom legacy lain (90 kolom `L_employee::list`) menyusul bersama pencarian lanjut/export B-20 penutup.
+ * Kolom legacy lain (90 kolom `L_employee::list`) belum dibawa (kartu lanjutan); ekspor memakai kolom yang sama (MAKE-014).
  */
 import type { PegawaiListItem } from './types'
 

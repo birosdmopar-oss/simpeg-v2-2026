@@ -75,7 +75,6 @@ const bolehProses = computed(() => detail.value?.can_process ?? false)
 
 const perubahan = computed<PerubahanBiodata[]>(() => detail.value?.perubahan ?? [])
 
-
 async function onConfirm(payload: ApprovalPayload): Promise<void> {
   busy.value = true
   error.value = ''

@@ -61,10 +61,11 @@ final class ArsipDataUmumTest extends DatabaseTestCase
 
         $res = $this->unggah($pegawai, $this->nip, 38, ['jenis_arsip' => 'KTP']);
         $this->assertSame(201, $res->response()->getStatusCode(), (string) $res->response()->getBody());
-        $this->assertSame(['KTP', $this->nip], [$this->json($res)['data']['tag'], $this->json($res)['data']['id_entri']]);
+        // Ikut legacy: id_entri NULL, terikat kolom NIP.
+        $this->assertSame(['KTP', null], [$this->json($res)['data']['tag'], $this->json($res)['data']['id_entri']]);
         $lain = (int) $this->json($this->unggah($pegawai, $this->nip, 38, ['jenis_arsip' => 'Lain-lain', 'nama_arsip_lain' => 'Surat Nikah']))['data']['id_attachment'];
 
-        // Baris legacy ber-id_entri NULL ikut terbaca.
+        // Baris legacy (id_entri NULL) terbaca bersama.
         $this->db->table('document_attachment')->insert(['NIP' => $this->nip, 'id_riwayat' => 38, 'nama_riwayat' => 'Arsip Data Umum', 'id_entri' => null, 'tag' => 'NPWP', 'display_name' => 'npwp.pdf']);
         $daftar = $this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/lampiran?id_riwayat=38&id_entri={$this->nip}");
         $daftar->assertStatus(200);
@@ -112,9 +113,22 @@ final class ArsipDataUmumTest extends DatabaseTestCase
         $this->assertContains('docx', ArsipDataUmum::aturan(37)->ekstensi);
     }
 
+    public function testKoreksiNipMembawaArsipDu(): void
+    {
+        $super = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $this->unggah($super, $this->nip, 38, ['jenis_arsip' => 'NPWP'])->assertStatus(201);
+        $baru = '199912312020121001';
+
+        $this->asUser($super)->withBodyFormat('json')->post("api/v1/pegawai/{$this->nip}/koreksi-nip", ['nip_baru' => $baru])->assertStatus(200);
+
+        $daftar = $this->asUser($super)->get("api/v1/pegawai/{$baru}/lampiran?id_riwayat=38&id_entri={$baru}");
+        $daftar->assertStatus(200);
+        $this->assertSame(['NPWP'], array_column($this->json($daftar)['data'], 'tag'));
+    }
+
     public function testPegawaiLainTidakMelihatArsip(): void
     {
-        $this->db->table('document_attachment')->insert(['NIP' => $this->nip, 'id_riwayat' => 38, 'nama_riwayat' => 'Arsip Data Umum', 'id_entri' => $this->nip, 'tag' => 'KTP', 'display_name' => 'ktp.pdf']);
+        $this->db->table('document_attachment')->insert(['NIP' => $this->nip, 'id_riwayat' => 38, 'nama_riwayat' => 'Arsip Data Umum', 'id_entri' => null, 'tag' => 'KTP', 'display_name' => 'ktp.pdf']);
         $id   = (int) $this->db->insertID();
         $lain = $this->akun($this->buatPegawai(), Role::PEGAWAI);
 
