@@ -34,6 +34,7 @@ Kolom `cek` pada hasil skrip memakai tiga awalan: **WAJIB_0**, **PERIKSA**, dan 
 | `backend/docs/db-review/DBV-011-runbook-impor-master-zona-waktu.md` | dokumen ini |
 | `backend/docs/db-review/sql/DBV-011-audit-duplikat-master-legacy.sql` | Audit **baca-saja** pada salinan data legacy (dijalankan pemegang akses): 111 kueri tetap + 2 kueri dinamis (ditambah 2 SELECT penyusun dan 4 SELECT pencetak teks kueri/daftar entri terlewat). Isinya: prasyarat salinan (kolom `password_decode` dan trigger sudah dibuang; putaran 5), duplikat untuk seluruh 28 UNIQUE master v2 dan UNIQUE akun, format hash `pengguna.password` dan akun tanpa email (putaran 5), integritas pendukung (termasuk pasangan `kategori` ↔ `old_id`, kolom kode NOT NULL, panjang kolom akun, serta kode wilayah ganda setelah trim dan panjang/format kode wilayah), profil per tabel termasuk status NULL dan counter AUTO_INCREMENT, nama yang NULL/berubah/tidak muat, tanggal nol, dan daftar kolom TIMESTAMP legacy |
 | `backend/docs/db-review/sql/DBV-011-counter-auto-increment-v2.sql` | Skrip **baca-saja** di DB v2 setelah impor. Membandingkan counter AUTO_INCREMENT v2 dengan counter legacy, lalu **mencetak** perintah `ALTER TABLE … AUTO_INCREMENT` untuk ditinjau (syarat DBV-005 6.5 #10). Berjalan tanpa error di MySQL 8 maupun MariaDB. Kesetiaan counter salinan terhadap sumber dicek dulu (2.4 langkah 1) |
+| `backend/docs/db-review/sql/DBV-019-audit-yatim-fk-g02.sql` | Ditambahkan 13-10-2026 (⏳ menunggu review DBV): kueri audit **baca-saja** DBV-019 Bagian 6 (yatim 55 FK G-02 dan FK masuk `pengguna`/`faq_rate`), disalin apa adanya. Langkahnya di 2.10 |
 | `backend/docs/progress/02-MasterData.md` | satu baris rujukan di G-01 bagian "Belum". Dua baris basi di atasnya (DBV-002 ⏳, strict mode) dibersihkan CR-022, jadi tidak disentuh di sini |
 | `backend/docs/progress/01-Auth.md` | rujukan ke Bagian 3 pada butir D-11 |
 | `backend/docs/db-review/A-01-auth-schema.md` | satu kalimat rujukan di Bagian 8 #7 dan di 9.7 D-11 |
@@ -70,6 +71,7 @@ Kolom `cek` pada hasil skrip memakai tiga awalan: **WAJIB_0**, **PERIKSA**, dan 
 - Prosedur dedupe dan penyalinan counter.
 - Usulan zona waktu dan `sql_mode` sesi.
 - Sejak putaran 5: pembersihan salinan (trigger dan kolom `password_decode` dibuang), audit format hash `pengguna.password`, dan akun tanpa email.
+- Sejak 13-10-2026 (⏳ menunggu review DBV): audit yatim FK G-02 dan prasyarat FK masuk `pengguna`/`faq_rate` dari DBV-019 (2.10). Ini pengecualian dari butir "Tabel G-02" di bawah: hanya audit rujukan FK yang digabung ke sini, bukan runbook impor tabelnya.
 
 **Tidak masuk:**
 - Perubahan kode atau migration. Bila opsi 3.3 disetujui, implementasinya menjadi unit DBV+CR terpisah.
@@ -361,11 +363,13 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
      - Hasil kueri terakhir dicatat di log 2.8; `utc_ok` harus 1.
      - `time_zone` sesi = aturan **R4** (3.2), yang sudah wajib apa pun opsi Bagian B. Strict mode sesi menggantikan butir "koneksi strict (`STRICT_ALL_TABLES`)" sebelum putaran 5, dan menambah mode tanggal nol sehingga tanggal nol yang lolos R3 ditolak 1292.
    - Urutan: induk → anak.
+   - **FK G-02 (DBV-019, sudah di `main`; ⏳ menunggu review DBV):** master G-02 + `jabatan_koordinasi`/`rumpun_jabatan` diimpor sebelum tabel snapshot/riwayat, id master `0`/`''` → NULL, dan audit yatim 2.10 = 0 sebelum migrate FK G-02 (atau sebelum aplikasi dibuka bila impor memakai `FOREIGN_KEY_CHECKS = 0`). Bila memungkinkan, migrate dijalankan sebelum impor data (tabel kosong = ALTER murah); bila tidak, ALTER (rebuild tabel besar) dijalankan di jendela cutover (2.10).
    - Kode sentinel wilayah (dikenali dari kode hasil trim, 2.2 #7) dilewati, karena barisnya sudah dibuat migration `100200`.
 7. **Verifikasi pasca-impor.**
    - Jumlah baris per tabel = profil C, dikurangi baris yang sengaja tidak diimpor (log 2.8).
    - Tidak ada error 1062, 1048, 1452, 3819, 1406, 1264, 1366, maupun 1292.
    - Periksa contoh baris per tabel.
+   - Audit yatim FK G-02 (DBV-019) = 0 dengan `DBV-019-audit-yatim-fk-g02.sql` (WAJIB_0, langkah lengkap di 2.10; ⏳ menunggu review DBV).
 8. **Counter AUTO_INCREMENT** (syarat DBV-005 6.5 #10, 2.7):
    - Jalankan `DBV-011-counter-auto-increment-v2.sql` (cara pakai di 2.7), lalu tinjau perintah yang dicetak. Bila salinan legacy di instance lain, pakai `counter_ai` bagian C audit dan tulis perintahnya manual dengan aturan 2.7.
    - Jalankan perintah `ALTER` itu secara manual.
@@ -533,6 +537,74 @@ Koreksi skema v2 lewat **migration ALTER baru + review DBV** (migration di `main
 | 16 | Counter AUTO_INCREMENT | — | Saat dump diambil, tidak ada tabel ber-PK TINYINT yang counter-nya ≥ 128; tertinggi `bidang_pendidikan` 100 | Tidak ada PERIKSA counter yang diperkirakan. Tetap dicek ulang pada dump final (2.4 langkah 1) |
 | 17 | Kolom TIMESTAMP | 3.1: 5 kolom, dari dump parsial | 13 kolom di 8 tabel; tidak satu pun di 28 master + `pengguna` | R1b tidak berlaku untuk tabel lingkup dokumen ini. Daftar lengkapnya dari E2 |
 | 18 | Nama tabel/kolom yang dirujuk skrip | Sebagian [I] | Semua ada | Skrip audit pada struktur dump: 0 error, `INFO D: ke-27 …`, `INFO E: ke-29 …` (6.6) |
+
+### 2.10 Audit yatim FK G-02 (DBV-019) — ⏳ MENUNGGU REVIEW DBV
+
+**Status:** ⏳ **MENUNGGU REVIEW DBV.** Sub-bagian ini ditambahkan 13-10-2026 dan **belum** direview DB Validator.
+Keputusan DBV-011 di Bagian 4 dan checklist Bagian 5 tidak diubah oleh penambahan ini.
+
+**Asal permintaan.** Catatan DB Validator saat menyetujui DBV-019 (07-10-2026) meminta kueri audit Bagian 6 dokumen
+`DBV-019-fk-g02-pegawai-schema.md` disalin ke "runbook DBV-014", supaya audit pra-impor punya satu tempat, sejalan dengan
+pola DBV-011. Nomor DBV-014 belum dipakai berkas mana pun (di dokumen ini baru disebut sebagai rencana runbook Tier 2–9,
+1.3 dan Bagian 7). Reviewer CR memutuskan audit ini **digabung ke runbook impor tunggal = DBV-011 (dokumen ini)**,
+sehingga sub-bagian ini memenuhi permintaan "salin ke runbook DBV-014" tersebut. Bila runbook DBV-014 kelak dibuat, ia
+merujuk ke sini, bukan menyalin ulang.
+
+**Konteks [V2].** DBV-019 sudah masuk `main` 13-10-2026 (`191efec`): migration `2026-10-07-100000_AddFkG02Pegawai` (15 FK
+snapshot) dan `2026-10-07-100100_AddFkG02Riwayat` (40 FK riwayat/penugasan) memasang 55 FK D1 [K] ke master G-02
+(`jabatan`, `unit`, `satker`, `group_jabatan`, `sub_group_jabatan`, `jabatan_koordinasi`, `rumpun_jabatan`) dengan aksi
+`RESTRICT/RESTRICT` [V2] (D1: SET NULL/CASCADE, `konv_ak` CASCADE/CASCADE). Kedua migration punya pra-cek yatim
+fail-closed: bila ada nilai yatim, `migrate` berhenti sebelum ALTER pertama dengan jumlah per FK. FK masuk
+`pengguna.nip`/`faq_rate.nip` → `pegawai.nip` masih **ditahan** (`app/Database/MigrationsDitahan/`).
+
+**Berkas:** `backend/docs/db-review/sql/DBV-019-audit-yatim-fk-g02.sql` — kueri DBV-019 Bagian 6 disalin apa adanya,
+hanya `SELECT`. Bagian 1 = pola per FK (diulang untuk ke-55 FK sesuai DBV-019 Bagian 2.3), Bagian 2 = contoh ringkasan
+per tabel anak (`pegawai_plh`), Bagian 3 = FK masuk, Bagian 4 = rujukan ke master berstatus 10.
+
+**Klasifikasi** (arti awalan = 2.3):
+
+| Kueri | Awalan | Syarat |
+|---|---|---|
+| Bagian 1–2 (55 FK G-02) | **WAJIB_0** | Setiap `yatim` = 0 sebelum migrate FK G-02 pada DB hasil impor, atau sebelum aplikasi dibuka bila impor dijalankan dengan `FOREIGN_KEY_CHECKS = 0` |
+| Bagian 3 (FK masuk `pengguna`/`faq_rate`) | **WAJIB_0** khusus aktivasi FK masuk | Tidak memblokir FK G-02 selama migration FK masuk ditahan (prasyarat di bawah) |
+| Bagian 4 (master status 10) | **INFO** | Dicatat di log 2.8; bukan pemblokir FK, tetapi memengaruhi tampilan |
+
+**Aturan normalisasi** (DBV-019 Bagian 4 #5 dan Bagian 6; dokumen B-01/B-02 Bagian 6 #4). Semua kolom anak ke-55 FK
+nullable [K] (`DEFAULT NULL`), jadi NULL = "tidak dirujuk" dan tidak dicek FK:
+- id master `0` atau `''` → **NULL** saat transformasi impor (nilai `0` biasanya lolos di legacy saat
+  `FOREIGN_KEY_CHECKS = 0`);
+- id lain yang tidak dikenal → **impor dulu baris master yang hilang** (status 10 bila sudah tidak dipakai), atau NULL-kan
+  dengan catatan rekonsiliasi; diputuskan per kasus dan dicatat di log 2.8, tidak dihapus diam-diam;
+- master G-02 + `jabatan_koordinasi`/`rumpun_jabatan` diimpor **sebelum** tabel snapshot/riwayat (induk → anak, sama
+  dengan 2.4 langkah 6).
+
+**Urutan langkah:**
+1. **Audit = 0.** Jalankan berkas di atas (cara pakai di kepala berkas) — di salinan kerja untuk perkiraan awal, lalu di DB
+   v2 tujuan setelah impor. Bagian 1 diulang untuk ke-55 FK; setiap hasil WAJIB_0 harus 0. Hasil > 0 diselesaikan dengan
+   aturan normalisasi di atas di salinan kerja/transformasi (2.4 langkah 4–5), lalu audit diulang.
+2. **Migrate.** Karena FK G-02 sudah di `main`, pada DB hasil impor ALTER-nya berjalan saat `php spark migrate`
+   (penulisan manual setelah persetujuan DBV, ISSUE-014). Pra-cek migration menjadi pemeriksaan kedua: bila masih ada yatim,
+   `migrate` berhenti sebelum ALTER pertama (pemulihan: DBV-019 Bagian 4.1).
+3. **Jendela cutover.** Memasang FK = rebuild tabel (ALGORITHM=COPY, tabel dikunci tulis selama ALTER; satu ALTER per
+   tabel anak, 10 ALTER). Tabel terbesar: `riwayat_lckh` (perkiraan ±1,6 juta baris, dari AUTO_INCREMENT D1) dan
+   `riwayat_ak_siasn` (±284 ribu). Bila ALTER berjalan pada tabel yang sudah terisi, jalankan di jendela cutover, bukan
+   saat aplikasi melayani tulis.
+4. **Disarankan: migrate sebelum impor data bila memungkinkan.** Pada tabel kosong ALTER murah. Dengan jalur ini FK sudah
+   aktif saat impor, jadi urutan induk → anak dan normalisasi di atas wajib dipenuhi (impor dengan FK aktif menolak yatim,
+   1452). Bila impor tetap dijalankan dengan `FOREIGN_KEY_CHECKS = 0`, langkah 1 (audit = 0) wajib diulang di DB v2 sebelum
+   aplikasi dibuka.
+5. **Catat** hasil audit (awal dan akhir), keputusan per nilai yatim, dan durasi ALTER di log 2.8 serta kartu (2.4 langkah
+   10).
+
+**Prasyarat aktivasi FK masuk `pengguna.nip`/`faq_rate.nip`** (DBV-019 Bagian 1.2; tidak dijalankan oleh `migrate` selama
+migration-nya di `MigrationsDitahan/`):
+- (a) validasi NIP 422 di Manajemen Akun/AccountProvisioner beserta penyesuaian seed/test Auth — MAKE-015, sedang
+  dikerjakan;
+- (b) audit yatim `pengguna`/`faq_rate` = 0 di lingkungan target dengan Bagian 3 berkas di atas (kueri DBV-019 Bagian 6);
+  `pegawai` sudah terisi lebih dulu. Tindak lanjut yatim diputuskan per kasus (impor pegawai yang hilang, akun dijadikan
+  non-pegawai sesuai K2, atau rating dibuang dengan catatan rekonsiliasi);
+- (c) aktivasi lewat **unit DBV terpisah**: migration dipindah ke `app/Database/Migrations/` dengan timestamp baru setelah
+  migration terakhir di lingkungan target, dan registry test FK disesuaikan.
 
 ## 3. Bagian B — Zona waktu & `sql_mode` sesi (ISSUE-022, D-11) — USULAN; keputusan final TL/DBA; DITAHAN menunggu ISSUE-024
 
@@ -892,7 +964,7 @@ Putaran ini bukan tindak lanjut pra-review. Isinya perluasan yang mengikuti kepu
 **Di luar PR ini (tindak lanjut putaran 5):**
 - DBV-017: koreksi teks dokumen DBV yang sudah disetujui, yaitu A-01 9.8 langkah 2 (1.4 butir a), A-01 9.1 dan D-5 (rujukan [K] `simpeg_prod_duplikat`), serta label [I] yang kini [K] (2.9).
 - Migration ALTER baru + DBV untuk selisih lebar kolom di 2.9 #1, #2, dan #10, bila audit data membutuhkannya.
-- DBV-014: runbook impor Tier 2–9 dan `pengguna` lengkap (status, `is_admin`, `id_kode_unit_instansi`), serta rekonsiliasi jumlah baris.
+- DBV-014: runbook impor Tier 2–9 dan `pengguna` lengkap (status, `is_admin`, `id_kode_unit_instansi`), serta rekonsiliasi jumlah baris. Audit yatim FK G-02 dari DBV-019 Bagian 6 yang semula diarahkan ke DBV-014 sudah digabung ke 2.10 dokumen ini (13-10-2026).
 
 **Setelah approval:**
 - Kartu ISSUE-009: runbook tercatat, eksekusi menunggu salinan data produksi (dump final saat freeze untuk impor final).
