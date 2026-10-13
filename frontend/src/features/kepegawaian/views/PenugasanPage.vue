@@ -2,7 +2,8 @@
 /**
  * Penugasan Plt/Plh (B-07, pemilik WS-2, MAKE-012) — legacy `hr/rwy/jabatan/list_off_plt|plh`. Dua tab (Plt, Plh;
  * `?jenis=`), daftar dari `GET penugasan/{jenis}` (role 1 semua; role 3 lingkup satker/unit; 4/5 lihat), pencarian
- * nama/NIP, paginasi. Aksi baris lewat ⋮ (AGENTS.md §1): Edit → Unduh lampiran → Hapus (ConfirmDialog, status 10).
+ * nama/NIP, paginasi. Aksi baris lewat ⋮ (AGENTS.md §1): Edit → Unduh lampiran → Hapus (ConfirmDialog; hapus PERMANEN
+ * ikut legacy, keputusan user 13-10-2026).
  * Tambah/Edit/Hapus hanya bila `can_create` (role 1).
  */
 import { Plus } from 'lucide-vue-next'
@@ -236,7 +237,7 @@ const aktif = (row: PenugasanItem): boolean => String(row.status) === '1'
     <ConfirmDialog
       :open="deleteOpen"
       :title="`Hapus penugasan ${label}?`"
-      :description="deleting ? `Penugasan ${label} ${deleting.nama_lengkap ?? deleting.nip} pada ${jabatanRow(deleting)} akan dihapus.` : ''"
+      :description="deleting ? `Penugasan ${label} ${deleting.nama_lengkap ?? deleting.nip} pada ${jabatanRow(deleting)} akan dihapus PERMANEN beserta lampirannya dan tidak dapat dipulihkan.` : ''"
       confirm-label="Ya, hapus"
       danger
       @update:open="(v) => (deleteOpen = v)"

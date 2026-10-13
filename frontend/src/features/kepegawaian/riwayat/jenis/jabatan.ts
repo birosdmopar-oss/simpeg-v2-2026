@@ -1,6 +1,8 @@
 // Tab riwayat `jabatan` — tabel `riwayat_mutasi_jabatan`, B-07 (pemilik WS-2). Isian dan lampiran disalin dari Definisi
 // backend `Riwayat/Definisi/Jabatan.php` (MAKE-012; legacy `L_jabatan.php` validate_param()/set_param()). Nama master
 // (unit, satker, jabatan, atasan, rumpun) disalin server; aturan wajib bersyarat yang mengikat tetap 422 backend.
+// Atasan Es I–IV diturunkan server dari struktur_jabatan (tidak diisi di form). Sub rumpun hanya-baca dan jabatan disaring
+// satu filter (sub group) sampai hook FE WS-1 MAKE-018 (multi-select, filter jamak) masuk.
 import { Role } from '@/features/auth/types'
 
 import { A, D, N, R, S, T, defineRiwayatJenis } from '../riwayat.config'
@@ -30,6 +32,9 @@ export default defineRiwayatJenis({
     { key: 'jabatan', label: 'Jabatan' },
     { key: 'unit', label: 'Unit' },
     { key: 'satker', label: 'Satker' },
+    // Atasan diturunkan server dari struktur jabatan periode aktif (hanya-baca di FE, keputusan reviewer Q3 M4).
+    { key: 'atasan_es_3', label: 'Atasan Es. III' },
+    { key: 'atasan_es_4', label: 'Atasan Es. IV' },
     { key: 'jenis_jabatan', label: 'Jenis', options: JENIS_JABATAN },
     { key: 'tmtsk', label: 'TMT', format: 'date' },
     { key: 'no_sk', label: 'No. SK' },

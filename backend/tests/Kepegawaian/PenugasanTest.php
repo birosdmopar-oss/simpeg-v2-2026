@@ -71,11 +71,15 @@ final class PenugasanTest extends DatabaseTestCase
         $this->assertSame(2, (int) $ubah['status']);
         $this->assertTrue($ubah['ada_lampiran'], 'lampiran lama dipertahankan bila tidak diganti');
 
-        $this->svc()->hapus($admin, 'plt', $row['id']);
-        $this->assertSame('10', (string) $this->db->table('pegawai_plt')->where('id_pegawai_plt', $row['id'])->get()->getRow()->status);
-        $this->assertSame(0, $this->svc()->daftar($admin, 'plt')['meta']['total']);
+        // Hapus PERMANEN ikut legacy: baris hilang, audit "before" tercatat, berkas lampiran dibuang.
+        $this->assertSame(['deleted' => true, 'soft_delete' => false, 'id' => $row['id']], $this->svc()->hapus($admin, 'plt', $row['id']));
+        $this->assertSame(0, $this->db->table('pegawai_plt')->where('id_pegawai_plt', $row['id'])->countAllResults());
         $this->assertStatusApi(404, fn () => $this->svc()->detail($admin, 'plt', $row['id']));
-        $this->assertNotSame([], $this->auditUji('pegawai_plt', (string) $row['id']));
+        $audit = $this->auditUji('pegawai_plt', (string) $row['id']);
+        $hapus = $audit[count($audit) - 1];
+        $this->assertSame('delete', $hapus['event']);
+        $this->assertStringContainsString($this->nipPlt, (string) $hapus['before_json']);
+        $this->assertSame([], glob($this->akarLampiranUji() . '/kolom/*/*/*') ?: []);
     }
 
     public function testPlhKoordinasiDanValidasiLegacy(): void

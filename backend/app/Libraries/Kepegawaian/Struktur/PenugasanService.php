@@ -27,9 +27,10 @@ use Throwable;
  * `libraries/hr/rwy/L_jabatan.php` list_off_plt (:4419, lingkup role 3: satker akun, atau unit bila tanpa satker),
  * insert/update/delete_off_plt (:4568-4810), validate_param_off_plt (:4811) / vp_off_plh (:5310), set_param (:4890).
  *
- * [V2] hapus = status 10 (legacy hapus keras; CHECK `IN (1, 2, 10)`), tgl_akhir >= tgl_mulai, rujukan master &
- * pegawai diperiksa (FK DBV-019 menolak id yatim), jabatan koordinasi harus milik jenis jabatan koordinasi.
- * Hak akses: lihat ROLE_LIHAT, tulis ROLE_TULIS (keputusan reviewer Q2 M4).
+ * Hapus = hapus PERMANEN ikut legacy (delete_off_plt :4765; keputusan user 13-10-2026) dengan audit "before" (model
+ * auditable) dan berkas lampiran dibuang sesudah commit. [V2] tgl_akhir >= tgl_mulai, rujukan master & pegawai
+ * diperiksa (FK DBV-019 menolak id yatim), jabatan koordinasi harus milik jenis koordinasi yang dipilih.
+ * Hak akses ikut legacy (keputusan user 13-10-2026): lihat ROLE_LIHAT (role 3 lingkup satker/unit), tulis ROLE_TULIS.
  */
 final class PenugasanService
 {
@@ -140,20 +141,39 @@ final class PenugasanService
     }
 
     /**
-     * Hapus lunak (status 10); lampiran dipertahankan (pola retensi lampiran riwayat status 10).
+     * Hapus permanen (legacy delete_off_plt/plh): baris dihapus dalam transaksi, audit_logs mencatat "before", berkas
+     * lampiran dihapus sesudah commit (PenjagaBerkas: tidak lagi dirujuk).
      *
-     * @return array{deleted: true, id: int}
+     * @return array{deleted: true, soft_delete: false, id: int}
      */
     public function hapus(AuthContext $auth, string $jenis, int $id): array
     {
         $this->periksaJenis($jenis);
         $this->wajibRole($auth, self::ROLE_TULIS);
-        $this->baris($auth, $jenis, $id);
-
+        $lama  = $this->baris($auth, $jenis, $id);
+        $db    = $this->db();
+        $kolom = $this->berkas ?? new KolomBerkas(null, $db);
         $model = $this->model($jenis);
-        $model->withActor($auth, static fn () => $model->update($id, ['status' => 10, 'updated_by' => $auth->idPengguna()]));
+        $db->transBegin();
 
-        return ['deleted' => true, 'id' => $id];
+        try {
+            $kolom->hapus($lama['lampiran'] ?? null, "pegawai_{$jenis}", 'lampiran');
+
+            if ($model->withActor($auth, static fn () => $model->delete($id)) === false || $db->transStatus() === false) {
+                throw new RuntimeException('Hapus penugasan gagal: ' . $db->error()['message']);
+            }
+
+            $db->transCommit();
+        } catch (Throwable $e) {
+            $db->transRollback();
+
+            throw $e;
+        } finally {
+            $db->resetTransStatus();
+            $kolom->selesaikan();
+        }
+
+        return ['deleted' => true, 'soft_delete' => false, 'id' => $id];
     }
 
     /**

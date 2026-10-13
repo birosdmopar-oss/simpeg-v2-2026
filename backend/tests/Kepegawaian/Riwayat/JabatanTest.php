@@ -119,17 +119,28 @@ final class JabatanTest extends DatabaseTestCase
 
     // ---- Aturan B-07 ---------------------------------------------------
 
-    public function testIzinMatriksV2(): void
+    public function testIzinLihatMatriksTulisIkutLegacy(): void
     {
+        // Keputusan user 13-10-2026: lihat Matriks v2; tulis/proses legacy (add 1, edit 1/3, delete 1, process 1/3).
+        $harapan = [
+            'lihat'  => [Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI],
+            'tambah' => [Role::SUPER_ADMIN],
+            'ubah'   => [Role::SUPER_ADMIN, Role::ADMIN_SATKER],
+            'hapus'  => [Role::SUPER_ADMIN],
+            'proses' => [Role::SUPER_ADMIN, Role::ADMIN_SATKER],
+        ];
+
         foreach (Role::all() as $role) {
-            $admin = in_array($role, [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true);
-            $lihat = $admin || in_array($role, [Role::PEGAWAI, Role::ADMIN_VIEW_ESELON1, Role::MENTERI], true);
-
-            $this->assertSame($lihat, $this->d->boleh(AksiRiwayat::Lihat, $role), "lihat {$role}");
-
-            foreach ([AksiRiwayat::Tambah, AksiRiwayat::Ubah, AksiRiwayat::Hapus, AksiRiwayat::Proses] as $aksi) {
-                $this->assertSame($admin, $this->d->boleh($aksi, $role), "{$aksi->value} {$role}");
+            foreach ($harapan as $aksi => $roles) {
+                $this->assertSame(in_array($role, $roles, true), $this->d->boleh(AksiRiwayat::from($aksi), $role), "{$aksi} {$role}");
             }
+        }
+
+        try {
+            $this->engine()->tambah($this->adminSatker, $this->nip, 'jabatan', $this->dataStruk('2018-03-01'), [Jabatan::LAMPIRAN_SK => $this->berkasUji('sk.pdf')]);
+            $this->fail('403 diharapkan');
+        } catch (ApiException $e) {
+            $this->assertSame(403, $e->getStatusCode());
         }
     }
 
@@ -245,6 +256,38 @@ final class JabatanTest extends DatabaseTestCase
         $this->assertSame([(string) $koord, 'Koordinator Uji'], [(string) $row['id_jabatan_koord'], $row['jabatan_koord']]);
     }
 
+    public function testAtasanDiturunkanDariStrukturDanEksplisitDivalidasi(): void
+    {
+        // Rantai: Es.I (level 2) → Es.II (level 3) → jabatan uji (level 4).
+        $this->db->table('periode_struktur_jabatan')->insert(['periode_struktur_jabatan' => 'Periode Atasan Uji', 'status' => 1]);
+        $periode = (int) $this->db->insertID();
+        $es1     = $this->buatJabatan($this->struk['id_satker'])['id_jabatan'];
+        $es2     = $this->buatJabatan($this->struk['id_satker'])['id_jabatan'];
+        $simpul  = fn (int $jab, ?int $atasan, int $level) => $this->db->table('struktur_jabatan')->insert([
+            'id_periode_struktur_jabatan' => $periode, 'id_jabatan' => $jab, 'id_jabatan_atasan' => $atasan,
+            'periode_struktur_jabatan'    => 'Periode Atasan Uji', 'jabatan' => 'x', 'level_struktur' => $level, 'urutan' => 1, 'status' => 1,
+        ]);
+        $simpul($es1, null, 2);
+        $simpul($es2, $es1, 3);
+        $simpul($this->struk['id_jabatan'], $es2, 4);
+
+        $row = $this->tambah($this->dataStruk('2018-03-01'));
+        $this->assertSame([(string) $es1, (string) $es2, null, null], [(string) $row['id_atasan_es_1'], (string) $row['id_atasan_es_2'], $row['id_atasan_es_3'], $row['id_atasan_es_4']]);
+        $this->assertNotNull($row['atasan_es_2']);
+
+        // Eksplisit: harus simpul struktur periode aktif ber-level yang sesuai.
+        $this->assertErrors(['id_atasan_es_1'], fn () => $this->tambah(['id_atasan_es_1' => $es2] + $this->dataStruk('2019-03-01')));
+        $es2Lain = $this->buatJabatan($this->struk['id_satker'])['id_jabatan'];
+        $simpul($es2Lain, $es1, 3);
+        $row = $this->tambah(['id_atasan_es_2' => $es2Lain] + $this->dataStruk('2019-03-01'));
+        $this->assertSame((string) $es2Lain, (string) $row['id_atasan_es_2'], 'nilai dari klien menang atas turunan');
+        $this->assertSame((string) $es1, (string) $row['id_atasan_es_1']);
+
+        // Ubah tanpa perubahan posisi tidak menurunkan ulang.
+        $ubah = $this->engine()->ubah($this->admin, $this->nip, 'jabatan', (int) $row['id_riwayat_mutasi_jabatan'], ['no_sk' => 'SK-B']);
+        $this->assertSame((string) $es2Lain, (string) $ubah['id_atasan_es_2']);
+    }
+
     public function testJabatanHarusDiSubGroupDanSatkerTerpilih(): void
     {
         $lain = $this->buatJabatan();
@@ -298,7 +341,7 @@ final class JabatanTest extends DatabaseTestCase
         $this->assertSame(['ser_dosen', 'f_spmt', 'f_bapel'], array_keys($this->d->kolomBerkas()));
     }
 
-    public function testAdminSatkerTidakBisaMenghapusBarisDisetujuiTetapiBisaMengubah(): void
+    public function testAdminSatkerTidakBisaMenghapusTetapiBisaMengubah(): void
     {
         $id = (int) $this->tambah($this->dataStruk('2018-03-01'))['id_riwayat_mutasi_jabatan'];
 
