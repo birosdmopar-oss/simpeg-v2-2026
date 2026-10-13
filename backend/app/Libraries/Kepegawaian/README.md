@@ -193,7 +193,7 @@ Perubahan sesudah beku (aditif / konsistensi, WS-1):
   berulang → array, form `kolom=''` → '') ke `validate()` dan `beforeSave()` saat tambah & ubah; kunci absen = tidak
   ada di `$data`. Engine membuang sisa kunci mentah sesudah beforeSave (tidak pernah ditulis ke tabel) — Definisi yang
   memindahkan/menormalkannya ke kolom nyata. RiwayatRegistry menolak (LogicException) nama tidak sah atau bentrok dengan
-  field `fields()`, kolom NIP/status, atau PK.
+  field `fields()`, kolom berkas `kolomBerkas()`, kolom NIP/status, atau PK; nama sebaiknya bukan kolom DDL tabel.
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata

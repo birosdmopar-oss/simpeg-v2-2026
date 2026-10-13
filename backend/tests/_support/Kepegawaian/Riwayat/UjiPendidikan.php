@@ -41,6 +41,13 @@ final class UjiPendidikan extends RiwayatDefinisi
     public array $mentah = [];
 
     /**
+     * Kolom berkas uji (MAKE-019, cek bentrok nama isian mentah); diatur SEBELUM registry dibuat.
+     *
+     * @var list<string>
+     */
+    public array $berkasKolom = [];
+
+    /**
      * Dipanggil di dalam hook validate() — dipakai test untuk mensimulasikan tulisan paralel di antara baca awal dan
      * transaksi engine (TOCTOU).
      *
@@ -112,6 +119,11 @@ final class UjiPendidikan extends RiwayatDefinisi
     public function isianMentah(): array
     {
         return $this->mentah;
+    }
+
+    public function kolomBerkas(): array
+    {
+        return array_fill_keys($this->berkasKolom, new AturanLampiran(0, false, 1, ['pdf']));
     }
 
     public function lampiran(): array

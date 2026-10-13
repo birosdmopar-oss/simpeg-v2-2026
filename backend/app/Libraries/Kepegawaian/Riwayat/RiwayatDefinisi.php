@@ -185,7 +185,9 @@ abstract class RiwayatDefinisi
      * `validate()` dan `beforeSave()` saat tambah maupun ubah, HANYA bila klien mengirim kuncinya. Engine tidak pernah
      * menulis kunci ini ke tabel: Definisi memindahkan/menormalkannya ke kolom nyata di beforeSave (mis. jabatan:
      * `id_subrumpun_jabatan` daftar ID → teks nama `subrumpun_jabatan` dipisah `***`); sisa kunci mentah dibuang sebelum
-     * insert/update. Nama tidak boleh sama dengan field `fields()`, kolom NIP/status, atau PK (RiwayatRegistry menolak).
+     * insert/update. Nama tidak boleh sama dengan field `fields()`, kolom berkas `kolomBerkas()`, kolom NIP/status, atau PK
+     * (RiwayatRegistry menolak), dan SEBAIKNYA bukan kolom DDL tabel sama sekali — kolom bernama sama tidak pernah ditulis
+     * engine dari kunci ini (dibuang sesudah beforeSave), sehingga mudah disalahpahami.
      *
      * @return list<string>
      */
