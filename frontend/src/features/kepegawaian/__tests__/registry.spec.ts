@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RIWAYAT_REGISTRY, configFor, tabsFromDescriptors } from '../riwayat/registry'
-import { fieldSyarat } from '../riwayat/riwayat.config'
+import { fieldSyarat, type SyaratTampil } from '../riwayat/riwayat.config'
 import { buildRiwayatSchema } from '../riwayat/riwayat.schema'
 import { JENIS_ENGINE, JENIS_NON_ENGINE } from '../types'
 
@@ -30,6 +30,13 @@ const EXPECTED = [
   'skp-periodik',
   'tanda-jasa',
 ]
+
+/** Syarat berisi gabungan `any`/`all` dengan daftar kosong (di tingkat mana pun). */
+function adaGabunganKosong(s: SyaratTampil): boolean {
+  if ('any' in s) return s.any.length === 0 || s.any.some(adaGabunganKosong)
+  if ('all' in s) return s.all.length === 0 || s.all.some(adaGabunganKosong)
+  return false
+}
 
 describe('registry riwayat', () => {
   it('16 berkas: tabel §2.3.5 + ak-siasn (WS-1 M3)', () => {
@@ -90,7 +97,13 @@ describe('registry riwayat', () => {
       for (const f of config.fields) {
         if (f.dependsOn) expect(config.fields.find((g) => g.name === f.dependsOn)?.type, `${config.jenis}.${f.name}`).toBe('ref')
         for (const syarat of [f.showWhen, f.requiredWhen]) {
-          for (const nama of syarat ? fieldSyarat(syarat) : []) expect(names, `${config.jenis}.${f.name}`).toContain(nama)
+          if (!syarat) continue
+          expect(adaGabunganKosong(syarat), `${config.jenis}.${f.name}: any/all kosong`).toBe(false)
+          for (const nama of fieldSyarat(syarat)) {
+            expect(names, `${config.jenis}.${f.name}`).toContain(nama)
+            // Nilai multiselect di luar nilai teks form → tidak bisa jadi pemicu syarat.
+            expect(config.fields.find((g) => g.name === nama)?.type, `${config.jenis}.${f.name} → ${nama}`).not.toBe('multiselect')
+          }
         }
       }
     }

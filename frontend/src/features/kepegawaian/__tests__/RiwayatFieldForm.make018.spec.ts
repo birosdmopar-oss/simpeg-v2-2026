@@ -18,6 +18,8 @@ import type { MasterOption } from '@/features/master-data/types'
 import { api } from '@/lib/axios'
 
 import RiwayatFieldForm from '../riwayat/RiwayatFieldForm.vue'
+import UsulanFormDialog from '../riwayat/UsulanFormDialog.vue'
+import type { UsulanConfig } from '../riwayat/usulan.config'
 import { M, R, S, T, type FieldDef } from '../riwayat/riwayat.config'
 
 const options = vi.mocked(masterService.options)
@@ -302,5 +304,41 @@ describe('MAKE-018 susulan: aksesibilitas multiselect', () => {
     expect(kotak('id_subrumpun_jabatan', '11')?.getAttribute('aria-invalid')).toBe('true')
     expect(q('#riwayat-id_subrumpun_jabatan-galat')?.textContent).toContain('wajib dipilih minimal satu')
     expect(fieldset?.getAttribute('aria-describedby')).toBe('riwayat-id_subrumpun_jabatan-galat')
+  })
+})
+
+describe('MAKE-018 susulan: requiredWhen di UsulanFormDialog', () => {
+  it('isian wajib bersyarat ditolak kosong hanya saat syaratnya terpenuhi', async () => {
+    const config: UsulanConfig = {
+      jenis: 'karpeg',
+      title: 'Uji',
+      singular: 'usulan uji',
+      titleMenurutJenisKelamin: null,
+      fields: [
+        S('jenis_permohonan', 'Jenis Permohonan', [
+          { value: 'A', label: 'A' },
+          { value: 'B', label: 'B' },
+        ], { required: true }),
+        S('alasan', 'Alasan', [{ value: 'x', label: 'X' }], { requiredWhen: { field: 'jenis_permohonan', in: ['B'] } }),
+      ],
+      berkas: [],
+      batas_mb: 5,
+      ekstensi: ['pdf'],
+    }
+    const wrapper = mount(UsulanFormDialog, { props: { open: true, config, row: null }, attachTo: document.body })
+    await flushPromises()
+    const kirimUsulan = async () => {
+      q('[data-testid="usulan-form"]')?.dispatchEvent(new Event('submit'))
+      await flushPromises()
+    }
+
+    await pilih('jenis_permohonan', 'A')
+    await kirimUsulan()
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+
+    await pilih('jenis_permohonan', 'B')
+    await kirimUsulan()
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+    expect(document.body.textContent).toContain('Alasan wajib diisi')
   })
 })

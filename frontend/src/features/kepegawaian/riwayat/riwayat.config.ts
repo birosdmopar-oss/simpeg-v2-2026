@@ -43,7 +43,8 @@ export interface FieldCondition {
 /**
  * Syarat tampil/wajib: satu syarat, atau gabungan jamak aditif MAKE-018 — `{ any: [...] }` (ATAU) / `{ all: [...] }` (DAN),
  * boleh bersarang, mis. `{ any: [{ field: 'jenis_jabatan', in: ['2'] }, { all: [{ field: 'jenis_jabatan', in: ['1', '3'] },
- * { field: 'id_satker', in: ['39'] }] }] }`. Syarat satuan membaca nilai isian TEKS (bukan multiselect).
+ * { field: 'id_satker', in: ['39'] }] }] }`. Syarat satuan membaca nilai isian TEKS (bukan multiselect). Daftar `any`/`all`
+ * tidak boleh kosong (registry.spec menolaknya; bila terjadi: `any: []` = tidak pernah, `all: []` = selalu).
  */
 export type SyaratTampil = FieldCondition | { any: readonly SyaratTampil[] } | { all: readonly SyaratTampil[] }
 

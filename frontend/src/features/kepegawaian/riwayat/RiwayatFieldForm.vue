@@ -6,7 +6,8 @@
  * - Isian `ref` memuat opsi master lewat `useCascadeOptions` (riwayatCascade.ts): isian ber-`dependsOn` berjenjang —
  *   mengganti induk mengosongkan dan memuat ulang turunannya.
  * - Isian ber-`showWhen` hanya tampil (dan hanya wajib) bila syaratnya terpenuhi; saat kirim, isian tersembunyi
- *   dikirim kosong (= NULL).
+ *   dikirim kosong (= NULL). `requiredWhen` (MAKE-018) = wajib hanya bila syaratnya terpenuhi (tanda * dinamis, tidak
+ *   bisa dikosongkan lewat tombol hapus pilihan); keduanya menerima syarat jamak `{ any }`/`{ all }` bersarang.
  * - Isian ber-`hint` (isian hitung) menampilkan petunjuk, mis. "dikosongkan = dihitung otomatis"; isian ber-`resetOn`
  *   dikosongkan saat pengguna mengubah isian pemicunya (dihitung ulang server kecuali diisi lagi).
  *
@@ -357,7 +358,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :disabled="busy"
             :options="refs.options(f.name)"
             :placeholder="`Pilih ${f.label.toLowerCase()}...`"
-            :clearable="!f.required"
+            :clearable="!wajib(f)"
             :state="fieldError(f.name) ? 'error' : 'default'"
             :help-text="helpText(f)"
             :data-field="f.name"
@@ -399,7 +400,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :disabled="busy"
             :options="f.options ?? []"
             :placeholder="`Pilih ${f.label.toLowerCase()}...`"
-            :clearable="!f.required"
+            :clearable="!wajib(f)"
             :state="fieldError(f.name) ? 'error' : 'default'"
             :help-text="helpText(f)"
             :data-field="f.name"
