@@ -27,7 +27,10 @@ defineProps<{
   serverErrors?: RiwayatValidationErrors | null
   busy?: boolean
 }>()
-const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Record<string, string>, berkas: BerkasMap] }>()
+const emit = defineEmits<{
+  'update:open': [value: boolean]
+  submit: [values: Record<string, string>, berkas: BerkasMap, jamak: Record<string, string[]>]
+}>()
 </script>
 
 <template>
@@ -64,7 +67,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
           :submit-label="initial ? 'Simpan Perubahan' : 'Simpan'"
           cancel-label="Batal"
           testid="riwayat"
-          @submit="(values, berkas) => emit('submit', values, berkas)"
+          @submit="(values, berkas, jamak) => emit('submit', values, berkas, jamak)"
           @cancel="emit('update:open', false)"
         />
       </DialogContent>

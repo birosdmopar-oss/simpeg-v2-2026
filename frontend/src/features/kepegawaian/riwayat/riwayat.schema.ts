@@ -2,7 +2,8 @@
  * Skema Zod dinamis untuk form riwayat (ADR-026), dibangun dari FieldDef. Nilai form selalu string (input HTML);
  * angka/tanggal divalidasi formatnya, bukan diubah tipenya (konversi di riwayat.service). Field wajib → tidak boleh
  * kosong; field bersyarat (`showWhen`) hanya diperiksa wajibnya saat tampil. Validasi yang mengikat tetap di backend
- * (422 `errors.<kolom>`).
+ * (422 `errors.<kolom>`). Isian `multiselect` (nilai daftar, MAKE-018) tidak ikut skema ini — wajibnya (minimal satu)
+ * diperiksa RiwayatFieldForm.
  */
 import { z } from 'zod'
 
@@ -21,7 +22,8 @@ function fieldSchema(f: FieldDef): z.ZodTypeAny {
   return f.required && !f.showWhen ? z.string().trim().min(1, `${f.label} wajib diisi`).pipe(base) : base
 }
 
-export function buildRiwayatSchema(fields: readonly FieldDef[]) {
+export function buildRiwayatSchema(semua: readonly FieldDef[]) {
+  const fields = semua.filter((f) => f.type !== 'multiselect')
   const conditional = fields.filter((f) => f.required && f.showWhen)
   return z.object(Object.fromEntries(fields.map((f) => [f.name, fieldSchema(f)]))).superRefine((values, ctx) => {
     const current = values as Record<string, string | undefined>

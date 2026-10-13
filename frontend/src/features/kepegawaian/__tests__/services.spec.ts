@@ -16,6 +16,7 @@ vi.mock('@/lib/axios', async (importOriginal) => {
 import { api } from '@/lib/axios'
 
 import pendidikan from '../riwayat/jenis/pendidikan'
+import { M, T } from '../riwayat/riwayat.config'
 import { riwayatService, toFormData, toJsonPayload } from '../riwayat/riwayat.service'
 import { describeApiError, splitValidationErrors } from '../services/apiErrors'
 import { lampiranService } from '../services/lampiran.service'
@@ -165,6 +166,18 @@ describe('riwayatService', () => {
   it('multipart: kolom kosong dikirim sebagai string kosong (= NULL, kontrak engine MAKE-004)', () => {
     const sent = entries(toFormData(pendidikan.fields, values, {}))
     expect(sent).toContainEqual(['no_ijazah', ''])
+  })
+
+  it('multiselect (MAKE-018): JSON = array ID; multipart = kolom[] berulang, tanpa pilihan = kolom kosong', () => {
+    const fields = [M('id_subrumpun_jabatan', 'Subrumpun', 'subrumpun-jabatan'), T('keterangan', 'Keterangan')]
+    expect(toJsonPayload(fields, { id_subrumpun_jabatan: ['11', '12'], keterangan: '' })).toEqual({ id_subrumpun_jabatan: ['11', '12'], keterangan: null })
+    expect(toJsonPayload(fields, { keterangan: 'x' })).toEqual({ id_subrumpun_jabatan: [], keterangan: 'x' })
+    expect(entries(toFormData(fields, { id_subrumpun_jabatan: ['11', '12'] }, {}))).toEqual([
+      ['id_subrumpun_jabatan[]', '11'],
+      ['id_subrumpun_jabatan[]', '12'],
+      ['keterangan', ''],
+    ])
+    expect(entries(toFormData(fields, { id_subrumpun_jabatan: [] }, {}))).toContainEqual(['id_subrumpun_jabatan', ''])
   })
 
   it('ubah tanpa berkas: PUT JSON ke /{id}', async () => {

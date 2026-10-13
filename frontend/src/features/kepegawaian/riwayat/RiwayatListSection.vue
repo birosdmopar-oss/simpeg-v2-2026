@@ -37,7 +37,7 @@ import BerkasKolomDialog from './BerkasKolomDialog.vue'
 import KeluargaAnakDialog from './KeluargaAnakDialog.vue'
 import RiwayatLampiranDialog from './RiwayatLampiranDialog.vue'
 import { A, S, type ColumnDef, type FieldDef, type RiwayatJenisConfig } from './riwayat.config'
-import { riwayatService, type BerkasMap } from './riwayat.service'
+import { riwayatService, type BerkasMap, type RiwayatValues } from './riwayat.service'
 
 const props = defineProps<{ nip: string; config: RiwayatJenisConfig; descriptor: RiwayatTabDescriptor }>()
 
@@ -252,9 +252,11 @@ const initialValues = computed<Record<string, string> | null>(() => {
   return pilihStatus.value ? { status: String(STATUS_RIWAYAT.DISETUJUI), reason_note: '', ...values } : values
 })
 
-async function onSubmit(values: Record<string, string>, berkas: BerkasMap): Promise<void> {
+async function onSubmit(teks: Record<string, string>, berkas: BerkasMap, jamak: Record<string, string[]> = {}): Promise<void> {
   saving.value = true
   formErrors.value = null
+  // Nilai multiselect (MAKE-018) digabung ke payload sebagai array ID.
+  const values: RiwayatValues = { ...teks, ...jamak }
   try {
     if (editing.value) await riwayatService.update(props.nip, jenis.value, rowId(editing.value), formFields.value, values, berkas)
     else await riwayatService.create(props.nip, jenis.value, formFields.value, values, berkas)

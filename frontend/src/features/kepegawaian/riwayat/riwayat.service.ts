@@ -17,8 +17,10 @@ import type { JenisEngine, ProcessRiwayatPayload, RiwayatRow, RiwayatTabDescript
 
 import type { FieldDef } from './riwayat.config'
 
-/** Nilai form (string, seperti input HTML). */
-export type RiwayatValues = Record<string, string>
+/** Nilai form: string (seperti input HTML); isian `multiselect` = daftar ID (MAKE-018). */
+export type RiwayatValues = Record<string, string | string[]>
+
+const daftar = (v: string | string[] | undefined): string[] => (Array.isArray(v) ? v : v ? [v] : []).map((x) => x.trim()).filter((x) => x !== '')
 /**
  * Berkas per kode `jenis_rwy` (`document_attachment.id_riwayat`), atau per nama kolom berkas Definisi (`berkas[file_1]`,
  * aditif MAKE-007, mis. usulan Karpeg).
@@ -28,11 +30,15 @@ export type BerkasMap = Record<number | string, File>
 const base = (nip: string, jenis: JenisEngine): string => `/pegawai/${encodeURIComponent(nip)}/riwayat/${jenis}`
 const item = (nip: string, jenis: JenisEngine, id: number | string): string => `${base(nip, jenis)}/${encodeURIComponent(String(id))}`
 
-/** Payload JSON: kolom kosong → null (kolom DDL nullable), angka → number. */
-export function toJsonPayload(fields: readonly FieldDef[], values: RiwayatValues): Record<string, string | number | null> {
-  const payload: Record<string, string | number | null> = {}
+/** Payload JSON: kolom kosong → null (kolom DDL nullable), angka → number, `multiselect` → array ID (MAKE-018). */
+export function toJsonPayload(fields: readonly FieldDef[], values: RiwayatValues): Record<string, string | number | null | string[]> {
+  const payload: Record<string, string | number | null | string[]> = {}
   for (const f of fields) {
-    const raw = (values[f.name] ?? '').trim()
+    if (f.type === 'multiselect') {
+      payload[f.name] = daftar(values[f.name])
+      continue
+    }
+    const raw = String(values[f.name] ?? '').trim()
     if (raw === '') payload[f.name] = null
     else payload[f.name] = f.type === 'number' ? Number(raw) : raw
   }
@@ -42,11 +48,20 @@ export function toJsonPayload(fields: readonly FieldDef[], values: RiwayatValues
 /**
  * Payload multipart: field kolom DDL + `berkas[<id_riwayat>]`. `method` = 'PUT' menambah `_method=PUT` (spoofing CI4).
  * Kolom kosong dikirim sebagai string kosong = NULL (kontrak engine: '' pada field opsional = NULL di JSON/form/multipart).
+ * Isian `multiselect` (MAKE-018) dikirim `kolom[]` berulang; tanpa pilihan → `kolom` = ''.
  */
 export function toFormData(fields: readonly FieldDef[], values: RiwayatValues, berkas: BerkasMap, method?: 'PUT'): FormData {
   const form = new FormData()
   if (method) form.append('_method', method)
-  for (const f of fields) form.append(f.name, (values[f.name] ?? '').trim())
+  for (const f of fields) {
+    if (f.type !== 'multiselect') {
+      form.append(f.name, String(values[f.name] ?? '').trim())
+      continue
+    }
+    const ids = daftar(values[f.name])
+    if (ids.length === 0) form.append(f.name, '')
+    for (const id of ids) form.append(`${f.name}[]`, id)
+  }
   for (const [idRiwayat, file] of Object.entries(berkas)) form.append(`berkas[${idRiwayat}]`, file, file.name)
   return form
 }

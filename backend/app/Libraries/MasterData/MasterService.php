@@ -220,7 +220,9 @@ class MasterService
      * @param mixed                $parent nilai `?parent=` apa adanya dari query string (lihat optionsParent())
      * @param array<string, mixed> $query  parameter query options (kolom filter; kunci lain diabaikan)
      *
-     * @return list<array{id: string, nama: string, parent: string|null}>
+     * Definisi ber-`optionsExtra` (aditif MAKE-018) menambah `extra` {field: nilai teks|null} per opsi.
+     *
+     * @return list<array{id: string, nama: string, parent: string|null, extra?: array<string, string|null>}>
      */
     public function options(MasterDefinition $def, mixed $parent = null, array $query = []): array
     {
@@ -228,10 +230,10 @@ class MasterService
         $filters = $this->filterValues($def, $query);
         $key     = $this->optionsCacheKey($def, $parent, $filters);
 
-        /** @var list<array{id: string, nama: string, parent: string|null}> $options */
+        /** @var list<array{id: string, nama: string, parent: string|null, extra?: array<string, string|null>}> $options */
         $options = $this->cache->remember($key, self::OPTIONS_TTL, function () use ($def, $parent, $filters): array {
             // Hanya kolom yang dipetakan ke hasil: kolom besar (mis. LONGTEXT isi artikel) tidak ikut terbaca.
-            $columns = [$def->primaryKey, $def->nameField];
+            $columns = [$def->primaryKey, $def->nameField, ...$def->optionsExtra];
 
             if ($def->parentField !== null) {
                 $columns[] = $def->parentField;
@@ -266,11 +268,23 @@ class MasterService
             /** @var list<array<string, mixed>> $rows */
             $rows = $builder->orderBy($def->nameField, 'ASC')->get()->getResultArray();
 
-            return array_map(static fn (array $row): array => [
-                'id'     => (string) $row[$def->primaryKey],
-                'nama'   => (string) $row[$def->nameField],
-                'parent' => $def->parentField !== null ? (string) $row[$def->parentField] : null,
-            ], $rows);
+            return array_map(static function (array $row) use ($def): array {
+                $opsi = [
+                    'id'     => (string) $row[$def->primaryKey],
+                    'nama'   => (string) $row[$def->nameField],
+                    'parent' => $def->parentField !== null ? (string) $row[$def->parentField] : null,
+                ];
+
+                if ($def->optionsExtra !== []) {
+                    $opsi['extra'] = [];
+
+                    foreach ($def->optionsExtra as $kolom) {
+                        $opsi['extra'][$kolom] = $row[$kolom] === null ? null : (string) $row[$kolom];
+                    }
+                }
+
+                return $opsi;
+            }, $rows);
         });
 
         return $options;
@@ -1486,7 +1500,10 @@ class MasterService
             default          => 'all',
         };
 
-        return "master_opt_{$def->key}_{$suffix}";
+        // Definisi ber-optionsExtra memakai kunci sendiri agar cache lama (tanpa `extra`) tidak terbaca (MAKE-018).
+        $versi = $def->optionsExtra !== [] ? 'x1_' : '';
+
+        return "master_opt_{$def->key}_{$versi}{$suffix}";
     }
 
     /**

@@ -854,6 +854,8 @@ class MasterData extends BaseConfig
             'auditColumns'    => self::AUDIT,
             'orderColumnType' => 'tinyint',
             'statusChain'     => true,
+            // MAKE-018: options membawa extra.need_satker (filter satker bersyarat di form riwayat jabatan B-07).
+            'optionsExtra' => ['need_satker'],
         ],
         // Kelas jabatan: PK alami = nomor kelas (TINYINT [K] D1:2028, bukan AUTO_INCREMENT) tanpa kolom nama → kode = nama
         // (codeAsName, CR-026), nomor 1-20 (mask form legacy kelas/form.php:73-74, CHECK chk_kelas_jabatan_kelas_jabatan).
