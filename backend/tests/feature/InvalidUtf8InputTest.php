@@ -9,8 +9,6 @@ use App\Controllers\Api\ApiController;
 use App\Libraries\ApiExceptionHandler;
 use CodeIgniter\HTTP\Exceptions\BadRequestException;
 use CodeIgniter\HTTP\ResponseInterface;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
 use Config\Exceptions;
@@ -19,6 +17,7 @@ use Tests\Support\AuthTestTrait;
 use Tests\Support\Controllers\DataErrorProbeController;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -32,17 +31,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class InvalidUtf8InputTest extends CIUnitTestCase
+final class InvalidUtf8InputTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const NIP = '199002152015022002'; // akun seed role 2
 

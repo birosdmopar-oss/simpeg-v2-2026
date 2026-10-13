@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Database;
 
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * DBV-010 (ISSUE-010) — setelah seluruh migration (semua namespace) dijalankan, setiap tabel ber-prefix di database test
@@ -18,14 +17,8 @@ use CodeIgniter\Test\DatabaseTestTrait;
  *
  * @internal
  */
-final class CollationInvariantTest extends CIUnitTestCase
+final class CollationInvariantTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     public function testEveryTableAndStringColumnIsUnicodeCi(): void
     {
         $prefix = $this->db->getPrefix();

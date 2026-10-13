@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Pembungkus route /hari-libur: HariLiburView di dalam AppShell.
-import AppShell from '@/shared/components/AppShell.vue'
+// Pembungkus route /hari-libur: HariLiburView di dalam RedesignShell.
+import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 import HariLiburView from './HariLiburView.vue'
 </script>
 
 <template>
-  <AppShell>
+  <RedesignShell>
     <HariLiburView />
-  </AppShell>
+  </RedesignShell>
 </template>

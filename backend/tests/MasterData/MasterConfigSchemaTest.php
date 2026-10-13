@@ -7,11 +7,10 @@ namespace Tests\MasterData;
 use App\Constants\Role;
 use App\Libraries\MasterData\MasterDefinition;
 use App\Libraries\MasterData\MasterField;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -26,17 +25,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class MasterConfigSchemaTest extends CIUnitTestCase
+final class MasterConfigSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     protected function setUp(): void
     {

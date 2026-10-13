@@ -32,6 +32,9 @@ class Routing extends BaseRouting
      */
     public array $routeFiles = [
         APPPATH . 'Config/Routes.php',
+        // Modul B — Kepegawaian Core (Fase 3, S0-A MAKE-002): satu berkas route per workstream.
+        APPPATH . 'Config/RoutesRiwayat.php', // WS-1
+        APPPATH . 'Config/RoutesPegawai.php', // WS-2
     ];
 
     /**

@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -22,17 +22,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class LokasiPresensiTest extends CIUnitTestCase
+final class LokasiPresensiTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const LOKASI = 'api/v1/master/lokasi-presensi';
     private const ATURAN = 'api/v1/master/aturan-lokasi-presensi';
@@ -394,6 +390,7 @@ final class LokasiPresensiTest extends CIUnitTestCase
      * D-2: tabel `web_config` belum ada (G-09 belum di main) → desc kode `0` = "Seluruh Kementerian". Bila tabel sudah
      * dibuat migration G-09, tabel itu disingkirkan sementara selama test ini lalu dipulihkan di tearDown.
      */
+    #[Group('db-isolasi-penuh')]
     public function testWholeMinistryDescFallsBackWhenWebConfigTableIsMissing(): void
     {
         $this->hideWebConfigTable();

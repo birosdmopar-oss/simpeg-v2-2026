@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Database\Kepegawaian;
 
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\SkemaD1;
 use Tests\Support\Kepegawaian\SkemaD1TestTrait;
 use Throwable;
@@ -19,14 +19,10 @@ use Throwable;
  *
  * @internal
  */
-final class RiwayatSchemaTest extends CIUnitTestCase
+final class RiwayatSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use SkemaD1TestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     private const NIP = '198501012010011001';
 
@@ -262,6 +258,7 @@ final class RiwayatSchemaTest extends CIUnitTestCase
      * down() semua migration sejak 130000 (termasuk 131000) menghapus tabel B-02 tanpa menyentuh tabel B-01/master;
      * up() membuatnya kembali persis.
      */
+    #[Group('db-isolasi-penuh')]
     public function testMigrationRollsBackAndUpAgain(): void
     {
         $this->lepasSejak(self::FIRST_VERSION);
@@ -282,6 +279,7 @@ final class RiwayatSchemaTest extends CIUnitTestCase
      * Bila salah satu CREATE gagal di tengah up(), tabel yang sempat dibuat PADA RUN ITU di-drop lalu error dilempar
      * ulang; tabel yang sudah ada sebelum run tidak disentuh.
      */
+    #[Group('db-isolasi-penuh')]
     public function testFailedUpDropsOnlyTablesCreatedInThatRun(): void
     {
         $this->lepasSejak(self::BLOCKER_VERSION);

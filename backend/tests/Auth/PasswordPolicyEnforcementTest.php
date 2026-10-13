@@ -10,12 +10,11 @@ use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\MockResetTokenNotifier;
 use App\Libraries\Auth\PasswordVerifier;
 use App\Models\Auth\PenggunaModel;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * ISSUE-006 / K4 — kebijakan password legacy (min 8, huruf besar, huruf kecil, angka) ditegakkan di SEMUA jalur yang
@@ -25,16 +24,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class PasswordPolicyEnforcementTest extends CIUnitTestCase
+final class PasswordPolicyEnforcementTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const SUPER_ADMIN = '198501012010011001';
     private const NIP         = '199002152015022002';

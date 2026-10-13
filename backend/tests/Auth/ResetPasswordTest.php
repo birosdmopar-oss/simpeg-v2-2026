@@ -13,13 +13,12 @@ use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\PenggunaModel;
 use Closure;
 use CodeIgniter\Database\ConnectionInterface;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
 use RuntimeException;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-07 — lupa/reset password (MTC-006): token expired ditolak, token dipakai ulang ditolak, rate limit forgot_attempts.
@@ -27,16 +26,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class ResetPasswordTest extends CIUnitTestCase
+final class ResetPasswordTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP = '199002152015022002';
     private const NEW = 'PasswordReset789';

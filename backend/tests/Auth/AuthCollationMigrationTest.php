@@ -9,9 +9,9 @@ use App\Database\Migrations\AlterIdentitasAkunIdPengguna;
 use App\Database\Migrations\AlterPenggunaAkunNonPegawai;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Database\Migration;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\DatabaseTestCase;
 use Throwable;
 
 /**
@@ -25,14 +25,9 @@ use Throwable;
  *
  * @internal
  */
-final class AuthCollationMigrationTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class AuthCollationMigrationTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const TABLES = ['pengguna', 'token', 'login_attempts', 'forgot_attempts', 'audit_logs', 'queue_jobs', 'queue_jobs_failed'];
 
     private const UNICODE = 'utf8mb4_unicode_ci';

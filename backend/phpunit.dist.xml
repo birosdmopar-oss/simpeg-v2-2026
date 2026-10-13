@@ -51,6 +51,8 @@
         <const name="PUBLICPATH" value="./public/"/>
         <!-- Database configuration -->
         <!-- Nilai default group `tests` ada di app/Config/Database.php; override lewat .env (database.tests.*) bila perlu -->
+        <!-- MAKE-001: driver MySQLi + bingkai transaksi uji (Tests\Support\DatabaseTestCase); jangan diganti di .env -->
+        <env name="database.tests.DBDriver" value="Tests\Support\Database\Isolasi" force="true"/>
         <env name="jwt.secret" value="phpunit-only-secret-do-not-use-in-production-0123456789abcdef"/>
         <env name="cors.allowedOrigins" value="http://localhost:5173"/>
         <!-- ISSUE-006: tautan reset password ditangkap di memori (MockResetTokenNotifier), tidak ditulis ke log -->

@@ -10,13 +10,13 @@ use App\Exceptions\ValidationException;
 use App\Libraries\MasterData\FaqService;
 use App\Models\MasterData\FaqRateModel;
 use CodeIgniter\I18n\Time;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use ReflectionProperty;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -30,17 +30,14 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class FaqTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class FaqTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = MasterDataSeeder::class;
+    protected $seed = MasterDataSeeder::class;
 
     private const RATER_ROLES     = [Role::PEGAWAI, Role::PTT, Role::PPPK];
     private const NON_RATER_ROLES = [Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN];

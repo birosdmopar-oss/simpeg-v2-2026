@@ -6,9 +6,9 @@ namespace Tests\Database\Kepegawaian;
 
 use App\Database\Migrations\AddFkPegawaiDiPenggunaFaqRate;
 use CodeIgniter\Database\Migration;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\DatabaseTestCase;
 use Throwable;
 
 /**
@@ -32,14 +32,8 @@ use Throwable;
  *
  * @internal
  */
-final class NipReferenceRegistryTest extends CIUnitTestCase
+final class NipReferenceRegistryTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     /**
      * FK → `pegawai(nip)` per versi migration: versi => [nama FK => [tabel, kolom]]. DBV-012 = 120000..120100;
      * DBV-013 = 130100..130900 (nama FK = D1 [K]). FK masuk yang ditahan: self::FK_MASUK.
@@ -248,8 +242,9 @@ final class NipReferenceRegistryTest extends CIUnitTestCase
     /**
      * Migration FK masuk yang ditahan menolak jalan (sebelum ALTER apa pun) bila ada NIP yang tidak ada di pegawai, dengan
      * jumlah per tabel; setelah orphan dibereskan, up() memasang kedua FK; up()/down() aman diulang. Di akhir FK dilepas
-     * lagi (tetap ditahan).
+     * lagi (tetap ditahan). ALTER = DDL, jadi test ini berjalan di luar bingkai transaksi uji.
      */
+    #[Group('db-isolasi-penuh')]
     public function testFkMasukRefusesOrphansBeforeAnyAlter(): void
     {
         $migration     = $this->fkMasukInstance();

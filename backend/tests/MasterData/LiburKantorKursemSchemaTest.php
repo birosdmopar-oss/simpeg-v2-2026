@@ -9,9 +9,9 @@ use App\Database\Migrations\CreateKantor;
 use App\Database\Migrations\CreateKursem;
 use App\Database\Migrations\SeedWilayahLainLain;
 use CodeIgniter\Database\Migration;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * DBV-003 — skema G-07/G-08 hasil migration 2026-09-25-100000_CreateHariLibur, 2026-09-25-100100_CreateKursem,
@@ -28,14 +28,8 @@ use RuntimeException;
  *
  * @internal
  */
-final class LiburKantorKursemSchemaTest extends CIUnitTestCase
+final class LiburKantorKursemSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private const TABLES = ['jenis_libur', 'hari_libur', 'bidang_kursem', 'instansi_kursem', 'kantor'];
 
     /**
@@ -463,6 +457,7 @@ final class LiburKantorKursemSchemaTest extends CIUnitTestCase
     /**
      * down() tiap migration menghapus tabelnya saja; up() membuatnya kembali persis.
      */
+    #[Group('db-isolasi-penuh')]
     public function testMigrationsRollBackAndUpAgain(): void
     {
         foreach (self::MIGRATIONS as $file => [, $tables]) {
@@ -487,6 +482,7 @@ final class LiburKantorKursemSchemaTest extends CIUnitTestCase
      * ulang, sehingga `migrate` bisa langsung diulang. Tabel yang sudah ada sebelum run tidak disentuh. Kegagalan
      * disimulasikan dengan tabel penghalang bernama tabel kedua (error 1050).
      */
+    #[Group('db-isolasi-penuh')]
     public function testFailedUpDropsOnlyTablesCreatedInThatRun(): void
     {
         $cases = [

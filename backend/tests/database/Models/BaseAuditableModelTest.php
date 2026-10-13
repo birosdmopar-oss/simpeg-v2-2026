@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Database\Models;
 
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Models\DummyAuditableModel;
 use Tests\Support\Models\DummySoftDeleteModel;
 
@@ -14,14 +13,8 @@ use Tests\Support\Models\DummySoftDeleteModel;
  *
  * @internal
  */
-final class BaseAuditableModelTest extends CIUnitTestCase
+final class BaseAuditableModelTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     protected function setUp(): void
     {
         parent::setUp();

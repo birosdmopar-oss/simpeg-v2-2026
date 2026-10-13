@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Database\Kepegawaian;
 
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\SkemaD1;
 use Tests\Support\Kepegawaian\SkemaD1TestTrait;
 use Throwable;
@@ -22,14 +22,10 @@ use Throwable;
  *
  * @internal
  */
-final class PegawaiSnapshotSchemaTest extends CIUnitTestCase
+final class PegawaiSnapshotSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use SkemaD1TestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     private const NIP = '198501012010011001';
 
@@ -150,6 +146,7 @@ final class PegawaiSnapshotSchemaTest extends CIUnitTestCase
     /**
      * down() semua migration sejak 120000 (termasuk DBV-013) menghapus ke-17 tabel B-01; up() membuatnya kembali persis.
      */
+    #[Group('db-isolasi-penuh')]
     public function testMigrationRollsBackAndUpAgain(): void
     {
         $this->lepasSejak(self::FIRST_VERSION);
@@ -170,6 +167,7 @@ final class PegawaiSnapshotSchemaTest extends CIUnitTestCase
      * Bila salah satu CREATE snapshot gagal di tengah up(), tabel yang sempat dibuat PADA RUN ITU di-drop (urutan
      * terbalik) lalu error dilempar ulang; tabel yang sudah ada sebelum run tidak disentuh.
      */
+    #[Group('db-isolasi-penuh')]
     public function testFailedSnapshotUpDropsOnlyTablesCreatedInThatRun(): void
     {
         $this->lepasSejak(self::SNAPSHOT_VERSION);

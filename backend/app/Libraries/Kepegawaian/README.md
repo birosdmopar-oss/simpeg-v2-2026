@@ -63,7 +63,7 @@ Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[
 | K-CR025-7 | Acuan jarak KGB = pendahulu terakhir (TMT ≤ TMT baru), seri → KGB > KP > CPNS > awal PPPK; isi daftar acuan ditentukan pemanggil (baris yang diedit dikeluarkan; status `NOT IN (2, 10)` seperti cek TMT kembar legacy) |
 | K-CR025-8 | Proyeksi KGB setia legacy dengan dua deviasi di atas |
 | K-CR025-9 | Masa hukdis = masa SK ?? masa bawaan jenis; akhir = TMT + masa (literal SRS-FR-027); masa 1–255 (CHECK `chk_jenis_hukdis_masa_sanksi_bulan`, TINYINT UNSIGNED) |
-| K-CR025-10 | Validasi KP/KGB hanya untuk input pengguna (create, atau update yang mengubah `tmtsk`); impor legacy dan sinkron SIASN tidak melewatinya |
+| K-CR025-10 | Validasi KP/KGB hanya untuk input pengguna (create, atau update yang mengubah `tmtsk` atau `id_jenis_kp`); impor legacy dan sinkron SIASN tidak melewatinya |
 | K-CR025-11 | "Hari ini" = Asia/Jakarta; hanya `TanggalBisnis::hariIni()` yang membaca jam |
 | K-CR025-12 | Hari kerja (Senin–Jumat dikurangi `hari_libur`, legacy `helpers/function_helper.php:2175-2213`) ditunda ke Fase 5; signature rencana `HariKerja::hitung(string $mulai, string $akhir, list<string> $tanggalLibur): int` dengan `HariLiburService::tanggalLibur()` |
 
@@ -91,6 +91,107 @@ Label sumber: **[K]** = kode legacy (path relatif ke `application/` legacy), **[
 ```bash
 cd backend && vendor/bin/phpunit --no-coverage tests/unit/Kepegawaian
 ```
+
+## Mesin riwayat (`Riwayat/`, WS-1 M1 MAKE-004)
+
+Satu mesin generik untuk semua jenis riwayat; perilaku per jenis = berkas Definisi (`Riwayat/Definisi/*.php`,
+auto-discovery). Kontrak endpoint dan ketetapan perilaku: `app/Controllers/Api/Kepegawaian/README.md` (bagian "Kontrak
+API Modul B" dan "Rincian engine riwayat").
+
+| Kelas | Isi |
+|---|---|
+| `RiwayatEngine` | `RiwayatServiceInterface` (service `riwayatService`): daftar, detail, tambah, ubah, hapus lunak, proses. Satu transaksi per tulisan (riwayat + snapshot + lampiran), baris `pegawai` dikunci `FOR UPDATE`, audit lewat `RiwayatModel`, event `riwayatNotifikasi` sesudah commit |
+| `SnapshotSync` | `SnapshotSyncInterface` (service `snapshotSync`): per `AturanSnapshot` pilih ulang baris Disetujui → INSERT/UPDATE (dilewati bila sama) atau DELETE snapshot; audit manual per tulisan |
+| `PemilihSnapshot` | Fungsi murni pemilih baris snapshot: status Disetujui (lewat `pemetaanStatus()`), filter dengan logika tiga nilai SQL (`!=`/`NOT IN` tidak memilih NULL), urutan berprioritas (NULL terkecil seperti MySQL, angka sebagai angka), seri → PK terbesar ([V2]) |
+| `ValidasiRiwayat` | Validasi + normalisasi payload dari `RiwayatDefinisi::fields()` (rules `MasterField`, nilai tunggal, ref master ada/aktif/berjenjang) |
+| `App\Models\Kepegawaian\RiwayatModel` | Model generik `riwayat_*` dari Definisi (turunan `BaseAuditableModel`, pola `MasterModel`); kolom sistem ditulis hanya bila ada di tabel; pelaku audit = `AuthContext` pemanggil (`withActor`) |
+
+**Aturan snapshot (ADR-006, dok DBV-012 §5.1).** Snapshot hanya disentuh engine bila status lama atau baru = Disetujui:
+proses `setujui`, tambah langsung oleh admin, ubah oleh role 3 (legacy menyetujui otomatis), ubah data baris yang sudah
+disetujui (setara trigger `afUpd`), dan hapus/keluar dari status 1 (dihitung ulang, DELETE bila kosong). Pengajuan
+pegawai dan penolakan baris yang belum disetujui tidak menyentuh snapshot. Pemecah seri PK terbesar adalah keputusan
+[V2] (legacy `ORDER BY … LIMIT 1` tanpa pemecah seri tidak deterministik): PK terbesar = baris yang **dibuat**
+belakangan, bukan yang disetujui belakangan. Untuk "mutasi bertanggal sama yang disetujui belakangan menang" (dok §5.1,
+B-07), Definisi menaruh kolom waktu persetujuan (mis. `notif_date`/`updated_at` DESC) di urutan sebelum pemecah seri.
+
+**Salin nama master = hook `beforeSave`** (WS1 §3.4.3). Kolom teks turunan master di tabel riwayat (mis. `jenis_kp`,
+`gol`, `ruang`, `gol_ruang`, `pangkat` di `riwayat_kp`, legacy `L_kp.php:551-560`) diisi server di
+`RiwayatDefinisi::beforeSave()` dari ID rujukan yang dikirim klien, bukan field yang diisi klien. Hook dipanggil di dalam
+transaksi engine dan hanya menurunkan kolom yang rujukannya ada di payload (ubah parsial tanpa rujukan tidak menyentuh
+kolom turunan). Contoh templat: `tests/_support/Kepegawaian/Riwayat/UjiKp.php`.
+
+**Tanpa TOCTOU.** Setiap tulisan (ubah/hapus/proses) mengunci baris `pegawai` lalu membaca ulang baris riwayat
+`FOR UPDATE` di dalam transaksi; guard kunci baris Disetujui (403), guard status proses (422), serta status lama/baru
+dihitung dari baca ulang itu. Pemeriksaan sebelum transaksi hanya jalan cepat.
+
+**Ikut legacy [K]** (data di Definisi, bisa di-override per jenis): status awal 0 untuk UL_PEGAWAI di alur
+self-service/usulan, selain itu 1 (`controllers/hr/rwy/Pendidikan.php:146`); ubah oleh UL_PEGAWAI → 0, role 3 → 1, role
+1 → tetap (`Pendidikan.php:255-260`, `Kp.php:196-198`), status NULL (data lama) diperlakukan seperti 0; UL_PEGAWAI tidak bisa mengubah/menghapus baris disetujui dan
+role 3 tidak bisa menghapusnya (`Pendidikan.php:471-484`, `Kp.php:379-387`); `approved_by`/`updated_by`/`show_ua_*` saat
+proses (`libraries/hr/rwy/L_kp.php:649-668`); `show_notif`/`notif_date` pada transisi 0 → 1/2 (trigger `<tabel>_beUpd`,
+dok DBV-012 §5.2); tipe notifikasi 1/2/3 (`helpers/function_helper.php:588`).
+
+**Deviasi [V2] dari legacy.** Hapus = lunak (status 10 + audit `delete`), bukan `DELETE` baris + lampiran; lampiran baris
+yang dihapus tetap tersimpan. Penanda baca notifikasi (`show_notif = 3` saat detail dibuka dari notifikasi, legacy
+`L_kp.php:84-87`) belum dibawa — milik fitur notifikasi (H-0x), bukan GET riwayat. Push FCM tidak dikirim engine:
+engine hanya memicu event `riwayatNotifikasi` (token perangkat `firebase_token` = H-01). Proses hanya dari status 0/3
+(422 `errors.status`) — legacy tidak menjaganya. Urutan daftar default PK DESC (`urutanDaftar()`) — legacy KP
+`ORDER BY status ASC, tmtsk ASC` dan hanya status 0/1 (`L_kp.php:27`); Definisi jenis nyata meng-override sesuai legacy
+jenisnya mulai M2.
+
+**Pemakaian lampiran nyata (setelah MAKE-009).** Engine memanggil `attachmentService->simpan()` di dalam transaksi,
+lalu `selesaikan()` (bila implementasinya punya) setelah commit atau rollback.
+
+**Definisi nyata (M2, MAKE-005).**
+
+| Definisi | Isi (sumber [K] di docblock kelas) |
+|---|---|
+| `Pendidikan` (B-10) | Self-service; izin 1, 2, 3, 6, 7 (proses 1, 3); jenjang di luar 1-3 → bidang & jurusan wajib, kode 98/1185 → isian "lain" wajib; tanggal ijazah tidak kembar (status selain 2/10, atas nilai akhir setiap tambah/ubah); nama jenjang/bidang/jurusan dan nem/ipk diturunkan `beforeSave` (`L_pendidikan.php` `sp()`); Ijazah (14) wajib, transkrip (40) & SK pencantuman gelar (39) opsional, 5 MB, jpg/jpeg/png/gif/pdf; snapshot jenjang tertinggi; daftar `status ASC, tgl_lulus ASC`; role 2 hanya tambah/ubah/hapus selama pegawai CPNS (`bolehAksiUntuk`, legacy `$isCPNS`); role 1 memilih status saat ubah (legacy `pendidikan/form.php:59-76`) |
+| `Kp` (B-08) | Alur admin; izin lihat 1, 2, 3, 4, 5, tulis/proses 1, 3 (Matriks v2; legacy juga membuka lihat untuk 8); field wajib legacy (`validate_param()`); pengangkatan CPNS/PNS sekali, TMT tidak kembar (status selain 2/10, atas nilai akhir setiap tambah/ubah); [V2] TMT 1 April/1 Oktober kecuali pengangkatan (CR-025, hanya bila tambah atau TMT/jenis berubah); nama jenis/pangkat dari `beforeSave`; SK (11) wajib, 5 MB; snapshot `pegawai_kp`/`_cpns`/`_pns`; daftar `status ASC, tmtsk ASC`; role 1 boleh memilih `status` saat ubah (legacy `kp/form.php:59-74`) |
+
+Hook `validate()` menerima kolom NIP pemilik di `$data` (aditif MAKE-005) agar cek per pegawai (tanggal kembar, CPNS
+sekali) juga jalan saat tambah.
+
+Hook `beforeSave()` saat tambah menerima `$data` tanpa kolom NIP dan `$lama = null` (I-1); NIP pemilik ditulis engine
+sesudah hook. Hook yang butuh NIP saat tambah memakai `validate()` (yang menerima NIP) atau menunggu keperluan aditif.
+
+### Engine-v1 beku (MAKE-005)
+
+Sejak MAKE-005 di `main`, permukaan berikut **beku**: hanya boleh berubah **aditif** dan **oleh WS-1**; permintaan WS-2
+(mis. hook baru untuk B-07 Jabatan) diajukan sebagai usulan ke WS-1.
+
+| Permukaan | Isi beku |
+|---|---|
+| `RiwayatServiceInterface` / `RiwayatEngine` | `daftar`, `detail`, `tambah`, `ubah`, `hapus`, `proses`; urutan pemeriksaan (jenis → izin role → PegawaiScope `bolehLihat`/`bolehUbah`/`bolehProses` → NIP → `bolehAksiUntuk` → baris → validasi), satu transaksi + kunci pegawai + baca ulang terkunci, event `riwayatNotifikasi` |
+| `SnapshotSyncInterface` / `SnapshotSync`, `PemilihSnapshot` | `sinkronkan(definisi, nip, ?pelaku)`; aturan pilih (status 1, filter tiga nilai SQL, urutan + join, seri PK terbesar) |
+| `AturanSnapshot`, `AturanLampiran` | Value object (konstruktor & properti) |
+| Hook `RiwayatDefinisi` | `jenis`, `label`, `tabel`, `primaryKey`, `fields`, `izin`, `alur`, `kolomNip`, `kolomStatus`, `pemetaanStatus`, `kunciBarisDisetujui`, `roleKunciHapusDisetujui`, `statusAwal`, `statusSetelahUbah`, `rolePilihStatusSaatUbah`, `bolehAksiUntuk`, `urutanDaftar`, `snapshot`, `lampiran`, `urutanTab`, `validate` (dengan NIP), `beforeSave`, `afterApprove` |
+| Kontrak HTTP | README `Controllers/Api/Kepegawaian` (endpoint, descriptor, "Rincian engine riwayat") |
+
+Perubahan sesudah beku (aditif / konsistensi, WS-1):
+- MAKE-006: `RiwayatRegistry::descriptorUntuk()` mengisi `can_process` dengan `PegawaiScope::bolehProses` (jalur proses
+  CR-045, sama dengan `RiwayatEngine::proses()`), bukan `bolehUbah` — perubahan konsistensi, bentuk descriptor tetap.
+- MAKE-006: endpoint aditif `GET pegawai/{nip}/riwayat` → `{ tabs }` (sumber = `descriptorUntuk`).
+- MAKE-007 (hook aditif, ikut beku sejak masuk `main`): `RiwayatDefinisi::lampiranWajib(aturan, nilai)`,
+  `entriLampiran(kode)` (lampiran per baris tabel anak; OtorisasiLampiran WS-2 membacanya), `kolomBerkas()` +
+  `kolomBerkasWajib()` (berkas di kolom tabel lewat KolomBerkas MAKE-009, `selesaikan()` sesudah commit/rollback),
+  `RiwayatEngine::unduhKolomBerkas()`; endpoint aditif `…/{id}/berkas/{kolom}`, `…/keluarga/{id}/anak`, `usulan/{jenis}`.
+- Isu cutover (MAKE-007): kolom berkas data impor legacy (mis. `riwayat_karpeg.file_*`) berisi path arsip remote legacy
+  (diawali `/`, berspasi) yang tidak ada di storage v2 — unduh menjawab 404 (bukan 500) sampai berkas arsip dipindahkan
+  saat cutover.
+- [V2] Diklat (MAKE-007): `id_diklat` wajib milik `jenis_diklat` terpilih (legacy `L_diklat.php:527-536` hanya memeriksa
+  keberadaannya).
+
+**Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
+`PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata
+lewat `RiwayatUjiTrait::pasangEngineNyata()`; Definisi uji M1 tetap memakai fake S0 lewat `pasangEngine()`).
+
+**Retensi lampiran baris status 10 (keputusan WS-1, M2).** Hapus riwayat = status 10; baris `document_attachment` dan
+berkasnya **dipertahankan** (jejak audit/pemulihan; legacy menghapus keras keduanya). Endpoint lampiran MAKE-009
+menjawab 404 untuk baris status 10, jadi berkas itu tidak lagi bisa diunduh/diubah lewat API. Pembersihan berkala (bila
+perlu) diputuskan terpisah.
+Trait B-TC generik `Tests\Support\Kepegawaian\RiwayatBtcTrait` + helper `RiwayatUjiTrait`: setiap jenis riwayat
+nyata membuat satu kelas test `use RiwayatBtcTrait` dan mengisi `btcDefinisi()`, `btcPayload()`, `btcBaris()`.
 
 ## Registry kolom NIP dan format NIP (`Nip/`, CR-036, B-06)
 
@@ -161,3 +262,88 @@ Auth sudah memegang aturan ini di `PenggunaModel::NIP_MAX_DIGITS`, `UserService:
 4. **Tujuh tabel `BelumDiputuskan`** perlu keputusan impor: email legacy, `layanan_pegawai`, `login_mysapk`, `riwayat_cuti_notif_kt` (Mapping: masuk inbox), dan `user_geo`.
 5. **Penyatuan registry.** Draf DBV-012 punya konstanta registry sendiri di `NipReferenceRegistryTest`. Usulan: setelah draf itu masuk, test tersebut membaca `TabelAnakNip::sampaiFase(3)`.
 6. **Pensiun PPPK.** Legacy memakai akhir masa perjanjian kerja (`mhpk_akhir`), bukan BUP. Ini perlu dikonfirmasi untuk dashboard v2.
+
+## Lingkup akses pegawai (`Scope/`, MAKE-009)
+
+`PegawaiScope` = implementasi nyata `PegawaiScopeInterface` (service `pegawaiScope`). Semua endpoint Modul B memeriksa
+lingkup lewat service ini (403 di luar lingkup); daftar disaring dengan `terapkanKeQuery($builder, $auth, 'p.nip')`.
+
+| Role | Lihat | Ubah | Proses (`bolehProses`, CR-045) |
+|---|---|---|---|
+| 1 | semua | semua | = ubah |
+| 4, 5, 8 | semua | — | = ubah |
+| 2, 6, 7 | NIP sendiri | NIP sendiri | = ubah |
+| 3 | jalur detail atas `pegawai_mutasi_jabatan` (pmj), lihat di bawah | sama dengan lihat | jalur proses |
+
+Role 3, admin **punya satker** → semua jalur `pmj.id_satker` = satker admin. Admin **tanpa satker** → predikat per
+jalur, **[K] ikut legacy, keputusan user 12-10-2026 (CR-045)** — legacy memang memakai predikat berbeda untuk daftar,
+detail, dan proses:
+
+| Admin tanpa satker | Daftar (`terapkanKeQuery`) | Detail/ubah riwayat, arsip, lampiran (`bolehLihat`, `bolehUbah`) | Setujui/Tolak + antrean approval (`bolehProses`) |
+|---|---|---|---|
+| unit 20 (`UNIT_KELEMBAGAAN`) | `pmj.id_unit IN (20, 6)` — `libraries/hr/L_employee.php:6231-6239` ("APPROVAL UPT") | `pmj.id_unit = 20` — `validateAccess_AP` | `pmj.id_unit = 20` — `libraries/hr/L_notification.php:1897-1901` (`get_na_ap_unit`), `controllers/hr/rwy/Kp.php:462-484` |
+| unit 21 (`UNIT_DESTINASI`) | `pmj.id_unit = 21 OR pmj.id_satker IN (37, 38, 41)` — `L_employee.php:6221-6229` ("APPROVAL BPO") | `pmj.id_unit = 21 OR (pmj.id_unit = 7 AND pmj.id_satker IN (37, 38, 41))` — `validateAccess_AP` | `pmj.id_unit = 21 OR pmj.id_satker IN (37, 38, 41)` — `L_notification.php:1899-1901`, `rwy/Kp.php:466-470` (pola sama di `rwy/*::process` lain) |
+| unit lain | `pmj.id_unit` = unit admin | sama | sama |
+
+`validateAccess_AP` = `helpers/function_helper.php:72-98` (literal `['37', '38', '41']` di :85); konstanta
+`UNIT_DESTINASI` / `UNIT_KELEMBAGAAN` / `UNIT_LAIN` / `LIST_SATKER_BPO` di `config/constants.php:312-316`, unit UPT =
+literal `'6'` di `L_employee.php:6232`. Konstanta [K] `PegawaiScope::UNIT_DESTINASI`, `UNIT_KELEMBAGAAN`, `UNIT_LAIN`,
+`UNIT_UPT`, `SATKER_BPO`.
+
+Konsekuensi yang **disengaja** (sama dengan legacy): pegawai UPT (unit 6) muncul di daftar admin unit 20 tetapi
+detailnya 403; pegawai satker BPO dengan unit bukan 7 bisa disetujui/ditolak admin unit 21 tetapi tidak bisa dibuka atau
+diubah. `RiwayatEngine::proses()` memakai `bolehProses`; descriptor tab tetap memakai `bolehUbah` untuk `can_process`
+(descriptor hanya ada bila `bolehLihat`, dan untuk pegawai yang lolos detail jalur proses = jalur ubah).
+
+Pegawai tanpa snapshot pmj (atau satker/unit NULL) tidak cocok predikat jalur mana pun untuk admin role 3. Role 3 tidak
+punya pengecualian NIP sendiri (legacy juga tidak). Satker akun dianggap "ada" bila bukan NULL dan bukan `''` **tanpa
+trim** (legacy `$idSatker_AP != ''`: string spasi masuk cabang satker dan tidak cocok pmj mana pun); nilai yang ada
+tetapi bukan angka kanonik ditolak, tidak jatuh ke cabang unit.
+
+Deviasi [V2]:
+
+- Legacy meloloskan admin role 3 **tanpa satker dan tanpa unit** (perbandingan `null == ''`) ke pegawai tanpa pmj
+  atau dengan `pmj.id_unit` NULL. v2 fail-closed (admin tanpa lingkup valid → tidak ada pegawai).
+- Jalur proses legacy (`rwy/*::process`, mis. `rwy/Kp.php:462-484`) **meloloskan** pegawai tanpa baris pmj, serta
+  pegawai dengan `pmj.id_satker` kosong (admin bersatker) atau `pmj.id_unit` kosong (admin tanpa satker). v2 tetap
+  fail-closed di **semua** jalur, termasuk `bolehProses` (CR-045).
+- Sementara sampai DBV-009 (tipe `id_satker`/`id_unit` akun VARCHAR vs pmj INT): claim di-cast ke int hanya bila angka
+  kanonik; bentuk non-kanonik seperti `'012'` ditolak (fail-closed). Ditinjau ulang saat DBV-009 diputus.
+
+Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai ini dalam lingkup pemanggil".
+
+## Lampiran B-18 (`Lampiran/`, MAKE-009)
+
+| Kelas | Isi |
+|---|---|
+| `LocalStorageAdapter` | `StorageAdapterInterface` di disk lokal (`writable/uploads/lampiran`); path relatif `[A-Za-z0-9._-]` per segmen, tulis atomik |
+| `AttachmentService` | `AttachmentServiceInterface` atas `document_attachment` (model `DocumentAttachmentModel`, audit otomatis create/delete); `path` tidak pernah dikembalikan |
+| `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil) |
+| `PenjagaBerkas` | Kompensasi berkas di luar transaksi DB: setelah transaksi selesai, berkas tercatat dipertahankan hanya bila masih dirujuk `tabel.kolom = path` |
+| `KolomBerkas` | Helper tabel yang menyimpan berkas di kolomnya sendiri (`riwayat_karpeg.file_1..5`, LKH, Konket) |
+| `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → (unggah) izin per pegawai `bolehAksiUntuk()` atas aksi `tambah`/`ubah` yang diizinkan role (403, CR-046) → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → izin aksi di Definisi berlampiran mana pun (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi → (hapus) `bolehUbah` + `bolehAksiUntuk()` atas `hapus`/`ubah` (403, CR-046) → baris riwayat bukan status 10 (404) (+ kunci baris, lampiran wajib terakhir 422 untuk hapus). Tulis diulang di dalam transaksi: `kunciUnggah()`/`kunciHapus()` (pegawai `FOR UPDATE`, baca ulang terkunci, hitung ulang lampiran wajib) |
+
+**Lampiran wajib & "ganti".** Lampiran terakhir kode ber-`wajib` pada satu baris tidak bisa dihapus (422
+`errors.berkas`); "ganti" = unggah berkas baru dulu, lalu hapus yang lama. Baris riwayat berstatus 1 Disetujui terkunci
+untuk UL_PEGAWAI (`kunciBarisDisetujui()`): unggah/hapus lampirannya 403; baris status 10 Dihapus → 404 (juga unduh).
+Hitungan "lampiran terakhir" diulang di dalam transaksi hapus dengan baris `pegawai` terkunci, jadi dua hapus paralel
+tidak bisa menghabiskan lampiran wajib.
+
+**Izin per pegawai di endpoint lampiran (CR-046).** Unggah dan hapus memanggil `RiwayatDefinisi::bolehAksiUntuk()` sama
+dengan engine, sesudah izin role dan `bolehUbah` (status pegawai di luar lingkup tidak bocor); contoh Pendidikan: role 2
+hanya selama CPNS, jadi pegawai PNS tidak bisa mengunggah/menghapus lampiran pendidikannya (403), sementara daftar dan
+unduh tetap boleh. Seperti izin role, pemeriksaan ini tidak diulang di `kunciUnggah()`/`kunciHapus()` (engine juga hanya
+memeriksanya sekali di `siapkan()`).
+
+**Deviasi [V2] lampiran.** Endpoint lampiran tidak mengubah status baris riwayat (legacy mengunggah lampiran hanya lewat
+form edit riwayat, yang mengembalikan status baris ke 0/1); kunci baris Disetujui untuk `DELETE` lampiran lebih ketat
+dari `delete_da` legacy.
+
+**Pemakaian dari RiwayatEngine (WS-1).** Panggil `service('attachmentService')->simpan(...)`/`hapus(...)` DI DALAM transaksi
+engine; tidak perlu kode kompensasi sendiri. Setelah commit/rollback, panggil `selesaikan()` bila service-nya
+`AttachmentService` (opsional: tanpa itu rekonsiliasi terjadi pada operasi lampiran berikutnya atau saat proses PHP
+berakhir). Otorisasi lampiran tetap tanggung jawab pemanggil (kontrak interface); `OtorisasiLampiran` boleh dipakai ulang.
+
+**Pemakaian `KolomBerkas`.** `simpan()` mengembalikan path untuk ditulis ke kolom; `hapus()` menandai berkas lama;
+`selesaikan()` WAJIB dipanggil setelah transaksi (juga di jalur rollback) — tidak ada rekonsiliasi oportunistik karena
+path baru belum dirujuk sampai kolomnya ditulis. Contoh lengkap di docblock kelas.

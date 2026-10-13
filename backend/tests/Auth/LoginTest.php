@@ -5,29 +5,24 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use App\Libraries\Auth\MockCaptchaVerifier;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-02 login, A-02b lazy rehash (MTC-003), A-03 captcha (MTC-001 langkah 2), A-04 lockout (MTC-001 langkah 3), A-10 audit login.
  *
  * @internal
  */
-final class LoginTest extends CIUnitTestCase
+final class LoginTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP = '199002152015022002'; // Siti Nurhaliza, role 2 (MTC-001/003)
 

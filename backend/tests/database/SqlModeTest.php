@@ -6,9 +6,9 @@ namespace Tests\Database;
 
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use Config\Database;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Throwable;
 
 /**
@@ -18,14 +18,9 @@ use Throwable;
  *
  * @internal
  */
-final class SqlModeTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class SqlModeTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private ?BaseConnection $appConnection = null;
 
     protected function tearDown(): void

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Pembungkus route /web-config: WebConfigView di dalam AppShell.
-import AppShell from '@/shared/components/AppShell.vue'
+// Pembungkus route /web-config: WebConfigView di dalam RedesignShell.
+import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 import WebConfigView from './WebConfigView.vue'
 </script>
 
 <template>
-  <AppShell>
+  <RedesignShell>
     <WebConfigView />
-  </AppShell>
+  </RedesignShell>
 </template>

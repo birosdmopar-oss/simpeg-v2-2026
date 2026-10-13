@@ -4,27 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Auth;
 
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-06 — ganti password (MTC-006): lama salah ditolak; baru Argon2id; seluruh refresh token lama dicabut; audit.
  *
  * @internal
  */
-final class ChangePasswordTest extends CIUnitTestCase
+final class ChangePasswordTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP = '199002152015022002';
     private const NEW = 'PasswordBaru456';

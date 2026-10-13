@@ -6,14 +6,13 @@ namespace Tests\Auth;
 
 use App\Constants\Role;
 use App\Libraries\Auth\JwtService;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Auth as AuthConfig;
 use Config\Jwt as JwtConfig;
 use Firebase\JWT\JWT;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\MasterDataTestTrait;
 
 /**
@@ -26,17 +25,13 @@ use Tests\Support\MasterDataTestTrait;
  *
  * @internal
  */
-final class AkunTanpaNipTest extends CIUnitTestCase
+final class AkunTanpaNipTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
     use MasterDataTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NEW_PASSWORD = 'PasswordBaru2026';
 

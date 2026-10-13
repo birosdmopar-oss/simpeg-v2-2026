@@ -13,3 +13,8 @@ Thumbs.db
 !.env.example
 # Crash dump keluaran shell/tool lokal, bukan artefak proyek.
 *.stackdump
+
+# Instance MySQL test (tools/mysql-test): datadir/log default di %LOCALAPPDATA%, jaga-jaga bila diarahkan ke repo
+tools/mysql-test/data/
+tools/mysql-test/*.log
+tools/mysql-test/*.pid

@@ -8,9 +8,9 @@ use App\Database\Migrations\AlterBatch1KeSkemaLegacy;
 use App\Database\Migrations\CreateKantor;
 use App\Database\Migrations\SeedWilayahLainLain;
 use CodeIgniter\Database\Migration;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
@@ -28,14 +28,11 @@ use Tests\Support\LepasMigrationKepegawaianTrait;
  *
  * @internal
  */
-final class Batch1LegacySchemaTest extends CIUnitTestCase
+#[Group('db-isolasi-penuh')]
+final class Batch1LegacySchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use LepasMigrationKepegawaianTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     /**
      * Migration dependen wilayah sesudah DBV-001, urut LEPAS (down() berurutan; pasang ulang urutan terbalik): kantor

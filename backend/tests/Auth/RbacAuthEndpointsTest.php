@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * A-13 — RBAC middleware 8 role terhadap SELURUH endpoint Modul A (Matriks Role x Endpoint Bagian 2 Modul A).
@@ -20,16 +19,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class RbacAuthEndpointsTest extends CIUnitTestCase
+final class RbacAuthEndpointsTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     protected function setUp(): void
     {

@@ -7,8 +7,8 @@ namespace Tests\MasterData;
 use App\Database\Migrations\AddFkJabatanJenjangJf;
 use App\Database\Migrations\CreateMasterJabatanSisa;
 use App\Database\Migrations\CreateMasterJabatanUnitSatker;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
@@ -22,14 +22,9 @@ use Tests\Support\LepasMigrationKepegawaianTrait;
  *
  * @internal
  */
-final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
+final class JabatanUnitSatkerSchemaTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use LepasMigrationKepegawaianTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     private const TABLES = ['unit', 'satker', 'group_jabatan', 'sub_group_jabatan', 'kelas_jabatan', 'jabatan'];
 
@@ -254,6 +249,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
     /**
      * down() menghapus keenam tabel (anak sebelum induk), up() membuatnya kembali persis. Tabel lain tidak tersentuh.
      */
+    #[Group('db-isolasi-penuh')]
     public function testMigrationRollsBackAndUpAgain(): void
     {
         $migration = $this->migration();
@@ -278,6 +274,7 @@ final class JabatanUnitSatkerSchemaTest extends CIUnitTestCase
      * error dilempar ulang, sehingga `migrate` bisa langsung diulang tanpa DDL manual. Tabel yang sudah ada sebelum run
      * tidak disentuh. Kegagalan disimulasikan dengan tabel penghalang bernama `kelas_jabatan` (CREATE ke-5 gagal, 1050).
      */
+    #[Group('db-isolasi-penuh')]
     public function testFailedUpDropsOnlyTablesCreatedInThatRun(): void
     {
         $migration = $this->migration();

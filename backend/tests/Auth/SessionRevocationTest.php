@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use App\Constants\Role;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use CodeIgniter\Test\FeatureTestTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * T-01 (QAFUNC-002-R1 24-09) — pencabutan massal sesi (ganti/reset password, perubahan/penghapusan akun oleh admin)
@@ -20,16 +19,12 @@ use Tests\Support\Database\Seeds\AuthSeeder;
  *
  * @internal
  */
-final class SessionRevocationTest extends CIUnitTestCase
+final class SessionRevocationTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use FeatureTestTrait;
     use AuthTestTrait;
 
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-    protected $seed      = AuthSeeder::class;
+    protected $seed = AuthSeeder::class;
 
     private const NIP         = '199002152015022002'; // role 2, S01
     private const SUPER_ADMIN = '198501012010011001';

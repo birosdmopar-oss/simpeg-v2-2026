@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\Models;
 
 use App\Interfaces\SyncsToSnapshot;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Models\DummyRiwayatModel;
 
 /**
@@ -14,14 +13,8 @@ use Tests\Support\Models\DummyRiwayatModel;
  *
  * @internal
  */
-final class BaseSnapshotModelTest extends CIUnitTestCase
+final class BaseSnapshotModelTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     public function testModelImplementsContract(): void
     {
         $model = new DummyRiwayatModel($this->db);

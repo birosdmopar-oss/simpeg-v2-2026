@@ -7,9 +7,8 @@ namespace Tests\Database\Queue;
 use App\Jobs\DummyJob;
 use CodeIgniter\Queue\Entities\QueueJob;
 use CodeIgniter\Queue\Enums\Status;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 use Config\Queue as QueueConfig;
+use Tests\Support\DatabaseTestCase;
 
 /**
  * F0-13 — job dummy ter-enqueue ke tabel queue_jobs (driver database) dan berhasil diproses.
@@ -18,14 +17,8 @@ use Config\Queue as QueueConfig;
  *
  * @internal
  */
-final class DatabaseQueueTest extends CIUnitTestCase
+final class DatabaseQueueTest extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
-
     private string $marker;
 
     protected function setUp(): void
