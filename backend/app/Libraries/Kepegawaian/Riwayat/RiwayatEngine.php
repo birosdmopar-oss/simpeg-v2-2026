@@ -268,7 +268,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
         $statusBaru = $aksi === self::AKSI_SETUJUI ? StatusRiwayat::Disetujui : StatusRiwayat::Ditolak;
 
-        $row = $this->transaksi(function () use ($d, $auth, $nip, $id, $catatan, $statusBaru): array {
+        $row = $this->transaksi(function () use ($d, $auth, $nip, $id, $aksi, $catatan, $statusBaru): array {
             $this->kunciPegawai($nip);
 
             $statusLama = $this->statusDari($d, $this->barisTerkunci($d, $nip, $id));
@@ -292,6 +292,9 @@ final class RiwayatEngine implements RiwayatServiceInterface
                 $this->snapshot()->sinkronkan($d, $nip, $auth);
                 $d->afterApprove($this->baris($d, $nip, $id), $auth);
             }
+
+            // Hook aditif MAKE-008: setujui DAN tolak lewat proses (mis. AK mengisi appr_at/appr_by).
+            $d->afterProses($aksi, $this->baris($d, $nip, $id), $auth);
 
             return $this->baris($d, $nip, $id);
         });

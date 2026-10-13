@@ -152,8 +152,8 @@ lalu `selesaikan()` (bila implementasinya punya) setelah commit atau rollback.
 Hook `validate()` menerima kolom NIP pemilik di `$data` (aditif MAKE-005) agar cek per pegawai (tanggal kembar, CPNS
 sekali) juga jalan saat tambah.
 
-Hook `beforeSave()` saat tambah menerima `$data` tanpa kolom NIP dan `$lama = null` (I-1); NIP pemilik ditulis engine
-sesudah hook. Hook yang butuh NIP saat tambah memakai `validate()` (yang menerima NIP) atau menunggu keperluan aditif.
+Hook `beforeSave()` saat tambah menerima `$data` berisi kolom NIP pemilik dan `$lama = null` (aditif MAKE-008; sebelumnya
+tanpa NIP, I-1); NIP tetap ditulis engine sesudah hook. Saat ubah NIP ada di `$lama`.
 
 ### Engine-v1 beku (MAKE-005)
 
@@ -181,6 +181,10 @@ Perubahan sesudah beku (aditif / konsistensi, WS-1):
   saat cutover.
 - [V2] Diklat (MAKE-007): `id_diklat` wajib milik `jenis_diklat` terpilih (legacy `L_diklat.php:527-536` hanya memeriksa
   keberadaannya).
+- MAKE-008 (hook aditif, ikut beku sejak masuk `main`): `RiwayatDefinisi::saringDaftar(BaseBuilder)` (saring tambahan
+  daftar; detail/ubah tidak ikut disaring), `beforeSave()` saat tambah menerima kolom NIP pemilik di `$data`,
+  `afterProses(aksi, baris, auth)` (dipanggil di transaksi `proses` untuk setujui DAN tolak, sesudah status ditulis;
+  default no-op — AK mengisi `appr_at`/`appr_by`).
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata

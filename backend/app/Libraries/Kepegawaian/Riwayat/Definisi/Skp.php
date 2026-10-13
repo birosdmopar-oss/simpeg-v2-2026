@@ -22,7 +22,13 @@ use App\Libraries\MasterData\MasterField;
  * Penilaian per periode tahun: sampai 2021 nilai angka (SKP 60% + perilaku 40% = prestasi kerja); mulai 2022 rating
  * (1 di bawah, 2 sesuai, 3 di atas ekspektasi) — kolom milik skema lain dikosongkan (`set_param()`). Persentase, nilai
  * prestasi, dan kategori dihitung FORM (legacy menghitungnya di peramban, `form.php:722-843`; frontend v2 sama), server
- * menerima nilainya seperti legacy. SKP 2023+ berasal dari e-Kinerja (tab SKP periodik).
+ * menerima nilainya seperti legacy. SKP 2023+ berasal dari e-Kinerja (tab SKP periodik): tahun maksimal 2022 (form
+ * legacy :455-475 mengganti tahun >= 2023 menjadi 2022).
+ *
+ * Aturan form legacy yang ditegakkan juga di server: tahun 2022 periodenya 1 Januari s.d. 31 Desember (form :476-484,
+ * diisi beforeSave); batas nilai skala 120 mulai 2021 dan 100 sebelumnya (`form.php:306-372`, :578-700) untuk nilai SKP,
+ * perilaku, dan prestasi, serta 60%/40%-nya (72/48 atau 60/40). Legacy 2021 mengisi nilai berbobot 60%/40% lalu
+ * menurunkan nilai mentah (/0,6, /0,4); v2 mengisi nilai mentah (maks 120) lalu menghitung bobotnya — setara.
  */
 final class Skp extends RiwayatDefinisi
 {
@@ -35,6 +41,16 @@ final class Skp extends RiwayatDefinisi
      * Tahun pertama penilaian berbasis rating (legacy `validate_param()` :552, `set_param()` :640).
      */
     public const TAHUN_RATING = 2022;
+
+    /**
+     * Tahun terakhir SKP tahunan (legacy form :455-475; 2023+ = SKP periodik e-Kinerja).
+     */
+    public const TAHUN_MAKS = 2022;
+
+    /**
+     * Tahun pertama skala nilai 120 (legacy form :306, :578).
+     */
+    public const TAHUN_SKALA_120 = 2021;
 
     /**
      * @var list<string>
@@ -77,7 +93,7 @@ final class Skp extends RiwayatDefinisi
         $nilai  = static fn (string $nama, string $label): MasterField => new MasterField($nama, $label, MasterField::TYPE_DECIMAL, min: 0, max: 999.99);
 
         return [
-            new MasterField('tahun', 'Tahun', MasterField::TYPE_INT, required: true, min: 1901, max: 2155),
+            new MasterField('tahun', 'Tahun', MasterField::TYPE_INT, required: true, min: 1901, max: self::TAHUN_MAKS),
             new MasterField('tgl_mulai', 'Tanggal Mulai', MasterField::TYPE_DATE, required: true),
             new MasterField('tgl_akhir', 'Tanggal Akhir', MasterField::TYPE_DATE, required: true),
             new MasterField('nip_penilai', 'NIP Pejabat Penilai', maxBytes: 18),
@@ -161,6 +177,14 @@ final class Skp extends RiwayatDefinisi
             }
         }
 
+        if (! self::rating((int) ($nilai['tahun'] ?? 0))) {
+            foreach (self::batasNilai((int) ($nilai['tahun'] ?? 0)) as $kolom => $maks) {
+                if (! isset($errors[$kolom]) && is_numeric($nilai[$kolom] ?? null) && (float) $nilai[$kolom] > $maks) {
+                    $errors[$kolom] = [$this->labelField($kolom) . ' maksimal ' . $maks . '.'];
+                }
+            }
+        }
+
         $kembar = db_connect()->table($this->tabel())
             ->where($this->kolomNip(), $nilai[$this->kolomNip()])
             ->where('tahun', $nilai['tahun'] ?? null)
@@ -180,7 +204,8 @@ final class Skp extends RiwayatDefinisi
     }
 
     /**
-     * Legacy `set_param()` :640-655: kolom skema lain dikosongkan (rating untuk ≤2021, nilai untuk ≥2022).
+     * Legacy `set_param()` :640-655: kolom skema lain dikosongkan (rating untuk ≤2021, nilai untuk ≥2022); tahun 2022
+     * periodenya 1 Januari s.d. 31 Desember (form legacy :476-484).
      */
     public function beforeSave(array $data, ?array $lama, AuthContext $auth): array
     {
@@ -191,7 +216,30 @@ final class Skp extends RiwayatDefinisi
             $data[$kolom] = null;
         }
 
+        if ((int) ($nilai['tahun'] ?? 0) === self::TAHUN_MAKS) {
+            $data['tgl_mulai'] = self::TAHUN_MAKS . '-01-01';
+            $data['tgl_akhir'] = self::TAHUN_MAKS . '-12-31';
+        }
+
         return $data;
+    }
+
+    /**
+     * Batas atas nilai skema ≤2021 per kolom (legacy form): skala 120 mulai 2021, 100 sebelumnya.
+     *
+     * @return array<string, float>
+     */
+    public static function batasNilai(int $tahun): array
+    {
+        $skala = $tahun >= self::TAHUN_SKALA_120 ? 120.0 : 100.0;
+
+        return [
+            'nilai_skp'                => $skala,
+            'nilai_skp_60_persen'      => $skala * 0.6,
+            'nilai_perilaku'           => $skala,
+            'nilai_perilaku_40_persen' => $skala * 0.4,
+            'nilai_prestasi_kerja'     => $skala,
+        ];
     }
 
     public static function rating(int $tahun): bool

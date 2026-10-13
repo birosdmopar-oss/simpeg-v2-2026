@@ -24,15 +24,21 @@ use DateTimeImmutable;
  * satu pengajuan menunggu per jabatan :305; status 1 untuk admin :322/:419), `libraries/hr/rwy/L_ak.php` (list() :26
  * status 0/1 `tgl_pak DESC`, form() :312-478 isian turunan, vp() :761-873, sp() :875-929, process_ak() :1231).
  *
- * Hak akses (keputusan reviewer 13-10-2026): lihat 1, 2, 3, 4, 7 — role 2 hanya bila jabatannya JF tertentu
- * (`pegawai_mutasi_jabatan.id_group_jabatan` = 2, legacy `is_jf`); role 6 tidak. Tambah/ubah/hapus/proses hanya role 1.
- * `process_cak` legacy (role 1 dan 3, form_process_ak) = aksi proses engine (setujui/tolak baris status 0), role 1 saja.
+ * Hak akses (keputusan user 13-10-2026): lihat 1, 2, 3, 4, 7 — role 2 dan 7 (UL_PEGAWAI) hanya bila pegawai sasaran
+ * pejabat JF tertentu (`pegawai_mutasi_jabatan.id_group_jabatan` = 2 = sesi legacy `is_jft`,
+ * `core/MY_Controller.php:89-98`); role 6 tidak. Tambah/ubah/hapus/proses hanya role 1. Legacy punya dua jalur proses:
+ * `process` (riwayat AK menunggu) dan `process_cak` (role 1 dan 3, form_process_ak, untuk baris Current AK `jenis_ak` 1
+ * yang menunggu). Keduanya = aksi proses engine (setujui/tolak baris status 0) untuk role 1 saja (keputusan A1) — role 3
+ * kehilangan `process_cak` legacy. Proses setujui dan tolak mengisi `appr_at`/`appr_by` lewat hook afterProses (legacy
+ * process_ak() :1240-1244).
  *
  * [V2] Isian turunan diisi SERVER saat tambah (input klien untuk kolom ini diabaikan; legacy mengirimnya dari form
  * read-only): nama, jabatan/no induk JF/TMT jabatan dari `pegawai_mutasi_jabatan`, pangkat/TMT pangkat dari
- * `pegawai_kp`, AK kumulatif dari `dm_ak_jf`. Masa kerja dihitung sampai tanggal PAK (legacy: sampai hari ini) dan
- * jumlah AK = AK lama + AK baru (legacy: dihitung form) — keduanya dihitung ulang setiap simpan. Tabel `dm_ak_jf` belum
- * ada di skema v2 (kebutuhan DBV): selama belum ada, AK kumulatif = 0 (nilai bawaan legacy sp() :888-889).
+ * `pegawai_kp`, AK kumulatif dari `dm_ak_jf`. Masa kerja sampai tanggal PAK (legacy: sampai hari ini) dihitung saat
+ * tambah dan saat tanggal PAK berubah; jumlah AK = AK lama + AK baru (legacy: dihitung form) saat tambah dan saat AK
+ * lama/baru dikirim — kecuali baris Current AK (`jenis_ak` 1) yang tidak pernah dihitung ulang. `jenis_ak` tidak
+ * di-reset saat ubah (legacy sp() menulis 2 setiap simpan). Tabel `dm_ak_jf` belum ada di skema v2 (kebutuhan DBV):
+ * selama belum ada, AK kumulatif = 0 (nilai bawaan legacy sp() :888-889).
  */
 final class Ak extends RiwayatDefinisi
 {
@@ -46,6 +52,11 @@ final class Ak extends RiwayatDefinisi
     public const GROUP_BOLEH_PAK = [2, 3];
 
     public const GROUP_JFT = 2;
+
+    /**
+     * `jenis_ak` 1 = Current/Starting AK (legacy), 2 = pengajuan riwayat AK.
+     */
+    public const JENIS_CURRENT = 1;
 
     /**
      * @var list<string>
@@ -138,13 +149,13 @@ final class Ak extends RiwayatDefinisi
     }
 
     /**
-     * Role 2 hanya melihat bila pegawai sasaran pejabat JF tertentu (legacy `Ak.php:17-23` `is_jf`); tambah hanya untuk
-     * pegawai berkelompok jabatan JF (legacy `Ak.php:290`).
+     * UL_PEGAWAI role 2 dan 7 hanya melihat bila pegawai sasaran pejabat JF tertentu (legacy `Ak.php:17-23`, `is_jft`;
+     * role 7 = keputusan user 13-10-2026); tambah hanya untuk pegawai berkelompok jabatan JF (legacy `Ak.php:290`).
      */
     public function bolehAksiUntuk(AuthContext $auth, AksiRiwayat $aksi, string $nip): bool
     {
-        if ($aksi === AksiRiwayat::Lihat && $auth->role() === Role::PEGAWAI) {
-            return self::groupJabatan($nip) === self::GROUP_JFT;
+        if ($aksi === AksiRiwayat::Lihat) {
+            return ! self::lihatHanyaJft($auth) || self::groupJabatan($nip) === self::GROUP_JFT;
         }
 
         if ($aksi === AksiRiwayat::Tambah) {
@@ -226,8 +237,9 @@ final class Ak extends RiwayatDefinisi
     }
 
     /**
-     * Tambah: isian turunan dari data pegawai saat ini ([V2], lihat docblock kelas). Setiap simpan: jumlah AK dan masa
-     * kerja sampai tanggal PAK dihitung ulang dari nilai akhir baris.
+     * Tambah: isian turunan dari data pegawai saat ini ([V2], lihat docblock kelas). Jumlah AK dihitung saat tambah atau
+     * bila AK lama/baru dikirim (tidak untuk Current AK `jenis_ak` 1); masa kerja saat tambah atau bila tanggal PAK
+     * berubah. `jenis_ak` tidak di-reset saat ubah ([V2]).
      */
     public function beforeSave(array $data, ?array $lama, AuthContext $auth): array
     {
@@ -238,25 +250,38 @@ final class Ak extends RiwayatDefinisi
             $data['created_by'] = $auth->idPengguna();
         }
 
-        $nilai = $data + ($lama ?? []);
+        $nilai     = $data + ($lama ?? []);
+        $akDikirim = array_key_exists('ak_terakhir', $data) || array_key_exists('pengajuan_ak', $data);
 
-        $data['nilai_ak'] = (float) ($nilai['ak_terakhir'] ?? 0) + (float) ($nilai['pengajuan_ak'] ?? 0);
+        if ($lama === null || ($akDikirim && (int) ($lama['jenis_ak'] ?? 0) !== self::JENIS_CURRENT)) {
+            $data['nilai_ak'] = (float) ($nilai['ak_terakhir'] ?? 0) + (float) ($nilai['pengajuan_ak'] ?? 0);
+        }
 
-        foreach (['jab' => 'tmt_jab', 'pang' => 'tmt_pang'] as $akhiran => $kolomTmt) {
-            [$data["mker_th_{$akhiran}"], $data["mker_bl_{$akhiran}"]] = self::masaKerja($nilai[$kolomTmt] ?? null, (string) ($nilai['tgl_pak'] ?? ''));
+        if ($lama === null || (array_key_exists('tgl_pak', $data) && (string) $data['tgl_pak'] !== (string) ($lama['tgl_pak'] ?? ''))) {
+            foreach (['jab' => 'tmt_jab', 'pang' => 'tmt_pang'] as $akhiran => $kolomTmt) {
+                [$data["mker_th_{$akhiran}"], $data["mker_bl_{$akhiran}"]] = self::masaKerja($nilai[$kolomTmt] ?? null, (string) ($nilai['tgl_pak'] ?? ''));
+            }
         }
 
         return $data;
     }
 
     /**
-     * Legacy process_ak() :1240-1244 mengisi `appr_at`/`appr_by` (tabel tanpa `approved_by`).
+     * Legacy process_ak() :1240-1244 mengisi `appr_at`/`appr_by` (tabel tanpa `approved_by`) untuk setujui DAN tolak.
      */
-    public function afterApprove(array $baris, AuthContext $auth): void
+    public function afterProses(string $aksi, array $baris, AuthContext $auth): void
     {
         db_connect()->table($this->tabel())
             ->where($this->primaryKey(), $baris[$this->primaryKey()])
             ->update(['appr_at' => Time::now()->toDateTimeString(), 'appr_by' => $auth->idPengguna()]);
+    }
+
+    /**
+     * Pemanggil UL_PEGAWAI yang berhak lihat (role 2, 7) hanya melihat AK/AK SIASN pejabat JF tertentu.
+     */
+    public static function lihatHanyaJft(AuthContext $auth): bool
+    {
+        return in_array($auth->role(), [Role::PEGAWAI, Role::PPPK], true);
     }
 
     /**

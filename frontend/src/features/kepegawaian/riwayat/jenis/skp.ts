@@ -1,7 +1,9 @@
 // Tab riwayat `skp` — tabel `riwayat_skp`, B-12a (pemilik WS-1). Isian & lampiran disalin dari Definisi backend
 // `Riwayat/Definisi/Skp.php` (MAKE-008; legacy `L_skp.php`). Skema menurut tahun: ≤2021 nilai angka (SKP 60% + perilaku
 // 40%), ≥2022 rating. Persentase, nilai prestasi, dan kategori/predikat = isian hitung (rumus form legacy
-// `views/hr/employee/rwy/skp/form.php:722-843`); server menerima nilainya seperti legacy.
+// `views/hr/employee/rwy/skp/form.php:722-843`); server menerima nilainya seperti legacy. Aturan form legacy
+// (:306-372, :455-500), ditegakkan juga di server: tahun maks 2022, periode 2022 dikunci 1 Jan s.d. 31 Des, batas nilai
+// skala 120 mulai 2021 (100 sebelumnya) — legacy 2021 mengisi nilai berbobot (maks 72/48), v2 nilai mentah (maks 120).
 import { Role, UL_PEGAWAI } from '@/features/auth/types'
 
 import { A, D, N, S, T, defineRiwayatJenis, type FieldCondition } from '../riwayat.config'
@@ -19,6 +21,10 @@ const angka = (v: string | undefined): number | null => {
   return String(v ?? '').trim() === '' || !Number.isFinite(n) ? null : n
 }
 const dua = (n: number): string => String(Math.round(n * 100) / 100)
+
+/** Skala nilai skema ≤2021: 120 mulai 2021, 100 sebelumnya (`Skp::batasNilai()`). */
+const skala = (v: Record<string, string>): number => ((angka(v.tahun) ?? 0) >= 2021 ? 120 : 100)
+const periode2022 = (tanggal: string) => (v: Record<string, string>): string | null => (angka(v.tahun) === 2022 ? tanggal : null)
 
 /** Kategori nilai prestasi ≤2021 (legacy: skala 120 mulai 2021, 100 sebelumnya; nilai dibulatkan ke bawah). */
 function kategoriNilai(tahun: number, total: number): string {
@@ -61,21 +67,21 @@ export default defineRiwayatJenis({
     { key: 'kategori_nilai_prestasi', label: 'Kategori/Predikat' },
   ],
   fields: [
-    N('tahun', 'Tahun', { required: true, hint: 'SKP 2023 dan seterusnya berasal dari e-Kinerja (tab SKP Periodik).' }),
-    D('tgl_mulai', 'Tanggal Mulai', { required: true }),
-    D('tgl_akhir', 'Tanggal Akhir', { required: true }),
+    N('tahun', 'Tahun', { required: true, hint: 'SKP 2023 dan seterusnya berasal dari e-Kinerja (tab SKP Periodik).', batasAtas: () => 2022 }),
+    D('tgl_mulai', 'Tanggal Mulai', { required: true, compute: periode2022('2022-01-01') }),
+    D('tgl_akhir', 'Tanggal Akhir', { required: true, compute: periode2022('2022-12-31') }),
     T('nip_penilai', 'NIP Pejabat Penilai', { max: 18 }),
     T('nama_penilai', 'Nama Pejabat Penilai', { max: 150 }),
     T('jabatan_penilai', 'Jabatan Pejabat Penilai', { max: 150, wide: true }),
     T('nip_atasan_penilai', 'NIP Atasan Pejabat Penilai', { max: 18 }),
     T('nama_atasan_penilai', 'Nama Atasan Pejabat Penilai', { max: 150 }),
     T('jabatan_atasan_penilai', 'Jabatan Atasan Pejabat Penilai', { max: 150, wide: true }),
-    N('nilai_skp', 'Nilai SKP', { required: true, showWhen: NILAI }),
+    N('nilai_skp', 'Nilai SKP', { required: true, showWhen: NILAI, batasAtas: skala }),
     N('nilai_skp_60_persen', 'Nilai SKP (60%)', {
       showWhen: NILAI,
       compute: (v) => (angka(v.nilai_skp) === null ? '' : dua(angka(v.nilai_skp)! * 0.6)),
     }),
-    N('nilai_perilaku', 'Nilai Perilaku', { required: true, showWhen: NILAI }),
+    N('nilai_perilaku', 'Nilai Perilaku', { required: true, showWhen: NILAI, batasAtas: skala }),
     N('nilai_perilaku_40_persen', 'Nilai Perilaku (40%)', {
       showWhen: NILAI,
       compute: (v) => (angka(v.nilai_perilaku) === null ? '' : dua(angka(v.nilai_perilaku)! * 0.4)),

@@ -129,22 +129,27 @@ final class AkTest extends DatabaseTestCase
         }
     }
 
-    public function testRole2MelihatHanyaBilaJft(): void
+    /**
+     * Role 2 dan 7 (keputusan user 13-10-2026) hanya melihat AK/AK SIASN bila pejabat JF tertentu.
+     */
+    public function testRole2Dan7MelihatHanyaBilaJft(): void
     {
-        [$nip, , $akun] = $this->aktor(Role::PEGAWAI);
-        $this->jadikanGroup($nip, 3);
+        foreach ([Role::PEGAWAI, Role::PPPK] as $role) {
+            [$nip, , $akun] = $this->aktor($role);
+            $this->jadikanGroup($nip, 3);
 
-        $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak")->assertStatus(403);
-        $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak-siasn")->assertStatus(403);
-        $this->assertSame([], $this->tabAk($akun, $nip));
+            $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak")->assertStatus(403);
+            $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak-siasn")->assertStatus(403);
+            $this->assertSame([], $this->tabAk($akun, $nip), "role {$role} non-JFT");
 
-        $this->jadikanGroup($nip, Ak::GROUP_JFT);
+            $this->jadikanGroup($nip, Ak::GROUP_JFT);
 
-        $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak")->assertStatus(200);
-        $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak-siasn")->assertStatus(200);
-        $tabs = $this->tabAk($akun, $nip);
-        $this->assertSame(['ak', 'ak-siasn'], array_keys($tabs));
-        $this->assertSame([true, false, false], [$tabs['ak']['can_view'], $tabs['ak']['can_create'], $tabs['ak']['can_process']]);
+            $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak")->assertStatus(200);
+            $this->asUser($akun)->get("api/v1/pegawai/{$nip}/riwayat/ak-siasn")->assertStatus(200);
+            $tabs = $this->tabAk($akun, $nip);
+            $this->assertSame(['ak', 'ak-siasn'], array_keys($tabs), "role {$role} JFT");
+            $this->assertSame([true, false, false], [$tabs['ak']['can_view'], $tabs['ak']['can_create'], $tabs['ak']['can_process']]);
+        }
     }
 
     public function testTambahHanyaUntukKelompokJabatanJf(): void
@@ -223,7 +228,44 @@ final class AkTest extends DatabaseTestCase
 
         $this->assertSame(['1', 45.0, '3', '6'], [(string) $row['status'], (float) $row['nilai_ak'], (string) $row['mker_th_jab'], (string) $row['mker_bl_jab']]);
         $this->assertSame((string) $id, (string) $this->snapshotUji('pegawai_ak', $this->nip)['id_riwayat_ak']);
-        $this->assertNotNull($row['appr_by']);
+        // appr_* hanya lewat proses (legacy edit tidak mengisinya).
+        $this->assertNull($row['appr_by']);
+
+        // Tanggal PAK tidak berubah → masa kerja tidak dihitung ulang walau TMT berubah di baris.
+        $this->db->table('riwayat_ak')->where('id_riwayat_ak', $id)->update(['tmt_jab' => '2010-01-01']);
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'ak', $id, ['keterangan' => 'catatan', 'tgl_pak' => '2023-07-01']);
+        $this->assertSame(['3', '6', 45.0], [(string) $row['mker_th_jab'], (string) $row['mker_bl_jab'], (float) $row['nilai_ak']]);
+    }
+
+    /**
+     * Baris Current AK legacy (`jenis_ak` 1) tidak pernah dihitung ulang; `jenis_ak` tidak di-reset ([V2]).
+     */
+    public function testCurrentAkJenis1TidakDihitungUlang(): void
+    {
+        $id = $this->sisipRiwayat($this->d, $this->nip, array_merge($this->btcBaris($this->nip), ['status' => 1, 'jenis_ak' => Ak::JENIS_CURRENT, 'nilai_ak' => 123.5]));
+        $this->engine()->ubah($this->admin, $this->nip, 'ak', $id, ['keterangan' => 'awal']);
+        $snapshot = $this->snapshotUji('pegawai_ak', $this->nip);
+
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'ak', $id, ['keterangan' => 'diubah']);
+        $this->assertSame([123.5, '1'], [(float) $row['nilai_ak'], (string) $row['jenis_ak']]);
+
+        // FE mengirim seluruh isian (termasuk AK lama/baru) — tetap tidak dihitung ulang.
+        $row = $this->engine()->ubah($this->admin, $this->nip, 'ak', $id, $this->dataAk('2023-01-01', '2023-06-30') + ['keterangan' => 'diubah']);
+        $this->assertSame([123.5, '1'], [(float) $row['nilai_ak'], (string) $row['jenis_ak']]);
+        $this->assertSame([123.5, (string) $snapshot['id_riwayat_ak']], [(float) $this->snapshotUji('pegawai_ak', $this->nip)['nilai_ak'], (string) $this->snapshotUji('pegawai_ak', $this->nip)['id_riwayat_ak']]);
+    }
+
+    /**
+     * Keputusan user 13-10-2026 (ikut legacy process_ak()): appr_at/appr_by diisi saat setujui DAN tolak (afterProses).
+     */
+    public function testProsesTolakJugaMengisiApproval(): void
+    {
+        $id  = $this->sisipRiwayat($this->d, $this->nip, array_merge($this->btcBaris($this->nip), ['status' => 0]));
+        $row = $this->engine()->proses($this->admin, $this->nip, 'ak', $id, 'tolak', 'Berkas tidak sesuai');
+
+        $this->assertSame(['2', (string) $this->admin->idPengguna()], [(string) $row['status'], (string) $row['appr_by']]);
+        $this->assertNotNull($row['appr_at']);
+        $this->assertNull($this->snapshotUji('pegawai_ak', $this->nip));
     }
 
     public function testDaftarHanyaStatus0Dan1TerbaruDulu(): void

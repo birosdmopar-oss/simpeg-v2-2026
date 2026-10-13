@@ -78,9 +78,14 @@ export interface FieldDef {
   suggestEntity?: string
   /**
    * Isian hitung di form (hanya-baca): nilainya dihitung dari isian lain setiap kali berubah, mis. nilai SKP 60% dan
-   * kategori (legacy menghitungnya di peramban, `skp/form.php`). Hasil '' = kosong.
+   * kategori (legacy menghitungnya di peramban, `skp/form.php`). Hasil '' = kosong; `null` = tidak dihitung untuk nilai
+   * ini (nilai tetap, isian bisa diisi), mis. periode SKP hanya dikunci untuk tahun 2022. `baris` = baris yang diedit
+   * (null saat tambah), mis. AK Current (`jenis_ak` 1) tidak dihitung ulang. Saat Edit, hitung baru berjalan sesudah
+   * pengguna mengubah isian — nilai tersimpan baris legacy tidak ditimpa saat form dibuka.
    */
-  compute?: (values: Record<string, string>) => string
+  compute?: (values: Record<string, string>, baris: Readonly<Record<string, unknown>> | null) => string | null
+  /** Batas atas angka yang bergantung isian lain (mis. nilai SKP maks 120 mulai 2021, 100 sebelumnya); null = tanpa batas. */
+  batasAtas?: (values: Record<string, string>) => number | null
 }
 
 export interface ColumnDef {

@@ -21,7 +21,7 @@ use CodeIgniter\Database\BaseBuilder;
  * Sumber [K] = kode legacy (`application/`): `libraries/hr/rwy/L_ak.php` list_siasn() :931-940 (status 0/1,
  * `tgl_sk DESC`), form_siasn_ad()/update_siasn_ad() :958-1048 — satu-satunya ubah = "pairing" jabatan SIMPEG
  * (`id_jabatan`, jabatan JF tertentu), oleh role 1 (`controllers/hr/rwy/Ak.php:143`, `:217`); status tidak berubah. Tanpa
- * tambah/hapus/proses. Hak lihat sama dengan AK (termasuk role 2 hanya bila JF tertentu). Aturan snapshot
+ * tambah/hapus/proses. Hak lihat sama dengan AK (termasuk role 2 dan 7 hanya bila JF tertentu). Aturan snapshot
  * `pegawai_ak_siasn` (tgl_sk terbaru) masih ⏳ di dok DBV-012 #6.
  */
 final class AkSiasn extends RiwayatDefinisi
@@ -83,11 +83,11 @@ final class AkSiasn extends RiwayatDefinisi
     }
 
     /**
-     * Sama dengan AK: role 2 hanya bila pegawai sasaran pejabat JF tertentu.
+     * Sama dengan AK: role 2 dan 7 hanya bila pegawai sasaran pejabat JF tertentu.
      */
     public function bolehAksiUntuk(AuthContext $auth, AksiRiwayat $aksi, string $nip): bool
     {
-        return $aksi !== AksiRiwayat::Lihat || $auth->role() !== Role::PEGAWAI || Ak::groupJabatan($nip) === Ak::GROUP_JFT;
+        return $aksi !== AksiRiwayat::Lihat || ! Ak::lihatHanyaJft($auth) || Ak::groupJabatan($nip) === Ak::GROUP_JFT;
     }
 
     public function saringDaftar(BaseBuilder $builder): void

@@ -1,6 +1,7 @@
 // Tab riwayat `ak` — tabel `riwayat_ak`, B-15 (pemilik WS-1). Isian & berkas disalin dari Definisi backend
 // `Riwayat/Definisi/Ak.php` (MAKE-008; legacy `L_ak.php`). Nama, jabatan, pangkat, TMT, masa kerja, dan AK kumulatif
-// diisi SERVER dari data pegawai saat ini ([V2]); jumlah AK = AK lama + AK baru (isian hitung, dihitung ulang server).
+// diisi SERVER dari data pegawai saat ini ([V2]); jumlah AK = AK lama + AK baru (isian hitung, dihitung ulang server),
+// kecuali baris Current AK legacy (`jenis_ak` 1) yang tidak pernah dihitung ulang — form menampilkan nilai tersimpannya.
 import { A, D, N, S, T, defineRiwayatJenis } from '../riwayat.config'
 
 const angka = (v: string | undefined): number => {
@@ -40,9 +41,11 @@ export default defineRiwayatJenis({
     N('ak_terakhir', 'AK Lama', { required: true }),
     N('pengajuan_ak', 'AK Baru', { required: true }),
     N('nilai_ak', 'Jumlah AK', {
-      compute: (v) => (String(v.ak_terakhir ?? '').trim() === '' && String(v.pengajuan_ak ?? '').trim() === ''
-        ? ''
-        : String(Math.round((angka(v.ak_terakhir) + angka(v.pengajuan_ak)) * 1000) / 1000)),
+      compute: (v, baris) => {
+        if (String(baris?.jenis_ak ?? '') === '1') return String(baris?.nilai_ak ?? '')
+        if (String(v.ak_terakhir ?? '').trim() === '' && String(v.pengajuan_ak ?? '').trim() === '') return ''
+        return String(Math.round((angka(v.ak_terakhir) + angka(v.pengajuan_ak)) * 1000) / 1000)
+      },
     }),
     A('keterangan', 'Keterangan', { max: 255 }),
   ],

@@ -43,9 +43,11 @@ Urutan pemeriksaan (wajib, endpoint riwayat dan lampiran):
 3. `PegawaiScope` atas `{nip}` (`bolehLihat` untuk baca, `bolehUbah` untuk tulis, `bolehProses` untuk Setujui/Tolak) → 403. Bagi pemanggil ber-lingkup, NIP
    yang tidak ada dan NIP di luar lingkup dijawab **sama (403)** — keberadaan NIP tidak bocor.
 4. Keberadaan data: NIP (404 bila lingkup pemanggil mencakupnya), baris `{id}` milik `{nip}` → 404.
-   Izin per pegawai sasaran `RiwayatDefinisi::bolehAksiUntuk()` (tambah/ubah/hapus) → 403 diperiksa di tengah langkah
-   ini: riwayat sesudah keberadaan NIP, sebelum baris `{id}`; lampiran `POST`/`DELETE` (CR-046) sesudah `bolehUbah`
-   (`DELETE`: sesudah baris lampiran `{id}` dibaca), sebelum baris riwayat `id_entri`. `GET`/unduh tidak memanggilnya.
+   Izin per pegawai sasaran `RiwayatDefinisi::bolehAksiUntuk()` → 403 diperiksa di tengah langkah ini: riwayat (semua
+   aksi, termasuk `lihat` untuk `GET` daftar/detail/unduh berkas kolom — mis. AK/AK SIASN role 2 dan 7 hanya pejabat JF
+   tertentu, MAKE-008; descriptor tab memakainya juga) sesudah keberadaan NIP, sebelum baris `{id}`; lampiran
+   `POST`/`DELETE` (CR-046, tambah/ubah/hapus) sesudah `bolehUbah` (`DELETE`: sesudah baris lampiran `{id}` dibaca),
+   sebelum baris riwayat `id_entri`. `GET`/unduh lampiran tidak memanggilnya.
 
 ### Endpoint
 
@@ -226,6 +228,7 @@ data di Definisi; default di bawah ikut legacy.
 | Notifikasi | Event aplikasi `riwayatNotifikasi` sesudah commit, payload `{tipe, jenis, label, nip, id, status, aksi, reason_note}`; `tipe` 1 = diajukan, 2 = diproses, 3 = diubah (legacy `fcmQueue_rwy`). Pengirim push (FCM, H-01) berlangganan event ini |
 | Berkas | `berkas[<id_riwayat>]` satu berkas per kode; kode bukan angka (kecuali nama kolom di `kolomBerkas()`, baris berikut), unggahan gagal, atau kode di luar `lampiran()` → 422 `errors.berkas.<kode>`; slot kosong (`UPLOAD_ERR_NO_FILE`) dilewati |
 | Berkas kolom (aditif MAKE-007) | `berkas[<kolom>]` untuk kolom di `RiwayatDefinisi::kolomBerkas()` (path disimpan di kolom tabel riwayat lewat KolomBerkas MAKE-009; berkas lama yang diganti dihapus setelah commit); wajib per `kolomBerkasWajib()` (ada di request atau kolom sudah terisi); kolom tak dikenal → 422 `errors.berkas.<kolom>` |
+| Proses (aditif MAKE-008) | Sesudah status setujui/tolak ditulis (dan sesudah snapshot + `afterApprove` saat setujui), engine memanggil `RiwayatDefinisi::afterProses(aksi, baris, auth)` di transaksi yang sama; default no-op (AK: `appr_at`/`appr_by`) |
 | beforeSave saat tambah (aditif MAKE-008) | `$data` berisi juga kolom NIP pemilik, agar isian turunan per pegawai bisa diisi server (mis. AK: jabatan, pangkat, TMT, masa kerja, AK kumulatif) |
 | Lampiran bersyarat & entri anak (aditif MAKE-007) | `lampiranWajib(aturan, nilai akhir)` menentukan wajib per baris (mis. KTP alamat bukan untuk kantor); kode dengan `entriLampiran()` (mis. akte 3 = `detail_anak`) tidak diminta/diterima di `POST/PUT riwayat` — diunggah lewat endpoint anak atau `POST lampiran` (`id_entri` = PK baris anak, pemilik lewat baris induk) |
 
@@ -268,7 +271,7 @@ ter-resolve (tanpa `resetSingle`).
 `snapshot()` (`AturanSnapshot`: tabel target, kolom, filter, urutan, join — multi-target), `lampiran()` (**daftar**
 `AturanLampiran`, satu per kode `jenis_rwy`: wajib, batas 1/2/5 MB, ekstensi), `urutanTab()`, dan hook opsional
 `validate`, `beforeSave`, `afterApprove`. Aditif engine-v1: `lampiranWajib`, `kolomBerkas`/`kolomBerkasWajib`,
-`entriLampiran` (MAKE-007), `saringDaftar` (MAKE-008).
+`entriLampiran` (MAKE-007), `saringDaftar`, `afterProses` (MAKE-008).
 
 **Fixture test** `Tests\Support\Kepegawaian\PegawaiFixtureTrait` (bersama, dipakai di test turunan
 `Tests\Support\DatabaseTestCase` MAKE-001): `buatPegawai(array $override = [], array $pmj = []): string`,

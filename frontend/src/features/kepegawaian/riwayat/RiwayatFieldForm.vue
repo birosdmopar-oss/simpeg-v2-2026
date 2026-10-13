@@ -35,6 +35,8 @@ const props = withDefaults(
     lampiran?: LampiranDef[]
     mode?: 'create' | 'edit'
     initial?: Record<string, string>
+    /** Baris yang diedit (mode edit) — diteruskan ke `compute` (mis. `jenis_ak` AK). */
+    baris?: Readonly<Record<string, unknown>> | null
     /** Jumlah lampiran yang sudah tersimpan per kode (mode edit); kode tanpa entri = tidak diketahui. */
     lampiranTersimpan?: Record<number, number>
     /** Berkas kolom Definisi (`berkas[<kolom>]`, MAKE-008). */
@@ -52,6 +54,7 @@ const props = withDefaults(
     lampiran: () => [],
     mode: 'create',
     initial: () => ({}),
+    baris: null,
     lampiranTersimpan: () => ({}),
     berkasKolom: () => [],
     kolomTerisi: () => ({}),
@@ -67,7 +70,7 @@ const emit = defineEmits<{ submit: [values: Record<string, string>, berkas: Berk
 
 const blank = (): Record<string, string> => Object.fromEntries(props.fields.map((f) => [f.name, props.initial[f.name] ?? '']))
 
-const { errors, values, handleSubmit, resetForm, defineField } = useForm<Record<string, string>>({
+const { errors, values, handleSubmit, resetForm, defineField, setFieldError } = useForm<Record<string, string>>({
   validationSchema: toTypedSchema(buildRiwayatSchema(props.fields)),
   initialValues: blank(),
 })
@@ -120,20 +123,40 @@ async function onRefChange(f: FieldDef, value: string): Promise<void> {
 
 const visible = (f: FieldDef): boolean => fieldVisible(f, values as Record<string, string | undefined>)
 
-// Isian hitung (`compute`): diperbarui setiap kali isian lain berubah; hanya-baca di form.
+// Isian hitung (`compute`): diperbarui setiap kali isian lain berubah; hanya-baca selama hasilnya bukan null. Saat
+// Edit, nilai tersimpan baris tidak ditimpa sampai pengguna mengubah isian (baris legacy, mis. kategori SKP lama).
+const hasilHitung = (f: FieldDef, vals: Record<string, string>): string | null => f.compute?.(vals, props.baris ?? null) ?? null
+const terkunciHitung = (f: FieldDef): boolean => Boolean(f.compute) && hasilHitung(f, values as Record<string, string>) !== null
+const samaAwal = (vals: Record<string, string>): boolean => props.fields.every((f) => (vals[f.name] ?? '') === (props.initial[f.name] ?? ''))
 const hitung = props.fields.filter((f) => f.compute)
 if (hitung.length) {
   watch(
     () => ({ ...values }) as Record<string, string>,
     (sekarang) => {
+      if (props.mode === 'edit' && samaAwal(sekarang)) return
       for (const f of hitung) {
         const model = models[f.name]
-        const hasil = f.compute?.(sekarang) ?? ''
-        if (model && model.value !== hasil) model.value = hasil
+        const hasil = hasilHitung(f, sekarang)
+        if (model && hasil !== null && model.value !== hasil) model.value = hasil
       }
     },
     { deep: true, immediate: true },
   )
+}
+
+/** Batas atas angka (`batasAtas`) atas isian yang tampil; galat dipasang di isiannya. */
+function lewatBatas(submitted: Record<string, string>): boolean {
+  let lewat = false
+  for (const f of props.fields) {
+    const maks = f.batasAtas?.(submitted) ?? null
+    const teks = String(submitted[f.name] ?? '').trim()
+    if (maks === null || teks === '' || !visible(f)) continue
+    if (Number(teks.replace(',', '.')) > maks) {
+      setFieldError(f.name, `${f.label} maksimal ${maks}.`)
+      lewat = true
+    }
+  }
+  return lewat
 }
 
 function onFile(def: LampiranDef, file: File | null): void {
@@ -177,12 +200,14 @@ function missingWajib(): boolean {
 
 const submit = handleSubmit(
   (submitted) => {
-    if (missingWajib()) return
+    const lewat = lewatBatas(submitted)
+    if (missingWajib() || lewat) return
     // Isian bersyarat yang tersembunyi dikirim kosong (= NULL), bukan nilai lama yang tak terlihat.
     const out = Object.fromEntries(props.fields.map((f) => [f.name, visible(f) ? (submitted[f.name] ?? '') : '']))
     emit('submit', out, { ...berkas })
   },
   () => {
+    lewatBatas(values as Record<string, string>)
     missingWajib()
   },
 )
@@ -250,7 +275,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :label="f.label"
             :required="f.required"
             :disabled="busy"
-            :readonly="Boolean(f.compute)"
+            :readonly="terkunciHitung(f)"
             :type="f.type === 'date' ? 'date' : 'text'"
             :inputmode="f.type === 'number' ? 'numeric' : undefined"
             :placeholder="f.placeholder"

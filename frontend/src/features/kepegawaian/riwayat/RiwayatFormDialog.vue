@@ -17,6 +17,8 @@ defineProps<{
   open: boolean
   config: RiwayatJenisConfig
   initial: Record<string, string> | null
+  /** Baris yang diedit (diteruskan ke isian hitung `compute`). */
+  baris?: Readonly<Record<string, unknown>> | null
   fields?: FieldDef[]
   lampiranTersimpan?: Record<number, number>
   kolomTerisi?: Record<string, boolean>
@@ -50,6 +52,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
           :lampiran="config.lampiran"
           :mode="initial ? 'edit' : 'create'"
           :initial="initial ?? {}"
+          :baris="baris ?? null"
           :lampiran-tersimpan="lampiranTersimpan ?? {}"
           :berkas-kolom="config.berkasKolom ?? []"
           :kolom-terisi="kolomTerisi ?? {}"

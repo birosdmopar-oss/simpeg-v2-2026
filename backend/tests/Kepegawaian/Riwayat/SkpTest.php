@@ -119,6 +119,26 @@ final class SkpTest extends DatabaseTestCase
         ])['tahun']);
     }
 
+    /**
+     * Form legacy (`skp/form.php:306-372`, :455-500): tahun maksimal 2022, periode 2022 = 1 Jan s.d. 31 Des, batas nilai
+     * skala 120 mulai 2021 dan 100 sebelumnya.
+     */
+    public function testAturanFormLegacyTahunPeriodeDanBatasNilai(): void
+    {
+        $this->assertErrors(['tahun'], fn () => $this->tambah(['tahun' => 2023] + $this->rating2022()));
+
+        $row = $this->tambah(['tgl_mulai' => '2022-03-01', 'tgl_akhir' => '2022-06-30'] + $this->rating2022());
+        $this->assertSame(['2022-01-01', '2022-12-31'], [$row['tgl_mulai'], $row['tgl_akhir']]);
+
+        $nilai = static fn (int $tahun, float $skp, float $skp60): array => [
+            'tahun'          => $tahun, 'tgl_mulai' => "{$tahun}-01-02", 'tgl_akhir' => "{$tahun}-12-31", 'nilai_skp' => $skp, 'nilai_skp_60_persen' => $skp60,
+            'nilai_perilaku' => 50, 'nilai_perilaku_40_persen' => 20, 'nilai_prestasi_kerja' => 50, 'kategori_nilai_prestasi' => 'Kurang',
+        ];
+        $this->assertErrors(['nilai_skp'], fn () => $this->tambah($nilai(2020, 101, 60)));
+        $this->assertErrors(['nilai_skp_60_persen'], fn () => $this->tambah($nilai(2021, 120, 72.5)));
+        $this->assertSame('120.00', (string) $this->tambah($nilai(2021, 120, 72))['nilai_skp']);
+    }
+
     public function testLampiranWajib(): void
     {
         $this->assertErrors(['berkas.32'], fn () => $this->engine()->tambah($this->admin, $this->nip, 'skp', $this->rating2022()));

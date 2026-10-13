@@ -379,6 +379,7 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :config="config"
       :fields="formFields"
       :initial="initialValues"
+      :baris="editing"
       :lampiran-tersimpan="lampiranTersimpan"
       :kolom-terisi="kolomTerisi"
       :server-errors="formErrors"

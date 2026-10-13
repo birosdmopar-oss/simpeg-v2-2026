@@ -313,6 +313,18 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Hook setelah baris DIPROSES lewat `POST …/process` (aditif MAKE-008, engine-v1): dipanggil untuk $aksi `setujui`
+     * maupun `tolak`, di dalam transaksi engine, sesudah status ditulis (dan sesudah SnapshotSync/afterApprove saat
+     * setujui). Default no-op. Contoh: AK mengisi `appr_at`/`appr_by` untuk setujui dan tolak (legacy `L_ak.php`
+     * process_ak()). Tidak dipanggil untuk perubahan status lewat tambah/ubah.
+     *
+     * @param array<string, mixed> $baris baris sesudah diproses
+     */
+    public function afterProses(string $aksi, array $baris, AuthContext $auth): void
+    {
+    }
+
+    /**
      * Role $role punya izin $aksi pada jenis ini (tanpa memeriksa lingkup pegawai).
      */
     final public function boleh(AksiRiwayat $aksi, ?int $role): bool

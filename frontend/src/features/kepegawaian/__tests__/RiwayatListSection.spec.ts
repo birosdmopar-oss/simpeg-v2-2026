@@ -654,3 +654,68 @@ describe('RiwayatListSection — SKP periodik, AK, AK SIASN (MAKE-008)', () => {
     expect(field('id_jabatan')).not.toBeNull()
   })
 })
+
+describe('RiwayatListSection — aturan form legacy SKP & AK Current (perbaikan review MAKE-008)', () => {
+  it('SKP: tahun 2022 mengunci periode 1 Jan s.d. 31 Des; tahun lain bebas; batas nilai 120 mulai 2021, 100 sebelumnya; tahun maks 2022', async () => {
+    svc.list.mockResolvedValue([])
+    const wrapper = await mountTab({}, skp)
+    await openCreate(wrapper)
+    await setInput('tahun', '2022')
+    expect([field('tgl_mulai')?.value, field('tgl_akhir')?.value]).toEqual(['2022-01-01', '2022-12-31'])
+    expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(true)
+    await setInput('tahun', '2021')
+    expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(false)
+
+    await setInput('tgl_mulai', '2021-01-02')
+    await setInput('tgl_akhir', '2021-12-31')
+    await setInput('nilai_skp', '121')
+    await setInput('nilai_perilaku', '120')
+    await submitForm()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Nilai SKP maksimal 120.'))
+    expect(svc.create).not.toHaveBeenCalled()
+    expect(document.body.textContent).not.toContain('Nilai Perilaku maksimal')
+
+    await setInput('tahun', '2020')
+    await setInput('nilai_skp', '101')
+    await submitForm()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Nilai SKP maksimal 100.'))
+
+    await setInput('tahun', '2023')
+    await submitForm()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Tahun maksimal 2022.'))
+    expect(svc.create).not.toHaveBeenCalled()
+  })
+
+  it('SKP edit baris legacy: kategori tersimpan tidak ditimpa saat form dibuka; dihitung ulang setelah nilai diubah', async () => {
+    svc.list.mockResolvedValue([
+      { id_riwayat_skp: 5, nip: NIP, tahun: 2020, tgl_mulai: '2020-01-02', tgl_akhir: '2020-12-31', nilai_skp: '90.00', nilai_skp_60_persen: '54.00', nilai_perilaku: '90.00', nilai_perilaku_40_persen: '36.00', nilai_prestasi_kerja: '90.00', kategori_nilai_prestasi: 'Sangat Baik (impor)', status: 1 },
+    ] as never)
+    const wrapper = await mountTab({}, skp)
+    await selectRowAction(wrapper, 'riwayat-actions-5', 'edit')
+    await flushPromises()
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik (impor)')
+    await setInput('nilai_skp', '95')
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik')
+    expect(field('nilai_prestasi_kerja')?.value).toBe('93')
+  })
+
+  it('AK edit Current AK (jenis_ak 1): jumlah AK menampilkan nilai tersimpan dan tidak dihitung ulang', async () => {
+    svc.list.mockResolvedValue([
+      { id_riwayat_ak: 3, nip: NIP, jenis_ak: 1, no_hpak: 'PAK-1', tgl_pak: '2020-01-01', ak_terakhir: 25, pengajuan_ak: 12.5, nilai_ak: 123.5, file_pak: 'x.pdf', status: 1 },
+      { id_riwayat_ak: 4, nip: NIP, jenis_ak: 2, no_hpak: 'PAK-2', tgl_pak: '2021-01-01', ak_terakhir: 25, pengajuan_ak: 12.5, nilai_ak: 37.5, file_pak: 'x.pdf', status: 1 },
+    ] as never)
+    const wrapper = await mountTab({}, ak)
+    await selectRowAction(wrapper, 'riwayat-actions-3', 'edit')
+    await flushPromises()
+    expect(field('nilai_ak')?.value).toBe('123.5')
+    await setInput('pengajuan_ak', '20')
+    expect(field('nilai_ak')?.value).toBe('123.5')
+    q<HTMLButtonElement>('[data-testid="riwayat-cancel"]')?.click()
+    await flushPromises()
+
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    await setInput('pengajuan_ak', '20')
+    expect(field('nilai_ak')?.value).toBe('45')
+  })
+})
