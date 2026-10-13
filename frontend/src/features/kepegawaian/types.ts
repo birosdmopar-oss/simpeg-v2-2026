@@ -887,3 +887,49 @@ export interface KonketOpsi {
   kategori_sakit: number
   jenis: { kategori: number; jenis_konket: string; affect_tukin: number }[]
 }
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * LKH — Laporan Kerja Harian (B-12b, `lkh/*`, MAKE-013); tabel `riwayat_lckh`
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/** 0 Menunggu, 1 Disetujui, 2 Ditolak, 3 Revisi. */
+export type StatusLkh = 0 | 1 | 2 | 3
+
+export interface LkhKegiatan {
+  kegiatan: string
+  output: string
+  jumlah_diselesaikan: string
+  jam_mulai: string
+  jam_selesai: string
+}
+
+export interface LkhItem {
+  id: number
+  nip: string
+  nama: string
+  unit: string | null
+  satker: string | null
+  tgl_laporan: string
+  nip_atasan: string | null
+  nama_atasan: string
+  status: StatusLkh
+  catatan: string | null
+  jumlah: number
+  aksi: { ubah: boolean; hapus: boolean; proses: boolean }
+  kegiatan?: LkhKegiatan[]
+}
+
+export interface LkhListResponse {
+  items: LkhItem[]
+  meta: { page: number; per_page: number; total: number }
+  nip?: string
+  can_create?: boolean
+}
+
+export interface LkhOpsi {
+  nip: string
+  tanggal_minimal: string
+  tanggal_maksimal: string
+  atasan: { nip: string; nama: string } | null
+  punya_jabatan: boolean
+}

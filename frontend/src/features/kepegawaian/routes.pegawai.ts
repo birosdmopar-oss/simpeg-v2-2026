@@ -36,14 +36,14 @@ export const pegawaiRoutes: RouteRecordRaw[] = [
     meta: { roles: PENUGASAN_ROLES, title: 'Plt/Plh' },
   },
   {
-    // B-13 Usulan Konket (hr/rwy/konket/* = role 1, 2, 3, 6, 7) — halaman usulan mandiri; placeholder sampai M5.
+    // B-13 Usulan Konket (hr/rwy/konket/* = role 1, 2, 3, 6, 7) — halaman usulan mandiri (MAKE-013).
     path: '/konket',
     name: 'konket-usulan',
     component: () => import('./views/UsulanKonketPage.vue'),
     meta: { roles: KONKET_ROLES, title: 'Usulan Konket' },
   },
   {
-    // B-12b Verifikasi LKH (hr/rwy/lkh/* = role 1, 2, 3, 6, 7; approver = atasan langsung) — placeholder sampai M5.
+    // B-12b LKH (hr/rwy/lkh/* = role 1, 2, 3, 6, 7; approver = atasan langsung) — tab LKH Saya & Verifikasi Bawahan (MAKE-013).
     path: '/lkh/verifikasi',
     name: 'lkh-verifikasi',
     component: () => import('./views/VerifikasiLkhPage.vue'),
