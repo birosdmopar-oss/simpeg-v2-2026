@@ -180,6 +180,21 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Kunci payload MENTAH (aditif MAKE-019, engine-v1): diteruskan engine APA ADANYA (tanpa ValidasiRiwayat; string,
+     * array, atau null sesuai kiriman — JSON array, multipart `kolom[]` berulang, atau multipart `kolom=''`) ke
+     * `validate()` dan `beforeSave()` saat tambah maupun ubah, HANYA bila klien mengirim kuncinya. Engine tidak pernah
+     * menulis kunci ini ke tabel: Definisi memindahkan/menormalkannya ke kolom nyata di beforeSave (mis. jabatan:
+     * `id_subrumpun_jabatan` daftar ID → teks nama `subrumpun_jabatan` dipisah `***`); sisa kunci mentah dibuang sebelum
+     * insert/update. Nama tidak boleh sama dengan field `fields()`, kolom NIP/status, atau PK (RiwayatRegistry menolak).
+     *
+     * @return list<string>
+     */
+    public function isianMentah(): array
+    {
+        return [];
+    }
+
+    /**
      * Saring tambahan daftar riwayat (aditif MAKE-008, engine-v1): dipanggil engine di `GET riwayat/{jenis}` setelah
      * filter NIP & status != 10, sebelum urutanDaftar(). Bawaan tidak menyaring. Contoh: SKP periodik hanya menampilkan
      * baris status 1 (legacy `L_skp.php` periodic() :779). Detail/ubah per baris tidak ikut disaring.

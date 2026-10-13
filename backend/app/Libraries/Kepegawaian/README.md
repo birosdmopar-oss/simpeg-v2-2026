@@ -188,6 +188,12 @@ Perubahan sesudah beku (aditif / konsistensi, WS-1):
 - MAKE-017 (hook aditif): `RiwayatDefinisi::pratinjauTambah(nip, query)` + `RiwayatEngine::pratinjauTambah()` + endpoint
   `GET …/riwayat/{jenis}/pratinjau` (izin aksi tambah; default null → 404). AK memakainya untuk isian turunan form tambah
   (logika bersama `Ak::turunan()`/`masaKerja()`/`akTerakhir()` dengan beforeSave).
+- MAKE-019 (hook aditif, untuk B-07 sub rumpun multiselect WS-2): `RiwayatDefinisi::isianMentah(): list<string>` (bawaan
+  []). Kunci terdaftar yang DIKIRIM klien diteruskan engine apa adanya (tanpa ValidasiRiwayat; JSON array, form `kolom[]`
+  berulang → array, form `kolom=''` → '') ke `validate()` dan `beforeSave()` saat tambah & ubah; kunci absen = tidak
+  ada di `$data`. Engine membuang sisa kunci mentah sesudah beforeSave (tidak pernah ditulis ke tabel) — Definisi yang
+  memindahkan/menormalkannya ke kolom nyata. RiwayatRegistry menolak (LogicException) nama tidak sah atau bentrok dengan
+  field `fields()`, kolom NIP/status, atau PK.
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata
