@@ -125,6 +125,43 @@ final class BiodataService implements BiodataServiceInterface
             throw new NotFoundException('Foto pegawai tidak tersedia.');
         }
 
+        return ['isi' => $isi, 'mime' => self::mime($isi), 'nama' => 'foto_' . $nip . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+    }
+
+    public function antreanPengajuan(AuthContext $auth, array $filter = []): array
+    {
+        return $this->approval()->antrean($auth, $filter);
+    }
+
+    public function pengajuan(AuthContext $auth, int $idHist): array
+    {
+        return $this->approval()->detail($auth, $idHist);
+    }
+
+    public function fotoPengajuan(AuthContext $auth, int $idHist): array
+    {
+        $path = $this->approval()->pathFoto($auth, $idHist);
+        $isi  = ApprovalBiodata::bacaFoto($this->berkas ?? new KolomBerkas(), $path);
+
+        if ($isi === null) {
+            throw new NotFoundException('Foto pengajuan tidak tersedia.');
+        }
+
+        return ['isi' => $isi, 'mime' => self::mime($isi), 'nama' => 'foto_pengajuan_' . $idHist . '.' . pathinfo((string) $path, PATHINFO_EXTENSION)];
+    }
+
+    public function prosesPengajuan(AuthContext $auth, int $idHist, string $aksi, ?string $reasonNote): array
+    {
+        return $this->approval()->proses($auth, $idHist, $aksi, $reasonNote);
+    }
+
+    private function approval(): ApprovalBiodata
+    {
+        return new ApprovalBiodata($this->koneksi(), $this->scope());
+    }
+
+    private static function mime(string $isi): string
+    {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime  = $finfo === false ? false : finfo_buffer($finfo, $isi);
 
@@ -132,7 +169,7 @@ final class BiodataService implements BiodataServiceInterface
             finfo_close($finfo);
         }
 
-        return ['isi' => $isi, 'mime' => is_string($mime) ? $mime : 'application/octet-stream', 'nama' => 'foto_' . $nip . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+        return is_string($mime) ? $mime : 'application/octet-stream';
     }
 
     /**
@@ -178,6 +215,11 @@ final class BiodataService implements BiodataServiceInterface
             $param['updated_at']  = $sekarang;
             $param['updated_by']  = $auth->idPengguna();
             $pegawaiModel->withActor($auth, static fn () => $pegawaiModel->update($nip, $param));
+
+            // B-05 [K] trigger pegawai_afUpd (D1:7975): status 1 → 2 menonaktifkan akun UserLevel 2 (PNS) + sesi dicabut.
+            if ((int) $pegawai['status'] === 1 && (int) ($param['status'] ?? 1) === 2) {
+                AkunPegawai::nonaktifkan($db, $auth, $nip, [Role::PEGAWAI], 'status pegawai 1 -> 2');
+            }
 
             if (isset($param['foto']) && $db->table('pegawai_foto')->where('nip', $nip)->where('foto', $param['foto'])->countAllResults() === 0) {
                 $fotoModel = new PegawaiFotoModel($db);

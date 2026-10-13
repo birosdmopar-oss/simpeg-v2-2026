@@ -6,7 +6,8 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/pegawai.service', () => ({ pegawaiService: { list: vi.fn(), detail: vi.fn() } }))
+vi.mock('../services/pegawai.service', () => ({ pegawaiService: { list: vi.fn(), detail: vi.fn(), hapus: vi.fn(), tambah: vi.fn() } }))
+vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
 
 import { Role, type RoleCode } from '@/features/auth/types'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
@@ -18,6 +19,7 @@ import DaftarPegawaiPage from '../views/DaftarPegawaiPage.vue'
 import { apiError, listItem } from './fixtures'
 
 const list = vi.mocked(pegawaiService.list)
+const hapus = vi.mocked(pegawaiService.hapus)
 const ITEMS = Array.from({ length: 10 }, (_, i) => listItem(i + 1))
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -126,6 +128,28 @@ describe('DaftarPegawaiPage — aksi & role', () => {
     expect(wrapper.get(`[data-testid="pegawai-actions-${first.nip}"]`).attributes('aria-label')).toBe(`Aksi untuk ${first.nama}`)
   })
 
+  it('"Hapus" → ConfirmDialog → DELETE pegawai/{nip} → pemberitahuan + muat ulang (B-05)', async () => {
+    hapus.mockResolvedValue({ deleted: true, soft_delete: true, item: ITEMS[0] as never })
+    const { wrapper } = await mountList()
+    await selectRowAction(wrapper, `pegawai-actions-${first.nip}`, 'hapus')
+    await flushPromises()
+    const ya = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Ya, hapus'))
+    expect(ya).toBeDefined()
+    ya?.click()
+    await vi.waitFor(() => expect(hapus).toHaveBeenCalledWith(first.nip))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('dihapus permanen'))
+    await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+  })
+
+  it('"Hapus" ditolak 422 (masih punya data terkait) → pesan server ditampilkan', async () => {
+    hapus.mockRejectedValue(apiError(422, { nip: ['Pegawai tidak dapat dihapus karena masih memiliki data terkait (riwayat, jabatan, akun, dll.).'] }))
+    const { wrapper } = await mountList()
+    await selectRowAction(wrapper, `pegawai-actions-${first.nip}`, 'hapus')
+    await flushPromises()
+    ;[...document.body.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Ya, hapus'))?.click()
+    await vi.waitFor(() => expect(wrapper.text()).toContain('masih memiliki data terkait'))
+  })
+
   it('"Lihat detail" membuka /pegawai/:nip', async () => {
     const { wrapper, router } = await mountList()
     await selectRowAction(wrapper, `pegawai-actions-${first.nip}`, 'detail')
@@ -133,10 +157,12 @@ describe('DaftarPegawaiPage — aksi & role', () => {
     expect(router.currentRoute.value.path).toBe(`/pegawai/${first.nip}`)
   })
 
-  it('"+ Data Pegawai" hanya Super Admin dan memberi pesan belum tersedia', async () => {
+  it('"+ Data Pegawai" hanya Super Admin dan membuka dialog Tambah Pegawai (B-05)', async () => {
     const admin = await mountList()
     await admin.wrapper.get('[data-testid="add-pegawai"]').trigger('click')
-    expect(admin.wrapper.text()).toContain('Form tambah pegawai belum tersedia')
+    await flushPromises()
+    expect(document.body.querySelector('[data-testid="tambah-pegawai-dialog"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-field="nip"]')).not.toBeNull()
     admin.wrapper.unmount()
 
     const { wrapper } = await mountList(Role.MENTERI)

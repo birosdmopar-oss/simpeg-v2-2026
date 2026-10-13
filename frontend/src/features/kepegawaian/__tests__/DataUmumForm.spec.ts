@@ -72,7 +72,7 @@ describe('DataUmumForm — isian per role', () => {
   })
 
   it('Pegawai: nama/gelar/tgl lahir READONLY (form legacy); tanpa jenis pegawai/jenis status; tombol "Ajukan Perubahan"', async () => {
-    await mountForm(Role.PEGAWAI, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false } }))
+    await mountForm(Role.PEGAWAI, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false, proses_biodata: false } }))
     const ro = q('[data-testid="data-umum-readonly"]')
     for (const name of ['nama', 'glr_awal', 'glr_akhir', 'tgl_lahir']) {
       const input = ro?.querySelector<HTMLInputElement>(`[data-field="${name}"] input, input[data-field="${name}"]`)
@@ -89,7 +89,7 @@ describe('DataUmumForm — isian per role', () => {
   })
 
   it('Admin Satker: jenis pegawai ada, nama hanya readonly', async () => {
-    await mountForm(Role.ADMIN_SATKER, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false } }))
+    await mountForm(Role.ADMIN_SATKER, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false, proses_biodata: false } }))
     expect(q('[data-field="id_jenis_pegawai"]')).not.toBeNull()
     expect(q('[data-testid="data-umum-form"] form [data-field="nama"]')).toBeNull()
     expect(q('[data-testid="data-umum-readonly"] [data-field="nama"]')).not.toBeNull()
@@ -103,7 +103,7 @@ describe('DataUmumForm — isian per role', () => {
 
 describe('DataUmumForm — kirim', () => {
   it('nilai awal dari detail; kerabat bebas data lama → Kerabat Lain + teks; kirim PUT tanpa foto', async () => {
-    const wrapper = await mountForm(Role.PEGAWAI, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false } }))
+    const wrapper = await mountForm(Role.PEGAWAI, lengkap({ aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false, proses_biodata: false } }))
     expect((field('jenis_kerabat_lain') as HTMLInputElement).value).toBe('Sepupu Jauh')
     await setInput('no_hp', '0812-9999')
     await submit()
@@ -144,7 +144,7 @@ describe('DataUmumForm — kirim', () => {
 
   it('pengaju dengan pengajuan menunggu: diberi tahu pengajuan lama akan diganti; tanpa konfirmasi', async () => {
     const menunggu = { id_pegawai_hist: 9, flag_update: 1, reason_note: null, created_at: null, updated_at: null, notif_date: null }
-    await mountForm(Role.PEGAWAI, lengkap({ pengajuan: menunggu, aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false } }))
+    await mountForm(Role.PEGAWAI, lengkap({ pengajuan: menunggu, aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false, proses_biodata: false } }))
     expect(q('[data-testid="data-umum-pengajuan-diganti"]')?.textContent).toContain('akan diganti')
     expect(q('[data-testid="data-umum-peringatan-pengajuan"]')).toBeNull()
 

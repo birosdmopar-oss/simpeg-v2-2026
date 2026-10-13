@@ -73,7 +73,7 @@ export function pegawaiDetail(
     jabatan_aktif: null,
     pangkat_aktif: null,
     pengajuan: null,
-    aksi: { ubah_biodata: true, ubah_langsung: true, koreksi_nip: true },
+    aksi: { ubah_biodata: true, ubah_langsung: true, koreksi_nip: true, proses_biodata: false },
     ...extra,
     tabs,
   }

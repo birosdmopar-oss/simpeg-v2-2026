@@ -7,7 +7,7 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/pegawai.service', () => ({
-  pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn() },
+  pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn(), pengajuan: vi.fn(), prosesPengajuan: vi.fn(), hapus: vi.fn() },
 }))
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
@@ -26,6 +26,9 @@ import { apiError, descriptor, NIP, pegawaiDetail } from './fixtures'
 const detail = vi.mocked(pegawaiService.detail)
 const updateBiodata = vi.mocked(pegawaiService.updateBiodata)
 const koreksiNip = vi.mocked(pegawaiService.koreksiNip)
+const pengajuanDetail = vi.mocked(pegawaiService.pengajuan)
+const prosesPengajuan = vi.mocked(pegawaiService.prosesPengajuan)
+const hapus = vi.mocked(pegawaiService.hapus)
 
 const TABS = [
   descriptor('jabatan', 'Riwayat Jabatan'),
@@ -67,7 +70,7 @@ describe('DetailPegawaiPage — data', () => {
   })
 
   it('tab Data Umum (bawaan) menampilkan biodata kolom pegawai, hanya-lihat sampai "Ubah Data Umum" dipilih', async () => {
-    detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: false } }))
+    detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: false, proses_biodata: false } }))
     const { wrapper } = await mountDetail()
     const du = wrapper.get('[data-testid="data-umum"]')
     expect(du.get('[data-field="bpjs_kes"]').text()).toContain('0001234567890')
@@ -81,7 +84,7 @@ describe('DetailPegawaiPage — data', () => {
   it('"Ubah Data Umum" (aksi.ubah_biodata) membuka form; pengajuan → pemberitahuan + detail dimuat ulang', async () => {
     detail.mockResolvedValue(
       pegawaiDetail(TABS, { npwp: '1', bpjs_kes: '2', no_taspen: '3', jenis_kerabat: 'Anak', no_telp_kerabat: '4', ada_foto: true }, {
-        aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false },
+        aksi: { ubah_biodata: true, ubah_langsung: false, koreksi_nip: false, proses_biodata: false },
         pengajuan: { id_pegawai_hist: 9, flag_update: 2, reason_note: 'Lengkapi NPWP', created_at: null, updated_at: null, notif_date: null },
       }),
     )
@@ -155,7 +158,7 @@ describe('DetailPegawaiPage — aksi kartu', () => {
       [Role.PTT, false, false],
       [Role.PIMPINAN, false, false],
     ] as const) {
-      detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: role === Role.SUPER_ADMIN } }))
+      detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: role === Role.SUPER_ADMIN, proses_biodata: false } }))
       const { wrapper } = await mountDetail(`/pegawai/${NIP}`, role)
       expect(wrapper.find('[data-testid="btn-cetak"]').exists(), `cetak role ${role}`).toBe(print)
       expect(wrapper.find('[data-testid="btn-more"]').exists(), `hapus role ${role}`).toBe(more)
@@ -192,6 +195,57 @@ describe('DetailPegawaiPage — aksi kartu', () => {
 
     expect(koreksiNip).toHaveBeenCalledWith(NIP, BARU)
     expect(router.currentRoute.value.params.nip).toBe(BARU)
+  })
+
+  it('B-04: aksi.proses_biodata → "Tolak Pengajuan" membuka ApprovalDialog dengan perbandingan; alasan wajib; kirim proses', async () => {
+    const menunggu = { id_pegawai_hist: 9, flag_update: 1, reason_note: null, created_at: null, updated_at: null, notif_date: null }
+    detail.mockResolvedValue(pegawaiDetail(TABS, {}, { pengajuan: menunggu, aksi: { ubah_biodata: true, ubah_langsung: true, koreksi_nip: true, proses_biodata: true } }))
+    pengajuanDetail.mockResolvedValue({
+      pengajuan: { ...menunggu, nip: NIP, nama: 'Budi Contoh', ada_foto: false },
+      pegawai: { nip: NIP, nama: 'Budi Contoh', ada_foto: false, email: 'a@contoh.test' },
+      perubahan: [{ kolom: 'no_hp', lama: '0811', baru: '0822' }, { kolom: 'foto', lama: false, baru: true }],
+      can_process: true,
+    })
+    prosesPengajuan.mockResolvedValue({
+      pengajuan: { ...menunggu, flag_update: 2, nip: NIP, nama: 'Budi Contoh', ada_foto: false },
+      pegawai: { nip: NIP, nama: 'Budi Contoh', ada_foto: false, email: null },
+      perubahan: [],
+      can_process: false,
+    })
+    const { wrapper } = await mountDetail()
+
+    await wrapper.get('[data-testid="btn-tolak-pengajuan"]').trigger('click')
+    await flushPromises()
+    expect(pengajuanDetail).toHaveBeenCalledWith(9)
+    const diff = document.body.querySelector('[data-testid="pengajuan-diff"]')
+    expect(diff?.querySelector('[data-kolom="no_hp"]')?.textContent).toContain('0822')
+    expect(diff?.querySelector('[data-kolom="foto"]')?.textContent).toContain('Ada foto')
+
+    const textarea = document.body.querySelector<HTMLTextAreaElement>('[data-testid="approval-dialog"] textarea, textarea')
+    expect(textarea).not.toBeNull()
+    if (textarea) {
+      textarea.value = 'Lengkapi NPWP'
+      textarea.dispatchEvent(new Event('input'))
+    }
+    await flushPromises()
+    const tolak = [...document.body.querySelectorAll<HTMLButtonElement>('button')].filter((b) => b.textContent?.trim() === 'Tolak').at(-1)
+    tolak?.click()
+    await vi.waitFor(() => expect(prosesPengajuan).toHaveBeenCalledWith(9, { aksi: 'tolak', reason_note: 'Lengkapi NPWP' }))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Pengajuan perubahan data umum ditolak.'))
+  })
+
+  it('B-05: ⋯ "Hapus Pegawai" → konfirmasi (permanen) → DELETE pegawai/{nip} → kembali ke daftar', async () => {
+    hapus.mockResolvedValue({ deleted: true, soft_delete: false, item: pegawaiDetail() })
+    const { wrapper, router } = await mountDetail()
+    await wrapper.get('[data-testid="btn-more"]').trigger('click')
+    await flushPromises()
+    document.body.querySelector<HTMLElement>('[data-action="hapus-pegawai"]')?.click()
+    await flushPromises()
+    expect(document.body.textContent).toContain('PERMANEN')
+    const ya = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Ya, hapus'))
+    ya?.click()
+    await vi.waitFor(() => expect(hapus).toHaveBeenCalledWith(NIP))
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('pegawai-list'))
   })
 
   it('"Arsip Kepegawaian" memberi tahu belum tersedia (B-18)', async () => {

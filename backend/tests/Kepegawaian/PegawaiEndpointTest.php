@@ -146,7 +146,7 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->assertSame('pegawai@contoh.test', $data['email']);
         $this->assertTrue($data['ada_foto']);
         $this->assertArrayNotHasKey('foto', $data);
-        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => true, 'koreksi_nip' => true], $data['aksi']);
+        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => true, 'koreksi_nip' => true, 'proses_biodata' => false], $data['aksi']);
         $this->assertNotNull($data['jabatan_aktif']);
         $this->assertNull($data['pengajuan']);
     }
@@ -159,7 +159,7 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->get("api/v1/pegawai/{$lain}")->assertStatus(401);
 
         $milik = $this->json($this->asUser($pegawai)->get("api/v1/pegawai/{$diri}"))['data'];
-        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => false, 'koreksi_nip' => false], $milik['aksi']);
+        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => false, 'koreksi_nip' => false, 'proses_biodata' => false], $milik['aksi']);
 
         $this->asUser($pegawai)->get("api/v1/pegawai/{$lain}")->assertStatus(403);
         $this->asUser($pegawai)->get('api/v1/pegawai/' . self::NIP_TIDAK_ADA)->assertStatus(403);

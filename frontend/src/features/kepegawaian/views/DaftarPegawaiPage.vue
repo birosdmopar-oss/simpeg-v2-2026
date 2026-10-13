@@ -5,14 +5,15 @@
  * Akses: role 1, 3, 4, 5, 8; tombol "+ Data Pegawai" dan aksi "Hapus" hanya role 1.
  *
  * Tanpa data contoh: selama endpoint masih stub (404/501) halaman menampilkan keadaan galat yang jelas.
- * TODO(B-20, WS-2): panel filter (unit, jenis/status pegawai, jabatan) & filter per kolom dikembalikan setelah
- * parameter `GET pegawai` ditetapkan. Tambah/Hapus/Export belum tersambung (B-05/B-20) — halaman memberi tahu.
+ * Tambah (TambahPegawaiDialog) dan Hapus (⋮ → ConfirmDialog → `DELETE pegawai/{nip}`, hapus PERMANEN ikut legacy;
+ * 422 bila pegawai masih punya data terkait) tersambung B-05 (MAKE-011). TODO(B-20 penutup, MAKE-014): panel filter, filter per kolom, export.
  */
 import { Plus } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { isApiError } from '@/lib/axios'
 import { Role } from '@/features/auth/types'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
@@ -20,6 +21,7 @@ import { UiButton, UiCard, UiExportMenu, UiNotice, UiPagination, UiSearchInput, 
 
 import PegawaiColumnPicker from '../components/PegawaiColumnPicker.vue'
 import PegawaiTable from '../components/PegawaiTable.vue'
+import TambahPegawaiDialog from '../components/TambahPegawaiDialog.vue'
 import { DEFAULT_COLUMN_KEYS, fullName } from '../columns'
 import { describeApiError, type ApiFailure } from '../services/apiErrors'
 import { pegawaiService } from '../services/pegawai.service'
@@ -44,6 +46,8 @@ const notice = ref<string | null>(null)
 const deleting = ref<PegawaiListItem | null>(null)
 /** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
 const deleteOpen = ref(false)
+const tambahOpen = ref(false)
+const busyDelete = ref(false)
 
 const PER_PAGE_OPTIONS = ['10', '25', '50'].map((v) => ({ value: v, label: v }))
 
@@ -92,10 +96,31 @@ function onAction(key: 'detail' | 'hapus', row: PegawaiListItem): void {
   }
 }
 
-function confirmDelete(): void {
+async function confirmDelete(): Promise<void> {
   deleteOpen.value = false
-  const name = deleting.value ? fullName(deleting.value) : ''
-  notice.value = `Penghapusan pegawai (${name}) belum tersedia — akan aktif bersama task B-05.`
+  const row = deleting.value
+  if (!row) return
+  busyDelete.value = true
+  try {
+    await pegawaiService.hapus(row.nip)
+    notice.value = `Data pegawai ${fullName(row)} (${row.nip}) dihapus permanen.`
+    void load()
+  } catch (error) {
+    notice.value = `Gagal menghapus pegawai: ${pesanServer(error)}`
+  } finally {
+    busyDelete.value = false
+    deleting.value = null
+  }
+}
+
+/** Pesan 422 server (mis. "masih memiliki data terkait") bila ada; selain itu pesan baku per jenis galat. */
+function pesanServer(error: unknown): string {
+  return (isApiError(error) ? Object.values(error.errors ?? {})[0]?.[0] : undefined) ?? describeApiError(error).message
+}
+
+function onCreated(): void {
+  notice.value = 'Pegawai baru ditambahkan. Lanjutkan dengan mengisi Riwayat Jabatan pegawai tersebut.'
+  void load()
 }
 
 const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawai' }]
@@ -107,7 +132,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
 
     <UiCard title="Daftar Pegawai" flush>
       <template #actions>
-        <UiButton v-if="isSuperAdmin" data-testid="add-pegawai" @click="notice = 'Form tambah pegawai belum tersedia — akan aktif bersama task B-05.'">
+        <UiButton v-if="isSuperAdmin" data-testid="add-pegawai" @click="tambahOpen = true">
           <template #icon-left><Plus class="h-4 w-4" aria-hidden="true" /></template>
           Data Pegawai
         </UiButton>
@@ -142,10 +167,12 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
       </div>
     </UiCard>
 
+    <TambahPegawaiDialog v-if="isSuperAdmin" v-model:open="tambahOpen" @created="onCreated" />
+
     <ConfirmDialog
       :open="deleteOpen"
       title="Hapus pegawai?"
-      :description="deleting ? `Data ${fullName(deleting)} (${deleting.nip}) akan dihapus.` : ''"
+      :description="deleting ? `Data ${fullName(deleting)} (${deleting.nip}) akan dihapus PERMANEN. Pegawai yang masih punya riwayat, jabatan, atau akun login tidak dapat dihapus.` : ''"
       confirm-label="Ya, hapus"
       danger
       @update:open="(v) => (deleteOpen = v)"

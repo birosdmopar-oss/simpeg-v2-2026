@@ -325,6 +325,30 @@ arsip status/arsip data umum (`document_attachment` ARSIP_RWY `status_du`/`arsip
 tidak bisa diubah [V2]; email akun hanya disinkron pada jalur langsung (jalur pengajuan menyimpannya di `pegawai_hist.email`
 sampai disetujui B-04).
 
+## Approval biodata B-04 & siklus pegawai B-05 (`Pegawai/`, MAKE-011)
+
+| Kelas | Isi |
+|---|---|
+| `ApprovalBiodata` | B-04: antrean pengajuan menunggu (jalur PROSES), detail + `perubahan`, setujui (salin kolom biodata → `pegawai`, `flag_update` 3, email akun, galeri foto) / tolak (alasan wajib, `pegawai` tidak berubah kecuali `flag_update` 2 — bug legacy `sp_process` :1098 tidak ditiru), penanda `show_notif`/`notif_date`/`approved_by`/`show_ua_*` seperti legacy :1095-1103 + trigger `pegawai_hist_beUpd`. [V2]: hanya kolom biodata yang disalin (bukan `status`/`nip`/SIASN), lingkup role 3 diperiksa `bolehProses` (legacy `process` tidak memeriksanya) |
+| `SiklusPegawai` | B-05: tambah (pegawai + foto + akun A-09 password awal = NIP, satu transaksi) dan hapus FISIK ikut legacy (422 bila masih ada data terkait: FK RESTRICT 1451 atau akun ber-NIP; galeri `pegawai_foto` ikut dihapus, berkas dibuang sesudah commit; audit `delete`) |
+| `AkunPegawai` | Role akun dari jenis pegawai [K] (`2` → PTT, `6` → PPPK, lain → PNS); nonaktifkan akun + cabut sesi (status 1 → 2 hanya user_level 2, trigger `pegawai_afUpd`) |
+
+**Jalur proses PegawaiScope = interface terpisah `PegawaiScopeProsesInterface`** (`terapkanKeQueryProses`, aditif
+MAKE-011), bukan method baru di `PegawaiScopeInterface`: kontrak beku itu punya implementasi lain (fake test
+`FakePegawaiScope`, kelas anonim di test WS-1 `RiwayatTabEndpointTest`) yang akan rusak bila interface-nya ditambah.
+`PegawaiScope` dan `StubPegawaiScope` mengimplementasikan keduanya; pemanggil yang menerima scope tanpa interface ini
+menyaring hasil per baris dengan `bolehProses()`. Antrean approval berikutnya (riwayat, Konket, LKH) memakai filter yang
+sama, bukan `terapkanKeQuery` (yang untuk admin unit 20 memuat UPT).
+
+**Password awal = NIP (B-05).** Jalur aditif `AccountProvisioner::provisionDenganPasswordNip()` (milik Auth/A-09)
+sengaja melewati PasswordPolicy karena keputusan user 13-10-2026 ikut legacy `L_employee.php:157-166`; hash Argon2id,
+bukan md5. `provisionForPegawai()` tetap password acak yang lolos kebijakan. Penanda "wajib ganti password" menunggu
+DBV-020.
+
+**Hapus pegawai [K]** ikut legacy (keputusan user 13-10-2026; DoD B-05 menyebut soft delete): praktis hanya pegawai yang
+baru ditambah tanpa data turunan dan tanpa akun yang bisa dihapus — sama dengan legacy, yang gagal ("Gagal menghapus
+data pegawai") bila FK menolak. Tidak ada cascade manual.
+
 ## Lingkup akses pegawai (`Scope/`, MAKE-009)
 
 `PegawaiScope` = implementasi nyata `PegawaiScopeInterface` (service `pegawaiScope`). Semua endpoint Modul B memeriksa

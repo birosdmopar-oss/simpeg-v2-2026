@@ -153,6 +153,49 @@ export interface AksiPegawai {
   /** true = Super Admin: perubahan langsung ke `pegawai`; false = lewat pengajuan (approval B-04). */
   ubah_langsung: boolean
   koreksi_nip: boolean
+  /** B-04 (MAKE-011): ada pengajuan menunggu yang boleh diproses pemanggil (role 1/3 + lingkup proses). */
+  proses_biodata: boolean
+}
+
+/** Satu kolom yang berubah pada pengajuan biodata (`foto`: lama/baru = ada foto atau tidak). */
+export interface PerubahanBiodata {
+  kolom: string
+  lama: string | number | boolean | null
+  baru: string | number | boolean | null
+}
+
+/** `GET biodata/pengajuan/{id}` → `data` (B-04). */
+export interface PengajuanBiodataDetail {
+  pengajuan: Record<string, unknown> & PengajuanBiodata & { nip: string; nama: string; ada_foto: boolean }
+  pegawai: Record<string, unknown> & { nip: string; nama: string; ada_foto: boolean; email: string | null }
+  perubahan: PerubahanBiodata[]
+  can_process: boolean
+}
+
+/** Satu baris `GET biodata/pengajuan` (antrean B-04). */
+export interface PengajuanBiodataItem {
+  id_pegawai_hist: number
+  nip: string
+  nama: string
+  glr_awal: string | null
+  glr_akhir: string | null
+  unit: string | null
+  satker: string | null
+  jabatan: string | null
+  tgl_permohonan: string | null
+}
+
+/** `POST pegawai` → `data` (B-05): akun A-09 dengan password awal yang dikembalikan SEKALI. */
+export interface TambahPegawaiResult {
+  pegawai: Pegawai
+  akun: {
+    id_pengguna: number | null
+    username: string
+    user_level: number
+    created: boolean
+    initial_password: string | null
+    email_skipped: boolean
+  }
 }
 
 /**

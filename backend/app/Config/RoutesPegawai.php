@@ -35,9 +35,18 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     // B-20 dasar + B-03 biodata + B-06 koreksi NIP (MAKE-010). Detail/biodata/foto: izin & lingkup di service (jwt saja).
     $routes->get('pegawai', 'PegawaiController::index', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN)]);
     $routes->get('pegawai/(:segment)', 'PegawaiController::show/$1');
+    // B-05 tambah & hapus pegawai (MAKE-011, role 1).
+    $routes->post('pegawai', 'PegawaiController::create', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
+    $routes->delete('pegawai/(:segment)', 'PegawaiController::delete/$1', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
     $routes->put('pegawai/(:segment)/biodata', 'PegawaiController::updateBiodata/$1');
     $routes->get('pegawai/(:segment)/foto', 'PegawaiController::foto/$1');
     $routes->post('pegawai/(:segment)/koreksi-nip', 'PegawaiController::koreksiNip/$1', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
+
+    // B-04 approval pengajuan biodata (MAKE-011). Detail/foto: pemroses atau pemilik (service); antrean/proses role 1, 3.
+    $routes->get('biodata/pengajuan', 'PegawaiController::antreanPengajuan', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]);
+    $routes->get('biodata/pengajuan/(:num)', 'PegawaiController::pengajuan/$1');
+    $routes->get('biodata/pengajuan/(:num)/foto', 'PegawaiController::fotoPengajuan/$1');
+    $routes->post('biodata/pengajuan/(:num)/process', 'PegawaiController::prosesPengajuan/$1', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]);
 
     // WS-2: endpoint struktur/Konket/LKH ditambahkan di sini.
 });

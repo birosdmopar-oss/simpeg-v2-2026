@@ -230,6 +230,30 @@ final class AccountProvisionerTest extends DatabaseTestCase
         $this->assertSame($other, $this->db->table('pengguna')->where('id_pengguna', $other['id_pengguna'])->get()->getRowArray());
     }
 
+    public function testPasswordNipB05MelewatiKebijakanDenganHashV2(): void
+    {
+        // MAKE-011 (B-05, keputusan user 13-10-2026): password awal = NIP [K], hash Argon2id, bukan md5.
+        $result = $this->provisioner->provisionDenganPasswordNip(['nip' => self::NIP, 'name' => 'Pegawai Baru'], Role::PPPK);
+
+        $this->assertTrue($result['created']);
+        $this->assertSame(self::NIP, $result['initial_password']);
+
+        $row = $this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray();
+        $this->assertIsArray($row);
+        $this->assertSame(Role::PPPK, (int) $row['user_level']);
+        $this->assertStringStartsWith('$argon2id$', (string) $row['password']);
+        $this->assertTrue(password_verify(self::NIP, (string) $row['password']));
+        $this->assertNull($row['password_legacy']);
+
+        // Jalur biasa tetap menegakkan kebijakan: NIP sebagai password eksplisit ditolak.
+        try {
+            $this->provisioner->provisionForPegawai(['nip' => '200101012025011002'], Role::PEGAWAI, '200101012025011002');
+            $this->fail('Kebijakan password seharusnya menolak NIP.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('password', $e->getErrors());
+        }
+    }
+
     public function testGeneratedPasswordSatisfiesPolicy(): void
     {
         $verifier = new PasswordVerifier(new PenggunaModel($this->db));
