@@ -85,6 +85,16 @@ ditemukan" sampai Definisi pertama masuk. Rincian: `app/Libraries/Kepegawaian/RE
   `Tests\Support\Kepegawaian\RiwayatBtcTrait` (dipakai `BtcUjiPendidikanTest`, `BtcUjiKpTest`; jenis nyata memakainya
   mulai M2) dengan Definisi uji `tests/_support/Kepegawaian/Riwayat/` dan fake scope/lampiran S0.
 
+## Skema Fase 3 (review DB Validator)
+
+- **DBV-012/DBV-013 (B-01/B-02)** — di `main` lewat PR #20 (`957729f`, perbaikan `96fcca2`); dokumen
+  `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md`.
+- **DBV-019 (lanjutan DBV-012/013)** — PR #23, branch `dbv-019/fk-g02-pegawai`, ⏳ menunggu review DB Validator: 55 FK
+  snapshot/riwayat → master G-02, `jabatan_koordinasi`, `rumpun_jabatan` (migration `2026-10-07-100000`/`100100`, RESTRICT,
+  pra-cek nilai yatim fail-closed); 2 FK masuk `pengguna.nip`/`faq_rate.nip` → `pegawai.nip` ikut diajukan tetapi tetap
+  ditahan (`app/Database/MigrationsDitahan/`) sampai `pegawai` diimpor dan validasi NIP 422 di Manajemen Akun ada
+  (keputusan #4); dokumen `backend/docs/db-review/DBV-019-fk-g02-pegawai-schema.md`.
+
 ## Persiapan tanpa skema
 
 ### CR-025 — kalkulasi murni Kepegawaian (bagian B-21) — pra-review internal sisi CR; di main lewat merge `a540703` 30-09-2026
