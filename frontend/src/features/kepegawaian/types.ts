@@ -282,36 +282,53 @@ export interface PegawaiListResponse {
   per_page: number
 }
 
-/** Pejabat simpul struktur (B-19): definitif dari snapshot jabatan, bila kosong Plt lalu Plh yang berlaku hari ini. */
-export interface OrgPejabat {
-  nip: string
-  nama_lengkap: string
-  gol_ruang: string | null
-  jenis: 'definitif' | 'plt' | 'plh'
-  /** Teks legacy "Nama, Gol, NIP" (awalan "Plt."/"Plh."). */
-  pejabat_so: string
+/** Kotak bagan struktur organisasi (B-19, `GET struktur-organisasi`, ikut dataset legacy so_012025). */
+export interface SoKotak {
+  id_jabatan?: number
+  jabatan: string
+  /** Teks legacy "Nama, Gol/Ruang, NIP" (awalan "Plt."/"Plh."); kosong = lowong. */
+  pejabat: string
+  is_plt: boolean
+  jenis: 'definitif' | 'plt' | 'plh' | null
+  satker?: string | null
+  list_es2?: SoKotak[]
+  es3?: SoKotak[]
+  es4?: SoKotak[]
 }
 
-/** Simpul bagan struktur organisasi (B-19, `GET struktur-organisasi`, MAKE-012). */
-export interface OrgNode {
-  /** `sj-<id_struktur_jabatan>`. */
-  id: string
-  id_jabatan: number
-  id_atasan: number | null
-  jabatan: string
-  level_struktur: number
-  id_unit: number | null
-  unit: string | null
-  id_satker: number | null
-  satker: string | null
-  pejabat: OrgPejabat | null
-  children: OrgNode[]
+export type SoFormat = 'kementerian' | 'sesmen' | 'deputi' | 'inspektorat_unit' | 'inspektorat' | 'pusat' | 'bpo' | 'upt'
+
+export interface SoPilihan {
+  value: string
+  label: string
+  level: number
+  disabled: boolean
 }
 
 export interface StrukturOrganisasi {
   periode: { id_periode_struktur_jabatan: number; periode_struktur_jabatan: string } | null
-  filter: { id_unit: number | null; id_satker: number | null }
-  nodes: OrgNode[]
+  tanggal: string
+  id_unit_satker: string
+  kementerian: string
+  pilihan: SoPilihan[]
+  judul: string
+  format: SoFormat
+  /** Dataset per format (kunci legacy): kementerian `menteri`, `wakil_menteri`, `staf_ahli`, `inspektorat`,
+   * `sekretaris`, `deputi`; unit `es1`, `es2_sek`, `es2`; satker `es2_sek`, `es2`, `es3_sek`, `es3`, `es4`. */
+  data: Record<string, SoKotak | SoKotak[] | null>
+}
+
+/** Simpul pohon tampilan (hasil susunan templat dari dataset). */
+export interface OrgNode {
+  id: string
+  jabatan: string
+  pejabat: string
+  jenis: SoKotak['jenis']
+  /** Baris tambahan (mis. Wakil Menteri, satker Es.II kementerian). */
+  sub?: string
+  /** Kotak "Jabatan Fungsional dan Jabatan Pelaksana" legacy. */
+  jf?: boolean
+  children: OrgNode[]
 }
 
 export interface SelectOptionItem {

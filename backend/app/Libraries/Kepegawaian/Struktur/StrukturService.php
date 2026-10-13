@@ -11,171 +11,153 @@ use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\I18n\Time;
 
 /**
- * B-19 Struktur Organisasi (WS-2 M4 MAKE-012).
+ * B-19 Struktur Organisasi (WS-2 M4 MAKE-012) — IKUT TEMPLAT LEGACY (keputusan user 13-10-2026).
  *
- * Sumber [K]: `controllers/hr/So.php` full(), `controllers/hr/rwy/Jabatan.php` so(), `libraries/hr/rwy/L_jabatan.php`
- * so_012025() (:6402), helper `getPLT()` (`helpers/function_helper.php:1946`), `formatNamaGelar()` (:102).
+ * Sumber [K]: `controllers/hr/rwy/Jabatan.php` so() (:1187), `controllers/hr/So.php` full() (:167),
+ * `libraries/hr/rwy/L_jabatan.php` so() (:7058) + so_012025() (:6402), `models/M_simpeg.php` getLUS_so_012025[_lst]()
+ * (:94, :125), helper getPLT() (`helpers/function_helper.php:1946`), formatNamaGelar() (:102), views
+ * `views/hr/employee/rwy/jabatan/so_012025/*`.
  *
- * [V2] Legacy merender templat bagan yang di-hard-code per bentuk organisasi (kementerian/sesmen/deputi/inspektorat/
- * UPT/BPO, tiga generasi templat) dan bisa mundur per bulan sejak 2022. v2 membangun pohon generik dari master
- * `struktur_jabatan` periode aktif (`periode_struktur_jabatan` status 1 terbaru, legacy `list_all_atasan`): simpul =
- * jabatan, induk = `id_jabatan_atasan`; urut `level_struktur`, `urutan`. Hanya kondisi hari ini; mundur per bulan &
- * ekspor PDF di luar M4.
+ * Pilihan `id_unit_satker`: '0' = kementerian, '<id_unit>' = unit, 'sat_<id_satker>' = satker (hanya satker yang
+ * ditawarkan legacy: unit 19 → satker 104, unit 6 → semua satkernya, unit 7 → satker 37/38/41). Format bagan sama
+ * dengan legacy: `kementerian`; unit → `sesmen` (unit = web_config `id_unit_kepegawaian`), `inspektorat` (unit 16),
+ * `deputi`; satker → `inspektorat` (104), `pusat` (49/50), `bpo` (37/38/41), `upt`. Isi dataset per format = kunci
+ * dataset legacy (`menteri`, `staf_ahli`, `sekretaris.list_es2`, `deputi[].list_es2`, `es1`, `es2_sek`, `es2[].es3[].es4`,
+ * `es3_sek`, `es3`, `es4`) dalam bentuk list JSON berurutan.
  *
- * Pejabat simpul (legacy so_012025 :6431-6460 + getPLT):
- *  1. definitif = `pegawai_mutasi_jabatan` jenis 1 dengan `id_jabatan` simpul, pegawai berstatus aktif (1); lebih dari
- *     satu → TMT terbaru;
- *  2. bila kosong: Plt (`pegawai_plt`) lalu Plh (`pegawai_plh`) jenis 1 dengan `id_jabatan` simpul yang berlaku hari ini
- *     (`tgl_mulai <= hari ini <= tgl_akhir`) dan [V2] berstatus 1 (legacy getPLT tidak menyaring status; v2 punya
- *     status 2 Tidak Aktif dan 10 Dihapus).
- * Golongan dari snapshot `pegawai_kp`. Teks `pejabat_so` = format legacy "Nama, Gol, NIP" (Plt./Plh. di depan).
+ * Pejabat per jabatan pada tanggal acuan (hari ini; parameter tanggal disiapkan untuk riwayat per bulan M5/M6):
+ *  - definitif = `riwayat_mutasi_jabatan` status 1, jenis 1, TMT ≤ tanggal, pegawai dibuat sebelum tanggal dan
+ *    (aktif dengan jenis status 1/12, atau nonaktif dengan TMT status sesudah tanggal); per NIP baris TMT terbaru; kunci
+ *    `koord_<id_jabatan_koord>` (koordinator/subkoordinator), `struk_<id_jabatan>` (group 1), `ll_<id_jabatan>` (group 5);
+ *    kunci sama → NIP terakhir (urut NIP) menang, sama dengan legacy;
+ *  - teks "Nama, Gol/Ruang, NIP" (golongan = `riwayat_kp` status 1 TMT ≤ tanggal terbaru); NIP diawali 12345678910
+ *    (akun dummy legacy) → nama saja;
+ *  - kosong → Plt (`pegawai_plt` jabatan itu, tgl_mulai ≤ tanggal ≤ tgl_akhir; legacy getPLT tanpa saring status),
+ *    teks "Plt. …"; [V2] lalu Plh (`pegawai_plh`, aturan sama, "Plh. …") — legacy bagan tidak memakai Plh.
+ *
+ * [V2] simpul diambil dari `struktur_jabatan` periode aktif saja (legacy LEFT JOIN tanpa saring periode + GROUP BY).
+ * Format `pusat` tidak punya view di legacy 2025 (bagan kosong); v2 merendernya dengan tata letak UPT.
  */
 final class StrukturService implements StrukturServiceInterface
 {
+    /** Unit inspektorat (legacy `$idUnitInspektorat = '16'`, so_012025 :6463). */
+    public const UNIT_INSPEKTORAT = 16;
+
+    /** Satker inspektorat (legacy `SATKER_INSPEKTORAT`, `config/constants.php:311`). */
+    public const SATKER_INSPEKTORAT = 104;
+
+    /** Jabatan inspektur (legacy `ID_JAB_INSPEKTORAT`, `config/constants.php:315`). */
+    public const JABATAN_INSPEKTORAT = 2060;
+
+    /** @var list<int> */
+    public const SATKER_PUSAT = [49, 50];
+
+    /** @var list<int> */
+    public const SATKER_BPO = [37, 38, 41];
+
+    /** Unit yang satkernya ditawarkan di pilihan (getLUS_so_012025_lst). */
+    private const UNIT_SATKER_PILIHAN = [19 => [self::SATKER_INSPEKTORAT], 6 => null, 7 => self::SATKER_BPO];
+
+    /** Unit yang tidak bisa dipilih langsung (option disabled di view legacy). */
+    private const UNIT_NONAKTIF_PILIHAN = [6];
+
+    private const NIP_DUMMY = '12345678910';
+
+    /** @var array<string, array<string, mixed>> */
+    private array $pejabat = [];
+
+    /** @var array<string, string> */
+    private array $golongan = [];
+
+    private string $tanggal = '';
+
     public function __construct(private readonly ?BaseConnection $db = null)
     {
     }
 
     public function pohon(AuthContext $auth, array $filter = []): array
     {
-        $idUnit   = $this->idFilter($filter, 'id_unit');
-        $idSatker = $this->idFilter($filter, 'id_satker');
-        $db       = $this->db();
+        $pilihan = $this->pilihan();
+        $kunci   = trim((string) ($filter['id_unit_satker'] ?? '0'));
+        $kunci   = $kunci === '' ? '0' : $kunci;
 
-        /** @var array{id_periode_struktur_jabatan: int|string, periode_struktur_jabatan: string}|null $periode */
-        $periode = $db->table('periode_struktur_jabatan')->where('status', 1)
-            ->orderBy('id_periode_struktur_jabatan', 'DESC')->limit(1)->get()->getRowArray();
-
-        $hasil = ['periode' => null, 'filter' => ['id_unit' => $idUnit, 'id_satker' => $idSatker], 'nodes' => []];
-
-        if ($periode === null) {
-            return $hasil;
+        if ($kunci !== '0' && ! in_array($kunci, array_column($pilihan, 'value'), true)) {
+            throw ValidationException::forField('id_unit_satker', 'Data struktur organisasi Unit / Satker yang dipilih tidak tersedia.');
         }
 
-        $hasil['periode'] = [
-            'id_periode_struktur_jabatan' => (int) $periode['id_periode_struktur_jabatan'],
-            'periode_struktur_jabatan'    => (string) $periode['periode_struktur_jabatan'],
+        $this->tanggal = Time::today()->toDateString();
+        $periode       = $this->periodeAktif();
+        $this->muatPejabat();
+
+        $wc    = $this->webConfig();
+        $hasil = [
+            'periode'        => $periode,
+            'tanggal'        => $this->tanggal,
+            'id_unit_satker' => $kunci,
+            'kementerian'    => $wc['nama_kementerian'] ?? '',
+            'pilihan'        => $pilihan,
+            'judul'          => '',
+            'format'         => 'kementerian',
+            'data'           => [],
         ];
 
-        $baris = $this->simpul((int) $periode['id_periode_struktur_jabatan'], $idUnit, $idSatker);
+        $idPeriode = $periode['id_periode_struktur_jabatan'] ?? null;
 
-        if ($baris === []) {
-            return $hasil;
+        if ($kunci === '0') {
+            $hasil['judul'] = $wc['nama_kementerian'] ?? '';
+            $hasil['data']  = $this->kementerian($idPeriode, $wc);
+        } elseif (str_starts_with($kunci, 'sat_')) {
+            $idSatker        = (int) substr($kunci, 4);
+            $hasil['judul']  = (string) ($this->db()->table('satker')->select('satker')->where('id_satker', $idSatker)->get()->getRow()->satker ?? '');
+            $hasil['format'] = match (true) {
+                $idSatker === self::SATKER_INSPEKTORAT        => 'inspektorat',
+                in_array($idSatker, self::SATKER_PUSAT, true) => 'pusat',
+                in_array($idSatker, self::SATKER_BPO, true)   => 'bpo',
+                default                                       => 'upt',
+            };
+            $hasil['data'] = $this->satker($idPeriode, $idSatker);
+        } else {
+            $idUnit          = (int) $kunci;
+            $hasil['judul']  = (string) ($this->db()->table('unit')->select('unit')->where('id_unit', $idUnit)->get()->getRow()->unit ?? '');
+            $hasil['format'] = match (true) {
+                $idUnit === (int) ($wc['id_unit_kepegawaian'] ?? 0) => 'sesmen',
+                $idUnit === self::UNIT_INSPEKTORAT                  => 'inspektorat_unit',
+                default                                             => 'deputi',
+            };
+            $hasil['data'] = $this->unit($idPeriode, $idUnit, (int) ($wc['id_unit_kepegawaian'] ?? 0));
         }
-
-        $pejabat = $this->pejabat(array_values(array_unique(array_map(static fn (array $r): int => (int) $r['id_jabatan'], $baris))));
-
-        // Simpul per id_jabatan (struktur unik per periode + jabatan + atasan; jabatan ganda atasan → simpul pertama).
-        $nodes = [];
-
-        foreach ($baris as $r) {
-            $id = (int) $r['id_jabatan'];
-
-            if (isset($nodes[$id])) {
-                continue;
-            }
-
-            $nodes[$id] = [
-                'id'             => 'sj-' . $r['id_struktur_jabatan'],
-                'id_jabatan'     => $id,
-                'id_atasan'      => $r['id_jabatan_atasan'] === null ? null : (int) $r['id_jabatan_atasan'],
-                'jabatan'        => (string) $r['jabatan'],
-                'level_struktur' => (int) $r['level_struktur'],
-                'id_unit'        => $r['id_unit'] === null ? null : (int) $r['id_unit'],
-                'unit'           => $r['unit'],
-                'id_satker'      => $r['id_satker'] === null ? null : (int) $r['id_satker'],
-                'satker'         => $r['satker'],
-                'pejabat'        => $pejabat[$id] ?? null,
-                'children'       => [],
-            ];
-        }
-
-        $hasil['nodes'] = $this->rangkai($nodes);
 
         return $hasil;
     }
 
     /**
-     * Baris struktur_jabatan aktif periode itu + jabatan/satker/unit, disaring unit/satker jabatan.
+     * Pilihan unit/satker (getLUS_so_012025: unit aktif urut `order`; satker per aturan UNIT_SATKER_PILIHAN).
      *
-     * @return list<array<string, mixed>>
+     * @return list<array{value: string, label: string, level: int, disabled: bool}>
      */
-    private function simpul(int $idPeriode, ?int $idUnit, ?int $idSatker): array
-    {
-        $builder = $this->db()->table('struktur_jabatan sj')
-            ->select('sj.id_struktur_jabatan, sj.id_jabatan, sj.id_jabatan_atasan, sj.level_struktur, sj.urutan, jab.jabatan, '
-                . 'jab.id_satker, s.satker, s.id_unit, u.unit')
-            ->join('jabatan jab', 'jab.id_jabatan = sj.id_jabatan', 'inner')
-            ->join('satker s', 's.id_satker = jab.id_satker', 'left')
-            ->join('unit u', 'u.id_unit = s.id_unit', 'left')
-            ->where('sj.id_periode_struktur_jabatan', $idPeriode)
-            ->where('sj.status', 1)
-            ->where('jab.status', 1);
-
-        if ($idSatker !== null) {
-            $builder->where('jab.id_satker', $idSatker);
-        } elseif ($idUnit !== null) {
-            $builder->where('s.id_unit', $idUnit);
-        }
-
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $builder->orderBy('sj.level_struktur', 'ASC')->orderBy('sj.urutan', 'ASC')->orderBy('sj.id_struktur_jabatan', 'ASC')
-            ->get()->getResultArray();
-
-        return $rows;
-    }
-
-    /**
-     * Pejabat per id_jabatan: definitif, lalu Plt, lalu Plh.
-     *
-     * @param list<int> $idJabatan
-     *
-     * @return array<int, array{nip: string, nama_lengkap: string, gol_ruang: string|null, jenis: string, pejabat_so: string}>
-     */
-    private function pejabat(array $idJabatan): array
+    private function pilihan(): array
     {
         $db    = $this->db();
         $hasil = [];
 
-        /** @var list<array<string, mixed>> $definitif */
-        $definitif = $db->table('pegawai_mutasi_jabatan pmj')
-            ->select('pmj.id_jabatan, pmj.tmtsk, p.nip, p.glr_awal, p.nama, p.glr_akhir, kp.gol_ruang')
-            ->join('pegawai p', 'p.nip = pmj.nip', 'inner')
-            ->join('pegawai_kp kp', 'kp.nip = p.nip', 'left')
-            ->whereIn('pmj.id_jabatan', $idJabatan)
-            ->where('pmj.jenis_jabatan', 1)
-            ->where('p.status', 1)
-            ->orderBy('pmj.tmtsk', 'DESC')->orderBy('p.nip', 'ASC')
-            ->get()->getResultArray();
+        foreach ($db->table('unit')->where('status', 1)->orderBy('order', 'ASC')->orderBy('id_unit', 'ASC')->get()->getResultArray() as $unit) {
+            $idUnit  = (int) $unit['id_unit'];
+            $hasil[] = ['value' => (string) $idUnit, 'label' => (string) $unit['unit'], 'level' => 1, 'disabled' => in_array($idUnit, self::UNIT_NONAKTIF_PILIHAN, true)];
 
-        foreach ($definitif as $r) {
-            $hasil[(int) $r['id_jabatan']] ??= $this->orang($r, 'definitif');
-        }
-
-        $hariIni = Time::today()->toDateString();
-
-        foreach (['plt' => 'nip_plt', 'plh' => 'nip_plh'] as $jenis => $kolomNip) {
-            $sisa = array_values(array_diff($idJabatan, array_keys($hasil)));
-
-            if ($sisa === []) {
-                break;
+            if (! array_key_exists($idUnit, self::UNIT_SATKER_PILIHAN)) {
+                continue;
             }
 
-            /** @var list<array<string, mixed>> $rows */
-            $rows = $db->table("pegawai_{$jenis} t")
-                ->select('t.id_jabatan, p.nip, p.glr_awal, p.nama, p.glr_akhir, kp.gol_ruang')
-                ->join('pegawai p', "p.nip = t.{$kolomNip}", 'inner')
-                ->join('pegawai_kp kp', 'kp.nip = p.nip', 'left')
-                ->whereIn('t.id_jabatan', $sisa)
-                ->where('t.jenis_jabatan', 1)
-                ->where('t.status', 1)
-                ->where('t.tgl_mulai <=', $hariIni)
-                ->where('t.tgl_akhir >=', $hariIni)
-                ->orderBy('t.tgl_mulai', 'DESC')->orderBy("t.id_pegawai_{$jenis}", 'DESC')
-                ->get()->getResultArray();
+            $builder = $db->table('satker')->where('status', 1)->orderBy('order', 'ASC')->orderBy('id_satker', 'ASC');
+            $hanya   = self::UNIT_SATKER_PILIHAN[$idUnit];
+            $hanya === null ? $builder->where('id_unit', $idUnit) : $builder->whereIn('id_satker', $hanya);
 
-            foreach ($rows as $r) {
-                $hasil[(int) $r['id_jabatan']] ??= $this->orang($r, $jenis);
+            if ($hanya !== null && $idUnit !== 19) {
+                $builder->where('id_unit', $idUnit);
+            }
+
+            foreach ($builder->get()->getResultArray() as $satker) {
+                $hasil[] = ['value' => 'sat_' . $satker['id_satker'], 'label' => (string) $satker['satker'], 'level' => 2, 'disabled' => false];
             }
         }
 
@@ -183,27 +165,362 @@ final class StrukturService implements StrukturServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $r
+     * so_012025 cabang kementerian (:6465-6720).
      *
-     * @return array{nip: string, nama_lengkap: string, gol_ruang: string|null, jenis: string, pejabat_so: string}
+     * @param array<string, string> $wc
+     *
+     * @return array<string, mixed>
      */
-    private function orang(array $r, string $jenis): array
+    private function kementerian(?int $idPeriode, array $wc): array
     {
-        $nama = self::namaGelar($r['glr_awal'] ?? null, (string) $r['nama'], $r['glr_akhir'] ?? null);
-        $gol  = trim((string) ($r['gol_ruang'] ?? ''));
-        $teks = implode(', ', array_filter([$nama, $gol, (string) $r['nip']], static fn (string $v): bool => $v !== ''));
-
-        return [
-            'nip'          => (string) $r['nip'],
-            'nama_lengkap' => $nama,
-            'gol_ruang'    => $gol === '' ? null : $gol,
-            'jenis'        => $jenis,
-            'pejabat_so'   => match ($jenis) {
-                'plt'   => "Plt. {$teks}",
-                'plh'   => "Plh. {$teks}",
-                default => $teks,
-            },
+        $data = [
+            'menteri'       => ['jabatan' => $wc['jabatan_menteri_singkat'] ?? '', 'pejabat' => $wc['nama_menteri'] ?? '', 'is_plt' => false, 'jenis' => null],
+            'wakil_menteri' => ['jabatan' => $wc['jabatan_wakil_menteri_singkat'] ?? '', 'pejabat' => $wc['nama_wakil_menteri'] ?? '', 'is_plt' => false, 'jenis' => null],
+            'staf_ahli'     => [],
+            'inspektorat'   => null,
+            'sekretaris'    => null,
+            'deputi'        => [],
         ];
+
+        // Es.I struktural (group 1, sub group 1) urut level & urutan struktur.
+        $es1 = $this->jabatanStruktur($idPeriode)
+            ->select('s.id_unit')
+            ->where('jab.id_group_jabatan', 1)->where('jab.id_sub_group_jabatan', 1)
+            ->get()->getResultArray();
+
+        foreach ($es1 as $row) {
+            $nama = strtolower((string) $row['jabatan']);
+
+            if (str_starts_with($nama, 'staf ahli')) {
+                $data['staf_ahli'][] = $this->simpul($row);
+            } elseif (str_starts_with($nama, 'sekretaris') || str_starts_with($nama, 'deputi')) {
+                $sek = str_starts_with($nama, 'sekretaris');
+                $es2 = $this->jabatanStruktur($idPeriode)
+                    ->where('s.id_unit', (int) $row['id_unit'])->where('sj.level_struktur', 3)->where('sj.id_jabatan_atasan', (int) $row['id_jabatan']);
+
+                if ($sek) {
+                    $es2->where('jab.id_satker !=', self::SATKER_INSPEKTORAT);
+                }
+
+                // Jalankan dulu: alias tabel builder CI4 dicatat per koneksi, query lain (simpul()) menimpanya.
+                $barisEs2           = $es2->get()->getResultArray();
+                $simpul             = $this->simpul($row);
+                $simpul['list_es2'] = array_map(fn (array $r): array => $this->simpul($r, true), $barisEs2);
+
+                if ($sek) {
+                    $data['sekretaris'] = $simpul;
+                } else {
+                    $data['deputi'][] = $simpul;
+                }
+            }
+        }
+
+        $insp = $this->db()->table('jabatan')->where('id_jabatan', self::JABATAN_INSPEKTORAT)->where('status', 1)->get()->getRowArray();
+
+        if ($insp !== null) {
+            $data['inspektorat'] = $this->simpul($insp) + ['satker' => 'Inspektorat'];
+        }
+
+        return $data;
+    }
+
+    /**
+     * so_012025 cabang unit (:6820-6965). Sesmen: Es.I staf ahli dilewati, Es.II hanya "Kepala Biro", Es.IV satker
+     * pusat 49/50 dilewati.
+     *
+     * @return array<string, mixed>
+     */
+    private function unit(?int $idPeriode, int $idUnit, int $idUnitKepegawaian): array
+    {
+        $rows = $this->jabatanStruktur($idPeriode)
+            ->where('s.id_unit', $idUnit)->whereIn('sj.level_struktur', [2, 3, 4, 5])
+            ->get()->getResultArray();
+
+        $data   = ['es1' => null, 'es2_sek' => [], 'es2' => []];
+        $sesmen = $idUnit === $idUnitKepegawaian;
+        $es2Sek = $es2 = $atasEs3 = [];
+
+        foreach ($rows as $row) {
+            $level = (int) $row['level_struktur'];
+            $nama  = strtolower((string) $row['jabatan']);
+
+            if ($sesmen && (($level === 2 && str_starts_with($nama, 'staf ahli'))
+                || ($level === 3 && ! str_starts_with($nama, 'kepala biro'))
+                || ($level === 5 && in_array((int) $row['id_satker'], self::SATKER_PUSAT, true)))) {
+                continue;
+            }
+
+            $id = (int) $row['id_jabatan'];
+
+            if ($level === 2) {
+                $data['es1'] = $this->simpul($row, false, ['Inspektur' => 'Inspektorat', 'Sekretaris' => 'Sekretariat']);
+            } elseif ($level === 3) {
+                if (str_starts_with($nama, 'sekretaris')) {
+                    $es2Sek[$id] = $this->simpul($row, false, ['Sekretaris' => 'Sekretariat']) + ['es3' => []];
+                } else {
+                    $es2[$id] = $this->simpul($row, false, ['Kepala ' => '', 'Inspektur' => 'Inspektorat']) + ['es3' => []];
+                }
+            } elseif ($level === 4) {
+                $atas         = (int) $row['id_jabatan_atasan'];
+                $atasEs3[$id] = $atas;
+                $simpul       = $this->simpul($row, false, ['Kepala ' => '']) + ['es4' => []];
+
+                if (isset($es2Sek[$atas])) {
+                    $es2Sek[$atas]['es3'][$id] = $simpul;
+                } elseif (isset($es2[$atas])) {
+                    $es2[$atas]['es3'][$id] = $simpul;
+                }
+            } elseif ($level === 5) {
+                $atas3 = (int) $row['id_jabatan_atasan'];
+                $atas2 = $atasEs3[$atas3] ?? null;
+
+                // Legacy hanya menempelkan Es.IV di bawah Es.III milik Es.II biasa (bukan sekretariat).
+                if ($atas2 !== null && isset($es2[$atas2]['es3'][$atas3])) {
+                    $es2[$atas2]['es3'][$atas3]['es4'][] = $this->simpul($row, false, ['Kepala ' => '']);
+                }
+            }
+        }
+
+        $daftar = static fn (array $es2List): array => array_values(array_map(static function (array $e): array {
+            $e['es3'] = array_values($e['es3']);
+
+            return $e;
+        }, $es2List));
+
+        $data['es2_sek'] = $daftar($es2Sek);
+        $data['es2']     = $daftar($es2);
+
+        return $data;
+    }
+
+    /**
+     * so_012025 cabang satker (:6722-6818).
+     *
+     * @return array<string, mixed>
+     */
+    private function satker(?int $idPeriode, int $idSatker): array
+    {
+        $rows = $this->jabatanStruktur($idPeriode)
+            ->where('jab.id_satker', $idSatker)->whereIn('sj.level_struktur', [3, 4, 5])
+            ->get()->getResultArray();
+
+        $pusat = in_array($idSatker, self::SATKER_PUSAT, true);
+        $bpo   = in_array($idSatker, self::SATKER_BPO, true);
+        $data  = ['es2_sek' => null, 'es2' => null, 'es3_sek' => null, 'es3' => [], 'es4' => []];
+        $es3   = [];
+        $es4   = [];
+
+        foreach ($rows as $row) {
+            $level = (int) $row['level_struktur'];
+            $nama  = strtolower((string) $row['jabatan']);
+
+            if ($level === 3) {
+                if (str_starts_with($nama, 'sekretaris')) {
+                    $data['es2_sek'] = $this->simpul($row, false, ['Sekretaris' => 'Sekretariat']);
+                } else {
+                    $data['es2'] = $this->simpul($row, false, ['Kepala ' => '', 'Inspektur' => 'Inspektorat']);
+                }
+            } elseif ($level === 4) {
+                if ($bpo && str_starts_with($nama, 'satuan pemeriksaan intern')) {
+                    $data['es3_sek'] = $this->simpul($row);
+                } else {
+                    $es3[(int) $row['id_jabatan']] = $this->simpul($row, false, $bpo ? [] : ['Kepala ' => '']) + ['es4' => []];
+                }
+            } elseif ($level === 5) {
+                $atas   = (int) $row['id_jabatan_atasan'];
+                $simpul = $this->simpul($row, false, ['Kepala ' => '']);
+
+                if ($pusat || ! isset($es3[$atas])) {
+                    $es4[] = $simpul;
+                } else {
+                    $es3[$atas]['es4'][] = $simpul;
+                }
+            }
+        }
+
+        $data['es3'] = array_values($es3);
+        $data['es4'] = $es4;
+
+        return $data;
+    }
+
+    /**
+     * Jabatan aktif + simpul struktur periode aktif (satu baris per jabatan), urut level & urutan.
+     */
+    private function jabatanStruktur(?int $idPeriode): \CodeIgniter\Database\BaseBuilder
+    {
+        $builder = $this->db()->table('jabatan jab')
+            ->select('jab.id_jabatan, jab.jabatan, jab.id_satker, jab.id_group_jabatan, sj.level_struktur, sj.id_jabatan_atasan, s.satker')
+            ->join('struktur_jabatan sj', 'sj.id_jabatan = jab.id_jabatan', 'inner')
+            ->join('satker s', 's.id_satker = jab.id_satker', 'left')
+            ->where('jab.status', 1)
+            ->where('sj.status', 1)
+            ->orderBy('sj.level_struktur', 'ASC')->orderBy('sj.urutan', 'ASC')->orderBy('sj.id_struktur_jabatan', 'ASC');
+
+        $idPeriode === null
+            ? $builder->where('1 = 0', null, false)
+            : $builder->where('sj.id_periode_struktur_jabatan', $idPeriode);
+
+        return $builder;
+    }
+
+    /**
+     * Satu kotak bagan: jabatan (dengan penggantian teks legacy), pejabat, is_plt.
+     *
+     * @param array<string, mixed>  $row
+     * @param array<string, string> $ganti
+     *
+     * @return array{id_jabatan: int, jabatan: string, pejabat: string, is_plt: bool, jenis: string|null, satker?: string|null}
+     */
+    private function simpul(array $row, bool $denganSatker = false, array $ganti = []): array
+    {
+        $id      = (int) $row['id_jabatan'];
+        $pejabat = $this->pejabatJabatan($id, (int) ($row['id_group_jabatan'] ?? 0));
+        $simpul  = [
+            'id_jabatan' => $id,
+            'jabatan'    => $ganti === [] ? (string) $row['jabatan'] : str_replace(array_keys($ganti), array_values($ganti), (string) $row['jabatan']),
+            'pejabat'    => $pejabat['teks'],
+            'is_plt'     => $pejabat['jenis'] === 'plt' || $pejabat['jenis'] === 'plh',
+            'jenis'      => $pejabat['jenis'],
+        ];
+
+        if ($denganSatker) {
+            $simpul['satker'] = $row['satker'] ?? null;
+        }
+
+        return $simpul;
+    }
+
+    /**
+     * @return array{teks: string, jenis: string|null}
+     */
+    private function pejabatJabatan(int $idJabatan, int $idGroup): array
+    {
+        $kunci = $idGroup === 5 ? "ll_{$idJabatan}" : "struk_{$idJabatan}";
+
+        if (isset($this->pejabat[$kunci])) {
+            return ['teks' => $this->teks($this->pejabat[$kunci]), 'jenis' => 'definitif'];
+        }
+
+        foreach (['plt', 'plh'] as $jenis) {
+            $row = $this->db()->table("pegawai_{$jenis} t")
+                ->select('p.nip, p.glr_awal, p.nama, p.glr_akhir')
+                ->join('pegawai p', "p.nip = t.nip_{$jenis}", 'inner')
+                ->where('t.id_jabatan', $idJabatan)
+                ->where('t.tgl_mulai <=', $this->tanggal)->where('t.tgl_akhir >=', $this->tanggal)
+                ->orderBy("t.id_pegawai_{$jenis}", 'ASC')->limit(1)->get()->getRowArray();
+
+            if ($row !== null) {
+                return ['teks' => ($jenis === 'plt' ? 'Plt. ' : 'Plh. ') . $this->teks($row), 'jenis' => $jenis];
+            }
+        }
+
+        return ['teks' => '', 'jenis' => null];
+    }
+
+    /**
+     * @param array<string, mixed> $p
+     */
+    private function teks(array $p): string
+    {
+        $nama = self::namaGelar($p['glr_awal'] ?? null, (string) $p['nama'], $p['glr_akhir'] ?? null);
+        $nip  = (string) $p['nip'];
+
+        if (str_starts_with($nip, self::NIP_DUMMY)) {
+            return $nama;
+        }
+
+        $gol = $this->golongan[$nip] ?? $this->golonganPegawai($nip);
+
+        return $gol !== '' ? "{$nama}, {$gol}, {$nip}" : "{$nama}, {$nip}";
+    }
+
+    /**
+     * Pejabat definitif per kunci (so_012025 :6430-6460).
+     */
+    private function muatPejabat(): void
+    {
+        $tgl  = $this->tanggal;
+        $rows = $this->db()->table('riwayat_mutasi_jabatan rmj')
+            ->select('rmj.nip, rmj.id_group_jabatan, rmj.jenis_jabatan_koord, rmj.id_jabatan_koord, rmj.id_jabatan, p.glr_awal, p.nama, p.glr_akhir')
+            ->join('pegawai p', 'p.nip = rmj.nip', 'left')
+            ->where('rmj.status', 1)->where('rmj.tmtsk <=', $tgl)->where('rmj.jenis_jabatan', 1)->where('p.created_at <', $tgl)
+            ->groupStart()
+            ->groupStart()->where('p.status', 1)->whereIn('p.id_jenis_status', [1, 12])->groupEnd()
+            ->orGroupStart()->where('p.status', 2)->where('p.tmt_status >', $tgl)->groupEnd()
+            ->groupEnd()
+            ->orderBy('rmj.nip', 'ASC')->orderBy('rmj.tmtsk', 'DESC')
+            ->get()->getResultArray();
+
+        $this->pejabat = [];
+        $sudah         = [];
+
+        foreach ($rows as $row) {
+            if (isset($sudah[$row['nip']])) {
+                continue;
+            }
+
+            $sudah[$row['nip']] = true;
+            $kunci              = match (true) {
+                in_array((int) $row['jenis_jabatan_koord'], [1, 2], true) => 'koord_' . $row['id_jabatan_koord'],
+                (int) $row['id_group_jabatan'] === 1                      => 'struk_' . $row['id_jabatan'],
+                (int) $row['id_group_jabatan'] === 5                      => 'll_' . $row['id_jabatan'],
+                default                                                   => '',
+            };
+
+            if ($kunci !== '') {
+                $this->pejabat[$kunci] = $row;
+            }
+        }
+
+        $this->golongan = [];
+    }
+
+    private function golonganPegawai(string $nip): string
+    {
+        $row = $this->db()->table('riwayat_kp')->select('gol_ruang')
+            ->where('nip', $nip)->where('status', 1)->where('tmtsk <=', $this->tanggal)
+            ->orderBy('tmtsk', 'DESC')->limit(1)->get()->getRowArray();
+
+        return $this->golongan[$nip] = trim((string) ($row['gol_ruang'] ?? ''));
+    }
+
+    /**
+     * @return array{id_periode_struktur_jabatan: int, periode_struktur_jabatan: string}|null
+     */
+    private function periodeAktif(): ?array
+    {
+        $row = $this->db()->table('periode_struktur_jabatan')->where('status', 1)
+            ->orderBy('id_periode_struktur_jabatan', 'DESC')->limit(1)->get()->getRowArray();
+
+        return $row === null ? null : [
+            'id_periode_struktur_jabatan' => (int) $row['id_periode_struktur_jabatan'],
+            'periode_struktur_jabatan'    => (string) $row['periode_struktur_jabatan'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function webConfig(): array
+    {
+        $db  = $this->db();
+        $ada = $db->query(
+            'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+            [$db->prefixTable('web_config')],
+        )->getRowArray() !== null;
+
+        if (! $ada) {
+            return [];
+        }
+
+        $hasil = [];
+
+        foreach ($db->table('web_config')->select('config_name, config_value')->get()->getResultArray() as $row) {
+            $hasil[(string) $row['config_name']] = (string) ($row['config_value'] ?? '');
+        }
+
+        return $hasil;
     }
 
     /**
@@ -214,77 +531,6 @@ final class StrukturService implements StrukturServiceInterface
         $hasil = trim(trim((string) $awal) . ' ' . trim($nama));
 
         return trim((string) $akhir) === '' ? $hasil : "{$hasil}, " . trim((string) $akhir);
-    }
-
-    /**
-     * Rangkai simpul menjadi hutan: induk = id_atasan bila atasan ada di himpunan (setelah filter); selain itu akar.
-     * Siklus data (A atasan B atasan A) diputus: simpul yang sudah dikunjungi tidak dirangkai ulang.
-     *
-     * @param array<int, array<string, mixed>> $nodes
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function rangkai(array $nodes): array
-    {
-        $anak = [];
-        $akar = [];
-
-        foreach ($nodes as $id => $node) {
-            $atasan = $node['id_atasan'];
-
-            if ($atasan !== null && $atasan !== $id && isset($nodes[$atasan])) {
-                $anak[$atasan][] = $id;
-            } else {
-                $akar[] = $id;
-            }
-        }
-
-        $dikunjungi = [];
-        $bangun     = function (int $id) use (&$bangun, &$dikunjungi, $nodes, $anak): array {
-            $dikunjungi[$id] = true;
-            $node            = $nodes[$id];
-
-            foreach ($anak[$id] ?? [] as $idAnak) {
-                if (! isset($dikunjungi[$idAnak])) {
-                    $node['children'][] = $bangun($idAnak);
-                }
-            }
-
-            return $node;
-        };
-
-        $hasil = [];
-
-        foreach ($akar as $id) {
-            $hasil[] = $bangun($id);
-        }
-
-        // Simpul dalam siklus tanpa akar tetap ditampilkan sebagai akar.
-        foreach (array_keys($nodes) as $id) {
-            if (! isset($dikunjungi[$id])) {
-                $hasil[] = $bangun($id);
-            }
-        }
-
-        return $hasil;
-    }
-
-    /**
-     * @param array<string, mixed> $filter
-     */
-    private function idFilter(array $filter, string $kunci): ?int
-    {
-        $nilai = $filter[$kunci] ?? null;
-
-        if ($nilai === null || $nilai === '') {
-            return null;
-        }
-
-        if (! is_string($nilai) || preg_match('/^[1-9][0-9]{0,9}$/', $nilai) !== 1 || (int) $nilai > 2147483647) {
-            throw ValidationException::forField($kunci, 'Filter tidak valid.');
-        }
-
-        return (int) $nilai;
     }
 
     private function db(): BaseConnection

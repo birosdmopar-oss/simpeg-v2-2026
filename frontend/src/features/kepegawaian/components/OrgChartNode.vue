@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * Satu simpul bagan struktur organisasi (B-19; desain redesign commit 3420e1a §4.1.2): kartu bergaris navy di atas,
- * jabatan (kecil, tebal) dan pejabat (nama lengkap, golongan, NIP). Komponen rekursif; garis penghubung murni CSS
- * (kelas `.org-tree`), tanpa library bagan. Jabatan kosong ditandai "Lowong"; Plt/Plh diberi lencana.
+ * Satu kotak bagan struktur organisasi (B-19; gaya redesign commit 3420e1a §4.1.2, hierarki templat legacy so_012025):
+ * jabatan + teks pejabat legacy ("Nama, Gol, NIP"; awalan Plt./Plh.). Kotak lowong = "Lowong" (legacy kelas `empty`),
+ * Plt/Plh = garis oranye + lencana (legacy kelas `plt`), kotak JF = garis putus-putus. Rekursif; garis penghubung
+ * murni CSS (`.org-tree`).
  */
-import { UiAvatar, UiBadge } from '@/shared/ui'
+import { UiBadge } from '@/shared/ui'
 
 import type { OrgNode } from '../types'
 
@@ -14,29 +15,28 @@ defineProps<{ node: OrgNode }>()
 <template>
   <li>
     <article
-      class="org-card relative w-60 rounded-xl border border-slate-200 border-t-4 border-t-brand-primary bg-white px-4 pb-3 pt-4 text-left shadow-card"
+      class="org-card relative w-60 rounded-xl border bg-white px-4 pb-3 pt-3 text-left shadow-card"
+      :class="[
+        node.jf ? 'border-dashed border-slate-300 text-center' : 'border-slate-200 border-t-4',
+        !node.jf && (node.jenis === 'plt' || node.jenis === 'plh') ? 'border-t-amber-500' : '',
+        !node.jf && node.jenis !== 'plt' && node.jenis !== 'plh' ? 'border-t-brand-primary' : '',
+      ]"
       :data-testid="`org-node-${node.id}`"
     >
-      <div class="flex items-start gap-3">
-        <UiAvatar :name="node.pejabat?.nama_lengkap ?? node.jabatan" size="lg" alt="" class="shrink-0" />
-        <p class="min-w-0 flex-1 text-right text-[0.6875rem] font-semibold leading-4 text-slate-800">
-          {{ node.jabatan }}
-          <span class="mt-1 ml-auto block h-0.5 w-12 rounded-full bg-gradient-to-r from-brand-primary to-brand-secondary" aria-hidden="true" />
-        </p>
-      </div>
-      <template v-if="node.pejabat">
-        <p class="mt-3 flex items-center gap-2 text-h6 text-slate-900">
-          <span class="truncate" :title="node.pejabat.nama_lengkap">{{ node.pejabat.nama_lengkap }}</span>
-          <UiBadge v-if="node.pejabat.jenis !== 'definitif'" tone="warning" :data-testid="`org-node-${node.id}-jenis`">
-            {{ node.pejabat.jenis === 'plt' ? 'Plt.' : 'Plh.' }}
+      <p class="text-[0.6875rem] font-semibold leading-4 text-slate-800" :class="node.jf ? 'italic text-slate-500' : ''">
+        {{ node.jabatan }}
+      </p>
+      <p v-if="node.sub" class="mt-1 text-caption text-slate-500">{{ node.sub }}</p>
+      <template v-if="!node.jf">
+        <span class="my-2 block h-0.5 w-12 rounded-full bg-gradient-to-r from-brand-primary to-brand-secondary" aria-hidden="true" />
+        <p v-if="node.pejabat" class="flex items-start gap-2 text-body2 text-slate-900">
+          <span class="min-w-0 break-words">{{ node.pejabat }}</span>
+          <UiBadge v-if="node.jenis === 'plt' || node.jenis === 'plh'" tone="warning" :data-testid="`org-node-${node.id}-jenis`">
+            {{ node.jenis === 'plt' ? 'Plt.' : 'Plh.' }}
           </UiBadge>
         </p>
-        <p class="truncate text-caption text-slate-400">
-          {{ [node.pejabat.gol_ruang, node.pejabat.nip].filter(Boolean).join(' · ') }}
-        </p>
+        <p v-else class="text-body2 italic text-slate-400" :data-testid="`org-node-${node.id}-lowong`">Lowong</p>
       </template>
-      <p v-else class="mt-3 text-body2 italic text-slate-400" :data-testid="`org-node-${node.id}-lowong`">Lowong</p>
-      <p v-if="node.satker" class="mt-1 truncate text-caption text-slate-500" :title="node.satker">{{ node.satker }}</p>
     </article>
 
     <ul v-if="node.children.length > 0">

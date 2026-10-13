@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Kepegawaian;
 
 use App\Constants\Role;
+use App\Exceptions\ApiException;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
+use Closure;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
@@ -13,8 +15,9 @@ use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatUjiTrait;
 
 /**
- * B-19 Struktur Organisasi (WS-2 M4 MAKE-012): pohon struktur_jabatan periode aktif, pejabat definitif → Plt → Plh,
- * filter unit/satker, akses semua pengguna login.
+ * B-19 Struktur Organisasi ikut templat legacy so_012025 (WS-2 M4 MAKE-012; keputusan user 13-10-2026): format
+ * kementerian / unit (deputi) / satker (UPT), pejabat definitif dari riwayat jabatan (aturan legacy), Plt lalu Plh,
+ * teks "Nama, Gol, NIP", pilihan unit/satker, akses semua pengguna login.
  *
  * @internal
  */
@@ -25,96 +28,113 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
     use RiwayatUjiTrait;
 
     private int $idPeriode;
+    private int $unitSek;
+    private int $unitDep;
+    private int $satSek;
+    private int $satDep;
 
     /**
-     * @var array<string, int> nama simpul => id_jabatan
+     * @var array<string, int>
      */
     private array $jab = [];
-
-    private int $idSatkerA;
-    private int $idSatkerB;
-    private int $idUnit;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->idUnit    = $this->buatUnit();
-        $this->idSatkerA = $this->buatSatker($this->idUnit);
-        $this->idSatkerB = $this->buatSatker($this->idUnit);
+        $this->pastikan('group_jabatan', ['id_group_jabatan' => 1, 'group_jabatan' => 'Struktural', 'status' => 1]);
+        $this->pastikan('jenis_status', ['id_jenis_status' => 1, 'jenis_status' => 'Aktif Bekerja', 'status_pegawai' => 1]);
+        $this->pastikan('sub_group_jabatan', ['id_sub_group_jabatan' => 1, 'id_group_jabatan' => 1, 'sub_group_jabatan' => 'Eselon I', 'need_satker' => 1, 'status' => 1]);
 
-        // Periode lama (status 2) diabaikan; periode aktif terbaru dipakai.
+        $this->unitSek = $this->buatUnit(['unit' => 'Sekretariat Uji']);
+        $this->unitDep = $this->buatUnit(['unit' => 'Deputi Uji']);
+        $this->satSek  = $this->buatSatker($this->unitSek, ['satker' => 'Biro Uji']);
+        $this->satDep  = $this->buatSatker($this->unitDep, ['satker' => 'Direktorat Uji']);
+
         $this->db->table('periode_struktur_jabatan')->insert(['periode_struktur_jabatan' => 'Periode Lama Uji', 'status' => 2]);
-        $this->db->table('periode_struktur_jabatan')->insert(['periode_struktur_jabatan' => 'Periode Uji ' . $this->idUnit, 'status' => 1]);
+        $this->db->table('periode_struktur_jabatan')->insert(['periode_struktur_jabatan' => 'Periode Uji ' . $this->unitSek, 'status' => 1]);
         $this->idPeriode = (int) $this->db->insertID();
 
-        $this->jab['es1']  = $this->buatJabatan($this->idSatkerA)['id_jabatan'];
-        $this->jab['es2a'] = $this->buatJabatan($this->idSatkerA)['id_jabatan'];
-        $this->jab['es2b'] = $this->buatJabatan($this->idSatkerB)['id_jabatan'];
-        $this->jab['es3']  = $this->buatJabatan($this->idSatkerB)['id_jabatan'];
-
-        $this->struktur('es1', null, 2, 1);
-        $this->struktur('es2b', 'es1', 3, 2);
-        $this->struktur('es2a', 'es1', 3, 1);
-        $this->struktur('es3', 'es2b', 4, 1);
+        $this->jabatan('sekretaris', 'Sekretaris Kementerian', $this->satSek, 1, null, 2);
+        $this->jabatan('staf_ahli', 'Staf Ahli Menteri Bidang Uji', $this->satSek, 1, null, 2);
+        $this->jabatan('deputi', 'Deputi Bidang Uji', $this->satDep, 1, null, 2);
+        $this->jabatan('kabiro', 'Kepala Biro Uji', $this->satSek, 2, 'sekretaris', 3);
+        $this->jabatan('sesdep', 'Sekretaris Deputi Uji', $this->satDep, 2, 'deputi', 3);
+        $this->jabatan('direktur', 'Direktur Uji', $this->satDep, 2, 'deputi', 3);
+        $this->jabatan('subdit', 'Kepala Subdirektorat Uji', $this->satDep, 3, 'direktur', 4);
+        $this->jabatan('seksi', 'Kepala Seksi Uji', $this->satDep, 4, 'subdit', 5);
     }
 
-    public function testPohonDanPejabatDefinitifPltPlh(): void
+    public function testKementerianPejabatDefinitifPltPlhDanLowong(): void
     {
-        $definitif = $this->buatPegawai(['nama' => 'Kepala', 'glr_awal' => 'Dr.', 'glr_akhir' => 'M.Si.'], ['id_jabatan' => $this->jab['es1']]);
-        $this->db->table('pegawai_kp')->insert([
-            'nip'   => $definitif, 'gol_ruang' => 'IV/e', 'gol' => 'IV', 'ruang' => 'e', 'pangkat' => 'Pembina Utama', 'jenis_kp' => 'Reguler',
-            'tmtsk' => '2020-04-01', 'tgl_sk' => '2020-03-01',
-        ]);
-        // Pegawai nonaktif pada jabatan es2a tidak dihitung → Plt aktif mengisi.
-        $this->buatPegawai(['nama' => 'Pensiun', 'status' => 2], ['id_jabatan' => $this->jab['es2a']]);
-        $plt = $this->buatPegawai(['nama' => 'Pelaksana Tugas']);
-        $this->penugasan('plt', $plt, 'es2a');
-        // Plt kedaluwarsa/berstatus 2 untuk es2b diabaikan → Plh yang berlaku.
-        $this->penugasan('plt', $this->buatPegawai(), 'es2b', '-30 days', '-1 day');
-        $this->penugasan('plt', $this->buatPegawai(), 'es2b', status: 2);
-        $plh = $this->buatPegawai(['nama' => 'Pelaksana Harian']);
-        $this->penugasan('plh', $plh, 'es2b');
+        $sek = $this->pejabatDefinitif('sekretaris', ['nama' => 'Budi', 'glr_awal' => 'Dr.', 'glr_akhir' => 'M.Si.'], 'IV/e');
+        // Pegawai nonaktif (status 2, TMT status lampau) tidak dihitung → Plt mengisi Kepala Biro.
+        $this->pejabatDefinitif('kabiro', ['status' => 2, 'tmt_status' => '2020-01-01']);
+        $this->penugasan('plt', $this->buatPegawai(['nama' => 'Pelaksana Tugas']), 'kabiro');
+        // Plt kedaluwarsa diabaikan; Plh berlaku → Deputi.
+        $this->penugasan('plt', $this->buatPegawai(), 'deputi', '-30 days', '-1 day');
+        $this->penugasan('plh', $this->buatPegawai(['nama' => 'Pelaksana Harian']), 'deputi');
 
         $hasil = (new StrukturService())->pohon($this->admin());
 
-        $this->assertSame($this->idPeriode, $hasil['periode']['id_periode_struktur_jabatan'] ?? null);
-        $this->assertCount(1, $hasil['nodes']);
-        $akar = $hasil['nodes'][0];
-        $this->assertSame($this->jab['es1'], $akar['id_jabatan']);
-        $this->assertSame(['definitif', $definitif, 'Dr. Kepala, M.Si.', "Dr. Kepala, M.Si., IV/e, {$definitif}"], [
-            $akar['pejabat']['jenis'], $akar['pejabat']['nip'], $akar['pejabat']['nama_lengkap'], $akar['pejabat']['pejabat_so'],
-        ]);
-
-        // Anak urut level, urutan.
-        $this->assertSame([$this->jab['es2a'], $this->jab['es2b']], array_column($akar['children'], 'id_jabatan'));
-        [$es2a, $es2b] = $akar['children'];
-        $this->assertSame(['plt', $plt], [$es2a['pejabat']['jenis'], $es2a['pejabat']['nip']]);
-        $this->assertStringStartsWith('Plt. ', $es2a['pejabat']['pejabat_so']);
-        $this->assertSame(['plh', $plh], [$es2b['pejabat']['jenis'], $es2b['pejabat']['nip']]);
-        $this->assertSame($this->jab['es3'], $es2b['children'][0]['id_jabatan']);
-        $this->assertNull($es2b['children'][0]['pejabat'], 'jabatan kosong');
-        $this->assertSame([$this->idUnit, $this->idSatkerB], [$es2b['id_unit'], $es2b['id_satker']]);
+        $this->assertSame(['kementerian', '0', $this->idPeriode], [$hasil['format'], $hasil['id_unit_satker'], $hasil['periode']['id_periode_struktur_jabatan'] ?? null]);
+        $data = $hasil['data'];
+        $this->assertSame("Dr. Budi, M.Si., IV/e, {$sek}", $data['sekretaris']['pejabat']);
+        $this->assertFalse($data['sekretaris']['is_plt']);
+        $this->assertSame(['Kepala Biro Uji'], array_column($data['sekretaris']['list_es2'], 'jabatan'));
+        $kabiro = $data['sekretaris']['list_es2'][0];
+        $this->assertSame(['plt', true, 'Biro Uji'], [$kabiro['jenis'], $kabiro['is_plt'], $kabiro['satker']]);
+        $this->assertStringStartsWith('Plt. Pelaksana Tugas', $kabiro['pejabat']);
+        $this->assertSame(['Staf Ahli Menteri Bidang Uji'], array_column($data['staf_ahli'], 'jabatan'));
+        $this->assertSame('', $data['staf_ahli'][0]['pejabat'], 'lowong');
+        $this->assertSame(['Deputi Bidang Uji'], array_column($data['deputi'], 'jabatan'));
+        $this->assertStringStartsWith('Plh. Pelaksana Harian', $data['deputi'][0]['pejabat']);
+        $this->assertSame(['Sekretaris Deputi Uji', 'Direktur Uji'], array_column($data['deputi'][0]['list_es2'], 'jabatan'));
     }
 
-    public function testFilterSatkerMenjadikanSimpulTeratasAkar(): void
+    public function testUnitDeputiBerjenjangDenganSesdep(): void
     {
-        $hasil = (new StrukturService())->pohon($this->admin(), ['id_satker' => (string) $this->idSatkerB]);
+        $this->pejabatDefinitif('seksi', ['nip' => '123456789100000001', 'nama' => 'Akun Dummy']);
 
-        $this->assertSame([$this->jab['es2b']], array_column($hasil['nodes'], 'id_jabatan'));
-        $this->assertSame([$this->jab['es3']], array_column($hasil['nodes'][0]['children'], 'id_jabatan'));
+        $hasil = (new StrukturService())->pohon($this->admin(), ['id_unit_satker' => (string) $this->unitDep]);
 
-        $unit = (new StrukturService())->pohon($this->admin(), ['id_unit' => (string) $this->idUnit]);
-        $this->assertSame([$this->jab['es1']], array_column($unit['nodes'], 'id_jabatan'));
+        $this->assertSame(['deputi', 'Deputi Uji'], [$hasil['format'], $hasil['judul']]);
+        $data = $hasil['data'];
+        $this->assertSame('Deputi Bidang Uji', $data['es1']['jabatan']);
+        $this->assertSame(['Sekretariat Deputi Uji'], array_column($data['es2_sek'], 'jabatan'), 'Sekretaris → Sekretariat');
+        $this->assertSame(['Direktur Uji'], array_column($data['es2'], 'jabatan'));
+        $this->assertSame(['Subdirektorat Uji'], array_column($data['es2'][0]['es3'], 'jabatan'), 'awalan "Kepala " dibuang');
+        $this->assertSame(['Seksi Uji'], array_column($data['es2'][0]['es3'][0]['es4'], 'jabatan'));
+        $this->assertSame('Akun Dummy', $data['es2'][0]['es3'][0]['es4'][0]['pejabat'], 'NIP dummy legacy → nama saja');
     }
 
-    public function testTanpaPeriodeAktifKosong(): void
+    public function testSatkerUptEs3DenganEs4(): void
     {
+        // Satker hanya bisa dipilih bila legacy menawarkannya: semua satker unit 6.
+        $this->pastikan('unit', ['id_unit' => 6, 'unit' => 'UPT Uji', 'status' => 1]);
+        $satUpt = $this->buatSatker(6, ['satker' => 'Balai Uji']);
+        $this->jabatan('kabalai', 'Kepala Balai Uji', $satUpt, 2, null, 3);
+        $this->jabatan('kasubbag', 'Kepala Subbagian Uji', $satUpt, 3, 'kabalai', 4);
+        $this->jabatan('kaurusan', 'Kepala Urusan Uji', $satUpt, 4, 'kasubbag', 5);
+
+        $hasil = (new StrukturService())->pohon($this->admin(), ['id_unit_satker' => "sat_{$satUpt}"]);
+
+        $this->assertSame(['upt', 'Balai Uji'], [$hasil['format'], $hasil['judul']]);
+        $this->assertSame('Balai Uji', $hasil['data']['es2']['jabatan']);
+        $this->assertSame(['Subbagian Uji'], array_column($hasil['data']['es3'], 'jabatan'));
+        $this->assertSame(['Urusan Uji'], array_column($hasil['data']['es3'][0]['es4'], 'jabatan'));
+        $this->assertContains("sat_{$satUpt}", array_column($hasil['pilihan'], 'value'));
+        $this->assertTrue($hasil['pilihan'][array_search('6', array_column($hasil['pilihan'], 'value'), true)]['disabled'], 'unit 6 tidak bisa dipilih langsung (legacy)');
+    }
+
+    public function testPilihanTidakTersediaDitolakDanTanpaPeriodeKosong(): void
+    {
+        $this->assertSame(422, $this->statusDari(fn () => (new StrukturService())->pohon($this->admin(), ['id_unit_satker' => "sat_{$this->satDep}"])));
+
         $this->db->table('periode_struktur_jabatan')->where('status', 1)->update(['status' => 2]);
-
         $hasil = (new StrukturService())->pohon($this->admin());
         $this->assertNull($hasil['periode']);
-        $this->assertSame([], $hasil['nodes']);
+        $this->assertSame([], $hasil['data']['deputi']);
     }
 
     public function testEndpointTanpaLogin401(): void
@@ -122,7 +142,7 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
         $this->get('api/v1/struktur-organisasi')->assertStatus(401);
     }
 
-    public function testEndpointSemuaRoleLoginDanFilterTidakValid(): void
+    public function testEndpointSemuaRoleLogin(): void
     {
         foreach (Role::all() as $role) {
             [, , $akun] = $this->aktor($role);
@@ -130,24 +150,70 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
         }
 
         [, , $akun] = $this->aktor(Role::PEGAWAI);
-        $this->asUser($akun)->get('api/v1/struktur-organisasi?id_satker=abc')->assertStatus(422);
+        $this->asUser($akun)->get('api/v1/struktur-organisasi?id_unit_satker=abc')->assertStatus(422);
     }
 
-    private function struktur(string $nama, ?string $atasan, int $level, int $urutan): void
+    /**
+     * @param array<string, mixed> $baris
+     */
+    private function pastikan(string $tabel, array $baris): void
     {
+        $pk = (string) array_key_first($baris);
+
+        if ($this->db->table($tabel)->where($pk, $baris[$pk])->countAllResults() === 0) {
+            $this->db->table($tabel)->insert($baris);
+        }
+    }
+
+    private function jabatan(string $kunci, string $nama, int $satker, int $eselon, ?string $atasan, int $level): void
+    {
+        $sub = $eselon === 1 ? 1 : $this->subGroup($eselon);
+        $this->db->table('jabatan')->insert(['id_group_jabatan' => 1, 'id_sub_group_jabatan' => $sub, 'id_satker' => $satker, 'jabatan' => $nama, 'status' => 1]);
+        $this->jab[$kunci] = (int) $this->db->insertID();
         $this->db->table('struktur_jabatan')->insert([
             'id_periode_struktur_jabatan' => $this->idPeriode,
-            'id_jabatan'                  => $this->jab[$nama],
+            'id_jabatan'                  => $this->jab[$kunci],
             'id_jabatan_atasan'           => $atasan === null ? null : $this->jab[$atasan],
             'periode_struktur_jabatan'    => 'Periode Uji',
             'jabatan'                     => $nama,
             'level_struktur'              => $level,
-            'urutan'                      => $urutan,
+            'urutan'                      => 1,
             'status'                      => 1,
         ]);
     }
 
-    private function penugasan(string $jenis, string $nip, string $jabatan, string $mulai = '-1 day', string $akhir = '+30 days', int $status = 1): void
+    private function subGroup(int $eselon): int
+    {
+        $nama = "Eselon {$eselon} Uji";
+        $row  = $this->db->table('sub_group_jabatan')->where('sub_group_jabatan', $nama)->get()->getRowArray();
+
+        if ($row !== null) {
+            return (int) $row['id_sub_group_jabatan'];
+        }
+
+        $this->db->table('sub_group_jabatan')->insert(['id_group_jabatan' => 1, 'sub_group_jabatan' => $nama, 'need_satker' => 1, 'status' => 1]);
+
+        return (int) $this->db->insertID();
+    }
+
+    /**
+     * Pegawai (jenis status 1, dibuat 2020) + riwayat jabatan disetujui pada jabatan $kunci.
+     *
+     * @param array<string, mixed> $pegawai
+     */
+    private function pejabatDefinitif(string $kunci, array $pegawai = [], ?string $gol = null): string
+    {
+        $nip = $this->buatPegawai($pegawai + ['id_jenis_status' => 1, 'created_at' => '2020-01-01 00:00:00']);
+        $this->buatRiwayatMutasiJabatan($nip, ['id_jabatan' => $this->jab[$kunci], 'id_group_jabatan' => 1, 'tmtsk' => '2021-01-01']);
+
+        if ($gol !== null) {
+            $this->db->table('riwayat_kp')->insert(['nip' => $nip, 'gol_ruang' => $gol, 'tmtsk' => '2020-04-01', 'status' => 1]);
+        }
+
+        return $nip;
+    }
+
+    private function penugasan(string $jenis, string $nip, string $jabatan, string $mulai = '-1 day', string $akhir = '+30 days'): void
     {
         $this->db->table("pegawai_{$jenis}")->insert([
             "nip_{$jenis}"  => $nip,
@@ -155,7 +221,18 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
             'id_jabatan'    => $this->jab[$jabatan],
             'tgl_mulai'     => Time::today()->modify($mulai)->toDateString(),
             'tgl_akhir'     => Time::today()->modify($akhir)->toDateString(),
-            'status'        => $status,
+            'status'        => 1,
         ]);
+    }
+
+    private function statusDari(Closure $aksi): int
+    {
+        try {
+            $aksi();
+        } catch (ApiException $e) {
+            return $e->getStatusCode();
+        }
+
+        return 200;
     }
 }

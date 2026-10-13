@@ -1,68 +1,73 @@
 /**
- * StrukturOrganisasiPage (B-19, MAKE-012): bagan dari `GET struktur-organisasi`, pejabat definitif/Plt/Plh/lowong,
- * filter unit → satker, periode kosong, galat tanpa data contoh.
+ * StrukturOrganisasiPage (B-19, MAKE-012; ikut templat legacy so_012025): pemilih unit/satker (?id_unit_satker=),
+ * judul, susunan bagan per format (kementerian / unit / satker), Plt/Plh & lowong, kotak JF, galat tanpa data contoh.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/struktur.service', () => ({ strukturService: { pohon: vi.fn() } }))
-vi.mock('@/shared/services/masterOptions', () => ({ masterOptions: vi.fn() }))
+vi.mock('../services/struktur.service', () => ({ strukturService: { bagan: vi.fn() } }))
 
 import { Role } from '@/features/auth/types'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
-import { masterOptions } from '@/shared/services/masterOptions'
 
 import { strukturService } from '../services/struktur.service'
-import type { OrgNode, StrukturOrganisasi } from '../types'
+import { susunBagan } from '../soTemplat'
+import type { SoKotak, StrukturOrganisasi } from '../types'
 import StrukturOrganisasiPage from '../views/StrukturOrganisasiPage.vue'
 
 import { apiError } from './fixtures'
 
-const pohon = vi.mocked(strukturService.pohon)
-const opsi = vi.mocked(masterOptions)
+const bagan = vi.mocked(strukturService.bagan)
 
-const simpul = (id: number, jabatan: string, extra: Partial<OrgNode> = {}): OrgNode => ({
-  id: `sj-${id}`,
-  id_jabatan: id,
-  id_atasan: null,
+const k = (jabatan: string, pejabat = '', extra: Partial<SoKotak> = {}): SoKotak => ({
   jabatan,
-  level_struktur: 2,
-  id_unit: 1,
-  unit: 'Unit A',
-  id_satker: 10,
-  satker: 'Satker A',
-  pejabat: null,
-  children: [],
+  pejabat,
+  is_plt: false,
+  jenis: pejabat ? 'definitif' : null,
   ...extra,
 })
 
-const DATA: StrukturOrganisasi = {
+const dasar = (extra: Partial<StrukturOrganisasi>): StrukturOrganisasi => ({
   periode: { id_periode_struktur_jabatan: 3, periode_struktur_jabatan: '2025' },
-  filter: { id_unit: null, id_satker: null },
-  nodes: [
-    simpul(1, 'Sekretaris', {
-      pejabat: { nip: '197001012000011001', nama_lengkap: 'Dr. Budi, M.Si.', gol_ruang: 'IV/d', jenis: 'definitif', pejabat_so: '' },
-      children: [
-        simpul(2, 'Kepala Biro', {
-          id_atasan: 1,
-          pejabat: { nip: '198001012005011002', nama_lengkap: 'Siti', gol_ruang: null, jenis: 'plt', pejabat_so: '' },
-        }),
-        simpul(3, 'Kepala Bagian', { id_atasan: 1 }),
-      ],
-    }),
+  tanggal: '2026-10-13',
+  id_unit_satker: '0',
+  kementerian: 'Kementerian Uji',
+  pilihan: [
+    { value: '5', label: 'Deputi Uji', level: 1, disabled: false },
+    { value: '6', label: 'UPT', level: 1, disabled: true },
+    { value: 'sat_9', label: 'Balai Uji', level: 2, disabled: false },
   ],
-}
+  judul: 'Kementerian Uji',
+  format: 'kementerian',
+  data: {},
+  ...extra,
+})
 
-async function mountPage() {
+const KEMENTERIAN = dasar({
+  data: {
+    menteri: k('Menteri', 'Menteri Uji'),
+    wakil_menteri: k('Wakil Menteri', 'Wamen Uji'),
+    staf_ahli: [k('Staf Ahli Uji')],
+    inspektorat: k('Inspektur Jenderal', 'Irjen, IV/e, 1'),
+    sekretaris: k('Sekretaris Kementerian', 'Budi, IV/e, 197001012000011001', {
+      list_es2: [k('Kepala Biro', 'Plt. Siti, IV/a, 2', { jenis: 'plt', is_plt: true, satker: 'Biro A' })],
+    }),
+    deputi: [k('Deputi Bidang Uji', '', { list_es2: [k('Direktur Uji')] })],
+  },
+})
+
+async function mountPage(query = '') {
   loginAs(Role.PEGAWAI)
   const router = createShellRouter()
   router.addRoute({ path: '/struktur-organisasi', name: 'org-structure', component: StrukturOrganisasiPage })
-  await router.push('/struktur-organisasi')
+  await router.push(`/struktur-organisasi${query}`)
   await router.isReady()
   const wrapper = mount(StrukturOrganisasiPage, { global: { plugins: [router] }, attachTo: document.body })
   await flushPromises()
-  return wrapper
+  return { wrapper, router }
 }
+
+const teks = (w: ReturnType<typeof mount>) => w.get('[data-testid="struktur-pohon"]').text()
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -70,47 +75,65 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 beforeEach(() => {
-  pohon.mockReset()
-  opsi.mockReset()
-  pohon.mockResolvedValue(DATA)
-  opsi.mockImplementation(async (entity: string) =>
-    entity === 'unit' ? [{ id: '1', nama: 'Unit A', parent: null }] : [{ id: '10', nama: 'Satker A', parent: '1' }],
-  )
+  bagan.mockReset()
+  bagan.mockResolvedValue(KEMENTERIAN)
 })
 
 describe('StrukturOrganisasiPage', () => {
-  it('menampilkan bagan: pejabat definitif, Plt berlencana, jabatan lowong', async () => {
-    const w = await mountPage()
+  it('kementerian: Menteri + Wakil → staf ahli, inspektorat, sekretaris (Es.II), deputi; Plt berlencana, lowong', async () => {
+    const { wrapper } = await mountPage()
 
-    expect(pohon).toHaveBeenCalledWith({ id_unit: '', id_satker: '' })
-    expect(w.get('[data-testid="struktur-periode"]').text()).toContain('2025')
-    expect(w.get('[data-testid="org-node-sj-1"]').text()).toContain('Dr. Budi, M.Si.')
-    expect(w.get('[data-testid="org-node-sj-1"]').text()).toContain('IV/d')
-    expect(w.find('[data-testid="org-node-sj-1-jenis"]').exists()).toBe(false)
-    expect(w.get('[data-testid="org-node-sj-2-jenis"]').text()).toBe('Plt.')
-    expect(w.find('[data-testid="org-node-sj-3-lowong"]').exists()).toBe(true)
+    expect(bagan).toHaveBeenCalledWith('0')
+    expect(wrapper.get('[data-testid="struktur-judul"]').text()).toContain('Kementerian Uji')
+    const t = teks(wrapper)
+    for (const s of ['Menteri Uji', 'Wamen Uji', 'Staf Ahli Uji', 'Irjen, IV/e, 1', 'Budi, IV/e, 197001012000011001', 'Plt. Siti', 'Deputi Bidang Uji', 'Direktur Uji']) {
+      expect(t).toContain(s)
+    }
+    expect(wrapper.findAll('[data-testid$="-jenis"]').map((b) => b.text())).toEqual(['Plt.'])
+    expect(wrapper.findAll('[data-testid$="-lowong"]').length).toBeGreaterThan(0)
   })
 
-  it('filter unit memuat opsi satker lalu memuat ulang; satker mempersempit', async () => {
-    const w = await mountPage()
+  it('pemilih: opsi dari backend (unit 6 nonaktif); memilih → ?id_unit_satker= dan muat ulang', async () => {
+    const { wrapper, router } = await mountPage()
+    const select = wrapper.get<HTMLSelectElement>('[data-testid="struktur-pilihan"]')
 
-    await w.get('[data-testid="struktur-filter-unit"] select').setValue('1')
-    await flushPromises()
-    expect(opsi).toHaveBeenCalledWith('satker', '1')
-    expect(pohon).toHaveBeenLastCalledWith({ id_unit: '1', id_satker: '' })
+    expect(select.findAll('option').map((o) => o.text())).toEqual(['Kementerian Uji', '─ Deputi Uji', '─ UPT', '─── Balai Uji'])
+    expect(select.find('option[value="6"]').attributes('disabled')).toBeDefined()
 
-    await w.get('[data-testid="struktur-filter-satker"] select').setValue('10')
+    bagan.mockResolvedValueOnce(dasar({ id_unit_satker: 'sat_9', format: 'upt', judul: 'Balai Uji', data: { es2: k('Balai Uji'), es3: [k('Subbagian Uji')], es4: [] } }))
+    await select.setValue('sat_9')
     await flushPromises()
-    expect(pohon).toHaveBeenLastCalledWith({ id_unit: '1', id_satker: '10' })
+
+    expect(router.currentRoute.value.query.id_unit_satker).toBe('sat_9')
+    expect(bagan).toHaveBeenLastCalledWith('sat_9')
+    expect(teks(wrapper)).toContain('Subbagian Uji')
+    expect(teks(wrapper)).toContain('Jabatan Fungsional dan Jabatan Pelaksana')
+  })
+
+  it('susunan unit: Es.I → sekretariat (Es.III + JF) lalu Es.II → Es.III → Es.IV / JF', () => {
+    const pohon = susunBagan(dasar({
+      format: 'deputi',
+      data: {
+        es1: k('Deputi'),
+        es2_sek: [k('Sekretariat Deputi', '', { es3: [k('Bagian Umum')] })],
+        es2: [k('Direktorat A', '', { es3: [k('Subdit 1', '', { es4: [k('Seksi 1')] }), k('Subdit 2', '', { es4: [] })] })],
+      },
+    }))
+
+    expect(pohon.map((n) => n.jabatan)).toEqual(['Deputi'])
+    const [sek, dir] = pohon[0]!.children
+    expect(sek!.children.map((n) => n.jabatan)).toEqual(['Bagian Umum', 'Jabatan Fungsional dan Jabatan Pelaksana'])
+    expect(dir!.children.map((n) => n.children.map((c) => c.jabatan))).toEqual([['Seksi 1'], ['Jabatan Fungsional dan Jabatan Pelaksana']])
   })
 
   it('tanpa periode aktif → pemberitahuan; galat API → pesan tanpa bagan', async () => {
-    pohon.mockResolvedValueOnce({ periode: null, filter: { id_unit: null, id_satker: null }, nodes: [] })
-    const w = await mountPage()
-    expect(w.find('[data-testid="struktur-tanpa-periode"]').exists()).toBe(true)
+    bagan.mockResolvedValueOnce(dasar({ periode: null, data: { staf_ahli: [], deputi: [] } }))
+    const { wrapper } = await mountPage()
+    expect(wrapper.find('[data-testid="struktur-tanpa-periode"]').exists()).toBe(true)
 
-    pohon.mockRejectedValueOnce(apiError(500))
-    const w2 = await mountPage()
+    bagan.mockRejectedValueOnce(apiError(422))
+    const { wrapper: w2 } = await mountPage('?id_unit_satker=sat_999')
+    expect(bagan).toHaveBeenLastCalledWith('sat_999')
     expect(w2.find('[data-testid="struktur-error"]').exists()).toBe(true)
     expect(w2.find('[data-testid="struktur-pohon"]').exists()).toBe(false)
   })

@@ -15,13 +15,13 @@ use App\Libraries\Auth\AuthContext;
 interface StrukturServiceInterface
 {
     /**
-     * Pohon struktur organisasi periode aktif (struktur_jabatan) beserta pejabat saat ini: definitif dari
-     * `pegawai_mutasi_jabatan`, bila kosong Plt lalu Plh yang aktif hari ini. Semua pengguna yang login (legacy
-     * `hr/so/full` = sesi, `hr/rwy/jabatan/so` = UL_ALL).
+     * Bagan struktur organisasi ikut templat legacy so_012025 (keputusan user 13-10-2026): format per pilihan
+     * `id_unit_satker` ('0' kementerian, '<id_unit>', 'sat_<id_satker>') dan pejabat (definitif, lalu Plt/Plh) pada
+     * tanggal acuan. Semua pengguna login (legacy `hr/so/full` = sesi, `hr/rwy/jabatan/so` = UL_ALL).
      *
-     * @param array<string, mixed> $filter `id_unit`, `id_satker` (opsional)
+     * @param array<string, mixed> $filter `id_unit_satker` (opsional, bawaan '0')
      *
-     * @return array{periode: array{id_periode_struktur_jabatan: int, periode_struktur_jabatan: string}|null, filter: array{id_unit: int|null, id_satker: int|null}, nodes: list<array<string, mixed>>}
+     * @return array<string, mixed> `{ periode, tanggal, id_unit_satker, kementerian, pilihan, judul, format, data }`
      */
     public function pohon(AuthContext $auth, array $filter = []): array;
 }
