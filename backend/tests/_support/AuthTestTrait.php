@@ -72,6 +72,28 @@ trait AuthTestTrait
     }
 
     /**
+     * MAKE-015: baris `pegawai` minimal untuk NIP akun yang dibuat test lewat UserService/AccountProvisioner — NIP akun
+     * wajib terdaftar sebagai pegawai (prasyarat FK masuk DBV-019). NIP yang sudah ada dilewati. Hanya INSERT lewat
+     * query builder (aman di bingkai transaksi uji).
+     */
+    protected function daftarkanPegawai(string ...$nips): void
+    {
+        foreach ($nips as $nip) {
+            if ($this->db->table('pegawai')->where('nip', $nip)->countAllResults() > 0) {
+                continue;
+            }
+
+            $this->db->table('pegawai')->insert([
+                'nip'           => $nip,
+                'nama'          => 'Pegawai Uji ' . $nip,
+                'tgl_lahir'     => '1990-01-01',
+                'jenis_kelamin' => 1,
+                'status'        => 1,
+            ]);
+        }
+    }
+
+    /**
      * Akun tanpa NIP (role 1/3/4/5/8, K2) dengan password AuthSeeder::PASSWORD (Argon2id). Test yang memakainya WAJIB
      * memanggil bersihkanDataDbv010() di tearDown(): down() migration DBV-010 menolak akun tanpa NIP.
      *

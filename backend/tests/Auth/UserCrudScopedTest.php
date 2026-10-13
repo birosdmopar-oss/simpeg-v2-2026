@@ -44,6 +44,8 @@ final class UserCrudScopedTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
+        // MAKE-015: NIP akun baru di test ini wajib terdaftar sebagai pegawai.
+        $this->daftarkanPegawai(self::NEW_NIP, '200001012024011002', '200001012024011003', '3171012345678901');
     }
 
     protected function tearDown(): void
@@ -375,6 +377,8 @@ final class UserCrudScopedTest extends DatabaseTestCase
      */
     public function testUniqueRaceIsTranslatedTo422(): void
     {
+        // MAKE-015: NIP akun seed terdaftar sebagai pegawai, supaya yang diuji benar-benar balapan UNIQUE (1062).
+        $this->daftarkanPegawai(self::PEGAWAI_S01);
         $akun = $this->buatAkunTanpaNip('admin.view', Role::ADMIN_VIEW_ESELON1);
         $id   = (int) $akun['id_pengguna'];
 

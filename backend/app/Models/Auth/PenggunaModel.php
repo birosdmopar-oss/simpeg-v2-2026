@@ -31,6 +31,16 @@ class PenggunaModel extends BaseAuditableModel
      */
     public const NIP_MAX_DIGITS = 18;
 
+    /**
+     * MAKE-015: pesan 422 errors.nip untuk NIP yang tidak ada di `pegawai` (prasyarat FK masuk DBV-019).
+     */
+    public const NIP_TIDAK_TERDAFTAR = 'NIP tidak terdaftar sebagai pegawai.';
+
+    /**
+     * Kode MySQL pelanggaran FK saat menulis anak (ER_NO_REFERENCED_ROW_2).
+     */
+    public const ER_FK_TANPA_INDUK = 1452;
+
     public const NAME_MAX  = 150;
     public const EMAIL_MAX = 150;
 
@@ -77,6 +87,18 @@ class PenggunaModel extends BaseAuditableModel
         $row = $this->where('nip', $nip)->first();
 
         return $row;
+    }
+
+    /**
+     * MAKE-015 (prasyarat FK masuk DBV-019 `fk_id_pegawai_pengguna_to_pegawai`): NIP ada di `pegawai.nip`. Status
+     * pegawai tidak dinilai — FK hanya mensyaratkan barisnya ada. Query builder baru, bukan state model. Membaca DB
+     * setiap dipanggil (cek ulang sesudah 1452 bisa berbeda dari cek pertama).
+     *
+     * @phpstan-impure
+     */
+    public function nipTerdaftarPegawai(string $nip): bool
+    {
+        return $this->db->table('pegawai')->where('nip', $nip)->countAllResults() > 0;
     }
 
     /**
