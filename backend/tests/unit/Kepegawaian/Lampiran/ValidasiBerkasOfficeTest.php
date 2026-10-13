@@ -86,6 +86,15 @@ final class ValidasiBerkasOfficeTest extends CIUnitTestCase
         $this->assertDitolak($this->unggah($this->zip(['word/document.xml' => '<w:document/>']), 'surat.docx'), $this->aturan(['docx']));
     }
 
+    public function testDokumenOleBernamaDocxDitolak(): void
+    {
+        // Tanda tangan OLE Compound File (Word/Excel lama) + isi sembarang: bukan paket OOXML.
+        $ole = "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1" . str_repeat("\x00", 504) . str_repeat('A', 1024);
+
+        $this->assertDitolak($this->unggah($ole, 'surat.docx'), $this->aturan(['docx']));
+        $this->assertDitolak($this->unggah($ole, 'rekap.xlsx'), $this->aturan(['xlsx']));
+    }
+
     public function testPdfTetapDiterimaTanpaPemeriksaanOffice(): void
     {
         $pdf   = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
