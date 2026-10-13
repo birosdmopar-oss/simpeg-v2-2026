@@ -34,9 +34,18 @@ export interface FieldCondition {
   /**
    * Bandingkan atribut `extra[opsi]` opsi TERPILIH di isian ref `field`, bukan nilainya (MAKE-018), mis. sub group
    * jabatan `need_satker` = '1'. Hanya dievaluasi untuk `when` filter opsi (perlu daftar opsi); `showWhen` tidak memakainya.
+   * `field` WAJIB isian ref rantai berjenjang (ber-`dependsOn`/akar rantai) yang opsinya sudah dimuat sebelum isian
+   * terfilter — rantai dimuat lebih dulu saat init; isian yang dimuat sendiri tidak dijamin siap.
    */
   opsi?: string
 }
+
+/**
+ * Syarat tampil/wajib: satu syarat, atau gabungan jamak aditif MAKE-018 — `{ any: [...] }` (ATAU) / `{ all: [...] }` (DAN),
+ * boleh bersarang, mis. `{ any: [{ field: 'jenis_jabatan', in: ['2'] }, { all: [{ field: 'jenis_jabatan', in: ['1', '3'] },
+ * { field: 'id_satker', in: ['39'] }] }] }`. Syarat satuan membaca nilai isian TEKS (bukan multiselect).
+ */
+export type SyaratTampil = FieldCondition | { any: readonly SyaratTampil[] } | { all: readonly SyaratTampil[] }
 
 /** Satu filter opsi master dari nilai isian lain (`?<param>=<nilai isian field>`), opsional bersyarat `when` (MAKE-018). */
 export interface FilterOpsi {
@@ -77,7 +86,12 @@ export interface FieldDef {
    * Isian hanya tampil (dan hanya wajib) bila syarat terpenuhi; isian tersembunyi dikirim kosong (= NULL). Validasi
    * yang mengikat tetap aturan bersyarat Definisi backend (422).
    */
-  showWhen?: FieldCondition
+  showWhen?: SyaratTampil
+  /**
+   * Wajib hanya bila syarat terpenuhi (aditif MAKE-018; bentuk sama dengan `showWhen`), untuk isian yang selalu tampil
+   * tetapi wajibnya bersyarat. `required: true` tetap = selalu wajib (selama tampil).
+   */
+  requiredWhen?: SyaratTampil
   /**
    * Isian hitung: dikosongkan = dihitung server (mis. tanggal berakhir hukdis dari masa sanksi jenis). Form
    * menampilkan petunjuk ini di bawah isian.
@@ -100,6 +114,7 @@ export interface FieldDef {
   /**
    * `ref`/`multiselect`: sumber opsi kustom (MAKE-018) — path API (respons `[{id, nama, parent}]`) dari nilai form;
    * null = belum bisa dimuat (opsi kosong). Path berubah → dimuat ulang dan nilai dikosongkan. Menggantikan `entity`.
+   * Nilai isian yang dirangkai ke path WAJIB di-`encodeURIComponent` (mis. `` `/x?satker=${encodeURIComponent(v.id_satker)}` ``).
    */
   optionsSource?: (values: Record<string, string>) => string | null
   /** `multiselect`: muat ulang nilai saat Edit dengan mencocokkan teks kolom baris ke opsi (MAKE-018). */
@@ -210,9 +225,26 @@ export interface RiwayatJenisConfig {
  * masih kosong = belum tampil (mis. bidang pendidikan baru muncul setelah jenjang dipilih).
  */
 export function fieldVisible(field: FieldDef, values: Record<string, string | undefined>): boolean {
-  const cond = field.showWhen
-  if (!cond) return true
-  return cocokKondisi(cond, String(values[cond.field] ?? ''))
+  return !field.showWhen || syaratTerpenuhi(field.showWhen, values)
+}
+
+/** Syarat tampil/wajib (satuan atau `any`/`all` bersarang) terpenuhi oleh nilai form. */
+export function syaratTerpenuhi(syarat: SyaratTampil, values: Record<string, string | undefined>): boolean {
+  if ('any' in syarat) return syarat.any.some((s) => syaratTerpenuhi(s, values))
+  if ('all' in syarat) return syarat.all.every((s) => syaratTerpenuhi(s, values))
+  return cocokKondisi(syarat, String(values[syarat.field] ?? ''))
+}
+
+/** Semua isian yang dibaca syarat (satuan atau `any`/`all` bersarang). */
+export function fieldSyarat(syarat: SyaratTampil): string[] {
+  if ('any' in syarat) return syarat.any.flatMap(fieldSyarat)
+  if ('all' in syarat) return syarat.all.flatMap(fieldSyarat)
+  return [syarat.field]
+}
+
+/** Isian wajib untuk nilai form saat ini (`required`, atau `requiredWhen` terpenuhi); tampil-tidaknya diperiksa terpisah. */
+export function fieldWajib(field: FieldDef, values: Record<string, string | undefined>): boolean {
+  return Boolean(field.required) || (field.requiredWhen !== undefined && syaratTerpenuhi(field.requiredWhen, values))
 }
 
 /** Syarat `cond` terpenuhi oleh nilai `nilai` (nilai isian, atau atribut opsi untuk `cond.opsi`); kosong = tidak. */
@@ -236,7 +268,11 @@ export const N = (name: string, label: string, extra: Partial<FieldDef> = {}): F
 export const A = (name: string, label: string, extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'textarea', wide: true, ...extra })
 export const R = (name: string, label: string, entity: string, extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'ref', entity, ...extra })
 export const S = (name: string, label: string, options: FieldOption[], extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'select', options, ...extra })
-/** Pilihan jamak opsi master (MAKE-018): nilai form = daftar ID, dikirim `kolom[]`; wajib = minimal satu. */
+/**
+ * Pilihan jamak opsi master (MAKE-018): nilai form = daftar ID, dikirim `kolom[]`; wajib = minimal satu. Nilainya di luar
+ * nilai teks form: dikirim lewat argumen ketiga event `submit` (digabung otomatis HANYA oleh RiwayatListSection) dan
+ * TIDAK bisa menjadi pemicu `showWhen`/`requiredWhen`/`compute`/`when`.
+ */
 export const M = (name: string, label: string, entity: string, extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'multiselect', entity, ...extra })
 
 export const defineRiwayatJenis = (config: RiwayatJenisConfig): RiwayatJenisConfig => config

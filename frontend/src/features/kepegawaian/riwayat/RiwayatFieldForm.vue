@@ -29,7 +29,7 @@ import { UiButton, UiCheckbox, UiFileField, UiSelect, UiTextField } from '@/shar
 
 import type { RiwayatValidationErrors } from '../services/apiErrors'
 
-import { fieldVisible, type BerkasKolomDef, type FieldDef, type LampiranDef, type PratinjauDef } from './riwayat.config'
+import { fieldVisible, fieldWajib, type BerkasKolomDef, type FieldDef, type LampiranDef, type PratinjauDef } from './riwayat.config'
 import { buildRiwayatSchema } from './riwayat.schema'
 import type { BerkasMap } from './riwayat.service'
 import { useRiwayatRefOptions } from './riwayatCascade'
@@ -125,11 +125,18 @@ function toggleJamak(f: FieldDef, value: string, pilih: boolean): void {
   onEdited(f.name)
 }
 
+/** id pesan galat / petunjuk / catatan multiselect yang sedang tampil, untuk aria-describedby ('' = tidak ada). */
+function keteranganJamak(f: FieldDef): string {
+  const ids = [fieldError(f.name) ? `${props.testid}-${f.name}-galat` : f.hint ? `${props.testid}-${f.name}-hint` : '']
+  if (catatanJamak[f.name]?.length) ids.push(`${props.testid}-${f.name}-catatan`)
+  return ids.filter(Boolean).join(' ')
+}
+
 /** Wajib multiselect (minimal satu) atas isian yang tampil; galat dipasang per isian. */
 function jamakKurang(): boolean {
   let kurang = false
   for (const f of jamakFields) {
-    if (f.required && visible(f) && (jamak[f.name] ?? []).length === 0) {
+    if (wajib(f) && visible(f) && (jamak[f.name] ?? []).length === 0) {
       galatJamak[f.name] = `${f.label} wajib dipilih minimal satu`
       kurang = true
     }
@@ -188,6 +195,8 @@ async function onRefChange(f: FieldDef, value: string): Promise<void> {
 }
 
 const visible = (f: FieldDef): boolean => fieldVisible(f, values as Record<string, string | undefined>)
+/** Tanda wajib (*) isian: `required`, atau `requiredWhen` yang terpenuhi untuk nilai form saat ini. */
+const wajib = (f: FieldDef): boolean => fieldWajib(f, values as Record<string, string | undefined>)
 
 // Isian hitung (`compute`): diperbarui setiap kali isian lain berubah; hanya-baca selama hasilnya bukan null. Saat
 // Edit, nilai tersimpan baris tidak ditimpa sampai pengguna mengubah isian (baris legacy, mis. kategori SKP lama).
@@ -333,7 +342,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             type="textarea"
             :name="f.name"
             :label="f.label"
-            :required="f.required"
+            :required="wajib(f)"
             :disabled="busy"
             :error="fieldError(f.name)"
             :hint="f.hint"
@@ -344,7 +353,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             v-else-if="f.type === 'ref'"
             :model-value="models[f.name].value"
             :label="f.label"
-            :required="f.required"
+            :required="wajib(f)"
             :disabled="busy"
             :options="refs.options(f.name)"
             :placeholder="`Pilih ${f.label.toLowerCase()}...`"
@@ -354,9 +363,9 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :data-field="f.name"
             @update:model-value="(v) => onRefChange(f, v)"
           />
-          <fieldset v-else-if="f.type === 'multiselect'" :data-field="f.name" :aria-invalid="Boolean(fieldError(f.name))">
+          <fieldset v-else-if="f.type === 'multiselect'" :data-field="f.name" :aria-describedby="keteranganJamak(f) || undefined">
             <legend class="mb-2 text-body2 font-medium text-slate-700">
-              {{ f.label }}<span v-if="f.required" class="text-danger"> *</span>
+              {{ f.label }}<span v-if="wajib(f)" class="text-danger" aria-hidden="true"> *</span>
             </legend>
             <div class="grid gap-2 sm:grid-cols-2">
               <span v-for="o in refs.options(f.name)" :key="o.value" :data-opsi="o.value">
@@ -365,14 +374,20 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
                   :label="o.label"
                   :disabled="busy"
                   :invalid="Boolean(fieldError(f.name))"
+                  :described-by="keteranganJamak(f) || undefined"
                   @update:model-value="(v) => toggleJamak(f, o.value, v)"
                 />
               </span>
             </div>
             <p v-if="refs.options(f.name).length === 0" class="text-body2 text-slate-500">Belum ada pilihan.</p>
-            <p v-if="fieldError(f.name)" role="alert" class="mt-1 text-caption text-danger">{{ fieldError(f.name) }}</p>
-            <p v-else-if="f.hint" class="mt-1 text-caption text-slate-500">{{ f.hint }}</p>
-            <p v-if="catatanJamak[f.name]?.length" class="mt-1 text-caption text-warning" :data-testid="`${testid}-catatan-${f.name}`">
+            <p v-if="fieldError(f.name)" :id="`${testid}-${f.name}-galat`" role="alert" class="mt-1 text-caption text-danger">{{ fieldError(f.name) }}</p>
+            <p v-else-if="f.hint" :id="`${testid}-${f.name}-hint`" class="mt-1 text-caption text-slate-500">{{ f.hint }}</p>
+            <p
+              v-if="catatanJamak[f.name]?.length"
+              :id="`${testid}-${f.name}-catatan`"
+              class="mt-1 text-caption text-warning"
+              :data-testid="`${testid}-catatan-${f.name}`"
+            >
               Tidak ditemukan di pilihan, pilih ulang bila perlu: {{ catatanJamak[f.name]?.join(', ') }}
             </p>
           </fieldset>
@@ -380,7 +395,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             v-else-if="f.type === 'select'"
             v-model="models[f.name].value"
             :label="f.label"
-            :required="f.required"
+            :required="wajib(f)"
             :disabled="busy"
             :options="f.options ?? []"
             :placeholder="`Pilih ${f.label.toLowerCase()}...`"
@@ -395,7 +410,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             v-model="models[f.name].value"
             :list="f.suggestEntity ? `${testid}-saran-${f.name}` : undefined"
             :label="f.label"
-            :required="f.required"
+            :required="wajib(f)"
             :disabled="busy"
             :readonly="terkunciHitung(f)"
             :type="f.type === 'date' ? 'date' : 'text'"

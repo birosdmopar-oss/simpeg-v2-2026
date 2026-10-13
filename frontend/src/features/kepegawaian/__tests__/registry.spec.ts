@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RIWAYAT_REGISTRY, configFor, tabsFromDescriptors } from '../riwayat/registry'
+import { fieldSyarat } from '../riwayat/riwayat.config'
 import { buildRiwayatSchema } from '../riwayat/riwayat.schema'
 import { JENIS_ENGINE, JENIS_NON_ENGINE } from '../types'
 
@@ -83,12 +84,14 @@ describe('registry riwayat', () => {
     }
   })
 
-  it('dependsOn menunjuk isian ref lain di jenis yang sama; showWhen menunjuk isian yang ada', () => {
+  it('dependsOn menunjuk isian ref lain di jenis yang sama; showWhen/requiredWhen menunjuk isian yang ada', () => {
     for (const config of Object.values(RIWAYAT_REGISTRY)) {
       const names = config.fields.map((f) => f.name)
       for (const f of config.fields) {
         if (f.dependsOn) expect(config.fields.find((g) => g.name === f.dependsOn)?.type, `${config.jenis}.${f.name}`).toBe('ref')
-        if (f.showWhen) expect(names, `${config.jenis}.${f.name}`).toContain(f.showWhen.field)
+        for (const syarat of [f.showWhen, f.requiredWhen]) {
+          for (const nama of syarat ? fieldSyarat(syarat) : []) expect(names, `${config.jenis}.${f.name}`).toContain(nama)
+        }
       }
     }
   })
