@@ -11,11 +11,13 @@ import type { RoleCode } from '@/features/auth/types'
 
 import type { AturanLampiran, JenisTab } from '../types'
 
-export type FieldType = 'text' | 'date' | 'number' | 'select' | 'textarea' | 'ref'
+export type FieldType = 'text' | 'date' | 'number' | 'select' | 'textarea' | 'ref' | 'multiselect'
 
 export interface FieldOption {
   value: string
   label: string
+  /** Atribut tambahan opsi master (`extra`, MAKE-018), dibaca syarat `FieldCondition.opsi`. */
+  extra?: Readonly<Record<string, string | null>>
 }
 
 /**
@@ -29,6 +31,26 @@ export interface FieldCondition {
   /** Nilai angka isian syarat ≥ min / ≤ max (mis. skema SKP menurut tahun). */
   min?: number
   max?: number
+  /**
+   * Bandingkan atribut `extra[opsi]` opsi TERPILIH di isian ref `field`, bukan nilainya (MAKE-018), mis. sub group
+   * jabatan `need_satker` = '1'. Hanya dievaluasi untuk `when` filter opsi (perlu daftar opsi); `showWhen` tidak memakainya.
+   */
+  opsi?: string
+}
+
+/** Satu filter opsi master dari nilai isian lain (`?<param>=<nilai isian field>`), opsional bersyarat `when` (MAKE-018). */
+export interface FilterOpsi {
+  param: string
+  field: string
+  when?: FieldCondition
+}
+
+/** Muat ulang isian multiselect saat Edit dari kolom teks baris (MAKE-018), mis. nama dipisah `***` (legacy jabatan). */
+export interface LoadFromDef {
+  kolom: string
+  pemisah: string
+  /** Pencocokan potongan teks ke opsi: `label` = nama opsi (tanpa beda huruf besar/kecil & spasi tepi). */
+  cocokkan: 'label'
 }
 
 export interface FieldDef {
@@ -68,8 +90,20 @@ export interface FieldDef {
   resetOn?: readonly string[]
   /** `ref`: induk tetap opsi master (`?parent=`), mis. sub-group jabatan fungsional = group 2 (legacy Diklat). */
   optionsParent?: string
-  /** `ref`: opsi disaring nilai isian lain lewat filter master (`?<param>=<nilai isian>`), mis. diklat per `jenis_diklat`. */
-  optionsFilter?: { param: string; field: string }
+  /**
+   * `ref`/`multiselect`: opsi disaring nilai isian lain lewat filter master (`?<param>=<nilai isian>`), mis. diklat per
+   * `jenis_diklat`. Bentuk tunggal (lama): opsi baru dimuat setelah isian pemicu terisi. Bentuk jamak (MAKE-018):
+   * parameter yang isiannya kosong atau `when`-nya tidak terpenuhi tidak dikirim. Pemicu berubah → opsi dimuat ulang dan
+   * nilai isian ini dikosongkan.
+   */
+  optionsFilter?: { param: string; field: string } | readonly FilterOpsi[]
+  /**
+   * `ref`/`multiselect`: sumber opsi kustom (MAKE-018) — path API (respons `[{id, nama, parent}]`) dari nilai form;
+   * null = belum bisa dimuat (opsi kosong). Path berubah → dimuat ulang dan nilai dikosongkan. Menggantikan `entity`.
+   */
+  optionsSource?: (values: Record<string, string>) => string | null
+  /** `multiselect`: muat ulang nilai saat Edit dengan mencocokkan teks kolom baris ke opsi (MAKE-018). */
+  loadFrom?: LoadFromDef
   /** `ref`: filter master tetap (`?<kolom>=<nilai>`), mis. jabatan JF tertentu `{ id_group_jabatan: '2' }` (AK SIASN). */
   optionsQuery?: Readonly<Record<string, string>>
   /** `ref`: opsi tambahan di akhir daftar master, mis. baris sistem LAIN-LAIN wilayah yang tidak ikut `options`. */
@@ -178,7 +212,12 @@ export interface RiwayatJenisConfig {
 export function fieldVisible(field: FieldDef, values: Record<string, string | undefined>): boolean {
   const cond = field.showWhen
   if (!cond) return true
-  const value = String(values[cond.field] ?? '').trim()
+  return cocokKondisi(cond, String(values[cond.field] ?? ''))
+}
+
+/** Syarat `cond` terpenuhi oleh nilai `nilai` (nilai isian, atau atribut opsi untuk `cond.opsi`); kosong = tidak. */
+export function cocokKondisi(cond: FieldCondition, nilai: string): boolean {
+  const value = nilai.trim()
   if (value === '') return false
   if (cond.in && !cond.in.includes(value)) return false
   if (cond.notIn && cond.notIn.includes(value)) return false
@@ -197,5 +236,7 @@ export const N = (name: string, label: string, extra: Partial<FieldDef> = {}): F
 export const A = (name: string, label: string, extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'textarea', wide: true, ...extra })
 export const R = (name: string, label: string, entity: string, extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'ref', entity, ...extra })
 export const S = (name: string, label: string, options: FieldOption[], extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'select', options, ...extra })
+/** Pilihan jamak opsi master (MAKE-018): nilai form = daftar ID, dikirim `kolom[]`; wajib = minimal satu. */
+export const M = (name: string, label: string, entity: string, extra: Partial<FieldDef> = {}): FieldDef => ({ name, label, type: 'multiselect', entity, ...extra })
 
 export const defineRiwayatJenis = (config: RiwayatJenisConfig): RiwayatJenisConfig => config
