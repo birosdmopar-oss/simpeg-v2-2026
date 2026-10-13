@@ -15,7 +15,8 @@
         "codeigniter4/framework": "^4.7",
         "codeigniter4/queue": "^1.0",
         "ezyang/htmlpurifier": "^4.17",
-        "firebase/php-jwt": "^7.1"
+        "firebase/php-jwt": "^7.1",
+        "tecnickcom/tcpdf": "^6.6"
     },
     "require-dev": {
         "codeigniter/phpstan-codeigniter": "^1.6",
