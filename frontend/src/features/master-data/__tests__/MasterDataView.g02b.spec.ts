@@ -143,6 +143,7 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = ''
+  vi.mocked(masterService.create).mockReset()
 })
 
 describe('MasterDataView — master G-02 sisa (DBV-018/CR-032)', () => {
@@ -219,8 +220,9 @@ describe('MasterFormDialog — master G-02 sisa (DBV-018/CR-032)', () => {
     vi.mocked(masterService.create).mockResolvedValue({ id_jabatan_akademik: '4', jabatan_akademik: 'Lektor Kepala', is_atasan: '1', status: '1' })
     await choose('select[name="is_atasan"]', '1')
     await submitForm()
-    await vi.waitFor(() => expect(masterService.create).toHaveBeenCalled())
-    expect(masterService.create).toHaveBeenCalledWith('jabatan-akademik', expect.objectContaining({ jabatan_akademik: 'Lektor Kepala', is_atasan: '1' }))
+    await vi.waitFor(() =>
+      expect(masterService.create).toHaveBeenCalledWith('jabatan-akademik', expect.objectContaining({ jabatan_akademik: 'Lektor Kepala', is_atasan: '1' })),
+    )
     wrapper.unmount()
   })
 
@@ -233,8 +235,11 @@ describe('MasterFormDialog — master G-02 sisa (DBV-018/CR-032)', () => {
     await choose('select[name="id_rumpun_jabatan"]', '2')
     await typeInto('input[name="subrumpun_jabatan"]', 'Ekonomi Kreatif')
     await submitForm()
-    await vi.waitFor(() => expect(masterService.create).toHaveBeenCalled())
-    expect(masterService.create).toHaveBeenCalledWith('subrumpun-jabatan', expect.objectContaining({ id_rumpun_jabatan: '2', subrumpun_jabatan: 'Ekonomi Kreatif' }))
+    // Tunggu panggilan yang benar (bukan sekadar "ada panggilan"): di runner CI, submit tertunda dari dialog test
+    // sebelumnya bisa tercatat lebih dulu dan membuat asersi berikutnya gagal (flaky, CR-047).
+    await vi.waitFor(() =>
+      expect(masterService.create).toHaveBeenCalledWith('subrumpun-jabatan', expect.objectContaining({ id_rumpun_jabatan: '2', subrumpun_jabatan: 'Ekonomi Kreatif' })),
+    )
     wrapper.unmount()
   })
 })
