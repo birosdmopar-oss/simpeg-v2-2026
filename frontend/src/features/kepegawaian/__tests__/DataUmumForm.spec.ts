@@ -42,6 +42,7 @@ async function setInput(name: string, value: string): Promise<void> {
 }
 
 async function submit(): Promise<void> {
+  // Validasi VeeValidate asinkron: pemanggil memakai vi.waitFor untuk hasilnya (CI lebih lambat dari lokal).
   q('[data-testid="data-umum-form"] form')?.dispatchEvent(new Event('submit'))
   await flushPromises()
   await new Promise((r) => setTimeout(r, 0))
@@ -94,13 +95,13 @@ describe('DataUmumForm — kirim', () => {
     await setInput('no_hp', '0812-9999')
     await submit()
 
-    expect(update).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
     const [nip, payload, foto] = update.mock.calls[0]
     expect(nip).toBe(NIP)
     expect(payload).toMatchObject({ no_hp: '0812-9999', jenis_kerabat: 'Kerabat Lain', jenis_kerabat_lain: 'Sepupu Jauh', email: 'budi@contoh.test' })
     expect(payload).not.toHaveProperty('nama')
     expect(foto).toBeNull()
-    expect(wrapper.emitted('saved')).toHaveLength(1)
+    await vi.waitFor(() => expect(wrapper.emitted('saved')).toHaveLength(1))
   })
 
   it('422 per kolom ditampilkan di isian; errors.foto di isian foto; tidak emit saved', async () => {
@@ -108,7 +109,7 @@ describe('DataUmumForm — kirim', () => {
     const wrapper = await mountForm(Role.SUPER_ADMIN, lengkap())
     await submit()
 
-    await vi.waitFor(() => expect(q('[data-field="npwp"]')?.textContent).toContain('Wajib diisi (angka).'))
+    await vi.waitFor(() => expect(q('[data-field="npwp"]')?.textContent ?? '').toContain('Wajib diisi (angka).'))
     expect(q('[data-testid="data-umum-berkas-error-0"]')?.textContent).toContain('Foto pegawai wajib diunggah.')
     expect(wrapper.emitted('saved')).toBeUndefined()
   })
@@ -117,7 +118,7 @@ describe('DataUmumForm — kirim', () => {
     await mountForm(Role.SUPER_ADMIN, pegawaiDetail([], { npwp: '1', bpjs_kes: '2', no_taspen: '3', jenis_kerabat: 'Anak', no_telp_kerabat: '4', ada_foto: false }))
     await submit()
 
+    await vi.waitFor(() => expect(q('[data-testid="data-umum-berkas-error-0"]')?.textContent ?? '').toContain('wajib diunggah'))
     expect(update).not.toHaveBeenCalled()
-    expect(q('[data-testid="data-umum-berkas-error-0"]')?.textContent).toContain('wajib diunggah')
   })
 })

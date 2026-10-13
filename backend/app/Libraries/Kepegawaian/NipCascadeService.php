@@ -148,11 +148,12 @@ final class NipCascadeService implements NipCascadeInterface
 
         $tabel    = [];
         $dilewati = [];
+        $ada      = $this->tabelAda($db);
 
         foreach ($this->registry as $rujukan) {
             $kunci = $rujukan->tabel . '.' . $rujukan->kolomDiV2();
 
-            if (! $db->tableExists($rujukan->tabel)) {
+            if (! isset($ada[strtolower($db->prefixTable($rujukan->tabel))])) {
                 $dilewati[] = $kunci;
 
                 continue;
@@ -222,6 +223,20 @@ final class NipCascadeService implements NipCascadeInterface
         if ($akunLain > 0) {
             throw ValidationException::forField('nip_baru', 'NIP baru sudah dipakai akun lain (username/NIP); gunakan NIP lain.');
         }
+    }
+
+    /**
+     * Nama tabel (ber-prefix, huruf kecil) yang ada di skema aktif, dibaca langsung dari information_schema. Tidak memakai
+     * `tableExists()`: daftar tabel CI4 di-cache per koneksi, sehingga cache yang terisi sebelum migrate (mis. proses test
+     * CI) membuat semua tabel dianggap tidak ada.
+     *
+     * @return array<string, true>
+     */
+    private function tabelAda(BaseConnection $db): array
+    {
+        $rows = $db->query('SELECT TABLE_NAME AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()')->getResultArray();
+
+        return array_fill_keys(array_map(static fn (array $r): string => strtolower((string) $r['t']), $rows), true);
     }
 
     /**

@@ -204,7 +204,7 @@ final class NipCascadeTest extends DatabaseTestCase
         $terlewat = [];
 
         foreach (TabelAnakNip::sampaiFase(3) as $r) {
-            if (! $this->db->tableExists($r->tabel)) {
+            if (! $this->tabelAda($r->tabel)) {
                 $terlewat[] = $r->tabel . '.' . $r->kolomDiV2();
             }
         }
@@ -295,7 +295,7 @@ final class NipCascadeTest extends DatabaseTestCase
         foreach (TabelAnakNip::sampaiFase(3) as $r) {
             $kunci = $r->tabel . '.' . $r->kolomDiV2();
 
-            if (isset($khusus[$kunci]) || ! $this->db->tableExists($r->tabel) || in_array($r->kunci(), ['token.nip', 'pengguna.username'], true)) {
+            if (isset($khusus[$kunci]) || ! $this->tabelAda($r->tabel) || in_array($r->kunci(), ['token.nip', 'pengguna.username'], true)) {
                 continue;
             }
 
@@ -317,6 +317,17 @@ final class NipCascadeTest extends DatabaseTestCase
         }
 
         return $harapan;
+    }
+
+    /**
+     * Tabel ada di skema aktif (information_schema, tanpa cache daftar tabel CI4).
+     */
+    private function tabelAda(string $tabel): bool
+    {
+        return $this->db->query(
+            'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+            [$this->db->prefixTable($tabel)],
+        )->getRowArray() !== null;
     }
 
     /**
