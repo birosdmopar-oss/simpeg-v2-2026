@@ -325,6 +325,36 @@ Tidak ada uji di DB pengembangan bersama, DB test bersama, maupun DB legacy.
 DB scratch `simpeg_v2_scr_d19` dan DB test scratch `simpeg_v2_t_d19` di-DROP dengan nama persis setelah selesai. `.env`
 worktree khusus uji, tidak di-commit.
 
+#### Sinkron dengan `main` `6663168` (13-10-2026)
+
+Branch di-merge dengan `origin/main` `6663168` (36 commit: MAKE-001 base case `Tests\Support\DatabaseTestCase`,
+MAKE-002..007, CR-045, CR-046) setelah persetujuan DB Validator 07-10. **Migration tidak berubah:**
+`git diff d14da75 HEAD -- backend/app/Database` kosong (`main` juga tidak mengubah `app/Database` sejak `2cfc2e4`), jadi
+`2026-10-07-100000_AddFkG02Pegawai`, `2026-10-07-100100_AddFkG02Riwayat`, dan `MigrationsDitahan/AddFkPegawaiDiPenggunaFaqRate`
+identik dengan yang disetujui.
+
+Konflik (hanya test) dan resolusinya — pola MAKE-001 dari `main` + perubahan DBV-019 dipertahankan:
+
+| Berkas | Resolusi |
+|---|---|
+| `tests/MasterData/JabatanSisaSchemaTest.php` | `extends DatabaseTestCase` (tanpa `DatabaseTestTrait`/`$refresh`), `#[Group('db-isolasi-penuh')]` dari `main` pada test down()/up(); tetap `use LepasMigrationKepegawaianTrait`, `lepasFkG02()` sebelum down() + `pasangUlangMigrationKepegawaian()` setelah up(), dan pengecualian FK DBV-019 (`AddFkG02Pegawai::FOREIGN_KEYS + AddFkG02Riwayat::FOREIGN_KEYS`) dari daftar FK G-02b |
+| `tests/MasterData/JabatanUnitSatkerSchemaTest.php` | sama: `DatabaseTestCase` + `#[Group]` dari `main`; `lepasFkG02()`/`pasangUlangMigrationKepegawaian()` di `downDependents()`/`upDependents()` tetap |
+| `tests/database/Kepegawaian/NipReferenceRegistryTest.php` | `DatabaseTestCase`; impor DBV-019 (`AddFkPegawaiDiPenggunaFaqRate`, `Migration`, `RuntimeException`, `Throwable`) tetap; registry/NON_FK tidak berubah; `testFkMasukRefusesOrphansBeforeAnyAlter` (ALTER = DDL) ditandai `#[Group('db-isolasi-penuh')]` |
+
+Penyesuaian tambahan (commit `test(db)` terpisah): `tests/database/Kepegawaian/FkG02Test.php` (berkas baru DBV-019, tidak
+konflik) dipindah ke `DatabaseTestCase` sesuai aturan MAKE-001, dan `testRefusesOrphansBeforeAnyAlter` (down()/up()
+migration) ditandai `#[Group('db-isolasi-penuh')]`. Fixture `PegawaiFixtureTrait` dari `main` sudah membuat induk
+unit/satker/jabatan sebelum menyisipkan `pegawai_mutasi_jabatan`/`riwayat_mutasi_jabatan`, jadi tidak perlu diubah.
+
+Gate (MySQL 8.0.30 instance test `127.0.0.1:3307`, DB scratch `simpeg_v2_t_d19s`/`simpeg_v2_s_d19s`, keduanya di-DROP
+setelah selesai):
+
+| Perintah / uji | Hasil |
+|---|---|
+| `composer analyse` + `composer cs-check` | ✅ 0 error; 0 dari 490 file perlu diperbaiki |
+| PHPUnit terarah `tests/MasterData`, `tests/database`, `tests/Kepegawaian`, `tests/unit/Kepegawaian`, `tests/feature/ListQueryParamTest.php` | ✅ OK (855 test, 20640 assertion) |
+| PHPUnit penuh (`phpunit --no-coverage`) | ✅ OK (1581 test, 31304 assertion) |
+
 ### 8.3 Permintaan verifikasi MariaDB 10.4 (lingkungan DB Validator)
 
 1. `php spark migrate` → `migrate:rollback` → `migrate`: batch DBV-019 berisi `2026-10-07-100000` dan `100100`; rollback
