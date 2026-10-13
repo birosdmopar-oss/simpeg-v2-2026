@@ -97,6 +97,18 @@ describe('TambahPegawaiDialog', () => {
     expect(q('[data-testid="tambah-pegawai-ganti-password"]')?.textContent).toContain('segera masuk dan mengganti password')
     expect(q('[data-testid="tambah-pegawai-email-skipped"]')).not.toBeNull()
     expect(wrapper.emitted('created')).toHaveLength(1)
+    // Pemanggil tidak menerima password awal.
+    expect((wrapper.emitted('created')?.[0]?.[0] as { akun: { initial_password: unknown } }).akun.initial_password).toBeNull()
+
+    // Ditutup → hasil (termasuk password) dibuang dari DOM dan state; dibuka ulang → form kosong lagi.
+    await wrapper.setProps({ open: false })
+    await flushPromises()
+    expect(document.body.textContent ?? '').not.toContain(ISIAN.nip + ' ')
+    expect(q('[data-testid="tambah-pegawai-password"]')).toBeNull()
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    expect(q('[data-testid="tambah-pegawai-password"]')).toBeNull()
+    expect(q('[data-testid="tambah-pegawai-form"]')).not.toBeNull()
   })
 
   it('422 errors.nip ditampilkan di isian NIP', async () => {

@@ -23,8 +23,9 @@ import { UiAvatar, UiBadge, UiButton } from '@/shared/ui'
 import { pegawaiService } from '../services/pegawai.service'
 import type { Pegawai } from '../types'
 
-const props = withDefaults(defineProps<{ detail: Pegawai; canPrint: boolean; canDelete: boolean; canKoreksiNip?: boolean }>(), {
+const props = withDefaults(defineProps<{ detail: Pegawai; canPrint: boolean; canDelete: boolean; canKoreksiNip?: boolean; deleting?: boolean }>(), {
   canKoreksiNip: false,
+  deleting: false,
 })
 
 const emit = defineEmits<{
@@ -146,6 +147,7 @@ const menuItem =
               </DropdownMenuItem>
               <DropdownMenuItem
                 v-if="canDelete"
+                :disabled="deleting"
                 class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-danger outline-none data-[highlighted]:bg-danger-soft"
                 data-action="hapus-pegawai"
                 @select="emit('delete')"

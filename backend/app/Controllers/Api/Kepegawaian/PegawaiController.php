@@ -51,7 +51,9 @@ class PegawaiController extends ApiController
         $data = $this->payload();
         $foto = $this->request->getFile('foto');
 
-        return $this->respondSuccess($this->pegawai()->tambah(service('authContext'), $data, $foto instanceof UploadedFile ? $foto : null), 201);
+        // Respons memuat password awal akun (= NIP): jangan disimpan cache.
+        return $this->respondSuccess($this->pegawai()->tambah(service('authContext'), $data, $foto instanceof UploadedFile ? $foto : null), 201)
+            ->setHeader('Cache-Control', 'no-store');
     }
 
     public function delete(string $nip): ResponseInterface

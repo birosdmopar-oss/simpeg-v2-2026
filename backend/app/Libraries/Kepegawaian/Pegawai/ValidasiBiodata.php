@@ -115,7 +115,7 @@ final class ValidasiBiodata
         $kosong = array_fill_keys([...self::ISIAN_UMUM, ...self::ISIAN_ADMIN_SATKER, ...self::ISIAN_SUPER_ADMIN], null);
         $kosong = array_merge($kosong, ['nip' => $nip, 'status' => 1]);
         unset($data['nip']);
-        $data += ['status' => '1'];
+        $data['status'] = '1'; // pegawai baru selalu Aktif (MAKE-011)
 
         try {
             $hasil = $this->periksa(Role::SUPER_ADMIN, $data, $kosong, null);

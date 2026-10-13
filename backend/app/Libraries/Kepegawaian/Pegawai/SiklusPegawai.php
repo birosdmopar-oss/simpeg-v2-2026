@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
+use App\Models\AuditLogModel;
 use App\Models\Kepegawaian\PegawaiFotoModel;
 use App\Models\Kepegawaian\PegawaiModel;
 use CodeIgniter\Database\BaseConnection;
@@ -32,10 +33,11 @@ use Throwable;
  * DoD B-05 menyebut soft delete, user memilih legacy): DELETE fisik baris `pegawai` dalam transaksi, audit `delete`
  * (before = baris pegawai: NIP + nama) sebelum DELETE, berkas foto dibuang SESUDAH commit. Legacy hanya menghapus
  * `pegawai`; di v2 FK RESTRICT ke `pegawai.nip` membuat pegawai yang masih punya data turunan (riwayat, snapshot
- * jabatan, pengajuan, …) GAGAL dihapus → 422 (bukan 500), tanpa cascade manual. Akun `pengguna` ber-NIP itu dianggap
- * data terkait (FK masuk pengguna → pegawai ditahan, DBV-019) → 422 yang sama; admin menonaktifkan/menghapus akun dulu
- * di Manajemen Akun. Pengecualian: galeri foto profil `pegawai_foto` milik pegawai itu ikut dihapus (bagian dari baris
- * pegawai, setara foto legacy yang dibuang `delete` :692-698), bukan data turunan.
+ * jabatan, pengajuan, …) GAGAL dihapus → 422 (bukan 500), tanpa cascade manual. Akun `pengguna` ber-NIP itu [K] D1:3756
+ * (FK `pengguna.id_pegawai` ON DELETE SET NULL, keputusan user 13-10-2026): di transaksi yang sama DILEPAS dari NIP
+ * (`nip` NULL, termasuk akun soft-deleted), dinonaktifkan (`status` '0'), sesinya dicabut, diaudit — tidak menghalangi
+ * hapus (akun role 2/6/7 tanpa NIP memang tidak lazim, tetapi itulah hasil legacy). Galeri `pegawai_foto` ikut dihapus
+ * [K] D1:2932 (`fk_nip_pegfoto_to_peg` ON DELETE CASCADE), diaudit per baris, berkasnya dibuang sesudah commit.
  */
 final class SiklusPegawai
 {
@@ -56,6 +58,12 @@ final class SiklusPegawai
         $this->wajibSuperAdmin($auth);
 
         $hasil = (new ValidasiBiodata($this->db))->periksaTambah($data);
+
+        // NIP sudah tertaut ke akun mana pun (termasuk soft-deleted, mis. bekas pegawai yang akunnya dilepas) → tolak
+        // sebelum provisioning; akun lama tidak boleh tertaut diam-diam ke pegawai baru.
+        if ($this->db->table('pengguna')->where('nip', $hasil['nip'])->countAllResults() > 0) {
+            throw ValidationException::forField('nip', 'NIP ini sudah tertaut ke akun lain; selesaikan akun tersebut di Manajemen Akun terlebih dahulu.');
+        }
 
         if (! $foto instanceof UploadedFile || $foto->getError() === UPLOAD_ERR_NO_FILE) {
             throw ValidationException::forField('foto', 'Foto pegawai wajib diunggah.');
@@ -111,14 +119,17 @@ final class SiklusPegawai
                 throw new NotFoundException('Pegawai tidak ditemukan.');
             }
 
-            if ($this->db->table('pengguna')->where('nip', $nip)->countAllResults() > 0) {
-                throw self::masihTerkait();
-            }
+            $this->lepasAkun($auth, $nip);
 
-            $fotoGaleri = array_column($this->db->table('pegawai_foto')->select('foto')->where('nip', $nip)->get()->getResultArray(), 'foto');
+            $galeri    = $this->db->table('pegawai_foto')->select('id_pegawai_foto, foto')->where('nip', $nip)->get()->getResultArray();
+            $fotoModel = new PegawaiFotoModel($this->db);
 
-            if ($this->db->table('pegawai_foto')->where('nip', $nip)->delete() === false) {
-                throw self::gagalTulis($this->db);
+            foreach ($galeri as $baris) {
+                $id = (int) $baris['id_pegawai_foto'];
+
+                if ($fotoModel->withActor($auth, static fn () => $fotoModel->delete($id)) === false) {
+                    throw self::gagalTulis($this->db);
+                }
             }
 
             // Audit otomatis model: event `delete`, before = baris pegawai (NIP, nama bergelar) — padanan mylog legacy.
@@ -128,9 +139,12 @@ final class SiklusPegawai
                 throw (int) $this->db->error()['code'] === 1451 ? self::masihTerkait() : self::gagalTulis($this->db);
             }
 
-            foreach (array_unique(array_filter([(string) ($pegawai['foto'] ?? ''), ...array_map('strval', $fotoGaleri)])) as $path) {
-                $this->berkas->hapus($path, 'pegawai', 'foto');
+            // Penjaga berkas: path dibuang sesudah commit bila tidak lagi dirujuk tabel.kolom asalnya.
+            foreach ($galeri as $baris) {
+                $this->berkas->hapus((string) $baris['foto'], 'pegawai_foto', 'foto');
             }
+
+            $this->berkas->hapus((string) ($pegawai['foto'] ?? ''), 'pegawai', 'foto');
 
             if ($this->db->transStatus() === false) {
                 throw new \RuntimeException('Transaksi hapus pegawai gagal.');
@@ -154,9 +168,35 @@ final class SiklusPegawai
         return $sebelum;
     }
 
+    /**
+     * [K] D1:3756 ON DELETE SET NULL: akun ber-NIP (termasuk soft-deleted) dilepas dari NIP, dinonaktifkan, sesi dicabut,
+     * diaudit. Akun yang sudah nonaktif tetap dilepas.
+     */
+    private function lepasAkun(AuthContext $auth, string $nip): void
+    {
+        foreach ($this->db->table('pengguna')->select('id_pengguna, nip, status')->where('nip', $nip)->get()->getResultArray() as $akun) {
+            $id = (int) $akun['id_pengguna'];
+
+            if ($this->db->table('pengguna')->where('id_pengguna', $id)->update(['nip' => null, 'status' => '0', 'updated_at' => gmdate('Y-m-d H:i:s')]) === false) {
+                throw self::gagalTulis($this->db);
+            }
+
+            service('jwt')->revokeAllForUser($id);
+            (new AuditLogModel($this->db))->record(
+                'pengguna',
+                $id,
+                AuditLogModel::EVENT_UPDATE,
+                ['nip' => $akun['nip'], 'status' => (string) $akun['status']],
+                ['nip' => null, 'status' => '0', 'alasan' => 'pegawai dihapus (legacy ON DELETE SET NULL)'],
+                $auth->idPengguna(),
+                $auth->nip(),
+            );
+        }
+    }
+
     private static function masihTerkait(): ValidationException
     {
-        return ValidationException::forField('nip', 'Pegawai tidak dapat dihapus karena masih memiliki data terkait (riwayat, jabatan, akun, dll.).');
+        return ValidationException::forField('nip', 'Pegawai tidak dapat dihapus karena masih memiliki data terkait (riwayat, jabatan, pengajuan, dll.).');
     }
 
     private static function gagalTulis(BaseConnection $db): DatabaseException
@@ -180,7 +220,7 @@ final class SiklusPegawai
         $model->withActor($auth, static fn () => $model->insert(array_merge($param, [
             'nip'         => $nip,
             'foto'        => $path,
-            'status'      => (int) ($param['status'] ?? 1),
+            'status'      => 1,
             'flag_update' => 0,
             'created_at'  => $sekarang,
             'updated_by'  => $auth->idPengguna(),
@@ -194,6 +234,11 @@ final class SiklusPegawai
         $role = AkunPegawai::roleUntukJenisPegawai(isset($param['id_jenis_pegawai']) ? (int) $param['id_jenis_pegawai'] : null);
 
         $akun = $this->provisioner->provisionDenganPasswordNip(['nip' => $nip, 'name' => mb_substr($nama, 0, 150), 'email' => $email], $role);
+
+        if (! $akun['created']) {
+            // Balapan: akun untuk NIP ini dibuat proses lain di antara cek dan provisioning.
+            throw ValidationException::forField('nip', 'NIP ini sudah tertaut ke akun lain; selesaikan akun tersebut di Manajemen Akun terlebih dahulu.');
+        }
 
         return [
             'id_pengguna'      => $akun['pengguna']['id_pengguna'] ?? null,

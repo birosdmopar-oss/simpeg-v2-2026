@@ -22,7 +22,10 @@ interface BiodataServiceInterface
      *
      * @param array<string, mixed> $data kolom DDL `pegawai` + `email` (akun) + `jenis_kerabat_lain`
      *
-     * @return array{jalur: 'langsung'|'pengajuan', pegawai: array<string, mixed>, pengajuan: array<string, mixed>|null}
+     * Email yang sudah dipakai akun lain: pengajuan → 422 `errors.email`; jalur langsung → biodata tersimpan, email akun
+     * tidak disinkron (`email_skipped` true) (MAKE-011).
+     *
+     * @return array{jalur: 'langsung'|'pengajuan', pegawai: array<string, mixed>, pengajuan: array<string, mixed>|null, email_skipped: bool}
      */
     public function ubah(AuthContext $auth, string $nip, array $data, ?UploadedFile $foto = null): array;
 

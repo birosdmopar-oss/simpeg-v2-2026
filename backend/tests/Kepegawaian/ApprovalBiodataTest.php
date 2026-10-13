@@ -74,6 +74,21 @@ final class ApprovalBiodataTest extends DatabaseTestCase
         $this->assertFalse($hasil['can_process']);
     }
 
+    public function testSetujuiMelewatiEmailYangSudahDipakaiAkunLain(): void
+    {
+        $nip  = $this->buatPegawai();
+        $akun = $this->buatAkunUntuk($nip, Role::PEGAWAI, ['email' => 'lama@contoh.test']);
+        $id   = $this->ajukan($nip, ['email' => 'rebutan@contoh.test']);
+        // Sesudah pengajuan dibuat, email itu dipakai akun lain.
+        $this->buatAkunUntuk($this->buatPegawai(), Role::PEGAWAI, ['email' => 'rebutan@contoh.test']);
+
+        $hasil = $this->service()->prosesPengajuan($this->auth(Role::SUPER_ADMIN), $id, 'setujui', null);
+
+        $this->assertTrue($hasil['email_skipped']);
+        $this->assertSame('lama@contoh.test', $this->baris('pengguna', 'id_pengguna', $akun)['email']);
+        $this->assertSame(3, (int) $this->baris('pegawai_hist', 'id_pegawai_hist', $id)['flag_update']);
+    }
+
     public function testTolakWajibAlasanDanPegawaiTidakBerubah(): void
     {
         $nip   = $this->buatPegawai(['no_hp' => '0811']);

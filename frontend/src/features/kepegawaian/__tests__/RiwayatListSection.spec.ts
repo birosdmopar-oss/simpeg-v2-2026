@@ -487,7 +487,10 @@ describe('RiwayatListSection — kunci baris Disetujui & isian hitung', () => {
 })
 
 describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LAIN, saran)', () => {
-  beforeEach(() => svc.list.mockResolvedValue([]))
+  beforeEach(() => {
+    // Kurung kurawal: nilai kembalian beforeEach dipakai Vitest sebagai teardown.
+    svc.list.mockResolvedValue([])
+  })
 
   it('diklat: opsi nama diklat disaring jenis_diklat dan dimuat ulang + dikosongkan saat jenis berganti; sub-group = group 2', async () => {
     options.mockImplementation(async (entity: string, parent?: string | null, filters?: Record<string, string>) =>
@@ -566,7 +569,10 @@ describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LA
 })
 
 describe('RiwayatListSection — isian hitung SKP (MAKE-008, rumus form legacy)', () => {
-  beforeEach(() => svc.list.mockResolvedValue([]))
+  beforeEach(() => {
+    // Kurung kurawal: nilai kembalian beforeEach dipakai Vitest sebagai teardown.
+    svc.list.mockResolvedValue([])
+  })
 
   it('≤2021: 60%/40%, nilai prestasi, kategori (skala 120 mulai 2021); ≥2022: predikat dari matriks rating', async () => {
     const wrapper = await mountTab({}, skp)

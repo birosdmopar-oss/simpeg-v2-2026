@@ -7,7 +7,7 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/pegawai.service', () => ({
-  pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn(), pengajuan: vi.fn(), prosesPengajuan: vi.fn(), hapus: vi.fn() },
+  pegawaiService: { detail: vi.fn(), list: vi.fn(), updateBiodata: vi.fn(), koreksiNip: vi.fn(), foto: vi.fn(), pengajuan: vi.fn(), prosesPengajuan: vi.fn(), hapus: vi.fn(), fotoPengajuan: vi.fn() },
 }))
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: vi.fn().mockResolvedValue([]) } }))
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
@@ -29,6 +29,7 @@ const koreksiNip = vi.mocked(pegawaiService.koreksiNip)
 const pengajuanDetail = vi.mocked(pegawaiService.pengajuan)
 const prosesPengajuan = vi.mocked(pegawaiService.prosesPengajuan)
 const hapus = vi.mocked(pegawaiService.hapus)
+const fotoPengajuan = vi.mocked(pegawaiService.fotoPengajuan)
 
 const TABS = [
   descriptor('jabatan', 'Riwayat Jabatan'),
@@ -232,6 +233,34 @@ describe('DetailPegawaiPage — aksi kartu', () => {
     tolak?.click()
     await vi.waitFor(() => expect(prosesPengajuan).toHaveBeenCalledWith(9, { aksi: 'tolak', reason_note: 'Lengkapi NPWP' }))
     await vi.waitFor(() => expect(wrapper.text()).toContain('Pengajuan perubahan data umum ditolak.'))
+  })
+
+  it('B-04: foto pengajuan tampil (object URL dicabut saat ditutup); can_process false → peringatan + tombol nonaktif', async () => {
+    const create = vi.fn(() => 'blob:pengajuan')
+    const revoke = vi.fn()
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke })
+    const menunggu = { id_pegawai_hist: 9, flag_update: 1, reason_note: null, created_at: null, updated_at: null, notif_date: null }
+    detail.mockResolvedValue(pegawaiDetail(TABS, {}, { pengajuan: menunggu, aksi: { ubah_biodata: true, ubah_langsung: true, koreksi_nip: true, proses_biodata: true } }))
+    pengajuanDetail.mockResolvedValue({
+      pengajuan: { ...menunggu, nip: NIP, nama: 'Budi Contoh', ada_foto: true },
+      pegawai: { nip: NIP, nama: 'Budi Contoh', ada_foto: true, email: null },
+      perubahan: [{ kolom: 'foto', lama: true, baru: true }],
+      can_process: false,
+    })
+    fotoPengajuan.mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+    const { wrapper } = await mountDetail()
+
+    await wrapper.get('[data-testid="btn-setujui-pengajuan"]').trigger('click')
+    await flushPromises()
+
+    await vi.waitFor(() => expect(document.body.querySelector('[data-testid="pengajuan-foto"]')?.getAttribute('src')).toBe('blob:pengajuan'))
+    expect(fotoPengajuan).toHaveBeenCalledWith(9)
+    expect(document.body.querySelector('[data-testid="pengajuan-tidak-bisa-diproses"]')).not.toBeNull()
+    expect(document.body.querySelector<HTMLButtonElement>('[data-testid="approval-confirm"]')?.disabled).toBe(true)
+
+    // Tutup dialog → object URL dicabut.
+    ;[...document.body.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === 'Batal')?.click()
+    await vi.waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:pengajuan'))
   })
 
   it('B-05: ⋯ "Hapus Pegawai" → konfirmasi (permanen) → DELETE pegawai/{nip} → kembali ke daftar', async () => {

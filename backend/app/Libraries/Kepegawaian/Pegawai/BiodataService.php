@@ -14,6 +14,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Models\AuditLogModel;
+use App\Models\Auth\PenggunaModel;
 use App\Models\Kepegawaian\PegawaiFotoModel;
 use App\Models\Kepegawaian\PegawaiHistModel;
 use App\Models\Kepegawaian\PegawaiModel;
@@ -175,7 +176,7 @@ final class BiodataService implements BiodataServiceInterface
     /**
      * @param array<string, mixed> $data
      *
-     * @return array{jalur: 'langsung'|'pengajuan', pegawai: array<string, mixed>, pengajuan: array<string, mixed>|null}
+     * @return array{jalur: 'langsung'|'pengajuan', pegawai: array<string, mixed>, pengajuan: array<string, mixed>|null, email_skipped: bool}
      */
     private function dalamTransaksi(BaseConnection $db, KolomBerkas $kolom, AuthContext $auth, int $role, string $nip, array $data, ?UploadedFile $foto): array
     {
@@ -198,6 +199,15 @@ final class BiodataService implements BiodataServiceInterface
 
         if (! $adaFoto && (string) ($pegawai['foto'] ?? '') === '') {
             throw ValidationException::forField('foto', 'Foto pegawai wajib diunggah.');
+        }
+
+        // Email akun unik (A-01 D-6): pengajuan ditolak bila email dipakai akun lain; jalur langsung tetap menyimpan
+        // biodata tetapi sinkron email akun dilewati (`email_skipped`).
+        $emailBentrok = $email !== '' && (string) (is_array($akun) ? $akun['email'] : '') !== $email
+            && (new PenggunaModel($db))->emailTaken($email, is_array($akun) ? (int) $akun['id_pengguna'] : null);
+
+        if ($emailBentrok && $role !== Role::SUPER_ADMIN) {
+            throw ValidationException::forField('email', 'Email sudah dipakai akun lain; gunakan email yang berbeda.');
         }
 
         $sekarang     = gmdate('Y-m-d H:i:s');
@@ -237,9 +247,11 @@ final class BiodataService implements BiodataServiceInterface
                 ]));
             }
 
-            $this->sinkronEmail($db, $auth, is_array($akun) ? $akun : null, $email);
+            if (! $emailBentrok) {
+                $this->sinkronEmail($db, $auth, is_array($akun) ? $akun : null, $email);
+            }
 
-            return ['jalur' => 'langsung', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => null];
+            return ['jalur' => 'langsung', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => null, 'email_skipped' => $emailBentrok];
         }
 
         if ($adaFoto) {
@@ -291,7 +303,7 @@ final class BiodataService implements BiodataServiceInterface
             ->select('id_pegawai_hist, flag_update, reason_note, created_at, updated_at, notif_date')
             ->where('id_pegawai_hist', $id)->get()->getRowArray();
 
-        return ['jalur' => 'pengajuan', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => is_array($hist) ? $hist : null];
+        return ['jalur' => 'pengajuan', 'pegawai' => $this->baris($db, $nip), 'pengajuan' => is_array($hist) ? $hist : null, 'email_skipped' => false];
     }
 
     /**

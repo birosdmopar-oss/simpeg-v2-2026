@@ -7,7 +7,7 @@
  */
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import { UiButton, UiNotice } from '@/shared/ui'
@@ -32,12 +32,16 @@ const formKey = ref(0)
 watch(
   () => props.open,
   (open) => {
-    if (!open) return
+    // Password awal tidak disimpan lebih lama dari dialognya: dibuang saat ditutup maupun dibuka ulang.
     hasil.value = null
     serverErrors.value = null
-    formKey.value++
+    if (open) formKey.value++
   },
 )
+
+onBeforeUnmount(() => {
+  hasil.value = null
+})
 
 const judul = computed(() => (hasil.value ? 'Pegawai berhasil ditambahkan' : 'Tambah Pegawai'))
 
@@ -52,7 +56,8 @@ async function kirim(values: Record<string, string>, berkas: BerkasMap): Promise
   serverErrors.value = null
   try {
     hasil.value = await pegawaiService.tambah(values, foto)
-    emit('created', hasil.value)
+    // Pemanggil tidak menerima password awal.
+    emit('created', { ...hasil.value, akun: { ...hasil.value.akun, initial_password: null } })
   } catch (error) {
     const failure = describeApiError(error)
     const split = splitValidationErrors(error, fields.map((f) => f.name))

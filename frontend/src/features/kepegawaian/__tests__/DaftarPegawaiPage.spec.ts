@@ -129,7 +129,7 @@ describe('DaftarPegawaiPage — aksi & role', () => {
   })
 
   it('"Hapus" → ConfirmDialog → DELETE pegawai/{nip} → pemberitahuan + muat ulang (B-05)', async () => {
-    hapus.mockResolvedValue({ deleted: true, soft_delete: true, item: ITEMS[0] as never })
+    hapus.mockResolvedValue({ deleted: true, soft_delete: false, item: ITEMS[0] as never })
     const { wrapper } = await mountList()
     await selectRowAction(wrapper, `pegawai-actions-${first.nip}`, 'hapus')
     await flushPromises()

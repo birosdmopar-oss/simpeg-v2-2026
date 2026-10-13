@@ -14,6 +14,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\ListQuery;
 use App\Models\AuditLogModel;
+use App\Models\Auth\PenggunaModel;
 use App\Models\Kepegawaian\PegawaiFotoModel;
 use App\Models\Kepegawaian\PegawaiHistModel;
 use App\Models\Kepegawaian\PegawaiModel;
@@ -64,6 +65,8 @@ final class ApprovalBiodata
 
     public const PER_PAGE_DEFAULT = 10;
     public const PER_PAGE_MAX     = 100;
+
+    private bool $emailDilewati = false;
 
     public function __construct(
         private readonly BaseConnection $db,
@@ -211,7 +214,7 @@ final class ApprovalBiodata
             $this->db->resetTransStatus();
         }
 
-        return $this->detail($auth, $id);
+        return $this->detail($auth, $id) + ['email_skipped' => $this->emailDilewati];
     }
 
     private function prosesTerkunci(AuthContext $auth, int $id, string $nip, string $aksi, ?string $alasan): void
@@ -268,18 +271,23 @@ final class ApprovalBiodata
             $fotoModel->withActor($auth, static fn () => $fotoModel->insert(['nip' => $nip, 'foto' => $foto, 'created_at' => $sekarang]));
         }
 
-        $this->sinkronEmail($auth, $nip, $hist['email'] === null ? null : (string) $hist['email']);
+        $this->emailDilewati = ! $this->sinkronEmail($auth, $nip, $hist['email'] === null ? null : (string) $hist['email']);
     }
 
     /**
-     * Email akun aktif disamakan dengan email pengajuan [K] (:1083-1090, akun `status` 1).
+     * Email akun aktif disamakan dengan email pengajuan [K] (:1083-1090, akun `status` 1). Email yang sementara itu sudah
+     * dipakai akun lain (A-01 D-6) TIDAK disinkron → false (`email_skipped` di respons proses, MAKE-011).
      */
-    private function sinkronEmail(AuthContext $auth, string $nip, ?string $email): void
+    private function sinkronEmail(AuthContext $auth, string $nip, ?string $email): bool
     {
         $akun = $this->db->table('pengguna')->select('id_pengguna, email')->where('nip', $nip)->where('status', '1')->get()->getRowArray();
 
         if (! is_array($akun) || $email === null || $email === '' || (string) ($akun['email'] ?? '') === $email) {
-            return;
+            return true;
+        }
+
+        if ((new PenggunaModel($this->db))->emailTaken($email, (int) $akun['id_pengguna'])) {
+            return false;
         }
 
         if ($this->db->table('pengguna')->where('id_pengguna', (int) $akun['id_pengguna'])->update(['email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')]) === false) {
@@ -289,6 +297,8 @@ final class ApprovalBiodata
         }
 
         (new AuditLogModel($this->db))->record('pengguna', (int) $akun['id_pengguna'], AuditLogModel::EVENT_UPDATE, ['email' => $akun['email']], ['email' => $email], $auth->idPengguna(), $auth->nip());
+
+        return true;
     }
 
     /**

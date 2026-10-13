@@ -18,6 +18,7 @@ use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
+use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\LampiranUjiTrait;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -160,18 +161,55 @@ final class SiklusPegawaiTest extends DatabaseTestCase
         $this->assertSame(1, $this->db->table('pegawai')->where('nip', $denganPmj)->countAllResults());
         $this->assertSame(1, $this->db->table('pegawai_mutasi_jabatan')->where('nip', $denganPmj)->countAllResults());
 
-        // Akun ber-NIP dianggap data terkait (FK masuk pengguna ditahan, DBV-019) → 422 yang sama.
-        $denganAkun = $this->pegawaiPolos('199901012020011777');
-        $this->db->table('pengguna')->insert(['nip' => $denganAkun, 'username' => $denganAkun, 'user_level' => Role::PEGAWAI, 'status' => '1']);
         try {
-            $this->service()->hapus($this->super(), $denganAkun);
-            $this->fail('Seharusnya 422');
+            $this->service()->hapus($this->super(), $denganPmj);
         } catch (ValidationException $e) {
             $this->assertStringContainsString('masih memiliki data terkait', $e->getErrors()['nip'][0]);
         }
-        $this->assertSame(1, $this->db->table('pegawai')->where('nip', $denganAkun)->countAllResults());
 
-        $this->assertForbidden(fn () => $this->service()->hapus($this->auth(Role::ADMIN_SATKER), $denganAkun));
+        // Akun ber-NIP pegawai berdata turunan TIDAK ikut dilepas (seluruh transaksi di-rollback).
+        $akun = $this->buatAkunUntuk($denganPmj, Role::PEGAWAI);
+        $this->assertErrors(['nip'], fn () => $this->service()->hapus($this->super(), $denganPmj));
+        $this->assertSame([$denganPmj, '1'], [(string) $this->db->table('pengguna')->where('id_pengguna', $akun)->get()->getRow()->nip, (string) $this->db->table('pengguna')->where('id_pengguna', $akun)->get()->getRow()->status]);
+
+        $this->assertForbidden(fn () => $this->service()->hapus($this->auth(Role::ADMIN_SATKER), $denganPmj));
+    }
+
+    public function testHapusMelepasAkunBerNipSetNull(): void
+    {
+        // [K] D1:3756 pengguna.id_pegawai ON DELETE SET NULL (keputusan user 13-10-2026): akun dilepas, nonaktif, sesi dicabut.
+        $nip   = $this->pegawaiPolos('199901012020011777');
+        $aktif = $this->buatAkunUntuk($nip, Role::PEGAWAI);
+        $this->login($nip, AuthSeeder::PASSWORD)->assertStatus(200);
+        $this->assertGreaterThan(0, $this->db->table('token')->where('id_pengguna', $aktif)->countAllResults());
+
+        $this->service()->hapus($this->super(), $nip);
+
+        $akun = $this->db->table('pengguna')->where('id_pengguna', $aktif)->get()->getRowArray();
+        $this->assertSame([null, '0'], [$akun['nip'], (string) $akun['status']]);
+        $this->assertSame(0, $this->db->table('token')->where('id_pengguna', $aktif)->countAllResults());
+        $this->assertSame(0, $this->db->table('pegawai')->where('nip', $nip)->countAllResults());
+
+        $audit = $this->db->table('audit_logs')->where('entity', 'pengguna')->where('entity_id', (string) $aktif)->orderBy('id_log', 'DESC')->get()->getRowArray();
+        $this->assertSame(['nip' => $nip, 'status' => '1'], json_decode((string) $audit['before_json'], true));
+
+        // Akun soft-deleted juga dilepas.
+        $nip2 = $this->pegawaiPolos('199901012020011776');
+        $this->db->table('pengguna')->insert(['nip' => $nip2, 'username' => 'akun.lama.' . $nip2, 'user_level' => Role::PEGAWAI, 'status' => '0', 'deleted_at' => '2026-01-01 00:00:00']);
+        $this->service()->hapus($this->super(), $nip2);
+        $this->assertSame(0, $this->db->table('pengguna')->where('nip', $nip2)->countAllResults());
+    }
+
+    public function testTambahMenolakNipYangTertautAkunDanMemaksaStatusAktif(): void
+    {
+        // Akun yatim (mis. bekas pegawai yang dilepas manual) masih memegang NIP ini → 422 sebelum provisioning.
+        $this->db->table('pengguna')->insert(['nip' => self::NIP_BARU, 'username' => 'yatim.' . self::NIP_BARU, 'user_level' => Role::PEGAWAI, 'status' => '0', 'deleted_at' => '2026-01-01 00:00:00']);
+        $this->assertErrors(['nip'], fn () => $this->service()->tambah($this->super(), $this->isian(), $this->berkasPng()));
+        $this->assertSame(0, $this->db->table('pegawai')->where('nip', self::NIP_BARU)->countAllResults());
+
+        $nip = '198505052010012002';
+        $this->service()->tambah($this->super(), $this->isian(['nip' => $nip, 'status' => '2', 'id_jenis_status' => '1', 'email' => 'x2@contoh.test']), $this->berkasPng());
+        $this->assertSame(1, (int) $this->db->table('pegawai')->where('nip', $nip)->get()->getRow()->status, 'status awal selalu Aktif');
     }
 
     public function testStatusSatuKeDuaMenonaktifkanAkunPnsSaja(): void
@@ -208,10 +246,10 @@ final class SiklusPegawaiTest extends DatabaseTestCase
         $this->assertSame(self::NIP_BARU, $this->json($result)['data']['pegawai']['nip']);
 
         $this->asUser($admin3)->delete('api/v1/pegawai/' . self::NIP_BARU)->assertStatus(403);
-        // Pegawai baru punya akun (data terkait) → 422; pegawai polos → terhapus.
-        $this->asUser($super)->delete('api/v1/pegawai/' . self::NIP_BARU)->assertStatus(422);
-        $polos = $this->pegawaiPolos();
-        $hapus = $this->asUser($super)->delete('api/v1/pegawai/' . $polos);
+        $this->assertStringContainsString('no-store', $result->response()->getHeaderLine('Cache-Control'));
+
+        // Pegawai baru (akun + foto, tanpa data turunan) bisa dihapus: akunnya dilepas.
+        $hapus = $this->asUser($super)->delete('api/v1/pegawai/' . self::NIP_BARU);
         $hapus->assertStatus(200);
         $this->assertSame(['deleted' => true, 'soft_delete' => false], array_intersect_key($this->json($hapus)['data'], ['deleted' => 1, 'soft_delete' => 1]));
     }

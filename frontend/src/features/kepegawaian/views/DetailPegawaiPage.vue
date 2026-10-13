@@ -175,6 +175,7 @@ const crumbs = computed(() => [
           :can-print="canPrint"
           :can-delete="canDelete"
           :can-koreksi-nip="detail.aksi?.koreksi_nip ?? false"
+          :deleting="busyDelete"
           @koreksi-nip="koreksiOpen = true"
           @arsip="notice = 'Arsip Kepegawaian belum tersedia (task B-18).'"
           @print="(kind) => (notice = `Cetak ${kind === 'drh' ? 'DRH' : 'Data Umum'} belum tersedia (task B-20).`)"

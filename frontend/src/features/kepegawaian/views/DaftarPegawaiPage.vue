@@ -47,7 +47,7 @@ const deleting = ref<PegawaiListItem | null>(null)
 /** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
 const deleteOpen = ref(false)
 const tambahOpen = ref(false)
-const busyDelete = ref(false)
+const busyNip = ref<string | null>(null)
 
 const PER_PAGE_OPTIONS = ['10', '25', '50'].map((v) => ({ value: v, label: v }))
 
@@ -100,7 +100,7 @@ async function confirmDelete(): Promise<void> {
   deleteOpen.value = false
   const row = deleting.value
   if (!row) return
-  busyDelete.value = true
+  busyNip.value = row.nip
   try {
     await pegawaiService.hapus(row.nip)
     notice.value = `Data pegawai ${fullName(row)} (${row.nip}) dihapus permanen.`
@@ -108,7 +108,7 @@ async function confirmDelete(): Promise<void> {
   } catch (error) {
     notice.value = `Gagal menghapus pegawai: ${pesanServer(error)}`
   } finally {
-    busyDelete.value = false
+    busyNip.value = null
     deleting.value = null
   }
 }
@@ -158,6 +158,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
           :column-keys="columnKeys"
           :loading="loading"
           :can-delete="isSuperAdmin"
+          :busy-nip="busyNip"
           @action="onAction"
         />
 

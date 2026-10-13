@@ -330,7 +330,7 @@ sampai disetujui B-04).
 | Kelas | Isi |
 |---|---|
 | `ApprovalBiodata` | B-04: antrean pengajuan menunggu (jalur PROSES), detail + `perubahan`, setujui (salin kolom biodata → `pegawai`, `flag_update` 3, email akun, galeri foto) / tolak (alasan wajib, `pegawai` tidak berubah kecuali `flag_update` 2 — bug legacy `sp_process` :1098 tidak ditiru), penanda `show_notif`/`notif_date`/`approved_by`/`show_ua_*` seperti legacy :1095-1103 + trigger `pegawai_hist_beUpd`. [V2]: hanya kolom biodata yang disalin (bukan `status`/`nip`/SIASN), lingkup role 3 diperiksa `bolehProses` (legacy `process` tidak memeriksanya) |
-| `SiklusPegawai` | B-05: tambah (pegawai + foto + akun A-09 password awal = NIP, satu transaksi) dan hapus FISIK ikut legacy (422 bila masih ada data terkait: FK RESTRICT 1451 atau akun ber-NIP; galeri `pegawai_foto` ikut dihapus, berkas dibuang sesudah commit; audit `delete`) |
+| `SiklusPegawai` | B-05: tambah (pegawai status 1 + foto + akun A-09 password awal = NIP, satu transaksi; NIP yang sudah tertaut akun mana pun, termasuk soft-deleted, → 422) dan hapus FISIK ikut legacy (422 bila masih ada data turunan: FK RESTRICT 1451; akun ber-NIP DILEPAS — `nip` NULL, nonaktif, sesi dicabut, diaudit [K] D1:3756 ON DELETE SET NULL; galeri `pegawai_foto` ikut dihapus [K] D1:2932 ON DELETE CASCADE, diaudit, berkas dibuang sesudah commit; audit `delete`) |
 | `AkunPegawai` | Role akun dari jenis pegawai [K] (`2` → PTT, `6` → PPPK, lain → PNS); nonaktifkan akun + cabut sesi (status 1 → 2 hanya user_level 2, trigger `pegawai_afUpd`) |
 
 **Jalur proses PegawaiScope = interface terpisah `PegawaiScopeProsesInterface`** (`terapkanKeQueryProses`, aditif
@@ -346,8 +346,15 @@ bukan md5. `provisionForPegawai()` tetap password acak yang lolos kebijakan. Pen
 DBV-020.
 
 **Hapus pegawai [K]** ikut legacy (keputusan user 13-10-2026; DoD B-05 menyebut soft delete): praktis hanya pegawai yang
-baru ditambah tanpa data turunan dan tanpa akun yang bisa dihapus — sama dengan legacy, yang gagal ("Gagal menghapus
-data pegawai") bila FK menolak. Tidak ada cascade manual.
+baru ditambah tanpa data turunan yang bisa dihapus — sama dengan legacy, yang gagal ("Gagal menghapus data pegawai") bila
+FK menolak. Tidak ada cascade manual untuk data turunan. Akun ber-NIP dilepas (SET NULL legacy), jadi akun role 2/6/7
+tanpa NIP bisa muncul — tidak lazim, tetapi itulah hasil legacy. **Catatan sesi utama:** FK masuk `pengguna.nip` →
+`pegawai` yang ditahan (DBV-019, `MigrationsDitahan/`, RESTRICT) perlu diselaraskan menjadi ON DELETE SET NULL saat
+diaktifkan (unit DBV terpisah); berkas migration itu tidak diubah di sini.
+
+**Email unik (A-01 D-6, MAKE-011):** pengajuan biodata dengan email yang dipakai akun lain → 422 `errors.email`; jalur
+langsung Super Admin dan approval B-04 tetap menyimpan biodata tetapi sinkron email akun dilewati (`email_skipped` di
+respons).
 
 ## Lingkup akses pegawai (`Scope/`, MAKE-009)
 

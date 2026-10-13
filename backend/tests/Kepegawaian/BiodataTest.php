@@ -264,6 +264,21 @@ final class BiodataTest extends DatabaseTestCase
         $this->assertSame([$fotoBaru], $this->berkasDiAkarUji(), 'foto pengajuan lama dibuang, foto pegawai tidak tersentuh');
     }
 
+    public function testEmailDipakaiAkunLain(): void
+    {
+        // A-01 D-6 (MAKE-011): pengajuan → 422 errors.email; jalur langsung → biodata tersimpan, email akun dilewati.
+        $this->buatAkunUntuk($this->pegawaiLengkap(), Role::PEGAWAI, ['email' => 'dipakai@contoh.test']);
+        [$nip, $auth] = $this->aktor(Role::PEGAWAI);
+
+        $this->assertErrors(['email'], fn () => $this->service()->ubah($auth, $nip, $this->isian(['email' => 'dipakai@contoh.test'])));
+        $this->assertSame(0, $this->db->table('pegawai_hist')->where('nip', $nip)->countAllResults());
+
+        $hasil = $this->service()->ubah($this->auth(Role::SUPER_ADMIN), $nip, $this->isian(['email' => 'dipakai@contoh.test', 'no_hp' => '0899']));
+        $this->assertTrue($hasil['email_skipped']);
+        $this->assertSame('08' . '99', $this->pegawai($nip)['no_hp']);
+        $this->assertNotSame('dipakai@contoh.test', (string) $this->db->table('pengguna')->where('nip', $nip)->get()->getRow()->email);
+    }
+
     public function testGelarTerlaluPanjangUntukPengajuan(): void
     {
         // Sementara sampai DBV-020: pegawai_hist.glr_awal VARCHAR(12), glr_akhir VARCHAR(24) [K].
