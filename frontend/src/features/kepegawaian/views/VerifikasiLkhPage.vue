@@ -20,6 +20,7 @@ import { UiBadge, UiButton, UiCard, UiNotice, UiPagination, UiSelect, UiTabs } f
 import LkhFormDialog from '../components/LkhFormDialog.vue'
 import LkhProsesDialog from '../components/LkhProsesDialog.vue'
 import { describeApiError } from '../services/apiErrors'
+import { simpanBerkas } from '../services/berkasUnduhan'
 import { lkhService, type AksiLkh } from '../services/lkh.service'
 import type { LkhItem, LkhListResponse, LkhOpsi, StatusLkh } from '../types'
 
@@ -97,12 +98,13 @@ function actionsFor(row: LkhItem): RowAction[] {
   if (tab.value === 'verifikasi') {
     return [
       { key: 'verifikasi', label: 'Verifikasi', hidden: !row.aksi.proses, disabled: busy },
-      { key: 'pdf', label: 'Unduh PDF', disabled: busy },
+      // PDF hanya untuk LKH Disetujui (server 422 selain itu; keputusan user 13-10-2026).
+      { key: 'pdf', label: 'Unduh PDF', hidden: row.status !== 1, disabled: busy },
     ]
   }
   return [
     { key: 'edit', label: 'Edit', hidden: !row.aksi.ubah, disabled: busy },
-    { key: 'pdf', label: 'Unduh PDF', disabled: busy },
+    { key: 'pdf', label: 'Unduh PDF', hidden: row.status !== 1, disabled: busy },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !row.aksi.hapus, disabled: busy },
   ]
 }
@@ -126,15 +128,8 @@ function onAction(key: string, row: LkhItem): void {
 async function unduh(row: LkhItem): Promise<void> {
   busyId.value = row.id
   try {
-    const blob = await lkhService.pdf(row.id)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `lkh_${row.nip}_${row.tgl_laporan.replaceAll('-', '')}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const berkas = await lkhService.pdf(row.id)
+    simpanBerkas(berkas)
   } catch (e) {
     notice.value = { tone: 'danger', text: describeApiError(e).message }
   } finally {

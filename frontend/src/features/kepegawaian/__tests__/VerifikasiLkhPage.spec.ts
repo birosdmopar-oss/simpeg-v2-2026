@@ -36,8 +36,8 @@ const baris = (id: number, extra: Partial<LkhItem> = {}): LkhItem => ({
   ...extra,
 })
 
-async function mountPage(query = '') {
-  loginAs(Role.PTT)
+async function mountPage(query = '', role: number = Role.PTT) {
+  loginAs(role as never)
   const router = createShellRouter()
   router.addRoute({ path: '/lkh/verifikasi', name: 'lkh-verifikasi', component: VerifikasiLkhPage })
   await router.push(`/lkh/verifikasi${query}`)
@@ -70,7 +70,7 @@ describe('VerifikasiLkhPage', () => {
     svc.create.mockResolvedValue(baris(3))
     const w = await mountPage()
 
-    expect((await rowMenuActions(w, 'lkh-actions-1')).map((a) => a.key)).toEqual(['edit', 'pdf', 'hapus'])
+    expect((await rowMenuActions(w, 'lkh-actions-1')).map((a) => a.key)).toEqual(['edit', 'hapus'])
     expect((await rowMenuActions(w, 'lkh-actions-2')).map((a) => a.key)).toEqual(['pdf'])
 
     await w.get('[data-testid="lkh-tambah"]').trigger('click')
@@ -89,6 +89,45 @@ describe('VerifikasiLkhPage', () => {
       kegiatan: [{ kegiatan: 'Menyusun laporan', output: 'Draf', jumlah_diselesaikan: '1', jam_mulai: '08:00', jam_selesai: '09:00' }],
     })
     expect(w.get('[data-testid="lkh-notice"]').text()).toContain('disimpan')
+    expect(q('[data-testid="lkh-nip-atasan"]')).toBeNull()
+  })
+
+  it('Super Admin: NIP atasan opsional ikut dikirim; Edit memuat detail kegiatan', async () => {
+    svc.create.mockResolvedValue(baris(3))
+    svc.update.mockResolvedValue(baris(1))
+    svc.detail.mockResolvedValue({ ...baris(1), kegiatan: [{ kegiatan: 'Rapat', output: 'Notula', jumlah_diselesaikan: '1', jam_mulai: '08:00', jam_selesai: '09:00' }] } as never)
+    const w = await mountPage('', Role.SUPER_ADMIN)
+
+    await selectRowAction(w, 'lkh-actions-1', 'edit')
+    await flushPromises()
+    expect(svc.detail).toHaveBeenCalledWith(1)
+    expect(q<HTMLTextAreaElement>('[data-testid="lkh-baris-0"] [data-field="kegiatan"]')?.value).toBe('Rapat')
+    isi(q('[data-testid="lkh-nip-atasan"] input'), '197501012000011001')
+    q('[data-testid="lkh-form"]')?.dispatchEvent(new Event('submit'))
+    await flushPromises()
+
+    expect(svc.update).toHaveBeenCalledWith(1, {
+      tgl_laporan: '2026-10-12',
+      kegiatan: [{ kegiatan: 'Rapat', output: 'Notula', jumlah_diselesaikan: '1', jam_mulai: '08:00', jam_selesai: '09:00' }],
+      nip_atasan: '197501012000011001',
+    })
+  })
+
+  it('Unduh PDF (hanya Disetujui) → nama berkas dari server', async () => {
+    svc.pdf.mockResolvedValue({ blob: new Blob(['%PDF'], { type: 'application/pdf' }), nama: 'lkh_198001012005011001_20261012.pdf' })
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:lkh'), revokeObjectURL: vi.fn() })
+    const nama: string[] = []
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      nama.push(this.download)
+    })
+    const w = await mountPage()
+
+    await selectRowAction(w, 'lkh-actions-2', 'pdf')
+    await flushPromises()
+
+    expect(svc.pdf).toHaveBeenCalledWith(2)
+    expect(nama).toEqual(['lkh_198001012005011001_20261012.pdf'])
+    klik.mockRestore()
   })
 
   it('Verifikasi Bawahan: antrean atasan; revisi tanpa catatan ditolak di form, lalu terkirim', async () => {
@@ -96,7 +135,7 @@ describe('VerifikasiLkhPage', () => {
     const w = await mountPage('?tab=verifikasi')
 
     expect(svc.verifikasi).toHaveBeenCalledWith({ page: 1, per_page: 20, status: '0' })
-    expect((await rowMenuActions(w, 'lkh-actions-5')).map((a) => a.key)).toEqual(['verifikasi', 'pdf'])
+    expect((await rowMenuActions(w, 'lkh-actions-5')).map((a) => a.key)).toEqual(['verifikasi'])
 
     await selectRowAction(w, 'lkh-actions-5', 'verifikasi')
     await flushPromises()

@@ -164,12 +164,15 @@ menonaktifkan akun user_level 2 (PNS) dan mencabut sesinya [K] trigger `pegawai_
 ### Jabatan, Plt/Plh, struktur organisasi (WS-2 M4, MAKE-012, aditif)
 
 Riwayat jabatan B-07 = jenis engine `jabatan` (`Riwayat/Definisi/Jabatan.php`) lewat endpoint riwayat engine yang sudah
-ada (`pegawai/{nip}/riwayat/jabatan…`); tidak ada endpoint khusus. Endpoint baru:
+ada (`pegawai/{nip}/riwayat/jabatan…`); tidak ada endpoint khusus. Sub rumpun (MAKE-013): isian mentah
+`id_subrumpun_jabatan` (JSON array, multipart `id_subrumpun_jabatan[]`, atau `''`) → respons `subrumpun_jabatan` (nama
+dipisah `***`); 422 `id_subrumpun_jabatan` bila kosong (jenis 1/3), tidak valid, bukan milik rumpun, atau kembar. Endpoint
+baru:
 
 | Method & path | Role | Isi |
 |---|---|---|
-| `GET struktur-organisasi?id_unit_satker=&bulan=` | semua pengguna login (jwt) | B-19 ikut templat legacy so_012025 (keputusan user 13-10-2026): `{ periode, tanggal, id_unit_satker, kementerian, pilihan, judul, format, data }`. `id_unit_satker` '0' (bawaan, kementerian) / `<id_unit>` / `sat_<id_satker>` (hanya pilihan legacy; selain itu 422 `errors.id_unit_satker`). `format` ∈ `kementerian`, `sesmen`, `deputi`, `inspektorat_unit`, `inspektorat`, `pusat`, `bpo`, `upt`; `data` = dataset legacy (kotak `{ id_jabatan, jabatan, pejabat, is_plt, jenis, satker? }`). `pilihan` = `[{ value, label, level, disabled }]`. Pejabat pada `tanggal` (bulan berjalan: hari ini; bulan lalu: akhir bulan; `bulan` YYYY-MM sejak 2022-01, di luar itu 422 `errors.bulan`; `bulan_tersedia` = daftar pilihan): definitif dari riwayat jabatan, lalu Plt, lalu Plh |
-| `GET struktur-organisasi/pdf?id_unit_satker=&bulan=&inline=1` | semua pengguna login | MAKE-013: PDF (TCPDF) tabel hierarki jabatan–pejabat sesuai format bagan; `application/pdf`, `attachment` (atau `inline`), `no-store` |
+| `GET struktur-organisasi?id_unit_satker=&bulan=` | semua pengguna login (jwt) | B-19 ikut templat legacy so_012025 (keputusan user 13-10-2026): `{ periode, tanggal, id_unit_satker, kementerian, pilihan, judul, format, data }`. `id_unit_satker` '0' (bawaan, kementerian) / `<id_unit>` / `sat_<id_satker>` (hanya pilihan legacy; selain itu 422 `errors.id_unit_satker`). `format` ∈ `kementerian`, `sesmen`, `deputi`, `inspektorat_unit`, `inspektorat`, `pusat`, `bpo`, `upt`; `data` = dataset legacy (kotak `{ id_jabatan, jabatan, pejabat, is_plt, jenis, satker? }`). `pilihan` = `[{ value, label, level, disabled }]`. Pejabat pada `tanggal` (bulan berjalan: hari ini; bulan lalu: akhir bulan; `bulan` YYYY-MM sejak 2025-01 (keputusan user 13-10-2026; bulan sebelum 2025 menunggu port templat legacy), di luar itu 422 `errors.bulan`; `bulan_tersedia` = daftar pilihan): definitif dari riwayat jabatan, lalu Plt, lalu Plh |
+| `GET struktur-organisasi/pdf?id_unit_satker=&bulan=&inline=1` | semua pengguna login | MAKE-013: PDF (TCPDF) tabel hierarki jabatan–pejabat sesuai format bagan ([V2], ADR-033 tanpa wkhtmltopdf); `application/pdf`, `attachment` (atau `inline`), `no-store` |
 | `GET penugasan/{plt\|plh}?search=&status=&page=&per_page=` | 1, 3 (lingkup satker akun, atau unit bila tanpa satker), 4, 5 | `{ items, meta: { page, per_page, total }, can_create }`. Item = kolom `pegawai_plt\|plh` (tanpa path `lampiran`) + `id`, `nip`, `nama_lengkap`, `jabatan`, `jabatan_koord`, `unit`, `satker`, `ada_lampiran` |
 | `GET penugasan/{plt\|plh}/{id}` | sama | satu item; 404 di luar lingkup |
 | `POST penugasan/{plt\|plh}` | 1 | Tambah tanpa approval (JSON, atau multipart dengan berkas `lampiran` opsional 5 MB jpg/jpeg/png/gif/pdf/xls/xlsx/doc/docx) → 201. Isian legacy `validate_param_off_plt`: `status` 1/2, `jenis_jabatan` 1 (group, sub group, jabatan) atau 2 (`jenis_jabatan_koord` 1/2 + `id_jabatan_koord` yang jenisnya sama), `tgl_mulai` ≤ `tgl_akhir`, `id_unit`, `id_satker`, `id_group_jabatan_<jenis>`, `id_sub_group_jabatan_<jenis>`, `id_unit_<jenis>`, `id_satker_<jenis>`, `nip_<jenis>` (pegawai ada), `keterangan` ≤ 255; 422 per kolom |
@@ -181,21 +184,21 @@ ada (`pegawai/{nip}/riwayat/jabatan…`); tidak ada endpoint khusus. Endpoint ba
 
 | Method & path | Role | Isi |
 |---|---|---|
-| `GET konket?ds=&de=&status=&search=&page=&per_page=` | 1, 2, 3, 6, 7 | B-13. Pegawai: pengajuan sendiri (`mode: pegawai`, urut tanggal mulai turun). Role 1/3: antrean `list_ad` rentang `ds`–`de` (bawaan bulan berjalan), pegawai aktif, lingkup PegawaiScope (`mode: admin`, `rentang`). Item = kolom `absen_ijin` (tanpa path berkas) + `nama_lengkap`, `unit`, `satker`, `ada_berkas`, `aksi {ubah, hapus, proses}`; `status` W/V/X |
-| `GET konket/opsi` | 1, 2, 3, 6, 7 | `{ mode, tanggal_minimal, hari_ini, kategori_dinas: 8, kategori_sakit: 10, jenis: [{ kategori, jenis_konket, affect_tukin }] }` (jenis per role: pegawai & role 3 tanpa id 2/4/5/6, role 1 tanpa 4/5) |
-| `GET konket/{id}` | pemilik / role 1 / role 3 lingkup | + `peserta` (dinas gabungan), `aksi`; tidak terlihat → 404 |
-| `POST konket` | 1, 2, 3, 6, 7 | Multipart `date_start`, `date_end`, `kategori`, `alasan`, `jenis_dinas` (kategori 8), `peserta[]` (gabungan), `affect_tukin` (role 1/3), `nip` (role 1/3), berkas `file_bukti` (wajib, 5 MB) → 201, status W. 422 per kolom (tanggal minimal, irisan, sakit, peserta) |
+| `GET konket?ds=&de=&status=&search=&page=&per_page=` | 1, 2, 3, 4, 5, 6, 7 | B-13. Pegawai: pengajuan sendiri (`mode: pegawai`, urut tanggal mulai turun). [K] Role 4/5: antrean semua pegawai, lihat saja (`can_create: false`, `aksi` semua false). Role 1/3: antrean `list_ad` rentang `ds`–`de` (bawaan bulan berjalan), pegawai aktif, lingkup PegawaiScope (`mode: admin`, `rentang`). Item = kolom `absen_ijin` (tanpa path berkas) + `nama_lengkap`, `unit`, `satker`, `ada_berkas`, `aksi {ubah, hapus, proses}`; `status` W/V/X |
+| `GET konket/opsi` | 1, 2, 3, 4, 5, 6, 7 | `{ mode, can_create, tanggal_minimal, hari_ini, kategori_dinas: 8, kategori_sakit: 10, jenis: [{ kategori, jenis_konket, affect_tukin }] }` (jenis per role: pegawai & role 3 tanpa id 2/4/5/6, role 1 tanpa 4/5) |
+| `GET konket/{id}` | pemilik / role 1 / role 3 lingkup / role 4, 5 | + `peserta` (dinas gabungan), `aksi`; tidak terlihat → 404 |
+| `POST konket` | 1, 2, 3, 6, 7 | Multipart `date_start`, `date_end`, `kategori`, `alasan`, `jenis_dinas` (kategori 8), `peserta[]` (gabungan), `affect_tukin` (role 1/3), `nip` (role 1/3), berkas `file_bukti` (wajib, 5 MB) → 201, status W. 422 per kolom (tanggal minimal, irisan, sakit, peserta; role 3: peserta di luar lingkup) |
 | `PUT konket/{id}` | pemilik (status W) / role 1 / role 3 lingkup | Ubah (multipart `_method=PUT`); pegawai → kembali W; baris peserta → 422 `id_parent` |
-| `DELETE konket/{id}` | pemilik / role 1 / role 3 lingkup | Status 10; dinas gabungan bersama pesertanya → `{ deleted, id, ids }` |
+| `DELETE konket/{id}` | pemilik / role 1 / role 3 lingkup | Status 10 ([V2], keputusan user); dinas gabungan bersama pesertanya → `{ deleted, id, ids }` |
 | `POST konket/{id}/process` | 1, 3 (lingkup proses) | `{ aksi: setujui\|tolak, reason_note }` → V/X (peserta ikut); alasan wajib saat tolak; hanya W |
 | `GET konket/{id}/berkas` | yang boleh melihat | Unduh berkas bukti; path arsip legacy → 404 |
 | `GET lkh?nip=&page=&per_page=` | 1, 2, 3, 6, 7 | B-12b LKH milik sendiri (role 1/3: `nip` lain dalam lingkup). Status 2/10 tidak ditampilkan; urut Revisi → Menunggu → Disetujui. Item: `id`, `nip`, `nama`, `tgl_laporan`, `nip_atasan`, `nama_atasan`, `status`, `catatan`, `jumlah`, `aksi {ubah, hapus, proses}` |
 | `GET lkh/opsi?nip=` | 1, 2, 3, 6, 7 | `{ nip, tanggal_minimal, tanggal_maksimal, atasan: { nip, nama } \| null, punya_jabatan }` |
 | `GET lkh/verifikasi?status=&ds=&de=&search=` | siapa pun (1, 2, 3, 6, 7) yang menjadi atasan langsung | Antrean `nip_atasan` = NIP pemanggil; bawaan status 0 |
-| `POST lkh` | 1, 2, 3, 6, 7 | `{ nip?, tgl_laporan, kegiatan: [{ kegiatan, output, jumlah_diselesaikan, jam_mulai, jam_selesai }] }` → 201, status 0; atasan, nama, unit/satker diisi server; 422 `tgl_laporan`, `kegiatan`, `kegiatan.<i>`, `nip_atasan`, `nip` |
-| `GET/PUT/DELETE lkh/{id}` | pemilik / atasan (lihat) / role 1 / role 3 lingkup | Detail + `kegiatan`; ubah (selain role 1 → status 0); hapus status 10; kunci tukin 422 `tgl_laporan`; pegawai tidak bisa mengubah/menghapus Disetujui (403) |
+| `POST lkh` | 1, 2, 3, 6, 7 | `{ nip?, nip_atasan? (hanya role 1: timpa atasan otomatis, NIP pegawai aktif), tgl_laporan, kegiatan: [{ kegiatan, output, jumlah_diselesaikan, jam_mulai, jam_selesai }] }` → 201, status 0; atasan, nama, unit/satker diisi server; 422 `tgl_laporan`, `kegiatan`, `kegiatan.<i>`, `nip_atasan`, `nip` |
+| `GET/PUT/DELETE lkh/{id}` | pemilik / atasan (lihat) / role 1 / role 3 lingkup | Detail + `kegiatan`; ubah (selain role 1 → status 0; nama/unit/satker ditulis ulang; role 1 boleh `nip_atasan`); hapus status 10; kunci tukin 422 `tgl_laporan`; pegawai tidak bisa mengubah/menghapus Disetujui (403); hapus Disetujui hanya role 1 (role 3 → 403); `aksi` = penegakan server |
 | `POST lkh/{id}/process` | atasan langsung | `{ aksi: setujui\|tolak\|revisi, catatan }` → 1/2/3; catatan wajib saat tolak/revisi; hanya status 0; bukan atasan → 404 |
-| `GET lkh/{id}/pdf` | yang boleh melihat | PDF LKH (TCPDF, QR kode LKH) |
+| `GET lkh/{id}/pdf` | yang boleh melihat | PDF LKH Disetujui (TCPDF, QR kode LKH); selain Disetujui → 422 `status` |
 | `GET usulan/{karpeg\|kariskarsu}/{id}/tanda-terima` | hak `detail` engine | PDF tanda terima usulan Disetujui (aditif di RoutesRiwayat/UsulanController WS-1); selain Disetujui → 422 `status` |
 
 PDF memakai `App\Libraries\Pdf\Pdf::renderer()` (antarmuka `PdfRendererInterface`, ADR-033) dan `Pdf::respon()`.

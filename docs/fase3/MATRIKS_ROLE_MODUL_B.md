@@ -91,7 +91,7 @@ Kode sel: **A** = Admin, **V** = View (hanya untuk baris yang di sumbernya ditan
 | `hr/rwy/jabatan/so` | Y | Y | Y | Y | Y | Y | Y | Y | UL_ALL |
 | `hr/rwy/skp/*` | Y | Y | Y | - | - | - | Y | - | 1, 2, 3, 7 |
 | `hr/rwy/lkh/*` | Y | Y | Y | - | - | Y | Y | - | 1, 2, 3, 6, 7 |
-| `hr/rwy/konket/*` | Y | Y | Y | - | - | Y | Y | - | 1, 2, 3, 6, 7 |
+| `hr/rwy/konket/*` | Y | Y | Y | V | V | Y | Y | - | 1, 2, 3, 6, 7; 4, 5 lihat saja [K] (legacy list_ad/detail; keputusan user 13-10-2026, MAKE-013) |
 | `hr/rwy/hukdis/*` | Y | - | Y | - | - | - | - | - | 1, 3 |
 | `hr/rwy/pendidikan/*` | Y | Y | Y | - | - | Y | Y | - | 1, 2, 3, 6, 7 |
 | `hr/rwy/diklat/*` | Y | Y | Y | - | - | - | Y | - | 1, 2, 3, 7 |
@@ -115,7 +115,7 @@ Pembagian View/Admin per jenis riwayat, disalin dari Bagian 2:
 | Tanda Jasa (`hr/rwy/tj/*`) | 1, 3 | 2, 4, 5 | — |
 | SKP (`hr/rwy/skp/*`) | — | — | 1, 2, 3, 7 |
 | LKH (`hr/rwy/lkh/*`) | — | — | 1, 2, 3, 6, 7 |
-| Konket (`hr/rwy/konket/*`) | — | — | 1, 2, 3, 6, 7 |
+| Konket (`hr/rwy/konket/*`) | — | 4, 5 [K] (antrean + detail, tanpa tulis/proses) | 1, 2, 3, 6, 7 |
 | Hukdis (`hr/rwy/hukdis/*`) | — | — | 1, 3 |
 | Pendidikan (`hr/rwy/pendidikan/*`) | — | — | 1, 2, 3, 6, 7 |
 | Diklat (`hr/rwy/diklat/*`) | — | — | 1, 2, 3, 7 |

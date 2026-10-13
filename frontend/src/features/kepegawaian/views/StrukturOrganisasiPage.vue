@@ -13,6 +13,7 @@ import { UiButton, UiCard, UiNotice } from '@/shared/ui'
 
 import OrgChartNode from '../components/OrgChartNode.vue'
 import { describeApiError } from '../services/apiErrors'
+import { simpanBerkas } from '../services/berkasUnduhan'
 import { strukturService } from '../services/struktur.service'
 import { susunBagan } from '../soTemplat'
 import type { StrukturOrganisasi } from '../types'
@@ -36,6 +37,8 @@ const data = ref<StrukturOrganisasi | null>(null)
 const mengunduh = ref(false)
 const memuat = ref(false)
 const error = ref('')
+/** Galat unduh PDF terpisah dari galat muat: bagan tetap tampil (review FE-2 MAKE-013). */
+const errorUnduh = ref('')
 let token = 0
 
 async function muat(): Promise<void> {
@@ -58,18 +61,12 @@ watch([pilihanAktif, bulan], () => void muat(), { immediate: true })
 
 async function unduh(): Promise<void> {
   mengunduh.value = true
+  errorUnduh.value = ''
   try {
-    const blob = await strukturService.pdf(pilihanAktif.value, data.value?.bulan)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `struktur_organisasi_${pilihanAktif.value}_${data.value?.bulan ?? ''}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const berkas = await strukturService.pdf(pilihanAktif.value, data.value?.bulan)
+    simpanBerkas(berkas)
   } catch (e) {
-    error.value = describeApiError(e).message
+    errorUnduh.value = describeApiError(e).message
   } finally {
     mengunduh.value = false
   }
@@ -109,6 +106,7 @@ const indent = (level: number): string => (level > 1 ? '─── ' : '─ ')
         </div>
       </div>
 
+      <UiNotice v-if="errorUnduh" tone="danger" class="mb-3" data-testid="struktur-error-unduh">{{ errorUnduh }}</UiNotice>
       <UiNotice v-if="error" tone="danger" data-testid="struktur-error">{{ error }}</UiNotice>
       <p v-else-if="memuat && !data" class="text-body2 text-slate-500">Memuat struktur organisasi…</p>
       <template v-else-if="data">

@@ -91,13 +91,19 @@ describe('Usulan Karpeg/Karis — pengusul (role 2)', () => {
   })
 
   it('aditif WS-2 MAKE-013: ⋮ "Unduh tanda terima" (hanya Disetujui) → PDF usulan/{jenis}/{id}/tanda-terima', async () => {
-    usulan.tandaTerima.mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }))
+    let selesai: (v: { blob: Blob; nama: string }) => void = () => undefined
+    usulan.tandaTerima.mockImplementation(() => new Promise((ok) => (selesai = ok)))
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:tt'), revokeObjectURL: vi.fn() })
     const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     await mountPage(Role.PEGAWAI)
 
     expect((await rowMenuActions(body(), 'usulan-actions-2')).map((i) => i.key)).not.toContain('tanda-terima')
     await selectRowAction(body(), 'usulan-actions-1', 'tanda-terima')
+    await flushPromises()
+    // Selama unduh: item baris itu dinonaktifkan (review FE-4).
+    expect((await rowMenuActions(body(), 'usulan-actions-1')).find((i) => i.key === 'tanda-terima')?.disabled).toBe(true)
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    selesai({ blob: new Blob(['%PDF'], { type: 'application/pdf' }), nama: 'tanda_terima_karpeg_1.pdf' })
     await flushPromises()
 
     expect(usulan.tandaTerima).toHaveBeenCalledWith('karpeg', '1')

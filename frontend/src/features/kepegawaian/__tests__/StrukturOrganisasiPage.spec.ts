@@ -123,7 +123,15 @@ describe('StrukturOrganisasiPage', () => {
     expect(router.currentRoute.value.query.bulan).toBe('2026-09')
     expect(bagan).toHaveBeenLastCalledWith('0', '2026-09')
 
-    vi.mocked(strukturService.pdf).mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }))
+    vi.mocked(strukturService.pdf).mockRejectedValueOnce(new Error('gagal'))
+    await wrapper.get('[data-testid="struktur-unduh"]').trigger('click')
+    await flushPromises()
+    // Galat unduh tampil terpisah; bagan tetap tampil (review FE-2 MAKE-013).
+    expect(wrapper.find('[data-testid="struktur-error-unduh"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="struktur-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="struktur-judul"]').exists()).toBe(true)
+
+    vi.mocked(strukturService.pdf).mockResolvedValue({ blob: new Blob(['%PDF'], { type: 'application/pdf' }), nama: 'so.pdf' })
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:so'), revokeObjectURL: vi.fn() })
     const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     await wrapper.get('[data-testid="struktur-unduh"]').trigger('click')

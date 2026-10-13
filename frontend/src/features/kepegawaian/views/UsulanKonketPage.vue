@@ -19,6 +19,7 @@ import { UiButton, UiCard, UiNotice, UiPagination, UiSearchInput, UiSelect, UiTe
 
 import KonketFormDialog from '../components/KonketFormDialog.vue'
 import { describeApiError } from '../services/apiErrors'
+import { simpanBerkas } from '../services/berkasUnduhan'
 import { konketService } from '../services/konket.service'
 import type { KonketItem, KonketListResponse, KonketOpsi, StatusKonket } from '../types'
 
@@ -49,6 +50,8 @@ const hapusRow = ref<KonketItem | null>(null)
 const busyId = ref<number | null>(null)
 let token = 0
 let timer: ReturnType<typeof setTimeout> | undefined
+/** Rentang bawaan diisi dari respons pertama: watch ds/de dilewati sekali supaya daftar tidak dimuat dua kali. */
+let rentangDariServer = false
 
 const admin = computed(() => opsi.value?.mode === 'admin')
 
@@ -60,6 +63,7 @@ async function muat(): Promise<void> {
     if (saya !== token) return
     data.value = hasil
     if (hasil.rentang && !ds.value) {
+      rentangDariServer = true
       ds.value = hasil.rentang.ds
       de.value = hasil.rentang.de
     }
@@ -83,6 +87,10 @@ onMounted(async () => {
 
 watch(page, () => void muat())
 watch([status, ds, de], () => {
+  if (rentangDariServer) {
+    rentangDariServer = false
+    return
+  }
   page.value = 1
   void muat()
 })
@@ -130,15 +138,8 @@ function tambah(): void {
 async function unduh(row: KonketItem): Promise<void> {
   busyId.value = row.id
   try {
-    const blob = await konketService.berkas(row.id)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `bukti_konket_${row.id}`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const berkas = await konketService.berkas(row.id)
+    simpanBerkas(berkas)
   } catch (e) {
     notice.value = { tone: 'danger', text: describeApiError(e).message }
   } finally {

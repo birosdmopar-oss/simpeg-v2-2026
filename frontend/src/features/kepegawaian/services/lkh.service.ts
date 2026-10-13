@@ -12,6 +12,8 @@
  */
 import { api } from '@/lib/axios'
 
+import { ambilBerkas, type BerkasUnduhan } from './berkasUnduhan'
+
 import type { LkhItem, LkhKegiatan, LkhListResponse, LkhOpsi } from '../types'
 
 export type AksiLkh = 'setujui' | 'tolak' | 'revisi'
@@ -19,6 +21,8 @@ export type AksiLkh = 'setujui' | 'tolak' | 'revisi'
 export interface LkhIsian {
   tgl_laporan: string
   kegiatan: LkhKegiatan[]
+  /** Hanya Super Admin: timpa atasan otomatis (NIP pegawai aktif). */
+  nip_atasan?: string
 }
 
 export const lkhService = {
@@ -63,8 +67,8 @@ export const lkhService = {
     return data
   },
 
-  async pdf(id: number): Promise<Blob> {
-    const { data } = await api.get<Blob>(`/lkh/${id}/pdf`, { responseType: 'blob' })
-    return data
+  /** PDF LKH Disetujui + nama dari `Content-Disposition` (cadangan `lkh_<id>.pdf`). */
+  pdf(id: number): Promise<BerkasUnduhan> {
+    return ambilBerkas(`/lkh/${id}/pdf`, `lkh_${id}`)
   },
 }

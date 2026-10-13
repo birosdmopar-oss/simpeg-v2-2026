@@ -27,6 +27,12 @@ use CodeIgniter\Database\BaseConnection;
  *
  * Jenis jabatan (`jenis_jabatan`): 1 Nomenklatur, 2 Instansi Lain (isian teks bebas), 3 Plt (tidak masuk snapshot).
  * Nama master G-02 disalin server (beforeSave) — klien tidak bisa menimpa kolom nama untuk jenis 1/3.
+ *
+ * Sub rumpun (MAKE-013, hook isian mentah MAKE-019): `id_subrumpun_jabatan` = daftar ID `subrumpun_jabatan` (JSON
+ * array, multipart `id_subrumpun_jabatan[]`, atau `''` = kosong) → kolom teks `subrumpun_jabatan` berisi nama dipisah
+ * `***` (legacy set_param :2233-2246). Wajib minimal satu untuk jenis 1/3 (legacy validate_param :1986-1989); opsional
+ * untuk Instansi Lain (legacy `id_subrumpun_jabatan_jlain`). [V2] ID harus angka, ada, aktif, milik rumpun terpilih, dan
+ * tidak kembar (legacy tidak memeriksa). Tidak dikirim saat ubah = nilai lama dipertahankan, kecuali rumpun berubah.
  */
 final class Jabatan extends RiwayatDefinisi
 {
@@ -48,6 +54,15 @@ final class Jabatan extends RiwayatDefinisi
      * Satker "dipekerjakan keluar instansi": jabatan diisi teks bebas (legacy :1985-1990, set_param :2263-2268).
      */
     public const SATKER_DIPEKERJAKAN = 39;
+
+    /** Kunci isian mentah daftar ID sub rumpun (bukan kolom tabel). */
+    public const ISIAN_SUBRUMPUN = 'id_subrumpun_jabatan';
+
+    /** Pemisah nama sub rumpun di kolom `subrumpun_jabatan` (legacy `implode('***', …)`). */
+    public const PEMISAH_SUBRUMPUN = '***';
+
+    /** Batas byte kolom `subrumpun_jabatan` (TEXT). */
+    private const MAKS_SUBRUMPUN = 65535;
 
     /**
      * Sub group dosen: berkas sertifikat dosen (legacy insert :1086).
@@ -240,6 +255,11 @@ final class Jabatan extends RiwayatDefinisi
     /**
      * Berkas di kolom tabel (legacy insert :1086-1238): sertifikat dosen, SPMT, BA pelantikan — opsional, 5 MB.
      */
+    public function isianMentah(): array
+    {
+        return [self::ISIAN_SUBRUMPUN];
+    }
+
     public function kolomBerkas(): array
     {
         $aturan = new AturanLampiran(0, false, 5, self::EKSTENSI);
@@ -315,6 +335,8 @@ final class Jabatan extends RiwayatDefinisi
             }
         }
 
+        $errors += $this->periksaSubrumpun($data, $lama, $n, $jenis !== self::JENIS_INSTANSI_LAIN);
+
         if ($jenis !== self::JENIS_PLT && ($n['tmtsk'] ?? '') !== '' && ! isset($errors['tmtsk'])) {
             $builder = $this->db()->table($this->tabel())
                 ->where($this->kolomNip(), $n[$this->kolomNip()])
@@ -362,10 +384,10 @@ final class Jabatan extends RiwayatDefinisi
             if (($n['id_rumpun_jabatan'] ?? null) !== null && (string) $n['id_rumpun_jabatan'] !== '') {
                 $data['rumpun_jabatan'] = $this->nama('rumpun_jabatan', 'id_rumpun_jabatan', 'rumpun_jabatan', $n['id_rumpun_jabatan']);
             } else {
-                $data['id_rumpun_jabatan'] = $data['rumpun_jabatan'] = null;
+                $data['id_rumpun_jabatan'] = $data['rumpun_jabatan'] = $data['subrumpun_jabatan'] = null;
             }
 
-            return $data;
+            return $this->salinSubrumpun($data);
         }
 
         $plt = $jenis === self::JENIS_PLT;
@@ -430,7 +452,136 @@ final class Jabatan extends RiwayatDefinisi
             }
         }
 
+        return $this->salinSubrumpun($data);
+    }
+
+    /**
+     * Isian mentah sub rumpun → daftar ID (string) apa adanya; `null`/`''`/`[]` = kosong. Skalar tunggal = satu ID.
+     *
+     * @return list<string>|null null = bentuk tidak sah (bukan skalar/array skalar)
+     */
+    public static function normalisasiSubrumpun(mixed $nilai): ?array
+    {
+        if ($nilai === null || $nilai === '' || $nilai === []) {
+            return [];
+        }
+
+        $daftar = is_array($nilai) ? array_values($nilai) : [$nilai];
+        $hasil  = [];
+
+        foreach ($daftar as $id) {
+            if (! is_scalar($id) || ! preg_match('/^[1-9]\d{0,9}$/', trim((string) $id))) {
+                return null;
+            }
+
+            $hasil[] = trim((string) $id);
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Validasi sub rumpun atas kiriman (kunci mentah) dan nilai akhir baris.
+     *
+     * @param array<string, mixed>      $data
+     * @param array<string, mixed>|null $lama
+     * @param array<string, mixed>      $n
+     *
+     * @return array<string, list<string>>
+     */
+    private function periksaSubrumpun(array $data, ?array $lama, array $n, bool $wajib): array
+    {
+        $kunci  = self::ISIAN_SUBRUMPUN;
+        $kosong = [$kunci => ['Silakan pilih sub rumpun jabatan.']];
+
+        if (! array_key_exists($kunci, $data)) {
+            $rumpunBerubah = $lama !== null && array_key_exists('id_rumpun_jabatan', $data)
+                && (string) $data['id_rumpun_jabatan'] !== (string) ($lama['id_rumpun_jabatan'] ?? '');
+            $adaLama = trim((string) ($lama['subrumpun_jabatan'] ?? '')) !== '';
+
+            return $wajib && ($lama === null || $rumpunBerubah || ! $adaLama) ? $kosong : [];
+        }
+
+        $id = self::normalisasiSubrumpun($data[$kunci]);
+
+        if ($id === null) {
+            return [$kunci => ['Sub rumpun jabatan tidak valid.']];
+        }
+
+        if ($id === []) {
+            return $wajib ? $kosong : [];
+        }
+
+        if (count(array_unique($id)) !== count($id)) {
+            return [$kunci => ['Sub rumpun jabatan tidak boleh dipilih lebih dari sekali.']];
+        }
+
+        $rumpun = trim((string) ($n['id_rumpun_jabatan'] ?? ''));
+        $baris  = $this->barisSubrumpun($id);
+        $salah  = [];
+
+        foreach ($id as $satu) {
+            $r = $baris[$satu] ?? null;
+
+            if ($r === null || (int) $r['status'] !== 1 || $rumpun === '' || (string) $r['id_rumpun_jabatan'] !== $rumpun) {
+                $salah[] = $satu;
+            }
+        }
+
+        if ($salah !== []) {
+            return [$kunci => ['Sub rumpun jabatan tidak ditemukan, tidak aktif, atau bukan bagian rumpun jabatan terpilih: ' . implode(', ', $salah) . '.']];
+        }
+
+        if (strlen($this->gabungSubrumpun($id, $baris)) > self::MAKS_SUBRUMPUN) {
+            return [$kunci => ['Gabungan nama sub rumpun jabatan terlalu panjang.']];
+        }
+
+        return [];
+    }
+
+    /**
+     * Pindahkan isian mentah (bila dikirim) ke kolom `subrumpun_jabatan`; sudah divalidasi di validate().
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    private function salinSubrumpun(array $data): array
+    {
+        if (array_key_exists(self::ISIAN_SUBRUMPUN, $data)) {
+            $id                        = self::normalisasiSubrumpun($data[self::ISIAN_SUBRUMPUN]) ?? [];
+            $data['subrumpun_jabatan'] = $id === [] ? null : $this->gabungSubrumpun($id, $this->barisSubrumpun($id));
+            unset($data[self::ISIAN_SUBRUMPUN]);
+        }
+
         return $data;
+    }
+
+    /**
+     * @param list<string> $id
+     *
+     * @return array<string, array<string, mixed>> per ID
+     */
+    private function barisSubrumpun(array $id): array
+    {
+        $hasil = [];
+
+        foreach ($this->db()->table('subrumpun_jabatan')->whereIn('id_subrumpun_jabatan', $id)->get()->getResultArray() as $r) {
+            $hasil[(string) $r['id_subrumpun_jabatan']] = $r;
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Nama sub rumpun dipisah `***`, urut kiriman.
+     *
+     * @param list<string>                         $id
+     * @param array<string, array<string, mixed>> $baris
+     */
+    private function gabungSubrumpun(array $id, array $baris): string
+    {
+        return implode(self::PEMISAH_SUBRUMPUN, array_map(static fn (string $s): string => (string) ($baris[$s]['subrumpun_jabatan'] ?? ''), $id));
     }
 
     /**

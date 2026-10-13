@@ -15,6 +15,8 @@ import type { ApprovalPayload } from '@/shared/components/approvalActions'
 
 import type { KonketItem, KonketListResponse, KonketOpsi } from '../types'
 
+import { ambilBerkas, type BerkasUnduhan } from './berkasUnduhan'
+
 export interface KonketQuery {
   page: number
   per_page: number
@@ -88,8 +90,8 @@ export const konketService = {
     return data
   },
 
-  async berkas(id: number): Promise<Blob> {
-    const { data } = await api.get<Blob>(`/konket/${id}/berkas`, { responseType: 'blob' })
-    return data
+  /** Berkas bukti + nama dari `Content-Disposition` (cadangan `bukti_konket_<id>.<ekstensi tipe>`). */
+  berkas(id: number): Promise<BerkasUnduhan> {
+    return ambilBerkas(`/konket/${id}/berkas`, `bukti_konket_${id}`)
   },
 }

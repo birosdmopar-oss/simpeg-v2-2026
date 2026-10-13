@@ -125,6 +125,8 @@ describe('UsulanKonketPage', () => {
     svc.process.mockResolvedValue(baris(1, { status: 'X' }))
     const w = await mountPage(Role.SUPER_ADMIN)
 
+    // Rentang bawaan dari respons pertama tidak memicu muat kedua (review FE-3 MAKE-013).
+    expect(svc.list).toHaveBeenCalledTimes(1)
     expect(w.find('[data-testid="konket-filter"]').exists()).toBe(true)
     expect(w.get('[data-testid="konket-row-1"]').text()).toContain('198001012005011001')
     expect((await rowMenuActions(w, 'konket-actions-1')).map((a) => a.key)).toEqual(['edit', 'setujui', 'tolak', 'berkas', 'hapus'])
@@ -142,7 +144,74 @@ describe('UsulanKonketPage', () => {
     await flushPromises()
 
     expect(svc.process).toHaveBeenCalledWith(1, { aksi: 'tolak', reason_note: 'Bukti tidak sesuai' })
-    expect(svc.list).toHaveBeenCalledTimes(3)
+    expect(svc.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('admin: Tambah dinas gabungan → Pengaruh Tukin bawaan master, peserta[] dari teks', async () => {
+    svc.opsi.mockResolvedValue(OPSI('admin'))
+    svc.list.mockResolvedValue({ mode: 'admin', items: [], meta: { page: 1, per_page: 20, total: 0 }, can_create: true, rentang: { ds: '2026-10-01', de: '2026-10-31' } })
+    svc.create.mockResolvedValue(baris(3))
+    const w = await mountPage(Role.SUPER_ADMIN)
+
+    await w.get('[data-testid="konket-tambah"]').trigger('click')
+    await flushPromises()
+    isi('[data-testid="konket-nip"] input', '198001012005011001')
+    isi('[data-testid="konket-date-start"] input', '2026-10-06')
+    isi('[data-testid="konket-date-end"] input', '2026-10-07')
+    isi('[data-testid="konket-kategori"] select', '8')
+    await flushPromises()
+    const gabungan = [...document.body.querySelectorAll<HTMLLabelElement>('[data-testid="konket-dialog"] label')].find((l) => l.textContent?.trim() === 'Gabungan')
+    gabungan?.querySelector<HTMLInputElement>('input')?.click()
+    await flushPromises()
+    isi('[data-testid="konket-peserta"] textarea', '199001012015011001\n199101012015011002, 199201012015011003')
+    isi('[data-testid="konket-alasan"]', 'Rapat koordinasi')
+    await flushPromises()
+    q('[data-testid="konket-form"]')?.dispatchEvent(new Event('submit'))
+    await flushPromises()
+
+    expect(svc.create).toHaveBeenCalledWith({
+      nip: '198001012005011001',
+      date_start: '2026-10-06',
+      date_end: '2026-10-07',
+      kategori: '8',
+      alasan: 'Rapat koordinasi',
+      affect_tukin: '2',
+      jenis_dinas: '1',
+      peserta: ['199001012015011001', '199101012015011002', '199201012015011003'],
+    }, null)
+  })
+
+  it('Edit dinas gabungan memuat detail (peserta tanpa pemohon)', async () => {
+    svc.opsi.mockResolvedValue(OPSI('pegawai'))
+    const dinas = baris(5, { kategori: 8, jenis_konket: 'Dinas Luar', jenis_dinas: 1 })
+    svc.list.mockResolvedValue({ mode: 'pegawai', items: [dinas], meta: { page: 1, per_page: 20, total: 1 }, can_create: true, rentang: null })
+    svc.detail.mockResolvedValue({ ...dinas, peserta: [{ nip: dinas.nip, nama: 'Budi', pemohon: true }, { nip: '199001012015011001', nama: 'Ani', pemohon: false }] } as never)
+    const w = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(w, 'konket-actions-5', 'edit')
+    await flushPromises()
+
+    expect(svc.detail).toHaveBeenCalledWith(5)
+    expect(q<HTMLTextAreaElement>('[data-testid="konket-peserta"] textarea')?.value).toBe('199001012015011001')
+  })
+
+  it('Unduh bukti → nama berkas dari server (Content-Disposition)', async () => {
+    svc.opsi.mockResolvedValue(OPSI('pegawai'))
+    svc.list.mockResolvedValue({ mode: 'pegawai', items: [baris(1)], meta: { page: 1, per_page: 20, total: 1 }, can_create: true, rentang: null })
+    svc.berkas.mockResolvedValue({ blob: new Blob(['x'], { type: 'image/png' }), nama: 'bukti_konket_1.png' })
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:kk'), revokeObjectURL: vi.fn() })
+    const nama: string[] = []
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      nama.push(this.download)
+    })
+    const w = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(w, 'konket-actions-1', 'berkas')
+    await flushPromises()
+
+    expect(svc.berkas).toHaveBeenCalledWith(1)
+    expect(nama).toEqual(['bukti_konket_1.png'])
+    klik.mockRestore()
   })
 
   it('Hapus → konfirmasi → DELETE', async () => {

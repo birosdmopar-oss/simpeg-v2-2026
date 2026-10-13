@@ -33,6 +33,7 @@ import { riwayatService, type BerkasMap } from './riwayat.service'
 import type { UsulanConfig } from './usulan.config'
 import UsulanFormDialog from './UsulanFormDialog.vue'
 import { usulanService, type UsulanAntrean, type UsulanSaya } from './usulan.service'
+import { simpanBerkas } from '../services/berkasUnduhan'
 
 const props = defineProps<{ config: UsulanConfig }>()
 
@@ -111,7 +112,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
       { key: 'edit', label: 'Edit', hidden: !saya.value?.can_edit, disabled: disetujui },
       { key: 'berkas', label: 'Berkas' },
       // Aditif WS-2 MAKE-013: tanda terima PDF hanya untuk usulan Disetujui (legacy tt_pdf saat disetujui).
-      { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui },
+      { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui, disabled: unduhId.value === rowId(row) },
       { key: 'hapus', label: 'Hapus', danger: true, hidden: !saya.value?.can_delete, disabled: disetujui },
     ]
   }
@@ -119,7 +120,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
   return [
     ...approvalRowActions({ canProcess: Boolean(antrean.value?.can_process), status: rowStatus(row), busy: processBusy.value && processing.value === row }),
     { key: 'berkas', label: 'Berkas' },
-    { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui },
+    { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui, disabled: unduhId.value === rowId(row) },
   ]
 }
 
@@ -144,20 +145,19 @@ function onAction(key: string, row: RiwayatRow): void {
   }
 }
 
+/** Baris yang sedang mengunduh tanda terima (aditif WS-2 MAKE-013): item ⋮ dinonaktifkan selama proses. */
+const unduhId = ref<string | null>(null)
+
 async function unduhTandaTerima(row: RiwayatRow): Promise<void> {
   const id = rowId(row)
+  unduhId.value = id
   try {
-    const blob = await usulanService.tandaTerima(props.config.jenis, id)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `tanda_terima_${props.config.jenis}_${id}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const berkas = await usulanService.tandaTerima(props.config.jenis, id)
+    simpanBerkas(berkas)
   } catch (error) {
     notice.value = { tone: 'danger', text: describeApiError(error).message }
+  } finally {
+    unduhId.value = null
   }
 }
 

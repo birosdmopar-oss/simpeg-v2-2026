@@ -15,6 +15,7 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use Closure;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatBtcTrait;
@@ -54,6 +55,11 @@ final class JabatanTest extends DatabaseTestCase
     private array $jft;
 
     private int $idRumpun;
+
+    /**
+     * @var list<int> sub rumpun aktif milik $idRumpun
+     */
+    private array $idSub;
 
     protected function setUp(): void
     {
@@ -96,7 +102,10 @@ final class JabatanTest extends DatabaseTestCase
         $pmj = $this->snapshotUji('pegawai_mutasi_jabatan', $nip) ?? [];
         $ids = array_intersect_key($pmj, array_flip(['id_group_jabatan', 'id_sub_group_jabatan', 'id_unit', 'id_satker', 'id_jabatan', 'unit', 'satker', 'jabatan']));
 
-        return array_merge($this->dataStruk('2016-01-01'), $ids);
+        $baris = array_merge($this->dataStruk('2016-01-01'), $ids, ['subrumpun_jabatan' => 'Sub Uji A']);
+        unset($baris['id_subrumpun_jabatan']);
+
+        return $baris;
     }
 
     protected function btcBerkas(): array
@@ -208,7 +217,7 @@ final class JabatanTest extends DatabaseTestCase
     public function testWajibBersyaratNomenklatur(): void
     {
         $this->assertErrors(
-            ['jenis_mutasi', 'id_group_jabatan', 'id_sub_group_jabatan', 'id_unit', 'id_satker', 'id_rumpun_jabatan', 'id_jabatan'],
+            ['jenis_mutasi', 'id_group_jabatan', 'id_sub_group_jabatan', 'id_unit', 'id_satker', 'id_rumpun_jabatan', 'id_jabatan', 'id_subrumpun_jabatan'],
             fn () => $this->tambah(['jenis_jabatan' => 1, 'tmtsk' => '2018-03-01', 'no_sk' => 'SK-1', 'tgl_sk' => '2018-02-01']),
         );
     }
@@ -381,6 +390,89 @@ final class JabatanTest extends DatabaseTestCase
 
     // ---- Helper ----------------------------------------------------------
 
+    // ---- Sub rumpun (MAKE-013, isian mentah MAKE-019) -------------------
+
+    public function testSubrumpunDisimpanSebagaiNamaDipisahBintang(): void
+    {
+        $row = $this->tambah(['id_subrumpun_jabatan' => [(string) $this->idSub[1], $this->idSub[0]]] + $this->dataStruk('2018-03-01'));
+        $this->assertSame('Sub Uji B***Sub Uji A', $row['subrumpun_jabatan']);
+        $this->assertArrayNotHasKey('id_subrumpun_jabatan', $row);
+        $this->assertSame('Sub Uji B***Sub Uji A', $this->snapshotUji('pegawai_mutasi_jabatan', $this->nip)['subrumpun_jabatan']);
+
+        // Ubah tanpa kunci = nilai lama dipertahankan; dengan kunci = diganti.
+        $id = (int) $row['id_riwayat_mutasi_jabatan'];
+        $this->assertSame('Sub Uji B***Sub Uji A', $this->engine()->ubah($this->admin, $this->nip, 'jabatan', $id, ['no_sk' => 'SK-2'], [])['subrumpun_jabatan']);
+        $this->assertSame('Sub Uji A', $this->engine()->ubah($this->admin, $this->nip, 'jabatan', $id, ['id_subrumpun_jabatan' => [$this->idSub[0]]], [])['subrumpun_jabatan']);
+
+        // Rumpun berubah tanpa memilih ulang sub rumpun → wajib.
+        $lain = $this->buatRumpunJabatan();
+        $this->assertErrors(['id_subrumpun_jabatan'], fn () => $this->engine()->ubah($this->admin, $this->nip, 'jabatan', $id, ['id_rumpun_jabatan' => $lain], []));
+    }
+
+    public function testSubrumpunWajibDanDivalidasi(): void
+    {
+        $tanpa = $this->dataStruk('2018-03-01');
+        unset($tanpa['id_subrumpun_jabatan']);
+        $this->assertErrors(['id_subrumpun_jabatan'], fn () => $this->tambah($tanpa));
+
+        $nonaktif   = $this->sisip('subrumpun_jabatan', ['id_rumpun_jabatan' => $this->idRumpun, 'subrumpun_jabatan' => 'Sub Nonaktif', 'status' => 2]);
+        $rumpunLain = $this->sisip('subrumpun_jabatan', ['id_rumpun_jabatan' => $this->buatRumpunJabatan(), 'subrumpun_jabatan' => 'Sub Lain', 'status' => 1]);
+
+        foreach ([[], '', null, ['abc'], [['x']], [$this->idSub[0], $this->idSub[0]], [$nonaktif], [$rumpunLain], [999999]] as $salah) {
+            $this->assertErrors(['id_subrumpun_jabatan'], fn () => $this->tambah(['id_subrumpun_jabatan' => $salah] + $this->dataStruk('2018-03-01')), (string) json_encode($salah));
+        }
+        // Batas panjang gabungan (TEXT 65535) diperiksa di validate(), tetapi tidak tercapai master saat ini (ID TINYINT ×
+        // nama ≤ 255) sehingga tidak diuji lewat data.
+    }
+
+    public function testSubrumpunOpsionalUntukInstansiLain(): void
+    {
+        $data = array_merge($this->dataStruk('2012-01-01'), [
+            'jenis_jabatan' => 2, 'nama_instansi' => 'Kementerian Lain', 'unit' => 'Unit L', 'satker' => 'Satker L', 'jabatan' => 'Analis L',
+        ]);
+        unset($data['id_subrumpun_jabatan']);
+        $this->assertNull($this->tambah($data)['subrumpun_jabatan']);
+        $this->assertSame('Sub Uji B', $this->tambah(['id_subrumpun_jabatan' => [$this->idSub[1]], 'tmtsk' => '2012-02-01'] + $data)['subrumpun_jabatan']);
+    }
+
+    /**
+     * @return array<string, array{0: bool, 1: mixed, 2: bool}>
+     */
+    public static function bentukSubrumpunProvider(): array
+    {
+        return [
+            'JSON array kosong'     => [true, [], true],
+            'JSON array berisi'     => [true, 'berisi', false],
+            'form kolom[] berulang' => [false, 'berisi', false],
+            "form kolom=''"         => [false, '', true],
+        ];
+    }
+
+    /**
+     * Tiga jalur payload isian mentah lewat HTTP (JSON, form `kolom[]`, form `kolom=''`). Lampiran SK wajib tidak bisa
+     * diunggah di PHPUnit (is_uploaded_file), jadi yang diuji: sub rumpun kosong → 422 `id_subrumpun_jabatan`; berisi →
+     * tidak ada galat sub rumpun (sisa galat hanya berkas). Penyimpanan diuji di testSubrumpunDisimpan… (engine).
+     */
+    #[DataProvider('bentukSubrumpunProvider')]
+    public function testEndpointTigaJalurPayloadSubrumpun(bool $json, mixed $nilai, bool $galat): void
+    {
+        [, , $admin]                  = $this->aktor(Role::SUPER_ADMIN);
+        $data                         = $this->dataStruk('2018-03-01');
+        $data['id_subrumpun_jabatan'] = $nilai === 'berisi' ? array_map('strval', $this->idSub) : $nilai;
+        $req                          = $this->asUser($admin);
+
+        if ($json) {
+            $req = $req->withBodyFormat('json');
+        }
+
+        $result = $req->post("api/v1/pegawai/{$this->nip}/riwayat/jabatan", $data);
+        $result->assertStatus(422);
+        $errors = json_decode((string) $result->getJSON(), true)['errors'] ?? [];
+        $this->assertSame($galat, array_key_exists('id_subrumpun_jabatan', $errors), (string) json_encode($errors));
+        // Validasi isian lolos → engine lanjut ke pemeriksaan berkas (SK wajib).
+        $this->assertSame(! $galat, array_key_exists('berkas.' . Jabatan::LAMPIRAN_SK, $errors));
+    }
+
     private function siapkanMasterJabatan(): void
     {
         foreach ([1 => 'Struktural', 2 => 'Jabatan Fungsional Tertentu', 3 => 'Jabatan Fungsional Umum'] as $id => $nama) {
@@ -410,6 +502,10 @@ final class JabatanTest extends DatabaseTestCase
             'id_jabatan'           => $this->sisip('jabatan', ['id_group_jabatan' => 2, 'id_sub_group_jabatan' => $subJft, 'jabatan' => 'Analis Uji', 'status' => 1]),
         ];
         $this->idRumpun = $this->buatRumpunJabatan(['rumpun_jabatan' => 'Rumpun Uji']);
+        $this->idSub    = [
+            $this->sisip('subrumpun_jabatan', ['id_rumpun_jabatan' => $this->idRumpun, 'subrumpun_jabatan' => 'Sub Uji A', 'status' => 1]),
+            $this->sisip('subrumpun_jabatan', ['id_rumpun_jabatan' => $this->idRumpun, 'subrumpun_jabatan' => 'Sub Uji B', 'status' => 1]),
+        ];
     }
 
     private function idUnitDipekerjakan(): int
@@ -437,7 +533,7 @@ final class JabatanTest extends DatabaseTestCase
     }
 
     /**
-     * @return array<string, int|string>
+     * @return array<string, int|list<int>|string> `id_subrumpun_jabatan` = daftar ID (isian mentah)
      */
     private function dataStruk(string $tmt): array
     {
@@ -453,6 +549,7 @@ final class JabatanTest extends DatabaseTestCase
             'id_satker'            => $this->struk['id_satker'],
             'id_jabatan'           => $this->struk['id_jabatan'],
             'id_rumpun_jabatan'    => $this->idRumpun,
+            'id_subrumpun_jabatan' => [$this->idSub[0]],
         ];
     }
 
@@ -478,12 +575,12 @@ final class JabatanTest extends DatabaseTestCase
     /**
      * @param list<string> $fields
      */
-    private function assertErrors(array $fields, Closure $aksi): void
+    private function assertErrors(array $fields, Closure $aksi, string $pesan = ''): void
     {
         try {
             $aksi();
         } catch (ValidationException $e) {
-            $this->assertSame($fields, array_keys($e->getErrors() ?? []), (string) json_encode($e->getErrors()));
+            $this->assertSame($fields, array_keys($e->getErrors() ?? []), $pesan . ' ' . json_encode($e->getErrors()));
 
             return;
         }

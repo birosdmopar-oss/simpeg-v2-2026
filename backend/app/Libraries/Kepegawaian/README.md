@@ -383,9 +383,12 @@ Alur Admin, role 1 memilih status saat edit (`form.php:59`), `roleKunciHapusDise
 | Snapshot | `pegawai_mutasi_jabatan`: status 1, `jenis_jabatan != 3`, `tmtsk DESC`, `updated_at DESC`, PK DESC (disetujui user 13-10-2026). Legacy afIns `>=` = baris yang ditulis belakangan menang; afUpd/afDel `LIMIT 1` tanpa pemecah seri (tidak deterministik). `notif_date` tidak dipakai karena tambah langsung admin tidak mengisinya |
 | Lampiran | 9 SK (wajib), 36 SK pembebasan sementara JFT (wajib bila jenis ≠ 2 + group JFT + status JFT 2), 41 perjanjian kerja (opsional); berkas kolom `ser_dosen`, `f_spmt`, `f_bapel` (opsional); semua 5 MB jpg/jpeg/png/gif/pdf |
 
-Menunggu hook FE WS-1 MAKE-018 (keputusan reviewer Q4/Q5): sub rumpun multi-pilih wajib (`subrumpun_jabatan` teks `***`)
-— sementara hanya-baca, nilai impor dipertahankan; saring jabatan per satker untuk sub group need_satker — sementara satu
-filter (sub group).
+Sub rumpun (MAKE-013 di atas hook MAKE-018 FE + MAKE-019 `isianMentah`): isian mentah `id_subrumpun_jabatan` (daftar ID;
+JSON array, multipart `id_subrumpun_jabatan[]`, atau `''` = kosong) → kolom `subrumpun_jabatan` berisi nama dipisah `***`
+(legacy set_param). Wajib minimal satu untuk jenis 1/3 (legacy validate_param :1986), opsional untuk Instansi Lain;
+[V2] ID angka, ada, aktif, milik `id_rumpun_jabatan`, tidak kembar, gabungan ≤ 65535 byte (diperiksa di validate()). Tidak
+dikirim saat ubah = nilai lama dipertahankan, kecuali rumpun berubah (422). FE: multiselect `loadFrom` mencocokkan nama
+saat Edit; teks `jabatan` tampil & wajib bila Instansi Lain ATAU (jenis 1/3 DAN satker 39) — syarat `any`/`all` MAKE-018.
 
 **Plt/Plh** (`Struktur/PenugasanService.php`, tabel `pegawai_plt`/`pegawai_plh`, model `PegawaiPltModel`/
 `PegawaiPlhModel`) ikut legacy (keputusan user 13-10-2026): CRUD tanpa approval, tulis role 1 (userAuth ['1']), lihat
@@ -408,7 +411,9 @@ Test: `tests/Kepegawaian/Riwayat/JabatanTest.php` (`use RiwayatBtcTrait` + `pasa
 halaman pertama, kaki setiap halaman, orientasi, ukuran), `TcpdfRenderer` (TCPDF ^6.6, LGPL-3.0-or-later, via Composer;
 font inti helvetica; cache `WRITEPATH/cache/tcpdf/`), `Pdf::renderer()` / `Pdf::pakai()` (ganti renderer, mis. dompdf
 cadangan atau test) / `Pdf::respon()` / `Pdf::qrImg()` (QR PNG tersemat lewat `TCPDF2DBarcode`). Services.php tidak ditambah
-entri (aturan kepemilikan Fase 3). Template di `app/Views/pdf/` dan wajib `esc()`.
+entri (aturan kepemilikan Fase 3). Template di `app/Views/pdf/` dan wajib `esc()`. **Deploy:** TCPDF butuh ekstensi
+PHP `gd` (QR/gambar PNG) dan `curl` — dideklarasikan `ext-gd` / `ext-curl` di `composer.json` (composer install gagal bila
+belum aktif).
 
 Pemakaian oleh WS-1 (contoh: tanda terima Karpeg/Karis, sudah dibuat di `Usulan/TandaTerimaUsulan.php`):
 
@@ -419,25 +424,48 @@ return Pdf::respon($this->response, $isi, 'nama.pdf');          // controller
 ```
 
 **Konket B-13** (`Konket/KonketService.php`, tabel `absen_ijin` W/V/X/10, `KonketAturan` murni): service tipis di luar
-engine. Hak: lihat Matriks v2 1/2/3/6/7 ([V2] role 4/5 tidak dibuka meski legacy list_ad/detail membukanya); tulis/proses
+engine. Hak (keputusan user 13-10-2026): lihat 1/2/3/6/7 + [K] role 4/5 LIHAT saja (legacy list_ad ['1','3','4'] +
+detail 1–7: antrean semua pegawai + detail, tanpa Tambah/ubah/hapus/proses; Matriks v2 hanya 1/2/3/6/7); tulis/proses
 legacy (pegawai: diri sendiri, ubah selama W, hapus tanpa syarat status; role 1 semua; role 3 PegawaiScope; proses 1/3
-jalur proses). Aturan legacy validate_param: tanggal ≤ hari ini, mulai ≥ tanggal minimal (konket_min_date, termasuk
+jalur proses). Peserta dinas gabungan yang diisi role 3 wajib dalam lingkupnya (422 `peserta`; legacy form_ad hanya
+menawarkan pegawai satker/unit); pegawai 2/6/7 boleh memilih pegawai aktif mana pun. Aturan legacy validate_param: tanggal ≤ hari ini, mulai ≥ tanggal minimal (konket_min_date, termasuk
 pengecualian bulan), akhir ≥ mulai, jenis & alasan & berkas wajib, tidak beririsan dengan W/V, konket sakit (kategori 10)
 selain PTT maksimal 1 hari kerja dan tidak berturut-turut (efek legacy: hanya hari kerja sebelumnya), Dinas Luar
 (kategori 8) gabungan dengan baris peserta (`id_parent`) yang ikut diubah/diproses/dihapus. [V2]: jenis dibatasi per role
-di server, hapus status 10, alasan wajib saat tolak, baris peserta tidak diubah/diproses sendiri, tanpa pengecualian akun
+di server, hapus status 10 (setara trigger arsip legacy; keputusan user), alasan wajib saat tolak, baris peserta tidak diubah/diproses sendiri, tanpa pengecualian akun
 pengembang.
 
 **LKH B-12b** (`Lkh/LkhService.php`, tabel `riwayat_lckh` 0/1/2/3/10, `LkhAturan` murni, `AtasanLangsung` = port getAL):
 approver = atasan langsung (`nip_atasan`, diisi server dari snapshot jabatan: subkoordinator → Es.IV → koordinator → Es.III
 → Es.II → Es.I, pemegang aktif atau Plt; Es.I → Menteri tanpa NIP sehingga tidak bisa diajukan). Rentang tanggal = 4 hari
 kerja terakhir (hari libur & akhir pekan dilewati), mulai tanggal 5 tidak sebelum tanggal 1; unik per tanggal; kegiatan
-JSON sejajar; kunci tukin ubah/hapus legacy; Revisi (3) → pegawai ubah → Menunggu. [V2]: verifikasi tidak dibatasi role 2,
-baris kegiatan setengah terisi 422, catatan wajib tolak/revisi, hapus status 10, PDF dibangkitkan saat diminta (bukan
-`file_lckh`), kop tanpa logo. Rekap LKH bawahan (legacy list_rekap) belum dibawa.
+JSON sejajar; kunci tukin ubah/hapus legacy; Revisi (3) → pegawai ubah → Menunggu; LKH Disetujui hanya dapat dihapus
+role 1 (legacy delete :464-472; role 3 → 403) dan tidak dapat diubah/dihapus pegawai; ubah menulis ulang nama/unit/satker
+terkini (legacy sp()). Keputusan user 13-10-2026: [V2] verifikator = siapa pun ber-role 1/2/3/6/7 yang NIP-nya =
+`nip_atasan` (legacy userAuth(['2']); atasan berakun 4/5/8 belum dibuka); role 1 boleh menimpa atasan dengan `nip_atasan`
+(NIP pegawai aktif, 422 bila tidak) — bawaan tetap atasan otomatis; PDF hanya untuk LKH Disetujui (selain itu 422
+`status`; legacy file_lckh dibuat saat disetujui), dibangkitkan saat diminta, QR kode legacy (waktu WIB), kop tanpa logo;
+[V2] baris kegiatan setengah terisi 422, catatan wajib tolak/revisi, hapus status 10. Rekap LKH bawahan (legacy
+list_rekap) belum dibawa.
+
+**Struktur organisasi per bulan & PDF:** `bulan` YYYY-MM mulai **2025-01** (keputusan user 13-10-2026; legacy sejak
+2022-01, tetapi bulan sebelum 2025 memakai templat so_062023/so_before_062023 yang belum di-port — TODO
+`StrukturService::BULAN_AWAL`); di luar rentang 422 `bulan`. Ekspor PDF = tabel hierarki jabatan–pejabat [V2] (ADR-033
+menolak wkhtmltopdf yang dipakai legacy untuk bagan).
 
 **Tanda terima usulan** (`Usulan/TandaTerimaUsulan.php`): PDF untuk usulan Karpeg/Karis Disetujui, port tt_pdf legacy
-(no tiket & kode permohonan legacy, QR), dibangkitkan saat diminta.
+(no tiket & kode permohonan legacy, QR dengan waktu dibuat WIB), dibangkitkan saat diminta.
+
+**Daftar periksa cutover (L6 review MAKE-013):**
+
+- Berkas legacy yang direferensikan path arsip lama — `absen_ijin.file_bukti`, `pegawai_plt.lampiran`,
+  `riwayat_lckh.file_lckh`, `file_tanda_terima` usulan — mengembalikan 404 sampai berkasnya dimigrasikan ke penyimpanan v2
+  (sertakan di skrip impor berkas atau terima sebagai arsip hanya-baca di legacy).
+- PDF LKH dan tanda terima v2 dibangkitkan saat diminta (tidak memakai berkas legacy): kode/QR sama dengan legacy, tetapi
+  tata letak berbeda — informasikan ke pengguna; tidak perlu menyalin `file_lckh`/tanda terima lama untuk baris baru.
+- Struktur organisasi sebelum 2025-01 belum tersedia (templat legacy lama belum di-port) — gunakan legacy/arsip bila
+  diperlukan sampai MAKE susulan.
+- Server produksi: aktifkan ekstensi PHP `gd` dan `curl` (TCPDF); folder `WRITEPATH/cache/tcpdf/` dapat ditulis.
 
 **Struktur organisasi per bulan** (MAKE-013): `bulan` sejak 2022-01, pejabat pada tanggal acuan; Plt/Plh & golongan
 dimuat sekaligus (tanpa N+1); ekspor PDF tabel hierarki. [V2] bulan sebelum Jan 2025 tetap memakai templat so_012025 +

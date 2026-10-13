@@ -2,12 +2,15 @@
 /**
  * Form LKH (B-12b, MAKE-013) — salinan isian legacy `views/hr/employee/rwy/lkh/form.php`: tanggal laporan dalam
  * [tanggal minimal, hari ini] dan baris kegiatan berulang (kegiatan, output, jumlah diselesaikan, jam mulai, jam
- * selesai). Atasan langsung ditentukan server (ditampilkan hanya-baca). Galat 422 per kolom/baris (`kegiatan.<i>`).
+ * selesai). Atasan langsung ditentukan server (ditampilkan hanya-baca); Super Admin boleh menimpanya dengan NIP pegawai
+ * aktif (`nip_atasan`, keputusan user 13-10-2026). Galat 422 per kolom/baris (`kegiatan.<i>`).
  */
 import { Plus, Trash2, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
+import { Role } from '@/features/auth/types'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isApiError } from '@/lib/axios'
 import { UiButton, UiNotice, UiTextField } from '@/shared/ui'
 
@@ -18,9 +21,16 @@ import type { LkhItem, LkhKegiatan, LkhOpsi } from '../types'
 const props = defineProps<{ open: boolean; opsi: LkhOpsi | null; row: LkhItem | null }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: LkhItem] }>()
 
-const kosong = (): LkhKegiatan => ({ kegiatan: '', output: '', jumlah_diselesaikan: '', jam_mulai: '', jam_selesai: '' })
+/** Baris kegiatan + kunci lokal untuk `:key` (tidak dikirim ke server). */
+type BarisKegiatan = LkhKegiatan & { _kunci: number }
 
-const isian = reactive<{ tgl_laporan: string; kegiatan: LkhKegiatan[] }>({ tgl_laporan: '', kegiatan: [kosong()] })
+let kunci = 0
+const kosong = (): BarisKegiatan => ({ _kunci: ++kunci, kegiatan: '', output: '', jumlah_diselesaikan: '', jam_mulai: '', jam_selesai: '' })
+
+const auth = useAuthStore()
+const bolehTimpaAtasan = computed(() => auth.role === Role.SUPER_ADMIN)
+
+const isian = reactive<{ tgl_laporan: string; nip_atasan: string; kegiatan: BarisKegiatan[] }>({ tgl_laporan: '', nip_atasan: '', kegiatan: [kosong()] })
 const errors = ref<Record<string, string>>({})
 const umum = ref('')
 const busy = ref(false)
@@ -32,11 +42,12 @@ watch(
     errors.value = {}
     umum.value = ''
     isian.tgl_laporan = props.row?.tgl_laporan ?? props.opsi?.tanggal_maksimal ?? ''
+    isian.nip_atasan = ''
     isian.kegiatan = [kosong()]
     if (props.row) {
       try {
         const detail = await lkhService.detail(props.row.id)
-        isian.kegiatan = detail.kegiatan?.length ? detail.kegiatan.map((k) => ({ ...k })) : [kosong()]
+        isian.kegiatan = detail.kegiatan?.length ? detail.kegiatan.map((k) => ({ ...k, _kunci: ++kunci })) : [kosong()]
       } catch (e) {
         umum.value = describeApiError(e).message
       }
@@ -56,7 +67,11 @@ async function simpan(): Promise<void> {
   errors.value = {}
   umum.value = ''
   try {
-    const data = { tgl_laporan: isian.tgl_laporan, kegiatan: isian.kegiatan }
+    const data = {
+      tgl_laporan: isian.tgl_laporan,
+      kegiatan: isian.kegiatan.map((k) => ({ kegiatan: k.kegiatan, output: k.output, jumlah_diselesaikan: k.jumlah_diselesaikan, jam_mulai: k.jam_mulai, jam_selesai: k.jam_selesai })),
+      ...(bolehTimpaAtasan.value && isian.nip_atasan.trim() ? { nip_atasan: isian.nip_atasan.trim() } : {}),
+    }
     const row = props.row ? await lkhService.update(props.row.id, data) : await lkhService.create(data)
     emit('saved', row)
     emit('update:open', false)
@@ -64,7 +79,7 @@ async function simpan(): Promise<void> {
     if (isApiError(e) && e.status === 422 && e.errors) {
       errors.value = Object.fromEntries(Object.entries(e.errors).map(([k, v]) => [k, v?.[0] ?? '']))
       umum.value = Object.entries(errors.value)
-        .filter(([k]) => k !== 'tgl_laporan' && !k.startsWith('kegiatan.'))
+        .filter(([k]) => k !== 'tgl_laporan' && k !== 'nip_atasan' && !k.startsWith('kegiatan.'))
         .map(([, v]) => v)
         .join(' ')
     } else {
@@ -124,12 +139,22 @@ const KOLOM: { key: keyof LkhKegiatan; label: string; type?: string }[] = [
             :help-text="errors.tgl_laporan"
             data-testid="lkh-tanggal"
           />
+          <UiTextField
+            v-if="bolehTimpaAtasan"
+            v-model="isian.nip_atasan"
+            class="max-w-md"
+            label="NIP Atasan (opsional)"
+            inputmode="numeric"
+            :state="errors.nip_atasan ? 'error' : 'default'"
+            :help-text="errors.nip_atasan || 'Kosongkan untuk memakai atasan langsung otomatis. Harus NIP pegawai aktif.'"
+            data-testid="lkh-nip-atasan"
+          />
 
           <fieldset class="space-y-3">
             <legend class="mb-2 text-body2 font-semibold text-slate-800">Kegiatan *</legend>
             <div
               v-for="(baris, i) in isian.kegiatan"
-              :key="i"
+              :key="baris._kunci"
               class="grid gap-2 rounded-xl border border-slate-200 p-3 md:grid-cols-[2fr_2fr_1fr_1fr_1fr_auto]"
               :data-testid="`lkh-baris-${i}`"
             >

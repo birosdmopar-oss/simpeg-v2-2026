@@ -2,11 +2,12 @@
 // backend `Riwayat/Definisi/Jabatan.php` (MAKE-012; legacy `L_jabatan.php` validate_param()/set_param()). Nama master
 // (unit, satker, jabatan, atasan, rumpun) disalin server; aturan wajib bersyarat yang mengikat tetap 422 backend.
 // Atasan Es I–IV diturunkan server dari struktur_jabatan (tidak diisi di form). Jabatan disaring sub group + satker
-// (need_satker, MAKE-018). Sub rumpun hanya-baca sampai hook engine isian mentah (multiselect backend) tersedia.
+// (need_satker, MAKE-018). Sub rumpun = multiselect isian mentah `id_subrumpun_jabatan` (MAKE-019) → server menyimpan
+// nama dipisah `***` di `subrumpun_jabatan`; Edit memuat ulang pilihan dari teks itu (loadFrom).
 import { Role } from '@/features/auth/types'
 
-import { A, D, N, R, S, T, defineRiwayatJenis } from '../riwayat.config'
-import type { FieldCondition } from '../riwayat.config'
+import { A, D, M, N, R, S, T, defineRiwayatJenis } from '../riwayat.config'
+import type { FieldCondition, SyaratTampil } from '../riwayat.config'
 
 const EKSTENSI = ['jpg', 'jpeg', 'png', 'gif', 'pdf']
 
@@ -19,6 +20,8 @@ const JENIS_JABATAN = [
 const NOMENKLATUR_PLT: FieldCondition = { field: 'jenis_jabatan', in: ['1', '3'] }
 const INSTANSI_LAIN: FieldCondition = { field: 'jenis_jabatan', in: ['2'] }
 const JFT: FieldCondition = { field: 'id_group_jabatan', in: ['2'] }
+// Teks jabatan: Instansi Lain, ATAU Nomenklatur/Plt di satker 39 "dipekerjakan keluar instansi" (legacy :1985-1990).
+const JABATAN_TEKS: SyaratTampil = { any: [INSTANSI_LAIN, { all: [NOMENKLATUR_PLT, { field: 'id_satker', in: ['39'] }] }] }
 
 export default defineRiwayatJenis({
   jenis: 'jabatan',
@@ -74,6 +77,14 @@ export default defineRiwayatJenis({
       ],
     }),
     R('id_rumpun_jabatan', 'Rumpun Jabatan', 'rumpun-jabatan', { required: true, showWhen: NOMENKLATUR_PLT }),
+    M('id_subrumpun_jabatan', 'Sub Rumpun Jabatan', 'subrumpun-jabatan', {
+      required: true,
+      wide: true,
+      dependsOn: 'id_rumpun_jabatan',
+      showWhen: NOMENKLATUR_PLT,
+      hint: 'Boleh lebih dari satu.',
+      loadFrom: { kolom: 'subrumpun_jabatan', pemisah: '***', cocokkan: 'label' },
+    }),
     T('jabatan_lain', 'Jabatan Lain', { max: 255, showWhen: NOMENKLATUR_PLT, hint: 'Contoh: Pembantu Rektor.' }),
     T('no_induk_jft', 'No. Induk JFT', { required: true, max: 50, showWhen: JFT }),
     S('status_jft', 'Status JFT', [
@@ -89,13 +100,8 @@ export default defineRiwayatJenis({
     T('nama_instansi', 'Kementerian / Lembaga', { required: true, max: 255, wide: true, showWhen: INSTANSI_LAIN }),
     T('unit', 'Unit Kerja', { required: true, max: 255, showWhen: INSTANSI_LAIN }),
     T('satker', 'Satuan Kerja', { required: true, max: 255, showWhen: INSTANSI_LAIN }),
-    // Teks jabatan dipakai Instansi Lain (jenis 2) DAN satker 39; showWhen satu syarat tidak bisa memuat keduanya, jadi
-    // isian selalu tampil dan wajibnya ditegakkan server (diabaikan untuk jabatan nomenklatur biasa).
-    T('jabatan', 'Nama Jabatan', {
-      max: 255,
-      wide: true,
-      hint: 'Wajib untuk Instansi Lain atau satuan kerja "dipekerjakan keluar instansi"; selain itu diisi otomatis dari master.',
-    }),
+    // Instansi Lain atau satker 39 (syarat jamak any/all MAKE-018); selain itu nama jabatan disalin server dari master.
+    T('jabatan', 'Nama Jabatan', { max: 255, wide: true, showWhen: JABATAN_TEKS, requiredWhen: JABATAN_TEKS }),
     A('keterangan', 'Keterangan', { max: 65535 }),
   ],
   // Jabatan::lampiran(): SK wajib; SK pembebasan sementara JFT wajib bila group JFT + status 2; perjanjian kerja opsional.
