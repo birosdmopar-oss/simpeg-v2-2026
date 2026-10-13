@@ -1,8 +1,8 @@
 // Tab riwayat `jabatan` — tabel `riwayat_mutasi_jabatan`, B-07 (pemilik WS-2). Isian dan lampiran disalin dari Definisi
 // backend `Riwayat/Definisi/Jabatan.php` (MAKE-012; legacy `L_jabatan.php` validate_param()/set_param()). Nama master
 // (unit, satker, jabatan, atasan, rumpun) disalin server; aturan wajib bersyarat yang mengikat tetap 422 backend.
-// Atasan Es I–IV diturunkan server dari struktur_jabatan (tidak diisi di form). Sub rumpun hanya-baca dan jabatan disaring
-// satu filter (sub group) sampai hook FE WS-1 MAKE-018 (multi-select, filter jamak) masuk.
+// Atasan Es I–IV diturunkan server dari struktur_jabatan (tidak diisi di form). Jabatan disaring sub group + satker
+// (need_satker, MAKE-018). Sub rumpun hanya-baca sampai hook engine isian mentah (multiselect backend) tersedia.
 import { Role } from '@/features/auth/types'
 
 import { A, D, N, R, S, T, defineRiwayatJenis } from '../riwayat.config'
@@ -67,7 +67,11 @@ export default defineRiwayatJenis({
       wide: true,
       hint: 'Wajib, kecuali satuan kerja "dipekerjakan keluar instansi" (isi Nama Jabatan).',
       showWhen: NOMENKLATUR_PLT,
-      optionsFilter: { param: 'id_sub_group_jabatan', field: 'id_sub_group_jabatan' },
+      // MAKE-018: saring sub group, dan satker bila sub group need_satker = '1' (legacy list_all_atasan, Local.php:779).
+      optionsFilter: [
+        { param: 'id_sub_group_jabatan', field: 'id_sub_group_jabatan' },
+        { param: 'id_satker', field: 'id_satker', when: { field: 'id_sub_group_jabatan', opsi: 'need_satker', in: ['1'] } },
+      ],
     }),
     R('id_rumpun_jabatan', 'Rumpun Jabatan', 'rumpun-jabatan', { required: true, showWhen: NOMENKLATUR_PLT }),
     T('jabatan_lain', 'Jabatan Lain', { max: 255, showWhen: NOMENKLATUR_PLT, hint: 'Contoh: Pembantu Rektor.' }),

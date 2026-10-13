@@ -34,7 +34,11 @@ export function penugasanFields(jenis: JenisPenugasan): FieldDef[] {
       required: true,
       wide: true,
       showWhen: NORMAL,
-      optionsFilter: { param: 'id_sub_group_jabatan', field: 'id_sub_group_jabatan' },
+      // MAKE-018: saring sub group, dan satker jabatan bila sub group need_satker = '1'.
+      optionsFilter: [
+        { param: 'id_sub_group_jabatan', field: 'id_sub_group_jabatan' },
+        { param: 'id_satker', field: 'id_satker', when: { field: 'id_sub_group_jabatan', opsi: 'need_satker', in: ['1'] } },
+      ],
     }),
     S('jenis_jabatan_koord', 'Jenis Koordinasi', [
       { value: '1', label: 'Koordinator' },
