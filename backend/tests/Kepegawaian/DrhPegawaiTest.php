@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Kepegawaian;
 
 use App\Constants\Role;
+use App\Interfaces\PdfRendererInterface;
 use App\Libraries\Kepegawaian\Pegawai\DrhPegawai;
+use App\Libraries\Pdf\DokumenPdf;
+use App\Libraries\Pdf\Pdf;
 use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
@@ -55,26 +58,25 @@ final class DrhPegawaiTest extends DatabaseTestCase
         $this->db->table('riwayat_seminar')->insert(['nip' => $nip, 'nama_seminar' => 'Seminar <b>Arsip</b>', 'jenis_seminar' => 1, 'status' => 1, 'tgl_sertifikat' => '2020-05-02']);
         $this->db->table('riwayat_seminar')->insert(['nip' => $nip, 'nama_seminar' => 'Seminar Ditolak', 'jenis_seminar' => 1, 'status' => 2]);
 
-        $html = '';
-        \App\Libraries\Pdf\Pdf::pakai(new class ($html) implements \App\Interfaces\PdfRendererInterface {
-            public function __construct(private string &$html)
-            {
-            }
+        $renderer = new class () implements PdfRendererInterface {
+            public string $html = '';
 
-            public function render(\App\Libraries\Pdf\DokumenPdf $dokumen): string
+            public function render(DokumenPdf $dokumen): string
             {
                 $this->html = $dokumen->kopHtml . $dokumen->html;
 
                 return '%PDF-uji';
             }
-        });
+        };
+        Pdf::pakai($renderer);
 
         try {
             $hasil = (new DrhPegawai())->pdf($auth, $nip);
         } finally {
-            \App\Libraries\Pdf\Pdf::reset();
+            Pdf::reset();
         }
 
+        $html = $renderer->html;
         $this->assertSame('%PDF-uji', $hasil['isi']);
         $this->assertStringContainsString('Budi DRH, S.Kom.', $html);
         $this->assertStringContainsString('Kota Uji', $html);
