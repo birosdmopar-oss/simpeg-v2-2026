@@ -2,7 +2,8 @@
  * Hook FE aditif mesin riwayat untuk WS-2 B-07 Jabatan (MAKE-018), diuji lewat RiwayatFieldForm dengan FieldDef uji:
  * (a) `multiselect` berinduk (`dependsOn`), wajib minimal satu, nilai lewat argumen ketiga `submit`, muat ulang saat
  * Edit dari teks kolom (`loadFrom`, nama dipisah `***`) dengan catatan untuk nama yang tidak cocok; (b) `optionsFilter`
- * jamak dengan syarat `when` atas atribut opsi terpilih (`extra.need_satker`); (c) `optionsSource` path API kustom.
+ * jamak dengan syarat `when` atas atribut opsi terpilih (`extra.need_satker`); (c) `optionsSource` path API kustom;
+ * susulan review: `showWhen`/`requiredWhen` jamak `any`/`all` dan aksesibilitas multiselect.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +18,9 @@ import type { MasterOption } from '@/features/master-data/types'
 import { api } from '@/lib/axios'
 
 import RiwayatFieldForm from '../riwayat/RiwayatFieldForm.vue'
-import { M, R, type FieldDef } from '../riwayat/riwayat.config'
+import UsulanFormDialog from '../riwayat/UsulanFormDialog.vue'
+import type { UsulanConfig } from '../riwayat/usulan.config'
+import { M, R, S, T, type FieldDef } from '../riwayat/riwayat.config'
 
 const options = vi.mocked(masterService.options)
 const apiGet = vi.mocked(api.get)
@@ -212,5 +215,130 @@ describe('MAKE-018 (c) optionsSource path API kustom', () => {
     expect(apiGet).toHaveBeenLastCalledWith('/pegawai/atasan?id_satker=10')
     expect(select('nip_atasan')?.value).toBe('')
     expect(opsiSelect('nip_atasan')).toEqual(['B'])
+  })
+})
+
+const isian = (name: string) => q<HTMLInputElement>(`[data-field="${name}"] input, input[data-field="${name}"]`)
+
+async function ketik(name: string, value: string): Promise<void> {
+  const el = isian(name)
+  if (!el) throw new Error(`isian ${name} tidak ada`)
+  el.value = value
+  el.dispatchEvent(new Event('input'))
+  await flushPromises()
+}
+
+describe('MAKE-018 susulan: showWhen/requiredWhen jamak (any/all)', () => {
+  const JENIS = [
+    { value: '1', label: 'Struktural' },
+    { value: '2', label: 'Fungsional' },
+    { value: '3', label: 'Pelaksana' },
+  ]
+  // Kasus B-07: teks jabatan tampil bila (jenis 2) ATAU (jenis 1/3 DAN satker 39).
+  const fields: FieldDef[] = [
+    S('jenis_jabatan', 'Jenis Jabatan', JENIS),
+    R('id_satker', 'Satuan Kerja', 'satker'),
+    T('jabatan', 'Nama Jabatan', {
+      required: true,
+      showWhen: { any: [{ field: 'jenis_jabatan', in: ['2'] }, { all: [{ field: 'jenis_jabatan', in: ['1', '3'] }, { field: 'id_satker', in: ['39'] }] }] },
+    }),
+    T('keterangan', 'Keterangan', { requiredWhen: { all: [{ field: 'jenis_jabatan', in: ['1'] }, { field: 'id_satker', in: ['39'] }] } }),
+  ]
+
+  beforeEach(() => {
+    options.mockResolvedValue([opsi('39', 'Satker Khusus'), opsi('10', 'Satker Lain')])
+  })
+
+  it('tampil menurut any/all; wajib hanya saat tampil; requiredWhen mewajibkan isian yang selalu tampil', async () => {
+    const wrapper = await mountForm(fields)
+    expect(isian('jabatan')).toBeNull()
+
+    await pilih('jenis_jabatan', '2')
+    expect(isian('jabatan')).not.toBeNull()
+
+    await pilih('jenis_jabatan', '1')
+    await pilih('id_satker', '10')
+    expect(isian('jabatan')).toBeNull()
+    await pilih('id_satker', '39')
+    expect(isian('jabatan')).not.toBeNull()
+    await pilih('jenis_jabatan', '3')
+    expect(isian('jabatan')).not.toBeNull()
+
+    // jenis 3 + satker 39: jabatan tampil & wajib; keterangan tidak wajib.
+    await kirim()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Nama Jabatan wajib diisi'))
+    expect(document.body.textContent).not.toContain('Keterangan wajib diisi')
+    expect(isian('keterangan')?.getAttribute('aria-required')).toBeNull()
+
+    // jenis 1 + satker 39: keterangan menjadi wajib.
+    await pilih('jenis_jabatan', '1')
+    expect(isian('keterangan')?.getAttribute('aria-required')).toBe('true')
+    await ketik('jabatan', 'Kepala Khusus')
+    await kirim()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Keterangan wajib diisi'))
+    expect(wrapper.emitted('submit')).toBeUndefined()
+
+    await ketik('keterangan', 'Catatan')
+    await kirim()
+    await vi.waitFor(() => expect(wrapper.emitted('submit')).toHaveLength(1))
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ jenis_jabatan: '1', id_satker: '39', jabatan: 'Kepala Khusus', keterangan: 'Catatan' })
+  })
+})
+
+describe('MAKE-018 susulan: aksesibilitas multiselect', () => {
+  it('fieldset tanpa aria-invalid; checkbox invalid + aria-describedby ke pesan galat/petunjuk; tanda * aria-hidden', async () => {
+    options.mockImplementation(async (entity: string) => (entity === 'rumpun-jabatan' ? [opsi('1', 'Rumpun A')] : [opsi('11', 'Sub A', '1')]))
+    await mountForm([
+      R('id_rumpun_jabatan', 'Rumpun Jabatan', 'rumpun-jabatan'),
+      M('id_subrumpun_jabatan', 'Subrumpun Jabatan', 'subrumpun-jabatan', { required: true, dependsOn: 'id_rumpun_jabatan', hint: 'Boleh lebih dari satu.' }),
+    ])
+    await pilih('id_rumpun_jabatan', '1')
+    const fieldset = q('[data-field="id_subrumpun_jabatan"]')
+    expect(fieldset?.hasAttribute('aria-invalid')).toBe(false)
+    expect(fieldset?.querySelector('legend span')?.getAttribute('aria-hidden')).toBe('true')
+    expect(kotak('id_subrumpun_jabatan', '11')?.getAttribute('aria-describedby')).toBe('riwayat-id_subrumpun_jabatan-hint')
+    expect(q('#riwayat-id_subrumpun_jabatan-hint')?.textContent).toContain('Boleh lebih dari satu.')
+
+    await kirim()
+    await vi.waitFor(() => expect(kotak('id_subrumpun_jabatan', '11')?.getAttribute('aria-describedby')).toBe('riwayat-id_subrumpun_jabatan-galat'))
+    expect(kotak('id_subrumpun_jabatan', '11')?.getAttribute('aria-invalid')).toBe('true')
+    expect(q('#riwayat-id_subrumpun_jabatan-galat')?.textContent).toContain('wajib dipilih minimal satu')
+    expect(fieldset?.getAttribute('aria-describedby')).toBe('riwayat-id_subrumpun_jabatan-galat')
+  })
+})
+
+describe('MAKE-018 susulan: requiredWhen di UsulanFormDialog', () => {
+  it('isian wajib bersyarat ditolak kosong hanya saat syaratnya terpenuhi', async () => {
+    const config: UsulanConfig = {
+      jenis: 'karpeg',
+      title: 'Uji',
+      singular: 'usulan uji',
+      titleMenurutJenisKelamin: null,
+      fields: [
+        S('jenis_permohonan', 'Jenis Permohonan', [
+          { value: 'A', label: 'A' },
+          { value: 'B', label: 'B' },
+        ], { required: true }),
+        S('alasan', 'Alasan', [{ value: 'x', label: 'X' }], { requiredWhen: { field: 'jenis_permohonan', in: ['B'] } }),
+      ],
+      berkas: [],
+      batas_mb: 5,
+      ekstensi: ['pdf'],
+    }
+    const wrapper = mount(UsulanFormDialog, { props: { open: true, config, row: null }, attachTo: document.body })
+    await flushPromises()
+    const kirimUsulan = async () => {
+      q('[data-testid="usulan-form"]')?.dispatchEvent(new Event('submit'))
+      await flushPromises()
+    }
+
+    await pilih('jenis_permohonan', 'A')
+    await kirimUsulan()
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+
+    await pilih('jenis_permohonan', 'B')
+    await kirimUsulan()
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+    expect(document.body.textContent).toContain('Alasan wajib diisi')
   })
 })
