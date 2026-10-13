@@ -57,6 +57,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     foreach (['karpeg', 'kariskarsu'] as $usulan) {
         $routes->get("usulan/{$usulan}", "UsulanController::antrean/{$usulan}");
         $routes->get("usulan/{$usulan}/saya", "UsulanController::saya/{$usulan}");
+        // Aditif WS-2 MAKE-013 (ADR-033): PDF tanda terima usulan Disetujui.
+        $routes->get("usulan/{$usulan}/(:num)/tanda-terima", "UsulanController::tandaTerima/{$usulan}/\$1");
     }
 
     // WS-1: endpoint riwayat tambahan (mis. usulan Karpeg/Karis M4) ditambahkan di sini.

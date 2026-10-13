@@ -7,7 +7,7 @@
 import { DOMWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../riwayat/usulan.service', () => ({ usulanService: { saya: vi.fn(), antrean: vi.fn() } }))
+vi.mock('../riwayat/usulan.service', () => ({ usulanService: { saya: vi.fn(), antrean: vi.fn(), tandaTerima: vi.fn() } }))
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return { ...actual, riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn() } }
@@ -84,10 +84,25 @@ describe('Usulan Karpeg/Karis — pengusul (role 2)', () => {
     expect(usulan.saya).toHaveBeenCalledWith('karpeg')
     expect(usulan.antrean).not.toHaveBeenCalled()
     const disetujui = await rowMenuActions(body(), 'usulan-actions-1')
-    expect(disetujui.map((i) => [i.key, i.disabled])).toEqual([['edit', true], ['berkas', false], ['hapus', true]])
+    expect(disetujui.map((i) => [i.key, i.disabled])).toEqual([['edit', true], ['berkas', false], ['tanda-terima', false], ['hapus', true]])
     const menunggu = await rowMenuActions(body(), 'usulan-actions-2')
     expect(menunggu.map((i) => i.disabled)).toEqual([false, false, false])
     expect(q('[data-testid="usulan-actions-2"]')?.getAttribute('aria-label')).toContain('Aksi untuk Kartu Pegawai')
+  })
+
+  it('aditif WS-2 MAKE-013: ⋮ "Unduh tanda terima" (hanya Disetujui) → PDF usulan/{jenis}/{id}/tanda-terima', async () => {
+    usulan.tandaTerima.mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }))
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:tt'), revokeObjectURL: vi.fn() })
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    await mountPage(Role.PEGAWAI)
+
+    expect((await rowMenuActions(body(), 'usulan-actions-2')).map((i) => i.key)).not.toContain('tanda-terima')
+    await selectRowAction(body(), 'usulan-actions-1', 'tanda-terima')
+    await flushPromises()
+
+    expect(usulan.tandaTerima).toHaveBeenCalledWith('karpeg', '1')
+    expect(klik).toHaveBeenCalled()
+    klik.mockRestore()
   })
 
   it('ajukan: berkas wajib dicek; kirim create(nip, karpeg, fields, values, { file_1..5 }) dengan kunci kolom', async () => {

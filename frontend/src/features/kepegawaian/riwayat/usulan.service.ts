@@ -35,4 +35,10 @@ export const usulanService = {
     const { data } = await api.get<UsulanAntrean>(`/usulan/${jenis}`, { params: status === '' ? {} : { status } })
     return data
   },
+
+  /** Aditif WS-2 MAKE-013 (ADR-033): PDF tanda terima usulan Disetujui — `GET usulan/{jenis}/{id}/tanda-terima`. */
+  async tandaTerima(jenis: JenisEngine, id: number | string): Promise<Blob> {
+    const { data } = await api.get<Blob>(`/usulan/${jenis}/${id}/tanda-terima`, { responseType: 'blob' })
+    return data
+  },
 }
