@@ -8,7 +8,7 @@ use App\Models\BaseAuditableModel;
 
 /**
  * Tabel `pegawai_plt` (B-02 DBV-012/DBV-019) — penugasan Plt pada jabatan lowong (B-07, MAKE-012). Status 1 Aktif,
- * 2 Tidak Aktif, 10 Dihapus [V2] (legacy hapus keras).
+ * 2 Tidak Aktif; hapus = hapus PERMANEN ikut legacy (audit "before" lewat model).
  */
 class PegawaiPltModel extends BaseAuditableModel
 {

@@ -275,17 +275,21 @@ final class JabatanTest extends DatabaseTestCase
         $this->assertSame([(string) $es1, (string) $es2, null, null], [(string) $row['id_atasan_es_1'], (string) $row['id_atasan_es_2'], $row['id_atasan_es_3'], $row['id_atasan_es_4']]);
         $this->assertNotNull($row['atasan_es_2']);
 
-        // Eksplisit: harus simpul struktur periode aktif ber-level yang sesuai.
+        // Eksplisit: harus leluhur simpul jabatan terpilih pada struktur periode aktif.
         $this->assertErrors(['id_atasan_es_1'], fn () => $this->tambah(['id_atasan_es_1' => $es2] + $this->dataStruk('2019-03-01')));
-        $es2Lain = $this->buatJabatan($this->struk['id_satker'])['id_jabatan'];
-        $simpul($es2Lain, $es1, 3);
-        $row = $this->tambah(['id_atasan_es_2' => $es2Lain] + $this->dataStruk('2019-03-01'));
-        $this->assertSame((string) $es2Lain, (string) $row['id_atasan_es_2'], 'nilai dari klien menang atas turunan');
-        $this->assertSame((string) $es1, (string) $row['id_atasan_es_1']);
+        $es1Lain = $this->buatJabatan($this->struk['id_satker'])['id_jabatan'];
+        $simpul($es1Lain, null, 2);
+        $this->assertErrors(['id_atasan_es_1'], fn () => $this->tambah(['id_atasan_es_1' => $es1Lain] + $this->dataStruk('2019-03-01')));
 
-        // Ubah tanpa perubahan posisi tidak menurunkan ulang.
+        // Struktural vs koordinator saling eksklusif (legacy satu pilihan struk_/koord_).
+        $es3   = $this->buatJabatan($this->struk['id_satker'])['id_jabatan'];
+        $koord = $this->buatJabatanKoordinasi($this->struk['id_satker']);
+        $this->assertErrors(['id_atasan_es_3', 'id_atasan_es_3_koord'], fn () => $this->tambah(['id_atasan_es_3' => $es3, 'id_atasan_es_3_koord' => $koord] + $this->dataStruk('2019-03-01')));
+        // Leluhur yang sah boleh dikirim eksplisit; ubah tanpa perubahan posisi tidak menurunkan ulang.
+        $row = $this->tambah(['id_atasan_es_2' => $es2] + $this->dataStruk('2019-03-01'));
+        $this->assertSame([(string) $es1, (string) $es2], [(string) $row['id_atasan_es_1'], (string) $row['id_atasan_es_2']]);
         $ubah = $this->engine()->ubah($this->admin, $this->nip, 'jabatan', (int) $row['id_riwayat_mutasi_jabatan'], ['no_sk' => 'SK-B']);
-        $this->assertSame((string) $es2Lain, (string) $ubah['id_atasan_es_2']);
+        $this->assertSame((string) $es2, (string) $ubah['id_atasan_es_2']);
     }
 
     public function testJabatanHarusDiSubGroupDanSatkerTerpilih(): void

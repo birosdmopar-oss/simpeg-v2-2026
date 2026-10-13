@@ -126,6 +126,24 @@ describe('StrukturOrganisasiPage', () => {
     expect(dir!.children.map((n) => n.children.map((c) => c.jabatan))).toEqual([['Seksi 1'], ['Jabatan Fungsional dan Jabatan Pelaksana']])
   })
 
+  it('susunan satker BPO: Es.II → sekretariat, SPI, Es.III (→ Es.IV / JF), Es.IV tanpa induk', () => {
+    const pohon = susunBagan(dasar({
+      format: 'bpo',
+      data: {
+        es2_sek: k('Sekretariat Badan'),
+        es2: k('Badan Pelaksana Uji'),
+        es3_sek: k('Satuan Pemeriksaan Intern'),
+        es3: [k('Divisi A', '', { es4: [k('Unit A1')] }), k('Divisi B', '', { es4: [] })],
+        es4: [k('Unit Lepas')],
+      },
+    }))
+
+    expect(pohon.map((n) => n.jabatan)).toEqual(['Badan Pelaksana Uji'])
+    expect(pohon[0]!.children.map((n) => n.jabatan)).toEqual(['Sekretariat Badan', 'Satuan Pemeriksaan Intern', 'Divisi A', 'Divisi B', 'Unit Lepas'])
+    expect(pohon[0]!.children[2]!.children.map((n) => n.jabatan)).toEqual(['Unit A1'])
+    expect(pohon[0]!.children[3]!.children.map((n) => n.jf)).toEqual([true])
+  })
+
   it('tanpa periode aktif → pemberitahuan; galat API → pesan tanpa bagan', async () => {
     bagan.mockResolvedValueOnce(dasar({ periode: null, data: { staf_ahli: [], deputi: [] } }))
     const { wrapper } = await mountPage()

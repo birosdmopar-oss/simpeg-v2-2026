@@ -115,6 +115,19 @@ final class PenugasanTest extends DatabaseTestCase
         $this->assertFalse($this->svc()->daftar($role3, 'plt')['can_create']);
         $this->assertStatusApi(403, fn () => $this->svc()->tambah($role3, 'plt', $this->data(), null));
 
+        // Di luar lingkup: detail/unduh 404 (tidak membocorkan keberadaan); hapus ditolak lebih dulu oleh hak tulis (403).
+        $idLain = (int) $this->db->table('pegawai_plt')->where('id_satker', $lain['id_satker'])->get()->getRow()->id_pegawai_plt;
+        $this->assertStatusApi(404, fn () => $this->svc()->detail($role3, 'plt', $idLain));
+        $this->assertStatusApi(404, fn () => $this->svc()->unduhLampiran($role3, 'plt', $idLain));
+        $this->assertStatusApi(403, fn () => $this->svc()->hapus($role3, 'plt', $idLain));
+
+        // Role 3 tanpa satker → lingkup unit akun; tanpa satker & unit → fail-closed (kosong).
+        $role3Unit = $this->aktor(Role::ADMIN_SATKER, ['id_satker' => null, 'id_unit' => $lain['id_unit']])[1];
+        $this->assertSame([$idLain], array_column($this->svc()->daftar($role3Unit, 'plt')['items'], 'id'));
+        $role3Kosong = $this->aktor(Role::ADMIN_SATKER, ['id_satker' => null, 'id_unit' => null])[1];
+        $this->assertSame(0, $this->svc()->daftar($role3Kosong, 'plt')['meta']['total']);
+        $this->assertStatusApi(404, fn () => $this->svc()->detail($role3Kosong, 'plt', $id));
+
         foreach ([Role::ADMIN_VIEW_ESELON1, Role::MENTERI] as $role) {
             $this->assertSame(2, $this->svc()->daftar($this->aktor($role)[1], 'plt')['meta']['total']);
         }

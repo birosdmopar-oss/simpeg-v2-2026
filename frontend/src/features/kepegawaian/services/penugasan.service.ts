@@ -3,7 +3,7 @@
  *   GET    penugasan/{jenis}                daftar (search, status, page, per_page)
  *   POST   penugasan/{jenis}                tambah (multipart; berkas `lampiran` opsional)
  *   POST   penugasan/{jenis}/{id}           ubah (multipart + `_method=PUT`)
- *   DELETE penugasan/{jenis}/{id}           hapus (status 10)
+ *   DELETE penugasan/{jenis}/{id}           hapus PERMANEN (ikut legacy)
  *   GET    penugasan/{jenis}/{id}/lampiran  unduh lampiran
  */
 import { api } from '@/lib/axios'
@@ -18,6 +18,19 @@ export interface PenugasanQuery {
 }
 
 const base = (jenis: JenisPenugasan): string => `/penugasan/${jenis}`
+
+const EKSTENSI: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+}
+
+const ekstensi = (tipe: string): string => EKSTENSI[tipe.split(';')[0]?.trim() ?? ''] ?? ''
 
 function formData(values: Record<string, string>, lampiran: File | null, method?: 'PUT'): FormData {
   const fd = new FormData()
@@ -50,8 +63,11 @@ export const penugasanService = {
     await api.delete(`${base(jenis)}/${id}`)
   },
 
-  async lampiran(jenis: JenisPenugasan, id: number): Promise<Blob> {
-    const { data } = await api.get<Blob>(`${base(jenis)}/${id}/lampiran`, { responseType: 'blob' })
-    return data
+  /** Berkas + nama dari `Content-Disposition` (fallback `lampiran_<jenis>_<id>.<ekstensi dari tipe blob>`). */
+  async lampiran(jenis: JenisPenugasan, id: number): Promise<{ blob: Blob; nama: string }> {
+    const res = await api.get<Blob>(`${base(jenis)}/${id}/lampiran`, { responseType: 'blob' })
+    const header = String((res.headers as Record<string, unknown> | undefined)?.['content-disposition'] ?? '')
+    const dariHeader = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header)?.[1]
+    return { blob: res.data, nama: dariHeader ? decodeURIComponent(dariHeader) : `lampiran_${jenis}_${id}${ekstensi(res.data.type)}` }
   },
 }

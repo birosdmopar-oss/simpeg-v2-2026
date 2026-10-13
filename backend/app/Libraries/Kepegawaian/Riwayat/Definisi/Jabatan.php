@@ -197,11 +197,11 @@ final class Jabatan extends RiwayatDefinisi
     }
 
     /**
-     * DBV-012 §5.1: status 1, `jenis_jabatan != 3`, `tmtsk DESC`. Seri `>=` legacy (trigger afIns/afUpd mengganti
-     * snapshot bila tmtsk baris yang DITULIS >= tmtsk snapshot) → `updated_at DESC` sebelum pemecah seri PK: baris
-     * bertanggal sama yang terakhir ditulis/disetujui menang. `notif_date` sengaja tidak dipakai: baris yang ditambah
-     * langsung oleh admin (status 1) tidak punya notif_date sehingga akan kalah dari baris lama yang disetujui lewat
-     * proses — berlawanan dengan legacy.
+     * DBV-012 §5.1: status 1, `jenis_jabatan != 3`, `tmtsk DESC`, lalu `updated_at DESC`, lalu PK DESC (pemecah seri
+     * PemilihSnapshot) — keputusan user 13-10-2026. Legacy: trigger afIns mengganti snapshot bila tmtsk baris yang
+     * ditulis >= tmtsk snapshot (seri `>=` → baris yang ditulis belakangan menang), sedangkan afUpd/afDel memilih ulang
+     * `ORDER BY tmtsk DESC LIMIT 1` tanpa pemecah seri (tidak deterministik). `updated_at DESC` meniru "ditulis belakangan
+     * menang" secara deterministik; `notif_date` tidak dipakai karena tambah langsung admin tidak mengisinya.
      */
     public function snapshot(): array
     {
@@ -308,7 +308,7 @@ final class Jabatan extends RiwayatDefinisi
 
             $errors += $this->periksaJabatan($n);
             $errors += $this->periksaKoordinasi($data, $n);
-            $errors += $this->periksaAtasanEksplisit($data, $lama);
+            $errors += $this->periksaAtasanEksplisit($data, $lama, $n);
 
             if ($this->pegawaiPppk((string) $n[$this->kolomNip()])) {
                 $wajib('id_gol_pppk', 'Silakan pilih Golongan PPPK.');
@@ -480,7 +480,29 @@ final class Jabatan extends RiwayatDefinisi
      */
     private function rantaiAtasan(array $n): array
     {
-        $hasil     = [1 => null, 2 => null, 3 => null, 4 => null];
+        $hasil = [1 => null, 2 => null, 3 => null, 4 => null];
+
+        foreach ($this->kandidatAtasan($n) as $es => $kandidat) {
+            if (count($kandidat) === 1) {
+                $hasil[$es] = $kandidat[0];
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Kandidat atasan per eselon (1–4) untuk posisi $n (dasar rantaiAtasan() dan validasi isian eksplisit). Jabatan
+     * bersimpul struktur → satu kandidat per level = leluhurnya; tanpa simpul → semua simpul periode aktif ber-level itu di
+     * unit (Es.I) / satker (Es.II–IV), dengan batas eselon group struktural.
+     *
+     * @param array<string, mixed> $n
+     *
+     * @return array<int, list<int>>
+     */
+    private function kandidatAtasan(array $n): array
+    {
+        $hasil     = [1 => [], 2 => [], 3 => [], 4 => []];
         $idPeriode = $this->periodeAktif();
         $idJabatan = (int) ($n['id_jabatan'] ?? 0);
 
@@ -504,8 +526,8 @@ final class Jabatan extends RiwayatDefinisi
                 $simpul                = $this->simpulStruktur($idPeriode, $idAtasan);
                 $level                 = (int) ($simpul['level_struktur'] ?? 0);
 
-                if ($level >= 2 && $level <= 5) {
-                    $hasil[$level - 1] = $idAtasan;
+                if ($level >= 2 && $level <= 5 && $hasil[$level - 1] === []) {
+                    $hasil[$level - 1] = [$idAtasan];
                 }
             }
 
@@ -529,15 +551,14 @@ final class Jabatan extends RiwayatDefinisi
                 $builder->where('jab.id_satker', (int) ($n['id_satker'] ?? 0));
             }
 
-            $kandidat = array_values(array_filter(
-                $builder->get()->getResultArray(),
-                // Legacy Es.III struktural tidak memuat jabatan "Koordinator…" (Local.php list_all_atasan).
-                static fn (array $r): bool => $es !== 3 || ! str_starts_with(strtolower((string) $r['jabatan']), 'koordinator'),
-            ));
-
-            if (count($kandidat) === 1) {
-                $hasil[$es] = (int) $kandidat[0]['id_jabatan'];
-            }
+            $hasil[$es] = array_map(
+                static fn (array $r): int => (int) $r['id_jabatan'],
+                array_values(array_filter(
+                    $builder->get()->getResultArray(),
+                    // Legacy Es.III struktural tidak memuat jabatan "Koordinator…" (Local.php list_all_atasan).
+                    static fn (array $r): bool => $es !== 3 || ! str_starts_with(strtolower((string) $r['jabatan']), 'koordinator'),
+                )),
+            );
         }
 
         return $hasil;
@@ -559,30 +580,43 @@ final class Jabatan extends RiwayatDefinisi
     }
 
     /**
-     * id_atasan_es_N yang dikirim klien (dan berubah) harus simpul struktur periode aktif ber-level N+1.
+     * Isian atasan eksplisit (dikirim dan berubah):
+     *  - id_atasan_es_N harus kandidat atasan posisi itu (kandidatAtasan(): leluhur simpul jabatan terpilih, atau simpul
+     *    ber-level N+1 di unit/satker yang sama untuk jabatan tanpa simpul);
+     *  - Es.III/Es.IV struktural dan koordinator/subkoordinator (`*_koord`) saling eksklusif — legacy satu pilihan
+     *    (`struk_`/`koord_`, set_param :2216-2259).
      *
      * @param array<string, mixed>      $data
      * @param array<string, mixed>|null $lama
+     * @param array<string, mixed>      $n    nilai akhir baris
      *
      * @return array<string, list<string>>
      */
-    private function periksaAtasanEksplisit(array $data, ?array $lama): array
+    private function periksaAtasanEksplisit(array $data, ?array $lama, array $n): array
     {
-        $errors    = [];
-        $idPeriode = $this->periodeAktif();
+        $errors   = [];
+        $kandidat = null;
+        $diisi    = static fn (mixed $v): bool => $v !== null && trim((string) $v) !== '';
 
         foreach ([1, 2, 3, 4] as $es) {
             $kolom = "id_atasan_es_{$es}";
             $nilai = $data[$kolom] ?? null;
 
-            if ($nilai === null || (string) $nilai === '' || ($lama !== null && (string) $nilai === (string) ($lama[$kolom] ?? ''))) {
+            if (! $diisi($nilai) || ($lama !== null && (string) $nilai === (string) ($lama[$kolom] ?? ''))) {
                 continue;
             }
 
-            $simpul = $idPeriode === null ? null : $this->simpulStruktur($idPeriode, (int) $nilai);
+            $kandidat ??= $this->kandidatAtasan($n);
 
-            if ((int) ($simpul['level_struktur'] ?? 0) !== $es + 1) {
-                $errors[$kolom] = ["Atasan eselon {$es} tidak terdaftar pada struktur jabatan periode aktif."];
+            if (! in_array((int) $nilai, $kandidat[$es], true)) {
+                $errors[$kolom] = ["Atasan eselon {$es} bukan atasan jabatan terpilih pada struktur jabatan periode aktif."];
+            }
+        }
+
+        foreach ([3, 4] as $es) {
+            if ($diisi($n["id_atasan_es_{$es}"] ?? null) && $diisi($n["id_atasan_es_{$es}_koord"] ?? null)
+                && (array_key_exists("id_atasan_es_{$es}", $data) || array_key_exists("id_atasan_es_{$es}_koord", $data))) {
+                $errors["id_atasan_es_{$es}_koord"] = ['Pilih atasan struktural atau koordinator, bukan keduanya.'];
             }
         }
 

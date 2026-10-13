@@ -371,10 +371,10 @@ Alur Admin, role 1 memilih status saat edit (`form.php:59`), `roleKunciHapusDise
 | Jenis jabatan | 1 Nomenklatur (jenis mutasi wajib), 2 Instansi Lain (nama instansi/unit/satker/jabatan teks wajib; kolom nomenklatur dikosongkan [V2]), 3 Plt (jabatan "PLT …", tidak masuk snapshot, TMT boleh kembar) |
 | Wajib bersyarat | jenis 1/3: group, sub group, unit, satker, rumpun, jabatan (satker 39 dipekerjakan → `jabatan` teks); group JFT (2): tugas koordinasi, no induk & status JFT; group JFU (3): tugas koordinasi; koordinator/subkoordinator → `id_jabatan_koord`; pegawai PPPK (`id_jenis_pegawai` 6) → golongan PPPK |
 | [V2] Konsistensi | jabatan harus di sub group terpilih (dan satker terpilih bila jabatan terikat satker); `jabatan_koordinasi` harus ada (aktif bila diubah) |
-| [V2] Atasan (Q3 reviewer) | Es I–IV diturunkan dari `struktur_jabatan` periode aktif saat tambah / jabatan-satker-unit-sub group berubah (legacy `list_all_atasan`): jabatan bersimpul struktur → naik lewat `id_jabatan_atasan`; tanpa simpul → kandidat tunggal per level di unit (Es.I) / satker (Es.II–IV). Nilai yang diisi klien menang dan harus simpul periode aktif ber-level sesuai. Koordinator/subkoordinator tidak diturunkan |
+| [V2] Atasan (Q3 reviewer) | Es I–IV diturunkan dari `struktur_jabatan` periode aktif saat tambah / jabatan-satker-unit-sub group berubah (legacy `list_all_atasan`): jabatan bersimpul struktur → naik lewat `id_jabatan_atasan`; tanpa simpul → kandidat tunggal per level di unit (Es.I) / satker (Es.II–IV). Nilai yang diisi klien menang dan harus kandidat atasan posisi itu (leluhur simpul jabatan terpilih, atau simpul ber-level sesuai di unit/satker yang sama untuk jabatan tanpa simpul); Es.III/IV struktural dan `*_koord` saling eksklusif (legacy `struk_`/`koord_`). Koordinator/subkoordinator tidak diturunkan |
 | Salinan nama | `nama_instansi` (web_config `nama_kementerian`), group, sub group, unit, satker, atasan es I–IV & koordinasi, jabatan + `kelas_jabatan`, jabatan koordinasi, rumpun, golongan PPPK — dari master, klien tidak bisa menimpa. Non-PPPK: golongan/PMK/MHPK dikosongkan |
 | TMT unik | jenis ≠ 3, status selain 2/10, baris sendiri dikecualikan |
-| Snapshot | `pegawai_mutasi_jabatan`: status 1, `jenis_jabatan != 3`, `tmtsk DESC`, lalu `updated_at DESC` sebelum pemecah seri PK (seri `>=` legacy = baris yang ditulis/disetujui belakangan menang). `notif_date` tidak dipakai karena tambah langsung admin tidak mengisinya |
+| Snapshot | `pegawai_mutasi_jabatan`: status 1, `jenis_jabatan != 3`, `tmtsk DESC`, `updated_at DESC`, PK DESC (disetujui user 13-10-2026). Legacy afIns `>=` = baris yang ditulis belakangan menang; afUpd/afDel `LIMIT 1` tanpa pemecah seri (tidak deterministik). `notif_date` tidak dipakai karena tambah langsung admin tidak mengisinya |
 | Lampiran | 9 SK (wajib), 36 SK pembebasan sementara JFT (wajib bila jenis ≠ 2 + group JFT + status JFT 2), 41 perjanjian kerja (opsional); berkas kolom `ser_dosen`, `f_spmt`, `f_bapel` (opsional); semua 5 MB jpg/jpeg/png/gif/pdf |
 
 Menunggu hook FE WS-1 MAKE-018 (keputusan reviewer Q4/Q5): sub rumpun multi-pilih wajib (`subrumpun_jabatan` teks `***`)
@@ -384,13 +384,13 @@ filter (sub group).
 **Plt/Plh** (`Struktur/PenugasanService.php`, tabel `pegawai_plt`/`pegawai_plh`, model `PegawaiPltModel`/
 `PegawaiPlhModel`) ikut legacy (keputusan user 13-10-2026): CRUD tanpa approval, tulis role 1 (userAuth ['1']), lihat
 1/3/4/5 (role 3 lingkup satker akun, atau unit bila tanpa satker — list_off_plt), hapus PERMANEN dengan audit "before" dan
-berkas lampiran dibuang sesudah commit; lampiran kolom `lampiran` lewat KolomBerkas.
+berkas lampiran dibuang sesudah commit; lampiran kolom `lampiran` lewat KolomBerkas. Isu cutover: kolom `lampiran` impor legacy berisi path arsip remote (`arsip/off_plt/…`) yang belum ada di storage v2 → unduh 404 sampai arsip dipindahkan.
 
 **Struktur organisasi B-19** (`Struktur/StrukturService.php`, service `strukturService`) ikut templat legacy so_012025
 (keputusan user 13-10-2026): format & dataset per pilihan kementerian/unit/satker sama dengan legacy, ID hard-code legacy
 (unit 6/7/16/19, satker 37/38/41/49/50/104, jabatan 2060) jadi konstanta [K]. Pejabat pada tanggal acuan (hari ini;
 siap untuk parameter bulan): definitif ikut aturan legacy (riwayat jabatan status 1 jenis 1, TMT ≤ tanggal, status
-pegawai), lalu Plt (getPLT, tanpa saring status seperti legacy), lalu [V2] Plh. [V2] simpul hanya periode struktur aktif;
+pegawai), lalu Plt [V2] hanya status 1 Aktif (legacy getPLT tanpa saring status; keputusan user 13-10-2026), lalu [V2] Plh bila tidak ada definitif maupun Plt (disetujui user). Pilihan `disabled` (unit 6) dan nilai non-string ditolak 422. [V2] simpul hanya periode struktur aktif;
 format `pusat` (legacy 2025 tanpa view) dirender seperti UPT. Riwayat per bulan & ekspor PDF: M5/M6 (TCPDF).
 
 Test: `tests/Kepegawaian/Riwayat/JabatanTest.php` (`use RiwayatBtcTrait` + `pasangEngineNyata`),

@@ -10,7 +10,8 @@ use CodeIgniter\HTTP\ResponseInterface;
 /**
  * B-19 Struktur Organisasi (WS-2 MAKE-012).
  *
- *   GET struktur-organisasi?id_unit=&id_satker=   pohon periode aktif + pejabat (semua pengguna login)
+ *   GET struktur-organisasi?id_unit_satker=   bagan ikut templat legacy so_012025: '0' kementerian, '<id_unit>',
+ *                                            'sat_<id_satker>' (hanya opsi aktif; selain itu 422); semua pengguna login
  */
 class StrukturController extends ApiController
 {

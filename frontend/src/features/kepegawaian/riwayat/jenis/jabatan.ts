@@ -56,11 +56,16 @@ export default defineRiwayatJenis({
       { value: '2', label: 'Subkoordinator' },
       { value: '3', label: 'Tidak Ada' },
     ], { showWhen: { field: 'id_group_jabatan', in: ['2', '3'] }, hint: 'Wajib untuk jabatan fungsional.' }),
+    // F1 review MAKE-012: koordinator/subkoordinator wajib memilih jabatan koordinasi (backend validate()). Sementara
+    // berupa ID karena belum ada master options jabatan_koordinasi — TODO(kartu lanjutan F4): dropdown master.
+    N('id_jabatan_koord', 'ID Jabatan Koordinasi', { required: true, showWhen: { field: 'jenis_jabatan_koord', in: ['1', '2'] } }),
     R('id_unit', 'Unit Kerja', 'unit', { required: true, showWhen: NOMENKLATUR_PLT }),
     R('id_satker', 'Satuan Kerja', 'satker', { required: true, dependsOn: 'id_unit', showWhen: NOMENKLATUR_PLT }),
+    // F2 review: satker 39 (dipekerjakan keluar instansi) memakai teks `jabatan`, jadi id_jabatan tidak wajib di FE —
+    // server yang menegakkan (422). Syarat jamak showWhen (jenis 1/3 DAN satker ≠ 39) = usulan hook MAKE-018.
     R('id_jabatan', 'Jabatan', 'jabatan', {
-      required: true,
       wide: true,
+      hint: 'Wajib, kecuali satuan kerja "dipekerjakan keluar instansi" (isi Nama Jabatan).',
       showWhen: NOMENKLATUR_PLT,
       optionsFilter: { param: 'id_sub_group_jabatan', field: 'id_sub_group_jabatan' },
     }),
@@ -80,7 +85,13 @@ export default defineRiwayatJenis({
     T('nama_instansi', 'Kementerian / Lembaga', { required: true, max: 255, wide: true, showWhen: INSTANSI_LAIN }),
     T('unit', 'Unit Kerja', { required: true, max: 255, showWhen: INSTANSI_LAIN }),
     T('satker', 'Satuan Kerja', { required: true, max: 255, showWhen: INSTANSI_LAIN }),
-    T('jabatan', 'Nama Jabatan', { required: true, max: 255, wide: true, showWhen: INSTANSI_LAIN }),
+    // Teks jabatan dipakai Instansi Lain (jenis 2) DAN satker 39; showWhen satu syarat tidak bisa memuat keduanya, jadi
+    // isian selalu tampil dan wajibnya ditegakkan server (diabaikan untuk jabatan nomenklatur biasa).
+    T('jabatan', 'Nama Jabatan', {
+      max: 255,
+      wide: true,
+      hint: 'Wajib untuk Instansi Lain atau satuan kerja "dipekerjakan keluar instansi"; selain itu diisi otomatis dari master.',
+    }),
     A('keterangan', 'Keterangan', { max: 65535 }),
   ],
   // Jabatan::lampiran(): SK wajib; SK pembebasan sementara JFT wajib bila group JFT + status 2; perjanjian kerja opsional.

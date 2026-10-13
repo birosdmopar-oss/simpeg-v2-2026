@@ -117,6 +117,24 @@ describe('PenugasanPage', () => {
     expect(wrapper.get('[data-testid="penugasan-notice"]').text()).toContain('dihapus')
   })
 
+  it('Unduh lampiran → berkas diunduh dengan nama dari server', async () => {
+    svc.lampiran.mockResolvedValue({ blob: new Blob(['x'], { type: 'application/pdf' }), nama: 'lampiran_plt_1.pdf' })
+    const create = vi.fn(() => 'blob:lampiran')
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: vi.fn() })
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      expect(this.download).toBe('lampiran_plt_1.pdf')
+      expect(this.href).toBe('blob:lampiran')
+    })
+    const { wrapper } = await mountPage()
+
+    await selectRowAction(wrapper, 'penugasan-actions-1', 'lampiran')
+    await flushPromises()
+
+    expect(svc.lampiran).toHaveBeenCalledWith('plt', 1)
+    expect(klik).toHaveBeenCalledTimes(1)
+    klik.mockRestore()
+  })
+
   it('isian form mengikuti jenis (kolom *_plt / *_plh)', () => {
     expect(penugasanFields('plh').map((f) => f.name)).toContain('nip_plh')
     expect(penugasanFields('plt').map((f) => f.name)).toContain('id_satker_plt')

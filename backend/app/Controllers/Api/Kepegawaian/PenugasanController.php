@@ -16,7 +16,7 @@ use CodeIgniter\HTTP\ResponseInterface;
  *   GET    penugasan/{jenis}/{id}             detail
  *   POST   penugasan/{jenis}                  tambah (JSON, atau multipart dengan berkas `lampiran`)
  *   PUT    penugasan/{jenis}/{id}             ubah (dengan berkas: POST multipart + `_method=PUT`)
- *   DELETE penugasan/{jenis}/{id}             hapus lunak (status 10)
+ *   DELETE penugasan/{jenis}/{id}             hapus PERMANEN (audit before, berkas dibuang)
  *   GET    penugasan/{jenis}/{id}/lampiran    unduh lampiran
  */
 class PenugasanController extends ApiController

@@ -71,8 +71,9 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
         // Pegawai nonaktif (status 2, TMT status lampau) tidak dihitung → Plt mengisi Kepala Biro.
         $this->pejabatDefinitif('kabiro', ['status' => 2, 'tmt_status' => '2020-01-01']);
         $this->penugasan('plt', $this->buatPegawai(['nama' => 'Pelaksana Tugas']), 'kabiro');
-        // Plt kedaluwarsa diabaikan; Plh berlaku → Deputi.
+        // Plt kedaluwarsa dan Plt berstatus 2 (Tidak Aktif, [V2]) diabaikan; Plh berlaku → Deputi.
         $this->penugasan('plt', $this->buatPegawai(), 'deputi', '-30 days', '-1 day');
+        $this->penugasan('plt', $this->buatPegawai(['nama' => 'Plt Nonaktif']), 'deputi', status: 2);
         $this->penugasan('plh', $this->buatPegawai(['nama' => 'Pelaksana Harian']), 'deputi');
 
         $hasil = (new StrukturService())->pohon($this->admin());
@@ -130,6 +131,10 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
     public function testPilihanTidakTersediaDitolakDanTanpaPeriodeKosong(): void
     {
         $this->assertSame(422, $this->statusDari(fn () => (new StrukturService())->pohon($this->admin(), ['id_unit_satker' => "sat_{$this->satDep}"])));
+        // Unit 6 tampil di pilihan tetapi `disabled` (legacy) → ditolak; nilai non-string → 422.
+        $this->pastikan('unit', ['id_unit' => 6, 'unit' => 'UPT Uji', 'status' => 1]);
+        $this->assertSame(422, $this->statusDari(fn () => (new StrukturService())->pohon($this->admin(), ['id_unit_satker' => '6'])));
+        $this->assertSame(422, $this->statusDari(fn () => (new StrukturService())->pohon($this->admin(), ['id_unit_satker' => ['0']])));
 
         $this->db->table('periode_struktur_jabatan')->where('status', 1)->update(['status' => 2]);
         $hasil = (new StrukturService())->pohon($this->admin());
@@ -213,7 +218,7 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
         return $nip;
     }
 
-    private function penugasan(string $jenis, string $nip, string $jabatan, string $mulai = '-1 day', string $akhir = '+30 days'): void
+    private function penugasan(string $jenis, string $nip, string $jabatan, string $mulai = '-1 day', string $akhir = '+30 days', int $status = 1): void
     {
         $this->db->table("pegawai_{$jenis}")->insert([
             "nip_{$jenis}"  => $nip,
@@ -221,7 +226,7 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
             'id_jabatan'    => $this->jab[$jabatan],
             'tgl_mulai'     => Time::today()->modify($mulai)->toDateString(),
             'tgl_akhir'     => Time::today()->modify($akhir)->toDateString(),
-            'status'        => 1,
+            'status'        => $status,
         ]);
     }
 

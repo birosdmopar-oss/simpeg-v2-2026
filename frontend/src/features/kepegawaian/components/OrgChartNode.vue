@@ -18,10 +18,11 @@ defineProps<{ node: OrgNode }>()
       class="org-card relative w-60 rounded-xl border bg-white px-4 pb-3 pt-3 text-left shadow-card"
       :class="[
         node.jf ? 'border-dashed border-slate-300 text-center' : 'border-slate-200 border-t-4',
-        !node.jf && (node.jenis === 'plt' || node.jenis === 'plh') ? 'border-t-amber-500' : '',
+        !node.jf && (node.jenis === 'plt' || node.jenis === 'plh') ? 'border-t-warning' : '',
         !node.jf && node.jenis !== 'plt' && node.jenis !== 'plh' ? 'border-t-brand-primary' : '',
       ]"
       :data-testid="`org-node-${node.id}`"
+      :aria-label="node.jf ? node.jabatan : `${node.jabatan}: ${node.pejabat || 'lowong'}`"
     >
       <p class="text-[0.6875rem] font-semibold leading-4 text-slate-800" :class="node.jf ? 'italic text-slate-500' : ''">
         {{ node.jabatan }}
@@ -69,12 +70,12 @@ defineProps<{ node: OrgNode }>()
   right: 50%;
   width: 50%;
   height: 1.5rem;
-  border-top: 2px solid #1c3964;
+  border-top: 2px solid theme('colors.brand.primary');
 }
 .org-tree li::after {
   right: auto;
   left: 50%;
-  border-left: 2px solid #1c3964;
+  border-left: 2px solid theme('colors.brand.primary');
 }
 .org-tree li:only-child::before,
 .org-tree li:only-child::after {
@@ -88,7 +89,7 @@ defineProps<{ node: OrgNode }>()
   border: 0 none;
 }
 .org-tree li:last-child::before {
-  border-right: 2px solid #1c3964;
+  border-right: 2px solid theme('colors.brand.primary');
   border-radius: 0 0.75rem 0 0;
 }
 .org-tree li:first-child::after {
@@ -100,7 +101,7 @@ defineProps<{ node: OrgNode }>()
   top: 0;
   left: 50%;
   height: 1.5rem;
-  border-left: 2px solid #1c3964;
+  border-left: 2px solid theme('colors.brand.primary');
 }
 /* Simpul akar tidak punya sambungan ke atas. */
 .org-tree > li {

@@ -2,6 +2,7 @@
  * Isian form penugasan Plt/Plh (B-07, MAKE-012) — salinan aturan backend `Struktur/PenugasanService.php` (legacy
  * validate_param_off_plt / vp_off_plh). Dipakai PenugasanFormDialog lewat RiwayatFieldForm (dropdown berjenjang master).
  * Batasan M4: jabatan koordinasi belum punya master `options`, jadi diisi ID-nya; pegawai Plt/Plh diisi NIP.
+ * TODO(kartu lanjutan F4 review MAKE-012): combobox pencarian pegawai + master options `jabatan-koordinasi`.
  */
 import { A, D, N, R, S, T, type BerkasKolomDef, type FieldDef } from './riwayat/riwayat.config'
 import type { JenisPenugasan, PenugasanItem } from './types'

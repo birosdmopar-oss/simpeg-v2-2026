@@ -32,8 +32,9 @@ use CodeIgniter\I18n\Time;
  *    kunci sama → NIP terakhir (urut NIP) menang, sama dengan legacy;
  *  - teks "Nama, Gol/Ruang, NIP" (golongan = `riwayat_kp` status 1 TMT ≤ tanggal terbaru); NIP diawali 12345678910
  *    (akun dummy legacy) → nama saja;
- *  - kosong → Plt (`pegawai_plt` jabatan itu, tgl_mulai ≤ tanggal ≤ tgl_akhir; legacy getPLT tanpa saring status),
- *    teks "Plt. …"; [V2] lalu Plh (`pegawai_plh`, aturan sama, "Plh. …") — legacy bagan tidak memakai Plh.
+ *  - kosong → Plt (`pegawai_plt` jabatan itu, tgl_mulai ≤ tanggal ≤ tgl_akhir), teks "Plt. …"; [V2] hanya status 1
+ *    Aktif (legacy getPLT tanpa saring status; keputusan user 13-10-2026); [V2] lalu Plh (`pegawai_plh`, aturan sama,
+ *    "Plh. …") bila tidak ada definitif maupun Plt — legacy bagan tidak memakai Plh (disetujui user 13-10-2026).
  *
  * [V2] simpul diambil dari `struktur_jabatan` periode aktif saja (legacy LEFT JOIN tanpa saring periode + GROUP BY).
  * Format `pusat` tidak punya view di legacy 2025 (bagan kosong); v2 merendernya dengan tata letak UPT.
@@ -78,10 +79,17 @@ final class StrukturService implements StrukturServiceInterface
     public function pohon(AuthContext $auth, array $filter = []): array
     {
         $pilihan = $this->pilihan();
-        $kunci   = trim((string) ($filter['id_unit_satker'] ?? '0'));
-        $kunci   = $kunci === '' ? '0' : $kunci;
+        $mentah  = $filter['id_unit_satker'] ?? '0';
 
-        if ($kunci !== '0' && ! in_array($kunci, array_column($pilihan, 'value'), true)) {
+        if (! is_string($mentah)) {
+            throw ValidationException::forField('id_unit_satker', 'Data struktur organisasi Unit / Satker yang dipilih tidak tersedia.');
+        }
+
+        $kunci = trim($mentah) === '' ? '0' : trim($mentah);
+        // Hanya opsi yang bisa dipilih (unit 6 `disabled` di legacy ditolak juga — keputusan user 13-10-2026).
+        $aktif = array_column(array_filter($pilihan, static fn (array $p): bool => ! $p['disabled']), 'value');
+
+        if ($kunci !== '0' && ! in_array($kunci, $aktif, true)) {
             throw ValidationException::forField('id_unit_satker', 'Data struktur organisasi Unit / Satker yang dipilih tidak tersedia.');
         }
 
@@ -407,6 +415,7 @@ final class StrukturService implements StrukturServiceInterface
                 ->select('p.nip, p.glr_awal, p.nama, p.glr_akhir')
                 ->join('pegawai p', "p.nip = t.nip_{$jenis}", 'inner')
                 ->where('t.id_jabatan', $idJabatan)
+                ->where('t.status', 1)
                 ->where('t.tgl_mulai <=', $this->tanggal)->where('t.tgl_akhir >=', $this->tanggal)
                 ->orderBy("t.id_pegawai_{$jenis}", 'ASC')->limit(1)->get()->getRowArray();
 

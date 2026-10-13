@@ -88,7 +88,12 @@ const indent = (level: number): string => (level > 1 ? '─── ' : '─ ')
           Tidak ada jabatan struktural pada pilihan ini.
         </p>
         <div v-else class="overflow-x-auto pb-4" :aria-busy="memuat">
-          <ul class="org-tree flex min-w-max justify-center gap-6" :data-format="data.format" data-testid="struktur-pohon">
+          <ul
+            class="org-tree flex min-w-max justify-center gap-6"
+            :data-format="data.format"
+            :aria-label="`Bagan struktur organisasi ${data.judul}`"
+            data-testid="struktur-pohon"
+          >
             <OrgChartNode v-for="node in bagan" :key="node.id" :node="node" />
           </ul>
         </div>

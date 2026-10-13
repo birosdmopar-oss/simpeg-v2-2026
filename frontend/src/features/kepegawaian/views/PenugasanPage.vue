@@ -116,11 +116,11 @@ function tambah(): void {
 async function unduh(row: PenugasanItem): Promise<void> {
   busyId.value = row.id
   try {
-    const blob = await penugasanService.lampiran(jenis.value, row.id)
+    const { blob, nama } = await penugasanService.lampiran(jenis.value, row.id)
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `lampiran_${jenis.value}_${row.id}`
+    link.download = nama
     document.body.appendChild(link)
     link.click()
     link.remove()
