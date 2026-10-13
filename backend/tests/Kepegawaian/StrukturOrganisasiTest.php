@@ -142,6 +142,38 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
         $this->assertSame([], $hasil['data']['deputi']);
     }
 
+    public function testPerBulanPejabatPadaTanggalAcuanDanPdf(): void
+    {
+        Time::setTestNow('2026-10-13 10:00:00', 'Asia/Jakarta');
+
+        try {
+            $nip = $this->pejabatDefinitif('sekretaris', ['nama' => 'Baru Dilantik'], 'IV/c', '2026-05-02');
+
+            $april = (new StrukturService())->pohon($this->admin(), ['bulan' => '2026-04']);
+            $this->assertSame(['2026-04', '2026-04-30', ''], [$april['bulan'], $april['tanggal'], $april['data']['sekretaris']['pejabat']], 'belum dilantik pada akhir April');
+
+            $kini = (new StrukturService())->pohon($this->admin());
+            $this->assertSame(['2026-10', '2026-10-13'], [$kini['bulan'], $kini['tanggal']]);
+            $this->assertStringContainsString($nip, $kini['data']['sekretaris']['pejabat']);
+            $this->assertSame(['2026-10', '2022-01'], [$kini['bulan_tersedia'][0]['value'], $kini['bulan_tersedia'][count($kini['bulan_tersedia']) - 1]['value']]);
+
+            foreach (['2021-12', '2026-11', 'Okt'] as $salah) {
+                $this->assertSame(422, $this->statusDari(fn () => (new StrukturService())->pohon($this->admin(), ['bulan' => $salah])), $salah);
+            }
+
+            $pdf = (new StrukturService())->pdf($this->admin(), ['id_unit_satker' => (string) $this->unitDep]);
+            $this->assertStringStartsWith('%PDF-', $pdf['isi']);
+            $this->assertSame("struktur_organisasi_{$this->unitDep}_2026-10.pdf", $pdf['nama']);
+
+            [, , $akun] = $this->aktor(Role::PEGAWAI);
+            $res        = $this->asUser($akun)->get('api/v1/struktur-organisasi/pdf?bulan=2026-09');
+            $res->assertStatus(200);
+            $this->assertStringStartsWith('%PDF-', (string) $res->response()->getBody());
+        } finally {
+            Time::setTestNow();
+        }
+    }
+
     public function testEndpointTanpaLogin401(): void
     {
         $this->get('api/v1/struktur-organisasi')->assertStatus(401);
@@ -206,10 +238,10 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
      *
      * @param array<string, mixed> $pegawai
      */
-    private function pejabatDefinitif(string $kunci, array $pegawai = [], ?string $gol = null): string
+    private function pejabatDefinitif(string $kunci, array $pegawai = [], ?string $gol = null, string $tmt = '2021-01-01'): string
     {
         $nip = $this->buatPegawai($pegawai + ['id_jenis_status' => 1, 'created_at' => '2020-01-01 00:00:00']);
-        $this->buatRiwayatMutasiJabatan($nip, ['id_jabatan' => $this->jab[$kunci], 'id_group_jabatan' => 1, 'tmtsk' => '2021-01-01']);
+        $this->buatRiwayatMutasiJabatan($nip, ['id_jabatan' => $this->jab[$kunci], 'id_group_jabatan' => 1, 'tmtsk' => $tmt]);
 
         if ($gol !== null) {
             $this->db->table('riwayat_kp')->insert(['nip' => $nip, 'gol_ruang' => $gol, 'tmtsk' => '2020-04-01', 'status' => 1]);

@@ -17,4 +17,9 @@ final class StubStrukturService implements StrukturServiceInterface
     {
         throw new BelumTersediaException('struktur organisasi');
     }
+
+    public function pdf(AuthContext $auth, array $filter = []): array
+    {
+        throw new BelumTersediaException('struktur organisasi');
+    }
 }

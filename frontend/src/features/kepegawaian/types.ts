@@ -308,6 +308,9 @@ export interface SoPilihan {
 export interface StrukturOrganisasi {
   periode: { id_periode_struktur_jabatan: number; periode_struktur_jabatan: string } | null
   tanggal: string
+  /** YYYY-MM (MAKE-013: riwayat per bulan sejak 2022-01). */
+  bulan: string
+  bulan_tersedia: { value: string; label: string }[]
   id_unit_satker: string
   kementerian: string
   pilihan: SoPilihan[]

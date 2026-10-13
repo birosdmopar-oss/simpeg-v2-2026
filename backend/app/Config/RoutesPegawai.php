@@ -50,6 +50,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
 
     // B-19 struktur organisasi (MAKE-012): semua pengguna login (legacy hr/so/full = sesi, hr/rwy/jabatan/so = UL_ALL).
     $routes->get('struktur-organisasi', 'StrukturController::index');
+    $routes->get('struktur-organisasi/pdf', 'StrukturController::pdf');
     // B-07 penugasan Plt/Plh (MAKE-012): {jenis} = plt|plh; hak akses & lingkup di PenugasanService (jwt saja).
     $routes->get('penugasan/(plt|plh)', 'PenugasanController::index/$1');
     $routes->post('penugasan/(plt|plh)', 'PenugasanController::create/$1');

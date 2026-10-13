@@ -19,9 +19,18 @@ interface StrukturServiceInterface
      * `id_unit_satker` ('0' kementerian, '<id_unit>', 'sat_<id_satker>') dan pejabat (definitif, lalu Plt/Plh) pada
      * tanggal acuan. Semua pengguna login (legacy `hr/so/full` = sesi, `hr/rwy/jabatan/so` = UL_ALL).
      *
-     * @param array<string, mixed> $filter `id_unit_satker` (opsional, bawaan '0')
+     * @param array<string, mixed> $filter `id_unit_satker` (bawaan '0'), `bulan` YYYY-MM (bawaan bulan berjalan; sejak 2022-01)
      *
-     * @return array<string, mixed> `{ periode, tanggal, id_unit_satker, kementerian, pilihan, judul, format, data }`
+     * @return array<string, mixed> `{ periode, tanggal, bulan, bulan_tersedia, id_unit_satker, kementerian, pilihan, judul, format, data }`
      */
     public function pohon(AuthContext $auth, array $filter = []): array;
+
+    /**
+     * Ekspor PDF bagan (TCPDF, ADR-033) untuk filter yang sama dengan pohon().
+     *
+     * @param array<string, mixed> $filter
+     *
+     * @return array{isi: string, nama: string}
+     */
+    public function pdf(AuthContext $auth, array $filter = []): array;
 }

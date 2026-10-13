@@ -3,13 +3,13 @@
  * Struktur Organisasi (B-19, pemilik WS-2, MAKE-012) — semua pengguna login (legacy `hr/so/full` = sesi,
  * `hr/rwy/jabatan/so` = UL_ALL). Ikut templat legacy so_012025 (keputusan user 13-10-2026): pemilih Kementerian / unit /
  * satker (`?id_unit_satker=`, opsi dari backend, unit 6 tidak bisa dipilih), judul "Struktur Organisasi <unit/satker>",
- * bagan per format (soTemplat.ts). Kondisi hari ini; riwayat per bulan & unduh PDF menyusul (M5/M6, TCPDF).
+ * bagan per format (soTemplat.ts). Pemilih bulan sejak Jan 2022 (`?bulan=`, MAKE-013) dan Unduh PDF (TCPDF).
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { UiCard, UiNotice } from '@/shared/ui'
+import { UiButton, UiCard, UiNotice } from '@/shared/ui'
 
 import OrgChartNode from '../components/OrgChartNode.vue'
 import { describeApiError } from '../services/apiErrors'
@@ -27,7 +27,13 @@ const pilihanAktif = computed<string>({
   set: (value) => void router.replace({ query: { ...route.query, id_unit_satker: value === '0' ? undefined : value } }),
 })
 
+const bulan = computed<string>({
+  get: () => (typeof route.query.bulan === 'string' ? route.query.bulan : ''),
+  set: (value) => void router.replace({ query: { ...route.query, bulan: value || undefined } }),
+})
+
 const data = ref<StrukturOrganisasi | null>(null)
+const mengunduh = ref(false)
 const memuat = ref(false)
 const error = ref('')
 let token = 0
@@ -37,7 +43,7 @@ async function muat(): Promise<void> {
   memuat.value = true
   error.value = ''
   try {
-    const hasil = await strukturService.bagan(pilihanAktif.value)
+    const hasil = await strukturService.bagan(pilihanAktif.value, bulan.value || undefined)
     if (saya === token) data.value = hasil
   } catch (e) {
     if (saya !== token) return
@@ -48,7 +54,26 @@ async function muat(): Promise<void> {
   }
 }
 
-watch(pilihanAktif, () => void muat(), { immediate: true })
+watch([pilihanAktif, bulan], () => void muat(), { immediate: true })
+
+async function unduh(): Promise<void> {
+  mengunduh.value = true
+  try {
+    const blob = await strukturService.pdf(pilihanAktif.value, data.value?.bulan)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `struktur_organisasi_${pilihanAktif.value}_${data.value?.bulan ?? ''}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    error.value = describeApiError(e).message
+  } finally {
+    mengunduh.value = false
+  }
+}
 
 const bagan = computed(() => (data.value ? susunBagan(data.value) : []))
 const indent = (level: number): string => (level > 1 ? '─── ' : '─ ')
@@ -57,7 +82,11 @@ const indent = (level: number): string => (level > 1 ? '─── ' : '─ ')
 <template>
   <RedesignShell :breadcrumbs="crumbs">
     <UiCard title="Struktur Organisasi">
-      <div class="mb-4 max-w-xl">
+      <template #actions>
+        <UiButton variant="secondary" :loading="mengunduh" :disabled="!data" data-testid="struktur-unduh" @click="unduh">Unduh PDF</UiButton>
+      </template>
+      <div class="mb-4 grid max-w-3xl gap-3 md:grid-cols-[2fr_1fr]">
+        <div>
         <label for="struktur-pilihan" class="mb-1 block text-body2 font-medium text-slate-700">Unit / Satuan Kerja</label>
         <select
           id="struktur-pilihan"
@@ -70,6 +99,14 @@ const indent = (level: number): string => (level > 1 ? '─── ' : '─ ')
             {{ indent(p.level) }}{{ p.label }}
           </option>
         </select>
+        </div>
+        <div>
+          <label for="struktur-bulan" class="mb-1 block text-body2 font-medium text-slate-700">Bulan</label>
+          <select id="struktur-bulan" v-model="bulan" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-body1" data-testid="struktur-bulan">
+            <option value="">Bulan ini</option>
+            <option v-for="b in data?.bulan_tersedia ?? []" :key="b.value" :value="b.value">{{ b.label }}</option>
+          </select>
+        </div>
       </div>
 
       <UiNotice v-if="error" tone="danger" data-testid="struktur-error">{{ error }}</UiNotice>

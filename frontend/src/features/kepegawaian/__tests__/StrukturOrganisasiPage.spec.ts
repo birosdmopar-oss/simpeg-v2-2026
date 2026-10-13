@@ -5,7 +5,7 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/struktur.service', () => ({ strukturService: { bagan: vi.fn() } }))
+vi.mock('../services/struktur.service', () => ({ strukturService: { bagan: vi.fn(), pdf: vi.fn() } }))
 
 import { Role } from '@/features/auth/types'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
@@ -30,6 +30,11 @@ const k = (jabatan: string, pejabat = '', extra: Partial<SoKotak> = {}): SoKotak
 const dasar = (extra: Partial<StrukturOrganisasi>): StrukturOrganisasi => ({
   periode: { id_periode_struktur_jabatan: 3, periode_struktur_jabatan: '2025' },
   tanggal: '2026-10-13',
+  bulan: '2026-10',
+  bulan_tersedia: [
+    { value: '2026-10', label: 'Oktober 2026' },
+    { value: '2026-09', label: 'September 2026' },
+  ],
   id_unit_satker: '0',
   kementerian: 'Kementerian Uji',
   pilihan: [
@@ -83,7 +88,7 @@ describe('StrukturOrganisasiPage', () => {
   it('kementerian: Menteri + Wakil → staf ahli, inspektorat, sekretaris (Es.II), deputi; Plt berlencana, lowong', async () => {
     const { wrapper } = await mountPage()
 
-    expect(bagan).toHaveBeenCalledWith('0')
+    expect(bagan).toHaveBeenCalledWith('0', undefined)
     expect(wrapper.get('[data-testid="struktur-judul"]').text()).toContain('Kementerian Uji')
     const t = teks(wrapper)
     for (const s of ['Menteri Uji', 'Wamen Uji', 'Staf Ahli Uji', 'Irjen, IV/e, 1', 'Budi, IV/e, 197001012000011001', 'Plt. Siti', 'Deputi Bidang Uji', 'Direktur Uji']) {
@@ -105,9 +110,27 @@ describe('StrukturOrganisasiPage', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.query.id_unit_satker).toBe('sat_9')
-    expect(bagan).toHaveBeenLastCalledWith('sat_9')
+    expect(bagan).toHaveBeenLastCalledWith('sat_9', undefined)
     expect(teks(wrapper)).toContain('Subbagian Uji')
     expect(teks(wrapper)).toContain('Jabatan Fungsional dan Jabatan Pelaksana')
+  })
+
+  it('pemilih bulan → ?bulan= dan muat ulang; Unduh PDF memakai bulan aktif', async () => {
+    const { wrapper, router } = await mountPage()
+    bagan.mockResolvedValueOnce({ ...KEMENTERIAN, bulan: '2026-09' })
+    await wrapper.get<HTMLSelectElement>('[data-testid="struktur-bulan"]').setValue('2026-09')
+    await flushPromises()
+    expect(router.currentRoute.value.query.bulan).toBe('2026-09')
+    expect(bagan).toHaveBeenLastCalledWith('0', '2026-09')
+
+    vi.mocked(strukturService.pdf).mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }))
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:so'), revokeObjectURL: vi.fn() })
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    await wrapper.get('[data-testid="struktur-unduh"]').trigger('click')
+    await flushPromises()
+    expect(strukturService.pdf).toHaveBeenCalledWith('0', '2026-09')
+    expect(klik).toHaveBeenCalled()
+    klik.mockRestore()
   })
 
   it('susunan unit: Es.I → sekretariat (Es.III + JF) lalu Es.II → Es.III → Es.IV / JF', () => {
@@ -151,7 +174,7 @@ describe('StrukturOrganisasiPage', () => {
 
     bagan.mockRejectedValueOnce(apiError(422))
     const { wrapper: w2 } = await mountPage('?id_unit_satker=sat_999')
-    expect(bagan).toHaveBeenLastCalledWith('sat_999')
+    expect(bagan).toHaveBeenLastCalledWith('sat_999', undefined)
     expect(w2.find('[data-testid="struktur-error"]').exists()).toBe(true)
     expect(w2.find('[data-testid="struktur-pohon"]').exists()).toBe(false)
   })
