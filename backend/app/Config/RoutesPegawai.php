@@ -80,6 +80,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->get('lkh', 'LkhController::index');
     $routes->get('lkh/opsi', 'LkhController::opsi');
     $routes->get('lkh/verifikasi', 'LkhController::verifikasi');
+    $routes->get('lkh/rekap', 'LkhController::rekap');
+    $routes->get('lkh/rekap/(:segment)', 'LkhController::rekapBawahan/$1');
     $routes->post('lkh', 'LkhController::create');
     $routes->get('lkh/(:num)', 'LkhController::show/$1');
     $routes->put('lkh/(:num)', 'LkhController::update/$1');

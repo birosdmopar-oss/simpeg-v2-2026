@@ -6,7 +6,7 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/lkh.service', () => ({
-  lkhService: { list: vi.fn(), verifikasi: vi.fn(), opsi: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), pdf: vi.fn() },
+  lkhService: { list: vi.fn(), verifikasi: vi.fn(), opsi: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), pdf: vi.fn(), rekap: vi.fn(), rekapBawahan: vi.fn() },
 }))
 
 import { Role } from '@/features/auth/types'
@@ -153,5 +153,28 @@ describe('VerifikasiLkhPage', () => {
     q<HTMLButtonElement>('[data-testid="lkh-proses-kirim"]')?.click()
     await flushPromises()
     expect(svc.process).toHaveBeenCalledWith(5, 'revisi', 'Rinci output')
+  })
+
+  it('Rekap Bawahan (MAKE-014): bulan bawaan dari server, jumlah per status, ⋮ Lihat LKH → daftar bawahan', async () => {
+    svc.rekap.mockResolvedValue({
+      bulan: '2026-10', ds: '2026-10-01', de: '2026-10-13',
+      items: [{ nip: '199001012015011001', nama: 'Ani', jabatan: 'Analis', satker: 'Satker', menunggu: 1, disetujui: 2, ditolak: 0, revisi: 1, total: 4 }],
+    })
+    svc.rekapBawahan.mockResolvedValue({ bulan: '2026-10', pegawai: { nip: '199001012015011001', nama: 'Ani', jabatan: 'Analis', satker: 'Satker' }, items: [baris(9, { status: 1 })] })
+    const w = await mountPage('?tab=rekap')
+
+    expect(svc.rekap).toHaveBeenCalledTimes(1)
+    expect(svc.list).not.toHaveBeenCalled()
+    expect(w.get('[data-testid="lkh-rekap-row-199001012015011001"]').text()).toContain('Ani')
+    expect(q<HTMLInputElement>('[data-testid="lkh-rekap-bulan"] input')?.value).toBe('2026-10')
+
+    await selectRowAction(w, 'lkh-rekap-actions-199001012015011001', 'lihat')
+    await flushPromises()
+    expect(svc.rekapBawahan).toHaveBeenCalledWith('199001012015011001', '2026-10')
+    expect(w.get('[data-testid="lkh-rekap-detail"]').text()).toContain('Disetujui')
+
+    await w.get('[data-testid="lkh-rekap-bulan"] input').setValue('2026-09')
+    await flushPromises()
+    expect(svc.rekap).toHaveBeenLastCalledWith('2026-09')
   })
 })

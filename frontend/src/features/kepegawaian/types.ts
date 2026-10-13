@@ -950,6 +950,32 @@ export interface LkhListResponse {
   can_create?: boolean
 }
 
+/** Rekap LKH bawahan (MAKE-014). */
+export interface LkhRekapItem {
+  nip: string
+  nama: string
+  jabatan: string | null
+  satker: string | null
+  menunggu: number
+  disetujui: number
+  ditolak: number
+  revisi: number
+  total: number
+}
+
+export interface LkhRekap {
+  bulan: string
+  ds: string
+  de: string
+  items: LkhRekapItem[]
+}
+
+export interface LkhRekapBawahan {
+  bulan: string
+  pegawai: Pick<LkhRekapItem, 'nip' | 'nama' | 'jabatan' | 'satker'>
+  items: LkhItem[]
+}
+
 export interface LkhOpsi {
   nip: string
   tanggal_minimal: string

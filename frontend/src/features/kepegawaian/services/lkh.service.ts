@@ -9,12 +9,13 @@
  *   DELETE lkh/{id}                          hapus
  *   POST   lkh/{id}/process                  `{ aksi: setujui|tolak|revisi, catatan }`
  *   GET    lkh/{id}/pdf                      PDF (TCPDF)
+ *   GET    lkh/rekap?bulan=, lkh/rekap/{nip}?bulan=   rekap LKH bawahan (MAKE-014)
  */
 import { api } from '@/lib/axios'
 
 import { ambilBerkas, type BerkasUnduhan } from './berkasUnduhan'
 
-import type { LkhItem, LkhKegiatan, LkhListResponse, LkhOpsi } from '../types'
+import type { LkhItem, LkhKegiatan, LkhListResponse, LkhOpsi, LkhRekap, LkhRekapBawahan } from '../types'
 
 export type AksiLkh = 'setujui' | 'tolak' | 'revisi'
 
@@ -40,6 +41,17 @@ export const lkhService = {
     const params: Record<string, string | number> = { page: query.page, per_page: query.per_page }
     if (query.status !== undefined) params.status = query.status
     const { data } = await api.get<LkhListResponse>('/lkh/verifikasi', { params })
+    return data
+  },
+
+  /** Rekap LKH bawahan per bulan (YYYY-MM; bawaan bulan berjalan). */
+  async rekap(bulan?: string): Promise<LkhRekap> {
+    const { data } = await api.get<LkhRekap>('/lkh/rekap', { params: bulan ? { bulan } : {} })
+    return data
+  },
+
+  async rekapBawahan(nip: string, bulan?: string): Promise<LkhRekapBawahan> {
+    const { data } = await api.get<LkhRekapBawahan>(`/lkh/rekap/${encodeURIComponent(nip)}`, { params: bulan ? { bulan } : {} })
     return data
   },
 

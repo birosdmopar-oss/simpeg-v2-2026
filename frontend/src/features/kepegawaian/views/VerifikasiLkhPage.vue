@@ -4,7 +4,8 @@
  *  - "LKH Saya": daftar LKH sendiri (legacy `hr/rwy/lkh`, urut Revisi → Menunggu → Disetujui), Tambah, ⋮ Edit → Unduh
  *    PDF → Hapus (ConfirmDialog);
  *  - "Verifikasi Bawahan": antrean atasan langsung (`nip_atasan` = saya; legacy notifikasi need_approval), ⋮ Verifikasi
- *    → Unduh PDF.
+ *    → Unduh PDF;
+ *  - "Rekap Bawahan": rekap LKH bawahan per bulan (MAKE-014, legacy list_rekap) — LkhRekapBawahan.
  * PDF dibangkitkan server (TCPDF). Tab LKH di Detail Pegawai = `components/LkhTab.vue` (MAKE-014).
  */
 import { Plus } from 'lucide-vue-next'
@@ -19,6 +20,7 @@ import { UiBadge, UiButton, UiCard, UiNotice, UiPagination, UiSelect, UiTabs } f
 
 import LkhFormDialog from '../components/LkhFormDialog.vue'
 import LkhProsesDialog from '../components/LkhProsesDialog.vue'
+import LkhRekapBawahan from '../components/LkhRekapBawahan.vue'
 import { describeApiError } from '../services/apiErrors'
 import { simpanBerkas } from '../services/berkasUnduhan'
 import { lkhService, type AksiLkh } from '../services/lkh.service'
@@ -32,9 +34,10 @@ const PER_PAGE = 20
 const TABS = [
   { value: 'saya', label: 'LKH Saya' },
   { value: 'verifikasi', label: 'Verifikasi Bawahan' },
+  { value: 'rekap', label: 'Rekap Bawahan' },
 ]
 const tab = computed<string>({
-  get: () => (route.query.tab === 'verifikasi' ? 'verifikasi' : 'saya'),
+  get: () => (route.query.tab === 'verifikasi' || route.query.tab === 'rekap' ? String(route.query.tab) : 'saya'),
   set: (v) => void router.replace({ query: { ...route.query, tab: v } }),
 })
 
@@ -89,7 +92,7 @@ onMounted(async () => {
 watch(tab, () => {
   page.value = 1
   notice.value = null
-  void muat()
+  if (tab.value !== 'rekap') void muat()
 }, { immediate: true })
 watch([page, statusVerif], () => void muat())
 
@@ -177,7 +180,10 @@ const STATUS_VERIF = [
     <div class="space-y-4" data-testid="lkh-page">
       <UiTabs v-model="tab" :items="TABS" aria-label="Laporan kerja harian" />
 
-      <UiCard :title="tab === 'verifikasi' ? 'Verifikasi LKH Bawahan' : 'Laporan Kerja Harian Saya'">
+      <UiCard v-if="tab === 'rekap'" title="Rekap LKH Bawahan">
+        <LkhRekapBawahan />
+      </UiCard>
+      <UiCard v-else :title="tab === 'verifikasi' ? 'Verifikasi LKH Bawahan' : 'Laporan Kerja Harian Saya'">
         <template #actions>
           <UiButton v-if="tab === 'saya' && opsi" data-testid="lkh-tambah" @click="tambah"><Plus class="h-4 w-4" aria-hidden="true" /> Tambah LKH</UiButton>
         </template>

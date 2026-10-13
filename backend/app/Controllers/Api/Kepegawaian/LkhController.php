@@ -15,6 +15,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  *   GET    lkh?nip=&page=&per_page=          LKH pegawai (bawaan: milik sendiri)
  *   GET    lkh/opsi?nip=                     rentang tanggal & atasan langsung
  *   GET    lkh/verifikasi?status=&ds=&de=    antrean atasan langsung (bawaan status 0)
+ *   GET    lkh/rekap?bulan=                  rekap LKH bawahan per bulan (MAKE-014)
+ *   GET    lkh/rekap/{nip}?bulan=            daftar LKH satu bawahan pada bulan itu
  *   POST   lkh                               `{ nip?, tgl_laporan, kegiatan: [{ kegiatan, output, jumlah_diselesaikan, jam_mulai, jam_selesai }] }`
  *   GET    lkh/{id}                          detail + kegiatan
  *   PUT    lkh/{id}                          ubah
@@ -45,6 +47,20 @@ class LkhController extends ApiController
         $query = $this->request->getGet();
 
         return $this->respondSuccess($this->service()->verifikasi(service('authContext'), is_array($query) ? $query : []));
+    }
+
+    public function rekap(): ResponseInterface
+    {
+        $bulan = $this->request->getGet('bulan');
+
+        return $this->respondSuccess($this->service()->rekap(service('authContext'), is_string($bulan) ? $bulan : null));
+    }
+
+    public function rekapBawahan(string $nip): ResponseInterface
+    {
+        $bulan = $this->request->getGet('bulan');
+
+        return $this->respondSuccess($this->service()->rekapBawahan(service('authContext'), $nip, is_string($bulan) ? $bulan : null));
     }
 
     public function show(string $id): ResponseInterface

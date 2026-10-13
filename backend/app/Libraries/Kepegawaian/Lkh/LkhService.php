@@ -44,6 +44,12 @@ use DateTimeImmutable;
  * membuangnya diam-diam); jam HH:MM; catatan wajib saat Tolak/Revisi; hapus = status 10 (setara trigger arsip legacy,
  * keputusan user); PDF hanya untuk LKH Disetujui (legacy regenerate_pdf/file_lckh) dan dibangkitkan saat diminta — QR =
  * kode LKH legacy (waktu WIB); kop tanpa logo.
+ *
+ * Rekap LKH bawahan (MAKE-014, legacy `list_rekap`/`rekap` userAuth ['2']; keputusan user 13-10-2026: untuk siapa pun
+ * yang menjadi atasan langsung, role LKH): bawahan = pegawai aktif yang snapshot jabatannya menunjuk jabatan pemanggil
+ * sebagai atasan terdekat (aturan legacy per sub group / jabatan koordinasi) [V2] ditambah pegawai yang LKH-nya pada
+ * bulan itu ber-`nip_atasan` = pemanggil (Plt, atasan ditimpa role 1). Per bawahan: jumlah LKH per status pada bulan
+ * itu; klik → daftar LKH bawahan (semua status kecuali dihapus) [V2] (legacy rekap hanya Disetujui).
  */
 final class LkhService implements LkhServiceInterface
 {
@@ -58,6 +64,18 @@ final class LkhService implements LkhServiceInterface
 
     /** @var list<string> kolom kegiatan (array JSON sejajar) */
     public const KOLOM_KEGIATAN = ['kegiatan', 'output', 'jumlah_diselesaikan', 'jam_mulai', 'jam_selesai'];
+
+    /**
+     * Rekap bawahan legacy: per sub group struktural pemanggil (1–4), kolom atasan level di bawahnya yang harus kosong.
+     *
+     * @var array<int, list<string>>
+     */
+    private const KOSONG_REKAP = [
+        1 => ['id_atasan_es_2', 'id_atasan_es_3', 'id_atasan_es_4', 'id_atasan_es_3_koord', 'id_atasan_es_4_koord'],
+        2 => ['id_atasan_es_3', 'id_atasan_es_4', 'id_atasan_es_3_koord', 'id_atasan_es_4_koord'],
+        3 => ['id_atasan_es_4', 'id_atasan_es_4_koord'],
+        4 => [],
+    ];
 
     public function __construct(
         private readonly ?BaseConnection $db = null,
@@ -329,6 +347,149 @@ final class LkhService implements LkhServiceInterface
             'can_delete'  => $tulis,
             'can_process' => false,
         ];
+    }
+
+    public function rekap(AuthContext $auth, ?string $bulan = null): array
+    {
+        $this->wajibRole($auth);
+        [$bulan, $awal, $akhir] = $this->bulanRekap($bulan);
+        $bawahan                = $this->bawahan($auth, $awal, $akhir);
+        $jumlah                 = [];
+
+        if ($bawahan !== []) {
+            $rows = $this->db()->table('riwayat_lckh')->select('nip, status, COUNT(*) AS n', false)
+                ->whereIn('nip', array_keys($bawahan))->where('tgl_laporan >=', $awal)->where('tgl_laporan <=', $akhir)
+                ->where('status !=', self::DIHAPUS)->groupBy(['nip', 'status'])->get()->getResultArray();
+
+            foreach ($rows as $r) {
+                $jumlah[(string) $r['nip']][(int) $r['status']] = (int) $r['n'];
+            }
+        }
+
+        $items = [];
+
+        foreach ($bawahan as $nip => $p) {
+            $j       = $jumlah[$nip] ?? [];
+            $items[] = $p + [
+                'menunggu'  => $j[self::MENUNGGU] ?? 0,
+                'disetujui' => $j[self::DISETUJUI] ?? 0,
+                'ditolak'   => $j[self::DITOLAK] ?? 0,
+                'revisi'    => $j[self::REVISI] ?? 0,
+                'total'     => array_sum($j),
+            ];
+        }
+
+        return ['bulan' => $bulan, 'ds' => $awal, 'de' => $akhir, 'items' => $items];
+    }
+
+    public function rekapBawahan(AuthContext $auth, string $nip, ?string $bulan = null): array
+    {
+        $this->wajibRole($auth);
+        [$bulan, $awal, $akhir] = $this->bulanRekap($bulan);
+        $bawahan                = $this->bawahan($auth, $awal, $akhir);
+
+        if (! isset($bawahan[$nip])) {
+            throw new ForbiddenException('Pegawai ini bukan bawahan langsung Anda.');
+        }
+
+        $rows = $this->db()->table('riwayat_lckh')->where('nip', $nip)->where('tgl_laporan >=', $awal)->where('tgl_laporan <=', $akhir)
+            ->where('status !=', self::DIHAPUS)->orderBy('tgl_laporan', 'ASC')->orderBy('id_riwayat_lckh', 'ASC')->get()->getResultArray();
+
+        return [
+            'bulan'   => $bulan,
+            'pegawai' => $bawahan[$nip],
+            'items'   => array_map(fn (array $r): array => $this->bentuk($r, $auth), $rows),
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string} bulan YYYY-MM, tanggal awal, tanggal akhir (≤ hari ini)
+     */
+    private function bulanRekap(?string $bulan): array
+    {
+        $hariIni = TanggalBisnis::hariIni();
+        $bulan   = $bulan === null || trim($bulan) === '' ? substr($hariIni, 0, 7) : trim($bulan);
+
+        if (preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', $bulan) !== 1 || $bulan > substr($hariIni, 0, 7)) {
+            throw ValidationException::forField('bulan', 'Bulan harus berformat YYYY-MM dan tidak melewati bulan berjalan.');
+        }
+
+        $akhir = (new DateTimeImmutable("{$bulan}-01"))->modify('last day of this month')->format('Y-m-d');
+
+        return [$bulan, "{$bulan}-01", min($akhir, $hariIni)];
+    }
+
+    /**
+     * Bawahan langsung pemanggil (nip => identitas), urut nama.
+     *
+     * @return array<string, array{nip: string, nama: string, jabatan: string|null, satker: string|null}>
+     */
+    private function bawahan(AuthContext $auth, string $awal, string $akhir): array
+    {
+        $saya = (string) $auth->nip();
+
+        if ($saya === '') {
+            return [];
+        }
+
+        $db  = $this->db();
+        $pmj = $db->table('pegawai_mutasi_jabatan')->where('nip', $saya)->get()->getRowArray();
+        $nip = [];
+
+        // Legacy list_rekap: atasan terdekat per sub group (struktural) / jabatan koordinasi.
+        if ($pmj !== null) {
+            $b = $db->table('pegawai_mutasi_jabatan')->select('pegawai_mutasi_jabatan.nip')
+                ->join('pegawai', 'pegawai.nip = pegawai_mutasi_jabatan.nip')
+                ->where('pegawai.status', 1)->where('pegawai_mutasi_jabatan.nip !=', $saya);
+            $ok = true;
+
+            if ((int) ($pmj['id_group_jabatan'] ?? 0) === 1 && in_array((int) ($pmj['id_sub_group_jabatan'] ?? 0), [1, 2, 3, 4], true)) {
+                $es = (int) $pmj['id_sub_group_jabatan'];
+                $b->where("pegawai_mutasi_jabatan.id_atasan_es_{$es}", (int) $pmj['id_jabatan']);
+
+                // Level di bawah pemanggil harus kosong (legacy L_lkh::list_rekap :1276-1287).
+                foreach (self::KOSONG_REKAP[$es] as $kolom) {
+                    $b->where("pegawai_mutasi_jabatan.{$kolom}", null);
+                }
+            } elseif ((string) ($pmj['jenis_jabatan_koord'] ?? '') === '2' && ($pmj['id_jabatan_koord'] ?? null) !== null) {
+                $b->where('pegawai_mutasi_jabatan.id_atasan_es_4_koord', (int) $pmj['id_jabatan_koord']);
+            } elseif ((string) ($pmj['jenis_jabatan_koord'] ?? '') === '1' && ($pmj['id_jabatan_koord'] ?? null) !== null) {
+                $b->where('pegawai_mutasi_jabatan.id_atasan_es_3_koord', (int) $pmj['id_jabatan_koord'])
+                    ->where('pegawai_mutasi_jabatan.id_atasan_es_4', null)->where('pegawai_mutasi_jabatan.id_atasan_es_4_koord', null);
+            } else {
+                $ok = false;
+            }
+
+            if ($ok) {
+                $nip = array_column($b->get()->getResultArray(), 'nip');
+            }
+        }
+
+        // [V2] + pegawai yang LKH-nya pada rentang itu diajukan ke pemanggil.
+        $lckh = array_column($db->table('riwayat_lckh')->distinct()->select('nip')->where('nip_atasan', $saya)
+            ->where('tgl_laporan >=', $awal)->where('tgl_laporan <=', $akhir)->where('status !=', self::DIHAPUS)
+            ->get()->getResultArray(), 'nip');
+        $nip = array_values(array_unique(array_map('strval', [...$nip, ...$lckh])));
+
+        if ($nip === []) {
+            return [];
+        }
+
+        $hasil = [];
+        $rows  = $db->table('pegawai')->select('pegawai.nip, pegawai.glr_awal, pegawai.nama, pegawai.glr_akhir, pegawai_mutasi_jabatan.jabatan, pegawai_mutasi_jabatan.satker')
+            ->join('pegawai_mutasi_jabatan', 'pegawai_mutasi_jabatan.nip = pegawai.nip', 'left')
+            ->whereIn('pegawai.nip', $nip)->orderBy('pegawai.nama', 'ASC')->get()->getResultArray();
+
+        foreach ($rows as $r) {
+            $hasil[(string) $r['nip']] = [
+                'nip'     => (string) $r['nip'],
+                'nama'    => StrukturService::namaGelar($r['glr_awal'], (string) $r['nama'], $r['glr_akhir']),
+                'jabatan' => $r['jabatan'],
+                'satker'  => $r['satker'],
+            ];
+        }
+
+        return $hasil;
     }
 
     private function nipSasaran(AuthContext $auth, mixed $nip, bool $tulis): string

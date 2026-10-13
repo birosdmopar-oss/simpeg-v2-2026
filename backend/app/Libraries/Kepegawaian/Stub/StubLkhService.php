@@ -62,4 +62,14 @@ final class StubLkhService implements LkhServiceInterface
     {
         return null;
     }
+
+    public function rekap(AuthContext $auth, ?string $bulan = null): array
+    {
+        throw new BelumTersediaException('lkh');
+    }
+
+    public function rekapBawahan(AuthContext $auth, string $nip, ?string $bulan = null): array
+    {
+        throw new BelumTersediaException('lkh');
+    }
 }

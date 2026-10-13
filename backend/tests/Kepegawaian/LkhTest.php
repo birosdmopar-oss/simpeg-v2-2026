@@ -193,6 +193,48 @@ final class LkhTest extends DatabaseTestCase
         $this->assertSame('Nama Baru', $this->svc()->ubah($this->pegawai, $milik['id'], ['kegiatan' => [$this->baris('09:00')]])['nama']);
     }
 
+    public function testRekapBawahanPerBulan(): void
+    {
+        // Atasan struktural Es.IV (sub group 4): bawahan = snapshot ber-id_atasan_es_4 = jabatan atasan (legacy list_rekap).
+        // ID hard-code legacy: group 1 Struktural, sub group 4 Eselon IV.
+        if ($this->db->table('group_jabatan')->where('id_group_jabatan', 1)->countAllResults() === 0) {
+            $this->db->table('group_jabatan')->insert(['id_group_jabatan' => 1, 'group_jabatan' => 'Struktural', 'status' => 1]);
+        }
+
+        if ($this->db->table('sub_group_jabatan')->where('id_sub_group_jabatan', 4)->countAllResults() === 0) {
+            $this->db->table('sub_group_jabatan')->insert(['id_sub_group_jabatan' => 4, 'id_group_jabatan' => 1, 'sub_group_jabatan' => 'Eselon IV', 'need_satker' => 1, 'status' => 1]);
+        }
+        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $this->nipAtasan)->update(['id_group_jabatan' => 1, 'id_sub_group_jabatan' => 4]);
+        $a = $this->tambah($this->pegawai, '2026-10-12');
+        $this->tambah($this->pegawai, '2026-10-09');
+        $this->svc()->proses($this->atasan, $a['id'], 'setujui', null);
+
+        // [V2] + pegawai yang LKH-nya diajukan ke atasan ini (atasan ditimpa role 1).
+        [$lain, $authLain] = $this->aktor(Role::PEGAWAI, [], $this->buatSatker());
+        $this->svc()->tambah($this->admin(), ['nip' => $lain, 'nip_atasan' => $this->nipAtasan, 'tgl_laporan' => '2026-10-12', 'kegiatan' => [$this->baris('08:00')]]);
+
+        $rekap = $this->svc()->rekap($this->atasan);
+        $this->assertSame(['2026-10', '2026-10-01', '2026-10-13'], [$rekap['bulan'], $rekap['ds'], $rekap['de']]);
+        $per = array_column($rekap['items'], null, 'nip');
+        $this->assertEqualsCanonicalizing([$this->nip, $lain], array_keys($per));
+        $this->assertSame([1, 1, 0, 0, 2], [$per[$this->nip]['menunggu'], $per[$this->nip]['disetujui'], $per[$this->nip]['ditolak'], $per[$this->nip]['revisi'], $per[$this->nip]['total']]);
+        $this->assertSame(0, $this->svc()->rekap($this->atasan, '2026-09')['items'][0]['total'] ?? 0);
+
+        $daftar = $this->svc()->rekapBawahan($this->atasan, $this->nip);
+        $this->assertSame(['2026-10-09', '2026-10-12'], array_column($daftar['items'], 'tgl_laporan'));
+        $this->assertSame($this->nip, $daftar['pegawai']['nip']);
+
+        // Bukan bawahan → 403; bulan salah/masa depan → 422; pegawai tanpa bawahan → kosong.
+        $this->assertStatusApi(403, fn () => $this->svc()->rekapBawahan($authLain, $this->nip));
+        $this->assertErrors(['bulan'], fn () => $this->svc()->rekap($this->atasan, '2026-13'));
+        $this->assertErrors(['bulan'], fn () => $this->svc()->rekap($this->atasan, '2026-11'));
+        $this->assertSame([], $this->svc()->rekap($this->pegawai)['items']);
+
+        $akun = $this->db->table('pengguna')->where('nip', $this->nipAtasan)->get()->getRowArray();
+        $this->asUser($akun)->get('api/v1/lkh/rekap?bulan=2026-10')->assertStatus(200);
+        $this->asUser($akun)->get("api/v1/lkh/rekap/{$this->nip}?bulan=2026-10")->assertStatus(200);
+    }
+
     public function testEndpointPdf(): void
     {
         $row = $this->tambah($this->pegawai, '2026-10-12');

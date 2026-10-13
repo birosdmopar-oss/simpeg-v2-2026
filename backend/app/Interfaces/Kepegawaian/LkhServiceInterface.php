@@ -82,4 +82,19 @@ interface LkhServiceInterface
      * @return array{jenis: string, label: string, can_view: bool, can_create: bool, can_edit: bool, can_delete: bool, can_process: bool}|null
      */
     public function descriptorTab(AuthContext $auth, string $nip): ?array;
+
+    /**
+     * Rekap LKH bawahan per bulan (MAKE-014; legacy `Lkh::list_rekap`): bawahan pemanggil + jumlah LKH per status pada
+     * `bulan` (YYYY-MM, bawaan bulan berjalan).
+     *
+     * @return array<string, mixed>
+     */
+    public function rekap(AuthContext $auth, ?string $bulan = null): array;
+
+    /**
+     * Daftar LKH satu bawahan pada `bulan` (legacy `Lkh::rekap($nip)`); bukan bawahan → 403.
+     *
+     * @return array<string, mixed>
+     */
+    public function rekapBawahan(AuthContext $auth, string $nip, ?string $bulan = null): array;
 }
