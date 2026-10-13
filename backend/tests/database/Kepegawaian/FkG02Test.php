@@ -7,9 +7,9 @@ namespace Tests\Database\Kepegawaian;
 use App\Database\Migrations\AddFkG02Pegawai;
 use App\Database\Migrations\AddFkG02Riwayat;
 use CodeIgniter\Database\Migration;
-use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\SkemaD1;
 use Tests\Support\Kepegawaian\SkemaD1TestTrait;
 use Throwable;
@@ -26,14 +26,9 @@ use Throwable;
  *
  * @internal
  */
-final class FkG02Test extends CIUnitTestCase
+final class FkG02Test extends DatabaseTestCase
 {
-    use DatabaseTestTrait;
     use SkemaD1TestTrait;
-
-    protected $migrate   = true;
-    protected $refresh   = true;
-    protected $namespace = null;
 
     private const VERSION_PEGAWAI = '2026-10-07-100000';
 
@@ -119,7 +114,9 @@ final class FkG02Test extends CIUnitTestCase
     /**
      * up() kedua migration menolak jalan bila ada nilai yatim (jumlah per FK), tanpa FK terpasang sebagian; setelah
      * dibereskan, ke-55 FK terpasang; up()/down() aman diulang dan index milik migration Create tetap.
+     * down()/up() = DDL, jadi test ini berjalan di luar bingkai transaksi uji.
      */
+    #[Group('db-isolasi-penuh')]
     public function testRefusesOrphansBeforeAnyAlter(): void
     {
         $riwayat = $this->migrationInstance(self::VERSION_RIWAYAT);
