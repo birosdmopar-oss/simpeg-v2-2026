@@ -67,8 +67,9 @@ final class TandaTerimaUsulan
             ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = p.nip', 'left')
             ->where('p.nip', $nip)->get()->getRowArray() ?? [];
 
-        $karpeg  = $jenis === 'karpeg';
-        $dibuat  = (int) strtotime((string) $baris['created_at']);
+        $karpeg = $jenis === 'karpeg';
+        // L4: waktu dibuat dibaca sebagai WIB (server legacy) supaya kode sama dengan legacy.
+        $dibuat  = Time::parse((string) $baris['created_at'], 'Asia/Jakarta')->getTimestamp();
         $kodeJen = $karpeg ? '1' : '0';
         $kode    = date('y', $dibuat) . '0' . $dibuat . $kodeJen . $id;
         $berkas  = $karpeg ? Karpeg::BERKAS : Kariskarsu::BERKAS;

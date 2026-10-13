@@ -32,12 +32,14 @@ use Throwable;
  * detail :195, insert :244, update :382, delete :890, konket_min_date :981, validate_param :1527, set_param :1734,
  * process :1800), views `views/hr/employee/rwy/konket/*`.
  *
- * Hak akses (pola keputusan user: lihat ikut Matriks v2 `hr/rwy/konket/*` = 1, 2, 3, 6, 7; tulis/proses ikut legacy):
+ * Hak akses (keputusan user 13-10-2026; tulis/proses ikut legacy):
  * - pegawai (2/6/7): mengajukan untuk diri sendiri (add, status W), mengubah miliknya selama W (edit), menghapus miliknya
  *   (delete legacy tanpa syarat status), melihat miliknya;
  * - role 1: semua pegawai (add_ad, edit_ad, delete, process); role 3: pegawai dalam lingkup (PegawaiScope: lihat/ubah
- *   = daftar, proses = jalur proses CR-045, sama dengan legacy process() UNIT_DESTINASI + BPO);
- * - [V2] role 4/5 tidak dibuka (legacy list_ad ['1','3','4'] dan detail 1–7; Matriks v2 hanya 1, 2, 3, 6, 7).
+ *   = daftar, proses = jalur proses CR-045, sama dengan legacy process() UNIT_DESTINASI + BPO); peserta dinas
+ *   gabungan yang diisi role 3 wajib dalam lingkupnya (legacy form_ad.php:152-171 hanya menawarkan pegawai satker/unit);
+ * - [K] role 4/5 LIHAT saja (legacy list_ad ['1','3','4'] + detail 1–7; Matriks v2 menulis 1, 2, 3, 6, 7 — keputusan
+ *   user: ikut legacy): antrean semua pegawai + detail, tanpa tulis/proses.
  *
  * Aturan legacy validate_param(): tanggal mulai/akhir wajib, akhir ≥ mulai, keduanya ≤ hari ini, mulai ≥ tanggal minimal
  * (KonketAturan; [V2] tanpa pengecualian akun pengembang USR_SADEV/USR_SPC), jenis & alasan wajib, berkas bukti wajib
@@ -63,7 +65,13 @@ final class KonketService implements KonketServiceInterface
     public const JENIS_PEGAWAI_PTT = 2;
 
     /** @var list<int> */
-    public const ROLE_LIHAT = [Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::PTT, Role::PPPK];
+    public const ROLE_LIHAT = [Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK];
+
+    /** @var list<int> tulis (tambah/ubah/hapus) — legacy add/edit/delete */
+    public const ROLE_TULIS = [Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::PTT, Role::PPPK];
+
+    /** @var list<int> pengamat antrean (legacy list_ad/detail) — lihat saja */
+    public const ROLE_PENGAMAT = [Role::ADMIN_VIEW_ESELON1, Role::MENTERI];
 
     /** @var list<int> */
     public const ROLE_ADMIN = [Role::SUPER_ADMIN, Role::ADMIN_SATKER];
@@ -88,7 +96,7 @@ final class KonketService implements KonketServiceInterface
         $this->wajibRole($auth, self::ROLE_LIHAT);
         $page    = max(1, (int) ($filter['page'] ?? 1));
         $perPage = min(100, max(1, (int) ($filter['per_page'] ?? 20)));
-        $admin   = $this->adalahAdmin($auth);
+        $admin   = $this->adalahAdmin($auth) || $this->pengamat($auth);
         $builder = $this->query();
 
         if (! $admin) {
@@ -118,7 +126,7 @@ final class KonketService implements KonketServiceInterface
             'mode'       => $admin ? 'admin' : 'pegawai',
             'items'      => array_map(fn (array $r): array => $this->bentuk($r) + ['aksi' => $this->aksi($auth, $r)], $rows),
             'meta'       => ['page' => $page, 'per_page' => $perPage, 'total' => $total],
-            'can_create' => true,
+            'can_create' => ! $this->pengamat($auth),
             'rentang'    => $admin ? array_combine(['ds', 'de'], $this->rentang($filter)) : null,
         ];
     }
@@ -132,7 +140,8 @@ final class KonketService implements KonketServiceInterface
             ->orderBy('order', 'ASC')->orderBy('id_jenis_konket', 'ASC')->get()->getResultArray();
 
         return [
-            'mode'            => $this->adalahAdmin($auth) ? 'admin' : 'pegawai',
+            'mode'            => $this->adalahAdmin($auth) || $this->pengamat($auth) ? 'admin' : 'pegawai',
+            'can_create'      => ! $this->pengamat($auth),
             'tanggal_minimal' => KonketAturan::tanggalMinimal(TanggalBisnis::hariIni()),
             'hari_ini'        => TanggalBisnis::hariIni(),
             'kategori_dinas'  => self::KATEGORI_DINAS,
@@ -157,7 +166,7 @@ final class KonketService implements KonketServiceInterface
 
     public function tambah(AuthContext $auth, array $data, ?UploadedFile $berkas): array
     {
-        $this->wajibRole($auth, self::ROLE_LIHAT);
+        $this->wajibRole($auth, self::ROLE_TULIS);
         $admin = $this->adalahAdmin($auth);
         $nip   = $admin ? trim((string) ($data['nip'] ?? '')) : (string) $auth->nip();
 
@@ -181,7 +190,7 @@ final class KonketService implements KonketServiceInterface
         // Pegawai tidak mengisi pengaruh tukin (legacy form.php; kolom default 1); admin boleh (form_ad.php).
         $param['affect_tukin'] ??= 1;
 
-        $id = $this->tulis($auth, null, $param, $berkas, $this->daftarPeserta($param, $data, $nip));
+        $id = $this->tulis($auth, null, $param, $berkas, $this->daftarPeserta($auth, $param, $data, $nip));
 
         return $this->detail($auth, $id);
     }
@@ -206,7 +215,7 @@ final class KonketService implements KonketServiceInterface
             $param['status'] = self::W;
         }
 
-        $this->tulis($auth, $id, $param, $berkas, $this->daftarPeserta($param, $data, (string) $lama['nip']), $lama);
+        $this->tulis($auth, $id, $param, $berkas, $this->daftarPeserta($auth, $param, $data, (string) $lama['nip']), $lama);
 
         return $this->detail($auth, $id);
     }
@@ -482,7 +491,7 @@ final class KonketService implements KonketServiceInterface
      *
      * @return list<string>
      */
-    private function daftarPeserta(array $param, array $data, string $nipPemohon): array
+    private function daftarPeserta(AuthContext $auth, array $param, array $data, string $nipPemohon): array
     {
         if ((int) $param['kategori'] !== self::KATEGORI_DINAS || (int) $param['jenis_dinas'] !== 1) {
             return [];
@@ -508,6 +517,15 @@ final class KonketService implements KonketServiceInterface
 
         if (count($aktif) !== count($nip)) {
             throw ValidationException::forField('peserta', 'Peserta tidak ditemukan atau tidak aktif: ' . implode(', ', array_diff(array_values($nip), $aktif)) . '.');
+        }
+
+        // M1 review MAKE-013: role 3 hanya boleh memilih peserta dalam lingkupnya (legacy form_ad.php:152-171).
+        if ($auth->role() === Role::ADMIN_SATKER) {
+            $luar = array_values(array_filter($nip, fn (string $n): bool => ! $this->scope()->bolehUbah($auth, $n)));
+
+            if ($luar !== []) {
+                throw ValidationException::forField('peserta', 'Peserta di luar lingkup akses Anda: ' . implode(', ', $luar) . '.');
+            }
         }
 
         return array_values($nip);
@@ -627,7 +645,7 @@ final class KonketService implements KonketServiceInterface
         $this->wajibRole($auth, self::ROLE_LIHAT);
         $row = $this->baris($id);
 
-        $boleh = $row !== null && ($this->adalahAdmin($auth)
+        $boleh = $row !== null && ($this->adalahAdmin($auth) || $this->pengamat($auth)
             ? $this->scope()->bolehLihat($auth, (string) $row['nip'])
             : (string) $row['nip'] === (string) $auth->nip());
 
@@ -664,6 +682,10 @@ final class KonketService implements KonketServiceInterface
     {
         $nip   = (string) $row['nip'];
         $induk = $row['id_parent'] === null;
+
+        if ($this->pengamat($auth)) {
+            return ['ubah' => false, 'hapus' => false, 'proses' => false];
+        }
 
         if (! $this->adalahAdmin($auth)) {
             $milik = $nip === (string) $auth->nip();
@@ -778,6 +800,11 @@ final class KonketService implements KonketServiceInterface
     private function pegawai(string $nip): ?array
     {
         return $this->db()->table('pegawai')->select('nip, id_jenis_pegawai, status')->where('nip', $nip)->get()->getRowArray();
+    }
+
+    private function pengamat(AuthContext $auth): bool
+    {
+        return in_array($auth->role(), self::ROLE_PENGAMAT, true);
     }
 
     private function adalahAdmin(AuthContext $auth): bool

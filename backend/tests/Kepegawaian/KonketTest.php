@@ -146,6 +146,12 @@ final class KonketTest extends DatabaseTestCase
         $this->svc()->proses($this->adminSatker, $row['id'], 'setujui', null);
         $this->assertSame(['V'], array_values(array_unique(array_column($this->db->table('absen_ijin')->whereIn('id', [$row['id'], ...array_column($aktif, 'id')])->get()->getResultArray(), 'status'))));
 
+        // M1: role 3 hanya boleh memilih peserta dalam lingkupnya; pegawai boleh semua pegawai aktif (sudah di atas).
+        $luar = $this->buatPegawaiDiSatker($this->buatSatker());
+        $this->assertErrors(['peserta'], fn () => $this->tambah($this->adminSatker, ['nip' => $this->nip, 'peserta' => [$luar]] + $dinas + $this->data('2026-10-09')));
+        $dalam = $this->buatPegawaiDiSatker($this->idSatker);
+        $this->assertSame(2, count($this->tambah($this->adminSatker, ['nip' => $this->nip, 'peserta' => [$dalam]] + $dinas + $this->data('2026-10-09'))['peserta']));
+
         // Hapus dari baris peserta → seluruh kelompok status 10 (legacy delete :897-925).
         $hapus = $this->svc()->hapus($this->admin, (int) $aktif[0]['id']);
         $this->assertCount(3, $hapus['ids']);
@@ -170,10 +176,19 @@ final class KonketTest extends DatabaseTestCase
         $row      = $this->tambah($this->pegawai, $this->data('2026-10-05'));
         [, $lain] = $this->aktor(Role::PEGAWAI, [], $this->buatSatker());
 
-        // Pegawai lain tidak melihat; role 4/5/8 tidak punya akses (Matriks v2).
+        // Pegawai lain tidak melihat; role 8 tidak punya akses.
         $this->assertStatusApi(404, fn () => $this->svc()->detail($lain, $row['id']));
-        foreach ([Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN] as $role) {
-            $this->assertStatusApi(403, fn () => $this->svc()->daftar($this->aktor($role)[1]));
+        $this->assertStatusApi(403, fn () => $this->svc()->daftar($this->aktor(Role::PIMPINAN)[1]));
+
+        // [K] role 4/5 lihat saja (legacy list_ad/detail): antrean semua + detail, tanpa tulis/proses.
+        foreach ([Role::ADMIN_VIEW_ESELON1, Role::MENTERI] as $role) {
+            $pengamat = $this->aktor($role)[1];
+            $daftar   = $this->svc()->daftar($pengamat);
+            $this->assertSame(['admin', false, [$row['id']]], [$daftar['mode'], $daftar['can_create'], array_column($daftar['items'], 'id')]);
+            $this->assertSame(['ubah' => false, 'hapus' => false, 'proses' => false], $this->svc()->detail($pengamat, $row['id'])['aksi']);
+            $this->assertStatusApi(403, fn () => $this->tambah($pengamat, ['nip' => $this->nip] + $this->data('2026-10-09')));
+            $this->assertStatusApi(403, fn () => $this->svc()->hapus($pengamat, $row['id']));
+            $this->assertStatusApi(403, fn () => $this->svc()->proses($pengamat, $row['id'], 'setujui', null));
         }
 
         // Admin satker lain: tidak terlihat, tidak bisa menambah untuk pegawai di luar lingkup.
@@ -215,7 +230,7 @@ final class KonketTest extends DatabaseTestCase
         $this->asUser($akun)->get('api/v1/konket/opsi')->assertStatus(200);
         $this->asUser($akun)->get('api/v1/konket')->assertStatus(200);
         $this->asUser($akun)->withBodyFormat('json')->post('api/v1/konket', $this->data('2026-10-05'))->assertStatus(422);
-        [, , $view] = $this->aktor(Role::MENTERI);
+        [, , $view] = $this->aktor(Role::PIMPINAN);
         $this->asUser($view)->get('api/v1/konket')->assertStatus(403);
     }
 

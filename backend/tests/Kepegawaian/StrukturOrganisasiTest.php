@@ -155,9 +155,10 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
             $kini = (new StrukturService())->pohon($this->admin());
             $this->assertSame(['2026-10', '2026-10-13'], [$kini['bulan'], $kini['tanggal']]);
             $this->assertStringContainsString($nip, $kini['data']['sekretaris']['pejabat']);
-            $this->assertSame(['2026-10', '2022-01'], [$kini['bulan_tersedia'][0]['value'], $kini['bulan_tersedia'][count($kini['bulan_tersedia']) - 1]['value']]);
+            // Keputusan user 13-10-2026: mulai 2025-01 sampai templat legacy lama di-port.
+            $this->assertSame(['2026-10', '2025-01'], [$kini['bulan_tersedia'][0]['value'], $kini['bulan_tersedia'][count($kini['bulan_tersedia']) - 1]['value']]);
 
-            foreach (['2021-12', '2026-11', 'Okt'] as $salah) {
+            foreach (['2024-12', '2026-11', 'Okt'] as $salah) {
                 $this->assertSame(422, $this->statusDari(fn () => (new StrukturService())->pohon($this->admin(), ['bulan' => $salah])), $salah);
             }
 

@@ -29,8 +29,10 @@ use DateTimeImmutable;
  *
  * Hak akses: Matriks v2 `hr/rwy/lkh/*` = 1, 2, 3, 6, 7. Pegawai mengelola LKH sendiri; role 1 (semua) dan role 3
  * (PegawaiScope) untuk pegawai lain (legacy add/edit/delete/index dengan NIP). Verifikasi = ATASAN LANGSUNG
- * (`nip_atasan` = NIP pemanggil; pengecualian keputusan #4, ikut legacy) — [V2] tidak dibatasi role 2 seperti legacy
- * userAuth(['2']) karena atasan bisa memegang akun role lain.
+ * (`nip_atasan` = NIP pemanggil; pengecualian keputusan #4, ikut legacy) — [V2] (keputusan user 13-10-2026) siapa pun
+ * dengan role 1/2/3/6/7 yang NIP-nya = `nip_atasan` (legacy userAuth(['2'])); atasan berakun 4/5/8 belum dibuka. Role 1
+ * boleh menimpa atasan dengan `nip_atasan` manual (NIP pegawai aktif; legacy form mengirim nip/nama atasan); bawaan tetap
+ * atasan otomatis. Hapus LKH Disetujui hanya role 1 (legacy Lkh::delete :464-472); pegawai juga tidak bisa mengubahnya.
  *
  * Aturan legacy: tanggal laporan dalam [LkhAturan::tanggalMinimal, hari ini] dan unik per pegawai (status selain
  * 2/10); minimal satu kegiatan lengkap (kegiatan, output, jumlah, jam mulai, jam selesai) disimpan sebagai array JSON
@@ -39,8 +41,9 @@ use DateTimeImmutable;
  * hanya status 0 (status 3 = Revisi menunggu perbaikan pegawai; ubah oleh pegawai → kembali 0).
  *
  * [V2]: tanpa pengecualian akun pengembang (USR_SADEV/USR_SPC); baris kegiatan setengah terisi ditolak 422 (legacy
- * membuangnya diam-diam); jam HH:MM; catatan wajib saat Tolak/Revisi; hapus = status 10; PDF dibangkitkan saat diminta
- * (legacy menyimpan berkas `file_lckh` saat disetujui) — QR = kode LKH legacy; kop tanpa logo (aset lokal menyusul).
+ * membuangnya diam-diam); jam HH:MM; catatan wajib saat Tolak/Revisi; hapus = status 10 (setara trigger arsip legacy,
+ * keputusan user); PDF hanya untuk LKH Disetujui (legacy regenerate_pdf/file_lckh) dan dibangkitkan saat diminta — QR =
+ * kode LKH legacy (waktu WIB); kop tanpa logo.
  */
 final class LkhService implements LkhServiceInterface
 {
@@ -155,7 +158,7 @@ final class LkhService implements LkhServiceInterface
             throw ValidationException::forField('nip', 'Data unit dan satker pegawai tidak terdaftar didalam sistem, silahkan periksa riwayat jabatan anda.');
         }
 
-        $atasan = $this->atasan()->untuk($nip);
+        $atasan = $this->atasanManual($auth, $data) ?? $this->atasan()->untuk($nip);
 
         if ($atasan === null || $atasan['nip'] === '') {
             throw ValidationException::forField('nip_atasan', 'Atasan langsung tidak ditemukan. Periksa riwayat jabatan (atasan) pegawai.');
@@ -185,7 +188,12 @@ final class LkhService implements LkhServiceInterface
         $this->wajibPengelola($auth, $lama);
         $this->wajibTerbuka($auth, $lama, LkhAturan::batasUbah(TanggalBisnis::hariIni()), [self::MENUNGGU, self::DISETUJUI, self::REVISI], 'merubah');
 
-        $param = $this->validasiKegiatan($data) + ['updated_by' => $auth->idPengguna()];
+        $param = $this->validasiKegiatan($data) + ['updated_by' => $auth->idPengguna()] + $this->identitas((string) $lama['nip']);
+
+        if (($manual = $this->atasanManual($auth, $data)) !== null) {
+            $param['nip_atasan']  = $manual['nip'];
+            $param['nama_atasan'] = $manual['nama'];
+        }
 
         if (array_key_exists('tgl_laporan', $data)) {
             $param['tgl_laporan'] = $this->validasiTanggal($data, (string) $lama['nip'], $lama);
@@ -206,6 +214,11 @@ final class LkhService implements LkhServiceInterface
     {
         $row = $this->barisTerlihat($auth, $id);
         $this->wajibPengelola($auth, $row);
+
+        if ((int) $row['status'] === self::DISETUJUI && $auth->role() !== Role::SUPER_ADMIN) {
+            throw new ForbiddenException('Laporan kerja harian yang sudah disetujui hanya dapat dihapus Super Admin.');
+        }
+
         $this->wajibTerbuka($auth, $row, LkhAturan::batasHapus(TanggalBisnis::hariIni()), [self::MENUNGGU, self::DISETUJUI], 'menghapus', true);
 
         $model = new LkhModel($this->db());
@@ -256,6 +269,11 @@ final class LkhService implements LkhServiceInterface
     public function pdf(AuthContext $auth, int $id): array
     {
         $row = $this->barisTerlihat($auth, $id);
+
+        if ((int) $row['status'] !== self::DISETUJUI) {
+            throw ValidationException::forField('status', 'PDF LKH tersedia setelah laporan disetujui atasan.');
+        }
+
         $wc  = $this->webConfig();
         $uns = $this->db()->table('unit')->select('unit, alamat_pdf_header')->where('id_unit', $row['id_unit'])->get()->getRowArray();
 
@@ -265,7 +283,8 @@ final class LkhService implements LkhServiceInterface
             . '<tr><td style="text-align:center;font-size:8pt;">' . nl2br(esc((string) ($uns['alamat_pdf_header'] ?? $wc['pdf_header_alamat_kementerian'] ?? ''))) . '</td></tr></table>'
             . '<hr style="height:2px;" />';
 
-        $kunci = $row['id_riwayat_lckh'] . date('y', (int) strtotime((string) $row['tgl_laporan'])) . '0' . strtotime((string) $row['created_at']);
+        // Kode legacy: id . yy(tgl_laporan) . '0' . strtotime(created_at) — waktu dibaca sebagai WIB seperti server legacy.
+        $kunci = $row['id_riwayat_lckh'] . date('y', (int) strtotime((string) $row['tgl_laporan'])) . '0' . Time::parse((string) $row['created_at'], 'Asia/Jakarta')->getTimestamp();
         $html  = view('pdf/lkh', ['lkh' => $this->bentuk($row, $auth, true), 'qr' => Pdf::qrImg($kunci, 100)]);
         $judul = 'Laporan Kerja Harian ' . $row['nama'] . ' - ' . TanggalBisnis::formatIndonesia((string) $row['tgl_laporan']);
         $isi   = Pdf::renderer()->render(new DokumenPdf(
@@ -417,14 +436,12 @@ final class LkhService implements LkhServiceInterface
      */
     private function wajibPengelola(AuthContext $auth, array $row): void
     {
-        $milik = (string) $row['nip'] === (string) $auth->nip();
-        $admin = in_array($auth->role(), [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true) && ($auth->role() === Role::SUPER_ADMIN || $this->scope()->bolehUbah($auth, (string) $row['nip']));
-
-        if (! $milik && ! $admin) {
+        if (! $this->bolehKelola($auth, $row)) {
             throw new ForbiddenException('Anda tidak dapat mengelola laporan kerja harian ini.');
         }
 
-        if ($milik && ! $admin && (int) $row['status'] === self::DISETUJUI) {
+        // Legacy edit/delete: UL_PEGAWAI tidak bisa mengubah/menghapus LKH Disetujui.
+        if (in_array($auth->role(), Role::UL_PEGAWAI, true) && (int) $row['status'] === self::DISETUJUI) {
             throw new ForbiddenException('Laporan kerja harian yang sudah disetujui tidak dapat diubah atau dihapus.');
         }
     }
@@ -499,10 +516,11 @@ final class LkhService implements LkhServiceInterface
         }
 
         $saya    = (string) $auth->nip();
-        $milik   = $saya !== '' && (string) $r['nip'] === $saya;
         $hariIni = TanggalBisnis::hariIni();
         $status  = (int) $r['status'];
-        $admin   = $auth->role() === Role::SUPER_ADMIN || ($auth->role() === Role::ADMIN_SATKER && ! $milik);
+        // L1: aksi = penegakan server (bolehKelola + aturan status + kunci tukin).
+        $kelola  = $this->bolehKelola($auth, $r);
+        $pegawai = in_array($auth->role(), Role::UL_PEGAWAI, true);
 
         $hasil = [
             'id'          => (int) $r['id_riwayat_lckh'],
@@ -517,8 +535,10 @@ final class LkhService implements LkhServiceInterface
             'catatan'     => $r['catatan'],
             'jumlah'      => count($kegiatan),
             'aksi'        => [
-                'ubah'   => ($milik && $status !== self::DISETUJUI || $admin) && ! ($r['tgl_laporan'] < LkhAturan::batasUbah($hariIni) && in_array($status, [0, 1, 3], true)),
-                'hapus'  => ($milik && $status !== self::DISETUJUI || $admin) && ! ($r['tgl_laporan'] <= LkhAturan::batasHapus($hariIni) && in_array($status, [0, 1], true)),
+                'ubah' => $kelola && ! ($pegawai && $status === self::DISETUJUI)
+                    && ! ($r['tgl_laporan'] < LkhAturan::batasUbah($hariIni) && in_array($status, [0, 1, 3], true)),
+                'hapus' => $kelola && ! ($status === self::DISETUJUI && $auth->role() !== Role::SUPER_ADMIN)
+                    && ! ($r['tgl_laporan'] <= LkhAturan::batasHapus($hariIni) && in_array($status, [0, 1], true)),
                 'proses' => $saya !== '' && (string) $r['nip_atasan'] === $saya && $status === self::MENUNGGU,
             ],
         ];
@@ -528,6 +548,65 @@ final class LkhService implements LkhServiceInterface
         }
 
         return $hasil;
+    }
+
+    /**
+     * Pemilik, role 1, atau role 3 dalam lingkup (legacy edit/delete: UL_PEGAWAI milik sendiri; role 3 validateAccess_AP).
+     *
+     * @param array<string, mixed> $row
+     */
+    private function bolehKelola(AuthContext $auth, array $row): bool
+    {
+        $saya = (string) $auth->nip();
+
+        return ($saya !== '' && (string) $row['nip'] === $saya)
+            || $auth->role() === Role::SUPER_ADMIN
+            || ($auth->role() === Role::ADMIN_SATKER && $this->scope()->bolehUbah($auth, (string) $row['nip']));
+    }
+
+    /**
+     * Keputusan user 13-10-2026: role 1 boleh menimpa atasan dengan `nip_atasan` (pegawai aktif). Role lain diabaikan.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array{nip: string, nama: string}|null
+     */
+    private function atasanManual(AuthContext $auth, array $data): ?array
+    {
+        $nip = is_scalar($data['nip_atasan'] ?? null) ? trim((string) $data['nip_atasan']) : '';
+
+        if ($nip === '' || $auth->role() !== Role::SUPER_ADMIN) {
+            return null;
+        }
+
+        $p = $this->db()->table('pegawai')->select('nip, glr_awal, nama, glr_akhir')->where('nip', $nip)->where('status', 1)->get()->getRowArray();
+
+        if ($p === null) {
+            throw ValidationException::forField('nip_atasan', 'Atasan harus pegawai aktif.');
+        }
+
+        return ['nip' => (string) $p['nip'], 'nama' => StrukturService::namaGelar($p['glr_awal'], (string) $p['nama'], $p['glr_akhir'])];
+    }
+
+    /**
+     * Nama + unit/satker terkini pegawai (legacy sp() menulis ulang setiap simpan; L5 review MAKE-013).
+     *
+     * @return array<string, mixed>
+     */
+    private function identitas(string $nip): array
+    {
+        $p = $this->db()->table('pegawai p')
+            ->select('p.glr_awal, p.nama, p.glr_akhir, pmj.id_unit, pmj.id_satker, pmj.unit, pmj.satker')
+            ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = p.nip', 'left')
+            ->where('p.nip', $nip)->get()->getRowArray();
+
+        return $p === null ? [] : [
+            'nama'      => StrukturService::namaGelar($p['glr_awal'], (string) $p['nama'], $p['glr_akhir']),
+            'id_unit'   => $p['id_unit'],
+            'id_satker' => $p['id_satker'],
+            'unit'      => $p['unit'],
+            'satker'    => $p['satker'],
+        ];
     }
 
     private function tanggalMinimal(string $hariIni): string

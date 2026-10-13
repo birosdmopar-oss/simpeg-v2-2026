@@ -143,9 +143,11 @@ final class LkhTest extends DatabaseTestCase
         $this->assertSame('10', (string) $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $baru['id'])->get()->getRow()->status);
     }
 
-    public function testPdfDanHakAkses(): void
+    public function testPdfHanyaDisetujuiDanHakAkses(): void
     {
         $row = $this->tambah($this->pegawai, '2026-10-12');
+        // Keputusan user 13-10-2026: PDF hanya untuk LKH Disetujui (legacy regenerate_pdf).
+        $this->assertErrors(['status'], fn () => $this->svc()->pdf($this->pegawai, $row['id']));
         $this->svc()->proses($this->atasan, $row['id'], 'setujui', null);
 
         foreach ([$this->pegawai, $this->atasan, $this->aktor(Role::SUPER_ADMIN)[1], $this->aktor(Role::ADMIN_SATKER, [], $this->idSatker)[1]] as $auth) {
@@ -161,9 +163,40 @@ final class LkhTest extends DatabaseTestCase
         $this->assertStatusApi(404, fn () => $this->svc()->pdf($this->aktor(Role::ADMIN_SATKER, [], $this->buatSatker())[1], $row['id']));
     }
 
+    public function testHapusDisetujuiHanyaRole1(): void
+    {
+        $row = $this->tambah($this->pegawai, '2026-10-12');
+        $this->svc()->proses($this->atasan, $row['id'], 'setujui', null);
+        $role3 = $this->aktor(Role::ADMIN_SATKER, [], $this->idSatker)[1];
+
+        // M2 (legacy Lkh::delete :464-472) + L1: aksi konsisten dengan penegakan server.
+        $this->assertSame(['ubah' => true, 'hapus' => false], array_intersect_key($this->svc()->detail($role3, $row['id'])['aksi'], ['ubah' => 1, 'hapus' => 1]));
+        $this->assertStatusApi(403, fn () => $this->svc()->hapus($role3, $row['id']));
+        $admin = $this->admin();
+        $this->assertTrue($this->svc()->detail($admin, $row['id'])['aksi']['hapus']);
+        $this->assertSame($row['id'], $this->svc()->hapus($admin, $row['id'])['id']);
+    }
+
+    public function testRole1MenimpaAtasanDanUbahMemperbaruiIdentitas(): void
+    {
+        $lain = $this->buatPegawai(['nama' => 'Atasan Pengganti']);
+        $row  = $this->svc()->tambah($this->admin(), ['nip' => $this->nip, 'nip_atasan' => $lain, 'tgl_laporan' => '2026-10-12', 'kegiatan' => [$this->baris('08:00')]]);
+        $this->assertSame([$lain, 'Atasan Pengganti'], [$row['nip_atasan'], $row['nama_atasan']]);
+        $this->assertErrors(['nip_atasan'], fn () => $this->svc()->tambah($this->admin(), ['nip' => $this->nip, 'nip_atasan' => '000', 'tgl_laporan' => '2026-10-09', 'kegiatan' => [$this->baris('08:00')]]));
+
+        // Pegawai tidak bisa menimpa atasan (diabaikan → atasan otomatis).
+        $milik = $this->svc()->tambah($this->pegawai, ['nip_atasan' => $lain, 'tgl_laporan' => '2026-10-09', 'kegiatan' => [$this->baris('08:00')]]);
+        $this->assertSame($this->nipAtasan, $milik['nip_atasan']);
+
+        // L5: ubah menulis ulang nama/unit/satker terkini (legacy sp()).
+        $this->db->table('pegawai')->where('nip', $this->nip)->update(['nama' => 'Nama Baru']);
+        $this->assertSame('Nama Baru', $this->svc()->ubah($this->pegawai, $milik['id'], ['kegiatan' => [$this->baris('09:00')]])['nama']);
+    }
+
     public function testEndpointPdf(): void
     {
-        $row  = $this->tambah($this->pegawai, '2026-10-12');
+        $row = $this->tambah($this->pegawai, '2026-10-12');
+        $this->svc()->proses($this->atasan, $row['id'], 'setujui', null);
         $akun = $this->db->table('pengguna')->where('nip', $this->nip)->get()->getRowArray();
 
         $res = $this->asUser($akun)->get("api/v1/lkh/{$row['id']}/pdf");

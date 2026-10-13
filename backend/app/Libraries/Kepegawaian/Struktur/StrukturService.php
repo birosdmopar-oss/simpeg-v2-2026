@@ -30,9 +30,9 @@ use DateTimeImmutable;
  * `es3_sek`, `es3`, `es4`) dalam bentuk list JSON berurutan.
  *
  * Pejabat per jabatan pada tanggal acuan (MAKE-013, legacy so() :1187 + so_012025 maxRwyDate): `bulan` YYYY-MM sejak
- * 2022-01 (legacy `month` n-Y sejak Jan 2022); bulan berjalan → hari ini, bulan lalu → hari terakhir bulan itu. [V2]
- * semua bulan memakai templat so_012025 + struktur periode aktif (legacy memakai templat so_062023/so_before_062023
- * untuk bulan sebelum Jan 2025 / Jun 2023 — belum di-port). Plt/Plh dan golongan dimuat sekaligus (tanpa N+1):
+ * 2025-01 (legacy `month` n-Y sejak Jan 2022; bulan sebelum 2025-01 memakai templat legacy lain yang belum di-port —
+ * keputusan user 13-10-2026, TODO BULAN_AWAL); bulan berjalan → hari ini, bulan lalu → hari terakhir bulan itu. Plt/Plh
+ * dan golongan dimuat sekaligus (tanpa N+1). Ekspor PDF = tabel hierarki [V2] (ADR-033 tidak memakai wkhtmltopdf):
  *  - definitif = `riwayat_mutasi_jabatan` status 1, jenis 1, TMT ≤ tanggal, pegawai dibuat sebelum tanggal dan
  *    (aktif dengan jenis status 1/12, atau nonaktif dengan TMT status sesudah tanggal); per NIP baris TMT terbaru; kunci
  *    `koord_<id_jabatan_koord>` (koordinator/subkoordinator), `struk_<id_jabatan>` (group 1), `ll_<id_jabatan>` (group 5);
@@ -82,8 +82,12 @@ final class StrukturService implements StrukturServiceInterface
     /** @var array<string, array<int, array<string, mixed>>> jenis (plt|plh) => id_jabatan => pegawai */
     private array $penugasan = [];
 
-    /** Bulan pertama yang bisa dipilih (legacy so(): `new DateTime('2022-01-01')`). */
-    public const BULAN_AWAL = '2022-01';
+    /**
+     * Bulan pertama yang bisa dipilih. Legacy so() sejak 2022-01, tetapi bulan sebelum 2025-01 memakai templat lain
+     * (so_062023, so_before_062023) yang belum di-port → dibatasi 2025-01 (keputusan user 13-10-2026).
+     * TODO(MAKE susulan): port templat so_062023/so_before_062023 lalu turunkan ke '2022-01'.
+     */
+    public const BULAN_AWAL = '2025-01';
 
     public function __construct(private readonly ?BaseConnection $db = null)
     {
@@ -523,13 +527,18 @@ final class StrukturService implements StrukturServiceInterface
             array_column($this->penugasan['plh'], 'nip'),
         )));
 
+        // L2: semua NIP diberi nilai awal '' supaya NIP tanpa riwayat KP tidak memicu kueri per orang.
+        $this->golongan = array_fill_keys(array_map('strval', $nip), '');
+
         foreach (array_chunk($nip, 500) as $potong) {
             $rows = $this->db()->table('riwayat_kp')->select('nip, gol_ruang')
                 ->whereIn('nip', $potong)->where('status', 1)->where('tmtsk <=', $this->tanggal)
                 ->orderBy('nip', 'ASC')->orderBy('tmtsk', 'DESC')->get()->getResultArray();
 
             foreach ($rows as $r) {
-                $this->golongan[(string) $r['nip']] ??= trim((string) $r['gol_ruang']);
+                if (($this->golongan[(string) $r['nip']] ?? '') === '') {
+                    $this->golongan[(string) $r['nip']] = trim((string) $r['gol_ruang']);
+                }
             }
         }
     }
