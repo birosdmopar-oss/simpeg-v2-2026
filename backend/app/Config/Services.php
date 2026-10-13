@@ -47,9 +47,9 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
+use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Kepegawaian\Stub\StubKonketService;
 use App\Libraries\Kepegawaian\Stub\StubLkhService;
-use App\Libraries\Kepegawaian\Stub\StubStrukturService;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
 use App\Libraries\MasterData\MasterService;
@@ -419,7 +419,7 @@ class Services extends BaseService
             return static::getSharedInstance('strukturService');
         }
 
-        return new StubStrukturService();
+        return new StrukturService();
     }
 
     /**

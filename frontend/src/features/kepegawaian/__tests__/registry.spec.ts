@@ -74,7 +74,10 @@ describe('registry riwayat', () => {
     expect(ringkas('tanda-jasa')).toEqual([[23, true, 5, ext]])
     expect(ringkas('organisasi')).toEqual([[13, true, 5, ext]])
     expect(ringkas('skp')).toEqual([[32, true, 5, ext]]) // MAKE-008
-    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi', 'skp']
+    // MAKE-012 (WS-2): Jabatan.php — SK 9 wajib, SK PS JFT 36 wajib bersyarat, perjanjian kerja 41 opsional.
+    expect(ringkas('jabatan')).toEqual([[9, true, 5, ext], [36, true, 5, ext], [41, false, 5, ext]])
+    expect(configFor('jabatan')?.lampiran[1]?.wajibBila).toEqual({ field: 'status_jft', in: ['2'] })
+    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi', 'skp', 'jabatan']
     for (const config of Object.values(RIWAYAT_REGISTRY)) {
       if (!berlampiran.includes(config.jenis)) expect(config.lampiran, config.jenis).toEqual([])
     }

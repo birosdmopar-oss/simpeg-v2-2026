@@ -160,6 +160,21 @@ tanpa alasan, `show_notif` 1, legacy `L_employee.php:410-418`); role 2/3/6/7 →
 menonaktifkan akun user_level 2 (PNS) dan mencabut sesinya [K] trigger `pegawai_afUpd`; 2 → 1 tidak mengaktifkan ulang.
 `GET pegawai/{nip}` → `aksi.proses_biodata` (MAKE-011) = ada pengajuan menunggu yang boleh diproses pemanggil.
 
+### Jabatan, Plt/Plh, struktur organisasi (WS-2 M4, MAKE-012, aditif)
+
+Riwayat jabatan B-07 = jenis engine `jabatan` (`Riwayat/Definisi/Jabatan.php`) lewat endpoint riwayat engine yang sudah
+ada (`pegawai/{nip}/riwayat/jabatan…`); tidak ada endpoint khusus. Endpoint baru:
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET struktur-organisasi?id_unit=&id_satker=` | semua pengguna login (jwt) | B-19 `{ periode, filter, nodes }`. `periode` = `periode_struktur_jabatan` status 1 terbaru (`null` → `nodes` kosong). `nodes` = hutan simpul `struktur_jabatan` (status 1, jabatan aktif), induk `id_jabatan_atasan`, urut `level_struktur`, `urutan`: `{ id: "sj-<id>", id_jabatan, id_atasan, jabatan, level_struktur, id_unit, unit, id_satker, satker, pejabat, children }`. `pejabat` = definitif (`pegawai_mutasi_jabatan` jenis 1, pegawai status 1, TMT terbaru), atau Plt lalu Plh berstatus 1 yang berlaku hari ini; `{ nip, nama_lengkap, gol_ruang, jenis: definitif\|plt\|plh, pejabat_so }`; `null` = lowong. Filter satker/unit (unit jabatan = unit satkernya) menjadikan simpul teratas di filter sebagai akar. 422 `errors.id_unit`/`id_satker` bila bukan ID |
+| `GET penugasan/{plt\|plh}?search=&status=&page=&per_page=` | 1, 3 (lingkup satker akun, atau unit bila tanpa satker), 4, 5 | `{ items, meta: { page, per_page, total }, can_create }`; status ≠ 10. Item = kolom `pegawai_plt\|plh` (tanpa path `lampiran`) + `id`, `nip`, `nama_lengkap`, `jabatan`, `jabatan_koord`, `unit`, `satker`, `ada_lampiran` |
+| `GET penugasan/{plt\|plh}/{id}` | sama | satu item; 404 di luar lingkup / status 10 |
+| `POST penugasan/{plt\|plh}` | 1 | Tambah tanpa approval (JSON, atau multipart dengan berkas `lampiran` opsional 5 MB jpg/jpeg/png/gif/pdf/xls/xlsx/doc/docx) → 201. Isian legacy `validate_param_off_plt`: `status` 1/2, `jenis_jabatan` 1 (group, sub group, jabatan) atau 2 (`jenis_jabatan_koord` 1/2 + `id_jabatan_koord` yang jenisnya sama), `tgl_mulai` ≤ `tgl_akhir`, `id_unit`, `id_satker`, `id_group_jabatan_<jenis>`, `id_sub_group_jabatan_<jenis>`, `id_unit_<jenis>`, `id_satker_<jenis>`, `nip_<jenis>` (pegawai ada), `keterangan` ≤ 255; 422 per kolom |
+| `PUT penugasan/{plt\|plh}/{id}` | 1 | Ubah (isian lengkap; dengan berkas: `POST` multipart + `_method=PUT`). Berkas lama diganti sesudah commit |
+| `DELETE penugasan/{plt\|plh}/{id}` | 1 | Hapus lunak status 10 [V2] (legacy hapus keras) → `{ deleted: true, id }`; lampiran dipertahankan |
+| `GET penugasan/{plt\|plh}/{id}/lampiran` | 1, 3, 4, 5 | Unduh (`attachment`, `nosniff`, `no-store`); tanpa berkas / path arsip legacy → 404 |
+
 ### Descriptor tab (beku)
 
 `GET pegawai/{nip}` mengembalikan `data.tabs`: array descriptor. Frontend merender tab dan tombol aksi **hanya** dari
@@ -288,7 +303,8 @@ ter-resolve (tanpa `resetSingle`).
 | `pegawaiService` | `PegawaiServiceInterface`: `daftar(AuthContext, filter): {items,total,page,per_page}`, `detail(AuthContext, nip)`; aditif MAKE-011: `tambah(AuthContext, data, ?UploadedFile)`, `hapus(AuthContext, nip)` — `PegawaiService` + `SiklusPegawai` | WS-2 (MAKE-010/011) |
 | `biodataService` | `BiodataServiceInterface`: `ubah(AuthContext, nip, data, ?UploadedFile foto)`, `foto(AuthContext, nip)`; aditif MAKE-011: `antreanPengajuan`, `pengajuan`, `fotoPengajuan`, `prosesPengajuan` — `BiodataService` + `ApprovalBiodata` | WS-2 (MAKE-010/011) |
 | `nipCascade` | `NipCascadeInterface`: `koreksi(AuthContext, nipLama, mixed nipBaru)` — `NipCascadeService` | WS-2 (MAKE-010) |
-| `strukturService`, `lkhService`, `konketService` | Interface penanda tanpa method; method ditetapkan pemiliknya di milestone-nya (aditif) | WS-2 (MAKE-012..013) |
+| `strukturService` | `StrukturServiceInterface`: `pohon(AuthContext, filter)` — `Struktur\StrukturService` | WS-2 (MAKE-012) |
+| `lkhService`, `konketService` | Interface penanda tanpa method; method ditetapkan pemiliknya di milestone-nya (aditif) | WS-2 (MAKE-013) |
 
 **Definisi riwayat** (`App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi`, pemilik WS-1): satu berkas per jenis di
 `app/Libraries/Kepegawaian/Riwayat/Definisi/`, ditemukan otomatis. Isinya data: `jenis()` (slug), `label()`, `tabel()`,

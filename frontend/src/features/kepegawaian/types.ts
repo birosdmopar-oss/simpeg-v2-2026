@@ -282,13 +282,36 @@ export interface PegawaiListResponse {
   per_page: number
 }
 
-/** Simpul bagan struktur organisasi (B-19). TODO(B-19, WS-2): bentuk & endpoint ditetapkan saat dibuat. */
-export interface OrgNode {
-  id: string
-  jabatan: string
-  nama: string
+/** Pejabat simpul struktur (B-19): definitif dari snapshot jabatan, bila kosong Plt lalu Plh yang berlaku hari ini. */
+export interface OrgPejabat {
+  nip: string
   nama_lengkap: string
+  gol_ruang: string | null
+  jenis: 'definitif' | 'plt' | 'plh'
+  /** Teks legacy "Nama, Gol, NIP" (awalan "Plt."/"Plh."). */
+  pejabat_so: string
+}
+
+/** Simpul bagan struktur organisasi (B-19, `GET struktur-organisasi`, MAKE-012). */
+export interface OrgNode {
+  /** `sj-<id_struktur_jabatan>`. */
+  id: string
+  id_jabatan: number
+  id_atasan: number | null
+  jabatan: string
+  level_struktur: number
+  id_unit: number | null
+  unit: string | null
+  id_satker: number | null
+  satker: string | null
+  pejabat: OrgPejabat | null
   children: OrgNode[]
+}
+
+export interface StrukturOrganisasi {
+  periode: { id_periode_struktur_jabatan: number; periode_struktur_jabatan: string } | null
+  filter: { id_unit: number | null; id_satker: number | null }
+  nodes: OrgNode[]
 }
 
 export interface SelectOptionItem {
@@ -760,4 +783,39 @@ export interface AturanLampiran {
   batas_mb: 1 | 2 | 5
   /** Ekstensi tanpa titik, huruf kecil. */
   ekstensi: string[]
+}
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * Penugasan Plt/Plh (B-07, `penugasan/{jenis}`, MAKE-012)
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+export type JenisPenugasan = 'plt' | 'plh'
+
+/** Satu baris `pegawai_plt` / `pegawai_plh` + nama rujukan; kolom `*_plt`/`*_plh` mengikuti jenis. */
+export interface PenugasanItem {
+  id: number
+  nip: string
+  nama_lengkap: string | null
+  status: number | string
+  jenis_jabatan: number | string
+  jenis_jabatan_koord: number | string | null
+  tgl_mulai: string | null
+  tgl_akhir: string | null
+  id_jabatan: number | string | null
+  jabatan: string | null
+  id_jabatan_koord: number | string | null
+  jabatan_koord: string | null
+  id_unit: number | string | null
+  unit: string | null
+  id_satker: number | string | null
+  satker: string | null
+  keterangan: string | null
+  ada_lampiran: boolean
+  [kolom: string]: unknown
+}
+
+export interface PenugasanListResponse {
+  items: PenugasanItem[]
+  meta: { page: number; per_page: number; total: number }
+  can_create: boolean
 }

@@ -4,7 +4,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES } from './roles'
+import { KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES, PENUGASAN_ROLES } from './roles'
 
 export const pegawaiRoutes: RouteRecordRaw[] = [
   {
@@ -27,6 +27,13 @@ export const pegawaiRoutes: RouteRecordRaw[] = [
     name: 'org-structure',
     component: () => import('./views/StrukturOrganisasiPage.vue'),
     meta: { title: 'Struktur Organisasi' },
+  },
+  {
+    // B-07 penugasan Plt/Plh (legacy list_off_plt|plh; lihat 1, 3, 4, 5 — tulis role 1, ditegakkan backend).
+    path: '/penugasan',
+    name: 'penugasan',
+    component: () => import('./views/PenugasanPage.vue'),
+    meta: { roles: PENUGASAN_ROLES, title: 'Plt/Plh' },
   },
   {
     // B-13 Usulan Konket (hr/rwy/konket/* = role 1, 2, 3, 6, 7) — halaman usulan mandiri; placeholder sampai M5.

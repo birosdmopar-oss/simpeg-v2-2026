@@ -48,5 +48,15 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->get('biodata/pengajuan/(:num)/foto', 'PegawaiController::fotoPengajuan/$1');
     $routes->post('biodata/pengajuan/(:num)/process', 'PegawaiController::prosesPengajuan/$1', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]);
 
-    // WS-2: endpoint struktur/Konket/LKH ditambahkan di sini.
+    // B-19 struktur organisasi (MAKE-012): semua pengguna login (legacy hr/so/full = sesi, hr/rwy/jabatan/so = UL_ALL).
+    $routes->get('struktur-organisasi', 'StrukturController::index');
+    // B-07 penugasan Plt/Plh (MAKE-012): {jenis} = plt|plh; hak akses & lingkup di PenugasanService (jwt saja).
+    $routes->get('penugasan/(plt|plh)', 'PenugasanController::index/$1');
+    $routes->post('penugasan/(plt|plh)', 'PenugasanController::create/$1');
+    $routes->get('penugasan/(plt|plh)/(:num)', 'PenugasanController::show/$1/$2');
+    $routes->put('penugasan/(plt|plh)/(:num)', 'PenugasanController::update/$1/$2');
+    $routes->delete('penugasan/(plt|plh)/(:num)', 'PenugasanController::delete/$1/$2');
+    $routes->get('penugasan/(plt|plh)/(:num)/lampiran', 'PenugasanController::unduhLampiran/$1/$2');
+
+    // WS-2: endpoint Konket/LKH ditambahkan di sini.
 });

@@ -30,3 +30,10 @@ export const KARPEG_KARIS_ROLES: readonly RoleCode[] = [
   Role.MENTERI,
   Role.PPPK,
 ]
+
+/**
+ * Penugasan Plt/Plh (`hr/rwy/jabatan/list_off_plt|plh`, B-07 MAKE-012): lihat 1, 3 (lingkup satker/unit), 4, 5;
+ * tambah/ubah/hapus hanya role 1 (legacy userAuth ['1']). Server tetap yang menegakkan.
+ */
+export const PENUGASAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI]
+export const PENUGASAN_TULIS_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
