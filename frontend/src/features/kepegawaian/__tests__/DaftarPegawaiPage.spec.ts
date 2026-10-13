@@ -54,7 +54,7 @@ describe('DaftarPegawaiPage — data', () => {
     const { wrapper } = await mountList()
     expect(list).toHaveBeenCalledWith({ page: 1, per_page: 10, search: undefined })
     expect(rows(wrapper)).toHaveLength(10)
-    expect(headers(wrapper)).toEqual(['Nama/NIP', 'Jenis Pegawai', 'Jenis Status', 'Aksi'])
+    expect(headers(wrapper)).toEqual(['Nama/NIP', 'Jabatan', 'Satuan Kerja', 'KP (Gol)', 'Jenis Pegawai', 'Aksi'])
   })
 
   it('nama lengkap (glr_akhir) menaut ke halaman detail', async () => {

@@ -108,35 +108,127 @@ export interface Pegawai {
   jenis_pegawai: string | null
   jenis_status: string | null
   tmt_status: string | null
-  foto: string | null
+  /** Path `pegawai.foto` tidak pernah dikirim backend (MAKE-010); berkas lewat `GET pegawai/{nip}/foto`. */
+  ada_foto: boolean
   keterangan: string | null
   status: number
+  /** 0 tanpa pengajuan, 1 diajukan, 2 ditolak, 3 disetujui (COMMENT DDL). */
   flag_update: number
   id_pns_siasn: string | null
 }
 
-/**
- * `GET pegawai/{nip}` → `data`. Yang dibekukan S0-A hanya `tabs`; field biodata = kolom `pegawai`.
- * TODO(B-20, WS-2): field tambahan (snapshot jabatan/pangkat untuk kartu identitas, foto) ditetapkan saat endpoint dibuat.
- */
-export interface PegawaiDetail extends Pegawai {
-  tabs: RiwayatTabDescriptor[]
+/** Snapshot jabatan aktif (`pegawai_mutasi_jabatan`) pada detail pegawai. */
+export interface JabatanAktif {
+  id_unit: number | null
+  unit: string | null
+  id_satker: number | null
+  satker: string | null
+  id_jabatan: number | null
+  jabatan: string | null
+  jabatan_lain: string | null
+  jenis_jabatan: number | null
+  tmtsk: string | null
+}
+
+/** Snapshot pangkat aktif (`pegawai_kp`) pada detail pegawai. */
+export interface PangkatAktif {
+  gol_ruang: string | null
+  pangkat: string | null
+  tmtsk: string | null
+}
+
+/** Pengajuan biodata terakhir (`pegawai_hist`) saat `flag_update` 1/2. */
+export interface PengajuanBiodata {
+  id_pegawai_hist: number
+  flag_update: number
+  reason_note: string | null
+  created_at: string | null
+  updated_at: string | null
+  notif_date: string | null
+}
+
+/** Hak aksi pemanggil atas pegawai ini, dihitung backend (role × PegawaiScope). */
+export interface AksiPegawai {
+  ubah_biodata: boolean
+  /** true = Super Admin: perubahan langsung ke `pegawai`; false = lewat pengajuan (approval B-04). */
+  ubah_langsung: boolean
+  koreksi_nip: boolean
 }
 
 /**
- * Satu baris `GET pegawai`. Kolom `pegawai` saja yang pasti ada.
- * TODO(B-20, WS-2): kolom snapshot (jabatan, unit, satker, gol_ruang) & parameter filter ditetapkan saat endpoint dibuat.
+ * `GET pegawai/{nip}` → `data` (MAKE-010; README kontrak "Pegawai, biodata, koreksi NIP"). `tabs` beku S0-A.
  */
-export type PegawaiListItem = Pick<
-  Pegawai,
-  'nip' | 'nip_lama' | 'nama' | 'glr_awal' | 'glr_akhir' | 'jenis_kelamin' | 'agama' | 'jenis_pegawai' | 'jenis_status' | 'tmt_status'
->
+export interface PegawaiDetail extends Pegawai {
+  email: string | null
+  jabatan_aktif: JabatanAktif | null
+  pangkat_aktif: PangkatAktif | null
+  pengajuan: PengajuanBiodata | null
+  aksi: AksiPegawai
+  tabs: RiwayatTabDescriptor[]
+}
+
+/** Satu baris `GET pegawai`: biodata inti + snapshot jabatan (pmj) + pangkat (`pegawai_kp`). */
+export interface PegawaiListItem
+  extends Pick<
+    Pegawai,
+    | 'nip'
+    | 'nip_lama'
+    | 'nama'
+    | 'glr_awal'
+    | 'glr_akhir'
+    | 'jenis_kelamin'
+    | 'tgl_lahir'
+    | 'agama'
+    | 'id_jenis_pegawai'
+    | 'jenis_pegawai'
+    | 'jenis_status'
+    | 'tmt_status'
+    | 'status'
+    | 'flag_update'
+    | 'ada_foto'
+  > {
+  id_unit: number | null
+  unit: string | null
+  id_satker: number | null
+  satker: string | null
+  id_jabatan: number | null
+  jabatan: string | null
+  tmt_jabatan: string | null
+  gol_ruang: string | null
+  pangkat: string | null
+}
 
 export interface PegawaiListQuery {
   page: number
   per_page: number
-  /** Pencarian nama/NIP. TODO(B-20): nama parameter dikonfirmasi saat endpoint dibuat. */
+  /** Nama, NIP, atau NIP lama. */
   search?: string
+  /** '1' Aktif / '2' Tidak Aktif; kosong = keduanya (legacy). */
+  status?: string
+  id_unit?: string
+  id_satker?: string
+  id_jenis_pegawai?: string
+  sort?: 'nama' | 'nip' | 'jabatan' | 'unit' | 'satker' | 'gol_ruang'
+  order?: 'asc' | 'desc'
+}
+
+/** Body `PUT pegawai/{nip}/biodata` — kolom DDL `pegawai` + `email` akun + `jenis_kerabat_lain`. */
+export type BiodataPayload = Record<string, string>
+
+/** `PUT pegawai/{nip}/biodata` → `data`. */
+export interface BiodataResult {
+  jalur: 'langsung' | 'pengajuan'
+  pegawai: Pegawai
+  pengajuan: PengajuanBiodata | null
+}
+
+/** `POST pegawai/{nip}/koreksi-nip` → `data`. */
+export interface KoreksiNipResult {
+  nip_lama: string
+  nip_baru: string
+  tabel: Record<string, number>
+  dilewati: string[]
+  sesi_dicabut: number
 }
 
 /** Konvensi daftar ber-paginasi proyek (sama dengan Manajemen Akun/Master Data). TODO(B-20): konfirmasi. */
