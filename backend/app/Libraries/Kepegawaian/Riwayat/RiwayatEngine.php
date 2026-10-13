@@ -102,6 +102,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
             ->where($d->kolomStatus() . ' !=', $this->nilaiStatus($d, StatusRiwayat::Dihapus))
             ->orWhere($d->kolomStatus(), null)
             ->groupEnd();
+        $d->saringDaftar($builder);
 
         foreach ($d->urutanDaftar() as $kolom => $arah) {
             $builder->orderBy($kolom, $arah);
@@ -132,7 +133,8 @@ final class RiwayatEngine implements RiwayatServiceInterface
         $row = $this->transaksi(function () use ($d, $auth, $nip, $data, $berkas, $status): array {
             $this->kunciPegawai($nip);
 
-            $data = $d->beforeSave($data, null, $auth);
+            // NIP pemilik ikut ke beforeSave (aditif MAKE-008) agar isian turunan per pegawai bisa diisi saat tambah.
+            $data = $d->beforeSave($data + [$d->kolomNip() => $nip], null, $auth);
             unset($data[$d->primaryKey()]);
             $data                    = $this->tulisKolomBerkas($d, $berkas, $data, null);
             $data[$d->kolomNip()]    = $nip;

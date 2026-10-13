@@ -7,6 +7,7 @@ namespace App\Libraries\Kepegawaian\Riwayat;
 use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\MasterData\MasterField;
+use CodeIgniter\Database\BaseBuilder;
 
 /**
  * Definisi satu jenis riwayat sebagai DATA (kontrak beku S0-A MAKE-002; pemilik WS-1). RiwayatEngine/SnapshotSync
@@ -179,6 +180,15 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Saring tambahan daftar riwayat (aditif MAKE-008, engine-v1): dipanggil engine di `GET riwayat/{jenis}` setelah
+     * filter NIP & status != 10, sebelum urutanDaftar(). Bawaan tidak menyaring. Contoh: SKP periodik hanya menampilkan
+     * baris status 1 (legacy `L_skp.php` periodic() :779). Detail/ubah per baris tidak ikut disaring.
+     */
+    public function saringDaftar(BaseBuilder $builder): void
+    {
+    }
+
+    /**
      * Aturan snapshot `pegawai_*` (boleh lebih dari satu target; kosong = jenis tanpa snapshot).
      *
      * @return list<AturanSnapshot>
@@ -279,7 +289,8 @@ abstract class RiwayatDefinisi
     }
 
     /**
-     * Hook sebelum simpan (mis. mengisi kolom teks turunan dari master). Dipanggil di dalam transaksi engine.
+     * Hook sebelum simpan (mis. mengisi kolom teks turunan dari master). Dipanggil di dalam transaksi engine. Saat tambah
+     * $data juga berisi kolom NIP pemilik (aditif MAKE-008; saat ubah NIP ada di $lama).
      *
      * @param array<string, mixed>      $data
      * @param array<string, mixed>|null $lama
