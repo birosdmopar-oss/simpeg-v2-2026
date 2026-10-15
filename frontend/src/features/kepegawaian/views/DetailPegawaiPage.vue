@@ -31,6 +31,7 @@ import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
 import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { tabsFromDescriptors } from '../riwayat/registry'
+import { PEGAWAI_LIST_ROLES } from '../roles'
 import { describeApiError, type ApiFailure } from '../services/apiErrors'
 import { simpanBerkas } from '../services/berkasUnduhan'
 import { pegawaiService } from '../services/pegawai.service'
@@ -195,9 +196,10 @@ const failureTitle = computed(() => {
   }
 })
 
+/** D-F15: "Daftar Pegawai" hanya ditautkan bagi role yang boleh membukanya (1, 3, 4, 5, 8). */
 const crumbs = computed(() => [
   { label: 'Home', to: { name: 'home' } },
-  { label: 'Daftar Pegawai', to: { name: 'pegawai-list' } },
+  ...(role.value !== null && PEGAWAI_LIST_ROLES.includes(role.value) ? [{ label: 'Daftar Pegawai', to: { name: 'pegawai-list' } }] : []),
   { label: 'Data Pegawai' },
 ])
 </script>

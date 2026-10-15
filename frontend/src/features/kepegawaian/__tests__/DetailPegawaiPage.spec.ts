@@ -176,6 +176,14 @@ describe('DetailPegawaiPage — aksi kartu', () => {
     }
   })
 
+  it('breadcrumb: "Daftar Pegawai" hanya ditautkan bagi role daftar (D-F15)', async () => {
+    const admin = await mountDetail()
+    expect(admin.wrapper.find('nav[aria-label="Breadcrumb"] a[href="/pegawai"]').exists()).toBe(true)
+    admin.wrapper.unmount()
+    const milik = await mountDetail(`/pegawai/${NIP}`, Role.PEGAWAI, NIP)
+    expect(milik.wrapper.get('nav[aria-label="Breadcrumb"]').text()).not.toContain('Daftar Pegawai')
+  })
+
   it('Cetak → DRH: unduh PDF dari server (nama berkas dari Content-Disposition); Cetak Data Umum tidak ditawarkan', async () => {
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:drh'), revokeObjectURL: vi.fn() })
     const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)

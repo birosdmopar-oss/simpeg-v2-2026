@@ -23,6 +23,7 @@ import {
   Folder,
   CalendarDays,
   CircleHelp,
+  ClipboardPen,
   FileText,
   House,
   MessageCircle,
@@ -41,6 +42,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
 import {
   BIODATA_PROSES_ROLES,
+  DATA_SAYA_ROLES,
   KARPEG_KARIS_ROLES,
   KONKET_ROLES,
   LKH_ROLES,
@@ -74,6 +76,8 @@ export interface NavItem {
   /** Kosong = semua role login. */
   roles?: readonly RoleCode[]
   phase: number
+  /** Tujuan = Detail Pegawai NIP akun; item disembunyikan bila akun tanpa NIP (CR-049). */
+  nipAkun?: true
 }
 
 export interface NavGroup {
@@ -92,6 +96,8 @@ const NAV: NavGroup[] = [
     key: 'kepegawaian',
     title: 'Kepegawaian',
     items: [
+      // Legacy "Kelola Data" (hr/employee/edit, data sendiri) — CR-049 ISSUE-034.
+      { key: 'data-saya', label: 'Kelola Data', icon: ClipboardPen, roles: DATA_SAYA_ROLES, phase: 3, nipAkun: true },
       { key: 'pegawai', label: 'Daftar Pegawai', icon: Users, to: { name: 'pegawai-list' }, roles: PEGAWAI_LIST_ROLES, phase: 3 },
       // B-04 antrean pengajuan perubahan Data Umum (MAKE-014).
       { key: 'biodata-antrean', label: 'Pengajuan Data Umum', icon: UserCheck, to: { name: 'biodata-antrean' }, roles: BIODATA_PROSES_ROLES, phase: 3 },
@@ -170,12 +176,16 @@ const NAV: NavGroup[] = [
   },
 ]
 
-/** Menu yang boleh tampil untuk `role` pada fase aktif; grup tanpa item dibuang. */
-export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHASE): NavGroup[] {
+/**
+ * Menu yang boleh tampil untuk `role` pada fase aktif; grup tanpa item dibuang. `nip` = NIP akun (item `nipAkun`
+ * menuju Detail Pegawai NIP itu; tanpa NIP item itu tidak tampil).
+ */
+export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHASE, nip: string | null = null): NavGroup[] {
   return NAV.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) => item.phase <= activePhase && (!item.roles || (role !== null && item.roles.includes(role))),
-    ),
+    items: group.items
+      .filter((item) => item.phase <= activePhase && (!item.roles || (role !== null && item.roles.includes(role))))
+      .filter((item) => !item.nipAkun || Boolean(nip))
+      .map((item) => (item.nipAkun && nip ? { ...item, to: { name: 'pegawai-detail', params: { nip } } } : item)),
   })).filter((group) => group.items.length > 0)
 }

@@ -64,6 +64,11 @@ describe('RedesignShell — menu', () => {
     expect(wrapper.get('[data-testid="nav-struktur"]').attributes('href')).toBe('/struktur-organisasi')
   })
 
+  it('Pegawai ber-NIP: menu "Kelola Data" menuju profil sendiri (CR-049)', async () => {
+    const { wrapper } = await mountShell(Role.PEGAWAI, '/', { nip: '199001012015011001' })
+    expect(wrapper.get('[data-testid="nav-data-saya"]').attributes('href')).toBe('/pegawai/199001012015011001')
+  })
+
   it('item aktif memakai aria-current="page"; halaman anak tetap menandai menu induknya', async () => {
     const { wrapper, router } = await mountShell(Role.SUPER_ADMIN, '/master')
     expect(wrapper.get('[data-testid="nav-master-data"]').attributes('aria-current')).toBe('page')
