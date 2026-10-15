@@ -69,7 +69,9 @@ async function centang(name: string, id: string): Promise<void> {
 async function kirim(): Promise<void> {
   q('[data-testid="riwayat-form"]')?.dispatchEvent(new Event('submit'))
   await flushPromises()
-  await new Promise((r) => setTimeout(r, 0))
+  // VeeValidate men-debounce validasi skema form (±5 ms): tunggu lewat jendela itu supaya submit ini selesai dengan
+  // nilai saat dikirim, bukan bergabung dengan validasi ketikan berikutnya (balapan di CI yang sibuk, CR-049).
+  await new Promise((r) => setTimeout(r, 30))
   await flushPromises()
 }
 
