@@ -81,6 +81,8 @@ describe('PenugasanPage', () => {
     const { wrapper } = await mountPage()
     expect(svc.list).toHaveBeenLastCalledWith('plt', { page: 1, per_page: 20, search: '' })
     expect(wrapper.get('[data-testid="penugasan-row-1"]').text()).toContain('Kepala Biro')
+    // CR-049 D-F13: periode tanggal Indonesia.
+    expect(wrapper.get('[data-testid="penugasan-row-1"]').text()).toContain('1 Januari 2026 s.d. 31 Desember 2026')
     expect(wrapper.get('[data-testid="penugasan-row-2"]').text()).toContain('Tidak Aktif')
 
     await mountPage(Role.SUPER_ADMIN, '?jenis=plh')

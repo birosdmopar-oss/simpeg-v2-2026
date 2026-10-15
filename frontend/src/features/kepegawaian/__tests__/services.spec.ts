@@ -70,6 +70,25 @@ describe('pegawaiService', () => {
     expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}`)
   })
 
+  it('CR-049: angka dari MySQLi berupa string ("1") dinormalkan — status, flag_update, pengajuan, antrean', async () => {
+    const mentah = { ...pegawaiDetail([]), status: '1', flag_update: '1', pengajuan: { id_pegawai_hist: '9', flag_update: '2', reason_note: 'Lengkapi', created_at: null, updated_at: null, notif_date: null } }
+    get.mockResolvedValueOnce({ data: mentah })
+    const hasil = await pegawaiService.detail(NIP)
+    expect([hasil.status, hasil.flag_update, hasil.pengajuan?.id_pegawai_hist, hasil.pengajuan?.flag_update]).toEqual([1, 1, 9, 2])
+
+    get.mockResolvedValueOnce({ data: { ...mentah, pengajuan: null } })
+    expect((await pegawaiService.detail(NIP)).pengajuan).toBeNull()
+
+    get.mockResolvedValueOnce({ data: { items: [{ id_pegawai_hist: '7', nip: NIP }], total: 1, page: 1, per_page: 20 } })
+    expect((await pegawaiService.antreanPengajuan({ page: 1, per_page: 20 })).items[0]?.id_pegawai_hist).toBe(7)
+
+    const detailPengajuan = { pengajuan: { id_pegawai_hist: '7', flag_update: '3', nip: NIP, nama: 'Budi', ada_foto: false }, pegawai: {}, perubahan: [], can_process: false }
+    get.mockResolvedValueOnce({ data: detailPengajuan })
+    expect((await pegawaiService.pengajuan(7)).pengajuan.flag_update).toBe(3)
+    post.mockResolvedValueOnce({ data: detailPengajuan })
+    expect((await pegawaiService.prosesPengajuan(7, { aksi: 'setujui', reason_note: '' })).pengajuan.id_pegawai_hist).toBe(7)
+  })
+
   it('list: filter status/id_unit/id_satker/sort ikut dikirim bila diisi (MAKE-010)', async () => {
     get.mockResolvedValue({ data: { items: [], total: 0, page: 1, per_page: 10 } })
     await pegawaiService.list({ page: 1, per_page: 10, status: '1', id_satker: '12', sort: 'jabatan', order: 'desc' })

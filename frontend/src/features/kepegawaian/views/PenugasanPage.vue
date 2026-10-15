@@ -6,6 +6,7 @@
  * ikut legacy, keputusan user 13-10-2026).
  * Tambah/Edit/Hapus hanya bila `can_create` (role 1).
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { Plus } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -155,7 +156,7 @@ function onSaved(): void {
 }
 
 const jabatanRow = (row: PenugasanItem): string => row.jabatan ?? row.jabatan_koord ?? '—'
-const periode = (row: PenugasanItem): string => [row.tgl_mulai, row.tgl_akhir].filter(Boolean).join(' s.d. ') || '—'
+const periode = (row: PenugasanItem): string => [tgl(row.tgl_mulai), tgl(row.tgl_akhir)].filter(Boolean).join(' s.d. ') || '—'
 const aktif = (row: PenugasanItem): boolean => String(row.status) === '1'
 </script>
 

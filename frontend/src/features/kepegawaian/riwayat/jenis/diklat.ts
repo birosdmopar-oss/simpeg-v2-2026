@@ -15,6 +15,8 @@ export default defineRiwayatJenis({
   task: 'B-11',
   singular: 'diklat',
   primaryKey: 'id_riwayat_diklat',
+  // CR-049 D-F12: label baris ⋮ / judul dialog.
+  labelKolom: ['jenis_diklat', 'nama_diklat'],
   columns: [
     { key: 'jenis_diklat', label: 'Jenis', options: [{ value: '1', label: 'Struktural' }, { value: '2', label: 'Teknis' }, { value: '3', label: 'Fungsional' }, { value: '4', label: 'Prajabatan' }, { value: '5', label: 'Sertifikasi' }] },
     { key: 'nama_diklat', label: 'Nama Diklat' },

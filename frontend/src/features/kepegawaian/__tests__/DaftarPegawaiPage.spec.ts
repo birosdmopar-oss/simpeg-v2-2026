@@ -165,6 +165,20 @@ describe('DaftarPegawaiPage — data', () => {
     expect(headers(wrapper)).toEqual(['Nama/NIP', 'Jabatan', 'Satuan Kerja', 'KP (Gol)', 'Jenis Pegawai', 'Aksi'])
   })
 
+  it('CR-049 D-F8: jenis pegawai berupa badge berwarna (PNS biru, PPPK tosca, PTT kuning)', async () => {
+    list.mockResolvedValue({
+      items: [{ ...listItem(1), jenis_pegawai: 'PNS' }, { ...listItem(2), jenis_pegawai: 'PPPK' }, { ...listItem(3), jenis_pegawai: 'PTT' }],
+      total: 3,
+      page: 1,
+      per_page: 10,
+    })
+    const { wrapper } = await mountList()
+    const kelas = wrapper.findAll('[data-testid="badge-jenis-pegawai"]').map((b) => b.classes().join(' '))
+    expect(kelas[0]).toContain('text-brand-tertiary')
+    expect(kelas[1]).toContain('bg-info-soft')
+    expect(kelas[2]).toContain('bg-brand-secondary/20')
+  })
+
   it('nama lengkap (glr_akhir) menaut ke halaman detail', async () => {
     const { wrapper } = await mountList()
     const second = ITEMS[1]

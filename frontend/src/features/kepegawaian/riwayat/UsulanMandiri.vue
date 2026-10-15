@@ -258,7 +258,7 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
                 <th v-if="config.fields.length" scope="col" class="px-5 py-3">Jenis Permohonan</th>
                 <th scope="col" class="px-5 py-3">Berkas</th>
                 <th scope="col" class="px-5 py-3">Status</th>
-                <th scope="col" class="px-5 py-3 text-right">Aksi</th>
+                <th scope="col" class="sticky right-0 bg-white px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200">
@@ -282,7 +282,7 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
                   <StatusBadge :status="rowStatus(row)" />
                   <p v-if="rowStatus(row) === STATUS_RIWAYAT.DITOLAK && row.reason_note" class="mt-1 max-w-56 text-caption text-slate-500">{{ row.reason_note }}</p>
                 </td>
-                <td class="px-5 py-3 text-right">
+                <td class="sticky right-0 bg-white px-5 py-3 text-right">
                   <RowActionsMenu
                     :actions="rowActions(row)"
                     :label="`Aksi untuk ${rowLabel(row)}`"

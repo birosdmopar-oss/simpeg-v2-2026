@@ -196,11 +196,11 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
 
     <UiCard title="Daftar Pegawai" flush>
       <template #actions>
-        <UiButton v-if="isSuperAdmin" data-testid="add-pegawai" @click="tambahOpen = true">
+        <UiButton v-if="isSuperAdmin" class="whitespace-nowrap" data-testid="add-pegawai" @click="tambahOpen = true">
           <template #icon-left><Plus class="h-4 w-4" aria-hidden="true" /></template>
           Data Pegawai
         </UiButton>
-        <UiButton v-if="bolehLanjutan" variant="secondary" appearance="soft" data-testid="pencarian-toggle" @click="lanjutanOpen = !lanjutanOpen">
+        <UiButton v-if="bolehLanjutan" variant="secondary" appearance="soft" class="whitespace-nowrap" data-testid="pencarian-toggle" @click="lanjutanOpen = !lanjutanOpen">
           <template #icon-left><SlidersHorizontal class="h-4 w-4" aria-hidden="true" /></template>
           Pencarian Lanjutan
         </UiButton>

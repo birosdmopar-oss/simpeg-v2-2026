@@ -6,6 +6,7 @@
  * TODO kartu lanjutan: combobox pencarian pegawai). Berkas bukti wajib saat tambah (5 MB, jpg/jpeg/png/gif/pdf/
  * xls/xlsx/doc/docx).
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, reactive, ref, watch } from 'vue'
@@ -123,7 +124,7 @@ const status = (k: string): 'default' | 'error' => (errors.value[k] ? 'error' : 
           <div>
             <DialogTitle class="text-h5 text-slate-900">{{ row ? 'Ubah' : 'Ajukan' }} Konfirmasi Ketidakhadiran</DialogTitle>
             <DialogDescription class="text-body2 text-slate-500">
-              Tanggal minimal {{ opsi.tanggal_minimal }}; data sebelum tanggal minimal tidak diterima sistem.
+              Tanggal minimal {{ tgl(opsi.tanggal_minimal) }}; data sebelum tanggal minimal tidak diterima sistem.
             </DialogDescription>
           </div>
           <DialogClose :disabled="busy" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
@@ -216,7 +217,7 @@ const status = (k: string): 'default' | 'error' => (errors.value[k] ? 'error' : 
           <UiNotice v-if="umum" tone="danger" class="md:col-span-2" data-testid="konket-error">{{ umum }}</UiNotice>
 
           <div class="flex justify-end gap-2 md:col-span-2">
-            <UiButton type="button" variant="secondary" :disabled="busy" @click="tutup">Batal</UiButton>
+            <UiButton type="button" variant="secondary" appearance="soft" :disabled="busy" @click="tutup">Batal</UiButton>
             <UiButton type="submit" :loading="busy" data-testid="konket-simpan">Simpan</UiButton>
           </div>
         </form>

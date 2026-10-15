@@ -149,6 +149,37 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-row-1"] [data-testid="status-badge"]').text()).toBe('Disetujui')
     expect(wrapper.get('[data-testid="riwayat-row-2"] [data-testid="status-badge"]').text()).toBe('Menunggu')
     expect(wrapper.get('[data-testid="riwayat-row-3"]').text()).toContain('Ijazah buram')
+    // CR-049 D-F3: kolom Aksi sticky kanan (header & sel).
+    expect(wrapper.findAll('thead th').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+    expect(wrapper.get('[data-testid="riwayat-row-1"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+  })
+
+  it('CR-049 D-F7: klik header mengurutkan (aria-sort naik → turun); tanggal dari nilai mentah', async () => {
+    svc.list.mockResolvedValue([
+      pendidikanRow(1, { tgl_lulus: '2012-08-30', institusi_pendidikan: 'Beta' }),
+      pendidikanRow(2, { tgl_lulus: '2005-01-02', institusi_pendidikan: 'alfa' }),
+      pendidikanRow(3, { tgl_lulus: '2019-12-31', institusi_pendidikan: 'Gamma' }),
+    ])
+    const wrapper = await mountTab()
+    const urutanId = () => wrapper.findAll('[data-testid^="riwayat-row-"]').map((r) => r.attributes('data-testid'))
+    const th = (key: string) => wrapper.get(`[data-testid="riwayat-sort-${key}"]`).element.closest('th')
+
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('none')
+    await wrapper.get('[data-testid="riwayat-sort-tgl_lulus"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('ascending')
+    expect(urutanId()).toEqual(['riwayat-row-2', 'riwayat-row-1', 'riwayat-row-3'])
+    await wrapper.get('[data-testid="riwayat-sort-tgl_lulus"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('descending')
+    expect(urutanId()).toEqual(['riwayat-row-3', 'riwayat-row-1', 'riwayat-row-2'])
+
+    await wrapper.get('[data-testid="riwayat-sort-institusi_pendidikan"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('none')
+    expect(urutanId()).toEqual(['riwayat-row-2', 'riwayat-row-1', 'riwayat-row-3'])
+  })
+
+  it('CR-049 D-F12: labelKolom membuat label ⋮ deskriptif', async () => {
+    const wrapper = await mountTab({}, { ...uji, labelKolom: ['institusi_pendidikan', 'tgl_lulus'] })
+    expect(wrapper.get('[data-testid="riwayat-actions-1"]').attributes('aria-label')).toBe('Aksi untuk Universitas 1 — 30 Agustus 2012')
   })
 
   it('501 (stub) → keterangan "belum tersedia", bukan tabel kosong', async () => {

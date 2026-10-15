@@ -5,6 +5,7 @@
  * pencarian, Tambah untuk pegawai lain), style redesign. Aksi baris lewat ⋮ (AGENTS.md §1): Edit → Setujui/Tolak →
  * Unduh bukti → Hapus (ConfirmDialog). Hak per baris dari `aksi` server.
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { Plus } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
@@ -186,7 +187,7 @@ function onSaved(): void {
   void muat()
 }
 
-const periode = (r: KonketItem): string => (r.date_start === r.date_end ? r.date_start : `${r.date_start} s.d. ${r.date_end}`)
+const periode = (r: KonketItem): string => (r.date_start === r.date_end ? tgl(r.date_start) : `${tgl(r.date_start)} s.d. ${tgl(r.date_end)}`)
 const STATUS_OPSI = [
   { value: 'W', label: 'Menunggu' },
   { value: 'V', label: 'Disetujui' },

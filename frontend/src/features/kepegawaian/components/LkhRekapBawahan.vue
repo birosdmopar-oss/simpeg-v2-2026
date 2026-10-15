@@ -4,6 +4,7 @@
  * pilih bulan → tabel bawahan langsung dengan jumlah LKH per status; ⋮ "Lihat LKH" membuka daftar LKH bawahan itu pada
  * bulan yang sama (semua status kecuali dihapus). Penentuan bawahan oleh server.
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { ref, watch } from 'vue'
 
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
@@ -124,7 +125,7 @@ async function lihat(row: LkhRekapItem): Promise<void> {
       <p v-if="detail.items.length === 0" class="text-body2 text-slate-500">Belum ada LKH pada bulan ini.</p>
       <ul v-else class="divide-y divide-slate-200">
         <li v-for="lkh in detail.items" :key="lkh.id" class="flex flex-wrap items-center justify-between gap-2 py-2" :data-testid="`lkh-rekap-lkh-${lkh.id}`">
-          <span class="text-slate-700">{{ lkh.tgl_laporan }} · {{ lkh.jumlah }} kegiatan</span>
+          <span class="text-slate-700">{{ tgl(lkh.tgl_laporan) }} · {{ lkh.jumlah }} kegiatan</span>
           <UiBadge :tone="STATUS[lkh.status].tone">{{ STATUS[lkh.status].label }}</UiBadge>
         </li>
       </ul>

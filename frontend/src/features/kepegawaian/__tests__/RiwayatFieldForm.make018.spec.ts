@@ -69,7 +69,9 @@ async function centang(name: string, id: string): Promise<void> {
 async function kirim(): Promise<void> {
   q('[data-testid="riwayat-form"]')?.dispatchEvent(new Event('submit'))
   await flushPromises()
-  await new Promise((r) => setTimeout(r, 0))
+  // VeeValidate men-debounce validasi skema form (±5 ms): tunggu lewat jendela itu supaya submit ini selesai dengan
+  // nilai saat dikirim, bukan bergabung dengan validasi ketikan berikutnya (balapan di CI yang sibuk, CR-049).
+  await new Promise((r) => setTimeout(r, 30))
   await flushPromises()
 }
 
@@ -190,6 +192,31 @@ describe('MAKE-018 (b) optionsFilter jamak dengan syarat when atas atribut opsi'
     expect(options).not.toHaveBeenCalledWith('x', expect.anything(), expect.anything())
     await pilih('jenis', '1')
     expect(options).toHaveBeenCalledWith('x', null, { jenis: '1' })
+  })
+})
+
+describe('CR-049 D-F4: isian berjenjang dikosongkan tanpa galat dini', () => {
+  it('memilih induk tidak memunculkan "wajib" pada turunan sebelum Simpan', async () => {
+    options.mockImplementation(async (entity: string, parent?: string | null) => {
+      if (entity === 'provinsi') return [opsi('31', 'DKI Jakarta')]
+      if (entity === 'kabupaten-kota') return parent === '31' ? [opsi('3171', 'Jakarta Selatan', '31')] : []
+      return parent ? [opsi(`${parent}01`, 'Kec', parent)] : []
+    })
+    const fields: FieldDef[] = [
+      R('id_provinsi', 'Provinsi', 'provinsi', { required: true }),
+      R('id_kabupaten_kota', 'Kabupaten/Kota', 'kabupaten-kota', { required: true, dependsOn: 'id_provinsi' }),
+      R('id_kecamatan', 'Kecamatan', 'kecamatan', { required: true, dependsOn: 'id_kabupaten_kota' }),
+    ]
+    await mountForm(fields)
+    await pilih('id_provinsi', '31')
+    await pilih('id_kabupaten_kota', '3171')
+    await pilih('id_provinsi', '31')
+
+    expect(document.body.textContent, document.body.textContent ?? '').not.toContain('wajib')
+    expect(document.body.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0)
+
+    await kirim()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('wajib'))
   })
 })
 

@@ -3,6 +3,7 @@
  * Verifikasi LKH oleh atasan langsung (B-12b, MAKE-013; legacy `form_process.php`): Setujui, Tolak, atau Revisi
  * (status 3 — kembali ke pegawai). Catatan wajib saat Tolak/Revisi (server menegakkan, 422 `catatan`).
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { ref, watch } from 'vue'
 
@@ -19,6 +20,8 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; processed: [row: Lkh
 const aksi = ref<AksiLkh>('setujui')
 const catatan = ref('')
 const error = ref('')
+/** Galat isian catatan, tampil di bawah textarea (CR-049 D-F11). */
+const galatCatatan = ref('')
 const busy = ref(false)
 
 watch(
@@ -28,14 +31,16 @@ watch(
     aksi.value = props.aksiAwal
     catatan.value = ''
     error.value = ''
+    galatCatatan.value = ''
   },
   { immediate: true },
 )
 
 async function kirim(): Promise<void> {
   if (!props.row) return
+  galatCatatan.value = ''
   if (aksi.value !== 'setujui' && catatan.value.trim() === '') {
-    error.value = 'Catatan wajib diisi saat menolak atau meminta revisi.'
+    galatCatatan.value = 'Catatan wajib diisi saat menolak atau meminta revisi.'
     return
   }
   busy.value = true
@@ -45,7 +50,9 @@ async function kirim(): Promise<void> {
     emit('processed', row)
     emit('update:open', false)
   } catch (e) {
-    error.value = (isApiError(e) ? Object.values(e.errors ?? {})[0]?.[0] : undefined) ?? describeApiError(e).message
+    const pesanCatatan = isApiError(e) ? e.errors?.catatan?.[0] : undefined
+    if (pesanCatatan) galatCatatan.value = pesanCatatan
+    else error.value = (isApiError(e) ? Object.values(e.errors ?? {})[0]?.[0] : undefined) ?? describeApiError(e).message
   } finally {
     busy.value = false
   }
@@ -62,7 +69,7 @@ async function kirim(): Promise<void> {
       >
         <DialogTitle class="text-h5 text-slate-900">Verifikasi Laporan Kerja Harian</DialogTitle>
         <DialogDescription class="mb-4 text-body2 text-slate-500">
-          {{ row ? `${row.nama} — ${row.tgl_laporan}` : '' }}
+          {{ row ? `${row.nama} — ${tgl(row.tgl_laporan)}` : '' }}
         </DialogDescription>
         <form class="space-y-4" @submit.prevent="kirim">
           <UiRadioGroup
@@ -75,12 +82,24 @@ async function kirim(): Promise<void> {
             ]"
           />
           <label class="block">
-            <span class="mb-1 block text-body2 font-medium text-slate-700">Catatan{{ aksi === 'setujui' ? '' : ' *' }}</span>
-            <textarea v-model="catatan" rows="3" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-body1" data-testid="lkh-catatan" />
+            <span class="mb-1 block text-body2 font-medium text-slate-700">
+              Catatan<span v-if="aksi !== 'setujui'" class="text-danger" aria-hidden="true"> *</span>
+            </span>
+            <textarea
+              v-model="catatan"
+              rows="3"
+              class="w-full rounded-lg border px-3 py-2 text-body1"
+              :class="galatCatatan ? 'border-danger' : 'border-slate-300'"
+              :aria-required="aksi !== 'setujui' || undefined"
+              :aria-invalid="galatCatatan ? true : undefined"
+              :aria-describedby="galatCatatan ? 'lkh-catatan-galat' : undefined"
+              data-testid="lkh-catatan"
+            />
+            <span v-if="galatCatatan" id="lkh-catatan-galat" class="mt-1 block text-caption text-danger" data-testid="lkh-proses-error">{{ galatCatatan }}</span>
           </label>
-          <UiNotice v-if="error" tone="danger" data-testid="lkh-proses-error">{{ error }}</UiNotice>
+          <UiNotice v-if="error" tone="danger" data-testid="lkh-proses-galat-umum">{{ error }}</UiNotice>
           <div class="flex justify-end gap-2">
-            <UiButton type="button" variant="secondary" :disabled="busy" @click="emit('update:open', false)">Batal</UiButton>
+            <UiButton type="button" variant="secondary" appearance="soft" :disabled="busy" @click="emit('update:open', false)">Batal</UiButton>
             <UiButton type="submit" :loading="busy" :variant="aksi === 'tolak' ? 'error' : 'primary'" data-testid="lkh-proses-kirim">Proses</UiButton>
           </div>
         </form>

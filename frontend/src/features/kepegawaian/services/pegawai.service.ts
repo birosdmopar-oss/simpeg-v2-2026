@@ -35,6 +35,17 @@ import type {
 
 const item = (nip: string): string => `/pegawai/${encodeURIComponent(nip)}`
 
+/** MySQLi mengirim kolom INT sebagai string ("1"); angka dinormalkan di sini supaya perbandingan `=== 1` benar (CR-049). */
+const angka = (v: unknown): number => (v === null || v === undefined || v === '' ? 0 : Number(v))
+
+function normalPengajuan<T extends { id_pegawai_hist: unknown; flag_update: unknown }>(p: T): T {
+  return { ...p, id_pegawai_hist: angka(p.id_pegawai_hist), flag_update: angka(p.flag_update) }
+}
+
+function normalDetailPengajuan(d: PengajuanBiodataDetail): PengajuanBiodataDetail {
+  return { ...d, pengajuan: normalPengajuan(d.pengajuan) }
+}
+
 const FILTER_KEYS = ['search', 'status', 'id_unit', 'id_satker', 'id_jenis_pegawai', 'sort', 'order'] as const
 
 function filterParams(query: Omit<PegawaiListQuery, 'page' | 'per_page'>): Record<string, string> {
@@ -73,7 +84,12 @@ export const pegawaiService = {
 
   async detail(nip: string): Promise<PegawaiDetail> {
     const { data } = await api.get<PegawaiDetail>(item(nip))
-    return data
+    return {
+      ...data,
+      status: angka(data.status),
+      flag_update: angka(data.flag_update),
+      pengajuan: data.pengajuan ? normalPengajuan(data.pengajuan) : null,
+    }
   },
 
   /** Ubah biodata; dengan `foto` dikirim multipart (`POST` + `_method=PUT`, PHP tidak mem-parse multipart pada PUT). */
@@ -113,12 +129,12 @@ export const pegawaiService = {
     const { data } = await api.get<{ items: PengajuanBiodataItem[]; total: number; page: number; per_page: number }>('/biodata/pengajuan', {
       params: { page: query.page, per_page: query.per_page, ...(query.search ? { search: query.search } : {}) },
     })
-    return data
+    return { ...data, items: data.items.map((i) => ({ ...i, id_pegawai_hist: angka(i.id_pegawai_hist) })) }
   },
 
   async pengajuan(id: number): Promise<PengajuanBiodataDetail> {
     const { data } = await api.get<PengajuanBiodataDetail>(`/biodata/pengajuan/${id}`)
-    return data
+    return normalDetailPengajuan(data)
   },
 
   async fotoPengajuan(id: number): Promise<Blob> {
@@ -128,7 +144,7 @@ export const pegawaiService = {
 
   async prosesPengajuan(id: number, payload: ApprovalPayload): Promise<PengajuanBiodataDetail> {
     const { data } = await api.post<PengajuanBiodataDetail>(`/biodata/pengajuan/${id}/process`, payload)
-    return data
+    return normalDetailPengajuan(data)
   },
 
   /** Cetak DRH PDF (MAKE-014; nama berkas dari server). */

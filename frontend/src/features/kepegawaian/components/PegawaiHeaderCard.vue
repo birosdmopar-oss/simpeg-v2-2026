@@ -16,10 +16,12 @@ import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
 } from 'radix-vue'
+import QRCode from 'qrcode'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import { UiAvatar, UiBadge, UiButton } from '@/shared/ui'
 
+import { nadaJenisPegawai } from '../columns'
 import { pegawaiService } from '../services/pegawai.service'
 import type { Pegawai } from '../types'
 
@@ -80,6 +82,20 @@ const STATUS: Record<number, { label: string; tone: 'success' | 'neutral' }> = {
   10: { label: 'Dihapus', tone: 'neutral' },
 }
 const status = computed(() => STATUS[props.detail.status] ?? null)
+
+/** QR berisi NIP (data URL PNG, lokal). Gagal dibangkitkan → tanpa QR. */
+const qrNip = ref<string | null>(null)
+watch(
+  () => props.detail.nip,
+  async (nip) => {
+    try {
+      qrNip.value = nip ? await QRCode.toDataURL(nip, { margin: 0, width: 144, errorCorrectionLevel: 'M' }) : null
+    } catch {
+      qrNip.value = null
+    }
+  },
+  { immediate: true },
+)
 const tanggalLahir = computed(() => {
   const d = new Date(`${props.detail.tgl_lahir.slice(0, 10)}T00:00:00`)
   return Number.isNaN(d.getTime()) ? props.detail.tgl_lahir : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -106,9 +122,10 @@ const menuItem =
         class="-mt-3"
       />
 
-      <div class="min-w-0 flex-1 pt-3">
+      <!-- CR-049 D-F9: kolom identitas minimal 14rem; tombol aksi turun ke baris sendiri di layar sempit. -->
+      <div class="min-w-[14rem] flex-1 pt-3">
         <div class="flex flex-wrap items-center gap-3">
-          <h1 class="text-h5 text-slate-900" data-testid="pegawai-name">
+          <h1 class="break-words text-h5 text-slate-900" data-testid="pegawai-name">
             {{ [detail.glr_awal, detail.nama].filter(Boolean).join(' ') }}<template v-if="detail.glr_akhir"
               >, <span class="text-brand-tertiary">{{ detail.glr_akhir }}</span></template
             >
@@ -118,12 +135,27 @@ const menuItem =
 
         <ul class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-body2 text-slate-600">
           <li class="inline-flex items-center gap-2"><IdCard class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.nip }}</li>
-          <li class="inline-flex items-center gap-2"><UserRound class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.jenis_pegawai || '—' }}</li>
+          <li class="inline-flex items-center gap-2">
+            <UserRound class="h-4 w-4 text-slate-400" aria-hidden="true" />
+            <UiBadge v-if="detail.jenis_pegawai" :tone="nadaJenisPegawai(detail.jenis_pegawai)" data-testid="pegawai-jenis">{{ detail.jenis_pegawai }}</UiBadge>
+            <template v-else>—</template>
+          </li>
           <li class="inline-flex items-center gap-2"><Calendar class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ tanggalLahir }}</li>
         </ul>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2 pt-3">
+      <!-- QR NIP (CR-049 D-F8): legacy kartu profil tanpa QR → isi = NIP saja, dibangkitkan lokal (lib qrcode, tanpa layanan luar). -->
+      <img
+        v-if="qrNip"
+        :src="qrNip"
+        :alt="`Kode QR NIP ${detail.nip}`"
+        width="72"
+        height="72"
+        class="mt-3 h-[72px] w-[72px] shrink-0 rounded border border-slate-200 bg-white p-1"
+        data-testid="pegawai-qr"
+      />
+
+      <div class="flex w-full flex-wrap items-center gap-2 pt-3 lg:w-auto">
         <UiButton data-testid="btn-arsip" @click="emit('arsip')">
           <template #icon-left><FolderOpen class="h-4 w-4" aria-hidden="true" /></template>
           Arsip Kepegawaian

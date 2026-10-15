@@ -8,6 +8,7 @@
  *  - "Rekap Bawahan": rekap LKH bawahan per bulan (MAKE-014, legacy list_rekap) — LkhRekapBawahan.
  * PDF dibangkitkan server (TCPDF). Tab LKH di Detail Pegawai = `components/LkhTab.vue` (MAKE-014).
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -218,7 +219,7 @@ const STATUS_VERIF = [
                   <span class="block font-medium text-slate-900">{{ row.nama }}</span>
                   <span class="block text-body2 text-slate-500">{{ row.nip }}</span>
                 </td>
-                <td class="px-4 py-3 text-slate-700">{{ row.tgl_laporan }}</td>
+                <td class="px-4 py-3 text-slate-700">{{ tgl(row.tgl_laporan) }}</td>
                 <td class="px-4 py-3 text-slate-700">
                   {{ row.jumlah }} kegiatan
                   <span v-if="row.catatan" class="block text-caption text-slate-500">Catatan: {{ row.catatan }}</span>
@@ -228,7 +229,7 @@ const STATUS_VERIF = [
                 <td class="sticky right-0 bg-white px-4 py-3 text-right">
                   <RowActionsMenu
                     :actions="actionsFor(row)"
-                    :label="`Aksi untuk LKH ${row.nama} ${row.tgl_laporan}`"
+                    :label="`Aksi untuk LKH ${row.nama} ${tgl(row.tgl_laporan)}`"
                     :testid="`lkh-actions-${row.id}`"
                     @select="(key) => onAction(key, row)"
                   />
@@ -247,7 +248,7 @@ const STATUS_VERIF = [
     <ConfirmDialog
       :open="hapusOpen"
       title="Hapus laporan kerja harian?"
-      :description="hapusRow ? `LKH tanggal ${hapusRow.tgl_laporan} akan dihapus.` : ''"
+      :description="hapusRow ? `LKH tanggal ${tgl(hapusRow.tgl_laporan)} akan dihapus.` : ''"
       confirm-label="Ya, hapus"
       danger
       @update:open="(v) => (hapusOpen = v)"

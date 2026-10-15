@@ -14,7 +14,7 @@
  * Aksi baris lewat menu ⋮ (AGENTS.md §1): Unduh → Hapus.
  */
 import { FileSearch, Upload } from 'lucide-vue-next'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
@@ -132,8 +132,28 @@ async function onPick(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] ?? null
   input.value = ''
-  if (!file) return
+  if (file) await unggah(file)
+}
 
+/** Seret-lepas berkas ke area unggah (CR-049 D-F6); aturan & pesan sama dengan memilih berkas. */
+const seret = ref(false)
+function onDrop(event: DragEvent): void {
+  seret.value = false
+  if (!props.canUpload || props.unggahDitahan || uploading.value) return
+  const file = event.dataTransfer?.files?.[0]
+  if (file) void unggah(file)
+}
+
+/** Pratinjau berkas yang sedang diunggah (gambar kecil atau nama + ukuran). */
+const sedangDiunggah = ref<{ nama: string; ukuran: number; url: string | null } | null>(null)
+
+function lepasPratinjau(): void {
+  if (sedangDiunggah.value?.url) URL.revokeObjectURL(sedangDiunggah.value.url)
+  sedangDiunggah.value = null
+}
+onBeforeUnmount(lepasPratinjau)
+
+async function unggah(file: File): Promise<void> {
   const aturan = props.aturan
   if (aturan) {
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
@@ -149,6 +169,8 @@ async function onPick(event: Event): Promise<void> {
 
   uploading.value = true
   notice.value = null
+  const gambar = /\.(jpe?g|png|gif|webp)$/i.test(file.name) && typeof URL.createObjectURL === 'function'
+  sedangDiunggah.value = { nama: file.name, ukuran: file.size, url: gambar ? URL.createObjectURL(file) : null }
   try {
     await lampiranService.upload(props.nip, props.target, file, props.isianUnggah)
     notice.value = { tone: 'success', text: `${file.name} diunggah.` }
@@ -160,6 +182,7 @@ async function onPick(event: Event): Promise<void> {
     notice.value = { tone: 'danger', text: failed.kind === 'validation' ? (split.general[0] ?? Object.values(split.fields)[0] ?? failed.message) : failed.message }
   } finally {
     uploading.value = false
+    lepasPratinjau()
   }
 }
 
@@ -215,7 +238,7 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
       <template v-if="canUpload">
         <input ref="fileInput" type="file" class="sr-only" :accept="accept" data-testid="arsip-input" :aria-label="`Pilih berkas ${title}`" @change="onPick" />
         <UiButton
-          variant="secondary"
+          appearance="soft"
           :loading="uploading"
           :disabled="Boolean(unggahDitahan)"
           :aria-describedby="unggahDitahan ? `arsip-tahan-${target.id_riwayat}` : undefined"
@@ -226,6 +249,22 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
           Unggah berkas
         </UiButton>
       </template>
+      <div
+        v-if="canUpload"
+        class="flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-4 text-center text-body2 transition"
+        :class="seret ? 'border-brand-tertiary bg-brand-tertiary/5 text-brand-tertiary' : 'border-slate-300 text-slate-500'"
+        data-testid="arsip-dropzone"
+        @dragenter.prevent="seret = !unggahDitahan"
+        @dragover.prevent="seret = !unggahDitahan"
+        @dragleave.prevent="seret = false"
+        @drop.prevent="onDrop"
+      >
+        <template v-if="sedangDiunggah">
+          <img v-if="sedangDiunggah.url" :src="sedangDiunggah.url" alt="Pratinjau berkas yang diunggah" class="h-14 w-14 rounded object-cover" />
+          <span data-testid="arsip-pratinjau">Mengunggah {{ sedangDiunggah.nama }} ({{ ukuran(sedangDiunggah.ukuran) }})…</span>
+        </template>
+        <span v-else>{{ unggahDitahan ? 'Lengkapi isian di atas untuk mengunggah.' : 'Seret berkas ke sini, atau gunakan tombol "Unggah berkas".' }}</span>
+      </div>
       <p
         v-if="canUpload && unggahDitahan"
         :id="`arsip-tahan-${target.id_riwayat}`"
@@ -248,7 +287,7 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
             <th scope="col" class="px-4 py-2.5">Nama berkas</th>
             <th scope="col" class="px-4 py-2.5">Ukuran</th>
             <th scope="col" class="px-4 py-2.5">Diunggah</th>
-            <th scope="col" class="px-4 py-2.5 text-right">Aksi</th>
+            <th scope="col" class="sticky right-0 bg-white px-4 py-2.5 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
@@ -269,7 +308,7 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
               <td class="max-w-72 truncate px-4 py-2.5 text-slate-800" :title="nama(row)">{{ nama(row) }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ ukuran(row.file_size) }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ formatApiDateTime(row.created_at) || '—' }}</td>
-              <td class="px-4 py-2.5 text-right">
+              <td class="sticky right-0 bg-white px-4 py-2.5 text-right">
                 <RowActionsMenu
                   :actions="rowActions(row)"
                   :label="`Aksi untuk ${nama(row)}`"

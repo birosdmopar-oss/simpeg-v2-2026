@@ -74,6 +74,10 @@ describe('DetailPegawaiPage — data', () => {
     expect(wrapper.get('[data-testid="pegawai-name"]').text()).toBe('Dr. Budi Contoh, S.E., M.M.')
     expect(wrapper.get('[data-testid="pegawai-status"]').text()).toBe('Aktif')
     expect(wrapper.get('[data-testid="pegawai-header"]').text()).toContain('1 Januari 1990')
+    // CR-049 D-F8: jenis pegawai badge berwarna + QR berisi NIP (dibangkitkan lokal).
+    expect(wrapper.get('[data-testid="pegawai-jenis"]').classes()).toContain('text-brand-tertiary')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="pegawai-qr"]').attributes('src')).toMatch(/^data:image\/png;base64,/))
+    expect(wrapper.get('[data-testid="pegawai-qr"]').attributes('alt')).toBe(`Kode QR NIP ${NIP}`)
   })
 
   it('tab Data Umum (bawaan) menampilkan biodata kolom pegawai, hanya-lihat sampai "Ubah Data Umum" dipilih', async () => {
@@ -174,6 +178,14 @@ describe('DetailPegawaiPage — aksi kartu', () => {
       expect(wrapper.find('[data-testid="btn-more"]').exists(), `hapus role ${role}`).toBe(more)
       wrapper.unmount()
     }
+  })
+
+  it('breadcrumb: "Daftar Pegawai" hanya ditautkan bagi role daftar (D-F15)', async () => {
+    const admin = await mountDetail()
+    expect(admin.wrapper.find('nav[aria-label="Breadcrumb"] a[href="/pegawai"]').exists()).toBe(true)
+    admin.wrapper.unmount()
+    const milik = await mountDetail(`/pegawai/${NIP}`, Role.PEGAWAI, NIP)
+    expect(milik.wrapper.get('nav[aria-label="Breadcrumb"]').text()).not.toContain('Daftar Pegawai')
   })
 
   it('Cetak → DRH: unduh PDF dari server (nama berkas dari Content-Disposition); Cetak Data Umum tidak ditawarkan', async () => {

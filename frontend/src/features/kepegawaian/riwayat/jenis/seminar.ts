@@ -13,6 +13,8 @@ export default defineRiwayatJenis({
   task: 'B-11',
   singular: 'kursus/seminar',
   primaryKey: 'id_riwayat_seminar',
+  // CR-049 D-F12: label baris ⋮ / judul dialog.
+  labelKolom: ['jenis_seminar', 'nama_seminar'],
   columns: [
     { key: 'jenis_seminar', label: 'Jenis', options: [{ value: '1', label: 'Seminar' }, { value: '2', label: 'Kursus' }] },
     { key: 'nama_seminar', label: 'Nama Kegiatan' },

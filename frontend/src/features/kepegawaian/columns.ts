@@ -38,6 +38,18 @@ export const COLUMNS: PegawaiColumn[] = [
   { key: 'agama', label: 'Agama', value: (r) => text(r.agama) },
 ]
 
+/**
+ * Warna badge jenis pegawai (kartu QAUI-003, CR-049 D-F8): PNS/CPNS biru, PPPK tosca, PTT/non-ASN kuning; lainnya netral.
+ * Ditentukan dari nama jenis (`jenis_pegawai`, master `jenis_pegawai`), token redesign lewat nada UiBadge.
+ */
+export function nadaJenisPegawai(jenis: string | null | undefined): 'primary' | 'info' | 'secondary' | 'neutral' {
+  const teks = (jenis ?? '').toUpperCase()
+  if (teks.includes('PPPK')) return 'info'
+  if (teks.includes('PTT') || teks.includes('NON')) return 'secondary'
+  if (teks.includes('PNS')) return 'primary'
+  return 'neutral'
+}
+
 /** Kolom bawaan. */
 export const DEFAULT_COLUMN_KEYS: string[] = ['nama_nip', 'jabatan', 'satker', 'gol_ruang', 'jenis_pegawai']
 
