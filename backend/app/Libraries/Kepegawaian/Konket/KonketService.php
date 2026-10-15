@@ -20,6 +20,7 @@ use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\I18n\Time;
+use Config\Konket;
 use DateTimeImmutable;
 use RuntimeException;
 use Throwable;
@@ -187,7 +188,8 @@ final class KonketService implements KonketServiceInterface
         $param = $this->validasi($auth, $data, $berkas, $pegawai, null);
         $param += ['nip' => $nip, 'status' => self::W];
 
-        // Pegawai tidak mengisi pengaruh tukin (legacy form.php; kolom default 1); admin boleh (form_ad.php).
+        // Pegawai tidak mengisi pengaruh tukin (legacy form.php); admin boleh (form_ad.php). Nilai awal dari master jenis
+        // (validasi(), [V2] CR-050); 1 bila tidak ada.
         $param['affect_tukin'] ??= 1;
 
         $id = $this->tulis($auth, null, $param, $berkas, $this->daftarPeserta($auth, $param, $data, $nip));
@@ -446,6 +448,11 @@ final class KonketService implements KonketServiceInterface
 
         if ($affect !== null) {
             $param['affect_tukin'] = $affect;
+        } elseif ($lama === null) {
+            // [V2] CR-050 (QA B-F1, DoD B-13 "flag affect_tukin dari master terbawa"; dok G-06 K5a): pengajuan baru memakai
+            // `jenis_konket.affect_tukin` sebagai nilai awal (legacy selalu 1 = default kolom). Admin tetap bisa mengubahnya
+            // per pengajuan; ubah tidak menyalin ulang dari master.
+            $param['affect_tukin'] = (int) ($jenis['affect_tukin'] ?? 1);
         }
 
         return $param;
@@ -785,13 +792,16 @@ final class KonketService implements KonketServiceInterface
     }
 
     /**
-     * id_jenis_konket yang tidak boleh dipilih role pemanggil (legacy form/form_ad).
+     * id_jenis_konket yang tidak boleh dipilih role pemanggil (legacy form/form_ad) — dari `Config\Konket` (CR-050 QA
+     * B-F4: tidak di-hard-code di service; kunci tetap PK [K], alasan di docblock config).
      *
      * @return list<int>
      */
     private function jenisTerlarang(AuthContext $auth): array
     {
-        return $auth->role() === Role::SUPER_ADMIN ? [4, 5] : [2, 4, 5, 6];
+        $config = config(Konket::class);
+
+        return $auth->role() === Role::SUPER_ADMIN ? $config->jenisTerlarangAdmin : $config->jenisTerlarangPegawai;
     }
 
     /**

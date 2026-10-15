@@ -302,6 +302,7 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
    - WAJIB_0 lainnya → dedupe atau perbaikan (2.5).
    - PERIKSA → keputusan pemilik proses, dicatat di log (2.8).
    - INFO → dicatat. `counter_ai` dipakai di langkah 8 (setelah dicocokkan dengan sumber di langkah 1), dan `st_lain` (termasuk `st_null`) harus 0 setelah normalisasi.
+   - **Wajib sebelum go-live (CR-050, QA B-F4, 15-10-2026): verifikasi arti `id_jenis_konket` 2/4/5/6 di data produksi.** v2 menolak jenis Konket berdasarkan PK seperti legacy (`Config\Konket`: pegawai & Admin Satker `2,4,5,6`, Super Admin `4,5`; `L_konket.php:36,91,149,153`). Dari hasil B7, catat nama + `old_id` keempat id itu di log 2.8 dan pastikan jenis yang memang harus bisa diajukan pegawai (mis. Dinas `old_id` 8, Sakit `old_id` 10) tidak jatuh di id terlarang. Bila arti produksi berbeda dari asumsi legacy, ubah daftar lewat `.env` (`konket.jenisTerlarangPegawai` / `konket.jenisTerlarangAdmin`, daftar bilangan bulat dipisah koma) dan catat keputusannya — jangan mengubah PK.
 4. **Perbaiki di salinan kerja**, yaitu salinan kedua dari salinan audit, bukan produksi dan bukan v2. Kerjakan top-down (2.5), lalu **ulangi langkah 2–4 sampai tidak ada error di luar pengecualian 2.3 dan semua WAJIB_0 kosong**. Menggabungkan induk bisa memunculkan duplikat baru di tabel anak.
 5. **Transformasi impor.** Langkah ini di luar skrip ini dan mengikuti G-xx 6.3 / G-06 6.5:
    - stripslashes per tabel, dengan normalisasi nama persis 2.2;

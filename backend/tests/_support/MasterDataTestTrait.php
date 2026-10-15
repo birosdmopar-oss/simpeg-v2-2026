@@ -37,7 +37,7 @@ trait MasterDataTestTrait
             'jenis-pegawai' => [
                 'new'       => ['jenis_pegawai' => 'Calon PNS'],
                 'duplicate' => 'Pegawai Tidak Tetap',
-                'existing'  => '3',
+                'existing'  => '2',
                 'parent'    => null,
             ],
             'jenis-status' => [

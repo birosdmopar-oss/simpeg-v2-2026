@@ -226,7 +226,7 @@ final class LokasiPresensiTest extends DatabaseTestCase
     {
         $result = $this->sendJson('POST', self::ATURAN, $this->aturan([
             'target_lp'      => '[1, "2", "1"]',
-            'target_jp'      => '["2", 1]',
+            'target_jp'      => '["6", 1]',
             'hari_berlaku'   => '5,1,3,3',
             'target_lp_desc' => 'nilai kiriman klien diabaikan',
         ]));
@@ -237,7 +237,7 @@ final class LokasiPresensiTest extends DatabaseTestCase
         $this->assertSame('["Kantor Pusat","Gedung Sapta Pesona"]', $row['target_lp_desc']);
         $this->assertSame('["0"]', $row['target_uns']);
         $this->assertSame('["Seluruh Kementerian"]', $row['target_uns_desc']);
-        $this->assertSame('["2","1"]', $row['target_jp']);
+        $this->assertSame('["6","1"]', $row['target_jp']);
         $this->assertSame('["Pegawai Pemerintah dengan Perjanjian Kerja","Pegawai Negeri Sipil"]', $row['target_jp_desc']);
         $this->assertSame('1,3,5', $row['hari_berlaku']);
         $this->assertSame('1', (string) $row['status']);
@@ -313,8 +313,8 @@ final class LokasiPresensiTest extends DatabaseTestCase
         $this->assertTargetRejected('target_lp', '["1"]', '1');
 
         // Jenis pegawai tidak aktif / dihapus.
-        $this->sendJson('PATCH', 'api/v1/master/jenis-pegawai/3/status', ['status' => '2'])->assertStatus(200);
-        $this->assertTargetRejected('target_jp', '["1","3"]', '3');
+        $this->sendJson('PATCH', 'api/v1/master/jenis-pegawai/2/status', ['status' => '2'])->assertStatus(200);
+        $this->assertTargetRejected('target_jp', '["1","2"]', '2');
 
         // K-8: jenis pegawai id 7 tidak dapat dipilih walaupun ada dan aktif.
         $this->db->table('jenis_pegawai')->insert(['id_jenis_pegawai' => 7, 'jenis_pegawai' => 'Jenis Tujuh', 'order' => 7, 'status' => 1]);
@@ -442,10 +442,10 @@ final class LokasiPresensiTest extends DatabaseTestCase
             'target_uns_desc'            => '["Kemenparekraf"]', 'target_jp_desc' => '["Pegawai Negeri Sipil"]',
         ]);
 
-        $this->sendJson('PUT', self::ATURAN . '/1', ['target_lp' => '["1","2"]', 'target_jp' => '["3"]'])->assertStatus(200);
+        $this->sendJson('PUT', self::ATURAN . '/1', ['target_lp' => '["1","2"]', 'target_jp' => '["2"]'])->assertStatus(200);
         $this->seeInDatabase('dm_user_lokasi_presensi', [
             'id_dm_user_lokasi_presensi' => 1, 'target_lp' => '["1","2"]', 'target_lp_desc' => '["Kantor Pusat","Gedung Sapta Pesona"]',
-            'target_jp'                  => '["3"]', 'target_jp_desc' => '["Pegawai Tidak Tetap"]', 'target_uns_desc' => '["Kemenparekraf"]',
+            'target_jp'                  => '["2"]', 'target_jp_desc' => '["Pegawai Tidak Tetap"]', 'target_uns_desc' => '["Kemenparekraf"]',
         ]);
 
         // Target wajib tidak boleh dikosongkan lewat ubah.

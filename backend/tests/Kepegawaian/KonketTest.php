@@ -13,8 +13,10 @@ use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use Closure;
+use CodeIgniter\Config\Factories;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Konket;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
@@ -81,6 +83,27 @@ final class KonketTest extends DatabaseTestCase
         $this->assertArrayNotHasKey('file_bukti', $row, 'path berkas tidak dibocorkan');
         $this->assertSame(['ubah' => true, 'hapus' => true, 'proses' => false], $row['aksi']);
         $this->assertStringStartsWith('%PDF', $this->svc()->berkas($this->pegawai, $row['id'])['isi']);
+    }
+
+    /**
+     * [V2] CR-050 (QA B-F1): pengajuan baru menyalin `affect_tukin` dari master jenis; admin tetap bisa mengubahnya; ubah
+     * tidak menyalin ulang dari master.
+     */
+    public function testAffectTukinAwalDariMasterJenis(): void
+    {
+        $this->db->table('jenis_konket')->where('old_id', 8)->update(['affect_tukin' => 2]);
+        $dinas = ['kategori' => 8] + $this->data('2026-10-05');
+
+        $row = $this->tambah($this->pegawai, $dinas);
+        $this->assertSame(2, $row['affect_tukin'], 'pegawai: nilai master');
+        $this->assertSame(1, $this->tambah($this->pegawai, $this->data('2026-10-06'))['affect_tukin'], 'master jenis lain = 1');
+
+        $admin = $this->tambah($this->admin, array_merge($dinas, ['nip' => $this->nip, 'affect_tukin' => 1, 'date_start' => '2026-10-07', 'date_end' => '2026-10-07']));
+        $this->assertSame(1, $admin['affect_tukin'], 'admin menimpa nilai master');
+
+        $this->db->table('jenis_konket')->where('old_id', 8)->update(['affect_tukin' => 1]);
+        $ubah = $this->svc()->ubah($this->pegawai, $row['id'], ['alasan' => 'Diubah'] + $dinas, null);
+        $this->assertSame(2, $ubah['affect_tukin'], 'ubah tidak menyalin ulang dari master');
     }
 
     public function testValidasiTanggalJenisBerkasDanIrisan(): void
@@ -204,6 +227,31 @@ final class KonketTest extends DatabaseTestCase
         $this->assertSame([$row['id']], $this->svc()->hapus($this->pegawai, $row['id'])['ids']);
         $this->assertStatusApi(404, fn () => $this->svc()->detail($this->pegawai, $row['id']));
         $this->assertSame('10', (string) $this->db->table('absen_ijin')->where('id', $row['id'])->get()->getRow()->status);
+    }
+
+    /**
+     * CR-050 (QA B-F4): daftar jenis terlarang dari `Config\Konket` (kunci id_jenis_konket [K]), bukan hard-code service.
+     * Bawaan = legacy; mengganti konfigurasi langsung mengubah opsi & validasi tanpa menyentuh service.
+     */
+    public function testJenisTerlarangDariKonfigurasi(): void
+    {
+        $config = config(Konket::class);
+        $this->assertSame([[2, 4, 5, 6], [4, 5]], [$config->jenisTerlarangPegawai, $config->jenisTerlarangAdmin], 'bawaan = legacy');
+
+        // Pegawai bisa mengajukan Dinas (id 108) dan Sakit (id 110): id bebas.
+        $this->assertSame(8, $this->tambah($this->pegawai, ['kategori' => 8] + $this->data('2026-10-05'))['kategori']);
+
+        $config->jenisTerlarangPegawai = [108];
+
+        try {
+            $this->assertErrors(['kategori'], fn () => $this->tambah($this->pegawai, ['kategori' => 8] + $this->data('2026-10-06')), 'Dinas kini terlarang');
+            $this->assertSame(2, $this->tambah($this->pegawai, ['kategori' => 2] + $this->data('2026-10-07'))['kategori'], 'id 2 kini boleh');
+            $kategori = array_column($this->svc()->opsi($this->pegawai)['jenis'], 'kategori');
+            $this->assertNotContains(8, $kategori);
+            $this->assertContains(2, $kategori);
+        } finally {
+            Factories::reset('config');
+        }
     }
 
     public function testDaftarDanOpsiPerRole(): void
