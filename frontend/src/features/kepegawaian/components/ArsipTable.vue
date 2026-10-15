@@ -238,7 +238,7 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
       <template v-if="canUpload">
         <input ref="fileInput" type="file" class="sr-only" :accept="accept" data-testid="arsip-input" :aria-label="`Pilih berkas ${title}`" @change="onPick" />
         <UiButton
-          variant="secondary"
+          appearance="soft"
           :loading="uploading"
           :disabled="Boolean(unggahDitahan)"
           :aria-describedby="unggahDitahan ? `arsip-tahan-${target.id_riwayat}` : undefined"

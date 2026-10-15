@@ -88,3 +88,13 @@ export function formatApiDateTime(
   const date = parseApiDateTime(value)
   return date ? date.toLocaleString(locale, options) : null
 }
+
+/**
+ * Tanggal API (`YYYY-MM-DD`, boleh berjam) → "3 Maret 2021" (format tab riwayat; CR-049 D-F13). Nilai kosong → '';
+ * tidak terbaca → teks apa adanya.
+ */
+export function formatTanggalIndonesia(value: string | null | undefined): string {
+  if (!value) return ''
+  const d = new Date(`${value.slice(0, 10)}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+}

@@ -6,6 +6,7 @@
  * baris dari `aksi` server: Edit → Unduh PDF (hanya Disetujui) → Hapus (ConfirmDialog). Verifikasi tetap di halaman
  * Verifikasi LKH (atasan langsung).
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { Plus } from 'lucide-vue-next'
 import { onMounted, ref, watch } from 'vue'
 
@@ -167,7 +168,7 @@ function tambah(): void {
             <td colspan="5" class="px-4 py-10 text-center text-body2 text-slate-500" data-testid="lkh-tab-empty">Belum ada laporan kerja harian.</td>
           </tr>
           <tr v-for="row in data?.items ?? []" v-else :key="row.id" :data-testid="`lkh-tab-row-${row.id}`">
-            <td class="px-4 py-3 text-slate-700">{{ row.tgl_laporan }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ tgl(row.tgl_laporan) }}</td>
             <td class="px-4 py-3 text-slate-700">
               {{ row.jumlah }} kegiatan
               <span v-if="row.catatan" class="block text-caption text-slate-500">Catatan: {{ row.catatan }}</span>
@@ -177,7 +178,7 @@ function tambah(): void {
             <td class="sticky right-0 bg-white px-4 py-3 text-right">
               <RowActionsMenu
                 :actions="actionsFor(row)"
-                :label="`Aksi untuk LKH ${row.nama} ${row.tgl_laporan}`"
+                :label="`Aksi untuk LKH ${row.nama} ${tgl(row.tgl_laporan)}`"
                 :testid="`lkh-actions-${row.id}`"
                 @select="(key) => onAction(key, row)"
               />
@@ -193,7 +194,7 @@ function tambah(): void {
     <ConfirmDialog
       :open="hapusOpen"
       title="Hapus laporan kerja harian?"
-      :description="hapusRow ? `LKH tanggal ${hapusRow.tgl_laporan} akan dihapus.` : ''"
+      :description="hapusRow ? `LKH tanggal ${tgl(hapusRow.tgl_laporan)} akan dihapus.` : ''"
       confirm-label="Ya, hapus"
       danger
       @update:open="(v) => (hapusOpen = v)"

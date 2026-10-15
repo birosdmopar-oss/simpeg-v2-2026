@@ -100,9 +100,10 @@ describe('StrukturOrganisasiPage', () => {
 
   it('pemilih: opsi dari backend (unit 6 nonaktif); memilih → ?id_unit_satker= dan muat ulang', async () => {
     const { wrapper, router } = await mountPage()
-    const select = wrapper.get<HTMLSelectElement>('[data-testid="struktur-pilihan"]')
+    const select = wrapper.get<HTMLSelectElement>('[data-testid="struktur-pilihan"] select')
 
-    expect(select.findAll('option').map((o) => o.text())).toEqual(['Kementerian Uji', '─ Deputi Uji', '─ UPT', '─── Balai Uji'])
+    // UiSelect (CR-049 D-F14): opsi placeholder bernilai '' diabaikan.
+    expect(select.findAll('option').filter((o) => o.attributes('value') !== '').map((o) => o.text())).toEqual(['Kementerian Uji', '─ Deputi Uji', '─ UPT', '─── Balai Uji'])
     expect(select.find('option[value="6"]').attributes('disabled')).toBeDefined()
 
     bagan.mockResolvedValueOnce(dasar({ id_unit_satker: 'sat_9', format: 'upt', judul: 'Balai Uji', data: { es2: k('Balai Uji'), es3: [k('Subbagian Uji')], es4: [] } }))
@@ -118,7 +119,7 @@ describe('StrukturOrganisasiPage', () => {
   it('pemilih bulan → ?bulan= dan muat ulang; Unduh PDF memakai bulan aktif', async () => {
     const { wrapper, router } = await mountPage()
     bagan.mockResolvedValueOnce({ ...KEMENTERIAN, bulan: '2026-09' })
-    await wrapper.get<HTMLSelectElement>('[data-testid="struktur-bulan"]').setValue('2026-09')
+    await wrapper.get<HTMLSelectElement>('[data-testid="struktur-bulan"] select').setValue('2026-09')
     await flushPromises()
     expect(router.currentRoute.value.query.bulan).toBe('2026-09')
     expect(bagan).toHaveBeenLastCalledWith('0', '2026-09')

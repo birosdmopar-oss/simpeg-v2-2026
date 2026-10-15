@@ -5,11 +5,12 @@
  * satker (`?id_unit_satker=`, opsi dari backend, unit 6 tidak bisa dipilih), judul "Struktur Organisasi <unit/satker>",
  * bagan per format (soTemplat.ts). Pemilih bulan sejak Jan 2022 (`?bulan=`, MAKE-013) dan Unduh PDF (TCPDF).
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { UiButton, UiCard, UiNotice } from '@/shared/ui'
+import { UiButton, UiCard, UiNotice, UiSelect, type SelectOption } from '@/shared/ui'
 
 import OrgChartNode from '../components/OrgChartNode.vue'
 import { describeApiError } from '../services/apiErrors'
@@ -59,6 +60,12 @@ async function muat(): Promise<void> {
 
 watch([pilihanAktif, bulan], () => void muat(), { immediate: true })
 
+const opsiPilihan = computed<SelectOption[]>(() => [
+  { value: '0', label: data.value?.kementerian || 'Kementerian' },
+  ...(data.value?.pilihan ?? []).map((p) => ({ value: p.value, label: `${indent(p.level)}${p.label}`, disabled: p.disabled })),
+])
+const opsiBulan = computed<SelectOption[]>(() => (data.value?.bulan_tersedia ?? []).map((b) => ({ value: b.value, label: b.label })))
+
 async function unduh(): Promise<void> {
   mengunduh.value = true
   errorUnduh.value = ''
@@ -80,30 +87,12 @@ const indent = (level: number): string => (level > 1 ? '─── ' : '─ ')
   <RedesignShell :breadcrumbs="crumbs">
     <UiCard title="Struktur Organisasi">
       <template #actions>
-        <UiButton variant="secondary" :loading="mengunduh" :disabled="!data" data-testid="struktur-unduh" @click="unduh">Unduh PDF</UiButton>
+        <UiButton appearance="soft" :loading="mengunduh" :disabled="!data" data-testid="struktur-unduh" @click="unduh">Unduh PDF</UiButton>
       </template>
       <div class="mb-4 grid max-w-3xl gap-3 md:grid-cols-[2fr_1fr]">
-        <div>
-        <label for="struktur-pilihan" class="mb-1 block text-body2 font-medium text-slate-700">Unit / Satuan Kerja</label>
-        <select
-          id="struktur-pilihan"
-          v-model="pilihanAktif"
-          class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-body1"
-          data-testid="struktur-pilihan"
-        >
-          <option value="0">{{ data?.kementerian || 'Kementerian' }}</option>
-          <option v-for="p in data?.pilihan ?? []" :key="p.value" :value="p.value" :disabled="p.disabled">
-            {{ indent(p.level) }}{{ p.label }}
-          </option>
-        </select>
-        </div>
-        <div>
-          <label for="struktur-bulan" class="mb-1 block text-body2 font-medium text-slate-700">Bulan</label>
-          <select id="struktur-bulan" v-model="bulan" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-body1" data-testid="struktur-bulan">
-            <option value="">Bulan ini</option>
-            <option v-for="b in data?.bulan_tersedia ?? []" :key="b.value" :value="b.value">{{ b.label }}</option>
-          </select>
-        </div>
+        <!-- CR-049 D-F14: UiSelect (komponen redesign), bukan <select> native. -->
+        <UiSelect v-model="pilihanAktif" label="Unit / Satuan Kerja" :options="opsiPilihan" placeholder="Pilih unit / satuan kerja" data-testid="struktur-pilihan" />
+        <UiSelect v-model="bulan" label="Bulan" :options="opsiBulan" placeholder="Bulan ini" clearable data-testid="struktur-bulan" />
       </div>
 
       <UiNotice v-if="errorUnduh" tone="danger" class="mb-3" data-testid="struktur-error-unduh">{{ errorUnduh }}</UiNotice>
@@ -114,7 +103,7 @@ const indent = (level: number): string => (level > 1 ? '─── ' : '─ ')
           Struktur Organisasi<br />{{ data.judul }}
         </h2>
         <p class="mb-4 text-center text-caption text-slate-500" data-testid="struktur-periode">
-          Kondisi {{ data.tanggal }}<template v-if="data.periode"> · Periode struktur: {{ data.periode.periode_struktur_jabatan }}</template>
+          Kondisi {{ tgl(data.tanggal) }}<template v-if="data.periode"> · Periode struktur: {{ data.periode.periode_struktur_jabatan }}</template>
         </p>
         <UiNotice v-if="!data.periode" tone="warning" data-testid="struktur-tanpa-periode">
           Belum ada periode struktur jabatan yang aktif.

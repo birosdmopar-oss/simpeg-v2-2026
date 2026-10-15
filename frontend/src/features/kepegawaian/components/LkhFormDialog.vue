@@ -5,6 +5,7 @@
  * selesai). Atasan langsung ditentukan server (ditampilkan hanya-baca); Super Admin boleh menimpanya dengan NIP pegawai
  * aktif (`nip_atasan`, keputusan user 13-10-2026). Galat 422 per kolom/baris (`kegiatan.<i>`).
  */
+import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { Plus, Trash2, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, reactive, ref, watch } from 'vue'
@@ -117,7 +118,7 @@ const KOLOM: { key: keyof LkhKegiatan; label: string; type?: string }[] = [
           <div>
             <DialogTitle class="text-h5 text-slate-900">{{ row ? 'Ubah' : 'Tambah' }} Laporan Kerja Harian</DialogTitle>
             <DialogDescription class="text-body2 text-slate-500">
-              <template v-if="opsi">Tanggal laporan {{ opsi.tanggal_minimal }} s.d. {{ opsi.tanggal_maksimal }}.</template>
+              <template v-if="opsi">Tanggal laporan {{ tgl(opsi.tanggal_minimal) }} s.d. {{ tgl(opsi.tanggal_maksimal) }}.</template>
               <template v-if="opsi?.atasan"> Diverifikasi oleh atasan langsung: {{ opsi.atasan.nama }}.</template>
             </DialogDescription>
           </div>
@@ -190,7 +191,7 @@ const KOLOM: { key: keyof LkhKegiatan; label: string; type?: string }[] = [
           <UiNotice v-if="umum" tone="danger" data-testid="lkh-error">{{ umum }}</UiNotice>
 
           <div class="flex justify-end gap-2">
-            <UiButton type="button" variant="secondary" :disabled="busy" @click="tutup">Batal</UiButton>
+            <UiButton type="button" variant="secondary" appearance="soft" :disabled="busy" @click="tutup">Batal</UiButton>
             <UiButton type="submit" :loading="busy" data-testid="lkh-simpan">Simpan</UiButton>
           </div>
         </form>

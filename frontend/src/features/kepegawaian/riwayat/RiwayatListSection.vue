@@ -189,9 +189,13 @@ function cell(row: RiwayatRow, col: ColumnDef): string {
 }
 
 function rowLabel(row: RiwayatRow): string {
-  const first = props.config.columns[0]
-  const text = first ? cell(row, first) : ''
-  return text && text !== '—' ? text : props.config.title
+  // CR-049 D-F12: kolom penamaan per jenis (`labelKolom`), bawaan kolom pertama.
+  const kunci = props.config.labelKolom ?? props.config.columns.slice(0, 1).map((c) => c.key)
+  const teks = kunci
+    .map((k) => props.config.columns.find((c) => c.key === k) ?? { key: k, label: k })
+    .map((c) => cell(row, c))
+    .filter((t) => t && t !== '—')
+  return teks.length ? teks.join(' — ') : props.config.title
 }
 
 /** Baris Disetujui terkunci untuk role pengguna (salinan aturan Definisi di konfigurasi jenis). */

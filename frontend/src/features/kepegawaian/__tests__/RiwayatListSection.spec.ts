@@ -177,6 +177,11 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(urutanId()).toEqual(['riwayat-row-2', 'riwayat-row-1', 'riwayat-row-3'])
   })
 
+  it('CR-049 D-F12: labelKolom membuat label ⋮ deskriptif', async () => {
+    const wrapper = await mountTab({}, { ...uji, labelKolom: ['institusi_pendidikan', 'tgl_lulus'] })
+    expect(wrapper.get('[data-testid="riwayat-actions-1"]').attributes('aria-label')).toBe('Aksi untuk Universitas 1 — 30 Agustus 2012')
+  })
+
   it('501 (stub) → keterangan "belum tersedia", bukan tabel kosong', async () => {
     svc.list.mockRejectedValue(apiError(501))
     const wrapper = await mountTab()

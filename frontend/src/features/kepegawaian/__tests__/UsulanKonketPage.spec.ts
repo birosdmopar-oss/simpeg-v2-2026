@@ -92,6 +92,7 @@ describe('UsulanKonketPage', () => {
 
     expect(w.find('[data-testid="konket-filter"]').exists()).toBe(false)
     expect(w.get('[data-testid="konket-row-1"]').text()).toContain('Izin')
+    expect(w.get('[data-testid="konket-row-1"]').text()).toContain('5 Oktober 2026')
 
     await w.get('[data-testid="konket-tambah"]').trigger('click')
     await flushPromises()

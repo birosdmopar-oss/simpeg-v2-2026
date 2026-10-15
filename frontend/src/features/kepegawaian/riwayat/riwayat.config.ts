@@ -194,6 +194,11 @@ export interface RiwayatJenisConfig {
   /** PK baris (`id_riwayat_*`) — dipakai untuk `{id}` dan `id_entri` lampiran. */
   primaryKey: string
   columns: ColumnDef[]
+  /**
+   * Kolom penamaan baris untuk label ⋮ "Aksi untuk …" dan judul dialog (CR-049 D-F12), digabung " — ". Bawaan = kolom
+   * pertama `columns`.
+   */
+  labelKolom?: string[]
   fields: FieldDef[]
   /** Lampiran per kode `jenis_rwy`; kosong = jenis tanpa lampiran (atau belum ditetapkan Definisi-nya). */
   lampiran: LampiranDef[]

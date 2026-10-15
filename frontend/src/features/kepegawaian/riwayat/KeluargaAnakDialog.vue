@@ -187,7 +187,7 @@ function tanggal(value: unknown): string {
       >
         <div class="mb-5 flex items-start justify-between gap-3">
           <div>
-            <DialogTitle class="text-h5 text-slate-900">Anak — {{ subject }}</DialogTitle>
+            <DialogTitle class="text-h5 text-slate-900">Data Anak — Perkawinan dengan {{ subject }}</DialogTitle>
             <DialogDescription class="text-body2 text-slate-500">Data anak dan akte lahir.</DialogDescription>
           </div>
           <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
