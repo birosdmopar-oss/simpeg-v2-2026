@@ -39,15 +39,21 @@ export const COLUMNS: PegawaiColumn[] = [
 ]
 
 /**
- * Warna badge jenis pegawai (kartu QAUI-003, CR-049 D-F8): PNS/CPNS biru, PPPK tosca, PTT/non-ASN kuning; lainnya netral.
- * Ditentukan dari nama jenis (`jenis_pegawai`, master `jenis_pegawai`), token redesign lewat nada UiBadge.
+ * Warna badge jenis pegawai (kartu QAUI-003, CR-049 D-F8; CR-051 R1D-F1) dari `id_jenis_pegawai` [K] legacy
+ * (`L_employee.php:158` 2 → PTT, 6 → PPPK; 1 = PNS): 1 PNS biru, 2 PTT kuning, 6 PPPK tosca, lainnya netral. Bukan dari
+ * nama jenis (nama master bisa panjang, mis. "Pegawai Negeri Sipil"). API mengirim angka sebagai string → dinormalkan.
  */
-export function nadaJenisPegawai(jenis: string | null | undefined): 'primary' | 'info' | 'secondary' | 'neutral' {
-  const teks = (jenis ?? '').toUpperCase()
-  if (teks.includes('PPPK')) return 'info'
-  if (teks.includes('PTT') || teks.includes('NON')) return 'secondary'
-  if (teks.includes('PNS')) return 'primary'
-  return 'neutral'
+export function nadaJenisPegawai(idJenis: number | string | null | undefined): 'primary' | 'info' | 'secondary' | 'neutral' {
+  switch (Number(idJenis)) {
+    case 1:
+      return 'primary'
+    case 2:
+      return 'secondary'
+    case 6:
+      return 'info'
+    default:
+      return 'neutral'
+  }
 }
 
 /** Kolom bawaan. */

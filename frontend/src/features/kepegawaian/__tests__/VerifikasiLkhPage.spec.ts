@@ -149,6 +149,7 @@ describe('VerifikasiLkhPage', () => {
     expect(q('[data-testid="lkh-proses-error"]')?.textContent).toContain('Catatan wajib')
     // CR-049 D-F11: galat di bawah textarea, bukan banner; textarea aria-invalid + aria-describedby.
     expect(q('[data-testid="lkh-catatan"]')?.getAttribute('aria-invalid')).toBe('true')
+    expect(q('[data-testid="lkh-proses-error"]')?.getAttribute('role')).toBe('alert')
     expect(q('[data-testid="lkh-catatan"]')?.getAttribute('aria-describedby')).toBe('lkh-catatan-galat')
     expect(q('[data-testid="lkh-proses-galat-umum"]')).toBeNull()
     expect(svc.process).not.toHaveBeenCalled()

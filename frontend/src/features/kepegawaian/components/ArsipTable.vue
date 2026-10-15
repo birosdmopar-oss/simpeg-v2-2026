@@ -13,7 +13,7 @@
  * 422 dari server (mis. hitungan di server berbeda) tampil dengan pesan `errors.berkas`-nya.
  * Aksi baris lewat menu ⋮ (AGENTS.md §1): Unduh → Hapus.
  */
-import { FileSearch, Upload } from 'lucide-vue-next'
+import { FileSearch, FileText, Upload } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
@@ -261,6 +261,14 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
       >
         <template v-if="sedangDiunggah">
           <img v-if="sedangDiunggah.url" :src="sedangDiunggah.url" alt="Pratinjau berkas yang diunggah" class="h-14 w-14 rounded object-cover" />
+          <!-- Non-gambar: ikon berkas seperti UiFileField (merah untuk PDF) — CR-051 R1D-I1. -->
+          <FileText
+            v-else
+            class="h-8 w-8"
+            :class="/\.pdf$/i.test(sedangDiunggah.nama) ? 'text-danger' : 'text-slate-400'"
+            aria-hidden="true"
+            data-testid="arsip-pratinjau-ikon"
+          />
           <span data-testid="arsip-pratinjau">Mengunggah {{ sedangDiunggah.nama }} ({{ ukuran(sedangDiunggah.ukuran) }})…</span>
         </template>
         <span v-else>{{ unggahDitahan ? 'Lengkapi isian di atas untuk mengunggah.' : 'Seret berkas ke sini, atau gunakan tombol "Unggah berkas".' }}</span>

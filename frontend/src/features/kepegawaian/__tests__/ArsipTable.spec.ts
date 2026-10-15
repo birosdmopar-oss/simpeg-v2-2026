@@ -211,6 +211,7 @@ describe('ArsipTable — unggah', () => {
     await wrapper.get('[data-testid="arsip-dropzone"]').trigger('drop', { dataTransfer: { files: [file] } })
     expect(svc.upload).toHaveBeenCalledWith(NIP, TARGET, file, {})
     expect(wrapper.get('[data-testid="arsip-pratinjau"]').text()).toContain('Mengunggah ijazah.pdf')
+    expect(wrapper.get('[data-testid="arsip-pratinjau-ikon"]').classes()).toContain('text-danger')
     selesai(lampiran(3))
     await flushPromises()
     expect(wrapper.find('[data-testid="arsip-pratinjau"]').exists()).toBe(false)

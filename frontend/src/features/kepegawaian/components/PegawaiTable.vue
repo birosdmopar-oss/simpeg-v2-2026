@@ -87,7 +87,7 @@ function actionsFor(row: PegawaiListItem): RowAction[] {
                 <span class="block text-body2 text-slate-500">{{ row.nip }}</span>
               </div>
             </div>
-            <UiBadge v-else-if="column.key === 'jenis_pegawai' && row.jenis_pegawai" :tone="nadaJenisPegawai(row.jenis_pegawai)" data-testid="badge-jenis-pegawai">
+            <UiBadge v-else-if="column.key === 'jenis_pegawai' && row.jenis_pegawai" :tone="nadaJenisPegawai(row.id_jenis_pegawai)" data-testid="badge-jenis-pegawai">
               {{ row.jenis_pegawai }}
             </UiBadge>
             <span v-else class="text-slate-700">{{ column.value(row) }}</span>

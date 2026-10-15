@@ -80,6 +80,13 @@ describe('DetailPegawaiPage — data', () => {
     expect(wrapper.get('[data-testid="pegawai-qr"]').attributes('alt')).toBe(`Kode QR NIP ${NIP}`)
   })
 
+  it('CR-051 R1D-F1: badge jenis dari id_jenis_pegawai (string API, nama master panjang)', async () => {
+    detail.mockResolvedValue(pegawaiDetail(TABS, { id_jenis_pegawai: '6' as never, jenis_pegawai: 'Pegawai Pemerintah dengan Perjanjian Kerja' }))
+    const { wrapper } = await mountDetail()
+    expect(wrapper.get('[data-testid="pegawai-jenis"]').classes()).toContain('bg-info-soft')
+    expect(wrapper.get('[data-testid="pegawai-jenis"]').text()).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
+  })
+
   it('tab Data Umum (bawaan) menampilkan biodata kolom pegawai, hanya-lihat sampai "Ubah Data Umum" dipilih', async () => {
     detail.mockResolvedValue(pegawaiDetail(TABS, {}, { aksi: { ubah_biodata: false, ubah_langsung: false, koreksi_nip: false, proses_biodata: false } }))
     const { wrapper } = await mountDetail()

@@ -95,7 +95,7 @@ async function kirim(): Promise<void> {
               :aria-describedby="galatCatatan ? 'lkh-catatan-galat' : undefined"
               data-testid="lkh-catatan"
             />
-            <span v-if="galatCatatan" id="lkh-catatan-galat" class="mt-1 block text-caption text-danger" data-testid="lkh-proses-error">{{ galatCatatan }}</span>
+            <span v-if="galatCatatan" id="lkh-catatan-galat" role="alert" class="mt-1 block text-caption text-danger" data-testid="lkh-proses-error">{{ galatCatatan }}</span>
           </label>
           <UiNotice v-if="error" tone="danger" data-testid="lkh-proses-galat-umum">{{ error }}</UiNotice>
           <div class="flex justify-end gap-2">

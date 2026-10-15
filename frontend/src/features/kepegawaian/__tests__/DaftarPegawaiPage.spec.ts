@@ -165,10 +165,13 @@ describe('DaftarPegawaiPage — data', () => {
     expect(headers(wrapper)).toEqual(['Nama/NIP', 'Jabatan', 'Satuan Kerja', 'KP (Gol)', 'Jenis Pegawai', 'Aksi'])
   })
 
-  it('CR-049 D-F8: jenis pegawai berupa badge berwarna (PNS biru, PPPK tosca, PTT kuning)', async () => {
+  it('CR-049 D-F8 / CR-051: badge jenis pegawai dari id_jenis_pegawai (nama master panjang; 1 biru, 6 tosca, 2 kuning, lain netral)', async () => {
     list.mockResolvedValue({
-      items: [{ ...listItem(1), jenis_pegawai: 'PNS' }, { ...listItem(2), jenis_pegawai: 'PPPK' }, { ...listItem(3), jenis_pegawai: 'PTT' }],
-      total: 3,
+      items: [{ ...listItem(1), id_jenis_pegawai: '1' as never, jenis_pegawai: 'Pegawai Negeri Sipil' },
+        { ...listItem(2), id_jenis_pegawai: 6, jenis_pegawai: 'Pegawai Pemerintah dengan Perjanjian Kerja' },
+        { ...listItem(3), id_jenis_pegawai: 2, jenis_pegawai: 'Pegawai Tidak Tetap' },
+        { ...listItem(4), id_jenis_pegawai: 3, jenis_pegawai: 'Lainnya' }],
+      total: 4,
       page: 1,
       per_page: 10,
     })
@@ -177,6 +180,7 @@ describe('DaftarPegawaiPage — data', () => {
     expect(kelas[0]).toContain('text-brand-tertiary')
     expect(kelas[1]).toContain('bg-info-soft')
     expect(kelas[2]).toContain('bg-brand-secondary/20')
+    expect(kelas[3]).toContain('bg-slate-100')
   })
 
   it('nama lengkap (glr_akhir) menaut ke halaman detail', async () => {
