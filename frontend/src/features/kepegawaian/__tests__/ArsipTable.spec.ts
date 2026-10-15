@@ -79,6 +79,8 @@ describe('ArsipTable — daftar', () => {
     expect(wrapper.get('[data-testid="arsip-row-1"]').text()).toContain('Ijazah 1.pdf')
     expect(wrapper.get('[data-testid="arsip-row-1"]').text()).toContain('2,0 KB')
     expect(wrapper.get('[data-testid="arsip-row-2"]').text()).toContain('3,0 MB')
+    expect(wrapper.findAll('thead th').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+    expect(wrapper.get('[data-testid="arsip-row-1"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
   })
 
   it('kosong → keterangan belum ada berkas', async () => {

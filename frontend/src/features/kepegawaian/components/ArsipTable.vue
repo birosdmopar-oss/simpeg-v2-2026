@@ -248,7 +248,7 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
             <th scope="col" class="px-4 py-2.5">Nama berkas</th>
             <th scope="col" class="px-4 py-2.5">Ukuran</th>
             <th scope="col" class="px-4 py-2.5">Diunggah</th>
-            <th scope="col" class="px-4 py-2.5 text-right">Aksi</th>
+            <th scope="col" class="sticky right-0 bg-white px-4 py-2.5 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
@@ -269,7 +269,7 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
               <td class="max-w-72 truncate px-4 py-2.5 text-slate-800" :title="nama(row)">{{ nama(row) }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ ukuran(row.file_size) }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ formatApiDateTime(row.created_at) || '—' }}</td>
-              <td class="px-4 py-2.5 text-right">
+              <td class="sticky right-0 bg-white px-4 py-2.5 text-right">
                 <RowActionsMenu
                   :actions="rowActions(row)"
                   :label="`Aksi untuk ${nama(row)}`"

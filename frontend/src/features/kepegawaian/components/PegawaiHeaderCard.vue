@@ -106,9 +106,10 @@ const menuItem =
         class="-mt-3"
       />
 
-      <div class="min-w-0 flex-1 pt-3">
+      <!-- CR-049 D-F9: kolom identitas minimal 14rem; tombol aksi turun ke baris sendiri di layar sempit. -->
+      <div class="min-w-[14rem] flex-1 pt-3">
         <div class="flex flex-wrap items-center gap-3">
-          <h1 class="text-h5 text-slate-900" data-testid="pegawai-name">
+          <h1 class="break-words text-h5 text-slate-900" data-testid="pegawai-name">
             {{ [detail.glr_awal, detail.nama].filter(Boolean).join(' ') }}<template v-if="detail.glr_akhir"
               >, <span class="text-brand-tertiary">{{ detail.glr_akhir }}</span></template
             >
@@ -123,7 +124,7 @@ const menuItem =
         </ul>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2 pt-3">
+      <div class="flex w-full flex-wrap items-center gap-2 pt-3 lg:w-auto">
         <UiButton data-testid="btn-arsip" @click="emit('arsip')">
           <template #icon-left><FolderOpen class="h-4 w-4" aria-hidden="true" /></template>
           Arsip Kepegawaian

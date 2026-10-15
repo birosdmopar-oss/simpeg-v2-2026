@@ -88,6 +88,7 @@ describe('Usulan Karpeg/Karis — pengusul (role 2)', () => {
     const menunggu = await rowMenuActions(body(), 'usulan-actions-2')
     expect(menunggu.map((i) => i.disabled)).toEqual([false, false, false])
     expect(q('[data-testid="usulan-actions-2"]')?.getAttribute('aria-label')).toContain('Aksi untuk Kartu Pegawai')
+    expect(q('[data-testid="usulan-actions-2"]')?.closest('td')?.classList.contains('sticky')).toBe(true)
   })
 
   it('aditif WS-2 MAKE-013: ⋮ "Unduh tanda terima" (hanya Disetujui) → PDF usulan/{jenis}/{id}/tanda-terima', async () => {

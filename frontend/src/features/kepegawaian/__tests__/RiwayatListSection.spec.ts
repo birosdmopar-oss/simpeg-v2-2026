@@ -149,6 +149,9 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-row-1"] [data-testid="status-badge"]').text()).toBe('Disetujui')
     expect(wrapper.get('[data-testid="riwayat-row-2"] [data-testid="status-badge"]').text()).toBe('Menunggu')
     expect(wrapper.get('[data-testid="riwayat-row-3"]').text()).toContain('Ijazah buram')
+    // CR-049 D-F3: kolom Aksi sticky kanan (header & sel).
+    expect(wrapper.findAll('thead th').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+    expect(wrapper.get('[data-testid="riwayat-row-1"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
   })
 
   it('501 (stub) → keterangan "belum tersedia", bukan tabel kosong', async () => {

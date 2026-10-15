@@ -212,7 +212,7 @@ function tanggal(value: unknown): string {
                   <th scope="col" class="px-4 py-2.5">Anak Ke-</th>
                   <th scope="col" class="px-4 py-2.5">Nama</th>
                   <th scope="col" class="px-4 py-2.5">Tempat, Tanggal Lahir</th>
-                  <th scope="col" class="px-4 py-2.5 text-right">Aksi</th>
+                  <th scope="col" class="sticky right-0 bg-white px-4 py-2.5 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200">
@@ -227,7 +227,7 @@ function tanggal(value: unknown): string {
                   <td class="px-4 py-2.5">{{ row.urutan }}</td>
                   <td class="px-4 py-2.5 text-slate-800">{{ row.nama }}</td>
                   <td class="px-4 py-2.5 text-slate-600">{{ row.tempat_lahir || '—' }}, {{ tanggal(row.tgl_lahir) }}</td>
-                  <td class="px-4 py-2.5 text-right">
+                  <td class="sticky right-0 bg-white px-4 py-2.5 text-right">
                     <RowActionsMenu
                       :actions="rowActions()"
                       :label="`Aksi untuk ${namaAnak(row)}`"

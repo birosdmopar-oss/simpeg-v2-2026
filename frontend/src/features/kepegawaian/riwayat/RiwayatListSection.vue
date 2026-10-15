@@ -340,7 +340,7 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
               <tr class="border-y border-slate-200 text-body2 font-semibold text-slate-900">
                 <th v-for="col in config.columns" :key="col.key" scope="col" class="px-5 py-3">{{ col.label }}</th>
                 <th scope="col" class="px-5 py-3">Status</th>
-                <th v-if="hasActions" scope="col" class="px-5 py-3 text-right">Aksi</th>
+                <th v-if="hasActions" scope="col" class="sticky right-0 bg-white px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200">
@@ -365,7 +365,7 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
                       {{ row.reason_note }}
                     </p>
                   </td>
-                  <td v-if="hasActions" class="px-5 py-3 text-right">
+                  <td v-if="hasActions" class="sticky right-0 bg-white px-5 py-3 text-right">
                     <RowActionsMenu
                       :actions="rowActions(row)"
                       :label="`Aksi untuk ${rowLabel(row)}`"

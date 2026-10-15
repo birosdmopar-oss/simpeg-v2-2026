@@ -241,7 +241,7 @@ const crumbs = computed(() => [
               <UiButton variant="success" appearance="soft" data-testid="btn-setujui-pengajuan" @click="bukaProses('setujui')">Setujui Pengajuan</UiButton>
               <UiButton variant="error" appearance="soft" data-testid="btn-tolak-pengajuan" @click="bukaProses('tolak')">Tolak Pengajuan</UiButton>
             </template>
-            <UiButton v-if="detail.aksi?.ubah_biodata" data-testid="btn-ubah-data-umum" @click="editing = true">Ubah Data Umum</UiButton>
+            <UiButton v-if="detail.aksi?.ubah_biodata" class="whitespace-nowrap" data-testid="btn-ubah-data-umum" @click="editing = true">Ubah Data Umum</UiButton>
           </template>
           <div class="mt-3 border-t border-slate-200">
             <UiNotice v-if="pengajuan?.flag_update === 1" tone="info" class="mx-5 mt-4" data-testid="pengajuan-status">

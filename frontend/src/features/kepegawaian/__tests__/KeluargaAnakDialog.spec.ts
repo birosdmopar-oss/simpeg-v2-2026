@@ -72,6 +72,7 @@ describe('KeluargaAnakDialog', () => {
     const items = await rowMenuActions(body(), 'anak-actions-1')
     expect(items.map((i) => i.label)).toEqual(['Edit', 'Akte', 'Hapus'])
     expect(q('[data-testid="anak-actions-1"]')?.getAttribute('aria-label')).toBe('Aksi untuk Anak Satu')
+    expect(q('[data-testid="anak-actions-1"]')?.closest('td')?.classList.contains('sticky')).toBe(true)
   })
 
   it('tanpa izin ubah: tanpa Tambah, menu hanya Akte (hidden)', async () => {
