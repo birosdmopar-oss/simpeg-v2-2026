@@ -6,11 +6,20 @@ namespace App\Libraries\Kepegawaian\Stub;
 
 use App\Exceptions\BelumTersediaException;
 use App\Interfaces\Kepegawaian\StrukturServiceInterface;
+use App\Libraries\Auth\AuthContext;
 
 /**
- * Stub S0-A (MAKE-002) sampai implementasi nyata WS-2 (MAKE-012). Interface belum punya method; method yang ditambahkan
- * pemiliknya pada stub ini wajib fail-closed (lempar BelumTersediaException → 501).
+ * Stub S0-A (MAKE-002); implementasi nyata WS-2 MAKE-012 (StrukturService). Fail-closed (501).
  */
 final class StubStrukturService implements StrukturServiceInterface
 {
+    public function pohon(AuthContext $auth, array $filter = []): array
+    {
+        throw new BelumTersediaException('struktur organisasi');
+    }
+
+    public function pdf(AuthContext $auth, array $filter = []): array
+    {
+        throw new BelumTersediaException('struktur organisasi');
+    }
 }

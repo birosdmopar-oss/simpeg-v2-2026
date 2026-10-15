@@ -25,6 +25,10 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  * errors.nip berpesan jelas, akun tidak dibuat dan tidak ditautkan ke akun itu (ISSUE-023/CR-019; sebelumnya 1062 →
  * 500). Balapan dua proses untuk NIP yang sama tetap idempoten (yang kalah menerima akun yang sudah ada, created=false).
  *
+ * NIP wajib sudah ada di `pegawai.nip` (MAKE-015, prasyarat FK masuk DBV-019): pemanggil (B-05) menyisipkan baris
+ * `pegawai` lebih dulu di transaksi yang sama. NIP asing → 422 errors.nip PenggunaModel::NIP_TIDAK_TERDAFTAR sebelum
+ * insert; 1452 (FK aktif, baris pegawai hilang di antara cek dan tulis) diterjemahkan ke 422 yang sama, bukan 500.
+ *
  * Email (syarat DBV-010 D-6, CR-019): email pegawai yang sudah dipakai akun lain yang belum dihapus (dibandingkan
  * collation unicode_ci) TIDAK ikut disimpan — akun tetap dibuat tanpa email dan hasil memuat `email_skipped: true`
  * agar pemanggil (B-05) memberi tahu admin. Pegawai tidak digagalkan karena email: satu orang bisa sudah punya akun
@@ -44,6 +48,33 @@ class AccountProvisioner
      * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null, email_skipped: bool}
      */
     public function provisionForPegawai(array $pegawai, int $userLevel = Role::PEGAWAI, ?string $initialPassword = null): array
+    {
+        return $this->provision($pegawai, $userLevel, $initialPassword, false);
+    }
+
+    /**
+     * Jalur ADITIF B-05 Tambah Pegawai (MAKE-011): password awal = NIP [K] ikut legacy `libraries/hr/L_employee.php:157-166`
+     * (keputusan user 13-10-2026). Sengaja MELEWATI PasswordPolicy (K4 menolak NIP) — hanya untuk akun pegawai baru yang
+     * dibuat Super Admin; pemilik akun wajib segera mengganti password (penanda "wajib ganti password" menunggu DBV-020).
+     * Hash tetap v2 (Argon2id lewat PasswordVerifier), bukan md5; `password_decode` tidak ada. Validasi lain (format NIP,
+     * NIP terdaftar di `pegawai` MAKE-015, username dipakai akun lain, email D-6, idempoten) sama dengan
+     * provisionForPegawai(). Jalur provisioning lain tetap password acak yang lolos kebijakan.
+     *
+     * @param array<string, mixed> $pegawai sama dengan provisionForPegawai()
+     *
+     * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null, email_skipped: bool}
+     */
+    public function provisionDenganPasswordNip(array $pegawai, int $userLevel = Role::PEGAWAI): array
+    {
+        return $this->provision($pegawai, $userLevel, trim((string) ($pegawai['nip'] ?? '')), true);
+    }
+
+    /**
+     * @param array<string, mixed> $pegawai
+     *
+     * @return array{pengguna: array<string, mixed>, created: bool, initial_password: string|null, email_skipped: bool}
+     */
+    private function provision(array $pegawai, int $userLevel, ?string $initialPassword, bool $lewatiKebijakan): array
     {
         $nip = trim((string) ($pegawai['nip'] ?? ''));
 
@@ -67,7 +98,7 @@ class AccountProvisioner
         }
 
         // Password awal dari pemanggil tunduk pada kebijakan yang sama dengan admin set password (K4).
-        $policyErrors = $initialPassword === null ? [] : $this->passwords->policyErrors($initialPassword);
+        $policyErrors = $initialPassword === null || $lewatiKebijakan ? [] : $this->passwords->policyErrors($initialPassword);
 
         if ($policyErrors !== []) {
             throw new ValidationException('Validasi gagal.', ['password' => $policyErrors]);
@@ -83,6 +114,10 @@ class AccountProvisioner
         // UNIQUE username mencakup baris soft-deleted). Gagal dengan pesan jelas; akun tidak dibuat/ditautkan diam-diam.
         if ($this->pengguna->withDeleted()->where('username', $nip)->countAllResults() > 0) {
             throw self::usernameTaken();
+        }
+
+        if (! $this->pengguna->nipTerdaftarPegawai($nip)) {
+            throw self::nipTidakTerdaftar();
         }
 
         // D-6: jangan menulis email duplikat; akun dibuat tanpa email dan pemanggil diberi penanda.
@@ -109,6 +144,10 @@ class AccountProvisioner
                 'password_changed_at' => null,
             ]);
         } catch (DatabaseException $e) {
+            if ($e->getCode() === PenggunaModel::ER_FK_TANPA_INDUK && ! $this->pengguna->nipTerdaftarPegawai($nip)) {
+                throw self::nipTidakTerdaftar();
+            }
+
             if ($e->getCode() !== 1062) {
                 throw $e;
             }
@@ -146,6 +185,11 @@ class AccountProvisioner
             'nip',
             'NIP ini sudah dipakai sebagai username akun lain; ganti username akun tersebut sebelum membuat akun pegawai.',
         );
+    }
+
+    private static function nipTidakTerdaftar(): ValidationException
+    {
+        return ValidationException::forField('nip', PenggunaModel::NIP_TIDAK_TERDAFTAR);
     }
 
     /**

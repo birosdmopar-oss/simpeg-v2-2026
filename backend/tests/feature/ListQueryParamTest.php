@@ -411,6 +411,9 @@ final class ListQueryParamTest extends DatabaseTestCase
      */
     private function createAccount(string $nip, string $username): void
     {
+        // NIP akun wajib terdaftar di pegawai (MAKE-015).
+        $this->daftarkanPegawai($nip);
+
         $this->sendJson('POST', self::USERS, [
             'nip'        => $nip,
             'username'   => $username,

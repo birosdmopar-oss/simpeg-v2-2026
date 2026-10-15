@@ -22,7 +22,8 @@ use App\Libraries\MasterData\MasterField;
  * - [V2] Pemroses = role 1 sampai `petugas_layanan` (Fase 4, C-01) ada — legacy: role 2 yang terdaftar petugas layanan.
  *   TODO(C-01): alihkan izin proses ke petugas layanan.
  * - [V2] Hapus = status 10 (legacy hapus keras).
- * - TODO(ADR-033, WS-2): PDF tanda terima (`file_tanda_terima`) saat disetujui ditunda.
+ * - PDF tanda terima: `GET usulan/{jenis}/{id}/tanda-terima` (WS-2 MAKE-013, `Usulan\TandaTerimaUsulan`, dibangkitkan
+ *   saat diminta untuk usulan Disetujui; `file_tanda_terima` tidak diisi).
  * Berkas `file_1..5` (+ `file_surat_hilang` wajib untuk permohonan karena kehilangan) disimpan di kolom lewat
  * `kolomBerkas()` (KolomBerkas MAKE-009); 5 MB, jpg|jpeg|png|gif|pdf|xls|xlsx|doc|docx (legacy).
  */

@@ -48,6 +48,10 @@ use CodeIgniter\Database\Exceptions\DatabaseException;
  *   collation unicode_ci → 422 errors.email. Kosong/NULL boleh untuk banyak akun. Saat ubah akun hanya dinilai bila
  *   email berubah, jadi duplikat lama hasil impor tidak mengunci akun. Tanpa UNIQUE di DB (menunggu audit data legacy)
  *   balapan dua admin menyimpan email yang sama bersamaan masih bisa lolos.
+ * - NIP yang diisi (buat akun / menautkan akun tanpa NIP) wajib ada di `pegawai.nip` → 422 errors.nip
+ *   PenggunaModel::NIP_TIDAK_TERDAFTAR (MAKE-015, prasyarat FK masuk DBV-019). NIP NULL (akun non-pegawai) tetap sah.
+ *   Bila FK sudah terpasang dan baris `pegawai` hilang di antara cek dan tulis, 1452 diterjemahkan ke 422 yang sama.
+ *   Koreksi NIP (B-06) tidak lewat service ini: NIP akun yang sudah ada tidak bisa diubah di sini.
  * - Username diubah → token reset password yang masih tertunda untuk username lama dibatalkan (token dipetakan ke akun
  *   lewat username; tanpa ini token bisa "berpindah" ke akun lain yang kemudian memakai username tersebut).
  */
@@ -198,6 +202,11 @@ class UserService
             throw new ValidationException('Validasi gagal.', ['nip' => ['NIP sudah memiliki akun.']]);
         }
 
+        // MAKE-015: akun ber-NIP harus tertaut ke pegawai yang ada (FK masuk DBV-019); tanpa ini 1452 → 500.
+        if ($nip !== null && ! $this->pengguna->nipTerdaftarPegawai($nip)) {
+            throw self::nipTidakTerdaftar();
+        }
+
         if ($this->pengguna->withDeleted()->where('username', $username)->countAllResults() > 0) {
             throw new ValidationException('Validasi gagal.', ['username' => ['Username sudah dipakai.']]);
         }
@@ -259,6 +268,8 @@ class UserService
                 if (self::validateNip($nip, $errors)) {
                     if ($this->pengguna->withDeleted()->where('nip', $nip)->countAllResults() > 0) {
                         $errors['nip'][] = 'NIP sudah memiliki akun.';
+                    } elseif (! $this->pengguna->nipTerdaftarPegawai($nip)) {
+                        $errors['nip'][] = PenggunaModel::NIP_TIDAK_TERDAFTAR;
                     } else {
                         $update['nip'] = $nip;
                     }
@@ -458,13 +469,18 @@ class UserService
 
     /**
      * Pelanggaran UNIQUE (1062) saat dua permintaan balapan lolos cek aplikasi → cek ulang lalu 422 per field
-     * (pola FaqService::rate / MasterService::translateDuplicate). Error DB lain tetap dilempar (500).
+     * (pola FaqService::rate / MasterService::translateDuplicate). Pelanggaran FK `pengguna.nip` → `pegawai` (1452,
+     * setelah FK masuk DBV-019 aktif) → 422 errors.nip (MAKE-015). Error DB lain tetap dilempar (500).
      */
     private function translateDuplicate(Closure $work, ?string $nip, ?string $username, ?int $exceptId): mixed
     {
         try {
             return $work();
         } catch (DatabaseException $e) {
+            if ($e->getCode() === PenggunaModel::ER_FK_TANPA_INDUK && $nip !== null && ! $this->pengguna->nipTerdaftarPegawai($nip)) {
+                throw self::nipTidakTerdaftar();
+            }
+
             if ($e->getCode() !== 1062) {
                 throw $e;
             }
@@ -485,6 +501,11 @@ class UserService
 
             throw new ValidationException('Validasi gagal.', $errors);
         }
+    }
+
+    private static function nipTidakTerdaftar(): ValidationException
+    {
+        return new ValidationException('Validasi gagal.', ['nip' => [PenggunaModel::NIP_TIDAK_TERDAFTAR]]);
     }
 
     /**

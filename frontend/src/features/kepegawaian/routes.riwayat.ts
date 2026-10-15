@@ -16,12 +16,10 @@ export const riwayatRoutes: RouteRecordRaw[] = [
     meta: { roles: KARPEG_KARIS_ROLES, title: 'Usulan Karpeg/Karis' },
   },
   {
-    // SEMENTARA sampai MAKE-010 (GET pegawai/{nip} + data.tabs, WS-2): tab riwayat pegawai dari
-    // GET pegawai/{nip}/riwayat (MAKE-006). Semua role login; lingkup & izin per jenis ditegakkan backend. Tanpa entri
-    // menu. TODO(MAKE-010): alihkan ke Detail Pegawai (tab yang sama) atau hapus.
+    // Alamat lama tab riwayat (halaman sementara MAKE-006, sebelum Detail Pegawai live MAKE-010): dialihkan ke Detail
+    // Pegawai — tab yang sama dari descriptor `data.tabs`; query (mis. `?tab=kp`) dipertahankan (MAKE-016).
     path: '/pegawai/:nip/riwayat',
     name: 'pegawai-riwayat',
-    component: () => import('./views/RiwayatPegawaiPage.vue'),
-    meta: { title: 'Riwayat Pegawai' },
+    redirect: (to) => ({ name: 'pegawai-detail', params: { nip: to.params.nip }, query: to.query }),
   },
 ]

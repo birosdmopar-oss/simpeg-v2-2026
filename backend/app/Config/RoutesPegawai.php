@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Constants\Role;
 use CodeIgniter\Router\RouteCollection;
 
 /**
@@ -31,5 +32,64 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->get('pegawai/(:segment)/lampiran/(:num)/unduh', 'LampiranController::unduh/$1/$2');
     $routes->delete('pegawai/(:segment)/lampiran/(:num)', 'LampiranController::delete/$1/$2');
 
-    // WS-2: endpoint pegawai/lampiran/biodata/NIP/struktur/Konket/LKH ditambahkan di sini.
+    // B-20 dasar + B-03 biodata + B-06 koreksi NIP (MAKE-010). Detail/biodata/foto: izin & lingkup di service (jwt saja).
+    $routes->get('pegawai', 'PegawaiController::index', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN)]);
+    // B-20 penutup (MAKE-014): ekspor & pencarian lanjutan — didaftarkan sebelum pegawai/(:segment).
+    $daftar    = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN)];
+    $pencarian = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI)];
+    $routes->get('pegawai/export', 'PegawaiController::ekspor', $daftar);
+    $routes->get('pegawai/pencarian/katalog', 'PegawaiController::katalogPencarian', $pencarian);
+    $routes->post('pegawai/pencarian', 'PegawaiController::pencarian', $pencarian);
+    $routes->post('pegawai/pencarian/export', 'PegawaiController::eksporPencarian', $pencarian);
+    $routes->get('pegawai/(:segment)', 'PegawaiController::show/$1');
+    // B-05 tambah & hapus pegawai (MAKE-011, role 1).
+    $routes->post('pegawai', 'PegawaiController::create', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
+    $routes->delete('pegawai/(:segment)', 'PegawaiController::delete/$1', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
+    $routes->put('pegawai/(:segment)/biodata', 'PegawaiController::updateBiodata/$1');
+    $routes->get('pegawai/(:segment)/foto', 'PegawaiController::foto/$1');
+    // B-20 penutup (MAKE-014): Cetak DRH PDF — hak di DrhPegawai (UL_ALL; 2/6/7 sendiri).
+    $routes->get('pegawai/(:segment)/drh', 'PegawaiController::drh/$1');
+    $routes->post('pegawai/(:segment)/koreksi-nip', 'PegawaiController::koreksiNip/$1', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
+
+    // B-04 approval pengajuan biodata (MAKE-011). Detail/foto: pemroses atau pemilik (service); antrean/proses role 1, 3.
+    $routes->get('biodata/pengajuan', 'PegawaiController::antreanPengajuan', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]);
+    $routes->get('biodata/pengajuan/(:num)', 'PegawaiController::pengajuan/$1');
+    $routes->get('biodata/pengajuan/(:num)/foto', 'PegawaiController::fotoPengajuan/$1');
+    $routes->post('biodata/pengajuan/(:num)/process', 'PegawaiController::prosesPengajuan/$1', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]);
+
+    // B-19 struktur organisasi (MAKE-012): semua pengguna login (legacy hr/so/full = sesi, hr/rwy/jabatan/so = UL_ALL).
+    $routes->get('struktur-organisasi', 'StrukturController::index');
+    $routes->get('struktur-organisasi/pdf', 'StrukturController::pdf');
+    // B-07 penugasan Plt/Plh (MAKE-012): {jenis} = plt|plh; hak akses & lingkup di PenugasanService (jwt saja).
+    $routes->get('penugasan/(plt|plh)', 'PenugasanController::index/$1');
+    $routes->post('penugasan/(plt|plh)', 'PenugasanController::create/$1');
+    $routes->get('penugasan/(plt|plh)/(:num)', 'PenugasanController::show/$1/$2');
+    $routes->put('penugasan/(plt|plh)/(:num)', 'PenugasanController::update/$1/$2');
+    $routes->delete('penugasan/(plt|plh)/(:num)', 'PenugasanController::delete/$1/$2');
+    $routes->get('penugasan/(plt|plh)/(:num)/lampiran', 'PenugasanController::unduhLampiran/$1/$2');
+
+    // B-13 Konket (MAKE-013): hak akses & lingkup di KonketService (role 1, 2, 3, 6, 7; proses 1, 3).
+    $routes->get('konket', 'KonketController::index');
+    $routes->get('konket/opsi', 'KonketController::opsi');
+    $routes->post('konket', 'KonketController::create');
+    $routes->get('konket/(:num)', 'KonketController::show/$1');
+    $routes->put('konket/(:num)', 'KonketController::update/$1');
+    $routes->delete('konket/(:num)', 'KonketController::delete/$1');
+    $routes->post('konket/(:num)/process', 'KonketController::process/$1');
+    $routes->get('konket/(:num)/berkas', 'KonketController::berkasBukti/$1');
+
+    // B-12b LKH (MAKE-013): role 1, 2, 3, 6, 7; verifikasi = atasan langsung (nip_atasan); hak & lingkup di LkhService.
+    $routes->get('lkh', 'LkhController::index');
+    $routes->get('lkh/opsi', 'LkhController::opsi');
+    $routes->get('lkh/verifikasi', 'LkhController::verifikasi');
+    $routes->get('lkh/rekap', 'LkhController::rekap');
+    $routes->get('lkh/rekap/(:segment)', 'LkhController::rekapBawahan/$1');
+    $routes->post('lkh', 'LkhController::create');
+    $routes->get('lkh/(:num)', 'LkhController::show/$1');
+    $routes->put('lkh/(:num)', 'LkhController::update/$1');
+    $routes->delete('lkh/(:num)', 'LkhController::delete/$1');
+    $routes->post('lkh/(:num)/process', 'LkhController::process/$1');
+    $routes->get('lkh/(:num)/pdf', 'LkhController::pdf/$1');
+
+    // WS-2: endpoint tambahan ditambahkan di sini.
 });

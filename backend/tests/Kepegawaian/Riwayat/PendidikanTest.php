@@ -334,11 +334,12 @@ final class PendidikanTest extends DatabaseTestCase
             'App\Libraries\Kepegawaian\Riwayat\Definisi',
         );
 
-        // Urut urutanTab() (seri → slug): kp 20, kgb 30, pendidikan 40, keluarga 50, alamat 55, diklat 60, seminar 65,
+        // Urut urutanTab() (seri → slug): jabatan 10 (WS-2 MAKE-012), kp 20, kgb 30, pendidikan 40, keluarga 50, alamat 55, diklat 60, seminar 65,
         // tanda-jasa 70, organisasi 75, hukdis 90, lalu usulan karpeg/kariskarsu (bawaan 100) — MAKE-005..007.
-        $this->assertSame(['kp', 'kgb', 'pendidikan', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi', 'hukdis', 'kariskarsu', 'karpeg'], array_map(static fn (RiwayatDefinisi $d): string => $d->jenis(), $registry->semua()));
+        $this->assertSame(['jabatan', 'kp', 'kgb', 'pendidikan', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi', 'skp', 'skp-periodik', 'ak', 'ak-siasn', 'hukdis', 'kariskarsu', 'karpeg'], array_map(static fn (RiwayatDefinisi $d): string => $d->jenis(), $registry->semua()));
         $this->assertSame('pendidikan', $registry->definisiUntukLampiran(14)?->jenis());
         $this->assertSame('kp', $registry->definisiUntukLampiran(11)?->jenis());
+        $this->assertSame('jabatan', $registry->definisiUntukLampiran(9)?->jenis());
 
         $tabs = array_column($registry->descriptorUntuk($this->pegawai, $this->nip), null, 'jenis');
         $this->assertTrue($tabs['pendidikan']['can_create']);

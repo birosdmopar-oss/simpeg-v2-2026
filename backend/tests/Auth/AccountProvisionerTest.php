@@ -37,6 +37,8 @@ final class AccountProvisionerTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
+        // MAKE-015: NIP akun baru di test ini wajib terdaftar sebagai pegawai.
+        $this->daftarkanPegawai(self::NIP, '200101012025011002', '3171012345678901');
         $pengguna          = new PenggunaModel($this->db);
         $this->provisioner = new AccountProvisioner($pengguna, new PasswordVerifier($pengguna));
     }
@@ -226,6 +228,30 @@ final class AccountProvisionerTest extends DatabaseTestCase
 
         $this->assertSame($total, $this->db->table('pengguna')->countAllResults());
         $this->assertSame($other, $this->db->table('pengguna')->where('id_pengguna', $other['id_pengguna'])->get()->getRowArray());
+    }
+
+    public function testPasswordNipB05MelewatiKebijakanDenganHashV2(): void
+    {
+        // MAKE-011 (B-05, keputusan user 13-10-2026): password awal = NIP [K], hash Argon2id, bukan md5.
+        $result = $this->provisioner->provisionDenganPasswordNip(['nip' => self::NIP, 'name' => 'Pegawai Baru'], Role::PPPK);
+
+        $this->assertTrue($result['created']);
+        $this->assertSame(self::NIP, $result['initial_password']);
+
+        $row = $this->db->table('pengguna')->where('nip', self::NIP)->get()->getRowArray();
+        $this->assertIsArray($row);
+        $this->assertSame(Role::PPPK, (int) $row['user_level']);
+        $this->assertStringStartsWith('$argon2id$', (string) $row['password']);
+        $this->assertTrue(password_verify(self::NIP, (string) $row['password']));
+        $this->assertNull($row['password_legacy']);
+
+        // Jalur biasa tetap menegakkan kebijakan: NIP sebagai password eksplisit ditolak.
+        try {
+            $this->provisioner->provisionForPegawai(['nip' => '200101012025011002'], Role::PEGAWAI, '200101012025011002');
+            $this->fail('Kebijakan password seharusnya menolak NIP.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('password', $e->getErrors());
+        }
     }
 
     public function testGeneratedPasswordSatisfiesPolicy(): void

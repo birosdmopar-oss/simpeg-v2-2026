@@ -11,6 +11,9 @@ Mesin yang membaca Definisi: `RiwayatEngine` + `SnapshotSync` (M1, MAKE-004). Se
 meng-override default ikut legacy: `statusAwal()`, `statusSetelahUbah()`, `kunciBarisDisetujui()`,
 `roleKunciHapusDisetujui()`, `rolePilihStatusSaatUbah()` (role yang boleh memilih `status` saat ubah; Ditolak wajib
 alasan), `bolehAksiUntuk()` (izin per pegawai sasaran, mis. role 2 Pendidikan hanya selama CPNS; dipakai engine dan
-descriptor), `urutanDaftar()`, `pemetaanStatus()`, dan hook `validate` (menerima NIP pemilik)/`beforeSave`/
-`afterApprove`. Permukaan ini beku sejak engine-v1 (MAKE-005): perubahan hanya aditif oleh WS-1.
+descriptor), `urutanDaftar()`, `saringDaftar()` (saring daftar tambahan, MAKE-008), `pemetaanStatus()`,
+`lampiranWajib()`, `kolomBerkas()`/`kolomBerkasWajib()`, `entriLampiran()` (MAKE-007), dan hook `validate` (menerima NIP
+pemilik)/`beforeSave` (saat tambah menerima NIP pemilik, MAKE-008)/`afterApprove`/`afterProses` (setujui dan tolak
+lewat proses, MAKE-008), `pratinjauTambah()` (pratinjau isian turunan form tambah, MAKE-017), dan `isianMentah()` (kunci payload mentah —
+string/array apa adanya — untuk validate/beforeSave, tidak ditulis engine, MAKE-019). Permukaan ini beku sejak engine-v1 (MAKE-005): perubahan hanya aditif oleh WS-1.
 Setiap jenis nyata wajib punya test B-TC (`Tests\Support\Kepegawaian\RiwayatBtcTrait`).

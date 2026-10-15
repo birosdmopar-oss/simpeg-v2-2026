@@ -15,7 +15,7 @@
  * (bawaan Disetujui, sama dengan form legacy) dan `reason_note` yang wajib bila memilih Ditolak; role lain tidak
  * mengirim status (server menghitungnya).
  */
-import { FileSearch, Plus } from 'lucide-vue-next'
+import { ChevronDown, ChevronsUpDown, ChevronUp, FileSearch, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -33,10 +33,11 @@ import { lampiranService } from '../services/lampiran.service'
 import { STATUS_RIWAYAT, STATUS_RIWAYAT_LABELS, type JenisEngine, type RiwayatRow, type RiwayatTabDescriptor } from '../types'
 
 import RiwayatFormDialog from './RiwayatFormDialog.vue'
+import BerkasKolomDialog from './BerkasKolomDialog.vue'
 import KeluargaAnakDialog from './KeluargaAnakDialog.vue'
 import RiwayatLampiranDialog from './RiwayatLampiranDialog.vue'
 import { A, S, type ColumnDef, type FieldDef, type RiwayatJenisConfig } from './riwayat.config'
-import { riwayatService, type BerkasMap } from './riwayat.service'
+import { riwayatService, type BerkasMap, type RiwayatValues } from './riwayat.service'
 
 const props = defineProps<{ nip: string; config: RiwayatJenisConfig; descriptor: RiwayatTabDescriptor }>()
 
@@ -80,6 +81,14 @@ const lampiranOpen = ref(false)
 const anakRow = ref<RiwayatRow | null>(null)
 const anakOpen = ref(false)
 
+const berkasRow = ref<RiwayatRow | null>(null)
+const berkasOpen = ref(false)
+
+/** Kolom berkas yang sudah terisi pada baris yang diedit (tidak diwajibkan lagi). */
+const kolomTerisi = computed<Record<string, boolean>>(() =>
+  Object.fromEntries(berkasKolom.value.map((b) => [b.kolom, String(editing.value?.[b.kolom] ?? '').trim() !== ''])),
+)
+
 const deleting = ref<RiwayatRow | null>(null)
 /** Dipisah dari baris terpilih: klik konfirmasi menutup dialog SEBELUM handler confirm jalan. */
 const deleteOpen = ref(false)
@@ -90,11 +99,14 @@ const processMode = ref<ApprovalAksi>('setujui')
 const processBusy = ref(false)
 const processError = ref('')
 
-const canCreate = computed(() => props.descriptor.can_create && props.config.fields.length > 0)
-const canEdit = computed(() => props.descriptor.can_edit && props.config.fields.length > 0)
+// Jenis tanpa isian tetapi ber-berkas kolom (mis. SKP periodik) tetap punya Edit (unggah berkas), tidak punya Tambah.
+const punyaIsian = computed(() => props.config.fields.length > 0)
+const berkasKolom = computed(() => props.config.berkasKolom ?? [])
+const canCreate = computed(() => props.descriptor.can_create && punyaIsian.value)
+const canEdit = computed(() => props.descriptor.can_edit && (punyaIsian.value || berkasKolom.value.length > 0))
 const hasLampiran = computed(() => props.config.lampiran.length > 0)
 const hasActions = computed(
-  () => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value || Boolean(props.config.kelolaAnak),
+  () => canEdit.value || props.descriptor.can_delete || props.descriptor.can_process || hasLampiran.value || Boolean(props.config.kelolaAnak) || berkasKolom.value.length > 0,
 )
 
 const pilihStatus = computed(() => editing.value !== null && auth.role !== null && (props.config.pilihStatusSaatUbah ?? []).includes(auth.role))
@@ -138,7 +150,31 @@ const filtered = computed(() => {
   if (!needle) return rows.value
   return rows.value.filter((r) => props.config.columns.some((c) => cell(r, c).toLowerCase().includes(needle)))
 })
-const paged = computed(() => filtered.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+/** Urutan klik header (CR-049 D-F7): null = urutan server; klik kolom sama membalik arah. */
+const urut = ref<{ key: string; arah: 'ascending' | 'descending' } | null>(null)
+
+function urutkan(col: ColumnDef): void {
+  urut.value = urut.value?.key === col.key && urut.value.arah === 'ascending' ? { key: col.key, arah: 'descending' } : { key: col.key, arah: 'ascending' }
+  page.value = 1
+}
+
+const ariaSort = (col: ColumnDef): 'ascending' | 'descending' | 'none' => (urut.value?.key === col.key ? urut.value.arah : 'none')
+
+const sorted = computed(() => {
+  const u = urut.value
+  const col = u ? props.config.columns.find((c) => c.key === u.key) : undefined
+  if (!u || !col) return filtered.value
+  // Tanggal dibandingkan dari nilai mentah (ISO); selain itu teks tampilan (angka dibandingkan sebagai angka). Kosong di akhir.
+  const kunci = (r: RiwayatRow): string => (col.format === 'date' ? String(r[col.key] ?? '') : cell(r, col) === '—' ? '' : cell(r, col))
+  const arah = u.arah === 'ascending' ? 1 : -1
+  return [...filtered.value].sort((a, b) => {
+    const ka = kunci(a)
+    const kb = kunci(b)
+    if (ka === '' || kb === '') return ka === kb ? 0 : ka === '' ? 1 : -1
+    return ka.localeCompare(kb, 'id', { numeric: true, sensitivity: 'base' }) * arah
+  })
+})
+const paged = computed(() => sorted.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
 
 function cell(row: RiwayatRow, col: ColumnDef): string {
   const raw = row[col.key]
@@ -153,9 +189,13 @@ function cell(row: RiwayatRow, col: ColumnDef): string {
 }
 
 function rowLabel(row: RiwayatRow): string {
-  const first = props.config.columns[0]
-  const text = first ? cell(row, first) : ''
-  return text && text !== '—' ? text : props.config.title
+  // CR-049 D-F12: kolom penamaan per jenis (`labelKolom`), bawaan kolom pertama.
+  const kunci = props.config.labelKolom ?? props.config.columns.slice(0, 1).map((c) => c.key)
+  const teks = kunci
+    .map((k) => props.config.columns.find((c) => c.key === k) ?? { key: k, label: k })
+    .map((c) => cell(row, c))
+    .filter((t) => t && t !== '—')
+  return teks.length ? teks.join(' — ') : props.config.title
 }
 
 /** Baris Disetujui terkunci untuk role pengguna (salinan aturan Definisi di konfigurasi jenis). */
@@ -170,6 +210,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
     ...approvalRowActions({ canProcess: props.descriptor.can_process, status: rowStatus(row), busy }),
     { key: 'lampiran', label: 'Lampiran', hidden: !hasLampiran.value },
     { key: 'anak', label: 'Anak', hidden: !props.config.kelolaAnak },
+    { key: 'berkas', label: 'Berkas', hidden: berkasKolom.value.length === 0 },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.descriptor.can_delete, disabled: terkunci(row, props.config.kunciHapusDisetujuiRole) },
   ]
 }
@@ -210,6 +251,9 @@ function onAction(key: string, row: RiwayatRow): void {
   } else if (key === 'anak') {
     anakRow.value = row
     anakOpen.value = true
+  } else if (key === 'berkas') {
+    berkasRow.value = row
+    berkasOpen.value = true
   } else if (key === 'setujui' || key === 'tolak') {
     processing.value = row
     processMode.value = key
@@ -221,6 +265,13 @@ function onAction(key: string, row: RiwayatRow): void {
   }
 }
 
+/** Pratinjau isian turunan form tambah (MAKE-017) — hanya saat tambah dan jenis punya `pratinjau`. */
+const pratinjauForm = computed(() =>
+  props.config.pratinjau && !editing.value
+    ? { def: props.config.pratinjau, muat: (query: Record<string, string>) => riwayatService.pratinjau(props.nip, jenis.value, query) }
+    : null,
+)
+
 const initialValues = computed<Record<string, string> | null>(() => {
   const row = editing.value
   if (!row) return null
@@ -229,9 +280,11 @@ const initialValues = computed<Record<string, string> | null>(() => {
   return pilihStatus.value ? { status: String(STATUS_RIWAYAT.DISETUJUI), reason_note: '', ...values } : values
 })
 
-async function onSubmit(values: Record<string, string>, berkas: BerkasMap): Promise<void> {
+async function onSubmit(teks: Record<string, string>, berkas: BerkasMap, jamak: Record<string, string[]> = {}): Promise<void> {
   saving.value = true
   formErrors.value = null
+  // Nilai multiselect (MAKE-018) digabung ke payload sebagai array ID.
+  const values: RiwayatValues = { ...teks, ...jamak }
   try {
     if (editing.value) await riwayatService.update(props.nip, jenis.value, rowId(editing.value), formFields.value, values, berkas)
     else await riwayatService.create(props.nip, jenis.value, formFields.value, values, berkas)
@@ -240,7 +293,11 @@ async function onSubmit(values: Record<string, string>, berkas: BerkasMap): Prom
     notice.value = { tone: 'success', text: `Data ${props.config.singular} tersimpan.` }
     await load()
   } catch (error) {
-    const split = splitValidationErrors(error, fieldNames.value, props.config.lampiran.map((l) => l.id_riwayat))
+    const split = splitValidationErrors(
+      error,
+      [...fieldNames.value, ...berkasKolom.value.map((b) => `berkas.${b.kolom}`)],
+      props.config.lampiran.map((l) => l.id_riwayat),
+    )
     const failed = describeApiError(error)
     formErrors.value = failed.kind === 'validation' ? split : { fields: {}, berkas: {}, general: [failed.message] }
   } finally {
@@ -309,9 +366,21 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
           <table class="w-full min-w-[40rem] border-collapse text-left text-body1" data-testid="riwayat-table">
             <thead>
               <tr class="border-y border-slate-200 text-body2 font-semibold text-slate-900">
-                <th v-for="col in config.columns" :key="col.key" scope="col" class="px-5 py-3">{{ col.label }}</th>
+                <th v-for="col in config.columns" :key="col.key" scope="col" class="px-5 py-3" :aria-sort="ariaSort(col)">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded hover:text-brand-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary/40"
+                    :data-testid="`riwayat-sort-${col.key}`"
+                    @click="urutkan(col)"
+                  >
+                    {{ col.label }}
+                    <ChevronUp v-if="ariaSort(col) === 'ascending'" class="h-3.5 w-3.5" aria-hidden="true" />
+                    <ChevronDown v-else-if="ariaSort(col) === 'descending'" class="h-3.5 w-3.5" aria-hidden="true" />
+                    <ChevronsUpDown v-else class="h-3.5 w-3.5 text-slate-300" aria-hidden="true" />
+                  </button>
+                </th>
                 <th scope="col" class="px-5 py-3">Status</th>
-                <th v-if="hasActions" scope="col" class="px-5 py-3 text-right">Aksi</th>
+                <th v-if="hasActions" scope="col" class="sticky right-0 bg-white px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200">
@@ -336,7 +405,7 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
                       {{ row.reason_note }}
                     </p>
                   </td>
-                  <td v-if="hasActions" class="px-5 py-3 text-right">
+                  <td v-if="hasActions" class="sticky right-0 bg-white px-5 py-3 text-right">
                     <RowActionsMenu
                       :actions="rowActions(row)"
                       :label="`Aksi untuk ${rowLabel(row)}`"
@@ -359,7 +428,10 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :config="config"
       :fields="formFields"
       :initial="initialValues"
+      :baris="editing"
+      :pratinjau="pratinjauForm"
       :lampiran-tersimpan="lampiranTersimpan"
+      :kolom-terisi="kolomTerisi"
       :server-errors="formErrors"
       :busy="saving"
       @submit="onSubmit"
@@ -385,6 +457,17 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
       :terkunci-ubah="terkunci(anakRow, config.kunciUbahDisetujuiRole)"
       :terkunci-hapus="terkunci(anakRow, config.kunciHapusDisetujuiRole)"
       @changed="load"
+    />
+
+    <BerkasKolomDialog
+      v-if="berkasRow"
+      v-model:open="berkasOpen"
+      :nip="nip"
+      :jenis="jenis"
+      :id-baris="rowId(berkasRow)"
+      :row="berkasRow"
+      :berkas="berkasKolom"
+      :subject="rowLabel(berkasRow)"
     />
 
     <ApprovalDialog

@@ -39,6 +39,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
         $routes->post("{$dasar}/(:num)/process", "RiwayatController::process/\$1/{$jenis}/\$2");
         // M4 (MAKE-007, aditif): unduh berkas kolom (RiwayatDefinisi::kolomBerkas()).
         $routes->get("{$dasar}/(:num)/berkas/(:segment)", "RiwayatController::unduhBerkas/\$1/{$jenis}/\$2/\$3");
+        // MAKE-017 (aditif): pratinjau isian turunan form tambah (RiwayatDefinisi::pratinjauTambah(); tanpa hook → 404).
+        $routes->get("{$dasar}/pratinjau", "RiwayatController::pratinjau/\$1/{$jenis}");
     }
 
     // M3 (MAKE-006, aditif): descriptor tab riwayat pegawai { tabs } = RiwayatRegistry::descriptorUntuk().
@@ -55,6 +57,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     foreach (['karpeg', 'kariskarsu'] as $usulan) {
         $routes->get("usulan/{$usulan}", "UsulanController::antrean/{$usulan}");
         $routes->get("usulan/{$usulan}/saya", "UsulanController::saya/{$usulan}");
+        // Aditif WS-2 MAKE-013 (ADR-033): PDF tanda terima usulan Disetujui.
+        $routes->get("usulan/{$usulan}/(:num)/tanda-terima", "UsulanController::tandaTerima/{$usulan}/\$1");
     }
 
     // WS-1: endpoint riwayat tambahan (mis. usulan Karpeg/Karis M4) ditambahkan di sini.

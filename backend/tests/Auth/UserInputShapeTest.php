@@ -44,6 +44,8 @@ final class UserInputShapeTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
+        // MAKE-015: NIP akun baru di test ini wajib terdaftar sebagai pegawai.
+        $this->daftarkanPegawai(self::NEW_NIP);
     }
 
     protected function tearDown(): void

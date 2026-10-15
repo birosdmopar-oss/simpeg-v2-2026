@@ -7,6 +7,7 @@ namespace App\Libraries\Kepegawaian\Riwayat;
 use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\MasterData\MasterField;
+use CodeIgniter\Database\BaseBuilder;
 
 /**
  * Definisi satu jenis riwayat sebagai DATA (kontrak beku S0-A MAKE-002; pemilik WS-1). RiwayatEngine/SnapshotSync
@@ -179,6 +180,32 @@ abstract class RiwayatDefinisi
     }
 
     /**
+     * Kunci payload MENTAH (aditif MAKE-019, engine-v1): diteruskan engine APA ADANYA (tanpa ValidasiRiwayat; string,
+     * array, atau null sesuai kiriman — JSON array, multipart `kolom[]` berulang, atau multipart `kolom=''`) ke
+     * `validate()` dan `beforeSave()` saat tambah maupun ubah, HANYA bila klien mengirim kuncinya. Engine tidak pernah
+     * menulis kunci ini ke tabel: Definisi memindahkan/menormalkannya ke kolom nyata di beforeSave (mis. jabatan:
+     * `id_subrumpun_jabatan` daftar ID → teks nama `subrumpun_jabatan` dipisah `***`); sisa kunci mentah dibuang sebelum
+     * insert/update. Nama tidak boleh sama dengan field `fields()`, kolom berkas `kolomBerkas()`, kolom NIP/status, atau PK
+     * (RiwayatRegistry menolak), dan SEBAIKNYA bukan kolom DDL tabel sama sekali — kolom bernama sama tidak pernah ditulis
+     * engine dari kunci ini (dibuang sesudah beforeSave), sehingga mudah disalahpahami.
+     *
+     * @return list<string>
+     */
+    public function isianMentah(): array
+    {
+        return [];
+    }
+
+    /**
+     * Saring tambahan daftar riwayat (aditif MAKE-008, engine-v1): dipanggil engine di `GET riwayat/{jenis}` setelah
+     * filter NIP & status != 10, sebelum urutanDaftar(). Bawaan tidak menyaring. Contoh: SKP periodik hanya menampilkan
+     * baris status 1 (legacy `L_skp.php` periodic() :779). Detail/ubah per baris tidak ikut disaring.
+     */
+    public function saringDaftar(BaseBuilder $builder): void
+    {
+    }
+
+    /**
      * Aturan snapshot `pegawai_*` (boleh lebih dari satu target; kosong = jenis tanpa snapshot).
      *
      * @return list<AturanSnapshot>
@@ -279,7 +306,8 @@ abstract class RiwayatDefinisi
     }
 
     /**
-     * Hook sebelum simpan (mis. mengisi kolom teks turunan dari master). Dipanggil di dalam transaksi engine.
+     * Hook sebelum simpan (mis. mengisi kolom teks turunan dari master). Dipanggil di dalam transaksi engine. Saat tambah
+     * $data juga berisi kolom NIP pemilik (aditif MAKE-008; saat ubah NIP ada di $lama).
      *
      * @param array<string, mixed>      $data
      * @param array<string, mixed>|null $lama
@@ -299,6 +327,33 @@ abstract class RiwayatDefinisi
      */
     public function afterApprove(array $baris, AuthContext $auth): void
     {
+    }
+
+    /**
+     * Hook setelah baris DIPROSES lewat `POST …/process` (aditif MAKE-008, engine-v1): dipanggil untuk $aksi `setujui`
+     * maupun `tolak`, di dalam transaksi engine, sesudah status ditulis (dan sesudah SnapshotSync/afterApprove saat
+     * setujui). Default no-op. Contoh: AK mengisi `appr_at`/`appr_by` untuk setujui dan tolak (legacy `L_ak.php`
+     * process_ak()). Tidak dipanggil untuk perubahan status lewat tambah/ubah.
+     *
+     * @param array<string, mixed> $baris baris sesudah diproses
+     */
+    public function afterProses(string $aksi, array $baris, AuthContext $auth): void
+    {
+    }
+
+    /**
+     * Pratinjau isian yang akan diisi server saat TAMBAH (aditif MAKE-017, engine-v1): `GET
+     * pegawai/{nip}/riwayat/{jenis}/pratinjau?<query>` dengan izin & lingkup aksi tambah. Null (bawaan) = jenis tanpa
+     * pratinjau → 404. Logika wajib dipakai bersama dengan beforeSave (jangan diduplikasi), mis. AK: jabatan, pangkat,
+     * TMT, masa kerja, AK kumulatif, AK lama.
+     *
+     * @param array<string, mixed> $query parameter query request
+     *
+     * @return array<string, mixed>|null
+     */
+    public function pratinjauTambah(string $nip, array $query): ?array
+    {
+        return null;
     }
 
     /**

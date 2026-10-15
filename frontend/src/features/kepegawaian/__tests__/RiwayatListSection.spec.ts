@@ -3,7 +3,7 @@
  * tombol tambah (can_create), menu ⋮ Edit → Setujui/Tolak (can_process, baris Menunggu) → Lampiran → Hapus
  * (can_delete), proses lewat ApprovalDialog, galat 422 (errors.<kolom>, errors["berkas.<id>"]) di form, lampiran wajib
  * saat tambah dan saat ubah bila baris belum punya lampiran, isian bersyarat & berjenjang, isian status untuk role
- * pemilih status, dan keadaan galat 403/501. Tab non-engine (lkh) → "belum tersedia".
+ * pemilih status, berkas kolom (`berkasKolom`, MAKE-008), dan keadaan galat 403/501. Tab non-engine (lkh) → "belum tersedia".
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -13,9 +13,12 @@ vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return {
     ...actual,
-    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn() },
+    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn(), pratinjau: vi.fn() },
   }
 })
+vi.mock('../services/lkh.service', () => ({
+  lkhService: { list: vi.fn().mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0 } }), opsi: vi.fn(), pdf: vi.fn(), remove: vi.fn() },
+}))
 vi.mock('../services/lampiran.service', () => ({
   lampiranService: { list: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn() },
 }))
@@ -28,11 +31,15 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { masterService } from '@/features/master-data/services/master.service'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 
+import ak from '../riwayat/jenis/ak'
+import akSiasn from '../riwayat/jenis/ak-siasn'
 import alamat from '../riwayat/jenis/alamat'
 import diklat from '../riwayat/jenis/diklat'
 import hukdis from '../riwayat/jenis/hukdis'
 import keluarga from '../riwayat/jenis/keluarga'
 import seminar from '../riwayat/jenis/seminar'
+import skp from '../riwayat/jenis/skp'
+import skpPeriodik from '../riwayat/jenis/skp-periodik'
 import kp from '../riwayat/jenis/kp'
 import lkh from '../riwayat/jenis/lkh'
 import pendidikan from '../riwayat/jenis/pendidikan'
@@ -142,6 +149,37 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-row-1"] [data-testid="status-badge"]').text()).toBe('Disetujui')
     expect(wrapper.get('[data-testid="riwayat-row-2"] [data-testid="status-badge"]').text()).toBe('Menunggu')
     expect(wrapper.get('[data-testid="riwayat-row-3"]').text()).toContain('Ijazah buram')
+    // CR-049 D-F3: kolom Aksi sticky kanan (header & sel).
+    expect(wrapper.findAll('thead th').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+    expect(wrapper.get('[data-testid="riwayat-row-1"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+  })
+
+  it('CR-049 D-F7: klik header mengurutkan (aria-sort naik → turun); tanggal dari nilai mentah', async () => {
+    svc.list.mockResolvedValue([
+      pendidikanRow(1, { tgl_lulus: '2012-08-30', institusi_pendidikan: 'Beta' }),
+      pendidikanRow(2, { tgl_lulus: '2005-01-02', institusi_pendidikan: 'alfa' }),
+      pendidikanRow(3, { tgl_lulus: '2019-12-31', institusi_pendidikan: 'Gamma' }),
+    ])
+    const wrapper = await mountTab()
+    const urutanId = () => wrapper.findAll('[data-testid^="riwayat-row-"]').map((r) => r.attributes('data-testid'))
+    const th = (key: string) => wrapper.get(`[data-testid="riwayat-sort-${key}"]`).element.closest('th')
+
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('none')
+    await wrapper.get('[data-testid="riwayat-sort-tgl_lulus"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('ascending')
+    expect(urutanId()).toEqual(['riwayat-row-2', 'riwayat-row-1', 'riwayat-row-3'])
+    await wrapper.get('[data-testid="riwayat-sort-tgl_lulus"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('descending')
+    expect(urutanId()).toEqual(['riwayat-row-3', 'riwayat-row-1', 'riwayat-row-2'])
+
+    await wrapper.get('[data-testid="riwayat-sort-institusi_pendidikan"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('none')
+    expect(urutanId()).toEqual(['riwayat-row-2', 'riwayat-row-1', 'riwayat-row-3'])
+  })
+
+  it('CR-049 D-F12: labelKolom membuat label ⋮ deskriptif', async () => {
+    const wrapper = await mountTab({}, { ...uji, labelKolom: ['institusi_pendidikan', 'tgl_lulus'] })
+    expect(wrapper.get('[data-testid="riwayat-actions-1"]').attributes('aria-label')).toBe('Aksi untuk Universitas 1 — 30 Agustus 2012')
   })
 
   it('501 (stub) → keterangan "belum tersedia", bukan tabel kosong', async () => {
@@ -157,9 +195,10 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-failure"]').text()).toBe('Anda tidak berhak mengakses data ini.')
   })
 
-  it('tab non-engine (lkh) → "belum tersedia" tanpa memanggil API riwayat', async () => {
+  it('tab non-engine (lkh) → LkhTab WS-2 (MAKE-014) tanpa memanggil API riwayat engine', async () => {
     const wrapper = await mountTab({}, lkh)
-    expect(wrapper.get('[data-testid="riwayat-belum-tersedia"]').text()).toContain('Laporan Kerja Harian')
+    expect(wrapper.find('[data-testid="lkh-tab-table"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="riwayat-belum-tersedia"]').exists()).toBe(false)
     expect(svc.list).not.toHaveBeenCalled()
   })
 
@@ -483,7 +522,10 @@ describe('RiwayatListSection — kunci baris Disetujui & isian hitung', () => {
 })
 
 describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LAIN, saran)', () => {
-  beforeEach(() => svc.list.mockResolvedValue([]))
+  beforeEach(() => {
+    // Kurung kurawal: nilai kembalian beforeEach dipakai Vitest sebagai teardown.
+    svc.list.mockResolvedValue([])
+  })
 
   it('diklat: opsi nama diklat disaring jenis_diklat dan dimuat ulang + dikosongkan saat jenis berganti; sub-group = group 2', async () => {
     options.mockImplementation(async (entity: string, parent?: string | null, filters?: Record<string, string>) =>
@@ -558,5 +600,215 @@ describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LA
     lepasLama([{ id: 'd1', nama: 'Diklat 1 (lama)', parent: null }])
     await flushPromises()
     expect([...(field('id_diklat') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'd2'])
+  })
+})
+
+describe('RiwayatListSection — isian hitung SKP (MAKE-008, rumus form legacy)', () => {
+  beforeEach(() => {
+    // Kurung kurawal: nilai kembalian beforeEach dipakai Vitest sebagai teardown.
+    svc.list.mockResolvedValue([])
+  })
+
+  it('≤2021: 60%/40%, nilai prestasi, kategori (skala 120 mulai 2021); ≥2022: predikat dari matriks rating', async () => {
+    const wrapper = await mountTab({}, skp)
+    await openCreate(wrapper)
+    await setInput('tahun', '2021')
+    expect(field('rating_skp')).toBeNull()
+    await setInput('nilai_skp', '100')
+    await setInput('nilai_perilaku', '90')
+    expect([field('nilai_skp_60_persen')?.value, field('nilai_perilaku_40_persen')?.value, field('nilai_prestasi_kerja')?.value]).toEqual(['60', '36', '96'])
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Baik')
+    expect(field('kategori_nilai_prestasi')?.hasAttribute('readonly')).toBe(true)
+
+    await setInput('tahun', '2020') // skala 100: 96 → Sangat Baik
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik')
+
+    await setInput('tahun', '2022')
+    expect(field('nilai_skp')).toBeNull()
+    await setInput('rating_skp', '3')
+    await setInput('rating_perilaku', '1')
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Kurang / Miss Conduct')
+    await setInput('rating_perilaku', '3')
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik')
+  })
+})
+
+async function chooseKolom(kolom: string, file: File): Promise<void> {
+  const input = q<HTMLInputElement>(`[data-testid="riwayat-berkas-${kolom}"] input[type="file"]`)
+  if (!input) throw new Error(`isian berkas ${kolom} tidak ada`)
+  Object.defineProperty(input, 'files', { value: [file], configurable: true })
+  input.dispatchEvent(new Event('change'))
+  await flushPromises()
+}
+
+describe('RiwayatListSection — SKP periodik, AK, AK SIASN (MAKE-008)', () => {
+  const pdf = () => new File(['%PDF-1.4'], 'arsip.pdf', { type: 'application/pdf' })
+
+  it('SKP periodik: tanpa Tambah; Edit = unggah arsip saja (wajib bila kosong) → update(…, [], {}, { f_arsip_1 }); ⋮ Berkas mengunduh', async () => {
+    svc.list.mockResolvedValue([
+      { id_riwayat_skp_periodik: 9, nip: NIP, tahun_skp: 2024, status: 1, f_arsip_1: null },
+      { id_riwayat_skp_periodik: 10, nip: NIP, tahun_skp: 2023, status: 1, f_arsip_1: 'arsip/x/skp.pdf' },
+    ] as never)
+    svc.update.mockResolvedValue({})
+    svc.unduhKolomBerkas.mockResolvedValue(new Blob(['%PDF']))
+    URL.createObjectURL = vi.fn(() => 'blob:uji')
+    URL.revokeObjectURL = vi.fn()
+    const wrapper = await mountTab({ can_create: false, can_delete: false, can_process: false }, skpPeriodik)
+
+    expect(wrapper.find('[data-testid="riwayat-add"]').exists()).toBe(false)
+    expect((await rowMenuActions(wrapper, 'riwayat-actions-9')).map((a) => a.key)).toEqual(['edit', 'berkas'])
+    await selectRowAction(wrapper, 'riwayat-actions-9', 'edit')
+    await flushPromises()
+    expect(document.body.querySelectorAll('[data-field]').length).toBe(0)
+    await submitForm()
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-f_arsip_1"]')?.textContent).toContain('wajib'))
+    expect(svc.update).not.toHaveBeenCalled()
+
+    const file = pdf()
+    await chooseKolom('f_arsip_1', file)
+    await submitForm()
+    await vi.waitFor(() => expect(svc.update).toHaveBeenCalledWith(NIP, 'skp-periodik', '9', [], {}, { f_arsip_1: file }))
+
+    await selectRowAction(wrapper, 'riwayat-actions-10', 'berkas')
+    await flushPromises()
+    q<HTMLButtonElement>('[data-testid="berkas-unduh-f_arsip_1"]')?.click()
+    await vi.waitFor(() => expect(svc.unduhKolomBerkas).toHaveBeenCalledWith(NIP, 'skp-periodik', '10', 'f_arsip_1'))
+  })
+
+  it('AK: jumlah AK = AK lama + AK baru (isian hitung); File PAK wajib saat tambah', async () => {
+    svc.list.mockResolvedValue([])
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await setInput('ak_terakhir', '25')
+    await setInput('pengajuan_ak', '12.5')
+    expect(field('nilai_ak')?.value).toBe('37.5')
+    expect(field('nilai_ak')?.hasAttribute('readonly')).toBe(true)
+    expect(q('[data-testid="riwayat-berkas-file_pak"]')?.textContent).toContain('File PAK *')
+  })
+
+  it('AK SIASN: pilihan Jabatan SIMPEG hanya jabatan fungsional tertentu (?id_group_jabatan=2)', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_ak_siasn: 4, nip: NIP, no_sk: 'SK-1', status: 1, id_jabatan: null }] as never)
+    const wrapper = await mountTab({ can_create: false }, akSiasn)
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    expect(options).toHaveBeenCalledWith('jabatan', null, { id_group_jabatan: '2' })
+    expect(field('id_jabatan')).not.toBeNull()
+  })
+})
+
+describe('RiwayatListSection — aturan form legacy SKP & AK Current (perbaikan review MAKE-008)', () => {
+  it('SKP: tahun 2022 mengunci periode 1 Jan s.d. 31 Des; tahun lain bebas; batas nilai 120 mulai 2021, 100 sebelumnya; tahun maks 2022', async () => {
+    svc.list.mockResolvedValue([])
+    const wrapper = await mountTab({}, skp)
+    await openCreate(wrapper)
+    await setInput('tahun', '2022')
+    expect([field('tgl_mulai')?.value, field('tgl_akhir')?.value]).toEqual(['2022-01-01', '2022-12-31'])
+    expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(true)
+    await setInput('tahun', '2021')
+    expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(false)
+
+    await setInput('tgl_mulai', '2021-01-02')
+    await setInput('tgl_akhir', '2021-12-31')
+    await setInput('nilai_skp', '121')
+    await setInput('nilai_perilaku', '120')
+    await submitForm()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Nilai SKP maksimal 120.'))
+    expect(svc.create).not.toHaveBeenCalled()
+    expect(document.body.textContent).not.toContain('Nilai Perilaku maksimal')
+
+    await setInput('tahun', '2020')
+    await setInput('nilai_skp', '101')
+    await submitForm()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Nilai SKP maksimal 100.'))
+
+    await setInput('tahun', '2023')
+    await submitForm()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Tahun maksimal 2022.'))
+    expect(svc.create).not.toHaveBeenCalled()
+  })
+
+  it('SKP edit baris legacy: kategori tersimpan tidak ditimpa saat form dibuka; dihitung ulang setelah nilai diubah', async () => {
+    svc.list.mockResolvedValue([
+      { id_riwayat_skp: 5, nip: NIP, tahun: 2020, tgl_mulai: '2020-01-02', tgl_akhir: '2020-12-31', nilai_skp: '90.00', nilai_skp_60_persen: '54.00', nilai_perilaku: '90.00', nilai_perilaku_40_persen: '36.00', nilai_prestasi_kerja: '90.00', kategori_nilai_prestasi: 'Sangat Baik (impor)', status: 1 },
+    ] as never)
+    const wrapper = await mountTab({}, skp)
+    await selectRowAction(wrapper, 'riwayat-actions-5', 'edit')
+    await flushPromises()
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik (impor)')
+    await setInput('nilai_skp', '95')
+    expect(field('kategori_nilai_prestasi')?.value).toBe('Sangat Baik')
+    expect(field('nilai_prestasi_kerja')?.value).toBe('93')
+  })
+
+  it('AK edit Current AK (jenis_ak 1): jumlah AK menampilkan nilai tersimpan dan tidak dihitung ulang', async () => {
+    svc.list.mockResolvedValue([
+      { id_riwayat_ak: 3, nip: NIP, jenis_ak: 1, no_hpak: 'PAK-1', tgl_pak: '2020-01-01', ak_terakhir: 25, pengajuan_ak: 12.5, nilai_ak: 123.5, file_pak: 'x.pdf', status: 1 },
+      { id_riwayat_ak: 4, nip: NIP, jenis_ak: 2, no_hpak: 'PAK-2', tgl_pak: '2021-01-01', ak_terakhir: 25, pengajuan_ak: 12.5, nilai_ak: 37.5, file_pak: 'x.pdf', status: 1 },
+    ] as never)
+    const wrapper = await mountTab({}, ak)
+    await selectRowAction(wrapper, 'riwayat-actions-3', 'edit')
+    await flushPromises()
+    expect(field('nilai_ak')?.value).toBe('123.5')
+    await setInput('pengajuan_ak', '20')
+    expect(field('nilai_ak')?.value).toBe('123.5')
+    q<HTMLButtonElement>('[data-testid="riwayat-cancel"]')?.click()
+    await flushPromises()
+
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    await setInput('pengajuan_ak', '20')
+    expect(field('nilai_ak')?.value).toBe('45')
+  })
+})
+
+describe('RiwayatListSection — pratinjau isian turunan AK (MAKE-017)', () => {
+  const hasil = {
+    nama: 'Dr. Budi Uji, M.Si.', jabatan: 'Analis Kebijakan Ahli Pertama', no_induk_jf: 'JF-0001', tmt_jab: '2018-01-01', mker_th_jab: 6, mker_bl_jab: 6,
+    pangkat: 'Penata Muda', gol_ruang: 'III/a', tmt_pang: '2019-01-01', mker_th_pang: 5, mker_bl_pang: 6, ak_kum_kp: 70, ak_kum_next_jen: 120, ak_terakhir: 30,
+  }
+
+  it('tambah: pratinjau dimuat (lalu dimuat ulang saat tanggal PAK berubah), tampil hanya-baca, AK Lama diisi otomatis', async () => {
+    svc.list.mockResolvedValue([])
+    svc.pratinjau.mockResolvedValue(hasil)
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenCalledWith(NIP, 'ak', { tgl_pak: '' }))
+    await flushPromises()
+    const panel = q('[data-testid="riwayat-pratinjau"]')
+    expect(panel?.textContent).toContain('Analis Kebijakan Ahli Pertama')
+    expect(panel?.textContent).toContain('Penata Muda / III/a')
+    expect(panel?.textContent).toContain('6 tahun 6 bulan')
+    expect(panel?.querySelector('input')).toBeNull()
+    expect(field('ak_terakhir')?.value).toBe('30')
+
+    await setInput('ak_terakhir', '40')
+    await setInput('tgl_pak', '2024-07-15')
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-07-15' }))
+    await flushPromises()
+    expect(field('ak_terakhir')?.value).toBe('40') // isian pengguna tidak ditimpa
+
+    // Dikosongkan pengguna = tetap disentuh: muat ulang pratinjau tidak mengisinya lagi.
+    await setInput('ak_terakhir', '')
+    await setInput('tgl_pak', '2024-08-01')
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-08-01' }))
+    await flushPromises()
+    expect(field('ak_terakhir')?.value).toBe('')
+  })
+
+  it('galat pratinjau tampil sebagai pesan; form tetap bisa diisi. Edit tidak memuat pratinjau', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_ak: 4, nip: NIP, jenis_ak: 2, no_hpak: 'PAK-2', tgl_pak: '2021-01-01', ak_terakhir: 25, pengajuan_ak: 12.5, nilai_ak: 37.5, file_pak: 'x.pdf', status: 1 }] as never)
+    svc.pratinjau.mockRejectedValue(apiError(403))
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-pratinjau-galat"]')?.textContent).toContain('tidak dapat dimuat'))
+    expect(field('ak_terakhir')?.value).toBe('')
+    q<HTMLButtonElement>('[data-testid="riwayat-cancel"]')?.click()
+    await flushPromises()
+
+    svc.pratinjau.mockClear()
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    expect(svc.pratinjau).not.toHaveBeenCalled()
+    expect(q('[data-testid="riwayat-pratinjau"]')).toBeNull()
   })
 })

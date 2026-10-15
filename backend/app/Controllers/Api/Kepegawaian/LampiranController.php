@@ -7,8 +7,10 @@ namespace App\Controllers\Api\Kepegawaian;
 use App\Controllers\Api\ApiController;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
+use App\Libraries\Kepegawaian\Lampiran\ArsipDataUmum;
 use App\Libraries\Kepegawaian\Lampiran\AttachmentService;
 use App\Libraries\Kepegawaian\Lampiran\OtorisasiLampiran;
+use App\Models\Kepegawaian\DocumentAttachmentModel;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\ResponseInterface;
 use Throwable;
@@ -18,6 +20,8 @@ use Throwable;
  *
  *   GET    pegawai/{nip}/lampiran?id_riwayat=&id_entri=   daftar lampiran satu baris riwayat (izin lihat)
  *   POST   pegawai/{nip}/lampiran                         multipart `berkas`, `id_riwayat`, `id_entri` (tambah/ubah)
+ *          Arsip Data Umum (kode 37/38, `id_entri` = NIP, MAKE-014): + `jenis_arsip`/`nama_arsip_lain` (38) atau
+ *          `nama_arsip` (37) → kolom `tag`
  *   GET    pegawai/{nip}/lampiran/{id}/unduh              unduh berkas (izin lihat)
  *   DELETE pegawai/{nip}/lampiran/{id}                    hapus keras + audit (izin hapus/ubah)
  *
@@ -49,16 +53,24 @@ class LampiranController extends ApiController
         $otorisasi = $this->otorisasi();
         $aturan    = $otorisasi->bolehUnggah($auth, $nip, $idRiwayat, $idEntri);
         $berkas    = $this->request->getFile('berkas');
+        $tag       = ArsipDataUmum::kode($idRiwayat) ? ArsipDataUmum::tag($idRiwayat, $this->payload()) : null;
 
         if (! $berkas instanceof UploadedFile) {
             throw ValidationException::forField('berkas', 'Berkas wajib diunggah.');
         }
 
-        $row = $this->dalamTransaksi(function () use ($otorisasi, $auth, $nip, $idRiwayat, $idEntri, $berkas, $aturan): array {
+        $row = $this->dalamTransaksi(function () use ($otorisasi, $auth, $nip, $idRiwayat, $idEntri, $berkas, $aturan, $tag): array {
             // Ulang di dalam transaksi (pegawai terkunci): baris riwayat bisa dihapus/disetujui sesudah cek cepat.
             $otorisasi->kunciUnggah($auth, $nip, $idRiwayat, $idEntri);
 
-            return $this->lampiran()->simpan($nip, $idRiwayat, $idEntri, $berkas, $aturan);
+            $row = $this->lampiran()->simpan($nip, $idRiwayat, $idEntri, $berkas, $aturan);
+
+            if ($tag !== null) {
+                model(DocumentAttachmentModel::class)->update((int) $row['id_attachment'], ['tag' => $tag]);
+                $row['tag'] = $tag;
+            }
+
+            return $row;
         });
 
         return $this->respondSuccess($row, 201);

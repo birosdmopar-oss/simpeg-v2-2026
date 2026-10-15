@@ -79,6 +79,8 @@ describe('ArsipTable — daftar', () => {
     expect(wrapper.get('[data-testid="arsip-row-1"]').text()).toContain('Ijazah 1.pdf')
     expect(wrapper.get('[data-testid="arsip-row-1"]').text()).toContain('2,0 KB')
     expect(wrapper.get('[data-testid="arsip-row-2"]').text()).toContain('3,0 MB')
+    expect(wrapper.findAll('thead th').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+    expect(wrapper.get('[data-testid="arsip-row-1"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
   })
 
   it('kosong → keterangan belum ada berkas', async () => {
@@ -196,9 +198,28 @@ describe('ArsipTable — unggah', () => {
     const wrapper = await mountTable()
     const file = new File(['%PDF-1.4'], 'ijazah.pdf', { type: 'application/pdf' })
     await pilihBerkas(wrapper, file)
-    expect(svc.upload).toHaveBeenCalledWith(NIP, TARGET, file)
+    expect(svc.upload).toHaveBeenCalledWith(NIP, TARGET, file, {})
     expect(svc.list).toHaveBeenCalledTimes(2)
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('ijazah.pdf diunggah.')
+  })
+
+  it('CR-049 D-F6: seret-lepas berkas ke area unggah → diunggah, pratinjau tampil selama unggah', async () => {
+    let selesai: (v: unknown) => void = () => undefined
+    svc.upload.mockImplementation(() => new Promise((ok) => (selesai = ok)) as never)
+    const wrapper = await mountTable()
+    const file = new File(['%PDF-1.4'], 'ijazah.pdf', { type: 'application/pdf' })
+    await wrapper.get('[data-testid="arsip-dropzone"]').trigger('drop', { dataTransfer: { files: [file] } })
+    expect(svc.upload).toHaveBeenCalledWith(NIP, TARGET, file, {})
+    expect(wrapper.get('[data-testid="arsip-pratinjau"]').text()).toContain('Mengunggah ijazah.pdf')
+    expect(wrapper.get('[data-testid="arsip-pratinjau-ikon"]').classes()).toContain('text-danger')
+    selesai(lampiran(3))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="arsip-pratinjau"]').exists()).toBe(false)
+
+    // Berkas di luar aturan lewat seret ditolak dengan pesan yang sama.
+    await wrapper.get('[data-testid="arsip-dropzone"]').trigger('drop', { dataTransfer: { files: [new File(['x'], 'foto.png')] } })
+    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis file .png tidak diperbolehkan.')
+    expect(svc.upload).toHaveBeenCalledTimes(1)
   })
 
   it('jenis atau ukuran di luar aturan ditolak sebelum dikirim', async () => {

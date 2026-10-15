@@ -2,11 +2,12 @@
  * Klien halaman usulan mandiri (WS-1 M4 MAKE-007, README kontrak backend):
  *   GET usulan/{jenis}/saya                              usulan milik pemanggil (role 2/7) + identitas & hak
  *   GET usulan/{jenis}?status=                           antrean (role 1/4/5, tanpa lingkup) + `can_process`
- *   GET pegawai/{nip}/riwayat/{jenis}/{id}/berkas/{kolom} unduh berkas kolom
- * Ajukan/ubah/hapus/proses memakai riwayatService (endpoint engine `{jenis}`), berkas kolom = `berkas[<kolom>]`.
+ * Ajukan/ubah/hapus/proses & unduh berkas kolom memakai riwayatService (endpoint engine `{jenis}`), berkas kolom =
+ * `berkas[<kolom>]`.
  */
 import { api } from '@/lib/axios'
 
+import { ambilBerkas, type BerkasUnduhan } from '../services/berkasUnduhan'
 import type { JenisEngine, RiwayatRow } from '../types'
 
 export interface UsulanSaya {
@@ -36,10 +37,8 @@ export const usulanService = {
     return data
   },
 
-  async unduh(nip: string, jenis: JenisEngine, id: number | string, kolom: string): Promise<Blob> {
-    const { data } = await api.get<Blob>(`/pegawai/${encodeURIComponent(nip)}/riwayat/${jenis}/${encodeURIComponent(String(id))}/berkas/${encodeURIComponent(kolom)}`, {
-      responseType: 'blob',
-    })
-    return data
+  /** Aditif WS-2 MAKE-013 (ADR-033): PDF tanda terima usulan Disetujui — `GET usulan/{jenis}/{id}/tanda-terima`. */
+  tandaTerima(jenis: JenisEngine, id: number | string): Promise<BerkasUnduhan> {
+    return ambilBerkas(`/usulan/${jenis}/${id}/tanda-terima`, `tanda_terima_${jenis}_${id}`)
   },
 }

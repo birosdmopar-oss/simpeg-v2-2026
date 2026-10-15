@@ -44,6 +44,8 @@ final class EmailUnikTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
+        // MAKE-015: NIP akun baru di test ini wajib terdaftar sebagai pegawai.
+        $this->daftarkanPegawai(self::NEW_NIP, self::NEW_NIP_2, self::NEW_NIP_3);
 
         // Seed tidak punya email: beri email pada akun aktif S01, akun S02, akun nonaktif, dan akun yang dihapus.
         $this->setEmail(self::PEGAWAI_S01, 'siti@example.go.id');

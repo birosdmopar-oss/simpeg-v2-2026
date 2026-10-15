@@ -39,6 +39,8 @@ final class AkunTanpaNipTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
+        // MAKE-015: NIP akun baru di test ini wajib terdaftar sebagai pegawai.
+        $this->daftarkanPegawai('200001012024011001');
         $this->resetMasterState();
     }
 

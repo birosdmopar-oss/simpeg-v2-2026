@@ -124,6 +124,8 @@ export interface MasterOption {
   id: string
   nama: string
   parent: string | null
+  /** Atribut tambahan opsi (definisi master ber-`optionsExtra`, aditif MAKE-018), mis. `need_satker` sub group jabatan. */
+  extra?: Record<string, string | null>
 }
 
 export interface MasterDeleteResponse {

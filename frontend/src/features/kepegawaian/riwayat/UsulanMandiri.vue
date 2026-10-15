@@ -11,8 +11,7 @@
  *
  * Berkas kolom diunduh lewat `…/{id}/berkas/{kolom}`. Hapus = status 10 (ConfirmDialog). Pesan galat baku (apiErrors).
  */
-import { FileSearch, Plus, X } from 'lucide-vue-next'
-import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
+import { FileSearch, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -29,10 +28,12 @@ import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { describeApiError, splitValidationErrors, type ApiFailure } from '../services/apiErrors'
 import { STATUS_RIWAYAT, STATUS_RIWAYAT_LABELS, type RiwayatRow } from '../types'
 
+import BerkasKolomDialog from './BerkasKolomDialog.vue'
 import { riwayatService, type BerkasMap } from './riwayat.service'
 import type { UsulanConfig } from './usulan.config'
 import UsulanFormDialog from './UsulanFormDialog.vue'
 import { usulanService, type UsulanAntrean, type UsulanSaya } from './usulan.service'
+import { simpanBerkas } from '../services/berkasUnduhan'
 
 const props = defineProps<{ config: UsulanConfig }>()
 
@@ -110,6 +111,8 @@ function rowActions(row: RiwayatRow): RowAction[] {
     return [
       { key: 'edit', label: 'Edit', hidden: !saya.value?.can_edit, disabled: disetujui },
       { key: 'berkas', label: 'Berkas' },
+      // Aditif WS-2 MAKE-013: tanda terima PDF hanya untuk usulan Disetujui (legacy tt_pdf saat disetujui).
+      { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui, disabled: unduhId.value === rowId(row) },
       { key: 'hapus', label: 'Hapus', danger: true, hidden: !saya.value?.can_delete, disabled: disetujui },
     ]
   }
@@ -117,6 +120,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
   return [
     ...approvalRowActions({ canProcess: Boolean(antrean.value?.can_process), status: rowStatus(row), busy: processBusy.value && processing.value === row }),
     { key: 'berkas', label: 'Berkas' },
+    { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui, disabled: unduhId.value === rowId(row) },
   ]
 }
 
@@ -131,11 +135,29 @@ function onAction(key: string, row: RiwayatRow): void {
   } else if (key === 'hapus') {
     deleting.value = row
     deleteOpen.value = true
+  } else if (key === 'tanda-terima') {
+    void unduhTandaTerima(row)
   } else if (key === 'setujui' || key === 'tolak') {
     processing.value = row
     processMode.value = key
     processError.value = ''
     processOpen.value = true
+  }
+}
+
+/** Baris yang sedang mengunduh tanda terima (aditif WS-2 MAKE-013): item ⋮ dinonaktifkan selama proses. */
+const unduhId = ref<string | null>(null)
+
+async function unduhTandaTerima(row: RiwayatRow): Promise<void> {
+  const id = rowId(row)
+  unduhId.value = id
+  try {
+    const berkas = await usulanService.tandaTerima(props.config.jenis, id)
+    simpanBerkas(berkas)
+  } catch (error) {
+    notice.value = { tone: 'danger', text: describeApiError(error).message }
+  } finally {
+    unduhId.value = null
   }
 }
 
@@ -197,22 +219,6 @@ async function onProcess(payload: ApprovalPayload): Promise<void> {
   }
 }
 
-async function unduh(row: RiwayatRow, kolom: string, label: string): Promise<void> {
-  try {
-    const blob = await usulanService.unduh(rowNip(row), props.config.jenis, rowId(row), kolom)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${label}.${String(row[kolom] ?? '').split('.').pop() ?? 'bin'}`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (error) {
-    notice.value = { tone: 'danger', text: describeApiError(error).message }
-  }
-}
-
 const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b) => String(row[b.kolom] ?? '') !== '').length
 </script>
 
@@ -252,7 +258,7 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
                 <th v-if="config.fields.length" scope="col" class="px-5 py-3">Jenis Permohonan</th>
                 <th scope="col" class="px-5 py-3">Berkas</th>
                 <th scope="col" class="px-5 py-3">Status</th>
-                <th scope="col" class="px-5 py-3 text-right">Aksi</th>
+                <th scope="col" class="sticky right-0 bg-white px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200">
@@ -276,7 +282,7 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
                   <StatusBadge :status="rowStatus(row)" />
                   <p v-if="rowStatus(row) === STATUS_RIWAYAT.DITOLAK && row.reason_note" class="mt-1 max-w-56 text-caption text-slate-500">{{ row.reason_note }}</p>
                 </td>
-                <td class="px-5 py-3 text-right">
+                <td class="sticky right-0 bg-white px-5 py-3 text-right">
                   <RowActionsMenu
                     :actions="rowActions(row)"
                     :label="`Aksi untuk ${rowLabel(row)}`"
@@ -293,38 +299,16 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
 
     <UsulanFormDialog v-model:open="formOpen" :config="config" :row="editing" :busy="saving" :server-errors="formErrors" @submit="onSubmit" />
 
-    <DialogRoot :open="berkasOpen" @update:open="(v) => (berkasOpen = v)">
-      <DialogPortal>
-        <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
-        <DialogContent
-          class="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
-          data-testid="usulan-berkas-dialog"
-          :aria-describedby="undefined"
-        >
-          <div class="mb-4 flex items-start justify-between gap-3">
-            <DialogTitle class="text-h5 text-slate-900">Berkas {{ berkasRow ? rowLabel(berkasRow) : '' }}</DialogTitle>
-            <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
-              <X class="h-5 w-5" aria-hidden="true" />
-            </DialogClose>
-          </div>
-          <ul v-if="berkasRow" class="divide-y divide-slate-200 rounded-lg border border-slate-200">
-            <li v-for="b in config.berkas" :key="b.kolom" class="flex items-center justify-between gap-3 px-4 py-2.5 text-body2">
-              <span class="text-slate-800">{{ b.label }}</span>
-              <UiButton
-                v-if="berkasRow[b.kolom]"
-                variant="secondary"
-                appearance="soft"
-                :data-testid="`usulan-unduh-${b.kolom}`"
-                @click="unduh(berkasRow, b.kolom, b.label)"
-              >
-                Unduh
-              </UiButton>
-              <span v-else class="text-slate-400">—</span>
-            </li>
-          </ul>
-        </DialogContent>
-      </DialogPortal>
-    </DialogRoot>
+    <BerkasKolomDialog
+      v-if="berkasRow"
+      v-model:open="berkasOpen"
+      :nip="rowNip(berkasRow)"
+      :jenis="config.jenis"
+      :id-baris="rowId(berkasRow)"
+      :row="berkasRow"
+      :berkas="config.berkas"
+      :subject="rowLabel(berkasRow)"
+    />
 
     <ApprovalDialog
       v-model:open="processOpen"

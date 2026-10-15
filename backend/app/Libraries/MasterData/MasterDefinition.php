@@ -86,6 +86,9 @@ final class MasterDefinition
      *                                                     keunikan nama = keunikan kode
      * @param array{0: int, 1: int}|null  $idRange         kode manual berupa bilangan bulat dalam rentang [min, max] (CR-026),
      *                                                     tanpa nol di depan (mis. kelas jabatan 1–20, mask form legacy)
+     * @param list<string>                $optionsExtra    field yang ikut dikirim di `options` sebagai `extra` {field: nilai}
+     *                                                     (aditif MAKE-018), mis. `need_satker` sub group jabatan untuk
+     *                                                     filter bersyarat form riwayat jabatan; kosong = tanpa `extra`
      */
     public function __construct(
         public readonly string $key,
@@ -121,6 +124,7 @@ final class MasterDefinition
         public readonly array $systemIds = [],
         public readonly bool $codeAsName = false,
         public readonly ?array $idRange = null,
+        public readonly array $optionsExtra = [],
     ) {
         if (! in_array($orderMode, [self::ORDER_SHIFT, self::ORDER_MANUAL], true)) {
             throw new LogicException("orderMode master {$key} tidak dikenal: {$orderMode}.");
@@ -130,6 +134,14 @@ final class MasterDefinition
 
         if ($idRange !== null && ($idRange[0] < 1 || $idRange[0] > $idRange[1])) {
             throw new LogicException("idRange master {$key} harus [min, max] bilangan bulat dengan 1 <= min <= max.");
+        }
+
+        $namaField = array_map(static fn (MasterField $field): string => $field->name, $fields);
+
+        foreach ($optionsExtra as $extra) {
+            if (! in_array($extra, $namaField, true)) {
+                throw new LogicException("optionsExtra master {$key}: '{$extra}' bukan field definisi.");
+            }
         }
     }
 
@@ -156,7 +168,8 @@ final class MasterDefinition
      *     statusChain?: bool,
      *     systemIds?: list<string>,
      *     codeAsName?: bool,
-     *     idRange?: array{0: int, 1: int}
+     *     idRange?: array{0: int, 1: int},
+     *     optionsExtra?: list<string>
      * } $config
      */
     public static function fromConfig(string $key, array $config): self
@@ -212,6 +225,7 @@ final class MasterDefinition
             systemIds: array_map('strval', $config['systemIds'] ?? []),
             codeAsName: $config['codeAsName'] ?? false,
             idRange: $config['idRange'] ?? null,
+            optionsExtra: $config['optionsExtra'] ?? [],
         );
     }
 

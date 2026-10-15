@@ -6,7 +6,7 @@
  */
 import { ChevronLeft, ChevronRight, Search } from 'lucide-vue-next'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'radix-vue'
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import { UiButton, UiTabs } from '@/shared/ui'
 
@@ -29,14 +29,21 @@ function scroll(direction: -1 | 1): void {
   wrap.value?.querySelector('[role="tablist"]')?.scrollBy({ left: direction * 240, behavior: 'smooth' })
 }
 
+/** Bawa tab aktif ke area terlihat (dipilih dari popup, dibuka lewat `?tab=`, atau berganti dari luar — CR-049 D-F5). */
+async function tampilkanAktif(): Promise<void> {
+  await nextTick()
+  wrap.value?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ inline: 'center', block: 'nearest' })
+}
+
 async function select(key: string): Promise<void> {
   emit('update:modelValue', key)
   open.value = false
   query.value = ''
-  await nextTick()
-  // Bawa tab terpilih ke area terlihat (mis. dipilih dari popup).
-  wrap.value?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ inline: 'center', block: 'nearest' })
+  await tampilkanAktif()
 }
+
+onMounted(() => void tampilkanAktif())
+watch(() => props.modelValue, () => void tampilkanAktif())
 </script>
 
 <template>

@@ -45,11 +45,13 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
     public function testJumlahPerJenis(): void
     {
-        $this->assertCount(79, TabelAnakNip::semua());
+        $this->assertCount(82, TabelAnakNip::semua());
         $this->assertCount(75, TabelAnakNip::perJenis(JenisRujukanNip::FkLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkUbahNipLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkSlipGaji));
         $this->assertCount(2, TabelAnakNip::perJenis(JenisRujukanNip::NonFkFkV2));
+        $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkKeputusanV2));
+        $this->assertCount(2, TabelAnakNip::perJenis(JenisRujukanNip::JsonArrayNip));
 
         $tabelFk = array_unique(array_map(
             static fn (RujukanNip $r): string => $r->tabel,
@@ -130,16 +132,19 @@ final class TabelAnakNipTest extends CIUnitTestCase
         $this->assertTrue(JenisRujukanNip::NonFkUbahNipLegacy->diubahLegacy());
         $this->assertFalse(JenisRujukanNip::NonFkSlipGaji->diubahLegacy());
         $this->assertFalse(JenisRujukanNip::NonFkFkV2->diubahLegacy());
+        $this->assertFalse(JenisRujukanNip::NonFkKeputusanV2->diubahLegacy());
+        $this->assertFalse(JenisRujukanNip::JsonArrayNip->diubahLegacy());
 
         $this->assertSame(JenisRujukanNip::NonFkUbahNipLegacy, $this->cari('pengguna', 'username')->jenis);
         $this->assertSame(JenisRujukanNip::NonFkSlipGaji, $this->cari('gaji_pegawai', 'nip')->jenis);
         $this->assertSame(JenisRujukanNip::NonFkFkV2, $this->cari('riwayat_cuti', 'nip_atasan_langsung')->jenis);
         $this->assertSame(JenisRujukanNip::NonFkFkV2, $this->cari('riwayat_cuti', 'nip_yang_menyetujui')->jenis);
+        $this->assertSame(JenisRujukanNip::NonFkKeputusanV2, $this->cari('jabatan_koordinasi', 'nip')->jenis);
     }
 
     public function testJumlahPerFaseDanKeberadaan(): void
     {
-        $harapan = [0 => 1, 1 => 2, 2 => 2, 3 => 40, 4 => 8, 5 => 2, 6 => 1, 7 => 5, 8 => 0];
+        $harapan = [0 => 1, 1 => 2, 2 => 4, 3 => 40, 4 => 8, 5 => 2, 6 => 1, 7 => 5, 8 => 0];
         $aktual  = [];
 
         for ($fase = TabelAnakNip::FASE_MIN; $fase <= TabelAnakNip::FASE_MAX; $fase++) {
@@ -147,8 +152,8 @@ final class TabelAnakNipTest extends CIUnitTestCase
         }
 
         $this->assertSame($harapan, $aktual);
-        $this->assertCount(61, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
-        $this->assertCount(11, TabelAnakNip::perKeberadaan(KeberadaanV2::TidakDiimpor));
+        $this->assertCount(63, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
+        $this->assertCount(12, TabelAnakNip::perKeberadaan(KeberadaanV2::TidakDiimpor));
         $this->assertCount(7, TabelAnakNip::perKeberadaan(KeberadaanV2::BelumDiputuskan));
     }
 
@@ -181,13 +186,13 @@ final class TabelAnakNipTest extends CIUnitTestCase
         $this->assertSame(['token.nip'], $kunci(TabelAnakNip::sampaiFase(0)));
 
         $fase3 = $kunci(TabelAnakNip::sampaiFase(3));
-        $this->assertCount(45, $fase3);
+        $this->assertCount(47, $fase3);
 
-        foreach (['token.nip', 'pengguna.id_pegawai', 'pengguna.username', 'faq_rate.nip', 'user_lokasi_presensi.nip', 'riwayat_kp.nip'] as $harus) {
+        foreach (['token.nip', 'pengguna.id_pegawai', 'pengguna.username', 'faq_rate.nip', 'dm_user_lokasi_presensi.target_peg', 'dm_user_lokasi_presensi.excl_peg', 'riwayat_kp.nip', 'jabatan_koordinasi.nip'] as $harus) {
             $this->assertContains($harus, $fase3);
         }
 
-        foreach (['riwayat_cuti.nip', 'gaji_pegawai.nip', 'riwayat_lckh_2019.nip', 'email_pool.nip'] as $belum) {
+        foreach (['riwayat_cuti.nip', 'gaji_pegawai.nip', 'riwayat_lckh_2019.nip', 'email_pool.nip', 'user_lokasi_presensi.nip'] as $belum) {
             $this->assertNotContains($belum, $fase3);
         }
 

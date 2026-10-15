@@ -105,7 +105,7 @@ server {
 }
 ```
 
-> Catatan infrastruktur (ADR Bagian 5): BSrE (10.10.100.132) dan server Arsip (172.17.100.84) berada di jaringan internal — server dev harus berada di jaringan yang sama / VPN saat integrasi real (Fase 6).
+> Catatan infrastruktur (ADR Bagian 5): BSrE dan server Arsip berada di jaringan internal — server dev harus berada di jaringan yang sama / VPN saat integrasi real (Fase 6).
 
 ### 1a. Email tautan reset password (CR-014, ISSUE-006)
 

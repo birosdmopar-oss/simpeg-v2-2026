@@ -2,7 +2,8 @@
 /**
  * Tabel Daftar Pegawai (§4.1.5, Gambar 18–21): kolom dinamis (dipilih lewat "Filter Kolom"), sel Nama/NIP berisi
  * avatar inisial + nama (tautan ke detail) + NIP.
- * TODO(B-20, WS-2): baris filter per kolom (Gambar 18) dikembalikan setelah parameter filter `GET pegawai` ditetapkan.
+ * Filter daftar = panel filter + pencarian lanjutan di halaman (MAKE-014); baris filter per kolom (Gambar 18) belum dibawa
+ * (kartu lanjutan).
  *
  * Penyimpangan disengaja dari mockup: tombol ⋮ berada di kolom "Aksi" paling KANAN (menempel saat digulir),
  * bukan di kiri seperti Gambar 18 — aturan proyek AGENTS.md §1 mewajibkan semua tabel seragam. Menunggu keputusan.
@@ -12,9 +13,9 @@ import { computed } from 'vue'
 
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
-import { UiAvatar } from '@/shared/ui'
+import { UiAvatar, UiBadge } from '@/shared/ui'
 
-import { COLUMN_BY_KEY, fullName } from '../columns'
+import { COLUMN_BY_KEY, fullName, nadaJenisPegawai } from '../columns'
 import type { PegawaiListItem } from '../types'
 
 const props = defineProps<{
@@ -22,6 +23,8 @@ const props = defineProps<{
   columnKeys: string[]
   loading: boolean
   canDelete: boolean
+  /** NIP yang sedang dihapus: item "Hapus" baris itu nonaktif (AGENTS.md §1.4). */
+  busyNip?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -30,10 +33,10 @@ const emit = defineEmits<{
 
 const columns = computed(() => props.columnKeys.map((k) => COLUMN_BY_KEY[k]).filter(Boolean))
 
-function actionsFor(): RowAction[] {
+function actionsFor(row: PegawaiListItem): RowAction[] {
   return [
     { key: 'detail', label: 'Lihat detail' },
-    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete },
+    { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.canDelete, disabled: props.busyNip === row.nip },
   ]
 }
 </script>
@@ -84,12 +87,15 @@ function actionsFor(): RowAction[] {
                 <span class="block text-body2 text-slate-500">{{ row.nip }}</span>
               </div>
             </div>
+            <UiBadge v-else-if="column.key === 'jenis_pegawai' && row.jenis_pegawai" :tone="nadaJenisPegawai(row.id_jenis_pegawai)" data-testid="badge-jenis-pegawai">
+              {{ row.jenis_pegawai }}
+            </UiBadge>
             <span v-else class="text-slate-700">{{ column.value(row) }}</span>
           </td>
 
           <td class="sticky right-0 bg-white px-4 py-3 text-right align-middle">
             <RowActionsMenu
-              :actions="actionsFor()"
+              :actions="actionsFor(row)"
               :label="`Aksi untuk ${row.nama}`"
               :testid="`pegawai-actions-${row.nip}`"
               @select="(key) => emit('action', key as 'detail' | 'hapus', row)"

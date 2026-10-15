@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RIWAYAT_REGISTRY, configFor, tabsFromDescriptors } from '../riwayat/registry'
+import { fieldSyarat, type SyaratTampil } from '../riwayat/riwayat.config'
 import { buildRiwayatSchema } from '../riwayat/riwayat.schema'
 import { JENIS_ENGINE, JENIS_NON_ENGINE } from '../types'
 
@@ -29,6 +30,13 @@ const EXPECTED = [
   'skp-periodik',
   'tanda-jasa',
 ]
+
+/** Syarat berisi gabungan `any`/`all` dengan daftar kosong (di tingkat mana pun). */
+function adaGabunganKosong(s: SyaratTampil): boolean {
+  if ('any' in s) return s.any.length === 0 || s.any.some(adaGabunganKosong)
+  if ('all' in s) return s.all.length === 0 || s.all.some(adaGabunganKosong)
+  return false
+}
 
 describe('registry riwayat', () => {
   it('16 berkas: tabel §2.3.5 + ak-siasn (WS-1 M3)', () => {
@@ -73,18 +81,35 @@ describe('registry riwayat', () => {
     expect(ringkas('seminar')).toEqual([[22, true, 1, ext]])
     expect(ringkas('tanda-jasa')).toEqual([[23, true, 5, ext]])
     expect(ringkas('organisasi')).toEqual([[13, true, 5, ext]])
-    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi']
+    expect(ringkas('skp')).toEqual([[32, true, 5, ext]]) // MAKE-008
+    // MAKE-012 (WS-2): Jabatan.php — SK 9 wajib, SK PS JFT 36 wajib bersyarat, perjanjian kerja 41 opsional.
+    expect(ringkas('jabatan')).toEqual([[9, true, 5, ext], [36, true, 5, ext], [41, false, 5, ext]])
+    expect(configFor('jabatan')?.lampiran[1]?.wajibBila).toEqual({ field: 'status_jft', in: ['2'] })
+    // MAKE-013 (hook MAKE-018): jabatan disaring sub group + satker bila need_satker = '1'.
+    expect(configFor('jabatan')?.fields.find((f) => f.name === 'id_jabatan')?.optionsFilter).toEqual([
+      { param: 'id_sub_group_jabatan', field: 'id_sub_group_jabatan' },
+      { param: 'id_satker', field: 'id_satker', when: { field: 'id_sub_group_jabatan', opsi: 'need_satker', in: ['1'] } },
+    ])
+    const berlampiran = ['pendidikan', 'kp', 'kgb', 'hukdis', 'keluarga', 'alamat', 'diklat', 'seminar', 'tanda-jasa', 'organisasi', 'skp', 'jabatan']
     for (const config of Object.values(RIWAYAT_REGISTRY)) {
       if (!berlampiran.includes(config.jenis)) expect(config.lampiran, config.jenis).toEqual([])
     }
   })
 
-  it('dependsOn menunjuk isian ref lain di jenis yang sama; showWhen menunjuk isian yang ada', () => {
+  it('dependsOn menunjuk isian ref lain di jenis yang sama; showWhen/requiredWhen menunjuk isian yang ada', () => {
     for (const config of Object.values(RIWAYAT_REGISTRY)) {
       const names = config.fields.map((f) => f.name)
       for (const f of config.fields) {
         if (f.dependsOn) expect(config.fields.find((g) => g.name === f.dependsOn)?.type, `${config.jenis}.${f.name}`).toBe('ref')
-        if (f.showWhen) expect(names, `${config.jenis}.${f.name}`).toContain(f.showWhen.field)
+        for (const syarat of [f.showWhen, f.requiredWhen]) {
+          if (!syarat) continue
+          expect(adaGabunganKosong(syarat), `${config.jenis}.${f.name}: any/all kosong`).toBe(false)
+          for (const nama of fieldSyarat(syarat)) {
+            expect(names, `${config.jenis}.${f.name}`).toContain(nama)
+            // Nilai multiselect di luar nilai teks form → tidak bisa jadi pemicu syarat.
+            expect(config.fields.find((g) => g.name === nama)?.type, `${config.jenis}.${f.name} → ${nama}`).not.toBe('multiselect')
+          }
+        }
       }
     }
   })

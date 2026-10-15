@@ -108,38 +108,194 @@ export interface Pegawai {
   jenis_pegawai: string | null
   jenis_status: string | null
   tmt_status: string | null
-  foto: string | null
+  /** Path `pegawai.foto` tidak pernah dikirim backend (MAKE-010); berkas lewat `GET pegawai/{nip}/foto`. */
+  ada_foto: boolean
   keterangan: string | null
   status: number
+  /** 0 tanpa pengajuan, 1 diajukan, 2 ditolak, 3 disetujui (COMMENT DDL). */
   flag_update: number
   id_pns_siasn: string | null
 }
 
-/**
- * `GET pegawai/{nip}` → `data`. Yang dibekukan S0-A hanya `tabs`; field biodata = kolom `pegawai`.
- * TODO(B-20, WS-2): field tambahan (snapshot jabatan/pangkat untuk kartu identitas, foto) ditetapkan saat endpoint dibuat.
- */
-export interface PegawaiDetail extends Pegawai {
-  tabs: RiwayatTabDescriptor[]
+/** Snapshot jabatan aktif (`pegawai_mutasi_jabatan`) pada detail pegawai. */
+export interface JabatanAktif {
+  id_unit: number | null
+  unit: string | null
+  id_satker: number | null
+  satker: string | null
+  id_jabatan: number | null
+  jabatan: string | null
+  jabatan_lain: string | null
+  jenis_jabatan: number | null
+  tmtsk: string | null
+}
+
+/** Snapshot pangkat aktif (`pegawai_kp`) pada detail pegawai. */
+export interface PangkatAktif {
+  gol_ruang: string | null
+  pangkat: string | null
+  tmtsk: string | null
+}
+
+/** Pengajuan biodata terakhir (`pegawai_hist`) saat `flag_update` 1/2. */
+export interface PengajuanBiodata {
+  id_pegawai_hist: number
+  flag_update: number
+  reason_note: string | null
+  created_at: string | null
+  updated_at: string | null
+  notif_date: string | null
+}
+
+/** Hak aksi pemanggil atas pegawai ini, dihitung backend (role × PegawaiScope). */
+export interface AksiPegawai {
+  ubah_biodata: boolean
+  /** true = Super Admin: perubahan langsung ke `pegawai`; false = lewat pengajuan (approval B-04). */
+  ubah_langsung: boolean
+  koreksi_nip: boolean
+  /** B-04 (MAKE-011): ada pengajuan menunggu yang boleh diproses pemanggil (role 1/3 + lingkup proses). */
+  proses_biodata: boolean
+}
+
+/** Satu kolom yang berubah pada pengajuan biodata (`foto`: lama/baru = ada foto atau tidak). */
+export interface PerubahanBiodata {
+  kolom: string
+  lama: string | number | boolean | null
+  baru: string | number | boolean | null
+}
+
+/** `GET biodata/pengajuan/{id}` → `data` (B-04). */
+export interface PengajuanBiodataDetail {
+  pengajuan: Record<string, unknown> & PengajuanBiodata & { nip: string; nama: string; ada_foto: boolean }
+  pegawai: Record<string, unknown> & { nip: string; nama: string; ada_foto: boolean; email: string | null }
+  perubahan: PerubahanBiodata[]
+  can_process: boolean
+}
+
+/** Satu baris `GET biodata/pengajuan` (antrean B-04). */
+export interface PengajuanBiodataItem {
+  id_pegawai_hist: number
+  nip: string
+  nama: string
+  glr_awal: string | null
+  glr_akhir: string | null
+  unit: string | null
+  satker: string | null
+  jabatan: string | null
+  tgl_permohonan: string | null
+}
+
+/** `POST pegawai` → `data` (B-05): akun A-09 dengan password awal yang dikembalikan SEKALI. */
+export interface TambahPegawaiResult {
+  pegawai: Pegawai
+  akun: {
+    id_pengguna: number | null
+    username: string
+    user_level: number
+    created: boolean
+    initial_password: string | null
+    email_skipped: boolean
+  }
 }
 
 /**
- * Satu baris `GET pegawai`. Kolom `pegawai` saja yang pasti ada.
- * TODO(B-20, WS-2): kolom snapshot (jabatan, unit, satker, gol_ruang) & parameter filter ditetapkan saat endpoint dibuat.
+ * `GET pegawai/{nip}` → `data` (MAKE-010; README kontrak "Pegawai, biodata, koreksi NIP"). `tabs` beku S0-A.
  */
-export type PegawaiListItem = Pick<
-  Pegawai,
-  'nip' | 'nip_lama' | 'nama' | 'glr_awal' | 'glr_akhir' | 'jenis_kelamin' | 'agama' | 'jenis_pegawai' | 'jenis_status' | 'tmt_status'
->
+export interface PegawaiDetail extends Pegawai {
+  email: string | null
+  jabatan_aktif: JabatanAktif | null
+  pangkat_aktif: PangkatAktif | null
+  pengajuan: PengajuanBiodata | null
+  aksi: AksiPegawai
+  tabs: RiwayatTabDescriptor[]
+}
+
+/** Satu baris `GET pegawai`: biodata inti + snapshot jabatan (pmj) + pangkat (`pegawai_kp`). */
+export interface PegawaiListItem
+  extends Pick<
+    Pegawai,
+    | 'nip'
+    | 'nip_lama'
+    | 'nama'
+    | 'glr_awal'
+    | 'glr_akhir'
+    | 'jenis_kelamin'
+    | 'tgl_lahir'
+    | 'agama'
+    | 'id_jenis_pegawai'
+    | 'jenis_pegawai'
+    | 'jenis_status'
+    | 'tmt_status'
+    | 'status'
+    | 'flag_update'
+    | 'ada_foto'
+  > {
+  id_unit: number | null
+  unit: string | null
+  id_satker: number | null
+  satker: string | null
+  id_jabatan: number | null
+  jabatan: string | null
+  tmt_jabatan: string | null
+  gol_ruang: string | null
+  pangkat: string | null
+}
+
+/** Kriteria pencarian lanjutan (B-20 penutup, MAKE-014; legacy advsearch). */
+export interface KriteriaPencarian {
+  jenis_rwy: string
+  jenis_data: 'last' | 'rwy'
+  atribut: string
+  operator: string
+  nilai: string
+  /** Penghubung dengan kriteria sebelumnya (diabaikan untuk kriteria pertama). */
+  hubung: 'AND' | 'OR'
+}
+
+export interface KatalogPencarian {
+  jenis: {
+    key: string
+    label: string
+    jenis_data: Array<'last' | 'rwy'>
+    atribut: { field: string; label: string; pilihan: string | { id: string; nama: string }[] | null; hanya_rwy: boolean }[]
+  }[]
+  operator: string[]
+}
 
 export interface PegawaiListQuery {
   page: number
   per_page: number
-  /** Pencarian nama/NIP. TODO(B-20): nama parameter dikonfirmasi saat endpoint dibuat. */
+  /** Nama, NIP, atau NIP lama. */
   search?: string
+  /** '1' Aktif / '2' Tidak Aktif; kosong = keduanya (legacy). */
+  status?: string
+  id_unit?: string
+  id_satker?: string
+  id_jenis_pegawai?: string
+  sort?: 'nama' | 'nip' | 'jabatan' | 'unit' | 'satker' | 'gol_ruang'
+  order?: 'asc' | 'desc'
 }
 
-/** Konvensi daftar ber-paginasi proyek (sama dengan Manajemen Akun/Master Data). TODO(B-20): konfirmasi. */
+/** Body `PUT pegawai/{nip}/biodata` — kolom DDL `pegawai` + `email` akun + `jenis_kerabat_lain`. */
+export type BiodataPayload = Record<string, string>
+
+/** `PUT pegawai/{nip}/biodata` → `data`. */
+export interface BiodataResult {
+  jalur: 'langsung' | 'pengajuan'
+  pegawai: Pegawai
+  pengajuan: PengajuanBiodata | null
+}
+
+/** `POST pegawai/{nip}/koreksi-nip` → `data`. */
+export interface KoreksiNipResult {
+  nip_lama: string
+  nip_baru: string
+  tabel: Record<string, number>
+  dilewati: string[]
+  sesi_dicabut: number
+}
+
+/** Konvensi daftar ber-paginasi proyek (sama dengan Manajemen Akun/Master Data). Dikonfirmasi `PegawaiService::daftar` (MAKE-010/014). */
 export interface PegawaiListResponse {
   items: PegawaiListItem[]
   total: number
@@ -147,12 +303,55 @@ export interface PegawaiListResponse {
   per_page: number
 }
 
-/** Simpul bagan struktur organisasi (B-19). TODO(B-19, WS-2): bentuk & endpoint ditetapkan saat dibuat. */
+/** Kotak bagan struktur organisasi (B-19, `GET struktur-organisasi`, ikut dataset legacy so_012025). */
+export interface SoKotak {
+  id_jabatan?: number
+  jabatan: string
+  /** Teks legacy "Nama, Gol/Ruang, NIP" (awalan "Plt."/"Plh."); kosong = lowong. */
+  pejabat: string
+  is_plt: boolean
+  jenis: 'definitif' | 'plt' | 'plh' | null
+  satker?: string | null
+  list_es2?: SoKotak[]
+  es3?: SoKotak[]
+  es4?: SoKotak[]
+}
+
+export type SoFormat = 'kementerian' | 'sesmen' | 'deputi' | 'inspektorat_unit' | 'inspektorat' | 'pusat' | 'bpo' | 'upt'
+
+export interface SoPilihan {
+  value: string
+  label: string
+  level: number
+  disabled: boolean
+}
+
+export interface StrukturOrganisasi {
+  periode: { id_periode_struktur_jabatan: number; periode_struktur_jabatan: string } | null
+  tanggal: string
+  /** YYYY-MM (MAKE-013: riwayat per bulan sejak 2022-01). */
+  bulan: string
+  bulan_tersedia: { value: string; label: string }[]
+  id_unit_satker: string
+  kementerian: string
+  pilihan: SoPilihan[]
+  judul: string
+  format: SoFormat
+  /** Dataset per format (kunci legacy): kementerian `menteri`, `wakil_menteri`, `staf_ahli`, `inspektorat`,
+   * `sekretaris`, `deputi`; unit `es1`, `es2_sek`, `es2`; satker `es2_sek`, `es2`, `es3_sek`, `es3`, `es4`. */
+  data: Record<string, SoKotak | SoKotak[] | null>
+}
+
+/** Simpul pohon tampilan (hasil susunan templat dari dataset). */
 export interface OrgNode {
   id: string
   jabatan: string
-  nama: string
-  nama_lengkap: string
+  pejabat: string
+  jenis: SoKotak['jenis']
+  /** Baris tambahan (mis. Wakil Menteri, satker Es.II kementerian). */
+  sub?: string
+  /** Kotak "Jabatan Fungsional dan Jabatan Pelaksana" legacy. */
+  jf?: boolean
   children: OrgNode[]
 }
 
@@ -625,4 +824,162 @@ export interface AturanLampiran {
   batas_mb: 1 | 2 | 5
   /** Ekstensi tanpa titik, huruf kecil. */
   ekstensi: string[]
+}
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * Penugasan Plt/Plh (B-07, `penugasan/{jenis}`, MAKE-012)
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+export type JenisPenugasan = 'plt' | 'plh'
+
+/** Satu baris `pegawai_plt` / `pegawai_plh` + nama rujukan; kolom `*_plt`/`*_plh` mengikuti jenis. */
+export interface PenugasanItem {
+  id: number
+  nip: string
+  nama_lengkap: string | null
+  status: number | string
+  jenis_jabatan: number | string
+  jenis_jabatan_koord: number | string | null
+  tgl_mulai: string | null
+  tgl_akhir: string | null
+  id_jabatan: number | string | null
+  jabatan: string | null
+  id_jabatan_koord: number | string | null
+  jabatan_koord: string | null
+  id_unit: number | string | null
+  unit: string | null
+  id_satker: number | string | null
+  satker: string | null
+  keterangan: string | null
+  ada_lampiran: boolean
+  [kolom: string]: unknown
+}
+
+export interface PenugasanListResponse {
+  items: PenugasanItem[]
+  meta: { page: number; per_page: number; total: number }
+  can_create: boolean
+}
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * Konket — Konfirmasi Ketidakhadiran (B-13, `konket/*`, MAKE-013); tabel `absen_ijin`
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/** W Menunggu, V Disetujui, X Ditolak (10 Dihapus tidak dikirim API). */
+export type StatusKonket = 'W' | 'V' | 'X'
+
+export interface KonketAksi {
+  ubah: boolean
+  hapus: boolean
+  proses: boolean
+}
+
+export interface KonketItem {
+  id: number
+  nip: string
+  nama_lengkap: string
+  date_start: string
+  date_end: string
+  kategori: number
+  jenis_konket: string | null
+  jenis_dinas: number | null
+  affect_tukin: number
+  id_parent: number | null
+  alasan: string
+  status: StatusKonket
+  reason_note: string | null
+  unit: string | null
+  satker: string | null
+  ada_berkas: boolean
+  aksi: KonketAksi
+  peserta?: { nip: string; nama_lengkap: string; pemohon: boolean }[]
+}
+
+export interface KonketListResponse {
+  mode: 'pegawai' | 'admin'
+  items: KonketItem[]
+  meta: { page: number; per_page: number; total: number }
+  can_create: boolean
+  rentang: { ds: string; de: string } | null
+}
+
+export interface KonketOpsi {
+  mode: 'pegawai' | 'admin'
+  tanggal_minimal: string
+  hari_ini: string
+  kategori_dinas: number
+  kategori_sakit: number
+  jenis: { kategori: number; jenis_konket: string; affect_tukin: number }[]
+}
+
+/* ----------------------------------------------------------------------------------------------------------------
+ * LKH — Laporan Kerja Harian (B-12b, `lkh/*`, MAKE-013); tabel `riwayat_lckh`
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/** 0 Menunggu, 1 Disetujui, 2 Ditolak, 3 Revisi. */
+export type StatusLkh = 0 | 1 | 2 | 3
+
+export interface LkhKegiatan {
+  kegiatan: string
+  output: string
+  jumlah_diselesaikan: string
+  jam_mulai: string
+  jam_selesai: string
+}
+
+export interface LkhItem {
+  id: number
+  nip: string
+  nama: string
+  unit: string | null
+  satker: string | null
+  tgl_laporan: string
+  nip_atasan: string | null
+  nama_atasan: string
+  status: StatusLkh
+  catatan: string | null
+  jumlah: number
+  aksi: { ubah: boolean; hapus: boolean; proses: boolean }
+  kegiatan?: LkhKegiatan[]
+}
+
+export interface LkhListResponse {
+  items: LkhItem[]
+  meta: { page: number; per_page: number; total: number }
+  nip?: string
+  can_create?: boolean
+}
+
+/** Rekap LKH bawahan (MAKE-014). */
+export interface LkhRekapItem {
+  nip: string
+  nama: string
+  jabatan: string | null
+  satker: string | null
+  menunggu: number
+  disetujui: number
+  ditolak: number
+  revisi: number
+  total: number
+}
+
+export interface LkhRekap {
+  bulan: string
+  ds: string
+  de: string
+  items: LkhRekapItem[]
+}
+
+export interface LkhRekapBawahan {
+  bulan: string
+  pegawai: Pick<LkhRekapItem, 'nip' | 'nama' | 'jabatan' | 'satker'>
+  items: LkhItem[]
+}
+
+export interface LkhOpsi {
+  nip: string
+  tanggal_minimal: string
+  tanggal_maksimal: string
+  atasan: { nip: string; nama: string } | null
+  punya_jabatan: boolean
 }

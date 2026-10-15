@@ -6,6 +6,7 @@
  * - Slot `diff` untuk perbandingan data lama ↔ usulan (biodata B-04).
  * - Emit `confirm` dengan payload body `POST …/{id}/process`: `{ aksi, reason_note }`.
  * Dialog tidak menutup sendiri saat confirm: pemanggil menutup setelah request berhasil (pola ConfirmDialog).
+ * `disabled` (aditif MAKE-011): tombol Setujui/Tolak nonaktif, mis. server menyatakan data tidak lagi bisa diproses.
  */
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
@@ -27,8 +28,10 @@ const props = withDefaults(
     loading?: boolean
     /** Galat dari server (mis. 409/422) untuk ditampilkan di dialog. */
     error?: string
+    /** Konfirmasi dinonaktifkan (mis. `can_process` false). */
+    disabled?: boolean
   }>(),
-  { subject: '', description: '', loading: false, error: '' },
+  { subject: '', description: '', loading: false, error: '', disabled: false },
 )
 
 const emit = defineEmits<{ 'update:open': [value: boolean]; confirm: [payload: ApprovalPayload] }>()
@@ -66,7 +69,7 @@ const shownError = computed(() => (touched.value ? reasonError.value : ''))
 
 function submit(): void {
   touched.value = true
-  if (reasonError.value || props.loading) return
+  if (reasonError.value || props.loading || props.disabled) return
   emit('confirm', { aksi: props.mode, reason_note: reason.value.trim() })
 }
 </script>
@@ -122,7 +125,7 @@ function submit(): void {
 
           <div class="mt-6 flex justify-end gap-2">
             <UiButton type="button" appearance="soft" variant="secondary" :disabled="loading" @click="emit('update:open', false)">Batal</UiButton>
-            <UiButton type="submit" :variant="isTolak ? 'error' : 'primary'" :loading="loading" data-testid="approval-confirm">
+            <UiButton type="submit" :variant="isTolak ? 'error' : 'primary'" :loading="loading" :disabled="disabled" data-testid="approval-confirm">
               {{ confirmLabel }}
             </UiButton>
           </div>

@@ -44,7 +44,7 @@ watch(collapsed, (value) => {
   }
 })
 
-const groups = computed(() => buildNav(auth.role))
+const groups = computed(() => buildNav(auth.role, undefined, auth.user?.nip ?? null))
 const userName = computed(() => auth.user?.name ?? auth.user?.username ?? 'Pengguna')
 const userSubtitle = computed(() => auth.user?.nip ?? (auth.role ? ROLE_LABELS[auth.role] : ''))
 

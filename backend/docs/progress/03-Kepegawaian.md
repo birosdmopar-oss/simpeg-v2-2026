@@ -2,8 +2,8 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `03-Kepegawaian.md`. Aturan kalkulasi dan tanggal bisnis: `backend/app/Libraries/Kepegawaian/README.md`.
 
-**Terakhir diperbarui:** 7 Oktober 2026 — S0-A (MAKE-002, Sprint 0-1): kontrak backend Fase 3 dibekukan, tabel status dipecah per task dengan kolom WS & Key. Riwayat sebelumnya: CR-036 (2 Oktober 2026, registry kolom NIP, format NIP, BUP pensiun) dan CR-025 (di main lewat merge `a540703` 30-09-2026, kalkulasi murni KP/KGB/hukdis/masa kerja) — rincian di bagian "Persiapan tanpa skema".
-**Entry criteria:** **terpenuhi** — Fase 1 + Fase 2 DONE (Fase 2 sign-off 07-10-2026); skema B-01/B-02 (44 tabel, DBV-012/DBV-013, PR #20) dan master G-02/G-03/G-09 sudah di `main`. FK G-02 ↔ pegawai/riwayat = DBV-019 (PR #24, menunggu review DB Validator).
+**Terakhir diperbarui:** 15 Oktober 2026 — QA Fase 3 selesai: QA fungsional + QA UI Lapis 1 (laporan `docs/qa/QAFUNC-004-fase-3-kepegawaian.md`, `QAUI-003-fase-3-lapis1-kepegawaian.md`, QA ulang R1/R2), temuan diperbaiki CR-049/CR-050/CR-051 (ISSUE-033..040, di `main` `ebe1b59`); status B-03..B-21 = DONE. Sebelumnya 13 Oktober 2026 — baris WS-2 (MAKE-010..014, bagian "WS-2 M2–M6" di bawah). Sebelumnya 7 Oktober 2026 — S0-A (MAKE-002, Sprint 0-1): kontrak backend Fase 3 dibekukan, tabel status dipecah per task dengan kolom WS & Key. Riwayat sebelumnya: CR-036 (2 Oktober 2026, registry kolom NIP, format NIP, BUP pensiun) dan CR-025 (di main lewat merge `a540703` 30-09-2026, kalkulasi murni KP/KGB/hukdis/masa kerja) — rincian di bagian "Persiapan tanpa skema".
+**Entry criteria:** **terpenuhi** — Fase 1 + Fase 2 DONE (Fase 2 sign-off 07-10-2026); skema B-01/B-02 (44 tabel, DBV-012/DBV-013, PR #20) dan master G-02/G-03/G-09 sudah di `main`. FK G-02 ↔ pegawai/riwayat = DBV-019 (PR #24, disetujui DB Validator 07-10-2026, di `main` 13-10-2026 `191efec`).
 
 Pembagian kerja Fase 3: WS-1 (mesin riwayat + riwayat karier/administrasi, `docs/fase3/WS1.md`) dan WS-2 (lingkup, lampiran, NIP, biodata, jabatan/struktur, Konket, LKH, halaman pegawai, `docs/fase3/WS2.md`). Key per paket milestone = peta `docs/fase3/WS1.md` §3.8.1. **Setiap WS hanya mengubah baris miliknya** di tabel ini.
 
@@ -11,27 +11,59 @@ Pembagian kerja Fase 3: WS-1 (mesin riwayat + riwayat karier/administrasi, `docs
 |---|---|---|---|---|
 | B-01 Migration tabel pegawai & snapshot | selesai | DBV-012 (+ DBV-019 FK G-02) | DONE (skema) | Tabel `pegawai` + snapshot `pegawai_*` di `main` (PR #20). FK snapshot → master G-02 = DBV-019 (PR #24) |
 | B-02 Migration tabel riwayat | selesai | DBV-013 | DONE (skema) | Tabel `riwayat_*`, `jenis_rwy`, `document_attachment` di `main` (PR #20) |
-| B-03 CRUD biodata (dua jalur) | WS-2 | MAKE-010 | TODO | Termasuk backend dasar B-20 |
-| B-04 Approval draft biodata | WS-2 | MAKE-011 | TODO | |
-| B-05 Tambah & hapus pegawai | WS-2 | MAKE-011 | TODO | |
-| B-06 Koreksi NIP (cascade) | WS-2 | MAKE-010 | TODO | Bahan murni sudah ada (CR-036): registry 79 kolom NIP (`TabelAnakNip::sampaiFase(3)` = 45), `FormatNip`. Service `nipCascade` terdaftar (stub S0-A) |
-| B-07 Riwayat jabatan / mutasi | WS-2 | MAKE-012 | TODO | Slug `jabatan` |
-| B-08 Riwayat KP | WS-1 | MAKE-005 | **REVIEW** | Definisi `kp` (multi-target kp/cpns/pns, TMT periode CR-025, CPNS/PNS sekali, TMT tidak kembar, SK wajib); role 1 memilih status saat ubah (ikut legacy, keputusan user 09-10); B-TC + test jenis dengan PegawaiScope + lampiran nyata (MAKE-009); freeze engine-v1 menunggu review (WS1 ⛔4) |
-| B-09 Riwayat KGB | WS-1 | MAKE-006 | **IN_PROGRESS** | Definisi `kgb` (snapshot `pegawai_kgb`, TMT tidak kembar, SK wajib, jarak 2 tahun dari KGB/KP terakhir — keputusan #10, KP pengangkatan CPNS = TMT CPNS; role 1 pilih status saat ubah) + test DoD; FE tab tersambung lewat halaman sementara `/pegawai/:nip/riwayat` (`GET pegawai/{nip}/riwayat`). TODO(MAKE-010): tersambung di Detail Pegawai lewat `data.tabs`, lalu halaman sementara dialihkan/dihapus (WS-1). Mode "halaman usulan mandiri" mesin FE (§3.4.5) dipindah ke M4 (MAKE-007) bersama halaman Usulan Karpeg/Karis (keputusan reviewer CR 12-10-2026) |
-| B-10 Riwayat pendidikan | WS-1 | MAKE-005 | **REVIEW** | Definisi `pendidikan` (self-service, snapshot jenjang tertinggi, bidang/jurusan bersyarat, Ijazah wajib); B-TC + test jenis dengan PegawaiScope + lampiran nyata (MAKE-009); freeze engine-v1 menunggu review (WS1 ⛔4) |
-| B-11 Riwayat diklat & seminar | WS-1 | MAKE-007 | **IN_PROGRESS** | Definisi `diklat` (isian per jenis, snapshot jenis 1, duplikat jenis 1, lampiran 1 MB; [V2] status ikut engine — perbaikan bug legacy `set_param`; jenis 5 rumpun/lembaga teks — kebutuhan master `rumpun_sertifikasi`/`lembaga_sertifikasi` = DBV baru) dan `seminar` (bidang/instansi teks + saran master, 1 MB); FE tab tersambung |
-| B-12 Riwayat SKP & LKH | WS-1 (B-12a SKP) / WS-2 (B-12b LKH) | MAKE-008 / MAKE-013 | TODO | Approver LKH = atasan langsung (ikut legacy) |
-| B-13 Riwayat Konket | WS-2 | MAKE-013 | TODO | Halaman usulan mandiri, bukan jenis engine |
-| B-14 Riwayat hukdis | WS-1 | MAKE-006 | **IN_PROGRESS** | Definisi `hukdis` (role 1/3; [K] hapus hanya role 1 ikut legacy `Hukdis.php:171-190`, keputusan user 12-10-2026 — deviasi Matriks v2; tanpa proses, status selalu 1, jenis berjenjang dari tingkat, akhir/masa dikosongkan = dihitung dari `masa_sanksi_bulan`, SK wajib) + test DoD; FE tab seperti B-09 |
-| B-15 Riwayat angka kredit | WS-1 | MAKE-008 | TODO | Slug `ak`, `ak-siasn` |
-| B-16 Riwayat keluarga & alamat | WS-1 | MAKE-007 | **IN_PROGRESS** | Definisi `keluarga` (+ sub-resource anak `detail_anak`, akte kode 3, hook `entriLampiran`) dan `alamat` (snapshot `pegawai_alamat` + `pegawai_alamat_kantor`, wilayah + LAIN-LAIN, [V2] kd_pos 5 digit, KTP wajib kecuali kantor lewat hook `lampiranWajib`); FE tab + dialog anak |
-| B-17 Karpeg, Karis/Karsu, tanda jasa, organisasi | WS-1 | MAKE-007 | **IN_PROGRESS** | `tanda-jasa` (snapshot 26/27/28, tambah role 1) dan `organisasi`; Karpeg/Karis = halaman usulan mandiri (`/karpeg-karis`, mode usulan mesin FE): berkas kolom lewat hook `kolomBerkas` (KolomBerkas MAKE-009), antrean `usulan/{jenis}` role 1/4/5 tanpa lingkup, [V2] proses role 1 — TODO(C-01) alihkan ke `petugas_layanan`; TODO(ADR-033) PDF tanda terima |
-| B-18 Upload lampiran | WS-2 | MAKE-009 | **REVIEW** | AttachmentService + LocalStorageAdapter + kompensasi berkas, helper kolom berkas, endpoint `pegawai/{nip}/lampiran*`, `ArsipTable`; bagian "WS-2 M1" di bawah |
-| B-19 Struktur organisasi | WS-2 | MAKE-012 | TODO | |
-| B-20 Detail pegawai & pencarian (frontend) | WS-2 | MAKE-003 (fondasi) / MAKE-010 (dasar) / MAKE-014 (penutup) | TODO | Menu Fase 3 tersembunyi (`ACTIVE_PHASE = 2`) sampai penutup |
-| B-21 Unit test Modul Kepegawaian | WS-1 (snapshot) / WS-2 (cascade NIP) | MAKE-008 / MAKE-010 | **IN_PROGRESS** | 3 dari 5 butir DoD lolos (CR-025: periode KP, jarak KGB, akhir hukdis). Sisa: snapshot sync hanya di approval final (WS-1) dan cascade NIP + rollback (WS-2) |
+| B-03 CRUD biodata (dua jalur) | WS-2 | MAKE-010 | DONE | Role 1 langsung ke `pegawai`; role 2/3/6/7 lewat `flag_update` + satu `pegawai_hist` pending per NIP; foto `pegawai_foto`; backend dasar B-20 (daftar/detail + descriptor tab). Pemilik melihat perubahan yang diajukannya (MAKE-014) |
+| B-04 Approval draft biodata | WS-2 | MAKE-011 | DONE | `biodata/pengajuan*` (role 1/3, lingkup jalur proses), diff Sekarang ↔ Diajukan + foto; halaman antrean "Pengajuan Data Umum" (MAKE-014) |
+| B-05 Tambah & hapus pegawai | WS-2 | MAKE-011 | DONE | Tambah role 1 + akun (password awal = NIP). **Hapus = FISIK ikut legacy** (keputusan user 13-10-2026; kontrak `docs/fase3/03-Kepegawaian.md` menulis soft delete status 10 — deviasi tercatat [K]), 422 bila masih ada data terkait/akun ber-NIP |
+| B-06 Koreksi NIP (cascade) | WS-2 | MAKE-010 | DONE | `NipCascadeService` atas registry kolom NIP (CR-036), satu transaksi + rollback; username & password akun = NIP baru, sesi dicabut (keputusan user). Penanda wajib ganti password = kebutuhan skema DBV-020 |
+| B-07 Riwayat jabatan / mutasi | WS-2 | MAKE-012 / MAKE-013 | DONE | Slug `jabatan` (engine), atasan Es I–IV dari `struktur_jabatan`, Plt/Plh (`penugasan/{plt\|plh}`), sub rumpun multiselect lewat isian mentah MAKE-019 (MAKE-013) |
+| B-08 Riwayat KP | WS-1 | MAKE-005 | DONE (QA Fase 3 lolos 15-10-2026) | Definisi `kp` (multi-target kp/cpns/pns, TMT periode CR-025, CPNS/PNS sekali, TMT tidak kembar, SK wajib); role 1 memilih status saat ubah (ikut legacy, keputusan user 09-10); B-TC + test jenis dengan PegawaiScope + lampiran nyata (MAKE-009); engine-v1 dibekukan (di `main`, MAKE-004/005) |
+| B-09 Riwayat KGB | WS-1 | MAKE-006 | DONE (QA Fase 3 lolos 15-10-2026) | Definisi `kgb` (snapshot `pegawai_kgb`, TMT tidak kembar, SK wajib, jarak 2 tahun dari KGB/KP terakhir — keputusan #10, KP pengangkatan CPNS = TMT CPNS; role 1 pilih status saat ubah) + test DoD; FE tab tersambung di Detail Pegawai lewat `data.tabs` (MAKE-010); alamat lama `/pegawai/:nip/riwayat` dialihkan ke Detail Pegawai dengan query tab yang sama dan halamannya dihapus (MAKE-016); endpoint `GET pegawai/{nip}/riwayat` tetap (kontrak aditif). Mode "halaman usulan mandiri" mesin FE (§3.4.5) dipindah ke M4 (MAKE-007) bersama halaman Usulan Karpeg/Karis (keputusan reviewer CR 12-10-2026) |
+| B-10 Riwayat pendidikan | WS-1 | MAKE-005 | DONE (QA Fase 3 lolos 15-10-2026) | Definisi `pendidikan` (self-service, snapshot jenjang tertinggi, bidang/jurusan bersyarat, Ijazah wajib); B-TC + test jenis dengan PegawaiScope + lampiran nyata (MAKE-009); engine-v1 dibekukan (di `main`, MAKE-004/005) |
+| B-11 Riwayat diklat & seminar | WS-1 | MAKE-007 | DONE (QA Fase 3 lolos 15-10-2026) | Definisi `diklat` (isian per jenis, snapshot jenis 1, duplikat jenis 1, lampiran 1 MB; [V2] status ikut engine — perbaikan bug legacy `set_param`; jenis 5 rumpun/lembaga teks — kebutuhan master `rumpun_sertifikasi`/`lembaga_sertifikasi` = DBV baru) dan `seminar` (bidang/instansi teks + saran master, 1 MB); FE tab tersambung |
+| B-12 Riwayat SKP & LKH | WS-1 (B-12a SKP) / WS-2 (B-12b LKH) | MAKE-008 / MAKE-013 | DONE (QA Fase 3 lolos 15-10-2026) | B-12b (WS-2): LKH `lkh/*` (atasan langsung = port getAL, verifikator [V2] siapa pun ber-NIP `nip_atasan`, PDF hanya Disetujui, timpa atasan role 1), tab LKH di Detail Pegawai + rekap LKH bawahan per bulan (MAKE-014). | B-12a: Definisi `skp` (skema nilai ≤2021 / rating ≥2022, kolom skema lain dikosongkan, duplikat periode hanya terhadap status 1, lampiran 32 wajib; aturan form legacy ditegakkan FE + server: tahun maks 2022, periode 2022 = 1 Jan s.d. 31 Des, batas nilai skala 120 mulai 2021 / 100 sebelumnya; FE isian hitung rumus form legacy, tidak menimpa nilai tersimpan saat Edit) dan `skp-periodik` (data tarik e-Kinerja: daftar hanya status 1 lewat hook `saringDaftar`, satu-satunya ubah = unggah arsip `f_arsip_1` PDF 1 MB oleh role 1, tanpa tambah/hapus/proses — [K] ikut legacy, deviasi teks PRD, keputusan user 13-10-2026). TODO: hapus arsip SKP periodik (legacy `L_skp.php:937-975`), rincian periode `bkn_periode_ekinper`. Approver LKH = atasan langsung (ikut legacy) |
+| B-13 Riwayat Konket | WS-2 | MAKE-013 | DONE | Halaman usulan mandiri `konket/*` (tabel `absen_ijin`), bukan jenis engine. **Deviasi arti:** Konket = *Konfirmasi Ketidakhadiran* (legacy `hr/rwy/konket` = izin/sakit/dinas luar/cuti, berkas bukti), bukan "kondisi kerja (Dinas Luar/WFH/WFO)" seperti keterangan Matriks v2 §B. Role 4/5 lihat saja [K]. [V2] CR-050 (QA B-F1): pengajuan baru memakai `jenis_konket.affect_tukin` sebagai nilai awal (admin tetap bisa mengubah; legacy selalu 1) [K] CR-050 (QA B-F4): jenis terlarang tetap berkunci `id_jenis_konket` seperti legacy (impor mempertahankan PK; `old_id` produksi bisa NULL/ganda, nama bisa diganti), daftar dipindah ke `Config\Konket` (bawaan legacy 2/4/5/6 dan 4/5, override `.env` tervalidasi); verifikasi arti id 2/4/5/6 di data produksi sebelum go-live (runbook DBV-011 2.4 #3) |
+| B-14 Riwayat hukdis | WS-1 | MAKE-006 | DONE (QA Fase 3 lolos 15-10-2026) | Definisi `hukdis` (role 1/3; [K] hapus hanya role 1 ikut legacy `Hukdis.php:171-190`, keputusan user 12-10-2026 — deviasi Matriks v2; tanpa proses, status selalu 1, jenis berjenjang dari tingkat, akhir/masa dikosongkan = dihitung dari `masa_sanksi_bulan`, SK wajib) + test DoD; FE tab seperti B-09 |
+| B-15 Riwayat angka kredit | WS-1 | MAKE-008 | DONE (QA Fase 3 lolos 15-10-2026; integrasi PermenPAN-RB 1/2023 lewat `dm_ak_jf` menunggu DBV-020 — ISSUE-041, wajib sebelum go-live, keputusan user 15-10-2026) | `ak` (lihat 1/2/3/4/7 — role 2 hanya JF tertentu `id_group_jabatan` 2; tulis & proses role 1, keputusan 13-10-2026; tambah hanya kelompok jabatan 2/3, satu PAK menunggu per jabatan, periode tidak beririsan dengan status 0/1; [V2] isian turunan diisi server — nama, jabatan/no induk JF/TMT jabatan berantai, pangkat/TMT pangkat, masa kerja sampai tanggal PAK, AK kumulatif `dm_ak_jf`; file PAK kolom berkas 1 MB; snapshot `pegawai_ak`) dan `ak-siasn` (ubah role 1 = pasangkan jabatan JF, status tetap; snapshot `pegawai_ak_siasn` — aturan masih ⏳ dok DBV-012 #6). Kebutuhan skema: tabel `dm_ak_jf` belum ada di v2 (selama belum ada AK kumulatif = 0). `konv_ak` (konversi AK) tidak dibangun di WS-1. Perbaikan review: role 7 juga hanya JF tertentu, proses setujui/tolak mengisi `appr_at`/`appr_by` (hook afterProses, ikut legacy), jumlah AK & masa kerja hanya dihitung saat tambah atau bila AK/tanggal PAK berubah, Current AK (`jenis_ak` 1) tidak dihitung ulang. Pratinjau isian turunan di form tambah (termasuk AK Lama otomatis dari `pegawai_ak`): `GET pegawai/{nip}/riwayat/ak/pratinjau?tgl_pak=` (hook aditif `pratinjauTambah`, MAKE-017, keputusan user 13-10-2026) |
+| B-16 Riwayat keluarga & alamat | WS-1 | MAKE-007 | DONE (QA Fase 3 lolos 15-10-2026) | Definisi `keluarga` (+ sub-resource anak `detail_anak`, akte kode 3, hook `entriLampiran`) dan `alamat` (snapshot `pegawai_alamat` + `pegawai_alamat_kantor`, wilayah + LAIN-LAIN, [V2] kd_pos 5 digit, KTP wajib kecuali kantor lewat hook `lampiranWajib`); FE tab + dialog anak |
+| B-17 Karpeg, Karis/Karsu, tanda jasa, organisasi | WS-1 | MAKE-007 | DONE (QA Fase 3 lolos 15-10-2026) | `tanda-jasa` (snapshot 26/27/28, tambah role 1) dan `organisasi`; Karpeg/Karis = halaman usulan mandiri (`/karpeg-karis`, mode usulan mesin FE): berkas kolom lewat hook `kolomBerkas` (KolomBerkas MAKE-009), antrean `usulan/{jenis}` role 1/4/5 tanpa lingkup, [V2] proses role 1 — TODO(C-01) alihkan ke `petugas_layanan`; TODO(ADR-033) PDF tanda terima |
+| B-18 Upload lampiran | WS-2 | MAKE-009 | DONE | AttachmentService + LocalStorageAdapter + kompensasi berkas, helper kolom berkas, endpoint `pegawai/{nip}/lampiran*`, `ArsipTable`; bagian "WS-2 M1" di bawah |
+| B-19 Struktur organisasi | WS-2 | MAKE-012 / MAKE-013 | DONE | Templat legacy so_012025 per pilihan kementerian/unit/satker, per bulan mulai 2025-01 (TODO port templat lama), ekspor PDF tabel hierarki [V2] |
+| B-20 Detail pegawai & pencarian (frontend) | WS-2 | MAKE-003 (fondasi) / MAKE-010 (dasar) / MAKE-014 (penutup) | DONE (QA Fase 3 lolos 15-10-2026) | `ACTIVE_PHASE = 3` (menu Fase 3 tampil); filter Daftar Pegawai (status bawaan Aktif, unit → satker, jenis, urutan; disembunyikan role 8); pencarian lanjutan (role 1/3/4/5, whitelist); ekspor CSV/XLSX; Cetak DRH PDF; Arsip Kepegawaian; semua tab riwayat + LKH di Detail Pegawai. Rincian bagian "WS-2 M2–M6" |
+| B-21 Unit test Modul Kepegawaian | WS-1 (snapshot) / WS-2 (cascade NIP) | MAKE-008 / MAKE-010 | DONE (QA Fase 3 lolos 15-10-2026) | CR-025 (periode KP, jarak KGB, akhir hukdis) + snapshot sync hanya di approval final (WS-1 MAKE-008, `tests/Kepegawaian/Riwayat/SnapshotApprovalFinalTest.php`). Butir WS-2 cascade NIP + rollback: `tests/Kepegawaian/NipCascadeTest.php` (MAKE-010) |
 
 Paket lintas task: S0-A kontrak backend (MAKE-002, bagian di bawah), S0-B fondasi frontend (MAKE-003, WS-2), WS-1 M1 SnapshotSync + RiwayatEngine (MAKE-004), WS-2 M1 PegawaiScope + B-18 (MAKE-009, bagian di bawah).
+
+## WS-2 M2–M6 — MAKE-010..014 (biodata, NIP, pegawai, jabatan/struktur, Konket, LKH, B-20 penutup)
+
+Satu branch per milestone dari `origin/main`, tanpa migration (kebutuhan skema dicatat untuk DBV: penanda wajib ganti
+password + `pegawai_hist.glr_*` = DBV-020). Keputusan bisnis user dicatat [K]/[V2] di README `Controllers/Api/Kepegawaian`
+dan `Libraries/Kepegawaian`.
+
+- **M2 MAKE-010:** B-06 koreksi NIP (cascade + akun), B-03 biodata dua jalur, backend dasar B-20.
+- **M3 MAKE-011:** B-04 approval biodata, B-05 tambah/hapus pegawai (**hapus fisik ikut legacy** — keputusan user; bukan
+  soft delete status 10 seperti kontrak awal), status pegawai 1↔2 (akun role 2 dinonaktifkan).
+- **M4 MAKE-012:** B-07 jabatan (engine) + Plt/Plh, B-19 struktur organisasi templat legacy.
+- **M5 MAKE-013:** B-13 Konket, B-12b LKH, pembungkus PDF TCPDF (ADR-033), SO per bulan + PDF, tanda terima Karpeg/Karis,
+  sub rumpun jabatan (isian mentah MAKE-019).
+- **M6 MAKE-014 (B-20 penutup):**
+  - `ACTIVE_PHASE` = 3 (`nav.config.ts`), spec menu per role; Konket untuk role 4/5 lihat saja; menu "Pengajuan Data Umum"
+    (role 1/3).
+  - Daftar Pegawai: panel filter (status bawaan Aktif ikut legacy, unit → satker, jenis pegawai, urutan; disembunyikan
+    role 8 sesuai WS2 §3.4.2 #12), pencarian lanjutan `pegawai/pencarian*` (port advsearch: 13 jenis riwayat, data
+    terakhir / seluruh riwayat, operator legacy, AND/OR; whitelist atribut & operator, parameter terikat, status pegawai 1,
+    [V2] lingkup role 3), ekspor `GET pegawai/export` / `POST pegawai/pencarian/export` CSV (UTF-8 BOM) / XLSX minimal
+    (ZipArchive), kolom tampil, NIP teks, escape formula.
+  - Detail Pegawai: Cetak DRH PDF `GET pegawai/{nip}/drh` (bagian A–L legacy; hak UL_ALL: 2/6/7 sendiri, lainnya lingkup;
+    PDF saja [V2], tanpa DOCX/ZIP generator), Arsip Kepegawaian (arsip Data Umum kode 38 + Arsip Status kode 37 lewat
+    endpoint lampiran, `id_entri` = NIP), tab LKH (`LkhService::descriptorTab`), pemilik melihat perubahan pengajuannya.
+  - LKH: rekap LKH bawahan per bulan `lkh/rekap*` (legacy list_rekap; bawahan per struktur + LKH ber-`nip_atasan`
+    pemanggil).
+  - [K] data sensitif detail pegawai (NIK, NPWP, BPJS, TASPEN, HP, kerabat) tampil penuh untuk role 4/5/8 (legacy
+    `Employee::detail` tanpa penyamaran; keputusan user Q3).
+  - Belum: Cetak Data Umum (legacy `print_du`) — tombol disembunyikan; 90 kolom legacy Daftar Pegawai (12 kolom v2).
+- **DoD M6:** B-20 penutup tersambung, `ACTIVE_PHASE` = 3; integrasi tab: semua jenis engine WS-1 (MAKE-004..008 di
+  `main`) + LKH. Test: `PegawaiPencarianEksporTest`, `DrhPegawaiTest`, `ArsipDataUmumTest`, `LkhTest` (rekap),
+  `PegawaiEndpointTest` (tab LKH); Vitest nav/DaftarPegawai/Detail/AntreanBiodata/VerifikasiLkh.
 
 ## WS-2 M1 — MAKE-009 (PegawaiScope nyata + B-18 Lampiran)
 
@@ -89,7 +121,8 @@ ditemukan" sampai Definisi pertama masuk. Rincian: `app/Libraries/Kepegawaian/RE
 
 - **DBV-012/DBV-013 (B-01/B-02)** — di `main` lewat PR #20 (`957729f`, perbaikan `96fcca2`); dokumen
   `backend/docs/db-review/B-01-B-02-pegawai-riwayat-schema.md`.
-- **DBV-019 (lanjutan DBV-012/013)** — PR #23, branch `dbv-019/fk-g02-pegawai`, ⏳ menunggu review DB Validator: 55 FK
+- **DBV-019 (lanjutan DBV-012/013)** — PR #24 (draf PR #23 ditutup), branch `dbv-019/fk-g02-pegawai`, ✅ disetujui DB
+  Validator 07-10-2026, di `main` 13-10-2026 (`191efec`): 55 FK
   snapshot/riwayat → master G-02, `jabatan_koordinasi`, `rumpun_jabatan` (migration `2026-10-07-100000`/`100100`, RESTRICT,
   pra-cek nilai yatim fail-closed); 2 FK masuk `pengguna.nip`/`faq_rate.nip` → `pegawai.nip` ikut diajukan tetapi tetap
   ditahan (`app/Database/MigrationsDitahan/`) sampai `pegawai` diimpor dan validasi NIP 422 di Manajemen Akun ada
