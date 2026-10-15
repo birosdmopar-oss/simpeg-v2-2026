@@ -193,6 +193,31 @@ describe('MAKE-018 (b) optionsFilter jamak dengan syarat when atas atribut opsi'
   })
 })
 
+describe('CR-049 D-F4: isian berjenjang dikosongkan tanpa galat dini', () => {
+  it('memilih induk tidak memunculkan "wajib" pada turunan sebelum Simpan', async () => {
+    options.mockImplementation(async (entity: string, parent?: string | null) => {
+      if (entity === 'provinsi') return [opsi('31', 'DKI Jakarta')]
+      if (entity === 'kabupaten-kota') return parent === '31' ? [opsi('3171', 'Jakarta Selatan', '31')] : []
+      return parent ? [opsi(`${parent}01`, 'Kec', parent)] : []
+    })
+    const fields: FieldDef[] = [
+      R('id_provinsi', 'Provinsi', 'provinsi', { required: true }),
+      R('id_kabupaten_kota', 'Kabupaten/Kota', 'kabupaten-kota', { required: true, dependsOn: 'id_provinsi' }),
+      R('id_kecamatan', 'Kecamatan', 'kecamatan', { required: true, dependsOn: 'id_kabupaten_kota' }),
+    ]
+    await mountForm(fields)
+    await pilih('id_provinsi', '31')
+    await pilih('id_kabupaten_kota', '3171')
+    await pilih('id_provinsi', '31')
+
+    expect(document.body.textContent, document.body.textContent ?? '').not.toContain('wajib')
+    expect(document.body.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0)
+
+    await kirim()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('wajib'))
+  })
+})
+
 describe('MAKE-018 (c) optionsSource path API kustom', () => {
   const fields: FieldDef[] = [
     R('id_satker', 'Satuan Kerja', 'satker'),

@@ -79,7 +79,7 @@ const emit = defineEmits<{ submit: [values: Record<string, string>, berkas: Berk
 
 const blank = (): Record<string, string> => Object.fromEntries(props.fields.map((f) => [f.name, props.initial[f.name] ?? '']))
 
-const { errors, values, handleSubmit, resetForm, defineField, setFieldError } = useForm<Record<string, string>>({
+const { errors, values, handleSubmit, resetForm, defineField, setFieldError, setFieldValue } = useForm<Record<string, string>>({
   validationSchema: toTypedSchema(buildRiwayatSchema(props.fields)),
   initialValues: blank(),
 })
@@ -169,28 +169,37 @@ const disentuh = new Set<string>()
  * Sesudah pengguna mengubah isian $name: isian hitung ber-`resetOn` pemicu itu dikosongkan (dihitung ulang server), dan
  * isian ref ber-`optionsFilter` dari isian itu dimuat ulang lalu dikosongkan.
  */
+/**
+ * Kosongkan isian turunan TANPA validasi (CR-049 D-F4): galat "wajib diisi" turunan baru tampil saat Simpan, bukan saat
+ * isian induk dipilih.
+ */
+function kosongkan(name: string): void {
+  if (models[name]) {
+    setFieldValue(name, '', false)
+    setFieldError(name, undefined)
+  }
+  if (name in jamak) jamak[name] = []
+}
+
 function onEdited(name: string): void {
   disentuh.add(name)
   for (const g of props.fields) {
-    const model = models[g.name]
-    if (model && g.resetOn?.includes(name)) model.value = ''
+    if (g.resetOn?.includes(name)) kosongkan(g.name)
   }
   // Dikosongkan sinkron sebelum opsi baru dimuat (respons lama tidak menimpa — token per isian di riwayatCascade).
-  for (const n of refs.pemicu(name, values as Record<string, string>)) {
-    const model = models[n]
-    if (model) model.value = ''
-    if (n in jamak) jamak[n] = []
-  }
+  for (const n of refs.pemicu(name, values as Record<string, string>)) kosongkan(n)
 }
 
 async function onRefChange(f: FieldDef, value: string): Promise<void> {
-  const model = models[f.name]
-  if (model) model.value = value
+  // Tanpa validasi skema saat memilih (validasi skema form ikut menandai isian lain); galat isian ini dibersihkan bila
+  // terisi, sisanya diperiksa saat Simpan (CR-049 D-F4).
+  if (models[f.name]) {
+    setFieldValue(f.name, value, false)
+    if (value !== '') setFieldError(f.name, undefined)
+  }
   onEdited(f.name)
   for (const name of await refs.select(f.name, value)) {
-    const turunan = models[name]
-    if (turunan) turunan.value = ''
-    if (name in jamak) jamak[name] = []
+    kosongkan(name)
     onEdited(name)
   }
 }

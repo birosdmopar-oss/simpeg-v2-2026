@@ -15,7 +15,7 @@
  * (bawaan Disetujui, sama dengan form legacy) dan `reason_note` yang wajib bila memilih Ditolak; role lain tidak
  * mengirim status (server menghitungnya).
  */
-import { FileSearch, Plus } from 'lucide-vue-next'
+import { ChevronDown, ChevronsUpDown, ChevronUp, FileSearch, Plus } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -150,7 +150,31 @@ const filtered = computed(() => {
   if (!needle) return rows.value
   return rows.value.filter((r) => props.config.columns.some((c) => cell(r, c).toLowerCase().includes(needle)))
 })
-const paged = computed(() => filtered.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+/** Urutan klik header (CR-049 D-F7): null = urutan server; klik kolom sama membalik arah. */
+const urut = ref<{ key: string; arah: 'ascending' | 'descending' } | null>(null)
+
+function urutkan(col: ColumnDef): void {
+  urut.value = urut.value?.key === col.key && urut.value.arah === 'ascending' ? { key: col.key, arah: 'descending' } : { key: col.key, arah: 'ascending' }
+  page.value = 1
+}
+
+const ariaSort = (col: ColumnDef): 'ascending' | 'descending' | 'none' => (urut.value?.key === col.key ? urut.value.arah : 'none')
+
+const sorted = computed(() => {
+  const u = urut.value
+  const col = u ? props.config.columns.find((c) => c.key === u.key) : undefined
+  if (!u || !col) return filtered.value
+  // Tanggal dibandingkan dari nilai mentah (ISO); selain itu teks tampilan (angka dibandingkan sebagai angka). Kosong di akhir.
+  const kunci = (r: RiwayatRow): string => (col.format === 'date' ? String(r[col.key] ?? '') : cell(r, col) === '—' ? '' : cell(r, col))
+  const arah = u.arah === 'ascending' ? 1 : -1
+  return [...filtered.value].sort((a, b) => {
+    const ka = kunci(a)
+    const kb = kunci(b)
+    if (ka === '' || kb === '') return ka === kb ? 0 : ka === '' ? 1 : -1
+    return ka.localeCompare(kb, 'id', { numeric: true, sensitivity: 'base' }) * arah
+  })
+})
+const paged = computed(() => sorted.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
 
 function cell(row: RiwayatRow, col: ColumnDef): string {
   const raw = row[col.key]
@@ -338,7 +362,19 @@ const colspan = computed(() => props.config.columns.length + 1 + (hasActions.val
           <table class="w-full min-w-[40rem] border-collapse text-left text-body1" data-testid="riwayat-table">
             <thead>
               <tr class="border-y border-slate-200 text-body2 font-semibold text-slate-900">
-                <th v-for="col in config.columns" :key="col.key" scope="col" class="px-5 py-3">{{ col.label }}</th>
+                <th v-for="col in config.columns" :key="col.key" scope="col" class="px-5 py-3" :aria-sort="ariaSort(col)">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded hover:text-brand-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary/40"
+                    :data-testid="`riwayat-sort-${col.key}`"
+                    @click="urutkan(col)"
+                  >
+                    {{ col.label }}
+                    <ChevronUp v-if="ariaSort(col) === 'ascending'" class="h-3.5 w-3.5" aria-hidden="true" />
+                    <ChevronDown v-else-if="ariaSort(col) === 'descending'" class="h-3.5 w-3.5" aria-hidden="true" />
+                    <ChevronsUpDown v-else class="h-3.5 w-3.5 text-slate-300" aria-hidden="true" />
+                  </button>
+                </th>
                 <th scope="col" class="px-5 py-3">Status</th>
                 <th v-if="hasActions" scope="col" class="sticky right-0 bg-white px-5 py-3 text-right">Aksi</th>
               </tr>
