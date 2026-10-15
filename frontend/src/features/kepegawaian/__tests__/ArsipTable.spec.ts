@@ -203,6 +203,24 @@ describe('ArsipTable — unggah', () => {
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('ijazah.pdf diunggah.')
   })
 
+  it('CR-049 D-F6: seret-lepas berkas ke area unggah → diunggah, pratinjau tampil selama unggah', async () => {
+    let selesai: (v: unknown) => void = () => undefined
+    svc.upload.mockImplementation(() => new Promise((ok) => (selesai = ok)) as never)
+    const wrapper = await mountTable()
+    const file = new File(['%PDF-1.4'], 'ijazah.pdf', { type: 'application/pdf' })
+    await wrapper.get('[data-testid="arsip-dropzone"]').trigger('drop', { dataTransfer: { files: [file] } })
+    expect(svc.upload).toHaveBeenCalledWith(NIP, TARGET, file, {})
+    expect(wrapper.get('[data-testid="arsip-pratinjau"]').text()).toContain('Mengunggah ijazah.pdf')
+    selesai(lampiran(3))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="arsip-pratinjau"]').exists()).toBe(false)
+
+    // Berkas di luar aturan lewat seret ditolak dengan pesan yang sama.
+    await wrapper.get('[data-testid="arsip-dropzone"]').trigger('drop', { dataTransfer: { files: [new File(['x'], 'foto.png')] } })
+    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis file .png tidak diperbolehkan.')
+    expect(svc.upload).toHaveBeenCalledTimes(1)
+  })
+
   it('jenis atau ukuran di luar aturan ditolak sebelum dikirim', async () => {
     const wrapper = await mountTable()
     await pilihBerkas(wrapper, new File(['x'], 'foto.png', { type: 'image/png' }))
