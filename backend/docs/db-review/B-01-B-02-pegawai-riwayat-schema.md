@@ -596,6 +596,8 @@ memenuhi.
 
 ## 6. Interaksi impor (bahan runbook DBV-014, Tier 2–3)
 
+> Audit yatim FK G-02 (DBV-019) kini ada di runbook impor tunggal DBV-011 2.10 (`DBV-019-audit-yatim-fk-g02.sql`); runbook DBV-014 kelak merujuk ke sana.
+
 1. **Urutan:** master (termasuk G-02 PR #17) → `pegawai` → `pegawai_hist` (hanya pengajuan pending `flag_update = 1`,
    Mapping Tier 3) → `pegawai_foto` → `riwayat_*`/`absen_ijin`/`document_attachment` → snapshot (disalin apa adanya dari
    legacy, bukan diturunkan ulang) → `131000` (pra-cek orphan) → FK G-02 → FK masuk `pengguna`/`faq_rate`.

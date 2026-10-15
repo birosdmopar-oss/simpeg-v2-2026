@@ -3,7 +3,8 @@
 -- =====================================================================================================================
 -- Dokumen langkah: backend/docs/db-review/DBV-011-runbook-impor-master-zona-waktu.md Bagian 2.10 (runbook impor
 -- tunggal). Sumber kueri: backend/docs/db-review/DBV-019-fk-g02-pegawai-schema.md Bagian 6, disalin APA ADANYA
--- (teks kueri tidak diubah; hanya komentar pembagi yang ditambahkan).
+-- (teks kueri tidak diubah; hanya komentar pembagi yang ditambahkan). Bagian 2 memakai COALESCE(SUM(...), 0) agar tabel
+-- anak kosong terbaca 0, bukan NULL (T-1 review DB Validator PR #26, 15-10-2026; DBV-019 Bagian 6 diselaraskan).
 --
 -- Tujuan: membuktikan tidak ada nilai rujukan yatim sebelum FK DBV-019 dipasang/dipakai:
 --   - 55 FK snapshot/riwayat -> master G-02 (`jabatan`, `unit`, `satker`, `group_jabatan`, `sub_group_jabatan`,
@@ -49,16 +50,16 @@ WHERE c.id_jabatan IS NOT NULL
 -- Bagian 2 — WAJIB_0. Ringkasan per tabel anak (satu pemindaian per tabel), contoh `pegawai_plh` (10 FK).
 -- ---------------------------------------------------------------------------------------------------------------------
 SELECT
-  SUM(c.id_jabatan               IS NOT NULL AND j.id_jabatan            IS NULL) AS fk_pegawai_plh_ibfk_02,
-  SUM(c.id_jabatan_koord         IS NOT NULL AND k.id_jabatan_koordinasi IS NULL) AS fk_pegawai_plh_ibfk_03,
-  SUM(c.id_group_jabatan         IS NOT NULL AND g.id_group_jabatan      IS NULL) AS fk_pegawai_plh_ibfk_04,
-  SUM(c.id_sub_group_jabatan     IS NOT NULL AND s.id_sub_group_jabatan  IS NULL) AS fk_pegawai_plh_ibfk_05,
-  SUM(c.id_unit                  IS NOT NULL AND u.id_unit               IS NULL) AS fk_pegawai_plh_ibfk_06,
-  SUM(c.id_satker                IS NOT NULL AND t.id_satker             IS NULL) AS fk_pegawai_plh_ibfk_07,
-  SUM(c.id_group_jabatan_plh     IS NOT NULL AND g2.id_group_jabatan     IS NULL) AS fk_pegawai_plh_ibfk_08,
-  SUM(c.id_sub_group_jabatan_plh IS NOT NULL AND s2.id_sub_group_jabatan IS NULL) AS fk_pegawai_plh_ibfk_09,
-  SUM(c.id_unit_plh              IS NOT NULL AND u2.id_unit              IS NULL) AS fk_pegawai_plh_ibfk_10,
-  SUM(c.id_satker_plh            IS NOT NULL AND t2.id_satker            IS NULL) AS fk_pegawai_plh_ibfk_11
+  COALESCE(SUM(c.id_jabatan               IS NOT NULL AND j.id_jabatan            IS NULL), 0) AS fk_pegawai_plh_ibfk_02,
+  COALESCE(SUM(c.id_jabatan_koord         IS NOT NULL AND k.id_jabatan_koordinasi IS NULL), 0) AS fk_pegawai_plh_ibfk_03,
+  COALESCE(SUM(c.id_group_jabatan         IS NOT NULL AND g.id_group_jabatan      IS NULL), 0) AS fk_pegawai_plh_ibfk_04,
+  COALESCE(SUM(c.id_sub_group_jabatan     IS NOT NULL AND s.id_sub_group_jabatan  IS NULL), 0) AS fk_pegawai_plh_ibfk_05,
+  COALESCE(SUM(c.id_unit                  IS NOT NULL AND u.id_unit               IS NULL), 0) AS fk_pegawai_plh_ibfk_06,
+  COALESCE(SUM(c.id_satker                IS NOT NULL AND t.id_satker             IS NULL), 0) AS fk_pegawai_plh_ibfk_07,
+  COALESCE(SUM(c.id_group_jabatan_plh     IS NOT NULL AND g2.id_group_jabatan     IS NULL), 0) AS fk_pegawai_plh_ibfk_08,
+  COALESCE(SUM(c.id_sub_group_jabatan_plh IS NOT NULL AND s2.id_sub_group_jabatan IS NULL), 0) AS fk_pegawai_plh_ibfk_09,
+  COALESCE(SUM(c.id_unit_plh              IS NOT NULL AND u2.id_unit              IS NULL), 0) AS fk_pegawai_plh_ibfk_10,
+  COALESCE(SUM(c.id_satker_plh            IS NOT NULL AND t2.id_satker            IS NULL), 0) AS fk_pegawai_plh_ibfk_11
 FROM pegawai_plh c
 LEFT JOIN jabatan            j  ON j.id_jabatan            = c.id_jabatan
 LEFT JOIN jabatan_koordinasi k  ON k.id_jabatan_koordinasi = c.id_jabatan_koord
