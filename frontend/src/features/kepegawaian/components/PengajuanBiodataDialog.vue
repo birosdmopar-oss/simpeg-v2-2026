@@ -20,7 +20,9 @@ import type { PengajuanBiodataDetail, PerubahanBiodata } from '../types'
 
 import PerubahanBiodataTabel from './PerubahanBiodataTabel.vue'
 
-const props = defineProps<{ open: boolean; mode: ApprovalAksi; idHist: number; nama: string }>()
+/** `idHist` dinormalkan service; tetap diterima sebagai string/angka (MySQLi mengirim INT sebagai string, CR-049). */
+const props = defineProps<{ open: boolean; mode: ApprovalAksi; idHist: number | string; nama: string }>()
+const idHist = computed(() => Number(props.idHist))
 const emit = defineEmits<{ 'update:open': [value: boolean]; processed: [detail: PengajuanBiodataDetail] }>()
 
 const detail = ref<PengajuanBiodataDetail | null>(null)
@@ -44,12 +46,12 @@ watch(
     error.value = ''
     memuat.value = true
     try {
-      const hasil = await pegawaiService.pengajuan(props.idHist)
+      const hasil = await pegawaiService.pengajuan(idHist.value)
       if (saya !== token) return
       detail.value = hasil
       if (hasil.pengajuan.ada_foto) {
         try {
-          const blob = await pegawaiService.fotoPengajuan(props.idHist)
+          const blob = await pegawaiService.fotoPengajuan(idHist.value)
           if (saya === token) fotoUrl.value = URL.createObjectURL(blob)
         } catch {
           // Foto tidak tersedia → tanpa pratinjau.
@@ -79,7 +81,7 @@ async function onConfirm(payload: ApprovalPayload): Promise<void> {
   busy.value = true
   error.value = ''
   try {
-    const hasil = await pegawaiService.prosesPengajuan(props.idHist, payload)
+    const hasil = await pegawaiService.prosesPengajuan(idHist.value, payload)
     emit('processed', hasil)
     emit('update:open', false)
   } catch (e) {
