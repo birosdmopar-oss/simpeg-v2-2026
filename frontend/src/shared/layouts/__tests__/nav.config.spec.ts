@@ -99,7 +99,7 @@ describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
 describe('buildNav — Kelola Data (profil sendiri, CR-049 ISSUE-034)', () => {
   const NIP = '199001012015011001'
 
-  it.each([Role.PEGAWAI, Role.ADMIN_VIEW_ESELON1, Role.MENTERI, Role.PTT, Role.PPPK, Role.PIMPINAN])(
+  it.each([Role.PEGAWAI, Role.PTT, Role.PPPK])(
     'role %i ber-NIP: "Kelola Data" → Detail Pegawai NIP akun, paling atas di Kepegawaian',
     (role) => {
       const kepeg = buildNav(role, ACTIVE_PHASE, NIP).find((g) => g.key === 'kepegawaian')
@@ -107,9 +107,9 @@ describe('buildNav — Kelola Data (profil sendiri, CR-049 ISSUE-034)', () => {
     },
   )
 
-  it('tanpa NIP akun, atau role 1/3, tidak ada "Kelola Data"', () => {
+  it('tanpa NIP akun, atau role 1/3/4/5/8 (ikut legacy), tidak ada "Kelola Data"', () => {
     expect(labels(Role.PEGAWAI)).not.toContain('Kelola Data')
-    for (const role of [Role.SUPER_ADMIN, Role.ADMIN_SATKER]) {
+    for (const role of [Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI, Role.PIMPINAN]) {
       expect(buildNav(role, ACTIVE_PHASE, NIP).flatMap((g) => g.items.map((i) => i.label))).not.toContain('Kelola Data')
     }
   })

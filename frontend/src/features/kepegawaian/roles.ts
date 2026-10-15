@@ -43,18 +43,11 @@ export const KARPEG_KARIS_ROLES: readonly RoleCode[] = [
 ]
 
 /**
- * "Kelola Data" = profil/riwayat pegawai milik akun (CR-049 ISSUE-034). Legacy sidebar pegawai/PTT/PPPK
- * (`views/template/sidebar_menu/pegawai.php`) menautkan `hr/employee/edit` (data sendiri); keputusan user 15-10-2026
- * memperluas ke akun ber-NIP role 4/5/8. Tampil hanya bila akun punya NIP.
+ * "Kelola Data" = profil/riwayat pegawai milik akun (CR-049 ISSUE-034). [K] legacy sidebar pegawai/ptt/pppk
+ * (`views/template/sidebar_menu/{pegawai,ptt,pppk}.php` → `hr/employee/edit`, data sendiri); role 4/5/8 membuka profil
+ * lewat Daftar Pegawai (keputusan user 15-10-2026). Tampil hanya bila akun punya NIP.
  */
-export const DATA_SAYA_ROLES: readonly RoleCode[] = [
-  Role.PEGAWAI,
-  Role.ADMIN_VIEW_ESELON1,
-  Role.MENTERI,
-  Role.PTT,
-  Role.PPPK,
-  Role.PIMPINAN,
-]
+export const DATA_SAYA_ROLES: readonly RoleCode[] = [Role.PEGAWAI, Role.PTT, Role.PPPK]
 
 /** Antrean pengajuan perubahan Data Umum (B-04 `biodata/pengajuan` = role 1, 3; legacy process userAuth ['1', '3']). */
 export const BIODATA_PROSES_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]
