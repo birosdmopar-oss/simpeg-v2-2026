@@ -552,7 +552,13 @@ final class StrukturService implements StrukturServiceInterface
     {
         $hariIni  = TanggalBisnis::hariIni();
         $sekarang = substr($hariIni, 0, 7);
-        $bulan    = is_string($bulan) && trim($bulan) !== '' ? trim($bulan) : $sekarang;
+
+        // CR-050 (QA C-F1): bentuk bukan teks (mis. `bulan[]=…`) → 422, bukan diam-diam bulan berjalan (pola CR-019).
+        if ($bulan !== null && ! is_string($bulan)) {
+            throw ValidationException::forField('bulan', 'Data struktur organisasi untuk bulan tersebut tidak tersedia.');
+        }
+
+        $bulan = is_string($bulan) && trim($bulan) !== '' ? trim($bulan) : $sekarang;
 
         if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $bulan) !== 1 || $bulan < self::BULAN_AWAL || $bulan > $sekarang) {
             throw ValidationException::forField('bulan', 'Data struktur organisasi untuk bulan tersebut tidak tersedia.');

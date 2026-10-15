@@ -177,9 +177,11 @@ final class PegawaiService implements PegawaiServiceInterface
 
         $baris = array_map(fn (array $r): array => $this->barisEkspor($r, $kolom), $rows);
         $nama  = 'daftar_pegawai_' . date('Ymd_His') . '.' . $format;
+        // Kolom identitas (NIP, NIP lama) ditulis sebagai teks Excel di CSV (CR-050 A-F1).
+        $teks = array_keys(array_intersect($header, ['NIP', self::KOLOM_EKSPOR['nip_lama']]));
 
         return [
-            'isi'  => $format === EksporTabel::CSV ? EksporTabel::csv($header, $baris) : EksporTabel::xlsx($header, $baris, 'Daftar Pegawai'),
+            'isi'  => $format === EksporTabel::CSV ? EksporTabel::csv($header, $baris, $teks) : EksporTabel::xlsx($header, $baris, 'Daftar Pegawai'),
             'nama' => $nama,
             'mime' => EksporTabel::MIME[$format],
         ];

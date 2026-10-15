@@ -13,6 +13,12 @@ use ZipArchive;
  * teks (`inlineStr`) sehingga NIP 18 digit tidak berubah menjadi angka ilmiah dan tidak pernah dievaluasi sebagai rumus.
  * CSV: nilai yang (setelah spasi awal) diawali `=`, `+`, `-`, `@`, atau diawali TAB/CR diberi apostrof (cegah CSV/formula
  * injection, OWASP).
+ *
+ * CSV tidak punya tipe sel, jadi kolom IDENTITAS (NIP, NIP lama; CR-050 temuan QA A-F1) ditulis sebagai rumus teks Excel
+ * `="<nilai>"` agar Excel/LibreOffice membacanya sebagai teks (NIP 18 digit tidak menjadi angka ilmiah, nol depan utuh).
+ * Hanya untuk nilai berkarakter aman `[0-9A-Za-z./ -]` (tanpa `"`, tidak bisa keluar dari literal string → tidak bisa
+ * menyisipkan rumus lain); nilai lain di kolom itu tetap lewat aman(). Pembaca CSV non-Excel melihat `="…"`; XLSX
+ * (bawaan UI) tetap sel teks murni.
  */
 final class EksporTabel
 {
@@ -33,10 +39,19 @@ final class EksporTabel
     }
 
     /**
+     * Nilai sel CSV kolom identitas: `="<nilai>"` bila berkarakter aman (lihat docblock kelas), selain itu aman().
+     */
+    public static function teks(string $nilai): string
+    {
+        return preg_match('/^[0-9A-Za-z.\/ -]+$/', $nilai) === 1 ? '="' . $nilai . '"' : self::aman($nilai);
+    }
+
+    /**
      * @param list<string>       $header
      * @param list<list<string>> $baris
+     * @param list<int>          $kolomTeks indeks kolom identitas (NIP dsb.) yang ditulis sebagai teks Excel — teks()
      */
-    public static function csv(array $header, array $baris): string
+    public static function csv(array $header, array $baris, array $kolomTeks = []): string
     {
         $f = fopen('php://temp', 'w+b');
 
@@ -46,8 +61,16 @@ final class EksporTabel
 
         fwrite($f, "\xEF\xBB\xBF");
 
-        foreach ([$header, ...$baris] as $r) {
-            fputcsv($f, array_map(self::aman(...), $r), ',', '"', '');
+        fputcsv($f, array_map(self::aman(...), $header), ',', '"', '');
+
+        foreach ($baris as $r) {
+            $sel = [];
+
+            foreach ($r as $i => $v) {
+                $sel[] = in_array($i, $kolomTeks, true) ? self::teks($v) : self::aman($v);
+            }
+
+            fputcsv($f, $sel, ',', '"', '');
         }
 
         rewind($f);

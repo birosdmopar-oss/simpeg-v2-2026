@@ -180,7 +180,10 @@ final class PegawaiPencarianEksporTest extends DatabaseTestCase
     public function testEksporCsvKolomTampilLingkupDanEscapeFormula(): void
     {
         [, , $super] = $this->aktor(Role::SUPER_ADMIN);
-        $res         = $this->asUser($super)->get('api/v1/pegawai/export?format=csv&kolom=jabatan,nip_lama&search=Budi');
+        // CR-050 A-F1: NIP lama ber-nol depan dan nilai tidak aman di kolom identitas.
+        $this->db->table('pegawai')->where('nip', $this->dalam)->update(['nip_lama' => '012345']);
+        $this->db->table('pegawai')->where('nip', $this->luar)->update(['nip_lama' => '=1+2"']);
+        $res = $this->asUser($super)->get('api/v1/pegawai/export?format=csv&kolom=jabatan,nip_lama&search=Budi');
 
         $res->assertStatus(200);
         $res->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
@@ -192,7 +195,14 @@ final class PegawaiPencarianEksporTest extends DatabaseTestCase
         $nama = array_column(array_slice($baris, 1), 0);
         $this->assertContains('Budi Pencarian, S.Kom.', $nama);
         $this->assertContains("'=HYPERLINK(\"x\") Budi Luar", $nama, 'formula diberi apostrof');
-        $this->assertContains($this->dalam, array_column(array_slice($baris, 1), 1));
+        // Kolom identitas = rumus teks Excel `="…"` (NIP 18 digit/nol depan tidak berubah angka); nilai tidak aman tetap
+        // lewat escape formula (apostrof), bukan dibungkus rumus.
+        $this->assertContains('="' . $this->dalam . '"', array_column(array_slice($baris, 1), 1));
+        $this->assertStringContainsString('"=""' . $this->dalam . '"""', $csv, 'mentah CSV: kutip ganda di-escape');
+        $nipLama = array_column(array_slice($baris, 1), 3);
+        $this->assertContains('="012345"', $nipLama);
+        $this->assertContains("'=1+2\"", $nipLama);
+        $this->assertNotContains('="Budi Pencarian, S.Kom."', $nama, 'kolom bukan identitas tidak dibungkus');
 
         // Role 3: hanya lingkupnya.
         [, , $admin3] = $this->aktor(Role::ADMIN_SATKER, [], $this->satker);

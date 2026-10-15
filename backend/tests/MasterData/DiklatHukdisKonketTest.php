@@ -417,10 +417,10 @@ final class DiklatHukdisKonketTest extends DatabaseTestCase
 
         // Unik global (UNIQUE uq_jenis_konket_old_id): 422 menyebut entri pemiliknya, bukan 1062/500.
         $this->assertSame(
-            ['Kode Kategori "8" sudah dipakai Jenis Konfirmasi Ketidakhadiran "Dinas" (kode 2).'],
+            ['Kode Kategori "8" sudah dipakai Jenis Konfirmasi Ketidakhadiran "Dinas" (kode 3).'],
             $this->rejected('POST', $base, $valid + ['old_id' => '8'], 'old_id'),
         );
-        $this->delete("{$base}/6")->assertStatus(200);
+        $this->delete("{$base}/2")->assertStatus(200);
         $this->assertStringContainsString('sudah dihapus', $this->rejected('POST', $base, $valid + ['old_id' => '5'], 'old_id')[0]);
         $this->sendJson('PATCH', "{$base}/1/status", ['status' => '2'])->assertStatus(200);
         $this->assertStringContainsString('tidak aktif', $this->rejected('POST', $base, $valid + ['old_id' => '1'], 'old_id')[0]);

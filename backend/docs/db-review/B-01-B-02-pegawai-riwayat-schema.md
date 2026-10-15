@@ -5,16 +5,20 @@
 > dua key review: B-01 (DBV-012) dan B-02 (DBV-013). Dikerjakan sebagai persiapan Fase 3 (pengecualian urutan fase
 > disetujui user 01-10-2026).
 
-**Key review:** `DBV-012` (B-01, Trello QASMTASK-043) dan `DBV-013` (B-02, QASMTASK-044). **Belum ada PR dan belum
-di-push.** Draf ada di branch lokal `dbv-012/b01-b02-pegawai-riwayat-draf` (sudah di-merge dengan `origin/main`
+**Key review:** `DBV-012` (B-01, Trello QASMTASK-043) dan `DBV-013` (B-02, QASMTASK-044). PR #20 (branch
+`dbv-012/b01-b02-pegawai-riwayat-draf`, di-merge ke `main` 06-10-2026, merge commit `957729f`). Catatan sejarah draf:
+draf awal ada di branch lokal `dbv-012/b01-b02-pegawai-riwayat-draf` (sudah di-merge dengan `origin/main`
 01-10-2026). Migration yang **ditahan** (FK masuk `pengguna`/`faq_rate`, FK ke tabel G-02) tidak ikut branch ini;
 drafnya di branch lokal `dbv-012/fk-ditahan` (Bagian 7). Usulan alur: `[CR]` + `[DBV]` (PR; DB Validator
 review/approve, reviewer CR yang merge), karena PR juga mengubah test yang sudah ada di `main` (`AGENTS.md` bagian 2).
 Urutan merge yang direncanakan: DBV-008 (G-02, PR #17) ↔ DBV-012 → DBV-013 → migration FK yang ditahan.
 
-**Status:** ⏳ **MENUNGGU REVIEW DB VALIDATOR.** Semua pemeriksaan yang dicatat di sini adalah **pra-review internal
-sisi CR**; belum ada butir yang direview atau disetujui DB Validator. Migration B-01/B-02 **JANGAN** dijalankan di
-Dev/Production sebelum disetujui DBV-012/DBV-013.
+**Status:** ✅ **DISETUJUI DB VALIDATOR (DBV-012/DBV-013, jjoseph48, komentar PR #20 06-10-2026
+https://github.com/birosdmopar-oss/simpeg-v2-2026/pull/20#issuecomment-6009037383)** — "Skema layak disetujui",
+verifikasi MariaDB 10.4 lolos; di-merge ke `main` 06-10-2026 (`957729f`). Keputusan Bagian 8 #1–#16 dicatat per butir di
+tabelnya (#13 ditunda ke B-12/Fase 5). FK yang ditahan (#12, #14) dilanjutkan unit DBV-019 (PR #24, di `main` 13-10-2026,
+`191efec`, dokumen `DBV-019-fk-g02-pegawai-schema.md`). Isi Bagian 9 dst. adalah verifikasi developer sebelum review
+(pra-review internal sisi CR). Status dokumen diperbarui CR-050 (temuan QA A-F2, 15-10-2026).
 
 **Rujukan:** `03-Kepegawaian.md` B-01 (:13-22), B-02 (:24-32), B-03/B-04 (DoD `pegawai_hist`), B-18 (lampiran);
 `Mapping_Migrasi_Data_SIMPEG_v2.docx` Tier 2 & 3; ADR-006 / `app/Models/BaseSnapshotModel.php`; dokumen DBV di `main`
@@ -669,22 +673,22 @@ lanjutan **DBV-019** (PR #23) — `AddFkG02Pegawai` (15 FK) dan `AddFkG02Riwayat
 
 | # | Pertanyaan | Usulan (pra-review CR) | Keputusan |
 |---|---|---|---|
-| 1 | Setujui skema [K] D1 + deviasi [V2] (Bagian 2-3) untuk B-01 (`120000`, `120100`) dan B-02 (`130000`..`131000`) | Setujui setelah verifikasi MariaDB 10.4 (9.4) | ⏳ |
-| 2 | Domain CHECK status riwayat (2.2.1): 0/1/2/3/10 untuk 11 tabel yang form admin legacy-nya menulis 3, 0/1/2/10 untuk 7 tabel; LKH 0/1/2/3/10 | Setujui; putuskan bersama hitungan `status` produksi (Bagian 6 #3). Alternatif: tanpa CHECK (persis D1) | ⏳ |
-| 3 | Semua FK RESTRICT/RESTRICT (V1), termasuk `detail_anak` dan `document_attachment` (D1 CASCADE) | Setujui (K1); service menghapus anak/lampiran eksplisit dalam satu transaksi | ⏳ |
-| 4 | **Tipe PK master `main` vs D1** (2.4): `jenjang_pendidikan`, `jenis_hukdis`, `tingkat_hukdis`, `tanda_jasa` INT di `main`, TINYINT di D1 | (a, draf ini) kolom anak INT (V5), master tidak diubah; (b) migration ALTER master → TINYINT (DBV baru, K3) lalu kolom anak kembali [K] TINYINT. Usulan (a): lossless, tanpa mengubah tabel yang sudah disetujui | ⏳ |
-| 5 | NIP VARCHAR(50) → VARCHAR(30) di 6 kolom (V4), termasuk `ignore_konv_ak.nip` | Setujui; audit panjang sebelum impor | ⏳ |
-| 6 | `pegawai_ak_siasn` (D1:2742-2779, snapshot `riwayat_ak_siasn` yang diisi trigger) masuk B-01 | Setujui masuk (draf ini); alternatif tetap di luar cakupan dan tidak diimpor | ⏳ |
-| 7 | Trigger legacy tidak dibawa; pemetaan Bagian 5 menjadi aturan aplikasi | Setujui; aturan 5.1 menjadi acuan B-03/B-07..B-17 dan rekonsiliasi impor | ⏳ |
-| 8 | `riwayat_pendidikan.status` INT NULL [K] (beda dari riwayat lain TINYINT NOT NULL) | Pertahankan [K]; seragamkan lewat ALTER setelah audit NULL bila DBV menghendaki | ⏳ |
-| 9 | `document_attachment` tanpa kolom status: hapus keras + `audit_logs` (pengganti `da_deleted`) | Setujui; alternatif tambah kolom status [V2] | ⏳ |
-| 10 | `riwayat_hukdis.status` COMMENT [K] "1: Active, 10: Deleted", DEFAULT 0; CHECK 0/1/2/3/10 | Setujui; service B-14 menulis 1 eksplisit | ⏳ |
-| 11 | Lookup `jenis_rwy` [V2] + FK `document_attachment.id_riwayat` (seed 21 baris termasuk 0) | Setujui; audit kode di luar seed (mis. 33) sebelum impor | ⏳ |
-| 12 | FK G-02 (45) ditahan sampai PR #17 merge; 10 FK ke `jabatan_koordinasi`/`rumpun_jabatan` menunggu master baru (D1 punya kedua tabel) | Setujui; key review migration FK G-02 = DBV-012/013 yang sama atau key baru (putuskan user) | ⏳ |
-| 13 | Pemilik `aa_lkh`/`queue_aa_lkh` | Diputuskan bersama B-12/Fase 5 | ⏳ |
-| 14 | FK masuk `pengguna.nip`/`faq_rate.nip` (`120200`) tetap ditahan | Setujui (prasyarat Bagian 7) | ⏳ |
-| 15 | Alur PR `[CR]` + `[DBV]`; test lama yang diubah: 3 test master (lepas migration B-01/B-02 sebelum `down()`), schema test B-02 digabung menjadi `RiwayatSchemaTest` | Setujui | ⏳ |
-| 16 | COMMENT kolom = D1 persis (bahasa Inggris/typo legacy) | Setujui (skema = produksi) | ⏳ |
+| 1 | Setujui skema [K] D1 + deviasi [V2] (Bagian 2-3) untuk B-01 (`120000`, `120100`) dan B-02 (`130000`..`131000`) | Setujui setelah verifikasi MariaDB 10.4 (9.4) | ✅ Setuju (verifikasi MariaDB 9.4 lolos) |
+| 2 | Domain CHECK status riwayat (2.2.1): 0/1/2/3/10 untuk 11 tabel yang form admin legacy-nya menulis 3, 0/1/2/10 untuk 7 tabel; LKH 0/1/2/3/10 | Setujui; putuskan bersama hitungan `status` produksi (Bagian 6 #3). Alternatif: tanpa CHECK (persis D1) | ✅ Setuju; syarat: dicocokkan dengan hitungan `status` produksi sebelum impor (Bagian 6 #3) |
+| 3 | Semua FK RESTRICT/RESTRICT (V1), termasuk `detail_anak` dan `document_attachment` (D1 CASCADE) | Setujui (K1); service menghapus anak/lampiran eksplisit dalam satu transaksi | ✅ Setuju; service wajib menghapus anak/lampiran eksplisit dalam satu transaksi (DoD B-03/B-17) |
+| 4 | **Tipe PK master `main` vs D1** (2.4): `jenjang_pendidikan`, `jenis_hukdis`, `tingkat_hukdis`, `tanda_jasa` INT di `main`, TINYINT di D1 | (a, draf ini) kolom anak INT (V5), master tidak diubah; (b) migration ALTER master → TINYINT (DBV baru, K3) lalu kolom anak kembali [K] TINYINT. Usulan (a): lossless, tanpa mengubah tabel yang sudah disetujui | ✅ Setuju opsi (a); master v2 tetap INT (tanpa ALTER ganda) |
+| 5 | NIP VARCHAR(50) → VARCHAR(30) di 6 kolom (V4), termasuk `ignore_konv_ak.nip` | Setujui; audit panjang sebelum impor | ✅ Setuju; audit panjang NIP sebelum impor |
+| 6 | `pegawai_ak_siasn` (D1:2742-2779, snapshot `riwayat_ak_siasn` yang diisi trigger) masuk B-01 | Setujui masuk (draf ini); alternatif tetap di luar cakupan dan tidak diimpor | ✅ Setuju |
+| 7 | Trigger legacy tidak dibawa; pemetaan Bagian 5 menjadi aturan aplikasi | Setujui; aturan 5.1 menjadi acuan B-03/B-07..B-17 dan rekonsiliasi impor | ✅ Setuju |
+| 8 | `riwayat_pendidikan.status` INT NULL [K] (beda dari riwayat lain TINYINT NOT NULL) | Pertahankan [K]; seragamkan lewat ALTER setelah audit NULL bila DBV menghendaki | ✅ Setuju [K]; catatan C-4 (arti NULL ditetapkan di aturan impor) |
+| 9 | `document_attachment` tanpa kolom status: hapus keras + `audit_logs` (pengganti `da_deleted`) | Setujui; alternatif tambah kolom status [V2] | ✅ Setuju (`audit_logs` fail-open disadari) |
+| 10 | `riwayat_hukdis.status` COMMENT [K] "1: Active, 10: Deleted", DEFAULT 0; CHECK 0/1/2/3/10 | Setujui; service B-14 menulis 1 eksplisit | ✅ Setuju; service menulis 1 eksplisit |
+| 11 | Lookup `jenis_rwy` [V2] + FK `document_attachment.id_riwayat` (seed 21 baris termasuk 0) | Setujui; audit kode di luar seed (mis. 33) sebelum impor | ✅ Setuju; audit kode di luar seed sebelum impor |
+| 12 | FK G-02 (45) ditahan sampai PR #17 merge; 10 FK ke `jabatan_koordinasi`/`rumpun_jabatan` menunggu master baru (D1 punya kedua tabel) | Setujui; key review migration FK G-02 = DBV-012/013 yang sama atau key baru (putuskan user) | ✅ Setuju ditahan; dilanjutkan key baru DBV-019 (PR #24, di `main` 13-10-2026) |
+| 13 | Pemilik `aa_lkh`/`queue_aa_lkh` | Diputuskan bersama B-12/Fase 5 | ⏸ Ditunda ke B-12/Fase 5 |
+| 14 | FK masuk `pengguna.nip`/`faq_rate.nip` (`120200`) tetap ditahan | Setujui (prasyarat Bagian 7) | ✅ Setuju tetap ditahan (catatan C-2; isi disetujui di DBV-019 #4) |
+| 15 | Alur PR `[CR]` + `[DBV]`; test lama yang diubah: 3 test master (lepas migration B-01/B-02 sebelum `down()`), schema test B-02 digabung menjadi `RiwayatSchemaTest` | Setujui | ✅ Setuju (regresi 3 test master OK) |
+| 16 | COMMENT kolom = D1 persis (bahasa Inggris/typo legacy) | Setujui (skema = produksi) | ✅ Setuju |
 
 Koreksi setelah approval dilakukan lewat migration ALTER baru, bukan dengan mengedit migration yang sudah di `main`.
 

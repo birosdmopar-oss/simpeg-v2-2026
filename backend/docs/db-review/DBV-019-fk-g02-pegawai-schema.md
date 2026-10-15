@@ -1,12 +1,15 @@
 # DB Validator Review — DBV-019 FK master G-02 dan FK masuk `pengguna`/`faq_rate` → `pegawai` (lanjutan DBV-012/DBV-013)
 
-**Key review:** `DBV-019` — pull request #23, branch `dbv-019/fk-g02-pegawai` (disinkronkan dengan `main` lewat merge,
+**Key review:** `DBV-019` — pull request #24 (menggantikan draf PR #23 yang ditutup tanpa merge), branch `dbv-019/fk-g02-pegawai` (disinkronkan dengan `main` lewat merge,
 tanpa rebase). Alur DBV: DB Validator me-review/approve dan merge (AGENTS.md §2). Rekomendasi key final dan alasannya:
 Bagian 7 #5.
 
-**Status:** ⏳ **MENUNGGU REVIEW DB VALIDATOR.** Kolom **Keputusan** di Bagian 7 masih kosong (⏳); isi Bagian 8 adalah
-verifikasi developer sebelum review (pra-review internal sisi CR), **bukan** hasil review DB Validator. Migration jangan
-dijalankan di Dev/Production sebelum disetujui.
+**Status:** ✅ **DISETUJUI DB VALIDATOR (jjoseph48, komentar PR #24 07-10-2026
+https://github.com/birosdmopar-oss/simpeg-v2-2026/pull/24#issuecomment-6033816301)** — temuan T-1..T-3 pemeriksaan awal
+ditutup, verifikasi MariaDB 10.4 lolos; di-merge ke `main` 13-10-2026 (merge commit `191efec`). Keputusan Bagian 7 #1–#6
+dicatat per butir. Isi Bagian 8 adalah verifikasi developer sebelum review (pra-review internal sisi CR), bukan hasil
+review DB Validator. Migration FK masuk `pengguna`/`faq_rate` tetap ditahan (#4). Status dokumen diperbarui CR-050
+(temuan QA A-F2, 15-10-2026).
 
 **Rujukan:** `B-01-B-02-pegawai-riwayat-schema.md` (DBV-012/013, PR #20; Bagian 4.1, 7, keputusan #3, #12, #14) dan
 catatan review DB Validator PR #20 06-10-2026 (C-2: FK yang ditahan menjadi unit DBV lanjutan; C-3: tipe PK master v2
@@ -287,12 +290,12 @@ jalan bila ada yang > 0.
 
 | # | Pertanyaan | Usulan (pra-review CR) | Keputusan |
 |---|---|---|---|
-| 1 | Setujui 55 FK Bagian 2.1–2.3 (nama, kolom, induk = D1) dengan aksi RESTRICT/RESTRICT (V1), termasuk 3 FK `konv_ak` yang di D1 CASCADE/CASCADE | Setujui (lanjutan keputusan #3 DBV-012/013) | ⏳ |
-| 2 | Timestamp baru `2026-10-07-100000`/`100100` menggantikan draf `129900`/`139900` (Bagian 4 #2) | Setujui | ⏳ |
-| 3 | Pra-cek nilai yatim fail-closed (V2) + aturan normalisasi Bagian 6 sebagai langkah runbook DBV-014 | Setujui | ⏳ |
-| 4 | FK masuk `pengguna.nip`/`faq_rate.nip` (Bagian 2.4): isi FK (nama/kolom/induk D1, RESTRICT) disetujui sekarang, tetapi migration-nya tetap **ditahan** di `app/Database/MigrationsDitahan/` sampai prasyarat Bagian 1.2 #1–#3 terpenuhi; aktivasi = unit DBV+CR lanjutan (validasi NIP 422 + seed/test Auth sebagai pekerjaan MAKE baru + audit Bagian 6 = 0) | Setujui isi + penahanan. Alternatif: (b) aktifkan sekarang dengan timestamp `2026-10-07-100200` — butuh CR kode aplikasi dan penyesuaian banyak test Auth, dan `migrate` di Dev/Production berhenti sampai `pegawai` diimpor; (c) keluarkan dari PR ini (draf hanya di riwayat commit) | ⏳ |
-| 5 | Key & alur: perubahan = 2 migration aktif + 1 migration ditahan + 1 schema test baru + penyesuaian `NipReferenceRegistryTest`, 2 schema test master, 1 trait test support; tanpa kode aplikasi/seed | `[DBV-019]` saja, alur DBV-only (PR, DB Validator merge): semua perubahan adalah skema + test skema. Alternatif `[DBV-019][MAKE-(nomor menyusul)]` bila reviewer kode ingin me-review perubahan test master/test support — preseden keputusan #15 PR #20 | ⏳ |
-| 6 | Jendela eksekusi Production: ALTER = rebuild tabel (Bagian 4 #4), dijalankan saat cutover setelah audit Bagian 6 = 0 | Setujui; masuk runbook DBV-014 | ⏳ |
+| 1 | Setujui 55 FK Bagian 2.1–2.3 (nama, kolom, induk = D1) dengan aksi RESTRICT/RESTRICT (V1), termasuk 3 FK `konv_ak` yang di D1 CASCADE/CASCADE | Setujui (lanjutan keputusan #3 DBV-012/013) | ✅ Setuju; penghapusan induk ditangani service secara eksplisit |
+| 2 | Timestamp baru `2026-10-07-100000`/`100100` menggantikan draf `129900`/`139900` (Bagian 4 #2) | Setujui | ✅ Setuju (jalan sebagai batch tersendiri di atas `main`) |
+| 3 | Pra-cek nilai yatim fail-closed (V2) + aturan normalisasi Bagian 6 sebagai langkah runbook DBV-014 | Setujui | ✅ Setuju; masuk runbook DBV-014 |
+| 4 | FK masuk `pengguna.nip`/`faq_rate.nip` (Bagian 2.4): isi FK (nama/kolom/induk D1, RESTRICT) disetujui sekarang, tetapi migration-nya tetap **ditahan** di `app/Database/MigrationsDitahan/` sampai prasyarat Bagian 1.2 #1–#3 terpenuhi; aktivasi = unit DBV+CR lanjutan (validasi NIP 422 + seed/test Auth sebagai pekerjaan MAKE baru + audit Bagian 6 = 0) | Setujui isi + penahanan. Alternatif: (b) aktifkan sekarang dengan timestamp `2026-10-07-100200` — butuh CR kode aplikasi dan penyesuaian banyak test Auth, dan `migrate` di Dev/Production berhenti sampai `pegawai` diimpor; (c) keluarkan dari PR ini (draf hanya di riwayat commit) | ✅ Setuju isi + penahanan; aktivasi = unit DBV terpisah setelah validasi NIP 422 (catatan 3.3) |
+| 5 | Key & alur: perubahan = 2 migration aktif + 1 migration ditahan + 1 schema test baru + penyesuaian `NipReferenceRegistryTest`, 2 schema test master, 1 trait test support; tanpa kode aplikasi/seed | `[DBV-019]` saja, alur DBV-only (PR, DB Validator merge): semua perubahan adalah skema + test skema. Alternatif `[DBV-019][MAKE-(nomor menyusul)]` bila reviewer kode ingin me-review perubahan test master/test support — preseden keputusan #15 PR #20 | ✅ Setuju `[DBV-019]` (tanpa kode aplikasi) |
+| 6 | Jendela eksekusi Production: ALTER = rebuild tabel (Bagian 4 #4), dijalankan saat cutover setelah audit Bagian 6 = 0 | Setujui; masuk runbook DBV-014 | ✅ Setuju; jendela cutover setelah audit Bagian 6 = 0 (runbook DBV-014) |
 
 Koreksi setelah approval dilakukan lewat migration baru, bukan dengan mengedit migration yang sudah di `main`.
 

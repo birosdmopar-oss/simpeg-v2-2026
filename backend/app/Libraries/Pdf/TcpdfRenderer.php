@@ -77,9 +77,18 @@ final class TcpdfRenderer implements PdfRendererInterface
 
     /**
      * Konstanta TCPDF dibaca sekali saat kelas dimuat: arahkan cache ke WRITEPATH sebelum `new TCPDF`.
+     *
+     * CR-050 (QA B-F2): TCPDF 6.11 memicu `E_USER_DEPRECATED` "TCPDF is deprecated: migrate to tc-lib-pdf" sekali per
+     * proses di konstruktornya, yang ditulis CI4 sebagai WARNING ke log setiap render. Diredam lewat saklar resmi TCPDF
+     * `TCPDF_SILENCE_DEPRECATION` — hanya notice milik TCPDF itu, didefinisikan di sini (sebelum `new TCPDF`), bukan
+     * meredam deprecation lain secara global. Migrasi ke tc-lib-pdf dicatat di ADR-033 (keputusan terpisah).
      */
     private static function siapkanKonfigurasi(): void
     {
+        if (! defined('TCPDF_SILENCE_DEPRECATION')) {
+            define('TCPDF_SILENCE_DEPRECATION', true);
+        }
+
         if (! defined('K_PATH_CACHE')) {
             $dir = rtrim(WRITEPATH, '/\\') . '/cache/tcpdf/';
 
