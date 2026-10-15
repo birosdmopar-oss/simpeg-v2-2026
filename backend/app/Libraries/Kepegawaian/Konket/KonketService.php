@@ -448,10 +448,11 @@ final class KonketService implements KonketServiceInterface
 
         if ($affect !== null) {
             $param['affect_tukin'] = $affect;
-        } elseif ($lama === null) {
+        } elseif ($lama === null || (int) $kategori !== (int) ($lama['kategori'] ?? 0)) {
             // [V2] CR-050 (QA B-F1, DoD B-13 "flag affect_tukin dari master terbawa"; dok G-06 K5a): pengajuan baru memakai
-            // `jenis_konket.affect_tukin` sebagai nilai awal (legacy selalu 1 = default kolom). Admin tetap bisa mengubahnya
-            // per pengajuan; ubah tidak menyalin ulang dari master.
+            // `jenis_konket.affect_tukin` sebagai nilai awal (legacy selalu 1 = default kolom). CR-051 (QA R1F-F1): ubah yang
+            // MENGGANTI jenis juga mengambil nilai master jenis baru (pegawai 2/6/7, atau admin tanpa `affect_tukin`); jenis
+            // tetap → nilai tersimpan dipertahankan. Admin (1/3) yang mengirim `affect_tukin` selalu menimpa.
             $param['affect_tukin'] = (int) ($jenis['affect_tukin'] ?? 1);
         }
 

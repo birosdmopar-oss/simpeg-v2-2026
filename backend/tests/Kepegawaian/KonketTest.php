@@ -103,7 +103,28 @@ final class KonketTest extends DatabaseTestCase
 
         $this->db->table('jenis_konket')->where('old_id', 8)->update(['affect_tukin' => 1]);
         $ubah = $this->svc()->ubah($this->pegawai, $row['id'], ['alasan' => 'Diubah'] + $dinas, null);
-        $this->assertSame(2, $ubah['affect_tukin'], 'ubah tidak menyalin ulang dari master');
+        $this->assertSame(2, $ubah['affect_tukin'], 'jenis tetap: nilai tersimpan dipertahankan');
+    }
+
+    /**
+     * CR-051 (QA R1F-F1): ubah yang mengganti jenis mengambil `affect_tukin` dari master jenis baru (pegawai, atau admin tanpa
+     * `affect_tukin`); admin yang mengirim `affect_tukin` tetap menimpa.
+     */
+    public function testUbahJenisMengambilAffectTukinMasterJenisBaru(): void
+    {
+        $this->db->table('jenis_konket')->where('old_id', 8)->update(['affect_tukin' => 2]);
+        $row = $this->tambah($this->pegawai, $this->data('2026-10-05'));
+        $this->assertSame(1, $row['affect_tukin']);
+
+        // Pegawai mengganti jenis 1 → 8 (master 2).
+        $dinas = ['kategori' => 8, 'jenis_dinas' => 0] + $this->data('2026-10-05');
+        $this->assertSame(2, $this->svc()->ubah($this->pegawai, $row['id'], $dinas, null)['affect_tukin'], 'pegawai: master jenis baru');
+
+        // Admin mengganti jenis 8 → 1 tanpa affect_tukin → master jenis 1 (= 1).
+        $this->assertSame(1, $this->svc()->ubah($this->admin, $row['id'], $this->data('2026-10-05'), null)['affect_tukin'], 'admin tanpa affect_tukin: master');
+
+        // Admin mengganti jenis 1 → 8 sambil mengirim affect_tukin 1 → menimpa master (2).
+        $this->assertSame(1, $this->svc()->ubah($this->admin, $row['id'], ['affect_tukin' => 1] + $dinas, null)['affect_tukin'], 'admin menimpa');
     }
 
     public function testValidasiTanggalJenisBerkasDanIrisan(): void

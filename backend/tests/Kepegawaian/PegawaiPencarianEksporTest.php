@@ -190,7 +190,8 @@ final class PegawaiPencarianEksporTest extends DatabaseTestCase
         $this->assertMatchesRegularExpression('/^attachment; filename="daftar_pegawai_\d{8}_\d{6}\.csv"$/', $res->response()->getHeaderLine('Content-Disposition'));
         $csv = $res->response()->getBody();
         $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
-        $baris = array_map(str_getcsv(...), array_filter(explode("\n", substr($csv, 3))));
+        // `$escape` eksplisit '' (sama dengan penulis CSV) — PHP 8.4 men-deprecate nilai bawaannya.
+        $baris = array_map(static fn (string $b): array => str_getcsv($b, ',', '"', ''), array_filter(explode("\n", substr($csv, 3))));
         $this->assertSame(['Nama', 'NIP', 'Jabatan', 'NIP Lama'], $baris[0]);
         $nama = array_column(array_slice($baris, 1), 0);
         $this->assertContains('Budi Pencarian, S.Kom.', $nama);

@@ -6,7 +6,7 @@ Bagian 7 #5.
 
 **Status:** ✅ **DISETUJUI DB VALIDATOR (jjoseph48, komentar PR #24 07-10-2026
 https://github.com/birosdmopar-oss/simpeg-v2-2026/pull/24#issuecomment-6033816301)** — temuan T-1..T-3 pemeriksaan awal
-ditutup, verifikasi MariaDB 10.4 lolos; di-merge ke `main` 13-10-2026 (merge commit `191efec`). Keputusan Bagian 7 #1–#6
+ditutup, verifikasi MariaDB 10.4 lolos; masuk `main` 13-10-2026 tanpa merge commit (fast-forward; `191efec` = commit ujung PR #24, CR-051). Keputusan Bagian 7 #1–#6
 dicatat per butir. Isi Bagian 8 adalah verifikasi developer sebelum review (pra-review internal sisi CR), bukan hasil
 review DB Validator. Migration FK masuk `pengguna`/`faq_rate` tetap ditahan (#4). Status dokumen diperbarui CR-050
 (temuan QA A-F2, 15-10-2026).
