@@ -3,7 +3,7 @@
  * Master Angka Kredit JF `dm_ak_jf` (MAKE-021, role 1; legacy Data Master > JABATAN > "Angka Kredit JF",
  * `C_jabatan::akjf`). Daftar seluruh pasangan jabatan × gol. ruang (urut sub group, jenjang, pangkat) dengan pencarian
  * di sisi klien (legacy DataTables). Aksi baris lewat menu ⋮ (AGENTS.md §1): hanya Edit — tanpa hapus [K] (hapus legacy
- * tidak berfungsi).
+ * tidak berfungsi). Kolom Aksi menempel di kanan (`sticky right-0`, pola CR-038) supaya ⋮ terlihat di layar sempit (CR-052).
  */
 import { Plus, Search } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
@@ -115,7 +115,7 @@ onMounted(() => void load())
             <th class="px-4 py-3">Jenjang JF</th>
             <th class="px-4 py-3">Gol. Ruang</th>
             <th class="px-4 py-3 text-right">Angka Kredit</th>
-            <th class="px-4 py-3 text-right">Aksi</th>
+            <th class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -125,14 +125,14 @@ onMounted(() => void load())
           <tr v-else-if="filtered.length === 0">
             <td colspan="7" class="px-4 py-8 text-center text-slate-500" data-testid="ak-jf-kosong">Belum ada angka kredit JF yang cocok.</td>
           </tr>
-          <tr v-for="row in filtered" v-else :key="idOf(row)" class="hover:bg-slate-50" :data-testid="`ak-jf-row-${idOf(row)}`">
+          <tr v-for="row in filtered" v-else :key="idOf(row)" class="group hover:bg-slate-50" :data-testid="`ak-jf-row-${idOf(row)}`">
             <td class="px-4 py-3 font-medium text-slate-800">{{ row.jabatan }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.group_jabatan ?? '—' }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.sub_group_jabatan ?? '—' }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.jenjang_jf ? `${row.kategori_jf} — ${row.jenjang_jf}` : '—' }}</td>
             <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ row.gol_ruang }}</td>
             <td class="px-4 py-3 text-right tabular-nums text-slate-800">{{ angka.format(row.ak) }}</td>
-            <td class="px-4 py-3 text-right">
+            <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50">
               <RowActionsMenu
                 :actions="rowActions()"
                 :label="`Aksi untuk ${row.jabatan} gol. ${row.gol_ruang}`"

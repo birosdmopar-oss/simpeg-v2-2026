@@ -28,7 +28,7 @@ const props = withDefaults(
     readonly?: boolean
     autocomplete?: string
     name?: string
-    inputmode?: 'text' | 'numeric' | 'tel' | 'email' | 'search'
+    inputmode?: 'text' | 'numeric' | 'decimal' | 'tel' | 'email' | 'search'
     /** id `<datalist>` saran nilai (aditif MAKE-007); nilai bebas tetap boleh. */
     list?: string
   }>(),

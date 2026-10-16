@@ -21,6 +21,8 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: AkJfRow
 const isEdit = computed(() => props.row !== null)
 const opsi = ref<AkJfOpsi | null>(null)
 const daftarJabatan = ref<AkJfJabatan[]>([])
+/** Jabatan untuk pilihan group/sub group/jenjang sekarang sudah dimuat (kosong → keterangan, CR-052 Q4P-I2). */
+const jabatanDimuat = ref(false)
 const form = reactive({ id_group_jabatan: '', id_sub_group_jabatan: '', id_jenjang_jf: '', id_jabatan: '', id_pangkat: '', ak: '' })
 const errors = reactive<Record<string, string>>({})
 const formError = ref('')
@@ -33,6 +35,7 @@ function reset(): void {
   for (const k of Object.keys(errors)) delete errors[k]
   formError.value = ''
   daftarJabatan.value = []
+  jabatanDimuat.value = false
 }
 
 watch(
@@ -56,11 +59,15 @@ let token = 0
 async function muatJabatan(): Promise<void> {
   form.id_jabatan = ''
   daftarJabatan.value = []
+  jabatanDimuat.value = false
   if (!form.id_group_jabatan || !form.id_sub_group_jabatan || !form.id_jenjang_jf) return
   const t = ++token
   try {
     const hasil = await akJfService.jabatan({ id_group_jabatan: form.id_group_jabatan, id_sub_group_jabatan: form.id_sub_group_jabatan, id_jenjang_jf: form.id_jenjang_jf })
-    if (t === token) daftarJabatan.value = hasil
+    if (t === token) {
+      daftarJabatan.value = hasil
+      jabatanDimuat.value = true
+    }
   } catch {
     if (t === token) daftarJabatan.value = []
   }
@@ -69,6 +76,9 @@ async function muatJabatan(): Promise<void> {
 function ubahIsian(nama: keyof typeof form, nilai: unknown): void {
   form[nama] = nilai === null || nilai === undefined ? '' : String(nilai)
   delete errors[nama]
+  // Galat pasangan kembar (422 `id_pangkat`) melekat ke pasangan jabatan × gol.: hilang bila jabatan atau rantai
+  // pilihannya diganti (CR-052).
+  if (nama !== 'ak') delete errors.id_pangkat
   if (nama === 'id_group_jabatan') form.id_sub_group_jabatan = ''
   if (nama === 'id_group_jabatan' || nama === 'id_sub_group_jabatan' || nama === 'id_jenjang_jf') void muatJabatan()
 }
@@ -182,6 +192,7 @@ async function onSubmit(event: Event): Promise<void> {
               placeholder="Pilih Jabatan"
               :disabled="daftarJabatan.length === 0"
               :options="daftarJabatan.map((j) => ({ value: String(j.id_jabatan), label: j.jabatan }))"
+              :hint="jabatanDimuat && daftarJabatan.length === 0 ? 'Tidak ada jabatan untuk pilihan ini.' : undefined"
               :error="errors.id_jabatan"
               @update:model-value="ubahIsian('id_jabatan', $event)"
             />
@@ -203,7 +214,7 @@ async function onSubmit(event: Event): Promise<void> {
             name="ak"
             label="Angka Kredit"
             required
-            inputmode="numeric"
+            inputmode="decimal"
             hint="Angka, paling banyak 3 angka desimal (mis. 12,5)."
             :error="errors.ak"
             @update:model-value="ubahIsian('ak', $event)"

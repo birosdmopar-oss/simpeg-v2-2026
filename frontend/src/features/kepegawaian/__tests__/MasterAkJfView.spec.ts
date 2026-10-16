@@ -71,6 +71,9 @@ describe('MasterAkJfView', () => {
     expect(wrapper.find('[data-testid="ak-jf-row-11-9"]').text()).toContain('100,5')
     expect((await rowMenuActions(wrapper, 'ak-jf-actions-11-9')).map((a) => a.key)).toEqual(['edit'])
     expect(q('[data-testid="ak-jf-actions-11-9"]')?.getAttribute('aria-label')).toContain('Aksi untuk Analis Kebijakan Ahli Pertama')
+    // CR-052 Q4P-F1: kolom Aksi sticky kanan (header & sel), pola CR-038.
+    expect(wrapper.findAll('thead th').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'z-10']))
+    expect(wrapper.get('[data-testid="ak-jf-row-11-9"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'z-10', 'bg-white']))
 
     await wrapper.get('[data-testid="ak-jf-search"]').setValue('pranata')
     expect(wrapper.findAll('[data-testid^="ak-jf-row-"]')).toHaveLength(1)
@@ -93,12 +96,36 @@ describe('MasterAkJfView', () => {
     await kirim()
     expect(svc.create).toHaveBeenCalledWith({ id_jabatan: '11', id_pangkat: '9', ak: '12.5' })
     expect(q('[data-testid="ak-jf-form"]')?.textContent).toContain('sudah terdaftar di sistem')
+    expect(q<HTMLInputElement>('[data-testid="ak-jf-form"] [name="ak"]')?.getAttribute('inputmode')).toBe('decimal')
+
+    // CR-052 Q4P-F3: galat pasangan kembar hilang saat jabatan diganti (juga saat rantai pilihannya diganti).
+    await isi('id_jabatan', '')
+    expect(q('[data-testid="ak-jf-form"]')?.textContent).not.toContain('sudah terdaftar di sistem')
+    await isi('id_jabatan', '11')
+    svc.create.mockRejectedValueOnce(apiError422({ id_pangkat: ['Data angka kredit JF untuk jabatan X dan gol. III/a sudah terdaftar di sistem.'] }))
+    await kirim()
+    expect(q('[data-testid="ak-jf-form"]')?.textContent).toContain('sudah terdaftar di sistem')
+    await isi('id_jenjang_jf', '1')
+    expect(q('[data-testid="ak-jf-form"]')?.textContent).not.toContain('sudah terdaftar di sistem')
+    await isi('id_jabatan', '11')
 
     svc.create.mockResolvedValueOnce(baris({ ak: 12.5 }))
     await kirim()
     await flushPromises()
     expect(svc.list).toHaveBeenCalledTimes(2)
     expect(document.body.textContent).toContain('tersimpan')
+  })
+
+  it('tambah: kombinasi tanpa jabatan menampilkan keterangan (CR-052 Q4P-I2)', async () => {
+    const wrapper = await mountView()
+    await wrapper.get('[data-testid="ak-jf-add"]').trigger('click')
+    await flushPromises()
+    svc.jabatan.mockResolvedValueOnce([])
+    await isi('id_group_jabatan', '2')
+    expect(q('[data-testid="ak-jf-form"]')?.textContent).not.toContain('Tidak ada jabatan untuk pilihan ini')
+    await isi('id_sub_group_jabatan', '5')
+    await isi('id_jenjang_jf', '1')
+    expect(q('[data-testid="ak-jf-form"]')?.textContent).toContain('Tidak ada jabatan untuk pilihan ini')
   })
 
   it('tambah: validasi klien (wajib, AK angka maks 3 desimal) tanpa memanggil API', async () => {

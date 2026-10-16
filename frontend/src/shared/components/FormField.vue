@@ -34,7 +34,7 @@ const props = withDefaults(
     required?: boolean
     disabled?: boolean
     autocomplete?: string
-    inputmode?: 'text' | 'numeric'
+    inputmode?: 'text' | 'numeric' | 'decimal'
     options?: Array<{ value: string | number; label: string }>
     name?: string
     /** Select opsional: pilihan kosong (placeholder) bisa dipilih lagi untuk mengosongkan nilai. */

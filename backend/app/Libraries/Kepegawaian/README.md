@@ -585,7 +585,7 @@ Keputusan user 16-10-2026 (Q1 b, Q2 a, Q3). Tanpa perubahan skema: `dm_ak_jf` su
 | `MasterAkJfService` | CRUD `dm_ak_jf` [K] (`C_jabatan.php:1380-1530`, `Lm_jabatan.php:2277-2512`): daftar (urut sub group, jenjang, urutan pangkat, jabatan), opsi form (group jabatan 2/3 aktif, sub group, jenjang JF, pangkat aktif non-CPNS `cpns = 2`), jabatan per group/sub group/jenjang, tambah, ubah AK. **Tanpa hapus** [K] (hapus legacy tidak berfungsi) |
 
 **Validasi master.** `id_jabatan` = jabatan aktif group 2/3; `id_pangkat` = pangkat aktif `cpns = 2`; `ak` angka ≥ 0,
-paling banyak 7 digit + 3 desimal (`DECIMAL(10,3)`); pasangan kembar → 422 `errors.id_pangkat` dengan pesan legacy
+paling banyak 7 digit + 3 desimal (batas validasi v2; kolom `ak` bertipe `DOUBLE`, migration `2026-10-13-100100`); pasangan kembar → 422 `errors.id_pangkat` dengan pesan legacy
 ("Data angka kredit JF untuk jabatan … dan gol. … sudah terdaftar di sistem …"), termasuk balapan tambah paralel
 (PK → DatabaseException → 422). Ubah hanya `ak` + `updated_by` (jabatan & gol. ruang terkunci, legacy form edit).
 Audit `audit_logs` entitas `dm_ak_jf`, id `"{id_jabatan}-{id_pangkat}"`.
