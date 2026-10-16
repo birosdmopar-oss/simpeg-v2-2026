@@ -11,6 +11,7 @@ import { computed, onMounted, ref } from 'vue'
 import { isApiError } from '@/lib/axios'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
+import { useStickyActionsShadow } from '@/shared/composables/useStickyActionsShadow'
 
 import AkJfFormDialog from './AkJfFormDialog.vue'
 import { akJfService, type AkJfRow } from './akJf.service'
@@ -34,6 +35,10 @@ const filtered = computed(() => {
 })
 
 const idOf = (row: AkJfRow): string => `${row.id_jabatan}-${row.id_pangkat}`
+
+/** Bayangan pemisah kolom Aksi selama tabel masih bisa digeser (pola CR-038 MasterDataView, CR-053). */
+const tableScroller = ref<HTMLElement | null>(null)
+const { actionsShadow, updateActionsShadow } = useStickyActionsShadow(tableScroller, [filtered, loading])
 
 async function load(): Promise<void> {
   loading.value = true
@@ -105,7 +110,7 @@ onMounted(() => void load())
       </label>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div ref="tableScroller" class="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="ak-jf-table-scroll" @scroll.passive="updateActionsShadow">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
@@ -115,7 +120,13 @@ onMounted(() => void load())
             <th class="px-4 py-3">Jenjang JF</th>
             <th class="px-4 py-3">Gol. Ruang</th>
             <th class="px-4 py-3 text-right">Angka Kredit</th>
-            <th class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right">Aksi</th>
+            <th
+              class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right"
+              :class="{ 'shadow-sticky-end': actionsShadow }"
+              data-testid="ak-jf-col-actions"
+            >
+              Aksi
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -132,7 +143,7 @@ onMounted(() => void load())
             <td class="px-4 py-3 text-slate-600">{{ row.jenjang_jf ? `${row.kategori_jf} — ${row.jenjang_jf}` : '—' }}</td>
             <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ row.gol_ruang }}</td>
             <td class="px-4 py-3 text-right tabular-nums text-slate-800">{{ angka.format(row.ak) }}</td>
-            <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50">
+            <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50" :class="{ 'shadow-sticky-end': actionsShadow }">
               <RowActionsMenu
                 :actions="rowActions()"
                 :label="`Aksi untuk ${row.jabatan} gol. ${row.gol_ruang}`"
