@@ -106,6 +106,8 @@ server {
 ```
 
 > Catatan infrastruktur (ADR Bagian 5): BSrE dan server Arsip berada di jaringan internal — server dev harus berada di jaringan yang sama / VPN saat integrasi real (Fase 6).
+>
+> Keputusan reviewer CR 16-10-2026 (saran DB Validator, review PR #27 §7): satu alamat host DB internal yang tersisa di komentar migration `2026-09-23-000000_AlterBatch1KeSkemaLegacy.php` dan di riwayat git **diterima sebagai risiko rendah** (alamat privat, tidak terjangkau dari luar). Komentar migration tidak diedit (aturan migration di `main`) dan riwayat git tidak ditulis ulang; dokumen baru tetap tidak boleh memuat alamat/host internal (CR-048).
 
 ### 1a. Email tautan reset password (CR-014, ISSUE-006)
 
