@@ -19,6 +19,8 @@ use Throwable;
  *     (+ backfill dari nip_actor), nip/nip_actor VARCHAR(30) sebagai jejak.
  * down() menolak data yang tidak bisa disimpan skema lama sebelum ALTER apa pun (backend/docs/db-review/A-01-auth-schema.md
  * Bagian 9).
+ * Kolom `pengguna.must_change_password` (DBV-020, 2026-10-13-100200) ikut di ekspektasi skema akhir; siklus down()/up()
+ * DBV-010 di test ini tidak menyentuhnya.
  *
  * @internal
  */
@@ -36,7 +38,7 @@ final class AkunNonPegawaiSchemaTest extends DatabaseTestCase
             'email'       => 'varchar(150) null', 'password' => 'varchar(255) null', 'password_legacy' => 'varchar(32) null',
             'user_level'  => 'tinyint unsigned', 'id_unit' => 'varchar(10) null', 'id_satker' => 'varchar(10) null',
             'status'      => "enum('0','1')", 'last_login_at' => 'datetime null', 'password_changed_at' => 'datetime null',
-            'expired_at'  => 'datetime null', 'created_at' => 'datetime null', 'updated_at' => 'datetime null', 'deleted_at' => 'datetime null',
+            'expired_at'  => 'datetime null', 'must_change_password' => 'tinyint', 'created_at' => 'datetime null', 'updated_at' => 'datetime null', 'deleted_at' => 'datetime null',
         ],
         'token' => [
             'id'          => 'int unsigned', 'id_pengguna' => 'int unsigned', 'nip' => 'varchar(30) null', 'token_hash' => 'char(64)',

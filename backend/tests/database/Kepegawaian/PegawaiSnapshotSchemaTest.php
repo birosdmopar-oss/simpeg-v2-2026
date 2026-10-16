@@ -57,7 +57,7 @@ final class PegawaiSnapshotSchemaTest extends DatabaseTestCase
 
     public function testSchemaMatchesD1(): void
     {
-        $this->assertSkemaD1(SkemaD1::B01);
+        $this->assertSkemaD1(self::skemaB01());
     }
 
     /**
@@ -78,6 +78,19 @@ final class PegawaiSnapshotSchemaTest extends DatabaseTestCase
         // pegawai_ak_siasn masuk B-01 (snapshot riwayat_ak_siasn, diisi trigger legacy).
         $this->assertArrayHasKey('pegawai_ak_siasn', SkemaD1::B01);
         $this->assertSame(['fk_id_jabatan_peg_ak_siasn_03', 'fk_id_riwayat_ak_siasn_peg_ak_siasn_02'], array_keys(SkemaD1::B01['pegawai_ak_siasn']['later']));
+    }
+
+    /**
+     * DBV-020 [V2]: `pegawai_hist.glr_awal`/`glr_akhir` dilebarkan ke VARCHAR(50) (= `pegawai`) oleh migration
+     * 2026-10-13-100200; D1 (SkemaD1) tetap VARCHAR(12)/(24).
+     */
+    public function testGelarPegawaiHistMengikutiPegawai(): void
+    {
+        $this->assertSame(['varchar(12) null', 'varchar(24) null'], [SkemaD1::B01['pegawai_hist']['columns']['glr_awal'], SkemaD1::B01['pegawai_hist']['columns']['glr_akhir']]);
+        $this->assertSame(
+            [SkemaD1::B01['pegawai']['columns']['glr_awal'], SkemaD1::B01['pegawai']['columns']['glr_akhir']],
+            [self::skemaB01()['pegawai_hist']['columns']['glr_awal'], self::skemaB01()['pegawai_hist']['columns']['glr_akhir']],
+        );
     }
 
     public function testMigrationCreatesNoRows(): void
@@ -160,7 +173,7 @@ final class PegawaiSnapshotSchemaTest extends DatabaseTestCase
         }
 
         $this->pasangUlang();
-        $this->assertSkemaD1(SkemaD1::B01);
+        $this->assertSkemaD1(self::skemaB01());
     }
 
     /**
@@ -195,7 +208,22 @@ final class PegawaiSnapshotSchemaTest extends DatabaseTestCase
 
         $this->db->query('DROP TABLE ' . $this->skemaQuoted(self::BLOCKER));
         $this->pasangUlang();
-        $this->assertSkemaD1(SkemaD1::B01);
+        $this->assertSkemaD1(self::skemaB01());
+    }
+
+    /**
+     * Ekspektasi B-01 setelah seluruh migration `main`: D1 + deviasi kolom DBV-020 (gelar `pegawai_hist` VARCHAR(50)).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function skemaB01(): array
+    {
+        $spec = SkemaD1::B01;
+
+        $spec['pegawai_hist']['columns']['glr_awal']  = 'varchar(50) null';
+        $spec['pegawai_hist']['columns']['glr_akhir'] = 'varchar(50) null';
+
+        return $spec;
     }
 
     /**

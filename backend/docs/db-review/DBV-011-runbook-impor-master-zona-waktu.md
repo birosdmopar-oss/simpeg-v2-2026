@@ -320,7 +320,22 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
      - `password` yang masuk kelas 32 heks (A6) → `password_legacy` apa adanya, dengan `password` v2 NULL. Verifier menyamakan huruf besar/kecil, jadi heks huruf besar tidak perlu diubah;
      - akun dengan format hash lain diperlakukan sesuai keputusan di log 2.8 (2.5);
      - `password_decode` tidak pernah dipilih; kolomnya sudah dibuang di langkah 1;
-     - pemetaan kolom akun lain (`id` → `id_pengguna`, `id_pegawai` → `nip`, `UserLevel` → `user_level`, status) mengikuti A-01 dan DBV-009.
+     - pemetaan kolom akun lain (`id` → `id_pengguna`, `id_pegawai` → `nip`, `UserLevel` → `user_level`, status) mengikuti A-01 dan DBV-009;
+     - **`must_change_password` (DBV-020 keputusan #7, disetujui DB Validator 15-10-2026):** default 0; akun role 2/6 yang password-nya masih = NIP (perilaku popup FCP legacy `MY_Controller.php:214-221`) diberi 1. Dijalankan di DB v2 setelah `pengguna` diimpor, jumlah baris dicatat di log 2.8:
+
+       ```sql
+       -- Hitung dulu (catat di log 2.8), lalu tandai.
+       SELECT user_level, COUNT(*) FROM pengguna
+       WHERE user_level IN (2, 6) AND nip IS NOT NULL AND password_legacy IS NOT NULL
+         AND LOWER(password_legacy) = MD5(nip)
+       GROUP BY user_level;
+
+       UPDATE pengguna SET must_change_password = 1
+       WHERE user_level IN (2, 6) AND nip IS NOT NULL AND password_legacy IS NOT NULL
+         AND LOWER(password_legacy) = MD5(nip);
+       ```
+
+       Penegakan saat login = ISSUE-044 (MAKE-020).
 6. **Impor ke DB v2** (Dev dulu). Ini penulisan manual setelah approval DBV (ISSUE-014).
    - **Prasyarat: D-12 tuntas** (A-01 9.7, keputusan Bagian 4 #11). Tipe `pengguna.id_pengguna` v2 (INT UNSIGNED) berbeda dengan legacy `pengguna.id` dan kolom `*_by`/`id_pengguna` legacy (INT signed). DBV-010 menetapkan penyelarasannya di DBV-009 dan **"wajib tuntas sebelum FK `*_by` dibuat atau data legacy diimpor"**. Runbook ini ikut mengimpor `pengguna` dan `created_by`/`updated_by` master, jadi migration DBV-009 (PK + `token.id_pengguna` + `audit_logs.id_pengguna_actor`) harus sudah disetujui DBV dan dijalankan.
    - **Prasyarat: semua nilai [I] tabel yang diimpor sudah dicocokkan dengan DDL dump** (langkah 1; keputusan Bagian 4 #11): G-01 8.3, G-04 Bagian 7, G-06 Bagian 3 dan 6.4, G-07 3.1, G-10 Bagian 3. Selisih dikoreksi lewat migration ALTER baru + review DBV (migration di `main` tidak diedit). Setelah itu angka panjang di katalog D/A6/B9 disesuaikan dengan tipe hasil koreksi, lalu audit (langkah 2–4) dijalankan ulang. Tanpa langkah ini, WAJIB_0 "lebih dari kolom v2" bisa keliru diselesaikan dengan memotong atau mengganti nama data, padahal yang salah adalah dugaan tipe v2.

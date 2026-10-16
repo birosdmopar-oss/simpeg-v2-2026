@@ -5,18 +5,15 @@ declare(strict_types=1);
 namespace Tests\Kepegawaian\Riwayat;
 
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Ak;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatUjiTrait;
 
 /**
  * AK kumulatif B-15 (WS-1 M5 MAKE-008) dari master `dm_ak_jf` — legacy `L_ak.php` form() :357-405. Tabel `dm_ak_jf`
- * belum ada di skema v2 (kebutuhan DBV), jadi test ini membuatnya sementara dengan DDL legacy (tanpa FK) dan
- * menghapusnya lagi; tanpa tabel itu AK kumulatif = 0.
+ * dibuat migration DBV-020 (2026-10-13-100100, FK ke `jabatan`/`pangkat`); master kosong → AK kumulatif = 0.
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class AkKumulatifTest extends DatabaseTestCase
 {
     use RiwayatUjiTrait;
@@ -28,22 +25,11 @@ final class AkKumulatifTest extends DatabaseTestCase
 
     private int $jenjangMuda = 0;
 
-    protected function tearDown(): void
-    {
-        $this->db->query('DROP TABLE IF EXISTS ' . $this->db->escapeIdentifiers($this->db->prefixTable('dm_ak_jf')));
-
-        parent::tearDown();
-    }
-
     public function testAkKumulatifKpDanJenjangBerikutDikurangiAkTerakhir(): void
     {
         $nip = $this->siapkanPegawaiJf();
 
-        $this->assertSame(['ak_kum_kp' => 0.0, 'ak_kum_next_jen' => 0.0], array_intersect_key(Ak::turunan($nip), array_flip(['ak_kum_kp', 'ak_kum_next_jen'])), 'tanpa dm_ak_jf');
-
-        $this->db->query('CREATE TABLE ' . $this->db->escapeIdentifiers($this->db->prefixTable('dm_ak_jf')) . ' (
-            `id_jabatan` int NOT NULL, `id_pangkat` tinyint NOT NULL, `jenjang` varchar(50) DEFAULT NULL, `ak` double NOT NULL,
-            PRIMARY KEY (`id_jabatan`, `id_pangkat`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        $this->assertSame(['ak_kum_kp' => 0.0, 'ak_kum_next_jen' => 0.0], array_intersect_key(Ak::turunan($nip), array_flip(['ak_kum_kp', 'ak_kum_next_jen'])), 'dm_ak_jf kosong');
 
         $pmj = $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->get()->getRowArray();
         $this->db->table('dm_ak_jf')->insertBatch([
