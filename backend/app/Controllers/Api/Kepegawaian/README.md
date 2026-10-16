@@ -226,6 +226,21 @@ baru:
 
 PDF memakai `App\Libraries\Pdf\Pdf::renderer()` (antarmuka `PdfRendererInterface`, ADR-033) dan `Pdf::respon()`.
 
+### Angka kredit JF (WS-1, MAKE-021, aditif)
+
+Keputusan user 16-10-2026 (ISSUE-041). Service: `Libraries/Kepegawaian/AngkaKredit` (README Libraries Kepegawaian).
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET pegawai/{nip}/ak/target-kp` | sama dengan melihat riwayat `ak` (izin lihat Definisi `ak`, lingkup PegawaiScope, role 2/7 hanya JF tertentu) | Target AK kenaikan pangkat PermenPAN-RB 1/2023 (port `getAKAccu` legacy): `{ nip, nama, jabatan, satker, pangkat, gol_ruang, jenjang, current_ak, ak_for_kp, ak_kurang, ak_maxed }`. Urutan cek: izin role → 403, lingkup → 403, NIP tidak ada → 404, `bolehAksiUntuk` → 403 |
+| `GET ak-jf` | 1 | Daftar master `dm_ak_jf` + nama jabatan, group/sub group, jenjang JF, pangkat/gol. ruang |
+| `GET ak-jf/opsi` | 1 | `{ group_jabatan (2/3), sub_group_jabatan, jenjang_jf, pangkat (aktif, cpns = 2) }` |
+| `GET ak-jf/jabatan?id_group_jabatan=&id_sub_group_jabatan=&id_jenjang_jf=` | 1 | Jabatan aktif; ketiga parameter wajib bilangan positif (group 2/3) → 422 |
+| `POST ak-jf` | 1 | `{ id_jabatan, id_pangkat, ak }` → 201; 422 per kolom (kembar → `id_pangkat`, pesan legacy) |
+| `PUT ak-jf/{id_jabatan}/{id_pangkat}` | 1 | `{ ak }` saja; 404 bila pasangan tidak ada |
+
+Tanpa `DELETE` [K]. Route di `Config/RoutesRiwayat.php` (grup `ak-jf` dengan filter `Role::filter(Role::SUPER_ADMIN)`).
+
 ### Descriptor tab (beku)
 
 `GET pegawai/{nip}` mengembalikan `data.tabs`: array descriptor. Frontend merender tab dan tombol aksi **hanya** dari

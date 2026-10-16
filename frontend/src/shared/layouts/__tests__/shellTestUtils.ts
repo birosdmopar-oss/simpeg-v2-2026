@@ -20,6 +20,7 @@ export function createShellRouter(): Router {
       { path: '/login', name: 'login', component: stub },
       { path: '/akun', name: 'users', component: stub },
       { path: '/master/:entity?', name: 'master-data', component: stub },
+      { path: '/master-ak-jf', name: 'master-ak-jf', component: stub },
       { path: '/hari-libur', name: 'hari-libur', component: stub },
       { path: '/web-config', name: 'web-config', component: stub },
       { path: '/faq/:id?', name: 'faq', component: stub },

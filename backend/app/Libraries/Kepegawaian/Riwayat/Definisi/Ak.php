@@ -38,8 +38,9 @@ use DateTimeImmutable;
  * `pegawai_kp`, AK kumulatif dari `dm_ak_jf`. Masa kerja sampai tanggal PAK (legacy: sampai hari ini) dihitung saat
  * tambah dan saat tanggal PAK berubah; jumlah AK = AK lama + AK baru (legacy: dihitung form) saat tambah dan saat AK
  * lama/baru dikirim — kecuali baris Current AK (`jenis_ak` 1) yang tidak pernah dihitung ulang. `jenis_ak` tidak
- * di-reset saat ubah (legacy sp() menulis 2 setiap simpan). Tabel `dm_ak_jf` belum ada di skema v2 (kebutuhan DBV):
- * selama belum ada, AK kumulatif = 0 (nilai bawaan legacy sp() :888-889).
+ * di-reset saat ubah (legacy sp() menulis 2 setiap simpan). Master `dm_ak_jf` dibuat DBV-020 (migration
+ * `2026-10-13-100100`, FK RESTRICT ke `jabatan`/`pangkat`, isi lewat impor); master kosong atau tanpa baris untuk jenjang
+ * pegawai → AK kumulatif = 0 (nilai bawaan legacy sp() :888-889).
  */
 final class Ak extends RiwayatDefinisi
 {
@@ -448,8 +449,9 @@ final class Ak extends RiwayatDefinisi
     }
 
     /**
-     * Master `dm_ak_jf` sudah ada di skema (belum ada di migration v2 — kebutuhan DBV). Dibaca langsung dari
-     * information_schema, tanpa cache daftar tabel.
+     * Penjaga: tabel `dm_ak_jf` ada (dibuat migration DBV-020 `2026-10-13-100100`; dirujuk komentar migration itu).
+     * Selalu true di skema terkini; dipertahankan agar lingkungan yang belum menjalankan migration itu tetap aman
+     * (AK kumulatif 0, bukan galat). Dibaca dari information_schema, tanpa cache daftar tabel.
      */
     private static function adaMasterAkJf(): bool
     {

@@ -23,7 +23,7 @@ describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
 
   // Menu lengkap per role (urut sidebar): Kepegawaian Fase 3 lalu menu main.
   it.each([
-    [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ']],
+    [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ']],
     [Role.PEGAWAI, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'FAQ']],
     [Role.ADMIN_SATKER, ['Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Manajemen Akun', 'FAQ']],
     [Role.ADMIN_VIEW_ESELON1, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Hari Libur', 'FAQ']],
@@ -88,6 +88,7 @@ describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
       'karpeg-karis': { name: 'karpeg-karis-usulan' },
       'lkh-verifikasi': { name: 'lkh-verifikasi' },
       'master-data': { name: 'master-data' },
+      'master-ak-jf': { name: 'master-ak-jf' },
       'web-config': { name: 'web-config' },
       'hari-libur': { name: 'hari-libur' },
       users: { name: 'users' },

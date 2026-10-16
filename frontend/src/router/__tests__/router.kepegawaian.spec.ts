@@ -102,6 +102,21 @@ describe('router — alamat lama /pegawai/:nip/riwayat (MAKE-016)', () => {
   })
 })
 
+describe('router — /master-ak-jf (MAKE-021)', () => {
+  it('role 1 boleh membuka master Angka Kredit JF', async () => {
+    loginAs(Role.SUPER_ADMIN)
+    await router.push('/master-ak-jf')
+    expect(router.currentRoute.value.name).toBe('master-ak-jf')
+    expect(router.currentRoute.value.meta.title).toBe('Angka Kredit JF')
+  })
+
+  it.each([Role.PEGAWAI, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.PIMPINAN])('role %i diarahkan ke /403', async (role) => {
+    loginAs(role)
+    await router.push('/master-ak-jf')
+    expect(router.currentRoute.value.name).toBe('forbidden')
+  })
+})
+
 describe('router — placeholder halaman Fase 3 (Matriks v2)', () => {
   const cases = [
     { path: '/konket', name: 'konket-usulan', roles: KONKET_ROLES, title: 'Usulan Konket' },

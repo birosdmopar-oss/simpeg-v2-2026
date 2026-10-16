@@ -49,7 +49,7 @@ describe('RedesignShell — menu', () => {
 
     expect(links).toEqual([
       'Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH',
-      'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ',
+      'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ',
     ])
     expect(wrapper.get('[data-testid="nav-web-config"]').attributes('href')).toBe('/web-config')
     expect(wrapper.get('main#main-content [data-testid="content"]').text()).toBe('isi halaman')

@@ -58,3 +58,5 @@ export const BIODATA_PROSES_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role
  */
 export const PENUGASAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI]
 export const PENUGASAN_TULIS_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
+/** Master Angka Kredit JF `dm_ak_jf` (MAKE-021; legacy `C_jabatan::akjf` userAuth ['1']). */
+export const AK_JF_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]

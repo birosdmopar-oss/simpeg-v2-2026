@@ -41,6 +41,7 @@ Kontrak backend yang diikuti: `backend/app/Controllers/Api/Kepegawaian/README.md
 | `components/KoreksiNipDialog.vue` | Koreksi NIP B-06 (MAKE-010, role 1): isi → tinjau (peringatan reset username/password + sesi dicabut) → konfirmasi; sukses → URL NIP baru | WS-2 |
 | `services/apiErrors.ts` | 401 → 404 jenis → 403 izin/lingkup → 404 data; 422 `errors.<kolom>` / `errors["berkas.<id>"]` / `errors.berkas`; 501 stub | bersama |
 | `views/DetailPegawaiPage.vue` | Tersambung `GET pegawai/{nip}` (MAKE-010): tab Data Umum (lihat + "Ubah Data Umum" bila `aksi.ubah_biodata`, status pengajuan dari `pengajuan`) + tab dari descriptor; foto profil dari `GET …/foto`; ⋯ "Koreksi NIP" bila `aksi.koreksi_nip` | WS-2 |
+| `angka-kredit/` (`MasterAkJfPage.vue`, `MasterAkJfView.vue`, `AkJfFormDialog.vue`, `akJf.service.ts`) | Master Angka Kredit JF `dm_ak_jf` (MAKE-021, role 1 `AK_JF_ROLES`, route `master-ak-jf` `/master-ak-jf`, menu Pengaturan "Angka Kredit JF"): daftar + cari klien, menu ⋮ hanya Edit (tanpa hapus [K]), testid `ak-jf-actions-<id_jabatan>-<id_pangkat>`; tambah berjenjang Group (2/3) → Sub Group → Jenjang JF → Jabatan (dimuat `ak-jf/jabatan`) + Gol. Ruang + AK; edit hanya AK; galat 422 dipetakan ke isian | WS-1 |
 
 Tidak ada data contoh di runtime: fixture hanya di `__tests__/fixtures.ts` (dijaga `__tests__/noRuntimeMock.spec.ts`).
 

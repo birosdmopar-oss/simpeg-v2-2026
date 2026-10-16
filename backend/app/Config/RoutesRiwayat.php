@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Constants\Role;
 use App\Libraries\Kepegawaian\Riwayat\JenisRiwayat;
 use CodeIgniter\Router\RouteCollection;
 
@@ -60,6 +61,18 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
         // Aditif WS-2 MAKE-013 (ADR-033): PDF tanda terima usulan Disetujui.
         $routes->get("usulan/{$usulan}/(:num)/tanda-terima", "UsulanController::tandaTerima/{$usulan}/\$1");
     }
+
+    // MAKE-021 (aditif): target AK kenaikan pangkat PermenPAN-RB 1/2023 (izin = lihat riwayat AK, diperiksa controller).
+    $routes->get('pegawai/(:segment)/ak/target-kp', 'AngkaKreditController::targetKp/$1');
+
+    // MAKE-021: master Angka Kredit JF `dm_ak_jf` — role 1 (legacy C_jabatan userAuth ['1']); tanpa hapus [K].
+    $routes->group('ak-jf', ['filter' => ['jwt', Role::filter(Role::SUPER_ADMIN)]], static function (RouteCollection $routes): void {
+        $routes->get('', 'AngkaKreditController::index');
+        $routes->get('opsi', 'AngkaKreditController::opsi');
+        $routes->get('jabatan', 'AngkaKreditController::jabatan');
+        $routes->post('', 'AngkaKreditController::create');
+        $routes->put('(:num)/(:num)', 'AngkaKreditController::update/$1/$2');
+    });
 
     // WS-1: endpoint riwayat tambahan (mis. usulan Karpeg/Karis M4) ditambahkan di sini.
 });

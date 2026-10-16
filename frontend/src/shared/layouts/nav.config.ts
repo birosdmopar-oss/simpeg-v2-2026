@@ -41,6 +41,7 @@ import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
 import {
+  AK_JF_ROLES,
   BIODATA_PROSES_ROLES,
   DATA_SAYA_ROLES,
   KARPEG_KARIS_ROLES,
@@ -160,6 +161,8 @@ const NAV: NavGroup[] = [
     title: 'Pengaturan',
     items: [
       { key: 'master-data', label: 'Master Data', icon: Database, to: { name: 'master-data' }, roles: MASTER_DATA_ROLES, phase: 2 },
+      // MAKE-021: legacy Data Master > JABATAN > Angka Kredit JF (master `dm_ak_jf`, role 1).
+      { key: 'master-ak-jf', label: 'Angka Kredit JF', icon: Database, to: { name: 'master-ak-jf' }, roles: AK_JF_ROLES, phase: 3 },
       { key: 'web-config', label: 'Web Config', icon: Settings, to: { name: 'web-config' }, roles: WEB_CONFIG_ROLES, phase: 2 },
       { key: 'hari-libur', label: 'Hari Libur', icon: CalendarDays, to: { name: 'hari-libur' }, roles: HARI_LIBUR_READ_ROLES, phase: 2 },
       { key: 'users', label: 'Manajemen Akun', icon: UserCog, to: { name: 'users' }, roles: USER_MANAGEMENT_ROLES, phase: 1 },

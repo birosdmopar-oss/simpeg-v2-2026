@@ -4,7 +4,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { KARPEG_KARIS_ROLES } from './roles'
+import { AK_JF_ROLES, KARPEG_KARIS_ROLES } from './roles'
 
 export const riwayatRoutes: RouteRecordRaw[] = [
   {
@@ -21,5 +21,12 @@ export const riwayatRoutes: RouteRecordRaw[] = [
     path: '/pegawai/:nip/riwayat',
     name: 'pegawai-riwayat',
     redirect: (to) => ({ name: 'pegawai-detail', params: { nip: to.params.nip }, query: to.query }),
+  },
+  {
+    // MAKE-021: master Angka Kredit JF `dm_ak_jf` (legacy Data Master > JABATAN > Angka Kredit JF, role 1).
+    path: '/master-ak-jf',
+    name: 'master-ak-jf',
+    component: () => import('./angka-kredit/MasterAkJfPage.vue'),
+    meta: { roles: AK_JF_ROLES, title: 'Angka Kredit JF' },
   },
 ]

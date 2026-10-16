@@ -572,3 +572,35 @@ path baru belum dirujuk sampai kolomnya ditulis. Contoh lengkap di docblock kela
   baris v2) terbaca di daftar tetapi unduhnya 404 sampai berkas dimigrasikan (sama dengan lampiran lain).
 - [V2] pencarian lanjutan: setiap kriteria riwayat dievaluasi sendiri (`EXISTS` per kriteria); legacy menggabung kriteria
   pada baris JOIN yang sama.
+
+## Angka kredit PermenPAN-RB 1/2023 & master `dm_ak_jf` (`AngkaKredit/`, MAKE-021, ISSUE-041)
+
+Keputusan user 16-10-2026 (Q1 b, Q2 a, Q3). Tanpa perubahan skema: `dm_ak_jf` sudah dibuat DBV-020 (migration
+`2026-10-13-100100`, PK `(id_jabatan, id_pangkat)`, FK RESTRICT ke `jabatan`/`pangkat`, diisi impor).
+
+| Kelas | Isi |
+|---|---|
+| `Config\AngkaKredit` | Konstanta [K] `getAKAccu()` (`helpers/function_helper.php:2049-2165`): `$akUntukKp` (AK untuk KP per jenjang × gol. ruang), `$nilaiGolongan` (II/a = 10 … IV/e = 22), `$batasGolonganJenjang` (gol. tertinggi per jenjang). Nilai bawaan persis legacy; tanpa override `.env` (aturan berubah = ubah PermenPAN-RB = ubah kode + test) |
+| `AkPermenpanrb` | Port `getAKAccu()`: `hitung(nip)` → `nip`, `nama`, `jabatan`, `satker`, `pangkat`, `gol_ruang`, `jenjang`, `current_ak`, `ak_for_kp`, `ak_kurang`, `ak_maxed`. `current_ak` = SUM `riwayat_ak_siasn.kredit_baru_total` jabatan sekarang (`pegawai_mutasi_jabatan.id_jabatan`) dengan `is_konversi = '1' OR is_integrasi = '1'` (tanpa saring status, ikut legacy), tidak negatif. `akUntukKp(jenjang, gol)`: jenjang kosong/tak dikenal → 0; gol ≤ batas jenjang → konstanta (atau 0); di atas batas → nilai terbesar jenjang itu. `ak_kurang`/`ak_maxed` ikut prediksi dashboard `L_user.php:719-740` |
+| `MasterAkJfService` | CRUD `dm_ak_jf` [K] (`C_jabatan.php:1380-1530`, `Lm_jabatan.php:2277-2512`): daftar (urut sub group, jenjang, urutan pangkat, jabatan), opsi form (group jabatan 2/3 aktif, sub group, jenjang JF, pangkat aktif non-CPNS `cpns = 2`), jabatan per group/sub group/jenjang, tambah, ubah AK. **Tanpa hapus** [K] (hapus legacy tidak berfungsi) |
+
+**Validasi master.** `id_jabatan` = jabatan aktif group 2/3; `id_pangkat` = pangkat aktif `cpns = 2`; `ak` angka ≥ 0,
+paling banyak 7 digit + 3 desimal (`DECIMAL(10,3)`); pasangan kembar → 422 `errors.id_pangkat` dengan pesan legacy
+("Data angka kredit JF untuk jabatan … dan gol. … sudah terdaftar di sistem …"), termasuk balapan tambah paralel
+(PK → DatabaseException → 422). Ubah hanya `ak` + `updated_by` (jabatan & gol. ruang terkunci, legacy form edit).
+Audit `audit_logs` entitas `dm_ak_jf`, id `"{id_jabatan}-{id_pangkat}"`.
+
+**Kenapa bukan engine MasterData.** Engine MasterData mengandalkan PK tunggal, kolom `status` (hapus lunak 10) dan urutan;
+`dm_ak_jf` ber-PK komposit tanpa status/urutan, jadi dipakai service + controller kecil.
+
+**C-3 (hapus jabatan/pangkat yang dirujuk).** Hapus master jabatan/pangkat di engine MasterData selalu lunak (status 10),
+jadi FK RESTRICT `dm_ak_jf` tidak pernah terpicu dari UI; baris `dm_ak_jf` lama tetap ada dan tetap dipakai
+`Ak::akKumulatif()`. Tambah baris baru menolak jabatan/pangkat tidak aktif (422 per kolom). Hapus keras hanya lewat SQL
+manual, dan FK menjawabnya dengan galat basis data — bukan jalur aplikasi.
+
+**Pemakaian.** `Ak::turunan()` membaca `dm_ak_jf` untuk AK kumulatif (master kosong → 0; `adaMasterAkJf()` tetap sebagai
+penjaga). Target KP dibaca lewat `GET pegawai/{nip}/ak/target-kp`; tab AK tidak berubah.
+
+**Test.** `tests/unit/Kepegawaian/AngkaKredit/AkPermenpanrbKonstantaTest.php` (konstanta & `akUntukKp` murni),
+`tests/Kepegawaian/AngkaKreditTest.php` (target KP dari `riwayat_ak_siasn`, izin endpoint, CRUD master kosong/terisi,
+master terisi dipakai `Ak::turunan`).
