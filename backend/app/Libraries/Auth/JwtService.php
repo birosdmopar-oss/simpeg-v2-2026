@@ -23,7 +23,8 @@ use Throwable;
  * - Refresh bersifat rotating: token lama langsung di-revoke saat dipakai; pemakaian ulang ditolak.
  *
  * Claims wajib: 'sub' (id_pengguna, bilangan bulat positif sebagai string) dan 'role'. Claims opsional: 'nip' (NULL
- * untuk akun tanpa NIP), 'id_unit', 'id_satker'. Setiap token membawa 'ver' = CLAIMS_VERSION.
+ * untuk akun tanpa NIP), 'id_unit', 'id_satker', 'must_change_password' (MAKE-020; hanya ada bila true). Setiap token
+ * membawa 'ver' = CLAIMS_VERSION.
  * Catatan: claims nip/id_unit/id_satker disalin dari row refresh token saat refresh, sehingga bisa stale
  * selama window 7 hari kalau pegawai dimutasi (lihat catatan 00-INDEX.md).
  *
@@ -347,11 +348,12 @@ class JwtService
     }
 
     /**
-     * Claims yang ditandatangani / disimpan: sub (id_pengguna), nip, ver, role, id_unit, id_satker.
+     * Claims yang ditandatangani / disimpan: sub (id_pengguna), nip, ver, role, id_unit, id_satker, dan
+     * must_change_password (MAKE-020) hanya bila true, sehingga token akun biasa tidak berubah bentuk.
      *
      * @param array<string, mixed> $claims
      *
-     * @return array{sub: string, nip: string|null, ver: int, role: int, id_unit: mixed, id_satker: mixed}
+     * @return array{sub: string, nip: string|null, ver: int, role: int, id_unit: mixed, id_satker: mixed, must_change_password?: true}
      */
     private function normalizeClaims(array $claims): array
     {
@@ -370,7 +372,7 @@ class JwtService
             'role'      => (int) $claims['role'],
             'id_unit'   => $claims['id_unit'] ?? null,
             'id_satker' => $claims['id_satker'] ?? null,
-        ];
+        ] + (($claims['must_change_password'] ?? false) === true ? ['must_change_password' => true] : []);
     }
 
     /**

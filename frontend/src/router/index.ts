@@ -2,6 +2,7 @@
  * Router aplikasi (ADR-024): role requirement dideklarasikan di `meta` ({ requiresAuth, roles }).
  * Satu global beforeEach guard memanggil fetchCurrentUser() untuk memvalidasi cookie saat pertama kali diperlukan.
  * Belum login → /login (dengan ?redirect). Salah role → /403 (terpisah dari kasus belum login).
+ * Wajib ganti password (MAKE-020) → semua route login diarahkan ke /ganti-password sampai password diganti.
  * Guard FE murni UX — otorisasi sesungguhnya ditegakkan RoleFilter backend (ADR-005).
  */
 import { createRouter, createWebHistory, type NavigationGuard, type RouteRecordRaw } from 'vue-router'
@@ -132,6 +133,11 @@ router.beforeEach(async (to) => {
   const ok = await auth.fetchCurrentUser()
   if (!ok) {
     return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
+  }
+
+  // MAKE-020 (ISSUE-044): selama password wajib diganti, hanya halaman Ganti Password yang boleh dibuka.
+  if (auth.mustChangePassword && to.name !== 'change-password') {
+    return { name: 'change-password' }
   }
 
   if (to.meta.roles && to.meta.roles.length > 0 && (auth.role === null || !to.meta.roles.includes(auth.role))) {

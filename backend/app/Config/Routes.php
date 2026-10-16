@@ -31,9 +31,10 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
         $routes->post('reset-password', 'ResetPasswordController::reset');
 
         // UL_ALL (sudah login)
-        $routes->post('logout', 'TokenController::logout', ['filter' => 'jwt']);
-        $routes->get('me', 'TokenController::me', ['filter' => 'jwt']);
-        $routes->post('change-password', 'PasswordController::change', ['filter' => 'jwt']);
+        // MAKE-020: `jwt:ganti_password` = tetap terbuka bagi sesi yang wajib ganti password (JwtAuthFilter).
+        $routes->post('logout', 'TokenController::logout', ['filter' => 'jwt:ganti_password']);
+        $routes->get('me', 'TokenController::me', ['filter' => 'jwt:ganti_password']);
+        $routes->post('change-password', 'PasswordController::change', ['filter' => 'jwt:ganti_password']);
 
         // user/index, add, edit, delete = role 1, 3 (scoping satker di UserService)
         $routes->group('users', ['filter' => ['jwt', Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]], static function (RouteCollection $routes): void {

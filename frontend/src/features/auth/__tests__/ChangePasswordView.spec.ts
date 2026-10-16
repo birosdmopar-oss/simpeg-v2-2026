@@ -164,3 +164,14 @@ describe('ChangePasswordView', () => {
     expect(wrapper.get('input[name="new_password"]').attributes('type')).toBe('text')
   })
 })
+
+describe('ChangePasswordView — wajib ganti password (MAKE-020)', () => {
+  it('banner penjelasan hanya tampil bila sesi wajib ganti password', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-testid="change-password-required"]').exists()).toBe(false)
+
+    useAuthStore().setSession({ ...user, must_change_password: true })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="change-password-required"]').text()).toContain('Ganti password terlebih dahulu')
+  })
+})

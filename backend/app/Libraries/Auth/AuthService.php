@@ -154,7 +154,7 @@ class AuthService
             'role'      => (int) $user['user_level'],
             'id_unit'   => $user['id_unit'] ?? null,
             'id_satker' => $user['id_satker'] ?? null,
-        ];
+        ] + (PenggunaModel::wajibGantiPassword($user) ? ['must_change_password' => true] : []);
     }
 
     /**

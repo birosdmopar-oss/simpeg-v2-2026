@@ -84,6 +84,14 @@ const onSubmit = handleSubmit(async (values) => {
   <section class="mx-auto max-w-lg space-y-4">
     <div>
       <h1 class="text-xl font-semibold text-slate-800">Ganti Password</h1>
+      <div
+        v-if="auth.mustChangePassword"
+        class="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        role="status"
+        data-testid="change-password-required"
+      >
+        Password akun Anda diatur oleh sistem atau admin. Ganti password terlebih dahulu sebelum memakai menu lain.
+      </div>
       <!--
         Backend hanya mencabut refresh token; access token yang sudah terbit di perangkat lain tetap sah sampai
         kedaluwarsa (jwt.accessTtl, default 3600 detik). Jangan menjanjikan sesi lain langsung terputus.

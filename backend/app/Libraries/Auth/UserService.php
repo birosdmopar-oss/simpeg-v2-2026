@@ -228,6 +228,8 @@ class UserService
             'id_satker'           => $data['id_satker'] ?? null,
             'status'              => (string) ($data['status'] ?? PenggunaModel::STATUS_ACTIVE) === PenggunaModel::STATUS_INACTIVE ? PenggunaModel::STATUS_INACTIVE : PenggunaModel::STATUS_ACTIVE,
             'password_changed_at' => date('Y-m-d H:i:s'),
+            // MAKE-020 [V2]: password dipilih admin, bukan pemilik → wajib ganti saat login pertama.
+            'must_change_password' => 1,
         ]), $nip, $username, null);
 
         return PenggunaModel::toPublic($this->pengguna->find((int) $id));
@@ -358,6 +360,9 @@ class UserService
                 $update['password']            = $this->passwords->hash($password);
                 $update['password_legacy']     = null;
                 $update['password_changed_at'] = date('Y-m-d H:i:s');
+                // MAKE-020 [V2]: reset password oleh admin → pemilik wajib ganti saat login berikutnya; admin yang
+                // mengubah password akunnya sendiri lewat Manajemen Akun = pemilik memilih sendiri → dilepas.
+                $update['must_change_password'] = $actor->idPengguna() === $id ? 0 : 1;
             }
         }
 

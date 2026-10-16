@@ -20,6 +20,10 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
 - **`/ganti-password`** (`ChangePasswordPage`, semua role login; tautan "Ganti Password" di menu pengguna AppShell).
   Sukses → backend mencabut seluruh refresh token dan menghapus cookie; `auth.changePassword()` hanya mengosongkan sesi
   lokal (TANPA `/auth/logout`) lalu halaman pindah ke `/login?reason=password-changed`.
+- **Wajib ganti password (MAKE-020, ISSUE-044) [V2]:** `user.must_change_password` (dari login / `/auth/me`) →
+  `auth.mustChangePassword`. Selama true, route guard mengarahkan setiap route login ke `/ganti-password`,
+  `RedesignShell` menyembunyikan semua menu (tinggal menu profil Ganti Password & Keluar), dan halaman menampilkan
+  banner `change-password-required`. Backend menolak endpoint lain dengan 403 `password_change_required` (README Auth).
 - **Batas pencabutan sesi (ganti & reset):** backend hanya mencabut refresh token; access token yang sudah terbit di
   perangkat lain tetap sah sampai kedaluwarsa (`jwt.accessTtl`, default 60 menit) karena verifikasi access token belum
   memeriksa pencabutan. Teks halaman sengaja berbunyi "berakhir paling lambat 60 menit", bukan "langsung diakhiri".

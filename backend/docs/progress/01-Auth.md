@@ -64,6 +64,21 @@ Tanpa perubahan skema (memakai `queue_jobs(_failed)` dan `pengguna.email` yang s
 - ~~Review kode CR-014 oleh reviewer CR, lalu merge ke `main` sesudah quality gate (alur [CR]).~~ ✅ di main lewat merge `cc553be` (commit `198cd57`, 30-09-2026).
 - Keputusan terbuka: kewajiban mengisi email akun (konfirmasi TL); teks pesan generik forgot-password (usulan menyebut email & folder spam, belum diubah); purge `queue_jobs_failed` lama digabung job purge D-7 (A-01 Bagian 8 #12); nama bergelar di sapaan email menyusul B-01.
 
+## MAKE-020 — ISSUE-044 paksa ganti password saat login (branch `feat/make-020-paksa-ganti-password`, tanpa skema; kolom dari DBV-020)
+
+- `pengguna.must_change_password` = 1 saat password diatur sistem/admin: akun baru A-09 (termasuk tambah pegawai B-05,
+  password = NIP), admin buat akun / ubah password akun lain, koreksi NIP B-06. = 0 saat pemilik memilih sendiri: ganti
+  password A-06, reset lewat token email A-07, admin mengubah password akunnya sendiri. Login/rehash tidak mengubahnya.
+- Penegakan: claim `must_change_password` dari login (disalin saat refresh; setiap perubahan penanda mencabut sesi);
+  `JwtAuthFilter` → 403 `code: password_change_required` untuk semua route jwt kecuali `jwt:ganti_password`
+  (auth/me, change-password, logout; refresh tanpa jwt). Login, `auth/me`, dan daftar akun mengembalikan
+  `user.must_change_password`. FE: guard ke `/ganti-password`, menu disembunyikan, banner penjelasan.
+- Deviasi [V2]: legacy (`core/MY_Controller.php:214-221`) hanya popup bila password role 2/6 = NIP, tanpa blokir menu.
+  `expired_at` (legacy :223-230) belum ditegakkan.
+- Test: `tests/Auth/WajibGantiPasswordTest` (endpoint ditolak/diloloskan, set/lepas per jalur), tambahan assertion
+  `AccountProvisionerTest` (B-05) dan `NipCascadeTest` (B-06); Vitest `router.spec`, `RedesignShell.spec`,
+  `ChangePasswordView.spec`.
+
 ## MAKE-015 — validasi NIP terdaftar sebagai pegawai (prasyarat FK masuk DBV-019, branch `make-015/validasi-nip-akun`)
 
 - Buat akun dan menautkan NIP ke akun tanpa NIP (`UserService::create/update`, A-08) serta `AccountProvisioner` (A-09) menolak NIP yang tidak ada di `pegawai.nip` → 422 `errors.nip` "NIP tidak terdaftar sebagai pegawai.", tanpa baris tertulis; akun non-pegawai (NIP NULL) tetap sah. Bila FK masuk aktif dan baris pegawai hilang di antara cek dan tulis, 1452 diterjemahkan ke 422 yang sama (bukan 500). `faq_rate.nip` selalu diambil dari claim sesi akun (bukan input), jadi tertutup lewat validasi akun. Koreksi NIP (B-06) tidak lewat jalur ini. Test: `tests/Auth/ValidasiNipPegawaiTest` (termasuk FK masuk dipasang sementara); test Auth yang membuat akun ber-NIP baru kini menyisipkan `pegawai` lebih dulu (`AuthTestTrait::daftarkanPegawai`). `AuthSeeder` belum menyisipkan `pegawai` (prasyarat #3 DBV-019 sisa).

@@ -243,6 +243,7 @@ final class AccountProvisionerTest extends DatabaseTestCase
         $this->assertSame(Role::PPPK, (int) $row['user_level']);
         $this->assertStringStartsWith('$argon2id$', (string) $row['password']);
         $this->assertTrue(password_verify(self::NIP, (string) $row['password']));
+        $this->assertSame(1, (int) $row['must_change_password'], 'MAKE-020: password = NIP diatur sistem');
         $this->assertNull($row['password_legacy']);
 
         // Jalur biasa tetap menegakkan kebijakan: NIP sebagai password eksplisit ditolak.

@@ -40,6 +40,8 @@ class PasswordService
             'password'            => $this->passwords->hash($newPassword),
             'password_legacy'     => null,
             'password_changed_at' => date('Y-m-d H:i:s'),
+            // MAKE-020 [V2]: pemilik memilih password sendiri → penanda wajib ganti dilepas.
+            'must_change_password' => 0,
         ]);
 
         // Seluruh sesi lama tidak berlaku lagi (MTC-006).

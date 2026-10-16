@@ -3,7 +3,8 @@
  * Shell aplikasi redesign: sidebar mengambang + topbar navy + breadcrumb + area konten.
  * Satu-satunya shell setelah login: membungkus semua halaman (AppShell lama sudah dipensiunkan).
  *
- * - Menu diturunkan dari role sesi lewat `buildNav` (nav.config.ts).
+ * - Menu diturunkan dari role sesi lewat `buildNav` (nav.config.ts); disembunyikan seluruhnya selama sesi wajib
+ *   ganti password (MAKE-020) — tinggal menu profil (Ganti Password, Keluar).
  * - Status collapse sidebar diingat di localStorage (opsional; gagal → tetap jalan tanpa disimpan).
  * - Aksesibilitas: tautan "Lewati ke konten", landmark <main id="main-content">.
  */
@@ -44,7 +45,7 @@ watch(collapsed, (value) => {
   }
 })
 
-const groups = computed(() => buildNav(auth.role, undefined, auth.user?.nip ?? null))
+const groups = computed(() => (auth.mustChangePassword ? [] : buildNav(auth.role, undefined, auth.user?.nip ?? null)))
 const userName = computed(() => auth.user?.name ?? auth.user?.username ?? 'Pengguna')
 const userSubtitle = computed(() => auth.user?.nip ?? (auth.role ? ROLE_LABELS[auth.role] : ''))
 
