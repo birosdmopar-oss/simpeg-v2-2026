@@ -4,9 +4,11 @@
 gelar pegawai_hist`. Branch `dbv-020/skema-tambahan-fase3` (dari `main` `5ddaf33`). Alur **DBV-only** (AGENTS.md §2): PR,
 DB Validator me-review/approve **dan** merge. Rekomendasi key/alur dan alasannya: Bagian 10 #9.
 
-**Status:** ⏳ **MENUNGGU REVIEW DBV.** Kolom **Keputusan** di Bagian 10 masih kosong (⏳) dan checklist Bagian 12 belum
-diisi; isi Bagian 11 adalah verifikasi developer sebelum review, **bukan** hasil review DB Validator. Migration jangan
-dijalankan di Dev/Production sebelum disetujui.
+**Status:** ✅ **DISETUJUI DB VALIDATOR (jjoseph48, komentar PR #27 15-10-2026
+https://github.com/birosdmopar-oss/simpeg-v2-2026/pull/27#issuecomment-6188236160)** — verifikasi MariaDB 10.4
+lolos (100 tabel / 204 FK, rollback & pengaman `down()` gelar terbukti); Keputusan Bagian 10 #1–#10 dicatat per butir.
+Sebelum merge: branch disinkronkan dengan `main` terbaru + CI (permintaan review bagian 2), rujukan "runbook DBV-014" →
+runbook impor DBV-011 (C-2). Isi Bagian 11 tetap verifikasi developer sebelum review.
 
 **Asal kebutuhan:** kumpulan kebutuhan skema Fase 3 yang dicatat WS-1 (MAKE-007 Diklat, MAKE-008 AK) dan WS-2 (MAKE-010
 Koreksi NIP & biodata, MAKE-011 NipCascade), disetujui user 13-10-2026 untuk diajukan sebagai satu unit DBV.
@@ -119,6 +121,9 @@ Definisi Diklat v2 (`app/Libraries/Kepegawaian/Riwayat/Definisi/Diklat.php`, WS-
 untuk jenis 5 (`rumpun_sertifikasi`, lembaga di `instansi_penyelenggara`) dan menulis `id_rumpun_sertifikasi` /
 `id_lembaga_sertifikasi` = NULL. Pengalihan ke dropdown master (perilaku legacy `L_diklat.php:652-661`) = **MAKE
 lanjutan WS-1** setelah unit ini disetujui dan master diimpor.
+
+**Syarat DB Validator (C-1, keputusan #2):** begitu `rumpun_sertifikasi`/`lembaga_sertifikasi` diberi CRUD, UNIQUE nama
+dipasang **bersamaan** (migration + review DBV baru), tidak ditunda lagi — mengikuti pola G-01..G-10.
 
 ## 2. Butir 2 — `dm_ak_jf`
 
@@ -260,7 +265,7 @@ tidak dibaca aplikasi.
 
 ## 8. Interaksi impor
 
-| Tabel/kolom | Aturan impor (bahan runbook DBV-014) |
+| Tabel/kolom | Aturan impor (bahan runbook impor DBV-011; C-2 review DBV) |
 |---|---|
 | `rumpun_sertifikasi`, `lembaga_sertifikasi` | Salin apa adanya termasuk id (tanpa AUTO_INCREMENT). Audit `SELECT status, COUNT(*) … GROUP BY status`: nilai di luar 1/2/10 dilaporkan dan dipetakan sebelum impor (legacy hanya membaca `status='1'`). Impor **sebelum** `riwayat_diklat` bila FK yang ditahan akan diaktifkan |
 | `riwayat_diklat.id_rumpun_sertifikasi` / `id_lembaga_sertifikasi` | Diimpor apa adanya (tanpa FK di unit ini); audit yatim Bagian 1.3 dilaporkan, id `0` → NULL. Nilai teks `rumpun_sertifikasi`/`instansi_penyelenggara` tetap disalin (dipakai tampilan v2) |
@@ -286,16 +291,16 @@ tidak dibaca aplikasi.
 
 | # | Pertanyaan | Usulan developer | Keputusan |
 |---|---|---|---|
-| 1 | Butir 1: `rumpun_sertifikasi`/`lembaga_sertifikasi` = D1 (PK INT tanpa AUTO_INCREMENT) + COMMENT status v2 | Setujui | ⏳ |
-| 2 | Butir 1: tanpa UNIQUE nama dan tanpa CHECK status (= D1) | Setujui; UNIQUE nama menyusul lewat migration baru setelah audit duplikat data impor bila dikehendaki | ⏳ |
-| 3 | Butir 1: 2 FK [V2] `riwayat_diklat` → master (Bagian 1.3, RESTRICT, KEY bernama sama) — isi disetujui sekarang, migration **ditahan** di `MigrationsDitahan/` sampai prasyarat 1.3 #1–#2 | Setujui isi + penahanan. Alternatif: (b) aktifkan sekarang (risiko `migrate` berhenti di lingkungan target bila data impor berisi yatim); (c) tanpa FK sama sekali (= D1) | ⏳ |
-| 4 | Butir 2: `dm_ak_jf` = D1 dengan FK RESTRICT/RESTRICT (D1 CASCADE/CASCADE); tanpa `status`/`created_by` | Setujui (konvensi V1) | ⏳ |
-| 5 | Butir 3: aturan snapshot `pegawai_ak_siasn` = status 1, `tgl_sk DESC`, seri → `id_riwayat_ak_siasn DESC`; tidak ada baris → snapshot dihapus. Sekaligus menutup keputusan #6 DBV-012 (tabel masuk B-01) | Setujui | ⏳ |
-| 6 | Butir 4: kolom `pengguna.must_change_password` TINYINT(1) NOT NULL DEFAULT 0 sesudah `expired_at` (nama, tipe, tanpa CHECK); alternatif (b)/(c) Bagian 4.2 ditolak | Setujui; pengisian & penegakan = MAKE terpisah | ⏳ |
-| 7 | Butir 4, impor: akun role 2/6 dengan `password_legacy = MD5(nip)` diberi `must_change_password = 1` | Setujui (menjaga perilaku FCP legacy); alternatif: semua 0 | ⏳ |
-| 8 | Butir 6: `user_lokasi_presensi` tidak dibuat di v2; ekspansi dihitung dari `dm_user_lokasi_presensi`; NIP di `target_peg`/`excl_peg` dikoreksi NipCascade (MAKE-011); G-03 6.2 #6 gugur | Setujui | ⏳ |
-| 9 | Key & alur: 3 migration aktif + 1 migration ditahan + 1 schema test baru + penyesuaian 3 test dan 1 trait test support; tanpa kode aplikasi/seed | `[DBV-020]` saja, alur DBV-only (PR, DB Validator merge) — semua perubahan skema + test skema (preseden DBV-019 #5). Alternatif `[DBV-020][CR-…]` bila reviewer kode ingin me-review perubahan test | ⏳ |
-| 10 | Butir 5 + Bagian 7 #4: MODIFY gelar in-place (tanpa jendela khusus); rollback (COPY) hanya di jendela pemeliharaan | Setujui; dicatat di runbook DBV-014 | ⏳ |
+| 1 | Butir 1: `rumpun_sertifikasi`/`lembaga_sertifikasi` = D1 (PK INT tanpa AUTO_INCREMENT) + COMMENT status v2 | Setujui | ✅ Setuju (PK INT tanpa AUTO_INCREMENT = D1; preseden `kelas_jabatan`) |
+| 2 | Butir 1: tanpa UNIQUE nama dan tanpa CHECK status (= D1) | Setujui; UNIQUE nama menyusul lewat migration baru setelah audit duplikat data impor bila dikehendaki | ✅ Setuju **dengan syarat C-1**: UNIQUE nama WAJIB dipasang bersamaan saat kedua master diberi CRUD (bukan ditunda lagi) |
+| 3 | Butir 1: 2 FK [V2] `riwayat_diklat` → master (Bagian 1.3, RESTRICT, KEY bernama sama) — isi disetujui sekarang, migration **ditahan** di `MigrationsDitahan/` sampai prasyarat 1.3 #1–#2 | Setujui isi + penahanan. Alternatif: (b) aktifkan sekarang (risiko `migrate` berhenti di lingkungan target bila data impor berisi yatim); (c) tanpa FK sama sekali (= D1) | ✅ Setuju isi 2 FK + penahanan di `MigrationsDitahan/` (terverifikasi tidak terpasang) |
+| 4 | Butir 2: `dm_ak_jf` = D1 dengan FK RESTRICT/RESTRICT (D1 CASCADE/CASCADE); tanpa `status`/`created_by` | Setujui (konvensi V1) | ✅ Setuju RESTRICT/RESTRICT (C-3: service wajib menghapus baris `dm_ak_jf` lebih dulu dalam satu transaksi saat tabel mulai dikelola) |
+| 5 | Butir 3: aturan snapshot `pegawai_ak_siasn` = status 1, `tgl_sk DESC`, seri → `id_riwayat_ak_siasn DESC`; tidak ada baris → snapshot dihapus. Sekaligus menutup keputusan #6 DBV-012 (tabel masuk B-01) | Setujui | ✅ Setuju (pemecah seri `id_riwayat_ak_siasn DESC` eksplisit; menutup DBV-012 #6) |
+| 6 | Butir 4: kolom `pengguna.must_change_password` TINYINT(1) NOT NULL DEFAULT 0 sesudah `expired_at` (nama, tipe, tanpa CHECK); alternatif (b)/(c) Bagian 4.2 ditolak | Setujui; pengisian & penegakan = MAKE terpisah | ✅ Setuju (TINYINT(1) NOT NULL DEFAULT 0 tanpa CHECK) |
+| 7 | Butir 4, impor: akun role 2/6 dengan `password_legacy = MD5(nip)` diberi `must_change_password = 1` | Setujui (menjaga perilaku FCP legacy); alternatif: semua 0 | ✅ Setuju; kueri penentunya masuk runbook impor DBV-011 langkah 5 (`pengguna`) |
+| 8 | Butir 6: `user_lokasi_presensi` tidak dibuat di v2; ekspansi dihitung dari `dm_user_lokasi_presensi`; NIP di `target_peg`/`excl_peg` dikoreksi NipCascade (MAKE-011); G-03 6.2 #6 gugur | Setujui | ✅ Setuju (menutup G-03 6.2 #6) |
+| 9 | Key & alur: 3 migration aktif + 1 migration ditahan + 1 schema test baru + penyesuaian 3 test dan 1 trait test support; tanpa kode aplikasi/seed | `[DBV-020]` saja, alur DBV-only (PR, DB Validator merge) — semua perubahan skema + test skema (preseden DBV-019 #5). Alternatif `[DBV-020][CR-…]` bila reviewer kode ingin me-review perubahan test | ✅ Setuju `[DBV-020]` saja |
+| 10 | Butir 5 + Bagian 7 #4: MODIFY gelar in-place (tanpa jendela khusus); rollback (COPY) hanya di jendela pemeliharaan | Setujui; dicatat di runbook impor (DBV-011) | ✅ Setuju; dicatat di runbook impor (DBV-011), lihat C-2 |
 
 Koreksi setelah approval dilakukan lewat migration baru, bukan dengan mengedit migration yang sudah di `main`.
 
@@ -344,12 +349,12 @@ frontend.
 
 ## 12. Checklist DB Validator
 
-- [ ] `rumpun_sertifikasi`/`lembaga_sertifikasi` cocok dengan D1 (Bagian 1.1–1.2)
-- [ ] FK sertifikasi ditahan: isi (Bagian 1.3) dan penahanan diterima
-- [ ] `dm_ak_jf` cocok dengan D1; FK RESTRICT/RESTRICT diterima (Bagian 2)
-- [ ] Aturan snapshot `pegawai_ak_siasn` (Bagian 3) diterima
-- [ ] `pengguna.must_change_password` (Bagian 4) diterima
-- [ ] Pelebaran gelar `pegawai_hist` (Bagian 5) diterima; dampak ALTER dicatat runbook
-- [ ] `user_lokasi_presensi` tidak dibuat di v2 (Bagian 6)
-- [ ] `migrate` → `migrate:rollback` → `migrate` di MariaDB 10.4 (Bagian 11.3)
-- [ ] Keputusan Bagian 10 #1–#10 diisi
+- [x] `rumpun_sertifikasi`/`lembaga_sertifikasi` cocok dengan D1 (Bagian 1.1–1.2)
+- [x] FK sertifikasi ditahan: isi (Bagian 1.3) dan penahanan diterima
+- [x] `dm_ak_jf` cocok dengan D1; FK RESTRICT/RESTRICT diterima (Bagian 2)
+- [x] Aturan snapshot `pegawai_ak_siasn` (Bagian 3) diterima
+- [x] `pengguna.must_change_password` (Bagian 4) diterima
+- [x] Pelebaran gelar `pegawai_hist` (Bagian 5) diterima; dampak ALTER dicatat runbook
+- [x] `user_lokasi_presensi` tidak dibuat di v2 (Bagian 6)
+- [x] `migrate` → `migrate:rollback` → `migrate` di MariaDB 10.4 (Bagian 11.3)
+- [x] Keputusan Bagian 10 #1–#10 diisi
