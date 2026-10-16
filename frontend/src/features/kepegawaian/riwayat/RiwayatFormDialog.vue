@@ -31,6 +31,9 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   submit: [values: Record<string, string>, berkas: BerkasMap, jamak: Record<string, string[]>]
 }>()
+
+/** Nilai awal mode tambah: objek tetap, bukan `{}` baru di setiap render (CR-055 Q4R2-F1). */
+const KOSONG: Record<string, string> = {}
 </script>
 
 <template>
@@ -56,7 +59,7 @@ const emit = defineEmits<{
           :fields="fields ?? config.fields"
           :lampiran="config.lampiran"
           :mode="initial ? 'edit' : 'create'"
-          :initial="initial ?? {}"
+          :initial="initial ?? KOSONG"
           :baris="baris ?? null"
           :pratinjau="pratinjau ?? null"
           :lampiran-tersimpan="lampiranTersimpan ?? {}"

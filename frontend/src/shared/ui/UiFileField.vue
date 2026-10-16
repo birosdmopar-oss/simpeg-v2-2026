@@ -11,6 +11,8 @@
 import { File as FileIcon, FileText, Upload } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, ref, useId } from 'vue'
 
+import { fileExtension, fileExtensionError } from '@/shared/utils/fileExtension'
+
 const props = withDefaults(
   defineProps<{
     label: string
@@ -60,9 +62,9 @@ function proses(file: File | null): void {
     return
   }
 
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-  if (!props.allowed.includes(ext)) {
-    error.value = `Jenis file .${ext || '?'} tidak diperbolehkan.`
+  const salahJenis = fileExtensionError(file.name, props.allowed)
+  if (salahJenis !== null) {
+    error.value = salahJenis
   } else if (file.size > props.maxMb * 1024 * 1024) {
     error.value = `Ukuran file melebihi ${props.maxMb} MB.`
   }
@@ -75,6 +77,7 @@ function proses(file: File | null): void {
   }
 
   fileName.value = file.name
+  const ext = fileExtension(file.name)
   fileSize.value = file.size
   pdf.value = ext === 'pdf'
   if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) && typeof URL.createObjectURL === 'function') {

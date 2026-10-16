@@ -228,6 +228,9 @@ describe('ArsipTable — unggah', () => {
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis file .png tidak diperbolehkan.')
     await pilihBerkas(wrapper, new File([new Uint8Array(1024 * 1024 + 1)], 'besar.pdf', { type: 'application/pdf' }))
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Ukuran file melebihi 1 MB.')
+    // CR-055 Q4R2-I2: nama tanpa ekstensi → pesan jelas.
+    await pilihBerkas(wrapper, new File(['%PDF'], 'sk', { type: 'application/pdf' }))
+    expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Nama berkas tidak memiliki ekstensi.')
     expect(svc.upload).not.toHaveBeenCalled()
   })
 

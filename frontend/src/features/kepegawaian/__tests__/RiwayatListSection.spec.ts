@@ -44,6 +44,7 @@ import kp from '../riwayat/jenis/kp'
 import lkh from '../riwayat/jenis/lkh'
 import pendidikan from '../riwayat/jenis/pendidikan'
 import { D, R, T, type RiwayatJenisConfig } from '../riwayat/riwayat.config'
+import RiwayatFormDialog from '../riwayat/RiwayatFormDialog.vue'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { riwayatService } from '../riwayat/riwayat.service'
 import { lampiranService } from '../services/lampiran.service'
@@ -310,6 +311,64 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     expect(berkas).toEqual({ 14: pdf })
     expect(q('[data-testid="riwayat-dialog"]')?.textContent).toContain('Tanggal lulus wajib diisi.')
     expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Berkas harus pdf.')
+  })
+
+  it('CR-055 Q4R2-F1: tambah → 422 server → isian & berkas tetap; Simpan ulang mengirim berkas yang sama', async () => {
+    svc.create.mockRejectedValueOnce(apiError(422, { no_ijazah: ['Nomor ijazah sudah terdaftar.'] }))
+    const wrapper = await mountTab({}, ujiBerlampiran)
+    await openCreate(wrapper)
+    await setInput('id_jenjang_pendidikan', '7')
+    await setInput('no_ijazah', 'IJZ-BARU')
+    await setInput('tgl_lulus', '2012-08-30')
+    await chooseFile(14, pdf)
+    await submitForm()
+    await vi.waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-dialog"]')?.textContent).toContain('Nomor ijazah sudah terdaftar.'))
+
+    // Isian yang diketik dan berkas terpilih tidak dikosongkan oleh render ulang sesudah galat.
+    expect(field('id_jenjang_pendidikan')?.value).toBe('7')
+    expect(field('no_ijazah')?.value).toBe('IJZ-BARU')
+    expect(field('tgl_lulus')?.value).toBe('2012-08-30')
+    expect(q('[data-testid="riwayat-berkas-14"]')?.textContent).toContain('ijazah.pdf')
+
+    svc.create.mockResolvedValueOnce({})
+    await setInput('no_ijazah', 'IJZ-LAIN')
+    await submitForm()
+    await vi.waitFor(() => expect(svc.create).toHaveBeenCalledTimes(2))
+    expect(q('[data-testid="riwayat-berkas-error-14"]')).toBeNull() // tanpa galat palsu "wajib diunggah"
+    const [, , , values, berkas] = svc.create.mock.calls[1]
+    expect(values).toMatchObject({ id_jenjang_pendidikan: '7', no_ijazah: 'IJZ-LAIN', tgl_lulus: '2012-08-30' })
+    expect(berkas).toEqual({ 14: pdf })
+  })
+
+  it('CR-055: edit tetap ter-reset saat entri berganti; objek initial baru berisi sama tidak me-reset', async () => {
+    const nilai = (row: Record<string, unknown>) => Object.fromEntries(uji.fields.map((f) => [f.name, String(row[f.name] ?? '')]))
+    const baris1 = pendidikanRow(1)
+    const baris2 = pendidikanRow(2, { tgl_lulus: '2015-01-02' })
+    const wrapper = mount(RiwayatFormDialog, {
+      props: { open: true, config: ujiBerlampiran, initial: nilai(baris1), baris: baris1, lampiranTersimpan: { 14: 0 } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(field('no_ijazah')?.value).toBe('IJZ-1')
+    await setInput('no_ijazah', 'DIKETIK')
+    await chooseFile(14, pdf)
+
+    // Induk merender ulang dengan objek initial baru berisi sama (mis. sesudah 422) → ketikan & berkas tetap.
+    await wrapper.setProps({ initial: nilai(baris1) })
+    await flushPromises()
+    expect(field('no_ijazah')?.value).toBe('DIKETIK')
+    expect(q('[data-testid="riwayat-berkas-14"]')?.textContent).toContain('ijazah.pdf')
+
+    // Entri berganti → nilai entri baru, ketikan & berkas terpilih dibuang (tampilan kolom berkas ikut kosong).
+    await wrapper.setProps({ initial: nilai(baris2), baris: baris2 })
+    await flushPromises()
+    expect(field('no_ijazah')?.value).toBe('IJZ-2')
+    expect(field('tgl_lulus')?.value).toBe('2015-01-02')
+    expect(q('[data-testid="riwayat-berkas-14"]')?.textContent).not.toContain('ijazah.pdf')
+    q('[data-testid="riwayat-form"]')?.dispatchEvent(new Event('submit'))
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Ijazah wajib diunggah.'))
+    expect(wrapper.emitted('submit')).toBeUndefined()
   })
 
   it('422 berkas.<id> untuk kode yang tidak ada di form → tampil di notice form, dialog tetap terbuka', async () => {

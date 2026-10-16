@@ -151,13 +151,27 @@ const berkasError = reactive<Record<number | string, string>>({})
 const refs = useRiwayatRefOptions(props.fields)
 onMounted(() => void refs.init(blank()).then(isiJamakAwal))
 
+/** Isi dua objek nilai awal sama (kunci & nilai string). */
+const samaIsi = (a: Record<string, string>, b: Record<string, string>): boolean => {
+  const kunci = new Set([...Object.keys(a), ...Object.keys(b)])
+  return [...kunci].every((k) => (a[k] ?? '') === (b[k] ?? ''))
+}
+
+/** Naik setiap reset form: kolom berkas (UiFileField, tidak terkendali) dirender ulang supaya tampilannya ikut kosong. */
+const resetKe = ref(0)
+
+// Reset HANYA bila entri yang dibuka berganti (isi nilai awal atau baris berbeda), bukan setiap kali induk mengirim
+// objek `initial` baru dengan isi yang sama (render ulang, mis. sesudah galat 422 server) — CR-055 Q4R2-F1: dulu isian
+// dan berkas terpilih ikut terhapus sehingga Simpan berikutnya terblokir "… wajib diunggah".
 watch(
-  () => props.initial,
-  () => {
+  [() => props.initial, () => props.baris],
+  ([initial, baris], [lamaInitial, lamaBaris]) => {
+    if (baris === lamaBaris && samaIsi(initial, lamaInitial)) return
     resetForm({ values: blank() })
     disentuh.clear()
-    for (const key of Object.keys(berkas)) delete berkas[Number(key)]
-    for (const key of Object.keys(berkasError)) delete berkasError[Number(key)]
+    for (const key of Object.keys(berkas)) delete berkas[key]
+    for (const key of Object.keys(berkasError)) delete berkasError[key]
+    resetKe.value++
     void refs.init(blank()).then(isiJamakAwal)
   },
 )
@@ -456,6 +470,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
       <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
         <div v-for="def in lampiran" :key="def.id_riwayat" :data-testid="`${testid}-berkas-${def.id_riwayat}`">
           <UiFileField
+            :key="resetKe"
             :label="fileRequired(def) ? `${def.label} *` : def.label"
             :allowed="def.ekstensi"
             :max-mb="def.batas_mb"
@@ -474,6 +489,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
       <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
         <div v-for="def in berkasKolom" :key="def.kolom" :data-testid="`${testid}-berkas-${def.kolom}`">
           <UiFileField
+            :key="resetKe"
             :label="kolomWajib(def) ? `${def.label} *` : def.label"
             :allowed="def.ekstensi ?? ['pdf']"
             :max-mb="def.batas_mb ?? 5"

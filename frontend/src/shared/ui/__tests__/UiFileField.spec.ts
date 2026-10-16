@@ -49,4 +49,13 @@ describe('UiFileField', () => {
     expect(w.emitted('change')?.at(-1)).toEqual([null])
     expect(w.find('[data-testid="file-preview"]').exists()).toBe(false)
   })
+
+  it('CR-055 Q4R2-I2: nama tanpa ekstensi → pesan jelas (bukan ".sk tidak diperbolehkan" / ".?")', async () => {
+    const w = pasang()
+    await lepas(w, new File(['x'], 'sk'))
+    expect(w.get('[role="alert"]').text()).toBe('Nama berkas tidak memiliki ekstensi. Gunakan berkas berekstensi .pdf, .png.')
+    await lepas(w, new File(['x'], 'sk.'))
+    expect(w.get('[role="alert"]').text()).toBe('Nama berkas tidak memiliki ekstensi. Gunakan berkas berekstensi .pdf, .png.')
+    expect(w.emitted('change')?.at(-1)).toEqual([null])
+  })
 })

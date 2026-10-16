@@ -102,8 +102,10 @@ function rowActions(): RowAction[] {
   ]
 }
 
-const initial = computed<Record<string, string> | null>(() =>
-  editing.value ? Object.fromEntries(FIELDS.map((f) => [f.name, editing.value?.[f.name] == null ? '' : String(editing.value[f.name])])) : null,
+/** Nilai awal tambah anak: objek tetap (CR-055 Q4R2-F1, sama dengan RiwayatFormDialog). */
+const KOSONG: Record<string, string> = {}
+const initial = computed<Record<string, string>>(() =>
+  editing.value ? Object.fromEntries(FIELDS.map((f) => [f.name, editing.value?.[f.name] == null ? '' : String(editing.value[f.name])])) : KOSONG,
 )
 
 function openCreate(): void {
@@ -247,7 +249,7 @@ function tanggal(value: unknown): string {
           :fields="FIELDS"
           :lampiran="[AKTE]"
           :mode="editing ? 'edit' : 'create'"
-          :initial="initial ?? {}"
+          :initial="initial"
           :lampiran-tersimpan="akteTersimpan"
           :server-errors="formErrors"
           :busy="saving"

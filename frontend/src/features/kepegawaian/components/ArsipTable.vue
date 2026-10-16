@@ -21,6 +21,7 @@ import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
 import { UiButton, UiNotice } from '@/shared/ui'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
+import { fileExtensionError } from '@/shared/utils/fileExtension'
 
 import { describeApiError, splitValidationErrors, type ApiFailure } from '../services/apiErrors'
 import { lampiranService, type LampiranTarget } from '../services/lampiran.service'
@@ -156,9 +157,9 @@ onBeforeUnmount(lepasPratinjau)
 async function unggah(file: File): Promise<void> {
   const aturan = props.aturan
   if (aturan) {
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-    if (!aturan.ekstensi.includes(ext)) {
-      notice.value = { tone: 'danger', text: `Jenis file .${ext || '?'} tidak diperbolehkan.` }
+    const salahJenis = fileExtensionError(file.name, aturan.ekstensi)
+    if (salahJenis !== null) {
+      notice.value = { tone: 'danger', text: salahJenis }
       return
     }
     if (file.size > aturan.batas_mb * 1024 * 1024) {
