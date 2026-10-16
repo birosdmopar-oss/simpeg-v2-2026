@@ -9,13 +9,14 @@
  * manual (mis. level pangkat) diubah lewat Edit karena nilainya tidak menggeser entri lain.
  */
 import { ArrowDown, ArrowUp, Pencil, Plus, Power, PowerOff, RotateCcw, Search, Trash2 } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
+import { useStickyActionsShadow } from '@/shared/composables/useStickyActionsShadow'
 
 import MasterFormDialog from '../components/MasterFormDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -57,25 +58,10 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.va
 /**
  * CR-038 (F-UI-2): kolom Aksi menempel di kanan area tabel (`sticky right-0`) supaya tombol ⋮ selalu terlihat di layar
  * sempit. Bayangan pemisah hanya tampil selama masih ada kolom yang tersembunyi di bawahnya (tabel bisa digeser).
+ * Logika bersama: `useStickyActionsShadow` (CR-053).
  */
 const tableScroller = ref<HTMLElement | null>(null)
-const actionsShadow = ref(false)
-let tableResizeObserver: ResizeObserver | null = null
-
-function updateActionsShadow(): void {
-  const el = tableScroller.value
-  actionsShadow.value = el !== null && el.scrollWidth - el.clientWidth - el.scrollLeft > 1
-}
-
-watch(tableScroller, (el, previous) => {
-  if (tableResizeObserver && previous) tableResizeObserver.disconnect()
-  if (el && typeof ResizeObserver !== 'undefined') {
-    tableResizeObserver ??= new ResizeObserver(updateActionsShadow)
-    tableResizeObserver.observe(el)
-    if (el.firstElementChild) tableResizeObserver.observe(el.firstElementChild)
-  }
-  updateActionsShadow()
-})
+const { actionsShadow, updateActionsShadow } = useStickyActionsShadow(tableScroller, [items, loading, meta])
 
 /**
  * Keterangan hapus. Status turunan tidak ditulis ulang (DBV-002 U3). Penyaringan rantai status untuk tampilan
@@ -403,15 +389,7 @@ async function onConfirmDelete(): Promise<void> {
   }
 }
 
-watch([items, loading, meta], () => void nextTick(updateActionsShadow))
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateActionsShadow)
-  tableResizeObserver?.disconnect()
-})
-
 onMounted(() => {
-  window.addEventListener('resize', updateActionsShadow)
   void loadMeta()
 })
 </script>

@@ -50,6 +50,12 @@ async function mountView() {
   return wrapper
 }
 
+function setScrollSize(el: HTMLElement, size: { scrollWidth: number; clientWidth: number; scrollLeft: number }): void {
+  Object.defineProperty(el, 'scrollWidth', { configurable: true, value: size.scrollWidth })
+  Object.defineProperty(el, 'clientWidth', { configurable: true, value: size.clientWidth })
+  Object.defineProperty(el, 'scrollLeft', { configurable: true, writable: true, value: size.scrollLeft })
+}
+
 const q = <T extends Element = HTMLElement>(sel: string) => document.body.querySelector<T>(sel)
 
 async function isi(name: string, value: string): Promise<void> {
@@ -77,6 +83,42 @@ describe('MasterAkJfView', () => {
 
     await wrapper.get('[data-testid="ak-jf-search"]').setValue('pranata')
     expect(wrapper.findAll('[data-testid^="ak-jf-row-"]')).toHaveLength(1)
+  })
+
+  it('CR-053: bayangan kolom Aksi hanya selama masih ada kolom tergulir di bawahnya (pola CR-038)', async () => {
+    const wrapper = await mountView()
+    const scroller = wrapper.get('[data-testid="ak-jf-table-scroll"]')
+    const header = () => wrapper.get('[data-testid="ak-jf-col-actions"]')
+    const cell = () => wrapper.get('[data-testid="ak-jf-row-11-9"]').findAll('td').at(-1)
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+
+    // Layar sempit: tabel 700px di area 390px, belum digeser.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 700, clientWidth: 390, scrollLeft: 0 })
+    await scroller.trigger('scroll')
+    expect(header().classes()).toContain('shadow-sticky-end')
+    expect(cell()?.classes()).toContain('shadow-sticky-end')
+
+    // Digeser sampai ujung kanan → tanpa bayangan.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 700, clientWidth: 390, scrollLeft: 310 })
+    await scroller.trigger('scroll')
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+    expect(cell()?.classes()).not.toContain('shadow-sticky-end')
+
+    // Resize jendela: bisa digeser → ada; tabel muat → hilang.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 900, clientWidth: 600, scrollLeft: 0 })
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+    expect(header().classes()).toContain('shadow-sticky-end')
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 900, clientWidth: 900, scrollLeft: 0 })
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+
+    // Isi tabel berubah (pencarian) → dihitung ulang sesudah render.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 700, clientWidth: 390, scrollLeft: 0 })
+    await wrapper.get('[data-testid="ak-jf-search"]').setValue('pranata')
+    await flushPromises()
+    expect(header().classes()).toContain('shadow-sticky-end')
   })
 
   it('tambah: pilihan berjenjang memuat jabatan dari server, lalu create; galat 422 dipetakan ke isian', async () => {

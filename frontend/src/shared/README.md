@@ -30,6 +30,9 @@ Kode lintas modul (ADR-019): komponen/composable/util pindah ke sini **begitu di
   Edit/ubah status/urutan dan sebelum Hapus. Props/emit dibekukan; perubahan diajukan ke WS-2.
 - `composables/useCascadeOptions.ts` dan `services/masterOptions.ts` me-re-export cascade & opsi master dari
   `features/master-data` (berkas asal tidak dipindah); modul lain mengimpor lewat `@/shared/...`.
+- `composables/useStickyActionsShadow.ts` (CR-053) — bayangan `shadow-sticky-end` kolom Aksi sticky kanan selama tabel
+  masih bisa digeser (pola CR-038; dipakai `MasterDataView` dan `MasterAkJfView`): `useStickyActionsShadow(tableScroller, pemicu)` dengan ref template milik view `ref="tableScroller"` +
+  `@scroll.passive="updateActionsShadow"` di wadah `overflow-x-auto`, `actionsShadow` di header & sel Aksi.
 
 ## Konvensi form (CR-028)
 
