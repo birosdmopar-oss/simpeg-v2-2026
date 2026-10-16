@@ -15,9 +15,18 @@ use Config\Jwt as JwtConfig;
  * JwtAuthFilter (F0-06) — validasi access token, 401 kalau tidak ada/invalid/expired.
  * Sumber token: cookie httpOnly (utama, ADR-004) atau header Authorization: Bearer (fallback API client).
  * Claims yang valid disimpan ke service('authContext') untuk dipakai RoleFilter/Service/Model.
+ *
+ * MAKE-020 (ISSUE-044) [V2]: sesi akun yang wajib ganti password (claim `must_change_password`) hanya boleh memakai
+ * route yang memasang argumen `jwt:ganti_password` (auth/me, auth/change-password, auth/logout; auth/refresh tanpa
+ * filter jwt). Route lain → 403 `code` = `password_change_required`. Fail-closed: route baru otomatis ikut ditolak.
  */
 class JwtAuthFilter implements FilterInterface
 {
+    /** Argumen filter (`jwt:ganti_password`) untuk route yang tetap boleh dipakai selama wajib ganti password. */
+    public const ARG_GANTI_PASSWORD = 'ganti_password';
+
+    public const CODE_PASSWORD_CHANGE_REQUIRED = 'password_change_required';
+
     /**
      * @param list<string>|null $arguments
      */
@@ -36,6 +45,16 @@ class JwtAuthFilter implements FilterInterface
         }
 
         service('authContext')->setClaims($claims);
+
+        if (service('authContext')->mustChangePassword() && ! in_array(self::ARG_GANTI_PASSWORD, (array) ($arguments ?? []), true)) {
+            return service('response')
+                ->setStatusCode(403)
+                ->setJSON([
+                    'status'  => 'error',
+                    'code'    => self::CODE_PASSWORD_CHANGE_REQUIRED,
+                    'message' => 'Password wajib diganti sebelum melanjutkan.',
+                ]);
+        }
 
         return null;
     }

@@ -142,6 +142,8 @@ class AccountProvisioner
                 'id_satker'           => $pegawai['id_satker'] ?? null,
                 'status'              => PenggunaModel::STATUS_ACTIVE,
                 'password_changed_at' => null,
+                // MAKE-020 [V2]: password awal diatur sistem (NIP / acak / dari admin) → wajib ganti saat login pertama.
+                'must_change_password' => 1,
             ]);
         } catch (DatabaseException $e) {
             if ($e->getCode() === PenggunaModel::ER_FK_TANPA_INDUK && ! $this->pengguna->nipTerdaftarPegawai($nip)) {

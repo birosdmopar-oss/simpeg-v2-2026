@@ -82,4 +82,12 @@ class AuthContext
 
         return $v === null ? null : (string) $v;
     }
+
+    /**
+     * Sesi akun yang wajib mengganti password dulu (MAKE-020, claim `must_change_password`; token tanpa claim = tidak).
+     */
+    public function mustChangePassword(): bool
+    {
+        return ($this->claims['must_change_password'] ?? false) === true;
+    }
 }

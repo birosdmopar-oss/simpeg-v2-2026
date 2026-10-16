@@ -57,6 +57,11 @@ export interface User {
   last_login_at: string | null
   created_at: string | null
   updated_at: string | null
+  /**
+   * MAKE-020: password diatur sistem/admin → wajib diganti dulu. Selama true, backend menolak endpoint selain
+   * auth/me, change-password, refresh, logout (403 `password_change_required`); FE mengunci ke halaman Ganti Password.
+   */
+  must_change_password?: boolean
 }
 
 export interface SessionClaims {

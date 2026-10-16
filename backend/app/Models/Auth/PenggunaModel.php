@@ -55,7 +55,7 @@ class PenggunaModel extends BaseAuditableModel
     protected $deletedField   = 'deleted_at';
     protected $allowedFields  = [
         'nip', 'username', 'name', 'email', 'password', 'password_legacy', 'user_level', 'id_unit', 'id_satker',
-        'status', 'last_login_at', 'password_changed_at', 'expired_at',
+        'status', 'last_login_at', 'password_changed_at', 'expired_at', 'must_change_password',
     ];
 
     protected array $auditMaskedFields = ['password', 'password_legacy'];
@@ -204,7 +204,19 @@ class PenggunaModel extends BaseAuditableModel
             'last_login_at' => $row['last_login_at'] ?? null,
             'created_at'    => $row['created_at'] ?? null,
             'updated_at'    => $row['updated_at'] ?? null,
+            // MAKE-020 (DBV-020 bagian 4): akun wajib ganti password sebelum memakai fitur lain.
+            'must_change_password' => self::wajibGantiPassword($row),
         ];
+    }
+
+    /**
+     * Penanda `must_change_password` = 1 (MAKE-020). MySQLi mengembalikan string; kolom tidak ada di baris = tidak.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function wajibGantiPassword(array $row): bool
+    {
+        return (int) ($row['must_change_password'] ?? 0) === 1;
     }
 
     /**

@@ -34,6 +34,8 @@ export const useAuthStore = defineStore('auth', () => {
   )
   /** Menu Master Data (Modul G) — role 1 saja. */
   const canManageMasterData = computed(() => role.value === Role.SUPER_ADMIN)
+  /** MAKE-020: sesi wajib ganti password dulu (route guard mengunci ke /ganti-password, menu disembunyikan). */
+  const mustChangePassword = computed(() => user.value?.must_change_password === true)
 
   function setSession(nextUser: User, nextClaims: SessionClaims | null = null): void {
     user.value = nextUser
@@ -103,6 +105,7 @@ export const useAuthStore = defineStore('auth', () => {
     role,
     canManageUsers,
     canManageMasterData,
+    mustChangePassword,
     setSession,
     clearSession,
     fetchCurrentUser,

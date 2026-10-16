@@ -78,3 +78,33 @@ describe('router — /ganti-password', () => {
     expect(router.currentRoute.value.meta.title).toBe('Ganti Password')
   })
 })
+
+describe('router — wajib ganti password (MAKE-020)', () => {
+  function sesi(must: boolean) {
+    vi.mocked(authService.me).mockResolvedValue({
+      user: { username: 'u', user_level: Role.SUPER_ADMIN, must_change_password: must } as User,
+      claims: { role: Role.SUPER_ADMIN, id_unit: null, id_satker: null, exp: null },
+    })
+  }
+
+  it.each(['/', '/akun', '/master/agama', '/faq', '/pegawai', '/403'])('penanda aktif → %s dialihkan ke /ganti-password', async (path) => {
+    sesi(true)
+    await router.push(path)
+
+    expect(router.currentRoute.value.name).toBe('change-password')
+  })
+
+  it('penanda aktif → /ganti-password tetap terbuka', async () => {
+    sesi(true)
+    await router.push('/ganti-password')
+
+    expect(router.currentRoute.value.name).toBe('change-password')
+  })
+
+  it('penanda tidak aktif → route lain terbuka seperti biasa', async () => {
+    sesi(false)
+    await router.push('/akun')
+
+    expect(router.currentRoute.value.name).toBe('users')
+  })
+})

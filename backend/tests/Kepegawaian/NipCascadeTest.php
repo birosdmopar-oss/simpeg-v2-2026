@@ -135,6 +135,7 @@ final class NipCascadeTest extends DatabaseTestCase
         $this->assertSame([self::NIP_BARU, self::NIP_BARU], [$akun['nip'], $akun['username']]);
         $this->assertNull($akun['password_legacy']);
         $this->assertTrue(password_verify(self::NIP_BARU, (string) $akun['password']));
+        $this->assertSame(1, (int) $akun['must_change_password'], 'MAKE-020: password = NIP baru diatur sistem');
         $this->assertSame(0, $this->db->table('token')->where('id_pengguna', $idAkun)->countAllResults());
         $this->assertGreaterThan(0, $hasil['sesi_dicabut']);
 

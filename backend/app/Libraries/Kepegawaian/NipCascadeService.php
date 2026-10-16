@@ -43,8 +43,8 @@ use Throwable;
  *  - Akun `pengguna` [K] ikut legacy penuh (:589-599, keputusan user 13-10-2026, menutup pertanyaan CR-036 #1):
  *    `username` akun pegawai itu SELALU diganti NIP baru dan password direset ke NIP baru — di-hash Argon2id lewat
  *    PasswordVerifier (bukan md5; `password_decode` tidak ada di v2), `password_legacy` dikosongkan,
- *    `password_changed_at` NULL seperti akun baru AccountProvisioner. Penanda "wajib ganti password" belum ada di skema
- *    v2 (kebutuhan skema, dicatat di laporan MAKE-010).
+ *    `password_changed_at` NULL seperti akun baru AccountProvisioner, dan `must_change_password` = 1 (MAKE-020 [V2],
+ *    kolom DBV-020): pemilik wajib mengganti password saat login berikutnya.
  *  - Sesi [V2]: refresh token menyimpan claims (termasuk `nip`) saat terbit, jadi seluruh sesi akun pegawai itu dicabut
  *    (`JwtService::revokeAllForUser`, baris token dihapus) di transaksi yang sama; pemilik login ulang dengan NIP baru.
  *    Kolom jejak `token.nip` (A-01 D-7) karena itu tidak diarahkan ulang.
@@ -199,7 +199,9 @@ final class NipCascadeService implements NipCascadeInterface
             'password'            => $this->passwords()->hash($baru),
             'password_legacy'     => null,
             'password_changed_at' => null,
-            'updated_at'          => $sekarang,
+            // MAKE-020 [V2]: password = NIP baru diatur sistem → wajib ganti saat login berikutnya.
+            'must_change_password' => 1,
+            'updated_at'           => $sekarang,
         ]);
         $this->wajibBerhasil($db, $akunDiganti, 'pengguna.username');
         $tabel['pengguna.username'] = $db->affectedRows();

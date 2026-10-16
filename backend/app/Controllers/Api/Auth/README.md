@@ -76,12 +76,44 @@ Replay token itu → 401 "Refresh token tidak dikenal."; sesi di perangkat lain 
 
 ### GET /auth/me
 200 `data: { user, claims:{ role, id_unit, id_satker, exp } }` — akun dicari per `id_pengguna` (claim `sub`).
+`user.must_change_password` (boolean, juga di respons login dan daftar akun) — lihat bagian berikut.
 
 ### POST /auth/change-password
 Request `{ "old_password", "new_password", "new_password_confirmation" }`.
 200 `data: { changed:true, sessions_revoked:true }` (seluruh baris refresh token akun dihapus, cookie dihapus → login ulang).
 422 `errors: { old_password | new_password | new_password_confirmation }`.
 Kebijakan password (K4, ikut legacy; satu sumber `App\Libraries\Auth\PasswordPolicy`, dicerminkan frontend `PASSWORD_RULES`): min `auth.passwordMinLength` (8) karakter, minimal 1 huruf besar, 1 huruf kecil, dan 1 angka; untuk ganti password juga harus beda dari password lama. Berlaku untuk semua jalur yang menetapkan password (ganti, reset, admin buat/ubah akun, password awal A-09). Login tidak memeriksa kebijakan: password lama yang tidak memenuhi aturan tetap bisa dipakai dan tidak dipaksa diganti.
+
+### Wajib ganti password (MAKE-020, ISSUE-044) [V2]
+Kolom `pengguna.must_change_password` (DBV-020 bagian 4) menandai akun yang passwordnya diatur sistem atau admin, bukan
+dipilih pemiliknya.
+
+| Jalur | Penanda |
+|---|---|
+| Akun baru A-09 (`AccountProvisioner`: tambah pegawai B-05 password = NIP, password acak/awal dari pemanggil) | 1 |
+| Admin buat akun (`POST /auth/users`) | 1 |
+| Admin mengubah password akun lain (`PUT /auth/users/{id}` dengan `password`) | 1 |
+| Admin mengubah password akunnya sendiri lewat Manajemen Akun | 0 (pemilik memilih sendiri) |
+| Koreksi NIP B-06 (password = NIP baru) | 1 |
+| Ganti password sendiri A-06 / reset lewat token email A-07 | 0 |
+| Login (termasuk lazy rehash A-02b), ubah akun tanpa `password` | tidak berubah |
+
+Penegakan:
+
+- Login membaca penanda dari DB dan memasukkannya ke claim `must_change_password` (hanya ada bila true). Refresh
+  menyalin claim itu. Setiap perubahan penanda mencabut seluruh sesi akun (reset admin, koreksi NIP, ganti/reset
+  password), jadi sesi berikutnya selalu memakai nilai terbaru. Access token yang sudah terbit tetap berlaku sampai
+  kedaluwarsa, seperti perubahan role.
+- Selama claim aktif, `JwtAuthFilter` hanya meloloskan route berargumen `jwt:ganti_password`: `GET /auth/me`,
+  `POST /auth/change-password`, `POST /auth/logout` (`POST /auth/refresh` tanpa filter jwt). Endpoint lain →
+  **403** `{ status:"error", code:"password_change_required", message:"Password wajib diganti sebelum melanjutkan." }`.
+  Route baru otomatis ikut ditolak (fail-closed).
+- Frontend: route guard mengunci ke `/ganti-password` dan menyembunyikan menu. Setelah ganti password, sesi dicabut dan
+  login ulang berjalan normal (penanda 0).
+
+Legacy (`core/MY_Controller.php:214-221`) hanya memunculkan popup ganti password bila password role 2/6 masih = NIP
+(md5) dan tidak memblokir menu. v2 memaksa ganti untuk semua jalur di atas, untuk semua role (deviasi [V2], ISSUE-044).
+Kedaluwarsa password (`expired_at`, legacy :223-230) belum ditegakkan.
 
 ### POST /auth/forgot-password
 Request `{ "username", "captcha_token": "<cf-turnstile-response>" }`. 200 selalu generik `data: { accepted:true, message }`; di development (`auth.exposeResetTokenInResponse=true`) ditambah `token`, `expires_at`. Flag itu **ditolak di production** (ISSUE-021): sesudah captcha valid, forgot-password gagal 500 (ConfigException) yang sama untuk semua username tanpa menulis `forgot_attempts`; reset-password tidak terpengaruh.

@@ -79,6 +79,17 @@ describe('RedesignShell — menu', () => {
     expect(wrapper.get('[data-testid="nav-master-data"]').attributes('aria-current')).toBe('page')
   })
 
+  it('wajib ganti password (MAKE-020): semua menu disembunyikan, menu profil tetap ada', async () => {
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN, '/ganti-password', { must_change_password: true })
+    expect(wrapper.find('[data-testid="nav-main"] a').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nav-master-data"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="user-menu"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector('[data-testid="nav-change-password"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-testid="nav-logout"]')).not.toBeNull()
+  })
+
   it('Beranda hanya aktif di "/" (bukan semua path)', async () => {
     const { wrapper } = await mountShell(Role.SUPER_ADMIN, '/faq')
     expect(wrapper.get('[data-testid="nav-home"]').attributes('aria-current')).toBeUndefined()
