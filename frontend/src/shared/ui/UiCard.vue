@@ -38,7 +38,7 @@ const ACCENTS = {
           <p v-if="subtitle" class="mt-0.5 text-body2 text-slate-500">{{ subtitle }}</p>
         </slot>
       </div>
-      <div v-if="$slots.actions" class="flex items-center gap-2">
+      <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2">
         <slot name="actions" />
       </div>
     </header>

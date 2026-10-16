@@ -31,11 +31,13 @@ export const lampiranService = {
     return data
   },
 
-  async upload(nip: string, target: LampiranTarget, berkas: File): Promise<DocumentAttachment> {
+  /** `isian` = kolom tambahan multipart (mis. jenis arsip Data Umum, MAKE-014). */
+  async upload(nip: string, target: LampiranTarget, berkas: File, isian: Record<string, string> = {}): Promise<DocumentAttachment> {
     const form = new FormData()
     form.append('berkas', berkas, berkas.name)
     form.append('id_riwayat', String(target.id_riwayat))
     form.append('id_entri', String(target.id_entri))
+    for (const [k, v] of Object.entries(isian)) form.append(k, v)
     const { data } = await api.post<DocumentAttachment>(base(nip), form)
     return data
   },

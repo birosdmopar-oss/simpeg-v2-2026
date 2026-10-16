@@ -27,10 +27,13 @@ class MasterDataSeeder extends Seeder
             ['id_agama' => 6, 'agama' => 'Konghucu', 'order' => 6, 'status' => 1],
         ]);
 
+        // CR-050 (QA A-F3): id selaras legacy yang dirujuk kode [K] — 2 = PTT (akun role 6, Konket JENIS_PEGAWAI_PTT),
+        // 6 = PPPK (akun role 7, Jabatan::JENIS_PEGAWAI_PPPK) — `AkunPegawai::roleUntukJenisPegawai()`
+        // (`L_employee.php:158-161`). Sebelumnya 2 = PPPK / 3 = PTT membuat pegawai PPPK uji mendapat akun PTT.
         $this->db->table('jenis_pegawai')->insertBatch([
             ['id_jenis_pegawai' => 1, 'jenis_pegawai' => 'Pegawai Negeri Sipil', 'order' => 1, 'status' => 1],
-            ['id_jenis_pegawai' => 2, 'jenis_pegawai' => 'Pegawai Pemerintah dengan Perjanjian Kerja', 'order' => 2, 'status' => 1],
-            ['id_jenis_pegawai' => 3, 'jenis_pegawai' => 'Pegawai Tidak Tetap', 'order' => 3, 'status' => 1],
+            ['id_jenis_pegawai' => 2, 'jenis_pegawai' => 'Pegawai Tidak Tetap', 'order' => 2, 'status' => 1],
+            ['id_jenis_pegawai' => 6, 'jenis_pegawai' => 'Pegawai Pemerintah dengan Perjanjian Kerja', 'order' => 3, 'status' => 1],
         ]);
 
         $this->db->table('jenis_status')->insertBatch([
@@ -268,7 +271,9 @@ class MasterDataSeeder extends Seeder
      * belum ada). ID yang di-hard-code kode legacy dipakai apa adanya (G-06 Bagian 2.6, tidak dikunci): diklat 8 (tidak
      * dikirim ke SIASN), konket id 2/4/5/6 dan old_id 8 (Dinas), 10 (sakit), 13 (lain-lain), tanda jasa 26/27/28 (SLKS)
      * dan 44 `LAIN-LAIN`. Pasangan id ↔ old_id konket di sini FIKTIF: di legacy keduanya kode terpisah dan pasangannya
-     * baru diketahui dari data produksi.
+     * baru diketahui dari data produksi. CR-050 (QA B-F4): Dinas (old 8) dan Sakit (old 10) ditaruh di id BEBAS (3, 7),
+     * id terlarang `Config\Konket` 2/4/5/6 diisi jenis contoh lain, supaya pegawai di lingkungan dev/QA bisa mengajukan
+     * Dinas/Sakit seperti di legacy.
      *
      * Kolom audit: updated_at tetap 2024-01-01 (kolom NOT NULL ON UPDATE, jadi test bisa membuktikan saudara yang hanya
      * bergeser urutannya tidak ikut di-stamp), updated_by NULL.
@@ -310,10 +315,12 @@ class MasterDataSeeder extends Seeder
             'id_jenis_konket' => $r[0], 'old_id' => $r[1], 'jenis_konket' => $r[2], 'affect_tukin' => $r[3], 'order' => $r[4],
         ] + $audit, [
             [1, 1, 'Izin Terlambat', 1, 1],
-            [2, 8, 'Dinas', 2, 2],
-            [4, 10, 'Sakit', 1, 3],
-            [5, 13, 'Lain-lain', 1, 4],
-            [6, 5, 'Cuti', 2, 5],
+            [2, 5, 'Cuti', 2, 2],
+            [3, 8, 'Dinas', 2, 3],
+            [4, 13, 'Lain-lain', 1, 4],
+            [5, 16, 'Izin Khusus', 1, 5],
+            [6, 17, 'Izin Lainnya', 1, 6],
+            [7, 10, 'Sakit', 1, 7],
         ]));
 
         $this->db->table('tanda_jasa')->insertBatch([

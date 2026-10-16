@@ -7,7 +7,7 @@
 import { DOMWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../riwayat/usulan.service', () => ({ usulanService: { saya: vi.fn(), antrean: vi.fn() } }))
+vi.mock('../riwayat/usulan.service', () => ({ usulanService: { saya: vi.fn(), antrean: vi.fn(), tandaTerima: vi.fn() } }))
 vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return { ...actual, riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn() } }
@@ -84,10 +84,32 @@ describe('Usulan Karpeg/Karis — pengusul (role 2)', () => {
     expect(usulan.saya).toHaveBeenCalledWith('karpeg')
     expect(usulan.antrean).not.toHaveBeenCalled()
     const disetujui = await rowMenuActions(body(), 'usulan-actions-1')
-    expect(disetujui.map((i) => [i.key, i.disabled])).toEqual([['edit', true], ['berkas', false], ['hapus', true]])
+    expect(disetujui.map((i) => [i.key, i.disabled])).toEqual([['edit', true], ['berkas', false], ['tanda-terima', false], ['hapus', true]])
     const menunggu = await rowMenuActions(body(), 'usulan-actions-2')
     expect(menunggu.map((i) => i.disabled)).toEqual([false, false, false])
     expect(q('[data-testid="usulan-actions-2"]')?.getAttribute('aria-label')).toContain('Aksi untuk Kartu Pegawai')
+    expect(q('[data-testid="usulan-actions-2"]')?.closest('td')?.classList.contains('sticky')).toBe(true)
+  })
+
+  it('aditif WS-2 MAKE-013: ⋮ "Unduh tanda terima" (hanya Disetujui) → PDF usulan/{jenis}/{id}/tanda-terima', async () => {
+    let selesai: (v: { blob: Blob; nama: string }) => void = () => undefined
+    usulan.tandaTerima.mockImplementation(() => new Promise((ok) => (selesai = ok)))
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:tt'), revokeObjectURL: vi.fn() })
+    const klik = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    await mountPage(Role.PEGAWAI)
+
+    expect((await rowMenuActions(body(), 'usulan-actions-2')).map((i) => i.key)).not.toContain('tanda-terima')
+    await selectRowAction(body(), 'usulan-actions-1', 'tanda-terima')
+    await flushPromises()
+    // Selama unduh: item baris itu dinonaktifkan (review FE-4).
+    expect((await rowMenuActions(body(), 'usulan-actions-1')).find((i) => i.key === 'tanda-terima')?.disabled).toBe(true)
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    selesai({ blob: new Blob(['%PDF'], { type: 'application/pdf' }), nama: 'tanda_terima_karpeg_1.pdf' })
+    await flushPromises()
+
+    expect(usulan.tandaTerima).toHaveBeenCalledWith('karpeg', '1')
+    expect(klik).toHaveBeenCalled()
+    klik.mockRestore()
   })
 
   it('ajukan: berkas wajib dicek; kirim create(nip, karpeg, fields, values, { file_1..5 }) dengan kunci kolom', async () => {

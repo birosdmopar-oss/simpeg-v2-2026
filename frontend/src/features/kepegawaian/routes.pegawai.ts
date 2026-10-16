@@ -4,7 +4,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES } from './roles'
+import { BIODATA_PROSES_ROLES, KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES, PENUGASAN_ROLES } from './roles'
 
 export const pegawaiRoutes: RouteRecordRaw[] = [
   {
@@ -22,6 +22,13 @@ export const pegawaiRoutes: RouteRecordRaw[] = [
     meta: { title: 'Data Pegawai' },
   },
   {
+    // B-04 antrean pengajuan perubahan Data Umum (role 1, 3; MAKE-014).
+    path: '/biodata/pengajuan',
+    name: 'biodata-antrean',
+    component: () => import('./views/AntreanBiodataPage.vue'),
+    meta: { roles: BIODATA_PROSES_ROLES, title: 'Pengajuan Data Umum' },
+  },
+  {
     // B-19 struktur organisasi (hr/so/full = semua role login).
     path: '/struktur-organisasi',
     name: 'org-structure',
@@ -29,14 +36,21 @@ export const pegawaiRoutes: RouteRecordRaw[] = [
     meta: { title: 'Struktur Organisasi' },
   },
   {
-    // B-13 Usulan Konket (hr/rwy/konket/* = role 1, 2, 3, 6, 7) — halaman usulan mandiri; placeholder sampai M5.
+    // B-07 penugasan Plt/Plh (legacy list_off_plt|plh; lihat 1, 3, 4, 5 — tulis role 1, ditegakkan backend).
+    path: '/penugasan',
+    name: 'penugasan',
+    component: () => import('./views/PenugasanPage.vue'),
+    meta: { roles: PENUGASAN_ROLES, title: 'Plt/Plh' },
+  },
+  {
+    // B-13 Usulan Konket (hr/rwy/konket/* = role 1, 2, 3, 6, 7) — halaman usulan mandiri (MAKE-013).
     path: '/konket',
     name: 'konket-usulan',
     component: () => import('./views/UsulanKonketPage.vue'),
     meta: { roles: KONKET_ROLES, title: 'Usulan Konket' },
   },
   {
-    // B-12b Verifikasi LKH (hr/rwy/lkh/* = role 1, 2, 3, 6, 7; approver = atasan langsung) — placeholder sampai M5.
+    // B-12b LKH (hr/rwy/lkh/* = role 1, 2, 3, 6, 7; approver = atasan langsung) — tab LKH Saya & Verifikasi Bawahan (MAKE-013).
     path: '/lkh/verifikasi',
     name: 'lkh-verifikasi',
     component: () => import('./views/VerifikasiLkhPage.vue'),

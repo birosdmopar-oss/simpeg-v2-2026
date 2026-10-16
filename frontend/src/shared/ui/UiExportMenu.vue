@@ -17,7 +17,7 @@ import {
 
 import UiButton from './UiButton.vue'
 
-export type ExportFormat = { key: 'pdf' | 'xlsx'; label: string }
+export type ExportFormat = { key: 'pdf' | 'xlsx' | 'csv'; label: string }
 
 withDefaults(defineProps<{ formats?: ExportFormat[]; label?: string; disabled?: boolean }>(), {
   formats: () => [{ key: 'pdf', label: 'Export PDF' }],

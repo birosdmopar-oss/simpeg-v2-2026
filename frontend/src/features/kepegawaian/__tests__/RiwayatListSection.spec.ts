@@ -13,9 +13,12 @@ vi.mock('../riwayat/riwayat.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../riwayat/riwayat.service')>()
   return {
     ...actual,
-    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn() },
+    riwayatService: { tabs: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), process: vi.fn(), unduhKolomBerkas: vi.fn(), pratinjau: vi.fn() },
   }
 })
+vi.mock('../services/lkh.service', () => ({
+  lkhService: { list: vi.fn().mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0 } }), opsi: vi.fn(), pdf: vi.fn(), remove: vi.fn() },
+}))
 vi.mock('../services/lampiran.service', () => ({
   lampiranService: { list: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn() },
 }))
@@ -146,6 +149,37 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-row-1"] [data-testid="status-badge"]').text()).toBe('Disetujui')
     expect(wrapper.get('[data-testid="riwayat-row-2"] [data-testid="status-badge"]').text()).toBe('Menunggu')
     expect(wrapper.get('[data-testid="riwayat-row-3"]').text()).toContain('Ijazah buram')
+    // CR-049 D-F3: kolom Aksi sticky kanan (header & sel).
+    expect(wrapper.findAll('thead th').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+    expect(wrapper.get('[data-testid="riwayat-row-1"]').findAll('td').at(-1)?.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0']))
+  })
+
+  it('CR-049 D-F7: klik header mengurutkan (aria-sort naik → turun); tanggal dari nilai mentah', async () => {
+    svc.list.mockResolvedValue([
+      pendidikanRow(1, { tgl_lulus: '2012-08-30', institusi_pendidikan: 'Beta' }),
+      pendidikanRow(2, { tgl_lulus: '2005-01-02', institusi_pendidikan: 'alfa' }),
+      pendidikanRow(3, { tgl_lulus: '2019-12-31', institusi_pendidikan: 'Gamma' }),
+    ])
+    const wrapper = await mountTab()
+    const urutanId = () => wrapper.findAll('[data-testid^="riwayat-row-"]').map((r) => r.attributes('data-testid'))
+    const th = (key: string) => wrapper.get(`[data-testid="riwayat-sort-${key}"]`).element.closest('th')
+
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('none')
+    await wrapper.get('[data-testid="riwayat-sort-tgl_lulus"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('ascending')
+    expect(urutanId()).toEqual(['riwayat-row-2', 'riwayat-row-1', 'riwayat-row-3'])
+    await wrapper.get('[data-testid="riwayat-sort-tgl_lulus"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('descending')
+    expect(urutanId()).toEqual(['riwayat-row-3', 'riwayat-row-1', 'riwayat-row-2'])
+
+    await wrapper.get('[data-testid="riwayat-sort-institusi_pendidikan"]').trigger('click')
+    expect(th('tgl_lulus')?.getAttribute('aria-sort')).toBe('none')
+    expect(urutanId()).toEqual(['riwayat-row-2', 'riwayat-row-1', 'riwayat-row-3'])
+  })
+
+  it('CR-049 D-F12: labelKolom membuat label ⋮ deskriptif', async () => {
+    const wrapper = await mountTab({}, { ...uji, labelKolom: ['institusi_pendidikan', 'tgl_lulus'] })
+    expect(wrapper.get('[data-testid="riwayat-actions-1"]').attributes('aria-label')).toBe('Aksi untuk Universitas 1 — 30 Agustus 2012')
   })
 
   it('501 (stub) → keterangan "belum tersedia", bukan tabel kosong', async () => {
@@ -161,9 +195,10 @@ describe('RiwayatListSection — data & tampilan', () => {
     expect(wrapper.get('[data-testid="riwayat-failure"]').text()).toBe('Anda tidak berhak mengakses data ini.')
   })
 
-  it('tab non-engine (lkh) → "belum tersedia" tanpa memanggil API riwayat', async () => {
+  it('tab non-engine (lkh) → LkhTab WS-2 (MAKE-014) tanpa memanggil API riwayat engine', async () => {
     const wrapper = await mountTab({}, lkh)
-    expect(wrapper.get('[data-testid="riwayat-belum-tersedia"]').text()).toContain('Laporan Kerja Harian')
+    expect(wrapper.find('[data-testid="lkh-tab-table"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="riwayat-belum-tersedia"]').exists()).toBe(false)
     expect(svc.list).not.toHaveBeenCalled()
   })
 
@@ -487,7 +522,10 @@ describe('RiwayatListSection — kunci baris Disetujui & isian hitung', () => {
 })
 
 describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LAIN, saran)', () => {
-  beforeEach(() => svc.list.mockResolvedValue([]))
+  beforeEach(() => {
+    // Kurung kurawal: nilai kembalian beforeEach dipakai Vitest sebagai teardown.
+    svc.list.mockResolvedValue([])
+  })
 
   it('diklat: opsi nama diklat disaring jenis_diklat dan dimuat ulang + dikosongkan saat jenis berganti; sub-group = group 2', async () => {
     options.mockImplementation(async (entity: string, parent?: string | null, filters?: Record<string, string>) =>
@@ -566,7 +604,10 @@ describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LA
 })
 
 describe('RiwayatListSection — isian hitung SKP (MAKE-008, rumus form legacy)', () => {
-  beforeEach(() => svc.list.mockResolvedValue([]))
+  beforeEach(() => {
+    // Kurung kurawal: nilai kembalian beforeEach dipakai Vitest sebagai teardown.
+    svc.list.mockResolvedValue([])
+  })
 
   it('≤2021: 60%/40%, nilai prestasi, kategori (skala 120 mulai 2021); ≥2022: predikat dari matriks rating', async () => {
     const wrapper = await mountTab({}, skp)
@@ -717,5 +758,57 @@ describe('RiwayatListSection — aturan form legacy SKP & AK Current (perbaikan 
     await flushPromises()
     await setInput('pengajuan_ak', '20')
     expect(field('nilai_ak')?.value).toBe('45')
+  })
+})
+
+describe('RiwayatListSection — pratinjau isian turunan AK (MAKE-017)', () => {
+  const hasil = {
+    nama: 'Dr. Budi Uji, M.Si.', jabatan: 'Analis Kebijakan Ahli Pertama', no_induk_jf: 'JF-0001', tmt_jab: '2018-01-01', mker_th_jab: 6, mker_bl_jab: 6,
+    pangkat: 'Penata Muda', gol_ruang: 'III/a', tmt_pang: '2019-01-01', mker_th_pang: 5, mker_bl_pang: 6, ak_kum_kp: 70, ak_kum_next_jen: 120, ak_terakhir: 30,
+  }
+
+  it('tambah: pratinjau dimuat (lalu dimuat ulang saat tanggal PAK berubah), tampil hanya-baca, AK Lama diisi otomatis', async () => {
+    svc.list.mockResolvedValue([])
+    svc.pratinjau.mockResolvedValue(hasil)
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenCalledWith(NIP, 'ak', { tgl_pak: '' }))
+    await flushPromises()
+    const panel = q('[data-testid="riwayat-pratinjau"]')
+    expect(panel?.textContent).toContain('Analis Kebijakan Ahli Pertama')
+    expect(panel?.textContent).toContain('Penata Muda / III/a')
+    expect(panel?.textContent).toContain('6 tahun 6 bulan')
+    expect(panel?.querySelector('input')).toBeNull()
+    expect(field('ak_terakhir')?.value).toBe('30')
+
+    await setInput('ak_terakhir', '40')
+    await setInput('tgl_pak', '2024-07-15')
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-07-15' }))
+    await flushPromises()
+    expect(field('ak_terakhir')?.value).toBe('40') // isian pengguna tidak ditimpa
+
+    // Dikosongkan pengguna = tetap disentuh: muat ulang pratinjau tidak mengisinya lagi.
+    await setInput('ak_terakhir', '')
+    await setInput('tgl_pak', '2024-08-01')
+    await vi.waitFor(() => expect(svc.pratinjau).toHaveBeenLastCalledWith(NIP, 'ak', { tgl_pak: '2024-08-01' }))
+    await flushPromises()
+    expect(field('ak_terakhir')?.value).toBe('')
+  })
+
+  it('galat pratinjau tampil sebagai pesan; form tetap bisa diisi. Edit tidak memuat pratinjau', async () => {
+    svc.list.mockResolvedValue([{ id_riwayat_ak: 4, nip: NIP, jenis_ak: 2, no_hpak: 'PAK-2', tgl_pak: '2021-01-01', ak_terakhir: 25, pengajuan_ak: 12.5, nilai_ak: 37.5, file_pak: 'x.pdf', status: 1 }] as never)
+    svc.pratinjau.mockRejectedValue(apiError(403))
+    const wrapper = await mountTab({}, ak)
+    await openCreate(wrapper)
+    await vi.waitFor(() => expect(q('[data-testid="riwayat-pratinjau-galat"]')?.textContent).toContain('tidak dapat dimuat'))
+    expect(field('ak_terakhir')?.value).toBe('')
+    q<HTMLButtonElement>('[data-testid="riwayat-cancel"]')?.click()
+    await flushPromises()
+
+    svc.pratinjau.mockClear()
+    await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
+    await flushPromises()
+    expect(svc.pratinjau).not.toHaveBeenCalled()
+    expect(q('[data-testid="riwayat-pratinjau"]')).toBeNull()
   })
 })

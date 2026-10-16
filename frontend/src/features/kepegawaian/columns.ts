@@ -3,7 +3,7 @@
  * "Filter Kolom" (Gambar 20/21: daftar kolom dikelompokkan per huruf awal, bisa dicari).
  * Kolom `nama_nip` (avatar + nama + NIP) selalu tampil dan tidak muncul di popup. Nilai kolom = kolom respons
  * `GET pegawai` (MAKE-010): biodata `pegawai` + snapshot jabatan (`pegawai_mutasi_jabatan`) + pangkat (`pegawai_kp`).
- * Kolom legacy lain (90 kolom `L_employee::list`) menyusul bersama pencarian lanjut/export B-20 penutup.
+ * Kolom legacy lain (90 kolom `L_employee::list`) belum dibawa (kartu lanjutan); ekspor memakai kolom yang sama (MAKE-014).
  */
 import type { PegawaiListItem } from './types'
 
@@ -37,6 +37,24 @@ export const COLUMNS: PegawaiColumn[] = [
   { key: 'jenis_kelamin', label: 'Jenis Kelamin', value: (r) => JENIS_KELAMIN[r.jenis_kelamin] ?? '' },
   { key: 'agama', label: 'Agama', value: (r) => text(r.agama) },
 ]
+
+/**
+ * Warna badge jenis pegawai (kartu QAUI-003, CR-049 D-F8; CR-051 R1D-F1) dari `id_jenis_pegawai` [K] legacy
+ * (`L_employee.php:158` 2 → PTT, 6 → PPPK; 1 = PNS): 1 PNS biru, 2 PTT kuning, 6 PPPK tosca, lainnya netral. Bukan dari
+ * nama jenis (nama master bisa panjang, mis. "Pegawai Negeri Sipil"). API mengirim angka sebagai string → dinormalkan.
+ */
+export function nadaJenisPegawai(idJenis: number | string | null | undefined): 'primary' | 'info' | 'secondary' | 'neutral' {
+  switch (Number(idJenis)) {
+    case 1:
+      return 'primary'
+    case 2:
+      return 'secondary'
+    case 6:
+      return 'info'
+    default:
+      return 'neutral'
+  }
+}
 
 /** Kolom bawaan. */
 export const DEFAULT_COLUMN_KEYS: string[] = ['nama_nip', 'jabatan', 'satker', 'gol_ruang', 'jenis_pegawai']

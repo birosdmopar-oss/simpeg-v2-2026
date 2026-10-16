@@ -1,12 +1,15 @@
 # DB Validator Review — DBV-019 FK master G-02 dan FK masuk `pengguna`/`faq_rate` → `pegawai` (lanjutan DBV-012/DBV-013)
 
-**Key review:** `DBV-019` — pull request #23, branch `dbv-019/fk-g02-pegawai` (disinkronkan dengan `main` lewat merge,
+**Key review:** `DBV-019` — pull request #24 (menggantikan draf PR #23 yang ditutup tanpa merge), branch `dbv-019/fk-g02-pegawai` (disinkronkan dengan `main` lewat merge,
 tanpa rebase). Alur DBV: DB Validator me-review/approve dan merge (AGENTS.md §2). Rekomendasi key final dan alasannya:
 Bagian 7 #5.
 
-**Status:** ⏳ **MENUNGGU REVIEW DB VALIDATOR.** Kolom **Keputusan** di Bagian 7 masih kosong (⏳); isi Bagian 8 adalah
-verifikasi developer sebelum review (pra-review internal sisi CR), **bukan** hasil review DB Validator. Migration jangan
-dijalankan di Dev/Production sebelum disetujui.
+**Status:** ✅ **DISETUJUI DB VALIDATOR (jjoseph48, komentar PR #24 07-10-2026
+https://github.com/birosdmopar-oss/simpeg-v2-2026/pull/24#issuecomment-6033816301)** — temuan T-1..T-3 pemeriksaan awal
+ditutup, verifikasi MariaDB 10.4 lolos; masuk `main` 13-10-2026 tanpa merge commit (fast-forward; `191efec` = commit ujung PR #24, CR-051). Keputusan Bagian 7 #1–#6
+dicatat per butir. Isi Bagian 8 adalah verifikasi developer sebelum review (pra-review internal sisi CR), bukan hasil
+review DB Validator. Migration FK masuk `pengguna`/`faq_rate` tetap ditahan (#4). Status dokumen diperbarui CR-050
+(temuan QA A-F2, 15-10-2026).
 
 **Rujukan:** `B-01-B-02-pegawai-riwayat-schema.md` (DBV-012/013, PR #20; Bagian 4.1, 7, keputusan #3, #12, #14) dan
 catatan review DB Validator PR #20 06-10-2026 (C-2: FK yang ditahan menjadi unit DBV lanjutan; C-3: tipe PK master v2
@@ -196,7 +199,7 @@ Tidak ada deviasi tipe kolom: seluruh pasangan anak/induk bertipe sama dengan D1
    dan dikunci tulis selama ALTER). Karena itu FK dikelompokkan **satu ALTER per tabel anak** (10 ALTER, bukan 55). Di
    Production setelah impor, tabel terbesar yang di-rebuild adalah `riwayat_lckh` (AUTO_INCREMENT D1 ±1,6 juta) dan
    `riwayat_ak_siasn` (±284 ribu); jalankan di jendela cutover, bukan saat aplikasi melayani tulis.
-5. **Hubungan dengan impor** (bahan runbook DBV-014; dokumen B-01/B-02 Bagian 6 #1 dan #4). Bila DB v2 di-migrate penuh
+5. **Hubungan dengan impor** (bahan runbook DBV-014 (audit yatimnya kini di runbook impor tunggal DBV-011 2.10, `DBV-019-audit-yatim-fk-g02.sql`; DBV-014 kelak merujuk ke sana); dokumen B-01/B-02 Bagian 6 #1 dan #4). Bila DB v2 di-migrate penuh
    sebelum impor, master G-02 + `jabatan_koordinasi`/`rumpun_jabatan` wajib diimpor sebelum snapshot/riwayat, dan nilai id
    master `0`/`''` dinormalkan ke NULL saat impor. Bila impor dijalankan dengan `FOREIGN_KEY_CHECKS = 0`, kueri audit
    Bagian 6 wajib menghasilkan 0 sebelum aplikasi dibuka.
@@ -233,20 +236,20 @@ WHERE c.id_jabatan IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM jabatan p WHERE p.id_jabatan = c.id_jabatan);
 ```
 
-Ringkasan per tabel anak (satu pemindaian per tabel), contoh `pegawai_plh` (10 FK):
+Ringkasan per tabel anak (satu pemindaian per tabel), contoh `pegawai_plh` (10 FK). `COALESCE(SUM(…), 0)` membuat tabel anak kosong terbaca 0, bukan NULL (T-1 review DB Validator PR #26, 15-10-2026):
 
 ```sql
 SELECT
-  SUM(c.id_jabatan               IS NOT NULL AND j.id_jabatan            IS NULL) AS fk_pegawai_plh_ibfk_02,
-  SUM(c.id_jabatan_koord         IS NOT NULL AND k.id_jabatan_koordinasi IS NULL) AS fk_pegawai_plh_ibfk_03,
-  SUM(c.id_group_jabatan         IS NOT NULL AND g.id_group_jabatan      IS NULL) AS fk_pegawai_plh_ibfk_04,
-  SUM(c.id_sub_group_jabatan     IS NOT NULL AND s.id_sub_group_jabatan  IS NULL) AS fk_pegawai_plh_ibfk_05,
-  SUM(c.id_unit                  IS NOT NULL AND u.id_unit               IS NULL) AS fk_pegawai_plh_ibfk_06,
-  SUM(c.id_satker                IS NOT NULL AND t.id_satker             IS NULL) AS fk_pegawai_plh_ibfk_07,
-  SUM(c.id_group_jabatan_plh     IS NOT NULL AND g2.id_group_jabatan     IS NULL) AS fk_pegawai_plh_ibfk_08,
-  SUM(c.id_sub_group_jabatan_plh IS NOT NULL AND s2.id_sub_group_jabatan IS NULL) AS fk_pegawai_plh_ibfk_09,
-  SUM(c.id_unit_plh              IS NOT NULL AND u2.id_unit              IS NULL) AS fk_pegawai_plh_ibfk_10,
-  SUM(c.id_satker_plh            IS NOT NULL AND t2.id_satker            IS NULL) AS fk_pegawai_plh_ibfk_11
+  COALESCE(SUM(c.id_jabatan               IS NOT NULL AND j.id_jabatan            IS NULL), 0) AS fk_pegawai_plh_ibfk_02,
+  COALESCE(SUM(c.id_jabatan_koord         IS NOT NULL AND k.id_jabatan_koordinasi IS NULL), 0) AS fk_pegawai_plh_ibfk_03,
+  COALESCE(SUM(c.id_group_jabatan         IS NOT NULL AND g.id_group_jabatan      IS NULL), 0) AS fk_pegawai_plh_ibfk_04,
+  COALESCE(SUM(c.id_sub_group_jabatan     IS NOT NULL AND s.id_sub_group_jabatan  IS NULL), 0) AS fk_pegawai_plh_ibfk_05,
+  COALESCE(SUM(c.id_unit                  IS NOT NULL AND u.id_unit               IS NULL), 0) AS fk_pegawai_plh_ibfk_06,
+  COALESCE(SUM(c.id_satker                IS NOT NULL AND t.id_satker             IS NULL), 0) AS fk_pegawai_plh_ibfk_07,
+  COALESCE(SUM(c.id_group_jabatan_plh     IS NOT NULL AND g2.id_group_jabatan     IS NULL), 0) AS fk_pegawai_plh_ibfk_08,
+  COALESCE(SUM(c.id_sub_group_jabatan_plh IS NOT NULL AND s2.id_sub_group_jabatan IS NULL), 0) AS fk_pegawai_plh_ibfk_09,
+  COALESCE(SUM(c.id_unit_plh              IS NOT NULL AND u2.id_unit              IS NULL), 0) AS fk_pegawai_plh_ibfk_10,
+  COALESCE(SUM(c.id_satker_plh            IS NOT NULL AND t2.id_satker            IS NULL), 0) AS fk_pegawai_plh_ibfk_11
 FROM pegawai_plh c
 LEFT JOIN jabatan            j  ON j.id_jabatan            = c.id_jabatan
 LEFT JOIN jabatan_koordinasi k  ON k.id_jabatan_koordinasi = c.id_jabatan_koord
@@ -287,12 +290,12 @@ jalan bila ada yang > 0.
 
 | # | Pertanyaan | Usulan (pra-review CR) | Keputusan |
 |---|---|---|---|
-| 1 | Setujui 55 FK Bagian 2.1–2.3 (nama, kolom, induk = D1) dengan aksi RESTRICT/RESTRICT (V1), termasuk 3 FK `konv_ak` yang di D1 CASCADE/CASCADE | Setujui (lanjutan keputusan #3 DBV-012/013) | ⏳ |
-| 2 | Timestamp baru `2026-10-07-100000`/`100100` menggantikan draf `129900`/`139900` (Bagian 4 #2) | Setujui | ⏳ |
-| 3 | Pra-cek nilai yatim fail-closed (V2) + aturan normalisasi Bagian 6 sebagai langkah runbook DBV-014 | Setujui | ⏳ |
-| 4 | FK masuk `pengguna.nip`/`faq_rate.nip` (Bagian 2.4): isi FK (nama/kolom/induk D1, RESTRICT) disetujui sekarang, tetapi migration-nya tetap **ditahan** di `app/Database/MigrationsDitahan/` sampai prasyarat Bagian 1.2 #1–#3 terpenuhi; aktivasi = unit DBV+CR lanjutan (validasi NIP 422 + seed/test Auth sebagai pekerjaan MAKE baru + audit Bagian 6 = 0) | Setujui isi + penahanan. Alternatif: (b) aktifkan sekarang dengan timestamp `2026-10-07-100200` — butuh CR kode aplikasi dan penyesuaian banyak test Auth, dan `migrate` di Dev/Production berhenti sampai `pegawai` diimpor; (c) keluarkan dari PR ini (draf hanya di riwayat commit) | ⏳ |
-| 5 | Key & alur: perubahan = 2 migration aktif + 1 migration ditahan + 1 schema test baru + penyesuaian `NipReferenceRegistryTest`, 2 schema test master, 1 trait test support; tanpa kode aplikasi/seed | `[DBV-019]` saja, alur DBV-only (PR, DB Validator merge): semua perubahan adalah skema + test skema. Alternatif `[DBV-019][MAKE-(nomor menyusul)]` bila reviewer kode ingin me-review perubahan test master/test support — preseden keputusan #15 PR #20 | ⏳ |
-| 6 | Jendela eksekusi Production: ALTER = rebuild tabel (Bagian 4 #4), dijalankan saat cutover setelah audit Bagian 6 = 0 | Setujui; masuk runbook DBV-014 | ⏳ |
+| 1 | Setujui 55 FK Bagian 2.1–2.3 (nama, kolom, induk = D1) dengan aksi RESTRICT/RESTRICT (V1), termasuk 3 FK `konv_ak` yang di D1 CASCADE/CASCADE | Setujui (lanjutan keputusan #3 DBV-012/013) | ✅ Setuju; penghapusan induk ditangani service secara eksplisit |
+| 2 | Timestamp baru `2026-10-07-100000`/`100100` menggantikan draf `129900`/`139900` (Bagian 4 #2) | Setujui | ✅ Setuju (jalan sebagai batch tersendiri di atas `main`) |
+| 3 | Pra-cek nilai yatim fail-closed (V2) + aturan normalisasi Bagian 6 sebagai langkah runbook DBV-014 | Setujui | ✅ Setuju; masuk runbook DBV-014 (audit yatimnya kini di runbook impor tunggal DBV-011 2.10, `DBV-019-audit-yatim-fk-g02.sql`; DBV-014 kelak merujuk ke sana) |
+| 4 | FK masuk `pengguna.nip`/`faq_rate.nip` (Bagian 2.4): isi FK (nama/kolom/induk D1, RESTRICT) disetujui sekarang, tetapi migration-nya tetap **ditahan** di `app/Database/MigrationsDitahan/` sampai prasyarat Bagian 1.2 #1–#3 terpenuhi; aktivasi = unit DBV+CR lanjutan (validasi NIP 422 + seed/test Auth sebagai pekerjaan MAKE baru + audit Bagian 6 = 0) | Setujui isi + penahanan. Alternatif: (b) aktifkan sekarang dengan timestamp `2026-10-07-100200` — butuh CR kode aplikasi dan penyesuaian banyak test Auth, dan `migrate` di Dev/Production berhenti sampai `pegawai` diimpor; (c) keluarkan dari PR ini (draf hanya di riwayat commit) | ✅ Setuju isi + penahanan; aktivasi = unit DBV terpisah setelah validasi NIP 422 (catatan 3.3) |
+| 5 | Key & alur: perubahan = 2 migration aktif + 1 migration ditahan + 1 schema test baru + penyesuaian `NipReferenceRegistryTest`, 2 schema test master, 1 trait test support; tanpa kode aplikasi/seed | `[DBV-019]` saja, alur DBV-only (PR, DB Validator merge): semua perubahan adalah skema + test skema. Alternatif `[DBV-019][MAKE-(nomor menyusul)]` bila reviewer kode ingin me-review perubahan test master/test support — preseden keputusan #15 PR #20 | ✅ Setuju `[DBV-019]` (tanpa kode aplikasi) |
+| 6 | Jendela eksekusi Production: ALTER = rebuild tabel (Bagian 4 #4), dijalankan saat cutover setelah audit Bagian 6 = 0 | Setujui; masuk runbook DBV-014 | ✅ Setuju; jendela cutover setelah audit Bagian 6 = 0 (runbook DBV-014 (audit yatimnya kini di runbook impor tunggal DBV-011 2.10, `DBV-019-audit-yatim-fk-g02.sql`; DBV-014 kelak merujuk ke sana)) |
 
 Koreksi setelah approval dilakukan lewat migration baru, bukan dengan mengedit migration yang sudah di `main`.
 
@@ -371,6 +374,6 @@ setelah selesai):
 - [ ] Tipe kolom anak = PK induk di `main` (INT; TINYINT untuk `rumpun_jabatan`), tanpa ALTER kolom
 - [ ] Penggantian timestamp (Bagian 4 #2) diterima; urutan setelah seluruh migration `main`
 - [ ] `migrate` → `migrate:rollback` → `migrate` di MariaDB 10.4: rollback hanya membatalkan batch DBV-019, index tetap
-- [ ] Pra-cek yatim fail-closed dan kueri audit Bagian 6 diterima sebagai langkah runbook DBV-014
+- [ ] Pra-cek yatim fail-closed dan kueri audit Bagian 6 diterima sebagai langkah runbook DBV-014 (audit yatimnya kini di runbook impor tunggal DBV-011 2.10, `DBV-019-audit-yatim-fk-g02.sql`; DBV-014 kelak merujuk ke sana)
 - [ ] FK masuk `pengguna`/`faq_rate` (Bagian 2.4): isi disetujui, migration tetap ditahan sampai prasyarat Bagian 1.2 (keputusan #4)
 - [ ] Keputusan Bagian 7 #1–#6 diisi

@@ -135,6 +135,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
             // NIP pemilik ikut ke beforeSave (aditif MAKE-008) agar isian turunan per pegawai bisa diisi saat tambah.
             $data = $d->beforeSave($data + [$d->kolomNip() => $nip], null, $auth);
+            $data = $this->buangMentah($d, $data);
             unset($data[$d->primaryKey()]);
             $data                    = $this->tulisKolomBerkas($d, $berkas, $data, null);
             $data[$d->kolomNip()]    = $nip;
@@ -185,6 +186,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
             $statusBaru = $pilihan ?? $d->statusSetelahUbah($role, $statusLama);
 
             $data = $d->beforeSave($data, $lama, $auth);
+            $data = $this->buangMentah($d, $data);
             unset($data[$d->primaryKey()], $data[$d->kolomNip()], $data[$d->kolomStatus()]);
             $data = $this->tulisKolomBerkas($d, $berkas, $data, $lama);
 
@@ -478,6 +480,14 @@ final class RiwayatEngine implements RiwayatServiceInterface
     {
         [$bersih, $errors] = (new ValidasiRiwayat(service('masterRegistry'), $this->db()))->periksa($d, $data, $lama);
 
+        // Isian mentah (aditif MAKE-019): diteruskan apa adanya, hanya bila dikirim; tidak menimpa field tervalidasi
+        // (registry menjamin namanya tidak bentrok).
+        foreach ($d->isianMentah() as $kunci) {
+            if (array_key_exists($kunci, $data)) {
+                $bersih[$kunci] = $data[$kunci];
+            }
+        }
+
         if ($errors === []) {
             // Hook menerima kolom NIP pemilik juga (mis. cek duplikat per pegawai saat tambah, ketika $lama null).
             $errors = $d->validate($bersih + [$d->kolomNip() => $nip], $lama, $auth);
@@ -631,6 +641,22 @@ final class RiwayatEngine implements RiwayatServiceInterface
     }
 
     /**
+     * Buang sisa kunci isian mentah (MAKE-019) sesudah beforeSave: tidak pernah ditulis engine ke tabel.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    private function buangMentah(RiwayatDefinisi $d, array $data): array
+    {
+        foreach ($d->isianMentah() as $kunci) {
+            unset($data[$kunci]);
+        }
+
+        return $data;
+    }
+
+    /**
      * Buang kolom sistem yang tidak ada di tabel jenis ini.
      *
      * @param array<string, mixed> $data
@@ -758,6 +784,21 @@ final class RiwayatEngine implements RiwayatServiceInterface
         }
 
         return $data;
+    }
+
+    /**
+     * Pratinjau isian turunan form tambah (aditif MAKE-017): izin, lingkup, dan izin per pegawai = aksi TAMBAH; jenis
+     * tanpa `RiwayatDefinisi::pratinjauTambah()` → 404.
+     *
+     * @param array<string, mixed> $query
+     *
+     * @return array<string, mixed>
+     */
+    public function pratinjauTambah(AuthContext $auth, string $nip, string $jenis, array $query): array
+    {
+        $d = $this->siapkan($auth, $nip, $jenis, AksiRiwayat::Tambah);
+
+        return $d->pratinjauTambah($nip, $query) ?? throw new NotFoundException('Pratinjau tidak tersedia untuk ' . $d->label() . '.');
     }
 
     /**

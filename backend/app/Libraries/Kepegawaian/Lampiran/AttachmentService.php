@@ -75,7 +75,8 @@ final class AttachmentService implements AttachmentServiceInterface
                 'filename'     => $basename,
                 'id_riwayat'   => $idRiwayat,
                 'nama_riwayat' => (string) $jenis['jenis_rwy'],
-                'id_entri'     => (string) $idEntri,
+                // Arsip Data Umum (37/38) ikut legacy: id_entri NULL, terikat lewat kolom NIP (MAKE-014).
+                'id_entri'     => ArsipDataUmum::kode($idRiwayat) ? null : (string) $idEntri,
                 'path'         => $path,
                 'basename'     => $basename,
                 'display_name' => $valid['nama_tampil'],
@@ -139,11 +140,17 @@ final class AttachmentService implements AttachmentServiceInterface
 
     public function daftar(string $nip, int $idRiwayat, int|string $idEntri): array
     {
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $this->koneksi()->table('document_attachment')
+        $builder = $this->koneksi()->table('document_attachment')
             ->where('NIP', $nip)
-            ->where('id_riwayat', $idRiwayat)
-            ->where('id_entri', (string) $idEntri)
+            ->where('id_riwayat', $idRiwayat);
+
+        // Arsip Data Umum (MAKE-014, legacy L_employee :48): disaring NIP + kode saja (id_entri NULL).
+        if (! ArsipDataUmum::kode($idRiwayat)) {
+            $builder->where('id_entri', (string) $idEntri);
+        }
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $builder
             ->orderBy('id_attachment', 'ASC')
             ->get()
             ->getResultArray();

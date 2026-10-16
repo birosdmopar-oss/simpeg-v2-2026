@@ -13,6 +13,8 @@ export default defineRiwayatJenis({
   task: 'B-16',
   singular: 'keluarga',
   primaryKey: 'id_riwayat_keluarga',
+  // CR-049 D-F12: label baris ⋮ / judul dialog.
+  labelKolom: ['nama_pasangan'],
   columns: [
     { key: 'urutan_perkawinan', label: 'Perkawinan ke-' },
     { key: 'nama_pasangan', label: 'Nama Pasangan' },

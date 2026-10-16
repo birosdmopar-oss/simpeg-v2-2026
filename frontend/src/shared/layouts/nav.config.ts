@@ -23,6 +23,7 @@ import {
   Folder,
   CalendarDays,
   CircleHelp,
+  ClipboardPen,
   FileText,
   House,
   MessageCircle,
@@ -31,6 +32,7 @@ import {
   Newspaper,
   Settings,
   TrendingUp,
+  UserCheck,
   UserCog,
   Users,
 } from 'lucide-vue-next'
@@ -38,16 +40,24 @@ import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
-import { KARPEG_KARIS_ROLES, KONKET_ROLES, LKH_ROLES, PEGAWAI_LIST_ROLES } from '@/features/kepegawaian/roles'
+import {
+  BIODATA_PROSES_ROLES,
+  DATA_SAYA_ROLES,
+  KARPEG_KARIS_ROLES,
+  KONKET_ROLES,
+  LKH_ROLES,
+  PEGAWAI_LIST_ROLES,
+  PENUGASAN_ROLES,
+} from '@/features/kepegawaian/roles'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
 /**
- * Fase tertinggi yang menunya ditampilkan. Tetap 2 sampai halaman Fase 3 tersambung API (B-20 penutup, WS-2);
- * menu Fase 3 sudah terdaftar di bawah tetapi tersembunyi.
+ * Fase tertinggi yang menunya ditampilkan. 3 sejak B-20 penutup (WS-2 MAKE-014): semua halaman Modul B tersambung API.
+ * Menu fase 4+ sudah terdaftar di bawah tetapi tersembunyi.
  */
-export const ACTIVE_PHASE = 2
+export const ACTIVE_PHASE = 3
 
 export interface NavChild {
   key: string
@@ -66,6 +76,8 @@ export interface NavItem {
   /** Kosong = semua role login. */
   roles?: readonly RoleCode[]
   phase: number
+  /** Tujuan = Detail Pegawai NIP akun; item disembunyikan bila akun tanpa NIP (CR-049). */
+  nipAkun?: true
 }
 
 export interface NavGroup {
@@ -84,8 +96,14 @@ const NAV: NavGroup[] = [
     key: 'kepegawaian',
     title: 'Kepegawaian',
     items: [
+      // Legacy "Kelola Data" (hr/employee/edit, data sendiri) — CR-049 ISSUE-034.
+      { key: 'data-saya', label: 'Kelola Data', icon: ClipboardPen, roles: DATA_SAYA_ROLES, phase: 3, nipAkun: true },
       { key: 'pegawai', label: 'Daftar Pegawai', icon: Users, to: { name: 'pegawai-list' }, roles: PEGAWAI_LIST_ROLES, phase: 3 },
+      // B-04 antrean pengajuan perubahan Data Umum (MAKE-014).
+      { key: 'biodata-antrean', label: 'Pengajuan Data Umum', icon: UserCheck, to: { name: 'biodata-antrean' }, roles: BIODATA_PROSES_ROLES, phase: 3 },
       { key: 'struktur', label: 'Struktur Organisasi', icon: Network, to: { name: 'org-structure' }, phase: 3 },
+      // B-07 penugasan Plt/Plh (legacy hr/rwy/jabatan/list_off_plt|plh; MAKE-012).
+      { key: 'penugasan', label: 'Plt/Plh', icon: UserCog, to: { name: 'penugasan' }, roles: PENUGASAN_ROLES, phase: 3 },
       // Konket & Karpeg/Karis = halaman usulan mandiri (bukan tab Detail Pegawai); LKH diverifikasi atasan langsung.
       { key: 'konket', label: 'Usulan Konket', icon: Briefcase, to: { name: 'konket-usulan' }, roles: KONKET_ROLES, phase: 3 },
       {
@@ -158,12 +176,16 @@ const NAV: NavGroup[] = [
   },
 ]
 
-/** Menu yang boleh tampil untuk `role` pada fase aktif; grup tanpa item dibuang. */
-export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHASE): NavGroup[] {
+/**
+ * Menu yang boleh tampil untuk `role` pada fase aktif; grup tanpa item dibuang. `nip` = NIP akun (item `nipAkun`
+ * menuju Detail Pegawai NIP itu; tanpa NIP item itu tidak tampil).
+ */
+export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHASE, nip: string | null = null): NavGroup[] {
   return NAV.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) => item.phase <= activePhase && (!item.roles || (role !== null && item.roles.includes(role))),
-    ),
+    items: group.items
+      .filter((item) => item.phase <= activePhase && (!item.roles || (role !== null && item.roles.includes(role))))
+      .filter((item) => !item.nipAkun || Boolean(nip))
+      .map((item) => (item.nipAkun && nip ? { ...item, to: { name: 'pegawai-detail', params: { nip } } } : item)),
   })).filter((group) => group.items.length > 0)
 }

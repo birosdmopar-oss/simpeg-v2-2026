@@ -15,6 +15,8 @@ use App\Libraries\Kepegawaian\Riwayat\AlurRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Kariskarsu;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatDefinisi;
 use App\Libraries\Kepegawaian\Riwayat\StatusRiwayat;
+use App\Libraries\Kepegawaian\Usulan\TandaTerimaUsulan;
+use App\Libraries\Pdf\Pdf;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
@@ -26,6 +28,8 @@ use CodeIgniter\HTTP\ResponseInterface;
  * - `GET usulan/{jenis}` — antrean (legacy `list_ad`): role ber-izin `lihat` yang BUKAN UL_PEGAWAI (1, 4, 5), semua baris
  *   status selain 10 tanpa lingkup (keputusan user 12-10-2026), plus nama/unit/satker pegawai; `?status=` opsional;
  *   `can_process` dari izin `proses`.
+ * - `GET usulan/{jenis}/{id}/tanda-terima` — (aditif WS-2 MAKE-013, ADR-033) PDF tanda terima usulan Disetujui; hak lihat
+ *   = engine `detail` (TandaTerimaUsulan).
  */
 final class UsulanController extends ApiController
 {
@@ -94,6 +98,13 @@ final class UsulanController extends ApiController
             'can_process' => $d->boleh(AksiRiwayat::Proses, $role),
             'items'       => $builder->get()->getResultArray(),
         ]);
+    }
+
+    public function tandaTerima(string $jenis, string $id): ResponseInterface
+    {
+        $pdf = (new TandaTerimaUsulan())->pdf($this->auth(), $jenis, (int) $id);
+
+        return Pdf::respon($this->response, $pdf['isi'], $pdf['nama'], $this->request->getGet('inline') === '1');
     }
 
     private function definisi(string $jenis): RiwayatDefinisi

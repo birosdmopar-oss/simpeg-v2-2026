@@ -17,6 +17,8 @@ export default defineRiwayatJenis({
   task: 'B-16',
   singular: 'alamat',
   primaryKey: 'id_riwayat_alamat',
+  // CR-049 D-F12: label baris ⋮ / judul dialog.
+  labelKolom: ['jenis_alamat', 'alamat'],
   columns: [
     { key: 'jenis_alamat', label: 'Jenis', options: [{ value: '1', label: 'KTP' }, { value: '2', label: 'Domisili' }, { value: '3', label: 'Kantor' }] },
     { key: 'alamat_utama', label: 'Utama', options: [{ value: '1', label: 'Ya' }, { value: '2', label: 'Tidak' }] },

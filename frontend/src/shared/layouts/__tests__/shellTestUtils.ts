@@ -27,6 +27,8 @@ export function createShellRouter(): Router {
       { path: '/pegawai', name: 'pegawai-list', component: stub },
       { path: '/pegawai/:nip', name: 'pegawai-detail', component: stub },
       { path: '/struktur-organisasi', name: 'org-structure', component: stub },
+      { path: '/penugasan', name: 'penugasan', component: stub },
+      { path: '/biodata/pengajuan', name: 'biodata-antrean', component: stub },
       { path: '/konket', name: 'konket-usulan', component: stub },
       { path: '/lkh/verifikasi', name: 'lkh-verifikasi', component: stub },
       { path: '/karpeg-karis', name: 'karpeg-karis-usulan', component: stub },

@@ -33,6 +33,7 @@ import { riwayatService, type BerkasMap } from './riwayat.service'
 import type { UsulanConfig } from './usulan.config'
 import UsulanFormDialog from './UsulanFormDialog.vue'
 import { usulanService, type UsulanAntrean, type UsulanSaya } from './usulan.service'
+import { simpanBerkas } from '../services/berkasUnduhan'
 
 const props = defineProps<{ config: UsulanConfig }>()
 
@@ -110,6 +111,8 @@ function rowActions(row: RiwayatRow): RowAction[] {
     return [
       { key: 'edit', label: 'Edit', hidden: !saya.value?.can_edit, disabled: disetujui },
       { key: 'berkas', label: 'Berkas' },
+      // Aditif WS-2 MAKE-013: tanda terima PDF hanya untuk usulan Disetujui (legacy tt_pdf saat disetujui).
+      { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui, disabled: unduhId.value === rowId(row) },
       { key: 'hapus', label: 'Hapus', danger: true, hidden: !saya.value?.can_delete, disabled: disetujui },
     ]
   }
@@ -117,6 +120,7 @@ function rowActions(row: RiwayatRow): RowAction[] {
   return [
     ...approvalRowActions({ canProcess: Boolean(antrean.value?.can_process), status: rowStatus(row), busy: processBusy.value && processing.value === row }),
     { key: 'berkas', label: 'Berkas' },
+    { key: 'tanda-terima', label: 'Unduh tanda terima', hidden: !disetujui, disabled: unduhId.value === rowId(row) },
   ]
 }
 
@@ -131,11 +135,29 @@ function onAction(key: string, row: RiwayatRow): void {
   } else if (key === 'hapus') {
     deleting.value = row
     deleteOpen.value = true
+  } else if (key === 'tanda-terima') {
+    void unduhTandaTerima(row)
   } else if (key === 'setujui' || key === 'tolak') {
     processing.value = row
     processMode.value = key
     processError.value = ''
     processOpen.value = true
+  }
+}
+
+/** Baris yang sedang mengunduh tanda terima (aditif WS-2 MAKE-013): item ⋮ dinonaktifkan selama proses. */
+const unduhId = ref<string | null>(null)
+
+async function unduhTandaTerima(row: RiwayatRow): Promise<void> {
+  const id = rowId(row)
+  unduhId.value = id
+  try {
+    const berkas = await usulanService.tandaTerima(props.config.jenis, id)
+    simpanBerkas(berkas)
+  } catch (error) {
+    notice.value = { tone: 'danger', text: describeApiError(error).message }
+  } finally {
+    unduhId.value = null
   }
 }
 
@@ -236,7 +258,7 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
                 <th v-if="config.fields.length" scope="col" class="px-5 py-3">Jenis Permohonan</th>
                 <th scope="col" class="px-5 py-3">Berkas</th>
                 <th scope="col" class="px-5 py-3">Status</th>
-                <th scope="col" class="px-5 py-3 text-right">Aksi</th>
+                <th scope="col" class="sticky right-0 bg-white px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200">
@@ -260,7 +282,7 @@ const jumlahBerkas = (row: RiwayatRow): number => props.config.berkas.filter((b)
                   <StatusBadge :status="rowStatus(row)" />
                   <p v-if="rowStatus(row) === STATUS_RIWAYAT.DITOLAK && row.reason_note" class="mt-1 max-w-56 text-caption text-slate-500">{{ row.reason_note }}</p>
                 </td>
-                <td class="px-5 py-3 text-right">
+                <td class="sticky right-0 bg-white px-5 py-3 text-right">
                   <RowActionsMenu
                     :actions="rowActions(row)"
                     :label="`Aksi untuk ${rowLabel(row)}`"

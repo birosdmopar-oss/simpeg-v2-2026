@@ -1,5 +1,5 @@
-// Tab NON-ENGINE `lkh` — tabel `riwayat_lckh`, B-12b (pemilik WS-2). Datanya lewat endpoint LKH WS-2 (M5), bukan
-// `riwayat/{jenis}`; sampai endpoint itu ada RiwayatTabHost menampilkan keterangan "belum tersedia".
+// Tab NON-ENGINE `lkh` — tabel `riwayat_lckh`, B-12b (pemilik WS-2). Datanya lewat endpoint LKH WS-2 (`GET lkh?nip=`),
+// bukan `riwayat/{jenis}`; RiwayatTabHost merender `components/LkhTab.vue` (MAKE-014). Kolom di bawah hanya acuan.
 import { defineRiwayatJenis } from '../riwayat.config'
 
 export default defineRiwayatJenis({

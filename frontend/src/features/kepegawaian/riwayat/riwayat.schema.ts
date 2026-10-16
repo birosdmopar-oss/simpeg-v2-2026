@@ -1,12 +1,13 @@
 /**
  * Skema Zod dinamis untuk form riwayat (ADR-026), dibangun dari FieldDef. Nilai form selalu string (input HTML);
  * angka/tanggal divalidasi formatnya, bukan diubah tipenya (konversi di riwayat.service). Field wajib → tidak boleh
- * kosong; field bersyarat (`showWhen`) hanya diperiksa wajibnya saat tampil. Validasi yang mengikat tetap di backend
- * (422 `errors.<kolom>`).
+ * kosong; field bersyarat (`showWhen`) hanya diperiksa wajibnya saat tampil; `requiredWhen` = wajib bila syaratnya terpenuhi. Validasi yang mengikat tetap di backend
+ * (422 `errors.<kolom>`). Isian `multiselect` (nilai daftar, MAKE-018) tidak ikut skema ini — wajibnya (minimal satu)
+ * diperiksa RiwayatFieldForm.
  */
 import { z } from 'zod'
 
-import { fieldVisible, type FieldDef } from './riwayat.config'
+import { fieldVisible, fieldWajib, type FieldDef } from './riwayat.config'
 
 function fieldSchema(f: FieldDef): z.ZodTypeAny {
   const max = f.max ?? (f.type === 'textarea' ? 1000 : 255)
@@ -21,12 +22,14 @@ function fieldSchema(f: FieldDef): z.ZodTypeAny {
   return f.required && !f.showWhen ? z.string().trim().min(1, `${f.label} wajib diisi`).pipe(base) : base
 }
 
-export function buildRiwayatSchema(fields: readonly FieldDef[]) {
-  const conditional = fields.filter((f) => f.required && f.showWhen)
+export function buildRiwayatSchema(semua: readonly FieldDef[]) {
+  const fields = semua.filter((f) => f.type !== 'multiselect')
+  // Wajib bersyarat: wajib selama tampil (`required` + `showWhen`) atau `requiredWhen` (MAKE-018).
+  const conditional = fields.filter((f) => (f.required && f.showWhen) || f.requiredWhen)
   return z.object(Object.fromEntries(fields.map((f) => [f.name, fieldSchema(f)]))).superRefine((values, ctx) => {
     const current = values as Record<string, string | undefined>
     for (const f of conditional) {
-      if (fieldVisible(f, current) && String(current[f.name] ?? '').trim() === '') {
+      if (fieldVisible(f, current) && fieldWajib(f, current) && String(current[f.name] ?? '').trim() === '') {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [f.name], message: `${f.label} wajib diisi` })
       }
     }

@@ -9,12 +9,13 @@
  * Koreksi NIP (B-06, `aksi.koreksi_nip`) lewat menu ⋯ kartu identitas; sukses → pindah ke URL NIP baru.
  *
  * Galat: 403 (izin/lingkup — termasuk NIP yang tidak ada bagi role ber-lingkup), 404, 501 (stub) ditampilkan sebagai
- * keadaan halaman, tidak pernah sebagai data contoh. Cetak, arsip, dan hapus pegawai belum tersambung (B-20/B-05).
+ * keadaan halaman, tidak pernah sebagai data contoh. Cetak DRH, Arsip Kepegawaian (MAKE-014) dan hapus pegawai (B-05) tersambung; Cetak Data Umum belum.
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { isApiError } from '@/lib/axios'
 import { Role } from '@/features/auth/types'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
@@ -23,13 +24,20 @@ import { UiButton, UiCard, UiNotice } from '@/shared/ui'
 import DataUmumForm from '../components/DataUmumForm.vue'
 import DataUmumView from '../components/DataUmumView.vue'
 import KoreksiNipDialog from '../components/KoreksiNipDialog.vue'
+import ArsipKepegawaianDialog from '../components/ArsipKepegawaianDialog.vue'
+import PengajuanBiodataDialog from '../components/PengajuanBiodataDialog.vue'
+import PerubahanBiodataTabel from '../components/PerubahanBiodataTabel.vue'
 import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
 import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { tabsFromDescriptors } from '../riwayat/registry'
+import { PEGAWAI_LIST_ROLES } from '../roles'
 import { describeApiError, type ApiFailure } from '../services/apiErrors'
+import { simpanBerkas } from '../services/berkasUnduhan'
 import { pegawaiService } from '../services/pegawai.service'
-import type { BiodataResult, KoreksiNipResult, PegawaiDetail, RiwayatMenu } from '../types'
+import type { ApprovalAksi } from '@/shared/components/approvalActions'
+
+import type { BiodataResult, KoreksiNipResult, PegawaiDetail, PengajuanBiodataDetail, PerubahanBiodata, RiwayatMenu } from '../types'
 
 const DATA_UMUM = 'data-umum'
 
@@ -45,9 +53,33 @@ const notice = ref<string | null>(null)
 const confirmDelete = ref(false)
 const editing = ref(false)
 const koreksiOpen = ref(false)
+const prosesOpen = ref(false)
+const prosesMode = ref<ApprovalAksi>('setujui')
+const busyDelete = ref(false)
 
 const role = computed(() => auth.role)
-const canPrint = computed(() => role.value !== null && [Role.SUPER_ADMIN, Role.PEGAWAI, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI].includes(role.value as 1 | 2 | 3 | 4 | 5))
+/**
+ * Cetak DRH (MAKE-014, legacy print_drh UL_ALL; keputusan user Q-M6-5): role 2/6/7 hanya DRH sendiri, role lain yang boleh
+ * melihat pegawai (lingkup ditegakkan server).
+ */
+const canPrint = computed(() => {
+  if (role.value === null) return false
+  if (([Role.PEGAWAI, Role.PTT, Role.PPPK] as number[]).includes(role.value)) return auth.user?.nip === nip.value
+  return true
+})
+const mencetak = ref(false)
+
+async function cetakDrh(): Promise<void> {
+  if (!detail.value || mencetak.value) return
+  mencetak.value = true
+  try {
+    simpanBerkas(await pegawaiService.drh(detail.value.nip))
+  } catch (error) {
+    notice.value = `Gagal mencetak DRH: ${describeApiError(error).message}`
+  } finally {
+    mencetak.value = false
+  }
+}
 const canDelete = computed(() => role.value === Role.SUPER_ADMIN)
 
 const riwayatTabs = computed(() => tabsFromDescriptors(detail.value?.tabs ?? []))
@@ -88,6 +120,30 @@ watch(nip, () => {
 }, { immediate: true })
 
 const pengajuan = computed(() => detail.value?.pengajuan ?? null)
+/** Arsip Kepegawaian = arsip Data Umum (MAKE-014). */
+const arsipOpen = ref(false)
+
+/** Pemilik/pengaju melihat perubahan yang diajukannya (MAKE-014; `GET biodata/pengajuan/{id}` mengizinkan pemilik). */
+const perubahanSaya = ref<PerubahanBiodata[] | null>(null)
+const galatPerubahan = ref('')
+watch(pengajuan, () => {
+  perubahanSaya.value = null
+  galatPerubahan.value = ''
+})
+
+async function lihatPerubahan(): Promise<void> {
+  if (!pengajuan.value) return
+  if (perubahanSaya.value) {
+    perubahanSaya.value = null
+    return
+  }
+  galatPerubahan.value = ''
+  try {
+    perubahanSaya.value = (await pegawaiService.pengajuan(pengajuan.value.id_pegawai_hist)).perubahan
+  } catch (error) {
+    galatPerubahan.value = describeApiError(error).message
+  }
+}
 
 function onSaved(result: BiodataResult): void {
   editing.value = false
@@ -95,6 +151,31 @@ function onSaved(result: BiodataResult): void {
     ? 'Data umum pegawai berhasil disimpan.'
     : 'Perubahan data umum berhasil diajukan dan menunggu verifikasi admin.'
   void load()
+}
+
+function bukaProses(mode: ApprovalAksi): void {
+  prosesMode.value = mode
+  prosesOpen.value = true
+}
+
+function onProcessed(hasil: PengajuanBiodataDetail): void {
+  notice.value = Number(hasil.pengajuan.flag_update) === 3 ? 'Pengajuan perubahan data umum disetujui.' : 'Pengajuan perubahan data umum ditolak.'
+  void load()
+}
+
+async function hapusPegawai(): Promise<void> {
+  confirmDelete.value = false
+  if (!detail.value) return
+  busyDelete.value = true
+  try {
+    await pegawaiService.hapus(detail.value.nip)
+    notice.value = 'Pegawai dihapus permanen.'
+    void router.push({ name: 'pegawai-list' })
+  } catch (error) {
+    notice.value = `Gagal menghapus pegawai: ${(isApiError(error) ? Object.values(error.errors ?? {})[0]?.[0] : undefined) ?? describeApiError(error).message}`
+  } finally {
+    busyDelete.value = false
+  }
 }
 
 function onKoreksi(result: KoreksiNipResult): void {
@@ -115,9 +196,10 @@ const failureTitle = computed(() => {
   }
 })
 
+/** D-F15: "Daftar Pegawai" hanya ditautkan bagi role yang boleh membukanya (1, 3, 4, 5, 8). */
 const crumbs = computed(() => [
   { label: 'Home', to: { name: 'home' } },
-  { label: 'Daftar Pegawai', to: { name: 'pegawai-list' } },
+  ...(role.value !== null && PEGAWAI_LIST_ROLES.includes(role.value) ? [{ label: 'Daftar Pegawai', to: { name: 'pegawai-list' } }] : []),
   { label: 'Data Pegawai' },
 ])
 </script>
@@ -143,17 +225,23 @@ const crumbs = computed(() => [
           :can-print="canPrint"
           :can-delete="canDelete"
           :can-koreksi-nip="detail.aksi?.koreksi_nip ?? false"
+          :deleting="busyDelete"
           @koreksi-nip="koreksiOpen = true"
-          @arsip="notice = 'Arsip Kepegawaian belum tersedia (task B-18).'"
-          @print="(kind) => (notice = `Cetak ${kind === 'drh' ? 'DRH' : 'Data Umum'} belum tersedia (task B-20).`)"
+          @arsip="arsipOpen = true"
+          :print-kinds="['drh']"
+          @print="(kind) => kind === 'drh' && cetakDrh()"
           @delete="confirmDelete = true"
         />
 
         <RiwayatMenuTabs v-model="tab" :menus="menus" />
 
         <UiCard v-if="tab === DATA_UMUM" title="Data Umum" subtitle="Biodata pegawai" flush>
-          <template v-if="detail.aksi?.ubah_biodata && !editing" #actions>
-            <UiButton data-testid="btn-ubah-data-umum" @click="editing = true">Ubah Data Umum</UiButton>
+          <template v-if="(detail.aksi?.ubah_biodata || detail.aksi?.proses_biodata) && !editing" #actions>
+            <template v-if="detail.aksi?.proses_biodata && pengajuan">
+              <UiButton variant="success" appearance="soft" data-testid="btn-setujui-pengajuan" @click="bukaProses('setujui')">Setujui Pengajuan</UiButton>
+              <UiButton variant="error" appearance="soft" data-testid="btn-tolak-pengajuan" @click="bukaProses('tolak')">Tolak Pengajuan</UiButton>
+            </template>
+            <UiButton v-if="detail.aksi?.ubah_biodata" class="whitespace-nowrap" data-testid="btn-ubah-data-umum" @click="editing = true">Ubah Data Umum</UiButton>
           </template>
           <div class="mt-3 border-t border-slate-200">
             <UiNotice v-if="pengajuan?.flag_update === 1" tone="info" class="mx-5 mt-4" data-testid="pengajuan-status">
@@ -162,6 +250,15 @@ const crumbs = computed(() => [
             <UiNotice v-else-if="pengajuan?.flag_update === 2" tone="danger" class="mx-5 mt-4" data-testid="pengajuan-status">
               Pengajuan perubahan data umum ditolak{{ pengajuan.reason_note ? `: ${pengajuan.reason_note}` : '.' }}
             </UiNotice>
+            <div v-if="pengajuan && !detail.aksi?.proses_biodata" class="mx-5 mt-2">
+              <button type="button" class="text-body2 font-medium text-brand-tertiary hover:underline" data-testid="btn-lihat-perubahan" @click="lihatPerubahan">
+                {{ perubahanSaya ? 'Sembunyikan perubahan yang diajukan' : 'Lihat perubahan yang diajukan' }}
+              </button>
+              <UiNotice v-if="galatPerubahan" tone="danger" class="mt-2">{{ galatPerubahan }}</UiNotice>
+              <div v-if="perubahanSaya" class="mt-2 rounded-lg border border-slate-200 p-3" data-testid="perubahan-saya">
+                <PerubahanBiodataTabel :perubahan="perubahanSaya" />
+              </div>
+            </div>
             <div v-if="editing" class="px-5 py-5">
               <DataUmumForm :detail="detail" @saved="onSaved" @cancel="editing = false" />
             </div>
@@ -179,6 +276,17 @@ const crumbs = computed(() => [
       </template>
     </div>
 
+    <PengajuanBiodataDialog
+      v-if="detail && pengajuan"
+      v-model:open="prosesOpen"
+      :mode="prosesMode"
+      :id-hist="pengajuan.id_pegawai_hist"
+      :nama="detail.nama"
+      @processed="onProcessed"
+    />
+
+    <ArsipKepegawaianDialog v-if="detail" v-model:open="arsipOpen" :nip="detail.nip" :nama="detail.nama" />
+
     <KoreksiNipDialog
       v-if="detail"
       v-model:open="koreksiOpen"
@@ -190,11 +298,11 @@ const crumbs = computed(() => [
     <ConfirmDialog
       :open="confirmDelete"
       title="Hapus pegawai?"
-      :description="detail ? `Data ${detail.nama} (${detail.nip}) akan dihapus.` : ''"
+      :description="detail ? `Data ${detail.nama} (${detail.nip}) akan dihapus PERMANEN. Pegawai yang masih punya riwayat, jabatan, atau akun login tidak dapat dihapus.` : ''"
       confirm-label="Ya, hapus"
       danger
       @update:open="(v) => (confirmDelete = v)"
-      @confirm="() => { confirmDelete = false; notice = 'Penghapusan pegawai belum tersedia (task B-05).' }"
+      @confirm="hapusPegawai"
     />
   </RedesignShell>
 </template>

@@ -185,6 +185,15 @@ Perubahan sesudah beku (aditif / konsistensi, WS-1):
   daftar; detail/ubah tidak ikut disaring), `beforeSave()` saat tambah menerima kolom NIP pemilik di `$data`,
   `afterProses(aksi, baris, auth)` (dipanggil di transaksi `proses` untuk setujui DAN tolak, sesudah status ditulis;
   default no-op — AK mengisi `appr_at`/`appr_by`).
+- MAKE-017 (hook aditif): `RiwayatDefinisi::pratinjauTambah(nip, query)` + `RiwayatEngine::pratinjauTambah()` + endpoint
+  `GET …/riwayat/{jenis}/pratinjau` (izin aksi tambah; default null → 404). AK memakainya untuk isian turunan form tambah
+  (logika bersama `Ak::turunan()`/`masaKerja()`/`akTerakhir()` dengan beforeSave).
+- MAKE-019 (hook aditif, untuk B-07 sub rumpun multiselect WS-2): `RiwayatDefinisi::isianMentah(): list<string>` (bawaan
+  []). Kunci terdaftar yang DIKIRIM klien diteruskan engine apa adanya (tanpa ValidasiRiwayat; JSON array, form `kolom[]`
+  berulang → array, form `kolom=''` → '') ke `validate()` dan `beforeSave()` saat tambah & ubah; kunci absen = tidak
+  ada di `$data`. Engine membuang sisa kunci mentah sesudah beforeSave (tidak pernah ditulis ke tabel) — Definisi yang
+  memindahkan/menormalkannya ke kolom nyata. RiwayatRegistry menolak (LogicException) nama tidak sah atau bentrok dengan
+  field `fields()`, kolom berkas `kolomBerkas()`, kolom NIP/status, atau PK; nama sebaiknya bukan kolom DDL tabel.
 
 **Test.** `tests/unit/Kepegawaian/Riwayat/PemilihSnapshotTest.php` (murni), `tests/Kepegawaian/Riwayat/` (ber-DB;
 `PendidikanTest`, `KpTest` = B-TC + aturan per jenis, dengan PegawaiScope + AttachmentService/LocalStorageAdapter nyata
@@ -205,9 +214,9 @@ Label sumber registry: **[K]** = DDL dump struktur produksi 01-10-2026 (D1, 285 
 
 | Kelas | Isi |
 |---|---|
-| `TabelAnakNip` | Registry statis 80 entri. Method: `semua`, `perFase(n)`, `sampaiFase(n)` (cakupan B-06 setelah fase n selesai), `perJenis`, `perKeberadaan` |
+| `TabelAnakNip` | Registry statis 82 entri. Method: `semua`, `perFase(n)`, `sampaiFase(n)` (cakupan B-06 setelah fase n selesai), `perJenis`, `perKeberadaan` |
 | `RujukanNip` | Satu entri: `tabel`, `kolom` (nama legacy), `kolomDiV2()`, `jenis`, `sumber`, `namaFkLegacy`, `nullable` (legacy), `keberadaan`, `fase`, `pemilik` (task migration), `catatan`, `kunci()` |
-| `JenisRujukanNip` | `FkLegacy`, `NonFkUbahNipLegacy`, `NonFkSlipGaji`, `NonFkFkV2`, `NonFkKeputusanV2` (MAKE-010: tanpa FK, tidak diganti legacy, ikut dikoreksi atas keputusan v2 — `jabatan_koordinasi.nip`, keputusan #10); `diubahLegacy()` |
+| `JenisRujukanNip` | `FkLegacy`, `NonFkUbahNipLegacy`, `NonFkSlipGaji`, `NonFkFkV2`, `NonFkKeputusanV2` (MAKE-010: tanpa FK, tidak diganti legacy, ikut dikoreksi atas keputusan v2 — `jabatan_koordinasi.nip`, keputusan #10), `JsonArrayNip` (MAKE-011: kolom teks berisi JSON array NIP + pasangan `*_desc` "NIP - Nama" — `dm_user_lokasi_presensi.target_peg`/`excl_peg`); `diubahLegacy()` |
 | `KeberadaanV2` | `Ada` (fase dan pemilik diketahui), `TidakDiimpor`, `BelumDiputuskan` |
 | `FormatNip` | `valid` (1–18 digit ASCII), `periksa` (input → `HasilKalkulasi`, kode `nip_wajib`/`nip_tidak_valid`), `periksaKoreksi` (B-06, kode `nip_lama_wajib`/`nip_baru_sama`) |
 
@@ -220,16 +229,17 @@ Label sumber registry: **[K]** = DDL dump struktur produksi 01-10-2026 (D1, 285 
 | Non-FK Slip Gaji | 1 (`gaji_pegawai.nip`) | [K] tanpa FK, `UNIQUE (nip, bulan, tahun)` | **Tidak** berubah, sehingga slip lama yatim |
 | Non-FK yang wajib FK di v2 | 2 (`riwayat_cuti.nip_atasan_langsung`, `nip_yang_menyetujui`) | [K] tanpa FK, VARCHAR(50); [V2] DoD C-01 (`04-Layanan.md:21`), SRS :161 | **Tidak** berubah |
 | Non-FK keputusan v2 (MAKE-010) | 1 (`jabatan_koordinasi.nip`, fase 2 G-02) | [K] tanpa FK (D1:1510-1545, DBV-018); [V2] keputusan #10 WS2.md | **Tidak** berubah (v2 ikut mengoreksi) |
+| JSON array NIP (MAKE-011) | 2 (`dm_user_lokasi_presensi.target_peg`, `excl_peg`, fase 2 G-03) | [K-kode] `libraries/hr/master/Lm_lokasi.php:694-758` | **Tidak** berubah (v2 mengganti elemen array + awalan `*_desc`, keputusan user 13-10-2026) |
 
 Status v2 per entri berasal dari `0x-*.md`, Mapping Migrasi, dan draf DBV-012/DBV-013. Draf itu baru pra-review internal dan belum disetujui DB Validator.
 
 | Keberadaan | Jumlah | Rincian |
 |---|---|---|
-| `Ada` | 62 | Fase 0: 1 (`token`, F0-06) · Fase 1: 2 (`pengguna.id_pegawai` → `pengguna.nip`, `pengguna.username`; A-01) · Fase 2: 3 (`faq_rate` G-10, `user_lokasi_presensi` G-03, `jabatan_koordinasi.nip` G-02, MAKE-010) · Fase 3: 40 (B-01: 16, B-02: 24, sama dengan registry draf DBV-012/013 revisi D1, termasuk `pegawai_ak_siasn` dari keputusan DBV-012 8 #6 yang belum disetujui) · Fase 4: 8 (C-01) · Fase 5: 2 (`dh_online`, `gaji_pegawai`; D-01) · Fase 6: 1 (`esign_hist`, H-01) · Fase 7: 5 (F-01) |
-| `TidakDiimpor` | 11 | Tabel cadangan bertanggal (2), `riwayat_lckh_2019..2022` (8 kolom), dan `riwayat_layanan` yang tidak dipakai kode legacy |
+| `Ada` | 63 | Fase 0: 1 (`token`, F0-06) · Fase 1: 2 (`pengguna.id_pegawai` → `pengguna.nip`, `pengguna.username`; A-01) · Fase 2: 4 (`faq_rate` G-10, `jabatan_koordinasi.nip` G-02 MAKE-010, `dm_user_lokasi_presensi.target_peg`/`excl_peg` G-03 MAKE-011) · Fase 3: 40 (B-01: 16, B-02: 24, sama dengan registry draf DBV-012/013 revisi D1, termasuk `pegawai_ak_siasn` dari keputusan DBV-012 8 #6 yang belum disetujui) · Fase 4: 8 (C-01) · Fase 5: 2 (`dh_online`, `gaji_pegawai`; D-01) · Fase 6: 1 (`esign_hist`, H-01) · Fase 7: 5 (F-01) |
+| `TidakDiimpor` | 12 | Tabel cadangan bertanggal (2), `riwayat_lckh_2019..2022` (8 kolom), `riwayat_layanan` yang tidak dipakai kode legacy, dan `user_lokasi_presensi` (tidak dibuat di v2, diganti JSON `dm_user_lokasi_presensi`; MAKE-011) |
 | `BelumDiputuskan` | 7 | `email_pool`, `email_retry`, `email_sent`, `layanan_pegawai`, `login_mysapk`, `riwayat_cuti_notif_kt`, `user_geo` |
 
-`sampaiFase(3)` = 46 entri, yaitu cakupan B-06 di Fase 3 (dipakai `NipCascadeService`, MAKE-010). Fase berikutnya menambah entri tanpa mengubah kode B-06. Kecocokan registry dengan skema nyata (`information_schema.KEY_COLUMN_USAGE` dan kolom NIP tanpa FK) **menyusul sebagai test ber-DB B-21** di `tests/Kepegawaian/` setelah tabel B-01/B-02 ada. Test unit `TabelAnakNipTest` hanya memeriksa kelengkapan data: tidak ada duplikat, label sumber, nama FK, fase/pemilik, dan jumlah per kategori.
+`sampaiFase(3)` = 47 entri, yaitu cakupan B-06 di Fase 3 (dipakai `NipCascadeService`, MAKE-010/011). Fase berikutnya menambah entri tanpa mengubah kode B-06. Kecocokan registry dengan skema nyata (`information_schema.KEY_COLUMN_USAGE` dan kolom NIP tanpa FK) **menyusul sebagai test ber-DB B-21** di `tests/Kepegawaian/` setelah tabel B-01/B-02 ada. Test unit `TabelAnakNipTest` hanya memeriksa kelengkapan data: tidak ada duplikat, label sumber, nama FK, fase/pemilik, dan jumlah per kategori.
 
 ### Kolom NIP tanpa FK di luar registry (keputusan B-06)
 
@@ -290,8 +300,17 @@ Perlakuan khusus:
   AccountProvisioner). Penanda "wajib ganti password" belum ada di skema v2 (kebutuhan skema, laporan MAKE-010).
 - **Sesi [V2]**: refresh token menyimpan claims termasuk `nip` saat terbit, jadi seluruh sesi akun itu dicabut
   (`JwtService::revokeAllForUser`) di transaksi yang sama. `token.nip` (jejak A-01 D-7) tidak diarahkan ulang.
+- **JSON array NIP** (`JsonArrayNip`, MAKE-011, keputusan user 13-10-2026): elemen = NIP lama di
+  `dm_user_lokasi_presensi.target_peg`/`excl_peg` diganti NIP baru, dan awalan "NIP lama - " di `*_desc`; baris dikunci
+  `FOR UPDATE`, NIP yang hanya mirip (awalan sama) tidak tersentuh. `user_lokasi_presensi` (tabel legacy) tidak dibuat di
+  v2 → entri registry-nya `TidakDiimpor`.
 - **Tabel registry yang belum ada di skema** dilewati dan dilaporkan di `dilewati`; `NipCascadeTest` mengunci daftarnya
-  (`user_lokasi_presensi` — G-03 membuat `dm_user_lokasi_presensi`; temuan registry untuk sesi utama).
+  (kosong sejak MAKE-011). Keberadaan tabel dibaca dari `information_schema`, bukan `tableExists()` (cache daftar tabel
+  CI4 yang terisi sebelum migrate membuat semua tabel dianggap tidak ada — temuan CI MAKE-010).
+- **Audit akun**: setiap akun yang username/password-nya direset dicatat `audit_logs` entity `pengguna` (password
+  dimasking; `pengguna` tidak punya kolom `updated_by`, pelaku = `id_pengguna_actor`). Username kustom ≠ NIP lama juga
+  ditimpa ([K]); bentrok dengan username akun lain dicegah cek keunikan NIP baru. 1062 pada salinan `pegawai` (balapan)
+  → 422 `nip_baru`.
 - `jabatan_koordinasi.nip` ikut dikoreksi (keputusan #10) lewat entri registry `NonFkKeputusanV2`.
 
 Test DoD B-06 + butir cascade B-21: `tests/Kepegawaian/NipCascadeTest.php` (data dummy di setiap tabel registry yang
@@ -308,10 +327,152 @@ registry ⊇ semua FK ke `pegawai(nip)` di skema, endpoint).
 | `App\Models\Kepegawaian\PegawaiModel`, `PegawaiHistModel`, `PegawaiFotoModel` | Model auditable + `PelakuAuditTrait` (pelaku = AuthContext pemanggil, tulis gagal → DatabaseException) |
 
 Keputusan [K]/[V2] B-03: role 1 menimpa pengajuan aktif → `flag_update` 2 TANPA alasan + `show_notif`/`notif_date`
-(trigger `pegawai_hist_beUpd`, keputusan user 13-10-2026); kolom `status` pegawai tidak dibuka di biodata (B-05, MAKE-011);
+(trigger `pegawai_hist_beUpd`, keputusan user 13-10-2026); jalur pengajuan menolak gelar > 12/24 karakter (panjang
+`pegawai_hist.glr_awal`/`glr_akhir` [K], sementara sampai DBV-020 melebarkannya) dengan arahan menghubungi admin;
+pengajuan ulang dengan foto baru membuang foto pengajuan sebelumnya (kecuali masih foto pegawai/galeri); kolom `status` pegawai tidak dibuka di biodata (B-05, MAKE-011);
 arsip status/arsip data umum (`document_attachment` ARSIP_RWY `status_du`/`arsip_du`) ditunda ke M6; pegawai status 10
 tidak bisa diubah [V2]; email akun hanya disinkron pada jalur langsung (jalur pengajuan menyimpannya di `pegawai_hist.email`
 sampai disetujui B-04).
+
+## Approval biodata B-04 & siklus pegawai B-05 (`Pegawai/`, MAKE-011)
+
+| Kelas | Isi |
+|---|---|
+| `ApprovalBiodata` | B-04: antrean pengajuan menunggu (jalur PROSES), detail + `perubahan`, setujui (salin kolom biodata → `pegawai`, `flag_update` 3, email akun, galeri foto) / tolak (alasan wajib, `pegawai` tidak berubah kecuali `flag_update` 2 — bug legacy `sp_process` :1098 tidak ditiru), penanda `show_notif`/`notif_date`/`approved_by`/`show_ua_*` seperti legacy :1095-1103 + trigger `pegawai_hist_beUpd`. [V2]: hanya kolom biodata yang disalin (bukan `status`/`nip`/SIASN), lingkup role 3 diperiksa `bolehProses` (legacy `process` tidak memeriksanya) |
+| `SiklusPegawai` | B-05: tambah (pegawai status 1 + foto + akun A-09 password awal = NIP, satu transaksi; NIP yang sudah tertaut akun mana pun, termasuk soft-deleted, → 422) dan hapus FISIK ikut legacy (422 bila masih ada data turunan: FK RESTRICT 1451; akun ber-NIP DILEPAS — `nip` NULL, nonaktif, sesi dicabut, diaudit [K] D1:3756 ON DELETE SET NULL; galeri `pegawai_foto` ikut dihapus [K] D1:2932 ON DELETE CASCADE, diaudit, berkas dibuang sesudah commit; audit `delete`) |
+| `AkunPegawai` | Role akun dari jenis pegawai [K] (`2` → PTT, `6` → PPPK, lain → PNS); nonaktifkan akun + cabut sesi (status 1 → 2 hanya user_level 2, trigger `pegawai_afUpd`) |
+
+**Jalur proses PegawaiScope = interface terpisah `PegawaiScopeProsesInterface`** (`terapkanKeQueryProses`, aditif
+MAKE-011), bukan method baru di `PegawaiScopeInterface`: kontrak beku itu punya implementasi lain (fake test
+`FakePegawaiScope`, kelas anonim di test WS-1 `RiwayatTabEndpointTest`) yang akan rusak bila interface-nya ditambah.
+`PegawaiScope` dan `StubPegawaiScope` mengimplementasikan keduanya; pemanggil yang menerima scope tanpa interface ini
+menyaring hasil per baris dengan `bolehProses()`. Antrean approval berikutnya (riwayat, Konket, LKH) memakai filter yang
+sama, bukan `terapkanKeQuery` (yang untuk admin unit 20 memuat UPT).
+
+**Password awal = NIP (B-05).** Jalur aditif `AccountProvisioner::provisionDenganPasswordNip()` (milik Auth/A-09)
+sengaja melewati PasswordPolicy karena keputusan user 13-10-2026 ikut legacy `L_employee.php:157-166`; hash Argon2id,
+bukan md5. `provisionForPegawai()` tetap password acak yang lolos kebijakan. Penanda "wajib ganti password" menunggu
+DBV-020.
+
+**Hapus pegawai [K]** ikut legacy (keputusan user 13-10-2026; DoD B-05 menyebut soft delete): praktis hanya pegawai yang
+baru ditambah tanpa data turunan yang bisa dihapus — sama dengan legacy, yang gagal ("Gagal menghapus data pegawai") bila
+FK menolak. Tidak ada cascade manual untuk data turunan. Akun ber-NIP dilepas (SET NULL legacy), jadi akun role 2/6/7
+tanpa NIP bisa muncul — tidak lazim, tetapi itulah hasil legacy. **Catatan sesi utama:** FK masuk `pengguna.nip` →
+`pegawai` yang ditahan (DBV-019, `MigrationsDitahan/`, RESTRICT) perlu diselaraskan menjadi ON DELETE SET NULL saat
+diaktifkan (unit DBV terpisah); berkas migration itu tidak diubah di sini.
+
+**Email unik (A-01 D-6, MAKE-011):** pengajuan biodata dengan email yang dipakai akun lain → 422 `errors.email`; jalur
+langsung Super Admin dan approval B-04 tetap menyimpan biodata tetapi sinkron email akun dilewati (`email_skipped` di
+respons).
+
+## Riwayat jabatan B-07, Plt/Plh & struktur organisasi B-19 (MAKE-012)
+
+**Riwayat jabatan** = `Riwayat/Definisi/Jabatan.php` di atas engine-v1 (tanpa hook baru). Sumber [K]
+`L_jabatan.php` validate_param()/set_param(). Hak akses (keputusan user 13-10-2026, pola biasa): lihat Matriks v2 (1, 2,
+3, 4, 5); tulis/proses ikut legacy [K] `controllers/hr/rwy/Jabatan.php` — tambah 1, ubah 1/3, hapus 1, proses 1/3.
+Alur Admin, role 1 memilih status saat edit (`form.php:59`), `roleKunciHapusDisetujui` bawaan. Ringkas:
+
+| Aturan | Isi |
+|---|---|
+| Jenis jabatan | 1 Nomenklatur (jenis mutasi wajib), 2 Instansi Lain (nama instansi/unit/satker/jabatan teks wajib; kolom nomenklatur dikosongkan [V2]), 3 Plt (jabatan "PLT …", tidak masuk snapshot, TMT boleh kembar) |
+| Wajib bersyarat | jenis 1/3: group, sub group, unit, satker, rumpun, jabatan (satker 39 dipekerjakan → `jabatan` teks); group JFT (2): tugas koordinasi, no induk & status JFT; group JFU (3): tugas koordinasi; koordinator/subkoordinator → `id_jabatan_koord`; pegawai PPPK (`id_jenis_pegawai` 6) → golongan PPPK |
+| [V2] Konsistensi | jabatan harus di sub group terpilih (dan satker terpilih bila jabatan terikat satker); `jabatan_koordinasi` harus ada (aktif bila diubah) |
+| [V2] Atasan (Q3 reviewer) | Es I–IV diturunkan dari `struktur_jabatan` periode aktif saat tambah / jabatan-satker-unit-sub group berubah (legacy `list_all_atasan`): jabatan bersimpul struktur → naik lewat `id_jabatan_atasan`; tanpa simpul → kandidat tunggal per level di unit (Es.I) / satker (Es.II–IV). Nilai yang diisi klien menang dan harus kandidat atasan posisi itu (leluhur simpul jabatan terpilih, atau simpul ber-level sesuai di unit/satker yang sama untuk jabatan tanpa simpul); Es.III/IV struktural dan `*_koord` saling eksklusif (legacy `struk_`/`koord_`). Koordinator/subkoordinator tidak diturunkan |
+| Salinan nama | `nama_instansi` (web_config `nama_kementerian`), group, sub group, unit, satker, atasan es I–IV & koordinasi, jabatan + `kelas_jabatan`, jabatan koordinasi, rumpun, golongan PPPK — dari master, klien tidak bisa menimpa. Non-PPPK: golongan/PMK/MHPK dikosongkan |
+| TMT unik | jenis ≠ 3, status selain 2/10, baris sendiri dikecualikan |
+| Snapshot | `pegawai_mutasi_jabatan`: status 1, `jenis_jabatan != 3`, `tmtsk DESC`, `updated_at DESC`, PK DESC (disetujui user 13-10-2026). Legacy afIns `>=` = baris yang ditulis belakangan menang; afUpd/afDel `LIMIT 1` tanpa pemecah seri (tidak deterministik). `notif_date` tidak dipakai karena tambah langsung admin tidak mengisinya |
+| Lampiran | 9 SK (wajib), 36 SK pembebasan sementara JFT (wajib bila jenis ≠ 2 + group JFT + status JFT 2), 41 perjanjian kerja (opsional); berkas kolom `ser_dosen`, `f_spmt`, `f_bapel` (opsional); semua 5 MB jpg/jpeg/png/gif/pdf |
+
+Sub rumpun (MAKE-013 di atas hook MAKE-018 FE + MAKE-019 `isianMentah`): isian mentah `id_subrumpun_jabatan` (daftar ID;
+JSON array, multipart `id_subrumpun_jabatan[]`, atau `''` = kosong) → kolom `subrumpun_jabatan` berisi nama dipisah `***`
+(legacy set_param). Wajib minimal satu untuk jenis 1/3 (legacy validate_param :1986), opsional untuk Instansi Lain;
+[V2] ID angka, ada, aktif, milik `id_rumpun_jabatan`, tidak kembar, gabungan ≤ 65535 byte (diperiksa di validate()). Tidak
+dikirim saat ubah = nilai lama dipertahankan, kecuali rumpun berubah (422). FE: multiselect `loadFrom` mencocokkan nama
+saat Edit; teks `jabatan` tampil & wajib bila Instansi Lain ATAU (jenis 1/3 DAN satker 39) — syarat `any`/`all` MAKE-018.
+
+**Plt/Plh** (`Struktur/PenugasanService.php`, tabel `pegawai_plt`/`pegawai_plh`, model `PegawaiPltModel`/
+`PegawaiPlhModel`) ikut legacy (keputusan user 13-10-2026): CRUD tanpa approval, tulis role 1 (userAuth ['1']), lihat
+1/3/4/5 (role 3 lingkup satker akun, atau unit bila tanpa satker — list_off_plt), hapus PERMANEN dengan audit "before" dan
+berkas lampiran dibuang sesudah commit; lampiran kolom `lampiran` lewat KolomBerkas. Isu cutover: kolom `lampiran` impor legacy berisi path arsip remote (`arsip/off_plt/…`) yang belum ada di storage v2 → unduh 404 sampai arsip dipindahkan.
+
+**Struktur organisasi B-19** (`Struktur/StrukturService.php`, service `strukturService`) ikut templat legacy so_012025
+(keputusan user 13-10-2026): format & dataset per pilihan kementerian/unit/satker sama dengan legacy, ID hard-code legacy
+(unit 6/7/16/19, satker 37/38/41/49/50/104, jabatan 2060) jadi konstanta [K]. Pejabat pada tanggal acuan (hari ini;
+siap untuk parameter bulan): definitif ikut aturan legacy (riwayat jabatan status 1 jenis 1, TMT ≤ tanggal, status
+pegawai), lalu Plt [V2] hanya status 1 Aktif (legacy getPLT tanpa saring status; keputusan user 13-10-2026), lalu [V2] Plh bila tidak ada definitif maupun Plt (disetujui user). Pilihan `disabled` (unit 6) dan nilai non-string ditolak 422. [V2] simpul hanya periode struktur aktif;
+format `pusat` (legacy 2025 tanpa view) dirender seperti UPT. Riwayat per bulan & ekspor PDF: MAKE-013 (lihat bagian M5).
+
+Test: `tests/Kepegawaian/Riwayat/JabatanTest.php` (`use RiwayatBtcTrait` + `pasangEngineNyata`),
+`tests/Kepegawaian/PenugasanTest.php`, `tests/Kepegawaian/StrukturOrganisasiTest.php`.
+
+## Konket B-13, LKH B-12b, PDF (MAKE-013)
+
+**PDF (ADR-033)** — `app/Libraries/Pdf/`: `PdfRendererInterface` (`app/Interfaces/`), `DokumenPdf` (judul, HTML badan, kop
+halaman pertama, kaki setiap halaman, orientasi, ukuran), `TcpdfRenderer` (TCPDF ^6.6, LGPL-3.0-or-later, via Composer;
+font inti helvetica; cache `WRITEPATH/cache/tcpdf/`), `Pdf::renderer()` / `Pdf::pakai()` (ganti renderer, mis. dompdf
+cadangan atau test) / `Pdf::respon()` / `Pdf::qrImg()` (QR PNG tersemat lewat `TCPDF2DBarcode`). Services.php tidak ditambah
+entri (aturan kepemilikan Fase 3). Template di `app/Views/pdf/` dan wajib `esc()`. **Deploy:** TCPDF butuh ekstensi
+PHP `gd` (QR/gambar PNG) dan `curl` — dideklarasikan `ext-gd` / `ext-curl` di `composer.json` (composer install gagal bila
+belum aktif). Ekspor XLSX Daftar Pegawai (MAKE-014) butuh `ext-zip` (ZipArchive; sudah di `composer.json`).
+
+Pemakaian oleh WS-1 (contoh: tanda terima Karpeg/Karis, sudah dibuat di `Usulan/TandaTerimaUsulan.php`):
+
+```php
+$html = view('pdf/nama_template', $data);                       // data sudah di-escape di template
+$isi  = Pdf::renderer()->render(new DokumenPdf('Judul', $html, kopHtml: $kop, kakiHtml: 'SIMPEG v2, ...'));
+return Pdf::respon($this->response, $isi, 'nama.pdf');          // controller
+```
+
+**Konket B-13** (`Konket/KonketService.php`, tabel `absen_ijin` W/V/X/10, `KonketAturan` murni): service tipis di luar
+engine. Hak (keputusan user 13-10-2026): lihat 1/2/3/6/7 + [K] role 4/5 LIHAT saja (legacy list_ad ['1','3','4'] +
+detail 1–7: antrean semua pegawai + detail, tanpa Tambah/ubah/hapus/proses; Matriks v2 hanya 1/2/3/6/7); tulis/proses
+legacy (pegawai: diri sendiri, ubah selama W, hapus tanpa syarat status; role 1 semua; role 3 PegawaiScope; proses 1/3
+jalur proses). Peserta dinas gabungan yang diisi role 3 wajib dalam lingkupnya (422 `peserta`; legacy form_ad hanya
+menawarkan pegawai satker/unit); pegawai 2/6/7 boleh memilih pegawai aktif mana pun. Aturan legacy validate_param: tanggal ≤ hari ini, mulai ≥ tanggal minimal (konket_min_date, termasuk
+pengecualian bulan), akhir ≥ mulai, jenis & alasan & berkas wajib, tidak beririsan dengan W/V, konket sakit (kategori 10)
+selain PTT maksimal 1 hari kerja dan tidak berturut-turut (efek legacy: hanya hari kerja sebelumnya), Dinas Luar
+(kategori 8) gabungan dengan baris peserta (`id_parent`) yang ikut diubah/diproses/dihapus. [V2]: jenis dibatasi per role
+di server, hapus status 10 (setara trigger arsip legacy; keputusan user), alasan wajib saat tolak, baris peserta tidak diubah/diproses sendiri, tanpa pengecualian akun
+pengembang.
+
+**LKH B-12b** (`Lkh/LkhService.php`, tabel `riwayat_lckh` 0/1/2/3/10, `LkhAturan` murni, `AtasanLangsung` = port getAL):
+approver = atasan langsung (`nip_atasan`, diisi server dari snapshot jabatan: subkoordinator → Es.IV → koordinator → Es.III
+→ Es.II → Es.I, pemegang aktif atau Plt; Es.I → Menteri tanpa NIP sehingga tidak bisa diajukan). Rentang tanggal = 4 hari
+kerja terakhir (hari libur & akhir pekan dilewati), mulai tanggal 5 tidak sebelum tanggal 1; unik per tanggal; kegiatan
+JSON sejajar; kunci tukin ubah/hapus legacy; Revisi (3) → pegawai ubah → Menunggu; LKH Disetujui hanya dapat dihapus
+role 1 (legacy delete :464-472; role 3 → 403) dan tidak dapat diubah/dihapus pegawai; ubah menulis ulang nama/unit/satker
+terkini (legacy sp()). Keputusan user 13-10-2026: [V2] verifikator = siapa pun ber-role 1/2/3/6/7 yang NIP-nya =
+`nip_atasan` (legacy userAuth(['2']); atasan berakun 4/5/8 belum dibuka); role 1 boleh menimpa atasan dengan `nip_atasan`
+(NIP pegawai aktif, 422 bila tidak) — bawaan tetap atasan otomatis; PDF hanya untuk LKH Disetujui (selain itu 422
+`status`; legacy file_lckh dibuat saat disetujui), dibangkitkan saat diminta, QR kode legacy (waktu WIB), kop tanpa logo;
+[V2] baris kegiatan setengah terisi 422, catatan wajib tolak/revisi, hapus status 10. Rekap LKH bawahan (legacy
+list_rekap) belum dibawa.
+
+**Struktur organisasi per bulan & PDF:** `bulan` YYYY-MM mulai **2025-01** (keputusan user 13-10-2026; legacy sejak
+2022-01, tetapi bulan sebelum 2025 memakai templat so_062023/so_before_062023 yang belum di-port — TODO
+`StrukturService::BULAN_AWAL`); di luar rentang 422 `bulan`. Ekspor PDF = tabel hierarki jabatan–pejabat [V2] (ADR-033
+menolak wkhtmltopdf yang dipakai legacy untuk bagan).
+
+**Tanda terima usulan** (`Usulan/TandaTerimaUsulan.php`): PDF untuk usulan Karpeg/Karis Disetujui, port tt_pdf legacy
+(no tiket & kode permohonan legacy, QR dengan waktu dibuat WIB), dibangkitkan saat diminta.
+
+**Daftar periksa cutover (L6 review MAKE-013):**
+
+- Berkas legacy yang direferensikan path arsip lama — `absen_ijin.file_bukti`, `pegawai_plt.lampiran`,
+  `riwayat_lckh.file_lckh`, `file_tanda_terima` usulan — mengembalikan 404 sampai berkasnya dimigrasikan ke penyimpanan v2
+  (sertakan di skrip impor berkas atau terima sebagai arsip hanya-baca di legacy).
+- PDF LKH dan tanda terima v2 dibangkitkan saat diminta (tidak memakai berkas legacy): kode/QR sama dengan legacy, tetapi
+  tata letak berbeda — informasikan ke pengguna; tidak perlu menyalin `file_lckh`/tanda terima lama untuk baris baru.
+- Struktur organisasi sebelum 2025-01 belum tersedia (templat legacy lama belum di-port) — gunakan legacy/arsip bila
+  diperlukan sampai MAKE susulan.
+- Server produksi: aktifkan ekstensi PHP `gd` dan `curl` (TCPDF) serta `zip` (ekspor XLSX); folder `WRITEPATH/cache/tcpdf/` dapat ditulis.
+
+**Struktur organisasi per bulan** (MAKE-013): `bulan` sejak 2022-01, pejabat pada tanggal acuan; Plt/Plh & golongan
+dimuat sekaligus (tanpa N+1); ekspor PDF tabel hierarki. [V2] bulan sebelum Jan 2025 tetap memakai templat so_012025 +
+struktur periode aktif (templat so_062023/so_before_062023 legacy belum di-port).
+
+Test: `tests/unit/Pdf/TcpdfRendererTest.php`, `tests/unit/Kepegawaian/{Konket,Lkh}/*AturanTest.php`,
+`tests/Kepegawaian/{KonketTest,LkhTest,TandaTerimaUsulanTest,StrukturOrganisasiTest}.php`.
 
 ## Lingkup akses pegawai (`Scope/`, MAKE-009)
 
@@ -368,7 +529,7 @@ Hak per aksi per jenis riwayat tetap di Definisi; scope hanya menjawab "pegawai 
 |---|---|
 | `LocalStorageAdapter` | `StorageAdapterInterface` di disk lokal (`writable/uploads/lampiran`); path relatif `[A-Za-z0-9._-]` per segmen, tulis atomik |
 | `AttachmentService` | `AttachmentServiceInterface` atas `document_attachment` (model `DocumentAttachmentModel`, audit otomatis create/delete); `path` tidak pernah dikembalikan |
-| `ValidasiBerkas` | Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil). Dokumen Office (MAKE-010): `docx`/`xlsx` wajib paket OOXML (`[Content_Types].xml` + bagian di `word/`/`xl/`), `doc`/`xls` wajib tanda tangan OLE — ZIP biasa bernama `.docx` ditolak walau `Config\Mimes` memetakan `application/zip` ke ekstensi itu |
+| `ValidasiBerkas` | **Butuh ekstensi PHP `zip`** (`ext-zip` di `composer.json` sejak MAKE-011; checklist deploy: pastikan ekstensi aktif di server, `composer install` gagal tanpanya). Ukuran dari disk, jenis dari ISI (finfo → `Config\Mimes`), nama tampil dibersihkan; 422 berkunci `berkas` (atau field pemanggil). Dokumen Office (MAKE-010): `docx`/`xlsx` wajib paket OOXML (`[Content_Types].xml` + bagian di `word/`/`xl/`), `doc`/`xls` wajib tanda tangan OLE — ZIP biasa bernama `.docx` ditolak walau `Config\Mimes` memetakan `application/zip` ke ekstensi itu |
 | `PenjagaBerkas` | Kompensasi berkas di luar transaksi DB: setelah transaksi selesai, berkas tercatat dipertahankan hanya bila masih dirujuk `tabel.kolom = path` |
 | `KolomBerkas` | Helper tabel yang menyimpan berkas di kolomnya sendiri (`riwayat_karpeg.file_1..5`, LKH, Konket) |
 | `OtorisasiLampiran` | Otorisasi endpoint lampiran. Daftar/unggah: kode `jenis_rwy` → izin Definisi × role → PegawaiScope → (unggah) izin per pegawai `bolehAksiUntuk()` atas aksi `tambah`/`ubah` yang diizinkan role (403, CR-046) → `id_entri` milik NIP (bukan status 10) → kunci baris Disetujui untuk UL_PEGAWAI. Unduh/hapus: PegawaiScope lihat (403, sebelum baris dibaca) → izin aksi di Definisi berlampiran mana pun (403, sebelum baris dibaca) → baris lampiran (404) → izin Definisi → (hapus) `bolehUbah` + `bolehAksiUntuk()` atas `hapus`/`ubah` (403, CR-046) → baris riwayat bukan status 10 (404) (+ kunci baris, lampiran wajib terakhir 422 untuk hapus). Tulis diulang di dalam transaksi: `kunciUnggah()`/`kunciHapus()` (pegawai `FOR UPDATE`, baca ulang terkunci, hitung ulang lampiran wajib) |
@@ -397,3 +558,17 @@ berakhir). Otorisasi lampiran tetap tanggung jawab pemanggil (kontrak interface)
 **Pemakaian `KolomBerkas`.** `simpan()` mengembalikan path untuk ditulis ke kolom; `hapus()` menandai berkas lama;
 `selesaikan()` WAJIB dipanggil setelah transaksi (juga di jalur rollback) — tidak ada rekonsiliasi oportunistik karena
 path baru belum dirujuk sampai kolomnya ditulis. Contoh lengkap di docblock kelas.
+
+## B-20 penutup (MAKE-014)
+
+- `Pegawai/PencarianLanjutan` — whitelist advsearch legacy (jenis × data terakhir/riwayat × atribut × operator), terapkan ke
+  builder daftar (`EXISTS` per kriteria riwayat, status pegawai 1). `Pegawai/EksporTabel` — CSV BOM & XLSX minimal tanpa
+  library baru, escape formula. Keduanya dipakai `PegawaiService::pencarian/ekspor` dengan builder & lingkup daftar.
+- `Pegawai/DrhPegawai` — Cetak DRH (port `L_employee::print_drh` + `drh_pdf.php`), templat `app/Views/pdf/drh.php`, hak
+  UL_ALL (2/6/7 sendiri). Dibuat langsung di controller (tanpa entri Services.php).
+- `Lampiran/ArsipDataUmum` — aturan arsip Data Umum kode 37/38 (cabang tanpa Definisi di `OtorisasiLampiran`).
+- `Lkh/LkhService::descriptorTab/rekap/rekapBawahan` — tab LKH Detail Pegawai dan rekap LKH bawahan.
+- Daftar periksa cutover tambahan: berkas arsip Data Umum legacy (`document_attachment` 37/38, `id_entri` NULL seperti
+  baris v2) terbaca di daftar tetapi unduhnya 404 sampai berkas dimigrasikan (sama dengan lampiran lain).
+- [V2] pencarian lanjutan: setiap kriteria riwayat dievaluasi sendiri (`EXISTS` per kriteria); legacy menggabung kriteria
+  pada baris JOIN yang sama.

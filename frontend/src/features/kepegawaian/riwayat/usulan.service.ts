@@ -7,6 +7,7 @@
  */
 import { api } from '@/lib/axios'
 
+import { ambilBerkas, type BerkasUnduhan } from '../services/berkasUnduhan'
 import type { JenisEngine, RiwayatRow } from '../types'
 
 export interface UsulanSaya {
@@ -34,5 +35,10 @@ export const usulanService = {
   async antrean(jenis: JenisEngine, status = ''): Promise<UsulanAntrean> {
     const { data } = await api.get<UsulanAntrean>(`/usulan/${jenis}`, { params: status === '' ? {} : { status } })
     return data
+  },
+
+  /** Aditif WS-2 MAKE-013 (ADR-033): PDF tanda terima usulan Disetujui — `GET usulan/{jenis}/{id}/tanda-terima`. */
+  tandaTerima(jenis: JenisEngine, id: number | string): Promise<BerkasUnduhan> {
+    return ambilBerkas(`/usulan/${jenis}/${id}/tanda-terima`, `tanda_terima_${jenis}_${id}`)
   },
 }

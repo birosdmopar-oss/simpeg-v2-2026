@@ -13,7 +13,7 @@ import { UiButton, UiFileField, UiSelect } from '@/shared/ui'
 
 import type { RiwayatRow } from '../types'
 
-import { fieldVisible } from './riwayat.config'
+import { fieldVisible, fieldWajib } from './riwayat.config'
 import type { BerkasMap } from './riwayat.service'
 import type { BerkasKolomDef, UsulanConfig } from './usulan.config'
 
@@ -64,7 +64,7 @@ function onFile(def: BerkasKolomDef, file: File | null): void {
 
 function submit(): void {
   const next: Record<string, string> = {}
-  for (const f of props.config.fields) if (f.required && (values[f.name] ?? '').trim() === '') next[f.name] = `${f.label} wajib diisi`
+  for (const f of props.config.fields) if (fieldWajib(f, values) && (values[f.name] ?? '').trim() === '') next[f.name] = `${f.label} wajib diisi`
   for (const def of props.config.berkas) if (wajib(def) && !berkas[def.kolom]) next[`berkas.${def.kolom}`] = `${def.label} wajib diunggah.`
   errors.value = next
   if (Object.keys(next).length > 0) return
@@ -109,7 +109,7 @@ const error = (key: string): string => errors.value[key] ?? props.serverErrors?.
             <UiSelect
               v-model="values[f.name]"
               :label="f.label"
-              :required="f.required"
+              :required="fieldWajib(f, values)"
               :disabled="busy"
               :options="f.options ?? []"
               :placeholder="`Pilih ${f.label.toLowerCase()}...`"

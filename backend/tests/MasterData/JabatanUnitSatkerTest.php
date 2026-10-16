@@ -283,6 +283,22 @@ final class JabatanUnitSatkerTest extends DatabaseTestCase
     }
 
     /**
+     * MAKE-018 (aditif): options sub group membawa `extra.need_satker` (filter satker bersyarat form riwayat jabatan);
+     * master lain tetap tanpa `extra`.
+     */
+    public function testSubGroupOptionsMembawaNeedSatker(): void
+    {
+        $this->sendJson('PUT', 'api/v1/master/sub-group-jabatan/2', ['sub_group_jabatan' => 'Administrator Utama', 'need_satker' => '2'])->assertStatus(200);
+
+        $options = $this->json($this->get('api/v1/master/sub-group-jabatan/options', ['parent' => '1']))['data'];
+        $this->assertSame(['1', '2'], array_column($options, 'id'));
+        $this->assertSame(['need_satker' => '2'], $options[1]['extra']);
+        $this->assertArrayHasKey('need_satker', $options[0]['extra']);
+
+        $this->assertArrayNotHasKey('extra', $this->json($this->get('api/v1/master/group-jabatan/options'))['data'][0]);
+    }
+
+    /**
      * Kelas jabatan (codeAsName, CR-026): nomor kelas = kode = nama, 1–20 tanpa nol di depan, unik, tidak bisa diubah;
      * yang bisa diubah hanya `tukin` dan status. Tanpa urutan tampil (urutan alami = nomor kelas).
      */

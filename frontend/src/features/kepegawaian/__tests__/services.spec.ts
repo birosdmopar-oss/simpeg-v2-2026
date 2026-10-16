@@ -16,6 +16,7 @@ vi.mock('@/lib/axios', async (importOriginal) => {
 import { api } from '@/lib/axios'
 
 import pendidikan from '../riwayat/jenis/pendidikan'
+import { M, T } from '../riwayat/riwayat.config'
 import { riwayatService, toFormData, toJsonPayload } from '../riwayat/riwayat.service'
 import { describeApiError, splitValidationErrors } from '../services/apiErrors'
 import { lampiranService } from '../services/lampiran.service'
@@ -69,6 +70,25 @@ describe('pegawaiService', () => {
     expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}`)
   })
 
+  it('CR-049: angka dari MySQLi berupa string ("1") dinormalkan — status, flag_update, pengajuan, antrean', async () => {
+    const mentah = { ...pegawaiDetail([]), status: '1', flag_update: '1', pengajuan: { id_pegawai_hist: '9', flag_update: '2', reason_note: 'Lengkapi', created_at: null, updated_at: null, notif_date: null } }
+    get.mockResolvedValueOnce({ data: mentah })
+    const hasil = await pegawaiService.detail(NIP)
+    expect([hasil.status, hasil.flag_update, hasil.pengajuan?.id_pegawai_hist, hasil.pengajuan?.flag_update]).toEqual([1, 1, 9, 2])
+
+    get.mockResolvedValueOnce({ data: { ...mentah, pengajuan: null } })
+    expect((await pegawaiService.detail(NIP)).pengajuan).toBeNull()
+
+    get.mockResolvedValueOnce({ data: { items: [{ id_pegawai_hist: '7', nip: NIP }], total: 1, page: 1, per_page: 20 } })
+    expect((await pegawaiService.antreanPengajuan({ page: 1, per_page: 20 })).items[0]?.id_pegawai_hist).toBe(7)
+
+    const detailPengajuan = { pengajuan: { id_pegawai_hist: '7', flag_update: '3', nip: NIP, nama: 'Budi', ada_foto: false }, pegawai: {}, perubahan: [], can_process: false }
+    get.mockResolvedValueOnce({ data: detailPengajuan })
+    expect((await pegawaiService.pengajuan(7)).pengajuan.flag_update).toBe(3)
+    post.mockResolvedValueOnce({ data: detailPengajuan })
+    expect((await pegawaiService.prosesPengajuan(7, { aksi: 'setujui', reason_note: '' })).pengajuan.id_pegawai_hist).toBe(7)
+  })
+
   it('list: filter status/id_unit/id_satker/sort ikut dikirim bila diisi (MAKE-010)', async () => {
     get.mockResolvedValue({ data: { items: [], total: 0, page: 1, per_page: 10 } })
     await pegawaiService.list({ page: 1, per_page: 10, status: '1', id_satker: '12', sort: 'jabatan', order: 'desc' })
@@ -107,6 +127,14 @@ describe('riwayatService', () => {
     get.mockResolvedValue({ data: { tabs } })
     await expect(riwayatService.tabs(NIP)).resolves.toEqual(tabs)
     expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}/riwayat`)
+  })
+
+  it('pratinjau: GET /pegawai/{nip}/riwayat/{jenis}/pratinjau, query kosong tidak dikirim (MAKE-017)', async () => {
+    get.mockResolvedValue({ data: { jabatan: 'Analis' } })
+    await expect(riwayatService.pratinjau(NIP, 'ak', { tgl_pak: '2024-07-15' })).resolves.toEqual({ jabatan: 'Analis' })
+    expect(get).toHaveBeenCalledWith(`/pegawai/${NIP}/riwayat/ak/pratinjau`, { params: { tgl_pak: '2024-07-15' } })
+    await riwayatService.pratinjau(NIP, 'ak', { tgl_pak: '' })
+    expect(get).toHaveBeenLastCalledWith(`/pegawai/${NIP}/riwayat/ak/pratinjau`, { params: {} })
   })
 
   it('daftar: GET /pegawai/{nip}/riwayat/{jenis}', async () => {
@@ -157,6 +185,18 @@ describe('riwayatService', () => {
   it('multipart: kolom kosong dikirim sebagai string kosong (= NULL, kontrak engine MAKE-004)', () => {
     const sent = entries(toFormData(pendidikan.fields, values, {}))
     expect(sent).toContainEqual(['no_ijazah', ''])
+  })
+
+  it('multiselect (MAKE-018): JSON = array ID; multipart = kolom[] berulang, tanpa pilihan = kolom kosong', () => {
+    const fields = [M('id_subrumpun_jabatan', 'Subrumpun', 'subrumpun-jabatan'), T('keterangan', 'Keterangan')]
+    expect(toJsonPayload(fields, { id_subrumpun_jabatan: ['11', '12'], keterangan: '' })).toEqual({ id_subrumpun_jabatan: ['11', '12'], keterangan: null })
+    expect(toJsonPayload(fields, { keterangan: 'x' })).toEqual({ id_subrumpun_jabatan: [], keterangan: 'x' })
+    expect(entries(toFormData(fields, { id_subrumpun_jabatan: ['11', '12'] }, {}))).toEqual([
+      ['id_subrumpun_jabatan[]', '11'],
+      ['id_subrumpun_jabatan[]', '12'],
+      ['keterangan', ''],
+    ])
+    expect(entries(toFormData(fields, { id_subrumpun_jabatan: [] }, {}))).toContainEqual(['id_subrumpun_jabatan', ''])
   })
 
   it('ubah tanpa berkas: PUT JSON ke /{id}', async () => {

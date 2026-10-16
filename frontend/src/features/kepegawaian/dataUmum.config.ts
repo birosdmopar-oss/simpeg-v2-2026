@@ -65,7 +65,9 @@ export function dataUmumFields(role: RoleCode | null): FieldDef[] {
 
   if (superAdmin) {
     fields.push(
-      R('id_jenis_status', 'Jenis Status', 'jenis-status', { required: true, hint: 'Harus sesuai status pegawai sekarang.' }),
+      // B-05 (MAKE-011): status 1/2 hanya Super Admin; 1 → 2 menonaktifkan akun PNS (backend). 10 = Hapus Pegawai.
+      S('status', 'Status Pegawai', [{ value: '1', label: 'Aktif' }, { value: '2', label: 'Tidak Aktif' }], { required: true }),
+      R('id_jenis_status', 'Jenis Status', 'jenis-status', { required: true, hint: 'Harus sesuai status pegawai.' }),
       D('tmt_status', 'TMT Status'),
     )
   }
@@ -73,6 +75,14 @@ export function dataUmumFields(role: RoleCode | null): FieldDef[] {
   fields.push(A('keterangan', 'Keterangan', { max: 255 }))
 
   return fields
+}
+
+/** Isian form Tambah Pegawai (B-05, role 1): NIP baru + isian Super Admin (status selalu 1 saat tambah). */
+export function tambahPegawaiFields(): FieldDef[] {
+  return [
+    T('nip', 'NIP / NI', { required: true, max: 18, hint: 'Angka saja, maksimal 18 digit.' }),
+    ...dataUmumFields(Role.SUPER_ADMIN).filter((f) => f.name !== 'status'),
+  ]
 }
 
 /** Nilai awal form dari baris pegawai + email akun (kerabat bebas data lama → "Kerabat Lain" + teksnya). */
@@ -89,4 +99,20 @@ export function dataUmumInitial(pegawai: Pegawai, email: string | null, fields: 
     out.jenis_kerabat_lain = kerabat
   }
   return out
+}
+
+/** Label kolom biodata untuk perbandingan pengajuan (B-04): label isian form, ditambah kolom nama turunan master. */
+const LABEL_TAMBAHAN: Record<string, string> = {
+  provinsi_lahir: 'Provinsi Tempat Lahir',
+  kabupaten_kota_lahir: 'Kabupaten/Kota Tempat Lahir',
+  agama: 'Agama',
+  jenis_pegawai: 'Jenis Pegawai',
+  jenis_status: 'Jenis Status',
+  nip_lama: 'NIP Lama',
+  foto: 'Foto',
+}
+
+export function labelKolomBiodata(kolom: string): string {
+  const field = dataUmumFields(Role.SUPER_ADMIN).find((f) => f.name === kolom)
+  return field?.label ?? LABEL_TAMBAHAN[kolom] ?? kolom
 }

@@ -86,6 +86,19 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->asUser($super)->get('api/v1/pegawai?page=abc')->assertStatus(422);
     }
 
+    public function testDaftarRole4Dan5TanpaBatasLingkup(): void
+    {
+        $a = $this->buatPegawaiDiSatker($this->buatSatker());
+        $b = $this->buatPegawaiDiSatker($this->buatSatker());
+
+        foreach ([Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PIMPINAN] as $role) {
+            [, , $akun] = $this->aktor($role);
+            $nips       = array_column($this->json($this->asUser($akun)->get('api/v1/pegawai?per_page=100'))['data']['items'], 'nip');
+            $this->assertContains($a, $nips, "role {$role}");
+            $this->assertContains($b, $nips, "role {$role}");
+        }
+    }
+
     public function testDaftarAdminSatkerHanyaLingkup(): void
     {
         $idSatker        = $this->buatSatker();
@@ -128,12 +141,14 @@ final class PegawaiEndpointTest extends DatabaseTestCase
 
         $data = $this->json($this->asUser($super)->get("api/v1/pegawai/{$nip}"))['data'];
 
-        $this->assertSame(service('riwayatRegistry')->descriptorUntuk($auth, $nip), $data['tabs']);
-        $this->assertSame(['kp', 'pendidikan', 'hukdis'], array_column($data['tabs'], 'jenis'));
+        // Descriptor engine lalu non-engine WS-2 `lkh` (MAKE-014).
+        $lkh = ['jenis' => 'lkh', 'label' => 'Laporan Kerja Harian', 'can_view' => true, 'can_create' => true, 'can_edit' => true, 'can_delete' => true, 'can_process' => false];
+        $this->assertSame([...service('riwayatRegistry')->descriptorUntuk($auth, $nip), $lkh], $data['tabs']);
+        $this->assertSame(['kp', 'pendidikan', 'hukdis', 'lkh'], array_column($data['tabs'], 'jenis'));
         $this->assertSame('pegawai@contoh.test', $data['email']);
         $this->assertTrue($data['ada_foto']);
         $this->assertArrayNotHasKey('foto', $data);
-        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => true, 'koreksi_nip' => true], $data['aksi']);
+        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => true, 'koreksi_nip' => true, 'proses_biodata' => false], $data['aksi']);
         $this->assertNotNull($data['jabatan_aktif']);
         $this->assertNull($data['pengajuan']);
     }
@@ -146,7 +161,8 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         $this->get("api/v1/pegawai/{$lain}")->assertStatus(401);
 
         $milik = $this->json($this->asUser($pegawai)->get("api/v1/pegawai/{$diri}"))['data'];
-        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => false, 'koreksi_nip' => false], $milik['aksi']);
+        $this->assertContains('lkh', array_column($milik['tabs'], 'jenis'), 'pemilik melihat tab LKH miliknya');
+        $this->assertSame(['ubah_biodata' => true, 'ubah_langsung' => false, 'koreksi_nip' => false, 'proses_biodata' => false], $milik['aksi']);
 
         $this->asUser($pegawai)->get("api/v1/pegawai/{$lain}")->assertStatus(403);
         $this->asUser($pegawai)->get('api/v1/pegawai/' . self::NIP_TIDAK_ADA)->assertStatus(403);
@@ -158,6 +174,20 @@ final class PegawaiEndpointTest extends DatabaseTestCase
         [, , $pimpinan] = $this->aktor(Role::PIMPINAN);
         $lihat          = $this->json($this->asUser($pimpinan)->get("api/v1/pegawai/{$lain}"))['data'];
         $this->assertFalse($lihat['aksi']['ubah_biodata']);
+        // Tab LKH hanya role LKH (1/2/3/6/7, Matriks `hr/rwy/lkh/*`): role 8 tidak.
+        $this->assertNotContains('lkh', array_column($lihat['tabs'], 'jenis'));
+    }
+
+    public function testTabLkhRole3IkutLingkup(): void
+    {
+        $satker            = $this->buatSatker();
+        $dalam             = $this->buatPegawaiDiSatker($satker);
+        $luarSatker        = $this->buatPegawaiDiSatker($this->buatSatker());
+        [, $auth, $admin3] = $this->aktor(Role::ADMIN_SATKER, [], $satker);
+
+        $tab = array_values(array_filter($this->json($this->asUser($admin3)->get("api/v1/pegawai/{$dalam}"))['data']['tabs'], static fn (array $t): bool => $t['jenis'] === 'lkh'));
+        $this->assertSame([[true, true, false]], array_map(static fn (array $t): array => [$t['can_view'], $t['can_create'], $t['can_process']], $tab));
+        $this->assertNull(service('lkhService')->descriptorTab($auth, $luarSatker));
     }
 
     public function testDetailMenampilkanStatusPengajuan(): void
