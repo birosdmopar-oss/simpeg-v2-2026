@@ -135,9 +135,14 @@ const menuItem =
 
         <ul class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-body2 text-slate-600">
           <li class="inline-flex items-center gap-2"><IdCard class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.nip }}</li>
-          <li class="inline-flex items-center gap-2">
-            <UserRound class="h-4 w-4 text-slate-400" aria-hidden="true" />
-            <UiBadge v-if="detail.jenis_pegawai" :tone="nadaJenisPegawai(detail.id_jenis_pegawai)" data-testid="pegawai-jenis">{{ detail.jenis_pegawai }}</UiBadge>
+          <li class="inline-flex min-w-0 max-w-full items-center gap-2">
+            <UserRound class="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <UiBadge
+              v-if="detail.jenis_pegawai"
+              :tone="nadaJenisPegawai(detail.id_jenis_pegawai)"
+              :title="detail.jenis_pegawai"
+              data-testid="pegawai-jenis"
+            >{{ detail.jenis_pegawai }}</UiBadge>
             <template v-else>—</template>
           </li>
           <li class="inline-flex items-center gap-2"><Calendar class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ tanggalLahir }}</li>

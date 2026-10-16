@@ -313,6 +313,12 @@ describe('UiStepper, UiStatTile, UiBadge, UiCard, UiNotice, UiSearchInput', () =
     expect(w.find('span[aria-hidden="true"]').exists()).toBe(true)
   })
 
+  it('badge: selalu satu baris; teks panjang dipotong elipsis di dalam lebar wadah (CR-054, QA R2-I1)', () => {
+    const w = mount(UiBadge, { slots: { default: 'Pegawai Pemerintah dengan Perjanjian Kerja' } })
+    expect(w.classes()).toEqual(expect.arrayContaining(['whitespace-nowrap', 'max-w-full']))
+    expect(w.get('span.truncate').text()).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
+  })
+
   it('card: judul, subjudul, slot aksi & footer; tanpa header bila tak ada judul/slot', () => {
     const w = mount(UiCard, { props: { title: 'Judul', subtitle: 'Sub' }, slots: { actions: '<button>Aksi</button>', footer: 'Kaki', default: 'Isi' } })
     expect(w.get('h2').text()).toBe('Judul')

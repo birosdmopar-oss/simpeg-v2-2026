@@ -14,8 +14,10 @@ use ZipArchive;
  * Validasi berkas unggahan terhadap AturanLampiran (B-18, MAKE-009), dipakai AttachmentService dan KolomBerkas.
  *
  * - Ukuran = ukuran berkas sementara di disk (bukan angka kiriman klien); kosong atau > batas → 422.
- * - Jenis = MIME dari ISI berkas (finfo) dipetakan ke ekstensi lewat Config\Mimes; ekstensi nama berkas klien hanya
- *   dipakai sebagai petunjuk bila satu MIME punya beberapa ekstensi. Tidak cocok dengan aturan → 422.
+ * - Jenis = MIME dari ISI berkas (finfo) dipetakan ke ekstensi lewat Config\Mimes; ekstensi nama berkas klien dipakai
+ *   sebagai petunjuk bila satu MIME punya beberapa ekstensi. Tidak cocok dengan aturan → 422.
+ * - [K] CR-054: ekstensi kiriman yang tidak setara dengan jenis isi (mis. PDF bernama `.xlsx`) → 422 "Jenis isi berkas
+ *   tidak sesuai dengan ekstensinya." (legacy Upload CI3 `allowed_types`), sehingga ekstensi nama tampil = jenis isi.
  * - Dokumen Office: struktur isi wajib cocok dengan ekstensi hasil pemetaan (OOXML untuk docx/xlsx, OLE untuk doc/xls;
  *   MAKE-010) — ZIP biasa bernama `.docx` → 422.
  * - Nama asli klien hanya metadata tampilan (dibersihkan), tidak pernah menjadi nama simpan.
@@ -85,6 +87,15 @@ final class ValidasiBerkas
             throw $gagal('Jenis berkas tidak diizinkan (hanya ' . implode(', ', $aturan->ekstensi) . ').');
         }
 
+        // [K] CR-054 (QA R2-I4, keputusan user 16-10-2026: tolak, ikut legacy Upload CI3 `allowed_types`,
+        // function_helper.php:1253): ekstensi kiriman wajib setara dengan jenis isi. guessExtensionFromType() sudah
+        // mengembalikan ekstensi kiriman bila MIME isi terdaftar untuknya di Config\Mimes (jpg/jpeg/jpe, xlsx/docx yang
+        // terdeteksi zip, csv sebagai text/plain, dst.), jadi selisih di sini = pasangan tidak setara (mis. PDF bernama
+        // `.xlsx`). Nama tanpa ekstensi tidak diklaim berjenis apa pun dan tetap mengikuti jenis isi.
+        if ($usulan !== '' && strtolower($ekstensi) !== $usulan) {
+            throw $gagal('Jenis isi berkas tidak sesuai dengan ekstensinya.');
+        }
+
         if (! self::strukturDokumenOfficeCocok($temp, strtolower($ekstensi))) {
             throw $gagal('Isi berkas tidak sesuai dengan jenis ' . strtolower($ekstensi) . '.');
         }
@@ -106,7 +117,8 @@ final class ValidasiBerkas
 
     /**
      * Nama tampilan aman dari nama kiriman klien: tanpa folder, tanpa karakter kontrol, UTF-8 valid, ≤ 200 karakter
-     * (kolom `display_name`); kosong → "lampiran.<ekstensi>".
+     * (kolom `display_name`); kosong → "lampiran.<ekstensi>". Nama tanpa ekstensi diberi ekstensi jenis isi (CR-054),
+     * sehingga ekstensi nama tampil/unduh selalu = `file_ext`.
      */
     public static function namaTampil(string $namaKlien, string $ekstensi): string
     {
@@ -116,6 +128,10 @@ final class ValidasiBerkas
 
         if ($nama === '' || $nama === '.' || $nama === '..') {
             return 'lampiran.' . $ekstensi;
+        }
+
+        if (pathinfo($nama, PATHINFO_EXTENSION) === '') {
+            $nama = mb_substr($nama, 0, 200 - strlen($ekstensi) - 1) . '.' . $ekstensi;
         }
 
         return mb_substr($nama, 0, 200);

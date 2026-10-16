@@ -85,6 +85,11 @@ describe('DetailPegawaiPage — data', () => {
     const { wrapper } = await mountDetail()
     expect(wrapper.get('[data-testid="pegawai-jenis"]').classes()).toContain('bg-info-soft')
     expect(wrapper.get('[data-testid="pegawai-jenis"]').text()).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
+    // CR-054 (QA R2-I1): satu baris, dibatasi lebar wadah (elipsis di 390), teks penuh di title.
+    const badge = wrapper.get('[data-testid="pegawai-jenis"]')
+    expect(badge.classes()).toEqual(expect.arrayContaining(['whitespace-nowrap', 'max-w-full']))
+    expect(badge.attributes('title')).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
+    expect(badge.element.parentElement?.className).toContain('min-w-0')
   })
 
   it('tab Data Umum (bawaan) menampilkan biodata kolom pegawai, hanya-lihat sampai "Ubah Data Umum" dipilih', async () => {

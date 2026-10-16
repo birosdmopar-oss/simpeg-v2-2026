@@ -3,7 +3,8 @@
  * Badge/chip status — memakai warna semantik §3.2.2. Dipakai untuk "Aktif" pada header Detail Pegawai
  * (§4.1.6), jam masuk/pulang pada Riwayat Kehadiran (§4.2.1), dan hitungan menu sidebar.
  *
- * Reusable.
+ * Reusable. Selalu satu baris (CR-054, QA R2-I1): teks panjang tidak terbungkus di dalam pil; bila wadahnya lebih sempit,
+ * badge dibatasi lebar wadah (`max-w-full`) dan teksnya dipotong elipsis, jadi pemakai memberi `title` berisi teks penuh.
  */
 withDefaults(
   defineProps<{
@@ -38,10 +39,10 @@ const DOTS = {
 
 <template>
   <span
-    class="inline-flex items-center gap-1.5 rounded-full font-medium"
+    class="inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full font-medium"
     :class="[TONES[tone], size === 'sm' ? 'px-2 py-0.5 text-caption' : 'px-2.5 py-1 text-body2']"
   >
     <span v-if="dot" class="h-1.5 w-1.5 rounded-full" :class="DOTS[tone]" aria-hidden="true" />
-    <slot />
+    <span class="min-w-0 truncate"><slot /></span>
   </span>
 </template>

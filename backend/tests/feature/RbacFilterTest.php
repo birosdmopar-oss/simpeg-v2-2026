@@ -113,7 +113,7 @@ final class RbacFilterTest extends DatabaseTestCase
         foreach (Role::all() as $role) {
             $expected = in_array($role, $allowed, true) ? 200 : 403;
 
-            $result = $this->asRole($role)->call(strtolower($method), $path);
+            $result = $this->asRole($role)->call(strtoupper($method), $path);
 
             $this->assertSame(
                 $expected,

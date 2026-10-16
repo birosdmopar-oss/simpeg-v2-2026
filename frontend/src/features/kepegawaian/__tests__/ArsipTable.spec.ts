@@ -237,4 +237,14 @@ describe('ArsipTable — unggah', () => {
     await pilihBerkas(wrapper, new File(['x'], 'palsu.pdf', { type: 'application/pdf' }))
     expect(wrapper.get('[data-testid="arsip-notice"]').text()).toContain('Jenis berkas tidak diizinkan (hanya pdf).')
   })
+
+  it('CR-054 (QA R2-I4): isi tidak sesuai ekstensi → pesan server tampil di tempat galat jenis/ukuran, baris tidak bertambah', async () => {
+    svc.upload.mockRejectedValue(apiError(422, { berkas: ['Jenis isi berkas tidak sesuai dengan ekstensinya.'] }))
+    const wrapper = await mountTable({ aturan: { ...ATURAN, ekstensi: ['pdf', 'xlsx'] } })
+    await pilihBerkas(wrapper, new File(['%PDF-1.4'], 'rekap.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    expect(svc.upload).toHaveBeenCalledTimes(1)
+    const notice = wrapper.get('[data-testid="arsip-notice"]')
+    expect(notice.text()).toContain('Jenis isi berkas tidak sesuai dengan ekstensinya.')
+    expect(svc.list).toHaveBeenCalledTimes(1)
+  })
 })
