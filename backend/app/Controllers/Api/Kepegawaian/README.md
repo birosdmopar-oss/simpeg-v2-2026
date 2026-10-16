@@ -68,7 +68,7 @@ Urutan pemeriksaan (wajib, endpoint riwayat dan lampiran):
 | `DELETE pegawai/{nip}/riwayat/{jenis}/{id}` | WS-1 | Hapus lunak → status **10**; snapshot dihitung ulang bila baris itu aktif |
 | `POST pegawai/{nip}/riwayat/{jenis}/{id}/process` | WS-1 | Body `{ "aksi": "setujui" \| "tolak", "reason_note": "…" }`; `reason_note` wajib saat `tolak` (422). Snapshot `pegawai_*` disinkron di sini (approval final, ADR-006) |
 | `GET pegawai/{nip}/lampiran?id_riwayat=&id_entri=` | WS-2 | Daftar lampiran satu baris riwayat (izin `lihat`) |
-| `POST pegawai/{nip}/lampiran` | WS-2 | Tambah/ganti lampiran pada baris yang **sudah ada**: `multipart/form-data` `berkas`, `id_riwayat`, `id_entri` (izin `tambah` atau `ubah`). [K] CR-054: ekstensi nama kiriman tidak setara dengan jenis isi (mis. PDF bernama `.xlsx`) → 422 `errors.berkas` "Jenis isi berkas tidak sesuai dengan ekstensinya."; berlaku juga untuk semua kolom berkas lain (lampiran riwayat, foto, Konket, Karpeg/Karis, penugasan) lewat `ValidasiBerkas` |
+| `POST pegawai/{nip}/lampiran` | WS-2 | Tambah/ganti lampiran pada baris yang **sudah ada**: `multipart/form-data` `berkas`, `id_riwayat`, `id_entri` (izin `tambah` atau `ubah`). [K] CR-054: ekstensi nama kiriman tidak setara dengan jenis isi (mis. PDF bernama `.xlsx`) atau nama tanpa ekstensi → 422 `errors.berkas` "Jenis isi berkas tidak sesuai dengan ekstensinya."; berlaku juga untuk semua kolom berkas lain (lampiran riwayat, foto, Konket, Karpeg/Karis, penugasan) lewat `ValidasiBerkas` |
 | `GET pegawai/{nip}/lampiran/{id}/unduh` | WS-2 | Unduh berkas lampiran milik `{nip}` (izin `lihat`) |
 | `DELETE pegawai/{nip}/lampiran/{id}` | WS-2 | Hapus keras lampiran milik `{nip}` + audit (izin `hapus` atau `ubah`) |
 

@@ -16,7 +16,8 @@ use ZipArchive;
 /**
  * CR-054 (QA R2-I4, keputusan user 16-10-2026: tolak, ikut legacy Upload CI3 `allowed_types`): ekstensi nama kiriman
  * wajib setara dengan jenis hasil deteksi isi. Pasangan setara menurut Config\Mimes (jpg/jpeg/jpe, xlsx/docx yang
- * terdeteksi zip, csv sebagai teks) tetap diterima.
+ * terdeteksi zip, csv sebagai teks) tetap diterima; nama tanpa ekstensi ditolak (ekstensi kosong tidak masuk
+ * `allowed_types` CI3).
  *
  * @internal
  */
@@ -104,12 +105,11 @@ final class ValidasiBerkasEkstensiTest extends CIUnitTestCase
         $this->assertSame('xlsx', ValidasiBerkas::periksa($this->unggah($this->xlsx(), 'rekap.xlsx'), $this->aturan(['docx', 'xlsx']))['ekstensi']);
     }
 
-    public function testNamaTanpaEkstensiMengikutiJenisIsi(): void
+    public function testNamaTanpaEkstensiDitolak(): void
     {
-        $hasil = ValidasiBerkas::periksa($this->unggah(self::PDF, 'sk'), $this->aturan(['pdf']));
-
-        $this->assertSame('pdf', $hasil['ekstensi']);
-        $this->assertSame('sk.pdf', $hasil['nama_tampil'], 'nama tampil diberi ekstensi jenis isi');
+        $this->assertDitolak($this->unggah(self::PDF, 'sk'), ['pdf'], self::PESAN);
+        $this->assertDitolak($this->unggah(self::PDF, 'sk.'), ['pdf'], self::PESAN);
+        $this->assertDitolak($this->unggah($this->jpeg(), 'foto'), ['jpg'], self::PESAN);
     }
 
     /**
