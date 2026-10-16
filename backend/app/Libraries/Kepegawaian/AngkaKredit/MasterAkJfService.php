@@ -10,6 +10,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Models\AuditLogModel;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
+use Throwable;
 
 /**
  * Master Angka Kredit JF `dm_ak_jf` (MAKE-021, keputusan user 16-10-2026 Q1: CRUD ikut legacy) — role 1 saja.
@@ -140,21 +141,28 @@ final class MasterAkJfService
 
         $baris = ['id_jabatan' => $idJabatan, 'id_pangkat' => $idPangkat, 'ak' => $ak, 'updated_by' => $auth->idPengguna()];
         $db    = $this->koneksi();
-        $db->transException(true)->transStart();
+        // Pola transaksi bersama (transBegin + resetTransStatus): tanpa transException(true), yang menempel di koneksi
+        // bersama dan mengubah perilaku galat query kode lain sesudahnya.
+        $db->transBegin();
 
         try {
-            $db->table('dm_ak_jf')->insert($baris);
+            if ($db->table('dm_ak_jf')->insert($baris) === false || $db->transStatus() === false) {
+                throw new DatabaseException('Tambah angka kredit JF gagal: ' . $db->error()['message']);
+            }
+
             (new AuditLogModel($db))->record('dm_ak_jf', "{$idJabatan}-{$idPangkat}", AuditLogModel::EVENT_CREATE, null, $baris, $auth->idPengguna(), $auth->nip());
-            $db->transComplete();
-        } catch (DatabaseException $e) {
+            $db->transCommit();
+        } catch (Throwable $e) {
             $db->transRollback();
 
             // Tambah paralel pasangan yang sama (PK) → 422, bukan 500.
-            if (($ada = $this->baris((int) $idJabatan, (int) $idPangkat)) !== null) {
+            if ($e instanceof DatabaseException && ($ada = $this->baris((int) $idJabatan, (int) $idPangkat)) !== null) {
                 throw ValidationException::forField('id_pangkat', $this->pesanKembar($ada));
             }
 
             throw $e;
+        } finally {
+            $db->resetTransStatus();
         }
 
         return $this->detail((int) $idJabatan, (int) $idPangkat);
@@ -180,10 +188,22 @@ final class MasterAkJfService
 
         $baru = ['ak' => $ak, 'updated_by' => $auth->idPengguna()];
         $db   = $this->koneksi();
-        $db->transException(true)->transStart();
-        $db->table('dm_ak_jf')->where('id_jabatan', $idJabatan)->where('id_pangkat', $idPangkat)->update($baru);
-        (new AuditLogModel($db))->record('dm_ak_jf', "{$idJabatan}-{$idPangkat}", AuditLogModel::EVENT_UPDATE, ['ak' => (float) $lama['ak']], $baru, $auth->idPengguna(), $auth->nip());
-        $db->transComplete();
+        $db->transBegin();
+
+        try {
+            if ($db->table('dm_ak_jf')->where('id_jabatan', $idJabatan)->where('id_pangkat', $idPangkat)->update($baru) === false || $db->transStatus() === false) {
+                throw new DatabaseException('Ubah angka kredit JF gagal: ' . $db->error()['message']);
+            }
+
+            (new AuditLogModel($db))->record('dm_ak_jf', "{$idJabatan}-{$idPangkat}", AuditLogModel::EVENT_UPDATE, ['ak' => (float) $lama['ak']], $baru, $auth->idPengguna(), $auth->nip());
+            $db->transCommit();
+        } catch (Throwable $e) {
+            $db->transRollback();
+
+            throw $e;
+        } finally {
+            $db->resetTransStatus();
+        }
 
         return $this->detail($idJabatan, $idPangkat);
     }

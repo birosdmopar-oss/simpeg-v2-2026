@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Libraries\Kepegawaian\AngkaKredit\AkPermenpanrb;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Ak;
 use CodeIgniter\Test\FeatureTestTrait;
+use ReflectionProperty;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\RiwayatUjiTrait;
@@ -153,6 +154,10 @@ final class AngkaKreditTest extends DatabaseTestCase
         $this->assertSame([80.0, $this->pangkat['III/a']], [(float) $this->json($ubah)['data']['ak'], $this->json($ubah)['data']['id_pangkat']]);
         $this->asUser($super)->withBodyFormat('json')->put("{$base}/{$this->jabatanJf}/{$this->pangkat['III/b']}", ['ak' => 1])->assertStatus(404);
         $this->asUser($super)->withBodyFormat('json')->put("{$base}/{$this->jabatanJf}/{$this->pangkat['III/a']}", ['ak' => ''])->assertStatus(422);
+
+        // Transaksi service tidak meninggalkan transException(true) di koneksi bersama: kode lain sesudahnya (mis. MasterModel
+        // dengan DBDebug = false) tetap menerima false, bukan exception.
+        $this->assertFalse((new ReflectionProperty($this->db, 'transException'))->getValue($this->db));
 
         // Tanpa hapus [K].
         $this->assertSame(404, $this->statusHapus("{$base}/{$this->jabatanJf}/{$this->pangkat['III/a']}", $super));
