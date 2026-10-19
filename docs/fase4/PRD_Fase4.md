@@ -274,7 +274,7 @@ Format setiap subbagian: tujuan · dependency · QASMTASK · file boundary · ko
 - Dokumen: `backend/docs/db-review/DBV-022-layanan-fase4-schema.md`; kueri audit baca-saja `backend/docs/db-review/sql/DBV-022-*.sql`.
 - Migration baru: `backend/app/Database/Migrations/2026-10-xx-xxxxxx_Create*.php` (satu berkas per kelompok tabel; nama mengikuti pola tanggal repo); FK ditahan: `backend/app/Database/MigrationsDitahan/Add*Fase4*.php`.
 - Seed uji: `backend/app/Database/Seeds/Layanan*Seeder.php` (master uji `jenis_cuti`, `jenis_layanan`, `jenis_pa`, `question_category`).
-- Registry NIP: `backend/app/Libraries/Kepegawaian/Nip/TabelAnakNip.php` (ubah baris fase 4/6 yang ada; tambah jenis untuk `ketua_tim`), `backend/app/Libraries/Kepegawaian/Nip/NipCascadeService.php` (cakupan tabel Fase 4), `backend/tests/database/Kepegawaian/NipReferenceRegistryTest.php`.
+- Registry NIP: `backend/app/Libraries/Kepegawaian/Nip/TabelAnakNip.php` (ubah baris fase 4/6 yang ada; tambah jenis untuk `ketua_tim`), `backend/app/Libraries/Kepegawaian/NipCascadeService.php` (cakupan tabel Fase 4; konstanta `NipCascadeService::FASE` naik ke 4 — test cascade memakai `sampaiFase(NipCascadeService::FASE)`, bukan angka tetap, agar Fase 5A dapat menaikkannya ke 5 tanpa konflik; lihat `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` §3.4), `backend/tests/database/Kepegawaian/NipReferenceRegistryTest.php`.
 - Test skema: `backend/tests/database/Layanan/SkemaLayananTest.php`, `SkemaInboxTicketTest.php`, `MigrasiLayananSiklusTest.php` (`#[Group('db-isolasi-penuh')]`).
 - DILARANG menyentuh migration lama di `main` (mis. `2026-09-30-130000_CreateJenisRwy.php`, `2026-09-30-130900_CreateDocumentAttachment.php`).
 
