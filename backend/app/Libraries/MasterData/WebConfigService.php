@@ -344,6 +344,13 @@ class WebConfigService
         /** @var array<string, mixed>|null $row */
         $row = $this->db->table('web_config')->select(self::COLUMNS)->where('config_name', $name)->get()->getRowArray();
 
+        // Kolom `config_name` ber-collation utf8mb4_unicode_ci (tidak peka huruf besar/kecil), sedangkan katalog dan
+        // peta nilai konsumen peka huruf (ISSUE-028): baris yang hanya cocok secara collation (mis. `NAMA_KEMENTERIAN`
+        // untuk `nama_kementerian`) bukan baris key ini, jadi tidak boleh terbaca, tertimpa, atau terhapus lewat nama itu.
+        if ($row !== null && $row['config_name'] !== $name) {
+            return null;
+        }
+
         return $row;
     }
 
@@ -387,7 +394,7 @@ class WebConfigService
             }
 
             $result = $this->transaction(function () use ($name, $value, $remark): bool {
-                $row = $this->findRow($name) ?? throw new NotFoundException('Web config tidak ditemukan.');
+                $row = $this->findRow($name) ?? throw ValidationException::forField('config_name', 'Sudah ada baris dengan key yang sama selain huruf besar/kecilnya; hapus baris itu dulu.');
                 $this->updateRow($row, $value, $remark);
 
                 return false;

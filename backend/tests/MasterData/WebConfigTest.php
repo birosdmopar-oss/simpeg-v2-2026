@@ -222,6 +222,58 @@ final class WebConfigTest extends DatabaseTestCase
     }
 
     /**
+     * ISSUE-028: kolom config_name ber-collation tidak peka huruf besar/kecil, katalog peka huruf. Key di URL yang beda
+     * huruf dari baris key katalog tidak boleh membaca, menimpa, atau menghapus baris itu.
+     */
+    public function testKeyMatchingIsCaseSensitive(): void
+    {
+        $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Kementerian Uji'])->assertStatus(201);
+        $row = $this->db->table('web_config')->where('config_name', 'nama_kementerian')->get()->getRowArray();
+
+        foreach (['NAMA_KEMENTERIAN', 'Nama_Kementerian'] as $variant) {
+            $this->get(self::BASE . '/' . $variant)->assertStatus(404);
+            $this->sendJson('PUT', self::BASE . '/' . $variant, ['config_value' => 'Ditimpa'])->assertStatus(404);
+            $this->sendJson('DELETE', self::BASE . '/' . $variant)->assertStatus(404);
+        }
+
+        $after = $this->db->table('web_config')->get()->getResultArray();
+        $this->assertCount(1, $after);
+        $this->assertSame($row['id_web_config'], $after[0]['id_web_config']);
+        $this->assertSame('nama_kementerian', $after[0]['config_name']);
+        $this->assertSame('Kementerian Uji', $after[0]['config_value']);
+        $this->assertSame('Kementerian Uji', service('webConfigService')->value('nama_kementerian'));
+        $this->dontSeeInDatabase('audit_logs', ['entity' => 'web_config', 'event' => 'delete']);
+
+        $this->get(self::BASE . '/nama_kementerian')->assertStatus(200);
+    }
+
+    /**
+     * ISSUE-028: baris impor yang hanya beda huruf dari key katalog adalah key tak dikenal — tidak dihitung sebagai
+     * nilai key katalog, tidak bisa diubah lewat nama katalog, tetapi bisa dihapus lewat namanya sendiri.
+     */
+    public function testImportedRowDifferingOnlyInCaseIsAnUnknownKey(): void
+    {
+        $this->db->table('web_config')->insert(['config_name' => 'Nama_Kementerian', 'config_value' => 'Dari Impor', 'remark' => 'impor']);
+
+        $byName = array_column($this->listItems(), null, 'config_name');
+        $this->assertTrue($byName['nama_kementerian']['is_default'], 'key katalog tetap memakai bawaan');
+        $this->assertFalse($byName['Nama_Kementerian']['known']);
+        $this->assertNotSame('Dari Impor', service('webConfigService')->value('nama_kementerian'));
+
+        $this->get(self::BASE . '/nama_kementerian')->assertStatus(200);
+        $this->assertTrue($this->json($this->get(self::BASE . '/nama_kementerian'))['data']['is_default']);
+
+        $blocked = $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Baru']);
+        $blocked->assertStatus(422);
+        $this->assertArrayHasKey('config_name', $this->json($blocked)['errors']);
+        $this->assertSame(1, $this->db->table('web_config')->countAllResults());
+
+        $this->sendJson('DELETE', self::BASE . '/Nama_Kementerian')->assertStatus(200);
+        $this->assertSame(0, $this->db->table('web_config')->countAllResults());
+        $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Baru'])->assertStatus(201);
+    }
+
+    /**
      * Nilai tersimpan yang tidak sah (mis. impor tanpa normalisasi) ditandai `valid: false` dan konsumen menerima bawaan.
      */
     public function testInvalidStoredValueFallsBackToDefault(): void
