@@ -152,6 +152,31 @@ final class JabatanUnitSatkerTest extends DatabaseTestCase
     }
 
     /**
+     * ISSUE-025: filter field ref (`id_group_jabatan`, `id_sub_group_jabatan`, `id_satker`, `kelas_jabatan`) di options dan
+     * daftar admin wajib bentuk kode kanonik master rujukannya, seperti `?parent=` (CR-024). `01` tidak lagi 200 dengan hasil
+     * yang sama seperti `1` (cast MySQL), `1abc` tidak lagi diterima.
+     */
+    public function testReferenceFiltersRejectNonCanonicalCodes(): void
+    {
+        $labels = ['id_group_jabatan' => 'Group Jabatan', 'id_sub_group_jabatan' => 'Sub Group Jabatan', 'id_satker' => 'Satuan Kerja', 'kelas_jabatan' => 'Kelas Jabatan'];
+
+        foreach ($labels as $filter => $label) {
+            foreach (['01', '1abc', '0', '+1', '1 ', '1.0'] as $value) {
+                foreach (['api/v1/master/jabatan/options', 'api/v1/master/jabatan'] as $uri) {
+                    $result = $this->get($uri . '?' . http_build_query([$filter => $value]));
+                    $result->assertStatus(422);
+                    $this->assertSame(["Filter {$label} tidak valid."], $this->json($result)['errors'][$filter], "{$uri} {$filter}={$value}");
+                }
+            }
+        }
+
+        // Kode kanonik tetap diterima; filter kosong = tanpa filter.
+        $this->get('api/v1/master/jabatan/options?id_satker=1')->assertStatus(200);
+        $this->get('api/v1/master/jabatan/options?id_satker=')->assertStatus(200);
+        $this->get('api/v1/master/jabatan?id_satker=1&kelas_jabatan=13')->assertStatus(200);
+    }
+
+    /**
      * Satker: nama unik per unit (nama sama di unit lain boleh), unit wajib aktif, urutan per unit.
      */
     public function testSatkerNameIsUniquePerUnitAndUnitMustBeActive(): void

@@ -1299,7 +1299,7 @@ class MasterService
             $field = $def->field($column);
             $value = is_string($raw) || is_int($raw) ? trim((string) $raw) : null;
 
-            if ($field === null || $value === null || $value === '' || ! $field->acceptsFilterValue($value)) {
+            if ($field === null || $value === null || $value === '' || ! $field->acceptsFilterValue($value) || ! $this->refFilterCanonical($field, (string) $raw)) {
                 throw ValidationException::forField($column, 'Filter ' . ($field->label ?? $column) . ' tidak valid.');
             }
 
@@ -1309,6 +1309,21 @@ class MasterService
         ksort($filters);
 
         return $filters;
+    }
+
+    /**
+     * Filter field `ref` harus berbentuk kode kanonik master rujukannya (seperti `?parent=`, CR-024): `01` atau `1abc`
+     * untuk kode bilangan bulat → 422, bukan 200 dengan hasil sama seperti `1` karena MySQL meng-cast string ke angka
+     * (ISSUE-025). Dicek atas nilai mentah tanpa trim (spasi = tidak kanonik, sama dengan `?parent=`). Field bukan ref:
+     * tanpa syarat tambahan.
+     */
+    private function refFilterCanonical(MasterField $field, string $value): bool
+    {
+        if ($field->type !== MasterField::TYPE_REF || $field->entity === null) {
+            return true;
+        }
+
+        return $this->registry->get($field->entity)->isCanonicalId($value);
     }
 
     /**
