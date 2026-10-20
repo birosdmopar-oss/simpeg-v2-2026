@@ -41,8 +41,10 @@ Fase 4. 5A **dilarang** membaca `riwayat_cuti`/`riwayat_tb`.
    periode. Bila tidak ada dan pegawai dibuat (`created_at`) setelah akhir periode, batasnya ≤ **akhir** periode.
    [K] `L_employee.php:6439`, `:6453`, `:6555-6560`.
 2. PPPK (`id_jenis_pegawai` = `Jabatan::JENIS_PEGAWAI_PPPK` = 6): kedua nilai ditimpa `gol_pppk` dan `tmtsk` dari
-   `riwayat_mutasi_jabatan` `status = 1`, `jenis_jabatan = 1` terakhir dengan `tmtsk` ≤ akhir periode.
-   [K] `L_employee.php:6478-6482` (kueri), `:6580-6584` (penimpaan memakai `id_jenis_pegawai == JP_PPPK`).
+   `riwayat_mutasi_jabatan` (bukan snapshot `pegawai_mutasi_jabatan`) `status = 1`, `jenis_jabatan = 1` terakhir
+   (`tmtsk DESC`) dengan `tmtsk` ≤ akhir periode. Batas ini = `$maxDateCreatedPeg` legacy (`$strCM_end_BKN`), bukan
+   `$maxRwyDate` yang dikomentari di kueri itu. [K] `L_employee.php:6470-6482` (kueri), `:6580-6584` (penimpaan memakai
+   `id_jenis_pegawai == JP_PPPK`); dikonfirmasi reviewer CR 20-10-2026.
 3. Rekap: `gol_ruang` lebih dari 5 karakter diawali "CPNS" → `tmtMasuk = tmtsk_pangkat`; selain itu PPPK →
    `tmtMasuk = tmtsk_pangkat` bila **setelah** hari kerja pertama periode (`$firstDayHK_CM`, dihitung `HariKerja` atas
    periode + libur); lainnya null. [K] `L_presensi.php:12703-12716`.
