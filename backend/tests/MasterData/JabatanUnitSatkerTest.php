@@ -324,6 +324,40 @@ final class JabatanUnitSatkerTest extends DatabaseTestCase
     }
 
     /**
+     * ISSUE-026: kode PK string yang diinput admin boleh berupa angka JSON, diperlakukan sama dengan string (seperti field
+     * ref/int/select yang sudah menerima angka JSON). Aturan kode tetap berlaku untuk angka: di luar 1–20, nol/negatif,
+     * ganda → 422; boolean dan pecahan JSON tetap ditolak.
+     */
+    public function testKelasJabatanCodeAcceptsJsonNumberLikeString(): void
+    {
+        $created = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => 20, 'tukin' => 1]);
+        $created->assertStatus(201);
+        $this->assertSame('20', (string) $this->json($created)['data']['kelas_jabatan']);
+        $this->seeInDatabase('kelas_jabatan', ['kelas_jabatan' => 20, 'tukin' => 1]);
+
+        $string = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => '19', 'tukin' => 1]);
+        $string->assertStatus(201);
+        $this->assertSame($this->json($created)['data']['status'], $this->json($string)['data']['status']);
+
+        // Angka mengikuti aturan kode yang sama dengan string.
+        foreach ([0, 21, -1, 100] as $value) {
+            $result = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => $value, 'tukin' => 1]);
+            $result->assertStatus(422);
+            $this->assertArrayHasKey('kelas_jabatan', $this->json($result)['errors'], var_export($value, true));
+        }
+
+        $duplicate = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => 20, 'tukin' => 1]);
+        $duplicate->assertStatus(422);
+        $this->assertSame(['Kode 20 sudah dipakai.'], $this->json($duplicate)['errors']['kelas_jabatan']);
+
+        foreach ([true, 18.5, [18], ['a' => 1]] as $value) {
+            $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => $value, 'tukin' => 1])->assertStatus(422);
+        }
+
+        $this->assertSame(0, $this->db->table('kelas_jabatan')->where('kelas_jabatan', 18)->countAllResults());
+    }
+
+    /**
      * Kelas jabatan (codeAsName, CR-026): nomor kelas = kode = nama, 1–20 tanpa nol di depan, unik, tidak bisa diubah;
      * yang bisa diubah hanya `tukin` dan status. Tanpa urutan tampil (urutan alami = nomor kelas).
      */

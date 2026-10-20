@@ -284,6 +284,13 @@ abstract class BaseMasterController extends ApiController
     {
         $payload = $this->payload();
 
+        // Kode yang diinput admin (PK string, mis. kelas jabatan `{"kelas_jabatan":20}`) boleh berupa angka JSON, sama
+        // seperti field ref/int/select yang menerima angka JSON: dinormalisasi ke teks sebelum divalidasi (ISSUE-026).
+        // Hanya bilangan bulat; desimal (18.0), boolean, dan nilai non-skalar tetap ditolak.
+        if (! $def->autoIncrement && is_int($payload[$def->primaryKey] ?? null)) {
+            $payload[$def->primaryKey] = (string) $payload[$def->primaryKey];
+        }
+
         foreach ($def->fields as $field) {
             if ($field->type === MasterField::TYPE_BOOLEAN && is_bool($payload[$field->name] ?? null)) {
                 $payload[$field->name] = $payload[$field->name] ? '1' : '0';
