@@ -358,6 +358,27 @@ final class JabatanUnitSatkerTest extends DatabaseTestCase
     }
 
     /**
+     * CR-058 (QA R4 T-3): boolean JSON pada kode kelas jabatan diberi pesan yang sama dengan nilai bukan angka lain,
+     * bukan "wajib diisi" (false) atau pesan berbeda (true). null tetap dibaca sebagai tidak diisi.
+     */
+    public function testKelasJabatanBooleanCodeGetsSameMessageAsNonNumber(): void
+    {
+        $format = ['Kelas Jabatan harus bilangan bulat 1 sampai 20 (tanpa nol di depan).'];
+
+        foreach (['7a', true, false] as $value) {
+            $result = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => $value, 'tukin' => 1]);
+            $result->assertStatus(422);
+            $this->assertSame($format, $this->json($result)['errors']['kelas_jabatan'], var_export($value, true));
+        }
+
+        $null = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => null, 'tukin' => 1]);
+        $null->assertStatus(422);
+        $this->assertSame(['Kelas Jabatan wajib diisi.'], $this->json($null)['errors']['kelas_jabatan']);
+
+        $this->assertSame(0, $this->db->table('kelas_jabatan')->where('kelas_jabatan', 1)->countAllResults());
+    }
+
+    /**
      * Kelas jabatan (codeAsName, CR-026): nomor kelas = kode = nama, 1–20 tanpa nol di depan, unik, tidak bisa diubah;
      * yang bisa diubah hanya `tukin` dan status. Tanpa urutan tampil (urutan alami = nomor kelas).
      */

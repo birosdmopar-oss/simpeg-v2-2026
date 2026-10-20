@@ -299,6 +299,13 @@ abstract class BaseMasterController extends ApiController
 
         $errors = [];
 
+        // Boolean JSON pada kode yang diinput admin bukan kode: pesannya sama dengan nilai bukan angka lain (mis. '7a'),
+        // bukan "wajib diisi" (false dibaca kosong oleh rule required) atau lolos sebagai '1' (true). CR-058.
+        if (! $def->autoIncrement && is_bool($payload[$def->primaryKey] ?? null)) {
+            $codeRule                 = $this->rules($def, true)[$def->primaryKey];
+            $errors[$def->primaryKey] = [is_array($codeRule) ? $codeRule['errors']['regex_match'] : 'Kode tidak valid.'];
+        }
+
         foreach ($this->inputLabels($def) as $column => $label) {
             if (array_key_exists($column, $payload) && ! is_scalar($payload[$column]) && $payload[$column] !== null) {
                 $errors[$column] = ["{$label} tidak valid."];

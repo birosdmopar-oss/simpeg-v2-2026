@@ -185,7 +185,10 @@ onMounted(() => {
         </tbody>
         <tbody v-for="group in loading ? [] : groups" v-else :key="group.name" class="divide-y divide-slate-100">
           <tr class="bg-slate-50/60">
-            <th colspan="5" class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600" scope="colgroup">{{ group.name }}</th>
+            <!-- CR-058: label grup menempel di kiri area gulir (pasangan kolom Aksi sticky kanan), tidak ikut tergulir. -->
+            <th colspan="5" class="p-0 text-left text-xs font-semibold uppercase tracking-wide text-slate-600" scope="colgroup">
+              <span class="sticky left-0 inline-block whitespace-nowrap px-4 py-2" :data-testid="`web-config-group-${group.name}`">{{ group.name }}</span>
+            </th>
           </tr>
           <tr v-for="item in group.items" :key="item.config_name" class="group hover:bg-slate-50" :data-testid="`web-config-row-${testidOf(item)}`">
             <td class="px-4 py-3">

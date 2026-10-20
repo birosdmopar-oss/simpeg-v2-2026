@@ -192,6 +192,21 @@ describe('WebConfigView — kolom Aksi sticky di layar sempit (ISSUE-029 / CR-05
     wrapper.unmount()
   })
 
+  it('CR-058: label baris judul grup menempel di kiri saat tabel digeser (390 px)', async () => {
+    const wrapper = await mountView()
+
+    const labels = wrapper.findAll('[data-testid^="web-config-group-"]')
+    expect(labels.length).toBeGreaterThan(0)
+    for (const label of labels) {
+      expect(label.classes()).toEqual(expect.arrayContaining(['sticky', 'left-0', 'whitespace-nowrap']))
+      const th = label.element.closest('th') as HTMLElement
+      expect(th.getAttribute('colspan')).toBe('5')
+      expect(th.getAttribute('scope')).toBe('colgroup')
+      expect(label.text()).toBe(label.attributes('data-testid')!.replace('web-config-group-', ''))
+    }
+    wrapper.unmount()
+  })
+
   it('bayangan pemisah hanya selama masih ada kolom tergulir di bawah kolom Aksi (600 dan 390 px)', async () => {
     const wrapper = await mountView()
     const scroller = wrapper.get('[data-testid="web-config-table-scroll"]')

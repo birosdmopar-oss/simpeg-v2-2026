@@ -8,10 +8,12 @@ use App\Constants\Role;
 use App\Libraries\CacheService;
 use App\Libraries\MasterData\WebConfigService;
 use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\TestLogger;
 use CodeIgniter\Test\TestResponse;
 use Config\Services;
 use Config\WebConfig;
 use InvalidArgumentException;
+use ReflectionProperty;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -263,14 +265,22 @@ final class WebConfigTest extends DatabaseTestCase
         $this->get(self::BASE . '/nama_kementerian')->assertStatus(200);
         $this->assertTrue($this->json($this->get(self::BASE . '/nama_kementerian'))['data']['is_default']);
 
+        $importedId   = (int) $this->db->table('web_config')->get()->getRowArray()['id_web_config'];
+        $duplicateLog = self::errorLogCount('Duplicate entry');
+
         $blocked = $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Baru']);
         $blocked->assertStatus(422);
         $this->assertArrayHasKey('config_name', $this->json($blocked)['errors']);
         $this->assertSame(1, $this->db->table('web_config')->countAllResults());
+        // CR-058: bentrok dicegah sebelum INSERT, jadi tidak ada log ERROR 1062.
+        $this->assertSame($duplicateLog, self::errorLogCount('Duplicate entry'));
 
         $this->sendJson('DELETE', self::BASE . '/Nama_Kementerian')->assertStatus(200);
         $this->assertSame(0, $this->db->table('web_config')->countAllResults());
         $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Baru'])->assertStatus(201);
+
+        // CR-058: PUT yang ditolak tidak memakan nilai AUTO_INCREMENT.
+        $this->assertSame($importedId + 1, (int) $this->db->table('web_config')->get()->getRowArray()['id_web_config']);
     }
 
     /**
@@ -311,6 +321,20 @@ final class WebConfigTest extends DatabaseTestCase
     private function sendJson(string $method, string $uri, array $body = []): TestResponse
     {
         return $this->withBodyFormat('json')->call($method, $uri, $body);
+    }
+
+    /**
+     * Jumlah catatan log level error yang memuat $needle sejauh ini (log TestLogger statis, terkumpul lintas test).
+     */
+    private static function errorLogCount(string $needle): int
+    {
+        /** @var list<array{level: mixed, message: string, file: string|null}> $logs */
+        $logs = (new ReflectionProperty(TestLogger::class, 'op_logs'))->getValue();
+
+        return count(array_filter(
+            $logs,
+            static fn (array $log): bool => strtolower((string) $log['level']) === 'error' && str_contains($log['message'], $needle),
+        ));
     }
 
     private function resetWebConfigServices(): void
