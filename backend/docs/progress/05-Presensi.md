@@ -49,3 +49,21 @@ Key review **CR-027** (CR saja). Tidak mengubah skema, jadi tidak ada dokumen `d
 - U-8 selesai di CR-040: pemindai kemurnian bersama `tests/_support/Libraries/PemindaiKemurnian.php` (daftar larangan gabungan ketiga penjaga, tanpa pelonggaran) dipakai `SlipGajiMurniTest`, `KalkulasiMurniTest` Tukin, dan `KalkulasiMurniTest` Kepegawaian.
 
 **Catatan lokasi test:** kontrak D-13 menyebut `tests/Presensi/`. Test logika murni ditaruh di `tests/unit/Presensi/` mengikuti konvensi repo (sama dengan CR-025); test integrasi ber-DB D-13 tetap di `tests/Presensi/`.
+
+## 5A M6 — MAKE-033 adapter Tukin (D-04/D-05/D-07 sisi integrasi) — IN_PROGRESS
+
+Branch `fase5a/make-033-adapter-tukin` (dari `main` `6806c38`); acuan PRD 5A §7.7. Merge setelah M2 (DBV-023) karena
+harian presensi membaca `dh_online`.
+
+- **Sudah:** `Libraries/Presensi/TukinData` (konfigurasi `web_config`, periode `bkn_periode_ekinper`, hari libur, data
+  pegawai, konket `absen_ijin`, sumber cuti/TB fail-closed `SumberCutiTbBelumTersedia` + `Config\Presensi::$sumberCutiTb`,
+  `TukinDataService::siapkan()` → `ArgumenTukin`) + README folder (rujukan legacy, [K]/[V2]); test
+  `tests/Presensi/TukinData` (AC-TK.1–TK.5 bagian non-skema).
+- **Keputusan reviewer CR 20-10-2026:** `tmtMasuk` ikut legacy `get_all_pegawai_dh_spe` + rekap [K], kecuali cabang PPPK
+  rekap mengenali PPPK lewat id (`Jabatan::JENIS_PEGAWAI_PPPK`) [V2]; syarat `tgl_perkawinan` pada jumlah anak [K].
+- **Berkas bersama (commit terpisah):** `Libraries/MasterData/WebConfigTypes.php` + `WebConfigTypesTest` (tipe
+  `date_range_list`); `Config/WebConfig.php` (grup "Jam Kerja & Puasa", 7 key F5-16) dengan angka katalog 35 → 42 di
+  `tests/MasterData/WebConfigTest.php` dan `WebConfigTypesTest` (disetujui reviewer); **tambahan disetujui reviewer:**
+  FE `features/master-data/webConfig.types.ts`, `schemas/webConfig.schema.ts`, `components/WebConfigFormDialog.vue`
+  (tipe `date_range_list` di form Web Config, agar `rentang_puasa` dapat dikelola admin lewat UI).
+- **Belum:** `presensi {masuk, pulang}` harian dari `dh_online` (menunggu M2).
