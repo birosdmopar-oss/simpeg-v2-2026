@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` — **acuan utama** coder/agen AI paket **5A** Fase 5 (kartu Trello DEV-006, prompt eksekusi 1/2 & 2/2 di komentar DEV-006 mewajibkan membaca dokumen ini) |
-| Versi | **v1.0 — 19-10-2026** |
+| Versi | **v1.1 — 20-10-2026** (v1.0 19-10-2026; v1.1 menambah keputusan F5-23 dan F5-24 tentang `tmtMasuk` adapter Tukin) |
 | Status | **BERLAKU** — keputusan user 19-10-2026 (P-1..P-4, F5-1..F5-22, "semua saran disetujui") sudah **DIKUNCI** di §5. Perubahan berikutnya hanya lewat revisi versi oleh reviewer CR |
 | Basis kode | `origin/main` = **`39b5331`** (semua rujukan `path:baris` repo diambil dari commit ini) |
 | Acuan legacy | Salinan kerja legacy CI3, **HEAD `771f8b4`** (08-10-2026) — acuan perilaku Slip Gaji terbaru (F5-1). Rujukan baris legacy bercatatan AS-09 (belum dicocokkan checksum produksi, §13 Q5A-14) |
@@ -235,6 +235,8 @@ Hak **LIHAT** ikut Matriks v2; alur **TULIS/PROSES** ikut legacy [K]; deviasi di
 | F5-20 | Kartu Trello baru: QASMTASK untuk D-14; kartu DBA `COUNT(*)` `gaji_pegawai` produksi (urusan reviewer CR) | §7.4, §13 Q5A-02 |
 | F5-21 | FE Presensi & Slip Gaji ikut 5A; Laporan Tukin dkk. di 5C; acuan QA Lapis 1 = PNG Figma Slip Gaji (`Figma - UI Slip Gaji.png`, `UI Preview Slip Gaji (Export PDF).png`, folder kerja proyek di luar repo — minta ke reviewer CR) + pola komponen Fase 3 | §7.8 |
 | F5-22 | Koreksi path `NipCascadeService` di PRD Fase 4 (dokumen saja) ikut push PRD 5A (urusan reviewer CR) | §3.6 |
+| F5-23 | (20-10-2026) `DataPegawaiTukin.tmtMasuk` ikut legacy [K] `L_employee.php` `get_all_pegawai_dh_spe` (~:6400-6600) + `L_presensi.php:12699-12716`: `gol_ruang`/`tmtsk_pangkat` = baris `riwayat_kp` status 1 dengan `tmtsk ≤ awal periode` urut `tmtsk DESC` (pegawai `created_at` setelah akhir periode → `≤ akhir periode`); PPPK ditimpa `gol_pppk`/`tmtsk` mutasi jabatan terbaru; "hari kerja pertama" = library `HariKerja` atas periode + libur; `jumlahAnak` ikut syarat legacy `tgl_perkawinan ≤ akhir periode` (:12170-12198) | §7.7.5 |
+| F5-24 | (20-10-2026, deviasi **[V2]**) Cabang PPPK pada `tmtMasuk` (legacy `L_presensi.php:12707` memakai **nama** `jenis_pegawai == 'PPPK'`) mengenali PPPK lewat **`id_jenis_pegawai == 6`** memakai konstanta bersama (mis. `Jabatan::JENIS_PEGAWAI_PPPK`), sama dengan bagian lain legacy (`:12621`, `L_employee.php:6580-6584`), role akun, dan badge CR-051. Alasan: nama master dapat diubah lewat CRUD → cek nama gagal diam-diam. **Cutover WAJIB** (runbook impor): `SELECT id_jenis_pegawai, jenis_pegawai FROM jenis_pegawai` di produksi; bila id 6 bernama tepat 'PPPK' → hasil identik legacy; bila bernama lain → nilai Tukin PPPK berbeda dari legacy (cabang legacy kemungkinan tidak pernah jalan) → keputusan bisnis + bandingkan dengan slip/rekap lama sebelum dipakai. Test: id 6 masuk cabang apa pun namanya; id selain 6 tidak masuk | §7.7.5, §13 Q5A-25 |
 | — | Tidak perlu keputusan sekarang: FCM presensi (Fase 6), precedence tukin (5B, K-1 ikut rekap), selfie/ikatan perangkat (**tidak**), AS-09 checksum (§13) | §1.2, §9, §13 |
 
 Keputusan final lama yang tetap berlaku (ringkas): **SG-1** Slip Gaji = port perilaku legacy; D-11 dan `/verify/slip/{token}` wajib live sejak switch produksi (DP2.4); D-14 task baru. **SG-2** akses slip: 2/6/7 milik sendiri, 1 semua satker, 3 satker sendiri (fail-closed, 403 di luar cakupan), 4/5/8 tanpa akses. **SG-3** slip tidak dirilis di produksi legacy. **K-1** tukin ikut rekap `laporan_tukin_us_skp`. **K2** ID legacy diimpor apa adanya (id akun 4675/4676 tetap bermakna). **K4** nama kolom ikut legacy kecuali keputusan tertulis; FK RESTRICT + koreksi NIP oleh aplikasi. **AS-12** stempel UTC.
@@ -826,7 +828,7 @@ Bawaan = nilai `05-Presensi.md` D-05 / `KonfigurasiTukin` (`:66-76`). Tipe baru 
 #### 7.7.5 `DataPegawaiTukin` [K rekap, README Tukin]
 - `predikatSkp` = `riwayat_skp_periodik.hasil_akhir` periode BKN (tanpa baris BKN / data → `null`);
 - `jumlahAnak` = jumlah `detail_anak` ber-`tgl_lahir` ≤ akhir periode pada `riwayat_keluarga` aktif [K `:12170-12198`];
-- `tmtMasuk` = `tmtsk_pangkat` bila CPNS (`gol_ruang` diawali "CPNS") atau PPPK dengan TMT setelah hari kerja pertama, selain itu `null` [K `:12699-12716`];
+- `tmtMasuk` = `tmtsk_pangkat` bila CPNS (`gol_ruang` diawali "CPNS") atau PPPK dengan TMT setelah hari kerja pertama, selain itu `null` [K `:12699-12716`]; sumber `gol_ruang`/`tmtsk_pangkat` dan "hari kerja pertama" = **F5-23** [K]; PPPK dikenali lewat `id_jenis_pegawai == 6` (konstanta bersama) = **F5-24 [V2]**, bukan nama;
 - `tmtKeluar` = `pegawai.tmt_status` bila `status = 2` [V2 README Tukin].
 
 #### 7.7.6 Harian (`$harian` per tanggal, periode sebelumnya + periode berjalan)
@@ -1100,6 +1102,7 @@ Aturan: butir **⛔** WAJIB dijawab pihak yang disebut **sebelum** batas yang di
 | Q5A-16 | ◻ | Ubah manual jam yang semula dari presensi online: koordinat jam itu | Dikosongkan (nilai lama tetap di audit) | reviewer CR | Review M0 |
 | Q5A-17 | ◻ | "Hari ini" untuk validasi `tgl ≤ hari ini` presensi manual; jendela waktu untuk manual | Tanggal lokal satker pegawai; jendela tidak berlaku untuk manual [K] | reviewer CR | Review M0 |
 | Q5A-18 | ⛔ | Checklist QA Lapis 1 FE 5A: Slip Gaji vs PNG Figma; layar tanpa Figma (presensi, impor, data presensi, verifikasi) vs pola komponen Fase 3 | Reviewer/QA menyepakati checklist tertulis sebelum QA | reviewer CR / QA | Sebelum QA Lapis 1 M7 |
+| Q5A-25 | ⛔ (cutover) | Nama `jenis_pegawai` id 6 di produksi (F5-24) | Kueri di butir F5-24 dijalankan saat cutover; bila ≠ 'PPPK' → keputusan bisnis sebelum Tukin PPPK dipakai | reviewer CR / DBA | Sebelum go-live |
 | Q5A-19 | ◻ | Versi PhpSpreadsheet | Rilis stabil terbaru yang mendukung matriks PHP CI, dicatat di ADR-032 | reviewer CR | M3 |
 | Q5A-20 | — | Revisi dokumen: `05-Presensi.md` (J0.04: D-01..D-14, SG-2, J7.02 opsi timpa), Matriks/FSD/TS (hak Slip Gaji, aktor D-02), errata DBV-011 (`offset_zona_menit` → `satker.zonasi`, K5-14), audit legacy (PK `dh_online`, K5-07), header dokumen G-03, PRD Fase 4 path (F5-22) | Di luar coder — reviewer CR | reviewer CR | — |
 | Q5A-21 | ◻ | URL dasar QR | `config('App')->baseURL` + `verify/slip/`, override `.env` `presensi.urlVerifikasiSlip` | reviewer CR | Review M0 |
