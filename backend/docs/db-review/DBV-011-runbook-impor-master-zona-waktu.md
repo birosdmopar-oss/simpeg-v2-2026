@@ -622,6 +622,33 @@ migration-nya di `MigrationsDitahan/`):
 - (c) aktivasi lewat **unit DBV terpisah**: migration dipindah ke `app/Database/Migrations/` dengan timestamp baru setelah
   migration terakhir di lingkungan target, dan registry test FK disesuaikan.
 
+### 2.11 Tabel Fase 5A presensi & slip gaji (DBV-023) — aditif
+
+**Asal.** Catatan persetujuan DB Validator atas DBV-023 (jjoseph48, komentar PR #28, 20-10-2026): C-4 dan syarat DBV-Q7.
+Rincian skema, urutan impor, dan klasifikasi audit ada di `DBV-023-presensi-gaji-fase5a-schema.md` Bagian 7–8; skrip
+audit `sql/DBV-023-audit-presensi-gaji.sql` (hanya `SELECT`; baca baris prasyarat P0 lebih dulu — `BERHENTI:` berarti
+skrip dijalankan di DB yang salah). Keputusan DBV-011 di Bagian 4 dan checklist Bagian 5 tidak diubah oleh penambahan ini.
+
+**Aturan `dh_online.sumber` (C-4).** `sumber` NULL hanya untuk baris impor legacy; setelah cutover setiap baris baru
+wajib 1/2, ditegakkan aplikasi. (`chk_dh_online_sumber` = `IN (1,2)` meloloskan NULL karena CHECK bernilai UNKNOWN —
+disengaja untuk baris impor, jadi penegakan untuk baris baru ada di aplikasi: presensi online = 1, manual = 2.)
+
+**Tabel legacy yang tidak dimigrasi (syarat DBV-Q7).** Dicatat eksplisit "tidak dimigrasi"; tidak dibuat di skema v2 dan
+isinya tidak diimpor:
+
+| Tabel legacy (D1) | Keterangan | Dasar |
+|---|---|---|
+| `user_geo` (D1:7547-7560) | tidak dimigrasi | PRD 5A §7.1.1, F5-12; DBV-Q7 |
+| `dh_online_coordinate` (D1:406-416) | tidak dimigrasi | F5-12; DBV-Q7 |
+| `d_dh_online` (arsip trigger `dh_online_beDel`) | tidak dimigrasi; trigger tidak dibawa, diganti `audit_logs` | F5-14, Q5A-15; DBV-Q4/Q7 |
+| `user_lokasi_presensi` (D1:7595-7605) | tidak dimigrasi | DBV-020 butir 6 |
+| `absen_real`, `absen_kategori` | tidak dimigrasi | F5-12; DBV-Q7 |
+
+Mapping Migrasi resmi berada di dokumen Bahan Baku (di luar repo); penyelarasannya diteruskan reviewer CR ke user.
+
+**Butir pra-cutover (C-3).** Uji koreksi NIP (`NipCascadeService`) pada volume `dh_online` realistis + urutan induk/anak
+di bawah FK RESTRICT, dicatat di log 2.8 sebelum aplikasi dibuka.
+
 ## 3. Bagian B — Zona waktu & `sql_mode` sesi (ISSUE-022, D-11) — USULAN; keputusan final TL/DBA; DITAHAN menunggu ISSUE-024
 
 **Status (01-10-2026): DITAHAN.** Bagian ini menunggu jawaban kartu ISSUE-024 di board tim, yaitu versi engine, `sql_mode`, `time_zone`, dan `table_rows` server DB produksi. Putaran 5 **tidak** memutuskan Bagian B: opsi 3.5 belum dipilih, dan offset R1a belum dipastikan.

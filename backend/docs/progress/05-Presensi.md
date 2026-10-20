@@ -1,19 +1,67 @@
 # Progress Fase 5 — Modul D: Presensi & Remunerasi
 
-Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak task lengkap: `05-Presensi.md`. Aturan Slip Gaji (sumber legacy, keputusan, hak akses, hal yang menunggu keputusan): `backend/app/Libraries/Presensi/README.md`.
+Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md dan PRD 5A §11.3). **Acuan utama paket 5A:**
+`docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` v1.0 (BERLAKU 19-10-2026; menang atas `05-Presensi.md`, Matriks, dan
+README modul). Aturan Slip Gaji (sumber legacy, hak akses): `backend/app/Libraries/Presensi/README.md`.
 
-**Status:** sebagian — pengecualian urutan fase, disetujui user.
+**Status:** paket **5A berjalan** (paralel dengan Fase 4, P-1). 5B/5C belum dimulai. 5A DONE ≠ Fase 5 DONE (PRD 5A §11.2).
 
-**Terakhir diperbarui:** 2 Oktober 2026 (CR-039: kalkulasi Tukin diselaraskan ke rekap legacy aktif `laporan_tukin_us_skp` dan butir Slip Gaji yang menunggu terjawab dari legacy; CR-037: kalkulasi Tukin murni di `Presensi/Tukin`; CR-027: jalur "Slip Gaji (a)" disetujui user 01-10-2026 — dokumen perilaku + logika murni Slip Gaji mendahului urutan fase)
-**Entry criteria:** Fase 2 (web_config) + Fase 3 (data jabatan) + Fase 4 (cuti/tugas belajar) DONE — belum terpenuhi. Pekerjaan di file ini sampai entry criteria terpenuhi hanya **persiapan yang tidak butuh tabel baru**.
+**Terakhir diperbarui:** 20 Oktober 2026 — DBV-023 **disetujui DB Validator 20-10-2026 (jjoseph48)** (PR #28); PR belum
+di-merge; ISSUE-049 (Q5A-02) ditutup keputusan user 20-10-2026, sisa syarat M2 = DBV-022 di `main`. Sebelumnya M1 DBV-023 (branch `fase5a/dbv-023-skema-presensi-gaji`,
+dari `main` `6806c38`): dokumen DBV-023 + kueri audit + draf migration (ditahan). M0 (laporan
+pemahaman, tanpa commit) diterima reviewer CR 20-10-2026. Sebelumnya: CR-039/CR-037/CR-027 (2 Oktober 2026, persiapan
+tanpa skema, bagian bawah).
+**Entry criteria:** Fase 2 (web_config) + Fase 3 (data jabatan) DONE. "Fase 4 DONE" **dikecualikan** untuk 5A (P-1);
+diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tetap menunggu Fase 4 M3/M5.
 
-| Task | Status | Ringkas |
-|---|---|---|
-| D-10 Slip Gaji: Import Excel | TODO | Aturan pratinjau murni tersedia (CR-027): parser nilai mentah sel, header/sheet, NIP/bulan/tahun, duplikat dalam berkas, pasangan GPP–TK, pencocokan nama (tolak + daftar untuk log), status valid/duplikat/galat, rencana commit. Pembaca berkas, unggah, simpan pratinjau, commit DB, dan log menunggu D-01 |
-| D-11 Slip Gaji: Akses Pegawai | TODO | Gerbang waktu (tanggal 4 pukul 10:00 WIB, inklusif), status buka/buka ulang, token QR, dan kebijakan hak akses tersedia sebagai logika murni (CR-027). Endpoint, PDF, QR, dan verifikasi publik menunggu D-10/D-01 |
-| D-04..D-07 Kalkulasi Tukin | **IN_PROGRESS** | Logika murni CR-037 di `Presensi/Tukin`, diselaraskan CR-039 ke rekap legacy aktif `laporan_tukin_us_skp` (periode 16–15/BKN dengan Januari mulai 16 Des, faktor presensi 0,2, cuti sakit hari ke-15+, cuti besar/melahirkan pengganti total, SKP periodik 0/16/32, pemutihan TB, cuti sepanjang periode, masa kerja; tanpa LKH, TB 25%, dan cuti alasan penting) beserta unit test sintetis. Tabel, adapter `web_config`/data pegawai, dan controller menunggu fase terkait (README `Presensi/Tukin`) |
-| D-13 Unit Test Kalkulasi Tukin (Lengkap) | **IN_PROGRESS** | Unit test murni Tukin (CR-037, `tests/unit/Presensi/Tukin/`) dan Slip Gaji: butir "Gate waktu slip gaji" (tepat sebelum/sesudah ambang, zona, lintas tahun) dan bagian murni butir "Import slip gaji" (mismatch nama, duplikat dalam berkas). Belum: pelanggaran constraint saat commit (butuh tabel D-01), test integrasi di `tests/Presensi/`, dan test integrasi Tukin ber-DB |
-| D-01..D-03, D-08, D-09, D-12 | TODO | Belum dimulai |
+| Task | Paket | Milestone | Key | Status | Ringkas |
+|---|---|---|---|---|---|
+| D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** | M1: dokumen + kueri audit + draf migration di `MigrationsDitahan/` (Bagian "5A M1" di bawah). M2 ⛔: ~~DBV approve~~ ✅ 20-10-2026 + DBV-022 di `main` + ~~hasil kartu DBA Q5A-02~~ ✅ ISSUE-049 ditutup 20-10-2026 |
+| D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | TODO | Logika murni `Libraries/Presensi/Geo` boleh disiapkan sebelum M2 (§3.5) |
+| D-03 Presensi manual | 5A | M5 | MAKE-032 | TODO | Menunggu M2 |
+| D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Logika murni CR-037/CR-039 selesai; adapter `TukinData` 5A (non-skema boleh mulai, merge setelah M2); precedence/laporan di 5B |
+| D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | — | — | TODO | Di luar 5A |
+| D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | TODO | Logika murni CR-027 tersedia; menunggu M2 |
+| D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | TODO | Menunggu M3 |
+| D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 | MAKE-034 | TODO | |
+| D-13 Unit test lengkap | 5A (bagian) / 5C | M8 | MAKE-035 | **IN_PROGRESS** | Bagian murni CR-037/CR-027; regression suite lengkap di 5C |
+| D-14 Verifikasi QR publik | 5A | M4 | MAKE-031 | TODO | Kartu QASMTASK baru (F5-20) |
+
+**Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** nilai uang makan slip (5B, F5-1); konfirmasi Biro Keuangan
+atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan ulang data `gaji_pegawai` produksi (DEPLOY-002.1; Q5A-02 ditutup ISSUE-049).
+
+## 5A M1 — DBV-023 dokumen skema (D-01)
+
+- **Sudah:** `backend/docs/db-review/DBV-023-presensi-gaji-fase5a-schema.md` (status "Menunggu review DB Validator"),
+  `backend/docs/db-review/sql/DBV-023-audit-presensi-gaji.sql`, draf `app/Database/MigrationsDitahan/CreatePresensiGaji.php`
+  dan `AlterAuditLogsEventPresensi.php` (tidak dijalankan `spark migrate`). Verifikasi developer MySQL 8.0.30 di DB
+  scratch `simpeg_v2_t_ws2_dbv023`: migrate/rollback/migrate dengan checksum identik, 32 uji constraint, `down()` ENUM
+  fail-closed, sintaks skrip audit di DDL D1 (dokumen Bagian 10).
+- **Keputusan reviewer CR 20-10-2026 (M0):** key DBV-023/MAKE-030..035; DB scratch `simpeg_v2_t_ws2_<milestone>`;
+  `down()` ENUM fail-closed (berbeda dari pola `2026-09-17-000004`); kunci enkripsi test lewat `config()` di test (tanpa
+  ubah workflow CI); ekstensi PHP CI untuk PhpSpreadsheet diverifikasi di M3.
+- **Persetujuan DB Validator:** ✅ 20-10-2026 (jjoseph48, komentar PR #28; verifikasi MariaDB 10.4.27). Keputusan
+  DBV-Q1..Q18 di dokumen Bagian 9, catatan C-1..C-4 di Bagian 14. Perapian yang diminta: C-1 catatan jumlah CHECK
+  MariaDB, C-2 kueri prasyarat `BERHENTI:` di skrip audit, C-4 + daftar tabel tidak dimigrasi (DBV-Q7) di runbook DBV-011
+  2.11.
+- **ISSUE-049 (Q5A-02) ditutup keputusan user 20-10-2026:** fitur Slip Gaji legacy belum masuk DB produksi (deployment
+  produksi ditahan) → histori `gaji_pegawai` produksi tidak ada (F5-2 tetap berlaku bila kelak ada data); berkas
+  `import_slip_gaji_uji_2026-01_s.d_09.xlsx` = data fiktif (1 NIP, Jan–Sep 2026, GPP + TK, 28 kolom); isi `gaji_pegawai`
+  v2 dari unggah Excel, uang makan dari presensi; `gaji_pegawai_qr_history` menjaga QR lama tetap valid (perbaikan bug
+  legacy reset admin); B2 (STOP) tidak berlaku; DBV-Q5/A2: baris tanpa jam dibersihkan saat impor, CHECK
+  `chk_dh_online_jam` tetap. Pengecekan ulang produksi → kartu DEPLOY-002.1. Dokumen DBV-023 Bagian 7.2/9/12/13.
+- **Belum / blocker:** DBV-022 belum di `main` (baru branch
+  `fase4/dbv-022-skema-layanan`) — satu-satunya syarat M2 yang tersisa. Registry NIP (`NipCascadeService::FASE` → 5) dan
+  test skema dikerjakan di M2.
+- **Tanggal persetujuan DB Validator:** 20-10-2026 (jjoseph48, PR #28; AC-D01.6).
+- **Tindak lanjut kode (C-4):** di M5 kode presensi online/manual wajib selalu mengisi `dh_online.sumber` (1 online,
+  2 manual) + test; NULL hanya baris impor legacy.
+
+### Q cutover 5A
+
+| # | Butir | Asal | Status |
+|---|---|---|---|
+| QC-1 | Uji koreksi NIP (`NipCascadeService`) pada volume `dh_online` realistis + urutan induk/anak di bawah FK RESTRICT | DBV-023 C-3 (DB Validator 20-10-2026) | ⏳ pra-cutover |
 
 ## Persiapan tanpa skema
 
