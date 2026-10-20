@@ -24,6 +24,9 @@ use LogicException;
  *   asset_path path relatif berkas gambar (png/jpg/jpeg) di penyimpanan aset v2, tanpa `..`/path absolut, ≤ 255
  *   time       HH:MM atau HH:MM:SS (00:00..23:59:59) → disimpan HH:MM:SS
  *   email_list daftar email dipisah koma, 1..20 alamat unik → disimpan "a@x,b@y"
+ *   date_range_list (Fase 5A F5-16, aditif) rentang tanggal satu per baris `YYYY-MM-DD..YYYY-MM-DD` (inklusif), tanggal
+ *              valid, mulai ≤ selesai, tidak tumpang tindih, ≤ 50 baris; disimpan unik & terurut naik dipisah LF; nilai
+ *              bertipe = list<array{mulai: string, selesai: string}>. Baris kosong diabaikan
  *
  * Nilai kosong selalu ditolak: mengosongkan = menghapus baris (kembali ke nilai bawaan katalog).
  */
@@ -40,9 +43,11 @@ final class WebConfigTypes
     public const TIME       = 'time';
     public const EMAIL_LIST = 'email_list';
 
+    public const DATE_RANGE = 'date_range_list';
+
     public const TYPES = [
         self::TEXT, self::TEXTAREA, self::HTML, self::INTEGER, self::DECIMAL, self::ID_REF, self::URL, self::ASSET_PATH,
-        self::TIME, self::EMAIL_LIST,
+        self::TIME, self::EMAIL_LIST, self::DATE_RANGE,
     ];
 
     public const TEXT_MAX_BYTES  = 65535;
@@ -50,6 +55,7 @@ final class WebConfigTypes
     public const PATH_MAX_LENGTH = 255;
     public const EMAIL_MAX_COUNT = 20;
     public const ID_MAX          = 2147483647;
+    public const RANGE_MAX_COUNT = 50;
 
     /**
      * Rumusan `config_name` yang sah (key legacy memakai huruf, angka, `_`, dan `/`, mis. `TL1/PSW1`).
@@ -100,6 +106,7 @@ final class WebConfigTypes
             self::ASSET_PATH => self::assetPath($value),
             self::TIME       => self::time($value),
             self::EMAIL_LIST => self::emailList($value),
+            self::DATE_RANGE => self::dateRangeList($value),
             default          => throw new LogicException("Tipe web_config tidak dikenal: {$type}."),
         };
     }
@@ -127,7 +134,7 @@ final class WebConfigTypes
      *
      * @param array<string, mixed> $def
      *
-     * @return float|int|list<string>|string|null
+     * @return float|int|list<array{mulai: string, selesai: string}>|list<string>|string|null
      */
     public static function cast(array $def, ?string $raw): mixed
     {
@@ -139,6 +146,7 @@ final class WebConfigTypes
             self::INTEGER, self::ID_REF => $raw === '' ? null : (int) $raw,
             self::DECIMAL               => $raw === '' ? null : (float) $raw,
             self::EMAIL_LIST            => $raw === '' ? [] : explode(',', $raw),
+            self::DATE_RANGE            => self::castDateRangeList($raw),
             default                     => $raw,
         };
     }
@@ -374,6 +382,78 @@ final class WebConfigTypes
         }
 
         return implode(',', $emails);
+    }
+
+    /**
+     * Rentang tanggal satu per baris (F5-16 `rentang_puasa`). Pesan galat menyebut nomor baris masukan.
+     */
+    private static function dateRangeList(string $value): string
+    {
+        $ranges = [];
+
+        foreach (explode("\n", str_replace(["\r\n", "\r"], "\n", $value)) as $index => $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            $no = $index + 1;
+
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2})\.\.(\d{4})-(\d{2})-(\d{2})\z/', $line, $m) !== 1) {
+                throw new InvalidArgumentException("Baris {$no}: format harus YYYY-MM-DD..YYYY-MM-DD (mis. 2026-02-18..2026-03-19).");
+            }
+
+            if (! checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || ! checkdate((int) $m[5], (int) $m[6], (int) $m[4])) {
+                throw new InvalidArgumentException("Baris {$no}: tanggal tidak valid.");
+            }
+
+            $start = "{$m[1]}-{$m[2]}-{$m[3]}";
+            $end   = "{$m[4]}-{$m[5]}-{$m[6]}";
+
+            if ($start > $end) {
+                throw new InvalidArgumentException("Baris {$no}: tanggal mulai tidak boleh setelah tanggal selesai.");
+            }
+
+            $ranges["{$start}..{$end}"] = [$start, $end];
+        }
+
+        if ($ranges === []) {
+            throw new InvalidArgumentException('Nilai wajib diisi. Untuk kembali ke nilai bawaan, hapus nilainya.');
+        }
+
+        if (count($ranges) > self::RANGE_MAX_COUNT) {
+            throw new InvalidArgumentException('Maksimal ' . self::RANGE_MAX_COUNT . ' rentang tanggal.');
+        }
+
+        ksort($ranges, SORT_STRING);
+        $previous = null;
+
+        foreach ($ranges as $key => [$start, $end]) {
+            if ($previous !== null && $start <= $previous[1]) {
+                throw new InvalidArgumentException("Rentang {$previous[0]}..{$previous[1]} dan {$key} tumpang tindih.");
+            }
+
+            $previous = [$start, $end];
+        }
+
+        return implode("\n", array_keys($ranges));
+    }
+
+    /**
+     * @return list<array{mulai: string, selesai: string}>
+     */
+    private static function castDateRangeList(string $raw): array
+    {
+        $ranges = [];
+
+        foreach (explode("\n", $raw) as $line) {
+            if (preg_match('/^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})\z/', trim($line), $m) === 1) {
+                $ranges[] = ['mulai' => $m[1], 'selesai' => $m[2]];
+            }
+        }
+
+        return $ranges;
     }
 
     private static function floatToString(float $value): string

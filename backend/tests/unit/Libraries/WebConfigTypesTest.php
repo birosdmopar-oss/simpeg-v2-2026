@@ -11,6 +11,7 @@ use CodeIgniter\Test\CIUnitTestCase;
 use Config\WebConfig;
 use InvalidArgumentException;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * DBV-006/CR-030 — unit test tipe data `web_config` (DoD G-09 / Exit Fase 2: "unit test G-09 tipe data config"):
@@ -265,5 +266,75 @@ final class WebConfigTypesTest extends CIUnitTestCase
 
         $this->assertSame(WebConfigImport::REVIEW, WebConfigImport::row($catalog, 'email_sent_time', '06:00:00', null)['action']);
         $this->assertSame(WebConfigImport::REVIEW, WebConfigImport::row($catalog, 'email_ultah_ad', 'a@contoh.id', null)['action']);
+    }
+
+    /**
+     * Fase 5A F5-16 (PRD 5A §7.7.2): tipe `date_range_list` untuk `rentang_puasa` — normalisasi kanonik (unik, terurut,
+     * LF), validasi per baris, dan nilai bertipe.
+     */
+    public function testDateRangeListNormalisasiKanonik(): void
+    {
+        $def = ['type' => T::DATE_RANGE];
+
+        $this->assertSame('2026-02-18..2026-03-19', T::normalize($def, ' 2026-02-18..2026-03-19 '));
+        $this->assertSame(
+            '2025-03-01..2025-03-30
+2026-02-18..2026-03-19',
+            T::normalize($def, '2026-02-18..2026-03-19
+
+2025-03-01..2025-03-30
+2026-02-18..2026-03-19
+'),
+            'CRLF → LF, baris kosong diabaikan, duplikat dibuang, urut naik',
+        );
+        $this->assertSame('2026-03-01..2026-03-01', T::normalize($def, '2026-03-01..2026-03-01'), 'rentang satu hari');
+        $this->assertSame('2026-01-01..2026-01-10
+2026-01-11..2026-01-20', T::normalize($def, '2026-01-11..2026-01-20
+2026-01-01..2026-01-10'), 'bersebelahan bukan tumpang tindih');
+        $this->assertTrue(T::isValidStored($def, '2025-03-01..2025-03-30
+2026-02-18..2026-03-19'));
+        $this->assertFalse(T::isValidStored($def, '2026-02-18..2026-03-19
+2025-03-01..2025-03-30'), 'tersimpan tidak kanonik');
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function dateRangeListTidakSah(): iterable
+    {
+        yield 'format salah' => ['2026-02-18 - 2026-03-19', 'Baris 1: format harus'];
+        yield 'tanpa nol di depan' => ['2026-2-18..2026-03-19', 'Baris 1: format harus'];
+        yield 'tanggal tidak ada' => ['2026-02-30..2026-03-19', 'Baris 1: tanggal tidak valid.'];
+        yield 'mulai setelah selesai' => ['2025-03-01..2025-03-30
+2026-03-19..2026-02-18', 'Baris 2: tanggal mulai tidak boleh setelah tanggal selesai.'];
+        yield 'tumpang tindih' => ['2026-02-18..2026-03-19
+2026-03-19..2026-03-25', 'tumpang tindih'];
+        yield 'hanya baris kosong' => ['
+ 
+', 'Nilai wajib diisi.'];
+        yield 'lebih dari 50 rentang' => [implode('
+', array_map(static fn (int $i): string => sprintf('%04d-01-01..%04d-01-02', 1990 + $i, 1990 + $i), range(1, 51))), 'Maksimal 50 rentang tanggal.'];
+    }
+
+    #[DataProvider('dateRangeListTidakSah')]
+    public function testDateRangeListDitolak(string $input, string $pesan): void
+    {
+        try {
+            T::normalize(['type' => T::DATE_RANGE], $input);
+            $this->fail('seharusnya ditolak');
+        } catch (InvalidArgumentException $e) {
+            $this->assertStringContainsString($pesan, $e->getMessage());
+        }
+    }
+
+    public function testDateRangeListCast(): void
+    {
+        $this->assertSame(
+            [['mulai' => '2025-03-01', 'selesai' => '2025-03-30'], ['mulai' => '2026-02-18', 'selesai' => '2026-03-19']],
+            T::cast(['type' => T::DATE_RANGE], '2025-03-01..2025-03-30
+2026-02-18..2026-03-19'),
+        );
+        $this->assertSame([], T::cast(['type' => T::DATE_RANGE], ''));
+        $this->assertNull(T::cast(['type' => T::DATE_RANGE], null));
     }
 }
