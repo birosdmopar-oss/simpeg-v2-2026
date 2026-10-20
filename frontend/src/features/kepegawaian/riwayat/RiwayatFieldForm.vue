@@ -147,6 +147,18 @@ function jamakKurang(): boolean {
 
 const berkas = reactive<BerkasMap>({})
 const berkasError = reactive<Record<number | string, string>>({})
+/**
+ * Galat server berkas (422 `berkas.<id>` / `berkas.<kolom>`) yang sudah "dijawab" pengguna dengan memilih berkas pengganti:
+ * tidak ditampilkan lagi sampai galat server baru datang (Q4R3-I1; sebelumnya pesan lama tetap tampil walau berkasnya sudah diganti).
+ */
+const berkasServerDijawab = reactive<Record<number | string, true>>({})
+
+watch(
+  () => props.serverErrors,
+  () => {
+    for (const key of Object.keys(berkasServerDijawab)) delete berkasServerDijawab[key]
+  },
+)
 
 const refs = useRiwayatRefOptions(props.fields)
 onMounted(() => void refs.init(blank()).then(isiJamakAwal))
@@ -171,6 +183,7 @@ watch(
     disentuh.clear()
     for (const key of Object.keys(berkas)) delete berkas[key]
     for (const key of Object.keys(berkasError)) delete berkasError[key]
+    for (const key of Object.keys(berkasServerDijawab)) delete berkasServerDijawab[key]
     resetKe.value++
     void refs.init(blank()).then(isiJamakAwal)
   },
@@ -291,8 +304,10 @@ function lewatBatas(submitted: Record<string, string>): boolean {
 
 function onFile(def: LampiranDef, file: File | null): void {
   delete berkasError[def.id_riwayat]
-  if (file) berkas[def.id_riwayat] = file
-  else delete berkas[def.id_riwayat]
+  if (file) {
+    berkas[def.id_riwayat] = file
+    berkasServerDijawab[def.id_riwayat] = true
+  } else delete berkas[def.id_riwayat]
 }
 
 const fileRequired = (def: LampiranDef): boolean =>
@@ -307,8 +322,10 @@ const kolomWajib = (def: BerkasKolomDef): boolean =>
 
 function onFileKolom(def: BerkasKolomDef, file: File | null): void {
   delete berkasError[def.kolom]
-  if (file) berkas[def.kolom] = file
-  else delete berkas[def.kolom]
+  if (file) {
+    berkas[def.kolom] = file
+    berkasServerDijawab[`berkas.${def.kolom}`] = true
+  } else delete berkas[def.kolom]
 }
 
 function missingWajib(): boolean {
@@ -351,7 +368,9 @@ function cancel(): void {
 }
 
 const fieldError = (name: string): string => galatJamak[name] || (errors.value[name] ?? props.serverErrors?.fields[name] ?? '')
-const fileError = (id: number): string => berkasError[id] ?? props.serverErrors?.berkas[id] ?? ''
+const fileError = (id: number): string => berkasError[id] ?? (berkasServerDijawab[id] ? '' : (props.serverErrors?.berkas[id] ?? ''))
+const kolomError = (def: BerkasKolomDef): string =>
+  berkasError[def.kolom] || (berkasServerDijawab[`berkas.${def.kolom}`] ? '' : (props.serverErrors?.fields[`berkas.${def.kolom}`] ?? ''))
 const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
 </script>
 
@@ -498,12 +517,12 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
           />
           <p v-if="kolomTerisi[def.kolom]" class="mt-1 text-caption text-slate-500">Sudah ada; pilih berkas untuk mengganti.</p>
           <p
-            v-if="berkasError[def.kolom] || serverErrors?.fields[`berkas.${def.kolom}`]"
+            v-if="kolomError(def)"
             role="alert"
             class="mt-1 text-caption text-danger"
             :data-testid="`${testid}-berkas-error-${def.kolom}`"
           >
-            {{ berkasError[def.kolom] || serverErrors?.fields[`berkas.${def.kolom}`] }}
+            {{ kolomError(def) }}
           </p>
         </div>
       </div>
