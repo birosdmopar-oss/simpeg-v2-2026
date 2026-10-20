@@ -6,8 +6,9 @@ README modul). Aturan Slip Gaji (sumber legacy, hak akses): `backend/app/Librari
 
 **Status:** paket **5A berjalan** (paralel dengan Fase 4, P-1). 5B/5C belum dimulai. 5A DONE ≠ Fase 5 DONE (PRD 5A §11.2).
 
-**Terakhir diperbarui:** 20 Oktober 2026 — M1 DBV-023 (branch `fase5a/dbv-023-skema-presensi-gaji`, dari `main`
-`6806c38`): dokumen DBV-023 + kueri audit + draf migration (ditahan) menunggu review DB Validator. M0 (laporan
+**Terakhir diperbarui:** 20 Oktober 2026 — DBV-023 **disetujui DB Validator 20-10-2026 (jjoseph48)** (PR #28); PR belum
+di-merge (menunggu DBV-022 di `main` + ISSUE-049). Sebelumnya M1 DBV-023 (branch `fase5a/dbv-023-skema-presensi-gaji`,
+dari `main` `6806c38`): dokumen DBV-023 + kueri audit + draf migration (ditahan). M0 (laporan
 pemahaman, tanpa commit) diterima reviewer CR 20-10-2026. Sebelumnya: CR-039/CR-037/CR-027 (2 Oktober 2026, persiapan
 tanpa skema, bagian bawah).
 **Entry criteria:** Fase 2 (web_config) + Fase 3 (data jabatan) DONE. "Fase 4 DONE" **dikecualikan** untuk 5A (P-1);
@@ -15,7 +16,7 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 
 | Task | Paket | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|---|
-| D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** | M1: dokumen + kueri audit + draf migration di `MigrationsDitahan/` (Bagian "5A M1" di bawah). M2 ⛔: DBV approve + DBV-022 di `main` + hasil kartu DBA Q5A-02 |
+| D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** | M1: dokumen + kueri audit + draf migration di `MigrationsDitahan/` (Bagian "5A M1" di bawah). M2 ⛔: ~~DBV approve~~ ✅ 20-10-2026 + DBV-022 di `main` + hasil kartu DBA Q5A-02 |
 | D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | TODO | Logika murni `Libraries/Presensi/Geo` boleh disiapkan sebelum M2 (§3.5) |
 | D-03 Presensi manual | 5A | M5 | MAKE-032 | TODO | Menunggu M2 |
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Logika murni CR-037/CR-039 selesai; adapter `TukinData` 5A (non-skema boleh mulai, merge setelah M2); precedence/laporan di 5B |
@@ -39,10 +40,22 @@ atas data verifikasi AS-06 (Q5A-08); hasil impor & checksum kode produksi (Q5A-0
 - **Keputusan reviewer CR 20-10-2026 (M0):** key DBV-023/MAKE-030..035; DB scratch `simpeg_v2_t_ws2_<milestone>`;
   `down()` ENUM fail-closed (berbeda dari pola `2026-09-17-000004`); kunci enkripsi test lewat `config()` di test (tanpa
   ubah workflow CI); ekstensi PHP CI untuk PhpSpreadsheet diverifikasi di M3.
-- **Belum / blocker:** persetujuan DB Validator (Bagian 9 dokumen, DBV-Q1..Q18); DBV-022 belum di `main` (baru branch
+- **Persetujuan DB Validator:** ✅ 20-10-2026 (jjoseph48, komentar PR #28; verifikasi MariaDB 10.4.27). Keputusan
+  DBV-Q1..Q18 di dokumen Bagian 9, catatan C-1..C-4 di Bagian 14. Perapian yang diminta: C-1 catatan jumlah CHECK
+  MariaDB, C-2 kueri prasyarat `BERHENTI:` di skrip audit, C-4 + daftar tabel tidak dimigrasi (DBV-Q7) di runbook DBV-011
+  2.11. DBV-Q5 dan B2 menunggu angka ISSUE-049.
+- **Belum / blocker:** DBV-022 belum di `main` (baru branch
   `fase4/dbv-022-skema-layanan`); hasil kartu DBA Q5A-02 (ISSUE-049). Registry NIP (`NipCascadeService::FASE` → 5) dan
   test skema dikerjakan di M2.
-- **Tanggal persetujuan DB Validator:** — (diisi saat approve; AC-D01.6).
+- **Tanggal persetujuan DB Validator:** 20-10-2026 (jjoseph48, PR #28; AC-D01.6).
+- **Tindak lanjut kode (C-4):** di M5 kode presensi online/manual wajib selalu mengisi `dh_online.sumber` (1 online,
+  2 manual) + test; NULL hanya baris impor legacy.
+
+### Q cutover 5A
+
+| # | Butir | Asal | Status |
+|---|---|---|---|
+| QC-1 | Uji koreksi NIP (`NipCascadeService`) pada volume `dh_online` realistis + urutan induk/anak di bawah FK RESTRICT | DBV-023 C-3 (DB Validator 20-10-2026) | ⏳ pra-cutover |
 
 ## Persiapan tanpa skema
 

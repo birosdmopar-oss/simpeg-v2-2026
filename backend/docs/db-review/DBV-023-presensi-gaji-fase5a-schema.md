@@ -4,8 +4,11 @@
 gaji_pegawai_qr_history, ENUM audit`. Branch `fase5a/dbv-023-skema-presensi-gaji` (dari `main` `6806c38`). Alur PRD 5A
 §3.5/§7.1.4: PR `[DBV]`, DB Validator me-review/approve, reviewer CR me-merge setelah syarat M2 (Bagian 12).
 
-**Status:** ⏳ **Menunggu review DB Validator.** Belum ada persetujuan; isi dokumen ini adalah usulan developer. Pra-review
-internal sisi CR: laporan M0 PRD 5A diterima reviewer CR 20-10-2026 (bukan review DB Validator).
+**Status:** ✅ **disetujui DB Validator 20-10-2026 (jjoseph48)** — komentar PR #28 atas HEAD `f323ca8`, diverifikasi di
+MariaDB 10.4.27. Keputusan DBV-Q1..Q18 di Bagian 9 dan catatan C-1..C-4 di Bagian 14, dicatat sesuai komentar tersebut.
+PR **belum di-merge**: syarat M2 #2 (DBV-022 di `main`) dan #3 (hasil Q5A-02 / ISSUE-049, yang juga menentukan DBV-Q5 dan
+B2 STOP) masih terbuka (Bagian 12). Pra-review internal sisi CR sebelumnya: laporan M0 PRD 5A diterima reviewer CR
+20-10-2026.
 
 **Penulis:** developer Fase 5A (sesi WS-2), 20-10-2026.
 
@@ -49,7 +52,8 @@ dinaikkan (Bagian 6) dan test skema ditambahkan (Bagian 11).
 
 **Tidak dibuat** (PRD 5A §7.1.1, F5-12, F5-14, DBV-020 butir 6): `d_dh_online` (arsip trigger), `dh_online_coordinate`
 (D1:406-416), `user_geo` (D1:7547-7560), `user_lokasi_presensi` (D1:7595-7605), `absen_real`, `absen_kategori`, tabel
-pratinjau/log impor Slip Gaji (F5-3/F5-4). Trigger `dh_online_beDel` (D1:7709-7714) tidak dibawa.
+pratinjau/log impor Slip Gaji (F5-3/F5-4). Trigger `dh_online_beDel` (D1:7709-7714) tidak dibawa. Syarat DBV-Q7: tabel
+yang tidak dimigrasi dicatat eksplisit "tidak dimigrasi" di runbook impor DBV-011 2.11 (Bagian 14 C-Q7).
 
 ---
 
@@ -347,6 +351,7 @@ yang melayani aplikasi; hasil yang memuat NIP/nominal tidak dicommit):
 
 | # | Kueri | Kelas |
 |---|---|---|
+| P0 | Prasyarat bentuk legacy: kolom `gaji_pegawai.gaji_pokok` ada di `information_schema` (C-2) | **BERHENTI** bila tidak ada — skrip dijalankan di DB yang salah (mis. DB v2); hasil kueri lain tidak bermakna |
 | A1 | `dh_online` NIP yatim terhadap `pegawai` | WAJIB_0 |
 | A2 | `dh_online` kedua jam NULL | WAJIB_0 bila CHECK `chk_dh_online_jam` disetujui |
 | A3 | `dh_online` `jam_masuk > jam_pulang` | INFO |
@@ -369,26 +374,28 @@ Sintaks skrip diverifikasi di DB scratch berisi DDL D1 apa adanya (Bagian 10). S
 
 ## 9. Keputusan yang diminta dari DB Validator
 
+Kolom "Keputusan" diisi dari komentar persetujuan DB Validator (jjoseph48, PR #28, 20-10-2026).
+
 | # | Pertanyaan | Usulan developer | Keputusan |
 |---|---|---|---|
-| DBV-Q1 | `dh_online` PK `(nip, tgl)` [K] vs surrogate + UNIQUE | PK komposit [K] (memenuhi DoD); + KEY `tgl` | ⏳ |
-| DBV-Q2 | FK `dh_online.nip` | RESTRICT + `NipCascadeService` (terjawab K4/ADR-008) | — |
-| DBV-Q3 | `created_by` di `dh_online` (`sumber` terjawab F5-12) | Tambah INT NULL | ⏳ |
-| DBV-Q4 | Arsip `d_dh_online` + trigger | Tidak dibuat, tidak diimpor; diganti `audit_logs` (terjawab F5-14; Q5A-15) | — |
-| DBV-Q5 | CHECK `chk_dh_online_jam` (minimal satu jam) | Pasang bila audit A2 = 0; bila > 0, DB Validator memilih: buang CHECK atau bersihkan baris saat impor | ⏳ |
-| DBV-Q6 | Tipe kolom koordinat/akurasi & FK lokasi | DECIMAL(10,7)/(10,2); `id_lokasi_*` INT + FK RESTRICT `fk_id_lokasi_masuk_dh_to_lp`/`…_pulang_…` | ⏳ |
-| DBV-Q7 | `dh_online_coordinate`, `absen_real`, `absen_kategori` | Tidak dibuat/diimpor (terjawab F5-12) — konfirmasi ke Mapping | ⏳ konfirmasi |
-| DBV-Q8 | 15 kolom generik `gaji_pegawai` | Dibuang (terjawab F5-2), kecuali temuan B2 > 0 | — |
-| DBV-Q9 | `gaji_pegawai.qr_token` UNIQUE | UNIQUE `uk_qr_token` menggantikan `idx_qr_token`; `idx_nip` dipertahankan | ⏳ |
-| DBV-Q10 | CHECK `bulan`, `tahun`, nominal ≥ 0 | Ya: `chk_gaji_pegawai_bulan` 1..12, `_tahun` 1900..2100, `_nominal` (29 kolom ≥ 0) | ⏳ |
-| DBV-Q11 | `qr_history` aksi FK & UNIQUE token | FK RESTRICT/RESTRICT + `UNIQUE uk_gpqh_qr_token` | ⏳ |
-| DBV-Q12 | Cache resolusi aturan lokasi | Tidak (resolusi dinamis per request, Q5A-04 default) | — |
-| DBV-Q13 | Tabel pratinjau/log impor | Tanpa tabel; log ke `audit_logs` (terjawab F5-3/F5-4) | — |
-| DBV-Q14 | Semantik waktu | Terjawab F5-11 + AS-12 (Bagian 1 dan 2.5, 3.4) | — |
-| DBV-Q15 | Collation | `utf8mb4_unicode_ci` (terjawab) | — |
-| DBV-Q16 | Nilai ENUM `audit_logs.event` baru | `warning`, `import`; `down()` fail-closed (Bagian 5) | ⏳ |
-| DBV-Q17 | Kolom snapshot (`snapshot_satker`, `snapshot_nama` VARCHAR(255) NULL) dan `qr_token_enkripsi` | Snapshot: setuju bentuk di Bagian 4.2. Token terenkripsi: **VARBINARY(255) NULL** (keluaran mentah 144 byte). Impor: isi dari token mentah legacy (alternatif NULL) | ⏳ |
-| DBV-Q18 | Penempatan draf di `MigrationsDitahan/` sampai M2 | Setuju (PRD 5A §7.1.4: draf dibaca DBV, tidak dijalankan) | ⏳ |
+| DBV-Q1 | `dh_online` PK `(nip, tgl)` [K] vs surrogate + UNIQUE | PK komposit [K] (memenuhi DoD); + KEY `tgl` | ✅ Setuju PK komposit `(nip, tgl)` [K] + KEY `tgl`; terverifikasi menolak baris ganda per hari (1062). Konsekuensi koreksi NIP: C-3 |
+| DBV-Q2 | FK `dh_online.nip` | RESTRICT + `NipCascadeService` (terjawab K4/ADR-008) | — terjawab K4/ADR-008; FK RESTRICT terverifikasi terpasang |
+| DBV-Q3 | `created_by` di `dh_online` (`sumber` terjawab F5-12) | Tambah INT NULL | ✅ Setuju `created_by` INT NULL: NULL untuk baris impor/otomatis, terisi untuk input manual |
+| DBV-Q4 | Arsip `d_dh_online` + trigger | Tidak dibuat, tidak diimpor; diganti `audit_logs` (terjawab F5-14; Q5A-15) | — terjawab F5-14; setuju arsip `d_dh_online` + trigger tidak dibawa, `audit_logs` memadai |
+| DBV-Q5 | CHECK `chk_dh_online_jam` (minimal satu jam) | Pasang bila audit A2 = 0; bila > 0, DB Validator memilih: buang CHECK atau bersihkan baris saat impor | ✅ Setuju pasang CHECK; bila A2 > 0 dipilih **bersihkan baris saat impor**, bukan membuang CHECK. ⏳ Keputusan final menunggu angka A2 (ISSUE-049) |
+| DBV-Q6 | Tipe kolom koordinat/akurasi & FK lokasi | DECIMAL(10,7)/(10,2); `id_lokasi_*` INT + FK RESTRICT `fk_id_lokasi_masuk_dh_to_lp`/`…_pulang_…` | ✅ Setuju; terverifikasi. `decimal(10,7)` cukup untuk lintang/bujur dan lebih aman daripada VARCHAR (pelajaran G-03) |
+| DBV-Q7 | `dh_online_coordinate`, `absen_real`, `absen_kategori` | Tidak dibuat/diimpor (terjawab F5-12) — konfirmasi ke Mapping | ✅ Setuju tidak dibuat/diimpor, **dengan syarat** dicatat eksplisit "tidak dimigrasi" di Mapping Migrasi (bukan hanya di dokumen DBV ini) → runbook DBV-011 2.11; Mapping Migrasi (docx di luar repo) diteruskan reviewer CR ke user |
+| DBV-Q8 | 15 kolom generik `gaji_pegawai` | Dibuang (terjawab F5-2), kecuali temuan B2 > 0 | — terjawab F5-2, dengan pengecualian temuan B2 bertanda STOP; ⏳ menunggu hasil ISSUE-049 |
+| DBV-Q9 | `gaji_pegawai.qr_token` UNIQUE | UNIQUE `uk_qr_token` menggantikan `idx_qr_token`; `idx_nip` dipertahankan | ✅ Setuju; terverifikasi banyak NULL diterima, slip tanpa QR tidak saling bentrok |
+| DBV-Q10 | CHECK `bulan`, `tahun`, nominal ≥ 0 | Ya: `chk_gaji_pegawai_bulan` 1..12, `_tahun` 1900..2100, `_nominal` (29 kolom ≥ 0) | ✅ Setuju ketiga CHECK; terverifikasi bulan 13, tahun 1800, nominal negatif ditolak 4025 |
+| DBV-Q11 | `qr_history` aksi FK & UNIQUE token | FK RESTRICT/RESTRICT + `UNIQUE uk_gpqh_qr_token` | ✅ Setuju; RESTRICT berarti slip yang punya riwayat QR tidak bisa dihapus — memang diinginkan untuk jejak verifikasi |
+| DBV-Q12 | Cache resolusi aturan lokasi | Tidak (resolusi dinamis per request, Q5A-04 default) | — terjawab Q5A-04; setuju resolusi dinamis, cache baru dipertimbangkan bila terbukti jadi beban |
+| DBV-Q13 | Tabel pratinjau/log impor | Tanpa tabel; log ke `audit_logs` (terjawab F5-3/F5-4) | — terjawab F5-3/F5-4; setuju tanpa tabel pratinjau, log ke `audit_logs` |
+| DBV-Q14 | Semantik waktu | Terjawab F5-11 + AS-12 (Bagian 1 dan 2.5, 3.4) | — terjawab F5-11 + AS-12; pastikan konsisten dengan keputusan zona waktu DBV-011 Bagian B yang masih menunggu ISSUE-024 |
+| DBV-Q15 | Collation | `utf8mb4_unicode_ci` (terjawab) | — terverifikasi `utf8mb4_unicode_ci` |
+| DBV-Q16 | Nilai ENUM `audit_logs.event` baru | `warning`, `import`; `down()` fail-closed (Bagian 5) | ✅ Setuju; `down()` fail-closed terverifikasi (ENUM tetap 7 nilai, tabel utuh, baris audit tidak dihapus) — perbaikan atas pola A-01 |
+| DBV-Q17 | Kolom snapshot (`snapshot_satker`, `snapshot_nama` VARCHAR(255) NULL) dan `qr_token_enkripsi` | Snapshot: setuju bentuk di Bagian 4.2. Token terenkripsi: **VARBINARY(255) NULL** (keluaran mentah 144 byte). Impor: isi dari token mentah legacy (alternatif NULL) | ✅ Setuju `VARBINARY(255)` (keluaran mentah tidak melewati konversi charset/kolasi; 144 byte muat) dan kolom snapshot `VARCHAR(255) NULL` |
+| DBV-Q18 | Penempatan draf di `MigrationsDitahan/` sampai M2 | Setuju (PRD 5A §7.1.4: draf dibaca DBV, tidak dijalankan) | ✅ Setuju draf ditahan di `MigrationsDitahan/` sampai M2 (preseden DBV-019/DBV-020); terbukti tidak ikut `spark migrate` |
 
 Koreksi setelah approval dilakukan lewat commit baru di PR yang sama (sebelum merge) atau migration baru (sesudah merge).
 
@@ -419,6 +426,10 @@ produksi; D1 dan kode legacy hanya dibaca. Untuk siklus migrate, kedua draf **di
 | `composer analyse` (PHPStan level 5, termasuk `MigrationsDitahan/`) | ✅ (lihat laporan PR) |
 | `composer cs-check` | ✅ (lihat laporan PR) |
 
+**Catatan jumlah CHECK (C-1 DB Validator):** di MariaDB jumlah CHECK +3 karena `json_valid` implisit pada kolom JSON
+(`audit_logs.before_json`/`after_json`, `token.claims_json`); angka MariaDB 48→53 = MySQL 45→50. Pertambahan DBV-023
+sama di kedua engine (+5); selisih angka absolut bukan perbedaan skema.
+
 ### 10.3 Permintaan verifikasi MariaDB 10.4 (lingkungan DB Validator)
 
 1. Salin kedua draf ke `app/Database/Migrations/` dengan timestamp sementara setelah migration terakhir, lalu
@@ -429,6 +440,15 @@ produksi; D1 dan kode legacy hanya dibaca. Untuk siklus migrate, kedua draf **di
    RESTRICT/RESTRICT.
 4. `UNIQUE uk_qr_token` menerima beberapa NULL; `VARBINARY(255)` menerima 144 byte.
 5. `down()` ENUM menolak saat ada baris `warning`/`import`.
+
+### 10.4 Hasil verifikasi DB Validator (MariaDB 10.4.27, komentar PR #28, 20-10-2026)
+
+Ringkasan dari komentar DB Validator (jjoseph48): migrate bertahap 100 → **103 tabel**, 204 → **208 FK**; ENUM `event`
+7 nilai; CHECK **+5 (48 → 53)** — lihat catatan C-1 di atas; `migrate:rollback` kembali 100/204 dan ENUM 5 nilai;
+`migrate` ulang identik antar-run; uji perilaku constraint dengan data (1062/1452/4025 sesuai, `sumber` NULL diterima,
+`uk_qr_token` banyak NULL diterima); `down()` ENUM fail-closed tanpa rollback separuh jalan; skrip audit hanya-baca
+(18 result set). Yang tidak diverifikasi DB Validator: kesetiaan baris-per-baris terhadap D1/SQL-L (dump di luar repo),
+skrip audit pada data legacy sungguhan (ISSUE-003), hasil Q5A-02 (ISSUE-049), quality gate penuh (CI hijau `f323ca8`).
 
 ---
 
@@ -445,7 +465,7 @@ index, FK + aksi, kolasi, COMMENT, CHECK; 28 kolom = `KolomGaji`; ketiadaan 15 k
 
 ## 12. Syarat merge (⛔, PRD 5A §7.1.4)
 
-1. ⛔ DB Validator menyetujui DBV-023 (Bagian 9 diisi) — tanggal persetujuan dicatat di `backend/docs/progress/05-Presensi.md`.
+1. ✅ DB Validator menyetujui DBV-023 (Bagian 9 diisi) — 20-10-2026 (jjoseph48), dicatat di `backend/docs/progress/05-Presensi.md`.
 2. ⛔ DBV-022 (Fase 4) ada di `main`; migration DBV-023 di-rebase dengan timestamp lebih baru.
 3. ⛔ Hasil kartu DBA Q5A-02 dicantumkan di Bagian 7.2.
 4. Draf dipindah ke `app/Database/Migrations/`, registry NIP (Bagian 6) dan test skema (Bagian 11) ditambahkan, CI
@@ -458,10 +478,27 @@ dilarang menjalankan migration di DB dev/produksi.
 
 ## 13. Checklist DB Validator
 
-- [ ] `dh_online` cocok D1 + deviasi [V2] F5-12 diterima (Bagian 2)
-- [ ] `gaji_pegawai` = struktur `771f8b4`; 15 kolom generik dibuang; UNIQUE/CHECK diterima (Bagian 3)
-- [ ] `gaji_pegawai_qr_history` = SQL-L + RESTRICT + UNIQUE + snapshot diterima (Bagian 4)
-- [ ] ENUM `audit_logs.event` + `down()` fail-closed diterima (Bagian 5)
-- [ ] Registry NIP (Bagian 6) dan aturan impor (Bagian 7) diterima; hasil Q5A-02 tercantum sebelum M2
-- [ ] `migrate` → `migrate:rollback` → `migrate` di MariaDB 10.4 (Bagian 10.3)
-- [ ] Keputusan Bagian 9 diisi
+Dicentang sesuai komentar persetujuan DB Validator (PR #28, 20-10-2026); kesetiaan baris-per-baris terhadap D1/SQL-L
+tidak diverifikasi DB Validator (dump di luar repo, Bagian 10.4).
+
+- [x] `dh_online` deviasi [V2] F5-12 diterima (Bagian 2; DBV-Q1/Q3/Q6)
+- [x] `gaji_pegawai` UNIQUE/CHECK diterima (Bagian 3; DBV-Q9/Q10); 15 kolom generik dibuang — ⏳ kecuali temuan B2 (ISSUE-049)
+- [x] `gaji_pegawai_qr_history` RESTRICT + UNIQUE + snapshot diterima (Bagian 4; DBV-Q11/Q17)
+- [x] ENUM `audit_logs.event` + `down()` fail-closed diterima (Bagian 5; DBV-Q16)
+- [ ] Registry NIP (Bagian 6) dan aturan impor (Bagian 7); hasil Q5A-02 tercantum sebelum M2 — ⏳ ISSUE-049; C-3/C-4 di Bagian 14
+- [x] `migrate` → `migrate:rollback` → `migrate` di MariaDB 10.4 (Bagian 10.4)
+- [x] Keputusan Bagian 9 diisi
+
+---
+
+## 14. Catatan DB Validator C-1..C-4 dan tindak lanjut (komentar PR #28, 20-10-2026)
+
+| # | Catatan DB Validator (ringkas) | Tindak lanjut |
+|---|---|---|
+| C-1 | Jumlah CHECK di MariaDB selalu 3 lebih banyak daripada MySQL (CHECK implisit `json_valid()` untuk kolom JSON), bukan perbedaan skema | ✅ Dicatat di Bagian 10 (catatan jumlah CHECK) |
+| C-2 | Skrip audit benar menyasar salinan legacy, tetapi salah sasaran (DB v2) hanya terlihat sebagai satu `1054` di tengah keluaran | ✅ Kueri pembuka P0 `BERHENTI:` (cek kolom `gaji_pegawai.gaji_pokok` di `information_schema`, pola skrip counter DBV-011) di `sql/DBV-023-audit-presensi-gaji.sql`; Bagian 8 |
+| C-3 | PK `(nip, tgl)` + FK RESTRICT: koreksi NIP memperbarui kolom kunci pada banyak baris `dh_online` dalam satu transaksi; urutan induk/anak harus jelas di bawah RESTRICT | ⏳ **Butir pra-cutover:** uji koreksi NIP (`NipCascadeService`) pada volume `dh_online` realistis + urutan induk/anak di bawah FK RESTRICT. Dicatat juga sebagai Q cutover di `backend/docs/progress/05-Presensi.md`. Test fungsional registry/cascade tetap di M2 (Bagian 11) |
+| C-4 | `sumber` NULL lolos `chk_dh_online_sumber` (UNKNOWN) — sah untuk baris impor legacy; jangan sampai menjadi "nilai ketiga yang sah" | ✅ Aturan ditulis di runbook impor DBV-011 2.11: NULL hanya untuk baris impor legacy; setelah cutover setiap baris baru wajib 1/2, ditegakkan aplikasi. ⏳ Kode presensi online/manual (M5) selalu mengisi `sumber` + test |
+| C-Q7 | Syarat DBV-Q7: tabel yang tidak dimigrasi dicatat eksplisit di Mapping Migrasi | ✅ Dicatat di runbook impor DBV-011 2.11 (`user_geo`, `dh_online_coordinate`, `d_dh_online`/arsip, dst.). Mapping Migrasi resmi (docx Bahan Baku, di luar repo) diteruskan reviewer CR ke user |
+
+Tetap terbuka sampai hasil ISSUE-049 (Q5A-02): **DBV-Q5** (angka A2) dan **B2** (STOP; DBV-Q8).

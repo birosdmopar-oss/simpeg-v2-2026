@@ -26,6 +26,17 @@
 -- SELECT (dan SET variabel sesi); tidak ada perubahan data. Hasil yang memuat NIP/nominal TIDAK dicommit ke repo publik.
 -- =====================================================================================================================
 
+-- P0 — BERHENTI bila bukan salinan legacy (catatan C-2 DB Validator, pola skrip counter DBV-011). Skrip ini memakai nama
+--      kolom D1; bila dijalankan di DB yang salah (mis. DB v2 hasil migrate), kueri lain tetap jalan tetapi hasilnya tidak
+--      bermakna dan baru gagal di B2 (1054). Baca baris ini lebih dulu: bila keluarannya BERHENTI, hentikan dan abaikan
+--      seluruh keluaran berikutnya.
+SELECT CASE
+         WHEN COUNT(*) = 0 THEN 'BERHENTI: bukan salinan legacy (kolom gaji_pegawai.gaji_pokok tidak ada) — jangan lanjut'
+         ELSE CONCAT('OK: bentuk legacy terdeteksi di skema ', DATABASE())
+       END AS prasyarat
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gaji_pegawai' AND COLUMN_NAME = 'gaji_pokok';
+
 -- Tanggal acuan "masa depan" untuk kueri A4: tanggal dump/freeze (ganti sesuai dump yang diaudit).
 SET @tgl_dump := CURDATE();
 
