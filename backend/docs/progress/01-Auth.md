@@ -46,7 +46,7 @@ Key review `[DBV-010][CR-013]`, branch `dbv-010/auth-collation-pengguna`, PR #15
 - D-12 wajib tuntas (DBV-009) sebelum FK `*_by` dibuat atau data legacy diimpor. D-7: job purge `token`/`login_attempts`/`forgot_attempts` (A-01 Bagian 8 #12).
 - Tindak lanjut 1 baris di G-01 Bagian 8.5 dan G-10 D2 (JOIN `pengguna` × `faq_rate` kini boleh) setelah merge.
 - Tindak lanjut 1 baris setelah merge: README MasterData (kolom `nip` tabel `faq_rate`) dan G-10 (kolom `nip` `faq_rate`) masih menyebut "JWT `sub`" → ganti "claim `nip`" (A-01 9.10).
-- Di luar cakupan (usul CR/issue terpisah): paksa ganti password dari `expired_at` (FCP legacy; putuskan sebelum impor karena `expired_at` impor sudah terisi); tipe legacy `pengguna.status`/`id_unit`/`id_satker` dan `id_pengguna` signed (D-12) di DBV-009; FK `pengguna.nip` → `pegawai` (B-01); ganti NIP (B-06); `AppShell` menampilkan `name`; pembatasan username ASCII (keputusan B, setelah audit data).
+- Di luar cakupan (usul CR/issue terpisah): ~~paksa ganti password dari `expired_at`~~ → dikerjakan di MAKE-028 (impor `expired_at` legacy dipakai apa adanya: lewat = wajib ganti saat login pertama di v2); tipe legacy `pengguna.status`/`id_unit`/`id_satker` dan `id_pengguna` signed (D-12) di DBV-009; FK `pengguna.nip` → `pegawai` (B-01); ganti NIP (B-06); `AppShell` menampilkan `name`; pembatasan username ASCII (keputusan B, setelah audit data).
 
 ## CR-014 — ISSUE-006 driver email SMTP tautan reset password (branch `cr-014/driver-email-reset`, CR saja tanpa DBV; di main lewat merge `cc553be` 30-09-2026, menunggu uji kirim di Dev)
 
@@ -74,7 +74,14 @@ Tanpa perubahan skema (memakai `queue_jobs(_failed)` dan `pengguna.email` yang s
   (auth/me, change-password, logout; refresh tanpa jwt). Login, `auth/me`, dan daftar akun mengembalikan
   `user.must_change_password`. FE: guard ke `/ganti-password`, menu disembunyikan, banner penjelasan.
 - Deviasi [V2]: legacy (`core/MY_Controller.php:214-221`) hanya popup bila password role 2/6 = NIP, tanpa blokir menu.
-  `expired_at` (legacy :223-230) belum ditegakkan.
+  `expired_at` (legacy :223-230) ditegakkan di MAKE-028 (di bawah).
+- **MAKE-028 (20-10-2026, keputusan user: ikut legacy)** — umur password `pengguna.expired_at` [K]: login/refresh tetap
+  berhasil, tetapi bila `expired_at` tidak NULL dan `now > expired_at` claim `must_change_password` dipasang (mekanisme
+  MAKE-020, dihitung ulang di login DAN refresh; `user.must_change_password` ikut true). NULL = tidak kedaluwarsa.
+  Penulisan nilai (pengganti trigger DB legacy `pengguna_beIns` +1 tahun / `pengguna_beUpd` +3 bulan, status aktif) di satu
+  titik `App\Libraries\Auth\PasswordExpiry`, interval di `Config\Auth`; dipakai semua jalur (akun baru, ganti sendiri,
+  reset email, admin mengatur password, koreksi NIP B-06). Tanpa perubahan skema. Test: `tests/Auth/PasswordExpiryTest`.
+  Rincian + tabel jalur: README Auth "Umur password (MAKE-028)".
 - Test: `tests/Auth/WajibGantiPasswordTest` (endpoint ditolak/diloloskan, set/lepas per jalur), tambahan assertion
   `AccountProvisionerTest` (B-05) dan `NipCascadeTest` (B-06); Vitest `router.spec`, `RedesignShell.spec`,
   `ChangePasswordView.spec`.
