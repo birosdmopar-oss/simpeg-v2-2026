@@ -17,7 +17,7 @@ use RuntimeException;
 /**
  * Generator PDF slip gaji (PRD 5A §7.3.6, ADR-032): TCPDF lewat `Pdf::renderer()`, view `pdf/slip_gaji` — port tata
  * letak legacy `771f8b4` `views/hr/employee/sl_gaji/print/cetak.php` (A4 potret, margin 12 mm, helvetica 8,5; kop
- * di dalam kotak dokumen; A. GPP → B. TK → C. Uang Makan → Ringkasan) [K `Lsl_gaji.php:487-599`].
+ * di dalam kotak dokumen; A. GPP → B. TK → C. Uang Makan → Ringkasan) [K `Lsl_gaji.php:468-588` `cetak_pdf`].
  *
  * - Total = `RingkasanSlip` (`bersih_gpp + bersih_tk + uang_makan`, F5-1); baris tukin kelas jabatan tidak ada.
  * - QR berisi URL verifikasi lewat `Pdf::qrImg`; **wajib gambar**: bila keluaran bukan `<img>` (GD/Imagick tidak ada),

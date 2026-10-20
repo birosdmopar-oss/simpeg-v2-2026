@@ -29,7 +29,7 @@ $alamat    = (string) preg_replace('/<a\b[^>]*>(.*?)<\/a>/is', '$1', $d->kop['al
 $rp        = static fn (int $sen): string => NominalGaji::formatAngka($sen);
 $sen       = static fn (string $f): int => $d->sen[$f] ?? 0;
 
-// Kelompok rincian [K print/cetak.php @771f8b4 :258-275].
+// Kelompok rincian [K print/cetak.php @771f8b4 :262-277].
 $gppGroups = [
     'Penghasilan' => [
         'Gaji Pokok'         => ['gjpokok'],
