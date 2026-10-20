@@ -179,6 +179,7 @@ PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f
 | PDF-2 | Baris "Dibuka: {waktu WIB}" | **[V2]** PRD §7.3.6 (legacy tidak punya); di bawah "Jakarta, {tanggal cetak}" di kolom QR; hanya bila slip sudah dibuka |
 | PDF-3 | Nama instansi "adalah benar pegawai …" | `web_config` `nama_kementerian`; kosong → literal legacy [K] "Kementerian Pariwisata" (`print/cetak.php:201`, `DataPdfSlip::NAMA_INSTANSI_BAWAAN`) |
 | PDF-4 | QR | wajib gambar; keluaran bukan `<img>` (tanpa gd/imagick) → cetak gagal, token tidak dicetak sebagai teks (§7.3.6); tanpa token → tanpa QR (U-3) |
+| PDF-5 | Logo bawaan v2 (katalog `web_config`: "kosong = logo bawaan v2", kontrak Fase 2) | logo bawaan v2 belum tersedia → tanpa logo, sama dengan PDF LKH; katalog tidak diubah. Akar aset v2 final + berkas logo bawaan ditetapkan saat cutover bersama G-09 |
 
 ### Test
 
