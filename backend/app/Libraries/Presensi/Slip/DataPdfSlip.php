@@ -13,11 +13,15 @@ use DateTimeInterface;
  * - `identitas`: nama bergelar (P-9), NIP, pangkat/golongan, jabatan/unit/satker jabatan saat ini [K]; '-' bila kosong.
  * - `sen`: 28 field `KolomGaji` + `uang_makan`, int sen.
  * - `kop`: HTML tersanitasi `web_config` (G-09) `pdf_header_*`.
- * - `logoKiri`/`logoKanan`: path berkas gambar yang sudah di-resolve; null/berkas tidak ada → tanpa logo.
+ * - `logoKiri`/`logoKanan`: path berkas gambar yang sudah di-resolve service ({@see KopSlip::resolveAset()}); null → tanpa logo.
+ * - `namaInstansi`: `web_config` `nama_kementerian`, kosong → literal legacy (lihat {@see KopSlip}).
  * - `urlQr`: URL verifikasi berisi token aktif; null = tanpa QR (U-3, P5-36).
  */
 final readonly class DataPdfSlip
 {
+    /** Nama instansi bila `web_config` `nama_kementerian` kosong — literal legacy [K] `print/cetak.php:201` @771f8b4. */
+    public const NAMA_INSTANSI_BAWAAN = 'Kementerian Pariwisata';
+
     /**
      * @param array{nama: string, nip: string, pangkat: string, jabatan: string, unit: string, satker: string} $identitas
      * @param array<string, int>                                                                               $sen
@@ -34,7 +38,7 @@ final readonly class DataPdfSlip
         public ?string $urlQr,
         public DateTimeInterface $dicetakPada,
         public ?DateTimeInterface $dibukaPada,
-        public string $namaInstansi = 'Kementerian Pariwisata',
+        public string $namaInstansi = self::NAMA_INSTANSI_BAWAAN,
     ) {
     }
 }

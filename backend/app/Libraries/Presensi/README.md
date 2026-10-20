@@ -171,6 +171,15 @@ LOCKED): skema DBV-023 (§7.1), impor 3 langkah (§7.2), akses pegawai & kelola 
 diubah sebatas §7.3.8 (`RingkasanSlip`). Nilai uang makan slip disambung D-09 (5B) lewat `UangMakanSlipInterface`
 — **wajib sebelum go-live** (F5-1).
 
+PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f8b4) — keputusan reviewer CR 20-10:
+
+| # | Butir | Keputusan |
+|---|---|---|
+| PDF-1 | Logo kop | `web_config` `logo_kementerian_pdf` (kiri) / `logo_wonderful_pdf` (kanan), ASSET_PATH relatif dari akar aset v2 `Config\Presensi::$akarAset` (bawaan `WRITEPATH . 'aset/'`, override `.env` `presensi.akarAset` tervalidasi). Di-resolve service lewat `Slip/KopSlip::resolveAset` (tolak `..`, path absolut, keluar akar); kosong / tidak ada / bukan PNG-JPEG → PDF tanpa logo (seperti PDF LKH). Akar aset final ditetapkan saat cutover bersama G-09 |
+| PDF-2 | Baris "Dibuka: {waktu WIB}" | **[V2]** PRD §7.3.6 (legacy tidak punya); di bawah "Jakarta, {tanggal cetak}" di kolom QR; hanya bila slip sudah dibuka |
+| PDF-3 | Nama instansi "adalah benar pegawai …" | `web_config` `nama_kementerian`; kosong → literal legacy [K] "Kementerian Pariwisata" (`print/cetak.php:201`, `DataPdfSlip::NAMA_INSTANSI_BAWAAN`) |
+| PDF-4 | QR | wajib gambar; keluaran bukan `<img>` (tanpa gd/imagick) → cetak gagal, token tidak dicetak sebagai teks (§7.3.6); tanpa token → tanpa QR (U-3) |
+
 ### Test
 
 `tests/unit/Presensi/SlipGaji/` (tanpa DB; konvensi `tests/unit` untuk kelas murni, sama dengan CR-025):
