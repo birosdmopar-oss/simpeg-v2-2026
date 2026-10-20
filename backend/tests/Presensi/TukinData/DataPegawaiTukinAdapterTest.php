@@ -27,8 +27,9 @@ final class DataPegawaiTukinAdapterTest extends DatabaseTestCase
         parent::setUp();
         $this->april = PeriodeTukin::dariBulan(2026, 4); // 2026-03-16 .. 2026-04-15
 
-        // Master jenis pegawai sintetis (id legacy: 1 PNS, 6 PPPK = JP_PPPK `config/constants.php:301`).
-        foreach ([1 => 'PNS Uji', 6 => 'PPPK Uji'] as $id => $nama) {
+        // Master jenis pegawai sintetis. id 6 = PPPK (JP_PPPK `config/constants.php:301`) memakai nama panjang seperti seed v2;
+        // id 2 sengaja bernama 'PPPK' untuk membuktikan cabang PPPK dikenali lewat id, bukan nama [V2].
+        foreach ([1 => 'Pegawai Negeri Sipil', 2 => 'PPPK', 6 => 'Pegawai Pemerintah dengan Perjanjian Kerja'] as $id => $nama) {
             if ($this->db->table('jenis_pegawai')->where('id_jenis_pegawai', $id)->countAllResults() === 0) {
                 $this->db->table('jenis_pegawai')->insert(['id_jenis_pegawai' => $id, 'jenis_pegawai' => $nama, 'status' => 1]);
             }
@@ -78,33 +79,72 @@ final class DataPegawaiTukinAdapterTest extends DatabaseTestCase
         $this->kp($nip, '2026-03-01', 'CPNS III/a');
         $this->kp($nip, '2026-03-20', 'III/a'); // setelah awal periode → tidak dipakai [K riwayat_kp tmtsk ≤ awal periode]
 
-        $this->assertSame('2026-03-01', $this->sumber()->untuk($nip, $this->april, null)->tmtMasuk);
+        $this->assertSame('2026-03-01', $this->tmt($nip), 'CPNS: tmtsk tanpa syarat hari kerja pertama');
 
         $pns = $this->buatPegawai(['id_jenis_pegawai' => 1]);
         $this->kp($pns, '2020-03-01', 'III/b');
-        $this->assertNull($this->sumber()->untuk($pns, $this->april, null)->tmtMasuk, 'bukan CPNS');
+        $this->assertNull($this->tmt($pns), 'bukan CPNS');
     }
 
-    public function testTmtMasukPppkSetelahHariKerjaPertama(): void
+    public function testTanpaRiwayatKpNull(): void
     {
+        $this->assertNull($this->tmt($this->buatPegawai(['id_jenis_pegawai' => 1])));
+    }
+
+    public function testPegawaiDibuatSetelahAkhirPeriodePakaiBatasAkhir(): void
+    {
+        $nip = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-20 09:00:00']);
+        $this->kp($nip, '2026-04-01', 'CPNS III/a'); // > awal periode, ≤ akhir periode [K L_employee.php:6453]
+
+        $this->assertSame('2026-04-01', $this->tmt($nip));
+
+        $lama = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-01-05 09:00:00']);
+        $this->kp($lama, '2026-04-01', 'CPNS III/a');
+        $this->assertNull($this->tmt($lama), 'dibuat sebelum akhir periode: batas tetap awal periode');
+    }
+
+    public function testTmtMasukPppkLewatIdApapunNamanya(): void
+    {
+        // Hari kerja pertama periode April 2026 = Senin 2026-03-16.
         $baru = $this->buatPegawai(['id_jenis_pegawai' => 6]);
-        $this->buatRiwayatMutasiJabatan($baru, ['tmtsk' => '2026-04-01']);
-        $this->assertSame('2026-04-01', $this->sumber()->untuk($baru, $this->april, null)->tmtMasuk);
+        $this->kp($baru, '2020-01-01', 'III/a'); // ditimpa jabatan PPPK [K L_employee.php:6580-6584]
+        $this->buatRiwayatMutasiJabatan($baru, ['tmtsk' => '2026-04-01', 'gol_pppk' => 'IX']);
+        $this->assertSame('2026-04-01', $this->tmt($baru), 'id 6 bernama panjang masuk cabang PPPK');
 
-        $lama = $this->buatPegawai(['id_jenis_pegawai' => 6]);
-        $this->buatRiwayatMutasiJabatan($lama, ['tmtsk' => '2024-01-01']);
-        $this->assertNull($this->sumber()->untuk($lama, $this->april, null)->tmtMasuk, 'TMT sebelum hari kerja pertama');
+        $sebelum = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->buatRiwayatMutasiJabatan($sebelum, ['tmtsk' => '2026-03-10', 'gol_pppk' => 'IX']);
+        $this->assertNull($this->tmt($sebelum), 'TMT sebelum hari kerja pertama');
 
-        // Hari kerja pertama periode April 2026 = Senin 2026-03-16; TMT hari itu bukan "setelah".
         $tepat = $this->buatPegawai(['id_jenis_pegawai' => 6]);
-        $this->buatRiwayatMutasiJabatan($tepat, ['tmtsk' => '2026-03-16']);
-        $this->assertNull($this->sumber()->untuk($tepat, $this->april, null)->tmtMasuk);
+        $this->buatRiwayatMutasiJabatan($tepat, ['tmtsk' => '2026-03-16', 'gol_pppk' => 'IX']);
+        $this->assertNull($this->tmt($tepat), 'TMT tepat hari kerja pertama bukan "setelah"');
+
+        $libur = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->buatRiwayatMutasiJabatan($libur, ['tmtsk' => '2026-03-17', 'gol_pppk' => 'IX']);
+        $this->assertNull(
+            $this->sumber()->untuk($libur, $this->april, null, ['2026-03-16', '2026-03-17'])->tmtMasuk,
+            'hari kerja pertama bergeser oleh libur (HariKerja) → 17 Maret bukan setelahnya',
+        );
+    }
+
+    public function testIdSelainPppkTidakMasukCabangWalauBernamaPppk(): void
+    {
+        $nip = $this->buatPegawai(['id_jenis_pegawai' => 2]); // nama master 'PPPK'
+        $this->kp($nip, '2020-01-01', 'II/a');
+        $this->buatRiwayatMutasiJabatan($nip, ['tmtsk' => '2026-04-01', 'gol_pppk' => 'IX']);
+
+        $this->assertNull($this->tmt($nip));
     }
 
     public function testPegawaiTidakAdaDitolakTerkendali(): void
     {
         $this->expectException(DataTukinTidakSah::class);
         $this->sumber()->untuk('199912312099121099', $this->april, null);
+    }
+
+    private function tmt(string $nip): ?string
+    {
+        return $this->sumber()->untuk($nip, $this->april, null)->tmtMasuk;
     }
 
     private function sumber(): SumberDataPegawaiTukin
