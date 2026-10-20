@@ -221,8 +221,8 @@ class JwtService
             throw AuthException::expiredToken();
         }
 
-        // Penyesuaian claim dari pemanggil (MAKE-028: password kedaluwarsa dihitung ulang dari DB), sebelum diteruskan
-        // ke token baru; token lama yang dirotasi tetap sama.
+        // Penyesuaian claim dari pemanggil (MAKE-028/CR-057: `must_change_password` dihitung ulang penuh dari DB, bisa
+        // menambah atau menghapus claim), sebelum diteruskan ke token baru; token lama yang dirotasi tetap sama.
         if ($adjustClaims !== null) {
             $claims = $adjustClaims($claims);
         }

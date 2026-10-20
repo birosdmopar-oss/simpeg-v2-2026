@@ -180,6 +180,84 @@ final class PasswordExpiryTest extends DatabaseTestCase
         $this->withBearer($this->json($pertama)['data']['access_token'])->get('api/v1/_rbac/any')->assertStatus(200);
     }
 
+    /**
+     * CR-057 T-1: claim dihitung dua arah saat refresh. `expired_at` diperpanjang langsung di DB (koreksi DBA) tanpa ganti
+     * password melepas claim pada refresh berikutnya, tanpa login ulang.
+     */
+    public function testRefreshMelepasClaimBilaExpiredAtDiperpanjang(): void
+    {
+        $this->setExpiredAt(self::NIP, date('Y-m-d H:i:s', time() - 60));
+        $login = $this->login(self::NIP, AuthSeeder::PASSWORD);
+        $login->assertStatus(200);
+        $this->assertTrue($this->json($login)['data']['user']['must_change_password']);
+        $refresh = $this->responseCookie($login, config(JwtConfig::class)->refreshCookie);
+        $this->assertNotNull($refresh);
+
+        // Sesi terkunci sebelum diperpanjang.
+        $this->clearAuthState();
+        $this->assertDitolak($this->withBearer($this->json($login)['data']['access_token'])->get('api/v1/_rbac/any'));
+
+        // DBA memperpanjang expired_at (bukan lewat ganti password).
+        $this->setExpiredAt(self::NIP, date('Y-m-d H:i:s', time() + 86400));
+
+        $this->clearAuthState();
+        $this->setRefreshCookie($refresh);
+        $baru = $this->post('api/v1/auth/refresh');
+        $baru->assertStatus(200);
+
+        $this->clearAuthState();
+        $this->withBearer($this->json($baru)['data']['access_token'])->get('api/v1/_rbac/any')->assertStatus(200);
+
+        // Refresh lagi: tetap lepas (claim tidak muncul kembali dari claim lama yang tersalin).
+        $this->clearAuthState();
+        $this->setRefreshCookie($this->responseCookie($baru, config(JwtConfig::class)->refreshCookie));
+        $lagi = $this->post('api/v1/auth/refresh');
+        $lagi->assertStatus(200);
+        $this->clearAuthState();
+        $this->withBearer($this->json($lagi)['data']['access_token'])->get('api/v1/_rbac/any')->assertStatus(200);
+    }
+
+    public function testRefreshMelepasClaimBilaExpiredAtDikosongkanTetapTerkunciBilaPenandaMake020(): void
+    {
+        // expired_at dikosongkan (NULL) → lepas.
+        $this->setExpiredAt(self::NIP, date('Y-m-d H:i:s', time() - 60));
+        $login = $this->login(self::NIP, AuthSeeder::PASSWORD);
+        $login->assertStatus(200);
+        $this->setExpiredAt(self::NIP, null);
+        $this->clearAuthState();
+        $this->setRefreshCookie($this->responseCookie($login, config(JwtConfig::class)->refreshCookie));
+        $baru = $this->post('api/v1/auth/refresh');
+        $baru->assertStatus(200);
+        $this->clearAuthState();
+        $this->withBearer($this->json($baru)['data']['access_token'])->get('api/v1/_rbac/any')->assertStatus(200);
+
+        // Penanda MAKE-020 = 1 dengan expired_at masih berlaku → claim tetap ada pada refresh.
+        $this->clearAuthState();
+        $this->setExpiredAt(self::NIP, date('Y-m-d H:i:s', time() + 86400));
+        $this->db->table('pengguna')->where('nip', self::NIP)->update(['must_change_password' => 1]);
+        $refresh = $this->responseCookie($baru, config(JwtConfig::class)->refreshCookie);
+        $this->setRefreshCookie($refresh);
+        $terkunci = $this->post('api/v1/auth/refresh');
+        $terkunci->assertStatus(200);
+        $this->clearAuthState();
+        $this->assertDitolak($this->withBearer($this->json($terkunci)['data']['access_token'])->get('api/v1/_rbac/any'));
+    }
+
+    public function testRefreshAkunDihapusTidakMengubahAturanPencabutanSesi(): void
+    {
+        $login = $this->login(self::NIP, AuthSeeder::PASSWORD);
+        $login->assertStatus(200);
+        $refresh = $this->responseCookie($login, config(JwtConfig::class)->refreshCookie);
+
+        // Akun hilang dari pencarian (soft delete): hitung ulang claim tidak dipakai, perilaku refresh seperti sebelumnya
+        // (claims baris token disalin apa adanya).
+        $this->db->table('pengguna')->where('nip', self::NIP)->update(['deleted_at' => date('Y-m-d H:i:s')]);
+        $this->clearAuthState();
+        $this->setRefreshCookie($refresh);
+        $hasil = $this->post('api/v1/auth/refresh');
+        $this->assertSame(200, $hasil->response()->getStatusCode(), 'CR-057 tidak menambah penolakan refresh untuk akun yang tidak ditemukan');
+    }
+
     public function testRefreshAkunNullTidakTerkena(): void
     {
         $login = $this->login(self::NIP, AuthSeeder::PASSWORD);

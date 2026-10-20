@@ -108,7 +108,8 @@ class AuthService
     public function refresh(string $refreshToken): array
     {
         // MAKE-028: kedaluwarsa password dihitung ulang dari DB di setiap refresh (waktu berjalan tanpa peristiwa yang
-        // mencabut sesi), sehingga sesi lama pun terkena begitu `expired_at` terlewati.
+        // mencabut sesi), sehingga sesi lama pun terkena begitu `expired_at` terlewati. CR-057: dua arah — claim juga
+        // dilepas bila DB tidak lagi mewajibkan (expired_at diperpanjang, penanda 0).
         return $this->jwt->refresh($refreshToken, fn (array $claims): array => $this->withPasswordExpiry($claims));
     }
 
@@ -122,8 +123,18 @@ class AuthService
         $id   = JwtService::subjectToId($claims['sub'] ?? null);
         $user = $id === null ? null : $this->pengguna->find($id);
 
-        if (is_array($user) && PasswordExpiry::isExpired($user['expired_at'], $this->jwt->now())) {
+        // Akun tidak ditemukan: claim apa adanya (aturan pencabutan/penolakan sesi refresh tidak diubah di sini).
+        if (! is_array($user)) {
+            return $claims;
+        }
+
+        // Dihitung penuh dari DB, bukan hanya ditambah (CR-057 T-1): penanda MAKE-020 ATAU password kedaluwarsa memasang
+        // claim; selain itu claim dihapus, sehingga `expired_at` yang diperpanjang langsung di DB (mis. koreksi DBA)
+        // melepas sesi berjalan pada refresh berikutnya tanpa login ulang.
+        if (PenggunaModel::wajibGantiPassword($user) || PasswordExpiry::isExpired($user['expired_at'], $this->jwt->now())) {
             $claims['must_change_password'] = true;
+        } else {
+            unset($claims['must_change_password']);
         }
 
         return $claims;
