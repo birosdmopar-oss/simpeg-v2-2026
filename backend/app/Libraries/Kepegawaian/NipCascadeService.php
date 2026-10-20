@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\NipCascadeInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Auth\JwtService;
+use App\Libraries\Auth\PasswordExpiry;
 use App\Libraries\Auth\PasswordVerifier;
 use App\Libraries\Kepegawaian\Nip\FormatNip;
 use App\Libraries\Kepegawaian\Nip\JenisRujukanNip;
@@ -205,6 +206,13 @@ final class NipCascadeService implements NipCascadeInterface
         ]);
         $this->wajibBerhasil($db, $akunDiganti, 'pengguna.username');
         $tabel['pengguna.username'] = $db->affectedRows();
+
+        // MAKE-028 [K]: password berubah → umur password +3 bulan, hanya untuk akun aktif (trigger legacy pengguna_beUpd).
+        $this->wajibBerhasil(
+            $db,
+            $db->table('pengguna')->where('nip', $baru)->where('status', PenggunaModel::STATUS_ACTIVE)->update(PasswordExpiry::forPasswordChange(PenggunaModel::STATUS_ACTIVE, time())),
+            'pengguna.expired_at',
+        );
 
         // Audit akun (reset password karena koreksi NIP): `pengguna` tidak punya kolom updated_by, pelaku dicatat di audit.
         foreach ($akunLama as $akun) {

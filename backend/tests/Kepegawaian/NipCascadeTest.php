@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\Auth\PasswordExpiry;
 use App\Libraries\Kepegawaian\Nip\JenisRujukanNip;
 use App\Libraries\Kepegawaian\Nip\KeberadaanV2;
 use App\Libraries\Kepegawaian\Nip\RujukanNip;
@@ -136,6 +137,8 @@ final class NipCascadeTest extends DatabaseTestCase
         $this->assertNull($akun['password_legacy']);
         $this->assertTrue(password_verify(self::NIP_BARU, (string) $akun['password']));
         $this->assertSame(1, (int) $akun['must_change_password'], 'MAKE-020: password = NIP baru diatur sistem');
+        $this->assertIsString($akun['expired_at'], 'MAKE-028: password berubah, umur password diisi (akun aktif)');
+        $this->assertEqualsWithDelta(PasswordExpiry::addMonths(time(), 3), strtotime($akun['expired_at']), 10);
         $this->assertSame(0, $this->db->table('token')->where('id_pengguna', $idAkun)->countAllResults());
         $this->assertGreaterThan(0, $hasil['sesi_dicabut']);
 

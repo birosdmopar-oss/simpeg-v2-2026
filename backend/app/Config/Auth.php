@@ -46,6 +46,17 @@ class Auth extends BaseConfig
      */
     public int $passwordMinLength = 8;
 
+    /**
+     * Umur password [K] (MAKE-028; kolom `pengguna.expired_at`). Legacy menegakkannya lewat trigger DB, bukan kode PHP
+     * (`simpeg01_struktur_lengkap_20261001.sql:8364-8382`): `pengguna_beIns` — akun dibuat berstatus aktif →
+     * `expired_at = NOW() + 1 YEAR`; `pengguna_beUpd` — password berubah dan status akhir aktif →
+     * `expired_at = NOW() + 3 MONTH`. v2 menulisnya di aplikasi lewat satu titik (App\Libraries\Auth\PasswordExpiry),
+     * tanpa trigger. Penambahan bulan mengikuti MySQL (hari dijepit ke akhir bulan tujuan).
+     */
+    public int $newAccountValidityMonths = 12;
+
+    public int $passwordValidityMonths = 3;
+
     // ------------------------------------------------------------------
     // A-07 Forgot / reset password
     // ------------------------------------------------------------------
