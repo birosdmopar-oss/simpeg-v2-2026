@@ -82,6 +82,11 @@ Tanpa perubahan skema (memakai `queue_jobs(_failed)` dan `pengguna.email` yang s
   titik `App\Libraries\Auth\PasswordExpiry`, interval di `Config\Auth`; dipakai semua jalur (akun baru, ganti sendiri,
   reset email, admin mengatur password, koreksi NIP B-06). Tanpa perubahan skema. Test: `tests/Auth/PasswordExpiryTest`.
   Rincian + tabel jalur: README Auth "Umur password (MAKE-028)".
+  FE (lib/axios.ts): respons 403 `password_change_required` menjalankan handler SEKALI (bersama untuk request paralel; auth/me,
+  change-password, logout, refresh tidak memicunya, jadi tanpa loop) → ambil ulang `/auth/me` (store `must_change_password`) →
+  redirect `/ganti-password`. Request yang diulang setelah auto-refresh juga lewat jalur ini, jadi password yang kedaluwarsa di
+  tengah sesi langsung terdeteksi tanpa muat ulang. Test: `lib/__tests__/axios.spec`, `features/auth/__tests__/passwordChangeRequired.spec`.
+  Catatan impor: `expired_at` legacy yang sudah lewat = wajib ganti saat login pertama v2 (runbook DBV-011 2.4, bagian `pengguna`).
 - Test: `tests/Auth/WajibGantiPasswordTest` (endpoint ditolak/diloloskan, set/lepas per jalur), tambahan assertion
   `AccountProvisionerTest` (B-05) dan `NipCascadeTest` (B-06); Vitest `router.spec`, `RedesignShell.spec`,
   `ChangePasswordView.spec`.
