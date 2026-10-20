@@ -168,8 +168,9 @@ final class WebConfigTypesTest extends CIUnitTestCase
         $keys = config(WebConfig::class)->keys;
         T::assertCatalog($keys);
 
-        // 24 key kode baseline (J4.04 §2) + pdf_header_nama_unit (Slip Gaji) + 10 key L_presensi.php:1483 (DBV-006).
-        $this->assertCount(35, $keys);
+        // 24 key kode baseline (J4.04 §2) + pdf_header_nama_unit (Slip Gaji) + 10 key L_presensi.php:1483 (DBV-006)
+        // + 7 key jam kerja & puasa Fase 5A (F5-16).
+        $this->assertCount(42, $keys);
 
         foreach (['TL1/PSW1', 'TL2/PSW2', 'TL3/PSW3', 'TA', 'TK', 'LKH'] as $name) {
             $this->assertSame(T::DECIMAL, $keys[$name]['type'], $name);
@@ -188,6 +189,14 @@ final class WebConfigTypesTest extends CIUnitTestCase
         }
 
         $this->assertSame('06:00:00', $keys['email_sent_time']['default'], 'fallback legacy Cron.php:483-484');
+
+        // Fase 5A F5-16: bawaan = KonfigurasiTukin (05-Presensi.md D-05).
+        $this->assertSame(
+            ['07:30:00', '16:00:00', '16:30:00', '08:00:00', '15:00:00', '15:30:00'],
+            array_map(static fn (string $k): mixed => $keys[$k]['default'], ['jam_masuk_normal', 'jam_pulang_normal', 'jam_pulang_jumat_normal', 'jam_masuk_puasa', 'jam_pulang_puasa', 'jam_pulang_jumat_puasa']),
+        );
+        $this->assertSame(T::DATE_RANGE, $keys['rentang_puasa']['type']);
+        $this->assertSame('', $keys['rentang_puasa']['default']);
     }
 
     /**
