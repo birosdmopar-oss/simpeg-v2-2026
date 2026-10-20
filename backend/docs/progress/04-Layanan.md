@@ -2,7 +2,7 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & sumber kebenaran: `docs/fase4/PRD_Fase4.md` v1.0 (18-10-2026).** Aturan proyek: `AGENTS.md`.
 
-**Terakhir diperbarui:** 19 Oktober 2026 — M0 selesai; M1 **sebagian** (dokumen DBV-022 + kueri audit; DDL per tabel tertahan menunggu D1). Branch: `fase4/dbv-022-skema-layanan` (worktree, dari `main` `6806c38`, **belum di-push**). Status CI: belum dijalankan — perubahan sejauh ini dokumen saja (`*.md`, `*.sql`) sehingga tidak memicu CI (AGENTS.md §3).
+**Terakhir diperbarui:** 20 Oktober 2026 — M1 dokumen **lengkap** (D1 diterima; 21 butir tabel terisi DDL + deviasi). Branch: `fase4/dbv-022-skema-layanan` (worktree, dari `main` `6806c38`). Status CI: perubahan dokumen + satu `.sql` di `backend/docs/` — `.sql` di luar `paths-ignore` sehingga CI terpicu; hasil belum terbaca (tidak ada `gh`, API anonim 403).
 
 **Entry criteria:** **terpenuhi** — Fase 3 DONE (QA fungsional + QA UI Lapis 1 selesai 15-10-2026, temuan ditutup CR-049/050/051/054/055; `backend/docs/progress/03-Kepegawaian.md`). Tabel `pegawai`, snapshot `pegawai_*`, `riwayat_*` Fase 3, `jenis_rwy`, `document_attachment` sudah di `main`.
 
@@ -10,7 +10,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 
 | Task | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|
-| C-01 Migration layanan + pemisahan inbox/ticketing | M1, M2 | DBV-022 | **IN_PROGRESS** | M0 selesai. M1 sebagian: dokumen `DBV-022-layanan-fase4-schema.md` Bagian 0,1,3–8 + `sql/DBV-022-audit-layanan.sql` selesai. **Bagian 2 (DDL per tabel) dan seluruh migration tertahan: sumber D1 tidak tersedia** (lihat Blocker B1) |
+| C-01 Migration layanan + pemisahan inbox/ticketing | M1, M2 | DBV-022 | **IN_PROGRESS** | M0 selesai. M1: dokumen `DBV-022-layanan-fase4-schema.md` **lengkap** (21 butir tabel: DDL D1 + usulan v2 + deviasi; pemisahan inbox/ticketing; registry NIP; impor; 27 butir DQ) + `sql/DBV-022-audit-layanan.sql`. **Migration menunggu keputusan 14 butir DQ** (Blocker B4) |
 | C-02 Pengajuan cuti | M3 | MAKE-022 | TODO | Menunggu M2 merged |
 | C-03 Kalkulasi kuota N/N-1/N-2 + `calculate_lc` | M3 | MAKE-022 | TODO | Menunggu M2 merged; ⛔ Q-02 untuk bagian saldo tahunan |
 | C-04 Approval berjenjang cuti | M3 | MAKE-022 | TODO | Menunggu M2 merged; ⛔ Q-07 untuk bagian tunda pengingat |
@@ -59,9 +59,22 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 
 ---
 
-## M1 — Dokumen DBV-022 + kueri audit (19-10-2026, SEBAGIAN)
+## M1 — Dokumen DBV-022 + kueri audit (19/20-10-2026)
 
-**Sudah jalan.**
+**Pembaruan 20-10-2026 (D1 diterima).** Blocker B1 selesai: berkas `simpeg01_struktur_lengkap_20261001.sql` diterima dan diverifikasi otentik (nomor baris cocok dengan rujukan PRD: `esign_hist` 891, `inbox` 1369, `jenis_cuti` 1634, `riwayat_cuti` 4396). Bagian 2 dokumen terisi untuk **21 butir tabel**: DDL D1 (kolom, tipe, COMMENT, index, nama FK + aksi, collation, AUTO_INCREMENT) + usulan v2 + tabel deviasi `[K]/[V2]/[I]` + perlakuan 6 trigger legacy + risiko impor.
+
+Temuan dari D1 yang mengubah/menutup butir PRD:
+
+1. **Butir `[I]` PRD §6.4.2 T4 tertutup → `[K]`**: COMMENT `riwayat_cuti.status_pyb` (D1:4431) memang menyebut `3: Disetujui AL - Waiting PYB`. PRD meminta ini diverifikasi di laporan M3; sudah terjawab di C-01.
+2. `riwayat_cuti.nip` **sudah** `varchar(30)` — tidak perlu penyempitan V4 (hanya kolom approver, `petugas_layanan.nip`, `pa_layanan.nip`, `disiplin_ticket.nip` yang perlu).
+3. FK `riwayat_cuti` → `jenis_cuti` di D1 bernama **`id_jenis_cuti`** (nama constraint = nama kolom) → pertanyaan baru **DQ-22**.
+4. `jenis_cuti` PK komposit tetap aman disederhanakan: FK menunjuk kolom terdepan PK, jadi usulan DQ-9 tidak memutus FK.
+5. `AUTO_INCREMENT` D1 membuktikan batas id master: `jenis_cuti`=7 (id 1..6), `jenis_layanan`=6 (id 1..5), `jenis_pa`=2 (id 1) — menguatkan seed literal.
+6. **`jenis_rwy` usulan direvisi dari 7 ke 8 kode (43..50)**: `surat_cuti` dan `surat_cuti_tte` dipisah sebagai jawaban DQ-21, agar `document_attachment` Fase 3 tidak perlu kolom `tag` baru (melanggar K3/§2.7).
+7. Pertanyaan baru dari D1: **DQ-22** (nama FK), **DQ-23** (`jenis_layanan.url_*`), **DQ-24** (typo `jenis_pa.udpated_at`), **DQ-25** (`firebase_token.auth_token` dibuang), **DQ-26** (`firebase_token` tanpa PK), **DQ-27** (`petugas_layanan.id_jenis_layanan` NULL-able).
+8. **Dump hanya struktur** (`-- Data exporting was unselected.`) → kueri audit Bagian 6 **tetap belum bisa dijalankan** (B2 masih terbuka). Usulan coder dibuat fail-safe: FK yang bergantung hasil audit ditaruh di `MigrationsDitahan/` dengan pra-cek fail-closed.
+
+**Sudah jalan (19-10-2026).**
 
 - `backend/docs/db-review/DBV-022-layanan-fase4-schema.md` — Bagian 0 (ringkasan 21 butir tabel D18), Bagian 1 (konvensi K1, G2, V1–V5, status, K3, MigrationsDitahan), **Bagian 3 (pemisahan `inbox` v2 vs `disiplin_ticket` — bagian inti D10/DoD 064-2/064-3/064-6)**, Bagian 4 (registry NIP termasuk jenis baru untuk `ketua_tim`), Bagian 5 (urutan impor J1.07), Bagian 6 (peta kueri audit), Bagian 7 (usulan coder untuk DQ-3, DQ-4, DQ-6, DQ-7, DQ-9, DQ-10, DQ-12, DQ-16, DQ-17, DQ-18, DQ-20, DQ-21 + nomor `jenis_rwy`), Bagian 8 (rencana test skema), Bagian 9 (blocker).
 - `backend/docs/db-review/sql/DBV-022-audit-layanan.sql` — 10 bagian kueri **baca-saja** sesuai PRD §6.1.2 butir 7, berklasifikasi WAJIB_0/INFO (pola DBV-011/DBV-019). Bagian 7.3 sengaja dikomentari (nama tabel pengguna legacy belum pasti tanpa D1).
@@ -81,8 +94,9 @@ Seluruh isi diturunkan dari PRD Fase 4 yang sudah disetujui; tidak ada tipe kolo
 
 | # | Blocker | Menghambat |
 |---|---|---|
-| B1 | **D1 (`simpeg01_struktur_lengkap_20261001.sql`) tidak tersedia** di repo maupun mesin kerja. PRD §6.1.1 hanya memuat ringkasan kolom inti; tipe/panjang/NULL sebagian besar kolom tidak ada. PRD Fase 5A memakai pola berbeda (DDL disalin penuh ke dalam PRD, mis. §7.1 `dh_online`/`gaji_pegawai`) sehingga Fase 5A tidak terhambat | **M1 Bagian 2 + seluruh M2** |
-| B2 | Tidak ada akses salinan dump legacy untuk **menjalankan** `sql/DBV-022-audit-layanan.sql` | Keputusan DQ-3, DQ-10, DQ-12, DQ-18, DQ-20 |
+| B1 | ✅ **SELESAI 20-10-2026** — D1 diterima dan terverifikasi | — |
+| B2 | Dump yang diterima **hanya struktur** (tanpa data), sehingga `sql/DBV-022-audit-layanan.sql` belum bisa dijalankan | Keputusan DQ-3, DQ-10, DQ-12, DQ-18, DQ-20, DQ-27 |
+| B2b | **14 butir DQ Bagian 7 belum diputus DB Validator** | Draf migration ditahan agar tidak ditulis dua kali |
 | B3 | Salinan kode legacy di mesin kerja (`simpegdev…/application/`) **bukan** versi yang dirujuk PRD (`1_legacy_simpeg…`); nomor baris tidak cocok pada uji acak `Cuti.php:584-591`, `L_cuti.php:1440`, `L_cuti.php:2645-2651` | Verifikasi `[K]` di M3–M5 |
 | B4 | **Q-07** — saran default menawarkan dua mekanisme alternatif (event `auth.login` + listener, atau `GET cuti/pengingat?reset=1`); perlu dipilih satu | Bagian tunda pengingat M3 |
 | B5 | **Q-01** — laporan M3 wajib memuat jumlah AL/PyB ber-role 4/5/8 dari data impor; data impor tidak tersedia di lingkungan ini | Laporan M3 |
