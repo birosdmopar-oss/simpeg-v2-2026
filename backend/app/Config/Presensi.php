@@ -8,15 +8,15 @@ use CodeIgniter\Config\BaseConfig;
 
 /**
  * Konfigurasi Modul D Presensi & Remunerasi paket 5A (PRD `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md`).
- * Berkas milik 5A (PRD §3.1); milestone lain (adapter Tukin M6, akses slip M4, presensi M5) menambah propertinya secara
- * aditif.
- *
- * Override `.env` (opsional) untuk batas impor: `presensi.maksUkuranImporByte`, `presensi.maksBarisImporPerSheet`,
- * `presensi.ttlPratinjauDetik` — hanya bilangan bulat positif yang sah; nilai lain diabaikan dan bawaan dipakai (pola
- * `Config\Konket::daftarDariEnv`).
+ * Berkas milik 5A (PRD §3.1); tiap milestone menambah propertinya secara aditif (satu blok per milestone).
  */
 class Presensi extends BaseConfig
 {
+    // --- M3 impor Slip Gaji (MAKE-030) ---
+    // Override `.env` (opsional): `presensi.maksUkuranImporByte`, `presensi.maksBarisImporPerSheet`,
+    // `presensi.ttlPratinjauDetik` — hanya bilangan bulat positif yang sah; nilai lain diabaikan dan bawaan dipakai
+    // (pola `Config\Konket::daftarDariEnv`).
+
     /** Batas ukuran berkas impor Slip Gaji (PRD 5A §7.2.1, Q5A-05 default). */
     public int $maksUkuranImporByte = 5 * 1024 * 1024;
 
