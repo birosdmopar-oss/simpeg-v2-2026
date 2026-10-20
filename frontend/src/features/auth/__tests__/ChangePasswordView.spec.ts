@@ -172,6 +172,9 @@ describe('ChangePasswordView — wajib ganti password (MAKE-020)', () => {
 
     useAuthStore().setSession({ ...user, must_change_password: true })
     await flushPromises()
-    expect(wrapper.get('[data-testid="change-password-required"]').text()).toContain('Ganti password terlebih dahulu')
+    const banner = wrapper.get('[data-testid="change-password-required"]').text()
+    expect(banner).toContain('wajib mengganti password')
+    expect(banner).toContain('diatur oleh sistem atau admin')
+    expect(banner).toContain('melewati masa berlaku')
   })
 })
