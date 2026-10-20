@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Libraries\Presensi\TukinData;
+
+use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
+use App\Libraries\Presensi\Tukin\KonfigurasiTukin;
+use App\Libraries\Presensi\Tukin\PeriodeTukin;
+
+/**
+ * Argumen siap pakai `KalkulasiTukin::hitung($periode, $hariLibur, $harian, $konfigurasi, $hariIni, $pegawai)` untuk satu
+ * pegawai × satu bulan Tukin (PRD 5A §7.7.1).
+ */
+final readonly class ArgumenTukin
+{
+    /**
+     * @param list<string>                        $hariLibur periode sebelumnya s.d. akhir periode (lookback cuti sakit)
+     * @param array<string, array<string, mixed>> $harian    per tanggal YYYY-MM-DD, rentang sama dengan $hariLibur
+     */
+    public function __construct(
+        public PeriodeTukin $periode,
+        public array $hariLibur,
+        public array $harian,
+        public KonfigurasiTukin $konfigurasi,
+        public ?DataPegawaiTukin $pegawai,
+    ) {
+    }
+}
