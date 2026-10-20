@@ -10,7 +10,10 @@ Jalur "Slip Gaji (a)" yang disetujui user pada 01-10-2026: perilaku Slip Gaji le
 
 Namespace `App\Libraries\Presensi\SlipGaji` dipilih karena Slip Gaji adalah bagian Modul D (05-Presensi D-10/D-11, controller rencana `Controllers/Api/Presensi/SlipGaji*`); subfolder memisahkannya dari kalkulasi Tukin D-04..D-07 di `Presensi/Tukin` (CR-037).
 
-Label sumber: **[K]** = kode legacy commit `39b6b15`, path relatif ke `application/` legacy; **[V2]** = dokumen v2 (05-Presensi, FSD, SRS, Matriks_Role_x_Endpoint, MTC). Keputusan: **IKUT** legacy, **PERBAIKI** (bug legacy diperbaiki), **FASE-5** (butuh DB/I/O). Butir yang dulu berlabel TUNGGU-BK/TUNGGU-USER sudah terjawab dari kode legacy (CR-039, 02-10-2026; lihat "Terjawab dari legacy"). Contoh dan test memakai data sintetis saja.
+Label sumber: **[K]** = kode legacy; acuan perilaku Slip Gaji **`771f8b4`** (08-10-2026, F5-1, PRD Fase 5A
+`docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` §7.3.8) menggantikan baseline CR-027 `39b6b15`. Rujukan baris yang
+sudah dicocokkan ulang ke `771f8b4` ditandai `@771f8b4`; rujukan lain masih baris `39b6b15` (dicocokkan ulang di M4
+MAKE-031). Path relatif ke `application/` legacy; **[V2]** = dokumen v2 (05-Presensi, FSD, SRS, Matriks_Role_x_Endpoint, MTC). Keputusan: **IKUT** legacy, **PERBAIKI** (bug legacy diperbaiki), **FASE-5** (butuh DB/I/O). Butir yang dulu berlabel TUNGGU-BK/TUNGGU-USER sudah terjawab dari kode legacy (CR-039, 02-10-2026; lihat "Terjawab dari legacy"). Contoh dan test memakai data sintetis saja.
 
 | Kelas | Isi |
 |---|---|
@@ -48,7 +51,7 @@ Label sumber: **[K]** = kode legacy commit `39b6b15`, path relatif ke `applicati
 | P-5 | Tanggal cetak "4 Oktober 2026" (WIB, tanpa jam) | `Lsl_gaji.php:366-369` | Feature Slip Gaji meminta tanggal dan waktu | IKUT tanpa jam (`print/cetak.php:322`); `FormatSlip::tanggalCetak($sekarang)` |
 | P-6 | Waktu dibuka disimpan stempel UTC, ditampilkan WIB + nama bulan Indonesia | Disimpan jam dinding WIB (`Lsl_gaji.php:84-86`, `:166`); tiga format tampil: admin dan verifikasi `d-m-Y H:i WIB` (`Sl_gaji.php:270`, `views/verify/slip.php:108`), halaman pegawai `d F Y, H:i WIB` dengan nama bulan Inggris (`views/hr/employee/sl_gaji/list.php:208`) | Konvensi stempel UTC v2 | IKUT format halaman pegawai + PERBAIKI nama bulan Indonesia dan satu format di semua keluaran: `FormatSlip::waktuWib` → "4 Oktober 2026, 10:00 WIB"; migrasi data WIB → UTC FASE-5 |
 | P-7 | Nama berkas `Slip_Gaji_{NAMA}_{Bulan}_{Tahun}.pdf`, nama disanitasi `[A-Z0-9_]`, fallback NIP | `Lsl_gaji.php:411` | — | PERBAIKI; `FormatSlip::namaBerkasPdf` |
-| P-8 | Label uang makan bulan−1 | Tidak ada di `39b6b15` | Feature/Brainstorm | IKUT: tidak ditampilkan; `PeriodeSlip::sebelumnya()` tidak dipakai untuk slip |
+| P-8 | Label uang makan bulan−1 | `@771f8b4`: layar `views/hr/employee/sl_gaji/_slip_content.php:59-66` (bagian "C. Uang Makan", keterangan "Presensi {Bulan} {Tahun} · {n} hari"); PDF `print/cetak.php:362-365`, `:412-420` (label "Uang Makan (Presensi {Bulan} {Tahun})", baris "Uang Makan" di Ringkasan) | Feature/Brainstorm; F5-1 | IKUT `771f8b4` (revisi F5-1): uang makan bulan−1 ditampilkan dengan label di atas; bulan kehadiran = `PeriodeSlip::sebelumnya()`; nilai dari snapshot `uang_makan`/`uang_makan_hari`/`uang_makan_periode` (`m-YYYY`) yang ditulis saat slip dibuka (PRD 5A §7.3.7; nilai dihitung 5B) |
 | P-9 | Nama bergelar `"{gelar awal} {nama}, {gelar akhir}"`, bagian kosong dilewati | `helpers/function_helper.php:102-108` (`formatNamaGelar`, dipakai admin, verifikasi, pratinjau); hanya PDF tanpa koma (`print/cetak.php:12`) | — | IKUT helper aplikasi di semua keluaran; `PencocokanNama::denganGelar` |
 | P-10 | Rupiah 0 desimal, setengah menjauhi nol, tanpa `-0` | `number_format(x, 0, ',', '.')`, awalan berbeda per keluaran | — | IKUT; `NominalGaji::formatAngka`; awalan "Rp" diputuskan UI. Sen disimpan (`DECIMAL(14,2)`), tampil 0 desimal seperti semua keluaran legacy |
 | M-1..M-5 | Nama dicek bila sheet punya kolom `nama`; normalisasi `[a-z0-9]`; cocok = sama atau substring; kosong → `nama_kosong`; tidak cocok → ditolak **dan** dicatat untuk log | `Lsl_gaji.php:715-737`, `:891-952` | D-10 / FSD-FN-D-10 / MTC-035 (mismatch di-log, bukan silent-fail) | IKUT (lebih ketat dari spek: tolak + log); `susun` mengembalikan `nama_tidak_cocok`, service menulis log sekali per pratinjau. Positif palsu substring ("Ani" ~ "Daniel") disengaja longgar seperti legacy: tetap |
@@ -64,7 +67,7 @@ Label sumber: **[K]** = kode legacy commit `39b6b15`, path relatif ke `applicati
 | I-11 | Status galat > duplikat (kunci sudah ada di DB) > valid; urut tahun → bulan → NIP numerik; nominal 28 field default 0 ditimpa GPP lalu TK | `Lsl_gaji.php:964-1015` | — | IKUT |
 | I-12 | Commit parsial per kunci: valid → sisip; duplikat → perbarui (timpa) atau lewati; galat → gagal | `Lsl_gaji.php:1018-1131` | D-10 (3 langkah; UNIQUE tertangkap) | IKUT; `rencanaCommit`. Opsi timpa bawaan **tercentang** [K] (`views/hr/employee/sl_gaji/admin_import.php:54`) → `PratinjauImpor::TIMPA_BAWAAN = true`, dipakai FE/service Fase 5 sebagai nilai awal |
 | I-13 | Impor oleh role 3 dibatasi satkernya | Role 3 boleh impor tanpa cakupan (`UL_ADMIN`, `Sl_gaji.php:361-460`) | PRD SG-2 (impor role 3 hanya pegawai di satkernya); Matriks lama: role 1 saja | [K] role 3 boleh impor + [V2] dibatasi satker (PRD SG-2): `susun(..., $cakupanSatker)` → `nip_di_luar_cakupan` |
-| R-1..R-4 | `jumlah_penghasilan_gpp`, `jumlah_potongan_gpp`; **`total_penghasilan = bersih_gpp + bersih_tk`**; `bersih_2`, tukin kelas jabatan, dan uang makan tidak masuk total | `Lsl_gaji.php:217-261` | Feature Slip Gaji §6.4: gaji bersih + tunjangan kinerja + uang makan bulan−1 | IKUT legacy, int sen (terjawab dari legacy). Tukin kelas jabatan dari jabatan **saat ini** (`getTukin`, `:217-232`), tampil terpisah, tidak dijumlahkan (D-11). Tidak ada uang makan |
+| R-1..R-4 | `jumlah_penghasilan_gpp`, `jumlah_potongan_gpp`; **`total_penghasilan = bersih_gpp + bersih_tk + uang_makan`**; `bersih_2` tidak masuk total; baris tukin kelas jabatan **dihapus** | `@771f8b4` `Lsl_gaji.php:416-446` (`hitungRingkasan`) | Feature Slip Gaji §6.4: gaji bersih + tunjangan kinerja + uang makan bulan−1 | IKUT `771f8b4` (revisi F5-1), int sen. Kunci masukan `uang_makan` opsional (tidak ada = 0); bentuk keluaran `RingkasanSlip::hitung` tidak berubah |
 | H-1..H-5 | Hak akses: lihat bagian berikut | `config/constants.php:298-301`, `Sl_gaji.php:19`, `:74`, `:137`, `:190` dst. | Matriks Modul D, FSD-FN-D-10/11 | Keputusan user 01-10-2026 |
 | S-1..S-5 | `viewed_at` kosong = belum dibuka; buka hanya bila belum; buka ulang (reset) hanya bila sudah, riwayat token dipertahankan; cetak pegawai selama dibuka | `Sl_gaji.php:92-133`, `:169-171`, `Lsl_gaji.php:633-662` | Feature Slip Gaji (akses 1x) | IKUT urutan dan pesan; `StatusSlip`. Buka hanya oleh pegawai pemilik (PERBAIKI). Pegawai boleh cetak selama dibuka [K] (`Sl_gaji.php:169-171`); admin boleh cetak kapan saja tanpa mengubah status [K] (`:143-171`) + [V2] tanpa QR bila belum ada token (QR `no-token` legacy, `Lsl_gaji.php:329`, menyesatkan) |
 | S-6 | Koreksi/timpa setelah slip dibuka | Diizinkan tanpa syarat; status dan token tetap (`saveGajiEdit` `Lsl_gaji.php:585-625`, timpa `:1041-1071`); koreksi diaudit lama → baru (`:612-621`), impor per commit (`:1109-1121`) | — | IKUT: boleh koreksi/timpa, status dan token tetap, diaudit. Service Fase 5 tidak mereset atau memblokir. Aman karena verifikasi v2 tidak menampilkan nominal (AS-06) |
@@ -137,13 +140,13 @@ Semua butir yang dulu menunggu Biro Keuangan (TUNGGU-BK) atau user/reviewer CR (
 
 | # | Butir | Jawaban |
 |---|---|---|
-| BK-1 | Rumus total | [K] `bersih_gpp + bersih_tk` (`Lsl_gaji.php:247-251`); `bersih_2` hanya tampil; tukin kelas jabatan nilai saat ini, tampil terpisah; tanpa uang makan |
+| BK-1 | Rumus total | [K] `@771f8b4` `bersih_gpp + bersih_tk + uang_makan` (`Lsl_gaji.php:433-434`); `bersih_2` hanya tampil; tukin kelas jabatan tidak ditampilkan lagi (F5-1). Baseline `39b6b15` (tanpa uang makan, tukin kelas jabatan tampil terpisah) tidak berlaku lagi |
 | BK-2 | Invarian `bersih_*` sebagai peringatan pratinjau | [K] tidak ada di legacy → `RingkasanSlip::periksaKonsistensi` dan test-nya dihapus |
 | BK-3 | Nominal negatif; teks `-` | [K] koreksi menolak negatif (impor diperketat sama); `-` = galat |
 | BK-4 | Sen | [K] disimpan `DECIMAL(14,2)`, tampil 0 desimal |
 | BK-5 | Template 28 kolom; singkatan bulan | [K] `downloadTemplate` 28 kolom; singkatan ditolak |
 | BK-6 / S-6 | Koreksi/timpa slip yang sudah dibuka | [K] boleh; status dan token tetap; diaudit |
-| P-8 | Label uang makan bulan−1 | [K] tidak ada → tidak ditampilkan |
+| P-8 | Label uang makan bulan−1 | [K] `@771f8b4` ditampilkan (lihat tabel aturan P-8) |
 | U-1 | Cakupan role 3 | [V2] PRD SG-2 (legacy tidak membatasi); sumber satker [K] jabatan saat ini; tanpa fallback unit [V2] fail-closed |
 | U-1b / I-13 | Impor role 3 | [K] boleh + [V2] dibatasi satker (PRD SG-2) |
 | U-2 | Admin memilih periode di luar gerbang | [K] jalur admin tidak digerbang di server |
@@ -159,13 +162,13 @@ Semua butir yang dulu menunggu Biro Keuangan (TUNGGU-BK) atau user/reviewer CR (
 (tidak ada yang dilonggarkan); uji dirinya di `tests/unit/Libraries/PemindaiKemurnianTest.php`. Slip Gaji memakai
 konfigurasi bawaan tanpa pengecualian.
 
-### Menunggu Fase 5 (bukan bagian CR-027)
+### Pelaksanaan Fase 5A (pengganti bagian "Menunggu Fase 5")
 
-- **D-01 (DB Validator):** skema `gaji_pegawai` — 28 kolom `DECIMAL(14,2) NOT NULL DEFAULT 0.00` di atas struktur produksi (`viewed_at`, `viewed_ip`, `qr_token`, `UNIQUE (nip, bulan, tahun)` sudah ada); nasib kolom generik lama; tabel riwayat token (FK, usul `UNIQUE (qr_token)`); volume histori; konversi stempel WIB → UTC.
-- **D-10:** dependensi PhpSpreadsheet; pembaca nilai mentah (`formatData = false`, rumus dihitung) yang menghasilkan masukan `PratinjauImpor::uraiSheet`; unggah aman; pratinjau disimpan di server; commit per baris dengan tangkapan UNIQUE; log ketidakcocokan nama; template unduhan berdata sintetis.
-- **D-11:** endpoint daftar, status, buka (atomik), cetak PDF, koreksi, buka ulang, dan verifikasi publik `/verify/slip/{token}`; generator QR; tukin kelas jabatan dan uang makan (D-08/D-09).
-- **D-12:** FE pegawai dan admin — aksi baris lewat menu ⋮ (AGENTS.md §1; "Buka ulang" sebagai aksi lain setelah "Edit", `hidden` bila belum dibuka, lewat `ConfirmDialog`), modal konfirmasi buka.
-- **D-13:** test integrasi impor (mismatch, duplikat, pelanggaran constraint) dan gerbang waktu di `tests/Presensi/`.
+Port D-01/D-10/D-11/D-14 dan FE Slip Gaji kini diatur PRD Fase 5A (`docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md`,
+LOCKED): skema DBV-023 (§7.1), impor 3 langkah (§7.2), akses pegawai & kelola admin + PDF/QR (§7.3), verifikasi publik
+(§7.4), FE (§7.8). Kode ber-DB/IO 5A berada di `Libraries/Presensi/Slip` (bukan folder murni ini); folder ini hanya
+diubah sebatas §7.3.8 (`RingkasanSlip`). Nilai uang makan slip disambung D-09 (5B) lewat `UangMakanSlipInterface`
+— **wajib sebelum go-live** (F5-1).
 
 ### Test
 
