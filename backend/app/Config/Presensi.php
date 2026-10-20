@@ -10,11 +10,12 @@ use CodeIgniter\Config\BaseConfig;
 
 /**
  * Konfigurasi Modul D Presensi & Remunerasi paket 5A (PRD `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md`).
- * Berkas milik 5A (PRD §3.1); milestone lain (impor Slip Gaji M3, akses slip M4, presensi M5) menambah propertinya secara
- * aditif.
+ * Berkas milik 5A (PRD §3.1); tiap milestone menambah propertinya secara aditif (satu blok per milestone).
  */
 class Presensi extends BaseConfig
 {
+    // --- M6 adapter Tukin (MAKE-033) ---
+
     /**
      * Sumber data cuti & tugas belajar harian untuk adapter Tukin (PRD 5A §7.7.6). Bawaan 5A = fail-closed
      * (`DataTukinBelumTersedia`); 5B mengganti nilai ini dengan implementasi berbasis data Fase 4. Nama kelas
