@@ -26,7 +26,7 @@ const errors = ref<{ config_value?: string; remark?: string }>({})
 const formError = ref('')
 const submitting = ref(false)
 
-const multiline = computed(() => ['textarea', 'html', 'email_list'].includes(props.item?.type ?? ''))
+const multiline = computed(() => ['textarea', 'html', 'email_list', 'date_range_list'].includes(props.item?.type ?? ''))
 const numeric = computed(() => ['integer', 'decimal', 'id_ref'].includes(props.item?.type ?? ''))
 
 const hint = computed(() => {

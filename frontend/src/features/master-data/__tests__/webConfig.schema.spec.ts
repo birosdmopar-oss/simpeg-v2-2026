@@ -62,3 +62,28 @@ describe('webConfigValueError', () => {
     expect(schema.safeParse({ config_value: '1', remark: 'x'.repeat(256) }).success).toBe(false)
   })
 })
+
+describe('webConfigValueError — date_range_list (Fase 5A F5-16, setara WebConfigTypes backend)', () => {
+  const range: Def = { type: 'date_range_list', constraints: {} }
+
+  it.each([
+    '2026-02-18..2026-03-19',
+    '2026-02-18..2026-03-19\r\n\r\n2025-03-01..2025-03-30\n2026-02-18..2026-03-19\n',
+    '2026-03-01..2026-03-01',
+    '2026-01-11..2026-01-20\n2026-01-01..2026-01-10',
+  ])('sah: %j', (value) => {
+    expect(webConfigValueError(range, value)).toBeNull()
+  })
+
+  it.each<[string, string]>([
+    ['2026-02-18 - 2026-03-19', 'Baris 1: format harus YYYY-MM-DD..YYYY-MM-DD (mis. 2026-02-18..2026-03-19).'],
+    ['2026-2-18..2026-03-19', 'Baris 1: format harus'],
+    ['2026-02-30..2026-03-19', 'Baris 1: tanggal tidak valid.'],
+    ['2025-03-01..2025-03-30\n2026-03-19..2026-02-18', 'Baris 2: tanggal mulai tidak boleh setelah tanggal selesai.'],
+    ['2026-02-18..2026-03-19\n2026-03-19..2026-03-25', 'Rentang 2026-02-18..2026-03-19 dan 2026-03-19..2026-03-25 tumpang tindih.'],
+    [' \n ', 'Nilai wajib diisi.'],
+    [Array.from({ length: 51 }, (_, i) => `${1991 + i}-01-01..${1991 + i}-01-02`).join('\n'), 'Maksimal 50 rentang tanggal.'],
+  ])('ditolak: %j', (value, message) => {
+    expect(webConfigValueError(range, value)).toContain(message)
+  })
+})
