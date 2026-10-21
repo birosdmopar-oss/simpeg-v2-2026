@@ -4,6 +4,7 @@
  */
 export { default as UiAvatar } from './UiAvatar.vue'
 export { default as UiBadge } from './UiBadge.vue'
+export { default as UiBarChart } from './UiBarChart.vue'
 export { default as UiBreadcrumb } from './UiBreadcrumb.vue'
 export { default as UiButton } from './UiButton.vue'
 export { default as UiCard } from './UiCard.vue'
@@ -23,6 +24,7 @@ export { default as UiStepper } from './UiStepper.vue'
 export { default as UiTabs } from './UiTabs.vue'
 export { default as UiTextField } from './UiTextField.vue'
 
+export type { BarSeries } from './UiBarChart.vue'
 export type { ExportFormat } from './UiExportMenu.vue'
 export type { RadioOption } from './UiRadioGroup.vue'
 export type { Crumb } from './UiBreadcrumb.vue'
