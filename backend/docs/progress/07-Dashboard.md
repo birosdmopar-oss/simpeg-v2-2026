@@ -2,14 +2,14 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak paket pertama: `docs/fase7/PRD_Fase7_Statistik-GeneratorDokumen.md` (F-03 + F-09, tanpa skema). Kontrak endpoint: `backend/app/Controllers/Api/Dashboard/README.md`.
 
-**Terakhir diperbarui:** 21 Oktober 2026 — M2 MAKE-036 frontend F-03 (halaman `/laporan/:tipe`, branch `fase7/make-036-statistik`, menunggu review reviewer CR); M1 backend di `main` `7fb3011`. Fase 7 **IN_PROGRESS**: hanya paket F-03 + F-09 yang dikerjakan sekarang (PRD Fase 7 §1); F-01, F-02, F-04..F-08, F-11..F-13 sisa, dan F-10 Arsip **ditunda** (keputusan Horii 20-10-2026) belum dimulai.
+**Terakhir diperbarui:** 21 Oktober 2026 — M3 MAKE-037 backend F-09 (generator dokumen, branch `fase7/make-037-generator-dokumen`, menunggu review reviewer CR; fallback PDF F7-15 diterapkan, lihat M3). M1 dan M2 MAKE-036 di `main`. Fase 7 **IN_PROGRESS**: hanya paket F-03 + F-09 yang dikerjakan sekarang (PRD Fase 7 §1); F-01, F-02, F-04..F-08, F-11..F-13 sisa, dan F-10 Arsip **ditunda** (keputusan Horii 20-10-2026) belum dimulai.
 **Entry criteria paket:** PRD Fase 7 v1.0 di `main` `90362c6` (21-10-2026); Fase 3 DONE (sumber data snapshot `pegawai_*`); tidak ada ketergantungan ke Fase 4/5A.
 
 | Task | Key | Status | Ringkas |
 |---|---|---|---|
 | F-03 Widget Statistik Kepegawaian — backend (M1) | MAKE-036 | DONE (main `7fb3011`) | `Config/RoutesDashboard.php` (+1 entri `Routing.php`), `StatistikController`, `Libraries/Dashboard/Statistik/*` (lingkup, kueri agregat, bucket usia, urutan golongan, cache, bentuk laporan), XLSX via `EksporTabel`, audit unduhan, kontrak role di `KontrakMatriksRoleTest` (MAKE-038). Test: 3 unit + 4 feature (22 test) |
-| F-03 — frontend (M2) | MAKE-036 | IN_PROGRESS (menunggu review) | `features/laporan` (halaman `/laporan/:tipe` 7 tipe, service API, route), `shared/ui/UiBarChart` dari mockup `67fa767`, nav `laporan` + `roles` + 7 anak (tetap `phase: 7`), spec 8 test + nav spec |
-| F-09 Generator Dokumen — backend (M3) | MAKE-037 | TODO | DUK, Nominatif, Proyeksi Pensiun, Baperjakat: JSON/PDF/XLSX, `KopDokumen`, uji volume ≥ 5.000 baris |
+| F-03 — frontend (M2) | MAKE-036 | DONE (main `1f76989`) | `features/laporan` (halaman `/laporan/:tipe` 7 tipe, service API, route), `shared/ui/UiBarChart` dari mockup `67fa767`, nav `laporan` + `roles` + 7 anak (tetap `phase: 7`), spec 8 test + nav spec |
+| F-09 Generator Dokumen — backend (M3) | MAKE-037 | IN_PROGRESS (menunggu review) | DUK, Nominatif, Proyeksi Pensiun, Baperjakat: JSON/PDF/XLSX, `KopDokumen`, audit, throttle; fallback PDF F7-15 (per unit/satker, maks 1.700 baris, ADR-034); uji volume 5.000 baris |
 | F-09 — frontend (M4) | MAKE-037 | TODO | `features/dokumen` |
 | F-10 Arsip Digital | — | DITUNDA | Belum ada konfigurasi server Arsip resmi (Horii 20-10-2026) |
 | F-01, F-02, F-04..F-08, F-11..F-13 | — | TODO | Paket Fase 7 berikutnya (butuh DBV / Fase 4) |
@@ -37,3 +37,34 @@ Keputusan PRD yang dipakai: F7-1..F7-14, F7-26, F7-27. Ringkasan implementasi:
 - **Test:** `features/laporan/__tests__/LaporanPage.spec.ts` (8 test: muat lingkup+statistik, pilih lingkup → parameter, pindah tipe, pencarian, ekspor xlsx, 403, `lingkupKeQuery`, `isLaporanTipe`); `nav.config.spec.ts` (7 anak + role 1,3,4,5,8 + tetap tersembunyi).
 - **Catatan:** ekspor hanya Excel (F7-11); QA UI lewat URL langsung karena menu `phase: 7` (F7-14, Q-2); mockup hanya menggambarkan 3 tipe — 4 tipe lain memakai layout yang sama (PRD Q-3).
 
+## M3 — MAKE-037 backend F-09 (21-10-2026)
+
+Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan implementasi:
+
+- **Endpoint** `GET api/v1/dokumen/{duk|nominatif|pensiun|baperjakat}` (JSON berhalaman), `GET dokumen/{duk|nominatif|pensiun}/{pdf|xlsx}`, `POST dokumen/baperjakat/{pdf|xlsx}` (role 1, 3, 4, 5, 8; role 3 lingkup satker/unit akun). Kontrak lengkap di README modul (bagian F-09).
+- **Library** `Libraries/Dashboard/Dokumen/*`: `DokumenService` (orkestrasi, lingkup, throttle 6/menit, audit, fallback PDF), `KueriDaftarPegawai` (satu builder `pegawai` + snapshot + master per dokumen, `PegawaiScope`), `UrutanDuk` (F7-17, ORDER BY SQL), `KolomDokumen` (37/11/37 kolom XLSX, subset PDF, format `d M Y`, eselon), `ProyeksiPensiun` (F7-20), `BaperjakatInput` (F7-21), `RenderDokumenPdf`; `Libraries/Pdf/KopDokumen.php` (aditif, `web_config`, tanpa logo).
+- **Audit** `audit_logs` `dokumen_unduhan`/`<jenis>`/`create` sesudah berkas dibangun (fail-closed); 401/403/404/422/429 tidak diaudit.
+- **Fallback PDF F7-15 (LOCKED, ADR-034).** Percobaan pertama uji volume: PDF DUK lingkup kementerian 5.000 baris kehabisan memori TCPDF di 512 MB. Karena itu:
+  - PDF hanya `lingkup=unit|satker`. Lingkup kementerian → 422 `errors.lingkup` "PDF hanya tersedia per unit/satker.".
+  - PDF maksimal **1.700 baris** (`DokumenService::PDF_MAKS_BARIS`). Di atas batas → 422 `errors.lingkup` "Persempit lingkup atau unduh XLSX.". Batas yang sama dikenakan pada jumlah NIP Baperjakat PDF (`errors.nip`; XLSX tetap s.d. 2.000 NIP).
+  - Lingkup dan batas baris dicek sebelum throttle dan sebelum render (`COUNT` dulu). Pensiun pengecualian: batas baru diketahui sesudah kueri, karena disaring di PHP menurut BUP.
+  - XLSX tetap untuk seluruh lingkup.
+- **Hasil uji volume** (`DokumenVolumeTest`, 5.000 PNS sintetis; mesin i7-11370H, RAM 15,7 GB, Windows 11, PHP 8.4.2, MySQL 8.0.30, `memory_limit` 1G, memori puncak per permintaan termasuk dasar proses uji 34–62 MB):
+
+  | Skenario | Baris | Waktu | Puncak | Target |
+  |---|---|---|---|---|
+  | PDF DUK kementerian (sebelum fallback) | 5.000 | — | > 512 MB | gagal |
+  | PDF DUK satker | 2.000 | 13,2 s | 270 MB | > 256 MB |
+  | PDF DUK satker (batas) | 1.700 | 10,2–10,6 s | 238 MB | ≤ 30 s / 256 MB ✓ |
+  | XLSX DUK kementerian | 5.000 | 0,9–1,0 s | 104 MB | ≤ 10 s / 128 MB ✓ |
+
+  Batas 1.700 dipilih agar satker sekitar 1.667 pegawai (5.000 dibagi rata ke 3 satker) masih lolos; kenaikan memori PDF sekitar 112 MB per 1.000 baris. XLSX semula memuncak 242 MB. Penyebabnya tiga salinan penuh baris hidup bersamaan; sekarang baris dilepas satu per satu saat dipetakan, sehingga turun ke 104 MB.
+- **Uji volume di CI:** di-skip kecuali env `RUN_VOLUME_TEST=1` (`markTestSkipped` di `setUp`). `phpunit.dist.xml` (berkas bersama) tidak diubah. Jalankan lokal setiap kali `PDF_MAKS_BARIS`, kolom PDF, atau `TcpdfRenderer` berubah:
+  `RUN_VOLUME_TEST=1 php -d memory_limit=1G vendor/bin/phpunit --no-coverage tests/Dashboard/DokumenVolumeTest.php`.
+- **Penyederhanaan dari PRD §7.2.1:**
+  - Satu view generik `Views/pdf/dokumen_daftar.php` untuk keempat jenis, menggantikan empat view `pdf/{duk,nominatif,pensiun,baperjakat}.php`. Kolom PDF per jenis datang dari `KolomDokumen::kolomPdf()`, judul/subjudul/teks Baperjakat lewat parameter.
+  - `KopDokumen::html()` menerima koneksi DB opsional (untuk test).
+  - Test PDF, audit, dan kop digabung di `tests/Dashboard/DokumenUnduhTest.php`, menggantikan `DokumenPdfTest`, `DokumenAuditTest`, dan `KopDokumenTest` terpisah.
+- **Berkas bersama (aditif):** `tests/feature/KontrakMatriksRoleTest.php` (prefiks `dokumen` + baris kontrak route, satu commit dengan `Config/RoutesDashboard.php`), `docs/adr/README.md` (+1 baris ADR-034). `Routing.php` tidak berubah (entri `RoutesDashboard.php` sudah ada sejak M1).
+- **Test:** unit `tests/unit/Dashboard/{UrutanDukTest (6), KolomDokumenTest (5), ProyeksiPensiunTest (3), BaperjakatInputTest (3)}.php`; feature `tests/Dashboard/{DokumenEndpointTest (5), DokumenScopeTest (3), DokumenSnapshotTest (1), DokumenUnduhTest (8), DokumenVolumeTest (1, skip default)}.php`; fixture `tests/_support/Dashboard/DokumenUjiTrait.php`.
+- **Pertanyaan terbuka:** PRD Q-6 (nomor ADR-034, mohon konfirmasi reviewer) dan Q-9 (angka batas volume untuk mesin dev; batas 1.700 dapat disesuaikan setelah melihat spesifikasi server). `memory_limit` PHP produksi untuk endpoint PDF perlu ≥ 256 MB (dicatat untuk runbook deploy). **Q-10** (dari M1, tetap terbuka): `RiwayatEngine::tambah` alur Admin tidak memicu `EVENT_NOTIFIKASI`. Ini tidak berdampak pada F-09 karena dokumen tanpa cache dan selalu kueri langsung; dampaknya hanya pada kesegaran statistik F-03 (≤ TTL).
