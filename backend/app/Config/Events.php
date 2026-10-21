@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Config;
 
+use App\Libraries\Dashboard\Statistik\StatistikCache;
+use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
 use CodeIgniter\Events\Events;
 use CodeIgniter\Exceptions\FrameworkException;
 use CodeIgniter\HotReloader\HotReloader;
@@ -24,6 +26,11 @@ use CodeIgniter\HotReloader\HotReloader;
  * Example:
  *      Events::on('create', [$myInstance, 'myMethod']);
  */
+
+// Fase 7 F-03 (MAKE-036, PRD F7-12a): setiap transisi riwayat/snapshot menghapus cache statistik `dashboard_stat_*`.
+Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [StatistikCache::class, 'invalidasiDariEvent']);
+// Pelengkap F7-12 (c): kueri tulis langsung ke `pegawai`/snapshot `pegawai_*` (tanpa model/event) juga menghapus cache.
+Events::on('DBQuery', [StatistikCache::class, 'invalidasiDariQuery']);
 
 Events::on('pre_system', static function (): void {
     if (ENVIRONMENT !== 'testing') {
