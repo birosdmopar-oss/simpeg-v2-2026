@@ -21,4 +21,11 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
     $routes->get('statistik/lingkup', 'StatistikController::lingkup', $laporan);
     $routes->get('statistik/(:segment)/xlsx', 'StatistikController::xlsx/$1', $laporan);
     $routes->get('statistik/(:segment)', 'StatistikController::statistik/$1', $laporan);
+
+    // F-09 generator dokumen (MAKE-037): duk|nominatif|pensiun|baperjakat; Baperjakat unduh lewat POST (daftar NIP).
+    $routes->post('dokumen/baperjakat/pdf', 'DokumenController::baperjakatPdf', $laporan);
+    $routes->post('dokumen/baperjakat/xlsx', 'DokumenController::baperjakatXlsx', $laporan);
+    $routes->get('dokumen/(:segment)/pdf', 'DokumenController::pdf/$1', $laporan);
+    $routes->get('dokumen/(:segment)/xlsx', 'DokumenController::xlsx/$1', $laporan);
+    $routes->get('dokumen/(:segment)', 'DokumenController::daftar/$1', $laporan);
 });
