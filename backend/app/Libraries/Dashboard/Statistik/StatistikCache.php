@@ -8,7 +8,6 @@ use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\CacheService;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
-use CodeIgniter\Database\Query;
 use Config\Services;
 use Throwable;
 
@@ -22,10 +21,9 @@ use Throwable;
  * Titik invalidasi (semua `invalidateMatching('dashboard_stat_*')`):
  *  (a) listener `Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [StatistikCache::class, 'invalidasiDariEvent'])` di
  *      `Config\Events` — setiap transisi riwayat/snapshot;
- *  (b) hook `afterInsert/afterUpdate/afterDelete` `PegawaiModel::invalidasiStatistik()` — tulis tabel `pegawai`;
- *  (c) listener `DBQuery` `invalidasiDariQuery()` — setiap INSERT/UPDATE/DELETE/REPLACE langsung ke `pegawai` atau snapshot
- *      `pegawai_*` lewat query builder (jalur Admin yang langsung Disetujui tanpa event, SiklusPegawai, koreksi NIP) —
- *      pelengkap (a)/(b) tanpa menyentuh berkas Fase 3; dilaporkan sebagai tambahan di M1.
+ *  (b) hook `afterInsert/afterUpdate/afterDelete` `PegawaiModel::invalidasiStatistik()` — tulis tabel `pegawai`.
+ * Jalur tulis lain (mis. `RiwayatEngine::tambah` alur Admin yang langsung Disetujui tanpa event, SiklusPegawai, koreksi
+ * NIP) diterima basi paling lama TTL (keputusan reviewer CR 21-10-2026; PRD §13 pertanyaan terbuka).
  * Kegagalan cache (mis. folder tidak bisa ditulis) hanya dicatat ke log; respons tidak berubah.
  */
 final class StatistikCache
@@ -91,21 +89,6 @@ final class StatistikCache
     public static function invalidasiDariEvent(array $payload = []): void
     {
         self::invalidasi();
-    }
-
-    /**
-     * Listener `DBQuery`: kueri tulis ke tabel `pegawai`/`pegawai_*` (dengan/tanpa DBPrefix) menghapus cache. Kueri
-     * baca dan tabel lain diabaikan (pola dicocokkan pada awal kueri, murah).
-     */
-    public static function invalidasiDariQuery(Query $query): void
-    {
-        if (! $query->isWriteType()) {
-            return;
-        }
-
-        if (preg_match('/^\s*(?:INSERT\s+(?:IGNORE\s+)?INTO|REPLACE\s+INTO|UPDATE|DELETE\s+FROM)\s+`?[a-z0-9]*_?pegawai(?:_[a-z_]+)?`?\s/i', $query->getQuery()) === 1) {
-            self::invalidasi();
-        }
     }
 
     /**

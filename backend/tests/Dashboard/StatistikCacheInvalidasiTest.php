@@ -23,7 +23,7 @@ use Tests\Support\Kepegawaian\RiwayatUjiTrait;
 /**
  * F-03 cache & invalidasi (MAKE-036, PRD §7.1.8 StatistikCacheInvalidasiTest, F7-12): permintaan kedua dari cache;
  * tulis `pegawai` lewat PegawaiModel (hook b) dan transisi riwayat lewat RiwayatEngine (event, listener a di
- * Config\Events) menghapus cache — statistik berubah tanpa menunggu TTL.
+ * Config\Events) menghapus cache — statistik berubah tanpa menunggu TTL; TTL 900 terpasang pada respons.
  *
  * @internal
  */
@@ -77,6 +77,8 @@ final class StatistikCacheInvalidasiTest extends DatabaseTestCase
         $this->assertTrue($kedua['cache']['hit']);
         $this->assertSame($pertama['baris'], $kedua['baris']);
         $this->assertNotNull($this->cacheUji->get('dashboard_stat_unit-kerja_kementerian_0_all'));
+        $this->assertSame(900, $kedua['cache']['ttl'], 'TTL 900 detik (F7-12)');
+        $this->assertSame(900, StatistikCache::TTL);
     }
 
     public function testTulisPegawaiLewatModelMenghapusCache(): void
@@ -135,28 +137,6 @@ final class StatistikCacheInvalidasiTest extends DatabaseTestCase
         $this->assertSame(['pns_iii_a' => 2], $this->nilaiBaris($sesudah, 'Unit A'), 'pangkat baru dari snapshot ikut dihitung');
 
         $this->lepasEngine();
-    }
-
-    public function testKueriTulisLangsungKeSnapshotMenghapusCache(): void
-    {
-        $nip = $this->pegawaiStatistik('B1', ['jenis' => 1, 'lahir' => $this->lahir]);
-
-        $this->assertSame(3, $this->dataStatistik($this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/unit-kerja'))['total']);
-        $this->assertTrue($this->dataStatistik($this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/unit-kerja'))['cache']['hit']);
-
-        // Pindah satker lewat query builder (tanpa model, tanpa event) → listener DBQuery (c).
-        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->update(['id_unit' => $this->unit['A'], 'id_satker' => $this->satker['A2']]);
-
-        $sesudah = $this->dataStatistik($this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/unit-kerja'));
-        $this->assertFalse($sesudah['cache']['hit']);
-        $this->assertSame(['pns' => 2, 'pppk' => 0], $this->nilaiBaris($sesudah, 'Unit A'));
-        $this->assertSame(['pns' => 1, 'pppk' => 0], $this->nilaiBaris($sesudah, 'Unit B'), 'tinggal pegawai B1 dari setUp');
-
-        // Kueri baca dan tulis ke tabel lain tidak menghapus cache.
-        $this->assertTrue($this->dataStatistik($this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/unit-kerja'))['cache']['hit']);
-        $this->db->table('unit')->where('id_unit', $this->unit['C'])->update(['unit' => 'Unit C Diganti']);
-        $this->db->table('pegawai')->where('nip', $nip)->get();
-        $this->assertTrue($this->dataStatistik($this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/unit-kerja'))['cache']['hit']);
     }
 
     public function testEventTanpaPayloadRelevanTetapMenghapusCache(): void
