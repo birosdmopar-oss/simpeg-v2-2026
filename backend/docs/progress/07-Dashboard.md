@@ -2,15 +2,15 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). Kontrak paket pertama: `docs/fase7/PRD_Fase7_Statistik-GeneratorDokumen.md` (F-03 + F-09, tanpa skema). Kontrak endpoint: `backend/app/Controllers/Api/Dashboard/README.md`.
 
-**Terakhir diperbarui:** 21 Oktober 2026 — M3 MAKE-037 backend F-09 (generator dokumen, branch `fase7/make-037-generator-dokumen`, menunggu review reviewer CR; fallback PDF F7-15 diterapkan, lihat M3). M1 dan M2 MAKE-036 di `main`. Fase 7 **IN_PROGRESS**: hanya paket F-03 + F-09 yang dikerjakan sekarang (PRD Fase 7 §1); F-01, F-02, F-04..F-08, F-11..F-13 sisa, dan F-10 Arsip **ditunda** (keputusan Horii 20-10-2026) belum dimulai.
+**Terakhir diperbarui:** 21 Oktober 2026 — M4 MAKE-037 frontend F-09 (halaman `/dokumen/:jenis`, branch `fase7/make-037-generator-dokumen`, menunggu review reviewer CR); M1–M3 di `main`. Fase 7 **IN_PROGRESS**: hanya paket F-03 + F-09 yang dikerjakan sekarang (PRD Fase 7 §1); F-01, F-02, F-04..F-08, F-11..F-13 sisa, dan F-10 Arsip **ditunda** (keputusan Horii 20-10-2026) belum dimulai.
 **Entry criteria paket:** PRD Fase 7 v1.0 di `main` `90362c6` (21-10-2026); Fase 3 DONE (sumber data snapshot `pegawai_*`); tidak ada ketergantungan ke Fase 4/5A.
 
 | Task | Key | Status | Ringkas |
 |---|---|---|---|
 | F-03 Widget Statistik Kepegawaian — backend (M1) | MAKE-036 | DONE (main `7fb3011`) | `Config/RoutesDashboard.php` (+1 entri `Routing.php`), `StatistikController`, `Libraries/Dashboard/Statistik/*` (lingkup, kueri agregat, bucket usia, urutan golongan, cache, bentuk laporan), XLSX via `EksporTabel`, audit unduhan, kontrak role di `KontrakMatriksRoleTest` (MAKE-038). Test: 3 unit + 4 feature (22 test) |
 | F-03 — frontend (M2) | MAKE-036 | DONE (main `1f76989`) | `features/laporan` (halaman `/laporan/:tipe` 7 tipe, service API, route), `shared/ui/UiBarChart` dari mockup `67fa767`, nav `laporan` + `roles` + 7 anak (tetap `phase: 7`), spec 8 test + nav spec |
-| F-09 Generator Dokumen — backend (M3) | MAKE-037 | IN_PROGRESS (menunggu review) | DUK, Nominatif, Proyeksi Pensiun, Baperjakat: JSON/PDF/XLSX, `KopDokumen`, audit, throttle; fallback PDF F7-15 (per unit/satker, maks 1.700 baris, ADR-034); uji volume 5.000 baris |
-| F-09 — frontend (M4) | MAKE-037 | TODO | `features/dokumen` |
+| F-09 Generator Dokumen — backend (M3) | MAKE-037 | DONE (main `6a03b19`) | DUK, Nominatif, Proyeksi Pensiun, Baperjakat: JSON/PDF/XLSX, `KopDokumen`, audit, throttle; fallback PDF F7-15 (per unit/satker, maks 1.700 baris, ADR-034); uji volume 5.000 baris |
+| F-09 — frontend (M4) | MAKE-037 | IN_PROGRESS (menunggu review) | `features/dokumen` (halaman `/dokumen/:jenis` 4 jenis, unduh PDF/XLSX + pesan fallback, Baperjakat pilih NIP + judul, ⋮ Lihat DRH), nav `dokumen` (tetap `phase: 7`), spec 10 test + nav spec |
 | F-10 Arsip Digital | — | DITUNDA | Belum ada konfigurasi server Arsip resmi (Horii 20-10-2026) |
 | F-01, F-02, F-04..F-08, F-11..F-13 | — | TODO | Paket Fase 7 berikutnya (butuh DBV / Fase 4) |
 
@@ -37,7 +37,7 @@ Keputusan PRD yang dipakai: F7-1..F7-14, F7-26, F7-27. Ringkasan implementasi:
 - **Test:** `features/laporan/__tests__/LaporanPage.spec.ts` (8 test: muat lingkup+statistik, pilih lingkup → parameter, pindah tipe, pencarian, ekspor xlsx, 403, `lingkupKeQuery`, `isLaporanTipe`); `nav.config.spec.ts` (7 anak + role 1,3,4,5,8 + tetap tersembunyi).
 - **Catatan:** ekspor hanya Excel (F7-11); QA UI lewat URL langsung karena menu `phase: 7` (F7-14, Q-2); mockup hanya menggambarkan 3 tipe — 4 tipe lain memakai layout yang sama (PRD Q-3).
 
-## M3 — MAKE-037 backend F-09 (21-10-2026)
+## M3 — MAKE-037 backend F-09 (21-10-2026, di `main` `6a03b19`)
 
 Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan implementasi:
 
@@ -68,3 +68,37 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - **Berkas bersama (aditif):** `tests/feature/KontrakMatriksRoleTest.php` (prefiks `dokumen` + baris kontrak route, satu commit dengan `Config/RoutesDashboard.php`), `docs/adr/README.md` (+1 baris ADR-034). `Routing.php` tidak berubah (entri `RoutesDashboard.php` sudah ada sejak M1).
 - **Test:** unit `tests/unit/Dashboard/{UrutanDukTest (6), KolomDokumenTest (5), ProyeksiPensiunTest (3), BaperjakatInputTest (3)}.php`; feature `tests/Dashboard/{DokumenEndpointTest (5), DokumenScopeTest (3), DokumenSnapshotTest (1), DokumenUnduhTest (8), DokumenVolumeTest (1, skip default)}.php`; fixture `tests/_support/Dashboard/DokumenUjiTrait.php`.
 - **Pertanyaan terbuka:** PRD Q-6 (nomor ADR-034, mohon konfirmasi reviewer) dan Q-9 (angka batas volume untuk mesin dev; batas 1.700 dapat disesuaikan setelah melihat spesifikasi server). `memory_limit` PHP produksi untuk endpoint PDF perlu ≥ 256 MB (dicatat untuk runbook deploy). **Q-10** (dari M1, tetap terbuka): `RiwayatEngine::tambah` alur Admin tidak memicu `EVENT_NOTIFIKASI`. Ini tidak berdampak pada F-09 karena dokumen tanpa cache dan selalu kueri langsung; dampaknya hanya pada kesegaran statistik F-03 (≤ TTL).
+
+## M4 — MAKE-037 frontend F-09 (21-10-2026)
+
+- **Halaman** `frontend/src/features/dokumen/views/DokumenPage.vue` (`/dokumen/:jenis(duk|nominatif|pensiun|baperjakat)`, `meta.roles` 1/3/4/5/8).
+  - Pemilih lingkup dari `GET statistik/lingkup`, sama dengan laporan F-03.
+  - Pencarian nama/NIP dan filter `tahun`/`sampai` Pensiun dikirim ke server dengan jeda 300 ms.
+  - Tabel berhalaman (20 per halaman) dengan kolom inti per jenis; label dari `kolom` respons, kolom lengkap ada di XLSX.
+  - Tombol level halaman "Unduh PDF" / "Unduh XLSX" lewat helper blob.
+- **Fallback PDF F7-15 di UI (ADR-034):**
+  - Tombol PDF dinonaktifkan dengan alasan tertulis bila lingkup efektif kementerian (dipilih, atau bawaan akun role 1/4/5/8) atau `total` > 1.700 baris. Untuk Baperjakat: lebih dari 1.700 pegawai terpilih.
+  - XLSX selalu aktif.
+  - Pesan 422 server tetap ditampilkan apa adanya. Contohnya bila data berubah sesudah daftar dimuat: "Persempit lingkup atau unduh XLSX.".
+  - Body galat unduhan datang sebagai Blob (`responseType: 'blob'`) dan tidak terbaca interceptor, jadi dibaca `pesanGalatUnduhan()` di `dokumen.service.ts`. `lib/axios` tidak diubah.
+- **Baperjakat:**
+  - Centang per baris + "Pilih semua di halaman ini"; pilihan bertahan lintas halaman.
+  - Form judul (wajib, ≤ 150), subjudul (≤ 150), teks (≤ 1.000) → `POST dokumen/baperjakat/{pdf|xlsx}` dengan `nip[]` terpilih.
+  - Validasi klien: minimal 1 pegawai dan judul wajib. 422 server (`errors.nip`, mis. NIP di luar lingkup) tampil sebagai notice.
+- **Aksi per baris:** `RowActionsMenu` ⋮ "Lihat DRH" → `GET pegawai/{nip}/drh` (unduh). Testid `dokumen-actions-<nip>`, aria-label "Aksi untuk <nama>".
+- **Testid:** `dokumen-page`, `dokumen-lingkup`, `dokumen-table`, `dokumen-row-<nip>`, `dokumen-unduh-pdf`, `dokumen-unduh-xlsx`, `dokumen-pdf-alasan`, `dokumen-unduh-galat`, `dokumen-failure`, `dokumen-baperjakat`, `dokumen-pilih-<nip>`, `dokumen-pilih-halaman`, `dokumen-actions-<nip>`.
+- **Berkas bersama (aditif, commit terpisah):** `router/index.ts` (+`dokumenRoutes`), `nav.config.ts` (item `dokumen` + 4 anak, `roles` 1/3/4/5/8, tetap `phase: 7`, **tanpa** `rilis`, `ACTIVE_PHASE` tidak disentuh) + `nav.config.spec.ts`.
+- **Test:** `features/dokumen/__tests__/DokumenPage.spec.ts` (10 test):
+  - muat + kolom inti + XLSX kementerian;
+  - PDF terkunci kementerian → satker aktif;
+  - batas 1.700 + 422 Blob;
+  - Pensiun tahun/sampai;
+  - ⋮ Lihat DRH;
+  - 403;
+  - Baperjakat validasi + POST;
+  - Baperjakat lintas halaman + 422 `errors.nip`;
+  - `paramsDokumen`;
+  - `pesanGalatUnduhan`.
+
+  `nav.config.spec.ts` (+1: Dokumen 4 anak, role 1/3/4/5/8, tetap tersembunyi). Uji mutasi: pembacaan body Blob dimatikan → 3 test gagal.
+- **Catatan:** QA visual oleh coder 2 lewat URL langsung (menu `phase: 7`, F7-14, PRD Q-2), tanpa preview browser di M4. Mockup halaman Dokumen tidak ada; layout mengikuti halaman laporan (PRD Q-3).
