@@ -10,6 +10,7 @@ import { createRouter, createWebHistory, type NavigationGuard, type RouteRecordR
 import { passwordResetEnabled } from '@/features/auth/config'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
+import { dokumenRoutes } from '@/features/dokumen/routes.dokumen'
 import { pegawaiRoutes } from '@/features/kepegawaian/routes.pegawai'
 import { riwayatRoutes } from '@/features/kepegawaian/routes.riwayat'
 import { laporanRoutes } from '@/features/laporan/routes.laporan'
@@ -105,6 +106,8 @@ const routes: RouteRecordRaw[] = [
   ...riwayatRoutes,
   // Modul F — Fase 7 F-03 laporan statistik (MAKE-036).
   ...laporanRoutes,
+  // Modul F — Fase 7 F-09 generator dokumen (MAKE-037).
+  ...dokumenRoutes,
   {
     path: '/403',
     name: 'forbidden',

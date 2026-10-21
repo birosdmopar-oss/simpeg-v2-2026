@@ -25,6 +25,7 @@ import {
   CircleHelp,
   ClipboardPen,
   FileText,
+  Files,
   House,
   MessageCircle,
   MousePointerClick,
@@ -40,6 +41,7 @@ import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
+import { DOKUMEN_ROLES } from '@/features/dokumen/types'
 import {
   AK_JF_ROLES,
   BIODATA_PROSES_ROLES,
@@ -145,6 +147,21 @@ const NAV: NavGroup[] = [
           { key: 'laporan-pendidikan', label: 'Pendidikan', to: '/laporan/pendidikan' },
           { key: 'laporan-usia', label: 'Usia', to: '/laporan/usia' },
           { key: 'laporan-golongan', label: 'Golongan', to: '/laporan/golongan' },
+        ],
+      },
+      // Fase 7 F-09 MAKE-037: generator dokumen (hr/document/* = role 1, 3, 4, 5, 8). Tetap `phase: 7` (tersembunyi
+      // sampai ACTIVE_PHASE ≥ 7, tanpa `rilis`); QA lewat URL langsung (PRD F7-14).
+      {
+        key: 'dokumen',
+        label: 'Dokumen',
+        icon: Files,
+        roles: DOKUMEN_ROLES,
+        phase: 7,
+        children: [
+          { key: 'dokumen-duk', label: 'DUK', to: '/dokumen/duk' },
+          { key: 'dokumen-nominatif', label: 'Nominatif', to: '/dokumen/nominatif' },
+          { key: 'dokumen-pensiun', label: 'Proyeksi Pensiun', to: '/dokumen/pensiun' },
+          { key: 'dokumen-baperjakat', label: 'Baperjakat', to: '/dokumen/baperjakat' },
         ],
       },
     ],
