@@ -52,7 +52,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -69,6 +69,12 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     {
         return [
             'GET api/v1/health' => self::PUBLIK,
+
+            // Modul F — Fase 7 F-03 statistik (MAKE-036): Matriks Bagian 2 `hr/chart/unit_kerja`, `hr/chart/usia|jabatan|
+            // gender|eselon|education|gol` = 1, 3, 4, 5, 8 (role 3 terbatas satker/unit di service, PegawaiScope).
+            'GET api/v1/statistik/lingkup'      => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)/xlsx' => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)'      => [1, 3, 4, 5, 8],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,
