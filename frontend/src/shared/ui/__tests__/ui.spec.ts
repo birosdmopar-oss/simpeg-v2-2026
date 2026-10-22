@@ -185,8 +185,8 @@ describe('UiAvatar', () => {
   })
 
   it('titik status hijau/merah dan bentuk rounded', () => {
-    expect(mount(UiAvatar, { props: { name: 'A', status: 'online' } }).get('[title="Aktif"]').classes()).toContain('bg-success')
-    expect(mount(UiAvatar, { props: { name: 'A', status: 'offline' } }).get('[title="Tidak aktif"]').classes()).toContain('bg-danger')
+    expect(mount(UiAvatar, { props: { name: 'A', status: 'online' } }).get('[aria-label="Aktif"]').classes()).toContain('bg-success')
+    expect(mount(UiAvatar, { props: { name: 'A', status: 'offline' } }).get('[aria-label="Tidak aktif"]').classes()).toContain('bg-danger')
     expect(mount(UiAvatar, { props: { name: 'A', shape: 'rounded' } }).get('[role="img"]').classes()).toContain('rounded-2xl')
   })
 })

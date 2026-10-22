@@ -23,6 +23,7 @@ export { default as UiStatTile } from './UiStatTile.vue'
 export { default as UiStepper } from './UiStepper.vue'
 export { default as UiTabs } from './UiTabs.vue'
 export { default as UiTextField } from './UiTextField.vue'
+export { default as UiTooltip } from './UiTooltip.vue'
 
 export type { BarSeries } from './UiBarChart.vue'
 export type { ExportFormat } from './UiExportMenu.vue'

@@ -21,7 +21,7 @@ import {
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { UiAvatar } from '@/shared/ui'
+import { UiAvatar, UiTooltip } from '@/shared/ui'
 
 import type { NavChild, NavGroup, NavItem } from './nav.config'
 
@@ -104,7 +104,6 @@ const itemActive = 'bg-brand-primary text-white shadow-float'
           <span
             class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-primary text-h6 font-bold text-white ring-2 ring-brand-secondary"
             aria-hidden="true"
-            title="Logo sementara"
           >
             S
           </span>
@@ -222,25 +221,25 @@ const itemActive = 'bg-brand-primary text-white shadow-float'
               </ul>
             </div>
 
-            <!-- Item biasa -->
-            <RouterLink
-              v-else-if="item.to"
-              :to="item.to"
-              :class="[itemBase, isActive(item) ? itemActive : itemIdle]"
-              :aria-current="isActive(item) ? 'page' : undefined"
-              :title="collapsed ? item.label : undefined"
-              :data-testid="`nav-${item.key}`"
-              @click="closeMobile"
-            >
-              <component :is="item.icon" class="h-5 w-5 shrink-0" aria-hidden="true" />
-              <span :class="collapsed ? 'sr-only' : 'flex-1 truncate'">{{ item.label }}</span>
-              <span
-                v-if="item.badge && !collapsed"
-                class="inline-flex min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-caption font-medium text-white"
+            <!-- Item biasa (diciutkan: label hanya lewat tooltip custom + sr-only) -->
+            <UiTooltip v-else-if="item.to" :content="collapsed ? item.label : ''" side="right">
+              <RouterLink
+                :to="item.to"
+                :class="[itemBase, isActive(item) ? itemActive : itemIdle]"
+                :aria-current="isActive(item) ? 'page' : undefined"
+                :data-testid="`nav-${item.key}`"
+                @click="closeMobile"
               >
-                {{ item.badge }}
-              </span>
-            </RouterLink>
+                <component :is="item.icon" class="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span :class="collapsed ? 'sr-only' : 'flex-1 truncate'">{{ item.label }}</span>
+                <span
+                  v-if="item.badge && !collapsed"
+                  class="inline-flex min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-caption font-medium text-white"
+                >
+                  {{ item.badge }}
+                </span>
+              </RouterLink>
+            </UiTooltip>
           </template>
         </div>
       </nav>

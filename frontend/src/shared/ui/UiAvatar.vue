@@ -12,6 +12,8 @@
  */
 import { computed, ref, watch } from 'vue'
 
+import UiTooltip from './UiTooltip.vue'
+
 const props = withDefaults(
   defineProps<{
     name?: string
@@ -82,11 +84,13 @@ const showImage = computed(() => Boolean(props.src) && !failed.value)
       {{ initials }}
     </span>
 
-    <span
-      v-if="status !== 'none'"
-      class="absolute bottom-0 right-0 rounded-full ring-2 ring-white"
-      :class="[SIZES[size].dot, status === 'online' ? 'bg-success' : 'bg-danger']"
-      :title="status === 'online' ? 'Aktif' : 'Tidak aktif'"
-    />
+    <UiTooltip v-if="status !== 'none'" :content="status === 'online' ? 'Aktif' : 'Tidak aktif'">
+      <span
+        class="absolute bottom-0 right-0 rounded-full ring-2 ring-white"
+        :class="[SIZES[size].dot, status === 'online' ? 'bg-success' : 'bg-danger']"
+        role="img"
+        :aria-label="status === 'online' ? 'Aktif' : 'Tidak aktif'"
+      />
+    </UiTooltip>
   </span>
 </template>
