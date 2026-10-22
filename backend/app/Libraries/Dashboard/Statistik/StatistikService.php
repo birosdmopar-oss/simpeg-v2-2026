@@ -80,17 +80,20 @@ final class StatistikService
 
     /**
      * Lingkup yang boleh dipilih akun (F7-2/F7-3): `kementerian` (null bila tidak boleh) + daftar unit beserta satker.
+     * `pilih_unit` = unit itu sendiri sah sebagai lingkup; false untuk Admin Satker ber-satker (unit hanya pembungkus
+     * satker miliknya, memilihnya pasti 403 — CR-064 T6; server tetap menolak).
      *
-     * @return array{kementerian: array{nama: string}|null, unit: list<array{id: int, nama: string, satker: list<array{id: int, nama: string}>}>}
+     * @return array{kementerian: array{nama: string}|null, unit: list<array{id: int, nama: string, pilih_unit: bool, satker: list<array{id: int, nama: string}>}>}
      */
     public function lingkupTersedia(AuthContext $auth): array
     {
         $this->wajibRole($auth);
 
-        $db       = $this->koneksi();
-        $unitRows = $db->table('unit')->select('id_unit, unit')->where('status', 1)->orderBy('order', 'ASC')->orderBy('id_unit', 'ASC');
-        $satRows  = $db->table('satker')->select('id_satker, id_unit, satker')->where('status', 1)->orderBy('order', 'ASC')->orderBy('id_satker', 'ASC');
-        $kemen    = ['nama' => $this->namaKementerian()];
+        $db        = $this->koneksi();
+        $unitRows  = $db->table('unit')->select('id_unit, unit')->where('status', 1)->orderBy('order', 'ASC')->orderBy('id_unit', 'ASC');
+        $satRows   = $db->table('satker')->select('id_satker, id_unit, satker')->where('status', 1)->orderBy('order', 'ASC')->orderBy('id_satker', 'ASC');
+        $kemen     = ['nama' => $this->namaKementerian()];
+        $pilihUnit = true;
 
         if ($auth->role() === Role::ADMIN_SATKER) {
             $akun = $this->lingkupAkun($auth);
@@ -102,6 +105,7 @@ final class StatistikService
             $kemen = null;
 
             if (isset($akun['satker'])) {
+                $pilihUnit = false;
                 $satRows->where('id_satker', $akun['satker']);
                 $idUnit = $db->table('satker')->select('id_unit')->where('id_satker', $akun['satker'])->get()->getRow('id_unit');
                 $unitRows->where('id_unit', $idUnit === null ? -1 : (int) $idUnit);
@@ -120,7 +124,7 @@ final class StatistikService
         $unit = [];
 
         foreach ($unitRows->get()->getResultArray() as $u) {
-            $unit[] = ['id' => (int) $u['id_unit'], 'nama' => (string) $u['unit'], 'satker' => $satkerPerUnit[(string) $u['id_unit']] ?? []];
+            $unit[] = ['id' => (int) $u['id_unit'], 'nama' => (string) $u['unit'], 'pilih_unit' => $pilihUnit, 'satker' => $satkerPerUnit[(string) $u['id_unit']] ?? []];
         }
 
         return ['kementerian' => $kemen, 'unit' => $unit];

@@ -174,6 +174,8 @@ final class StatistikEndpointTest extends DatabaseTestCase
         $this->assertCount(1, $unitA);
         $this->assertSame(['Satker A1', 'Satker A2'], array_column($unitA[0]['satker'], 'nama'));
         $this->assertNotContains($this->unit['C'], array_column($data['unit'], 'id'), 'unit nonaktif tidak ditawarkan');
+        // CR-064 T6: role lintas satker boleh memilih unit mana pun.
+        $this->assertSame([true], array_values(array_unique(array_column($data['unit'], 'pilih_unit'))));
     }
 
     public function testJenisAtauUnitTidakDikenal404(): void

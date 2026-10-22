@@ -85,6 +85,8 @@ final class StatistikScopeTest extends DatabaseTestCase
         $this->assertNull($lingkup['kementerian']);
         $this->assertSame([$this->unit['A']], array_column($lingkup['unit'], 'id'));
         $this->assertSame(['Satker A1'], array_column($lingkup['unit'][0]['satker'], 'nama'));
+        // CR-064 T6: unit hanya pembungkus satker akun → tidak ditawarkan sebagai lingkup (memilihnya = 403, di atas).
+        $this->assertFalse($lingkup['unit'][0]['pilih_unit']);
     }
 
     public function testAdminUnitTanpaSatkerMelihatUnitDanSatkerDiBawahnya(): void
@@ -106,6 +108,8 @@ final class StatistikScopeTest extends DatabaseTestCase
         $this->assertNull($lingkup['kementerian']);
         $this->assertSame([$this->unit['A']], array_column($lingkup['unit'], 'id'));
         $this->assertSame(['Satker A1', 'Satker A2'], array_column($lingkup['unit'][0]['satker'], 'nama'));
+        // Admin unit boleh memilih unitnya sendiri (200 di atas) → pilih_unit true; server tetap menolak kementerian/unit lain.
+        $this->assertTrue($lingkup['unit'][0]['pilih_unit']);
     }
 
     public function testAdminSatkerTanpaLingkupValidFailClosed(): void
