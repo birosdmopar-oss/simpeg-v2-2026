@@ -17,6 +17,7 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
 import { useStickyActionsShadow } from '@/shared/composables/useStickyActionsShadow'
+import { UiSelect } from '@/shared/ui'
 
 import MasterFormDialog from '../components/MasterFormDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -42,6 +43,13 @@ const error = ref('')
 const notice = ref('')
 const search = ref('')
 const statusFilter = ref<MasterStatus | ''>('')
+
+/** Filter status: kosong = Aktif & Tidak Aktif (tanpa Dihapus), lewat `clearable` UiSelect. */
+const STATUS_FILTER_OPTIONS = [
+  { value: '1', label: 'Aktif' },
+  { value: '2', label: 'Tidak Aktif' },
+  { value: '10', label: 'Dihapus' },
+]
 const busyId = ref('')
 
 /** Nilai filter field allowlist (meta `filters`), per nama field; '' = semua. */
@@ -450,36 +458,41 @@ onMounted(() => {
               data-testid="master-search"
             />
           </label>
-          <select
+          <UiSelect
             v-for="(level, index) in filterLevels"
             :key="level.meta.key"
-            :value="level.value"
-            class="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+            :model-value="level.value"
+            :options="level.options.map((o) => ({ value: o.id, label: o.nama }))"
+            clearable
+            :placeholder="`Semua ${level.meta.label}`"
             :disabled="level.loading || (index > 0 && !filterLevels[index - 1]?.value)"
             :aria-label="`Filter ${level.meta.label}`"
-            @change="onFilterLevel(index, ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Semua {{ level.meta.label }}</option>
-            <option v-for="o in level.options" :key="o.id" :value="o.id">{{ o.nama }}</option>
-          </select>
-          <select
+            class="w-52"
+            :data-testid="`master-filter-level-${level.meta.key}`"
+            @update:model-value="onFilterLevel(index, $event)"
+          />
+          <UiSelect
             v-for="field in filterFields"
             :key="field.name"
-            :value="fieldFilters[field.name] ?? ''"
-            class="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            :model-value="fieldFilters[field.name] ?? ''"
+            :options="filterOptions(field)"
+            clearable
+            :placeholder="`Semua ${field.label}`"
             :aria-label="`Filter ${field.label}`"
+            class="w-52"
             :data-testid="`master-filter-${field.name}`"
-            @change="onFieldFilter(field.name, ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Semua {{ field.label }}</option>
-            <option v-for="o in filterOptions(field)" :key="o.value" :value="o.value">{{ o.label }}</option>
-          </select>
-          <select v-model="statusFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm" aria-label="Filter status">
-            <option value="">Aktif &amp; Tidak Aktif</option>
-            <option value="1">Aktif</option>
-            <option value="2">Tidak Aktif</option>
-            <option value="10">Dihapus</option>
-          </select>
+            @update:model-value="onFieldFilter(field.name, $event)"
+          />
+          <UiSelect
+            :model-value="statusFilter"
+            :options="STATUS_FILTER_OPTIONS"
+            clearable
+            placeholder="Aktif & Tidak Aktif"
+            aria-label="Filter status"
+            class="w-52"
+            data-testid="master-filter-status"
+            @update:model-value="statusFilter = $event as MasterStatus | ''"
+          />
         </div>
 
         <div ref="tableScroller" class="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="master-table-scroll" @scroll.passive="updateActionsShadow">

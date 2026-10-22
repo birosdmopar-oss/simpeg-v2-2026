@@ -11,6 +11,7 @@ import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
+import { UiSelect } from '@/shared/ui'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 
 import UserFormDialog from '../components/UserFormDialog.vue'
@@ -31,6 +32,13 @@ const error = ref('')
 const search = ref('')
 const roleFilter = ref<RoleCode | ''>('')
 const statusFilter = ref<'0' | '1' | ''>('')
+
+/** Opsi filter dropdown custom (UiSelect, AGENTS.md bagian 3); opsi kosong = "Semua ..." lewat `clearable`. */
+const roleFilterOptions = Object.entries(ROLE_LABELS).map(([code, label]) => ({ value: Number(code), label: `${code} — ${label}` }))
+const statusFilterOptions = [
+  { value: '1', label: 'Aktif' },
+  { value: '0', label: 'Nonaktif' },
+]
 const sort = ref<SortKey>('username')
 const order = ref<'asc' | 'desc'>('asc')
 
@@ -231,15 +239,26 @@ onMounted(() => {
           data-testid="user-search"
         />
       </label>
-      <select v-model="roleFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
-        <option value="">Semua role</option>
-        <option v-for="(label, code) in ROLE_LABELS" :key="code" :value="Number(code)">{{ code }} — {{ label }}</option>
-      </select>
-      <select v-model="statusFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
-        <option value="">Semua status</option>
-        <option value="1">Aktif</option>
-        <option value="0">Nonaktif</option>
-      </select>
+      <UiSelect
+        :model-value="roleFilter"
+        :options="roleFilterOptions"
+        clearable
+        placeholder="Semua role"
+        aria-label="Filter role"
+        class="w-56"
+        data-testid="user-role-filter"
+        @update:model-value="roleFilter = $event === '' ? '' : (Number($event) as RoleCode)"
+      />
+      <UiSelect
+        :model-value="statusFilter"
+        :options="statusFilterOptions"
+        clearable
+        placeholder="Semua status"
+        aria-label="Filter status"
+        class="w-44"
+        data-testid="user-status-filter"
+        @update:model-value="statusFilter = $event as '0' | '1' | ''"
+      />
     </div>
 
     <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">

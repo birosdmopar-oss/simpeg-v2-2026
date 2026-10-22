@@ -195,7 +195,7 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
       'Pilih Jenis Diklat dan kosongkan filter Sertifikasi untuk mengubah urutan (urutan berlaku per Jenis Diklat).',
     )
 
-    await wrapper.get('[data-testid="master-filter-jenis"]').setValue('2')
+    await wrapper.get('[data-testid="master-filter-jenis"] select').setValue('2')
     await flushPromises()
     expect(masterService.list).toHaveBeenLastCalledWith('uji-diklat', expect.objectContaining({ filters: { jenis: '2' }, page: 1 }))
     expect(wrapper.find('[data-testid="master-reorder-hint"]').exists()).toBe(false)
@@ -221,13 +221,13 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
     expect(masterService.reorder).toHaveBeenCalledTimes(1)
 
     // Filter di luar lingkup urutan membuat daftar tidak utuh → panah disembunyikan lagi.
-    await wrapper.get('[data-testid="master-filter-aktif_sertifikasi"]').setValue('1')
+    await wrapper.get('[data-testid="master-filter-aktif_sertifikasi"] select').setValue('1')
     await flushPromises()
     expect(masterService.list).toHaveBeenLastCalledWith('uji-diklat', expect.objectContaining({ filters: { jenis: '2', aktif_sertifikasi: '1' } }))
     expect(await actionKeys(wrapper, '1')).not.toContain('down')
     expect(await actionKeys(wrapper, '1')).not.toContain('up')
     expect(
-      Array.from(wrapper.get<HTMLSelectElement>('[data-testid="master-filter-aktif_sertifikasi"]').element.options).map((o) => o.textContent),
+      Array.from(wrapper.get<HTMLSelectElement>('[data-testid="master-filter-aktif_sertifikasi"] select').element.options).map((o) => o.textContent),
     ).toEqual(['Semua Sertifikasi', 'Ya', 'Tidak'])
     wrapper.unmount()
   })
@@ -266,7 +266,7 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
     const wrapper = await mountView('uji-kantor')
 
     expect(masterService.options).toHaveBeenCalledWith('provinsi')
-    const select = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-id_provinsi"]')
+    const select = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-id_provinsi"] select')
     expect(Array.from(select.element.options).map((o) => [o.value, o.textContent])).toEqual([
       ['', 'Semua Provinsi'],
       ['31', 'DKI Jakarta'],

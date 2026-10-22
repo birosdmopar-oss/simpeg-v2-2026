@@ -14,6 +14,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
+import { UiSelect } from '@/shared/ui'
 import type { RowAction } from '@/shared/components/rowActions'
 
 import HariLiburFormDialog from '../components/HariLiburFormDialog.vue'
@@ -29,6 +30,14 @@ const canWrite = computed(() => auth.role !== null && (HARI_LIBUR_WRITE_ROLES as
 const currentYear = new Date().getFullYear()
 /** Pilihan tahun: tahun depan s.d. 5 tahun lalu, plus "Semua tahun". */
 const yearOptions = Array.from({ length: 7 }, (_, i) => String(currentYear + 1 - i))
+const tahunOptions = yearOptions.map((year) => ({ value: year, label: year }))
+
+/** Filter status (role 1): kosong = Aktif & Tidak Aktif (tanpa Dihapus), lewat `clearable` UiSelect. */
+const STATUS_FILTER_OPTIONS = [
+  { value: '1', label: 'Aktif' },
+  { value: '2', label: 'Tidak Aktif' },
+  { value: '10', label: 'Dihapus' },
+]
 
 const items = ref<HariLiburRow[]>([])
 const total = ref(0)
@@ -238,22 +247,26 @@ onMounted(() => {
           data-testid="hari-libur-search"
         />
       </label>
-      <select v-model="tahun" class="rounded-md border border-slate-300 px-3 py-2 text-sm" aria-label="Filter tahun" data-testid="hari-libur-tahun">
-        <option value="">Semua tahun</option>
-        <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
-      </select>
-      <select
+      <UiSelect
+        v-model="tahun"
+        :options="tahunOptions"
+        clearable
+        placeholder="Semua tahun"
+        aria-label="Filter tahun"
+        class="w-40"
+        data-testid="hari-libur-tahun"
+      />
+      <UiSelect
         v-if="canWrite"
-        v-model="statusFilter"
-        class="rounded-md border border-slate-300 px-3 py-2 text-sm"
+        :model-value="statusFilter"
+        :options="STATUS_FILTER_OPTIONS"
+        clearable
+        placeholder="Aktif & Tidak Aktif"
         aria-label="Filter status"
+        class="w-52"
         data-testid="hari-libur-status"
-      >
-        <option value="">Aktif &amp; Tidak Aktif</option>
-        <option value="1">Aktif</option>
-        <option value="2">Tidak Aktif</option>
-        <option value="10">Dihapus</option>
-      </select>
+        @update:model-value="statusFilter = $event as MasterStatus | ''"
+      />
     </div>
 
     <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">

@@ -257,6 +257,7 @@ const displayText = computed(() => (selected.value ? selected.value.label : ''))
             :name="name"
             :value="current"
             :disabled="disabled"
+            :aria-label="label || ariaLabel"
             class="sr-only"
             aria-hidden="true"
             tabindex="-1"
