@@ -415,3 +415,29 @@ describe('RedesignShell — --page-top diukur dari posisi <main> (CR-060, window
     expect(root.style.getPropertyValue('--page-top')).toBe('137px')
   })
 })
+
+describe('RedesignShell — kontainer gulir menu menampung label sr-only (CR-060, selisih 33px mode ciut)', () => {
+  it('nav gulir memakai position relative; label sr-only mode ciut berada DI DALAM kontainer gulir itu', async () => {
+    const viewport = fakeViewport(true)
+    try {
+      window.localStorage.setItem('simpeg.sidebar.collapsed', '1')
+      const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+      const nav = wrapper.get('[data-testid="nav-main"]')
+
+      expect(nav.classes()).toEqual(expect.arrayContaining(['relative', 'overflow-y-auto']))
+      const labels = nav.findAll('span.sr-only')
+      expect(labels.length).toBeGreaterThan(3)
+      for (const label of labels) {
+        expect(nav.element.contains(label.element)).toBe(true)
+        // Leluhur terdekat yang menggulir adalah nav itu sendiri, dan nav terposisi → label absolute terpotong olehnya.
+        let node: HTMLElement | null = label.element.parentElement
+        while (node && node !== nav.element) {
+          expect(node.classList.contains('overflow-y-auto'), 'tidak ada kontainer gulir lain di antara label dan nav').toBe(false)
+          node = node.parentElement
+        }
+      }
+    } finally {
+      viewport.restore()
+    }
+  })
+})

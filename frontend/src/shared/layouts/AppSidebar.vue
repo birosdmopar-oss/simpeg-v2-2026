@@ -184,8 +184,11 @@ const menuItemBase = 'flex w-full cursor-pointer items-center gap-3 rounded-xl p
         </DropdownMenuRoot>
       </div>
 
-      <!-- Menu (area gulir mandiri) -->
-      <nav class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" :class="ciut ? 'px-3' : ''" aria-label="Navigasi utama" data-testid="nav-main">
+      <!--
+        Menu (area gulir mandiri). `relative` = kotak penampung bagi label `sr-only` (absolute) item menu saat ciut; tanpa itu
+        label lolos dari overflow-y-auto dan menambah tinggi dokumen (window bisa tergulir beberapa piksel, CR-060).
+      -->
+      <nav class="relative min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" :class="ciut ? 'px-3' : ''" aria-label="Navigasi utama" data-testid="nav-main">
         <div v-for="group in groups" :key="group.key" class="space-y-1">
           <p v-if="group.title && !ciut" class="px-3 pb-1 pt-1 text-overline uppercase text-slate-400">
             {{ group.title }}
