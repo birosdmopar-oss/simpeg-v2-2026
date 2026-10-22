@@ -38,11 +38,16 @@
 
   /*
    * Scrollbar custom ramping GLOBAL (AGENTS.md bagian 3, CR-060): halaman, sidebar, tabel, dialog, dan semua area gulir.
-   * Firefox memakai scrollbar-width/color; WebKit/Blink memakai pseudo-element (thumb bulat, trek transparan).
+   * Chrome/Edge/Safari memakai pseudo-element ::-webkit-scrollbar* (thumb bulat, trek transparan, TANPA tombol panah).
+   * Properti standar scrollbar-width/color HANYA untuk browser tanpa ::-webkit-scrollbar (Firefox): sejak Chrome 121
+   * menyetelnya membuat Blink mengabaikan ::-webkit-scrollbar* dan merender scrollbar native tipis lengkap dengan tombol
+   * panah (CR-063), jadi jangan pernah menyetelnya di luar @supports ini.
    */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(203 213 225) transparent;
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(203 213 225) transparent;
+    }
   }
 
   *::-webkit-scrollbar {
@@ -53,6 +58,13 @@
   *::-webkit-scrollbar-track,
   *::-webkit-scrollbar-corner {
     background: transparent;
+  }
+
+  /* Tombol panah atas/bawah (dan kiri/kanan) tidak pernah tampil. */
+  *::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   *::-webkit-scrollbar-thumb {
@@ -146,9 +158,11 @@
   }
 
   /* Alias lama: scrollbar global sudah ramping; kelas ini dipertahankan agar pemakai lama tidak berubah. */
-  .scrollbar-slim {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(203 213 225) transparent;
+  @supports not selector(::-webkit-scrollbar) {
+    .scrollbar-slim {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(203 213 225) transparent;
+    }
   }
 
   .scrollbar-slim::-webkit-scrollbar {
@@ -162,5 +176,11 @@
 
   .scrollbar-slim::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }

@@ -11,11 +11,48 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(resolve(__dirname, '../main.css'), 'utf-8')
 
 describe('main.css', () => {
-  it('scrollbar ramping berlaku global: Firefox (scrollbar-width/color) dan WebKit (::-webkit-scrollbar)', () => {
-    expect(css).toMatch(/\*\s*\{[^}]*scrollbar-width:\s*thin;[^}]*scrollbar-color:/s)
+  /** Teks CSS tanpa blok `@supports not selector(::-webkit-scrollbar) { … }` (sampai kurung penutupnya). */
+  const tanpaSupports = (teks: string): string => {
+    const awal = /@supports not selector\(::-webkit-scrollbar\)\s*\{/g
+    let hasil = ''
+    let dari = 0
+    for (let m = awal.exec(teks); m; m = awal.exec(teks)) {
+      hasil += teks.slice(dari, m.index)
+      let kedalaman = 1
+      let i = m.index + m[0].length
+      while (i < teks.length && kedalaman > 0) {
+        if (teks[i] === '{') kedalaman++
+        else if (teks[i] === '}') kedalaman--
+        i++
+      }
+      dari = i
+      awal.lastIndex = i
+    }
+    return hasil + teks.slice(dari)
+  }
+
+  it('scrollbar ramping berlaku global lewat ::-webkit-scrollbar* (Chrome/Edge/Safari), thumb bulat, trek transparan', () => {
     expect(css).toMatch(/\*::-webkit-scrollbar\s*\{[^}]*width:\s*8px/s)
     expect(css).toMatch(/\*::-webkit-scrollbar-thumb/)
     expect(css).toMatch(/\*::-webkit-scrollbar-track/)
+  })
+
+  it('CR-063: scrollbar-width/color standar hanya di dalam @supports not selector(::-webkit-scrollbar), tidak di level global', () => {
+    // Ada dua blok @supports (global `*` dan alias .scrollbar-slim) yang memuat properti standar.
+    const supports = css.match(/@supports not selector\(::-webkit-scrollbar\)\s*\{\s*(\*|\.scrollbar-slim)\s*\{[^}]*scrollbar-width:\s*thin;[^}]*scrollbar-color:[^}]*\}\s*\}/g) ?? []
+    expect(supports).toHaveLength(2)
+    expect(supports.some((blok) => /\{\s*\*\s*\{/.test(blok))).toBe(true)
+    expect(supports.some((blok) => /\.scrollbar-slim/.test(blok))).toBe(true)
+
+    // Di luar blok @supports TIDAK ada scrollbar-width/scrollbar-color (Blink akan mengabaikan ::-webkit-scrollbar*).
+    const luar = tanpaSupports(css).replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(luar).not.toMatch(/scrollbar-width\s*:/)
+    expect(luar).not.toMatch(/scrollbar-color\s*:/)
+  })
+
+  it('CR-063: tombol panah scrollbar disembunyikan (global dan alias .scrollbar-slim)', () => {
+    expect(css).toMatch(/\*::-webkit-scrollbar-button\s*\{[^}]*display:\s*none[^}]*width:\s*0[^}]*height:\s*0/s)
+    expect(css).toMatch(/\.scrollbar-slim::-webkit-scrollbar-button\s*\{[^}]*display:\s*none/s)
   })
 
   it('.pane-scroll: sticky di bawah navbar, tinggi = viewport − navbar, gulir mandiri, hanya dari lg', () => {
