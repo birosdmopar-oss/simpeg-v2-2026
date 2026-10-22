@@ -351,3 +351,15 @@ describe('UiStepper, UiStatTile, UiBadge, UiCard, UiNotice, UiSearchInput', () =
     expect(w.emitted('submit')).toHaveLength(1)
   })
 })
+
+describe('UiAvatar — tidak tertimpa latar di belakangnya (CR-060)', () => {
+  it('inisial memakai latar OPAK (bukan transparan) dan avatar berada di layer z-10', () => {
+    const w = mount(UiAvatar, { props: { name: 'Herry Widjaja' } })
+    const inisial = w.get('[role="img"]')
+
+    expect(w.classes()).toEqual(expect.arrayContaining(['relative', 'z-10']))
+    // Latar transparan (mis. bg-brand-tertiary/10) membuat pita navy di belakangnya tembus; harus warna penuh.
+    expect(inisial.classes().some((c) => /^bg-\[#[0-9A-Fa-f]{6}\]$/.test(c))).toBe(true)
+    expect(inisial.classes().some((c) => /\/\d+$/.test(c) && c.startsWith('bg-'))).toBe(false)
+  })
+})

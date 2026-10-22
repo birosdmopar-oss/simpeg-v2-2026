@@ -9,6 +9,20 @@
     /* Public Sans dimuat lewat <link> Google Fonts di index.html; fallback ada di fontFamily.sans. */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+
+    /*
+     * Tata letak shell (RedesignShell): jarak tepi konten, tinggi top navbar, dan batas atas area yang menempel
+     * (panel menu samping) sesudah navbar sticky. Dipakai .pane-scroll.
+     */
+    --shell-gap: 1rem;
+    --topbar-h: 3.5rem;
+    --sticky-top: calc(var(--shell-gap) + var(--topbar-h) + 1rem);
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      --shell-gap: 1.25rem;
+    }
   }
 
   body {
@@ -18,6 +32,36 @@
   /* Prinsip desain 1.2 "Aksesibilitas dan Inklusivitas" (WCAG 2.1 AA): fokus keyboard harus selalu terlihat. */
   :focus-visible {
     @apply outline-none ring-2 ring-brand-tertiary/50 ring-offset-2 ring-offset-white;
+  }
+
+  /*
+   * Scrollbar custom ramping GLOBAL (AGENTS.md bagian 3, CR-060): halaman, sidebar, tabel, dialog, dan semua area gulir.
+   * Firefox memakai scrollbar-width/color; WebKit/Blink memakai pseudo-element (thumb bulat, trek transparan).
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+    background-clip: content-box;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -39,7 +83,22 @@
       linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   }
 
-  /* Scrollbar tipis untuk panel yang bisa digulir (sidebar, daftar chat, riwayat kehadiran). */
+  /*
+   * Panel gulir mandiri (CR-060): menempel di bawah top navbar sticky (lg ke atas), tinggi = viewport − navbar, dan
+   * menggulir isinya sendiri sehingga menggulir panel tidak menggulir halaman/area data, dan sebaliknya. Di bawah lg
+   * (layout bertumpuk) tidak menempel dan tidak dibatasi tinggi.
+   */
+  @media (min-width: 1024px) {
+    .pane-scroll {
+      position: sticky;
+      top: var(--sticky-top);
+      max-height: calc(100vh - var(--sticky-top) - var(--shell-gap));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+
+  /* Alias lama: scrollbar global sudah ramping; kelas ini dipertahankan agar pemakai lama tidak berubah. */
   .scrollbar-slim {
     scrollbar-width: thin;
     scrollbar-color: rgb(203 213 225) transparent;

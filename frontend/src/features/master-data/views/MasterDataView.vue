@@ -414,8 +414,13 @@ onMounted(() => {
 
     <p v-if="metaError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ metaError }}</p>
 
-    <div class="grid gap-4 lg:grid-cols-[220px_1fr]">
-      <nav class="flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 lg:flex-col" aria-label="Daftar master">
+    <!-- CR-060: menu kiri dan area data masing-masing panel gulir mandiri (sticky di bawah navbar, tinggi = viewport − navbar). -->
+    <div class="grid gap-4 lg:grid-cols-[220px_1fr] lg:items-start">
+      <nav
+        class="pane-scroll flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 lg:flex-col lg:overflow-x-hidden"
+        aria-label="Daftar master"
+        data-testid="master-nav"
+      >
         <button
           v-for="m in metas"
           :key="m.key"
@@ -430,7 +435,7 @@ onMounted(() => {
         </button>
       </nav>
 
-      <div v-if="meta" class="min-w-0 space-y-4">
+      <div v-if="meta" class="pane-scroll min-w-0 space-y-4 lg:pr-1" data-testid="master-data-pane">
         <p v-if="notice" class="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800" role="status">{{ notice }}</p>
         <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
 

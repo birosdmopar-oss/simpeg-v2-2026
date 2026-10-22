@@ -4,6 +4,8 @@
  * status merah (offline/tidak aktif); dua bentuk isi: inisial dan foto/ilustrasi.
  *
  * Reusable. Kalau `src` gagal dimuat, otomatis jatuh ke inisial supaya tidak pernah tampil kotak rusak.
+ * CR-060: akar `z-10` dan latar inisial OPAK, supaya avatar yang menumpuk pita/latar berwarna (kartu profil Detail Pegawai)
+ * tidak tertimpa atau ditembus warna di belakangnya. Jangan menaruh komentar HTML di akar template (membuat akar jamak).
  *
  * ASSET SEMENTARA: foto pegawai belum ada di sistem. Halaman pemanggil boleh mengisi `src` dengan
  * URL placeholder (lihat src/shared/ui/placeholderAssets.ts) — komponen ini sendiri tidak memuat aset apa pun.
@@ -60,7 +62,7 @@ const showImage = computed(() => Boolean(props.src) && !failed.value)
 </script>
 
 <template>
-  <span class="relative inline-flex shrink-0">
+  <span class="relative z-10 inline-flex shrink-0">
     <img
       v-if="showImage"
       :src="src ?? undefined"
@@ -72,7 +74,7 @@ const showImage = computed(() => Boolean(props.src) && !failed.value)
     />
     <span
       v-else
-      class="inline-flex items-center justify-center bg-brand-tertiary/10 font-semibold text-brand-tertiary ring-2 ring-white"
+      class="inline-flex items-center justify-center bg-[#E8F1FF] font-semibold text-brand-tertiary ring-2 ring-white"
       :class="[SIZES[size].box, radius]"
       :aria-label="name || undefined"
       role="img"

@@ -200,3 +200,18 @@ describe('RedesignShell — sidebar & layout', () => {
     expect(bell.find('span').exists()).toBe(false)
   })
 })
+
+describe('RedesignShell — top navbar sticky (AGENTS.md bagian 3, CR-060)', () => {
+  it('navbar dibungkus pembungkus sticky top-0 di atas konten tetapi di bawah drawer mobile dan dialog', async () => {
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+    const sticky = wrapper.get('[data-testid="app-topbar-sticky"]')
+
+    expect(sticky.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'z-20']))
+    expect(sticky.find('[data-testid="app-topbar"]').exists()).toBe(true)
+
+    // z-20 < overlay/drawer mobile (z-30/z-40) supaya navbar tidak menimpa drawer.
+    expect(wrapper.get('[data-testid="app-sidebar"]').classes()).toContain('z-40')
+    // Navbar ada SEBELUM konten di DOM; konten tidak berada di dalam pembungkus sticky.
+    expect(sticky.find('#main-content').exists()).toBe(false)
+  })
+})

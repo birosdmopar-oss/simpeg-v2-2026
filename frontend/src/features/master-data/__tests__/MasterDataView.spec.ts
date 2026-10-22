@@ -444,3 +444,20 @@ describe('MasterDataView — tata letak sempit & label daftar master (CR-038)', 
     wrapper.unmount()
   })
 })
+
+describe('MasterDataView — panel gulir mandiri (CR-060)', () => {
+  it('menu kiri dan area data masing-masing panel gulir sendiri yang menempel di bawah navbar', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+
+    const nav = wrapper.get('[data-testid="master-nav"]')
+    const data = wrapper.get('[data-testid="master-data-pane"]')
+    expect(nav.classes()).toContain('pane-scroll')
+    expect(data.classes()).toContain('pane-scroll')
+    // Dua panel terpisah: menu bukan di dalam area data, sehingga menggulir salah satunya tidak menggulir yang lain.
+    expect(data.find('[data-testid="master-nav"]').exists()).toBe(false)
+    expect(nav.find('[data-testid="master-data-pane"]').exists()).toBe(false)
+    // Tombol menu tetap ada dengan testid lama.
+    expect(nav.find('[data-testid="master-nav-kabupaten-kota"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+})

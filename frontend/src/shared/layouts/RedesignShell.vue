@@ -87,7 +87,17 @@ async function logout(): Promise<void> {
       />
 
       <div class="min-w-0 flex-1 p-4 lg:p-5">
-        <AppTopbar @open-menu="mobileOpen = true" />
+        <!--
+          Top navbar sticky di semua halaman (AGENTS.md bagian 3, CR-060). Pembungkus menutup celah di atas navbar
+          dengan gradasi latar supaya konten yang digulir tidak terlihat di sela-sela navbar yang mengambang;
+          z-20 di bawah drawer/overlay mobile (z-30/40) dan dialog (z-50).
+        -->
+        <div
+          class="sticky top-0 z-20 -mx-4 -mt-4 bg-gradient-to-b from-slate-100 via-slate-100/90 to-transparent px-4 pb-3 pt-4 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5"
+          data-testid="app-topbar-sticky"
+        >
+          <AppTopbar @open-menu="mobileOpen = true" />
+        </div>
 
         <UiBreadcrumb v-if="breadcrumbs?.length" :items="breadcrumbs" class="mt-4 block" />
 
