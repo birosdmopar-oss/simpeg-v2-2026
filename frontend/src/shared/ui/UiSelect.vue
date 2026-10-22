@@ -68,7 +68,6 @@ const open = ref(false)
 const active = ref(-1)
 const query = ref('')
 const trigger = ref<HTMLElement | null>(null)
-const listEl = ref<HTMLElement | null>(null)
 
 const current = computed(() => String(props.modelValue ?? ''))
 const selected = computed(() => props.options.find((o) => String(o.value) === current.value) ?? null)
@@ -340,7 +339,7 @@ const displayText = computed(() => (selected.value ? selected.value.label : ''))
           @focus-outside.prevent
           @escape-key-down="() => closeList(true)"
         >
-          <ul :id="listId" ref="listEl" role="listbox" :aria-label="label || ariaLabel" class="max-h-64 overflow-y-auto" tabindex="-1">
+          <ul :id="listId" role="listbox" :aria-label="label || ariaLabel" class="max-h-64 overflow-y-auto" tabindex="-1">
             <li
               v-for="(item, index) in items"
               :id="optionId(index)"

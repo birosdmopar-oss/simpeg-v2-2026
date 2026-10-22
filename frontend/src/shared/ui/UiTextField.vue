@@ -73,10 +73,11 @@ const id = useId()
 const slots = useSlots()
 
 const PICKERS = { date: UiDatePicker, time: UiTimePicker, month: UiMonthPicker } as const
-const picker = computed(() => PICKERS[props.type as keyof typeof PICKERS] ?? (props.suggestions !== undefined && props.type === 'text' ? UiCombobox : null))
+const isCombobox = computed(() => props.suggestions !== undefined && props.type === 'text')
+const picker = computed(() => (isCombobox.value ? UiCombobox : (PICKERS[props.type as keyof typeof PICKERS] ?? null)))
 /** Props khusus per komponen kontrol (picker tanggal: batas; combobox: saran + atribut input). */
 const pickerProps = computed(() =>
-  picker.value === UiCombobox
+  isCombobox.value
     ? { suggestions: props.suggestions, inputmode: props.inputmode, autocomplete: props.autocomplete, placeholder: props.placeholder }
     : { min: props.min, max: props.max, ...(props.placeholder ? { placeholder: props.placeholder } : {}) },
 )
@@ -130,7 +131,7 @@ const controlClass = computed(() => [
         v-if="picker"
         :id="id"
         :name="name"
-        :model-value="modelValue ?? ''"
+        :model-value="String(modelValue ?? '')"
         :disabled="disabled"
         :readonly="readonly"
         :invalid="effState === 'error'"
