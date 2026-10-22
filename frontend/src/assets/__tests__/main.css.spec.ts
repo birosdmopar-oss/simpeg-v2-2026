@@ -50,6 +50,18 @@ describe('main.css', () => {
     expect(luar).not.toMatch(/scrollbar-color\s*:/)
   })
 
+  it('CR-063: scrollbar menu sidebar mengikuti sudut panel — margin track bawah ≥ radius 1.75rem, khusus .sidebar-scroll (tidak global)', () => {
+    const track = css.match(/\.sidebar-scroll::-webkit-scrollbar-track\s*\{([^}]*)\}/)?.[1] ?? ''
+    const margin = track.match(/margin-block:\s*([\d.]+)rem\s+([\d.]+)rem/)
+    expect(margin, 'margin-block atas dan bawah').not.toBeNull()
+    expect(Number(margin?.[1])).toBeGreaterThan(0)
+    expect(Number(margin?.[2])).toBeGreaterThanOrEqual(1.75)
+    expect(css).toMatch(/\.sidebar-scroll::-webkit-scrollbar\s*\{[^}]*width:\s*10px/s)
+    expect(css).toMatch(/\.sidebar-scroll::-webkit-scrollbar-thumb\s*\{[^}]*border-width:\s*3px/s)
+    // Tidak bocor ke scrollbar global: aturan margin track hanya ada di bawah selektor .sidebar-scroll.
+    expect(css.match(/::-webkit-scrollbar-track[^{]*\{[^}]*margin-block/g) ?? []).toHaveLength(1)
+  })
+
   it('CR-063: tombol panah scrollbar disembunyikan (global dan alias .scrollbar-slim)', () => {
     expect(css).toMatch(/\*::-webkit-scrollbar-button\s*\{[^}]*display:\s*none[^}]*width:\s*0[^}]*height:\s*0/s)
     expect(css).toMatch(/\.scrollbar-slim::-webkit-scrollbar-button\s*\{[^}]*display:\s*none/s)

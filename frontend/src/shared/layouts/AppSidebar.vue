@@ -114,7 +114,15 @@ const menuItemBase = 'flex w-full cursor-pointer items-center gap-3 rounded-xl p
     aria-label="Sidebar"
     data-testid="app-sidebar"
   >
-    <div class="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-white/70 bg-white shadow-panel lg:bg-white/85 lg:backdrop-blur">
+    <!--
+      Panel sidebar bersudut bulat: `overflow-hidden` memotong isi (termasuk scrollbar menu) mengikuti lengkung di semua
+      browser (CR-063). Yang TIDAK boleh terpotong ada di luar panel ini: tombol ciutkan (anak langsung <aside>) serta
+      dropdown profil dan tooltip menu (radix portal ke <body>).
+    -->
+    <div
+      class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-panel lg:bg-white/85 lg:backdrop-blur"
+      data-testid="sidebar-panel"
+    >
       <!-- Logo (+ tombol tutup di drawer mobile) -->
       <div class="flex items-center gap-2 px-5 pb-3 pt-5" :class="ciut ? 'justify-center px-3' : 'justify-between'">
         <div class="flex min-w-0 items-center gap-3">
@@ -188,7 +196,7 @@ const menuItemBase = 'flex w-full cursor-pointer items-center gap-3 rounded-xl p
         Menu (area gulir mandiri). `relative` = kotak penampung bagi label `sr-only` (absolute) item menu saat ciut; tanpa itu
         label lolos dari overflow-y-auto dan menambah tinggi dokumen (window bisa tergulir beberapa piksel, CR-060).
       -->
-      <nav class="relative min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" :class="ciut ? 'px-3' : ''" aria-label="Navigasi utama" data-testid="nav-main">
+      <nav class="sidebar-scroll relative min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" :class="ciut ? 'px-3' : ''" aria-label="Navigasi utama" data-testid="nav-main">
         <div v-for="group in groups" :key="group.key" class="space-y-1">
           <p v-if="group.title && !ciut" class="px-3 pb-1 pt-1 text-overline uppercase text-slate-400">
             {{ group.title }}

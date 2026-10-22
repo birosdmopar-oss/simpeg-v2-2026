@@ -441,3 +441,54 @@ describe('RedesignShell — kontainer gulir menu menampung label sr-only (CR-060
     }
   })
 })
+
+describe('RedesignShell — scrollbar menu mengikuti sudut panel sidebar (CR-063)', () => {
+  it('panel sidebar overflow-hidden + rounded; nav memakai sidebar-scroll; tombol ciutkan, dropdown profil, dan tooltip di LUAR panel', async () => {
+    const viewport = fakeViewport(true)
+    try {
+      const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+      const sidebar = wrapper.get('[data-testid="app-sidebar"]')
+      const panel = wrapper.get('[data-testid="sidebar-panel"]')
+      const nav = wrapper.get('[data-testid="nav-main"]')
+
+      // Panel bersudut bulat memotong isinya (termasuk scrollbar) mengikuti lengkung; menu = turunan panel.
+      expect(panel.classes()).toEqual(expect.arrayContaining(['overflow-hidden', 'rounded-[1.75rem]']))
+      expect(panel.element.contains(nav.element)).toBe(true)
+      expect(nav.classes()).toEqual(expect.arrayContaining(['sidebar-scroll', 'overflow-y-auto']))
+      expect(panel.element.parentElement).toBe(sidebar.element)
+
+      // Yang tidak boleh terpotong ada di luar panel.
+      const toggle = wrapper.get('[data-testid="sidebar-collapse"]')
+      expect(panel.element.contains(toggle.element)).toBe(false)
+      expect(toggle.element.parentElement).toBe(sidebar.element)
+
+      await wrapper.get('[data-testid="user-menu"]').trigger('click')
+      await flushPromises()
+      const dropdown = document.body.querySelector('[data-testid="user-menu-panel"]')
+      expect(dropdown, 'dropdown profil terbuka').not.toBeNull()
+      expect(panel.element.contains(dropdown)).toBe(false)
+    } finally {
+      viewport.restore()
+    }
+  })
+
+  it('tooltip menu mode ciut dirender di portal <body>, bukan di dalam panel yang overflow-hidden', async () => {
+    const viewport = fakeViewport(true)
+    try {
+      window.localStorage.setItem('simpeg.sidebar.collapsed', '1')
+      const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+      const panel = wrapper.get('[data-testid="sidebar-panel"]')
+      const item = wrapper.get('[data-testid="nav-master-data"]')
+
+      ;(item.element as HTMLElement).focus()
+      await item.trigger('focus')
+      await flushPromises()
+      const tip = document.body.querySelector('[data-testid="ui-tooltip"]')
+      expect(tip, 'tooltip tampil saat fokus').not.toBeNull()
+      expect(panel.element.contains(tip)).toBe(false)
+    } finally {
+      viewport.restore()
+    }
+  })
+})
+

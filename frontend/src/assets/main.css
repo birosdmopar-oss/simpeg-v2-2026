@@ -157,6 +157,25 @@
     }
   }
 
+  /*
+   * Scrollbar menu sidebar (CR-063): panel sidebar bersudut bulat (rounded-[1.75rem]) dan scrollbar mengikuti lengkungnya.
+   * Track diberi margin atas/bawah (bawah ≥ radius panel 1.75rem) supaya thumb berhenti sebelum lengkung kanan-bawah, dan
+   * thumb dijauhkan dari tepi panel (border transparan lebih tebal). Hanya untuk sidebar (bukan global); panel sidebar
+   * sendiri `overflow-hidden` sehingga Firefox (tanpa ::-webkit-scrollbar-track margin) juga terpotong mengikuti lengkung.
+   * Berlaku juga di drawer mobile (komponen yang sama).
+   */
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-track {
+    margin-block: 0.75rem 1.75rem;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    border-width: 3px;
+  }
+
   /* Alias lama: scrollbar global sudah ramping; kelas ini dipertahankan agar pemakai lama tidak berubah. */
   @supports not selector(::-webkit-scrollbar) {
     .scrollbar-slim {
