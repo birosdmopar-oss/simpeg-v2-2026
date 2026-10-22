@@ -17,6 +17,8 @@
     --shell-gap: 1rem;
     --topbar-h: 3.5rem;
     --sticky-top: calc(var(--shell-gap) + var(--topbar-h) + 1rem);
+    /* Awal konten halaman: padding shell + navbar + pembungkus sticky (pb-3 = 0.75rem) + jarak <main> (mt-4 = 1rem). */
+    --page-top: calc(var(--shell-gap) + var(--topbar-h) + 1.75rem);
   }
 
   @media (min-width: 1024px) {
@@ -93,6 +95,37 @@
       position: sticky;
       top: var(--sticky-top);
       max-height: calc(100vh - var(--sticky-top) - var(--shell-gap));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+
+  /*
+   * Halaman "isi penuh" (CR-060, Master Data): dari lg, halaman TIDAK menggulir di window. `.page-fill` setinggi sisa
+   * viewport di bawah navbar sticky (tanpa angka tetap per halaman: --page-top = padding shell + tinggi navbar +
+   * pembungkus + jarak konten); bagian atas halaman (judul, aksi, pencarian/filter) tetap terlihat. `.pane-fill` =
+   * panel samping yang menggulir sendiri mengisi tinggi baris grid; `.table-fill` = kartu tabel yang mengisi sisa tinggi
+   * kolom flex dan menggulir isinya (header tabel dibuat sticky oleh halaman; paginasi di luar kartu tetap terlihat).
+   * Di bawah lg (layout bertumpuk) ketiganya tidak berlaku: halaman menggulir seperti biasa.
+   */
+  @media (min-width: 1024px) {
+    .page-fill {
+      height: calc(100vh - var(--page-top) - var(--shell-gap));
+      height: calc(100dvh - var(--page-top) - var(--shell-gap));
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-fill {
+      height: 100%;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .table-fill {
+      flex: 1 1 0%;
+      min-height: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
     }

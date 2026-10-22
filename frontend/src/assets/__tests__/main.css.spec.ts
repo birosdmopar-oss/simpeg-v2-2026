@@ -29,6 +29,16 @@ describe('main.css', () => {
     expect(aturan).toMatch(/overscroll-behavior:\s*contain/)
   })
 
+  it('.page-fill/.pane-fill/.table-fill: halaman isi-penuh tanpa gulir window, hanya dari lg (CR-060 Master Data)', () => {
+    const media = css.match(/@media \(min-width: 1024px\)\s*\{\s*\.page-fill\s*\{[^}]*\}[\s\S]*?\.table-fill\s*\{[^}]*\}\s*\}/)
+    expect(media, 'tiga utilitas di dalam satu media lg').not.toBeNull()
+    const blok = media?.[0] ?? ''
+    expect(blok).toMatch(/\.page-fill\s*\{[^}]*calc\(100dvh - var\(--page-top\) - var\(--shell-gap\)\)[^}]*overflow:\s*hidden/s)
+    expect(blok).toMatch(/\.pane-fill\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto/s)
+    expect(blok).toMatch(/\.table-fill\s*\{[^}]*flex:\s*1 1 0%[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s)
+    expect(css).toMatch(/--page-top:\s*calc\(/)
+  })
+
   it('variabel jarak shell terdefinisi (tinggi navbar dan batas atas sticky)', () => {
     expect(css).toMatch(/--topbar-h:\s*3\.5rem/)
     expect(css).toMatch(/--sticky-top:\s*calc\(/)

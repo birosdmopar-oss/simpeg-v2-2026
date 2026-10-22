@@ -451,8 +451,8 @@ describe('MasterDataView — panel gulir mandiri (CR-060)', () => {
 
     const nav = wrapper.get('[data-testid="master-nav"]')
     const data = wrapper.get('[data-testid="master-data-pane"]')
-    expect(nav.classes()).toContain('pane-scroll')
-    expect(data.classes()).toContain('pane-scroll')
+    expect(nav.classes()).toContain('pane-fill')
+    expect(data.classes()).toEqual(expect.arrayContaining(['flex', 'flex-col', 'lg:h-full', 'lg:min-h-0']))
     // Dua panel terpisah: menu bukan di dalam area data, sehingga menggulir salah satunya tidak menggulir yang lain.
     expect(data.find('[data-testid="master-nav"]').exists()).toBe(false)
     expect(nav.find('[data-testid="master-data-pane"]').exists()).toBe(false)
@@ -474,6 +474,56 @@ describe('MasterDataView — baris filter sejajar (CR-060 regresi tata letak)', 
     }
     // Kotak cari tetap fleksibel di baris yang sama.
     expect(wrapper.get('[data-testid="master-search"]').element.closest('label')?.className).toContain('flex-1')
+    wrapper.unmount()
+  })
+})
+
+describe('MasterDataView — bagian atas tetap, hanya isi tabel menggulir (CR-060)', () => {
+  it('halaman setinggi sisa viewport tanpa gulir window; judul/aksi/filter/paginasi di luar area gulir tabel', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const page = wrapper.get('[data-testid="master-page"]')
+    const scroller = wrapper.get('[data-testid="master-table-scroll"]')
+
+    // Halaman mengisi sisa viewport (lg) dan tidak menggulir sendiri.
+    expect(page.classes()).toEqual(expect.arrayContaining(['page-fill', 'flex', 'flex-col']))
+    // Hanya kartu tabel yang menggulir (table-fill), dan tabel ada DI DALAM kontainer gulir itu.
+    expect(scroller.classes()).toEqual(expect.arrayContaining(['table-fill', 'overflow-x-auto']))
+    expect(scroller.find('table').exists()).toBe(true)
+
+    // Judul + tombol aksi, filter, dan paginasi BUKAN anak kontainer gulir dan tidak ikut menyusut/menggulir (shrink-0).
+    const judul = wrapper.get('h1')
+    const tambah = wrapper.get('[data-testid="master-add"]')
+    const filter = wrapper.get('[data-testid="master-filter-bar"]')
+    const paginasi = wrapper.get('[data-testid="master-pagination"]')
+    for (const el of [judul, tambah, filter, paginasi]) {
+      expect(scroller.element.contains(el.element), el.html().slice(0, 40)).toBe(false)
+    }
+    expect(filter.classes()).toContain('shrink-0')
+    expect(paginasi.classes()).toContain('shrink-0')
+    expect(judul.element.closest('div.shrink-0')).not.toBeNull()
+    wrapper.unmount()
+  })
+
+  it('header tabel sticky di atas area gulir (setiap th), sel Aksi sticky kanan+atas dengan z lebih tinggi; bayangan tetap ada', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const ths = wrapper.findAll('[data-testid="master-thead"] th')
+
+    expect(ths.length).toBeGreaterThanOrEqual(4)
+    for (const th of ths) {
+      expect(th.classes(), th.text()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bg-slate-50']))
+    }
+    const aksi = wrapper.get('[data-testid="master-col-actions"]')
+    expect(aksi.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'right-0', 'z-30']))
+    const biasa = ths.filter((th) => th.element !== aksi.element)
+    for (const th of biasa) expect(th.classes(), th.text()).toContain('z-20')
+
+    // Bayangan pemisah kolom Aksi (CR-053) tetap bekerja pada kontainer gulir yang sama.
+    const scroller = wrapper.get('[data-testid="master-table-scroll"]')
+    Object.defineProperty(scroller.element, 'scrollWidth', { configurable: true, value: 900 })
+    Object.defineProperty(scroller.element, 'clientWidth', { configurable: true, value: 400 })
+    Object.defineProperty(scroller.element, 'scrollLeft', { configurable: true, writable: true, value: 0 })
+    await scroller.trigger('scroll')
+    expect(aksi.classes()).toContain('shadow-sticky-end')
     wrapper.unmount()
   })
 })
