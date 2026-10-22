@@ -113,14 +113,14 @@ describe('UiSelect', () => {
     const w = mount(UiSelect, { props: { options, label: 'Agama' } })
     await w.get('select').setValue('a')
     expect(w.emitted('update:modelValue')?.[0]).toEqual(['a'])
-    expect(w.get('select').attributes('aria-label')).toBeUndefined()
+    expect(w.get('[role="combobox"]').attributes('aria-label')).toBeUndefined()
 
-    expect(mount(UiSelect, { props: { options, ariaLabel: 'Jumlah baris' } }).get('select').attributes('aria-label')).toBe('Jumlah baris')
+    expect(mount(UiSelect, { props: { options, ariaLabel: 'Jumlah baris' } }).get('[role="combobox"]').attributes('aria-label')).toBe('Jumlah baris')
   })
 
   it('state error memerahkan border dan menampilkan teks bantu', () => {
     const w = mount(UiSelect, { props: { options, state: 'error', helpText: 'Wajib dipilih' } })
-    expect(w.get('select').classes()).toContain('border-danger')
+    expect(w.get('[role="combobox"]').classes()).toContain('border-danger')
     expect(w.text()).toContain('Wajib dipilih')
   })
 })

@@ -114,6 +114,23 @@ describe('LaporanPage', () => {
     expect(wrapper.get('[data-testid="laporan-table"] thead').text()).toContain('Satuan Kerja')
   })
 
+  it('CR-060: pemilih lingkup = dropdown custom; klik trigger lalu klik opsi (bukan <select> native) memuat ulang statistik', async () => {
+    const { wrapper } = await mountPage('usia')
+    const trigger = wrapper.get('[data-testid="laporan-lingkup"] [role="combobox"]')
+    expect(trigger.element.tagName).toBe('BUTTON')
+
+    await trigger.trigger('click')
+    const opsi = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]')]
+    // Opsi pertama = pilihan bawaan server (clearable, nilai kosong).
+    expect(opsi.map((o) => o.dataset.value)).toEqual(['', 'kementerian', 'unit:3', 'satker:31', 'satker:32', 'unit:4'])
+
+    opsi.find((o) => o.dataset.value === 'satker:32')?.click()
+    await flushPromises()
+
+    expect(get).toHaveBeenCalledWith('/statistik/usia', { params: { lingkup: 'satker', id: '32' } })
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull()
+  })
+
   it('pindah tipe lewat route memuat ulang statistik tipe baru', async () => {
     const { router } = await mountPage('jabatan')
     expect(get).toHaveBeenCalledWith('/statistik/jabatan', { params: {} })
