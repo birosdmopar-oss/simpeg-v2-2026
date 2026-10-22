@@ -30,13 +30,21 @@ describe('main.css', () => {
   })
 
   it('.page-fill/.pane-fill/.table-fill: halaman isi-penuh tanpa gulir window, hanya dari lg (CR-060 Master Data)', () => {
-    const media = css.match(/@media \(min-width: 1024px\)\s*\{\s*\.page-fill\s*\{[^}]*\}[\s\S]*?\.table-fill\s*\{[^}]*\}\s*\}/)
+    const media = css.match(/@media \(min-width: 1024px\)\s*\{(?:\s|\/\*[\s\S]*?\*\/)*\.page-fill\s*\{[^}]*\}[\s\S]*?\.table-fill\s*\{[^}]*\}/)
     expect(media, 'tiga utilitas di dalam satu media lg').not.toBeNull()
     const blok = media?.[0] ?? ''
     expect(blok).toMatch(/\.page-fill\s*\{[^}]*calc\(100dvh - var\(--page-top\) - var\(--shell-gap\)\)[^}]*overflow:\s*hidden/s)
     expect(blok).toMatch(/\.pane-fill\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto/s)
     expect(blok).toMatch(/\.table-fill\s*\{[^}]*flex:\s*1 1 0%[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s)
     expect(css).toMatch(/--page-top:\s*calc\(/)
+  })
+
+  it('utilitas isi-penuh adalah kotak penampung (position: relative) dan window tidak menggulir selama ada .page-fill', () => {
+    for (const nama of ['page-fill', 'pane-fill', 'table-fill']) {
+      const aturan = css.match(new RegExp(`\\.${nama}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+      expect(aturan, nama).toMatch(/position:\s*relative/)
+    }
+    expect(css).toMatch(/html:has\(\.page-fill\)\s*\{[^}]*overflow:\s*hidden/s)
   })
 
   it('variabel jarak shell terdefinisi (tinggi navbar dan batas atas sticky)', () => {

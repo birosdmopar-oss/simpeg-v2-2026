@@ -109,7 +109,14 @@
    * Di bawah lg (layout bertumpuk) ketiganya tidak berlaku: halaman menggulir seperti biasa.
    */
   @media (min-width: 1024px) {
+    /*
+     * `--page-top` dihitung ulang dari posisi <main> sebenarnya oleh RedesignShell (CSS var di akar shell) sehingga
+     * jarak yang tak terhitung rumus (breadcrumb, tinggi navbar berubah) ikut; nilai di :root hanyalah cadangan.
+     * `position: relative` pada ketiganya = kotak penampung bagi turunan `absolute` (mis. elemen sr-only): tanpa itu
+     * turunan absolut lolos dari overflow dan menambah tinggi dokumen sehingga window bisa tergulir beberapa piksel.
+     */
     .page-fill {
+      position: relative;
       height: calc(100vh - var(--page-top) - var(--shell-gap));
       height: calc(100dvh - var(--page-top) - var(--shell-gap));
       min-height: 0;
@@ -117,6 +124,7 @@
     }
 
     .pane-fill {
+      position: relative;
       height: 100%;
       min-height: 0;
       overflow-y: auto;
@@ -124,10 +132,16 @@
     }
 
     .table-fill {
+      position: relative;
       flex: 1 1 0%;
       min-height: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
+    }
+
+    /* Pengaman: selama ada halaman isi-penuh, window tidak punya gulir sama sekali (sisa subpiksel pun terpotong). */
+    html:has(.page-fill) {
+      overflow: hidden;
     }
   }
 

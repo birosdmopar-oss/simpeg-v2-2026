@@ -8,7 +8,7 @@
  * - Status collapse sidebar diingat di localStorage (opsional; gagal → tetap jalan tanpa disimpan).
  * - Aksesibilitas: tautan "Lewati ke konten", landmark <main id="main-content">.
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -19,7 +19,7 @@ import AppSidebar from './AppSidebar.vue'
 import AppTopbar from './AppTopbar.vue'
 import { buildNav } from './nav.config'
 
-defineProps<{ breadcrumbs?: Crumb[] }>()
+const props = defineProps<{ breadcrumbs?: Crumb[] }>()
 
 const COLLAPSE_KEY = 'simpeg.sidebar.collapsed'
 
@@ -36,6 +36,35 @@ function readCollapsed(): boolean {
 
 const collapsed = ref(readCollapsed())
 const mobileOpen = ref(false)
+
+/**
+ * Halaman isi-penuh (`.page-fill`, CR-060): tingginya = viewport − `--page-top`. Alih-alih angka tetap, jarak itu DIUKUR dari
+ * posisi <main> sebenarnya (navbar sticky + breadcrumb + jarak) dan dipasang sebagai CSS var di akar shell; diukur ulang saat
+ * ukuran konten/jendela atau breadcrumb berubah. Tanpa pengukuran (jsdom/0) nilai cadangan di main.css dipakai.
+ */
+const rootEl = ref<HTMLElement | null>(null)
+const mainEl = ref<HTMLElement | null>(null)
+const pageTop = ref<string | undefined>(undefined)
+let resizeObserver: ResizeObserver | null = null
+
+function measurePageTop(): void {
+  const top = (mainEl.value?.getBoundingClientRect().top ?? 0) + window.scrollY
+  pageTop.value = top > 0 ? `${Math.round(top * 100) / 100}px` : undefined
+}
+
+onMounted(() => {
+  measurePageTop()
+  window.addEventListener('resize', measurePageTop)
+  if (typeof ResizeObserver !== 'undefined' && rootEl.value) {
+    resizeObserver = new ResizeObserver(measurePageTop)
+    resizeObserver.observe(rootEl.value)
+  }
+})
+
+watch(
+  () => props.breadcrumbs?.length ?? 0,
+  () => void nextTick(measurePageTop),
+)
 
 /**
  * Drawer mobile (CR-060 butir I): saat dibuka fokus pindah ke tombol tutup di drawer, saat ditutup fokus kembali ke
@@ -55,7 +84,11 @@ watch(mobileOpen, (open) => {
   }
 })
 
-onBeforeUnmount(() => window.removeEventListener('keydown', onDrawerKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onDrawerKeydown)
+  window.removeEventListener('resize', measurePageTop)
+  resizeObserver?.disconnect()
+})
 
 watch(collapsed, (value) => {
   try {
@@ -79,7 +112,7 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-  <div class="app-canvas min-h-screen">
+  <div ref="rootEl" class="app-canvas min-h-screen" :style="{ '--page-top': pageTop }" data-testid="app-shell">
     <a
       href="#main-content"
       class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-brand-primary focus:shadow-panel"
@@ -121,7 +154,7 @@ async function logout(): Promise<void> {
 
         <UiBreadcrumb v-if="breadcrumbs?.length" :items="breadcrumbs" class="mt-4 block" />
 
-        <main id="main-content" class="mt-4" tabindex="-1">
+        <main id="main-content" ref="mainEl" class="mt-4" tabindex="-1">
           <slot />
         </main>
       </div>

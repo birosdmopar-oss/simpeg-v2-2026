@@ -371,3 +371,47 @@ describe('RedesignShell — sidebar: tombol ciut di tepi, dropdown profil, ciut 
     expect(document.activeElement).toBe(opener.element)
   })
 })
+
+describe('RedesignShell — --page-top diukur dari posisi <main> (CR-060, window tidak boleh menggulir di halaman isi-penuh)', () => {
+  const asli = HTMLElement.prototype.getBoundingClientRect
+
+  afterEach(() => {
+    HTMLElement.prototype.getBoundingClientRect = asli
+  })
+
+  it('tanpa pengukuran (jsdom: top 0) CSS var tidak dipasang sehingga cadangan main.css berlaku', async () => {
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+    expect((wrapper.get('[data-testid="app-shell"]').element as HTMLElement).style.getPropertyValue('--page-top')).toBe('')
+  })
+
+  it('top <main> terukur dipasang sebagai --page-top di akar shell dan diukur ulang saat jendela diubah', async () => {
+    let top = 137
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      return { top: this.id === 'main-content' ? top : 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+    }
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+    const root = wrapper.get('[data-testid="app-shell"]').element as HTMLElement
+    expect(root.style.getPropertyValue('--page-top')).toBe('137px')
+
+    // Breadcrumb/navbar berubah tinggi → posisi main bergeser → diukur ulang (event resize jendela).
+    top = 170.5
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+    expect(root.style.getPropertyValue('--page-top')).toBe('170.5px')
+  })
+
+  it('breadcrumb ditambahkan → diukur ulang', async () => {
+    let top = 104
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      return { top: this.id === 'main-content' ? top : 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+    }
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+    const root = wrapper.get('[data-testid="app-shell"]').element as HTMLElement
+    expect(root.style.getPropertyValue('--page-top')).toBe('104px')
+
+    top = 137
+    await wrapper.setProps({ breadcrumbs: [{ label: 'Home' }, { label: 'Master Data' }] })
+    await flushPromises()
+    expect(root.style.getPropertyValue('--page-top')).toBe('137px')
+  })
+})
