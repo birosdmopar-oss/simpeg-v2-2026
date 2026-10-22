@@ -14,7 +14,7 @@ describe('favicon tab browser (CR-061)', () => {
   it('index.html memuat link SVG, PNG 100x100, dan apple-touch-icon', () => {
     expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/favicon.svg" />')
     expect(html).toContain('<link rel="icon" type="image/png" sizes="100x100" href="/favicon-100.png" />')
-    expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />')
+    expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />')
   })
 
   it('favicon.svg berisi logo legacy (viewBox 542.21), bukan ikon bawaan Vite', () => {
@@ -22,6 +22,15 @@ describe('favicon tab browser (CR-061)', () => {
     expect(svg).toContain('viewBox="0 0 542.21 542.21"')
     expect(svg).not.toContain('#863bff') // warna ikon Vite
     expect(svg).not.toContain('logo-vector') // judul sumber dibuang
+  })
+
+  it('PNG cadangan berdimensi tepat (IHDR): favicon 100x100, apple-touch-icon 180x180', () => {
+    const size = (relative: string) => {
+      const buf = readFileSync(fileURLToPath(new URL(relative, import.meta.url)))
+      return [buf.readUInt32BE(16), buf.readUInt32BE(20)]
+    }
+    expect(size('../../../../public/favicon-100.png')).toEqual([100, 100])
+    expect(size('../../../../public/apple-touch-icon.png')).toEqual([180, 180])
   })
 
   it('favicon.svg bersih: tanpa script, foreignObject, image, atau URL eksternal', () => {
