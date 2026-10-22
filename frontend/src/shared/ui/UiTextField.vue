@@ -16,12 +16,13 @@
  * dan browser tidak memblokir submit lebih dulu; pesan bantu pada state error memakai role="alert" agar diumumkan
  * pembaca layar; wadah input selalu `relative` supaya slot `suffix` (mis. tombol lihat password) bisa diposisikan.
  */
-import { computed, ref, useId, useSlots } from 'vue'
+import { computed, ref, useAttrs, useId, useSlots } from 'vue'
 
 import UiCombobox from './UiCombobox.vue'
 import UiDatePicker from './UiDatePicker.vue'
 import UiMonthPicker from './UiMonthPicker.vue'
 import UiTimePicker from './UiTimePicker.vue'
+import { hasWidthClass } from './widthClass'
 
 const props = withDefaults(
   defineProps<{
@@ -71,6 +72,9 @@ const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus
 
 const id = useId()
 const slots = useSlots()
+/** `w-full` hanya bila pemanggil tidak memberi kelas lebar (CR-060). */
+const attrs = useAttrs()
+const fullWidth = computed(() => !hasWidthClass(attrs.class))
 
 const PICKERS = { date: UiDatePicker, time: UiTimePicker, month: UiMonthPicker } as const
 const isCombobox = computed(() => props.suggestions !== undefined && props.type === 'text')
@@ -109,7 +113,7 @@ const controlClass = computed(() => [
 </script>
 
 <template>
-  <div class="w-full">
+  <div :class="fullWidth ? 'w-full' : ''">
     <!-- Tampilan stacked: label di atas kotak. -->
     <label v-if="label && appearance === 'stacked'" :for="id" class="mb-1 block text-body2 font-medium" :class="tone.label">
       {{ label }}<span v-if="required" class="text-danger"> *</span>

@@ -17,7 +17,9 @@
  */
 import { Check, ChevronDown } from 'lucide-vue-next'
 import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from 'radix-vue'
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useAttrs, useId, watch } from 'vue'
+
+import { hasWidthClass } from './widthClass'
 
 export type SelectOption = { value: string | number; label: string; disabled?: boolean }
 
@@ -58,6 +60,10 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
+
+/** `w-full` hanya bila pemanggil tidak memberi kelas lebar (mis. `w-52` di baris filter), CR-060. */
+const attrs = useAttrs()
+const fullWidth = computed(() => !hasWidthClass(attrs.class))
 
 const id = useId()
 const listId = `${id}-list`
@@ -243,7 +249,7 @@ const displayText = computed(() => (selected.value ? selected.value.label : ''))
 </script>
 
 <template>
-  <div ref="root" class="w-full">
+  <div ref="root" :class="fullWidth ? 'w-full' : ''">
     <label v-if="label" :id="labelId" :for="id" class="mb-1 block text-body2 font-medium" :class="tone.label">
       {{ label }}<span v-if="required" class="text-danger"> *</span>
     </label>

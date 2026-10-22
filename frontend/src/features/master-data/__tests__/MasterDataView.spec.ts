@@ -461,3 +461,20 @@ describe('MasterDataView — panel gulir mandiri (CR-060)', () => {
     wrapper.unmount()
   })
 })
+
+describe('MasterDataView — baris filter sejajar (CR-060 regresi tata letak)', () => {
+  it('filter UiSelect memakai w-52 tanpa w-full sehingga sejajar di samping pencarian, bukan turun satu baris penuh', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const status = wrapper.get('[data-testid="master-filter-status"]')
+
+    expect(status.classes()).toContain('w-52')
+    expect(status.classes()).not.toContain('w-full')
+    for (const filter of wrapper.findAll('[data-testid^="master-filter-"]')) {
+      expect(filter.classes(), filter.attributes('data-testid')).not.toContain('w-full')
+    }
+    // Kotak cari tetap fleksibel di baris yang sama.
+    expect(wrapper.get('[data-testid="master-search"]').element.closest('label')?.className).toContain('flex-1')
+    wrapper.unmount()
+  })
+})
+
