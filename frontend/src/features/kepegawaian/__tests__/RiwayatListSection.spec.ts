@@ -364,7 +364,8 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     await wrapper.setProps({ initial: nilai(baris2), baris: baris2 })
     await flushPromises()
     expect(field('no_ijazah')?.value).toBe('IJZ-2')
-    expect(field('tgl_lulus')?.value).toBe('2015-01-02')
+    // Tampilan input tanggal custom (CR-060) = dd/mm/yyyy; nilai terkirim tetap YYYY-MM-DD.
+    expect(field('tgl_lulus')?.value).toBe('02/01/2015')
     expect(q('[data-testid="riwayat-berkas-14"]')?.textContent).not.toContain('ijazah.pdf')
     q('[data-testid="riwayat-form"]')?.dispatchEvent(new Event('submit'))
     await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Ijazah wajib diunggah.'))
@@ -555,7 +556,7 @@ describe('RiwayatListSection — kunci baris Disetujui & isian hitung', () => {
     const wrapper = await mountTab({}, hukdis)
     await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
     await flushPromises()
-    expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['2027-01-01', '1 Tahun'])
+    expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['01/01/2027', '1 Tahun'])
 
     await setInput('tmtsk', '2026-02-01')
     expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['', ''])
@@ -761,7 +762,7 @@ describe('RiwayatListSection — aturan form legacy SKP & AK Current (perbaikan 
     const wrapper = await mountTab({}, skp)
     await openCreate(wrapper)
     await setInput('tahun', '2022')
-    expect([field('tgl_mulai')?.value, field('tgl_akhir')?.value]).toEqual(['2022-01-01', '2022-12-31'])
+    expect([field('tgl_mulai')?.value, field('tgl_akhir')?.value]).toEqual(['01/01/2022', '31/12/2022'])
     expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(true)
     await setInput('tahun', '2021')
     expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(false)
