@@ -9,6 +9,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import {
   UiAvatar,
   UiBadge,
+  UiBarChart,
   UiButton,
   UiCard,
   UiCheckbox,
@@ -238,12 +239,20 @@ describe('UiProgressBar, UiDonutChart, UiSparkline', () => {
     const w = mount(UiDonutChart, {
       props: { caption: 'Komposisi', slices: [{ label: 'PNS', value: 75, color: '#1C3964' }, { label: 'PPPK', value: 25, color: '#217AFF' }] },
     })
-    const table = w.get('table.sr-only')
+    // CR-064: sr-only di pembungkus <div>, bukan di <table> (display:table mengalahkannya dan melebarkan halaman).
+    expect(w.find('table.sr-only').exists()).toBe(false)
+    const table = w.get('div.sr-only > table')
     expect(table.text()).toContain('PNS')
     expect(table.text()).toContain('75.0%')
     expect(table.text()).toContain('25.0%')
     expect(w.findAll('circle')).toHaveLength(3) // latar + 2 potongan
     expect(w.get('svg').attributes('aria-label')).toBe('Komposisi')
+  })
+
+  it('CR-064: diagram batang — tabel data sr-only di pembungkus <div>, bukan table.sr-only', () => {
+    const w = mount(UiBarChart, { props: { caption: 'Data', categories: ['A', 'B'], series: [{ label: 'PNS', color: '#000', values: [1, 2] }] } })
+    expect(w.find('table.sr-only').exists()).toBe(false)
+    expect(w.get('div.sr-only > table').text()).toContain('PNS')
   })
 
   it('donat kosong (total 0) tidak menggambar potongan dan persentasenya 0%', () => {

@@ -74,20 +74,23 @@ function percent(value: number): string {
       </li>
     </ul>
 
-    <table class="sr-only">
-      <caption>
-        {{ caption || 'Rincian diagram' }}
-      </caption>
-      <thead>
-        <tr><th scope="col">Kategori</th><th scope="col">Jumlah</th><th scope="col">Persentase</th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="slice in slices" :key="slice.label">
-          <th scope="row">{{ slice.label }}</th>
-          <td>{{ slice.value }}</td>
-          <td>{{ percent(slice.value) }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Pembungkus sr-only (CR-064): kelas ini pada <table> kalah oleh display:table sehingga tabel ikut melebarkan halaman. -->
+    <div class="sr-only">
+      <table>
+        <caption>
+          {{ caption || 'Rincian diagram' }}
+        </caption>
+        <thead>
+          <tr><th scope="col">Kategori</th><th scope="col">Jumlah</th><th scope="col">Persentase</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="slice in slices" :key="slice.label">
+            <th scope="row">{{ slice.label }}</th>
+            <td>{{ slice.value }}</td>
+            <td>{{ percent(slice.value) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>

@@ -74,20 +74,23 @@ const width = computed(() => `${Math.max(props.categories.length * props.minCate
       </span>
     </figcaption>
 
-    <table class="sr-only">
-      <caption>{{ caption || 'Data diagram batang' }}</caption>
-      <thead>
-        <tr>
-          <th scope="col">Kategori</th>
-          <th v-for="s in series" :key="s.label" scope="col">{{ s.label }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(category, ci) in categories" :key="category">
-          <th scope="row">{{ category }}</th>
-          <td v-for="s in series" :key="s.label">{{ s.values[ci] ?? 0 }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Pembungkus sr-only (CR-064): kelas ini pada <table> kalah oleh display:table sehingga tabel ikut melebarkan halaman. -->
+    <div class="sr-only">
+      <table>
+        <caption>{{ caption || 'Data diagram batang' }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Kategori</th>
+            <th v-for="s in series" :key="s.label" scope="col">{{ s.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(category, ci) in categories" :key="category">
+            <th scope="row">{{ category }}</th>
+            <td v-for="s in series" :key="s.label">{{ s.values[ci] ?? 0 }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </figure>
 </template>
