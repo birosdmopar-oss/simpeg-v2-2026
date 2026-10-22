@@ -67,7 +67,7 @@ const lingkupOptions = computed<SelectOption[]>(() => {
   const opsi: SelectOption[] = []
   if (l.kementerian) opsi.push({ value: 'kementerian', label: l.kementerian.nama })
   for (const u of l.unit) {
-    opsi.push({ value: `unit:${u.id}`, label: u.nama })
+    if (u.pilih_unit !== false) opsi.push({ value: `unit:${u.id}`, label: u.nama })
     for (const s of u.satker) opsi.push({ value: `satker:${s.id}`, label: `— ${s.nama}` })
   }
   return opsi

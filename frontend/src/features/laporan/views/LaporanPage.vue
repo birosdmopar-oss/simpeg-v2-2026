@@ -28,7 +28,7 @@ const failure = ref<string | null>(null)
 const memuat = ref(false)
 const mengekspor = ref(false)
 
-const FORMATS: ExportFormat[] = [{ key: 'xlsx', label: 'Export Excel' }]
+const FORMATS: ExportFormat[] = [{ key: 'xlsx', label: 'Ekspor Excel' }]
 const nf = new Intl.NumberFormat('id-ID')
 const tipe = computed<LaporanTipe>(() => (isLaporanTipe(route.params.tipe) ? route.params.tipe : 'unit-kerja'))
 
@@ -39,7 +39,7 @@ const lingkupOptions = computed<SelectOption[]>(() => {
   const opsi: SelectOption[] = []
   if (l.kementerian) opsi.push({ value: 'kementerian', label: `${l.kementerian.nama} (per unit)` })
   for (const u of l.unit) {
-    opsi.push({ value: `unit:${u.id}`, label: u.nama })
+    if (u.pilih_unit !== false) opsi.push({ value: `unit:${u.id}`, label: u.nama })
     for (const s of u.satker) opsi.push({ value: `satker:${s.id}`, label: `— ${s.nama}` })
   }
   return opsi
@@ -74,6 +74,18 @@ const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   return (data.value?.baris ?? []).filter((b) => b.label.toLowerCase().includes(q))
 })
+const mencari = computed(() => search.value.trim() !== '')
+/** Subtotal mengikuti pencarian (CR-064): dijumlah dari baris yang tampil; tanpa pencarian = angka server. */
+const subtotalTampil = computed(() => {
+  const d = data.value
+  if (!d) return { nilai: [] as number[], total: 0 }
+  if (!mencari.value) return { nilai: d.subtotal, total: d.total }
+  return {
+    nilai: d.seri.map((_, i) => filtered.value.reduce((jumlah, b) => jumlah + (b.nilai[i] ?? 0), 0)),
+    total: filtered.value.reduce((jumlah, b) => jumlah + b.total, 0),
+  }
+})
+const kosong = computed(() => data.value !== null && data.value.baris.length === 0)
 const seri = computed(() => data.value?.seri ?? [])
 const warna = (i: number): string => SERI_PALET[i % SERI_PALET.length] ?? '#1e3a8a'
 const tone = (i: number) => PROGRES_TONE[i % PROGRES_TONE.length] ?? 'primary'
@@ -114,15 +126,16 @@ async function onExport(format: ExportFormat['key']): Promise<void> {
         </div>
       </div>
 
-      <UiCard title="Jumlah Pegawai" :subtitle="data ? `Per ${data.label_kategori.toLowerCase()}` : ''">
+      <UiCard title="Jumlah Pegawai" :subtitle="data ? `Per ${data.label_kategori}` : ''">
         <div v-if="lingkupOptions.length" class="mb-4 max-w-md" data-testid="laporan-lingkup">
           <UiSelect v-model="pilihan" label="Lingkup" :options="lingkupOptions" placeholder="Lingkup bawaan akun" clearable />
         </div>
-        <UiBarChart v-if="data" :categories="data.baris.map((b) => b.label)" :series="barSeries" :caption="judul" />
+        <p v-if="kosong" class="py-10 text-center text-slate-500" data-testid="laporan-kosong">Tidak ada data pada lingkup ini</p>
+        <UiBarChart v-else-if="data" :categories="data.baris.map((b) => b.label)" :series="barSeries" :caption="judul" />
         <p v-else-if="!failure" class="py-10 text-center text-slate-500">Memuat…</p>
       </UiCard>
 
-      <div v-if="data" class="grid gap-5 lg:grid-cols-2">
+      <div v-if="data && !kosong" class="grid gap-5 lg:grid-cols-2">
         <UiCard :title="`Komposisi per ${data.label_kategori}`" subtitle="Total pegawai per baris">
           <UiDonutChart :slices="donutBaris" legend="bottom" :caption="`Komposisi per ${data.label_kategori}`" />
         </UiCard>
@@ -131,7 +144,7 @@ async function onExport(format: ExportFormat['key']): Promise<void> {
         </UiCard>
       </div>
 
-      <UiCard v-if="data" :title="`Tabel ${judul}`" flush>
+      <UiCard v-if="data && !kosong" :title="`Tabel ${judul}`" flush>
         <div class="space-y-4 pb-5">
           <div class="w-64 max-w-full px-5"><UiSearchInput v-model="search" placeholder="Cari baris" label="Cari baris laporan" /></div>
           <div class="scrollbar-slim overflow-x-auto">
@@ -156,11 +169,16 @@ async function onExport(format: ExportFormat['key']): Promise<void> {
                 </tr>
                 <tr v-if="filtered.length === 0">
                   <td :colspan="seri.length + 2" class="px-5 py-10 text-center text-slate-500" data-testid="laporan-empty">
-                    {{ data.baris.length === 0 ? 'Belum ada data pada lingkup ini' : 'Tidak ada baris yang cocok' }}
+                    Tidak ada baris yang cocok
                   </td>
                 </tr>
                 <tr class="bg-brand-primary/5 font-semibold text-slate-900" data-testid="laporan-subtotal">
-                  <td class="px-5 py-3">Subtotal</td>
+                  <td class="px-5 py-3">{{ mencari ? `Subtotal hasil pencarian (${filtered.length} baris)` : 'Subtotal' }}</td>
+                  <td v-for="(s, i) in seri" :key="s.key" class="px-5 py-3 tabular-nums">{{ nf.format(subtotalTampil.nilai[i] ?? 0) }}</td>
+                  <td class="px-5 py-3 text-right tabular-nums">{{ nf.format(subtotalTampil.total) }}</td>
+                </tr>
+                <tr v-if="mencari" class="text-body2 text-slate-600" data-testid="laporan-total-keseluruhan">
+                  <td class="px-5 py-3">Total keseluruhan lingkup</td>
                   <td v-for="(s, i) in seri" :key="s.key" class="px-5 py-3 tabular-nums">{{ nf.format(data.subtotal[i] ?? 0) }}</td>
                   <td class="px-5 py-3 text-right tabular-nums">{{ nf.format(data.total) }}</td>
                 </tr>

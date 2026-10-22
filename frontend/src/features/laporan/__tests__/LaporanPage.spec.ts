@@ -52,17 +52,19 @@ function envelope<T>(data: T) {
   return Promise.resolve({ data, headers: {} })
 }
 
-function pasangApi(opsi: { gagal?: number } = {}): void {
+function pasangApi(opsi: { gagal?: number; lingkup?: LingkupTersedia; kosong?: boolean } = {}): void {
   get.mockReset()
   get.mockImplementation((url: string, config?: { params?: unknown }) => {
-    if (url === '/statistik/lingkup') return envelope(LINGKUP) as never
+    if (url === '/statistik/lingkup') return envelope(opsi.lingkup ?? LINGKUP) as never
     if (opsi.gagal) {
       return Promise.reject({ status: opsi.gagal, message: 'x', errors: null, isNetworkError: false, original: {} }) as never
     }
     const jenis = url.replace('/statistik/', '') as StatistikData['jenis']
     const p = (config?.params ?? {}) as Record<string, string>
     const lingkup = p.lingkup === 'satker' ? { tipe: 'satker' as const, id: Number(p.id), nama: `Satker ${p.id}` } : undefined
-    return envelope(statistik(jenis, lingkup)) as never
+    const data = statistik(jenis, lingkup)
+    if (opsi.kosong) Object.assign(data, { baris: [], kategori: [], subtotal: [0, 0], total: 0 })
+    return envelope(data) as never
   })
 }
 
@@ -152,6 +154,86 @@ describe('LaporanPage', () => {
     await settle()
     await flushPromises()
     expect(wrapper.find('[data-testid="laporan-empty"]').exists()).toBe(true)
+  })
+
+  it('CR-064 T5: subjudul kartu memakai label kategori apa adanya ("Per Unit Kerja Eselon I", bukan "eselon i")', async () => {
+    const { wrapper } = await mountPage('unit-kerja')
+    expect(wrapper.text()).toContain('Per Unit Kerja Eselon I')
+    expect(wrapper.text()).not.toContain('eselon i')
+    expect(wrapper.text()).toContain('Komposisi per Unit Kerja Eselon I')
+  })
+
+  it('CR-064 T4: tombol dan item ekspor berbahasa Indonesia ("Ekspor" / "Ekspor Excel")', async () => {
+    const { wrapper } = await mountPage('pendidikan')
+    expect(wrapper.get('[data-testid="export-trigger"]').text()).toBe('Ekspor')
+    await wrapper.get('[data-testid="export-trigger"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector('[data-format="xlsx"]')?.textContent?.trim()).toBe('Ekspor Excel')
+    expect(wrapper.text()).not.toContain('Export')
+    expect(document.body.textContent).not.toContain('Export')
+  })
+
+  it('CR-064 T11: baris Subtotal mengikuti pencarian (dijumlah dari baris tampil, berlabel); total keseluruhan lingkup tetap dari server', async () => {
+    const { wrapper } = await mountPage('unit-kerja')
+    expect(wrapper.find('[data-testid="laporan-total-keseluruhan"]').exists()).toBe(false)
+
+    const input = wrapper.get('[data-testid="laporan-table"]').element.closest('section')!.querySelector('input')!
+    input.value = 'Unit B'
+    input.dispatchEvent(new Event('input'))
+    await settle()
+    await flushPromises()
+
+    const sub = wrapper.get('[data-testid="laporan-subtotal"]').text()
+    expect(sub).toContain('Subtotal hasil pencarian (1 baris)')
+    expect(sub).toContain('626')
+    expect(sub).toContain('10')
+    expect(sub).toContain('636')
+    expect(sub).not.toContain('1.826')
+    const semua = wrapper.get('[data-testid="laporan-total-keseluruhan"]').text()
+    expect(semua).toContain('Total keseluruhan lingkup')
+    expect(semua).toContain('1.826')
+    expect(semua).toContain('2.136')
+
+    // Pencarian tanpa hasil: Subtotal 0, bukan angka seluruh lingkup.
+    input.value = 'zzz'
+    input.dispatchEvent(new Event('input'))
+    await settle()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="laporan-subtotal"]').text()).toContain('Subtotal hasil pencarian (0 baris)')
+    expect(wrapper.get('[data-testid="laporan-subtotal"]').text()).not.toContain('1.826')
+
+    // Pencarian dikosongkan → kembali ke Subtotal server.
+    input.value = ''
+    input.dispatchEvent(new Event('input'))
+    await settle()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="laporan-subtotal"]').text()).toContain('1.826')
+    expect(wrapper.find('[data-testid="laporan-total-keseluruhan"]').exists()).toBe(false)
+  })
+
+  it('CR-064 T12: lingkup tanpa pegawai menampilkan "Tidak ada data pada lingkup ini" tanpa diagram, donat, dan tabel 0', async () => {
+    pasangApi({ kosong: true })
+    const { wrapper } = await mountPage('golongan')
+    expect(wrapper.get('[data-testid="laporan-kosong"]').text()).toBe('Tidak ada data pada lingkup ini')
+    expect(wrapper.find('figure').exists()).toBe(false)
+    expect(wrapper.find('svg[role="img"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="laporan-table"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="laporan-subtotal"]').exists()).toBe(false)
+    // Judul dan ekspor tetap ada.
+    expect(wrapper.get('h1').text()).toContain('Formasi golongan')
+  })
+
+  it('CR-064 T6: admin satker tidak ditawari unit pembungkus (403); satker miliknya tetap bisa dipilih', async () => {
+    pasangApi({ lingkup: { kementerian: null, unit: [{ id: 3, nama: 'Unit A', pilih_unit: false, satker: [{ id: 31, nama: 'Satker A1' }] }] } })
+    const { wrapper } = await mountPage('usia')
+    const opsi = [...wrapper.get('[data-testid="laporan-lingkup"]').element.querySelectorAll('option')].map((o) => o.value).filter(Boolean)
+    expect(opsi).toEqual(['satker:31'])
+
+    // Admin unit (pilih_unit true) tetap melihat unitnya.
+    pasangApi({ lingkup: { kementerian: null, unit: [{ id: 3, nama: 'Unit A', pilih_unit: true, satker: [{ id: 31, nama: 'Satker A1' }] }] } })
+    const { wrapper: unit } = await mountPage('usia')
+    const opsiUnit = [...unit.get('[data-testid="laporan-lingkup"]').element.querySelectorAll('option')].map((o) => o.value).filter(Boolean)
+    expect(opsiUnit).toEqual(['unit:3', 'satker:31'])
   })
 
   it('ekspor Excel mengunduh statistik/{jenis}/xlsx dengan lingkup aktif', async () => {

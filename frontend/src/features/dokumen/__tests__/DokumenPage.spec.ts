@@ -65,10 +65,10 @@ function galatBlob(status: number, body: unknown) {
   return { status, message: `HTTP ${status}`, errors: null, isNetworkError: false, original: { response: { status, data: new Blob([JSON.stringify(body)], { type: 'application/json' }) } } }
 }
 
-function pasangApi(opsi: { total?: number; gagal?: number } = {}): void {
+function pasangApi(opsi: { total?: number; gagal?: number; lingkup?: LingkupTersedia } = {}): void {
   get.mockReset()
   get.mockImplementation((url: string, config?: { params?: unknown }) => {
-    if (url === '/statistik/lingkup') return envelope(LINGKUP) as never
+    if (url === '/statistik/lingkup') return envelope(opsi.lingkup ?? LINGKUP) as never
     if (opsi.gagal) return Promise.reject({ status: opsi.gagal, message: 'x', errors: null, isNetworkError: false, original: {} }) as never
     const jenis = url.replace('/dokumen/', '') as DokumenJenis
     const p = (config?.params ?? {}) as Record<string, string>
@@ -127,6 +127,13 @@ describe('DokumenPage — daftar & unduh (MAKE-037)', () => {
     await flushPromises()
     expect(ambilBerkas).toHaveBeenCalledWith('/dokumen/duk/xlsx', 'dokumen_duk', {})
     expect(simpanBerkas).toHaveBeenCalledWith(berkas)
+  })
+
+  it('CR-064 T6: admin satker (pilih_unit false) tidak ditawari unit pembungkus; hanya satkernya', async () => {
+    pasangApi({ lingkup: { kementerian: null, unit: [{ id: 3, nama: 'Unit A', pilih_unit: false, satker: [{ id: 31, nama: 'Satker A1' }] }] } })
+    const wrapper = await mountPage('duk', Role.ADMIN_SATKER)
+    const opsi = [...wrapper.get('[data-testid="dokumen-lingkup"]').element.querySelectorAll('option')].map((o) => o.value).filter(Boolean)
+    expect(opsi).toEqual(['satker:31'])
   })
 
   it('fallback F7-15: PDF nonaktif + alasan pada lingkup kementerian; pilih satker → PDF aktif dan dikirim dengan lingkup', async () => {

@@ -33,7 +33,8 @@ export interface LingkupStatistik {
 /** `GET statistik/lingkup`: lingkup yang boleh dipilih akun (kementerian null untuk role 3). */
 export interface LingkupTersedia {
   kementerian: { nama: string } | null
-  unit: Array<{ id: number; nama: string; satker: Array<{ id: number; nama: string }> }>
+  /** `pilih_unit` false: unit hanya pembungkus satker akun (admin satker) — unitnya sendiri tidak boleh dipilih (403). */
+  unit: Array<{ id: number; nama: string; pilih_unit?: boolean; satker: Array<{ id: number; nama: string }> }>
 }
 
 export interface StatistikSeri {
