@@ -5,7 +5,7 @@
  *   GET statistik/{jenis}/xlsx    unduh XLSX (blob; nama dari Content-Disposition)
  * Tidak ada data contoh di runtime — fixture hanya di `__tests__/`.
  */
-import { api, type ApiEnvelope } from '@/lib/axios'
+import { api } from '@/lib/axios'
 
 import { ambilBerkas, type BerkasUnduhan } from '@/features/kepegawaian/services/berkasUnduhan'
 
@@ -35,13 +35,14 @@ function normalisasi(data: StatistikData): StatistikData {
 
 export const laporanService = {
   async lingkup(): Promise<LingkupTersedia> {
-    const res = await api.get<ApiEnvelope<LingkupTersedia>>('/statistik/lingkup')
-    return res.data.data as LingkupTersedia
+    // Interceptor `@/lib/axios` sudah membuka amplop {status, data}: `response.data` = payload (CR-059).
+    const { data } = await api.get<LingkupTersedia>('/statistik/lingkup')
+    return data
   },
 
   async statistik(tipe: LaporanTipe, pilihan: LingkupPilihan = ''): Promise<StatistikData> {
-    const res = await api.get<ApiEnvelope<StatistikData>>(`/statistik/${tipe}`, { params: lingkupKeQuery(pilihan) })
-    return normalisasi(res.data.data as StatistikData)
+    const { data } = await api.get<StatistikData>(`/statistik/${tipe}`, { params: lingkupKeQuery(pilihan) })
+    return normalisasi(data)
   },
 
   xlsx(tipe: LaporanTipe, pilihan: LingkupPilihan = ''): Promise<BerkasUnduhan> {

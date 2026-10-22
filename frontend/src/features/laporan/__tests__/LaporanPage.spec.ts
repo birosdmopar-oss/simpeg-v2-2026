@@ -47,8 +47,9 @@ const statistik = (jenis: StatistikData['jenis'], lingkup: StatistikData['lingku
   cache: { hit: false, ttl: 900 },
 })
 
+/** Bentuk setelah interceptor `@/lib/axios` membuka amplop {status, data}: `response.data` = payload (CR-059). */
 function envelope<T>(data: T) {
-  return Promise.resolve({ data: { status: 'success', data }, headers: {} })
+  return Promise.resolve({ data, headers: {} })
 }
 
 function pasangApi(opsi: { gagal?: number } = {}): void {

@@ -5,7 +5,7 @@
  *   POST dokumen/baperjakat/{pdf|xlsx}   unduh Baperjakat dari NIP terpilih + judul/subjudul/teks
  * Lingkup memakai pemilih yang sama dengan laporan statistik (`statistik/lingkup`). Tidak ada data contoh di runtime.
  */
-import { api, isApiError, type ApiEnvelope } from '@/lib/axios'
+import { api, isApiError } from '@/lib/axios'
 
 import { ambilBerkas, kirimBerkas, type BerkasUnduhan } from '@/features/kepegawaian/services/berkasUnduhan'
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
@@ -61,8 +61,8 @@ export async function pesanGalatUnduhan(error: unknown): Promise<string> {
 
 export const dokumenService = {
   async daftar(jenis: DokumenJenis, pilihan: LingkupPilihan, query: DokumenQuery = {}): Promise<DokumenData> {
-    const res = await api.get<ApiEnvelope<DokumenData>>(`/dokumen/${jenis}`, { params: paramsDokumen(pilihan, query) })
-    const data = res.data.data as DokumenData
+    // Interceptor sudah membuka amplop: `response.data` = payload (CR-059).
+    const { data } = await api.get<DokumenData>(`/dokumen/${jenis}`, { params: paramsDokumen(pilihan, query) })
     return { ...data, total: Number(data.total), page: Number(data.page), per_page: Number(data.per_page) }
   },
 

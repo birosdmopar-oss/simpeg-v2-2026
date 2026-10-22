@@ -55,8 +55,9 @@ function dokumen(jenis: DokumenJenis, opsi: { total?: number; lingkup?: DokumenD
   }
 }
 
+/** Bentuk setelah interceptor `@/lib/axios` membuka amplop {status, data}: `response.data` = payload (CR-059). */
 function envelope<T>(data: T) {
-  return Promise.resolve({ data: { status: 'success', data }, headers: {} })
+  return Promise.resolve({ data, headers: {} })
 }
 
 /** Galat unduhan seperti dari interceptor: body JSON datang sebagai Blob (responseType blob). */
