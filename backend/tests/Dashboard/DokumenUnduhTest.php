@@ -199,6 +199,16 @@ final class DokumenUnduhTest extends DatabaseTestCase
         $this->assertStringContainsString('Citra', $sheet);
         $this->assertStringNotContainsString('Gina', $sheet);
 
+        // CR-064 T3: judul, subjudul, dan teks ada DI ATAS header 37 kolom (baris 1-3, kosong baris 4, header baris 5).
+        $this->assertMatchesRegularExpression('#<c r="A1" t="inlineStr" s="1"><is><t xml:space="preserve">Bahan Sidang Baperjakat</t>#', $sheet);
+        $this->assertStringContainsString('<c r="A2" t="inlineStr"><is><t xml:space="preserve">Periode I</t>', $sheet);
+        $this->assertMatchesRegularExpression('#<c r="A3" t="inlineStr" s="2"><is><t xml:space="preserve">Daftar calon\.</t>#', $sheet);
+        $this->assertMatchesRegularExpression('#<c r="A5" t="inlineStr" s="1"><is><t xml:space="preserve">NO</t></is></c><c r="B5" t="inlineStr" s="1"><is><t xml:space="preserve">NAMA</t>#', $sheet, 'header di baris 5');
+        $this->assertStringContainsString('<mergeCell ref="A1:AL1"/>', $sheet, 'judul digabung selebar header 38 kolom (NO + 37)');
+        // Dokumen daftar lain (DUK) tidak berubah: header tetap baris 1.
+        $duk = $this->sheet($this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/duk/xlsx')->response()->getBody());
+        $this->assertMatchesRegularExpression('#<row r="1"><c r="A1" t="inlineStr" s="1"><is><t xml:space="preserve">NO</t>#', $duk);
+
         $audit = $this->auditUnduhan('baperjakat');
         $this->assertCount(2, $audit);
         $after = json_decode((string) $audit[0]['after_json'], true);
@@ -264,6 +274,27 @@ final class DokumenUnduhTest extends DatabaseTestCase
         }
 
         return (int) $j['id_satker'];
+    }
+
+    public function testPencetakPdfAdalahUsernameAkunBukanAkunId(): void
+    {
+        $metode = new \ReflectionMethod(DokumenService::class, 'pencetak');
+        $id     = (int) $this->db->table('pengguna')->select('id_pengguna')->where('nip', AuthSeeder::NIP_ARGON)->get()->getRow('id_pengguna');
+        $auth   = new \App\Libraries\Auth\AuthContext();
+        $auth->setClaims(['sub' => (string) $id, 'nip' => AuthSeeder::NIP_ARGON, 'role' => Role::SUPER_ADMIN]);
+
+        // CR-064 T8 (PRD §7.2.6): username pencetak, bukan "akun #id" dan bukan NIP.
+        $this->assertSame(AuthSeeder::NIP_ARGON, $metode->invoke(new DokumenService(), $auth), 'username akun seed = NIP');
+        $this->db->table('pengguna')->where('id_pengguna', $id)->update(['username' => 'budi.pencetak']);
+        $this->assertSame('budi.pencetak', $metode->invoke(new DokumenService(), $auth));
+
+        // Baris akun tidak ada → cadangan NIP, lalu "akun #id".
+        $hilang = new \App\Libraries\Auth\AuthContext();
+        $hilang->setClaims(['sub' => '99999999', 'nip' => '198501019999999999', 'role' => Role::SUPER_ADMIN]);
+        $this->assertSame('198501019999999999', $metode->invoke(new DokumenService(), $hilang));
+        $tanpaNip = new \App\Libraries\Auth\AuthContext();
+        $tanpaNip->setClaims(['sub' => '99999998', 'role' => Role::SUPER_ADMIN]);
+        $this->assertSame('akun #99999998', $metode->invoke(new DokumenService(), $tanpaNip));
     }
 
     private function sheet(string $isi): string

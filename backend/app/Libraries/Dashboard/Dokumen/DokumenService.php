@@ -171,7 +171,9 @@ final class DokumenService
 
         $baris  = self::petakanBaris($rows, $hariIni);
         $jumlah = count($baris);
-        $berkas = $this->berkas($jenis, $format, $baris, $lingkup, $hariIni, $this->pencetak($auth));
+        // Pensiun: rentang proyeksi disebut di subjudul PDF (CR-064 T10).
+        $ekstra = $jenis === KolomDokumen::PENSIUN ? ['proyeksi' => $param] : [];
+        $berkas = $this->berkas($jenis, $format, $baris, $lingkup, $hariIni, $this->pencetak($auth), $ekstra);
 
         $this->catatUnduhan($auth, $jenis, $format, $lingkup, $param + ['search' => $q->string('search')], $jumlah);
 
@@ -249,7 +251,7 @@ final class DokumenService
 
     /**
      * @param list<array<string, string>> $baris dikosongkan untuk XLSX (baris dilepas saat dipindah ke sel)
-     * @param array{judul?: string, subjudul?: string, teks?: string} $ekstra
+     * @param array{judul?: string, subjudul?: string, teks?: string, proyeksi?: array{tahun: int, sampai: int}} $ekstra
      *
      * @param-out array<int, array<string, string>> $baris
      *
@@ -278,7 +280,36 @@ final class DokumenService
 
         $judulSheet = mb_substr($ekstra['judul'] ?? KolomDokumen::JUDUL[$jenis], 0, 31);
 
-        return ['isi' => EksporTabel::xlsx($header, $rows, $judulSheet), 'nama' => $dasar . '.xlsx', 'mime' => EksporTabel::MIME[EksporTabel::XLSX]];
+        return ['isi' => EksporTabel::xlsx($header, $rows, $judulSheet, self::barisAtasXlsx($jenis, $ekstra)), 'nama' => $dasar . '.xlsx', 'mime' => EksporTabel::MIME[EksporTabel::XLSX]];
+    }
+
+    /**
+     * Baris di atas header XLSX: hanya Baperjakat (judul, subjudul, teks bebas — sama seperti PDF; CR-064 T3). Teks
+     * multi-baris tetap satu sel ber-wrap; tetap teks murni (EksporTabel menulis inlineStr, bukan rumus).
+     *
+     * @param array{judul?: string, subjudul?: string, teks?: string, proyeksi?: array{tahun: int, sampai: int}} $ekstra
+     *
+     * @return list<array{teks: string, gaya?: string}>
+     */
+    private static function barisAtasXlsx(string $jenis, array $ekstra): array
+    {
+        if ($jenis !== KolomDokumen::BAPERJAKAT) {
+            return [];
+        }
+
+        $atas = [['teks' => $ekstra['judul'] ?? KolomDokumen::JUDUL[$jenis], 'gaya' => 'judul']];
+
+        if (($ekstra['subjudul'] ?? '') !== '') {
+            $atas[] = ['teks' => $ekstra['subjudul']];
+        }
+
+        if (($ekstra['teks'] ?? '') !== '') {
+            $atas[] = ['teks' => $ekstra['teks'], 'gaya' => 'wrap'];
+        }
+
+        $atas[] = ['teks' => ''];
+
+        return $atas;
     }
 
     /**
@@ -342,9 +373,22 @@ final class DokumenService
         }
     }
 
+    /**
+     * Pencetak di kaki PDF (PRD §7.2.6): USERNAME akun; cadangan NIP, lalu "akun #id" bila baris akun tidak ditemukan.
+     */
     private function pencetak(AuthContext $auth): string
     {
-        return $auth->nip() ?? ('akun #' . ($auth->idPengguna() ?? 0));
+        $id = $auth->idPengguna();
+
+        if ($id !== null) {
+            $username = $this->koneksi()->table('pengguna')->select('username')->where('id_pengguna', $id)->get()->getRow('username');
+
+            if (is_string($username) && $username !== '') {
+                return $username;
+            }
+        }
+
+        return $auth->nip() ?? ('akun #' . ($id ?? 0));
     }
 
     private function kueri(): KueriDaftarPegawai
