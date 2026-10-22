@@ -40,7 +40,9 @@ describe('UiBreadcrumb — warna link biru SIMPEG', () => {
 
   it('ruas terakhir = teks biasa (bukan link) dengan aria-current="page" dan warna netral', async () => {
     const w = await mountCrumb([{ label: 'Home', to: '/' }, { label: 'Usulan Karpeg/Karis' }])
-    const last = w.get('[aria-current="page"]')
+    // Ruas terakhir = <span> (bukan link). Catatan: RouterLink sendiri menambah aria-current pada link rute aktif; yang diuji di sini
+    // hanya ruas terakhir komponen.
+    const last = w.get('li:last-child span[aria-current="page"]')
 
     expect(last.element.tagName).toBe('SPAN')
     expect(last.text()).toBe('Usulan Karpeg/Karis')
