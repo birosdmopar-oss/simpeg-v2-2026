@@ -528,3 +528,20 @@ describe('MasterDataView — bagian atas tetap, hanya isi tabel menggulir (CR-06
   })
 })
 
+describe('MasterDataView — tinggi filter = tinggi kotak pencarian (CR-063)', () => {
+  it('semua dropdown filter memakai size sm (py-2 text-sm rounded-md) sama dengan kotak cari, bukan h-11', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const cari = wrapper.get('[data-testid="master-search"]').classes()
+    const bersama = ['py-2', 'text-sm', 'rounded-md', 'border']
+    expect(cari).toEqual(expect.arrayContaining(bersama))
+
+    const filters = wrapper.findAll('[data-testid="master-filter-bar"] [role="combobox"]')
+    expect(filters.length).toBeGreaterThanOrEqual(2)
+    for (const trigger of filters) {
+      expect(trigger.classes(), trigger.attributes('aria-label')).toEqual(expect.arrayContaining(bersama))
+      expect(trigger.classes(), trigger.attributes('aria-label')).not.toContain('h-11')
+    }
+    wrapper.unmount()
+  })
+})
+

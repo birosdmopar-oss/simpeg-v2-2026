@@ -11,6 +11,9 @@
  *
  * API TIDAK berubah dari versi <select> native (modelValue, options, label, placeholder, state, helpText, required,
  * disabled, name, clearable, ariaLabel; emit update:modelValue dan blur), jadi pemanggil tidak perlu diubah.
+ * Ukuran (CR-063): `md` (default) = h-11 / text-body1 / rounded-lg, sejajar UiTextField di form dan dialog; `sm` = SAMA
+ * PERSIS dengan kotak pencarian di baris filter (py-2, text-sm/leading-5, rounded-md ≈ 38px) — pakai `sm` untuk dropdown yang
+ * satu baris dengan kotak pencarian, jangan di form/dialog.
  * Sebuah <select> native TERSEMBUNYI (sr-only, aria-hidden, tabindex -1) menjadi cermin nilai dua arah (pola radix
  * BubbleSelect): pembawa nilai untuk <form>/`name` dan titik masuk bagi alat yang mengubah nilai lewat elemen native.
  * CR-028: dibungkus FormField.vue untuk tipe `select`; pesan error memakai role="alert".
@@ -42,6 +45,8 @@ const props = withDefaults(
     ariaLabel?: string
     /** true = trigger berupa kolom ketik yang menyaring opsi (daftar panjang). Default false. */
     searchable?: boolean
+    /** `md` = tinggi form (h-11); `sm` = setara kotak pencarian di baris filter (CR-063). */
+    size?: 'md' | 'sm'
   }>(),
   {
     modelValue: '',
@@ -56,6 +61,7 @@ const props = withDefaults(
     clearable: false,
     ariaLabel: undefined,
     searchable: false,
+    size: 'md',
   },
 )
 
@@ -100,8 +106,12 @@ const tone = computed(() => {
   return { border: 'border-slate-300', label: 'text-slate-700', help: 'text-slate-500' }
 })
 
+/** Ukuran kotak: `sm` memakai utilitas yang sama dengan kotak pencarian (py-2 + text-sm + rounded-md), tanpa tinggi tetap. */
+const sizeClass = computed(() => (props.size === 'sm' ? 'rounded-md py-2 pl-3 pr-9 text-sm' : 'h-11 rounded-lg pl-3 pr-10 text-body1'))
+
 const boxClass = computed(() => [
-  'flex h-11 w-full items-center rounded-lg border bg-white pl-3 pr-10 text-left text-body1 outline-none transition',
+  'flex w-full items-center border bg-white text-left outline-none transition',
+  sizeClass.value,
   tone.value.border,
   props.state === 'default' && !props.disabled ? 'focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25' : '',
   open.value && props.state === 'default' ? 'border-brand-tertiary ring-2 ring-brand-tertiary/25' : '',
@@ -324,8 +334,8 @@ const displayText = computed(() => (selected.value ? selected.value.label : ''))
             <span :id="valueId" class="min-w-0 flex-1 truncate">{{ displayText || placeholder }}</span>
           </button>
           <ChevronDown
-            class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-transform"
-            :class="[disabled ? 'text-slate-300' : 'text-slate-500', open ? 'rotate-180' : '']"
+            class="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 transition-transform"
+            :class="[size === 'sm' ? 'right-2.5' : 'right-3', disabled ? 'text-slate-300' : 'text-slate-500', open ? 'rotate-180' : '']"
             aria-hidden="true"
           />
         </div>

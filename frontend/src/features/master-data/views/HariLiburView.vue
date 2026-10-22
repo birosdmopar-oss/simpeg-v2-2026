@@ -251,6 +251,7 @@ onMounted(() => {
         v-model="tahun"
         :options="tahunOptions"
         clearable
+        size="sm"
         placeholder="Semua tahun"
         aria-label="Filter tahun"
         class="w-40"
@@ -261,6 +262,7 @@ onMounted(() => {
         :model-value="statusFilter"
         :options="STATUS_FILTER_OPTIONS"
         clearable
+        size="sm"
         placeholder="Aktif & Tidak Aktif"
         aria-label="Filter status"
         class="w-52"

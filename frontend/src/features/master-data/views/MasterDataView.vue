@@ -468,6 +468,7 @@ onMounted(() => {
             :model-value="level.value"
             :options="level.options.map((o) => ({ value: o.id, label: o.nama }))"
             clearable
+            size="sm"
             :placeholder="`Semua ${level.meta.label}`"
             :disabled="level.loading || (index > 0 && !filterLevels[index - 1]?.value)"
             :aria-label="`Filter ${level.meta.label}`"
@@ -481,6 +482,7 @@ onMounted(() => {
             :model-value="fieldFilters[field.name] ?? ''"
             :options="filterOptions(field)"
             clearable
+            size="sm"
             :placeholder="`Semua ${field.label}`"
             :aria-label="`Filter ${field.label}`"
             class="w-52"
@@ -491,6 +493,7 @@ onMounted(() => {
             :model-value="statusFilter"
             :options="STATUS_FILTER_OPTIONS"
             clearable
+            size="sm"
             placeholder="Aktif & Tidak Aktif"
             aria-label="Filter status"
             class="w-52"

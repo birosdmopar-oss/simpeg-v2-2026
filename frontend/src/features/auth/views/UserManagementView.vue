@@ -243,6 +243,7 @@ onMounted(() => {
         :model-value="roleFilter"
         :options="roleFilterOptions"
         clearable
+        size="sm"
         placeholder="Semua role"
         aria-label="Filter role"
         class="w-56"
@@ -253,6 +254,7 @@ onMounted(() => {
         :model-value="statusFilter"
         :options="statusFilterOptions"
         clearable
+        size="sm"
         placeholder="Semua status"
         aria-label="Filter status"
         class="w-44"
