@@ -18,6 +18,7 @@
  */
 import { computed, ref, useId, useSlots } from 'vue'
 
+import UiCombobox from './UiCombobox.vue'
 import UiDatePicker from './UiDatePicker.vue'
 import UiMonthPicker from './UiMonthPicker.vue'
 import UiTimePicker from './UiTimePicker.vue'
@@ -37,8 +38,10 @@ const props = withDefaults(
     autocomplete?: string
     name?: string
     inputmode?: 'text' | 'numeric' | 'decimal' | 'tel' | 'email' | 'search'
-    /** id `<datalist>` saran nilai (aditif MAKE-007); nilai bebas tetap boleh. */
+    /** id `<datalist>` saran nilai (aditif MAKE-007); nilai bebas tetap boleh. DEPRECATED: pakai `suggestions`. */
     list?: string
+    /** Saran nilai teks bebas (UiCombobox custom, bukan <datalist> bawaan browser); `[]` = belum ada saran (CR-060). */
+    suggestions?: string[]
     /** Batas tanggal `YYYY-MM-DD` (inklusif), hanya untuk type="date". */
     min?: string
     max?: string
@@ -58,6 +61,7 @@ const props = withDefaults(
     name: undefined,
     inputmode: undefined,
     list: undefined,
+    suggestions: undefined,
     min: undefined,
     max: undefined,
   },
@@ -69,7 +73,13 @@ const id = useId()
 const slots = useSlots()
 
 const PICKERS = { date: UiDatePicker, time: UiTimePicker, month: UiMonthPicker } as const
-const picker = computed(() => PICKERS[props.type as keyof typeof PICKERS] ?? null)
+const picker = computed(() => PICKERS[props.type as keyof typeof PICKERS] ?? (props.suggestions !== undefined && props.type === 'text' ? UiCombobox : null))
+/** Props khusus per komponen kontrol (picker tanggal: batas; combobox: saran + atribut input). */
+const pickerProps = computed(() =>
+  picker.value === UiCombobox
+    ? { suggestions: props.suggestions, inputmode: props.inputmode, autocomplete: props.autocomplete, placeholder: props.placeholder }
+    : { min: props.min, max: props.max, ...(props.placeholder ? { placeholder: props.placeholder } : {}) },
+)
 /** Pesan format salah dari picker (kosong = sah); hanya dipakai bila pemanggil tidak memberi help text sendiri. */
 const pickerMessage = ref('')
 const help = computed(() => props.helpText || pickerMessage.value)
@@ -121,13 +131,11 @@ const controlClass = computed(() => [
         :id="id"
         :name="name"
         :model-value="modelValue ?? ''"
-        v-bind="placeholder ? { placeholder } : {}"
         :disabled="disabled"
         :readonly="readonly"
         :invalid="effState === 'error'"
         :required="required"
-        :min="min"
-        :max="max"
+        v-bind="pickerProps"
         :control-class="controlClass"
         :describedby="help ? `${id}-help` : undefined"
         @update:model-value="emit('update:modelValue', $event)"

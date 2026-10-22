@@ -629,14 +629,26 @@ describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LA
     expect(field('alamat_utama')).toBeNull()
   })
 
-  it('seminar: bidang & instansi = teks bebas dengan saran nama master (datalist)', async () => {
+  it('seminar: bidang & instansi = teks bebas dengan saran nama master (UiCombobox custom, bukan datalist, CR-060)', async () => {
     options.mockImplementation(async (entity: string) => [{ id: '1', nama: entity === 'bidang-kursem' ? 'Pariwisata' : 'Kemenparekraf', parent: null }])
     const wrapper = await mountTab({}, seminar)
     await openCreate(wrapper)
     await flushPromises()
-    expect(field('bidang_seminar')?.getAttribute('list')).toBe('riwayat-saran-bidang_seminar')
-    expect([...document.querySelectorAll('#riwayat-saran-bidang_seminar option')].map((o) => o.getAttribute('value'))).toEqual(['Pariwisata'])
-    expect([...document.querySelectorAll('#riwayat-saran-instansi_penyelenggara option')].map((o) => o.getAttribute('value'))).toEqual(['Kemenparekraf'])
+    expect(document.querySelector('datalist')).toBeNull()
+    const bidang = field('bidang_seminar')
+    expect(bidang?.getAttribute('role')).toBe('combobox')
+    expect(bidang?.hasAttribute('list')).toBe(false)
+
+    // Fokus + ArrowDown membuka daftar saran dari master; memilih mengisi kolom (nilai tetap teks bebas).
+    bidang?.focus()
+    bidang?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    await flushPromises()
+    const saran = [...document.querySelectorAll('[role="listbox"] [role="option"]')].map((o) => o.textContent?.trim())
+    expect(saran).toEqual(['Pariwisata'])
+    ;(document.querySelector('[role="listbox"] [role="option"]') as HTMLElement).click()
+    await flushPromises()
+    expect(field('bidang_seminar')?.value).toBe('Pariwisata')
+    expect(field('instansi_penyelenggara')?.getAttribute('role')).toBe('combobox')
   })
 
   it('keluarga: item ⋮ Anak (sesudah Lampiran) membuka dialog anak', async () => {

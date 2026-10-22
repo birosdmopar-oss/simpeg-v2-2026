@@ -451,7 +451,7 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
           <UiTextField
             v-else
             v-model="models[f.name].value"
-            :list="f.suggestEntity ? `${testid}-saran-${f.name}` : undefined"
+            :suggestions="f.suggestEntity ? refs.saran(f.name) : undefined"
             :label="f.label"
             :required="wajib(f)"
             :disabled="busy"
@@ -464,9 +464,6 @@ const helpText = (f: FieldDef): string => fieldError(f.name) || f.hint || ''
             :data-field="f.name"
             @update:model-value="onEdited(f.name)"
           />
-          <datalist v-if="f.suggestEntity" :id="`${testid}-saran-${f.name}`">
-            <option v-for="s in refs.saran(f.name)" :key="s" :value="s" />
-          </datalist>
         </div>
       </template>
     </div>

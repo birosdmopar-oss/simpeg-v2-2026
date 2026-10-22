@@ -8,7 +8,7 @@
  */
 import { useId } from 'vue'
 
-export type RadioOption = { value: string; label: string; disabled?: boolean }
+export type RadioOption = { value: string; label: string; disabled?: boolean; testid?: string }
 
 withDefaults(
   defineProps<{
@@ -20,8 +20,10 @@ withDefaults(
     disabled?: boolean
     state?: 'default' | 'error'
     helpText?: string
+    /** `column` = satu opsi per baris (daftar alasan panjang); default `row` membungkus ke samping. */
+    direction?: 'row' | 'column'
   }>(),
-  { modelValue: '', label: '', name: undefined, required: false, disabled: false, state: 'default', helpText: '' },
+  { modelValue: '', label: '', name: undefined, required: false, disabled: false, state: 'default', helpText: '', direction: 'row' },
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -35,7 +37,7 @@ const id = useId()
       {{ label }}<span v-if="required" class="text-danger"> *</span>
     </legend>
 
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+    <div :class="direction === 'column' ? 'flex flex-col gap-y-2' : 'flex flex-wrap items-center gap-x-6 gap-y-2'">
       <label
         v-for="opt in options"
         :key="opt.value"
@@ -50,6 +52,7 @@ const id = useId()
             :value="opt.value"
             :checked="modelValue === opt.value"
             :disabled="disabled || opt.disabled"
+            :data-testid="opt.testid"
             @change="emit('update:modelValue', opt.value)"
           />
           <span

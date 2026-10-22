@@ -65,6 +65,12 @@ Wajib:
    bawaan, scrollbar default, atribut `title` sebagai tooltip, `<datalist>`, dialog `window.confirm/alert/prompt`, dsb.
    Input native boleh tetap ada **hanya sebagai pembawa nilai/aksesibilitas yang disembunyikan** di dalam komponen custom
    (mis. checkbox `opacity-0` di `UiCheckbox`), tidak pernah sebagai tampilan.
+   Pengecualian yang dicatat: widget Turnstile mode `mock` (hanya development/test) dan `<input type="file">` tersembunyi
+   (`sr-only`) di balik tombol/dropzone unggah (`UiFileField`, `ArsipTable`). Daftar komponen yang tersedia: `UiSelect`
+   (dropdown/listbox, `searchable` opsional), `UiTooltip`, `UiTextField` (type `date`/`time`/`month` = `UiDatePicker`/
+   `UiTimePicker`/`UiMonthPicker`, `suggestions` = `UiCombobox`), `UiCheckbox`, `UiRadioGroup`, `UiFileField`, `UiExportMenu`,
+   `RowActionsMenu`; nilai picker tetap string `YYYY-MM-DD` / `HH:mm` / `YYYY-MM` dan perhitungan tanggal memakai komponen
+   kalender lokal (tanpa `toISOString()`).
 2. **Komponen yang belum ada dibuat dulu di `shared/ui`** (diekspor dari `shared/ui/index.ts`) lalu dipakai ulang. Jangan
    membuat versi lokal per fitur, dan jangan membungkus ulang elemen native di dalam fitur.
 3. **Aksesibel dan teruji.** Komponen custom wajib bisa dioperasikan lewat keyboard (Tab, Enter/Spasi, Esc, panah, Home/End),
