@@ -215,3 +215,159 @@ describe('RedesignShell — top navbar sticky (AGENTS.md bagian 3, CR-060)', () 
     expect(sticky.find('#main-content').exists()).toBe(false)
   })
 })
+
+/** matchMedia palsu yang bisa diubah dan menembakkan event `change` (CR-060 butir I). */
+function fakeViewport(desktop: boolean) {
+  const listeners = new Set<(e: { matches: boolean }) => void>()
+  let matches = desktop
+  const original = window.matchMedia
+  window.matchMedia = ((query: string) => ({
+    get matches() {
+      return matches
+    },
+    media: query,
+    addEventListener: (_: string, fn: (e: { matches: boolean }) => void) => listeners.add(fn),
+    removeEventListener: (_: string, fn: (e: { matches: boolean }) => void) => listeners.delete(fn),
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => true,
+    onchange: null,
+  })) as unknown as typeof window.matchMedia
+  return {
+    set(value: boolean) {
+      matches = value
+      for (const fn of listeners) fn({ matches: value })
+    },
+    restore() {
+      window.matchMedia = original
+    },
+  }
+}
+
+describe('RedesignShell — sidebar: tombol ciut di tepi, dropdown profil, ciut hanya desktop (CR-060 G/H/I)', () => {
+  let viewport: ReturnType<typeof fakeViewport> | null = null
+  afterEach(() => {
+    viewport?.restore()
+    viewport = null
+  })
+
+  it('H: tombol ciutkan di luar kontainer gulir, menjorok ke luar tepi kanan, label ARIA berganti, mode lebar tidak berubah', async () => {
+    viewport = fakeViewport(true)
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+    const sidebar = wrapper.get('[data-testid="app-sidebar"]')
+    const toggle = wrapper.get('[data-testid="sidebar-collapse"]')
+    const nav = wrapper.get('[data-testid="nav-main"]')
+
+    // Di luar elemen yang overflow-y-auto (tidak terpotong), anak langsung <aside>, posisi absolut menjorok setengah.
+    expect(nav.element.contains(toggle.element)).toBe(false)
+    expect(toggle.element.parentElement).toBe(sidebar.element)
+    expect(toggle.classes()).toEqual(expect.arrayContaining(['absolute', '-right-3', 'z-10', 'rounded-full']))
+    expect(nav.classes()).toContain('overflow-y-auto')
+    // Di atas konten/navbar sticky tetapi di bawah dialog/dropdown (z-50).
+    expect(sidebar.classes()).toContain('lg:z-30')
+
+    expect(toggle.attributes('aria-label')).toBe('Ciutkan menu')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(sidebar.classes()).toContain('lg:w-[19rem]')
+    expect(wrapper.get('[data-testid="nav-master-data"] span').classes()).not.toContain('sr-only')
+
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-label')).toBe('Perluas menu')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(sidebar.classes()).toContain('lg:w-[6.5rem]')
+    // Ciut: logo, avatar, dan ikon menu satu kolom terpusat; tombol tetap di luar kontainer gulir.
+    expect(wrapper.get('[data-testid="user-menu"]').classes()).toContain('justify-center')
+    expect(wrapper.get('[data-testid="nav-master-data"]').classes()).toEqual(expect.arrayContaining(['justify-center', 'gap-0']))
+    expect(wrapper.find('[data-testid="user-name"]').exists()).toBe(false)
+  })
+
+  it('G: panel menu profil selebar trigger; item w-full dengan padding dan radius sama seperti item nav; nama panjang lewat tooltip', async () => {
+    viewport = fakeViewport(true)
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN, '/', { name: 'Hadi Wibowo Susanto Kusumawardhani, S.Kom., M.M.' })
+    const trigger = wrapper.get('[data-testid="user-menu"]')
+
+    await trigger.trigger('click')
+    await flushPromises()
+    const panel = document.body.querySelector('[data-testid="user-menu-panel"]')
+    expect(panel, 'panel menu profil terbuka').not.toBeNull()
+    expect(panel?.className).toContain('w-[var(--radix-dropdown-menu-trigger-width)]')
+
+    const navItem = wrapper.get('[data-testid="nav-master-data"]').classes()
+    const items = ['nav-change-password', 'nav-logout'].map((id) => document.body.querySelector<HTMLElement>(`[data-testid="${id}"]`))
+    for (const item of items) {
+      expect(item).not.toBeNull()
+      const cls = [...(item?.classList ?? [])]
+      // Padding horizontal, radius, dan w-full sama dengan item navigasi.
+      for (const shared of ['w-full', 'px-3', 'py-2.5', 'rounded-xl']) {
+        expect(cls, shared).toContain(shared)
+        expect(navItem, shared).toContain(shared)
+      }
+    }
+
+    // Nama panjang: dipotong (truncate) dan nama lengkap lewat UiTooltip, bukan atribut title.
+    const name = wrapper.get('[data-testid="user-name"]')
+    expect(name.classes()).toContain('truncate')
+    expect(name.attributes('title')).toBeUndefined()
+    expect(name.attributes('data-tooltip')).toBe('Hadi Wibowo Susanto Kusumawardhani, S.Kom., M.M.')
+  })
+
+  it('I: preferensi ciut + viewport mobile → drawer mode penuh, tanpa tombol ciutkan; kembali ke desktop → ciut lagi; preferensi tidak tertimpa', async () => {
+    window.localStorage.setItem('simpeg.sidebar.collapsed', '1')
+    viewport = fakeViewport(false)
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+    const sidebar = wrapper.get('[data-testid="app-sidebar"]')
+
+    // Mobile: mode penuh walau preferensi ciut = 1.
+    expect(sidebar.classes()).toContain('lg:w-[19rem]')
+    expect(sidebar.classes()).not.toContain('lg:w-[6.5rem]')
+    expect(wrapper.find('[data-testid="sidebar-collapse"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="nav-master-data"] span').classes()).not.toContain('sr-only')
+    expect(wrapper.get('[data-testid="nav-master-data"] span').text()).not.toBe('')
+    expect(wrapper.find('[data-testid="user-name"]').exists()).toBe(true)
+    expect(sidebar.text()).toContain('SIMPEG')
+    expect(wrapper.get('[data-testid="nav-master-data"]').classes()).not.toContain('justify-center')
+    expect(wrapper.get('[data-testid="sidebar-close"]').attributes('aria-label')).toBe('Tutup menu')
+    // Preferensi tersimpan tidak berubah.
+    expect(window.localStorage.getItem('simpeg.sidebar.collapsed')).toBe('1')
+
+    // Kembali ke desktop: ciut aktif lagi sesuai preferensi, tombol ada kembali.
+    viewport.set(true)
+    await flushPromises()
+    expect(sidebar.classes()).toContain('lg:w-[6.5rem]')
+    expect(wrapper.get('[data-testid="sidebar-collapse"]').attributes('aria-label')).toBe('Perluas menu')
+    expect(wrapper.get('[data-testid="nav-master-data"] span').classes()).toContain('sr-only')
+    expect(window.localStorage.getItem('simpeg.sidebar.collapsed')).toBe('1')
+
+    // Pindah ke mobile lagi lalu kembali: preferensi tetap.
+    viewport.set(false)
+    await flushPromises()
+    expect(sidebar.classes()).toContain('lg:w-[19rem]')
+    viewport.set(true)
+    await flushPromises()
+    expect(window.localStorage.getItem('simpeg.sidebar.collapsed')).toBe('1')
+  })
+
+  it('I: drawer mobile — fokus pindah ke tombol tutup saat dibuka, Esc menutup dan fokus kembali ke tombol pemicu', async () => {
+    viewport = fakeViewport(false)
+    const { wrapper } = await mountShell(Role.SUPER_ADMIN)
+    const opener = wrapper.get('[data-testid="topbar-open-menu"]')
+
+    await opener.trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="sidebar-close"]').element)
+    expect(wrapper.get('[data-testid="app-sidebar"]').classes()).toContain('translate-x-0')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(wrapper.get('[data-testid="app-sidebar"]').classes()).toContain('-translate-x-full')
+    expect(document.activeElement).toBe(opener.element)
+
+    // Tombol tutup (X) juga menutup dan mengembalikan fokus.
+    await opener.trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="sidebar-close"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="app-sidebar"]').classes()).toContain('-translate-x-full')
+    expect(document.activeElement).toBe(opener.element)
+  })
+})

@@ -8,7 +8,7 @@
  * - Status collapse sidebar diingat di localStorage (opsional; gagal → tetap jalan tanpa disimpan).
  * - Aksesibilitas: tautan "Lewati ke konten", landmark <main id="main-content">.
  */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -36,6 +36,26 @@ function readCollapsed(): boolean {
 
 const collapsed = ref(readCollapsed())
 const mobileOpen = ref(false)
+
+/**
+ * Drawer mobile (CR-060 butir I): saat dibuka fokus pindah ke tombol tutup di drawer, saat ditutup fokus kembali ke
+ * tombol pemicu (hamburger) dan Esc menutup. Preferensi `collapsed` tidak disentuh di sini.
+ */
+function onDrawerKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') mobileOpen.value = false
+}
+
+watch(mobileOpen, (open) => {
+  if (open) {
+    window.addEventListener('keydown', onDrawerKeydown)
+    void nextTick(() => document.querySelector<HTMLElement>('[data-testid="sidebar-close"]')?.focus())
+  } else {
+    window.removeEventListener('keydown', onDrawerKeydown)
+    void nextTick(() => document.querySelector<HTMLElement>('[data-testid="topbar-open-menu"]')?.focus())
+  }
+})
+
+onBeforeUnmount(() => window.removeEventListener('keydown', onDrawerKeydown))
 
 watch(collapsed, (value) => {
   try {
