@@ -15,10 +15,17 @@ use Throwable;
  * tidak diubah). Pola sama dengan `DrhPegawai::kop()` [K `L_employee.php:7147-7166`]: baris 1 nama kementerian
  * (`pdf_header_nama_kementerian` ?? `nama_kementerian`, huruf besar), baris 2 nama unit/satker (unit UPT/lain →
  * satker), baris 3 alamat (`unit.alamat_pdf_header` / `satker.alamat_pdf_header` bila terisi, selain itu
- * `pdf_header_alamat_kementerian`), garis. Tanpa logo (keputusan F7-15, konsisten DRH/LKH).
+ * `pdf_header_alamat_kementerian`), garis. Nama kosong → `NAMA_INSTANSI_BAWAAN` (CR-066). Tanpa lingkup (Baperjakat)
+ * baris 2 dihilangkan. Tanpa logo (keputusan F7-15, konsisten DRH/LKH).
  */
 final class KopDokumen
 {
+    /**
+     * Nama instansi bila `web_config` kosong [K legacy `print/cetak.php:201`]. SATU sumber untuk kop dokumen daftar;
+     * generator PDF lain yang butuh bawaan sama (mis. slip gaji `DataPdfSlip`) wajib merujuk konstanta ini.
+     */
+    public const NAMA_INSTANSI_BAWAAN = 'Kementerian Pariwisata';
+
     private function __construct()
     {
     }
@@ -63,6 +70,10 @@ final class KopDokumen
 
         if (trim(strip_tags($nama)) === '') {
             $nama = (string) ($wc['nama_kementerian'] ?? '');
+        }
+
+        if (trim(strip_tags($nama)) === '') {
+            $nama = self::NAMA_INSTANSI_BAWAAN;
         }
 
         return '<table width="100%" cellpadding="0"><tr><td style="text-align:center;font-size:12pt;"><b>'
