@@ -103,6 +103,27 @@ final class KolomDokumen
     ];
 
     /**
+     * Label PDF Pensiun (CR-066): Title Case seperti DUK dan dipendekkan agar kolom angka sempit tidak memotong kata di
+     * tengah. `pensiun_th` = BUP (tahun), `pensiun_bl` = bulan TMT pensiun; XLSX/JSON tetap `KOLOM_PENSIUN` (legacy).
+     *
+     * @var array<string, string>
+     */
+    public const KOLOM_PENSIUN_PDF = [
+        'nama'          => 'Nama',
+        'nip'           => 'NIP',
+        'tgl_lahir'     => 'Tgl Lahir',
+        'jabatan'       => 'Jabatan',
+        'tmtsk_jabatan' => 'TMT Jabatan',
+        'satker'        => 'Satker',
+        'eselon'        => 'Eselon',
+        'tgl_pensiun'   => 'Tgl Pensiun',
+        'pensiun_th'    => 'BUP (Th)',
+        'pensiun_bl'    => 'Pensiun (Bl)',
+        'usia_th'       => 'Usia (Th)',
+        'usia_bl'       => 'Usia (Bl)',
+    ];
+
+    /**
      * Subset inti PDF (F7-16): key → label; `pangkat_gol`, `unit_satker`, `pendidikan`, `masa_kerja`, `lahir_usia`
      * = kolom gabungan.
      *
@@ -149,7 +170,7 @@ final class KolomDokumen
      */
     public static function kolomPdf(string $jenis): array
     {
-        return $jenis === self::PENSIUN ? self::KOLOM_PENSIUN : self::KOLOM_PDF;
+        return $jenis === self::PENSIUN ? self::KOLOM_PENSIUN_PDF : self::KOLOM_PDF;
     }
 
     /**

@@ -28,7 +28,8 @@ final class KolomDokumenTest extends CIUnitTestCase
         $this->assertSame(array_values(KolomDokumen::KOLOM_LENGKAP), KolomDokumen::headerXlsx('nominatif'));
         $this->assertCount(13, KolomDokumen::KOLOM_PDF);
         $this->assertSame(KolomDokumen::KOLOM_PDF, KolomDokumen::kolomPdf('duk'));
-        $this->assertSame(KolomDokumen::KOLOM_PENSIUN, KolomDokumen::kolomPdf('pensiun'));
+        $this->assertSame(KolomDokumen::KOLOM_PENSIUN_PDF, KolomDokumen::kolomPdf('pensiun'));
+        $this->assertSame(array_keys(KolomDokumen::KOLOM_PENSIUN), array_keys(KolomDokumen::KOLOM_PENSIUN_PDF), 'kunci sama dengan XLSX/JSON; hanya label PDF yang berbeda');
     }
 
     public function testBarisLengkap(): void

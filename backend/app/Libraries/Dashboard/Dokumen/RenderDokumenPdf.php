@@ -23,32 +23,34 @@ final class RenderDokumenPdf
 
     /**
      * Bobot lebar kolom PDF (relatif; dinormalkan ke TEPAT 100% bersama kolom No). NIP 18 digit selalu muat satu baris
-     * (CR-064 T9); kolom tanpa bobot memakai BOBOT_BAWAAN.
+     * (CR-064 T9); kolom teks bebas (nama, jabatan, unit/satker, pendidikan, diklat, satker) cukup lebar untuk kata
+     * terpanjang yang lazim ("Pengembangan", "Kepemimpinan") tanpa terpotong di tengah (CR-066 R3-2, diuji terhadap
+     * lebar huruf TCPDF); kolom tanpa bobot memakai BOBOT_BAWAAN.
      *
      * @var array<string, int>
      */
     public const BOBOT = [
         'no'            => 3,
-        'nama'          => 12,
-        'nip'           => 12,
+        'nama'          => 10,
+        'nip'           => 11,
         'pangkat_gol'   => 8,
-        'tmtsk_pangkat' => 7,
-        'jabatan'       => 12,
-        'tmtsk_jabatan' => 7,
+        'tmtsk_pangkat' => 6,
+        'jabatan'       => 11,
+        'tmtsk_jabatan' => 6,
         'unit_satker'   => 11,
-        'pendidikan'    => 8,
-        'tmtsk_cpns'    => 7,
+        'pendidikan'    => 9,
+        'tmtsk_cpns'    => 6,
         'masa_kerja'    => 6,
-        'lahir_usia'    => 8,
-        'diklat'        => 8,
-        'tgl_pensiun'   => 7,
-        'tgl_lahir'     => 8,
+        'lahir_usia'    => 7,
+        'diklat'        => 9,
+        'tgl_pensiun'   => 6,
+        'tgl_lahir'     => 7,
         'satker'        => 14,
         'eselon'        => 6,
-        'pensiun_th'    => 5,
-        'pensiun_bl'    => 5,
-        'usia_th'       => 5,
-        'usia_bl'       => 5,
+        'pensiun_th'    => 6,
+        'pensiun_bl'    => 6,
+        'usia_th'       => 6,
+        'usia_bl'       => 6,
     ];
 
     public const BOBOT_BAWAAN = 8;

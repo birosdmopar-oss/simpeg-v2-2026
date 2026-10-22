@@ -9,8 +9,10 @@ use App\Libraries\Dashboard\Dokumen\RenderDokumenPdf;
 use App\Libraries\Dashboard\Statistik\LingkupStatistik;
 use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
 use App\Libraries\Pdf\DokumenPdf;
+use App\Libraries\Pdf\KopDokumen;
 use CodeIgniter\Test\CIUnitTestCase;
 use ReflectionMethod;
+use TCPDF;
 use ZipArchive;
 
 /**
@@ -57,6 +59,50 @@ final class RenderDokumenPdfTest extends CIUnitTestCase
             // A4 lanskap 277 mm, 7pt: NIP 18 digit ≈ 26 mm → minimal ~10% agar satu baris.
             $this->assertGreaterThanOrEqual(10, $lebar['kolom']['nip'], 'NIP 18 digit harus muat satu baris (T9)');
         }
+    }
+
+    public function testKolomTeksBebasMuatKataTerpanjangTanpaTerpotongDiTengah(): void
+    {
+        // A4 lanskap, margin sisi 10 mm → 277 mm; padding sel 3 px ≈ 1,06 mm per sisi + garis tepi.
+        $pdf = new TCPDF('L', 'mm', 'A4');
+        $pdf->SetFont('helvetica', 'B', 7);
+        $kataTerpanjang = max(array_map(
+            static fn (string $k): float => $pdf->GetStringWidth($k),
+            ['Pengembangan', 'Kepemimpinan', 'Administrator', 'Pembangunan', 'Pemberdayaan', 'Struktural'],
+        ));
+
+        foreach (['duk' => ['nama', 'jabatan', 'unit_satker', 'pendidikan', 'diklat'], 'pensiun' => ['nama', 'jabatan', 'satker']] as $jenis => $teksBebas) {
+            $lebar = RenderDokumenPdf::lebarKolom(array_keys(KolomDokumen::kolomPdf($jenis)));
+
+            foreach ($teksBebas as $k) {
+                $mm = $lebar['kolom'][$k] / 100 * 277 - 2 * 1.06 - 0.3;
+                $this->assertGreaterThanOrEqual($kataTerpanjang, $mm, "{$jenis}.{$k} ({$lebar['kolom'][$k]}%) harus muat kata terpanjang ({$kataTerpanjang} mm)");
+            }
+
+            // NIP 18 digit tetap satu baris.
+            $this->assertGreaterThanOrEqual($pdf->GetStringWidth('198501012010011001') + 2 * 1.06 + 0.3, $lebar['kolom']['nip'] / 100 * 277, "{$jenis}.nip");
+            $this->assertSame(100, $lebar['no'] + array_sum($lebar['kolom']));
+        }
+    }
+
+    public function testLabelPdfPensiunTitleCaseDanPendek(): void
+    {
+        $this->assertSame(
+            ['Nama', 'NIP', 'Tgl Lahir', 'Jabatan', 'TMT Jabatan', 'Satker', 'Eselon', 'Tgl Pensiun', 'BUP (Th)', 'Pensiun (Bl)', 'Usia (Th)', 'Usia (Bl)'],
+            array_values(KolomDokumen::kolomPdf('pensiun')),
+        );
+        $this->assertArrayNotHasKey('PENSIUN (TH)', array_flip(KolomDokumen::kolomPdf('pensiun')));
+        // XLSX tetap label legacy huruf besar.
+        $this->assertSame('PENSIUN (TH)', KolomDokumen::KOLOM_PENSIUN['pensiun_th']);
+    }
+
+    public function testKopMemakaiNamaBawaanBilaWebConfigKosongDanBaperjakatTidakKosong(): void
+    {
+        $kop = KopDokumen::html(null, null);
+
+        $this->assertSame('Kementerian Pariwisata', KopDokumen::NAMA_INSTANSI_BAWAAN);
+        $this->assertStringContainsString('KEMENTERIAN PARIWISATA', $kop, 'nama bawaan bila web_config kosong');
+        $this->assertStringNotContainsString('font-size:9pt', $kop, 'tanpa lingkup: baris 2 (unit/satker) dihilangkan');
     }
 
     public function testHeaderDanDataBerlebarSamaPerKolomTanpaSelEkstra(): void
