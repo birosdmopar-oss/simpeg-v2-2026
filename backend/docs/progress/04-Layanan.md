@@ -2,7 +2,7 @@
 
 Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & sumber kebenaran: `docs/fase4/PRD_Fase4.md` v1.1 (26-10-2026; v1.0 18-10-2026).** Aturan proyek: `AGENTS.md`.
 
-**Terakhir diperbarui:** 26 Oktober 2026 — **take over** (pelaksana berganti; coder sebelumnya Wahyu sampai 20-10). M1 **selesai**: dokumen DBV-022 + 9 draf migration + 1 FK ditahan di `MigrationsDitahan/` + audit #11/#12, diverifikasi di DB scratch. Branch `fase4/dbv-022-skema-layanan` di-rebase ke `main` `4d4ae92`. PR `[DBV-022]` dibuat reviewer CR dari branch ini.
+**Terakhir diperbarui:** 26 Oktober 2026 (M2b di main 3fbf08e; PR #29 DBV-022) — **take over** (pelaksana berganti; coder sebelumnya Wahyu sampai 20-10). M1 **selesai**: dokumen DBV-022 + 9 draf migration + 1 FK ditahan di `MigrationsDitahan/` + audit #11/#12, diverifikasi di DB scratch. Branch `fase4/dbv-022-skema-layanan` di-rebase ke `main` `4d4ae92`. PR `[DBV-022]` dibuat reviewer CR dari branch ini.
 
 **Entry criteria:** **terpenuhi** — Fase 3 DONE (QA fungsional + QA UI Lapis 1 selesai 15-10-2026, temuan ditutup CR-049/050/051/054/055; `backend/docs/progress/03-Kepegawaian.md`). Tabel `pegawai`, snapshot `pegawai_*`, `riwayat_*` Fase 3, `jenis_rwy`, `document_attachment` sudah di `main`.
 
@@ -11,9 +11,9 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 | Task | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|
 | C-01 Migration layanan + pemisahan inbox/ticketing | M1, M2 | DBV-022 | **IN_PROGRESS** | M0 ✅ (19-10, diulang 26-10). M1 ✅ 26-10: dokumen DBV-022 (21 butir + Bagian 10 draf migration + Bagian 11 verifikasi developer) + `sql/DBV-022-audit-layanan.sql` 12 bagian + 9 draf migration & 1 FK ditahan di `app/Database/MigrationsDitahan/` (tidak jalan di CI). **M2 menunggu keputusan DBV Bagian 7** (B2b) |
-| C-02 Pengajuan cuti | M3 | MAKE-022 | TODO | Menunggu M2 merged |
-| C-03 Kalkulasi kuota N/N-1/N-2 + `calculate_lc` | M3 | MAKE-022 | TODO | Menunggu M2 merged; ⛔ Q-02 untuk bagian saldo tahunan |
-| C-04 Approval berjenjang cuti | M3 | MAKE-022 | TODO | Menunggu M2 merged; ⛔ Q-07 untuk bagian tunda pengingat |
+| C-02 Pengajuan cuti | M2b, M3 | MAKE-022 | **IN_PROGRESS** | M2b ✅ DI MAIN 3fbf08e (26-10): `ValidasiTanggalCuti` (murni). Sisa (M3, service DB + tumpang tindih) menunggu M2 merged |
+| C-03 Kalkulasi kuota N/N-1/N-2 + `calculate_lc` | M2b, M3 | MAKE-022 | **IN_PROGRESS** | M2b ✅ DI MAIN 3fbf08e: `HitungLamaCuti`, `PorsiTahunCuti`, `KuotaCuti`, `SaldoCuti`, `Config\Cuti` + `KuotaBoundaryTest` (K1–K21, T9, T11–T14). Sisa (M3, `KuotaCutiService` ber-DB) menunggu M2 merged; ⛔ Q-02 untuk bagian saldo tahunan |
+| C-04 Approval berjenjang cuti | M2b, M3 | MAKE-022 | **IN_PROGRESS** | M2b ✅ DI MAIN 3fbf08e: `StatusCuti`, `TransisiCuti`, `EfekFinalCuti`, `PengingatCuti` (murni; single end node diuji). Sisa (M3: AL/PyB, `CutiApprovalService`) menunggu M2 merged; ⛔ Q-07 untuk bagian tunda pengingat |
 | C-05 Penerbitan surat cuti e-sign (mock) | M4 | MAKE-023 | TODO | Menunggu M3 merged |
 | C-06 Notifikasi approval | M4 | MAKE-023 | TODO | ⛔ DILARANG mulai sebelum DBV-022 disetujui (PRD §6.1.4) |
 | C-07 Tugas Belajar | M5 | MAKE-024 | TODO | Inti menunggu M2; penyambungan notifikasi menunggu M4 |
@@ -138,3 +138,21 @@ Pelaksana berganti (permintaan coder Wahyu). PRD v1.1 (`docs/fase4-prd-v1-1`, 13
 **Blocker.** B2 (audit data produksi) dan B2b (14 DQ) tetap terbuka — menghambat M2, bukan M1. B7 selesai (key dikonfirmasi reviewer: DBV-022, MAKE-022 Tahap 2b).
 
 **Berkas terakhir yang disentuh.** `backend/app/Database/MigrationsDitahan/*Fase4*.php`, `backend/docs/db-review/DBV-022-layanan-fase4-schema.md`, `backend/docs/db-review/sql/DBV-022-audit-layanan.sql`, berkas ini.
+
+---
+
+## M2b — Tahap 2b: library murni cuti (26-10-2026) — DI MAIN 3fbf08e
+
+**Sudah jalan.** Branch `fase4/make-022-cuti` dari `main` 02cb088, CI hijau (run 40322925610), fast-forward ke `main`
+3fbf08e (izin Horii). `Config\Cuti` (§6.3.1) + 10 kelas murni `backend/app/Libraries/Layanan/Cuti/` (`AturanCuti`,
+`StatusCuti`, `SaldoCuti`, `HitungLamaCuti`, `PorsiTahunCuti`, `ValidasiTanggalCuti`, `KuotaCuti`, `TransisiCuti`,
+`EfekFinalCuti`, `PengingatCuti`) + 5 test `backend/tests/unit/Layanan/Cuti/` (86 test, 1065 asersi): `CutiMurniTest`
+(pemindai kemurnian + paritas `Config\Cuti` = `AturanCuti::bawaan()`), `HitungLamaCutiTest` (K22–K24, T1, T4–T8, paritas
+`HariKerja` Tukin), `KuotaBoundaryTest` (K1–K21, T9, T11–T14), `ValidasiTanggalCutiTest` (T2, T3, T7, T8),
+`TransisiCutiTest` (T4–T10, T16–T18, single end node). README `Libraries/Layanan/README.md`. Tanpa
+Model/controller/route/migration (§6.1.4).
+
+**Keputusan coder — disetujui Horii 26-10** (dicatat di PRD v1.1 §14): batas `tgl_akhir ≤ 31-12 tahun acuan + 1` hanya
+jenis 1; paritas T13 hanya saldo ternormalisasi legacy; teks pesan batas jenis 5/6 [V2]; berkas ke-10 `AturanCuti`.
+
+**Belum jalan.** M3 (service ber-DB, AL/PyB, tumpang tindih, notifikasi) — menunggu DBV-022 (PR #29) disetujui dan M2 merged.

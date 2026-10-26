@@ -405,7 +405,7 @@ Daftar opsi (`GET cuti/opsi`) **sudah disaring server** per pemohon; `POST` deng
 | `status` | role 1 saja | ∈ {0,1}; role 2/7 dipaksa 0 | `form_ad.php:151-154` |
 | `id_jenis_cuti` | ya | "Silahkan pilih jenis cuti." / "Jenis cuti tidak tersedia untuk pegawai ini." | `L:1440`, `setJenisCuti` |
 | `tgl_mulai` | ya | `YYYY-MM-DD`; "Tanggal mulai cuti wajib diisi."; jenis 1/2/4/6: "Tanggal mulai cuti tidak boleh sebelum hari ini." (jenis 3/5 boleh mundur [K `L:1547-1554`]); **tahun acuan (26-10, keputusan #6)**: `tgl_mulai` < 01-01 tahun acuan (§6.3.3) → "Tanggal cuti tidak boleh pada tahun sebelum tahun pengajuan." [V2; legacy meloloskan tanpa potong `L:1591-1610`] | `L:1540-1554` |
-| `tgl_akhir` | ya (kecuali jenis 2: dihitung dari `durasi`) | `>= tgl_mulai` "Tanggal akhir tidak boleh sebelum tanggal mulai."; `<= 31-12 tahun acuan + 1` "Tanggal akhir cuti maksimal 31-12-{tahun+1}." [V2 di server; legacy hanya klien C:248-255, 295 — keputusan #6: porsi hanya tahun acuan & tahun berikutnya]; jenis 5: `<= tgl_mulai + 1 bulan` (§6.3.2); jenis 6: `<= tgl_mulai + 3 tahun` (§6.3.2) | `L:1540-1543`, C:248-255 |
+| `tgl_akhir` | ya (kecuali jenis 2: dihitung dari `durasi`) | `>= tgl_mulai` "Tanggal akhir tidak boleh sebelum tanggal mulai."; `<= 31-12 tahun acuan + 1` "Tanggal akhir cuti maksimal 31-12-{tahun+1}." [V2 di server; legacy hanya klien C:248-255, 295 — keputusan #6: porsi hanya tahun acuan & tahun berikutnya] — **hanya jenis 1** (catatan v1.1 26-10, disetujui Horii: batas ini berasal dari kuota dua tahun; CLTN sah sampai 3 tahun dan jenis 2–6 tidak memotong kuota, jadi tidak dikenai batas ini); jenis 5: `<= tgl_mulai + 1 bulan` (§6.3.2); jenis 6: `<= tgl_mulai + 3 tahun` (§6.3.2) | `L:1540-1543`, C:248-255 |
 | `durasi` | jenis 2 | ∈ {1,2,3} "Silahkan pilih durasi cuti besar." | `form.php:130-137` |
 | `lama_cuti` | — | **tidak diterima dari klien**; diisi server = `KuotaCutiService::hitungLama()` (§6.3.2); hasil 0 → `errors.tgl_mulai` "Lama cuti tidak boleh 0 hari." | `L:1504-1517`; §12 Q-03 |
 | `no_telp_saat_cuti` | ya | ≤ 50; "No. telepon selama cuti wajib diisi." | `L:1440-1467` |
@@ -549,7 +549,7 @@ Saldo awal `(N, N-1, N-2, utang, ditangguhkan)`; semua cuti Tahunan di tahun acu
 | T10 | Edit: baris sendiri dikecualikan dari menunggu & tumpang tindih | `L:1616, 1527` |
 | T11 | Status 4 dengan `lcTahunDepan > 0`: ditangguhkan += `lcTahunIni`, utang tetap, porsi tahun depan dibuang | `L:3892-3901` |
 | T12 | Potong saat saldo kurang (balapan) → 422, saldo tidak berubah | A-07 |
-| T13 | **Paritas**: untuk saldo dengan N ≤ 12, N-1 ≤ 6, N-2 ≤ 6 dan `lc ≤ total`, hasil N-2 → N-1 → N = normalisasi legacy e-sign (`L:3867-3886`) — jaminan data impor | A-11 |
+| T13 | **Paritas**: untuk saldo **berbentuk ternormalisasi legacy** (N terisi dulu sampai 12, lalu N-1 sampai 6, lalu N-2 — bentuk yang selalu dihasilkan legacy) dan `lc ≤ total`, hasil N-2 → N-1 → N = normalisasi legacy e-sign (`L:3867-3886`) — jaminan data impor. Catatan v1.1 (26-10, disetujui Horii): untuk saldo di luar bentuk itu (mis. (5,6,6), lc 2 → v2 (5,6,4) vs normalisasi (12,3,0)) kedua rumus memang berbeda; bentuk tersebut tidak pernah dihasilkan legacy maupun v2, sehingga test dibatasi ke bentuk ternormalisasi | A-11 |
 | T14 | Refund cuti tahun lalu memakai tahun `created_at` baris; refund `utang < lcTahunDepan` → 0 | `L:1282, 1318` |
 | T15 | Input admin status 1 (T3) memakai potong yang sama; potongan ganda `sp()` legacy tidak ditiru | `L:1986-2024` |
 | T16 | State machine: AL tangguhkan dari 0 → final 4 + potong [K A-05]; AL == PyB → langkah tunggal; PyB kosong → langkah tunggal | `L:3797-3818` |
@@ -1462,6 +1462,7 @@ Konteks: coder Wahyu meminta Fase 4 diambil alih tim reviewer CR (26-10). Basis 
 | 12 | Q-05: audit nilai negatif `pegawai_sisa_cuti` masuk DBV-022 (DQ-23) | §6.1.2 #7, §6.1.3 |
 | 13 | Hari kerja cuti dihitung sendiri di `HitungLamaCuti` + test paritas terhadap `HariKerja` | §6.3.2 |
 | — | Kasus uji tambahan T1–T19 | §6.3.10 |
+| — | Catatan Tahap 2b (26-10, disetujui Horii): batas `tgl_akhir ≤ 31-12 tahun acuan + 1` hanya jenis 1; paritas T13 hanya saldo ternormalisasi legacy; teks pesan batas jenis 5/6 dan "tanggal tidak valid" = [V2]; berkas ke-10 `AturanCuti` (library tidak boleh membaca `Config`). Tahap 2b di `main` 3fbf08e | §6.2.3, §6.3.10, §6.1.4 |
 | — | Butir ◻ lain (Q-03, Q-04, Q-09, Q-11–Q-17, Q-22, Q-24): default v1.0 dipertahankan | §12 |
 
 ### 14.2 Temuan legacy pendukung butir ⛔ (bukan keputusan)
