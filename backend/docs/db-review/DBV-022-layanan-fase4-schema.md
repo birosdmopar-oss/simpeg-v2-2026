@@ -1,14 +1,15 @@
 # DB Validator Review — DBV-022 skema Modul C Layanan Fase 4 + pemisahan `inbox` (notifikasi) vs `disiplin_ticket` (ticketing)
 
 **Key review:** `DBV-022`. Judul PR yang direncanakan: `[DBV-022] Skema Modul C Fase 4: layanan, notifikasi inbox, ticketing
-disiplin_ticket`. Branch `fase4/dbv-022-skema-layanan` (dari `main` `6806c38`). Alur: `[DBV]` (+`[MAKE]` bila ada kode) → PR →
+disiplin_ticket`. Branch `fase4/dbv-022-skema-layanan` (di-rebase ke `main` `4d4ae92`, 26-10-2026). Alur: `[DBV]` (+`[MAKE]` bila ada kode) → PR →
 DB Validator review/approve → reviewer CR merge (AGENTS.md §2, PRD §6.1.4).
 
-**Status:** 📋 **PRA-REVIEW INTERNAL SISI CR — MENUNGGU REVIEW DB VALIDATOR.** Dokumen ini **bukan** hasil review DB Validator
-dan **belum** disetujui siapa pun. Seluruh 21 butir tabel sudah berisi DDL D1 + usulan v2 + deviasi (Bagian 2) sejak D1
-tersedia 20-10-2026. Yang masih kosong: **hasil** kueri audit data (Bagian 6 — perlu akses salinan dump) dan draf migration
-(ditahan sampai 14 butir keputusan Bagian 7 dijawab, agar tidak ditulis dua kali). Isi dokumen diturunkan dari
-`docs/fase4/PRD_Fase4.md` v1.0 (18-10-2026) + D1; tidak ada tipe kolom atau nama constraint yang dikarang.
+**Status:** ⏳ **Menunggu review DB Validator.** Isi = **usulan coder**; belum direview reviewer CR maupun DB Validator dan
+belum disetujui siapa pun. Seluruh 21 butir tabel berisi DDL D1 + usulan v2 + deviasi (Bagian 2). Draf migration per
+kelompok tabel sudah ditulis di `backend/app/Database/MigrationsDitahan/` (Bagian 10 — **tidak** dijalankan `spark migrate`
+maupun CI) dan diverifikasi coder di DB scratch (Bagian 11). Yang masih kosong: **hasil** kueri audit data produksi
+(Bagian 6 — perlu akses salinan dump; blocker B2). Isi dokumen diturunkan dari `docs/fase4/PRD_Fase4.md` v1.1 (26-10-2026,
+branch `docs/fase4-prd-v1-1`) + D1; tidak ada tipe kolom atau nama constraint yang dikarang.
 
 **Asal kebutuhan:** PRD Fase 4 §6.1 (C-01), keputusan user **D18** (satu unit review untuk seluruh tabel Modul C) dan **D10**
 (pemisahan notifikasi vs ticketing). Prinsip #4 Mapping Migrasi yang menyebut `inbox` dipakai untuk notifikasi dikoreksi di sini
@@ -40,7 +41,7 @@ Satu unit review untuk **21 butir** (PRD §6.1.1, D18): 9 tabel layanan, 4 tabel
 | E | **Ticketing (Fase 8)** | `disiplin_ticket`, `disiplin_ticket_msg`, `question_category` | CREATE [K] rename dari `inbox`/`inbox_msg` legacy |
 | F | Petugas / aturan approval | `jenis_layanan`, `petugas_layanan`, `pa_layanan`, `jenis_pa` | CREATE [K] D1 + deviasi |
 | G | Integrasi (dimajukan) | `esign_hist`, `firebase_token` | CREATE [K] D1 + deviasi |
-| H | Kode | `jenis_rwy` kode baru 43..49 (usulan) | Migration **baru** (bukan edit seed lama) |
+| H | Kode | `jenis_rwy` kode baru 43..50 (usulan, Bagian 2.21) | Migration **baru** (bukan edit seed lama) |
 
 **Inti keputusan yang diminta:** Bagian 3 (pemisahan `inbox` vs `disiplin_ticket`) dan Bagian 7 (DQ-3, DQ-4, DQ-6, DQ-7, DQ-9,
 DQ-10, DQ-12, DQ-16, DQ-17, DQ-18, DQ-20, DQ-21, nomor `jenis_rwy`) = PRD §12 **Q-20**.
@@ -465,7 +466,7 @@ Desain baru (tidak ada padanannya di D1). Usulan PRD §6.1.1 #12/#13:
 | `nip_penerima` | VARCHAR(30) NOT NULL | FK → `pegawai(nip)` RESTRICT (K1/V4); registry NIP Bagian 4 |
 | `id_pengguna_penerima` | INT NULL | Opsional — DQ-4: penerima diidentifikasi NIP, `id_pengguna` atau keduanya |
 | `modul` | VARCHAR(20) NOT NULL | `cuti` \| `tb` \| `ib` \| `pmk`; CHECK domain [V2] |
-| `id_jenis_layanan` | TINYINT NULL | FK → `jenis_layanan` RESTRICT; NULL untuk cuti (cuti bukan `jenis_layanan`) |
+| `id_jenis_layanan` | INT NULL | FK → `jenis_layanan` RESTRICT; NULL untuk cuti (cuti bukan `jenis_layanan`). INT (bukan TINYINT) karena PK `jenis_layanan` = INT [K] (V5) |
 | `id_rwy` | BIGINT NOT NULL | Id baris sumber; **tanpa FK** (polimorfik lintas 4 tabel) |
 | `judul` | VARCHAR(150) NOT NULL | |
 | `url` | VARCHAR(255) NOT NULL | Rute FE tujuan |
@@ -563,7 +564,7 @@ dilakukan setelah hasil audit Bagian 6 dibaca DB Validator — bukan diputuskan 
 
 ## 6. Kueri audit baca-saja
 
-Berkas: `backend/docs/db-review/sql/DBV-022-audit-layanan.sql` (10 bagian, hanya `SELECT`, dijalankan di salinan dump —
+Berkas: `backend/docs/db-review/sql/DBV-022-audit-layanan.sql` (12 bagian, hanya `SELECT`, dijalankan di salinan dump —
 bukan di produksi legacy dan bukan di DB dev v2).
 
 | Bagian | Isi | Klasifikasi |
@@ -578,6 +579,8 @@ bukan di produksi legacy dan bukan di DB dev v2).
 | 8 | `esign_hist`: status di luar ('1','2'), NIP yatim, panjang `ip_address`; `firebase_token` | INFO (DQ-7) |
 | 9 | `riwayat_cuti.ketua_tim`: elemen yang bukan NIP pegawai | INFO (DQ-15) |
 | 10 | `riwayat_cuti_notif_kt`: distribusi status, baris yatim | WAJIB_0 + INFO |
+| 11 | `pegawai_sisa_cuti`: saldo negatif per kolom (prasyarat CHECK `>= 0`), nilai di atas batas D8 (12/6/6/12, total > 24) + daftar baris negatif | WAJIB_0 (negatif) + INFO (batas D8) — PRD v1.1 §6.1.2 #7 (11), DQ-23 PRD |
+| 12 | `LENGTH(reason_note*) > 255` byte di `riwayat_cuti` (3 kolom), `riwayat_tb`, `riwayat_ib`, `riwayat_pmk_req` + panjang maksimum terpakai | INFO — kolom tetap TEXT [K], aplikasi v2 menolak > 255 byte (Q-23); PRD v1.1 §6.1.2 #7 (12), DQ-22 PRD |
 
 Bagian 7.3 (pelaku tiket terhadap tabel pengguna legacy) sengaja dibiarkan **dikomentari**: nama tabel/kolom pengguna di
 legacy berbeda dari v2 dan belum dapat dipastikan tanpa D1.
@@ -619,8 +622,10 @@ PRD §12 Q-20. Butir yang sudah terjawab keputusan user tidak diajukan ulang.
 
 ---
 
-## 8. Rencana test skema
+## 8. Rencana test skema (M2)
 
+Ditulis di M2 bersama pemindahan draf Bagian 10 ke `app/Database/Migrations/` dan pembaruan registry NIP (Bagian 4,
+`NipCascadeService::FASE` → 4) — **tidak** di M1, karena test skema baru bisa jalan di CI setelah migration-nya aktif.
 Berkas (PRD §6.1 file boundary):
 
 | Berkas | Isi |
@@ -643,10 +648,90 @@ backend/app/Database/Migrations/` hanya berisi berkas baru.
 | **B1** | ✅ **selesai 20-10-2026** | D1 (`simpeg01_struktur_lengkap_20261001.sql`) diterima; nomor baris cocok dengan rujukan PRD (`esign_hist` 891, `inbox` 1369, `jenis_cuti` 1634, `riwayat_cuti` 4396) | Bagian 2 terisi lengkap untuk 21 butir |
 | **B2** | ⛔ terbuka | Tidak ada akses salinan dump legacy untuk **menjalankan** `sql/DBV-022-audit-layanan.sql` (dump yang diterima hanya **struktur**, tanpa data — `-- Data exporting was unselected.`) | Keputusan DQ-3 (FK approver aktif vs ditahan), DQ-10 (UNIQUE saldo), DQ-12/DQ-27 (domain & NULL PIC), DQ-18, DQ-20 bergantung angka ini. Usulan coder sudah dibuat **fail-safe**: FK yang bergantung audit ditaruh di `MigrationsDitahan/` |
 | **B3** | ⛔ terbuka | Salinan kode legacy di mesin kerja (`simpegdev…/application/`) **bukan** versi yang dirujuk PRD (`1_legacy_simpeg…`); nomor baris tidak cocok pada uji acak `Cuti.php:584-591`, `L_cuti.php:1440`, `L_cuti.php:2645-2651` | Rujukan `[K] berkas:baris` tidak dapat diverifikasi sendiri. **Tidak memblokir C-01** (skema seluruhnya bersumber D1); relevan untuk M3–M5 |
-| **B4** | ⛔ terbuka | 14 butir keputusan Bagian 7 (DQ-3, 4, 6, 7, 9, 10, 12, 16, 17, 18, 20, 21, 22–27) belum diputus DB Validator | **Draf migration ditahan**: setiap butir mengubah DDL, menulisnya sekarang berarti menulis dua kali |
+| **B4** | ⛔ terbuka | 14 butir keputusan Bagian 7 (DQ-3, 4, 6, 7, 9, 10, 12, 16, 17, 18, 20, 21, 22–27) belum diputus DB Validator | Draf migration **sudah ditulis sesuai usulan coder** (Bagian 10) agar DBV mereview DDL konkret; butir yang diputus berbeda → draf direvisi sebelum dipindah ke `Migrations/` (M2) |
 
-**Langkah berikutnya begitu Bagian 7 diputus:** tulis migration per kelompok tabel + `MigrationsDitahan/` + seed uji +
-pembaruan registry NIP + tiga test skema (Bagian 8), jalankan hanya di DB scratch `simpeg_v2_t_dbv022*` port 3307, lalu
-ajukan PR `[DBV-022]`.
+**Langkah berikutnya begitu Bagian 7 diputus (M2, PR yang sama):** revisi draf Bagian 10 sesuai keputusan DBV → pindahkan
+ke `app/Database/Migrations/` (nama tetap) → pembaruan registry NIP (Bagian 4, `TabelAnakNip`, `NipCascadeService::FASE` =
+4) → tiga test skema (Bagian 8) → gate penuh di DB scratch `simpeg_v2_t_dbv022` port 3307 → PR `[DBV-022]` dilengkapi.
+`AddFkNipLayananFase4.php` tetap di `MigrationsDitahan/` sampai audit yatim di lingkungan target = 0 (pola DBV-019).
 
-Status C-01 = **IN_PROGRESS** (dokumen siap direview; migration menunggu keputusan).
+Status C-01 = **IN_PROGRESS** (M1 selesai: dokumen + draf migration siap direview DB Validator; M2 menunggu keputusan
+Bagian 7).
+
+---
+
+## 10. Draf migration (`app/Database/MigrationsDitahan/`, usulan coder — belum disetujui)
+
+Pola DBV-020 (CREATE SQL mentah per tabel, `TABLES` const, drop tabel yang dibuat pada run itu bila DDL berikutnya gagal,
+`down()` DROP urutan terbalik) dan DBV-019 (FK ditahan dengan pra-cek yatim fail-closed). Nama berkas sudah memakai stempel
+waktu supaya **pemindahan ke `Migrations/` tidak mengubah nama**; selama di `MigrationsDitahan/` berkas tidak dimuat `spark
+migrate` dan tidak ikut CI (AC-01.8 terjaga: `git diff origin/main -- backend/app/Database/Migrations/` kosong).
+
+| Urutan | Berkas | Tabel / isi | Butir DQ yang terkandung |
+|---|---|---|---|
+| 1 | `2026-10-26-100000_CreateMasterLayananFase4.php` | `jenis_cuti` (seed id 1..6), `jenis_layanan` (seed id 1..5), `jenis_pa` (seed id 1 Cuti, `udpated_at` → `updated_at`), `question_category` (CHECK 0/1, DEFAULT 1) | DQ-5, DQ-9, DQ-23, DQ-24 |
+| 2 | `2026-10-26-100100_CreateRiwayatCutiFase4.php` | `pegawai_sisa_cuti` (UNIQUE `nip_tahun`, CHECK saldo ≥ 0), `riwayat_cuti` (NIP approver VARCHAR(30) tanpa FK, index `(nip_*, status)`, CHECK status 0..4 tanpa 10), `riwayat_cuti_notif_kt` | DQ-3 (kolom), DQ-10, DQ-16, DQ-22 |
+| 3 | `2026-10-26-100200_CreateRiwayatTbIbFase4.php` | `riwayat_tb`, `riwayat_tb_perpan` (FK RESTRICT), `riwayat_ib`; `id_jenjang_pendidikan` INT, `file_*` NULL-able | DQ-18, DQ-20 |
+| 4 | `2026-10-26-100300_CreateRiwayatPmkFase4.php` | `riwayat_pmk`, `riwayat_pmk_req` (DEFAULT status 1 [K]) | DQ-18 |
+| 5 | `2026-10-26-100400_CreateInboxNotifikasiFase4.php` | `inbox` v2, `inbox_msg` v2 (Bagian 3.2; `created_at` tanpa DEFAULT; konstanta `KOLOM_TERLARANG` untuk test AC-01.2) | DQ-4 |
+| 6 | `2026-10-26-100500_CreateDisiplinTicketFase4.php` | `disiplin_ticket`, `disiplin_ticket_msg` (rename `inbox`/`inbox_msg` legacy; `nip` VARCHAR(30) tanpa FK; `id_inbox` NOT NULL) | DQ-4, DQ-6 |
+| 7 | `2026-10-26-100600_CreatePetugasPaLayananFase4.php` | `petugas_layanan` (`id_jenis_layanan` NOT NULL, UNIQUE `(id_jenis_layanan, nip)`, CHECK status (0,1,10)), `pa_layanan` (11 FK RESTRICT nama legacy) | DQ-12, DQ-17, DQ-27 |
+| 8 | `2026-10-26-100700_CreateEsignFirebaseFase4.php` | `esign_hist` (`status_code`, `ip_address` 45, index `(modul, id_rw)`, CHECK status ('1','2')), `firebase_token` (PK surrogate, FK `nip` aktif, tanpa `auth_token`) | DQ-7, DQ-25, DQ-26 |
+| 9 | `2026-10-26-100800_SeedJenisRwyLayananFase4.php` | `jenis_rwy` 43..50 (fail-closed bila id sudah ada; `order` 21..28) | DQ-21, DQ-jenis_rwy |
+| — | `AddFkNipLayananFase4.php` (**tanpa stempel waktu**, ditahan dua lapis) | FK `riwayat_cuti.nip_atasan_langsung`/`nip_yang_menyetujui`, `petugas_layanan.nip`, `pa_layanan.nip`, `disiplin_ticket.nip` → `pegawai.nip` RESTRICT; pra-cek yatim fail-closed per kolom (NULL dan `''` diabaikan) | DQ-3, DQ-4, DQ-12, DQ-17 — DBV mencoret baris `FOREIGN_KEYS` yang diputus tanpa FK |
+
+Catatan untuk DB Validator:
+
+1. **Constraint yang bergantung audit tetapi dipasang di CREATE** (bukan ditahan): UNIQUE `pegawai_sisa_cuti (nip, tahun)`
+   (DQ-10), UNIQUE `petugas_layanan (id_jenis_layanan, nip)` + NOT NULL `id_jenis_layanan` (DQ-12/27), NOT NULL
+   `disiplin_ticket_msg.id_inbox`. Alasannya: tabel v2 dibuat kosong, pelanggaran hanya mungkin dari data impor, dan impor
+   yang gagal pada baris itu adalah sinyal yang diinginkan (normalisasi dikerjakan di runbook impor sebelum baris masuk).
+   Berbeda dari FK ke `pegawai.nip` yang ditahan karena keputusan "bagaimana memperlakukan approver yatim" milik DBV.
+   Bila DBV lebih memilih pola ditahan untuk UNIQUE juga, cukup dipindah ke `AddFkNipLayananFase4.php` (ALTER ADD UNIQUE).
+2. **CHECK pada kolom NULL-able** (`status_al`, `status_pyb`, `status_admin_*`, saldo `pegawai_sisa_cuti`): NULL lolos
+   CHECK (semantik SQL), sehingga baris impor dengan NULL tidak ditolak.
+3. **Index redundan** `riwayat_cuti`: KEY kolom tunggal D1 (`nip_atasan_langsung`, `nip_yang_menyetujui`) dipertahankan
+   bersama index gabungan baru `(…, status)`. DBV boleh menghapus yang tunggal; coder mempertahankan demi diff D1 nol.
+4. **`petugas_layanan.status` CHECK (0,1,10)**: 10 disertakan karena kode legacy membaca `status != '10'`; dipersempit ke
+   (0,1) bila audit Bagian 6.5 tidak menemukan 10.
+5. **Tidak dibuat** oleh draf: perubahan `NipCascadeService::FASE`, registry `TabelAnakNip`, ENUM `audit_logs.event`
+   (DBV-023 memilikinya), dan tiga test skema — semuanya M2.
+
+---
+
+## 11. Verifikasi developer (26-10-2026, DB scratch `simpeg_v2_t_dbv022` port 3307, MySQL 8.0.30)
+
+Dikerjakan coder, bukan pengganti review DBV. Cara: draf Bagian 10 disalin **sementara** ke `app/Database/Migrations/`
+(`AddFkNipLayananFase4.php` dengan stempel `2026-10-26-100900`), dijalankan `php spark migrate`, lalu salinan dihapus —
+`git status` membuktikan `Migrations/` kembali bersih. Data uji = baris sintetis (2 `pegawai`, 1 `jenjang_pendidikan`,
+1 `jenis_pegawai`, 1 `unit`); skrip SQL ada di luar repo.
+
+| Pemeriksaan | Hasil |
+|---|---|
+| Skema `main` `4d4ae92` (46 migration) sebelum draf | **100 tabel / 204 FK / 45 CHECK** |
+| Setelah 9 draf CREATE/seed (batch berikutnya, 9 "Running") | **120 tabel (+20) / 235 FK (+31) / 84 CHECK (+39)**, 55 migration |
+| Setelah `AddFkNipLayananFase4` (tanpa yatim) | 120 / **240 FK (+5)** / 84 |
+| Collation 20 tabel Modul C | semua `utf8mb4_unicode_ci` (termasuk 5 tabel D1 `0900_ai_ci`) |
+| FK 31 buah di tabel Modul C | **0** yang bukan RESTRICT/RESTRICT (`REFERENTIAL_CONSTRAINTS`) |
+| Kolom NIP ber-FK (13 tabel) | **0** yang bukan `varchar(30)` |
+| Seed | `jenis_cuti` 6 baris id 1..6; `jenis_layanan` 5 baris id 1..5; `jenis_pa` id 1 "Cuti"; `jenis_rwy` 43..50 (8 baris) |
+| `inbox`/`inbox_msg` v2 tanpa kolom `status`, `allow_reply`, `closed_by`, `is_read_off`, `notify_pic` | **0 kolom** (AC-01.2); `disiplin_ticket` memiliki kelimanya (5) (AC-01.3) |
+| `firebase_token.auth_token` / `jenis_pa.udpated_at` | tidak ada (0 / 0); `jenis_pa.updated_at` ada |
+| `riwayat_cuti`: NIP yatim 1452; `id_jenis_cuti` yatim 1452; `status` 10 → 3819; `status_al` 3 → 3819; `status_pyb` 3 sah; hapus pegawai/jenis_cuti yang dipakai → 1451 | sesuai |
+| `jenis_cuti` nama ganda → 1062; `riwayat_cuti_notif_kt` cuti yatim 1452, status 3 → 3819, hapus cuti yang punya tembusan → 1451 | sesuai |
+| `pegawai_sisa_cuti`: duplikat `(nip, tahun)` → 1062; saldo −1 → 3819; `digunakan` 2 → 3819; saldo NULL lolos | sesuai |
+| `riwayat_tb` tanpa `file_*` sah; jenjang yatim 1452; status 4 → 3819; `riwayat_tb_perpan.file_sperpan` NULL → 1048; hapus TB induk berperpanjangan → **1451** (RESTRICT, bukan CASCADE); hapus jenjang yang dipakai → **1451** (bukan SET NULL); `riwayat_ib.nama` NULL → 1048 [K] | sesuai |
+| `riwayat_pmk_req` status 4 → 3819; `riwayat_pmk` status 0 → 3819 | sesuai |
+| `inbox`: modul di luar domain → 3819; `nip_penerima` yatim 1452; `created_at` tanpa nilai → **1364** (wajib diisi aplikasi); `id_jenis_layanan` yatim 1452; `inbox_msg` tipe 5 / push_status 4 → 3819; hapus `inbox` berpesan → 1451 | sesuai |
+| `question_category` status 2 → 3819; `disiplin_ticket` status 2 → 3819, `is_read` 0 → 3819; `_msg.id_inbox` NULL → 1048, induk yatim 1452; hapus kategori yang dipakai → 1451 | sesuai |
+| `petugas_layanan` duplikat → 1062; `id_jenis_layanan` NULL → 1048; status 2 → 3819; hapus `jenis_layanan` yang dipakai → 1451 | sesuai |
+| `pa_layanan` `id_unit_pemohon`/`id_jenis_pa` yatim → 1452; status 3 → 3819; hapus `unit` yang dipakai → **1451** (bukan SET NULL) | sesuai |
+| `esign_hist` status '3' → 3819; IPv6 45 karakter tersimpan; `nip` NULL sah; hapus pegawai ber-`esign_hist` → 1451; `firebase_token` nip yatim 1452 | sesuai |
+| **FK ditahan fail-closed**: 3 baris yatim ditanam (`riwayat_cuti` AL + PyB, `disiplin_ticket.nip`) + 1 `petugas_layanan.nip = ''` | `migrate` berhenti dengan `RuntimeException` "DBV-022: FK NIP layanan ke pegawai.nip tidak dipasang — riwayat_cuti.nip_atasan_langsung: 1 …; riwayat_cuti.nip_yang_menyetujui: 1 …; disiplin_ticket.nip: 1 …"; **0 FK terpasang**, batch tidak bertambah; NIP kosong **tidak** dihitung yatim (3 masalah, bukan 4) |
+| Setelah yatim di-NULL-kan/dihapus → `migrate` ulang | 5 FK terpasang; UPDATE approver ke NIP yatim → 1452 |
+| `migrate:rollback` ke batch `main` (10 "Rolling back") | 20 tabel Modul C hilang, `jenis_rwy` ≥ 43 = 0 baris, kembali **100 / 204 / 45** |
+| `migrate` ulang lalu `SHOW CREATE TABLE` 20 tabel dibandingkan dengan sebelum rollback (tanpa `AUTO_INCREMENT=`) | **identik** (`diff` kosong) |
+| `php -l`, PHP-CS-Fixer (`.php-cs-fixer.dist.php`), PHPStan level 5 pada `MigrationsDitahan/` | lolos, 0 error |
+
+Catatan operasional: `migrate:rollback` membutuhkan berkas migration **masih ada** di `Migrations/` (CI4 memuat kelas
+untuk `down()`); menghapus salinan sebelum rollback membuat rollback diam-diam tidak melakukan apa pun.

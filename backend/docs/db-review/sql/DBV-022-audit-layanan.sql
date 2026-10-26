@@ -362,6 +362,73 @@ SELECT 'rcnkt_nip_kt_lebih_30', COUNT(*) FROM riwayat_cuti_notif_kt WHERE CHAR_L
 SELECT CAST(status AS CHAR) AS status, COUNT(*) AS jumlah
 FROM riwayat_cuti_notif_kt GROUP BY status ORDER BY status;
 
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Bagian 11 — `pegawai_sisa_cuti`: saldo negatif atau di luar batas D8 per kolom (PRD v1.1 §6.1.2 #7 butir 11, DQ-23).
+-- Rujukan: CHECK v2 `chk_psc_saldo_nonnegatif` (>= 0) WAJIB_0; batas atas D8 (12/6/6/12) INFO — ditegakkan aplikasi,
+-- bukan CHECK, tetapi nilai di atasnya perlu dicatat untuk rekonsiliasi kuota (PRD §6.3.6).
+-- ---------------------------------------------------------------------------------------------------------------------
+SELECT 'psc_sisa_cuti_negatif' AS metrik, COUNT(*) AS jumlah FROM pegawai_sisa_cuti WHERE sisa_cuti < 0
+UNION ALL
+SELECT 'psc_sisa_cuti_n1_negatif', COUNT(*) FROM pegawai_sisa_cuti WHERE sisa_cuti_n1 < 0
+UNION ALL
+SELECT 'psc_sisa_cuti_n2_negatif', COUNT(*) FROM pegawai_sisa_cuti WHERE sisa_cuti_n2 < 0
+UNION ALL
+SELECT 'psc_sisa_cuti_ditangguhkan_negatif', COUNT(*) FROM pegawai_sisa_cuti WHERE sisa_cuti_ditangguhkan < 0
+UNION ALL
+SELECT 'psc_utang_cuti_negatif', COUNT(*) FROM pegawai_sisa_cuti WHERE utang_cuti < 0
+UNION ALL
+-- INFO: di luar batas atas D8.
+SELECT 'psc_sisa_cuti_lebih_12', COUNT(*) FROM pegawai_sisa_cuti WHERE sisa_cuti > 12
+UNION ALL
+SELECT 'psc_sisa_cuti_n1_lebih_6', COUNT(*) FROM pegawai_sisa_cuti WHERE sisa_cuti_n1 > 6
+UNION ALL
+SELECT 'psc_sisa_cuti_n2_lebih_6', COUNT(*) FROM pegawai_sisa_cuti WHERE sisa_cuti_n2 > 6
+UNION ALL
+SELECT 'psc_utang_cuti_lebih_12', COUNT(*) FROM pegawai_sisa_cuti WHERE utang_cuti > 12
+UNION ALL
+SELECT 'psc_total_lebih_24', COUNT(*) FROM pegawai_sisa_cuti
+WHERE COALESCE(sisa_cuti, 0) + COALESCE(sisa_cuti_n1, 0) + COALESCE(sisa_cuti_n2, 0) > 24;
+
+-- Daftar baris saldo negatif (untuk keputusan normalisasi: 0 atau nilai legacy dipertahankan tanpa CHECK).
+SELECT nip, tahun, sisa_cuti, sisa_cuti_n1, sisa_cuti_n2, sisa_cuti_ditangguhkan, utang_cuti
+FROM pegawai_sisa_cuti
+WHERE sisa_cuti < 0 OR sisa_cuti_n1 < 0 OR sisa_cuti_n2 < 0 OR sisa_cuti_ditangguhkan < 0 OR utang_cuti < 0
+ORDER BY nip, tahun;
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Bagian 12 — panjang `reason_note*` > 255 byte (PRD v1.1 §6.1.2 #7 butir 12, DQ-22, Q-23).
+-- Kolom `reason_note`/`reason_note_al`/`reason_note_pyb` tetap TEXT/MEDIUMTEXT/TINYTEXT [K] di v2; aplikasi v2 menolak
+-- > 255 byte (422). Nilai legacy yang lebih panjang tetap diimpor apa adanya — INFO, bukan prasyarat. Dihitung dalam
+-- byte (LENGTH), bukan karakter, karena batas aplikasi = byte (TINYTEXT `riwayat_pmk_req.reason_note` = 255 byte).
+-- ---------------------------------------------------------------------------------------------------------------------
+SELECT 'cuti_reason_note_lebih_255' AS metrik, COUNT(*) AS jumlah FROM riwayat_cuti WHERE LENGTH(reason_note) > 255
+UNION ALL
+SELECT 'cuti_reason_note_al_lebih_255', COUNT(*) FROM riwayat_cuti WHERE LENGTH(reason_note_al) > 255
+UNION ALL
+SELECT 'cuti_reason_note_pyb_lebih_255', COUNT(*) FROM riwayat_cuti WHERE LENGTH(reason_note_pyb) > 255
+UNION ALL
+SELECT 'tb_reason_note_lebih_255', COUNT(*) FROM riwayat_tb WHERE LENGTH(reason_note) > 255
+UNION ALL
+SELECT 'ib_reason_note_lebih_255', COUNT(*) FROM riwayat_ib WHERE LENGTH(reason_note) > 255
+UNION ALL
+SELECT 'pmk_req_reason_note_lebih_255', COUNT(*) FROM riwayat_pmk_req WHERE LENGTH(reason_note) > 255
+UNION ALL
+-- INFO: panjang maksimum terpakai per kolom (byte).
+SELECT 'cuti_reason_note_maks_byte', COALESCE(MAX(LENGTH(reason_note)), 0) FROM riwayat_cuti
+UNION ALL
+SELECT 'cuti_reason_note_al_maks_byte', COALESCE(MAX(LENGTH(reason_note_al)), 0) FROM riwayat_cuti
+UNION ALL
+SELECT 'cuti_reason_note_pyb_maks_byte', COALESCE(MAX(LENGTH(reason_note_pyb)), 0) FROM riwayat_cuti
+UNION ALL
+SELECT 'tb_reason_note_maks_byte', COALESCE(MAX(LENGTH(reason_note)), 0) FROM riwayat_tb
+UNION ALL
+SELECT 'ib_reason_note_maks_byte', COALESCE(MAX(LENGTH(reason_note)), 0) FROM riwayat_ib
+UNION ALL
+SELECT 'pmk_req_reason_note_maks_byte', COALESCE(MAX(LENGTH(reason_note)), 0) FROM riwayat_pmk_req;
+
 -- =====================================================================================================================
--- Akhir skrip. Ringkasan hasil dicatat di DBV-022 Bagian 6 dan di log runbook impor DBV-011 Bagian 2.8.
+-- Akhir skrip (12 bagian). Ringkasan hasil dicatat di DBV-022 Bagian 6 dan di log runbook impor DBV-011 Bagian 2.8.
 -- =====================================================================================================================
