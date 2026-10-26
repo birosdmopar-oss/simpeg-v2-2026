@@ -3,11 +3,12 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `PRD_Fase4.md` — acuan utama coder/agen AI Fase 4 (kartu Trello DEV-005, prompt eksekusi 1/2 & 2/2) |
-| Versi | **v1.0 — 18-10-2026** |
-| Status | **BERLAKU** — disetujui user/reviewer CR 18-10-2026: keputusan D1–D19 dan **seluruh saran default §12 (butir ⛔ dan ◻) diterima**, termasuk konfirmasi Q-03 (nilai turunan dihitung server) dan Q-13 (pemanggil `process` = NIP approver tahap aktif). Perubahan berikutnya hanya lewat revisi versi oleh reviewer CR |
-| Basis kode | `origin/main` = **`2b712ed`** (rujukan `path:baris` repo diambil dari `0a79e38`/`2b712ed`; selisih keduanya hanya CR-055 frontend form riwayat, tidak mengubah baris yang dirujuk) |
+| Versi | **v1.1 — 26-10-2026** (revisi atas v1.0 18-10-2026; daftar perubahan di §14) |
+| Status | **BERLAKU** — disetujui user/reviewer CR 18-10-2026: keputusan D1–D19 dan **seluruh saran default §12 (butir ⛔ dan ◻) diterima**, termasuk konfirmasi Q-03 (nilai turunan dihitung server) dan Q-13 (pemanggil `process` = NIP approver tahap aktif). Perubahan berikutnya hanya lewat revisi versi oleh reviewer CR. **26-10-2026:** Horii menyetujui 13 keputusan riset take over (§14) — seluruh butir ◻ §12 = **disetujui default 26-10** dengan penyesuaian Q-08/Q-10/Q-21/Q-23; **tahap 2b** (logika murni cuti sebelum DBV-022) diizinkan (§6.1.4, §9) |
+| Basis kode | v1.0: `origin/main` = **`2b712ed`** (rujukan `path:baris` repo diambil dari `0a79e38`/`2b712ed`). v1.1: `origin/main` = **`4d4ae92`** — berkas baru yang dirujuk v1.1: `Libraries/Pdf/KopDokumen.php` (MAKE-037), `tests/_support/Libraries/PemindaiKemurnian.php`, `tests/feature/KontrakMatriksRoleTest.php` (MAKE-038: setiap route `api/v1` baru wajib punya baris kontrak role di commit yang sama) |
 | Sumber | Keputusan user D1–D19 (18-10-2026), Trello DEV-005/QASMTASK-064..075/QAUI-004/QAFUNC-005, `04-Layanan.md`, Matriks Role × Endpoint v2 Modul C, kode & DDL legacy (D1 `simpeg01_struktur_lengkap_20261001.sql`), repo v2. Daftar lengkap di Lampiran A |
-| Key | Skema: **DBV-022** (DBV-021 dicadangkan ISSUE-045). Pekerjaan baru: **MAKE-022** dst. Perbaikan review/QA: CR-### berikutnya (CR-056) |
+| Key | Skema: **DBV-022** (DBV-021 dicadangkan ISSUE-045). Pekerjaan baru: **MAKE-022** dst. (tahap 2b = bagian awal MAKE-022). Perbaikan review/QA: CR-### berikutnya |
+| Pelaksana | **Take over 26-10-2026** (permintaan coder Wahyu): Fase 4 dikerjakan tim reviewer CR. Basis = branch `fase4/dbv-022-skema-layanan` @`706f73b` (dokumen DBV-022 + skrip audit, belum ada draf migration/PR). Pembagian sesi: PRD v1.1, M0–M1 DBV-022, dan tahap 2b oleh sesi coder (Worker Fable); review/merge/PR oleh reviewer CR (Qoder-A-Fadhlan); keputusan produk oleh Horii |
 
 ## Cara pakai (WAJIB dibaca)
 
@@ -315,8 +316,8 @@ Mengikuti pola `B-01-B-02-pegawai-riwayat-schema.md`, `DBV-019`, `DBV-020`:
 3. **Per tabel**: DDL D1 apa adanya (baris), DDL v2 usulan, tabel deviasi `[K]/[V2]/[I]` per kolom/index/FK/CHECK + alasan, perlakuan trigger legacy, risiko impor.
 4. **Pemisahan inbox vs ticketing** (bagian tersendiri): temuan T1 (legacy `inbox` = 100% tiket Halo Simpeg, `L_support.php:997,1006,1169,1341`), rancangan `inbox` v2 (satu arah) vs `disiplin_ticket` (rename [K]), daftar kolom yang **dilarang** ada di `inbox` v2, rencana impor: semua `inbox`/`inbox_msg` legacy → `disiplin_ticket(_msg)` (Fase 8), `inbox` v2 dimulai kosong atau diisi dari `riwayat_cuti_notif_kt`/`show_notif` (keputusan DBV/F-02, dicatat).
 5. **Registry NIP**: setiap kolom NIP baru + jenisnya (`FkV2`, `NonFk`, `NULLABLE`, jenis baru untuk `ketua_tim` TEXT dipisah `***`), cakupan `NipCascadeService`.
-6. **Bagian impor** (J1.07): urutan impor (`jenis_cuti`, `jenis_layanan`, `jenis_pa`, `question_category` → `petugas_layanan`, `pa_layanan` → `pegawai_sisa_cuti` → `riwayat_cuti` → `riwayat_cuti_notif_kt` → `riwayat_tb` → `riwayat_tb_perpan` → `riwayat_ib` → `riwayat_pmk_req`, `riwayat_pmk` → `esign_hist` (utuh, bukti legal) → `disiplin_ticket` → `disiplin_ticket_msg` → `inbox` v2), counter AUTO_INCREMENT disalin, normalisasi nilai di luar domain.
-7. **Kueri audit baca-saja** (WAJIB_0 kecuali disebut) di `backend/docs/db-review/sql/`: (1) yatim/panjang/`''` `riwayat_cuti.nip_atasan_langsung`/`nip_yang_menyetujui`; (2) distribusi `status`, `status_al`, `status_pyb`, `rated`, `skip_*`, `status_regen`; (3) duplikat `pegawai_sisa_cuti (nip, tahun)`, `tahun = 0`; (4) distribusi status TB/IB/PMK req, `jenis_pmk`; (5) `petugas_layanan` nip yatim/>30, status di luar {0,1,10}, `id_jenis_layanan` NULL, duplikat; (6) `pa_layanan` id master yatim, nip yatim; (7) `inbox` `id_question_category` NULL, nip yatim, sender/receiver/closed_by tanpa pengguna, `inbox_msg.id_inbox` NULL/yatim, tabrakan UNIQUE setelah collation; (8) `esign_hist.status` di luar ('1','2'), nip yatim; (9) elemen `ketua_tim` yang bukan NIP; (10) `riwayat_cuti_notif_kt` distribusi & yatim. Digabung ke runbook impor DBV-011.
+6. **Bagian impor** (J1.07): urutan impor (`jenis_cuti`, `jenis_layanan`, `jenis_pa`, `question_category` → `petugas_layanan`, `pa_layanan` → `pegawai_sisa_cuti` → `riwayat_cuti` → `riwayat_cuti_notif_kt` → `riwayat_tb` → `riwayat_tb_perpan` → `riwayat_ib` → `riwayat_pmk_req`, `riwayat_pmk` → `esign_hist` (utuh, bukti legal) → `disiplin_ticket` → `disiplin_ticket_msg` → `inbox` v2), counter AUTO_INCREMENT disalin, normalisasi nilai di luar domain. **Lampiran lama (26-10, Q-21):** path legacy di kolom `riwayat_cuti.file_bukti/file_sc_unsign/file_sc_signed_bef/file_surat_cuti`, `riwayat_tb.file_sp/file_1..3/file_surat_tb`, `riwayat_tb_perpan.file_sperpan`, `riwayat_ib.file_sp/file_1/file_2/file_surat_ib` dipetakan ke baris `document_attachment` (kode `jenis_rwy` baru) pada runbook cutover agar riwayat lama tetap bisa diunduh; kolom `file_*` legacy diperlakukan sesuai DQ-20. Dicatat juga di dokumen Mapping (Q-19).
+7. **Kueri audit baca-saja** (WAJIB_0 kecuali disebut) di `backend/docs/db-review/sql/`: (1) yatim/panjang/`''` `riwayat_cuti.nip_atasan_langsung`/`nip_yang_menyetujui`; (2) distribusi `status`, `status_al`, `status_pyb`, `rated`, `skip_*`, `status_regen`; (3) duplikat `pegawai_sisa_cuti (nip, tahun)`, `tahun = 0`; (4) distribusi status TB/IB/PMK req, `jenis_pmk`; (5) `petugas_layanan` nip yatim/>30, status di luar {0,1,10}, `id_jenis_layanan` NULL, duplikat; (6) `pa_layanan` id master yatim, nip yatim; (7) `inbox` `id_question_category` NULL, nip yatim, sender/receiver/closed_by tanpa pengguna, `inbox_msg.id_inbox` NULL/yatim, tabrakan UNIQUE setelah collation; (8) `esign_hist.status` di luar ('1','2'), nip yatim; (9) elemen `ketua_tim` yang bukan NIP; (10) `riwayat_cuti_notif_kt` distribusi & yatim; **(11)** `pegawai_sisa_cuti` nilai negatif (`utang_cuti < 0 OR sisa_cuti_ditangguhkan < 0 OR sisa_cuti* < 0` — akibat bug refund legacy `L:1318, 1325`) dan di luar batas D8 (PERIKSA); **(12)** `LENGTH(reason_note*) > 255` di `riwayat_cuti`, `riwayat_tb`, `riwayat_ib` (PERIKSA; kolom [K] tidak dikecilkan, lihat DQ-22). Digabung ke runbook impor DBV-011.
 8. **Pertanyaan untuk DBV** (§6.1.3) beserta usulan coder.
 9. **Rencana test skema**: `information_schema` per tabel (kolom, tipe, NULL, default, PK, index, FK + aksi, collation, COMMENT), error 1452/1451/1062, CHECK, siklus `down()`/`up()`, migration ditahan menolak jalan bila ada yatim, `inbox` tidak punya kolom `status`/`allow_reply`/`closed_by`.
 
@@ -344,11 +345,14 @@ Mengikuti pola `B-01-B-02-pegawai-riwayat-schema.md`, `DBV-019`, `DBV-020`:
 | DQ-19 | Revisi dokumen Mapping (tambah `pegawai_sisa_cuti`, `jenis_cuti`, `pa_layanan`, `jenis_pa`; koreksi Prinsip #4) | Di luar coder → §12 Q-19 |
 | DQ-20 | Kolom `file_*` NOT NULL [K] di `riwayat_tb`/`riwayat_ib` sementara berkas v2 di `document_attachment` | DBV |
 | DQ-21 | Kolom `tag`/pembeda versi surat (belum TTE vs ber-TTE) di `document_attachment` atau dua kode `jenis_rwy` | DBV |
+| DQ-22 | (26-10, Q-23) Tipe kolom `reason_note*` tetap [K] (`text`/`mediumtext`; `riwayat_pmk_req` `tinytext`) — **tidak dikecilkan** karena data impor bisa > 255; batas 255 byte hanya validasi input v2 | Usulan tetap [K]; DBV konfirmasi |
+| DQ-23 | (26-10, Q-05) Audit `pegawai_sisa_cuti` bernilai negatif / di luar batas D8 sebelum CHECK ≥ 0 dipasang (DQ-10) | DBV memutuskan: normalisasi saat impor atau CHECK ditahan |
 
 #### 6.1.4 ⛔ TITIK TUNGGU C-01
 - ⛔ **Sebelum DBV menyetujui DBV-022: DILARANG** menulis migration yang dijalankan, model, service, controller, atau test yang bergantung pada tabel Modul C — **khususnya coding notifikasi (C-06)**. Yang boleh: dokumen DBV-022, kueri audit, draf migration **di branch DBV** untuk dibaca DBV.
 - ⛔ Migration **DILARANG dijalankan** di DB Dev/Production sebelum disetujui; hanya di DB scratch uji (`simpeg_v2_t_dbv022*`, port 3307).
 - Alur: dokumen + draf migration → PR `[DBV]`(+`[MAKE]` bila ada kode) → DB Validator review/approve → reviewer CR merge. Revisi setelah review = commit baru di PR yang sama.
+- **Tahap 2b (26-10-2026, DIIZINKAN):** logika **murni** cuti boleh dikerjakan sebelum DBV-022 disetujui karena tidak bergantung pada tabel Modul C (input → output; tidak memakai Model, `db_connect`, `Database::connect`, `Services`). Batas berkas: `backend/app/Config/Cuti.php`; `backend/app/Libraries/Layanan/Cuti/{StatusCuti, SaldoCuti (value object), HitungLamaCuti (termasuk hari kerja sendiri + test paritas terhadap `Presensi/Tukin/HariKerja`), PorsiTahunCuti, ValidasiTanggalCuti, KuotaCuti (validasi/potong/refund atas `SaldoCuti`), TransisiCuti, EfekFinalCuti (predikat CLTN saja), PengingatCuti (batas tunda)}.php`; test `backend/tests/unit/Layanan/Cuti/*` termasuk `KuotaBoundaryTest` (§6.3.8 + §6.3.10) dan `CutiMurniTest` (`PemindaiKemurnian` pada folder itu); README `Libraries/Layanan`. **DILARANG** di tahap 2b: Model, controller, route, migration, `KuotaCutiService` berbasis DB, penentuan AL/PyB, notifikasi. Key: bagian awal **MAKE-022**, branch `fase4/make-022-cuti` (§9 M2b).
 
 #### 6.1.5 Acceptance criteria C-01 (QASMTASK-064)
 - **AC-01.1** Migration membuat `riwayat_cuti`, `riwayat_tb`, `riwayat_tb_perpan`, `riwayat_ib`, `riwayat_pmk`, `riwayat_pmk_req` (+ semua tabel D18) sesuai DBV-022 yang disetujui; test `information_schema` lulus di MySQL 8.0 & MariaDB 10.4 (CI).
@@ -400,8 +404,8 @@ Daftar opsi (`GET cuti/opsi`) **sudah disaring server** per pemohon; `POST` deng
 | `nip` | role 1 saja | pegawai aktif ada; role 2/7 diabaikan (dipaksa NIP sesi) | C:263-266 |
 | `status` | role 1 saja | ∈ {0,1}; role 2/7 dipaksa 0 | `form_ad.php:151-154` |
 | `id_jenis_cuti` | ya | "Silahkan pilih jenis cuti." / "Jenis cuti tidak tersedia untuk pegawai ini." | `L:1440`, `setJenisCuti` |
-| `tgl_mulai` | ya | `YYYY-MM-DD`; "Tanggal mulai cuti wajib diisi."; jenis 1: "Tanggal mulai cuti tahunan tidak boleh sebelum hari ini." | `L:1540-1548` |
-| `tgl_akhir` | ya (kecuali jenis 2: dihitung dari `durasi`) | `>= tgl_mulai` "Tanggal akhir tidak boleh sebelum tanggal mulai."; `<= 31-12 tahun depan` "Tanggal akhir cuti maksimal 31-12-{tahun+1}." | `L:1533-1537`, C:247-255 |
+| `tgl_mulai` | ya | `YYYY-MM-DD`; "Tanggal mulai cuti wajib diisi."; jenis 1/2/4/6: "Tanggal mulai cuti tidak boleh sebelum hari ini." (jenis 3/5 boleh mundur [K `L:1547-1554`]); **tahun acuan (26-10, keputusan #6)**: `tgl_mulai` < 01-01 tahun acuan (§6.3.3) → "Tanggal cuti tidak boleh pada tahun sebelum tahun pengajuan." [V2; legacy meloloskan tanpa potong `L:1591-1610`] | `L:1540-1554` |
+| `tgl_akhir` | ya (kecuali jenis 2: dihitung dari `durasi`) | `>= tgl_mulai` "Tanggal akhir tidak boleh sebelum tanggal mulai."; `<= 31-12 tahun acuan + 1` "Tanggal akhir cuti maksimal 31-12-{tahun+1}." [V2 di server; legacy hanya klien C:248-255, 295 — keputusan #6: porsi hanya tahun acuan & tahun berikutnya]; jenis 5: `<= tgl_mulai + 1 bulan` (§6.3.2); jenis 6: `<= tgl_mulai + 3 tahun` (§6.3.2) | `L:1540-1543`, C:248-255 |
 | `durasi` | jenis 2 | ∈ {1,2,3} "Silahkan pilih durasi cuti besar." | `form.php:130-137` |
 | `lama_cuti` | — | **tidak diterima dari klien**; diisi server = `KuotaCutiService::hitungLama()` (§6.3.2); hasil 0 → `errors.tgl_mulai` "Lama cuti tidak boleh 0 hari." | `L:1504-1517`; §12 Q-03 |
 | `no_telp_saat_cuti` | ya | ≤ 50; "No. telepon selama cuti wajib diisi." | `L:1440-1467` |
@@ -411,7 +415,7 @@ Daftar opsi (`GET cuti/opsi`) **sudah disaring server** per pemohon; `POST` deng
 | `nip_yang_menyetujui` | ya kecuali eselon I | "Silahkan pilih pejabat yang berwenang menyetujui cuti."; NIP pegawai yang ada (integritas FK) [K D19]; validasi lain tidak ditambahkan (ISSUE-048) | `L:1762-1772` |
 | `ketua_tim[]` | tidak | array NIP pegawai aktif (`pegawai.status = 1`), unik; disimpan `implode('***')` + baris `riwayat_cuti_notif_kt` | `L:1785-1800`, `L:516` |
 | `file_bukti` | tidak (server) | 5 MB, jpg/jpeg/png/gif/pdf via `ValidasiBerkas` (isi ≙ ekstensi, tanpa ekstensi ditolak, CR-054); disimpan `AttachmentService` kode `jenis_rwy` cuti (§6.1.1 #21). FE mewajibkan untuk jenis 3 [K klien `form.php:354-362`] | `L:901-915` |
-| Tumpang tindih | — | Sakit/Alasan Penting: cek terhadap jenis 3/5 status {0,1}; jenis lain: terhadap semua jenis status {0,1,4} → `errors.tgl_mulai` "Tanggal cuti beririsan dengan pengajuan cuti lain." | `L:1520-1530` |
+| Tumpang tindih | — | Sakit/Alasan Penting: cek terhadap jenis 3/5 status {0,1,**3**}; jenis lain: terhadap semua jenis status {0,1,**3**,4} → `errors.tgl_mulai` "Tanggal cuti beririsan dengan pengajuan cuti lain." Status 3 **ikut dicek** [V2, keputusan #5 26-10; legacy `L:1527-1536` mengabaikan 3 walau 3 ikut dihitung "menunggu" kuota]. Baris yang sedang diubah dikecualikan | `L:1527-1536` |
 | Kuota (jenis 1) | — | §6.3.4 → `errors.lama_cuti` | `L:1572-1661` |
 
 **Semua galat dikumpulkan** (bukan hanya yang terakhir — A-09 [V2], kontrak 422 per kolom platform).
@@ -456,14 +460,16 @@ Dalam satu transaksi: (1) kunci `pegawai` pemohon `FOR UPDATE`, baca ulang baris
 `KUOTA_N = 12`, `MAKS_N1 = 6`, `MAKS_N2 = 6`, `MAKS_TOTAL = 24`, `MAKS_UTANG = 12`, `JENIS_HARI_KERJA = [1, 3, 5]`, `JENIS_HARI_KALENDER = [2, 4, 6]`, `DURASI_BESAR = [1, 2, 3]`, `MAKS_BULAN_ALASAN_PENTING = 1`, `MAKS_TAHUN_CLTN = 3`, `JAM_BATAS_TUNDA = '12:00'`.
 
 #### 6.3.2 Lama cuti (D9, `Local.php:2147-2209`, `FH:2175-2215`)
-- Jenis 1/3/5: hitung **hari kerja** inklusif `tgl_mulai..tgl_akhir` = hari Senin–Jumat yang **bukan** tanggal di `HariLiburService::tanggalLibur(from, to)` (hanya hari libur `status = 1`; cuti bersama yang tercatat sebagai hari libur ikut dikurangi → **tidak memotong kuota** [K]). Pakai `HariLiburService::tanggalLibur()` (`Libraries/MasterData/HariLiburService.php:200-212`) dan `Libraries/Presensi/Tukin/HariKerja::hariKerja()` **baca-saja** — DILARANG mengubah perilaku keduanya; bila helper perlu dipindah ke lokasi bersama → eskalasi dulu.
-- Jenis 2: `tgl_akhir = tgl_mulai + durasi bulan − 1 hari`; lama = hari kalender inklusif. Respons mengembalikan `tgl_akhir` yang **benar** (tanpa maju 1 hari — perbaikan anomali LK-01, §12 Q-15).
+- Jenis 1/3/5: hitung **hari kerja** inklusif `tgl_mulai..tgl_akhir` = hari Senin–Jumat yang **bukan** tanggal di `HariLiburService::tanggalLibur(from, to)` (hanya hari libur `status = 1`; cuti bersama yang tercatat sebagai hari libur ikut dikurangi → **tidak memotong kuota** [K]). Daftar libur dari `HariLiburService::tanggalLibur()` (`Libraries/MasterData/HariLiburService.php:209-230`, baca-saja). **Hari kerja dihitung sendiri** di `HitungLamaCuti` (Sabtu/Minggu = `date('N') >= 6` [K `FH:997-999`], libur = himpunan tanggal) dengan **test paritas** terhadap `Libraries/Presensi/Tukin/HariKerja::hariKerja()` (keputusan #13 26-10: `Libraries/Layanan/Cuti` lolos pemindai kemurnian dan tidak mengikat Fase 5). DILARANG mengubah `HariKerja`/`HariLiburService`. Libur legacy = semua baris `hari_libur` tanpa filter jenis (`FH:2181-2195`) → cuti bersama ikut dikurangi [K].
+- Jenis 2: `tgl_akhir` = **tanggal yang sama pada bulan `tgl_mulai + durasi` (dipotong ke hari terakhir bulan itu bila tidak ada) dikurangi 1 hari** [K `addMonth` `FH:960-966`; keputusan #2 26-10]. Contoh: 15-01 + 1 bulan → **14-02**; 31-01-2025 + 1 → **27-02-2025** (28-02 dipotong, −1); 31-01-2024 + 1 → **28-02-2024** (kabisat: 29-02 − 1); 31-03 + 1 → 29-04; 15-01 + 3 → 14-04. **Bukan** PHP `+1 month` (31-01 → 03-03). Lama = hari kalender inklusif. Respons mengembalikan `tgl_akhir` yang **benar** (tanpa maju 1 hari — perbaikan anomali LK-01, §12 Q-15).
 - Jenis 4, 6: hari kalender inklusif (nilai yang selama ini tersimpan dari kalkulator klien legacy; anomali server `diff()->days` eksklusif LK-02 tidak dibawa).
 - `satuan_lama_cuti = 'Hari'`.
+- Batas durasi jenis 5 (alasan penting): `tgl_akhir ≤ tgl_mulai` **+ 1 bulan PHP** (`DateTime::modify('+1 month')`, inklusif) [K `L:1666-1674`; keputusan #4 26-10]. Contoh: 15-01 → batas 15-02; 31-01-2025 → **03-03-2025**; 31-01-2024 → **02-03-2024**; 30-04 → 30-05. Jenis 6 (CLTN): `tgl_akhir ≤ tgl_mulai + 3 tahun` inklusif (TA = TM + 3 tahun persis masih boleh) [K `L:1567-1575`]; 29-02 + 3 tahun → 01-03 (PHP).
 
 #### 6.3.3 Tahun acuan & saldo
 - Baris saldo = `pegawai_sisa_cuti (nip, tahun)`; tahun acuan = **tahun pengajuan** (`created_at`, zona waktu aplikasi) [K `L:1579`, `L:3829-3831`] — validasi saat ajukan dan potong saat final memakai baris tahun yang sama (§12 Q-04 konfirmasi).
-- Porsi cuti yang jatuh **di tahun acuan** = `lcTahunIni`; porsi di tahun berikut = `lcTahunDepan` (pecah pada 31-12 / 01-01 memakai hitungan hari kerja §6.3.2).
+- Porsi cuti yang jatuh **di tahun acuan** = `lcTahunIni`; porsi di tahun berikut = `lcTahunDepan` (pecah pada 31-12 / 01-01 memakai hitungan hari kerja §6.3.2). **Hanya dua tahun** yang dikenal: tanggal sebelum 01-01 tahun acuan atau sesudah 31-12 tahun berikutnya → 422 (§6.2.3; keputusan #6 26-10, legacy tidak menangani `L:1591-1610`).
+- Tahun acuan **refund** (§6.3.5) = tahun `created_at` baris yang dihapus, bukan tahun berjalan saat menghapus [V2; legacy `L:1282` memakai `date('Y')` sehingga hapus cuti tahun lalu salah sasaran].
 - `saldoTahunIni = sisa_cuti + sisa_cuti_n1 + sisa_cuti_n2` (≤ 24 karena batas D8); `saldoTahunDepan = MAKS_UTANG − utang_cuti`.
 - Saldo tidak ada → 422 `errors.lama_cuti` "Saldo cuti anda tidak terdaftar didalam sistem. Silahkan hubungi admin SIMPEG untuk menambahkan saldo cuti tahunan anda." (`L:1655-1658`).
 
@@ -528,6 +534,29 @@ Saldo awal `(N, N-1, N-2, utang, ditangguhkan)`; semua cuti Tahunan di tahun acu
 
 **DILARANG (C-03):** lebih dari satu implementasi potong/refund; menghitung kuota di FE (ADR-025/026); normalisasi ulang saldo saat potong; menulis saldo di luar transaksi terkunci; mengubah `HariKerja`/`HariLiburService`.
 
+#### 6.3.10 Kasus uji tambahan wajib (26-10-2026, dari verifikasi kode legacy; masuk `KuotaBoundaryTest`/`HitungLamaCutiTest`)
+| # | Kasus | Dasar |
+|---|---|---|
+| T1 | `tgl_akhir` Besar: 31-01-2025 → 27-02; 31-01-2024 → 28-02; 30-01 → 28-02/27-02; 31-03 → 29-04; durasi 2/3 bulan | `FH:960-966` |
+| T2 | Alasan penting 31-01 → batas 03-03 (02-03 kabisat); TA = batas (boleh), batas + 1 (422) | `L:1666-1674` |
+| T3 | CLTN TA = TM + 3 tahun persis (boleh), + 1 hari (422); TM 29-02 | `L:1567-1575` |
+| T4 | Jenis 2/4/6 `tgl_mulai = tgl_akhir` → lama 1 (sah, Q-24; legacy server menolak `L:1509-1513`) | Q-24 |
+| T5 | Jenis 1: rentang seluruhnya libur/akhir pekan → lama 0 → 422 | `L:1519` |
+| T6 | Libur multi-hari yang hanya sebagian beririsan; libur jatuh di Sabtu/Minggu (tidak dobel); libur status 2/10 tidak dihitung | `FH:2181-2208` |
+| T7 | Lintas tahun: 31-12 Jumat & 01-01 libur; TM 31-12; TM 01-01 tahun berikut (`lcTahunIni` 0); TA > 31-12 tahun berikut → 422 | `L:1591-1610` |
+| T8 | Pengajuan Januari untuk tanggal tahun sebelumnya → 422 (keputusan #6) | §6.2.3 |
+| T9 | Menunggu mencakup status 0 **dan 3**, dihitung ulang dari tanggal, termasuk baris menunggu lintas tahun (A-10 diperbaiki) | `L:1614-1644` |
+| T10 | Edit: baris sendiri dikecualikan dari menunggu & tumpang tindih | `L:1616, 1527` |
+| T11 | Status 4 dengan `lcTahunDepan > 0`: ditangguhkan += `lcTahunIni`, utang tetap, porsi tahun depan dibuang | `L:3892-3901` |
+| T12 | Potong saat saldo kurang (balapan) → 422, saldo tidak berubah | A-07 |
+| T13 | **Paritas**: untuk saldo dengan N ≤ 12, N-1 ≤ 6, N-2 ≤ 6 dan `lc ≤ total`, hasil N-2 → N-1 → N = normalisasi legacy e-sign (`L:3867-3886`) — jaminan data impor | A-11 |
+| T14 | Refund cuti tahun lalu memakai tahun `created_at` baris; refund `utang < lcTahunDepan` → 0 | `L:1282, 1318` |
+| T15 | Input admin status 1 (T3) memakai potong yang sama; potongan ganda `sp()` legacy tidak ditiru | `L:1986-2024` |
+| T16 | State machine: AL tangguhkan dari 0 → final 4 + potong [K A-05]; AL == PyB → langkah tunggal; PyB kosong → langkah tunggal | `L:3797-3818` |
+| T17 | Tunda tepat `tgl_mulai 12:00:00` (boleh), 12:00:01 (422); zona Asia/Jakarta | C:971-976 |
+| T18 | CLTN TM = hari ini / TA = hari ini → aktif; TM = besok → tidak | `L:3494-3504` |
+| T19 | Tumpang tindih: jenis 3 vs jenis 1 status 1 (legacy tidak mengecek lintas kelompok) → tetap tidak dicek [K], terdokumentasi | `L:1527-1536` |
+
 ---
 
 ### 6.4 C-04 — Approval berjenjang cuti
@@ -575,7 +604,7 @@ Saldo awal `(N, N-1, N-2, utang, ditangguhkan)`; semua cuti Tahunan di tahun acu
 | T1 | — | ajukan | pegawai 2/7 | validasi §6.2.3 | 0 | `status_al = 0`, `status_pyb = 0`; notif ke AL (atau PyB bila langkah tunggal), tembusan KT |
 | T2 | — | input admin status 0 | role 1 | validasi | 0 | sama T1 |
 | T3 | — | input admin status 1 | role 1 | validasi + kuota | **1** | `status_al = status_pyb = 1`; efek final; notif ke pemohon |
-| T4 | 0 (dua langkah) | setujui | NIP = AL | — | **3** | `status_al = 1`, `status_pyb` mengikuti `set_param_process`/`sp_process_esign` (`L:2639-2692`, `L:3754-3810`; COMMENT D1:4431 menyebut nilai 3 "Disetujui AL - Waiting PYB" — [I], diverifikasi & dicatat di laporan M3); `reason_note_al = NULL`; `keterangan_petugas_approval .= "- Disetujui {nama} - ({jabatan})"`; `show_atasan = 1`; **tanpa efek final**; notif pemohon ("Sedang Diproses") + PyB ("perlu persetujuan") + KT |
+| T4 | 0 (dua langkah) | setujui | NIP = AL | — | **3** | `status_al = 1`, **`status_pyb` tetap 0** (tidak ditulis) [K — diverifikasi 26-10: `set_param_process` `L:2654-2660` dan `sp_process_esign` `L:3810-3818` tidak menyentuh `status_pyb`; COMMENT D1:4431 "3 Disetujui AL - Waiting PYB" tidak dipakai kode; keputusan #3]; `reason_note_al = NULL`; `keterangan_petugas_approval .= "- Disetujui {nama} - ({jabatan})"`; `show_atasan = 1`; **tanpa efek final**; notif pemohon ("Sedang Diproses") + PyB ("perlu persetujuan") + KT |
 | T5 | 0 (dua langkah) | tolak | NIP = AL | `reason_note` wajib | **2** | `status_al = 2`, `reason_note_al`, `reason_note`; notif pemohon (+alasan) + KT |
 | T6 | 0 (dua langkah) | tangguhkan | NIP = AL | jenis 1 | **4** | `status_al = 4`; efek final (status 4); notif pemohon + KT |
 | T7 | 0 (langkah tunggal) | setujui/tolak/tangguhkan | NIP = PyB (atau AL bila PyB kosong) | sama T4–T6 | **1/2/4** | `status_al = status_pyb = <keputusan>`, `show_pejabat = 1`; efek final bila 1/4 |
@@ -585,6 +614,8 @@ Saldo awal `(N, N-1, N-2, utang, ditangguhkan)`; semua cuti Tahunan di tahun acu
 | T11 | 0 / 3 | tunda | NIP approver tahap aktif | sebelum `tgl_mulai` 12:00 | (tetap) | `skip_al = 1` (tahap AL) / `skip_pyb = 1` (tahap PyB); **status tidak berubah** |
 | T12 | 0 | ubah | pemilik / role 1 | §6.2.1 | 0 | notif "Perubahan Cuti Online" ke approver tahap aktif |
 | T13 | 0, 2 (pemilik) / semua (role 1) | hapus | §6.2.1 | — | (hilang) | §6.2.6 |
+
+`keterangan_petugas_approval`: baris AL ditulis ulang (overwrite) saat T4–T6, baris PyB **ditambahkan** dengan pemisah `"\n"` (jalur `process()` `L:2672-2686`; jalur e-sign memakai `<br/>` `L:3784-3792` — tidak dibawa; keputusan #7 26-10); FE merender baris baru.
 
 Setiap transisi lain → 422 `errors.status` "Permohonan cuti tidak dalam tahap yang dapat Anda proses." (contoh: PyB memproses status 0 dua langkah, AL memproses status 3, siapa pun memproses 1/2/4 — menutup A-02). Pemanggil bukan approver tahap aktif tetapi boleh melihat (pemilik, KT, role 1/3) → **403**; tidak boleh melihat → **404**.
 
@@ -625,7 +656,7 @@ Pola `transBegin()` → cek `transStatus()` → `transCommit()`/`transRollback()
 
 #### 6.4.8 Petugas approval cuti (`pa_layanan`) [K C:1009-1171, `L:3958-4516`]
 - Daftar: role 1 semua; role 3 `id_unit_pemohon = unit pemanggil` (`L:4058-4081`); kolom Layanan, Jenis Pemohon, Unit/GJ/SGJ/Gol Pemohon, Unit/Satker/GJ/SGJ Petugas, Nama/NIP/Jabatan Petugas (nama = pemegang jabatan saat ini, Plt bila kosong, `L:4000-4053`).
-- Tambah/ubah: `id_jenis_pa`, `id_jenis_pegawai` (1/6), `id_unit_pemohon`, `id_group_jabatan_pemohon`; GJ pemohon ∈ {2,3} → `gol_ruang_pemohon` wajib, selain itu `id_sub_group_jabatan_pemohon` wajib; `id_unit_petugas`, `id_satker_petugas`, `id_group_jabatan_petugas`, `id_sub_group_jabatan_petugas`, petugas (`struk_<id_jabatan>` | `koord_<id_jabatan_koord>` | `other_<nip>` → kolom `id_jabatan`/`id_jabatan_koord`/`nip`) (`L:4401-4516`). Whitelist kolom (bukan mass-assignment `$postData`). Ubah hanya baris status 1, status dipaksa 1 (C:1103). Role 3 ubah/hapus hanya unit sendiri; **tambah** oleh role 3 dengan unit lain → §12 Q-08.
+- Tambah/ubah: `id_jenis_pa`, `id_jenis_pegawai` (1/6), `id_unit_pemohon`, `id_group_jabatan_pemohon`; GJ pemohon ∈ {2,3} → `gol_ruang_pemohon` wajib, selain itu `id_sub_group_jabatan_pemohon` wajib; `id_unit_petugas`, `id_satker_petugas`, `id_group_jabatan_petugas`, `id_sub_group_jabatan_petugas`, petugas (`struk_<id_jabatan>` | `koord_<id_jabatan_koord>` | `other_<nip>` → kolom `id_jabatan`/`id_jabatan_koord`/`nip`) (`L:4401-4516`). Whitelist kolom (bukan mass-assignment `$postData`). Ubah hanya baris status 1, status dipaksa 1 (C:1103). Role 3 ubah/hapus hanya unit sendiri [K C:1090-1095, 1149-1154]; **tambah** oleh role 3: `id_unit_pemohon` wajib = unit pemanggil → 422 `errors.id_unit_pemohon` (= pembatasan dropdown legacy `L:4170-4172`; server legacy tidak mengecek `L:4208-4240, 4479` sehingga baris yatim tak terlihat/terubah oleh pembuatnya — §12 Q-08 disesuaikan 26-10, keputusan #8; bukan penjaga keamanan D19).
 - Hapus: fisik [K `L:4357`] + audit (kecuali DBV memutuskan status 10).
 
 #### 6.4.9 AC C-04 (QASMTASK-067)
@@ -659,7 +690,7 @@ Pola `transBegin()` → cek `transStatus()` → `transCommit()`/`transRollback()
 - **DILARANG** memanggil layanan eksternal; adapter = `service('esign')` driver `mock` (`Config\Integrations`). Swap real Fase 6 tidak boleh mengubah kontrak ini.
 
 #### 6.5.2 PDF surat cuti
-- Render lewat `App\Libraries\Pdf\Pdf::renderer()` (`PdfRendererInterface`, TCPDF, ADR-033) + `DokumenPdf` (A4, kop kementerian, kaki/disclaimer TTE) dari view `Views/pdf/surat_cuti.php` = port isi `views/hr/employee/rwy/cuti/pdf/surat_cuti.php` [K] (data pemohon, jenis, tanggal, lama, alamat & telepon selama cuti, AL, PyB, catatan pertimbangan). Satu generator untuk semua jalur (perbaikan E10). Kop: konfigurasi kop v2 yang sudah dipakai PDF Fase 3 (DRH/LKH); bila kop legacy per unit (`MY_PDF_HEADER_UNIT`) dibutuhkan → §12 Q-10.
+- Render lewat `App\Libraries\Pdf\Pdf::renderer()` (`PdfRendererInterface`, TCPDF, ADR-033) + `DokumenPdf` (A4, kop kementerian, kaki/disclaimer TTE) dari view `Views/pdf/surat_cuti.php` = port isi `views/hr/employee/rwy/cuti/pdf/surat_cuti.php` [K] (data pemohon, jenis, tanggal, lama, alamat & telepon selama cuti, AL, PyB, catatan pertimbangan). Satu generator untuk semua jalur (perbaikan E10). **Kop = kop kementerian (K1)** [keputusan Horii #9 26-10]: `App\Libraries\Pdf\KopDokumen::html(null, null)` (MAKE-037) **tanpa lingkup** — nama + alamat kementerian dari `web_config` (`pdf_header_nama_kementerian` ?? `nama_kementerian`, `pdf_header_alamat_kementerian`; bawaan `KopDokumen::NAMA_INSTANSI_BAWAAN` bila kosong), tanpa logo; satu kop untuk surat unduhan maupun ber-TTE. Dasar: surat resmi/TTE legacy memakai `MY_PDF_HEADER` kementerian (`L:943-975`, `L:3268-3300`); kop unit/satker `MY_PDF_HEADER_UNIT` hanya pada unduhan detail (`L:811-858`) dan **tidak dibawa** (§12 Q-10).
 - QR: pola PDF LKH Fase 3 (`Pdf::qrImg()`, isi kode identitas dokumen, bukan URL berkas publik). E8 (QR = URL publik) tidak direplikasi karena v2 tidak punya URL arsip publik.
 - Versi **belum TTE** dibuat otomatis saat efek final (§6.4.5 #3) dan disimpan `document_attachment` (kode surat cuti, penanda versi sesuai DBV DQ-21). Versi ber-TTE disimpan sebagai lampiran terpisah; `GET cuti/{id}/surat` mengembalikan versi ber-TTE bila ada.
 
@@ -1082,6 +1113,7 @@ Aturan setiap milestone: (a) branch baru dari **`origin/main` terbaru** (`git fe
 | M0 | Baca PRD + inspeksi repo + lapor pemahaman | — | (tanpa commit) | — | — | ⛔ reviewer CR menjawab §12 (butir ⛔) & mengonfirmasi key |
 | M1 | Dokumen DBV-022 + kueri audit + draf migration (belum dijalankan di DB dev) | C-01 | DBV-022 | `fase4/dbv-022-skema-layanan` (PR) | M0 | ⛔ **DB Validator approve kedua skema** + reviewer CR |
 | M2 | Migration + seed uji + registry NIP + test skema, sesuai DBV-022 disetujui | C-01 | DBV-022 (PR sama atau lanjutan) | idem | M1 approve | ⛔ merge PR → semua milestone kode |
+| **M2b** | **Tahap 2b (26-10):** `Config\Cuti` + library murni cuti + `KuotaBoundaryTest` + pemindai kemurnian (batas berkas §6.1.4) — tanpa Model/controller/route/migration | C-03, C-04 (bagian murni) | MAKE-022 (bagian awal) | `fase4/make-022-cuti` | M0 (tidak menunggu M1/M2) | M3 (service DB membungkus library murni) |
 | M3 | Cuti: CRUD, kalkulator, kuota, state machine, efek final, tunda, pa_layanan, saldo | C-02, C-03, C-04 | MAKE-022 | `fase4/make-022-cuti` | M2 merged; ⛔ Q-07 untuk bagian tunda | M4, M6, M7 (cuti) |
 | M4 | E-sign mock + notifikasi + job push (cuti) | C-05, C-06 | MAKE-023 | `fase4/make-023-esign-notifikasi` | M3 merged; ⛔ DBV-022 disetujui (C-06) | M5 wiring notifikasi, M7 |
 | M5 | TB (+perpanjangan, `bebasPresensiPenuh`), IB, PMK, `PetugasLayananService` | C-07, C-08, C-09 | MAKE-024 | `fase4/make-024-tb-ib-pmk` | M2 merged (inti); **M4 merged** sebelum menyambung notifikasi | M6, M7 |
@@ -1089,7 +1121,7 @@ Aturan setiap milestone: (a) branch baru dari **`origin/main` terbaru** (`git fe
 | M7 | Frontend Modul C + menu + `ACTIVE_PHASE = 4` (commit penutup) | C-11 | MAKE-026 | `fase4/make-026-frontend-layanan` | backend modul terkait merged | M8 |
 | M8 | Verifikasi akhir: test C-12 lengkap, single-end-node, pemisahan skema, matriks 403, `check.sh`/CI hijau, progres & laporan akhir | C-12 | MAKE-027 | `fase4/make-027-verifikasi` | M3–M7 merged | ⛔ sign-off reviewer CR (§12 Q-14) |
 
-**Boleh paralel** (coder berbeda, berkas tidak tumpang tindih): M3 ∥ inti M5 (setelah M2); M7 per halaman segera setelah backend halaman itu merged (cuti setelah M4; TB/IB/PMK setelah M5; Status Layanan setelah M6), `ACTIVE_PHASE` tetap di akhir. **Tidak boleh paralel**: apa pun sebelum M2 merged (kecuali dokumen); C-06 sebelum DBV-022 disetujui.
+**Boleh paralel** (coder berbeda, berkas tidak tumpang tindih): M3 ∥ inti M5 (setelah M2); M7 per halaman segera setelah backend halaman itu merged (cuti setelah M4; TB/IB/PMK setelah M5; Status Layanan setelah M6), `ACTIVE_PHASE` tetap di akhir. **Tidak boleh paralel**: apa pun sebelum M2 merged (kecuali dokumen **dan M2b**); C-06 sebelum DBV-022 disetujui. M2b ∥ M1 (berkas tidak tumpang tindih).
 
 Isi laporan **M0** (wajib sebelum M1): ringkasan pemahaman per task (≤ 3 baris), daftar berkas repo yang akan dipakai ulang (dengan path), konfirmasi tidak ada migration/kode Modul C di `main` selain README, jawaban/konfirmasi yang dibutuhkan dari §12, risiko yang terlihat.
 
@@ -1156,6 +1188,8 @@ Blocker / pertanyaan terbuka: <daftar + rujukan §12>
 
 ## 12. Pertanyaan terbuka yang TERSISA
 
+> **Status 26-10-2026:** seluruh butir **◻** = **disetujui default 26-10** oleh Horii (riset take over), dengan penyesuaian **Q-08, Q-10, Q-21, Q-23** di kolom "Saran default" (teks tercoret = versi v1.0). Butir ⛔ (Q-01, Q-02, Q-06, Q-07, Q-18, Q-20) tetap titik tunggu; temuan legacy pendukung di §14.
+>
 > **Status 18-10-2026:** user/reviewer CR **menyetujui semua saran default** di tabel ini (butir ⛔ dan ◻). Kolom "Saran default" = **keputusan yang berlaku**. Q-01 tetap mensyaratkan laporan jumlah pejabat AL/PyB ber-role 4/5/8 di M3; Q-02 syarat masa kerja ≥ 12 bulan diikuti seperti legacy (`Cron.php:2406-2428`); Q-20 tetap diputuskan DB Validator di DBV-022; Q-19 urusan reviewer CR. Hal baru di luar tabel ini → tetap BERHENTI dan eskalasi.
 
 Aturan: butir **⛔** WAJIB dijawab reviewer CR (atau pihak yang disebut) **sebelum** milestone yang disebut; coder **berhenti** pada bagian itu dan mengerjakan bagian lain. Butir **◻** = default PRD berlaku bila reviewer CR tidak menolaknya saat review laporan M0; bila ditolak, ikuti jawaban reviewer. Tidak ada butir yang boleh "diputuskan sendiri" oleh coder.
@@ -1169,9 +1203,9 @@ Aturan: butir **⛔** WAJIB dijawab reviewer CR (atau pihak yang disebut) **sebe
 | Q-05 | ◻ | Rumus refund D6 (legacy menormalisasi dan bisa negatif) | §6.3.5: kembalikan ke N → N-1 → N-2 dengan batas 12/6/6, utang/ditangguhkan dikurangi tanpa negatif; status 4 juga mengembalikan saldo yang dipotong | Review M0 |
 | Q-06 | ⛔ | (a) Sumber v2 untuk nilai `web_config` legacy: `nama_menteri`, `jabatan_menteri_full`, `id_jabatan_kabiro_kepegawaian`, `id_satker_kepegawaian`, `id_unit_kepegawaian`, `pdf_header_*`. (b) Pegawai **eselon I** (`id_sub_group_jabatan = 1`): AL & PyB = Menteri tanpa NIP → tidak ada yang bisa memproses di sistem (jalan buntu) | (a) `Config\Layanan` + override `.env` tervalidasi (pola `Config\Konket`), nilai diisi saat cutover; (b) pengajuan eselon I tetap dibuat (status 0) dan **difinalkan lewat input admin role 1** (ubah ke status 1 dengan efek final) — perlu keputusan produk | Sebelum M3 |
 | Q-07 | ⛔ | Reset `skip_al`/`skip_pyb` "saat login berikutnya" membutuhkan kait di modul Auth (tidak ada event login di v2) | Tambah `Events::trigger('auth.login', $nip)` aditif di alur login sukses + listener Modul C yang me-reset flag NIP itu; atau FE memanggil `GET cuti/pengingat?reset=1` sekali per sesi login | Sebelum bagian tunda M3 |
-| Q-08 | ◻ | Role 3 menambah aturan `pa_layanan` untuk unit pemohon lain: legacy server tidak membatasi (`L:4170-4172`) | Ikut legacy (tanpa penjaga tambahan, D19); ubah/hapus tetap dibatasi unit sendiri [K] | Review M0 |
+| Q-08 | ◻ | Role 3 menambah aturan `pa_layanan` untuk unit pemohon lain: dropdown legacy dibatasi unit sendiri (`L:4170-4172`) tetapi server menyimpan POST apa adanya (`L:4208-4240, 4479`) | **26-10:** `id_unit_pemohon` wajib = unit pemanggil (422) — meniru pembatasan UI legacy, mencegah baris yatim; ubah/hapus tetap dibatasi unit sendiri [K]. ~~Ikut legacy tanpa penjaga tambahan~~ | Disetujui 26-10 |
 | Q-09 | ◻ | Penanda tangan surat cuti & siapa yang mengetik passphrase (admin role 1/3 memicu, tetapi sertifikat milik pejabat) | Penanda tangan = NIP PyB (AL bila langkah tunggal tanpa PyB); di Fase 4 (mock) passphrase diketik admin di dialog; mekanisme real = Fase 6 | Review M0 |
-| Q-10 | ◻ | Kop surat cuti: legacy punya tiga generator/kop (E10) | Kop kementerian yang sama dengan PDF Fase 3 (DRH/LKH); kop per unit tidak dipakai | Review M0 |
+| Q-10 | ◻ | Kop surat cuti: legacy punya lima titik generator dan tiga kop (E10): kementerian `MY_PDF_HEADER` (`L:943-975, 3268-3300`), remote `GENERATE_SC_URL` (`L:2100-2122, 2586-2606`), unit/satker `MY_PDF_HEADER_UNIT` di unduhan detail (`L:811-858`) | **26-10 (Horii):** kop **kementerian (K1)** via `KopDokumen::html(null, null)` tanpa lingkup/logo, satu kop untuk unduhan & TTE (§6.5.2); kop unit/satker tidak dipakai | Disetujui 26-10 |
 | Q-11 | ◻ | Aturan legacy yang dibiarkan: tidak ada kedaluwarsa pengajuan (E14), TB dan IB boleh beririsan (IB-09), CLTN masa depan tidak mengubah status pegawai (A-12) | Ikut legacy [K]; "tanpa stuck" = setiap status non-final selalu punya pelaku | Review M0 |
 | Q-12 | ◻ | Perpanjangan TB: D15 "pengajuan terpisah terhubung induk" — perlu status approval? | Tanpa status, langsung berlaku, hanya role 1 [K] (`Tb.php:614-674`) | Review M0 |
 | Q-13 | ◻ | Konsekuensi D19 yang otomatis menutup sebagian celah: tahap dari status (bukan `appr_as`), pemanggil `process` harus NIP approver tahap aktif (penjaga jalur `process` legacy C:584-591), PegawaiScope membatasi PMK ke pemilik | Diterima sebagai aturan platform/state machine (bukan penjaga baru); ISSUE-048 tetap mencatat celah legacy | Review M0 |
@@ -1182,9 +1216,9 @@ Aturan: butir **⛔** WAJIB dijawab reviewer CR (atau pihak yang disebut) **sebe
 | Q-18 | ⛔ | Acuan QA Lapis 1 C-11 tanpa Figma (QAUI-004 bloker, RTM Conflict #2) | Mockup Gambar 17 + `LayananStatusPage` `67fa767` + pola komponen redesign Fase 3; reviewer/QA menyepakati checklist sebelum QA | Sebelum QA Lapis 1 M7 |
 | Q-19 | — | Revisi dokumen Mapping Migrasi (tambah `pegawai_sisa_cuti`, `jenis_cuti`, `pa_layanan`, `jenis_pa`; koreksi Prinsip #4 "inbox dipakai notifikasi") | Di luar coder — reviewer CR/Horii | — |
 | Q-20 | ⛔ (DBV) | DQ-3, DQ-4 (detail), DQ-6, DQ-7 (tipe/kolom), DQ-9, DQ-10, DQ-12, DQ-16, DQ-17, DQ-18, DQ-20, DQ-21, nomor kode `jenis_rwy` | Usulan di §6.1.1/§6.1.3; diputuskan DB Validator di DBV-022 | M1 |
-| Q-21 | ◻ | Penyimpanan lampiran: cuti/TB/IB/surat → `document_attachment` (kode baru D13/D18); PMK req → kolom [K] (`KolomBerkas`) | Seperti tertulis | Review M0 |
+| Q-21 | ◻ | Penyimpanan lampiran: cuti/TB/IB/surat → `document_attachment` (kode baru D13/D18); PMK req → kolom [K] (`KolomBerkas`). Legacy: cuti/TB/IB memakai kolom `file_*` + arsip remote, `document_attachment` tidak dipakai (0 referensi) | Seperti tertulis **+ (26-10)** lampiran lama dipetakan ke `document_attachment` pada runbook cutover (§6.1.2 #6) dan DQ-20 dijawab searah; dicatat di Mapping (Q-19) | Disetujui 26-10 |
 | Q-22 | ◻ | Templat teks notifikasi (D11 tidak menetapkan isi) | Tabel §6.6.2 (dari teks legacy, typo diperbaiki) | Review M0 |
-| Q-23 | ◻ | Batas `reason_note` untuk semua modul (kolom legacy beragam: TEXT, MEDIUMTEXT, TINYTEXT) | ≤ 255 byte (batas `ApprovalDialog` dan TINYTEXT PMK) | Review M0 |
+| Q-23 | ◻ | Batas `reason_note` untuk semua modul (kolom legacy: `riwayat_cuti.reason_note` text, `_al/_pyb` mediumtext, TB/IB mediumtext, `riwayat_pmk_req` tinytext; textarea tanpa `maxlength`) | ≤ 255 byte sebagai **validasi input baru**; **(26-10)** tipe kolom [K] **tidak dikecilkan** di DBV-022 (DQ-22) karena data impor bisa > 255 (audit §6.1.2 #12) | Disetujui 26-10 |
 | Q-24 | ◻ | Lama cuti jenis 2/4/6 = hari kalender **inklusif** (nilai kalkulator klien legacy) vs server legacy eksklusif (LK-02) | Inklusif | Review M0 |
 
 ---
@@ -1222,7 +1256,10 @@ Legenda perlakuan: **[K]** dibiarkan seperti legacy · **[V2]** diperbaiki · **
 | A-13 | Cuti bersama tidak memotong kuota | `FH:2175-2215` | [K] D9 (libur status 1) |
 | A-14 | Hanya role 2 bisa approve | MYC:331; C:573 | [V2] D3 approver = NIP (route 1,2,3,6,7); Q-01 |
 | A-15 | Role 3 di delete mati | C:498, 526-548 | [K] D5 (role 3 lihat saja) |
-| LK-01/02 | Off-by-one lama/tgl akhir Besar/Melahirkan/CLTN | `Local.php:2185-2201`; `L:1505-1512` | [V2] Q-15/Q-24 |
+| LK-01/02 | Off-by-one lama/tgl akhir Besar/Melahirkan/CLTN | `Local.php:2187-2201`; `L:1509-1513` | [V2] Q-15/Q-24 |
+| LK-08 | `addMonth` memotong ke akhir bulan lalu −1 hari (31-01 → 27-02) | `FH:960-966` | [K] §6.3.2 (rumus ditegaskan 26-10) |
+| LK-09 | `process()`: status 4 hanya bulan 12, tanpa N-2, membaca kolom `sisa_cuti_ditangguhkan` yang tidak ada di `riwayat_cuti`; `utang_cuti` ditimpa | `L:2275-2411` | tidak dibawa (PRD ikut jalur e-sign) |
+| LK-10 | Refund memakai tahun berjalan & `lcNext` dari `yearTM-01-01` | `L:1282, 1297-1326` | [V2] §6.3.3/§6.3.5 |
 | LK-03 | Dua cron saldo berbeda | `Cron.php:2349-2663` | D8 + Q-02 |
 | LK-04 | Tahun acuan berbeda-beda | `L:1579, 3830` | Q-04 |
 | LK-05 | Normalisasi ulang saat potong | `L:3864-3884` | [V2] D8 |
@@ -1401,3 +1438,39 @@ Pertanyaan spek §7 no. 1–16: 1 → D3/Q-01; 2 → D17; 3 → D18/D12/Q-09; 4 
 Hasil: **semua pertanyaan skema terjawab keputusan atau masuk §12 (Q-19/Q-20) sebagai tugas DBV M1.**
 
 — Akhir dokumen —
+
+---
+
+## 14. Riwayat revisi & keputusan 26-10-2026
+
+### 14.1 v1.1 (26-10-2026) — take over & riset tahap 2b
+Konteks: coder Wahyu meminta Fase 4 diambil alih tim reviewer CR (26-10). Basis = branch `fase4/dbv-022-skema-layanan` @`706f73b`. Riset read-only (laporan "Riset_Fase4_Tahap2b_dan_Q12", verifikasi baris legacy 26-10) menghasilkan 13 keputusan Horii:
+
+| # | Keputusan | Tempat di PRD |
+|---|---|---|
+| 1 | Tahap 2b (library murni cuti sebelum DBV-022) diizinkan; batas berkas; bagian awal MAKE-022 | §6.1.4, §9 M2b |
+| 2 | Rumus `tgl_akhir` cuti Besar = legacy `addMonth` (potong akhir bulan, −1 hari) dengan contoh | §6.3.2 |
+| 3 | T4 (AL setuju): `status_pyb` tetap 0 [K] (koreksi "[I]" v1.0) | §6.4.2 T4 |
+| 4 | "1 bulan" alasan penting = PHP `+1 month` inklusif, dengan contoh | §6.3.2 |
+| 5 | Tumpang tindih mengikutsertakan status 3 [V2] | §6.2.3 |
+| 6 | Tanggal sebelum tahun acuan atau sesudah 31-12 tahun berikutnya → 422 | §6.2.3, §6.3.3 |
+| 7 | Pemisah `keterangan_petugas_approval` = `\n` | §6.4.2 |
+| 8 | Q-08: validasi server `id_unit_pemohon` = unit admin (role 3) | §6.4.8, §12 |
+| 9 | Q-10: kop surat cuti = **kementerian (K1)** via `KopDokumen` tanpa lingkup | §6.5.2, §12 |
+| 10 | Q-21: lampiran lama cuti/TB/IB → `document_attachment` di runbook cutover + DQ-20 | §6.1.2 #6, §12 |
+| 11 | Q-23: 255 byte = validasi input; kolom `reason_note*` [K] tidak dikecilkan (DQ-22) + audit panjang | §6.1.2 #7, §6.1.3, §12 |
+| 12 | Q-05: audit nilai negatif `pegawai_sisa_cuti` masuk DBV-022 (DQ-23) | §6.1.2 #7, §6.1.3 |
+| 13 | Hari kerja cuti dihitung sendiri di `HitungLamaCuti` + test paritas terhadap `HariKerja` | §6.3.2 |
+| — | Kasus uji tambahan T1–T19 | §6.3.10 |
+| — | Butir ◻ lain (Q-03, Q-04, Q-09, Q-11–Q-17, Q-22, Q-24): default v1.0 dipertahankan | §12 |
+
+### 14.2 Temuan legacy pendukung butir ⛔ (bukan keputusan)
+- **Q-01:** endpoint proses `userAuth(['2'])` (C:573, 653, 777, 846); popup approval MYC:331 untuk role 2 **dan 6** (PTT melihat popup tetapi endpoint menolak).
+- **Q-02:** `calculate_yearly_sc` (`Cron.php:2349-2533`) mensyaratkan masa kerja ≥ 12 bulan (2406-2428) + "dua tahun tidak cuti" (2395-2400) dan N-2 selalu 0; `calculate_yearly_sc_2` (2534-2663) tanpa syarat masa kerja — hanya `_2` yang cocok dengan D8 (N-2 ≤ 6).
+- **Q-06:** eselon I → `nip_atasan_langsung = NULL`, nama/jabatan dari `web_config.nama_menteri` / `jabatan_menteri_full` (`L:1741-1745, 1763-1766`), `status_al = status`; jalan buntu juga terjadi di legacy.
+- **Q-07:** `justLogin` flashdata (MYC:21-22); `skip_al`/`skip_pyb` di-reset ke 0 **setiap** login (MYC:395-398, 433-436) — "tunda" hanya berlaku sampai login berikutnya.
+- **Q-20/DQ-20:** terkait keputusan #10 (lampiran lama).
+
+### 14.3 Verifikasi nomor baris legacy (26-10)
+Beberapa rujukan v1.0 bergeser; nomor aktual: `calcLCTahunan` FH:2175-2213; `addMonth` FH:960-966; `vp()` L:1424-1686 (kuota L:1586-1659, bug A-10 L:1639); potong `sp()` L:1935-2026, `process()` L:2156-2415, `sp_process_esign()` L:3824-3903 (normalisasi 3867-3886); refund `delete()` L:1257-1352; `set_param_process` L:2639-2692; `sp_process_esign` param L:3767-3822; CLTN L:2416-2427 / 3494-3504; `skip_cuti` C:922-1004 (batas 971-976); guard C:584-591, 667-674, `process_esign_api` C:775-842.
+
