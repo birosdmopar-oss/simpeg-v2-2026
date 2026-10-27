@@ -92,8 +92,8 @@ final class LoginEventTest extends DatabaseTestCase
 
     public function testEventTidakTerbitPadaRefreshToken(): void
     {
-        $login   = $this->login(self::NIP, AuthSeeder::PASSWORD);
-        $refresh = (string) $this->responseCookie($login, 'refresh_token');
+        $login          = $this->login(self::NIP, AuthSeeder::PASSWORD);
+        $refresh        = (string) $this->responseCookie($login, 'refresh_token');
         $this->diterima = [];
 
         $this->clearAuthState();
