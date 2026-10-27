@@ -16,9 +16,9 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 | C-04 Approval berjenjang cuti | M2b, M3 | MAKE-022 | **IN_PROGRESS** | M2b ✅ DI MAIN 3fbf08e: `StatusCuti`, `TransisiCuti`, `EfekFinalCuti`, `PengingatCuti` (murni; single end node diuji). Sisa (M3: AL/PyB, `CutiApprovalService`) menunggu M2 merged; ⛔ Q-07 untuk bagian tunda pengingat |
 | C-05 Penerbitan surat cuti e-sign (mock) | M4 | MAKE-023 | TODO | Menunggu M3 merged |
 | C-06 Notifikasi approval | M4 | MAKE-023 | TODO | ⛔ DILARANG mulai sebelum DBV-022 disetujui (PRD §6.1.4) |
-| C-07 Tugas Belajar | M5 | MAKE-024 | TODO | Inti menunggu M2; penyambungan notifikasi menunggu M4 |
-| C-08 Izin Belajar | M5 | MAKE-024 | TODO | idem |
-| C-09 PMK | M5 | MAKE-024 | TODO | idem |
+| C-07 Tugas Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 branch `fase4/make-024-tb-ib-pmk-m5`: inti TB (CRUD, proses PIC, perpanjangan, `bebasPresensiPenuh`, surat) + route + kontrak + 6 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
+| C-08 Izin Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti IB (CRUD, proses PIC, Surat IB otomatis kode 50) + route + kontrak + 4 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
+| C-09 PMK | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti PMK (pengajuan, opsi, kalkulator, proses PIC 0→3→1/2, riwayat final + arsip SK) + route + kontrak + 5 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | TODO | Menunggu M3 & M5 merged |
 | C-11 Frontend Modul Layanan | M7 | MAKE-026 | TODO | Per halaman setelah backend-nya merged; `ACTIVE_PHASE = 4` hanya di commit penutup |
 | C-12 Unit test & verifikasi | M8 | MAKE-027 | TODO | Menunggu M3–M7 merged |
@@ -168,3 +168,56 @@ jenis 1; paritas T13 hanya saldo ternormalisasi legacy; teks pesan batas jenis 5
 - Test skema: `tests/database/Layanan/{SkemaLayananTest,SkemaInboxTicketTest,MigrasiLayananSiklusTest}.php`.
 
 **Verifikasi 27-10:** 3307 — 100/204/45 → 120/235/84 (+20/+31/+39), rollback → migrate ulang identik; kueri audit bebas error 1267/1271 (DBV-022 Bagian 12.5–12.6); CI hijau `bc3b759`.
+
+---
+
+## M5 — TB, IB, PMK (MAKE-024, 27-10-2026, branch `fase4/make-024-tb-ib-pmk-m5` dari main `598a5f3`)
+
+Inti M5 saja (§9): penyambungan notifikasi menunggu M4; e-sign, frontend, `ACTIVE_PHASE` di luar cakupan; tanpa migration.
+DB uji scratch `simpeg_v2_t_make024` port 3307.
+
+**Keputusan reviewer CR 27-10 (dicatat [V2], masuk PRD revisi berikutnya):**
+1. Route TB/IB/PMK di berkas sendiri `Config/RoutesLayananStudi.php` (+ satu baris `Routing::$routeFiles`); cuti M3 di
+   `RoutesLayanan.php`. PRD §5 menyebut satu berkas `RoutesLayanan.php`.
+2. Titik sambung notifikasi `App\Interfaces\Layanan\NotifikasiLayananInterface` + `NotifikasiNoOp` +
+   `Config\Services::notifikasiLayanan()` — milik M5; binding diganti NotifikasiService di M4 (MAKE-023).
+3. Slot berkas TB/IB di `document_attachment.tag` (nama kolom legacy), pola Arsip Data Umum; kolom `file_*` impor dianggap
+   slot berisi; ganti slot = hapus lama + simpan baru dalam satu transaksi; kode satu-slot tanpa `tag`.
+
+**Sudah jalan — C-07 Tugas Belajar.** Route (12) + baris `KontrakMatriksRoleTest` (prefiks `tb`, `TbService::ROLE_ROUTE`);
+`TbController`; service `LayananStudi`/`StudiPengajuanService`/`StudiApprovalService`, `Tb/{TbService, TbApprovalService,
+PerpanjanganTbService, StatusTugasBelajar, SuratTbService, EfekTbTrait}`, `PetugasLayananService`, `PenandaTanganKabiro`;
+model `Models/Layanan/{LayananModel, RiwayatTbModel, RiwayatTbPerpanModel, RiwayatIbModel}`; murni baru
+`Studi/{BerkasStudi, TampilanStudi}`; view `Views/pdf/surat_tb.php`; `Config\Services::statusTugasBelajar()`. Test
+`tests/Layanan/Tb/{TbCrudTest, TbApprovalTest, TbPerpanjanganTest, BebasPresensiPenuhTest, TbRoleTest, TbSingleEndNodeTest}`
+(49 test). Dokumentasi endpoint: `Controllers/Api/Layanan/README.md`; keputusan coder: `Libraries/Layanan/README.md`.
+
+**Sudah jalan — C-07 TB:** SHA `944f358`, CI run 40460415030 hijau.
+
+**Sudah jalan — C-08 Izin Belajar.** Route (9) + baris kontrak (prefiks `ib`, `IbService::ROLE_ROUTE`); `IbController`;
+`Ib/{IbService, IbApprovalService, SuratIbService}`; view `Views/pdf/surat_ib.php`. Test `tests/Layanan/Ib/{IbCrudTest,
+IbApprovalTest, IbRoleTest, IbSingleEndNodeTest}` (20 test).
+
+**Sudah jalan — C-08 IB:** SHA `df3b43b`, CI run 40461106005 hijau.
+
+**Sudah jalan — C-09 PMK.** Route (12) + baris kontrak (prefiks `pmk`, `DasarPmkService::ROLE_ROUTE`); `PmkController`;
+`Pmk/{DasarPmkService, PmkPengajuanService, PmkApprovalService, RiwayatPmkService, TampilanPmk}`; model
+`RiwayatPmkModel`, `RiwayatPmkReqModel`. Test `tests/Layanan/Pmk/{PmkPengajuanTest, PmkApprovalTest, PmkRoleTest,
+PmkSingleEndNodeTest, RiwayatPmkTest}` (32 test).
+
+**Review TB (reviewer CR 27-10):** tahap TB diterima. Deviasi #3 (efek `id_jenis_status` per tanggal inklusif, legacy
+`L_tb.php:1169-1179` dan `:746-757` membandingkan dengan jam sekarang) **disetujui Horii** [V2]; #2, #4–#7 diterima [V2]
+(masuk PRD v1.4); #1 pemindai kemurnian diganti daftar eksplisit berkas murni/lapisan DB (sama dengan keputusan M3).
+
+**Catatan gap (tidak dikerjakan M5, menunggu keputusan Horii):** TB yang disetujui sebelum `tgl_mulai`, atau TB yang sudah
+berakhir, tidak mengubah `pegawai.id_jenis_status` secara otomatis (tanpa cron) — sama dengan legacy. Konsumen Fase 5
+memakai `bebasPresensiPenuh`, bukan `id_jenis_status`.
+
+**[V2] Unduh berkas pengajuan PMK** (gap PRD §5.4, disetujui Horii 27-10-2026): `GET pmk/pengajuan/{id}/berkas/{kolom}`
+(role 1, 2, 3; hak = lihat detail; whitelist empat kolom; traversal/path impor tanpa berkas → 404). Legacy membuka lewat
+tautan langsung (`views/hr/employee/rwy/pmk/req/admin/form.php:142-214`, `pathToSrc()` `helpers/function_helper.php:314`).
+Test `tests/Layanan/Pmk/PmkBerkasTest.php`.
+
+**Review final M5 (reviewer CR 27-10):** `e70cff6` diterima.
+
+**Belum jalan.** Penyambungan notifikasi (M4), gate penuh.
