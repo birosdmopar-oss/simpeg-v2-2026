@@ -3,6 +3,11 @@
  * Templat PDF Daftar Riwayat Hidup (B-20 penutup, MAKE-014) — port `views/hr/employee/print/drh_pdf.php` legacy untuk
  * writeHTML TCPDF. Semua data di-escape (`esc`); $fotoTag = tag <img> base64 dari DrhPegawai (atau '').
  *
+ * CR-065: setiap bagian (judul + tabelnya) dibungkus `<div nobr="true">`: bila tidak muat di sisa halaman, TCPDF
+ * memindahkan judul bersama tabelnya ke halaman berikut (judul tidak tertinggal sendirian di dasar halaman). Bagian yang
+ * lebih panjang dari satu halaman tetap terpecah normal, dimulai di halaman baru. `nobr` tabel di dalamnya diabaikan
+ * TCPDF (nobr bersarang), jadi tidak dipasang lagi.
+ *
  * @var string                    $nama
  * @var array<string, mixed>      $du
  * @var string                    $lahir
@@ -22,6 +27,8 @@ $uang = static fn (mixed $v): string => is_numeric($v) && (float) $v > 0 ? 'Rp' 
 <div style="text-align:center;"><?= $fotoTag ?></div>
 <?php endif ?>
 <div style="font-size:6pt;">&nbsp;</div>
+<div nobr="true">
+<h4>A. DATA PRIBADI</h4>
 <table width="100%" cellpadding="3" border="1">
     <tr><td width="23%"><b>NIP</b></td><td width="77%"><?= esc((string) $du['nip']) ?></td></tr>
     <tr><td><b>NAMA</b></td><td><?= esc($nama) ?></td></tr>
@@ -31,14 +38,16 @@ $uang = static fn (mixed $v): string => is_numeric($v) && (float) $v > 0 ? 'Rp' 
     <tr><td><b>JENIS KELAMIN</b></td><td><?= (int) ($du['jenis_kelamin'] ?? 0) === 1 ? 'LAKI-LAKI' : 'PEREMPUAN' ?></td></tr>
     <tr><td><b>ALAMAT RUMAH</b></td><td><?= nl2br(esc($alamat)) ?></td></tr>
 </table>
+</div>
 <?php foreach ($bagian as $b): ?>
+<div nobr="true">
 <?php if ($b['judul'] !== ''): ?>
 <h4><?= esc($b['kode'] . '. ' . $b['judul']) ?></h4>
 <?php endif ?>
 <?php if (isset($b['sub'])): ?>
 <h5><?= esc($b['sub']) ?></h5>
 <?php endif ?>
-<table width="100%" cellpadding="3" border="1" nobr="true">
+<table width="100%" cellpadding="3" border="1">
     <tr style="font-weight:bold;">
         <?php foreach ($b['kolom'] as [$label, $lebar]): ?><td width="<?= (int) $lebar ?>%"><?= esc($label) ?></td><?php endforeach ?>
     </tr>
@@ -51,12 +60,15 @@ $uang = static fn (mixed $v): string => is_numeric($v) && (float) $v > 0 ? 'Rp' 
     </tr>
     <?php endforeach ?>
 </table>
+</div>
 <?php if ($b['kode'] === 'I'): ?>
+<div nobr="true">
 <h4>J. KENAIKAN GAJI BERKALA TERAKHIR</h4>
-<table width="100%" cellpadding="3" border="1" nobr="true">
+<table width="100%" cellpadding="3" border="1">
     <tr><td width="20%"><b>TMT</b></td><td width="80%"><?= esc($tgl($kgb['tmtsk'] ?? null)) ?></td></tr>
     <tr><td><b>MKER. GOLONGAN</b></td><td><?= isset($kgb['mker_gol_th']) && (int) $kgb['mker_gol_th'] > 0 ? esc((string) $kgb['mker_gol_th']) . ' Tahun' : '' ?></td></tr>
     <tr><td><b>GAJI POKOK</b></td><td><?= esc($uang($kgb['gaji_pokok'] ?? null)) ?></td></tr>
 </table>
+</div>
 <?php endif ?>
 <?php endforeach ?>

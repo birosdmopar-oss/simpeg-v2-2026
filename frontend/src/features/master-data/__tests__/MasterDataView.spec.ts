@@ -195,7 +195,7 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
       'Pilih Jenis Diklat dan kosongkan filter Sertifikasi untuk mengubah urutan (urutan berlaku per Jenis Diklat).',
     )
 
-    await wrapper.get('[data-testid="master-filter-jenis"]').setValue('2')
+    await wrapper.get('[data-testid="master-filter-jenis"] select').setValue('2')
     await flushPromises()
     expect(masterService.list).toHaveBeenLastCalledWith('uji-diklat', expect.objectContaining({ filters: { jenis: '2' }, page: 1 }))
     expect(wrapper.find('[data-testid="master-reorder-hint"]').exists()).toBe(false)
@@ -221,13 +221,13 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
     expect(masterService.reorder).toHaveBeenCalledTimes(1)
 
     // Filter di luar lingkup urutan membuat daftar tidak utuh → panah disembunyikan lagi.
-    await wrapper.get('[data-testid="master-filter-aktif_sertifikasi"]').setValue('1')
+    await wrapper.get('[data-testid="master-filter-aktif_sertifikasi"] select').setValue('1')
     await flushPromises()
     expect(masterService.list).toHaveBeenLastCalledWith('uji-diklat', expect.objectContaining({ filters: { jenis: '2', aktif_sertifikasi: '1' } }))
     expect(await actionKeys(wrapper, '1')).not.toContain('down')
     expect(await actionKeys(wrapper, '1')).not.toContain('up')
     expect(
-      Array.from(wrapper.get<HTMLSelectElement>('[data-testid="master-filter-aktif_sertifikasi"]').element.options).map((o) => o.textContent),
+      Array.from(wrapper.get<HTMLSelectElement>('[data-testid="master-filter-aktif_sertifikasi"] select').element.options).map((o) => o.textContent),
     ).toEqual(['Semua Sertifikasi', 'Ya', 'Tidak'])
     wrapper.unmount()
   })
@@ -266,7 +266,7 @@ describe('MasterDataView — mode urutan, lingkup urutan, filter field, rantai s
     const wrapper = await mountView('uji-kantor')
 
     expect(masterService.options).toHaveBeenCalledWith('provinsi')
-    const select = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-id_provinsi"]')
+    const select = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-id_provinsi"] select')
     expect(Array.from(select.element.options).map((o) => [o.value, o.textContent])).toEqual([
       ['', 'Semua Provinsi'],
       ['31', 'DKI Jakarta'],
@@ -444,3 +444,104 @@ describe('MasterDataView — tata letak sempit & label daftar master (CR-038)', 
     wrapper.unmount()
   })
 })
+
+describe('MasterDataView — panel gulir mandiri (CR-060)', () => {
+  it('menu kiri dan area data masing-masing panel gulir sendiri yang menempel di bawah navbar', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+
+    const nav = wrapper.get('[data-testid="master-nav"]')
+    const data = wrapper.get('[data-testid="master-data-pane"]')
+    expect(nav.classes()).toContain('pane-fill')
+    expect(data.classes()).toEqual(expect.arrayContaining(['flex', 'flex-col', 'lg:h-full', 'lg:min-h-0']))
+    // Dua panel terpisah: menu bukan di dalam area data, sehingga menggulir salah satunya tidak menggulir yang lain.
+    expect(data.find('[data-testid="master-nav"]').exists()).toBe(false)
+    expect(nav.find('[data-testid="master-data-pane"]').exists()).toBe(false)
+    // Tombol menu tetap ada dengan testid lama.
+    expect(nav.find('[data-testid="master-nav-kabupaten-kota"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+})
+
+describe('MasterDataView — baris filter sejajar (CR-060 regresi tata letak)', () => {
+  it('filter UiSelect memakai w-52 tanpa w-full sehingga sejajar di samping pencarian, bukan turun satu baris penuh', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const status = wrapper.get('[data-testid="master-filter-status"]')
+
+    expect(status.classes()).toContain('w-52')
+    expect(status.classes()).not.toContain('w-full')
+    for (const filter of wrapper.findAll('[data-testid^="master-filter-"]')) {
+      expect(filter.classes(), filter.attributes('data-testid')).not.toContain('w-full')
+    }
+    // Kotak cari tetap fleksibel di baris yang sama.
+    expect(wrapper.get('[data-testid="master-search"]').element.closest('label')?.className).toContain('flex-1')
+    wrapper.unmount()
+  })
+})
+
+describe('MasterDataView — bagian atas tetap, hanya isi tabel menggulir (CR-060)', () => {
+  it('halaman setinggi sisa viewport tanpa gulir window; judul/aksi/filter/paginasi di luar area gulir tabel', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const page = wrapper.get('[data-testid="master-page"]')
+    const scroller = wrapper.get('[data-testid="master-table-scroll"]')
+
+    // Halaman mengisi sisa viewport (lg) dan tidak menggulir sendiri.
+    expect(page.classes()).toEqual(expect.arrayContaining(['page-fill', 'flex', 'flex-col']))
+    // Hanya kartu tabel yang menggulir (table-fill), dan tabel ada DI DALAM kontainer gulir itu.
+    expect(scroller.classes()).toEqual(expect.arrayContaining(['table-fill', 'overflow-x-auto']))
+    expect(scroller.find('table').exists()).toBe(true)
+
+    // Judul + tombol aksi, filter, dan paginasi BUKAN anak kontainer gulir dan tidak ikut menyusut/menggulir (shrink-0).
+    const judul = wrapper.get('h1')
+    const tambah = wrapper.get('[data-testid="master-add"]')
+    const filter = wrapper.get('[data-testid="master-filter-bar"]')
+    const paginasi = wrapper.get('[data-testid="master-pagination"]')
+    for (const el of [judul, tambah, filter, paginasi]) {
+      expect(scroller.element.contains(el.element), el.html().slice(0, 40)).toBe(false)
+    }
+    expect(filter.classes()).toContain('shrink-0')
+    expect(paginasi.classes()).toContain('shrink-0')
+    expect(judul.element.closest('div.shrink-0')).not.toBeNull()
+    wrapper.unmount()
+  })
+
+  it('header tabel sticky di atas area gulir (setiap th), sel Aksi sticky kanan+atas dengan z lebih tinggi; bayangan tetap ada', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const ths = wrapper.findAll('[data-testid="master-thead"] th')
+
+    expect(ths.length).toBeGreaterThanOrEqual(4)
+    for (const th of ths) {
+      expect(th.classes(), th.text()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bg-slate-50']))
+    }
+    const aksi = wrapper.get('[data-testid="master-col-actions"]')
+    expect(aksi.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'right-0', 'z-30']))
+    const biasa = ths.filter((th) => th.element !== aksi.element)
+    for (const th of biasa) expect(th.classes(), th.text()).toContain('z-20')
+
+    // Bayangan pemisah kolom Aksi (CR-053) tetap bekerja pada kontainer gulir yang sama.
+    const scroller = wrapper.get('[data-testid="master-table-scroll"]')
+    Object.defineProperty(scroller.element, 'scrollWidth', { configurable: true, value: 900 })
+    Object.defineProperty(scroller.element, 'clientWidth', { configurable: true, value: 400 })
+    Object.defineProperty(scroller.element, 'scrollLeft', { configurable: true, writable: true, value: 0 })
+    await scroller.trigger('scroll')
+    expect(aksi.classes()).toContain('shadow-sticky-end')
+    wrapper.unmount()
+  })
+})
+
+describe('MasterDataView — tinggi filter = tinggi kotak pencarian (CR-063)', () => {
+  it('semua dropdown filter memakai size sm (py-2 text-sm rounded-md) sama dengan kotak cari, bukan h-11', async () => {
+    const wrapper = await mountMaster('kabupaten-kota')
+    const cari = wrapper.get('[data-testid="master-search"]').classes()
+    const bersama = ['py-2', 'text-sm', 'rounded-md', 'border']
+    expect(cari).toEqual(expect.arrayContaining(bersama))
+
+    const filters = wrapper.findAll('[data-testid="master-filter-bar"] [role="combobox"]')
+    expect(filters.length).toBeGreaterThanOrEqual(2)
+    for (const trigger of filters) {
+      expect(trigger.classes(), trigger.attributes('aria-label')).toEqual(expect.arrayContaining(bersama))
+      expect(trigger.classes(), trigger.attributes('aria-label')).not.toContain('h-11')
+    }
+    wrapper.unmount()
+  })
+})
+

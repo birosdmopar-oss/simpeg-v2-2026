@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Auth;
 
+use App\Database\Migrations\AlterAuditLogsEventPresensi;
 use App\Database\Migrations\AlterAuthKeUnicodeCi;
 use App\Database\Migrations\AlterIdentitasAkunIdPengguna;
 use App\Database\Migrations\AlterPenggunaAkunNonPegawai;
@@ -22,6 +23,9 @@ use Throwable;
  *
  * Keadaan "sebelum DBV-010" dicapai dengan menjalankan down() ketiga migration DBV-010 dari yang terakhir; tearDown()
  * mengosongkan data uji lalu menjalankan up() semuanya lagi (idempoten) agar migrate:refresh test berikutnya konsisten.
+ * ENUM `audit_logs.event` ditulis eksplisit 5 nilai oleh 130000, jadi migration lebih baru yang memperluasnya
+ * (DBV-023 `2026-10-27-100100_AlterAuditLogsEventPresensi`) di-rollback lebih dulu di setUp() dan dipasang lagi di
+ * tearDown() — urutan regress yang sama dengan `migrate:rollback`.
  *
  * @internal
  */
@@ -45,6 +49,7 @@ final class AuthCollationMigrationTest extends DatabaseTestCase
         parent::setUp();
 
         $this->sqlMode = (string) $this->db->query('SELECT @@SESSION.sql_mode AS m')->getRowArray()['m'];
+        $this->enumPresensi()->down();
     }
 
     protected function tearDown(): void
@@ -59,6 +64,8 @@ final class AuthCollationMigrationTest extends DatabaseTestCase
         foreach ($this->chain() as $migration) {
             $migration->up();
         }
+
+        $this->enumPresensi()->up();
 
         parent::tearDown();
     }
@@ -306,6 +313,13 @@ final class AuthCollationMigrationTest extends DatabaseTestCase
         require_once APPPATH . 'Database/Migrations/2026-09-25-130000_AlterAuthKeUnicodeCi.php';
 
         return new AlterAuthKeUnicodeCi();
+    }
+
+    private function enumPresensi(): AlterAuditLogsEventPresensi
+    {
+        require_once APPPATH . 'Database/Migrations/2026-10-27-100100_AlterAuditLogsEventPresensi.php';
+
+        return new AlterAuditLogsEventPresensi();
     }
 
     private function downAll(): void

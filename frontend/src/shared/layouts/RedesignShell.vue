@@ -8,7 +8,7 @@
  * - Status collapse sidebar diingat di localStorage (opsional; gagal → tetap jalan tanpa disimpan).
  * - Aksesibilitas: tautan "Lewati ke konten", landmark <main id="main-content">.
  */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -19,7 +19,7 @@ import AppSidebar from './AppSidebar.vue'
 import AppTopbar from './AppTopbar.vue'
 import { buildNav } from './nav.config'
 
-defineProps<{ breadcrumbs?: Crumb[] }>()
+const props = defineProps<{ breadcrumbs?: Crumb[] }>()
 
 const COLLAPSE_KEY = 'simpeg.sidebar.collapsed'
 
@@ -36,6 +36,59 @@ function readCollapsed(): boolean {
 
 const collapsed = ref(readCollapsed())
 const mobileOpen = ref(false)
+
+/**
+ * Halaman isi-penuh (`.page-fill`, CR-060): tingginya = viewport − `--page-top`. Alih-alih angka tetap, jarak itu DIUKUR dari
+ * posisi <main> sebenarnya (navbar sticky + breadcrumb + jarak) dan dipasang sebagai CSS var di akar shell; diukur ulang saat
+ * ukuran konten/jendela atau breadcrumb berubah. Tanpa pengukuran (jsdom/0) nilai cadangan di main.css dipakai.
+ */
+const rootEl = ref<HTMLElement | null>(null)
+const mainEl = ref<HTMLElement | null>(null)
+const pageTop = ref<string | undefined>(undefined)
+let resizeObserver: ResizeObserver | null = null
+
+function measurePageTop(): void {
+  const top = (mainEl.value?.getBoundingClientRect().top ?? 0) + window.scrollY
+  pageTop.value = top > 0 ? `${Math.round(top * 100) / 100}px` : undefined
+}
+
+onMounted(() => {
+  measurePageTop()
+  window.addEventListener('resize', measurePageTop)
+  if (typeof ResizeObserver !== 'undefined' && rootEl.value) {
+    resizeObserver = new ResizeObserver(measurePageTop)
+    resizeObserver.observe(rootEl.value)
+  }
+})
+
+watch(
+  () => props.breadcrumbs?.length ?? 0,
+  () => void nextTick(measurePageTop),
+)
+
+/**
+ * Drawer mobile (CR-060 butir I): saat dibuka fokus pindah ke tombol tutup di drawer, saat ditutup fokus kembali ke
+ * tombol pemicu (hamburger) dan Esc menutup. Preferensi `collapsed` tidak disentuh di sini.
+ */
+function onDrawerKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') mobileOpen.value = false
+}
+
+watch(mobileOpen, (open) => {
+  if (open) {
+    window.addEventListener('keydown', onDrawerKeydown)
+    void nextTick(() => document.querySelector<HTMLElement>('[data-testid="sidebar-close"]')?.focus())
+  } else {
+    window.removeEventListener('keydown', onDrawerKeydown)
+    void nextTick(() => document.querySelector<HTMLElement>('[data-testid="topbar-open-menu"]')?.focus())
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onDrawerKeydown)
+  window.removeEventListener('resize', measurePageTop)
+  resizeObserver?.disconnect()
+})
 
 watch(collapsed, (value) => {
   try {
@@ -59,7 +112,7 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-  <div class="app-canvas min-h-screen">
+  <div ref="rootEl" class="app-canvas min-h-screen" :style="{ '--page-top': pageTop }" data-testid="app-shell">
     <a
       href="#main-content"
       class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-brand-primary focus:shadow-panel"
@@ -87,11 +140,21 @@ async function logout(): Promise<void> {
       />
 
       <div class="min-w-0 flex-1 p-4 lg:p-5">
-        <AppTopbar @open-menu="mobileOpen = true" />
+        <!--
+          Top navbar sticky di semua halaman (AGENTS.md bagian 3, CR-060). Pembungkus menutup celah di atas navbar
+          dengan gradasi latar supaya konten yang digulir tidak terlihat di sela-sela navbar yang mengambang;
+          z-20 di bawah drawer/overlay mobile (z-30/40) dan dialog (z-50).
+        -->
+        <div
+          class="sticky top-0 z-20 -mx-4 -mt-4 bg-gradient-to-b from-slate-100 via-slate-100/90 to-transparent px-4 pb-3 pt-4 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5"
+          data-testid="app-topbar-sticky"
+        >
+          <AppTopbar @open-menu="mobileOpen = true" />
+        </div>
 
         <UiBreadcrumb v-if="breadcrumbs?.length" :items="breadcrumbs" class="mt-4 block" />
 
-        <main id="main-content" class="mt-4" tabindex="-1">
+        <main id="main-content" ref="mainEl" class="mt-4" tabindex="-1">
           <slot />
         </main>
       </div>

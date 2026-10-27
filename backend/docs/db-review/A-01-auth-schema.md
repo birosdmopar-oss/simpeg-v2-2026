@@ -161,7 +161,7 @@ Legacy yang dirujuk: `simpeg_prod_duplikat.pengguna` [K] (provenance DDL belum p
 | name | — | VARCHAR(150) uni NULL COMMENT 'nama akun (legacy name); wajib diisi aplikasi untuk akun tanpa NIP', setelah `username` | 130100 | [K] |
 | email | — | VARCHAR(150) uni NULL COMMENT 'email akun (legacy); tujuan tautan reset password (K3)', setelah `name`; tanpa UNIQUE | 130100 | [K] (D-6) |
 | password, password_legacy, id_unit, id_satker, status | gen | uni, definisi lain tetap | 130000 | [V2] (`status`, `id_unit`/`id_satker` tipe legacy di luar cakupan) |
-| expired_at | — | DATETIME NULL COMMENT 'legacy: batas berlaku password (paksa ganti); belum dipakai aplikasi v2', setelah `password_changed_at` | 130100 | [K] |
+| expired_at | — | DATETIME NULL COMMENT 'legacy: batas berlaku password (paksa ganti); belum dipakai aplikasi v2' (teks COMMENT di migration 130100 tidak diubah), setelah `password_changed_at` | 130100 | [K] — **ditegakkan aplikasi sejak MAKE-028** (tanpa perubahan skema): kolom DIISI aplikasi, bukan trigger, meniru trigger legacy `pengguna_beIns` (akun aktif baru → +1 tahun) dan `pengguna_beUpd` (password berubah, status akhir aktif → +3 bulan) di `simpeg01_struktur_lengkap_20261001.sql:8364-8382`; DIBACA sebagai kedaluwarsa password → wajib ganti (legacy `core/MY_Controller.php:223-230`), NULL = tidak kedaluwarsa. Lihat `Auth/README.md` "Umur password (MAKE-028)" |
 | user_level, last_login_at, password_changed_at, created_at, updated_at, deleted_at | — | tetap | — | [V2] |
 
 Index `pengguna` tetap: PRIMARY, UNIQUE `nip`, UNIQUE `username`, KEY `user_level`, `id_satker`, `status`. UNIQUE `nip` menerima banyak NULL (MySQL/MariaDB). Tidak ada CHECK role↔nip di DB (D-4).

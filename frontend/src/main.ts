@@ -3,8 +3,9 @@ import { createApp } from 'vue'
 
 import App from './App.vue'
 import './assets/main.css'
+import { handlePasswordChangeRequired } from './features/auth/passwordChangeRequired'
 import { useAuthStore } from './features/auth/stores/auth.store'
-import { setAuthFailureHandler } from './lib/axios'
+import { setAuthFailureHandler, setPasswordChangeRequiredHandler } from './lib/axios'
 import router from './router'
 
 const app = createApp(App)
@@ -21,5 +22,9 @@ setAuthFailureHandler(() => {
     void router.push({ name: 'login', query: current.fullPath !== '/' ? { redirect: current.fullPath } : {} })
   }
 })
+
+// 403 password_change_required (wajib ganti password, termasuk password kedaluwarsa di tengah sesi, MAKE-028): ambil
+// ulang user lalu ke /ganti-password, tanpa menunggu muat ulang halaman.
+setPasswordChangeRequiredHandler(() => handlePasswordChangeRequired(useAuthStore(pinia), router))
 
 app.mount('#app')

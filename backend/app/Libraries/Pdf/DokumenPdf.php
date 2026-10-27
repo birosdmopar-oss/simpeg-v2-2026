@@ -16,6 +16,13 @@ final class DokumenPdf
     public const ORIENTASI = ['P', 'L'];
 
     /**
+     * Token di `kakiHtml` yang diganti renderer dengan nomor halaman berjalan dan jumlah halaman ("Halaman x dari y").
+     */
+    public const TOKEN_HALAMAN = '{halaman}';
+
+    public const TOKEN_TOTAL = '{total}';
+
+    /**
      * @param string $judul          metadata Title PDF
      * @param string $html           badan dokumen (writeHTML)
      * @param string $kopHtml        kop, hanya di halaman pertama (legacy Header())

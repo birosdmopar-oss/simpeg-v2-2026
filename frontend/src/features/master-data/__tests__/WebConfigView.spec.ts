@@ -197,3 +197,71 @@ describe('WebConfigView', () => {
     expect(route?.meta.roles).toEqual([Role.SUPER_ADMIN])
   })
 })
+
+describe('WebConfigView — kolom Aksi sticky di layar sempit (ISSUE-029 / CR-053)', () => {
+  /** Ukuran area gulir tabel (jsdom tidak menghitung tata letak). */
+  function setScrollSize(el: HTMLElement, size: { scrollWidth: number; clientWidth: number; scrollLeft: number }): void {
+    Object.defineProperty(el, 'scrollWidth', { configurable: true, value: size.scrollWidth })
+    Object.defineProperty(el, 'clientWidth', { configurable: true, value: size.clientWidth })
+    Object.defineProperty(el, 'scrollLeft', { configurable: true, writable: true, value: size.scrollLeft })
+  }
+
+  it('header "Aksi" dan sel ⋮ menempel di kanan berlatar sama dengan baris', async () => {
+    const wrapper = await mountView()
+
+    const header = wrapper.get('[data-testid="web-config-col-actions"]')
+    expect(header.text()).toBe('Aksi')
+    expect(header.classes()).toEqual(expect.arrayContaining(['sticky', 'right-0', 'bg-slate-50', 'whitespace-nowrap']))
+
+    for (const name of ['nama_kementerian', 'TL1-PSW1', 'TK', 'key_lama']) {
+      const cell = wrapper.get(`[data-testid="web-config-actions-${name}"]`).element.closest('td') as HTMLElement
+      expect([...cell.classList]).toEqual(expect.arrayContaining(['sticky', 'right-0', 'bg-white', 'group-hover:bg-slate-50']))
+      expect(cell.closest('tr')?.classList.contains('group')).toBe(true)
+    }
+    wrapper.unmount()
+  })
+
+  it('CR-058: label baris judul grup menempel di kiri saat tabel digeser (390 px)', async () => {
+    const wrapper = await mountView()
+
+    const labels = wrapper.findAll('[data-testid^="web-config-group-"]')
+    expect(labels.length).toBeGreaterThan(0)
+    for (const label of labels) {
+      expect(label.classes()).toEqual(expect.arrayContaining(['sticky', 'left-0', 'whitespace-nowrap']))
+      const th = label.element.closest('th') as HTMLElement
+      expect(th.getAttribute('colspan')).toBe('5')
+      expect(th.getAttribute('scope')).toBe('colgroup')
+      expect(label.text()).toBe(label.attributes('data-testid')!.replace('web-config-group-', ''))
+    }
+    wrapper.unmount()
+  })
+
+  it('bayangan pemisah hanya selama masih ada kolom tergulir di bawah kolom Aksi (600 dan 390 px)', async () => {
+    const wrapper = await mountView()
+    const scroller = wrapper.get('[data-testid="web-config-table-scroll"]')
+    const header = () => wrapper.get('[data-testid="web-config-col-actions"]')
+    const cell = () => wrapper.get('[data-testid="web-config-actions-TK"]').element.closest('td') as HTMLElement
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+
+    for (const width of [600, 390]) {
+      // Tabel 900px di area sempit, belum digeser → ada isi di bawah kolom Aksi.
+      setScrollSize(scroller.element as HTMLElement, { scrollWidth: 900, clientWidth: width, scrollLeft: 0 })
+      await scroller.trigger('scroll')
+      expect(header().classes()).toContain('shadow-sticky-end')
+      expect(cell().classList.contains('shadow-sticky-end')).toBe(true)
+
+      // Digeser sampai ujung kanan → tidak ada yang tertutup lagi.
+      setScrollSize(scroller.element as HTMLElement, { scrollWidth: 900, clientWidth: width, scrollLeft: 900 - width })
+      await scroller.trigger('scroll')
+      expect(header().classes()).not.toContain('shadow-sticky-end')
+      expect(cell().classList.contains('shadow-sticky-end')).toBe(false)
+    }
+
+    // Layar lebar setelah resize jendela: tabel muat → tanpa bayangan.
+    setScrollSize(scroller.element as HTMLElement, { scrollWidth: 900, clientWidth: 900, scrollLeft: 0 })
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+    expect(header().classes()).not.toContain('shadow-sticky-end')
+    wrapper.unmount()
+  })
+})

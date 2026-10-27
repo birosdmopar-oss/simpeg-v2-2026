@@ -38,7 +38,8 @@ describe('RowActionsMenu', () => {
 
     expect(trigger.element.tagName).toBe('BUTTON')
     expect(trigger.attributes('aria-label')).toBe('Aksi untuk Islam')
-    expect(trigger.attributes('title')).toBe('Aksi untuk Islam')
+    expect(trigger.attributes('title')).toBeUndefined() // tooltip custom, bukan title bawaan browser
+    expect(trigger.attributes('data-tooltip')).toBe('Aksi untuk Islam')
     expect(trigger.attributes('aria-haspopup')).toBe('menu')
     expect(trigger.attributes('aria-expanded')).toBe('false')
     expect(trigger.attributes('disabled')).toBeUndefined()

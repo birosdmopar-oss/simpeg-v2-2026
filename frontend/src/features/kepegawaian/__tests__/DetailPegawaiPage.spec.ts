@@ -88,7 +88,8 @@ describe('DetailPegawaiPage — data', () => {
     // CR-054 (QA R2-I1): satu baris, dibatasi lebar wadah (elipsis di 390), teks penuh di title.
     const badge = wrapper.get('[data-testid="pegawai-jenis"]')
     expect(badge.classes()).toEqual(expect.arrayContaining(['whitespace-nowrap', 'max-w-full']))
-    expect(badge.attributes('title')).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
+    expect(badge.attributes('title')).toBeUndefined()
+    expect(badge.attributes('data-tooltip')).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
     expect(badge.element.parentElement?.className).toContain('min-w-0')
   })
 

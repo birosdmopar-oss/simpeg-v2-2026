@@ -83,8 +83,13 @@ final class EksporTabel
     /**
      * @param list<string>       $header
      * @param list<list<string>> $baris
+     * @param list<array{teks: string, gaya?: string}> $atas baris di ATAS header (judul/subjudul/teks, mis. Baperjakat): satu
+     *                                                       sel di kolom A digabung selebar header; `gaya` = `judul` (tebal),
+     *                                                       `wrap` (teks multi-baris, tinggi baris mengikuti jumlah baris),
+     *                                                       selain itu biasa; `teks` kosong = baris kosong. Tetap sel teks
+     *                                                       murni (inlineStr), anti formula injection.
      */
-    public static function xlsx(array $header, array $baris, string $judulSheet = 'Data'): string
+    public static function xlsx(array $header, array $baris, string $judulSheet = 'Data', array $atas = []): string
     {
         $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
 
@@ -129,13 +134,32 @@ final class EksporTabel
             . '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
             . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
             . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            . '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+            . '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+            . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs>'
             . '</styleSheet>');
 
-        $rows = '';
+        $rows   = '';
+        $n      = 0;
+        $gabung = [];
+        $akhir  = self::kolom(max(0, count($header) - 1));
+
+        // Baris atas (judul/subjudul/teks): satu sel A, digabung selebar header.
+        foreach ($atas as $a) {
+            $n++;
+            $teks   = $a['teks'];
+            $gaya   = ($a['gaya'] ?? '') === 'judul' ? ' s="1"' : (($a['gaya'] ?? '') === 'wrap' ? ' s="2"' : '');
+            $tinggi = ($a['gaya'] ?? '') === 'wrap' ? ' ht="' . (15 * (substr_count(str_replace("\r\n", "\n", $teks), "\n") + 1)) . '" customHeight="1"' : '';
+            $sel    = $teks === '' ? '' : '<c r="A' . $n . '" t="inlineStr"' . $gaya . '><is><t xml:space="preserve">' . self::esc($teks) . '</t></is></c>';
+
+            if ($teks !== '' && $akhir !== 'A') {
+                $gabung[] = '<mergeCell ref="A' . $n . ':' . $akhir . $n . '"/>';
+            }
+
+            $rows .= '<row r="' . $n . '"' . $tinggi . '>' . $sel . '</row>';
+        }
 
         foreach ([$header, ...$baris] as $i => $r) {
-            $n    = $i + 1;
+            $n++;
             $sel  = '';
             $gaya = $i === 0 ? ' s="1"' : '';
 
@@ -146,8 +170,10 @@ final class EksporTabel
             $rows .= '<row r="' . $n . '">' . $sel . '</row>';
         }
 
+        $merge = $gabung === [] ? '' : '<mergeCells count="' . count($gabung) . '">' . implode('', $gabung) . '</mergeCells>';
+
         $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' . $rows . '</sheetData></worksheet>');
+            . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' . $rows . '</sheetData>' . $merge . '</worksheet>');
         $zip->close();
 
         $isi = (string) file_get_contents($tmp);

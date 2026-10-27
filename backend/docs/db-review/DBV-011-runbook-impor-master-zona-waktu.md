@@ -235,7 +235,7 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
 - **G-06 6.5 #3:** tabel arsip `absen_ijin_20240106` dan `absen_ijin_20240702` (`simpeg_prod.sql:74, 108`) tidak ikut dicek pasangannya. Bila tabel arsip itu ikut dimigrasi, jalankan kueri pasangan B5 dengan nama tabel arsip.
 - **G-07 6.3 #4:** rantai wilayah kantor tidak konsisten, `kode_pos` bukan 5 digit, `telp`/`faks` > 50, dan `*_lain` terisi.
 - **G-10 6.3:** #2/#3 (sanitasi konten dan gambar), #6 (`faq_rate.nip` orphan, butuh `pegawai`).
-- **A-01 9.10:** username non-ASCII/berkarakter kontrol, dan `expired_at` (keputusan FCP). Panjang `username` > 100 kini dicek A6.
+- **A-01 9.10:** username non-ASCII/berkarakter kontrol, dan `expired_at` (keputusan FCP → diputuskan di MAKE-028, lihat 2.4 langkah `pengguna`). Panjang `username` > 100 kini dicek A6.
 - **Nilai [I]** (G-01 8.3, G-04 Bagian 7, G-06 Bagian 3 dan 6.4, G-07 3.1, G-10 Bagian 3): dicocokkan dengan DDL dump sebagai prasyarat impor (2.4 langkah 6). Skrip hanya menguji data terhadap tipe dugaan v2 (D, A6, B8, B9).
 
 ### 2.4 Langkah runbook impor
@@ -321,6 +321,7 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
      - akun dengan format hash lain diperlakukan sesuai keputusan di log 2.8 (2.5);
      - `password_decode` tidak pernah dipilih; kolomnya sudah dibuang di langkah 1;
      - pemetaan kolom akun lain (`id` → `id_pengguna`, `id_pegawai` → `nip`, `UserLevel` → `user_level`, status) mengikuti A-01 dan DBV-009;
+     - **`expired_at` (MAKE-028, keputusan user: ikut legacy):** disalin apa adanya. Di v2 kolom ini = batas berlaku PASSWORD (legacy `MY_Controller.php:223-230`): akun yang `expired_at`-nya sudah lewat saat v2 dipakai wajib mengganti password pada login pertama (login tetap berhasil), `NULL` = tidak kedaluwarsa. Hitung dan catat di log 2.8 jumlah akun aktif dengan `expired_at < NOW()` (`SELECT COUNT(*) FROM pengguna WHERE status = '1' AND expired_at IS NOT NULL AND expired_at < NOW();`) supaya dukungan pengguna siap menghadapi lonjakan penggantian password; tidak ada tindakan data. Sesudah impor, v2 mengisi `expired_at` di aplikasi (akun aktif baru +1 tahun, password berubah +3 bulan) meniru trigger legacy, jadi jangan membuat ulang trigger itu di DB v2;
      - **`must_change_password` (DBV-020 keputusan #7, disetujui DB Validator 15-10-2026):** default 0; akun role 2/6 yang password-nya masih = NIP (perilaku popup FCP legacy `MY_Controller.php:214-221`) diberi 1. Dijalankan di DB v2 setelah `pengguna` diimpor, jumlah baris dicatat di log 2.8:
 
        ```sql
@@ -621,6 +622,48 @@ migration-nya di `MigrationsDitahan/`):
   non-pegawai sesuai K2, atau rating dibuang dengan catatan rekonsiliasi);
 - (c) aktivasi lewat **unit DBV terpisah**: migration dipindah ke `app/Database/Migrations/` dengan timestamp baru setelah
   migration terakhir di lingkungan target, dan registry test FK disesuaikan.
+
+### 2.11 Tabel Fase 5A presensi & slip gaji (DBV-023) — aditif
+
+**Asal.** Catatan persetujuan DB Validator atas DBV-023 (jjoseph48, komentar PR #28, 20-10-2026): C-4 dan syarat DBV-Q7.
+Rincian skema, urutan impor, dan klasifikasi audit ada di `DBV-023-presensi-gaji-fase5a-schema.md` Bagian 7–8; skrip
+audit `sql/DBV-023-audit-presensi-gaji.sql` (hanya `SELECT`; baca baris prasyarat P0 lebih dulu — `BERHENTI:` berarti
+skrip dijalankan di DB yang salah). Keputusan DBV-011 di Bagian 4 dan checklist Bagian 5 tidak diubah oleh penambahan ini.
+
+**Aturan `dh_online.sumber` (C-4).** `sumber` NULL hanya untuk baris impor legacy; setelah cutover setiap baris baru
+wajib 1/2, ditegakkan aplikasi. (`chk_dh_online_sumber` = `IN (1,2)` meloloskan NULL karena CHECK bernilai UNKNOWN —
+disengaja untuk baris impor, jadi penegakan untuk baris baru ada di aplikasi: presensi online = 1, manual = 2.)
+
+**Tabel legacy yang tidak dimigrasi (syarat DBV-Q7).** Dicatat eksplisit "tidak dimigrasi"; tidak dibuat di skema v2 dan
+isinya tidak diimpor:
+
+| Tabel legacy (D1) | Keterangan | Dasar |
+|---|---|---|
+| `user_geo` (D1:7547-7560) | tidak dimigrasi | PRD 5A §7.1.1, F5-12; DBV-Q7 |
+| `dh_online_coordinate` (D1:406-416) | tidak dimigrasi | F5-12; DBV-Q7 |
+| `d_dh_online` (arsip trigger `dh_online_beDel`) | tidak dimigrasi; trigger tidak dibawa, diganti `audit_logs` | F5-14, Q5A-15; DBV-Q4/Q7 |
+| `user_lokasi_presensi` (D1:7595-7605) | tidak dimigrasi | DBV-020 butir 6 |
+| `absen_real`, `absen_kategori` | tidak dimigrasi | F5-12; DBV-Q7 |
+
+Mapping Migrasi resmi berada di dokumen Bahan Baku (di luar repo); penyelarasannya diteruskan reviewer CR ke user.
+
+**Butir pra-cutover (C-3).** Uji koreksi NIP (`NipCascadeService`) pada volume `dh_online` realistis + urutan induk/anak
+di bawah FK RESTRICT, dicatat di log 2.8 sebelum aplikasi dibuka.
+
+### 2.12 Fase 4 — normalisasi `pegawai_sisa_cuti` dan audit Modul C (DBV-022, 27-10-2026)
+
+Rujukan: DBV-022 Bagian 13 (hasil audit B2) dan skrip `sql/DBV-022-audit-layanan.sql`. Migration Modul C (`main` `598a5f3`)
+memasang UNIQUE `pegawai_sisa_cuti (nip, tahun)` dan CHECK saldo ≥ 0 secara langsung, jadi data legacy wajib dinormalisasi
+di salinan kerja/transformasi (2.4 langkah 4–5) **sebelum** dimuat:
+
+1. **Duplikat `(nip, tahun)`** (audit 27-10: 3 pasangan, tahun 2019–2020): simpan `id_pegawai_sisa_cuti` terkecil, buang
+   sisanya; catat id yang dibuang di log 2.8.
+2. **Kolom saldo negatif** (audit 27-10: 9 baris, tahun 2024–2025, `utang_cuti` s.d. −128 dan `sisa_cuti_ditangguhkan` −1):
+   naikkan ke 0; catat nilai sebelum di log 2.8.
+3. Nilai di atas batas D8 diimpor apa adanya (PRD Fase 4 v1.3 §6.3.3).
+4. **NIP approver/tiket yatim** (audit 27-10: 2 + 2 + 5): diimpor apa adanya; `AddFkNipLayananFase4` tetap di
+   `MigrationsDitahan/` sampai audit di lingkungan target = 0 (pola 2.10 butir (c)).
+5. Ulangi skrip audit DBV-022 (dengan `COLLATE` eksplisit, DBV-022 12.6) di DB v2 hasil impor; Bagian 3 harus 0.
 
 ## 3. Bagian B — Zona waktu & `sql_mode` sesi (ISSUE-022, D-11) — USULAN; keputusan final TL/DBA; DITAHAN menunggu ISSUE-024
 

@@ -45,13 +45,14 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
     public function testJumlahPerJenis(): void
     {
-        $this->assertCount(82, TabelAnakNip::semua());
+        $this->assertCount(88, TabelAnakNip::semua());
         $this->assertCount(75, TabelAnakNip::perJenis(JenisRujukanNip::FkLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkUbahNipLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkSlipGaji));
-        $this->assertCount(2, TabelAnakNip::perJenis(JenisRujukanNip::NonFkFkV2));
+        $this->assertCount(7, TabelAnakNip::perJenis(JenisRujukanNip::NonFkFkV2));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkKeputusanV2));
         $this->assertCount(2, TabelAnakNip::perJenis(JenisRujukanNip::JsonArrayNip));
+        $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::DaftarNipBerpemisah));
 
         $tabelFk = array_unique(array_map(
             static fn (RujukanNip $r): string => $r->tabel,
@@ -134,17 +135,19 @@ final class TabelAnakNipTest extends CIUnitTestCase
         $this->assertFalse(JenisRujukanNip::NonFkFkV2->diubahLegacy());
         $this->assertFalse(JenisRujukanNip::NonFkKeputusanV2->diubahLegacy());
         $this->assertFalse(JenisRujukanNip::JsonArrayNip->diubahLegacy());
+        $this->assertFalse(JenisRujukanNip::DaftarNipBerpemisah->diubahLegacy());
 
         $this->assertSame(JenisRujukanNip::NonFkUbahNipLegacy, $this->cari('pengguna', 'username')->jenis);
         $this->assertSame(JenisRujukanNip::NonFkSlipGaji, $this->cari('gaji_pegawai', 'nip')->jenis);
         $this->assertSame(JenisRujukanNip::NonFkFkV2, $this->cari('riwayat_cuti', 'nip_atasan_langsung')->jenis);
         $this->assertSame(JenisRujukanNip::NonFkFkV2, $this->cari('riwayat_cuti', 'nip_yang_menyetujui')->jenis);
         $this->assertSame(JenisRujukanNip::NonFkKeputusanV2, $this->cari('jabatan_koordinasi', 'nip')->jenis);
+        $this->assertSame(JenisRujukanNip::DaftarNipBerpemisah, $this->cari('riwayat_cuti', 'ketua_tim')->jenis);
     }
 
     public function testJumlahPerFaseDanKeberadaan(): void
     {
-        $harapan = [0 => 1, 1 => 2, 2 => 4, 3 => 40, 4 => 8, 5 => 2, 6 => 1, 7 => 5, 8 => 0];
+        $harapan = [0 => 1, 1 => 2, 2 => 4, 3 => 40, 4 => 16, 5 => 2, 6 => 0, 7 => 5, 8 => 0];
         $aktual  = [];
 
         for ($fase = TabelAnakNip::FASE_MIN; $fase <= TabelAnakNip::FASE_MAX; $fase++) {
@@ -152,9 +155,9 @@ final class TabelAnakNipTest extends CIUnitTestCase
         }
 
         $this->assertSame($harapan, $aktual);
-        $this->assertCount(63, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
+        $this->assertCount(70, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
         $this->assertCount(12, TabelAnakNip::perKeberadaan(KeberadaanV2::TidakDiimpor));
-        $this->assertCount(7, TabelAnakNip::perKeberadaan(KeberadaanV2::BelumDiputuskan));
+        $this->assertCount(6, TabelAnakNip::perKeberadaan(KeberadaanV2::BelumDiputuskan));
     }
 
     public function testFase3SamaDenganDrafB01B02(): void
@@ -195,6 +198,26 @@ final class TabelAnakNipTest extends CIUnitTestCase
         foreach (['riwayat_cuti.nip', 'gaji_pegawai.nip', 'riwayat_lckh_2019.nip', 'email_pool.nip', 'user_lokasi_presensi.nip'] as $belum) {
             $this->assertNotContains($belum, $fase3);
         }
+
+        // DBV-022 M2 (AC-01.7): seluruh kolom NIP Modul C masuk cakupan Fase 4.
+        $fase4 = $kunci(TabelAnakNip::sampaiFase(4));
+        $this->assertCount(63, $fase4);
+
+        foreach ([
+            'riwayat_cuti.nip', 'riwayat_cuti.nip_atasan_langsung', 'riwayat_cuti.nip_yang_menyetujui', 'riwayat_cuti.ketua_tim',
+            'riwayat_cuti_notif_kt.nip_kt', 'pegawai_sisa_cuti.nip', 'riwayat_tb.nip', 'riwayat_ib.nip', 'riwayat_pmk.nip',
+            'riwayat_pmk_req.nip', 'esign_hist.nip', 'firebase_token.nip', 'inbox.nip_penerima', 'petugas_layanan.nip',
+            'pa_layanan.nip', 'disiplin_ticket.nip',
+        ] as $harus) {
+            $this->assertContains($harus, $fase4, "Fase 4: {$harus}");
+        }
+
+        $this->assertNotContains('gaji_pegawai.nip', $fase4, 'Fase 5');
+
+        // DBV-023 M2 (AC-D01.7): cakupan Fase 5A = presensi harian (FK) + slip gaji (NonFkSlipGaji, tidak diarahkan).
+        $fase5 = $kunci(TabelAnakNip::sampaiFase(5));
+        $this->assertCount(65, $fase5);
+        $this->assertSame(['dh_online.nip', 'gaji_pegawai.nip'], array_values(array_diff($fase5, $fase4)));
 
         $this->assertSame(
             $kunci(TabelAnakNip::perKeberadaan(KeberadaanV2::Ada)),
