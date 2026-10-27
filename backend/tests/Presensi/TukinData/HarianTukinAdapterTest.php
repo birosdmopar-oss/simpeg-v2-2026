@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Presensi\TukinData;
 
 use App\Libraries\Presensi\TukinData\DataTukinBelumTersedia;
+use App\Libraries\Presensi\TukinData\DataTukinTidakSah;
 use App\Libraries\Presensi\TukinData\SumberCutiTbBelumTersedia;
 use App\Libraries\Presensi\TukinData\SumberHarianTukin;
 use Tests\Support\DatabaseTestCase;
@@ -12,9 +13,9 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 use Tests\Support\Presensi\TukinDataUjiTrait;
 
 /**
- * PRD 5A §7.7.6 — AC-TK.5 (bagian harian): konket `absen_ijin` status V & `affect_tukin` 1 per tanggal (rekap legacy
- * `L_presensi.php:12343-12373`), cuti/TB lewat `SumberCutiTbInterface` (5A fail-closed). Presensi `dh_online` menyusul
- * setelah DBV-023 (D-01) merged.
+ * PRD 5A §7.7.6 — AC-TK.5 (bagian harian): presensi `dh_online` per tanggal tanpa saring `sumber` (rekap legacy
+ * `L_presensi.php:12376-12391`, `:12850-12851`), konket `absen_ijin` status V & `affect_tukin` 1 per tanggal
+ * (`:12343-12373`), cuti/TB lewat `SumberCutiTbInterface` (5A fail-closed).
  *
  * @internal
  */
@@ -69,6 +70,52 @@ final class HarianTukinAdapterTest extends DatabaseTestCase
         ], $harian);
     }
 
+    public function testPresensiDhOnlinePerTanggalSemuaSumber(): void
+    {
+        $nip = $this->buatPegawai();
+        $this->presensi($nip, '2026-03-09', '07:25:00', '16:05:00', 1);  // online
+        $this->presensi($nip, '2026-03-10', '08:10:00', null, 2);        // manual, tanpa jam pulang
+        $this->presensi($nip, '2026-03-11', null, '16:00:00', null);     // impor legacy
+        $this->presensi($nip, '2026-02-28', '07:30:00', '16:00:00', 1);  // di luar rentang
+        $this->presensi($this->buatPegawai(), '2026-03-09', '07:30:00', '16:00:00', 1); // pegawai lain
+
+        $presensi = $this->sumber()->presensi($nip, '2026-03-01', '2026-03-31');
+
+        $this->assertSame([
+            '2026-03-09' => ['masuk' => '07:25:00', 'pulang' => '16:05:00'],
+            '2026-03-10' => ['masuk' => '08:10:00', 'pulang' => null],
+            '2026-03-11' => ['masuk' => null, 'pulang' => '16:00:00'],
+        ], $presensi);
+    }
+
+    public function testHarianMenggabungPresensiKonketCutiTb(): void
+    {
+        $nip = $this->buatPegawai();
+        $this->presensi($nip, '2026-03-10', '07:30:00', '16:00:00', 1);
+        $this->presensi($nip, '2026-03-12', '07:45:00', '16:00:00', 2);
+        $this->konket($nip, '2026-03-10 00:00:00', '2026-03-10 00:00:00', 'V', 1, 13);
+
+        $harian = (new SumberHarianTukin($this->db, $this->sumberCutiTbPalsu([
+            '2026-03-11' => ['cuti' => ['jenis' => 'tahunan']],
+        ])))->untuk($nip, '2026-03-01', '2026-03-31');
+
+        $this->assertSame([
+            '2026-03-10' => ['presensi' => ['masuk' => '07:30:00', 'pulang' => '16:00:00'], 'konket' => ['affect_tukin' => 1, 'kategori' => 13]],
+            '2026-03-11' => ['cuti' => ['jenis' => 'tahunan']],
+            '2026-03-12' => ['presensi' => ['masuk' => '07:45:00', 'pulang' => '16:00:00']],
+        ], $harian);
+    }
+
+    public function testJamPresensiTidakSahGagalTerkendali(): void
+    {
+        $nip = $this->buatPegawai();
+        $this->presensi($nip, '2026-03-10', '24:15:00', null, null); // TIME menerima > 23:59:59; impor legacy tidak dijamin bersih
+
+        $this->expectException(DataTukinTidakSah::class);
+        $this->expectExceptionMessage("Jam presensi pegawai {$nip} tanggal 2026-03-10 tidak sah.");
+        $this->sumber()->untuk($nip, '2026-03-01', '2026-03-31');
+    }
+
     public function testSumberCutiTbBawaanFailClosed(): void
     {
         $nip = $this->buatPegawai();
@@ -81,6 +128,13 @@ final class HarianTukinAdapterTest extends DatabaseTestCase
     private function sumber(): SumberHarianTukin
     {
         return new SumberHarianTukin($this->db, $this->sumberCutiTbPalsu());
+    }
+
+    private function presensi(string $nip, string $tgl, ?string $masuk, ?string $pulang, ?int $sumber): void
+    {
+        $this->db->table('dh_online')->insert([
+            'nip' => $nip, 'tgl' => $tgl, 'jam_masuk' => $masuk, 'jam_pulang' => $pulang, 'sumber' => $sumber,
+        ]);
     }
 
     private function konket(string $nip, string $mulai, string $selesai, string $status, int $affect, int $kategori): void

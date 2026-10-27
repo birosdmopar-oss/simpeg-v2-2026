@@ -15,7 +15,7 @@ README `Presensi/Tukin` "Kontrak data"). Galat terkendali = turunan `GalatDataTu
 |---|---|
 | `KonfigurasiTukinTidakLengkap` | Tarif wajib `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK` belum diatur di Web Config (tidak pernah diganti 0) |
 | `RentangPuasaGanda` | Lebih dari satu `rentang_puasa` beririsan dengan periode |
-| `DataTukinTidakSah` | Baris `bkn_periode_ekinper` ganda/tidak berformat `MM-DD`, periode BKN tidak berakhir di bulan itu, pegawai tidak ada, atau nilai ditolak library (mis. tarif 0,01% → faktor 0,2 tidak bulat) |
+| `DataTukinTidakSah` | Baris `bkn_periode_ekinper` ganda/tidak berformat `MM-DD`, periode BKN tidak berakhir di bulan itu, pegawai tidak ada, nilai ditolak library (mis. tarif 0,01% → faktor 0,2 tidak bulat), atau jam `dh_online` tidak sah |
 | `DataTukinBelumTersedia` | Sumber cuti/TB bawaan 5A (fail-closed sampai 5B) |
 
 Sumber cuti/TB dipilih `Config\Presensi::$sumberCutiTb` (bawaan `SumberCutiTbBelumTersedia`); 5B menggantinya dengan data
@@ -33,7 +33,7 @@ Fase 4. 5A **dilarang** membaca `riwayat_cuti`/`riwayat_tb`.
 | TMT keluar | `pegawai.tmt_status` bila `pegawai.status = 2` | [V2] README Tukin |
 | TMT masuk | Lihat bagian berikut | [K] + satu [V2] |
 | Konket | `absen_ijin` `status = 'V'`, `affect_tukin = 1`, rentang `DATE(date_start)`..`DATE(date_end)` beririsan; setiap tanggal mendapat `{affect_tukin, kategori}`; tanggal tumpang tindih → baris terakhir menurut `date_start` naik | [K] `L_presensi.php:12343-12373` |
-| Presensi | `dh_online` jam lokal apa adanya — **menyusul** setelah DBV-023 (D-01) merged | PRD §7.7.6 |
+| Presensi | `dh_online` per `tgl` dalam [awal periode sebelumnya, akhir periode], **tanpa saring `sumber`** (online, manual, impor legacy sama); `jam_masuk`/`jam_pulang` lokal apa adanya → `{masuk, pulang}`, NULL → null; tanggal tanpa baris → tanpa kunci `presensi` (library: TK); jam di luar 00:00:00–23:59:59 → `DataTukinTidakSah`. Legacy memuat bulan kalender N−1 dan N (`MONTH/YEAR(tgl)`); periode berjalan 16–15 tercakup penuh, hari periode sebelumnya hanya dipakai lookback cuti sakit yang tidak membaca presensi | [K] `L_presensi.php:12376-12391`, `:12850-12851` |
 
 ## TMT masuk pegawai baru (keputusan reviewer CR 20-10-2026)
 

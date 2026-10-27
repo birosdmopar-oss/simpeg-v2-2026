@@ -113,7 +113,7 @@ Key review **CR-027** (CR saja). Tidak mengubah skema, jadi tidak ada dokumen `d
 
 **Catatan lokasi test:** kontrak D-13 menyebut `tests/Presensi/`. Test logika murni ditaruh di `tests/unit/Presensi/` mengikuti konvensi repo (sama dengan CR-025); test integrasi ber-DB D-13 tetap di `tests/Presensi/`.
 
-## 5A M6 — MAKE-033 adapter Tukin (D-04/D-05/D-07 sisi integrasi) — IN_PROGRESS
+## 5A M6 — MAKE-033 adapter Tukin (D-04/D-05/D-07 sisi integrasi)
 
 Branch `fase5a/make-033-adapter-tukin` (dari `main` `6806c38`); acuan PRD 5A §7.7. Merge setelah M2 (DBV-023) karena
 harian presensi membaca `dh_online`.
@@ -129,4 +129,10 @@ harian presensi membaca `dh_online`.
   `tests/MasterData/WebConfigTest.php` dan `WebConfigTypesTest` (disetujui reviewer); **tambahan disetujui reviewer:**
   FE `features/master-data/webConfig.types.ts`, `schemas/webConfig.schema.ts`, `components/WebConfigFormDialog.vue`
   (tipe `date_range_list` di form Web Config, agar `rentang_puasa` dapat dikelola admin lewat UI).
-- **Belum:** `presensi {masuk, pulang}` harian dari `dh_online` (menunggu M2).
+- **Sudah (27-10-2026, setelah M2 di `main`):** `presensi {masuk, pulang}` harian dari `dh_online`
+  (`SumberHarianTukin::presensi`, tanpa saring `sumber`, jam lokal apa adanya [K `L_presensi.php:12376-12391`,
+  `:12850-12851`]; jam tidak sah → `DataTukinTidakSah`). Test: `HarianTukinAdapterTest` (online/manual/impor, gabung
+  presensi+konket+cuti, jam tidak sah) dan `TukinDataServiceTest` (baris `dh_online` → status `hadir`, tanpa baris → `TK`).
+  AC-TK.1–TK.6 terpenuhi; `Libraries/Presensi/Tukin` tidak diubah.
+- **Sisa untuk 5B (di luar 5A):** sumber cuti/TB nyata (`Config\Presensi::$sumberCutiTb`), endpoint/laporan Tukin
+  (D-08), cross-check rumus resmi Q5A-13.

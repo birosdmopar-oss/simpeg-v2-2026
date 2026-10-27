@@ -64,6 +64,21 @@ final class TukinDataServiceTest extends DatabaseTestCase
         $this->assertSame('2026-04-13', $hasil->akhirDihitung);
     }
 
+    public function testPresensiDhOnlineMenentukanPotonganHarian(): void
+    {
+        $nip = $this->buatPegawai();
+        // Periode April 2026 tanpa baris BKN = 16 Maret–15 April; 16 & 17 Maret 2026 = Senin & Selasa.
+        $this->db->table('dh_online')->insert(['nip' => $nip, 'tgl' => '2026-03-16', 'jam_masuk' => '07:30:00', 'jam_pulang' => '16:00:00', 'sumber' => 1]);
+
+        $argumen = $this->service()->siapkan($nip, 2026, 4);
+        $hasil   = KalkulasiTukin::hitung($argumen->periode, $argumen->hariLibur, $argumen->harian, $argumen->konfigurasi, '2026-03-17', $argumen->pegawai);
+
+        $this->assertSame('hadir', $hasil->harian['2026-03-16']->status);
+        $this->assertSame(0, $hasil->harian['2026-03-16']->potongan);
+        $this->assertSame('TK', $hasil->harian['2026-03-17']->status, 'tanpa baris dh_online');
+        $this->assertSame($argumen->konfigurasi->potonganHarian('TK'), $hasil->potonganPresensi);
+    }
+
     public function testRakitanBawaanGagalTerkendaliSampai5B(): void
     {
         $nip = $this->buatPegawai();
