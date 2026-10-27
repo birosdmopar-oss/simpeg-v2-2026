@@ -86,11 +86,14 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // lingkup) di CutiService. `hitung-lama` = semua login (jwt saja).
             'GET api/v1/cuti/opsi'              => [1, 2, 3, 6, 7],
             'POST api/v1/cuti/hitung-lama'      => self::JWT,
+            'GET api/v1/cuti/pengingat'         => [1, 2, 3, 6, 7],
             'GET api/v1/cuti'                   => [1, 2, 3, 6, 7],
             'POST api/v1/cuti'                  => [1, 2, 3, 6, 7],
             'GET api/v1/cuti/([0-9]+)'          => [1, 2, 3, 6, 7],
             'PUT api/v1/cuti/([0-9]+)'          => [1, 2, 3, 6, 7],
             'DELETE api/v1/cuti/([0-9]+)'       => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti/([0-9]+)/process' => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti/([0-9]+)/tunda'   => [1, 2, 3, 6, 7],
             'GET api/v1/cuti/([0-9]+)/lampiran' => [1, 2, 3, 6, 7],
             'GET api/v1/cuti/([0-9]+)/surat'    => [1, 2, 3, 6, 7],
 

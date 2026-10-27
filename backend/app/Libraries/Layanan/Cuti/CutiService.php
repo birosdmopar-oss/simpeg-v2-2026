@@ -73,7 +73,7 @@ class CutiService
 
     public function sekarang(): DateTimeImmutable
     {
-        return $this->sekarang !== null ? ($this->sekarang)() : new DateTimeImmutable('now', new DateTimeZone(config(\Config\App::class)->appTimezone));
+        return $this->sekarang !== null ? ($this->sekarang)() : new DateTimeImmutable('now', new DateTimeZone(\App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis::ZONA));
     }
 
     public function hariIni(): string
@@ -237,16 +237,7 @@ class CutiService
                 $nip === null ? $b->where('1 = 0', null, false) : $b->where('rc.nip', $nip);
                 $b->orderBy('rc.tgl_mulai', 'DESC');
             } elseif ($mode === self::MODE_PERSETUJUAN) {
-                if ($nip === null) {
-                    $b->where('1 = 0', null, false);
-                } else {
-                    $b->groupStart()
-                        ->groupStart()->where('rc.status', StatusCuti::PENGAJUAN)->where('rc.nip_atasan_langsung', $nip)->where('rc.nip_yang_menyetujui !=', $nip)->where("COALESCE(rc.nip_atasan_langsung, '') != ''", null, false)->where("COALESCE(rc.nip_yang_menyetujui, '') != ''", null, false)->groupEnd()
-                        ->orGroupStart()->where('rc.status', StatusCuti::DISETUJUI_AL)->where('rc.nip_yang_menyetujui', $nip)->groupEnd()
-                        ->orGroupStart()->where('rc.status', StatusCuti::PENGAJUAN)->where('rc.nip_yang_menyetujui', $nip)->groupStart()->where("COALESCE(rc.nip_atasan_langsung, '') = ''", null, false)->orWhere('rc.nip_atasan_langsung = rc.nip_yang_menyetujui', null, false)->groupEnd()->groupEnd()
-                        ->orGroupStart()->where('rc.status', StatusCuti::PENGAJUAN)->where("COALESCE(rc.nip_yang_menyetujui, '') = ''", null, false)->where('rc.nip_atasan_langsung', $nip)->groupEnd()
-                        ->groupEnd();
-                }
+                $this->terapkanPersetujuan($b, $nip, false);
 
                 $b->orderBy('rc.tgl_mulai', 'ASC');
             } else {
@@ -304,6 +295,62 @@ class CutiService
             'mode'       => $mode,
             'can_create' => in_array($role, self::ROLE_AJUKAN, true),
         ];
+    }
+
+    /**
+     * Antrean persetujuan milik NIP: AL pada status 0 (dua langkah), PyB pada status 3 / status 0 langkah tunggal.
+     * `$belumDitunda` menyaring baris yang flag tahapnya masih 0 (pengingat, §6.4.7).
+     */
+    private function terapkanPersetujuan(BaseBuilder $b, ?string $nip, bool $belumDitunda): void
+    {
+        if ($nip === null) {
+            $b->where('1 = 0', null, false);
+
+            return;
+        }
+
+        $b->groupStart();
+
+        // (1) AL pada status 0, dua langkah.
+        $b->groupStart()->where('rc.status', StatusCuti::PENGAJUAN)->where('rc.nip_atasan_langsung', $nip)
+            ->where('rc.nip_yang_menyetujui !=', $nip)->where("COALESCE(rc.nip_yang_menyetujui, '') != ''", null, false);
+        $belumDitunda && $b->where('rc.skip_al', 0);
+        $b->groupEnd();
+
+        // (2) PyB pada status 3.
+        $b->orGroupStart()->where('rc.status', StatusCuti::DISETUJUI_AL)->where('rc.nip_yang_menyetujui', $nip);
+        $belumDitunda && $b->where('rc.skip_pyb', 0);
+        $b->groupEnd();
+
+        // (3) PyB pada status 0 langkah tunggal (AL kosong atau sama dengan PyB).
+        $b->orGroupStart()->where('rc.status', StatusCuti::PENGAJUAN)->where('rc.nip_yang_menyetujui', $nip)
+            ->groupStart()->where("COALESCE(rc.nip_atasan_langsung, '') = ''", null, false)->orWhere('rc.nip_atasan_langsung = rc.nip_yang_menyetujui', null, false)->groupEnd();
+        $belumDitunda && $b->where('rc.skip_pyb', 0);
+        $b->groupEnd();
+
+        // (4) AL sendirian (PyB kosong): langkah tunggal oleh AL.
+        $b->orGroupStart()->where('rc.status', StatusCuti::PENGAJUAN)->where("COALESCE(rc.nip_yang_menyetujui, '') = ''", null, false)->where('rc.nip_atasan_langsung', $nip);
+        $belumDitunda && $b->where('rc.skip_pyb', 0);
+        $b->groupEnd();
+
+        $b->groupEnd();
+    }
+
+    /**
+     * Daftar pengingat persetujuan (§6.4.7): antrean `persetujuan` pemanggil yang flag tahapnya masih 0.
+     *
+     * @return array{items: list<array<string, mixed>>, total: int}
+     */
+    public function pengingat(AuthContext $auth): array
+    {
+        $this->wajibRoleRoute($auth);
+
+        $b = $this->db->table('riwayat_cuti rc');
+        $this->terapkanPersetujuan($b, $auth->nip(), true);
+        $baris = $b->select('rc.*')->orderBy('rc.tgl_mulai', 'ASC')->limit(100)->get()->getResultArray();
+        $items = array_map(fn (array $r): array => $this->item($auth, $r, ['lampiran' => false, 'surat' => false]), $baris);
+
+        return ['items' => $items, 'total' => count($items)];
     }
 
     /**
@@ -1023,7 +1070,7 @@ class CutiService
      *
      * @return array<string, mixed>
      */
-    private function item(AuthContext $auth, array $cuti, array $ada, bool $tandaiAtasNama = false): array
+    public function item(AuthContext $auth, array $cuti, array $ada, bool $tandaiAtasNama = false): array
     {
         $nipAl   = $this->tekstuPlain($cuti['nip_atasan_langsung'] ?? null);
         $nipPyb  = $this->tekstuPlain($cuti['nip_yang_menyetujui'] ?? null);
@@ -1044,7 +1091,7 @@ class CutiService
      *
      * @return array<string, mixed>
      */
-    private function itemDetail(AuthContext $auth, array $cuti): array
+    public function itemDetail(AuthContext $auth, array $cuti): array
     {
         $id     = (int) $cuti['id_riwayat_cuti'];
         $nip    = (string) $cuti['nip'];
@@ -1119,7 +1166,7 @@ class CutiService
     /**
      * @return array<string, mixed>|null
      */
-    private function ambil(int $id, bool $kunci = false): ?array
+    public function ambil(int $id, bool $kunci = false): ?array
     {
         $b = $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $id);
 
@@ -1132,12 +1179,12 @@ class CutiService
         return $b->get()->getRowArray();
     }
 
-    private function kunciPegawai(string $nip): void
+    public function kunciPegawai(string $nip): void
     {
         $this->db->query('SELECT nip FROM ' . $this->db->prefixTable('pegawai') . ' WHERE nip = ? FOR UPDATE', [$nip]);
     }
 
-    private function dalamTransaksi(Closure $kerja): void
+    public function dalamTransaksi(Closure $kerja): void
     {
         $this->db->transBegin();
 

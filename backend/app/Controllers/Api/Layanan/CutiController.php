@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api\Layanan;
 
 use App\Controllers\Api\ApiController;
+use App\Libraries\Layanan\Cuti\CutiApprovalService;
 use App\Libraries\Layanan\Cuti\CutiService;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -52,6 +53,21 @@ final class CutiController extends ApiController
         return $this->respondSuccess($this->cuti()->hapus(service('authContext'), $id));
     }
 
+    public function process(int $id): ResponseInterface
+    {
+        return $this->respondSuccess($this->persetujuan()->process(service('authContext'), $id, $this->payload()));
+    }
+
+    public function tunda(int $id): ResponseInterface
+    {
+        return $this->respondSuccess($this->persetujuan()->tunda(service('authContext'), $id));
+    }
+
+    public function pengingat(): ResponseInterface
+    {
+        return $this->respondSuccess($this->cuti()->pengingat(service('authContext')));
+    }
+
     public function lampiran(int $id): ResponseInterface
     {
         return $this->unduhBerkas($id, 'lampiran');
@@ -91,6 +107,11 @@ final class CutiController extends ApiController
         $query = $this->request->getGet();
 
         return is_array($query) ? $query : [];
+    }
+
+    private function persetujuan(): CutiApprovalService
+    {
+        return service('cutiApprovalService');
     }
 
     private function cuti(): CutiService

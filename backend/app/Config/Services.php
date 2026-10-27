@@ -538,4 +538,27 @@ class Services extends BaseService
             static::attachmentService(),
         );
     }
+
+    /**
+     * Persetujuan berjenjang cuti (MAKE-022 M3): state machine, efek final, tunda, atas nama.
+     */
+    public static function cutiApprovalService(bool $getShared = true): \App\Libraries\Layanan\Cuti\CutiApprovalService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('cutiApprovalService');
+        }
+
+        $db     = db_connect();
+        $aturan = config(\Config\Cuti::class)->aturan();
+        $kuota  = new \App\Libraries\Layanan\Cuti\KuotaCutiService($db, $aturan, new \App\Libraries\MasterData\HariLiburService($db));
+
+        return new \App\Libraries\Layanan\Cuti\CutiApprovalService(
+            $db,
+            $aturan,
+            static::cutiService(),
+            $kuota,
+            new \App\Libraries\Layanan\Cuti\EfekFinalCutiService($db, $kuota, static::penerbitSuratCuti()),
+            new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
+        );
+    }
 }

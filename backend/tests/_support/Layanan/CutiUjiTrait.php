@@ -8,11 +8,11 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Layanan\Cuti\ApproverTerjangkau;
 use App\Libraries\Layanan\Cuti\AtasanLangsungCuti;
+use App\Libraries\Layanan\Cuti\CutiApprovalService;
 use App\Libraries\Layanan\Cuti\CutiService;
 use App\Libraries\Layanan\Cuti\EfekFinalCutiService;
 use App\Libraries\Layanan\Cuti\KuotaCutiService;
 use App\Libraries\Layanan\Cuti\PejabatBerwenangCuti;
-use App\Libraries\Layanan\Cuti\PenerbitSuratCutiNoOp;
 use App\Libraries\MasterData\HariLiburService;
 use Closure;
 use Config\Cuti as CutiConfig;
@@ -34,6 +34,8 @@ trait CutiUjiTrait
     protected string $sekarangUji = '2026-11-02 09:00:00';
 
     protected FakeAttachmentService $lampiranUji;
+
+    protected ?PenerbitSuratCutiUji $penerbitSurat = null;
 
     /**
      * @param array<string, mixed> $pegawai kolom `pegawai`
@@ -149,7 +151,7 @@ trait CutiUjiTrait
     protected function cutiService(?Closure $sekarang = null): CutiService
     {
         $this->lampiranUji ??= new FakeAttachmentService();
-        $sekarang ??= fn (): DateTimeImmutable => new DateTimeImmutable($this->sekarangUji, new DateTimeZone(config(\Config\App::class)->appTimezone));
+        $sekarang ??= fn (): DateTimeImmutable => new DateTimeImmutable($this->sekarangUji, new DateTimeZone(\App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis::ZONA));
 
         $aturan = config(CutiConfig::class)->aturan();
         $kuota  = new KuotaCutiService($this->db, $aturan, new HariLiburService($this->db));
@@ -158,7 +160,7 @@ trait CutiUjiTrait
             $this->db,
             $aturan,
             $kuota,
-            new EfekFinalCutiService($this->db, $kuota, new PenerbitSuratCutiNoOp()),
+            new EfekFinalCutiService($this->db, $kuota, $this->penerbitUji()),
             new AtasanLangsungCuti($this->db),
             new PejabatBerwenangCuti($this->db),
             new ApproverTerjangkau($this->db),
@@ -167,5 +169,26 @@ trait CutiUjiTrait
             null,
             $sekarang,
         );
+    }
+
+    protected function approvalService(?Closure $sekarang = null): CutiApprovalService
+    {
+        $svc    = $this->cutiService($sekarang);
+        $aturan = config(CutiConfig::class)->aturan();
+        $kuota  = new KuotaCutiService($this->db, $aturan, new HariLiburService($this->db));
+
+        return new CutiApprovalService(
+            $this->db,
+            $aturan,
+            $svc,
+            $kuota,
+            new EfekFinalCutiService($this->db, $kuota, $this->penerbitUji()),
+            new ApproverTerjangkau($this->db),
+        );
+    }
+
+    protected function penerbitUji(): PenerbitSuratCutiUji
+    {
+        return $this->penerbitSurat ??= new PenerbitSuratCutiUji();
     }
 }

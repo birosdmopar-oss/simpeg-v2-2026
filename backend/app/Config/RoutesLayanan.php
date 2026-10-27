@@ -19,12 +19,15 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     // Path literal didaftarkan sebelum cuti/(:num).
     $routes->get('cuti/opsi', 'CutiController::opsi', $cuti);
     $routes->post('cuti/hitung-lama', 'CutiController::hitungLama'); // semua login (jwt saja)
+    $routes->get('cuti/pengingat', 'CutiController::pengingat', $cuti);
 
     $routes->get('cuti', 'CutiController::index', $cuti);
     $routes->post('cuti', 'CutiController::create', $cuti);
     $routes->get('cuti/(:num)', 'CutiController::show/$1', $cuti);
     $routes->put('cuti/(:num)', 'CutiController::update/$1', $cuti);
     $routes->delete('cuti/(:num)', 'CutiController::delete/$1', $cuti);
+    $routes->post('cuti/(:num)/process', 'CutiController::process/$1', $cuti);
+    $routes->post('cuti/(:num)/tunda', 'CutiController::tunda/$1', $cuti);
     $routes->get('cuti/(:num)/lampiran', 'CutiController::lampiran/$1', $cuti);
     $routes->get('cuti/(:num)/surat', 'CutiController::surat/$1', $cuti);
 });

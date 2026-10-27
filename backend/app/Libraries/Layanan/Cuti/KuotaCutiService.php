@@ -66,7 +66,7 @@ class KuotaCutiService
     {
         $waktu = new \DateTimeImmutable($createdAtUtc, new \DateTimeZone('UTC'));
 
-        return (int) $waktu->setTimezone(new \DateTimeZone(config(\Config\App::class)->appTimezone))->format('Y');
+        return (int) $waktu->setTimezone(new \DateTimeZone(\App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis::ZONA))->format('Y');
     }
 
     public function saldo(string $nip, int $tahun, bool $kunci = false): ?SaldoCuti
