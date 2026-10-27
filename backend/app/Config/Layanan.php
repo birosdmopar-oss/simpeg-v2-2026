@@ -16,7 +16,9 @@ use CodeIgniter\Config\BaseConfig;
  * service ber-DB (M5) menyalurkan nilai ini lewat {@see self::aturanStudi()} / {@see self::aturanPmk()}. `LayananMurniTest`
  * menjaga bawaan di sini = `AturanStudi::bawaan()` / `AturanPmk::bawaan()`.
  *
- * Nilai pengganti `web_config` legacy (Q-06: kop/penanda tangan surat TB/IB) menyusul di sini pada M5.
+ * Hanya konstanta aturan. Nilai pejabat, kop, dan penanda tangan (`id_jabatan_kabiro_kepegawaian`, `id_unit_kepegawaian`,
+ * `id_satker_kepegawaian`, `nama_kementerian`, `pdf_header_*`, dsb.) TIDAK di sini: dibaca lewat
+ * `WebConfigService::value()` dari katalog `Config\WebConfig`, tanpa override `.env` (PRD v1.2 §6.4.1, Q-06(a) 27-10).
  */
 class Layanan extends BaseConfig
 {
