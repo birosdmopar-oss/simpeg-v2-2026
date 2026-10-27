@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Presensi\Slip;
 
+use App\Libraries\Pdf\KopDokumen;
 use App\Libraries\Presensi\SlipGaji\PeriodeSlip;
 use DateTimeInterface;
 
@@ -19,9 +20,6 @@ use DateTimeInterface;
  */
 final readonly class DataPdfSlip
 {
-    /** Nama instansi bila `web_config` `nama_kementerian` kosong — literal legacy [K] `print/cetak.php:201` @771f8b4. */
-    public const NAMA_INSTANSI_BAWAAN = 'Kementerian Pariwisata';
-
     /**
      * @param array{nama: string, nip: string, pangkat: string, jabatan: string, unit: string, satker: string} $identitas
      * @param array<string, int>                                                                               $sen
@@ -38,7 +36,7 @@ final readonly class DataPdfSlip
         public ?string $urlQr,
         public DateTimeInterface $dicetakPada,
         public ?DateTimeInterface $dibukaPada,
-        public string $namaInstansi = self::NAMA_INSTANSI_BAWAAN,
+        public string $namaInstansi = KopDokumen::NAMA_INSTANSI_BAWAAN,
     ) {
     }
 }

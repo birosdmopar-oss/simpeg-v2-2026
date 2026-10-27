@@ -177,9 +177,10 @@ PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f
 |---|---|---|
 | PDF-1 | Logo kop | `web_config` `logo_kementerian_pdf` (kiri) / `logo_wonderful_pdf` (kanan), ASSET_PATH relatif dari akar aset v2 `Config\Presensi::$akarAset` (bawaan `WRITEPATH . 'aset/'`, override `.env` `presensi.akarAset` tervalidasi). Di-resolve service lewat `Slip/KopSlip::resolveAset` (tolak `..`, path absolut, keluar akar); kosong / tidak ada / bukan PNG-JPEG → PDF tanpa logo (seperti PDF LKH). Akar aset final ditetapkan saat cutover bersama G-09 |
 | PDF-2 | Baris "Dibuka: {waktu WIB}" | **[V2]** PRD §7.3.6 (legacy tidak punya); di bawah "Jakarta, {tanggal cetak}" di kolom QR; hanya bila slip sudah dibuka |
-| PDF-3 | Nama instansi "adalah benar pegawai …" | `web_config` `nama_kementerian`; kosong → literal legacy [K] "Kementerian Pariwisata" (`print/cetak.php:201`, `DataPdfSlip::NAMA_INSTANSI_BAWAAN`) |
+| PDF-3 | Nama instansi "adalah benar pegawai …" | `web_config` `nama_kementerian`; kosong → literal legacy [K] "Kementerian Pariwisata" (`print/cetak.php:201`; konstanta tunggal `App\Libraries\Pdf\KopDokumen::NAMA_INSTANSI_BAWAAN`, CR-066) |
 | PDF-4 | QR | wajib gambar; keluaran bukan `<img>` (tanpa gd/imagick) → cetak gagal, token tidak dicetak sebagai teks (§7.3.6); tanpa token → tanpa QR (U-3) |
 | PDF-5 | Logo bawaan v2 (katalog `web_config`: "kosong = logo bawaan v2", kontrak Fase 2) | logo bawaan v2 belum tersedia → tanpa logo, sama dengan PDF LKH; katalog tidak diubah. Akar aset v2 final + berkas logo bawaan ditetapkan saat cutover bersama G-09 |
+| PDF-6 | Kaki halaman "Halaman x dari y" + username (pola CR-064 `DokumenPdf::TOKEN_HALAMAN`/`TOKEN_TOTAL`) | **Tidak dipakai** di slip [K] `print/cetak.php` @771f8b4 + PRD §7.3.6: slip satu halaman per pegawai dengan QR verifikasi; `PdfSlipGaji` tidak mengirim `kakiHtml` (keputusan reviewer CR 22-10-2026) |
 
 ### Test
 

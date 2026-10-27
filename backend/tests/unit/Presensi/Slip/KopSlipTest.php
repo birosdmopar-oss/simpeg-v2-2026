@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Presensi\Slip;
 
-use App\Libraries\Presensi\Slip\DataPdfSlip;
+use App\Libraries\Pdf\KopDokumen;
 use App\Libraries\Presensi\Slip\KopSlip;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Presensi;
@@ -107,7 +107,7 @@ final class KopSlipTest extends CIUnitTestCase
         $this->assertSame(['nama_kementerian' => '', 'nama_unit' => '', 'alamat' => ''], $hasil['kop']);
         $this->assertNull($hasil['logoKiri']);
         $this->assertNull($hasil['logoKanan']);
-        $this->assertSame(DataPdfSlip::NAMA_INSTANSI_BAWAAN, $hasil['namaInstansi']);
+        $this->assertSame(KopDokumen::NAMA_INSTANSI_BAWAAN, $hasil['namaInstansi']);
 
         $hasil = KopSlip::dariWebConfig(['nama_kementerian' => 'Kementerian Uji'], $this->akar);
         $this->assertSame('Kementerian Uji', $hasil['kop']['nama_kementerian'], 'kop jatuh ke nama_kementerian (pola PDF LKH)');

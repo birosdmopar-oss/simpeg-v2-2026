@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Presensi\Slip;
 
 use App\Libraries\MasterData\WebConfigTypes;
+use App\Libraries\Pdf\KopDokumen;
 
 /**
  * Kop PDF slip gaji dari nilai `web_config` (PRD 5A §7.3.6, G-09) — dipakai service slip sebelum membentuk
@@ -17,7 +18,7 @@ use App\Libraries\MasterData\WebConfigTypes;
  *   dari akar (symlink) → tanpa logo, PDF tetap dibuat (seperti PDF LKH). Cek PNG/JPEG isi berkas di
  *   {@see PdfSlipGaji::logo()}.
  * - Nama instansi pada kalimat "adalah benar pegawai …": `nama_kementerian`; kosong → literal legacy [K]
- *   {@see DataPdfSlip::NAMA_INSTANSI_BAWAAN}.
+ *   {@see KopDokumen::NAMA_INSTANSI_BAWAAN} (satu sumber, CR-066).
  */
 final class KopSlip
 {
@@ -39,7 +40,7 @@ final class KopSlip
             ],
             'logoKiri'     => self::resolveAset($akarAset, $wc['logo_kementerian_pdf'] ?? null),
             'logoKanan'    => self::resolveAset($akarAset, $wc['logo_wonderful_pdf'] ?? null),
-            'namaInstansi' => $namaKementerian !== '' ? $namaKementerian : DataPdfSlip::NAMA_INSTANSI_BAWAAN,
+            'namaInstansi' => $namaKementerian !== '' ? $namaKementerian : KopDokumen::NAMA_INSTANSI_BAWAAN,
         ];
     }
 
