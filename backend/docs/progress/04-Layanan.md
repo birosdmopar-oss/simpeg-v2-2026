@@ -221,3 +221,17 @@ Test `tests/Layanan/Pmk/PmkBerkasTest.php`.
 **Review final M5 (reviewer CR 27-10):** `e70cff6` diterima.
 
 **Belum jalan.** Penyambungan notifikasi (M4), gate penuh.
+
+### Butir runbook cutover dari M5 (catatan reviewer CR 27-10-2026, setelah M5 masuk main `ffee734`)
+
+1. **Migrasi berkas legacy ke storage v2.** Path impor legacy (arsip remote) di `riwayat_tb.file_sp/file_1..3/file_surat_tb`,
+   `riwayat_tb_perpan.file_sperpan`, `riwayat_ib.file_sp/file_1/file_2/file_surat_ib`, dan `riwayat_pmk_req.file_kontrak/
+   file_paklaring/file_surat_phk/file_slip_gaji` belum ada di storage v2, sehingga unduhnya menjawab **404** (pola Konket,
+   PRD §7.4). Berkas baru bisa dibuka setelah dipindah ke storage v2 saat cutover: TB/IB ke `document_attachment` kode
+   46–50 dengan `tag` slot (Q-21, §6.1.2 #6); PMK req tetap di kolom dengan path relatif akar storage v2 (segmen hanya
+   `[A-Za-z0-9._-]`, tanpa `..`).
+2. **Validasi jenis berkas saat migrasi.** Unduh menyajikan mime dari isi berkas dan mendukung `inline=1`. Unggahan v2 aman
+   karena `ValidasiBerkas` membatasi jenis dari isi (TB/IB `jpg jpeg png gif pdf doc docx`, PMK `jpg jpeg png gif pdf`;
+   HTML/SVG ditolak — diverifikasi 27-10 untuk HTML-sebagai-pdf, SVG, `.html`, SVG-sebagai-png pada PMK/TB/IB). Berkas
+   legacy yang dipindah **tidak** melewati validasi itu: skrip migrasi wajib menyaring jenis dari isi dengan whitelist yang
+   sama (atau menyisihkan berkas di luar whitelist untuk ditinjau) agar tidak ada HTML/SVG yang tersaji inline.
