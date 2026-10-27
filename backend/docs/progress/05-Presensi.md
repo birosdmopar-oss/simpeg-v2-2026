@@ -140,6 +140,23 @@ harian presensi membaca `dh_online`.
 - **Sisa untuk 5B (di luar 5A):** sumber cuti/TB nyata (`Config\Presensi::$sumberCutiTb`), endpoint/laporan Tukin
   (D-08), cross-check rumus resmi Q5A-13.
 
+## 5A M7 — FE 5A Presensi & Slip Gaji (MAKE-034) — IN_PROGRESS
+
+Branch `fase5a/make-034-frontend-presensi-slip` (dari `main` `bb6cb90`); merge bertahap (a) → (b) → (c) atas izin Horii,
+tiap tahap gate cepat + CI + `./check.sh` sekali. Status FE 5A tetap IN_PROGRESS sampai QA Lapis 1 lolos (Q5A-18).
+
+- **Tahap (a) (27-10-2026):** `features/presensi/{roles,types,routes.presensi}.ts`, `services/slipGaji.service.ts`
+  (amplop sudah dibuka interceptor; nominal string server, format rupiah BigInt tanpa float), `SlipGajiPage` (empat
+  keadaan legacy, modal sekali buka + centang, kartu slip + Cetak PDF hanya di sesi buka), `SlipGajiKartu`,
+  `BukaSlipDialog`, `VerifikasiSlipPage` (publik, tanpa layout login, meta robots `noindex`, hanya endpoint publik).
+  Berkas bersama aditif, commit terpisah: `shared/layouts/nav.config.ts` (`NavItem.rilis`, `NavChild.roles` — satu
+  definisi lintas fase, grup Presensi `rilis: true`, ACTIVE_PHASE tetap 3) + spec; `router/index.ts` (`presensiRoutes`).
+  Backend aditif: respons buka slip memuat `pegawai {nip, nama, pangkat, jabatan, unit, satker}` untuk identitas kartu
+  [K `_slip_content.php`]. Test: `features/presensi/__tests__/{services.amplop,SlipGajiPage,VerifikasiSlipPage,navPresensi}.spec.ts`
+  (klien axios asli untuk service, payload string), `nav.config.spec.ts`.
+- **Figma:** acuan hanya Slip Gaji (PNG); halaman verifikasi tanpa frame Figma → pola `AuthCardLayout` (AGENTS §3.6).
+- **Berikutnya:** tahap (b) Kelola Slip Gaji (monitoring, impor, koreksi); tahap (c) Presensi Saya + Data Presensi + manual.
+
 ### Q cutover 5A
 
 | # | Butir | Asal | Status |
