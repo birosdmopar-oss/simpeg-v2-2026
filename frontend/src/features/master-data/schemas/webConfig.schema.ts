@@ -11,6 +11,8 @@ import type { WebConfigItem } from '../webConfig.types'
 export const WEB_CONFIG_TEXT_MAX_BYTES = 65_535
 export const WEB_CONFIG_REMARK_MAX = 255
 export const WEB_CONFIG_EMAIL_MAX = 20
+/** Fase 5A F5-16 (`date_range_list`): batas jumlah rentang = WebConfigTypes::RANGE_MAX_COUNT backend. */
+export const WEB_CONFIG_RANGE_MAX = 50
 
 const EMAIL = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/
 
@@ -60,9 +62,50 @@ export function webConfigValueError(item: Pick<WebConfigItem, 'type' | 'constrai
       if (new Set(parts.map((p) => p.toLowerCase())).size !== parts.length) return 'Ada alamat email ganda.'
       return parts.length > WEB_CONFIG_EMAIL_MAX ? `Maksimal ${WEB_CONFIG_EMAIL_MAX} alamat email.` : null
     }
+    case 'date_range_list':
+      return dateRangeListError(value)
     default:
       return 'Key ini tidak ada di katalog sehingga nilainya tidak bisa diubah.'
   }
+}
+
+/**
+ * `date_range_list` (Fase 5A F5-16): pesan & urutan pemeriksaan sama dengan WebConfigTypes::dateRangeList backend —
+ * per baris (nomor baris masukan, baris kosong diabaikan), lalu jumlah, lalu tumpang tindih setelah duplikat dibuang.
+ */
+function dateRangeListError(value: string): string | null {
+  const ranges = new Map<string, [string, string]>()
+  const lines = value.split(/\r\n|\r|\n/)
+
+  for (const [index, raw] of lines.entries()) {
+    const line = raw.trim()
+    if (line === '') continue
+    const no = index + 1
+    const m = /^(\d{4})-(\d{2})-(\d{2})\.\.(\d{4})-(\d{2})-(\d{2})$/.exec(line)
+    if (!m) return `Baris ${no}: format harus YYYY-MM-DD..YYYY-MM-DD (mis. 2026-02-18..2026-03-19).`
+    if (!validDate(m[1]!, m[2]!, m[3]!) || !validDate(m[4]!, m[5]!, m[6]!)) return `Baris ${no}: tanggal tidak valid.`
+    const start = `${m[1]}-${m[2]}-${m[3]}`
+    const end = `${m[4]}-${m[5]}-${m[6]}`
+    if (start > end) return `Baris ${no}: tanggal mulai tidak boleh setelah tanggal selesai.`
+    ranges.set(`${start}..${end}`, [start, end])
+  }
+
+  if (ranges.size === 0) return 'Nilai wajib diisi. Untuk kembali ke nilai bawaan, hapus nilainya.'
+  if (ranges.size > WEB_CONFIG_RANGE_MAX) return `Maksimal ${WEB_CONFIG_RANGE_MAX} rentang tanggal.`
+
+  const sorted = [...ranges.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  for (let i = 1; i < sorted.length; i++) {
+    const [prevKey, [, prevEnd]] = sorted[i - 1]!
+    const [key, [start]] = sorted[i]!
+    if (start <= prevEnd) return `Rentang ${prevKey} dan ${key} tumpang tindih.`
+  }
+
+  return null
+}
+
+function validDate(y: string, m: string, d: string): boolean {
+  const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)))
+  return date.getUTCFullYear() === Number(y) && date.getUTCMonth() === Number(m) - 1 && date.getUTCDate() === Number(d)
 }
 
 function rangeError(n: number, c: WebConfigItem['constraints']): string | null {

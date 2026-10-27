@@ -86,7 +86,7 @@ final class WebConfigTest extends DatabaseTestCase
         $catalog = config(WebConfig::class)->keys;
 
         $this->assertSame(array_keys($catalog), array_column($items, 'config_name'));
-        $this->assertCount(35, $items, '24 key baseline + pdf_header_nama_unit (Slip Gaji) + 10 key potongan tukin/uang makan');
+        $this->assertCount(42, $items, '24 key baseline + pdf_header_nama_unit (Slip Gaji) + 10 key potongan tukin/uang makan + 7 key jam kerja Fase 5A');
 
         $byName = array_column($items, null, 'config_name');
         $this->assertTrue($byName['email_sent_time']['is_default']);

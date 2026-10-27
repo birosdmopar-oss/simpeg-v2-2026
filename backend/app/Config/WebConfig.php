@@ -35,6 +35,9 @@ class WebConfig extends BaseConfig
     public const GROUP_UANG      = 'Uang Makan PNS (Rp per hari)';
     public const GROUP_EMAIL     = 'Email Ulang Tahun';
 
+    /** Fase 5A F5-16 (PRD 5A §7.7.2): jam kerja normal/puasa untuk kalkulasi Tukin (grup `jam_kerja`). */
+    public const GROUP_JAM_KERJA = 'Jam Kerja & Puasa';
+
     /**
      * Tingkat potongan tukin legacy dalam persen (L_presensi.php:1483, dipakai :2102-2170): desimal 0..100, 2 digit.
      */
@@ -173,6 +176,36 @@ class WebConfig extends BaseConfig
         'email_ultah_ad' => [
             'label'       => 'Penerima Email', 'group' => self::GROUP_EMAIL, 'type' => T::EMAIL_LIST, 'default' => '', 'personal' => true,
             'description' => 'Daftar email dipisah koma; alamat pertama = penerima, sisanya tembusan.',
+        ],
+
+        // --- Jam kerja & puasa (Fase 5A F5-16; bawaan = 05-Presensi.md D-05 / KonfigurasiTukin) ---
+        'jam_masuk_normal' => [
+            'label'       => 'Jam Masuk Normal', 'group' => self::GROUP_JAM_KERJA, 'type' => T::TIME, 'default' => '07:30:00',
+            'description' => 'Jam masuk hari kerja normal (dasar keterlambatan Tukin).',
+        ],
+        'jam_pulang_normal' => [
+            'label'       => 'Jam Pulang Normal (Senin-Kamis)', 'group' => self::GROUP_JAM_KERJA, 'type' => T::TIME, 'default' => '16:00:00',
+            'description' => 'Jam pulang Senin-Kamis di luar rentang puasa.',
+        ],
+        'jam_pulang_jumat_normal' => [
+            'label'       => 'Jam Pulang Normal (Jumat)', 'group' => self::GROUP_JAM_KERJA, 'type' => T::TIME, 'default' => '16:30:00',
+            'description' => 'Jam pulang Jumat di luar rentang puasa.',
+        ],
+        'jam_masuk_puasa' => [
+            'label'       => 'Jam Masuk Puasa', 'group' => self::GROUP_JAM_KERJA, 'type' => T::TIME, 'default' => '08:00:00',
+            'description' => 'Jam masuk selama rentang puasa.',
+        ],
+        'jam_pulang_puasa' => [
+            'label'       => 'Jam Pulang Puasa (Senin-Kamis)', 'group' => self::GROUP_JAM_KERJA, 'type' => T::TIME, 'default' => '15:00:00',
+            'description' => 'Jam pulang Senin-Kamis selama rentang puasa.',
+        ],
+        'jam_pulang_jumat_puasa' => [
+            'label'       => 'Jam Pulang Puasa (Jumat)', 'group' => self::GROUP_JAM_KERJA, 'type' => T::TIME, 'default' => '15:30:00',
+            'description' => 'Jam pulang Jumat selama rentang puasa.',
+        ],
+        'rentang_puasa' => [
+            'label'       => 'Rentang Puasa', 'group' => self::GROUP_JAM_KERJA, 'type' => T::DATE_RANGE, 'default' => '',
+            'description' => 'Rentang puasa per tahun, satu per baris YYYY-MM-DD..YYYY-MM-DD (inklusif), mis. 2026-02-18..2026-03-19.',
         ],
     ];
 }

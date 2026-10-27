@@ -21,6 +21,8 @@ export type WebConfigType =
   | 'asset_path'
   | 'time'
   | 'email_list'
+  /** Fase 5A F5-16: rentang tanggal `YYYY-MM-DD..YYYY-MM-DD` satu per baris (`rentang_puasa`). */
+  | 'date_range_list'
 
 export interface WebConfigConstraints {
   /** text: batas karakter */
@@ -88,4 +90,5 @@ export const WEB_CONFIG_TYPE_LABELS: Record<WebConfigType, string> = {
   asset_path: 'Path aset',
   time: 'Jam',
   email_list: 'Daftar email',
+  date_range_list: 'Rentang tanggal',
 }

@@ -145,6 +145,35 @@ describe('WebConfigView', () => {
     wrapper.unmount()
   })
 
+  it('Fase 5A F5-16: date_range_list diisi lewat textarea, format salah ditolak, nilai sah disimpan', async () => {
+    const rentang = item({
+      config_name: 'rentang_puasa', label: 'Rentang Puasa', group: 'Jam Kerja & Puasa', type: 'date_range_list', constraints: {},
+    })
+    vi.mocked(webConfigService.list).mockResolvedValue([...items, rentang])
+    const wrapper = await mountView()
+    await selectRowAction(wrapper, 'web-config-actions-rentang_puasa', 'edit')
+
+    const textarea = document.body.querySelector<HTMLTextAreaElement>('textarea[name="config_value"]')
+    if (!textarea) throw new Error('textarea nilai tidak ada')
+    expect(document.body.textContent).toContain('Tipe: Rentang tanggal.')
+
+    textarea.value = '2026-02-18 - 2026-03-19'
+    textarea.dispatchEvent(new Event('input'))
+    dialogButton('Simpan').click()
+    await flushPromises()
+    expect(document.body.textContent).toContain('Baris 1: format harus YYYY-MM-DD..YYYY-MM-DD')
+    expect(webConfigService.save).not.toHaveBeenCalled()
+
+    vi.mocked(webConfigService.save).mockResolvedValueOnce({ ...rentang, config_value: '2026-02-18..2026-03-19', is_default: false })
+    textarea.value = '2026-02-18..2026-03-19'
+    textarea.dispatchEvent(new Event('input'))
+    dialogButton('Simpan').click()
+    await flushPromises()
+    expect(webConfigService.save).toHaveBeenCalledWith('rentang_puasa', { config_value: '2026-02-18..2026-03-19', remark: '' })
+    expect(wrapper.text()).toContain('"Rentang Puasa" disimpan.')
+    wrapper.unmount()
+  })
+
   it('Hapus lewat ConfirmDialog → nilai kembali ke bawaan', async () => {
     vi.mocked(webConfigService.remove).mockResolvedValue({ deleted: true, item: { ...items[0]!, is_default: true } })
     const wrapper = await mountView()

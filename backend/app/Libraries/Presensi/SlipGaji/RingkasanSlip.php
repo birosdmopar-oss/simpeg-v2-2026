@@ -9,13 +9,15 @@ use InvalidArgumentException;
 /**
  * CR-027 (K-CR027-8) — ringkasan dan total slip gaji, int sen tanpa float.
  *
- * Setia legacy (`libraries/hr/Lsl_gaji.php:234-261`; terjawab dari legacy, CR-039). Legacy tidak punya cek invarian
+ * Setia legacy `771f8b4` (`libraries/hr/Lsl_gaji.php:416-446`, F5-1; PRD 5A §7.3.8). Legacy tidak punya cek invarian
  * `bersih_*`, jadi tidak ada peringatan konsistensi:
  * - `jumlah_penghasilan_gpp` = Σ 13 field penghasilan GPP; `jumlah_potongan_gpp` = Σ 8 field potongan GPP (legacy
  *   menghitung keduanya tetapi tidak menampilkannya);
  * - `bersih_gpp`, `bersih_tk`, `bersih_2` = nilai berkas apa adanya, tidak dihitung ulang;
- * - **`total_penghasilan = bersih_gpp + bersih_tk`**; `bersih_2` (Tunjangan Kinerja Bersih), tukin kelas jabatan, dan
- *   uang makan tidak masuk total.
+ * - **`total_penghasilan = bersih_gpp + bersih_tk + uang_makan`** (uang makan N−1 snapshot saat slip dibuka; kunci
+ *   masukan `uang_makan` opsional, tidak ada = 0); `bersih_2` (Tunjangan Kinerja Bersih) tidak masuk total; baris tukin
+ *   kelas jabatan dihapus di `771f8b4`. Bentuk keluaran tidak berubah (pemanggil menampilkan uang makan dari datanya
+ *   sendiri).
  */
 final class RingkasanSlip
 {
@@ -41,7 +43,7 @@ final class RingkasanSlip
             'bersih_gpp'             => $bersihGpp,
             'bersih_tk'              => $bersihTk,
             'bersih_2'               => self::ambil($sen, 'bersih_2'),
-            'total_penghasilan'      => $bersihGpp + $bersihTk,
+            'total_penghasilan'      => $bersihGpp + $bersihTk + self::ambil($sen, 'uang_makan'),
         ];
     }
 
