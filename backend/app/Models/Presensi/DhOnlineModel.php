@@ -17,10 +17,10 @@ use App\Models\BaseAuditableModel;
  */
 class DhOnlineModel extends BaseAuditableModel
 {
-    protected $table         = 'dh_online';
-    protected $primaryKey    = 'nip';
-    protected $returnType    = 'array';
-    protected $useTimestamps = false;
+    protected $table             = 'dh_online';
+    protected $primaryKey        = 'nip';
+    protected $returnType        = 'array';
+    protected $useTimestamps     = false;
     protected bool $auditEnabled = false;
 
     /**

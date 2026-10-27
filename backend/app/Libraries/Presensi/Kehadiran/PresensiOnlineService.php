@@ -58,10 +58,16 @@ final class PresensiOnlineService
     private readonly Closure $jam;
 
     /**
-     * @param (Closure(): DateTimeInterface)|null $jam instan sekarang (bawaan jam server); disuntik test
+     * @param (Closure(): DateTimeInterface)|null   $jam              instan sekarang (bawaan jam server); disuntik test
+     * @param (Closure(string, string): void)|null $kaitSebelumTulis seam test konkurensi (AC-D02.10): dipanggil setelah
+     *                                                                 pemeriksaan awal, tepat sebelum transaksi tulis
      */
-    public function __construct(private readonly ?BaseConnection $db = null, ?Presensi $config = null, ?Closure $jam = null)
-    {
+    public function __construct(
+        private readonly ?BaseConnection $db = null,
+        ?Presensi $config = null,
+        ?Closure $jam = null,
+        private readonly ?Closure $kaitSebelumTulis = null,
+    ) {
         $this->config = $config ?? config(Presensi::class);
         $this->jam    = $jam ?? static fn (): DateTimeInterface => new DateTimeImmutable('now', new DateTimeZone('UTC'));
     }
@@ -250,6 +256,10 @@ final class PresensiOnlineService
      */
     private function tulis(BaseConnection $db, AuthContext $auth, string $nip, string $tgl, bool $masuk, array $data): int
     {
+        if ($this->kaitSebelumTulis !== null) {
+            ($this->kaitSebelumTulis)($nip, $tgl);
+        }
+
         for ($percobaan = 0; ; $percobaan++) {
             $db->transBegin();
 

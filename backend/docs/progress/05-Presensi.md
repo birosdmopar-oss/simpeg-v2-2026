@@ -19,8 +19,8 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 | Task | Paket | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|---|
 | D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** | M1: dokumen + kueri audit + draf migration di `MigrationsDitahan/` (Bagian "5A M1" di bawah). M2 (27-10-2026): migration aktif + registry NIP Fase 5 + test skema (bagian "5A M2"); syarat DBV approve ✅ 20-10, DBV-022 di `main` ✅ `598a5f3`, ISSUE-049 ✅; menunggu CI + merge |
-| D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | TODO | Logika murni `Libraries/Presensi/Geo` boleh disiapkan sebelum M2 (§3.5) |
-| D-03 Presensi manual | 5A | M5 | MAKE-032 | TODO | Menunggu M2 |
+| D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | **IN_PROGRESS** | Service/controller/test AC-D02 di branch `fase5a/make-032-presensi-online-manual` (bagian "5A M5"); menunggu review/merge |
+| D-03 Presensi manual | 5A | M5 | MAKE-032 | **IN_PROGRESS** | Akun khusus + data presensi admin + test AC-D03 (bagian "5A M5"); menunggu review/merge |
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Logika murni CR-037/CR-039 selesai; adapter `TukinData` 5A (non-skema boleh mulai, merge setelah M2); precedence/laporan di 5B |
 | D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | — | — | TODO | Di luar 5A |
 | D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | TODO | Logika murni CR-027 tersedia; menunggu M2 |
@@ -71,6 +71,20 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
 - **Berikutnya:** CI hijau + `./check.sh` penuh → lapor reviewer CR → merge oleh reviewer (izin Horii). Setelah M2 di
   `main`: sambungkan kode non-skema MAKE-030..033 sesuai urutan PRD 5A (M3 impor → M4 akses/verifikasi → M5 presensi →
   M6 adapter Tukin).
+
+## 5A M5 — D-02/D-03 presensi online, manual, data admin (MAKE-032)
+
+- **Sudah (27-10-2026, branch `fase5a/make-032-presensi-online-manual`):** logika murni `Libraries/Presensi/Geo` (fc3451f,
+  sebelum M2); setelah M2: `Kehadiran/{PresensiOnlineService, PresensiManualService, DataPresensiService,
+  ResolverLokasiPresensi, ZonaSatker, KodeGalatPresensi, DuplikatPresensi}`, `Models/Presensi/DhOnlineModel`,
+  `PresensiController`, `PresensiManualController`, `Config/RoutesPresensi.php` (blok M5) + `Routing::$routeFiles`, kontrak
+  role prefiks `presensi` di `KontrakMatriksRoleTest`, `Config\Presensi` blok M5 (jendela waktu, `$akunPresensiManual` +
+  override `.env`), README endpoint. Kode galat envelope `ApiException(kode:)` dibawa dari MAKE-030 (isi identik, ed1d951).
+- **Test (AC-D02.1–10, AC-D03.1–8):** `tests/Presensi/Kehadiran/{PresensiOnline, ResolverLokasiPresensi, PresensiZonasi,
+  PresensiJendela, PresensiKonkurensi (db-isolasi-penuh), RoleMatriksPresensi, PresensiManualAkses, PresensiManualValidasi,
+  PresensiManualAudit, DataPresensiAdmin}Test.php` + unit `Geo` (Haversine, PenilaianGeofence, kemurnian). Konkurensi:
+  koneksi DB kedua menulis & commit lewat seam `kaitSebelumTulis` (setelah pemeriksaan awal, sebelum transaksi tulis).
+- **DBV-023 C-4 terpenuhi:** baris baru `dh_online` selalu `sumber` 1 (online) / 2 (manual, melekat); diuji.
 
 ### Q cutover 5A
 
