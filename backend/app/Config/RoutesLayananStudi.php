@@ -58,6 +58,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->put('pmk/pengajuan/(:num)', 'PmkController::updatePengajuan/$1', $pmk);
     $routes->delete('pmk/pengajuan/(:num)', 'PmkController::deletePengajuan/$1', $pmk);
     $routes->post('pmk/pengajuan/(:num)/process', 'PmkController::processPengajuan/$1', $pmk);
+    // [V2] gap PRD §5.4 (disetujui Horii 27-10-2026): unduh berkas kolom pengajuan; {kolom} di-whitelist di service.
+    $routes->get('pmk/pengajuan/(:num)/berkas/(:segment)', 'PmkController::unduhBerkas/$1/$2', $pmk);
     $routes->get('pmk', 'PmkController::index', $pmk);
     $routes->put('pmk/(:num)', 'PmkController::tambahArsip/$1', $pmk);
     $routes->delete('pmk/(:num)/arsip/(:num)', 'PmkController::hapusArsip/$1/$2', $pmk);

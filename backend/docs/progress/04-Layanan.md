@@ -213,6 +213,11 @@ PmkSingleEndNodeTest, RiwayatPmkTest}` (32 test).
 berakhir, tidak mengubah `pegawai.id_jenis_status` secara otomatis (tanpa cron) — sama dengan legacy. Konsumen Fase 5
 memakai `bebasPresensiPenuh`, bukan `id_jenis_status`.
 
-**Pertanyaan terbuka.** PRD §5.4 tidak memuat endpoint unduh berkas pengajuan PMK (kolom `file_*`); belum dibuat.
+**[V2] Unduh berkas pengajuan PMK** (gap PRD §5.4, disetujui Horii 27-10-2026): `GET pmk/pengajuan/{id}/berkas/{kolom}`
+(role 1, 2, 3; hak = lihat detail; whitelist empat kolom; traversal/path impor tanpa berkas → 404). Legacy membuka lewat
+tautan langsung (`views/hr/employee/rwy/pmk/req/admin/form.php:142-214`, `pathToSrc()` `helpers/function_helper.php:314`).
+Test `tests/Layanan/Pmk/PmkBerkasTest.php`.
+
+**Review final M5 (reviewer CR 27-10):** `e70cff6` diterima.
 
 **Belum jalan.** Penyambungan notifikasi (M4), gate penuh.

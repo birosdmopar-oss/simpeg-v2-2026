@@ -118,11 +118,13 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'PUT api/v1/pmk/pengajuan/([0-9]+)'          => [1, 2, 3],
             'DELETE api/v1/pmk/pengajuan/([0-9]+)'       => [1, 2, 3],
             'POST api/v1/pmk/pengajuan/([0-9]+)/process' => [1, 2, 3],
-            'GET api/v1/pmk'                             => [1, 2, 3],
-            'PUT api/v1/pmk/([0-9]+)'                    => [1, 2, 3],
-            'DELETE api/v1/pmk/([0-9]+)/arsip/([0-9]+)'  => [1, 2, 3],
-            'DELETE api/v1/pmk/([0-9]+)'                 => [1, 2, 3],
-            'GET api/v1/dokumen/([^/]+)'                 => [1, 3, 4, 5, 8],
+            // [V2] gap PRD §5.4 (disetujui Horii 27-10-2026): unduh berkas kolom pengajuan, hak = lihat detail.
+            'GET api/v1/pmk/pengajuan/([0-9]+)/berkas/([^/]+)' => [1, 2, 3],
+            'GET api/v1/pmk'                                   => [1, 2, 3],
+            'PUT api/v1/pmk/([0-9]+)'                          => [1, 2, 3],
+            'DELETE api/v1/pmk/([0-9]+)/arsip/([0-9]+)'        => [1, 2, 3],
+            'DELETE api/v1/pmk/([0-9]+)'                       => [1, 2, 3],
+            'GET api/v1/dokumen/([^/]+)'                       => [1, 3, 4, 5, 8],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,

@@ -86,6 +86,25 @@ class PmkController extends ApiController
         return $this->respondSuccess(['deleted' => true, 'soft_delete' => false]);
     }
 
+    /**
+     * Unduh berkas kolom pengajuan ([V2] gap PRD §5.4). Pola unduh lampiran TB/IB: mime dari isi, nama aman, `attachment`
+     * (atau `inline=1`), `nosniff`, `no-store`.
+     */
+    public function unduhBerkas(int $id, string $kolom): ResponseInterface
+    {
+        $berkas = $this->pengajuan()->berkas(service('authContext'), $id, $kolom);
+        $mime   = (new \finfo(FILEINFO_MIME_TYPE))->buffer($berkas['isi']);
+        $nama   = (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $berkas['nama']);
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setContentType(is_string($mime) && $mime !== '' ? $mime : 'application/octet-stream')
+            ->setHeader('Content-Disposition', ($this->request->getGet('inline') === '1' ? 'inline' : 'attachment') . '; filename="' . $nama . '"')
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('Cache-Control', 'private, no-store')
+            ->setBody($berkas['isi']);
+    }
+
     public function processPengajuan(int $id): ResponseInterface
     {
         $auth = service('authContext');

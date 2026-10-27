@@ -6,6 +6,7 @@ namespace App\Libraries\Layanan\Pmk;
 
 use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
+use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\ValidasiBerkas;
@@ -13,6 +14,7 @@ use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Libraries\Layanan\Studi\RentangTanggal;
 use App\Libraries\ListQuery;
 use CodeIgniter\HTTP\Files\UploadedFile;
+use InvalidArgumentException;
 
 /**
  * Pengajuan PMK C-09 (PRD Fase 4 §5.4, §6.9.1): daftar `mode=saya|pic|admin`, opsi (`tmt_cpns`, `tgl_awal_maks`),
@@ -258,6 +260,41 @@ class PmkPengajuanService extends DasarPmkService
             $model = $this->model();
             $model->withActor($auth, static fn () => $model->delete($id));
         });
+    }
+
+    /**
+     * Unduh satu berkas kolom pengajuan (`GET pmk/pengajuan/{id}/berkas/{kolom}`). [V2] gap PRD §5.4 (disetujui Horii
+     * 27-10-2026): legacy membuka berkas lewat tautan langsung (`views/hr/employee/rwy/pmk/req/admin/form.php:142-214`,
+     * `pathToSrc()` `helpers/function_helper.php:314`). Hak = hak lihat detail (404 bila tak terlihat); `$kolom` hanya
+     * empat kolom berkas D1 ({@see self::BERKAS}), selain itu 404; kolom kosong, path impor legacy yang belum ada di
+     * storage v2, atau path yang ditolak storage (traversal / karakter di luar `[A-Za-z0-9._-]`) → 404. Path internal
+     * tidak pernah dikirim; nama unduhan dibangkitkan server.
+     *
+     * @return array{isi: string, nama: string}
+     */
+    public function berkas(AuthContext $auth, int $id, string $kolom): array
+    {
+        $row = $this->barisTerlihat($auth, $id);
+
+        if (! array_key_exists($kolom, self::BERKAS)) {
+            throw new NotFoundException('Berkas tidak ditemukan.');
+        }
+
+        $path = trim((string) ($row[$kolom] ?? ''));
+
+        try {
+            if ($path === '' || ! $this->kolomBerkas()->ada($path)) {
+                throw new NotFoundException('Berkas tidak ditemukan.');
+            }
+
+            $isi = $this->kolomBerkas()->baca($path);
+        } catch (InvalidArgumentException) {
+            throw new NotFoundException('Berkas tidak ditemukan.');
+        }
+
+        $ekstensi = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        return ['isi' => $isi, 'nama' => "pmk_{$id}_{$kolom}" . ($ekstensi !== '' ? ".{$ekstensi}" : '')];
     }
 
     public function bolehMengajukan(AuthContext $auth): bool
