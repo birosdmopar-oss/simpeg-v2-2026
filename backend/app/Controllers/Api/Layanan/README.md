@@ -116,3 +116,53 @@ Contoh respons `POST cuti/saldo` (data sintetis), target 1, tahun 2026:
 
 Semua sudah punya saldo: `jumlah_dibuat = 0`, `dibuat = []`, `message` "Tidak ada saldo cuti tahun 2026 yang dibuat; N pegawai dilewati karena sudah memiliki saldo." Audit ringkasan
 (`jenis_audit = cuti.saldo_massal`) memuat angka yang sama dan daftar `nip_dibuat`/`nip_dilewati` tanpa nama.
+
+## Dashboard Status Layanan & PIC — C-10 (MAKE-025 M6, PRD Fase 4 §5.5, §6.10)
+
+Route: `Config/RoutesLayananDashboard.php`, filter `jwt` + `role:1,2,3,4,5,6,7` (`LayananDashboardService::ROLE_ROUTE`,
+`PetugasLayananService::ROLE_ROUTE`); **role 8 → 403**. Tulis PIC role 1 saja (role 2–7 → 403 di service).
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET layanan/status?jenis=&status=&id_unit=&id_satker=&search=&page=&per_page=` | 1–7 | Gabungan `riwayat_cuti`, `riwayat_tb`, `riwayat_ib`, `riwayat_pmk_req`, urut `created_at DESC`. Lingkup `PegawaiScope::terapkanKeQuery` per jenis: role 1/4/5 semua, role 2/6/7 NIP sendiri, role 3 jalur daftar. Modul per role: 6 cuti + TB, 7 cuti + IB, lainnya keempatnya (`jenis` di luar modul role → daftar kosong). `jenis` `cuti\|tb\|ib\|pmk`; `status` `berjalan` (non-final) \| `selesai` (final) \| kode angka per jenis (pakai bersama `jenis`); `search` nama/NIP; `per_page` 1..100 (bawaan 20). Parameter tidak sah → 422 |
+| `GET layanan/jenis` | 1–7 | Master `jenis_layanan` aktif `[{id_jenis_layanan, jenis_layanan, module_name}]` |
+| `GET layanan/petugas?id_jenis_layanan=&status=&search=&page=&per_page=` | 1–7 | Role 1 semua status (filter `status` 0/1); role 2–7 hanya PIC aktif. Urut `status DESC, id DESC`. `can_create` (role 1) |
+| `POST layanan/petugas` | 1–7 | Role 1 saja. `{id_jenis_layanan, nip, status?}` (status bawaan 1). 201 + item |
+| `PUT layanan/petugas/{id}` | 1–7 | Role 1 saja. Kolom yang tidak dikirim tetap; tidak ada → 404 |
+| `DELETE layanan/petugas/{id}` | 1–7 | Role 1 saja. Hapus fisik + audit [K `L_layanan.php:166`] → `{deleted: true, soft_delete: false}`; tidak ada → 404 |
+
+Item `GET layanan/status`:
+
+```json
+{
+  "jenis": "tb", "jenis_layanan": "Tugas Belajar", "id": 12, "nip": "199001012015011001", "nama": "Contoh Pegawai, S.E.",
+  "unit": "Unit Contoh", "satker": "Satker Contoh", "tanggal_pengajuan": "2026-10-21 01:00:00", "status": 0,
+  "ringkasan": "Tugas Belajar S.1 - Universitas Contoh (Manajemen), 01-01-2027 s/d 31-12-2028",
+  "label_status": "Menunggu PIC", "nada_status": "warning",
+  "tahap": [
+    {"kode": "diajukan", "label": "Diajukan", "state": "done", "nama_petugas": null, "waktu": "2026-10-21 01:00:00"},
+    {"kode": "pic", "label": "Verifikasi PIC", "state": "current", "nama_petugas": null, "waktu": null},
+    {"kode": "selesai", "label": "Selesai", "state": "todo", "nama_petugas": null, "waktu": null}
+  ],
+  "petugas": [{"peran": "PIC", "nip": "198001012005011001", "nama": "Contoh PIC"}], "catatan": null,
+  "url_detail": "/layanan/tb/12", "aksi": {"lihat_detail": true}
+}
+```
+
+- `tahap`, `label_status`, `nada_status` dari penyaji modul yang sama dengan halaman modul (`CutiPenyaji`, `TampilanStudi`,
+  `TampilanPmk`); tahap cuti diberi `waktu` (Diajukan = `created_at`, Selesai = `updated_at` bila final).
+- `petugas`: cuti = Atasan Langsung & Pejabat Berwenang dari snapshot (`nama_atasan_langsung`, `nama_yang_menyetujui`;
+  langkah tunggal hanya satu); TB/IB/PMK = semua PIC aktif jenis 3/4/5. Tanpa PIC aktif → `[]` + `catatan` "PIC belum ditunjuk".
+- `url_detail` = rute halaman FE (`/layanan/cuti/{id}`, `/layanan/tb/{id}`, `/layanan/ib/{id}`, `/layanan/pmk/pengajuan/{id}`);
+  `null` dan `aksi.lihat_detail = false` bila pemanggil tidak punya route detail modul itu (role 4/5) atau, untuk role 3,
+  pegawainya di luar jalur detail PegawaiScope. Tidak ada aksi tulis.
+
+Item `layanan/petugas`: `{id_petugas_layanan, id_jenis_layanan, jenis_layanan, nip, nama, jabatan, satker, unit, status,
+label_status, created_at, updated_at, aksi {ubah, aktifkan, nonaktifkan, hapus}}` (aksi hanya `true` untuk role 1).
+
+Validasi tulis (422 per field): `id_jenis_layanan` wajib, ada dan **aktif** (perbaikan opsi nonaktif legacy; dicek saat
+tambah atau saat diubah); `nip` kandidat = pegawai `status = 1`, PNS (`id_jenis_pegawai = 1`), `pmj.id_satker` = satker
+kepegawaian (`WebConfigService::value('id_satker_kepegawaian')`; kosong → `errors.nip` "Satker kepegawaian belum diatur di
+Web Config; PIC belum dapat ditunjuk.") [K `L_layanan.php:38-46`], dicek saat tambah atau saat NIP diubah (PIC lama yang
+tidak lagi memenuhi syarat tetap bisa dinonaktifkan); `status` 0/1; duplikat `(id_jenis_layanan, nip)` → `errors.nip`
+"Petugas sudah terdaftar untuk layanan ini." [K `L_layanan.php:192-242`].
