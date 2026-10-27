@@ -6,8 +6,10 @@ README modul). Aturan Slip Gaji (sumber legacy, hak akses): `backend/app/Librari
 
 **Status:** paket **5A berjalan** (paralel dengan Fase 4, P-1). 5B/5C belum dimulai. 5A DONE ≠ Fase 5 DONE (PRD 5A §11.2).
 
-**Terakhir diperbarui:** 20 Oktober 2026 — DBV-023 **disetujui DB Validator 20-10-2026 (jjoseph48)** (PR #28); PR belum
-di-merge; ISSUE-049 (Q5A-02) ditutup keputusan user 20-10-2026, sisa syarat M2 = DBV-022 di `main`. Sebelumnya M1 DBV-023 (branch `fase5a/dbv-023-skema-presensi-gaji`,
+**Terakhir diperbarui:** 27 Oktober 2026 — **M2 DBV-023** dikerjakan di branch PR #28 setelah DBV-022 masuk `main`
+`598a5f3`: migration aktif `2026-10-27-100000/100100`, registry NIP Fase 5, test skema (bagian "5A M2"); menunggu CI +
+merge reviewer CR. Sebelumnya: DBV-023 **disetujui DB Validator 20-10-2026 (jjoseph48)** (PR #28); ISSUE-049 (Q5A-02)
+ditutup keputusan user 20-10-2026. Sebelumnya M1 DBV-023 (branch `fase5a/dbv-023-skema-presensi-gaji`,
 dari `main` `6806c38`): dokumen DBV-023 + kueri audit + draf migration (ditahan). M0 (laporan
 pemahaman, tanpa commit) diterima reviewer CR 20-10-2026. Sebelumnya: CR-039/CR-037/CR-027 (2 Oktober 2026, persiapan
 tanpa skema, bagian bawah).
@@ -16,7 +18,7 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 
 | Task | Paket | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|---|
-| D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** | M1: dokumen + kueri audit + draf migration di `MigrationsDitahan/` (Bagian "5A M1" di bawah). M2 ⛔: ~~DBV approve~~ ✅ 20-10-2026 + DBV-022 di `main` + ~~hasil kartu DBA Q5A-02~~ ✅ ISSUE-049 ditutup 20-10-2026 |
+| D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** | M1: dokumen + kueri audit + draf migration di `MigrationsDitahan/` (Bagian "5A M1" di bawah). M2 (27-10-2026): migration aktif + registry NIP Fase 5 + test skema (bagian "5A M2"); syarat DBV approve ✅ 20-10, DBV-022 di `main` ✅ `598a5f3`, ISSUE-049 ✅; menunggu CI + merge |
 | D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | TODO | Logika murni `Libraries/Presensi/Geo` boleh disiapkan sebelum M2 (§3.5) |
 | D-03 Presensi manual | 5A | M5 | MAKE-032 | TODO | Menunggu M2 |
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Logika murni CR-037/CR-039 selesai; adapter `TukinData` 5A (non-skema boleh mulai, merge setelah M2); precedence/laporan di 5B |
@@ -50,12 +52,25 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
   v2 dari unggah Excel, uang makan dari presensi; `gaji_pegawai_qr_history` menjaga QR lama tetap valid (perbaikan bug
   legacy reset admin); B2 (STOP) tidak berlaku; DBV-Q5/A2: baris tanpa jam dibersihkan saat impor, CHECK
   `chk_dh_online_jam` tetap. Pengecekan ulang produksi → kartu DEPLOY-002.1. Dokumen DBV-023 Bagian 7.2/9/12/13.
-- **Belum / blocker:** DBV-022 belum di `main` (baru branch
-  `fase4/dbv-022-skema-layanan`) — satu-satunya syarat M2 yang tersisa. Registry NIP (`NipCascadeService::FASE` → 5) dan
-  test skema dikerjakan di M2.
+- **Blocker M1 terbuka:** DBV-022 masuk `main` `598a5f3` (PR #29, 27-10-2026) — semua syarat M2 terpenuhi.
 - **Tanggal persetujuan DB Validator:** 20-10-2026 (jjoseph48, PR #28; AC-D01.6).
 - **Tindak lanjut kode (C-4):** di M5 kode presensi online/manual wajib selalu mengisi `dh_online.sumber` (1 online,
   2 manual) + test; NULL hanya baris impor legacy.
+
+## 5A M2 — DBV-023 migration aktif, registry NIP, test skema (D-01)
+
+- **Sudah (27-10-2026, branch `fase5a/dbv-023-skema-presensi-gaji`):** `origin/main` `598a5f3` digabung lewat merge
+  (tanpa rebase/force push). Draf dipindah ke `app/Database/Migrations/2026-10-27-100000_CreatePresensiGaji.php` dan
+  `2026-10-27-100100_AlterAuditLogsEventPresensi.php` (DDL tidak berubah; > migration Modul C `2026-10-26-1008xx`).
+  `NipCascadeService::FASE` = 5; `gaji_pegawai.nip` di `TIDAK_DIARAHKAN` (slip lama tetap ber-NIP lama [K]);
+  `NipReferenceRegistryTest` + `TabelAnakNipTest` + `NipCascadeTest` diperbarui. Test skema baru
+  `tests/database/Presensi/*` + `tests/_support/Presensi/SkemaPresensiGaji.php`. Test lama disesuaikan:
+  `LokasiPresensiSchemaTest` (FK `dh_online` → `lokasi_presensi`) dan `AuthCollationMigrationTest` (ENUM `event`).
+- **Verifikasi MySQL 8.0.30 (3307):** `main` 120 tabel / 235 FK / 84 CHECK → + DBV-023 123 / 239 / 89; rollback kembali
+  120 / 235 / 84 dan ENUM 5 nilai; migrate ulang checksum identik (dokumen DBV-023 Bagian 15).
+- **Berikutnya:** CI hijau + `./check.sh` penuh → lapor reviewer CR → merge oleh reviewer (izin Horii). Setelah M2 di
+  `main`: sambungkan kode non-skema MAKE-030..033 sesuai urutan PRD 5A (M3 impor → M4 akses/verifikasi → M5 presensi →
+  M6 adapter Tukin).
 
 ### Q cutover 5A
 

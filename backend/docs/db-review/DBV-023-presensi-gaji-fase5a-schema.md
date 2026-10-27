@@ -6,8 +6,9 @@ gaji_pegawai_qr_history, ENUM audit`. Branch `fase5a/dbv-023-skema-presensi-gaji
 
 **Status:** ✅ **disetujui DB Validator 20-10-2026 (jjoseph48)** — komentar PR #28 atas HEAD `f323ca8`, diverifikasi di
 MariaDB 10.4.27. Keputusan DBV-Q1..Q18 di Bagian 9 dan catatan C-1..C-4 di Bagian 14, dicatat sesuai komentar tersebut.
-PR **belum di-merge**: syarat M2 #3 (Q5A-02) ditutup keputusan user 20-10-2026 (ISSUE-049, Bagian 7.2); tinggal syarat
-#2 (DBV-022 di `main`, Bagian 12). Pra-review internal sisi CR sebelumnya: laporan M0 PRD 5A diterima reviewer CR
+Syarat M2 #2 (DBV-022 di `main` `598a5f3`, 27-10-2026) dan #3 (Q5A-02, ISSUE-049) terpenuhi; **M2 dikerjakan 27-10-2026**
+(Bagian 15): migration dipindah ke `app/Database/Migrations/` (DDL tidak berubah), registry NIP Fase 5, test skema. PR
+di-merge reviewer CR setelah CI hijau (Bagian 12). Pra-review internal sisi CR sebelumnya: laporan M0 PRD 5A diterima reviewer CR
 20-10-2026.
 
 **Penulis:** developer Fase 5A (sesi WS-2), 20-10-2026.
@@ -30,8 +31,8 @@ keputusan); **[I]** inferensi bila sumber tidak cukup.
 
 | File | Isi |
 |---|---|
-| `app/Database/MigrationsDitahan/CreatePresensiGaji.php` | **Draf** migration butir 1–3 (`dh_online`, `gaji_pegawai`, `gaji_pegawai_qr_history`); `down()` = DROP anak dulu. **Ditahan** (tidak dijalankan `spark migrate`) sampai Bagian 12 |
-| `app/Database/MigrationsDitahan/AlterAuditLogsEventPresensi.php` | **Draf** migration butir 4: ENUM `audit_logs.event` + `warning`, `import`; `down()` fail-closed. Ditahan |
+| `app/Database/Migrations/2026-10-27-100000_CreatePresensiGaji.php` | Migration butir 1–3 (`dh_online`, `gaji_pegawai`, `gaji_pegawai_qr_history`); `down()` = DROP anak dulu. M1: draf di `MigrationsDitahan/`; dipindah di M2 (Bagian 15) |
+| `app/Database/Migrations/2026-10-27-100100_AlterAuditLogsEventPresensi.php` | Migration butir 4: ENUM `audit_logs.event` + `warning`, `import`; `down()` fail-closed. M1: draf; dipindah di M2 |
 | `docs/db-review/sql/DBV-023-audit-presensi-gaji.sql` | Kueri audit baca-saja data legacy (Bagian 8) |
 
 Draf ditaruh di `MigrationsDitahan/` agar dapat dibaca dan dijalankan DB Validator, tetapi tidak ikut `migrate` di CI
@@ -322,6 +323,10 @@ Perubahan kode registry **di M2** (bukan M1), setelah DBV-022 ada di `main`, di 
 5A. Pemeriksaan M0: entri fase 5 di registry hanya dua kolom di atas, jadi `sampaiFase(5)` tidak memunculkan tabel lain
 yang belum ada di v2. Versi migration untuk `NipReferenceRegistryTest::REGISTRY` = timestamp migration M2.
 
+**Pelaksanaan M2 (27-10-2026):** Fase 4 (DBV-022) sudah menaikkan `FASE` ke 4 dan mengganti literal di `NipCascadeTest`,
+jadi M2 cukup `FASE` 4 → 5. "Tidak dikoreksi" untuk `gaji_pegawai.nip` ditegakkan lewat `NipCascadeService::TIDAK_DIARAHKAN`
+(tanpa itu, kolom non-FK registry ikut di-UPDATE). Rincian di Bagian 15.
+
 ---
 
 ## 7. Impor (J1.07; bahan runbook impor DBV-011)
@@ -477,10 +482,11 @@ index, FK + aksi, kolasi, COMMENT, CHECK; 28 kolom = `KolomGaji`; ketiadaan 15 k
 ## 12. Syarat merge (⛔, PRD 5A §7.1.4)
 
 1. ✅ DB Validator menyetujui DBV-023 (Bagian 9 diisi) — 20-10-2026 (jjoseph48), dicatat di `backend/docs/progress/05-Presensi.md`.
-2. ⛔ DBV-022 (Fase 4) ada di `main`; migration DBV-023 di-rebase dengan timestamp lebih baru.
+2. ✅ DBV-022 (Fase 4) ada di `main` (`598a5f3`, PR #29, 27-10-2026); `main` digabung ke branch PR #28 lewat merge (bukan
+   rebase, arahan reviewer CR), migration DBV-023 bertimestamp `2026-10-27-100000/100100` > `2026-10-26-100800`.
 3. ✅ Q5A-02 ditutup keputusan user 20-10-2026 (ISSUE-049), dicantumkan di Bagian 7.2; pengecekan ulang produksi di DEPLOY-002.1.
-4. Draf dipindah ke `app/Database/Migrations/`, registry NIP (Bagian 6) dan test skema (Bagian 11) ditambahkan, CI
-   hijau di MySQL 8.0 dan MariaDB 10.4, lalu reviewer CR me-merge.
+4. ✅ Draf dipindah ke `app/Database/Migrations/`, registry NIP (Bagian 6) dan test skema (Bagian 11) ditambahkan (Bagian
+   15); CI hijau di MySQL 8.0 dan MariaDB 10.4 dilaporkan ke reviewer CR, lalu reviewer CR me-merge (izin Horii).
 
 Sebelum itu **dilarang** me-merge migration, model, service, controller, atau test yang bergantung pada tabel ini, dan
 dilarang menjalankan migration di DB dev/produksi.
@@ -514,3 +520,52 @@ tidak diverifikasi DB Validator (dump di luar repo, Bagian 10.4).
 
 **DBV-Q5** dan **B2** ditutup keputusan user 20-10-2026 (ISSUE-049, Bagian 7.2): baris tanpa jam dibersihkan saat impor
 (CHECK tetap), B2 tidak berlaku; pengecekan ulang produksi di DEPLOY-002.1.
+
+---
+
+## 15. Pelaksanaan M2 (27-10-2026)
+
+**Basis.** `origin/main` `598a5f3` (DBV-022 M2) digabung ke branch PR #28 dengan `git merge` (tanpa rebase/force push,
+arahan reviewer CR); tanpa konflik.
+
+**Migration.** Kedua draf dipindah dari `app/Database/MigrationsDitahan/` ke `app/Database/Migrations/` dengan DDL/isi
+tidak berubah; yang berubah hanya docblock status. Nama kelas tetap; timestamp baru:
+
+| Draf M1 | Migration M2 |
+|---|---|
+| `MigrationsDitahan/CreatePresensiGaji.php` | `Migrations/2026-10-27-100000_CreatePresensiGaji.php` |
+| `MigrationsDitahan/AlterAuditLogsEventPresensi.php` | `Migrations/2026-10-27-100100_AlterAuditLogsEventPresensi.php` |
+
+Keduanya lebih baru dari 9 migration Modul C `2026-10-26-100000..100800` (DBV-022). DBV-022 tidak mengubah ENUM
+`audit_logs.event`, jadi `AlterAuditLogsEventPresensi::NILAI_LAMA` tetap 5 nilai.
+
+**Registry NIP (Bagian 6, AC-D01.7).**
+- `NipCascadeService::FASE` 4 → **5**. `NipCascadeTest` sudah memakai `sampaiFase(NipCascadeService::FASE)` sejak DBV-022.
+- `sampaiFase(5)` = `sampaiFase(4)` + `dh_online.nip` + `gaji_pegawai.nip` (65 entri; `TabelAnakNipTest`).
+- `dh_online.nip` (FK RESTRICT) diarahkan ulang cascade. `gaji_pegawai.nip` (`NonFkSlipGaji` [K]) masuk
+  `NipCascadeService::TIDAK_DIARAHKAN`: slip lama tetap ber-NIP lama dan tidak tercatat di hasil koreksi (PRD 5A §3.4;
+  test `testPresensiPindahSlipGajiTetapNipLama`).
+- `NipReferenceRegistryTest`: `REGISTRY['2026-10-27-100000']` = `fk_nip_dh_to_pegawai`; `gaji_pegawai.nip` di `NON_FK`.
+
+**Test skema (Bagian 11).** `tests/_support/Presensi/SkemaPresensiGaji.php` (daftar tabel/FK/CHECK bersama, autoload untuk
+CI ter-shard), `tests/database/Presensi/SkemaPresensiGajiTest.php`, `tests/database/Presensi/MigrasiPresensiGajiSiklusTest.php`
+(`db-isolasi-penuh`). Test lama yang ikut disesuaikan karena FK/ENUM baru:
+- `tests/MasterData/LokasiPresensiSchemaTest.php` — `dh_online.id_lokasi_*` merujuk `lokasi_presensi` (FK RESTRICT), jadi
+  migration `CreatePresensiGaji` dilepas sebelum `down()` G-03 dan dipasang lagi sesudahnya (urutan regress).
+- `tests/Auth/AuthCollationMigrationTest.php` — `AlterAuthKeUnicodeCi` menulis ENUM `event` 5 nilai eksplisit, jadi
+  `AlterAuditLogsEventPresensi` di-rollback di `setUp()` dan dipasang lagi di `tearDown()`.
+
+**Verifikasi developer (MySQL 8.0.30, 3307, DB scratch `simpeg_v2_t_ws2_dbv023`; DB test terpisah
+`simpeg_v2_t_ws2_make030`, prefix `t_`).** Batch 1 = `main` tanpa DBV-023, batch 2 = DBV-023:
+
+| Tahap | Tabel | FK | CHECK | ENUM `event` |
+|---|---|---|---|---|
+| `main` (batch 1) | 120 | 235 | 84 | 5 nilai |
+| + DBV-023 (batch 2) | **123** | **239** | **89** | 7 nilai |
+| `migrate:rollback` | 120 | 235 | 84 | 5 nilai |
+| `migrate` ulang | 123 | 239 | 89 | 7 nilai |
+
+Checksum `information_schema` (COLUMNS, REFERENTIAL_CONSTRAINTS, STATISTICS, CHECK_CONSTRAINTS) identik antara batch 2
+pertama dan `migrate` ulang. Pertambahan +3 tabel / +4 FK / +5 CHECK sama dengan M1 dan verifikasi DB Validator
+(MariaDB: angka absolut CHECK +3, catatan C-1).
+

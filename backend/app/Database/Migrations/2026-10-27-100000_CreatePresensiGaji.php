@@ -10,11 +10,10 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DRAF DBV-023 (Fase 5A D-01) — DITAHAN. File ini sengaja di luar app/Database/Migrations sehingga TIDAK dijalankan
- * `php spark migrate` (pola DBV-019/DBV-020). Dipindah ke app/Database/Migrations dengan nama
- * `<timestamp>_CreatePresensiGaji.php` di milestone M2 PRD 5A, setelah (1) DB Validator menyetujui DBV-023 dan (2) DBV-022
- * (Fase 4) ada di `main`; timestamp WAJIB lebih baru dari semua migration DBV-022 (PRD 5A §3.5). Isi final mengikuti
- * keputusan DB Validator di dokumen backend/docs/db-review/DBV-023-presensi-gaji-fase5a-schema.md (Bagian 9).
+ * DBV-023 (Fase 5A D-01, 1/2) — disetujui DB Validator 20-10-2026 (PR #28, diverifikasi MariaDB 10.4.27); dipindah dari
+ * app/Database/MigrationsDitahan ke app/Database/Migrations di M2 dengan DDL tidak berubah. Timestamp `2026-10-27-100000`
+ * lebih baru dari semua migration DBV-022 (`2026-10-26-100000..100800`, PRD 5A §3.5). Dokumen:
+ * backend/docs/db-review/DBV-023-presensi-gaji-fase5a-schema.md (keputusan Bagian 9, catatan Bagian 14).
  *
  * Tabel:
  *   - `dh_online` — D1:390-401 [K] (PK `(nip, tgl)`, FK `fk_nip_dh_to_pegawai` RESTRICT/RESTRICT [V2], D1 CASCADE)

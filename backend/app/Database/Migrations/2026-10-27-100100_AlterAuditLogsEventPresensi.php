@@ -8,10 +8,9 @@ use CodeIgniter\Database\Migration;
 use RuntimeException;
 
 /**
- * DRAF DBV-023 (Fase 5A, F5-4) — DITAHAN, pola sama dengan `CreatePresensiGaji` di folder ini: dipindah ke
- * app/Database/Migrations dengan nama `<timestamp>_AlterAuditLogsEventPresensi.php` di M2 setelah DBV-023 disetujui dan
- * DBV-022 ada di `main`. Bila DBV-022 juga mengubah ENUM `audit_logs.event`, daftar NILAI_LAMA diganti nilai ENUM terkini
- * di `main` saat itu (gabungan) dan timestamp file ini lebih baru dari migration DBV-022.
+ * DBV-023 (Fase 5A F5-4, 2/2) — disetujui DB Validator 20-10-2026 (PR #28); dipindah dari app/Database/MigrationsDitahan
+ * ke app/Database/Migrations di M2 dengan isi tidak berubah. DBV-022 tidak mengubah ENUM `audit_logs.event`, jadi
+ * NILAI_LAMA tetap nilai `2026-09-17-000004_AlterAuditLogsEventAddAuth`.
  *
  * Menambah dua nilai `audit_logs.event` [V2]:
  *   - `warning` — catatan non-mutasi: ketidakcocokan nama–NIP saat pratinjau impor Slip Gaji (D-10, F5-4), sekali per
