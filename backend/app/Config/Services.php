@@ -506,7 +506,7 @@ class Services extends BaseService
     }
 
     /**
-     * Penerbit surat cuti belum-TTE saat efek final (MAKE-022 M3). Bawaan no-op; M4 (MAKE-023) menggantinya.
+     * Penerbit surat cuti belum-TTE saat efek final (PRD Fase 4 §6.5.2): SuratCutiService (MAKE-023; di M3 berupa no-op).
      */
     public static function penerbitSuratCuti(bool $getShared = true): \App\Interfaces\Layanan\PenerbitSuratCutiInterface
     {
@@ -514,7 +514,25 @@ class Services extends BaseService
             return static::getSharedInstance('penerbitSuratCuti');
         }
 
-        return new \App\Libraries\Layanan\Cuti\PenerbitSuratCutiNoOp();
+        return new \App\Libraries\Layanan\Cuti\SuratCutiService();
+    }
+
+    /**
+     * Penerbitan surat cuti ber-TTE (PRD Fase 4 §6.5, MAKE-023): adapter dari `esignGateway` (driver mock di Fase 4).
+     */
+    public static function esignCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\EsignCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('esignCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\EsignCutiService(
+            db_connect(),
+            static::cutiService(),
+            new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
+            static::esignGateway(),
+            static::pegawaiScope(),
+        );
     }
 
     /**
