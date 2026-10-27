@@ -623,6 +623,21 @@ migration-nya di `MigrationsDitahan/`):
 - (c) aktivasi lewat **unit DBV terpisah**: migration dipindah ke `app/Database/Migrations/` dengan timestamp baru setelah
   migration terakhir di lingkungan target, dan registry test FK disesuaikan.
 
+### 2.11 Fase 4 — normalisasi `pegawai_sisa_cuti` dan audit Modul C (DBV-022, 27-10-2026)
+
+Rujukan: DBV-022 Bagian 13 (hasil audit B2) dan skrip `sql/DBV-022-audit-layanan.sql`. Migration Modul C (`main` `598a5f3`)
+memasang UNIQUE `pegawai_sisa_cuti (nip, tahun)` dan CHECK saldo ≥ 0 secara langsung, jadi data legacy wajib dinormalisasi
+di salinan kerja/transformasi (2.4 langkah 4–5) **sebelum** dimuat:
+
+1. **Duplikat `(nip, tahun)`** (audit 27-10: 3 pasangan, tahun 2019–2020): simpan `id_pegawai_sisa_cuti` terkecil, buang
+   sisanya; catat id yang dibuang di log 2.8.
+2. **Kolom saldo negatif** (audit 27-10: 9 baris, tahun 2024–2025, `utang_cuti` s.d. −128 dan `sisa_cuti_ditangguhkan` −1):
+   naikkan ke 0; catat nilai sebelum di log 2.8.
+3. Nilai di atas batas D8 diimpor apa adanya (PRD Fase 4 v1.3 §6.3.3).
+4. **NIP approver/tiket yatim** (audit 27-10: 2 + 2 + 5): diimpor apa adanya; `AddFkNipLayananFase4` tetap di
+   `MigrationsDitahan/` sampai audit di lingkungan target = 0 (pola 2.10 butir (c)).
+5. Ulangi skrip audit DBV-022 (dengan `COLLATE` eksplisit, DBV-022 12.6) di DB v2 hasil impor; Bagian 3 harus 0.
+
 ## 3. Bagian B — Zona waktu & `sql_mode` sesi (ISSUE-022, D-11) — USULAN; keputusan final TL/DBA; DITAHAN menunggu ISSUE-024
 
 **Status (01-10-2026): DITAHAN.** Bagian ini menunggu jawaban kartu ISSUE-024 di board tim, yaitu versi engine, `sql_mode`, `time_zone`, dan `table_rows` server DB produksi. Putaran 5 **tidak** memutuskan Bagian B: opsi 3.5 belum dipilih, dan offset R1a belum dipastikan.
