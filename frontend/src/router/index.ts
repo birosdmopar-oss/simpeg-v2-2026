@@ -16,6 +16,7 @@ import { riwayatRoutes } from '@/features/kepegawaian/routes.riwayat'
 import { laporanRoutes } from '@/features/laporan/routes.laporan'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
+import { presensiRoutes } from '@/features/presensi/routes.presensi'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -108,6 +109,8 @@ const routes: RouteRecordRaw[] = [
   ...laporanRoutes,
   // Modul F — Fase 7 F-09 generator dokumen (MAKE-037).
   ...dokumenRoutes,
+  // Modul D — Fase 5A Presensi & Slip Gaji (MAKE-034), termasuk rute publik `/verify/slip/:token`.
+  ...presensiRoutes,
   {
     path: '/403',
     name: 'forbidden',
