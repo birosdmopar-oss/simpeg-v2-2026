@@ -130,8 +130,9 @@ Service ber-DB membungkus kelas murni di atas; DILARANG ada aturan tumpang tindi
 | `Ib/SuratIbService` | render `Views/pdf/surat_ib.php` + simpan kode 50 di transaksi approval (berkas buatan server lewat jalur validasi unggahan yang sama, `UploadedFile` atas berkas sementara), unduh surat terbaru |
 
 Kelas murni baru M5: `Studi/BerkasStudi` (slot berkas & kode `jenis_rwy` 46–50, `slotKosong()`), `Studi/TampilanStudi`
-(badge/stepper §6.11.4). Penjaga kemurnian (`LayananStudiPmkMurniTest`) mengecualikan berkas lapisan DB di `Tb/`/`Pmk/`
-berdasarkan nama (`*Service.php`, `StatusTugasBelajar.php`, `*Trait.php`) — file boundary PRD menaruhnya di folder itu.
+(badge/stepper §6.11.4). Penjaga kemurnian (`LayananStudiPmkMurniTest`) memakai daftar eksplisit: setiap berkas di `Studi/`, `Tb/`, `Pmk/`,
+`Interfaces/Layanan/` wajib terdaftar sebagai murni (dipindai) atau lapisan DB (dikecualikan; hanya di `Tb/`/`Pmk/`, file
+boundary PRD) — berkas baru tanpa pendaftaran membuat test gagal.
 
 Catatan keputusan coder M5 (dicatat untuk reviewer):
 
@@ -140,8 +141,9 @@ Catatan keputusan coder M5 (dicatat untuk reviewer):
    terisi; berkas pengganti menghapus lampiran lama slot itu (fisik + audit) di transaksi yang sama. Kolom `file_*` tidak
    diisi v2 (DQ-20). Kode satu-slot 47/48/50 tanpa `tag`. `riwayat_tb_perpan.file_sperpan` NOT NULL [K] diisi `basename`
    lampiran kode 48.
-2. **[V2] Rentang efek `id_jenis_status` per tanggal inklusif.** Legacy membandingkan `tgl_akhir` dengan jam sekarang sehingga
-   hari terakhir TB tidak ikut.
+2. **[V2] Rentang efek `id_jenis_status` per tanggal inklusif** (disetujui Horii 27-10). Legacy `L_tb.php:1169-1179` /
+   `:746-757` membandingkan dengan jam sekarang sehingga hari terakhir TB tidak ikut. Gap "TB disetujui sebelum mulai / TB
+   berakhir → status tidak berubah otomatis" sama dengan legacy, tidak dikerjakan M5.
 3. **`dalam_negeri` tidak divalidasi [K]**; kolom NOT NULL → 1 (Dalam Negeri) bila kosong/di luar 1|2 (bukan 422).
 4. **Ubah oleh role 1 pada TB disetujui** menyimpan perubahan data tetapi status tetap 1 (`status` lain → 422
    `errors.status`): status final tidak punya transisi keluar (single end node). Status 0 → 1 lewat ubah role 1 memberi efek

@@ -15,8 +15,11 @@ use App\Libraries\Layanan\Studi\RentangTanggal;
  *   Tanpa cron: TB yang mulai di masa depan tidak mengubah status [K]; konsumen Fase 5 memakai `bebasPresensiPenuh`.
  * - Hapus TB status 1: `id_jenis_status` kembali 1 bila hari ini dalam rentang, pegawai aktif, dan masih 2
  *   [K `L_tb.php:746-760`]; semua perpanjangan + berkasnya dihapus eksplisit dulu (FK RESTRICT, perbaikan TB-14).
- * - [V2] Rentang dibandingkan per tanggal inklusif (legacy membandingkan dengan jam sekarang sehingga hari terakhir TB
- *   tidak ikut).
+ * - [V2] Rentang dibandingkan per TANGGAL inklusif (disetujui Horii 27-10-2026). Legacy `L_tb.php:1169-1179` (process → 2)
+ *   dan `L_tb.php:746-757` (delete → 1) membandingkan `tgl_mulai`/`tgl_akhir` dengan `new DateTime()` (jam sekarang),
+ *   sehingga hari terakhir TB tidak ikut. v2 konsisten dengan `bebasPresensiPenuh` (inklusif). Register deviasi + gap di
+ *   Trello (kartu reviewer CR); gap "TB disetujui sebelum `tgl_mulai` / TB berakhir → status tidak berubah otomatis" sama
+ *   dengan legacy dan tidak dikerjakan di M5.
  */
 trait EfekTbTrait
 {

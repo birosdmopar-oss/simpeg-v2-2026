@@ -205,6 +205,14 @@ IbApprovalTest, IbRoleTest, IbSingleEndNodeTest}` (20 test).
 `RiwayatPmkModel`, `RiwayatPmkReqModel`. Test `tests/Layanan/Pmk/{PmkPengajuanTest, PmkApprovalTest, PmkRoleTest,
 PmkSingleEndNodeTest, RiwayatPmkTest}` (32 test).
 
+**Review TB (reviewer CR 27-10):** tahap TB diterima. Deviasi #3 (efek `id_jenis_status` per tanggal inklusif, legacy
+`L_tb.php:1169-1179` dan `:746-757` membandingkan dengan jam sekarang) **disetujui Horii** [V2]; #2, #4–#7 diterima [V2]
+(masuk PRD v1.4); #1 pemindai kemurnian diganti daftar eksplisit berkas murni/lapisan DB (sama dengan keputusan M3).
+
+**Catatan gap (tidak dikerjakan M5, menunggu keputusan Horii):** TB yang disetujui sebelum `tgl_mulai`, atau TB yang sudah
+berakhir, tidak mengubah `pegawai.id_jenis_status` secara otomatis (tanpa cron) — sama dengan legacy. Konsumen Fase 5
+memakai `bebasPresensiPenuh`, bukan `id_jenis_status`.
+
 **Pertanyaan terbuka.** PRD §5.4 tidak memuat endpoint unduh berkas pengajuan PMK (kolom `file_*`); belum dibuat.
 
 **Belum jalan.** Penyambungan notifikasi (M4), gate penuh.
