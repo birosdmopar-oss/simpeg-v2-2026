@@ -10,6 +10,8 @@ use App\Exceptions\ValidationException;
 use App\Interfaces\CaptchaVerifierInterface;
 use App\Models\AuditLogModel;
 use App\Models\Auth\PenggunaModel;
+use CodeIgniter\Events\Events;
+use Throwable;
 
 /**
  * Orkestrasi login / logout / refresh (A-02, A-03, A-04, A-05, A-10).
@@ -22,6 +24,9 @@ class AuthService
 {
     public const EVENT_LOGIN  = 'login';
     public const EVENT_LOGOUT = 'logout';
+
+    /** Nama event aplikasi (`Events::trigger`) setelah login sukses; bukan nilai kolom audit. */
+    public const EVENT_LOGIN_SUKSES = 'auth.login';
 
     public function __construct(
         private PenggunaModel $pengguna,
@@ -94,6 +99,14 @@ class AuthService
             'password_path' => $result['path'],
             'rehashed'      => $result['rehashed'],
         ], (int) $user['id_pengguna'], self::nipOf($user));
+
+        // Aditif (PRD Fase 4 §6.4.7): pemberitahuan login sukses bagi listener modul lain. Kegagalan listener tidak
+        // pernah menggagalkan login; respons, claim, dan audit di atas tidak bergantung padanya.
+        try {
+            Events::trigger(self::EVENT_LOGIN_SUKSES, ['id_pengguna' => (int) $user['id_pengguna'], 'nip' => self::nipOf($user)]);
+        } catch (Throwable $e) {
+            log_message('error', 'Listener auth.login gagal: {class}', ['class' => $e::class]);
+        }
 
         $fresh = $this->pengguna->find((int) $user['id_pengguna']) ?? $user;
 

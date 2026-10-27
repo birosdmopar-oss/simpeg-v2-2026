@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Config;
 
+use App\Libraries\Auth\AuthService;
 use App\Libraries\Dashboard\Statistik\StatistikCache;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
+use App\Libraries\Layanan\Cuti\Servis\ResetTundaCuti;
 use CodeIgniter\Events\Events;
 use CodeIgniter\Exceptions\FrameworkException;
 use CodeIgniter\HotReloader\HotReloader;
@@ -29,6 +31,9 @@ use CodeIgniter\HotReloader\HotReloader;
 
 // Fase 7 F-03 (MAKE-036, PRD F7-12a): setiap transisi riwayat/snapshot menghapus cache statistik `dashboard_stat_*`.
 Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [StatistikCache::class, 'invalidasiDariEvent']);
+
+// Fase 4 C-04 (MAKE-022, PRD §6.4.7): login sukses mereset penanda tunda pengingat persetujuan cuti milik NIP itu.
+Events::on(AuthService::EVENT_LOGIN_SUKSES, [ResetTundaCuti::class, 'tangani']);
 
 Events::on('pre_system', static function (): void {
     if (ENVIRONMENT !== 'testing') {
