@@ -41,6 +41,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesLayanan.php',
         // Modul C — Layanan (Fase 4, MAKE-024 M5): Tugas Belajar, Izin Belajar, PMK (cuti di RoutesLayanan.php, M3).
         APPPATH . 'Config/RoutesLayananStudi.php',
+        // Modul D — Presensi & Remunerasi (Fase 5A, MAKE-030): slip gaji, verifikasi publik, presensi (PRD 5A §6).
+        APPPATH . 'Config/RoutesPresensi.php',
     ];
 
     /**

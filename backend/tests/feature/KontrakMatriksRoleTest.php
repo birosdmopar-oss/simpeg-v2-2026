@@ -55,7 +55,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti|tb|ib|pmk)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti|tb|ib|pmk|slip-gaji)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -148,6 +148,11 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/cuti/([0-9]+)/tunda'              => [1, 2, 3, 6, 7],
             'GET api/v1/cuti/([0-9]+)/lampiran'            => [1, 2, 3, 6, 7],
             'GET api/v1/cuti/([0-9]+)/surat'               => [1, 2, 3, 6, 7],
+
+            // Modul D — Fase 5A D-10 impor Slip Gaji (MAKE-030): Matriks Bagian 2 `hr/sl_gaji/import_preview`,
+            // `hr/sl_gaji/import_commit` = 1, 3 (SG-2; role 3 dibatasi satker akun di service, tanpa satker → 403).
+            'POST api/v1/slip-gaji/impor/pratinjau'                => [1, 3],
+            'POST api/v1/slip-gaji/impor/pratinjau/([^/]+)/commit' => [1, 3],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,

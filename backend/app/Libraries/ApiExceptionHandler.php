@@ -67,6 +67,10 @@ class ApiExceptionHandler extends BaseExceptionHandler implements ExceptionHandl
         if ($exception instanceof ApiException) {
             $body = ['status' => 'error', 'message' => $exception->getMessage()];
 
+            if ($exception->getKode() !== null) {
+                $body = ['status' => 'error', 'code' => $exception->getKode(), 'message' => $exception->getMessage()];
+            }
+
             if ($exception->getErrors() !== null) {
                 $body['errors'] = $exception->getErrors();
             }
