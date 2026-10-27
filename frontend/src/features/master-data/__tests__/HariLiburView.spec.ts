@@ -109,11 +109,11 @@ describe('HariLiburView', () => {
     expect(wrapper.get('[data-testid="hari-libur-row-5"]').findAll('td')[3]?.text()).toBe('—')
     expect(wrapper.get('[data-testid="hari-libur-row-5"]').text()).toContain('25 Desember 2025')
 
-    await wrapper.get('[data-testid="hari-libur-status"]').setValue('10')
+    await wrapper.get('[data-testid="hari-libur-status"] select').setValue('10')
     await flushPromises()
     expect(hariLiburService.list).toHaveBeenLastCalledWith(query({ status: '10' }))
 
-    await wrapper.get('[data-testid="hari-libur-tahun"]').setValue('')
+    await wrapper.get('[data-testid="hari-libur-tahun"] select').setValue('')
     await flushPromises()
     expect(hariLiburService.list).toHaveBeenLastCalledWith(query({ tahun: '', status: '10' }))
     wrapper.unmount()

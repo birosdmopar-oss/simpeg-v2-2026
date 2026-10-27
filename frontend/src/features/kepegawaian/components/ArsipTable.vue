@@ -19,7 +19,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
-import { UiButton, UiNotice } from '@/shared/ui'
+import { UiButton, UiNotice, UiTooltip } from '@/shared/ui'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { fileExtensionError } from '@/shared/utils/fileExtension'
 
@@ -314,7 +314,9 @@ const colspan = computed(() => (props.tampilTag ? 5 : 4))
           <template v-else>
             <tr v-for="row in rows" :key="row.id_attachment" :data-testid="`arsip-row-${row.id_attachment}`">
               <td v-if="tampilTag" class="px-4 py-2.5 text-slate-800">{{ row.tag || '—' }}</td>
-              <td class="max-w-72 truncate px-4 py-2.5 text-slate-800" :title="nama(row)">{{ nama(row) }}</td>
+              <td class="max-w-72 px-4 py-2.5 text-slate-800">
+                <UiTooltip :content="nama(row)"><span class="block truncate">{{ nama(row) }}</span></UiTooltip>
+              </td>
               <td class="px-4 py-2.5 text-slate-600">{{ ukuran(row.file_size) }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ formatApiDateTime(row.created_at) || '—' }}</td>
               <td class="sticky right-0 bg-white px-4 py-2.5 text-right">

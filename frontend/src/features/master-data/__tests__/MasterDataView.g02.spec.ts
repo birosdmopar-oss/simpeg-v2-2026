@@ -254,7 +254,7 @@ describe('MasterDataView — master G-02 (DBV-008/CR-026)', () => {
     for (const name of ['id_group_jabatan', 'id_sub_group_jabatan', 'id_satker', 'kelas_jabatan']) {
       expect(wrapper.find(`[data-testid="master-filter-${name}"]`).exists()).toBe(true)
     }
-    const kelasFilter = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-kelas_jabatan"]')
+    const kelasFilter = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-kelas_jabatan"] select')
     expect(Array.from(kelasFilter.element.options).map((o) => o.textContent)).toEqual(['Semua Kelas Jabatan', '7', '9'])
 
     await kelasFilter.setValue('9')

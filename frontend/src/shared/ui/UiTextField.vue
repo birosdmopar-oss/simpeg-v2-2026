@@ -8,11 +8,21 @@
  * Reusable. FormField.vue (VeeValidate) membungkus komponen ini untuk tipe text/password/number/date (CR-028), jadi
  * semua form lama ikut tampilan §3.4 tanpa mengubah pemanggilnya.
  *
+ * CR-060 (AGENTS.md bagian 3): `type` "date" | "time" | "month" TIDAK lagi memakai input native bawaan browser,
+ * melainkan UiDatePicker / UiTimePicker / UiMonthPicker (nilai tetap `YYYY-MM-DD` / `HH:mm` / `YYYY-MM`). Pesan format
+ * salah dari picker tampil sebagai help text berstatus error bila pemanggil tidak memberi pesan sendiri.
+ *
  * CR-028: wajib ditandai `aria-required` (bukan atribut `required` native) supaya validasi tetap milik Zod/VeeValidate
  * dan browser tidak memblokir submit lebih dulu; pesan bantu pada state error memakai role="alert" agar diumumkan
  * pembaca layar; wadah input selalu `relative` supaya slot `suffix` (mis. tombol lihat password) bisa diposisikan.
  */
-import { computed, useId, useSlots } from 'vue'
+import { computed, ref, useAttrs, useId, useSlots } from 'vue'
+
+import UiCombobox from './UiCombobox.vue'
+import UiDatePicker from './UiDatePicker.vue'
+import UiMonthPicker from './UiMonthPicker.vue'
+import UiTimePicker from './UiTimePicker.vue'
+import { hasWidthClass } from './widthClass'
 
 const props = withDefaults(
   defineProps<{
@@ -29,8 +39,13 @@ const props = withDefaults(
     autocomplete?: string
     name?: string
     inputmode?: 'text' | 'numeric' | 'decimal' | 'tel' | 'email' | 'search'
-    /** id `<datalist>` saran nilai (aditif MAKE-007); nilai bebas tetap boleh. */
+    /** id `<datalist>` saran nilai (aditif MAKE-007); nilai bebas tetap boleh. DEPRECATED: pakai `suggestions`. */
     list?: string
+    /** Saran nilai teks bebas (UiCombobox custom, bukan <datalist> bawaan browser); `[]` = belum ada saran (CR-060). */
+    suggestions?: string[]
+    /** Batas tanggal `YYYY-MM-DD` (inklusif), hanya untuk type="date". */
+    min?: string
+    max?: string
   }>(),
   {
     modelValue: '',
@@ -47,6 +62,9 @@ const props = withDefaults(
     name: undefined,
     inputmode: undefined,
     list: undefined,
+    suggestions: undefined,
+    min: undefined,
+    max: undefined,
   },
 )
 
@@ -54,14 +72,31 @@ const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus
 
 const id = useId()
 const slots = useSlots()
+/** `w-full` hanya bila pemanggil tidak memberi kelas lebar (CR-060). */
+const attrs = useAttrs()
+const fullWidth = computed(() => !hasWidthClass(attrs.class))
+
+const PICKERS = { date: UiDatePicker, time: UiTimePicker, month: UiMonthPicker } as const
+const isCombobox = computed(() => props.suggestions !== undefined && props.type === 'text')
+const picker = computed(() => (isCombobox.value ? UiCombobox : (PICKERS[props.type as keyof typeof PICKERS] ?? null)))
+/** Props khusus per komponen kontrol (picker tanggal: batas; combobox: saran + atribut input). */
+const pickerProps = computed(() =>
+  isCombobox.value
+    ? { suggestions: props.suggestions, inputmode: props.inputmode, autocomplete: props.autocomplete, placeholder: props.placeholder }
+    : { min: props.min, max: props.max, ...(props.placeholder ? { placeholder: props.placeholder } : {}) },
+)
+/** Pesan format salah dari picker (kosong = sah); hanya dipakai bila pemanggil tidak memberi help text sendiri. */
+const pickerMessage = ref('')
+const help = computed(() => props.helpText || pickerMessage.value)
+const effState = computed(() => (props.state === 'default' && pickerMessage.value && !props.helpText ? 'error' : props.state))
 
 const tone = computed(() => {
   // Field terkunci tetap menampilkan pesan error berwarna merah (mis. dropdown induk belum dipilih saat form dikirim).
   if (props.disabled) {
-    return { border: 'border-slate-200', label: 'text-slate-400', help: props.state === 'error' ? 'text-danger' : 'text-slate-400' }
+    return { border: 'border-slate-200', label: 'text-slate-400', help: effState.value === 'error' ? 'text-danger' : 'text-slate-400' }
   }
-  if (props.state === 'error') return { border: 'border-danger', label: 'text-danger', help: 'text-danger' }
-  if (props.state === 'success') return { border: 'border-success', label: 'text-success', help: 'text-success' }
+  if (effState.value === 'error') return { border: 'border-danger', label: 'text-danger', help: 'text-danger' }
+  if (effState.value === 'success') return { border: 'border-success', label: 'text-success', help: 'text-success' }
   return { border: 'border-slate-300', label: 'text-slate-700', help: 'text-slate-500' }
 })
 
@@ -72,13 +107,13 @@ const controlClass = computed(() => [
   slots.suffix ? 'pr-10' : '',
   'border',
   tone.value.border,
-  props.state === 'default' && !props.disabled ? 'focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25' : '',
+  effState.value === 'default' && !props.disabled ? 'focus:border-brand-tertiary focus:ring-2 focus:ring-brand-tertiary/25' : '',
   props.disabled ? 'cursor-not-allowed bg-slate-100 text-slate-400' : '',
 ])
 </script>
 
 <template>
-  <div class="w-full">
+  <div :class="fullWidth ? 'w-full' : ''">
     <!-- Tampilan stacked: label di atas kotak. -->
     <label v-if="label && appearance === 'stacked'" :for="id" class="mb-1 block text-body2 font-medium" :class="tone.label">
       {{ label }}<span v-if="required" class="text-danger"> *</span>
@@ -95,7 +130,26 @@ const controlClass = computed(() => [
         {{ label }}<span v-if="required" class="text-danger"> *</span>
       </label>
 
+      <component
+        :is="picker"
+        v-if="picker"
+        :id="id"
+        :name="name"
+        :model-value="String(modelValue ?? '')"
+        :disabled="disabled"
+        :readonly="readonly"
+        :invalid="effState === 'error'"
+        :required="required"
+        v-bind="pickerProps"
+        :control-class="controlClass"
+        :describedby="help ? `${id}-help` : undefined"
+        @update:model-value="emit('update:modelValue', $event)"
+        @invalid="pickerMessage = $event"
+        @blur="emit('blur')"
+        @focus="emit('focus')"
+      />
       <input
+        v-else
         :id="id"
         :name="name"
         :type="type"
@@ -118,13 +172,13 @@ const controlClass = computed(() => [
     </div>
 
     <p
-      v-if="helpText"
+      v-if="help"
       :id="`${id}-help`"
       class="mt-1 text-caption"
       :class="tone.help"
-      :role="state === 'error' ? 'alert' : undefined"
+      :role="effState === 'error' ? 'alert' : undefined"
     >
-      {{ helpText }}
+      {{ help }}
     </p>
   </div>
 </template>

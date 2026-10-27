@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Auth;
 
+use App\Libraries\Auth\PasswordExpiry;
 use App\Models\BaseAuditableModel;
 use Closure;
 use CodeIgniter\Database\Exceptions\DatabaseException;
@@ -205,7 +206,8 @@ class PenggunaModel extends BaseAuditableModel
             'created_at'    => $row['created_at'] ?? null,
             'updated_at'    => $row['updated_at'] ?? null,
             // MAKE-020 (DBV-020 bagian 4): akun wajib ganti password sebelum memakai fitur lain.
-            'must_change_password' => self::wajibGantiPassword($row),
+            // MAKE-028: password kedaluwarsa (`expired_at` lewat) juga berarti wajib ganti, sama dengan claim sesi.
+            'must_change_password' => self::wajibGantiPassword($row) || PasswordExpiry::isExpired($row['expired_at'] ?? null, time()),
         ];
     }
 

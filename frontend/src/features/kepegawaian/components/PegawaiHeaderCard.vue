@@ -19,7 +19,7 @@ import {
 import QRCode from 'qrcode'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import { UiAvatar, UiBadge, UiButton } from '@/shared/ui'
+import { UiAvatar, UiBadge, UiButton, UiTooltip } from '@/shared/ui'
 
 import { nadaJenisPegawai } from '../columns'
 import { pegawaiService } from '../services/pegawai.service'
@@ -137,12 +137,9 @@ const menuItem =
           <li class="inline-flex items-center gap-2"><IdCard class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ detail.nip }}</li>
           <li class="inline-flex min-w-0 max-w-full items-center gap-2">
             <UserRound class="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-            <UiBadge
-              v-if="detail.jenis_pegawai"
-              :tone="nadaJenisPegawai(detail.id_jenis_pegawai)"
-              :title="detail.jenis_pegawai"
-              data-testid="pegawai-jenis"
-            >{{ detail.jenis_pegawai }}</UiBadge>
+            <UiTooltip v-if="detail.jenis_pegawai" :content="detail.jenis_pegawai">
+              <UiBadge :tone="nadaJenisPegawai(detail.id_jenis_pegawai)" data-testid="pegawai-jenis">{{ detail.jenis_pegawai }}</UiBadge>
+            </UiTooltip>
             <template v-else>—</template>
           </li>
           <li class="inline-flex items-center gap-2"><Calendar class="h-4 w-4 text-slate-400" aria-hidden="true" />{{ tanggalLahir }}</li>

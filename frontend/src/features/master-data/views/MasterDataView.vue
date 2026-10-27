@@ -17,6 +17,7 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
 import { useStickyActionsShadow } from '@/shared/composables/useStickyActionsShadow'
+import { UiSelect } from '@/shared/ui'
 
 import MasterFormDialog from '../components/MasterFormDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -42,6 +43,16 @@ const error = ref('')
 const notice = ref('')
 const search = ref('')
 const statusFilter = ref<MasterStatus | ''>('')
+
+/** Header tabel menempel di atas area gulir tabel (CR-060); sel Aksi punya sticky kanan sendiri (z-30). */
+const thSticky = 'sticky top-0 z-20 bg-slate-50'
+
+/** Filter status: kosong = Aktif & Tidak Aktif (tanpa Dihapus), lewat `clearable` UiSelect. */
+const STATUS_FILTER_OPTIONS = [
+  { value: '1', label: 'Aktif' },
+  { value: '2', label: 'Tidak Aktif' },
+  { value: '10', label: 'Dihapus' },
+]
 const busyId = ref('')
 
 /** Nilai filter field allowlist (meta `filters`), per nama field; '' = semua. */
@@ -395,8 +406,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+  <!-- CR-060: dari lg halaman tidak menggulir; judul/aksi/filter tetap, hanya isi tabel (dan menu kiri) yang menggulir. -->
+  <section class="page-fill flex flex-col gap-4" data-testid="master-page">
+    <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-xl font-semibold text-slate-900">Master Data</h1>
         <p class="text-sm text-slate-500">Referensi yang dipakai dropdown seluruh modul. Hanya Super Admin.</p>
@@ -412,10 +424,15 @@ onMounted(() => {
       </button>
     </div>
 
-    <p v-if="metaError" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ metaError }}</p>
+    <p v-if="metaError" class="shrink-0 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ metaError }}</p>
 
-    <div class="grid gap-4 lg:grid-cols-[220px_1fr]">
-      <nav class="flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 lg:flex-col" aria-label="Daftar master">
+    <!-- Menu kiri = panel gulir mandiri; kolom data = kolom flex (filter tetap, kartu tabel menggulir, paginasi tetap). -->
+    <div class="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[220px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+      <nav
+        class="pane-fill flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 lg:flex-col lg:overflow-x-hidden"
+        aria-label="Daftar master"
+        data-testid="master-nav"
+      >
         <button
           v-for="m in metas"
           :key="m.key"
@@ -430,11 +447,11 @@ onMounted(() => {
         </button>
       </nav>
 
-      <div v-if="meta" class="min-w-0 space-y-4">
-        <p v-if="notice" class="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800" role="status">{{ notice }}</p>
-        <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
+      <div v-if="meta" class="flex min-w-0 flex-col gap-4 lg:h-full lg:min-h-0" data-testid="master-data-pane">
+        <p v-if="notice" class="shrink-0 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800" role="status">{{ notice }}</p>
+        <p v-if="error" class="shrink-0 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
 
-        <div class="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div class="flex shrink-0 flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3" data-testid="master-filter-bar">
           <label class="relative min-w-[200px] flex-1">
             <Search class="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -445,49 +462,58 @@ onMounted(() => {
               data-testid="master-search"
             />
           </label>
-          <select
+          <UiSelect
             v-for="(level, index) in filterLevels"
             :key="level.meta.key"
-            :value="level.value"
-            class="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+            :model-value="level.value"
+            :options="level.options.map((o) => ({ value: o.id, label: o.nama }))"
+            clearable
+            size="sm"
+            :placeholder="`Semua ${level.meta.label}`"
             :disabled="level.loading || (index > 0 && !filterLevels[index - 1]?.value)"
             :aria-label="`Filter ${level.meta.label}`"
-            @change="onFilterLevel(index, ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Semua {{ level.meta.label }}</option>
-            <option v-for="o in level.options" :key="o.id" :value="o.id">{{ o.nama }}</option>
-          </select>
-          <select
+            class="w-52"
+            :data-testid="`master-filter-level-${level.meta.key}`"
+            @update:model-value="onFilterLevel(index, $event)"
+          />
+          <UiSelect
             v-for="field in filterFields"
             :key="field.name"
-            :value="fieldFilters[field.name] ?? ''"
-            class="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            :model-value="fieldFilters[field.name] ?? ''"
+            :options="filterOptions(field)"
+            clearable
+            size="sm"
+            :placeholder="`Semua ${field.label}`"
             :aria-label="`Filter ${field.label}`"
+            class="w-52"
             :data-testid="`master-filter-${field.name}`"
-            @change="onFieldFilter(field.name, ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Semua {{ field.label }}</option>
-            <option v-for="o in filterOptions(field)" :key="o.value" :value="o.value">{{ o.label }}</option>
-          </select>
-          <select v-model="statusFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm" aria-label="Filter status">
-            <option value="">Aktif &amp; Tidak Aktif</option>
-            <option value="1">Aktif</option>
-            <option value="2">Tidak Aktif</option>
-            <option value="10">Dihapus</option>
-          </select>
+            @update:model-value="onFieldFilter(field.name, $event)"
+          />
+          <UiSelect
+            :model-value="statusFilter"
+            :options="STATUS_FILTER_OPTIONS"
+            clearable
+            size="sm"
+            placeholder="Aktif & Tidak Aktif"
+            aria-label="Filter status"
+            class="w-52"
+            data-testid="master-filter-status"
+            @update:model-value="statusFilter = $event as MasterStatus | ''"
+          />
         </div>
 
-        <div ref="tableScroller" class="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="master-table-scroll" @scroll.passive="updateActionsShadow">
+        <!-- Kartu tabel: satu-satunya area gulir data (table-fill); header tabel sticky di atasnya. -->
+        <div ref="tableScroller" class="table-fill overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="master-table-scroll" @scroll.passive="updateActionsShadow">
           <table class="min-w-full text-sm">
-            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500" data-testid="master-thead">
               <tr>
-                <th v-if="meta.has_order" class="w-16 px-4 py-3">Urutan</th>
-                <th class="px-4 py-3">Kode</th>
-                <th class="px-4 py-3">{{ meta.name_label }}</th>
-                <th v-if="meta.parent" class="px-4 py-3">{{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'Induk' }}</th>
-                <th class="px-4 py-3">Status</th>
+                <th v-if="meta.has_order" :class="[thSticky, 'w-16 px-4 py-3']">Urutan</th>
+                <th :class="[thSticky, 'px-4 py-3']">Kode</th>
+                <th :class="[thSticky, 'px-4 py-3']">{{ meta.name_label }}</th>
+                <th v-if="meta.parent" :class="[thSticky, 'px-4 py-3']">{{ metas.find((m) => m.key === meta?.parent?.entity)?.label ?? 'Induk' }}</th>
+                <th :class="[thSticky, 'px-4 py-3']">Status</th>
                 <th
-                  class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right"
+                  class="sticky right-0 top-0 z-30 whitespace-nowrap bg-slate-50 px-4 py-3 text-right"
                   :class="{ 'shadow-sticky-end': actionsShadow }"
                   data-testid="master-col-actions"
                 >
@@ -523,9 +549,9 @@ onMounted(() => {
           </table>
         </div>
 
-        <p v-if="reorderHint" class="text-xs text-slate-500" data-testid="master-reorder-hint">{{ reorderHint }}</p>
+        <p v-if="reorderHint" class="shrink-0 text-xs text-slate-500" data-testid="master-reorder-hint">{{ reorderHint }}</p>
 
-        <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+        <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 text-sm text-slate-600" data-testid="master-pagination">
           <span>{{ total }} data · halaman {{ page }} dari {{ totalPages }}</span>
           <div class="flex gap-1">
             <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40" :disabled="page <= 1" @click="goTo(page - 1)">Sebelumnya</button>

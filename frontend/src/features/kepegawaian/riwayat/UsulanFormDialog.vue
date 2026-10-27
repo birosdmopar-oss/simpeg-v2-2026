@@ -34,6 +34,15 @@ const emit = defineEmits<{ 'update:open': [value: boolean]; submit: [values: Rec
 const values = reactive<Record<string, string>>({})
 const berkas = reactive<BerkasMap>({})
 const errors = ref<Record<string, string>>({})
+/** Galat server berkas yang sudah dijawab dengan memilih berkas pengganti; hilang saat galat server baru datang (Q4R3-I1). */
+const serverDijawab = reactive<Record<string, true>>({})
+
+watch(
+  () => props.serverErrors,
+  () => {
+    for (const key of Object.keys(serverDijawab)) delete serverDijawab[key]
+  },
+)
 
 watch(
   () => [props.open, props.row] as const,
@@ -41,6 +50,7 @@ watch(
     if (!open) return
     for (const f of props.config.fields) values[f.name] = props.row?.[f.name] == null ? '' : String(props.row[f.name])
     for (const key of Object.keys(berkas)) delete berkas[key]
+    for (const key of Object.keys(serverDijawab)) delete serverDijawab[key]
     errors.value = {}
   },
   { immediate: true },
@@ -58,8 +68,10 @@ function onFile(def: BerkasKolomDef, file: File | null): void {
   const next = { ...errors.value }
   delete next[`berkas.${def.kolom}`]
   errors.value = next
-  if (file) berkas[def.kolom] = file
-  else delete berkas[def.kolom]
+  if (file) {
+    berkas[def.kolom] = file
+    serverDijawab[`berkas.${def.kolom}`] = true
+  } else delete berkas[def.kolom]
 }
 
 function submit(): void {
@@ -77,7 +89,7 @@ function submit(): void {
   emit('submit', { ...values }, kirim)
 }
 
-const error = (key: string): string => errors.value[key] ?? props.serverErrors?.fields[key] ?? ''
+const error = (key: string): string => errors.value[key] ?? (serverDijawab[key] ? '' : (props.serverErrors?.fields[key] ?? ''))
 </script>
 
 <template>

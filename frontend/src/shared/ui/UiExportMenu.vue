@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Tombol "Export" yang membuka popup pilihan format (Laporan Redesign §4.1.2, Gambar 14): "Export data pada
+ * Tombol "Ekspor" yang membuka popup pilihan format (Laporan Redesign §4.1.2, Gambar 14): "Export data pada
  * setiap halaman dibuat menjadi popup. Jenis export yang disajikan disesuaikan dengan ketersediaan dari jenis
  * file itu sendiri." — halaman menentukan `formats` sesuai yang benar-benar tersedia.
  *
@@ -20,8 +20,8 @@ import UiButton from './UiButton.vue'
 export type ExportFormat = { key: 'pdf' | 'xlsx' | 'csv'; label: string }
 
 withDefaults(defineProps<{ formats?: ExportFormat[]; label?: string; disabled?: boolean }>(), {
-  formats: () => [{ key: 'pdf', label: 'Export PDF' }],
-  label: 'Export',
+  formats: () => [{ key: 'pdf', label: 'Ekspor PDF' }],
+  label: 'Ekspor',
   disabled: false,
 })
 

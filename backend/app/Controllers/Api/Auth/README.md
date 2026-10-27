@@ -113,7 +113,34 @@ Penegakan:
 
 Legacy (`core/MY_Controller.php:214-221`) hanya memunculkan popup ganti password bila password role 2/6 masih = NIP
 (md5) dan tidak memblokir menu. v2 memaksa ganti untuk semua jalur di atas, untuk semua role (deviasi [V2], ISSUE-044).
-Kedaluwarsa password (`expired_at`, legacy :223-230) belum ditegakkan.
+
+### Umur password (`expired_at`, MAKE-028) [K]
+
+`pengguna.expired_at` = batas berlaku PASSWORD, bukan masa berlaku akun. Legacy (`core/MY_Controller.php:223-230`,
+`libraries/hr/L_user.php:207`): `now > expired_at` → pengguna hanya diminta mengganti password (popup `fcp`); login
+tidak ditolak. `NULL` = tidak kedaluwarsa (`new DateTime(NULL)` dibuat sesudah `$dtNow`, jadi `$dtNow > $dtPassExp`
+false). Nilainya diisi trigger DB legacy (`simpeg01_struktur_lengkap_20261001.sql:8364-8382`): `pengguna_beIns` — akun
+dibuat berstatus aktif → `NOW() + 1 YEAR`; `pengguna_beUpd` — password berubah dan status akhir aktif →
+`NOW() + 3 MONTH`. v2 tidak memakai trigger; aturannya ada di satu titik, `App\Libraries\Auth\PasswordExpiry`
+(interval di `Config\Auth::$newAccountValidityMonths` = 12 dan `$passwordValidityMonths` = 3; penambahan bulan ala MySQL,
+hari dijepit ke akhir bulan).
+
+| Jalur | `expired_at` |
+|---|---|
+| Akun baru aktif (A-09 `AccountProvisioner`, admin `POST /auth/users`) | now + 12 bulan (nonaktif: tidak diisi) |
+| Ganti password sendiri A-06, reset lewat token email A-07 | now + 3 bulan |
+| Admin mengatur password akun (lain atau sendiri) lewat `PUT /auth/users/{id}` | now + 3 bulan bila status AKHIR aktif (aktivasi + password sekaligus ikut) |
+| Koreksi NIP B-06 (password = NIP baru) | now + 3 bulan untuk akun aktif |
+| Akun status bukan aktif | tidak disentuh |
+| Lazy rehash saat login (hash diganti, password sama), ubah akun tanpa `password` | tidak berubah |
+
+Penegakan memakai mekanisme wajib ganti password di atas (tanpa tabel/kolom baru): bila `expired_at` tidak NULL dan
+`now > expired_at` (strict), login menambahkan claim `must_change_password`, dan `user.must_change_password` pada
+login/`auth/me`/daftar akun bernilai true. **Dihitung ulang di setiap login DAN refresh** (kolom dibaca dari DB), jadi sesi
+yang sudah berjalan terkena begitu `expired_at` terlewati dan refresh berikutnya terjadi. Login/refresh tetap berhasil;
+access token yang sudah terbit berlaku sampai TTL-nya habis (seperti perubahan role). Penanda DB `must_change_password`
+tidak dinyalakan oleh kedaluwarsa; mengganti password (A-06/A-07) melepas penanda MAKE-020 sekaligus memperpanjang
+`expired_at` +3 bulan, dan password yang diatur admin/sistem menyalakan penanda DAN mengisi `expired_at` baru.
 
 ### POST /auth/forgot-password
 Request `{ "username", "captcha_token": "<cf-turnstile-response>" }`. 200 selalu generik `data: { accepted:true, message }`; di development (`auth.exposeResetTokenInResponse=true`) ditambah `token`, `expires_at`. Flag itu **ditolak di production** (ISSUE-021): sesudah captcha valid, forgot-password gagal 500 (ConfigException) yang sama untuk semua username tanpa menulis `forgot_attempts`; reset-password tidak terpengaruh.
