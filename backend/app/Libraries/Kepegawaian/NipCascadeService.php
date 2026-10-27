@@ -34,7 +34,7 @@ use Throwable;
  *  1. kunci baris `pegawai` lama (`FOR UPDATE`), cek NIP baru belum dipakai pegawai lain [K] (:569-575) atau akun lain
  *     (username/NIP, ISSUE-023);
  *  2. salin baris `pegawai` ke NIP baru;
- *  3. arahkan ulang setiap kolom registry `TabelAnakNip::sampaiFase(3)` (FK legacy, `pengguna.nip`, `faq_rate.nip`,
+ *  3. arahkan ulang setiap kolom registry `TabelAnakNip::sampaiFase(self::FASE)` (FK legacy, `pengguna.nip`, `faq_rate.nip`,
  *     `jabatan_koordinasi.nip` keputusan #10, …) dengan `UPDATE … WHERE kolom = NIP lama`;
  *  4. hapus baris `pegawai` lama — FK RESTRICT menjadi jaring pengaman: tabel anak yang tidak terdaftar membuat DELETE
  *     gagal sehingga seluruh koreksi di-rollback, bukan meninggalkan baris yatim;
@@ -52,18 +52,20 @@ use Throwable;
  *  - Kolom JSON array NIP (`JenisRujukanNip::JsonArrayNip`: `dm_user_lokasi_presensi.target_peg`/`excl_peg`, pengganti
  *    `user_lokasi_presensi` yang tidak dibuat di v2) — elemen NIP lama diganti, begitu pula awalan "NIP - " di
  *    `*_desc` (keputusan user 13-10-2026, MAKE-011).
+ *  - Kolom daftar NIP berpemisah (`JenisRujukanNip::DaftarNipBerpemisah`: `riwayat_cuti.ketua_tim`, NIP dipisah `***`,
+ *    DBV-022 DQ-15) — elemen yang sama persis dengan NIP lama diganti; elemen lain dan urutan dipertahankan.
  *  - Tabel registry yang belum ada di skema dilewati dan dilaporkan di `dilewati`; test B-21 mengunci daftarnya.
  *  - Audit: `pegawai` (NIP + jumlah baris per tabel) dan setiap akun `pengguna` yang direset (password dimasking).
  *  - Balapan NIP baru didaftarkan proses lain (1062 pada salinan `pegawai`) → 422 `nip_baru`.
- *  - `gaji_pegawai.nip` dan `riwayat_cuti.*` (Fase 4/5) belum masuk cakupan: registry menambahkannya per fase tanpa
- *    mengubah kelas ini.
+ *  - Cakupan per fase: `FASE` = 4 sejak DBV-022 M2 (tabel Modul C Layanan); `gaji_pegawai.nip` (Fase 5) menyusul dengan
+ *    menaikkan `FASE` tanpa mengubah logika kelas ini.
  */
 final class NipCascadeService implements NipCascadeInterface
 {
     /**
-     * Cakupan registry pada fase berjalan (Fase 3).
+     * Cakupan registry pada fase berjalan (Fase 4, DBV-022 M2).
      */
-    public const FASE = 3;
+    public const FASE = 4;
 
     /**
      * Kolom registry yang tidak diarahkan ulang dengan UPDATE (tabel.kolom huruf kecil => alasan).
@@ -77,6 +79,14 @@ final class NipCascadeService implements NipCascadeInterface
      * PK tabel yang punya kolom JSON array NIP (`JenisRujukanNip::JsonArrayNip`).
      */
     private const PK_JSON = ['dm_user_lokasi_presensi' => 'id_dm_user_lokasi_presensi'];
+
+    /**
+     * PK tabel yang punya kolom daftar NIP berpemisah (`JenisRujukanNip::DaftarNipBerpemisah`).
+     */
+    private const PK_DAFTAR = ['riwayat_cuti' => 'id_riwayat_cuti'];
+
+    /** Pemisah elemen `riwayat_cuti.ketua_tim` [K `L_cuti.php:1785-1800`]. */
+    public const PEMISAH_DAFTAR_NIP = '***';
 
     /**
      * @var list<RujukanNip>
@@ -185,6 +195,12 @@ final class NipCascadeService implements NipCascadeInterface
 
             if ($rujukan->jenis === JenisRujukanNip::JsonArrayNip) {
                 $tabel[$kunci] = $this->arahkanJson($db, $rujukan, $lama, $baru);
+
+                continue;
+            }
+
+            if ($rujukan->jenis === JenisRujukanNip::DaftarNipBerpemisah) {
+                $tabel[$kunci] = $this->arahkanDaftar($db, $rujukan, $lama, $baru);
 
                 continue;
             }
@@ -312,6 +328,37 @@ final class NipCascadeService implements NipCascadeInterface
             }
 
             $this->wajibBerhasil($db, $db->table($rujukan->tabel)->where($pk, $row['pk'])->update($baris), $rujukan->tabel . '.' . $kolom);
+            $ubah++;
+        }
+
+        return $ubah;
+    }
+
+    /**
+     * Kolom daftar NIP berpemisah (`DaftarNipBerpemisah`): ganti elemen = NIP lama (setelah trim) dengan NIP baru, elemen lain
+     * dan urutan tetap, lalu tulis ulang dengan pemisah `***`. Baris dikunci `FOR UPDATE`; `LIKE` hanya penyaring awal,
+     * kecocokan ditentukan per elemen (NIP lama sebagai bagian NIP lain tidak ikut diganti). Mengembalikan jumlah baris.
+     */
+    private function arahkanDaftar(BaseConnection $db, RujukanNip $rujukan, string $lama, string $baru): int
+    {
+        $kolom = $rujukan->kolomDiV2();
+        $pk    = self::PK_DAFTAR[$rujukan->tabel] ?? throw new \LogicException("PK tabel daftar NIP {$rujukan->tabel} belum didaftarkan.");
+        $t     = $db->escapeIdentifiers($db->prefixTable($rujukan->tabel));
+        $rows  = $db->query(
+            "SELECT {$db->escapeIdentifiers($pk)} AS pk, {$db->escapeIdentifiers($kolom)} AS isi FROM {$t} WHERE {$db->escapeIdentifiers($kolom)} LIKE ? FOR UPDATE",
+            ['%' . $db->escapeLikeString($lama) . '%'],
+        )->getResultArray();
+        $ubah = 0;
+
+        foreach ($rows as $row) {
+            $elemen = explode(self::PEMISAH_DAFTAR_NIP, (string) $row['isi']);
+
+            if (! in_array($lama, array_map('trim', $elemen), true)) {
+                continue;
+            }
+
+            $isi = implode(self::PEMISAH_DAFTAR_NIP, array_map(static fn (string $e): string => trim($e) === $lama ? $baru : $e, $elemen));
+            $this->wajibBerhasil($db, $db->table($rujukan->tabel)->where($pk, $row['pk'])->update([$kolom => $isi]), $rujukan->tabel . '.' . $kolom);
             $ubah++;
         }
 

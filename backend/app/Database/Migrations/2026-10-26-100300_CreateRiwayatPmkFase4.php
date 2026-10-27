@@ -10,7 +10,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-022 (4/9) — DRAF, DITAHAN (lihat 2026-10-26-100000_CreateMasterLayananFase4.php untuk aturan pemindahan).
+ * DBV-022 (4/9) — disetujui DB Validator 27-10-2026; dipindah ke app/Database/Migrations di M2 (DDL tidak berubah).
  * Isi = usulan coder; belum direview DB Validator.
  *
  * Kelompok C — Peninjauan Masa Kerja, dari dump struktur produksi D1 [K]:

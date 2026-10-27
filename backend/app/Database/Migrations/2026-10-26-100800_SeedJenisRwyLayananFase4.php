@@ -10,7 +10,7 @@ use CodeIgniter\Database\ResultInterface;
 use RuntimeException;
 
 /**
- * DBV-022 (9/9) — DRAF, DITAHAN (lihat 2026-10-26-100000_CreateMasterLayananFase4.php untuk aturan pemindahan).
+ * DBV-022 (9/9) — disetujui DB Validator 27-10-2026; dipindah ke app/Database/Migrations di M2 (DDL tidak berubah).
  * Isi = usulan coder; belum direview DB Validator.
  *
  * Kelompok H — kode `jenis_rwy` baru 43..50 untuk lampiran/surat Modul C di `document_attachment` (PRD §6.1.1 #21,

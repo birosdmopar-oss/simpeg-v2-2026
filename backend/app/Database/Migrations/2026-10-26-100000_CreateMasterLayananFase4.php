@@ -10,9 +10,9 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-022 (1/9) — DRAF, DITAHAN. Berada di app/Database/MigrationsDitahan sehingga TIDAK dijalankan `php spark migrate`
- * dan tidak ikut CI. Dipindah ke app/Database/Migrations (nama tetap) hanya setelah DB Validator menyetujui dokumen
- * backend/docs/db-review/DBV-022-layanan-fase4-schema.md (Bagian 2.3, 2.14, 2.15, 2.18, 7). Isi = usulan coder.
+ * DBV-022 (1/9) — disetujui DB Validator 27-10-2026 (PR #29, diverifikasi MySQL 8.0 & MariaDB 10.4); dipindah dari
+ * app/Database/MigrationsDitahan ke app/Database/Migrations di M2 dengan nama tetap dan DDL tidak berubah. Dokumen:
+ * backend/docs/db-review/DBV-022-layanan-fase4-schema.md (Bagian 2.3, 2.14, 2.15, 2.18, 7).
  *
  * Master pendukung Modul C Fase 4 dari dump struktur produksi D1 [K]:
  *   `jenis_cuti` D1:1634-1643, `jenis_layanan` D1:1705-1714, `jenis_pa` D1:1733-1741, `question_category` D1:4008-4017.

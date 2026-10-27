@@ -13,18 +13,20 @@ use InvalidArgumentException;
  * transaksi: salin baris pegawai ke NIP baru → arahkan ulang setiap kolom di registry ini → hapus baris lama. Legacy
  * cukup `UPDATE pegawai SET nip` karena FK-nya `ON UPDATE CASCADE` (`libraries/hr/L_employee.php:586-587`).
  *
- * Isi (82 entri):
+ * Isi (88 entri):
  * - {@see JenisRujukanNip::FkLegacy} (75): semua `REFERENCES pegawai (nip)` di dump struktur produksi 01-10-2026 (D1,
  *   285 tabel), 70 tabel. Semuanya `ON UPDATE CASCADE`; nama FK legacy dicatat.
  * - {@see JenisRujukanNip::NonFkUbahNipLegacy} (1): `pengguna.username`, diganti kode Ubah NIP legacy.
  * - {@see JenisRujukanNip::NonFkSlipGaji} (1): `gaji_pegawai.nip`.
- * - {@see JenisRujukanNip::NonFkFkV2} (2): `riwayat_cuti.nip_atasan_langsung`/`nip_yang_menyetujui`, tanpa FK di legacy
- *   tetapi wajib FK di v2 (DoD C-01).
+ * - {@see JenisRujukanNip::NonFkFkV2} (7): tanpa FK di legacy tetapi ber-FK di v2 — `riwayat_cuti.nip_atasan_langsung`/
+ *   `nip_yang_menyetujui`, `petugas_layanan.nip`, `pa_layanan.nip`, `disiplin_ticket.nip` (FK ditahan
+ *   `AddFkNipLayananFase4`), `inbox.nip_penerima`, `firebase_token.nip` (FK di CREATE) — DBV-022.
  * - {@see JenisRujukanNip::NonFkKeputusanV2} (1): `jabatan_koordinasi.nip`, tanpa FK dan tidak diganti legacy, ikut
  *   dikoreksi atas keputusan #10 WS2.md (MAKE-010).
  * - {@see JenisRujukanNip::JsonArrayNip} (2): `dm_user_lokasi_presensi.target_peg`/`excl_peg` (JSON array NIP, pasangan
  *   `*_desc` "NIP - Nama"), pengganti `user_lokasi_presensi` yang tidak dibuat di v2 (keputusan user 13-10-2026,
  *   MAKE-011).
+ * - {@see JenisRujukanNip::DaftarNipBerpemisah} (1): `riwayat_cuti.ketua_tim` (NIP dipisah `***`, DBV-022 DQ-15).
  *
  * Label sumber: **[K]** = DDL dump struktur produksi D1; **[K-kode]** = kode legacy (path relatif ke `application/`);
  * **[V2]** = dokumen v2. Fase/pemilik diambil dari `0x-*.md`, Mapping Migrasi, dan draf DBV-012/DBV-013 (belum
@@ -49,7 +51,7 @@ final class TabelAnakNip
         ['email_pool', 'nip', 'fk_nip_emailpool_to_pegawai', true, KeberadaanV2::BelumDiputuskan, null, null, 'Antrean email legacy (Cron); tidak ada di Mapping Migrasi; antrean email v2 = Queue CR-014'],
         ['email_retry', 'nip', 'fk_nip_emailretry_to_pegawai', true, KeberadaanV2::BelumDiputuskan, null, null, 'Antrean ulang email legacy, tidak dipakai kode; tidak ada di Mapping Migrasi'],
         ['email_sent', 'nip', 'fk_nip_emailsent_to_pegawai', true, KeberadaanV2::BelumDiputuskan, null, null, 'Arsip email terkirim legacy (Cron); tidak ada di Mapping Migrasi'],
-        ['esign_hist', 'nip', 'fk_esign_hist_ibfk01', true, KeberadaanV2::Ada, 6, 'H-01', 'Bukti legal tanda tangan elektronik (Mapping Tier 6)'],
+        ['esign_hist', 'nip', 'fk_esign_hist_ibfk01', true, KeberadaanV2::Ada, 4, 'C-01', 'Bukti legal tanda tangan elektronik (Mapping Tier 6); dibuat DBV-022 untuk TTE surat cuti (C-05, mock Fase 4), adapter real H-01 Fase 6'],
         ['faq_rate', 'nip', 'fk_nip_faqrate_to_peg', false, KeberadaanV2::Ada, 2, 'G-10', 'Sudah di main tanpa FK; FK menunggu migration 120200 yang ditahan (draf DBV-012)'],
         ['filled_form_digital', 'nip', 'fk_nip_ffd_to_pegawai', false, KeberadaanV2::Ada, 7, 'F-01', 'Isian form digital'],
         ['ignore_konv_ak', 'nip', 'fk_nip_ignorekonvak_to_pegawai', false, KeberadaanV2::Ada, 3, 'B-02', 'Angka kredit (B-15); nip bagian PK (draf DBV-013)'],
@@ -80,7 +82,7 @@ final class TabelAnakNip
         ['riwayat_ak_siasn', 'nip', 'fk_nip_rw_ak_siasn_01', false, KeberadaanV2::Ada, 3, 'B-02', 'Angka kredit SIASN (B-15), draf DBV-013'],
         ['riwayat_alamat', 'nip', 'fk_nip_rwyalamat_to_pegawai', false, KeberadaanV2::Ada, 3, 'B-02', 'Riwayat alamat (B-16), draf DBV-013'],
         ['riwayat_cuti', 'nip', 'fk_nip_rwycuti_to_pegawai', false, KeberadaanV2::Ada, 4, 'C-01', 'Pengajuan cuti'],
-        ['riwayat_cuti_notif_kt', 'nip_kt', 'fk_nip_kt_rcnkt_2', false, KeberadaanV2::BelumDiputuskan, null, null, 'Mapping Tier 7: isinya ikut ke inbox/inbox_msg; draf DBV-012 mencatatnya di C-01'],
+        ['riwayat_cuti_notif_kt', 'nip_kt', 'fk_nip_kt_rcnkt_2', false, KeberadaanV2::Ada, 4, 'C-01', 'Tembusan ketua tim cuti (D11); dibuat DBV-022, nip_kt bagian PK komposit (AC-01.7)'],
         ['riwayat_diklat', 'nip', 'fk_nip_rwydiklat_to_pegawai', false, KeberadaanV2::Ada, 3, 'B-02', 'Riwayat diklat (B-11), draf DBV-013'],
         ['riwayat_hukdis', 'nip', 'fk_nip_rwyhukdis_to_pegawai', false, KeberadaanV2::Ada, 3, 'B-02', 'Riwayat hukdis (B-14), draf DBV-013'],
         ['riwayat_ib', 'nip', 'fk_nip_rwyib_to_pegawai', false, KeberadaanV2::Ada, 4, 'C-01', 'Izin belajar'],
@@ -138,12 +140,47 @@ final class TabelAnakNip
         [
             'riwayat_cuti', 'nip_atasan_langsung', JenisRujukanNip::NonFkFkV2,
             '[K] tanpa FK, VARCHAR(50); [V2] 04-Layanan.md:21 (DoD C-01), SRS :161', true, KeberadaanV2::Ada, 4, 'C-01',
-            'NIP atasan langsung; FK v2 menuntut VARCHAR(30) dan audit orphan sebelum impor',
+            'NIP atasan langsung; VARCHAR(30) di DBV-022, FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DQ-3)',
         ],
         [
             'riwayat_cuti', 'nip_yang_menyetujui', JenisRujukanNip::NonFkFkV2,
             '[K] tanpa FK, VARCHAR(50); [V2] 04-Layanan.md:21 (DoD C-01), SRS :161', true, KeberadaanV2::Ada, 4, 'C-01',
-            'NIP pejabat yang menyetujui; FK v2 menuntut VARCHAR(30) dan audit orphan sebelum impor',
+            'NIP pejabat yang menyetujui; VARCHAR(30) di DBV-022, FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DQ-3)',
+        ],
+        [
+            'inbox', 'nip_penerima', JenisRujukanNip::NonFkFkV2,
+            '[K] inbox legacy (D1:1369-1393) campur tiket & notifikasi tanpa kolom penerima ber-FK; [V2] kolom baru inbox v2 DBV-022 Bagian 3.2',
+            false, KeberadaanV2::Ada, 4, 'C-01',
+            'Penerima notifikasi (approver, PIC, pemohon, tembusan); FK RESTRICT di CREATE (DQ-4)',
+        ],
+        [
+            'firebase_token', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K] firebase_token.nip tanpa FK (D1:1156-1163); [V2] FK RESTRICT DBV-022 Bagian 2.20', false, KeberadaanV2::Ada, 4, 'C-01',
+            'Token push FCM per perangkat (C-06 mock; real H-04 Fase 6)',
+        ],
+        [
+            'petugas_layanan', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K] petugas_layanan.nip tanpa FK, VARCHAR(50) (D1:3952-3962); [V2] VARCHAR(30) + FK DITAHAN AddFkNipLayananFase4 (DQ-12)',
+            false, KeberadaanV2::Ada, 4, 'C-01',
+            'PIC layanan TB/IB/PMK (C-07..C-10); FK dipasang setelah audit yatim = 0, sampai itu tetap diarahkan ulang B-06',
+        ],
+        [
+            'pa_layanan', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K] pa_layanan.nip tanpa FK, VARCHAR(50) (D1:2429-2471); [V2] VARCHAR(30) + FK DITAHAN AddFkNipLayananFase4 (DQ-17)',
+            true, KeberadaanV2::Ada, 4, 'C-01',
+            'Aturan petugas approval per NIP (JFT/JF); FK dipasang setelah audit yatim = 0, sampai itu tetap diarahkan ulang B-06',
+        ],
+        [
+            'disiplin_ticket', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K] inbox.nip (tiket) tanpa FK, VARCHAR(18) (D1:1369-1393); [V2] VARCHAR(30) + FK DITAHAN AddFkNipLayananFase4 (DQ-4)',
+            false, KeberadaanV2::Ada, 4, 'C-01',
+            'Pelapor tiket Halo Simpeg (skema final Fase 8, dibuat DBV-022); FK dipasang setelah audit yatim = 0',
+        ],
+        [
+            'riwayat_cuti', 'ketua_tim', JenisRujukanNip::DaftarNipBerpemisah,
+            '[K] riwayat_cuti.ketua_tim TEXT, NIP dipisah *** (D1:4396-4463; [K-kode] libraries/hr/rwy/L_cuti.php:1785-1800 implode); [V2] DBV-022 DQ-15',
+            true, KeberadaanV2::Ada, 4, 'C-01',
+            'Tembusan ketua tim; elemen = NIP lama diganti per elemen saat koreksi NIP (bukan seluruh nilai kolom)',
         ],
         [
             'jabatan_koordinasi', 'nip', JenisRujukanNip::NonFkKeputusanV2,
