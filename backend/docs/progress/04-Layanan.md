@@ -167,4 +167,4 @@ jenis 1; paritas T13 hanya saldo ternormalisasi legacy; teks pesan batas jenis 5
 - Registry NIP Fase 4: `NipCascadeService::FASE` = 4, `TabelAnakNip` 88 entri, jenis baru `DaftarNipBerpemisah` untuk `riwayat_cuti.ketua_tim` (DQ-15, usulan coder menunggu verifikasi delta DBV; perilaku tepi di DBV-022 Bagian 12.3).
 - Test skema: `tests/database/Layanan/{SkemaLayananTest,SkemaInboxTicketTest,MigrasiLayananSiklusTest}.php`.
 
-**Belum jalan.** Angka verifikasi di DB scratch + gate penuh (DBV-022 Bagian 12.5), push, CI.
+**Verifikasi 27-10:** 3307 — 100/204/45 → 120/235/84 (+20/+31/+39), rollback → migrate ulang identik; kueri audit bebas error 1267/1271 (DBV-022 Bagian 12.5–12.6); CI hijau `bc3b759`.

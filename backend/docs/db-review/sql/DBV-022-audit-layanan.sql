@@ -149,7 +149,9 @@ SELECT 'riwayat_pmk.status', CAST(status AS CHAR), COUNT(*) FROM riwayat_pmk GRO
 UNION ALL
 SELECT 'riwayat_pmk_req.status', CAST(status AS CHAR), COUNT(*) FROM riwayat_pmk_req GROUP BY status
 UNION ALL
-SELECT 'riwayat_pmk_req.jenis_pmk', COALESCE(jenis_pmk, '(NULL)'), COUNT(*) FROM riwayat_pmk_req GROUP BY jenis_pmk
+-- `jenis_pmk` (kolom unicode_ci) digabung UNION dengan CAST(... AS CHAR) (collation koneksi, mis. 0900_ai_ci di klien
+-- MySQL 8 dengan --default-character-set=utf8mb4): COLLATE eksplisit mencegah error 1271 "Illegal mix ... 'UNION'".
+SELECT 'riwayat_pmk_req.jenis_pmk', COALESCE(jenis_pmk, '(NULL)') COLLATE utf8mb4_unicode_ci, COUNT(*) FROM riwayat_pmk_req GROUP BY jenis_pmk
 ORDER BY kolom, nilai;
 
 -- WAJIB_0: NIP yatim di keempat tabel layanan (FK -> pegawai RESTRICT).

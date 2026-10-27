@@ -790,13 +790,21 @@ Usulan coder (disetujui reviewer CR 27-10-2026 sebagai usulan; **belum diverifik
 | `tests/database/Layanan/SkemaInboxTicketTest.php` | `inbox` tepat 11 kolom; `inbox`/`inbox_msg` tanpa 5 kolom percakapan (AC-01.2); `disiplin_ticket` memilikinya + CHECK (AC-01.3); tanpa FK silang (AC-01.6) |
 | `tests/database/Layanan/MigrasiLayananSiklusTest.php` (`db-isolasi-penuh`) | `down()` sejak `2026-10-26-100000` melepas 20 tabel + seed 43..50, `up()` identik; `AddFkNipLayananFase4` dipanggil langsung dari `MigrationsDitahan/`: menolak (fail-closed) saat ada NIP atasan yatim, tanpa FK terpasang sebagian, lalu memasang 5 FK RESTRICT setelah data dibereskan; `up()`/`down()` aman diulang; FK yang dipasang dilepas lagi di test/`tearDown()` |
 
-### 12.5 Verifikasi M2 (DB scratch `simpeg_v2_t_dbv022` port 3307)
+### 12.5 Verifikasi M2 (27-10-2026, DB scratch `simpeg_v2_t_dbv022` port 3307, MySQL 8.0.30)
+
+DB scratch dibuat baru (`utf8mb4_unicode_ci`). Batch 1 = migration `main` `189b8d4` (sembilan berkas Modul C dikeluarkan
+sementara dari folder, dikembalikan sesudahnya; `git status` bersih); batch 2 = sembilan migration Modul C dari
+`app/Database/Migrations/`. `AddFkNipLayananFase4` tidak dijalankan (tetap ditahan).
 
 | Pemeriksaan | Hasil |
 |---|---|
-| Skema setelah `migrate` (main + 9 migration Modul C) | _diisi setelah dijalankan_ |
-| `migrate:rollback` → `migrate` ulang | _diisi setelah dijalankan_ |
-| `./check.sh` | _diisi setelah dijalankan_ |
+| Batch 1 (`main`, 46 migration) | **100 tabel / 204 FK / 45 CHECK** (sama dengan Bagian 11) |
+| Batch 2 (+9 migration Modul C, total 55) | **120 tabel (+20) / 235 FK (+31) / 84 CHECK (+39)**; 5 FK ditahan tidak terpasang |
+| Collation 20 tabel Modul C / FK bukan RESTRICT | 0 tabel bukan `utf8mb4_unicode_ci` / 0 FK bukan RESTRICT-RESTRICT |
+| Seed | `jenis_cuti` 6, `jenis_layanan` 5, `jenis_pa` 1, `jenis_rwy` 43..50 (8 baris) |
+| `migrate:rollback -b 1` | kembali **100 / 204 / 45**, 46 migration; `jenis_rwy` >= 43 = 0 baris |
+| `migrate` ulang | **120 / 235 / 84**; `SHOW CREATE TABLE` 20 tabel (tanpa `AUTO_INCREMENT=`) + seed dibandingkan dengan sebelum rollback: **identik** (575 baris, `diff` kosong) |
+| CI (MySQL 8.0 + MariaDB 10.4, 8 shard PHPUnit, PHPStan/CS, frontend) | **hijau** di `bc3b759` (run 40449532677) |
 
 ### 12.6 Collation campuran di kueri audit (temuan 27-10-2026)
 
@@ -815,4 +823,19 @@ Perbaikan (skrip tetap hanya SELECT): `p.nip = <kolom legacy> COLLATE utf8mb4_un
 dengan `pegawai`. Bahan G2: collation 0900 di atas diseragamkan ke `utf8mb4_unicode_ci` saat impor; tabel v2 Modul C
 seluruhnya `utf8mb4_unicode_ci` (Bagian 11).
 
-Verifikasi di DB scratch dengan tabel uji ber-collation campuran: _diisi setelah dijalankan_.
+Perbaikan tambahan dari verifikasi: Bagian 4 menggabungkan (UNION) `CAST(status AS CHAR)` — ber-collation koneksi
+(`utf8mb4_0900_ai_ci` di klien MySQL 8 dengan `--default-character-set=utf8mb4`) — dengan kolom `riwayat_pmk_req.jenis_pmk`
+(`unicode_ci`), sehingga berhenti dengan error 1271 "Illegal mix of collations for operation 'UNION'"; kolom itu kini diberi
+`COLLATE utf8mb4_unicode_ci`. UNION lain di skrip hanya memuat CAST/literal dari satu tabel.
+
+Verifikasi (27-10-2026, DB sementara `simpeg_v2_t_dbv022_audit` port 3307, MySQL 8.0.30, klien
+`--default-character-set=utf8mb4`): skema legacy mini dengan collation per tabel = D1 (kolom yang dipakai skrip) + data
+sintetis (1 NIP yatim di `pa_layanan`, `inbox`, `firebase_token`; `ketua_tim` berisi 1 elemen bukan pegawai).
+
+| Skrip | Hasil |
+|---|---|
+| Lama (`bc3b759`, `--force`) | 4 error: **1267** di Bagian 6 (`pa_layanan`), 7.1 (`inbox`), Bagian 8 (`firebase_token`); **1271** UNION di Bagian 4 |
+| Baru (tanpa `--force`) | **0 error**, exit 0, seluruh 12 bagian berjalan; `pa_nip_yatim` = `inbox_nip_yatim` = `firebase_token_nip_yatim` = 1, NIP yatim lain 0, `ketua_tim` posisi 2 = 1 (sesuai data uji) |
+
+DB sementara di-DROP dengan nama eksplisit setelah verifikasi. MariaDB 10.4 tidak diuji untuk skrip ini (skrip dijalankan
+di salinan legacy MySQL 8; `utf8mb4_unicode_ci` dikenal di kedua engine).
