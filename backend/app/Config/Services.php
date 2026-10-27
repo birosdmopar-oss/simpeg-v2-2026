@@ -52,7 +52,7 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
-use App\Libraries\Layanan\NotifikasiNoOp;
+use App\Libraries\Layanan\NotifikasiService;
 use App\Libraries\Layanan\Tb\StatusTugasBelajar;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
@@ -532,6 +532,7 @@ class Services extends BaseService
             new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
             static::esignGateway(),
             static::pegawaiScope(),
+            static::cutiNotifikasiService(),
         );
     }
 
@@ -558,6 +559,9 @@ class Services extends BaseService
             new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
             static::pegawaiScope(),
             static::attachmentService(),
+            null,
+            null,
+            static::cutiNotifikasiService(),
         );
     }
 
@@ -581,6 +585,25 @@ class Services extends BaseService
             $kuota,
             new \App\Libraries\Layanan\Cuti\EfekFinalCutiService($db, $kuota, static::penerbitSuratCuti()),
             new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
+            static::cutiNotifikasiService(),
+        );
+    }
+
+    /**
+     * Titik kirim notifikasi cuti (PRD Fase 4 §6.6.2, MAKE-023 M4).
+     */
+    public static function cutiNotifikasiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\CutiNotifikasiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('cutiNotifikasiService');
+        }
+
+        $db = db_connect();
+
+        return new \App\Libraries\Layanan\Cuti\CutiNotifikasiService(
+            static::notifikasiLayanan(),
+            new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
+            new \App\Libraries\Layanan\Notifikasi\PenerimaNotifikasi($db),
         );
     }
 
@@ -611,8 +634,8 @@ class Services extends BaseService
     // Modul C — Layanan TB/IB/PMK (Fase 4, MAKE-024 M5).
 
     /**
-     * Titik sambung notifikasi TB/IB/PMK (PRD §6.6.1). Binding sementara NotifikasiNoOp; binding diganti
-     * NotifikasiService di M4 (MAKE-023).
+     * Titik sambung notifikasi cuti/TB/IB/PMK (PRD §6.6.1): NotifikasiService (MAKE-023 M4) menggantikan
+     * NotifikasiNoOp tanpa mengubah pemanggil TB/IB/PMK.
      */
     public static function notifikasiLayanan(bool $getShared = true): NotifikasiLayananInterface
     {
@@ -620,7 +643,7 @@ class Services extends BaseService
             return static::getSharedInstance('notifikasiLayanan');
         }
 
-        return new NotifikasiNoOp();
+        return new NotifikasiService();
     }
 
     /**

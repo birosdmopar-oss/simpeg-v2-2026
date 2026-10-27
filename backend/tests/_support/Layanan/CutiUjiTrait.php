@@ -9,10 +9,13 @@ use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Layanan\Cuti\ApproverTerjangkau;
 use App\Libraries\Layanan\Cuti\AtasanLangsungCuti;
 use App\Libraries\Layanan\Cuti\CutiApprovalService;
+use App\Libraries\Layanan\Cuti\CutiNotifikasiService;
 use App\Libraries\Layanan\Cuti\CutiService;
 use App\Libraries\Layanan\Cuti\EfekFinalCutiService;
 use App\Libraries\Layanan\Cuti\KuotaCutiService;
 use App\Libraries\Layanan\Cuti\PejabatBerwenangCuti;
+use App\Libraries\Layanan\Notifikasi\PenerimaNotifikasi;
+use App\Libraries\Layanan\NotifikasiService;
 use App\Libraries\MasterData\HariLiburService;
 use Closure;
 use Config\Cuti as CutiConfig;
@@ -36,6 +39,12 @@ trait CutiUjiTrait
     protected FakeAttachmentService $lampiranUji;
 
     protected ?PenerbitSuratCutiUji $penerbitSurat = null;
+
+    /** Notifikasi cuti (M4): bawaan tidak terpasang agar test M3 tidak menulis `inbox`; pasang lewat {@see pasangNotifikasi()}. */
+    protected ?CutiNotifikasiService $notifikasiUji = null;
+
+    /** @var list<int> id `inbox_msg` yang diantrekan oleh {@see pasangNotifikasi()} */
+    protected array $diantrekan = [];
 
     /**
      * @param array<string, mixed> $pegawai kolom `pegawai`
@@ -167,6 +176,7 @@ trait CutiUjiTrait
             $this->lampiranUji,
             null,
             $sekarang,
+            $this->notifikasiUji,
         ];
 
         if ($sebelumTransaksi === null) {
@@ -203,11 +213,34 @@ trait CutiUjiTrait
             $kuota,
             new EfekFinalCutiService($this->db, $kuota, $this->penerbitUji()),
             new ApproverTerjangkau($this->db),
+            $this->notifikasiUji,
         );
     }
 
     protected function penerbitUji(): PenerbitSuratCutiUji
     {
         return $this->penerbitSurat ??= new PenerbitSuratCutiUji();
+    }
+
+    /**
+     * Pasang notifikasi cuti ke service uji berikutnya. `$antre` menggantikan pengantre (nilai balik = berhasil); bawaan
+     * mencatat id ke {@see $diantrekan}.
+     *
+     * @param Closure(int): bool|null $antre
+     */
+    protected function pasangNotifikasi(?Closure $antre = null): void
+    {
+        $this->diantrekan = [];
+        $antre ??= function (int $id): bool {
+            $this->diantrekan[] = $id;
+
+            return true;
+        };
+
+        $this->notifikasiUji = new CutiNotifikasiService(
+            new NotifikasiService($this->db, $antre),
+            new ApproverTerjangkau($this->db),
+            new PenerimaNotifikasi($this->db),
+        );
     }
 }

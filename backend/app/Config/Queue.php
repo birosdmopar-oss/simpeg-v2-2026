@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Config;
 
 use App\Jobs\DummyJob;
+use App\Jobs\PushNotifLayananJob;
 use App\Jobs\ResetPasswordEmailJob;
 use CodeIgniter\Queue\Config\Queue as BaseQueue;
 use CodeIgniter\Queue\Handlers\DatabaseHandler;
@@ -16,6 +17,9 @@ use CodeIgniter\Queue\Handlers\DatabaseHandler;
  * Queue `email` (CR-014, ISSUE-006): job `reset-password-email` (tautan reset password, isi terenkripsi) dari
  * EmailResetTokenNotifier. Worker: `php spark queue:work email --stop-when-empty --max-time 55` lewat cron tiap menit
  * (README-deploy.md §1a). Tanpa worker, email reset tidak pernah terkirim.
+ *
+ * Queue `push` (MAKE-023, PRD Fase 4 §6.6.3): job `push-notif` (push mock FCM per `inbox_msg`). Worker:
+ * `php spark queue:work push --stop-when-empty --max-time 55` (README-deploy.md §1b).
  */
 class Queue extends BaseQueue
 {
@@ -42,5 +46,6 @@ class Queue extends BaseQueue
     public array $jobHandlers = [
         'dummy'                => DummyJob::class,
         'reset-password-email' => ResetPasswordEmailJob::class,
+        'push-notif'           => PushNotifLayananJob::class,
     ];
 }

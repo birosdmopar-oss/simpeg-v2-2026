@@ -64,6 +64,7 @@ class CutiService
         private readonly AttachmentServiceInterface $lampiran,
         private readonly ?WebConfigService $web = null,
         private readonly ?Closure $sekarang = null,
+        private readonly ?CutiNotifikasiService $notifikasi = null,
     ) {
     }
 
@@ -679,12 +680,13 @@ class CutiService
             $data['show_pejabat'] = 1;
         }
 
-        $ketua  = $siap['ketua_tim'];
-        $idBaru = 0;
+        $ketua   = $siap['ketua_tim'];
+        $idBaru  = 0;
+        $idNotif = [];
 
         $this->sebelumTransaksi();
 
-        $this->dalamTransaksi(function () use ($auth, $nip, $data, $ketua, $berkas, $lama, $status, $hari, $tahunAcuan, $profil, &$idBaru): void {
+        $this->dalamTransaksi(function () use ($auth, $nip, $data, $ketua, $berkas, $lama, $status, $hari, $tahunAcuan, $profil, &$idBaru, &$idNotif): void {
             $this->kunciPegawai($nip);
 
             // Ulangi pemeriksaan yang bergantung keadaan di bawah lock (balapan dengan persetujuan/hapus/pengajuan lain).
@@ -748,7 +750,15 @@ class CutiService
                     throw new ValidationException('Validasi gagal.', ['lama_cuti' => [(string) $hasil->pesan]]);
                 }
             }
+
+            // Notifikasi (§6.6.2) ditulis di transaksi yang sama; push diantrekan sesudah commit.
+            if ($this->notifikasi !== null) {
+                $baris   = $this->ambil($idBaru, true) ?? throw new NotFoundException();
+                $idNotif = $lama === null ? $this->notifikasi->diajukan($baris) : $this->notifikasi->diubah($baris);
+            }
         });
+
+        $this->notifikasi?->antrekan($idNotif);
 
         return $this->itemDetail($auth, $this->ambil($idBaru) ?? throw new NotFoundException());
     }

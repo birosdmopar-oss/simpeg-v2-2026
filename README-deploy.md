@@ -147,6 +147,19 @@ Driver `auth.resetTokenNotifier = email` **tidak** mengirim SMTP di dalam reques
 
 4. Pantau: baris `queue_jobs` queue `email` yang lebih tua dari 10 menit berarti worker tidak berjalan. `VITE_PASSWORD_RESET_ENABLED=true` di frontend baru dinyalakan setelah kirim nyata lolos di Dev. Hook `post-receive` tidak menjalankan worker (ranah CR-021).
 
+### 1b. Push notifikasi layanan (MAKE-023, PRD Fase 4 §6.6.3)
+
+Notifikasi layanan (cuti, TB, IB, PMK) ditulis ke `inbox`/`inbox_msg` v2 di dalam transaksi bisnis; push-nya **tidak** dikirim di dalam request, melainkan satu job `push-notif` per `inbox_msg` di queue `push` (tabel `queue_jobs`) yang diantrekan sesudah commit. Di Fase 4 adapter push = mock (tidak ada koneksi jaringan; payload hanya tercatat di log), jadi tanpa worker notifikasi `inbox` tetap tersimpan tetapi `inbox_msg.push_status` tinggal `0` (antre).
+
+Worker lewat cron user `deploy` (pola sama dengan §1a):
+
+```bash
+# /etc/cron.d/simpeg-v2-queue-push
+* * * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-queue-push.lock php spark queue:work push --stop-when-empty --max-time 55 >> /var/www/simpeg-v2/logs/queue-push.log 2>&1
+```
+
+Job dicoba ulang tiap 60 detik sampai 5 percobaan, lalu pindah ke `queue_jobs_failed` (`php spark queue:failed`); tidak retry selamanya. Penerima tanpa token perangkat (`firebase_token`) ditandai `push_status = 3` tanpa galat. Pantau: baris `queue_jobs` queue `push` yang lebih tua dari 10 menit berarti worker tidak berjalan; `inbox_msg.push_status = 2` berarti push gagal (log `[NotifikasiService]` / `[MockFcmAdapter]`).
+
 ---
 
 ## 2. Cara push (operator deploy)

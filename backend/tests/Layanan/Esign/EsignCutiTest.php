@@ -209,6 +209,35 @@ final class EsignCutiTest extends DatabaseTestCase
         $this->assertSame($a['al']['nip'], $this->db->table('esign_hist')->where('id_rw', $id)->get()->getRowArray()['nip']);
     }
 
+    public function testSuratTerbitMengabariPemohonDanMengantrekanPush(): void
+    {
+        ['id' => $id, 'a' => $a] = $this->cutiFinal();
+        $this->pasangNotifikasi();
+
+        $this->esignService()->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+
+        $pesan = $this->db->table('inbox_msg')->select('inbox.judul, inbox_msg.status_sumber, inbox_msg.id_inbox_msg')->join('inbox', 'inbox.id_inbox = inbox_msg.id_inbox')->where('inbox.nip_penerima', $a['pemohon']['nip'])->get()->getResultArray();
+        $this->assertCount(1, $pesan);
+        $this->assertSame('Surat Cuti Online Terbit', $pesan[0]['judul']);
+        $this->assertSame(1, (int) $pesan[0]['status_sumber']);
+        $this->assertSame([(int) $pesan[0]['id_inbox_msg']], $this->diantrekan);
+    }
+
+    public function testGagalTidakMengabariPemohon(): void
+    {
+        ['id' => $id, 'a' => $a] = $this->cutiFinal();
+        $this->pasangNotifikasi();
+
+        try {
+            $this->esignService([$a['pyb']['nip']])->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+        } catch (ValidationException) {
+            // gagal gateway
+        }
+
+        $this->assertSame(0, $this->db->table('inbox')->countAllResults());
+        $this->assertSame([], $this->diantrekan);
+    }
+
     public function testAdapterDiambilDariLayananEsignGatewayDriverMockTanpaJaringan(): void
     {
         $this->assertInstanceOf(MockEsignAdapter::class, service('esignGateway', false));

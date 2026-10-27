@@ -56,6 +56,7 @@ trait EsignUjiTrait
             new SuratCutiService($this->db, $this->lampiranUji),
             new MockEsignAdapter($tanpaSertifikat),
             new PegawaiScope($this->db),
+            $this->notifikasiUji,
         );
     }
 }

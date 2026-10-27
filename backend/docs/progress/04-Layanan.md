@@ -268,3 +268,40 @@ Saldo massal memakai jalur PROSES `PegawaiScope`; ubah `pa_layanan` role 3 meneg
 (T4 = NULL) dan alasan atas nama non-tolak hanya di audit (`jenis_audit`).
 
 **Batasan diketahui.** Baris dengan AL terisi dan PyB kosong: `ResetTundaCuti` tidak mereset `skip_pyb` bagi AL (dampak rendah; PyB wajib saat ajukan, hanya data impor yang bisa begitu).
+
+## M4 — E-sign mock, notifikasi, job push (MAKE-023, 28-10-2026, branch `fase4/make-023-esign-notifikasi` dari main `f636194`)
+
+PRD Fase 4 v1.3 §6.5 (C-05), §6.6 (C-06), §6.12, §9 baris M4. Tanpa migration baru, tanpa frontend.
+
+**Tahap A — e-sign dan surat cuti.** `POST cuti/{id}/esign` (role 1, 3; `CutiEsignController`) → `EsignCutiService`. `SuratCutiService`
+menggantikan `PenerbitSuratCutiNoOp` di binding `penerbitSuratCuti`: surat BELUM TTE dirender dari `Views/pdf/surat_cuti.php` (port
+templat legacy, kop kementerian K1 `KopDokumen::html(null, null)`, QR kode identitas dokumen) saat efek final 1/4 dan disimpan
+`document_attachment` kode 44; ber-TTE disimpan terpisah kode 45. `esign_hist` (`EsignHistModel`) ditulis di luar transaksi bisnis, satu
+baris per percobaan. Adapter = `service('esignGateway')` (driver mock; di kode PRD menyebut `service('esign')`, nama sebenarnya
+`esignGateway`). Passphrase hanya dari body, tidak disimpan/dicatat/dikembalikan; pesan gateway dibersihkan dari passphrase.
+
+**Tahap B — notifikasi dan push.** `NotifikasiService` (implements `NotifikasiLayananInterface`, menggantikan `NotifikasiNoOp` di
+`notifikasiLayanan`; pemanggil TB/IB/PMK tidak berubah) menulis `inbox` (satu induk per penerima per pengajuan, dipakai ulang dan
+di-"belum dibaca"-kan lagi) dan `inbox_msg`; `enqueuePush()` mengantrekan satu job `push-notif` per pesan ke queue `push`
+(`PushNotifLayananJob`, TRIES 5). `TemplatNotifikasi` (murni) dan `PenerimaNotifikasi` (ketua tim, admin role 1), titik kirim cuti di
+`CutiNotifikasiService` dipasang di `CutiService::simpan` (diajukan T1/T2, diubah T12; admin langsung final) dan
+`CutiApprovalService::process` (T4–T10, T14); surat terbit dikirim sesudah commit e-sign. Worker: README-deploy.md §1b.
+
+**Keputusan / hal ambigu untuk reviewer.**
+1. Role 3 di luar lingkup → **403** (AC-05.4); baris tak ada → 404. PRD §6.5.3 langkah 1 menulis "terlihat (404)" lalu "lingkup (403)";
+   untuk role 3 keduanya bertabrakan, dipilih mengikuti AC-05.4 (`PegawaiScope::bolehProses`).
+2. Penanda tangan: PyB; langkah tunggal tanpa PyB → AL; keduanya kosong → 422 `errors.nip`. NIK kosong → dicatat gagal (pesan "NIK pejabat
+   belum terdaftar.") sebelum gateway dipanggil.
+3. Surat belum TTE yang belum ada (cuti final sebelum M4) dibuat dulu saat e-sign (transaksi tersendiri), lalu ditandatangani.
+4. Tolak/tangguhkan mengikuti PRD: alasan hanya pada notifikasi tolak; tangguhkan tanpa `Ket:`.
+5. Akun role 1 tanpa NIP tidak menerima notifikasi "Perlu Diproses Admin" (kunci `inbox` = NIP). Penerima NIP yang tidak ada di `pegawai`
+   dilewati.
+6. Pelaku aksi dikecualikan lewat `service('authContext')->nip()` di dalam `NotifikasiService::kirim` (signature antarmuka tetap).
+7. `url` notifikasi cuti `/layanan/cuti/{id}` (pola sama dengan M5); rute FE final milik M7.
+8. `PushNotifJobTest` menjalankan `process()` langsung (tidak ada koneksi DB kedua) sehingga tanpa `#[Group('db-isolasi-penuh')]`;
+   `NotifikasiServiceTest` memeriksa baris `queue_jobs` antrean `push`.
+9. Kegagalan notifikasi surat terbit hanya dicatat (surat sudah ber-TTE); kegagalan enqueue push → `push_status = 2` dan log.
+
+**Test.** `tests/Layanan/Esign/{EsignCutiTest,EsignHistTest,EsignRoleTest,SuratCutiTest}`, `tests/Layanan/Notifikasi/{NotifikasiServiceTest,
+NotifikasiPenerimaTest,NotifikasiTidakKeTicketingTest,PushNotifJobTest}`, `tests/unit/Layanan/Notifikasi/TemplatNotifikasiTest`; baris
+`POST cuti/{id}/esign` (1,3) di `KontrakMatriksRoleTest`.
