@@ -786,7 +786,7 @@ Usulan coder (disetujui reviewer CR 27-10-2026 sebagai usulan; **belum diverifik
 
 | Berkas | Isi |
 |---|---|
-| `tests/database/Layanan/SkemaLayananTest.php` | 20 tabel, 31 FK RESTRICT (nama, kolom, induk), 5 FK ditahan tidak terpasang, 39 CHECK; kolom/index kunci; seed `jenis_cuti` 1..6, `jenis_layanan` 1..5, `jenis_pa` 1, `jenis_rwy` 43..50; penegakan 1452/1451/1062/CHECK |
+| `tests/database/Layanan/SkemaLayananTest.php` (daftar tabel/FK/CHECK di `tests/_support/Layanan/SkemaLayanan.php`, dipakai juga oleh `LepasMigrationKepegawaianTrait::lepasFkG02()` dan `JabatanSisaSchemaTest`) | 20 tabel, 31 FK RESTRICT (nama, kolom, induk), 5 FK ditahan tidak terpasang, 39 CHECK; kolom/index kunci; seed `jenis_cuti` 1..6, `jenis_layanan` 1..5, `jenis_pa` 1, `jenis_rwy` 43..50; penegakan 1452/1451/1062/CHECK |
 | `tests/database/Layanan/SkemaInboxTicketTest.php` | `inbox` tepat 11 kolom; `inbox`/`inbox_msg` tanpa 5 kolom percakapan (AC-01.2); `disiplin_ticket` memilikinya + CHECK (AC-01.3); tanpa FK silang (AC-01.6) |
 | `tests/database/Layanan/MigrasiLayananSiklusTest.php` (`db-isolasi-penuh`) | `down()` sejak `2026-10-26-100000` melepas 20 tabel + seed 43..50, `up()` identik; `AddFkNipLayananFase4` dipanggil langsung dari `MigrationsDitahan/`: menolak (fail-closed) saat ada NIP atasan yatim, tanpa FK terpasang sebagian, lalu memasang 5 FK RESTRICT setelah data dibereskan; `up()`/`down()` aman diulang; FK yang dipasang dilepas lagi di test/`tearDown()` |
 

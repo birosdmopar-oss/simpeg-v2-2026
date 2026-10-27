@@ -389,6 +389,9 @@ final class NipCascadeTest extends DatabaseTestCase
             'faq_rate'              => ['id_faq_article' => $this->buatArtikelFaq(), 'rate' => 1],
             'jabatan_koordinasi'    => ['jenis' => 1, 'jabatan' => 'Koordinator Uji'],
             'pegawai_hist'          => ['tgl_lahir' => '1990-01-01'],
+            // Fase 4 (DBV-022): `inbox.modul` ber-CHECK domain; tembusan cuti wajib merujuk satu `riwayat_cuti` milik pegawai lain.
+            'inbox'                 => ['modul' => 'cuti'],
+            'riwayat_cuti_notif_kt' => ['id_riwayat_cuti' => $this->sisip('riwayat_cuti', ['nip' => $pegawaiLain, 'id_jenis_cuti' => 1])],
         ];
 
         foreach (TabelAnakNip::sampaiFase(NipCascadeService::FASE) as $r) {
@@ -409,6 +412,11 @@ final class NipCascadeTest extends DatabaseTestCase
 
             if ($r->tabel === 'riwayat_lckh') {
                 $baris['nip_atasan'] = $pegawaiLain;
+            }
+
+            // Kolom approver `riwayat_cuti`: pemilik baris (`nip` NOT NULL, FK) = pegawai lain.
+            if ($r->tabel === 'riwayat_cuti' && $r->kolomDiV2() !== 'nip') {
+                $baris['nip'] = $pegawaiLain;
             }
 
             $this->sisip($r->tabel, $baris);

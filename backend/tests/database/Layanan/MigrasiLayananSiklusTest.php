@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
+use Tests\Support\Layanan\SkemaLayanan;
 use Tests\Support\SkemaKepegawaianTestTrait;
 
 /**
@@ -26,7 +27,7 @@ final class MigrasiLayananSiklusTest extends DatabaseTestCase
     use PegawaiFixtureTrait;
     use SkemaKepegawaianTestTrait;
 
-    private const VERSI_PERTAMA = '2026-10-26-100000';
+    private const VERSI_PERTAMA = SkemaLayanan::VERSI_PERTAMA;
 
     private const NIP_YATIM = '199912312099121001';
 
@@ -53,7 +54,7 @@ final class MigrasiLayananSiklusTest extends DatabaseTestCase
 
         $this->lepasSejak(self::VERSI_PERTAMA);
 
-        foreach (SkemaLayananTest::TABEL as $tabel) {
+        foreach (SkemaLayanan::TABEL as $tabel) {
             $this->assertFalse($this->skemaTableExists($tabel), "{$tabel} terhapus oleh down()");
         }
 
@@ -91,7 +92,7 @@ final class MigrasiLayananSiklusTest extends DatabaseTestCase
         $this->fkDitahan->up();
 
         $fk = $this->fkDitahan();
-        $this->assertEqualsCanonicalizing(SkemaLayananTest::FK_DITAHAN, array_keys($fk), '5 FK NIP approver/petugas');
+        $this->assertEqualsCanonicalizing(SkemaLayanan::FK_DITAHAN, array_keys($fk), '5 FK NIP approver/petugas');
 
         foreach ($fk as $nama => [$update, $delete]) {
             $this->assertSame(['RESTRICT', 'RESTRICT'], [$update, $delete], $nama);
@@ -152,7 +153,7 @@ final class MigrasiLayananSiklusTest extends DatabaseTestCase
         $rows = $this->db->query(
             'SELECT CONSTRAINT_NAME, UPDATE_RULE, DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
              WHERE CONSTRAINT_SCHEMA = ? AND CONSTRAINT_NAME IN ? ORDER BY CONSTRAINT_NAME',
-            [$this->db->getDatabase(), SkemaLayananTest::FK_DITAHAN],
+            [$this->db->getDatabase(), SkemaLayanan::FK_DITAHAN],
         )->getResultArray();
 
         $out = [];
@@ -173,12 +174,12 @@ final class MigrasiLayananSiklusTest extends DatabaseTestCase
     {
         $sidik = [];
 
-        foreach (SkemaLayananTest::TABEL as $tabel) {
+        foreach (SkemaLayanan::TABEL as $tabel) {
             $sidik[$tabel] = [$this->skemaColumns($tabel), $this->skemaDefaults($tabel), $this->skemaIndexes($tabel)];
         }
 
-        $sidik['_fk']    = $this->skemaForeignKeys(SkemaLayananTest::TABEL, SkemaLayananTest::FK_DITAHAN)[0];
-        $sidik['_check'] = $this->skemaChecks(SkemaLayananTest::TABEL);
+        $sidik['_fk']    = $this->skemaForeignKeys(SkemaLayanan::TABEL, SkemaLayanan::FK_DITAHAN)[0];
+        $sidik['_check'] = $this->skemaChecks(SkemaLayanan::TABEL);
 
         return $sidik;
     }

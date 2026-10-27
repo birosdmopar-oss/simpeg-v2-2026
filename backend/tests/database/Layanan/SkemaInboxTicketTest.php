@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\Layanan;
 
 use Tests\Support\DatabaseTestCase;
+use Tests\Support\Layanan\SkemaLayanan;
 use Tests\Support\SkemaKepegawaianTestTrait;
 
 /**
@@ -53,7 +54,7 @@ final class SkemaInboxTicketTest extends DatabaseTestCase
         $this->assertTrue($this->skemaTableExists('disiplin_ticket_msg'));
 
         // Dua pasang tabel terpisah tanpa FK silang (AC-01.6).
-        [$fk]   = $this->skemaForeignKeys(['inbox', 'inbox_msg', 'disiplin_ticket', 'disiplin_ticket_msg'], SkemaLayananTest::FK_DITAHAN);
+        [$fk]   = $this->skemaForeignKeys(['inbox', 'inbox_msg', 'disiplin_ticket', 'disiplin_ticket_msg'], SkemaLayanan::FK_DITAHAN);
         $silang = array_filter($fk, static fn (array $f): bool => (str_starts_with($f[0], 'inbox') && str_starts_with($f[2], 'disiplin'))
             || (str_starts_with($f[0], 'disiplin') && str_starts_with($f[2], 'inbox')));
         $this->assertSame([], $silang);
