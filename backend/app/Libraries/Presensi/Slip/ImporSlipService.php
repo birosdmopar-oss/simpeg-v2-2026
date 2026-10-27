@@ -7,7 +7,6 @@ namespace App\Libraries\Presensi\Slip;
 use App\Constants\Role;
 use App\Exceptions\ApiException;
 use App\Exceptions\ForbiddenException;
-use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Lampiran\ValidasiBerkas;
@@ -95,7 +94,7 @@ final class ImporSlipService
         $filter = PratinjauImpor::filterDariMasukan($bulan, $tahun);
 
         if (! $filter->valid) {
-            throw (new ValidationException((string) $filter->pesan, ['filter_bulan' => [(string) $filter->pesan]]))->denganKode((string) $filter->kode);
+            throw new ApiException((string) $filter->pesan, 422, ['filter_bulan' => [(string) $filter->pesan]], kode: $filter->kode);
         }
 
         /** @var PeriodeSlip|null $periodeFilter */
@@ -155,7 +154,7 @@ final class ImporSlipService
         $muat = $this->penyimpan->muat($token, (int) $auth->idPengguna(), $sekarang);
 
         if ($muat === null) {
-            throw (new NotFoundException(self::PESAN_PRATINJAU_TIDAK_ADA))->denganKode('pratinjau_tidak_ditemukan');
+            throw new ApiException(self::PESAN_PRATINJAU_TIDAK_ADA, 404, kode: KodeGalatSlip::PRATINJAU_TIDAK_DITEMUKAN);
         }
 
         try {
@@ -229,11 +228,12 @@ final class ImporSlipService
         } catch (KonflikImporSlip $e) {
             $this->rollback($db);
 
-            throw (new ApiException(
+            throw new ApiException(
                 "Data slip NIP {$e->nip} periode {$e->periode->label()} sudah ditambahkan proses lain. Tidak ada data yang disimpan; ulangi unggah dan pratinjau.",
                 409,
                 ['nip_periode' => ["{$e->nip} {$e->periode->kunci()}"]],
-            ))->denganKode('konflik_data');
+                kode: KodeGalatSlip::KONFLIK_DATA,
+            );
         } catch (ApiException $e) {
             $this->rollback($db);
 
@@ -324,7 +324,7 @@ final class ImporSlipService
         $susun = PratinjauImpor::susun($sheet[KolomGaji::SHEET_GPP], $sheet[KolomGaji::SHEET_TK], $pegawai, $kunciSudahAda($nip), $filter, $cakupan);
 
         if (! $susun->valid) {
-            throw (new ValidationException((string) $susun->pesan, ['filter_bulan' => [(string) $susun->pesan]]))->denganKode((string) $susun->kode);
+            throw new ApiException((string) $susun->pesan, 422, ['filter_bulan' => [(string) $susun->pesan]], kode: $susun->kode);
         }
 
         $periodeBaris = [];

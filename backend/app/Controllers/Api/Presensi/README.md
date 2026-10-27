@@ -7,8 +7,8 @@ Dokumentasi endpoint (method, path, payload, role akses) ditulis di sini per tas
 ## D-10 Impor Slip Gaji (MAKE-030, PRD 5A §6.2, §7.2)
 
 Controller `SlipGajiImportController`; aturan & akses di `Libraries/Presensi/Slip/ImporSlipService` (logika murni CR-027
-`PratinjauImpor`/`KolomGaji`/`BarisImpor` dipakai apa adanya). Envelope ADR-001; galat mesin memakai field `code`
-(`ApiException::denganKode`).
+`PratinjauImpor`/`KolomGaji`/`BarisImpor` dipakai apa adanya). Envelope ADR-001 + field `code` opsional (snake_case, level atas, urutan
+`status, code, message, errors`; `ApiException` parameter `kode`, konstanta `Libraries/Presensi/Slip/KodeGalatSlip`).
 
 | Method & path | Role | Isi |
 |---|---|---|

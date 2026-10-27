@@ -79,7 +79,7 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
   non-skema sebelumnya; lalu setelah M2: `ImporSlipService` (pratinjau + commit 1 transaksi, 1062 → 409 `konflik_data`,
   audit `warning`/`import`), `GajiPegawaiModel`, `SlipGajiImportController`, `Config/RoutesPresensi.php` (+
   `Routing::$routeFiles`), kontrak role `slip-gaji` di `KontrakMatriksRoleTest`, kode galat mesin opsional di envelope
-  (`ApiException::denganKode`, berkas bersama aditif, commit terpisah), dokumentasi endpoint di README controller.
+  (`ApiException` parameter terakhir `kode` → field `code` envelope, konstanta `KodeGalatSlip`; berkas bersama aditif, commit terpisah), dokumentasi endpoint di README controller.
 - **Test (AC-D10.1–10):** `tests/Presensi/Slip/ImporSlip{Pratinjau,Commit,MismatchNama,Duplikat,KonflikUnique,Akses,Berkas}Test.php`
   + `tests/unit/Presensi/Slip/{PembacaExcelSlip,PenyimpanPratinjau}Test.php`; berkas Excel sintetis dibangkitkan test
   (`tests/_support/Presensi/ImporSlipUjiTrait.php`). Konflik 1062 lewat seam `kaitSebelumTulis` (PRD §7.2.6).

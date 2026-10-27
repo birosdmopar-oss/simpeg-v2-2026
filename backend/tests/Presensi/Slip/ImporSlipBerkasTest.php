@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Presensi\Slip;
 
-use App\Exceptions\NotFoundException;
+use App\Exceptions\ApiException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Presensi\Slip\ImporSlipService;
+use App\Libraries\Presensi\Slip\KodeGalatSlip;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Presensi;
 use Tests\Support\AuthTestTrait;
@@ -103,8 +104,9 @@ final class ImporSlipBerkasTest extends DatabaseTestCase
         try {
             (new ImporSlipService(null, null, null, static fn (): int => $nanti))->commit($auth, $token, null);
             $this->fail('pratinjau kedaluwarsa harus 404');
-        } catch (NotFoundException $e) {
-            $this->assertSame('pratinjau_tidak_ditemukan', $e->getKode());
+        } catch (ApiException $e) {
+            $this->assertSame(404, $e->getStatusCode());
+            $this->assertSame(KodeGalatSlip::PRATINJAU_TIDAK_DITEMUKAN, $e->getKode());
             $this->assertSame(ImporSlipService::PESAN_PRATINJAU_TIDAK_ADA, $e->getMessage());
         }
 

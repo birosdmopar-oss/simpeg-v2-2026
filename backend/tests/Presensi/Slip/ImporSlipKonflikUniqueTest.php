@@ -7,6 +7,7 @@ namespace Tests\Presensi\Slip;
 use App\Exceptions\ApiException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Presensi\Slip\ImporSlipService;
+use App\Libraries\Presensi\Slip\KodeGalatSlip;
 use App\Libraries\Presensi\SlipGaji\PeriodeSlip;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -66,7 +67,7 @@ final class ImporSlipKonflikUniqueTest extends DatabaseTestCase
             $this->fail('1062 harus menjadi 409');
         } catch (ApiException $e) {
             $this->assertSame(409, $e->getStatusCode());
-            $this->assertSame('konflik_data', $e->getKode());
+            $this->assertSame(KodeGalatSlip::KONFLIK_DATA, $e->getKode());
             $this->assertSame("Data slip NIP {$b} periode September 2026 sudah ditambahkan proses lain. Tidak ada data yang disimpan; ulangi unggah dan pratinjau.", $e->getMessage());
             $this->assertSame(['nip_periode' => ["{$b} 2026-09"]], $e->getErrors());
         }
