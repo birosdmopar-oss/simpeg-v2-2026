@@ -10,6 +10,7 @@ use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\ListQuery;
 use App\Models\AuditLogModel;
 use App\Models\Layanan\PegawaiSisaCutiModel;
@@ -125,7 +126,10 @@ class SaldoCutiService
             /** @var string $nip */
             $id = (new PegawaiSisaCutiModel())->insert(['nip' => $nip, 'tahun' => $tahun, 'digunakan' => 0, 'updated_by' => $auth->idPengguna() ?? 0] + $saldo->keBaris());
 
-            return ['dibuat' => 1, 'dilewati' => 0, 'item' => $this->ambil((int) $id)];
+            $p = $this->db->table('pegawai')->select('glr_awal, nama, glr_akhir')->where('nip', $nip)->get()->getRowArray();
+
+            return $this->hasil($tahun, self::TARGET_PILIH, 1, [['nip' => $nip, 'nama' => StrukturService::namaGelar($p['glr_awal'] ?? null, (string) ($p['nama'] ?? ''), $p['glr_akhir'] ?? null)]], [])
+                + ['item' => $this->ambil((int) $id)];
         }
 
         return $this->tambahSemua($auth, $tahun, $saldo);
@@ -168,30 +172,45 @@ class SaldoCutiService
 
     // ------------------------------------------------------------------
 
+    public const ALASAN_SUDAH_PUNYA = 'sudah_punya_saldo';
+
     /**
-     * @return array{dibuat: int, dilewati: int}
+     * Target 1: pegawai aktif jenis 1/6 dalam lingkup pemanggil. Yang sudah punya baris tahun itu DILEWATI (alasan
+     * `sudah_punya_saldo`), yang belum DIBUATKAN. Populasi di luar lingkup atau bukan jenis 1/6 tidak ikut dihitung.
+     *
+     * @return array<string, mixed>
      */
     private function tambahSemua(AuthContext $auth, int $tahun, SaldoCuti $saldo): array
     {
-        $b = $this->db->table('pegawai p')->select('p.nip')->where('p.status', 1)->whereIn('p.id_jenis_pegawai', SaldoTahunanService::JENIS_PEGAWAI);
+        $b = $this->db->table('pegawai p')->select('p.nip, p.nama, p.glr_awal, p.glr_akhir')->where('p.status', 1)->whereIn('p.id_jenis_pegawai', SaldoTahunanService::JENIS_PEGAWAI);
         $this->scope->terapkanKeQuery($b, $auth, 'p.nip');
-        $semua = array_map('strval', array_column($b->get()->getResultArray(), 'nip'));
+        $populasi = $b->orderBy('p.nama', 'ASC')->get()->getResultArray();
 
         $ada = array_flip(array_map('strval', array_column(
             $this->db->table('pegawai_sisa_cuti')->select('nip')->where('tahun', $tahun)->get()->getResultArray(),
             'nip',
         )));
 
-        $baru = [];
-        $now  = date('Y-m-d H:i:s');
+        $baru     = [];
+        $dibuat   = [];
+        $dilewati = [];
+        $now      = date('Y-m-d H:i:s');
 
-        foreach ($semua as $nip) {
-            if (! isset($ada[$nip])) {
-                $baru[] = ['nip' => $nip, 'tahun' => $tahun, 'digunakan' => 0, 'created_at' => $now, 'updated_by' => $auth->idPengguna() ?? 0] + $saldo->keBaris();
+        foreach ($populasi as $p) {
+            $nip  = (string) $p['nip'];
+            $nama = StrukturService::namaGelar($p['glr_awal'], (string) $p['nama'], $p['glr_akhir']);
+
+            if (isset($ada[$nip])) {
+                $dilewati[] = ['nip' => $nip, 'nama' => $nama, 'alasan_kode' => self::ALASAN_SUDAH_PUNYA, 'alasan' => "Pegawai sudah memiliki saldo cuti tahun {$tahun}."];
+
+                continue;
             }
+
+            $dibuat[] = ['nip' => $nip, 'nama' => $nama];
+            $baru[]   = ['nip' => $nip, 'tahun' => $tahun, 'digunakan' => 0, 'created_at' => $now, 'updated_by' => $auth->idPengguna() ?? 0] + $saldo->keBaris();
         }
 
-        $hasil = ['dibuat' => count($baru), 'dilewati' => count($semua) - count($baru)];
+        $hasil = $this->hasil($tahun, self::TARGET_SEMUA, count($populasi), $dibuat, $dilewati);
 
         if ($baru === []) {
             return $hasil;
@@ -204,7 +223,13 @@ class SaldoCutiService
                 $this->db->table('pegawai_sisa_cuti')->insertBatch($potong);
             }
 
-            (new AuditLogModel())->record('pegawai_sisa_cuti', (string) $tahun, AuditLogModel::EVENT_CREATE, null, ['jenis_audit' => 'cuti.saldo_massal', 'tahun' => $tahun, 'saldo' => $saldo->keBaris()] + $hasil, $auth->idPengguna(), $auth->nip());
+            (new AuditLogModel())->record('pegawai_sisa_cuti', (string) $tahun, AuditLogModel::EVENT_CREATE, null, [
+                'jenis_audit'  => 'cuti.saldo_massal',
+                'saldo'        => $saldo->keBaris(),
+                'ringkasan'    => $hasil['ringkasan'],
+                'nip_dibuat'   => array_column($dibuat, 'nip'),
+                'nip_dilewati' => array_column($dilewati, 'nip'),
+            ], $auth->idPengguna(), $auth->nip());
 
             if (! $this->db->transStatus()) {
                 throw new \RuntimeException('Penambahan saldo massal gagal.');
@@ -219,6 +244,34 @@ class SaldoCutiService
         }
 
         return $hasil;
+    }
+
+    /**
+     * Bentuk respons tambah saldo (kedua target): ringkasan angka, daftar dibuat, daftar dilewati beserta alasan.
+     *
+     * @param list<array{nip: string, nama: string}>                                                   $dibuat
+     * @param list<array{nip: string, nama: string, alasan_kode: string, alasan: string}> $dilewati
+     *
+     * @return array<string, mixed>
+     */
+    private function hasil(int $tahun, int $target, int $populasi, array $dibuat, array $dilewati): array
+    {
+        $jumlahDibuat   = count($dibuat);
+        $jumlahDilewati = count($dilewati);
+
+        $pesan = $jumlahDibuat === 0
+            ? ($jumlahDilewati > 0
+                ? "Tidak ada saldo cuti tahun {$tahun} yang dibuat; {$jumlahDilewati} pegawai dilewati karena sudah memiliki saldo."
+                : "Tidak ada pegawai yang memenuhi syarat untuk dibuatkan saldo cuti tahun {$tahun}.")
+            : "Saldo cuti tahun {$tahun} dibuat untuk {$jumlahDibuat} pegawai"
+                . ($jumlahDilewati > 0 ? "; {$jumlahDilewati} pegawai dilewati karena sudah memiliki saldo." : '.');
+
+        return [
+            'message'   => $pesan,
+            'ringkasan' => ['tahun' => $tahun, 'target' => $target, 'jumlah_populasi' => $populasi, 'jumlah_dibuat' => $jumlahDibuat, 'jumlah_dilewati' => $jumlahDilewati],
+            'dibuat'    => $dibuat,
+            'dilewati'  => $dilewati,
+        ];
     }
 
     /**

@@ -34,7 +34,7 @@ galat dikumpulkan dalam satu respons (A-09). Audit tidak memuat isi berkas.
 | `POST cuti/{id}/tunda` | 1,2,3,6,7 | Approver tahap aktif; sebelum `tgl_mulai` 12:00 WIB (inklusif); set `skip_al`/`skip_pyb = 1`, status tidak berubah. Bukan approver → 403; bukan tahapnya atau lewat batas → 422 `errors.status` |
 | `GET cuti/pengingat` | 1,2,3,6,7 | `{items, total}`: antrean `persetujuan` pemanggil yang flag tahapnya masih 0. Flag direset listener `auth.login` (hanya NIP yang login) |
 | `GET cuti/saldo?tahun=&search=&id_unit=&id_satker=&page=&per_page=` | 1,3 | Daftar saldo per tahun (bawaan tahun ini; `tahun` > tahun ini → 422); role 3 dibatasi lingkup; role 4/5 → 403 |
-| `POST cuti/saldo` | 1,3 | `{target: 1\|2, nip?, tahun, sisa_cuti, sisa_cuti_n1, sisa_cuti_n2, utang_cuti, sisa_cuti_ditangguhkan?}`; batas D8 per kolom (422); target 2 sudah punya baris → 422 `errors.nip`; target 1 = semua pegawai aktif jenis 1/6 dalam lingkup yang belum punya baris → `{dibuat, dilewati}` |
+| `POST cuti/saldo` | 1,3 | `{target: 1\|2, nip?, tahun, sisa_cuti, sisa_cuti_n1, sisa_cuti_n2, utang_cuti, sisa_cuti_ditangguhkan?}`; batas D8 per kolom (422); target 2 yang sudah punya baris → 422 `errors.nip` (tidak dilewati diam-diam). Respons **201** kedua target berbentuk sama (lihat contoh di bawah); target 1 = semua pegawai aktif jenis 1/6 dalam lingkup: yang sudah punya baris tahun itu **dilewati** (`alasan_kode = sudah_punya_saldo`), yang belum **dibuat** |
 | `PUT cuti/saldo/{id}`, `DELETE cuti/saldo/{id}` | 1,3 | Ubah kolom saldo; hapus fisik + audit; di luar lingkup role 3 → 404 |
 | `GET cuti/petugas-approval` | 1,3 | Aturan petugas `pa_layanan` (jenis 1) + nama/NIP/jabatan petugas (pemegang saat ini, Plt bila kosong); role 3 hanya `id_unit_pemohon` = unit pemanggil |
 | `POST cuti/petugas-approval`, `PUT …/{id}`, `DELETE …/{id}` | 1,3 | Whitelist kolom; `petugas` = `struk_<id_jabatan>` \| `koord_<id_jabatan_koord>` \| `other_<nip>`; GJ pemohon 2/3 → `gol_ruang_pemohon` wajib, selain itu `id_sub_group_jabatan_pemohon`; ubah hanya baris status 1; role 3 tambah wajib `id_unit_pemohon` = unit sendiri (422), ubah/hapus unit lain → 403; hapus fisik + audit |
@@ -99,3 +99,20 @@ Route: `Config/RoutesLayananStudi.php`, filter `jwt` + `role:1,2,3` (`DasarPmkSe
 | `POST pmk/pengajuan/{id}/process` | 1,2,3 | PIC PMK aktif; status 0/3. `{aksi: proses\|setujui\|tolak, reason_note}`: 0 → 3, 0/3 → 1, 0/3 → 2 (alasan wajib ≤ 255 byte); 1/2 → 422 `errors.status`. Tanpa salin ke `riwayat_pmk`, tanpa ubah masa kerja (D16) |
 
 | `GET pmk/pengajuan/{id}/berkas/{kolom}` | 1,2,3 | **[V2] gap PRD §5.4** (disetujui Horii 27-10-2026; legacy membuka lewat tautan langsung `views/hr/employee/rwy/pmk/req/admin/form.php:142-214`, `pathToSrc()` `helpers/function_helper.php:314`). Hak = hak lihat detail (404 bila tak terlihat). `{kolom}` hanya `file_kontrak`, `file_paklaring`, `file_surat_phk`, `file_slip_gaji` (lain → 404). Berkas dari kolom lewat KolomBerkas di dalam akar storage; kolom kosong, path impor legacy yang belum ada di storage v2, atau path yang ditolak storage (traversal) → 404. Isi dialirkan dengan mime dari isi, nama `pmk_{id}_{kolom}.{ext}` (tanpa path internal), `attachment` (`inline=1` → inline), `nosniff`, `no-store` |
+
+Contoh respons `POST cuti/saldo` (data sintetis), target 1, tahun 2026:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "message": "Saldo cuti tahun 2026 dibuat untuk 2 pegawai; 1 pegawai dilewati karena sudah memiliki saldo.",
+    "ringkasan": {"tahun": 2026, "target": 1, "jumlah_populasi": 3, "jumlah_dibuat": 2, "jumlah_dilewati": 1},
+    "dibuat": [{"nip": "199001010001010001", "nama": "Contoh Satu, S.T."}, {"nip": "199001010001010002", "nama": "Contoh Dua"}],
+    "dilewati": [{"nip": "199001010001010003", "nama": "Contoh Tiga", "alasan_kode": "sudah_punya_saldo", "alasan": "Pegawai sudah memiliki saldo cuti tahun 2026."}]
+  }
+}
+```
+
+Semua sudah punya saldo: `jumlah_dibuat = 0`, `dibuat = []`, `message` "Tidak ada saldo cuti tahun 2026 yang dibuat; N pegawai dilewati karena sudah memiliki saldo." Audit ringkasan
+(`jenis_audit = cuti.saldo_massal`) memuat angka yang sama dan daftar `nip_dibuat`/`nip_dilewati` tanpa nama.

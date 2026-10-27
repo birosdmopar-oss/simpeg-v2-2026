@@ -52,7 +52,9 @@ final class SaldoCutiCrudTest extends DatabaseTestCase
 
         $hasil = $this->service()->tambah($admin['auth'], $this->isian($p['nip'], ['sisa_cuti_n1' => 4]));
 
-        $this->assertSame(1, $hasil['dibuat']);
+        $this->assertSame(1, $hasil['ringkasan']['jumlah_dibuat']);
+        $this->assertSame([$p['nip']], array_column($hasil['dibuat'], 'nip'));
+        $this->assertSame([], $hasil['dilewati']);
         $this->seeInDatabase('pegawai_sisa_cuti', ['nip' => $p['nip'], 'tahun' => 2026, 'sisa_cuti' => 12, 'sisa_cuti_n1' => 4, 'sisa_cuti_n2' => 6]);
         $this->seeInDatabase('audit_logs', ['entity' => 'pegawai_sisa_cuti', 'event' => 'create']);
     }
@@ -136,20 +138,57 @@ final class SaldoCutiCrudTest extends DatabaseTestCase
         }
     }
 
-    public function testTargetSemuaHanyaMenambahYangBelumPunyaBarisDanMengabaikanJenisLain(): void
+    public function testTargetSemuaMembuatYangBelumDanMelewatiYangSudahDenganAlasan(): void
     {
-        $a     = $this->buatPemohon(2);
-        $b     = $this->buatPemohon(2);
+        $a     = $this->buatPemohon(2, ['nama' => 'Ada Dulu', 'glr_akhir' => 'S.T.']);
+        $b     = $this->buatPemohon(2, ['nama' => 'Belum Punya']);
         $lain  = $this->buatPemohon(2, ['id_jenis_pegawai' => 2]);
         $admin = $this->buatPemohon(1);
         $this->buatSaldo($a['nip'], 2026, [1, 1, 1, 1, 0]);
 
         $hasil = $this->service()->tambah($admin['auth'], $this->isian('', ['target' => 1]));
 
-        $this->assertGreaterThanOrEqual(2, $hasil['dibuat']);
+        $this->assertSame(2026, $hasil['ringkasan']['tahun']);
+        $this->assertSame(1, $hasil['ringkasan']['target']);
+        $this->assertSame($hasil['ringkasan']['jumlah_dibuat'] + $hasil['ringkasan']['jumlah_dilewati'], $hasil['ringkasan']['jumlah_populasi']);
+        $this->assertContains($b['nip'], array_column($hasil['dibuat'], 'nip'));
+        $this->assertNotContains($a['nip'], array_column($hasil['dibuat'], 'nip'));
+        $this->assertNotContains($lain['nip'], array_column($hasil['dibuat'], 'nip'));
+
+        $lewat = array_values(array_filter($hasil['dilewati'], static fn (array $d): bool => $d['nip'] === $a['nip']));
+        $this->assertCount(1, $lewat);
+        $this->assertSame(['nip', 'nama', 'alasan_kode', 'alasan'], array_keys($lewat[0]));
+        $this->assertSame('sudah_punya_saldo', $lewat[0]['alasan_kode']);
+        $this->assertSame('Pegawai sudah memiliki saldo cuti tahun 2026.', $lewat[0]['alasan']);
+        $this->assertSame('Ada Dulu, S.T.', $lewat[0]['nama']);
+        $this->assertStringContainsString('dilewati karena sudah memiliki saldo', $hasil['message']);
+
         $this->seeInDatabase('pegawai_sisa_cuti', ['nip' => $b['nip'], 'tahun' => 2026, 'sisa_cuti' => 12]);
         $this->seeInDatabase('pegawai_sisa_cuti', ['nip' => $a['nip'], 'tahun' => 2026, 'sisa_cuti' => 1]);
         $this->dontSeeInDatabase('pegawai_sisa_cuti', ['nip' => $lain['nip']]);
+
+        $audit = json_decode((string) $this->db->table('audit_logs')->where('entity', 'pegawai_sisa_cuti')->like('after_json', 'cuti.saldo_massal')->get()->getRowArray()['after_json'], true);
+        $this->assertEqualsCanonicalizing($hasil['ringkasan'], $audit['ringkasan']);
+        $this->assertContains($b['nip'], $audit['nip_dibuat']);
+        $this->assertContains($a['nip'], $audit['nip_dilewati']);
+        $this->assertArrayNotHasKey('nama', $audit);
+    }
+
+    public function testTargetSemuaBilaSemuaSudahAdaTidakMembuatApaPunDenganPesanJelas(): void
+    {
+        $a     = $this->buatPemohon(2);
+        $admin = $this->buatPemohon(1);
+        $this->service()->tambah($admin['auth'], $this->isian('', ['target' => 1]));
+        $sebelum = $this->db->table('pegawai_sisa_cuti')->countAllResults();
+
+        $hasil = $this->service()->tambah($admin['auth'], $this->isian('', ['target' => 1]));
+
+        $this->assertSame(0, $hasil['ringkasan']['jumlah_dibuat']);
+        $this->assertSame($hasil['ringkasan']['jumlah_populasi'], $hasil['ringkasan']['jumlah_dilewati']);
+        $this->assertSame([], $hasil['dibuat']);
+        $this->assertStringStartsWith('Tidak ada saldo cuti tahun 2026 yang dibuat;', $hasil['message']);
+        $this->assertSame($sebelum, $this->db->table('pegawai_sisa_cuti')->countAllResults());
+        $this->assertContains($a['nip'], array_column($hasil['dilewati'], 'nip'));
     }
 
     public function testUbahDanHapusFisikDenganAudit(): void
