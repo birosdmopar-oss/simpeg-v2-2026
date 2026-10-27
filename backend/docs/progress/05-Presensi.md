@@ -24,10 +24,10 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Logika murni CR-037/CR-039 selesai; adapter `TukinData` 5A (non-skema boleh mulai, merge setelah M2); precedence/laporan di 5B |
 | D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | — | — | TODO | Di luar 5A |
 | D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **IN_PROGRESS** | Impor 3 langkah + test AC-D10 di branch `fase5a/make-030-impor-slip-gaji` (bagian "5A M3"); menunggu review/merge |
-| D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | TODO | Menunggu M3 |
+| D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | **IN_PROGRESS** | WIP dijeda 27-10-2026 (instruksi Horii); lihat "5A M4 (JEDA)" |
 | D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 | MAKE-034 | TODO | |
 | D-13 Unit test lengkap | 5A (bagian) / 5C | M8 | MAKE-035 | **IN_PROGRESS** | Bagian murni CR-037/CR-027; regression suite lengkap di 5C |
-| D-14 Verifikasi QR publik | 5A | M4 | MAKE-031 | TODO | Kartu QASMTASK baru (F5-20) |
+| D-14 Verifikasi QR publik | 5A | M4 | MAKE-031 | **IN_PROGRESS** | Kode ada, test belum; dijeda 27-10-2026 (bagian "5A M4 (JEDA)") |
 
 **Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** nilai uang makan slip (5B, F5-1); konfirmasi Biro Keuangan
 atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan ulang data `gaji_pegawai` produksi (DEPLOY-002.1; Q5A-02 ditutup ISSUE-049).
@@ -86,6 +86,25 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
 - **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
   (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran
   (CR-054); galat filter periode dipetakan ke `errors.filter_bulan` + `code`.
+
+## 5A M4 — D-11/D-14 akses & verifikasi Slip Gaji (MAKE-031) — JEDA 27-10-2026 (instruksi Horii, WIP belum siap review)
+
+- **Sudah (branch `fase5a/make-031-akses-verifikasi-slip`):** persiapan non-skema (RingkasanSlip + uang makan F5-1, kontrak
+  `UangMakanSlip*`, `ThrottlePublikFilter`, `PdfSlipGaji` + view, `KopSlip`, README 771f8b4); merge `origin/main` 2e0aabd
+  (M3) 9e3ae78 (konflik `Config/Presensi.php` digabung blok M3+M4); b5da9e0 `TokenSlipService`, `SlipGajiData`,
+  `SlipGajiService` (daftar/status/buka atomik/PDF pegawai, snapshot uang makan §7.3.7, seam `kaitBuka`),
+  `SlipGajiAdminService` (monitoring/detail/koreksi/buka ulang/PDF admin), `VerifikasiSlipService`, `SlipSudahDibuka`,
+  konstanta `KodeGalatSlip`, `GajiPegawaiQrHistoryModel`, 3 controller, route M4 + grup publik `throttle`,
+  `Config\Presensi` blok M4 (`$sumberUangMakan`, `$urlVerifikasiSlip`); f76cd5a alias filter `throttle` (Filters, aditif) +
+  kontrak role `slip-gaji`/`publik`; commit WIP: `tests/_support/Presensi/SlipUjiTrait.php` + `BukaSlipAtomikTest` (lolos).
+- **Belum:** test wajib `GerbangSlipTest`, `SlipPegawaiAksesTest`, `BukaSlipKonkurensiTest` (db-isolasi-penuh, seam
+  `kaitBuka` + koneksi kedua), `SlipAdminTest`, `UangMakanSnapshotTest`, `RoleMatriksSlipTest`, `VerifikasiSlipTest`,
+  `RoutePresensiKontrakTest`; README endpoint controller M4; gate cepat penuh area slip; CI; `./check.sh`; laporan M4.
+  FE M7 belum.
+- **M5 (`fase5a/make-032-presensi-online-manual` @ c085341):** kode + 10 test lengkap, gate cepat lolos (580), **gate penuh
+  `./check.sh` belum jalan**; belum dilaporkan siap review.
+- **Langkah berikutnya setelah "Lanjutkan":** tulis test M4 yang belum → gate cepat → push → CI → README → `./check.sh` M4;
+  lalu `./check.sh` M5 (worktree di-checkout ke 032) → lapor M4 & M5. Merge keduanya menunggu izin Horii.
 
 ### Q cutover 5A
 
