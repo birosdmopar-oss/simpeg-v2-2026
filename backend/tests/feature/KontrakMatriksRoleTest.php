@@ -55,7 +55,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb|ib|pmk)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb|ib|pmk|presensi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -125,6 +125,20 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/pmk/([0-9]+)/arsip/([0-9]+)'        => [1, 2, 3],
             'DELETE api/v1/pmk/([0-9]+)'                       => [1, 2, 3],
             'GET api/v1/dokumen/([^/]+)'                       => [1, 3, 4, 5, 8],
+
+            // Modul D — Fase 5A D-02/D-03 presensi (MAKE-032): Matriks Bagian 2 `hr/services/local/po_in|po_out`,
+            // `hr/presensi/view_presensi|list_ptt` = 2, 6, 7; `hr/presensi/list_ad|list` = 1, 3, 4, 5 (role 3 lingkup satker,
+            // F5-15); `hr/presensi/add|edit|delete` = 1 (akun khusus `Config\Presensi::$akunPresensiManual` di service).
+            'GET api/v1/presensi/saya/hari-ini'             => [2, 6, 7],
+            'GET api/v1/presensi/saya'                      => [2, 6, 7],
+            'POST api/v1/presensi/cek-lokasi'               => [2, 6, 7],
+            'POST api/v1/presensi/masuk'                    => [2, 6, 7],
+            'POST api/v1/presensi/pulang'                   => [2, 6, 7],
+            'GET api/v1/presensi/pegawai'                   => [1, 3, 4, 5],
+            'GET api/v1/presensi/pegawai/([^/]+)'           => [1, 3, 4, 5],
+            'POST api/v1/presensi/manual'                   => [1],
+            'PUT api/v1/presensi/manual/([^/]+)/([^/]+)'    => [1],
+            'DELETE api/v1/presensi/manual/([^/]+)/([^/]+)' => [1],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,
