@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Constants\Role;
 use App\Libraries\Layanan\Ib\IbService;
+use App\Libraries\Layanan\Pmk\DasarPmkService;
 use App\Libraries\Layanan\Tb\TbService;
 use CodeIgniter\Router\RouteCollection;
 
@@ -46,4 +47,19 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->post('ib/(:num)/process', 'IbController::process/$1', $ib);
     $routes->get('ib/(:num)/lampiran/(:num)', 'IbController::lampiran/$1/$2', $ib);
     $routes->get('ib/(:num)/surat', 'IbController::surat/$1', $ib);
+
+    // C-09 PMK — role 1, 2, 3 (role 4..8 → 403, DoD 072-4).
+    $pmk = ['filter' => Role::filter(...DasarPmkService::ROLE_ROUTE)];
+    $routes->get('pmk/opsi', 'PmkController::opsi', $pmk);
+    $routes->post('pmk/hitung-mker', 'PmkController::hitungMker', $pmk);
+    $routes->get('pmk/pengajuan', 'PmkController::indexPengajuan', $pmk);
+    $routes->post('pmk/pengajuan', 'PmkController::createPengajuan', $pmk);
+    $routes->get('pmk/pengajuan/(:num)', 'PmkController::showPengajuan/$1', $pmk);
+    $routes->put('pmk/pengajuan/(:num)', 'PmkController::updatePengajuan/$1', $pmk);
+    $routes->delete('pmk/pengajuan/(:num)', 'PmkController::deletePengajuan/$1', $pmk);
+    $routes->post('pmk/pengajuan/(:num)/process', 'PmkController::processPengajuan/$1', $pmk);
+    $routes->get('pmk', 'PmkController::index', $pmk);
+    $routes->put('pmk/(:num)', 'PmkController::tambahArsip/$1', $pmk);
+    $routes->delete('pmk/(:num)/arsip/(:num)', 'PmkController::hapusArsip/$1/$2', $pmk);
+    $routes->delete('pmk/(:num)', 'PmkController::delete/$1', $pmk);
 });

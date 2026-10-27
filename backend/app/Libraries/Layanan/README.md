@@ -123,6 +123,10 @@ Service ber-DB membungkus kelas murni di atas; DILARANG ada aturan tumpang tindi
 | `Tb/StatusTugasBelajar` | implementasi `StatusTugasBelajarInterface` (`Config\Services::statusTugasBelajar()`, Fase 5 D-06) — dua kueri lalu `BebasPresensiTb` |
 | `Tb/SuratTbService` | SK unggahan (kode 47) atau render `Views/pdf/surat_tb.php` |
 | `Ib/IbService`, `Ib/IbApprovalService` | C-08; status selalu 0, tiga slot wajib semua role, efek final = surat |
+| `Pmk/DasarPmkService` | dasar PMK di atas LayananStudi: hak lihat/tulis PMK (role 3 lihat saja, ubah tanpa syarat status [K D19], hapus ditolak bila status 1), tampilan `TampilanPmk`, isi notifikasi |
+| `Pmk/PmkPengajuanService` | C-09 pengajuan: daftar `mode`, opsi (`tmt_cpns` dari `pegawai_cpns.tmtsk`), `hitung-mker`, CRUD; berkas kolom lewat `KolomBerkas` |
+| `Pmk/PmkApprovalService` | C-09 proses PIC (`TransisiPmk`); tanpa efek `riwayat_pmk`/masa kerja (D16) |
+| `Pmk/RiwayatPmkService` | riwayat PMK final: daftar, arsip SK kode 42 (min 1 tersisa), hapus |
 | `Ib/SuratIbService` | render `Views/pdf/surat_ib.php` + simpan kode 50 di transaksi approval (berkas buatan server lewat jalur validasi unggahan yang sama, `UploadedFile` atas berkas sementara), unduh surat terbaru |
 
 Kelas murni baru M5: `Studi/BerkasStudi` (slot berkas & kode `jenis_rwy` 46–50, `slotKosong()`), `Studi/TampilanStudi`

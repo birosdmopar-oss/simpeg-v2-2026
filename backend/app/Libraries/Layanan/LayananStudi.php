@@ -13,6 +13,7 @@ use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Interfaces\Layanan\NotifikasiLayananInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
+use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Layanan\Studi\AturanStudi;
@@ -50,6 +51,9 @@ abstract class LayananStudi
 
     /** @var list<int> id `inbox_msg` yang menunggu enqueue sesudah commit */
     private array $antreanPush = [];
+
+    /** Berkas di kolom (PMK req) transaksi berjalan; direkonsiliasi sesudah commit/rollback. */
+    private ?KolomBerkas $kolomBerkas = null;
 
     public function __construct(
         protected readonly ?BaseConnection $db = null,
@@ -565,6 +569,14 @@ abstract class LayananStudi
         throw new ForbiddenException("Anda tidak berhak melakukan aksi ini pada {$this->namaKecil()} ini.");
     }
 
+    /**
+     * Penulis berkas kolom (`KolomBerkas`, pola transaksi `transBegin` §7.4) untuk transaksi berjalan.
+     */
+    protected function kolomBerkas(): KolomBerkas
+    {
+        return $this->kolomBerkas ??= new KolomBerkas(null, $this->koneksi());
+    }
+
     private function selesaikanBerkas(): void
     {
         $lampiran = $this->lampiran();
@@ -572,5 +584,8 @@ abstract class LayananStudi
         if (method_exists($lampiran, 'selesaikan')) {
             $lampiran->selesaikan();
         }
+
+        $this->kolomBerkas?->selesaikan();
+        $this->kolomBerkas = null;
     }
 }

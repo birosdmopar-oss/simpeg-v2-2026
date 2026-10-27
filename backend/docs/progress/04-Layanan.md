@@ -18,7 +18,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 | C-06 Notifikasi approval | M4 | MAKE-023 | TODO | ⛔ DILARANG mulai sebelum DBV-022 disetujui (PRD §6.1.4) |
 | C-07 Tugas Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 branch `fase4/make-024-tb-ib-pmk-m5`: inti TB (CRUD, proses PIC, perpanjangan, `bebasPresensiPenuh`, surat) + route + kontrak + 6 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-08 Izin Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti IB (CRUD, proses PIC, Surat IB otomatis kode 50) + route + kontrak + 4 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
-| C-09 PMK | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 menyusul IB di branch yang sama |
+| C-09 PMK | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti PMK (pengajuan, opsi, kalkulator, proses PIC 0→3→1/2, riwayat final + arsip SK) + route + kontrak + 5 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | TODO | Menunggu M3 & M5 merged |
 | C-11 Frontend Modul Layanan | M7 | MAKE-026 | TODO | Per halaman setelah backend-nya merged; `ACTIVE_PHASE = 4` hanya di commit penutup |
 | C-12 Unit test & verifikasi | M8 | MAKE-027 | TODO | Menunggu M3–M7 merged |
@@ -198,4 +198,13 @@ model `Models/Layanan/{LayananModel, RiwayatTbModel, RiwayatTbPerpanModel, Riway
 `Ib/{IbService, IbApprovalService, SuratIbService}`; view `Views/pdf/surat_ib.php`. Test `tests/Layanan/Ib/{IbCrudTest,
 IbApprovalTest, IbRoleTest, IbSingleEndNodeTest}` (20 test).
 
-**Belum jalan.** C-09 PMK, gate penuh.
+**Sudah jalan — C-08 IB:** SHA `df3b43b`, CI run 40461106005 hijau.
+
+**Sudah jalan — C-09 PMK.** Route (12) + baris kontrak (prefiks `pmk`, `DasarPmkService::ROLE_ROUTE`); `PmkController`;
+`Pmk/{DasarPmkService, PmkPengajuanService, PmkApprovalService, RiwayatPmkService, TampilanPmk}`; model
+`RiwayatPmkModel`, `RiwayatPmkReqModel`. Test `tests/Layanan/Pmk/{PmkPengajuanTest, PmkApprovalTest, PmkRoleTest,
+PmkSingleEndNodeTest, RiwayatPmkTest}` (32 test).
+
+**Pertanyaan terbuka.** PRD §5.4 tidak memuat endpoint unduh berkas pengajuan PMK (kolom `file_*`); belum dibuat.
+
+**Belum jalan.** Penyambungan notifikasi (M4), gate penuh.

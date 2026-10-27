@@ -43,3 +43,25 @@ role 4/5/8 → 403. Pola sama dengan TB kecuali yang disebut di bawah.
 | `POST ib/{id}/process` | 1,2,3,7 | PIC IB aktif; status 0. `{aksi: setujui\|tolak, reason_note, no_sk, tgl_sk, ds_ib, no_ds_ib, tgl_ds_ib?, perihal_ds_ib?}`. Setujui → **Surat IB PDF dibuat otomatis** (`Views/pdf/surat_ib.php`, penanda tangan Kabiro) dan disimpan kode 50 dalam transaksi yang sama; tanpa efek pegawai/presensi/tukin |
 | `GET ib/{id}/lampiran/{id_attachment}` | 1,2,3,7 | Hak lihat detail; lampiran kode 49/50 milik baris itu, selain itu 404 |
 | `GET ib/{id}/surat` | 1,2,3,7 | Hak lihat detail; Surat IB tersimpan terbaru (hanya status 1), selain itu 404 |
+
+## PMK — C-09 (MAKE-024 M5, PRD Fase 4 §5.4, §6.9)
+
+Route: `Config/RoutesLayananStudi.php`, filter `jwt` + `role:1,2,3` (`DasarPmkService::ROLE_ROUTE`); **role 4–8 → 403**
+(DoD 072-4). Role 3 lihat saja (tulis → 403). PMK hanya PNS (P-17).
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET pmk?nip=&page=&per_page=` | 1,2,3 | Riwayat PMK final (`riwayat_pmk`, impor/SIASN): role 2 diri sendiri, 3 lingkup, 1 semua; item + `arsip[]` (kode 42); `can_edit` |
+| `PUT pmk/{id}` (multipart `arsip`) | 1,2,3 | Role 1 saja: tambah arsip SK (wajib, 2 MB, `jpg jpeg png gif pdf`) → daftar arsip |
+| `DELETE pmk/{id}` | 1,2,3 | Role 1 saja: hapus fisik + audit + arsip |
+| `DELETE pmk/{id}/arsip/{id_attachment}` | 1,2,3 | Role 1 saja; minimal satu arsip tersisa (422 `errors.arsip`); arsip bukan milik baris → 404 |
+| `GET pmk/pengajuan?mode=saya\|pic\|admin&status=&search=` | 1,2,3 | `saya` (role 2), `pic` (PIC PMK aktif: status 0 dan 3, tanpa batas unit [K P-19]), `admin` (role 1 semua, role 3 lingkup lihat saja); bawaan role 1/3 `admin` |
+| `GET pmk/opsi?nip=` | 1,2,3 | `{jenis_pmk[] (Swasta, Negeri), pegawai, tmt_cpns (pegawai_cpns.tmtsk), tgl_awal_maks (TMT − 1 hari), berkas {kolom: label}, can_create}` |
+| `POST pmk/hitung-mker` | 1,2,3 | `{tgl_awal, tgl_akhir}` → `{mker_th, mker_bl, peringatan}` (diff y/m, hari diabaikan [K]) |
+| `POST pmk/pengajuan` (multipart) | 1,2,3 | Role 2 PNS diri sendiri; role 1 `nip` PNS; role 3 → 403. `jenis_pmk`, `instansi`, `tgl_awal`, `tgl_akhir`, `mker_th`, `mker_bl` (dari klien [K P-4]) + berkas kolom `file_kontrak`, `file_paklaring`, `file_surat_phk`, `file_slip_gaji` wajib (2 MB, `jpg jpeg png gif pdf`). Status 0. 201 + detail |
+| `GET pmk/pengajuan/{id}` | 1,2,3 | Pemilik, PIC PMK aktif, role 1, role 3 lingkup; lainnya 404 (status 0 boleh dibuka, Q-16). Kolom berkas = penanda `true/false` (path internal tidak dikirim), `label_status`, `nada_status`, `tahap[]`, `aksi {ubah, hapus, proses}`, `aksi_tersedia[]` |
+| `PUT pmk/pengajuan/{id}` (multipart `POST` + `_method=PUT`) | 1,2,3 | Pemilik (role 2) / role 1, tanpa syarat status; status tidak berubah [K D19]. Berkas pengganti per kolom; wajib bila kolom kosong |
+| `DELETE pmk/pengajuan/{id}` | 1,2,3 | Pemilik / role 1; status 1 → 422 `errors.status` [K]; hapus fisik + audit + berkas (P-9) |
+| `POST pmk/pengajuan/{id}/process` | 1,2,3 | PIC PMK aktif; status 0/3. `{aksi: proses\|setujui\|tolak, reason_note}`: 0 → 3, 0/3 → 1, 0/3 → 2 (alasan wajib ≤ 255 byte); 1/2 → 422 `errors.status`. Tanpa salin ke `riwayat_pmk`, tanpa ubah masa kerja (D16) |
+
+Catatan: PRD §5.4 tidak memuat endpoint unduh berkas pengajuan PMK (berkas kolom); belum dibuat — lihat laporan M5.
