@@ -33,6 +33,7 @@ trait ImporSlipUjiTrait
     protected function siapkanImporSlip(): void
     {
         $this->dirPratinjau = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'slip-impor-uji-' . bin2hex(random_bytes(4)) . DIRECTORY_SEPARATOR;
+
         config(Presensi::class)->direktoriPratinjau = $this->dirPratinjau;
     }
 

@@ -23,7 +23,7 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 | D-03 Presensi manual | 5A | M5 | MAKE-032 | TODO | Menunggu M2 |
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Logika murni CR-037/CR-039 selesai; adapter `TukinData` 5A (non-skema boleh mulai, merge setelah M2); precedence/laporan di 5B |
 | D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | — | — | TODO | Di luar 5A |
-| D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | TODO | Logika murni CR-027 tersedia; menunggu M2 |
+| D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **IN_PROGRESS** | Impor 3 langkah + test AC-D10 di branch `fase5a/make-030-impor-slip-gaji` (bagian "5A M3"); menunggu review/merge |
 | D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | TODO | Menunggu M3 |
 | D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 | MAKE-034 | TODO | |
 | D-13 Unit test lengkap | 5A (bagian) / 5C | M8 | MAKE-035 | **IN_PROGRESS** | Bagian murni CR-037/CR-027; regression suite lengkap di 5C |
@@ -71,6 +71,21 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
 - **Berikutnya:** CI hijau + `./check.sh` penuh → lapor reviewer CR → merge oleh reviewer (izin Horii). Setelah M2 di
   `main`: sambungkan kode non-skema MAKE-030..033 sesuai urutan PRD 5A (M3 impor → M4 akses/verifikasi → M5 presensi →
   M6 adapter Tukin).
+
+## 5A M3 — D-10 impor Slip Gaji (MAKE-030)
+
+- **Sudah (27-10-2026, branch `fase5a/make-030-impor-slip-gaji`):** PhpSpreadsheet 5.10 + ekstensi (cc373bf), ADR-032,
+  `ValidasiBerkas::periksaImpor`, `PembacaExcelSlip`, `PenyimpanPratinjau`, `Config\Presensi` (batas impor) — persiapan
+  non-skema sebelumnya; lalu setelah M2: `ImporSlipService` (pratinjau + commit 1 transaksi, 1062 → 409 `konflik_data`,
+  audit `warning`/`import`), `GajiPegawaiModel`, `SlipGajiImportController`, `Config/RoutesPresensi.php` (+
+  `Routing::$routeFiles`), kontrak role `slip-gaji` di `KontrakMatriksRoleTest`, kode galat mesin opsional di envelope
+  (`ApiException::denganKode`, berkas bersama aditif, commit terpisah), dokumentasi endpoint di README controller.
+- **Test (AC-D10.1–10):** `tests/Presensi/Slip/ImporSlip{Pratinjau,Commit,MismatchNama,Duplikat,KonflikUnique,Akses,Berkas}Test.php`
+  + `tests/unit/Presensi/Slip/{PembacaExcelSlip,PenyimpanPratinjau}Test.php`; berkas Excel sintetis dibangkitkan test
+  (`tests/_support/Presensi/ImporSlipUjiTrait.php`). Konflik 1062 lewat seam `kaitSebelumTulis` (PRD §7.2.6).
+- **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
+  (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran
+  (CR-054); galat filter periode dipetakan ke `errors.filter_bulan` + `code`.
 
 ### Q cutover 5A
 

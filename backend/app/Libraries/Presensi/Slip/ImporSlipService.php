@@ -536,9 +536,10 @@ final class ImporSlipService
 
     private function pesanUkuran(): string
     {
-        $mb = $this->config->maksUkuranImporByte / (1024 * 1024);
+        $byte = $this->config->maksUkuranImporByte;
+        $mb   = $byte % (1024 * 1024) === 0 ? (string) intdiv($byte, 1024 * 1024) : number_format($byte / (1024 * 1024), 1, ',', '');
 
-        return 'Ukuran berkas maksimal ' . (floor($mb) === $mb ? (string) (int) $mb : number_format($mb, 1, ',', '')) . ' MB.';
+        return "Ukuran berkas maksimal {$mb} MB.";
     }
 
     private function rollback(BaseConnection $db): void

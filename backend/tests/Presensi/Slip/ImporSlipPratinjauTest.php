@@ -149,9 +149,9 @@ final class ImporSlipPratinjauTest extends DatabaseTestCase
         $lain   = $this->adminSlip();
         $berkas = fn () => $this->berkasSlip([$this->barisGpp($this->nip, 9, 2026, 'Budi')], [$this->barisTk($this->nip, 9, 2026, 'Budi')]);
 
-        $pertama = $this->dataOk($this->unggahSlip($admin, $berkas()))['token_pratinjau'];
+        $pertama   = $this->dataOk($this->unggahSlip($admin, $berkas()))['token_pratinjau'];
         $milikLain = $this->dataOk($this->unggahSlip($lain, $berkas()))['token_pratinjau'];
-        $kedua   = $this->dataOk($this->unggahSlip($admin, $berkas()))['token_pratinjau'];
+        $kedua     = $this->dataOk($this->unggahSlip($admin, $berkas()))['token_pratinjau'];
 
         $this->assertNotSame($pertama, $kedua);
         $this->assertCount(4, $this->isiDirPratinjau(), 'pratinjau lama pengguna sama terhapus; milik pengguna lain tetap');
