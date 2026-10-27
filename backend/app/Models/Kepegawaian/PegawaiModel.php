@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Models\Kepegawaian;
 
+use App\Libraries\Dashboard\Statistik\StatistikCache;
 use App\Models\BaseAuditableModel;
 
 /**
  * Tabel `pegawai` (B-01 DBV-012, PK `nip`) untuk tulis biodata B-03/B-04/B-05 WS-2 (MAKE-010) dengan audit otomatis
  * create/update/delete. `updated_at` diisi service dalam UTC; `created_at` default DB. Koreksi NIP (B-06) tidak lewat
  * model ini (NipCascadeService: salin + arahkan ulang + hapus dalam satu transaksi, audit manual).
+ * Hook opt-in Model Events (F0-14, Fase 7 MAKE-036 PRD F7-12b): setiap tulis lewat model ini menghapus cache statistik
+ * `dashboard_stat_*` (`invalidasiStatistik`); handler audit BaseAuditableModel ditambahkan konstruktor induk.
  */
 class PegawaiModel extends BaseAuditableModel
 {
@@ -28,4 +31,22 @@ class PegawaiModel extends BaseAuditableModel
         'keterangan', 'status', 'flag_update', 'id_pns_siasn', 'siasn_flag', 'siasn_lu', 'created_at', 'updated_at',
         'updated_by', 'deleted_at',
     ];
+
+    protected $afterInsert = ['invalidasiStatistik'];
+
+    protected $afterUpdate = ['invalidasiStatistik'];
+
+    protected $afterDelete = ['invalidasiStatistik'];
+
+    /**
+     * @param array<string, mixed> $eventData
+     *
+     * @return array<string, mixed>
+     */
+    public function invalidasiStatistik(array $eventData): array
+    {
+        StatistikCache::invalidasi();
+
+        return $eventData;
+    }
 }

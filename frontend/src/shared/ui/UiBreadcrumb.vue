@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * Breadcrumb "Home / Laporan / Unit Kerja" yang muncul di bawah topbar pada seluruh halaman bab 4
- * (mis. §4.1.2, §4.1.3, §4.1.5). Ruas terakhir tidak bisa diklik dan ditandai aria-current.
+ * (mis. §4.1.2, §4.1.3, §4.1.5). Ruas terakhir tidak bisa diklik dan ditandai aria-current. Link memakai biru SIMPEG
+ * (`text-brand-primary`, navy, sama dengan sidebar aktif/navbar), bukan biru aksi `brand-tertiary` (CR-062).
  *
  * Reusable.
  */
@@ -21,7 +22,7 @@ defineProps<{ items: Crumb[] }>()
         <RouterLink
           v-if="item.to && index < items.length - 1"
           :to="item.to"
-          class="inline-flex items-center gap-1.5 rounded px-1 text-brand-tertiary hover:underline"
+          class="inline-flex items-center gap-1.5 rounded px-1 text-brand-primary hover:underline"
         >
           <House v-if="index === 0" class="h-4 w-4" aria-hidden="true" />
           {{ item.label }}

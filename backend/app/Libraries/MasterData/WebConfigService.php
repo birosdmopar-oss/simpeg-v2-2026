@@ -43,6 +43,8 @@ class WebConfigService
 
     private const ERR_DUPLICATE = 1062;
 
+    private const MSG_CASE_CONFLICT = 'Sudah ada baris dengan key yang sama selain huruf besar/kecilnya; hapus baris itu dulu.';
+
     /**
      * Kolom baris yang dikirim ke admin.
      */
@@ -188,6 +190,12 @@ class WebConfigService
             $row = $this->findRow($name);
 
             if ($row === null) {
+                // Baris beda huruf (mis. `NAMA_KEMENTERIAN`) pasti bentrok UNIQUE collation: tolak sebelum INSERT agar tidak
+                // ada log ERROR 1062 dan nilai AUTO_INCREMENT tidak terpakai (CR-058).
+                if ($this->collationRow($name) !== null) {
+                    throw ValidationException::forField('config_name', self::MSG_CASE_CONFLICT);
+                }
+
                 $this->model()->insert([
                     'config_name'  => $name,
                     'config_value' => $value,
@@ -337,6 +345,25 @@ class WebConfigService
      */
     private function findRow(string $name): ?array
     {
+        $row = $this->collationRow($name);
+
+        // Kolom `config_name` ber-collation utf8mb4_unicode_ci (tidak peka huruf besar/kecil), sedangkan katalog dan
+        // peta nilai konsumen peka huruf (ISSUE-028): baris yang hanya cocok secara collation (mis. `NAMA_KEMENTERIAN`
+        // untuk `nama_kementerian`) bukan baris key ini, jadi tidak boleh terbaca, tertimpa, atau terhapus lewat nama itu.
+        if ($row !== null && $row['config_name'] !== $name) {
+            return null;
+        }
+
+        return $row;
+    }
+
+    /**
+     * Baris yang cocok dengan $name menurut collation kolom (bisa beda huruf besar/kecil); null bila tidak ada.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function collationRow(string $name): ?array
+    {
         if (preg_match(WebConfigTypes::NAME_PATTERN, $name) !== 1 || strlen($name) > 255) {
             return null;
         }
@@ -387,7 +414,7 @@ class WebConfigService
             }
 
             $result = $this->transaction(function () use ($name, $value, $remark): bool {
-                $row = $this->findRow($name) ?? throw new NotFoundException('Web config tidak ditemukan.');
+                $row = $this->findRow($name) ?? throw ValidationException::forField('config_name', self::MSG_CASE_CONFLICT);
                 $this->updateRow($row, $value, $remark);
 
                 return false;

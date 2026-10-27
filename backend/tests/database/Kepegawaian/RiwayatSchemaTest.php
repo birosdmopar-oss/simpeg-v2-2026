@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\SkemaD1;
 use Tests\Support\Kepegawaian\SkemaD1TestTrait;
+use Tests\Support\Layanan\SkemaLayanan;
 use Throwable;
 
 /**
@@ -147,17 +148,19 @@ final class RiwayatSchemaTest extends DatabaseTestCase
             $this->assertSame(0, $this->db->table($table)->countAllResults(), "{$table} harus kosong setelah migration");
         }
 
-        $this->assertSame(21, $this->db->table('jenis_rwy')->countAllResults());
+        // Kode 43..50 milik seed Modul C DBV-022 (SeedJenisRwyLayananFase4, diuji SkemaLayananTest).
+        $this->assertSame(21, $this->db->table('jenis_rwy')->whereNotIn('id_jenis_rwy', SkemaLayanan::JENIS_RWY)->countAllResults());
     }
 
     /**
      * Seed `jenis_rwy` = konstanta legacy: kode & kunci (ARSIP_RWY), label & urutan (JENIS_RWY_ARSIP), ditambah baris 0
-     * "Belum Terhubung" [V2] untuk `document_attachment.id_riwayat = 0` legacy. Semua aktif.
+     * "Belum Terhubung" [V2] untuk `document_attachment.id_riwayat = 0` legacy. Semua aktif. Kode 43..50 Modul C (DBV-022)
+     * tidak termasuk.
      */
     public function testJenisRwySeedMatchesLegacyConstants(): void
     {
         $rows = $this->db->query('SELECT `id_jenis_rwy`, `kode`, `jenis_rwy`, `tabel_entri`, `order`, `status`, `updated_by` FROM '
-            . $this->skemaQuoted('jenis_rwy') . ' ORDER BY `order`, `id_jenis_rwy`')->getResultArray();
+            . $this->skemaQuoted('jenis_rwy') . ' WHERE `id_jenis_rwy` NOT IN ? ORDER BY `order`, `id_jenis_rwy`', [SkemaLayanan::JENIS_RWY])->getResultArray();
 
         $expected = [[0, 'belum_terhubung', 'Belum Terhubung', null, 0]];
         $kodeById = array_flip(self::LEGACY_ARSIP_RWY);

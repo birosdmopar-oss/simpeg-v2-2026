@@ -91,7 +91,7 @@ describe('HariLiburFormDialog', () => {
     expect(field<HTMLSelectElement>('select[name="status"]').value).toBe('1')
 
     await setValue('input[name="tgl_mulai"]', '2026-08-17')
-    expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('2026-08-17')
+    expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('17/08/2026')
     await setValue('input[name="tgl_akhir"]', '2026-08-18')
     expect(document.body.textContent).toContain('2 hari')
     await setValue('select[name="id_jenis_libur"]', '1', 'change')
@@ -116,7 +116,7 @@ describe('HariLiburFormDialog', () => {
     // Urutan event `input` Chromium saat mengetik 0 8 1 7 2 0 2 6 di input tanggal.
     for (const value of ['0002-08-17', '0020-08-17', '0202-08-17', '2026-08-17']) {
       await setValue('input[name="tgl_mulai"]', value)
-      expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe(value)
+      expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe(value.split('-').reverse().join('/'))
     }
 
     // Setelah tanggal selesai diubah pengguna, perubahan tanggal mulai tidak lagi menimpanya.
@@ -133,7 +133,7 @@ describe('HariLiburFormDialog', () => {
     const wrapper = await mountDialog(row)
 
     await setValue('input[name="tgl_mulai"]', '2026-03-18')
-    expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('2026-03-20')
+    expect(field<HTMLInputElement>('input[name="tgl_akhir"]').value).toBe('20/03/2026')
     expect(document.body.textContent).toContain('3 hari')
     wrapper.unmount()
   })

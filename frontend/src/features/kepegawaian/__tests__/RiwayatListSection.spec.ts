@@ -364,7 +364,8 @@ describe('RiwayatListSection — tambah/ubah/hapus', () => {
     await wrapper.setProps({ initial: nilai(baris2), baris: baris2 })
     await flushPromises()
     expect(field('no_ijazah')?.value).toBe('IJZ-2')
-    expect(field('tgl_lulus')?.value).toBe('2015-01-02')
+    // Tampilan input tanggal custom (CR-060) = dd/mm/yyyy; nilai terkirim tetap YYYY-MM-DD.
+    expect(field('tgl_lulus')?.value).toBe('02/01/2015')
     expect(q('[data-testid="riwayat-berkas-14"]')?.textContent).not.toContain('ijazah.pdf')
     q('[data-testid="riwayat-form"]')?.dispatchEvent(new Event('submit'))
     await vi.waitFor(() => expect(q('[data-testid="riwayat-berkas-error-14"]')?.textContent).toContain('Ijazah wajib diunggah.'))
@@ -555,7 +556,7 @@ describe('RiwayatListSection — kunci baris Disetujui & isian hitung', () => {
     const wrapper = await mountTab({}, hukdis)
     await selectRowAction(wrapper, 'riwayat-actions-4', 'edit')
     await flushPromises()
-    expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['2027-01-01', '1 Tahun'])
+    expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['01/01/2027', '1 Tahun'])
 
     await setInput('tmtsk', '2026-02-01')
     expect([field('akhir_hukdis')?.value, field('masa_hukuman')?.value]).toEqual(['', ''])
@@ -628,14 +629,26 @@ describe('RiwayatListSection — opsi ref MAKE-007 (filter, induk tetap, LAIN-LA
     expect(field('alamat_utama')).toBeNull()
   })
 
-  it('seminar: bidang & instansi = teks bebas dengan saran nama master (datalist)', async () => {
+  it('seminar: bidang & instansi = teks bebas dengan saran nama master (UiCombobox custom, bukan datalist, CR-060)', async () => {
     options.mockImplementation(async (entity: string) => [{ id: '1', nama: entity === 'bidang-kursem' ? 'Pariwisata' : 'Kemenparekraf', parent: null }])
     const wrapper = await mountTab({}, seminar)
     await openCreate(wrapper)
     await flushPromises()
-    expect(field('bidang_seminar')?.getAttribute('list')).toBe('riwayat-saran-bidang_seminar')
-    expect([...document.querySelectorAll('#riwayat-saran-bidang_seminar option')].map((o) => o.getAttribute('value'))).toEqual(['Pariwisata'])
-    expect([...document.querySelectorAll('#riwayat-saran-instansi_penyelenggara option')].map((o) => o.getAttribute('value'))).toEqual(['Kemenparekraf'])
+    expect(document.querySelector('datalist')).toBeNull()
+    const bidang = field('bidang_seminar')
+    expect(bidang?.getAttribute('role')).toBe('combobox')
+    expect(bidang?.hasAttribute('list')).toBe(false)
+
+    // Fokus + ArrowDown membuka daftar saran dari master; memilih mengisi kolom (nilai tetap teks bebas).
+    bidang?.focus()
+    bidang?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    await flushPromises()
+    const saran = [...document.querySelectorAll('[role="listbox"] [role="option"]')].map((o) => o.textContent?.trim())
+    expect(saran).toEqual(['Pariwisata'])
+    ;(document.querySelector('[role="listbox"] [role="option"]') as HTMLElement).click()
+    await flushPromises()
+    expect(field('bidang_seminar')?.value).toBe('Pariwisata')
+    expect(field('instansi_penyelenggara')?.getAttribute('role')).toBe('combobox')
   })
 
   it('keluarga: item ⋮ Anak (sesudah Lampiran) membuka dialog anak', async () => {
@@ -761,7 +774,7 @@ describe('RiwayatListSection — aturan form legacy SKP & AK Current (perbaikan 
     const wrapper = await mountTab({}, skp)
     await openCreate(wrapper)
     await setInput('tahun', '2022')
-    expect([field('tgl_mulai')?.value, field('tgl_akhir')?.value]).toEqual(['2022-01-01', '2022-12-31'])
+    expect([field('tgl_mulai')?.value, field('tgl_akhir')?.value]).toEqual(['01/01/2022', '31/12/2022'])
     expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(true)
     await setInput('tahun', '2021')
     expect(field('tgl_mulai')?.hasAttribute('readonly')).toBe(false)

@@ -8,7 +8,14 @@
 import { AxiosError, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createApiClient, isApiError, REFRESH_PATH, setAuthFailureHandler } from '../axios'
+import {
+  createApiClient,
+  isApiError,
+  PASSWORD_CHANGE_REQUIRED_CODE,
+  REFRESH_PATH,
+  setAuthFailureHandler,
+  setPasswordChangeRequiredHandler,
+} from '../axios'
 
 type Call = { method: string; url: string; withCredentials: boolean | undefined }
 
@@ -16,6 +23,8 @@ interface FakeServer {
   calls: Call[]
   /** antrian status per URL (FIFO); default 200 */
   queue: Record<string, number[]>
+  /** URL yang jawaban 403-nya membawa code `password_change_required` (JwtAuthFilter, MAKE-020) */
+  passwordRequired: Set<string>
   adapter: NonNullable<AxiosRequestConfig['adapter']>
 }
 
@@ -23,6 +32,7 @@ function makeServer(queue: Record<string, number[]> = {}): FakeServer {
   const server: FakeServer = {
     calls: [],
     queue,
+    passwordRequired: new Set<string>(),
     adapter: async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => {
       const url = config.url ?? ''
       const method = (config.method ?? 'get').toUpperCase()
@@ -39,7 +49,9 @@ function makeServer(queue: Record<string, number[]> = {}): FakeServer {
           data:
             next === 422
               ? { status: 'error', message: 'Validasi gagal', errors: { nip: ['NIP wajib diisi'] } }
-              : { status: 'error', message: next === 401 ? 'Unauthorized' : 'Forbidden' },
+              : next === 403 && server.passwordRequired.has(url)
+                ? { status: 'error', code: PASSWORD_CHANGE_REQUIRED_CODE, message: 'Password wajib diganti sebelum melanjutkan.' }
+                : { status: 'error', message: next === 401 ? 'Unauthorized' : 'Forbidden' },
         }
         throw new AxiosError(`Request failed with status code ${next}`, 'ERR_BAD_REQUEST', config, null, response)
       }
@@ -170,5 +182,112 @@ describe('src/lib/axios (F0-09)', () => {
     await expect(api.get('/master')).rejects.toMatchObject({ status: 403, message: 'Forbidden' })
     expect(server.calls).toHaveLength(1)
     expect(onAuthFailure).not.toHaveBeenCalled()
+  })
+
+  describe('403 password_change_required (MAKE-020/028)', () => {
+    const onPasswordChange = vi.fn()
+
+    beforeEach(() => {
+      onPasswordChange.mockReset().mockResolvedValue(undefined)
+      setPasswordChangeRequiredHandler(onPasswordChange)
+    })
+
+    afterEach(() => {
+      setPasswordChangeRequiredHandler(null)
+    })
+
+    it('menjalankan handler SEKALI lalu tetap menolak request dengan error 403 yang sama', async () => {
+      const server = makeServer({ '/master': [403] })
+      server.passwordRequired.add('/master')
+      const api = createApiClient({ adapter: server.adapter })
+
+      await expect(api.get('/master')).rejects.toMatchObject({ status: 403, message: 'Password wajib diganti sebelum melanjutkan.' })
+
+      expect(onPasswordChange).toHaveBeenCalledTimes(1)
+      expect(server.calls).toHaveLength(1) // tanpa retry, tanpa refresh, tanpa permintaan tambahan dari interceptor
+      expect(onAuthFailure).not.toHaveBeenCalled()
+    })
+
+    it('banyak 403 bersamaan hanya menjalankan handler satu kali', async () => {
+      const server = makeServer({ '/a': [403], '/b': [403], '/c': [403] })
+      for (const url of ['/a', '/b', '/c']) server.passwordRequired.add(url)
+      const api = createApiClient({ adapter: server.adapter })
+
+      const results = await Promise.allSettled([api.get('/a'), api.get('/b'), api.get('/c')])
+
+      expect(results.every((r) => r.status === 'rejected')).toBe(true)
+      expect(onPasswordChange).toHaveBeenCalledTimes(1)
+      expect(server.calls).toHaveLength(3)
+    })
+
+    it('403 berikutnya setelah handler selesai boleh memicu lagi (bukan terkunci selamanya)', async () => {
+      const server = makeServer({ '/master': [403, 403] })
+      server.passwordRequired.add('/master')
+      const api = createApiClient({ adapter: server.adapter })
+
+      await expect(api.get('/master')).rejects.toMatchObject({ status: 403 })
+      await expect(api.get('/master')).rejects.toMatchObject({ status: 403 })
+
+      expect(onPasswordChange).toHaveBeenCalledTimes(2)
+    })
+
+    it('403 biasa (tanpa code) tetap perilaku lama: tanpa handler, refresh, atau redirect', async () => {
+      const server = makeServer({ '/master': [403] })
+      const api = createApiClient({ adapter: server.adapter })
+
+      await expect(api.get('/master')).rejects.toMatchObject({ status: 403, message: 'Forbidden' })
+
+      expect(onPasswordChange).not.toHaveBeenCalled()
+      expect(server.calls).toHaveLength(1)
+      expect(onAuthFailure).not.toHaveBeenCalled()
+    })
+
+    it('endpoint yang memang terbuka (auth/me, change-password, logout) tidak memicu handler', async () => {
+      const open = ['/auth/me', '/auth/change-password', '/auth/logout', '/auth/me?x=1']
+      const server = makeServer(Object.fromEntries(open.map((url) => [url, [403]])))
+      for (const url of open) server.passwordRequired.add(url)
+      const api = createApiClient({ adapter: server.adapter })
+
+      for (const url of open) {
+        await expect(api.get(url)).rejects.toMatchObject({ status: 403 })
+      }
+
+      expect(onPasswordChange).not.toHaveBeenCalled()
+    })
+
+    it('handler yang gagal tidak menutupi error 403 asli dan tidak membuat loop', async () => {
+      onPasswordChange.mockRejectedValue(new Error('me gagal'))
+      const server = makeServer({ '/master': [403] })
+      server.passwordRequired.add('/master')
+      const api = createApiClient({ adapter: server.adapter })
+
+      await expect(api.get('/master')).rejects.toMatchObject({ status: 403 })
+
+      expect(onPasswordChange).toHaveBeenCalledTimes(1)
+      expect(server.calls).toHaveLength(1)
+    })
+
+    it('setelah auto-refresh, request yang diulang dan kena 403 ini juga memicu handler sekali', async () => {
+      // Token baru hasil refresh membawa must_change_password (password kedaluwarsa): retry -> 403 + code.
+      const server = makeServer({ '/data': [401, 403], [REFRESH_PATH]: [200] })
+      server.passwordRequired.add('/data')
+      const api = createApiClient({ adapter: server.adapter })
+
+      await expect(api.get('/data')).rejects.toMatchObject({ status: 403 })
+
+      expect(server.calls.map((c) => c.url)).toEqual(['/data', REFRESH_PATH, '/data'])
+      expect(onPasswordChange).toHaveBeenCalledTimes(1)
+      expect(onAuthFailure).not.toHaveBeenCalled()
+    })
+
+    it('tanpa handler terpasang, 403 password_change_required hanya ditolak biasa', async () => {
+      setPasswordChangeRequiredHandler(null)
+      const server = makeServer({ '/master': [403] })
+      server.passwordRequired.add('/master')
+      const api = createApiClient({ adapter: server.adapter })
+
+      await expect(api.get('/master')).rejects.toMatchObject({ status: 403 })
+      expect(onPasswordChange).not.toHaveBeenCalled()
+    })
   })
 })

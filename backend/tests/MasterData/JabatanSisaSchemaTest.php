@@ -10,6 +10,7 @@ use App\Database\Migrations\AddFkJabatanJenjangJf;
 use App\Database\Migrations\CreateMasterJabatanSisa;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
+use Tests\Support\Layanan\SkemaLayanan;
 use Tests\Support\LepasMigrationKepegawaianTrait;
 
 /**
@@ -584,7 +585,8 @@ final class JabatanSisaSchemaTest extends DatabaseTestCase
         $dbv019 = AddFkG02Pegawai::FOREIGN_KEYS + AddFkG02Riwayat::FOREIGN_KEYS;
 
         foreach ($rows as $row) {
-            if (isset($dbv019[(string) $row['CONSTRAINT_NAME']])) {
+            // FK masuk dari tabel Modul C Layanan (DBV-022, mis. `pa_layanan` -> `jabatan_koordinasi`) dikunci SkemaLayananTest.
+            if (isset($dbv019[(string) $row['CONSTRAINT_NAME']]) || in_array($this->stripPrefix((string) $row['TABLE_NAME']), SkemaLayanan::TABEL, true)) {
                 continue;
             }
 

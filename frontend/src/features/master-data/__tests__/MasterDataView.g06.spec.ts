@@ -126,7 +126,7 @@ describe('MasterDataView — master G-06 (DBV-005/CR-012)', () => {
     // Daftar tanpa filter mencampur jenis → tidak ada item urutan; urutan item lain tetap baku.
     expect(await rowMenuActions(wrapper, 'master-actions-1')).toEqual([item('edit', 'Edit'), item('deactivate', 'Nonaktifkan'), item('delete', 'Hapus', false, true)])
     expect(wrapper.get('[data-testid="master-reorder-hint"]').text()).toBe('Pilih Jenis Pelatihan untuk mengubah urutan (urutan berlaku per Jenis Pelatihan).')
-    const filter = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-jenis_diklat"]')
+    const filter = wrapper.get<HTMLSelectElement>('[data-testid="master-filter-jenis_diklat"] select')
     expect(Array.from(filter.element.options).map((o) => o.textContent)).toEqual([
       'Semua Jenis Pelatihan',
       'Struktural',

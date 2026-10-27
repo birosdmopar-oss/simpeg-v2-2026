@@ -84,7 +84,7 @@ class AuthService
             fn (): bool => $this->pengguna->update((int) $user['id_pengguna'], ['last_login_at' => date('Y-m-d H:i:s')]),
         );
 
-        $claims = self::claimsFor($user);
+        $claims = self::claimsFor($user, $this->jwt->now());
         $tokens = $this->jwt->issueTokenPair($claims);
 
         $this->audit->record('pengguna', (string) $user['id_pengguna'], self::EVENT_LOGIN, null, [
@@ -107,7 +107,37 @@ class AuthService
      */
     public function refresh(string $refreshToken): array
     {
-        return $this->jwt->refresh($refreshToken);
+        // MAKE-028: kedaluwarsa password dihitung ulang dari DB di setiap refresh (waktu berjalan tanpa peristiwa yang
+        // mencabut sesi), sehingga sesi lama pun terkena begitu `expired_at` terlewati. CR-057: dua arah — claim juga
+        // dilepas bila DB tidak lagi mewajibkan (expired_at diperpanjang, penanda 0).
+        return $this->jwt->refresh($refreshToken, fn (array $claims): array => $this->withPasswordExpiry($claims));
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     *
+     * @return array<string, mixed>
+     */
+    private function withPasswordExpiry(array $claims): array
+    {
+        $id   = JwtService::subjectToId($claims['sub'] ?? null);
+        $user = $id === null ? null : $this->pengguna->find($id);
+
+        // Akun tidak ditemukan: claim apa adanya (aturan pencabutan/penolakan sesi refresh tidak diubah di sini).
+        if (! is_array($user)) {
+            return $claims;
+        }
+
+        // Dihitung penuh dari DB, bukan hanya ditambah (CR-057 T-1): penanda MAKE-020 ATAU password kedaluwarsa memasang
+        // claim; selain itu claim dihapus, sehingga `expired_at` yang diperpanjang langsung di DB (mis. koreksi DBA)
+        // melepas sesi berjalan pada refresh berikutnya tanpa login ulang.
+        if (PenggunaModel::wajibGantiPassword($user) || PasswordExpiry::isExpired($user['expired_at'], $this->jwt->now())) {
+            $claims['must_change_password'] = true;
+        } else {
+            unset($claims['must_change_password']);
+        }
+
+        return $claims;
     }
 
     /**
@@ -140,13 +170,14 @@ class AuthService
 
     /**
      * Claims sesi (DBV-010/CR-013): `sub` = id_pengguna, `nip` = NIP akun (NULL untuk akun tanpa NIP). JwtService
-     * menambahkan `ver`.
+     * menambahkan `ver`. `must_change_password` bila penanda MAKE-020 = 1 ATAU password kedaluwarsa (MAKE-028,
+     * `expired_at` < $now; NULL = tidak kedaluwarsa).
      *
      * @param array<string, mixed> $user
      *
      * @return array<string, mixed>
      */
-    public static function claimsFor(array $user): array
+    public static function claimsFor(array $user, ?int $now = null): array
     {
         return [
             'sub'       => (string) (int) $user['id_pengguna'],
@@ -154,7 +185,7 @@ class AuthService
             'role'      => (int) $user['user_level'],
             'id_unit'   => $user['id_unit'] ?? null,
             'id_satker' => $user['id_satker'] ?? null,
-        ] + (PenggunaModel::wajibGantiPassword($user) ? ['must_change_password' => true] : []);
+        ] + (PenggunaModel::wajibGantiPassword($user) || PasswordExpiry::isExpired($user['expired_at'] ?? null, $now ?? time()) ? ['must_change_password' => true] : []);
     }
 
     /**

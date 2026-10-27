@@ -127,7 +127,7 @@ abstract class DatabaseTestCase extends CIUnitTestCase
             throw new AssertionFailedError(
                 static::class . '::' . $this->name() . ' memutus bingkai transaksi uji (implicit commit: DDL seperti '
                 . 'CREATE/ALTER/DROP/TRUNCATE/RENAME/trigger/down()-up() migration, atau koneksi tersambung ulang). '
-                . "Tandai test/kelasnya #[Group('" . self::GRUP_ISOLASI_PENUH . "')] (lihat AGENTS.md §3).",
+                . "Tandai test/kelasnya #[Group('" . self::GRUP_ISOLASI_PENUH . "')] (lihat AGENTS.md §4).",
             );
         }
 

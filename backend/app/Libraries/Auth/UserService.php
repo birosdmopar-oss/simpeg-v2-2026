@@ -216,6 +216,8 @@ class UserService
             throw new ValidationException('Validasi gagal.', ['email' => ['Email sudah dipakai akun lain.']]);
         }
 
+        $status = (string) ($data['status'] ?? PenggunaModel::STATUS_ACTIVE) === PenggunaModel::STATUS_INACTIVE ? PenggunaModel::STATUS_INACTIVE : PenggunaModel::STATUS_ACTIVE;
+
         $id = $this->translateDuplicate(fn () => $this->pengguna->insert([
             'nip'                 => $nip,
             'username'            => $username,
@@ -226,11 +228,11 @@ class UserService
             'user_level'          => $level,
             'id_unit'             => $data['id_unit'] ?? null,
             'id_satker'           => $data['id_satker'] ?? null,
-            'status'              => (string) ($data['status'] ?? PenggunaModel::STATUS_ACTIVE) === PenggunaModel::STATUS_INACTIVE ? PenggunaModel::STATUS_INACTIVE : PenggunaModel::STATUS_ACTIVE,
+            'status'              => $status,
             'password_changed_at' => date('Y-m-d H:i:s'),
             // MAKE-020 [V2]: password dipilih admin, bukan pemilik → wajib ganti saat login pertama.
             'must_change_password' => 1,
-        ]), $nip, $username, null);
+        ] + PasswordExpiry::forNewAccount($status, time())), $nip, $username, null);
 
         return PenggunaModel::toPublic($this->pengguna->find((int) $id));
     }
@@ -363,6 +365,8 @@ class UserService
                 // MAKE-020 [V2]: reset password oleh admin → pemilik wajib ganti saat login berikutnya; admin yang
                 // mengubah password akunnya sendiri lewat Manajemen Akun = pemilik memilih sendiri → dilepas.
                 $update['must_change_password'] = $actor->idPengguna() === $id ? 0 : 1;
+                // MAKE-028 [K]: password berubah dan status akhir aktif → umur password +3 bulan (trigger legacy beUpd).
+                $update += PasswordExpiry::forPasswordChange((string) ($update['status'] ?? $row['status']), time());
             }
         }
 

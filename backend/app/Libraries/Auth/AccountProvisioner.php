@@ -144,7 +144,7 @@ class AccountProvisioner
                 'password_changed_at' => null,
                 // MAKE-020 [V2]: password awal diatur sistem (NIP / acak / dari admin) → wajib ganti saat login pertama.
                 'must_change_password' => 1,
-            ]);
+            ] + PasswordExpiry::forNewAccount(PenggunaModel::STATUS_ACTIVE, time()));
         } catch (DatabaseException $e) {
             if ($e->getCode() === PenggunaModel::ER_FK_TANPA_INDUK && ! $this->pengguna->nipTerdaftarPegawai($nip)) {
                 throw self::nipTidakTerdaftar();

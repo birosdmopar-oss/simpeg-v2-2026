@@ -183,7 +183,7 @@ describe('DaftarPegawaiPage — data', () => {
     expect(kelas[3]).toContain('bg-slate-100')
     // CR-054 (QA R2-I1): nama panjang tidak terbungkus; teks penuh di title.
     expect(kelas[1]).toContain('whitespace-nowrap')
-    expect(wrapper.findAll('[data-testid="badge-jenis-pegawai"]')[1].attributes('title')).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
+    expect(wrapper.findAll('[data-testid="badge-jenis-pegawai"]')[1].attributes('data-tooltip')).toBe('Pegawai Pemerintah dengan Perjanjian Kerja')
   })
 
   it('nama lengkap (glr_akhir) menaut ke halaman detail', async () => {

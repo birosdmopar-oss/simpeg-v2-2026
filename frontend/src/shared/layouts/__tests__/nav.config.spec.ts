@@ -128,11 +128,29 @@ describe('buildNav — fase 2 (sebelum B-20 penutup)', () => {
 })
 
 describe('buildNav — fase berikutnya', () => {
-  it('menaikkan fase aktif memunculkan menu berikutnya lengkap dengan submenu (Laporan → 3 anak)', () => {
+  it('menaikkan fase aktif memunculkan menu berikutnya lengkap dengan submenu (Laporan → 7 anak, MAKE-036)', () => {
     expect(labels(Role.SUPER_ADMIN, 4)).toContain('Layanan')
     const laporan = buildNav(Role.SUPER_ADMIN, 7)
       .flatMap((g) => g.items)
       .find((i) => i.key === 'laporan')
-    expect(laporan?.children?.map((c) => c.label)).toEqual(['Unit Kerja', 'Jenis Kelamin', 'Struktural'])
+    expect(laporan?.children?.map((c) => c.label)).toEqual(['Unit Kerja', 'Jenis Kelamin', 'Struktural', 'Jabatan', 'Pendidikan', 'Usia', 'Golongan'])
+    expect(laporan?.children?.map((c) => c.to)).toEqual(['/laporan/unit-kerja', '/laporan/jenis-kelamin', '/laporan/eselon', '/laporan/jabatan', '/laporan/pendidikan', '/laporan/usia', '/laporan/golongan'])
+  })
+
+  it('Laporan (fase 7) = role 1, 3, 4, 5, 8 (hr/chart/*), tetap tersembunyi pada fase aktif', () => {
+    const punya = Object.values(Role).filter((r) => buildNav(r, 7).flatMap((g) => g.items).some((i) => i.key === 'laporan'))
+    expect(punya).toEqual([1, 3, 4, 5, 8])
+    expect(Object.values(Role).flatMap((r) => labels(r))).not.toContain('Laporan')
+  })
+
+  it('Dokumen (fase 7, MAKE-037) = role 1, 3, 4, 5, 8 (hr/document/*), 4 anak, tetap tersembunyi pada fase aktif', () => {
+    const punya = Object.values(Role).filter((r) => buildNav(r, 7).flatMap((g) => g.items).some((i) => i.key === 'dokumen'))
+    expect(punya).toEqual([1, 3, 4, 5, 8])
+    const dokumen = buildNav(Role.SUPER_ADMIN, 7)
+      .flatMap((g) => g.items)
+      .find((i) => i.key === 'dokumen')
+    expect(dokumen?.children?.map((c) => c.label)).toEqual(['DUK', 'Nominatif', 'Proyeksi Pensiun', 'Baperjakat'])
+    expect(dokumen?.children?.map((c) => c.to)).toEqual(['/dokumen/duk', '/dokumen/nominatif', '/dokumen/pensiun', '/dokumen/baperjakat'])
+    expect(Object.values(Role).flatMap((r) => labels(r))).not.toContain('Dokumen')
   })
 })
