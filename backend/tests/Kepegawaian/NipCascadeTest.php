@@ -23,8 +23,8 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * B-06 Koreksi NIP + butir cascade B-21 (MAKE-010): satu transaksi ikut `update_nip` legacy (keputusan #10) atas
- * `TabelAnakNip::sampaiFase(NipCascadeService::FASE)` (Fase 4 sejak DBV-022 M2) — data dummy di 20+ tabel riwayat, snapshot,
- * dan layanan berpindah semua, rollback penuh bila satu
+ * `TabelAnakNip::sampaiFase(NipCascadeService::FASE)` (Fase 5 sejak DBV-023 M2) — data dummy di 20+ tabel riwayat, snapshot,
+ * layanan, dan presensi berpindah semua (kecuali `NipCascadeService::TIDAK_DIARAHKAN`, mis. `gaji_pegawai.nip`), rollback penuh bila satu
  * langkah gagal, akun pegawai ikut legacy penuh (username + password = NIP baru, keputusan user 13-10-2026), sesi
  * dicabut, registry cocok dengan skema nyata.
  *
@@ -184,6 +184,29 @@ final class NipCascadeTest extends DatabaseTestCase
         $this->assertSame([$lama . '9'], json_decode((string) $baris($c)['target_peg'], true));
         $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.target_peg']);
         $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.excl_peg']);
+    }
+
+    /**
+     * DBV-023 / PRD 5A §3.4: `dh_online.nip` (FK RESTRICT) ikut dikoreksi; `gaji_pegawai.nip` (`NonFkSlipGaji` [K]) TIDAK —
+     * slip lama tetap ber-NIP lama dan tidak tercatat di hasil; riwayat QR (tanpa kolom NIP) tidak tersentuh.
+     */
+    public function testPresensiPindahSlipGajiTetapNipLama(): void
+    {
+        [$lama, $super] = $this->siapkan();
+        $this->sisip('dh_online', ['nip' => $lama, 'tgl' => '2026-10-01', 'jam_masuk' => '07:30:00', 'sumber' => 2]);
+        $this->sisip('dh_online', ['nip' => $lama, 'tgl' => '2026-10-02', 'jam_pulang' => '16:00:00', 'sumber' => 1]);
+        $slip = $this->sisip('gaji_pegawai', ['nip' => $lama, 'bulan' => 9, 'tahun' => 2026, 'qr_token' => str_repeat('a', 64)]);
+        $this->sisip('gaji_pegawai_qr_history', ['id_gaji_pegawai' => $slip, 'qr_token' => str_repeat('b', 64)]);
+
+        $hasil = (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
+
+        $this->assertSame(2, $hasil['tabel']['dh_online.nip']);
+        $this->assertSame(0, $this->db->table('dh_online')->where('nip', $lama)->countAllResults());
+        $this->assertSame(2, $this->db->table('dh_online')->where('nip', self::NIP_BARU)->countAllResults());
+        $this->assertArrayNotHasKey('gaji_pegawai.nip', $hasil['tabel']);
+        $this->assertSame(1, $this->db->table('gaji_pegawai')->where('nip', $lama)->countAllResults(), 'slip lama tetap ber-NIP lama [K]');
+        $this->assertSame(0, $this->db->table('gaji_pegawai')->where('nip', self::NIP_BARU)->countAllResults());
+        $this->assertSame(1, $this->db->table('gaji_pegawai_qr_history')->where('id_gaji_pegawai', $slip)->countAllResults());
     }
 
     /**
@@ -392,12 +415,14 @@ final class NipCascadeTest extends DatabaseTestCase
             // Fase 4 (DBV-022): `inbox.modul` ber-CHECK domain; tembusan cuti wajib merujuk satu `riwayat_cuti` milik pegawai lain.
             'inbox'                 => ['modul' => 'cuti'],
             'riwayat_cuti_notif_kt' => ['id_riwayat_cuti' => $this->sisip('riwayat_cuti', ['nip' => $pegawaiLain, 'id_jenis_cuti' => 1])],
+            // Fase 5A (DBV-023): `chk_dh_online_jam` menolak baris tanpa jam masuk maupun pulang.
+            'dh_online' => ['tgl' => '2020-01-01', 'jam_masuk' => '07:30:00'],
         ];
 
         foreach (TabelAnakNip::sampaiFase(NipCascadeService::FASE) as $r) {
             $kunci = $r->tabel . '.' . $r->kolomDiV2();
 
-            if (isset($khusus[$kunci]) || ! $this->tabelAda($r->tabel) || in_array($r->kunci(), ['token.nip', 'pengguna.username'], true) || in_array($kunci, self::KOLOM_JSON, true) || in_array($kunci, self::KOLOM_DAFTAR, true)) {
+            if (isset($khusus[$kunci]) || ! $this->tabelAda($r->tabel) || isset(NipCascadeService::TIDAK_DIARAHKAN[$r->kunci()]) || in_array($kunci, self::KOLOM_JSON, true) || in_array($kunci, self::KOLOM_DAFTAR, true)) {
                 continue;
             }
 

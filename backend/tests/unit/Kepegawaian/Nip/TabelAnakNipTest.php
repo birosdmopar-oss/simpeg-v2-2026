@@ -214,6 +214,11 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
         $this->assertNotContains('gaji_pegawai.nip', $fase4, 'Fase 5');
 
+        // DBV-023 M2 (AC-D01.7): cakupan Fase 5A = presensi harian (FK) + slip gaji (NonFkSlipGaji, tidak diarahkan).
+        $fase5 = $kunci(TabelAnakNip::sampaiFase(5));
+        $this->assertCount(65, $fase5);
+        $this->assertSame(['dh_online.nip', 'gaji_pegawai.nip'], array_values(array_diff($fase5, $fase4)));
+
         $this->assertSame(
             $kunci(TabelAnakNip::perKeberadaan(KeberadaanV2::Ada)),
             $kunci(TabelAnakNip::sampaiFase(TabelAnakNip::FASE_MAX)),

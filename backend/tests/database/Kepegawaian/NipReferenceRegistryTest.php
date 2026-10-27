@@ -122,6 +122,10 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
             'fk_esign_hist_ibfk01'             => ['esign_hist', 'nip'],
             'fk_nip_firebase_token_to_pegawai' => ['firebase_token', 'nip'],
         ],
+        // DBV-023 (Fase 5A): FK NIP presensi harian [K] D1 (aksi RESTRICT [V2]); gaji_pegawai.nip tanpa FK (self::NON_FK).
+        '2026-10-27-100000' => [
+            'fk_nip_dh_to_pegawai' => ['dh_online', 'nip'],
+        ],
     ];
 
     /**
@@ -155,6 +159,7 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
         'petugas_layanan.nip'                     => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-12) — diarahkan ulang B-06',
         'pa_layanan.nip'                          => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-17) — diarahkan ulang B-06',
         'disiplin_ticket.nip'                     => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-4) — diarahkan ulang B-06',
+        'gaji_pegawai.nip'                        => '[K] legacy tanpa FK (NonFkSlipGaji, DBV-023): tidak ikut Ubah NIP, slip lama tetap ber-NIP lama (PRD 5A §3.4)',
     ];
 
     /**

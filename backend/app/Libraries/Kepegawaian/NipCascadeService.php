@@ -57,15 +57,16 @@ use Throwable;
  *  - Tabel registry yang belum ada di skema dilewati dan dilaporkan di `dilewati`; test B-21 mengunci daftarnya.
  *  - Audit: `pegawai` (NIP + jumlah baris per tabel) dan setiap akun `pengguna` yang direset (password dimasking).
  *  - Balapan NIP baru didaftarkan proses lain (1062 pada salinan `pegawai`) → 422 `nip_baru`.
- *  - Cakupan per fase: `FASE` = 4 sejak DBV-022 M2 (tabel Modul C Layanan); `gaji_pegawai.nip` (Fase 5) menyusul dengan
- *    menaikkan `FASE` tanpa mengubah logika kelas ini.
+ *  - Cakupan per fase: `FASE` = 4 sejak DBV-022 M2 (tabel Modul C Layanan); `FASE` = 5 sejak DBV-023 M2 (Fase 5A:
+ *    `dh_online.nip` ber-FK RESTRICT ikut diarahkan ulang; `gaji_pegawai.nip` = `NonFkSlipGaji` [K] TIDAK diarahkan —
+ *    slip lama tetap ber-NIP lama, PRD 5A §3.4 — lewat self::TIDAK_DIARAHKAN).
  */
 final class NipCascadeService implements NipCascadeInterface
 {
     /**
-     * Cakupan registry pada fase berjalan (Fase 4, DBV-022 M2).
+     * Cakupan registry pada fase berjalan (Fase 5, DBV-023 M2).
      */
-    public const FASE = 4;
+    public const FASE = 5;
 
     /**
      * Kolom registry yang tidak diarahkan ulang dengan UPDATE (tabel.kolom huruf kecil => alasan).
@@ -73,6 +74,7 @@ final class NipCascadeService implements NipCascadeInterface
     public const TIDAK_DIARAHKAN = [
         'token.nip'         => 'jejak NIP pemilik token (A-01 D-7); sesi akun dicabut',
         'pengguna.username' => 'ditangani khusus: username akun = NIP baru + reset password (legacy :589-599)',
+        'gaji_pegawai.nip'  => '[K] NonFkSlipGaji: Ubah NIP legacy tidak mengganti NIP slip; slip lama tetap ber-NIP lama (PRD 5A §3.4)',
     ];
 
     /**
