@@ -874,5 +874,5 @@ Rincian C:
 4. Setelah normalisasi, Bagian 3 skrip audit diulang di DB v2 hasil impor: duplikat = 0 dan negatif = 0 sebelum aplikasi
    dibuka. Rumus saldo tahun baru v2 (`SaldoTahunanCuti`) juga melantai utang/ditangguhkan lalu dengan `max(0, …)`.
 
-Langkah ini masuk runbook impor DBV-011 Bagian 2.11. Status DQ-10: UNIQUE + CHECK ≥ 0 **tetap** (keputusan final), dengan
+Langkah ini masuk runbook impor DBV-011 Bagian 2.12. Status DQ-10: UNIQUE + CHECK ≥ 0 **tetap** (keputusan final), dengan
 normalisasi di atas sebagai prasyarat impor. DQ-12/DQ-27: final (audit = 0). DQ-3: FK approver tetap ditahan.

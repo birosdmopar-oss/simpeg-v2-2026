@@ -623,7 +623,7 @@ migration-nya di `MigrationsDitahan/`):
 - (c) aktivasi lewat **unit DBV terpisah**: migration dipindah ke `app/Database/Migrations/` dengan timestamp baru setelah
   migration terakhir di lingkungan target, dan registry test FK disesuaikan.
 
-### 2.11 Fase 4 — normalisasi `pegawai_sisa_cuti` dan audit Modul C (DBV-022, 27-10-2026)
+### 2.12 Fase 4 — normalisasi `pegawai_sisa_cuti` dan audit Modul C (DBV-022, 27-10-2026)
 
 Rujukan: DBV-022 Bagian 13 (hasil audit B2) dan skrip `sql/DBV-022-audit-layanan.sql`. Migration Modul C (`main` `598a5f3`)
 memasang UNIQUE `pegawai_sisa_cuti (nip, tahun)` dan CHECK saldo ≥ 0 secara langsung, jadi data legacy wajib dinormalisasi
