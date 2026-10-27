@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Layanan\Kuota;
 
-use App\Libraries\Layanan\Cuti\Servis\SaldoTahunanService;
+use App\Libraries\Layanan\Cuti\SaldoTahunanService;
 use CodeIgniter\Test\StreamFilterTrait;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -48,7 +48,10 @@ final class CutiSaldoTahunanCommandTest extends DatabaseTestCase
 
         command('cuti:saldo-tahunan 2026');
 
-        $this->assertStringContainsString('Eksekusi tulis hanya untuk tahun 2027', $this->getStreamFilterBuffer());
+        $keluaran = $this->getStreamFilterBuffer();
+        $this->assertStringContainsString('Eksekusi tulis saldo cuti hanya untuk tahun 2027', $keluaran);
+        $this->assertStringContainsString('--dry-run', $keluaran);
+        $this->assertStringContainsString('§6.3.6', $keluaran);
         $this->assertSame(0, $this->db->table('pegawai_sisa_cuti')->countAllResults());
     }
 

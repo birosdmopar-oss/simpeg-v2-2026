@@ -2,11 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Libraries\Layanan\Cuti\Servis;
+namespace App\Libraries\Layanan\Cuti;
 
-use App\Libraries\Layanan\Cuti\AturanCuti;
-use App\Libraries\Layanan\Cuti\SaldoCuti;
-use App\Libraries\Layanan\Cuti\SaldoTahunanCuti;
 use App\Models\AuditLogModel;
 use CodeIgniter\Database\BaseConnection;
 use InvalidArgumentException;
@@ -18,15 +15,13 @@ use Throwable;
  * Idempoten: NIP yang sudah punya baris `(nip, tahun)` dilewati. `--dry-run` tidak menulis apa pun.
  *
  * Penulisan: query builder dalam satu transaksi + satu baris `audit_logs` ringkasan per eksekusi tulis
- * (`jenis_audit` {@see self::JENIS_AUDIT}, aktor sistem). Eksekusi tulis untuk tahun < {@see self::TAHUN_TULIS_MULAI} ditolak
+ * (`jenis_audit` {@see self::JENIS_AUDIT}, aktor sistem). Eksekusi tulis untuk tahun < `Config\Cuti::$tahunTulisSaldoMulai` ditolak
  * (keputusan Horii 27-10: saldo 2026 mengikuti data impor; command hanya `--dry-run` untuk laporan Biro SDM).
  */
 final class SaldoTahunanService
 {
     /** Penanda `after_json.jenis_audit` pada baris audit ringkasan (PRD §6.3.6 "event cuti.saldo_tahunan"). */
     public const JENIS_AUDIT = 'cuti.saldo_tahunan';
-
-    public const TAHUN_TULIS_MULAI = 2027;
 
     public const TAHUN_MINIMAL = 2000;
 
@@ -52,8 +47,8 @@ final class SaldoTahunanService
             throw new InvalidArgumentException('Tahun harus antara ' . self::TAHUN_MINIMAL . " dan {$tahunBerjalan}.");
         }
 
-        if (! $dryRun && $tahun < self::TAHUN_TULIS_MULAI) {
-            throw new InvalidArgumentException('Eksekusi tulis hanya untuk tahun ' . self::TAHUN_TULIS_MULAI . " ke atas; gunakan --dry-run untuk tahun {$tahun}.");
+        if (! $dryRun && $tahun < $this->aturan->tahunTulisSaldoMulai) {
+            throw new InvalidArgumentException("Eksekusi tulis saldo cuti hanya untuk tahun {$this->aturan->tahunTulisSaldoMulai} ke atas; untuk tahun {$tahun} gunakan --dry-run (PRD Fase 4 §6.3.6).");
         }
 
         $pegawai = $this->db->table('pegawai')

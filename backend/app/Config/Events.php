@@ -7,7 +7,7 @@ namespace Config;
 use App\Libraries\Auth\AuthService;
 use App\Libraries\Dashboard\Statistik\StatistikCache;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
-use App\Libraries\Layanan\Cuti\Servis\ResetTundaCuti;
+use App\Libraries\Layanan\Cuti\ResetTundaCuti;
 use CodeIgniter\Events\Events;
 use CodeIgniter\Exceptions\FrameworkException;
 use CodeIgniter\HotReloader\HotReloader;

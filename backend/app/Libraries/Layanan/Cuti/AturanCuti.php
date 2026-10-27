@@ -37,6 +37,9 @@ final readonly class AturanCuti
 
     public const JAM_BATAS_TUNDA = '12:00';
 
+    /** Tahun pertama yang boleh ditulis command `cuti:saldo-tahunan` (PRD §6.3.6: saldo 2026 mengikuti impor). */
+    public const TAHUN_TULIS_SALDO_MULAI = 2027;
+
     public const JENIS_TAHUNAN = 1;
 
     public const JENIS_BESAR = 2;
@@ -66,6 +69,7 @@ final readonly class AturanCuti
         public int $maksBulanAlasanPenting = self::MAKS_BULAN_ALASAN_PENTING,
         public int $maksTahunCltn = self::MAKS_TAHUN_CLTN,
         public string $jamBatasTunda = self::JAM_BATAS_TUNDA,
+        public int $tahunTulisSaldoMulai = self::TAHUN_TULIS_SALDO_MULAI,
     ) {
         if (preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]\z/', $jamBatasTunda) !== 1) {
             throw new InvalidArgumentException("Jam batas tunda harus HH:MM: {$jamBatasTunda}");

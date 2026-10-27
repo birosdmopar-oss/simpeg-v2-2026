@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use App\Libraries\Auth\AuthService;
-use App\Libraries\Layanan\Cuti\Servis\ResetTundaCuti;
+use App\Libraries\Layanan\Cuti\ResetTundaCuti;
 use CodeIgniter\Events\Events;
 use CodeIgniter\Test\FeatureTestTrait;
 use RuntimeException;

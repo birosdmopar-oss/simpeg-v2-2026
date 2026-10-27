@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Libraries\Layanan\Cuti\Servis;
+namespace App\Libraries\Layanan\Cuti;
 
-use App\Libraries\Layanan\Cuti\StatusCuti;
 use Throwable;
 
 /**

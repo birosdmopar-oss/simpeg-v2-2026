@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
-use App\Libraries\Layanan\Cuti\Servis\SaldoTahunanService;
+use App\Libraries\Layanan\Cuti\SaldoTahunanService;
 use App\Models\AuditLogModel;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
