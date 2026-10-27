@@ -12,6 +12,7 @@ Folder ini menyimpan ADR yang ditulis setelah dokumen utama dan perlu dibaca cod
 | ADR-031 | Cutover S1 & read-only legacy | — | Di luar repo (bersama dokumen utama) |
 | ADR-032 | Library PDF/Excel/QR & pola rute publik (Slip Gaji Fase 5) | Draf, belum diputus | Di luar repo (bersama dokumen utama) |
 | [ADR-033](ADR-033-library-pdf-tcpdf.md) | Library PDF: TCPDF untuk Fase 3 (LKH, Cetak DRH) | Diterima 07-10-2026 | Repo |
+| [ADR-034](ADR-034-pdf-sinkron-dokumen-daftar.md) | PDF sinkron dokumen daftar F-09: fallback per unit/satker, batas 1.700 baris | Diusulkan 21-10-2026 | Repo |
 
 ## Format
 

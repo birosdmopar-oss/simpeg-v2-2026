@@ -27,6 +27,8 @@ File terkait di repo ini:
 
 Prasyarat di server: `git`, `php >= 8.2` (+ ext mysqli, intl, mbstring, json), `composer`, `node >= 20` + `npm`, MySQL 8.x, web server (nginx/Apache).
 
+PHP untuk unduhan PDF dokumen F-09 (MAKE-037, ADR-034): `memory_limit` ≥ 256M dan batas waktu request ≥ 30 detik (`max_execution_time` PHP-FPM serta timeout proxy web server, mis. `fastcgi_read_timeout`). PDF 1.700 baris terukur ±238 MB dan ±10 detik di mesin dev.
+
 Database: koneksi aplikasi berjalan strict (`strictOn = true`) dan tabel memakai `utf8mb4_unicode_ci`. Sebelum deploy yang memuat DBV-010 (migration `2026-09-25-1300xx`), ikuti runbook `backend/docs/db-review/A-01-auth-schema.md` Bagian 9.8: cek versi/`sql_mode`/collation server (MySQL 8 vs MariaDB 10.4, D-11), `ALTER DATABASE` oleh DBA, bersihkan data QA, deploy di luar jam kerja (semua pengguna login ulang sekali). Migration-nya sendiri dijalankan manual (§3a), bukan oleh hook.
 
 ```bash

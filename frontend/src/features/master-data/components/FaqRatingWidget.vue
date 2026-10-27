@@ -9,6 +9,7 @@ import { CircleCheck, ThumbsDown, ThumbsUp } from 'lucide-vue-next'
 import { computed, ref, useId } from 'vue'
 
 import { isApiError } from '@/lib/axios'
+import { UiRadioGroup, type RadioOption } from '@/shared/ui'
 
 import { FAQ_RATE_REASONS, FAQ_REASON_OTHER, faqReasonSchema } from '../schemas/faq.schema'
 import { faqService } from '../services/faq.service'
@@ -32,6 +33,12 @@ const serverError = ref('')
 const submitting = ref(false)
 
 const radioName = `faq-rate-reason-${useId()}`
+
+/** Alasan + "Lainnya" sebagai UiRadioGroup custom (AGENTS.md bagian 3); testid input lama dipertahankan. */
+const reasonOptions: RadioOption[] = [
+  ...FAQ_RATE_REASONS.map((reason) => ({ value: reason, label: reason })),
+  { value: FAQ_REASON_OTHER, label: 'Lainnya', testid: 'faq-reason-other-radio' },
+]
 
 async function send(rate: FaqRate, reason?: string): Promise<void> {
   submitting.value = true
@@ -117,17 +124,16 @@ async function submitReason(): Promise<void> {
     </div>
 
     <form v-else class="space-y-3" novalidate data-testid="faq-reason-form" @submit.prevent="submitReason">
-      <fieldset class="space-y-2" :aria-describedby="fieldErrors.choice ? `${radioName}-error` : undefined">
-        <legend class="mb-1 font-medium text-slate-800">Apa yang kurang dari artikel ini?</legend>
-        <label v-for="reason in FAQ_RATE_REASONS" :key="reason" class="flex items-start gap-2 text-sm text-slate-700">
-          <input v-model="choice" type="radio" :name="radioName" :value="reason" class="mt-1" />
-          <span>{{ reason }}</span>
-        </label>
-        <label class="flex items-start gap-2 text-sm text-slate-700">
-          <input v-model="choice" type="radio" :name="radioName" :value="FAQ_REASON_OTHER" class="mt-1" data-testid="faq-reason-other-radio" />
-          <span>Lainnya</span>
-        </label>
-        <div v-if="choice === FAQ_REASON_OTHER" class="pl-6">
+      <div class="space-y-2" :aria-describedby="fieldErrors.choice ? `${radioName}-error` : undefined">
+        <UiRadioGroup
+          v-model="choice"
+          :name="radioName"
+          label="Apa yang kurang dari artikel ini?"
+          :options="reasonOptions"
+          direction="column"
+          :state="fieldErrors.choice ? 'error' : 'default'"
+        />
+        <div v-if="choice === FAQ_REASON_OTHER" class="pl-7">
           <input
             v-model="other"
             type="text"
@@ -143,7 +149,7 @@ async function submitReason(): Promise<void> {
           <p v-if="fieldErrors.other" :id="`${radioName}-other-error`" class="mt-1 text-xs text-red-600" role="alert">{{ fieldErrors.other }}</p>
         </div>
         <p v-if="fieldErrors.choice" :id="`${radioName}-error`" class="text-xs text-red-600" role="alert">{{ fieldErrors.choice }}</p>
-      </fieldset>
+      </div>
       <div class="flex gap-2">
         <button
           type="submit"

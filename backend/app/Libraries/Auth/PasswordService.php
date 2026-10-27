@@ -42,7 +42,7 @@ class PasswordService
             'password_changed_at' => date('Y-m-d H:i:s'),
             // MAKE-020 [V2]: pemilik memilih password sendiri → penanda wajib ganti dilepas.
             'must_change_password' => 0,
-        ]);
+        ] + PasswordExpiry::forPasswordChange((string) $user['status'], time()));
 
         // Seluruh sesi lama tidak berlaku lagi (MTC-006).
         $this->jwt->revokeAllForUser($idPengguna);

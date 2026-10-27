@@ -130,11 +130,14 @@ describe('FormField memakai komponen redesign (CR-028 / MIG-001b)', () => {
   it('select: dirender UiSelect dengan label di atas, error ber-role alert, emit nilai terpilih', async () => {
     const options = [{ value: '1', label: 'Aktif' }]
     const wrapper = mount(FormField, { props: { label: 'Status', modelValue: '', type: 'select', name: 'status', options, error: 'Wajib dipilih.' } })
-    const select = wrapper.get('select[name="status"]')
-    expect(wrapper.get('label').attributes('for')).toBe(select.attributes('id'))
-    expect(select.attributes('aria-invalid')).toBe('true')
+    // CR-060: yang terlihat/berfokus = trigger combobox custom; <select> native hanyalah cermin tersembunyi.
+    const trigger = wrapper.get('[role="combobox"]')
+    expect(wrapper.get('label').attributes('for')).toBe(trigger.attributes('id'))
+    expect(trigger.attributes('aria-invalid')).toBe('true')
     expect(wrapper.get('[role="alert"]').text()).toBe('Wajib dipilih.')
-    await select.setValue('1')
+    const mirror = wrapper.get('select[name="status"]')
+    expect(mirror.attributes('aria-hidden')).toBe('true')
+    await mirror.setValue('1')
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['1'])
   })
 

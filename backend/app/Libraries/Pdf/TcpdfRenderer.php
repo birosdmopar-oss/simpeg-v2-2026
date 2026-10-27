@@ -57,7 +57,13 @@ final class TcpdfRenderer implements PdfRendererInterface
 
                 $this->SetFont(TcpdfRenderer::FONT, '', 7);
                 $this->SetY(-10);
-                $this->writeHTML($this->dok->kakiHtml, false, true, false, true);
+                // Token kaki → alias TCPDF yang diisi saat dokumen selesai (nomor halaman ini dan jumlah halaman).
+                $kaki = str_replace(
+                    [DokumenPdf::TOKEN_HALAMAN, DokumenPdf::TOKEN_TOTAL],
+                    [$this->getAliasNumPage(), $this->getAliasNbPages()],
+                    $this->dok->kakiHtml,
+                );
+                $this->writeHTML($kaki, false, true, false, true);
             }
         };
 

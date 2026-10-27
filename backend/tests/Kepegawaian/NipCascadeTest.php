@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\Auth\PasswordExpiry;
 use App\Libraries\Kepegawaian\Nip\JenisRujukanNip;
 use App\Libraries\Kepegawaian\Nip\KeberadaanV2;
 use App\Libraries\Kepegawaian\Nip\RujukanNip;
@@ -22,7 +23,8 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * B-06 Koreksi NIP + butir cascade B-21 (MAKE-010): satu transaksi ikut `update_nip` legacy (keputusan #10) atas
- * `TabelAnakNip::sampaiFase(3)` — data dummy di 20+ tabel riwayat & snapshot berpindah semua, rollback penuh bila satu
+ * `TabelAnakNip::sampaiFase(NipCascadeService::FASE)` (Fase 4 sejak DBV-022 M2) — data dummy di 20+ tabel riwayat, snapshot,
+ * dan layanan berpindah semua, rollback penuh bila satu
  * langkah gagal, akun pegawai ikut legacy penuh (username + password = NIP baru, keputusan user 13-10-2026), sesi
  * dicabut, registry cocok dengan skema nyata.
  *
@@ -47,6 +49,11 @@ final class NipCascadeTest extends DatabaseTestCase
      * Kolom JSON array NIP (diuji terpisah di testJsonDmUserLokasiPresensi).
      */
     private const KOLOM_JSON = ['dm_user_lokasi_presensi.target_peg', 'dm_user_lokasi_presensi.excl_peg'];
+
+    /**
+     * Kolom daftar NIP berpemisah `***` (diuji terpisah di testDaftarKetuaTimRiwayatCuti, DBV-022 DQ-15).
+     */
+    private const KOLOM_DAFTAR = ['riwayat_cuti.ketua_tim'];
 
     protected function setUp(): void
     {
@@ -98,7 +105,7 @@ final class NipCascadeTest extends DatabaseTestCase
 
         // Entri terakhir menunjuk kolom yang tidak ada: semua UPDATE sebelumnya sudah jalan saat langkah ini gagal.
         $rusak    = new RujukanNip('riwayat_kp', 'kolom_tidak_ada', JenisRujukanNip::FkLegacy, '[K] uji', 'fk_uji', false, KeberadaanV2::Ada, 3, 'B-02', 'uji rollback');
-        $registry = [...TabelAnakNip::sampaiFase(3), $rusak];
+        $registry = [...TabelAnakNip::sampaiFase(NipCascadeService::FASE), $rusak];
 
         try {
             (new NipCascadeService(null, $registry))->koreksi($super, $lama, self::NIP_BARU);
@@ -136,6 +143,8 @@ final class NipCascadeTest extends DatabaseTestCase
         $this->assertNull($akun['password_legacy']);
         $this->assertTrue(password_verify(self::NIP_BARU, (string) $akun['password']));
         $this->assertSame(1, (int) $akun['must_change_password'], 'MAKE-020: password = NIP baru diatur sistem');
+        $this->assertIsString($akun['expired_at'], 'MAKE-028: password berubah, umur password diisi (akun aktif)');
+        $this->assertEqualsWithDelta(PasswordExpiry::addMonths(time(), 3), strtotime($akun['expired_at']), 10);
         $this->assertSame(0, $this->db->table('token')->where('id_pengguna', $idAkun)->countAllResults());
         $this->assertGreaterThan(0, $hasil['sesi_dicabut']);
 
@@ -175,6 +184,35 @@ final class NipCascadeTest extends DatabaseTestCase
         $this->assertSame([$lama . '9'], json_decode((string) $baris($c)['target_peg'], true));
         $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.target_peg']);
         $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.excl_peg']);
+    }
+
+    /**
+     * DBV-022 DQ-15: `riwayat_cuti.ketua_tim` berisi beberapa NIP dipisah `***` — elemen = NIP lama diganti, elemen lain,
+     * urutan, dan spasi di sekitar elemen dipertahankan; NIP lama yang hanya bagian NIP lain tidak ikut berubah.
+     */
+    public function testDaftarKetuaTimRiwayatCuti(): void
+    {
+        [$lama, $super] = $this->siapkan();
+        $pemohon        = $this->buatPegawai();
+        $lain           = $this->buatPegawai();
+        $cuti           = fn (?string $ketuaTim): int => $this->sisip('riwayat_cuti', ['nip' => $pemohon, 'id_jenis_cuti' => 1, 'ketua_tim' => $ketuaTim]);
+
+        $a = $cuti("{$lain}***{$lama}");
+        $b = $cuti(" {$lama} ***{$lain}***{$lama}");
+        $c = $cuti("{$lama}9***{$lain}");
+        $d = $cuti(null);
+        $e = $cuti("***{$lama}******{$lain} ***");
+
+        $hasil = (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
+
+        $isi = fn (int $id): ?string => $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $id)->get()->getRowArray()['ketua_tim'] ?? null;
+        $this->assertSame("{$lain}***" . self::NIP_BARU, $isi($a));
+        $this->assertSame(self::NIP_BARU . "***{$lain}***" . self::NIP_BARU, $isi($b), 'elemen ber-spasi diganti utuh; NIP ganda diganti semua, baris dihitung sekali');
+        $this->assertSame("{$lama}9***{$lain}", $isi($c), 'NIP lain berawalan sama tidak berubah');
+        $this->assertNull($isi($d));
+        $this->assertSame('***' . self::NIP_BARU . "******{$lain} ***", $isi($e), 'elemen kosong & spasi elemen lain dipertahankan apa adanya');
+        $this->assertSame(3, $hasil['tabel']['riwayat_cuti.ketua_tim']);
+        $this->assertSame(NipCascadeService::PEMISAH_DAFTAR_NIP, '***');
     }
 
     public function testUsernameKustomIkutLegacyDitimpaDanAkunLainTidakBerubah(): void
@@ -248,7 +286,7 @@ final class NipCascadeTest extends DatabaseTestCase
     public function testRegistryCocokDenganSkema(): void
     {
         // Setiap FK ke pegawai(nip) di skema tercakup registry Fase 3 (B-21): FK baru tanpa entri registry = test gagal.
-        $registry = array_map(static fn (RujukanNip $r): string => strtolower($r->tabel . '.' . $r->kolomDiV2()), TabelAnakNip::sampaiFase(3));
+        $registry = array_map(static fn (RujukanNip $r): string => strtolower($r->tabel . '.' . $r->kolomDiV2()), TabelAnakNip::sampaiFase(NipCascadeService::FASE));
         $prefix   = $this->db->getPrefix();
         $rows     = $this->db->query(
             'SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = ? AND REFERENCED_COLUMN_NAME = ?',
@@ -259,12 +297,12 @@ final class NipCascadeTest extends DatabaseTestCase
 
         foreach ($rows as $row) {
             $kunci = strtolower(substr((string) $row['t'], strlen($prefix)) . '.' . $row['c']);
-            $this->assertContains($kunci, $registry, "FK {$kunci} belum ada di TabelAnakNip::sampaiFase(3)");
+            $this->assertContains($kunci, $registry, "FK {$kunci} belum ada di TabelAnakNip::sampaiFase(NipCascadeService::FASE)");
         }
 
         $terlewat = [];
 
-        foreach (TabelAnakNip::sampaiFase(3) as $r) {
+        foreach (TabelAnakNip::sampaiFase(NipCascadeService::FASE) as $r) {
             if (! $this->tabelAda($r->tabel)) {
                 $terlewat[] = $r->tabel . '.' . $r->kolomDiV2();
             }
@@ -351,12 +389,15 @@ final class NipCascadeTest extends DatabaseTestCase
             'faq_rate'              => ['id_faq_article' => $this->buatArtikelFaq(), 'rate' => 1],
             'jabatan_koordinasi'    => ['jenis' => 1, 'jabatan' => 'Koordinator Uji'],
             'pegawai_hist'          => ['tgl_lahir' => '1990-01-01'],
+            // Fase 4 (DBV-022): `inbox.modul` ber-CHECK domain; tembusan cuti wajib merujuk satu `riwayat_cuti` milik pegawai lain.
+            'inbox'                 => ['modul' => 'cuti'],
+            'riwayat_cuti_notif_kt' => ['id_riwayat_cuti' => $this->sisip('riwayat_cuti', ['nip' => $pegawaiLain, 'id_jenis_cuti' => 1])],
         ];
 
-        foreach (TabelAnakNip::sampaiFase(3) as $r) {
+        foreach (TabelAnakNip::sampaiFase(NipCascadeService::FASE) as $r) {
             $kunci = $r->tabel . '.' . $r->kolomDiV2();
 
-            if (isset($khusus[$kunci]) || ! $this->tabelAda($r->tabel) || in_array($r->kunci(), ['token.nip', 'pengguna.username'], true) || in_array($kunci, self::KOLOM_JSON, true)) {
+            if (isset($khusus[$kunci]) || ! $this->tabelAda($r->tabel) || in_array($r->kunci(), ['token.nip', 'pengguna.username'], true) || in_array($kunci, self::KOLOM_JSON, true) || in_array($kunci, self::KOLOM_DAFTAR, true)) {
                 continue;
             }
 
@@ -371,6 +412,11 @@ final class NipCascadeTest extends DatabaseTestCase
 
             if ($r->tabel === 'riwayat_lckh') {
                 $baris['nip_atasan'] = $pegawaiLain;
+            }
+
+            // Kolom approver `riwayat_cuti`: pemilik baris (`nip` NOT NULL, FK) = pegawai lain.
+            if ($r->tabel === 'riwayat_cuti' && $r->kolomDiV2() !== 'nip') {
+                $baris['nip'] = $pegawaiLain;
             }
 
             $this->sisip($r->tabel, $baris);

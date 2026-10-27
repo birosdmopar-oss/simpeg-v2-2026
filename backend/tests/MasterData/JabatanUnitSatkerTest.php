@@ -152,6 +152,31 @@ final class JabatanUnitSatkerTest extends DatabaseTestCase
     }
 
     /**
+     * ISSUE-025: filter field ref (`id_group_jabatan`, `id_sub_group_jabatan`, `id_satker`, `kelas_jabatan`) di options dan
+     * daftar admin wajib bentuk kode kanonik master rujukannya, seperti `?parent=` (CR-024). `01` tidak lagi 200 dengan hasil
+     * yang sama seperti `1` (cast MySQL), `1abc` tidak lagi diterima.
+     */
+    public function testReferenceFiltersRejectNonCanonicalCodes(): void
+    {
+        $labels = ['id_group_jabatan' => 'Group Jabatan', 'id_sub_group_jabatan' => 'Sub Group Jabatan', 'id_satker' => 'Satuan Kerja', 'kelas_jabatan' => 'Kelas Jabatan'];
+
+        foreach ($labels as $filter => $label) {
+            foreach (['01', '1abc', '0', '+1', '1 ', '1.0'] as $value) {
+                foreach (['api/v1/master/jabatan/options', 'api/v1/master/jabatan'] as $uri) {
+                    $result = $this->get($uri . '?' . http_build_query([$filter => $value]));
+                    $result->assertStatus(422);
+                    $this->assertSame(["Filter {$label} tidak valid."], $this->json($result)['errors'][$filter], "{$uri} {$filter}={$value}");
+                }
+            }
+        }
+
+        // Kode kanonik tetap diterima; filter kosong = tanpa filter.
+        $this->get('api/v1/master/jabatan/options?id_satker=1')->assertStatus(200);
+        $this->get('api/v1/master/jabatan/options?id_satker=')->assertStatus(200);
+        $this->get('api/v1/master/jabatan?id_satker=1&kelas_jabatan=13')->assertStatus(200);
+    }
+
+    /**
      * Satker: nama unik per unit (nama sama di unit lain boleh), unit wajib aktif, urutan per unit.
      */
     public function testSatkerNameIsUniquePerUnitAndUnitMustBeActive(): void
@@ -296,6 +321,61 @@ final class JabatanUnitSatkerTest extends DatabaseTestCase
         $this->assertArrayHasKey('need_satker', $options[0]['extra']);
 
         $this->assertArrayNotHasKey('extra', $this->json($this->get('api/v1/master/group-jabatan/options'))['data'][0]);
+    }
+
+    /**
+     * ISSUE-026: kode PK string yang diinput admin boleh berupa angka JSON, diperlakukan sama dengan string (seperti field
+     * ref/int/select yang sudah menerima angka JSON). Aturan kode tetap berlaku untuk angka: di luar 1–20, nol/negatif,
+     * ganda → 422; boolean dan pecahan JSON tetap ditolak.
+     */
+    public function testKelasJabatanCodeAcceptsJsonNumberLikeString(): void
+    {
+        $created = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => 20, 'tukin' => 1]);
+        $created->assertStatus(201);
+        $this->assertSame('20', (string) $this->json($created)['data']['kelas_jabatan']);
+        $this->seeInDatabase('kelas_jabatan', ['kelas_jabatan' => 20, 'tukin' => 1]);
+
+        $string = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => '19', 'tukin' => 1]);
+        $string->assertStatus(201);
+        $this->assertSame($this->json($created)['data']['status'], $this->json($string)['data']['status']);
+
+        // Angka mengikuti aturan kode yang sama dengan string.
+        foreach ([0, 21, -1, 100] as $value) {
+            $result = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => $value, 'tukin' => 1]);
+            $result->assertStatus(422);
+            $this->assertArrayHasKey('kelas_jabatan', $this->json($result)['errors'], var_export($value, true));
+        }
+
+        $duplicate = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => 20, 'tukin' => 1]);
+        $duplicate->assertStatus(422);
+        $this->assertSame(['Kode 20 sudah dipakai.'], $this->json($duplicate)['errors']['kelas_jabatan']);
+
+        foreach ([true, 18.5, [18], ['a' => 1]] as $value) {
+            $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => $value, 'tukin' => 1])->assertStatus(422);
+        }
+
+        $this->assertSame(0, $this->db->table('kelas_jabatan')->where('kelas_jabatan', 18)->countAllResults());
+    }
+
+    /**
+     * CR-058 (QA R4 T-3): boolean JSON pada kode kelas jabatan diberi pesan yang sama dengan nilai bukan angka lain,
+     * bukan "wajib diisi" (false) atau pesan berbeda (true). null tetap dibaca sebagai tidak diisi.
+     */
+    public function testKelasJabatanBooleanCodeGetsSameMessageAsNonNumber(): void
+    {
+        $format = ['Kelas Jabatan harus bilangan bulat 1 sampai 20 (tanpa nol di depan).'];
+
+        foreach (['7a', true, false] as $value) {
+            $result = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => $value, 'tukin' => 1]);
+            $result->assertStatus(422);
+            $this->assertSame($format, $this->json($result)['errors']['kelas_jabatan'], var_export($value, true));
+        }
+
+        $null = $this->sendJson('POST', 'api/v1/master/kelas-jabatan', ['kelas_jabatan' => null, 'tukin' => 1]);
+        $null->assertStatus(422);
+        $this->assertSame(['Kelas Jabatan wajib diisi.'], $this->json($null)['errors']['kelas_jabatan']);
+
+        $this->assertSame(0, $this->db->table('kelas_jabatan')->where('kelas_jabatan', 1)->countAllResults());
     }
 
     /**

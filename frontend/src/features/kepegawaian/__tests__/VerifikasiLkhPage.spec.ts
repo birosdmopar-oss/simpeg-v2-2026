@@ -171,7 +171,7 @@ describe('VerifikasiLkhPage', () => {
     expect(svc.rekap).toHaveBeenCalledTimes(1)
     expect(svc.list).not.toHaveBeenCalled()
     expect(w.get('[data-testid="lkh-rekap-row-199001012015011001"]').text()).toContain('Ani')
-    expect(q<HTMLInputElement>('[data-testid="lkh-rekap-bulan"] input')?.value).toBe('2026-10')
+    expect(q<HTMLInputElement>('[data-testid="lkh-rekap-bulan"] input')?.value).toBe('10/2026')
 
     await selectRowAction(w, 'lkh-rekap-actions-199001012015011001', 'lihat')
     await flushPromises()

@@ -235,7 +235,7 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
 - **G-06 6.5 #3:** tabel arsip `absen_ijin_20240106` dan `absen_ijin_20240702` (`simpeg_prod.sql:74, 108`) tidak ikut dicek pasangannya. Bila tabel arsip itu ikut dimigrasi, jalankan kueri pasangan B5 dengan nama tabel arsip.
 - **G-07 6.3 #4:** rantai wilayah kantor tidak konsisten, `kode_pos` bukan 5 digit, `telp`/`faks` > 50, dan `*_lain` terisi.
 - **G-10 6.3:** #2/#3 (sanitasi konten dan gambar), #6 (`faq_rate.nip` orphan, butuh `pegawai`).
-- **A-01 9.10:** username non-ASCII/berkarakter kontrol, dan `expired_at` (keputusan FCP). Panjang `username` > 100 kini dicek A6.
+- **A-01 9.10:** username non-ASCII/berkarakter kontrol, dan `expired_at` (keputusan FCP → diputuskan di MAKE-028, lihat 2.4 langkah `pengguna`). Panjang `username` > 100 kini dicek A6.
 - **Nilai [I]** (G-01 8.3, G-04 Bagian 7, G-06 Bagian 3 dan 6.4, G-07 3.1, G-10 Bagian 3): dicocokkan dengan DDL dump sebagai prasyarat impor (2.4 langkah 6). Skrip hanya menguji data terhadap tipe dugaan v2 (D, A6, B8, B9).
 
 ### 2.4 Langkah runbook impor
@@ -321,6 +321,7 @@ Butir asal yang **tidak** dicakup skrip ini tetap menjadi langkah manual dari do
      - akun dengan format hash lain diperlakukan sesuai keputusan di log 2.8 (2.5);
      - `password_decode` tidak pernah dipilih; kolomnya sudah dibuang di langkah 1;
      - pemetaan kolom akun lain (`id` → `id_pengguna`, `id_pegawai` → `nip`, `UserLevel` → `user_level`, status) mengikuti A-01 dan DBV-009;
+     - **`expired_at` (MAKE-028, keputusan user: ikut legacy):** disalin apa adanya. Di v2 kolom ini = batas berlaku PASSWORD (legacy `MY_Controller.php:223-230`): akun yang `expired_at`-nya sudah lewat saat v2 dipakai wajib mengganti password pada login pertama (login tetap berhasil), `NULL` = tidak kedaluwarsa. Hitung dan catat di log 2.8 jumlah akun aktif dengan `expired_at < NOW()` (`SELECT COUNT(*) FROM pengguna WHERE status = '1' AND expired_at IS NOT NULL AND expired_at < NOW();`) supaya dukungan pengguna siap menghadapi lonjakan penggantian password; tidak ada tindakan data. Sesudah impor, v2 mengisi `expired_at` di aplikasi (akun aktif baru +1 tahun, password berubah +3 bulan) meniru trigger legacy, jadi jangan membuat ulang trigger itu di DB v2;
      - **`must_change_password` (DBV-020 keputusan #7, disetujui DB Validator 15-10-2026):** default 0; akun role 2/6 yang password-nya masih = NIP (perilaku popup FCP legacy `MY_Controller.php:214-221`) diberi 1. Dijalankan di DB v2 setelah `pengguna` diimpor, jumlah baris dicatat di log 2.8:
 
        ```sql

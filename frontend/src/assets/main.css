@@ -9,6 +9,22 @@
     /* Public Sans dimuat lewat <link> Google Fonts di index.html; fallback ada di fontFamily.sans. */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+
+    /*
+     * Tata letak shell (RedesignShell): jarak tepi konten, tinggi top navbar, dan batas atas area yang menempel
+     * (panel menu samping) sesudah navbar sticky. Dipakai .pane-scroll.
+     */
+    --shell-gap: 1rem;
+    --topbar-h: 3.5rem;
+    --sticky-top: calc(var(--shell-gap) + var(--topbar-h) + 1rem);
+    /* Awal konten halaman: padding shell + navbar + pembungkus sticky (pb-3 = 0.75rem) + jarak <main> (mt-4 = 1rem). */
+    --page-top: calc(var(--shell-gap) + var(--topbar-h) + 1.75rem);
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      --shell-gap: 1.25rem;
+    }
   }
 
   body {
@@ -18,6 +34,48 @@
   /* Prinsip desain 1.2 "Aksesibilitas dan Inklusivitas" (WCAG 2.1 AA): fokus keyboard harus selalu terlihat. */
   :focus-visible {
     @apply outline-none ring-2 ring-brand-tertiary/50 ring-offset-2 ring-offset-white;
+  }
+
+  /*
+   * Scrollbar custom ramping GLOBAL (AGENTS.md bagian 3, CR-060): halaman, sidebar, tabel, dialog, dan semua area gulir.
+   * Chrome/Edge/Safari memakai pseudo-element ::-webkit-scrollbar* (thumb bulat, trek transparan, TANPA tombol panah).
+   * Properti standar scrollbar-width/color HANYA untuk browser tanpa ::-webkit-scrollbar (Firefox): sejak Chrome 121
+   * menyetelnya membuat Blink mengabaikan ::-webkit-scrollbar* dan merender scrollbar native tipis lengkap dengan tombol
+   * panah (CR-063), jadi jangan pernah menyetelnya di luar @supports ini.
+   */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(203 213 225) transparent;
+    }
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Tombol panah atas/bawah (dan kiri/kanan) tidak pernah tampil. */
+  *::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+    background-clip: content-box;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -39,10 +97,91 @@
       linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   }
 
-  /* Scrollbar tipis untuk panel yang bisa digulir (sidebar, daftar chat, riwayat kehadiran). */
-  .scrollbar-slim {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(203 213 225) transparent;
+  /*
+   * Panel gulir mandiri (CR-060): menempel di bawah top navbar sticky (lg ke atas), tinggi = viewport − navbar, dan
+   * menggulir isinya sendiri sehingga menggulir panel tidak menggulir halaman/area data, dan sebaliknya. Di bawah lg
+   * (layout bertumpuk) tidak menempel dan tidak dibatasi tinggi.
+   */
+  @media (min-width: 1024px) {
+    .pane-scroll {
+      position: sticky;
+      top: var(--sticky-top);
+      max-height: calc(100vh - var(--sticky-top) - var(--shell-gap));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+
+  /*
+   * Halaman "isi penuh" (CR-060, Master Data): dari lg, halaman TIDAK menggulir di window. `.page-fill` setinggi sisa
+   * viewport di bawah navbar sticky (tanpa angka tetap per halaman: --page-top = padding shell + tinggi navbar +
+   * pembungkus + jarak konten); bagian atas halaman (judul, aksi, pencarian/filter) tetap terlihat. `.pane-fill` =
+   * panel samping yang menggulir sendiri mengisi tinggi baris grid; `.table-fill` = kartu tabel yang mengisi sisa tinggi
+   * kolom flex dan menggulir isinya (header tabel dibuat sticky oleh halaman; paginasi di luar kartu tetap terlihat).
+   * Di bawah lg (layout bertumpuk) ketiganya tidak berlaku: halaman menggulir seperti biasa.
+   */
+  @media (min-width: 1024px) {
+    /*
+     * `--page-top` dihitung ulang dari posisi <main> sebenarnya oleh RedesignShell (CSS var di akar shell) sehingga
+     * jarak yang tak terhitung rumus (breadcrumb, tinggi navbar berubah) ikut; nilai di :root hanyalah cadangan.
+     * `position: relative` pada ketiganya = kotak penampung bagi turunan `absolute` (mis. elemen sr-only): tanpa itu
+     * turunan absolut lolos dari overflow dan menambah tinggi dokumen sehingga window bisa tergulir beberapa piksel.
+     */
+    .page-fill {
+      position: relative;
+      height: calc(100vh - var(--page-top) - var(--shell-gap));
+      height: calc(100dvh - var(--page-top) - var(--shell-gap));
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-fill {
+      position: relative;
+      height: 100%;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .table-fill {
+      position: relative;
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    /* Pengaman: selama ada halaman isi-penuh, window tidak punya gulir sama sekali (sisa subpiksel pun terpotong). */
+    html:has(.page-fill) {
+      overflow: hidden;
+    }
+  }
+
+  /*
+   * Scrollbar menu sidebar (CR-063): panel sidebar bersudut bulat (rounded-[1.75rem]) dan scrollbar mengikuti lengkungnya.
+   * Track diberi margin atas/bawah (bawah ≥ radius panel 1.75rem) supaya thumb berhenti sebelum lengkung kanan-bawah, dan
+   * thumb dijauhkan dari tepi panel (border transparan lebih tebal). Hanya untuk sidebar (bukan global); panel sidebar
+   * sendiri `overflow-hidden` sehingga Firefox (tanpa ::-webkit-scrollbar-track margin) juga terpotong mengikuti lengkung.
+   * Berlaku juga di drawer mobile (komponen yang sama).
+   */
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-track {
+    margin-block: 0.75rem 1.75rem;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    border-width: 3px;
+  }
+
+  /* Alias lama: scrollbar global sudah ramping; kelas ini dipertahankan agar pemakai lama tidak berubah. */
+  @supports not selector(::-webkit-scrollbar) {
+    .scrollbar-slim {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(203 213 225) transparent;
+    }
   }
 
   .scrollbar-slim::-webkit-scrollbar {
@@ -56,5 +195,11 @@
 
   .scrollbar-slim::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }
