@@ -150,6 +150,12 @@ harian presensi membaca `dh_online`.
 | QC-4 | Isi `Config\App::$proxyIPs` bila backend di belakang reverse proxy/load balancer, agar throttle verifikasi publik per IP klien (bukan per IP proxy) | review CR M4 27-10-2026 | ⏳ deploy |
 | QC-5 | `encryption.key` terisi di produksi (token QR slip terenkripsi) dan HTTPS aktif (geolokasi presensi online) | MAKE-031, MAKE-032 | ⏳ deploy |
 
+### Uji paritas QA Fase 5
+
+| # | Butir | Asal | Status |
+|---|---|---|---|
+| UP-1 | Paritas adapter Tukin vs rekap legacy `laporan_tukin_us_skp` pada data nyata: legacy memuat `dh_online` per bulan kalender N−1 dan N (`L_presensi.php:12376-12391`), adapter v2 per rentang [awal periode sebelumnya, akhir periode] (`SumberHarianTukin`). Bandingkan hasil per pegawai untuk periode dengan baris BKN tidak standar dan pegawai dengan **cuti sakit lintas periode** (lookback urutan cuti sakit, `KalkulasiTukin::sakitSebelumPeriode`) | MAKE-033, review CR M6 27-10-2026 | ⏳ QA Fase 5 (setelah 5B: cuti/TB nyata) |
+
 ## Persiapan tanpa skema
 
 ### CR-037 — Kalkulasi Tukin murni (bagian D-04..D-07/D-13)
