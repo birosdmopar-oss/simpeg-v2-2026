@@ -26,6 +26,12 @@
 -- LARANGAN: jangan jalankan di DB produksi legacy yang sedang melayani aplikasi, dan jangan di DB dev v2
 -- (`simpeg_v2`). Jalankan di SALINAN dump final saat freeze atau salinan gladi (DBV-011 2.4 langkah 1).
 -- Skrip ini hanya berisi SELECT.
+--
+-- Collation campuran (temuan 27-10-2026, error 1267 "Illegal mix of collations"): di D1, tabel legacy `inbox`, `inbox_msg`,
+-- `question_category`, `pa_layanan`, `jenis_pa`, dan `firebase_token` ber-collation `utf8mb4_0900_ai_ci`, sedangkan
+-- `pegawai` dan tabel layanan lain `utf8mb4_unicode_ci`. Setiap perbandingan string lintas kedua kelompok memakai
+-- `COLLATE utf8mb4_unicode_ci` eksplisit di sisi kolom legacy (indeks `pegawai.nip` tetap terpakai). Perbandingan id INT
+-- tidak terpengaruh. Bahan G2: collation diseragamkan ke `utf8mb4_unicode_ci` saat impor (DBV-022 Bagian 12.6).
 -- =====================================================================================================================
 
 
@@ -192,10 +198,11 @@ SELECT CAST(status AS CHAR) AS status, COUNT(*) AS jumlah FROM petugas_layanan G
 -- Bagian 6 — `pa_layanan` (aturan PyB): id master yatim dan NIP yatim.
 -- Rujukan: PRD §6.1.1 #17 (11 FK SET NULL -> RESTRICT, V1), DQ-17.
 -- Master G-02 sudah ada di `main`; pemeriksaan dijalankan terhadap master legacy dengan nama kolom D1.
+-- `pa_layanan` D1 = `utf8mb4_0900_ai_ci`: NIP dibandingkan dengan `COLLATE utf8mb4_unicode_ci`; id master = INT.
 -- ---------------------------------------------------------------------------------------------------------------------
 SELECT 'pa_nip_yatim' AS metrik, COUNT(*) AS jumlah FROM pa_layanan a
 WHERE a.nip IS NOT NULL AND TRIM(a.nip) <> ''
-  AND NOT EXISTS (SELECT 1 FROM pegawai p WHERE p.nip = a.nip)
+  AND NOT EXISTS (SELECT 1 FROM pegawai p WHERE p.nip = a.nip COLLATE utf8mb4_unicode_ci)
 UNION ALL
 SELECT 'pa_nip_lebih_30', COUNT(*) FROM pa_layanan WHERE CHAR_LENGTH(nip) > 30
 UNION ALL
@@ -233,7 +240,8 @@ WHERE a.id_jabatan_koord IS NOT NULL
 -- CATATAN PENTING: seluruh isi `inbox`/`inbox_msg` legacy diimpor ke `disiplin_ticket(_msg)` (Fase 8), BUKAN ke
 -- `inbox` v2 (notifikasi satu arah) — lihat DBV-022 Bagian 3.
 -- ---------------------------------------------------------------------------------------------------------------------
--- 7.1 Integritas kategori & NIP.
+-- 7.1 Integritas kategori & NIP. `inbox`/`inbox_msg`/`question_category` D1 = `utf8mb4_0900_ai_ci`: NIP dibandingkan
+-- dengan `COLLATE utf8mb4_unicode_ci`; `id_question_category`/`id_inbox` = INT.
 SELECT 'inbox_id_question_category_null' AS metrik, COUNT(*) AS jumlah FROM inbox WHERE id_question_category IS NULL
 UNION ALL
 SELECT 'inbox_id_question_category_yatim', COUNT(*) FROM inbox i
@@ -242,7 +250,7 @@ WHERE i.id_question_category IS NOT NULL
 UNION ALL
 SELECT 'inbox_nip_yatim', COUNT(*) FROM inbox i
 WHERE i.nip IS NOT NULL AND TRIM(i.nip) <> ''
-  AND NOT EXISTS (SELECT 1 FROM pegawai p WHERE p.nip = i.nip)
+  AND NOT EXISTS (SELECT 1 FROM pegawai p WHERE p.nip = i.nip COLLATE utf8mb4_unicode_ci)
 UNION ALL
 SELECT 'inbox_nip_lebih_30', COUNT(*) FROM inbox WHERE CHAR_LENGTH(nip) > 30;
 
@@ -261,6 +269,7 @@ ORDER BY kolom, nilai;
 
 -- 7.3 Pelaku tiket tanpa baris pengguna (DQ-6: FK ke `pengguna` atau tanpa FK; nilai 0 = "semua petugas").
 -- Ganti `<tabel_pengguna_legacy>` dan `<kolom_id_pengguna_legacy>` sesuai skema legacy sebelum dijalankan.
+-- `sender`/`receiver`/`closed_by` = INT (tanpa collation); bila diganti ke kolom string, tambahkan COLLATE seperti 7.1.
 -- SELECT 'inbox_sender_tanpa_pengguna' AS metrik, COUNT(*) AS jumlah FROM inbox i
 -- WHERE i.sender <> 0 AND NOT EXISTS (
 --     SELECT 1 FROM <tabel_pengguna_legacy> u WHERE u.<kolom_id_pengguna_legacy> = i.sender)
@@ -310,11 +319,11 @@ SELECT 'esign_ip_lebih_20', COUNT(*) FROM esign_hist WHERE CHAR_LENGTH(ip_addres
 
 SELECT COALESCE(modul, '(NULL)') AS modul, COUNT(*) AS jumlah FROM esign_hist GROUP BY modul ORDER BY jumlah DESC;
 
--- INFO: `firebase_token` (tabel tanpa PK di D1; usulan [V2] PK surrogate + FK nip).
+-- INFO: `firebase_token` (tabel tanpa PK di D1; usulan [V2] PK surrogate + FK nip). D1 = `utf8mb4_0900_ai_ci`.
 SELECT 'firebase_token_baris' AS metrik, COUNT(*) AS jumlah FROM firebase_token
 UNION ALL
 SELECT 'firebase_token_nip_yatim', COUNT(*) FROM firebase_token f
-WHERE NOT EXISTS (SELECT 1 FROM pegawai p WHERE p.nip = f.nip)
+WHERE NOT EXISTS (SELECT 1 FROM pegawai p WHERE p.nip = f.nip COLLATE utf8mb4_unicode_ci)
 UNION ALL
 SELECT 'firebase_token_nip_duplikat', (SELECT COUNT(*) FROM (
     SELECT nip FROM firebase_token GROUP BY nip HAVING COUNT(*) > 1

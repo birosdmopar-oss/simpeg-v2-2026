@@ -797,3 +797,22 @@ Usulan coder (disetujui reviewer CR 27-10-2026 sebagai usulan; **belum diverifik
 | Skema setelah `migrate` (main + 9 migration Modul C) | _diisi setelah dijalankan_ |
 | `migrate:rollback` → `migrate` ulang | _diisi setelah dijalankan_ |
 | `./check.sh` | _diisi setelah dijalankan_ |
+
+### 12.6 Collation campuran di kueri audit (temuan 27-10-2026)
+
+Kueri `sql/DBV-022-audit-layanan.sql` yang dijalankan di salinan prod berhenti dengan error 1267 "Illegal mix of
+collations (utf8mb4_unicode_ci) and (utf8mb4_0900_ai_ci)". **Tabel legacy ber-collation `utf8mb4_0900_ai_ci` memerlukan
+`COLLATE` eksplisit** saat dibandingkan dengan `pegawai` (`utf8mb4_unicode_ci`). Acuan collation per tabel = D1:
+
+| Collation D1 | Tabel yang dipakai skrip audit |
+|---|---|
+| `utf8mb4_0900_ai_ci` | `inbox`, `inbox_msg` (kolom `attachments` juga eksplisit 0900), `question_category`, `pa_layanan` (kolom `gol_ruang_pemohon` juga eksplisit 0900), `jenis_pa`, `firebase_token` |
+| `utf8mb4_unicode_ci` | `pegawai`, `riwayat_cuti` (termasuk `ketua_tim`), `riwayat_cuti_notif_kt`, `pegawai_sisa_cuti`, `riwayat_tb`, `riwayat_tb_perpan`, `riwayat_ib`, `riwayat_pmk`, `riwayat_pmk_req`, `petugas_layanan`, `jenis_layanan`, `esign_hist`, `unit`, `satker`, `jabatan`, `jabatan_koordinasi` |
+
+Perbaikan (skrip tetap hanya SELECT): `p.nip = <kolom legacy> COLLATE utf8mb4_unicode_ci` pada NIP `pa_layanan` (Bagian 6),
+`inbox` (7.1), dan `firebase_token` (Bagian 8). Perbandingan lain di skrip tidak lintas collation: id master/induk = INT
+(Bagian 6, 7.1, 7.3, 7.4), 7.5 sudah memakai `COLLATE` eksplisit, `ketua_tim` dan `esign_hist` sama-sama `unicode_ci`
+dengan `pegawai`. Bahan G2: collation 0900 di atas diseragamkan ke `utf8mb4_unicode_ci` saat impor; tabel v2 Modul C
+seluruhnya `utf8mb4_unicode_ci` (Bagian 11).
+
+Verifikasi di DB scratch dengan tabel uji ber-collation campuran: _diisi setelah dijalankan_.
