@@ -10,13 +10,14 @@ use App\Libraries\Layanan\Cuti\EfekFinalCuti;
 use App\Libraries\Layanan\Cuti\KuotaCuti;
 use App\Libraries\Layanan\Cuti\PorsiTahunCuti;
 use App\Libraries\Layanan\Cuti\SaldoCuti;
+use App\Libraries\Layanan\Cuti\SnapshotSaldoCuti;
 use App\Libraries\Layanan\Cuti\StatusCuti;
 use CodeIgniter\Test\CIUnitTestCase;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * MAKE-022 Tahap 2b — tabel kasus uji wajib kuota PRD Fase 4 v1.1 §6.3.8 (K1–K21) + §6.3.10 (T11–T14) atas value
+ * MAKE-022 Tahap 2b — tabel kasus uji wajib kuota PRD Fase 4 §6.3.8 (K1–K21, K25–K26 v1.3) + §6.3.10 (T11–T14) atas value
  * object `SaldoCuti`. Saldo ditulis `(N, N-1, N-2, utang, ditangguhkan)`; tahun acuan 2027.
  *
  * @internal
@@ -142,7 +143,7 @@ final class KuotaBoundaryTest extends CIUnitTestCase
     }
 
     /**
-     * K16–K19, T14: refund kebalikan tepat, tanpa negatif, kelebihan dibuang.
+     * K16–K19, T14: refund kebalikan tepat, tanpa negatif, kelebihan di atas batas D8 dibuang (tanpa snapshot).
      *
      * @return iterable<string, array{array{int, int, int, int, int}, int, int, int, array{int, int, int, int, int}}>
      */
@@ -176,6 +177,63 @@ final class KuotaBoundaryTest extends CIUnitTestCase
 
         $this->assertTrue((new SaldoCuti(...$akhir))->sama($hasil), json_encode($hasil->keBaris()));
         $this->assertLessThanOrEqual(24, $hasil->total());
+    }
+
+    /**
+     * K25–K26 (v1.3, Q-05): refund dengan batas per kolom dari snapshot `riwayat_cuti` — `max(batas D8, snapshot)`;
+     * snapshot NULL (seluruhnya atau per kolom) → batas D8; snapshot di bawah D8 → batas D8.
+     *
+     * @return iterable<string, array{array{int, int, int, int, int}, array{?int, ?int, ?int}, int, int, int, array{int, int, int, int, int}}>
+     */
+    public static function refundSnapshot(): iterable
+    {
+        yield 'K25 snapshot impor (12,9,0): N-1 pulih sampai 9' => [[12, 4, 0, 0, 0], [12, 9, 0], 5, 0, 1, [12, 9, 0, 0, 0]];
+
+        yield 'K26 snapshot NULL: batas D8, sisa ke N-2' => [[12, 5, 0, 0, 0], [null, null, null], 3, 0, 1, [12, 6, 2, 0, 0]];
+
+        yield 'campuran: n1 NULL (batas 6), n2 terisi 9 (batas 9)' => [[12, 2, 3, 0, 0], [12, null, 9], 12, 0, 1, [12, 6, 9, 0, 0]];
+
+        yield 'snapshot di bawah D8 → batas D8' => [[12, 4, 0, 0, 0], [10, 3, 2], 8, 0, 1, [12, 6, 6, 0, 0]];
+
+        yield 'snapshot N-1 = 9 tetap membuang sisa di atas batas kolom' => [[12, 8, 6, 0, 0], [12, 9, 6], 5, 0, 1, [12, 9, 6, 0, 0]];
+
+        yield 'status 4 + snapshot: ditangguhkan berkurang' => [[12, 4, 0, 0, 5], [12, 9, 0], 5, 0, 4, [12, 9, 0, 0, 0]];
+
+        yield 'status 1 + snapshot: utang berkurang tanpa negatif' => [[0, 0, 0, 2, 0], [12, 9, 0], 2, 3, 1, [2, 0, 0, 0, 0]];
+    }
+
+    /**
+     * @param array{int, int, int, int, int} $saldo
+     * @param array{?int, ?int, ?int}        $snap
+     * @param array{int, int, int, int, int} $akhir
+     */
+    #[DataProvider('refundSnapshot')]
+    public function testRefundDenganSnapshot(array $saldo, array $snap, int $lcIni, int $lcDepan, int $status, array $akhir): void
+    {
+        $hasil = KuotaCuti::kembalikan(new SaldoCuti(...$saldo), $lcIni, $lcDepan, $status, $this->aturan, new SnapshotSaldoCuti(...$snap));
+
+        $this->assertTrue((new SaldoCuti(...$akhir))->sama($hasil), json_encode($hasil->keBaris()));
+    }
+
+    public function testRefundTanpaSnapshotSamaDenganSnapshotKosong(): void
+    {
+        $saldo = new SaldoCuti(12, 5, 0, 1, 2);
+
+        foreach ([[3, 0, 1], [4, 0, 4], [30, 2, 1]] as [$lcIni, $lcDepan, $status]) {
+            $this->assertTrue(
+                KuotaCuti::kembalikan($saldo, $lcIni, $lcDepan, $status, $this->aturan)
+                    ->sama(KuotaCuti::kembalikan($saldo, $lcIni, $lcDepan, $status, $this->aturan, new SnapshotSaldoCuti())),
+            );
+        }
+    }
+
+    public function testSnapshotDariBarisMengonversiStringDanMenjagaNull(): void
+    {
+        $snap = SnapshotSaldoCuti::dariBaris(['sisa_cuti' => '12', 'sisa_cuti_n1' => '9', 'sisa_cuti_n2' => null]);
+
+        $this->assertSame(['n' => 12, 'n1' => 9, 'n2' => 6], $snap->batas($this->aturan));
+        $this->assertSame(['n' => 12, 'n1' => 6, 'n2' => 6], SnapshotSaldoCuti::dariBaris([])->batas($this->aturan));
+        $this->assertSame(['n' => 12, 'n1' => 6, 'n2' => 6], SnapshotSaldoCuti::dariBaris(['sisa_cuti' => '', 'sisa_cuti_n1' => '0'])->batas($this->aturan));
     }
 
     public function testK16K17PotongLaluRefundKembaliKeAwal(): void

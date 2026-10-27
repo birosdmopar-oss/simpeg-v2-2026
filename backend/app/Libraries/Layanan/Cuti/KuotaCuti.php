@@ -16,9 +16,10 @@ use InvalidArgumentException;
  * - Potong (transisi ke 1 atau 4): `lcTahunIni` dari N-2 → N-1 → N tanpa normalisasi ulang (LK-05 tidak dibawa);
  *   status 1 dan `lcTahunDepan > 0` → `utang += lcTahunDepan` (≤ MAKS_UTANG); status 4 → `ditangguhkan += lcTahunIni`
  *   dan porsi tahun depan dibuang [K `L:3891-3901`]. Kurang → gagal (422), saldo tidak berubah (A-07).
- * - Refund (hapus cuti final jenis 1, D6): kebalikan tepat — ke N → N-1 → N-2 dengan batas 12/6/6 (kelebihan dibuang,
- *   total ≤ 24); status 1 `utang = max(0, utang − lcTahunDepan)`; status 4 `ditangguhkan = max(0, … − lcTahunIni)`.
- *   Tidak pernah negatif (A-08).
+ * - Refund (hapus cuti final jenis 1, D6): kebalikan tepat — ke N → N-1 → N-2 dengan batas per kolom
+ *   `max(batas D8, snapshot saldo kolom itu di baris cuti)` (v1.3, Q-05: saldo impor di atas D8 tidak dihanguskan);
+ *   tanpa snapshot → batas D8 12/6/6; sisa di atas batas dibuang; status 1 `utang = max(0, utang − lcTahunDepan)`;
+ *   status 4 `ditangguhkan = max(0, … − lcTahunIni)`. Tidak pernah negatif (A-08).
  * - Jaminan impor (T13): untuk saldo dalam batas D8 hasil potong = normalisasi legacy e-sign `L:3867-3886` (diuji).
  */
 final class KuotaCuti
@@ -119,17 +120,26 @@ final class KuotaCuti
 
     /**
      * Refund saat hapus cuti final jenis 1 (D6). Tahun acuan = tahun `created_at` baris yang dihapus (pemanggil).
+     * `$snapshot` = saldo pada baris cuti yang dihapus: batas per kolom = `max(batas D8, snapshot kolom itu)`; null atau
+     * kolom NULL → batas D8 (perilaku sebelum v1.3).
      */
-    public static function kembalikan(SaldoCuti $saldo, int $lcTahunIni, int $lcTahunDepan, int $status, AturanCuti $aturan): SaldoCuti
-    {
+    public static function kembalikan(
+        SaldoCuti $saldo,
+        int $lcTahunIni,
+        int $lcTahunDepan,
+        int $status,
+        AturanCuti $aturan,
+        ?SnapshotSaldoCuti $snapshot = null,
+    ): SaldoCuti {
         self::wajibStatusEfekFinal($status);
         self::wajibNonNegatif($lcTahunIni, $lcTahunDepan);
 
-        $sisa = $lcTahunIni;
-        $n    = self::tambah($saldo->n, $aturan->kuotaN, $sisa);
-        $n1   = self::tambah($saldo->n1, $aturan->maksN1, $sisa);
-        $n2   = self::tambah($saldo->n2, $aturan->maksN2, $sisa);
-        // $sisa yang tersisa = kelebihan di atas batas D8 → dibuang (total tidak pernah > MAKS_TOTAL).
+        $batas = ($snapshot ?? new SnapshotSaldoCuti())->batas($aturan);
+        $sisa  = $lcTahunIni;
+        $n     = self::tambah($saldo->n, $batas['n'], $sisa);
+        $n1    = self::tambah($saldo->n1, $batas['n1'], $sisa);
+        $n2    = self::tambah($saldo->n2, $batas['n2'], $sisa);
+        // $sisa yang tersisa = kelebihan di atas batas kolom → dibuang.
 
         return $status === StatusCuti::DISETUJUI
             ? new SaldoCuti($n, $n1, $n2, max(0, $saldo->utang - $lcTahunDepan), $saldo->ditangguhkan)
