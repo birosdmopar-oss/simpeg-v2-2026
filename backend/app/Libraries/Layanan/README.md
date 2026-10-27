@@ -45,3 +45,63 @@ Catatan keputusan coder (dicatat untuk reviewer):
 Belum ada di Tahap 2b (M3+): Model, controller, route, migration, penentuan AL/PyB, tumpang tindih atas baris DB,
 notifikasi, `KuotaCutiService`/`CutiApprovalService`.
 
+## TB, IB, PMK — logika murni (`Studi/`, `Tb/`, `Pmk/`, MAKE-024 bagian awal, PRD Fase 4 v1.1 §6.7–§6.9)
+
+Pola sama dengan Cuti Tahap 2b (§6.1.4): kelas `final` statis / value object `readonly`, **tanpa DB, HTTP, session, jam
+sistem, angka acak, konfigurasi, lingkungan, atau I/O** — dijaga `tests/unit/Layanan/LayananStudiPmkMurniTest.php`
+(`PemindaiKemurnian` pada `Studi/`, `Tb/`, `Pmk/`, dan `app/Interfaces/Layanan/`; pengecualian hanya
+`createFromFormat('!Y-m-d')`). "Hari ini", master, TMT CPNS, dan baris pembanding (tumpang tindih, perpanjangan) diterima
+sebagai parameter. Konstanta runtime di `Config\Layanan` → `aturanStudi()` / `aturanPmk()`. Service ber-DB M5 (`Tb/TbService`,
+`Tb/StatusTugasBelajar`, `Ib/IbService`, `Pmk/PmkPengajuanService`, …, PRD §6.7–§6.9 file boundary) membungkus kelas ini.
+
+`Studi/` = bagian yang sama untuk TB dan IB (PRD §6.8.1 "sama TB kecuali disebut"); `Tb/` = khusus TB. Label sumber: **[K]**
+kode legacy (`L_tb.php`, `L_ib.php`, `L_pmk.php`, `controllers/hr/services/Local.php`, DDL `simpeg01_struktur_lengkap`),
+**[V2]** keputusan PRD (Q-03, Q-11, Q-12, Q-15, Q-16, Q-23).
+
+| Kelas | Isi |
+|---|---|
+| `Studi/AturanStudi` | value object: jenjang > 3, `up` bawaan, `reason_note` ≤ 255 byte; `JENIS_TB`/`JENIS_IB`, `namaLayanan()` |
+| `Studi/StatusStudi` | kode 0/1/2/3 [K DDL] + label, `FINAL` {1,2}, `TUMPANG_TINDIH` {0,1,3,4} ([K] {0,3,4} + 1 [V2 TB-04]) |
+| `Studi/RentangTanggal` | urai `!Y-m-d`, selisih `DateTime::diff`, irisan inklusif, tambah hari |
+| `Studi/LamaTahunStudi` | `lama_tahun` = `diff.y + diff.m/12` 1 desimal [K TB-17 `Local.php:3203-3214`], dihitung server (Q-03); kolom `"3.90"` |
+| `Studi/ValidasiStudi` | isian wajib TB/IB (semua galat dikumpulkan, TB-03), `tgl_akhir ≥ tgl_mulai`, jenjang, status awal TB 0\|1 + data SK bila 1, IB selalu 0; `bentrok()` + `pesanBentrok()` [K]; TB vs IB tidak dibandingkan (IB-09, Q-11) |
+| `Studi/TransisiStudi` | satu langkah 0 → setujui (data SK wajib, `show_pl = 1`) / tolak (`reason_note` wajib ≤ 255 byte) → final; selain dari 0 → `errors.status` |
+| `Tb/PerpanjanganTb` | validasi (wajib, `akhir ≥ mulai`, induk status 1 [V2 TB-13]), saran mulai = akhir efektif + 1 [K], akhir efektif = MAX, `ringkasan()` = MAX terpisah pengganti trigger `riwayat_tb_perpan_af*` [K] |
+| `Tb/BebasPresensiTb` | `bebasPresensiPenuh(daftarTb, tanggal)`, `rentangBebasPresensi(daftarTb, dari, sampai)`, `statusPenuh()` (D15, turunan) — inti murni untuk `App\Interfaces\Layanan\StatusTugasBelajarInterface` (Fase 5 D-06) |
+| `Pmk/AturanPmk` | value object: `jenis_pmk` {Swasta, Negeri} [V2 P-5], `reason_note` ≤ 255 byte, `mker` ≤ 255 (TINYINT) |
+| `Pmk/StatusPmk` | kode 0/1/2/3 [K DDL] + label kolom & label UI v2, `FINAL` {1,2}, `ikutTumpangTindih` (≠ 2 [K]), `detailBolehDibuka` (Q-16), `bolehHapus` (≠ 1 [K]) |
+| `Pmk/MasaKerjaPmk` | kalkulator `pmk/hitung-mker`: `mker_th = diff.y`, `mker_bl = diff.m` [K `Local.php:4574-4601`]; nilai pengajuan tetap dari klien (D19/P-4) |
+| `Pmk/ValidasiPmk` | isian wajib (semua galat), enum `jenis_pmk`, `tgl_akhir ≥ tgl_awal`, `tgl_akhir < TMT CPNS` [V2 P-3], `mker` 0..255; `bentrok()` status ≠ 2 [K] |
+| `Pmk/TransisiPmk` | 0 → proses → 3; 0/3 → setujui → 1, tolak → 2 (`reason_note` wajib [K] ≤ 255 byte); 1/2 final terkunci [V2 P-14]; `aksiTersedia()` |
+
+Test: `tests/unit/Layanan/{LayananStudiPmkMurniTest, Studi/{LamaTahunStudiTest, ValidasiStudiTest, TransisiStudiTest},
+Tb/{PerpanjanganTbTest, BebasPresensiTbTest}, Pmk/PmkMurniTest}` — boundary kabisat, akhir bulan, perpanjangan berganda,
+lintas tahun, single end node (BFS PMK).
+
+Catatan keputusan coder (dicatat untuk reviewer):
+
+1. **Bebas presensi = rentang TB ATAU salah satu rentang perpanjangan** (teks PRD §6.7.5), bukan satu rentang
+   `tgl_mulai..MAX(tgl_akhir, tgl_akhir_perpan)`. Akibatnya celah antara akhir TB dan awal perpanjangan **tidak** bebas,
+   sama dengan `laporan_tukin`/`laporan_tukin_us_skp` (acuan Tukin). `rekap_full_xls`/`rekap_uma*` legacy menganggap
+   celah itu TB (anomali, tidak dibawa). `PerpanjanganTb::tglAkhirEfektif()` (MAX) hanya untuk tampilan/saran tanggal.
+2. **Status TB/IB 3 (Diproses) dan 4** hanya mungkin dari data impor; v2 tidak menulisnya dan `TransisiStudi` menolak
+   memproses keduanya (`errors.status`), karena PRD hanya mendefinisikan transisi dari 0. Data impor berstatus 3/4 perlu
+   keputusan cutover (dibiarkan atau dinormalkan ke 0) — tidak diputuskan di sini.
+3. **Teks pesan.** Wajib isi memakai format PRD "{Label} wajib diisi." dengan label legacy. Teks tumpang tindih, urutan tanggal
+   PMK, TMT CPNS, aksi, dan alasan PMK dipakai persis [K]. Teks [V2] baru: jenjang/tanggal tidak valid, status awal,
+   perpanjangan, status tidak dapat diproses, dan batas 255 byte. Pesan "Alasan ditolak tidak boleh kosong." [K PMK]
+   dipakai juga untuk TB/IB, karena alasan tolak TB/IB di legacy hanya wajib di klien.
+4. **PMK `tgl_akhir ≥ tgl_awal`** dicek bila kedua tanggal sah. Legacy mengeceknya hanya bila belum ada galat lain, tetapi v2
+   mengumpulkan semua galat.
+5. **TMT CPNS tidak diketahui** (`null`, mis. data impor tanpa `pegawai_cpns`) → cek P-3 dilewati. Service M5 memutuskan
+   sumber TMT (snapshot `pegawai_cpns` atau `MasaKerja::tmtCpnsDariNip`).
+6. **`mker_th`/`mker_bl` divalidasi bilangan bulat 0..255** (tipe TINYINT) [V2]. Legacy hanya mengecek kosong. Hasil 0 th
+   0 bl tetap diterima server [K]; peringatan "harus melebihi 1 bulan" hanya di kalkulator klien (`MasaKerjaPmk::kurangSebulan`).
+7. **`App\Interfaces\Layanan\StatusTugasBelajarInterface`** dibuat sekarang (kontrak murni, tanpa implementasi) supaya
+   Fase 5B bisa mengandalkan nama dan signature PRD §6.7.5. Implementasi DB dan `Config\Services::statusTugasBelajar()`
+   menyusul di M5 setelah DBV-022.
+8. **Hak ubah/hapus TB/IB** (pemilik status 0 dan `tgl_mulai > hari ini`, dsb., §6.7.2) belum dibuat predikatnya; bagian itu
+   bergantung pada role/lingkup dan dikerjakan di service M5.
+
+Belum ada di bagian ini (M5 setelah DBV-022 & M2): Model, controller, route, migration, berkas, PIC (`PetugasLayananService`),
+notifikasi, efek `id_jenis_status`, surat TB/IB.
