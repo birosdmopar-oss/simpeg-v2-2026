@@ -6,6 +6,7 @@ namespace Config;
 
 use App\Filters\JwtAuthFilter;
 use App\Filters\RoleFilter;
+use App\Filters\ThrottlePublikFilter;
 use CodeIgniter\Config\Filters as BaseFilters;
 use CodeIgniter\Filters\Cors;
 use CodeIgniter\Filters\CSRF;
@@ -41,6 +42,8 @@ class Filters extends BaseFilters
         // SIMPEG v2 — rantai auth (ADR-005): 'jwt' validasi token (401), 'role' cek role (403).
         'jwt'  => JwtAuthFilter::class,
         'role' => RoleFilter::class,
+        // Fase 5A (MAKE-031): rate limit endpoint publik verifikasi QR slip (30/60 detik/IP, PRD 5A §6.7).
+        'throttle' => ThrottlePublikFilter::class,
     ];
 
     /**

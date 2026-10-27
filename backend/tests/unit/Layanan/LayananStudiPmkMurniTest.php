@@ -17,30 +17,84 @@ use Tests\Support\Libraries\PemindaiKemurnian;
  * PRD Fase 4 v1.1 §6.1.4 (pola Tahap 2b cuti). Pengecualian sama dengan Cuti: hanya `::createFromFormat` berformat literal
  * berawalan `!` (`RentangTanggal::tanggal()`). Juga menjaga `Config\Layanan` = nilai bawaan value object.
  *
+ * M5 (ber-DB): PRD §6.7/§6.9 menaruh service ber-DB di folder `Tb/` dan `Pmk/`. Setiap berkas di folder itu WAJIB terdaftar
+ * di {@see self::BERKAS_MURNI} (dipindai) atau {@see self::BERKAS_DB} (lapisan DB, dikecualikan) — daftar eksplisit,
+ * disamakan dengan keputusan M3 reviewer CR 27-10-2026, sehingga berkas baru tidak lolos diam-diam. `Studi/` dan
+ * `Interfaces/Layanan/` 100% murni (tanpa daftar DB).
+ *
  * @internal
  */
 final class LayananStudiPmkMurniTest extends CIUnitTestCase
 {
     /**
-     * @return array<string, array{0: string, 1: int}> folder => jumlah berkas minimum
+     * Berkas murni per folder (dipindai PemindaiKemurnian).
+     *
+     * @var array<string, list<string>>
      */
-    public static function folderMurni(): array
+    private const BERKAS_MURNI = [
+        'Libraries/Layanan/Studi' => [
+            'AturanStudi.php', 'BerkasStudi.php', 'LamaTahunStudi.php', 'RentangTanggal.php', 'StatusStudi.php',
+            'TampilanStudi.php', 'TransisiStudi.php', 'ValidasiStudi.php',
+        ],
+        'Libraries/Layanan/Tb'  => ['BebasPresensiTb.php', 'PerpanjanganTb.php'],
+        'Libraries/Layanan/Pmk' => ['AturanPmk.php', 'MasaKerjaPmk.php', 'StatusPmk.php', 'TampilanPmk.php', 'TransisiPmk.php', 'ValidasiPmk.php'],
+        'Interfaces/Layanan'    => ['NotifikasiLayananInterface.php', 'StatusTugasBelajarInterface.php'],
+    ];
+
+    /**
+     * Berkas lapisan DB M5 (file boundary PRD §6.7–§6.9) — dikecualikan dari pemindaian kemurnian.
+     *
+     * @var array<string, list<string>>
+     */
+    private const BERKAS_DB = [
+        'Libraries/Layanan/Studi' => [],
+        'Libraries/Layanan/Tb'    => [
+            'EfekTbTrait.php', 'PerpanjanganTbService.php', 'StatusTugasBelajar.php', 'SuratTbService.php',
+            'TbApprovalService.php', 'TbService.php',
+        ],
+        'Libraries/Layanan/Pmk' => ['DasarPmkService.php', 'PmkApprovalService.php', 'PmkPengajuanService.php', 'RiwayatPmkService.php'],
+        'Interfaces/Layanan'    => [],
+    ];
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function folder(): array
     {
-        return [
-            'Studi (TB & IB)' => ['Libraries/Layanan/Studi', 6],
-            'Tb'              => ['Libraries/Layanan/Tb', 2],
-            'Pmk'             => ['Libraries/Layanan/Pmk', 5],
-            'Interfaces'      => ['Interfaces/Layanan', 1],
-        ];
+        return array_combine(array_keys(self::BERKAS_MURNI), array_map(static fn (string $f): array => [$f], array_keys(self::BERKAS_MURNI)));
     }
 
-    #[DataProvider('folderMurni')]
-    public function testFolderMurni(string $folder, int $minimum): void
+    #[DataProvider('folder')]
+    public function testSetiapBerkasTerdaftarMurniAtauLapisanDb(string $folder): void
     {
-        $hasil = (new PemindaiKemurnian(createFromFormatBerjangkar: true))->pindaiFolder(APPPATH . $folder);
+        $ada = array_map('basename', glob(APPPATH . $folder . '/*.php') ?: []);
+        sort($ada);
 
-        $this->assertGreaterThanOrEqual($minimum, $hasil['jumlahBerkas'], "Kelas murni {$folder} tidak ditemukan");
-        $this->assertSame([], $hasil['pelanggaran']);
+        $terdaftar = [...self::BERKAS_MURNI[$folder], ...self::BERKAS_DB[$folder]];
+        sort($terdaftar);
+
+        $this->assertSame([], array_values(array_intersect(self::BERKAS_MURNI[$folder], self::BERKAS_DB[$folder])), "{$folder}: berkas terdaftar ganda");
+        $this->assertSame($terdaftar, $ada, "{$folder}: setiap berkas wajib terdaftar di BERKAS_MURNI atau BERKAS_DB");
+    }
+
+    #[DataProvider('folder')]
+    public function testBerkasMurniTanpaPelanggaran(string $folder): void
+    {
+        $pemindai    = new PemindaiKemurnian(createFromFormatBerjangkar: true);
+        $pelanggaran = [];
+
+        foreach (self::BERKAS_MURNI[$folder] as $berkas) {
+            array_push($pelanggaran, ...$pemindai->pindai((string) file_get_contents(APPPATH . $folder . '/' . $berkas), $berkas));
+        }
+
+        $this->assertNotSame([], self::BERKAS_MURNI[$folder]);
+        $this->assertSame([], $pelanggaran);
+    }
+
+    public function testStudiDanInterfacesTanpaLapisanDb(): void
+    {
+        $this->assertSame([], self::BERKAS_DB['Libraries/Layanan/Studi']);
+        $this->assertSame([], self::BERKAS_DB['Interfaces/Layanan']);
     }
 
     public function testConfigLayananSamaDenganAturanBawaan(): void

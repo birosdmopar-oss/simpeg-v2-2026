@@ -51,6 +51,20 @@ final class RingkasanSlipTest extends CIUnitTestCase
         ], RingkasanSlip::hitung(self::slipSintetis()));
     }
 
+    /**
+     * Fase 5A F5-1 (PRD 5A §7.3.8, legacy `771f8b4` `Lsl_gaji.php:416-446`): uang makan N−1 masuk total.
+     */
+    public function testUangMakanMasukTotal(): void
+    {
+        $slip               = self::slipSintetis();
+        $slip['uang_makan'] = 74_000_000;
+
+        $hasil = RingkasanSlip::hitung($slip);
+        $this->assertSame(726_052_500 + 74_000_000, $hasil['total_penghasilan']);
+        $this->assertSame(346_052_500, $hasil['bersih_gpp'], 'komponen lain tidak berubah');
+        $this->assertArrayNotHasKey('uang_makan', $hasil, 'bentuk keluaran tetap');
+    }
+
     public function testBersih2TidakMasukTotal(): void
     {
         $slip             = self::slipSintetis();

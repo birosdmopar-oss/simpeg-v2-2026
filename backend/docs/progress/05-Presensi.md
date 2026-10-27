@@ -19,15 +19,15 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 | Task | Paket | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|---|
 | D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** | M1: dokumen + kueri audit + draf migration di `MigrationsDitahan/` (Bagian "5A M1" di bawah). M2 (27-10-2026): migration aktif + registry NIP Fase 5 + test skema (bagian "5A M2"); syarat DBV approve ✅ 20-10, DBV-022 di `main` ✅ `598a5f3`, ISSUE-049 ✅; menunggu CI + merge |
-| D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | TODO | Logika murni `Libraries/Presensi/Geo` boleh disiapkan sebelum M2 (§3.5) |
-| D-03 Presensi manual | 5A | M5 | MAKE-032 | TODO | Menunggu M2 |
+| D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | **IN_PROGRESS** | Service/controller/test AC-D02 di branch `fase5a/make-032-presensi-online-manual` (bagian "5A M5"); menunggu review/merge |
+| D-03 Presensi manual | 5A | M5 | MAKE-032 | **IN_PROGRESS** | Akun khusus + data presensi admin + test AC-D03 (bagian "5A M5"); menunggu review/merge |
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Logika murni CR-037/CR-039 selesai; adapter `TukinData` 5A (non-skema boleh mulai, merge setelah M2); precedence/laporan di 5B |
 | D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | — | — | TODO | Di luar 5A |
-| D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | TODO | Logika murni CR-027 tersedia; menunggu M2 |
-| D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | TODO | Menunggu M3 |
+| D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **IN_PROGRESS** | Impor 3 langkah + test AC-D10 di branch `fase5a/make-030-impor-slip-gaji` (bagian "5A M3"); menunggu review/merge |
+| D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | **IN_PROGRESS** | Kode + test AC-D11 di branch `fase5a/make-031-akses-verifikasi-slip` (bagian "5A M4"); menunggu review/merge (izin Horii) |
 | D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 | MAKE-034 | TODO | |
 | D-13 Unit test lengkap | 5A (bagian) / 5C | M8 | MAKE-035 | **IN_PROGRESS** | Bagian murni CR-037/CR-027; regression suite lengkap di 5C |
-| D-14 Verifikasi QR publik | 5A | M4 | MAKE-031 | TODO | Kartu QASMTASK baru (F5-20) |
+| D-14 Verifikasi QR publik | 5A | M4 | MAKE-031 | **IN_PROGRESS** | Kode + test AC-D14 (bagian "5A M4"); FE halaman `/verify/slip/:token` di M7 |
 
 **Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** nilai uang makan slip (5B, F5-1); konfirmasi Biro Keuangan
 atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan ulang data `gaji_pegawai` produksi (DEPLOY-002.1; Q5A-02 ditutup ISSUE-049).
@@ -72,11 +72,83 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
   `main`: sambungkan kode non-skema MAKE-030..033 sesuai urutan PRD 5A (M3 impor → M4 akses/verifikasi → M5 presensi →
   M6 adapter Tukin).
 
+## 5A M3 — D-10 impor Slip Gaji (MAKE-030)
+
+- **Sudah (27-10-2026, branch `fase5a/make-030-impor-slip-gaji`):** PhpSpreadsheet 5.10 + ekstensi (cc373bf), ADR-032,
+  `ValidasiBerkas::periksaImpor`, `PembacaExcelSlip`, `PenyimpanPratinjau`, `Config\Presensi` (batas impor) — persiapan
+  non-skema sebelumnya; lalu setelah M2: `ImporSlipService` (pratinjau + commit 1 transaksi, 1062 → 409 `konflik_data`,
+  audit `warning`/`import`), `GajiPegawaiModel`, `SlipGajiImportController`, `Config/RoutesPresensi.php` (+
+  `Routing::$routeFiles`), kontrak role `slip-gaji` di `KontrakMatriksRoleTest`, kode galat mesin opsional di envelope
+  (`ApiException` parameter terakhir `kode` → field `code` envelope, konstanta `KodeGalatSlip`; berkas bersama aditif, commit terpisah), dokumentasi endpoint di README controller.
+- **Test (AC-D10.1–10):** `tests/Presensi/Slip/ImporSlip{Pratinjau,Commit,MismatchNama,Duplikat,KonflikUnique,Akses,Berkas}Test.php`
+  + `tests/unit/Presensi/Slip/{PembacaExcelSlip,PenyimpanPratinjau}Test.php`; berkas Excel sintetis dibangkitkan test
+  (`tests/_support/Presensi/ImporSlipUjiTrait.php`). Konflik 1062 lewat seam `kaitSebelumTulis` (PRD §7.2.6).
+- **Catatan perilaku:** berkas tanpa ekstensi ditolak "Isi berkas tidak sesuai dengan ekstensinya." dan isi ber-jenis lain
+  (mis. PDF bernama `.xlsx`) "Format berkas harus .xlsx atau .xls." — sama dengan aturan `ValidasiBerkas` jalur lampiran
+  (CR-054); galat filter periode dipetakan ke `errors.filter_bulan` + `code`.
+
+## 5A M4 — D-11/D-14 akses & verifikasi Slip Gaji (MAKE-031)
+
+- **Sudah (branch `fase5a/make-031-akses-verifikasi-slip`; jeda 27-10-2026 atas instruksi Horii, dilanjutkan setelah
+  "Lanjutkan"):** persiapan non-skema (RingkasanSlip + uang makan F5-1, kontrak `UangMakanSlip*`, `ThrottlePublikFilter`,
+  `PdfSlipGaji` + view, `KopSlip`, README 771f8b4); merge main 2e0aabd (M3); `TokenSlipService` (hash + terenkripsi Q5A-01),
+  `SlipGajiData`, `SlipGajiService` (daftar/status/buka atomik/PDF, snapshot uang makan §7.3.7), `SlipGajiAdminService`
+  (monitoring/detail/koreksi/buka ulang/PDF), `VerifikasiSlipService`, `GajiPegawaiQrHistoryModel`, 3 controller, route M4
+  + grup publik `throttle` (alias `Config/Filters`, aditif), kontrak role `slip-gaji`/`publik`, `Config\Presensi` blok M4
+  (`$sumberUangMakan`, `$urlVerifikasiSlip`), README endpoint.
+- **Test (AC-D11.1–11, AC-D14.1–7):** `tests/Presensi/Slip/{GerbangSlip, SlipPegawaiAkses, BukaSlipAtomik,
+  BukaSlipKonkurensi (db-isolasi-penuh), SlipAdmin, UangMakanSnapshot, RoleMatriksSlip, VerifikasiSlip}Test.php`,
+  `tests/Presensi/RoutePresensiKontrakTest.php`, unit `PdfSlipGaji`/`KopSlip`/`RingkasanSlip`/`ThrottlePublikFilter`.
+- **Blocker go-live (bukan blocker 5A DONE):** `Config\Presensi::$sumberUangMakan` masih `UangMakanBelumTersedia` sampai 5B
+  (F5-1); kunci `encryption.key` wajib terisi di produksi.
+
+## 5A M5 — D-02/D-03 presensi online, manual, data admin (MAKE-032)
+
+- **Sudah (27-10-2026, branch `fase5a/make-032-presensi-online-manual`):** logika murni `Libraries/Presensi/Geo` (fc3451f,
+  sebelum M2); setelah M2: `Kehadiran/{PresensiOnlineService, PresensiManualService, DataPresensiService,
+  ResolverLokasiPresensi, ZonaSatker, KodeGalatPresensi, DuplikatPresensi}`, `Models/Presensi/DhOnlineModel`,
+  `PresensiController`, `PresensiManualController`, `Config/RoutesPresensi.php` (blok M5) + `Routing::$routeFiles`, kontrak
+  role prefiks `presensi` di `KontrakMatriksRoleTest`, `Config\Presensi` blok M5 (jendela waktu, `$akunPresensiManual` +
+  override `.env`), README endpoint. Kode galat envelope `ApiException(kode:)` dibawa dari MAKE-030 (isi identik, ed1d951).
+- **Test (AC-D02.1–10, AC-D03.1–8):** `tests/Presensi/Kehadiran/{PresensiOnline, ResolverLokasiPresensi, PresensiZonasi,
+  PresensiJendela, PresensiKonkurensi (db-isolasi-penuh), RoleMatriksPresensi, PresensiManualAkses, PresensiManualValidasi,
+  PresensiManualAudit, DataPresensiAdmin}Test.php` + unit `Geo` (Haversine, PenilaianGeofence, kemurnian). Konkurensi:
+  koneksi DB kedua menulis & commit lewat seam `kaitSebelumTulis` (setelah pemeriksaan awal, sebelum transaksi tulis).
+- **DBV-023 C-4 terpenuhi:** baris baru `dh_online` selalu `sumber` 1 (online) / 2 (manual, melekat); diuji.
+
+## 5A M6 — MAKE-033 adapter Tukin (D-04/D-05/D-07 sisi integrasi)
+
+Branch `fase5a/make-033-adapter-tukin` (dari `main` `6806c38`); acuan PRD 5A §7.7. Merge setelah M2 (DBV-023) karena
+harian presensi membaca `dh_online`.
+
+- **Sudah:** `Libraries/Presensi/TukinData` (konfigurasi `web_config`, periode `bkn_periode_ekinper`, hari libur, data
+  pegawai, konket `absen_ijin`, sumber cuti/TB fail-closed `SumberCutiTbBelumTersedia` + `Config\Presensi::$sumberCutiTb`,
+  `TukinDataService::siapkan()` → `ArgumenTukin`) + README folder (rujukan legacy, [K]/[V2]); test
+  `tests/Presensi/TukinData` (AC-TK.1–TK.5 bagian non-skema).
+- **Keputusan reviewer CR 20-10-2026:** `tmtMasuk` ikut legacy `get_all_pegawai_dh_spe` + rekap [K], kecuali cabang PPPK
+  rekap mengenali PPPK lewat id (`Jabatan::JENIS_PEGAWAI_PPPK`) [V2]; syarat `tgl_perkawinan` pada jumlah anak [K].
+- **Berkas bersama (commit terpisah):** `Libraries/MasterData/WebConfigTypes.php` + `WebConfigTypesTest` (tipe
+  `date_range_list`); `Config/WebConfig.php` (grup "Jam Kerja & Puasa", 7 key F5-16) dengan angka katalog 35 → 42 di
+  `tests/MasterData/WebConfigTest.php` dan `WebConfigTypesTest` (disetujui reviewer); **tambahan disetujui reviewer:**
+  FE `features/master-data/webConfig.types.ts`, `schemas/webConfig.schema.ts`, `components/WebConfigFormDialog.vue`
+  (tipe `date_range_list` di form Web Config, agar `rentang_puasa` dapat dikelola admin lewat UI).
+- **Sudah (27-10-2026, setelah M2 di `main`):** `presensi {masuk, pulang}` harian dari `dh_online`
+  (`SumberHarianTukin::presensi`, tanpa saring `sumber`, jam lokal apa adanya [K `L_presensi.php:12376-12391`,
+  `:12850-12851`]; jam tidak sah → `DataTukinTidakSah`). Test: `HarianTukinAdapterTest` (online/manual/impor, gabung
+  presensi+konket+cuti, jam tidak sah) dan `TukinDataServiceTest` (baris `dh_online` → status `hadir`, tanpa baris → `TK`).
+  AC-TK.1–TK.6 terpenuhi; `Libraries/Presensi/Tukin` tidak diubah.
+- **Sisa untuk 5B (di luar 5A):** sumber cuti/TB nyata (`Config\Presensi::$sumberCutiTb`), endpoint/laporan Tukin
+  (D-08), cross-check rumus resmi Q5A-13.
+
 ### Q cutover 5A
 
 | # | Butir | Asal | Status |
 |---|---|---|---|
 | QC-1 | Uji koreksi NIP (`NipCascadeService`) pada volume `dh_online` realistis + urutan induk/anak di bawah FK RESTRICT | DBV-023 C-3 (DB Validator 20-10-2026) | ⏳ pra-cutover |
+| QC-2 | Akar aset v2 final (`presensi.akarAset`) + berkas logo kop slip bawaan ditetapkan | MAKE-031, bersama G-09 | ⏳ cutover |
+| QC-3 | Konfirmasi Biro Keuangan atas data yang tampil di verifikasi QR publik (AS-06) | Q5A-08, review CR M4 27-10-2026 | ⏳ pra-go-live |
+| QC-4 | Isi `Config\App::$proxyIPs` bila backend di belakang reverse proxy/load balancer, agar throttle verifikasi publik per IP klien (bukan per IP proxy) | review CR M4 27-10-2026 | ⏳ deploy |
+| QC-5 | `encryption.key` terisi di produksi (token QR slip terenkripsi) dan HTTPS aktif (geolokasi presensi online) | MAKE-031, MAKE-032 | ⏳ deploy |
 
 ## Persiapan tanpa skema
 
@@ -112,27 +184,3 @@ Key review **CR-027** (CR saja). Tidak mengubah skema, jadi tidak ada dokumen `d
 - U-8 selesai di CR-040: pemindai kemurnian bersama `tests/_support/Libraries/PemindaiKemurnian.php` (daftar larangan gabungan ketiga penjaga, tanpa pelonggaran) dipakai `SlipGajiMurniTest`, `KalkulasiMurniTest` Tukin, dan `KalkulasiMurniTest` Kepegawaian.
 
 **Catatan lokasi test:** kontrak D-13 menyebut `tests/Presensi/`. Test logika murni ditaruh di `tests/unit/Presensi/` mengikuti konvensi repo (sama dengan CR-025); test integrasi ber-DB D-13 tetap di `tests/Presensi/`.
-
-## 5A M6 — MAKE-033 adapter Tukin (D-04/D-05/D-07 sisi integrasi)
-
-Branch `fase5a/make-033-adapter-tukin` (dari `main` `6806c38`); acuan PRD 5A §7.7. Merge setelah M2 (DBV-023) karena
-harian presensi membaca `dh_online`.
-
-- **Sudah:** `Libraries/Presensi/TukinData` (konfigurasi `web_config`, periode `bkn_periode_ekinper`, hari libur, data
-  pegawai, konket `absen_ijin`, sumber cuti/TB fail-closed `SumberCutiTbBelumTersedia` + `Config\Presensi::$sumberCutiTb`,
-  `TukinDataService::siapkan()` → `ArgumenTukin`) + README folder (rujukan legacy, [K]/[V2]); test
-  `tests/Presensi/TukinData` (AC-TK.1–TK.5 bagian non-skema).
-- **Keputusan reviewer CR 20-10-2026:** `tmtMasuk` ikut legacy `get_all_pegawai_dh_spe` + rekap [K], kecuali cabang PPPK
-  rekap mengenali PPPK lewat id (`Jabatan::JENIS_PEGAWAI_PPPK`) [V2]; syarat `tgl_perkawinan` pada jumlah anak [K].
-- **Berkas bersama (commit terpisah):** `Libraries/MasterData/WebConfigTypes.php` + `WebConfigTypesTest` (tipe
-  `date_range_list`); `Config/WebConfig.php` (grup "Jam Kerja & Puasa", 7 key F5-16) dengan angka katalog 35 → 42 di
-  `tests/MasterData/WebConfigTest.php` dan `WebConfigTypesTest` (disetujui reviewer); **tambahan disetujui reviewer:**
-  FE `features/master-data/webConfig.types.ts`, `schemas/webConfig.schema.ts`, `components/WebConfigFormDialog.vue`
-  (tipe `date_range_list` di form Web Config, agar `rentang_puasa` dapat dikelola admin lewat UI).
-- **Sudah (27-10-2026, setelah M2 di `main`):** `presensi {masuk, pulang}` harian dari `dh_online`
-  (`SumberHarianTukin::presensi`, tanpa saring `sumber`, jam lokal apa adanya [K `L_presensi.php:12376-12391`,
-  `:12850-12851`]; jam tidak sah → `DataTukinTidakSah`). Test: `HarianTukinAdapterTest` (online/manual/impor, gabung
-  presensi+konket+cuti, jam tidak sah) dan `TukinDataServiceTest` (baris `dh_online` → status `hadir`, tanpa baris → `TK`).
-  AC-TK.1–TK.6 terpenuhi; `Libraries/Presensi/Tukin` tidak diubah.
-- **Sisa untuk 5B (di luar 5A):** sumber cuti/TB nyata (`Config\Presensi::$sumberCutiTb`), endpoint/laporan Tukin
-  (D-08), cross-check rumus resmi Q5A-13.
