@@ -109,7 +109,7 @@ final class SkemaLayananTest extends DatabaseTestCase
         $this->assertSame([1, 2, 3, 4, 5], $id('jenis_layanan', 'id_jenis_layanan'));
 
         $rwy = $this->db->table('jenis_rwy')->select('id_jenis_rwy, kode')->where('id_jenis_rwy >=', 43)->orderBy('id_jenis_rwy')->get()->getResultArray();
-        $this->assertSame(range(43, 50), array_map('intval', array_column($rwy, 'id_jenis_rwy')));
+        $this->assertSame(SkemaLayanan::JENIS_RWY, array_map('intval', array_column($rwy, 'id_jenis_rwy')));
         $this->assertSame('cuti', $rwy[0]['kode']);
         $this->assertSame('surat_ib', $rwy[7]['kode']);
         $this->assertSame(8, $this->db->table('jenis_rwy')->where('id_jenis_rwy >=', 43)->countAllResults(), 'tidak ada kode > 50');

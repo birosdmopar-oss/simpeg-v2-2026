@@ -16,6 +16,11 @@ final class SkemaLayanan
      */
     public const VERSI_PERTAMA = '2026-10-26-100000';
 
+    /**
+     * Kode `jenis_rwy` seed Modul C (`SeedJenisRwyLayananFase4::ROWS`); test seed B-02 mengecualikannya.
+     */
+    public const JENIS_RWY = [43, 44, 45, 46, 47, 48, 49, 50];
+
     public const TABEL = [
         'jenis_cuti', 'jenis_layanan', 'jenis_pa', 'question_category',
         'pegawai_sisa_cuti', 'riwayat_cuti', 'riwayat_cuti_notif_kt',
