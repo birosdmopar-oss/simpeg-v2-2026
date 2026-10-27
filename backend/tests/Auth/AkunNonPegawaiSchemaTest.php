@@ -20,7 +20,8 @@ use Throwable;
  * down() menolak data yang tidak bisa disimpan skema lama sebelum ALTER apa pun (backend/docs/db-review/A-01-auth-schema.md
  * Bagian 9).
  * Kolom `pengguna.must_change_password` (DBV-020, 2026-10-13-100200) ikut di ekspektasi skema akhir; siklus down()/up()
- * DBV-010 di test ini tidak menyentuhnya.
+ * DBV-010 di test ini tidak menyentuhnya. ENUM `audit_logs.event` skema akhir = 7 nilai (DBV-023,
+ * 2026-10-27-100100_AlterAuditLogsEventPresensi: + `warning`, `import`); siklus DBV-010 juga tidak menyentuhnya.
  *
  * @internal
  */
@@ -47,7 +48,7 @@ final class AkunNonPegawaiSchemaTest extends DatabaseTestCase
         ],
         'audit_logs' => [
             'id_log'      => 'int unsigned', 'id_pengguna_actor' => 'int unsigned null', 'nip_actor' => 'varchar(30) null',
-            'entity'      => 'varchar(100)', 'entity_id' => 'varchar(50)', 'event' => "enum('create','update','delete','login','logout')",
+            'entity'      => 'varchar(100)', 'entity_id' => 'varchar(50)', 'event' => "enum('create','update','delete','login','logout','warning','import')",
             'before_json' => 'json null', 'after_json' => 'json null', 'created_at' => 'datetime',
         ],
         'login_attempts' => [
