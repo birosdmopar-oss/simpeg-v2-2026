@@ -77,6 +77,12 @@ class CutiApprovalService
             $this->cuti->kunciPegawai((string) $awal['nip']);
             $cuti = $this->cuti->ambil($id, true) ?? throw new NotFoundException();
 
+            if ((string) $cuti['nip'] !== (string) $awal['nip']) {
+                // NIP pemohon berubah antara baca awal dan lock: kunci pemohon yang benar, lalu baca ulang.
+                $this->cuti->kunciPegawai((string) $cuti['nip']);
+                $cuti = $this->cuti->ambil($id, true) ?? throw new NotFoundException();
+            }
+
             $status     = (int) $cuti['status'];
             $nipAl      = $this->plain($cuti['nip_atasan_langsung'] ?? null);
             $nipPyb     = $this->plain($cuti['nip_yang_menyetujui'] ?? null);
@@ -182,7 +188,7 @@ class CutiApprovalService
         }
 
         // State tampilan: tanpa audit (PRD §6.4.7), tidak menyentuh status.
-        $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $id)->update([PengingatCuti::flagTahap($tahap) => 1]);
+        $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $id)->whereIn('status', StatusCuti::MENUNGGU)->update([PengingatCuti::flagTahap($tahap) => 1]);
 
         return $this->cuti->itemDetail($auth, $this->muat($id));
     }
@@ -224,11 +230,14 @@ class CutiApprovalService
         $data[(string) $d['flag_tampil']] = 1;
         $data['updated_by']               = $auth->idPengguna() ?? 0;
 
-        // Alasan: kolom per tahap; `reason_note` umum hanya untuk tolak (legacy), `reason_note_al` direset pada setujui AL.
+        // Alasan: setujui menulis NULL (T4 `reason_note_al = NULL`); atas nama selain tolak menyimpan alasan HANYA di audit
+        // (`jenis_audit`, §6.4.10); selain itu alasan per tahap. `reason_note` umum hanya untuk tolak (legacy).
+        $alasan = ($aksi === TransisiCuti::AKSI_SETUJUI || ($atasNama && $aksi !== TransisiCuti::AKSI_TOLAK)) ? null : $d['reason_note'];
+
         if ($tahap === TransisiCuti::TAHAP_AL) {
-            $data['reason_note_al'] = $d['reason_note'];
+            $data['reason_note_al'] = $alasan;
         } else {
-            $data['reason_note_pyb'] = $d['reason_note'];
+            $data['reason_note_pyb'] = $alasan;
         }
 
         if ($aksi === TransisiCuti::AKSI_TOLAK) {

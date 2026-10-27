@@ -575,7 +575,7 @@ class Services extends BaseService
             return static::getSharedInstance('saldoCutiService');
         }
 
-        return new \App\Libraries\Layanan\Cuti\SaldoCutiService(db_connect(), config(\Config\Cuti::class)->aturan(), static::pegawaiScope());
+        return new \App\Libraries\Layanan\Cuti\SaldoCutiService(db_connect(), config(\Config\Cuti::class)->aturan(), new PegawaiScope());
     }
 
     /**

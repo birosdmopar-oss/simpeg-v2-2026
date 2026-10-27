@@ -148,15 +148,14 @@ trait CutiUjiTrait
         return (int) $this->db->insertID();
     }
 
-    protected function cutiService(?Closure $sekarang = null): CutiService
+    protected function cutiService(?Closure $sekarang = null, ?Closure $sebelumTransaksi = null): CutiService
     {
         $this->lampiranUji ??= new FakeAttachmentService();
         $sekarang ??= fn (): DateTimeImmutable => new DateTimeImmutable($this->sekarangUji, new DateTimeZone(\App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis::ZONA));
 
         $aturan = config(CutiConfig::class)->aturan();
         $kuota  = new KuotaCutiService($this->db, $aturan, new HariLiburService($this->db));
-
-        return new CutiService(
+        $args   = [
             $this->db,
             $aturan,
             $kuota,
@@ -168,7 +167,27 @@ trait CutiUjiTrait
             $this->lampiranUji,
             null,
             $sekarang,
-        );
+        ];
+
+        if ($sebelumTransaksi === null) {
+            return new CutiService(...$args);
+        }
+
+        // Uji balapan: `$sebelumTransaksi` berjalan tepat setelah pemeriksaan awal dan sebelum lock diambil.
+        return new class ($sebelumTransaksi, ...$args) extends CutiService {
+            private Closure $seam;
+
+            public function __construct(Closure $seam, mixed ...$args)
+            {
+                parent::__construct(...$args);
+                $this->seam = $seam;
+            }
+
+            protected function sebelumTransaksi(): void
+            {
+                ($this->seam)();
+            }
+        };
     }
 
     protected function approvalService(?Closure $sekarang = null): CutiApprovalService

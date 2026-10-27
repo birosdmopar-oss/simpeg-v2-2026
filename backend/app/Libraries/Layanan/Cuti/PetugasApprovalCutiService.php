@@ -176,7 +176,7 @@ class PetugasApprovalCutiService
 
         $petugas = $this->urai(isset($in['petugas']) && is_string($in['petugas']) ? $in['petugas'] : '', $errors);
 
-        if ((int) $auth->role() === Role::ADMIN_SATKER && $tambah) {
+        if ((int) $auth->role() === Role::ADMIN_SATKER) {
             $unitSendiri = $this->unitPemanggil($auth);
 
             if ($unit === null || $unitSendiri === null || $unit !== $unitSendiri) {

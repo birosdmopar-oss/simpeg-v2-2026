@@ -261,3 +261,10 @@ Test `tests/Layanan/Pmk/PmkBerkasTest.php`.
    HTML/SVG ditolak — diverifikasi 27-10 untuk HTML-sebagai-pdf, SVG, `.html`, SVG-sebagai-png pada PMK/TB/IB). Berkas
    legacy yang dipindah **tidak** melewati validasi itu: skrip migrasi wajib menyaring jenis dari isi dengan whitelist yang
    sama (atau menyisihkan berkas di luar whitelist untuk ditinjau) agar tidak ada HTML/SVG yang tersaji inline.
+
+**Perbaikan review 27-10 (balapan).** Pemeriksaan yang bergantung keadaan diulang di bawah lock pegawai: `ubah` (status 0, pemilik, `tgl_mulai`), `hapus` (hak hapus pemilik 0/2), `simpan`
+(tumpang tindih + kuota, termasuk input admin status 1), `process` (NIP pemohon dibaca ulang setelah lock). Seam uji: `CutiService::sebelumTransaksi()` (kosong di produksi), dipakai `CutiBalapanTest`.
+Saldo massal memakai jalur PROSES `PegawaiScope`; ubah `pa_layanan` role 3 menegakkan unit sendiri; `tunda` hanya pada status 0/3; alasan setujui tidak disimpan di `reason_note_al`
+(T4 = NULL) dan alasan atas nama non-tolak hanya di audit (`jenis_audit`).
+
+**Batasan diketahui.** Baris dengan AL terisi dan PyB kosong: `ResetTundaCuti` tidak mereset `skip_pyb` bagi AL (dampak rendah; PyB wajib saat ajukan, hanya data impor yang bisa begitu).

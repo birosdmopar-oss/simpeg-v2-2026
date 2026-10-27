@@ -411,22 +411,66 @@ class CutiService
         }
 
         $role = (int) $auth->role();
-
-        if ($role !== Role::SUPER_ADMIN && (string) $lama['nip'] !== $auth->nip()) {
-            throw new ForbiddenException('Anda tidak berhak mengubah pengajuan cuti ini.');
-        }
-
-        if ((int) $lama['status'] !== StatusCuti::PENGAJUAN) {
-            throw ValidationException::forField('status', 'Pengajuan cuti hanya dapat diubah saat berstatus pengajuan.');
-        }
-
-        if ($role !== Role::SUPER_ADMIN && (string) $lama['tgl_mulai'] < $this->hariIni()) {
-            throw ValidationException::forField('tgl_mulai', 'Pengajuan cuti yang tanggal mulainya sudah lewat tidak dapat diubah.');
-        }
+        $this->periksaUbah($auth, $lama);
 
         $nip = $role === Role::SUPER_ADMIN ? ($this->teks($in['nip'] ?? null) ?? (string) $lama['nip']) : (string) $lama['nip'];
 
         return $this->simpan($auth, $in, $berkas, $this->nipPemohon($auth, $nip, 'nip'), StatusCuti::PENGAJUAN, $this->kuota->tahunAcuan((string) $lama['created_at']), $lama);
+    }
+
+    /**
+     * Hak ubah (§6.2.1): pemilik (role 1: siapa pun) hanya pada status 0 dan, untuk non-admin, `tgl_mulai >= hari ini`.
+     * Dipanggil sebelum transaksi (gagal cepat) DAN diulang pada baris terkunci di dalam transaksi.
+     *
+     * @param array<string, mixed> $cuti
+     */
+    private function periksaUbah(AuthContext $auth, array $cuti): void
+    {
+        $role = (int) $auth->role();
+
+        if ($role !== Role::SUPER_ADMIN && (string) $cuti['nip'] !== $auth->nip()) {
+            throw new ForbiddenException('Anda tidak berhak mengubah pengajuan cuti ini.');
+        }
+
+        if ((int) $cuti['status'] !== StatusCuti::PENGAJUAN) {
+            throw ValidationException::forField('status', 'Pengajuan cuti hanya dapat diubah saat berstatus pengajuan.');
+        }
+
+        if ($role !== Role::SUPER_ADMIN && (string) $cuti['tgl_mulai'] < $this->hariIni()) {
+            throw ValidationException::forField('tgl_mulai', 'Pengajuan cuti yang tanggal mulainya sudah lewat tidak dapat diubah.');
+        }
+    }
+
+    /**
+     * Hak hapus (§6.2.1): role 1 semua status; pemilik role 2/7 hanya status 0 atau 2; lainnya 403. Diulang pada baris
+     * terkunci di dalam transaksi.
+     *
+     * @param array<string, mixed> $cuti
+     */
+    private function periksaHapus(AuthContext $auth, array $cuti): void
+    {
+        $role  = (int) $auth->role();
+        $milik = (string) $cuti['nip'] === $auth->nip();
+
+        if ($role === Role::SUPER_ADMIN) {
+            return;
+        }
+
+        if (! in_array($role, [Role::PEGAWAI, Role::PPPK], true) || ! $milik) {
+            throw new ForbiddenException('Anda tidak berhak menghapus pengajuan cuti ini.');
+        }
+
+        if (! in_array((int) $cuti['status'], [StatusCuti::PENGAJUAN, StatusCuti::DITOLAK], true)) {
+            throw new ForbiddenException('Pengajuan cuti yang sudah diproses tidak dapat dihapus.');
+        }
+    }
+
+    /**
+     * Titik sambung uji balapan: dipanggil tepat sebelum transaksi tulis (pemeriksaan awal sudah lewat, lock belum
+     * diambil). Produksi: tidak melakukan apa pun.
+     */
+    protected function sebelumTransaksi(): void
+    {
     }
 
     /**
@@ -444,22 +488,13 @@ class CutiService
             throw new NotFoundException();
         }
 
-        $role  = (int) $auth->role();
-        $milik = (string) $cuti['nip'] === $auth->nip();
+        $this->periksaHapus($auth, $cuti);
+        $this->sebelumTransaksi();
 
-        if ($role === Role::SUPER_ADMIN) {
-            // semua status
-        } elseif (in_array($role, [Role::PEGAWAI, Role::PPPK], true) && $milik) {
-            if (! in_array((int) $cuti['status'], [StatusCuti::PENGAJUAN, StatusCuti::DITOLAK], true)) {
-                throw new ForbiddenException('Pengajuan cuti yang sudah diproses tidak dapat dihapus.');
-            }
-        } else {
-            throw new ForbiddenException('Anda tidak berhak menghapus pengajuan cuti ini.');
-        }
-
-        $this->dalamTransaksi(function () use ($id, &$cuti): void {
+        $this->dalamTransaksi(function () use ($auth, $id, &$cuti): void {
             $this->kunciPegawai((string) $cuti['nip']);
             $cuti = $this->ambil($id, true) ?? throw new NotFoundException();
+            $this->periksaHapus($auth, $cuti);
 
             if ((int) $cuti['id_jenis_cuti'] === AturanCuti::JENIS_TAHUNAN && in_array((int) $cuti['status'], StatusCuti::EFEK_FINAL, true)) {
                 $this->kuota->kembalikan($cuti);
@@ -647,8 +682,30 @@ class CutiService
         $ketua  = $siap['ketua_tim'];
         $idBaru = 0;
 
-        $this->dalamTransaksi(function () use ($nip, $data, $ketua, $berkas, $lama, $status, $hari, $tahunAcuan, &$idBaru): void {
+        $this->sebelumTransaksi();
+
+        $this->dalamTransaksi(function () use ($auth, $nip, $data, $ketua, $berkas, $lama, $status, $hari, $tahunAcuan, $profil, &$idBaru): void {
             $this->kunciPegawai($nip);
+
+            // Ulangi pemeriksaan yang bergantung keadaan di bawah lock (balapan dengan persetujuan/hapus/pengajuan lain).
+            if ($lama !== null) {
+                $kini = $this->ambil((int) $lama['id_riwayat_cuti'], true) ?? throw new NotFoundException();
+
+                if ((string) $kini['nip'] !== $nip) {
+                    $this->kunciPegawai((string) $kini['nip']);
+                    $kini = $this->ambil((int) $lama['id_riwayat_cuti'], true) ?? throw new NotFoundException();
+                }
+
+                $this->periksaUbah($auth, $kini);
+                $lama = $kini;
+            }
+
+            $errors = [];
+            $this->validasiBisnis($errors, $nip, (int) $data['id_jenis_cuti'], (string) $data['tgl_mulai'], (string) $data['tgl_akhir'], $tahunAcuan, $lama === null ? null : (int) $lama['id_riwayat_cuti'], $profil);
+
+            if ($errors !== []) {
+                throw new ValidationException('Validasi gagal.', $this->keDaftar($errors));
+            }
 
             // Saldo pemohon saat ini → snapshot baris (L:1795-1808).
             $saldo = $this->kuota->saldo($nip, $tahunAcuan, true);

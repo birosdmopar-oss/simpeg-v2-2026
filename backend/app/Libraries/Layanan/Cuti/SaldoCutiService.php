@@ -9,6 +9,7 @@ use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
+use App\Interfaces\Kepegawaian\PegawaiScopeProsesInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\ListQuery;
@@ -33,7 +34,7 @@ class SaldoCutiService
     public function __construct(
         private readonly BaseConnection $db,
         private readonly AturanCuti $aturan,
-        private readonly PegawaiScopeInterface $scope,
+        private readonly PegawaiScopeInterface&PegawaiScopeProsesInterface $scope,
         private readonly ?\Closure $sekarang = null,
     ) {
     }
@@ -183,7 +184,8 @@ class SaldoCutiService
     private function tambahSemua(AuthContext $auth, int $tahun, SaldoCuti $saldo): array
     {
         $b = $this->db->table('pegawai p')->select('p.nip, p.nama, p.glr_awal, p.glr_akhir')->where('p.status', 1)->whereIn('p.id_jenis_pegawai', SaldoTahunanService::JENIS_PEGAWAI);
-        $this->scope->terapkanKeQuery($b, $auth, 'p.nip');
+        // Jalur PROSES (sama dengan tambah tunggal/ubah/hapus): saldo yang dibuat massal tetap bisa diubah/dihapus pembuatnya.
+        $this->scope->terapkanKeQueryProses($b, $auth, 'p.nip');
         $populasi = $b->orderBy('p.nama', 'ASC')->get()->getResultArray();
 
         $ada = array_flip(array_map('strval', array_column(
