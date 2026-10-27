@@ -284,6 +284,13 @@ abstract class BaseMasterController extends ApiController
     {
         $payload = $this->payload();
 
+        // Kode yang diinput admin (PK string, mis. kelas jabatan `{"kelas_jabatan":20}`) boleh berupa angka JSON, sama
+        // seperti field ref/int/select yang menerima angka JSON: dinormalisasi ke teks sebelum divalidasi (ISSUE-026).
+        // Hanya bilangan bulat; desimal (18.0), boolean, dan nilai non-skalar tetap ditolak.
+        if (! $def->autoIncrement && is_int($payload[$def->primaryKey] ?? null)) {
+            $payload[$def->primaryKey] = (string) $payload[$def->primaryKey];
+        }
+
         foreach ($def->fields as $field) {
             if ($field->type === MasterField::TYPE_BOOLEAN && is_bool($payload[$field->name] ?? null)) {
                 $payload[$field->name] = $payload[$field->name] ? '1' : '0';
@@ -291,6 +298,13 @@ abstract class BaseMasterController extends ApiController
         }
 
         $errors = [];
+
+        // Boolean JSON pada kode yang diinput admin bukan kode: pesannya sama dengan nilai bukan angka lain (mis. '7a'),
+        // bukan "wajib diisi" (false dibaca kosong oleh rule required) atau lolos sebagai '1' (true). CR-058.
+        if (! $def->autoIncrement && is_bool($payload[$def->primaryKey] ?? null)) {
+            $codeRule                 = $this->rules($def, true)[$def->primaryKey];
+            $errors[$def->primaryKey] = [is_array($codeRule) ? $codeRule['errors']['regex_match'] : 'Kode tidak valid.'];
+        }
 
         foreach ($this->inputLabels($def) as $column => $label) {
             if (array_key_exists($column, $payload) && ! is_scalar($payload[$column]) && $payload[$column] !== null) {

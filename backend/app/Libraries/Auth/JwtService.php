@@ -6,6 +6,7 @@ namespace App\Libraries\Auth;
 
 use App\Exceptions\AuthException;
 use App\Models\Auth\TokenModel;
+use Closure;
 use CodeIgniter\Cookie\Cookie;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use Config\Jwt as JwtConfig;
@@ -181,12 +182,15 @@ class JwtService
      * Token lama di-revoke. Token yang sudah revoked/expired/tidak dikenal → AuthException; token expired sekaligus
      * dihapus dari DB (bukan revoked=1) agar pengiriman ulangnya tidak terbaca reuse.
      *
+     * @param (Closure(array<string, mixed>): array<string, mixed>)|null $adjustClaims menyesuaikan claim baris token
+     *                                                                                 sebelum token baru diterbitkan
+     *
      * @return array{access_token: string, refresh_token: string, access_expires_at: int, refresh_expires_at: int}
      *
      * @throws AuthException
      * @throws DatabaseException error DB (bukan reuse) — rotasi di-rollback, token lama tetap berlaku
      */
-    public function refresh(string $refreshToken): array
+    public function refresh(string $refreshToken, ?Closure $adjustClaims = null): array
     {
         $row = $this->tokens->findByHash(self::hash($refreshToken));
 
@@ -215,6 +219,12 @@ class JwtService
             $this->tokens->deleteExpired((int) $row['id'], $this->now());
 
             throw AuthException::expiredToken();
+        }
+
+        // Penyesuaian claim dari pemanggil (MAKE-028/CR-057: `must_change_password` dihitung ulang penuh dari DB, bisa
+        // menambah atau menghapus claim), sebelum diteruskan ke token baru; token lama yang dirotasi tetap sama.
+        if ($adjustClaims !== null) {
+            $claims = $adjustClaims($claims);
         }
 
         $pair = $this->rotate((int) $row['id'], $claims);

@@ -101,6 +101,31 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
         '2026-09-30-130900' => [
             'fk_NIP_da_to_pegawai' => ['document_attachment', 'NIP'],
         ],
+        // DBV-022 (Modul C Fase 4): FK NIP pemilik di CREATE; FK NIP approver/petugas ditahan (self::NON_FK).
+        '2026-10-26-100100' => [
+            'fk_nip_psc_to_pegawai'     => ['pegawai_sisa_cuti', 'nip'],
+            'fk_nip_rwycuti_to_pegawai' => ['riwayat_cuti', 'nip'],
+            'fk_nip_kt_rcnkt_2'         => ['riwayat_cuti_notif_kt', 'nip_kt'],
+        ],
+        '2026-10-26-100200' => [
+            'fk_nip_rwytb_to_pegawai' => ['riwayat_tb', 'nip'],
+            'fk_nip_rwyib_to_pegawai' => ['riwayat_ib', 'nip'],
+        ],
+        '2026-10-26-100300' => [
+            'fk_rw_pmk_01'           => ['riwayat_pmk', 'nip'],
+            'fk_rriwayat_pmk_req_01' => ['riwayat_pmk_req', 'nip'],
+        ],
+        '2026-10-26-100400' => [
+            'fk_nip_penerima_inbox_to_pegawai' => ['inbox', 'nip_penerima'],
+        ],
+        '2026-10-26-100700' => [
+            'fk_esign_hist_ibfk01'             => ['esign_hist', 'nip'],
+            'fk_nip_firebase_token_to_pegawai' => ['firebase_token', 'nip'],
+        ],
+        // DBV-023 (Fase 5A): FK NIP presensi harian [K] D1 (aksi RESTRICT [V2]); gaji_pegawai.nip tanpa FK (self::NON_FK).
+        '2026-10-27-100000' => [
+            'fk_nip_dh_to_pegawai' => ['dh_online', 'nip'],
+        ],
     ];
 
     /**
@@ -109,6 +134,7 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
     private const NULLABLE = [
         'pengguna.nip'            => 'K2/DBV-010: akun non-pegawai tanpa NIP',
         'riwayat_lckh.nip_atasan' => '[K] D1 riwayat_lckh.nip_atasan DEFAULT NULL',
+        'esign_hist.nip'          => '[K] D1 esign_hist.nip DEFAULT NULL (DBV-022 Bagian 2.19)',
     ];
 
     /**
@@ -128,6 +154,12 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
         'riwayat_skp_periodik.nip'                => 'data API BKN e-Kinerja, tanpa FK',
         'riwayat_skp_periodik.pegawai_atasan_nip' => 'data API BKN e-Kinerja, tanpa FK',
         'jabatan_koordinasi.nip'                  => 'legacy tanpa FK (D1; DBV-018), pejabat koordinasi — tetap diarahkan ulang di B-06',
+        'riwayat_cuti.nip_atasan_langsung'        => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-3) — diarahkan ulang B-06',
+        'riwayat_cuti.nip_yang_menyetujui'        => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-3) — diarahkan ulang B-06',
+        'petugas_layanan.nip'                     => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-12) — diarahkan ulang B-06',
+        'pa_layanan.nip'                          => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-17) — diarahkan ulang B-06',
+        'disiplin_ticket.nip'                     => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-4) — diarahkan ulang B-06',
+        'gaji_pegawai.nip'                        => '[K] legacy tanpa FK (NonFkSlipGaji, DBV-023): tidak ikut Ubah NIP, slip lama tetap ber-NIP lama (PRD 5A §3.4)',
     ];
 
     /**

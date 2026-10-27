@@ -211,8 +211,8 @@ onBeforeUnmount(cancelSearchTimer)
       />
     </label>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-      <nav class="h-fit rounded-lg border border-slate-200 bg-white p-2" aria-label="Topik FAQ">
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
+      <nav class="pane-scroll h-fit rounded-lg border border-slate-200 bg-white p-2" aria-label="Topik FAQ" data-testid="faq-topic-nav">
         <p v-if="treeLoading" class="px-3 py-6 text-center text-sm text-slate-500">Memuat...</p>
         <p v-else-if="treeError" class="m-1 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ treeError }}</p>
         <p v-else-if="topics.length === 0" class="px-3 py-6 text-center text-sm text-slate-500">Belum ada FAQ.</p>

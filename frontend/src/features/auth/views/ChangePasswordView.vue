@@ -90,7 +90,7 @@ const onSubmit = handleSubmit(async (values) => {
         role="status"
         data-testid="change-password-required"
       >
-        Password akun Anda diatur oleh sistem atau admin. Ganti password terlebih dahulu sebelum memakai menu lain.
+        Anda wajib mengganti password sebelum memakai menu lain (password diatur oleh sistem atau admin, atau sudah melewati masa berlaku).
       </div>
       <!--
         Backend hanya mencabut refresh token; access token yang sudah terbit di perangkat lain tetap sah sampai

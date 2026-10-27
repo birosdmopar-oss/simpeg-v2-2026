@@ -6,6 +6,7 @@ namespace Tests\Support;
 
 use CodeIgniter\Database\Migration;
 use RuntimeException;
+use Tests\Support\Layanan\SkemaLayanan;
 
 /**
  * Lepas/pasang ulang migration Kepegawaian B-01/B-02 (DBV-012/DBV-013, versi App >= 2026-09-30-120000) untuk test skema
@@ -23,6 +24,10 @@ use RuntimeException;
  *
  * DBV-020: `dm_ak_jf` (migration 2026-10-13-100100) merujuk `jabatan` dan `pangkat` dengan FK RESTRICT, jadi ikut dilepas
  * lepasFkG02() (tabel dibuang lalu dibuat ulang kosong) dan lepasMigrationKepegawaian() (versi >= 120000).
+ *
+ * DBV-022: tabel Modul C Layanan (migration >= 2026-10-26-100000, mis. `pa_layanan` -> `unit`/`satker`/`jabatan_koordinasi`)
+ * merujuk master G-02 dengan FK RESTRICT, jadi ikut dilepas lepasFkG02() (tabel dibuang lalu dibuat ulang kosong, seed
+ * master layanan dipasang ulang) dan lepasMigrationKepegawaian() (versi >= 120000).
  *
  * Dipakai bersama DatabaseTestTrait (`$this->db`, tabel `migrations` ber-prefix).
  */
@@ -59,13 +64,14 @@ trait LepasMigrationKepegawaianTrait
     }
 
     /**
-     * Lepas (down) hanya migration yang ber-FK ke master G-02 (DBV-019, DBV-020 `dm_ak_jf`) yang sudah jalan, urut versi
+     * Lepas (down) hanya migration yang ber-FK ke master G-02 (DBV-019, DBV-020 `dm_ak_jf`, DBV-022 Modul C) yang sudah jalan, urut versi
      * menurun. down() migration itu aman diulang (FK/tabel yang sudah lepas dilewati).
      */
     protected function lepasFkG02(): void
     {
         $rows = $this->db->table('migrations')->select('version')->where('namespace', 'App')
-            ->whereIn('version', self::$versiFkG02)->orderBy('version', 'DESC')->get()->getResultArray();
+            ->groupStart()->whereIn('version', self::$versiFkG02)->orWhere('version >=', SkemaLayanan::VERSI_PERTAMA)->groupEnd()
+            ->orderBy('version', 'DESC')->get()->getResultArray();
 
         foreach ($rows as $row) {
             $migration = $this->migrationKepegawaian((string) $row['version']);

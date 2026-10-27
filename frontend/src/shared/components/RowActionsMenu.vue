@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from 'radix-vue'
 
+import UiTooltip from '@/shared/ui/UiTooltip.vue'
+
 import type { RowAction } from './rowActions'
 
 const props = defineProps<{
@@ -35,15 +37,17 @@ const visible = computed(() => props.actions.filter((a) => !a.hidden))
 
 <template>
   <DropdownMenuRoot :modal="false">
-    <DropdownMenuTrigger
-      :disabled="disabled || visible.length === 0"
-      :aria-label="label"
-      :title="label"
-      :data-testid="testid"
-      class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary/60 disabled:opacity-40 data-[state=open]:bg-slate-100 data-[state=open]:text-brand-primary"
-    >
-      <MoreVertical class="h-4 w-4" aria-hidden="true" />
-    </DropdownMenuTrigger>
+    <!-- Tooltip custom (UiTooltip), bukan atribut `title` bawaan browser (AGENTS.md bagian 3). -->
+    <UiTooltip :content="label">
+      <DropdownMenuTrigger
+        :disabled="disabled || visible.length === 0"
+        :aria-label="label"
+        :data-testid="testid"
+        class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary/60 disabled:opacity-40 data-[state=open]:bg-slate-100 data-[state=open]:text-brand-primary"
+      >
+        <MoreVertical class="h-4 w-4" aria-hidden="true" />
+      </DropdownMenuTrigger>
+    </UiTooltip>
     <DropdownMenuPortal>
       <DropdownMenuContent
         align="end"

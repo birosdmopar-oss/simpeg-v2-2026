@@ -47,12 +47,42 @@ Wajib:
   `[DBV]` bersama `[CR]`/`[MAKE]` → PR, DB Validator review/approve, reviewer CR yang merge; hanya `[DBV]` → PR, DB
   Validator yang merge.
 - **Quality gate:** `./check.sh` (PHPStan level 5, PHP-CS-Fixer, PHPUnit, ESLint, vue-tsc, Vitest, build) harus lolos
-  sebelum push ke `main` — cara menjalankannya secara efisien ada di bagian 3.
+  sebelum push ke `main` — cara menjalankannya secara efisien ada di bagian 4.
 - **Skema database:** ikut kode & DDL legacy (label `[K]` / `[V2]` / `[I]`), status 1 / 2 / 10, collation
   `utf8mb4_unicode_ci`, migration yang sudah ada di `main` tidak diedit, dan setiap perubahan skema direview DB
   Validator lewat dokumen di `backend/docs/db-review/`.
 
-## 3. Quality gate efisien (gate penuh sekali, gate cepat di tahap lain)
+## 3. UI: komponen custom (bukan tampilan bawaan browser)
+
+Tujuannya supaya seluruh aplikasi tampil dan berperilaku sama di semua browser, mengikuti desain Figma acuan SIMPEG v2
+(layout, warna, transparansi/blur, bayangan, radius, spasi), bukan tampilan bawaan browser/OS.
+
+Wajib:
+
+1. **Semua komponen interaktif memakai komponen custom proyek di `frontend/src/shared/ui`**, mengikuti Figma acuan:
+   dropdown/select, menu, checkbox/radio, input tanggal/waktu, tooltip, scrollbar, dialog, dan sejenisnya. **Dilarang**
+   menampilkan tampilan bawaan browser di halaman: `<select>` native yang terlihat, popup `<input type="date|time|month">`
+   bawaan, scrollbar default, atribut `title` sebagai tooltip, `<datalist>`, dialog `window.confirm/alert/prompt`, dsb.
+   Input native boleh tetap ada **hanya sebagai pembawa nilai/aksesibilitas yang disembunyikan** di dalam komponen custom
+   (mis. checkbox `opacity-0` di `UiCheckbox`), tidak pernah sebagai tampilan.
+   Pengecualian yang dicatat: widget Turnstile mode `mock` (hanya development/test) dan `<input type="file">` tersembunyi
+   (`sr-only`) di balik tombol/dropzone unggah (`UiFileField`, `ArsipTable`). Daftar komponen yang tersedia: `UiSelect`
+   (dropdown/listbox, `searchable` opsional), `UiTooltip`, `UiTextField` (type `date`/`time`/`month` = `UiDatePicker`/
+   `UiTimePicker`/`UiMonthPicker`, `suggestions` = `UiCombobox`), `UiCheckbox`, `UiRadioGroup`, `UiFileField`, `UiExportMenu`,
+   `RowActionsMenu`; nilai picker tetap string `YYYY-MM-DD` / `HH:mm` / `YYYY-MM` dan perhitungan tanggal memakai komponen
+   kalender lokal (tanpa `toISOString()`).
+2. **Komponen yang belum ada dibuat dulu di `shared/ui`** (diekspor dari `shared/ui/index.ts`) lalu dipakai ulang. Jangan
+   membuat versi lokal per fitur, dan jangan membungkus ulang elemen native di dalam fitur.
+3. **Aksesibel dan teruji.** Komponen custom wajib bisa dioperasikan lewat keyboard (Tab, Enter/Spasi, Esc, panah, Home/End),
+   memakai role/ARIA yang benar (mis. `listbox`/`option`, `combobox`, `dialog`) dengan label, dan fokus selalu terlihat.
+   Setiap komponen punya test Vitest di `shared/ui/__tests__` yang menguji keyboard dan ARIA, bukan hanya klik.
+4. **Scrollbar custom ramping berlaku global** (`assets/main.css`). Area yang panjang (menu samping, daftar, tabel, dialog)
+   punya **area gulir mandiri**: menggulir menu tidak menggulir data dan sebaliknya; area lain tidak ikut tergulir.
+5. **Top navbar sticky** di semua halaman (layout bersama), tidak tertutup konten saat menggulir.
+6. **Halaman tanpa frame Figma:** ikuti pola halaman lain yang sudah sesuai Figma, lalu catat di laporan pekerjaan bahwa
+   Figma halaman itu belum ada.
+
+## 4. Quality gate efisien (gate penuh sekali, gate cepat di tahap lain)
 
 Tujuannya supaya satu perubahan tidak di-gate penuh berulang kali (PHPUnit penuh ±80 menit di mesin lokal).
 

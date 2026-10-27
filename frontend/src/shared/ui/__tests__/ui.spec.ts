@@ -9,6 +9,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import {
   UiAvatar,
   UiBadge,
+  UiBarChart,
   UiButton,
   UiCard,
   UiCheckbox,
@@ -113,14 +114,14 @@ describe('UiSelect', () => {
     const w = mount(UiSelect, { props: { options, label: 'Agama' } })
     await w.get('select').setValue('a')
     expect(w.emitted('update:modelValue')?.[0]).toEqual(['a'])
-    expect(w.get('select').attributes('aria-label')).toBeUndefined()
+    expect(w.get('[role="combobox"]').attributes('aria-label')).toBeUndefined()
 
-    expect(mount(UiSelect, { props: { options, ariaLabel: 'Jumlah baris' } }).get('select').attributes('aria-label')).toBe('Jumlah baris')
+    expect(mount(UiSelect, { props: { options, ariaLabel: 'Jumlah baris' } }).get('[role="combobox"]').attributes('aria-label')).toBe('Jumlah baris')
   })
 
   it('state error memerahkan border dan menampilkan teks bantu', () => {
     const w = mount(UiSelect, { props: { options, state: 'error', helpText: 'Wajib dipilih' } })
-    expect(w.get('select').classes()).toContain('border-danger')
+    expect(w.get('[role="combobox"]').classes()).toContain('border-danger')
     expect(w.text()).toContain('Wajib dipilih')
   })
 })
@@ -185,8 +186,8 @@ describe('UiAvatar', () => {
   })
 
   it('titik status hijau/merah dan bentuk rounded', () => {
-    expect(mount(UiAvatar, { props: { name: 'A', status: 'online' } }).get('[title="Aktif"]').classes()).toContain('bg-success')
-    expect(mount(UiAvatar, { props: { name: 'A', status: 'offline' } }).get('[title="Tidak aktif"]').classes()).toContain('bg-danger')
+    expect(mount(UiAvatar, { props: { name: 'A', status: 'online' } }).get('[aria-label="Aktif"]').classes()).toContain('bg-success')
+    expect(mount(UiAvatar, { props: { name: 'A', status: 'offline' } }).get('[aria-label="Tidak aktif"]').classes()).toContain('bg-danger')
     expect(mount(UiAvatar, { props: { name: 'A', shape: 'rounded' } }).get('[role="img"]').classes()).toContain('rounded-2xl')
   })
 })
@@ -238,12 +239,20 @@ describe('UiProgressBar, UiDonutChart, UiSparkline', () => {
     const w = mount(UiDonutChart, {
       props: { caption: 'Komposisi', slices: [{ label: 'PNS', value: 75, color: '#1C3964' }, { label: 'PPPK', value: 25, color: '#217AFF' }] },
     })
-    const table = w.get('table.sr-only')
+    // CR-064: sr-only di pembungkus <div>, bukan di <table> (display:table mengalahkannya dan melebarkan halaman).
+    expect(w.find('table.sr-only').exists()).toBe(false)
+    const table = w.get('div.sr-only > table')
     expect(table.text()).toContain('PNS')
     expect(table.text()).toContain('75.0%')
     expect(table.text()).toContain('25.0%')
     expect(w.findAll('circle')).toHaveLength(3) // latar + 2 potongan
     expect(w.get('svg').attributes('aria-label')).toBe('Komposisi')
+  })
+
+  it('CR-064: diagram batang — tabel data sr-only di pembungkus <div>, bukan table.sr-only', () => {
+    const w = mount(UiBarChart, { props: { caption: 'Data', categories: ['A', 'B'], series: [{ label: 'PNS', color: '#000', values: [1, 2] }] } })
+    expect(w.find('table.sr-only').exists()).toBe(false)
+    expect(w.get('div.sr-only > table').text()).toContain('PNS')
   })
 
   it('donat kosong (total 0) tidak menggambar potongan dan persentasenya 0%', () => {
@@ -349,5 +358,17 @@ describe('UiStepper, UiStatTile, UiBadge, UiCard, UiNotice, UiSearchInput', () =
     await input.trigger('keyup.enter')
     await flushPromises()
     expect(w.emitted('submit')).toHaveLength(1)
+  })
+})
+
+describe('UiAvatar — tidak tertimpa latar di belakangnya (CR-060)', () => {
+  it('inisial memakai latar OPAK (bukan transparan) dan avatar berada di layer z-10', () => {
+    const w = mount(UiAvatar, { props: { name: 'Herry Widjaja' } })
+    const inisial = w.get('[role="img"]')
+
+    expect(w.classes()).toEqual(expect.arrayContaining(['relative', 'z-10']))
+    // Latar transparan (mis. bg-brand-tertiary/10) membuat pita navy di belakangnya tembus; harus warna penuh.
+    expect(inisial.classes().some((c) => /^bg-\[#[0-9A-Fa-f]{6}\]$/.test(c))).toBe(true)
+    expect(inisial.classes().some((c) => /\/\d+$/.test(c) && c.startsWith('bg-'))).toBe(false)
   })
 })

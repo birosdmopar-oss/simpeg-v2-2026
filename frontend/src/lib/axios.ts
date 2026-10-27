@@ -7,6 +7,12 @@
  * - Auto-refresh              → response 401 memicu POST /auth/refresh lalu request diulang SEKALI.
  *                               Kalau refresh gagal (atau retry tetap 401) → handler auth-failure (default: redirect /login).
  *                               Beberapa 401 bersamaan berbagi satu refresh in-flight (tidak ada refresh storm/loop).
+ * - 403 password_change_required (MAKE-020/028) → handler wajib-ganti-password dijalankan SEKALI (bersama untuk
+ *                               request paralel): pemanggil mengambil ulang /auth/me dan mengarahkan ke /ganti-password.
+ *                               Endpoint yang memang dibuka selama wajib ganti (auth/me, change-password, logout,
+ *                               refresh) tidak memicunya, sehingga tidak ada loop. Request yang diulang setelah
+ *                               auto-refresh juga lewat jalur ini, jadi claim `must_change_password` pada token baru
+ *                               (mis. password kedaluwarsa) langsung memperbarui store tanpa muat ulang halaman.
  *
  * Seluruh feature WAJIB memakai `api` dari file ini — jangan membuat axios instance lain.
  */
@@ -46,6 +52,47 @@ export const LOGIN_ROUTE = '/login'
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean; _isRefresh?: boolean }
 
 export type AuthFailureHandler = () => void
+
+/** Kode error 403 backend untuk sesi yang wajib mengganti password dulu (JwtAuthFilter, MAKE-020). */
+export const PASSWORD_CHANGE_REQUIRED_CODE = 'password_change_required'
+
+/** Endpoint yang tetap terbuka selama wajib ganti password; tidak pernah memicu handler (anti-loop). */
+const PASSWORD_CHANGE_OPEN_PATHS = ['/auth/me', '/auth/change-password', '/auth/logout', REFRESH_PATH]
+
+export type PasswordChangeRequiredHandler = () => Promise<void> | void
+
+let passwordChangeHandler: PasswordChangeRequiredHandler | null = null
+let passwordChangeInFlight: Promise<void> | null = null
+
+/**
+ * Pasang aksi saat backend menjawab 403 `password_change_required` (mis. ambil ulang user + redirect ke
+ * /ganti-password). null = tanpa aksi (default).
+ */
+export function setPasswordChangeRequiredHandler(handler: PasswordChangeRequiredHandler | null): void {
+  passwordChangeHandler = handler
+}
+
+function isPasswordChangeRequired(error: AxiosError, config: InternalAxiosRequestConfig | undefined): boolean {
+  if (error.response?.status !== 403 || !config) return false
+  const body = error.response.data as { code?: unknown } | undefined
+  if (body?.code !== PASSWORD_CHANGE_REQUIRED_CODE) return false
+  const path = (config.url ?? '').split('?')[0] ?? ''
+  return !PASSWORD_CHANGE_OPEN_PATHS.some((open) => path.endsWith(open))
+}
+
+/** Jalankan handler sekali untuk semua 403 yang bersamaan; kegagalan handler tidak menutupi error aslinya. */
+function runPasswordChangeHandler(): Promise<void> {
+  if (passwordChangeHandler === null) return Promise.resolve()
+  if (passwordChangeInFlight === null) {
+    passwordChangeInFlight = Promise.resolve()
+      .then(() => passwordChangeHandler?.())
+      .catch(() => undefined)
+      .finally(() => {
+        passwordChangeInFlight = null
+      })
+  }
+  return passwordChangeInFlight
+}
 
 const defaultAuthFailureHandler: AuthFailureHandler = () => {
   if (typeof window !== 'undefined' && window.location.pathname !== LOGIN_ROUTE) {
@@ -163,6 +210,10 @@ export function createApiClient(options: CreateApiClientOptions = {}): AxiosInst
     if (status === 401 && config?._isRefresh) {
       // Refresh endpoint sendiri menjawab 401 → refresh token invalid/expired/reused.
       // Redirect ditangani oleh pemanggil refreshOnce() lewat catch di atas.
+    }
+
+    if (isPasswordChangeRequired(error, config)) {
+      await runPasswordChangeHandler()
     }
 
     return Promise.reject(normalizeError(error))

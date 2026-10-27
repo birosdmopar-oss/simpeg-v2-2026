@@ -25,6 +25,7 @@ import {
   CircleHelp,
   ClipboardPen,
   FileText,
+  Files,
   House,
   MessageCircle,
   MousePointerClick,
@@ -40,6 +41,7 @@ import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
+import { DOKUMEN_ROLES } from '@/features/dokumen/types'
 import {
   AK_JF_ROLES,
   BIODATA_PROSES_ROLES,
@@ -50,6 +52,7 @@ import {
   PEGAWAI_LIST_ROLES,
   PENUGASAN_ROLES,
 } from '@/features/kepegawaian/roles'
+import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
@@ -128,16 +131,37 @@ const NAV: NavGroup[] = [
       },
       // Fase 5 (Presensi & Remunerasi).
       { key: 'presensi', label: 'Presensi', icon: AlarmClock, phase: 5, children: [] },
-      // Fase 7 (Dashboard/laporan). Submenu mengikuti mockup Gambar 15.
+      // Fase 7 (Dashboard/laporan) F-03 MAKE-036: 7 statistik (hr/chart/* = role 1, 3, 4, 5, 8); 3 pertama mengikuti
+      // mockup Gambar 15. Tetap `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7); QA lewat URL langsung (PRD F7-14).
       {
         key: 'laporan',
         label: 'Laporan',
         icon: FileText,
+        roles: LAPORAN_ROLES,
         phase: 7,
         children: [
           { key: 'laporan-unit', label: 'Unit Kerja', to: '/laporan/unit-kerja' },
           { key: 'laporan-jk', label: 'Jenis Kelamin', to: '/laporan/jenis-kelamin' },
-          { key: 'laporan-struktural', label: 'Struktural', to: '/laporan/struktural' },
+          { key: 'laporan-struktural', label: 'Struktural', to: '/laporan/eselon' },
+          { key: 'laporan-jabatan', label: 'Jabatan', to: '/laporan/jabatan' },
+          { key: 'laporan-pendidikan', label: 'Pendidikan', to: '/laporan/pendidikan' },
+          { key: 'laporan-usia', label: 'Usia', to: '/laporan/usia' },
+          { key: 'laporan-golongan', label: 'Golongan', to: '/laporan/golongan' },
+        ],
+      },
+      // Fase 7 F-09 MAKE-037: generator dokumen (hr/document/* = role 1, 3, 4, 5, 8). Tetap `phase: 7` (tersembunyi
+      // sampai ACTIVE_PHASE ≥ 7, tanpa `rilis`); QA lewat URL langsung (PRD F7-14).
+      {
+        key: 'dokumen',
+        label: 'Dokumen',
+        icon: Files,
+        roles: DOKUMEN_ROLES,
+        phase: 7,
+        children: [
+          { key: 'dokumen-duk', label: 'DUK', to: '/dokumen/duk' },
+          { key: 'dokumen-nominatif', label: 'Nominatif', to: '/dokumen/nominatif' },
+          { key: 'dokumen-pensiun', label: 'Proyeksi Pensiun', to: '/dokumen/pensiun' },
+          { key: 'dokumen-baperjakat', label: 'Baperjakat', to: '/dokumen/baperjakat' },
         ],
       },
     ],

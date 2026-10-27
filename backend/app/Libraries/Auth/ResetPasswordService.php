@@ -196,7 +196,7 @@ class ResetPasswordService
                 'password_changed_at' => date('Y-m-d H:i:s', $now),
                 // MAKE-020 [V2]: reset lewat token email = pemilik memilih password sendiri → penanda dilepas.
                 'must_change_password' => 0,
-            ]));
+            ] + PasswordExpiry::forPasswordChange((string) $user['status'], $now)));
             $this->assertStep($updated, 'password baru tidak tersimpan');
 
             $invalidated = $this->attempts->invalidateOtherTokens((string) $row['username'], $tokenId, $now);

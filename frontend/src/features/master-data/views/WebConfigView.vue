@@ -13,6 +13,7 @@ import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
+import { useStickyActionsShadow } from '@/shared/composables/useStickyActionsShadow'
 
 import WebConfigFormDialog from '../components/WebConfigFormDialog.vue'
 import { webConfigService } from '../services/webConfig.service'
@@ -27,6 +28,13 @@ const notice = ref('')
 const formOpen = ref(false)
 const editing = ref<WebConfigItem | null>(null)
 const confirm = ref<{ open: boolean; item: WebConfigItem | null; loading: boolean }>({ open: false, item: null, loading: false })
+
+/**
+ * ISSUE-029 (CR-053): kolom Aksi menempel di kanan area tabel (`sticky right-0`) supaya header "Aksi" dan tombol ⋮ selalu
+ * terlihat di 600/390 px; bayangan hanya selama masih ada kolom tergulir di bawahnya (pola `MasterDataView`).
+ */
+const tableScroller = ref<HTMLElement | null>(null)
+const { actionsShadow, updateActionsShadow } = useStickyActionsShadow(tableScroller, [items, loading, search])
 
 /** Kelompok berurutan sesuai katalog, setelah filter pencarian (label atau config_name). */
 const groups = computed(() => {
@@ -148,7 +156,7 @@ onMounted(() => {
       </label>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div ref="tableScroller" class="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="web-config-table-scroll" @scroll.passive="updateActionsShadow">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
@@ -156,7 +164,13 @@ onMounted(() => {
             <th class="px-4 py-3">Nilai</th>
             <th class="px-4 py-3">Tipe</th>
             <th class="px-4 py-3">Keterangan</th>
-            <th class="px-4 py-3 text-right">Aksi</th>
+            <th
+              class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right"
+              :class="{ 'shadow-sticky-end': actionsShadow }"
+              data-testid="web-config-col-actions"
+            >
+              Aksi
+            </th>
           </tr>
         </thead>
         <tbody v-if="loading">
@@ -171,9 +185,12 @@ onMounted(() => {
         </tbody>
         <tbody v-for="group in loading ? [] : groups" v-else :key="group.name" class="divide-y divide-slate-100">
           <tr class="bg-slate-50/60">
-            <th colspan="5" class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600" scope="colgroup">{{ group.name }}</th>
+            <!-- CR-058: label grup menempel di kiri area gulir (pasangan kolom Aksi sticky kanan), tidak ikut tergulir. -->
+            <th colspan="5" class="p-0 text-left text-xs font-semibold uppercase tracking-wide text-slate-600" scope="colgroup">
+              <span class="sticky left-0 inline-block whitespace-nowrap px-4 py-2" :data-testid="`web-config-group-${group.name}`">{{ group.name }}</span>
+            </th>
           </tr>
-          <tr v-for="item in group.items" :key="item.config_name" class="hover:bg-slate-50" :data-testid="`web-config-row-${testidOf(item)}`">
+          <tr v-for="item in group.items" :key="item.config_name" class="group hover:bg-slate-50" :data-testid="`web-config-row-${testidOf(item)}`">
             <td class="px-4 py-3">
               <div class="font-medium text-slate-800">{{ item.label }}</div>
               <code class="text-xs text-slate-500">{{ item.config_name }}</code>
@@ -185,7 +202,7 @@ onMounted(() => {
               <span v-else-if="item.is_default" class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600" data-badge="default">Bawaan</span>
               <span v-else-if="!item.valid" class="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700" data-badge="invalid">Tidak valid — memakai bawaan</span>
             </td>
-            <td class="px-4 py-3 text-right">
+            <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50" :class="{ 'shadow-sticky-end': actionsShadow }">
               <RowActionsMenu
                 :actions="rowActions(item)"
                 :label="`Aksi untuk ${item.label}`"

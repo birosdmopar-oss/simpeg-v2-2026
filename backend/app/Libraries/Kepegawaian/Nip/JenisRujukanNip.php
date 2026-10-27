@@ -49,14 +49,22 @@ enum JenisRujukanNip: string
     case JsonArrayNip = 'json_array_nip';
 
     /**
+     * Kolom teks berisi beberapa NIP dipisah `***` (bukan kolom NIP tunggal), mis. `riwayat_cuti.ketua_tim` (tembusan
+     * ketua tim, legacy `libraries/hr/rwy/L_cuti.php:1785-1800` `implode('***', ...)`; DBV-022 DQ-15). Legacy tidak menggantinya saat
+     * Ubah NIP; v2 mengganti elemen yang sama persis dengan NIP lama di transaksi koreksi (DBV-022 M2).
+     */
+    case DaftarNipBerpemisah = 'daftar_nip_berpemisah';
+
+    /**
      * Apakah Ubah NIP legacy ikut mengganti nilai kolom ini (lewat cascade FK atau kode). `false` berarti setelah Ubah NIP
      * legacy, baris lama menunjuk NIP yang sudah tidak ada.
      */
     public function diubahLegacy(): bool
     {
         return match ($this) {
-            self::FkLegacy, self::NonFkUbahNipLegacy                                         => true,
-            self::NonFkSlipGaji, self::NonFkFkV2, self::NonFkKeputusanV2, self::JsonArrayNip => false,
+            self::FkLegacy, self::NonFkUbahNipLegacy => true,
+            self::NonFkSlipGaji, self::NonFkFkV2, self::NonFkKeputusanV2, self::JsonArrayNip,
+            self::DaftarNipBerpemisah => false,
         };
     }
 }

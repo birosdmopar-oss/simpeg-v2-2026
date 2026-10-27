@@ -8,10 +8,12 @@ use App\Constants\Role;
 use App\Libraries\CacheService;
 use App\Libraries\MasterData\WebConfigService;
 use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\TestLogger;
 use CodeIgniter\Test\TestResponse;
 use Config\Services;
 use Config\WebConfig;
 use InvalidArgumentException;
+use ReflectionProperty;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -222,6 +224,66 @@ final class WebConfigTest extends DatabaseTestCase
     }
 
     /**
+     * ISSUE-028: kolom config_name ber-collation tidak peka huruf besar/kecil, katalog peka huruf. Key di URL yang beda
+     * huruf dari baris key katalog tidak boleh membaca, menimpa, atau menghapus baris itu.
+     */
+    public function testKeyMatchingIsCaseSensitive(): void
+    {
+        $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Kementerian Uji'])->assertStatus(201);
+        $row = $this->db->table('web_config')->where('config_name', 'nama_kementerian')->get()->getRowArray();
+
+        foreach (['NAMA_KEMENTERIAN', 'Nama_Kementerian'] as $variant) {
+            $this->get(self::BASE . '/' . $variant)->assertStatus(404);
+            $this->sendJson('PUT', self::BASE . '/' . $variant, ['config_value' => 'Ditimpa'])->assertStatus(404);
+            $this->sendJson('DELETE', self::BASE . '/' . $variant)->assertStatus(404);
+        }
+
+        $after = $this->db->table('web_config')->get()->getResultArray();
+        $this->assertCount(1, $after);
+        $this->assertSame($row['id_web_config'], $after[0]['id_web_config']);
+        $this->assertSame('nama_kementerian', $after[0]['config_name']);
+        $this->assertSame('Kementerian Uji', $after[0]['config_value']);
+        $this->assertSame('Kementerian Uji', service('webConfigService')->value('nama_kementerian'));
+        $this->dontSeeInDatabase('audit_logs', ['entity' => 'web_config', 'event' => 'delete']);
+
+        $this->get(self::BASE . '/nama_kementerian')->assertStatus(200);
+    }
+
+    /**
+     * ISSUE-028: baris impor yang hanya beda huruf dari key katalog adalah key tak dikenal — tidak dihitung sebagai
+     * nilai key katalog, tidak bisa diubah lewat nama katalog, tetapi bisa dihapus lewat namanya sendiri.
+     */
+    public function testImportedRowDifferingOnlyInCaseIsAnUnknownKey(): void
+    {
+        $this->db->table('web_config')->insert(['config_name' => 'Nama_Kementerian', 'config_value' => 'Dari Impor', 'remark' => 'impor']);
+
+        $byName = array_column($this->listItems(), null, 'config_name');
+        $this->assertTrue($byName['nama_kementerian']['is_default'], 'key katalog tetap memakai bawaan');
+        $this->assertFalse($byName['Nama_Kementerian']['known']);
+        $this->assertNotSame('Dari Impor', service('webConfigService')->value('nama_kementerian'));
+
+        $this->get(self::BASE . '/nama_kementerian')->assertStatus(200);
+        $this->assertTrue($this->json($this->get(self::BASE . '/nama_kementerian'))['data']['is_default']);
+
+        $importedId   = (int) $this->db->table('web_config')->get()->getRowArray()['id_web_config'];
+        $duplicateLog = self::errorLogCount('Duplicate entry');
+
+        $blocked = $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Baru']);
+        $blocked->assertStatus(422);
+        $this->assertArrayHasKey('config_name', $this->json($blocked)['errors']);
+        $this->assertSame(1, $this->db->table('web_config')->countAllResults());
+        // CR-058: bentrok dicegah sebelum INSERT, jadi tidak ada log ERROR 1062.
+        $this->assertSame($duplicateLog, self::errorLogCount('Duplicate entry'));
+
+        $this->sendJson('DELETE', self::BASE . '/Nama_Kementerian')->assertStatus(200);
+        $this->assertSame(0, $this->db->table('web_config')->countAllResults());
+        $this->sendJson('PUT', self::BASE . '/nama_kementerian', ['config_value' => 'Baru'])->assertStatus(201);
+
+        // CR-058: PUT yang ditolak tidak memakan nilai AUTO_INCREMENT.
+        $this->assertSame($importedId + 1, (int) $this->db->table('web_config')->get()->getRowArray()['id_web_config']);
+    }
+
+    /**
      * Nilai tersimpan yang tidak sah (mis. impor tanpa normalisasi) ditandai `valid: false` dan konsumen menerima bawaan.
      */
     public function testInvalidStoredValueFallsBackToDefault(): void
@@ -259,6 +321,20 @@ final class WebConfigTest extends DatabaseTestCase
     private function sendJson(string $method, string $uri, array $body = []): TestResponse
     {
         return $this->withBodyFormat('json')->call($method, $uri, $body);
+    }
+
+    /**
+     * Jumlah catatan log level error yang memuat $needle sejauh ini (log TestLogger statis, terkumpul lintas test).
+     */
+    private static function errorLogCount(string $needle): int
+    {
+        /** @var list<array{level: mixed, message: string, file: string|null}> $logs */
+        $logs = (new ReflectionProperty(TestLogger::class, 'op_logs'))->getValue();
+
+        return count(array_filter(
+            $logs,
+            static fn (array $log): bool => strtolower((string) $log['level']) === 'error' && str_contains($log['message'], $needle),
+        ));
     }
 
     private function resetWebConfigServices(): void
