@@ -12,6 +12,9 @@ use App\Libraries\Kepegawaian\Pegawai\PegawaiService;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\JenisRiwayat;
 use App\Libraries\Kepegawaian\Struktur\PenugasanService;
+use App\Libraries\Layanan\Ib\IbService;
+use App\Libraries\Layanan\Pmk\DasarPmkService;
+use App\Libraries\Layanan\Tb\TbService;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\HariLiburService;
 use App\Libraries\MasterData\WebConfigService;
@@ -52,7 +55,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb|ib|pmk)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -80,7 +83,48 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/dokumen/baperjakat/xlsx' => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)/pdf'      => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)/xlsx'     => [1, 3, 4, 5, 8],
-            'GET api/v1/dokumen/([^/]+)'          => [1, 3, 4, 5, 8],
+            // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
+            // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
+            'GET api/v1/tb'                            => [1, 2, 3, 6],
+            'GET api/v1/tb/opsi'                       => [1, 2, 3, 6],
+            'POST api/v1/tb'                           => [1, 2, 3, 6],
+            'GET api/v1/tb/([0-9]+)'                   => [1, 2, 3, 6],
+            'PUT api/v1/tb/([0-9]+)'                   => [1, 2, 3, 6],
+            'DELETE api/v1/tb/([0-9]+)'                => [1, 2, 3, 6],
+            'POST api/v1/tb/([0-9]+)/process'          => [1, 2, 3, 6],
+            'POST api/v1/tb/([0-9]+)/perpanjangan'     => [1, 2, 3, 6],
+            'PUT api/v1/tb/perpanjangan/([0-9]+)'      => [1, 2, 3, 6],
+            'DELETE api/v1/tb/perpanjangan/([0-9]+)'   => [1, 2, 3, 6],
+            'GET api/v1/tb/([0-9]+)/lampiran/([0-9]+)' => [1, 2, 3, 6],
+            'GET api/v1/tb/([0-9]+)/surat'             => [1, 2, 3, 6],
+            // C-08 Izin Belajar (MAKE-024 M5): PRD §5.3, Matriks `hr/rwy/ib/*` = 1, 2, 3, 7 (role 6 → 403, DoD 071-3)
+            // (IbService::ROLE_ROUTE).
+            'GET api/v1/ib'                            => [1, 2, 3, 7],
+            'GET api/v1/ib/opsi'                       => [1, 2, 3, 7],
+            'POST api/v1/ib'                           => [1, 2, 3, 7],
+            'GET api/v1/ib/([0-9]+)'                   => [1, 2, 3, 7],
+            'PUT api/v1/ib/([0-9]+)'                   => [1, 2, 3, 7],
+            'DELETE api/v1/ib/([0-9]+)'                => [1, 2, 3, 7],
+            'POST api/v1/ib/([0-9]+)/process'          => [1, 2, 3, 7],
+            'GET api/v1/ib/([0-9]+)/lampiran/([0-9]+)' => [1, 2, 3, 7],
+            'GET api/v1/ib/([0-9]+)/surat'             => [1, 2, 3, 7],
+            // C-09 PMK (MAKE-024 M5): PRD §5.4, Matriks `hr/rwy/pmk/*` = 1, 2, 3 (role 4..8 → 403, DoD 072-4); role 3 lihat
+            // saja, PIC/pemilik/role 1 di service (DasarPmkService::ROLE_ROUTE).
+            'GET api/v1/pmk/opsi'                        => [1, 2, 3],
+            'POST api/v1/pmk/hitung-mker'                => [1, 2, 3],
+            'GET api/v1/pmk/pengajuan'                   => [1, 2, 3],
+            'POST api/v1/pmk/pengajuan'                  => [1, 2, 3],
+            'GET api/v1/pmk/pengajuan/([0-9]+)'          => [1, 2, 3],
+            'PUT api/v1/pmk/pengajuan/([0-9]+)'          => [1, 2, 3],
+            'DELETE api/v1/pmk/pengajuan/([0-9]+)'       => [1, 2, 3],
+            'POST api/v1/pmk/pengajuan/([0-9]+)/process' => [1, 2, 3],
+            // [V2] gap PRD §5.4 (disetujui Horii 27-10-2026): unduh berkas kolom pengajuan, hak = lihat detail.
+            'GET api/v1/pmk/pengajuan/([0-9]+)/berkas/([^/]+)' => [1, 2, 3],
+            'GET api/v1/pmk'                                   => [1, 2, 3],
+            'PUT api/v1/pmk/([0-9]+)'                          => [1, 2, 3],
+            'DELETE api/v1/pmk/([0-9]+)/arsip/([0-9]+)'        => [1, 2, 3],
+            'DELETE api/v1/pmk/([0-9]+)'                       => [1, 2, 3],
+            'GET api/v1/dokumen/([^/]+)'                       => [1, 3, 4, 5, 8],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,
@@ -408,6 +452,9 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
         $this->assertSame([1, 2, 3, 6, 7], PegawaiService::ROLE_UBAH_BIODATA);
         // hr/rwy/lkh/* = 1, 2, 3, 6, 7.
         $this->assertSame([1, 2, 3, 6, 7], LkhService::ROLE_LKH);
+        $this->assertSame([1, 2, 3, 6], TbService::ROLE_ROUTE);
+        $this->assertSame([1, 2, 3, 7], IbService::ROLE_ROUTE);
+        $this->assertSame([1, 2, 3], DasarPmkService::ROLE_ROUTE);
         // hr/rwy/konket/* = 1, 2, 3, 6, 7 (tulis); lihat + pengamat 4, 5 (legacy list_ad/detail, lihat saja).
         $this->assertSame([1, 2, 3, 6, 7], KonketService::ROLE_TULIS);
         $this->assertSame([1, 2, 3, 4, 5, 6, 7], KonketService::ROLE_LIHAT);

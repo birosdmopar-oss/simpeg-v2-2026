@@ -105,3 +105,52 @@ Catatan keputusan coder (dicatat untuk reviewer):
 
 Belum ada di bagian ini (M5 setelah DBV-022 & M2): Model, controller, route, migration, berkas, PIC (`PetugasLayananService`),
 notifikasi, efek `id_jenis_status`, surat TB/IB.
+
+## TB, IB, PMK — lapisan DB (MAKE-024 M5, PRD Fase 4 §6.7–§6.9)
+
+Service ber-DB membungkus kelas murni di atas; DILARANG ada aturan tumpang tindih/transisi/validasi/lama tahun kedua.
+
+| Kelas | Isi |
+|---|---|
+| `LayananStudi` (abstrak) | dasar TB/IB: kunci pegawai `FOR UPDATE` + baca ulang baris, hak lihat (pemilik, PIC aktif, role 1, role 3 `bolehLihat`), pelaku tulis (`admin1`/`admin3`/`pemilik`), tampilan (`label_status`, `nada_status`, `tahap[]`, `aksi {}`), lampiran ber-slot, notifikasi, transaksi pola RiwayatEngine (push sesudah commit, berkas direkonsiliasi) |
+| `StudiPengajuanService` (abstrak) | daftar `mode`, opsi, detail, tambah, ubah, hapus, unduh lampiran — `ValidasiStudi`, `BerkasStudi`, master jenjang, snapshot pemohon server |
+| `StudiApprovalService` (abstrak) | proses PIC satu langkah — `TransisiStudi`; `show_notif`/`notif_date` pengganti trigger `riwayat_*_beUpd` |
+| `PetugasLayananService` | `adalahPic(nip, jenis)`, `nipPicAktif(jenis)` (status 1, tanpa batas unit) — dipakai M5 dan M6 |
+| `PenandaTanganKabiro` | penanda tangan surat TB/IB (`id_jabatan_kabiro_kepegawaian`, `tmtsk` terbaru) + unit tujuan laporan (`id_unit_kepegawaian`), lewat `WebConfigService::value()` (Q-06(a)) |
+| `NotifikasiNoOp` | binding sementara `NotifikasiLayananInterface` (`Config\Services::notifikasiLayanan()`); diganti NotifikasiService di M4 (MAKE-023) |
+| `Tb/TbService`, `Tb/TbApprovalService`, `Tb/EfekTbTrait` | C-07; efek final `pegawai.id_jenis_status` 2 bila hari ini dalam rentang (dibalik saat hapus) |
+| `Tb/PerpanjanganTbService` | C-07 perpanjangan role 1; ringkasan `tgl_*_perpan` = `PerpanjanganTb::ringkasan` (pengganti trigger `riwayat_tb_perpan_af*`) |
+| `Tb/StatusTugasBelajar` | implementasi `StatusTugasBelajarInterface` (`Config\Services::statusTugasBelajar()`, Fase 5 D-06) — dua kueri lalu `BebasPresensiTb` |
+| `Tb/SuratTbService` | SK unggahan (kode 47) atau render `Views/pdf/surat_tb.php` |
+| `Ib/IbService`, `Ib/IbApprovalService` | C-08; status selalu 0, tiga slot wajib semua role, efek final = surat |
+| `Pmk/DasarPmkService` | dasar PMK di atas LayananStudi: hak lihat/tulis PMK (role 3 lihat saja, ubah tanpa syarat status [K D19], hapus ditolak bila status 1), tampilan `TampilanPmk`, isi notifikasi |
+| `Pmk/PmkPengajuanService` | C-09 pengajuan: daftar `mode`, opsi (`tmt_cpns` dari `pegawai_cpns.tmtsk`), `hitung-mker`, CRUD; berkas kolom lewat `KolomBerkas` |
+| `Pmk/PmkApprovalService` | C-09 proses PIC (`TransisiPmk`); tanpa efek `riwayat_pmk`/masa kerja (D16) |
+| `Pmk/RiwayatPmkService` | riwayat PMK final: daftar, arsip SK kode 42 (min 1 tersisa), hapus |
+| `Ib/SuratIbService` | render `Views/pdf/surat_ib.php` + simpan kode 50 di transaksi approval (berkas buatan server lewat jalur validasi unggahan yang sama, `UploadedFile` atas berkas sementara), unduh surat terbaru |
+
+Kelas murni baru M5: `Studi/BerkasStudi` (slot berkas & kode `jenis_rwy` 46–50, `slotKosong()`), `Studi/TampilanStudi`
+(badge/stepper §6.11.4). Penjaga kemurnian (`LayananStudiPmkMurniTest`) memakai daftar eksplisit: setiap berkas di `Studi/`, `Tb/`, `Pmk/`,
+`Interfaces/Layanan/` wajib terdaftar sebagai murni (dipindai) atau lapisan DB (dikecualikan; hanya di `Tb/`/`Pmk/`, file
+boundary PRD) — berkas baru tanpa pendaftaran membuat test gagal.
+
+Catatan keputusan coder M5 (dicatat untuk reviewer):
+
+1. **[V2] Slot berkas lewat `document_attachment.tag`** (keputusan reviewer CR 27-10 butir 3, pola Arsip Data Umum): satu kode
+   per jenis (46 TB, 49 IB), `tag` = nama kolom legacy; slot berisi bila ada lampiran ber-`tag` itu atau kolom `file_*` impor
+   terisi; berkas pengganti menghapus lampiran lama slot itu (fisik + audit) di transaksi yang sama. Kolom `file_*` tidak
+   diisi v2 (DQ-20). Kode satu-slot 47/48/50 tanpa `tag`. `riwayat_tb_perpan.file_sperpan` NOT NULL [K] diisi `basename`
+   lampiran kode 48.
+2. **[V2] Rentang efek `id_jenis_status` per tanggal inklusif** (disetujui Horii 27-10). Legacy `L_tb.php:1169-1179` /
+   `:746-757` membandingkan dengan jam sekarang sehingga hari terakhir TB tidak ikut. Gap "TB disetujui sebelum mulai / TB
+   berakhir → status tidak berubah otomatis" sama dengan legacy, tidak dikerjakan M5.
+3. **`dalam_negeri` tidak divalidasi [K]**; kolom NOT NULL → 1 (Dalam Negeri) bila kosong/di luar 1|2 (bukan 422).
+4. **Ubah oleh role 1 pada TB disetujui** menyimpan perubahan data tetapi status tetap 1 (`status` lain → 422
+   `errors.status`): status final tidak punya transisi keluar (single end node). Status 0 → 1 lewat ubah role 1 memberi efek
+   final yang sama dengan approval (TB-07).
+5. **Status salah → 422 `errors.status`; bukan pelaku → 403.** Pemilik yang mengubah pada/sesudah `tgl_mulai` juga 422
+   `errors.status` ("hanya dapat diubah sebelum tanggal mulai").
+6. **Model** `Models/Layanan/LayananModel` (BaseAuditableModel + `withActor`); `riwayat_tb/ib/pmk*` tidak memakai
+   BaseSnapshotModel karena tidak punya tabel snapshot — efek final ditulis lewat model beraudit pemiliknya.
+7. **`NotifikasiLayananInterface::kirim()` mengembalikan `list<int>`** id `inbox_msg`: §6.6.1 menulis tipe `void` sekaligus
+   "mengembalikan daftar id untuk di-enqueue"; kontrak memakai kalimat kedua. Judul/isi notifikasi TB/IB dari tabel §6.6.2.

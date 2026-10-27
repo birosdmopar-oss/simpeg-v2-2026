@@ -18,6 +18,8 @@ use App\Interfaces\Kepegawaian\RiwayatServiceInterface;
 use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Interfaces\Kepegawaian\StorageAdapterInterface;
 use App\Interfaces\Kepegawaian\StrukturServiceInterface;
+use App\Interfaces\Layanan\NotifikasiLayananInterface;
+use App\Interfaces\Layanan\StatusTugasBelajarInterface;
 use App\Interfaces\PushNotifGatewayInterface;
 use App\Interfaces\ResetTokenNotifierInterface;
 use App\Interfaces\SiasnGatewayInterface;
@@ -50,6 +52,8 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
+use App\Libraries\Layanan\NotifikasiNoOp;
+use App\Libraries\Layanan\Tb\StatusTugasBelajar;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
 use App\Libraries\MasterData\MasterService;
@@ -499,5 +503,32 @@ class Services extends BaseService
             'mock'  => new MockFcmAdapter(),
             default => throw new RuntimeException("Push driver '{$driver}' belum tersedia (adapter real dikerjakan di Fase 6)."),
         };
+    }
+
+    // Modul C — Layanan TB/IB/PMK (Fase 4, MAKE-024 M5).
+
+    /**
+     * Titik sambung notifikasi TB/IB/PMK (PRD §6.6.1). Binding sementara NotifikasiNoOp; binding diganti
+     * NotifikasiService di M4 (MAKE-023).
+     */
+    public static function notifikasiLayanan(bool $getShared = true): NotifikasiLayananInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('notifikasiLayanan');
+        }
+
+        return new NotifikasiNoOp();
+    }
+
+    /**
+     * Kontrak "TB penuh bebas presensi" untuk Fase 5 D-06 (PRD §6.7.5).
+     */
+    public static function statusTugasBelajar(bool $getShared = true): StatusTugasBelajarInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('statusTugasBelajar');
+        }
+
+        return new StatusTugasBelajar();
     }
 }
