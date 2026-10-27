@@ -55,7 +55,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb|ib|pmk|presensi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb|ib|pmk|slip-gaji|publik|presensi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -125,6 +125,25 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/pmk/([0-9]+)/arsip/([0-9]+)'        => [1, 2, 3],
             'DELETE api/v1/pmk/([0-9]+)'                       => [1, 2, 3],
             'GET api/v1/dokumen/([^/]+)'                       => [1, 3, 4, 5, 8],
+
+            // Modul D — Fase 5A D-10 impor Slip Gaji (MAKE-030): Matriks Bagian 2 `hr/sl_gaji/import_preview`,
+            // `hr/sl_gaji/import_commit` = 1, 3 (SG-2; role 3 dibatasi satker akun di service, tanpa satker → 403).
+            'POST api/v1/slip-gaji/impor/pratinjau'                => [1, 3],
+            'POST api/v1/slip-gaji/impor/pratinjau/([^/]+)/commit' => [1, 3],
+
+            // Modul D — Fase 5A D-11 akses Slip Gaji (MAKE-031): Matriks Bagian 2 `hr/sl_gaji/list|mark_viewed|cetak` =
+            // 2, 6, 7 (NIP dari token); `hr/sl_gaji/admin|admin_data|get_detail|edit_save|reset_access` = 1, 3 (SG-2,
+            // role 3 dibatasi satker di service). D-14 verifikasi QR publik (ADR-032): tanpa jwt, filter throttle.
+            'GET api/v1/slip-gaji/saya'                 => [2, 6, 7],
+            'GET api/v1/slip-gaji/saya/([^/]+)/pdf'     => [2, 6, 7],
+            'POST api/v1/slip-gaji/saya/([^/]+)/buka'   => [2, 6, 7],
+            'GET api/v1/slip-gaji/saya/([^/]+)'         => [2, 6, 7],
+            'GET api/v1/slip-gaji'                      => [1, 3],
+            'GET api/v1/slip-gaji/([0-9]+)/pdf'         => [1, 3],
+            'POST api/v1/slip-gaji/([0-9]+)/buka-ulang' => [1, 3],
+            'GET api/v1/slip-gaji/([0-9]+)'             => [1, 3],
+            'PUT api/v1/slip-gaji/([0-9]+)'             => [1, 3],
+            'GET api/v1/publik/verifikasi-slip/([^/]+)' => self::PUBLIK,
 
             // Modul D — Fase 5A D-02/D-03 presensi (MAKE-032): Matriks Bagian 2 `hr/services/local/po_in|po_out`,
             // `hr/presensi/view_presensi|list_ptt` = 2, 6, 7; `hr/presensi/list_ad|list` = 1, 3, 4, 5 (role 3 lingkup satker,

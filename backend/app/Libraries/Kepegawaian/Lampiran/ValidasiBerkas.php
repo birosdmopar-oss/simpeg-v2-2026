@@ -52,7 +52,53 @@ final class ValidasiBerkas
      */
     public static function periksa(UploadedFile $berkas, AturanLampiran $aturan, string $field = 'berkas'): array
     {
-        $gagal = static fn (string $pesan): ValidationException => new ValidationException('Validasi gagal.', [$field => [$pesan]]);
+        return self::inti($berkas, $aturan->ekstensi, $aturan->batasByte(), $field, [
+            'ukuran'       => "Ukuran berkas melebihi {$aturan->batasMb} MB.",
+            'jenis'        => 'Jenis berkas tidak diizinkan (hanya ' . implode(', ', $aturan->ekstensi) . ').',
+            'isi_ekstensi' => 'Jenis isi berkas tidak sesuai dengan ekstensinya.',
+            'struktur'     => static fn (string $ekstensi): string => "Isi berkas tidak sesuai dengan jenis {$ekstensi}.",
+        ]);
+    }
+
+    /**
+     * Fase 5A (PRD 5A §7.2.2, aditif): validasi berkas impor non-lampiran (Excel Slip Gaji) dengan aturan yang sama
+     * persis dengan {@see self::periksa()} — ukuran dari disk, MIME dari isi, ekstensi kiriman ≙ isi (tanpa ekstensi
+     * ditolak), struktur OOXML/OLE — tetapi pesan galat impor PRD: format & ukuran dari pemanggil, isi ≠ ekstensi
+     * "Isi berkas tidak sesuai dengan ekstensinya.". Perilaku dan pesan jalur lampiran tidak berubah.
+     *
+     * @param list<string> $ekstensi ekstensi huruf kecil yang diizinkan (mis. xlsx, xls)
+     *
+     * @return array{isi: string, ekstensi: string, mime: string, ukuran: int, nama_tampil: string}
+     *
+     * @throws ValidationException 422 dengan kunci $field
+     */
+    public static function periksaImpor(
+        UploadedFile $berkas,
+        array $ekstensi,
+        int $batasByte,
+        string $pesanFormat,
+        string $pesanUkuran,
+        string $field = 'berkas',
+    ): array {
+        return self::inti($berkas, $ekstensi, $batasByte, $field, [
+            'ukuran'       => $pesanUkuran,
+            'jenis'        => $pesanFormat,
+            'isi_ekstensi' => 'Isi berkas tidak sesuai dengan ekstensinya.',
+            'struktur'     => static fn (string $ekstensi): string => 'Isi berkas tidak sesuai dengan ekstensinya.',
+        ]);
+    }
+
+    /**
+     * Inti validasi bersama {@see self::periksa()} dan {@see self::periksaImpor()}; hanya teks pesan yang berbeda.
+     *
+     * @param list<string>                                                                                  $ekstensiIzin
+     * @param array{ukuran: string, jenis: string, isi_ekstensi: string, struktur: callable(string): string} $pesan
+     *
+     * @return array{isi: string, ekstensi: string, mime: string, ukuran: int, nama_tampil: string}
+     */
+    private static function inti(UploadedFile $berkas, array $ekstensiIzin, int $batasByte, string $field, array $pesan): array
+    {
+        $gagal = static fn (string $teks): ValidationException => new ValidationException('Validasi gagal.', [$field => [$teks]]);
 
         $error = $berkas->getError();
 
@@ -61,7 +107,7 @@ final class ValidasiBerkas
         }
 
         if ($error === UPLOAD_ERR_INI_SIZE || $error === UPLOAD_ERR_FORM_SIZE) {
-            throw $gagal("Ukuran berkas melebihi {$aturan->batasMb} MB.");
+            throw $gagal($pesan['ukuran']);
         }
 
         $temp = $berkas->getTempName();
@@ -76,16 +122,16 @@ final class ValidasiBerkas
             throw $gagal('Berkas kosong.');
         }
 
-        if ($ukuran > $aturan->batasByte()) {
-            throw $gagal("Ukuran berkas melebihi {$aturan->batasMb} MB.");
+        if ($ukuran > $batasByte) {
+            throw $gagal($pesan['ukuran']);
         }
 
         $mime     = self::mimeDariIsi($temp);
         $usulan   = strtolower(pathinfo($berkas->getClientName(), PATHINFO_EXTENSION));
         $ekstensi = $mime === '' ? null : Mimes::guessExtensionFromType($mime, $usulan === '' ? null : $usulan);
 
-        if ($ekstensi === null || $ekstensi === '' || ! $aturan->ekstensiDiizinkan($ekstensi)) {
-            throw $gagal('Jenis berkas tidak diizinkan (hanya ' . implode(', ', $aturan->ekstensi) . ').');
+        if ($ekstensi === null || $ekstensi === '' || ! in_array(strtolower(ltrim($ekstensi, '.')), $ekstensiIzin, true)) {
+            throw $gagal($pesan['jenis']);
         }
 
         // [K] CR-054 (QA R2-I4, keputusan user 16-10-2026: tolak, ikut legacy Upload CI3 `allowed_types`,
@@ -95,11 +141,11 @@ final class ValidasiBerkas
         // `.xlsx`). Nama tanpa ekstensi juga ditolak (keputusan user 16-10-2026): ekstensi kosong tidak pernah masuk
         // `allowed_types` CI3.
         if ($usulan === '' || strtolower($ekstensi) !== $usulan) {
-            throw $gagal('Jenis isi berkas tidak sesuai dengan ekstensinya.');
+            throw $gagal($pesan['isi_ekstensi']);
         }
 
         if (! self::strukturDokumenOfficeCocok($temp, strtolower($ekstensi))) {
-            throw $gagal('Isi berkas tidak sesuai dengan jenis ' . strtolower($ekstensi) . '.');
+            throw $gagal(($pesan['struktur'])(strtolower($ekstensi)));
         }
 
         $isi = @file_get_contents($temp);
