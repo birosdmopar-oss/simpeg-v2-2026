@@ -839,3 +839,40 @@ sintetis (1 NIP yatim di `pa_layanan`, `inbox`, `firebase_token`; `ketua_tim` be
 
 DB sementara di-DROP dengan nama eksplisit setelah verifikasi. MariaDB 10.4 tidak diuji untuk skrip ini (skrip dijalankan
 di salinan legacy MySQL 8; `utf8mb4_unicode_ci` dikenal di kedua engine).
+
+## 13. Hasil audit B2 pada salinan data legacy (27-10-2026)
+
+Kueri ringkas baca-saja (turunan `sql/DBV-022-audit-layanan.sql` Bagian 1, 3, 5, 6, 7.1, dengan `COLLATE` 12.6) dijalankan
+Horii pada salinan basis data produksi legacy (struktur = D1). Angka agregat, tanpa data pribadi.
+
+| Bagian | Metrik | Jumlah | Akibat |
+|---|---|---|---|
+| A (ditahan) | `riwayat_cuti.nip_atasan_langsung` yatim | 2 | `AddFkNipLayananFase4` **tetap di `MigrationsDitahan/`** (pra-cek fail-closed menolak). Nilai dipertahankan apa adanya saat impor; penelusuran (NULL-kan / petakan) diputuskan di gladi impor |
+| A (ditahan) | `riwayat_cuti.nip_yang_menyetujui` yatim | 2 | idem |
+| A (ditahan) | `petugas_layanan.nip`, `pa_layanan.nip` yatim | 0 / 0 | — |
+| A (ditahan) | `inbox.nip` yatim (calon `disiplin_ticket`) | 5 | idem baris pertama |
+| B (FK langsung) | NIP pemilik yatim `riwayat_cuti`, `pegawai_sisa_cuti`, `riwayat_tb`, `riwayat_ib`, `riwayat_pmk` | 0 | FK inline aman |
+| C (DQ-10) | duplikat `pegawai_sisa_cuti (nip, tahun)` | **3 pasangan (7 baris)** | ⛔ melanggar UNIQUE inline → **dinormalisasi saat impor** (13.1) |
+| C (DQ-10) | baris saldo bernilai negatif | **9** | ⛔ melanggar `chk_psc_saldo_nonnegatif` → **dinormalisasi saat impor** (13.1) |
+| D (DQ-12/27) | `petugas_layanan`: `id_jenis_layanan` NULL / duplikat `(id_jenis_layanan, nip)` / status di luar 0,1,10 / status 10 | 0 / 0 / 0 / 0 | NOT NULL, UNIQUE, CHECK aman; tidak ada status 10 |
+
+Rincian C:
+- **Duplikat** seluruhnya tahun 2019–2020. Dua pasangan identik (cron legacy jalan ganda 28-02-2020 16:31:13: id 5901, 5902,
+  5906 dan id 6161, 6175). Satu pasangan 2019 berbeda: id 12 (`sisa_cuti` 11, pernah diperbarui — potongan cuti) dan id 265
+  (`sisa_cuti` 12, dibuat belakangan, tidak pernah diubah).
+- **Negatif** seluruhnya tahun 2024–2025: 8 baris `utang_cuti` (−7, −8, −126, −128) dan 1 baris `sisa_cuti_ditangguhkan`
+  (−1); N/N-1/N-2 tidak ada yang negatif. Nilai −128 = batas bawah TINYINT: jejak pengurangan legacy yang kebablasan
+  (bug refund A-08), bukan utang sungguhan.
+
+### 13.1 Aturan normalisasi saat impor (keputusan Horii 27-10-2026)
+
+1. **Duplikat `(nip, tahun)`:** simpan baris dengan `id_pegawai_sisa_cuti` **terkecil**, buang sisanya (untuk 2019 = id 12,
+   baris yang dipakai; 2020 identik). Id yang dibuang dicatat di log impor (DBV-011 2.8).
+2. **Kolom saldo negatif** (`sisa_cuti`, `sisa_cuti_n1`, `sisa_cuti_n2`, `sisa_cuti_ditangguhkan`, `utang_cuti`): dinaikkan
+   ke **0**; nilai sebelum normalisasi dicatat di log impor.
+3. Nilai di atas batas D8 (mis. 303 baris 2026 N-1 > 6, PRD v1.3 §14.5) **tidak** dinormalisasi.
+4. Setelah normalisasi, Bagian 3 skrip audit diulang di DB v2 hasil impor: duplikat = 0 dan negatif = 0 sebelum aplikasi
+   dibuka. Rumus saldo tahun baru v2 (`SaldoTahunanCuti`) juga melantai utang/ditangguhkan lalu dengan `max(0, …)`.
+
+Langkah ini masuk runbook impor DBV-011 Bagian 2.12. Status DQ-10: UNIQUE + CHECK ≥ 0 **tetap** (keputusan final), dengan
+normalisasi di atas sebagai prasyarat impor. DQ-12/DQ-27: final (audit = 0). DQ-3: FK approver tetap ditahan.

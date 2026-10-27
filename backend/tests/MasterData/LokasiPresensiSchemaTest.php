@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\MasterData;
 
 use App\Database\Migrations\CreateLokasiPresensi;
+use App\Database\Migrations\CreatePresensiGaji;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Libraries\TipeKolomSkema;
@@ -15,6 +16,10 @@ use Tests\Support\Libraries\TipeKolomSkema;
  * `dm_user_lokasi_presensi` (D1:474-493) [K] — kolom, tipe, nullability, default, urutan, komentar, collation — plus
  * deviasi [V2]: kolom `dm_user_lokasi_presensi.status` (paling akhir), KEY `status` di kedua tabel, komentar status
  * 1/2/10 dan kolom *_by. down() hanya men-DROP dua tabel batch ini dan up() bisa dijalankan ulang.
+ *
+ * DBV-023 (Fase 5A): `dh_online.id_lokasi_masuk`/`id_lokasi_pulang` merujuk `lokasi_presensi` dengan FK RESTRICT, jadi
+ * migration `2026-10-27-100000_CreatePresensiGaji` dilepas lebih dulu sebelum down() dan dipasang lagi setelah up()
+ * (urutan regress `migrate:rollback`).
  *
  * @internal
  */
@@ -78,11 +83,16 @@ final class LokasiPresensiSchemaTest extends DatabaseTestCase
         foreach (self::TABLES as $table) {
             if (! $this->db->tableExists($table, false)) {
                 $migration = $this->migration();
+                $this->presensiGaji()->down();
                 $migration->down();
                 $migration->up();
 
                 break;
             }
+        }
+
+        if (! $this->db->tableExists('dh_online', false)) {
+            $this->presensiGaji()->up();
         }
 
         parent::tearDown();
@@ -95,6 +105,7 @@ final class LokasiPresensiSchemaTest extends DatabaseTestCase
 
     public function testRollbackDropsOnlyBatchTablesAndCanBeReapplied(): void
     {
+        $this->presensiGaji()->down();
         $before    = $this->tableNames();
         $migration = $this->migration();
 
@@ -106,6 +117,8 @@ final class LokasiPresensiSchemaTest extends DatabaseTestCase
         $migration->up();
         $this->assertSame($before, $this->tableNames());
         $this->assertSchema();
+
+        $this->presensiGaji()->up();
     }
 
     public function testRulesUseDerivedNameAndNoOrder(): void
@@ -216,6 +229,13 @@ final class LokasiPresensiSchemaTest extends DatabaseTestCase
         )->getResultArray(), 'TABLE_NAME');
 
         return array_map('strval', $names);
+    }
+
+    private function presensiGaji(): CreatePresensiGaji
+    {
+        require_once APPPATH . 'Database/Migrations/2026-10-27-100000_CreatePresensiGaji.php';
+
+        return new CreatePresensiGaji();
     }
 
     private function migration(): CreateLokasiPresensi
