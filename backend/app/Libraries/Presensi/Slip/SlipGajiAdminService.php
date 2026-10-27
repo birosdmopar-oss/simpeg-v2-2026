@@ -190,6 +190,10 @@ final class SlipGajiAdminService
 
             $hasil = NominalGaji::dariInputApi($body[$f]);
 
+            if ($hasil->valid) {
+                $hasil = NominalGaji::periksaNonNegatif((int) $hasil->nilai) ?? $hasil;
+            }
+
             if (! $hasil->valid) {
                 $kode ??= $hasil->kode;
                 $errors[$f][] = $hasil->kode === KodeGalatSlip::NOMINAL_NEGATIF ? 'Nilai harus berupa angka non-negatif.' : (string) $hasil->pesan;

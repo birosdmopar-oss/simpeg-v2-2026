@@ -45,6 +45,55 @@ POST api/v1/slip-gaji/impor/pratinjau/<token>/commit
              "galat": [{"kode": "nip_di_luar_cakupan", "pesan": "NIP 199001012020011002 berada di luar satker Anda.", "sheet": "GPP", "baris": 3}]}]}}
 ```
 
+## D-11/D-14 Akses & verifikasi Slip Gaji (MAKE-031, PRD 5A §6.1–6.3, §7.3–7.4)
+
+Controller `SlipGajiController` (pegawai), `SlipGajiAdminController` (admin), `VerifikasiSlipController` (publik); aturan
+di `Libraries/Presensi/Slip/{SlipGajiService, SlipGajiAdminService, VerifikasiSlipService, TokenSlipService, SlipGajiData,
+PdfSlipGaji, KopSlip}` + logika murni `Libraries/Presensi/SlipGaji` (`GerbangPeriode`, `StatusSlip`, `AksesSlip`,
+`RingkasanSlip`, `FormatSlip`, `TokenQr`, `NominalGaji`). Kode galat = konstanta `KodeGalatSlip` / kode `HasilSlip`.
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET api/v1/slip-gaji/saya` | 2, 6, 7 | `{items[] {periode, label, ada_data, dibuka, viewed_at, viewed_at_wib}, periode_terbaru}` — periode tersedia (Januari 2024 → terbaru, terbaru dulu), **tanpa nominal** |
+| `GET api/v1/slip-gaji/saya/{periode}` | 2, 6, 7 | `{periode, label, ada_data, dibuka, viewed_at, viewed_at_wib}` — metadata saja |
+| `POST api/v1/slip-gaji/saya/{periode}/buka` | 2, 6, 7 | Buka sekali (atomik). 200 `{periode, label, viewed_at, viewed_at_wib, rincian {28 field desimal}, ringkasan {jumlah_penghasilan_gpp, jumlah_potongan_gpp, bersih_gpp, bersih_tk, bersih_2, uang_makan, total_penghasilan}, uang_makan {nominal, hari, periode_kehadiran, tersedia}}`; token mentah tidak dikirim |
+| `GET api/v1/slip-gaji/saya/{periode}/pdf` | 2, 6, 7 | PDF (hanya bila dibuka); `Content-Disposition: attachment`, `nosniff`, `no-store` |
+| `GET api/v1/slip-gaji?periode=YYYY-MM&unit_satker=&status_view=semua\|dibuka\|belum&search=&page=&per_page=` | 1, 3 | `{items[] {id, nip, nama, unit_satker, periode, dibuka, viewed_at, viewed_at_wib, viewed_ip, aksi {lihat, cetak, koreksi, buka_ulang}}, total, page, per_page, ringkasan {jumlah, dibuka, belum_dibuka}, periode_tersedia[]}`; `periode` wajib; role 3 dipaksa satker akun (`unit_satker` = id satker, hanya role 1) |
+| `GET api/v1/slip-gaji/{id}` | 1, 3 | detail + rincian + ringkasan + uang makan + `aksi`; tidak mengubah status |
+| `PUT api/v1/slip-gaji/{id}` (JSON 28 field, desimal titik, mis. `"4500000.00"`) | 1, 3 | koreksi; status, token, `uang_makan*` tidak berubah; audit before/after lewat `GajiPegawaiModel` |
+| `POST api/v1/slip-gaji/{id}/buka-ulang` | 1, 3 | reset status & token aktif; riwayat token dan snapshot uang makan dipertahankan |
+| `GET api/v1/slip-gaji/{id}/pdf` | 1, 3 | PDF kapan saja tanpa gerbang & tanpa ubah status; tanpa QR bila tidak ada token aktif |
+| `GET api/v1/publik/verifikasi-slip/{token}` | publik (tanpa jwt, filter `throttle` 30/60 dtk/IP) | 200 `{status_keaslian: "asli", periode, label_periode, satker_penerbit, waktu_terbit, nama (tersamar)}` dari snapshot saat terbit |
+
+| Status | Kondisi |
+|---|---|
+| 401 / 403 | tanpa token; role di luar kolom; akun pegawai tanpa NIP; role 3 tanpa `id_satker` (seluruh jalur admin); target di luar satker role 3 (403, bukan 404) |
+| 404 `code: slip_tidak_ditemukan` | periode tersedia tetapi slip tidak ada: "Slip gaji periode {label} belum tersedia." |
+| 404 publik | semua alasan (format, tidak ada, huruf besar, spasi): "Dokumen tidak ditemukan atau tidak valid." — header `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store` di 200/404/429 |
+| 422 `errors.periode` + `code` | `periode_wajib`, `periode_tidak_valid`, `periode_sebelum_awal`, `periode_belum_rilis` (gerbang tanggal 4 pukul 10:00 WIB, tanpa zonasi); `slip_sudah_dibuka`; `slip_belum_dibuka` (PDF pegawai) |
+| 422 koreksi | per field: `Nilai wajib diisi.`; `code: nominal_negatif` "Nilai harus berupa angka non-negatif."; `nominal_tidak_valid` |
+| 422 `errors.status` + `code: slip_belum_dibuka` | buka ulang slip yang belum dibuka |
+| 429 | verifikasi publik melebihi 30 permintaan/60 detik per IP (`Retry-After`) |
+
+Token QR: `random_bytes(32)` → 64 heks; DB menyimpan `hash('sha256')` (`qr_token`, riwayat `gaji_pegawai_qr_history`) dan
+token terenkripsi Encrypter CI4 (`qr_token_enkripsi`, Q5A-01 opsi a) untuk QR PDF; URL QR =
+`Config\Presensi::$urlVerifikasiSlip` + token. Snapshot uang makan N−1 lewat `Config\Presensi::$sumberUangMakan` (bawaan
+5A `UangMakanBelumTersedia` → `uang_makan.tersedia = false`; **5B wajib mengganti sebelum go-live**, F5-1). Audit `update`
+`gaji_pegawai` saat buka/buka ulang tanpa IP, token, nominal; koreksi lewat model (token & IP dimasking).
+
+Contoh (data sintetis):
+
+```json
+GET api/v1/publik/verifikasi-slip/<64 heks>
+
+200 {"status": "success", "data": {"status_keaslian": "asli", "periode": "2026-09", "label_periode": "September 2026",
+     "satker_penerbit": "Sekretariat Uji", "waktu_terbit": "27 Oktober 2026, 09:00 WIB", "nama": "B*** S***"}}
+404 {"status": "error", "message": "Dokumen tidak ditemukan atau tidak valid."}
+```
+
+Catatan deploy M4: kunci enkripsi aplikasi (`encryption.key`) wajib terisi (token QR terenkripsi); key `.env` opsional
+`presensi.urlVerifikasiSlip` (URL absolut http/https; bawaan `app.baseURL` + `verify/slip/`) dan `presensi.akarAset`.
+
 ## Catatan deploy (PRD Fase 5A §8.5, Q5A-22)
 
 Dieksekusi tim infra saat cutover; tanpa nama host/IP di repo.
