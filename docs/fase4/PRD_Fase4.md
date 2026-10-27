@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `PRD_Fase4.md` — acuan utama coder/agen AI Fase 4 (kartu Trello DEV-005, prompt eksekusi 1/2 & 2/2) |
-| Versi | **v1.2 — 27-10-2026** (revisi atas v1.1 26-10-2026 dan v1.0 18-10-2026; kelima butir ⛔ §12 diputuskan 27-10; daftar perubahan di §14) |
+| Versi | **v1.3 — 27-10-2026** (revisi atas v1.2 27-10-2026, v1.1 26-10-2026, dan v1.0 18-10-2026; v1.2: kelima butir ⛔ §12 diputuskan; v1.3: hasil kueri DBA saldo cuti → Q-05 refund & saldo cutover diputuskan; daftar perubahan di §14) |
 | Status | **BERLAKU** — disetujui user/reviewer CR 18-10-2026: keputusan D1–D19 dan **seluruh saran default §12 (butir ⛔ dan ◻) diterima**, termasuk konfirmasi Q-03 (nilai turunan dihitung server) dan Q-13 (pemanggil `process` = NIP approver tahap aktif). Perubahan berikutnya hanya lewat revisi versi oleh reviewer CR. **26-10-2026:** Horii menyetujui 13 keputusan riset take over (§14) — seluruh butir ◻ §12 = **disetujui default 26-10** dengan penyesuaian Q-08/Q-10/Q-21/Q-23; **tahap 2b** (logika murni cuti sebelum DBV-022) diizinkan (§6.1.4, §9) |
 | Basis kode | v1.0: `origin/main` = **`2b712ed`** (rujukan `path:baris` repo diambil dari `0a79e38`/`2b712ed`). v1.1: `origin/main` = **`4d4ae92`** — berkas baru yang dirujuk v1.1: `Libraries/Pdf/KopDokumen.php` (MAKE-037), `tests/_support/Libraries/PemindaiKemurnian.php`, `tests/feature/KontrakMatriksRoleTest.php` (MAKE-038: setiap route `api/v1` baru wajib punya baris kontrak role di commit yang sama) |
 | Sumber | Keputusan user D1–D19 (18-10-2026), Trello DEV-005/QASMTASK-064..075/QAUI-004/QAFUNC-005, `04-Layanan.md`, Matriks Role × Endpoint v2 Modul C, kode & DDL legacy (D1 `simpeg01_struktur_lengkap_20261001.sql`), repo v2. Daftar lengkap di Lampiran A |
@@ -346,7 +346,7 @@ Mengikuti pola `B-01-B-02-pegawai-riwayat-schema.md`, `DBV-019`, `DBV-020`:
 | DQ-20 | Kolom `file_*` NOT NULL [K] di `riwayat_tb`/`riwayat_ib` sementara berkas v2 di `document_attachment` | DBV |
 | DQ-21 | Kolom `tag`/pembeda versi surat (belum TTE vs ber-TTE) di `document_attachment` atau dua kode `jenis_rwy` | DBV |
 | DQ-22 | (26-10, Q-23) Tipe kolom `reason_note*` tetap [K] (`text`/`mediumtext`; `riwayat_pmk_req` `tinytext`) — **tidak dikecilkan** karena data impor bisa > 255; batas 255 byte hanya validasi input v2 | Usulan tetap [K]; DBV konfirmasi |
-| DQ-23 | (26-10, Q-05) Audit `pegawai_sisa_cuti` bernilai negatif / di luar batas D8 sebelum CHECK ≥ 0 dipasang (DQ-10) | DBV memutuskan: normalisasi saat impor atau CHECK ditahan |
+| DQ-23 | (26-10, Q-05) Audit `pegawai_sisa_cuti` bernilai negatif / di luar batas D8 sebelum CHECK ≥ 0 dipasang (DQ-10) | DBV memutuskan: normalisasi saat impor atau CHECK ditahan. **27-10 (v1.3):** data legacy memuat 303 baris tahun 2026 dengan N-1 > 6 (§14.5); Horii memutuskan **tidak dinormalisasi saat impor** (diimpor apa adanya). Usulan DBV-022 (CHECK hanya ≥ 0, batas atas D8 tidak di-CHECK) sudah sejalan; audit nilai negatif tetap wajib 0 |
 
 #### 6.1.4 ⛔ TITIK TUNGGU C-01
 - ⛔ **Sebelum DBV menyetujui DBV-022: DILARANG** menulis migration yang dijalankan, model, service, controller, atau test yang bergantung pada tabel Modul C — **khususnya coding notifikasi (C-06)**. Yang boleh: dokumen DBV-022, kueri audit, draf migration **di branch DBV** untuk dibaca DBV.
@@ -470,7 +470,7 @@ Dalam satu transaksi: (1) kunci `pegawai` pemohon `FOR UPDATE`, baca ulang baris
 - Baris saldo = `pegawai_sisa_cuti (nip, tahun)`; tahun acuan = **tahun pengajuan** (`created_at`, zona waktu aplikasi) [K `L:1579`, `L:3829-3831`] — validasi saat ajukan dan potong saat final memakai baris tahun yang sama (§12 Q-04 konfirmasi).
 - Porsi cuti yang jatuh **di tahun acuan** = `lcTahunIni`; porsi di tahun berikut = `lcTahunDepan` (pecah pada 31-12 / 01-01 memakai hitungan hari kerja §6.3.2). **Hanya dua tahun** yang dikenal: tanggal sebelum 01-01 tahun acuan atau sesudah 31-12 tahun berikutnya → 422 (§6.2.3; keputusan #6 26-10, legacy tidak menangani `L:1591-1610`).
 - Tahun acuan **refund** (§6.3.5) = tahun `created_at` baris yang dihapus, bukan tahun berjalan saat menghapus [V2; legacy `L:1282` memakai `date('Y')` sehingga hapus cuti tahun lalu salah sasaran].
-- `saldoTahunIni = sisa_cuti + sisa_cuti_n1 + sisa_cuti_n2` (≤ 24 karena batas D8); `saldoTahunDepan = MAKS_UTANG − utang_cuti`.
+- `saldoTahunIni = sisa_cuti + sisa_cuti_n1 + sisa_cuti_n2` (≤ 24 karena batas D8); `saldoTahunDepan = MAKS_UTANG − utang_cuti`. **27-10 (v1.3):** baris impor tahun 2026 bisa melampaui batas D8 (N-1 > 6, §14.5) dan dihormati apa adanya — validasi memakai nilai saldo tersimpan, bukan batas D8; batas D8 hanya untuk input Tambah/Ubah saldo dan pembentukan saldo tahun baru.
 - Saldo tidak ada → 422 `errors.lama_cuti` "Saldo cuti anda tidak terdaftar didalam sistem. Silahkan hubungi admin SIMPEG untuk menambahkan saldo cuti tahunan anda." (`L:1655-1658`).
 
 #### 6.3.4 Validasi saat ajukan/ubah (jenis 1) [K `L:1584-1653`]
@@ -482,14 +482,15 @@ Dalam satu transaksi: (1) kunci `pegawai` pemohon `FOR UPDATE`, baca ulang baris
   2. Status 1 dan `lcTahunDepan > 0` → `utang_cuti += lcTahunDepan` (≤ 12).
   3. Status 4 → `sisa_cuti_ditangguhkan += lcTahunIni` (porsi tahun depan tidak menjadi utang) [K `L:3891-3893`].
   4. Hasil tidak boleh negatif; bila kurang (seharusnya tidak terjadi karena §6.3.4 diulang) → 422, transaksi dibatalkan (perbaikan A-07: tidak ada `return` tanpa rollback).
-- **Refund** (D6, hapus cuti status 1/4 jenis 1) = kebalikan tepat: (1) `lcTahunIni` dikembalikan berurutan ke `sisa_cuti` → `sisa_cuti_n1` → `sisa_cuti_n2` dengan batas 12 / 6 / 6 (sisa yang melebihi batas dibuang, total tidak pernah > 24); (2) status 1: `utang_cuti = max(0, utang_cuti − lcTahunDepan)`; (3) status 4: `sisa_cuti_ditangguhkan = max(0, … − lcTahunIni)`. **Tidak ada nilai negatif** (perbaikan A-08). Rumus refund = keputusan PRD [V2] atas D6 → §12 Q-05 konfirmasi.
+- **Refund** (D6, hapus cuti status 1/4 jenis 1) = kebalikan tepat: (1) `lcTahunIni` dikembalikan berurutan ke `sisa_cuti` → `sisa_cuti_n1` → `sisa_cuti_n2` dengan batas ~~12 / 6 / 6 (sisa yang melebihi batas dibuang, total tidak pernah > 24)~~ **per kolom = maks(batas D8, snapshot saldo kolom itu di baris `riwayat_cuti` yang dihapus)** — yaitu `max(12, rc.sisa_cuti)`, `max(6, rc.sisa_cuti_n1)`, `max(6, rc.sisa_cuti_n2)`; sisa yang melebihi batas itu dibuang (**27-10 (v1.3)**, Q-05: data impor 2026 punya N-1 > 6, batas 12/6/6 ketat akan menghanguskan hari; snapshot NULL → batas D8); (2) status 1: `utang_cuti = max(0, utang_cuti − lcTahunDepan)`; (3) status 4: `sisa_cuti_ditangguhkan = max(0, … − lcTahunIni)`. **Tidak ada nilai negatif** (perbaikan A-08). Rumus refund = keputusan PRD [V2] atas D6 → ~~§12 Q-05 konfirmasi~~ §12 Q-05 **diputuskan 27-10**.
+  - Dampak kode (M3): `KuotaCuti::kembalikan()` (tahap 2b, `main` `3fbf08e`) saat ini membatasi 12/6/6 dari `AturanCuti`; M3 menambah parameter batas per kolom dari snapshot `riwayat_cuti` (fungsi tetap murni, tetap SATU algoritma) + kasus K25–K26 §6.3.8. Saldo yang tidak pernah melampaui D8 berperilaku sama seperti sebelumnya (K16–K18 tidak berubah).
 - Seluruh perubahan saldo dicatat `audit_logs` (`update`, before/after).
 
 #### 6.3.6 Kelola saldo (`cuti/saldo`, legacy `sc/add_sc/edit_sc/delete_sc` C:1174-1374, `L:4590-4993`)
 - Daftar per `tahun` (bawaan tahun berjalan; `tahun > tahun ini` → 422), role 3 lingkup; kolom NIP, nama, tahun, `sisa_cuti`, `sisa_cuti_n1`, `sisa_cuti_n2`, `sisa_cuti_ditangguhkan`, `utang_cuti`, jabatan, satker.
 - Tambah: target `1` semua pegawai (dalam lingkup pemanggil — perbaikan anomali cek duplikat lintas lingkup) / `2` pilih pegawai (jenis pegawai 1/6); `tahun`, `sisa_cuti`, `sisa_cuti_n1`, `sisa_cuti_n2`, `utang_cuti` wajib, `sisa_cuti_ditangguhkan` opsional; tolak bila pegawai sudah punya baris tahun itu (`errors.nip`). [V2 D8] batas `sisa_cuti ≤ 12`, `n1 ≤ 6`, `n2 ≤ 6`, `utang ≤ 12`, semua ≥ 0 → 422 per kolom.
 - Ubah: kolom saldo saja; hapus: fisik + audit [K].
-- **Pembentukan saldo tahun baru (Q-02, diputuskan 27-10-2026).** Rumus = `calculate_yearly_sc_2` (`Cron.php:2534-2663`) dengan satu perapian (lantai N ≥ 0). Alasan: hanya cron ini yang konsisten dengan D8 (12/6/6); `calculate_yearly_sc` (`Cron.php:2349-2532`, helper `calculateSC` 2252-2347) menghasilkan N-1 sampai 12 dan N-2 selalu 0. Cron mana yang aktif di produksi tidak dapat dipastikan dari kode (tidak ada pemanggil di pohon legacy); kueri pembanding atas data `pegawai_sisa_cuti` legacy dikerjakan DBA sebagai bahan uji paritas, bukan prasyarat implementasi.
+- **Pembentukan saldo tahun baru (Q-02, diputuskan 27-10-2026).** Rumus = `calculate_yearly_sc_2` (`Cron.php:2534-2663`) dengan satu perapian (lantai N ≥ 0). Alasan: hanya cron ini yang konsisten dengan D8 (12/6/6); `calculate_yearly_sc` (`Cron.php:2349-2532`, helper `calculateSC` 2252-2347) menghasilkan N-1 sampai 12 dan N-2 selalu 0. Cron mana yang aktif di produksi tidak dapat dipastikan dari kode (tidak ada pemanggil di pohon legacy); kueri pembanding atas data `pegawai_sisa_cuti` legacy dikerjakan DBA sebagai bahan uji paritas, bukan prasyarat implementasi. **27-10 (v1.3), hasil kueri DBA (§14.5):** data 2021–2025 cocok dengan `_2` (N-1 ≤ 6, N-2 terisi), sedangkan saldo **2026** dibentuk sistem pada 03-01 dan 05-01-2026 dengan pola `calculate_yearly_sc` versi 1 (303 baris N-1 > 6; 895 pegawai aktif TMT 2025 tanpa baris karena syarat masa kerja). Rumus Q-02 di atas **tetap** (Horii, 27-10) — data menguatkan alasan "tanpa syarat masa kerja".
   - **Fungsi murni** `SaldoTahunanCuti::bentuk(SaldoCuti $tahunLalu, AturanCuti $aturan): SaldoCuti` di `backend/app/Libraries/Layanan/Cuti/SaldoTahunanCuti.php` (masuk pemindai kemurnian). Rumus (semua batas dari `AturanCuti`):
     ```
     pool  = min(12, ditangguhkan_lalu + min(6, N_lalu) + min(6, N1_lalu))      -- N-2 tahun lalu kedaluwarsa
@@ -498,7 +499,7 @@ Dalam satu transaksi: (1) kunci `pegawai` pemohon `FOR UPDATE`, baca ulang baris
     ```
     Batas D8 terpenuhi secara konstruksi (N ≤ 12, N-1 ≤ 6, N-2 ≤ 6, total ≤ 24). Perilaku [K] yang diwarisi: *pool* menghilangkan asal-usul N-1/N-2 (contoh N lalu = 2, N-1 lalu = 6 → N-1 = 6, N-2 = 2); varian "ikut asal-usul" bukan bagian Fase 4 (tindak lanjut bila produk meminta).
   - **Command** `php spark cuti:saldo-tahunan {tahun} [--dry-run] [--nip=<nip>]` di `backend/app/Commands/CutiSaldoTahunan.php`. Populasi: `pegawai.status = 1 AND id_jenis_pegawai IN (1, 6)`. **Tanpa syarat masa kerja ≥ 12 bulan** (mengubah catatan 18-10; kelayakan cuti tahunan sudah digerbang saat pengajuan, §6.2.2, sedangkan filter legacy v1 membuat pegawai yang genap setahun di tengah tahun tidak punya saldo sampai Januari). Idempoten: NIP yang sudah punya baris `(nip, tahun)` dilewati; baris tahun lalu tidak ada → pool 0 (N = 12). `--dry-run` hanya mencetak ringkasan (jumlah dibuat/dilewati, distribusi N-1/N-2) tanpa menulis. Penulisan lewat query builder + satu baris `audit_logs` ringkasan per eksekusi (event `cuti.saldo_tahunan`, aktor sistem).
-  - **Jadwal bukan bagian kode**: dicatat di runbook deploy/cutover (mis. `0 1 1 1 *` dan eksekusi ulang berkala yang idempoten supaya pegawai yang masuk di tengah tahun mendapat baris). Sebelum cutover, saldo tahun berjalan dibentuk cron legacy dan ikut impor; command dipakai sekali saat cutover untuk menambal pegawai tanpa baris.
+  - **Jadwal bukan bagian kode**: dicatat di runbook deploy/cutover (mis. `0 1 1 1 *` dan eksekusi ulang berkala yang idempoten supaya pegawai yang masuk di tengah tahun mendapat baris). Sebelum cutover, saldo tahun berjalan dibentuk cron legacy dan ikut impor; ~~command dipakai sekali saat cutover untuk menambal pegawai tanpa baris.~~ **27-10 (v1.3, Horii):** saat cutover, saldo **tahun berjalan (2026) TIDAK dibuat otomatis** untuk pegawai tanpa baris (895 pegawai TMT 2025, §14.5) — ikut kondisi legacy. Runbook cutover menjalankan `php spark cuti:saldo-tahunan 2026 --dry-run` dan menyerahkan ringkasannya ke Biro SDM sebagai laporan; pengisian dilakukan manual lewat Tambah saldo bila Biro SDM meminta. Eksekusi tulis terjadwal (termasuk eksekusi ulang berkala) baru berlaku mulai tahun **2027**; runbook tidak menjadwalkan eksekusi tulis untuk tahun 2026.
   - **Test:** `tests/Layanan/Kuota/SaldoTahunanCutiTest.php` (murni: boundary pool 5/6/7/12/13, utang 0/6/12/> 12, tanpa baris tahun lalu, ditangguhkan, invarian total ≤ 24 pada himpunan nilai luas, paritas terhadap `_2` untuk tabel nilai hasil hitung tangan) dan `tests/Layanan/Kuota/CutiSaldoTahunanCommandTest.php` (DB: idempoten, `--dry-run` tidak menulis, hanya jenis pegawai 1/6 aktif, pegawai nonaktif dilewati).
 
 #### 6.3.7 Kalkulator real-time `POST cuti/hitung-lama`
@@ -533,6 +534,8 @@ Saldo awal `(N, N-1, N-2, utang, ditangguhkan)`; semua cuti Tahunan di tahun acu
 | K22 | 3 hari kerja dengan 1 hari libur status 1 di tengah | — | — | `lama_cuti = 2` | — |
 | K23 | hari libur status 2/10 di rentang | — | — | tidak dikurangi | — |
 | K24 | rentang Jumat–Senin | — | — | `lama_cuti = 2` (akhir pekan tidak dihitung) | — |
+| K25 | (v1.3) refund saldo impor: snapshot `riwayat_cuti` (12,9,0), saldo sesudah potong (12,4,0), lama 5 | — | hapus status 1 | — | (12,9,0,0,0) — batas N-1 = maks(6, 9) = 9, tidak ada hari hangus |
+| K26 | (v1.3) refund dengan snapshot NULL (data impor lama), saldo (12,5,0,0,0), lama 3 | — | hapus status 1 | — | (12,6,2,0,0) — batas D8 berlaku: N-1 penuh di 6, sisa 2 ke N-2 |
 
 #### 6.3.9 AC C-03 (QASMTASK-066)
 - **AC-03.1** N = 12: pegawai tanpa sisa bawaan dapat mengajukan tepat 12 hari kerja dan ditolak pada 13 (K6/K7).
@@ -1188,7 +1191,7 @@ Aturan setiap milestone: (a) branch baru dari **`origin/main` terbaru** (`git fe
 
 Isi laporan **M0** (wajib sebelum M1): ringkasan pemahaman per task (≤ 3 baris), daftar berkas repo yang akan dipakai ulang (dengan path), konfirmasi tidak ada migration/kode Modul C di `main` selain README, jawaban/konfirmasi yang dibutuhkan dari §12, risiko yang terlihat.
 
-Isi tambahan laporan **M3** (v1.2): hasil kueri audit approver (§6.4.10) — jumlah pejabat AL/PyB menurut role, tanpa akun, akun nonaktif/terhapus, dan jumlah pegawai eselon I; hasil kueri pembanding saldo legacy dari DBA (bahan uji paritas `SaldoTahunanCutiTest`); daftar berkas Auth yang disentuh (hanya `AuthService.php` aditif + `Config/Events.php`) beserta bukti `LoginEventTest` hijau.
+Isi tambahan laporan **M3** (v1.2): hasil kueri audit approver (§6.4.10) — jumlah pejabat AL/PyB menurut role, tanpa akun, akun nonaktif/terhapus, dan jumlah pegawai eselon I; hasil kueri pembanding saldo legacy dari DBA (bahan uji paritas `SaldoTahunanCutiTest`; **sudah tersedia 27-10, §14.5** — laporan M3 cukup merujuk dan menyertakan hasil `--dry-run` 2026 pada data gladi impor); daftar berkas Auth yang disentuh (hanya `AuthService.php` aditif + `Config/Events.php`) beserta bukti `LoginEventTest` hijau.
 
 ---
 
@@ -1253,6 +1256,8 @@ Blocker / pertanyaan terbuka: <daftar + rujukan §12>
 
 ## 12. Pertanyaan terbuka yang TERSISA
 
+> **Status 27-10-2026 (v1.3):** hasil kueri DBA saldo cuti legacy masuk (§14.5); **Q-05** (◻) diputuskan ulang oleh Horii — batas refund per kolom = maks(D8, snapshot `riwayat_cuti`), saldo impor 2026 tidak dinormalisasi; Q-02 tetap, ditambah keputusan cutover saldo 2026 (§6.3.6). Teks status di bawah tetap berlaku untuk butir lain.
+
 > **Status 27-10-2026:** kelima butir ⛔ **Q-01, Q-02, Q-06, Q-07, Q-18** **diputuskan** oleh Horii berdasarkan riset read-only reviewer CR (semua rekomendasi riset disetujui); keputusannya ada di kolom "Saran default" masing-masing (dan spesifikasinya di §6.3.6, §6.4.1, §6.4.7, §6.4.10, §6.11.8). Hanya **Q-20** (DBV-022) yang masih ⛔. Teks status 18-10 dan 26-10 di bawah yang menyebut Q-01/Q-02/Q-06/Q-07/Q-18 "tetap titik tunggu" sudah digantikan oleh status ini.
 
 > **Status 26-10-2026:** seluruh butir **◻** = **disetujui default 26-10** oleh Horii (riset take over), dengan penyesuaian **Q-08, Q-10, Q-21, Q-23** di kolom "Saran default" (teks tercoret = versi v1.0). Butir ⛔ (Q-01, Q-02, Q-06, Q-07, Q-18, Q-20) tetap titik tunggu; temuan legacy pendukung di §14.
@@ -1264,10 +1269,10 @@ Aturan: butir **⛔** WAJIB dijawab reviewer CR (atau pihak yang disebut) **sebe
 | ID | Sifat | Pertanyaan | Saran default | Batas |
 |---|---|---|---|---|
 | Q-01 | ✔ 27-10 | Approver (AL/PyB) yang akunnya role **4/5/8**, tanpa akun, nonaktif, atau terhapus tidak bisa memproses → pengajuan berpotensi tertahan. Legacy: hanya role 2 yang bisa approve (A-14) | **Diputuskan 27-10 (opsi B):** route tetap 1,2,3,6,7; **role 1 memproses atas nama** hanya bila approver tahap aktif tak terjangkau (alasan wajib ≤ 255 byte, audit, notifikasi ke role 1); `bisa_memproses` di `GET cuti/opsi` sebagai informasi (bukan 422). Spesifikasi §6.4.10. Kueri audit dijalankan reviewer pada data impor dan masuk laporan M3 | Diputuskan 27-10 |
-| Q-02 | ✔ 27-10 | Pembentukan saldo `pegawai_sisa_cuti` tahun baru: dua cron legacy berbeda (`Cron.php:2349-2532` vs `:2534-2663`); apakah dan bagaimana dibuat di Fase 4 | **Diputuskan 27-10:** rumus `calculate_yearly_sc_2` + lantai N ≥ 0; `php spark cuti:saldo-tahunan {tahun} [--dry-run]`; **tanpa** syarat masa kerja ≥ 12 bulan (mengubah catatan 18-10; kelayakan digerbang saat pengajuan); idempoten; jadwal di runbook. Spesifikasi §6.3.6 | Diputuskan 27-10 |
+| Q-02 | ✔ 27-10 | Pembentukan saldo `pegawai_sisa_cuti` tahun baru: dua cron legacy berbeda (`Cron.php:2349-2532` vs `:2534-2663`); apakah dan bagaimana dibuat di Fase 4 | **Diputuskan 27-10:** rumus `calculate_yearly_sc_2` + lantai N ≥ 0; `php spark cuti:saldo-tahunan {tahun} [--dry-run]`; **tanpa** syarat masa kerja ≥ 12 bulan (mengubah catatan 18-10; kelayakan digerbang saat pengajuan); idempoten; jadwal di runbook. Spesifikasi §6.3.6. **Tambahan 27-10 (v1.3, Horii)** setelah hasil kueri DBA (§14.5): rumus tetap; saat cutover saldo 2026 **tidak** dibuat otomatis untuk pegawai tanpa baris — hanya `--dry-run` sebagai laporan ke Biro SDM, eksekusi tulis terjadwal mulai 2027 | Diputuskan 27-10 |
 | Q-03 | ◻ | Nilai turunan dihitung server walau legacy menerima dari klien: `lama_cuti` (A-03, D19), `lama_tahun` TB, snapshot pemohon cuti/TB. D19 menyatakan A-03 "dibiarkan", tetapi D8/D9 mensyaratkan satu fungsi hitung | Server menghitung & menyimpan; field klien diabaikan (bukan penolakan → bukan penjaga tambahan). `mker` PMK tetap dari klien (P-4, D19) | Review M0 |
 | Q-04 | ◻ | Tahun acuan saldo: legacy validasi memakai tahun berjalan (`L:1579`), potong memakai tahun `created_at` (`L:3830`), form edit tahun `tgl_mulai` | Tahun `created_at` (= tahun berjalan saat ajukan) untuk validasi & potong; porsi tahun berikut → utang | Review M0 |
-| Q-05 | ◻ | Rumus refund D6 (legacy menormalisasi dan bisa negatif) | §6.3.5: kembalikan ke N → N-1 → N-2 dengan batas 12/6/6, utang/ditangguhkan dikurangi tanpa negatif; status 4 juga mengembalikan saldo yang dipotong | Review M0 |
+| Q-05 | ✔ 27-10 | Rumus refund D6 (legacy menormalisasi dan bisa negatif) | ~~§6.3.5: kembalikan ke N → N-1 → N-2 dengan batas 12/6/6, utang/ditangguhkan dikurangi tanpa negatif; status 4 juga mengembalikan saldo yang dipotong~~ (default 18-10/26-10). **Diputuskan 27-10 (v1.3, Horii)** setelah hasil kueri DBA (§14.5): kembalikan ke N → N-1 → N-2 dengan batas per kolom **= maks(batas D8 12/6/6, snapshot saldo di `riwayat_cuti`)**; utang/ditangguhkan dikurangi tanpa negatif; status 4 juga mengembalikan saldo yang dipotong; saldo impor 2026 **tidak** dinormalisasi. Spesifikasi §6.3.5, kasus K25–K26 | Diputuskan 27-10 |
 | Q-06 | ✔ 27-10 | (a) Sumber v2 nilai `web_config` legacy (`nama_menteri`, `jabatan_menteri_full`, `id_*_kepegawaian`, `id_jabatan_kabiro_kepegawaian`, `pdf_header_*`). (b) Pegawai **eselon I**: AL & PyB = Menteri tanpa NIP → jalan buntu | **Diputuskan 27-10:** (a) **A1** — baca lewat `WebConfigService::value()`; semua key sudah ada di `Config\WebConfig`; **tidak ada** `Config\Layanan`/`.env`/key baru (§6.4.1). (b) **O1** — pengajuan eselon I status 0 diselesaikan role 1 atas nama (T14, alasan wajib, audit, notifikasi), satu mekanisme dengan Q-01 (§6.4.10) | Diputuskan 27-10 |
 | Q-07 | ✔ 27-10 | Reset `skip_al`/`skip_pyb` "saat login berikutnya" membutuhkan kait di modul Auth (tidak ada event login di v2) | **Diputuskan 27-10 (opsi A):** event `auth.login` aditif di `AuthService::login()` (try/catch, tidak menghalangi login) + listener Layanan `ResetTundaCuti` tanpa audit; perubahan Auth aditif disetujui; test kontrak `LoginEventTest`. Spesifikasi §6.4.7 | Diputuskan 27-10 |
 | Q-08 | ◻ | Role 3 menambah aturan `pa_layanan` untuk unit pemohon lain: dropdown legacy dibatasi unit sendiri (`L:4170-4172`) tetapi server menyimpan POST apa adanya (`L:4208-4240, 4479`) | **26-10:** `id_unit_pemohon` wajib = unit pemanggil (422) — meniru pembatasan UI legacy, mencegah baris yatim; ubah/hapus tetap dibatasi unit sendiri [K]. ~~Ikut legacy tanpa penjaga tambahan~~ | Disetujui 26-10 |
@@ -1556,3 +1561,26 @@ Konteks: riset read-only reviewer CR atas Q-01, Q-02, Q-06, Q-07, Q-18 (laporan 
 | — | Test baru: `CutiAtasNamaTest`, `CutiApproverTerjangkauTest`, `SaldoTahunanCutiTest`, `CutiSaldoTahunanCommandTest`, `LoginEventTest` | §6.12.1 |
 
 Rujukan legacy v1.2 (berkas:baris, diverifikasi 27-10): `Cron.php:2252-2347, 2349-2532, 2534-2663`; `MY_Controller.php:331, 363, 395-398, 419, 433-436, 448-453`; `controllers/User.php:398`; `Cuti.php:573, 653, 777, 846, 924`; `function_helper.php:459, 573, 1700`; `L_cuti.php:1741-1745, 1763-1766`.
+
+### 14.5 v1.3 (27-10-2026) — hasil kueri DBA saldo cuti & keputusan Q-05/cutover
+
+Konteks: kueri baca-saja kartu "Pertanyaan DBA (Fase 4) — data saldo cuti legacy (Q-02)" dijalankan pada salinan basis data produksi legacy (struktur sama dengan D1; salinan lokal yang tidak memuat kolom `sisa_cuti_n1`/`sisa_cuti_n2` tidak dipakai). Basis kode `origin/main` = `1213805`. Keputusan v1.2 **tidak dihapus**; teks yang diganti dicoret dan keputusan baru ditandai "27-10 (v1.3)".
+
+Hasil (agregat, tanpa data pribadi):
+
+| Tahun | Baris | N-2 > 0 | N-1 > 6 | Pola |
+|---|---|---|---|---|
+| 2017–2020 | 1 – 2.109 | 0 | 0 | sebelum N-2 dipakai |
+| 2021–2025 | 1.999 – 2.307 | 81 – 822 | 0 | `calculate_yearly_sc_2` |
+| 2026 | 1.836 | 26 | **303** | `calculate_yearly_sc` versi 1 |
+
+- Seluruh 303 baris 2026 dengan N-1 > 6 dibuat sistem (`updated_by` 0): 297 dari 1.503 baris pada 03-01-2026 dan 6 dari 237 baris pada 05-01-2026. ±96 baris input admin tidak ada yang > 6.
+- **895** pegawai aktif jenis 1/6 tanpa baris 2026 = 280 PNS TMT 2025 + 613 PPPK TMT 2025 + 2 PNS TMT kosong; semuanya juga tanpa baris 2025 → tersaring syarat masa kerja ≥ 12 bulan cron versi 1.
+
+| # | Keputusan (Horii, 27-10) | Tempat di PRD |
+|---|---|---|
+| 1 | Q-02: rumus `calculate_yearly_sc_2` + N ≥ 0 **tetap**, tanpa syarat masa kerja; batas D8 12/6/6 dipertahankan (cron versi 1 yang dipakai Januari 2026 melanggarnya) | §6.3.6, §12 Q-02 |
+| 2 | Q-05: refund dibatasi per kolom = maks(batas D8, snapshot saldo `riwayat_cuti`); saldo impor 2026 tidak dinormalisasi; validasi pengajuan memakai saldo tersimpan | §6.3.3, §6.3.5, §6.3.8 K25–K26, §12 Q-05, DQ-23 |
+| 3 | Cutover: saldo 2026 untuk pegawai tanpa baris **tidak** dibuat otomatis; `--dry-run` 2026 sebagai laporan ke Biro SDM, pengisian manual bila diminta; eksekusi tulis terjadwal mulai 2027 | §6.3.6, §12 Q-02 |
+| 4 | Skema DBV-022 (PR #29) tidak berubah: CHECK saldo hanya ≥ 0, batas atas D8 ditegakkan aplikasi | DQ-23 |
+| — | Dampak kode M3: `KuotaCuti::kembalikan()` menerima batas per kolom dari snapshot (tetap murni, SATU algoritma) | §6.3.5 |
