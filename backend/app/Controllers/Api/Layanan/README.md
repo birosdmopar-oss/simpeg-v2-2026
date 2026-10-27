@@ -27,3 +27,19 @@ terlihat → 403 bukan pelaku → 422 (`errors.status` untuk status/tanggal yang
 
 Contoh proses: `POST api/v1/tb/12/process` body `{"aksi": "tolak", "reason_note": "Berkas BAN PT belum ada"}` → 200 detail
 (`status` 2, `label_status` "Ditolak"). Galat: `{"status": "error", "message": "Validasi gagal.", "errors": {"reason_note": ["Alasan ditolak tidak boleh kosong."]}}`.
+
+## Izin Belajar — C-08 (MAKE-024 M5, PRD Fase 4 §5.3, §6.8)
+
+Route: `Config/RoutesLayananStudi.php`, filter `jwt` + `role:1,2,3,7` (`IbService::ROLE_ROUTE`); **role 6 → 403** (DoD 071-3),
+role 4/5/8 → 403. Pola sama dengan TB kecuali yang disebut di bawah.
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET ib?mode=saya\|pic\|admin&status=&search=&page=&per_page=` | 1,2,3,7 | Seperti TB; `pic` = PIC IB aktif (`petugas_layanan` jenis 4), tanpa batas unit |
+| `GET ib/opsi?nip=` | 1,2,3,7 | Seperti TB; `slot_berkas` = `file_sp`, `file_1`, `file_2`; `berkas_wajib` selalu `true` |
+| `POST ib` (multipart) | 1,2,3,7 | 201 + detail. Role 2/7 diri sendiri; role 1 & 3 `nip` (3 lingkup) — input admin berfungsi dengan berkas (IB-01). Status **selalu 0** (`status` ≠ 0 dari role 1 → 422 `errors.status`). Tiga slot wajib **semua role** termasuk role 1 [K] |
+| `GET ib/{id}` | 1,2,3,7 | Pemilik, PIC IB aktif, role 1, role 3 lingkup; lainnya 404. Seperti TB tanpa `status_penuh`/`perpanjangan[]`; `surat[]` = Surat IB kode 50 |
+| `PUT ib/{id}`, `DELETE ib/{id}` | 1,2,3,7 | Aturan sama TB (pemilik status 0 & `tgl_mulai > hari ini`; role 3 status 0 + lingkup; role 1 kecuali 2 / hapus semua), tanpa ubah status oleh admin. Hapus fisik + audit + berkas |
+| `POST ib/{id}/process` | 1,2,3,7 | PIC IB aktif; status 0. `{aksi: setujui\|tolak, reason_note, no_sk, tgl_sk, ds_ib, no_ds_ib, tgl_ds_ib?, perihal_ds_ib?}`. Setujui → **Surat IB PDF dibuat otomatis** (`Views/pdf/surat_ib.php`, penanda tangan Kabiro) dan disimpan kode 50 dalam transaksi yang sama; tanpa efek pegawai/presensi/tukin |
+| `GET ib/{id}/lampiran/{id_attachment}` | 1,2,3,7 | Hak lihat detail; lampiran kode 49/50 milik baris itu, selain itu 404 |
+| `GET ib/{id}/surat` | 1,2,3,7 | Hak lihat detail; Surat IB tersimpan terbaru (hanya status 1), selain itu 404 |

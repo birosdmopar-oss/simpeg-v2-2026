@@ -122,6 +122,8 @@ Service ber-DB membungkus kelas murni di atas; DILARANG ada aturan tumpang tindi
 | `Tb/PerpanjanganTbService` | C-07 perpanjangan role 1; ringkasan `tgl_*_perpan` = `PerpanjanganTb::ringkasan` (pengganti trigger `riwayat_tb_perpan_af*`) |
 | `Tb/StatusTugasBelajar` | implementasi `StatusTugasBelajarInterface` (`Config\Services::statusTugasBelajar()`, Fase 5 D-06) — dua kueri lalu `BebasPresensiTb` |
 | `Tb/SuratTbService` | SK unggahan (kode 47) atau render `Views/pdf/surat_tb.php` |
+| `Ib/IbService`, `Ib/IbApprovalService` | C-08; status selalu 0, tiga slot wajib semua role, efek final = surat |
+| `Ib/SuratIbService` | render `Views/pdf/surat_ib.php` + simpan kode 50 di transaksi approval (berkas buatan server lewat jalur validasi unggahan yang sama, `UploadedFile` atas berkas sementara), unduh surat terbaru |
 
 Kelas murni baru M5: `Studi/BerkasStudi` (slot berkas & kode `jenis_rwy` 46–50, `slotKosong()`), `Studi/TampilanStudi`
 (badge/stepper §6.11.4). Penjaga kemurnian (`LayananStudiPmkMurniTest`) mengecualikan berkas lapisan DB di `Tb/`/`Pmk/`

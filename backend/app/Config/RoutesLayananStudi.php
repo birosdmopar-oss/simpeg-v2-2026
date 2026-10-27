@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Constants\Role;
+use App\Libraries\Layanan\Ib\IbService;
 use App\Libraries\Layanan\Tb\TbService;
 use CodeIgniter\Router\RouteCollection;
 
@@ -33,4 +34,16 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->post('tb/(:num)/perpanjangan', 'TbController::tambahPerpanjangan/$1', $tb);
     $routes->get('tb/(:num)/lampiran/(:num)', 'TbController::lampiran/$1/$2', $tb);
     $routes->get('tb/(:num)/surat', 'TbController::surat/$1', $tb);
+
+    // C-08 Izin Belajar — role 1, 2, 3, 7 (role 6 → 403, DoD 071-3).
+    $ib = ['filter' => Role::filter(...IbService::ROLE_ROUTE)];
+    $routes->get('ib', 'IbController::index', $ib);
+    $routes->get('ib/opsi', 'IbController::opsi', $ib);
+    $routes->post('ib', 'IbController::create', $ib);
+    $routes->get('ib/(:num)', 'IbController::show/$1', $ib);
+    $routes->put('ib/(:num)', 'IbController::update/$1', $ib);
+    $routes->delete('ib/(:num)', 'IbController::delete/$1', $ib);
+    $routes->post('ib/(:num)/process', 'IbController::process/$1', $ib);
+    $routes->get('ib/(:num)/lampiran/(:num)', 'IbController::lampiran/$1/$2', $ib);
+    $routes->get('ib/(:num)/surat', 'IbController::surat/$1', $ib);
 });

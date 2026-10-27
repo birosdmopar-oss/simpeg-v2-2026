@@ -12,6 +12,7 @@ use App\Libraries\Kepegawaian\Pegawai\PegawaiService;
 use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\JenisRiwayat;
 use App\Libraries\Kepegawaian\Struktur\PenugasanService;
+use App\Libraries\Layanan\Ib\IbService;
 use App\Libraries\Layanan\Tb\TbService;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\HariLiburService;
@@ -53,7 +54,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb|ib)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -95,6 +96,17 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/tb/perpanjangan/([0-9]+)'   => [1, 2, 3, 6],
             'GET api/v1/tb/([0-9]+)/lampiran/([0-9]+)' => [1, 2, 3, 6],
             'GET api/v1/tb/([0-9]+)/surat'             => [1, 2, 3, 6],
+            // C-08 Izin Belajar (MAKE-024 M5): PRD §5.3, Matriks `hr/rwy/ib/*` = 1, 2, 3, 7 (role 6 → 403, DoD 071-3)
+            // (IbService::ROLE_ROUTE).
+            'GET api/v1/ib'                            => [1, 2, 3, 7],
+            'GET api/v1/ib/opsi'                       => [1, 2, 3, 7],
+            'POST api/v1/ib'                           => [1, 2, 3, 7],
+            'GET api/v1/ib/([0-9]+)'                   => [1, 2, 3, 7],
+            'PUT api/v1/ib/([0-9]+)'                   => [1, 2, 3, 7],
+            'DELETE api/v1/ib/([0-9]+)'                => [1, 2, 3, 7],
+            'POST api/v1/ib/([0-9]+)/process'          => [1, 2, 3, 7],
+            'GET api/v1/ib/([0-9]+)/lampiran/([0-9]+)' => [1, 2, 3, 7],
+            'GET api/v1/ib/([0-9]+)/surat'             => [1, 2, 3, 7],
             'GET api/v1/dokumen/([^/]+)'               => [1, 3, 4, 5, 8],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
@@ -424,6 +436,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
         // hr/rwy/lkh/* = 1, 2, 3, 6, 7.
         $this->assertSame([1, 2, 3, 6, 7], LkhService::ROLE_LKH);
         $this->assertSame([1, 2, 3, 6], TbService::ROLE_ROUTE);
+        $this->assertSame([1, 2, 3, 7], IbService::ROLE_ROUTE);
         // hr/rwy/konket/* = 1, 2, 3, 6, 7 (tulis); lihat + pengamat 4, 5 (legacy list_ad/detail, lihat saja).
         $this->assertSame([1, 2, 3, 6, 7], KonketService::ROLE_TULIS);
         $this->assertSame([1, 2, 3, 4, 5, 6, 7], KonketService::ROLE_LIHAT);

@@ -17,7 +17,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 | C-05 Penerbitan surat cuti e-sign (mock) | M4 | MAKE-023 | TODO | Menunggu M3 merged |
 | C-06 Notifikasi approval | M4 | MAKE-023 | TODO | ⛔ DILARANG mulai sebelum DBV-022 disetujui (PRD §6.1.4) |
 | C-07 Tugas Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 branch `fase4/make-024-tb-ib-pmk-m5`: inti TB (CRUD, proses PIC, perpanjangan, `bebasPresensiPenuh`, surat) + route + kontrak + 6 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
-| C-08 Izin Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 menyusul TB di branch yang sama |
+| C-08 Izin Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti IB (CRUD, proses PIC, Surat IB otomatis kode 50) + route + kontrak + 4 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-09 PMK | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 menyusul IB di branch yang sama |
 | C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | TODO | Menunggu M3 & M5 merged |
 | C-11 Frontend Modul Layanan | M7 | MAKE-026 | TODO | Per halaman setelah backend-nya merged; `ACTIVE_PHASE = 4` hanya di commit penutup |
@@ -192,4 +192,10 @@ model `Models/Layanan/{LayananModel, RiwayatTbModel, RiwayatTbPerpanModel, Riway
 `tests/Layanan/Tb/{TbCrudTest, TbApprovalTest, TbPerpanjanganTest, BebasPresensiPenuhTest, TbRoleTest, TbSingleEndNodeTest}`
 (49 test). Dokumentasi endpoint: `Controllers/Api/Layanan/README.md`; keputusan coder: `Libraries/Layanan/README.md`.
 
-**Belum jalan.** C-08 IB, C-09 PMK, gate penuh, CI.
+**Sudah jalan — C-07 TB:** SHA `944f358`, CI run 40460415030 hijau.
+
+**Sudah jalan — C-08 Izin Belajar.** Route (9) + baris kontrak (prefiks `ib`, `IbService::ROLE_ROUTE`); `IbController`;
+`Ib/{IbService, IbApprovalService, SuratIbService}`; view `Views/pdf/surat_ib.php`. Test `tests/Layanan/Ib/{IbCrudTest,
+IbApprovalTest, IbRoleTest, IbSingleEndNodeTest}` (20 test).
+
+**Belum jalan.** C-09 PMK, gate penuh.
