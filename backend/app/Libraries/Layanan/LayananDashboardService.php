@@ -98,6 +98,10 @@ class LayananDashboardService
         $perPage = $q->perPage(20, 100);
         $status  = $this->filterStatus($q);
 
+        if (is_int($status) && ! $q->filled('jenis')) {
+            throw new ValidationException(ListQuery::INVALID_MESSAGE, ['status' => ['Filter status kode memerlukan jenis layanan.']]);
+        }
+
         foreach (['id_unit', 'id_satker'] as $k) {
             if ($q->filled($k) && ! ctype_digit($q->string($k))) {
                 throw new ValidationException(ListQuery::INVALID_MESSAGE, [$k => ['Harus berupa ID angka.']]);

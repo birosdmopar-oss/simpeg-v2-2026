@@ -133,6 +133,24 @@ final class LayananStatusRoleTest extends DatabaseTestCase
         }
     }
 
+    public function testDetailModulTetapMenolakRole4Dan5(): void
+    {
+        $jalur = [
+            'api/v1/cuti/' . $this->sisipCuti($this->luar),
+            'api/v1/tb/' . $this->sisipStudi('tb', $this->luar),
+            'api/v1/ib/' . $this->sisipStudi('ib', $this->luar),
+            'api/v1/pmk/pengajuan/' . $this->sisipPmk($this->luar),
+        ];
+
+        foreach ([Role::ADMIN_VIEW_ESELON1, Role::MENTERI] as $role) {
+            [$nip] = $this->aktorStudi($role);
+
+            foreach ($jalur as $path) {
+                $this->sebagai($nip)->get($path)->assertStatus(403);
+            }
+        }
+    }
+
     public function testRole8DitolakPadaSemuaRouteLayanan(): void
     {
         [$pimpinan] = $this->aktorStudi(Role::PIMPINAN);

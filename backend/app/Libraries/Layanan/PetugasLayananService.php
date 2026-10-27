@@ -52,6 +52,13 @@ class PetugasLayananService
 
     public const PESAN_DUPLIKAT = 'Petugas sudah terdaftar untuk layanan ini.';
 
+    /** Batas hasil & panjang kata kunci `GET layanan/petugas/kandidat` (pencarian di server). */
+    public const KANDIDAT_MAKS = 50;
+
+    public const KANDIDAT_SEARCH_MAKS = 100;
+
+    public const PERINGATAN_SATKER_KOSONG = 'Satker kepegawaian belum diatur di Web Config; PIC belum dapat ditunjuk.';
+
     private const JENIS_PEGAWAI_PNS = 1;
 
     private const STATUS_DIHAPUS = 10;
@@ -205,6 +212,46 @@ class PetugasLayananService
         return ['deleted' => true, 'soft_delete' => false];
     }
 
+    /**
+     * Kandidat PIC (`GET layanan/petugas/kandidat`, role 1) — [V2] gap PRD §5.5; legacy memuat pilihan di form
+     * (`L_layanan.php` `form_off`) [K]: pegawai `status = 1`, `id_jenis_pegawai = 1`, `pmj.id_satker` = satker kepegawaian,
+     * urut nama, maksimal KANDIDAT_MAKS baris. Satker kosong → `items: []` + `peringatan`.
+     *
+     * @param array<string, mixed> $query
+     *
+     * @return array{items: list<array{nip: string, nama: string}>, peringatan: string|null}
+     */
+    public function kandidat(AuthContext $auth, array $query): array
+    {
+        $this->wajibAdmin($auth);
+
+        $q = ListQuery::from($query, ['search']);
+
+        if (mb_strlen($q->string('search')) > self::KANDIDAT_SEARCH_MAKS) {
+            throw new ValidationException(ListQuery::INVALID_MESSAGE, ['search' => ['Kata kunci maksimal ' . self::KANDIDAT_SEARCH_MAKS . ' karakter.']]);
+        }
+
+        $satker = $this->satkerKepegawaian();
+
+        if ($satker === null) {
+            return ['items' => [], 'peringatan' => self::PERINGATAN_SATKER_KOSONG];
+        }
+
+        $b = $this->kueriKandidat($satker)->select('p.nip, p.glr_awal, p.nama, p.glr_akhir');
+
+        if ($q->filled('search')) {
+            $like = ListQuery::likeLiteral($this->db(), $q->string('search'));
+            $b->groupStart()->like('p.nama', $like, 'both', null, true)->orLike('p.nip', $like, 'both', null, true)->groupEnd();
+        }
+
+        $rows = $b->orderBy('p.nama')->orderBy('p.nip')->limit(self::KANDIDAT_MAKS)->get()->getResultArray();
+
+        return [
+            'items'      => array_map(static fn (array $r): array => ['nip' => (string) $r['nip'], 'nama' => StrukturService::namaGelar($r['glr_awal'], (string) $r['nama'], $r['glr_akhir'])], $rows),
+            'peringatan' => null,
+        ];
+    }
+
     // ------------------------------------------------------------------------------------------------------------
 
     /**
@@ -265,19 +312,31 @@ class PetugasLayananService
 
     private function galatKandidat(string $nip): ?string
     {
-        $satker = service('webConfigService')->value('id_satker_kepegawaian');
+        $satker = $this->satkerKepegawaian();
 
-        if ($satker === null || $satker === '' || ! ctype_digit((string) $satker)) {
-            return 'Satker kepegawaian belum diatur di Web Config; PIC belum dapat ditunjuk.';
+        if ($satker === null) {
+            return self::PERINGATAN_SATKER_KOSONG;
         }
 
-        $ada = $this->db()->table('pegawai p')
-            ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = p.nip', 'inner')
-            ->where('p.nip', $nip)->where('p.status', 1)->where('p.id_jenis_pegawai', self::JENIS_PEGAWAI_PNS)
-            ->where('pmj.id_satker', (int) $satker)
-            ->countAllResults();
+        return $this->kueriKandidat($satker)->where('p.nip', $nip)->countAllResults() > 0 ? null : 'Petugas harus PNS aktif di satker kepegawaian.';
+    }
 
-        return $ada > 0 ? null : 'Petugas harus PNS aktif di satker kepegawaian.';
+    /**
+     * Aturan kandidat PIC [K `L_layanan.php:38-46`] — satu sumber untuk daftar kandidat dan validasi tulis.
+     */
+    private function kueriKandidat(int $satker): BaseBuilder
+    {
+        return $this->db()->table('pegawai p')
+            ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = p.nip', 'inner')
+            ->where('p.status', 1)->where('p.id_jenis_pegawai', self::JENIS_PEGAWAI_PNS)
+            ->where('pmj.id_satker', $satker);
+    }
+
+    private function satkerKepegawaian(): ?int
+    {
+        $satker = service('webConfigService')->value('id_satker_kepegawaian');
+
+        return is_scalar($satker) && ctype_digit((string) $satker) ? (int) $satker : null;
     }
 
     /**

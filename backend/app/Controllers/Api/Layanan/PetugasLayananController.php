@@ -21,6 +21,13 @@ class PetugasLayananController extends ApiController
         return $this->respondSuccess($this->petugas()->daftar(service('authContext'), is_array($query) ? $query : []));
     }
 
+    public function kandidat(): ResponseInterface
+    {
+        $query = $this->request->getGet();
+
+        return $this->respondSuccess($this->petugas()->kandidat(service('authContext'), is_array($query) ? $query : []));
+    }
+
     public function create(): ResponseInterface
     {
         return $this->respondSuccess($this->petugas()->tambah(service('authContext'), $this->payload()), 201);

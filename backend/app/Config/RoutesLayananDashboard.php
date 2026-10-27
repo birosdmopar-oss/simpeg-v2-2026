@@ -22,6 +22,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
 
     $pic = ['filter' => Role::filter(...PetugasLayananService::ROLE_ROUTE)];
     $routes->get('layanan/petugas', 'PetugasLayananController::index', $pic);
+    // [V2] gap PRD §5.5 (disetujui Horii 27-10-2026): kandidat PIC untuk form, role 1 saja.
+    $routes->get('layanan/petugas/kandidat', 'PetugasLayananController::kandidat', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
     $routes->post('layanan/petugas', 'PetugasLayananController::create', $pic);
     $routes->put('layanan/petugas/(:num)', 'PetugasLayananController::update/$1', $pic);
     $routes->delete('layanan/petugas/(:num)', 'PetugasLayananController::delete/$1', $pic);

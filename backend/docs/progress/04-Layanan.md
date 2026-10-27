@@ -274,16 +274,20 @@ Saldo massal memakai jalur PROSES `PegawaiScope`; ubah `pa_layanan` role 3 meneg
 Cakupan C-10 backend saja (FE di M7). Tanpa migration; tidak menyentuh berkas M4 (notifikasi/e-sign). DB uji scratch
 `simpeg_v2_t_make024` port 3307.
 
-**Sudah jalan.** Route (6) di `Config/RoutesLayananDashboard.php` (+ satu baris `Routing::$routeFiles`) + baris
+**Sudah jalan.** Route (7) di `Config/RoutesLayananDashboard.php` (+ satu baris `Routing::$routeFiles`) + baris
 `KontrakMatriksRoleTest` (prefiks `layanan`, `LayananDashboardService::ROLE_ROUTE`, `PetugasLayananService::ROLE_ROUTE`);
 `LayananDashboardController`, `PetugasLayananController`; `LayananDashboardService`; `PetugasLayananService` diperluas (CRUD
 + jenis aktif); model `PetugasLayananModel`, `JenisLayananModel`. Test `tests/Layanan/Dashboard/{LayananStatusTest,
-LayananStatusRoleTest, PetugasLayananCrudTest}` (21 test) + fixture `tests/_support/Layanan/DashboardUjiTrait.php`.
+LayananStatusRoleTest, PetugasLayananCrudTest}` (25 test) + fixture `tests/_support/Layanan/DashboardUjiTrait.php`.
 Dokumentasi endpoint: `Controllers/Api/Layanan/README.md`; keputusan coder: `Libraries/Layanan/README.md`.
 
 AC-10.1 (`LayananStatusRoleTest`), AC-10.2 (`PetugasLayananCrudTest`), AC-10.3 (`testPetugasCutiAlPybDanPicAktifSaja`),
 AC-10.4 (`testTahapDanLabelKonsistenDenganStateMachineModul`).
 
-**Menunggu keputusan reviewer:** endpoint kandidat PIC untuk FE (di luar PRD §5.5).
+**Keputusan reviewer CR 27-10 (4 default M6 disetujui):** `layanan/petugas` role 2–7 hanya PIC aktif; `url_detail` null
+untuk role 4/5 (detail modul tetap 403 untuk role 4/5, diuji); filter `status` angka tanpa `jenis` → 422 `errors.status`;
+hapus PIC fisik + audit [K]. **[V2] `GET layanan/petugas/kandidat?search=`** (role 1; gap PRD §5.5, legacy memuat pilihan di
+form `L_layanan.php` `form_off`; disetujui Horii): PNS aktif satker kepegawaian, urut nama, maks 50, satker kosong →
+`items: []` + peringatan. Route jadi 7.
 
 **Belum jalan.** Gate penuh (CI).

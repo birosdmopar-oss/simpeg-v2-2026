@@ -177,6 +177,46 @@ final class PetugasLayananCrudTest extends DatabaseTestCase
         $this->assertSame(1, $this->daftar($pegawai, '?status=0')['total'], 'role non-1 tidak bisa melihat PIC nonaktif');
     }
 
+    public function testKandidatHanyaPnsAktifSatkerKepegawaianUrutNama(): void
+    {
+        [$b] = $this->aktorStudi(Role::PEGAWAI, ['nama' => 'Budi Kandidat', 'glr_akhir' => 'S.E.'], $this->satkerKepeg);
+        [$a] = $this->aktorStudi(Role::PEGAWAI, ['nama' => 'Ani Kandidat'], $this->satkerKepeg);
+        $this->aktorStudi(Role::PEGAWAI, ['nama' => 'Cici Luar Satker']);
+        $this->aktorStudi(Role::PPPK, ['nama' => 'Dedi Pppk', 'id_jenis_pegawai' => 2], $this->satkerKepeg);
+        $this->aktorStudi(Role::PEGAWAI, ['nama' => 'Euis Nonaktif', 'status' => 2], $this->satkerKepeg);
+
+        $data = $this->kandidat('?search=Kandidat');
+        $this->assertSame([$a, $b], array_column($data['items'], 'nip'), 'urut nama; luar satker, non-PNS, nonaktif tidak muncul');
+        $this->assertSame('Budi Kandidat, S.E.', $data['items'][1]['nama']);
+        $this->assertNull($data['peringatan']);
+
+        $semua = array_column($this->kandidat()['items'], 'nip');
+        $this->assertContains($this->kandidat, $semua);
+        $this->assertCount(3, $semua);
+
+        $this->sebagai($this->admin)->get('api/v1/layanan/petugas/kandidat?search=' . str_repeat('a', PetugasLayananService::KANDIDAT_SEARCH_MAKS + 1))->assertStatus(422);
+    }
+
+    public function testKandidatDibatasiDanSatkerKosongMemberiPeringatan(): void
+    {
+        for ($i = 0; $i < PetugasLayananService::KANDIDAT_MAKS + 2; $i++) {
+            $this->buatPegawaiDiSatker($this->satkerKepeg, ['id_jenis_pegawai' => 1]);
+        }
+
+        $this->assertCount(PetugasLayananService::KANDIDAT_MAKS, $this->kandidat()['items']);
+
+        service('webConfigService')->delete('id_satker_kepegawaian');
+        $this->assertSame(['items' => [], 'peringatan' => PetugasLayananService::PERINGATAN_SATKER_KOSONG], $this->kandidat());
+    }
+
+    public function testKandidatRole2Sampai8Ditolak403(): void
+    {
+        foreach ([Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK, Role::PIMPINAN] as $role) {
+            [$nip] = $this->aktorStudi($role);
+            $this->sebagai($nip)->get('api/v1/layanan/petugas/kandidat')->assertStatus(403);
+        }
+    }
+
     public function testJenisLayananAktif(): void
     {
         $this->db->table('jenis_layanan')->where('id_jenis_layanan', 2)->update(['status' => 2]);
@@ -193,6 +233,17 @@ final class PetugasLayananCrudTest extends DatabaseTestCase
     private function tulis(string $verb, string $path, array $body): \CodeIgniter\Test\TestResponse
     {
         return $this->sebagai($this->admin)->withBodyFormat('json')->{$verb}('api/v1/layanan/petugas' . $path, $body);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function kandidat(string $query = ''): array
+    {
+        $res = $this->sebagai($this->admin)->get('api/v1/layanan/petugas/kandidat' . $query);
+        $res->assertStatus(200);
+
+        return $this->json($res);
     }
 
     /**

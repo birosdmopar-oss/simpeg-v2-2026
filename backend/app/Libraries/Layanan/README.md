@@ -170,7 +170,8 @@ Catatan keputusan coder M6 (dicatat untuk reviewer):
 2. `GET layanan/petugas` role 2–7 hanya PIC aktif (kolom Lihat §5.5 "PIC aktif"); role 1 semua status.
 3. `url_detail` = rute FE M7; role 3 diberi "Lihat detail" hanya bila `PegawaiScope::bolehLihat` (jalur detail) — daftar
    memakai jalur daftar yang bisa lebih luas (unit 20/21, README `Libraries/Kepegawaian`).
-4. Filter `status` angka diterapkan apa adanya ke semua jenis yang tampil (kode per jenis berbeda makna); FE memakainya
-   bersama `jenis`.
+4. Filter `status` angka wajib bersama `jenis` (422 `errors.status` bila tanpa `jenis`, keputusan reviewer CR 27-10).
 5. Status PIC 10 tidak dipakai (hapus fisik [K]); daftar tetap menyaring `status != 10` untuk data impor.
-6. Tidak ada endpoint kandidat PIC (di luar PRD §5.5); diusulkan ke reviewer untuk FE M7.
+6. [V2] `GET layanan/petugas/kandidat` (role 1, gap PRD §5.5, disetujui Horii 27-10): aturan kandidat satu sumber
+   (`kueriKandidat`) untuk daftar dan validasi tulis. Detail modul tetap menolak role 4/5 lewat route modul (diuji
+   `LayananStatusRoleTest::testDetailModulTetapMenolakRole4Dan5`), bukan hanya flag `aksi.lihat_detail`.

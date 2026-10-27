@@ -153,7 +153,8 @@ final class LayananStatusTest extends DatabaseTestCase
         $this->assertSame(['tb'], array_column($this->dasbor($this->pegawai, ['jenis' => 'tb'])['items'], 'jenis'));
         $this->assertSame(['ib'], array_column($this->dasbor($this->pegawai, ['status' => 'selesai'])['items'], 'jenis'));
         $this->assertEqualsCanonicalizing(['pmk', 'tb', 'cuti'], array_column($this->dasbor($this->pegawai, ['status' => 'berjalan'])['items'], 'jenis'));
-        $this->assertEqualsCanonicalizing(['tb', 'cuti'], array_column($this->dasbor($this->pegawai, ['status' => '0'])['items'], 'jenis'));
+        $this->assertSame(['tb'], array_column($this->dasbor($this->pegawai, ['jenis' => 'tb', 'status' => '0'])['items'], 'jenis'));
+        $this->assertSame(0, $this->dasbor($this->pegawai, ['jenis' => 'ib', 'status' => '0'])['total']);
         $this->assertSame(4, $this->dasbor($this->pegawai, ['search' => substr($this->nip, -6)])['total']);
         $this->assertSame(0, $this->dasbor($this->pegawai, ['search' => 'tidak-ada-%'])['total']);
     }
@@ -175,7 +176,7 @@ final class LayananStatusTest extends DatabaseTestCase
 
     public function testParameterTidakSah422(): void
     {
-        foreach ([['jenis' => 'karpeg'], ['status' => 'macet'], ['id_unit' => 'x'], ['search' => ['a']]] as $query) {
+        foreach ([['jenis' => 'karpeg'], ['status' => 'macet'], ['status' => '1'], ['id_unit' => 'x'], ['search' => ['a']]] as $query) {
             try {
                 $this->dasbor($this->pegawai, $query);
                 $this->fail('Seharusnya 422: ' . json_encode($query));
