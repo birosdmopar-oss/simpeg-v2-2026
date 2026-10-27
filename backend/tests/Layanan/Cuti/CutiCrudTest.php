@@ -300,4 +300,23 @@ final class CutiCrudTest extends DatabaseTestCase
         $this->assertTrue($opsi['can_create']);
         $this->assertSame('2027-12-31', $opsi['tgl_akhir_maks']);
     }
+
+    public function testOpsiKetuaTimHanyaNipDanNamaTerurutMenurutNama(): void
+    {
+        $a = $this->buatAlurDuaLangkah();
+        $this->buatPegawai(['nama' => 'Zzz Terakhir']);
+        $this->buatPegawai(['nama' => 'Aaa Pertama', 'glr_akhir' => 'S.H.']);
+
+        $ketua = $this->cutiService()->opsi($a['pemohon']['auth'], null)['ketua_tim'];
+
+        $this->assertNotEmpty($ketua);
+
+        foreach ($ketua as $k) {
+            $this->assertSame(['nip', 'nama'], array_keys($k));
+        }
+
+        $nama = array_column($ketua, 'nama');
+        $this->assertSame('Aaa Pertama, S.H.', $nama[0]);
+        $this->assertSame('Zzz Terakhir', end($nama));
+    }
 }

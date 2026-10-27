@@ -188,3 +188,12 @@ command `cuti:saldo-tahunan`. Route di `Config/RoutesLayanan.php`; kontrak di `C
 
 **Catatan yang perlu dicek reviewer.** Tambah saldo target `1` dibuat massal dengan satu baris audit ringkasan (bukan per baris); target `2` per baris lewat model. `GET cuti/opsi`
 mengembalikan `ketua_tim[]` seluruh pegawai aktif sesuai PRD (daftar panjang; FE mungkin perlu pencarian di M7).
+
+**Rujukan legacy AL/PyB (untuk QA).** `AtasanLangsungCuti` = port `getAL_es2()` (`1_legacy_simpeg.kemenparekraf.go.id/application/helpers/function_helper.php:1700-1945`);
+`PejabatBerwenangCuti` = port `getListPYB()` (`application/libraries/hr/rwy/L_cuti.php:12-279`); `ApproverTerjangkau` tidak punya padanan legacy (PRD §6.4.10).
+`Lkh\AtasanLangsung::untuk()` (port `getAL()` `function_helper.php:1479`) TIDAK dipakai karena perilakunya berbeda: urutan kolom atasan
+`es4_koord → es4 → es3_koord → es3 → es2 → es1` (cuti: `es4 → es3 → es2 → es1` tanpa koordinator), tanpa prioritas Plh (cuti: Plh aktif mengganti pemegang definitif,
+`function_helper.php:1760-1790`), dan Plt tanpa batas tanggal (cuti: Plt wajib dalam rentang tanggal, `:1795-1810`). Kontrak LKH beku, jadi tidak diubah.
+
+**Ukuran `GET cuti/opsi` → `ketua_tim[]`** (semua pegawai aktif, `{nip, nama}` terurut nama, satu kueri): pada data seed sintetis 8 pegawai respons `ketua_tim` ≈ 0,6 KB;
+per elemen ≈ 90 byte, sehingga 5.000 pegawai ≈ 450 KB sebelum kompresi. Dibuka CR terpisah bila terasa berat di data nyata.
