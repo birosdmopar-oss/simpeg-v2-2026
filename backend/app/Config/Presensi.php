@@ -38,6 +38,20 @@ class Presensi extends BaseConfig
      */
     public string $akarAset = WRITEPATH . 'aset/';
 
+    /**
+     * Implementasi sumber uang makan slip N−1 (`App\Libraries\Presensi\Slip\UangMakanSlipInterface`, PRD 5A §7.3.7).
+     * Bawaan 5A = `UangMakanBelumTersedia` (selalu null); 5B mengganti dengan implementasi D-09 — **wajib sebelum go-live**
+     * (F5-1). Nama kelas divalidasi saat dipakai (`SlipGajiService`).
+     */
+    public string $sumberUangMakan = 'App\Libraries\Presensi\Slip\UangMakanBelumTersedia';
+
+    /**
+     * Awalan URL verifikasi QR slip; URL QR = awalan + token (PRD 5A §7.3.6, Q5A-21). Bawaan = `App::$baseURL` +
+     * `verify/slip/` (setara `site_url` legacy). Override `.env` `presensi.urlVerifikasiSlip`: hanya URL absolut http/https;
+     * nilai lain diabaikan dan bawaan dipakai. Selalu diakhiri `/`.
+     */
+    public string $urlVerifikasiSlip = '';
+
     public function __construct()
     {
         parent::__construct();
@@ -47,6 +61,28 @@ class Presensi extends BaseConfig
         $this->ttlPratinjauDetik      = self::angkaPositifDariEnv('presensi.ttlPratinjauDetik', $this->ttlPratinjauDetik);
 
         $this->akarAset = self::direktoriAbsolut($this->akarAset) ?? WRITEPATH . 'aset/';
+
+        $this->urlVerifikasiSlip = self::urlAbsolut($this->urlVerifikasiSlip)
+            ?? rtrim((string) config(App::class)->baseURL, '/') . '/verify/slip/';
+    }
+
+    /**
+     * URL absolut http/https (diakhiri `/`), atau null bila kosong / bukan URL absolut http(s).
+     */
+    public static function urlAbsolut(mixed $nilai): ?string
+    {
+        if (! is_string($nilai) || trim($nilai) === '') {
+            return null;
+        }
+
+        $nilai = trim($nilai);
+        $skema = strtolower((string) parse_url($nilai, PHP_URL_SCHEME));
+
+        if (! in_array($skema, ['http', 'https'], true) || filter_var($nilai, FILTER_VALIDATE_URL) === false || (string) parse_url($nilai, PHP_URL_HOST) === '') {
+            return null;
+        }
+
+        return rtrim($nilai, '/') . '/';
     }
 
     /**
