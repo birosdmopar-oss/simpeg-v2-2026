@@ -54,6 +54,7 @@ import {
 } from '@/features/kepegawaian/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
+import { SLIP_GAJI_PEGAWAI_ROLES } from '@/features/presensi/roles'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
@@ -67,6 +68,12 @@ export interface NavChild {
   key: string
   label: string
   to: RouteLocationRaw
+  /**
+   * Role yang melihat submenu ini; kosong = semua role yang melihat induknya. Item induk ber-`children` yang semua
+   * anaknya tersaring dibuang (grup tidak tampil kosong). Tambahan F5-18 (PRD Fase 5A §7.8.2) — satu definisi untuk
+   * semua fase.
+   */
+  roles?: readonly RoleCode[]
 }
 
 export interface NavItem {
@@ -80,6 +87,12 @@ export interface NavItem {
   /** Kosong = semua role login. */
   roles?: readonly RoleCode[]
   phase: number
+  /**
+   * Menu dirilis lebih awal: tampil walau `phase > ACTIVE_PHASE` (hak role tetap berlaku). Untuk modul yang selesai
+   * sebelum fasenya ditutup (F5-18, PRD Fase 5A §7.8.2; Fase 4 M7 memakai definisi yang sama). Hapus `rilis` saat
+   * penutup fase menaikkan `ACTIVE_PHASE` melewati `phase` item itu. Tanpa `rilis` = perilaku lama.
+   */
+  rilis?: true
   /** Tujuan = Detail Pegawai NIP akun; item disembunyikan bila akun tanpa NIP (CR-049). */
   nipAkun?: true
 }
@@ -129,8 +142,16 @@ const NAV: NavGroup[] = [
         phase: 4,
         children: [{ key: 'layanan-status', label: 'Status Layanan', to: '/layanan/status' }],
       },
-      // Fase 5 (Presensi & Remunerasi).
-      { key: 'presensi', label: 'Presensi', icon: AlarmClock, phase: 5, children: [] },
+      // Fase 5 (Presensi & Remunerasi). Paket 5A dirilis sebelum ACTIVE_PHASE 5 (`rilis`, F5-18; dihapus saat 5C
+      // menaikkan ACTIVE_PHASE ke 5). Anak per role PRD 5A §7.8.2; grup tampil bila minimal satu anak tampil.
+      {
+        key: 'presensi',
+        label: 'Presensi',
+        icon: AlarmClock,
+        phase: 5,
+        rilis: true,
+        children: [{ key: 'presensi-slip-gaji', label: 'Slip Gaji', to: '/presensi/slip-gaji', roles: SLIP_GAJI_PEGAWAI_ROLES }],
+      },
       // Fase 7 (Dashboard/laporan) F-03 MAKE-036: 7 statistik (hr/chart/* = role 1, 3, 4, 5, 8); 3 pertama mengikuti
       // mockup Gambar 15. Tetap `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7); QA lewat URL langsung (PRD F7-14).
       {
@@ -203,16 +224,28 @@ const NAV: NavGroup[] = [
   },
 ]
 
+const bolehRole = (roles: readonly RoleCode[] | undefined, role: RoleCode | null): boolean =>
+  !roles || (role !== null && roles.includes(role))
+
+/** Submenu yang boleh dilihat `role`; item ber-anak yang semua anaknya tersaring → null (dibuang). */
+function saringAnak(item: NavItem, role: RoleCode | null): NavItem | null {
+  if (!item.children || item.children.length === 0) return item
+  const children = item.children.filter((c) => bolehRole(c.roles, role))
+  return children.length > 0 ? { ...item, children } : null
+}
+
 /**
- * Menu yang boleh tampil untuk `role` pada fase aktif; grup tanpa item dibuang. `nip` = NIP akun (item `nipAkun`
- * menuju Detail Pegawai NIP itu; tanpa NIP item itu tidak tampil).
+ * Menu yang boleh tampil untuk `role` pada fase aktif (atau ber-`rilis`); submenu disaring per `NavChild.roles`; item &
+ * grup kosong dibuang. `nip` = NIP akun (item `nipAkun` menuju Detail Pegawai NIP itu; tanpa NIP item itu tidak tampil).
  */
 export function buildNav(role: RoleCode | null, activePhase: number = ACTIVE_PHASE, nip: string | null = null): NavGroup[] {
   return NAV.map((group) => ({
     ...group,
     items: group.items
-      .filter((item) => item.phase <= activePhase && (!item.roles || (role !== null && item.roles.includes(role))))
+      .filter((item) => (item.phase <= activePhase || item.rilis === true) && bolehRole(item.roles, role))
       .filter((item) => !item.nipAkun || Boolean(nip))
+      .map((item) => saringAnak(item, role))
+      .filter((item): item is NavItem => item !== null)
       .map((item) => (item.nipAkun && nip ? { ...item, to: { name: 'pegawai-detail', params: { nip } } } : item)),
   })).filter((group) => group.items.length > 0)
 }
