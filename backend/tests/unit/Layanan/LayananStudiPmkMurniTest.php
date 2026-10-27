@@ -17,10 +17,17 @@ use Tests\Support\Libraries\PemindaiKemurnian;
  * PRD Fase 4 v1.1 §6.1.4 (pola Tahap 2b cuti). Pengecualian sama dengan Cuti: hanya `::createFromFormat` berformat literal
  * berawalan `!` (`RentangTanggal::tanggal()`). Juga menjaga `Config\Layanan` = nilai bawaan value object.
  *
+ * M5 (ber-DB): PRD §6.7/§6.9 menaruh service ber-DB di folder yang sama (`Tb/TbService.php`, `Tb/StatusTugasBelajar.php`,
+ * `Pmk/PmkPengajuanService.php`, …). Berkas lapisan DB dikenali dari namanya ({@see self::BERKAS_DB}) dan dikecualikan;
+ * berkas lain di folder itu tetap wajib murni.
+ *
  * @internal
  */
 final class LayananStudiPmkMurniTest extends CIUnitTestCase
 {
+    /** Nama berkas lapisan DB M5 di folder murni (file boundary PRD §6.7–§6.9). */
+    private const BERKAS_DB = '/(Service|StatusTugasBelajar|Trait)\.php$/';
+
     /**
      * @return array<string, array{0: string, 1: int}> folder => jumlah berkas minimum
      */
@@ -37,10 +44,34 @@ final class LayananStudiPmkMurniTest extends CIUnitTestCase
     #[DataProvider('folderMurni')]
     public function testFolderMurni(string $folder, int $minimum): void
     {
-        $hasil = (new PemindaiKemurnian(createFromFormatBerjangkar: true))->pindaiFolder(APPPATH . $folder);
+        $pemindai    = new PemindaiKemurnian(createFromFormatBerjangkar: true);
+        $jumlah      = 0;
+        $pelanggaran = [];
 
-        $this->assertGreaterThanOrEqual($minimum, $hasil['jumlahBerkas'], "Kelas murni {$folder} tidak ditemukan");
-        $this->assertSame([], $hasil['pelanggaran']);
+        foreach (glob(APPPATH . $folder . '/*.php') ?: [] as $path) {
+            if (preg_match(self::BERKAS_DB, basename($path)) === 1) {
+                continue;
+            }
+
+            $jumlah++;
+            array_push($pelanggaran, ...$pemindai->pindai((string) file_get_contents($path), basename($path)));
+        }
+
+        $this->assertGreaterThanOrEqual($minimum, $jumlah, "Kelas murni {$folder} tidak ditemukan");
+        $this->assertSame([], $pelanggaran);
+    }
+
+    public function testPengecualianHanyaBerkasLapisanDb(): void
+    {
+        foreach (['Libraries/Layanan/Studi', 'Interfaces/Layanan'] as $folder) {
+            foreach (glob(APPPATH . $folder . '/*.php') ?: [] as $path) {
+                $this->assertSame(0, preg_match(self::BERKAS_DB, basename($path)), "{$folder} tidak boleh berisi lapisan DB");
+            }
+        }
+
+        $this->assertSame(1, preg_match(self::BERKAS_DB, 'TbService.php'));
+        $this->assertSame(1, preg_match(self::BERKAS_DB, 'StatusTugasBelajar.php'));
+        $this->assertSame(0, preg_match(self::BERKAS_DB, 'BebasPresensiTb.php'));
     }
 
     public function testConfigLayananSamaDenganAturanBawaan(): void
