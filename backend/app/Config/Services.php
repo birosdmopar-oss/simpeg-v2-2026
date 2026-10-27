@@ -561,4 +561,28 @@ class Services extends BaseService
             new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
         );
     }
+
+    /**
+     * Kelola saldo cuti tahunan (MAKE-022 M3, PRD Fase 4 §6.3.6).
+     */
+    public static function saldoCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\SaldoCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('saldoCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\SaldoCutiService(db_connect(), config(\Config\Cuti::class)->aturan(), static::pegawaiScope());
+    }
+
+    /**
+     * Petugas approval cuti `pa_layanan` (MAKE-022 M3, PRD Fase 4 §6.4.8).
+     */
+    public static function petugasApprovalCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\PetugasApprovalCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('petugasApprovalCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\PetugasApprovalCutiService(db_connect());
+    }
 }

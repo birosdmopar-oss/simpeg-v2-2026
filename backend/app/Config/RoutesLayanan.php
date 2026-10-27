@@ -21,6 +21,17 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->post('cuti/hitung-lama', 'CutiController::hitungLama'); // semua login (jwt saja)
     $routes->get('cuti/pengingat', 'CutiController::pengingat', $cuti);
 
+    // Kelola saldo (cuti/saldo) dan petugas approval: role 1, 3.
+    $admin = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)];
+    $routes->get('cuti/saldo', 'CutiSaldoController::index', $admin);
+    $routes->post('cuti/saldo', 'CutiSaldoController::create', $admin);
+    $routes->put('cuti/saldo/(:num)', 'CutiSaldoController::update/$1', $admin);
+    $routes->delete('cuti/saldo/(:num)', 'CutiSaldoController::delete/$1', $admin);
+    $routes->get('cuti/petugas-approval', 'CutiPetugasApprovalController::index', $admin);
+    $routes->post('cuti/petugas-approval', 'CutiPetugasApprovalController::create', $admin);
+    $routes->put('cuti/petugas-approval/(:num)', 'CutiPetugasApprovalController::update/$1', $admin);
+    $routes->delete('cuti/petugas-approval/(:num)', 'CutiPetugasApprovalController::delete/$1', $admin);
+
     $routes->get('cuti', 'CutiController::index', $cuti);
     $routes->post('cuti', 'CutiController::create', $cuti);
     $routes->get('cuti/(:num)', 'CutiController::show/$1', $cuti);

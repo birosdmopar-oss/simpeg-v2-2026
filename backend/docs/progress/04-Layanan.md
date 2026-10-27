@@ -168,3 +168,23 @@ jenis 1; paritas T13 hanya saldo ternormalisasi legacy; teks pesan batas jenis 5
 - Test skema: `tests/database/Layanan/{SkemaLayananTest,SkemaInboxTicketTest,MigrasiLayananSiklusTest}.php`.
 
 **Verifikasi 27-10:** 3307 — 100/204/45 → 120/235/84 (+20/+31/+39), rollback → migrate ulang identik; kueri audit bebas error 1267/1271 (DBV-022 Bagian 12.5–12.6); CI hijau `bc3b759`.
+
+---
+
+## M3 — Cuti (MAKE-022, 27-10-2026, branch `fase4/make-022-cuti-m3`)
+
+**Sudah jalan.** CRUD cuti, `cuti/opsi`, `cuti/hitung-lama`, kuota/potong/refund (`KuotaCutiService` membungkus `KuotaCuti` murni; refund memakai `SnapshotSaldoCuti`),
+state machine (`CutiApprovalService` memakai `TransisiCuti`), efek final (`EfekFinalCutiService`: saldo, CLTN, titik panggil `PenerbitSuratCutiInterface` no-op untuk M4),
+tunda + pengingat + listener `ResetTundaCuti` (event `auth.login` aditif), proses atas nama (`ApproverTerjangkau`), `pa_layanan`, kelola saldo, `SaldoTahunanCuti` +
+command `cuti:saldo-tahunan`. Route di `Config/RoutesLayanan.php`; kontrak di `Controllers/Api/Layanan/README.md`; kueri audit approver di `04-Layanan-audit-approver-cuti.sql`.
+
+**Keputusan [V2] (disetujui reviewer 27-10).**
+1. `audit_logs.event` ber-ENUM: penanda `cuti.saldo_tahunan`, `cuti.saldo_massal`, `cuti.process_atas_nama`, `cuti.cltn_aktif`/`cuti.cltn_pulih` dibawa di `after_json.jenis_audit`
+   (event `create`/`update`); tanpa perubahan skema.
+2. `RiwayatCutiModel extends BaseAuditableModel` (bukan `BaseSnapshotModel`): cuti tidak punya tabel snapshot; efek final eksplisit lewat query builder + audit manual.
+3. Zona bisnis = `Asia/Jakarta` (`TanggalBisnis::ZONA`), bukan `appTimezone` (bawaan UTC): "hari ini", batas tunda 12:00, dan tahun acuan (`created_at` UTC → WIB).
+4. Command `cuti:saldo-tahunan` menolak eksekusi tulis tahun < `Config\Cuti::$tahunTulisSaldoMulai` (2027); `--dry-run` tetap untuk 2026 (PRD §6.3.6).
+5. Notifikasi cuti bukan bagian M3 (M4 memakai `NotifikasiLayananInterface`).
+
+**Catatan yang perlu dicek reviewer.** Tambah saldo target `1` dibuat massal dengan satu baris audit ringkasan (bukan per baris); target `2` per baris lewat model. `GET cuti/opsi`
+mengembalikan `ketua_tim[]` seluruh pegawai aktif sesuai PRD (daftar panjang; FE mungkin perlu pencarian di M7).

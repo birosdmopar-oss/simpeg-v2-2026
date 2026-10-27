@@ -25,3 +25,16 @@ di `CutiService`: baris yang tidak boleh dilihat → **404**; terlihat tetapi ti
 Kode galat 422 (`errors.<field>`): `id_jenis_cuti`, `tgl_mulai`, `tgl_akhir`, `durasi`, `no_telp_saat_cuti`, `alamat_saat_cuti`,
 `keterangan`, `nip_atasan_langsung`, `nip_yang_menyetujui`, `ketua_tim`, `file_bukti`, `lama_cuti` (kuota), `status`. Semua
 galat dikumpulkan dalam satu respons (A-09). Audit tidak memuat isi berkas.
+
+### Persetujuan, tunda, pengingat, saldo, petugas approval (M3 bagian c)
+
+| Method & path | Role route | Isi |
+|---|---|---|
+| `POST cuti/{id}/process` | 1,2,3,6,7 | Body JSON `{aksi: setujui\|tolak\|tangguhkan, reason_note?, atas_nama?}` → 200 item terbaru. Urutan: baris terlihat (404) → pemanggil AL/PyB baris itu atau role 1 dengan `atas_nama` (403) → body (422) → transaksi terkunci → tahap (422 `errors.status`) → kuota diulang saat final (422 `errors.lama_cuti`) → tulis → efek final (hanya status 1/4). `tolak` tanpa `reason_note` → 422; `tangguhkan` hanya jenis 1 (`errors.aksi`). `atas_nama`: bukan role 1 → 403; approver tahap aktif masih terjangkau → 422 `errors.status`; `reason_note` wajib untuk semua aksi |
+| `POST cuti/{id}/tunda` | 1,2,3,6,7 | Approver tahap aktif; sebelum `tgl_mulai` 12:00 WIB (inklusif); set `skip_al`/`skip_pyb = 1`, status tidak berubah. Bukan approver → 403; bukan tahapnya atau lewat batas → 422 `errors.status` |
+| `GET cuti/pengingat` | 1,2,3,6,7 | `{items, total}`: antrean `persetujuan` pemanggil yang flag tahapnya masih 0. Flag direset listener `auth.login` (hanya NIP yang login) |
+| `GET cuti/saldo?tahun=&search=&id_unit=&id_satker=&page=&per_page=` | 1,3 | Daftar saldo per tahun (bawaan tahun ini; `tahun` > tahun ini → 422); role 3 dibatasi lingkup; role 4/5 → 403 |
+| `POST cuti/saldo` | 1,3 | `{target: 1\|2, nip?, tahun, sisa_cuti, sisa_cuti_n1, sisa_cuti_n2, utang_cuti, sisa_cuti_ditangguhkan?}`; batas D8 per kolom (422); target 2 sudah punya baris → 422 `errors.nip`; target 1 = semua pegawai aktif jenis 1/6 dalam lingkup yang belum punya baris → `{dibuat, dilewati}` |
+| `PUT cuti/saldo/{id}`, `DELETE cuti/saldo/{id}` | 1,3 | Ubah kolom saldo; hapus fisik + audit; di luar lingkup role 3 → 404 |
+| `GET cuti/petugas-approval` | 1,3 | Aturan petugas `pa_layanan` (jenis 1) + nama/NIP/jabatan petugas (pemegang saat ini, Plt bila kosong); role 3 hanya `id_unit_pemohon` = unit pemanggil |
+| `POST cuti/petugas-approval`, `PUT …/{id}`, `DELETE …/{id}` | 1,3 | Whitelist kolom; `petugas` = `struk_<id_jabatan>` \| `koord_<id_jabatan_koord>` \| `other_<nip>`; GJ pemohon 2/3 → `gol_ruang_pemohon` wajib, selain itu `id_sub_group_jabatan_pemohon`; ubah hanya baris status 1; role 3 tambah wajib `id_unit_pemohon` = unit sendiri (422), ubah/hapus unit lain → 403; hapus fisik + audit |
