@@ -52,7 +52,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -81,6 +81,18 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'GET api/v1/dokumen/([^/]+)/pdf'      => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)/xlsx'     => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)'          => [1, 3, 4, 5, 8],
+
+            // Modul C — Fase 4 Cuti (MAKE-022, PRD §5.1): route role 1, 2, 3, 6, 7; hak per baris (pemilik, AL/PyB, ketua tim,
+            // lingkup) di CutiService. `hitung-lama` = semua login (jwt saja).
+            'GET api/v1/cuti/opsi'              => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti/hitung-lama'      => self::JWT,
+            'GET api/v1/cuti'                   => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti'                  => [1, 2, 3, 6, 7],
+            'GET api/v1/cuti/([0-9]+)'          => [1, 2, 3, 6, 7],
+            'PUT api/v1/cuti/([0-9]+)'          => [1, 2, 3, 6, 7],
+            'DELETE api/v1/cuti/([0-9]+)'       => [1, 2, 3, 6, 7],
+            'GET api/v1/cuti/([0-9]+)/lampiran' => [1, 2, 3, 6, 7],
+            'GET api/v1/cuti/([0-9]+)/surat'    => [1, 2, 3, 6, 7],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,

@@ -500,4 +500,42 @@ class Services extends BaseService
             default => throw new RuntimeException("Push driver '{$driver}' belum tersedia (adapter real dikerjakan di Fase 6)."),
         };
     }
+
+    /**
+     * Penerbit surat cuti belum-TTE saat efek final (MAKE-022 M3). Bawaan no-op; M4 (MAKE-023) menggantinya.
+     */
+    public static function penerbitSuratCuti(bool $getShared = true): \App\Interfaces\Layanan\PenerbitSuratCutiInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('penerbitSuratCuti');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\PenerbitSuratCutiNoOp();
+    }
+
+    /**
+     * Cuti online (MAKE-022 M3): kabel service ber-DB (PRD Fase 4 §6.2–§6.4).
+     */
+    public static function cutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\CutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('cutiService');
+        }
+
+        $db     = db_connect();
+        $aturan = config(\Config\Cuti::class)->aturan();
+        $kuota  = new \App\Libraries\Layanan\Cuti\KuotaCutiService($db, $aturan, new \App\Libraries\MasterData\HariLiburService($db));
+
+        return new \App\Libraries\Layanan\Cuti\CutiService(
+            $db,
+            $aturan,
+            $kuota,
+            new \App\Libraries\Layanan\Cuti\EfekFinalCutiService($db, $kuota, static::penerbitSuratCuti()),
+            new \App\Libraries\Layanan\Cuti\AtasanLangsungCuti($db),
+            new \App\Libraries\Layanan\Cuti\PejabatBerwenangCuti($db),
+            new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
+            static::pegawaiScope(),
+            static::attachmentService(),
+        );
+    }
 }

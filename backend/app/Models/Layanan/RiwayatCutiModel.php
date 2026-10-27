@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Layanan;
 
+use App\Libraries\Layanan\Cuti\CutiPenyaji;
 use App\Models\BaseAuditableModel;
 
 /**
@@ -14,7 +15,7 @@ use App\Models\BaseAuditableModel;
 class RiwayatCutiModel extends BaseAuditableModel
 {
     /** Kolom yang tidak pernah dikirim ke klien. */
-    public const KOLOM_INTERNAL = ['file_bukti', 'file_sc_unsign', 'file_sc_signed_bef', 'file_surat_cuti'];
+    public const KOLOM_INTERNAL = CutiPenyaji::KOLOM_INTERNAL;
 
     protected $table          = 'riwayat_cuti';
     protected $primaryKey     = 'id_riwayat_cuti';

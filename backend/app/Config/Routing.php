@@ -37,6 +37,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesPegawai.php', // WS-2
         // Modul F — Dashboard & News (Fase 7, MAKE-036): statistik & generator dokumen.
         APPPATH . 'Config/RoutesDashboard.php',
+        // Modul C — Layanan & Approval (Fase 4): cuti (MAKE-022); TB/IB/PMK berkas terpisah (MAKE-024).
+        APPPATH . 'Config/RoutesLayanan.php',
     ];
 
     /**

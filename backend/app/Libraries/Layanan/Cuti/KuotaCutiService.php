@@ -59,6 +59,16 @@ class KuotaCutiService
         return PorsiTahunCuti::pecah($jenis, $mulai, $akhir, $tahunAcuan, $libur, $this->aturan);
     }
 
+    /**
+     * Tahun acuan dari `created_at` (UTC) dalam zona waktu aplikasi (PRD §6.3.3).
+     */
+    public function tahunAcuan(string $createdAtUtc): int
+    {
+        $waktu = new \DateTimeImmutable($createdAtUtc, new \DateTimeZone('UTC'));
+
+        return (int) $waktu->setTimezone(new \DateTimeZone(config(\Config\App::class)->appTimezone))->format('Y');
+    }
+
     public function saldo(string $nip, int $tahun, bool $kunci = false): ?SaldoCuti
     {
         $baris = $this->barisSaldo($nip, $tahun, $kunci);
@@ -122,7 +132,7 @@ class KuotaCutiService
     public function potong(array $cuti, int $statusFinal): HasilKalkulasi
     {
         $nip   = (string) $cuti['nip'];
-        $tahun = PorsiTahunCuti::tahunAcuan((string) $cuti['created_at']);
+        $tahun = $this->tahunAcuan((string) $cuti['created_at']);
         $baris = $this->barisSaldo($nip, $tahun, true);
 
         if ($baris === null) {
@@ -150,7 +160,7 @@ class KuotaCutiService
      */
     public function kembalikan(array $cuti): bool
     {
-        $tahun = PorsiTahunCuti::tahunAcuan((string) $cuti['created_at']);
+        $tahun = $this->tahunAcuan((string) $cuti['created_at']);
         $baris = $this->barisSaldo((string) $cuti['nip'], $tahun, true);
 
         if ($baris === null) {

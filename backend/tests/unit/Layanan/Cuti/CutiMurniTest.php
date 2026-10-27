@@ -26,12 +26,12 @@ final class CutiMurniTest extends CIUnitTestCase
      * (PRD §6.2–§6.4 file boundary) hidup di folder yang sama dan tidak dipindai sebagai murni.
      */
     private const MURNI = [
-        'AturanCuti', 'EfekFinalCuti', 'HitungLamaCuti', 'KuotaCuti', 'PengingatCuti', 'PorsiTahunCuti', 'SaldoCuti',
+        'AturanCuti', 'AturanJenisCuti', 'CutiPenyaji', 'EfekFinalCuti', 'HitungLamaCuti', 'KuotaCuti', 'PengingatCuti', 'PorsiTahunCuti', 'SaldoCuti',
         'SaldoTahunanCuti', 'SnapshotSaldoCuti', 'StatusCuti', 'TransisiCuti', 'ValidasiTanggalCuti',
     ];
 
     /** Kelas ber-DB yang path-nya ditetapkan PRD tanpa sufiks `Service`. */
-    private const BER_DB = ['ResetTundaCuti', 'ApproverTerjangkau', 'AtasanLangsungCuti', 'PejabatBerwenangCuti', 'OpsiCuti'];
+    private const BER_DB = ['ResetTundaCuti', 'ApproverTerjangkau', 'AtasanLangsungCuti', 'PejabatBerwenangCuti', 'OpsiCuti', 'PenerbitSuratCutiNoOp'];
 
     public function testSemuaKelasCutiMurni(): void
     {
