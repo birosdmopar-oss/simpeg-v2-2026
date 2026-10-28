@@ -156,7 +156,7 @@ diperbarui (rakitan bawaan kini memakai sumber Fase 4). D-04/D-05/D-07 → DONE 
   BukaSlipKonkurensi (db-isolasi-penuh), SlipAdmin, UangMakanSnapshot, RoleMatriksSlip, VerifikasiSlip}Test.php`,
   `tests/Presensi/RoutePresensiKontrakTest.php`, unit `PdfSlipGaji`/`KopSlip`/`RingkasanSlip`/`ThrottlePublikFilter`.
 - **Blocker go-live (bukan blocker 5A DONE):** `Config\Presensi::$sumberUangMakan` masih `UangMakanBelumTersedia` sampai 5B
-  (F5-1); kunci `encryption.key` wajib terisi di produksi.
+  (F5-1; **ditutup 5B M2 MAKE-040** setelah merged, lihat bagian 5B M2); kunci `encryption.key` wajib terisi di produksi.
 
 ## 5A M5 — D-02/D-03 presensi online, manual, data admin (MAKE-032)
 
@@ -197,6 +197,20 @@ harian presensi membaca `dh_online`.
   (D-08), cross-check rumus resmi Q5A-13.
 - **5B M1a (MAKE-044):** metode massal TB `StatusTugasBelajarInterface::rentangBebasPresensiBanyak` di modul Fase 4 —
   rincian di `docs/progress/04-Layanan.md` bagian "Fase 5B M1a"; acuan `docs/fase5/PRD_Fase5B_Cuti-TB-LaporanTukin-UangMakan.md`.
+
+## 5B M2 — D-09a uang makan slip (MAKE-040, 28-10-2026)
+
+Branch `fase5b/make-040-uang-makan-slip` (dari `main` `4548718`). Implementasi asli `UangMakanSlipInterface`:
+`Slip/UangMakanSlipPresensi` + `Slip/TarifUangMakan` + aturan murni `Rekap/HariUangMakan` (folder murni baru, penjaga
+`RekapMurniTest`), port `Lsl_gaji.php:260-414` `0cf7e67` [K] — rincian aturan di README `Libraries/Presensi` bagian
+"Uang makan slip 5B". Berkas bersama, commit terpisah: switch `Config\Presensi::$sumberUangMakan =
+UangMakanSlipPresensi::class`. `SlipGajiService` (aturan snapshot 5A), `Presensi/Tukin`, `SlipGaji`, dan berkas Fase 4
+tidak tersentuh. Test: `HariUangMakanTest`, `RekapMurniTest`, `TarifUangMakanTest`, `UangMakanSlipPresensiTest`,
+`UangMakanSnapshotAsliTest` (AC-D09a.1–09a.5); `UangMakanSnapshotTest`/`BukaSlipAtomikTest` menyuntik
+`UangMakanBelumTersedia` secara eksplisit. **Blocker go-live F5-1 ditutup** setelah branch ini merged (AC-D09a.5).
+Usulan awal M2 (`gol_pppk.uang_makan` tidak bulat sampai sen → sumber `null`) **ditolak Horii 28-10-2026** (Q5B-24):
+ikut legacy, total = tarif × hari dibulatkan setengah-menjauhi-nol ke sen seperti kolom DECIMAL(14,2), dihitung desimal
+eksak (`TarifUangMakan::totalSen`); `DataUangMakanTidakSah` dihapus; tarif > 2 desimal dicatat log warning tanpa nominal.
 
 ## CR-067 — Slip Gaji TK tanpa Pajak / Tunjangan Pajak (ikut legacy `0cf7e67`)
 

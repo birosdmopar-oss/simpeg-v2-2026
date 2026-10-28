@@ -8,7 +8,6 @@ use App\Libraries\Presensi\Slip\UangMakanBelumTersedia;
 use App\Libraries\Presensi\Slip\UangMakanSlip;
 use App\Libraries\Presensi\Slip\UangMakanSlipInterface;
 use App\Libraries\Presensi\SlipGaji\PeriodeSlip;
-use Config\Presensi;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 use Tests\Support\Presensi\SlipUjiTrait;
@@ -17,8 +16,8 @@ use Tests\Support\Presensi\SlipUjiTrait;
  * PRD 5A §7.3.7 (AC-D11.10): snapshot uang makan N−1 saat slip dibuka — fake bernilai > 0 → `uang_makan`,
  * `uang_makan_hari`, `uang_makan_periode = m-YYYY` (bulan kehadiran = periode slip − 1) ditulis; fake 0 sedangkan nilai
  * lama > 0 → nilai lama dipertahankan; fake 0 dan lama 0 → ditulis 0; `UangMakanBelumTersedia` (bawaan 5A) → kolom tidak
- * berubah & `tersedia = false`; snapshot yang sudah ada tidak dihitung ulang (termasuk setelah buka ulang); bawaan
- * `Config\Presensi::$sumberUangMakan` = `UangMakanBelumTersedia`.
+ * berubah & `tersedia = false`; snapshot yang sudah ada tidak dihitung ulang (termasuk setelah buka ulang). Sejak 5B
+ * bawaan `Config\Presensi::$sumberUangMakan` = `UangMakanSlipPresensi` (diuji `UangMakanSnapshotAsliTest`).
  *
  * @internal
  */
@@ -75,10 +74,9 @@ final class UangMakanSnapshotTest extends DatabaseTestCase
 
     public function testBelumTersediaTidakMengubahKolom(): void
     {
-        $this->assertSame(UangMakanBelumTersedia::class, (new Presensi())->sumberUangMakan);
         $id = $this->slip($this->nip, 2026, 4, ['uang_makan' => '10000.00']);
 
-        $hasil = $this->slipPegawai()->buka($this->authPegawaiSlip($this->nip), '2026-04', '203.0.113.1');
+        $hasil = $this->slipPegawai('2026-10-27 09:00:00', new UangMakanBelumTersedia())->buka($this->authPegawaiSlip($this->nip), '2026-04', '203.0.113.1');
 
         $this->assertFalse($hasil['uang_makan']['tersedia']);
         $this->seeInDatabase('gaji_pegawai', ['id' => $id, 'uang_makan' => '10000.00', 'uang_makan_hari' => null, 'uang_makan_periode' => null]);

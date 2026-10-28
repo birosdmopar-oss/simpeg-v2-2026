@@ -78,7 +78,7 @@ PdfSlipGaji, KopSlip}` + logika murni `Libraries/Presensi/SlipGaji` (`GerbangPer
 Token QR: `random_bytes(32)` → 64 heks; DB menyimpan `hash('sha256')` (`qr_token`, riwayat `gaji_pegawai_qr_history`) dan
 token terenkripsi Encrypter CI4 (`qr_token_enkripsi`, Q5A-01 opsi a) untuk QR PDF; URL QR =
 `Config\Presensi::$urlVerifikasiSlip` + token. Snapshot uang makan N−1 lewat `Config\Presensi::$sumberUangMakan` (bawaan
-5A `UangMakanBelumTersedia` → `uang_makan.tersedia = false`; **5B wajib mengganti sebelum go-live**, F5-1). Audit `update`
+5B `UangMakanSlipPresensi`, MAKE-040, menutup F5-1; `UangMakanBelumTersedia` 5A → `uang_makan.tersedia = false`). Audit `update`
 `gaji_pegawai` saat buka/buka ulang tanpa IP, token, nominal; koreksi lewat model (token & IP dimasking).
 
 Contoh (data sintetis):
