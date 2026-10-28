@@ -126,6 +126,10 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
         '2026-10-27-100000' => [
             'fk_nip_dh_to_pegawai' => ['dh_online', 'nip'],
         ],
+        // DBV-024 (Fase 5B): tabel [V2] penyesuaian Tukin, FK NIP RESTRICT di CREATE.
+        '2026-10-28-100000' => [
+            'fk_nip_ptk_to_pegawai' => ['penyesuaian_tukin', 'nip'],
+        ],
     ];
 
     /**
