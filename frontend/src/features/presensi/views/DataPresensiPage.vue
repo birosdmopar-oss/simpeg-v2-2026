@@ -201,7 +201,7 @@ onMounted(async () => {
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <div class="space-y-5" data-testid="data-presensi-page">
+    <div class="page-fill flex flex-col gap-5" data-testid="data-presensi-page">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 class="text-h2 font-semibold text-slate-900">Data Presensi</h1>
@@ -240,7 +240,7 @@ onMounted(async () => {
           />
           <UiSearchInput v-model="search" placeholder="Cari NIP / nama" label="Cari NIP atau nama pegawai" class="min-w-[200px] flex-1" data-testid="data-presensi-search" />
         </div>
-        <div ref="tableScroller" class="scrollbar-slim overflow-x-auto rounded-2xl border border-slate-200 bg-white" @scroll.passive="updateActionsShadow">
+        <div ref="tableScroller" class="table-fill scrollbar-slim overflow-x-auto rounded-2xl border border-slate-200 bg-white" @scroll.passive="updateActionsShadow">
           <table class="min-w-full text-sm" data-testid="data-presensi-pegawai">
             <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -281,7 +281,7 @@ onMounted(async () => {
           <p class="pb-2 text-caption text-slate-500">Tanpa rentang: 100 data terbaru.</p>
         </div>
         <UiNotice v-if="galatDetail" tone="danger" data-testid="data-presensi-galat-detail">{{ galatDetail }}</UiNotice>
-        <div ref="tableScroller" class="scrollbar-slim overflow-x-auto rounded-2xl border border-slate-200 bg-white" @scroll.passive="updateActionsShadow">
+        <div ref="tableScroller" class="table-fill scrollbar-slim overflow-x-auto rounded-2xl border border-slate-200 bg-white" @scroll.passive="updateActionsShadow">
           <table class="min-w-full text-sm" data-testid="data-presensi-detail">
             <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>

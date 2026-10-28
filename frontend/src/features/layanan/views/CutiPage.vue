@@ -207,7 +207,8 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <UiCard title="Cuti">
+    <div class="page-fill flex flex-col gap-4" data-testid="cuti-page">
+    <UiCard title="Cuti" class="flex min-h-0 flex-1 flex-col" fill>
       <template #actions>
         <UiButton v-if="data?.can_create" data-testid="cuti-tambah" @click="ajukan"><Plus class="h-4 w-4" aria-hidden="true" /> Ajukan Cuti</UiButton>
       </template>
@@ -232,6 +233,7 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
 
       <UiPagination v-if="data && data.total > PER_PAGE" v-model:page="page" class="mt-4" :per-page="PER_PAGE" :total="data.total" />
     </UiCard>
+    </div>
 
     <CutiFormDialog v-model:open="formOpen" :row="formRow" @saved="onSaved" />
 

@@ -42,7 +42,7 @@ function actionsFor(row: PegawaiListItem): RowAction[] {
 </script>
 
 <template>
-  <div class="scrollbar-slim overflow-x-auto">
+  <div class="table-fill scrollbar-slim overflow-x-auto">
     <table class="w-full min-w-[52rem] border-collapse text-left text-body1" data-testid="pegawai-table">
       <thead>
         <tr class="text-body2 font-semibold text-slate-900">

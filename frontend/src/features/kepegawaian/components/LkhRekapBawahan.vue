@@ -65,13 +65,13 @@ async function lihat(row: LkhRekapItem): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-4" data-testid="lkh-rekap">
+  <div class="flex min-h-0 flex-1 flex-col gap-4" data-testid="lkh-rekap">
     <div class="max-w-xs">
       <UiTextField v-model="bulan" type="month" label="Bulan" data-testid="lkh-rekap-bulan" />
     </div>
     <UiNotice v-if="galat" tone="danger" data-testid="lkh-rekap-error">{{ galat }}</UiNotice>
 
-    <div class="scrollbar-slim overflow-x-auto">
+    <div class="table-fill scrollbar-slim overflow-x-auto">
       <table class="w-full min-w-[44rem] border-collapse text-left text-body1" data-testid="lkh-rekap-table">
         <thead>
           <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">

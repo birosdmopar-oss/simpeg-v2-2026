@@ -228,7 +228,8 @@ async function onAksi(key: string, row: DokumenItem): Promise<void> {
     <UiNotice v-if="failure" tone="danger" class="mb-4" data-testid="dokumen-failure">{{ failure }}</UiNotice>
     <UiNotice v-if="galatUnduh" tone="warning" dismissible class="mb-4" data-testid="dokumen-unduh-galat" @dismiss="galatUnduh = null">{{ galatUnduh }}</UiNotice>
 
-    <div class="space-y-5" data-testid="dokumen-page" :aria-busy="memuat">
+    <!-- Berisi formulir filter dan pilihan baperjakat: menggulir normal, bukan `page-fill` (AGENTS §3.4, CR-069). -->
+    <div class="flex flex-col gap-5" data-testid="dokumen-page" :aria-busy="memuat">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 class="text-h2 font-semibold text-slate-900">{{ judul }}</h1>
@@ -283,9 +284,9 @@ async function onAksi(key: string, row: DokumenItem): Promise<void> {
         <p v-if="bapErrors.nip" role="alert" class="mt-2 text-caption text-danger" data-testid="dokumen-bap-nip-galat">{{ bapErrors.nip }}</p>
       </UiCard>
 
-      <UiCard :title="`Tabel ${judul}`" flush>
-        <div class="space-y-4 pb-5">
-          <div class="scrollbar-slim overflow-x-auto">
+      <UiCard :title="`Tabel ${judul}`" flush fill>
+        <div class="flex min-h-0 flex-1 flex-col gap-4 pb-5">
+          <div class="table-fill scrollbar-slim overflow-x-auto">
             <table class="w-full min-w-[48rem] border-collapse text-left text-body1" data-testid="dokumen-table">
               <thead>
                 <tr class="border-y border-slate-200 text-body2 font-semibold text-slate-900">

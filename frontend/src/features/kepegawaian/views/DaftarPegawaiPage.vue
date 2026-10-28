@@ -192,9 +192,10 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
+    <div class="page-fill flex flex-col gap-4" data-testid="pegawai-list-page">
     <UiNotice v-if="notice" tone="info" dismissible class="mb-4" @dismiss="notice = null">{{ notice }}</UiNotice>
 
-    <UiCard title="Daftar Pegawai" flush>
+    <UiCard title="Daftar Pegawai" flush fill>
       <template #actions>
         <UiButton v-if="isSuperAdmin" class="whitespace-nowrap" data-testid="add-pegawai" @click="tambahOpen = true">
           <template #icon-left><Plus class="h-4 w-4" aria-hidden="true" /></template>
@@ -207,7 +208,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
         <UiExportMenu :formats="EXPORT_FORMATS" :disabled="mengekspor" @select="ekspor" />
       </template>
 
-      <div class="mt-2 space-y-5 pb-5">
+      <div class="mt-2 flex min-h-0 flex-1 flex-col gap-5 pb-5">
         <div class="flex flex-wrap items-center justify-between gap-3 px-5">
           <div class="w-24">
             <UiSelect v-model="perPage" :options="PER_PAGE_OPTIONS" placeholder="10" aria-label="Jumlah baris" />
@@ -244,6 +245,7 @@ const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Daftar Pegawa
         </div>
       </div>
     </UiCard>
+    </div>
 
     <TambahPegawaiDialog v-if="isSuperAdmin" v-model:open="tambahOpen" @created="onCreated" />
 

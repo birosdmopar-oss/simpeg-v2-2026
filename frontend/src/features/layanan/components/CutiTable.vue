@@ -31,7 +31,7 @@ const periode = (r: CutiItem): string => (r.tgl_mulai === r.tgl_akhir ? tgl(r.tg
 </script>
 
 <template>
-  <div ref="wadah" class="scrollbar-slim overflow-x-auto" @scroll.passive="updateActionsShadow">
+  <div ref="wadah" class="table-fill scrollbar-slim overflow-x-auto" @scroll.passive="updateActionsShadow">
     <table class="w-full min-w-[52rem] border-collapse text-left text-body1" data-testid="cuti-table">
       <thead>
         <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">

@@ -114,6 +114,16 @@ final class PmkPengajuanTest extends DatabaseTestCase
         $this->assertSame(0, (int) (new PmkPengajuanService())->tambah($auth, $this->isianPmk(['tgl_akhir' => '2015-02-28']), $this->berkasPmk())['status']);
     }
 
+    public function testOpsiMemuatPenandaAdalahPic(): void
+    {
+        [, $auth]       = $this->aktorStudi(Role::PEGAWAI);
+        [$picNip, $pic] = $this->aktorStudi(Role::PEGAWAI);
+        $this->jadikanPic($picNip, PetugasLayananService::JENIS_PMK);
+
+        $this->assertFalse((new PmkPengajuanService())->opsi($auth, null)['adalah_pic']);
+        $this->assertTrue((new PmkPengajuanService())->opsi($pic, null)['adalah_pic']);
+    }
+
     public function testTumpangTindihKecualiYangDitolak(): void
     {
         [, $auth]       = $this->aktorStudi(Role::PEGAWAI);

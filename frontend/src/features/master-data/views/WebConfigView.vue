@@ -131,7 +131,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="page-fill flex flex-col gap-4" data-testid="web-config-page">
     <div>
       <h1 class="text-xl font-semibold text-slate-900">Web Config</h1>
       <p class="text-sm text-slate-500">
@@ -156,7 +156,7 @@ onMounted(() => {
       </label>
     </div>
 
-    <div ref="tableScroller" class="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="web-config-table-scroll" @scroll.passive="updateActionsShadow">
+    <div ref="tableScroller" class="table-fill overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="web-config-table-scroll" @scroll.passive="updateActionsShadow">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
