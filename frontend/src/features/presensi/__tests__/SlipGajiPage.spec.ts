@@ -178,7 +178,9 @@ describe('SlipGajiPage — buka sekali & cetak', () => {
 
   it('422 saat buka (mis. sudah dibuka di perangkat lain): modal ditutup, pesan server tampil, status disegarkan', async () => {
     let panggil = 0
-    get.mockImplementation(() => {
+    get.mockImplementation((url: string) => {
+      // Shell memanggil pengingat cuti (PRD Fase 4 §6.4.7); hanya daftar slip yang dihitung.
+      if (url !== '/slip-gaji/saya') return gagal(404) as never
       panggil += 1
       const dibuka = panggil > 1
       return ok({ items: [ITEM({ dibuka, viewed_at_wib: dibuka ? '27 Oktober 2026, 08:00 WIB' : null })], periode_terbaru: '2026-09' }) as never

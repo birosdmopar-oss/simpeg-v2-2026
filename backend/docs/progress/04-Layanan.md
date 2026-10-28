@@ -351,6 +351,10 @@ Keputusan/ambigu untuk reviewer:
 4. Filter status daftar memakai kode 0/3/1/2/4 dikirim apa adanya ke `GET cuti?status=`.
 5. Tangkapan layar (API tiruan sintetis, tanpa Figma — acuan Q-18, AGENTS §3.6): 1440 dan 390 px, tanpa scroll horizontal halaman (`scrollWidth` = lebar viewport).
 
+**Paket 10 — Penutup M7** (branch `fase4/make-026-p10-penutup`, dari main `0e4e9cf`; satu-satunya paket yang menaikkan fase). `nav.config.ts`: grup Layanan (`phase: 4`) berisi Cuti, Saldo Cuti, Petugas Approval Cuti, Tugas Belajar, Izin Belajar, PMK, Status Layanan, Petugas Layanan; tiap anak memakai konstanta `features/layanan/roles.ts` (sama dengan `meta.roles` route; PRD §6.11.2: TB tanpa role 7, IB tanpa role 6, role 8 tanpa grup). `NavItem.rilis`/`NavChild.roles` milik WS-2 tidak diubah (grup Layanan tidak butuh `rilis` karena `ACTIVE_PHASE` naik). **`ACTIVE_PHASE = 4`** (AC-11.8). `PengingatCutiDialog` dipindah dari `CutiPage` ke shell (`PengingatCutiShell` dipasang di `RedesignShell`): tampil di halaman mana pun yang pertama dibuka setelah login bila `GET cuti/pengingat` tidak kosong, sekali per sesi tab (`sessionStorage`), hanya role Cuti (1, 2, 3, 6, 7) dan bukan sesi wajib ganti password; Keluar mengosongkan penanda. Test: `nav.config.spec` (menu per role, tujuan = path route, role anak = role route), `PengingatCutiShell.spec`; `navPresensi.spec`/`SlipGajiPage.spec` disesuaikan (fase 4; mock `api.get` dipilah per URL karena shell memanggil pengingat).
+
+Catatan untuk reviewer: (1) bila sesi kedaluwarsa (401) lalu login ulang di tab yang sama tanpa Keluar, penanda lama masih ada dan pengingat tidak tampil sekali lagi; pengingat tetap ada lewat tab Perlu Persetujuan; (2) QA responsif 1440/600/390 untuk menu dan dialog di shell dicatat di laporan reviewer (lihat laporan pengiriman).
+
 ## Fase 5B M1a — metode massal TB (MAKE-044, 28-10-2026, branch `fase5b/make-044-tb-massal` dari main `bb0648b`)
 
 Pengecualian tertulis PRD Fase 5B v1.0 F5B-18 (§3.2/§3.3): tambahan **aditif** di modul Fase 4 untuk konsumen Tukin massal

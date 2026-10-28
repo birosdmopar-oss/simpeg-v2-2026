@@ -3,7 +3,7 @@
  * Cuti Online (Modul C, PRD §6.11.1): tab Cuti Saya (role 2/6/7), Perlu Persetujuan (semua role route, badge jumlah),
  * Monitoring (role 1/3). Tabel + ⋮ (`cuti-actions-<id>`), pencarian/status, paginasi. Hak aksi per baris dari `aksi {}`
  * server. Tombol "Ajukan Cuti" dan aksi Edit ditambahkan paket form (Paket 2), Terbitkan TTE paket e-sign (Paket 3).
- * Pengingat persetujuan tampil sekali per sesi tab bila `GET cuti/pengingat` tidak kosong (reset listener `auth.login`).
+ * Pengingat persetujuan setelah login dipasang di shell (`PengingatCutiShell`), bukan di halaman ini.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Plus } from 'lucide-vue-next'
@@ -19,7 +19,6 @@ import CutiFormDialog from '../components/CutiFormDialog.vue'
 import CutiProsesDialog from '../components/CutiProsesDialog.vue'
 import EsignDialog from '../components/EsignDialog.vue'
 import CutiTable from '../components/CutiTable.vue'
-import PengingatCutiDialog from '../components/PengingatCutiDialog.vue'
 import { useCutiAksi } from '../composables/useCutiAksi'
 import { CUTI_ADMIN_ROLES, CUTI_SAYA_ROLES } from '../roles'
 import { LAYANAN_ROUTE } from '../routes.layanan'
@@ -27,7 +26,6 @@ import { cutiService } from '../services/cuti.service'
 import type { CutiItem, CutiListResponse, ModeCuti } from '../types'
 
 const PER_PAGE = 20
-const KUNCI_PENGINGAT = 'layanan-pengingat-cuti-tampil'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,55 +92,6 @@ const aksi = useCutiAksi(async () => {
   void muatJumlahPersetujuan()
 })
 
-const pengingatOpen = ref(false)
-const pengingat = ref<CutiItem[]>([])
-const pengingatError = ref('')
-const pengingatBusy = ref<number | null>(null)
-
-function sudahDitampilkan(): boolean {
-  try {
-    return window.sessionStorage.getItem(KUNCI_PENGINGAT) === '1'
-  } catch {
-    return false
-  }
-}
-
-function tandaiDitampilkan(): void {
-  try {
-    window.sessionStorage.setItem(KUNCI_PENGINGAT, '1')
-  } catch {
-    // Penyimpanan tidak tersedia → pengingat bisa tampil lagi pada muat berikutnya; tidak fatal.
-  }
-}
-
-async function muatPengingat(): Promise<void> {
-  if (sudahDitampilkan()) return
-  try {
-    const hasil = await cutiService.pengingat()
-    tandaiDitampilkan()
-    if (hasil.items.length > 0) {
-      pengingat.value = hasil.items
-      pengingatOpen.value = true
-    }
-  } catch {
-    // Pengingat gagal dimuat → abaikan; antrean tetap ada di tab Perlu Persetujuan.
-  }
-}
-
-async function tundaPengingat(row: CutiItem): Promise<void> {
-  pengingatBusy.value = row.id
-  pengingatError.value = ''
-  try {
-    await cutiService.tunda(row.id)
-    pengingat.value = pengingat.value.filter((p) => p.id !== row.id)
-    if (pengingat.value.length === 0) pengingatOpen.value = false
-  } catch (e) {
-    pengingatError.value = describeApiError(e).message
-  } finally {
-    pengingatBusy.value = null
-  }
-}
-
 function lihatDetail(row: CutiItem): void {
   void router.push({ name: LAYANAN_ROUTE.CUTI_DETAIL, params: { id: row.id } })
 }
@@ -172,7 +121,6 @@ function onSaved(): void {
 onMounted(() => {
   void muat()
   void muatJumlahPersetujuan()
-  void muatPengingat()
 })
 watch(tab, () => {
   page.value = 1
@@ -269,13 +217,5 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
       @confirm="aksi.hapus"
     />
 
-    <PengingatCutiDialog
-      v-model:open="pengingatOpen"
-      :items="pengingat"
-      :busy-id="pengingatBusy"
-      :error="pengingatError"
-      @proses="lihatDetail"
-      @tunda="tundaPengingat"
-    />
   </RedesignShell>
 </template>

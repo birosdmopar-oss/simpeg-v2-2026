@@ -2,8 +2,8 @@
  * Route Modul C (Layanan & Approval, Fase 4). Diimpor sekali dari `router/index.ts`; tiap paket M7 menambah route
  * halamannya di berkas ini (PRD §6.11.1). Role mengikuti `roles.ts`; guard FE hanya UX (ADR-024).
  *
- * Menu Fase 4 tetap tersembunyi sampai paket penutup (`ACTIVE_PHASE` dinaikkan hanya di sana, AC-11.8); halaman
- * dapat dibuka lewat URL langsung untuk QA.
+ * Menu Layanan tampil sejak paket penutup (Paket 10: `ACTIVE_PHASE = 4`, AC-11.8) dengan role yang sama dengan `meta.roles`
+ * di sini (`nav.config.ts` memakai konstanta `roles.ts`).
  */
 import type { RouteRecordRaw } from 'vue-router'
 
