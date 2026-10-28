@@ -83,7 +83,9 @@ Wajib:
    punya **area gulir mandiri**: menggulir menu tidak menggulir data dan sebaliknya; area lain tidak ikut tergulir.
    **Halaman daftar ber-tabel:** hanya body tabel yang menggulir; judul, tombol, filter, header kolom, dan paginasi tetap
    terlihat. Pakai pola `page-fill` (halaman) + `table-fill` (wadah tabel) dari `assets/main.css`, `UiCard fill`, dan
-   header `thead` sticky otomatis (CR-069).
+   header `thead` sticky otomatis (CR-069). Batasannya: `page-fill` (yang memotong tinggi dan `overflow: hidden`) hanya
+   untuk halaman yang isinya tabel/daftar; halaman berisi grafik, formulir, atau kartu tinggi (mis. tab Impor, ringkasan
+   besar) tetap menggulir normal di halaman, tanpa `page-fill`, agar konten di bawahnya tidak terkunci.
 5. **Top navbar sticky** di semua halaman (layout bersama), tidak tertutup konten saat menggulir.
 6. **Halaman tanpa frame Figma:** ikuti pola halaman lain yang sudah sesuai Figma, lalu catat di laporan pekerjaan bahwa
    Figma halaman itu belum ada.

@@ -131,6 +131,114 @@ describe('cutiService — amplop backend nyata lewat klien asli', () => {
     await expect(cutiService.process(12, { aksi: 'tolak' })).rejects.toMatchObject({ status: 422, errors: { reason_note: ['Alasan ditolak tidak boleh kosong.'] } })
   })
 
+  it('opsi() menormalkan jenis, pejabat, saldo, dan ketua tim (string MySQLi)', async () => {
+    server.balasan['get /cuti/opsi'] = sukses({
+      jenis_cuti: [
+        { id_jenis_cuti: '1', nama_jenis_cuti: 'Cuti Tahunan', pakai_durasi: '0', lampiran_wajib: '0' },
+        { id_jenis_cuti: '3', nama_jenis_cuti: 'Cuti Sakit', pakai_durasi: false, lampiran_wajib: true },
+      ],
+      atasan_langsung: { nip: '197', nama: 'Atasan', jabatan: 'Kabag', bisa_memproses: '1' },
+      pyb: [{ nip: '196', nama: 'Pejabat', jabatan: null, bisa_memproses: '0' }],
+      langkah_tunggal: '0',
+      eselon_i: '0',
+      saldo: { tahun: '2026', sisa_cuti: '12', sisa_cuti_n1: '6', sisa_cuti_n2: '4', saldo_tahun_ini: '22', saldo_tahun_depan: '0' },
+      tgl_akhir_maks: '2027-12-31',
+      ketua_tim: [{ nip: '111', nama: 'Ketua' }],
+      can_create: '1',
+    })
+
+    const o = await cutiService.opsi('198001012005011001')
+
+    expect(server.permintaan[0]?.params).toEqual({ nip: '198001012005011001' })
+    expect(o.jenis_cuti).toEqual([
+      { id_jenis_cuti: 1, nama_jenis_cuti: 'Cuti Tahunan', pakai_durasi: false, lampiran_wajib: false },
+      { id_jenis_cuti: 3, nama_jenis_cuti: 'Cuti Sakit', pakai_durasi: false, lampiran_wajib: true },
+    ])
+    expect(o.atasan_langsung).toMatchObject({ nip: '197', bisa_memproses: true })
+    expect(o.pyb[0]).toMatchObject({ jabatan: null, bisa_memproses: false })
+    expect(o.saldo).toMatchObject({ tahun: 2026, sisa_cuti_n2: 4, saldo_tahun_ini: 22 })
+    expect(o.can_create).toBe(true)
+    expect(o.eselon_i).toBe(false)
+  })
+
+  it('hitungLama() membuka amplop dan menormalkan kuota, hari libur, dan tgl_akhir', async () => {
+    server.balasan['post /cuti/hitung-lama'] = sukses({
+      lama_cuti: '3',
+      satuan_lama_cuti: 'Hari',
+      tgl_akhir: null,
+      hari_libur: [{ tanggal: '2026-11-05', keterangan: 'Libur' }],
+      kuota: { tahun: '2026', sisa_cuti: '12', sisa_cuti_n1: '6', sisa_cuti_n2: '4', saldo_tahun_ini: '19', menunggu_tahun_ini: '1', diajukan_tahun_ini: '3', saldo_tahun_depan: '0', menunggu_tahun_depan: '0', diajukan_tahun_depan: '0', sisa_setelah_tahun_ini: '15', sisa_setelah_tahun_depan: '-2', cukup: '0', pesan: 'Tidak cukup' },
+    })
+
+    const h = await cutiService.hitungLama({ id_jenis_cuti: 1, tgl_mulai: '2026-11-04', tgl_akhir: '2026-11-06' })
+
+    expect(h.lama_cuti).toBe(3)
+    expect(h.tgl_akhir).toBeNull()
+    expect(h.hari_libur).toEqual([{ tanggal: '2026-11-05', keterangan: 'Libur' }])
+    expect(h.kuota).toMatchObject({ tahun: 2026, sisa_cuti_n1: 6, saldo_tahun_ini: 19, sisa_setelah_tahun_ini: 15, sisa_setelah_tahun_depan: -2, cukup: false, pesan: 'Tidak cukup' })
+    expect(JSON.parse(String(server.permintaan[0]?.data))).toEqual({ id_jenis_cuti: 1, tgl_mulai: '2026-11-04', tgl_akhir: '2026-11-06' })
+  })
+
+  it('hitungLama() jenis non-Tahunan: kuota null tetap null', async () => {
+    server.balasan['post /cuti/hitung-lama'] = sukses({ lama_cuti: '31', satuan_lama_cuti: 'Hari', tgl_akhir: '2026-12-03', hari_libur: [], kuota: null })
+
+    const h = await cutiService.hitungLama({ id_jenis_cuti: 2, tgl_mulai: '2026-11-04', durasi: 1 })
+
+    expect(h.kuota).toBeNull()
+    expect(h.tgl_akhir).toBe('2026-12-03')
+  })
+
+  it('create()/update() mengirim multipart: ketua_tim[] berulang, file_bukti, dan _method=PUT', async () => {
+    server.balasan['post /cuti'] = sukses(barisCuti())
+    server.balasan['post /cuti/12'] = sukses(barisCuti())
+    const isian = {
+      id_jenis_cuti: '1',
+      tgl_mulai: '2026-11-04',
+      tgl_akhir: '2026-11-06',
+      no_telp_saat_cuti: '0812',
+      alamat_saat_cuti: 'Jl. Uji',
+      keterangan: 'Keperluan keluarga besar',
+      ketua_tim: ['111', '222'],
+    }
+    const berkas = new File(['%PDF'], 'bukti.pdf', { type: 'application/pdf' })
+
+    const dibuat = await cutiService.create(isian, berkas)
+    const fdBuat = server.permintaan[0]?.data as FormData
+    expect(dibuat.id).toBe(12)
+    expect(fdBuat.getAll('ketua_tim[]')).toEqual(['111', '222'])
+    expect(fdBuat.get('id_jenis_cuti')).toBe('1')
+    expect((fdBuat.get('file_bukti') as File).name).toBe('bukti.pdf')
+    expect(fdBuat.has('lama_cuti')).toBe(false)
+
+    await cutiService.update(12, isian, null)
+    const fdUbah = server.permintaan[1]?.data as FormData
+    expect(fdUbah.get('_method')).toBe('PUT')
+    expect(fdUbah.has('file_bukti')).toBe(false)
+  })
+
+  it('esign() mengirim passphrase hanya di body JSON (bukan URL/query) dan mengembalikan item terbaru', async () => {
+    server.balasan['post /cuti/12/esign'] = sukses(barisCuti({ status: '1', label_status: 'Disetujui', nada_status: 'success', aksi: { esign: '0', unduh_surat: '1' } }))
+
+    const item = await cutiService.esign(12, 'rahasia-Passphrase-123')
+
+    const req = server.permintaan[0]!
+    expect(req.url).toBe('/cuti/12/esign')
+    expect(req.params).toBeUndefined()
+    expect(JSON.parse(String(req.data))).toEqual({ passphrase: 'rahasia-Passphrase-123' })
+    expect(item.id).toBe(12)
+    expect(item.aksi.esign).toBe(false)
+    expect(item.aksi.unduh_surat).toBe(true)
+  })
+
+  it('esign() 422: galat per kolom passphrase/nip/status diteruskan tanpa membuka passphrase', async () => {
+    server.balasan['post /cuti/12/esign'] = {
+      status: 422,
+      body: { status: 'error', message: 'Validasi gagal.', errors: { passphrase: ['Passphrase tidak sesuai.'], nip: ['Data pejabat tidak terdaftar.'] } },
+    }
+
+    await expect(cutiService.esign(12, 'x')).rejects.toMatchObject({ status: 422, errors: { passphrase: ['Passphrase tidak sesuai.'], nip: ['Data pejabat tidak terdaftar.'] } })
+  })
+
   it('data kosong/rusak tidak melempar TypeError', async () => {
     server.balasan['get /cuti'] = sukses({})
 

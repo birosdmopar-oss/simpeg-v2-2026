@@ -173,8 +173,60 @@ tiap tahap gate cepat + CI + `./check.sh` sekali. Status FE 5A tetap IN_PROGRESS
   Backend aditif: respons buka slip memuat `pegawai {nip, nama, pangkat, jabatan, unit, satker}` untuk identitas kartu
   [K `_slip_content.php`]. Test: `features/presensi/__tests__/{services.amplop,SlipGajiPage,VerifikasiSlipPage,navPresensi}.spec.ts`
   (klien axios asli untuk service, payload string), `nav.config.spec.ts`.
-- **Figma:** acuan hanya Slip Gaji (PNG); halaman verifikasi tanpa frame Figma → pola `AuthCardLayout` (AGENTS §3.6).
-- **Berikutnya:** tahap (b) Kelola Slip Gaji (monitoring, impor, koreksi); tahap (c) Presensi Saya + Data Presensi + manual.
+- **Tahap (a) di `main` `5279b82`** (28-10-2026, izin Horii).
+- **Tahap (b) (28-10-2026):** `/presensi/slip-gaji/kelola` (`SlipGajiKelolaPage`, role 1, 3) [K `admin_list.php`,
+  `admin_import.php`]:
+  - Tab **Monitoring** (`SlipGajiMonitoring`): periode wajib, bawaan periode terbaru yang tersedia [K
+    `Sl_gaji.php:219-221`]; filter satker hanya role 1 (opsi `master/satker/options`; role 3 dipaksa server); status
+    pembukaan dan pencarian; ringkasan jumlah/dibuka/belum. Kolom tabel: NIP, Nama, Unit/Satker, Periode, badge
+    Status, Waktu dibuka WIB, IP. Menu ⋮ `slipgaji-actions-<id>`: Edit → Lihat detail → Cetak PDF → Buka ulang
+    (dari `aksi` server; Buka ulang `hidden` bila belum dibuka, lewat `ConfirmDialog`).
+  - `SlipGajiDetailDialog`: rincian admin berisi identitas dan seluruh kolom GPP/TK termasuk Pajak/Tunjangan Pajak
+    (modal admin legacy tidak diubah `0cf7e67`), uang makan, total, dan Cetak PDF.
+  - `SlipGajiKoreksiDialog`: 28 kolom desimal titik, 422 per kolom, uang makan tidak dapat dikoreksi; dua kolom, satu
+    kolom ≤ 600 px.
+  - Tab **Impor** (`SlipGajiImpor`): unggah .xlsx/.xls (`UiFileField`) + filter periode opsional (`UiMonthPicker` →
+    `filter_bulan`/`filter_tahun`); tabel pratinjau berisi status per baris dari server dan baris galat ditandai warna
+    beserta pesannya; "Timpa data yang sudah ada" bawaan dari server (tercentang); "Simpan ke Database" lewat
+    `ConfirmDialog`; hasil commit ditampilkan; 409 menampilkan ajakan unggah ulang.
+  - Backend aditif: `GET|PUT slip-gaji/{id}` memuat `pegawai {nip, nama, pangkat, jabatan, unit, satker}` untuk
+    identitas modal [K `admin_list.php:459-470`].
+  - Berkas bersama aditif (commit terpisah): `nav.config.ts` menambah anak "Kelola Slip Gaji" (role 1, 3) beserta spec.
+  - Test: `slipGajiAdmin.amplop.spec.ts` (klien asli), `SlipGajiKelolaPage.spec.ts`, `ImporPratinjau.spec.ts`,
+    `navPresensi.spec.ts`.
+- **Temuan di luar lingkup (dilaporkan ke reviewer CR 28-10):** sejak CR-060 (`9d212f0`), menu ⋮ `RowActionsMenu`
+  tidak terposisi di browser nyata (wrapper popper tetap `translate(0, -200%)`). Penyebabnya trigger dropdown dibungkus
+  `UiTooltip`; dibuktikan dengan melepas pembungkus secara lokal. Komponen bersama tidak diubah di MAKE-034 (PRD 5A
+  §7.8); perbaikan menunggu kartu CR.
+- **Figma:** acuan hanya Slip Gaji (PNG); halaman verifikasi dan Kelola Slip Gaji tanpa frame Figma → pola
+  `AuthCardLayout` / komponen Fase 3 (AGENTS §3.6).
+- **Tahap (b) di `main` `5a3a35c`** (28-10-2026, izin Horii).
+- **Tahap (c) (28-10-2026):**
+  - `/presensi` (`PresensiPage`, role 2, 6, 7) [K `dashboard_pns.php` panel presensi], mobile-first:
+    - Tanggal, jam lokal, jendela, dan `boleh_*` dari server; jam berjalan hanya tampilan.
+    - Tombol Rekam Masuk/Pulang dengan alasan nonaktif berupa teks.
+    - Panel status lokasi sebelum submit: izin, koordinat, akurasi, putusan `cek-lokasi` server, dan
+      `IndikatorRadius` (SVG lingkaran radius + posisi relatif, tanpa peta tile, ◻ Q5A-10).
+    - `useGeolokasi`: `getCurrentPosition` tiap 10 detik (`enableHighAccuracy`, `timeout` 10000, `maximumAge` 0).
+      `cek-lokasi` maks sekali per pembacaan (toleransi 500 ms agar pembacaan yang datang beberapa ms lebih awal
+      tidak terlewat).
+    - Koordinat dikirim di body.
+    - Riwayat pribadi per bulan (`UiMonthPicker`) + paginasi + badge Sumber.
+  - `/presensi/data` (`DataPresensiPage`, role 1, 3, 4, 5) [K `list_ad.php`, `list.php`]:
+    - Daftar pegawai (lingkup server, filter unit/satker berjenjang, pencarian) → ⋮ "Lihat presensi" → detail `?nip=`
+      (rentang tanggal, bawaan 100 terbaru, badge Sumber Online/Manual/Impor, lokasi masuk/pulang).
+    - Akun khusus (dari `can_*`/`aksi`) mendapat "Tambah Presensi" + ⋮ `presensi-actions-<nip>-<tgl>` Edit → Hapus
+      (`danger`, `ConfirmDialog`).
+  - `PresensiManualDialog`: tambah/edit, `UiDatePicker`/`UiTimePicker`, 422 per kolom. Saat edit, jam yang tidak
+    diubah dikirim apa adanya (detik tidak hilang) agar server tidak mengosongkan bukti lokasi (◻ Q5A-16).
+  - Berkas bersama aditif (commit terpisah): `nav.config.ts` menambah anak Presensi Saya (2, 6, 7) dan Data Presensi
+    (1, 3, 4, 5). Menu Presensi kini lengkap sesuai §7.8.2; role 4 dan 5 kini melihat grup Presensi.
+  - Test: `presensi.amplop.spec.ts` (klien asli), `PresensiPage.spec.ts` (geolokasi tiruan + timer palsu),
+    `DataPresensiPage.spec.ts`, `PresensiManualDialog.spec.ts`, `navPresensi.spec.ts`, `nav.config.spec.ts`.
+  - Cek browser nyata (pratinjau + API tiruan): izin lokasi ditolak (state asli browser pane), lalu geolokasi tiruan
+    dalam/luar radius; rekam masuk; menu ⋮ desktop + 375 px; dialog edit di 375 px.
+- **Figma:** halaman Presensi Saya dan Data Presensi tanpa frame Figma → pola komponen Fase 3 (AGENTS §3.6).
+- **Berikutnya:** M8 MAKE-035 (verifikasi 5A) setelah tahap (c) di `main`; checklist Q5A-18 disiapkan menjelang QA.
 
 ### Q cutover 5A
 

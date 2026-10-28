@@ -115,7 +115,8 @@ async function onExport(format: ExportFormat['key']): Promise<void> {
     <UiNotice v-if="notice" tone="info" dismissible class="mb-4" @dismiss="notice = null">{{ notice }}</UiNotice>
     <UiNotice v-if="failure" tone="danger" class="mb-4" data-testid="laporan-failure">{{ failure }}</UiNotice>
 
-    <div class="page-fill flex flex-col gap-5" data-testid="laporan-page" :aria-busy="memuat">
+    <!-- Berisi grafik dan kartu komposisi: menggulir normal, bukan `page-fill` (AGENTS §3.4, CR-069). -->
+    <div class="flex flex-col gap-5" data-testid="laporan-page" :aria-busy="memuat">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-h2 font-semibold text-slate-900">{{ judul }}</h1>

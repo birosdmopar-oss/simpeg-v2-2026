@@ -81,6 +81,18 @@ final readonly class AturanCuti
         return new self();
     }
 
+    /** Jenis yang diisi lewat `durasi` (bulan); `tgl_akhir` dihitung server (§6.3.2). Satu sumber untuk validasi dan `GET cuti/opsi`. */
+    public function pakaiDurasi(int $jenis): bool
+    {
+        return $jenis === self::JENIS_BESAR;
+    }
+
+    /** Jenis yang wajib berlampiran bukti (klien legacy mewajibkan; PRD §6.2.3 `file_bukti`). Petunjuk tampilan di `GET cuti/opsi`. */
+    public function lampiranWajib(int $jenis): bool
+    {
+        return $jenis === self::JENIS_SAKIT;
+    }
+
     public function jenisDikenal(int $jenis): bool
     {
         return in_array($jenis, $this->jenisHariKerja, true) || in_array($jenis, $this->jenisHariKalender, true);

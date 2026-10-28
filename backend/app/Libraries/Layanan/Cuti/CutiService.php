@@ -1129,7 +1129,12 @@ class CutiService
 
         $rows = $this->db->table('jenis_cuti')->select('id_jenis_cuti, nama_jenis_cuti')->whereIn('id_jenis_cuti', $ids)->orderBy('order', 'ASC')->get()->getResultArray();
 
-        return array_map(static fn (array $r): array => ['id_jenis_cuti' => (int) $r['id_jenis_cuti'], 'nama_jenis_cuti' => (string) $r['nama_jenis_cuti']], $rows);
+        return array_map(fn (array $r): array => [
+            'id_jenis_cuti'   => (int) $r['id_jenis_cuti'],
+            'nama_jenis_cuti' => (string) $r['nama_jenis_cuti'],
+            'pakai_durasi'    => $this->aturan->pakaiDurasi((int) $r['id_jenis_cuti']),
+            'lampiran_wajib'  => $this->aturan->lampiranWajib((int) $r['id_jenis_cuti']),
+        ], $rows);
     }
 
     /**

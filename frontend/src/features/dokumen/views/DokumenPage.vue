@@ -228,7 +228,8 @@ async function onAksi(key: string, row: DokumenItem): Promise<void> {
     <UiNotice v-if="failure" tone="danger" class="mb-4" data-testid="dokumen-failure">{{ failure }}</UiNotice>
     <UiNotice v-if="galatUnduh" tone="warning" dismissible class="mb-4" data-testid="dokumen-unduh-galat" @dismiss="galatUnduh = null">{{ galatUnduh }}</UiNotice>
 
-    <div class="page-fill flex flex-col gap-5" data-testid="dokumen-page" :aria-busy="memuat">
+    <!-- Berisi formulir filter dan pilihan baperjakat: menggulir normal, bukan `page-fill` (AGENTS §3.4, CR-069). -->
+    <div class="flex flex-col gap-5" data-testid="dokumen-page" :aria-busy="memuat">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 class="text-h2 font-semibold text-slate-900">{{ judul }}</h1>

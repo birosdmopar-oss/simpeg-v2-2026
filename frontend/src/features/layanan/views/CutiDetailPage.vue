@@ -15,7 +15,9 @@ import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiNotice, UiStepper } from '@/shared/ui'
 
+import CutiFormDialog from '../components/CutiFormDialog.vue'
 import CutiProsesDialog from '../components/CutiProsesDialog.vue'
+import EsignDialog from '../components/EsignDialog.vue'
 import StatusLayananBadge from '../components/StatusLayananBadge.vue'
 import { useCutiAksi } from '../composables/useCutiAksi'
 import { aksiBarisCuti, labelAksiCuti } from '../rowActionsCuti'
@@ -76,8 +78,17 @@ async function unduhLampiran(): Promise<void> {
   }
 }
 
+const formOpen = ref(false)
+
 function onAction(key: string): void {
-  if (detail.value) aksi.pilih(key, detail.value)
+  if (!detail.value) return
+  if (key === 'edit') formOpen.value = true
+  else aksi.pilih(key, detail.value)
+}
+
+function onSaved(): void {
+  aksi.notice.value = { tone: 'success', text: 'Pengajuan cuti disimpan.' }
+  void muat()
 }
 
 const subjekProses = computed(() => (detail.value ? `cuti ${detail.value.nama} (${detail.value.nama_jenis_cuti})` : ''))
@@ -151,6 +162,8 @@ const catatan = computed(() => {
       </UiCard>
     </template>
 
+    <CutiFormDialog v-if="detail" v-model:open="formOpen" :row="detail" @saved="onSaved" />
+
     <CutiProsesDialog
       v-if="aksi.prosesRow.value"
       :open="aksi.prosesOpen.value"
@@ -161,6 +174,16 @@ const catatan = computed(() => {
       :error="aksi.prosesError.value"
       @update:open="(v) => (aksi.prosesOpen.value = v)"
       @confirm="aksi.proses"
+    />
+
+    <EsignDialog
+      :open="aksi.esignOpen.value"
+      :subject="aksi.esignRow.value ? `surat cuti ${aksi.esignRow.value.nama}` : ''"
+      :loading="aksi.esignBusy.value"
+      :errors="aksi.esignErrors.value"
+      :umum="aksi.esignUmum.value"
+      @update:open="(v) => (aksi.esignOpen.value = v)"
+      @confirm="aksi.esign"
     />
 
     <ConfirmDialog

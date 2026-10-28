@@ -54,7 +54,7 @@ import {
 } from '@/features/kepegawaian/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
-import { SLIP_GAJI_PEGAWAI_ROLES } from '@/features/presensi/roles'
+import { PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from '@/features/presensi/roles'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
@@ -150,7 +150,12 @@ const NAV: NavGroup[] = [
         icon: AlarmClock,
         phase: 5,
         rilis: true,
-        children: [{ key: 'presensi-slip-gaji', label: 'Slip Gaji', to: '/presensi/slip-gaji', roles: SLIP_GAJI_PEGAWAI_ROLES }],
+        children: [
+          { key: 'presensi-saya', label: 'Presensi Saya', to: '/presensi', roles: PRESENSI_PEGAWAI_ROLES },
+          { key: 'presensi-slip-gaji', label: 'Slip Gaji', to: '/presensi/slip-gaji', roles: SLIP_GAJI_PEGAWAI_ROLES },
+          { key: 'presensi-slip-gaji-kelola', label: 'Kelola Slip Gaji', to: '/presensi/slip-gaji/kelola', roles: SLIP_GAJI_ADMIN_ROLES },
+          { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: PRESENSI_ADMIN_ROLES },
+        ],
       },
       // Fase 7 (Dashboard/laporan) F-03 MAKE-036: 7 statistik (hr/chart/* = role 1, 3, 4, 5, 8); 3 pertama mengikuti
       // mockup Gambar 15. Tetap `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7); QA lewat URL langsung (PRD F7-14).

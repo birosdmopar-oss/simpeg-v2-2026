@@ -6,15 +6,18 @@
  * Pengingat persetujuan tampil sekali per sesi tab bila `GET cuti/pengingat` tidak kosong (reset listener `auth.login`).
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Plus } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { UiCard, UiNotice, UiPagination, UiSearchInput, UiSelect, UiTabs } from '@/shared/ui'
+import { UiButton, UiCard, UiNotice, UiPagination, UiSearchInput, UiSelect, UiTabs } from '@/shared/ui'
 
+import CutiFormDialog from '../components/CutiFormDialog.vue'
 import CutiProsesDialog from '../components/CutiProsesDialog.vue'
+import EsignDialog from '../components/EsignDialog.vue'
 import CutiTable from '../components/CutiTable.vue'
 import PengingatCutiDialog from '../components/PengingatCutiDialog.vue'
 import { useCutiAksi } from '../composables/useCutiAksi'
@@ -144,9 +147,26 @@ function lihatDetail(row: CutiItem): void {
   void router.push({ name: LAYANAN_ROUTE.CUTI_DETAIL, params: { id: row.id } })
 }
 
+const formOpen = ref(false)
+const formRow = ref<CutiItem | null>(null)
+
+function ajukan(): void {
+  formRow.value = null
+  formOpen.value = true
+}
+
 function onAction(key: string, row: CutiItem): void {
   if (key === 'detail') lihatDetail(row)
-  else aksi.pilih(key, row)
+  else if (key === 'edit') {
+    formRow.value = row
+    formOpen.value = true
+  } else aksi.pilih(key, row)
+}
+
+function onSaved(): void {
+  aksi.notice.value = { tone: 'success', text: 'Pengajuan cuti disimpan.' }
+  void muat()
+  void muatJumlahPersetujuan()
 }
 
 onMounted(() => {
@@ -189,6 +209,9 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
   <RedesignShell :breadcrumbs="crumbs">
     <div class="page-fill flex flex-col gap-4" data-testid="cuti-page">
     <UiCard title="Cuti" class="flex min-h-0 flex-1 flex-col" fill>
+      <template #actions>
+        <UiButton v-if="data?.can_create" data-testid="cuti-tambah" @click="ajukan"><Plus class="h-4 w-4" aria-hidden="true" /> Ajukan Cuti</UiButton>
+      </template>
       <UiTabs v-model="tab" :items="tabs" aria-label="Daftar cuti" class="mb-4" />
 
       <div class="mb-4 grid gap-3 md:grid-cols-3" data-testid="cuti-filter">
@@ -212,6 +235,8 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
     </UiCard>
     </div>
 
+    <CutiFormDialog v-model:open="formOpen" :row="formRow" @saved="onSaved" />
+
     <CutiProsesDialog
       v-if="aksi.prosesRow.value"
       :open="aksi.prosesOpen.value"
@@ -222,6 +247,16 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
       :error="aksi.prosesError.value"
       @update:open="(v) => (aksi.prosesOpen.value = v)"
       @confirm="aksi.proses"
+    />
+
+    <EsignDialog
+      :open="aksi.esignOpen.value"
+      :subject="aksi.esignRow.value ? `surat cuti ${aksi.esignRow.value.nama}` : ''"
+      :loading="aksi.esignBusy.value"
+      :errors="aksi.esignErrors.value"
+      :umum="aksi.esignUmum.value"
+      @update:open="(v) => (aksi.esignOpen.value = v)"
+      @confirm="aksi.esign"
     />
 
     <ConfirmDialog

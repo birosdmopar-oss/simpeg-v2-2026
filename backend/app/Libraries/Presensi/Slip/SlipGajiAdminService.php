@@ -346,6 +346,15 @@ final class SlipGajiAdminService
             'viewed_ip' => $row['viewed_ip'],
             ...SlipGajiData::nominal($row),
             'aksi' => ['lihat' => true, 'cetak' => true, 'koreksi' => true, 'buka_ulang' => $dibuka],
+            // Identitas modal rincian/koreksi admin [K `admin_list.php:456-472`] (MAKE-034, aditif).
+            'pegawai' => [
+                'nip'     => (string) $row['nip'],
+                'nama'    => $pegawai['nama_bergelar'] ?? null,
+                'pangkat' => $pegawai['pangkat'] ?? '-',
+                'jabatan' => $pegawai['jabatan'] ?? '-',
+                'unit'    => $pegawai['unit'] ?? '-',
+                'satker'  => $pegawai['satker'] ?? '-',
+            ],
         ];
     }
 
