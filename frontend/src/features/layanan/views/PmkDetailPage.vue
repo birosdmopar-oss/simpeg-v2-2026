@@ -103,7 +103,7 @@ const labelKolom = (kolom: string): string => labelBerkas.value[kolom] ?? kolom
             <StatusLayananBadge :label="detail.label_status" :nada="detail.nada_status" />
             <RowActionsMenu
               :actions="aksiBarisPmk(detail, { busy: aksi.busyId.value === detail.id, detail: false, labelBerkas })"
-              :label="labelAksiPmk(detail, periode, true)"
+              :label="labelAksiPmk(detail, periode)"
               :testid="`pmk-actions-${detail.id}`"
               @select="onAction"
             />

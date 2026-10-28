@@ -157,6 +157,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // Modul C — Fase 4 C-10 Dashboard Status Layanan & PIC (MAKE-025 M6): PRD §5.5, route role 1–7 (role 8 → 403);
             // lingkup per role di LayananDashboardService (PegawaiScope), tulis PIC role 1 saja di PetugasLayananService.
             'GET api/v1/layanan/status'              => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/layanan/status/ekspor'       => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/layanan/jenis'               => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/layanan/petugas'             => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/layanan/petugas/kandidat'    => [1],
