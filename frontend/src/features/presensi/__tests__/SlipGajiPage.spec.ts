@@ -41,7 +41,7 @@ const BUKA = {
   label: 'September 2026',
   viewed_at: '2026-10-27T02:00:00Z',
   viewed_at_wib: '27 Oktober 2026, 09:00 WIB',
-  rincian: { gjpokok: '3000000.00', tjistri: '300000.00', potpfkbul: '100000.00', bersih_gpp: '3200000.00', kotor: '2000000.00', bersih_tk: '1900000.00', bersih_2: '1850000.00' },
+  rincian: { gjpokok: '3000000.00', tjistri: '300000.00', potpfkbul: '100000.00', bersih_gpp: '3200000.00', kotor: '2000000.00', bersih_tk: '1900000.00', pajak: '70000.00', tunj_pajak: '90000.00', bersih_2: '1850000.00' },
   ringkasan: {
     jumlah_penghasilan_gpp: '3300000.00',
     jumlah_potongan_gpp: '100000.00',
@@ -149,6 +149,10 @@ describe('SlipGajiPage — buka sekali & cetak', () => {
     expect(testid('slip-potpfkbul')?.textContent).toContain('- 100.000')
     expect(testid('slip-total')?.textContent).toContain('5.100.000')
     expect(testid('slip-ringkasan')?.textContent).toContain('Total Penghasilan September 2026')
+    // CR-067 [K `_slip_content.php` @0cf7e67 :43-46]: bagian TK tanpa baris Pajak / Tunjangan Pajak.
+    const tk = $('section[aria-labelledby="slip-tk"]')?.textContent ?? ''
+    expect(tk).toContain('Penghasilan Kotor')
+    expect(tk).not.toMatch(/Pajak|70\.000|90\.000/)
 
     vi.mocked(ambilBerkas).mockResolvedValue({ blob: new Blob(['%PDF-']), nama: 'slip.pdf' })
     ;(testid('slip-cetak-pdf') as HTMLButtonElement).click()

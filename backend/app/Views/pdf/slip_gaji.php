@@ -1,6 +1,6 @@
 <?php
 /**
- * PDF slip gaji (PRD 5A §7.3.6) — port tata letak legacy `771f8b4` `views/hr/employee/sl_gaji/print/cetak.php` [K]:
+ * PDF slip gaji (PRD 5A §7.3.6) — port tata letak legacy `0cf7e67` `views/hr/employee/sl_gaji/print/cetak.php` [K]:
  * kotak dokumen berisi kop (logo kiri/kanan, nama kementerian & unit satu baris, alamat), judul "SLIP GAJI", identitas
  * + QR, rincian A. GPP (dua kolom penghasilan | potongan) → B. TK → C. Uang Makan → Ringkasan Penghasilan.
  *
@@ -29,7 +29,7 @@ $alamat    = (string) preg_replace('/<a\b[^>]*>(.*?)<\/a>/is', '$1', $d->kop['al
 $rp        = static fn (int $sen): string => NominalGaji::formatAngka($sen);
 $sen       = static fn (string $f): int => $d->sen[$f] ?? 0;
 
-// Kelompok rincian [K print/cetak.php @771f8b4 :262-277].
+// Kelompok rincian [K print/cetak.php @771f8b4 :262-277; TK @0cf7e67 :274-277].
 $gppGroups = [
     'Penghasilan' => [
         'Gaji Pokok'         => ['gjpokok'],
@@ -42,7 +42,9 @@ $gppGroups = [
         'Potongan Lainnya' => ['potswrum', 'potkelbtj', 'pottabrum', 'potlain'],
     ],
 ];
-$tkGroups = ['Penghasilan' => ['kotor', 'tunj_pajak'], 'Potongan' => ['potongan', 'pajak']];
+// TK hanya Penghasilan Kotor & Potongan; baris "Pajak" dan "Tunjangan Pajak" dihapus [K print/cetak.php @0cf7e67 :274-277]
+// (CR-067). Kolom `pajak`/`tunj_pajak` tetap disimpan & diimpor; hanya tidak ditampilkan.
+$tkGroups = ['Penghasilan' => ['kotor'], 'Potongan' => ['potongan']];
 
 $baris = static fn (string $label, int $nilai, int $indent = 0, bool $neg = false): string => '<tr>'
     . '<td width="82%" align="left" style="padding-left: ' . $indent . 'px;">' . esc($label) . '</td>'
@@ -178,7 +180,7 @@ $identitas      = [
         <?= $section('B. TUNJANGAN KINERJA (TK)') ?>
         <?= $duaKolom($sisiTk['Penghasilan'], $sisiTk['Potongan']) ?>
         <?= $sp(3) ?>
-        <?= $duaKolom($tintSetengah('Jumlah Penghasilan', $sen('kotor') + $sen('tunj_pajak')), $tintSetengah('Jumlah Potongan', $sen('potongan') + $sen('pajak'), true)) ?>
+        <?= $duaKolom($tintSetengah('Jumlah Penghasilan', $sen('kotor')), $tintSetengah('Jumlah Potongan', $sen('potongan'), true)) ?>
         <?= $sp(3) ?>
         <?= $tint($labelTkBersih, $ringkasan['bersih_tk'], '#e4e9f0', 8) ?>
 

@@ -13,7 +13,11 @@ Namespace `App\Libraries\Presensi\SlipGaji` dipilih karena Slip Gaji adalah bagi
 Label sumber: **[K]** = kode legacy; acuan perilaku Slip Gaji **`771f8b4`** (08-10-2026, F5-1, PRD Fase 5A
 `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` §7.3.8) menggantikan baseline CR-027 `39b6b15`. Seluruh rujukan baris
 di README ini sudah dicocokkan ulang ke `771f8b4` (M4 MAKE-031; penanda `@771f8b4` pada baris yang isinya berubah oleh
-F5-1). Rujukan baris di docblock kelas `SlipGaji/*.php` tetap baseline `39b6b15` (folder murni hanya diubah sebatas
+F5-1). **Acuan dinaikkan ke `0cf7e67`** (26-10-2026, CR-067, keputusan Horii): selisih `771f8b4..0cf7e67` hanya
+`1c3142f` (snapshot uang makan tidak ditimpa 0, logo PDF disematkan data URI — v2 sudah setara: `SlipGajiService::snapshotUangMakan`,
+`PdfSlipGaji::logo`) dan `0cf7e67` (baris Pajak/Tunjangan Pajak dihapus dari bagian TK, P-10 / PDF-7); rujukan `@771f8b4`
+yang lain tetap berlaku untuk isinya, tetapi nomor baris `Lsl_gaji.php` sesudah `:157` bergeser di `0cf7e67` (mis.
+`hitungRingkasan` `:416-446`, rumus total `:430-434`). Rujukan baris di docblock kelas `SlipGaji/*.php` tetap baseline `39b6b15` (folder murni hanya diubah sebatas
 §7.3.8). Path relatif ke `application/` legacy; **[V2]** = dokumen v2 (05-Presensi, FSD, SRS, Matriks_Role_x_Endpoint, MTC). Keputusan: **IKUT** legacy, **PERBAIKI** (bug legacy diperbaiki), **FASE-5** (butuh DB/I/O). Butir yang dulu berlabel TUNGGU-BK/TUNGGU-USER sudah terjawab dari kode legacy (CR-039, 02-10-2026; lihat "Terjawab dari legacy"). Contoh dan test memakai data sintetis saja.
 
 | Kelas | Isi |
@@ -54,6 +58,7 @@ F5-1). Rujukan baris di docblock kelas `SlipGaji/*.php` tetap baseline `39b6b15`
 | P-7 | Nama berkas `Slip_Gaji_{NAMA}_{Bulan}_{Tahun}.pdf`, nama disanitasi `[A-Z0-9_]`, fallback NIP | `Lsl_gaji.php:573` | — | PERBAIKI; `FormatSlip::namaBerkasPdf` |
 | P-8 | Label uang makan bulan−1 | `@771f8b4`: layar `views/hr/employee/sl_gaji/_slip_content.php:59-66` (bagian "C. Uang Makan", keterangan "Presensi {Bulan} {Tahun} · {n} hari"); PDF `print/cetak.php:362-365`, `:412-420` (label "Uang Makan (Presensi {Bulan} {Tahun})", baris "Uang Makan" di Ringkasan) | Feature/Brainstorm; F5-1 | IKUT `771f8b4` (revisi F5-1): uang makan bulan−1 ditampilkan dengan label di atas; bulan kehadiran = `PeriodeSlip::sebelumnya()`; nilai dari snapshot `uang_makan`/`uang_makan_hari`/`uang_makan_periode` (`m-YYYY`) yang ditulis saat slip dibuka (PRD 5A §7.3.7; nilai dihitung 5B) |
 | P-9 | Nama bergelar `"{gelar awal} {nama}, {gelar akhir}"`, bagian kosong dilewati | `helpers/function_helper.php:102-108` (`formatNamaGelar`, dipakai admin, verifikasi, pratinjau); hanya PDF tanpa koma (`print/cetak.php:12`) | — | IKUT helper aplikasi di semua keluaran; `PencocokanNama::denganGelar` |
+| P-10 | Bagian B (TK) hanya "Penghasilan Kotor" (Penghasilan) dan "Potongan" (Potongan); baris "Pajak" dan "Tunjangan Pajak" tidak ditampilkan | `@0cf7e67`: layar `_slip_content.php:43-46` (`$tkGroups`); PDF `print/cetak.php:274-277` (`$tkGroups`), `:360-361` (jumlah per kolom TK = `kotor` / `potongan` saja), `:408`. Bagian A "Iuran & Pajak" dan modal detail/edit admin tidak berubah | Keputusan Horii 28-10 (CR-067) | IKUT `0cf7e67`: kartu FE (`SlipGajiKartu`) dan PDF (`pdf/slip_gaji`). Kolom `pajak`/`tunj_pajak` tetap di DB dan tetap diimpor (I-3, tanpa migration); total slip tidak berubah (R-1..R-4 tidak memakai keduanya) |
 | P-10 | Rupiah 0 desimal, setengah menjauhi nol, tanpa `-0` | `number_format(x, 0, ',', '.')`, awalan berbeda per keluaran | — | IKUT; `NominalGaji::formatAngka`; awalan "Rp" diputuskan UI. Sen disimpan (`DECIMAL(14,2)`), tampil 0 desimal seperti semua keluaran legacy |
 | M-1..M-5 | Nama dicek bila sheet punya kolom `nama`; normalisasi `[a-z0-9]`; cocok = sama atau substring; kosong → `nama_kosong`; tidak cocok → ditolak **dan** dicatat untuk log | `Lsl_gaji.php:873-895`, `:1049-1110` | D-10 / FSD-FN-D-10 / MTC-035 (mismatch di-log, bukan silent-fail) | IKUT (lebih ketat dari spek: tolak + log); `susun` mengembalikan `nama_tidak_cocok`, service menulis log sekali per pratinjau. Positif palsu substring ("Ani" ~ "Daniel") disengaja longgar seperti legacy: tetap |
 | M-6 | Setiap sheet yang punya kolom `nama` dicek sendiri | `Lsl_gaji.php:1090` (nama TK tertutup nama GPP) | — | PERBAIKI |
@@ -171,7 +176,7 @@ LOCKED): skema DBV-023 (§7.1), impor 3 langkah (§7.2), akses pegawai & kelola 
 diubah sebatas §7.3.8 (`RingkasanSlip`). Nilai uang makan slip disambung D-09 (5B) lewat `UangMakanSlipInterface`
 — **wajib sebelum go-live** (F5-1).
 
-PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f8b4) — keputusan reviewer CR 20-10:
+PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f8b4, bagian TK @0cf7e67) — keputusan reviewer CR 20-10:
 
 | # | Butir | Keputusan |
 |---|---|---|
@@ -181,6 +186,7 @@ PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f
 | PDF-4 | QR | wajib gambar; keluaran bukan `<img>` (tanpa gd/imagick) → cetak gagal, token tidak dicetak sebagai teks (§7.3.6); tanpa token → tanpa QR (U-3) |
 | PDF-5 | Logo bawaan v2 (katalog `web_config`: "kosong = logo bawaan v2", kontrak Fase 2) | logo bawaan v2 belum tersedia → tanpa logo, sama dengan PDF LKH; katalog tidak diubah. Akar aset v2 final + berkas logo bawaan ditetapkan saat cutover bersama G-09 |
 | PDF-6 | Kaki halaman "Halaman x dari y" + username (pola CR-064 `DokumenPdf::TOKEN_HALAMAN`/`TOKEN_TOTAL`) | **Tidak dipakai** di slip [K] `print/cetak.php` @771f8b4 + PRD §7.3.6: slip satu halaman per pegawai dengan QR verifikasi; `PdfSlipGaji` tidak mengirim `kakiHtml` (keputusan reviewer CR 22-10-2026) |
+| PDF-7 | Bagian B (TK) | [K] `print/cetak.php` @0cf7e67 `:274-277`, `:360-361`: tanpa baris "Pajak"/"Tunjangan Pajak"; "Jumlah Penghasilan"/"Jumlah Potongan" TK = `kotor` / `potongan` (sebelumnya + `tunj_pajak` / + `pajak`), sehingga Jumlah Penghasilan − Jumlah Potongan = TK Bersih bila data konsisten. CR-067 |
 
 ### Test
 
