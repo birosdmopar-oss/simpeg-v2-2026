@@ -252,7 +252,7 @@ const pesan = (k: string): string | undefined => errors.value[k] || undefined
             <p :class="FORM_WIDE_CLASS" class="text-caption font-semibold uppercase tracking-wide text-slate-500">Berkas</p>
             <div v-for="slot in opsi.slot_berkas" :key="`${slot.tag}-${kunciBerkas}`" :class="FORM_WIDE_CLASS">
               <UiFileField
-                :label="slot.label"
+                :label="opsi.berkas_wajib && !edit ? `${slot.label} *` : slot.label"
                 :allowed="[...BERKAS.allowed]"
                 :max-mb="BERKAS.maxMb"
                 :hint="opsi.berkas_wajib && !edit ? 'Wajib diunggah.' : ''"

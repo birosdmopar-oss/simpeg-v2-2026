@@ -23,7 +23,7 @@ const crumbs = [
   { label: 'Home', to: { name: 'home' } },
   { label: 'Layanan' },
   { label: 'Cuti', to: { name: 'layanan-cuti' } },
-  { label: 'Petugas Approval' },
+  { label: 'Petugas Approval Cuti' },
 ]
 const PER_PAGE = 20
 

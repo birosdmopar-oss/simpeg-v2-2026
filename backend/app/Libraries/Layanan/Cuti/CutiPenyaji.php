@@ -75,7 +75,8 @@ final class CutiPenyaji
         }
 
         $tahap[] = ['kode' => 'pejabat', 'label' => $labelPyb, 'state' => $statePyb, 'nama_petugas' => $cuti['nama_yang_menyetujui'] ?? null];
-        $tahap[] = ['kode' => 'selesai', 'label' => $final ? StatusCuti::label($status) : 'Selesai', 'state' => $final ? 'done' : 'todo', 'nama_petugas' => null];
+        // Label tetap "Selesai" seperti TB/IB/PMK (§6.11.4, CR-073); hasil terlihat dari badge & label tahap yang memutus.
+        $tahap[] = ['kode' => 'selesai', 'label' => 'Selesai', 'state' => $final ? 'done' : 'todo', 'nama_petugas' => null];
 
         return $tahap;
     }
