@@ -219,7 +219,7 @@ const pesan = (k: string): string | undefined => errors.value[k] || kalkulator.g
 
             <div v-for="kolom in KOLOM_BERKAS_PMK" :key="`${kolom}-${kunciBerkas}`" :data-testid="`pmk-berkas-${kolom}`">
               <UiFileField
-                :label="labelBerkas(kolom)"
+                :label="sudahAda(kolom) ? labelBerkas(kolom) : `${labelBerkas(kolom)} *`"
                 :allowed="[...BERKAS.allowed]"
                 :max-mb="BERKAS.maxMb"
                 :hint="sudahAda(kolom) ? 'Sudah ada; unggah untuk mengganti.' : 'Wajib.'"

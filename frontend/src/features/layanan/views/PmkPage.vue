@@ -22,6 +22,7 @@ import PmkFormDialog from '../components/PmkFormDialog.vue'
 import PmkProsesDialog from '../components/PmkProsesDialog.vue'
 import PmkTable from '../components/PmkTable.vue'
 import RiwayatPmkTable from '../components/RiwayatPmkTable.vue'
+import { useFokusPemicu } from '../composables/useFokusPemicu'
 import { usePmkAksi } from '../composables/usePmkAksi'
 import { LAYANAN_ROUTE } from '../routes.layanan'
 import { pmkService } from '../services/pmk.service'
@@ -32,7 +33,7 @@ const PER_PAGE = 20
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'PMK' }]
+const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Layanan' }, { label: 'PMK' }]
 
 const role = computed(() => auth.role)
 const tabs = computed(() => [
@@ -198,14 +199,26 @@ const STATUS_OPSI = [
   { value: '2', label: 'Ditolak' },
 ]
 const adaCari = computed(() => tab.value === 'admin' || tab.value === 'pic' || (tab.value === 'riwayat' && role.value !== Role.PEGAWAI))
-const subjekProses = computed(() => (aksi.prosesRow.value ? `PMK ${aksi.prosesRow.value.nip}` : ''))
+const subjekProses = computed(() => (aksi.prosesRow.value ? `PMK ${aksi.prosesRow.value.nama || aksi.prosesRow.value.nip}` : ''))
+
+// CR-072 butir 8: fokus kembali ke ⋮ baris setelah dialog proses/hapus ditutup (Esc, Batal, atau selesai).
+function selectorMenuPmk(): string | null {
+  const row = aksi.prosesRow.value ?? aksi.hapusRow.value
+  return row ? `[data-testid="pmk-actions-${row.id}"]` : null
+}
+useFokusPemicu(aksi.prosesOpen, selectorMenuPmk)
+useFokusPemicu(aksi.hapusOpen, selectorMenuPmk)
 const total = computed(() => (tab.value === 'riwayat' ? (dataRiwayat.value?.total ?? 0) : (dataPengajuan.value?.total ?? 0)))
 </script>
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
     <div class="page-fill flex flex-col gap-4" data-testid="pmk-page">
-    <UiCard title="Peninjauan Masa Kerja (PMK)" class="flex min-h-0 flex-1 flex-col" fill>
+    <div>
+      <h1 class="text-h2 font-semibold text-slate-900">Peninjauan Masa Kerja (PMK)</h1>
+      <p class="text-body2 text-slate-500">Riwayat PMK final, pengajuan, dan proses persetujuan PIC.</p>
+    </div>
+    <UiCard title="Daftar PMK" class="flex min-h-0 flex-1 flex-col" fill>
       <template #actions>
         <UiButton v-if="bisaMengajukan && tab !== 'riwayat'" data-testid="pmk-tambah" @click="ajukan"><Plus class="h-4 w-4" aria-hidden="true" /> Ajukan PMK</UiButton>
       </template>
@@ -213,7 +226,7 @@ const total = computed(() => (tab.value === 'riwayat' ? (dataRiwayat.value?.tota
       <UiTabs v-model="tab" :items="tabs" aria-label="Daftar PMK" class="mb-4" />
 
       <div class="mb-4 grid gap-3 md:grid-cols-3" data-testid="pmk-filter">
-        <UiSelect v-if="tab !== 'riwayat'" v-model="status" label="Status" placeholder="Semua status" :options="STATUS_OPSI" clearable />
+        <UiSelect v-if="tab !== 'riwayat'" v-model="status" label="Status" placeholder="Semua Status" :options="STATUS_OPSI" clearable />
         <UiSearchInput v-if="adaCari" v-model="search" :label="tab === 'riwayat' ? 'Cari NIP' : 'Cari pegawai'" :placeholder="tab === 'riwayat' ? 'NIP pegawai' : 'Cari nama atau NIP'" />
       </div>
 

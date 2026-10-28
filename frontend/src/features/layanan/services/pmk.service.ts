@@ -46,6 +46,7 @@ export function normalisasiPmk(raw: Record<string, unknown>): PmkItem {
     ...normalisasiTampilan(raw),
     id: num(raw.id_riwayat_pmk_req),
     nip: String(raw.nip ?? ''),
+    nama: String(raw.nama ?? ''),
     jenis_pmk: String(raw.jenis_pmk ?? ''),
     instansi: String(raw.instansi ?? ''),
     tgl_awal: String(raw.tgl_awal ?? ''),

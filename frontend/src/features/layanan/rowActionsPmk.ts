@@ -16,10 +16,10 @@ export interface OpsiAksiPmk {
 }
 
 const LABEL_BAWAAN: Record<string, string> = {
-  file_kontrak: 'Surat kontrak kerja',
-  file_paklaring: 'Surat paklaring',
+  file_kontrak: 'Surat Kontrak Kerja',
+  file_paklaring: 'Surat Paklaring',
   file_surat_phk: 'Surat PHK',
-  file_slip_gaji: 'Slip gaji',
+  file_slip_gaji: 'Slip Gaji',
 }
 
 export function aksiBarisPmk(row: PmkItem, { busy = false, detail = true, labelBerkas = {} }: OpsiAksiPmk = {}): RowAction[] {
@@ -32,7 +32,7 @@ export function aksiBarisPmk(row: PmkItem, { busy = false, detail = true, labelB
     { key: 'tolak', label: 'Tolak', hidden: !row.aksi.proses || !tersedia('tolak'), disabled: busy },
     ...KOLOM_BERKAS_PMK.map((kolom) => ({
       key: `berkas:${kolom}`,
-      label: `Unduh ${(labelBerkas[kolom] ?? LABEL_BAWAAN[kolom] ?? kolom).toLowerCase()}`,
+      label: `Unduh ${labelBerkas[kolom] ?? LABEL_BAWAAN[kolom] ?? kolom}`,
       hidden: !row.berkas[kolom],
       disabled: busy,
     })),

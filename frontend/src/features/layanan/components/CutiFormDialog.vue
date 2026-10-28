@@ -384,7 +384,7 @@ const pesan = (k: string): string | undefined => errors.value[k] || kalkulator.g
 
             <div :class="FORM_WIDE_CLASS">
               <UiFileField
-                label="Lampiran Bukti"
+                :label="lampiranWajib && !edit ? 'Lampiran Bukti *' : 'Lampiran Bukti'"
                 :allowed="[...BERKAS_BUKTI.allowed]"
                 :max-mb="BERKAS_BUKTI.maxMb"
                 :hint="lampiranWajib && !edit ? 'Wajib untuk jenis cuti ini.' : 'Opsional.'"
