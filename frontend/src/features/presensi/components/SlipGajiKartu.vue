@@ -102,6 +102,7 @@ const catatanUangMakan = computed(() => {
       <!-- B. TK, C. Uang Makan, ringkasan -->
       <section class="flex flex-col border-t border-slate-200 p-5 sm:p-6 lg:border-t-0" aria-labelledby="slip-tk">
         <h3 id="slip-tk" class="mb-3 text-caption font-semibold uppercase tracking-wide text-slate-500">B. Tunjangan Kinerja (TK)</h3>
+        <!-- TK tanpa baris Pajak / Tunjangan Pajak [K _slip_content.php @0cf7e67 :43-46] (CR-067). -->
         <div v-for="kolom in ['kotor', 'potongan', 'bersih_tk']" :key="kolom" class="flex justify-between gap-3 py-0.5 text-body2" :data-testid="`slip-${kolom}`">
           <span class="text-slate-700">{{ LABEL_KOLOM[kolom] }}</span>
           <span class="flex min-w-[8rem] justify-between gap-3 tabular-nums" :class="kolom === 'potongan' ? 'text-red-700' : 'text-slate-900'">

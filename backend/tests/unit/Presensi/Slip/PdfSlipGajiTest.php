@@ -63,6 +63,25 @@ final class PdfSlipGajiTest extends CIUnitTestCase
         $this->assertMatchesRegularExpression('/Total Penghasilan Bulan Oktober 2026.*?7\.500\.000/s', $html);
     }
 
+    public function testBagianTkTanpaPajakDanTunjanganPajak(): void
+    {
+        // CR-067 [K print/cetak.php @0cf7e67 :274-277, :360-361]: baris "Pajak"/"Tunjangan Pajak" tidak tampil; jumlah per
+        // kolom TK hanya dari baris yang tampil (kotor / potongan); total slip tetap dari bersih_tk.
+        $penangkap = $this->penangkap();
+        (new PdfSlipGaji($penangkap, static fn (): string => '<img src="@QR" />'))
+            ->render($this->data(sen: ['pajak' => 7_000_000, 'tunj_pajak' => 9_000_000]));
+
+        $this->assertNotNull($penangkap->dokumen);
+        $html = $penangkap->dokumen->html;
+        $tk   = substr($html, (int) strpos($html, 'B. TUNJANGAN KINERJA (TK)'), (int) strpos($html, 'C. UANG MAKAN') - (int) strpos($html, 'B. TUNJANGAN KINERJA (TK)'));
+        $this->assertStringNotContainsString('Pajak', $tk);
+        $this->assertStringNotContainsString('70.000', $tk);
+        $this->assertStringNotContainsString('90.000', $tk);
+        $this->assertMatchesRegularExpression('/Jumlah Penghasilan.*?3\.200\.000/s', $tk);
+        $this->assertMatchesRegularExpression('/Jumlah Potongan.*?-&nbsp;200\.000/s', $tk);
+        $this->assertMatchesRegularExpression('/Total Penghasilan Bulan Oktober 2026.*?7\.500\.000/s', $html);
+    }
+
     public function testTanpaTokenTanpaQrDanTanpaWaktuDibuka(): void
     {
         $penangkap = $this->penangkap();
@@ -129,15 +148,20 @@ final class PdfSlipGajiTest extends CIUnitTestCase
         }
     }
 
-    private function data(string $nama = 'Ana Budi', ?string $urlQr = 'https://contoh.test/verify/slip/token-rahasia', bool $dibuka = true): DataPdfSlip
+    /**
+     * @param array<string, int> $sen
+     */
+    private function data(string $nama = 'Ana Budi', ?string $urlQr = 'https://contoh.test/verify/slip/token-rahasia', bool $dibuka = true, array $sen = []): DataPdfSlip
     {
-        $sen = array_fill_keys(KolomGaji::semuaField(), 0);
-        $sen = [
+        $tambahan = $sen;
+        $sen      = array_fill_keys(KolomGaji::semuaField(), 0);
+        $sen      = [
             ...$sen,
             'gjpokok'    => 300_000_000, 'tjistri' => 50_000_000, 'tjberas' => 100_000_000,
             'potpfk10'   => 50_000_000, 'bersih_gpp' => 400_000_000,
             'kotor'      => 320_000_000, 'potongan' => 20_000_000, 'bersih_tk' => 300_000_000,
             'uang_makan' => 50_000_000,
+            ...$tambahan,
         ];
         $zona = new DateTimeZone('UTC');
 
