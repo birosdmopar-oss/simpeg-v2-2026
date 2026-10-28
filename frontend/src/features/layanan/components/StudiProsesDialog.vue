@@ -128,17 +128,16 @@ const pesan = (k: string): string | undefined => errors.value[k] || undefined
             />
           </template>
 
-          <UiFileField
-            v-if="cfg.berkasProses && aksi === 'setujui'"
-            :key="kunciBerkas"
-            :class="FORM_WIDE_CLASS"
-            label="Surat (opsional, PDF)"
-            :allowed="['pdf']"
-            :max-mb="5"
-            :state="state(cfg.berkasProses)"
-            :help-text="pesan(cfg.berkasProses)"
-            @change="(f: File | null) => (berkas[cfg.berkasProses as string] = f ?? undefined)"
-          />
+          <div v-if="cfg.berkasProses && aksi === 'setujui'" :class="FORM_WIDE_CLASS">
+            <UiFileField
+              :key="kunciBerkas"
+              label="Surat (opsional, PDF)"
+              :allowed="['pdf']"
+              :max-mb="5"
+              @change="(f: File | null) => (berkas[cfg.berkasProses as string] = f ?? undefined)"
+            />
+            <p v-if="pesan(cfg.berkasProses)" role="alert" class="mt-1 text-caption text-danger">{{ pesan(cfg.berkasProses) }}</p>
+          </div>
 
           <div :class="FORM_ACTIONS_CLASS">
             <UiButton variant="secondary" appearance="outline" :disabled="busy" @click="tutup">Batal</UiButton>

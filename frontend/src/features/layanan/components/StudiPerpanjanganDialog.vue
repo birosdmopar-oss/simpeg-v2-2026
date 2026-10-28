@@ -94,18 +94,17 @@ const pesan = (k: string): string | undefined => errors.value[k] || undefined
           <UiTextField v-model="isian.tgl_mulai_perpan" type="date" label="Tanggal Mulai Perpanjangan" :state="state('tgl_mulai_perpan')" :help-text="pesan('tgl_mulai_perpan')" />
           <UiTextField v-model="isian.tgl_akhir_perpan" type="date" label="Tanggal Akhir Perpanjangan" required :state="state('tgl_akhir_perpan')" :help-text="pesan('tgl_akhir_perpan')" />
 
-          <UiFileField
-            v-if="!edit"
-            :key="kunciBerkas"
-            :class="FORM_WIDE_CLASS"
-            label="Surat Perpanjangan"
-            :allowed="['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx']"
-            :max-mb="5"
-            required
-            :state="state('file_sperpan')"
-            :help-text="pesan('file_sperpan')"
-            @change="(f: File | null) => (berkas = f ?? undefined)"
-          />
+          <div v-if="!edit" :class="FORM_WIDE_CLASS">
+            <UiFileField
+              :key="kunciBerkas"
+              label="Surat Perpanjangan (wajib)"
+              :allowed="['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx']"
+              :max-mb="5"
+              hint="Wajib diunggah."
+              @change="(f: File | null) => (berkas = f ?? undefined)"
+            />
+            <p v-if="pesan('file_sperpan')" role="alert" class="mt-1 text-caption text-danger">{{ pesan('file_sperpan') }}</p>
+          </div>
 
           <div :class="FORM_ACTIONS_CLASS">
             <UiButton variant="secondary" appearance="outline" :disabled="busy" @click="tutup">Batal</UiButton>
