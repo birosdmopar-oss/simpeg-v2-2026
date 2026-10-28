@@ -19,8 +19,8 @@ const anakPresensi = (role: (typeof Role)[keyof typeof Role]) =>
     ?.children?.map((c) => c.label) ?? []
 
 describe('navPresensi', () => {
-  it('ACTIVE_PHASE tidak dinaikkan oleh 5A', () => {
-    expect(ACTIVE_PHASE).toBe(3)
+  it('ACTIVE_PHASE tidak dinaikkan oleh 5A (baru 4 oleh penutup Fase 4 M7)', () => {
+    expect(ACTIVE_PHASE).toBe(4)
   })
 
   it.each([
