@@ -11,7 +11,8 @@ use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * PRD 5B §7.4.1 AC-D09b.5 (MAKE-042): satu test per cabang klasifikasi (TB, cuti, konket 8/9/10/13/lain, TK, hadir) +
+ * PRD 5B §7.4.1 AC-D09b.5 (MAKE-042): satu test per cabang klasifikasi (TB — ringkas ikut legacy tanpa TB, grid harian TB
+ * dulu, keputusan Horii 28-10-2026; cuti, konket 8/9/10/13/lain, TK, hadir) +
  * boundary TL/PSW 30/60 dengan jam `web_config` (normal & puasa, Jumat & bukan Jumat). September 2026: 1 Sep = Selasa,
  * 4/11/18/25 Sep = Jumat; puasa 21–25 Sep.
  *
@@ -24,7 +25,7 @@ final class KlasifikasiKehadiranTest extends CIUnitTestCase
         $hasil = $this->rekap(
             libur: ['2026-09-16'],
             cuti: [['2026-09-02', '2026-09-02']],
-            tb: [['2026-09-03', '2026-09-03']],
+            tb: [['2026-09-03', '2026-09-03'], ['2026-09-15', '2026-09-15']],
             konket: [
                 ['mulai' => '2026-09-07 00:00:00', 'akhir' => '2026-09-07 23:59:59', 'kategori' => 8],
                 ['mulai' => '2026-09-08 00:00:00', 'akhir' => '2026-09-08 23:59:59', 'kategori' => 9],
@@ -35,7 +36,7 @@ final class KlasifikasiKehadiranTest extends CIUnitTestCase
             presensi: [
                 '2026-09-01' => ['masuk' => '07:30:00', 'pulang' => '16:00:00'],
                 '2026-09-02' => ['masuk' => '07:30:00', 'pulang' => '16:00:00'], // cuti menang
-                '2026-09-03' => ['masuk' => '07:30:00', 'pulang' => '16:00:00'], // TB menang
+                '2026-09-03' => ['masuk' => '07:30:00', 'pulang' => '16:00:00'], // TB + presensi: ringkas hadir (legacy), grid TB
                 '2026-09-10' => ['masuk' => null, 'pulang' => null],
                 '2026-09-14' => ['masuk' => null, 'pulang' => null],
                 '2026-09-16' => ['masuk' => '07:30:00', 'pulang' => '16:00:00'], // libur
@@ -46,14 +47,14 @@ final class KlasifikasiKehadiranTest extends CIUnitTestCase
         $this->assertSame([
             '2026-09-01' => 'H', '2026-09-02' => 'CT', '2026-09-03' => 'TB', '2026-09-04' => 'TK', '2026-09-05' => 'weekend',
             '2026-09-06' => 'weekend', '2026-09-07' => 'DL', '2026-09-08' => 'CT', '2026-09-09' => 'SKT', '2026-09-10' => 'LL',
-            '2026-09-11' => null, '2026-09-12' => 'weekend', '2026-09-13' => 'weekend', '2026-09-14' => 'TK', '2026-09-15' => 'TK',
+            '2026-09-11' => null, '2026-09-12' => 'weekend', '2026-09-13' => 'weekend', '2026-09-14' => 'TK', '2026-09-15' => 'TB',
             '2026-09-16' => 'libur',
         ], $hasil['harian'], 'dipotong hari ini 16 Sep');
 
         $this->assertSame([
-            'hari_kerja' => 11, 'hadir' => 2, 'tl' => 0, 'psw' => 0, 'tk' => 3, 'sakit' => 1, 'dinas_luar' => 1,
-            'lain_lain'  => 1, 'cuti' => 2, 'tidak_hadir' => 7, 'tb' => 1,
-        ], $hasil['ringkas'], 'LL = hadir; kategori lain tidak dihitung; tidak_hadir = cuti+DL+sakit+TK, tanpa TB');
+            'hari_kerja' => 11, 'hadir' => 3, 'tl' => 0, 'psw' => 0, 'tk' => 3, 'sakit' => 1, 'dinas_luar' => 1,
+            'lain_lain'  => 1, 'cuti' => 2, 'tidak_hadir' => 7, 'tb' => 2,
+        ], $hasil['ringkas'], 'LL = hadir; kategori lain tidak dihitung; tidak_hadir = cuti+DL+sakit+TK; TB ikut legacy (3 Sep hadir, 15 Sep TK), kolom tb informasi');
     }
 
     public function testKonketTumpangTindihBarisTerakhirDanAkhirPekanMendahuluiLibur(): void

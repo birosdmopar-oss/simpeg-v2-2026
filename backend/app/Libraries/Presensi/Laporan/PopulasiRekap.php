@@ -33,12 +33,12 @@ final class PopulasiRekap
     /**
      * @param list<int> $jenisPegawai
      *
-     * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string}>
+     * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string, dibuat: string}>
      */
     public function dh(string $awal, string $akhir, LingkupLaporan $lingkup, array $jenisPegawai): array
     {
         $pegawai = $this->db->table('pegawai')
-            ->select('nip, nama, glr_awal, glr_akhir')
+            ->select('nip, nama, glr_awal, glr_akhir, created_at')
             ->groupStart()->where('status', 1)->orGroupStart()->where('status', 2)->where('tmt_status >', $awal)->groupEnd()->groupEnd()
             ->where('DATE(created_at) <=', $akhir)
             ->whereIn('id_jenis_pegawai', $jenisPegawai === [] ? [0] : $jenisPegawai)
@@ -51,12 +51,12 @@ final class PopulasiRekap
     }
 
     /**
-     * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string}>
+     * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string, dibuat: string}>
      */
     public function il(string $awal): array
     {
         $pegawai = $this->db->table('pegawai peg')
-            ->select('peg.nip, peg.nama, peg.glr_awal, peg.glr_akhir')
+            ->select('peg.nip, peg.nama, peg.glr_awal, peg.glr_akhir, peg.created_at')
             ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = peg.nip', 'inner')
             ->groupStart()->where('peg.status', 1)->orGroupStart()->where('peg.status', 2)->where('peg.tmt_status >', $awal)->groupEnd()->groupEnd()
             ->where('DATE(peg.created_at) <=', $awal)
@@ -70,7 +70,7 @@ final class PopulasiRekap
     /**
      * @param list<array<string, mixed>> $pegawai
      *
-     * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string}>
+     * @return list<array{nip: string, nama: string, jabatan: string, id_unit: int|null, id_satker: int|null, unit: string, satker: string, dibuat: string}>
      */
     private function lengkapi(array $pegawai, int $jenisJabatan, string $batasJabatan, string $batasPangkat): array
     {
@@ -94,6 +94,7 @@ final class PopulasiRekap
                     'id_satker' => isset($j['id_satker']) ? (int) $j['id_satker'] : null,
                     'unit'      => (string) ($j['unit'] ?? ''),
                     'satker'    => (string) ($j['satker'] ?? ''),
+                    'dibuat'    => (string) ($p['created_at'] ?? ''),
                     '_kelas'    => (int) ($j['kelas_jabatan'] ?? 0),
                     '_gol'      => (string) ($k['gol_ruang'] ?? ''),
                     '_tmt'      => (string) ($k['tmtsk'] ?? '9999-12-31'),

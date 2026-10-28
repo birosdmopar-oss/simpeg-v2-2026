@@ -33,8 +33,11 @@ use InvalidArgumentException;
  * `rentangBebasPresensiBanyak` (F5B-10); libur aktif `HariLiburService`. Paginasi JSON: kalkulasi hanya untuk pegawai di
  * halaman (urutan populasi stabil). Jam kerja dari `web_config` F5-16 + `rentang_puasa` [V2].
  *
- * [V2] dicatat: presensi pegawai yang dibuat di tengah bulan ikut dihitung (legacy mensyaratkan `created_at` < awal
- * bulan di kueri presensi `:599`, sehingga pegawai baru tampil TK seluruh bulan; pola F5B-2).
+ * **Ikut legacy (keputusan Horii 28-10-2026):** presensi hanya dibaca untuk pegawai yang sudah ada sebelum bulan itu —
+ * ringkas (JSON & XLSX) `DATE(peg.created_at) <= awal bulan` [K `rekap` `L_presensi.php:599`], grid harian
+ * `peg.created_at < awal bulan` [K `rekap_full_xls` `:1053`]; pegawai yang dibuat sesudahnya tetap masuk populasi
+ * (`DATE(created_at) ≤` akhir bulan) tetapi seluruh hari kerjanya TK. Rekap uang makan **tidak** ikut aturan ini (F5B-2,
+ * MAKE-040: pegawai baru dihitung dari presensinya), sehingga kedua rekap berbeda untuk pegawai baru.
  */
 final class RekapKehadiranService
 {
@@ -117,7 +120,7 @@ final class RekapKehadiranService
     public function xlsxHarian(AuthContext $auth, array $query): array
     {
         [$p, $lingkup, $populasi] = $this->siapkan($auth, $query);
-        $hasil                    = $this->hitung($populasi, $p);
+        $hasil                    = $this->hitung($populasi, $p, true);
         $baris                    = [];
 
         foreach ($populasi as $i => $peg) {
@@ -150,9 +153,12 @@ final class RekapKehadiranService
     /**
      * @param list<array<string, mixed>> $populasi
      *
+     * @param bool $harian grid harian memakai syarat presensi `rekap_full_xls` (`created_at <` awal), ringkas `rekap`
+     *                     (`DATE(created_at) <=` awal)
+     *
      * @return array<string, array{ringkas: array<string, int>, harian: array<string, string|null>}>
      */
-    private function hitung(array $populasi, ParameterRekap $p): array
+    private function hitung(array $populasi, ParameterRekap $p, bool $harian = false): array
     {
         $hasil = [];
 
@@ -163,6 +169,15 @@ final class RekapKehadiranService
         $jadwal  = $this->jadwal($p);
         $libur   = $this->libur($p);
         $hariIni = $this->hariIni();
+        $baca    = [];
+
+        foreach ($populasi as $peg) {
+            $dibuat = (string) ($peg['dibuat'] ?? '');
+
+            if ($harian ? $dibuat < $p->awal : substr($dibuat, 0, 10) <= $p->awal) {
+                $baca[(string) $peg['nip']] = true;
+            }
+        }
 
         foreach (array_chunk(array_map(static fn (array $peg): string => (string) $peg['nip'], $populasi), PopulasiRekap::BATCH_NIP) as $nip) {
             $data = DataRekapBulan::muat($this->db, $nip, $p->awal, $p->akhir);
@@ -177,7 +192,7 @@ final class RekapKehadiranService
                     $data['cuti'][$n] ?? [],
                     array_map(static fn (string $t): array => [$t, $t], $tb[$n] ?? []),
                     $data['konket'][$n] ?? [],
-                    $data['presensi'][$n] ?? [],
+                    isset($baca[$n]) ? ($data['presensi'][$n] ?? []) : [],
                     $jadwal,
                 );
             }

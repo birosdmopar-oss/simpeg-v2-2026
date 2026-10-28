@@ -15,8 +15,9 @@ use InvalidArgumentException;
  *
  * Bulan kalender 1..akhir, dipotong `$hariIni` [K `:444-455`]. Hari kerja = Senin–Jumat yang bukan hari libur. Setiap hari
  * kerja diklasifikasikan menurut **cabang pertama yang cocok**:
- * 1. [V2] **TB** (rentang bebas presensi TB, F5B-10) → `TB` (legacy HTML tidak mengenal TB sehingga hari TB jatuh ke TK;
- *    ekspor harian legacy memeriksa TB lebih dulu `:1087-1099`). Tidak dihitung di kolom lain.
+ * 1. **TB** (rentang bebas presensi TB, F5B-10): **ringkas ikut legacy** `rekap` yang tidak mengenal TB (keputusan Horii
+ *    28-10-2026) — hari TB tetap melewati cabang 2–5 (praktis TK + tidak hadir bila tanpa presensi) dan kolom `tb` [V2]
+ *    hanya informasi jumlah hari TB; **grid harian** memeriksa TB lebih dulu → kode `TB` [K `rekap_full_xls` `:1087-1099`].
  * 2. Cuti (`riwayat_cuti` status 1, jenis apa pun) → `CT`, cuti + tidak hadir [K `:644-648`].
  * 3. Konket `V` (affect_tukin apa pun) — kategori 8 `DL` dinas luar + tidak hadir; 9 `CT` cuti + tidak hadir; 10 `SKT`
  *    sakit + tidak hadir; 13 `LL` lain-lain + **hadir**; kategori lain → tidak masuk kolom mana pun, kode kosong
@@ -27,7 +28,7 @@ use InvalidArgumentException;
  *    `psw > 0` [K `:722-740`]; hanya pulang → PSW bila `psw > 0`; hanya masuk → TL bila `tl > 0` (tanpa kompensasi)
  *    [K `:748-806`]. TL/PSW menghitung hari, bukan menit.
  *
- * `tidak_hadir` = cuti + dinas luar + sakit + TK [K]; `tb` [V2] tidak masuk `tidak_hadir`. Hari non-kerja di grid harian =
+ * `tidak_hadir` = cuti + dinas luar + sakit + TK [K]; `tb` [V2] = informasi, tidak mengurangi kolom lain. Hari non-kerja di grid harian =
  * `weekend` / `libur` (Sabtu/Minggu didahulukan, [K `:899-914`]).
  */
 final class KlasifikasiKehadiran
@@ -119,12 +120,28 @@ final class KlasifikasiKehadiran
      */
     private static function hari(string $t, array $hariTb, array $hariCuti, array $hariKonket, array $absen, JadwalKerjaRekap $jadwal, array &$ringkas): ?string
     {
-        if (isset($hariTb[$t])) {
-            $ringkas['tb']++;
+        $kode = self::ringkas($t, $hariCuti, $hariKonket, $absen, $jadwal, $ringkas);
 
-            return 'TB';
+        if (! isset($hariTb[$t])) {
+            return $kode;
         }
 
+        // Ringkas ikut legacy (TB tidak dikenal, keputusan Horii 28-10-2026); kolom `tb` informasi; grid harian TB dulu.
+        $ringkas['tb']++;
+
+        return 'TB';
+    }
+
+    /**
+     * Klasifikasi ringkas legacy `rekap` (`L_presensi.php:642-810`) tanpa pemeriksaan TB.
+     *
+     * @param array<string, true>                       $hariCuti
+     * @param array<string, int>                        $hariKonket
+     * @param array{masuk?: ?string, pulang?: ?string} $absen
+     * @param array<string, int>                        $ringkas
+     */
+    private static function ringkas(string $t, array $hariCuti, array $hariKonket, array $absen, JadwalKerjaRekap $jadwal, array &$ringkas): ?string
+    {
         if (isset($hariCuti[$t])) {
             $ringkas['cuti']++;
             $ringkas['tidak_hadir']++;

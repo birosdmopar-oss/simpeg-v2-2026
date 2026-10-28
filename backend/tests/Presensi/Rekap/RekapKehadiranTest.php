@@ -69,8 +69,8 @@ final class RekapKehadiranTest extends DatabaseTestCase
         $this->assertSame(['tipe' => 'satker', 'id' => $this->satkerA, 'kode' => 'sat_' . $this->satkerA], array_intersect_key($data['lingkup'], ['tipe' => 1, 'id' => 1, 'kode' => 1]));
         $this->assertSame(1, $data['total']);
         $this->assertSame([
-            'nip'       => $a, 'hari_kerja' => 22, 'hadir' => 4, 'tl' => 1, 'psw' => 1, 'tk' => 15, 'sakit' => 1, 'dinas_luar' => 0,
-            'lain_lain' => 1, 'cuti' => 1, 'tidak_hadir' => 17, 'tb' => 1,
+            'nip'       => $a, 'hari_kerja' => 22, 'hadir' => 4, 'tl' => 1, 'psw' => 1, 'tk' => 16, 'sakit' => 1, 'dinas_luar' => 0,
+            'lain_lain' => 1, 'cuti' => 1, 'tidak_hadir' => 18, 'tb' => 1,
         ], array_diff_key($data['items'][0], ['nama' => 1, 'jabatan' => 1]));
 
         $this->assertSame(2, $this->serviceKehadiran()->daftar($this->adminRekap(), ['bulan' => '2026-09', 'unit_satker' => (string) $this->unit])['total']);
@@ -113,6 +113,43 @@ final class RekapKehadiranTest extends DatabaseTestCase
         $this->assertSame(4, $this->serviceKehadiran()->daftar($this->adminRekap(), ['bulan' => '2026-09', 'unit_satker' => 'sat_' . $this->satkerA, 'jenis_pegawai' => ['1', '6']])['total']);
         $this->assertNotContains($baru, $nip($this->serviceKehadiran()->daftar($this->adminRekap(), ['bulan' => '2026-09'])));
         $this->assertNotContains($lama, $nip($this->serviceKehadiran()->daftar($this->adminRekap(), ['bulan' => '2026-09'])));
+    }
+
+    /**
+     * Keputusan Horii 28-10-2026 (ikut legacy): presensi pegawai yang dibuat setelah awal bulan tidak dibaca — ringkas
+     * `DATE(created_at) <= awal` (`L_presensi.php:599`), grid harian `created_at < awal` (`:1053`); pegawai tetap di
+     * populasi, seluruh hari kerja TK. Rekap uang makan tetap menghitung pegawai baru (F5B-2).
+     */
+    public function testPresensiPegawaiBaruTidakDibacaIkutLegacy(): void
+    {
+        $baru = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-15 08:00:00']);
+        $tgl1 = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-01 08:00:00']);
+        $lama = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-08-31 23:59:59']);
+
+        foreach ([$baru, $tgl1, $lama] as $n) {
+            $this->hadir($n, '2026-09-16');
+        }
+
+        $item = [];
+
+        foreach ($this->serviceKehadiran()->daftar($this->adminRekap(), ['bulan' => '2026-09'])['items'] as $i) {
+            $item[$i['nip']] = [$i['hadir'], $i['tk']];
+        }
+
+        $this->assertSame([0, 22], $item[$baru], 'dibuat 15 Sep → TK sebulan');
+        $this->assertSame([1, 21], $item[$tgl1], 'ringkas: DATE(created_at) <= tanggal 1 → dibaca');
+        $this->assertSame([1, 21], $item[$lama]);
+
+        $grid = [];
+
+        foreach ($this->baca($this->serviceKehadiran()->xlsxHarian($this->adminRekap(), ['bulan' => '2026-09'])['isi']) as $baris) {
+            $grid[(string) ($baris[2] ?? '')] = $baris[5 + 15] ?? null;
+        }
+
+        $this->assertSame(['TK', 'TK', 'H'], [$grid[$baru], $grid[$tgl1], $grid[$lama]], 'harian: created_at < tanggal 1 (tanggal 1 jam 08:00 tidak dibaca)');
+
+        $uangMakan = $this->serviceUangMakan()->daftar($this->adminRekap(), ['bulan' => '2026-09']);
+        $this->assertSame(3, $uangMakan['total'], 'uang makan (F5B-2) tetap menghitung pegawai baru');
     }
 
     public function testValidasi422(): void
@@ -189,7 +226,7 @@ final class RekapKehadiranTest extends DatabaseTestCase
         $this->assertSame(['NO', 'NAMA', 'NIP', 'JABATAN', 'HARI KERJA', 'HADIR', 'TL', 'PSW', 'TK', 'SAKIT', 'DINAS LUAR', 'LAIN LAIN', 'CUTI', 'TIDAK HADIR', 'TB'], $sheet[4]);
         $this->assertSame('Rekap Presensi Pegawai Negeri Sipil', $sheet[0][0]);
         $this->assertSame('Periode: September 2026', $sheet[2][0]);
-        $this->assertSame(['1', '199001012020121001', '21', '2', '0', '0', '15', '1', '1', '1', '1', '18', '1'], array_map('strval', [$sheet[5][0], $sheet[5][2], ...array_slice($sheet[5], 4)]));
+        $this->assertSame(['1', '199001012020121001', '21', '2', '0', '0', '16', '1', '1', '1', '1', '19', '1'], array_map('strval', [$sheet[5][0], $sheet[5][2], ...array_slice($sheet[5], 4)]));
 
         $harian = $this->serviceKehadiran()->xlsxHarian($this->adminRekap(), $query);
         $this->assertSame('rekap_kehadiran_harian_sat_' . $this->satkerA . '_2026-09.xlsx', $harian['nama']);
