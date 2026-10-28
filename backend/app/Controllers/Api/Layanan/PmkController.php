@@ -38,6 +38,23 @@ class PmkController extends ApiController
         return $this->respondSuccess(['deleted' => true, 'soft_delete' => false]);
     }
 
+    /**
+     * [V2] gap PRD §5.4: unduh arsip SK riwayat PMK final (hak = hak lihat riwayat). Pola unduh TB/IB.
+     */
+    public function unduhArsip(int $id, int $idAttachment): ResponseInterface
+    {
+        $hasil = (new RiwayatPmkService())->unduhArsip(service('authContext'), $id, $idAttachment);
+        $nama  = (string) ($hasil['lampiran']['display_name'] ?? 'arsip');
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setContentType((string) ($hasil['lampiran']['file_type'] ?? '') !== '' ? (string) $hasil['lampiran']['file_type'] : 'application/octet-stream')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]+/', '_', $nama) . '"; filename*=UTF-8\'\'' . rawurlencode($nama))
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('Cache-Control', 'private, no-store')
+            ->setBody($hasil['isi']);
+    }
+
     public function hapusArsip(int $id, int $idAttachment): ResponseInterface
     {
         (new RiwayatPmkService())->hapusArsip(service('authContext'), $id, $idAttachment);

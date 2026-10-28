@@ -124,6 +124,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'GET api/v1/pmk/pengajuan/([0-9]+)/berkas/([^/]+)' => [1, 2, 3],
             'GET api/v1/pmk'                                   => [1, 2, 3],
             'PUT api/v1/pmk/([0-9]+)'                          => [1, 2, 3],
+            'GET api/v1/pmk/([0-9]+)/arsip/([0-9]+)'           => [1, 2, 3],
             'DELETE api/v1/pmk/([0-9]+)/arsip/([0-9]+)'        => [1, 2, 3],
             'DELETE api/v1/pmk/([0-9]+)'                       => [1, 2, 3],
             'GET api/v1/dokumen/([^/]+)'                       => [1, 3, 4, 5, 8],

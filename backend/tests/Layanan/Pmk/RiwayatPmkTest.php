@@ -72,6 +72,37 @@ final class RiwayatPmkTest extends DatabaseTestCase
         $this->assertSame(['arsip'], array_keys($this->galat(fn () => $svc->hapusArsip($su, $id, (int) $arsip[1]['id_attachment']))));
     }
 
+    public function testUnduhArsipSkMengikutiHakLihatRiwayat(): void
+    {
+        $idSatker       = $this->buatSatker();
+        [$nip, $auth]   = $this->aktorStudi(Role::PEGAWAI, [], $idSatker);
+        [, $lain]       = $this->aktorStudi(Role::PEGAWAI, [], $this->buatSatker());
+        [, $admin3]     = $this->aktorStudi(Role::ADMIN_SATKER, [], $idSatker);
+        [, $admin3Luar] = $this->aktorStudi(Role::ADMIN_SATKER, [], $this->buatSatker());
+        [, $su]         = $this->aktorStudi(Role::SUPER_ADMIN);
+        $id             = $this->riwayat($nip);
+        $idLain         = $this->riwayat($nip);
+        $svc            = new RiwayatPmkService();
+        $arsip          = $svc->tambahArsip($su, $id, $this->berkasPdf('sk-asli.pdf'));
+        $idArsip        = (int) $arsip[0]['id_attachment'];
+        $arsipLain      = $svc->tambahArsip($su, $idLain, $this->berkasPdf('sk-lain.pdf'));
+
+        foreach ([$auth, $admin3, $su] as $pelihat) {
+            $hasil = $svc->unduhArsip($pelihat, $id, $idArsip);
+            $this->assertSame('sk-asli.pdf', $hasil['lampiran']['display_name']);
+            $this->assertNotSame('', $hasil['isi']);
+            $this->assertArrayNotHasKey('path', $hasil['lampiran'], 'path internal tidak keluar');
+        }
+
+        foreach ([$lain, $admin3Luar] as $tidakBerhak) {
+            $this->assertSame(404, $this->kodeGalat(fn () => $svc->unduhArsip($tidakBerhak, $id, $idArsip)), 'riwayat tak terlihat → 404');
+        }
+
+        $this->assertSame(404, $this->kodeGalat(fn () => $svc->unduhArsip($su, $id, (int) $arsipLain[0]['id_attachment'])), 'arsip milik riwayat lain → 404');
+        $this->assertSame(404, $this->kodeGalat(fn () => $svc->unduhArsip($su, $id, 999999)), 'arsip tidak ada → 404');
+        $this->assertSame(404, $this->kodeGalat(fn () => $svc->unduhArsip($su, 999999, $idArsip)), 'riwayat tidak ada → 404');
+    }
+
     public function testHapusRiwayatRole1Saja(): void
     {
         [$nip, $auth] = $this->aktorStudi(Role::PEGAWAI);
@@ -98,6 +129,19 @@ final class RiwayatPmkTest extends DatabaseTestCase
         $this->db->table('riwayat_pmk')->insert(['nip' => $nip, 'no_sk' => 'SK/PMK/1', 'tgl_sk' => '2020-01-10', 'instansi' => 'PT Lama', 'tgl_awal' => '2010-01-01', 'tgl_akhir' => '2012-12-31', 'mker_th' => 2, 'mker_bl' => 11]);
 
         return (int) $this->db->insertID();
+    }
+
+    private function kodeGalat(\Closure $aksi): int
+    {
+        try {
+            $aksi();
+        } catch (NotFoundException) {
+            return 404;
+        } catch (ForbiddenException) {
+            return 403;
+        }
+
+        return 200;
     }
 
     /**

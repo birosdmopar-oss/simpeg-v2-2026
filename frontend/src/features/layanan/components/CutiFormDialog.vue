@@ -14,8 +14,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role } from '@/features/auth/types'
 import { describeApiError, splitValidationErrors } from '@/features/kepegawaian/services/apiErrors'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
-import { pegawaiService } from '@/features/kepegawaian/services/pegawai.service'
-import { UiButton, UiCheckbox, UiCombobox, UiFileField, UiNotice, UiRadioGroup, UiSearchInput, UiSelect, UiTextField } from '@/shared/ui'
+import { UiButton, UiCheckbox, UiFileField, UiNotice, UiRadioGroup, UiSearchInput, UiSelect, UiTextField } from '@/shared/ui'
 
 import { BERKAS_BUKTI, DURASI_OPSI } from '../cutiJenis'
 import { useHitungLama } from '../composables/useHitungLama'
@@ -23,6 +22,7 @@ import { cutiService } from '../services/cuti.service'
 import type { CutiIsian, CutiItem, CutiOpsi } from '../types'
 
 import KalkulatorCutiPanel from './KalkulatorCutiPanel.vue'
+import PegawaiPicker from './PegawaiPicker.vue'
 
 const props = defineProps<{ open: boolean; row: CutiItem | null }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: CutiItem] }>()
@@ -61,9 +61,6 @@ const isian = reactive({
   keterangan: '',
   nip_yang_menyetujui: '',
 })
-const cariPegawai = ref('')
-const saranPegawai = ref<{ label: string; nip: string }[]>([])
-let timerPegawai: ReturnType<typeof setTimeout> | undefined
 const ketuaTim = ref<string[]>([])
 const cariKetua = ref('')
 const berkas = ref<File | null>(null)
@@ -98,8 +95,6 @@ function reset(): void {
   berkas.value = null
   cariKetua.value = ''
   ketuaTim.value = []
-  cariPegawai.value = ''
-  saranPegawai.value = []
   Object.assign(isian, {
     nip: '',
     status: '0',
@@ -161,36 +156,10 @@ watch(
   { immediate: true },
 )
 
-function labelPegawai(p: { nip: string; nama: string; glr_awal: string | null; glr_akhir: string | null }): string {
-  const nama = [p.glr_awal, p.nama].filter(Boolean).join(' ') + (p.glr_akhir ? `, ${p.glr_akhir}` : '')
-  return `${p.nip} — ${nama}`
-}
-
-/** Pencarian pegawai ke server (`GET pegawai?search=`, role 1); memilih saran memuat `cuti/opsi?nip=`. */
-async function cariPegawaiServer(kata: string): Promise<void> {
-  try {
-    const hasil = await pegawaiService.list({ page: 1, per_page: 10, search: kata })
-    saranPegawai.value = hasil.items.map((p) => ({ nip: p.nip, label: labelPegawai(p) }))
-  } catch {
-    saranPegawai.value = []
-  }
-}
-
-function onCariPegawai(nilai: string): void {
-  cariPegawai.value = nilai
-  const dipilih = saranPegawai.value.find((s) => s.label === nilai)
-  if (dipilih) {
-    isian.nip = dipilih.nip
-    void muatOpsi(dipilih.nip)
-    return
-  }
-  isian.nip = ''
-  clearTimeout(timerPegawai)
-  if (nilai.trim().length < 3) {
-    saranPegawai.value = []
-    return
-  }
-  timerPegawai = setTimeout(() => void cariPegawaiServer(nilai.trim()), 300)
+/** Pemilih pegawai (role 1): memilih saran memuat `cuti/opsi?nip=`; mengetik ulang mengosongkan NIP terpilih. */
+function onPilihPegawai(nip: string): void {
+  isian.nip = nip
+  if (nip !== '') void muatOpsi(nip)
 }
 
 function pilihKetua(nip: string, dipilih: boolean): void {
@@ -274,19 +243,7 @@ const pesan = (k: string): string | undefined => errors.value[k] || kalkulator.g
         <form v-else :class="FORM_GRID_CLASS" novalidate data-testid="cuti-form" @submit.prevent="simpan">
           <p v-if="umum" role="alert" :class="FORM_ALERT_CLASS" data-testid="cuti-form-error">{{ umum }}</p>
 
-          <div v-if="admin && !edit" :class="FORM_WIDE_CLASS" data-testid="cuti-pegawai">
-            <span class="mb-1.5 block text-body2 font-medium text-slate-700">Pegawai<span class="text-danger" aria-hidden="true"> *</span></span>
-            <UiCombobox
-              :model-value="cariPegawai"
-              :suggestions="saranPegawai.map((x) => x.label)"
-              placeholder="Cari NIP atau nama pegawai (min. 3 huruf)"
-              aria-label="Pegawai"
-              :invalid="!!errors.nip"
-              @update:model-value="onCariPegawai"
-            />
-            <span v-if="errors.nip" role="alert" class="mt-1 block text-caption text-danger">{{ errors.nip }}</span>
-            <span v-else-if="isian.nip" class="mt-1 block text-caption text-slate-500" data-testid="cuti-pegawai-terpilih">NIP terpilih: {{ isian.nip }}</span>
-          </div>
+          <PegawaiPicker v-if="admin && !edit" :class="FORM_WIDE_CLASS" :nip="isian.nip" :error="errors.nip" @pilih="onPilihPegawai" />
 
           <UiNotice v-if="opsi && !bisaDiisi" tone="warning" :class="FORM_WIDE_CLASS" data-testid="cuti-tidak-bisa">
             Tidak ada jenis cuti yang dapat diajukan untuk pegawai ini.

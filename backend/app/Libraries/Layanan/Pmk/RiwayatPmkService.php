@@ -115,6 +115,25 @@ class RiwayatPmkService extends DasarPmkService
         return $this->lampiran()->daftar($nip, self::KODE_ARSIP, $id);
     }
 
+    /**
+     * Unduh satu arsip SK riwayat PMK final (gap PRD §5.4, [V2]; legacy `views/hr/employee/rwy/pmk/list.php:70-77`
+     * menautkan arsip ke semua yang boleh melihat riwayat). Hak = hak lihat riwayat (role 1, 2 pemilik, 3 lingkup);
+     * baris tak terlihat atau arsip yang bukan milik baris itu (kode 42, id_entri) → 404. Path internal tidak keluar.
+     *
+     * @return array{lampiran: array<string, mixed>, isi: string}
+     */
+    public function unduhArsip(AuthContext $auth, int $id, int $idAttachment): array
+    {
+        $row = $this->barisTerlihat($auth, $id);
+        $da  = model(DocumentAttachmentModel::class)->find($idAttachment);
+
+        if (! is_array($da) || (int) $da['id_riwayat'] !== self::KODE_ARSIP || (string) $da['id_entri'] !== (string) $id) {
+            throw new NotFoundException('Arsip tidak ditemukan.');
+        }
+
+        return $this->lampiran()->ambil((string) $row['nip'], $idAttachment);
+    }
+
     public function hapus(AuthContext $auth, int $id): void
     {
         $row = $this->barisTerlihat($auth, $id);

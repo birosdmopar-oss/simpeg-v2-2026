@@ -323,14 +323,14 @@ describe('CutiFormDialog — role 1 dan ubah', () => {
     expect(svc.opsi).not.toHaveBeenCalled()
     expect(q('[data-testid="cuti-jenis"]')).toBeNull()
 
-    isi('[data-testid="cuti-pegawai"] input', 'budi')
+    isi('[data-testid="pegawai-picker"] input', 'budi')
     await lewatJeda()
     expect(pegawaiList).toHaveBeenCalledWith({ page: 1, per_page: 10, search: 'budi' })
 
-    isi('[data-testid="cuti-pegawai"] input', '198001012005011001 — Drs. Budi Santoso, M.Si.')
+    isi('[data-testid="pegawai-picker"] input', '198001012005011001 — Drs. Budi Santoso, M.Si.')
     await flushPromises()
     expect(svc.opsi).toHaveBeenCalledWith('198001012005011001')
-    expect(q('[data-testid="cuti-pegawai-terpilih"]')?.textContent).toContain('198001012005011001')
+    expect(q('[data-testid="pegawai-picker-terpilih"]')?.textContent).toContain('198001012005011001')
 
     await isiDasar()
     isi('[data-testid="cuti-tgl-akhir"] input', '2026-11-06')
@@ -347,7 +347,7 @@ describe('CutiFormDialog — role 1 dan ubah', () => {
 
   it('role 1: ketikan kurang dari 3 huruf tidak memanggil server', async () => {
     await mountDialog(Role.SUPER_ADMIN)
-    isi('[data-testid="cuti-pegawai"] input', 'bu')
+    isi('[data-testid="pegawai-picker"] input', 'bu')
     await lewatJeda()
     expect(pegawaiList).not.toHaveBeenCalled()
   })

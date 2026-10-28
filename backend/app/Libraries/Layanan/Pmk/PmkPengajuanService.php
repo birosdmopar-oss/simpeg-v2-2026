@@ -102,7 +102,7 @@ class PmkPengajuanService extends DasarPmkService
     }
 
     /**
-     * @return array{jenis_pmk: list<string>, pegawai: array<string, mixed>|null, tmt_cpns: ?string, tgl_awal_maks: ?string, berkas: array<string, string>, can_create: bool}
+     * @return array{jenis_pmk: list<string>, pegawai: array<string, mixed>|null, tmt_cpns: ?string, tgl_awal_maks: ?string, berkas: array<string, string>, can_create: bool, adalah_pic: bool}
      */
     public function opsi(AuthContext $auth, ?string $nip): array
     {
@@ -122,6 +122,8 @@ class PmkPengajuanService extends DasarPmkService
             'tgl_awal_maks' => $tmt !== null ? RentangTanggal::tambahHari($tmt, -1) : null,
             'berkas'        => self::BERKAS,
             'can_create'    => $this->bolehMengajukan($auth),
+            // Penanda tampilan (FE menyembunyikan tab Perlu Persetujuan); hak proses tetap ditegakkan service.
+            'adalah_pic' => $this->adalahPic($auth),
         ];
     }
 

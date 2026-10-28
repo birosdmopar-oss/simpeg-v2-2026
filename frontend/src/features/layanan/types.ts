@@ -215,6 +215,105 @@ export interface CutiIsian {
   status?: string
 }
 
+/** Mode daftar pengajuan PMK (`GET pmk/pengajuan?mode=`). */
+export type ModePmk = 'saya' | 'pic' | 'admin'
+
+/** Aksi proses PMK (`POST pmk/pengajuan/{id}/process`). */
+export type AksiProsesPmk = 'proses' | 'setujui' | 'tolak'
+
+export type KolomBerkasPmk = 'file_kontrak' | 'file_paklaring' | 'file_surat_phk' | 'file_slip_gaji'
+
+/** Pengajuan PMK (`riwayat_pmk_req`) setelah normalisasi; kolom berkas hanya penanda ada/tidak (path internal tidak dikirim). */
+export interface PmkItem extends TampilanStatus {
+  id: number
+  nip: string
+  jenis_pmk: string
+  instansi: string
+  tgl_awal: string
+  tgl_akhir: string
+  mker_th: number
+  mker_bl: number
+  status: number
+  reason_note: string | null
+  berkas: Record<KolomBerkasPmk, boolean>
+  /** Server: aksi proses yang boleh pada status sekarang (kosong bila bukan PIC atau status final). */
+  aksi_tersedia: AksiProsesPmk[]
+  created_at: string | null
+  approved_at: string | null
+}
+
+export interface PmkListResponse {
+  items: PmkItem[]
+  total: number
+  page: number
+  per_page: number
+  mode: ModePmk
+  can_create: boolean
+  can_process: boolean
+}
+
+export interface ArsipPmk {
+  id_attachment: number
+  display_name: string | null
+}
+
+/** Riwayat PMK final (`riwayat_pmk`, dari impor/SIASN). */
+export interface RiwayatPmkItem {
+  id: number
+  nip: string
+  no_sk: string
+  tgl_sk: string
+  instansi: string | null
+  tgl_awal: string | null
+  tgl_akhir: string | null
+  mker_th: number
+  mker_bl: number
+  arsip: ArsipPmk[]
+}
+
+export interface RiwayatPmkResponse {
+  items: RiwayatPmkItem[]
+  total: number
+  page: number
+  per_page: number
+  can_edit: boolean
+}
+
+export interface PmkOpsi {
+  jenis_pmk: string[]
+  pegawai: { nip: string; nama: string } | null
+  tmt_cpns: string | null
+  tgl_awal_maks: string | null
+  /** kolom berkas → label (server). */
+  berkas: Record<string, string>
+  can_create: boolean
+  /** Server (`PetugasLayananService`): pemanggil PIC PMK aktif → tab Perlu Persetujuan ditampilkan. */
+  adalah_pic: boolean
+}
+
+export interface HitungMker {
+  mker_th: number
+  mker_bl: number
+  peringatan: string | null
+}
+
+/** Isian pengajuan PMK; `mker_th`/`mker_bl` dari kalkulator server (`pmk/hitung-mker`). */
+export interface PmkIsian {
+  jenis_pmk: string
+  instansi: string
+  tgl_awal: string
+  tgl_akhir: string
+  mker_th: string
+  mker_bl: string
+  /** Hanya role 1. */
+  nip?: string
+}
+
+export interface PmkQuery {
+  mode: ModePmk
+  page: number
+  per_page: number
+  status?: string
 /** Jenis layanan pada Status Layanan (`GET layanan/status` → `jenis`). */
 export type JenisLayananKode = 'cuti' | 'tb' | 'ib' | 'pmk'
 
