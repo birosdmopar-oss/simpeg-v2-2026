@@ -13,14 +13,15 @@ use InvalidArgumentException;
  * transaksi: salin baris pegawai ke NIP baru → arahkan ulang setiap kolom di registry ini → hapus baris lama. Legacy
  * cukup `UPDATE pegawai SET nip` karena FK-nya `ON UPDATE CASCADE` (`libraries/hr/L_employee.php:586-587`).
  *
- * Isi (88 entri):
+ * Isi (89 entri):
  * - {@see JenisRujukanNip::FkLegacy} (75): semua `REFERENCES pegawai (nip)` di dump struktur produksi 01-10-2026 (D1,
  *   285 tabel), 70 tabel. Semuanya `ON UPDATE CASCADE`; nama FK legacy dicatat.
  * - {@see JenisRujukanNip::NonFkUbahNipLegacy} (1): `pengguna.username`, diganti kode Ubah NIP legacy.
  * - {@see JenisRujukanNip::NonFkSlipGaji} (1): `gaji_pegawai.nip`.
- * - {@see JenisRujukanNip::NonFkFkV2} (7): tanpa FK di legacy tetapi ber-FK di v2 — `riwayat_cuti.nip_atasan_langsung`/
+ * - {@see JenisRujukanNip::NonFkFkV2} (8): tanpa FK di legacy tetapi ber-FK di v2 — `riwayat_cuti.nip_atasan_langsung`/
  *   `nip_yang_menyetujui`, `petugas_layanan.nip`, `pa_layanan.nip`, `disiplin_ticket.nip` (FK ditahan
- *   `AddFkNipLayananFase4`), `inbox.nip_penerima`, `firebase_token.nip` (FK di CREATE) — DBV-022.
+ *   `AddFkNipLayananFase4`), `inbox.nip_penerima`, `firebase_token.nip` (FK di CREATE) — DBV-022;
+ *   `penyesuaian_tukin.nip` (tabel [V2] pengganti hard-code legacy, FK di CREATE) — DBV-024.
  * - {@see JenisRujukanNip::NonFkKeputusanV2} (1): `jabatan_koordinasi.nip`, tanpa FK dan tidak diganti legacy, ikut
  *   dikoreksi atas keputusan #10 WS2.md (MAKE-010).
  * - {@see JenisRujukanNip::JsonArrayNip} (2): `dm_user_lokasi_presensi.target_peg`/`excl_peg` (JSON array NIP, pasangan
@@ -175,6 +176,12 @@ final class TabelAnakNip
             '[K] inbox.nip (tiket) tanpa FK, VARCHAR(18) (D1:1369-1393); [V2] VARCHAR(30) + FK DITAHAN AddFkNipLayananFase4 (DQ-4)',
             false, KeberadaanV2::Ada, 4, 'C-01',
             'Pelapor tiket Halo Simpeg (skema final Fase 8, dibuat DBV-022); FK dipasang setelah audit yatim = 0',
+        ],
+        [
+            'penyesuaian_tukin', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K-kode] libraries/hr/L_presensi.php:11755-11806 (daftar NIP & periode di-hard-code, tanpa tabel); [V2] tabel baru DBV-024',
+            false, KeberadaanV2::Ada, 5, 'D-08',
+            'Penyesuaian Tukin per NIP (fk_nip_ptk_to_pegawai RESTRICT di CREATE, DBV-Q6); ikut koreksi NIP B-06',
         ],
         [
             'riwayat_cuti', 'ketua_tim', JenisRujukanNip::DaftarNipBerpemisah,

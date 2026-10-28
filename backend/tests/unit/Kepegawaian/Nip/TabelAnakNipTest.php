@@ -45,11 +45,11 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
     public function testJumlahPerJenis(): void
     {
-        $this->assertCount(88, TabelAnakNip::semua());
+        $this->assertCount(89, TabelAnakNip::semua());
         $this->assertCount(75, TabelAnakNip::perJenis(JenisRujukanNip::FkLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkUbahNipLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkSlipGaji));
-        $this->assertCount(7, TabelAnakNip::perJenis(JenisRujukanNip::NonFkFkV2));
+        $this->assertCount(8, TabelAnakNip::perJenis(JenisRujukanNip::NonFkFkV2));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkKeputusanV2));
         $this->assertCount(2, TabelAnakNip::perJenis(JenisRujukanNip::JsonArrayNip));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::DaftarNipBerpemisah));
@@ -147,7 +147,7 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
     public function testJumlahPerFaseDanKeberadaan(): void
     {
-        $harapan = [0 => 1, 1 => 2, 2 => 4, 3 => 40, 4 => 16, 5 => 2, 6 => 0, 7 => 5, 8 => 0];
+        $harapan = [0 => 1, 1 => 2, 2 => 4, 3 => 40, 4 => 16, 5 => 3, 6 => 0, 7 => 5, 8 => 0];
         $aktual  = [];
 
         for ($fase = TabelAnakNip::FASE_MIN; $fase <= TabelAnakNip::FASE_MAX; $fase++) {
@@ -155,7 +155,7 @@ final class TabelAnakNipTest extends CIUnitTestCase
         }
 
         $this->assertSame($harapan, $aktual);
-        $this->assertCount(70, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
+        $this->assertCount(71, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
         $this->assertCount(12, TabelAnakNip::perKeberadaan(KeberadaanV2::TidakDiimpor));
         $this->assertCount(6, TabelAnakNip::perKeberadaan(KeberadaanV2::BelumDiputuskan));
     }
@@ -216,8 +216,9 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
         // DBV-023 M2 (AC-D01.7): cakupan Fase 5A = presensi harian (FK) + slip gaji (NonFkSlipGaji, tidak diarahkan).
         $fase5 = $kunci(TabelAnakNip::sampaiFase(5));
-        $this->assertCount(65, $fase5);
-        $this->assertSame(['dh_online.nip', 'gaji_pegawai.nip'], array_values(array_diff($fase5, $fase4)));
+        // DBV-024 (Fase 5B): penyesuaian Tukin per NIP (NonFkFkV2, FK RESTRICT di CREATE).
+        $this->assertCount(66, $fase5);
+        $this->assertSame(['dh_online.nip', 'gaji_pegawai.nip', 'penyesuaian_tukin.nip'], array_values(array_diff($fase5, $fase4)));
 
         $this->assertSame(
             $kunci(TabelAnakNip::perKeberadaan(KeberadaanV2::Ada)),
