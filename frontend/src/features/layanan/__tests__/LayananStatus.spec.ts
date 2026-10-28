@@ -8,7 +8,7 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const server = vi.hoisted(() => ({
-  balasan: {} as Record<string, { status: number; body: unknown }>,
+  balasan: {} as Record<string, { status: number; body: unknown; headers?: Record<string, string> }>,
   permintaan: [] as { method: string; url: string; params: unknown }[],
 }))
 
@@ -20,7 +20,7 @@ vi.mock('@/lib/axios', async (importOriginal) => {
     server.permintaan.push({ method, url, params: config.params })
     const balasan = server.balasan[`${method} ${url}`]
     if (!balasan) throw new Error(`tidak ada balasan palsu untuk ${method} ${url}`)
-    const response: AxiosResponse = { status: balasan.status, statusText: 'x', headers: {}, config, data: balasan.body }
+    const response: AxiosResponse = { status: balasan.status, statusText: 'x', headers: balasan.headers ?? {}, config, data: balasan.body }
     if (balasan.status >= 400) throw new AxiosError('gagal', 'ERR_BAD_REQUEST', config, null, response)
     return response
   }
@@ -32,6 +32,8 @@ import { Role } from '@/features/auth/types'
 import { masterService } from '@/features/master-data/services/master.service'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
+
+import * as berkas from '@/features/kepegawaian/services/berkasUnduhan'
 
 import { layananStatusService } from '../services/layananStatus.service'
 import LayananStatusPage from '../views/LayananStatusPage.vue'
@@ -67,7 +69,8 @@ const item = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-const daftar = (items: unknown[], total = items.length) => sukses({ items, total: String(total), page: '1', per_page: '10', jenis: [] })
+const daftar = (items: unknown[], total = items.length, canExport: unknown = true) =>
+  sukses({ items, total: String(total), page: '1', per_page: '10', jenis: [], can_export: canExport })
 
 beforeEach(() => {
   server.balasan = {}
@@ -128,6 +131,31 @@ describe('layananStatusService — amplop backend nyata lewat klien asli', () =>
   it('422 diteruskan sebagai ApiError', async () => {
     server.balasan['get /layanan/status'] = { status: 422, body: { status: 'error', message: 'Validasi gagal.', errors: { status: ['Filter status kode memerlukan jenis layanan.'] } } }
     await expect(layananStatusService.list({ page: 1, per_page: 10, status: '1' })).rejects.toMatchObject({ status: 422 })
+  })
+})
+
+describe('layananStatusService.ekspor — klien asli, biner', () => {
+  it('memanggil GET layanan/status/ekspor dengan format + filter aktif (kosong dibuang) dan memberi nama dari server', async () => {
+    server.balasan['get /layanan/status/ekspor'] = {
+      status: 200,
+      body: new Blob(['PK']),
+      headers: { 'content-disposition': 'attachment; filename="status_layanan_20261028_101500.xlsx"', 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    }
+
+    const hasil = await layananStatusService.ekspor('xlsx', { jenis: 'tb', status: '', id_unit: 'U1', id_satker: '', search: 'contoh' })
+
+    expect(server.permintaan[0]?.params).toEqual({ format: 'xlsx', jenis: 'tb', id_unit: 'U1', search: 'contoh' })
+    expect(hasil.blob).toBeInstanceOf(Blob)
+    expect(hasil.nama).toBe('status_layanan_20261028_101500.xlsx')
+  })
+
+  it('list() membaca can_export (boolean/"1"); tanpa flag → false', async () => {
+    server.balasan['get /layanan/status'] = daftar([], 0, true)
+    expect((await layananStatusService.list({ page: 1, per_page: 10 })).can_export).toBe(true)
+    server.balasan['get /layanan/status'] = daftar([], 0, '1')
+    expect((await layananStatusService.list({ page: 1, per_page: 10 })).can_export).toBe(true)
+    server.balasan['get /layanan/status'] = sukses({ items: [], total: '0' })
+    expect((await layananStatusService.list({ page: 1, per_page: 10 })).can_export).toBe(false)
   })
 })
 
@@ -220,6 +248,57 @@ describe('LayananStatusPage', () => {
     server.balasan['get /layanan/status'] = daftar([])
     await mountPage()
     expect(q('[data-testid="layanan-status-empty"]')?.textContent).toContain('Tidak ada data pada lingkup ini')
+  })
+
+  it('tombol Ekspor hanya bila server mengizinkan (can_export)', async () => {
+    server.balasan['get /layanan/status'] = daftar([item()], 1, false)
+    const { wrapper } = await mountPage()
+    expect(wrapper.find('[data-testid="export-trigger"]').exists()).toBe(false)
+    wrapper.unmount()
+
+    server.balasan['get /layanan/status'] = daftar([item()], 1, true)
+    await mountPage()
+    expect(q('[data-testid="export-trigger"]')?.textContent).toContain('Ekspor')
+  })
+
+  it('Ekspor memakai filter aktif, memilih CSV/XLSX, dan menyimpan berkas dari server', async () => {
+    server.balasan['get /layanan/status'] = daftar([item()])
+    server.balasan['get /layanan/status/ekspor'] = {
+      status: 200,
+      body: new Blob(['x']),
+      headers: { 'content-disposition': 'attachment; filename="status_layanan_20261028_101500.csv"', 'content-type': 'text/csv; charset=UTF-8' },
+    }
+    const simpan = vi.spyOn(berkas, 'simpanBerkas').mockImplementation(() => undefined)
+    const { wrapper } = await mountPage()
+    await wrapper.get('[data-testid="layanan-status-filter"]').findAll('select')[0]!.setValue('tb')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="export-trigger"]').trigger('click')
+    await flushPromises()
+    expect([...document.body.querySelectorAll('[data-format]')].map((n) => n.getAttribute('data-format'))).toEqual(['xlsx', 'csv'])
+    ;(document.body.querySelector('[data-format="csv"]') as HTMLElement).click()
+    await flushPromises()
+
+    const minta = server.permintaan.find((p) => p.url === '/layanan/status/ekspor')
+    expect(minta?.params).toEqual({ format: 'csv', jenis: 'tb' })
+    expect(simpan).toHaveBeenCalledWith({ blob: expect.any(Blob), nama: 'status_layanan_20261028_101500.csv' })
+    simpan.mockRestore()
+  })
+
+  it('Ekspor gagal (422 batas baris) → pesan galat, tidak menyimpan berkas', async () => {
+    server.balasan['get /layanan/status'] = daftar([item()])
+    server.balasan['get /layanan/status/ekspor'] = { status: 422, body: { status: 'error', message: 'Validasi gagal.', errors: { format: ['Data terlalu banyak untuk diekspor (maksimal 20000 baris); persempit filter.'] } } }
+    const simpan = vi.spyOn(berkas, 'simpanBerkas').mockImplementation(() => undefined)
+    const { wrapper } = await mountPage()
+
+    await wrapper.get('[data-testid="export-trigger"]').trigger('click')
+    await flushPromises()
+    ;(document.body.querySelector('[data-format="xlsx"]') as HTMLElement).click()
+    await flushPromises()
+
+    expect(q('[data-testid="layanan-status-ekspor-error"]')?.textContent).toContain('Gagal mengekspor')
+    expect(simpan).not.toHaveBeenCalled()
+    simpan.mockRestore()
   })
 
   it('paginasi muncul bila total melebihi jumlah baris', async () => {

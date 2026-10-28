@@ -18,6 +18,8 @@ use CodeIgniter\Router\RouteCollection;
 $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter' => 'jwt'], static function (RouteCollection $routes): void {
     $lihat = ['filter' => Role::filter(...LayananDashboardService::ROLE_ROUTE)];
     $routes->get('layanan/status', 'LayananDashboardController::status', $lihat);
+    // [V2] MAKE-046 ekspor Status Layanan (legacy tidak punya halaman Status Layanan); role & lingkup sama dengan daftar.
+    $routes->get('layanan/status/ekspor', 'LayananDashboardController::ekspor', $lihat);
     $routes->get('layanan/jenis', 'LayananDashboardController::jenis', $lihat);
 
     $pic = ['filter' => Role::filter(...PetugasLayananService::ROLE_ROUTE)];

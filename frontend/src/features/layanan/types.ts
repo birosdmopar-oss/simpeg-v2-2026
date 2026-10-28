@@ -357,7 +357,11 @@ export interface LayananStatusResponse {
   total: number
   page: number
   per_page: number
+  /** Server: pemanggil boleh mengekspor lingkup yang sama (tombol Ekspor). */
+  can_export: boolean
 }
+
+export type FormatEksporStatus = 'csv' | 'xlsx'
 
 export interface LayananStatusQuery {
   page: number
