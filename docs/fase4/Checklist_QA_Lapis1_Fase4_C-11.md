@@ -16,9 +16,9 @@ PRD di tabel §6.11.8 **bukan** temuan (ikuti PRD). Halaman tanpa frame dicatat 
 
 | Kode | Data | Untuk butir |
 |---|---|---|
-| Akun | `demo.admin` (1), `demo.pegawai` (2, PIC TB/IB/PMK), `demo.atasan` (2, atasan langsung `demo.pegawai`), `demo.pyb` (2, pejabat berwenang `demo.pegawai`; tidak dibuat bila langkah tunggal), `demo.satker` (3), `demo.eselon1` (4), `demo.menteri` (5), `demo.ptt` (6), `demo.pppk` (7), `demo.pimpinan` (8) | B, semua |
-| C1 | Cuti Tahunan `demo.pegawai` menunggu atasan langsung | D (pengingat AL, proses AL) |
-| C2 | Cuti Tahunan menunggu PyB (sudah disetujui AL) | D (pengingat PyB, proses PyB) |
+| Akun | `demo.admin` (1), `demo.pegawai` (2, PIC TB/IB/PMK), `demo.pemohon` (2, pemohon cuti C1–C5: PNS pertama di satker kepegawaian yang atasan langsung & PyB-nya terisi, dipilih skrip; data struktur demo tidak diubah), `demo.atasan` (2, atasan langsung `demo.pemohon`), `demo.pyb` (2, pejabat berwenang `demo.pemohon`; tidak dibuat bila langkah tunggal), `demo.satker` (3), `demo.eselon1` (4), `demo.menteri` (5), `demo.ptt` (6), `demo.pppk` (7), `demo.pimpinan` (8) | B, semua |
+| C1 | Cuti Tahunan `demo.pemohon` menunggu atasan langsung | D (pengingat AL, proses AL) |
+| C2 | Cuti Tahunan `demo.pemohon` menunggu PyB (sudah disetujui AL) | D (pengingat PyB, proses PyB) |
 | C3 | Cuti ditolak atasan langsung | C4, D |
 | C4 | Cuti ditangguhkan PyB | C4, D |
 | C5 | Cuti disetujui (final) | D (TTE, unduh surat), I |
@@ -68,7 +68,7 @@ Halaman: `/layanan/cuti`, `/layanan/cuti/:id`, `/layanan/cuti/saldo`, `/layanan/
 
 ## C. Status Layanan vs Gambar 17 (butir 1–4) — `/layanan/status`
 
-Akun: `demo.admin` (filter unit/satker tampil), `demo.pegawai` (hanya pengajuan sendiri, tanpa filter unit), `demo.eselon1`
+Akun: `demo.admin` (filter unit/satker tampil), `demo.pemohon` (hanya pengajuan sendiri, tanpa filter unit), `demo.eselon1`
 (role 4: tanpa "Lihat detail"). Data: C1–C5, T1, I1–I2, P1–P3, TB id 1.
 
 | # | Butir | Langkah | Hasil yang diharapkan | Layar | Hasil |
@@ -85,18 +85,18 @@ Akun: `demo.admin` (filter unit/satker tampil), `demo.pegawai` (hanya pengajuan 
 
 | # | Butir | Akun | Data | Langkah | Hasil yang diharapkan | Layar | Hasil |
 |---|---|---|---|---|---|---|---|
-| D1 | 15, A | `demo.pegawai` | C1–C5 | Buka halaman | Tab "Cuti Saya", "Perlu Persetujuan" (badge jumlah), tanpa "Monitoring"; tombol "Ajukan Cuti" (hak dari `can_create`) | 1440, 390 | |
+| D1 | 15, A | `demo.pemohon` | C1–C5 | Buka halaman | Tab "Cuti Saya", "Perlu Persetujuan" (badge jumlah), tanpa "Monitoring"; tombol "Ajukan Cuti" (hak dari `can_create`) | 1440, 390 | |
 | D2 | 15 | `demo.admin`, `demo.satker` | — | Buka halaman | Tab "Perlu Persetujuan" + "Monitoring"; tanpa "Cuti Saya" | 1440 | |
-| D3 | 9 | `demo.pegawai` | saldo 2026 | "Ajukan Cuti" → isi Tahunan, tanggal mulai/akhir, telp, alamat, keterangan; ganti tanggal | Form 2 kolom ≥ 601 px, 1 kolom ≤ 600 px; datepicker/dropdown/unggah custom; kalkulator memanggil `POST cuti/hitung-lama` (debounce) dan menampilkan lama, hari libur, panel kuota N/N-1/N-2, Dalam Proses, Diajukan Sekarang, Sisa Setelah Pengajuan; tanpa hitungan di FE (cek Network); Simpan tidak dikunci kalkulator | 1440, 600, 390 | |
-| D4 | 9 | `demo.pegawai` | — | Simpan dengan keterangan < 10 karakter, tanggal beririsan C1 | Galat 422 per kolom di bawah field (`keterangan`, `tgl_mulai`) | 1440 | |
-| D5 | 9 | `demo.pegawai` | — | Jenis Besar | Isian durasi tampil, tanggal akhir dari server (`pakai_durasi`); Sakit → lampiran wajib (`lampiran_wajib`) | 1440 | |
+| D3 | 9 | `demo.pemohon` | saldo 2026 | "Ajukan Cuti" → isi Tahunan, tanggal mulai/akhir, telp, alamat, keterangan; ganti tanggal | Form 2 kolom ≥ 601 px, 1 kolom ≤ 600 px; datepicker/dropdown/unggah custom; kalkulator memanggil `POST cuti/hitung-lama` (debounce) dan menampilkan lama, hari libur, panel kuota N/N-1/N-2, Dalam Proses, Diajukan Sekarang, Sisa Setelah Pengajuan; tanpa hitungan di FE (cek Network); Simpan tidak dikunci kalkulator | 1440, 600, 390 | |
+| D4 | 9 | `demo.pemohon` | — | Simpan dengan keterangan < 10 karakter, tanggal beririsan C1 | Galat 422 per kolom di bawah field (`keterangan`, `tgl_mulai`) | 1440 | |
+| D5 | 9 | `demo.pemohon` | — | Jenis Besar | Isian durasi tampil, tanggal akhir dari server (`pakai_durasi`); Sakit → lampiran wajib (`lampiran_wajib`) | 1440 | |
 | D6 | — | `demo.atasan` | C1 | Login | **Pengingat** "Pengingat Persetujuan Cuti" muncul sekali di halaman pertama setelah login; "Tunda" menghilangkan baris; "Proses" membuka detail; pindah halaman tidak memunculkan lagi; Keluar → login lagi → muncul lagi (§14.7 #7) | 1440, 390 | |
 | D7 | — | `demo.pyb` | C2 | Login | Pengingat berisi C2 (tahap PyB) | 1440 | |
 | D8 | 8 | `demo.atasan` | C1 | ⋮ Tolak tanpa alasan; alasan > 255 byte; Esc | `ApprovalDialog`: kirim tanpa alasan diblokir; > 255 byte → galat; muat di 390 px; Esc menutup; fokus kembali ke ⋮ | 1440, 390 | |
 | D9 | 8 | `demo.pyb` | C2 | ⋮ Tangguhkan | `TangguhkanDialog` (pembungkus `ApprovalDialog`), alasan wajib; status menjadi Ditangguhkan (lalu jalankan ulang skrip untuk memulihkan data uji bila perlu) | 1440 | |
 | D10 | 8 | `demo.admin` | C1 bila approver tak terjangkau | ⋮ "Setujui/Tolak atas nama" | Hanya tampil bila `aksi.proses_atas_nama` server; alasan wajib | 1440 | — bila tidak ada data |
 | D11 | — | `demo.admin` | C5 | ⋮ Terbitkan TTE → passphrase | `EsignDialog`: input password custom, galat 422 per kolom, passphrase tidak tersimpan di DOM/storage/URL | 1440, 390 | |
-| D12 | §14.7 #9 | `demo.pegawai` | C1 | Buka detail | Stepper dari `tahap[]`, data, lampiran, ⋮ di kepala halaman (pola detail Cuti/PMK, deviasi sah) | 1440, 390 | |
+| D12 | §14.7 #9 | `demo.pemohon` | C1 | Buka detail | Stepper dari `tahap[]`, data, lampiran, ⋮ di kepala halaman (pola detail Cuti/PMK, deviasi sah) | 1440, 390 | |
 
 ## E. Saldo Cuti & Petugas Approval Cuti (role 1, 3)
 
@@ -144,7 +144,7 @@ Akun: `demo.admin` (filter unit/satker tampil), `demo.pegawai` (hanya pengajuan 
 
 | # | Akun | Data | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|---|
-| I1 | `demo.pegawai` / `demo.admin` | C5 | Unduh surat cuti (belum TTE, lalu setelah TTE mock) | Kop nama kementerian (bawaan bila `web_config` kosong, CR-066); "Halaman x dari y"; nama pencetak; kata tidak terpotong di kolom sempit | |
+| I1 | `demo.pemohon` / `demo.admin` | C5 | Unduh surat cuti (belum TTE, lalu setelah TTE mock) | Kop nama kementerian (bawaan bila `web_config` kosong, CR-066); "Halaman x dari y"; nama pencetak; kata tidak terpotong di kolom sempit | |
 | I2 | `demo.pegawai` | TB id 1 | Unduh surat TB | Templat surat TB terbaca, tanpa teks terpotong | |
 
 ## J. Deviasi yang sah (bukan temuan)
