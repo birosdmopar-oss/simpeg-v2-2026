@@ -19,6 +19,9 @@
     --sticky-top: calc(var(--shell-gap) + var(--topbar-h) + 1rem);
     /* Awal konten halaman: padding shell + navbar + pembungkus sticky (pb-3 = 0.75rem) + jarak <main> (mt-4 = 1rem). */
     --page-top: calc(var(--shell-gap) + var(--topbar-h) + 1.75rem);
+    /* Ruang yang dicadangkan di bawah wadah tabel di layar sempit untuk paginasi (mt-4 + tinggi tombol), supaya saat
+     * halaman digulir sampai paginasi, batas kartu induk tidak mendorong header tabel ke bawah navbar (CR-070). */
+    --table-foot: 6rem;
   }
 
   @media (min-width: 1024px) {
@@ -171,8 +174,9 @@
 
   /*
    * Layar sempit (CR-070): halaman tetap menggulir normal. Wadah tabel menempel di bawah navbar sticky (`--sticky-top`)
-   * dan bertinggi maksimum = sisa viewport di bawah navbar, sehingga wadah itu menggulir sendiri dan `thead th` sticky
-   * (CR-069) menempel di bawahnya. `max-height` (bukan height): tabel pendek tidak punya ruang kosong atau scrollbar palsu.
+   * dan bertinggi maksimum = sisa viewport di bawah navbar dikurangi ruang paginasi (`--table-foot`), sehingga wadah itu
+   * menggulir sendiri, `thead th` sticky (CR-069) menempel di bawahnya, dan batas kartu induk tidak mendorongnya ke atas
+   * saat paginasi terlihat. `max-height` (bukan height): tabel pendek tidak punya ruang kosong atau scrollbar palsu.
    */
   @media (max-width: 1023.98px) {
     .table-fill {
@@ -180,8 +184,8 @@
       top: var(--sticky-top);
       overflow-y: auto;
       overscroll-behavior: contain;
-      max-height: calc(100vh - var(--sticky-top) - var(--shell-gap));
-      max-height: calc(100dvh - var(--sticky-top) - var(--shell-gap));
+      max-height: calc(100vh - var(--sticky-top) - var(--shell-gap) - var(--table-foot));
+      max-height: calc(100dvh - var(--sticky-top) - var(--shell-gap) - var(--table-foot));
     }
   }
 

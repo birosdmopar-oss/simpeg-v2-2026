@@ -106,7 +106,8 @@ describe('main.css', () => {
     expect(mobile?.[1]).toMatch(/position: sticky;/)
     expect(mobile?.[1]).toMatch(/top: var\(--sticky-top\);/)
     expect(mobile?.[1]).toMatch(/overflow-y: auto;/)
-    expect(mobile?.[1]).toMatch(/max-height: calc\(100dvh - var\(--sticky-top\) - var\(--shell-gap\)\);/)
+    expect(mobile?.[1]).toMatch(/max-height: calc\(100dvh - var\(--sticky-top\) - var\(--shell-gap\) - var\(--table-foot\)\);/)
+    expect(css).toMatch(/--table-foot: 6rem;/)
     expect(mobile?.[1]).not.toMatch(/(^|[\s;])height:/)
   })
 
