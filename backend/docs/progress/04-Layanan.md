@@ -296,6 +296,9 @@ di-"belum dibaca"-kan lagi) dan `inbox_msg`; `enqueuePush()` mengantrekan satu j
 4. Tolak/tangguhkan mengikuti PRD: alasan hanya pada notifikasi tolak; tangguhkan tanpa `Ket:`.
 5. Akun role 1 tanpa NIP tidak menerima notifikasi "Perlu Diproses Admin" (kunci `inbox` = NIP). Penerima NIP yang tidak ada di `pegawai`
    dilewati.
+   **Keputusan Horii (28-10): diterima dulu sebagai keterbatasan.** Admin tetap melihat antrean lewat daftar/pengingat
+   (`bisa_memproses`) dan dashboard M6. Jalan keluar bila nanti dibutuhkan: unit DBV baru — `inbox.nip_penerima` nullable dan
+   `id_pengguna_penerima` sebagai kunci penerima (perubahan skema, wajib review DB Validator).
 6. Pelaku aksi dikecualikan lewat `service('authContext')->nip()` di dalam `NotifikasiService::kirim` (signature antarmuka tetap).
 7. `url` notifikasi cuti `/layanan/cuti/{id}` (pola sama dengan M5); rute FE final milik M7.
 8. `PushNotifJobTest` menjalankan `process()` langsung (tidak ada koneksi DB kedua) sehingga tanpa `#[Group('db-isolasi-penuh')]`;
