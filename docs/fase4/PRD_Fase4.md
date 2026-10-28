@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `PRD_Fase4.md` — acuan utama coder/agen AI Fase 4 (kartu Trello DEV-005, prompt eksekusi 1/2 & 2/2) |
-| Versi | **v1.4 — 28-10-2026** (revisi atas v1.3 27-10-2026, v1.2 27-10-2026, v1.1 26-10-2026, dan v1.0 18-10-2026; v1.2: kelima butir ⛔ §12 diputuskan; v1.3: hasil kueri DBA saldo cuti → Q-05 refund & saldo cutover diputuskan; v1.4: register deviasi [V2] implementasi M3–M6 + 2 endpoint gap §5 (§14.6); daftar perubahan di §14) |
+| Versi | **v1.5 — 28-10-2026** (revisi atas v1.4 28-10-2026, v1.3 27-10-2026, v1.2 27-10-2026, v1.1 26-10-2026, dan v1.0 18-10-2026; v1.2: kelima butir ⛔ §12 diputuskan; v1.3: hasil kueri DBA saldo cuti → Q-05 refund & saldo cutover diputuskan; v1.4: register deviasi [V2] implementasi M3–M6 + 2 endpoint gap §5 (§14.6); v1.5: deviasi & keputusan M7 FE Paket 0–10 + 2 endpoint/penanda baru §5 (§14.7); daftar perubahan di §14) |
 | Status | **BERLAKU** — disetujui user/reviewer CR 18-10-2026: keputusan D1–D19 dan **seluruh saran default §12 (butir ⛔ dan ◻) diterima**, termasuk konfirmasi Q-03 (nilai turunan dihitung server) dan Q-13 (pemanggil `process` = NIP approver tahap aktif). Perubahan berikutnya hanya lewat revisi versi oleh reviewer CR. **26-10-2026:** Horii menyetujui 13 keputusan riset take over (§14) — seluruh butir ◻ §12 = **disetujui default 26-10** dengan penyesuaian Q-08/Q-10/Q-21/Q-23; **tahap 2b** (logika murni cuti sebelum DBV-022) diizinkan (§6.1.4, §9) |
 | Basis kode | v1.0: `origin/main` = **`2b712ed`** (rujukan `path:baris` repo diambil dari `0a79e38`/`2b712ed`). v1.1: `origin/main` = **`4d4ae92`** — berkas baru yang dirujuk v1.1: `Libraries/Pdf/KopDokumen.php` (MAKE-037), `tests/_support/Libraries/PemindaiKemurnian.php`, `tests/feature/KontrakMatriksRoleTest.php` (MAKE-038: setiap route `api/v1` baru wajib punya baris kontrak role di commit yang sama) |
 | Sumber | Keputusan user D1–D19 (18-10-2026), Trello DEV-005/QASMTASK-064..075/QAUI-004/QAFUNC-005, `04-Layanan.md`, Matriks Role × Endpoint v2 Modul C, kode & DDL legacy (D1 `simpeg01_struktur_lengkap_20261001.sql`), repo v2. Daftar lengkap di Lampiran A |
@@ -200,13 +200,14 @@ Prefix semua path `api/v1/`; filter `jwt` di level grup; `Role::filter(...)` per
 | `POST cuti/saldo`, `PUT cuti/saldo/{id}`, `DELETE cuti/saldo/{id}` | `add_sc/edit_sc/delete_sc` | 1, 3 | — | role 1; role 3 lingkup | Hapus fisik [K] + audit (§6.3.6) |
 | `GET cuti/petugas-approval` | `list_off` (C:1009-1033) | 1, 3 | role 1 semua; role 3 `id_unit_pemohon` = unit pemanggil [K] `L:4058-4081` | — | |
 | `POST cuti/petugas-approval`, `PUT …/{id}`, `DELETE …/{id}` | `add_off/edit_off/delete_off` | 1, 3 | — | role 1; role 3 unit sendiri (edit/hapus [K]); `edit` hanya baris status 1 [K] C:1103 | Hapus fisik [K] + audit (§6.4.8) |
+| `GET cuti/petugas-approval/opsi` **28-10 (v1.5)** | pilihan dimuat di form (`add_off/edit_off`, C:1009-1171) | 1, 3 | — | — | [V2] gap §5.1 (§14.7 #4): hanya opsi yang tidak ada di master options — `jabatan_koordinasi`, `jenis_pegawai` (PNS/PPPK), `group_jabatan_pakai_gol`, `unit_terkunci` (role 3), `id_jenis_pa`; sisanya master options (`unit`, `satker`, `group-jabatan`, `sub-group-jabatan`, `pangkat`, `jabatan`) dan `GET pegawai?search=` |
 
 ### 5.2 Tugas Belajar (C-07)
 
 | Method & path v2 | Legacy | Route | Lihat | Tulis / Proses | Catatan |
 |---|---|---|---|---|---|
 | `GET tb?mode=saya\|pic\|admin&status=&search=&page=&per_page=` | `tb/index`, `list_ad`, `L_notification.php:213-228` | **1,2,3,6** | `saya` milik sendiri; `pic` = semua pengajuan status 0 bila pemanggil PIC TB aktif (tanpa batas unit, D14 [V2]); `admin` role 1 semua / role 3 lingkup | — | **Role 7 → 403** (DoD 070) |
-| `GET tb/opsi?nip=` | `form` L_tb.php:66-72 | 1,2,3,6 | — | — | jenjang (`id_jenjang_pendidikan > 3`), default `up`, snapshot pegawai, `can_create` |
+| `GET tb/opsi?nip=` | `form` L_tb.php:66-72 | 1,2,3,6 | — | — | jenjang (`id_jenjang_pendidikan > 3`), default `up`, snapshot pegawai, `can_create`; juga `slot_berkas`, `berkas_wajib` (role 1 bebas berkas TB). **28-10 (v1.5)** + `adalah_pic` (penanda tampilan tab Perlu Persetujuan; hak proses tetap di server, §14.7 #3) |
 | `POST tb` | `add` / `add_ad` | 1,2,3,6 | — | role 2, 6: diri sendiri, status 0; role 3: `nip` dalam lingkup, status 0; role 1: `nip` PNS, status 0\|1 | Multipart 4 berkas (§6.7) → 201 |
 | `GET tb/{id}` | `detail` Tb.php:326-473 | 1,2,3,6 | pemilik, PIC TB aktif, role 1, role 3 lingkup; lainnya 404 | — | + `status_penuh`, `perpanjangan[]`, `aksi {}`, `tahap[]` |
 | `PUT tb/{id}` | `edit`, `edit_ad` | 1,2,3,6 | — | pemilik: status 0 & `tgl_mulai > hari ini` [K Tb.php:174-243]; role 3: status 0 + lingkup; role 1: semua status kecuali 2 [K list_ad.php:181-187] | |
@@ -221,7 +222,7 @@ Prefix semua path `api/v1/`; filter `jwt` di level grup; `Role::filter(...)` per
 | Method & path v2 | Legacy | Route | Lihat | Tulis / Proses | Catatan |
 |---|---|---|---|---|---|
 | `GET ib?mode=saya\|pic\|admin…` | `ib/index`, `list_ad`, `L_notification.php:230-245` | **1,2,3,7** | sama pola TB (PIC IB jenis 4) | — | **Role 6 → 403** (DoD 071) |
-| `GET ib/opsi?nip=` | `form` | 1,2,3,7 | — | — | |
+| `GET ib/opsi?nip=` | `form` | 1,2,3,7 | — | — | Pola TB: `slot_berkas`, `berkas_wajib` (IB wajib untuk semua role). **28-10 (v1.5)** + `adalah_pic` (§14.7 #3) |
 | `POST ib` | `add`, `add_ad` | 1,2,3,7 | — | role 2, 7: diri sendiri; role 1, 3: `nip` (3 lingkup); status **selalu 0** [K Ib.php:128-171] | 3 berkas wajib semua role [K L_ib.php:705] |
 | `GET ib/{id}` | `detail` | 1,2,3,7 | pemilik, PIC IB, role 1, role 3 lingkup | — | |
 | `PUT ib/{id}`, `DELETE ib/{id}` | `edit`, `edit_ad`, `delete` | 1,2,3,7 | — | aturan sama TB (tanpa ubah status oleh admin) | Hapus fisik [K] + audit |
@@ -234,6 +235,7 @@ Prefix semua path `api/v1/`; filter `jwt` di level grup; `Role::filter(...)` per
 |---|---|---|---|---|---|
 | `GET pmk?nip=` (riwayat PMK final) | `pmk/index` Pmk.php:11-79 | **1,2,3** | 2: diri sendiri; 3: lingkup; 1: semua | — | Role selain 1,2,3 → 403 (DoD 072) |
 | `PUT pmk/{id}` (tambah arsip SK), `DELETE pmk/{id}`, `DELETE pmk/{id}/arsip/{id_attachment}` | `edit`, `delete`, `delete_da` | 1,2,3 | — | role 1 saja; arsip minimal tersisa 1 [K Pmk.php:178-183] | Arsip di `document_attachment` kode 42 (sudah ada) |
+| `GET pmk/{id}/arsip/{id_attachment}` **28-10 (v1.5)** | tautan langsung per arsip `views/hr/employee/rwy/pmk/list.php:70-77` | 1,2,3 | = hak lihat riwayat (role 1 semua, role 2 pemilik, role 3 lingkup); 404 bila baris tak terlihat, arsip bukan kode 42 atau bukan milik baris itu | — | [V2] gap §5.4 (keputusan Horii 28-10, §14.7 #2): berkas dialirkan controller (`attachment`, `nosniff`, `no-store`), path internal tidak dikirim; endpoint lampiran umum Fase 3 tidak bisa dipakai (kode 42 tidak terdaftar di `RiwayatRegistry`) |
 | `GET pmk/pengajuan?mode=saya\|pic\|admin&status=…` | `req`, `req_ad`, `list_pic` | 1,2,3 | `saya` (role 2); `pic` (PIC jenis 5, semua tanpa batas unit [K P-19]); `admin` role 1 semua, role 3 lingkup lihat saja | — | |
 | `GET pmk/opsi?nip=`, `POST pmk/hitung-mker` | `peg_selected_pmk_req`, `calc_mker_pmk_req` (Local.php:4537-4603) | 1,2,3 | — | — | `tmt_cpns`, `tgl_awal_maks`; mker = `diff` y/m (hari diabaikan) [K] |
 | `POST pmk/pengajuan` | `add_req`, `add_req_ad` | 1,2,3 | — | role 2 (PNS) diri sendiri; role 1 `nip` PNS; role 3 → 403 | status 0; 4 berkas (§6.9) |
@@ -995,12 +997,12 @@ Label UI: 0 "Menunggu PIC", 3 "Diproses", 1 "Selesai", 2 "Ditolak". Antrean `mod
 | `/layanan/cuti/:id` (`layanan-cuti-detail`) | `CutiDetailPage.vue` | 1,2,3,6,7 | Data, timeline/stepper tahap, riwayat approval & alasan, lampiran, surat, aksi sesuai `aksi {}` |
 | dialog | `CutiFormDialog.vue` | 1,2,7 | Form 2 kolom (`formLayout.ts`): jenis (dropdown dari `opsi`), datepicker mulai/akhir (`tgl_akhir` maks dari server), durasi (jenis 2), **kalkulator lama & sisa kuota real-time** (§6.11.3), telp, alamat, keterangan, AL (readonly dari server), PyB (dropdown `pyb[]`), CC ketua tim (multi-select), unggah `file_bukti` (`UiFileField`, wajib untuk Sakit), role 1: pilih pegawai + status 0/1 |
 | dialog | `CutiProsesDialog.vue` (membungkus `ApprovalDialog`) | approver | Setujui / Tolak (alasan **wajib**) / Tangguhkan (hanya jenis 1) |
-| dialog | `PengingatCutiDialog.vue` | 1,2,3,6,7 | Sekali setelah login bila `GET cuti/pengingat` tidak kosong; "Proses" / "Tunda" (mekanisme §6.4.7: reset lewat event `auth.login`, Q-07 diputuskan 27-10) |
+| dialog | `PengingatCutiDialog.vue` | 1,2,3,6,7 | Sekali setelah login bila `GET cuti/pengingat` tidak kosong; "Proses" / "Tunda" (mekanisme §6.4.7: reset lewat event `auth.login`, Q-07 diputuskan 27-10). **28-10 (v1.5)**: dipasang di shell, bukan di halaman Cuti (§14.7 #7) |
 | dialog | `EsignDialog.vue` | 1,3 | Konfirmasi + input passphrase `type="password"` (perbaikan E7), dikirim di body; galat gateway ditampilkan |
 | `/layanan/cuti/saldo` | `SaldoCutiPage.vue` | 1,3 | Tabel saldo per tahun + ⋮ Edit/Hapus, tombol Tambah |
 | `/layanan/cuti/petugas-approval` | `PetugasApprovalCutiPage.vue` | 1,3 | CRUD `pa_layanan` |
-| `/layanan/tugas-belajar` (+`/:id`) | `TbPage.vue`, `TbDetailPage.vue`, `TbFormDialog.vue`, `TbProsesDialog.vue`, `TbPerpanjanganDialog.vue` | **1,2,3,6** (tanpa 7) | Tab Saya / Perlu Persetujuan (PIC) / Monitoring; perpanjangan (role 1) |
-| `/layanan/izin-belajar` (+`/:id`) | `IbPage.vue`, `IbDetailPage.vue`, `IbFormDialog.vue`, `IbProsesDialog.vue` | **1,2,3,7** (tanpa 6) | Pola TB tanpa perpanjangan |
+| ~~`/layanan/tugas-belajar` (+`/:id`)~~ **28-10 (v1.5)** `/layanan/tb` (+`/:id`) (§14.7 #1) | `TbPage.vue`, `TbDetailPage.vue`, `TbFormDialog.vue`, `TbProsesDialog.vue`, `TbPerpanjanganDialog.vue` | **1,2,3,6** (tanpa 7) | Tab Saya / Perlu Persetujuan (PIC) / Monitoring; perpanjangan (role 1) |
+| ~~`/layanan/izin-belajar` (+`/:id`)~~ **28-10 (v1.5)** `/layanan/ib` (+`/:id`) (§14.7 #1) | `IbPage.vue`, `IbDetailPage.vue`, `IbFormDialog.vue`, `IbProsesDialog.vue` | **1,2,3,7** (tanpa 6) | Pola TB tanpa perpanjangan |
 | `/layanan/pmk` (+`/pengajuan/:id`) | `PmkPage.vue`, `PmkDetailPage.vue`, `PmkFormDialog.vue`, `PmkProsesDialog.vue` | **1,2,3** | Tab Riwayat PMK / Pengajuan Saya / Perlu Persetujuan (PIC) / Monitoring; proses: Proses / Setujui / Tolak |
 | `/layanan/status` (`layanan-status`) | `LayananStatusPage.vue` | **1–7** | Kartu "Status Layanan", filter Unit/Satker (1,3,4,5) & Jenis & Status, pencarian, jumlah baris 10/25/50, tabel **Nama Pegawai (avatar + NIP) · Jenis Layanan · Status Layanan (UiStepper) · PIC/Petugas · Aksi ⋮** (`layanan-actions-<jenis>-<id>`), `UiPagination` |
 | `/layanan/petugas` | `PetugasLayananPage.vue` | 1 | CRUD PIC per jenis layanan (`layanan-petugas-actions-<id>`) |
@@ -1016,6 +1018,7 @@ Label UI: 0 "Menunggu PIC", 3 "Diproses", 1 "Selesai", 2 "Ditolak". Antrean `mod
 | Status Layanan | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | Petugas Layanan (PIC) | ✓ | – | – | – | – | – | – | – |
 Konstanta role per menu di `features/layanan/roles.ts` (pola `features/kepegawaian/roles.ts`). Guard route = UX saja; penegakan di backend. **`ACTIVE_PHASE` dinaikkan dari 3 ke 4 hanya di milestone penutup C-11 (M7)** setelah semua halaman Fase 4 ada di `main` (pola WS-2 B-20); sebelum itu menu Fase 4 tersembunyi.
+**28-10 (v1.5):** tujuan menu TB/IB = `/layanan/tb` dan `/layanan/ib` (§14.7 #1); anak menu memakai konstanta `roles.ts` yang sama dengan `meta.roles` route; role 4/5 hanya melihat Status Layanan, role 8 tidak melihat grup Layanan (§14.7 #8).
 
 #### 6.11.3 Kalkulator real-time
 Saat jenis/tanggal/durasi berubah (debounce ±300 ms) FE memanggil `POST cuti/hitung-lama` dan menampilkan `lama_cuti`, `tgl_akhir` (jenis 2), daftar hari libur dalam rentang, dan panel kuota (jenis 1: sisa N/N-1/N-2, menunggu, diajukan, sisa setelah pengajuan, pesan `cukup=false`). **FE DILARANG menghitung hari kerja/kuota sendiri** (ADR-025/026); tombol Simpan tidak dikunci oleh hasil kalkulator (validasi akhir tetap di server, 422 ditampilkan per kolom).
@@ -1629,3 +1632,40 @@ tanpa dampak produk).
 
 Tidak ada perubahan skema di v1.4. Butir terbuka di luar dokumen ini: DQ-15 `DaftarNipBerpemisah` (`ketua_tim`, menunggu
 tanggapan DB Validator) dan NIP approver/tiket yatim (diputuskan saat gladi impor).
+
+### 14.7 v1.5 (28-10-2026) — deviasi & keputusan M7 FE (MAKE-026, Paket 0–10)
+
+Konteks: deviasi dan keputusan yang diambil selama M7 (frontend Modul C, MAKE-026, rencana `docs/fase4/RENCANA_M7_Frontend.md`),
+diverifikasi ke kode `origin/main` = `150e986` dan `backend/docs/progress/04-Layanan.md` bagian M7. Paket 10 (penutup) semula belum ada di
+`main` (diverifikasi ke branch `fase4/make-026-p10-penutup` @`7980639`, diperbarui @`eeece0f`); sejak 28-10 **di `main` `68cf14a`** (merge dari `eeece0f`, CI hijau). Keputusan
+v1.0–v1.4 **tidak dihapus**: teks yang diganti dicoret, keputusan baru ditandai "28-10 (v1.5)". Kolom "Oleh": H = keputusan Horii,
+R = keputusan reviewer CR (teknis, tanpa dampak produk). Kolom "Gap" = selisih v2 terhadap legacy/PRD lama yang masih terbuka
+atau perlu diketahui QA ("—" = tidak ada).
+
+| # | Butir | Legacy [K] / PRD lama | v2 [V2] | Gap | Oleh | Tempat |
+|---|---|---|---|---|---|---|
+| 1 | Rute FE TB/IB | PRD §6.11.1: `/layanan/tugas-belajar`, `/layanan/izin-belajar` (+`/:id`) | `/layanan/tb`, `/layanan/tb/:id`, `/layanan/ib`, `/layanan/ib/:id` (`routes.layanan.ts`), sama dengan path API backend, `url_detail` Status Layanan (M6), dan URL notifikasi M5 | — (rute PRD lama tidak pernah dibuat, tidak ada tautan yang putus) | R 28-10 | §6.11.1, §6.11.2 |
+| 2 | Unduh arsip SK riwayat PMK final | Tautan langsung ke berkas per arsip bagi semua yang boleh melihat riwayat (`views/hr/employee/rwy/pmk/list.php:70-77`) | **Ikut legacy** soal siapa yang boleh mengunduh, lewat `GET pmk/{id}/arsip/{id_attachment}` (role 1, 2, 3; hak = hak lihat riwayat; berkas dialirkan controller); FE: item ⋮ "Unduh <nama arsip>" per arsip di tab Riwayat PMK | Legacy membuka path berkas langsung (tanpa cek hak di server dan path terlihat); v2 menutupnya (404 bila tak terlihat, path internal tidak dikirim). Berkas arsip legacy baru bisa diunduh setelah dipindah ke storage v2 saat cutover (v1.4 #25) | H 28-10 | §5.4 |
+| 3 | `adalah_pic` di `GET tb/opsi`, `GET ib/opsi` (pola `GET pmk/opsi`, Paket 7) | Legacy menampilkan menu/daftar PIC berdasarkan data `petugas_layanan` di server | Penanda boolean untuk tampilan: FE menyembunyikan tab "Perlu Persetujuan" bila `false` (belum dimuat = tab tetap tampil); **hak proses tetap ditegakkan service** (`mode=pic` dan `process` menolak non-PIC) | — | R 28-10 | §5.2, §5.3, §5.4 |
+| 4 | Opsi form Petugas Approval Cuti | Pilihan dimuat langsung di form `add_off/edit_off` (C:1009-1171) | `GET cuti/petugas-approval/opsi` (role 1, 3): `jabatan_koordinasi`, `jenis_pegawai` (PNS/PPPK), `group_jabatan_pakai_gol`, `unit_terkunci` (role 3), `id_jenis_pa`; opsi lain dari master options dan `GET pegawai?search=` | — | R 28-10 | §5.1, §6.4.8 |
+| 5a | Status Layanan: filter Jenis | PRD §6.11.1 tidak merinci sumber nilai | Empat nilai tetap `cuti`, `tb`, `ib`, `pmk` (sama dengan nilai yang diterima `GET layanan/status`), bukan master `GET layanan/jenis` (memuat jenis lain, tidak memuat cuti) | — | R 28-10 | §6.10, §6.11.1 |
+| 5b | Status Layanan: filter Status | Kode angka per jenis (v1.4 #23: wajib bersama `jenis`) | UI hanya menawarkan `berjalan` / `selesai`; kode angka per jenis tidak ditawarkan | Penyaringan per kode status tidak tersedia di UI (tetap tersedia di API) | H 28-10 | §6.10, §6.11.1 |
+| 5c | Status Layanan: "Lihat detail" | — | Membuka `url_detail` dari server apa adanya, hanya bila `aksi.lihat_detail` server; hanya tautan internal `/…` yang dipakai; tanpa hak → kolom Aksi "—" | — | R 28-10 | §6.10, §6.11.1 |
+| 6 | Fondasi TB/IB berparameter jenis (Paket 5/6) | PRD §6.11.1: berkas halaman/dialog terpisah per modul | Satu klien `studi.service` (`tb`/`ib`) + `StudiListPage`/`StudiDetailPage`; `TbPage`/`IbPage`/`TbDetailPage`/`IbDetailPage` pembungkus tipis. IB tanpa perpanjangan dan tanpa pilihan status awal (status selalu 0 [K Ib.php:128-171]); slot berkas dari `slot_berkas`, wajib-tidaknya dari `berkas_wajib` server (IB wajib untuk semua role [K L_ib.php:705]; TB: role 1 bebas berkas) | — | R 28-10 | §5.2, §5.3, §6.11.1 |
+| 7 | Pengingat persetujuan cuti | Popup setelah login di halaman mana pun (`justLogin`, MYC:21-22, 331); `skip_*` di-reset setiap login (MYC:395-398, 433-436) | Dipindah dari `CutiPage` ke shell (`PengingatCutiShell` di `RedesignShell`): tampil di halaman pertama setelah login, sekali per sesi tab (`sessionStorage`, dikosongkan saat Keluar), hanya role Cuti (1, 2, 3, 6, 7), tidak untuk sesi wajib ganti password; **tampil lagi pada setiap login sukses, termasuk login ulang setelah 401** | **Status implementasi:** ~~login ulang setelah 401 di tab yang sama belum memunculkan pengingat lagi~~ **diperbaiki di `eeece0f`**: `login()` di `auth.store` memanggil `resetPengingatCuti()`, sehingga setiap login sukses (termasuk login ulang setelah 401) memunculkan pengingat lagi, dengan test. **Di `main` `68cf14a`.** Uji demo reviewer 28-10 (role 2): pengingat dipanggil sekali setelah login | H 28-10 | §6.4.7, §6.11.1 |
+| 8 | Menu Layanan per role, `ACTIVE_PHASE` | §6.11.2 | Sesuai §6.11.2: TB tanpa role 7, IB tanpa role 6, role 4/5 hanya Status Layanan, role 8 tanpa grup; anak menu memakai konstanta `roles.ts` = `meta.roles` route; `ACTIVE_PHASE = 4` hanya di paket penutup (AC-11.8) | **Status implementasi:** **di `main` `68cf14a`** (`ACTIVE_PHASE = 4`; grup Layanan berisi anak per role). Uji demo reviewer 28-10 (role 2): menu Layanan berisi Cuti, Tugas Belajar, Izin Belajar, PMK, Status Layanan | PRD | §6.11.2 |
+| 9 | Tombol level halaman di detail | AGENTS §1: ⋮ wajib untuk aksi baris tabel; tombol level halaman dikecualikan | ⋮ wajib untuk aksi baris tabel (termasuk daftar lampiran/perpanjangan di dalam detail). Aksi level halaman di detail (Ubah, Setujui/Tolak, Unduh surat, Hapus) di luar aturan itu: boleh tombol atau ⋮ | **Pengecualian tercatat (keputusan reviewer 28-10, berasal dari temuan Handling Case):** ada dua pola detail yang sama-sama sah, karena AGENTS §1 hanya mengatur aksi baris tabel: `StudiDetailPage` (TB/IB) memakai tombol, sedangkan `CutiDetailPage` dan `PmkDetailPage` memakai `RowActionsMenu` ⋮ di kepala halaman detail (`cuti-actions-<id>`, `pmk-actions-<id>`). Tanpa CR sekarang; penyeragaman, bila diinginkan, diusulkan lewat QA Lapis 1 | R 28-10 | §2.1, §6.11.1 |
+| 10 | Acuan visual | Figma Modul C belum ada (QAUI-004) | QA visual lewat QA Lapis 1 (§6.11.8, Q-18): Gambar 17 + pola halaman Fase 3/7 + checklist; bukti tiap paket = tangkapan layar 1440/390 px dengan API tiruan sintetis | Figma Modul C belum ada; bila desainer menyerahkan frame Layanan, checklist §6.11.8 digantikan | H 27-10 | §6.11.8 |
+
+**Temuan Handling Case** (dari `04-Layanan.md` dan commit MAKE-026; semuanya aditif, tanpa migration):
+
+| # | Butir | Legacy [K] / PRD lama | v2 [V2] | Gap | Oleh | Tempat |
+|---|---|---|---|---|---|---|
+| 11 | Aturan per jenis cuti di FE | — | `GET cuti/opsi` → `jenis_cuti[] {id_jenis_cuti, nama_jenis_cuti, pakai_durasi, lampiran_wajib}` dari `AturanCuti`; FE tidak menyimpan konstanta kode jenis; batas `tgl_akhir_maks` tidak dipasang sebagai `max` di FE (hanya jenis 1, server memvalidasi) | — | R 28-10 (review Paket 2) | §6.2, §6.11.3 |
+| 12 | Panel kuota kalkulator | §6.11.3: sisa N/N-1/N-2, menunggu, diajukan, sisa setelah pengajuan | `KuotaCuti::periksa` menambah `sisa_setelah_tahun_ini` dan `sisa_setelah_tahun_depan` (negatif = kekurangan); porsi tahun depan tampil bila `diajukan_tahun_depan > 0`; FE tidak menghitung | — | R 28-10 (review Paket 2) | §6.3.7, §6.11.3 |
+| 13 | Tangguhkan atas nama | §6.4.10 hanya menyebut `bisa_memproses`/proses atas nama | Flag `aksi.tangguhkan_atas_nama` (= proses atas nama untuk cuti Tahunan) supaya FE tidak menghitung jenis sendiri; dialog Tangguhkan dengan alasan wajib | — | H 28-10 (review Paket 1) | §6.4.4, §6.4.10 |
+| 14 | Pemilih pegawai role 1 | PRD §6.11.1: role 1 memilih pegawai (tanpa rincian) | `PegawaiPicker` bersama (pencarian `GET pegawai?search=`, min. 3 huruf, debounce 300 ms) di form Cuti dan PMK | — | R 28-10 (review Paket 7) | §6.11.1 |
+| 15 | Dialog Setujui TB/IB | Kontrak `process` §5.2 mewajibkan dasar SK | Kolom Dasar SK dan No. Dasar wajib juga di FE (CR-071), sesuai kontrak `process` | — | R 28-10 (CR-071) | §5.2, §5.3 |
+| 16 | Catatan progres M7 | — | `04-Layanan.md` bagian M7 memuat Paket 0, 1, 2, 3, 7, 8, prasyarat Paket 4–6, dan (di branch) Paket 10 | Paket 4 (Saldo & Petugas Approval Cuti), 5 (TB), 6 (IB), dan 9 (Petugas Layanan) belum punya catatan di `04-Layanan.md`, hanya pesan commit. **Ditindaklanjuti** (catatan progres Paket 4/5/6/9, diserahkan reviewer 28-10) | R | `04-Layanan.md` |
+
+Tidak ada perubahan skema di v1.5. Status butir: #7 dan #8 di `main` `68cf14a` (Paket 10); #9 pengecualian tercatat (tanpa CR); #16 ditindaklanjuti (catatan progres Paket 4/5/6/9).
