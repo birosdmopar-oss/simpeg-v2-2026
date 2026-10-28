@@ -72,6 +72,32 @@ final class BebasPresensiTbTest extends CIUnitTestCase
         $this->assertSame(['2025-01-01'], BebasPresensiTb::rentangBebasPresensi($lintas, '2025-01-01', '2025-01-01'));
     }
 
+    public function testRentangBanyakSamaDenganTunggalPerNip(): void
+    {
+        $perNip = [
+            '199001012020011001' => self::daftar(),
+            '199001012020011002' => [['status' => 1, 'tgl_mulai' => '2024-03-30', 'tgl_akhir' => '2024-04-02']],
+            '199001012020011003' => [['status' => 2, 'tgl_mulai' => '2024-03-01', 'tgl_akhir' => '2024-03-31']],
+        ];
+        $nip   = ['199001012020011001', '199001012020011002', '199001012020011003', '199001012020019999', '199001012020011001'];
+        $hasil = BebasPresensiTb::rentangBebasPresensiBanyak($nip, $perNip, '2024-02-28', '2024-04-02');
+
+        $this->assertSame(['199001012020011001', '199001012020011002', '199001012020011003', '199001012020019999'], array_map('strval', array_keys($hasil)), 'unik, urutan pertama muncul');
+
+        foreach (array_unique($nip) as $n) {
+            $this->assertSame(BebasPresensiTb::rentangBebasPresensi($perNip[$n] ?? [], '2024-02-28', '2024-04-02'), $hasil[$n], $n);
+        }
+
+        $this->assertSame([], $hasil['199001012020019999'], 'NIP tanpa data → kosong');
+        $this->assertSame([], BebasPresensiTb::rentangBebasPresensiBanyak([], $perNip, '2024-02-28', '2024-04-02'));
+    }
+
+    public function testRentangBanyakMemvalidasiRentangWalauKosong(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        BebasPresensiTb::rentangBebasPresensiBanyak([], [], '2024-03-02', '2024-03-01');
+    }
+
     public function testRentangTerbalikAtauTerlaluPanjangDitolak(): void
     {
         try {

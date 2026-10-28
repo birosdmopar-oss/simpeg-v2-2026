@@ -24,4 +24,16 @@ interface StatusTugasBelajarInterface
      * @return list<string>
      */
     public function rentangBebasPresensi(string $nip, string $dari, string $sampai): array;
+
+    /**
+     * Versi massal {@see self::rentangBebasPresensi()} untuk banyak NIP dalam satu rentang (MAKE-044, PRD Fase 5B
+     * F5B-18): hasil per NIP identik dengan pemanggilan tunggal. Kunci = setiap NIP masukan (unik, urutan pertama muncul),
+     * nilai = daftar tanggal (kosong bila tanpa TB bebas / NIP tidak ada). Jumlah kueri tetap per batch, bukan per NIP. Kunci
+     * bertipe `array-key` karena PHP mengubah kunci NIP berupa angka menjadi int.
+     *
+     * @param list<string> $nip
+     *
+     * @return array<array-key, list<string>>
+     */
+    public function rentangBebasPresensiBanyak(array $nip, string $dari, string $sampai): array;
 }

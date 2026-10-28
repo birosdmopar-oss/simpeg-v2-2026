@@ -350,3 +350,19 @@ Keputusan/ambigu untuk reviewer:
 3. Proses atas nama memakai tiga item ⋮ ("Setujui/Tolak atas nama" dari `aksi.proses_atas_nama`, "Tangguhkan atas nama" dari `aksi.tangguhkan_atas_nama`). Atas arahan review (Horii): flag baru `tangguhkan_atas_nama` ditambahkan di `CutiService::aksi` (aditif; = proses atas nama untuk cuti Tahunan) supaya FE tidak menghitung jenis sendiri; tangguhkan atas nama memakai `TangguhkanDialog` dengan alasan wajib.
 4. Filter status daftar memakai kode 0/3/1/2/4 dikirim apa adanya ke `GET cuti?status=`.
 5. Tangkapan layar (API tiruan sintetis, tanpa Figma — acuan Q-18, AGENTS §3.6): 1440 dan 390 px, tanpa scroll horizontal halaman (`scrollWidth` = lebar viewport).
+
+## Fase 5B M1a — metode massal TB (MAKE-044, 28-10-2026, branch `fase5b/make-044-tb-massal` dari main `bb0648b`)
+
+Pengecualian tertulis PRD Fase 5B v1.0 F5B-18 (§3.2/§3.3): tambahan **aditif** di modul Fase 4 untuk konsumen Tukin massal
+(5B D-06). Tanpa migration, tanpa route.
+
+**Sudah jalan.** `StatusTugasBelajarInterface::rentangBebasPresensiBanyak(list<string> $nip, $dari, $sampai)` →
+`array<NIP, list<tanggal>>` (kunci = setiap NIP unik dalam urutan masukan; NIP tanpa TB / tidak ada → `[]`); implementasi
+`StatusTugasBelajar` (batch `BATCH_NIP` = 1000: satu kueri `riwayat_tb` status 1 + satu kueri `riwayat_tb_perpan` per batch,
+masukan kosong tanpa kueri) dan inti murni `BebasPresensiTb::rentangBebasPresensiBanyak()` (validasi rentang sekali, aturan
+per NIP = `rentangBebasPresensi`). `bebasPresensiPenuh` dan `rentangBebasPresensi` tidak berubah.
+
+**Test.** `tests/Layanan/Tb/RentangBebasPresensiBanyakTest` (paritas massal vs tunggal: TB + perpanjangan + celah, TB status
+0/2, tanpa TB, NIP tidak ada, dua TB; 2.500 NIP → 5 kueri SELECT; masukan kosong → 0 kueri) dan
+`tests/unit/Layanan/Tb/BebasPresensiTbTest` (paritas murni, NIP ganda, validasi rentang walau kosong); pemindai kemurnian
+`LayananStudiPmkMurniTest` tetap lolos.
