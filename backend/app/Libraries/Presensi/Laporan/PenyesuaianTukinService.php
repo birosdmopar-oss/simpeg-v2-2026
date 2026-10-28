@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Libraries\Presensi\Laporan;
 
 use App\Constants\Role;
+use App\Exceptions\ApiException;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\ListQuery;
+use App\Libraries\Presensi\Slip\KodeGalatSlip;
 use App\Models\Presensi\PenyesuaianTukinModel;
 use Closure;
 use CodeIgniter\Database\BaseBuilder;
@@ -33,7 +35,7 @@ use Throwable;
  * - **Tumpang tindih (syarat DBV C-1):** baris berstatus 1 tidak boleh beririsan rentang dengan baris status 1 lain milik
  *   NIP yang sama. Kunci `SELECT … FROM pegawai WHERE nip = ? FOR UPDATE` diambil **sebelum** cek rentang; cek + tulis
  *   dalam satu transaksi, sehingga permintaan bersamaan untuk NIP yang sama berjalan berurutan (tabel tidak bisa
- *   menjaganya dengan UNIQUE).
+ *   menjaganya dengan UNIQUE). Kunci gagal karena permintaan lain (1205/1213) → 409 `konflik_data`.
  * - Audit lewat {@see PenyesuaianTukinModel} (`create`/`update`, hapus = status 10 event `delete`).
  */
 final class PenyesuaianTukinService
@@ -41,6 +43,11 @@ final class PenyesuaianTukinService
     public const BULAN_MINIMUM = '2024-04';
 
     public const PESAN_TUMPANG_TINDIH = 'Rentang bulan beririsan dengan penyesuaian aktif lain milik pegawai ini.';
+
+    public const PESAN_KONFLIK = 'Data sedang diubah oleh permintaan lain, coba lagi.';
+
+    /** Galat kunci karena permintaan lain: 1205 lock wait timeout, 1213 deadlock. */
+    private const GALAT_KUNCI = [1205, 1213];
 
     private readonly BaseConnection $db;
 
@@ -363,15 +370,25 @@ final class PenyesuaianTukinService
     }
 
     /**
-     * Kunci baris pegawai (C-1): permintaan lain untuk NIP yang sama menunggu sampai transaksi ini selesai.
+     * Kunci baris pegawai (C-1): permintaan lain untuk NIP yang sama menunggu sampai transaksi ini selesai. Kunci gagal
+     * karena permintaan lain (1205 lock wait timeout, 1213 deadlock) → 409 `konflik_data` (preseden impor Slip Gaji,
+     * keputusan reviewer CR 28-10-2026); transaksi di-rollback pemanggil. Galat lain diteruskan; tidak pernah lanjut
+     * tanpa kunci.
      */
     private function kunciNip(string $nip): void
     {
-        $hasil = $this->db->query('SELECT nip FROM ' . $this->db->escapeIdentifiers($this->db->prefixTable('pegawai')) . ' WHERE nip = ? FOR UPDATE', [$nip]);
+        try {
+            $hasil = $this->db->query('SELECT nip FROM ' . $this->db->escapeIdentifiers($this->db->prefixTable('pegawai')) . ' WHERE nip = ? FOR UPDATE', [$nip]);
+        } catch (DatabaseException $e) {
+            $this->lemparBilaKonflik(self::kodeGalat($e));
 
-        // Tanpa DBDebug, kueri gagal (mis. 1205 lock wait timeout) mengembalikan false: jangan lanjut tanpa kunci.
+            throw $e;
+        }
+
+        // Tanpa DBDebug, kueri gagal mengembalikan false.
         if ($hasil === false) {
             $galat = $this->db->error();
+            $this->lemparBilaKonflik((int) $galat['code']);
 
             throw new DatabaseException('Kunci data pegawai gagal: ' . $galat['message'], (int) $galat['code']);
         }
@@ -379,6 +396,27 @@ final class PenyesuaianTukinService
         if ($this->kaitSetelahKunci !== null) {
             ($this->kaitSetelahKunci)($nip);
         }
+    }
+
+    private function lemparBilaKonflik(int $kode): void
+    {
+        if (in_array($kode, self::GALAT_KUNCI, true)) {
+            throw new ApiException(self::PESAN_KONFLIK, 409, kode: KodeGalatSlip::KONFLIK_DATA);
+        }
+    }
+
+    /**
+     * Kode galat DB dari exception atau rantai sebelumnya (`mysqli_sql_exception`).
+     */
+    private static function kodeGalat(Throwable $e): int
+    {
+        for ($t = $e; $t !== null; $t = $t->getPrevious()) {
+            if (in_array((int) $t->getCode(), self::GALAT_KUNCI, true)) {
+                return (int) $t->getCode();
+            }
+        }
+
+        return (int) $e->getCode();
     }
 
     /**

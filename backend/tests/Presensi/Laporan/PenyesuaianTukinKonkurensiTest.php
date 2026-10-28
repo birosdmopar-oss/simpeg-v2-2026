@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Presensi\Laporan;
 
 use App\Constants\Role;
+use App\Exceptions\ApiException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Presensi\Laporan\PenyesuaianTukinService;
@@ -18,7 +19,8 @@ use Throwable;
  * Syarat DB Validator C-1 untuk DBV-024 (PRD 5B §7.3.10, MAKE-045): dua permintaan tambah/ubah bersamaan untuk NIP yang
  * sama tidak boleh sama-sama lolos cek tumpang tindih. Permintaan A memegang kunci `FOR UPDATE` baris pegawai; di seam
  * `kaitSetelahKunci` (setelah kunci, sebelum cek rentang) permintaan B dijalankan lewat koneksi DB kedua dengan
- * `innodb_lock_wait_timeout = 1` → B tertahan di kunci yang sama (1205), bukan lolos cek. Setelah A commit, B diulang
+ * `innodb_lock_wait_timeout = 1` → B tertahan di kunci yang sama (1205) dan mendapat 409 `konflik_data` (keputusan
+ * reviewer CR 28-10-2026, bukan 500), tanpa menulis apa pun. Setelah A commit, B diulang
  * → 422 tumpang tindih; hanya satu baris aktif. NIP lain tidak tertahan. Koneksi kedua melihat/menulis data test →
  * `db-isolasi-penuh`.
  *
@@ -28,8 +30,6 @@ use Throwable;
 final class PenyesuaianTukinKonkurensiTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private const ER_LOCK_WAIT_TIMEOUT = 1205;
 
     public function testTambahBersamaanNipSamaBerurutan(): void
     {
@@ -43,7 +43,7 @@ final class PenyesuaianTukinKonkurensiTest extends DatabaseTestCase
 
         try {
             (new PenyesuaianTukinService($this->db, null, $kait))->tambah($this->admin(), $this->isi($nip, '2024-04', '2024-06'));
-            $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $kodeB, 'B harus menunggu kunci per NIP milik A (bukan lolos cek)');
+            $this->assertSame([409, 'konflik_data'], $kodeB, 'B tertahan kunci per NIP milik A (1205) → 409 konflik_data, bukan lolos cek');
 
             try {
                 (new PenyesuaianTukinService($lain))->tambah($this->admin(), $this->isi($nip, '2024-05', '2024-07'));
@@ -74,7 +74,7 @@ final class PenyesuaianTukinKonkurensiTest extends DatabaseTestCase
 
         try {
             (new PenyesuaianTukinService($this->db, null, $kait))->ubah($this->admin(), $a['id'], $this->isi($nip, '2024-04', '2024-06'));
-            $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $kodeB);
+            $this->assertSame([409, 'konflik_data'], $kodeB);
 
             try {
                 (new PenyesuaianTukinService($lain))->ubah($this->admin(), $b['id'], $this->isi($nip, '2024-05', '2024-08'));
@@ -118,18 +118,17 @@ final class PenyesuaianTukinKonkurensiTest extends DatabaseTestCase
         return $lain;
     }
 
-    private function kodeGalat(callable $aksi): ?int
+    /**
+     * @return array{0: int, 1: string|null}|null [status HTTP, `code`] bila B gagal dengan ApiException
+     */
+    private function kodeGalat(callable $aksi): ?array
     {
         try {
             $aksi();
+        } catch (ApiException $e) {
+            return [$e->getStatusCode(), $e->getKode()];
         } catch (Throwable $e) {
-            for ($t = $e; $t !== null; $t = $t->getPrevious()) {
-                if ((int) $t->getCode() === self::ER_LOCK_WAIT_TIMEOUT) {
-                    return self::ER_LOCK_WAIT_TIMEOUT;
-                }
-            }
-
-            return (int) $e->getCode();
+            $this->fail('galat kunci harus dipetakan ke ApiException 409, bukan ' . $e::class . ' (' . $e->getCode() . ')');
         }
 
         return null;
