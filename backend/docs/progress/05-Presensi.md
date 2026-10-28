@@ -194,8 +194,9 @@ UangMakanSlipPresensi::class`. `SlipGajiService` (aturan snapshot 5A), `Presensi
 tidak tersentuh. Test: `HariUangMakanTest`, `RekapMurniTest`, `TarifUangMakanTest`, `UangMakanSlipPresensiTest`,
 `UangMakanSnapshotAsliTest` (AC-D09a.1–09a.5); `UangMakanSnapshotTest`/`BukaSlipAtomikTest` menyuntik
 `UangMakanBelumTersedia` secara eksplisit. **Blocker go-live F5-1 ditutup** setelah branch ini merged (AC-D09a.5).
-Keputusan dilaporkan: `gol_pppk.uang_makan` tidak bulat sampai sen → sumber mengembalikan `null` (snapshot tidak
-ditulis, slip tetap terbuka, log tanpa nominal).
+Usulan awal M2 (`gol_pppk.uang_makan` tidak bulat sampai sen → sumber `null`) **ditolak Horii 28-10-2026** (Q5B-24):
+ikut legacy, total = tarif × hari dibulatkan setengah-menjauhi-nol ke sen seperti kolom DECIMAL(14,2), dihitung desimal
+eksak (`TarifUangMakan::totalSen`); `DataUangMakanTidakSah` dihapus; tarif > 2 desimal dicatat log warning tanpa nominal.
 
 ## CR-067 — Slip Gaji TK tanpa Pajak / Tunjangan Pajak (ikut legacy `0cf7e67`)
 

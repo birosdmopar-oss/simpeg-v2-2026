@@ -398,6 +398,14 @@ Aturan yang sama dipakai rekap uang makan (F5B-2); perbedaannya dengan `rekap_um
 - Golongan lain/tanpa baris/tarif belum diatur → 0 (PTT praktis 0 [K/I], F5B-19; konfirmasi Biro Keuangan sebelum go-live).
 - Rupiah → sen secara eksak (`web_config` tipe rupiah bulat; `gol_pppk.uang_makan` DOUBLE: nilai tak bulat sampai sen →
   `DataTukinTidakSah`-setara di namespace Slip, dicatat log tanpa nominal).
+- **Log keputusan 28-10-2026 (Horii, lewat reviewer CR; butir di atas tetap tercatat sebagai rancangan awal):** tarif
+  `gol_pppk.uang_makan` yang tidak bulat sampai sen **ikut legacy** — tidak ada galat, tidak `null` (Q5B-24).
+
+**[CATAT] Q5B-24 — tarif `gol_pppk.uang_makan` tidak bulat sampai sen**
+
+| v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
+|---|---|---|
+| Ikut legacy: total = tarif × hari apa adanya, lalu dibulatkan **eksplisit** setengah-menjauhi-nol ke 2 desimal (sama dengan konversi ke kolom `gaji_pegawai.uang_makan` DECIMAL(14,2), DBV-023); hitungan desimal eksak dari string (`TarifUangMakan::totalSen`) | `(float) $gp['uang_makan']` (`Lsl_gaji.php:404`), `$result['total'] = $hari * $tarif` float (`:381`), ditulis ke `gaji_pegawai.uang_makan` (`:193`); pembulatan 2 desimal terjadi **implisit** di kolom DB | v2 deterministik. Pada tarif tepat setengah sen (`.xx5`) hasil legacy bisa selisih 1 sen dari v2 karena galat representasi float — gap diterima (test mengikuti hitungan eksak v2). Usulan awal M2 (galat → sumber `null`) **DITOLAK** Horii; tarif lebih dari 2 desimal tetap dicatat log warning tanpa nominal sebagai jejak data master |
 
 #### 7.2.4 Acceptance criteria D-09a
 - **AC-D09a.1** `Config\Presensi::$sumberUangMakan = UangMakanSlipPresensi::class`; slip dibuka → snapshot terisi
@@ -874,6 +882,7 @@ BERHENTI dan eskalasi.
 | Q5B-21 | (baru v1.0) Riwayat penyesuaian periode ≥ 2024-04 dari daftar legacy | Diisi admin lewat CRUD saat cutover; tidak di-commit (data pribadi) | — | F5B-21; runbook cutover |
 | Q5B-22 | (baru v1.0) Sumber data Plt v2 untuk blok tanda tangan | Dicek di M0 | — | F5B-22; tidak ada sumber setara → BERHENTI & eskalasi |
 | Q5B-23 | (baru v1.0) Key milestone tambahan | MAKE-044 (M1a), MAKE-045 (M4) dipakai | — | F5B-23 |
+| Q5B-24 | (log 28-10-2026, temuan M2) Tarif `gol_pppk.uang_makan` tidak bulat sampai sen | **Ikut legacy**: total = tarif × hari, dibulatkan eksplisit setengah-menjauhi-nol ke sen seperti kolom DECIMAL(14,2); usulan galat/`null` ditolak | §7.2.3 [CATAT] Q5B-24 | Gap `.xx5` float legacy ±1 sen diterima |
 
 ## 14. Lampiran
 
@@ -969,5 +978,6 @@ Butir keamanan ditulis **kode + jenis** saja; **rincian tidak ditulis di repo pu
 |---|---|---|
 | v0.1 | 28-10-2026 | Draf awal (`a5f5254`): scope D-06/D-08/D-09, bahan Q5A-13, 20 pertanyaan (6 ⛔) |
 | v1.0 | 28-10-2026 | Keputusan Horii atas semua butir → §5.3 F5B-1..F5B-20 (+ F5B-21..F5B-23). Perubahan isi: rekap uang makan menjadi format legacy `NIP \| TGL_ABSEN` tanpa nominal/golongan (F5B-20, §7.4.2; `Rekap\RingkasanGolongan` dihapus); rekap kehadiran + role 4 (F5B-10); IL hanya role 1 (F5B-6); laporan per pegawai role 3 fail-closed (F5B-7); PDF per pegawai = render legacy persis: "Rp." hanya di baris konket, tanpa kolom/total (F5B-8, diputus ulang setelah temuan komentar HTML); blok tanda tangan dengan 6 kasus (F5B-13); tabel penyesuaian Tukin + DBV-024 + CRUD role 1 (F5B-14, §7.3.10, §7.6); PDF rekap berbatas (F5B-16); cuti tak dikenal fail-closed & tumpang tindih id terbesar (F5B-17); metode massal TB aditif di Fase 4 sebagai prasyarat M1a (F5B-18); runbook M0–M7 (+ M1a MAKE-044, DBV-024 M3, CRUD M4 MAKE-045); blocker go-live diperluas (Q5B-01/03/09/15/19); acuan Slip Gaji `0cf7e67` lewat CR 5A terpisah; tabel [CATAT] per butir |
+| log | 28-10-2026 | Q5B-24 (tarif `gol_pppk` tak bulat sampai sen ikut legacy, §7.2.3); keputusan lama tidak dihapus |
 
 — Akhir dokumen —
