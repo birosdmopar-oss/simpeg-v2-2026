@@ -71,7 +71,9 @@ Branch `fase5b/make-042-rekap-kehadiran-uang-makan` (dari `main` `79641be` + sin
 `KontrakMatriksRoleTest` (berkas bersama, commit terpisah). Test: `KlasifikasiKehadiranTest` (AC-D09b.5),
 `RekapKehadiranTest`, `RekapUangMakanTest` (AC-D09b.1–.4, termasuk jumlah baris = `uang_makan_hari` snapshot slip M+1),
 `RoleMatriksRekapTest` (AC-D09b.6). Deviasi [V2] dirinci di README `Libraries/Presensi` bagian "Rekap kehadiran & uang
-makan 5B". `Libraries/Presensi/Tukin`, `SlipGaji`, `SlipGajiService`, berkas Fase 4 tidak tersentuh.
+makan 5B". Keputusan Horii 28-10-2026 (Q5B-25/26): ringkas ikut legacy — hari TB tidak diperiksa (TK + tidak hadir bila
+tanpa presensi, kolom `tb` informasi) dan presensi pegawai yang dibuat setelah awal bulan tidak dibaca (`L_presensi.php:599`
+ringkas, `:1053` harian); rekap uang makan tetap F5B-2. `Libraries/Presensi/Tukin`, `SlipGaji`, `SlipGajiService`, berkas Fase 4 tidak tersentuh.
 
 ## 5B M4 — CRUD penyesuaian Tukin (MAKE-045, 28-10-2026)
 
