@@ -314,6 +314,9 @@ export interface PmkQuery {
   page: number
   per_page: number
   status?: string
+  search?: string
+}
+
 /** Jenis layanan pada Status Layanan (`GET layanan/status` → `jenis`). */
 export type JenisLayananKode = 'cuti' | 'tb' | 'ib' | 'pmk'
 
