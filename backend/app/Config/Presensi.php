@@ -93,14 +93,40 @@ class Presensi extends BaseConfig
      */
     public int $tukinBatchNip = 500;
 
+    // --- 5B M5 laporan Tukin (MAKE-041) ---
+
+    /**
+     * Batas baris PDF rekap Tukin (PRD 5B §7.3.5, F5B-16; awal 1.700 = ADR-034, disesuaikan hasil uji volume ADR-035):
+     * di atas batas → 422 `errors.unit_satker`. Override `.env` `presensi.pdfRekapMaksBaris` (bilangan bulat positif).
+     */
+    public int $pdfRekapMaksBaris = 1700;
+
+    /**
+     * Id unit yang penanda tangan rekapnya diambil dari **satker terpilih** (legacy hard-code `'6'`,
+     * `L_presensi.php:12019`, `:12107`) dan yang kop PDF per pegawainya memakai nama/alamat satker (`:7106`). Keputusan
+     * reviewer CR M0 F3: konstanta bernama + override `.env` `presensi.unitTtdSatkerTerpilih`; nilai produksi dicek saat
+     * cutover (QC).
+     */
+    public int $unitTtdSatkerTerpilih = 6;
+
+    /**
+     * Id unit yang penanda tangan rekapnya diambil dari satker kepegawaian (`web_config` `id_satker_kepegawaian`), selain
+     * unit `id_unit_kepegawaian` (legacy hard-code `'7'`, `L_presensi.php:12019`, `:12107`; kop PDF `:7110`). Override
+     * `.env` `presensi.unitTtdSatkerKepegawaian`; dicek saat cutover (QC, F3).
+     */
+    public int $unitTtdSatkerKepegawaian = 7;
+
     public function __construct()
     {
         parent::__construct();
 
-        $this->maksUkuranImporByte    = self::angkaPositifDariEnv('presensi.maksUkuranImporByte', $this->maksUkuranImporByte);
-        $this->maksBarisImporPerSheet = self::angkaPositifDariEnv('presensi.maksBarisImporPerSheet', $this->maksBarisImporPerSheet);
-        $this->ttlPratinjauDetik      = self::angkaPositifDariEnv('presensi.ttlPratinjauDetik', $this->ttlPratinjauDetik);
-        $this->tukinBatchNip          = self::angkaPositifDariEnv('presensi.tukinBatchNip', $this->tukinBatchNip);
+        $this->maksUkuranImporByte      = self::angkaPositifDariEnv('presensi.maksUkuranImporByte', $this->maksUkuranImporByte);
+        $this->maksBarisImporPerSheet   = self::angkaPositifDariEnv('presensi.maksBarisImporPerSheet', $this->maksBarisImporPerSheet);
+        $this->ttlPratinjauDetik        = self::angkaPositifDariEnv('presensi.ttlPratinjauDetik', $this->ttlPratinjauDetik);
+        $this->tukinBatchNip            = self::angkaPositifDariEnv('presensi.tukinBatchNip', $this->tukinBatchNip);
+        $this->pdfRekapMaksBaris        = self::angkaPositifDariEnv('presensi.pdfRekapMaksBaris', $this->pdfRekapMaksBaris);
+        $this->unitTtdSatkerTerpilih    = self::angkaPositifDariEnv('presensi.unitTtdSatkerTerpilih', $this->unitTtdSatkerTerpilih);
+        $this->unitTtdSatkerKepegawaian = self::angkaPositifDariEnv('presensi.unitTtdSatkerKepegawaian', $this->unitTtdSatkerKepegawaian);
 
         $this->akarAset = self::direktoriAbsolut($this->akarAset) ?? WRITEPATH . 'aset/';
 
