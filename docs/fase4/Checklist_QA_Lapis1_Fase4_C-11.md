@@ -42,14 +42,14 @@ Halaman: `/layanan/cuti`, `/layanan/cuti/:id`, `/layanan/cuti/saldo`, `/layanan/
 
 | # | Butir §6.11.8 | Langkah | Hasil yang diharapkan | Layar | Hasil |
 |---|---|---|---|---|---|
-| A1 | 5 | Buka tiap daftar & detail yang memuat badge status | Badge satu baris, warna §6.11.4 (Cuti: Menunggu Atasan `warning`, Menunggu PyB `info`, Disetujui `success`, Ditolak `danger`, Ditangguhkan `secondary`; TB/IB: Menunggu PIC/Disetujui/Ditolak; PMK: Menunggu PIC/Diproses/Selesai/Ditolak); hover/fokus → teks lengkap di tooltip custom, **tanpa** atribut `title` | 1440, 390 | |
+| A1 | 5 | Buka tiap daftar & detail yang memuat badge status | Badge satu baris, warna §6.11.4 (Cuti: Menunggu Atasan `warning`, Menunggu PyB `info`, Disetujui `success`, Ditolak `danger`, Ditangguhkan `secondary`; TB/IB: Menunggu PIC/Disetujui/Ditolak; PMK: Menunggu PIC/Diproses/Selesai/Ditolak); hover/fokus → teks lengkap di tooltip custom, **tanpa** atribut `title` | 1440, 390 || sebagian: badge satu baris (nowrap) ✅ di Cuti; tooltip belum diuji |
 | A2 | 6 | Gulir tabel ke kanan di 600/390 px | Kolom Aksi paling kanan, sticky, bayangan saat tergulir; ⋮ ber-aria-label "Aksi untuk …"; menu terbuka di samping tombol (bukan di luar layar, CR-068) | 1440, 600, 390 | ✅ (8 halaman, 1440/600/390: Aksi sticky, ⋮ di dalam layar) |
 | A3 | 6 | Buka ⋮ tiap tabel | Urutan AGENTS §1 / §6.11.6: Edit → (status) → Lihat detail, Setujui, Tolak, Tangguhkan, Proses, Tunda, Perpanjang, Terbitkan TTE, Unduh … → Hapus (merah, dengan pemisah). Aksi tak berlaku tidak tampil; aksi yang berlaku tetapi tidak boleh = nonaktif | 1440 | ✅ |
 | A4 | 7 | Baca judul, label kolom, label tombol & item ⋮ | Bahasa Indonesia, Title Case, konsisten dengan DUK/Pensiun: "Ekspor", "Unduh", "Setujui", "Tolak", "Tangguhkan", "Tunda" | 1440 | ❌ (§M 3, 4) |
 | A5 | 10 | Filter yang tidak menghasilkan data; muat halaman (jaringan lambat); matikan backend | Kosong: "Tidak ada data pada lingkup ini."; memuat: indikator; galat: pesan Indonesia (403 "Anda tidak berhak …", 404 "Data tidak ditemukan"); subjudul & label kategori berkapitalisasi benar | 1440 | — tidak diuji |
 | A6 | 11 | Ubah lebar ke 600 dan 390 px pada setiap halaman | Tanpa scroll horizontal halaman (`scrollWidth` = lebar viewport); tabel menggulir di wadahnya; desktop ≥ 1024: hanya area tabel yang menggulir, judul/filter tetap (CR-069), header kolom sticky (CR-070); tanpa `table.sr-only`; scrollbar ramping custom; navbar sticky | 1440, 600, 390 | ✅ (tanpa gulir horizontal) |
 | A7 | 12 | Periksa semua kontrol | Tanpa elemen bawaan browser: `<select>` terlihat, popup tanggal native, tooltip `title`, `<datalist>`, `window.confirm/alert` | 1440, 390 | ✅ (tanpa select native/`title`) |
-| A8 | 13 | DevTools Console & Network selama alur normal tiap halaman | Konsol bersih; tidak ada 4xx/5xx tak terduga (403/422 yang memang diuji dikecualikan) | 1440 | |
+| A8 | 13 | DevTools Console & Network selama alur normal tiap halaman | Konsol bersih; tidak ada 4xx/5xx tak terduga (403/422 yang memang diuji dikecualikan) | 1440 || — (tidak diperiksa sistematis) |
 | A9 | 14 | Keyboard saja: Tab ke semua kontrol, Enter/Spasi membuka ⋮/dropdown, panah memilih, Esc menutup; cek kontras | Label form terbaca, aria-label ⋮ ada, fokus selalu terlihat, urutan Tab wajar, kontras AA | 1440 | — kontras tidak diuji (Esc/fokus diuji di D8) |
 | A10 | 10 | Breadcrumb & judul tab | Breadcrumb "Home / Layanan / <Halaman>"; judul tab "<Halaman> · SIMPEG v2" | 1440 | ❌ (§M 1, 2, 5) |
 
@@ -77,7 +77,7 @@ Akun: `demo.admin` (filter unit/satker tampil), `demo.pemohon` (hanya pengajuan 
 |---|---|---|---|---|---|
 | C1 | 1 | Buka halaman sebagai `demo.admin` | Kartu "Status Layanan"; filter Unit/Satker (role 1, 3, 4, 5), Jenis (Cuti/TB/IB/PMK), Status (Berjalan/Selesai); baris jumlah baris 10/25/50 + pencarian; tabel; ringkasan jumlah + paginasi; breadcrumb Home / Layanan / Status Layanan. Tombol **Ekspor** kanan atas: lihat catatan pra-QA §K1 | 1440, 600, 390 | ✅ kecuali Ekspor (menunggu MAKE-046, §K1) |
 | C2 | 2 | Periksa kolom | Nama Pegawai (avatar + nama + NIP), Jenis Layanan, Status Layanan (stepper), PIC/Petugas ("PIC belum ditunjuk" bila kosong), Aksi ⋮ (`layanan-actions-<jenis>-<id>`) | 1440 | ✅ |
-| C3 | 3 | Bandingkan stepper C1 (berjalan), C5 (selesai), I1, P2 | Selesai = lingkaran terisi bercentang; berjalan = cincin; belum = pudar; garis penghubung; warna per jenis (IB `info`, TB `primary`, Cuti `warning`); label langkah §6.11.4 (Cuti: Diajukan → Atasan Langsung → Pejabat Berwenang → Selesai; TB/IB: Diajukan → Verifikasi PIC → Selesai; PMK: Diajukan → Diproses PIC → Selesai) | 1440, 390 | ✅ kecuali label langkah terakhir Cuti (§M 6) |
+| C3 | 3 | Bandingkan stepper C1 (berjalan), C5 (selesai), I1, P2 | Selesai = lingkaran terisi bercentang; berjalan = cincin; belum = pudar; garis penghubung; warna per jenis (IB `info`, TB `primary`, Cuti `warning`); label langkah §6.11.4 (Cuti: Diajukan → Atasan Langsung → Pejabat Berwenang → Selesai; TB/IB: Diajukan → Verifikasi PIC → Selesai; PMK: Diajukan → Diproses PIC → Selesai) | 1440, 390 | ❌ (§M 6) |
 | C4 | 4 | Lihat C3 (ditolak AL), C4 (ditangguhkan PyB), I2, P3 (ditolak PIC) | Tahap yang memutus ditandai (label "Ditolak oleh …"/"Ditangguhkan …") pada tahap itu, bukan di akhir | 1440 | ✅ |
 | C5 | §14.7 #5a/b | Ubah filter Jenis & Status | Jenis = empat nilai tetap; Status hanya Berjalan/Selesai (deviasi sah) | 1440 | ✅ |
 | C6 | §14.7 #5c | ⋮ "Lihat detail" pada baris Cuti/TB/IB/PMK | Membuka `url_detail` server (`/layanan/cuti/{id}`, `/layanan/tb/{id}`, `/layanan/ib/{id}`, `/layanan/pmk/pengajuan/{id}`) | 1440 | ✅ |
@@ -94,7 +94,7 @@ Akun: `demo.admin` (filter unit/satker tampil), `demo.pemohon` (hanya pengajuan 
 | D5 | 9 | `demo.pemohon` | — | Jenis Besar | Isian durasi tampil, tanggal akhir dari server (`pakai_durasi`); Sakit → lampiran wajib (`lampiran_wajib`) | 1440 | ✅ |
 | D6 | — | `demo.atasan` | C1 | Login | **Pengingat** "Pengingat Persetujuan Cuti" muncul sekali di halaman pertama setelah login; "Tunda" menghilangkan baris; "Proses" membuka detail; pindah halaman tidak memunculkan lagi; Keluar → login lagi → muncul lagi (§14.7 #7) | 1440, 390 | ✅ |
 | D7 | — | `demo.pyb` | C2 | Login | Pengingat berisi C2 (tahap PyB) | 1440 | ✅ |
-| D8 | 8 | `demo.atasan` | C1 | ⋮ Tolak tanpa alasan; alasan > 255 byte; Esc | `ApprovalDialog`: kirim tanpa alasan diblokir; > 255 byte → galat; muat di 390 px; Esc menutup; fokus kembali ke ⋮ | 1440, 390 | ✅ kecuali fokus kembali setelah Esc (§M 8) |
+| D8 | 8 | `demo.atasan` | C1 | ⋮ Tolak tanpa alasan; alasan > 255 byte; Esc | `ApprovalDialog`: kirim tanpa alasan diblokir; > 255 byte → galat; muat di 390 px; Esc menutup; fokus kembali ke ⋮ | 1440, 390 | ❌ (§M 8) |
 | D9 | 8 | `demo.pyb` | C2 | ⋮ Tangguhkan | `TangguhkanDialog` (pembungkus `ApprovalDialog`), alasan opsional; wajib bila atas nama (PRD §6.4 `reason_note?`, T14); status menjadi Ditangguhkan (lalu jalankan ulang skrip untuk memulihkan data uji bila perlu) | 1440 | ✅ |
 | D10 | 8 | `demo.admin` | C1 bila approver tak terjangkau | ⋮ "Setujui/Tolak atas nama" | Hanya tampil bila `aksi.proses_atas_nama` server; alasan wajib | 1440 | — tidak ada data atas nama |
 | D11 | — | `demo.admin` | C5 | ⋮ Terbitkan TTE → passphrase | `EsignDialog`: input password custom, galat 422 per kolom, passphrase tidak tersimpan di DOM/storage/URL | 1440, 390 | ✅ |
@@ -188,7 +188,7 @@ Akun: `demo.admin` (filter unit/satker tampil), `demo.pemohon` (hanya pengajuan 
 | 4 | 7 (A4) | PMK (⋮ berkas) | 1440 | Item ⋮ "Unduh surat phk" (kapitalisasi/istilah) | QA reviewer 28-10 | CR-072 |
 | 5 | 10 (A10) | Petugas Approval Cuti | 1440 | Breadcrumb "Petugas Approval" tidak sesuai pola Home / Layanan / <Halaman> | QA reviewer 28-10 | CR-072 |
 | 6 | 3 (C3) | Status Layanan, detail Cuti | 1440 | Langkah terakhir stepper Cuti berlabel hasil (Disetujui/Ditolak/Ditangguhkan) setelah final; §6.11.4 = "Selesai" seperti TB/IB/PMK | QA reviewer 28-10 | CR-073 |
-| 7 | 9 | Form ajukan (berkas wajib) | 1440 | Berkas wajib tanpa penanda * | QA reviewer 28-10 | CR-072 |
+| 7 | 9 | Form Ajukan Cuti (Sakit), Form Ajukan IB/TB (slot berkas), Form Ajukan PMK | 1440 | Berkas wajib tanpa penanda * | QA reviewer 28-10 | CR-072 |
 | 8 | 14 (D8) | Cuti (dialog Tolak) | 1440 | Fokus tidak kembali ke ⋮ setelah Esc | QA reviewer 28-10 | CR-072 |
 | 9 | 8 (D9) | Cuti (Tangguhkan) | 1440 | ~~Tangguhkan tanpa alasan~~ **DIBATALKAN**: sah sesuai PRD §6.4 (`reason_note?`; wajib hanya untuk tolak dan atas nama T14); ekspektasi D9 diperbaiki | QA reviewer 28-10 | — |
 | 10 | 7 | PMK (dialog) | 1440 | Judul dialog PMK memakai NIP, bukan nama | QA reviewer 28-10 | CR-072 |
