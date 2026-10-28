@@ -7,6 +7,7 @@ namespace Tests\Presensi\Slip;
 use App\Exceptions\ApiException;
 use App\Libraries\Presensi\Slip\KodeGalatSlip;
 use App\Libraries\Presensi\Slip\TokenSlipService;
+use App\Libraries\Presensi\Slip\UangMakanBelumTersedia;
 use App\Libraries\Presensi\SlipGaji\KolomGaji;
 use App\Libraries\Presensi\SlipGaji\TokenQr;
 use Tests\Support\DatabaseTestCase;
@@ -48,7 +49,7 @@ final class BukaSlipAtomikTest extends DatabaseTestCase
     public function testBukaSekaliDanNominalHanyaDiRespons(): void
     {
         $auth  = $this->authPegawaiSlip($this->nip);
-        $slip  = $this->slipPegawai();
+        $slip  = $this->slipPegawai('2026-10-27 09:00:00', new UangMakanBelumTersedia()); // sumber 5A: kolom uang makan tidak disentuh
         $tanpa = static fn (array $d): array => array_intersect_key($d, array_flip(['rincian', 'ringkasan', 'uang_makan', ...KolomGaji::semuaField()]));
 
         $status = $slip->status($auth, '2026-09');
