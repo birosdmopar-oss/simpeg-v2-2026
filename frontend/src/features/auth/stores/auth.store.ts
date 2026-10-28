@@ -7,6 +7,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
 import { isApiError } from '@/lib/axios'
 
 import { authService } from '../services/auth.service'
@@ -76,6 +77,8 @@ export const useAuthStore = defineStore('auth', () => {
       id_satker: result.user.id_satker,
       exp: result.access_expires_at,
     })
+    // Setiap login sukses (termasuk login ulang setelah 401) boleh memicu pengingat cuti lagi (PRD Fase 4 §6.4.7).
+    resetPengingatCuti()
     return result.user
   }
 

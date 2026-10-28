@@ -52,6 +52,15 @@ import {
   PEGAWAI_LIST_ROLES,
   PENUGASAN_ROLES,
 } from '@/features/kepegawaian/roles'
+import {
+  CUTI_ADMIN_ROLES,
+  CUTI_ROLES,
+  IB_ROLES,
+  PETUGAS_LAYANAN_ROLES,
+  PMK_ROLES,
+  STATUS_LAYANAN_ROLES,
+  TB_ROLES,
+} from '@/features/layanan/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from '@/features/presensi/roles'
@@ -59,10 +68,11 @@ import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
 /**
- * Fase tertinggi yang menunya ditampilkan. 3 sejak B-20 penutup (WS-2 MAKE-014): semua halaman Modul B tersambung API.
- * Menu fase 4+ sudah terdaftar di bawah tetapi tersembunyi.
+ * Fase tertinggi yang menunya ditampilkan. 4 sejak paket penutup M7 (MAKE-026): semua halaman Modul C tersambung API
+ * (sebelumnya 3 sejak B-20 penutup WS-2 MAKE-014). Menu fase 5+ sudah terdaftar di bawah tetapi tersembunyi
+ * (kecuali yang ber-`rilis`).
  */
-export const ACTIVE_PHASE = 3
+export const ACTIVE_PHASE = 4
 
 export interface NavChild {
   key: string
@@ -134,13 +144,22 @@ const NAV: NavGroup[] = [
       { key: 'lkh-verifikasi', label: 'Verifikasi LKH', icon: ClipboardCheck, to: { name: 'lkh-verifikasi' }, roles: LKH_ROLES, phase: 3 },
       // Fase 7 (F-10 Arsip Digital).
       { key: 'arsip', label: 'Arsip', icon: Folder, phase: 7 },
-      // Fase 4 (Layanan & Approval). Submenu mengikuti mockup Gambar 17.
+      // Fase 4 (Layanan & Approval): submenu per role PRD Fase 4 §6.11.2; grup tampil bila minimal satu anak tampil.
       {
         key: 'layanan',
         label: 'Layanan',
         icon: MousePointerClick,
         phase: 4,
-        children: [{ key: 'layanan-status', label: 'Status Layanan', to: '/layanan/status' }],
+        children: [
+          { key: 'layanan-cuti', label: 'Cuti', to: '/layanan/cuti', roles: CUTI_ROLES },
+          { key: 'layanan-cuti-saldo', label: 'Saldo Cuti', to: '/layanan/cuti/saldo', roles: CUTI_ADMIN_ROLES },
+          { key: 'layanan-cuti-petugas-approval', label: 'Petugas Approval Cuti', to: '/layanan/cuti/petugas-approval', roles: CUTI_ADMIN_ROLES },
+          { key: 'layanan-tb', label: 'Tugas Belajar', to: '/layanan/tb', roles: TB_ROLES },
+          { key: 'layanan-ib', label: 'Izin Belajar', to: '/layanan/ib', roles: IB_ROLES },
+          { key: 'layanan-pmk', label: 'PMK', to: '/layanan/pmk', roles: PMK_ROLES },
+          { key: 'layanan-status', label: 'Status Layanan', to: '/layanan/status', roles: STATUS_LAYANAN_ROLES },
+          { key: 'layanan-petugas', label: 'Petugas Layanan', to: '/layanan/petugas', roles: PETUGAS_LAYANAN_ROLES },
+        ],
       },
       // Fase 5 (Presensi & Remunerasi). Paket 5A dirilis sebelum ACTIVE_PHASE 5 (`rilis`, F5-18; dihapus saat 5C
       // menaikkan ACTIVE_PHASE ke 5). Anak per role PRD 5A §7.8.2; grup tampil bila minimal satu anak tampil.

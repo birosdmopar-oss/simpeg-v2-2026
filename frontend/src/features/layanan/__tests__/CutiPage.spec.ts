@@ -1,7 +1,7 @@
 /**
  * Paket 1 M7 (MAKE-026) — CutiPage: tab per role (Cuti Saya 2/6/7, Perlu Persetujuan semua, Monitoring 1/3), ⋮ dari
  * `aksi {}` server dipilih lewat `data-action` (AGENTS §1), proses Setujui/Tolak/Tangguhkan, proses atas nama (alasan
- * wajib), Tunda, Hapus, dan pengingat sekali per sesi. Service di-mock; bentuk amplop diuji di cuti.service.amplop.spec.
+ * wajib), Tunda, dan Hapus (pengingat setelah login: PengingatCutiShell.spec). Service di-mock; bentuk amplop diuji di cuti.service.amplop.spec.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -330,32 +330,6 @@ describe('CutiPage — tunda dan hapus', () => {
     await flushPromises()
 
     expect(svc.remove).toHaveBeenCalledWith(4)
-  })
-})
-
-describe('CutiPage — pengingat', () => {
-  it('tampil bila antrean tidak kosong; Tunda menghapus baris; tidak tampil lagi pada sesi yang sama', async () => {
-    svc.pengingat.mockResolvedValue({ items: [baris(5, { proses: true, tunda: true })], total: 1 })
-    svc.tunda.mockResolvedValue(baris(5))
-    const { wrapper } = await mountPage(Role.PEGAWAI)
-
-    expect(q('[data-testid="pengingat-cuti-dialog"]')).not.toBeNull()
-    expect(q('[data-testid="pengingat-row-5"]')?.textContent).toContain('Budi Santoso')
-
-    q<HTMLButtonElement>('[data-testid="pengingat-tunda-5"]')!.click()
-    await flushPromises()
-    expect(svc.tunda).toHaveBeenCalledWith(5)
-    expect(q('[data-testid="pengingat-cuti-dialog"]')).toBeNull()
-
-    wrapper.unmount()
-    svc.pengingat.mockClear()
-    await mountPage(Role.PEGAWAI)
-    expect(svc.pengingat).not.toHaveBeenCalled()
-  })
-
-  it('antrean kosong → dialog tidak muncul', async () => {
-    await mountPage(Role.PEGAWAI)
-    expect(q('[data-testid="pengingat-cuti-dialog"]')).toBeNull()
   })
 })
 
