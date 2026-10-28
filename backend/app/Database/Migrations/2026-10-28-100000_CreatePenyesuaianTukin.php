@@ -9,9 +9,10 @@ use CodeIgniter\Database\Migration;
 use RuntimeException;
 
 /**
- * DBV-024 (Fase 5B, F5B-14) — DRAF, DITAHAN di app/Database/MigrationsDitahan (tidak dijalankan `spark migrate`) sampai
- * disetujui DB Validator. Setelah disetujui: dipindah ke app/Database/Migrations dengan timestamp lebih baru dari semua
- * migration 5A (`2026-10-27-100100`) dan DDL tidak berubah, bersama registry NIP & test skema (PRD 5B §10 M3).
+ * DBV-024 (Fase 5B, F5B-14) — disetujui DB Validator 28-10-2026 (DBV-Q1..Q8; verifikasi MySQL 8.0 dan MariaDB 10.4).
+ * Dipindah dari MigrationsDitahan dengan timestamp setelah migration 5A (`2026-10-27-100100`), DDL tidak berubah;
+ * registry NIP `TabelAnakNip` dan `SkemaPenyesuaianTukinTest` (PRD 5B §10 M3). Syarat C-1 (kunci `FOR UPDATE` per NIP
+ * sebelum cek tumpang tindih, satu transaksi, test konkurensi) berlaku di CRUD MAKE-045.
  * Dokumen: backend/docs/db-review/DBV-024-penyesuaian-tukin-schema.md.
  *
  * Tabel `penyesuaian_tukin` [V2] — pengganti daftar NIP & periode penyesuaian Tukin yang di-hard-code legacy
