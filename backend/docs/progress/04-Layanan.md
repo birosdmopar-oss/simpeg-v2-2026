@@ -19,7 +19,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 | C-07 Tugas Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 branch `fase4/make-024-tb-ib-pmk-m5`: inti TB (CRUD, proses PIC, perpanjangan, `bebasPresensiPenuh`, surat) + route + kontrak + 6 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-08 Izin Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti IB (CRUD, proses PIC, Surat IB otomatis kode 50) + route + kontrak + 4 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-09 PMK | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti PMK (pengajuan, opsi, kalkulator, proses PIC 0→3→1/2, riwayat final + arsip SK) + route + kontrak + 5 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
-| C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | TODO | Menunggu M3 & M5 merged |
+| C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | **IN_PROGRESS** | 27-10 `GET layanan/status` (gabungan cuti/TB/IB/PMK, lingkup PegawaiScope, tahap & PIC) + `layanan/jenis` + CRUD `layanan/petugas` (tulis role 1) + route + kontrak + 3 berkas test |
 | C-11 Frontend Modul Layanan | M7 | MAKE-026 | TODO | Per halaman setelah backend-nya merged; `ACTIVE_PHASE = 4` hanya di commit penutup |
 | C-12 Unit test & verifikasi | M8 | MAKE-027 | TODO | Menunggu M3–M7 merged |
 
@@ -308,3 +308,27 @@ di-"belum dibaca"-kan lagi) dan `inbox_msg`; `enqueuePush()` mengantrekan satu j
 **Test.** `tests/Layanan/Esign/{EsignCutiTest,EsignHistTest,EsignRoleTest,SuratCutiTest}`, `tests/Layanan/Notifikasi/{NotifikasiServiceTest,
 NotifikasiPenerimaTest,NotifikasiTidakKeTicketingTest,PushNotifJobTest}`, `tests/unit/Layanan/Notifikasi/TemplatNotifikasiTest`; baris
 `POST cuti/{id}/esign` (1,3) di `KontrakMatriksRoleTest`.
+
+## M6 — Dashboard status layanan & PIC (MAKE-025, 27-10-2026, branch `fase4/make-025-dashboard-pic` dari main `f636194`)
+
+Cakupan C-10 backend saja (FE di M7). Tanpa migration; tidak menyentuh berkas M4 (notifikasi/e-sign). DB uji scratch
+`simpeg_v2_t_make024` port 3307.
+
+**Sudah jalan.** Route (7) di `Config/RoutesLayananDashboard.php` (+ satu baris `Routing::$routeFiles`) + baris
+`KontrakMatriksRoleTest` (prefiks `layanan`, `LayananDashboardService::ROLE_ROUTE`, `PetugasLayananService::ROLE_ROUTE`);
+`LayananDashboardController`, `PetugasLayananController`; `LayananDashboardService`; `PetugasLayananService` diperluas (CRUD
++ jenis aktif); model `PetugasLayananModel`, `JenisLayananModel`. Test `tests/Layanan/Dashboard/{LayananStatusTest,
+LayananStatusRoleTest, PetugasLayananCrudTest}` (25 test) + fixture `tests/_support/Layanan/DashboardUjiTrait.php`.
+Dokumentasi endpoint: `Controllers/Api/Layanan/README.md`; keputusan coder: `Libraries/Layanan/README.md`.
+
+AC-10.1 (`LayananStatusRoleTest`), AC-10.2 (`PetugasLayananCrudTest`), AC-10.3 (`testPetugasCutiAlPybDanPicAktifSaja`),
+AC-10.4 (`testTahapDanLabelKonsistenDenganStateMachineModul`).
+
+**Keputusan reviewer CR 27-10 (4 default M6 disetujui):** `layanan/petugas` role 2–7 hanya PIC aktif; `url_detail` null
+untuk role 4/5 (detail modul tetap 403 untuk role 4/5, diuji); filter `status` angka tanpa `jenis` → 422 `errors.status`;
+hapus PIC fisik + audit [K]. **[V2] `GET layanan/petugas/kandidat?search=`** (role 1; gap PRD §5.5, legacy memuat pilihan di
+form `L_layanan.php` `form_off`; disetujui Horii): PNS aktif satker kepegawaian, urut nama, maks 50, satker kosong →
+`items: []` + peringatan. Route jadi 7.
+
+**Review.** Isi diterima reviewer CR 28-10 (`9ba79f9`, CI 40545968056 hijau); di-merge dengan main `9ce8c56` (M4) untuk
+verifikasi ulang dengan `NotifikasiService` asli. Merge ke main menunggu izin Horii.
