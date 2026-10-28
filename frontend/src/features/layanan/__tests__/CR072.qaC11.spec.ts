@@ -209,7 +209,7 @@ describe('CR-072 butir 1 & 2 — breadcrumb dan h1 Cuti/PMK', () => {
   })
 
   it('Status Layanan: breadcrumb Home / Layanan / Status Layanan dan h1', async () => {
-    vi.mocked(layananStatusService).list.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 10 })
+    vi.mocked(layananStatusService).list.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 10, can_export: false })
     loginAs(Role.SUPER_ADMIN as never)
     const router = createShellRouter()
     router.addRoute({ path: '/layanan/status', name: 'layanan-status', component: LayananStatusPage })
