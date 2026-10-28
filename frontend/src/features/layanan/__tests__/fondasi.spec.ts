@@ -47,7 +47,13 @@ describe('routes.layanan.ts', () => {
   it('nama route tetap; halaman cuti dan PMK terdaftar (menu tersembunyi)', () => {
     expect(LAYANAN_ROUTE.STATUS).toBe('layanan-status')
     expect(LAYANAN_ROUTE.CUTI_DETAIL).toBe('layanan-cuti-detail')
-    expect(layananRoutes.map((r) => r.name)).toEqual([LAYANAN_ROUTE.CUTI, LAYANAN_ROUTE.CUTI_DETAIL, LAYANAN_ROUTE.PMK, LAYANAN_ROUTE.PMK_DETAIL])
+    expect(layananRoutes.map((r) => r.name)).toEqual([
+      LAYANAN_ROUTE.CUTI,
+      LAYANAN_ROUTE.CUTI_DETAIL,
+      LAYANAN_ROUTE.PMK,
+      LAYANAN_ROUTE.PMK_DETAIL,
+      LAYANAN_ROUTE.STATUS,
+    ])
   })
 })
 

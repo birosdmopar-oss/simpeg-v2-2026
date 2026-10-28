@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Layanan\Ib\IbService;
+use App\Libraries\Layanan\PetugasLayananService;
 use App\Libraries\Layanan\Studi\AturanStudi;
 use App\Libraries\Layanan\Studi\BerkasStudi;
 use Closure;
@@ -119,5 +120,15 @@ final class IbCrudTest extends DatabaseTestCase
         }
 
         $this->fail('Seharusnya 422');
+    }
+
+    public function testOpsiMemuatPenandaAdalahPicIb(): void
+    {
+        [, $auth]       = $this->aktorStudi(Role::PPPK);
+        [$picNip, $pic] = $this->aktorStudi(Role::PPPK);
+        $this->jadikanPic($picNip, PetugasLayananService::JENIS_IB);
+
+        $this->assertFalse((new IbService())->opsi($auth, null)['adalah_pic']);
+        $this->assertTrue((new IbService())->opsi($pic, null)['adalah_pic']);
     }
 }

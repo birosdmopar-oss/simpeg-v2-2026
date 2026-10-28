@@ -399,3 +399,16 @@ Keputusan/ambigu untuk reviewer:
 4. **(Review Paket 7, diselesaikan)** `PegawaiPicker` dipakai bersama: `CutiFormDialog` dipindah ke komponen itu (test Cuti tetap hijau; selektor `pegawai-picker`).
 5. Daftar riwayat role 1 tanpa NIP memuat semua riwayat (lingkup server); kolom NIP ditampilkan karena `RiwayatPmk` tidak membawa nama pegawai.
 6. Bukti browser (API tiruan sintetis, tanpa Figma — Q-18): menu ⋮ tab PIC terbuka di dalam layar 1440 dan 390 px; unduh berkas memanggil `GET pmk/pengajuan/41/berkas/file_kontrak`; form + kalkulator 1440 dan 390 px (satu kolom).
+
+**Prasyarat backend Paket 4/5/6** (branch `fase4/make-026-prasyarat-p4-p6`, dari main `6aca985`; keputusan reviewer 28-10; aditif, tanpa migration):
+1. `GET tb/opsi` dan `GET ib/opsi` memuat `adalah_pic` (`StudiPengajuanService::opsi` lewat `adalahPic`, meniru PMK) — FE menyembunyikan tab Perlu Persetujuan bila `false`. Test `TbCrudTest`/`IbCrudTest::testOpsiMemuatPenandaAdalahPic*`.
+2. **[V2]** `GET cuti/petugas-approval/opsi` (role 1, 3): opsi form yang tidak ada di master options — `jabatan_koordinasi`, `jenis_pegawai` (PNS/PPPK), `group_jabatan_pakai_gol`, `unit_terkunci` (role 3), `id_jenis_pa`. Sisanya memakai master options (`unit`, `satker`, `group-jabatan`, `sub-group-jabatan`, `pangkat`, `jabatan`) dan `GET pegawai?search=`. Baris `KontrakMatriksRoleTest`; test `PetugasApprovalCutiTest::testOpsi*`.
+3. **[V2] deviasi PRD §6.11.1 (keputusan reviewer 28-10):** rute FE TB/IB mengikuti backend — `/layanan/tb`, `/layanan/tb/:id`, `/layanan/ib`, `/layanan/ib/:id` — konsisten dengan `url_detail` Status Layanan (M6) dan URL notifikasi M5; PRD menulis `/layanan/tugas-belajar` dan `/layanan/izin-belajar`. Dicatat untuk PRD Fase 4 v1.5.
+
+**Paket 8 — Status Layanan** (branch `fase4/make-026-p8-status-layanan`, dari main `bddd089`). `LayananStatusPage` (`/layanan/status`, role 1–7; kartu "Status Layanan"; filter Unit/Satker hanya role 1, 3, 4, 5 lewat opsi master, Jenis (cuti/tb/ib/pmk), Status (berjalan/selesai), pencarian nama/NIP, jumlah baris 10/25/50, paginasi; pola gulir CR-069), `LayananStatusTable` (Nama Pegawai: avatar + NIP + satker; Jenis Layanan + ringkasan; Status Layanan: badge + `UiStepper` dari `tahap[]` server; PIC/Petugas dari `petugas[]` atau `catatan` "PIC belum ditunjuk"; ⋮ "Lihat detail" `layanan-actions-<jenis>-<id>` hanya bila `aksi.lihat_detail` server, tanpa itu "—"), `layananStatus.service.ts` (normalisasi string, hanya tautan internal `/…` yang dipakai untuk navigasi). Read-only.
+
+Keputusan/ambigu untuk reviewer:
+1. Filter Jenis memakai empat nilai tetap (`cuti|tb|ib|pmk`), bukan `GET layanan/jenis`: master itu memuat KARPEG/KARISKARSU dan tidak memuat cuti, sedangkan `GET layanan/status` hanya menerima empat nilai tadi.
+2. Filter Status hanya `berjalan`/`selesai` (kode angka per jenis butuh `jenis` dan label per jenis; tidak ditawarkan di UI).
+3. "Lihat detail" membuka `url_detail` dari server apa adanya: `/layanan/tb/{id}` dan `/layanan/ib/{id}` (rute TB/IB milik Paket 5/6 harus memakai path itu, atau backend `url_detail` diubah — lihat butir brief Coder B).
+4. Tangkapan layar/ukuran (API tiruan sintetis, tanpa Figma — Q-18; Gambar 17 sebagai acuan): 1440 dan 390 px, menu ⋮ terbuka di dalam layar, `scrollWidth` = lebar viewport, tabel menggulir sendiri di desktop (window tidak).
