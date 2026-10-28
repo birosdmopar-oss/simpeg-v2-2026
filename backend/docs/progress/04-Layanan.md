@@ -389,3 +389,11 @@ peringatan; galat umum/403 pesan baku). Terpasang di halaman daftar dan detail.
 Catatan untuk reviewer: (1) passphrase tidak masuk store/composable: `useCutiAksi.esign(passphrase)` hanya meneruskannya ke request; (2) tes memastikan passphrase
 tidak ada di DOM, `localStorage`/`sessionStorage`, atau URL; (3) bukti browser (API tiruan sintetis): 1440 dan 390 px, galat 422 per kolom, sukses menutup dialog +
 pemberitahuan, passphrase tidak ada di DOM/storage/URL, request esign tanpa query string.
+
+**Paket 8 — Status Layanan** (branch `fase4/make-026-p8-status-layanan`, dari main `bddd089`). `LayananStatusPage` (`/layanan/status`, role 1–7; kartu "Status Layanan"; filter Unit/Satker hanya role 1, 3, 4, 5 lewat opsi master, Jenis (cuti/tb/ib/pmk), Status (berjalan/selesai), pencarian nama/NIP, jumlah baris 10/25/50, paginasi; pola gulir CR-069), `LayananStatusTable` (Nama Pegawai: avatar + NIP + satker; Jenis Layanan + ringkasan; Status Layanan: badge + `UiStepper` dari `tahap[]` server; PIC/Petugas dari `petugas[]` atau `catatan` "PIC belum ditunjuk"; ⋮ "Lihat detail" `layanan-actions-<jenis>-<id>` hanya bila `aksi.lihat_detail` server, tanpa itu "—"), `layananStatus.service.ts` (normalisasi string, hanya tautan internal `/…` yang dipakai untuk navigasi). Read-only.
+
+Keputusan/ambigu untuk reviewer:
+1. Filter Jenis memakai empat nilai tetap (`cuti|tb|ib|pmk`), bukan `GET layanan/jenis`: master itu memuat KARPEG/KARISKARSU dan tidak memuat cuti, sedangkan `GET layanan/status` hanya menerima empat nilai tadi.
+2. Filter Status hanya `berjalan`/`selesai` (kode angka per jenis butuh `jenis` dan label per jenis; tidak ditawarkan di UI).
+3. "Lihat detail" membuka `url_detail` dari server apa adanya: `/layanan/tb/{id}` dan `/layanan/ib/{id}` (rute TB/IB milik Paket 5/6 harus memakai path itu, atau backend `url_detail` diubah — lihat butir brief Coder B).
+4. Tangkapan layar/ukuran (API tiruan sintetis, tanpa Figma — Q-18; Gambar 17 sebagai acuan): 1440 dan 390 px, menu ⋮ terbuka di dalam layar, `scrollWidth` = lebar viewport, tabel menggulir sendiri di desktop (window tidak).

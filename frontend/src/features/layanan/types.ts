@@ -214,3 +214,56 @@ export interface CutiIsian {
   nip?: string
   status?: string
 }
+
+/** Jenis layanan pada Status Layanan (`GET layanan/status` → `jenis`). */
+export type JenisLayananKode = 'cuti' | 'tb' | 'ib' | 'pmk'
+
+/** Petugas/approver yang ditampilkan pada kolom PIC (server: atasan + pejabat untuk cuti, semua PIC aktif untuk TB/IB/PMK). */
+export interface PetugasStatus {
+  peran: string
+  nip: string
+  nama: string
+}
+
+/** Tahap stepper Status Layanan: `tahap[]` modul + `waktu` (server). */
+export interface TahapStatus extends TahapLayanan {
+  waktu: string | null
+}
+
+/** Satu baris `GET layanan/status` setelah normalisasi (gabungan cuti, TB, IB, PMK). */
+export interface LayananStatusItem extends Omit<TampilanStatus, 'aksi' | 'tahap'> {
+  jenis: JenisLayananKode
+  jenis_layanan: string
+  id: number
+  nip: string
+  nama: string
+  unit: string | null
+  satker: string | null
+  tanggal_pengajuan: string | null
+  status: number
+  ringkasan: string
+  tahap: TahapStatus[]
+  petugas: PetugasStatus[]
+  catatan: string | null
+  /** Rute halaman FE modul (null = pemanggil tidak punya halaman detail modul itu). */
+  url_detail: string | null
+  lihat_detail: boolean
+}
+
+export interface LayananStatusResponse {
+  items: LayananStatusItem[]
+  total: number
+  page: number
+  per_page: number
+}
+
+export interface LayananStatusQuery {
+  page: number
+  per_page: number
+  jenis?: string
+  /** `berjalan` | `selesai` (kode angka per jenis tidak ditawarkan di UI). */
+  status?: string
+  id_unit?: string
+  id_satker?: string
+  search?: string
+}
