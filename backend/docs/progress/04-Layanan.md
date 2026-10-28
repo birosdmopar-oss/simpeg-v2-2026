@@ -351,6 +351,51 @@ Keputusan/ambigu untuk reviewer:
 4. Filter status daftar memakai kode 0/3/1/2/4 dikirim apa adanya ke `GET cuti?status=`.
 5. Tangkapan layar (API tiruan sintetis, tanpa Figma — acuan Q-18, AGENTS §3.6): 1440 dan 390 px, tanpa scroll horizontal halaman (`scrollWidth` = lebar viewport).
 
+**Paket 4 — Saldo Cuti + Petugas Approval Cuti** (branch `fase4/make-026-p4-saldo-petugas-cuti`; DI MAIN `54e0a27`). `CutiSaldoPage`
+(daftar saldo per tahun, tambah target semua pegawai atau satu pegawai, ubah/hapus lewat ⋮; hasil tambah `ringkasan` dan `dilewati` ditampilkan
+utuh), `SaldoCutiFormDialog`, `PetugasApprovalCutiPage` dan `PetugasApprovalFormDialog` (opsi dari `cuti/petugas-approval/opsi`, unit terkunci
+role 3). Service `cutiSaldo.service.ts` dan `cutiPetugasApproval.service.ts`. Route `/layanan/cuti/saldo`, `/layanan/cuti/petugas-approval`
+(role 1, 3). Test: `cutiSaldo.petugas.amplop.spec.ts` (klien asli, angka string), `SaldoPetugasPage.spec.ts` (⋮ dan hapus). Label ⋮ petugas
+memakai nama petugas dan unit pemohon (perbaikan dari review, commit `54e0a27`).
+
+**Paket 5 — Tugas Belajar (fondasi TB/IB berparameter jenis)** (branch `fase4/make-026-p5-tb`; DI MAIN `1da0ec6`). `studi.service.ts` (fabrik
+`createStudiService('tb'|'ib')`, nama kolom SK per jenis), `studiConfig.ts` (hanya data statis: judul, route, awalan testid, role),
+`StudiListPage` dan `StudiDetailPage` berparameter `jenis`; `TbPage`, `IbPage`, `TbDetailPage`, `IbDetailPage` sebagai pembungkus tipis.
+Komponen `StudiTable`, `StudiFormDialog`, `StudiProsesDialog`, `StudiPerpanjanganDialog`, `rowActionsStudi.ts`. Route `/layanan/tb`, `/layanan/ib`
+(+ `/:id(\d+)`).
+
+Keputusan/deviasi untuk reviewer:
+1. Slot berkas, label slot, dan berkas wajib diambil dari `GET {jenis}/opsi` (`slot_berkas`, `berkas_wajib`), bukan dari konfigurasi FE (ADR-025/026).
+2. Item Perpanjangan tampil dari `aksi.perpanjangan` server; pagar jenis (TB saja) hanya tambahan. Tab Perlu Persetujuan dari `adalah_pic` opsi.
+3. Tanggal mulai perpanjangan kosong saat tambah: server mengisi bawaan (akhir efektif + 1 hari); FE tidak menghitungnya.
+4. Pemilih pegawai memakai `PegawaiPicker` (kandidat pencarian server), bukan `GET pegawai` langsung.
+
+Test: `studi.service.amplop.spec.ts` (klien asli, TB dan IB), `StudiListPage.spec.ts` (tab dan ⋮ TB). Uji demo dilakukan reviewer dengan backend asli (Ajukan TB oleh role 1, Setujui/Tolak sebagai PIC TB).
+
+**Paket 6 — Izin Belajar** (branch `fase4/make-026-p6-ib`; DI MAIN `b2a9b9c`). Tidak ada file IB baru selain yang disediakan fondasi Paket 5;
+paket ini menambah uji dan perbaikan. `IzinBelajar.spec.ts`: meta route roles (IB 1,2,3,7; TB 1,2,3,6), tab per role IB (Saya,
+Perlu Persetujuan dari `adalah_pic`, Monitoring 1/3), Ajukan hanya bila `can_create`, berkas IB wajib untuk semua role dari `berkas_wajib`
+(role 1 tidak bebas berkas), tanpa pilihan status awal dan tanpa Perpanjangan untuk IB. Tangkapan layar uji browser (API tiruan): 1440 dan 390 px,
+tanpa scroll horizontal halaman, menu ⋮ terbuka di dalam layar.
+
+Deviasi: `UiFileField` hanya menerima `hint`, bukan `helpText`/`state`; akibatnya petunjuk wajib dan galat 422 per slot berkas tidak tampil. Diperbaiki
+di `StudiFormDialog`, `StudiProsesDialog`, dan `StudiPerpanjanganDialog` (hint + galat di bawah field). Dampak juga ke TB (diterima reviewer).
+"Unduh surat" di halaman detail tetap tombol halaman (koreksi reviewer), bukan item ⋮; ⋮ "Unduh surat" ada di daftar.
+
+**Paket 9 — Petugas Layanan (PIC), role 1** (branch `fase4/make-026-p9-petugas`; DI MAIN `0e4e9cf`). `petugasLayanan.service.ts`
+(jenis, daftar, kandidat, tambah/ubah/hapus), `PetugasLayananPage` (filter jenis dan status, pencarian, tabel, ⋮ dari `aksi {}` server: Edit →
+Aktifkan/Nonaktifkan → Hapus), `PetugasLayananFormDialog` (kandidat dari `GET layanan/petugas/kandidat` min. 3 huruf, debounce 300 ms;
+`peringatan` server ditampilkan apa adanya). Route `/layanan/petugas`, role 1 (`PETUGAS_LAYANAN_ROLES`). Test: `petugasLayanan.amplop.spec.ts`
+(klien asli), `PetugasLayananPage.spec.ts` (⋮ per status, aktifkan/nonaktifkan, hapus lewat konfirmasi, Tambah hanya bila `can_create`).
+
+Keputusan/deviasi: kandidat satker kosong menampilkan `peringatan` server (tanpa kandidat); uji demo reviewer: "Satker kepegawaian belum diatur di
+Web Config" muncul sesuai server.
+
+**CR-071 — kolom SK wajib di dialog Setujui TB/IB** (branch `fix/cr-071-proses-studi-wajib`; DI MAIN `150e986`). Temuan uji demo sebagai PIC TB:
+`ds_{jenis}` dan `no_ds_{jenis}` belum bertanda wajib, padahal kontrak `POST {jenis}/{id}/process` mewajibkannya (sama seperti `no_sk` dan
+`tgl_sk`). Perbaikan di `StudiProsesDialog`; `tgl_ds_*` dan `perihal_ds_*` tetap opsional. Validasi tetap di server (422 per kolom). Test:
+`StudiProsesDialog.spec.ts` (TB dan IB, 4 kasus).
+
 **Paket 10 — Penutup M7** (branch `fase4/make-026-p10-penutup`, dari main `0e4e9cf`; satu-satunya paket yang menaikkan fase). `nav.config.ts`: grup Layanan (`phase: 4`) berisi Cuti, Saldo Cuti, Petugas Approval Cuti, Tugas Belajar, Izin Belajar, PMK, Status Layanan, Petugas Layanan; tiap anak memakai konstanta `features/layanan/roles.ts` (sama dengan `meta.roles` route; PRD §6.11.2: TB tanpa role 7, IB tanpa role 6, role 8 tanpa grup). `NavItem.rilis`/`NavChild.roles` milik WS-2 tidak diubah (grup Layanan tidak butuh `rilis` karena `ACTIVE_PHASE` naik). **`ACTIVE_PHASE = 4`** (AC-11.8). `PengingatCutiDialog` dipindah dari `CutiPage` ke shell (`PengingatCutiShell` dipasang di `RedesignShell`): tampil di halaman mana pun yang pertama dibuka setelah login bila `GET cuti/pengingat` tidak kosong, sekali per sesi tab (`sessionStorage`), hanya role Cuti (1, 2, 3, 6, 7) dan bukan sesi wajib ganti password; Keluar mengosongkan penanda. Test: `nav.config.spec` (menu per role, tujuan = path route, role anak = role route), `PengingatCutiShell.spec`; `navPresensi.spec`/`SlipGajiPage.spec` disesuaikan (fase 4; mock `api.get` dipilah per URL karena shell memanggil pengingat).
 
 Catatan untuk reviewer: penanda pengingat dikosongkan pada Keluar dan pada setiap login sukses (`auth.store` `login()` memanggil `resetPengingatCuti()`, termasuk login ulang setelah 401 tanpa Keluar), sehingga pengingat tampil "setelah login" (keputusan Horii); navigasi biasa dalam sesi yang sama tidak menampilkannya lagi.
