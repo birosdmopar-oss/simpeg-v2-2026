@@ -379,3 +379,13 @@ Keputusan/ambigu untuk reviewer:
 3. **(Review Paket 2, diselesaikan)** Porsi tahun depan (saldo, dalam proses, diajukan, sisa setelah) tampil bila `diajukan_tahun_depan > 0`. Role 1 memilih pegawai lewat `UiCombobox` (pencarian server `GET pegawai?search=`, min. 3 huruf, debounce 300 ms) lalu `cuti/opsi?nip=`.
 4. Pesan server `pesan` tampil saat `cukup=false` (atau sebagai catatan bila ada).
 5. Tangkapan layar form + kalkulator 1440/390 (API tiruan sintetis, tanpa Figma — Q-18): form 1 kolom di 390 px, tanpa scroll horizontal.
+
+**Paket 3 — Terbitkan TTE (EsignDialog)** (branch `fase4/make-026-p3-esign`, dari main `ceb08fb`). `EsignDialog` (passphrase `UiTextField type="password"`, `autocomplete=off`;
+passphrase hanya variabel lokal dialog: dikosongkan segera setelah dikirim, saat dialog ditutup/dibuka, dan saat dilepas; input dipasang ulang (`:key`)
+supaya nilai di elemen DOM ikut hilang), `cutiService.esign()` (`POST cuti/{id}/esign` body JSON `{passphrase}`, tanpa query), item ⋮ "Terbitkan TTE" hanya
+bila `aksi.esign` server (urutan: … Tunda → Terbitkan TTE → Unduh surat → Hapus), galat 422 per kolom (`passphrase` di bawah input; `nip` dan `status` sebagai
+peringatan; galat umum/403 pesan baku). Terpasang di halaman daftar dan detail.
+
+Catatan untuk reviewer: (1) passphrase tidak masuk store/composable: `useCutiAksi.esign(passphrase)` hanya meneruskannya ke request; (2) tes memastikan passphrase
+tidak ada di DOM, `localStorage`/`sessionStorage`, atau URL; (3) bukti browser (API tiruan sintetis): 1440 dan 390 px, galat 422 per kolom, sukses menutup dialog +
+pemberitahuan, passphrase tidak ada di DOM/storage/URL, request esign tanpa query string.

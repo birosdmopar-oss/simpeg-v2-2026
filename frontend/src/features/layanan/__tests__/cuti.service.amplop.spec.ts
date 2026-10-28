@@ -216,6 +216,29 @@ describe('cutiService — amplop backend nyata lewat klien asli', () => {
     expect(fdUbah.has('file_bukti')).toBe(false)
   })
 
+  it('esign() mengirim passphrase hanya di body JSON (bukan URL/query) dan mengembalikan item terbaru', async () => {
+    server.balasan['post /cuti/12/esign'] = sukses(barisCuti({ status: '1', label_status: 'Disetujui', nada_status: 'success', aksi: { esign: '0', unduh_surat: '1' } }))
+
+    const item = await cutiService.esign(12, 'rahasia-Passphrase-123')
+
+    const req = server.permintaan[0]!
+    expect(req.url).toBe('/cuti/12/esign')
+    expect(req.params).toBeUndefined()
+    expect(JSON.parse(String(req.data))).toEqual({ passphrase: 'rahasia-Passphrase-123' })
+    expect(item.id).toBe(12)
+    expect(item.aksi.esign).toBe(false)
+    expect(item.aksi.unduh_surat).toBe(true)
+  })
+
+  it('esign() 422: galat per kolom passphrase/nip/status diteruskan tanpa membuka passphrase', async () => {
+    server.balasan['post /cuti/12/esign'] = {
+      status: 422,
+      body: { status: 'error', message: 'Validasi gagal.', errors: { passphrase: ['Passphrase tidak sesuai.'], nip: ['Data pejabat tidak terdaftar.'] } },
+    }
+
+    await expect(cutiService.esign(12, 'x')).rejects.toMatchObject({ status: 422, errors: { passphrase: ['Passphrase tidak sesuai.'], nip: ['Data pejabat tidak terdaftar.'] } })
+  })
+
   it('data kosong/rusak tidak melempar TypeError', async () => {
     server.balasan['get /cuti'] = sukses({})
 
