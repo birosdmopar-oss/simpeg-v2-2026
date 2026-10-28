@@ -20,7 +20,7 @@ use CodeIgniter\Database\BaseConnection;
  * baris itu, atau role 1 dengan `atas_nama` (403) → validasi body (422) → transaksi: kunci `pegawai` pemohon `FOR UPDATE`,
  * baca ulang baris terkunci → cek tahap (422) → kuota diulang (422) → tulis → efek final → commit. Keputusan tahap
  * memakai {@see TransisiCuti::proses()} (satu sumber state machine). Efek final hanya ke status 1/4
- * ({@see EfekFinalCutiService}). Notifikasi bukan bagian M3.
+ * ({@see EfekFinalCutiService}). Notifikasi (§6.6.2) lewat {@see CutiNotifikasiService} bila terpasang (M4, MAKE-023).
  */
 class CutiApprovalService
 {
@@ -37,6 +37,7 @@ class CutiApprovalService
         private readonly KuotaCutiService $kuota,
         private readonly EfekFinalCutiService $efek,
         private readonly ApproverTerjangkau $terjangkau,
+        private readonly ?CutiNotifikasiService $notifikasi = null,
     ) {
     }
 
@@ -72,7 +73,9 @@ class CutiApprovalService
             throw new ValidationException('Validasi gagal.', ['reason_note' => [self::PESAN_ALASAN_ATAS_NAMA]]);
         }
 
-        $this->cuti->dalamTransaksi(function () use ($auth, $id, $aksi, $reason, $atasNama, $nip): void {
+        $idNotif = [];
+
+        $this->cuti->dalamTransaksi(function () use ($auth, $id, $aksi, $reason, $atasNama, $nip, &$idNotif): void {
             $awal = $this->cuti->ambil($id) ?? throw new NotFoundException();
             $this->cuti->kunciPegawai((string) $awal['nip']);
             $cuti = $this->cuti->ambil($id, true) ?? throw new NotFoundException();
@@ -149,7 +152,14 @@ class CutiApprovalService
                     'reason_note'           => $reason,
                 ], $auth->idPengguna(), $auth->nip());
             }
+
+            // Notifikasi (§6.6.2) di transaksi yang sama; push diantrekan sesudah commit.
+            if ($this->notifikasi !== null) {
+                $idNotif = $this->notifikasi->setelahProses($this->muat($id), $d['tahap'], $d['reason_note']);
+            }
         });
+
+        $this->notifikasi?->antrekan($idNotif);
 
         return $this->cuti->itemDetail($auth, $this->muat($id));
     }

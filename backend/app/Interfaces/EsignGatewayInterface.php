@@ -10,7 +10,7 @@ namespace App\Interfaces;
  *
  * Seluruh method mengembalikan array dengan minimal:
  *   status_code : string  kode hasil gateway ('200' sukses)
- *   message     : string  pesan gateway (disimpan ke esign_hist.pesan_gateway)
+ *   message     : string  pesan gateway (disimpan ke esign_hist.keterangan, dipotong 255; kode ke esign_hist.status_code)
  * Kegagalan jaringan/gateway TIDAK boleh silent — kembalikan status_code non-200 + message, atau lempar exception.
  */
 interface EsignGatewayInterface
