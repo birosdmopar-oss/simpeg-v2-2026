@@ -3,16 +3,17 @@
 Acuan: `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` v1.1 (§11.1 DoD, §11.4 format laporan, §12 checklist,
 Lampiran C keterlacakan). Disusun 28-10-2026 dari `main` `919c822` (seluruh M1–M7 5A sudah di `main`).
 
-> **5A DONE ≠ Fase 5 DONE** (PRD 5A §11.2). Laporan ini **tidak** menyatakan Fase 5 selesai atau siap go-live. Status
-> 5A DONE menunggu (a) sign-off reviewer CR 5A (§11.1 #8) dan (b) QA Lapis 1 FE 5A lolos (§11.1 #7, Q5A-18).
+> **Pembaruan 28-10-2026:** M8 masuk `main` `54cb441`; **Horii sign-off 5A** (§11.1 #8). D-01, D-02, D-03, D-10, D-11,
+> D-14 = **DONE**; FE 5A (D-12) tetap **IN_PROGRESS** sampai QA Lapis 1 lolos (§11.1 #7, Q5A-18); blocker go-live §7.1
+> tetap berlaku. **5A DONE ≠ Fase 5 DONE** (PRD 5A §11.2) — laporan ini tidak menyatakan Fase 5 selesai atau siap go-live.
 
 ## 1. Laporan (format §11.4)
 
 ```
-Status: D-01 IN_PROGRESS (menunggu sign-off 5A), D-02 idem, D-03 idem, D-10 idem, D-11 idem, D-14 idem,
+Status: D-01 DONE, D-02 DONE, D-03 DONE, D-10 DONE, D-11 DONE, D-14 DONE (sign-off Horii 28-10-2026, main 54cb441),
         5A-4 (D-04/05/07 adapter) IN_PROGRESS (selesai 5A; precedence/laporan = 5B),
         FE 5A (D-12) IN_PROGRESS (sampai QA Lapis 1 lolos, Q5A-18)
-Branch/SHA/CI: fase5a/make-035-verifikasi-5a — SHA & run CI di pesan laporan ke reviewer CR (§5)
+Branch/SHA/CI: fase5a/make-035-verifikasi-5a 54cb441 — CI Quality gate #297 hijau; ./check.sh penuh lolos pada 82f3c2a
 File utama: lihat §2
 Test & validasi: lihat §3 (keterlacakan AC → test) dan §4 (checklist §12)
 Tabrakan Fase 4: tidak ada berkas Fase 4 yang disentuh di 5A; berkas bersama hanya aditif di commit terpisah
