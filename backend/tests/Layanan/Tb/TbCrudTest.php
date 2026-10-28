@@ -287,4 +287,14 @@ final class TbCrudTest extends DatabaseTestCase
         return (int) $this->db->table('document_attachment')->where('id_riwayat', BerkasStudi::KODE_TB)->where('id_entri', (string) $id)->where('tag', $tag)
             ->get()->getRow()->id_attachment;
     }
+
+    public function testOpsiMemuatPenandaAdalahPicTb(): void
+    {
+        [, $auth]       = $this->aktorStudi(Role::PEGAWAI);
+        [$picNip, $pic] = $this->aktorStudi(Role::PEGAWAI);
+        $this->jadikanPic($picNip, PetugasLayananService::JENIS_TB);
+
+        $this->assertFalse((new TbService())->opsi($auth, null)['adalah_pic']);
+        $this->assertTrue((new TbService())->opsi($pic, null)['adalah_pic']);
+    }
 }

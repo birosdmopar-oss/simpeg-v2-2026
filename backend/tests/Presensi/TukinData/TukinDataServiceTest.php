@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Presensi\TukinData;
 
 use App\Libraries\Presensi\Tukin\KalkulasiTukin;
-use App\Libraries\Presensi\TukinData\DataTukinBelumTersedia;
 use App\Libraries\Presensi\TukinData\KonfigurasiTukinDariWebConfig;
+use App\Libraries\Presensi\TukinData\SumberCutiTbFase4;
 use App\Libraries\Presensi\TukinData\SumberDataPegawaiTukin;
 use App\Libraries\Presensi\TukinData\SumberHarianTukin;
 use App\Libraries\Presensi\TukinData\SumberHariLibur;
@@ -21,8 +21,8 @@ use Tests\Support\Presensi\TukinDataUjiTrait;
 
 /**
  * PRD 5A §7.7.1 — `TukinDataService::siapkan()` merakit argumen `KalkulasiTukin::hitung()` (periode BKN, libur periode
- * sebelumnya s.d. akhir, harian, konfigurasi, data pegawai); rakitan bawaan 5A gagal terkendali karena cuti/TB baru ada
- * di 5B (fail-closed).
+ * sebelumnya s.d. akhir, harian, konfigurasi, data pegawai); rakitan bawaan memakai sumber cuti/TB Fase 4 sejak 5B M1
+ * (MAKE-039; sebelumnya fail-closed 5A).
  *
  * @internal
  */
@@ -79,12 +79,17 @@ final class TukinDataServiceTest extends DatabaseTestCase
         $this->assertSame($argumen->konfigurasi->potonganHarian('TK'), $hasil->potonganPresensi);
     }
 
-    public function testRakitanBawaanGagalTerkendaliSampai5B(): void
+    public function testRakitanBawaanMemakaiSumberCutiTbFase4(): void
     {
-        $nip = $this->buatPegawai();
+        // 5B M1 (MAKE-039): `Config\Presensi::$sumberCutiTb` = `SumberCutiTbFase4`, rakitan bawaan tidak lagi fail-closed.
+        $this->assertSame(SumberCutiTbFase4::class, config(Presensi::class)->sumberCutiTb);
+        $this->assertInstanceOf(SumberCutiTbFase4::class, TukinDataService::sumberCutiTb(config(Presensi::class)));
 
-        $this->expectException(DataTukinBelumTersedia::class);
-        TukinDataService::bawaan($this->db)->siapkan($nip, 2026, 4);
+        $nip = $this->buatPegawai();
+        $this->db->table('riwayat_cuti')->insert(['nip' => $nip, 'id_jenis_cuti' => 1, 'nama_jenis_cuti' => 'Cuti Tahunan', 'tgl_mulai' => '2026-03-17', 'tgl_akhir' => '2026-03-17', 'lama_cuti' => 1, 'status' => 1]);
+
+        $argumen = TukinDataService::bawaan($this->db)->siapkan($nip, 2026, 4);
+        $this->assertSame('tahunan', $argumen->harian['2026-03-17']['cuti']['jenis']);
     }
 
     public function testSumberCutiTbHarusMengimplementasikanInterface(): void

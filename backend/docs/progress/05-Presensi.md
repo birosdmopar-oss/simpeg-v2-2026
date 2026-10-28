@@ -53,6 +53,19 @@ kueri audit baca-saja `backend/docs/db-review/sql/DBV-024-audit-penyesuaian-tuki
 1452/1451/3819, EXPLAIN dua indeks, siklus `down()/up()`, skrip audit A/B (dokumen Bagian 8). Setelah approve (masih M3):
 migration dipindah + registry NIP `TabelAnakNip` + `SkemaPenyesuaianTukinTest`. **⛔** M4 MAKE-045 menunggu DBV-024 di `main`.
 
+## 5B M1 — D-06 sumber cuti & TB nyata (MAKE-039, 28-10-2026)
+
+Branch `fase5b/make-039-sumber-cuti-tb` (dari `main` `988c1ed`). `SumberCutiTbFase4` (+ `SumberCutiTbMassalInterface`):
+cuti `status = 1` jenis 1..6 (di luar → `DataTukinTidakSah`; tumpang tindih → id terbesar, F5B-17), TB lewat
+`rentangBebasPresensiBanyak` Fase 4 (MAKE-044). Jalur massal `TukinDataService::siapkanBanyak()` + varian massal aditif
+`SumberHarianTukin::untukBanyak()` / `SumberDataPegawaiTukin::untukBanyak()` (**deviasi PRD 5B §3.3 disetujui reviewer CR
+M0 F1**; metode tunggal tidak berubah). Berkas bersama aditif, commit terpisah: `Config\Presensi::$tukinBatchNip` (500,
+`.env` `presensi.tukinBatchNip`) dan switch `$sumberCutiTb = SumberCutiTbFase4::class`. Library `Presensi/Tukin`,
+`SlipGaji`, dan berkas Fase 4 tidak tersentuh. Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest`,
+`CutiSakitLookbackTest`, `CutiBesarMelahirkanPeriodeTest`, `TukinDataMassalTest` (AC-D06.1–06.9); `TukinDataServiceTest`
+diperbarui (rakitan bawaan kini memakai sumber Fase 4). D-04/D-05/D-07 → DONE (backend) setelah M1 merged + review
+(PRD 5B §11.3).
+
 ## 5A M1 — DBV-023 dokumen skema (D-01)
 
 - **Sudah:** `backend/docs/db-review/DBV-023-presensi-gaji-fase5a-schema.md` (status "Menunggu review DB Validator"),
