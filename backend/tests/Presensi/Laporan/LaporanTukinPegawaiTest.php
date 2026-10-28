@@ -7,6 +7,9 @@ namespace Tests\Presensi\Laporan;
 use App\Constants\Role;
 use App\Exceptions\ApiException;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Pdf\Pdf;
+use App\Libraries\Presensi\Laporan\LaporanTukinService;
+use Config\Presensi;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 use Tests\Support\Presensi\LaporanTukinUjiTrait;
@@ -110,6 +113,45 @@ final class LaporanTukinPegawaiTest extends DatabaseTestCase
 
         $this->serviceLaporanTukin()->pdf($this->adminRekap(), $b, ['bulan' => '2026-09']);
         $this->assertStringNotContainsString('Rp. ', $this->pdfTertangkap[1]->html, 'konket 13 setelah penanda TB di bulan kalender yang sama');
+    }
+
+    /**
+     * Keputusan Horii 28-10-2026: kop PDF per pegawai ikut legacy berlogo (`MY_PDF_HEADER_UNIT`) — logo `web_config`
+     * `logo_kementerian_pdf` dari akar aset (tanpa path di-hard-code), nama kementerian & unit huruf besar, alamat unit;
+     * PDF TCPDF nyata memuat objek gambar.
+     */
+    public function testKopBerlogoIkutLegacy(): void
+    {
+        $akar = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kop_tukin_' . bin2hex(random_bytes(4));
+        mkdir($akar);
+        $gambar = imagecreatetruecolor(20, 20);
+        imagepng($gambar, $akar . DIRECTORY_SEPARATOR . 'logo.png');
+        imagedestroy($gambar);
+
+        $config           = new Presensi();
+        $config->akarAset = $akar . DIRECTORY_SEPARATOR;
+        $this->aturWebConfig(['logo_kementerian_pdf' => 'logo.png', 'nama_kementerian' => 'Kementerian Uji']);
+        $this->db->table('unit')->where('id_unit', $this->db->table('satker')->select('id_unit')->where('id_satker', $this->satker)->get()->getRow('id_unit'))->update(['alamat_pdf_header' => 'Jalan Uji No. 1<br>Jakarta']);
+        $n       = $this->pegawaiRekap($this->satker);
+        $service = new LaporanTukinService($this->db, self::jamRekap('2026-10-27 09:00:00'), null, null, $config);
+
+        try {
+            $service->pdf($this->adminRekap(), $n, ['bulan' => '2026-09']);
+            $kop = $this->pdfTertangkap[0]->kopHtml;
+            $this->assertStringContainsString('<img src="@', $kop, 'logo kiri tersemat');
+            $this->assertStringContainsString('<b>KEMENTERIAN UJI</b>', $kop);
+            $this->assertMatchesRegularExpression('/<b>UNIT FIXTURE [^<]*<\/b>/', $kop);
+            $this->assertStringContainsString('Jalan Uji No. 1<br />' . "\n" . 'Jakarta', $kop);
+            $this->assertStringContainsString('height: 2px; border-color: #000000', $kop, 'garis kop legacy');
+
+            Pdf::reset();
+            $pdf = $service->pdf($this->adminRekap(), $n, ['bulan' => '2026-09'])['isi'];
+            $this->assertStringStartsWith('%PDF', $pdf);
+            $this->assertMatchesRegularExpression('/\/Subtype\s*\/Image/', $pdf, 'objek gambar logo di PDF');
+        } finally {
+            @unlink($akar . DIRECTORY_SEPARATOR . 'logo.png');
+            @rmdir($akar);
+        }
     }
 
     private function akun(int $role, string $nip): AuthContext

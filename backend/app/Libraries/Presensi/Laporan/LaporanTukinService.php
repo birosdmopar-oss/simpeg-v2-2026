@@ -12,8 +12,8 @@ use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
+use App\Libraries\MasterData\WebConfigService;
 use App\Libraries\Pdf\DokumenPdf;
-use App\Libraries\Pdf\KopDokumen;
 use App\Libraries\Pdf\Pdf;
 use App\Libraries\Presensi\Rekap\PenyesuaianTukin;
 use App\Libraries\Presensi\Slip\TarifUangMakan;
@@ -38,7 +38,8 @@ use DateTimeZone;
  * - Angka = **kalkulasi rekap** {@see KalkulasiLaporanTukin} (K-1 [V2]: legacy layar per pegawai memakai `laporan_tukin_skp`
  *   yang berbeda 4 aturan dari rekap; v2 satu kalkulasi sehingga layar = baris rekap). Layar JSON persen saja, tanpa uang
  *   makan & nominal (F5B-8). Galat terkendali → 422 ber-`code`.
- * - PDF (TCPDF, ADR-033) = render legacy persis [K `print/laporan_tukin_skp_pdf.php:55-257`, F5B-8]: A4 potret, identitas,
+ * - PDF (TCPDF, ADR-033) = render legacy persis [K `print/laporan_tukin_skp_pdf.php:55-257`, F5B-8]: kop unit berlogo
+ *   {@see KopLaporanTukin} (keputusan Horii 28-10-2026), A4 potret, identitas,
  *   tabel TANGGAL | JAM MASUK | JAM PULANG | KET. | POTONGAN PRESENSI; baris konket = tanggal + keterangan `colspan=4` + sel
  *   "Rp. <tarif>" **hanya** bila tanggal itu hari dibayar uang makan menurut aturan slip (F5B-2, `HariUangMakan` per bulan
  *   kalender tanggal itu, tarif bulan itu); tanpa kolom/total uang makan; "TOTAL PENGURANGAN TUKIN" =
@@ -62,6 +63,7 @@ final class LaporanTukinService
         ?KalkulasiLaporanTukin $kalkulasi = null,
         private readonly ?PegawaiScopeInterface $scope = null,
         private readonly ?Presensi $config = null,
+        private readonly ?WebConfigService $webConfig = null,
     ) {
         $this->db        = $db ?? db_connect();
         $this->jam       = $jam ?? static fn (): DateTimeInterface => new DateTimeImmutable('now', new DateTimeZone('UTC'));
@@ -93,8 +95,7 @@ final class LaporanTukinService
     {
         [$p, $data] = $this->siapkan($auth, $nip, $query);
         $config     = $this->config ?? config(Presensi::class);
-        $unit       = $data['identitas']['id_unit'];
-        $satker     = in_array($unit, [$config->unitTtdSatkerTerpilih, $config->unitTtdSatkerKepegawaian], true) ? $data['identitas']['id_satker'] : null;
+        $kop        = KopLaporanTukin::html($this->db, ($this->webConfig ?? service('webConfigService'))->values(), $config, $data['identitas']['id_unit'], $data['identitas']['id_satker']);
         $rp         = $this->rupiahKonket($nip, $data['harian']);
 
         $html = view('pdf/laporan_tukin_pegawai', [
@@ -105,7 +106,7 @@ final class LaporanTukinService
         ], ['saveData' => false]);
 
         return [
-            'isi'  => Pdf::renderer()->render(new DokumenPdf('Laporan Tukin ' . $data['identitas']['nama'] . ' - ' . $p->label(), $html, kopHtml: KopDokumen::html($unit, $satker, $this->db), marginAtasKop: 42.0)),
+            'isi'  => Pdf::renderer()->render(new DokumenPdf('Laporan Tukin ' . $data['identitas']['nama'] . ' - ' . $p->label(), $html, kopHtml: $kop, marginAtasKop: 42.0)),
             'nama' => sprintf('tukin_%s_%s.pdf', $nip, $p->kunci()),
             'mime' => 'application/pdf',
         ];
