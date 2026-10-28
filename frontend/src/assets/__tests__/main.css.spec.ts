@@ -100,6 +100,16 @@ describe('main.css', () => {
     expect(css).toMatch(/:where\(\.table-fill\) thead th\s*\{[^}]*position: sticky;[^}]*top: 0;/)
   })
 
+  it('CR-070: di bawah lg, .table-fill menempel di bawah navbar (--sticky-top), bertinggi maksimum, menggulir sendiri (bukan height)', () => {
+    const mobile = css.match(/@media \(max-width: 1023\.98px\) \{\s*\.table-fill \{([^}]*)\}/)
+    expect(mobile).not.toBeNull()
+    expect(mobile?.[1]).toMatch(/position: sticky;/)
+    expect(mobile?.[1]).toMatch(/top: var\(--sticky-top\);/)
+    expect(mobile?.[1]).toMatch(/overflow-y: auto;/)
+    expect(mobile?.[1]).toMatch(/max-height: calc\(100dvh - var\(--sticky-top\) - var\(--shell-gap\)\);/)
+    expect(mobile?.[1]).not.toMatch(/(^|[\s;])height:/)
+  })
+
   it('variabel jarak shell terdefinisi (tinggi navbar dan batas atas sticky)', () => {
     expect(css).toMatch(/--topbar-h:\s*3\.5rem/)
     expect(css).toMatch(/--sticky-top:\s*calc\(/)

@@ -170,6 +170,22 @@
   }
 
   /*
+   * Layar sempit (CR-070): halaman tetap menggulir normal. Wadah tabel menempel di bawah navbar sticky (`--sticky-top`)
+   * dan bertinggi maksimum = sisa viewport di bawah navbar, sehingga wadah itu menggulir sendiri dan `thead th` sticky
+   * (CR-069) menempel di bawahnya. `max-height` (bukan height): tabel pendek tidak punya ruang kosong atau scrollbar palsu.
+   */
+  @media (max-width: 1023.98px) {
+    .table-fill {
+      position: sticky;
+      top: var(--sticky-top);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      max-height: calc(100vh - var(--sticky-top) - var(--shell-gap));
+      max-height: calc(100dvh - var(--sticky-top) - var(--shell-gap));
+    }
+  }
+
+  /*
    * Scrollbar menu sidebar (CR-063): panel sidebar bersudut bulat (rounded-[1.75rem]) dan scrollbar mengikuti lengkungnya.
    * Track diberi margin atas/bawah (bawah ≥ radius panel 1.75rem) supaya thumb berhenti sebelum lengkung kanan-bawah, dan
    * thumb dijauhkan dari tepi panel (border transparan lebih tebal). Hanya untuk sidebar (bukan global); panel sidebar
