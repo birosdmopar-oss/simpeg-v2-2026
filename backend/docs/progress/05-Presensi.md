@@ -140,6 +140,23 @@ harian presensi membaca `dh_online`.
 - **Sisa untuk 5B (di luar 5A):** sumber cuti/TB nyata (`Config\Presensi::$sumberCutiTb`), endpoint/laporan Tukin
   (D-08), cross-check rumus resmi Q5A-13.
 
+## CR-067 — Slip Gaji TK tanpa Pajak / Tunjangan Pajak (ikut legacy `0cf7e67`)
+
+Keputusan Horii 28-10-2026: ikut legacy terbaru `0cf7e67` (26-10). Branch `fase5a/cr-067-slip-tanpa-pajak`.
+
+| Butir | v2 sebelum | Legacy `771f8b4` → `0cf7e67` | v2 sesudah | Gap |
+|---|---|---|---|---|
+| Baris TK di layar | Kartu FE sudah hanya Penghasilan Kotor, Potongan, Bersih (TK) | `_slip_content.php:43-46`: `kotor, tunj_pajak` / `potongan, pajak` → `kotor` / `potongan` | Tetap (ditambah test & rujukan) | — |
+| Baris TK di PDF | Pajak & Tunjangan Pajak tampil | `print/cetak.php:274-277` sama seperti layar | Dihapus (`pdf/slip_gaji`) | — |
+| Jumlah per kolom TK (PDF) | `kotor + tunj_pajak` / `potongan + pajak` | `:360-361` → `kotor` / `potongan` | Ikut | — |
+| Total slip | `bersih_gpp + bersih_tk + uang_makan` | Tidak berubah (`Lsl_gaji.php:430-434` @0cf7e67) | Tidak berubah | — |
+| Kolom DB & impor | `pajak`, `tunj_pajak` disimpan | Tidak berubah | Tidak berubah (tanpa migration) | — |
+| Bagian A "Iuran & Pajak", detail/edit admin | — | Tidak berubah | Tidak berubah (tahap (b) menampilkan kolom lengkap seperti legacy) | — |
+| `1c3142f` (di rentang yang sama) | Snapshot uang makan tidak ditimpa 0; logo tersemat | Snapshot dipertahankan, logo data URI | Sudah setara sejak M4 | — |
+
+Acuan slip di README Presensi dinaikkan ke `0cf7e67` (P-10, PDF-7). Test: `PdfSlipGajiTest::testBagianTkTanpaPajakDanTunjanganPajak`,
+`SlipGajiPage.spec.ts` (bagian TK tanpa Pajak).
+
 ## 5A M7 — FE 5A Presensi & Slip Gaji (MAKE-034) — IN_PROGRESS
 
 Branch `fase5a/make-034-frontend-presensi-slip` (dari `main` `bb6cb90`); merge bertahap (a) → (b) → (c) atas izin Horii,
