@@ -35,6 +35,24 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
 (geolokasi browser hanya di konteks aman; IP asli untuk throttle & `viewed_ip`, Q5A-22); nama `jenis_pegawai` id 6
 produksi (Q5A-25); QA Lapis 1 FE 5A (Q5A-18).
 
+## 5B M0 — laporan pemahaman PRD 5B (28-10-2026, tanpa commit)
+
+Diterima reviewer CR 28-10-2026: F1 varian massal aditif `untukBanyak()` di `SumberHarianTukin` &
+`SumberDataPegawaiTukin` (M1, deviasi §3.3 dicatat di laporan M1; test kesetaraan + hitung kueri); F2 sumber Plt blok tanda
+tangan (status 1 tanpa Plh vs legacy tanpa saring status) **diajukan ke Horii** (hanya berdampak M5); F3 unit legacy '6'/'7'
+= konstanta bernama `Config\Presensi` + QC cutover (tanpa key `web_config` baru); F4 pembaruan status 5A = commit docs di
+branch 5B pertama; urutan M3 → M1 → M2 → M6 → M4 → M5 → M7; DB scratch tunggal 3307 `simpeg_v2_t_ws2_fase5b`. M1a MAKE-044
+(TB massal Fase 4) sudah di `main` `7c40229`.
+
+## 5B M3 — DBV-024 tabel `penyesuaian_tukin` (28-10-2026, menunggu DB Validator)
+
+Branch `fase5b/dbv-024-penyesuaian-tukin` (dari `main` `988c1ed`), PR `[DBV-024]`. Isi: dokumen
+`backend/docs/db-review/DBV-024-penyesuaian-tukin-schema.md` (DDL, deviasi, registry NIP, cutover tanpa impor, DBV-Q1..Q8),
+kueri audit baca-saja `backend/docs/db-review/sql/DBV-024-audit-penyesuaian-tukin.sql`, draf migration **ditahan**
+`app/Database/MigrationsDitahan/CreatePenyesuaianTukin.php`. Verifikasi developer di MySQL 8.0.30 (scratch 3307): DDL,
+1452/1451/3819, EXPLAIN dua indeks, siklus `down()/up()`, skrip audit A/B (dokumen Bagian 8). Setelah approve (masih M3):
+migration dipindah + registry NIP `TabelAnakNip` + `SkemaPenyesuaianTukinTest`. **⛔** M4 MAKE-045 menunggu DBV-024 di `main`.
+
 ## 5A M1 — DBV-023 dokumen skema (D-01)
 
 - **Sudah:** `backend/docs/db-review/DBV-023-presensi-gaji-fase5a-schema.md` (status "Menunggu review DB Validator"),
