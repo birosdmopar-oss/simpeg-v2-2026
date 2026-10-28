@@ -370,8 +370,7 @@ Keputusan/deviasi untuk reviewer:
 3. Tanggal mulai perpanjangan kosong saat tambah: server mengisi bawaan (akhir efektif + 1 hari); FE tidak menghitungnya.
 4. Pemilih pegawai memakai `PegawaiPicker` (kandidat pencarian server), bukan `GET pegawai` langsung.
 
-Test: `studi.service.amplop.spec.ts` (klien asli, TB dan IB), `StudiListPage.spec.ts` (tab dan ⋮ TB). Tangkapan layar demo menyusul di
-lapor reviewer; uji demo dilakukan reviewer dengan backend asli (Ajukan TB oleh role 1, Setujui/Tolak sebagai PIC TB).
+Test: `studi.service.amplop.spec.ts` (klien asli, TB dan IB), `StudiListPage.spec.ts` (tab dan ⋮ TB). Uji demo dilakukan reviewer dengan backend asli (Ajukan TB oleh role 1, Setujui/Tolak sebagai PIC TB).
 
 **Paket 6 — Izin Belajar** (branch `fase4/make-026-p6-ib`; DI MAIN `b2a9b9c`). Tidak ada file IB baru selain yang disediakan fondasi Paket 5;
 paket ini menambah uji dan perbaikan. `IzinBelajar.spec.ts`: meta route roles (IB 1,2,3,7; TB 1,2,3,6), tab per role IB (Saya,
