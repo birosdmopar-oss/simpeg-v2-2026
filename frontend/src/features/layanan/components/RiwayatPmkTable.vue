@@ -34,7 +34,7 @@ const periode = (r: RiwayatPmkItem): string => (r.tgl_awal && r.tgl_akhir ? `${t
 </script>
 
 <template>
-  <div ref="wadah" class="scrollbar-slim overflow-x-auto" @scroll.passive="updateActionsShadow">
+  <div ref="wadah" class="table-fill scrollbar-slim overflow-x-auto" @scroll.passive="updateActionsShadow">
     <table class="w-full min-w-[52rem] border-collapse text-left text-body1" data-testid="riwayat-pmk-table">
       <thead>
         <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">

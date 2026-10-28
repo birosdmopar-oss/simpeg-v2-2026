@@ -204,7 +204,8 @@ const total = computed(() => (tab.value === 'riwayat' ? (dataRiwayat.value?.tota
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <UiCard title="Peninjauan Masa Kerja (PMK)">
+    <div class="page-fill flex flex-col gap-4" data-testid="pmk-page">
+    <UiCard title="Peninjauan Masa Kerja (PMK)" class="flex min-h-0 flex-1 flex-col" fill>
       <template #actions>
         <UiButton v-if="bisaMengajukan && tab !== 'riwayat'" data-testid="pmk-tambah" @click="ajukan"><Plus class="h-4 w-4" aria-hidden="true" /> Ajukan PMK</UiButton>
       </template>
@@ -240,6 +241,7 @@ const total = computed(() => (tab.value === 'riwayat' ? (dataRiwayat.value?.tota
 
       <UiPagination v-if="total > PER_PAGE" v-model:page="page" class="mt-4" :per-page="PER_PAGE" :total="total" />
     </UiCard>
+    </div>
 
     <PmkFormDialog v-model:open="formOpen" :row="formRow" @saved="onSaved" />
     <ArsipPmkDialog v-model:open="arsipOpen" :row="arsipRow" @berubah="onArsipBerubah" />

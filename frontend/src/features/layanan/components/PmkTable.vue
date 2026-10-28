@@ -29,7 +29,7 @@ const periode = (r: PmkItem): string => `${tgl(r.tgl_awal)} s.d. ${tgl(r.tgl_akh
 </script>
 
 <template>
-  <div ref="wadah" class="scrollbar-slim overflow-x-auto" @scroll.passive="updateActionsShadow">
+  <div ref="wadah" class="table-fill scrollbar-slim overflow-x-auto" @scroll.passive="updateActionsShadow">
     <table class="w-full min-w-[52rem] border-collapse text-left text-body1" data-testid="pmk-table">
       <thead>
         <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">
