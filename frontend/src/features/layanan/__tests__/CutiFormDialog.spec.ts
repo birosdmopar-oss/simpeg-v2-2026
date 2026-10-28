@@ -273,6 +273,16 @@ describe('CutiFormDialog — simpan', () => {
     expect(q('[data-testid="cuti-file-error"]')?.textContent).toContain('wajib')
   })
 
+  it('CR-072 butir 7: label lampiran bertanda * hanya untuk jenis yang mewajibkan lampiran', async () => {
+    await mountDialog()
+    await isiSemua('3')
+    expect(document.body.textContent).toContain('Lampiran Bukti *')
+
+    await isiSemua('1')
+    expect(document.body.textContent).toContain('Lampiran Bukti')
+    expect(document.body.textContent).not.toContain('Lampiran Bukti *')
+  })
+
   it('jenis Besar mengirim durasi tanpa tgl_akhir', async () => {
     svc.create.mockResolvedValue({ id: 9 } as CutiItem)
     await mountDialog()

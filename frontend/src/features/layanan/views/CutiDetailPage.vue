@@ -20,6 +20,7 @@ import CutiProsesDialog from '../components/CutiProsesDialog.vue'
 import EsignDialog from '../components/EsignDialog.vue'
 import StatusLayananBadge from '../components/StatusLayananBadge.vue'
 import { useCutiAksi } from '../composables/useCutiAksi'
+import { useFokusPemicu } from '../composables/useFokusPemicu'
 import { aksiBarisCuti, labelAksiCuti } from '../rowActionsCuti'
 import { LAYANAN_ROUTE } from '../routes.layanan'
 import { cutiService } from '../services/cuti.service'
@@ -36,6 +37,7 @@ const galat = ref('')
 
 const crumbs = computed(() => [
   { label: 'Home', to: { name: 'home' } },
+  { label: 'Layanan' },
   { label: 'Cuti', to: { name: LAYANAN_ROUTE.CUTI } },
   { label: 'Detail Cuti' },
 ])
@@ -60,6 +62,9 @@ const aksi = useCutiAksi(async (jenis) => {
   }
   await muat()
 })
+
+// CR-072 butir 8: fokus kembali ke ⋮ setelah dialog proses ditutup (Esc, Batal, atau selesai).
+useFokusPemicu(aksi.prosesOpen, () => (detail.value ? `[data-testid="cuti-actions-${detail.value.id}"]` : null))
 
 onMounted(() => void muat())
 

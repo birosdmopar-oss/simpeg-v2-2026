@@ -172,6 +172,15 @@ describe('(c) berkas IB wajib untuk semua role, sumber server', () => {
 
     expect(document.body.textContent).toContain('Label Dari Server')
   })
+
+  it('CR-072 butir 7: label slot berkas bertanda * bila berkas_wajib pada pengajuan baru', async () => {
+    loginAs(Role.PEGAWAI as never)
+    svc.opsi.mockResolvedValue(opsiIb({ berkas_wajib: true, slot_berkas: [{ tag: 'file_sp', label: 'Label Dari Server' }] }))
+    mount(StudiFormDialog, { props: { open: true, row: null, cfg: STUDI_CONFIG.ib, service: ibService }, attachTo: document.body })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Label Dari Server *')
+  })
 })
 
 describe('(e) IB tanpa efek final di FE', () => {

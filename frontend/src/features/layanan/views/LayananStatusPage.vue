@@ -22,7 +22,7 @@ import type { FormatEksporStatus, LayananStatusItem, LayananStatusResponse } fro
 
 const router = useRouter()
 const auth = useAuthStore()
-const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Status Layanan' }]
+const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Layanan' }, { label: 'Status Layanan' }]
 
 const PER_PAGE_OPTIONS = ['10', '25', '50'].map((v) => ({ value: v, label: v }))
 const STATUS_OPSI = [
@@ -149,15 +149,19 @@ function onAction(key: string, row: LayananStatusItem): void {
 <template>
   <RedesignShell :breadcrumbs="crumbs">
     <div class="page-fill flex flex-col gap-4" data-testid="layanan-status-page">
-      <UiCard title="Status Layanan" subtitle="Pantau tahap dan PIC seluruh pengajuan layanan." class="flex min-h-0 flex-1 flex-col" fill>
+      <div>
+        <h1 class="text-h2 font-semibold text-slate-900">Status Layanan</h1>
+        <p class="text-body2 text-slate-500">Pantau tahap dan PIC seluruh pengajuan layanan.</p>
+      </div>
+      <UiCard title="Daftar Pengajuan" class="flex min-h-0 flex-1 flex-col" fill>
         <template #actions>
           <UiExportMenu v-if="data?.can_export" :formats="FORMAT_EKSPOR" :disabled="mengekspor" @select="ekspor" />
         </template>
         <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="layanan-status-filter">
-          <UiSelect v-if="filterUnit" v-model="idUnit" label="Unit" placeholder="Semua unit" :options="unitOpsi" clearable />
-          <UiSelect v-if="filterUnit" v-model="idSatker" label="Satker" :placeholder="idUnit ? 'Semua satker' : 'Pilih unit dulu'" :options="satkerOpsi" :disabled="!idUnit" clearable />
-          <UiSelect v-model="jenis" label="Jenis Layanan" placeholder="Semua jenis" :options="JENIS_OPSI" clearable />
-          <UiSelect v-model="status" label="Status" placeholder="Semua status" :options="STATUS_OPSI" clearable />
+          <UiSelect v-if="filterUnit" v-model="idUnit" label="Unit" placeholder="Semua Unit" :options="unitOpsi" clearable />
+          <UiSelect v-if="filterUnit" v-model="idSatker" label="Satker" :placeholder="idUnit ? 'Semua Satker' : 'Pilih Unit Dulu'" :options="satkerOpsi" :disabled="!idUnit" clearable />
+          <UiSelect v-model="jenis" label="Jenis Layanan" placeholder="Semua Jenis Layanan" :options="JENIS_OPSI" clearable />
+          <UiSelect v-model="status" label="Status" placeholder="Semua Status" :options="STATUS_OPSI" clearable />
         </div>
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div class="w-64 max-w-full"><UiSearchInput v-model="search" label="Cari pegawai" placeholder="Cari nama atau NIP" /></div>
