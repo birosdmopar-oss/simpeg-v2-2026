@@ -61,6 +61,19 @@ Selesai M3: migration `2026-10-28-100000_CreatePenyesuaianTukin` (DDL tidak beru
 `down()/up()`). Syarat berikutnya: **C-1** di M4 MAKE-045 (kunci `FOR UPDATE` per NIP sebelum cek tumpang tindih, cek +
 tulis satu transaksi, test konkurensi dua permintaan); **C-2** audit B1 berkala (tutup bulan Tukin) di runbook 5B.
 
+## 5B M4 — CRUD penyesuaian Tukin (MAKE-045, 28-10-2026)
+
+Branch `fase5b/make-045-penyesuaian-tukin` (dari `main` `e9f4616`, DBV-024 sudah di `main`). `PenyesuaianTukinModel`
+(`BaseAuditableModel`, hapus = status 10 audit `delete`), `Laporan\PenyesuaianTukinService`, `PenyesuaianTukinController`,
+route role 1 di berkas 5B baru `Config/RoutesPresensiLaporan.php`. Berkas bersama aditif, commit terpisah:
+`Config/Routing.php` (entri berkas route) + baris kontrak di `KontrakMatriksRoleTest`. Syarat DB Validator **C-1**
+dipenuhi: kunci `FOR UPDATE` baris pegawai per NIP sebelum cek tumpang tindih, cek + tulis satu transaksi, kunci gagal →
+galat (tidak lanjut tanpa kunci); test `PenyesuaianTukinKonkurensiTest` (`db-isolasi-penuh`, koneksi kedua tertahan 1205
+lalu 422 setelah commit; NIP lain tidak tertahan). Test CRUD `PenyesuaianTukinCrudTest` (validasi per field, nilai batas,
+tumpang tindih hanya antar-baris aktif NIP sama, NIP tidak bisa diubah [V2], audit, daftar/filter, 404, route 1 saja).
+Efek ke laporan/rekap (`Rekap\PenyesuaianTukin`, AC-D08.11 bagian efek) = M5. Syarat **C-2** (audit B1 berkala) dicatat
+untuk runbook 5B (M7).
+
 ## 5B M1 — D-06 sumber cuti & TB nyata (MAKE-039, 28-10-2026)
 
 Branch `fase5b/make-039-sumber-cuti-tb` (dari `main` `988c1ed`). `SumberCutiTbFase4` (+ `SumberCutiTbMassalInterface`):

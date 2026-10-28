@@ -145,6 +145,29 @@ POST api/v1/presensi/masuk
 Catatan deploy M5: key `.env` opsional `presensi.akunPresensiManual` (daftar `id_pengguna` dipisah koma; tidak sah →
 bawaan 4675, 4676 dipakai). HTTPS wajib (geolokasi browser).
 
+## Penyesuaian Tukin (MAKE-045, PRD 5B §6.1, §7.3.10, F5B-14, DBV-024)
+
+Route di `Config/RoutesPresensiLaporan.php` (berkas 5B), `PenyesuaianTukinController` → `Laporan\PenyesuaianTukinService`.
+Pengganti daftar NIP & periode yang di-hard-code legacy (`L_presensi.php:11755-11806`); efek ke laporan/rekap Tukin
+dibuat di M5 (keterangan + kolom `penyesuaian`, `total_potongan` tidak berubah).
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET api/v1/presensi/tukin/penyesuaian?nip=&bulan=&status=&page=&per_page=` | 1 | Daftar; `bulan` `YYYY-MM` = baris yang mencakup bulan itu; `status` 1/2/10 (bawaan 1 dan 2); urut NIP, bulan mulai terbaru |
+| `POST api/v1/presensi/tukin/penyesuaian` | 1 | Tambah (201) |
+| `PUT api/v1/presensi/tukin/penyesuaian/{id}` | 1 | Ubah rentang, persen, alasan, status 1/2; NIP tidak bisa diubah (422 `errors.nip`) |
+| `DELETE api/v1/presensi/tukin/penyesuaian/{id}` | 1 | Status 10 (pola master), audit `delete`; baris status 10 → 404 untuk ubah/hapus |
+
+- Body: `nip`, `bulan_mulai`, `bulan_akhir` (`YYYY-MM`), `persen`, `alasan`, `status` (opsional, bawaan 1). Respons baris:
+  `{id, nip, nama, bulan_mulai, bulan_akhir, persen ("-20.00"), alasan, status, created_at, updated_at}` (stempel UTC).
+- Validasi 422 per field: NIP ada di `pegawai`; bulan ≥ 2024-04 (F5B-4), mulai ≤ akhir; persen paling banyak dua desimal,
+  ≠ 0, −100..100; alasan wajib ≤ 255 karakter; status 1/2.
+- **Tumpang tindih (syarat DB Validator C-1):** baris status 1 tidak boleh beririsan dengan baris status 1 lain milik NIP
+  yang sama (422 `errors.bulan_mulai`, menyebut rentang yang bentrok). Kunci `SELECT … FROM pegawai WHERE nip = ? FOR UPDATE`
+  diambil sebelum cek; cek + tulis satu transaksi, jadi permintaan bersamaan untuk NIP yang sama berjalan berurutan
+  (`PenyesuaianTukinKonkurensiTest`). Kunci gagal (mis. lock wait timeout) → galat, tidak pernah lanjut tanpa kunci.
+- Audit lewat `PenyesuaianTukinModel` (`BaseAuditableModel`): `create`, `update`, `delete` (status 10) dengan before/after.
+
 ## Catatan deploy (PRD Fase 5A §8.5, Q5A-22)
 
 Dieksekusi tim infra saat cutover; tanpa nama host/IP di repo.
