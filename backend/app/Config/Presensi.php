@@ -42,10 +42,10 @@ class Presensi extends BaseConfig
 
     /**
      * Implementasi sumber uang makan slip N−1 (`App\Libraries\Presensi\Slip\UangMakanSlipInterface`, PRD 5A §7.3.7).
-     * Bawaan 5A = `UangMakanBelumTersedia` (selalu null); 5B mengganti dengan implementasi D-09 — **wajib sebelum go-live**
-     * (F5-1). Nama kelas divalidasi saat dipakai (`SlipGajiService`).
+     * Bawaan 5B = `UangMakanSlipPresensi` (D-09a, MAKE-040; menutup blocker go-live F5-1); `UangMakanBelumTersedia`
+     * (selalu null, bawaan 5A) tetap tersedia. Nama kelas divalidasi saat dipakai (`SlipGajiService`).
      */
-    public string $sumberUangMakan = 'App\Libraries\Presensi\Slip\UangMakanBelumTersedia';
+    public string $sumberUangMakan = 'App\Libraries\Presensi\Slip\UangMakanSlipPresensi';
 
     /**
      * Awalan URL verifikasi QR slip; URL QR = awalan + token (PRD 5A §7.3.6, Q5A-21). Bawaan = `App::$baseURL` +
