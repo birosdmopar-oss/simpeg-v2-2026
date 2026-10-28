@@ -227,3 +227,96 @@ export interface HasilImpor {
   gagal: number
   baris: { nip: string | null; periode: string | null; hasil: RencanaImpor; galat: GalatImpor[] }[]
 }
+
+/** Lokasi presensi yang berlaku untuk pegawai hari ini (`GET presensi/saya/hari-ini`). */
+export interface LokasiPresensi {
+  id_lokasi_presensi: number
+  nama_lokasi: string
+  latitude: number
+  longitude: number
+  radius: number
+}
+
+/** Status presensi hari ini; tanggal, jam, jendela, dan `boleh_*` dihitung server (zonasi satker). */
+export interface PresensiHariIni {
+  tanggal_lokal: string
+  jam_lokal: string
+  zonasi_menit: number
+  jendela: { masuk: [string, string]; pulang: [string, string] }
+  boleh_masuk: boolean
+  boleh_pulang: boolean
+  presensi: { jam_masuk: string | null; jam_pulang: string | null } | null
+  wajib_geofence: boolean
+  lokasi: LokasiPresensi[]
+}
+
+/** Putusan geofence server (`POST presensi/cek-lokasi`); sama dengan putusan saat rekam. */
+export interface CekLokasi {
+  wajib_geofence: boolean
+  dalam_radius: boolean
+  lokasi_terdekat: { id: number; nama: string; radius: number; jarak_m: number } | null
+}
+
+export interface HasilRekamPresensi {
+  tgl: string
+  jam_masuk: string | null
+  jam_pulang: string | null
+  jarak_m: number | null
+}
+
+/** `sumber` `dh_online`: 1 online, 2 manual, null baris impor legacy. */
+export type SumberPresensi = 1 | 2 | null
+
+export interface BarisPresensi {
+  tgl: string
+  jam_masuk: string | null
+  jam_pulang: string | null
+  sumber: SumberPresensi
+}
+
+export interface RiwayatPresensi {
+  bulan: string
+  items: BarisPresensi[]
+  total: number
+  page: number
+  per_page: number
+}
+
+export interface PegawaiPresensi {
+  nip: string
+  nama: string
+  unit: string | null
+  satker: string | null
+}
+
+export interface DaftarPegawaiPresensi {
+  items: PegawaiPresensi[]
+  total: number
+  page: number
+  per_page: number
+  can_kelola_manual: boolean
+}
+
+export interface BarisPresensiAdmin extends BarisPresensi {
+  nip: string
+  lokasi_masuk: string | null
+  lokasi_pulang: string | null
+  aksi: { ubah: boolean; hapus: boolean }
+}
+
+export interface DetailPresensiPegawai {
+  pegawai: { nip: string; nama: string }
+  items: BarisPresensiAdmin[]
+  total: number
+  page: number
+  per_page: number
+  can_create: boolean
+}
+
+/** Isian presensi manual (D-03); jam `HH:MM`/`HH:MM:SS`, kosong = null. */
+export interface IsianPresensiManual {
+  nip: string
+  tgl: string
+  jam_masuk: string
+  jam_pulang: string
+}

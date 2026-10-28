@@ -4,9 +4,23 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from './roles'
+import { PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from './roles'
 
 export const presensiRoutes: RouteRecordRaw[] = [
+  {
+    // D-02 presensi online (`hr/services/local/po_in|po_out`, `hr/presensi/view_presensi|list_ptt` = 2, 6, 7).
+    path: '/presensi',
+    name: 'presensi-saya',
+    component: () => import('./views/PresensiPage.vue'),
+    meta: { roles: PRESENSI_PEGAWAI_ROLES, title: 'Presensi Saya' },
+  },
+  {
+    // F5-15 data presensi + D-03 manual akun khusus (`hr/presensi/list_ad|list` = 1, 3, 4, 5; `add|edit|delete` = 1).
+    path: '/presensi/data',
+    name: 'presensi-data',
+    component: () => import('./views/DataPresensiPage.vue'),
+    meta: { roles: PRESENSI_ADMIN_ROLES, title: 'Data Presensi' },
+  },
   {
     // D-11 slip pegawai (`hr/sl_gaji/list|mark_viewed|cetak` = 2, 6, 7).
     path: '/presensi/slip-gaji',
