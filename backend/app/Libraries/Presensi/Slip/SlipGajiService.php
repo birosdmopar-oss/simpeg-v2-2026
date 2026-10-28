@@ -163,7 +163,18 @@ final class SlipGajiService
 
         $baru = $data->barisId((int) $row['id']) ?? throw new RuntimeException('Slip hilang setelah dibuka.');
 
-        return ['periode' => $periode->kunci(), 'label' => $periode->label(), ...SlipGajiData::waktuDibuka($baru), ...SlipGajiData::nominal($baru)];
+        return [
+            'periode' => $periode->kunci(), 'label' => $periode->label(), ...SlipGajiData::waktuDibuka($baru), ...SlipGajiData::nominal($baru),
+            // Identitas kartu slip [K `_slip_content.php` tblIdentitas] (MAKE-034, aditif).
+            'pegawai' => [
+                'nip'     => $nip,
+                'nama'    => $pegawai['nama_bergelar'] ?? null,
+                'pangkat' => $pegawai['pangkat'] ?? '-',
+                'jabatan' => $pegawai['jabatan'] ?? '-',
+                'unit'    => $pegawai['unit'] ?? '-',
+                'satker'  => $pegawai['satker'] ?? '-',
+            ],
+        ];
     }
 
     /**

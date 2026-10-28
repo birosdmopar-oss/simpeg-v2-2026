@@ -17,6 +17,7 @@ import { laporanRoutes } from '@/features/laporan/routes.laporan'
 import { layananRoutes } from '@/features/layanan/routes.layanan'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
+import { presensiRoutes } from '@/features/presensi/routes.presensi'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -109,6 +110,8 @@ const routes: RouteRecordRaw[] = [
   ...laporanRoutes,
   // Modul F — Fase 7 F-09 generator dokumen (MAKE-037).
   ...dokumenRoutes,
+  // Modul D — Fase 5A Presensi & Slip Gaji (MAKE-034), termasuk rute publik `/verify/slip/:token`.
+  ...presensiRoutes,
   // Modul C — Fase 4 Layanan & Approval (MAKE-026): route ditambah per paket di routes.layanan.ts.
   ...layananRoutes,
   {

@@ -69,6 +69,10 @@ final class BukaSlipAtomikTest extends DatabaseTestCase
         $this->assertSame('4600000.00', $buka['ringkasan']['total_penghasilan'], 'bersih_gpp + bersih_tk + uang_makan');
         $this->assertSame(['nominal' => '0.00', 'hari' => null, 'periode_kehadiran' => null, 'tersedia' => false], $buka['uang_makan']);
         $this->assertArrayNotHasKey('token', $buka);
+        $this->assertSame('Dr. Budi Santoso, M.Si.', $buka['pegawai']['nama'], 'identitas kartu slip [K _slip_content.php]');
+        $this->assertSame([$this->nip, 'Analis Uji', 'Biro Uji'], [$buka['pegawai']['nip'], $buka['pegawai']['jabatan'], $buka['pegawai']['unit']]);
+        $this->assertStringStartsWith('Satker Uji ', $buka['pegawai']['satker']);
+        $this->assertArrayHasKey('pangkat', $buka['pegawai']);
 
         $status = $slip->status($auth, '2026-09');
         $this->assertTrue($status['dibuka']);
