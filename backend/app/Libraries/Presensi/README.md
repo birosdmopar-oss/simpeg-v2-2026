@@ -174,7 +174,8 @@ Port D-01/D-10/D-11/D-14 dan FE Slip Gaji kini diatur PRD Fase 5A (`docs/fase5/P
 LOCKED): skema DBV-023 (§7.1), impor 3 langkah (§7.2), akses pegawai & kelola admin + PDF/QR (§7.3), verifikasi publik
 (§7.4), FE (§7.8). Kode ber-DB/IO 5A berada di `Libraries/Presensi/Slip` (bukan folder murni ini); folder ini hanya
 diubah sebatas §7.3.8 (`RingkasanSlip`). Nilai uang makan slip disambung D-09 (5B) lewat `UangMakanSlipInterface`
-— **wajib sebelum go-live** (F5-1).
+— **wajib sebelum go-live** (F5-1); sejak 5B M2 (MAKE-040) bawaan `Config\Presensi::$sumberUangMakan` =
+`Slip\UangMakanSlipPresensi` (lihat bagian "Uang makan slip 5B").
 
 PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f8b4, bagian TK @0cf7e67) — keputusan reviewer CR 20-10:
 
@@ -187,6 +188,21 @@ PDF slip (`Slip/PdfSlipGaji`, view `pdf/slip_gaji`, port `print/cetak.php` @771f
 | PDF-5 | Logo bawaan v2 (katalog `web_config`: "kosong = logo bawaan v2", kontrak Fase 2) | logo bawaan v2 belum tersedia → tanpa logo, sama dengan PDF LKH; katalog tidak diubah. Akar aset v2 final + berkas logo bawaan ditetapkan saat cutover bersama G-09 |
 | PDF-6 | Kaki halaman "Halaman x dari y" + username (pola CR-064 `DokumenPdf::TOKEN_HALAMAN`/`TOKEN_TOTAL`) | **Tidak dipakai** di slip [K] `print/cetak.php` @771f8b4 + PRD §7.3.6: slip satu halaman per pegawai dengan QR verifikasi; `PdfSlipGaji` tidak mengirim `kakiHtml` (keputusan reviewer CR 22-10-2026) |
 | PDF-7 | Bagian B (TK) | [K] `print/cetak.php` @0cf7e67 `:274-277`, `:360-361`: tanpa baris "Pajak"/"Tunjangan Pajak"; "Jumlah Penghasilan"/"Jumlah Potongan" TK = `kotor` / `potongan` (sebelumnya + `tunj_pajak` / + `pajak`), sehingga Jumlah Penghasilan − Jumlah Potongan = TK Bersih bila data konsisten. CR-067 |
+
+### Uang makan slip 5B (D-09a, MAKE-040)
+
+Port `Lsl_gaji::getUangMakan` + `_getTarifUangMakan` legacy `0cf7e67` (`libraries/hr/Lsl_gaji.php:260-414`) [K], PRD 5B
+§7.2. Aturan snapshot (kapan ditulis/dipertahankan) tetap `SlipGajiService::snapshotUangMakan` 5A, tidak diubah.
+
+| Bagian | Kelas | Aturan |
+|---|---|---|
+| Hari dibayar (murni) | `Rekap/HariUangMakan` (folder murni baru `Presensi/Rekap`, dijaga `RekapMurniTest`) | Per tanggal bulan kalender kehadiran, dipotong hari ini WIB: libur/Sabtu/Minggu → lewati; tanggal TB → lewati, dan bila potongan TB bulan itu > 0 penanda TB melekat sampai akhir bulan (F5B-3; potongan 0 bila TB mulai setelah tanggal 1 di bulan itu, perpanjangan memakai `tgl_mulai` induk); cuti status 1 → lewati; konket `affect_tukin = 1` dibayar hanya `kategori = 13`; selain itu dibayar bila ada jam masuk **atau** jam pulang. Dipakai ulang rekap uang makan D-09b (F5B-2) |
+| Tarif | `Slip/TarifUangMakan` | PPPK (`id_jenis_pegawai` 6, F5-24): mutasi jabatan `status = 1`, `jenis_jabatan = 1`, `tmtsk` ≤ tanggal 1 terbaru (seri → id terbesar [V2]) → `gol_pppk.uang_makan`; lainnya: KP `status = 1` `tmtsk` ≤ tanggal 1 terbaru → `trim(gol)` ∈ I..IV → `web_config` `uang_makan_gol_1..4` (dibaca langsung lewat `WebConfigService`, ubah nilai langsung berlaku); golongan lain ("IV/a"), tanpa baris, tarif kosong, PTT → 0. Rupiah → sen eksak; `gol_pppk.uang_makan` tidak bulat sampai sen → `DataUangMakanTidakSah` |
+| Sumber | `Slip/UangMakanSlipPresensi` (`Config\Presensi::$sumberUangMakan`) | Pegawai tidak ada → `null`; tarif ≤ 0 → `(0, 0, 0)` tanpa menghitung hari; `DataUangMakanTidakSah` → `null` + log warning tanpa nominal (**keputusan M2**: snapshot tidak ditulis, slip tetap bisa dibuka; dilaporkan ke reviewer); selain itu hari × tarif. Pemuat `hariDibayarBanyak()` = 5 SELECT tetap per 500 NIP (`riwayat_cuti`, `riwayat_tb` + `riwayat_tb_perpan`, `absen_ijin` status `V`, `dh_online`) + libur aktif |
+
+Test: `tests/unit/Presensi/Rekap/{HariUangMakan,RekapMurni}Test.php`, `tests/Presensi/Slip/{TarifUangMakan,
+UangMakanSlipPresensi,UangMakanSnapshotAsli}Test.php` (AC-D09a.1–09a.5). Test 5A yang menguji perilaku
+`UangMakanBelumTersedia` (`UangMakanSnapshotTest`, `BukaSlipAtomikTest`) kini menyuntik sumber itu secara eksplisit.
 
 ### Test
 
