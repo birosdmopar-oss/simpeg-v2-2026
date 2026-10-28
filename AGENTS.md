@@ -81,6 +81,9 @@ Wajib:
    <UiTooltip …><button …/></UiTooltip></DropdownMenuTrigger>` — UiTooltip meneruskan atributnya ke elemen pemicu.
 4. **Scrollbar custom ramping berlaku global** (`assets/main.css`). Area yang panjang (menu samping, daftar, tabel, dialog)
    punya **area gulir mandiri**: menggulir menu tidak menggulir data dan sebaliknya; area lain tidak ikut tergulir.
+   **Halaman daftar ber-tabel:** hanya body tabel yang menggulir; judul, tombol, filter, header kolom, dan paginasi tetap
+   terlihat. Pakai pola `page-fill` (halaman) + `table-fill` (wadah tabel) dari `assets/main.css`, `UiCard fill`, dan
+   header `thead` sticky otomatis (CR-069).
 5. **Top navbar sticky** di semua halaman (layout bersama), tidak tertutup konten saat menggulir.
 6. **Halaman tanpa frame Figma:** ikuti pola halaman lain yang sudah sesuai Figma, lalu catat di laporan pekerjaan bahwa
    Figma halaman itu belum ada.

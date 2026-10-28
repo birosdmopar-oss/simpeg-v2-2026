@@ -162,10 +162,10 @@ const aktif = (row: PenugasanItem): boolean => String(row.status) === '1'
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <div class="space-y-4" data-testid="penugasan-page">
+    <div class="page-fill flex flex-col gap-4" data-testid="penugasan-page">
       <UiTabs v-model="jenis" :items="TABS" aria-label="Jenis penugasan" />
 
-      <UiCard :title="`Daftar ${label}`">
+      <UiCard :title="`Daftar ${label}`" fill>
         <template #actions>
           <UiButton v-if="canWrite" data-testid="penugasan-tambah" @click="tambah">
             <Plus class="h-4 w-4" aria-hidden="true" /> Tambah {{ label }}
@@ -178,7 +178,7 @@ const aktif = (row: PenugasanItem): boolean => String(row.status) === '1'
 
         <UiNotice v-if="notice" :tone="notice.tone" class="mb-4" data-testid="penugasan-notice">{{ notice.text }}</UiNotice>
 
-        <div class="scrollbar-slim overflow-x-auto">
+        <div class="table-fill scrollbar-slim overflow-x-auto">
           <table class="w-full min-w-[48rem] border-collapse text-left text-body1" data-testid="penugasan-table">
             <thead>
               <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">

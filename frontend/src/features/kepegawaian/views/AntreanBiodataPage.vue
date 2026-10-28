@@ -94,11 +94,11 @@ const namaDipilih = computed(() => (dipilih.value ? fullName(dipilih.value) : ''
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <UiCard title="Pengajuan Perubahan Data Umum" subtitle="Pengajuan pegawai yang menunggu verifikasi">
+    <UiCard title="Pengajuan Perubahan Data Umum" subtitle="Pengajuan pegawai yang menunggu verifikasi" class="page-fill" fill data-testid="antrean-biodata-page">
       <div class="mb-4 w-72 max-w-full"><UiSearchInput v-model="search" placeholder="Cari nama / NIP" label="Cari pengajuan" /></div>
       <UiNotice v-if="notice" :tone="notice.tone" class="mb-4" data-testid="antrean-biodata-notice">{{ notice.text }}</UiNotice>
 
-      <div class="scrollbar-slim overflow-x-auto">
+      <div class="table-fill scrollbar-slim overflow-x-auto">
         <table class="w-full min-w-[44rem] border-collapse text-left text-body1" data-testid="antrean-biodata-table">
           <thead>
             <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">

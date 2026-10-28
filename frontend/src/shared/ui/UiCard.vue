@@ -13,8 +13,11 @@ withDefaults(
     flush?: boolean
     /** Garis aksen tipis di dasar kartu (dipakai kartu "Berulang Tahun" §4.1.1). */
     accent?: 'none' | 'warning' | 'success' | 'primary'
+    /** `fill` = kartu mengisi sisa tinggi halaman isi-penuh (CR-069): header di atas, badan menjadi kolom flex yang
+     *  menampung `.table-fill` (area gulir tabel). Hanya bermakna di dalam `.page-fill` pada lg ke atas. */
+    fill?: boolean
   }>(),
-  { title: '', subtitle: '', flush: false, accent: 'none' },
+  { title: '', subtitle: '', flush: false, accent: 'none', fill: false },
 )
 
 const ACCENTS = {
@@ -26,7 +29,10 @@ const ACCENTS = {
 </script>
 
 <template>
-  <section class="overflow-hidden rounded-card border border-slate-200 bg-white shadow-card" :class="ACCENTS[accent]">
+  <section
+    class="overflow-hidden rounded-card border border-slate-200 bg-white shadow-card"
+    :class="[ACCENTS[accent], fill ? 'flex min-h-0 flex-1 flex-col' : '']"
+  >
     <header
       v-if="title || $slots.header || $slots.actions"
       class="flex flex-wrap items-start justify-between gap-3 px-5 pt-5"
@@ -43,7 +49,7 @@ const ACCENTS = {
       </div>
     </header>
 
-    <div :class="flush ? '' : 'p-5'">
+    <div :class="[flush ? '' : 'p-5', fill ? 'flex min-h-0 flex-1 flex-col' : '']">
       <slot />
     </div>
 

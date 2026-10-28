@@ -77,7 +77,7 @@ onMounted(() => void load())
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="page-fill flex flex-col gap-4" data-testid="ak-jf-page">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-xl font-semibold text-slate-900">Angka Kredit JF</h1>
@@ -110,7 +110,7 @@ onMounted(() => void load())
       </label>
     </div>
 
-    <div ref="tableScroller" class="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="ak-jf-table-scroll" @scroll.passive="updateActionsShadow">
+    <div ref="tableScroller" class="table-fill overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="ak-jf-table-scroll" @scroll.passive="updateActionsShadow">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>

@@ -115,7 +115,7 @@ async function onExport(format: ExportFormat['key']): Promise<void> {
     <UiNotice v-if="notice" tone="info" dismissible class="mb-4" @dismiss="notice = null">{{ notice }}</UiNotice>
     <UiNotice v-if="failure" tone="danger" class="mb-4" data-testid="laporan-failure">{{ failure }}</UiNotice>
 
-    <div class="space-y-5" data-testid="laporan-page" :aria-busy="memuat">
+    <div class="page-fill flex flex-col gap-5" data-testid="laporan-page" :aria-busy="memuat">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-h2 font-semibold text-slate-900">{{ judul }}</h1>
@@ -144,10 +144,10 @@ async function onExport(format: ExportFormat['key']): Promise<void> {
         </UiCard>
       </div>
 
-      <UiCard v-if="data && !kosong" :title="`Tabel ${judul}`" flush>
-        <div class="space-y-4 pb-5">
+      <UiCard v-if="data && !kosong" :title="`Tabel ${judul}`" flush fill>
+        <div class="flex min-h-0 flex-1 flex-col gap-4 pb-5">
           <div class="w-64 max-w-full px-5"><UiSearchInput v-model="search" placeholder="Cari baris" label="Cari baris laporan" /></div>
-          <div class="scrollbar-slim overflow-x-auto">
+          <div class="table-fill scrollbar-slim overflow-x-auto">
             <table class="w-full min-w-[40rem] border-collapse text-left text-body1" data-testid="laporan-table">
               <thead>
                 <tr class="border-y border-slate-200 text-body2 font-semibold text-slate-900">
