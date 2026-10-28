@@ -67,9 +67,10 @@ Branch `fase5b/make-045-penyesuaian-tukin` (dari `main` `e9f4616`, DBV-024 sudah
 (`BaseAuditableModel`, hapus = status 10 audit `delete`), `Laporan\PenyesuaianTukinService`, `PenyesuaianTukinController`,
 route role 1 di berkas 5B baru `Config/RoutesPresensiLaporan.php`. Berkas bersama aditif, commit terpisah:
 `Config/Routing.php` (entri berkas route) + baris kontrak di `KontrakMatriksRoleTest`. Syarat DB Validator **C-1**
-dipenuhi: kunci `FOR UPDATE` baris pegawai per NIP sebelum cek tumpang tindih, cek + tulis satu transaksi, kunci gagal →
-galat (tidak lanjut tanpa kunci); test `PenyesuaianTukinKonkurensiTest` (`db-isolasi-penuh`, koneksi kedua tertahan 1205
-lalu 422 setelah commit; NIP lain tidak tertahan). Test CRUD `PenyesuaianTukinCrudTest` (validasi per field, nilai batas,
+dipenuhi: kunci `FOR UPDATE` baris pegawai per NIP sebelum cek tumpang tindih, cek + tulis satu transaksi, kunci gagal
+1205/1213 → 409 `konflik_data` (keputusan reviewer CR 28-10-2026; tidak lanjut tanpa kunci); test
+`PenyesuaianTukinKonkurensiTest` (`db-isolasi-penuh`, koneksi kedua tertahan 1205 → 409, lalu 422 setelah commit; NIP
+lain tidak tertahan). Test CRUD `PenyesuaianTukinCrudTest` (validasi per field, nilai batas,
 tumpang tindih hanya antar-baris aktif NIP sama, NIP tidak bisa diubah [V2], audit, daftar/filter, 404, route 1 saja).
 Efek ke laporan/rekap (`Rekap\PenyesuaianTukin`, AC-D08.11 bagian efek) = M5. Syarat **C-2** (audit B1 berkala) dicatat
 untuk runbook 5B (M7).

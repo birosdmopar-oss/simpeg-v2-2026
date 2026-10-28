@@ -165,7 +165,9 @@ dibuat di M5 (keterangan + kolom `penyesuaian`, `total_potongan` tidak berubah).
 - **Tumpang tindih (syarat DB Validator C-1):** baris status 1 tidak boleh beririsan dengan baris status 1 lain milik NIP
   yang sama (422 `errors.bulan_mulai`, menyebut rentang yang bentrok). Kunci `SELECT … FROM pegawai WHERE nip = ? FOR UPDATE`
   diambil sebelum cek; cek + tulis satu transaksi, jadi permintaan bersamaan untuk NIP yang sama berjalan berurutan
-  (`PenyesuaianTukinKonkurensiTest`). Kunci gagal (mis. lock wait timeout) → galat, tidak pernah lanjut tanpa kunci.
+  (`PenyesuaianTukinKonkurensiTest`). Kunci gagal karena permintaan lain (1205 lock wait timeout, 1213 deadlock) →
+  **409** `code: konflik_data` "Data sedang diubah oleh permintaan lain, coba lagi." (rollback; preseden impor Slip Gaji,
+  keputusan reviewer CR 28-10-2026); galat lain diteruskan, tidak pernah lanjut tanpa kunci.
 - Audit lewat `PenyesuaianTukinModel` (`BaseAuditableModel`): `create`, `update`, `delete` (status 10) dengan before/after.
 
 ## Catatan deploy (PRD Fase 5A §8.5, Q5A-22)
