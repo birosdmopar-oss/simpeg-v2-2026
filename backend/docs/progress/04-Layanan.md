@@ -332,3 +332,37 @@ form `L_layanan.php` `form_off`; disetujui Horii): PNS aktif satker kepegawaian,
 
 **Review.** Isi diterima reviewer CR 28-10 (`9ba79f9`, CI 40545968056 hijau); di-merge dengan main `9ce8c56` (M4) untuk
 verifikasi ulang dengan `NotifikasiService` asli. Merge ke main menunggu izin Horii.
+
+## M7 — Frontend Modul C (MAKE-026, 28-10-2026; rencana `docs/fase4/RENCANA_M7_Frontend.md`)
+
+**Paket 0 — fondasi** (main `82e390a`): `features/layanan/{roles,routes.layanan,types,cutiStatus,tahapStepper}.ts`, `services/normalisasi.ts`,
+`StatusLayananBadge`, `TangguhkanDialog`.
+
+**Paket 1 — Cuti: halaman, detail, proses, pengingat** (branch `fase4/make-026-p1-cuti`). `CutiPage` (tab Cuti Saya 2/6/7, Perlu Persetujuan
+dengan badge jumlah, Monitoring 1/3; filter status + pencarian; paginasi), `CutiDetailPage` (stepper dari `tahap[]`, catatan approver, ketua tim,
+berkas, menu ⋮ tanpa "Lihat detail"), `CutiTable` + `rowActionsCuti` (urutan AGENTS §1; `cuti-actions-<id>`; kolom Aksi sticky + bayangan),
+`CutiProsesDialog` (membungkus `ApprovalDialog`/`TangguhkanDialog`; proses atas nama → alasan wajib), `PengingatCutiDialog`, `useCutiAksi`,
+`cuti.service.ts` (normalisasi string MySQLi). Route `/layanan/cuti`, `/layanan/cuti/:id(\d+)`; menu tetap tersembunyi (`ACTIVE_PHASE` 3).
+
+Keputusan/ambigu untuk reviewer:
+1. Edit, "Ajukan Cuti", kalkulator → Paket 2; Terbitkan TTE → Paket 3 (item belum ada di ⋮).
+2. Pengingat dipasang di `CutiPage` dan tampil sekali per sesi tab (`sessionStorage`, aman bila diblokir). Keputusan Horii: tetap di halaman Cuti sekarang; **butir Paket 10**: dipindah ke setelah login (shell/beranda), sekali per sesi, sesuai PRD §6.4.7.
+3. Proses atas nama memakai tiga item ⋮ ("Setujui/Tolak atas nama" dari `aksi.proses_atas_nama`, "Tangguhkan atas nama" dari `aksi.tangguhkan_atas_nama`). Atas arahan review (Horii): flag baru `tangguhkan_atas_nama` ditambahkan di `CutiService::aksi` (aditif; = proses atas nama untuk cuti Tahunan) supaya FE tidak menghitung jenis sendiri; tangguhkan atas nama memakai `TangguhkanDialog` dengan alasan wajib.
+4. Filter status daftar memakai kode 0/3/1/2/4 dikirim apa adanya ke `GET cuti?status=`.
+5. Tangkapan layar (API tiruan sintetis, tanpa Figma — acuan Q-18, AGENTS §3.6): 1440 dan 390 px, tanpa scroll horizontal halaman (`scrollWidth` = lebar viewport).
+
+## Fase 5B M1a — metode massal TB (MAKE-044, 28-10-2026, branch `fase5b/make-044-tb-massal` dari main `bb0648b`)
+
+Pengecualian tertulis PRD Fase 5B v1.0 F5B-18 (§3.2/§3.3): tambahan **aditif** di modul Fase 4 untuk konsumen Tukin massal
+(5B D-06). Tanpa migration, tanpa route.
+
+**Sudah jalan.** `StatusTugasBelajarInterface::rentangBebasPresensiBanyak(list<string> $nip, $dari, $sampai)` →
+`array<NIP, list<tanggal>>` (kunci = setiap NIP unik dalam urutan masukan; NIP tanpa TB / tidak ada → `[]`); implementasi
+`StatusTugasBelajar` (batch `BATCH_NIP` = 1000: satu kueri `riwayat_tb` status 1 + satu kueri `riwayat_tb_perpan` per batch,
+masukan kosong tanpa kueri) dan inti murni `BebasPresensiTb::rentangBebasPresensiBanyak()` (validasi rentang sekali, aturan
+per NIP = `rentangBebasPresensi`). `bebasPresensiPenuh` dan `rentangBebasPresensi` tidak berubah.
+
+**Test.** `tests/Layanan/Tb/RentangBebasPresensiBanyakTest` (paritas massal vs tunggal: TB + perpanjangan + celah, TB status
+0/2, tanpa TB, NIP tidak ada, dua TB; 2.500 NIP → 5 kueri SELECT; masukan kosong → 0 kueri) dan
+`tests/unit/Layanan/Tb/BebasPresensiTbTest` (paritas murni, NIP ganda, validasi rentang walau kosong); pemindai kemurnian
+`LayananStudiPmkMurniTest` tetap lolos.

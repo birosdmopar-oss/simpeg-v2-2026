@@ -67,7 +67,7 @@ kode legacy (`L_tb.php`, `L_ib.php`, `L_pmk.php`, `controllers/hr/services/Local
 | `Studi/ValidasiStudi` | isian wajib TB/IB (semua galat dikumpulkan, TB-03), `tgl_akhir ≥ tgl_mulai`, jenjang, status awal TB 0\|1 + data SK bila 1, IB selalu 0; `bentrok()` + `pesanBentrok()` [K]; TB vs IB tidak dibandingkan (IB-09, Q-11) |
 | `Studi/TransisiStudi` | satu langkah 0 → setujui (data SK wajib, `show_pl = 1`) / tolak (`reason_note` wajib ≤ 255 byte) → final; selain dari 0 → `errors.status` |
 | `Tb/PerpanjanganTb` | validasi (wajib, `akhir ≥ mulai`, induk status 1 [V2 TB-13]), saran mulai = akhir efektif + 1 [K], akhir efektif = MAX, `ringkasan()` = MAX terpisah pengganti trigger `riwayat_tb_perpan_af*` [K] |
-| `Tb/BebasPresensiTb` | `bebasPresensiPenuh(daftarTb, tanggal)`, `rentangBebasPresensi(daftarTb, dari, sampai)`, `statusPenuh()` (D15, turunan) — inti murni untuk `App\Interfaces\Layanan\StatusTugasBelajarInterface` (Fase 5 D-06) |
+| `Tb/BebasPresensiTb` | `bebasPresensiPenuh(daftarTb, tanggal)`, `rentangBebasPresensi(daftarTb, dari, sampai)`, `rentangBebasPresensiBanyak(nip, daftarTbPerNip, dari, sampai)` (MAKE-044, aditif), `statusPenuh()` (D15, turunan) — inti murni untuk `App\Interfaces\Layanan\StatusTugasBelajarInterface` (Fase 5 D-06) |
 | `Pmk/AturanPmk` | value object: `jenis_pmk` {Swasta, Negeri} [V2 P-5], `reason_note` ≤ 255 byte, `mker` ≤ 255 (TINYINT) |
 | `Pmk/StatusPmk` | kode 0/1/2/3 [K DDL] + label kolom & label UI v2, `FINAL` {1,2}, `ikutTumpangTindih` (≠ 2 [K]), `detailBolehDibuka` (Q-16), `bolehHapus` (≠ 1 [K]) |
 | `Pmk/MasaKerjaPmk` | kalkulator `pmk/hitung-mker`: `mker_th = diff.y`, `mker_bl = diff.m` [K `Local.php:4574-4601`]; nilai pengajuan tetap dari klien (D19/P-4) |
@@ -120,7 +120,7 @@ Service ber-DB membungkus kelas murni di atas; DILARANG ada aturan tumpang tindi
 | `NotifikasiNoOp` | binding sementara `NotifikasiLayananInterface` (`Config\Services::notifikasiLayanan()`); diganti NotifikasiService di M4 (MAKE-023) |
 | `Tb/TbService`, `Tb/TbApprovalService`, `Tb/EfekTbTrait` | C-07; efek final `pegawai.id_jenis_status` 2 bila hari ini dalam rentang (dibalik saat hapus) |
 | `Tb/PerpanjanganTbService` | C-07 perpanjangan role 1; ringkasan `tgl_*_perpan` = `PerpanjanganTb::ringkasan` (pengganti trigger `riwayat_tb_perpan_af*`) |
-| `Tb/StatusTugasBelajar` | implementasi `StatusTugasBelajarInterface` (`Config\Services::statusTugasBelajar()`, Fase 5 D-06) — dua kueri lalu `BebasPresensiTb` |
+| `Tb/StatusTugasBelajar` | implementasi `StatusTugasBelajarInterface` (`Config\Services::statusTugasBelajar()`, Fase 5 D-06) — dua kueri lalu `BebasPresensiTb`; versi massal `rentangBebasPresensiBanyak(nip[], dari, sampai)` (MAKE-044, PRD Fase 5B F5B-18): per batch `BATCH_NIP` = 1000 NIP satu kueri `riwayat_tb` status 1 (WHERE IN) + satu kueri `riwayat_tb_perpan` (WHERE IN id, dilewati bila batch tanpa TB); masukan kosong → `[]` tanpa kueri; hasil per NIP identik dengan versi tunggal; metode tunggal tidak berubah |
 | `Tb/SuratTbService` | SK unggahan (kode 47) atau render `Views/pdf/surat_tb.php` |
 | `Ib/IbService`, `Ib/IbApprovalService` | C-08; status selalu 0, tiga slot wajib semua role, efek final = surat |
 | `Pmk/DasarPmkService` | dasar PMK di atas LayananStudi: hak lihat/tulis PMK (role 3 lihat saja, ubah tanpa syarat status [K D19], hapus ditolak bila status 1), tampilan `TampilanPmk`, isi notifikasi |

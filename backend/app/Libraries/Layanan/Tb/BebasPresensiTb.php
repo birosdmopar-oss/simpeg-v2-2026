@@ -81,6 +81,29 @@ final class BebasPresensiTb
     }
 
     /**
+     * Versi massal {@see self::rentangBebasPresensi()} (MAKE-044): rentang divalidasi sekali, lalu aturan yang sama
+     * diterapkan per NIP. NIP tanpa entri di `$daftarTbPerNip` → daftar kosong; NIP ganda muncul sekali. Kunci bertipe
+     * `array-key`: PHP mengubah kunci NIP berupa angka menjadi int.
+     *
+     * @param list<string>                                                                                                                                                        $nip
+     * @param array<array-key, list<array{status: int|string, tgl_mulai: string, tgl_akhir: string, perpanjangan?: list<array{tgl_mulai_perpan: string, tgl_akhir_perpan: string}>}>> $daftarTbPerNip
+     *
+     * @return array<array-key, list<string>>
+     */
+    public static function rentangBebasPresensiBanyak(array $nip, array $daftarTbPerNip, string $dari, string $sampai): array
+    {
+        self::rentangBebasPresensi([], $dari, $sampai);
+
+        $hasil = [];
+
+        foreach ($nip as $n) {
+            $hasil[$n] ??= self::rentangBebasPresensi($daftarTbPerNip[$n] ?? [], $dari, $sampai);
+        }
+
+        return $hasil;
+    }
+
+    /**
      * `status_penuh` turunan untuk respons TB: 1 bila hari ini bebas presensi, selain itu 0 (DoD 070-3).
      *
      * @param list<array{status: int|string, tgl_mulai: string, tgl_akhir: string, perpanjangan?: list<array{tgl_mulai_perpan: string, tgl_akhir_perpan: string}>}> $daftarTb

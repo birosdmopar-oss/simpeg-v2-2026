@@ -37,17 +37,22 @@ const visible = computed(() => props.actions.filter((a) => !a.hidden))
 
 <template>
   <DropdownMenuRoot :modal="false">
-    <!-- Tooltip custom (UiTooltip), bukan atribut `title` bawaan browser (AGENTS.md bagian 3). -->
-    <UiTooltip :content="label">
-      <DropdownMenuTrigger
-        :disabled="disabled || visible.length === 0"
-        :aria-label="label"
-        :data-testid="testid"
-        class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary/60 disabled:opacity-40 data-[state=open]:bg-slate-100 data-[state=open]:text-brand-primary"
-      >
-        <MoreVertical class="h-4 w-4" aria-hidden="true" />
-      </DropdownMenuTrigger>
-    </UiTooltip>
+    <!-- Tooltip custom (UiTooltip), bukan atribut `title` bawaan browser (AGENTS.md bagian 3). CR-068: pemicu
+         dropdown DI LUAR UiTooltip (as-child), agar anchor popper dropdown tidak terdaftar ke konteks popper tooltip.
+         `data-state` tombol milik tooltip; status buka menu dibaca dari `aria-expanded`. -->
+    <DropdownMenuTrigger as-child :disabled="disabled || visible.length === 0">
+      <UiTooltip :content="label">
+        <button
+          type="button"
+          :disabled="disabled || visible.length === 0"
+          :aria-label="label"
+          :data-testid="testid"
+          class="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary/60 disabled:opacity-40 aria-expanded:bg-slate-100 aria-expanded:text-brand-primary"
+        >
+          <MoreVertical class="h-4 w-4" aria-hidden="true" />
+        </button>
+      </UiTooltip>
+    </DropdownMenuTrigger>
     <DropdownMenuPortal>
       <DropdownMenuContent
         align="end"

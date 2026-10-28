@@ -629,8 +629,9 @@ class CutiService
             'tunda'      => $tunda,
             'esign'      => in_array($role, [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true) && in_array($status, StatusCuti::EFEK_FINAL, true) && ! $adaSuratTte
                 && ($role === Role::SUPER_ADMIN || $this->scope->bolehProses($auth, (string) $cuti['nip'])),
-            'unduh_surat'      => in_array($status, StatusCuti::EFEK_FINAL, true) && $adaSurat,
-            'proses_atas_nama' => $atasNama,
+            'unduh_surat'          => in_array($status, StatusCuti::EFEK_FINAL, true) && $adaSurat,
+            'proses_atas_nama'     => $atasNama,
+            'tangguhkan_atas_nama' => $atasNama && (int) $cuti['id_jenis_cuti'] === AturanCuti::JENIS_TAHUNAN,
         ];
     }
 

@@ -42,7 +42,8 @@ async function settle(): Promise<void> {
  */
 export async function openRowMenu(root: Root, testid: string): Promise<HTMLElement> {
   const trigger = root.get(`[data-testid="${testid}"]`)
-  if (trigger.attributes('data-state') !== 'open') {
+  // `aria-expanded` milik dropdown; `data-state` tombol dipakai tooltip (CR-068).
+  if (trigger.attributes('aria-expanded') !== 'true') {
     await trigger.trigger('click')
     await flushPromises()
   }

@@ -139,6 +139,8 @@ harian presensi membaca `dh_online`.
   AC-TK.1–TK.6 terpenuhi; `Libraries/Presensi/Tukin` tidak diubah.
 - **Sisa untuk 5B (di luar 5A):** sumber cuti/TB nyata (`Config\Presensi::$sumberCutiTb`), endpoint/laporan Tukin
   (D-08), cross-check rumus resmi Q5A-13.
+- **5B M1a (MAKE-044):** metode massal TB `StatusTugasBelajarInterface::rentangBebasPresensiBanyak` di modul Fase 4 —
+  rincian di `docs/progress/04-Layanan.md` bagian "Fase 5B M1a"; acuan `docs/fase5/PRD_Fase5B_Cuti-TB-LaporanTukin-UangMakan.md`.
 
 ## CR-067 — Slip Gaji TK tanpa Pajak / Tunjangan Pajak (ikut legacy `0cf7e67`)
 

@@ -44,10 +44,10 @@ describe('roles.ts — matriks menu PRD §6.11.2', () => {
 })
 
 describe('routes.layanan.ts', () => {
-  it('nama route tetap dan daftar route belum berisi halaman (menu tersembunyi)', () => {
+  it('nama route tetap; baru halaman cuti yang terdaftar (menu tersembunyi)', () => {
     expect(LAYANAN_ROUTE.STATUS).toBe('layanan-status')
     expect(LAYANAN_ROUTE.CUTI_DETAIL).toBe('layanan-cuti-detail')
-    expect(layananRoutes).toEqual([])
+    expect(layananRoutes.map((r) => r.name)).toEqual([LAYANAN_ROUTE.CUTI, LAYANAN_ROUTE.CUTI_DETAIL])
   })
 })
 
