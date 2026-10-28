@@ -28,6 +28,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->put('cuti/saldo/(:num)', 'CutiSaldoController::update/$1', $admin);
     $routes->delete('cuti/saldo/(:num)', 'CutiSaldoController::delete/$1', $admin);
     $routes->get('cuti/petugas-approval', 'CutiPetugasApprovalController::index', $admin);
+    $routes->get('cuti/petugas-approval/opsi', 'CutiPetugasApprovalController::opsi', $admin); // [V2] opsi form (jabatan koordinasi, unit terkunci)
     $routes->post('cuti/petugas-approval', 'CutiPetugasApprovalController::create', $admin);
     $routes->put('cuti/petugas-approval/(:num)', 'CutiPetugasApprovalController::update/$1', $admin);
     $routes->delete('cuti/petugas-approval/(:num)', 'CutiPetugasApprovalController::delete/$1', $admin);

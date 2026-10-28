@@ -138,6 +138,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'PUT api/v1/cuti/saldo/([0-9]+)'               => [1, 3],
             'DELETE api/v1/cuti/saldo/([0-9]+)'            => [1, 3],
             'GET api/v1/cuti/petugas-approval'             => [1, 3],
+            'GET api/v1/cuti/petugas-approval/opsi'        => [1, 3],
             'POST api/v1/cuti/petugas-approval'            => [1, 3],
             'PUT api/v1/cuti/petugas-approval/([0-9]+)'    => [1, 3],
             'DELETE api/v1/cuti/petugas-approval/([0-9]+)' => [1, 3],
