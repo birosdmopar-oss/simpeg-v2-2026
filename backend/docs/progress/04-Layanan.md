@@ -366,3 +366,16 @@ per NIP = `rentangBebasPresensi`). `bebasPresensiPenuh` dan `rentangBebasPresens
 0/2, tanpa TB, NIP tidak ada, dua TB; 2.500 NIP → 5 kueri SELECT; masukan kosong → 0 kueri) dan
 `tests/unit/Layanan/Tb/BebasPresensiTbTest` (paritas murni, NIP ganda, validasi rentang walau kosong); pemindai kemurnian
 `LayananStudiPmkMurniTest` tetap lolos.
+
+**Paket 2 — form pengajuan/ubah cuti + kalkulator** (branch `fase4/make-026-p2-cuti-form`, dari main `ffa833c`). `CutiFormDialog` (2 kolom, 1 kolom
+≤ 600 px; jenis dari `opsi`, tanggal mulai/akhir, durasi jenis Besar, telp, alamat, keterangan, AL readonly, PyB, ketua tim dengan pencarian,
+`UiFileField` lampiran; role 1: NIP + "Muat Data Pegawai" + status 0/1), `KalkulatorCutiPanel`, `useHitungLama` (debounce 300 ms ke
+`POST cuti/hitung-lama`; respons basi dibuang), tombol "Ajukan Cuti" (`can_create` server) dan item ⋮ Edit (`aksi.ubah`, paling atas) di daftar dan detail.
+Semua angka (lama, tanggal akhir Besar, hari libur, kuota) dari server; Simpan tidak dikunci hasil kalkulator; 422 per kolom (`lama_cuti` di bawah panel).
+
+Keputusan/ambigu untuk reviewer:
+1. Penanda tampilan per jenis ada di `cutiJenis.ts`: jenis 2 memakai `durasi` (tanggal akhir dari server), jenis 3 lampiran wajib (klien legacy; server tetap yang menegakkan), jenis 1 panel kuota. Server belum mengirim flag per jenis di `opsi`; kalau kode jenis berubah, FE ikut diubah.
+2. Panel kuota memakai nama kolom server apa adanya: "Dalam Proses" = `menunggu_tahun_ini`, "Diajukan Sekarang" = `diajukan_tahun_ini`, "Total Saldo" = `saldo_tahun_ini` (PRD §6.11.3 menulis "sisa setelah pengajuan"; `KuotaCuti` mengirim saldo total — label mengikuti isi).
+3. Pegawai role 1 dipilih lewat NIP + tombol muat (belum ada pencarian pegawai); pencarian pegawai bisa menyusul bila diminta.
+4. Kuota tahun depan (`saldo_tahun_depan` dst.) belum ditampilkan; pesan server `pesan` tampil saat `cukup=false`.
+5. Tangkapan layar form + kalkulator 1440/390 (API tiruan sintetis, tanpa Figma — Q-18): form 1 kolom di 390 px, tanpa scroll horizontal.

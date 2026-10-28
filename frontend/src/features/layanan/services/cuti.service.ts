@@ -15,6 +15,12 @@ import { api } from '@/lib/axios'
 
 import type {
   CutiDetail,
+  CutiIsian,
+  CutiOpsi,
+  HitungLamaCuti,
+  HitungLamaPayload,
+  KuotaHitung,
+  PejabatCuti,
   CutiItem,
   CutiListQuery,
   CutiListResponse,
@@ -83,7 +89,90 @@ function normalisasiDetail(raw: Record<string, unknown>): CutiDetail {
   }
 }
 
+function normalisasiPejabat(raw: unknown): PejabatCuti | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const r = raw as Record<string, unknown>
+  return { nip: String(r.nip ?? ''), nama: String(r.nama ?? ''), jabatan: teksOrNull(r.jabatan), bisa_memproses: flag(r.bisa_memproses) }
+}
+
+function normalisasiKuota(raw: unknown): KuotaHitung | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const r = raw as Record<string, unknown>
+  return {
+    tahun: num(r.tahun),
+    sisa_cuti: num(r.sisa_cuti),
+    sisa_cuti_n1: num(r.sisa_cuti_n1),
+    sisa_cuti_n2: num(r.sisa_cuti_n2),
+    saldo_tahun_ini: num(r.saldo_tahun_ini),
+    menunggu_tahun_ini: num(r.menunggu_tahun_ini),
+    diajukan_tahun_ini: num(r.diajukan_tahun_ini),
+    saldo_tahun_depan: num(r.saldo_tahun_depan),
+    menunggu_tahun_depan: num(r.menunggu_tahun_depan),
+    diajukan_tahun_depan: num(r.diajukan_tahun_depan),
+    cukup: flag(r.cukup),
+    pesan: String(r.pesan ?? ''),
+  }
+}
+
+function formData(isian: CutiIsian, berkas: File | null, method?: 'PUT'): FormData {
+  const fd = new FormData()
+  for (const [k, v] of Object.entries(isian)) {
+    if (k === 'ketua_tim' || v === undefined) continue
+    fd.append(k, String(v))
+  }
+  for (const nip of isian.ketua_tim ?? []) fd.append('ketua_tim[]', nip)
+  if (berkas) fd.append('file_bukti', berkas)
+  if (method) fd.append('_method', method)
+  return fd
+}
+
 export const cutiService = {
+  async opsi(nip?: string): Promise<CutiOpsi> {
+    const { data } = await api.get<Record<string, unknown>>('/cuti/opsi', { params: nip ? { nip } : undefined })
+    const saldo = data.saldo as Record<string, unknown> | null
+    return {
+      jenis_cuti: daftarRecord(data.jenis_cuti).map((j) => ({ id_jenis_cuti: num(j.id_jenis_cuti), nama_jenis_cuti: String(j.nama_jenis_cuti ?? '') })),
+      atasan_langsung: normalisasiPejabat(data.atasan_langsung),
+      pyb: daftarRecord(data.pyb).map((p) => normalisasiPejabat(p)!),
+      langkah_tunggal: flag(data.langkah_tunggal),
+      eselon_i: flag(data.eselon_i),
+      saldo: saldo
+        ? {
+            tahun: num(saldo.tahun),
+            sisa_cuti: num(saldo.sisa_cuti),
+            sisa_cuti_n1: num(saldo.sisa_cuti_n1),
+            sisa_cuti_n2: num(saldo.sisa_cuti_n2),
+            saldo_tahun_ini: num(saldo.saldo_tahun_ini),
+            saldo_tahun_depan: num(saldo.saldo_tahun_depan),
+          }
+        : null,
+      tgl_akhir_maks: teksOrNull(data.tgl_akhir_maks),
+      ketua_tim: daftarRecord(data.ketua_tim).map((k) => ({ nip: String(k.nip ?? ''), nama: String(k.nama ?? '') })),
+      can_create: flag(data.can_create),
+    }
+  },
+
+  async hitungLama(payload: HitungLamaPayload): Promise<HitungLamaCuti> {
+    const { data } = await api.post<Record<string, unknown>>('/cuti/hitung-lama', payload)
+    return {
+      lama_cuti: num(data.lama_cuti),
+      satuan_lama_cuti: String(data.satuan_lama_cuti ?? ''),
+      tgl_akhir: teksOrNull(data.tgl_akhir),
+      hari_libur: daftarRecord(data.hari_libur).map((h) => ({ tanggal: String(h.tanggal ?? ''), keterangan: String(h.keterangan ?? '') })),
+      kuota: normalisasiKuota(data.kuota),
+    }
+  },
+
+  async create(isian: CutiIsian, berkas: File | null): Promise<CutiItem> {
+    const { data } = await api.post<Record<string, unknown>>('/cuti', formData(isian, berkas))
+    return normalisasiCuti(data)
+  },
+
+  async update(id: number, isian: CutiIsian, berkas: File | null): Promise<CutiItem> {
+    const { data } = await api.post<Record<string, unknown>>(`/cuti/${id}`, formData(isian, berkas, 'PUT'))
+    return normalisasiCuti(data)
+  },
+
   async list(query: CutiListQuery): Promise<CutiListResponse> {
     const params: Record<string, string | number> = { mode: query.mode, page: query.page, per_page: query.per_page }
     if (query.status) params.status = query.status

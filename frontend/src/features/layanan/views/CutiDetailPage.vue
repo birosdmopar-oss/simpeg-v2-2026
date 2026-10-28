@@ -15,6 +15,7 @@ import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiNotice, UiStepper } from '@/shared/ui'
 
+import CutiFormDialog from '../components/CutiFormDialog.vue'
 import CutiProsesDialog from '../components/CutiProsesDialog.vue'
 import StatusLayananBadge from '../components/StatusLayananBadge.vue'
 import { useCutiAksi } from '../composables/useCutiAksi'
@@ -76,8 +77,17 @@ async function unduhLampiran(): Promise<void> {
   }
 }
 
+const formOpen = ref(false)
+
 function onAction(key: string): void {
-  if (detail.value) aksi.pilih(key, detail.value)
+  if (!detail.value) return
+  if (key === 'edit') formOpen.value = true
+  else aksi.pilih(key, detail.value)
+}
+
+function onSaved(): void {
+  aksi.notice.value = { tone: 'success', text: 'Pengajuan cuti disimpan.' }
+  void muat()
 }
 
 const subjekProses = computed(() => (detail.value ? `cuti ${detail.value.nama} (${detail.value.nama_jenis_cuti})` : ''))
@@ -150,6 +160,8 @@ const catatan = computed(() => {
         </ul>
       </UiCard>
     </template>
+
+    <CutiFormDialog v-if="detail" v-model:open="formOpen" :row="detail" @saved="onSaved" />
 
     <CutiProsesDialog
       v-if="aksi.prosesRow.value"

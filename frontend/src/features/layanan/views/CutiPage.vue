@@ -6,14 +6,16 @@
  * Pengingat persetujuan tampil sekali per sesi tab bila `GET cuti/pengingat` tidak kosong (reset listener `auth.login`).
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Plus } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { UiCard, UiNotice, UiPagination, UiSearchInput, UiSelect, UiTabs } from '@/shared/ui'
+import { UiButton, UiCard, UiNotice, UiPagination, UiSearchInput, UiSelect, UiTabs } from '@/shared/ui'
 
+import CutiFormDialog from '../components/CutiFormDialog.vue'
 import CutiProsesDialog from '../components/CutiProsesDialog.vue'
 import CutiTable from '../components/CutiTable.vue'
 import PengingatCutiDialog from '../components/PengingatCutiDialog.vue'
@@ -144,9 +146,26 @@ function lihatDetail(row: CutiItem): void {
   void router.push({ name: LAYANAN_ROUTE.CUTI_DETAIL, params: { id: row.id } })
 }
 
+const formOpen = ref(false)
+const formRow = ref<CutiItem | null>(null)
+
+function ajukan(): void {
+  formRow.value = null
+  formOpen.value = true
+}
+
 function onAction(key: string, row: CutiItem): void {
   if (key === 'detail') lihatDetail(row)
-  else aksi.pilih(key, row)
+  else if (key === 'edit') {
+    formRow.value = row
+    formOpen.value = true
+  } else aksi.pilih(key, row)
+}
+
+function onSaved(): void {
+  aksi.notice.value = { tone: 'success', text: 'Pengajuan cuti disimpan.' }
+  void muat()
+  void muatJumlahPersetujuan()
 }
 
 onMounted(() => {
@@ -188,6 +207,9 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
 <template>
   <RedesignShell :breadcrumbs="crumbs">
     <UiCard title="Cuti">
+      <template #actions>
+        <UiButton v-if="data?.can_create" data-testid="cuti-tambah" @click="ajukan"><Plus class="h-4 w-4" aria-hidden="true" /> Ajukan Cuti</UiButton>
+      </template>
       <UiTabs v-model="tab" :items="tabs" aria-label="Daftar cuti" class="mb-4" />
 
       <div class="mb-4 grid gap-3 md:grid-cols-3" data-testid="cuti-filter">
@@ -209,6 +231,8 @@ const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesR
 
       <UiPagination v-if="data && data.total > PER_PAGE" v-model:page="page" class="mt-4" :per-page="PER_PAGE" :total="data.total" />
     </UiCard>
+
+    <CutiFormDialog v-model:open="formOpen" :row="formRow" @saved="onSaved" />
 
     <CutiProsesDialog
       v-if="aksi.prosesRow.value"
