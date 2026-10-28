@@ -234,6 +234,7 @@ Port `list_lt`/`list_lt_il`, `laporan_tukin/{nip}` (`laporan_tukin_skp`), `lapor
 | XLSX: ekstensi `.xlsx`, content type xlsx, judul "TOTAL POTONGAN", legenda "Terlambat" | `.xls.xlsx`, `application/vnd.ms-excel`, "POTONGGAN", "Telambat" (`:13306-13483`) | Salah ketik & nama berkas diperbaiki |
 | Penanda tangan: jabatan dari `struktur_jabatan` periode aktif, urut `urutan`/id; definitif seri → NIP naik | `row_array` tanpa urutan, tanpa saring periode (`:12018-12140`) | Pilihan deterministik |
 | Nama berkas PDF per pegawai tanpa angka acak | `tukin_<nip>_<bulan>_<rand>.pdf` (`:7726-7728`) | Nama stabil |
+| Bawaan `jenis_pegawai[]`: rekap `[1]` (PNS), daftar pegawai semua jenis | Rekap `jenis_pegawai` bawaan `'1'` (`hr/Presensi.php:645`, `:744`, `:853`, `:952`); daftar bawaan `'0'` = semua (`:411`, `:494`) — diverifikasi reviewer CR 28-10-2026 | Sama dengan legacy |
 | `penyesuaian` dari tabel DBV-024 (persen bebas ±100) | NIP & periode hard-code (`:11755-11806`, `:6526-6560`) | Lihat [CATAT] F5B-14 PRD |
 
 Test: `tests/unit/Presensi/Rekap/{PenandaTangan,PenyesuaianTukin}Test.php`, `tests/Presensi/Laporan/{RekapTukin,

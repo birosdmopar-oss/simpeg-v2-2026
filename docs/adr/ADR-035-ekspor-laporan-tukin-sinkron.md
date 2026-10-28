@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Diusulkan 28-10-2026** (MAKE-041 M5; batas PDF menunggu konfirmasi reviewer CR) |
+| **Status** | **Diterima 28-10-2026** (MAKE-041 M5; batas PDF 800 baris disetujui reviewer CR berdasarkan uji volume §3) |
 | **Cakupan** | Rekap Tukin Fase 5B: `GET api/v1/presensi/tukin/rekap` (JSON), `/rekap/xlsx`, `/rekap/pdf`, `/rekap-il[/xlsx]` |
 | **Pemilik pelaksanaan** | Fase 5B, milestone M5 (MAKE-041) |
 | **Terkait** | ADR-032 (PhpSpreadsheet), ADR-033 (TCPDF + `PdfRendererInterface`), ADR-034 (PDF sinkron dokumen daftar, pola batas baris), PRD `docs/fase5/PRD_Fase5B_Cuti-TB-LaporanTukin-UangMakan.md` §7.3.5, §7.3.7, F5B-11, F5B-16 |
