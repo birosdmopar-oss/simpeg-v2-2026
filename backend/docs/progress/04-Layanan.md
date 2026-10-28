@@ -332,3 +332,19 @@ form `L_layanan.php` `form_off`; disetujui Horii): PNS aktif satker kepegawaian,
 
 **Review.** Isi diterima reviewer CR 28-10 (`9ba79f9`, CI 40545968056 hijau); di-merge dengan main `9ce8c56` (M4) untuk
 verifikasi ulang dengan `NotifikasiService` asli. Merge ke main menunggu izin Horii.
+
+## Fase 5B M1a — metode massal TB (MAKE-044, 28-10-2026, branch `fase5b/make-044-tb-massal` dari main `bb0648b`)
+
+Pengecualian tertulis PRD Fase 5B v1.0 F5B-18 (§3.2/§3.3): tambahan **aditif** di modul Fase 4 untuk konsumen Tukin massal
+(5B D-06). Tanpa migration, tanpa route.
+
+**Sudah jalan.** `StatusTugasBelajarInterface::rentangBebasPresensiBanyak(list<string> $nip, $dari, $sampai)` →
+`array<NIP, list<tanggal>>` (kunci = setiap NIP unik dalam urutan masukan; NIP tanpa TB / tidak ada → `[]`); implementasi
+`StatusTugasBelajar` (batch `BATCH_NIP` = 1000: satu kueri `riwayat_tb` status 1 + satu kueri `riwayat_tb_perpan` per batch,
+masukan kosong tanpa kueri) dan inti murni `BebasPresensiTb::rentangBebasPresensiBanyak()` (validasi rentang sekali, aturan
+per NIP = `rentangBebasPresensi`). `bebasPresensiPenuh` dan `rentangBebasPresensi` tidak berubah.
+
+**Test.** `tests/Layanan/Tb/RentangBebasPresensiBanyakTest` (paritas massal vs tunggal: TB + perpanjangan + celah, TB status
+0/2, tanpa TB, NIP tidak ada, dua TB; 2.500 NIP → 5 kueri SELECT; masukan kosong → 0 kueri) dan
+`tests/unit/Layanan/Tb/BebasPresensiTbTest` (paritas murni, NIP ganda, validasi rentang walau kosong); pemindai kemurnian
+`LayananStudiPmkMurniTest` tetap lolos.
