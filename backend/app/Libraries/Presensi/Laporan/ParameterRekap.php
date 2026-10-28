@@ -12,7 +12,7 @@ use CodeIgniter\Database\BaseConnection;
 
 /**
  * Parameter bersama rekap D-09b (PRD 5B §6.4): `bulan` wajib `YYYY-MM` dan tidak melewati bulan berjalan (422
- * `errors.bulan`); `jenis_pegawai[]` id yang ada di master `jenis_pegawai` (bawaan `[1]` = legacy `str_jp` "1",
+ * `errors.bulan`; laporan Tukin memberi batas sendiri lewat `$bulanMaks`); `jenis_pegawai[]` id yang ada di master `jenis_pegawai` (bawaan `[1]` = legacy `str_jp` "1",
  * `Presensi.php:827`; 422 `errors.jenis_pegawai`); `page`/`per_page` (maks 100) lewat `ListQuery`.
  */
 final readonly class ParameterRekap
@@ -35,7 +35,7 @@ final readonly class ParameterRekap
     /**
      * @param array<string, mixed> $query
      */
-    public static function dari(array $query, string $hariIni, BaseConnection $db, bool $denganJenis = true): self
+    public static function dari(array $query, string $hariIni, BaseConnection $db, bool $denganJenis = true, ?string $bulanMaks = null): self
     {
         $q     = ListQuery::from($query, ['bulan', 'unit_satker', 'page', 'per_page']);
         $bulan = $q->string('bulan');
@@ -44,8 +44,8 @@ final readonly class ParameterRekap
             throw ValidationException::forField('bulan', 'Bulan wajib berformat YYYY-MM.');
         }
 
-        if ($bulan > substr($hariIni, 0, 7)) {
-            throw ValidationException::forField('bulan', 'Bulan tidak boleh melewati bulan berjalan.');
+        if ($bulan > ($bulanMaks ?? substr($hariIni, 0, 7))) {
+            throw ValidationException::forField('bulan', 'Bulan belum tersedia.');
         }
 
         $jenis = [1];
