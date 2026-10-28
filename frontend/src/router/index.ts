@@ -14,6 +14,7 @@ import { dokumenRoutes } from '@/features/dokumen/routes.dokumen'
 import { pegawaiRoutes } from '@/features/kepegawaian/routes.pegawai'
 import { riwayatRoutes } from '@/features/kepegawaian/routes.riwayat'
 import { laporanRoutes } from '@/features/laporan/routes.laporan'
+import { layananRoutes } from '@/features/layanan/routes.layanan'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 
@@ -108,6 +109,8 @@ const routes: RouteRecordRaw[] = [
   ...laporanRoutes,
   // Modul F — Fase 7 F-09 generator dokumen (MAKE-037).
   ...dokumenRoutes,
+  // Modul C — Fase 4 Layanan & Approval (MAKE-026): route ditambah per paket di routes.layanan.ts.
+  ...layananRoutes,
   {
     path: '/403',
     name: 'forbidden',
