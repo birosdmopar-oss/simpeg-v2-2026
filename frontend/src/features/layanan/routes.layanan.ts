@@ -2,10 +2,12 @@
  * Route Modul C (Layanan & Approval, Fase 4). Diimpor sekali dari `router/index.ts`; tiap paket M7 menambah route
  * halamannya di berkas ini (PRD §6.11.1). Role mengikuti `roles.ts`; guard FE hanya UX (ADR-024).
  *
- * Paket 0 hanya menyiapkan fondasi — belum ada halaman, jadi daftar masih kosong dan menu Fase 4 tetap tersembunyi
- * (`ACTIVE_PHASE` dinaikkan hanya di paket penutup, AC-11.8).
+ * Menu Fase 4 tetap tersembunyi sampai paket penutup (`ACTIVE_PHASE` dinaikkan hanya di sana, AC-11.8); halaman
+ * dapat dibuka lewat URL langsung untuk QA.
  */
 import type { RouteRecordRaw } from 'vue-router'
+
+import { CUTI_ROLES } from './roles'
 
 /** Nama route Modul C (tetap, dipakai tautan antarhalaman dan `nav.config.ts`). */
 export const LAYANAN_ROUTE = {
@@ -23,4 +25,19 @@ export const LAYANAN_ROUTE = {
   PETUGAS: 'layanan-petugas',
 } as const
 
-export const layananRoutes: RouteRecordRaw[] = []
+export const layananRoutes: RouteRecordRaw[] = [
+  {
+    // Cuti Online: daftar (3 tab) — role 1, 2, 3, 6, 7 (PRD §6.11.1).
+    path: '/layanan/cuti',
+    name: LAYANAN_ROUTE.CUTI,
+    component: () => import('./views/CutiPage.vue'),
+    meta: { roles: CUTI_ROLES, title: 'Cuti' },
+  },
+  {
+    // Detail cuti (:id angka agar tidak bentrok dengan /layanan/cuti/saldo dan /petugas-approval).
+    path: '/layanan/cuti/:id(\\d+)',
+    name: LAYANAN_ROUTE.CUTI_DETAIL,
+    component: () => import('./views/CutiDetailPage.vue'),
+    meta: { roles: CUTI_ROLES, title: 'Detail Cuti' },
+  },
+]

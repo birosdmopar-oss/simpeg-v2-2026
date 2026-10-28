@@ -35,7 +35,7 @@ Coder A = penalaran/form kompleks/keamanan (kalkulator, e-sign passphrase, prose
 | Paket 7 | PMK: `PmkPage` (4 tab), `PmkDetailPage`, `PmkFormDialog`, `PmkProsesDialog` | Coder A | M5 | alur Proses/Setujui/Tolak |
 | Paket 8 | `LayananStatusPage` (filter, UiStepper, PIC, ⋮ Lihat detail, paginasi) | Coder A | **M6** | Gambar 17 |
 | Paket 9 | `PetugasLayananPage` (CRUD PIC, role 1) | Coder B | **M6** | |
-| Paket 10 | Penutup: entri menu `nav.config.ts` per role, `ACTIVE_PHASE = 4`, Vitest menu per role, QA responsif 1440/600/390, progres | Coder A | semua | satu-satunya yang menaikkan fase |
+| Paket 10 | Penutup: entri menu `nav.config.ts` per role, `ACTIVE_PHASE = 4`, Vitest menu per role, QA responsif 1440/600/390, progres; **pindahkan `PengingatCutiDialog` dari halaman Cuti ke setelah login (shell/beranda), sekali per sesi, PRD §6.4.7 (keputusan Horii 28-10)** | Coder A | semua | satu-satunya yang menaikkan fase |
 
 Urutan merge: Paket 0 → Paket 1 → (Paket 2, Paket 3, Paket 4 paralel) → (Paket 5, Paket 6, Paket 7 paralel) → Paket 8 → Paket 9 → Paket 10. Paket 5/6 baru dibuka setelah Paket 1 merged agar Coder B punya contoh. Satu worktree dan satu DB scratch per paket; Coder B bekerja di worktree terpisah dengan batas berkas per paket (`features/layanan/views/<modul>/**`) supaya tidak tumpang tindih.
 
