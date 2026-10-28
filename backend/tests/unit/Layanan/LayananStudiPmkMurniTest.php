@@ -38,7 +38,7 @@ final class LayananStudiPmkMurniTest extends CIUnitTestCase
         ],
         'Libraries/Layanan/Tb'  => ['BebasPresensiTb.php', 'PerpanjanganTb.php'],
         'Libraries/Layanan/Pmk' => ['AturanPmk.php', 'MasaKerjaPmk.php', 'StatusPmk.php', 'TampilanPmk.php', 'TransisiPmk.php', 'ValidasiPmk.php'],
-        'Interfaces/Layanan'    => ['NotifikasiLayananInterface.php', 'StatusTugasBelajarInterface.php'],
+        'Interfaces/Layanan'    => ['NotifikasiLayananInterface.php', 'PenerbitSuratCutiInterface.php', 'StatusTugasBelajarInterface.php'],
     ];
 
     /**

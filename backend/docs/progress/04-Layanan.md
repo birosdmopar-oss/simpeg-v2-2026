@@ -19,7 +19,7 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md). **Acuan utama & 
 | C-07 Tugas Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 branch `fase4/make-024-tb-ib-pmk-m5`: inti TB (CRUD, proses PIC, perpanjangan, `bebasPresensiPenuh`, surat) + route + kontrak + 6 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-08 Izin Belajar | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti IB (CRUD, proses PIC, Surat IB otomatis kode 50) + route + kontrak + 4 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
 | C-09 PMK | M5 | MAKE-024 | **IN_PROGRESS** | 27-10 inti PMK (pengajuan, opsi, kalkulator, proses PIC 0→3→1/2, riwayat final + arsip SK) + route + kontrak + 5 berkas test; notifikasi lewat titik sambung no-op sampai M4 |
-| C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | TODO | Menunggu M3 & M5 merged |
+| C-10 Dashboard status layanan + PIC | M6 | MAKE-025 | **IN_PROGRESS** | 27-10 `GET layanan/status` (gabungan cuti/TB/IB/PMK, lingkup PegawaiScope, tahap & PIC) + `layanan/jenis` + CRUD `layanan/petugas` (tulis role 1) + route + kontrak + 3 berkas test |
 | C-11 Frontend Modul Layanan | M7 | MAKE-026 | TODO | Per halaman setelah backend-nya merged; `ACTIVE_PHASE = 4` hanya di commit penutup |
 | C-12 Unit test & verifikasi | M8 | MAKE-027 | TODO | Menunggu M3–M7 merged |
 
@@ -171,6 +171,32 @@ jenis 1; paritas T13 hanya saldo ternormalisasi legacy; teks pesan batas jenis 5
 
 ---
 
+## M3 — Cuti (MAKE-022, 27-10-2026, branch `fase4/make-022-cuti-m3`)
+
+**Sudah jalan.** CRUD cuti, `cuti/opsi`, `cuti/hitung-lama`, kuota/potong/refund (`KuotaCutiService` membungkus `KuotaCuti` murni; refund memakai `SnapshotSaldoCuti`),
+state machine (`CutiApprovalService` memakai `TransisiCuti`), efek final (`EfekFinalCutiService`: saldo, CLTN, titik panggil `PenerbitSuratCutiInterface` no-op untuk M4),
+tunda + pengingat + listener `ResetTundaCuti` (event `auth.login` aditif), proses atas nama (`ApproverTerjangkau`), `pa_layanan`, kelola saldo, `SaldoTahunanCuti` +
+command `cuti:saldo-tahunan`. Route di `Config/RoutesLayanan.php`; kontrak di `Controllers/Api/Layanan/README.md`; kueri audit approver di `04-Layanan-audit-approver-cuti.sql`.
+
+**Keputusan [V2] (disetujui reviewer 27-10).**
+1. `audit_logs.event` ber-ENUM: penanda `cuti.saldo_tahunan`, `cuti.saldo_massal`, `cuti.process_atas_nama`, `cuti.cltn_aktif`/`cuti.cltn_pulih` dibawa di `after_json.jenis_audit`
+   (event `create`/`update`); tanpa perubahan skema.
+2. `RiwayatCutiModel extends BaseAuditableModel` (bukan `BaseSnapshotModel`): cuti tidak punya tabel snapshot; efek final eksplisit lewat query builder + audit manual.
+3. Zona bisnis = `Asia/Jakarta` (`TanggalBisnis::ZONA`), bukan `appTimezone` (bawaan UTC): "hari ini", batas tunda 12:00, dan tahun acuan (`created_at` UTC → WIB).
+4. Command `cuti:saldo-tahunan` menolak eksekusi tulis tahun < `Config\Cuti::$tahunTulisSaldoMulai` (2027); `--dry-run` tetap untuk 2026 (PRD §6.3.6).
+5. Notifikasi cuti bukan bagian M3 (M4 memakai `NotifikasiLayananInterface`).
+
+**Catatan yang perlu dicek reviewer.** Tambah saldo target `1` dibuat massal dengan satu baris audit ringkasan (bukan per baris); target `2` per baris lewat model. `GET cuti/opsi`
+mengembalikan `ketua_tim[]` seluruh pegawai aktif sesuai PRD (daftar panjang; FE mungkin perlu pencarian di M7).
+
+**Rujukan legacy AL/PyB (untuk QA).** `AtasanLangsungCuti` = port `getAL_es2()` (`1_legacy_simpeg.kemenparekraf.go.id/application/helpers/function_helper.php:1700-1945`);
+`PejabatBerwenangCuti` = port `getListPYB()` (`application/libraries/hr/rwy/L_cuti.php:12-279`); `ApproverTerjangkau` tidak punya padanan legacy (PRD §6.4.10).
+`Lkh\AtasanLangsung::untuk()` (port `getAL()` `function_helper.php:1479`) TIDAK dipakai karena perilakunya berbeda: urutan kolom atasan
+`es4_koord → es4 → es3_koord → es3 → es2 → es1` (cuti: `es4 → es3 → es2 → es1` tanpa koordinator), tanpa prioritas Plh (cuti: Plh aktif mengganti pemegang definitif,
+`function_helper.php:1760-1790`), dan Plt tanpa batas tanggal (cuti: Plt wajib dalam rentang tanggal, `:1795-1810`). Kontrak LKH beku, jadi tidak diubah.
+
+**Ukuran `GET cuti/opsi` → `ketua_tim[]`** (semua pegawai aktif, `{nip, nama}` terurut nama, satu kueri): pada data seed sintetis 8 pegawai respons `ketua_tim` ≈ 0,6 KB;
+per elemen ≈ 90 byte, sehingga 5.000 pegawai ≈ 450 KB sebelum kompresi. Dibuka CR terpisah bila terasa berat di data nyata.
 ## M5 — TB, IB, PMK (MAKE-024, 27-10-2026, branch `fase4/make-024-tb-ib-pmk-m5` dari main `598a5f3`)
 
 Inti M5 saja (§9): penyambungan notifikasi menunggu M4; e-sign, frontend, `ACTIVE_PHASE` di luar cakupan; tanpa migration.
@@ -235,3 +261,74 @@ Test `tests/Layanan/Pmk/PmkBerkasTest.php`.
    HTML/SVG ditolak — diverifikasi 27-10 untuk HTML-sebagai-pdf, SVG, `.html`, SVG-sebagai-png pada PMK/TB/IB). Berkas
    legacy yang dipindah **tidak** melewati validasi itu: skrip migrasi wajib menyaring jenis dari isi dengan whitelist yang
    sama (atau menyisihkan berkas di luar whitelist untuk ditinjau) agar tidak ada HTML/SVG yang tersaji inline.
+
+**Perbaikan review 27-10 (balapan).** Pemeriksaan yang bergantung keadaan diulang di bawah lock pegawai: `ubah` (status 0, pemilik, `tgl_mulai`), `hapus` (hak hapus pemilik 0/2), `simpan`
+(tumpang tindih + kuota, termasuk input admin status 1), `process` (NIP pemohon dibaca ulang setelah lock). Seam uji: `CutiService::sebelumTransaksi()` (kosong di produksi), dipakai `CutiBalapanTest`.
+Saldo massal memakai jalur PROSES `PegawaiScope`; ubah `pa_layanan` role 3 menegakkan unit sendiri; `tunda` hanya pada status 0/3; alasan setujui tidak disimpan di `reason_note_al`
+(T4 = NULL) dan alasan atas nama non-tolak hanya di audit (`jenis_audit`).
+
+**Batasan diketahui.** Baris dengan AL terisi dan PyB kosong: `ResetTundaCuti` tidak mereset `skip_pyb` bagi AL (dampak rendah; PyB wajib saat ajukan, hanya data impor yang bisa begitu).
+
+## M4 — E-sign mock, notifikasi, job push (MAKE-023, 28-10-2026, branch `fase4/make-023-esign-notifikasi` dari main `f636194`)
+
+PRD Fase 4 v1.3 §6.5 (C-05), §6.6 (C-06), §6.12, §9 baris M4. Tanpa migration baru, tanpa frontend.
+
+**Tahap A — e-sign dan surat cuti.** `POST cuti/{id}/esign` (role 1, 3; `CutiEsignController`) → `EsignCutiService`. `SuratCutiService`
+menggantikan `PenerbitSuratCutiNoOp` di binding `penerbitSuratCuti`: surat BELUM TTE dirender dari `Views/pdf/surat_cuti.php` (port
+templat legacy, kop kementerian K1 `KopDokumen::html(null, null)`, QR kode identitas dokumen) saat efek final 1/4 dan disimpan
+`document_attachment` kode 44; ber-TTE disimpan terpisah kode 45. `esign_hist` (`EsignHistModel`) ditulis di luar transaksi bisnis, satu
+baris per percobaan. Adapter = `service('esignGateway')` (driver mock; di kode PRD menyebut `service('esign')`, nama sebenarnya
+`esignGateway`). Passphrase hanya dari body, tidak disimpan/dicatat/dikembalikan; pesan gateway dibersihkan dari passphrase.
+
+**Tahap B — notifikasi dan push.** `NotifikasiService` (implements `NotifikasiLayananInterface`, menggantikan `NotifikasiNoOp` di
+`notifikasiLayanan`; pemanggil TB/IB/PMK tidak berubah) menulis `inbox` (satu induk per penerima per pengajuan, dipakai ulang dan
+di-"belum dibaca"-kan lagi) dan `inbox_msg`; `enqueuePush()` mengantrekan satu job `push-notif` per pesan ke queue `push`
+(`PushNotifLayananJob`, TRIES 5). `TemplatNotifikasi` (murni) dan `PenerimaNotifikasi` (ketua tim, admin role 1), titik kirim cuti di
+`CutiNotifikasiService` dipasang di `CutiService::simpan` (diajukan T1/T2, diubah T12; admin langsung final) dan
+`CutiApprovalService::process` (T4–T10, T14); surat terbit dikirim sesudah commit e-sign. Worker: README-deploy.md §1b.
+
+**Keputusan / hal ambigu untuk reviewer.**
+1. Role 3 di luar lingkup → **403** (AC-05.4); baris tak ada → 404. PRD §6.5.3 langkah 1 menulis "terlihat (404)" lalu "lingkup (403)";
+   untuk role 3 keduanya bertabrakan, dipilih mengikuti AC-05.4 (`PegawaiScope::bolehProses`).
+2. Penanda tangan: PyB; langkah tunggal tanpa PyB → AL; keduanya kosong → 422 `errors.nip`. NIK kosong → dicatat gagal (pesan "NIK pejabat
+   belum terdaftar.") sebelum gateway dipanggil.
+3. Surat belum TTE yang belum ada (cuti final sebelum M4) dibuat dulu saat e-sign (transaksi tersendiri), lalu ditandatangani.
+4. Tolak/tangguhkan mengikuti PRD: alasan hanya pada notifikasi tolak; tangguhkan tanpa `Ket:`.
+5. Akun role 1 tanpa NIP tidak menerima notifikasi "Perlu Diproses Admin" (kunci `inbox` = NIP). Penerima NIP yang tidak ada di `pegawai`
+   dilewati.
+   **Keputusan Horii (28-10): diterima dulu sebagai keterbatasan.** Admin tetap melihat antrean lewat daftar/pengingat
+   (`bisa_memproses`) dan dashboard M6. Jalan keluar bila nanti dibutuhkan: unit DBV baru — `inbox.nip_penerima` nullable dan
+   `id_pengguna_penerima` sebagai kunci penerima (perubahan skema, wajib review DB Validator).
+6. Pelaku aksi dikecualikan lewat `service('authContext')->nip()` di dalam `NotifikasiService::kirim` (signature antarmuka tetap).
+7. `url` notifikasi cuti `/layanan/cuti/{id}` (pola sama dengan M5); rute FE final milik M7.
+8. `PushNotifJobTest` menjalankan `process()` langsung (tidak ada koneksi DB kedua) sehingga tanpa `#[Group('db-isolasi-penuh')]`;
+   `NotifikasiServiceTest` memeriksa baris `queue_jobs` antrean `push`.
+9. Kegagalan notifikasi surat terbit hanya dicatat (surat sudah ber-TTE); kegagalan enqueue push → `push_status = 2` dan log.
+
+**Test.** `tests/Layanan/Esign/{EsignCutiTest,EsignHistTest,EsignRoleTest,SuratCutiTest}`, `tests/Layanan/Notifikasi/{NotifikasiServiceTest,
+NotifikasiPenerimaTest,NotifikasiTidakKeTicketingTest,PushNotifJobTest}`, `tests/unit/Layanan/Notifikasi/TemplatNotifikasiTest`; baris
+`POST cuti/{id}/esign` (1,3) di `KontrakMatriksRoleTest`.
+
+## M6 — Dashboard status layanan & PIC (MAKE-025, 27-10-2026, branch `fase4/make-025-dashboard-pic` dari main `f636194`)
+
+Cakupan C-10 backend saja (FE di M7). Tanpa migration; tidak menyentuh berkas M4 (notifikasi/e-sign). DB uji scratch
+`simpeg_v2_t_make024` port 3307.
+
+**Sudah jalan.** Route (7) di `Config/RoutesLayananDashboard.php` (+ satu baris `Routing::$routeFiles`) + baris
+`KontrakMatriksRoleTest` (prefiks `layanan`, `LayananDashboardService::ROLE_ROUTE`, `PetugasLayananService::ROLE_ROUTE`);
+`LayananDashboardController`, `PetugasLayananController`; `LayananDashboardService`; `PetugasLayananService` diperluas (CRUD
++ jenis aktif); model `PetugasLayananModel`, `JenisLayananModel`. Test `tests/Layanan/Dashboard/{LayananStatusTest,
+LayananStatusRoleTest, PetugasLayananCrudTest}` (25 test) + fixture `tests/_support/Layanan/DashboardUjiTrait.php`.
+Dokumentasi endpoint: `Controllers/Api/Layanan/README.md`; keputusan coder: `Libraries/Layanan/README.md`.
+
+AC-10.1 (`LayananStatusRoleTest`), AC-10.2 (`PetugasLayananCrudTest`), AC-10.3 (`testPetugasCutiAlPybDanPicAktifSaja`),
+AC-10.4 (`testTahapDanLabelKonsistenDenganStateMachineModul`).
+
+**Keputusan reviewer CR 27-10 (4 default M6 disetujui):** `layanan/petugas` role 2–7 hanya PIC aktif; `url_detail` null
+untuk role 4/5 (detail modul tetap 403 untuk role 4/5, diuji); filter `status` angka tanpa `jenis` → 422 `errors.status`;
+hapus PIC fisik + audit [K]. **[V2] `GET layanan/petugas/kandidat?search=`** (role 1; gap PRD §5.5, legacy memuat pilihan di
+form `L_layanan.php` `form_off`; disetujui Horii): PNS aktif satker kepegawaian, urut nama, maks 50, satker kosong →
+`items: []` + peringatan. Route jadi 7.
+
+**Review.** Isi diterima reviewer CR 28-10 (`9ba79f9`, CI 40545968056 hijau); di-merge dengan main `9ce8c56` (M4) untuk
+verifikasi ulang dengan `NotifikasiService` asli. Merge ke main menunggu izin Horii.

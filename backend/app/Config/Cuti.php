@@ -65,6 +65,9 @@ class Cuti extends BaseConfig
     /** Jam batas tunda pengingat pada `tgl_mulai` (WIB), format `HH:MM`. */
     public string $jamBatasTunda = AturanCuti::JAM_BATAS_TUNDA;
 
+    /** Tahun pertama yang boleh ditulis `cuti:saldo-tahunan` (tanpa `--dry-run`), PRD §6.3.6. */
+    public int $tahunTulisSaldoMulai = AturanCuti::TAHUN_TULIS_SALDO_MULAI;
+
     /**
      * Value object aturan untuk library murni.
      */
@@ -82,6 +85,7 @@ class Cuti extends BaseConfig
             maksBulanAlasanPenting: $this->maksBulanAlasanPenting,
             maksTahunCltn: $this->maksTahunCltn,
             jamBatasTunda: $this->jamBatasTunda,
+            tahunTulisSaldoMulai: $this->tahunTulisSaldoMulai,
         );
     }
 }

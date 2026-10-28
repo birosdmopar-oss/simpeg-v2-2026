@@ -21,12 +21,45 @@ use Tests\Support\Libraries\PemindaiKemurnian;
  */
 final class CutiMurniTest extends CIUnitTestCase
 {
+    /**
+     * Berkas murni (daftar eksplisit: tahap 2b PRD §6.1.4 + `SnapshotSaldoCuti` + `SaldoTahunanCuti`). Kelas ber-DB
+     * (PRD §6.2–§6.4 file boundary) hidup di folder yang sama dan tidak dipindai sebagai murni.
+     */
+    private const MURNI = [
+        'AturanCuti', 'AturanJenisCuti', 'CutiPenyaji', 'EfekFinalCuti', 'HitungLamaCuti', 'KuotaCuti', 'PengingatCuti', 'PorsiTahunCuti', 'SaldoCuti',
+        'SaldoTahunanCuti', 'SnapshotSaldoCuti', 'StatusCuti', 'TransisiCuti', 'ValidasiTanggalCuti',
+    ];
+
+    /** Kelas ber-DB yang path-nya ditetapkan PRD tanpa sufiks `Service`. */
+    private const BER_DB = ['ResetTundaCuti', 'ApproverTerjangkau', 'AtasanLangsungCuti', 'PejabatBerwenangCuti', 'OpsiCuti', 'PenerbitSuratCutiNoOp'];
+
     public function testSemuaKelasCutiMurni(): void
     {
-        $hasil = self::pemindai()->pindaiFolder(APPPATH . 'Libraries/Layanan/Cuti');
+        $pemindai    = self::pemindai();
+        $pelanggaran = [];
 
-        $this->assertGreaterThanOrEqual(10, $hasil['jumlahBerkas'], 'Kelas murni cuti MAKE-022 tidak ditemukan');
-        $this->assertSame([], $hasil['pelanggaran']);
+        foreach (self::MURNI as $kelas) {
+            $berkas = APPPATH . "Libraries/Layanan/Cuti/{$kelas}.php";
+            $this->assertFileExists($berkas, "Kelas murni {$kelas} tidak ditemukan");
+            $pelanggaran = array_merge($pelanggaran, $pemindai->pindai((string) file_get_contents($berkas), "{$kelas}.php"));
+        }
+
+        $this->assertSame([], $pelanggaran);
+    }
+
+    public function testSetiapBerkasBaruTerdaftarSebagaiMurniAtauBerDb(): void
+    {
+        $tidakTerdaftar = [];
+
+        foreach (glob(APPPATH . 'Libraries/Layanan/Cuti/*.php') ?: [] as $berkas) {
+            $kelas = basename($berkas, '.php');
+
+            if (! in_array($kelas, self::MURNI, true) && ! in_array($kelas, self::BER_DB, true) && ! str_ends_with($kelas, 'Service')) {
+                $tidakTerdaftar[] = $kelas;
+            }
+        }
+
+        $this->assertSame([], $tidakTerdaftar, 'Berkas baru harus didaftarkan sebagai murni (MURNI) atau ber-DB (BER_DB / sufiks Service)');
     }
 
     public function testPengecualianHanyaCreateFromFormatBerjangkar(): void

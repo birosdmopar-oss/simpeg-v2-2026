@@ -52,7 +52,7 @@ use App\Libraries\Kepegawaian\Riwayat\RiwayatRegistry;
 use App\Libraries\Kepegawaian\Riwayat\SnapshotSync;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
-use App\Libraries\Layanan\NotifikasiNoOp;
+use App\Libraries\Layanan\NotifikasiService;
 use App\Libraries\Layanan\Tb\StatusTugasBelajar;
 use App\Libraries\MasterData\FaqService;
 use App\Libraries\MasterData\MasterRegistry;
@@ -505,11 +505,137 @@ class Services extends BaseService
         };
     }
 
+    /**
+     * Penerbit surat cuti belum-TTE saat efek final (PRD Fase 4 §6.5.2): SuratCutiService (MAKE-023; di M3 berupa no-op).
+     */
+    public static function penerbitSuratCuti(bool $getShared = true): \App\Interfaces\Layanan\PenerbitSuratCutiInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('penerbitSuratCuti');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\SuratCutiService();
+    }
+
+    /**
+     * Penerbitan surat cuti ber-TTE (PRD Fase 4 §6.5, MAKE-023): adapter dari `esignGateway` (driver mock di Fase 4).
+     */
+    public static function esignCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\EsignCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('esignCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\EsignCutiService(
+            db_connect(),
+            static::cutiService(),
+            new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
+            static::esignGateway(),
+            static::pegawaiScope(),
+            static::cutiNotifikasiService(),
+        );
+    }
+
+    /**
+     * Cuti online (MAKE-022 M3): kabel service ber-DB (PRD Fase 4 §6.2–§6.4).
+     */
+    public static function cutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\CutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('cutiService');
+        }
+
+        $db     = db_connect();
+        $aturan = config(\Config\Cuti::class)->aturan();
+        $kuota  = new \App\Libraries\Layanan\Cuti\KuotaCutiService($db, $aturan, new \App\Libraries\MasterData\HariLiburService($db));
+
+        return new \App\Libraries\Layanan\Cuti\CutiService(
+            $db,
+            $aturan,
+            $kuota,
+            new \App\Libraries\Layanan\Cuti\EfekFinalCutiService($db, $kuota, static::penerbitSuratCuti()),
+            new \App\Libraries\Layanan\Cuti\AtasanLangsungCuti($db),
+            new \App\Libraries\Layanan\Cuti\PejabatBerwenangCuti($db),
+            new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
+            static::pegawaiScope(),
+            static::attachmentService(),
+            null,
+            null,
+            static::cutiNotifikasiService(),
+        );
+    }
+
+    /**
+     * Persetujuan berjenjang cuti (MAKE-022 M3): state machine, efek final, tunda, atas nama.
+     */
+    public static function cutiApprovalService(bool $getShared = true): \App\Libraries\Layanan\Cuti\CutiApprovalService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('cutiApprovalService');
+        }
+
+        $db     = db_connect();
+        $aturan = config(\Config\Cuti::class)->aturan();
+        $kuota  = new \App\Libraries\Layanan\Cuti\KuotaCutiService($db, $aturan, new \App\Libraries\MasterData\HariLiburService($db));
+
+        return new \App\Libraries\Layanan\Cuti\CutiApprovalService(
+            $db,
+            $aturan,
+            static::cutiService(),
+            $kuota,
+            new \App\Libraries\Layanan\Cuti\EfekFinalCutiService($db, $kuota, static::penerbitSuratCuti()),
+            new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
+            static::cutiNotifikasiService(),
+        );
+    }
+
+    /**
+     * Titik kirim notifikasi cuti (PRD Fase 4 §6.6.2, MAKE-023 M4).
+     */
+    public static function cutiNotifikasiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\CutiNotifikasiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('cutiNotifikasiService');
+        }
+
+        $db = db_connect();
+
+        return new \App\Libraries\Layanan\Cuti\CutiNotifikasiService(
+            static::notifikasiLayanan(),
+            new \App\Libraries\Layanan\Cuti\ApproverTerjangkau($db),
+            new \App\Libraries\Layanan\Notifikasi\PenerimaNotifikasi($db),
+        );
+    }
+
+    /**
+     * Kelola saldo cuti tahunan (MAKE-022 M3, PRD Fase 4 §6.3.6).
+     */
+    public static function saldoCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\SaldoCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('saldoCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\SaldoCutiService(db_connect(), config(\Config\Cuti::class)->aturan(), new PegawaiScope());
+    }
+
+    /**
+     * Petugas approval cuti `pa_layanan` (MAKE-022 M3, PRD Fase 4 §6.4.8).
+     */
+    public static function petugasApprovalCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\PetugasApprovalCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('petugasApprovalCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\PetugasApprovalCutiService(db_connect());
+    }
+
     // Modul C — Layanan TB/IB/PMK (Fase 4, MAKE-024 M5).
 
     /**
-     * Titik sambung notifikasi TB/IB/PMK (PRD §6.6.1). Binding sementara NotifikasiNoOp; binding diganti
-     * NotifikasiService di M4 (MAKE-023).
+     * Titik sambung notifikasi cuti/TB/IB/PMK (PRD §6.6.1): NotifikasiService (MAKE-023 M4) menggantikan
+     * NotifikasiNoOp tanpa mengubah pemanggil TB/IB/PMK.
      */
     public static function notifikasiLayanan(bool $getShared = true): NotifikasiLayananInterface
     {
@@ -517,7 +643,7 @@ class Services extends BaseService
             return static::getSharedInstance('notifikasiLayanan');
         }
 
-        return new NotifikasiNoOp();
+        return new NotifikasiService();
     }
 
     /**

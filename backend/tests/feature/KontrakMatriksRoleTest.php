@@ -13,6 +13,8 @@ use App\Libraries\Kepegawaian\Riwayat\AksiRiwayat;
 use App\Libraries\Kepegawaian\Riwayat\JenisRiwayat;
 use App\Libraries\Kepegawaian\Struktur\PenugasanService;
 use App\Libraries\Layanan\Ib\IbService;
+use App\Libraries\Layanan\LayananDashboardService;
+use App\Libraries\Layanan\PetugasLayananService;
 use App\Libraries\Layanan\Pmk\DasarPmkService;
 use App\Libraries\Layanan\Tb\TbService;
 use App\Libraries\MasterData\FaqService;
@@ -55,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|tb|ib|pmk|slip-gaji|publik|presensi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -125,6 +127,40 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/pmk/([0-9]+)/arsip/([0-9]+)'        => [1, 2, 3],
             'DELETE api/v1/pmk/([0-9]+)'                       => [1, 2, 3],
             'GET api/v1/dokumen/([^/]+)'                       => [1, 3, 4, 5, 8],
+
+            // Modul C — Fase 4 Cuti (MAKE-022, PRD §5.1): route role 1, 2, 3, 6, 7; hak per baris (pemilik, AL/PyB, ketua tim,
+            // lingkup) di CutiService. `hitung-lama` = semua login (jwt saja).
+            'GET api/v1/cuti/opsi'                         => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti/hitung-lama'                 => self::JWT,
+            'GET api/v1/cuti/saldo'                        => [1, 3],
+            'POST api/v1/cuti/saldo'                       => [1, 3],
+            'PUT api/v1/cuti/saldo/([0-9]+)'               => [1, 3],
+            'DELETE api/v1/cuti/saldo/([0-9]+)'            => [1, 3],
+            'GET api/v1/cuti/petugas-approval'             => [1, 3],
+            'POST api/v1/cuti/petugas-approval'            => [1, 3],
+            'PUT api/v1/cuti/petugas-approval/([0-9]+)'    => [1, 3],
+            'DELETE api/v1/cuti/petugas-approval/([0-9]+)' => [1, 3],
+            'GET api/v1/cuti/pengingat'                    => [1, 2, 3, 6, 7],
+            'GET api/v1/cuti'                              => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti'                             => [1, 2, 3, 6, 7],
+            'GET api/v1/cuti/([0-9]+)'                     => [1, 2, 3, 6, 7],
+            'PUT api/v1/cuti/([0-9]+)'                     => [1, 2, 3, 6, 7],
+            'DELETE api/v1/cuti/([0-9]+)'                  => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti/([0-9]+)/process'            => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti/([0-9]+)/tunda'              => [1, 2, 3, 6, 7],
+            'POST api/v1/cuti/([0-9]+)/esign'              => [1, 3],
+            'GET api/v1/cuti/([0-9]+)/lampiran'            => [1, 2, 3, 6, 7],
+            'GET api/v1/cuti/([0-9]+)/surat'               => [1, 2, 3, 6, 7],
+
+            // Modul C — Fase 4 C-10 Dashboard Status Layanan & PIC (MAKE-025 M6): PRD §5.5, route role 1–7 (role 8 → 403);
+            // lingkup per role di LayananDashboardService (PegawaiScope), tulis PIC role 1 saja di PetugasLayananService.
+            'GET api/v1/layanan/status'              => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/layanan/jenis'               => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/layanan/petugas'             => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/layanan/petugas/kandidat'    => [1],
+            'POST api/v1/layanan/petugas'            => [1, 2, 3, 4, 5, 6, 7],
+            'PUT api/v1/layanan/petugas/([0-9]+)'    => [1, 2, 3, 4, 5, 6, 7],
+            'DELETE api/v1/layanan/petugas/([0-9]+)' => [1, 2, 3, 4, 5, 6, 7],
 
             // Modul D — Fase 5A D-10 impor Slip Gaji (MAKE-030): Matriks Bagian 2 `hr/sl_gaji/import_preview`,
             // `hr/sl_gaji/import_commit` = 1, 3 (SG-2; role 3 dibatasi satker akun di service, tanpa satker → 403).
@@ -488,6 +524,8 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
         $this->assertSame([1, 2, 3, 6], TbService::ROLE_ROUTE);
         $this->assertSame([1, 2, 3, 7], IbService::ROLE_ROUTE);
         $this->assertSame([1, 2, 3], DasarPmkService::ROLE_ROUTE);
+        $this->assertSame([1, 2, 3, 4, 5, 6, 7], LayananDashboardService::ROLE_ROUTE);
+        $this->assertSame([1, 2, 3, 4, 5, 6, 7], PetugasLayananService::ROLE_ROUTE);
         // hr/rwy/konket/* = 1, 2, 3, 6, 7 (tulis); lihat + pengamat 4, 5 (legacy list_ad/detail, lihat saja).
         $this->assertSame([1, 2, 3, 6, 7], KonketService::ROLE_TULIS);
         $this->assertSame([1, 2, 3, 4, 5, 6, 7], KonketService::ROLE_LIHAT);
