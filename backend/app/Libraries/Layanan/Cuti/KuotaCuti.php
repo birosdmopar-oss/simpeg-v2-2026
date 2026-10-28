@@ -67,6 +67,9 @@ final class KuotaCuti
             'saldo_tahun_depan'    => $saldoTahunDepan,
             'menunggu_tahun_depan' => $menungguTahunDepan,
             'diajukan_tahun_depan' => $lcTahunDepan,
+            // Sisa setelah pengajuan ini (PRD §6.11.3): saldo − menunggu − diajukan; negatif = kekurangan (cukup=false).
+            'sisa_setelah_tahun_ini'   => $saldoTahunIni - $menungguTahunIni - $lcTahunIni,
+            'sisa_setelah_tahun_depan' => $saldoTahunDepan - $menungguTahunDepan - $lcTahunDepan,
         ];
 
         if ($lcTahunIni + $menungguTahunIni > $saldoTahunIni || $lcTahunDepan + $menungguTahunDepan > $saldoTahunDepan) {

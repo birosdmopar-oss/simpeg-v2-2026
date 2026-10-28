@@ -7,7 +7,7 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/cuti.service', () => ({
-  cutiService: { list: vi.fn(), detail: vi.fn(), process: vi.fn(), tunda: vi.fn(), remove: vi.fn(), pengingat: vi.fn(), lampiran: vi.fn(), surat: vi.fn() },
+  cutiService: { list: vi.fn(), detail: vi.fn(), process: vi.fn(), tunda: vi.fn(), remove: vi.fn(), pengingat: vi.fn(), lampiran: vi.fn(), surat: vi.fn(), opsi: vi.fn(), hitungLama: vi.fn(), create: vi.fn(), update: vi.fn() },
 }))
 
 import { Role } from '@/features/auth/types'
@@ -227,6 +227,44 @@ describe('CutiPage — proses', () => {
     await flushPromises()
 
     expect(svc.process).toHaveBeenCalledWith(7, { aksi: 'setujui', reason_note: 'Atasan cuti panjang', atas_nama: true })
+  })
+})
+
+describe('CutiPage — form pengajuan', () => {
+  it('tombol Ajukan Cuti hanya bila can_create dari server; membuka form', async () => {
+    svc.opsi.mockResolvedValue({
+      jenis_cuti: [],
+      atasan_langsung: null,
+      pyb: [],
+      langkah_tunggal: false,
+      eselon_i: false,
+      saldo: null,
+      tgl_akhir_maks: null,
+      ketua_tim: [],
+      can_create: true,
+    })
+    svc.list.mockImplementation(async (query) => daftar(query.mode, [], true))
+    const { wrapper } = await mountPage(Role.PEGAWAI)
+
+    await wrapper.get('[data-testid="cuti-tambah"]').trigger('click')
+    await flushPromises()
+
+    expect(q('[data-testid="cuti-form-dialog"]')?.textContent).toContain('Ajukan Cuti')
+    expect(svc.opsi).toHaveBeenCalled()
+  })
+
+  it('tanpa can_create: tombol tidak ada', async () => {
+    const { wrapper } = await mountPage(Role.PEGAWAI)
+    expect(wrapper.find('[data-testid="cuti-tambah"]').exists()).toBe(false)
+  })
+
+  it('menu ⋮: Edit paling atas (sebelum Lihat detail) bila aksi.ubah', async () => {
+    svc.list.mockImplementation(async (query) => daftar(query.mode, [baris(6, { ubah: true, hapus: true })]))
+    const { wrapper } = await mountPage(Role.PEGAWAI)
+
+    const aksi = await rowMenuActions(wrapper, 'cuti-actions-6')
+
+    expect(aksi.map((a) => a.key)).toEqual(['edit', 'detail', 'hapus'])
   })
 })
 
