@@ -293,6 +293,10 @@ final class CutiCrudTest extends DatabaseTestCase
         $opsi = $this->cutiService()->opsi($a['pemohon']['auth'], null);
 
         $this->assertSame([1, 2, 3, 5], array_column($opsi['jenis_cuti'], 'id_jenis_cuti'));
+        $flag = array_column($opsi['jenis_cuti'], null, 'id_jenis_cuti');
+        $this->assertSame([false, true, false, false], array_column($opsi['jenis_cuti'], 'pakai_durasi'), 'hanya Besar memakai durasi');
+        $this->assertTrue($flag[3]['lampiran_wajib'], 'Sakit wajib lampiran');
+        $this->assertSame([false, false, true, false], array_column($opsi['jenis_cuti'], 'lampiran_wajib'));
         $this->assertSame($a['al']['nip'], $opsi['atasan_langsung']['nip']);
         $this->assertTrue($opsi['atasan_langsung']['bisa_memproses']);
         $this->assertSame($a['pyb']['nip'], $opsi['pyb'][0]['nip']);

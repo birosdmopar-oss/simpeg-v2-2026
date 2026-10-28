@@ -366,3 +366,16 @@ per NIP = `rentangBebasPresensi`). `bebasPresensiPenuh` dan `rentangBebasPresens
 0/2, tanpa TB, NIP tidak ada, dua TB; 2.500 NIP → 5 kueri SELECT; masukan kosong → 0 kueri) dan
 `tests/unit/Layanan/Tb/BebasPresensiTbTest` (paritas murni, NIP ganda, validasi rentang walau kosong); pemindai kemurnian
 `LayananStudiPmkMurniTest` tetap lolos.
+
+**Paket 2 — form pengajuan/ubah cuti + kalkulator** (branch `fase4/make-026-p2-cuti-form`, dari main `ffa833c`). `CutiFormDialog` (2 kolom, 1 kolom
+≤ 600 px; jenis dari `opsi`, tanggal mulai/akhir, durasi jenis Besar, telp, alamat, keterangan, AL readonly, PyB, ketua tim dengan pencarian,
+`UiFileField` lampiran; role 1: NIP + "Muat Data Pegawai" + status 0/1), `KalkulatorCutiPanel`, `useHitungLama` (debounce 300 ms ke
+`POST cuti/hitung-lama`; respons basi dibuang), tombol "Ajukan Cuti" (`can_create` server) dan item ⋮ Edit (`aksi.ubah`, paling atas) di daftar dan detail.
+Semua angka (lama, tanggal akhir Besar, hari libur, kuota) dari server; Simpan tidak dikunci hasil kalkulator; 422 per kolom (`lama_cuti` di bawah panel).
+
+Keputusan/ambigu untuk reviewer:
+1. **(Review Paket 2, diselesaikan)** Aturan per jenis dari server: `GET cuti/opsi` → `jenis_cuti[] {id_jenis_cuti, nama_jenis_cuti, pakai_durasi, lampiran_wajib}` dari `AturanCuti::pakaiDurasi()/lampiranWajib()` (aditif; `CutiCrudTest` memeriksa). Konstanta kode jenis di FE dihapus (`cutiJenis.ts` hanya opsi durasi + batas berkas). Batas `tgl_akhir_maks` tidak lagi dipasang sebagai `max` di FE (aturan hanya untuk jenis 1) — server tetap memvalidasi, 422 per kolom.
+2. **(Review Paket 2, diselesaikan)** Kuota: `KuotaCuti::periksa` kini menambah `sisa_setelah_tahun_ini` dan `sisa_setelah_tahun_depan` (saldo − menunggu − diajukan; negatif = kekurangan), diuji `KuotaBoundaryTest` (termasuk lintas tahun). Panel mengikuti PRD §6.11.3: N/N-1/N-2, Total Saldo, Dalam Proses, Diajukan Sekarang, **Sisa Setelah Pengajuan**.
+3. **(Review Paket 2, diselesaikan)** Porsi tahun depan (saldo, dalam proses, diajukan, sisa setelah) tampil bila `diajukan_tahun_depan > 0`. Role 1 memilih pegawai lewat `UiCombobox` (pencarian server `GET pegawai?search=`, min. 3 huruf, debounce 300 ms) lalu `cuti/opsi?nip=`.
+4. Pesan server `pesan` tampil saat `cukup=false` (atau sebagai catatan bila ada).
+5. Tangkapan layar form + kalkulator 1440/390 (API tiruan sintetis, tanpa Figma — Q-18): form 1 kolom di 390 px, tanpa scroll horizontal.

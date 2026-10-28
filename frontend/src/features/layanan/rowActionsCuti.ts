@@ -1,7 +1,7 @@
 /**
- * Item ⋮ per baris cuti (AGENTS.md §1): Lihat detail → Setujui/Tolak/Tangguhkan → Setujui/Tolak/Tangguhkan atas nama → Tunda → Unduh surat
+ * Item ⋮ per baris cuti (AGENTS.md §1): Edit → Lihat detail → Setujui/Tolak/Tangguhkan → Setujui/Tolak/Tangguhkan atas nama → Tunda → Unduh surat
  * → Hapus (`danger`, paling bawah). Semua hak dari `aksi {}` server — FE hanya menyembunyikan/menonaktifkan item.
- * Edit dan Terbitkan TTE ditambahkan oleh paket form (Paket 2) dan e-sign (Paket 3).
+ * Terbitkan TTE ditambahkan oleh paket e-sign (Paket 3).
  */
 import type { RowAction } from '@/shared/components/rowActions'
 
@@ -17,6 +17,7 @@ export interface OpsiAksiCuti {
 export function aksiBarisCuti(row: CutiItem, { busy = false, detail = true }: OpsiAksiCuti = {}): RowAction[] {
   const a = row.aksi
   return [
+    { key: 'edit', label: 'Edit', hidden: !a.ubah, disabled: busy },
     { key: 'detail', label: 'Lihat detail', hidden: !detail, disabled: busy },
     { key: 'setujui', label: 'Setujui', hidden: !a.proses, disabled: busy },
     { key: 'tolak', label: 'Tolak', hidden: !a.proses, disabled: busy },
