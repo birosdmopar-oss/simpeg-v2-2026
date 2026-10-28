@@ -115,7 +115,7 @@ final class PenandaTanganRekapTest extends DatabaseTestCase
 
     private function strukturJabatan(int $satker, int $level, string $nama): int
     {
-        $this->db->table('jabatan')->insert(['id_group_jabatan' => $this->buatJabatan($satker)['id_group_jabatan'] ?? 1, 'id_satker' => $satker, 'jabatan' => $nama, 'status' => 1]);
+        $this->db->table('jabatan')->insert(['id_group_jabatan' => $this->buatJabatan($satker)['id_group_jabatan'], 'id_satker' => $satker, 'jabatan' => $nama, 'status' => 1]);
         $id = (int) $this->db->insertID();
         $this->db->table('struktur_jabatan')->insert([
             'id_periode_struktur_jabatan' => $this->idPeriode, 'id_jabatan' => $id, 'periode_struktur_jabatan' => 'Periode Uji',

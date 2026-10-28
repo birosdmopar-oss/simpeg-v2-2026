@@ -10,6 +10,7 @@ use App\Libraries\Pdf\Pdf;
 use App\Libraries\Presensi\Laporan\DaftarPegawaiTukinService;
 use App\Libraries\Presensi\Laporan\LaporanTukinService;
 use App\Libraries\Presensi\Laporan\RekapTukinService;
+use ArrayObject;
 
 /**
  * Fixture laporan Tukin D-08 (MAKE-041): tarif Tukin `web_config` (TARIF_UJI), service dengan jam disuntik, dan renderer
@@ -18,26 +19,25 @@ use App\Libraries\Presensi\Laporan\RekapTukinService;
  */
 trait LaporanTukinUjiTrait
 {
-    /** @var list<DokumenPdf> */
-    protected array $pdfTertangkap = [];
+    /** @var ArrayObject<int, DokumenPdf> */
+    protected ArrayObject $pdfTertangkap;
 
     protected function siapkanLaporanTukin(): void
     {
         $this->resetWebConfig();
         $this->aturWebConfig(self::TARIF_UJI);
         $this->siapkanJenisPegawai();
-        $this->pdfTertangkap = [];
-        $tangkap             = &$this->pdfTertangkap;
+        $this->pdfTertangkap = new ArrayObject();
 
-        Pdf::pakai(new class ($tangkap) implements PdfRendererInterface {
-            /** @param list<DokumenPdf> $tangkap */
-            public function __construct(private array &$tangkap)
+        Pdf::pakai(new class ($this->pdfTertangkap) implements PdfRendererInterface {
+            /** @param ArrayObject<int, DokumenPdf> $tangkap */
+            public function __construct(private readonly ArrayObject $tangkap)
             {
             }
 
             public function render(DokumenPdf $dokumen): string
             {
-                $this->tangkap[] = $dokumen;
+                $this->tangkap->append($dokumen);
 
                 return '%PDF-1.4 palsu';
             }
