@@ -61,6 +61,16 @@ Selesai M3: migration `2026-10-28-100000_CreatePenyesuaianTukin` (DDL tidak beru
 `down()/up()`). Syarat berikutnya: **C-1** di M4 MAKE-045 (kunci `FOR UPDATE` per NIP sebelum cek tumpang tindih, cek +
 tulis satu transaksi, test konkurensi dua permintaan); **C-2** audit B1 berkala (tutup bulan Tukin) di runbook 5B.
 
+## 5B M5 — D-08 laporan Tukin (MAKE-041, 28-10-2026)
+
+Branch `fase5b/make-041-laporan-tukin` (dari `main` `70a24b6`). Daftar pegawai (+IL), laporan per pegawai JSON + PDF
+render legacy (F5B-8), rekap JSON + XLSX tata letak legacy + PDF berbatas (F5B-16) + IL (F5B-6); satu kalkulasi untuk per
+pegawai & rekap (K-1); penanda tangan enam kasus (F5B-13) dengan Plt status 1 deterministik (F2); efek penyesuaian Tukin
+DBV-024 tanpa mengubah `total_potongan` (F5B-14); lingkup role lewat `CakupanLaporan` (M6). Berkas bersama, commit
+terpisah: `Config\Presensi` (`$pdfRekapMaksBaris`, `$unitTtdSatkerTerpilih`, `$unitTtdSatkerKepegawaian` — F3),
+baris `KontrakMatriksRoleTest` bersama route. Uji volume `RekapTukinVolumeTest` (group `volume`) + ADR-035. Rincian di
+README `Libraries/Presensi` bagian "Laporan Tukin 5B" dan README controller.
+
 ## 5B M6 — D-09b rekap kehadiran & rekap uang makan (MAKE-042, 28-10-2026)
 
 Branch `fase5b/make-042-rekap-kehadiran-uang-makan` (dari `main` `79641be` + sinkron `139898f`). Murni:
