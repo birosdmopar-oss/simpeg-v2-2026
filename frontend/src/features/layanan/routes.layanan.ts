@@ -7,7 +7,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { CUTI_ADMIN_ROLES, CUTI_ROLES, PMK_ROLES, STATUS_LAYANAN_ROLES } from './roles'
+import { CUTI_ADMIN_ROLES, CUTI_ROLES, IB_ROLES, PETUGAS_LAYANAN_ROLES, PMK_ROLES, STATUS_LAYANAN_ROLES, TB_ROLES } from './roles'
 
 /** Nama route Modul C (tetap, dipakai tautan antarhalaman dan `nav.config.ts`). */
 export const LAYANAN_ROUTE = {
@@ -54,6 +54,32 @@ export const layananRoutes: RouteRecordRaw[] = [
     meta: { roles: CUTI_ADMIN_ROLES, title: 'Petugas Approval Cuti' },
   },
   {
+    // Tugas Belajar (C-07): daftar + detail; role 1, 2, 3, 6 (role 7 → 403). Rute mengikuti backend (keputusan 28-10).
+    path: '/layanan/tb',
+    name: LAYANAN_ROUTE.TB,
+    component: () => import('./views/TbPage.vue'),
+    meta: { roles: TB_ROLES, title: 'Tugas Belajar' },
+  },
+  {
+    path: '/layanan/tb/:id(\\d+)',
+    name: LAYANAN_ROUTE.TB_DETAIL,
+    component: () => import('./views/TbDetailPage.vue'),
+    meta: { roles: TB_ROLES, title: 'Detail Tugas Belajar' },
+  },
+  {
+    // Izin Belajar (C-08): daftar + detail; role 1, 2, 3, 7 (role 6 → 403).
+    path: '/layanan/ib',
+    name: LAYANAN_ROUTE.IB,
+    component: () => import('./views/IbPage.vue'),
+    meta: { roles: IB_ROLES, title: 'Izin Belajar' },
+  },
+  {
+    path: '/layanan/ib/:id(\\d+)',
+    name: LAYANAN_ROUTE.IB_DETAIL,
+    component: () => import('./views/IbDetailPage.vue'),
+    meta: { roles: IB_ROLES, title: 'Detail Izin Belajar' },
+  },
+  {
     // PMK: riwayat final + pengajuan (4 tab) — role 1, 2, 3 (PRD §6.11.1).
     path: '/layanan/pmk',
     name: LAYANAN_ROUTE.PMK,
@@ -72,5 +98,12 @@ export const layananRoutes: RouteRecordRaw[] = [
     name: LAYANAN_ROUTE.STATUS,
     component: () => import('./views/LayananStatusPage.vue'),
     meta: { roles: STATUS_LAYANAN_ROLES, title: 'Status Layanan' },
+  },
+  {
+    // Petugas Layanan (PIC): role 1 saja (brief §6; menu tersembunyi sampai paket penutup).
+    path: '/layanan/petugas',
+    name: LAYANAN_ROUTE.PETUGAS,
+    component: () => import('./views/PetugasLayananPage.vue'),
+    meta: { roles: PETUGAS_LAYANAN_ROLES, title: 'Petugas Layanan' },
   },
 ]
