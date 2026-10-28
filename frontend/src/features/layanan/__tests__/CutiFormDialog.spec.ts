@@ -6,11 +6,13 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/features/kepegawaian/services/pegawai.service', () => ({ pegawaiService: { list: vi.fn() } }))
 vi.mock('../services/cuti.service', () => ({
   cutiService: { list: vi.fn(), detail: vi.fn(), process: vi.fn(), tunda: vi.fn(), remove: vi.fn(), pengingat: vi.fn(), lampiran: vi.fn(), surat: vi.fn(), opsi: vi.fn(), hitungLama: vi.fn(), create: vi.fn(), update: vi.fn() },
 }))
 
 import { Role } from '@/features/auth/types'
+import { pegawaiService } from '@/features/kepegawaian/services/pegawai.service'
 import type { ApiError } from '@/lib/axios'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
@@ -19,6 +21,7 @@ import { cutiService } from '../services/cuti.service'
 import type { CutiDetail, CutiItem, CutiOpsi, HitungLamaCuti } from '../types'
 
 const svc = vi.mocked(cutiService)
+const pegawaiList = vi.mocked(pegawaiService.list)
 const q = <T extends Element = HTMLElement>(sel: string) => document.body.querySelector<T>(sel)
 
 const apiError = (status: number, errors: Record<string, string[]> | null = null): ApiError =>
@@ -26,9 +29,9 @@ const apiError = (status: number, errors: Record<string, string[]> | null = null
 
 const OPSI: CutiOpsi = {
   jenis_cuti: [
-    { id_jenis_cuti: 1, nama_jenis_cuti: 'Cuti Tahunan' },
-    { id_jenis_cuti: 2, nama_jenis_cuti: 'Cuti Besar' },
-    { id_jenis_cuti: 3, nama_jenis_cuti: 'Cuti Sakit' },
+    { id_jenis_cuti: 1, nama_jenis_cuti: 'Cuti Tahunan', pakai_durasi: false, lampiran_wajib: false },
+    { id_jenis_cuti: 2, nama_jenis_cuti: 'Cuti Besar', pakai_durasi: true, lampiran_wajib: false },
+    { id_jenis_cuti: 3, nama_jenis_cuti: 'Cuti Sakit', pakai_durasi: false, lampiran_wajib: true },
   ],
   atasan_langsung: { nip: '197001012000011001', nama: 'Dra. Siti Aminah', jabatan: 'Kepala Bagian', bisa_memproses: true },
   pyb: [{ nip: '196501012000011001', nama: 'Drs. Hadi Pranoto', jabatan: 'Kepala Biro', bisa_memproses: true }],
@@ -59,6 +62,8 @@ const HITUNG: HitungLamaCuti = {
     saldo_tahun_depan: 0,
     menunggu_tahun_depan: 0,
     diajukan_tahun_depan: 0,
+    sisa_setelah_tahun_ini: 16,
+    sisa_setelah_tahun_depan: 0,
     cukup: true,
     pesan: '',
   },
@@ -104,6 +109,7 @@ beforeEach(() => {
   for (const fn of Object.values(svc)) fn.mockReset()
   svc.opsi.mockResolvedValue(OPSI)
   svc.hitungLama.mockResolvedValue(HITUNG)
+  pegawaiList.mockReset()
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 })
 
@@ -122,7 +128,34 @@ describe('CutiFormDialog — kalkulator real-time', () => {
     expect(q('[data-testid="kalkulator-lama"]')?.textContent).toContain('3 Hari')
     expect(q('[data-testid="kalkulator-libur"]')?.textContent).toContain('Libur Nasional Uji')
     expect(q('[data-testid="kalkulator-saldo"]')?.textContent).toBe('19')
+    expect(q('[data-testid="kalkulator-sisa-setelah"]')?.textContent?.trim()).toBe('16')
+    expect(q('[data-testid="kalkulator-tahun-depan"]')).toBeNull()
     expect(q('[data-testid="kalkulator-kuota"]')?.textContent).toContain('N-1')
+  })
+
+  it('pengajuan lintas tahun: porsi tahun depan + sisa setelah dari server; kekurangan negatif', async () => {
+    svc.hitungLama.mockResolvedValue({
+      ...HITUNG,
+      kuota: {
+        ...HITUNG.kuota!,
+        diajukan_tahun_ini: 2,
+        diajukan_tahun_depan: 3,
+        saldo_tahun_depan: 12,
+        menunggu_tahun_depan: 1,
+        sisa_setelah_tahun_ini: 17,
+        sisa_setelah_tahun_depan: -2,
+        cukup: false,
+        pesan: 'Tidak cukup',
+      },
+    })
+    await mountDialog()
+    await isiDasar()
+    isi('[data-testid="cuti-tgl-akhir"] input', '2027-01-05')
+    await lewatJeda()
+
+    expect(q('[data-testid="kalkulator-tahun-depan"]')?.textContent).toContain('Porsi Tahun 2027')
+    expect(q('[data-testid="kalkulator-sisa-setelah"]')?.textContent?.trim()).toBe('17')
+    expect(q('[data-testid="kalkulator-sisa-setelah-depan"]')?.textContent?.trim()).toBe('-2')
   })
 
   it('jenis Besar memakai durasi: tanggal akhir ditampilkan dari server, tidak dihitung FE', async () => {
@@ -278,17 +311,26 @@ describe('CutiFormDialog — simpan', () => {
 })
 
 describe('CutiFormDialog — role 1 dan ubah', () => {
-  it('role 1: isi NIP lalu muat data pegawai (opsi?nip=); kirim nip + status', async () => {
+  it('role 1: cari pegawai (combobox, server), pilih saran memuat opsi?nip=; kirim nip + status', async () => {
     svc.create.mockResolvedValue({ id: 9 } as CutiItem)
+    pegawaiList.mockResolvedValue({
+      items: [{ nip: '198001012005011001', nama: 'Budi Santoso', glr_awal: 'Drs.', glr_akhir: 'M.Si.' }],
+      total: 1,
+      page: 1,
+      per_page: 10,
+    } as never)
     await mountDialog(Role.SUPER_ADMIN)
     expect(svc.opsi).not.toHaveBeenCalled()
     expect(q('[data-testid="cuti-jenis"]')).toBeNull()
 
-    isi('[data-testid="cuti-nip"] input', '198001012005011001')
-    await flushPromises()
-    q<HTMLButtonElement>('[data-testid="cuti-muat-pegawai"]')!.click()
+    isi('[data-testid="cuti-pegawai"] input', 'budi')
+    await lewatJeda()
+    expect(pegawaiList).toHaveBeenCalledWith({ page: 1, per_page: 10, search: 'budi' })
+
+    isi('[data-testid="cuti-pegawai"] input', '198001012005011001 — Drs. Budi Santoso, M.Si.')
     await flushPromises()
     expect(svc.opsi).toHaveBeenCalledWith('198001012005011001')
+    expect(q('[data-testid="cuti-pegawai-terpilih"]')?.textContent).toContain('198001012005011001')
 
     await isiDasar()
     isi('[data-testid="cuti-tgl-akhir"] input', '2026-11-06')
@@ -301,6 +343,13 @@ describe('CutiFormDialog — role 1 dan ubah', () => {
     expect(svc.create.mock.calls[0]![0]).toMatchObject({ nip: '198001012005011001', status: '0' })
     await lewatJeda()
     expect(svc.hitungLama).toHaveBeenLastCalledWith(expect.objectContaining({ nip: '198001012005011001' }))
+  })
+
+  it('role 1: ketikan kurang dari 3 huruf tidak memanggil server', async () => {
+    await mountDialog(Role.SUPER_ADMIN)
+    isi('[data-testid="cuti-pegawai"] input', 'bu')
+    await lewatJeda()
+    expect(pegawaiList).not.toHaveBeenCalled()
   })
 
   it('ubah: prefill dari detail, kalkulator mengecualikan id sendiri, simpan lewat update', async () => {

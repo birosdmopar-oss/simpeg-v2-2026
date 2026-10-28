@@ -7,7 +7,6 @@ import { describeApiError, splitValidationErrors } from '@/features/kepegawaian/
 import { isApiError } from '@/lib/axios'
 import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 
-import { JENIS_PAKAI_DURASI } from '../cutiJenis'
 import { cutiService } from '../services/cuti.service'
 import type { HitungLamaCuti, HitungLamaPayload } from '../types'
 
@@ -20,7 +19,7 @@ export interface IsianHitung {
 
 export const JEDA_HITUNG_MS = 300
 
-export function useHitungLama(isian: IsianHitung, opsi: { aktif: Ref<boolean>; nip: Ref<string>; idRiwayatCuti: Ref<number | null> }) {
+export function useHitungLama(isian: IsianHitung, opsi: { aktif: Ref<boolean>; pakaiDurasi: Ref<boolean>; nip: Ref<string>; idRiwayatCuti: Ref<number | null> }) {
   const hasil = ref<HitungLamaCuti | null>(null)
   const memuat = ref(false)
   const galat = ref<Record<string, string>>({})
@@ -38,7 +37,7 @@ export function useHitungLama(isian: IsianHitung, opsi: { aktif: Ref<boolean>; n
     const jenis = Number(isian.id_jenis_cuti)
     if (!jenis || !isian.tgl_mulai) return null
     const p: HitungLamaPayload = { id_jenis_cuti: jenis, tgl_mulai: isian.tgl_mulai }
-    if (jenis === JENIS_PAKAI_DURASI) {
+    if (opsi.pakaiDurasi.value) {
       if (!isian.durasi) return null
       p.durasi = Number(isian.durasi)
     } else {
@@ -86,7 +85,7 @@ export function useHitungLama(isian: IsianHitung, opsi: { aktif: Ref<boolean>; n
     timer = setTimeout(() => void hitung(), JEDA_HITUNG_MS)
   }
 
-  watch(() => [isian.id_jenis_cuti, isian.tgl_mulai, isian.tgl_akhir, isian.durasi, opsi.aktif.value, opsi.nip.value, opsi.idRiwayatCuti.value], jadwalkan)
+  watch(() => [isian.id_jenis_cuti, isian.tgl_mulai, isian.tgl_akhir, isian.durasi, opsi.aktif.value, opsi.pakaiDurasi.value, opsi.nip.value, opsi.idRiwayatCuti.value], jadwalkan)
   onBeforeUnmount(() => {
     clearTimeout(timer)
     token++

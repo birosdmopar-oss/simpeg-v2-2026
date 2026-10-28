@@ -1,16 +1,8 @@
 /**
- * Petunjuk TAMPILAN form per jenis cuti (PRD §6.2.3, §6.11.1). Hanya menentukan field mana yang diperlihatkan; seluruh
- * validasi, lama cuti, `tgl_akhir` jenis Besar, dan kuota tetap dari server (ADR-025/026, §6.11.3).
+ * Opsi statis form cuti. Aturan per jenis (memakai durasi, lampiran wajib) datang dari server di `GET cuti/opsi`
+ * (`jenis_cuti[].pakai_durasi`, `lampiran_wajib`; satu sumber dengan validasi server, ADR-025/026) — tidak ada
+ * konstanta kode jenis di FE.
  */
-
-/** Jenis 2 (Besar): `tgl_akhir` dihitung server dari `durasi` (1–3 bulan); kolom tanggal akhir tidak diisi pengguna. */
-export const JENIS_PAKAI_DURASI = 2
-
-/** Jenis 3 (Sakit): klien legacy mewajibkan lampiran bukti; server tetap yang menegakkan. */
-export const JENIS_BUKTI_WAJIB = 3
-
-/** Jenis 1 (Tahunan): panel kuota dari `POST cuti/hitung-lama`. */
-export const JENIS_PANEL_KUOTA = 1
 
 export const DURASI_OPSI = [
   { value: '1', label: '1 bulan' },

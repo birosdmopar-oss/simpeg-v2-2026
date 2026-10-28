@@ -373,4 +373,39 @@ final class KuotaBoundaryTest extends CIUnitTestCase
 
         return new SaldoCuti($sisa, $n1, $n2, $psc->utang, $psc->ditangguhkan);
     }
+
+    /**
+     * [V2] `sisa_setelah_tahun_ini`/`sisa_setelah_tahun_depan` (PRD §6.11.3, review Paket 2): saldo − menunggu − diajukan,
+     * dihitung di server supaya FE tidak menghitung. Negatif = kekurangan (cukup=false).
+     */
+    public function testPeriksaMemuatSisaSetelahPengajuanTahunIniDanDepan(): void
+    {
+        $saldo = new SaldoCuti(12, 6, 6, 0, 0);
+
+        $cukup = KuotaCuti::periksa($saldo, 5, 0, 2, 0, self::TAHUN, $this->aturan);
+        $this->assertTrue($cukup->valid);
+        $this->assertSame(24, $cukup->detail['saldo_tahun_ini']);
+        $this->assertSame(17, $cukup->detail['sisa_setelah_tahun_ini']);
+        $this->assertSame($saldo->saldoTahunDepan($this->aturan), $cukup->detail['saldo_tahun_depan']);
+        $this->assertSame($saldo->saldoTahunDepan($this->aturan), $cukup->detail['sisa_setelah_tahun_depan'], 'tanpa porsi tahun depan sisa = saldo');
+    }
+
+    public function testSisaSetelahPengajuanLintasTahunMemakaiPorsiTahunDepan(): void
+    {
+        $saldo = new SaldoCuti(12, 6, 6, 0, 0);
+
+        $hasil = KuotaCuti::periksa($saldo, 3, 4, 1, 2, self::TAHUN, $this->aturan);
+
+        $this->assertTrue($hasil->valid);
+        $this->assertSame(24 - 1 - 3, $hasil->detail['sisa_setelah_tahun_ini']);
+        $this->assertSame($saldo->saldoTahunDepan($this->aturan) - 2 - 4, $hasil->detail['sisa_setelah_tahun_depan']);
+    }
+
+    public function testSisaSetelahPengajuanNegatifBilaKuotaTidakCukup(): void
+    {
+        $hasil = KuotaCuti::periksa(new SaldoCuti(2, 0, 0, 0, 0), 5, 0, 0, 0, self::TAHUN, $this->aturan);
+
+        $this->assertFalse($hasil->valid);
+        $this->assertSame(-3, $hasil->detail['sisa_setelah_tahun_ini']);
+    }
 }

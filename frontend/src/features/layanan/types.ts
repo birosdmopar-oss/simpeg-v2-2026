@@ -129,6 +129,10 @@ export interface PejabatCuti {
 export interface JenisCutiOpsi {
   id_jenis_cuti: number
   nama_jenis_cuti: string
+  /** Server (`AturanCuti`): jenis diisi lewat `durasi` (bulan); `tgl_akhir` dihitung server. */
+  pakai_durasi: boolean
+  /** Server (`AturanCuti`): lampiran bukti wajib pada jenis ini. */
+  lampiran_wajib: boolean
 }
 
 /** Ringkasan saldo pada `GET cuti/opsi` (tahun berjalan). */
@@ -165,6 +169,9 @@ export interface KuotaHitung {
   saldo_tahun_depan: number
   menunggu_tahun_depan: number
   diajukan_tahun_depan: number
+  /** Dihitung server: saldo − menunggu − diajukan (negatif = kekurangan). */
+  sisa_setelah_tahun_ini: number
+  sisa_setelah_tahun_depan: number
   cukup: boolean
   pesan: string
 }

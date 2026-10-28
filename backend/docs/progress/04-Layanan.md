@@ -374,8 +374,8 @@ per NIP = `rentangBebasPresensi`). `bebasPresensiPenuh` dan `rentangBebasPresens
 Semua angka (lama, tanggal akhir Besar, hari libur, kuota) dari server; Simpan tidak dikunci hasil kalkulator; 422 per kolom (`lama_cuti` di bawah panel).
 
 Keputusan/ambigu untuk reviewer:
-1. Penanda tampilan per jenis ada di `cutiJenis.ts`: jenis 2 memakai `durasi` (tanggal akhir dari server), jenis 3 lampiran wajib (klien legacy; server tetap yang menegakkan), jenis 1 panel kuota. Server belum mengirim flag per jenis di `opsi`; kalau kode jenis berubah, FE ikut diubah.
-2. Panel kuota memakai nama kolom server apa adanya: "Dalam Proses" = `menunggu_tahun_ini`, "Diajukan Sekarang" = `diajukan_tahun_ini`, "Total Saldo" = `saldo_tahun_ini` (PRD §6.11.3 menulis "sisa setelah pengajuan"; `KuotaCuti` mengirim saldo total — label mengikuti isi).
-3. Pegawai role 1 dipilih lewat NIP + tombol muat (belum ada pencarian pegawai); pencarian pegawai bisa menyusul bila diminta.
-4. Kuota tahun depan (`saldo_tahun_depan` dst.) belum ditampilkan; pesan server `pesan` tampil saat `cukup=false`.
+1. **(Review Paket 2, diselesaikan)** Aturan per jenis dari server: `GET cuti/opsi` → `jenis_cuti[] {id_jenis_cuti, nama_jenis_cuti, pakai_durasi, lampiran_wajib}` dari `AturanCuti::pakaiDurasi()/lampiranWajib()` (aditif; `CutiCrudTest` memeriksa). Konstanta kode jenis di FE dihapus (`cutiJenis.ts` hanya opsi durasi + batas berkas). Batas `tgl_akhir_maks` tidak lagi dipasang sebagai `max` di FE (aturan hanya untuk jenis 1) — server tetap memvalidasi, 422 per kolom.
+2. **(Review Paket 2, diselesaikan)** Kuota: `KuotaCuti::periksa` kini menambah `sisa_setelah_tahun_ini` dan `sisa_setelah_tahun_depan` (saldo − menunggu − diajukan; negatif = kekurangan), diuji `KuotaBoundaryTest` (termasuk lintas tahun). Panel mengikuti PRD §6.11.3: N/N-1/N-2, Total Saldo, Dalam Proses, Diajukan Sekarang, **Sisa Setelah Pengajuan**.
+3. **(Review Paket 2, diselesaikan)** Porsi tahun depan (saldo, dalam proses, diajukan, sisa setelah) tampil bila `diajukan_tahun_depan > 0`. Role 1 memilih pegawai lewat `UiCombobox` (pencarian server `GET pegawai?search=`, min. 3 huruf, debounce 300 ms) lalu `cuti/opsi?nip=`.
+4. Pesan server `pesan` tampil saat `cukup=false` (atau sebagai catatan bila ada).
 5. Tangkapan layar form + kalkulator 1440/390 (API tiruan sintetis, tanpa Figma — Q-18): form 1 kolom di 390 px, tanpa scroll horizontal.

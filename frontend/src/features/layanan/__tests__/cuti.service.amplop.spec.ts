@@ -133,7 +133,10 @@ describe('cutiService — amplop backend nyata lewat klien asli', () => {
 
   it('opsi() menormalkan jenis, pejabat, saldo, dan ketua tim (string MySQLi)', async () => {
     server.balasan['get /cuti/opsi'] = sukses({
-      jenis_cuti: [{ id_jenis_cuti: '1', nama_jenis_cuti: 'Cuti Tahunan' }],
+      jenis_cuti: [
+        { id_jenis_cuti: '1', nama_jenis_cuti: 'Cuti Tahunan', pakai_durasi: '0', lampiran_wajib: '0' },
+        { id_jenis_cuti: '3', nama_jenis_cuti: 'Cuti Sakit', pakai_durasi: false, lampiran_wajib: true },
+      ],
       atasan_langsung: { nip: '197', nama: 'Atasan', jabatan: 'Kabag', bisa_memproses: '1' },
       pyb: [{ nip: '196', nama: 'Pejabat', jabatan: null, bisa_memproses: '0' }],
       langkah_tunggal: '0',
@@ -147,7 +150,10 @@ describe('cutiService — amplop backend nyata lewat klien asli', () => {
     const o = await cutiService.opsi('198001012005011001')
 
     expect(server.permintaan[0]?.params).toEqual({ nip: '198001012005011001' })
-    expect(o.jenis_cuti).toEqual([{ id_jenis_cuti: 1, nama_jenis_cuti: 'Cuti Tahunan' }])
+    expect(o.jenis_cuti).toEqual([
+      { id_jenis_cuti: 1, nama_jenis_cuti: 'Cuti Tahunan', pakai_durasi: false, lampiran_wajib: false },
+      { id_jenis_cuti: 3, nama_jenis_cuti: 'Cuti Sakit', pakai_durasi: false, lampiran_wajib: true },
+    ])
     expect(o.atasan_langsung).toMatchObject({ nip: '197', bisa_memproses: true })
     expect(o.pyb[0]).toMatchObject({ jabatan: null, bisa_memproses: false })
     expect(o.saldo).toMatchObject({ tahun: 2026, sisa_cuti_n2: 4, saldo_tahun_ini: 22 })
@@ -161,7 +167,7 @@ describe('cutiService — amplop backend nyata lewat klien asli', () => {
       satuan_lama_cuti: 'Hari',
       tgl_akhir: null,
       hari_libur: [{ tanggal: '2026-11-05', keterangan: 'Libur' }],
-      kuota: { tahun: '2026', sisa_cuti: '12', sisa_cuti_n1: '6', sisa_cuti_n2: '4', saldo_tahun_ini: '19', menunggu_tahun_ini: '1', diajukan_tahun_ini: '3', saldo_tahun_depan: '0', menunggu_tahun_depan: '0', diajukan_tahun_depan: '0', cukup: '0', pesan: 'Tidak cukup' },
+      kuota: { tahun: '2026', sisa_cuti: '12', sisa_cuti_n1: '6', sisa_cuti_n2: '4', saldo_tahun_ini: '19', menunggu_tahun_ini: '1', diajukan_tahun_ini: '3', saldo_tahun_depan: '0', menunggu_tahun_depan: '0', diajukan_tahun_depan: '0', sisa_setelah_tahun_ini: '15', sisa_setelah_tahun_depan: '-2', cukup: '0', pesan: 'Tidak cukup' },
     })
 
     const h = await cutiService.hitungLama({ id_jenis_cuti: 1, tgl_mulai: '2026-11-04', tgl_akhir: '2026-11-06' })
@@ -169,7 +175,7 @@ describe('cutiService — amplop backend nyata lewat klien asli', () => {
     expect(h.lama_cuti).toBe(3)
     expect(h.tgl_akhir).toBeNull()
     expect(h.hari_libur).toEqual([{ tanggal: '2026-11-05', keterangan: 'Libur' }])
-    expect(h.kuota).toMatchObject({ tahun: 2026, sisa_cuti_n1: 6, saldo_tahun_ini: 19, cukup: false, pesan: 'Tidak cukup' })
+    expect(h.kuota).toMatchObject({ tahun: 2026, sisa_cuti_n1: 6, saldo_tahun_ini: 19, sisa_setelah_tahun_ini: 15, sisa_setelah_tahun_depan: -2, cukup: false, pesan: 'Tidak cukup' })
     expect(JSON.parse(String(server.permintaan[0]?.data))).toEqual({ id_jenis_cuti: 1, tgl_mulai: '2026-11-04', tgl_akhir: '2026-11-06' })
   })
 

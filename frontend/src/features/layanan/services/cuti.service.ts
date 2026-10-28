@@ -109,6 +109,8 @@ function normalisasiKuota(raw: unknown): KuotaHitung | null {
     saldo_tahun_depan: num(r.saldo_tahun_depan),
     menunggu_tahun_depan: num(r.menunggu_tahun_depan),
     diajukan_tahun_depan: num(r.diajukan_tahun_depan),
+    sisa_setelah_tahun_ini: num(r.sisa_setelah_tahun_ini),
+    sisa_setelah_tahun_depan: num(r.sisa_setelah_tahun_depan),
     cukup: flag(r.cukup),
     pesan: String(r.pesan ?? ''),
   }
@@ -131,7 +133,12 @@ export const cutiService = {
     const { data } = await api.get<Record<string, unknown>>('/cuti/opsi', { params: nip ? { nip } : undefined })
     const saldo = data.saldo as Record<string, unknown> | null
     return {
-      jenis_cuti: daftarRecord(data.jenis_cuti).map((j) => ({ id_jenis_cuti: num(j.id_jenis_cuti), nama_jenis_cuti: String(j.nama_jenis_cuti ?? '') })),
+      jenis_cuti: daftarRecord(data.jenis_cuti).map((j) => ({
+        id_jenis_cuti: num(j.id_jenis_cuti),
+        nama_jenis_cuti: String(j.nama_jenis_cuti ?? ''),
+        pakai_durasi: flag(j.pakai_durasi),
+        lampiran_wajib: flag(j.lampiran_wajib),
+      })),
       atasan_langsung: normalisasiPejabat(data.atasan_langsung),
       pyb: daftarRecord(data.pyb).map((p) => normalisasiPejabat(p)!),
       langkah_tunggal: flag(data.langkah_tunggal),

@@ -14,9 +14,10 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role } from '@/features/auth/types'
 import { describeApiError, splitValidationErrors } from '@/features/kepegawaian/services/apiErrors'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
-import { UiButton, UiCheckbox, UiFileField, UiNotice, UiRadioGroup, UiSearchInput, UiSelect, UiTextField } from '@/shared/ui'
+import { pegawaiService } from '@/features/kepegawaian/services/pegawai.service'
+import { UiButton, UiCheckbox, UiCombobox, UiFileField, UiNotice, UiRadioGroup, UiSearchInput, UiSelect, UiTextField } from '@/shared/ui'
 
-import { BERKAS_BUKTI, DURASI_OPSI, JENIS_BUKTI_WAJIB, JENIS_PAKAI_DURASI } from '../cutiJenis'
+import { BERKAS_BUKTI, DURASI_OPSI } from '../cutiJenis'
 import { useHitungLama } from '../composables/useHitungLama'
 import { cutiService } from '../services/cuti.service'
 import type { CutiIsian, CutiItem, CutiOpsi } from '../types'
@@ -60,6 +61,9 @@ const isian = reactive({
   keterangan: '',
   nip_yang_menyetujui: '',
 })
+const cariPegawai = ref('')
+const saranPegawai = ref<{ label: string; nip: string }[]>([])
+let timerPegawai: ReturnType<typeof setTimeout> | undefined
 const ketuaTim = ref<string[]>([])
 const cariKetua = ref('')
 const berkas = ref<File | null>(null)
@@ -68,12 +72,13 @@ const umum = ref('')
 const busy = ref(false)
 
 const edit = computed(() => props.row !== null)
-const jenis = computed(() => Number(isian.id_jenis_cuti))
-const pakaiDurasi = computed(() => jenis.value === JENIS_PAKAI_DURASI)
+const jenisDipilih = computed(() => opsi.value?.jenis_cuti.find((j) => String(j.id_jenis_cuti) === isian.id_jenis_cuti) ?? null)
+const pakaiDurasi = computed(() => jenisDipilih.value?.pakai_durasi ?? false)
+const lampiranWajib = computed(() => jenisDipilih.value?.lampiran_wajib ?? false)
 const siapKalkulator = computed(() => props.open && opsi.value !== null)
 const nipKalkulator = computed(() => (admin.value ? isian.nip.trim() : ''))
 const idRiwayat = computed(() => props.row?.id ?? null)
-const kalkulator = useHitungLama(isian, { aktif: siapKalkulator, nip: nipKalkulator, idRiwayatCuti: idRiwayat })
+const kalkulator = useHitungLama(isian, { aktif: siapKalkulator, pakaiDurasi, nip: nipKalkulator, idRiwayatCuti: idRiwayat })
 
 const jenisOpsi = computed(() => (opsi.value?.jenis_cuti ?? []).map((j) => ({ value: String(j.id_jenis_cuti), label: j.nama_jenis_cuti })))
 const pybOpsi = computed(() => (opsi.value?.pyb ?? []).map((p) => ({ value: p.nip, label: p.jabatan ? `${p.nama} — ${p.jabatan}` : p.nama })))
@@ -85,7 +90,6 @@ const ketuaTersaring = computed(() => {
   return kata === '' ? semua : semua.filter((k) => k.nama.toLowerCase().includes(kata) || k.nip.includes(kata))
 })
 const bisaDiisi = computed(() => opsi.value !== null && opsi.value.can_create)
-const maksTglAkhir = computed(() => (jenis.value === 1 ? (opsi.value?.tgl_akhir_maks ?? undefined) : undefined))
 
 function reset(): void {
   opsi.value = null
@@ -94,6 +98,8 @@ function reset(): void {
   berkas.value = null
   cariKetua.value = ''
   ketuaTim.value = []
+  cariPegawai.value = ''
+  saranPegawai.value = []
   Object.assign(isian, {
     nip: '',
     status: '0',
@@ -155,6 +161,38 @@ watch(
   { immediate: true },
 )
 
+function labelPegawai(p: { nip: string; nama: string; glr_awal: string | null; glr_akhir: string | null }): string {
+  const nama = [p.glr_awal, p.nama].filter(Boolean).join(' ') + (p.glr_akhir ? `, ${p.glr_akhir}` : '')
+  return `${p.nip} — ${nama}`
+}
+
+/** Pencarian pegawai ke server (`GET pegawai?search=`, role 1); memilih saran memuat `cuti/opsi?nip=`. */
+async function cariPegawaiServer(kata: string): Promise<void> {
+  try {
+    const hasil = await pegawaiService.list({ page: 1, per_page: 10, search: kata })
+    saranPegawai.value = hasil.items.map((p) => ({ nip: p.nip, label: labelPegawai(p) }))
+  } catch {
+    saranPegawai.value = []
+  }
+}
+
+function onCariPegawai(nilai: string): void {
+  cariPegawai.value = nilai
+  const dipilih = saranPegawai.value.find((s) => s.label === nilai)
+  if (dipilih) {
+    isian.nip = dipilih.nip
+    void muatOpsi(dipilih.nip)
+    return
+  }
+  isian.nip = ''
+  clearTimeout(timerPegawai)
+  if (nilai.trim().length < 3) {
+    saranPegawai.value = []
+    return
+  }
+  timerPegawai = setTimeout(() => void cariPegawaiServer(nilai.trim()), 300)
+}
+
 function pilihKetua(nip: string, dipilih: boolean): void {
   ketuaTim.value = dipilih ? [...new Set([...ketuaTim.value, nip])] : ketuaTim.value.filter((n) => n !== nip)
 }
@@ -185,8 +223,8 @@ function isianKirim(): CutiIsian {
 async function simpan(): Promise<void> {
   errors.value = {}
   umum.value = ''
-  if (jenis.value === JENIS_BUKTI_WAJIB && !edit.value && !berkas.value) {
-    errors.value = { file_bukti: 'Lampiran bukti wajib untuk cuti sakit.' }
+  if (lampiranWajib.value && !edit.value && !berkas.value) {
+    errors.value = { file_bukti: 'Lampiran bukti wajib untuk jenis cuti ini.' }
     return
   }
   busy.value = true
@@ -236,21 +274,19 @@ const pesan = (k: string): string | undefined => errors.value[k] || kalkulator.g
         <form v-else :class="FORM_GRID_CLASS" novalidate data-testid="cuti-form" @submit.prevent="simpan">
           <p v-if="umum" role="alert" :class="FORM_ALERT_CLASS" data-testid="cuti-form-error">{{ umum }}</p>
 
-          <template v-if="admin && !edit">
-            <UiTextField
-              v-model="isian.nip"
-              label="NIP Pegawai"
-              required
-              :state="state('nip')"
-              :help-text="pesan('nip')"
-              data-testid="cuti-nip"
+          <div v-if="admin && !edit" :class="FORM_WIDE_CLASS" data-testid="cuti-pegawai">
+            <span class="mb-1.5 block text-body2 font-medium text-slate-700">Pegawai<span class="text-danger" aria-hidden="true"> *</span></span>
+            <UiCombobox
+              :model-value="cariPegawai"
+              :suggestions="saranPegawai.map((x) => x.label)"
+              placeholder="Cari NIP atau nama pegawai (min. 3 huruf)"
+              aria-label="Pegawai"
+              :invalid="!!errors.nip"
+              @update:model-value="onCariPegawai"
             />
-            <div class="flex items-end">
-              <UiButton type="button" appearance="soft" variant="secondary" :disabled="isian.nip.trim() === '' || memuatOpsi" data-testid="cuti-muat-pegawai" @click="muatOpsi(isian.nip.trim())">
-                Muat Data Pegawai
-              </UiButton>
-            </div>
-          </template>
+            <span v-if="errors.nip" role="alert" class="mt-1 block text-caption text-danger">{{ errors.nip }}</span>
+            <span v-else-if="isian.nip" class="mt-1 block text-caption text-slate-500" data-testid="cuti-pegawai-terpilih">NIP terpilih: {{ isian.nip }}</span>
+          </div>
 
           <UiNotice v-if="opsi && !bisaDiisi" tone="warning" :class="FORM_WIDE_CLASS" data-testid="cuti-tidak-bisa">
             Tidak ada jenis cuti yang dapat diajukan untuk pegawai ini.
@@ -306,7 +342,6 @@ const pesan = (k: string): string | undefined => errors.value[k] || kalkulator.g
               type="date"
               label="Tanggal Akhir"
               required
-              :max="maksTglAkhir"
               :state="state('tgl_akhir')"
               :help-text="pesan('tgl_akhir')"
               data-testid="cuti-tgl-akhir"
@@ -395,7 +430,7 @@ const pesan = (k: string): string | undefined => errors.value[k] || kalkulator.g
                 label="Lampiran Bukti"
                 :allowed="[...BERKAS_BUKTI.allowed]"
                 :max-mb="BERKAS_BUKTI.maxMb"
-                :hint="jenis === JENIS_BUKTI_WAJIB && !edit ? 'Wajib untuk cuti sakit.' : 'Opsional.'"
+                :hint="lampiranWajib && !edit ? 'Wajib untuk jenis cuti ini.' : 'Opsional.'"
                 @change="(f) => (berkas = f)"
               />
               <span v-if="errors.file_bukti" role="alert" class="mt-1 block text-caption text-danger" data-testid="cuti-file-error">{{ errors.file_bukti }}</span>

@@ -45,10 +45,31 @@ defineProps<{ hasil: HitungLamaCuti | null; memuat: boolean; galatUmum: string; 
           <div><dt class="text-slate-500">N</dt><dd class="text-slate-900">{{ hasil.kuota.sisa_cuti }}</dd></div>
           <div><dt class="text-slate-500">N-1</dt><dd class="text-slate-900">{{ hasil.kuota.sisa_cuti_n1 }}</dd></div>
           <div><dt class="text-slate-500">N-2</dt><dd class="text-slate-900">{{ hasil.kuota.sisa_cuti_n2 }}</dd></div>
+          <div><dt class="text-slate-500">Total Saldo</dt><dd class="text-slate-900" data-testid="kalkulator-saldo">{{ hasil.kuota.saldo_tahun_ini }}</dd></div>
           <div><dt class="text-slate-500">Dalam Proses</dt><dd class="text-slate-900">{{ hasil.kuota.menunggu_tahun_ini }}</dd></div>
           <div><dt class="text-slate-500">Diajukan Sekarang</dt><dd class="text-slate-900">{{ hasil.kuota.diajukan_tahun_ini }}</dd></div>
-          <div><dt class="text-slate-500">Total Saldo</dt><dd class="text-slate-900" data-testid="kalkulator-saldo">{{ hasil.kuota.saldo_tahun_ini }}</dd></div>
+          <div class="col-span-3">
+            <dt class="text-slate-500">Sisa Setelah Pengajuan</dt>
+            <dd class="font-semibold" :class="hasil.kuota.sisa_setelah_tahun_ini < 0 ? 'text-danger' : 'text-slate-900'" data-testid="kalkulator-sisa-setelah">
+              {{ hasil.kuota.sisa_setelah_tahun_ini }}
+            </dd>
+          </div>
         </dl>
+
+        <div v-if="hasil.kuota.diajukan_tahun_depan > 0" class="mt-3 border-t border-slate-200 pt-3" data-testid="kalkulator-tahun-depan">
+          <p class="mb-1 text-body2 font-medium text-slate-900">Porsi Tahun {{ hasil.kuota.tahun + 1 }} (pengajuan lintas tahun)</p>
+          <dl class="grid grid-cols-3 gap-2 text-body2">
+            <div><dt class="text-slate-500">Saldo</dt><dd class="text-slate-900">{{ hasil.kuota.saldo_tahun_depan }}</dd></div>
+            <div><dt class="text-slate-500">Dalam Proses</dt><dd class="text-slate-900">{{ hasil.kuota.menunggu_tahun_depan }}</dd></div>
+            <div><dt class="text-slate-500">Diajukan</dt><dd class="text-slate-900">{{ hasil.kuota.diajukan_tahun_depan }}</dd></div>
+            <div class="col-span-3">
+              <dt class="text-slate-500">Sisa Setelah Pengajuan</dt>
+              <dd class="font-semibold" :class="hasil.kuota.sisa_setelah_tahun_depan < 0 ? 'text-danger' : 'text-slate-900'" data-testid="kalkulator-sisa-setelah-depan">
+                {{ hasil.kuota.sisa_setelah_tahun_depan }}
+              </dd>
+            </div>
+          </dl>
+        </div>
         <UiNotice v-if="!hasil.kuota.cukup" tone="warning" class="mt-2" data-testid="kalkulator-tidak-cukup">
           {{ hasil.kuota.pesan || 'Kuota cuti tidak mencukupi.' }}
         </UiNotice>
