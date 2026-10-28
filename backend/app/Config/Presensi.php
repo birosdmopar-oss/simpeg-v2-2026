@@ -96,10 +96,11 @@ class Presensi extends BaseConfig
     // --- 5B M5 laporan Tukin (MAKE-041) ---
 
     /**
-     * Batas baris PDF rekap Tukin (PRD 5B §7.3.5, F5B-16; awal 1.700 = ADR-034, disesuaikan hasil uji volume ADR-035):
-     * di atas batas → 422 `errors.unit_satker`. Override `.env` `presensi.pdfRekapMaksBaris` (bilangan bulat positif).
+     * Batas baris PDF rekap Tukin (PRD 5B §7.3.5, F5B-16): awal 1.700 (ADR-034) diturunkan ke 800 menurut uji volume
+     * ADR-035 (1.700 baris = 440 MB, di atas target 256 MB). Di atas batas → 422 `errors.unit_satker`. Override `.env`
+     * `presensi.pdfRekapMaksBaris` (bilangan bulat positif).
      */
-    public int $pdfRekapMaksBaris = 1700;
+    public int $pdfRekapMaksBaris = 800;
 
     /**
      * Id unit yang penanda tangan rekapnya diambil dari **satker terpilih** (legacy hard-code `'6'`,
