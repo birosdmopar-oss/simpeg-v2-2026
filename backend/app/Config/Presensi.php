@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Config;
 
-use App\Libraries\Presensi\TukinData\SumberCutiTbBelumTersedia;
+use App\Libraries\Presensi\TukinData\SumberCutiTbFase4;
 use App\Libraries\Presensi\TukinData\SumberCutiTbInterface;
 use CodeIgniter\Config\BaseConfig;
 
@@ -78,11 +78,20 @@ class Presensi extends BaseConfig
     // --- M6 adapter Tukin (MAKE-033) ---
 
     /**
-     * Sumber data cuti & tugas belajar harian untuk adapter Tukin (PRD 5A §7.7.6). Bawaan 5A = fail-closed
-     * (`DataTukinBelumTersedia`); 5B mengganti nilai ini dengan implementasi berbasis data Fase 4. Nama kelas
-     * divalidasi saat dipakai (`TukinDataService::sumberCutiTb()`: wajib mengimplementasikan {@see SumberCutiTbInterface}).
+     * Sumber data cuti & tugas belajar harian untuk adapter Tukin (PRD 5A §7.7.6). 5B M1 (MAKE-039, PRD 5B §7.1.4):
+     * `SumberCutiTbFase4` — data Fase 4 (`riwayat_cuti` status 1, TB lewat `statusTugasBelajar`), menggantikan bawaan 5A
+     * yang fail-closed (`SumberCutiTbBelumTersedia`). Nama kelas divalidasi saat dipakai
+     * (`TukinDataService::sumberCutiTb()`: wajib mengimplementasikan {@see SumberCutiTbInterface}).
      */
-    public string $sumberCutiTb = SumberCutiTbBelumTersedia::class;
+    public string $sumberCutiTb = SumberCutiTbFase4::class;
+
+    // --- 5B M1 sumber cuti/TB nyata (MAKE-039) ---
+
+    /**
+     * Jumlah NIP per batch jalur massal Tukin (`TukinDataService::siapkanBanyak`, PRD 5B §7.1.4, §7.3.8): jumlah kueri
+     * tetap per batch. Override `.env` `presensi.tukinBatchNip` (bilangan bulat positif; nilai lain diabaikan).
+     */
+    public int $tukinBatchNip = 500;
 
     public function __construct()
     {
@@ -91,6 +100,7 @@ class Presensi extends BaseConfig
         $this->maksUkuranImporByte    = self::angkaPositifDariEnv('presensi.maksUkuranImporByte', $this->maksUkuranImporByte);
         $this->maksBarisImporPerSheet = self::angkaPositifDariEnv('presensi.maksBarisImporPerSheet', $this->maksBarisImporPerSheet);
         $this->ttlPratinjauDetik      = self::angkaPositifDariEnv('presensi.ttlPratinjauDetik', $this->ttlPratinjauDetik);
+        $this->tukinBatchNip          = self::angkaPositifDariEnv('presensi.tukinBatchNip', $this->tukinBatchNip);
 
         $this->akarAset = self::direktoriAbsolut($this->akarAset) ?? WRITEPATH . 'aset/';
 

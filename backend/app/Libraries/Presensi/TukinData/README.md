@@ -1,4 +1,4 @@
-# Adapter data Tukin (`Libraries/Presensi/TukinData`) — Fase 5A M6 (MAKE-033)
+# Adapter data Tukin (`Libraries/Presensi/TukinData`) — Fase 5A M6 (MAKE-033), 5B M1 (MAKE-039)
 
 Kode ber-DB yang menyiapkan argumen `KalkulasiTukin::hitung()` (library murni `Presensi/Tukin`, tidak diubah) dari data
 v2. Acuan: PRD `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` §7.7. Legacy = rekap aktif `laporan_tukin_us_skp`
@@ -16,10 +16,34 @@ README `Presensi/Tukin` "Kontrak data"). Galat terkendali = turunan `GalatDataTu
 | `KonfigurasiTukinTidakLengkap` | Tarif wajib `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK` belum diatur di Web Config (tidak pernah diganti 0) |
 | `RentangPuasaGanda` | Lebih dari satu `rentang_puasa` beririsan dengan periode |
 | `DataTukinTidakSah` | Baris `bkn_periode_ekinper` ganda/tidak berformat `MM-DD`, periode BKN tidak berakhir di bulan itu, pegawai tidak ada, nilai ditolak library (mis. tarif 0,01% → faktor 0,2 tidak bulat), atau jam `dh_online` tidak sah |
-| `DataTukinBelumTersedia` | Sumber cuti/TB bawaan 5A (fail-closed sampai 5B) |
+| `DataTukinBelumTersedia` | Sumber cuti/TB fail-closed 5A (`SumberCutiTbBelumTersedia`; tidak lagi bawaan sejak 5B M1) |
 
-Sumber cuti/TB dipilih `Config\Presensi::$sumberCutiTb` (bawaan `SumberCutiTbBelumTersedia`); 5B menggantinya dengan data
-Fase 4. 5A **dilarang** membaca `riwayat_cuti`/`riwayat_tb`.
+Sumber cuti/TB dipilih `Config\Presensi::$sumberCutiTb`: sejak **5B M1 (MAKE-039)** = `SumberCutiTbFase4` (data Fase 4,
+bagian "Cuti & tugas belajar (5B)" di bawah); sebelumnya `SumberCutiTbBelumTersedia` (5A dilarang membaca
+`riwayat_cuti`/`riwayat_tb`).
+
+**Jalur massal (5B M1, PRD 5B §7.1.4):** `TukinDataService::siapkanBanyak(list<nip>, tahun, bulan, ?hariIni, ?ukuranBatch)`
+→ `array<nip, ArgumenTukin|GalatDataTukin>`. Periode, libur, dan konfigurasi dihitung sekali; harian & data pegawai dimuat
+per batch `Config\Presensi::$tukinBatchNip` (bawaan 500, override `.env` `presensi.tukinBatchNip`) lewat varian massal
+aditif `SumberHarianTukin::untukBanyak()` dan `SumberDataPegawaiTukin::untukBanyak()` (keputusan reviewer CR M0 F1 —
+deviasi aditif PRD 5B §3.3; metode tunggal tidak berubah perilaku, aturan pemetaan memakai helper bersama). Jumlah kueri
+**tetap** terhadap jumlah NIP; galat satu pegawai (jam tidak sah, jenis cuti di luar 1..6, pegawai tidak ada) menjadi
+nilai NIP itu saja; konfigurasi tarif belum lengkap → semua NIP `KonfigurasiTukinTidakLengkap`. Urutan galat per NIP =
+`siapkan()` (harian → konfigurasi → data pegawai). Test: `TukinDataMassalTest` (kesetaraan tunggal vs massal + hitung
+kueri lewat event `DBQuery`).
+
+## Cuti & tugas belajar (5B M1, `SumberCutiTbFase4`, PRD 5B §7.1)
+
+| Butir | Aturan | Label / rujukan |
+|---|---|---|
+| Cuti | `riwayat_cuti` **`status = 1` saja** (0/2/3/4 diabaikan, Fase 4 §8) yang beririsan [awal, akhir]; setiap tanggal kalender `tgl_mulai..tgl_akhir` di dalam rentang (termasuk akhir pekan/libur) → `cuti {jenis, mulai, akhir, lama}` | [K] `L_presensi.php:12201-12267` |
+| Jenis | `id_jenis_cuti` 1..6 → `tahunan`, `besar`, `sakit`, `melahirkan`, `alasan_penting`, `cltn` (kebalikan `StatusHarian::JENIS_CUTI`); di luar 1..6 → `DataTukinTidakSah` | [V2] F5B-17 (legacy diam-diam membebaskan) |
+| Tumpang tindih | Tanggal yang sama dari dua cuti → `id_riwayat_cuti` terbesar | [V2] F5B-17 (legacy: `tgl_mulai` terbesar, seri tak pasti) |
+| Tugas belajar | Tanggal `service('statusTugasBelajar')->rentangBebasPresensiBanyak()` (Fase 4 MAKE-044: TB status 1 + perpanjangan, celah tidak bebas) → `tugas_belajar = true`; aturan TB tidak disalin | PRD 5B §7.1.3, F5B-18 |
+| Massal | `untukBanyak(list<nip>)`: satu kueri `riwayat_cuti` per 500 NIP + kueri TB Fase 4; `untuk()` = `untukBanyak([nip])[nip]` | PRD 5B §7.1.1 |
+
+Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest` (AC-D06.1/.2/.6), `CutiSakitLookbackTest` (AC-D06.3),
+`CutiBesarMelahirkanPeriodeTest` (AC-D06.4/.5), `TukinDataMassalTest` (AC-D06.9).
 
 ## Aturan per sumber
 

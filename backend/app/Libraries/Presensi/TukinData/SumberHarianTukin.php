@@ -26,9 +26,15 @@ use InvalidArgumentException;
  * mendapat `{affect_tukin, kategori}`; tanggal yang tercakup lebih dari satu konket memakai baris terakhir menurut
  * urutan `date_start` naik (legacy menimpa entri per tanggal). Cuti & tugas belajar lewat {@see SumberCutiTbInterface}
  * (5A: fail-closed).
+ *
+ * Varian massal {@see self::untukBanyak()} (MAKE-039, keputusan reviewer CR M0 F1 — deviasi aditif PRD 5B §3.3): aturan
+ * pemetaan baris sama dengan jalur tunggal (helper bersama), satu kueri `dh_online` + satu kueri `absen_ijin` per
+ * {@see self::BATCH_NIP} NIP; data tidak sah satu pegawai menjadi {@see GalatDataTukin} NIP itu saja.
  */
 final class SumberHarianTukin
 {
+    public const BATCH_NIP = 500;
+
     public function __construct(
         private readonly BaseConnection $db,
         private readonly SumberCutiTbInterface $cutiTb,
@@ -64,6 +70,72 @@ final class SumberHarianTukin
     }
 
     /**
+     * Masukan harian banyak pegawai sekaligus; hasil per NIP = {@see self::untuk()} NIP itu, atau galatnya.
+     *
+     * @param list<string> $nip
+     *
+     * @return array<array-key, array<string, array<string, mixed>>|GalatDataTukin> setiap NIP masukan menjadi kunci
+     */
+    public function untukBanyak(array $nip, string $awal, string $akhir): array
+    {
+        $unik = array_values(array_unique(array_map('strval', $nip)));
+
+        if ($unik === []) {
+            return [];
+        }
+
+        $harian = array_fill_keys($unik, []);
+        $galat  = [];
+
+        foreach (array_chunk($unik, self::BATCH_NIP) as $batch) {
+            foreach ($this->barisPresensi($batch, $awal, $akhir) as $n => $baris) {
+                try {
+                    foreach (self::petakanPresensi((string) $n, $baris) as $tanggal => $presensi) {
+                        $harian[$n][$tanggal]['presensi'] = $presensi;
+                    }
+                } catch (GalatDataTukin $e) {
+                    $galat[$n] ??= $e;
+                }
+            }
+
+            foreach ($this->barisKonket($batch, $awal, $akhir) as $n => $baris) {
+                foreach (self::petakanKonket($baris, $awal, $akhir) as $tanggal => $konket) {
+                    $harian[$n][$tanggal]['konket'] = $konket;
+                }
+            }
+        }
+
+        foreach ($this->cutiTbBanyak($unik, $awal, $akhir) as $n => $data) {
+            if ($data instanceof GalatDataTukin) {
+                $galat[$n] ??= $data;
+
+                continue;
+            }
+
+            foreach ($data as $tanggal => $isi) {
+                foreach (['tugas_belajar', 'cuti'] as $kunci) {
+                    if (array_key_exists($kunci, $isi)) {
+                        $harian[$n][$tanggal][$kunci] = $isi[$kunci];
+                    }
+                }
+            }
+        }
+
+        foreach ($harian as $n => $perTanggal) {
+            if (isset($galat[$n])) {
+                $harian[$n] = $galat[$n];
+
+                continue;
+            }
+
+            ksort($perTanggal, SORT_STRING);
+            $harian[$n] = $perTanggal;
+        }
+
+        return $harian;
+    }
+
+    /**
      * @return array<string, array{masuk: ?string, pulang: ?string}>
      *
      * @throws DataTukinTidakSah
@@ -80,18 +152,7 @@ final class SumberHarianTukin
             ->get()
             ->getResultArray();
 
-        $hasil = [];
-
-        foreach ($baris as $b) {
-            $tanggal = (string) $b['tgl'];
-
-            $hasil[$tanggal] = [
-                'masuk'  => self::jam($b['jam_masuk'], $nip, $tanggal),
-                'pulang' => self::jam($b['jam_pulang'], $nip, $tanggal),
-            ];
-        }
-
-        return $hasil;
+        return self::petakanPresensi($nip, $baris);
     }
 
     /**
@@ -112,6 +173,130 @@ final class SumberHarianTukin
             ->get()
             ->getResultArray();
 
+        return self::petakanKonket($baris, $awal, $akhir);
+    }
+
+    /**
+     * Baris `dh_online` banyak NIP dikelompokkan per NIP, urut `tgl` naik (sama dengan {@see self::presensi()}).
+     *
+     * @param list<string> $nip
+     *
+     * @return array<array-key, list<array<string, mixed>>>
+     */
+    private function barisPresensi(array $nip, string $awal, string $akhir): array
+    {
+        /** @var list<array<string, mixed>> $baris */
+        $baris = $this->db->table('dh_online')
+            ->select(['nip', 'tgl', 'jam_masuk', 'jam_pulang'])
+            ->whereIn('nip', $nip)
+            ->where('tgl >=', $awal)
+            ->where('tgl <=', $akhir)
+            ->orderBy('nip', 'ASC')
+            ->orderBy('tgl', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return self::kelompokkan($baris);
+    }
+
+    /**
+     * Baris `absen_ijin` banyak NIP dikelompokkan per NIP, urut `date_start`, `id` naik (sama dengan {@see self::konket()}).
+     *
+     * @param list<string> $nip
+     *
+     * @return array<array-key, list<array<string, mixed>>>
+     */
+    private function barisKonket(array $nip, string $awal, string $akhir): array
+    {
+        /** @var list<array<string, mixed>> $baris */
+        $baris = $this->db->table('absen_ijin')
+            ->select(['nip', 'date_start', 'date_end', 'affect_tukin', 'kategori'])
+            ->whereIn('nip', $nip)
+            ->where('status', 'V')
+            ->where('affect_tukin', 1)
+            ->where('DATE(date_start) <=', $akhir)
+            ->where('DATE(date_end) >=', $awal)
+            ->orderBy('nip', 'ASC')
+            ->orderBy('date_start', 'ASC')
+            ->orderBy('id', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return self::kelompokkan($baris);
+    }
+
+    /**
+     * Cuti/TB banyak NIP: varian massal bila sumbernya mendukung, selain itu `untuk()` per NIP (galat per NIP).
+     *
+     * @param list<string> $nip
+     *
+     * @return array<array-key, array<string, array<string, mixed>>|GalatDataTukin>
+     */
+    private function cutiTbBanyak(array $nip, string $awal, string $akhir): array
+    {
+        if ($this->cutiTb instanceof SumberCutiTbMassalInterface) {
+            return $this->cutiTb->untukBanyak($nip, $awal, $akhir);
+        }
+
+        $hasil = [];
+
+        foreach ($nip as $n) {
+            try {
+                $hasil[$n] = $this->cutiTb->untuk($n, $awal, $akhir);
+            } catch (GalatDataTukin $e) {
+                $hasil[$n] = $e;
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baris
+     *
+     * @return array<array-key, list<array<string, mixed>>>
+     */
+    private static function kelompokkan(array $baris): array
+    {
+        $hasil = [];
+
+        foreach ($baris as $b) {
+            $hasil[(string) $b['nip']][] = $b;
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baris baris `dh_online` satu pegawai, urut `tgl` naik
+     *
+     * @return array<string, array{masuk: ?string, pulang: ?string}>
+     *
+     * @throws DataTukinTidakSah
+     */
+    private static function petakanPresensi(string $nip, array $baris): array
+    {
+        $hasil = [];
+
+        foreach ($baris as $b) {
+            $tanggal = (string) $b['tgl'];
+
+            $hasil[$tanggal] = [
+                'masuk'  => self::jam($b['jam_masuk'], $nip, $tanggal),
+                'pulang' => self::jam($b['jam_pulang'], $nip, $tanggal),
+            ];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baris baris `absen_ijin` satu pegawai, urut `date_start`, `id` naik
+     *
+     * @return array<string, array{affect_tukin: int, kategori: int}>
+     */
+    private static function petakanKonket(array $baris, string $awal, string $akhir): array
+    {
         $hasil = [];
 
         foreach ($baris as $b) {
