@@ -27,7 +27,7 @@ Isi kolom Hasil: ✅ lolos / ❌ gagal (+ nomor temuan) / — tidak berlaku.
 | A1 | Navbar atas sticky; menu samping & isi halaman punya area gulir mandiri; scrollbar ramping custom | |
 | A2 | Tidak ada elemen bawaan browser yang terlihat: `<select>` native, popup tanggal/jam bawaan, tooltip `title`, `alert/confirm` | |
 | A3 | Tidak ada scroll horizontal halaman di 390/600 px; tabel tergulir di wadahnya sendiri | |
-| A4 | Setelah CR-069 di `main`: hanya area tabel yang bergulir, header/filter tetap (pola baru) | |
+| A4 | Desktop ≥ 1024: hanya area tabel yang bergulir, judul/filter tetap, header kolom sticky (CR-069; Kelola Slip tab Monitoring & Data Presensi; tab Impor menggulir normal); mobile: header kolom sticky (CR-070, bila sudah di `main`) | |
 | A5 | Semua aksi per baris lewat ⋮ di kolom Aksi paling kanan; menu terbuka **di samping tombol** (bukan di luar layar) di desktop & 390 px | |
 | A6 | Label menu ⋮ persis baku; aksi destruktif merah paling bawah dengan pemisah; aksi yang tidak berlaku tidak tampil | |
 | A7 | Aksi berisiko memakai `ConfirmDialog`; tombol batal & konfirmasi jelas | |

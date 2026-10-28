@@ -190,9 +190,11 @@ server).
 ## 7. Blocker & pertanyaan terbuka
 
 - **QA Lapis 1 FE 5A (Q5A-18, AC-FE.9)** — checklist disiapkan untuk QA; D-12 tetap IN_PROGRESS sampai lolos.
-- **CR-069** (gulir hanya di area tabel, header/filter tetap; aturan AGENTS §3 baru) belum di `main` saat M8 disusun →
-  tindak lanjut: Kelola Slip Gaji (Monitoring) dan Data Presensi (daftar & detail) disesuaikan ke pola CR-069 setelah
-  masuk `main` (kartu terpisah / bagian 5C, tanpa perubahan perilaku data).
+- **CR-069** (gulir hanya di area tabel pada desktop ≥ 1024, header/filter tetap) masuk `main` `bddd089` dan sudah
+  diterapkan CR-069 ke Kelola Slip Gaji tab Monitoring dan Data Presensi (daftar & detail); tab Impor tetap menggulir
+  normal. M8 me-merge `main` lalu mengecek ulang di browser desktop 1440 px: halaman tidak menggulir, area tabel
+  menggulir sendiri, judul & filter tetap di tempat, header kolom sticky di dalam area tabel, menu ⋮ terbuka di dalam
+  viewport. **CR-070** (header kolom sticky di mobile) masih dikerjakan sesi lain → dicek di QA Lapis 1 (butir A4).
 - **Q5A-13** (cross-check rumus Tukin) — prasyarat 5B (PRD 5B).
 
 ### 7.1 Blocker go-live (§11.2; bukan blocker 5A DONE)
