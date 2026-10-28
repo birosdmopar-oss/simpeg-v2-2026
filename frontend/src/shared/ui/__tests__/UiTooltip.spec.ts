@@ -33,6 +33,22 @@ describe('UiTooltip', () => {
     expect(pemicu.attributes('data-tooltip')).toBe('Nama berkas lengkap.pdf')
   })
 
+  it('CR-068: atribut & listener yang diberikan ke UiTooltip diteruskan ke elemen pemicu (pola as-child)', async () => {
+    let klik = 0
+    const w = mount(UiTooltip, {
+      props: { content: 'Aksi' },
+      attrs: { 'aria-haspopup': 'menu', 'data-uji': 'x', onClick: () => klik++ },
+      slots: { default: '<button type="button" data-testid="pemicu">Buka</button>' },
+      attachTo: document.body,
+    })
+    const pemicu = w.get('[data-testid="pemicu"]')
+
+    expect(pemicu.attributes('aria-haspopup')).toBe('menu')
+    expect(pemicu.attributes('data-uji')).toBe('x')
+    await pemicu.trigger('click')
+    expect(klik).toBe(1)
+  })
+
   it('fokus keyboard memunculkan tooltip berisi teks, pemicu mendapat aria-describedby ke tooltip', async () => {
     const w = mountTip()
     const pemicu = w.get('[data-testid="pemicu"]')

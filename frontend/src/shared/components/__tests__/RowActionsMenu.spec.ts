@@ -52,6 +52,26 @@ describe('RowActionsMenu', () => {
     expect(wrapper.element.contains(menu)).toBe(false)
   })
 
+  it('CR-068: konten menu ter-anchor ke trigger ⋮ (bukan ke konteks popper tooltip) sehingga terposisi', async () => {
+    const wrapper = mountMenu([{ key: 'edit', label: 'Edit', icon: Pencil }])
+
+    const menu = await openRowMenu(wrapper, TESTID)
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 0))
+    await flushPromises()
+
+    // radix-vue PopperContent menahan `translate(0, -200%)` (di luar layar) selama floating-ui belum punya anchor.
+    const popper = menu.closest('[data-radix-popper-content-wrapper]') as HTMLElement | null
+    expect(popper).not.toBeNull()
+    expect(popper!.style.transform).not.toBe('translate(0, -200%)')
+    expect(popper!.style.transform).toMatch(/^translate\(-?\d/)
+
+    // Tooltip tetap berfungsi: fokus keyboard pada trigger memunculkan tooltip berisi label.
+    await wrapper.get(`[data-testid="${TESTID}"]`).trigger('focus')
+    await flushPromises()
+    expect(document.body.querySelector('[data-testid="ui-tooltip"]')?.textContent).toContain('Aksi untuk Islam')
+  })
+
   it('bisa dibuka dengan keyboard (Enter pada trigger)', async () => {
     const wrapper = mountMenu([{ key: 'edit', label: 'Edit' }])
 
