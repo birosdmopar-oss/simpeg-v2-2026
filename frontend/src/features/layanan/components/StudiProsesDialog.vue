@@ -111,8 +111,8 @@ const pesan = (k: string): string | undefined => errors.value[k] || undefined
           <template v-if="aksi === 'setujui'">
             <UiTextField v-model="isian.no_sk" label="No. SK" required :state="state(sk.no_sk)" :help-text="pesan(sk.no_sk)" />
             <UiTextField v-model="isian.tgl_sk" type="date" label="Tanggal SK" required :state="state(sk.tgl_sk)" :help-text="pesan(sk.tgl_sk)" />
-            <UiTextField v-model="isian.ds" label="Dasar SK" :state="state(sk.ds)" :help-text="pesan(sk.ds)" />
-            <UiTextField v-model="isian.no_ds" label="No. Dasar" :state="state(sk.no_ds)" :help-text="pesan(sk.no_ds)" />
+            <UiTextField v-model="isian.ds" label="Dasar SK" required :state="state(sk.ds)" :help-text="pesan(sk.ds)" />
+            <UiTextField v-model="isian.no_ds" label="No. Dasar" required :state="state(sk.no_ds)" :help-text="pesan(sk.no_ds)" />
             <UiTextField v-model="isian.tgl_ds" type="date" label="Tanggal Dasar" :state="state(sk.tgl_ds)" :help-text="pesan(sk.tgl_ds)" />
             <UiTextField v-model="isian.perihal_ds" label="Perihal Dasar" :state="state(sk.perihal_ds)" :help-text="pesan(sk.perihal_ds)" />
           </template>
