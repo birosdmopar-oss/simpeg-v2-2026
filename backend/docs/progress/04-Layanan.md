@@ -332,3 +332,21 @@ form `L_layanan.php` `form_off`; disetujui Horii): PNS aktif satker kepegawaian,
 
 **Review.** Isi diterima reviewer CR 28-10 (`9ba79f9`, CI 40545968056 hijau); di-merge dengan main `9ce8c56` (M4) untuk
 verifikasi ulang dengan `NotifikasiService` asli. Merge ke main menunggu izin Horii.
+
+## M7 — Frontend Modul C (MAKE-026, 28-10-2026; rencana `docs/fase4/RENCANA_M7_Frontend.md`)
+
+**Paket 0 — fondasi** (main `82e390a`): `features/layanan/{roles,routes.layanan,types,cutiStatus,tahapStepper}.ts`, `services/normalisasi.ts`,
+`StatusLayananBadge`, `TangguhkanDialog`.
+
+**Paket 1 — Cuti: halaman, detail, proses, pengingat** (branch `fase4/make-026-p1-cuti`). `CutiPage` (tab Cuti Saya 2/6/7, Perlu Persetujuan
+dengan badge jumlah, Monitoring 1/3; filter status + pencarian; paginasi), `CutiDetailPage` (stepper dari `tahap[]`, catatan approver, ketua tim,
+berkas, menu ⋮ tanpa "Lihat detail"), `CutiTable` + `rowActionsCuti` (urutan AGENTS §1; `cuti-actions-<id>`; kolom Aksi sticky + bayangan),
+`CutiProsesDialog` (membungkus `ApprovalDialog`/`TangguhkanDialog`; proses atas nama → alasan wajib), `PengingatCutiDialog`, `useCutiAksi`,
+`cuti.service.ts` (normalisasi string MySQLi). Route `/layanan/cuti`, `/layanan/cuti/:id(\d+)`; menu tetap tersembunyi (`ACTIVE_PHASE` 3).
+
+Keputusan/ambigu untuk reviewer:
+1. Edit, "Ajukan Cuti", kalkulator → Paket 2; Terbitkan TTE → Paket 3 (item belum ada di ⋮).
+2. Pengingat dipasang di `CutiPage` dan tampil sekali per sesi tab (`sessionStorage`, aman bila diblokir). PRD §6.4.7 menyebut "setelah login": memasangnya di beranda/shell menyentuh `shared/**` — ditunda sampai disetujui.
+3. Proses atas nama memakai dua item ⋮ ("Setujui atas nama", "Tolak atas nama") dari `aksi.proses_atas_nama`; Tangguhkan atas nama tidak ditawarkan (server hanya mengizinkan untuk jenis Tahunan, dan flag `aksi.tangguhkan` hanya untuk approver).
+4. Filter status daftar memakai kode 0/3/1/2/4 dikirim apa adanya ke `GET cuti?status=`.
+5. Tangkapan layar (API tiruan sintetis, tanpa Figma — acuan Q-18, AGENTS §3.6): 1440 dan 390 px, tanpa scroll horizontal halaman (`scrollWidth` = lebar viewport).
