@@ -22,4 +22,18 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Presensi', 'filter
     $routes->post('presensi/tukin/penyesuaian', 'PenyesuaianTukinController::create', $superAdmin);
     $routes->put('presensi/tukin/penyesuaian/(:num)', 'PenyesuaianTukinController::update/$1', $superAdmin);
     $routes->delete('presensi/tukin/penyesuaian/(:num)', 'PenyesuaianTukinController::delete/$1', $superAdmin);
+
+    // --- M6 D-09b rekap kehadiran & uang makan (MAKE-042): Matriks/legacy `hr/presensi/rekap` dan `rekap_uma` =
+    // `userAuth(['1','3','4'])` (`Presensi.php:740`, `:849`); v2: rekap kehadiran 1, 3, 4 (F5B-10), rekap uang makan 1, 3,
+    // varian IL hanya 1 (F5B-6). Lingkup role 3 dipaksa di service (CakupanLaporan). ---
+    $rekapKehadiran = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1)];
+    $rekapUangMakan = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)];
+
+    $routes->get('presensi/rekap-kehadiran', 'RekapController::kehadiran', $rekapKehadiran);
+    $routes->get('presensi/rekap-kehadiran/xlsx', 'RekapController::kehadiranXlsx', $rekapKehadiran);
+    $routes->get('presensi/rekap-kehadiran/xlsx-harian', 'RekapController::kehadiranXlsxHarian', $rekapKehadiran);
+    $routes->get('presensi/uang-makan/rekap', 'RekapController::uangMakan', $rekapUangMakan);
+    $routes->get('presensi/uang-makan/rekap/xlsx', 'RekapController::uangMakanXlsx', $rekapUangMakan);
+    $routes->get('presensi/uang-makan/rekap-il', 'RekapController::uangMakanIl', $superAdmin);
+    $routes->get('presensi/uang-makan/rekap-il/xlsx', 'RekapController::uangMakanIlXlsx', $superAdmin);
 });
