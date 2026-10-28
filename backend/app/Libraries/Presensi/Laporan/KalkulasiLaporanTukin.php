@@ -44,7 +44,7 @@ final class KalkulasiLaporanTukin
     /**
      * @param list<string> $nip
      *
-     * @return array<array-key, array{hasil: HasilTukin, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string}|array{galat: array{code: string, message: string}}>
+     * @return array<array-key, array{hasil: HasilTukin, predikat_skp: ?string, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string}|array{galat: array{code: string, message: string}}>
      */
     public function hitung(array $nip, int $tahun, int $bulan, string $hariIni): array
     {
@@ -77,9 +77,10 @@ final class KalkulasiLaporanTukin
                 $penyesuaian = PenyesuaianTukin::aktif($info['penyesuaian'][$n] ?? [], $bulanTk);
 
                 $hasil[$n] = [
-                    'hasil'       => $h,
-                    'penyesuaian' => $penyesuaian,
-                    'keterangan'  => PenyesuaianTukin::keterangan($penyesuaian, ($info['cltn'][$n] ?? false), $adaTb ? ($info['tb'][$n] ?? '') : null, $info['cuti'][$n] ?? []),
+                    'hasil'        => $h,
+                    'predikat_skp' => $a->pegawai?->predikatSkp,
+                    'penyesuaian'  => $penyesuaian,
+                    'keterangan'   => PenyesuaianTukin::keterangan($penyesuaian, ($info['cltn'][$n] ?? false), $adaTb ? ($info['tb'][$n] ?? '') : null, $info['cuti'][$n] ?? []),
                 ];
             }
         }
