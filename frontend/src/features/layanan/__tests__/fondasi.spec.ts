@@ -50,6 +50,8 @@ describe('routes.layanan.ts', () => {
     expect(layananRoutes.map((r) => r.name)).toEqual([
       LAYANAN_ROUTE.CUTI,
       LAYANAN_ROUTE.CUTI_DETAIL,
+      LAYANAN_ROUTE.CUTI_SALDO,
+      LAYANAN_ROUTE.CUTI_PETUGAS_APPROVAL,
       LAYANAN_ROUTE.TB,
       LAYANAN_ROUTE.TB_DETAIL,
       LAYANAN_ROUTE.IB,
@@ -58,6 +60,14 @@ describe('routes.layanan.ts', () => {
       LAYANAN_ROUTE.PMK_DETAIL,
       LAYANAN_ROUTE.STATUS,
     ])
+  })
+})
+
+describe('rute detail TB/IB', () => {
+  it('id detail cocok angka lewat regex (bukan huruf d)', () => {
+    const path = (name: string) => layananRoutes.find((r) => r.name === name)?.path ?? ''
+    expect(path(LAYANAN_ROUTE.TB_DETAIL)).toBe('/layanan/tb/:id(\\d+)')
+    expect(path(LAYANAN_ROUTE.IB_DETAIL)).toBe('/layanan/ib/:id(\\d+)')
   })
 })
 
