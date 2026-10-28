@@ -50,6 +50,10 @@ describe('routes.layanan.ts', () => {
     expect(layananRoutes.map((r) => r.name)).toEqual([
       LAYANAN_ROUTE.CUTI,
       LAYANAN_ROUTE.CUTI_DETAIL,
+      LAYANAN_ROUTE.TB,
+      LAYANAN_ROUTE.TB_DETAIL,
+      LAYANAN_ROUTE.IB,
+      LAYANAN_ROUTE.IB_DETAIL,
       LAYANAN_ROUTE.PMK,
       LAYANAN_ROUTE.PMK_DETAIL,
       LAYANAN_ROUTE.STATUS,
