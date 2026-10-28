@@ -2,6 +2,7 @@
  * Klien Modul C — PMK (PRD Fase 4 §5.4, §6.9, README controller Layanan). `api` sudah membuka amplop `{status, data}`
  * (interceptor): service membaca `res.data` langsung (CR-059) dan menormalkan string MySQLi (CR-049).
  *   GET    pmk?nip=&page=&per_page=                       riwayat PMK final (+ `arsip[]`, `can_edit`)
+ *   GET    pmk/{id}/arsip/{id_attachment}                 unduh arsip SK (semua yang boleh melihat riwayat)
  *   PUT    pmk/{id} (POST multipart + `_method=PUT`)      tambah arsip SK (role 1)
  *   DELETE pmk/{id}, pmk/{id}/arsip/{id_attachment}       hapus riwayat / arsip (role 1)
  *   GET    pmk/pengajuan?mode=saya|pic|admin              daftar pengajuan (+ `can_create`, `can_process`)
@@ -120,6 +121,7 @@ export const pmkService = {
       tgl_awal_maks: teksOrNull(data.tgl_awal_maks),
       berkas: Object.fromEntries(Object.entries(berkas).map(([k, v]) => [k, String(v)])),
       can_create: flag(data.can_create),
+      adalah_pic: flag(data.adalah_pic),
     }
   },
 
@@ -161,6 +163,11 @@ export const pmkService = {
       per_page: num(data.per_page),
       can_edit: flag(data.can_edit),
     }
+  },
+
+  /** Unduh arsip SK riwayat final (`GET pmk/{id}/arsip/{id_attachment}`, [V2] gap PRD §5.4; hak = hak lihat riwayat). */
+  arsip(id: number, idAttachment: number): Promise<BerkasUnduhan> {
+    return ambilBerkas(`/pmk/${id}/arsip/${idAttachment}`, `arsip-pmk-${id}-${idAttachment}`)
   },
 
   async tambahArsip(id: number, berkas: File): Promise<ArsipPmk[]> {

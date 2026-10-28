@@ -287,6 +287,8 @@ export interface PmkOpsi {
   /** kolom berkas → label (server). */
   berkas: Record<string, string>
   can_create: boolean
+  /** Server (`PetugasLayananService`): pemanggil PIC PMK aktif → tab Perlu Persetujuan ditampilkan. */
+  adalah_pic: boolean
 }
 
 export interface HitungMker {

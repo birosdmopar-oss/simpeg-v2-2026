@@ -12,6 +12,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role } from '@/features/auth/types'
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
+import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiNotice, UiPagination, UiSearchInput, UiSelect, UiTabs } from '@/shared/ui'
@@ -37,7 +38,7 @@ const role = computed(() => auth.role)
 const tabs = computed(() => [
   { value: 'riwayat', label: 'Riwayat PMK' },
   ...(role.value === Role.PEGAWAI ? [{ value: 'saya', label: 'Pengajuan Saya' }] : []),
-  { value: 'pic', label: 'Perlu Persetujuan' },
+  ...(adalahPic.value === false ? [] : [{ value: 'pic', label: 'Perlu Persetujuan' }]),
   ...(role.value === Role.SUPER_ADMIN || role.value === Role.ADMIN_SATKER ? [{ value: 'admin', label: 'Monitoring' }] : []),
 ])
 
@@ -53,6 +54,8 @@ const dataPengajuan = ref<PmkListResponse | null>(null)
 const dataRiwayat = ref<RiwayatPmkResponse | null>(null)
 const labelBerkas = ref<Record<string, string>>({})
 const bisaMengajukan = ref(false)
+/** `null` = belum diketahui (opsi belum dimuat): tab PIC tetap tampil; `false` dari server menyembunyikannya. */
+const adalahPic = ref<boolean | null>(null)
 const page = ref(1)
 const search = ref('')
 const status = ref('')
@@ -91,6 +94,7 @@ async function muatOpsi(): Promise<void> {
     const o = await pmkService.opsi()
     labelBerkas.value = o.berkas
     bisaMengajukan.value = o.can_create
+    adalahPic.value = o.adalah_pic
   } catch {
     bisaMengajukan.value = false
   }
@@ -120,8 +124,18 @@ function onAction(key: string, row: PmkItem): void {
   } else aksi.pilih(key, row)
 }
 
+async function unduhArsip(row: RiwayatPmkItem, idAttachment: number): Promise<void> {
+  try {
+    simpanBerkas(await pmkService.arsip(row.id, idAttachment))
+  } catch (e) {
+    aksi.notice.value = { tone: 'danger', text: describeApiError(e).message }
+  }
+}
+
 function onActionRiwayat(key: string, row: RiwayatPmkItem): void {
-  if (key === 'arsip') {
+  if (key.startsWith('unduh:')) {
+    void unduhArsip(row, Number(key.slice('unduh:'.length)))
+  } else if (key === 'arsip') {
     arsipRow.value = row
     arsipOpen.value = true
   } else if (key === 'hapus') {

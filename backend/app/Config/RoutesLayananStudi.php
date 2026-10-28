@@ -62,6 +62,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->get('pmk/pengajuan/(:num)/berkas/(:segment)', 'PmkController::unduhBerkas/$1/$2', $pmk);
     $routes->get('pmk', 'PmkController::index', $pmk);
     $routes->put('pmk/(:num)', 'PmkController::tambahArsip/$1', $pmk);
+    // [V2] gap PRD §5.4 (keputusan Horii 28-10-2026): unduh arsip SK riwayat final; legacy `list.php:70-77`.
+    $routes->get('pmk/(:num)/arsip/(:num)', 'PmkController::unduhArsip/$1/$2', $pmk);
     $routes->delete('pmk/(:num)/arsip/(:num)', 'PmkController::hapusArsip/$1/$2', $pmk);
     $routes->delete('pmk/(:num)', 'PmkController::delete/$1', $pmk);
 });

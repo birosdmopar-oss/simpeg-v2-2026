@@ -19,6 +19,7 @@ vi.mock('../services/pmk.service', () => ({
     process: vi.fn(),
     berkas: vi.fn(),
     riwayat: vi.fn(),
+    arsip: vi.fn(),
     tambahArsip: vi.fn(),
     hapusRiwayat: vi.fn(),
     hapusArsip: vi.fn(),
@@ -51,6 +52,7 @@ const OPSI: PmkOpsi = {
   tgl_awal_maks: '2004-12-31',
   berkas: { file_kontrak: 'Surat kontrak kerja', file_paklaring: 'Surat paklaring', file_surat_phk: 'Surat PHK', file_slip_gaji: 'Slip gaji' },
   can_create: true,
+  adalah_pic: false,
 }
 
 const ITEM = {

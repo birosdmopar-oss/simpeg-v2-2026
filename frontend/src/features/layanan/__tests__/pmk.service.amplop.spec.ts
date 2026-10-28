@@ -99,6 +99,7 @@ describe('pmkService — amplop backend nyata lewat klien asli', () => {
       tgl_awal_maks: '2004-12-31',
       berkas: { file_kontrak: 'Surat kontrak kerja' },
       can_create: '1',
+      adalah_pic: '1',
     })
 
     const o = await pmkService.opsi('198001012005011001')
@@ -108,6 +109,7 @@ describe('pmkService — amplop backend nyata lewat klien asli', () => {
     expect(o.tgl_awal_maks).toBe('2004-12-31')
     expect(o.berkas.file_kontrak).toBe('Surat kontrak kerja')
     expect(o.can_create).toBe(true)
+    expect(o.adalah_pic).toBe(true)
   })
 
   it('hitungMker() mengirim tanggal dan menormalkan hasil server', async () => {
@@ -164,6 +166,19 @@ describe('pmkService — amplop backend nyata lewat klien asli', () => {
 
     expect(server.permintaan[0]?.responseType).toBe('blob')
     expect(b.nama).toBe('pmk_31_file_kontrak.pdf')
+  })
+
+  it('arsip() meminta blob ke pmk/{id}/arsip/{id_attachment} dan membaca nama dari Content-Disposition', async () => {
+    server.balasan['get /pmk/5/arsip/9'] = {
+      status: 200,
+      body: new Blob(['%PDF'], { type: 'application/pdf' }),
+      headers: { 'content-disposition': 'attachment; filename="sk-pmk-2020.pdf"' },
+    }
+
+    const b = await pmkService.arsip(5, 9)
+
+    expect(server.permintaan[0]?.responseType).toBe('blob')
+    expect(b.nama).toBe('sk-pmk-2020.pdf')
   })
 
   it('riwayat() menormalkan item final + arsip; tambahArsip/hapus memakai rute yang benar', async () => {

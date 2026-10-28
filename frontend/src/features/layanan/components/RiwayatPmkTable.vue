@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Tabel Riwayat PMK final (`riwayat_pmk`, dari impor/SIASN — tidak dibuat lewat aplikasi). Hanya role 1 (`can_edit`
- * server) yang mendapat menu ⋮: Kelola arsip → Hapus (`danger`). Aksi baris lewat ⋮ (AGENTS.md §1, `riwayat-pmk-actions-<id>`).
+ * Tabel Riwayat PMK final (`riwayat_pmk`, dari impor/SIASN — tidak dibuat lewat aplikasi). Menu ⋮ untuk semua yang
+ * melihat riwayat: Unduh per arsip (keputusan Horii 28-10, ikut legacy `list.php:70-77`); role 1 (`can_edit` server) menambah Kelola arsip → Hapus (`danger`). Aksi baris lewat ⋮ (AGENTS.md §1, `riwayat-pmk-actions-<id>`).
  */
 import { formatTanggalIndonesia as tgl } from '@/shared/utils/dateTime'
 import { ref } from 'vue'
@@ -23,9 +23,11 @@ const emit = defineEmits<{ action: [key: string, row: RiwayatPmkItem] }>()
 const wadah = ref<HTMLElement | null>(null)
 const { actionsShadow, updateActionsShadow } = useStickyActionsShadow(wadah, [() => props.items, () => props.memuat])
 
-const aksi = (): RowAction[] => [
-  { key: 'arsip', label: 'Kelola arsip' },
-  { key: 'hapus', label: 'Hapus', danger: true },
+/** Unduh per arsip (semua yang melihat riwayat) → Kelola arsip → Hapus (hanya `bisaUbah`, role 1; AGENTS §1). */
+const aksi = (row: RiwayatPmkItem): RowAction[] => [
+  ...row.arsip.map((a) => ({ key: `unduh:${a.id_attachment}`, label: `Unduh ${a.display_name ?? `arsip ${a.id_attachment}`}` })),
+  { key: 'arsip', label: 'Kelola arsip', hidden: !props.bisaUbah },
+  { key: 'hapus', label: 'Hapus', danger: true, hidden: !props.bisaUbah },
 ]
 
 const periode = (r: RiwayatPmkItem): string => (r.tgl_awal && r.tgl_akhir ? `${tgl(r.tgl_awal)} s.d. ${tgl(r.tgl_akhir)}` : '—')
@@ -43,7 +45,7 @@ const periode = (r: RiwayatPmkItem): string => (r.tgl_awal && r.tgl_akhir ? `${t
           <th scope="col" class="px-4 py-3">Periode</th>
           <th scope="col" class="px-4 py-3">Masa Kerja</th>
           <th scope="col" class="px-4 py-3">Arsip SK</th>
-          <th v-if="bisaUbah" scope="col" class="sticky right-0 bg-white px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }">Aksi</th>
+          <th scope="col" class="sticky right-0 bg-white px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }">Aksi</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-200">
@@ -64,9 +66,9 @@ const periode = (r: RiwayatPmkItem): string => (r.tgl_awal && r.tgl_akhir ? `${t
             <span v-if="row.arsip.length === 0" class="text-slate-500">Belum ada</span>
             <template v-else>{{ row.arsip.length }} berkas</template>
           </td>
-          <td v-if="bisaUbah" class="sticky right-0 bg-white px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }">
+          <td class="sticky right-0 bg-white px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }">
             <RowActionsMenu
-              :actions="aksi()"
+              :actions="aksi(row)"
               :label="`Aksi untuk riwayat PMK ${row.no_sk}`"
               :testid="`riwayat-pmk-actions-${row.id}`"
               @select="(key) => emit('action', key, row)"

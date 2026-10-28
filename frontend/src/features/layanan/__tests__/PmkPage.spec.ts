@@ -19,6 +19,7 @@ vi.mock('../services/pmk.service', () => ({
     process: vi.fn(),
     berkas: vi.fn(),
     riwayat: vi.fn(),
+    arsip: vi.fn(),
     tambahArsip: vi.fn(),
     hapusRiwayat: vi.fn(),
     hapusArsip: vi.fn(),
@@ -49,6 +50,7 @@ const OPSI: PmkOpsi = {
   tgl_awal_maks: null,
   berkas: { file_kontrak: 'Surat kontrak kerja', file_paklaring: 'Surat paklaring', file_surat_phk: 'Surat PHK', file_slip_gaji: 'Slip gaji' },
   can_create: true,
+  adalah_pic: true,
 }
 
 const baris = (id: number, extra: Partial<PmkItem> & { aksi?: Record<string, boolean> } = {}): PmkItem =>
@@ -138,6 +140,17 @@ describe('PmkPage — tab per role', () => {
       expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual(['Riwayat PMK', 'Perlu Persetujuan', 'Monitoring'])
       wrapper.unmount()
     }
+  })
+
+  it('adalah_pic=false dari server menyembunyikan tab Perlu Persetujuan; true/unknown menampilkannya', async () => {
+    svc.opsi.mockResolvedValue({ ...OPSI, adalah_pic: false })
+    const { wrapper } = await mountPage(Role.PEGAWAI)
+    expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual(['Riwayat PMK', 'Pengajuan Saya'])
+    wrapper.unmount()
+
+    svc.opsi.mockResolvedValue({ ...OPSI, adalah_pic: true })
+    const { wrapper: w2 } = await mountPage(Role.PEGAWAI)
+    expect(w2.findAll('[role="tab"]').map((t) => t.text())).toContain('Perlu Persetujuan')
   })
 
   it('tombol Ajukan PMK hanya pada tab pengajuan dan bila can_create dari server', async () => {
@@ -298,16 +311,33 @@ describe('PmkPage — unduh berkas dan hapus', () => {
 })
 
 describe('PmkPage — riwayat PMK final', () => {
-  it('can_edit server: menu Kelola arsip → Hapus; tanpa can_edit tidak ada kolom Aksi', async () => {
+  it('menu ⋮: Unduh arsip untuk semua yang melihat; Kelola arsip → Hapus hanya bila can_edit server', async () => {
     svc.riwayat.mockResolvedValue(RIWAYAT)
     const { wrapper } = await mountPage(Role.SUPER_ADMIN)
 
-    expect((await rowMenuActions(wrapper, 'riwayat-pmk-actions-5')).map((a) => a.key)).toEqual(['arsip', 'hapus'])
+    expect((await rowMenuActions(wrapper, 'riwayat-pmk-actions-5')).map((a) => a.key)).toEqual(['unduh:9', 'arsip', 'hapus'])
 
     svc.riwayat.mockResolvedValue({ ...RIWAYAT, can_edit: false })
     const { wrapper: w2 } = await mountPage(Role.PEGAWAI)
-    expect(w2.find('[data-testid="riwayat-pmk-actions-5"]').exists()).toBe(false)
+    expect((await rowMenuActions(w2, 'riwayat-pmk-actions-5')).map((a) => a.key)).toEqual(['unduh:9'])
     expect(w2.find('[data-testid="riwayat-pmk-row-5"]').text()).toContain('SK-PMK-1')
+  })
+
+  it('Unduh arsip memanggil service dengan id riwayat dan arsip lalu menyimpan berkas; 404 → pesan baku', async () => {
+    const berkas = { blob: new Blob(['x']), nama: 'sk.pdf' }
+    svc.riwayat.mockResolvedValue({ ...RIWAYAT, can_edit: false })
+    svc.arsip.mockResolvedValueOnce(berkas)
+    const { wrapper } = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'riwayat-pmk-actions-5', 'unduh:9')
+    await flushPromises()
+    expect(svc.arsip).toHaveBeenCalledWith(5, 9)
+    expect(simpanBerkas).toHaveBeenCalledWith(berkas)
+
+    svc.arsip.mockRejectedValueOnce(apiError(404))
+    await selectRowAction(wrapper, 'riwayat-pmk-actions-5', 'unduh:9')
+    await flushPromises()
+    expect(q('[data-testid="pmk-notice"]')?.textContent).toContain('tidak ditemukan')
   })
 
   it('Kelola arsip: tambah arsip memanggil service; galat minimal-satu-arsip tampil per kolom', async () => {
