@@ -13,6 +13,8 @@ import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
+import PengingatCutiShell from '@/features/layanan/components/PengingatCutiShell.vue'
+import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
 import { UiBreadcrumb, type Crumb } from '@/shared/ui'
 
 import AppSidebar from './AppSidebar.vue'
@@ -106,6 +108,7 @@ async function logout(): Promise<void> {
   try {
     await auth.logout()
   } finally {
+    resetPengingatCuti()
     await router.push({ name: 'login' })
   }
 }
@@ -159,5 +162,8 @@ async function logout(): Promise<void> {
         </main>
       </div>
     </div>
+
+    <!-- Pengingat persetujuan cuti sekali per sesi setelah login (PRD Fase 4 §6.4.7). -->
+    <PengingatCutiShell />
   </div>
 </template>
