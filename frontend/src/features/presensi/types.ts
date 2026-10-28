@@ -121,3 +121,109 @@ export const KELOMPOK_GPP: { penghasilan: KelompokSlip[]; potongan: KelompokSlip
 /** Nama hasil akhir per bagian [K `_slip_content.php`]. */
 export const LABEL_GPP_BERSIH = 'Gaji Pokok & Pendapatan (GPP) Bersih'
 export const LABEL_TK_BERSIH = 'Tunjangan Kinerja (TK) Bersih'
+
+/** Kolom per bagian modal rincian & koreksi admin [K `admin_list.php:238`, `:251` `Lsl_gaji::GPP_FIELDS` / `TK_FIELDS`]. */
+export const KOLOM_GPP = [
+  'gjpokok', 'tjistri', 'tjanak', 'tjupns', 'tjstruk', 'tjfungs', 'tjdaerah', 'tjpencil', 'tjlain', 'tjkompen', 'pembul', 'tjberas', 'tjpph',
+  'potpfkbul', 'potpfk2', 'potpfk10', 'potpph', 'potswrum', 'potkelbtj', 'potlain', 'pottabrum', 'bersih_gpp',
+] as const
+export const KOLOM_TK = ['kotor', 'potongan', 'bersih_tk', 'pajak', 'tunj_pajak', 'bersih_2'] as const
+
+/** Aksi baris dari server (`aksi {}`); FE hanya menampilkan, tidak menghitung. */
+export interface AksiSlipAdmin {
+  lihat: boolean
+  cetak: boolean
+  koreksi: boolean
+  buka_ulang: boolean
+}
+
+/** Satu baris monitoring `GET slip-gaji` (role 1, 3). */
+export interface SlipMonitoring {
+  id: number
+  nip: string
+  nama: string | null
+  unit_satker: string
+  periode: string
+  dibuka: boolean
+  viewed_at: string | null
+  viewed_at_wib: string | null
+  viewed_ip: string | null
+  aksi: AksiSlipAdmin
+}
+
+export interface DaftarMonitoring {
+  items: SlipMonitoring[]
+  total: number
+  page: number
+  per_page: number
+  ringkasan: { jumlah: number; dibuka: number; belum_dibuka: number }
+  /** `YYYY-MM`, terbaru dulu. */
+  periode_tersedia: string[]
+}
+
+export interface MonitoringQuery {
+  periode: string
+  unit_satker?: string
+  status_view?: 'semua' | 'dibuka' | 'belum'
+  search?: string
+  page?: number
+  per_page?: number
+}
+
+/** Respons `GET|PUT slip-gaji/{id}` (rincian 28 kolom, tidak mengubah status). */
+export interface SlipAdmin {
+  id: number
+  nip: string
+  nama: string | null
+  periode: string
+  label: string
+  dibuka: boolean
+  viewed_at: string | null
+  viewed_at_wib: string | null
+  viewed_ip: string | null
+  rincian: Record<string, string>
+  ringkasan: RingkasanSlip
+  uang_makan: UangMakanSlip
+  aksi: AksiSlipAdmin
+  pegawai: IdentitasSlip
+}
+
+export type StatusBarisImpor = 'valid' | 'duplikat' | 'galat'
+export type RencanaImpor = 'sisip' | 'perbarui' | 'lewati' | 'gagal'
+
+export interface GalatImpor {
+  kode: string
+  pesan: string
+  sheet: string
+  baris: number
+}
+
+/** Satu baris pratinjau impor (`POST slip-gaji/impor/pratinjau`); status & rencana dihitung server (ADR-025). */
+export interface BarisPratinjau {
+  nomor: number
+  sheet: string
+  nip: string | null
+  nama: string | null
+  periode: string | null
+  status: StatusBarisImpor
+  rencana_bila_timpa: RencanaImpor
+  rencana_bila_tidak_timpa: RencanaImpor
+  galat: GalatImpor[]
+}
+
+export interface PratinjauImpor {
+  token_pratinjau: string
+  kedaluwarsa_at: string | null
+  timpa_bawaan: boolean
+  filter: string | null
+  ringkasan: { valid: number; duplikat: number; galat: number }
+  baris: BarisPratinjau[]
+}
+
+export interface HasilImpor {
+  disisip: number
+  diperbarui: number
+  dilewati: number
+  gagal: number
+  baris: { nip: string | null; periode: string | null; hasil: RencanaImpor; galat: GalatImpor[] }[]
+}
