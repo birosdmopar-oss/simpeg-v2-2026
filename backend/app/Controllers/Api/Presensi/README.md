@@ -170,6 +170,28 @@ dibuat di M5 (keterangan + kolom `penyesuaian`, `total_potongan` tidak berubah).
   keputusan reviewer CR 28-10-2026); galat lain diteruskan, tidak pernah lanjut tanpa kunci.
 - Audit lewat `PenyesuaianTukinModel` (`BaseAuditableModel`): `create`, `update`, `delete` (status 10) dengan before/after.
 
+## Rekap kehadiran & uang makan (MAKE-042, PRD 5B §6.2, §7.4, D-09b)
+
+Route di `Config/RoutesPresensiLaporan.php`, `RekapController` → `Laporan\RekapKehadiranService` /
+`Laporan\RekapUangMakanService`. Semua hanya baca; lingkup lewat `Laporan\CakupanLaporan`.
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET api/v1/presensi/rekap-kehadiran?bulan=&unit_satker=&jenis_pegawai[]=&page=&per_page=` | 1, 3, 4 | `items[] {nip, nama, jabatan, hari_kerja, hadir, tl, psw, tk, sakit, dinas_luar, lain_lain, cuti, tidak_hadir, tb}` + `total/page/per_page/bulan/lingkup` |
+| `GET api/v1/presensi/rekap-kehadiran/xlsx?…` | 1, 3, 4 | XLSX ringkas seluruh lingkup (`rekap_kehadiran_<lingkup>_<YYYY-MM>.xlsx`) |
+| `GET api/v1/presensi/rekap-kehadiran/xlsx-harian?…` | 1, 3, 4 | XLSX grid harian, kode `TB/CT/DL/SKT/LL/H/TK`, akhir pekan & libur berwarna (`rekap_kehadiran_harian_<lingkup>_<YYYY-MM>.xlsx`) |
+| `GET api/v1/presensi/uang-makan/rekap?bulan=&unit_satker=&jenis_pegawai[]=&page=&per_page=` | 1, 3 | `items[] {nip, tgl_absen}` satu per hari dibayar (aturan slip, F5B-2), tanpa nominal (F5B-20) |
+| `GET api/v1/presensi/uang-makan/rekap/xlsx?…` | 1, 3 | XLSX dua kolom `NIP \| TGL_ABSEN` (`rekap_uang_makan_<lingkup>_<YYYY-MM>.xlsx`) |
+| `GET api/v1/presensi/uang-makan/rekap-il[/xlsx]?bulan=` | 1 | Varian Instansi Lain (`jenis_jabatan = 2`), tanpa lingkup & jenis pegawai (F5B-6) |
+
+- Parameter: `bulan` wajib `YYYY-MM`, tidak melewati bulan berjalan (422 `errors.bulan`); `unit_satker` = `0` (bawaan) /
+  `<id_unit>` / `sat_<id_satker>`, harus ada & aktif (422 `errors.unit_satker`); `jenis_pegawai[]` id master (bawaan `[1]`,
+  422 `errors.jenis_pegawai`); `per_page` maks 100.
+- Role 3: `unit_satker` diabaikan, dipaksa satker akun (tanpa satker → unit akun; tanpa keduanya → 403).
+- Jam kerja/puasa dari `web_config`; jam belum diatur → 422 `code: jam_kerja_tidak_sah`; lebih dari satu rentang puasa
+  dalam bulan → 422 `code: rentang_puasa_ganda`.
+- Berkas: `Content-Disposition: attachment`, `Cache-Control: private, no-store`, tanpa data pribadi di nama berkas.
+
 ## Catatan deploy (PRD Fase 5A §8.5, Q5A-22)
 
 Dieksekusi tim infra saat cutover; tanpa nama host/IP di repo.

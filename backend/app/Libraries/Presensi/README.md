@@ -210,6 +210,38 @@ Test: `tests/unit/Presensi/Rekap/{HariUangMakan,RekapMurni}Test.php`, `tests/Pre
 UangMakanSlipPresensi,UangMakanSnapshotAsli}Test.php` (AC-D09a.1–09a.5). Test 5A yang menguji perilaku
 `UangMakanBelumTersedia` (`UangMakanSnapshotTest`, `BukaSlipAtomikTest`) kini menyuntik sumber itu secara eksplisit.
 
+### Rekap kehadiran & uang makan 5B (D-09b, MAKE-042)
+
+Port `Presensi::rekap` / `rekap_uma` / `rekap_uma_il` + `L_presensi::rekap` (`:415-810`), `rekap_full_xls`
+(`:824-1436`), `rekap_uma` (`:2694-3212`) dan populasi `L_employee::get_all_pegawai_dh_spe`/`_il_spe` (`:6398-6775`)
+legacy `0cf7e67` [K].
+
+| Bagian | Kelas | Aturan |
+|---|---|---|
+| Klasifikasi (murni) | `Rekap/KlasifikasiKehadiran`, `Rekap/JadwalKerjaRekap` | Cabang pertama yang cocok: TB [V2] → cuti → konket (8 DL, 9 CT, 10 SKT, 13 LL = hadir, lain = tidak dihitung) → TK → hadir dengan TL (`> 60`, `30 < tl ≤ 60` & `psw > −60`, `0 < tl ≤ 30` & `psw > −30`; hanya masuk: `tl > 0`) dan PSW (`psw > 0`); `tidak_hadir` = cuti + DL + sakit + TK. Grid harian: `weekend`/`libur` |
+| Populasi | `Laporan/PopulasiRekap` | DH: status 1 atau (2 & `tmt_status >` awal), `DATE(created_at) ≤` akhir, jenis pegawai; jabatan berlaku `riwayat_mutasi_jabatan` jenis 1 `tmtsk ≤` akhir; pangkat `riwayat_kp` `tmtsk ≤` awal; urut kelas ↓, gol ↓, TMT pangkat ↑, satker ↑, NIP ↑. IL: ⋈ `pegawai_mutasi_jabatan` jenis 2, `created_at ≤` awal |
+| Lingkup | `Laporan/CakupanLaporan`, `Laporan/LingkupLaporan` | `unit_satker` `0`/unit/`sat_<id>`; role 3 dipaksa satker akun (unit bila tanpa satker, 403 bila keduanya kosong) — dipakai juga laporan Tukin M5 |
+| Data | `Laporan/DataRekapBulan` | 3 SELECT per batch 500 NIP (cuti status 1, konket `V` semua `affect_tukin`, `dh_online`) + TB Fase 4 massal + libur aktif |
+| Uang makan | `Laporan/RekapUangMakanService` | `UangMakanSlipPresensi::hariDibayarBanyak` (aturan slip F5B-2) → baris `{nip, tgl_absen}` |
+| Ekspor | `Laporan/EksporRekapXlsx` | PhpSpreadsheet; NIP & tanggal teks eksplisit |
+
+**[CATAT] MAKE-042 — rekap kehadiran & uang makan v2 vs legacy**
+
+| v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
+|---|---|---|
+| Hari TB → kolom `tb` [V2], tidak masuk `tidak_hadir` | Layar `rekap` tidak mengenal TB: hari TB tanpa presensi jatuh ke TK + tidak hadir (`L_presensi.php:642-810`); ekspor harian memeriksa TB lebih dulu (`:1087-1099`) | Angka TK/tidak hadir pegawai TB lebih kecil; TB tampil terpisah (F5B-10) |
+| Jam kerja & puasa dari `web_config` F5-16 + `rentang_puasa` | Jam & Ramadan 2026 di-hard-code (`:614-622`, `:679-684`) | Sama selama nilai `web_config` sama; tahun lain ikut konfigurasi |
+| Presensi pegawai yang dibuat di tengah bulan dihitung | Kueri presensi mensyaratkan `created_at` < awal bulan (`:599`), padahal populasi `≤` akhir bulan → pegawai baru tampil TK seluruh bulan | Pegawai baru mendapat hadir sesuai presensinya (pola F5B-2) |
+| Hari libur = `hari_libur` status 1 (`HariLiburService`) | `hari_libur` tanpa saring status (`:461-473`) | Libur yang dinonaktifkan tidak lagi dihitung libur |
+| XLSX dibangun server: ringkas (judul + 15 kolom), harian `.xlsx`, uang makan 2 kolom | Ringkas & uang makan: ekspor DataTables di browser; harian `.xls` Excel 97 bernama `laporan_tukin_<jenis>_<unit_satker>_<n-Y>.xls`, lalu HTML ikut terlampir di berkas (bug `:1431-1435`) | Format berkas modern, nama berkas `rekap_*`; bug lampiran HTML tidak di-port |
+| Bawaan `unit_satker = 0`; role 3 tanpa satker → unit akun | Bawaan `sat_47` hard-code untuk role 1/4; role 3 tanpa satker bawaan satker pertama unitnya dan boleh memilih satker lain di unit itu (`Presensi.php:747-775`) | Lingkup role 3 lebih ketat (PRD 5B §7.3.6) |
+| Bulan boleh sampai bulan berjalan (dipotong hari ini) | Daftar bulan 2020-07 s.d. bulan lalu, bawaan bulan berjalan (`Presensi.php:786-807`) | Bulan berjalan dapat dipilih eksplisit |
+| Urutan populasi [K] + NIP naik sebagai penentu akhir; jabatan seri `tmtsk` → id terbesar | `array_multisort` tanpa penentu akhir (`L_employee.php:6607-6611`) | Urutan stabil untuk paginasi |
+| Rekap uang makan IL memakai aturan slip (konket `affect_tukin = 1`, kategori 13 dibayar) | `rekap_uma_il` tanpa saring `affect_tukin` (`:3115`) | Sama dengan varian DH (F5B-2) |
+
+Test: `tests/unit/Presensi/Rekap/KlasifikasiKehadiranTest.php`, `tests/Presensi/Rekap/{RekapKehadiran, RekapUangMakan,
+RoleMatriksRekap}Test.php` (XLSX ringkas, harian, dan uang makan dibaca ulang di dua test pertama).
+
 ### Test
 
 `tests/unit/Presensi/SlipGaji/` (tanpa DB; konvensi `tests/unit` untuk kelas murni, sama dengan CR-025):
