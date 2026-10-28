@@ -7,7 +7,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { CUTI_ROLES, PMK_ROLES } from './roles'
+import { CUTI_ROLES, PMK_ROLES, STATUS_LAYANAN_ROLES } from './roles'
 
 /** Nama route Modul C (tetap, dipakai tautan antarhalaman dan `nav.config.ts`). */
 export const LAYANAN_ROUTE = {
@@ -52,5 +52,12 @@ export const layananRoutes: RouteRecordRaw[] = [
     name: LAYANAN_ROUTE.PMK_DETAIL,
     component: () => import('./views/PmkDetailPage.vue'),
     meta: { roles: PMK_ROLES, title: 'Detail PMK' },
+  },
+  {
+    // Status Layanan: monitoring semua pengajuan layanan — role 1–7 (PRD §6.11.1); lingkup data ditegakkan server.
+    path: '/layanan/status',
+    name: LAYANAN_ROUTE.STATUS,
+    component: () => import('./views/LayananStatusPage.vue'),
+    meta: { roles: STATUS_LAYANAN_ROLES, title: 'Status Layanan' },
   },
 ]
