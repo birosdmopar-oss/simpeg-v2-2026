@@ -148,7 +148,7 @@ abstract class StudiPengajuanService extends LayananStudi
     }
 
     /**
-     * Opsi form: jenjang (`status = 1`, id > batas), `up` bawaan, snapshot pemohon (`nip` hanya role 1/3), `can_create`.
+     * Opsi form: jenjang (`status = 1`, id > batas), `up` bawaan, snapshot pemohon (`nip` hanya role 1/3), `can_create`, `adalah_pic`.
      *
      * @return array<string, mixed>
      */
@@ -169,6 +169,8 @@ abstract class StudiPengajuanService extends LayananStudi
             'slot_berkas'        => BerkasStudi::slot($this->jenis()),
             'berkas_wajib'       => ! ($this->role1BebasBerkas() && $auth->role() === Role::SUPER_ADMIN),
             'can_create'         => $this->bolehMengajukan($auth),
+            // Penanda tampilan (FE menyembunyikan tab Perlu Persetujuan); hak proses tetap ditegakkan service.
+            'adalah_pic' => $this->adalahPic($auth),
         ];
     }
 

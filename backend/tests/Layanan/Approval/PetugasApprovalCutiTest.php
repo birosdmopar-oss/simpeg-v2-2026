@@ -158,6 +158,34 @@ final class PetugasApprovalCutiTest extends DatabaseTestCase
         $this->service()->hapus($auth3, (int) $lain['id_pa_layanan']);
     }
 
+    public function testOpsiMemuatJabatanKoordinasiJenisPegawaiDanUnitTerkunciRole3(): void
+    {
+        $idKoord = $this->buatJabatanKoordinasi();
+        $admin   = $this->buatPemohon(1);
+
+        $opsi = $this->service()->opsi($admin['auth']);
+
+        $this->assertSame(1, $opsi['id_jenis_pa']);
+        $this->assertSame([1, 6], array_column($opsi['jenis_pegawai'], 'id_jenis_pegawai'));
+        $this->assertSame([2, 3], $opsi['group_jabatan_pakai_gol']);
+        $this->assertContains($idKoord, array_column($opsi['jabatan_koordinasi'], 'id_jabatan_koordinasi'));
+        $this->assertNull($opsi['unit_terkunci'], 'role 1 tidak terkunci');
+
+        $admin3 = $this->buatPejabat(3);
+        $unit3  = (int) $this->db->table('pegawai_mutasi_jabatan')->where('nip', $admin3['nip'])->get()->getRowArray()['id_unit'];
+        $this->db->table('pengguna')->where('id_pengguna', $admin3['id_pengguna'])->update(['id_unit' => (string) $unit3]);
+
+        $opsi3 = $this->service()->opsi($this->authUntukAkun((int) $admin3['id_pengguna']));
+        $this->assertSame($unit3, $opsi3['unit_terkunci']['id_unit']);
+        $this->assertNotSame('', $opsi3['unit_terkunci']['unit']);
+    }
+
+    public function testOpsiRoleSelainSatuDanTigaDitolak(): void
+    {
+        $this->expectException(ForbiddenException::class);
+        $this->service()->opsi($this->buatPemohon(2)['auth']);
+    }
+
     public function testRoleSelainSatuDanTigaDitolak(): void
     {
         $p = $this->buatPemohon(2);

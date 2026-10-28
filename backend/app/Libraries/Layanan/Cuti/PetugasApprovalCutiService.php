@@ -85,6 +85,42 @@ class PetugasApprovalCutiService
     }
 
     /**
+     * Opsi form petugas approval cuti yang TIDAK tersedia di master options: jabatan koordinasi/sub koordinasi (`koord_<id>`),
+     * jenis pemohon yang sah (PNS/PPPK), group jabatan yang memakai golongan/ruang, jenis layanan tetap, dan unit terkunci
+     * untuk Admin Satker. Daftar lain memakai `GET master/{entitas}/options`: `unit`, `satker`, `group-jabatan`,
+     * `sub-group-jabatan` (parent group), `pangkat` (gol/ruang), `jabatan` (`struk_<id>`); pegawai lain (`other_<nip>`) lewat
+     * `GET pegawai?search=`.
+     *
+     * @return array<string, mixed>
+     */
+    public function opsi(AuthContext $auth): array
+    {
+        $this->wajibRole($auth);
+
+        $jenisPegawai = $this->db->table('jenis_pegawai')->select('id_jenis_pegawai, jenis_pegawai')
+            ->whereIn('id_jenis_pegawai', [AturanJenisCuti::ID_PNS, AturanJenisCuti::ID_PPPK])->orderBy('id_jenis_pegawai')->get()->getResultArray();
+
+        $koordinasi = $this->db->table('jabatan_koordinasi')->select('id_jabatan_koordinasi, jabatan, jenis')
+            ->where('status', 1)->orderBy('jabatan')->get()->getResultArray();
+
+        $unitTerkunci = null;
+        $unit         = $this->unitPemanggil($auth);
+
+        if ((int) $auth->role() === Role::ADMIN_SATKER && $unit !== null) {
+            $baris        = $this->db->table('unit')->select('id_unit, unit')->where('id_unit', $unit)->get()->getRowArray();
+            $unitTerkunci = is_array($baris) ? ['id_unit' => (int) $baris['id_unit'], 'unit' => (string) $baris['unit']] : null;
+        }
+
+        return [
+            'id_jenis_pa'             => self::ID_JENIS_PA_CUTI,
+            'jenis_pegawai'           => array_map(static fn (array $r): array => ['id_jenis_pegawai' => (int) $r['id_jenis_pegawai'], 'jenis_pegawai' => (string) $r['jenis_pegawai']], $jenisPegawai),
+            'group_jabatan_pakai_gol' => self::GOL_GJ,
+            'jabatan_koordinasi'      => array_map(static fn (array $r): array => ['id_jabatan_koordinasi' => (int) $r['id_jabatan_koordinasi'], 'jabatan' => (string) $r['jabatan'], 'jenis' => (int) $r['jenis']], $koordinasi),
+            'unit_terkunci'           => $unitTerkunci,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $in
      *
      * @return array<string, mixed>

@@ -20,6 +20,11 @@ final class CutiPetugasApprovalController extends ApiController
         return $this->respondSuccess($this->petugas()->daftar(service('authContext'), is_array($query) ? $query : []));
     }
 
+    public function opsi(): ResponseInterface
+    {
+        return $this->respondSuccess($this->petugas()->opsi(service('authContext')));
+    }
+
     public function create(): ResponseInterface
     {
         return $this->respondSuccess($this->petugas()->tambah(service('authContext'), $this->payload()), 201);
