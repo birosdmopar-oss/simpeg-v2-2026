@@ -20,7 +20,7 @@ use Tests\Support\Presensi\TukinDataUjiTrait;
 /**
  * PRD 5B §7.2 AC-D09a.2/.3 (MAKE-040) — sumber uang makan slip asli {@see UangMakanSlipPresensi} atas data DB: nominal
  * = hari dibayar × tarif; pegawai tidak ada → `null`; tarif 0 → `(0, 0, 0)` tanpa menghitung hari; `gol_pppk` tidak
- * bulat sampai sen → `null`; nilai `web_config` tersimpan tak sah = bawaan katalog (0); hari dipotong hari ini WIB (jam disuntik); pemuat banyak NIP setara jalur satu NIP dengan jumlah kueri tetap.
+ * bulat sampai sen → dibulatkan ke sen seperti kolom DECIMAL (ikut legacy, keputusan Horii 28-10); nilai `web_config` tersimpan tak sah = bawaan katalog (0); hari dipotong hari ini WIB (jam disuntik); pemuat banyak NIP setara jalur satu NIP dengan jumlah kueri tetap.
  * Kalender: September 2026 (1 Sep = Selasa).
  *
  * @internal
@@ -96,7 +96,7 @@ final class UangMakanSlipPresensiTest extends DatabaseTestCase
         $this->assertSame(['2026-09-01', '2026-09-02', '2026-09-29'], $hari[$b]);
     }
 
-    public function testPegawaiTidakAdaTarifNolDanTarifTidakSah(): void
+    public function testPegawaiTidakAdaTarifNolDanTarifPppkTidakBulat(): void
     {
         $this->assertNull($this->sumber('2026-10-27 09:00:00')->hitung('199912312099121099', PeriodeSlip::buat(2026, 9)));
 
@@ -111,16 +111,22 @@ final class UangMakanSlipPresensiTest extends DatabaseTestCase
         $this->resetWebConfig();
         $this->assertEquals(new UangMakanSlip(0, 0, 0), $this->sumber('2026-10-27 09:00:00')->hitung($nip, PeriodeSlip::buat(2026, 9)));
 
-        // gol_pppk.uang_makan tidak bulat sampai sen → DataUangMakanTidakSah → null (snapshot tidak ditulis, slip tetap terbuka).
+        // gol_pppk.uang_makan tidak bulat sampai sen → ikut legacy (keputusan Horii 28-10-2026): total = tarif × hari
+        // dibulatkan ke sen seperti kolom DECIMAL(14,2), tidak null.
         if ($this->db->table('jenis_pegawai')->where('id_jenis_pegawai', 6)->countAllResults() === 0) {
             $this->db->table('jenis_pegawai')->insert(['id_jenis_pegawai' => 6, 'jenis_pegawai' => 'PPPK', 'status' => 1]);
         }
 
-        $this->db->table('gol_pppk')->insert(['id_gol_pppk' => 122, 'gol_pppk' => 'XI', 'uang_makan' => 40000.125, 'status' => 1]);
+        $this->db->table('gol_pppk')->insert(['id_gol_pppk' => 122, 'gol_pppk' => 'XI', 'uang_makan' => 37000.333, 'status' => 1]);
         $pppk = $this->buatPegawai(['id_jenis_pegawai' => 6]);
         $this->buatRiwayatMutasiJabatan($pppk, ['tmtsk' => '2025-01-01', 'id_gol_pppk' => 122, 'gol_pppk' => 'XI']);
-        $this->hadir($pppk, '2026-09-01');
-        $this->assertNull($this->sumber('2026-10-27 09:00:00')->hitung($pppk, PeriodeSlip::buat(2026, 9)));
+
+        foreach (['2026-09-01', '2026-09-02', '2026-09-03'] as $t) {
+            $this->hadir($pppk, $t);
+        }
+
+        // 3 × 37000.333 = 111000.999 → 111001.00; tarifSen informasi = 37000.33.
+        $this->assertEquals(new UangMakanSlip(11100100, 3, 3700033), $this->sumber('2026-10-27 09:00:00')->hitung($pppk, PeriodeSlip::buat(2026, 9)));
     }
 
     public function testBanyakNipSetaraDanJumlahKueriTetap(): void

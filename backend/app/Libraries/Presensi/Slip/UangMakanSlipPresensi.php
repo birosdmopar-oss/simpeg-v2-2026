@@ -24,8 +24,10 @@ use DateTimeZone;
  * - Tarif dari {@see TarifUangMakan}; tarif ≤ 0 → `UangMakanSlip(0, 0, 0)` tanpa menghitung hari (legacy :268-271).
  * - Hari dibayar = aturan murni {@see HariUangMakan} (F5B-2: sama untuk rekap uang makan) atas data bulan kalender
  *   kehadiran, dipotong hari ini WIB (disuntik).
- * - `null` hanya bila pegawai tidak ada; tarif tidak sah ({@see DataUangMakanTidakSah}) juga `null` + log tanpa nominal,
- *   sehingga snapshot tidak ditulis dan slip tetap bisa dibuka (dicatat sebagai keputusan di laporan M2).
+ * - Total = {@see TarifUangMakan::totalSen()} (tarif × hari dibulatkan setengah-menjauhi-nol ke sen seperti kolom
+ *   DECIMAL(14,2), keputusan Horii 28-10-2026: ikut legacy, tanpa galat/`null` untuk tarif `gol_pppk` tak bulat).
+ *   `tarifSen` = tarif dibulatkan ke sen, hanya informasi: total tidak selalu sama dengan hari × `tarifSen`.
+ * - `null` hanya bila pegawai tidak ada.
  *
  * Pemuat data {@see self::hariDibayarBanyak()} memakai jumlah kueri tetap per {@see self::BATCH_NIP} NIP (dipakai ulang
  * rekap uang makan D-09b). Sumber TB = baris `riwayat_tb` (status 1, `tgl_mulai` ≤ akhir bulan, `tgl_akhir` atau
@@ -62,21 +64,16 @@ final class UangMakanSlipPresensi implements UangMakanSlipInterface
             return null;
         }
 
-        try {
-            $tarifSen = $this->tarif->tarifSen($nip, $periodeKehadiran);
-        } catch (DataUangMakanTidakSah $e) {
-            log_message('warning', 'Uang makan slip NIP {nip} bulan {bulan} tidak dihitung: {pesan}', ['nip' => $nip, 'bulan' => $periodeKehadiran->kunci(), 'pesan' => $e->getMessage()]);
+        $tarif    = $this->tarif->tarifRupiah($nip, $periodeKehadiran);
+        $tarifSen = TarifUangMakan::totalSen($tarif, 1);
 
-            return null;
-        }
-
-        if ($tarifSen <= 0) {
+        if ($tarif === '0') {
             return new UangMakanSlip(0, 0, 0);
         }
 
         $hari = count($this->hariDibayarBanyak([$nip], $periodeKehadiran->tahun, $periodeKehadiran->bulan)[$nip] ?? []);
 
-        return new UangMakanSlip($hari * $tarifSen, $hari, $tarifSen);
+        return new UangMakanSlip(TarifUangMakan::totalSen($tarif, $hari), $hari, $tarifSen);
     }
 
     /**
