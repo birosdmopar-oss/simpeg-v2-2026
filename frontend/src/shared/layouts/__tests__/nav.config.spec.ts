@@ -24,9 +24,9 @@ describe('buildNav — fase aktif 3 (B-20 penutup)', () => {
 
   // Menu lengkap per role (urut sidebar): Kepegawaian Fase 3 lalu menu main.
   it.each([
-    [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ']],
+    [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Presensi', 'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ']],
     [Role.PEGAWAI, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Presensi', 'FAQ']],
-    [Role.ADMIN_SATKER, ['Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Manajemen Akun', 'FAQ']],
+    [Role.ADMIN_SATKER, ['Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Presensi', 'Manajemen Akun', 'FAQ']],
     [Role.ADMIN_VIEW_ESELON1, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Hari Libur', 'FAQ']],
     [Role.MENTERI, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Hari Libur', 'FAQ']],
     [Role.PTT, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Verifikasi LKH', 'Presensi', 'FAQ']],
@@ -124,7 +124,7 @@ describe('buildNav — fase 2 (sebelum B-20 penutup)', () => {
   })
 
   it('Super Admin melihat menu main saja', () => {
-    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
+    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Presensi', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
   })
 })
 
@@ -173,14 +173,22 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
     }
   })
 
+  it('anak disaring per role: Kelola Slip Gaji = role 1, 3 → /presensi/slip-gaji/kelola', () => {
+    for (const role of [Role.SUPER_ADMIN, Role.ADMIN_SATKER]) {
+      expect(presensi(role)?.children).toEqual([
+        { key: 'presensi-slip-gaji-kelola', label: 'Kelola Slip Gaji', to: '/presensi/slip-gaji/kelola', roles: [1, 3] },
+      ])
+    }
+  })
+
   it('grup dibuang bila tidak ada anak yang boleh dilihat role itu (role 8 tidak pernah melihat Presensi)', () => {
-    expect(Object.values(Role).filter((r) => presensi(r) !== undefined)).toEqual([2, 6, 7])
+    expect(Object.values(Role).filter((r) => presensi(r) !== undefined)).toEqual([1, 2, 3, 6, 7])
     expect(presensi(Role.PIMPINAN)).toBeUndefined()
     expect(presensi(null)).toBeUndefined()
   })
 
   it('`rilis` tidak melewati penyaringan role dan fase lebih tinggi tetap memakai anak yang sama', () => {
-    expect(presensi(Role.SUPER_ADMIN)).toBeUndefined()
+    expect(presensi(Role.ADMIN_VIEW_ESELON1)).toBeUndefined()
     expect(presensi(Role.PEGAWAI, 5)?.children?.map((c) => c.key)).toEqual(['presensi-slip-gaji'])
   })
 
