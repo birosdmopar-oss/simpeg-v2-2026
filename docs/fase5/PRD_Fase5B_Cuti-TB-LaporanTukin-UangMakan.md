@@ -4,12 +4,12 @@
 |---|---|
 | Dokumen | `docs/fase5/PRD_Fase5B_Cuti-TB-LaporanTukin-UangMakan.md` — **acuan utama** coder/agen AI paket **5B** Fase 5 (kartu Trello DEV-006, sub-card DEV-006.2; nama berkas sesuai DEV-006.2) |
 | Versi | **v1.0 — 28-10-2026** (v0.1 draf 28-10-2026 `a5f5254`; v1.0 memuat keputusan Horii 28-10-2026 atas semua butir ⛔ dan ◻, disampaikan reviewer CR; riwayat perubahan §14 Lampiran D) |
-| Status | **BERLAKU setelah review reviewer CR** (keputusan F5B-1..F5B-21 dikunci di §5.3). Satu butir menunggu konfirmasi ulang: **Q5B-08** (temuan verifikasi: baris uang makan PDF legacy berada di dalam komentar HTML, §7.3.2). Koding 5B mulai setelah dokumen ini di `main` dan FE 5A selesai |
+| Status | **BERLAKU setelah review reviewer CR** (keputusan F5B-1..F5B-21 dikunci di §5.3; Q5B-08 diputus ulang Horii 28-10-2026 setelah temuan verifikasi). Koding 5B mulai setelah dokumen ini di `main` dan FE 5A selesai |
 | Basis kode | `origin/main` = **`43023e6`** (rujukan `path:baris` repo dari commit ini). 5A M2–M6 sudah di `main` (`3a12909` dst.); Fase 4 M3–M6 (cuti, e-sign/notifikasi, TB/IB/PMK, dashboard/PIC) sudah di `main` |
 | Acuan legacy | Salinan kerja legacy CI3 **HEAD `0cf7e67`** (26-10-2026). `L_presensi.php`, `Presensi.php`, `L_employee.php` **identik** dengan `771f8b4` (acuan 5A), sehingga nomor baris 5A tetap berlaku; `Lsl_gaji.php` berubah di `1c3142f` (aturan snapshot uang makan — sudah sama dengan PRD 5A §7.3.7) dan `0cf7e67` (baris Pajak di slip, §9 catatan). Rujukan baris bercatatan AS-09 (belum dicocokkan checksum produksi, Q5A-14) |
 | Scope | **5B** = D-06 (sumber cuti/TB nyata untuk Tukin), D-08 (Laporan Tukin, API + ekspor), D-09 (rekap kehadiran, rekap uang makan, **nilai uang makan slip**), bahan cross-check rumus Q5A-13. **Bukan** 5A/5C (§1.2). Backend saja; FE laporan = 5C (F5-21) |
 | Dikerjakan | Setelah Fase 4 M3/M5 di `main` (P-1, DEV-006.2 — terpenuhi 28-10-2026). Pelaksana: sesi WS-2 setelah FE 5A selesai (keputusan reviewer CR 28-10-2026) |
-| Key | Pekerjaan baru **MAKE-039..045** (§10; MAKE-044/045 usulan, dikonfirmasi reviewer CR). Skema: **DBV-024** = tabel penyesuaian Tukin per NIP (F5B-14, §7.6). Perbaikan review/QA: CR-### berikutnya (CR-067 dst., dikonfirmasi reviewer CR) |
+| Key | Pekerjaan baru **MAKE-039..045** (§10; MAKE-044 TB massal Fase 4, MAKE-045 CRUD penyesuaian — dikonfirmasi reviewer CR 28-10-2026). Skema: **DBV-024** = tabel penyesuaian Tukin per NIP (F5B-14, §7.6). Perbaikan review/QA: CR-### berikutnya (CR-067 dst., dikonfirmasi reviewer CR) |
 | Sumber | PRD 5A v1.1 (§1.2, §7.3.7, §7.7, §9, §13, Lampiran C); `backend/docs/progress/05-Presensi.md` (status 5A, UP-1, QC-1..5); README `Libraries/Presensi`, `Presensi/Tukin`, `Presensi/TukinData`; PRD Fase 4 v1.4 (§6.7.5, §8, §14.6); `Bahan Baku SIMPEG/05-Presensi.md` (D-06, D-08, D-09, D-12, D-13, exit criteria); Matriks Role × Endpoint v2 Modul D; ADR-013/029 (`SIMPEG_v2_ADR`), ADR-032/033/034 repo; Trello DEV-006, DEV-006.2, QASMTASK-079..088, QAUI-005, QAFUNC-006; kode legacy `0cf7e67` (Lampiran A) |
 
 ## Cara pakai (WAJIB dibaca)
@@ -180,7 +180,7 @@ spesifikasinya (dirujuk kolom terakhir).
 | F5B-5 | "Tukin Lama" (`laporan_tukin_us`) **tidak** di-port | §6.3 |
 | F5B-6 | Laporan IL (`list_lt_il`, rekap IL, `rekap_uma_il`) **hanya role 1** [V2] | §6 |
 | F5B-7 | Laporan per pegawai ikut legacy: role 1/4/5 semua NIP; role 3 satker akun (unit bila akun tanpa satker) dicek **server**; role 2/6/7 hanya NIP sendiri (NIP lain → 403, tidak dialihkan); role 8 → 403 | §6.1, §7.3.6 |
-| F5B-8 | Layar laporan per pegawai hanya persen; PDF per pegawai memuat uang makan (aturan slip) — **menunggu konfirmasi ulang** atas temuan §7.3.2. Nominal Tukin tidak ditampilkan; `gaji_pegawai` di DoD 083 = teks DoD lebih luas dari legacy. **[CATAT]** | §7.3.2 |
+| F5B-8 | Layar laporan per pegawai hanya persen. PDF per pegawai = **render legacy persis [K]**: tanpa kolom & tanpa baris total uang makan; "Rp." hanya di baris konket yang dibayar (sel ke-6), nilainya dengan aturan slip (F5B-2) per bulan kalender. Nominal Tukin tidak ditampilkan; `gaji_pegawai` di DoD 083 = teks DoD lebih luas dari legacy. **[CATAT]** | §7.3.2 |
 | F5B-9 | Uji paritas UP-1 data nyata oleh QA (5C/cutover). **Blocker go-live** | §10, §11.2 |
 | F5B-10 | Rekap kehadiran role **1, 3, 4** [K]: role 3 dipaksa satkernya, role 4 semua lingkup; TB didahulukan dan jam dari `web_config` [V2] | §6.2, §7.4.1 |
 | F5B-11 | Ekspor **tidak** diaudit; target uji volume §7.3.7. Opsi tindak lanjut: audit setiap unduhan rekap Tukin/uang makan (data keuangan) | §8 |
@@ -193,7 +193,9 @@ spesifikasinya (dirujuk kolom terakhir).
 | F5B-18 | Fase 4 menambah **metode massal aditif** di `BebasPresensiTb`/`StatusTugasBelajar` (tanpa mengubah perilaku tunggal) = prasyarat D-06 massal (M1a; pelaksana: pemilik M5 Fase 4) | §7.1.3, §10 |
 | F5B-19 | Uang makan PTT / golongan di luar I–IV = 0 [K/I]; konfirmasi Biro Keuangan sebelum go-live | §7.2.3, §11.2 |
 | F5B-20 | Rekap uang makan = format legacy **`NIP \| TGL_ABSEN`** saja (tanpa nominal, tanpa ringkasan golongan; dikonfirmasi Horii); hari dibayar = aturan slip (F5B-2). **[CATAT]** | §7.4.2 |
-| F5B-21 | (usulan v1.0, ◻) Riwayat penyesuaian Tukin periode yang didukung v2 (≥ 2024-04) diisi admin saat cutover lewat CRUD; data tidak di-commit | §7.3.10 |
+| F5B-22 | Sumber data Plt v2 untuk blok tanda tangan dicek di M0 (laporan M0) | §7.3.4, §10 |
+| F5B-23 | Key **MAKE-044** (M1a, TB massal Fase 4) dan **MAKE-045** (M4, CRUD penyesuaian) | §10 |
+| F5B-21 | Riwayat penyesuaian Tukin legacy (periode ≥ 2024-04) diisi admin lewat CRUD saat cutover; data **tidak** di-commit (data pribadi) | §7.3.10 |
 | — | Slip Gaji: acuan legacy kini **`0cf7e67`** (hapus baris "Pajak" & "Tunjangan Pajak" bagian TK) lewat **CR 5A terpisah**; di luar 5B | §9 |
 
 ### 5.4 Pemetaan teks DoD Trello → arti v2 (acuan penilaian QA)
@@ -220,7 +222,7 @@ spesifikasinya (dirujuk kolom terakhir).
 
 ---
 
-## 6. Matriks role × endpoint 5B (v2, usulan)
+## 6. Matriks role × endpoint 5B (v2)
 
 Pola PRD 5A §6: prefix `api/v1/`, `jwt` di grup, `Role::filter(...)` per route, aturan rinci di service. Semua route di
 **`Config/RoutesPresensiLaporan.php`**. Role: 1 Super Admin, 2 PNS, 3 Admin Satker, 4 Admin View Eselon I, 5 Menteri,
@@ -441,18 +443,24 @@ Aturan yang sama dipakai rekap uang makan (F5B-2); perbedaannya dengan `rekap_um
 - PDF (TCPDF lewat `Pdf::renderer()`, ADR-033): A4 potret; identitas + tabel harian (tanggal, jam masuk, jam pulang, ket.,
   potongan) + total pengurangan Tukin (+ penyesuaian, §7.3.10) [K isi `print/laporan_tukin_skp_pdf.php:55-257`]; nama
   berkas `tukin_<nip>_<YYYY-MM>.pdf` tanpa angka acak.
-- **Uang makan di PDF (F5B-8, menunggu konfirmasi ulang — lihat temuan).** Keputusan Horii: PDF memuat uang makan Rp per
-  hari yang dibayar dan baris "TOTAL UANG MAKAN", nilainya dengan aturan slip (F5B-2). Cara hitung yang diusulkan: untuk
-  setiap tanggal periode Tukin, dibayar/tidak menurut `Rekap\HariUangMakan` §7.2.2 (penanda TB melekat dihitung per bulan
-  kalender tanggal itu), tarif = `TarifUangMakan` bulan kalender tanggal itu; total = jumlah per hari. Rp dicetak di kolom
-  "UANG MAKAN" per baris hari.
+- **Uang makan di PDF (F5B-8 = render legacy persis [K]).** PDF **tidak** punya kolom "UANG MAKAN" dan **tidak** punya
+  baris "TOTAL UANG MAKAN". Satu-satunya tampilan uang makan = teks "Rp. <nilai>" pada **baris konket** yang dibayar uang
+  makan, di sel ke-6 tanpa header (baris konket: tanggal + keterangan `colspan="4"` + sel Rp) [K `:190-197`]. Baris
+  "TOTAL PENGURANGAN TUKIN" tetap. Nilai Rp memakai **aturan slip** (F5B-2):
+  1. Untuk setiap tanggal konket di periode Tukin, kelompokkan menurut **bulan kalender** tanggal itu (periode 16–15 terbelah
+     dua bulan kalender). Untuk setiap bulan kalender yang tersentuh, jalankan `Rekap\HariUangMakan` §7.2.2 atas bulan kalender
+     itu (mulai tanggal 1, sehingga penanda TB melekat dan urutan hari sama dengan slip), dipotong `hariIni`.
+  2. Tanggal konket dicetak "Rp." **hanya** bila tanggal itu termasuk hari dibayar hasil langkah 1 (praktis: konket `V`,
+     `affect_tukin = 1`, kategori 13, bukan TB/penanda/cuti); nilai = `TarifUangMakan` bulan kalender tanggal itu.
+  3. Hari presensi biasa **tidak** dicetak nominalnya (sel legacy dikomentari); tidak ada penjumlahan.
 
 **[CATAT] F5B-8 — uang makan & nominal di laporan per pegawai**
 
 | v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
 |---|---|---|
 | Layar JSON hanya persen | Layar `laporan_tukin_skp.php` hanya persen; kolom uang makan dikomentari | Sama |
-| PDF: kolom "UANG MAKAN" per hari + baris "TOTAL UANG MAKAN", aturan slip | **Temuan verifikasi 28-10:** header kolom "UANG MAKAN" (`print/laporan_tukin_skp_pdf.php:169`), sel uang makan baris presensi (`:228`), dan baris "TOTAL UANG MAKAN" (`:256-259`) berada **di dalam komentar HTML `<!--tr> … <tr-->`**; TCPDF memanggil `strip_tags()` yang membuang komentar (`tcpdf.php` `getHtmlDomArray`), sehingga **tidak tercetak**. Yang tercetak hanya "Rp." pada baris konket kategori 13 (sel ke-6 tanpa header, `:190-197`). Nilai per hari legacy berasal dari `laporan_tukin_skp` (konket kategori 13 dan hari presensi = tarif; cuti/libur = 0; `:7089-7101`, `:7435-7649`) | Bila dipertahankan, keputusan ini = **[V2]** (legacy praktis tidak mencetak uang makan, kecuali sel konket kategori 13). Aturan per hari legacy `laporan_tukin_skp` ≠ aturan slip (tanpa penanda TB melekat). Periode PDF = periode Tukin 16–15, sedangkan aturan slip berbasis bulan kalender → dipecah per bulan kalender. **Pilihan untuk dikonfirmasi:** (a) tetap sesuai keputusan (cetak kolom + total, [V2]); (b) ikut render legacy persis: hanya "Rp." di baris konket kategori 13, tanpa kolom/total; (c) tanpa uang makan di PDF |
+| PDF: tanpa kolom "UANG MAKAN", tanpa baris "TOTAL UANG MAKAN"; "Rp." hanya di baris konket yang dibayar (sel ke-6 tanpa header) | Header kolom "UANG MAKAN" (`print/laporan_tukin_skp_pdf.php:169`), sel uang makan baris presensi (`:228`), dan baris "TOTAL UANG MAKAN" (`:256-259`) berada **di dalam komentar HTML `<!--tr> … <tr-->`**; TCPDF memanggil `strip_tags()` yang membuang komentar, sehingga **tidak tercetak** (diverifikasi penyusun & reviewer CR 28-10-2026). Yang tercetak hanya "Rp." pada baris konket dengan `uang_makan > 0` (sel ke-6 tanpa header, `:190-197`) | Tampilan **sama** |
+| Nilai "Rp." baris konket = aturan slip (F5B-2), dihitung per bulan kalender tanggal itu | Nilai dari `laporan_tukin_skp`: konket kategori 13 = tarif pegawai (`:7089-7101`, `:7435-7444`), tanpa penanda TB melekat | Hanya **sumber nilai** (aturan slip): tanggal konket setelah penanda TB aktif di bulan kalender yang sama tidak dicetak Rp; tarif per bulan kalender tanggal itu |
 | Nominal Tukin tidak ditampilkan | Nominal tidak tampil (kelas jabatan hanya identitas) | Sama |
 | Data `gaji_pegawai` tidak dipakai | Laporan/rekap tidak membaca `gaji_pegawai` | DoD 083 "query gabungan … gaji_pegawai" lebih luas dari legacy |
 - Galat terkendali adapter (`KonfigurasiTukinTidakLengkap`, `RentangPuasaGanda`, `DataTukinTidakSah`) → 422 dengan `code`
@@ -540,7 +548,10 @@ alternatif), override `.env` tervalidasi (pola `angkaPositifDariEnv`).
 - **AC-D08.3** Filter `bulan`, `unit_satker`, `jenis_pegawai[]` (kombinasi) mengubah populasi sesuai §7.3.3; validasi 422.
 - **AC-D08.4** Periode berjalan dipotong hari ini (`hariIni` disuntik); periode BKN tidak standar dipakai.
 - **AC-D08.5** XLSX: header & urutan kolom persis §7.3.4 (dibaca ulang PhpSpreadsheet di test), nama berkas & content type.
-- **AC-D08.6** PDF per pegawai dan PDF rekap (batas baris 422, lingkup `0` 422).
+- **AC-D08.6** PDF per pegawai dan PDF rekap (batas baris 422, lingkup `0` 422). PDF per pegawai: teks tidak memuat
+  "UANG MAKAN" sebagai header/total; "Rp." hanya pada baris konket kategori 13 yang dibayar (test: konket kategori 13 →
+  ada Rp; konket kategori lain → tidak; konket kategori 13 setelah penanda TB aktif → tidak; konket di periode 16–15 yang
+  melintasi dua bulan kalender dengan tarif berbeda → tarif masing-masing bulan).
 - **AC-D08.7** Galat satu pegawai tidak menggagalkan rekap; tarif `web_config` belum lengkap → semua baris galat
   `konfigurasi_tukin_tidak_lengkap` (bukan 0).
 - **AC-D08.8** Ubah tarif `TL1/PSW1` lewat `WebConfigService` → rekap & laporan langsung berubah (regression Fase 2).
@@ -749,12 +760,12 @@ gate cepat lokal, push, CI hijau, lapor, ⛔ tunggu merge reviewer CR).
 
 | No | Milestone | Task | Key | Branch | Menunggu | Membuka jalan |
 |---|---|---|---|---|---|---|
-| M0 | Baca PRD v1.0 + inspeksi repo + laporan pemahaman | — | (tanpa commit) | — | PRD 5B v1.0 di `main`; FE 5A selesai; ⛔ jawaban ulang Q5B-08 | ⛔ reviewer CR konfirmasi key (termasuk usulan MAKE-044/045) |
-| M1a | Metode massal TB aditif di Fase 4 (F5B-18) + test kesetaraan | D-06 (prasyarat) | MAKE-044 (usulan) | `fase5b/make-044-tb-massal` | M0 | M1 |
+| M0 | Baca PRD v1.0 + inspeksi repo + laporan pemahaman | — | (tanpa commit) | — | PRD 5B v1.0 di `main`; FE 5A selesai | ⛔ reviewer CR menerima laporan M0 (termasuk sumber data Plt v2, F5B-22) |
+| M1a | Metode massal TB aditif di Fase 4 (F5B-18) + test kesetaraan | D-06 (prasyarat) | MAKE-044 | `fase5b/make-044-tb-massal` | M0 | M1 |
 | M1 | Sumber cuti/TB + massal + switch `$sumberCutiTb` + test precedence/kombinasi | D-06 | MAKE-039 | `fase5b/make-039-sumber-cuti-tb` | M1a merged | M5, M6 |
 | M2 | Uang makan slip asli + tarif + switch `$sumberUangMakan` | D-09a | MAKE-040 | `fase5b/make-040-uang-makan-slip` | M0 | M5 (PDF uang makan), M6; **menutup blocker go-live F5-1** |
 | M3 | Dokumen DBV-024 + kueri audit + draf migration → setelah disetujui: migration + registry NIP + test skema | DBV-024 | DBV-024 | `fase5b/dbv-024-penyesuaian-tukin` (PR `[DBV]`) | M0 | ⛔ **DB Validator approve DBV-024**, merge PR → M4 |
-| M4 | CRUD penyesuaian Tukin (model, service, controller, route, audit, validasi) | D-08 (F5B-14) | MAKE-045 (usulan) | `fase5b/make-045-penyesuaian-tukin` | M3 merged | M5 |
+| M4 | CRUD penyesuaian Tukin (model, service, controller, route, audit, validasi) | D-08 (F5B-14) | MAKE-045 | `fase5b/make-045-penyesuaian-tukin` | M3 merged | M5 |
 | M5 | Laporan Tukin: daftar, per pegawai (+PDF), rekap (+XLSX, PDF terbatas), IL, cakupan role, tanda tangan, efek penyesuaian, uji volume, ADR-035 | D-08 | MAKE-041 | `fase5b/make-041-laporan-tukin` | M1 + M2 + M4 merged | 5C FE laporan |
 | M6 | Rekap kehadiran (+XLSX ringkas/harian) + rekap uang makan `NIP \| TGL_ABSEN` (+XLSX) | D-09b | MAKE-042 | `fase5b/make-042-rekap-kehadiran-uang-makan` | M1 + M2 merged | 5C FE rekap |
 | M7 | Verifikasi 5B: AC, matriks 403, keterlacakan, README, progres, prosedur paritas UP-1 (membandingkan XLSX v2 vs ekspor legacy per periode), laporan akhir | semua 5B | MAKE-043 | `fase5b/make-043-verifikasi-5b` | M1–M6 merged | ⛔ sign-off reviewer CR **5B** (bukan Fase 5) |
@@ -834,8 +845,8 @@ Blocker / pertanyaan terbuka: <daftar + rujukan §13>; blocker go-live: <daftar>
 ## 13. Register keputusan & pertanyaan (v1.0)
 
 Status 28-10-2026: Horii memutus **semua** butir ⛔ dan ◻ v0.1 (disampaikan reviewer CR); keputusan mengikat = §5.3 (F5B-n).
-Tabel ini menyimpan riwayat pertanyaan + keputusan. Satu-satunya butir yang **dibuka ulang** = Q5B-08 (temuan verifikasi
-setelah keputusan, §7.3.2). Kolom **[CATAT]** menunjuk tabel "v2 dipakai | legacy [K] | gap". Hal baru di luar tabel →
+Tabel ini menyimpan riwayat pertanyaan + keputusan. Q5B-08 sempat dibuka ulang (temuan verifikasi setelah keputusan pertama, §7.3.2) dan
+diputus ulang Horii 28-10-2026 = render legacy persis. Kolom **[CATAT]** menunjuk tabel "v2 dipakai | legacy [K] | gap". Hal baru di luar tabel →
 BERHENTI dan eskalasi.
 
 | ID | Pertanyaan (v0.1) | Keputusan Horii 28-10-2026 | [CATAT] | Tindak lanjut / batas |
@@ -847,7 +858,7 @@ BERHENTI dan eskalasi.
 | Q5B-05 | "Tukin Lama" `laporan_tukin_us` | Tidak di-port | — | — |
 | Q5B-06 | Hak laporan IL | Hanya role 1 [V2] | — | — |
 | Q5B-07 | Role pada laporan per pegawai | Ikut legacy: 1/4/5 semua NIP; 3 satker (unit bila akun tanpa satker) dicek server; 2/6/7 NIP sendiri (NIP lain → 403); 8 → 403 | — | — |
-| Q5B-08 | Uang makan & nominal di laporan per pegawai | (b) ikut legacy: layar persen saja; PDF memuat uang makan per hari + "TOTAL UANG MAKAN" dengan aturan slip; nominal Tukin tidak tampil; `gaji_pegawai` DoD = teks lebih luas | §7.3.2 (F5B-8) | ⛔ **Konfirmasi ulang** sebelum M5: baris uang makan PDF legacy ada di dalam komentar HTML (tidak tercetak) → pilih (a) cetak [V2] / (b) render legacy persis / (c) tanpa uang makan |
+| Q5B-08 | Uang makan & nominal di laporan per pegawai | Putusan awal (b) "PDF memuat uang makan per hari + TOTAL" didasarkan pembacaan keliru; **putus ulang 28-10-2026 = render legacy persis [K]**: layar persen saja; PDF tanpa kolom/total uang makan, "Rp." hanya di baris konket yang dibayar (nilai aturan slip per bulan kalender); nominal Tukin tidak tampil; `gaji_pegawai` DoD = teks lebih luas | §7.3.2 (F5B-8) | AC-D08.6 |
 | Q5B-09 | Uji paritas UP-1 data nyata | Tetap (QA 5C/cutover, prosedur M7) | — | ⛔ **Blocker go-live** |
 | Q5B-10 | Hak & aturan rekap kehadiran | Role 1, 3, 4 [K] (3 dipaksa satker, 4 semua lingkup); TB dulu & jam `web_config` [V2] | — | — |
 | Q5B-11 | Audit unduhan & target volume | Tidak diaudit; target §7.3.7 | — | Opsi tindak lanjut: audit setiap unduhan rekap Tukin/uang makan (data keuangan) |
@@ -860,9 +871,9 @@ BERHENTI dan eskalasi.
 | Q5B-18 | TB massal | Fase 4 menambah metode massal aditif (prasyarat D-06 massal) | — | Milestone M1a; pelaksana pemilik M5 Fase 4 |
 | Q5B-19 | Uang makan PTT / golongan di luar I–IV | 0 [K/I] | — | ⛔ Konfirmasi Biro Keuangan sebelum go-live |
 | Q5B-20 | Bentuk rekap uang makan | Format legacy `NIP \| TGL_ABSEN` saja (tanpa nominal & ringkasan golongan); hari = aturan slip | §7.4.2 (F5B-20) | — |
-| Q5B-21 | (baru v1.0) Riwayat penyesuaian periode ≥ 2024-04 dari daftar legacy | Usulan: diisi admin saat cutover lewat CRUD; data tidak di-commit | — | ◻ default bila reviewer tidak menolak |
-| Q5B-22 | (baru v1.0) Sumber data Plt v2 untuk blok tanda tangan | Usulan: memakai data/pola Plt v2 yang sudah ada (port `getPLT` yang dipakai modul lain), dicek di M0 | — | ◻; bila tidak ada sumber Plt v2 yang setara → BERHENTI & eskalasi |
-| Q5B-23 | (baru v1.0) Key MAKE-044 (TB massal Fase 4) & MAKE-045 (CRUD penyesuaian) | Usulan penyusun | — | Dikonfirmasi reviewer CR di M0 |
+| Q5B-21 | (baru v1.0) Riwayat penyesuaian periode ≥ 2024-04 dari daftar legacy | Diisi admin lewat CRUD saat cutover; tidak di-commit (data pribadi) | — | F5B-21; runbook cutover |
+| Q5B-22 | (baru v1.0) Sumber data Plt v2 untuk blok tanda tangan | Dicek di M0 | — | F5B-22; tidak ada sumber setara → BERHENTI & eskalasi |
+| Q5B-23 | (baru v1.0) Key milestone tambahan | MAKE-044 (M1a), MAKE-045 (M4) dipakai | — | F5B-23 |
 
 ## 14. Lampiran
 
@@ -957,6 +968,6 @@ Butir keamanan ditulis **kode + jenis** saja; **rincian tidak ditulis di repo pu
 | Versi | Tanggal | Perubahan |
 |---|---|---|
 | v0.1 | 28-10-2026 | Draf awal (`a5f5254`): scope D-06/D-08/D-09, bahan Q5A-13, 20 pertanyaan (6 ⛔) |
-| v1.0 | 28-10-2026 | Keputusan Horii atas semua butir → §5.3 F5B-1..F5B-20 (+ F5B-21 usulan). Perubahan isi: rekap uang makan menjadi format legacy `NIP \| TGL_ABSEN` tanpa nominal/golongan (F5B-20, §7.4.2; `Rekap\RingkasanGolongan` dihapus); rekap kehadiran + role 4 (F5B-10); IL hanya role 1 (F5B-6); laporan per pegawai role 3 fail-closed (F5B-7); PDF per pegawai memuat uang makan + temuan komentar HTML (F5B-8, dibuka ulang); blok tanda tangan dengan 6 kasus (F5B-13); tabel penyesuaian Tukin + DBV-024 + CRUD role 1 (F5B-14, §7.3.10, §7.6); PDF rekap berbatas (F5B-16); cuti tak dikenal fail-closed & tumpang tindih id terbesar (F5B-17); metode massal TB aditif di Fase 4 sebagai prasyarat M1a (F5B-18); runbook M0–M7 (+ M1a, DBV-024 M3, CRUD M4; key usulan MAKE-044/045); blocker go-live diperluas (Q5B-01/03/09/15/19); acuan Slip Gaji `0cf7e67` lewat CR 5A terpisah; tabel [CATAT] per butir |
+| v1.0 | 28-10-2026 | Keputusan Horii atas semua butir → §5.3 F5B-1..F5B-20 (+ F5B-21..F5B-23). Perubahan isi: rekap uang makan menjadi format legacy `NIP \| TGL_ABSEN` tanpa nominal/golongan (F5B-20, §7.4.2; `Rekap\RingkasanGolongan` dihapus); rekap kehadiran + role 4 (F5B-10); IL hanya role 1 (F5B-6); laporan per pegawai role 3 fail-closed (F5B-7); PDF per pegawai = render legacy persis: "Rp." hanya di baris konket, tanpa kolom/total (F5B-8, diputus ulang setelah temuan komentar HTML); blok tanda tangan dengan 6 kasus (F5B-13); tabel penyesuaian Tukin + DBV-024 + CRUD role 1 (F5B-14, §7.3.10, §7.6); PDF rekap berbatas (F5B-16); cuti tak dikenal fail-closed & tumpang tindih id terbesar (F5B-17); metode massal TB aditif di Fase 4 sebagai prasyarat M1a (F5B-18); runbook M0–M7 (+ M1a MAKE-044, DBV-024 M3, CRUD M4 MAKE-045); blocker go-live diperluas (Q5B-01/03/09/15/19); acuan Slip Gaji `0cf7e67` lewat CR 5A terpisah; tabel [CATAT] per butir |
 
 — Akhir dokumen —
