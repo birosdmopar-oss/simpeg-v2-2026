@@ -36,6 +36,19 @@ atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan
 (geolokasi browser hanya di konteks aman; IP asli untuk throttle & `viewed_ip`, Q5A-22); nama `jenis_pegawai` id 6
 produksi (Q5A-25); QA Lapis 1 FE 5A (Q5A-18).
 
+## 5B M1 — D-06 sumber cuti & TB nyata (MAKE-039, 28-10-2026)
+
+Branch `fase5b/make-039-sumber-cuti-tb` (dari `main` `988c1ed`). `SumberCutiTbFase4` (+ `SumberCutiTbMassalInterface`):
+cuti `status = 1` jenis 1..6 (di luar → `DataTukinTidakSah`; tumpang tindih → id terbesar, F5B-17), TB lewat
+`rentangBebasPresensiBanyak` Fase 4 (MAKE-044). Jalur massal `TukinDataService::siapkanBanyak()` + varian massal aditif
+`SumberHarianTukin::untukBanyak()` / `SumberDataPegawaiTukin::untukBanyak()` (**deviasi PRD 5B §3.3 disetujui reviewer CR
+M0 F1**; metode tunggal tidak berubah). Berkas bersama aditif, commit terpisah: `Config\Presensi::$tukinBatchNip` (500,
+`.env` `presensi.tukinBatchNip`) dan switch `$sumberCutiTb = SumberCutiTbFase4::class`. Library `Presensi/Tukin`,
+`SlipGaji`, dan berkas Fase 4 tidak tersentuh. Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest`,
+`CutiSakitLookbackTest`, `CutiBesarMelahirkanPeriodeTest`, `TukinDataMassalTest` (AC-D06.1–06.9); `TukinDataServiceTest`
+diperbarui (rakitan bawaan kini memakai sumber Fase 4). D-04/D-05/D-07 → DONE (backend) setelah M1 merged + review
+(PRD 5B §11.3).
+
 ## 5A M1 — DBV-023 dokumen skema (D-01)
 
 - **Sudah:** `backend/docs/db-review/DBV-023-presensi-gaji-fase5a-schema.md` (status "Menunggu review DB Validator"),

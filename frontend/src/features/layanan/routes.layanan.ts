@@ -7,7 +7,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { CUTI_ROLES, PMK_ROLES, STATUS_LAYANAN_ROLES } from './roles'
+import { CUTI_ADMIN_ROLES, CUTI_ROLES, PMK_ROLES, STATUS_LAYANAN_ROLES } from './roles'
 
 /** Nama route Modul C (tetap, dipakai tautan antarhalaman dan `nav.config.ts`). */
 export const LAYANAN_ROUTE = {
@@ -39,6 +39,19 @@ export const layananRoutes: RouteRecordRaw[] = [
     name: LAYANAN_ROUTE.CUTI_DETAIL,
     component: () => import('./views/CutiDetailPage.vue'),
     meta: { roles: CUTI_ROLES, title: 'Detail Cuti' },
+  },
+  {
+    // Saldo Cuti & Petugas Approval Cuti: role 1, 3 (menu tersembunyi sampai paket penutup).
+    path: '/layanan/cuti/saldo',
+    name: LAYANAN_ROUTE.CUTI_SALDO,
+    component: () => import('./views/CutiSaldoPage.vue'),
+    meta: { roles: CUTI_ADMIN_ROLES, title: 'Saldo Cuti' },
+  },
+  {
+    path: '/layanan/cuti/petugas-approval',
+    name: LAYANAN_ROUTE.CUTI_PETUGAS_APPROVAL,
+    component: () => import('./views/PetugasApprovalCutiPage.vue'),
+    meta: { roles: CUTI_ADMIN_ROLES, title: 'Petugas Approval Cuti' },
   },
   {
     // PMK: riwayat final + pengajuan (4 tab) — role 1, 2, 3 (PRD §6.11.1).

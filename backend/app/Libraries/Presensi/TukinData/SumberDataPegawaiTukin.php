@@ -31,9 +31,16 @@ use InvalidArgumentException;
  *      [V2] cabang PPPK rekap mengenali PPPK lewat id (legacy :12707 lewat nama `jenis_pegawai == 'PPPK'`): nama master
  *      dapat diubah lewat CRUD, cek nama bisa gagal diam-diam.
  * - `tmtKeluar` = `pegawai.tmt_status` bila `pegawai.status = 2` [V2 README Tukin].
+ *
+ * Varian massal {@see self::untukBanyak()} (MAKE-039, keputusan reviewer CR M0 F1 — deviasi aditif PRD 5B §3.3): aturan
+ * yang sama (helper bersama {@see self::tentukanTmtMasuk()}), jumlah kueri tetap per {@see self::BATCH_NIP} NIP
+ * (`pegawai`, `riwayat_skp_periodik`, `detail_anak`, `riwayat_kp`, dan `riwayat_mutasi_jabatan` bila ada PPPK); galat satu
+ * pegawai menjadi {@see GalatDataTukin} NIP itu saja.
  */
 final class SumberDataPegawaiTukin
 {
+    public const BATCH_NIP = 500;
+
     public function __construct(private readonly BaseConnection $db)
     {
     }
@@ -63,6 +70,72 @@ final class SumberDataPegawaiTukin
         } catch (InvalidArgumentException $e) {
             throw new DataTukinTidakSah("Data pegawai {$nip} untuk Tukin tidak sah: " . $e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * `DataPegawaiTukin` banyak pegawai; hasil per NIP = {@see self::untuk()} NIP itu, atau galatnya.
+     *
+     * @param list<string> $nip
+     * @param list<string> $hariLibur
+     *
+     * @return array<array-key, DataPegawaiTukin|GalatDataTukin> setiap NIP masukan menjadi kunci
+     */
+    public function untukBanyak(array $nip, PeriodeTukin $periode, ?string $idPeriodeBkn, array $hariLibur = []): array
+    {
+        $unik  = array_values(array_unique(array_map('strval', $nip)));
+        $hasil = [];
+
+        foreach (array_chunk($unik, self::BATCH_NIP) as $batch) {
+            $pegawai = [];
+
+            foreach ($this->db->table('pegawai')->select(['nip', 'status', 'tmt_status', 'id_jenis_pegawai', 'created_at'])->whereIn('nip', $batch)->get()->getResultArray() as $p) {
+                $pegawai[(string) $p['nip']] = $p;
+            }
+
+            $skp  = $this->predikatSkpBanyak($batch, $idPeriodeBkn);
+            $anak = $this->jumlahAnakBanyak($batch, $periode->akhir);
+            $kp   = $this->kelompokkan($this->db->table('riwayat_kp')
+                ->select(['nip', 'gol_ruang', 'tmtsk'])
+                ->whereIn('nip', $batch)
+                ->where('status', 1)
+                ->where('tmtsk <=', max($periode->awal, $periode->akhir))
+                ->orderBy('nip', 'ASC')->orderBy('tmtsk', 'DESC')->orderBy('id_riwayat_kp', 'DESC')
+                ->get()->getResultArray());
+
+            $pppk   = array_values(array_filter($batch, static fn (string $n): bool => isset($pegawai[$n]) && (int) ($pegawai[$n]['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK));
+            $mutasi = $pppk === [] ? [] : $this->kelompokkan($this->db->table('riwayat_mutasi_jabatan')
+                ->select(['nip', 'gol_pppk', 'tmtsk'])
+                ->whereIn('nip', $pppk)
+                ->where('status', 1)
+                ->where('jenis_jabatan', 1)
+                ->where('tmtsk <=', $periode->akhir)
+                ->orderBy('nip', 'ASC')->orderBy('tmtsk', 'DESC')->orderBy('id_riwayat_mutasi_jabatan', 'DESC')
+                ->get()->getResultArray());
+
+            foreach ($batch as $n) {
+                if (! isset($pegawai[$n])) {
+                    $hasil[$n] = new DataTukinTidakSah("Pegawai {$n} tidak ditemukan.");
+
+                    continue;
+                }
+
+                $p                = $pegawai[$n];
+                [$golRuang, $tmt] = self::pangkatDari($kp[$n] ?? [], $periode, (string) ($p['created_at'] ?? ''));
+
+                try {
+                    $hasil[$n] = new DataPegawaiTukin(
+                        $skp[$n] ?? null,
+                        $anak[$n] ?? 0,
+                        self::tentukanTmtMasuk($golRuang, $tmt, (int) ($p['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK, $mutasi[$n][0] ?? null, $periode, $hariLibur),
+                        (int) $p['status'] === 2 && $p['tmt_status'] !== null ? (string) $p['tmt_status'] : null,
+                    );
+                } catch (InvalidArgumentException $e) {
+                    $hasil[$n] = new DataTukinTidakSah("Data pegawai {$n} untuk Tukin tidak sah: " . $e->getMessage(), 0, $e);
+                }
+            }
+        }
+
+        return $hasil;
     }
 
     public function predikatSkp(string $nip, ?string $idPeriodeBkn): ?string
@@ -107,7 +180,8 @@ final class SumberDataPegawaiTukin
     {
         [$golRuang, $tmt] = $this->pangkat($nip, $periode, (string) ($pegawai['created_at'] ?? ''));
 
-        $pppk = (int) ($pegawai['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK;
+        $pppk    = (int) ($pegawai['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK;
+        $jabatan = null;
 
         if ($pppk) {
             $jabatan = $this->db->table('riwayat_mutasi_jabatan')
@@ -120,11 +194,22 @@ final class SumberDataPegawaiTukin
                 ->orderBy('id_riwayat_mutasi_jabatan', 'DESC')
                 ->get(1)
                 ->getRowArray();
+        }
 
-            if (is_array($jabatan)) {
-                $golRuang = (string) ($jabatan['gol_pppk'] ?? '');
-                $tmt      = (string) ($jabatan['tmtsk'] ?? '');
-            }
+        return self::tentukanTmtMasuk($golRuang, $tmt, $pppk, is_array($jabatan) ? $jabatan : null, $periode, $hariLibur);
+    }
+
+    /**
+     * Aturan `tmtMasuk` bersama jalur tunggal & massal (lihat docblock kelas butir 1–3).
+     *
+     * @param array<string, mixed>|null $jabatanPppk baris `riwayat_mutasi_jabatan` PPPK terakhir (`gol_pppk`, `tmtsk`)
+     * @param list<string>              $hariLibur
+     */
+    private static function tentukanTmtMasuk(string $golRuang, string $tmt, bool $pppk, ?array $jabatanPppk, PeriodeTukin $periode, array $hariLibur): ?string
+    {
+        if ($pppk && $jabatanPppk !== null) {
+            $golRuang = (string) ($jabatanPppk['gol_pppk'] ?? '');
+            $tmt      = (string) ($jabatanPppk['tmtsk'] ?? '');
         }
 
         if (strlen($golRuang) > 5 && strtoupper(substr($golRuang, 0, 4)) === 'CPNS') {
@@ -138,6 +223,100 @@ final class SumberDataPegawaiTukin
         }
 
         return null;
+    }
+
+    /**
+     * {@see self::pangkat()} dari baris `riwayat_kp` satu pegawai yang sudah dimuat (urut `tmtsk`, `id` turun).
+     *
+     * @param list<array<string, mixed>> $baris
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function pangkatDari(array $baris, PeriodeTukin $periode, string $createdAt): array
+    {
+        $batas = [$periode->awal];
+
+        if ($createdAt !== '' && substr($createdAt, 0, 10) > $periode->akhir) {
+            $batas[] = $periode->akhir;
+        }
+
+        foreach ($batas as $tanggal) {
+            foreach ($baris as $kp) {
+                if ((string) $kp['tmtsk'] <= $tanggal) {
+                    return [(string) ($kp['gol_ruang'] ?? ''), (string) ($kp['tmtsk'] ?? '')];
+                }
+            }
+        }
+
+        return ['', ''];
+    }
+
+    /**
+     * @param list<string> $nip
+     *
+     * @return array<array-key, string>
+     */
+    private function predikatSkpBanyak(array $nip, ?string $idPeriodeBkn): array
+    {
+        if ($idPeriodeBkn === null) {
+            return [];
+        }
+
+        $hasil = [];
+
+        foreach ($this->db->table('riwayat_skp_periodik')
+            ->select(['nip', 'hasil_akhir'])
+            ->whereIn('nip', $nip)
+            ->where('status', 1)
+            ->where('periode_id', $idPeriodeBkn)
+            ->where('hasil_akhir IS NOT NULL', null, false)
+            ->orderBy('nip', 'ASC')
+            ->orderBy('id_riwayat_skp_periodik', 'ASC')
+            ->get()->getResultArray() as $b) {
+            $hasil[(string) $b['nip']] ??= strtolower((string) $b['hasil_akhir']);
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param list<string> $nip
+     *
+     * @return array<array-key, int>
+     */
+    private function jumlahAnakBanyak(array $nip, string $akhir): array
+    {
+        $hasil = [];
+
+        foreach ($this->db->table('detail_anak da')
+            ->select('rk.nip, COUNT(*) AS jumlah')
+            ->join('riwayat_keluarga rk', 'rk.id_riwayat_keluarga = da.id_riwayat_keluarga')
+            ->whereIn('rk.nip', $nip)
+            ->where('rk.status', 1)
+            ->where('rk.tgl_perkawinan <=', $akhir)
+            ->where('da.tgl_lahir <=', $akhir)
+            ->groupBy('rk.nip')
+            ->get()->getResultArray() as $b) {
+            $hasil[(string) $b['nip']] = (int) $b['jumlah'];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baris
+     *
+     * @return array<array-key, list<array<string, mixed>>>
+     */
+    private function kelompokkan(array $baris): array
+    {
+        $hasil = [];
+
+        foreach ($baris as $b) {
+            $hasil[(string) $b['nip']][] = $b;
+        }
+
+        return $hasil;
     }
 
     /**
