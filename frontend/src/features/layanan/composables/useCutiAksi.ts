@@ -3,7 +3,7 @@
  * Hapus, dan Unduh surat. Memegang keadaan dialog/busy/notice; `onSelesai` dipanggil setelah aksi sukses (muat ulang).
  * Hak aksi TIDAK diputuskan di sini — pemanggil hanya meneruskan kunci menu yang sudah disaring `aksi {}` server.
  */
-import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
+import { describeApiError, splitValidationErrors } from '@/features/kepegawaian/services/apiErrors'
 import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
 import { ref } from 'vue'
 
@@ -21,7 +21,7 @@ const PESAN_PROSES: Record<AksiProsesCuti, string> = {
   tangguhkan: 'Pengajuan cuti ditangguhkan.',
 }
 
-export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus', id: number) => void | Promise<void>) {
+export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'esign', id: number) => void | Promise<void>) {
   const notice = ref<NoticeCuti | null>(null)
   const busyId = ref<number | null>(null)
 
@@ -32,6 +32,12 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus', id: 
   const prosesBusy = ref(false)
   const prosesError = ref('')
 
+  const esignOpen = ref(false)
+  const esignRow = ref<CutiItem | null>(null)
+  const esignBusy = ref(false)
+  const esignErrors = ref<Record<string, string>>({})
+  const esignUmum = ref('')
+
   const hapusOpen = ref(false)
   const hapusRow = ref<CutiItem | null>(null)
 
@@ -41,6 +47,11 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus', id: 
       bukaProses(row, key, false)
     } else if (key === 'setujui-atas-nama' || key === 'tolak-atas-nama' || key === 'tangguhkan-atas-nama') {
       bukaProses(row, key.replace('-atas-nama', '') as AksiProsesCuti, true)
+    } else if (key === 'esign') {
+      esignRow.value = row
+      esignErrors.value = {}
+      esignUmum.value = ''
+      esignOpen.value = true
     } else if (key === 'tunda') {
       void tunda(row)
     } else if (key === 'surat') {
@@ -73,6 +84,27 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus', id: 
       prosesError.value = describeApiError(e).message
     } finally {
       prosesBusy.value = false
+    }
+  }
+
+  /** Passphrase hanya diteruskan ke request; tidak disimpan di state composable ini. */
+  async function esign(passphrase: string): Promise<void> {
+    const row = esignRow.value
+    if (!row) return
+    esignBusy.value = true
+    esignErrors.value = {}
+    esignUmum.value = ''
+    try {
+      await cutiService.esign(row.id, passphrase)
+      esignOpen.value = false
+      notice.value = { tone: 'success', text: 'Surat cuti ber-TTE diterbitkan.' }
+      await onSelesai('esign', row.id)
+    } catch (e) {
+      const v = splitValidationErrors(e, ['passphrase', 'nip', 'status'])
+      esignErrors.value = v.fields
+      esignUmum.value = v.general.length ? v.general.join(' ') : Object.keys(v.fields).length ? '' : describeApiError(e).message
+    } finally {
+      esignBusy.value = false
     }
   }
 
@@ -126,10 +158,16 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus', id: 
     prosesRow,
     prosesBusy,
     prosesError,
+    esignOpen,
+    esignRow,
+    esignBusy,
+    esignErrors,
+    esignUmum,
     hapusOpen,
     hapusRow,
     pilih,
     proses,
+    esign,
     hapus,
     tunda,
     unduhSurat,

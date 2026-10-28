@@ -17,6 +17,7 @@ import { UiButton, UiCard, UiNotice, UiStepper } from '@/shared/ui'
 
 import CutiFormDialog from '../components/CutiFormDialog.vue'
 import CutiProsesDialog from '../components/CutiProsesDialog.vue'
+import EsignDialog from '../components/EsignDialog.vue'
 import StatusLayananBadge from '../components/StatusLayananBadge.vue'
 import { useCutiAksi } from '../composables/useCutiAksi'
 import { aksiBarisCuti, labelAksiCuti } from '../rowActionsCuti'
@@ -173,6 +174,16 @@ const catatan = computed(() => {
       :error="aksi.prosesError.value"
       @update:open="(v) => (aksi.prosesOpen.value = v)"
       @confirm="aksi.proses"
+    />
+
+    <EsignDialog
+      :open="aksi.esignOpen.value"
+      :subject="aksi.esignRow.value ? `surat cuti ${aksi.esignRow.value.nama}` : ''"
+      :loading="aksi.esignBusy.value"
+      :errors="aksi.esignErrors.value"
+      :umum="aksi.esignUmum.value"
+      @update:open="(v) => (aksi.esignOpen.value = v)"
+      @confirm="aksi.esign"
     />
 
     <ConfirmDialog
