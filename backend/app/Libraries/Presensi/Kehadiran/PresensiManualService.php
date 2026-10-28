@@ -48,10 +48,17 @@ final class PresensiManualService
     private readonly Closure $jam;
 
     /**
-     * @param (Closure(): DateTimeInterface)|null $jam instan sekarang (bawaan jam server); disuntik test
+     * @param (Closure(): DateTimeInterface)|null   $jam              instan sekarang (bawaan jam server); disuntik test
+     * @param (Closure(string, string): void)|null $kaitSebelumTulis seam test duplikat bersamaan (AC-D03.4, jalur tangkap
+     *                                                                 1062): dipanggil setelah pra-cek, tepat sebelum
+     *                                                                 transaksi tulis (pola `PresensiOnlineService`)
      */
-    public function __construct(private readonly ?BaseConnection $db = null, ?Presensi $config = null, ?Closure $jam = null)
-    {
+    public function __construct(
+        private readonly ?BaseConnection $db = null,
+        ?Presensi $config = null,
+        ?Closure $jam = null,
+        private readonly ?Closure $kaitSebelumTulis = null,
+    ) {
         $this->config = $config ?? config(Presensi::class);
         $this->jam    = $jam ?? static fn (): DateTimeInterface => new DateTimeImmutable('now', new DateTimeZone('UTC'));
     }
@@ -104,6 +111,10 @@ final class PresensiManualService
             'nip'        => $nip, 'tgl' => $tgl, 'jam_masuk' => $masuk, 'jam_pulang' => $pulang, 'sumber' => PresensiOnlineService::SUMBER_MANUAL,
             'created_at' => gmdate('Y-m-d H:i:s'), 'created_by' => $auth->idPengguna(), 'updated_by' => $auth->idPengguna(),
         ];
+
+        if ($this->kaitSebelumTulis !== null) {
+            ($this->kaitSebelumTulis)($nip, (string) $tgl);
+        }
 
         $this->transaksi($db, function (BaseConnection $db) use ($auth, $baru, $nip, $tgl): void {
             try {
