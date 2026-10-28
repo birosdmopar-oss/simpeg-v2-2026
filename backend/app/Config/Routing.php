@@ -45,6 +45,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesLayananDashboard.php',
         // Modul D — Presensi & Remunerasi (Fase 5A, MAKE-030): slip gaji, verifikasi publik, presensi (PRD 5A §6).
         APPPATH . 'Config/RoutesPresensi.php',
+        // Modul D — Presensi paket 5B (MAKE-045 dst.): laporan Tukin, rekap, penyesuaian Tukin (PRD 5B §6).
+        APPPATH . 'Config/RoutesPresensiLaporan.php',
     ];
 
     /**

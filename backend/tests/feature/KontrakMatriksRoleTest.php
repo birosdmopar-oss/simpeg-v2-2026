@@ -196,6 +196,11 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/presensi/manual'                   => [1],
             'PUT api/v1/presensi/manual/([^/]+)/([^/]+)'    => [1],
             'DELETE api/v1/presensi/manual/([^/]+)/([^/]+)' => [1],
+            // 5B M4 MAKE-045: penyesuaian Tukin per NIP hanya role 1 (PRD 5B §6.1, F5B-14).
+            'GET api/v1/presensi/tukin/penyesuaian'             => [1],
+            'POST api/v1/presensi/tukin/penyesuaian'            => [1],
+            'PUT api/v1/presensi/tukin/penyesuaian/([0-9]+)'    => [1],
+            'DELETE api/v1/presensi/tukin/penyesuaian/([0-9]+)' => [1],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,
