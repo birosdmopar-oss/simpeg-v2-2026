@@ -49,6 +49,16 @@ async function mountShell(role: RoleCode, extra: Parameters<typeof loginAs>[1] =
   return { wrapper, router, auth }
 }
 
+async function mountShellDenganStore() {
+  const router = createShellRouter()
+  router.addRoute({ path: '/layanan/cuti/:id', name: 'layanan-cuti-detail', component: { render: () => null } })
+  await router.push('/')
+  await router.isReady()
+  const wrapper = mount(RedesignShell, { slots: { default: '<p>beranda</p>' }, global: { plugins: [router] }, attachTo: document.body })
+  await flushPromises()
+  return wrapper
+}
+
 afterEach(() => {
   document.body.innerHTML = ''
   window.sessionStorage.clear()
@@ -140,5 +150,38 @@ describe('PengingatCutiShell', () => {
     wrapper.findComponent({ name: 'AppSidebar' }).vm.$emit('logout')
     await flushPromises()
     expect(window.sessionStorage.getItem('layanan-pengingat-cuti-tampil')).toBeNull()
+  })
+
+  it('login sukses memicu pengingat; navigasi biasa tidak; 401 lalu login ulang di tab yang sama memicu lagi', async () => {
+    svc.pengingat.mockResolvedValue({ items: [baris(5)], total: 1 })
+    const { authService } = await import('@/features/auth/services/auth.service')
+    const user = { id_pengguna: 1, nip: null, username: 'tester', name: 'Tester', user_level: Role.PEGAWAI, id_unit: null, id_satker: null }
+    vi.mocked(authService.login).mockResolvedValue({ user, access_expires_at: null } as never)
+    const payload = { username: 'tester', password: 'x', captcha_token: 't' }
+
+    // (1) login → tampil
+    const { wrapper: awal, auth } = await mountShell(Role.PEGAWAI)
+    awal.unmount()
+    await auth.login(payload)
+    svc.pengingat.mockClear()
+    const w1 = await mountShellDenganStore()
+    expect(svc.pengingat).toHaveBeenCalledTimes(1)
+    expect(q('[data-testid="pengingat-cuti-dialog"]')).not.toBeNull()
+    w1.unmount()
+
+    // (2) navigasi biasa dalam sesi yang sama (shell terpasang ulang) → tidak tampil lagi
+    svc.pengingat.mockClear()
+    const w2 = await mountShellDenganStore()
+    expect(svc.pengingat).not.toHaveBeenCalled()
+    expect(q('[data-testid="pengingat-cuti-dialog"]')).toBeNull()
+    w2.unmount()
+
+    // (3) 401 → sesi dibersihkan tanpa Keluar → login ulang → tampil lagi
+    auth.clearSession()
+    await auth.login(payload)
+    const w3 = await mountShellDenganStore()
+    expect(svc.pengingat).toHaveBeenCalledTimes(1)
+    expect(q('[data-testid="pengingat-cuti-dialog"]')).not.toBeNull()
+    w3.unmount()
   })
 })
