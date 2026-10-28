@@ -16,7 +16,8 @@ use Tests\Support\Presensi\TukinDataUjiTrait;
 /**
  * Uji volume rekap Tukin (PRD 5B §7.3.7, F5B-11, AC-D08.9, pola ADR-034; hasil dicatat di ADR-035): 5.000 PNS sintetis ×
  * presensi dua periode (16 Jul – 15 Sep 2026, insertBatch di bingkai transaksi uji). Target: rekap JSON halaman 1 (100
- * baris) ≤ 5 detik; XLSX kementerian ≤ 60 detik & ≤ 256 MB; PDF satker 1.700 baris (TCPDF nyata) ≤ 30 detik & ≤ 256 MB;
+ * baris) ≤ 5 detik; XLSX kementerian ≤ 60 detik & ≤ 256 MB; PDF satker tepat di `$pdfRekapMaksBaris` (TCPDF nyata) ≤ 30
+ * detik & ≤ 256 MB;
  * PDF unit di atas batas → 422 sebelum kalkulasi. Memori puncak per permintaan (`memory_reset_peak_usage()`). Di-skip kecuali
  * env `RUN_VOLUME_TEST=1`.
  *
@@ -30,8 +31,11 @@ final class RekapTukinVolumeTest extends DatabaseTestCase
     use RekapUjiTrait;
     use TukinDataUjiTrait;
 
-    /** Sebaran per satker: A1 tepat di batas PDF, A2 di unit yang sama (unit di atas batas), B1 sisanya; total 5.000. */
-    private const SEBARAN = ['A1' => 1700, 'A2' => 1650, 'B1' => 1650];
+    /** Sebaran per satker: A1 tepat di batas PDF (`Config\Presensi::$pdfRekapMaksBaris`), A2 di unit yang sama (unit di atas batas), B1 sisanya; total 5.000. */
+    private const TOTAL = 5000;
+
+    /** @var array<string, int> */
+    private array $sebaran = [];
 
     public const JSON_DETIK = 5;
 
@@ -70,25 +74,34 @@ final class RekapTukinVolumeTest extends DatabaseTestCase
         $hasil = [];
 
         [$data, $detik, $mb] = $this->ukur(fn () => $this->serviceRekapTukin()->daftar($this->adminRekap(), ['bulan' => '2026-09', 'per_page' => '100']));
-        $this->assertSame([array_sum(self::SEBARAN), 100], [$data['total'], count($data['items'])]);
+        $this->assertSame([self::TOTAL, 100], [$data['total'], count($data['items'])]);
         $hasil['json'] = [$detik, $mb];
+        fwrite(STDERR, '
+[volume rekap Tukin] json ' . json_encode($hasil['json']) . '
+');
         $this->assertLessThanOrEqual(self::JSON_DETIK, $detik, 'JSON halaman 1');
 
         [$xlsx, $detik, $mb] = $this->ukur(fn () => $this->serviceRekapTukin()->xlsx($this->adminRekap(), ['bulan' => '2026-09']));
         $this->assertStringStartsWith('PK', $xlsx['isi']);
         $hasil['xlsx'] = [$detik, $mb];
+        fwrite(STDERR, '
+[volume rekap Tukin] xlsx ' . json_encode($hasil['xlsx']) . '
+');
         $this->assertLessThanOrEqual(self::XLSX_DETIK, $detik, 'XLSX kementerian');
         $this->assertLessThanOrEqual(self::MB, $mb, 'XLSX memori');
 
         [$pdf, $detik, $mb] = $this->ukur(fn () => $this->serviceRekapTukin()->pdf($this->adminRekap(), ['bulan' => '2026-09', 'unit_satker' => 'sat_' . $this->satker['A1']]));
         $this->assertStringStartsWith('%PDF', $pdf['isi']);
         $hasil['pdf'] = [$detik, $mb];
-        $this->assertLessThanOrEqual(self::PDF_DETIK, $detik, 'PDF satker 1.700 baris');
+        fwrite(STDERR, '
+[volume rekap Tukin] pdf ' . json_encode($hasil['pdf']) . '
+');
+        $this->assertLessThanOrEqual(self::PDF_DETIK, $detik, 'PDF satker di batas baris');
         $this->assertLessThanOrEqual(self::MB, $mb, 'PDF memori');
 
         try {
             $this->serviceRekapTukin()->pdf($this->adminRekap(), ['bulan' => '2026-09', 'unit_satker' => (string) $this->unitA]);
-            $this->fail('unit 3.350 baris harus 422');
+            $this->fail('unit di atas batas harus 422');
         } catch (ApiException $e) {
             $this->assertSame(422, $e->getStatusCode());
         }
@@ -125,7 +138,10 @@ final class RekapTukinVolumeTest extends DatabaseTestCase
 
         $urut = 0;
 
-        foreach (self::SEBARAN as $kunci => $jumlah) {
+        $batas         = (new \Config\Presensi())->pdfRekapMaksBaris;
+        $this->sebaran = ['A1' => $batas, 'A2' => intdiv(self::TOTAL - $batas, 2), 'B1' => self::TOTAL - $batas - intdiv(self::TOTAL - $batas, 2)];
+
+        foreach ($this->sebaran as $kunci => $jumlah) {
             $contoh  = $this->pegawaiRekap($this->satker[$kunci]);
             $pegawai = $this->db->table('pegawai')->where('nip', $contoh)->get()->getRowArray();
             $rmj     = $this->db->table('riwayat_mutasi_jabatan')->where('nip', $contoh)->get()->getRowArray();

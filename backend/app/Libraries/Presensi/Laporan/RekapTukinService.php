@@ -177,6 +177,23 @@ final class RekapTukinService
      */
     private function baris(array $populasi, ParameterRekap $p): array
     {
+        $baris = [];
+
+        // Per batch (`$tukinBatchNip`): argumen & hasil harian satu batch dilepas sebelum batch berikutnya (memori, ADR-035).
+        foreach (array_chunk($populasi, max(1, ($this->config ?? config(Presensi::class))->tukinBatchNip)) as $potong) {
+            array_push($baris, ...$this->barisBatch($potong, $p));
+        }
+
+        return $baris;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $populasi
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function barisBatch(array $populasi, ParameterRekap $p): array
+    {
         $nip   = array_map(static fn (array $peg): string => (string) $peg['nip'], $populasi);
         $hasil = $nip === [] ? [] : $this->kalkulasi->hitung($nip, $p->tahun, $p->bulan, $this->hariIni());
         $baris = [];
