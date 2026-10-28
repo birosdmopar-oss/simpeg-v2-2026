@@ -144,6 +144,13 @@ Di commit migration (setelah approve, masih M3):
 - `NipCascadeService::FASE` **tetap 5**; `NipReferenceRegistryTest` & `TabelAnakNipTest` diperbarui (aditif) agar
   FK baru terdaftar; `NipCascadeTest` memakai `FASE`.
 
+**Pelaksanaan setelah approve (28-10-2026, deviasi kecil dicatat):** baris didaftarkan di `NON_FK` sebagai
+`JenisRujukanNip::NonFkFkV2` (keberadaan `Ada`, fase 5, pemilik `D-08`; isi sama dengan DBV-Q6), bukan di `FK_LEGACY`.
+Alasan: `FK_LEGACY` khusus FK yang ada di dump struktur legacy D1 (75 FK / 70 tabel, sumber `[K] FK <nama>`, dijaga
+`TabelAnakNipTest`), sedangkan `penyesuaian_tukin` tabel [V2] tanpa padanan legacy — polanya sama dengan
+`firebase_token.nip` / `inbox.nip_penerima` DBV-022 (FK RESTRICT di CREATE). Efek ke koreksi NIP B-06 sama: kolom
+ikut `TabelAnakNip::sampaiFase(5)` dan `NipCascadeService`.
+
 ---
 
 ## 5. Impor & cutover

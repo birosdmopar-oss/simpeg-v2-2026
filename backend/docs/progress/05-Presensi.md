@@ -44,7 +44,7 @@ tangan (status 1 tanpa Plh vs legacy tanpa saring status) **diajukan ke Horii** 
 branch 5B pertama; urutan M3 → M1 → M2 → M6 → M4 → M5 → M7; DB scratch tunggal 3307 `simpeg_v2_t_ws2_fase5b`. M1a MAKE-044
 (TB massal Fase 4) sudah di `main` `7c40229`.
 
-## 5B M3 — DBV-024 tabel `penyesuaian_tukin` (28-10-2026, menunggu DB Validator)
+## 5B M3 — DBV-024 tabel `penyesuaian_tukin` (28-10-2026, disetujui DB Validator)
 
 Branch `fase5b/dbv-024-penyesuaian-tukin` (dari `main` `988c1ed`), PR `[DBV-024]`. Isi: dokumen
 `backend/docs/db-review/DBV-024-penyesuaian-tukin-schema.md` (DDL, deviasi, registry NIP, cutover tanpa impor, DBV-Q1..Q8),
@@ -52,6 +52,14 @@ kueri audit baca-saja `backend/docs/db-review/sql/DBV-024-audit-penyesuaian-tuki
 `app/Database/MigrationsDitahan/CreatePenyesuaianTukin.php`. Verifikasi developer di MySQL 8.0.30 (scratch 3307): DDL,
 1452/1451/3819, EXPLAIN dua indeks, siklus `down()/up()`, skrip audit A/B (dokumen Bagian 8). Setelah approve (masih M3):
 migration dipindah + registry NIP `TabelAnakNip` + `SkemaPenyesuaianTukinTest`. **⛔** M4 MAKE-045 menunggu DBV-024 di `main`.
+
+**Disetujui DB Validator 28-10-2026** (PR #30; verifikasi MariaDB 10.4.27; DBV-Q1..Q8 disetujui, Q7 dengan syarat C-1/C-2).
+Selesai M3: migration `2026-10-28-100000_CreatePenyesuaianTukin` (DDL tidak berubah; tiga draf lain di
+`MigrationsDitahan` tetap), registry NIP `TabelAnakNip` (`NonFkFkV2`, fase 5, `D-08` — deviasi kecil dari baris
+`FK_LEGACY` di dokumen, alasan di dokumen Bagian 4), `NipReferenceRegistryTest`/`TabelAnakNipTest` diperbarui,
+`tests/database/Presensi/SkemaPenyesuaianTukinTest` (`db-isolasi-penuh`: skema, constraint sampai nilai batas,
+`down()/up()`). Syarat berikutnya: **C-1** di M4 MAKE-045 (kunci `FOR UPDATE` per NIP sebelum cek tumpang tindih, cek +
+tulis satu transaksi, test konkurensi dua permintaan); **C-2** audit B1 berkala (tutup bulan Tukin) di runbook 5B.
 
 ## 5B M1 — D-06 sumber cuti & TB nyata (MAKE-039, 28-10-2026)
 
