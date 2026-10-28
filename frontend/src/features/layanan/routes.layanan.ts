@@ -7,7 +7,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { CUTI_ADMIN_ROLES, CUTI_ROLES, IB_ROLES, PMK_ROLES, STATUS_LAYANAN_ROLES, TB_ROLES } from './roles'
+import { CUTI_ADMIN_ROLES, CUTI_ROLES, IB_ROLES, PETUGAS_LAYANAN_ROLES, PMK_ROLES, STATUS_LAYANAN_ROLES, TB_ROLES } from './roles'
 
 /** Nama route Modul C (tetap, dipakai tautan antarhalaman dan `nav.config.ts`). */
 export const LAYANAN_ROUTE = {
@@ -98,5 +98,12 @@ export const layananRoutes: RouteRecordRaw[] = [
     name: LAYANAN_ROUTE.STATUS,
     component: () => import('./views/LayananStatusPage.vue'),
     meta: { roles: STATUS_LAYANAN_ROLES, title: 'Status Layanan' },
+  },
+  {
+    // Petugas Layanan (PIC): role 1 saja (brief §6; menu tersembunyi sampai paket penutup).
+    path: '/layanan/petugas',
+    name: LAYANAN_ROUTE.PETUGAS,
+    component: () => import('./views/PetugasLayananPage.vue'),
+    meta: { roles: PETUGAS_LAYANAN_ROLES, title: 'Petugas Layanan' },
   },
 ]
