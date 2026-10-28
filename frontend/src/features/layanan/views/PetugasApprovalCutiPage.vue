@@ -105,6 +105,11 @@ function pemohon(r: PetugasApprovalCuti): string {
   return [r.unit_pemohon, r.group_jabatan_pemohon, pangkat].filter(Boolean).join(' · ') || '-'
 }
 
+/** Label ⋮ yang bermakna: nama (atau jabatan) petugas + unit pemohon; id hanya bila keduanya kosong. */
+function labelBaris(r: PetugasApprovalCuti): string {
+  return [r.petugas.nama ?? r.petugas.jabatan, r.unit_pemohon].filter(Boolean).join(' · ') || String(r.id)
+}
+
 onMounted(() => void muat())
 </script>
 
@@ -150,7 +155,7 @@ onMounted(() => void muat())
                 </td>
                 <td class="px-4 py-3 text-slate-600">{{ [row.unit_petugas, row.satker_petugas].filter(Boolean).join(' · ') || '-' }}</td>
                 <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50" :class="{ 'shadow-sticky-end': actionsShadow }">
-                  <RowActionsMenu :actions="aksiBaris()" :label="`Aksi untuk petugas approval ${row.id}`" :testid="`pa-actions-${row.id}`" @select="onAksi(row, $event)" />
+                  <RowActionsMenu :actions="aksiBaris()" :label="`Aksi untuk petugas approval ${labelBaris(row)}`" :testid="`pa-actions-${row.id}`" @select="onAksi(row, $event)" />
                 </td>
               </tr>
             </tbody>
