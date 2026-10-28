@@ -76,6 +76,9 @@ Wajib:
 3. **Aksesibel dan teruji.** Komponen custom wajib bisa dioperasikan lewat keyboard (Tab, Enter/Spasi, Esc, panah, Home/End),
    memakai role/ARIA yang benar (mis. `listbox`/`option`, `combobox`, `dialog`) dengan label, dan fokus selalu terlihat.
    Setiap komponen punya test Vitest di `shared/ui/__tests__` yang menguji keyboard dan ARIA, bukan hanya klik.
+   **Jangan membungkus pemicu Dropdown/Popover/Select/Combobox dengan `UiTooltip`** (radix-vue memakai satu konteks Popper,
+   sehingga konten popper itu tertahan di luar layar, CR-068); pakai pemicu di luar: `<DropdownMenuTrigger as-child>
+   <UiTooltip …><button …/></UiTooltip></DropdownMenuTrigger>` — UiTooltip meneruskan atributnya ke elemen pemicu.
 4. **Scrollbar custom ramping berlaku global** (`assets/main.css`). Area yang panjang (menu samping, daftar, tabel, dialog)
    punya **area gulir mandiri**: menggulir menu tidak menggulir data dan sebaliknya; area lain tidak ikut tergulir.
 5. **Top navbar sticky** di semua halaman (layout bersama), tidak tertutup konten saat menggulir.

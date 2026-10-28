@@ -9,8 +9,15 @@
  * Pemicu bukan elemen fokus (badge/teks) hanya bisa memunculkannya lewat hover; isinya tetap harus tertulis di tempat
  * lain (mis. teks terpotong yang lengkapnya ada di detail) — jangan menyembunyikan informasi penting hanya di tooltip.
  * `data-tooltip` pada pemicu mencerminkan isi (untuk test/e2e).
+ *
+ * Atribut lain (`$attrs`) diteruskan ke elemen pemicu (CR-068), sehingga UiTooltip bisa menjadi anak `as-child` dari
+ * pemicu popper lain: `<DropdownMenuTrigger as-child><UiTooltip …><button/></UiTooltip></DropdownMenuTrigger>`. JANGAN
+ * membungkus pemicu Dropdown/Popover/Select/Combobox dengan UiTooltip: radix-vue memakai satu konteks Popper (inject
+ * terdekat), sehingga anchor popper itu terdaftar ke tooltip dan kontennya tertahan di luar layar.
  */
 import { TooltipContent, TooltipPortal, TooltipProvider, TooltipRoot, TooltipTrigger } from 'radix-vue'
+
+defineOptions({ inheritAttrs: false })
 
 withDefaults(
   defineProps<{
@@ -27,7 +34,7 @@ withDefaults(
 <template>
   <TooltipProvider :delay-duration="delay" :skip-delay-duration="150">
     <TooltipRoot :disabled="disabled || content === ''">
-      <TooltipTrigger as-child :data-tooltip="content || undefined">
+      <TooltipTrigger as-child v-bind="$attrs" :data-tooltip="content || undefined">
         <slot />
       </TooltipTrigger>
       <TooltipPortal>
