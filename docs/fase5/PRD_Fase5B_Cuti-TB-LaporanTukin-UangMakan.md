@@ -451,6 +451,15 @@ Aturan yang sama dipakai rekap uang makan (F5B-2); perbedaannya dengan `rekap_um
 - PDF (TCPDF lewat `Pdf::renderer()`, ADR-033): A4 potret; identitas + tabel harian (tanggal, jam masuk, jam pulang, ket.,
   potongan) + total pengurangan Tukin (+ penyesuaian, §7.3.10) [K isi `print/laporan_tukin_skp_pdf.php:55-257`]; nama
   berkas `tukin_<nip>_<YYYY-MM>.pdf` tanpa angka acak.
+- **Log keputusan 28-10-2026 (Horii, lewat reviewer CR; butir di atas tetap tercatat):** kop PDF per pegawai **ikut legacy
+  berlogo** (Q5B-27).
+
+**[CATAT] Q5B-27 — kop PDF laporan Tukin per pegawai**
+
+| v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
+|---|---|---|
+| Kop PDF per pegawai **ikut legacy berlogo** (keputusan Horii 28-10-2026, Q5B-27): tata letak `MY_PDF_HEADER_UNIT`, logo `web_config` `logo_kementerian_pdf` / `logo_wonderful_pdf` (unit 6: `satker.logo_uns`) dari akar aset `Config\Presensi::$akarAset`, nama kementerian & unit huruf besar, alamat unit (unit 6: satker) — `Laporan\KopLaporanTukin` | `MY_PDF_HEADER_UNIT` (`config/constants.php:257`) diisi `L_presensi.php:7105-7118` (unit/satker 6/7 hard-code) | Usulan awal M5 (kop `KopDokumen` tanpa logo) **DITOLAK**. Id 6/7 lewat konstanta F3; alamat unit kosong → alamat kementerian `web_config` [V2] |
+
 - **Uang makan di PDF (F5B-8 = render legacy persis [K]).** PDF **tidak** punya kolom "UANG MAKAN" dan **tidak** punya
   baris "TOTAL UANG MAKAN". Satu-satunya tampilan uang makan = teks "Rp. <nilai>" pada **baris konket** yang dibayar uang
   makan, di sel ke-6 tanpa header (baris konket: tanggal + keterangan `colspan="4"` + sel Rp) [K `:190-197`]. Baris
@@ -899,6 +908,7 @@ BERHENTI dan eskalasi.
 | Q5B-24 | (log 28-10-2026, temuan M2) Tarif `gol_pppk.uang_makan` tidak bulat sampai sen | **Ikut legacy**: total = tarif × hari, dibulatkan eksplisit setengah-menjauhi-nol ke sen seperti kolom DECIMAL(14,2); usulan galat/`null` ditolak | §7.2.3 [CATAT] Q5B-24 | Gap `.xx5` float legacy ±1 sen diterima |
 | Q5B-25 | (log 28-10-2026, temuan M6) Hari TB di rekap kehadiran ringkas | **Ikut legacy**: TB tidak diperiksa di ringkas (TK + tidak hadir bila tanpa presensi); kolom `tb` informasi; grid harian TB dulu | §7.4.1 [CATAT] Q5B-25 | Usulan v2 (TB terpisah dari TK) ditolak |
 | Q5B-26 | (log 28-10-2026, temuan M6) Presensi pegawai yang dibuat setelah awal bulan | **Ikut legacy**: tidak dibaca — ringkas `DATE(created_at) <= awal` (`:599`), harian `created_at < awal` (`:1053`); rekap uang makan tetap F5B-2 | §7.4.1 [CATAT] Q5B-26 | Rekap kehadiran & uang makan berbeda untuk pegawai baru |
+| Q5B-27 | (log 28-10-2026, temuan M5) Kop PDF laporan Tukin per pegawai | **Ikut legacy berlogo** (`MY_PDF_HEADER_UNIT`), logo & teks dari sumber v2 (`web_config`, akar aset) | §7.3.2 [CATAT] Q5B-27 | Usulan tanpa logo ditolak |
 
 ## 14. Lampiran
 
@@ -996,5 +1006,6 @@ Butir keamanan ditulis **kode + jenis** saja; **rincian tidak ditulis di repo pu
 | v1.0 | 28-10-2026 | Keputusan Horii atas semua butir → §5.3 F5B-1..F5B-20 (+ F5B-21..F5B-23). Perubahan isi: rekap uang makan menjadi format legacy `NIP \| TGL_ABSEN` tanpa nominal/golongan (F5B-20, §7.4.2; `Rekap\RingkasanGolongan` dihapus); rekap kehadiran + role 4 (F5B-10); IL hanya role 1 (F5B-6); laporan per pegawai role 3 fail-closed (F5B-7); PDF per pegawai = render legacy persis: "Rp." hanya di baris konket, tanpa kolom/total (F5B-8, diputus ulang setelah temuan komentar HTML); blok tanda tangan dengan 6 kasus (F5B-13); tabel penyesuaian Tukin + DBV-024 + CRUD role 1 (F5B-14, §7.3.10, §7.6); PDF rekap berbatas (F5B-16); cuti tak dikenal fail-closed & tumpang tindih id terbesar (F5B-17); metode massal TB aditif di Fase 4 sebagai prasyarat M1a (F5B-18); runbook M0–M7 (+ M1a MAKE-044, DBV-024 M3, CRUD M4 MAKE-045); blocker go-live diperluas (Q5B-01/03/09/15/19); acuan Slip Gaji `0cf7e67` lewat CR 5A terpisah; tabel [CATAT] per butir |
 | log | 28-10-2026 | Q5B-24 (tarif `gol_pppk` tak bulat sampai sen ikut legacy, §7.2.3); keputusan lama tidak dihapus |
 | log | 28-10-2026 | Q5B-25/Q5B-26 (rekap kehadiran ringkas ikut legacy: TB tidak diperiksa; presensi pegawai baru tidak dibaca, §7.4.1); keputusan lama tidak dihapus |
+| log | 28-10-2026 | Q5B-27 (kop PDF per pegawai ikut legacy berlogo, §7.3.2); keputusan lama tidak dihapus |
 
 — Akhir dokumen —
