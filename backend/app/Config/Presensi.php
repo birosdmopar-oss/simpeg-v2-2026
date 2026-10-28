@@ -84,6 +84,14 @@ class Presensi extends BaseConfig
      */
     public string $sumberCutiTb = SumberCutiTbBelumTersedia::class;
 
+    // --- 5B M1 sumber cuti/TB nyata (MAKE-039) ---
+
+    /**
+     * Jumlah NIP per batch jalur massal Tukin (`TukinDataService::siapkanBanyak`, PRD 5B §7.1.4, §7.3.8): jumlah kueri
+     * tetap per batch. Override `.env` `presensi.tukinBatchNip` (bilangan bulat positif; nilai lain diabaikan).
+     */
+    public int $tukinBatchNip = 500;
+
     public function __construct()
     {
         parent::__construct();
@@ -91,6 +99,7 @@ class Presensi extends BaseConfig
         $this->maksUkuranImporByte    = self::angkaPositifDariEnv('presensi.maksUkuranImporByte', $this->maksUkuranImporByte);
         $this->maksBarisImporPerSheet = self::angkaPositifDariEnv('presensi.maksBarisImporPerSheet', $this->maksBarisImporPerSheet);
         $this->ttlPratinjauDetik      = self::angkaPositifDariEnv('presensi.ttlPratinjauDetik', $this->ttlPratinjauDetik);
+        $this->tukinBatchNip          = self::angkaPositifDariEnv('presensi.tukinBatchNip', $this->tukinBatchNip);
 
         $this->akarAset = self::direktoriAbsolut($this->akarAset) ?? WRITEPATH . 'aset/';
 
