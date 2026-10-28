@@ -40,6 +40,7 @@ export function aksiBarisPmk(row: PmkItem, { busy = false, detail = true, labelB
   ]
 }
 
-export function labelAksiPmk(row: PmkItem, periode: string, tampilkanNip: boolean): string {
-  return `Aksi untuk PMK ${tampilkanNip ? row.nip + ' ' : ''}${periode}`
+/** Label baris untuk aria-label ⋮ (AGENTS §1 butir 7): "Aksi untuk PMK <nama> <periode>"; NIP hanya bila nama kosong. */
+export function labelAksiPmk(row: PmkItem, periode: string): string {
+  return `Aksi untuk PMK ${row.nama || row.nip} ${periode}`
 }

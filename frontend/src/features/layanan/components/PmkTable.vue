@@ -62,7 +62,7 @@ const periode = (r: PmkItem): string => `${tgl(r.tgl_awal)} s.d. ${tgl(r.tgl_akh
           <td class="sticky right-0 bg-white px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }">
             <RowActionsMenu
               :actions="aksiBarisPmk(row, { busy: busyId === row.id, labelBerkas })"
-              :label="labelAksiPmk(row, periode(row), tampilkanPegawai)"
+              :label="labelAksiPmk(row, periode(row))"
               :testid="`pmk-actions-${row.id}`"
               @select="(key) => emit('action', key, row)"
             />
