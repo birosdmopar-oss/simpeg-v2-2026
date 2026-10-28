@@ -157,6 +157,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // Modul C — Fase 4 C-10 Dashboard Status Layanan & PIC (MAKE-025 M6): PRD §5.5, route role 1–7 (role 8 → 403);
             // lingkup per role di LayananDashboardService (PegawaiScope), tulis PIC role 1 saja di PetugasLayananService.
             'GET api/v1/layanan/status'              => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/layanan/status/ekspor'       => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/layanan/jenis'               => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/layanan/petugas'             => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/layanan/petugas/kandidat'    => [1],
@@ -201,6 +202,14 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/presensi/tukin/penyesuaian'            => [1],
             'PUT api/v1/presensi/tukin/penyesuaian/([0-9]+)'    => [1],
             'DELETE api/v1/presensi/tukin/penyesuaian/([0-9]+)' => [1],
+            // 5B M6 MAKE-042: rekap kehadiran 1, 3, 4 (F5B-10); rekap uang makan 1, 3; varian IL hanya 1 (F5B-6).
+            'GET api/v1/presensi/rekap-kehadiran'             => [1, 3, 4],
+            'GET api/v1/presensi/rekap-kehadiran/xlsx'        => [1, 3, 4],
+            'GET api/v1/presensi/rekap-kehadiran/xlsx-harian' => [1, 3, 4],
+            'GET api/v1/presensi/uang-makan/rekap'            => [1, 3],
+            'GET api/v1/presensi/uang-makan/rekap/xlsx'       => [1, 3],
+            'GET api/v1/presensi/uang-makan/rekap-il'         => [1],
+            'GET api/v1/presensi/uang-makan/rekap-il/xlsx'    => [1],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,

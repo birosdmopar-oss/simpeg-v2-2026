@@ -12,16 +12,17 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
 import { masterService } from '@/features/master-data/services/master.service'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
-import { UiCard, UiNotice, UiPagination, UiSearchInput, UiSelect, type SelectOption } from '@/shared/ui'
+import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
+import { UiCard, UiExportMenu, UiNotice, UiPagination, UiSearchInput, UiSelect, type SelectOption } from '@/shared/ui'
 
 import LayananStatusTable from '../components/LayananStatusTable.vue'
 import { STATUS_LAYANAN_FILTER_UNIT_ROLES } from '../roles'
 import { layananStatusService } from '../services/layananStatus.service'
-import type { LayananStatusItem, LayananStatusResponse } from '../types'
+import type { FormatEksporStatus, LayananStatusItem, LayananStatusResponse } from '../types'
 
 const router = useRouter()
 const auth = useAuthStore()
-const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Status Layanan' }]
+const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Layanan' }, { label: 'Status Layanan' }]
 
 const PER_PAGE_OPTIONS = ['10', '25', '50'].map((v) => ({ value: v, label: v }))
 const STATUS_OPSI = [
@@ -48,6 +49,12 @@ const jenis = ref('')
 const status = ref('')
 const idUnit = ref('')
 const idSatker = ref('')
+const mengekspor = ref(false)
+const noticeEkspor = ref('')
+const FORMAT_EKSPOR = [
+  { key: 'xlsx' as const, label: 'Ekspor Excel (.xlsx)' },
+  { key: 'csv' as const, label: 'Ekspor CSV' },
+]
 const unitOpsi = ref<SelectOption[]>([])
 const satkerOpsi = ref<SelectOption[]>([])
 let token = 0
@@ -112,6 +119,28 @@ watch(search, () => {
 })
 onBeforeUnmount(() => clearTimeout(timer))
 
+/** Ekspor data sesuai filter aktif (bukan hanya halaman ini); lingkup dan batas baris ditegakkan server. */
+async function ekspor(format: 'pdf' | 'xlsx' | 'csv'): Promise<void> {
+  if (format === 'pdf') return
+  mengekspor.value = true
+  noticeEkspor.value = ''
+  try {
+    simpanBerkas(
+      await layananStatusService.ekspor(format as FormatEksporStatus, {
+        jenis: jenis.value,
+        status: status.value,
+        id_unit: idUnit.value,
+        id_satker: idSatker.value,
+        search: search.value.trim(),
+      }),
+    )
+  } catch (e) {
+    noticeEkspor.value = `Gagal mengekspor: ${describeApiError(e).message}`
+  } finally {
+    mengekspor.value = false
+  }
+}
+
 function onAction(key: string, row: LayananStatusItem): void {
   if (key === 'detail' && row.url_detail) void router.push(row.url_detail)
 }
@@ -120,12 +149,19 @@ function onAction(key: string, row: LayananStatusItem): void {
 <template>
   <RedesignShell :breadcrumbs="crumbs">
     <div class="page-fill flex flex-col gap-4" data-testid="layanan-status-page">
-      <UiCard title="Status Layanan" subtitle="Pantau tahap dan PIC seluruh pengajuan layanan." class="flex min-h-0 flex-1 flex-col" fill>
+      <div>
+        <h1 class="text-h2 font-semibold text-slate-900">Status Layanan</h1>
+        <p class="text-body2 text-slate-500">Pantau tahap dan PIC seluruh pengajuan layanan.</p>
+      </div>
+      <UiCard title="Daftar Pengajuan" class="flex min-h-0 flex-1 flex-col" fill>
+        <template #actions>
+          <UiExportMenu v-if="data?.can_export" :formats="FORMAT_EKSPOR" :disabled="mengekspor" @select="ekspor" />
+        </template>
         <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="layanan-status-filter">
-          <UiSelect v-if="filterUnit" v-model="idUnit" label="Unit" placeholder="Semua unit" :options="unitOpsi" clearable />
-          <UiSelect v-if="filterUnit" v-model="idSatker" label="Satker" :placeholder="idUnit ? 'Semua satker' : 'Pilih unit dulu'" :options="satkerOpsi" :disabled="!idUnit" clearable />
-          <UiSelect v-model="jenis" label="Jenis Layanan" placeholder="Semua jenis" :options="JENIS_OPSI" clearable />
-          <UiSelect v-model="status" label="Status" placeholder="Semua status" :options="STATUS_OPSI" clearable />
+          <UiSelect v-if="filterUnit" v-model="idUnit" label="Unit" placeholder="Semua Unit" :options="unitOpsi" clearable />
+          <UiSelect v-if="filterUnit" v-model="idSatker" label="Satker" :placeholder="idUnit ? 'Semua Satker' : 'Pilih Unit Dulu'" :options="satkerOpsi" :disabled="!idUnit" clearable />
+          <UiSelect v-model="jenis" label="Jenis Layanan" placeholder="Semua Jenis Layanan" :options="JENIS_OPSI" clearable />
+          <UiSelect v-model="status" label="Status" placeholder="Semua Status" :options="STATUS_OPSI" clearable />
         </div>
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div class="w-64 max-w-full"><UiSearchInput v-model="search" label="Cari pegawai" placeholder="Cari nama atau NIP" /></div>
@@ -133,6 +169,7 @@ function onAction(key: string, row: LayananStatusItem): void {
         </div>
 
         <UiNotice v-if="errorMuat" tone="danger" class="mb-4" data-testid="layanan-status-error">{{ errorMuat }}</UiNotice>
+        <UiNotice v-if="noticeEkspor" tone="danger" class="mb-4" data-testid="layanan-status-ekspor-error">{{ noticeEkspor }}</UiNotice>
 
         <LayananStatusTable :items="data?.items ?? []" :memuat="memuat" @action="onAction" />
 

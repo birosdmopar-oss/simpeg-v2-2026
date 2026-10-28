@@ -183,7 +183,7 @@ describe('PmkPage — menu ⋮ dari server', () => {
     const aksi = await rowMenuActions(wrapper, 'pmk-actions-31')
 
     expect(aksi.map((a) => a.key)).toEqual(['edit', 'detail', 'proses', 'setujui', 'tolak', 'berkas:file_kontrak', 'berkas:file_surat_phk', 'hapus'])
-    expect(aksi.find((a) => a.key === 'berkas:file_kontrak')?.label).toBe('Unduh surat kontrak kerja')
+    expect(aksi.find((a) => a.key === 'berkas:file_kontrak')?.label).toBe('Unduh Surat kontrak kerja')
     expect(aksi.at(-1)).toMatchObject({ key: 'hapus', danger: true })
     expect(q('[data-testid="pmk-actions-31"]')?.getAttribute('aria-label')).toContain('Aksi untuk PMK')
   })

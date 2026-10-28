@@ -61,6 +61,20 @@ Selesai M3: migration `2026-10-28-100000_CreatePenyesuaianTukin` (DDL tidak beru
 `down()/up()`). Syarat berikutnya: **C-1** di M4 MAKE-045 (kunci `FOR UPDATE` per NIP sebelum cek tumpang tindih, cek +
 tulis satu transaksi, test konkurensi dua permintaan); **C-2** audit B1 berkala (tutup bulan Tukin) di runbook 5B.
 
+## 5B M6 — D-09b rekap kehadiran & rekap uang makan (MAKE-042, 28-10-2026)
+
+Branch `fase5b/make-042-rekap-kehadiran-uang-makan` (dari `main` `79641be` + sinkron `139898f`). Murni:
+`Rekap/KlasifikasiKehadiran` + `Rekap/JadwalKerjaRekap` (penjaga `RekapMurniTest`). Ber-DB di `Laporan/`:
+`CakupanLaporan`/`LingkupLaporan` (lingkup role, dipakai ulang M5), `PopulasiRekap`, `ParameterRekap`, `DataRekapBulan`,
+`RekapKehadiranService`, `RekapUangMakanService` (aturan hari slip F5B-2 lewat `UangMakanSlipPresensi::hariDibayarBanyak`),
+`EksporRekapXlsx` (PhpSpreadsheet); `RekapController`; 7 route di `Config/RoutesPresensiLaporan.php` (berkas 5B) + baris
+`KontrakMatriksRoleTest` (berkas bersama, commit terpisah). Test: `KlasifikasiKehadiranTest` (AC-D09b.5),
+`RekapKehadiranTest`, `RekapUangMakanTest` (AC-D09b.1–.4, termasuk jumlah baris = `uang_makan_hari` snapshot slip M+1),
+`RoleMatriksRekapTest` (AC-D09b.6). Deviasi [V2] dirinci di README `Libraries/Presensi` bagian "Rekap kehadiran & uang
+makan 5B". Keputusan Horii 28-10-2026 (Q5B-25/26): ringkas ikut legacy — hari TB tidak diperiksa (TK + tidak hadir bila
+tanpa presensi, kolom `tb` informasi) dan presensi pegawai yang dibuat setelah awal bulan tidak dibaca (`L_presensi.php:599`
+ringkas, `:1053` harian); rekap uang makan tetap F5B-2. `Libraries/Presensi/Tukin`, `SlipGaji`, `SlipGajiService`, berkas Fase 4 tidak tersentuh.
+
 ## 5B M4 — CRUD penyesuaian Tukin (MAKE-045, 28-10-2026)
 
 Branch `fase5b/make-045-penyesuaian-tukin` (dari `main` `e9f4616`, DBV-024 sudah di `main`). `PenyesuaianTukinModel`

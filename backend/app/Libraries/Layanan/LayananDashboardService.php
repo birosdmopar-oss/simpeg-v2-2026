@@ -9,6 +9,7 @@ use App\Exceptions\ForbiddenException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Layanan\Cuti\CutiPenyaji;
 use App\Libraries\Layanan\Cuti\StatusCuti;
@@ -48,6 +49,14 @@ class LayananDashboardService
 
     public const CATATAN_TANPA_PIC = 'PIC belum ditunjuk';
 
+    /** Batas baris ekspor (sama dengan ekspor daftar pegawai). */
+    public const MAKS_EKSPOR = 20000;
+
+    /** Header ekspor [V2] (tidak ada di legacy): urutan kolom tetap. */
+    public const HEADER_EKSPOR = ['Nama', 'NIP', 'Satker', 'Jenis Layanan', 'Ringkasan', 'Tanggal Diajukan', 'Status', 'PIC/Petugas'];
+
+    private const CHUNK_EKSPOR = 500;
+
     /** Modul yang dilihat role pegawai non-PNS (§6.10.1): PTT cuti + TB, PPPK cuti + IB. */
     private const MODUL_ROLE = [Role::PTT => ['cuti', 'tb'], Role::PPPK => ['cuti', 'ib']];
 
@@ -82,7 +91,7 @@ class LayananDashboardService
     /**
      * @param array<string, mixed> $query
      *
-     * @return array{items: list<array<string, mixed>>, total: int, page: int, per_page: int, jenis: list<string>}
+     * @return array{items: list<array<string, mixed>>, total: int, page: int, per_page: int, jenis: list<string>, can_export: bool}
      */
     public function status(AuthContext $auth, array $query): array
     {
@@ -92,11 +101,110 @@ class LayananDashboardService
             throw new ForbiddenException();
         }
 
-        $q       = ListQuery::from($query, ['jenis', 'status', 'id_unit', 'id_satker', 'search', 'page', 'per_page']);
-        $modul   = $this->modul($role, $q);
-        $page    = $q->page();
-        $perPage = $q->perPage(20, 100);
-        $status  = $this->filterStatus($q);
+        $q               = ListQuery::from($query, ['jenis', 'status', 'id_unit', 'id_satker', 'search', 'page', 'per_page']);
+        $page            = $q->page();
+        $perPage         = $q->perPage(20, 100);
+        [$modul, $union] = $this->rencana($auth, $q);
+
+        if ($modul === []) {
+            return ['items' => [], 'total' => 0, 'page' => $page, 'per_page' => $perPage, 'jenis' => [], 'can_export' => true];
+        }
+
+        $db    = $this->koneksi();
+        $total = (int) ($db->query("SELECT COUNT(*) AS n FROM ({$union}) u")->getRowArray()['n'] ?? 0);
+        $baris = $db->query("SELECT * FROM ({$union}) u ORDER BY u.created_at DESC, u.jenis ASC, u.id DESC LIMIT ? OFFSET ?", [$perPage, ($page - 1) * $perPage])->getResultArray();
+
+        // `can_export`: pemanggil sudah lolos ROLE_ROUTE, jadi boleh mengekspor lingkup yang sama (hanya untuk tampilan tombol).
+        return ['items' => $this->isi($auth, $baris), 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'jenis' => $modul, 'can_export' => true];
+    }
+
+    /**
+     * Ekspor [V2] (MAKE-046): data yang sama dengan `status()` (role, lingkup, dan filter jenis/status/unit/satker/search
+     * satu sumber lewat `rencana()`), tanpa paginasi, CSV/XLSX lewat EksporTabel (pola ekspor Kepegawaian). Tanpa audit
+     * (pola ekspor daftar pegawai: baca saja).
+     *
+     * @param array<string, mixed> $query
+     *
+     * @return array{isi: string, nama: string, mime: string}
+     */
+    public function ekspor(AuthContext $auth, array $query): array
+    {
+        if (! in_array((int) $auth->role(), self::ROLE_ROUTE, true)) {
+            throw new ForbiddenException();
+        }
+
+        $format = isset($query['format']) && is_string($query['format']) ? strtolower($query['format']) : EksporTabel::XLSX;
+
+        if (! isset(EksporTabel::MIME[$format])) {
+            throw ValidationException::forField('format', 'Format ekspor harus csv atau xlsx.');
+        }
+
+        $q               = ListQuery::from($query, ['jenis', 'status', 'id_unit', 'id_satker', 'search']);
+        [$modul, $union] = $this->rencana($auth, $q);
+        $baris           = [];
+
+        if ($modul !== []) {
+            $db = $this->koneksi();
+
+            if ((int) ($db->query("SELECT COUNT(*) AS n FROM ({$union}) u")->getRowArray()['n'] ?? 0) > $this->maksEkspor()) {
+                throw ValidationException::forField('format', 'Data terlalu banyak untuk diekspor (maksimal ' . $this->maksEkspor() . ' baris); persempit filter.');
+            }
+
+            $urut = $db->query("SELECT * FROM ({$union}) u ORDER BY u.created_at DESC, u.jenis ASC, u.id DESC")->getResultArray();
+
+            foreach (array_chunk($urut, self::CHUNK_EKSPOR) as $bagian) {
+                foreach ($this->isi($auth, $bagian) as $item) {
+                    $baris[] = $this->barisEkspor($item);
+                }
+            }
+        }
+
+        // NIP (kolom 1) ditulis sebagai teks Excel di CSV.
+        return [
+            'isi'  => $format === EksporTabel::CSV ? EksporTabel::csv(self::HEADER_EKSPOR, $baris, [1]) : EksporTabel::xlsx(self::HEADER_EKSPOR, $baris, 'Status Layanan'),
+            'nama' => 'status_layanan_' . date('Ymd_His') . '.' . $format,
+            'mime' => EksporTabel::MIME[$format],
+        ];
+    }
+
+    protected function maksEkspor(): int
+    {
+        return self::MAKS_EKSPOR;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     *
+     * @return list<string>
+     */
+    private function barisEkspor(array $item): array
+    {
+        $petugas = array_map(
+            static fn (array $p): string => $p['peran'] . ': ' . ($p['nama'] ?? $p['nip']),
+            is_array($item['petugas'] ?? null) ? $item['petugas'] : [],
+        );
+
+        return [
+            (string) ($item['nama'] ?? ''),
+            (string) $item['nip'],
+            (string) ($item['satker'] ?? ''),
+            (string) $item['jenis_layanan'],
+            (string) $item['ringkasan'],
+            $this->tgl(substr((string) ($item['tanggal_pengajuan'] ?? ''), 0, 10)),
+            (string) $item['label_status'],
+            $petugas !== [] ? implode('; ', $petugas) : (string) ($item['catatan'] ?? ''),
+        ];
+    }
+
+    /**
+     * Validasi filter, modul yang boleh, dan SQL UNION (satu sumber untuk daftar dan ekspor).
+     *
+     * @return array{0: list<string>, 1: string}
+     */
+    private function rencana(AuthContext $auth, ListQuery $q): array
+    {
+        $modul  = $this->modul((int) $auth->role(), $q);
+        $status = $this->filterStatus($q);
 
         if (is_int($status) && ! $q->filled('jenis')) {
             throw new ValidationException(ListQuery::INVALID_MESSAGE, ['status' => ['Filter status kode memerlukan jenis layanan.']]);
@@ -109,15 +217,12 @@ class LayananDashboardService
         }
 
         if ($modul === []) {
-            return ['items' => [], 'total' => 0, 'page' => $page, 'per_page' => $perPage, 'jenis' => []];
+            return [[], ''];
         }
 
         $union = implode(' UNION ALL ', array_map(fn (string $j): string => '(' . $this->cabang($auth, $j, $q, $status)->getCompiledSelect() . ')', $modul));
-        $db    = $this->koneksi();
-        $total = (int) ($db->query("SELECT COUNT(*) AS n FROM ({$union}) u")->getRowArray()['n'] ?? 0);
-        $baris = $db->query("SELECT * FROM ({$union}) u ORDER BY u.created_at DESC, u.jenis ASC, u.id DESC LIMIT ? OFFSET ?", [$perPage, ($page - 1) * $perPage])->getResultArray();
 
-        return ['items' => $this->isi($auth, $baris), 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'jenis' => $modul];
+        return [$modul, $union];
     }
 
     /**

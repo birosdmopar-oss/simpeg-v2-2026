@@ -20,6 +20,7 @@ import CutiProsesDialog from '../components/CutiProsesDialog.vue'
 import EsignDialog from '../components/EsignDialog.vue'
 import CutiTable from '../components/CutiTable.vue'
 import { useCutiAksi } from '../composables/useCutiAksi'
+import { useFokusPemicu } from '../composables/useFokusPemicu'
 import { CUTI_ADMIN_ROLES, CUTI_SAYA_ROLES } from '../roles'
 import { LAYANAN_ROUTE } from '../routes.layanan'
 import { cutiService } from '../services/cuti.service'
@@ -30,7 +31,7 @@ const PER_PAGE = 20
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Cuti' }]
+const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Layanan' }, { label: 'Cuti' }]
 
 const adaSaya = computed(() => auth.role !== null && CUTI_SAYA_ROLES.includes(auth.role))
 const adaMonitoring = computed(() => auth.role !== null && CUTI_ADMIN_ROLES.includes(auth.role))
@@ -151,19 +152,31 @@ const STATUS_OPSI = [
 ]
 const tampilkanPegawai = computed(() => tab.value !== 'saya')
 const subjekProses = computed(() => (aksi.prosesRow.value ? `cuti ${aksi.prosesRow.value.nama} (${aksi.prosesRow.value.nama_jenis_cuti})` : ''))
+
+// CR-072 butir 8: fokus kembali ke ⋮ baris setelah dialog proses/hapus ditutup (Esc, Batal, atau selesai).
+function selectorMenuCuti(): string | null {
+  const row = aksi.prosesRow.value ?? aksi.hapusRow.value
+  return row ? `[data-testid="cuti-actions-${row.id}"]` : null
+}
+useFokusPemicu(aksi.prosesOpen, selectorMenuCuti)
+useFokusPemicu(aksi.hapusOpen, selectorMenuCuti)
 </script>
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
     <div class="page-fill flex flex-col gap-4" data-testid="cuti-page">
-    <UiCard title="Cuti" class="flex min-h-0 flex-1 flex-col" fill>
+    <div>
+      <h1 class="text-h2 font-semibold text-slate-900">Cuti</h1>
+      <p class="text-body2 text-slate-500">Pengajuan cuti, persetujuan, dan monitoring cuti pegawai.</p>
+    </div>
+    <UiCard title="Daftar Cuti" class="flex min-h-0 flex-1 flex-col" fill>
       <template #actions>
         <UiButton v-if="data?.can_create" data-testid="cuti-tambah" @click="ajukan"><Plus class="h-4 w-4" aria-hidden="true" /> Ajukan Cuti</UiButton>
       </template>
       <UiTabs v-model="tab" :items="tabs" aria-label="Daftar cuti" class="mb-4" />
 
       <div class="mb-4 grid gap-3 md:grid-cols-3" data-testid="cuti-filter">
-        <UiSelect v-model="status" label="Status" placeholder="Semua status" :options="STATUS_OPSI" clearable />
+        <UiSelect v-model="status" label="Status" placeholder="Semua Status" :options="STATUS_OPSI" clearable />
         <UiSearchInput v-if="tampilkanPegawai" v-model="search" label="Cari pegawai" placeholder="Cari nama atau NIP" />
       </div>
 

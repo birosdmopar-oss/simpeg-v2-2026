@@ -17,6 +17,7 @@ import { UiCard, UiNotice, UiStepper } from '@/shared/ui'
 import PmkFormDialog from '../components/PmkFormDialog.vue'
 import PmkProsesDialog from '../components/PmkProsesDialog.vue'
 import StatusLayananBadge from '../components/StatusLayananBadge.vue'
+import { useFokusPemicu } from '../composables/useFokusPemicu'
 import { usePmkAksi } from '../composables/usePmkAksi'
 import { aksiBarisPmk, labelAksiPmk } from '../rowActionsPmk'
 import { LAYANAN_ROUTE } from '../routes.layanan'
@@ -36,6 +37,7 @@ const formOpen = ref(false)
 
 const crumbs = computed(() => [
   { label: 'Home', to: { name: 'home' } },
+  { label: 'Layanan' },
   { label: 'PMK', to: { name: LAYANAN_ROUTE.PMK } },
   { label: 'Detail PMK' },
 ])
@@ -82,7 +84,9 @@ function onSaved(): void {
 }
 
 const periode = computed(() => (detail.value ? `${tgl(detail.value.tgl_awal)} s.d. ${tgl(detail.value.tgl_akhir)}` : ''))
-const subjekProses = computed(() => (detail.value ? `PMK ${detail.value.nip}` : ''))
+const subjekProses = computed(() => (detail.value ? `PMK ${detail.value.nama || detail.value.nip}` : ''))
+// CR-072 butir 8: fokus kembali ke ⋮ setelah dialog proses ditutup (Esc, Batal, atau selesai).
+useFokusPemicu(aksi.prosesOpen, () => (detail.value ? `[data-testid="pmk-actions-${detail.value.id}"]` : null))
 const labelKolom = (kolom: string): string => labelBerkas.value[kolom] ?? kolom
 </script>
 

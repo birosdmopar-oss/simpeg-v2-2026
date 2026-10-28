@@ -97,7 +97,7 @@ const pesan = (k: string): string | undefined => errors.value[k] || undefined
           <div v-if="!edit" :class="FORM_WIDE_CLASS">
             <UiFileField
               :key="kunciBerkas"
-              label="Surat Perpanjangan (wajib)"
+              label="Surat Perpanjangan *"
               :allowed="['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx']"
               :max-mb="5"
               hint="Wajib diunggah."

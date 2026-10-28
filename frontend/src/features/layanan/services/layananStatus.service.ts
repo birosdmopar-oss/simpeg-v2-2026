@@ -3,9 +3,10 @@
  * `{status, data}` (interceptor): service membaca `res.data` langsung (CR-059) dan menormalkan string MySQLi (CR-049).
  *   GET layanan/status?jenis=&status=&id_unit=&id_satker=&search=&page=&per_page=   gabungan cuti, TB, IB, PMK (read-only)
  */
+import { ambilBerkas, type BerkasUnduhan } from '@/features/kepegawaian/services/berkasUnduhan'
 import { api } from '@/lib/axios'
 
-import type { JenisLayananKode, LayananStatusItem, LayananStatusQuery, LayananStatusResponse, PetugasStatus, TahapStatus } from '../types'
+import type { FormatEksporStatus, JenisLayananKode, LayananStatusItem, LayananStatusQuery, LayananStatusResponse, PetugasStatus, TahapStatus } from '../types'
 
 import { flag, normalisasiNada, normalisasiTahap, num, teksOrNull } from './normalisasi'
 
@@ -59,7 +60,18 @@ export const layananStatusService = {
       total: num(data.total),
       page: num(data.page, 1),
       per_page: num(data.per_page),
+      can_export: flag(data.can_export),
     }
+  },
+
+  /** `GET layanan/status/ekspor` [V2]: data sesuai filter aktif (tanpa paginasi), CSV/XLSX dari server. */
+  ekspor(format: FormatEksporStatus, filter: Pick<LayananStatusQuery, 'jenis' | 'status' | 'id_unit' | 'id_satker' | 'search'>): Promise<BerkasUnduhan> {
+    const params: Record<string, string> = { format }
+    for (const k of ['jenis', 'status', 'id_unit', 'id_satker', 'search'] as const) {
+      const v = filter[k]
+      if (v) params[k] = v
+    }
+    return ambilBerkas('/layanan/status/ekspor', 'status_layanan', params)
   },
 
 }

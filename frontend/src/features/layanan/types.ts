@@ -227,6 +227,8 @@ export type KolomBerkasPmk = 'file_kontrak' | 'file_paklaring' | 'file_surat_phk
 export interface PmkItem extends TampilanStatus {
   id: number
   nip: string
+  /** Nama pegawai dari server (join `pegawai`); kosong bila pegawai tak ditemukan. Dipakai judul dialog proses. */
+  nama: string
   jenis_pmk: string
   instansi: string
   tgl_awal: string
@@ -357,7 +359,11 @@ export interface LayananStatusResponse {
   total: number
   page: number
   per_page: number
+  /** Server: pemanggil boleh mengekspor lingkup yang sama (tombol Ekspor). */
+  can_export: boolean
 }
+
+export type FormatEksporStatus = 'csv' | 'xlsx'
 
 export interface LayananStatusQuery {
   page: number

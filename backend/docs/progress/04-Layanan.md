@@ -400,6 +400,19 @@ Web Config" muncul sesuai server.
 
 Catatan untuk reviewer: penanda pengingat dikosongkan pada Keluar dan pada setiap login sukses (`auth.store` `login()` memanggil `resetPengingatCuti()`, termasuk login ulang setelah 401 tanpa Keluar), sehingga pengingat tampil "setelah login" (keputusan Horii); navigasi biasa dalam sesi yang sama tidak menampilkannya lagi.
 
+## MAKE-046 — Ekspor Status Layanan (28-10-2026, branch `fase4/make-046-ekspor-status-layanan` dari main `139898f`)
+
+Keputusan Horii 28-10 (temuan pra-QA Lapis 1, butir 1 §6.11.8 / Gambar 17). **[V2]** — legacy tidak punya halaman Status Layanan.
+
+- Backend: `GET layanan/status/ekspor?format=csv|xlsx&jenis=&status=&id_unit=&id_satker=&search=` (role 1–7, role 8 → 403). `LayananDashboardService::ekspor()` memakai `rencana()` yang sama dengan `status()` (validasi filter, modul per role, UNION per jenis dengan `PegawaiScope::terapkanKeQuery`) sehingga lingkup dan filter tidak disalin. Baris dibentuk lewat `isi()` per 500 baris (label, ringkasan, petugas dari penyaji modul). Penulis `Kepegawaian\Pegawai\EksporTabel` (pola MAKE-014; ADR-032 PhpSpreadsheet tidak dipakai di jalur ekspor Kepegawaian, tidak ada library baru). Respons `attachment`, `nosniff`, `no-store`. `GET layanan/status` memuat `can_export` (aditif).
+- Frontend: `UiExportMenu` (Ekspor Excel / Ekspor CSV) di kanan atas kartu, hanya bila `can_export`; `layananStatusService.ekspor()` lewat `ambilBerkas` + `simpanBerkas`; galat → notice "Gagal mengekspor: …".
+- Test: `LayananStatusEksporTest` (CSV/XLSX isi dan header, filter jenis/search/satker diteruskan, lingkup role 3 dan role 2, PTT hanya cuti + TB, role 8 403 di route dan service, format/filter tidak sah 422, batas baris 422 lewat subclass `maksEkspor()`, kosong hanya header, `can_export`); baris `GET layanan/status/ekspor` di `KontrakMatriksRoleTest`; `LayananStatus.spec` (klien asli biner + halaman).
+
+Keputusan/deviasi untuk reviewer:
+1. Tanpa audit ekspor: ekspor daftar pegawai (pola yang ditiru) tidak mengaudit; data yang diekspor sama dengan yang tampil di daftar.
+2. Batas 20000 baris (sama `PegawaiService::MAKS_EKSPOR`) → 422 `errors.format`.
+3. Lingkungan: `.env` worktree memakai DB default `simpeg_v2_t_make046` dan DB uji terpisah `simpeg_v2_t_make046_uji` (group tests memakai prefix `t_`; satu DB untuk keduanya bentrok nama foreign key saat migrate). Keduanya dibuat baru di 3307; dihapus hanya dengan izin.
+
 ## Fase 5B M1a — metode massal TB (MAKE-044, 28-10-2026, branch `fase5b/make-044-tb-massal` dari main `bb0648b`)
 
 Pengecualian tertulis PRD Fase 5B v1.0 F5B-18 (§3.2/§3.3): tambahan **aditif** di modul Fase 4 untuk konsumen Tukin massal

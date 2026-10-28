@@ -622,6 +622,20 @@ diaudit (`BaseAuditableModel` → `audit_logs` before/after, ADR-011).
 - XLSX harian (`xls-full`) [K `:824-1424`]: `NO, NAMA, NIP, UNIT ES.I, UNIT ES.II, <satu kolom per tanggal>, KETERANGAN`, kode
   TB/CT/DL/SKT/LL/H/TK.
 - Populasi = rekap Tukin §7.3.3 dengan batas bulan kalender [K `L_employee.php:6412-6416`].
+- **Log keputusan 28-10-2026 (Horii, lewat reviewer CR; butir di atas tetap tercatat sebagai rancangan awal):**
+  hari TB di ringkas **ikut legacy** (Q5B-25) dan presensi pegawai baru **ikut legacy** (Q5B-26).
+
+**[CATAT] Q5B-25 — hari TB di rekap kehadiran ringkas**
+
+| v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
+|---|---|---|
+| **Ringkas ikut legacy (keputusan Horii 28-10-2026, Q5B-25):** hari TB tidak diperiksa di ringkas — tetap melalui cuti → konket → presensi (praktis TK + tidak hadir bila tanpa presensi, hadir bila ada presensi); kolom `tb` hanya informasi jumlah hari TB. Grid harian memeriksa TB lebih dulu → kode `TB` | Layar `rekap` tidak mengenal TB (`L_presensi.php:642-810`) sehingga hari TB tanpa presensi = TK + tidak hadir; ekspor harian `rekap_full_xls` memeriksa TB lebih dulu (`:1087-1099`) | Usulan v2 awal (hari TB hanya di kolom `tb`, tidak masuk TK/`tidak_hadir`) **DITOLAK**. Dampak: pegawai TB tetap tampil TK & tidak hadir pada hari TB-nya (angka sama dengan legacy); kolom `tb` [V2] tambahan tidak mengurangi kolom lain |
+
+**[CATAT] Q5B-26 — presensi pegawai yang dibuat setelah awal bulan**
+
+| v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
+|---|---|---|
+| **Ikut legacy (keputusan Horii 28-10-2026, Q5B-26):** presensi hanya dibaca bila pegawai sudah ada sebelum bulan itu — ringkas JSON/XLSX `DATE(peg.created_at) <= awal bulan` (`L_presensi.php:599`), grid harian `peg.created_at < awal bulan` (`:1053`); populasi tetap `DATE(created_at) ≤` akhir bulan | Sama: populasi `≤` akhir bulan (`L_employee.php:6412-6416`), kueri presensi `rekap` `:599` dan `rekap_full_xls` `:1053` (operator berbeda per fungsi) | Usulan v2 awal (presensi pegawai baru dihitung, pola F5B-2) **DITOLAK**. Dampak: pegawai yang dibuat setelah tanggal 1 tampil TK seluruh hari kerja di rekap kehadiran; pegawai dibuat tanggal 1 di atas jam 00:00 dibaca di ringkas tetapi tidak di grid harian. Rekap uang makan **tetap** F5B-2 (MAKE-040, di `main`) sehingga untuk pegawai baru kedua rekap berbeda |
 
 #### 7.4.2 Rekap uang makan (F5B-2, F5B-20)
 - **Bentuk [K]:** baris `{nip, tgl_absen}` satu per hari dibayar, urut NIP lalu tanggal; XLSX dua kolom `NIP | TGL_ABSEN`
@@ -883,6 +897,8 @@ BERHENTI dan eskalasi.
 | Q5B-22 | (baru v1.0) Sumber data Plt v2 untuk blok tanda tangan | Dicek di M0 | — | F5B-22; tidak ada sumber setara → BERHENTI & eskalasi |
 | Q5B-23 | (baru v1.0) Key milestone tambahan | MAKE-044 (M1a), MAKE-045 (M4) dipakai | — | F5B-23 |
 | Q5B-24 | (log 28-10-2026, temuan M2) Tarif `gol_pppk.uang_makan` tidak bulat sampai sen | **Ikut legacy**: total = tarif × hari, dibulatkan eksplisit setengah-menjauhi-nol ke sen seperti kolom DECIMAL(14,2); usulan galat/`null` ditolak | §7.2.3 [CATAT] Q5B-24 | Gap `.xx5` float legacy ±1 sen diterima |
+| Q5B-25 | (log 28-10-2026, temuan M6) Hari TB di rekap kehadiran ringkas | **Ikut legacy**: TB tidak diperiksa di ringkas (TK + tidak hadir bila tanpa presensi); kolom `tb` informasi; grid harian TB dulu | §7.4.1 [CATAT] Q5B-25 | Usulan v2 (TB terpisah dari TK) ditolak |
+| Q5B-26 | (log 28-10-2026, temuan M6) Presensi pegawai yang dibuat setelah awal bulan | **Ikut legacy**: tidak dibaca — ringkas `DATE(created_at) <= awal` (`:599`), harian `created_at < awal` (`:1053`); rekap uang makan tetap F5B-2 | §7.4.1 [CATAT] Q5B-26 | Rekap kehadiran & uang makan berbeda untuk pegawai baru |
 
 ## 14. Lampiran
 
@@ -979,5 +995,6 @@ Butir keamanan ditulis **kode + jenis** saja; **rincian tidak ditulis di repo pu
 | v0.1 | 28-10-2026 | Draf awal (`a5f5254`): scope D-06/D-08/D-09, bahan Q5A-13, 20 pertanyaan (6 ⛔) |
 | v1.0 | 28-10-2026 | Keputusan Horii atas semua butir → §5.3 F5B-1..F5B-20 (+ F5B-21..F5B-23). Perubahan isi: rekap uang makan menjadi format legacy `NIP \| TGL_ABSEN` tanpa nominal/golongan (F5B-20, §7.4.2; `Rekap\RingkasanGolongan` dihapus); rekap kehadiran + role 4 (F5B-10); IL hanya role 1 (F5B-6); laporan per pegawai role 3 fail-closed (F5B-7); PDF per pegawai = render legacy persis: "Rp." hanya di baris konket, tanpa kolom/total (F5B-8, diputus ulang setelah temuan komentar HTML); blok tanda tangan dengan 6 kasus (F5B-13); tabel penyesuaian Tukin + DBV-024 + CRUD role 1 (F5B-14, §7.3.10, §7.6); PDF rekap berbatas (F5B-16); cuti tak dikenal fail-closed & tumpang tindih id terbesar (F5B-17); metode massal TB aditif di Fase 4 sebagai prasyarat M1a (F5B-18); runbook M0–M7 (+ M1a MAKE-044, DBV-024 M3, CRUD M4 MAKE-045); blocker go-live diperluas (Q5B-01/03/09/15/19); acuan Slip Gaji `0cf7e67` lewat CR 5A terpisah; tabel [CATAT] per butir |
 | log | 28-10-2026 | Q5B-24 (tarif `gol_pppk` tak bulat sampai sen ikut legacy, §7.2.3); keputusan lama tidak dihapus |
+| log | 28-10-2026 | Q5B-25/Q5B-26 (rekap kehadiran ringkas ikut legacy: TB tidak diperiksa; presensi pegawai baru tidak dibaca, §7.4.1); keputusan lama tidak dihapus |
 
 — Akhir dokumen —
