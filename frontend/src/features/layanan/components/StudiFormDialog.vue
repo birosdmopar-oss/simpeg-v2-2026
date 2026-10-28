@@ -250,17 +250,17 @@ const pesan = (k: string): string | undefined => errors.value[k] || undefined
             </template>
 
             <p :class="FORM_WIDE_CLASS" class="text-caption font-semibold uppercase tracking-wide text-slate-500">Berkas</p>
-            <UiFileField
-              v-for="slot in opsi.slot_berkas"
-              :key="`${slot.tag}-${kunciBerkas}`"
-              :label="slot.label"
-              :allowed="[...BERKAS.allowed]"
-              :max-mb="BERKAS.maxMb"
-              :state="state(slot.tag)"
-              :help-text="pesan(slot.tag) ?? (opsi.berkas_wajib && !edit ? 'Wajib diunggah.' : undefined)"
-              :data-testid="`${cfg.testid}-berkas-${slot.tag}`"
-              @change="(f: File | null) => (berkas[slot.tag] = f ?? undefined)"
-            />
+            <div v-for="slot in opsi.slot_berkas" :key="`${slot.tag}-${kunciBerkas}`" :class="FORM_WIDE_CLASS">
+              <UiFileField
+                :label="slot.label"
+                :allowed="[...BERKAS.allowed]"
+                :max-mb="BERKAS.maxMb"
+                :hint="opsi.berkas_wajib && !edit ? 'Wajib diunggah.' : ''"
+                :data-testid="`${cfg.testid}-berkas-${slot.tag}`"
+                @change="(f: File | null) => (berkas[slot.tag] = f ?? undefined)"
+              />
+              <p v-if="errors[slot.tag]" role="alert" class="mt-1 text-caption text-danger">{{ errors[slot.tag] }}</p>
+            </div>
           </template>
 
           <div :class="FORM_ACTIONS_CLASS">
