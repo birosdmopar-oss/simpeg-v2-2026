@@ -197,7 +197,7 @@ const STATUS_OPSI = [
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <UiCard title="Konfirmasi Ketidakhadiran">
+    <UiCard title="Konfirmasi Ketidakhadiran" class="page-fill" fill>
       <template #actions>
         <UiButton v-if="opsi && data?.can_create" data-testid="konket-tambah" @click="tambah">
           <Plus class="h-4 w-4" aria-hidden="true" /> {{ admin ? 'Tambah' : 'Ajukan' }}
@@ -216,7 +216,7 @@ const STATUS_OPSI = [
 
       <UiNotice v-if="notice" :tone="notice.tone" class="mb-4" data-testid="konket-notice">{{ notice.text }}</UiNotice>
 
-      <div class="scrollbar-slim overflow-x-auto">
+      <div class="table-fill scrollbar-slim overflow-x-auto">
         <table class="w-full min-w-[48rem] border-collapse text-left text-body1" data-testid="konket-table">
           <thead>
             <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">

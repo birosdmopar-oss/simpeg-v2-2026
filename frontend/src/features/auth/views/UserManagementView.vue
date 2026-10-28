@@ -207,7 +207,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="page-fill flex flex-col gap-4" data-testid="users-page">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-xl font-semibold text-slate-900">Manajemen Akun</h1>
@@ -263,7 +263,7 @@ onMounted(() => {
       />
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div class="table-fill overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="users-table-scroll">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>

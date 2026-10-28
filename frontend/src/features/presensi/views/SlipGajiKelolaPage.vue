@@ -46,7 +46,8 @@ function onImporSelesai(periode: string | null): void {
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <div class="space-y-5" data-testid="slip-gaji-kelola-page">
+    <!-- Hanya tab Monitoring (tabel) yang mengisi tinggi; tab Impor (formulir) tetap menggulir normal (CR-069). -->
+    <div :class="tab === 'monitoring' ? 'page-fill flex flex-col gap-5' : 'space-y-5'" data-testid="slip-gaji-kelola-page">
       <div>
         <h1 class="text-h2 font-semibold text-slate-900">Kelola Slip Gaji</h1>
         <p class="text-body2 text-slate-500">

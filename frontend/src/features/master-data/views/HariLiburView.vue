@@ -214,7 +214,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="page-fill flex flex-col gap-4" data-testid="hari-libur-page">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-xl font-semibold text-slate-900">Hari Libur</h1>
@@ -271,7 +271,8 @@ onMounted(() => {
       />
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <!-- Kartu tabel: satu-satunya area gulir data (table-fill); header tabel sticky di atasnya (CR-069). -->
+    <div class="table-fill overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="hari-libur-table-scroll">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>

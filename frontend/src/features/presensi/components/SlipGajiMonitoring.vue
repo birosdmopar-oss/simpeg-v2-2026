@@ -193,7 +193,7 @@ defineExpose({ muat, periode })
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="flex min-h-0 flex-1 flex-col gap-4">
     <UiNotice v-if="notice" tone="success" data-testid="slipgaji-notice">{{ notice }}</UiNotice>
     <UiNotice v-if="failure" tone="danger" data-testid="slipgaji-failure">{{ failure }}</UiNotice>
 
@@ -223,7 +223,7 @@ defineExpose({ muat, periode })
 
     <div
       ref="tableScroller"
-      class="scrollbar-slim overflow-x-auto rounded-2xl border border-slate-200 bg-white"
+      class="table-fill scrollbar-slim overflow-x-auto rounded-2xl border border-slate-200 bg-white"
       data-testid="slipgaji-table-scroll"
       @scroll.passive="updateActionsShadow"
     >

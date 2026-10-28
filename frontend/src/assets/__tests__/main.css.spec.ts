@@ -96,6 +96,10 @@ describe('main.css', () => {
     expect(css).toMatch(/html:has\(\.page-fill\)\s*\{[^}]*overflow:\s*hidden/s)
   })
 
+  it('CR-069: header tabel sticky di dalam .table-fill (spesifisitas nol lewat :where), kelas utilitas Aksi tetap menang', () => {
+    expect(css).toMatch(/:where\(\.table-fill\) thead th\s*\{[^}]*position: sticky;[^}]*top: 0;/)
+  })
+
   it('variabel jarak shell terdefinisi (tinggi navbar dan batas atas sticky)', () => {
     expect(css).toMatch(/--topbar-h:\s*3\.5rem/)
     expect(css).toMatch(/--sticky-top:\s*calc\(/)

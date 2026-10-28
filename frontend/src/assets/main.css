@@ -98,6 +98,18 @@
   }
 
   /*
+   * Header tabel menempel di atas area gulir tabel (CR-069). Berlaku di semua halaman daftar yang memakai kartu
+   * `.table-fill`; `:where()` menjaga spesifisitas nol supaya kelas utilitas (mis. `sticky right-0 z-30` pada kolom
+   * Aksi) tetap menang.
+   */
+  :where(.table-fill) thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: rgb(248 250 252);
+  }
+
+  /*
    * Panel gulir mandiri (CR-060): menempel di bawah top navbar sticky (lg ke atas), tinggi = viewport − navbar, dan
    * menggulir isinya sendiri sehingga menggulir panel tidak menggulir halaman/area data, dan sebaliknya. Di bawah lg
    * (layout bertumpuk) tidak menempel dan tidak dibatasi tinggi.

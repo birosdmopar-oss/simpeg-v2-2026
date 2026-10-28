@@ -178,13 +178,13 @@ const STATUS_VERIF = [
 
 <template>
   <RedesignShell :breadcrumbs="crumbs">
-    <div class="space-y-4" data-testid="lkh-page">
+    <div class="page-fill flex flex-col gap-4" data-testid="lkh-page">
       <UiTabs v-model="tab" :items="TABS" aria-label="Laporan kerja harian" />
 
-      <UiCard v-if="tab === 'rekap'" title="Rekap LKH Bawahan">
+      <UiCard v-if="tab === 'rekap'" title="Rekap LKH Bawahan" fill>
         <LkhRekapBawahan />
       </UiCard>
-      <UiCard v-else :title="tab === 'verifikasi' ? 'Verifikasi LKH Bawahan' : 'Laporan Kerja Harian Saya'">
+      <UiCard v-else fill :title="tab === 'verifikasi' ? 'Verifikasi LKH Bawahan' : 'Laporan Kerja Harian Saya'">
         <template #actions>
           <UiButton v-if="tab === 'saya' && opsi" data-testid="lkh-tambah" @click="tambah"><Plus class="h-4 w-4" aria-hidden="true" /> Tambah LKH</UiButton>
         </template>
@@ -195,7 +195,7 @@ const STATUS_VERIF = [
 
         <UiNotice v-if="notice" :tone="notice.tone" class="mb-4" data-testid="lkh-notice">{{ notice.text }}</UiNotice>
 
-        <div class="scrollbar-slim overflow-x-auto">
+        <div class="table-fill scrollbar-slim overflow-x-auto">
           <table class="w-full min-w-[44rem] border-collapse text-left text-body1" data-testid="lkh-table">
             <thead>
               <tr class="border-b border-slate-200 text-body2 font-semibold text-slate-900">
