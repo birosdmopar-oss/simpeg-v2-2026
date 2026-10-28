@@ -89,6 +89,9 @@ final class SlipAdminTest extends DatabaseTestCase
 
         $this->assertSame([true, '3000000.00', '4600000.00'], [$data['dibuka'], $data['rincian']['gjpokok'], $data['ringkasan']['total_penghasilan']]);
         $this->assertTrue($data['aksi']['buka_ulang']);
+        $this->assertSame(['nip', 'nama', 'pangkat', 'jabatan', 'unit', 'satker'], array_keys($data['pegawai']));
+        $this->assertSame($data['nip'], $data['pegawai']['nip']);
+        $this->assertSame($data['nama'], $data['pegawai']['nama']);
         $this->assertFalse($admin->detail($this->authAdminSlip(), $this->idA)['aksi']['buka_ulang']);
         $this->seeInDatabase('gaji_pegawai', ['id' => $this->idA, 'viewed_at' => null]);
 
