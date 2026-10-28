@@ -4,31 +4,30 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md dan PRD 5A §11.3)
 `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` v1.0 (BERLAKU 19-10-2026; menang atas `05-Presensi.md`, Matriks, dan
 README modul). Aturan Slip Gaji (sumber legacy, hak akses): `backend/app/Libraries/Presensi/README.md`.
 
-**Status:** paket **5A: kode M1–M7 di `main`, M8 verifikasi akhir (MAKE-035) dilaporkan, menunggu sign-off reviewer CR
-5A** (PRD 5A §11.1 #8) dan QA Lapis 1 FE (Q5A-18). 5B dimulai dari M0 setelah sign-off 5A (PRD 5B v1.0 di `main`
-`bb0648b`). 5A DONE ≠ Fase 5 DONE (PRD 5A §11.2).
+**Status:** paket **5A DONE (backend & dokumen)** — sign-off Horii 28-10-2026 (PRD 5A §11.1 #8) setelah M8 MAKE-035
+masuk `main` `54cb441`. **FE 5A (D-12) tetap IN_PROGRESS** sampai QA Lapis 1 lolos (Q5A-18, AC-FE.9); blocker go-live
+5A tetap berlaku (di bawah). **5B berjalan** (PRD 5B v1.0, sesi WS-2): M0 diterima reviewer CR 28-10-2026; M1a MAKE-044
+di `main` `7c40229`. 5A DONE ≠ Fase 5 DONE (PRD 5A §11.2).
 
-**Terakhir diperbarui:** 28 Oktober 2026 — **M8 MAKE-035** (branch `fase5a/make-035-verifikasi-5a` dari `main`
-`919c822`): laporan akhir 5A + keterlacakan AC → test (`docs/fase5/Laporan_Akhir_5A_MAKE-035.md`), checklist QA Lapis 1
-FE 5A (`docs/fase5/Checklist_QA_Lapis1_FE5A_Q5A-18.md`), test matriks route `presensi*` × role 1–8 lengkap, dan test
-jalur tangkap 1062 presensi manual (AC-D03.4). Riwayat merge 5A ke `main`: M2 DBV-023 `e8d08dc`; M3–M6 s.d. `3a12909`;
-M7 tahap (a) `5279b82`, (b) `5a3a35c`, (c) `919c822`; CR-067 `08b6c89`. DBV-023 **disetujui DB Validator 20-10-2026
-(jjoseph48)** (PR #28); ISSUE-049 (Q5A-02) ditutup keputusan user 20-10-2026.
+**Terakhir diperbarui:** 28 Oktober 2026 — status 5A pasca sign-off (commit docs di branch 5B pertama
+`fase5b/dbv-024-penyesuaian-tukin`, keputusan reviewer CR M0 F4). Sebelumnya: M8 MAKE-035 di `main` `54cb441`; riwayat
+merge 5A: M2 DBV-023 `e8d08dc`; M3–M6 s.d. `3a12909`; M7 (a) `5279b82`, (b) `5a3a35c`, (c) `919c822`; CR-067 `08b6c89`.
+DBV-023 **disetujui DB Validator 20-10-2026 (jjoseph48)** (PR #28); ISSUE-049 (Q5A-02) ditutup keputusan user 20-10-2026.
 **Entry criteria:** Fase 2 (web_config) + Fase 3 (data jabatan) DONE. "Fase 4 DONE" **dikecualikan** untuk 5A (P-1);
 diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tetap menunggu Fase 4 M3/M5.
 
 | Task | Paket | Milestone | Key | Status | Ringkas |
 |---|---|---|---|---|---|
-| D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **IN_PROGRESS** (menunggu sign-off 5A) | Di `main` (`e8d08dc`); DBV approve 20-10; registry NIP & cascade hijau; AC-D01 → laporan M8 |
-| D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | **IN_PROGRESS** (menunggu sign-off 5A) | Di `main`; AC-D02.1–02.10 berbukti test (laporan M8); GPS perangkat nyata di QA (Q5A-22) |
-| D-03 Presensi manual | 5A | M5 | MAKE-032 | **IN_PROGRESS** (menunggu sign-off 5A) | Di `main`; AC-D03.1–03.8 berbukti test, termasuk jalur tangkap 1062 (M8) |
+| D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **DONE** (sign-off 5A 28-10) | Di `main` (`e8d08dc`); DBV approve 20-10; registry NIP & cascade hijau; AC-D01 → laporan M8 |
+| D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D02.1–02.10 berbukti test (laporan M8); GPS perangkat nyata di QA (Q5A-22) |
+| D-03 Presensi manual | 5A | M5 | MAKE-032 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D03.1–03.8 berbukti test, termasuk jalur tangkap 1062 (M8) |
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Murni CR-037/039 + adapter `TukinData` 5A di `main`; sumber cuti/TB, precedence, laporan di 5B (PRD 5B) |
-| D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | — | — | TODO | PRD 5B v1.0 (`bb0648b`); dimulai setelah sign-off 5A |
-| D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **IN_PROGRESS** (menunggu sign-off 5A) | Di `main`; AC-D10.1–10.10 berbukti test |
-| D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | **IN_PROGRESS** (menunggu sign-off 5A) | Di `main`; AC-D11.1–11.11 berbukti test; acuan slip `0cf7e67` (CR-067) |
+| D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | M2/M5/M6 | MAKE-040/041/042 | TODO | PRD 5B v1.0; M0 diterima 28-10; urutan M3 DBV-024 → M1 → M2 → M6 → M4 → M5 → M7 |
+| D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D10.1–10.10 berbukti test |
+| D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D11.1–11.11 berbukti test; acuan slip `0cf7e67` (CR-067) |
 | D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 | MAKE-034 | **IN_PROGRESS** (sampai QA Lapis 1 lolos) | FE 5A (a/b/c) di `main` `919c822`; AC-FE.1–FE.8 berbukti Vitest + cek browser; AC-FE.9 = QA Lapis 1 (Q5A-18) |
 | D-13 Unit test lengkap | 5A (bagian) / 5C | M8 | MAKE-035 | **IN_PROGRESS** | Bagian 5A lengkap (laporan M8); regression suite D-13 penuh di 5C |
-| D-14 Verifikasi QR publik | 5A | M4/M7 | MAKE-031/034 | **IN_PROGRESS** (menunggu sign-off 5A) | Di `main`; AC-D14.1–14.7 berbukti test; FE `/verify/slip/:token` |
+| D-14 Verifikasi QR publik | 5A | M4/M7 | MAKE-031/034 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D14.1–14.7 berbukti test; FE `/verify/slip/:token` |
 
 **Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** nilai uang makan slip (5B, F5-1); konfirmasi Biro Keuangan
 atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan ulang data `gaji_pegawai` produksi
