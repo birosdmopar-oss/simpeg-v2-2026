@@ -389,3 +389,13 @@ peringatan; galat umum/403 pesan baku). Terpasang di halaman daftar dan detail.
 Catatan untuk reviewer: (1) passphrase tidak masuk store/composable: `useCutiAksi.esign(passphrase)` hanya meneruskannya ke request; (2) tes memastikan passphrase
 tidak ada di DOM, `localStorage`/`sessionStorage`, atau URL; (3) bukti browser (API tiruan sintetis): 1440 dan 390 px, galat 422 per kolom, sukses menutup dialog +
 pemberitahuan, passphrase tidak ada di DOM/storage/URL, request esign tanpa query string.
+
+**Paket 7 — PMK** (branch `fase4/make-026-p7-pmk`, dari main `fba5b7c`). `PmkPage` (tab Riwayat PMK semua role, Pengajuan Saya role 2, Perlu Persetujuan (PIC; 403 server → "Anda bukan PIC peninjauan masa kerja yang aktif"), Monitoring role 1/3), `PmkDetailPage` (stepper dari `tahap[]`, alasan penolakan, status berkas), `PmkTable` + `rowActionsPmk` (urutan: Edit → Lihat detail → Proses/Setujui/Tolak → Unduh surat kontrak/paklaring/PHK/slip gaji → Hapus; `pmk-actions-<id>`; hak dari `aksi {}`/`aksi_tersedia[]`/penanda berkas server), `PmkFormDialog` (kalkulator masa kerja `POST pmk/hitung-mker` debounce 300 ms; 4 berkas 2 MB; role 1 memilih pegawai lewat `PegawaiPicker`), `PmkProsesDialog` (Proses = konfirmasi; Setujui/Tolak membungkus `ApprovalDialog`), `RiwayatPmkTable` + `ArsipPmkDialog` (role 1 lewat `can_edit`: tambah/hapus arsip SK, hapus riwayat), `pmk.service.ts`. Route `/layanan/pmk`, `/layanan/pmk/pengajuan/:id(\d+)`.
+
+Keputusan/ambigu untuk reviewer:
+1. Riwayat PMK final tidak punya endpoint unduh arsip (PRD §5.4 hanya mendefinisikan unduh untuk berkas pengajuan); arsip hanya didaftar (nama), dikelola role 1. Perlu endpoint bila arsip harus bisa diunduh.
+2. Tab "Perlu Persetujuan" tampil untuk semua role route (server menolak non-PIC dengan 403; FE menampilkan pesan khusus), karena FE tidak tahu siapa PIC sebelum memanggil.
+3. `mker_th`/`mker_bl` dikirim dari hasil kalkulator server [K D19/P-4]; kolom itu tidak diedit manual.
+4. Pemilih pegawai role 1 dibuat sebagai komponen `PegawaiPicker` (dipakai form PMK); form cuti masih memakai kode sendiri yang setara — dapat dipindah ke komponen ini nanti.
+5. Daftar riwayat role 1 tanpa NIP memuat semua riwayat (lingkup server); kolom NIP ditampilkan karena `RiwayatPmk` tidak membawa nama pegawai.
+6. Bukti browser (API tiruan sintetis, tanpa Figma — Q-18): menu ⋮ tab PIC terbuka di dalam layar 1440 dan 390 px; unduh berkas memanggil `GET pmk/pengajuan/41/berkas/file_kontrak`; form + kalkulator 1440 dan 390 px (satu kolom).

@@ -7,7 +7,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { CUTI_ROLES } from './roles'
+import { CUTI_ROLES, PMK_ROLES } from './roles'
 
 /** Nama route Modul C (tetap, dipakai tautan antarhalaman dan `nav.config.ts`). */
 export const LAYANAN_ROUTE = {
@@ -39,5 +39,18 @@ export const layananRoutes: RouteRecordRaw[] = [
     name: LAYANAN_ROUTE.CUTI_DETAIL,
     component: () => import('./views/CutiDetailPage.vue'),
     meta: { roles: CUTI_ROLES, title: 'Detail Cuti' },
+  },
+  {
+    // PMK: riwayat final + pengajuan (4 tab) — role 1, 2, 3 (PRD §6.11.1).
+    path: '/layanan/pmk',
+    name: LAYANAN_ROUTE.PMK,
+    component: () => import('./views/PmkPage.vue'),
+    meta: { roles: PMK_ROLES, title: 'PMK' },
+  },
+  {
+    path: '/layanan/pmk/pengajuan/:id(\\d+)',
+    name: LAYANAN_ROUTE.PMK_DETAIL,
+    component: () => import('./views/PmkDetailPage.vue'),
+    meta: { roles: PMK_ROLES, title: 'Detail PMK' },
   },
 ]
