@@ -39,8 +39,8 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus', id: 
   function pilih(key: string, row: CutiItem): void {
     if (key === 'setujui' || key === 'tolak' || key === 'tangguhkan') {
       bukaProses(row, key, false)
-    } else if (key === 'setujui-atas-nama' || key === 'tolak-atas-nama') {
-      bukaProses(row, key === 'setujui-atas-nama' ? 'setujui' : 'tolak', true)
+    } else if (key === 'setujui-atas-nama' || key === 'tolak-atas-nama' || key === 'tangguhkan-atas-nama') {
+      bukaProses(row, key.replace('-atas-nama', '') as AksiProsesCuti, true)
     } else if (key === 'tunda') {
       void tunda(row)
     } else if (key === 'surat') {

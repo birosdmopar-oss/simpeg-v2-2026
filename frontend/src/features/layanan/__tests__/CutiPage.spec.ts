@@ -26,7 +26,17 @@ const apiError = (status: number, errors: Record<string, string[]> | null = null
   ({ status, message: `HTTP ${status}`, errors, isNetworkError: false, original: new Error('x') }) as ApiError
 const q = <T extends Element = HTMLElement>(sel: string) => document.body.querySelector<T>(sel)
 
-const AKSI_KOSONG = { ubah: false, hapus: false, proses: false, tangguhkan: false, tunda: false, esign: false, unduh_surat: false, proses_atas_nama: false }
+const AKSI_KOSONG = {
+  ubah: false,
+  hapus: false,
+  proses: false,
+  tangguhkan: false,
+  tunda: false,
+  esign: false,
+  unduh_surat: false,
+  proses_atas_nama: false,
+  tangguhkan_atas_nama: false,
+}
 
 const baris = (id: number, aksi: Partial<typeof AKSI_KOSONG> = {}, extra: Partial<CutiItem> = {}): CutiItem => ({
   id,
@@ -217,6 +227,42 @@ describe('CutiPage — proses', () => {
     await flushPromises()
 
     expect(svc.process).toHaveBeenCalledWith(7, { aksi: 'setujui', reason_note: 'Atasan cuti panjang', atas_nama: true })
+  })
+})
+
+describe('CutiPage — tangguhkan atas nama', () => {
+  it('item hanya muncul bila server mengizinkan (tangguhkan_atas_nama) dan urutannya sesuai AGENTS §1', async () => {
+    svc.list.mockImplementation(async (query) =>
+      daftar(query.mode, [baris(7, { proses_atas_nama: true, tangguhkan_atas_nama: true }), baris(8, { proses_atas_nama: true })]),
+    )
+    const { wrapper } = await mountPage(Role.SUPER_ADMIN, '?tab=admin')
+
+    expect((await rowMenuActions(wrapper, 'cuti-actions-7')).map((a) => a.key)).toEqual([
+      'detail',
+      'setujui-atas-nama',
+      'tolak-atas-nama',
+      'tangguhkan-atas-nama',
+    ])
+    expect((await rowMenuActions(wrapper, 'cuti-actions-8')).map((a) => a.key)).toEqual(['detail', 'setujui-atas-nama', 'tolak-atas-nama'])
+  })
+
+  it('alasan wajib; payload { aksi: tangguhkan, reason_note, atas_nama: true }', async () => {
+    svc.list.mockImplementation(async (query) => daftar(query.mode, [baris(7, { proses_atas_nama: true, tangguhkan_atas_nama: true })]))
+    svc.process.mockResolvedValue(baris(7, {}, { status: 4 }))
+    const { wrapper } = await mountPage(Role.SUPER_ADMIN, '?tab=admin')
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'tangguhkan-atas-nama')
+    await flushPromises()
+    q<HTMLButtonElement>('[data-testid="tangguhkan-confirm"]')!.click()
+    await flushPromises()
+    expect(svc.process).not.toHaveBeenCalled()
+    expect(q('[data-testid="tangguhkan-reason-error"]')?.textContent).toContain('wajib')
+
+    isi('[data-testid="tangguhkan-reason"]', 'Menunggu pengganti atasan')
+    q<HTMLButtonElement>('[data-testid="tangguhkan-confirm"]')!.click()
+    await flushPromises()
+
+    expect(svc.process).toHaveBeenCalledWith(7, { aksi: 'tangguhkan', reason_note: 'Menunggu pengganti atasan', atas_nama: true })
   })
 })
 

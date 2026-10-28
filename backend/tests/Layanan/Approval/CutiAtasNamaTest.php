@@ -179,7 +179,10 @@ final class CutiAtasNamaTest extends DatabaseTestCase
         $this->assertSame('Menunggu persetujuan Menteri (diproses admin)', $hasil['label_status']);
 
         $admin = $this->buatPemohon(1);
-        $this->assertTrue($this->cutiService()->detail($admin['auth'], (int) $hasil['id_riwayat_cuti'])['aksi']['proses_atas_nama']);
+        $aksi  = $this->cutiService()->detail($admin['auth'], (int) $hasil['id_riwayat_cuti'])['aksi'];
+        $this->assertTrue($aksi['proses_atas_nama']);
+        $this->assertTrue($aksi['tangguhkan_atas_nama'], 'cuti tahunan boleh ditangguhkan atas nama');
+        $this->assertFalse($this->cutiService()->detail($p['auth'], (int) $hasil['id_riwayat_cuti'])['aksi']['tangguhkan_atas_nama']);
 
         $selesai = $this->approvalService()->process($admin['auth'], (int) $hasil['id_riwayat_cuti'], ['aksi' => 'setujui', 'atas_nama' => true, 'reason_note' => 'Persetujuan Menteri']);
         $this->assertSame(1, (int) $selesai['status']);

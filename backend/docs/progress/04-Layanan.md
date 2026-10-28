@@ -346,7 +346,7 @@ berkas, menu ⋮ tanpa "Lihat detail"), `CutiTable` + `rowActionsCuti` (urutan A
 
 Keputusan/ambigu untuk reviewer:
 1. Edit, "Ajukan Cuti", kalkulator → Paket 2; Terbitkan TTE → Paket 3 (item belum ada di ⋮).
-2. Pengingat dipasang di `CutiPage` dan tampil sekali per sesi tab (`sessionStorage`, aman bila diblokir). PRD §6.4.7 menyebut "setelah login": memasangnya di beranda/shell menyentuh `shared/**` — ditunda sampai disetujui.
-3. Proses atas nama memakai dua item ⋮ ("Setujui atas nama", "Tolak atas nama") dari `aksi.proses_atas_nama`; Tangguhkan atas nama tidak ditawarkan (server hanya mengizinkan untuk jenis Tahunan, dan flag `aksi.tangguhkan` hanya untuk approver).
+2. Pengingat dipasang di `CutiPage` dan tampil sekali per sesi tab (`sessionStorage`, aman bila diblokir). Keputusan Horii: tetap di halaman Cuti sekarang; **butir Paket 10**: dipindah ke setelah login (shell/beranda), sekali per sesi, sesuai PRD §6.4.7.
+3. Proses atas nama memakai tiga item ⋮ ("Setujui/Tolak atas nama" dari `aksi.proses_atas_nama`, "Tangguhkan atas nama" dari `aksi.tangguhkan_atas_nama`). Atas arahan review (Horii): flag baru `tangguhkan_atas_nama` ditambahkan di `CutiService::aksi` (aditif; = proses atas nama untuk cuti Tahunan) supaya FE tidak menghitung jenis sendiri; tangguhkan atas nama memakai `TangguhkanDialog` dengan alasan wajib.
 4. Filter status daftar memakai kode 0/3/1/2/4 dikirim apa adanya ke `GET cuti?status=`.
 5. Tangkapan layar (API tiruan sintetis, tanpa Figma — acuan Q-18, AGENTS §3.6): 1440 dan 390 px, tanpa scroll horizontal halaman (`scrollWidth` = lebar viewport).
