@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Impor\DaftarTabel;
 use App\Libraries\Impor\ImporGagal;
 use App\Libraries\Impor\Keputusan;
@@ -14,6 +15,7 @@ use CodeIgniter\CLI\CLI;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 use Config\ImporLegacy as KonfigImpor;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -27,8 +29,9 @@ use Throwable;
  * dev/produksi; penjaga tidak bisa mengenali host, jadi host:port + nama DB tujuan dicetak lebih dulu untuk diperiksa
  * sebelum `--konfirmasi`. Sumber = skema salinan di server & akun yang sama. Kedua koneksi dibuat dengan `DBDebug = true`
  * apa pun environment-nya (galat query = exception, tidak diam-diam).
+ * Opsi bernilai menerima `--k=v` maupun `--k v`; opsi tak dikenal, ganda, atau tanpa nilai ditolak (`OpsiCli`, CR-080).
  * Keluaran hanya nama tabel, jumlah, dan kode aturan. Kode keluar 0 = selesai, 1 = gagal (tier berjalan di-rollback),
- * 2 = masukan salah.
+ * EXIT_USER_INPUT = masukan salah.
  */
 class ImporLegacy extends BaseCommand
 {
@@ -51,18 +54,28 @@ class ImporLegacy extends BaseCommand
      */
     public function run(array $params): int
     {
-        $opsi = static fn (string $k): ?string => self::opsi($params, $k);
+        try {
+            ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, [
+                'sumber' => true, 'zona-sumber' => true, 'konfirmasi' => true, 'tier' => true, 'keputusan' => true,
+                'batch'  => true, 'dry-run' => false,
+            ]);
+        } catch (InvalidArgumentException $e) {
+            CLI::error($e->getMessage() . ' Pemakaian: ' . $this->usage);
 
-        $sumber = $opsi('sumber');
-        $zona   = $opsi('zona-sumber');
-        $tier   = $opsi('tier') ?? 'semua';
-        $dryRun = array_key_exists('dry-run', $params) || array_key_exists('dry-run', CLI::getOptions());
-        $batch  = $opsi('batch') ?? (string) config(KonfigImpor::class)->ukuranBatch;
+            return EXIT_USER_INPUT;
+        }
 
-        if (! is_string($sumber) || $sumber === '' || ! is_string($zona) || ! ctype_digit($batch) || (int) $batch < 1) {
+        $sumber  = $opsi['sumber'] ?? null;
+        $zona    = $opsi['zona-sumber'] ?? null;
+        $tier    = $opsi['tier'] ?? 'semua';
+        $dryRun  = isset($opsi['dry-run']);
+        $batch   = $opsi['batch'] ?? (string) config(KonfigImpor::class)->ukuranBatch;
+        $tierSah = $tier === 'semua' || (is_string($tier) && ctype_digit($tier) && (int) $tier >= 1 && (int) $tier <= DaftarTabel::TIER_MAKS);
+
+        if ($argumen !== [] || ! is_string($sumber) || ! is_string($zona) || ! is_string($batch) || ! ctype_digit($batch) || (int) $batch < 1 || ! $tierSah) {
             CLI::error('Pemakaian: ' . $this->usage);
 
-            return 2;
+            return EXIT_USER_INPUT;
         }
 
         $daftarTier = $tier === 'semua' ? range(1, DaftarTabel::TIER_MAKS) : [(int) $tier];
@@ -70,8 +83,10 @@ class ImporLegacy extends BaseCommand
         try {
             $tujuan = self::koneksi(null);
             CLI::write(sprintf('Tujuan: %s:%s / %s — sumber: %s (server & akun yang sama)', $tujuan->hostname, (string) $tujuan->port, $tujuan->getDatabase(), $sumber), 'yellow');
-            PenjagaTujuan::periksa($tujuan->getDatabase(), $sumber, $opsi('konfirmasi'), config(KonfigImpor::class)->tujuanTerlarang);
-            $keputusan = is_string($opsi('keputusan')) ? Keputusan::dariBerkas((string) $opsi('keputusan')) : Keputusan::kosong();
+            $konfirmasi = $opsi['konfirmasi'] ?? null;
+            $berkas     = $opsi['keputusan'] ?? null;
+            PenjagaTujuan::periksa($tujuan->getDatabase(), $sumber, is_string($konfirmasi) ? $konfirmasi : null, config(KonfigImpor::class)->tujuanTerlarang);
+            $keputusan = is_string($berkas) ? Keputusan::dariBerkas($berkas) : Keputusan::kosong();
 
             $laporan = (new PengimporLegacy(self::koneksi($sumber), $tujuan, $zona, $keputusan, (int) $batch))
                 ->jalankan($daftarTier, $dryRun);
@@ -92,29 +107,6 @@ class ImporLegacy extends BaseCommand
         CLI::write($dryRun ? 'Dry-run selesai, tidak ada yang ditulis.' : 'Impor selesai.', 'green');
 
         return EXIT_SUCCESS;
-    }
-
-    /**
-     * Nilai opsi dalam bentuk `--k nilai` maupun `--k=nilai`. Parser CLI CI4 tidak memecah `=`, sehingga
-     * `--sumber=x` tiba sebagai opsi bernama `sumber=x` tanpa nilai.
-     *
-     * @param array<int|string, string|null> $params
-     */
-    private static function opsi(array $params, string $k): ?string
-    {
-        $nilai = $params[$k] ?? CLI::getOption($k);
-
-        if (is_string($nilai)) {
-            return $nilai;
-        }
-
-        foreach ([...array_keys($params), ...array_keys(CLI::getOptions())] as $nama) {
-            if (is_string($nama) && str_starts_with($nama, $k . '=')) {
-                return substr($nama, strlen($k) + 1);
-            }
-        }
-
-        return null;
     }
 
     /**

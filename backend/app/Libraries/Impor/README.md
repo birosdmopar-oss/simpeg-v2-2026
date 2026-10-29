@@ -16,8 +16,8 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
 - **Penjaga** (`PenjagaTujuan`): tujuan ditolak bila namanya ada di `Config\ImporLegacy::$tujuanTerlarang`, berawalan
   `prod`, sama dengan sumber, atau `--konfirmasi` tidak sama persis. Port tidak dipakai sebagai syarat.
 - **`--zona-sumber`** wajib diisi dan tidak punya nilai bawaan (GAP-2). Nilainya dikonfirmasi DBA sebelum dijalankan.
-- **Opsi** boleh ditulis `--k nilai` atau `--k=nilai`. Parser CLI CI4 tidak memecah `=`, jadi command membacanya
-  sendiri.
+- **Opsi** boleh ditulis `--k nilai` atau `--k=nilai`; diurai `App\Libraries\Cli\OpsiCli` (CR-080): opsi tak dikenal,
+  ganda, tanpa nilai, atau argumen berlebih ditolak (EXIT_USER_INPUT) sebelum koneksi dibuat.
 - **Galat DB tidak boleh diam-diam** (R-1 review PR #32). Command membuat kedua koneksi dengan `DBDebug = true` apa
   pun environment-nya. Mesin juga memeriksa setiap hasil: kueri/tulis `false`, `transStatus()` gagal, atau
   `transCommit()` false → `ImporGagal` dan tier di-rollback, tanpa pesan "selesai". Di dalam transaksi, CI4 bisa
