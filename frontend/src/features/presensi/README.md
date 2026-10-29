@@ -51,3 +51,14 @@ non-presensi; baris presensi tidak berwarna, dan rekap/daftar legacy tanpa warna
 Warna memakai token tema `status-{kuning|merah|jingga|biru|abu|hijau|ungu|pink}` di `tailwind.config.js` (`text-status-*`,
 `bg-status-*-soft`, `bg-status-*-titik`; nilai heks hanya di sana dan di uji kontras). Teks kode selalu tampil (warna tidak
 berdiri sendiri) dan setiap pasangan teks/latar ≥ 4,5:1 (diuji). Legenda dua bagian: "Warna baris" ([K]) dan "Kode" ([V2]).
+
+## Penyesuaian Tukin (MAKE-050, PRD 5C §7.4, F5B-14)
+
+Role 1 saja (`PENYESUAIAN_TUKIN_ROLES`, route `/presensi/tukin/penyesuaian`). Daftar dengan filter NIP, Bulan, dan Status;
+tambah/ubah lewat dialog (`PenyesuaianTukinFormDialog.vue`, galat 422 per field); ⋮ berurutan Edit → Aktifkan/Nonaktifkan
+→ Hapus (`danger`, `ConfirmDialog`). Status hanya diubah lewat ⋮, tidak ada di form.
+
+- [CATAT] **PUT body lengkap untuk Aktifkan/Nonaktifkan** ([V2] deviasi dari "status saja"). `PenyesuaianTukinService::isian`
+  mewajibkan `bulan_mulai`, `bulan_akhir`, `persen`, dan `alasan` pada setiap PUT, jadi `ubahStatus` mengirim ulang nilai
+  baris dan hanya `status` yang berubah. Risiko kecil: bila dua admin mengubah baris yang sama hampir bersamaan, perubahan
+  yang lebih dulu bisa tertimpa. Backend tidak diubah (di luar lingkup 5C); diterima reviewer CR.

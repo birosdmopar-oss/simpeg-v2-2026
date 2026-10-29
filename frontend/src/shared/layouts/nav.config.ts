@@ -64,6 +64,7 @@ import {
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import {
+  PENYESUAIAN_TUKIN_ROLES,
   PRESENSI_ADMIN_ROLES,
   PRESENSI_PEGAWAI_ROLES,
   REKAP_KEHADIRAN_ROLES,
@@ -183,6 +184,7 @@ const NAV: NavGroup[] = [
           { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: PRESENSI_ADMIN_ROLES },
           { key: 'presensi-rekap-kehadiran', label: 'Rekap Kehadiran', to: '/presensi/rekap-kehadiran', roles: REKAP_KEHADIRAN_ROLES },
           { key: 'presensi-uang-makan', label: 'Rekap Uang Makan', to: '/presensi/uang-makan', roles: REKAP_UANG_MAKAN_ROLES },
+          { key: 'presensi-penyesuaian-tukin', label: 'Penyesuaian Tukin', to: '/presensi/tukin/penyesuaian', roles: PENYESUAIAN_TUKIN_ROLES },
         ],
       },
       // Fase 7 (Dashboard/laporan) F-03 MAKE-036: 7 statistik (hr/chart/* = role 1, 3, 4, 5, 8); 3 pertama mengikuti
