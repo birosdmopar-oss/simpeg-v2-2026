@@ -53,7 +53,7 @@ const daftar = (items = [pegawai()]) => ({
   bulan_tersedia: [{ bulan: '2026-10', label: 'Oktober 2026' }],
 })
 const harian = (tanggal: string, status: string, kode: string[] = [], ekstra: Record<string, unknown> = {}) => ({
-  tanggal, status, kode, jam_masuk: null, jam_pulang: null, potongan: '0', keterangan: '', kategori_konket: null, ...ekstra,
+  tanggal, status, kode, jam_masuk: null, jam_pulang: null, potongan: '0.00', keterangan: '', kategori_konket: null, ...ekstra,
 })
 const laporan = (ekstra: Record<string, unknown> = {}) => ({
   identitas: { nip: NIP, nama: 'Budi Santoso', gol_ruang: 'III/c', satker: 'Satker Uji', jabatan: 'Analis', kelas_jabatan: '9', id_unit: '1', id_satker: '2', predikat_skp: 'Baik' },
@@ -205,6 +205,9 @@ describe('LaporanTukinPegawaiPage', () => {
     expect(baris('2026-10-05').classes()).toContain('bg-status-jingga-soft/70')
     expect(baris('2026-10-10').classes()).toContain('bg-status-abu-soft/80')
     expect(baris('2026-10-10').text()).toContain('Akhir pekan')
+    expect(baris('2026-10-10').text()).toContain('Sabtu')
+    expect(baris('2026-10-10').text()).toContain('0,00%')
+    expect(baris('2026-10-10').findAll('td')[2]!.text()).toBe('-')
     expect(baris('2026-10-14').classes()).toContain('bg-status-biru-soft/70')
     expect(baris('2026-10-14').text()).toContain('(Libur) Hari Uji')
     expect(baris('2026-09-16').classes()).toContain('bg-status-abu-soft/80')
