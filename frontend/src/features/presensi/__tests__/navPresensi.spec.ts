@@ -12,6 +12,8 @@ import { ACTIVE_PHASE, buildNav } from '@/shared/layouts/nav.config'
 import {
   PRESENSI_ADMIN_ROLES,
   PRESENSI_PEGAWAI_ROLES,
+  REKAP_TUKIN_IL_ROLES,
+  REKAP_TUKIN_ROLES,
   SLIP_GAJI_ADMIN_ROLES,
   SLIP_GAJI_PEGAWAI_ROLES,
   TUKIN_DAFTAR_ROLES,
@@ -33,9 +35,9 @@ describe('navPresensi', () => {
   })
 
   it.each([
-    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Rekap Kehadiran', 'Rekap Uang Makan', 'Penyesuaian Tukin']],
+    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Rekap Tukin', 'Rekap Kehadiran', 'Rekap Uang Makan', 'Penyesuaian Tukin']],
     [Role.PEGAWAI, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
-    [Role.ADMIN_SATKER, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Rekap Kehadiran', 'Rekap Uang Makan']],
+    [Role.ADMIN_SATKER, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Rekap Tukin', 'Rekap Kehadiran', 'Rekap Uang Makan']],
     [Role.ADMIN_VIEW_ESELON1, ['Data Presensi', 'Rekap Kehadiran']],
     [Role.MENTERI, ['Data Presensi']],
     [Role.PTT, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
@@ -72,6 +74,7 @@ describe('navPresensi', () => {
     ['presensi-data', PRESENSI_ADMIN_ROLES, Role.MENTERI],
     ['presensi-tukin', TUKIN_DAFTAR_ROLES, Role.ADMIN_SATKER],
     ['presensi-tukin-saya', TUKIN_SAYA_ROLES, Role.PEGAWAI],
+    ['presensi-rekap-tukin', REKAP_TUKIN_ROLES, Role.ADMIN_SATKER],
   ] as const)('tujuan menu %s = path route dan role route = role menu', (key, roles, role) => {
     const rute = presensiRoutes.find((r) => r.name === key)
     const anak = buildNav(role)
@@ -90,5 +93,14 @@ describe('navPresensi', () => {
     expect(TUKIN_PER_PEGAWAI_ROLES).not.toContain(Role.PIMPINAN)
     expect(rute('presensi-tukin-saya')?.path).toBe('/presensi/tukin/saya')
     expect(rute('presensi-tukin-pegawai')?.path).toBe(String.raw`/presensi/tukin/:nip(\d+)`)
+  })
+
+  it('route Rekap Tukin (MAKE-049): role sesuai PRD 5C §6; IL role 1; statis sebelum ":nip" numerik', () => {
+    const rute = (nama: string) => presensiRoutes.find((r) => r.name === nama)
+    expect(rute('presensi-rekap-tukin')?.path).toBe('/presensi/tukin/rekap')
+    expect(rute('presensi-rekap-tukin')?.meta?.roles).toEqual(REKAP_TUKIN_ROLES)
+    expect(rute('presensi-rekap-tukin-il')?.path).toBe('/presensi/tukin/rekap-il')
+    expect(rute('presensi-rekap-tukin-il')?.meta?.roles).toEqual(REKAP_TUKIN_IL_ROLES)
+    expect(REKAP_TUKIN_ROLES).toEqual([Role.SUPER_ADMIN, Role.ADMIN_SATKER])
   })
 })

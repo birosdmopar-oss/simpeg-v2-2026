@@ -192,6 +192,7 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
         { key: 'presensi-slip-gaji-kelola', label: 'Kelola Slip Gaji', to: '/presensi/slip-gaji/kelola', roles: [1, 3] },
         { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: [1, 3, 4, 5] },
         { key: 'presensi-tukin', label: 'Laporan Tukin', to: '/presensi/tukin', roles: [1, 3] },
+        { key: 'presensi-rekap-tukin', label: 'Rekap Tukin', to: '/presensi/tukin/rekap', roles: [1, 3] },
         { key: 'presensi-rekap-kehadiran', label: 'Rekap Kehadiran', to: '/presensi/rekap-kehadiran', roles: [1, 3, 4] },
         { key: 'presensi-uang-makan', label: 'Rekap Uang Makan', to: '/presensi/uang-makan', roles: [1, 3] },
         ...(role === Role.SUPER_ADMIN
