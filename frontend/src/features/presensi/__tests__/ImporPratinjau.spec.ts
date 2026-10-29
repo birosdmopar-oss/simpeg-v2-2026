@@ -140,3 +140,37 @@ describe('Impor Slip Gaji — pratinjau & commit', () => {
     expect(testid('impor-pratinjau')).toBeNull()
   })
 })
+
+describe('CR-082 T5A-02: label galat hasil impor', () => {
+  it('pesan yang sudah berawalan "Sheet <sheet> baris <n>" tidak diberi awalan lagi; pesan tanpa awalan diberi awalan', async () => {
+    post.mockImplementation(((url: string) =>
+      url === '/slip-gaji/impor/pratinjau'
+        ? ok(PRATINJAU)
+        : ok({
+            disisip: '0',
+            diperbarui: '0',
+            dilewati: '0',
+            gagal: '2',
+            baris: [
+              {
+                nip: '199001012020011001',
+                periode: '2026-09',
+                hasil: 'gagal',
+                galat: [
+                  { kode: 'kolom', pesan: 'Sheet GPP baris 9: kolom gjpokok tidak valid.', sheet: 'GPP', baris: 9 },
+                  { kode: 'nip', pesan: 'NIP tidak terdaftar.', sheet: 'TK', baris: 10 },
+                ],
+              },
+            ],
+          })) as never)
+    await mountImpor()
+    await pratinjau()
+    testid('impor-simpan')?.click()
+    await flushPromises()
+    tombol('Ya, Simpan ke Database')?.click()
+    await flushPromises()
+
+    const butir = Array.from(testid('impor-hasil-galat')?.querySelectorAll('li') ?? []).map((li) => li.textContent?.trim())
+    expect(butir).toEqual(['Sheet GPP baris 9: kolom gjpokok tidak valid.', 'Sheet TK baris 10: NIP tidak terdaftar.'])
+  })
+})
