@@ -99,3 +99,12 @@ tambah/ubah lewat dialog (`PenyesuaianTukinFormDialog.vue`, galat 422 per field)
   sticky, angka rata kanan berkoma Indonesia. Baris galat tetap tampil (penanda "Galat" + pesan, kolom angka "—").
 - [CATAT] Rekap legacy tanpa warna → v2 tanpa warna baris (hanya sel angka); blok penanda tangan hanya di berkas XLSX/PDF, tidak
   di layar (Q5C-08). Cetak HTML legacy diganti PDF/XLSX server (Q5C-04).
+
+## Penutup 5C (MAKE-053)
+
+`ACTIVE_PHASE = 5` dan grup Presensi tidak lagi ber-`rilis` (`shared/layouts/nav.config.ts`). Anak menu Presensi per role:
+1 Kelola Slip Gaji, Data Presensi, Laporan Tukin, Rekap Tukin, Rekap Kehadiran, Rekap Uang Makan, Penyesuaian Tukin; 2/6/7
+Presensi Saya, Slip Gaji, Laporan Tukin Saya; 3 Kelola Slip Gaji, Data Presensi, Laporan Tukin, Rekap Tukin, Rekap Kehadiran,
+Rekap Uang Makan; 4 Data Presensi, Rekap Kehadiran; 5 Data Presensi; 8 tidak ada (grup dibuang). Halaman Instansi Lain
+(`/presensi/tukin/il`, `/presensi/tukin/rekap-il`, tab Uang Makan IL) dibuka lewat tab, bukan menu. Peta kode status:
+`statusPresensi.ts`; filter laporan: `useFilterLaporan` + `FilterLaporanBar`.

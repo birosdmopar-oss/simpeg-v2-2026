@@ -28,8 +28,8 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 | D-08 Laporan Tukin, D-09 rekap & uang makan | 5B / 5C (FE) | 5B M2–M6 | MAKE-040/041/042/045, DBV-024 | **IN_PROGRESS** (backend 5B lengkap di `main`, menunggu sign-off 5B; FE = 5C) | AC-D08/D09a/D09b berbukti test (laporan 5B M7); F5-1 ditutup M2 |
 | D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D10.1–10.10 berbukti test |
 | D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D11.1–11.11 berbukti test; acuan slip `0cf7e67` (CR-067) |
-| D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 | MAKE-034 | **IN_PROGRESS** (sampai QA Lapis 1 lolos) | FE 5A (a/b/c) di `main` `919c822`; AC-FE.1–FE.8 berbukti Vitest + cek browser; AC-FE.9 = QA Lapis 1 (Q5A-18) |
-| D-13 Unit test lengkap | 5A (bagian) / 5C | M8 | MAKE-035 | **IN_PROGRESS** | Bagian 5A lengkap (laporan M8); regression suite D-13 penuh di 5C |
+| D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 / 5C M1–M5 | MAKE-034, MAKE-047..051, MAKE-053 | **IN_PROGRESS** (FE lengkap di `main`; sampai QA Lapis 1 5A + 5C lolos) | FE 5A di `main` `919c822`; FE 5C lengkap: fondasi (047), Laporan Tukin (048), Rekap Tukin (049), Penyesuaian Tukin (050), Rekap Kehadiran & Uang Makan (051); menu Presensi tanpa `rilis`, `ACTIVE_PHASE = 5` (053). AC-FE.9 / AC-FE5C.4 = QA Lapis 1 (reviewer, app demo) |
+| D-13 Unit test lengkap | 5A (bagian) / 5C | M8 / 5C | MAKE-035, MAKE-052 | **DONE (suite)** — verifikasi AC di MAKE-054 | Bagian 5A lengkap (laporan M8); regression suite 12 skenario `backend/tests/Presensi/RegresiD13/` (grup `d13`, `composer test:d13`) di `main` (MAKE-052) |
 | D-14 Verifikasi QR publik | 5A | M4/M7 | MAKE-031/034 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D14.1–14.7 berbukti test; FE `/verify/slip/:token` |
 
 **Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** ~~nilai uang makan slip (5B, F5-1)~~ **selesai** — 5B M2
@@ -410,6 +410,14 @@ yang disetujui**; hasil yang dibagikan tanpa data pribadi. Prasyarat: DB v2 beri
 6. **Catat hasil** (tanpa NIP/nama) di laporan MAKE-054: periode, lingkup, baris ringkasan `presensi:paritas-tukin`,
    jumlah temuan per kelompok (a)/(b)/(c), dan keputusan. UP-1 **lolos** bila tidak ada temuan kelompok (c) yang masih
    terbuka; sampai itu UP-1 tetap blocker go-live (Q5B-09).
+
+## 5C M5 — penutup FE (MAKE-053, 29-10-2026)
+
+Branch `fase5c/make-053-penutup` (dari `main` `fde58a3`; MAKE-047..052 dan CR-075/076 sudah di `main`). Perubahan:
+`ACTIVE_PHASE` 4 → 5 dan `rilis` dihapus dari grup Presensi di `shared/layouts/nav.config.ts` (AC-5C.X1); spec nav
+(`nav.config.spec.ts`, `navPresensi.spec.ts`) diperbarui: grup Presensi tampil pada fase 5 tanpa `rilis`, tersembunyi pada
+fase 4 untuk semua role, anak per role 1–8 sesuai PRD 5C §6. Menu fase 6+ tidak berubah. Sisa 5C: MAKE-054 (verifikasi AC
+5A/5B/5C, QA Lapis 1, paritas UP-1, `Laporan_Akhir_Fase5.md`) lalu sign-off Horii Fase 5.
 
 ## Persiapan tanpa skema
 
