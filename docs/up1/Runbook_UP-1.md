@@ -256,6 +256,14 @@ Hasilnya hanya jumlah, tanpa NIP. Lakukan sebelum langkah 22; temuannya dipakai 
   aturannya diputus DBV/Horii sebelum perbandingan.
 - **T-07 awal periode BKN:** cek `periode_awal` semua baris BKN yang dibandingkan; periode yang mulai sebelum bulan
   kalender N−1 membuat legacy menghitung TK pada hari-hari itu.
+- **T-09 pengenal PPPK per baris:** legacy mengenali PPPK dari teks `pegawai.jenis_pegawai` per baris
+  (`L_presensi.php:12708`, `== 'PPPK'`: peka huruf, tanpa trim), sedangkan v2 memakai `id_jenis_pegawai = 6` (F5-24).
+  Gerbang Q5A-25 hanya memeriksa nama master, jadi selisih per baris tidak terlihat di sana. Setelah impor, hitung
+  (tanpa NIP) per `status`:
+  `SELECT status, COUNT(*) FROM pegawai WHERE (id_jenis_pegawai <=> 6) <> (jenis_pegawai IS NOT NULL AND BINARY jenis_pegawai = 'PPPK') GROUP BY status;`
+  Bila ada yang > 0, Horii/DBV memutus sebelum perbandingan: perbaiki data atau catat sebagai selisih. Kolom
+  `jenis_pegawai` ikut ekstraksi (`01_penuh.sql` mendump `pegawai` penuh) dan disalin alat impor apa adanya (irisan
+  kolom sumber–tujuan, tidak di-trim karena bukan `kolomKode`).
 - **T-01 / T-02:** selisih karena pegawai yang dibuat di hari terakhir periode (T-01) atau CPNS tanpa `tmtsk_pangkat`
   (T-02) masuk kelompok (a) bila Horii sudah memutusnya sebagai [V2]; bila belum diputus, catat terpisah di lembar hasil.
 
