@@ -51,6 +51,10 @@ final class PengimporLegacy
             throw new ImporGagal('--zona-sumber wajib WIB atau UTC (GAP-2).');
         }
 
+        if ($ukuranBatch < 1) {
+            throw new ImporGagal('Ukuran batch minimal 1.');
+        }
+
         $this->laporan = new LaporanImpor();
     }
 
@@ -64,7 +68,9 @@ final class PengimporLegacy
         $this->aturSesi($this->tujuan);
 
         foreach ($tier as $t) {
+            $mulai = hrtime(true);
             $this->jalankanTier($t, $dryRun);
+            $this->laporan->waktuTier($t, (hrtime(true) - $mulai) / 1e9);
         }
 
         return $this->laporan;

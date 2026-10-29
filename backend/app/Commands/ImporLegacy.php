@@ -21,7 +21,7 @@ use Throwable;
  * `app/Libraries/Impor/README.md`):
  *
  *   php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirmasi=<db_tujuan>
- *                          [--tier=1|semua] [--dry-run] [--keputusan=<berkas.json>]
+ *                          [--tier=1|semua] [--dry-run] [--keputusan=<berkas.json>] [--batch=1000]
  *
  * Tujuan = koneksi `default` (`.env` DB scratch hasil `migrate --all`). Sumber = skema lain di server & akun yang sama.
  * Keluaran hanya nama tabel, jumlah, dan kode aturan. Kode keluar 0 = selesai, 1 = gagal (tier berjalan di-rollback),
@@ -32,7 +32,7 @@ class ImporLegacy extends BaseCommand
     protected $group       = 'Impor';
     protected $name        = 'impor:legacy';
     protected $description = 'Impor salinan legacy ke DB v2 kosong per tier (MAKE-056, UP-1/cutover).';
-    protected $usage       = 'impor:legacy --sumber=<skema> --zona-sumber=WIB|UTC --konfirmasi=<db_tujuan> [--tier=1|semua] [--dry-run] [--keputusan=<berkas.json>]';
+    protected $usage       = 'impor:legacy --sumber=<skema> --zona-sumber=WIB|UTC --konfirmasi=<db_tujuan> [--tier=1|semua] [--dry-run] [--keputusan=<berkas.json>] [--batch=1000]';
     protected $options     = [
         '--sumber'      => 'Skema salinan legacy di server yang sama dengan tujuan',
         '--zona-sumber' => 'Jam server legacy untuk kolom DATETIME: WIB atau UTC (wajib, tanpa bawaan; GAP-2)',
@@ -40,6 +40,7 @@ class ImporLegacy extends BaseCommand
         '--tier'        => 'Nomor tier atau "semua" (bawaan semua)',
         '--dry-run'     => 'Hanya pra-cek, transformasi, dan hitung; tidak menulis',
         '--keputusan'   => 'Berkas JSON keputusan DBV (pemetaan status/nilai, tanggal nol)',
+        '--batch'       => 'Baris per batch baca/tulis (bawaan Config\ImporLegacy::$ukuranBatch = 1000)',
     ];
 
     /**
@@ -53,8 +54,9 @@ class ImporLegacy extends BaseCommand
         $zona   = $opsi('zona-sumber');
         $tier   = $opsi('tier') ?? 'semua';
         $dryRun = array_key_exists('dry-run', $params) || CLI::getOption('dry-run') !== null;
+        $batch  = $opsi('batch') ?? (string) config(KonfigImpor::class)->ukuranBatch;
 
-        if (! is_string($sumber) || $sumber === '' || ! is_string($zona)) {
+        if (! is_string($sumber) || $sumber === '' || ! is_string($zona) || ! ctype_digit($batch) || (int) $batch < 1) {
             CLI::error('Pemakaian: ' . $this->usage);
 
             return 2;
@@ -67,7 +69,7 @@ class ImporLegacy extends BaseCommand
             PenjagaTujuan::periksa($tujuan->getDatabase(), $sumber, $opsi('konfirmasi'), config(KonfigImpor::class)->tujuanTerlarang);
             $keputusan = is_string($opsi('keputusan')) ? Keputusan::dariBerkas((string) $opsi('keputusan')) : Keputusan::kosong();
 
-            $laporan = (new PengimporLegacy(self::koneksiSumber($sumber), $tujuan, $zona, $keputusan, config(KonfigImpor::class)->ukuranBatch))
+            $laporan = (new PengimporLegacy(self::koneksiSumber($sumber), $tujuan, $zona, $keputusan, (int) $batch))
                 ->jalankan($daftarTier, $dryRun);
         } catch (ImporGagal $e) {
             CLI::error('GAGAL: ' . $e->getMessage());

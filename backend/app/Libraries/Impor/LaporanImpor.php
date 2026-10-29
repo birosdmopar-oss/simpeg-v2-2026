@@ -15,6 +15,13 @@ final class LaporanImpor
      */
     private array $tabel = [];
 
+    /**
+     * Durasi per tier (detik).
+     *
+     * @var array<int, float>
+     */
+    private array $waktu = [];
+
     public function mulai(int $tier, DefinisiTabel $def, int $sumber, string $catatan = ''): void
     {
         $this->tabel[$def->tabel] = [
@@ -36,6 +43,19 @@ final class LaporanImpor
     public function dibuang(string $tabel, string $kode): void
     {
         $this->tabel[$tabel]['dibuang'][$kode] = ($this->tabel[$tabel]['dibuang'][$kode] ?? 0) + 1;
+    }
+
+    public function waktuTier(int $tier, float $detik): void
+    {
+        $this->waktu[$tier] = $detik;
+    }
+
+    /**
+     * @return array<int, float>
+     */
+    public function waktu(): array
+    {
+        return $this->waktu;
     }
 
     public function koreksi(string $tabel, string $kode): void
@@ -74,6 +94,10 @@ final class LaporanImpor
                 $t['catatan'] === '' ? '' : ' — ' . $t['catatan'],
                 $t['aturan'],
             );
+        }
+
+        foreach ($this->waktu as $tier => $detik) {
+            $out[] = sprintf('Tier %d selesai dalam %.1f detik', $tier, $detik);
         }
 
         return $out;

@@ -98,6 +98,20 @@ final class ImporLegacyTier1Test extends ImporLegacyTestCase
         $this->assertSame('2026-08-16 00:30:00', $this->db->table('unit')->where('id_unit', 5)->get()->getRowArray()['created_at']);
     }
 
+    public function testWaktuPerTierDicatatDanBatchMinimalSatu(): void
+    {
+        $this->isiLegacyDasar();
+
+        $laporan = (new PengimporLegacy($this->src, $this->db, 'WIB', Keputusan::kosong(), 1))->jalankan([1], false);
+
+        $this->assertSame([1], array_keys($laporan->waktu()));
+        $this->assertStringStartsWith('Tier 1 selesai dalam ', $laporan->baris()[array_key_last($laporan->baris())]);
+        $this->assertSame(2, $laporan->semua()['satker']['ditulis'], 'batch 1 baris tetap menyalin semua baris');
+
+        $this->expectException(ImporGagal::class);
+        new PengimporLegacy($this->src, $this->db, 'WIB', Keputusan::kosong(), 0);
+    }
+
     public function testZonaSumberWajibDiisi(): void
     {
         $this->expectException(ImporGagal::class);
