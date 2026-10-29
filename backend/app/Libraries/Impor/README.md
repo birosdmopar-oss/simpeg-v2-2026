@@ -84,11 +84,40 @@ tidak pernah diturunkan). PK TINYINT dengan counter ≥ 128 tidak disalin dan di
 berjalan di luar transaksi tier. Bila galat terjadi di langkah ini, data tier tetap ada; ulangi dengan `--tier`
 berikutnya setelah counter dibereskan manual.
 
-## GAP terbuka
+## Keputusan DBV yang dibutuhkan
 
-- **GAP-8:** `stripslashes` untuk tabel pegawai/riwayat (T2–T3) belum tercatat per tabel di dokumen DBV. DBV-011 §2.2 #3
-  baru mendaftar master. Bawaan alat adalah stripslashes, karena form legacy memakai `addslashes` [K]. Pengecualian per
-  kolom (`tanpaStripslashes`) menunggu keputusan DBV.
+Bagian ini dijawab DB Validator sekali untuk semua butir. Isi keputusan berupa kode/nilai masuk ke berkas keputusan
+lokal (contoh: `docs/up1/keputusan-impor.contoh.json`). Keputusan berupa aturan akan diterapkan coder di `DaftarTabel`.
+
+| No | Butir | Bawaan alat sekarang | Yang diminta dari DBV |
+|---|---|---|---|
+| GAP-2 | Jam server legacy untuk kolom DATETIME (DBV-011 §3.6 #3) | Tanpa bawaan: `--zona-sumber=WIB\|UTC` wajib diisi | Konfirmasi WIB atau UTC sebelum UP-1 dijalankan |
+| GAP-4 | `dm_user_lokasi_presensi` / `user_lokasi_presensi` (Mapping "tidak dimigrasi" vs G-03 §6.2 #6) | Tidak diimpor; tidak dibaca jalur Tukin | Keputusan untuk cutover (di luar UP-1) |
+| GAP-6 | Isi berkas keputusan: status/nilai di luar domain (`status`, `<tabel>.<kolom>` ber-CHECK, mis. `absen_ijin` `H`/angka lama, `pegawai.jenis_kelamin`), `hari_libur.id_jenis_libur` NULL, pengganti tanggal nol di kolom NOT NULL (R3) | Gagal-cepat bila belum dipetakan | Pemetaan per nilai dari hasil audit salinan (log 2.8) |
+| GAP-8 | `stripslashes` untuk tabel T2–T6 (DBV-011 §2.2 #3 baru mendaftar master) | `stripslashes` PHP pada semua kolom teks di bawah (form legacy `addslashes` [K]); NIP dan kode tidak terpengaruh | Daftar kolom yang disimpan MENTAH (`tanpaStripslashes`). Kandidat kuat: `riwayat_skp_periodik` dan `bkn_periode_ekinper`, karena terisi dari sinkron BKN, bukan dari form |
+| GAP-9 | Kolom DATETIME berisi waktu kejadian (`waktuBisnis`, tidak dikonversi R1a) | `absen_ijin.date_start`, `absen_ijin.date_end` | Konfirmasi daftar, termasuk apakah `riwayat_skp_periodik.waktu_dinilai` stempel (dikonversi) atau waktu bisnis |
+| GAP-10 | Kolom domain/status yang tidak punya CHECK v2 | `bkn_periode_ekinper.status`, `detail_anak`, `pegawai_sisa_cuti`, `riwayat_tb_perpan`, snapshot: disalin apa adanya | Konfirmasi tidak perlu normalisasi |
+| GAP-11 | Pembanding seed (GAP-3) memakai id + nama, tanpa beda huruf besar/kecil | `jenis_cuti`, sentinel `provinsi` 99 / `kabupaten_kota` 9999 | Konfirmasi aturan; bila nama legacy berbeda dengan seed, pilih mana yang dipakai |
+
+Kolom teks T2–T6 yang terkena `stripslashes` bawaan (GAP-8; NIP dan kode di-trim, tidak diubah):
+
+| Tabel | Kolom |
+|---|---|
+| `pegawai` | `id_provinsi_lahir`, `id_kabupaten_kota_lahir`, `nip_lama`, `nama`, `glr_awal`, `glr_akhir`, `provinsi_lahir`, `provinsi_lahir_lain`, `kabupaten_kota_lahir`, `kabupaten_kota_lahir_lain`, `agama`, `npwp`, `nik`, `bpjs_kes`, `bpjs_ket`, `no_taspen`, `no_hp`, `jenis_kerabat`, `no_telp_kerabat`, `jenis_pegawai`, `jenis_status`, `foto`, `keterangan`, `id_pns_siasn` |
+| `riwayat_mutasi_jabatan` | `no_sk`, `gol_pppk`, `nama_instansi`, `group_jabatan`, `sub_group_jabatan`, `unit`, `satker`, `atasan_es_1`, `atasan_es_2`, `atasan_es_3`, `atasan_es_3_koord`, `atasan_es_4`, `atasan_es_4_koord`, `jabatan`, `jabatan_koord`, `jabatan_lain`, `rumpun_jabatan`, `subrumpun_jabatan`, `no_induk_jft`, `ser_dosen`, `f_spmt`, `f_bapel`, `keterangan`, `id_rw_siasn`, `siasn_error`, `reason_note` |
+| `riwayat_kp` | `no_sk`, `no_pertek_bkn`, `jenis_kp`, `gol`, `ruang`, `gol_ruang`, `pangkat`, `keterangan`, `id_rw_siasn`, `siasn_error`, `reason_note` |
+| `pegawai_mutasi_jabatan` | `no_sk`, `gol_pppk`, `nama_instansi`, `group_jabatan`, `sub_group_jabatan`, `unit`, `satker`, `atasan_es_1`, `atasan_es_2`, `atasan_es_3`, `atasan_es_3_koord`, `atasan_es_4`, `atasan_es_4_koord`, `jabatan`, `jabatan_koord`, `jabatan_lain`, `rumpun_jabatan`, `subrumpun_jabatan`, `no_induk_jft`, `ser_dosen`, `f_spmt`, `f_bapel`, `keterangan`, `id_rw_siasn` |
+| `pegawai_kp` | `no_sk`, `no_pertek_bkn`, `jenis_kp`, `gol`, `ruang`, `gol_ruang`, `pangkat`, `keterangan`, `id_rw_siasn` |
+| `pegawai_plt` | `keterangan`, `lampiran` |
+| `pegawai_plh` | `keterangan`, `lampiran` |
+| `absen_ijin` | `jenis_konket`, `alasan`, `file_bukti`, `file_bukti_2`, `file_bukti_3`, `file_bukti_4`, `file_bukti_5`, `status`, `reason_note` |
+| `riwayat_keluarga` | `kota_perkawinan`, `nama_pasangan`, `keterangan`, `reason_note` |
+| `detail_anak` | `nama`, `tempat_lahir`, `keterangan` |
+| `bkn_periode_ekinper` | `id`, `nama`, `bulan`, `periode_awal`, `periode_akhir`, `batas_pengisian`, `jenis_periode` |
+| `riwayat_skp_periodik` | `id_pns`, `periode_id`, `skp_id`, `skp_penilaian_id`, `nama`, `skp_unor_id`, `skp_unor`, `skp_unor_induk`, `skp_jabatan`, `hasil_kerja`, `perilaku_kerja`, `hasil_akhir`, `pegawai_atasan_id`, `pegawai_atasan_nip`, `pegawai_atasan_nama`, `pegawai_atasan_unor_id`, `pegawai_atasan_unor`, `pegawai_atasan_jabatan`, `pegawai_atasan_golru`, `pegawai_penilai_id`, `golru`, `f_arsip_1`, `f_arsip_2` |
+| `riwayat_cuti` | `nama`, `pangkat`, `gol_ruang`, `jabatan`, `satker`, `nama_jenis_cuti`, `satuan_lama_cuti`, `no_telp_saat_cuti`, `alamat_saat_cuti`, `file_bukti`, `keterangan`, `nip_atasan_langsung`, `nama_atasan_langsung`, `jabatan_atasan_langsung`, `reason_note_al`, `nip_yang_menyetujui`, `nama_yang_menyetujui`, `jabatan_yang_menyetujui`, `reason_note_pyb`, `file_sc_unsign`, `file_sc_signed_bef`, `file_surat_cuti`, `keterangan_petugas_approval`, `ketua_tim`, `reason_note` |
+| `riwayat_tb` | `nama`, `gol_ruang`, `pangkat`, `jabatan`, `unit`, `satker`, `pendidikan_dasar_singkat`, `jenjang_pendidikan_singkat`, `institusi_pendidikan`, `jurusan_pendidikan`, `lokasi_pendidikan`, `lembaga_yang_mendanai`, `up`, `tembusan`, `file_sp`, `file_1`, `file_2`, `file_3`, `keterangan`, `rs_admin_upt`, `sp_admin_deputi`, `rs_admin_deputi`, `ds_tb`, `no_ds_tb`, `perihal_ds_tb`, `no_sk`, `file_surat_tb`, `reason_note` |
+| `riwayat_tb_perpan` | `file_sperpan` |
 
 ## Di luar cakupan
 
