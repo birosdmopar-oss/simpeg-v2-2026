@@ -4,9 +4,9 @@ Acuan: PRD 5A v1.1, PRD 5B v1.0, PRD 5C v1.1 (§7.7 MAKE-054, §8 AC, §5.1 K5C-
 §6–§7 (Tahap UP-1, prasyarat Fase 6). Disusun 29-10-2026 dari `main` `6c116ac` (seluruh paket koding 5A, 5B, 5C dan
 perbaikan QA CR-075..081 sudah di `main`).
 
-> **Status:** 5A sign-off Horii 28-10-2026, 5B sign-off 29-10-2026, 5C seluruh AC berbukti (§3), QA Lapis 1 5C
-> **lolos** (§4), QA Lapis 1 FE 5A (Q5A-18) **lolos dengan temuan rendah** (§4.1). **Sign-off Fase 5 oleh Horii**
-> menunggu keputusan atas butir §7. Uji paritas UP-1 **bukan** syarat sign-off Fase 5 (K5C-10); UP-1 menjadi gerbang masuk Fase 6. Fase 5 DONE
+> **Status:** **FASE 5 DONE — sign-off Horii 29-10-2026** (`main` `d0f12c1`). 5A sign-off 28-10-2026, 5B sign-off
+> 29-10-2026, 5C seluruh AC berbukti (§3), QA Lapis 1 5C **lolos** (§4), QA Lapis 1 FE 5A (Q5A-18) **lolos**; temuan
+> rendah T5A-01/02/04 diperbaiki CR-082 sebelum sign-off (§4.1, §7). Uji paritas UP-1 **bukan** syarat sign-off Fase 5 (K5C-10); UP-1 menjadi gerbang masuk Fase 6. Fase 5 DONE
 > **tidak** berarti siap go-live: blocker go-live di §8 tetap berlaku.
 
 ## 1. Laporan
@@ -14,9 +14,11 @@ perbaikan QA CR-075..081 sudah di `main`).
 ```
 Status: 5A DONE (sign-off 28-10-2026), 5B DONE (sign-off 29-10-2026),
         5C: D-12 sisa (FE laporan), D-13 suite, MAKE-053 penutup — semua di main; QA Lapis 1 5C LOLOS;
-        D-12 FE 5A: QA Lapis 1 (Q5A-18) LOLOS dengan temuan rendah T5A-01..04 (§4.1, §7)
+        D-12 FE 5A: QA Lapis 1 (Q5A-18) LOLOS; T5A-01/02/04 diperbaiki CR-082 (§4.1, §7)
+        FASE 5 DONE: sign-off Horii 29-10-2026 pada main d0f12c1
 Branch/SHA/CI: main 6c116ac — gate penuh ./check.sh lolos pada 6c116ac (2.988 PHPUnit, 1.436 Vitest, build);
                CI Quality gate #421 hijau. Laporan ini: docs saja (docs/make-054-laporan-akhir-fase5)
+               CR-082 → main d0f12c1 — gate penuh lolos (2.988 PHPUnit, 1.443 Vitest, build), CI #427 hijau
 Berkas utama: §2
 Test & validasi: §3 (AC 5C → test), §4 (QA Lapis 1), laporan 5A/5B untuk AC 5A/5B
 Deviasi [V2] & keputusan: §6
@@ -144,6 +146,10 @@ Keputusan pelaksanaan 5C lengkap di PRD 5C §5.1 (K5C-1..K5C-10). Ringkas:
 | 2 | D-01 PDF slip: legacy vs PNG Figma | PDF v2 = tata letak legacy `0cf7e67` (keputusan CR-067 ikut legacy); PNG Figma export PDF versi lebih lama | Tetap ikut legacy (tidak ada perubahan); ubah ke Figma = CR baru |
 | 3 | T5A-03 zona kosong QR | Belum terbukti mengganggu | Pindai fisik di uji perangkat (§8 butir 4); CR bila gagal terbaca |
 
+**Keputusan Horii 29-10-2026:** butir 1 → CR-082 dikerjakan sebelum sign-off (`d0f12c1`); butir 2 → PDF slip tetap
+ikut legacy; butir 3 → pindai fisik saat uji perangkat (blocker go-live §8 butir 4). Ketiganya ditutup dengan sign-off
+Fase 5.
+
 Tidak ada pertanyaan ⛔ 5C lain yang terbuka (Q5C-01, Q5C-03, Q5C-06, Q5C-09 diputus; Q5C-02/04/05/07/08 ◻ default berlaku).
 
 ## 8. Blocker go-live (bukan blocker sign-off Fase 5)
@@ -162,5 +168,7 @@ Tidak ada pertanyaan ⛔ 5C lain yang terbuka (Q5C-01, Q5C-03, Q5C-06, Q5C-09 di
 
 ## 9. Setelah sign-off
 
-Sinkron Trello DEV-006 (+ QASMTASK-076..088) dan Notion baris Fase 5 ke selesai; Fase 6 tetap terkunci oleh `GATE-F6`
-sampai UP-1 di-sign-off.
+Sinkron Trello DEV-006 (+ QASMTASK-076..088, QASMTASK-119 D-14) dan Notion baris Fase 5 ke selesai — **selesai
+29-10-2026**. Butir DoD yang sengaja tidak dicentang: "Lolos MTC-0xx" / "Sesuai MTC-033" (MT fase tersendiri),
+cross-check rumus 079 (Q5B-01, blocker go-live) dan rekap per golongan PPPK 084 (F5B-20). Fase 6 tetap terkunci oleh
+`GATE-F6` sampai UP-1 di-sign-off.

@@ -1,6 +1,6 @@
 # Task List Fase 5 — pelacakan & pembagian paralel (29-10-2026)
 
-Basis: `origin/main` = `6c116ac` (pembaruan MAKE-054; sebelumnya `7eac943`). Acuan: PRD 5A v1.1, PRD 5B v1.0, PRD 5C v1.1 +
+Basis: `origin/main` = `d0f12c1` (CR-082, sign-off Fase 5; sebelumnya `6c116ac`). Acuan: PRD 5A v1.1, PRD 5B v1.0, PRD 5C v1.1 +
 `docs/fase5/TaskList_Fase5C.md`. Nama pelaksana netral: **Coder A–D** = sesi coder, **Reviewer** = reviewer CR, **Horii** =
 pengambil keputusan & sign-off.
 
@@ -11,7 +11,7 @@ pengambil keputusan & sign-off.
 | 5A (skema, slip gaji, presensi, FE 5A) | ✅ SIGN-OFF 28-10 | M1–M8 di `main` (`54cb441`), DBV-023 |
 | 5B (cuti/TB Tukin, laporan, rekap, uang makan) | ✅ SIGN-OFF Horii 29-10 | M1–M7 di `main` (MAKE-043 `87f77c8`), DBV-024 |
 | 5C (FE laporan, D-13, penutup) | ✅ QA Lapis 1 5C lolos 29-10; MAKE-054 laporan akhir | MAKE-047..053, CR-075..081 di `main` (`6c116ac`) |
-| Fase 5 DONE | ⛔ Sign-off Horii (keputusan butir `Laporan_Akhir_Fase5.md` §7) | **Tidak** menunggu UP-1 (§6) |
+| Fase 5 DONE | ✅ SIGN-OFF Horii 29-10 | `main` `d0f12c1` (CR-082), `Laporan_Akhir_Fase5.md` §7 diputus; **tidak** menunggu UP-1 (§6) |
 | Tahap UP-1 | ⏳ Persiapan | §6, Trello list "Tahap UP-1" |
 
 ## 2. Daftar task (semua pelaksana)
@@ -34,14 +34,15 @@ pengambil keputusan & sign-off.
 | 14 | Perbaikan temuan QA: bulan bawaan Tukin 16–15, sinkron rute, galat unduhan blob, fokus ⋮, label TB, Predikat SKP (T-01, T-04..T-07, T-09) | CR-078 | Coder B | No. 12 | ✅ Di `main` `7eac943` | Horii |
 | 15 | QA ulang setelah CR-077/078 + `IndikatorRadius` (I1, pegawai wajib geofence + izin lokasi) | (MAKE-054) | Reviewer | No. 13–14 | ✅ Lolos; temuan T-12..T-15 → CR-079 `e9027e5`, CR-081 `6c116ac` | — |
 | 16 | Verifikasi 5C + laporan akhir Fase 5 (status Tahap UP-1 dicatat, bukan syarat) | MAKE-054 | Reviewer (+ Coder D dokumen) | No. 15 | ✅ `docs/fase5/Laporan_Akhir_Fase5.md` | Horii |
-| 16a | QA Lapis 1 FE 5A (`Checklist_QA_Lapis1_FE5A_Q5A-18.md`; GPS perangkat nyata → blocker go-live) | (MAKE-054) | Reviewer | — | ✅ Lolos dengan temuan rendah T5A-01..04 | — |
-| 17 | Sign-off Fase 5 | — | Horii | No. 16, 16a | ⛔ | — |
-| 18 | Sinkron Trello DEV-006 / QASMTASK-076..088 + Notion | — | Reviewer | Tiap merge / sign-off | Berjalan | — |
+| 16a | QA Lapis 1 FE 5A (`Checklist_QA_Lapis1_FE5A_Q5A-18.md`; GPS perangkat nyata → blocker go-live) | (MAKE-054) | Reviewer | — | ✅ Lolos; T5A-01/02/04 → CR-082 `d0f12c1` | — |
+| 16b | Perbaikan temuan QA FE 5A T5A-01/02/04 | CR-082 | Coder B | No. 16a | ✅ Di `main` `d0f12c1` | Horii |
+| 17 | Sign-off Fase 5 | — | Horii | No. 16, 16a, 16b | ✅ 29-10-2026 | — |
+| 18 | Sinkron Trello DEV-006 / QASMTASK-076..088 + Notion | — | Reviewer | Tiap merge / sign-off | ✅ Sinkron sign-off 29-10 | — |
 
 ## 3. Jalur paralel (sisa)
 
 ```
-Reviewer: MAKE-054 (No. 16) + QA Lapis 1 FE 5A (No. 16a) → sign-off Horii Fase 5 (No. 17)
+Reviewer: MAKE-054 (No. 16) + QA Lapis 1 FE 5A (No. 16a) → CR-082 (No. 16b) → sign-off Horii Fase 5 (No. 17) ✅
 Tahap UP-1 (§6) berjalan paralel, terpisah dari penutupan Fase 5
 ```
 
