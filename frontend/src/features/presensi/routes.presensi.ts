@@ -8,6 +8,8 @@ import {
   PENYESUAIAN_TUKIN_ROLES,
   PRESENSI_ADMIN_ROLES,
   PRESENSI_PEGAWAI_ROLES,
+  REKAP_KEHADIRAN_ROLES,
+  REKAP_UANG_MAKAN_ROLES,
   SLIP_GAJI_ADMIN_ROLES,
   SLIP_GAJI_PEGAWAI_ROLES,
   TUKIN_DAFTAR_ROLES,
@@ -73,6 +75,20 @@ export const presensiRoutes: RouteRecordRaw[] = [
     name: 'presensi-tukin-pegawai',
     component: () => import('./views/LaporanTukinPegawaiPage.vue'),
     meta: { roles: TUKIN_PER_PEGAWAI_ROLES, title: 'Laporan Tukin' },
+  },
+  {
+    // Rekap Kehadiran (5B MAKE-042, F5B-10; PRD 5C §6): role 1, 3, 4.
+    path: '/presensi/rekap-kehadiran',
+    name: 'presensi-rekap-kehadiran',
+    component: () => import('./views/RekapKehadiranPage.vue'),
+    meta: { roles: REKAP_KEHADIRAN_ROLES, title: 'Rekap Kehadiran' },
+  },
+  {
+    // Rekap Uang Makan (5B MAKE-042, F5B-20; PRD 5C §6): role 1, 3; tab Instansi Lain hanya role 1.
+    path: '/presensi/uang-makan',
+    name: 'presensi-uang-makan',
+    component: () => import('./views/RekapUangMakanPage.vue'),
+    meta: { roles: REKAP_UANG_MAKAN_ROLES, title: 'Rekap Uang Makan' },
   },
   {
     // Penyesuaian Tukin per NIP (5B MAKE-045, F5B-14; PRD 5C §6): role 1 saja.

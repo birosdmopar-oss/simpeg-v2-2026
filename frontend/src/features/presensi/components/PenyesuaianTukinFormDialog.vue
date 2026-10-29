@@ -14,7 +14,8 @@ import { UiButton, UiNotice, UiTextField } from '@/shared/ui'
 
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
 
-import { labelBulan, penyesuaianTukinService, type IsianPenyesuaian, type PenyesuaianTukin } from '../services/penyesuaianTukin.service'
+import { labelBulan } from '../formatLaporan'
+import { penyesuaianTukinService, type IsianPenyesuaian, type PenyesuaianTukin } from '../services/penyesuaianTukin.service'
 
 const props = defineProps<{
   open: boolean

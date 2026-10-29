@@ -33,10 +33,10 @@ describe('navPresensi', () => {
   })
 
   it.each([
-    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Penyesuaian Tukin']],
+    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Rekap Kehadiran', 'Rekap Uang Makan', 'Penyesuaian Tukin']],
     [Role.PEGAWAI, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
-    [Role.ADMIN_SATKER, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin']],
-    [Role.ADMIN_VIEW_ESELON1, ['Data Presensi']],
+    [Role.ADMIN_SATKER, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Rekap Kehadiran', 'Rekap Uang Makan']],
+    [Role.ADMIN_VIEW_ESELON1, ['Data Presensi', 'Rekap Kehadiran']],
     [Role.MENTERI, ['Data Presensi']],
     [Role.PTT, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
     [Role.PPPK, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
