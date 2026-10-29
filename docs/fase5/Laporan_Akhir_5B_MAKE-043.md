@@ -15,7 +15,7 @@ Status: D-06 DONE (backend; D-04/D-05/D-07 → DONE backend setelah M1, §11.3),
         D-08 backend lengkap di main (menunggu sign-off 5B; FE = 5C),
         D-09a DONE (backend; blocker go-live F5-1 ditutup),
         D-09b backend lengkap di main (menunggu sign-off 5B; FE = 5C)
-Branch/SHA/CI: fase5b/make-043-verifikasi-5b <SHA M7> — CI Quality gate <run> (lihat laporan ke reviewer)
+Branch/SHA/CI: fase5b/make-043-verifikasi-5b 9ad5b10 (kode & dokumen M7) — CI Quality gate #363 hijau
                Milestone di main: M1a MAKE-044 7c40229, M1 MAKE-039 df10c0f, M2 MAKE-040 79641be, M3 DBV-024 e9f4616,
                M4 MAKE-045 ccb81f3, M6 MAKE-042 70a24b6, M5 MAKE-041 9968dc0 (CI #360 hijau); gate penuh ./check.sh
                terakhir lolos pada 8b1a374 (M5: 2.923 PHPUnit, 1.284 Vitest)
