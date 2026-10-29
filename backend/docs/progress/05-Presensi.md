@@ -112,6 +112,21 @@ M0 F1**; metode tunggal tidak berubah). Berkas bersama aditif, commit terpisah: 
 diperbarui (rakitan bawaan kini memakai sumber Fase 4). D-04/D-05/D-07 → DONE (backend) setelah M1 merged + review
 (PRD 5B §11.3).
 
+## 5C MAKE-052 — suite regresi D-13 (29-10-2026)
+
+Branch `fase5c/make-052-regresi-d13` (PRD 5C §7.6, AC-D13.1; C0 diterima reviewer CR 29-10-2026, P1–P4). 12 kelas test di
+`backend/tests/Presensi/RegresiD13/` (`S01LiburAkhirPekan` … `S12UbahTarifWebConfig`), `#[Group('d13')]`, `extends
+DatabaseTestCase`, data sintetis, waktu disuntik. Jalur nyata: S01–S10 & S12 lewat `Laporan\LaporanTukinService::laporan` +
+`Laporan\RekapTukinService::daftar` (`KalkulasiLaporanTukin` → `TukinDataService::siapkanBanyak` + `SumberCutiTbFase4` + TB
+Fase 4 → `KalkulasiTukin`), setiap skenario juga memeriksa baris rekap = laporan (K-1); S11 lewat `ImporSlipService` (HTTP
+pratinjau + commit dengan seam 1062), `SlipGajiService` (gerbang tgl 4 10:00 WIB) dan route slip pegawai (hanya slip
+sendiri). Setiap kelas mencantumkan rujukan legacy [K] dan test lama yang dicakup (test lama tidak diubah). Catatan
+CR-076 (usulan): S01/S10 tidak meng-assert jumlah baris `harian[]` atau ketiadaan tanggal libur. Jalankan
+`cd backend && composer test:d13` (26 test); suite tetap ikut PHPUnit penuh (`./check.sh`) dan shard CI. Berkas bersama,
+commit terpisah: `backend/composer.json` (script `test:d13`), helper `tests/_support/Presensi/RegresiD13UjiTrait.php` (berkas
+baru; namespace test `Tests\` tidak di-autoload sehingga helper tidak bisa di folder `RegresiD13`). D-13 → DONE setelah
+MAKE-052 merged + MAKE-054.
+
 ## 5A M1 — DBV-023 dokumen skema (D-01)
 
 - **Sudah:** `backend/docs/db-review/DBV-023-presensi-gaji-fase5a-schema.md` (status "Menunggu review DB Validator"),
