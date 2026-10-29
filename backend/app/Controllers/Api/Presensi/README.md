@@ -170,6 +170,31 @@ dibuat di M5 (keterangan + kolom `penyesuaian`, `total_potongan` tidak berubah).
   keputusan reviewer CR 28-10-2026); galat lain diteruskan, tidak pernah lanjut tanpa kunci.
 - Audit lewat `PenyesuaianTukinModel` (`BaseAuditableModel`): `create`, `update`, `delete` (status 10) dengan before/after.
 
+## Laporan Tukin (MAKE-041, PRD 5B §6.1, §7.3, D-08)
+
+Route di `Config/RoutesPresensiLaporan.php`, `LaporanTukinController` → `Laporan\DaftarPegawaiTukinService`,
+`Laporan\LaporanTukinService`, `Laporan\RekapTukinService`. Hanya varian `skp` (F5B-4); "Tukin Lama" tidak di-port (F5B-5).
+
+| Method & path | Role | Isi |
+|---|---|---|
+| `GET api/v1/presensi/tukin/pegawai?unit_satker=&jenis_pegawai[]=&search=&page=&per_page=` | 1, 3 | Daftar pegawai aktif (snapshot jabatan jenis 1), paginasi server, `bulan_tersedia` |
+| `GET api/v1/presensi/tukin/pegawai-il?search=&page=&per_page=` | 1 | Daftar pegawai Instansi Lain (F5B-6) |
+| `GET api/v1/presensi/tukin/laporan/{nip}?bulan=` | 1–7 | Laporan per pegawai: identitas, periode, harian, jumlah, rincian & total (persen 2 desimal), penyesuaian, keterangan |
+| `GET api/v1/presensi/tukin/laporan/{nip}/pdf?bulan=` | 1–7 | PDF per pegawai (render legacy, F5B-8), `tukin_<nip>_<YYYY-MM>.pdf` |
+| `GET api/v1/presensi/tukin/rekap?bulan=&unit_satker=&jenis_pegawai[]=&page=&per_page=` | 1, 3 | Rekap: `items[] {nip, nama, unit_es1, unit_es2, pengurangan {TL,PSW,TK,TA,CUTI,TB}, total_presensi, total_skp, total_potongan, keterangan, penyesuaian, galat}` + `periode`, `jumlah_galat` |
+| `GET api/v1/presensi/tukin/rekap/xlsx?…` | 1, 3 | XLSX seluruh lingkup, tata letak legacy + blok penanda tangan (`laporan_tukin_<lingkup>_<YYYY-MM>.xlsx`) |
+| `GET api/v1/presensi/tukin/rekap/pdf?…` | 1, 3 | PDF [V2] hanya lingkup unit/satker ≤ `Config\Presensi::$pdfRekapMaksBaris` (bawaan 800, ADR-035); lingkup `0`/di atas batas → 422 `errors.unit_satker` |
+| `GET api/v1/presensi/tukin/rekap-il[/xlsx]?bulan=` | 1 | Rekap IL, penanda tangan menteri |
+
+- `bulan` `YYYY-MM` 2024-04 s.d. bulan berjalan (setelah tanggal 15 termasuk bulan depan); sebelum 2024-04 → 422
+  `code: periode_tidak_didukung` "Laporan periode sebelum April 2024 tersedia di arsip SIMPEG lama."; sesudah batas → 422
+  `errors.bulan`.
+- Akses per pegawai (F5B-7): role 2/6/7 hanya NIP sendiri (403, tidak dialihkan); NIP tidak ada → 404; role 3 di luar
+  lingkup → 403 (`PegawaiScope`); role 1/4/5 semua. Daftar & rekap role 3 dipaksa satkernya di server.
+- Galat terkendali adapter: per pegawai → 422 dengan `code` (`konfigurasi_tukin_tidak_lengkap`, `rentang_puasa_ganda`,
+  `data_tukin_belum_tersedia`, `data_tukin_tidak_sah`); rekap → baris tetap tampil dengan `galat {code, message}`.
+- Ekspor tidak diaudit (F5B-11); kinerja & batas PDF di ADR-035.
+
 ## Rekap kehadiran & uang makan (MAKE-042, PRD 5B §6.2, §7.4, D-09b)
 
 Route di `Config/RoutesPresensiLaporan.php`, `RekapController` → `Laporan\RekapKehadiranService` /

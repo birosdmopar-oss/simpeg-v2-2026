@@ -210,6 +210,16 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'GET api/v1/presensi/uang-makan/rekap/xlsx'       => [1, 3],
             'GET api/v1/presensi/uang-makan/rekap-il'         => [1],
             'GET api/v1/presensi/uang-makan/rekap-il/xlsx'    => [1],
+            // 5B M5 MAKE-041: laporan Tukin (F5B-6/F5B-7).
+            'GET api/v1/presensi/tukin/pegawai'             => [1, 3],
+            'GET api/v1/presensi/tukin/pegawai-il'          => [1],
+            'GET api/v1/presensi/tukin/laporan/([^/]+)/pdf' => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/presensi/tukin/laporan/([^/]+)'     => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/presensi/tukin/rekap'               => [1, 3],
+            'GET api/v1/presensi/tukin/rekap/xlsx'          => [1, 3],
+            'GET api/v1/presensi/tukin/rekap/pdf'           => [1, 3],
+            'GET api/v1/presensi/tukin/rekap-il'            => [1],
+            'GET api/v1/presensi/tukin/rekap-il/xlsx'       => [1],
 
             // Modul A — user/login (Publik), logout/change_password/me (UL_ALL; tetap terbuka saat wajib ganti password).
             'POST api/v1/auth/login'           => self::PUBLIK,

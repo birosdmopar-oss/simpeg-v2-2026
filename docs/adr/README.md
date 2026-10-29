@@ -13,6 +13,7 @@ Folder ini menyimpan ADR yang ditulis setelah dokumen utama dan perlu dibaca cod
 | [ADR-032](ADR-032-library-pdf-excel-qr-rute-publik.md) | Library PDF/Excel/QR & pola rute publik (Slip Gaji Fase 5A) | Diterima 19-10-2026 | Repo |
 | [ADR-033](ADR-033-library-pdf-tcpdf.md) | Library PDF: TCPDF untuk Fase 3 (LKH, Cetak DRH) | Diterima 07-10-2026 | Repo |
 | [ADR-034](ADR-034-pdf-sinkron-dokumen-daftar.md) | PDF sinkron dokumen daftar F-09: fallback per unit/satker, batas 1.700 baris | Diusulkan 21-10-2026 | Repo |
+| [ADR-035](ADR-035-ekspor-laporan-tukin-sinkron.md) | Ekspor rekap Tukin sinkron: kalkulasi per batch 500, PDF per unit/satker maks 800 baris (uji volume 5.000 pegawai) | Diterima 28-10-2026 | Repo |
 
 ## Format
 

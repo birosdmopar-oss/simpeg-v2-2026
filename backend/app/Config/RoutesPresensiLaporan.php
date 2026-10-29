@@ -36,4 +36,20 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Presensi', 'filter
     $routes->get('presensi/uang-makan/rekap/xlsx', 'RekapController::uangMakanXlsx', $rekapUangMakan);
     $routes->get('presensi/uang-makan/rekap-il', 'RekapController::uangMakanIl', $superAdmin);
     $routes->get('presensi/uang-makan/rekap-il/xlsx', 'RekapController::uangMakanIlXlsx', $superAdmin);
+
+    // --- M5 D-08 laporan Tukin (MAKE-041): legacy `list_lt`, `list_lt_il`, `laporan_tukin_us_skp[_il]` =
+    // `userAuth(['1','3'])`, `laporan_tukin/{nip}` = 1..7 (`Presensi.php:78`, `:162`, `:246`, `:491`, `:572`); v2 varian IL
+    // hanya 1 (F5B-6), per pegawai role 8 ditolak (F5B-7). Lingkup role 3 & NIP sendiri dicek di service. ---
+    $adminTukin = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)];
+    $perPegawai = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK)];
+
+    $routes->get('presensi/tukin/pegawai', 'LaporanTukinController::pegawai', $adminTukin);
+    $routes->get('presensi/tukin/pegawai-il', 'LaporanTukinController::pegawaiIl', $superAdmin);
+    $routes->get('presensi/tukin/laporan/(:segment)/pdf', 'LaporanTukinController::laporanPdf/$1', $perPegawai);
+    $routes->get('presensi/tukin/laporan/(:segment)', 'LaporanTukinController::laporan/$1', $perPegawai);
+    $routes->get('presensi/tukin/rekap', 'LaporanTukinController::rekap', $adminTukin);
+    $routes->get('presensi/tukin/rekap/xlsx', 'LaporanTukinController::rekapXlsx', $adminTukin);
+    $routes->get('presensi/tukin/rekap/pdf', 'LaporanTukinController::rekapPdf', $adminTukin);
+    $routes->get('presensi/tukin/rekap-il', 'LaporanTukinController::rekapIl', $superAdmin);
+    $routes->get('presensi/tukin/rekap-il/xlsx', 'LaporanTukinController::rekapIlXlsx', $superAdmin);
 });

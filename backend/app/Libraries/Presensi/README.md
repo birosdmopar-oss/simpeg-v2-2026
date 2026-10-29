@@ -210,6 +210,38 @@ Test: `tests/unit/Presensi/Rekap/{HariUangMakan,RekapMurni}Test.php`, `tests/Pre
 UangMakanSlipPresensi,UangMakanSnapshotAsli}Test.php` (AC-D09a.1–09a.5). Test 5A yang menguji perilaku
 `UangMakanBelumTersedia` (`UangMakanSnapshotTest`, `BukaSlipAtomikTest`) kini menyuntik sumber itu secara eksplisit.
 
+### Laporan Tukin 5B (D-08, MAKE-041)
+
+Port `list_lt`/`list_lt_il`, `laporan_tukin/{nip}` (`laporan_tukin_skp`), `laporan_tukin_us_skp`/`_il` legacy `0cf7e67`
+[K] (`Presensi.php:76-635`, `L_presensi.php:3535-3627`, `:6510-7752`, `:11752-15450`).
+
+| Bagian | Kelas | Aturan |
+|---|---|---|
+| Kalkulasi | `Laporan/KalkulasiLaporanTukin` | Satu kalkulasi rekap untuk layar per pegawai & rekap (K-1); `TukinDataService::siapkanBanyak` + `KalkulasiTukin::hitung` dipotong hari ini; galat per pegawai ber-`code`; data keterangan per batch |
+| Penyesuaian (murni) | `Rekap/PenyesuaianTukin` | Baris status 1 yang mencakup bulan laporan; keterangan "Penyesuaian Tukin <alasan> <persen>% (sebelum potongan lain)." + TB/CLTN + daftar cuti; akhiran total PDF; `total_potongan` tidak diubah |
+| Penanda tangan | `Rekap/PenandaTangan` (murni), `Laporan/PejabatPenandaTangan` | Enam kasus selalu dicetak (F5B-13); Plt status 1 tanggal cetak, tanpa Plh, deterministik (F2); konstanta unit F3 di `Config\Presensi` |
+| Rekap & ekspor | `Laporan/RekapTukinService`, `Laporan/EksporTukinXlsx`, view `pdf/rekap_tukin` | Populasi periode Tukin; XLSX tata letak legacy; PDF berbatas (F5B-16); IL role 1 |
+| Per pegawai | `Laporan/LaporanTukinService`, view `pdf/laporan_tukin_pegawai` | Akses F5B-7; PDF render legacy F5B-8 ("Rp." hanya konket kategori 13 yang dibayar aturan slip per bulan kalender) |
+| Daftar | `Laporan/DaftarPegawaiTukinService` | Snapshot jabatan, paginasi server, `bulan_tersedia` |
+
+**[CATAT] MAKE-041 — laporan Tukin v2 vs legacy (butir di luar F5B-n yang sudah ada di PRD)**
+
+| v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
+|---|---|---|
+| Layar per pegawai memakai kalkulasi rekap (K-1) | `laporan_tukin_skp` per pegawai berbeda 4 aturan dari rekap (`L_presensi.php:6510-7752` vs `:11752-13492`) | Angka layar = baris rekap; nilai SKP sebelum batas penilaian mengikuti rekap |
+| Rekap role 3 dipaksa satker akun di server | Rekap hanya dibatasi di JS (`list_lt.php:262-264`), controller tanpa cek (`Presensi.php:491`) | Celah L5B-02 ditutup |
+| Pegawai galat tetap tampil dengan `galat` | Satu galat menghentikan halaman | Rekap tidak gagal total |
+| XLSX: ekstensi `.xlsx`, content type xlsx, judul "TOTAL POTONGAN", legenda "Terlambat" | `.xls.xlsx`, `application/vnd.ms-excel`, "POTONGGAN", "Telambat" (`:13306-13483`) | Salah ketik & nama berkas diperbaiki |
+| Penanda tangan: jabatan dari `struktur_jabatan` periode aktif, urut `urutan`/id; definitif seri → NIP naik | `row_array` tanpa urutan, tanpa saring periode (`:12018-12140`) | Pilihan deterministik |
+| Kop PDF per pegawai **ikut legacy berlogo** (keputusan Horii 28-10-2026, Q5B-27): tata letak `MY_PDF_HEADER_UNIT`, logo `web_config` `logo_kementerian_pdf` / `logo_wonderful_pdf` (unit 6: `satker.logo_uns`) dari akar aset `Config\Presensi::$akarAset`, nama kementerian & unit huruf besar; alamat & logo kanan ikut cabang legacy (unit ∉ {6, 7} ber-alamat unit → alamat unit; unit 6 + alamat satker → alamat + logo satker; selain itu alamat kementerian + logo wonderful) — `Laporan\KopLaporanTukin` | `MY_PDF_HEADER_UNIT` (`config/constants.php:257`) diisi `L_presensi.php:6512-6521` + `:7105-7116` (unit/satker 6/7 hard-code) | Usulan awal M5 (kop `KopDokumen` tanpa logo) **DITOLAK**. Id 6/7 lewat konstanta F3; G1/G2 ikut legacy (keputusan Horii 29-10-2026); [V2] logo satker tidak sah → logo wonderful |
+| Nama berkas PDF per pegawai tanpa angka acak | `tukin_<nip>_<bulan>_<rand>.pdf` (`:7726-7728`) | Nama stabil |
+| Bawaan `jenis_pegawai[]`: rekap `[1]` (PNS), daftar pegawai semua jenis | Rekap `jenis_pegawai` bawaan `'1'` (`hr/Presensi.php:645`, `:744`, `:853`, `:952`); daftar bawaan `'0'` = semua (`:411`, `:494`) — diverifikasi reviewer CR 28-10-2026 | Sama dengan legacy |
+| `penyesuaian` dari tabel DBV-024 (persen bebas ±100) | NIP & periode hard-code (`:11755-11806`, `:6526-6560`) | Lihat [CATAT] F5B-14 PRD |
+
+Test: `tests/unit/Presensi/Rekap/{PenandaTangan,PenyesuaianTukin}Test.php`, `tests/Presensi/Laporan/{RekapTukin,
+LaporanTukinPegawai, RekapTukinXlsx, RekapTukinPdf, RekapTukinIl, PenandaTanganRekap, PenyesuaianTukinEfek,
+DaftarPegawaiTukin, CakupanLaporan, RoleMatriksLaporan, RekapTukinVolume}Test.php`.
+
 ### Rekap kehadiran & uang makan 5B (D-09b, MAKE-042)
 
 Port `Presensi::rekap` / `rekap_uma` / `rekap_uma_il` + `L_presensi::rekap` (`:415-810`), `rekap_full_xls`
