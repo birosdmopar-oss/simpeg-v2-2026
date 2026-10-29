@@ -5,6 +5,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 import {
+  PENYESUAIAN_TUKIN_ROLES,
   PRESENSI_ADMIN_ROLES,
   PRESENSI_PEGAWAI_ROLES,
   SLIP_GAJI_ADMIN_ROLES,
@@ -72,6 +73,13 @@ export const presensiRoutes: RouteRecordRaw[] = [
     name: 'presensi-tukin-pegawai',
     component: () => import('./views/LaporanTukinPegawaiPage.vue'),
     meta: { roles: TUKIN_PER_PEGAWAI_ROLES, title: 'Laporan Tukin' },
+  },
+  {
+    // Penyesuaian Tukin per NIP (5B MAKE-045, F5B-14; PRD 5C §6): role 1 saja.
+    path: '/presensi/tukin/penyesuaian',
+    name: 'presensi-penyesuaian-tukin',
+    component: () => import('./views/PenyesuaianTukinPage.vue'),
+    meta: { roles: PENYESUAIAN_TUKIN_ROLES, title: 'Penyesuaian Tukin' },
   },
   {
     // D-14 verifikasi QR publik (ADR-032): tanpa login & tanpa `guestOnly` (bisa dibuka saat sudah login), tanpa layout

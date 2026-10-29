@@ -35,3 +35,6 @@ export const TUKIN_PER_PEGAWAI_ROLES: readonly RoleCode[] = [
 
 /** Laporan Tukin Saya (NIP akun): 2, 6, 7. */
 export const TUKIN_SAYA_ROLES: readonly RoleCode[] = [Role.PEGAWAI, Role.PTT, Role.PPPK]
+
+/** Penyesuaian Tukin per NIP (5B F5B-14, PRD 5C §6): CRUD hanya Super Admin (`PenyesuaianTukinController` role 1). */
+export const PENYESUAIAN_TUKIN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]

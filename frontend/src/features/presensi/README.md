@@ -70,4 +70,17 @@ Halaman (PRD 5C §7.3; API `Controllers/Api/Presensi` "Laporan Tukin MAKE-041"):
 - [CATAT] Kolom daftar pegawai mengikuti respons API (Nama+NIP, Gol/Ruang, Jabatan, Eselon, Unit/Satker, Pendidikan, Jenis
   Pegawai). Kolom legacy `list_lt.php` yang tidak ada di API v2: kolom tersembunyi filter (10 pertama) dan kolom setelah
   "Jurusan"; filter Jenis Pegawai legacy (ALL/PNS/PPPK/PPT) diganti opsi master `jenis-pegawai` (multi).
+- [K] Role 4/5: tanpa menu Laporan Tukin, seperti legacy (tidak ada tautan ke `laporan_tukin/{nip}` di sidebar atau halaman mereka);
+  route `/presensi/tukin/:nip` tetap terbuka (1–7) dan lingkup ditegakkan server (keputusan reviewer 29-10).
 - [CATAT] Cetak dari layar legacy diganti PDF server (Q5C-04); varian Tukin Lama tidak ada (F5B-5).
+
+## Penyesuaian Tukin (MAKE-050, PRD 5C §7.4, F5B-14)
+
+Role 1 saja (`PENYESUAIAN_TUKIN_ROLES`, route `/presensi/tukin/penyesuaian`). Daftar dengan filter NIP, Bulan, dan Status;
+tambah/ubah lewat dialog (`PenyesuaianTukinFormDialog.vue`, galat 422 per field); ⋮ berurutan Edit → Aktifkan/Nonaktifkan
+→ Hapus (`danger`, `ConfirmDialog`). Status hanya diubah lewat ⋮, tidak ada di form.
+
+- [CATAT] **PUT body lengkap untuk Aktifkan/Nonaktifkan** ([V2] deviasi dari "status saja"). `PenyesuaianTukinService::isian`
+  mewajibkan `bulan_mulai`, `bulan_akhir`, `persen`, dan `alasan` pada setiap PUT, jadi `ubahStatus` mengirim ulang nilai
+  baris dan hanya `status` yang berubah. Risiko kecil: bila dua admin mengubah baris yang sama hampir bersamaan, perubahan
+  yang lebih dulu bisa tertimpa. Backend tidak diubah (di luar lingkup 5C); diterima reviewer CR.

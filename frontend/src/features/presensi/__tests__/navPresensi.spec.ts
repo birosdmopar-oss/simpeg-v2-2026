@@ -33,7 +33,7 @@ describe('navPresensi', () => {
   })
 
   it.each([
-    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin']],
+    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin', 'Penyesuaian Tukin']],
     [Role.PEGAWAI, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
     [Role.ADMIN_SATKER, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin']],
     [Role.ADMIN_VIEW_ESELON1, ['Data Presensi']],
