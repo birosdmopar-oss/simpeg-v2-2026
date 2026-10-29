@@ -6,10 +6,13 @@ README modul). Aturan Slip Gaji (sumber legacy, hak akses): `backend/app/Librari
 
 **Status:** paket **5A DONE (backend & dokumen)** — sign-off Horii 28-10-2026 (PRD 5A §11.1 #8) setelah M8 MAKE-035
 masuk `main` `54cb441`. **FE 5A (D-12) tetap IN_PROGRESS** sampai QA Lapis 1 lolos (Q5A-18, AC-FE.9); blocker go-live
-5A tetap berlaku (di bawah). **5B berjalan** (PRD 5B v1.0, sesi WS-2): M0 diterima reviewer CR 28-10-2026; M1a MAKE-044
-di `main` `7c40229`. 5A DONE ≠ Fase 5 DONE (PRD 5A §11.2).
+5A tetap berlaku (di bawah). **5B: M1a–M6 di `main`** (MAKE-044 `7c40229`, MAKE-039 `df10c0f`, MAKE-040 `79641be`,
+DBV-024 `e9f4616`, MAKE-045 `ccb81f3`, MAKE-042 `70a24b6`, MAKE-041 `9968dc0`); **M7 MAKE-043 (verifikasi 5B)** di branch
+`fase5b/make-043-verifikasi-5b` — laporan `docs/fase5/Laporan_Akhir_5B_MAKE-043.md`, menunggu sign-off reviewer CR 5B
+(PRD 5B §11.1 #7). 5A/5B DONE ≠ Fase 5 DONE (PRD 5A §11.2, PRD 5B §11.2).
 
-**Terakhir diperbarui:** 28 Oktober 2026 — status 5A pasca sign-off (commit docs di branch 5B pertama
+**Terakhir diperbarui:** 29 Oktober 2026 — 5B M7 MAKE-043 (status D-04..D-09, blocker F5-1 ditutup, prosedur paritas
+UP-1, runbook 5B C-2). Sebelumnya 28 Oktober 2026 — status 5A pasca sign-off (commit docs di branch 5B pertama
 `fase5b/dbv-024-penyesuaian-tukin`, keputusan reviewer CR M0 F4). Sebelumnya: M8 MAKE-035 di `main` `54cb441`; riwayat
 merge 5A: M2 DBV-023 `e8d08dc`; M3–M6 s.d. `3a12909`; M7 (a) `5279b82`, (b) `5a3a35c`, (c) `919c822`; CR-067 `08b6c89`.
 DBV-023 **disetujui DB Validator 20-10-2026 (jjoseph48)** (PR #28); ISSUE-049 (Q5A-02) ditutup keputusan user 20-10-2026.
@@ -21,19 +24,41 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 | D-01 Migration tabel presensi & gaji | 5A | M1/M2 | DBV-023 | **DONE** (sign-off 5A 28-10) | Di `main` (`e8d08dc`); DBV approve 20-10; registry NIP & cascade hijau; AC-D01 → laporan M8 |
 | D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D02.1–02.10 berbukti test (laporan M8); GPS perangkat nyata di QA (Q5A-22) |
 | D-03 Presensi manual | 5A | M5 | MAKE-032 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D03.1–03.8 berbukti test, termasuk jalur tangkap 1062 (M8) |
-| D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | M6 | MAKE-033 | **IN_PROGRESS** | Murni CR-037/039 + adapter `TukinData` 5A di `main`; sumber cuti/TB, precedence, laporan di 5B (PRD 5B) |
-| D-08 Laporan Tukin, D-09 rekap & uang makan | 5B | M2/M5/M6 | MAKE-040/041/042 | TODO | PRD 5B v1.0; M0 diterima 28-10; urutan M3 DBV-024 → M1 → M2 → M6 → M4 → M5 → M7 |
+| D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | 5A M6 / 5B M1 | MAKE-033/039 | **DONE (backend)** | Murni CR-037/039 + adapter 5A + sumber cuti/TB nyata 5B M1 (`df10c0f`, review CR 28-10; PRD 5B §11.3); AC-D06.1–06.10 → laporan 5B M7 |
+| D-08 Laporan Tukin, D-09 rekap & uang makan | 5B / 5C (FE) | 5B M2–M6 | MAKE-040/041/042/045, DBV-024 | **IN_PROGRESS** (backend 5B lengkap di `main`, menunggu sign-off 5B; FE = 5C) | AC-D08/D09a/D09b berbukti test (laporan 5B M7); F5-1 ditutup M2 |
 | D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D10.1–10.10 berbukti test |
 | D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D11.1–11.11 berbukti test; acuan slip `0cf7e67` (CR-067) |
 | D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 | MAKE-034 | **IN_PROGRESS** (sampai QA Lapis 1 lolos) | FE 5A (a/b/c) di `main` `919c822`; AC-FE.1–FE.8 berbukti Vitest + cek browser; AC-FE.9 = QA Lapis 1 (Q5A-18) |
 | D-13 Unit test lengkap | 5A (bagian) / 5C | M8 | MAKE-035 | **IN_PROGRESS** | Bagian 5A lengkap (laporan M8); regression suite D-13 penuh di 5C |
 | D-14 Verifikasi QR publik | 5A | M4/M7 | MAKE-031/034 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D14.1–14.7 berbukti test; FE `/verify/slip/:token` |
 
-**Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** nilai uang makan slip (5B, F5-1); konfirmasi Biro Keuangan
+**Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** ~~nilai uang makan slip (5B, F5-1)~~ **selesai** — 5B M2
+MAKE-040 di `main` `79641be` (`Config\Presensi::$sumberUangMakan = UangMakanSlipPresensi::class`, AC-D09a.5); konfirmasi Biro Keuangan
 atas data verifikasi AS-06 (Q5A-08); checksum kode produksi (Q5A-14); pengecekan ulang data `gaji_pegawai` produksi
 (DEPLOY-002.1; Q5A-02 ditutup ISSUE-049); deploy HTTPS + rute Nginx `/verify/slip/*` + `Config\App::$proxyIPs`
 (geolokasi browser hanya di konteks aman; IP asli untuk throttle & `viewed_ip`, Q5A-22); nama `jenis_pegawai` id 6
-produksi (Q5A-25); QA Lapis 1 FE 5A (Q5A-18).
+produksi (Q5A-25); QA Lapis 1 FE 5A (Q5A-18). **Tambahan 5B (PRD 5B §11.2):** Q5B-01 (cek Biro SDM/Keuangan X-1, X-5,
+X-6, X-10, X-12), Q5B-03 (konfirmasi penanda TB uang makan), Q5B-09 (paritas UP-1 data nyata, prosedur di bawah), Q5B-19
+(uang makan PTT/golongan di luar I–IV), Q5A-14/Q5B-15 (checksum), isi `penyesuaian_tukin` dan tarif uang makan /
+`gol_pppk` produksi, audit DBV-024 C-2 (runbook 5B di bawah).
+
+## 5B M7 — verifikasi 5B (MAKE-043, 29-10-2026)
+
+Branch `fase5b/make-043-verifikasi-5b` (dari `main` `9968dc0`, seluruh M1a–M6 di `main`). Laporan akhir 5B (format §11.4,
+keterlacakan AC → test, checklist §12, deviasi, blocker): `docs/fase5/Laporan_Akhir_5B_MAKE-043.md`. Perubahan M7:
+`RoutePresensiLaporanKontrakTest` (seluruh route 5B × role 1–8 + 401; daftar route di router = matriks; menutup route PDF
+yang belum teruji role), `RekapTukinTest::testPeriodeBknTidakStandarDipakai` (AC-D08.4 bagian BKN), alat paritas UP-1
+`php spark presensi:paritas-tukin` (`Laporan\ParitasRekapTukin` + `ParitasRekapTukinTest`), dokumen ini (status, blocker,
+prosedur UP-1, runbook 5B). Tanpa perubahan perilaku endpoint.
+
+### Runbook operasional 5B
+
+| # | Butir | Kapan | Cara | Asal |
+|---|---|---|---|---|
+| R5B-1 (C-2) | Audit isi `penyesuaian_tukin`: **B1** rentang aktif tumpang tindih NIP sama = 0 (WAJIB_0), **B2** rentang sebelum 2024-04 = 0 | Setiap **tutup bulan Tukin** (sebelum rekap/ekspor bulan itu dipakai) dan sekali setelah pengisian cutover (F5B-21) | Akun baca saja: `mysql --table … < backend/docs/db-review/sql/DBV-024-audit-penyesuaian-tukin.sql` (bagian B); hasil ≠ 0 → perbaiki lewat CRUD penyesuaian (role 1), jangan lewat SQL; hasil yang memuat NIP tidak dibagikan/di-commit | DBV-024 DBV-Q7 syarat C-2 (DB Validator 28-10-2026) |
+| R5B-2 | Uji paritas UP-1 rekap Tukin | 5C MAKE-054 dan cutover (Q5C-06) | "Prosedur paritas UP-1" di bawah | F5B-9, Q5B-09 |
+| R5B-3 | Batas PDF rekap (`presensi.pdfRekapMaksBaris`, bawaan 800) diukur ulang di server produksi | Deploy | Jalankan `RekapTukinVolumeTest` (`RUN_VOLUME_TEST=1`) di mesin setara produksi; sesuaikan `.env` bila perlu | ADR-035 §4 |
+| R5B-4 | Konstanta unit penanda tangan legacy '6'/'7' (`presensi.unitTtdSatkerTerpilih`, `presensi.unitTtdSatkerKepegawaian`) sesuai id unit produksi | Cutover | Cocokkan id unit di DB v2 hasil impor dengan unit legacy 6/7; override `.env` bila berbeda | F3 (M0) |
 
 ## 5B M0 — laporan pemahaman PRD 5B (28-10-2026, tanpa commit)
 
@@ -336,7 +361,36 @@ tiap tahap gate cepat + CI + `./check.sh` sekali. Status FE 5A tetap IN_PROGRESS
 
 | # | Butir | Asal | Status |
 |---|---|---|---|
-| UP-1 | Paritas adapter Tukin vs rekap legacy `laporan_tukin_us_skp` pada data nyata: legacy memuat `dh_online` per bulan kalender N−1 dan N (`L_presensi.php:12376-12391`), adapter v2 per rentang [awal periode sebelumnya, akhir periode] (`SumberHarianTukin`). Bandingkan hasil per pegawai untuk periode dengan baris BKN tidak standar dan pegawai dengan **cuti sakit lintas periode** (lookback urutan cuti sakit, `KalkulasiTukin::sakitSebelumPeriode`) | MAKE-033, review CR M6 27-10-2026 | ⏳ QA Fase 5 (setelah 5B: cuti/TB nyata) |
+| UP-1 | **Prosedur & alat siap (5B M7, di bawah); dijalankan 5C MAKE-054 / cutover.** Paritas adapter Tukin vs rekap legacy `laporan_tukin_us_skp` pada data nyata: legacy memuat `dh_online` per bulan kalender N−1 dan N (`L_presensi.php:12376-12391`), adapter v2 per rentang [awal periode sebelumnya, akhir periode] (`SumberHarianTukin`). Bandingkan hasil per pegawai untuk periode dengan baris BKN tidak standar dan pegawai dengan **cuti sakit lintas periode** (lookback urutan cuti sakit, `KalkulasiTukin::sakitSebelumPeriode`) | MAKE-033, review CR M6 27-10-2026 | ⏳ QA Fase 5 (setelah 5B: cuti/TB nyata) |
+
+### Prosedur paritas UP-1 (5B M7 MAKE-043; dijalankan 5C MAKE-054 / cutover)
+
+Keputusan Horii 29-10-2026 (Q5C-06): **dua periode terakhir**, dijalankan reviewer CR bersama DBA pada **salinan data
+yang disetujui**; hasil yang dibagikan tanpa data pribadi. Prasyarat: DB v2 berisi impor dari salinan legacy yang sama
+(pegawai, jabatan, `dh_online`, `absen_ijin`, `riwayat_cuti`, `riwayat_tb`, `hari_libur`, `bkn_periode_ekinper`,
+`web_config` tarif TL/PSW/TK/TA, SKP) dan isi `penyesuaian_tukin` sudah dimasukkan lewat CRUD (F5B-21).
+
+1. **Pilih periode & lingkup.** Untuk tiap bulan `M` dari dua periode terakhir: lingkup kementerian (`0`), ditambah minimal
+   satu unit yang memuat pegawai **cuti sakit lintas periode** dan satu bulan dengan **baris BKN tidak standar** bila ada —
+   catat di lembar hasil.
+2. **Ekspor legacy** (aplikasi legacy terhadap salinan data yang sama): rekap Laporan Tukin varian SKP
+   (`laporan_tukin_us_skp`, ekspor XLSX `L_presensi.php:13139-13486`), bulan `M`, lingkup sama, jenis pegawai **PNS**
+   (bawaan legacy). Jangan memakai "Tukin Lama" atau varian `tukinver` (F5B-4/F5B-5).
+3. **Ekspor v2:** `GET api/v1/presensi/tukin/rekap/xlsx?bulan=M&unit_satker=<lingkup>` sebagai role 1 (bawaan
+   `jenis_pegawai[] = 1`), dijalankan **setelah** akhir periode `M` (periode berjalan dipotong hari ini, AC-D08.4).
+4. **Bandingkan** di mesin lokal reviewer/DBA (hanya membaca dua berkas, tanpa DB):
+   `php spark presensi:paritas-tukin legacy_M.xlsx v2_M.xlsx --csv=temuan_M.csv` (toleransi bawaan 0,01 poin persen; kode
+   keluar 0 = sama semua, 1 = ada temuan, 2 = masukan salah). Keluaran memakai NIP tersamar `#xxxxxxxx`; `--nip-penuh`
+   hanya untuk telaah lokal DBA dan **tidak** dibagikan atau di-commit.
+5. **Telaah temuan** per jenis: `beda` (kolom TL/PSW/TK/TA/CUTI/TB/total yang berselisih), `hanya_legacy` / `hanya_v2`
+   (populasi — cek status pegawai, jabatan jenis 1, `created_at`, jenis pegawai), `galat_v2` (keterangan = pesan galat
+   adapter, mis. tarif belum lengkap atau jenis cuti di luar 1..6), `galat_legacy`. Kelompokkan setiap selisih: (a) deviasi
+   [V2] tercatat (README `Libraries/Presensi` & `TukinData`, PRD 5B §5.3/§13 — mis. F5B-17 tumpang tindih cuti, F5B-14
+   penyesuaian dari tabel bukan hard-code, rentang `dh_online` per periode vs per bulan kalender), (b) data salinan tidak
+   konsisten, (c) **bug v2** → kartu ISSUE/CR.
+6. **Catat hasil** (tanpa NIP/nama) di laporan MAKE-054: periode, lingkup, baris ringkasan `presensi:paritas-tukin`,
+   jumlah temuan per kelompok (a)/(b)/(c), dan keputusan. UP-1 **lolos** bila tidak ada temuan kelompok (c) yang masih
+   terbuka; sampai itu UP-1 tetap blocker go-live (Q5B-09).
 
 ## Persiapan tanpa skema
 

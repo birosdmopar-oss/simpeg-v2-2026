@@ -908,7 +908,7 @@ BERHENTI dan eskalasi.
 | Q5B-24 | (log 28-10-2026, temuan M2) Tarif `gol_pppk.uang_makan` tidak bulat sampai sen | **Ikut legacy**: total = tarif × hari, dibulatkan eksplisit setengah-menjauhi-nol ke sen seperti kolom DECIMAL(14,2); usulan galat/`null` ditolak | §7.2.3 [CATAT] Q5B-24 | Gap `.xx5` float legacy ±1 sen diterima |
 | Q5B-25 | (log 28-10-2026, temuan M6) Hari TB di rekap kehadiran ringkas | **Ikut legacy**: TB tidak diperiksa di ringkas (TK + tidak hadir bila tanpa presensi); kolom `tb` informasi; grid harian TB dulu | §7.4.1 [CATAT] Q5B-25 | Usulan v2 (TB terpisah dari TK) ditolak |
 | Q5B-26 | (log 28-10-2026, temuan M6) Presensi pegawai yang dibuat setelah awal bulan | **Ikut legacy**: tidak dibaca — ringkas `DATE(created_at) <= awal` (`:599`), harian `created_at < awal` (`:1053`); rekap uang makan tetap F5B-2 | §7.4.1 [CATAT] Q5B-26 | Rekap kehadiran & uang makan berbeda untuk pegawai baru |
-| Q5B-27 | (log 28-10-2026, temuan M5) Kop PDF laporan Tukin per pegawai | **Ikut legacy berlogo** (`MY_PDF_HEADER_UNIT`), logo & teks dari sumber v2 (`web_config`, akar aset) | §7.3.2 [CATAT] Q5B-27 | Usulan tanpa logo ditolak |
+| Q5B-27 | (log 28-10-2026, temuan M5) Kop PDF laporan Tukin per pegawai | **Ikut legacy berlogo** (`MY_PDF_HEADER_UNIT`), logo & teks dari sumber v2 (`web_config`, akar aset) | §7.3.2 [CATAT] Q5B-27 | Usulan tanpa logo ditolak. **Lanjutan 29-10-2026:** cabang alamat & logo kanan G1/G2 ikut legacy (`L_presensi.php:6512-6521`, `:7105-7116`), docblock `KopLaporanTukin` |
 
 ## 14. Lampiran
 
@@ -1007,5 +1007,6 @@ Butir keamanan ditulis **kode + jenis** saja; **rincian tidak ditulis di repo pu
 | log | 28-10-2026 | Q5B-24 (tarif `gol_pppk` tak bulat sampai sen ikut legacy, §7.2.3); keputusan lama tidak dihapus |
 | log | 28-10-2026 | Q5B-25/Q5B-26 (rekap kehadiran ringkas ikut legacy: TB tidak diperiksa; presensi pegawai baru tidak dibaca, §7.4.1); keputusan lama tidak dihapus |
 | log | 28-10-2026 | Q5B-27 (kop PDF per pegawai ikut legacy berlogo, §7.3.2); keputusan lama tidak dihapus |
+| log | 29-10-2026 | Q5B-27 lanjutan (Horii): G1 unit 7 ber-alamat unit → alamat kementerian; G2 unit 6 tanpa alamat satker → alamat kementerian + logo wonderful (ikut legacy); M7 MAKE-043 prosedur paritas UP-1 di `05-Presensi.md` |
 
 — Akhir dokumen —
