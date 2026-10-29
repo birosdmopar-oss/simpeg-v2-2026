@@ -44,9 +44,7 @@ Isi paket:
 
 ## Langkah
 
-Perkiraan waktu bersifat kasar dan belum termasuk waktu menunggu izin.
-
-### a. Prasyarat & izin (H, D, R — ±1 hari kalender)
+### a. Prasyarat & izin (H, D, R)
 
 1. ⛔ **H** menjawab `Pertanyaan_Terbuka_UP-1.md` (P-01..P-09): siapa DBA, akun baca-saja DevSimpeg, lokasi penyimpanan,
    jadwal, kesiapan aplikasi legacy di server dev, dan zona jam server legacy (GAP-2, butir d).
@@ -57,7 +55,7 @@ Perkiraan waktu bersifat kasar dan belum termasuk waktu menunggu izin.
    - Folder kerja terbatas, misalnya `<KERJA_UP1>`.
 3. **D** mengisi checklist keamanan data di lembar hasil (bagian 6) **sebelum** data pertama diambil.
 
-### b. Pilih periode & lingkup (R, H — ±30 menit)
+### b. Pilih periode & lingkup (R, H)
 
 4. **Periode.** Ambil dua periode Tukin terakhir yang sudah tutup (Q5C-06). Periode Tukin bulan `M` = tanggal 16 bulan
    `M-1` s.d. 15 bulan `M`. Contoh: bila UP-1 dijalankan setelah 15-10-2026, `M` = September dan Oktober 2026
@@ -79,7 +77,7 @@ Perkiraan waktu bersifat kasar dan belum termasuk waktu menunggu izin.
    jumlah, tanpa NIP.
 6. Catat periode dan id lingkup di lembar hasil (bagian 1).
 
-### c. Ambil salinan dari DevSimpeg (D — ±1–2 jam)
+### c. Ambil salinan dari DevSimpeg (D)
 
 7. Isi parameter di sesi shell. Jangan simpan ke berkas yang di-commit:
    ```bash
@@ -125,7 +123,7 @@ Nama kolom mengikuti label [K] di dokumen DBV, yaitu nama legacy. **D** mencocok
 menjalankan skrip. Bila ada kolom yang berbeda, perbaiki `--where` di salinan lokal dan catat perbedaannya di lembar
 hasil.
 
-### d. Impor ke DB scratch v2 (D — ±½ hari)
+### d. Impor ke DB scratch v2 (D)
 
 Alat yang dipakai: `php spark impor:legacy` (MAKE-056, P-06 opsi 2). Aturannya per tabel ada di
 `backend/app/Libraries/Impor/README.md`; keputusan yang masih ditunggu dari DBV ada di bagian "Keputusan DBV yang
@@ -191,15 +189,15 @@ akun yang sama.
     di `laporan_impor.txt`, yaitu kolom `dibuang`, mis. `DBV-023 A2 tanpa jam` dan `DBV-022 §13.1 duplikat (nip, tahun)`,
     serta seed yang `dilewati`. Setiap selisih lain masuk kelompok (b) dan dicatat di lembar hasil (bagian 3).
 
-### e. Isi penyesuaian Tukin (D — ±30 menit)
+### e. Isi penyesuaian Tukin (D)
 
-18. Isi `penyesuaian_tukin` lewat **CRUD role 1** (F5B-21, menu Penyesuaian Tukin) untuk setiap penyesuaian yang
-    berlaku di rentang uji. Daftarnya disiapkan sesuai P-09, tanpa membuka
-    `constants.php`. Jangan isi lewat SQL.
+18. Isi `penyesuaian_tukin` lewat **CRUD role 1** (F5B-21, menu Penyesuaian Tukin) hanya untuk penyesuaian yang
+    berlaku di rentang uji menurut keputusan yang berjalan (P-09: penyesuaian historis ≤ Juni 2024 tidak dimigrasi;
+    tidak ada ekstraktor dari legacy). Bila tidak ada, tabel dibiarkan kosong. Jangan isi lewat SQL.
 19. Jalankan audit `backend/docs/db-review/sql/DBV-024-audit-penyesuaian-tukin.sql` **bagian B**. B1 dan B2 harus 0;
     B3/B4 dicatat sebagai info (syarat C-2).
 
-### f. Ekspor per bulan × lingkup (D untuk legacy, D/R untuk v2 — ±15 menit per kombinasi)
+### f. Ekspor per bulan × lingkup (D untuk legacy, D/R untuk v2)
 
 20. **Legacy** (aplikasi legacy di server dev, terhadap data yang sama dengan salinan): Rekap Laporan Tukin varian SKP
     (`laporan_tukin_us_skp`), XLSX, bulan `M`, lingkup sama, jenis pegawai **PNS**. Jangan memakai "Tukin Lama" atau
@@ -211,7 +209,7 @@ akun yang sama.
     `GET api/v1/presensi/tukin/rekap/xlsx?bulan=<M>&unit_satker=<lingkup>`. Simpan sebagai
     `<KERJA_UP1>/v2_<M>_<lingkup>.xlsx`.
 
-### g. Bandingkan & triase (R, D — ±1–2 jam per bulan)
+### g. Bandingkan & triase (R, D)
 
 22. Untuk tiap pasangan:
     ```bash
@@ -228,12 +226,12 @@ akun yang sama.
     nominal nyata. **A** memperbaiki, lalu setelah fix di `main`, **D/R** mengulang langkah 21–23 untuk bulan dan
     lingkup terkait.
 
-### h. Lembar hasil (R — ±30 menit)
+### h. Lembar hasil (R)
 
 25. Isi `Hasil_UP-1_TEMPLATE.md` dan simpan salinannya sebagai `docs/up1/Hasil_UP-1.md` atau di laporan MAKE-054.
     Isinya hanya angka agregat, tanpa NIP atau nama.
 
-### i. Bersih-bersih (D — ±30 menit; ⛔ per objek)
+### i. Bersih-bersih (D; ⛔ per objek)
 
 26. ⛔ Minta izin **H** untuk setiap objek, satu per satu, lalu hapus dan centang di checklist bagian 6:
     - DB scratch `simpeg_v2_t_up1`;

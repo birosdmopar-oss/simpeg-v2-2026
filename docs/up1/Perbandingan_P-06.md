@@ -13,7 +13,7 @@ Aturan impor sudah tertulis di dokumen berikut:
 - DBV-024 §5 (`penyesuaian_tukin` lewat CRUD);
 - B-01/B-02 §6 (pegawai & riwayat).
 
-Repo **belum punya alat** yang menjalankan aturan itu (GAP-1). UP-1 butuh ±35 tabel jalur Tukin; cutover butuh semua tabel.
+Repo **belum punya alat** yang menjalankan aturan itu (GAP-1). UP-1 butuh sekitar 35 tabel jalur Tukin; cutover butuh semua tabel.
 
 ## Opsi 1 — SQL sekali pakai oleh DBA
 
@@ -23,8 +23,8 @@ Repo **belum punya alat** yang menjalankan aturan itu (GAP-1). UP-1 butuh ±35 t
 | Saat UP-1 | DBA menulis `INSERT … SELECT` lokal dari skema salinan ke DB scratch |
 | Saat cutover | Semua ditulis ulang sebagai alat resmi |
 | Gap & risiko | Hasil paritas mungkin tidak sah untuk cutover, karena R1a/R1b, pembersihan `dh_online` tanpa jam, dan dedupe sisa cuti bisa berbeda dari alat cutover. Skrip tidak direview dan sulit diulang. Risiko data sedang (skrip/log lokal) |
-| Usaha & pelaku | ±2–3 hari kerja, DBA |
-| Dampak Fase 6 | Terbuka ±1 minggu setelah data siap; pekerjaan impor dikerjakan dua kali |
+| Pelaku | DBA |
+| Dampak Fase 6 | Terbuka setelah data siap; pekerjaan impor dikerjakan dua kali |
 
 ## Opsi 2 — kartu MAKE alat impor resmi (gladi cutover) ✅ dipilih
 
@@ -33,9 +33,9 @@ Repo **belum punya alat** yang menjalankan aturan itu (GAP-1). UP-1 butuh ±35 t
 | Kapan cocok | UP-1 harus membuktikan "v2 + data hasil impor = legacy" untuk hari H |
 | Saat UP-1 | Coder membuat alat impor di repo (command `spark` / SQL transformasi), dengan test data sintetis dan review CR + DBV; DBA menjalankannya ke DB scratch |
 | Saat cutover | Alat yang sama dijalankan pada dump final |
-| Gap & risiko | Pekerjaan terbesar; cakupan awal ±35 tabel jalur Tukin. Mungkin perlu kartu DBV bila ada penyesuaian skema. Hasil sah untuk cutover, bisa diulang, dan diaudit lewat skrip audit DBV-022/023/024. Risiko data paling rendah: kode ada di repo, data hanya di mesin DBA |
-| Usaha & pelaku | Coder ±5–8 hari kerja, lalu DBA menjalankan ±1 hari |
-| Dampak Fase 6 | Terbuka ±2–3 minggu; sebagian besar waktu itu tetap terpakai saat cutover |
+| Gap & risiko | Pekerjaan terbesar; cakupan awal sekitar 35 tabel jalur Tukin. Mungkin perlu kartu DBV bila ada penyesuaian skema. Hasil sah untuk cutover, bisa diulang, dan diaudit lewat skrip audit DBV-022/023/024. Risiko data paling rendah: kode ada di repo, data hanya di mesin DBA |
+| Pelaku | Coder membuat alat, lalu DBA menjalankannya |
+| Dampak Fase 6 | Terbuka setelah alat selesai dan dijalankan; pekerjaannya tetap terpakai saat cutover |
 
 ## Opsi 3 — menunggu alat cutover
 
@@ -45,7 +45,7 @@ Repo **belum punya alat** yang menjalankan aturan itu (GAP-1). UP-1 butuh ±35 t
 | Saat UP-1 | Belum ada yang dikerjakan sampai alat cutover jadi |
 | Saat cutover | Sama dengan opsi 2, tetapi UP-1 jatuh di akhir proyek |
 | Gap & risiko | Alat cutover belum dijadwalkan; bug Tukin (c) baru ketahuan menjelang go-live |
-| Usaha & pelaku | 0 sekarang; total sama dengan opsi 2 |
+| Pelaku | Belum ada sekarang; total sama dengan opsi 2 |
 | Dampak Fase 6 | Terkunci tanpa batas waktu yang jelas; bertentangan dengan keputusan "UP-1 di antara Fase 5 dan 6" |
 
 ## Ringkasan
@@ -55,9 +55,8 @@ Repo **belum punya alat** yang menjalankan aturan itu (GAP-1). UP-1 butuh ±35 t
 | Hasil sah untuk cutover | Tidak pasti | **Ya** | Ya |
 | Bisa diulang & direview | Rendah | **Tinggi** | Tinggi |
 | Risiko keamanan data | Sedang | **Rendah** | Rendah |
-| Usaha sekarang | ±2–3 hari | ±5–8 + 1 hari | 0 |
 | Pekerjaan dobel saat cutover | Ya | **Tidak** | Tidak |
-| Fase 6 terbuka | ±1 minggu | ±2–3 minggu | Tidak jelas |
+| Fase 6 terbuka | Setelah data siap | Setelah alat selesai | Tidak jelas |
 
 ## Alasan pemilihan
 
