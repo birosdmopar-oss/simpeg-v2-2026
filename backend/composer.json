@@ -65,6 +65,7 @@
         "cs-check": "php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php",
         "cs-fix": "php-cs-fixer fix --config=.php-cs-fixer.dist.php",
         "test": "phpunit --no-coverage",
+        "test:d13": "phpunit --no-coverage --group d13",
         "check": [
             "@analyse",
             "@cs-check",
@@ -72,6 +73,7 @@
         ]
     },
     "scripts-descriptions": {
-        "check": "Quality gate backend (F0-10): PHPStan level 5 -> PHP-CS-Fixer PSR-12 dry-run -> PHPUnit"
+        "check": "Quality gate backend (F0-10): PHPStan level 5 -> PHP-CS-Fixer PSR-12 dry-run -> PHPUnit",
+        "test:d13": "Suite regresi D-13 Presensi (12 skenario, grup d13, PRD 5C §7.6); tetap ikut PHPUnit penuh"
     }
 }
