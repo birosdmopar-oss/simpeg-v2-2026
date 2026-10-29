@@ -19,9 +19,9 @@ import { UiBadge, UiButton, UiNotice, UiPagination, UiSearchInput, UiSelect, UiT
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
 
 import PenyesuaianTukinFormDialog from '../components/PenyesuaianTukinFormDialog.vue'
+import { labelBulan } from '../formatLaporan'
 import {
   formatPersen,
-  labelBulan,
   penyesuaianTukinService,
   type DaftarPenyesuaian,
   type PenyesuaianTukin,

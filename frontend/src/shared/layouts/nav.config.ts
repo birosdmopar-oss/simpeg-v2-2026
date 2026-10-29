@@ -63,7 +63,15 @@ import {
 } from '@/features/layanan/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
-import { PENYESUAIAN_TUKIN_ROLES, PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from '@/features/presensi/roles'
+import {
+  PENYESUAIAN_TUKIN_ROLES,
+  PRESENSI_ADMIN_ROLES,
+  PRESENSI_PEGAWAI_ROLES,
+  REKAP_KEHADIRAN_ROLES,
+  REKAP_UANG_MAKAN_ROLES,
+  SLIP_GAJI_ADMIN_ROLES,
+  SLIP_GAJI_PEGAWAI_ROLES,
+} from '@/features/presensi/roles'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
@@ -174,6 +182,8 @@ const NAV: NavGroup[] = [
           { key: 'presensi-slip-gaji', label: 'Slip Gaji', to: '/presensi/slip-gaji', roles: SLIP_GAJI_PEGAWAI_ROLES },
           { key: 'presensi-slip-gaji-kelola', label: 'Kelola Slip Gaji', to: '/presensi/slip-gaji/kelola', roles: SLIP_GAJI_ADMIN_ROLES },
           { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: PRESENSI_ADMIN_ROLES },
+          { key: 'presensi-rekap-kehadiran', label: 'Rekap Kehadiran', to: '/presensi/rekap-kehadiran', roles: REKAP_KEHADIRAN_ROLES },
+          { key: 'presensi-uang-makan', label: 'Rekap Uang Makan', to: '/presensi/uang-makan', roles: REKAP_UANG_MAKAN_ROLES },
           { key: 'presensi-penyesuaian-tukin', label: 'Penyesuaian Tukin', to: '/presensi/tukin/penyesuaian', roles: PENYESUAIAN_TUKIN_ROLES },
         ],
       },

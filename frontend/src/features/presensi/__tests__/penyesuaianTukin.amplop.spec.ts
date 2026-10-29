@@ -26,7 +26,8 @@ vi.mock('@/lib/axios', async (importOriginal) => {
   return { ...actual, api: actual.createApiClient({ adapter }) }
 })
 
-import { formatPersen, labelBulan, penyesuaianTukinService } from '../services/penyesuaianTukin.service'
+import { labelBulan } from '../formatLaporan'
+import { formatPersen, penyesuaianTukinService } from '../services/penyesuaianTukin.service'
 
 const sukses = (data: unknown, status = 200) => ({ status, body: { status: 'success', data } })
 const sukses201 = (data: unknown) => sukses(data, 201)

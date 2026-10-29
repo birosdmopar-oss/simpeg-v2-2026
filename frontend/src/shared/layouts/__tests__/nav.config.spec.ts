@@ -178,9 +178,11 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
   })
 
   it('anak disaring per role: Data Presensi = role 1, 3, 4, 5 → /presensi/data', () => {
-    for (const role of [Role.ADMIN_VIEW_ESELON1, Role.MENTERI]) {
-      expect(presensi(role)?.children).toEqual([{ key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: [1, 3, 4, 5] }])
-    }
+    expect(presensi(Role.MENTERI)?.children).toEqual([{ key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: [1, 3, 4, 5] }])
+    expect(presensi(Role.ADMIN_VIEW_ESELON1)?.children).toEqual([
+      { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: [1, 3, 4, 5] },
+      { key: 'presensi-rekap-kehadiran', label: 'Rekap Kehadiran', to: '/presensi/rekap-kehadiran', roles: [1, 3, 4] },
+    ])
   })
 
   it('anak disaring per role: Kelola Slip Gaji = role 1, 3 → /presensi/slip-gaji/kelola', () => {
@@ -188,6 +190,8 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
       expect(presensi(role)?.children).toEqual([
         { key: 'presensi-slip-gaji-kelola', label: 'Kelola Slip Gaji', to: '/presensi/slip-gaji/kelola', roles: [1, 3] },
         { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: [1, 3, 4, 5] },
+        { key: 'presensi-rekap-kehadiran', label: 'Rekap Kehadiran', to: '/presensi/rekap-kehadiran', roles: [1, 3, 4] },
+        { key: 'presensi-uang-makan', label: 'Rekap Uang Makan', to: '/presensi/uang-makan', roles: [1, 3] },
         ...(role === Role.SUPER_ADMIN
           ? [{ key: 'presensi-penyesuaian-tukin', label: 'Penyesuaian Tukin', to: '/presensi/tukin/penyesuaian', roles: [1] }]
           : []),

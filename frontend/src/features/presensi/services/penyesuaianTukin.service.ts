@@ -74,15 +74,6 @@ function baris(b: PenyesuaianTukin): PenyesuaianTukin {
   }
 }
 
-const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-
-/** `YYYY-MM` → "April 2024" (tanpa Date, tanpa zona waktu). */
-export function labelBulan(bulan: string): string {
-  const [y, m] = bulan.split('-')
-  const nama = NAMA_BULAN[Number(m) - 1]
-  return nama ? `${nama} ${y}` : bulan
-}
-
 /** Persen server (titik desimal, negatif = pengurangan) → "-20,00%" (koma desimal Indonesia, AC-FE5C angka). */
 export function formatPersen(persen: string): string {
   const n = Number(persen)
