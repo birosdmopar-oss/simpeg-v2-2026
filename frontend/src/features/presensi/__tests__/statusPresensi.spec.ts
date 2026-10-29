@@ -56,6 +56,17 @@ describe('statusPresensi (peta kode → chip)', () => {
     }
   })
 
+  it('CR-077: `sel` = --sel-sticky solid setara `baris` (token soft dicampur putih dengan persen opasitas baris)', () => {
+    for (const [nada, k] of Object.entries(NADA_STATUS)) {
+      const opasitas = k.baris.match(/\/(\d+)$/)?.[1]
+      if (opasitas === undefined) {
+        expect(k.sel, nada).toBe('')
+        continue
+      }
+      expect(k.sel, nada).toBe(`[--sel-sticky:color-mix(in_srgb,theme(colors.status.${nada}.soft)_${opasitas}%,white)]`)
+    }
+  })
+
   it('chipHarian: kode menang; cuti sakit CS tampil bersama cuti; tanpa kode dari status', () => {
     expect(chipHarian('hadir', ['TL2', 'PSW1']).map((c) => c.kode)).toEqual(['TL2', 'PSW1'])
     expect(chipHarian('TPM', ['TPM', 'PSW2']).map((c) => c.kode)).toEqual(['TPM', 'PSW2'])

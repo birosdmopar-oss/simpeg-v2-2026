@@ -79,9 +79,10 @@ describe('akses role', () => {
 })
 
 describe('tabel ringkas', () => {
-  it('kolom TB diberi tanda v2 dan catatan bahwa TB tidak mengurangi kolom lain', async () => {
+  it('CR-078 T-07: header kolom TB polos; penjelasan v2 ada di catatan bawah tabel (TB tidak mengurangi kolom lain)', async () => {
     const { wrapper } = await mountPage(Role.SUPER_ADMIN)
-    expect(wrapper.get('[data-testid="rekap-kehadiran-kolom-tb"]').text()).toContain('(v2)')
+    expect(wrapper.get('[data-testid="rekap-kehadiran-kolom-tb"]').text()).toBe('TB')
+    expect(wrapper.get('[data-testid="rekap-kehadiran-catatan-tb"]').text()).toContain('tambahan v2')
     expect(wrapper.get('[data-testid="rekap-kehadiran-catatan-tb"]').text()).toContain('tidak mengurangi kolom lain')
   })
 

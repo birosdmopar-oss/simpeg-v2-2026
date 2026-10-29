@@ -7,8 +7,8 @@
  * Opsi Unit/Satker/Jenis Pegawai dimuat dari master (`GET master/{entitas}/options`); gagal dimuat → opsi kosong, halaman
  * tetap bisa dipakai. Role 3/4 tidak menampilkan Unit/Satker (`bisaPilihUnit = false`): server memaksa lingkupnya.
  */
-import { computed, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { onBeforeRouteUpdate, useRoute, useRouter, type LocationQuery, type LocationQueryRaw } from 'vue-router'
 
 import { masterService } from '@/features/master-data/services/master.service'
 import type { SelectOption } from '@/shared/ui'
@@ -17,12 +17,32 @@ import { PER_PAGE_LAPORAN, type FilterLaporan, type ParamLaporan } from '../type
 
 const POLA_BULAN = /^\d{4}-(0[1-9]|1[0-2])$/
 
-/** Bulan berjalan `YYYY-MM` menurut tanggal WIB (UTC+7), tanpa `toISOString()`. */
+/** Tahun, bulan (1–12), dan tanggal menurut WIB (UTC+7) lewat Intl, tanpa `toISOString()`. */
+function tanggalWib(sekarang: Date): { tahun: number; bulan: number; tanggal: number } {
+  const bagian = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(sekarang)
+  const ambil = (jenis: string): number => Number(bagian.find((p) => p.type === jenis)?.value ?? 1970)
+  return { tahun: ambil('year'), bulan: ambil('month'), tanggal: ambil('day') }
+}
+
+/** `YYYY-MM` untuk bulan yang berjarak `selisih` bulan dari `tahun`/`bulan` (bulan 1–12), tanpa `Date`. */
+function bulanGeser(tahun: number, bulan: number, selisih: number): string {
+  const indeks = tahun * 12 + (bulan - 1) + selisih
+  return `${Math.floor(indeks / 12)}-${String((indeks % 12) + 1).padStart(2, '0')}`
+}
+
+/** Bulan kalender berjalan `YYYY-MM` menurut WIB. Dipakai laporan kalender (Rekap Kehadiran, Rekap Uang Makan). */
 export function bulanBerjalanWib(sekarang: Date = new Date()): string {
-  const bagian = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit' }).formatToParts(sekarang)
-  const y = bagian.find((p) => p.type === 'year')?.value ?? '1970'
-  const m = bagian.find((p) => p.type === 'month')?.value ?? '01'
-  return `${y}-${m}`
+  const { tahun, bulan } = tanggalWib(sekarang)
+  return bulanGeser(tahun, bulan, 0)
+}
+
+/**
+ * Bulan periode Tukin `YYYY-MM` menurut WIB: tanggal > 15 → bulan berikutnya (periode 16 s.d. 15). Sama dengan legacy
+ * `list_lt` (Presensi.php:110-119) dan batas `bulan` maks di RekapTukinService.
+ */
+export function bulanPeriodeTukinWib(sekarang: Date = new Date()): string {
+  const { tahun, bulan, tanggal } = tanggalWib(sekarang)
+  return bulanGeser(tahun, bulan, tanggal > 15 ? 1 : 0)
 }
 
 /** `unit_satker` API dari pilihan Unit/Satker: Satker menang atas Unit, tanpa keduanya = `0` (Kementerian). */
@@ -46,26 +66,32 @@ export interface OpsiFilterLaporan {
   perPageBawaan?: number
   /** Bulan awal bila URL tidak memuatnya (uji menyuntikkan; bawaan = bulan berjalan WIB). */
   bulanBawaan?: string
+  /** true = bulan bawaan memakai periode Tukin (tanggal > 15 → bulan berikutnya). Hanya laporan Tukin. */
+  bulanTukin?: boolean
 }
 
 export function useFilterLaporan(opsi: OpsiFilterLaporan) {
   const route = useRoute()
   const router = useRouter()
   const perPageBawaan = opsi.perPageBawaan ?? 25
-  const bulanBawaan = opsi.bulanBawaan ?? bulanBerjalanWib()
-  const q = route.query
+  const bulanBawaan = opsi.bulanBawaan ?? (opsi.bulanTukin ? bulanPeriodeTukinWib() : bulanBerjalanWib())
 
-  const filter = reactive<FilterLaporan>({
-    bulan: POLA_BULAN.test(teks(q.bulan)) ? teks(q.bulan) : bulanBawaan,
-    idUnit: opsi.bisaPilihUnit && /^\d+$/.test(teks(q.unit)) ? teks(q.unit) : '',
-    idSatker: opsi.bisaPilihUnit && /^\d+$/.test(teks(q.satker)) ? teks(q.satker) : '',
-    jenisPegawai: teks(q.jp)
-      .split(',')
-      .filter((v) => /^\d+$/.test(v)),
-    search: teks(q.q),
-    page: angka(q.page, 1),
-    perPage: (PER_PAGE_LAPORAN as readonly number[]).includes(angka(q.per_page, perPageBawaan)) ? angka(q.per_page, perPageBawaan) : perPageBawaan,
-  })
+  /** Keadaan filter dari query URL; yang tidak ada di URL kembali ke bawaan. */
+  function dariQuery(q: LocationQuery): FilterLaporan {
+    return {
+      bulan: POLA_BULAN.test(teks(q.bulan)) ? teks(q.bulan) : bulanBawaan,
+      idUnit: opsi.bisaPilihUnit && /^\d+$/.test(teks(q.unit)) ? teks(q.unit) : '',
+      idSatker: opsi.bisaPilihUnit && /^\d+$/.test(teks(q.satker)) ? teks(q.satker) : '',
+      jenisPegawai: teks(q.jp)
+        .split(',')
+        .filter((v) => /^\d+$/.test(v)),
+      search: teks(q.q),
+      page: angka(q.page, 1),
+      perPage: (PER_PAGE_LAPORAN as readonly number[]).includes(angka(q.per_page, perPageBawaan)) ? angka(q.per_page, perPageBawaan) : perPageBawaan,
+    }
+  }
+
+  const filter = reactive<FilterLaporan>(dariQuery(route.query))
 
   const unitOpsi = ref<SelectOption[]>([])
   const satkerOpsi = ref<SelectOption[]>([])
@@ -118,13 +144,50 @@ export function useFilterLaporan(opsi: OpsiFilterLaporan) {
       if (filter.idSatker && !satkerOpsi.value.some((o) => String(o.value) === filter.idSatker)) filter.idSatker = ''
     },
   )
+  // Sinkron agar tidak berjalan setelah penerapan dari URL (lihat `dariUrl`) dan mengatur halaman URL di belakangnya.
+  let dariUrl = false
   watch(
     () => [filter.bulan, filter.idUnit, filter.idSatker, filter.jenisPegawai.join(','), filter.search, filter.perPage],
     () => {
-      filter.page = 1
+      if (!dariUrl) filter.page = 1
     },
+    { flush: 'sync' },
   )
-  watch(queryUrl, (u) => void router.replace({ query: u }), { flush: 'post' })
+
+  // Rute milik halaman ini (nama saat setup). Penulisan balik ke URL hanya selama rute ini masih aktif, dan ditunda
+  // selama penerapan dari URL belum selesai (navigasi masih berjalan; `replace` di tengah navigasi membatalkannya).
+  const namaRute = route.name
+  let urlSedangDiterapkan = false
+  onBeforeUnmount(router.afterEach(() => (urlSedangDiterapkan = false)))
+  watch(
+    queryUrl,
+    (u) => {
+      if (router.currentRoute.value.name !== namaRute || urlSedangDiterapkan) return
+      void router.replace({ query: u })
+    },
+    { flush: 'post' },
+  )
+
+  /** Terapkan query ke filter; hanya nilai yang benar-benar berbeda yang ditulis (penulisan ulang array memicu `queryUrl`). */
+  function terapkanQuery(q: LocationQuery): void {
+    const baru = dariQuery(q)
+    const berbeda = Object.fromEntries(
+      Object.entries(baru).filter(([kunci, nilai]) => JSON.stringify((filter as unknown as Record<string, unknown>)[kunci]) !== JSON.stringify(nilai)),
+    )
+    dariUrl = true
+    try {
+      Object.assign(filter, berbeda)
+    } finally {
+      dariUrl = false
+    }
+  }
+
+  // Back/forward atau klik menu ke rute yang SAMA (komponen dipakai ulang): sinkronkan dari query tujuan. Hook ini tidak
+  // terpicu saat halaman ditinggalkan ke rute lain, jadi query rute tujuan tidak tersentuh.
+  onBeforeRouteUpdate((tujuan) => {
+    urlSedangDiterapkan = true
+    terapkanQuery(tujuan.query)
+  })
 
   function setBulan(nilai: string): void {
     if (POLA_BULAN.test(nilai)) filter.bulan = nilai

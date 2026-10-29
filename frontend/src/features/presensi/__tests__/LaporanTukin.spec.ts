@@ -31,6 +31,9 @@ import { Role, type RoleCode } from '@/features/auth/types'
 import * as berkas from '@/features/kepegawaian/services/berkasUnduhan'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
+import { bulanPeriodeTukinWib } from '../composables/useFilterLaporan'
+import { defineComponent, h } from 'vue'
+import { RouterView } from 'vue-router'
 
 import LaporanTukinDaftarPage from '../views/LaporanTukinDaftarPage.vue'
 import LaporanTukinPegawaiPage from '../views/LaporanTukinPegawaiPage.vue'
@@ -167,10 +170,12 @@ describe('LaporanTukinDaftarPage', () => {
 async function mountLaporan(opts: { role?: RoleCode; saya?: boolean; nip?: string; query?: string } = {}) {
   loginAs(opts.role ?? Role.SUPER_ADMIN, { nip: opts.saya ? NIP : null })
   const router = createShellRouter()
-  router.addRoute({ path: '/presensi/tukin/:nip', name: 'presensi-tukin-pegawai', component: { render: () => null } })
-  router.addRoute({ path: '/presensi/tukin/saya', name: 'presensi-tukin-saya', component: { render: () => null } })
+  // Halaman dipasang lewat RouterView seperti di aplikasi: onBeforeRouteUpdate hanya aktif bila rute dirender RouterView.
+  router.addRoute({ path: '/presensi/tukin/:nip', name: 'presensi-tukin-pegawai', component: LaporanTukinPegawaiPage })
+  router.addRoute({ path: '/presensi/tukin/saya', name: 'presensi-tukin-saya', component: LaporanTukinPegawaiPage, props: { saya: true } })
+  router.addRoute({ path: '/presensi/rekap-tukin', name: 'presensi-rekap-tukin', component: { render: () => null } })
   await router.push(opts.saya ? '/presensi/tukin/saya' : `/presensi/tukin/${opts.nip ?? NIP}${opts.query ?? '?bulan=2026-10'}`)
-  const wrapper = mount(LaporanTukinPegawaiPage, { props: { saya: opts.saya ?? false }, global: { plugins: [router] }, attachTo: document.body })
+  const wrapper = mount(defineComponent({ render: () => h(RouterView) }), { global: { plugins: [router] }, attachTo: document.body })
   await flushPromises()
   await flushPromises()
   return { wrapper, router }
@@ -212,6 +217,19 @@ describe('LaporanTukinPegawaiPage', () => {
     expect(baris('2026-10-14').text()).toContain('(Libur) Hari Uji')
     expect(baris('2026-09-16').classes()).toContain('bg-status-abu-soft/80')
     expect(wrapper.find('[data-testid="legenda-status-presensi"]').exists()).toBe(true)
+  })
+
+  it('CR-077: baris berwarna memasang --sel-sticky (latar solid sel Tanggal); baris presensi tidak; wadah gulir isolate', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    const { wrapper } = await mountLaporan()
+
+    const baris = (tgl: string) => wrapper.get(`[data-testid="harian-${tgl}"]`)
+    expect(baris('2026-10-03').classes()).toContain('[--sel-sticky:color-mix(in_srgb,theme(colors.status.ungu.soft)_80%,white)]')
+    expect(baris('2026-10-05').classes()).toContain('[--sel-sticky:color-mix(in_srgb,theme(colors.status.jingga.soft)_70%,white)]')
+    expect(baris('2026-10-14').classes()).toContain('[--sel-sticky:color-mix(in_srgb,theme(colors.status.biru.soft)_70%,white)]')
+    expect(baris('2026-10-01').classes().join(' ')).not.toMatch(/--sel-sticky/)
+    expect(baris('2026-10-03').get('td').classes()).toContain('col-sticky-kiri')
+    expect(wrapper.get('[data-testid="tabel-harian-tukin"]').classes()).toContain('isolate')
   })
 
   it('periode berjalan diberi catatan "dihitung sampai"; penyesuaian dan keterangan tampil', async () => {
@@ -262,5 +280,64 @@ describe('LaporanTukinPegawaiPage', () => {
     expect(server.permintaan.at(-1)).toMatchObject({ url: `/presensi/tukin/laporan/${NIP}/pdf`, params: { bulan: '2026-10' } })
     expect(simpan).toHaveBeenCalled()
     simpan.mockRestore()
+  })
+})
+
+describe('LaporanTukinPegawaiPage — CR-078', () => {
+  const NIP_LAIN = '199002022021022002'
+
+  it('T-04: NIP berganti pada komponen yang sama (menu / back-forward) memuat laporan NIP itu', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    server.balasan[`get /presensi/tukin/laporan/${NIP_LAIN}`] = sukses(laporan())
+    const { router } = await mountLaporan()
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+
+    await router.push(`/presensi/tukin/${NIP_LAIN}?bulan=2026-10`)
+    await flushPromises()
+
+    expect(minta(`/presensi/tukin/laporan/${NIP_LAIN}`)).toHaveLength(1)
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+  })
+
+  it('CR-078 T-04 revisi: pindah ke rute lain (rekap) → query tujuan utuh dan tidak ada muat laporan tambahan', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    const { router } = await mountLaporan({ query: '?bulan=2026-09' })
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+
+    await router.push('/presensi/rekap-tukin?unit=1&satker=1')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/presensi/rekap-tukin?unit=1&satker=1')
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+    expect(minta(`/presensi/tukin/laporan/`)).toHaveLength(0)
+  })
+
+  it('T-04: ?bulan berganti (back/forward) memuat ulang dengan bulan dari URL, tanpa muat ganda', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    const { router } = await mountLaporan()
+
+    await router.push(`/presensi/tukin/${NIP}?bulan=2026-09`)
+    await flushPromises()
+
+    const permintaan = minta(`/presensi/tukin/laporan/${NIP}`)
+    expect(permintaan.at(-1)!.params).toEqual({ bulan: '2026-09' })
+    expect(permintaan).toHaveLength(2)
+    expect(router.currentRoute.value.query).toEqual({ bulan: '2026-09' })
+  })
+
+  it('T-01: tanpa ?bulan, bulan bawaan = periode Tukin (tanggal > 15 → bulan berikutnya)', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    await mountLaporan({ query: '' })
+
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)[0]!.params).toEqual({ bulan: bulanPeriodeTukinWib() })
+  })
+
+  it('T-09: Predikat SKP tetap tampil dengan "-" bila null', async () => {
+    const d = laporan()
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses({ ...d, identitas: { ...d.identitas, predikat_skp: null } })
+    const { wrapper } = await mountLaporan()
+
+    expect(wrapper.get('[data-testid="tukin-identitas"]').text()).toContain('Predikat SKP')
+    expect(wrapper.get('[data-testid="tukin-predikat-skp"]').text()).toBe('-')
   })
 })

@@ -8,7 +8,7 @@
  * otomatis diberi pemisah di atasnya. Item `hidden` tidak dirender; item `disabled` tetap tampil tetapi tidak bisa
  * dipilih. Konfirmasi (ConfirmDialog) tetap tanggung jawab halaman pemanggil lewat event `select`.
  */
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { MoreVertical } from 'lucide-vue-next'
 import {
   DropdownMenuContent,
@@ -33,6 +33,29 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [key: string] }>()
 
 const visible = computed(() => props.actions.filter((a) => !a.hidden))
+const pemicu = ref<HTMLButtonElement | null>(null)
+
+/**
+ * CR-078 (T-06): fokus pindah ke ⋮ SEBELUM aksi dipancarkan. Dialog konfirmasi yang dibuka aksi ini menyimpan elemen
+ * yang sedang fokus sebagai tujuan kembali; tanpa ini, itu item menu yang lepas saat menu menutup, dan fokus jatuh ke
+ * body setelah dialog ditutup.
+ */
+function pilih(key: string): void {
+  pemicu.value?.focus()
+  emit('select', key)
+}
+
+/**
+ * CR-078 (T-06): baris yang memegang fokus dihapus (mis. setelah Hapus dikonfirmasi) → fokus pindah ke ⋮ baris
+ * sesudahnya, atau sebelumnya bila ini baris terakhir.
+ */
+onBeforeUnmount(() => {
+  const el = pemicu.value
+  if (!el || document.activeElement !== el) return
+  const baris = el.closest('tr')
+  const tetangga = baris?.nextElementSibling ?? baris?.previousElementSibling
+  tetangga?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')?.focus()
+})
 </script>
 
 <template>
@@ -43,6 +66,7 @@ const visible = computed(() => props.actions.filter((a) => !a.hidden))
     <DropdownMenuTrigger as-child :disabled="disabled || visible.length === 0">
       <UiTooltip :content="label">
         <button
+          ref="pemicu"
           type="button"
           :disabled="disabled || visible.length === 0"
           :aria-label="label"
@@ -67,7 +91,7 @@ const visible = computed(() => props.actions.filter((a) => !a.hidden))
             :data-action="action.key"
             class="flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-1.5 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
             :class="action.danger ? 'text-red-600 data-[highlighted]:bg-red-50' : 'text-slate-700 data-[highlighted]:bg-slate-100'"
-            @select="emit('select', action.key)"
+            @select="pilih(action.key)"
           >
             <component :is="action.icon" v-if="action.icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
             {{ action.label }}

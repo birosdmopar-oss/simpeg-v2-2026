@@ -1,29 +1,33 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h, nextTick } from 'vue'
-import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+import { createMemoryHistory, createRouter, RouterView, type Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import FilterLaporanBar from '../components/FilterLaporanBar.vue'
-import { bulanBerjalanWib, lingkupDariFilter, useFilterLaporan, type OpsiFilterLaporan } from '../composables/useFilterLaporan'
+import { bulanBerjalanWib, bulanPeriodeTukinWib, lingkupDariFilter, useFilterLaporan, type OpsiFilterLaporan } from '../composables/useFilterLaporan'
 
 const options = vi.fn()
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: (...a: unknown[]) => options(...a) } }))
 
-function router(): Router {
-  return createRouter({ history: createMemoryHistory(), routes: [{ path: '/x', component: { render: () => null } }] })
-}
-
+/** Halaman ber-filter dipasang di bawah RouterView seperti di aplikasi (onBeforeRouteUpdate hanya aktif di sana). */
 async function pasang(opsi: OpsiFilterLaporan, url = '/x') {
-  const r = router()
-  await r.push(url)
   let api!: ReturnType<typeof useFilterLaporan>
-  const komponen = defineComponent({
+  const halaman = defineComponent({
     setup() {
       api = useFilterLaporan(opsi)
       return () => h('div')
     },
   })
-  const w = mount(komponen, { global: { plugins: [r] } })
+  const r: Router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/x', name: 'x', component: halaman },
+      { path: '/y', name: 'y', component: { render: () => null } },
+    ],
+  })
+  await r.push(url)
+  const w = mount(defineComponent({ render: () => h(RouterView) }), { global: { plugins: [r] } })
+  await flushPromises()
   return { r, api, w }
 }
 
@@ -41,6 +45,28 @@ describe('bulanBerjalanWib & lingkupDariFilter', () => {
   it('bulan berjalan menurut WIB, bukan UTC', () => {
     expect(bulanBerjalanWib(new Date('2026-10-31T18:00:00Z'))).toBe('2026-11')
     expect(bulanBerjalanWib(new Date('2026-10-31T16:59:00Z'))).toBe('2026-10')
+  })
+
+  it('bulan kalender (Kehadiran, Uang Makan) tidak ikut aturan tanggal 15: 29-10 WIB tetap Oktober', () => {
+    expect(bulanBerjalanWib(new Date('2026-10-29T03:00:00Z'))).toBe('2026-10')
+    expect(bulanBerjalanWib(new Date('2026-12-31T18:00:00Z'))).toBe('2027-01')
+  })
+
+  it('periode Tukin: tanggal > 15 WIB → bulan berikutnya; batas 15/16 dan akhir tahun', () => {
+    expect(bulanPeriodeTukinWib(new Date('2026-10-15T16:59:59Z'))).toBe('2026-10') // 15-10 23:59:59 WIB
+    expect(bulanPeriodeTukinWib(new Date('2026-10-15T17:00:00Z'))).toBe('2026-11') // 16-10 00:00 WIB
+    expect(bulanPeriodeTukinWib(new Date('2026-10-29T03:00:00Z'))).toBe('2026-11') // 29-10 10:00 WIB (contoh reviewer)
+    expect(bulanPeriodeTukinWib(new Date('2026-12-16T00:00:00Z'))).toBe('2027-01') // 16-12 07:00 WIB
+    expect(bulanPeriodeTukinWib(new Date('2026-12-15T16:59:00Z'))).toBe('2026-12') // 15-12 23:59 WIB
+  })
+
+  it('periode Tukin menurut WIB, bukan tanggal UTC: 16-10 00:30 WIB sudah bulan berikutnya', () => {
+    expect(new Date('2026-10-15T17:30:00Z').getUTCDate()).toBe(15)
+    expect(bulanPeriodeTukinWib(new Date('2026-10-15T17:30:00Z'))).toBe('2026-11')
+  })
+
+  it('tanggal 1 sampai 15 tetap bulan berjalan untuk periode Tukin', () => {
+    expect(bulanPeriodeTukinWib(new Date('2026-10-01T03:00:00Z'))).toBe('2026-10')
   })
 
   it('lingkup: satker menang atas unit; kosong = 0', () => {
@@ -124,6 +150,47 @@ describe('useFilterLaporan', () => {
     const { api } = await pasang({ bisaPilihUnit: false, bulanBawaan: '2026-10' })
     await api.muatOpsi()
     expect(options.mock.calls.map((c) => c[0])).toEqual(['jenis-pegawai'])
+  })
+
+  it('CR-078 T-04: query yang berganti pada komponen yang sama (back/forward, menu ke halaman sama) diterapkan ke filter', async () => {
+    const { r, api } = await pasang({ bisaPilihUnit: true, bulanBawaan: '2026-10' }, '/x?bulan=2026-09&unit=5&page=3&q=lama')
+    expect(api.filter).toMatchObject({ bulan: '2026-09', idUnit: '5', page: 3, search: 'lama' })
+
+    await r.push('/x?bulan=2026-08&q=ani')
+    await flushPromises()
+    expect(api.filter).toMatchObject({ bulan: '2026-08', idUnit: '', idSatker: '', page: 1, search: 'ani' })
+    expect(api.param.value).toEqual({ bulan: '2026-08', unit_satker: '0', page: 1, per_page: 25, search: 'ani' })
+    // Penerapan dari URL tidak ditulis ulang menjadi query lain (tanpa putaran).
+    expect(r.currentRoute.value.query).toEqual({ bulan: '2026-08', q: 'ani' })
+  })
+
+  it('CR-078 T-04: URL dengan halaman dari back/forward dipertahankan (tidak direset ke halaman 1)', async () => {
+    const { r, api } = await pasang({ bisaPilihUnit: false, bulanBawaan: '2026-10' }, '/x?page=2')
+    await r.push('/x?page=4&bulan=2026-09')
+    await flushPromises()
+    expect(api.filter).toMatchObject({ bulan: '2026-09', page: 4 })
+  })
+
+  it('CR-078 T-04 revisi: pindah ke rute lain yang ber-query → query tujuan utuh, halaman lama tidak menulis balik', async () => {
+    const { r, api } = await pasang({ bisaPilihUnit: true, bulanBawaan: '2026-10' }, '/x?unit=5&page=3&q=lama')
+    const replace = vi.spyOn(r, 'replace')
+
+    await r.push('/y?bulan=2026-08&q=ani')
+    await flushPromises()
+
+    expect(r.currentRoute.value.fullPath).toBe('/y?bulan=2026-08&q=ani')
+    expect(replace).not.toHaveBeenCalled()
+    expect(api.filter).toMatchObject({ bulan: '2026-10', idUnit: '5', search: 'lama' }) // filter lama tidak ikut pindah
+  })
+
+  it('CR-078 T-04: menu ke halaman yang sama tanpa query mengembalikan filter ke bawaan (Unit lama tidak tersisa)', async () => {
+    const { r, api } = await pasang({ bisaPilihUnit: true, bulanBawaan: '2026-10' }, '/x?unit=5&satker=9')
+    expect(api.filter.idUnit).toBe('5')
+
+    await r.push('/x')
+    await flushPromises()
+    expect(api.filter).toMatchObject({ bulan: '2026-10', idUnit: '', idSatker: '', page: 1 })
+    expect(api.param.value).toEqual({ bulan: '2026-10', unit_satker: '0', page: 1, per_page: 25 })
   })
 })
 

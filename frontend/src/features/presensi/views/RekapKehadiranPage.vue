@@ -123,7 +123,7 @@ onMounted(() => {
       <UiNotice v-if="notice" tone="success" data-testid="rekap-kehadiran-notice">{{ notice }}</UiNotice>
       <UiNotice v-if="failure" tone="danger" data-testid="rekap-kehadiran-failure">{{ failure }}</UiNotice>
 
-      <UiCard fill>
+      <UiCard>
         <FilterLaporanBar
           v-model:bulan="filter.bulan"
           v-model:id-unit="filter.idUnit"
@@ -155,7 +155,7 @@ onMounted(() => {
                 <th class="whitespace-nowrap px-3 py-3 text-right">Lain-lain</th>
                 <th class="whitespace-nowrap px-3 py-3 text-right">Cuti</th>
                 <th class="whitespace-nowrap px-3 py-3 text-right">Tidak Hadir</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right" data-testid="rekap-kehadiran-kolom-tb">TB <span class="normal-case text-slate-400">(v2)</span></th>
+                <th class="whitespace-nowrap px-3 py-3 text-right" data-testid="rekap-kehadiran-kolom-tb">TB</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">

@@ -4,6 +4,7 @@
  * :235-262: libur biru, akhir pekan abu, konket jingga, cuti ungu, TB merah muda, di luar masa kerja abu; baris presensi
  * tanpa warna) dan CHIP kode kejadian palet Q5C-03 ([V2]); teks kode selalu tampil. Baris non-kerja (`libur`,
  * `akhir_pekan`, `di_luar_masa_kerja`) tampil bila API mengirimnya; tabel tidak mengarang tanggal yang tidak ada di `harian[]`.
+ * Wadah gulir `isolate` (CR-077 T-03): header dan kolom sticky menumpuk di dalam wadah ini, tidak di atas navbar sticky.
  */
 import { formatTanggalIndonesia } from '@/shared/utils/dateTime'
 
@@ -18,12 +19,14 @@ defineProps<{ harian: HarianLaporan[] }>()
 
 function kelasBaris(h: HarianLaporan): string {
   const nada = nadaBaris(h.status, h.tanggal)
-  return nada === null ? '' : NADA_STATUS[nada].baris
+  if (nada === null) return ''
+  // `sel` = latar solid untuk sel sticky Tanggal (CR-077 T-02): warna baris tampil penuh tanpa tembus saat digulir ke samping.
+  return `${NADA_STATUS[nada].baris} ${NADA_STATUS[nada].sel}`.trim()
 }
 </script>
 
 <template>
-  <div class="scrollbar-slim max-h-[36rem] overflow-auto" data-testid="tabel-harian-tukin">
+  <div class="scrollbar-slim isolate max-h-[36rem] overflow-auto" data-testid="tabel-harian-tukin">
     <table class="w-full min-w-[44rem] border-collapse text-left text-body2">
       <thead>
         <tr class="font-semibold text-slate-900">
