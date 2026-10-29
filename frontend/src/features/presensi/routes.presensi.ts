@@ -4,7 +4,16 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from './roles'
+import {
+  PRESENSI_ADMIN_ROLES,
+  PRESENSI_PEGAWAI_ROLES,
+  SLIP_GAJI_ADMIN_ROLES,
+  SLIP_GAJI_PEGAWAI_ROLES,
+  TUKIN_DAFTAR_ROLES,
+  TUKIN_IL_ROLES,
+  TUKIN_PER_PEGAWAI_ROLES,
+  TUKIN_SAYA_ROLES,
+} from './roles'
 
 export const presensiRoutes: RouteRecordRaw[] = [
   {
@@ -34,6 +43,35 @@ export const presensiRoutes: RouteRecordRaw[] = [
     name: 'presensi-slip-gaji-kelola',
     component: () => import('./views/SlipGajiKelolaPage.vue'),
     meta: { roles: SLIP_GAJI_ADMIN_ROLES, title: 'Kelola Slip Gaji' },
+  },
+  {
+    // D-12 Laporan Tukin (5C MAKE-048; `hr/presensi/list_lt` = 1, 3): daftar pegawai.
+    path: '/presensi/tukin',
+    name: 'presensi-tukin',
+    component: () => import('./views/LaporanTukinDaftarPage.vue'),
+    meta: { roles: TUKIN_DAFTAR_ROLES, title: 'Laporan Tukin' },
+  },
+  {
+    // Laporan Tukin pegawai Instansi Lain (`list_lt_il` = 1).
+    path: '/presensi/tukin/il',
+    name: 'presensi-tukin-il',
+    component: () => import('./views/LaporanTukinIlPage.vue'),
+    meta: { roles: TUKIN_IL_ROLES, title: 'Laporan Tukin Instansi Lain' },
+  },
+  {
+    // Laporan Tukin Saya: NIP dari akun (2, 6, 7). Statis, jadi menang atas `/presensi/tukin/:nip`.
+    path: '/presensi/tukin/saya',
+    name: 'presensi-tukin-saya',
+    component: () => import('./views/LaporanTukinPegawaiPage.vue'),
+    props: { saya: true },
+    meta: { roles: TUKIN_SAYA_ROLES, title: 'Laporan Tukin Saya' },
+  },
+  {
+    // Laporan Tukin per pegawai (`laporan_tukin/{nip}` = 1..7; 2/6/7 hanya diri sendiri, ditegakkan server).
+    path: '/presensi/tukin/:nip(\\d+)',
+    name: 'presensi-tukin-pegawai',
+    component: () => import('./views/LaporanTukinPegawaiPage.vue'),
+    meta: { roles: TUKIN_PER_PEGAWAI_ROLES, title: 'Laporan Tukin' },
   },
   {
     // D-14 verifikasi QR publik (ADR-032): tanpa login & tanpa `guestOnly` (bisa dibuka saat sudah login), tanpa layout

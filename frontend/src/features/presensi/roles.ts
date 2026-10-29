@@ -15,3 +15,23 @@ export const PRESENSI_PEGAWAI_ROLES: readonly RoleCode[] = [Role.PEGAWAI, Role.P
 
 /** Data Presensi (`hr/presensi/list_ad|list` = 1, 3, 4, 5; F5-15). */
 export const PRESENSI_ADMIN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI]
+
+/** Laporan Tukin — daftar pegawai (`hr/presensi/list_lt` = 1, 3; PRD 5C §6). */
+export const TUKIN_DAFTAR_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]
+
+/** Laporan Tukin — pegawai Instansi Lain (`list_lt_il` = 1). */
+export const TUKIN_IL_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
+
+/** Laporan Tukin per pegawai (`laporan_tukin/{nip}` = 1..7): 2/6/7 hanya NIP sendiri, ditegakkan server (F5B-7). */
+export const TUKIN_PER_PEGAWAI_ROLES: readonly RoleCode[] = [
+  Role.SUPER_ADMIN,
+  Role.PEGAWAI,
+  Role.ADMIN_SATKER,
+  Role.ADMIN_VIEW_ESELON1,
+  Role.MENTERI,
+  Role.PTT,
+  Role.PPPK,
+]
+
+/** Laporan Tukin Saya (NIP akun): 2, 6, 7. */
+export const TUKIN_SAYA_ROLES: readonly RoleCode[] = [Role.PEGAWAI, Role.PTT, Role.PPPK]
