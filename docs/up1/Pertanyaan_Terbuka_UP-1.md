@@ -5,8 +5,8 @@ Cukup tulis "sudah diberikan ke DBA, tanggal …".
 
 | No | Pertanyaan | Usulan | Jawaban |
 |---|---|---|---|
-| P-01 | Siapa DBA UP-1? | DBV, bila diberi izin memegang salinan data nyata. Usulan ini **ditunda** per 29-10-2026 | |
-| P-02 | Akun **baca-saja** ke DB server dev SIMPEG: siapa yang membuat, untuk siapa, dan kapan dicabut? | Akun khusus UP-1 dengan hak `SELECT` + `SHOW VIEW` pada skema SIMPEG saja, dicabut setelah UP-1 | |
+| P-01 | Siapa DBA UP-1? | DBV, bila diberi izin memegang salinan data nyata. Usulan ini **ditunda** per 29-10-2026 | **DBV** (DB Validator) ditetapkan Horii 29-10-2026 sebagai DBA UP-1 (DBA = Database Administrator, pelaksana operasi data; di proyek ini DBV biasanya me-review skema DBV-###) |
+| P-02 | Akun **baca-saja** ke DB server dev SIMPEG: siapa yang membuat, untuk siapa, dan kapan dicabut? | Akun khusus UP-1 dengan hak `SELECT` + `SHOW VIEW` pada skema SIMPEG saja, dicabut setelah UP-1 | Akses sudah ada pada DBV (29-10-2026). **Masih terbuka:** apakah akun yang dipakai baca-saja, dan kapan akses dicabut/ditinjau setelah UP-1 |
 | P-03 | Persetujuan memakai data server dev (salinan produksi, berisi data pribadi) untuk UP-1? | Disetujui untuk rentang 2 periode + tabel di Runbook bagian c saja | |
 | P-04 | Di mana salinan disimpan, dan berapa lama? | Satu folder lokal di mesin DBA, terenkripsi bila memungkinkan, di luar repo/cloud; dihapus segera setelah UP-1 lolos | |
 | P-05 | Dua periode yang diuji? | Bulan Tukin September & Oktober 2026 (rentang data `UP1_AWAL` 16-07 s.d. 15-10-2026 karena v2 membaca sejak periode sebelumnya; lookback cuti/izin sejak 16-01-2026); dijalankan setelah 15-10 | |
