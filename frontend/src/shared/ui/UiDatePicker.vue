@@ -33,6 +33,7 @@ import {
   WEEKDAYS_SHORT,
   type YMD,
 } from './dateUtils'
+import { kelasKontrolPicker } from './pickerControl'
 
 const props = withDefaults(
   defineProps<{
@@ -69,6 +70,9 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus: []; invalid: [message: string] }>()
+
+/** Kelas input: dari `controlClass` (UiTextField) atau gaya bawaan; selalu mengisi wadah (CR-081). */
+const kelasKontrol = computed(() => kelasKontrolPicker(props.controlClass, props.invalid, props.disabled))
 
 const input = ref<HTMLInputElement | null>(null)
 const content = ref<HTMLElement | null>(null)
@@ -233,7 +237,8 @@ function clear(): void {
 <template>
   <PopoverRoot :open="open" :modal="false" @update:open="(v: boolean) => (v ? openCalendar() : closeCalendar(false))">
     <PopoverAnchor as-child>
-      <div class="relative">
+      <!-- CR-081: kontrol selalu mengisi wadahnya dan tidak pernah lebih lebar darinya (tanpa lebar intrinsik `size` input). -->
+      <div class="relative w-full min-w-0">
         <input
           :id="id"
           ref="input"
@@ -245,7 +250,7 @@ function clear(): void {
           :placeholder="placeholder"
           :disabled="disabled"
           :readonly="readonly"
-          :class="[controlClass, 'pr-11']"
+          :class="kelasKontrol"
           :aria-required="required || undefined"
           :aria-invalid="invalid || undefined"
           :aria-describedby="describedby"

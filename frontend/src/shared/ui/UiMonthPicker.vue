@@ -11,9 +11,10 @@
  */
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from 'radix-vue'
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import { formatMonthDisplay, MONTH_NAMES, parseMonth, parseMonthTyped, toMonth, today, type YM } from './dateUtils'
+import { kelasKontrolPicker } from './pickerControl'
 
 const props = withDefaults(
   defineProps<{
@@ -45,6 +46,9 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: []; focus: []; invalid: [message: string] }>()
+
+/** Kelas input: dari `controlClass` (UiTextField) atau gaya bawaan; selalu mengisi wadah (CR-081). */
+const kelasKontrol = computed(() => kelasKontrolPicker(props.controlClass, props.invalid, props.disabled))
 
 const input = ref<HTMLInputElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
@@ -177,7 +181,8 @@ const isSelected = (m: number): boolean => {
 <template>
   <PopoverRoot :open="open" :modal="false" @update:open="(v: boolean) => (v ? openPanel() : closePanel(false))">
     <PopoverAnchor as-child>
-      <div class="relative">
+      <!-- CR-081: kontrol selalu mengisi wadahnya dan tidak pernah lebih lebar darinya (tanpa lebar intrinsik `size` input). -->
+      <div class="relative w-full min-w-0">
         <input
           :id="id"
           ref="input"
@@ -189,7 +194,7 @@ const isSelected = (m: number): boolean => {
           :placeholder="placeholder"
           :disabled="disabled"
           :readonly="readonly"
-          :class="[controlClass, 'pr-11']"
+          :class="kelasKontrol"
           :aria-required="required || undefined"
           :aria-invalid="invalid || undefined"
           :aria-describedby="describedby"
