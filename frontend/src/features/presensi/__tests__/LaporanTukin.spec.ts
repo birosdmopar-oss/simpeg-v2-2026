@@ -219,6 +219,19 @@ describe('LaporanTukinPegawaiPage', () => {
     expect(wrapper.find('[data-testid="legenda-status-presensi"]').exists()).toBe(true)
   })
 
+  it('CR-077: baris berwarna memasang --sel-sticky (latar solid sel Tanggal); baris presensi tidak; wadah gulir isolate', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    const { wrapper } = await mountLaporan()
+
+    const baris = (tgl: string) => wrapper.get(`[data-testid="harian-${tgl}"]`)
+    expect(baris('2026-10-03').classes()).toContain('[--sel-sticky:color-mix(in_srgb,theme(colors.status.ungu.soft)_80%,white)]')
+    expect(baris('2026-10-05').classes()).toContain('[--sel-sticky:color-mix(in_srgb,theme(colors.status.jingga.soft)_70%,white)]')
+    expect(baris('2026-10-14').classes()).toContain('[--sel-sticky:color-mix(in_srgb,theme(colors.status.biru.soft)_70%,white)]')
+    expect(baris('2026-10-01').classes().join(' ')).not.toMatch(/--sel-sticky/)
+    expect(baris('2026-10-03').get('td').classes()).toContain('col-sticky-kiri')
+    expect(wrapper.get('[data-testid="tabel-harian-tukin"]').classes()).toContain('isolate')
+  })
+
   it('periode berjalan diberi catatan "dihitung sampai"; penyesuaian dan keterangan tampil', async () => {
     server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(
       laporan({

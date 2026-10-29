@@ -18,17 +18,19 @@ export type NadaStatus = 'kuning' | 'merah' | 'jingga' | 'biru' | 'abu' | 'hijau
 
 /**
  * Kelas Tailwind per nada, dari token tema `status-*` (`tailwind.config.js`; nilai heks hanya di sana): `chip` (latar +
- * teks), `baris` (latar baris tabel), `titik` (penanda legenda). Ditulis lengkap per entri agar terdeteksi pemindai Tailwind.
+ * teks), `baris` (latar baris tabel), `sel` (variabel `--sel-sticky` = latar SOLID setara `baris` di atas putih, dipasang di `<tr>`
+ * untuk sel sticky `col-sticky-kiri`, CR-077 T-02), `titik` (penanda legenda). Ditulis lengkap per entri agar terdeteksi
+ * pemindai Tailwind.
  */
-export const NADA_STATUS: Record<NadaStatus, { chip: string; baris: string; titik: string }> = {
-  kuning: { chip: 'bg-status-kuning-soft text-status-kuning', baris: 'bg-status-kuning-soft/70', titik: 'bg-status-kuning-titik' },
-  merah: { chip: 'bg-status-merah-soft text-status-merah', baris: 'bg-status-merah-soft/70', titik: 'bg-status-merah-titik' },
-  jingga: { chip: 'bg-status-jingga-soft text-status-jingga', baris: 'bg-status-jingga-soft/70', titik: 'bg-status-jingga-titik' },
-  biru: { chip: 'bg-status-biru-soft text-status-biru', baris: 'bg-status-biru-soft/70', titik: 'bg-status-biru-titik' },
-  abu: { chip: 'bg-status-abu-soft text-status-abu', baris: 'bg-status-abu-soft/80', titik: 'bg-status-abu-titik' },
-  hijau: { chip: 'bg-status-hijau-soft text-status-hijau', baris: '', titik: 'bg-status-hijau-titik' },
-  ungu: { chip: 'bg-status-ungu-soft text-status-ungu', baris: 'bg-status-ungu-soft/80', titik: 'bg-status-ungu-titik' },
-  pink: { chip: 'bg-status-pink-soft text-status-pink', baris: 'bg-status-pink-soft/80', titik: 'bg-status-pink-titik' },
+export const NADA_STATUS: Record<NadaStatus, { chip: string; baris: string; sel: string; titik: string }> = {
+  kuning: { chip: 'bg-status-kuning-soft text-status-kuning', baris: 'bg-status-kuning-soft/70', sel: '[--sel-sticky:color-mix(in_srgb,theme(colors.status.kuning.soft)_70%,white)]', titik: 'bg-status-kuning-titik' },
+  merah: { chip: 'bg-status-merah-soft text-status-merah', baris: 'bg-status-merah-soft/70', sel: '[--sel-sticky:color-mix(in_srgb,theme(colors.status.merah.soft)_70%,white)]', titik: 'bg-status-merah-titik' },
+  jingga: { chip: 'bg-status-jingga-soft text-status-jingga', baris: 'bg-status-jingga-soft/70', sel: '[--sel-sticky:color-mix(in_srgb,theme(colors.status.jingga.soft)_70%,white)]', titik: 'bg-status-jingga-titik' },
+  biru: { chip: 'bg-status-biru-soft text-status-biru', baris: 'bg-status-biru-soft/70', sel: '[--sel-sticky:color-mix(in_srgb,theme(colors.status.biru.soft)_70%,white)]', titik: 'bg-status-biru-titik' },
+  abu: { chip: 'bg-status-abu-soft text-status-abu', baris: 'bg-status-abu-soft/80', sel: '[--sel-sticky:color-mix(in_srgb,theme(colors.status.abu.soft)_80%,white)]', titik: 'bg-status-abu-titik' },
+  hijau: { chip: 'bg-status-hijau-soft text-status-hijau', baris: '', sel: '', titik: 'bg-status-hijau-titik' },
+  ungu: { chip: 'bg-status-ungu-soft text-status-ungu', baris: 'bg-status-ungu-soft/80', sel: '[--sel-sticky:color-mix(in_srgb,theme(colors.status.ungu.soft)_80%,white)]', titik: 'bg-status-ungu-titik' },
+  pink: { chip: 'bg-status-pink-soft text-status-pink', baris: 'bg-status-pink-soft/80', sel: '[--sel-sticky:color-mix(in_srgb,theme(colors.status.pink.soft)_80%,white)]', titik: 'bg-status-pink-titik' },
 }
 
 export interface InfoStatus {
