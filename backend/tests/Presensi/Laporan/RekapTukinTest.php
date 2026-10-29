@@ -128,6 +128,25 @@ final class RekapTukinTest extends DatabaseTestCase
         $this->assertSame('3.00', array_column($berjalan, null, 'nip')[$n]['pengurangan']['TK'], '17–21 Agu = 5 hari TK');
     }
 
+    /**
+     * AC-D08.4 bagian kedua (M7 MAKE-043): periode BKN tidak standar (`bkn_periode_ekinper`, adapter 5A AC-TK.1) dipakai
+     * rekap dan laporan per pegawai, bukan bawaan 16–15.
+     */
+    public function testPeriodeBknTidakStandarDipakai(): void
+    {
+        $n = $this->pegawaiRekap($this->satkerA);
+        $this->barisBkn(2026, 9, '08-14', '09-13');
+
+        $rekap   = $this->serviceRekapTukin()->daftar($this->adminRekap(), ['bulan' => '2026-09']);
+        $laporan = $this->serviceLaporanTukin()->laporan($this->adminRekap(), $n, ['bulan' => '2026-09']);
+
+        $this->assertSame(['awal' => '2026-08-14', 'akhir' => '2026-09-13'], $rekap['periode']);
+        $this->assertSame(['awal' => '2026-08-14', 'akhir' => '2026-09-13', 'dihitung_sampai' => '2026-09-13', 'sumber' => 'bkn'], $laporan['periode']);
+        $baris = array_column($rekap['items'], null, 'nip')[$n];
+        $this->assertSame('12.60', $baris['pengurangan']['TK'], '21 hari kerja 14 Agu – 13 Sep × 3% × 0,2 (bawaan 16–15 = 22 hari)');
+        $this->assertSame([$baris['pengurangan']['TK'], $baris['total_presensi']], [$laporan['rincian']['TK'] ?? null, $laporan['total_presensi']]);
+    }
+
     public function testTarifBelumLengkapSemuaBarisGalatDanUbahTarifBerlaku(): void
     {
         $n = $this->pegawaiRekap($this->satkerA);
