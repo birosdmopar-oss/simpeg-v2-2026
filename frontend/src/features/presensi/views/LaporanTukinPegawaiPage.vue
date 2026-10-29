@@ -7,7 +7,7 @@
  */
 import { ArrowLeft, Download } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteUpdate, useRoute, useRouter, type LocationQuery } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
@@ -31,11 +31,14 @@ const auth = useAuthStore()
 const nip = computed(() => (props.saya ? (auth.user?.nip ?? '') : String(route.params.nip ?? '')))
 const POLA_BULAN = /^\d{4}-(0[1-9]|1[0-2])$/
 /** Bulan dari query URL bila sah; bawaan = periode Tukin berjalan (16–15, legacy `list_lt`). */
-function bulanDariUrl(): string {
-  const q = route.query.bulan
-  return typeof q === 'string' && POLA_BULAN.test(q) ? q : bulanPeriodeTukinWib()
+function bulanDariQuery(q: LocationQuery): string {
+  return typeof q.bulan === 'string' && POLA_BULAN.test(q.bulan) ? q.bulan : bulanPeriodeTukinWib()
 }
-const bulan = ref(bulanDariUrl())
+const bulan = ref(bulanDariQuery(route.query))
+/** NIP halaman yang sedang tampil (ikut rute; diperbarui oleh guard saat rute yang sama dipakai ulang). */
+let nipAktif = nip.value
+/** true selama bulan diterapkan dari URL: penulisan balik ke URL dan muat ulang dilakukan oleh guard, bukan watcher. */
+let dariUrl = false
 
 const crumbs = computed(() => [{ label: 'Home', to: { name: 'home' } }, { label: 'Presensi' }, { label: props.saya ? 'Laporan Tukin Saya' : 'Laporan Tukin' }])
 
@@ -56,13 +59,13 @@ const KOLOM_RINCIAN: [string, string][] = [
 ]
 const berjalan = computed(() => data.value !== null && data.value.periode.dihitung_sampai !== '' && data.value.periode.dihitung_sampai < data.value.periode.akhir)
 
-async function muat(): Promise<void> {
-  if (!POLA_BULAN.test(bulan.value) || nip.value === '') return
+async function muat(nipTuju: string = nipAktif, bulanTuju: string = bulan.value): Promise<void> {
+  if (!POLA_BULAN.test(bulanTuju) || nipTuju === '') return
   const saya = ++token
   memuat.value = true
   galat.value = ''
   try {
-    const hasil = await laporanTukinService.laporan(nip.value, bulan.value)
+    const hasil = await laporanTukinService.laporan(nipTuju, bulanTuju)
     if (saya === token) data.value = hasil
   } catch (e) {
     if (saya !== token) return
@@ -74,24 +77,30 @@ async function muat(): Promise<void> {
 }
 
 onMounted(() => void muat())
-watch(bulan, () => {
-  void router.replace({ query: bulan.value === bulanPeriodeTukinWib() ? {} : { bulan: bulan.value } })
-  void muat()
-})
-
-// CR-078 (T-04): NIP atau ?bulan berganti pada komponen yang sama (back/forward, menu ke NIP lain) → ikut URL dan muat
-// ulang. Bulan yang sudah sama dengan URL tidak memuat dua kali (tulisan balik dari `watch(bulan)` cukup mencocokkan).
+// Sinkron: perubahan dari URL (guard di bawah) melewati penulisan balik dengan `dariUrl`, sebelum navigasi selesai.
+const namaRute = route.name
 watch(
-  () => [nip.value, route.query.bulan],
-  ([nipBaru], [nipLama]) => {
-    const dariUrl = bulanDariUrl()
-    if (dariUrl !== bulan.value) {
-      bulan.value = dariUrl // `watch(bulan)` menulis URL dan memuat
-      return
-    }
-    if (nipBaru !== nipLama) void muat()
+  bulan,
+  () => {
+    if (dariUrl || router.currentRoute.value.name !== namaRute) return
+    void router.replace({ query: bulan.value === bulanPeriodeTukinWib() ? {} : { bulan: bulan.value } })
+    void muat()
   },
+  { flush: 'sync' },
 )
+
+// CR-078 (T-04): rute yang SAMA dipakai ulang (back/forward, menu ke NIP lain) → ikut NIP dan ?bulan tujuan, lalu muat
+// sekali bila salah satunya berubah. Hook ini tidak terpicu saat halaman ditinggalkan ke rute lain.
+onBeforeRouteUpdate((tujuan) => {
+  const nipTuju = props.saya ? nip.value : String(tujuan.params.nip ?? '')
+  const bulanTuju = bulanDariQuery(tujuan.query)
+  const berubah = nipTuju !== nipAktif || bulanTuju !== bulan.value
+  nipAktif = nipTuju
+  dariUrl = true
+  bulan.value = bulanTuju
+  dariUrl = false
+  if (berubah) void muat(nipTuju, bulanTuju)
+})
 
 async function unduhPdf(): Promise<void> {
   mengunduh.value = true

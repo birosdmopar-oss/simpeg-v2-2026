@@ -7,8 +7,8 @@
  * Opsi Unit/Satker/Jenis Pegawai dimuat dari master (`GET master/{entitas}/options`); gagal dimuat → opsi kosong, halaman
  * tetap bisa dipakai. Role 3/4 tidak menampilkan Unit/Satker (`bisaPilihUnit = false`): server memaksa lingkupnya.
  */
-import { computed, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter, type LocationQuery, type LocationQueryRaw } from 'vue-router'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { onBeforeRouteUpdate, useRoute, useRouter, type LocationQuery, type LocationQueryRaw } from 'vue-router'
 
 import { masterService } from '@/features/master-data/services/master.service'
 import type { SelectOption } from '@/shared/ui'
@@ -153,26 +153,41 @@ export function useFilterLaporan(opsi: OpsiFilterLaporan) {
     },
     { flush: 'sync' },
   )
-  watch(queryUrl, (u) => void router.replace({ query: u }), { flush: 'post' })
 
-  // Back/forward atau klik menu ke halaman yang sama mengganti query tanpa membuat ulang komponen: terapkan ke filter.
-  // Hanya nilai yang benar-benar berbeda yang ditulis: penulisan ulang array yang sama akan memicu `queryUrl` dan
-  // menulis query baru ke URL (membuang `bulan`) saat halaman sedang ditinggalkan.
+  // Rute milik halaman ini (nama saat setup). Penulisan balik ke URL hanya selama rute ini masih aktif, dan ditunda
+  // selama penerapan dari URL belum selesai (navigasi masih berjalan; `replace` di tengah navigasi membatalkannya).
+  const namaRute = route.name
+  let urlSedangDiterapkan = false
+  onBeforeUnmount(router.afterEach(() => (urlSedangDiterapkan = false)))
   watch(
-    () => route.query,
-    (q) => {
-      const baru = dariQuery(q)
-      const berbeda = Object.fromEntries(
-        Object.entries(baru).filter(([kunci, nilai]) => JSON.stringify((filter as unknown as Record<string, unknown>)[kunci]) !== JSON.stringify(nilai)),
-      )
-      dariUrl = true
-      try {
-        Object.assign(filter, berbeda)
-      } finally {
-        dariUrl = false
-      }
+    queryUrl,
+    (u) => {
+      if (router.currentRoute.value.name !== namaRute || urlSedangDiterapkan) return
+      void router.replace({ query: u })
     },
+    { flush: 'post' },
   )
+
+  /** Terapkan query ke filter; hanya nilai yang benar-benar berbeda yang ditulis (penulisan ulang array memicu `queryUrl`). */
+  function terapkanQuery(q: LocationQuery): void {
+    const baru = dariQuery(q)
+    const berbeda = Object.fromEntries(
+      Object.entries(baru).filter(([kunci, nilai]) => JSON.stringify((filter as unknown as Record<string, unknown>)[kunci]) !== JSON.stringify(nilai)),
+    )
+    dariUrl = true
+    try {
+      Object.assign(filter, berbeda)
+    } finally {
+      dariUrl = false
+    }
+  }
+
+  // Back/forward atau klik menu ke rute yang SAMA (komponen dipakai ulang): sinkronkan dari query tujuan. Hook ini tidak
+  // terpicu saat halaman ditinggalkan ke rute lain, jadi query rute tujuan tidak tersentuh.
+  onBeforeRouteUpdate((tujuan) => {
+    urlSedangDiterapkan = true
+    terapkanQuery(tujuan.query)
+  })
 
   function setBulan(nilai: string): void {
     if (POLA_BULAN.test(nilai)) filter.bulan = nilai

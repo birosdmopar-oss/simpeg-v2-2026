@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h, nextTick } from 'vue'
-import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+import { createMemoryHistory, createRouter, RouterView, type Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import FilterLaporanBar from '../components/FilterLaporanBar.vue'
@@ -9,21 +9,25 @@ import { bulanBerjalanWib, bulanPeriodeTukinWib, lingkupDariFilter, useFilterLap
 const options = vi.fn()
 vi.mock('@/features/master-data/services/master.service', () => ({ masterService: { options: (...a: unknown[]) => options(...a) } }))
 
-function router(): Router {
-  return createRouter({ history: createMemoryHistory(), routes: [{ path: '/x', component: { render: () => null } }] })
-}
-
+/** Halaman ber-filter dipasang di bawah RouterView seperti di aplikasi (onBeforeRouteUpdate hanya aktif di sana). */
 async function pasang(opsi: OpsiFilterLaporan, url = '/x') {
-  const r = router()
-  await r.push(url)
   let api!: ReturnType<typeof useFilterLaporan>
-  const komponen = defineComponent({
+  const halaman = defineComponent({
     setup() {
       api = useFilterLaporan(opsi)
       return () => h('div')
     },
   })
-  const w = mount(komponen, { global: { plugins: [r] } })
+  const r: Router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/x', name: 'x', component: halaman },
+      { path: '/y', name: 'y', component: { render: () => null } },
+    ],
+  })
+  await r.push(url)
+  const w = mount(defineComponent({ render: () => h(RouterView) }), { global: { plugins: [r] } })
+  await flushPromises()
   return { r, api, w }
 }
 
@@ -165,6 +169,18 @@ describe('useFilterLaporan', () => {
     await r.push('/x?page=4&bulan=2026-09')
     await flushPromises()
     expect(api.filter).toMatchObject({ bulan: '2026-09', page: 4 })
+  })
+
+  it('CR-078 T-04 revisi: pindah ke rute lain yang ber-query → query tujuan utuh, halaman lama tidak menulis balik', async () => {
+    const { r, api } = await pasang({ bisaPilihUnit: true, bulanBawaan: '2026-10' }, '/x?unit=5&page=3&q=lama')
+    const replace = vi.spyOn(r, 'replace')
+
+    await r.push('/y?bulan=2026-08&q=ani')
+    await flushPromises()
+
+    expect(r.currentRoute.value.fullPath).toBe('/y?bulan=2026-08&q=ani')
+    expect(replace).not.toHaveBeenCalled()
+    expect(api.filter).toMatchObject({ bulan: '2026-10', idUnit: '5', search: 'lama' }) // filter lama tidak ikut pindah
   })
 
   it('CR-078 T-04: menu ke halaman yang sama tanpa query mengembalikan filter ke bawaan (Unit lama tidak tersisa)', async () => {

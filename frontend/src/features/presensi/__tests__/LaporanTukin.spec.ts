@@ -32,6 +32,8 @@ import * as berkas from '@/features/kepegawaian/services/berkasUnduhan'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 import { bulanPeriodeTukinWib } from '../composables/useFilterLaporan'
+import { defineComponent, h } from 'vue'
+import { RouterView } from 'vue-router'
 
 import LaporanTukinDaftarPage from '../views/LaporanTukinDaftarPage.vue'
 import LaporanTukinPegawaiPage from '../views/LaporanTukinPegawaiPage.vue'
@@ -168,10 +170,12 @@ describe('LaporanTukinDaftarPage', () => {
 async function mountLaporan(opts: { role?: RoleCode; saya?: boolean; nip?: string; query?: string } = {}) {
   loginAs(opts.role ?? Role.SUPER_ADMIN, { nip: opts.saya ? NIP : null })
   const router = createShellRouter()
-  router.addRoute({ path: '/presensi/tukin/:nip', name: 'presensi-tukin-pegawai', component: { render: () => null } })
-  router.addRoute({ path: '/presensi/tukin/saya', name: 'presensi-tukin-saya', component: { render: () => null } })
+  // Halaman dipasang lewat RouterView seperti di aplikasi: onBeforeRouteUpdate hanya aktif bila rute dirender RouterView.
+  router.addRoute({ path: '/presensi/tukin/:nip', name: 'presensi-tukin-pegawai', component: LaporanTukinPegawaiPage })
+  router.addRoute({ path: '/presensi/tukin/saya', name: 'presensi-tukin-saya', component: LaporanTukinPegawaiPage, props: { saya: true } })
+  router.addRoute({ path: '/presensi/rekap-tukin', name: 'presensi-rekap-tukin', component: { render: () => null } })
   await router.push(opts.saya ? '/presensi/tukin/saya' : `/presensi/tukin/${opts.nip ?? NIP}${opts.query ?? '?bulan=2026-10'}`)
-  const wrapper = mount(LaporanTukinPegawaiPage, { props: { saya: opts.saya ?? false }, global: { plugins: [router] }, attachTo: document.body })
+  const wrapper = mount(defineComponent({ render: () => h(RouterView) }), { global: { plugins: [router] }, attachTo: document.body })
   await flushPromises()
   await flushPromises()
   return { wrapper, router }
@@ -280,6 +284,19 @@ describe('LaporanTukinPegawaiPage — CR-078', () => {
 
     expect(minta(`/presensi/tukin/laporan/${NIP_LAIN}`)).toHaveLength(1)
     expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+  })
+
+  it('CR-078 T-04 revisi: pindah ke rute lain (rekap) → query tujuan utuh dan tidak ada muat laporan tambahan', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    const { router } = await mountLaporan({ query: '?bulan=2026-09' })
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+
+    await router.push('/presensi/rekap-tukin?unit=1&satker=1')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/presensi/rekap-tukin?unit=1&satker=1')
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+    expect(minta(`/presensi/tukin/laporan/`)).toHaveLength(0)
   })
 
   it('T-04: ?bulan berganti (back/forward) memuat ulang dengan bulan dari URL, tanpa muat ganda', async () => {
