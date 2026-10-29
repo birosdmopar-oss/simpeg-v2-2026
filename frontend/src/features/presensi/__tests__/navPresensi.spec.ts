@@ -1,6 +1,6 @@
 /**
- * Menu & rute Presensi per role (AC-FE.6, PRD Fase 5A §7.8.2): grup Presensi ber-`rilis` tampil walau ACTIVE_PHASE
- * belum 5, anak disaring per role, tujuan menu sama dengan path route, guard route memakai role yang sama dengan menu.
+ * Menu & rute Presensi per role (AC-FE.6, PRD Fase 5A §7.8.2, PRD 5C §6): grup Presensi tampil pada ACTIVE_PHASE = 5
+ * (tanpa `rilis` sejak penutup 5C MAKE-053), anak disaring per role, tujuan menu sama dengan path route, guard route memakai role yang sama dengan menu.
  * MAKE-034 tahap (a): Slip Gaji (2, 6, 7); tahap (b): Kelola Slip Gaji (1, 3); tahap (c): Presensi Saya (2, 6, 7) dan
  * Data Presensi (1, 3, 4, 5) — lengkap sesuai PRD 5A §7.8.2.
  */
@@ -30,8 +30,13 @@ const anakPresensi = (role: (typeof Role)[keyof typeof Role]) =>
     ?.children?.map((c) => c.label) ?? []
 
 describe('navPresensi', () => {
-  it('ACTIVE_PHASE tidak dinaikkan oleh 5A (baru 4 oleh penutup Fase 4 M7)', () => {
-    expect(ACTIVE_PHASE).toBe(4)
+  it('ACTIVE_PHASE = 5 sejak penutup 5C (MAKE-053); grup Presensi tanpa `rilis`', () => {
+    expect(ACTIVE_PHASE).toBe(5)
+    const grup = buildNav(Role.SUPER_ADMIN)
+      .flatMap((g) => g.items)
+      .find((i) => i.key === 'presensi')
+    expect(grup).toMatchObject({ phase: 5 })
+    expect(grup).not.toHaveProperty('rilis')
   })
 
   it.each([

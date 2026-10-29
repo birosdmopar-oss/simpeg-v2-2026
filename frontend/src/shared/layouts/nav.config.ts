@@ -79,11 +79,11 @@ import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
 /**
- * Fase tertinggi yang menunya ditampilkan. 4 sejak paket penutup M7 (MAKE-026): semua halaman Modul C tersambung API
- * (sebelumnya 3 sejak B-20 penutup WS-2 MAKE-014). Menu fase 5+ sudah terdaftar di bawah tetapi tersembunyi
- * (kecuali yang ber-`rilis`).
+ * Fase tertinggi yang menunya ditampilkan. 5 sejak paket penutup 5C (MAKE-053): semua halaman Modul D (Presensi &
+ * Remunerasi) tersambung API (4 sejak penutup M7 MAKE-026, 3 sejak B-20 penutup WS-2 MAKE-014). Menu fase 6+ sudah
+ * terdaftar di bawah tetapi tersembunyi (kecuali yang ber-`rilis`).
  */
-export const ACTIVE_PHASE = 4
+export const ACTIVE_PHASE = 5
 
 export interface NavChild {
   key: string
@@ -172,14 +172,14 @@ const NAV: NavGroup[] = [
           { key: 'layanan-petugas', label: 'Petugas Layanan', to: '/layanan/petugas', roles: PETUGAS_LAYANAN_ROLES },
         ],
       },
-      // Fase 5 (Presensi & Remunerasi). Paket 5A dirilis sebelum ACTIVE_PHASE 5 (`rilis`, F5-18; dihapus saat 5C
-      // menaikkan ACTIVE_PHASE ke 5). Anak per role PRD 5A §7.8.2; grup tampil bila minimal satu anak tampil.
+      // Fase 5 (Presensi & Remunerasi). Paket 5A sempat dirilis lebih awal (`rilis`, F5-18); dihapus oleh penutup 5C
+      // (MAKE-053) saat ACTIVE_PHASE naik ke 5. Anak per role PRD 5A §7.8.2 dan PRD 5C §6; grup tampil bila minimal satu
+      // anak tampil.
       {
         key: 'presensi',
         label: 'Presensi',
         icon: AlarmClock,
         phase: 5,
-        rilis: true,
         children: [
           { key: 'presensi-saya', label: 'Presensi Saya', to: '/presensi', roles: PRESENSI_PEGAWAI_ROLES },
           { key: 'presensi-slip-gaji', label: 'Slip Gaji', to: '/presensi/slip-gaji', roles: SLIP_GAJI_PEGAWAI_ROLES },

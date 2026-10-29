@@ -1,9 +1,9 @@
 /**
  * nav.config — menu sidebar redesign per role & fase aktif. Hak akses mengikuti Matriks Role x Endpoint
  * (Fase 3: Matriks v2 + keputusan user). Semua menu yang ada di `main` (termasuk Web Config) wajib ada; menu Fase 3
- * tampil sejak B-20 penutup (WS-2 MAKE-014) dan menu Layanan Fase 4 sejak penutup M7 (ACTIVE_PHASE = 4, MAKE-026,
- * PRD Fase 4 §6.11.2); menu fase 5+ tetap tersembunyi kecuali ber-`rilis` (F5-18: grup Presensi paket 5A, anak per
- * role `NavChild.roles`).
+ * tampil sejak B-20 penutup (WS-2 MAKE-014), menu Layanan Fase 4 sejak penutup M7 (MAKE-026, PRD Fase 4 §6.11.2), dan
+ * menu Presensi Fase 5 sejak penutup 5C (ACTIVE_PHASE = 5, MAKE-053, tanpa `rilis`; anak per role `NavChild.roles`);
+ * menu fase 6+ tetap tersembunyi.
  */
 import { describe, expect, it } from 'vitest'
 
@@ -18,9 +18,9 @@ const rolesWith = (menu: string, phase?: number): RoleCode[] => Object.values(Ro
 
 const FASE3_MENUS = ['Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH']
 
-describe('buildNav — fase aktif 4 (penutup M7 Fase 4)', () => {
-  it('ACTIVE_PHASE = 4 sejak halaman Modul C (Layanan) tersambung API', () => {
-    expect(ACTIVE_PHASE).toBe(4)
+describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
+  it('ACTIVE_PHASE = 5 sejak halaman Modul D (Presensi) tersambung API', () => {
+    expect(ACTIVE_PHASE).toBe(5)
   })
 
   // Menu lengkap per role (urut sidebar): Kepegawaian Fase 3 lalu menu main.
@@ -125,7 +125,7 @@ describe('buildNav — fase 2 (sebelum B-20 penutup)', () => {
   })
 
   it('Super Admin melihat menu main saja', () => {
-    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Presensi', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
+    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
   })
 })
 
@@ -163,9 +163,11 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
       .flatMap((g) => g.items)
       .find((i) => i.key === 'presensi')
 
-  it('grup Presensi (phase 5, `rilis`) tampil pada ACTIVE_PHASE 4 tanpa menaikkan fase ke 5', () => {
-    expect(ACTIVE_PHASE).toBe(4)
-    expect(presensi(Role.PEGAWAI)).toMatchObject({ phase: 5, rilis: true })
+  it('grup Presensi (phase 5, tanpa `rilis`) tampil pada ACTIVE_PHASE 5 dan tersembunyi pada fase 4', () => {
+    expect(ACTIVE_PHASE).toBe(5)
+    expect(presensi(Role.PEGAWAI)).toMatchObject({ phase: 5 })
+    expect(presensi(Role.PEGAWAI)).not.toHaveProperty('rilis')
+    for (const role of Object.values(Role)) expect(presensi(role, 4), `role ${role}`).toBeUndefined()
   })
 
   it('anak disaring per role: Presensi Saya + Slip Gaji = role 2, 6, 7', () => {
