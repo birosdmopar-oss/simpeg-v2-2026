@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Presensi\Laporan;
 
 use App\Libraries\Presensi\Rekap\PenyesuaianTukin;
+use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
 use App\Libraries\Presensi\Tukin\HasilTukin;
 use App\Libraries\Presensi\Tukin\KalkulasiTukin;
 use App\Libraries\Presensi\Tukin\PeriodeTukin;
@@ -44,7 +45,7 @@ final class KalkulasiLaporanTukin
     /**
      * @param list<string> $nip
      *
-     * @return array<array-key, array{hasil: HasilTukin, predikat_skp: ?string, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string}|array{galat: array{code: string, message: string}}>
+     * @return array<array-key, array{hasil: HasilTukin, predikat_skp: ?string, pegawai: ?DataPegawaiTukin, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string}|array{galat: array{code: string, message: string}}>
      */
     public function hitung(array $nip, int $tahun, int $bulan, string $hariIni): array
     {
@@ -79,6 +80,7 @@ final class KalkulasiLaporanTukin
                 $hasil[$n] = [
                     'hasil'        => $h,
                     'predikat_skp' => $a->pegawai?->predikatSkp,
+                    'pegawai'      => $a->pegawai,
                     'penyesuaian'  => $penyesuaian,
                     'keterangan'   => PenyesuaianTukin::keterangan($penyesuaian, ($info['cltn'][$n] ?? false), $adaTb ? ($info['tb'][$n] ?? '') : null, $info['cuti'][$n] ?? []),
                 ];

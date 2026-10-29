@@ -85,8 +85,8 @@ final class LaporanTukinPegawaiTest extends DatabaseTestCase
 
     /**
      * CR-075: `harian[].kode` = `HasilHarian::kategori` apa adanya (urutan sama dengan `keterangan`) untuk color-coding FE;
-     * `[]` bila tanpa kode kejadian (cuti tanpa potongan, konket). Hari libur/akhir pekan tidak masuk `harian[]`
-     * (`KalkulasiTukin` melewatinya). Field lain tidak berubah.
+     * `[]` bila tanpa kode kejadian (cuti tanpa potongan, konket, akhir pekan — baris non-kerja sejak CR-076). Field lain
+     * tidak berubah.
      */
     public function testHarianMemuatKodeKejadian(): void
     {
@@ -99,7 +99,7 @@ final class LaporanTukinPegawaiTest extends DatabaseTestCase
         $this->hadir($n, '2026-09-09', '07:45:00', '15:50:00'); // TL1 + PSW1
         $this->hadir($n, '2026-09-10', null, '15:00:00');       // TPM + PSW2
         $this->konketRekap($n, '2026-09-14', 5);
-        // 11-09 tanpa presensi → TK; 12/13-09 akhir pekan tidak masuk harian.
+        // 11-09 tanpa presensi → TK; 12-09 Sabtu → akhir pekan (CR-076).
 
         $harian = array_column($this->serviceLaporanTukin()->laporan($this->adminRekap(), $n, ['bulan' => '2026-09'])['harian'], null, 'tanggal');
 
@@ -109,11 +109,82 @@ final class LaporanTukinPegawaiTest extends DatabaseTestCase
         $this->assertSame(['TPM', 'PSW2'], $harian['2026-09-10']['kode']);
         $this->assertSame(['TK'], $harian['2026-09-11']['kode']);
         $this->assertSame([], $harian['2026-09-14']['kode'], 'konket');
-        $this->assertArrayNotHasKey('2026-09-12', $harian, 'akhir pekan');
+        $this->assertSame(['akhir_pekan', []], [$harian['2026-09-12']['status'], $harian['2026-09-12']['kode']], 'akhir pekan');
         foreach (['2026-09-09', '2026-09-10', '2026-09-11'] as $t) {
             $this->assertSame(implode(' - ', $harian[$t]['kode']), $harian[$t]['keterangan'], "urutan kode = keterangan {$t}");
         }
         $this->assertSame(['tanggal', 'status', 'jam_masuk', 'jam_pulang', 'potongan', 'keterangan', 'kode', 'kategori_konket'], array_keys($harian['2026-09-09']));
+    }
+
+    /**
+     * CR-076 (keputusan Horii 29-10-2026): `harian[]` memuat setiap tanggal periode seperti legacy
+     * [K `L_presensi.php:7302-7345`] — urutan cek di luar masa kerja → libur ("(Libur) <nama>") → Sabtu/Minggu
+     * (`akhir_pekan`); baris non-kerja tanpa jam/potongan/kode. Total sama dengan baris rekap (kalkulasi tidak berubah).
+     */
+    public function testHarianMemuatSetiapTanggalPeriode(): void
+    {
+        $n = $this->pegawaiRekap($this->satker);
+        $this->db->table('hari_libur')->insertBatch([
+            ['tgl_mulai' => '2026-08-17', 'tgl_akhir' => '2026-08-17', 'nama_libur' => 'Hari Kemerdekaan Uji', 'status' => 1],
+            ['tgl_mulai' => '2026-08-22', 'tgl_akhir' => '2026-08-22', 'nama_libur' => 'Libur Sabtu Uji', 'status' => 1],
+            ['tgl_mulai' => '2026-08-24', 'tgl_akhir' => '2026-08-24', 'nama_libur' => 'Libur Nonaktif', 'status' => 2],
+        ]);
+        $q    = ['bulan' => '2026-09'];
+        $data = $this->serviceLaporanTukin()->laporan($this->adminRekap(), $n, $q);
+
+        $tanggal = array_column($data['harian'], 'tanggal');
+        $this->assertCount(31, $tanggal, '16-08 s.d. 15-09');
+        $this->assertSame('2026-08-16', $tanggal[0]);
+        $this->assertSame('2026-09-15', $tanggal[30]);
+        $urut = $tanggal;
+        sort($urut);
+        $this->assertSame($urut, $tanggal, 'urut tanggal');
+
+        $h = array_column($data['harian'], null, 'tanggal');
+        $this->assertSame(['tanggal' => '2026-08-16', 'status' => 'akhir_pekan', 'jam_masuk' => null, 'jam_pulang' => null, 'potongan' => '0.00', 'keterangan' => 'Minggu', 'kode' => [], 'kategori_konket' => null], $h['2026-08-16']);
+        $this->assertSame(['libur', '(Libur) Hari Kemerdekaan Uji'], [$h['2026-08-17']['status'], $h['2026-08-17']['keterangan']]);
+        $this->assertSame(['libur', '(Libur) Libur Sabtu Uji'], [$h['2026-08-22']['status'], $h['2026-08-22']['keterangan']], 'libur didahulukan dari akhir pekan');
+        $this->assertSame(['akhir_pekan', 'Minggu'], [$h['2026-08-23']['status'], $h['2026-08-23']['keterangan']]);
+        $this->assertSame(['akhir_pekan', 'Sabtu'], [$h['2026-08-29']['status'], $h['2026-08-29']['keterangan']]);
+        $this->assertSame('TK', $h['2026-08-24']['status'], 'libur nonaktif tetap hari kerja');
+
+        $rekap = $this->serviceRekapTukin()->daftar($this->adminRekap(), $q)['items'][0];
+        $this->assertSame($n, $rekap['nip']);
+        $this->assertSame([$rekap['total_presensi'], $rekap['total_potongan']], [$data['total_presensi'], $data['total_potongan']], 'total tidak berubah oleh baris non-kerja');
+        $this->assertSame(21, count(array_filter($data['harian'], static fn (array $b): bool => ! in_array($b['status'], ['libur', 'akhir_pekan'], true))), 'hari kerja = 31 − 2 libur − 8 akhir pekan');
+    }
+
+    /** CR-076: hari sebelum TMT (CPNS baru) = `di_luar_masa_kerja`, didahulukan dari libur & akhir pekan [K :7302-7310]. */
+    public function testHariSebelumTmtDiLuarMasaKerja(): void
+    {
+        $n = $this->pegawaiRekap($this->satker, ['created_at' => '2026-10-01 00:00:00']);
+        $this->db->table('riwayat_kp')->insert(['nip' => $n, 'tmtsk' => '2026-08-26', 'gol' => 'III', 'gol_ruang' => 'CPNS III/a', 'status' => 1]);
+        $this->db->table('hari_libur')->insert(['tgl_mulai' => '2026-08-17', 'tgl_akhir' => '2026-08-17', 'nama_libur' => 'Libur Uji', 'status' => 1]);
+
+        $h = array_column($this->serviceLaporanTukin()->laporan($this->adminRekap(), $n, ['bulan' => '2026-09'])['harian'], null, 'tanggal');
+
+        foreach (['2026-08-16', '2026-08-17', '2026-08-22', '2026-08-25'] as $t) {
+            $this->assertSame(['di_luar_masa_kerja', ''], [$h[$t]['status'], $h[$t]['keterangan']], $t);
+        }
+        $this->assertNotSame('di_luar_masa_kerja', $h['2026-08-26']['status'], 'mulai TMT');
+        $this->assertSame(['akhir_pekan', 'Sabtu'], [$h['2026-08-29']['status'], $h['2026-08-29']['keterangan']]);
+    }
+
+    /** CR-076: PDF memuat baris non-kerja seperti legacy (`print/laporan_tukin_skp_pdf.php:188-205`) dengan warna palet layar. */
+    public function testPdfMemuatBarisNonKerjaBerwarna(): void
+    {
+        $n = $this->pegawaiRekap($this->satker);
+        $this->db->table('hari_libur')->insert(['tgl_mulai' => '2026-08-17', 'tgl_akhir' => '2026-08-17', 'nama_libur' => 'Hari Kemerdekaan Uji', 'status' => 1]);
+
+        $this->serviceLaporanTukin()->pdf($this->adminRekap(), $n, ['bulan' => '2026-09']);
+        $html = $this->pdfTertangkap[0]->html;
+
+        $this->assertStringContainsString('(Libur) Hari Kemerdekaan Uji', $html);
+        $this->assertStringContainsString('>Sabtu<', $html);
+        $this->assertStringContainsString('>Minggu<', $html);
+        $this->assertStringContainsString('bgcolor="' . LaporanTukinService::WARNA_BARIS_PDF['libur'] . '"', $html);
+        $this->assertStringContainsString('bgcolor="' . LaporanTukinService::WARNA_BARIS_PDF['akhir_pekan'] . '"', $html);
+        $this->assertSame(10, substr_count($html, 'bgcolor="'), '1 libur + 9 akhir pekan; baris presensi tanpa warna');
     }
 
     public function testPdfRupiahHanyaKonketKategori13YangDibayar(): void

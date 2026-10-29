@@ -98,6 +98,8 @@ README `Libraries/Presensi` bagian "Laporan Tukin 5B" dan README controller.
 
 **CR-075 (29-10-2026):** `harian[].kode` aditif di `GET presensi/tukin/laporan/{nip}` (kode kejadian `HasilHarian::kategori` untuk color-coding FE 5C MAKE-048); field lain, PDF, dan XLSX tidak berubah.
 
+**CR-076 (29-10-2026, keputusan Horii):** `harian[]` JSON dan PDF per pegawai memuat setiap tanggal periode seperti legacy (`di_luar_masa_kerja` → `libur` "(Libur) <nama>" → `akhir_pekan` "Sabtu"/"Minggu", status baru), lapisan tampilan saja (`LaporanTukinService`, view PDF; `KalkulasiTukin` tidak diubah, total & rekap/XLSX tetap). PDF berwarna baris dengan palet layar (`WARNA_BARIS_PDF`) [V2: legacy kuning/hijau].
+
 ## 5B M6 — D-09b rekap kehadiran & rekap uang makan (MAKE-042, 28-10-2026)
 
 Branch `fase5b/make-042-rekap-kehadiran-uang-makan` (dari `main` `79641be` + sinkron `139898f`). Murni:
