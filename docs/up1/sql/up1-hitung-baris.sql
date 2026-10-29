@@ -18,6 +18,17 @@ UNION ALL SELECT 'unit', COUNT(*) FROM unit
 UNION ALL SELECT 'satker', COUNT(*) FROM satker
 UNION ALL SELECT 'jabatan', COUNT(*) FROM jabatan
 UNION ALL SELECT 'rumpun_jabatan', COUNT(*) FROM rumpun_jabatan
+UNION ALL SELECT 'kelas_jabatan', COUNT(*) FROM kelas_jabatan
+UNION ALL SELECT 'jabatan_koordinasi', COUNT(*) FROM jabatan_koordinasi
+UNION ALL SELECT 'agama', COUNT(*) FROM agama
+UNION ALL SELECT 'jenis_status', COUNT(*) FROM jenis_status
+UNION ALL SELECT 'provinsi', COUNT(*) FROM provinsi
+UNION ALL SELECT 'kabupaten_kota', COUNT(*) FROM kabupaten_kota
+UNION ALL SELECT 'pangkat', COUNT(*) FROM pangkat
+UNION ALL SELECT 'jenis_kp', COUNT(*) FROM jenis_kp
+UNION ALL SELECT 'jenjang_pendidikan', COUNT(*) FROM jenjang_pendidikan
+UNION ALL SELECT 'pegawai_kp', COUNT(*) FROM pegawai_kp
+UNION ALL SELECT 'riwayat_kp', COUNT(*) FROM riwayat_kp
 UNION ALL SELECT 'lokasi_presensi', COUNT(*) FROM lokasi_presensi
 UNION ALL SELECT 'dh_online', COUNT(*) FROM dh_online WHERE tgl BETWEEN @awal AND @akhir
 UNION ALL SELECT 'dh_online_tanpa_jam', COUNT(*) FROM dh_online

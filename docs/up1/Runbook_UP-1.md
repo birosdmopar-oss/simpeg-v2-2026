@@ -111,7 +111,8 @@ Daftar tabel minimal (dari prosedur UP-1 dan kode jalur Tukin `Libraries/Presens
 | Kelompok | Tabel | Batas |
 |---|---|---|
 | Pegawai & jabatan | `pegawai`, `pegawai_mutasi_jabatan`, `riwayat_mutasi_jabatan`, `pegawai_plt`, `pegawai_plh`, `pegawai_kp`, `riwayat_kp`, `riwayat_keluarga`, `detail_anak` | penuh |
-| Struktur | `unit`, `satker`, `jabatan`, `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `struktur_jabatan`, `periode_struktur_jabatan`, `jabatan_koordinasi`, `jenis_pegawai`, `gol_pppk` | penuh |
+| Struktur | `unit`, `satker`, `jabatan`, `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `struktur_jabatan`, `periode_struktur_jabatan`, `jabatan_koordinasi`, `kelas_jabatan`, `jenjang_jf` (bila ada), `jenis_pegawai`, `gol_pppk` | penuh |
+| Rujukan pegawai | `agama`, `jenis_status`, `provinsi`, `kabupaten_kota`, `pangkat`, `jenis_kp`, `jenjang_pendidikan` | penuh |
 | Presensi | `dh_online` (`tgl`), `lokasi_presensi` (penuh) | rentang |
 | Izin & dinas | `absen_ijin` (`date_start`/`date_end` tumpang tindih) | rentang |
 | Cuti & TB | `riwayat_cuti` (`tgl_mulai`/`tgl_akhir` tumpang tindih), `jenis_cuti`, `pegawai_sisa_cuti` (tahun rentang), `riwayat_tb`, `riwayat_tb_perpan` | rentang (TB: tumpang tindih) |
