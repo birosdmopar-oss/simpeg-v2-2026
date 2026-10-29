@@ -40,7 +40,7 @@ dump() { # dump <berkas> <argumen mysqldump...>
 dump 01_penuh.sql \
   pegawai pegawai_mutasi_jabatan riwayat_mutasi_jabatan pegawai_plt pegawai_plh pegawai_kp riwayat_kp \
   riwayat_keluarga detail_anak \
-  unit satker jabatan group_jabatan sub_group_jabatan struktur_jabatan periode_struktur_jabatan jabatan_koordinasi \
+  unit satker jabatan group_jabatan sub_group_jabatan rumpun_jabatan struktur_jabatan periode_struktur_jabatan jabatan_koordinasi \
   jenis_pegawai gol_pppk lokasi_presensi jenis_cuti jenis_libur
 
 # 2. Rentang: transaksi presensi, izin, cuti, TB, kalender, SKP/BKN.

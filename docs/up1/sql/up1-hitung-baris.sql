@@ -17,6 +17,7 @@ UNION ALL SELECT 'detail_anak', COUNT(*) FROM detail_anak
 UNION ALL SELECT 'unit', COUNT(*) FROM unit
 UNION ALL SELECT 'satker', COUNT(*) FROM satker
 UNION ALL SELECT 'jabatan', COUNT(*) FROM jabatan
+UNION ALL SELECT 'rumpun_jabatan', COUNT(*) FROM rumpun_jabatan
 UNION ALL SELECT 'lokasi_presensi', COUNT(*) FROM lokasi_presensi
 UNION ALL SELECT 'dh_online', COUNT(*) FROM dh_online WHERE tgl BETWEEN @awal AND @akhir
 UNION ALL SELECT 'dh_online_tanpa_jam', COUNT(*) FROM dh_online
