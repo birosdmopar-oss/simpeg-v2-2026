@@ -128,38 +128,42 @@ onMounted(() => void muat())
       <UiNotice v-if="failure" tone="danger" data-testid="pa-failure">{{ failure }}</UiNotice>
 
       <UiCard title="Daftar Petugas" flush fill class="flex min-h-0 flex-1 flex-col">
-        <div ref="tableScroller" class="table-fill scrollbar-slim overflow-x-auto" data-testid="pa-table-scroll" @scroll.passive="updateActionsShadow">
-          <table class="min-w-full text-sm" data-testid="pa-tabel">
-            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th class="min-w-[16rem] px-4 py-3">Pemohon</th>
-                <th class="whitespace-nowrap px-4 py-3">Jenis Pegawai</th>
-                <th class="min-w-[14rem] px-4 py-3">Petugas</th>
-                <th class="min-w-[14rem] px-4 py-3">Unit / Satker Petugas</th>
-                <th class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }">Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="memuat">
-                <td colspan="5" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
-              </tr>
-              <tr v-else-if="!daftar || daftar.items.length === 0">
-                <td colspan="5" class="px-4 py-8 text-center text-slate-500" data-testid="pa-kosong">Belum ada petugas approval cuti.</td>
-              </tr>
-              <tr v-for="row in daftar?.items ?? []" v-else :key="row.id" class="group hover:bg-slate-50" :data-testid="`pa-baris-${row.id}`">
-                <td class="px-4 py-3 text-slate-700">{{ pemohon(row) }}</td>
-                <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ row.jenis_pegawai ?? '-' }}</td>
-                <td class="px-4 py-3">
-                  <p class="font-medium text-slate-800">{{ row.petugas.nama ?? row.petugas.jabatan ?? '-' }}</p>
-                  <p v-if="row.petugas.nama" class="text-caption text-slate-500">{{ row.petugas.jabatan ?? '' }}</p>
-                </td>
-                <td class="px-4 py-3 text-slate-600">{{ [row.unit_petugas, row.satker_petugas].filter(Boolean).join(' · ') || '-' }}</td>
-                <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50" :class="{ 'shadow-sticky-end': actionsShadow }">
-                  <RowActionsMenu :actions="aksiBaris()" :label="`Aksi untuk petugas approval ${labelBaris(row)}`" :testid="`pa-actions-${row.id}`" @select="onAksi(row, $event)" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Pembungkus = containing block tabel (CR-079): di bawah lg `.table-fill` sticky tidak bergeser menimpa paginasi
+             dan tidak menyisakan celah di atas tabel; di lg ikut mengisi sisa tinggi kartu. -->
+        <div class="flex min-h-0 flex-1 flex-col" data-testid="pa-table-bingkai">
+          <div ref="tableScroller" class="table-fill scrollbar-slim overflow-x-auto" data-testid="pa-table-scroll" @scroll.passive="updateActionsShadow">
+            <table class="min-w-full text-sm" data-testid="pa-tabel">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th class="min-w-[16rem] px-4 py-3">Pemohon</th>
+                  <th class="whitespace-nowrap px-4 py-3">Jenis Pegawai</th>
+                  <th class="min-w-[14rem] px-4 py-3">Petugas</th>
+                  <th class="min-w-[14rem] px-4 py-3">Unit / Satker Petugas</th>
+                  <th class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 text-right" :class="{ 'shadow-sticky-end': actionsShadow }">Aksi</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-if="memuat">
+                  <td colspan="5" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
+                </tr>
+                <tr v-else-if="!daftar || daftar.items.length === 0">
+                  <td colspan="5" class="px-4 py-8 text-center text-slate-500" data-testid="pa-kosong">Belum ada petugas approval cuti.</td>
+                </tr>
+                <tr v-for="row in daftar?.items ?? []" v-else :key="row.id" class="group hover:bg-slate-50" :data-testid="`pa-baris-${row.id}`">
+                  <td class="px-4 py-3 text-slate-700">{{ pemohon(row) }}</td>
+                  <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ row.jenis_pegawai ?? '-' }}</td>
+                  <td class="px-4 py-3">
+                    <p class="font-medium text-slate-800">{{ row.petugas.nama ?? row.petugas.jabatan ?? '-' }}</p>
+                    <p v-if="row.petugas.nama" class="text-caption text-slate-500">{{ row.petugas.jabatan ?? '' }}</p>
+                  </td>
+                  <td class="px-4 py-3 text-slate-600">{{ [row.unit_petugas, row.satker_petugas].filter(Boolean).join(' · ') || '-' }}</td>
+                  <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50" :class="{ 'shadow-sticky-end': actionsShadow }">
+                    <RowActionsMenu :actions="aksiBaris()" :label="`Aksi untuk petugas approval ${labelBaris(row)}`" :testid="`pa-actions-${row.id}`" @select="onAksi(row, $event)" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <div v-if="daftar && daftar.total > PER_PAGE" class="p-4">
           <UiPagination v-model:page="page" :per-page="PER_PAGE" :total="daftar.total" />

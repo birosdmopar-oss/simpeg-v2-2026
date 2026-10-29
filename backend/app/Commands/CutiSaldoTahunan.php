@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Layanan\Cuti\SaldoTahunanService;
 use App\Models\AuditLogModel;
 use CodeIgniter\CLI\BaseCommand;
@@ -18,7 +19,8 @@ use InvalidArgumentException;
  *   php spark cuti:saldo-tahunan 2027 [--nip=<nip>]
  *
  * Idempoten; `--dry-run` hanya mencetak ringkasan. Eksekusi tulis hanya untuk tahun 2027 ke atas. Jadwal berada di
- * runbook deploy, bukan di kode.
+ * runbook deploy, bukan di kode. `--nip` menerima `--nip=<nip>` maupun `--nip <nip>`; opsi tak dikenal, `--nip` tanpa
+ * nilai (dulu diam-diam berarti semua pegawai), atau argumen berlebih ditolak dengan EXIT_USER_INPUT (CR-080, `OpsiCli`).
  */
 class CutiSaldoTahunan extends BaseCommand
 {
@@ -37,21 +39,27 @@ class CutiSaldoTahunan extends BaseCommand
      */
     public function run(array $params): int
     {
-        $tahun = $params[0] ?? null;
-
-        if (! is_string($tahun) || ! ctype_digit($tahun)) {
-            CLI::error('Tahun wajib diisi (angka), mis. 2027.');
+        try {
+            ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, ['dry-run' => false, 'nip' => true]);
+        } catch (InvalidArgumentException $e) {
+            CLI::error($e->getMessage() . ' Pemakaian: ' . $this->usage);
 
             return EXIT_USER_INPUT;
         }
 
-        $dryRun = array_key_exists('dry-run', $params) || CLI::getOption('dry-run') !== null;
-        $nip    = $params['nip'] ?? CLI::getOption('nip');
+        $tahun = $argumen[0] ?? null;
 
+        if ($tahun === null || ! ctype_digit($tahun) || count($argumen) > 1) {
+            CLI::error('Tahun wajib diisi (angka), mis. 2027. Pemakaian: ' . $this->usage);
+
+            return EXIT_USER_INPUT;
+        }
+
+        $nip     = $opsi['nip'] ?? null;
         $service = new SaldoTahunanService(db_connect(), config(CutiConfig::class)->aturan(), new AuditLogModel());
 
         try {
-            $r = $service->jalankan((int) $tahun, $dryRun, is_string($nip) && $nip !== '' ? $nip : null);
+            $r = $service->jalankan((int) $tahun, isset($opsi['dry-run']), is_string($nip) ? $nip : null);
         } catch (InvalidArgumentException $e) {
             CLI::error($e->getMessage());
 

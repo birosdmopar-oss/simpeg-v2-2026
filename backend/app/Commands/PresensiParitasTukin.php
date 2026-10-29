@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Presensi\Laporan\ParitasRekapTukin;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -17,7 +18,8 @@ use PhpOffice\PhpSpreadsheet\Reader\Exception as ReaderException;
  *   php spark presensi:paritas-tukin <legacy.xlsx> <v2.xlsx> [--toleransi=0.01] [--csv=<path>] [--nip-penuh]
  *
  * Hanya membaca dua berkas lokal; tidak menyentuh database. Keluaran memakai NIP tersamar kecuali `--nip-penuh` (khusus
- * telaah lokal, jangan dibagikan). Kode keluar 0 = semua baris sama, 1 = ada temuan, 2 = masukan salah.
+ * telaah lokal, jangan dibagikan). Kode keluar 0 = semua baris sama, 1 = ada temuan, 2 = masukan salah (termasuk opsi
+ * tak dikenal / tanpa nilai). Opsi bernilai menerima `--k=v` maupun `--k v` (CR-080, `OpsiCli`).
  */
 class PresensiParitasTukin extends BaseCommand
 {
@@ -40,16 +42,25 @@ class PresensiParitasTukin extends BaseCommand
      */
     public function run(array $params): int
     {
-        [$legacy, $v2] = [$params[0] ?? null, $params[1] ?? null];
-        $toleransi     = $params['toleransi'] ?? CLI::getOption('toleransi') ?? '0.01';
-        $csv           = $params['csv'] ?? CLI::getOption('csv');
-        $nipPenuh      = array_key_exists('nip-penuh', $params) || CLI::getOption('nip-penuh') !== null;
+        try {
+            ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, ['toleransi' => true, 'csv' => true, 'nip-penuh' => false]);
+        } catch (InvalidArgumentException $e) {
+            CLI::error($e->getMessage() . ' Pemakaian: ' . $this->usage);
 
-        if (! is_string($legacy) || ! is_string($v2) || ! is_numeric($toleransi) || (float) $toleransi < 0) {
+            return 2;
+        }
+
+        $toleransi = $opsi['toleransi'] ?? '0.01';
+        $csv       = $opsi['csv'] ?? null;
+        $nipPenuh  = isset($opsi['nip-penuh']);
+
+        if (count($argumen) !== 2 || ! is_numeric($toleransi) || (float) $toleransi < 0) {
             CLI::error('Pemakaian: ' . $this->usage);
 
             return 2;
         }
+
+        [$legacy, $v2] = $argumen;
 
         try {
             $hasil = ParitasRekapTukin::bandingkan(ParitasRekapTukin::baca($legacy), ParitasRekapTukin::baca($v2), (float) $toleransi, $nipPenuh);
@@ -70,7 +81,7 @@ class PresensiParitasTukin extends BaseCommand
             $r['hanya_v2'],
             $r['galat_v2'],
             $r['galat_legacy'],
-            (string) $toleransi,
+            $toleransi,
         ), $hasil['temuan'] === [] ? 'green' : 'yellow');
 
         foreach ($hasil['temuan'] as $t) {

@@ -227,6 +227,15 @@
       isolation: isolate;
     }
 
+    /*
+     * CR-079: panel samping (mis. daftar entitas Master Data) juga `contain: size`; tanpa itu `min-content` grid pembungkus
+     * (`.page-fill :has(.table-fill)`) memuat seluruh daftar panel sehingga panel dan tabel tidak lagi menggulir sendiri.
+     * Tinggi panel tetap `100%` area grid-nya.
+     */
+    .pane-fill {
+      contain: size;
+    }
+
     /* Pengaman: selama ada halaman isi-penuh, window tidak punya gulir sama sekali (sisa subpiksel pun terpotong). */
     html:has(.page-fill) {
       overflow: hidden;

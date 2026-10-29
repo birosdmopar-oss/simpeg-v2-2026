@@ -42,6 +42,28 @@ final class CutiSaldoTahunanCommandTest extends DatabaseTestCase
         $this->assertSame(0, $this->jumlahAuditRingkasan());
     }
 
+    /**
+     * CR-080: `--nip=<nip>` dulu tiba sebagai kunci `"nip=<nip>"` dan diabaikan diam-diam (semua pegawai diproses).
+     */
+    public function testOpsiNipBentukSamaDenganDanSpasi(): void
+    {
+        $this->pegawai('E001', 1);
+        $this->pegawai('E002', 1);
+
+        command('cuti:saldo-tahunan 2026 --dry-run --nip=E002');
+        $this->assertStringContainsString('Populasi: 1, dibuat: 1', $this->getStreamFilterBuffer());
+
+        $this->resetStreamFilterBuffer();
+        command('cuti:saldo-tahunan 2026 --nip E002 --dry-run');
+        $this->assertStringContainsString('Populasi: 1, dibuat: 1', $this->getStreamFilterBuffer());
+
+        $this->resetStreamFilterBuffer();
+        command('cuti:saldo-tahunan 2026 --dry-run --nip=');
+        $this->assertStringContainsString('Opsi --nip wajib diberi nilai', $this->getStreamFilterBuffer());
+        $this->assertStringNotContainsString('Populasi:', $this->getStreamFilterBuffer());
+        $this->assertSame(0, $this->db->table('pegawai_sisa_cuti')->countAllResults());
+    }
+
     public function testEksekusiTulisTahun2026Ditolak(): void
     {
         $this->pegawai('A001', 1);

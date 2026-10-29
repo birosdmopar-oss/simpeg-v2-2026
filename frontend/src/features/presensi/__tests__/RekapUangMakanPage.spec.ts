@@ -61,6 +61,14 @@ describe('tab Instansi Lain', () => {
     expect(satker.find('[data-testid="rekap-uang-makan-tab"]').exists()).toBe(false)
   })
 
+  it('CR-079: kartu filter tanpa fill; wadah tabel punya bingkai sendiri, catatan di luar bingkai', async () => {
+    const { wrapper } = await mountPage(Role.SUPER_ADMIN)
+    const bingkai = wrapper.get('[data-testid="rekap-uang-makan-bingkai"]')
+    expect(bingkai.element.children).toHaveLength(1)
+    expect(bingkai.element.firstElementChild?.getAttribute('data-testid')).toBe('rekap-uang-makan-wadah')
+    expect(bingkai.text()).not.toContain('aturan slip')
+  })
+
   it('memilih Instansi Lain memanggil daftar dengan il = true dan memakai bulan saja', async () => {
     const { wrapper } = await mountPage(Role.SUPER_ADMIN)
     const il = wrapper.findAll('[role="tab"]').find((t) => t.text().includes('Instansi Lain'))

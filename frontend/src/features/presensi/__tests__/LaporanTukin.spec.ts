@@ -111,6 +111,17 @@ describe('LaporanTukinDaftarPage', () => {
     expect((await rowMenuActions(wrapper, `tukin-actions-${NIP}`)).map((a) => [a.key, a.label])).toEqual([['lihat', 'Lihat laporan'], ['pdf', 'Unduh PDF']])
   })
 
+  it('CR-079: kolom panjang punya lebar minimum (sel ≤ ±2–3 baris teks, tabel menggulir horizontal) dan tinggi minimum wadah 20rem', async () => {
+    server.balasan['get /presensi/tukin/pegawai'] = sukses(daftar())
+    const { wrapper } = await mountDaftar(Role.SUPER_ADMIN)
+
+    const sel = wrapper.get(`[data-testid="tukin-row-${NIP}"]`).findAll('td')
+    expect(sel.map((td) => td.classes().find((k) => k.startsWith('min-w-')))).toEqual([
+      'min-w-[20rem]', undefined, 'min-w-[18rem]', undefined, 'min-w-[24rem]', 'min-w-[18rem]', 'min-w-[10rem]', undefined,
+    ])
+    expect(wrapper.get('.table-fill').classes()).toContain('[--table-fill-min:20rem]')
+  })
+
   it('role 3: tidak ada pemilih Unit/Satker dan tidak mengirim unit_satker (dipaksa server)', async () => {
     server.balasan['get /presensi/tukin/pegawai'] = sukses(daftar())
     const { wrapper } = await mountDaftar(Role.ADMIN_SATKER)

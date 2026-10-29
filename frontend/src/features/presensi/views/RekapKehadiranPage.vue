@@ -138,51 +138,55 @@ onMounted(() => {
       </UiCard>
 
       <UiCard fill>
-        <div class="table-fill scrollbar-slim overflow-auto rounded-xl border border-slate-200" data-testid="rekap-kehadiran-wadah">
-          <table class="min-w-max text-sm" data-testid="rekap-kehadiran-tabel">
-            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th class="col-sticky-kiri w-56 min-w-[14rem] px-3 py-3">Nama</th>
-                <th class="col-sticky-kiri whitespace-nowrap px-3 py-3" style="--sticky-kiri: 14rem">NIP</th>
-                <th class="min-w-[12rem] px-3 py-3">Jabatan</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">Hari Kerja</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">Hadir</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">TL</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">PSW</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">TK</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">Sakit</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">Dinas Luar</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">Lain-lain</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">Cuti</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right">Tidak Hadir</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right" data-testid="rekap-kehadiran-kolom-tb">TB</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="memuat">
-                <td colspan="14" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
-              </tr>
-              <tr v-else-if="!daftar || daftar.items.length === 0">
-                <td colspan="14" class="px-4 py-8 text-center text-slate-500" data-testid="rekap-kehadiran-kosong">Tidak ada data untuk filter ini.</td>
-              </tr>
-              <tr v-for="b in daftar?.items ?? []" v-else :key="b.nip" class="group hover:bg-slate-50" :data-testid="`rekap-kehadiran-baris-${b.nip}`">
-                <td class="col-sticky-kiri w-56 min-w-[14rem] px-3 py-2.5 font-medium text-slate-800">{{ b.nama }}</td>
-                <td class="col-sticky-kiri whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-700" style="--sticky-kiri: 14rem">{{ b.nip }}</td>
-                <td class="px-3 py-2.5 text-slate-600">{{ b.jabatan ?? '-' }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.hari_kerja }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.hadir }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tl }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.psw }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tk }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.sakit }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.dinas_luar }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.lain_lain }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.cuti }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tidak_hadir }}</td>
-                <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tb }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Pembungkus = containing block tabel (CR-079): di bawah lg `.table-fill` sticky tidak bergeser ke catatan/paginasi di
+             bawahnya (tanpa celah di atas tabel, tanpa tumpang tindih); di lg ikut mengisi sisa tinggi kartu. -->
+        <div class="flex min-h-0 flex-1 flex-col" data-testid="rekap-kehadiran-bingkai">
+          <div class="table-fill scrollbar-slim overflow-auto rounded-xl border border-slate-200" data-testid="rekap-kehadiran-wadah">
+            <table class="min-w-max text-sm" data-testid="rekap-kehadiran-tabel">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th class="col-sticky-kiri w-56 min-w-[14rem] px-3 py-3">Nama</th>
+                  <th class="col-sticky-kiri whitespace-nowrap px-3 py-3" style="--sticky-kiri: 14rem">NIP</th>
+                  <th class="min-w-[12rem] px-3 py-3">Jabatan</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">Hari Kerja</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">Hadir</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">TL</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">PSW</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">TK</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">Sakit</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">Dinas Luar</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">Lain-lain</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">Cuti</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right">Tidak Hadir</th>
+                  <th class="whitespace-nowrap px-3 py-3 text-right" data-testid="rekap-kehadiran-kolom-tb">TB</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-if="memuat">
+                  <td colspan="14" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
+                </tr>
+                <tr v-else-if="!daftar || daftar.items.length === 0">
+                  <td colspan="14" class="px-4 py-8 text-center text-slate-500" data-testid="rekap-kehadiran-kosong">Tidak ada data untuk filter ini.</td>
+                </tr>
+                <tr v-for="b in daftar?.items ?? []" v-else :key="b.nip" class="group hover:bg-slate-50" :data-testid="`rekap-kehadiran-baris-${b.nip}`">
+                  <td class="col-sticky-kiri w-56 min-w-[14rem] px-3 py-2.5 font-medium text-slate-800">{{ b.nama }}</td>
+                  <td class="col-sticky-kiri whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-700" style="--sticky-kiri: 14rem">{{ b.nip }}</td>
+                  <td class="px-3 py-2.5 text-slate-600">{{ b.jabatan ?? '-' }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.hari_kerja }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.hadir }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tl }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.psw }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tk }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.sakit }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.dinas_luar }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.lain_lain }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.cuti }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tidak_hadir }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">{{ b.tb }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
