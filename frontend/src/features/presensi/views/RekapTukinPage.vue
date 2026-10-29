@@ -29,7 +29,7 @@ const auth = useAuthStore()
 const crumbs = computed(() => [{ label: 'Home', to: { name: 'home' } }, { label: 'Presensi' }, { label: props.il ? 'Rekap Tukin Instansi Lain' : 'Rekap Tukin' }])
 
 const bisaPilihUnit = !props.il && auth.role === Role.SUPER_ADMIN
-const { filter, param, unitOpsi, satkerOpsi, jenisPegawaiOpsi, muatOpsi } = useFilterLaporan({ bisaPilihUnit })
+const { filter, param, unitOpsi, satkerOpsi, jenisPegawaiOpsi, muatOpsi } = useFilterLaporan({ bisaPilihUnit, bulanTukin: true })
 const perPageOpsi = PER_PAGE_LAPORAN.map((n) => ({ value: String(n), label: String(n) }))
 const perPage = computed({ get: () => String(filter.perPage), set: (v: string) => (filter.perPage = Number(v)) })
 

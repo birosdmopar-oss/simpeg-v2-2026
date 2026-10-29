@@ -31,6 +31,7 @@ import { Role, type RoleCode } from '@/features/auth/types'
 import * as berkas from '@/features/kepegawaian/services/berkasUnduhan'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
+import { bulanPeriodeTukinWib } from '../composables/useFilterLaporan'
 
 import LaporanTukinDaftarPage from '../views/LaporanTukinDaftarPage.vue'
 import LaporanTukinPegawaiPage from '../views/LaporanTukinPegawaiPage.vue'
@@ -262,5 +263,51 @@ describe('LaporanTukinPegawaiPage', () => {
     expect(server.permintaan.at(-1)).toMatchObject({ url: `/presensi/tukin/laporan/${NIP}/pdf`, params: { bulan: '2026-10' } })
     expect(simpan).toHaveBeenCalled()
     simpan.mockRestore()
+  })
+})
+
+describe('LaporanTukinPegawaiPage — CR-078', () => {
+  const NIP_LAIN = '199002022021022002'
+
+  it('T-04: NIP berganti pada komponen yang sama (menu / back-forward) memuat laporan NIP itu', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    server.balasan[`get /presensi/tukin/laporan/${NIP_LAIN}`] = sukses(laporan())
+    const { router } = await mountLaporan()
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+
+    await router.push(`/presensi/tukin/${NIP_LAIN}?bulan=2026-10`)
+    await flushPromises()
+
+    expect(minta(`/presensi/tukin/laporan/${NIP_LAIN}`)).toHaveLength(1)
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)).toHaveLength(1)
+  })
+
+  it('T-04: ?bulan berganti (back/forward) memuat ulang dengan bulan dari URL, tanpa muat ganda', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    const { router } = await mountLaporan()
+
+    await router.push(`/presensi/tukin/${NIP}?bulan=2026-09`)
+    await flushPromises()
+
+    const permintaan = minta(`/presensi/tukin/laporan/${NIP}`)
+    expect(permintaan.at(-1)!.params).toEqual({ bulan: '2026-09' })
+    expect(permintaan).toHaveLength(2)
+    expect(router.currentRoute.value.query).toEqual({ bulan: '2026-09' })
+  })
+
+  it('T-01: tanpa ?bulan, bulan bawaan = periode Tukin (tanggal > 15 → bulan berikutnya)', async () => {
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
+    await mountLaporan({ query: '' })
+
+    expect(minta(`/presensi/tukin/laporan/${NIP}`)[0]!.params).toEqual({ bulan: bulanPeriodeTukinWib() })
+  })
+
+  it('T-09: Predikat SKP tetap tampil dengan "-" bila null', async () => {
+    const d = laporan()
+    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses({ ...d, identitas: { ...d.identitas, predikat_skp: null } })
+    const { wrapper } = await mountLaporan()
+
+    expect(wrapper.get('[data-testid="tukin-identitas"]').text()).toContain('Predikat SKP')
+    expect(wrapper.get('[data-testid="tukin-predikat-skp"]').text()).toBe('-')
   })
 })

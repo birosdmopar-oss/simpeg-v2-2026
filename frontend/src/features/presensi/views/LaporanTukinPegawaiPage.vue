@@ -17,7 +17,7 @@ import { UiButton, UiCard, UiNotice, UiTextField } from '@/shared/ui'
 
 import LegendaStatusPresensi from '../components/LegendaStatusPresensi.vue'
 import TabelHarianTukin from '../components/TabelHarianTukin.vue'
-import { bulanBerjalanWib } from '../composables/useFilterLaporan'
+import { bulanPeriodeTukinWib } from '../composables/useFilterLaporan'
 import { persenId } from '../format'
 import { laporanTukinService, pesanGalatLaporan } from '../services/laporanTukin.service'
 import type { LaporanTukinPegawai } from '../types.laporan.tukin'
@@ -30,8 +30,12 @@ const auth = useAuthStore()
 
 const nip = computed(() => (props.saya ? (auth.user?.nip ?? '') : String(route.params.nip ?? '')))
 const POLA_BULAN = /^\d{4}-(0[1-9]|1[0-2])$/
-const bulanAwal = typeof route.query.bulan === 'string' && POLA_BULAN.test(route.query.bulan) ? route.query.bulan : bulanBerjalanWib()
-const bulan = ref(bulanAwal)
+/** Bulan dari query URL bila sah; bawaan = periode Tukin berjalan (16–15, legacy `list_lt`). */
+function bulanDariUrl(): string {
+  const q = route.query.bulan
+  return typeof q === 'string' && POLA_BULAN.test(q) ? q : bulanPeriodeTukinWib()
+}
+const bulan = ref(bulanDariUrl())
 
 const crumbs = computed(() => [{ label: 'Home', to: { name: 'home' } }, { label: 'Presensi' }, { label: props.saya ? 'Laporan Tukin Saya' : 'Laporan Tukin' }])
 
@@ -71,9 +75,23 @@ async function muat(): Promise<void> {
 
 onMounted(() => void muat())
 watch(bulan, () => {
-  void router.replace({ query: bulan.value === bulanAwal ? {} : { bulan: bulan.value } })
+  void router.replace({ query: bulan.value === bulanPeriodeTukinWib() ? {} : { bulan: bulan.value } })
   void muat()
 })
+
+// CR-078 (T-04): NIP atau ?bulan berganti pada komponen yang sama (back/forward, menu ke NIP lain) → ikut URL dan muat
+// ulang. Bulan yang sudah sama dengan URL tidak memuat dua kali (tulisan balik dari `watch(bulan)` cukup mencocokkan).
+watch(
+  () => [nip.value, route.query.bulan],
+  ([nipBaru], [nipLama]) => {
+    const dariUrl = bulanDariUrl()
+    if (dariUrl !== bulan.value) {
+      bulan.value = dariUrl // `watch(bulan)` menulis URL dan memuat
+      return
+    }
+    if (nipBaru !== nipLama) void muat()
+  },
+)
 
 async function unduhPdf(): Promise<void> {
   mengunduh.value = true
@@ -121,7 +139,7 @@ async function unduhPdf(): Promise<void> {
             <div><dt class="text-slate-500">Jabatan</dt><dd class="font-medium text-slate-900">{{ data.identitas.jabatan || '-' }}</dd></div>
             <div><dt class="text-slate-500">Satker</dt><dd class="font-medium text-slate-900">{{ data.identitas.satker || '-' }}</dd></div>
             <div v-if="data.identitas.kelas_jabatan !== null"><dt class="text-slate-500">Kelas Jabatan</dt><dd class="font-medium text-slate-900">{{ data.identitas.kelas_jabatan }}</dd></div>
-            <div v-if="data.identitas.predikat_skp"><dt class="text-slate-500">Predikat SKP</dt><dd class="font-medium text-slate-900">{{ data.identitas.predikat_skp }}</dd></div>
+            <div><dt class="text-slate-500">Predikat SKP</dt><dd class="font-medium text-slate-900" data-testid="tukin-predikat-skp">{{ data.identitas.predikat_skp || '-' }}</dd></div>
             <div>
               <dt class="text-slate-500">Periode</dt>
               <dd class="font-medium text-slate-900" data-testid="tukin-periode">
