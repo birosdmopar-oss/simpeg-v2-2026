@@ -51,3 +51,23 @@ non-presensi; baris presensi tidak berwarna, dan rekap/daftar legacy tanpa warna
 Warna memakai token tema `status-{kuning|merah|jingga|biru|abu|hijau|ungu|pink}` di `tailwind.config.js` (`text-status-*`,
 `bg-status-*-soft`, `bg-status-*-titik`; nilai heks hanya di sana dan di uji kontras). Teks kode selalu tampil (warna tidak
 berdiri sendiri) dan setiap pasangan teks/latar ≥ 4,5:1 (diuji). Legenda dua bagian: "Warna baris" ([K]) dan "Kode" ([V2]).
+
+## Laporan Tukin (MAKE-048)
+
+Halaman (PRD 5C §7.3; API `Controllers/Api/Presensi` "Laporan Tukin MAKE-041"):
+
+| Path | Role | Halaman |
+|---|---|---|
+| `/presensi/tukin` | 1, 3 | `LaporanTukinDaftarPage` — daftar pegawai, filter Unit/Satker (role 1), Jenis Pegawai, Cari; ⋮ Lihat laporan → Unduh PDF |
+| `/presensi/tukin/il` | 1 | pegawai Instansi Lain (`LaporanTukinIlPage` membungkus halaman yang sama) |
+| `/presensi/tukin/:nip` | 1–7 | `LaporanTukinPegawaiPage` — identitas, periode, tabel harian, ringkasan, Unduh PDF (2/6/7 hanya NIP sendiri, server menegakkan) |
+| `/presensi/tukin/saya` | 2, 6, 7 | halaman yang sama dengan NIP akun |
+
+- Service `services/laporanTukin.service.ts` (normalisasi string MySQLi, `kode[]` CR-075, `pesanGalatLaporan` memetakan `code`
+  422: `konfigurasi_tukin_tidak_lengkap`, `data_tukin_belum_tersedia`, `periode_tidak_didukung`, dst.); diuji dengan klien asli.
+- Tabel harian `TabelHarianTukin`: warna baris [K] legacy per `status`, chip kode [V2]. Baris `libur`/`akhir_pekan`/
+  `di_luar_masa_kerja` tampil bila API mengirimnya (CR-076); tabel tidak mengarang tanggal.
+- [CATAT] Kolom daftar pegawai mengikuti respons API (Nama+NIP, Gol/Ruang, Jabatan, Eselon, Unit/Satker, Pendidikan, Jenis
+  Pegawai). Kolom legacy `list_lt.php` yang tidak ada di API v2: kolom tersembunyi filter (10 pertama) dan kolom setelah
+  "Jurusan"; filter Jenis Pegawai legacy (ALL/PNS/PPPK/PPT) diganti opsi master `jenis-pegawai` (multi).
+- [CATAT] Cetak dari layar legacy diganti PDF server (Q5C-04); varian Tukin Lama tidak ada (F5B-5).
