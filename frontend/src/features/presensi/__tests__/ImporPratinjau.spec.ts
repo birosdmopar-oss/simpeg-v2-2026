@@ -150,7 +150,7 @@ describe('CR-082 T5A-02: label galat hasil impor', () => {
             disisip: '0',
             diperbarui: '0',
             dilewati: '0',
-            gagal: '2',
+            gagal: '3',
             baris: [
               {
                 nip: '199001012020011001',
@@ -159,6 +159,7 @@ describe('CR-082 T5A-02: label galat hasil impor', () => {
                 galat: [
                   { kode: 'kolom', pesan: 'Sheet GPP baris 9: kolom gjpokok tidak valid.', sheet: 'GPP', baris: 9 },
                   { kode: 'nip', pesan: 'NIP tidak terdaftar.', sheet: 'TK', baris: 10 },
+                  { kode: 'nama', pesan: 'Sheet TK baris 7: nama pada berkas tidak cocok.', sheet: 'GPP', baris: 7 },
                 ],
               },
             ],
@@ -171,6 +172,10 @@ describe('CR-082 T5A-02: label galat hasil impor', () => {
     await flushPromises()
 
     const butir = Array.from(testid('impor-hasil-galat')?.querySelectorAll('li') ?? []).map((li) => li.textContent?.trim())
-    expect(butir).toEqual(['Sheet GPP baris 9: kolom gjpokok tidak valid.', 'Sheet TK baris 10: NIP tidak terdaftar.'])
+    expect(butir).toEqual([
+      'Sheet GPP baris 9: kolom gjpokok tidak valid.',
+      'Sheet TK baris 10: NIP tidak terdaftar.',
+      'Sheet TK baris 7: nama pada berkas tidak cocok.',
+    ])
   })
 })

@@ -54,12 +54,15 @@ function keterangan(b: BarisPratinjau): string {
 }
 
 /**
- * CR-082 (T5A-02): server kadang sudah memberi awalan "Sheet <sheet> baris <n>" (BarisImpor.php), kadang tidak (mis. NIP
- * tidak terdaftar). Awalan hanya ditambahkan bila pesan belum memakainya, supaya label tidak ganda.
+ * CR-082 (T5A-02): server kadang sudah memberi awalan lokasi "Sheet <sheet> baris <n>" (BarisImpor.php), kadang tidak (mis.
+ * NIP tidak terdaftar). Awalan hanya ditambahkan bila pesan belum berawalan lokasi apa pun, termasuk sheet lain (galat
+ * lintas sheet milik baris kunci), supaya label tidak ganda.
  */
+const AWALAN_LOKASI = /^Sheet \S+ baris \d+\b/
+
 function labelGalat(g: GalatImpor): string {
-  const awalan = `Sheet ${g.sheet} baris ${g.baris}`
-  return g.pesan.startsWith(awalan) ? g.pesan : `${awalan}: ${g.pesan}`
+  if (AWALAN_LOKASI.test(g.pesan)) return g.pesan
+  return `Sheet ${g.sheet} baris ${g.baris}: ${g.pesan}`
 }
 
 function pilihBerkas(file: File | null): void {
