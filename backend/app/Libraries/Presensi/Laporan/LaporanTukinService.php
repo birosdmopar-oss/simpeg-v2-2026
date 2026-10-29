@@ -19,8 +19,11 @@ use App\Libraries\Presensi\Rekap\PenyesuaianTukin;
 use App\Libraries\Presensi\Slip\TarifUangMakan;
 use App\Libraries\Presensi\Slip\UangMakanSlipPresensi;
 use App\Libraries\Presensi\SlipGaji\PeriodeSlip;
+use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
+use App\Libraries\Presensi\Tukin\HariKerja;
 use App\Libraries\Presensi\Tukin\HasilTukin;
 use App\Libraries\Presensi\TukinData\SumberPeriodeTukin;
+use App\Models\MasterData\MasterModel;
 use Closure;
 use CodeIgniter\Database\BaseConnection;
 use Config\Presensi;
@@ -44,9 +47,29 @@ use DateTimeZone;
  *   "Rp. <tarif>" **hanya** bila tanggal itu hari dibayar uang makan menurut aturan slip (F5B-2, `HariUangMakan` per bulan
  *   kalender tanggal itu, tarif bulan itu); tanpa kolom/total uang makan; "TOTAL PENGURANGAN TUKIN" =
  *   "<total>%<akhiran penyesuaian>". Nama berkas `tukin_<nip>_<YYYY-MM>.pdf` [V2 tanpa angka acak].
+ * - `harian[]` (CR-076, keputusan Horii 29-10-2026) memuat **setiap** tanggal awal periode s.d. `dihitung_sampai` seperti
+ *   legacy [K `L_presensi.php:7302-7345`], urut tanggal. Hari kerja = hasil `KalkulasiTukin`; hari yang dilewati kalkulasi
+ *   diisi di lapisan tampilan ini dengan urutan cek legacy: di luar masa kerja (`di_luar_masa_kerja`, keterangan "") →
+ *   hari libur (`libur`, "(Libur) <nama libur>") → Sabtu/Minggu (`akhir_pekan` [V2 nama status], "Sabtu"/"Minggu");
+ *   jam null, potongan "0.00", `kode` []. Total, jumlah, rincian, dan rekap tidak berubah (kalkulasi tidak disentuh).
+ *   [CATAT] PDF memberi warna baris dengan palet yang sama dengan layar FE ({@see self::WARNA_BARIS_PDF}); [V2] legacy PDF
+ *   memakai palet berbeda (akhir pekan kuning, konket hijau, `print/laporan_tukin_skp_pdf.php:188`).
  */
 final class LaporanTukinService
 {
+    /**
+     * Warna latar baris PDF per status (keputusan "satu palet" 29-10-2026, sama dengan layar FE): akhir pekan abu-abu,
+     * libur biru, konket jingga, cuti ungu, tugas belajar merah muda, di luar masa kerja abu-abu; baris presensi tanpa warna.
+     */
+    public const WARNA_BARIS_PDF = [
+        'akhir_pekan'        => '#EEEEEE',
+        'libur'              => '#DCEAF8',
+        'konket'             => '#FCE5CD',
+        'cuti'               => '#E9DFF5',
+        'tugas_belajar'      => '#F9DDE7',
+        'di_luar_masa_kerja' => '#EEEEEE',
+    ];
+
     private readonly BaseConnection $db;
 
     /** @var Closure(): DateTimeInterface */
@@ -103,6 +126,7 @@ final class LaporanTukinService
             'periode' => $p->label(),
             'rp'      => $rp,
             'akhiran' => PenyesuaianTukin::akhiranTotal($data['penyesuaian']),
+            'warna'   => self::WARNA_BARIS_PDF,
         ], ['saveData' => false]);
 
         return [
@@ -157,7 +181,7 @@ final class LaporanTukinService
         return [$p, [
             'identitas'      => $this->identitas($pegawai, $periode->awal) + ['predikat_skp' => $hasil['predikat_skp']],
             'periode'        => ['awal' => $periode->awal, 'akhir' => $periode->akhir, 'dihitung_sampai' => $h->akhirDihitung, 'sumber' => (new SumberPeriodeTukin($this->db))->barisBkn($p->tahun, $p->bulan) !== null ? 'bkn' : 'bawaan'],
-            'harian'         => $this->harian($h, $argumen),
+            'harian'         => $this->harian($h, $argumen, $hasil['pegawai'] ?? null, $this->namaLibur($periode->awal, $h->akhirDihitung)),
             'jumlah'         => $h->jumlah,
             'rincian'        => array_map(static fn (int $bp): string => KalkulasiLaporanTukin::persen($bp), $h->rincian),
             'total_presensi' => KalkulasiLaporanTukin::persen($h->totalPresensi),
@@ -219,17 +243,39 @@ final class LaporanTukinService
     }
 
     /**
+     * Setiap tanggal awal periode s.d. `akhirDihitung` (CR-076): hari kerja dari `HasilTukin::harian`, sisanya baris
+     * non-kerja dengan urutan cek legacy (di luar masa kerja → libur → akhir pekan).
+     *
      * @param array<string, array{masuk: ?string, pulang: ?string, kategori: ?int}> $mentah
+     * @param array<string, string>                                               $libur  tanggal → nama libur
      *
      * `kode` (CR-075) = `HasilHarian::kategori` apa adanya (mis. `['TL2', 'PSW1']`, `['CS']`, `[]`) untuk color-coding FE.
      *
      * @return list<array{tanggal: string, status: string, jam_masuk: ?string, jam_pulang: ?string, potongan: string, keterangan: string, kode: list<string>, kategori_konket: ?int}>
      */
-    private function harian(HasilTukin $h, array $mentah): array
+    private function harian(HasilTukin $h, array $mentah, ?DataPegawaiTukin $pegawai, array $libur): array
     {
         $baris = [];
 
-        foreach ($h->harian as $tgl => $hh) {
+        foreach (HariKerja::kalender($h->periode->awal, $h->akhirDihitung) as $tgl) {
+            $hh = $h->harian[$tgl] ?? null;
+
+            if ($hh === null) {
+                [$status, $ket] = match (true) {
+                    $pegawai !== null && ! $pegawai->dalamMasaKerja($tgl) => ['di_luar_masa_kerja', ''],
+                    isset($libur[$tgl])                                   => ['libur', '(Libur) ' . $libur[$tgl]],
+                    HariKerja::nomorHari($tgl) === 6                      => ['akhir_pekan', 'Sabtu'],
+                    HariKerja::nomorHari($tgl) === 7                      => ['akhir_pekan', 'Minggu'],
+                    default                                               => [null, ''],
+                };
+
+                if ($status !== null) {
+                    $baris[] = ['tanggal' => $tgl, 'status' => $status, 'jam_masuk' => null, 'jam_pulang' => null, 'potongan' => KalkulasiLaporanTukin::persen(0), 'keterangan' => $ket, 'kode' => [], 'kategori_konket' => null];
+                }
+
+                continue;
+            }
+
             $m       = $mentah[$tgl] ?? ['masuk' => null, 'pulang' => null, 'kategori' => null];
             $baris[] = [
                 'tanggal'    => (string) $tgl,
@@ -251,6 +297,33 @@ final class LaporanTukinService
         }
 
         return $baris;
+    }
+
+    /**
+     * Nama hari libur aktif per tanggal untuk rentang laporan (CR-076), satu kueri; sumber sama dengan `TukinData`
+     * (`hari_libur` status aktif, `HariLiburService::tanggalLibur`). Libur bertumpuk: baris `id_libur` terbesar menang
+     * (legacy menimpa peta `listLibur_per` berurutan, `L_presensi.php:1724-1733`).
+     *
+     * @return array<string, string>
+     */
+    private function namaLibur(string $awal, string $akhir): array
+    {
+        $hasil = [];
+
+        if ($awal > $akhir) {
+            return $hasil;
+        }
+
+        $rows = $this->db->table('hari_libur')->select('tgl_mulai, tgl_akhir, nama_libur')->where('status', MasterModel::STATUS_ACTIVE)
+            ->where('tgl_mulai <=', $akhir)->where('tgl_akhir >=', $awal)->orderBy('id_libur', 'ASC')->get()->getResultArray();
+
+        foreach ($rows as $r) {
+            foreach (HariKerja::kalender(max($awal, (string) $r['tgl_mulai']), min($akhir, (string) $r['tgl_akhir'])) as $t) {
+                $hasil[$t] = (string) $r['nama_libur'];
+            }
+        }
+
+        return $hasil;
     }
 
     /**

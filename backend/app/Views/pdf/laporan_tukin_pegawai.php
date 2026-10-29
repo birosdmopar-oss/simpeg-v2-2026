@@ -6,11 +6,14 @@
  * keterangan `colspan=4` + sel "Rp." hanya bila hari dibayar uang makan (aturan slip); **tanpa** kolom "UANG MAKAN" dan
  * tanpa baris "TOTAL UANG MAKAN" (di legacy berada di dalam komentar HTML); "TOTAL PENGURANGAN TUKIN" =
  * "<total>%<akhiran penyesuaian>". Keterangan penyesuaian (DBV-024) dicetak di atas tabel. Semua teks di-escape.
+ * CR-076: baris non-kerja (di luar masa kerja, "(Libur) <nama>", "Sabtu"/"Minggu") ikut legacy `:188-205` sebagai tanggal +
+ * keterangan `colspan=4`; warna baris per status dari `$warna` (palet sama dengan layar FE; [V2] legacy kuning/hijau).
  *
  * @var array<string, mixed> $d
  * @var string               $periode
  * @var array<string, int>   $rp      tanggal → sen
  * @var string               $akhiran
+ * @var array<string, string> $warna   status → warna latar baris
  */
 
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
@@ -46,8 +49,9 @@ $i       = $d['identitas'];
         <th width="20%">TANGGAL</th><th width="20%">JAM<br>MASUK</th><th width="20%">JAM<br>PULANG</th><th width="20%">KET.</th><th width="20%">POTONGAN<br>PRESENSI</th>
     </tr>
     <?php foreach ($d['harian'] as $h): ?>
+        <?php $bg = isset($warna[$h['status']]) ? ' bgcolor="' . esc($warna[$h['status']]) . '"' : '' ?>
         <?php if ($h['status'] === 'konket'): ?>
-            <tr nobr="true">
+            <tr nobr="true"<?= $bg ?>>
                 <td width="20%"><?= esc($tanggal($h['tanggal'])) ?></td>
                 <td colspan="4" width="<?= isset($rp[$h['tanggal']]) ? '60%' : '80%' ?>"><?= esc((string) $h['keterangan']) ?></td>
                 <?php if (isset($rp[$h['tanggal']])): ?>
@@ -55,13 +59,13 @@ $i       = $d['identitas'];
                 <?php endif ?>
             </tr>
         <?php elseif ($h['status'] === 'cuti'): ?>
-            <tr nobr="true">
+            <tr nobr="true"<?= $bg ?>>
                 <td width="20%"><?= esc($tanggal($h['tanggal'])) ?></td>
                 <td colspan="3" width="60%"><?= esc((string) $h['keterangan']) ?></td>
                 <td class="c" width="20%"><?= esc((string) $h['potongan']) ?>%</td>
             </tr>
-        <?php elseif (in_array($h['status'], ['tugas_belajar', 'libur', 'di_luar_masa_kerja'], true)): ?>
-            <tr nobr="true">
+        <?php elseif (in_array($h['status'], ['tugas_belajar', 'libur', 'akhir_pekan', 'di_luar_masa_kerja'], true)): ?>
+            <tr nobr="true"<?= $bg ?>>
                 <td width="20%"><?= esc($tanggal($h['tanggal'])) ?></td>
                 <td colspan="4" width="80%"><?= esc((string) $h['keterangan']) ?></td>
             </tr>
