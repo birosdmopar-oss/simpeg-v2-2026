@@ -4,15 +4,15 @@ Catatan progres per task (aturan `IN_PROGRESS` di 00-INDEX.md dan PRD 5A §11.3)
 `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` v1.0 (BERLAKU 19-10-2026; menang atas `05-Presensi.md`, Matriks, dan
 README modul). Aturan Slip Gaji (sumber legacy, hak akses): `backend/app/Libraries/Presensi/README.md`.
 
-**Status:** paket **5A DONE (backend & dokumen)** — sign-off Horii 28-10-2026 (PRD 5A §11.1 #8) setelah M8 MAKE-035
-masuk `main` `54cb441`. **FE 5A (D-12) tetap IN_PROGRESS** sampai QA Lapis 1 lolos (Q5A-18, AC-FE.9); blocker go-live
-5A tetap berlaku (di bawah). **5B: M1a–M6 di `main`** (MAKE-044 `7c40229`, MAKE-039 `df10c0f`, MAKE-040 `79641be`,
-DBV-024 `e9f4616`, MAKE-045 `ccb81f3`, MAKE-042 `70a24b6`, MAKE-041 `9968dc0`); **M7 MAKE-043 (verifikasi 5B)** di branch
-`fase5b/make-043-verifikasi-5b` — laporan `docs/fase5/Laporan_Akhir_5B_MAKE-043.md`, menunggu sign-off reviewer CR 5B
-(PRD 5B §11.1 #7). 5A/5B DONE ≠ Fase 5 DONE (PRD 5A §11.2, PRD 5B §11.2).
+**Status:** **5A DONE** (sign-off Horii 28-10-2026, `54cb441`), **5B DONE** (sign-off Horii 29-10-2026, MAKE-043
+`87f77c8`), **5C** seluruh paket di `main` (MAKE-047..053, CR-075..081; `main` `6c116ac`) dan **QA Lapis 1 5C lolos**
+29-10-2026. Verifikasi akhir Fase 5 = `docs/fase5/Laporan_Akhir_Fase5.md` (MAKE-054); **sign-off Horii Fase 5** menunggu
+laporan itu + QA Lapis 1 FE 5A (Q5A-18, belum dijalankan). Uji paritas UP-1 = **Tahap UP-1** tersendiri (bukan syarat
+sign-off Fase 5, gerbang Fase 6 — K5C-10). Fase 5 DONE ≠ siap go-live (blocker go-live di bawah dan di laporan akhir §8).
 
-**Terakhir diperbarui:** 29 Oktober 2026 — 5B M7 MAKE-043 (status D-04..D-09, blocker F5-1 ditutup, prosedur paritas
-UP-1, runbook 5B C-2). Sebelumnya 28 Oktober 2026 — status 5A pasca sign-off (commit docs di branch 5B pertama
+**Terakhir diperbarui:** 29 Oktober 2026 — MAKE-054 (status 5C, QA Lapis 1 5C lolos, laporan akhir Fase 5). Sebelumnya
+29 Oktober 2026 — 5B M7 MAKE-043 (status D-04..D-09, blocker F5-1 ditutup, prosedur paritas UP-1, runbook 5B C-2).
+Sebelumnya 28 Oktober 2026 — status 5A pasca sign-off (commit docs di branch 5B pertama
 `fase5b/dbv-024-penyesuaian-tukin`, keputusan reviewer CR M0 F4). Sebelumnya: M8 MAKE-035 di `main` `54cb441`; riwayat
 merge 5A: M2 DBV-023 `e8d08dc`; M3–M6 s.d. `3a12909`; M7 (a) `5279b82`, (b) `5a3a35c`, (c) `919c822`; CR-067 `08b6c89`.
 DBV-023 **disetujui DB Validator 20-10-2026 (jjoseph48)** (PR #28); ISSUE-049 (Q5A-02) ditutup keputusan user 20-10-2026.
@@ -25,11 +25,11 @@ diganti syarat "DBV-022 ada di `main`" untuk migration 5A (PRD 5A §3.5). 5B tet
 | D-02 Presensi online + geofence | 5A | M5 | MAKE-032 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D02.1–02.10 berbukti test (laporan M8); GPS perangkat nyata di QA (Q5A-22) |
 | D-03 Presensi manual | 5A | M5 | MAKE-032 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D03.1–03.8 berbukti test, termasuk jalur tangkap 1062 (M8) |
 | D-04..D-07 Kalkulasi Tukin | 5A (adapter) / 5B | 5A M6 / 5B M1 | MAKE-033/039 | **DONE (backend)** | Murni CR-037/039 + adapter 5A + sumber cuti/TB nyata 5B M1 (`df10c0f`, review CR 28-10; PRD 5B §11.3); AC-D06.1–06.10 → laporan 5B M7 |
-| D-08 Laporan Tukin, D-09 rekap & uang makan | 5B / 5C (FE) | 5B M2–M6 | MAKE-040/041/042/045, DBV-024 | **IN_PROGRESS** (backend 5B lengkap di `main`, menunggu sign-off 5B; FE = 5C) | AC-D08/D09a/D09b berbukti test (laporan 5B M7); F5-1 ditutup M2 |
+| D-08 Laporan Tukin, D-09 rekap & uang makan | 5B / 5C (FE) | 5B M2–M6 / 5C | MAKE-040/041/042/045, DBV-024, MAKE-048..051 | **DONE** (5B sign-off 29-10; FE 5C di `main`, QA Lapis 1 5C lolos) | AC-D08/D09a/D09b berbukti test (laporan 5B M7); FE → `Laporan_Akhir_Fase5.md` §3 |
 | D-10 Slip Gaji: impor Excel | 5A | M3 | MAKE-030 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D10.1–10.10 berbukti test |
 | D-11 Slip Gaji: akses & kelola admin | 5A | M4 | MAKE-031 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D11.1–11.11 berbukti test; acuan slip `0cf7e67` (CR-067) |
-| D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 / 5C M1–M5 | MAKE-034, MAKE-047..051, MAKE-053 | **IN_PROGRESS** (FE lengkap di `main`; sampai QA Lapis 1 5A + 5C lolos) | FE 5A di `main` `919c822`; FE 5C lengkap: fondasi (047), Laporan Tukin (048), Rekap Tukin (049), Penyesuaian Tukin (050), Rekap Kehadiran & Uang Makan (051); menu Presensi tanpa `rilis`, `ACTIVE_PHASE = 5` (053). AC-FE.9 / AC-FE5C.4 = QA Lapis 1 (reviewer, app demo) |
-| D-13 Unit test lengkap | 5A (bagian) / 5C | M8 / 5C | MAKE-035, MAKE-052 | **DONE (suite)** — verifikasi AC di MAKE-054 | Bagian 5A lengkap (laporan M8); regression suite 12 skenario `backend/tests/Presensi/RegresiD13/` (grup `d13`, `composer test:d13`) di `main` (MAKE-052) |
+| D-12 Frontend | 5A (Presensi & Slip Gaji) / 5C | M7 / 5C M1–M5 | MAKE-034, MAKE-047..051, MAKE-053 | **IN_PROGRESS** — FE 5C selesai (QA Lapis 1 5C lolos 29-10, CR-077..079/081); sisa QA Lapis 1 FE 5A (Q5A-18) | FE 5A `919c822`; FE 5C: fondasi (047), Laporan Tukin (048), Rekap Tukin (049), Penyesuaian Tukin (050), Rekap Kehadiran & Uang Makan (051); `ACTIVE_PHASE = 5` (053). Checklist & hasil: `Checklist_QA_Lapis1_Fase5C.md` |
+| D-13 Unit test lengkap | 5A (bagian) / 5C | M8 / 5C | MAKE-035, MAKE-052 | **DONE** (AC-D13.1 diverifikasi MAKE-054) | Bagian 5A lengkap (laporan M8); regression suite 12 skenario `backend/tests/Presensi/RegresiD13/` (grup `d13`, `composer test:d13`), ikut gate penuh `6c116ac` |
 | D-14 Verifikasi QR publik | 5A | M4/M7 | MAKE-031/034 | **DONE** (sign-off 5A 28-10) | Di `main`; AC-D14.1–14.7 berbukti test; FE `/verify/slip/:token` |
 
 **Blocker go-live (bukan blocker 5A DONE, PRD 5A §11.2):** ~~nilai uang makan slip (5B, F5-1)~~ **selesai** — 5B M2
