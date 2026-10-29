@@ -115,6 +115,53 @@ final class ParitasRekapTukinTest extends CIUnitTestCase
     }
 
     /**
+     * CR-080: parser CI4 meneruskan `--csv=x` sebagai kunci `"csv=x"` bernilai null; dulu diabaikan diam-diam (toleransi
+     * bawaan, CSV tidak ditulis). Kedua bentuk kini berlaku; opsi salah → kode keluar 2 + pemakaian.
+     */
+    public function testOpsiBentukSamaDenganDanSpasi(): void
+    {
+        $legacy = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0], ['199001012020011002', 3.0, 1.0]]);
+        $beda   = $this->xlsxV2([$this->baris('199001012020011001', 1.5), $this->baris('199001012020011002', 2.0)]);
+        $csv1   = $this->berkas[] = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'paritas_' . bin2hex(random_bytes(4)) . '.csv';
+        $csv2   = $this->berkas[] = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'paritas_' . bin2hex(random_bytes(4)) . '.csv';
+
+        // `--csv=<path> --toleransi=2` (bentuk usage & prosedur UP-1), persis seperti hasil parser CI4.
+        $this->resetStreamFilterBuffer();
+        $this->assertSame(0, $this->jalankan([$legacy, $beda, "csv={$csv1}" => null, 'toleransi=2' => null]), 'toleransi 2 dipakai → sama');
+        $this->assertStringContainsString('sama: 2, beda: 0', $this->getStreamFilterBuffer());
+        $this->assertStringContainsString('(toleransi 2)', $this->getStreamFilterBuffer());
+        $this->assertFileExists($csv1, 'CSV ditulis untuk bentuk --csv=');
+
+        // `--csv <path> --toleransi 0.5`.
+        $this->resetStreamFilterBuffer();
+        $this->assertSame(1, $this->jalankan([$legacy, $beda, 'csv' => $csv2, 'toleransi' => '0.5']));
+        $this->assertStringContainsString('(toleransi 0.5)', $this->getStreamFilterBuffer());
+        $this->assertStringContainsString(',beda,', (string) file_get_contents($csv2));
+
+        // Lewat jalur parser `command()` (tanpa backslash di path: helper itu memakai stripcslashes).
+        $csv3 = $this->berkas[] = str_replace('\\', '/', sys_get_temp_dir()) . '/paritas_' . bin2hex(random_bytes(4)) . '.csv';
+        $this->resetStreamFilterBuffer();
+        command(sprintf('presensi:paritas-tukin %s %s --csv=%s --toleransi=2', str_replace('\\', '/', $legacy), str_replace('\\', '/', $beda), $csv3));
+        $this->assertStringContainsString('(toleransi 2)', $this->getStreamFilterBuffer());
+        $this->assertFileExists($csv3);
+
+        // Opsi salah → 2 + pemakaian, tanpa menjalankan perbandingan.
+        foreach ([
+            'tak dikenal'           => [$legacy, $beda, 'tolerance=2' => null],
+            'csv tanpa nilai'       => [$legacy, $beda, 'csv=' => null],
+            'toleransi bukan angka' => [$legacy, $beda, 'toleransi=dua' => null],
+            'toleransi negatif'     => [$legacy, $beda, 'toleransi=-1' => null],
+            'bendera bernilai'      => [$legacy, 'nip-penuh' => $beda],
+            'argumen berlebih'      => [$legacy, $beda, 'ketiga.xlsx'],
+        ] as $kasus => $params) {
+            $this->resetStreamFilterBuffer();
+            $this->assertSame(2, $this->jalankan($params), $kasus);
+            $this->assertStringContainsString('Pemakaian: presensi:paritas-tukin', $this->getStreamFilterBuffer(), $kasus);
+            $this->assertStringNotContainsString('Baris legacy:', $this->getStreamFilterBuffer(), $kasus);
+        }
+    }
+
+    /**
      * @param array<int|string, string|null> $params
      */
     private function jalankan(array $params): int
