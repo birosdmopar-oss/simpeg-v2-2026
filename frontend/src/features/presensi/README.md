@@ -48,4 +48,6 @@ non-presensi; baris presensi tidak berwarna, dan rekap/daftar legacy tanpa warna
 | Kode CS (cuti sakit hari ke-15+) | tanpa warna | [V2] chip jingga |
 | Rekap Tukin / Rekap Kehadiran | tanpa warna | hanya chip/sel kode, tanpa warna baris |
 
-Teks kode selalu tampil (warna tidak berdiri sendiri) dan setiap pasangan teks/latar ≥ 4,5:1 (diuji).
+Warna memakai token tema `status-{kuning|merah|jingga|biru|abu|hijau|ungu|pink}` di `tailwind.config.js` (`text-status-*`,
+`bg-status-*-soft`, `bg-status-*-titik`; nilai heks hanya di sana dan di uji kontras). Teks kode selalu tampil (warna tidak
+berdiri sendiri) dan setiap pasangan teks/latar ≥ 4,5:1 (diuji). Legenda dua bagian: "Warna baris" ([K]) dan "Kode" ([V2]).

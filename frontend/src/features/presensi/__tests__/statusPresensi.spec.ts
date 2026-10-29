@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 import LegendaStatusPresensi from '../components/LegendaStatusPresensi.vue'
 import StatusPresensiChip from '../components/StatusPresensiChip.vue'
-import { akhirPekan, chipHarian, entriLegenda, infoKode, infoStatusHarian, NADA_STATUS, nadaBaris, URUTAN_LEGENDA, type NadaStatus } from '../statusPresensi'
+import tailwindRaw from '../../../../tailwind.config.js?raw'
+import { akhirPekan, chipHarian, infoKode, infoStatusHarian, legendaBaris, legendaKode, NADA_STATUS, nadaBaris, type NadaStatus } from '../statusPresensi'
 
 /** Kontras WCAG 2.x dua warna heks `#rrggbb`. */
 function kontras(a: string, b: string): number {
@@ -13,6 +14,14 @@ function kontras(a: string, b: string): number {
   }
   const [t, g] = [lum(a), lum(b)].sort((x, y) => y - x)
   return (t! + 0.05) / (g! + 0.05)
+}
+
+/** Token tema `status-*` dibaca dari `tailwind.config.js` (satu-satunya tempat nilai heks). */
+function tokenStatus(): Record<string, { DEFAULT: string; soft: string; titik: string }> {
+  const blok = /status:\s*\{([\s\S]*?)\n {8}\},/.exec(tailwindRaw)![1]!
+  const hasil: Record<string, { DEFAULT: string; soft: string; titik: string }> = {}
+  for (const m of blok.matchAll(/(\w+):\s*\{\s*DEFAULT:\s*'(#\w{6})',\s*soft:\s*'(#\w{6})',\s*titik:\s*'(#\w{6})'/g)) hasil[m[1]!] = { DEFAULT: m[2]!, soft: m[3]!, titik: m[4]! }
+  return hasil
 }
 
 describe('statusPresensi (peta kode → chip)', () => {
@@ -33,8 +42,18 @@ describe('statusPresensi (peta kode → chip)', () => {
     expect(['libur', 'konket', 'cuti', 'tugas_belajar', 'di_luar_masa_kerja'].map(nada)).toEqual(['biru', 'jingga', 'ungu', 'pink', 'abu'])
   })
 
-  it('kontras teks/latar setiap nada ≥ 4,5:1', () => {
-    for (const [nama, n] of Object.entries(NADA_STATUS)) expect(kontras(n.teks, n.latar), nama).toBeGreaterThanOrEqual(4.5)
+  it('kontras teks/latar setiap token status-* ≥ 4,5:1 dan semua nada punya token', () => {
+    const token = tokenStatus()
+    expect(Object.keys(token).sort()).toEqual(Object.keys(NADA_STATUS).sort())
+    for (const [nama, t] of Object.entries(token)) expect(kontras(t.DEFAULT, t.soft), nama).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('kelas chip/baris/titik memakai token status-* (tanpa heks lepas) sesuai nadanya', () => {
+    for (const [nada, k] of Object.entries(NADA_STATUS)) {
+      for (const kelas of [k.chip, k.baris, k.titik]) expect(kelas, nada).not.toMatch(/\[#/)
+      expect(k.chip).toContain(`status-${nada}`)
+      expect(k.titik).toBe(`bg-status-${nada}-titik`)
+    }
   })
 
   it('chipHarian: kode menang; cuti sakit CS tampil bersama cuti; tanpa kode dari status', () => {
@@ -65,8 +84,9 @@ describe('statusPresensi (peta kode → chip)', () => {
     for (const st of ['hadir', 'TK', 'TPM', 'TPP', 'tidak-dikenal']) expect(nadaBaris(st), st).toBeNull()
   })
 
-  it('legenda memuat semua entri berurutan', () => {
-    expect(entriLegenda().map((e) => e.kunci)).toEqual([...URUTAN_LEGENDA])
+  it('legenda terpisah: Kode (kejadian) dan Warna baris (status)', () => {
+    expect(legendaKode().map((e) => e.kunci)).toEqual(['TK', 'TPM', 'TPP', 'CS', 'TL1', 'TL2', 'TL3', 'PSW1', 'PSW2', 'PSW3'])
+    expect(legendaBaris().map((e) => e.kunci)).toEqual(['libur', 'akhir_pekan', 'konket', 'cuti', 'tugas_belajar', 'di_luar_masa_kerja', 'hadir'])
   })
 })
 
@@ -84,12 +104,15 @@ describe('StatusPresensiChip & LegendaStatusPresensi', () => {
     expect(mount(StatusPresensiChip, { props: { status: 'tidak-dikenal' } }).find('[data-testid="status-presensi-chip"]').exists()).toBe(false)
   })
 
-  it('legenda lengkap dan versi ringkas hanya kode potongan', () => {
+  it('legenda: bagian Warna baris + Kode; versi ringkas hanya Kode', () => {
     const penuh = mount(LegendaStatusPresensi)
-    expect(penuh.findAll('li').map((l) => l.attributes('data-kode'))).toEqual([...URUTAN_LEGENDA])
+    expect(penuh.get('[data-testid="legenda-warna-baris"]').findAll('li').map((l) => l.attributes('data-kode'))).toEqual(legendaBaris().map((e) => e.kunci))
+    expect(penuh.get('[data-testid="legenda-kode"]').findAll('li').map((l) => l.attributes('data-kode'))).toEqual(legendaKode().map((e) => e.kunci))
     expect(penuh.get('section').attributes('aria-label')).toBe('Legenda status presensi')
+    expect(penuh.findAll('h3').map((h) => h.text())).toEqual(['Warna baris', 'Kode'])
 
     const ringkas = mount(LegendaStatusPresensi, { props: { ringkas: true } })
-    expect(ringkas.findAll('li').map((l) => l.attributes('data-kode'))).toEqual(['TK', 'TPM', 'TPP', 'CS', 'TL1', 'TL2', 'TL3', 'PSW1', 'PSW2', 'PSW3'])
+    expect(ringkas.find('[data-testid="legenda-warna-baris"]').exists()).toBe(false)
+    expect(ringkas.findAll('li').map((l) => l.attributes('data-kode'))).toEqual(legendaKode().map((e) => e.kunci))
   })
 })

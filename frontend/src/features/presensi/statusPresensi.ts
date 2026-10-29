@@ -9,26 +9,26 @@
  *   CS jingga. Rekap Tukin/kehadiran (legacy tanpa warna) hanya memakai chip/sel kode, tanpa warna baris.
  *
  * Aturan: warna TIDAK berdiri sendiri — teks kode selalu tampil (`kode`), lalu legenda menjelaskan. Pasangan teks/latar
- * dipilih ≥ 4,5:1 (diuji di `statusPresensi.spec.ts`). Warna teks lebih gelap daripada `UiBadge` karena pasangan
- * badge itu hanya ±3–4,2:1 untuk kuning/hijau/biru muda.
+ * token `status-*` dipilih ≥ 4,5:1 (diuji di `statusPresensi.spec.ts`). Teksnya lebih gelap daripada `UiBadge` karena
+ * pasangan badge itu hanya ±3–4,2:1 untuk kuning/hijau/biru muda.
  */
 import type { KodeKejadian, StatusHarian } from './types.laporan'
 
 export type NadaStatus = 'kuning' | 'merah' | 'jingga' | 'biru' | 'abu' | 'hijau' | 'ungu' | 'pink'
 
 /**
- * Kelas Tailwind per nada: `chip` (latar + teks), `baris` (latar baris), `titik` (penanda legenda). `teks`/`latar`
- * adalah nilai heks pasangan `chip` yang sama, dipakai hanya oleh uji kontras.
+ * Kelas Tailwind per nada, dari token tema `status-*` (`tailwind.config.js`; nilai heks hanya di sana): `chip` (latar +
+ * teks), `baris` (latar baris tabel), `titik` (penanda legenda). Ditulis lengkap per entri agar terdeteksi pemindai Tailwind.
  */
-export const NADA_STATUS: Record<NadaStatus, { chip: string; baris: string; titik: string; teks: string; latar: string }> = {
-  kuning: { chip: 'bg-warning-soft text-[#8a5b00]', baris: 'bg-warning-soft/60', titik: 'bg-warning', teks: '#8a5b00', latar: '#FFF2E4' },
-  merah: { chip: 'bg-danger-soft text-[#a82d2e]', baris: 'bg-danger-soft/70', titik: 'bg-danger', teks: '#a82d2e', latar: '#FDEBEB' },
-  jingga: { chip: 'bg-[#ffe9d6] text-[#8f3f00]', baris: 'bg-[#ffe9d6]/70', titik: 'bg-[#f97316]', teks: '#8f3f00', latar: '#ffe9d6' },
-  biru: { chip: 'bg-info-soft text-[#006672]', baris: 'bg-info-soft/70', titik: 'bg-info', teks: '#006672', latar: '#E0F7FA' },
-  abu: { chip: 'bg-slate-100 text-slate-600', baris: 'bg-slate-100/80', titik: 'bg-slate-400', teks: '#475569', latar: '#f1f5f9' },
-  hijau: { chip: 'bg-success-soft text-[#13753d]', baris: '', titik: 'bg-success', teks: '#13753d', latar: '#E6F8EF' },
-  ungu: { chip: 'bg-[#efe9f7] text-[#5b3f8c]', baris: 'bg-[#efe9f7]/80', titik: 'bg-[#6f519d]', teks: '#5b3f8c', latar: '#efe9f7' },
-  pink: { chip: 'bg-[#fbe6f0] text-[#9c1f5a]', baris: 'bg-[#fbe6f0]/80', titik: 'bg-[#d5317c]', teks: '#9c1f5a', latar: '#fbe6f0' },
+export const NADA_STATUS: Record<NadaStatus, { chip: string; baris: string; titik: string }> = {
+  kuning: { chip: 'bg-status-kuning-soft text-status-kuning', baris: 'bg-status-kuning-soft/70', titik: 'bg-status-kuning-titik' },
+  merah: { chip: 'bg-status-merah-soft text-status-merah', baris: 'bg-status-merah-soft/70', titik: 'bg-status-merah-titik' },
+  jingga: { chip: 'bg-status-jingga-soft text-status-jingga', baris: 'bg-status-jingga-soft/70', titik: 'bg-status-jingga-titik' },
+  biru: { chip: 'bg-status-biru-soft text-status-biru', baris: 'bg-status-biru-soft/70', titik: 'bg-status-biru-titik' },
+  abu: { chip: 'bg-status-abu-soft text-status-abu', baris: 'bg-status-abu-soft/80', titik: 'bg-status-abu-titik' },
+  hijau: { chip: 'bg-status-hijau-soft text-status-hijau', baris: '', titik: 'bg-status-hijau-titik' },
+  ungu: { chip: 'bg-status-ungu-soft text-status-ungu', baris: 'bg-status-ungu-soft/80', titik: 'bg-status-ungu-titik' },
+  pink: { chip: 'bg-status-pink-soft text-status-pink', baris: 'bg-status-pink-soft/80', titik: 'bg-status-pink-titik' },
 }
 
 export interface InfoStatus {
@@ -75,8 +75,11 @@ export function akhirPekan(tanggal: string): boolean {
   return hari === 0 || hari === 6
 }
 
-/** Urutan legenda: dari paling berat ke paling ringan, lalu status tanpa potongan. */
-export const URUTAN_LEGENDA: readonly string[] = ['TK', 'TPM', 'TPP', 'CS', 'TL1', 'TL2', 'TL3', 'PSW1', 'PSW2', 'PSW3', 'cuti', 'tugas_belajar', 'konket', 'libur', 'akhir_pekan', 'di_luar_masa_kerja', 'hadir']
+/** Legenda "Kode": kode kejadian potongan, dari paling berat ke paling ringan. */
+export const URUTAN_LEGENDA_KODE: readonly string[] = ['TK', 'TPM', 'TPP', 'CS', 'TL1', 'TL2', 'TL3', 'PSW1', 'PSW2', 'PSW3']
+
+/** Legenda "Warna baris": status harian (hadir tanpa warna baris, jadi hanya dicantumkan sebagai keterangan chip). */
+export const URUTAN_LEGENDA_BARIS: readonly string[] = ['libur', 'akhir_pekan', 'konket', 'cuti', 'tugas_belajar', 'di_luar_masa_kerja', 'hadir']
 
 export function infoKode(kode: string): InfoStatus | null {
   return (KODE as Record<string, InfoStatus | undefined>)[kode] ?? null
@@ -88,9 +91,16 @@ export function infoStatusHarian(status: string, tanggal?: string): InfoStatus |
   return (STATUS as Record<string, InfoStatus | null | undefined>)[status] ?? null
 }
 
-/** Daftar entri legenda sesuai `URUTAN_LEGENDA` (kode kejadian + status tanpa potongan). */
-export function entriLegenda(): InfoStatus[] {
-  return URUTAN_LEGENDA.map((k) => infoKode(k) ?? infoStatusHarian(k)).filter((i): i is InfoStatus => i !== null)
+const dariKunci = (k: string): InfoStatus | null => infoKode(k) ?? infoStatusHarian(k)
+
+/** Entri legenda "Kode" (chip kejadian). */
+export function legendaKode(): InfoStatus[] {
+  return URUTAN_LEGENDA_KODE.map(dariKunci).filter((i): i is InfoStatus => i !== null)
+}
+
+/** Entri legenda "Warna baris" (status harian). */
+export function legendaBaris(): InfoStatus[] {
+  return URUTAN_LEGENDA_BARIS.map(dariKunci).filter((i): i is InfoStatus => i !== null)
 }
 
 /** Status yang sudah diwakili kode kejadian (potongan presensi) sehingga tidak perlu chip status tambahan. */
