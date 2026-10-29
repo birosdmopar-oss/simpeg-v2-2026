@@ -111,6 +111,14 @@ describe('RekapTukinPage', () => {
     expect(wrapper.get('[data-testid="rekap-row-199001012020011001"] [data-kolom="total_potongan"]').text()).toBe('1,2')
   })
 
+  it('CR-079: kolom Unit Es. I/II diberi lebar minimum supaya nama unit tidak membungkus banyak baris', async () => {
+    server.balasan['get /presensi/tukin/rekap'] = sukses(rekap(ITEMS))
+    const { wrapper } = await mountRekap()
+
+    const th = wrapper.findAll('thead th').filter((h) => /^Unit Es\./.test(h.text()))
+    expect(th.map((h) => h.classes())).toEqual([expect.arrayContaining(['min-w-[16rem]']), expect.arrayContaining(['min-w-[16rem]'])])
+  })
+
   it('tanpa warna baris (legacy rekap tanpa warna) dan tanpa blok penanda tangan di layar', async () => {
     server.balasan['get /presensi/tukin/rekap'] = sukses(rekap(ITEMS))
     const { wrapper } = await mountRekap()

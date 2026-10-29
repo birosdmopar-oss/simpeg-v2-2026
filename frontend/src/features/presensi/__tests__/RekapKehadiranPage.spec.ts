@@ -93,6 +93,14 @@ describe('tabel ringkas', () => {
     expect(baris.text()).toContain('Budi Santoso')
   })
 
+  it('CR-079: wadah tabel punya bingkai sendiri; catatan & paginasi di luar bingkai (tidak tertimpa tabel sticky di layar sempit)', async () => {
+    const { wrapper } = await mountPage(Role.SUPER_ADMIN)
+    const bingkai = wrapper.get('[data-testid="rekap-kehadiran-bingkai"]')
+    expect(bingkai.element.children).toHaveLength(1)
+    expect(bingkai.element.firstElementChild?.classList.contains('table-fill')).toBe(true)
+    expect(bingkai.find('[data-testid="rekap-kehadiran-catatan-tb"]').exists()).toBe(false)
+  })
+
   it('panggilan daftar memuat bulan berjalan dan paginasi', async () => {
     await mountPage(Role.SUPER_ADMIN)
     const q = svc.daftar.mock.calls[0]?.[0]

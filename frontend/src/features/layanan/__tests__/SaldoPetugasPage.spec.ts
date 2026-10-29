@@ -132,4 +132,13 @@ describe('PetugasApprovalCutiPage', () => {
     const menu = await rowMenuActions(wrapper, 'pa-actions-7')
     expect(menu.map((m) => m.key)).toEqual(['edit', 'hapus'])
   })
+
+  it('CR-079: wadah tabel petugas punya bingkai sendiri (paginasi di luar bingkai)', async () => {
+    vi.mocked(cutiPetugasApprovalService.list).mockResolvedValue({ items: [petugas(7)], total: 1, page: 1, per_page: 20 })
+    const { wrapper } = await mountHalaman(PetugasApprovalCutiPage, Role.SUPER_ADMIN, '/layanan/cuti/petugas-approval')
+
+    const bingkai = wrapper.get('[data-testid="pa-table-bingkai"]')
+    expect(bingkai.element.children).toHaveLength(1)
+    expect(bingkai.element.firstElementChild?.getAttribute('data-testid')).toBe('pa-table-scroll')
+  })
 })

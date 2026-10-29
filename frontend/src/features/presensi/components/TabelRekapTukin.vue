@@ -27,8 +27,8 @@ const OFFSET_NIP = { '--sticky-kiri': '17rem' }
           <th scope="col" rowspan="2" class="col-sticky-kiri w-12 min-w-[3rem] px-3 py-2.5 text-center">No</th>
           <th scope="col" rowspan="2" class="col-sticky-kiri w-56 min-w-[14rem] px-3 py-2.5" :style="OFFSET_NAMA">Nama</th>
           <th scope="col" rowspan="2" class="col-sticky-kiri w-44 min-w-[11rem] px-3 py-2.5" :style="OFFSET_NIP">NIP</th>
-          <th scope="col" rowspan="2" class="px-3 py-2.5">Unit Es. I</th>
-          <th scope="col" rowspan="2" class="px-3 py-2.5">Unit Es. II</th>
+          <th scope="col" rowspan="2" class="min-w-[16rem] px-3 py-2.5">Unit Es. I</th>
+          <th scope="col" rowspan="2" class="min-w-[16rem] px-3 py-2.5">Unit Es. II</th>
           <th scope="colgroup" colspan="6" class="h-10 px-3 py-2 text-center">Jumlah Pengurangan (%)</th>
           <th scope="col" rowspan="2" class="px-3 py-2.5 text-right">Total Pengurangan Presensi (%)</th>
           <th scope="col" rowspan="2" class="px-3 py-2.5 text-right">Total Pengurangan SKP (%)</th>
