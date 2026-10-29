@@ -113,6 +113,28 @@
   }
 
   /*
+   * Kolom identitas tabel densitas tinggi menempel di kiri saat tabel digulir horizontal (laporan Presensi 5C, AC-FE5C.4).
+   * Pasang `col-sticky-kiri` pada `<th>`/`<td>` kolom No/Nama/NIP; kolom kedua dst. memberi offset lewat
+   * `style="--sticky-kiri: <lebar kolom sebelumnya>"`. Latar dibuat tegas (bukan transparan) supaya isi yang tergulir tidak
+   * tembus; baris genap mengikuti zebra halus `tr:nth-child(even)`. Header-nya menumpuk di atas header sticky atas.
+   */
+  .col-sticky-kiri {
+    position: sticky;
+    left: var(--sticky-kiri, 0px);
+    z-index: 5;
+    background-color: rgb(255 255 255);
+  }
+
+  tbody tr:nth-child(even) > .col-sticky-kiri {
+    background-color: rgb(248 250 252);
+  }
+
+  thead th.col-sticky-kiri {
+    z-index: 20;
+    background-color: rgb(248 250 252);
+  }
+
+  /*
    * Panel gulir mandiri (CR-060): menempel di bawah top navbar sticky (lg ke atas), tinggi = viewport − navbar, dan
    * menggulir isinya sendiri sehingga menggulir panel tidak menggulir halaman/area data, dan sebaliknya. Di bawah lg
    * (layout bertumpuk) tidak menempel dan tidak dibatasi tinggi.
