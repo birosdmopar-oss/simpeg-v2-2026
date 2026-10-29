@@ -1,0 +1,139 @@
+/**
+ * Keadaan filter bersama halaman laporan Presensi 5C (PRD 5C §7.1): Bulan (`YYYY-MM`), Unit/Satker, Jenis Pegawai
+ * (multi), Cari, paginasi. Disimpan di query string URL (`?bulan=&unit=&satker=&jp=&q=&page=&per_page=`) supaya halaman
+ * bisa dibagikan dan di-refresh; nilai bawaan tidak ditulis. `param` mengikuti kontrak README API (`unit_satker`
+ * `0` / `<id_unit>` / `sat_<id_satker>`, `jenis_pegawai[]`, `per_page` maks 100).
+ *
+ * Opsi Unit/Satker/Jenis Pegawai dimuat dari master (`GET master/{entitas}/options`); gagal dimuat → opsi kosong, halaman
+ * tetap bisa dipakai. Role 3/4 tidak menampilkan Unit/Satker (`bisaPilihUnit = false`): server memaksa lingkupnya.
+ */
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+
+import { masterService } from '@/features/master-data/services/master.service'
+import type { SelectOption } from '@/shared/ui'
+
+import { PER_PAGE_LAPORAN, type FilterLaporan, type ParamLaporan } from '../types.laporan'
+
+const POLA_BULAN = /^\d{4}-(0[1-9]|1[0-2])$/
+
+/** Bulan berjalan `YYYY-MM` menurut tanggal WIB (UTC+7), tanpa `toISOString()`. */
+export function bulanBerjalanWib(sekarang: Date = new Date()): string {
+  const bagian = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit' }).formatToParts(sekarang)
+  const y = bagian.find((p) => p.type === 'year')?.value ?? '1970'
+  const m = bagian.find((p) => p.type === 'month')?.value ?? '01'
+  return `${y}-${m}`
+}
+
+/** `unit_satker` API dari pilihan Unit/Satker: Satker menang atas Unit, tanpa keduanya = `0` (Kementerian). */
+export function lingkupDariFilter(idUnit: string, idSatker: string): string {
+  if (idSatker) return `sat_${idSatker}`
+  return idUnit || '0'
+}
+
+function teks(nilai: unknown): string {
+  return typeof nilai === 'string' ? nilai : Array.isArray(nilai) && typeof nilai[0] === 'string' ? nilai[0] : ''
+}
+
+function angka(nilai: unknown, bawaan: number): number {
+  const n = Number.parseInt(teks(nilai), 10)
+  return Number.isFinite(n) && n > 0 ? n : bawaan
+}
+
+export interface OpsiFilterLaporan {
+  /** true = tampilkan pemilih Unit/Satker (role 1). */
+  bisaPilihUnit: boolean
+  perPageBawaan?: number
+  /** Bulan awal bila URL tidak memuatnya (uji menyuntikkan; bawaan = bulan berjalan WIB). */
+  bulanBawaan?: string
+}
+
+export function useFilterLaporan(opsi: OpsiFilterLaporan) {
+  const route = useRoute()
+  const router = useRouter()
+  const perPageBawaan = opsi.perPageBawaan ?? 25
+  const bulanBawaan = opsi.bulanBawaan ?? bulanBerjalanWib()
+  const q = route.query
+
+  const filter = reactive<FilterLaporan>({
+    bulan: POLA_BULAN.test(teks(q.bulan)) ? teks(q.bulan) : bulanBawaan,
+    idUnit: opsi.bisaPilihUnit && /^\d+$/.test(teks(q.unit)) ? teks(q.unit) : '',
+    idSatker: opsi.bisaPilihUnit && /^\d+$/.test(teks(q.satker)) ? teks(q.satker) : '',
+    jenisPegawai: teks(q.jp)
+      .split(',')
+      .filter((v) => /^\d+$/.test(v)),
+    search: teks(q.q),
+    page: angka(q.page, 1),
+    perPage: (PER_PAGE_LAPORAN as readonly number[]).includes(angka(q.per_page, perPageBawaan)) ? angka(q.per_page, perPageBawaan) : perPageBawaan,
+  })
+
+  const unitOpsi = ref<SelectOption[]>([])
+  const satkerOpsi = ref<SelectOption[]>([])
+  const jenisPegawaiOpsi = ref<SelectOption[]>([])
+
+  const keOpsi = (daftar: { id: string; nama: string }[]): SelectOption[] => daftar.map((o) => ({ value: o.id, label: o.nama }))
+
+  async function opsiMaster(entitas: string, parent?: string): Promise<SelectOption[]> {
+    try {
+      return keOpsi(await masterService.options(entitas, parent))
+    } catch {
+      return []
+    }
+  }
+
+  async function muatOpsi(): Promise<void> {
+    const [jenis, unit] = await Promise.all([opsiMaster('jenis-pegawai'), opsi.bisaPilihUnit ? opsiMaster('unit') : Promise.resolve([])])
+    jenisPegawaiOpsi.value = jenis
+    unitOpsi.value = unit
+    if (opsi.bisaPilihUnit && filter.idUnit) satkerOpsi.value = await opsiMaster('satker', filter.idUnit)
+  }
+
+  const param = computed<ParamLaporan>(() => {
+    const p: ParamLaporan = { bulan: filter.bulan, page: filter.page, per_page: filter.perPage }
+    if (opsi.bisaPilihUnit) p.unit_satker = lingkupDariFilter(filter.idUnit, filter.idSatker)
+    if (filter.jenisPegawai.length > 0) p.jenis_pegawai = [...filter.jenisPegawai]
+    const cari = filter.search.trim()
+    if (cari) p.search = cari
+    return p
+  })
+
+  /** Query string URL: hanya nilai yang berbeda dari bawaan. */
+  const queryUrl = computed<LocationQueryRaw>(() => {
+    const u: LocationQueryRaw = {}
+    if (filter.bulan !== bulanBawaan) u.bulan = filter.bulan
+    if (filter.idUnit) u.unit = filter.idUnit
+    if (filter.idSatker) u.satker = filter.idSatker
+    if (filter.jenisPegawai.length > 0) u.jp = filter.jenisPegawai.join(',')
+    if (filter.search.trim()) u.q = filter.search.trim()
+    if (filter.page > 1) u.page = String(filter.page)
+    if (filter.perPage !== perPageBawaan) u.per_page = String(filter.perPage)
+    return u
+  })
+
+  // Ganti Unit → Satker lama tidak sah lagi; ganti filter apa pun (selain halaman) kembali ke halaman 1.
+  watch(
+    () => filter.idUnit,
+    async (unit) => {
+      satkerOpsi.value = unit ? await opsiMaster('satker', unit) : []
+      if (filter.idSatker && !satkerOpsi.value.some((o) => String(o.value) === filter.idSatker)) filter.idSatker = ''
+    },
+  )
+  watch(
+    () => [filter.bulan, filter.idUnit, filter.idSatker, filter.jenisPegawai.join(','), filter.search, filter.perPage],
+    () => {
+      filter.page = 1
+    },
+  )
+  watch(queryUrl, (u) => void router.replace({ query: u }), { flush: 'post' })
+
+  function setBulan(nilai: string): void {
+    if (POLA_BULAN.test(nilai)) filter.bulan = nilai
+  }
+
+  function setJenisPegawai(id: string, aktif: boolean): void {
+    const tanpa = filter.jenisPegawai.filter((v) => v !== id)
+    filter.jenisPegawai = aktif ? [...tanpa, id] : tanpa
+  }
+
+  return { filter, param, queryUrl, unitOpsi, satkerOpsi, jenisPegawaiOpsi, muatOpsi, setBulan, setJenisPegawai }
+}
