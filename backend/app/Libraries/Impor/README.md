@@ -41,7 +41,7 @@ DEFAULT dari DB.
 |---|---|---|
 | 1 | Pemetaan `nilai` dari berkas keputusan didahulukan | GAP-6, log 2.8 |
 | 2 | Tanggal/stempel nol: kolom nullable → NULL; NOT NULL → pengganti dari `tanggal_nol` di berkas keputusan, kalau tidak gagal | R3 |
-| 3 | DATETIME tujuan: sumber DATETIME + WIB → −7 jam; sumber DATETIME + UTC dan sumber TIMESTAMP → apa adanya; DATE/TIME tidak diubah | R1a, R1b, R2 |
+| 3 | DATETIME tujuan: sumber DATETIME + WIB → −7 jam; sumber DATETIME + UTC dan sumber TIMESTAMP → apa adanya; DATE/TIME tidak diubah; kolom `waktuBisnis` (waktu kejadian, bukan stempel) tidak diubah | R1a, R1b, R2 |
 | 4 | Kolom FK tujuan (dibaca dari `information_schema`): `0`/`''` → NULL | DBV-011 §2.10, B-01/B-02 §6 #4 |
 | 5 | Teks: `stripslashes` PHP, kecuali `tanpaStripslashes` | DBV-011 §2.2 #3 |
 | 6 | `kolomNama`: whitespace → satu spasi, lalu trim | DBV-011 §2.2 #2 |
@@ -57,7 +57,10 @@ DEFAULT dari DB.
   Contoh: `jabatan_koordinasi.id_atasan_es_3_koord`.
 - `bolehSeed` (GAP-3): untuk master yang sudah di-seed migration. Bila id dan nama sama, baris dilewati. Bila berbeda,
   impor gagal dengan menyebut tabel dan id.
-- `khusus`: aturan per baris. Contoh: `web_config` lewat `WebConfigImport` (G-09 §5); hasil SKIP/REVIEW tidak diimpor
+- `kunciUrut`: PK komposit untuk baca per batch, mis. `dh_online (nip, tgl)`.
+- `waktuBisnis`: kolom DATETIME berisi waktu kejadian, mis. `absen_ijin.date_start/date_end`. Kolom ini tidak dikonversi
+  R1a, karena tanggal izin akan bergeser sehari bila dikurangi 7 jam.
+- `khusus`: aturan per baris; boleh mengembalikan `__koreksi` (list kode) untuk dicatat. Contoh: `web_config` lewat `WebConfigImport` (G-09 §5); hasil SKIP/REVIEW tidak diimpor
   dan dihitung sebagai `dibuang`.
 
 ## Berkas keputusan
@@ -69,10 +72,17 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 
 | Tier | Isi | Status |
 |---|---|---|
-| 1 | Master: `agama`, `jenis_status`, `provinsi`/`kabupaten_kota` (sentinel = seed), `pangkat`, `jenis_kp`, `unit`, `satker`, `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `kelas_jabatan`, `jenjang_jf` (opsional), `jabatan`, `jabatan_koordinasi`, `periode_struktur_jabatan`, `struktur_jabatan`, `jenis_pegawai`, `gol_pppk`, `jenis_libur`, `hari_libur`, `jenis_cuti`, `web_config` | M1 |
+| 1 | Master: `agama`, `jenis_status`, `provinsi`/`kabupaten_kota` (sentinel = seed), `pangkat`, `jenis_kp`, `jenjang_pendidikan`, `unit`, `satker`, `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `kelas_jabatan`, `jenjang_jf` (opsional), `jabatan`, `jabatan_koordinasi`, `periode_struktur_jabatan`, `struktur_jabatan`, `jenis_pegawai`, `gol_pppk`, `jenis_libur`, `hari_libur`, `jenis_cuti`, `web_config` | M1 |
 | 2 | `pegawai` (domain `flag_update` 0–3, `jenis_kelamin` 1/2; NIP & kode wilayah di-trim) | M2 |
 | 3 | `riwayat_mutasi_jabatan`, `riwayat_kp` (status 0/1/2/3/10), snapshot `pegawai_mutasi_jabatan`/`pegawai_kp` (`id_riwayat_*` yatim → NULL), `pegawai_plt`, `pegawai_plh` | M2 |
-| 4–6 | Riwayat/keluarga/SKP-BKN/`absen_ijin`, lokasi + `dh_online`, cuti/TB/sisa cuti; counter AUTO_INCREMENT | M3 |
+| 4 | `absen_ijin` (status W/V/X/10, `affect_tukin`/`jenis_dinas` ber-domain, rentang izin = waktu bisnis), `riwayat_keluarga`, `detail_anak`, `bkn_periode_ekinper`, `riwayat_skp_periodik` | M3 |
+| 5 | `lokasi_presensi`, `dh_online` (baris tanpa jam masuk & pulang dibuang `DBV-023 A2`; `sumber` NULL) | M3 |
+| 6 | `pegawai_sisa_cuti` (duplikat `(nip, tahun)` → id terkecil, saldo negatif → 0), `riwayat_cuti` (6 kolom ber-domain), `riwayat_tb`, `riwayat_tb_perpan` | M3 |
+
+Sesudah setiap tier di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7;
+tidak pernah diturunkan). PK TINYINT dengan counter ≥ 128 tidak disalin dan dicatat `PERIKSA`. Langkah ini DDL, jadi
+berjalan di luar transaksi tier. Bila galat terjadi di langkah ini, data tier tetap ada; ulangi dengan `--tier`
+berikutnya setelah counter dibereskan manual.
 
 ## GAP terbuka
 
@@ -89,6 +99,6 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 ## Test
 
 - `tests/unit/Impor/AturanImporTest.php`: aturan murni (transformasi, keputusan, penjaga).
-- `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php` (`db-isolasi-penuh`), di atas
+- `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php` (`db-isolasi-penuh`), di atas
   `Tests\Support\Impor\ImporLegacyTestCase`: skema sumber sintetis `<db_test>_lgc` dibuat dari struktur v2
   (`CREATE TABLE … LIKE`) lalu diubah seperti legacy (kolom dibuang, tipe diubah, CHECK dilepas).

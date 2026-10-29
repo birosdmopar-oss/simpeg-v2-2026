@@ -8,12 +8,12 @@ use App\Libraries\MasterData\WebConfigImport;
 use Config\WebConfig;
 
 /**
- * Daftar tabel jalur Tukin per tier, urut induk → anak (FK G-02 DBV-019 aktif sesudah `migrate`). Tier 4–6 ditambah di
- * M3 MAKE-056.
+ * Daftar tabel jalur Tukin per tier, urut induk → anak (FK G-02 DBV-019 aktif sesudah `migrate`). Dipanggil sekali per
+ * tier per proses impor, jadi aturan khusus yang menyimpan keadaan (dedupe) mulai bersih setiap kali.
  */
 final class DaftarTabel
 {
-    public const TIER_MAKS = 3;
+    public const TIER_MAKS = 6;
 
     private function __construct()
     {
@@ -28,6 +28,9 @@ final class DaftarTabel
             1       => self::tier1(),
             2       => self::tier2(),
             3       => self::tier3(),
+            4       => self::tier4(),
+            5       => self::tier5(),
+            6       => self::tier6(),
             default => throw new ImporGagal("Tier {$tier} belum tersedia."),
         };
     }
@@ -56,6 +59,7 @@ final class DaftarTabel
             ),
             new DefinisiTabel('pangkat', 'id_pangkat', 'G-04 §6.3/6.4', kolomNama: ['pangkat']),
             new DefinisiTabel('jenis_kp', 'id_jenis_kp', 'G-04 §6.4 (id 1/2/6 hard-code)', kolomNama: ['jenis_kp']),
+            new DefinisiTabel('jenjang_pendidikan', 'id_jenjang_pendidikan', 'G-04/G-05 §6.3', kolomNama: ['jenjang_pendidikan']),
             new DefinisiTabel('unit', 'id_unit', $g02, kolomNama: ['unit']),
             new DefinisiTabel('satker', 'id_satker', $g02, kolomNama: ['satker']),
             new DefinisiTabel('group_jabatan', 'id_group_jabatan', $g02, kolomNama: ['group_jabatan']),
@@ -137,6 +141,114 @@ final class DaftarTabel
             new DefinisiTabel('pegawai_kp', 'nip', 'B-01 §6 #1/#6 (snapshot)', statusDomain: null, kolomKode: ['nip'], yatimKeNull: ['id_riwayat_kp']),
             new DefinisiTabel('pegawai_plt', 'id_pegawai_plt', 'B-01 §6, DBV-019', kolomKode: ['nip_plt']),
             new DefinisiTabel('pegawai_plh', 'id_pegawai_plh', 'B-01 §6, DBV-019', kolomKode: ['nip_plh']),
+        ];
+    }
+
+    /**
+     * T4 — izin/dinas, keluarga, SKP/BKN: B-01/B-02 §6 #3 (`absen_ijin.status` W/V/X/10; angka/`H` lama → berkas
+     * keputusan), DBV-011 §2.4 #5 (`affect_tukin` = 1 bila tidak ada di sumber, lewat DEFAULT).
+     *
+     * @return list<DefinisiTabel>
+     */
+    private static function tier4(): array
+    {
+        return [
+            new DefinisiTabel(
+                'absen_ijin',
+                'id',
+                'B-01/B-02 §6 #3, DBV-011 §2.4 #5',
+                statusDomain: ['W', 'V', 'X', '10'],
+                domain: ['affect_tukin' => [1, 2], 'jenis_dinas' => [0, 1]],
+                kolomKode: ['nip'],
+                waktuBisnis: ['date_start', 'date_end'],
+            ),
+            new DefinisiTabel('riwayat_keluarga', 'id_riwayat_keluarga', 'B-02 §6', statusDomain: [0, 1, 2, 3, 10], kolomKode: ['nip']),
+            new DefinisiTabel('detail_anak', 'id_detail_anak', 'B-02 §6', statusDomain: null),
+            new DefinisiTabel('bkn_periode_ekinper', 'id', 'B-01 §3.4.1', statusDomain: null),
+            new DefinisiTabel('riwayat_skp_periodik', 'id_riwayat_skp_periodik', 'B-01 §6', statusDomain: [0, 1, 2, 10], kolomKode: ['nip']),
+        ];
+    }
+
+    /**
+     * T5 — lokasi + presensi: G-03 §6.2, DBV-023 §7.1 (baris tanpa jam masuk & pulang dibuang dan dicatat; `sumber`
+     * [V2] NULL = impor; koordinat [V2] NULL).
+     *
+     * @return list<DefinisiTabel>
+     */
+    private static function tier5(): array
+    {
+        return [
+            new DefinisiTabel('lokasi_presensi', 'id_lokasi_presensi', 'G-03 §6.2', kolomNama: ['nama_lokasi']),
+            new DefinisiTabel(
+                'dh_online',
+                'nip',
+                'DBV-023 §7.1',
+                statusDomain: null,
+                kolomKode: ['nip'],
+                kunciUrut: ['nip', 'tgl'],
+                khusus: static fn (array $b): array|string => $b['jam_masuk'] === null && $b['jam_pulang'] === null ? 'DBV-023 A2 tanpa jam' : $b,
+            ),
+        ];
+    }
+
+    /**
+     * T6 — layanan cuti/TB: DBV-022 §5, §13.1 / DBV-011 §2.12 (`pegawai_sisa_cuti`: duplikat `(nip, tahun)` → id
+     * terkecil, saldo negatif → 0, keduanya dicatat).
+     *
+     * @return list<DefinisiTabel>
+     */
+    private static function tier6(): array
+    {
+        $sudah = [];
+
+        return [
+            new DefinisiTabel(
+                'pegawai_sisa_cuti',
+                'id_pegawai_sisa_cuti',
+                'DBV-022 §13.1, DBV-011 §2.12',
+                statusDomain: null,
+                domain: ['digunakan' => [0, 1]],
+                kolomKode: ['nip'],
+                khusus: static function (array $b) use (&$sudah): array|string {
+                    $kunci = $b['nip'] . '|' . $b['tahun'];
+
+                    if (isset($sudah[$kunci])) {
+                        return 'DBV-022 §13.1 duplikat (nip, tahun)';
+                    }
+
+                    $sudah[$kunci]  = true;
+                    $b['__koreksi'] = [];
+
+                    foreach (['sisa_cuti', 'sisa_cuti_n1', 'sisa_cuti_n2', 'sisa_cuti_ditangguhkan', 'utang_cuti'] as $k) {
+                        if (isset($b[$k]) && (int) $b[$k] < 0) {
+                            $b[$k]            = 0;
+                            $b['__koreksi'][] = "DBV-022 §13.1 {$k} negatif→0";
+                        }
+                    }
+
+                    return $b;
+                },
+            ),
+            new DefinisiTabel(
+                'riwayat_cuti',
+                'id_riwayat_cuti',
+                'DBV-022 §5',
+                statusDomain: [0, 1, 2, 3, 4],
+                domain: [
+                    'status_al' => [0, 1, 2, 4], 'status_pyb' => [0, 1, 2, 3, 4], 'status_regen' => [0, 1], 'rated' => [0, 1, 2],
+                    'skip_al'   => [0, 1], 'skip_pyb' => [0, 1],
+                ],
+                kolomKode: ['nip'],
+            ),
+            new DefinisiTabel(
+                'riwayat_tb',
+                'id_riwayat_tb',
+                'DBV-022 §5',
+                statusDomain: [0, 1, 2, 3],
+                domain: ['status_admin_upt' => [0, 1, 2], 'status_admin_deputi' => [0, 1, 2], 'rated' => [0, 1, 2]],
+                kolomKode: ['nip'],
+            ),
+            new DefinisiTabel('riwayat_tb_perpan', 'id_riwayat_tb_perpan', 'DBV-022 §5', statusDomain: null),
         ];
     }
 

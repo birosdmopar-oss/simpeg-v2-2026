@@ -27,6 +27,8 @@ final class DefinisiTabel
      * @param array<string, list<int|string>> $domain       domain kolom lain (CHECK v2); di luar itu → berkas keputusan
      * @param list<string>                  $kolomKode         kode/PK teks yang di-trim seperti aplikasi (kode wilayah, DBV-011 §2.2 #7)
      * @param list<string>                  $yatimKeNull       FK nullable yang rujukannya tidak ada di tujuan → NULL + dicatat (snapshot `id_riwayat_*`, B-01/B-02 §6 #6); FK lain yang yatim → gagal
+     * @param list<string>                  $kunciUrut         kolom PK komposit untuk baca per batch (bawaan `[$pk]`)
+     * @param list<string>                  $waktuBisnis       kolom DATETIME berisi waktu bisnis (mis. rentang izin), bukan stempel → tidak dikonversi R1a
      */
     public function __construct(
         public readonly string $tabel,
@@ -43,6 +45,8 @@ final class DefinisiTabel
         public readonly array $domain = [],
         public readonly array $kolomKode = [],
         public readonly array $yatimKeNull = [],
+        public readonly array $kunciUrut = [],
+        public readonly array $waktuBisnis = [],
     ) {
     }
 }

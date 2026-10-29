@@ -24,6 +24,10 @@ use Throwable;
  * 8. Rujukan FK dicek per batch terhadap tabel induk di tujuan (audit DBV-019 = 0): yatim → NULL bila kolomnya
  *    `yatimKeNull` (dicatat), selain itu gagal dengan jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
  *
+ * Aturan khusus tabel boleh mengembalikan kunci `__koreksi` (list kode) untuk dicatat di laporan. Sesudah setiap tier
+ * di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7; PK TINYINT dengan
+ * counter ≥ 128 tidak disalin, dicatat PERIKSA). Langkah ini DDL, jadi berjalan di luar transaksi tier.
+ *
  * Kedua koneksi diawali sesi R4 (`time_zone = '+00:00'`, strict). Tujuan wajib kosong, kecuali tabel `bolehSeed`.
  */
 final class PengimporLegacy
@@ -105,7 +109,55 @@ final class PengimporLegacy
 
         if (! $dryRun) {
             $this->tujuan->transCommit();
+
+            foreach ($defs as $def) {
+                if ($rinci[$def->tabel] !== null) {
+                    $this->salinCounter($def);
+                }
+            }
         }
+    }
+
+    /**
+     * Counter AUTO_INCREMENT tujuan = counter sumber bila lebih besar (DBV-011 §2.7). Tidak pernah diturunkan.
+     */
+    private function salinCounter(DefinisiTabel $def): void
+    {
+        $sumber = $this->counter($this->sumber, $def->tabel);
+        $tabel  = $this->tujuan->prefixTable($def->tabel);
+        $tujuan = $this->counter($this->tujuan, $tabel);
+
+        if ($sumber === null || $tujuan === null || $sumber <= $tujuan) {
+            return;
+        }
+
+        $tipe = $this->tujuan->query(
+            'SELECT DATA_TYPE AS t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+            [$this->tujuan->getDatabase(), $tabel, $def->pk],
+        )->getRowArray();
+
+        if (strtolower((string) ($tipe['t'] ?? '')) === 'tinyint' && $sumber >= 128) {
+            $this->laporan->koreksi($def->tabel, "PERIKSA counter TINYINT {$sumber} tidak disalin");
+
+            return;
+        }
+
+        $this->tujuan->query('ALTER TABLE ' . $this->tujuan->escapeIdentifiers($tabel) . ' AUTO_INCREMENT = ' . $sumber);
+        $this->laporan->koreksi($def->tabel, "counter AUTO_INCREMENT {$tujuan}→{$sumber}");
+    }
+
+    private function counter(BaseConnection $db, string $tabel): ?int
+    {
+        if (! str_contains(strtolower($db->getVersion()), 'mariadb')) {
+            $db->query('SET SESSION information_schema_stats_expiry = 0');
+        }
+
+        $r = $db->query(
+            'SELECT AUTO_INCREMENT AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?',
+            [$db->getDatabase(), $tabel],
+        )->getRowArray();
+
+        return isset($r['n']) ? (int) $r['n'] : null;
     }
 
     /**
@@ -181,19 +233,21 @@ final class PengimporLegacy
 
         $daftarKolom = array_keys($rinci['kolom']);
         $pilih       = implode(', ', array_map(fn (string $k): string => $this->sumber->escapeIdentifiers($k), $daftarKolom));
-        $pk          = $this->sumber->escapeIdentifiers($def->pk);
+        $kunci       = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
+        $urutPk      = implode(', ', array_map(fn (string $k): string => $this->sumber->escapeIdentifiers($k), $kunci));
         $tabel       = $this->sumber->escapeIdentifiers($def->tabel);
         $urutan      = [];
         $tunda       = [];
         $terakhir    = null;
 
         do {
-            $sql   = "SELECT {$pilih} FROM {$tabel}" . ($terakhir === null ? '' : " WHERE {$pk} > ?") . " ORDER BY {$pk} LIMIT {$this->ukuranBatch}";
-            $baris = $this->sumber->query($sql, $terakhir === null ? [] : [$terakhir])->getResultArray();
-            $tulis = [];
+            $syarat = $terakhir === null ? '' : " WHERE ({$urutPk}) > (" . implode(', ', array_fill(0, count($kunci), '?')) . ')';
+            $sql    = "SELECT {$pilih} FROM {$tabel}{$syarat} ORDER BY {$urutPk} LIMIT {$this->ukuranBatch}";
+            $baris  = $this->sumber->query($sql, $terakhir ?? [])->getResultArray();
+            $tulis  = [];
 
             foreach ($baris as $mentah) {
-                $terakhir = $mentah[$def->pk];
+                $terakhir = array_map(static fn (string $k): mixed => $mentah[$k], $kunci);
                 $hasil    = $this->ubahBaris($def, $rinci, $mentah);
 
                 if (is_string($hasil)) {
@@ -201,6 +255,12 @@ final class PengimporLegacy
 
                     continue;
                 }
+
+                foreach ($hasil['__koreksi'] ?? [] as $kode) {
+                    $this->laporan->koreksi($def->tabel, (string) $kode);
+                }
+
+                unset($hasil['__koreksi']);
 
                 if ($def->urutan !== null && ! isset($rinci['kolom'][$def->urutan['kolom']])) {
                     $lingkup                      = implode('|', array_map(static fn (string $k): string => (string) ($hasil[$k] ?? ''), $def->urutan['lingkup']));
@@ -297,7 +357,7 @@ final class PengimporLegacy
                     ?? throw new ImporGagal("Tanggal nol di {$def->tabel}.{$kolom} (NOT NULL) belum diputuskan (R3).");
             }
 
-            return $tipe['tipeTujuan'] === 'datetime'
+            return $tipe['tipeTujuan'] === 'datetime' && ! in_array($kolom, $def->waktuBisnis, true)
                 ? Transformasi::waktuUtc((string) $nilai, $tipe['tipeSumber'], $this->zonaSumber)
                 : $nilai;
         }
