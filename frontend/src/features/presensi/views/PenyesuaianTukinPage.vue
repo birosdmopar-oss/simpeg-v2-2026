@@ -2,10 +2,10 @@
 /**
  * Penyesuaian Tukin per NIP (5B MAKE-045, PRD 5B §7.3.10; PRD 5C §7.4; role 1 saja). Daftar paginasi server dengan
  * filter NIP, Bulan, dan Status; tambah lewat tombol halaman, ubah & hapus lewat ⋮ (Edit → Hapus `danger` + ConfirmDialog,
- * AGENTS §1). Kolom Status hanya badge; perubahan status lewat dialog Edit. Tanpa frame Figma → pola halaman 5A
- * (AGENTS §3.6).
+ * AGENTS §1). Aktifkan/Nonaktifkan lewat ⋮ tanpa konfirmasi (pola Master Data: tidak destruktif). Kolom Status hanya
+ * badge. Tanpa frame Figma → pola halaman 5A (AGENTS §3.6).
  */
-import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { Pencil, Plus, Power, PowerOff, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
@@ -85,11 +85,31 @@ const { actionsShadow, updateActionsShadow } = useStickyActionsShadow(tableScrol
 const periode = (b: PenyesuaianTukin): string => `${labelBulan(b.bulan_mulai)} s.d. ${labelBulan(b.bulan_akhir)}`
 const labelAksi = (b: PenyesuaianTukin): string => `Aksi untuk penyesuaian ${b.nama || b.nip} ${periode(b)}`
 
-function aksiBaris(): RowAction[] {
+function aksiBaris(b: PenyesuaianTukin): RowAction[] {
+  const busy = busyId.value !== null
   return [
-    { key: 'edit', label: 'Edit', icon: Pencil },
-    { key: 'hapus', label: 'Hapus', icon: Trash2, danger: true },
+    { key: 'edit', label: 'Edit', icon: Pencil, disabled: busy },
+    { key: 'aktifkan', label: 'Aktifkan', icon: Power, hidden: b.status !== 2, disabled: busy },
+    { key: 'nonaktifkan', label: 'Nonaktifkan', icon: PowerOff, hidden: b.status !== 1, disabled: busy },
+    { key: 'hapus', label: 'Hapus', icon: Trash2, danger: true, disabled: busy },
   ]
+}
+
+/** Id baris yang sedang diubah statusnya (⋮ dinonaktifkan selama memproses). */
+const busyId = ref<number | null>(null)
+
+async function ubahStatus(b: PenyesuaianTukin, status: 1 | 2): Promise<void> {
+  notice.value = ''
+  busyId.value = b.id
+  try {
+    await penyesuaianTukinService.ubahStatus(b, status)
+    notice.value = `Penyesuaian Tukin ${b.nama || b.nip} (${periode(b)}) ${status === 1 ? 'diaktifkan' : 'dinonaktifkan'}.`
+    await muat()
+  } catch (err) {
+    failure.value = isApiError(err) && err.message && err.status !== null && err.status < 500 ? err.message : describeApiError(err).message
+  } finally {
+    busyId.value = null
+  }
 }
 
 // --- Tambah / ubah / hapus -----------------------------------------------------------------------------------------
@@ -108,6 +128,10 @@ function onAksi(b: PenyesuaianTukin, key: string): void {
   if (key === 'edit') {
     barisEdit.value = b
     dialogOpen.value = true
+  } else if (key === 'aktifkan') {
+    void ubahStatus(b, 1)
+  } else if (key === 'nonaktifkan') {
+    void ubahStatus(b, 2)
   } else if (key === 'hapus') {
     konfirmasi.value = { open: true, baris: b, loading: false }
   }
@@ -199,7 +223,7 @@ onMounted(() => void muat())
                 </UiBadge>
               </td>
               <td class="sticky right-0 z-10 bg-white px-4 py-3 text-right group-hover:bg-slate-50" :class="{ 'shadow-sticky-end': actionsShadow }">
-                <RowActionsMenu :actions="aksiBaris()" :label="labelAksi(b)" :testid="`penyesuaian-actions-${b.id}`" @select="onAksi(b, $event)" />
+                <RowActionsMenu :actions="aksiBaris(b)" :label="labelAksi(b)" :testid="`penyesuaian-actions-${b.id}`" @select="onAksi(b, $event)" />
               </td>
             </tr>
           </tbody>

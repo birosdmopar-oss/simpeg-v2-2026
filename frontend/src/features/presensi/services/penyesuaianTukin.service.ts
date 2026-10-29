@@ -115,6 +115,21 @@ export const penyesuaianTukinService = {
     return baris(data)
   },
 
+  /**
+   * Aktifkan/Nonaktifkan lewat ⋮ (AGENTS §1): PUT yang sama dengan Edit. Server (`PenyesuaianTukinService::isian`)
+   * mewajibkan body lengkap, jadi nilai baris dikirim ulang dan hanya `status` yang berubah.
+   */
+  async ubahStatus(b: PenyesuaianTukin, status: 1 | 2): Promise<PenyesuaianTukin> {
+    return this.ubah(b.id, {
+      nip: b.nip,
+      bulan_mulai: b.bulan_mulai,
+      bulan_akhir: b.bulan_akhir,
+      persen: b.persen,
+      alasan: b.alasan,
+      status,
+    })
+  },
+
   async hapus(id: number): Promise<void> {
     await api.delete(`/presensi/tukin/penyesuaian/${id}`)
   },

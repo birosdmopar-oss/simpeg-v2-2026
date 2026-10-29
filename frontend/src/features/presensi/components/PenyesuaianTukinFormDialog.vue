@@ -2,15 +2,15 @@
 /**
  * Dialog tambah/ubah Penyesuaian Tukin per NIP (5B MAKE-045, PRD 5B §7.3.10; PRD 5C §7.4; role 1). Pola dialog 5A
  * (`PresensiManualDialog`). Validasi yang mengikat (NIP ada, bulan ≥ 2024-04, rentang, persen, alasan, tumpang tindih)
- * di server; galat 422 ditampilkan per field, 409 `konflik_data` sebagai pesan umum. NIP & status hanya tampil sesuai
- * mode (NIP tetap saat ubah; status hanya saat ubah). Figma & layar legacy untuk fitur ini tidak ada (data hard-code).
+ * di server; galat 422 ditampilkan per field, 409 `konflik_data` sebagai pesan umum. NIP hanya terkunci saat ubah.
+ * Status tidak ada di form (AGENTS §1: diubah lewat ⋮). Figma & layar legacy untuk fitur ini tidak ada (data hard-code).
  */
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
-import { UiButton, UiNotice, UiSelect, UiTextField } from '@/shared/ui'
+import { UiButton, UiNotice, UiTextField } from '@/shared/ui'
 
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
 
@@ -29,15 +29,9 @@ const bulanMulai = ref('')
 const bulanAkhir = ref('')
 const persen = ref('')
 const alasan = ref('')
-const status = ref<'1' | '2'>('1')
 const errors = ref<Record<string, string>>({})
 const formError = ref('')
 const menyimpan = ref(false)
-
-const OPSI_STATUS = [
-  { value: '1', label: 'Aktif' },
-  { value: '2', label: 'Nonaktif' },
-]
 
 watch(
   () => [props.open, props.baris] as const,
@@ -48,7 +42,6 @@ watch(
     bulanAkhir.value = b?.bulan_akhir ?? ''
     persen.value = b?.persen ?? ''
     alasan.value = b?.alasan ?? ''
-    status.value = b?.status === 2 ? '2' : '1'
     errors.value = {}
     formError.value = ''
   },
@@ -59,14 +52,13 @@ watch(
 const persenServer = (nilai: string): string => nilai.trim().replace(',', '.')
 
 function isian(): IsianPenyesuaian {
-  const dasar: IsianPenyesuaian = {
+  return {
     nip: nip.value.trim(),
     bulan_mulai: bulanMulai.value,
     bulan_akhir: bulanAkhir.value,
     persen: persenServer(persen.value),
     alasan: alasan.value.trim(),
   }
-  return isEdit.value ? { ...dasar, status: status.value === '2' ? 2 : 1 } : dasar
 }
 
 async function simpan(event: Event): Promise<void> {
@@ -109,7 +101,7 @@ async function simpan(event: Event): Promise<void> {
           <div>
             <DialogTitle class="text-h5 text-slate-900">{{ isEdit ? 'Edit Penyesuaian Tukin' : 'Tambah Penyesuaian Tukin' }}</DialogTitle>
             <DialogDescription class="text-body2 text-slate-500">
-              Persen negatif = pengurangan (mis. -20). Rentang bulan dibatasi mulai 2024-04. Tidak boleh tumpang tindih dengan penyesuaian aktif NIP yang sama.
+              Persen negatif = pengurangan (mis. -20). Rentang bulan dibatasi mulai 2024-04. Tidak boleh tumpang tindih dengan penyesuaian aktif NIP yang sama. Status diubah lewat menu ⋮.
             </DialogDescription>
           </div>
           <DialogClose :disabled="menyimpan" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50" aria-label="Tutup">
@@ -175,17 +167,6 @@ async function simpan(event: Event): Promise<void> {
             :state="errors.alasan ? 'error' : 'default'"
             :help-text="errors.alasan ?? 'Maks. 255 karakter, mis. Predikat Kinerja Sangat Kurang.'"
             data-testid="penyesuaian-tukin-alasan"
-          />
-          <UiSelect
-            v-if="isEdit"
-            v-model="status"
-            name="status"
-            label="Status"
-            :options="OPSI_STATUS"
-            :disabled="menyimpan"
-            :state="errors.status ? 'error' : 'default'"
-            :help-text="errors.status ?? ''"
-            data-testid="penyesuaian-tukin-status"
           />
 
           <div class="flex flex-wrap justify-end gap-2 pt-2">

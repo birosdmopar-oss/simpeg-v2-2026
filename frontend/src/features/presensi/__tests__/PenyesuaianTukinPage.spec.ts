@@ -9,7 +9,7 @@ vi.mock('../services/penyesuaianTukin.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/penyesuaianTukin.service')>()
   return {
     ...actual,
-    penyesuaianTukinService: { daftar: vi.fn(), tambah: vi.fn(), ubah: vi.fn(), hapus: vi.fn() },
+    penyesuaianTukinService: { daftar: vi.fn(), tambah: vi.fn(), ubah: vi.fn(), ubahStatus: vi.fn(), hapus: vi.fn() },
   }
 })
 
@@ -70,6 +70,7 @@ beforeEach(() => {
   svc.tambah.mockReset()
   svc.ubah.mockReset()
   svc.hapus.mockReset()
+  svc.ubahStatus.mockReset()
 })
 
 describe('akses role', () => {
@@ -94,13 +95,41 @@ describe('daftar penyesuaian', () => {
     expect(tombol.attributes('aria-label')).toBe('Aksi untuk penyesuaian Budi Santoso April 2024 s.d. Juni 2024')
   })
 
-  it('item ⋮ berurutan Edit lalu Hapus (danger)', async () => {
+  it('item ⋮ untuk baris aktif: Edit → Nonaktifkan → Hapus (danger); Aktifkan disembunyikan', async () => {
     const { wrapper } = await mountPage()
     const menu = await rowMenuActions(wrapper, 'penyesuaian-actions-4')
     expect(menu.map((m) => [m.key, m.label, m.danger])).toEqual([
       ['edit', 'Edit', false],
+      ['nonaktifkan', 'Nonaktifkan', false],
       ['hapus', 'Hapus', true],
     ])
+  })
+
+  it('item ⋮ untuk baris nonaktif: Aktifkan tampil, Nonaktifkan disembunyikan', async () => {
+    const { wrapper } = await mountPage(Role.SUPER_ADMIN, [baris({ id: 5, status: 2 })])
+    const menu = await rowMenuActions(wrapper, 'penyesuaian-actions-5')
+    expect(menu.map((m) => m.key)).toEqual(['edit', 'aktifkan', 'hapus'])
+  })
+
+  it('Nonaktifkan memanggil PUT lewat ubahStatus tanpa ConfirmDialog, lalu memuat ulang daftar', async () => {
+    svc.ubahStatus.mockResolvedValue(baris({ status: 2 }))
+    const { wrapper } = await mountPage()
+    await selectRowAction(wrapper, 'penyesuaian-actions-4', 'nonaktifkan')
+    await flushPromises()
+
+    expect(svc.ubahStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 4, status: 1 }), 2)
+    expect(document.body.textContent).not.toContain('Ya, hapus')
+    expect(svc.daftar).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-testid="penyesuaian-tukin-notice"]').text()).toContain('dinonaktifkan')
+  })
+
+  it('Aktifkan memanggil ubahStatus dengan status 1', async () => {
+    svc.ubahStatus.mockResolvedValue(baris({ id: 5, status: 1 }))
+    const { wrapper } = await mountPage(Role.SUPER_ADMIN, [baris({ id: 5, status: 2 })])
+    await selectRowAction(wrapper, 'penyesuaian-actions-5', 'aktifkan')
+    await flushPromises()
+
+    expect(svc.ubahStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 5, status: 2 }), 1)
   })
 
   it('tabel kosong menampilkan pesan kosong', async () => {
@@ -128,7 +157,7 @@ describe('hapus lewat ⋮ dengan konfirmasi', () => {
 })
 
 describe('tambah dan ubah', () => {
-  it('Edit membuka dialog terisi; NIP terkunci dan status tampil', async () => {
+  it('Edit membuka dialog terisi; NIP terkunci; status tidak ada di form (lewat ⋮)', async () => {
     const { wrapper } = await mountPage()
     await selectRowAction(wrapper, 'penyesuaian-actions-4', 'edit')
     await flushPromises()
@@ -136,7 +165,7 @@ describe('tambah dan ubah', () => {
     expect(q('[data-testid="penyesuaian-tukin-dialog"]')).not.toBeNull()
     expect(q<HTMLInputElement>('input[name="nip"]')?.disabled).toBe(true)
     expect(q<HTMLInputElement>('input[name="persen"]')?.value).toBe('-20.00')
-    expect(q('[data-testid="penyesuaian-tukin-status"]')).not.toBeNull()
+    expect(q('[data-testid="penyesuaian-tukin-status"]')).toBeNull()
   })
 
   it('galat 422 per field tampil di bawah field terkait', async () => {

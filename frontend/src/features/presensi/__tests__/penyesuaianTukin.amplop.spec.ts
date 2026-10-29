@@ -94,6 +94,20 @@ describe('penyesuaianTukinService — amplop backend nyata lewat klien asli', ()
     expect(JSON.parse(String(server.panggilan[0]?.data))).toMatchObject({ status: 2 })
   })
 
+  it('ubahStatus(): PUT body lengkap dari baris, hanya status yang berubah', async () => {
+    server.balasan['PUT /presensi/tukin/penyesuaian/4'] = sukses({ ...barisBalasan, status: '2' })
+    const baris = {
+      id: 4, nip: '198001012005011001', nama: 'Budi Santoso', bulan_mulai: '2025-03', bulan_akhir: '2025-06',
+      persen: '-20.00', alasan: 'Predikat Kinerja Sangat Kurang', status: 1 as const, created_at: null, updated_at: null,
+    }
+    const hasil = await penyesuaianTukinService.ubahStatus(baris, 2)
+    expect(hasil.status).toBe(2)
+    expect(JSON.parse(String(server.panggilan[0]?.data))).toEqual({
+      nip: '198001012005011001', bulan_mulai: '2025-03', bulan_akhir: '2025-06', persen: '-20.00',
+      alasan: 'Predikat Kinerja Sangat Kurang', status: 2,
+    })
+  })
+
   it('hapus(): DELETE ke /{id}, tanpa body yang dibaca', async () => {
     server.balasan['DELETE /presensi/tukin/penyesuaian/4'] = sukses(null)
     await expect(penyesuaianTukinService.hapus(4)).resolves.toBeUndefined()
