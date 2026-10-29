@@ -8,7 +8,7 @@
  */
 import { BadgeCheck, CircleX, Clock, ShieldCheck } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { onBeforeRouteUpdate, useRoute } from 'vue-router'
 
 import { isApiError } from '@/lib/axios'
 import { UiButton } from '@/shared/ui'
@@ -23,14 +23,19 @@ const pesan = ref('')
 
 const TIDAK_DITEMUKAN = 'Dokumen tidak ditemukan atau tidak valid.'
 let meta: HTMLMetaElement | null = null
+/** Nomor permintaan terakhir: respons permintaan yang sudah digantikan token lain dibuang. */
+let urutan = 0
 
-async function verifikasi(): Promise<void> {
+async function verifikasi(token: string): Promise<void> {
+  const saya = ++urutan
   keadaan.value = 'memuat'
-  const token = String(route.params.token ?? '')
   try {
-    hasil.value = await slipGajiService.verifikasi(token)
+    const data = await slipGajiService.verifikasi(token)
+    if (saya !== urutan) return
+    hasil.value = data
     keadaan.value = 'asli'
   } catch (error) {
+    if (saya !== urutan) return
     const status = isApiError(error) ? error.status : null
     if (status === 429) {
       keadaan.value = 'terlalu-banyak'
@@ -49,7 +54,13 @@ onMounted(() => {
   meta.name = 'robots'
   meta.content = 'noindex, nofollow'
   document.head.appendChild(meta)
-  void verifikasi()
+  void verifikasi(String(route.params.token ?? ''))
+})
+
+// CR-082 (T5A-01): token lain pada rute yang sama (navigasi SPA) memuat ulang verifikasi; rute lain tidak memicu muat.
+onBeforeRouteUpdate((tujuan, dari) => {
+  const token = String(tujuan.params.token ?? '')
+  if (token !== String(dari.params.token ?? '')) void verifikasi(token)
 })
 
 onBeforeUnmount(() => {
