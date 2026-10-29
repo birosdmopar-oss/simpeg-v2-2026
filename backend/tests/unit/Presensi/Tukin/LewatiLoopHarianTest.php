@@ -17,7 +17,7 @@ use CodeIgniter\Test\CIUnitTestCase;
  * (`L_presensi.php:12703-12705`); `$dt < $dtTmtPegBaru` (:12739-12743) benar untuk setiap hari loop yang dipotong ke hari
  * ini (:11881-11885), sehingga seluruh hari loop dilewati tanpa potongan, berapa pun jam acuannya. Cek cuti sepanjang
  * periode tetap atas semua hari kerja periode (legacy :12667 hanya melewati hari sebelum `tmtsk_pangkat` yang tidak
- * kosong). Jalur lain (CPNS ber-TMT, PPPK, PNS) tidak berubah.
+ * kosong). PPPK tanpa TMT sama (keputusan Horii 29-10 malam). Jalur lain (CPNS ber-TMT, PPPK ber-TMT, PNS) tidak berubah.
  *
  * @internal
  */
@@ -73,7 +73,29 @@ final class LewatiLoopHarianTest extends CIUnitTestCase
         $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('CPNS', '', false, null, $this->periode, $libur), 'gol_ruang ≤ 5 karakter bukan CPNS');
         $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('III/a', '', false, null, $this->periode, $libur), 'PNS tanpa TMT');
         $this->assertSame(['tmtMasuk' => '2026-08-25', 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('', '', true, ['gol_pppk' => 'V', 'tmtsk' => '2026-08-25'], $this->periode, $libur), 'PPPK TMT setelah hari kerja pertama');
-        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('', '', true, null, $this->periode, $libur), 'PPPK tanpa TMT tidak diubah CR-083');
+        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('', '', true, ['gol_pppk' => 'V', 'tmtsk' => '2026-08-17'], $this->periode, $libur), 'PPPK TMT = hari kerja pertama (17 Agu)');
+        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('', '', true, ['gol_pppk' => 'V', 'tmtsk' => '2025-01-02'], $this->periode, $libur), 'PPPK TMT sebelum hari kerja pertama');
+        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('IX', '2024-01-01', true, null, $this->periode, $libur), 'PPPK tanpa jabatan, TMT dari riwayat_kp');
+    }
+
+    /**
+     * CR-083, keputusan Horii 29-10 malam [K]: PPPK tanpa TMT (`riwayat_mutasi_jabatan` maupun `riwayat_kp` tidak memberi
+     * TMT) → legacy `new DateTime('')` = saat ekspor > hari kerja pertama (`:12707-12710`) → seluruh loop dilewati.
+     * Periode tanpa hari kerja: `$firstDayHK_CM` kosong juga = saat ekspor → tanda tidak dipasang (tanpa hari kerja,
+     * hasilnya sama).
+     */
+    public function testPppkTanpaTmtMelewatiSeluruhLoop(): void
+    {
+        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => true], SumberDataPegawaiTukin::pegawaiBaru('', '', true, null, $this->periode, []));
+        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => true], SumberDataPegawaiTukin::pegawaiBaru('IX', '', true, null, $this->periode, []), 'gol ada, TMT kosong');
+        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('', '', false, null, $this->periode, []), 'bukan PPPK (PNS) tanpa TMT tetap');
+
+        $akhirPekan = new PeriodeTukin('2026-08-22', '2026-08-23');
+        $this->assertSame(['tmtMasuk' => null, 'lewatiLoopHarian' => false], SumberDataPegawaiTukin::pegawaiBaru('', '', true, null, $akhirPekan, []), 'periode tanpa hari kerja');
+
+        $baru = SumberDataPegawaiTukin::pegawaiBaru('', '', true, null, $this->periode, []);
+        $h    = KalkulasiTukin::hitung($this->periode, [], [], $this->config(), '2026-10-27', new DataPegawaiTukin('baik', tmtMasuk: $baru['tmtMasuk'], lewatiLoopHarian: $baru['lewatiLoopHarian']));
+        $this->assertSame([0, 0], [$h->jumlah['TK'], $h->totalPotongan], 'tanpa presensi pun tanpa potongan');
     }
 
     private function config(): KonfigurasiTukin

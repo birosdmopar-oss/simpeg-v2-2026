@@ -30,8 +30,9 @@ use InvalidArgumentException;
  *      `tmtsk_pangkat` bila setelah hari kerja pertama periode (`$firstDayHK_CM`, via `HariKerja`); selain itu null.
  *      [V2] cabang PPPK rekap mengenali PPPK lewat id (legacy :12707 lewat nama `jenis_pegawai == 'PPPK'`): nama master
  *      dapat diubah lewat CRUD, cek nama bisa gagal diam-diam.
- *   4. [K T-02, CR-083, keputusan Horii 29-10] CPNS dengan `tmtsk_pangkat` kosong → `lewatiLoopHarian` (seluruh hari
- *      loop harian dilewati; rincian di {@see DataPegawaiTukin}).
+ *   4. [K T-02, CR-083, keputusan Horii 29-10] CPNS atau PPPK dengan `tmtsk_pangkat` kosong (`:12703-12710`) →
+ *      `lewatiLoopHarian` (seluruh hari loop harian dilewati; rincian di {@see DataPegawaiTukin}); PPPK hanya bila
+ *      periode punya hari kerja.
  * - `tmtKeluar` = `pegawai.tmt_status` bila `pegawai.status = 2` [V2 README Tukin].
  *
  * Varian massal {@see self::untukBanyak()} (MAKE-039, keputusan reviewer CR M0 F1 — deviasi aditif PRD 5B §3.3): aturan
@@ -219,9 +220,10 @@ final class SumberDataPegawaiTukin
 
     /**
      * Aturan pegawai baru bersama jalur tunggal & massal (lihat docblock kelas butir 1–4): `tmtMasuk`, dan
-     * `lewatiLoopHarian` untuk CPNS tanpa TMT (butir 4, T-02). Publik agar cabang T-02 dapat diuji langsung:
+     * `lewatiLoopHarian` untuk CPNS atau PPPK tanpa TMT (butir 4). Publik agar cabang CPNS (T-02) dapat diuji langsung:
      * `riwayat_kp.tmtsk` `NOT NULL` dan disaring `tmtsk <=` (legacy sama, `L_employee.php:6439`), sehingga lewat basis
-     * data `gol_ruang` CPNS selalu membawa TMT.
+     * data `gol_ruang` CPNS selalu membawa TMT. PPPK tanpa TMT terbentuk bila tidak ada baris `riwayat_mutasi_jabatan`
+     * maupun `riwayat_kp` yang memberi TMT.
      *
      * @param array<string, mixed>|null $jabatanPppk baris `riwayat_mutasi_jabatan` PPPK terakhir (`gol_pppk`, `tmtsk`)
      * @param list<string>              $hariLibur
@@ -239,8 +241,16 @@ final class SumberDataPegawaiTukin
             return $tmt !== '' ? ['tmtMasuk' => $tmt, 'lewatiLoopHarian' => false] : ['tmtMasuk' => null, 'lewatiLoopHarian' => true];
         }
 
-        if ($pppk && $tmt !== '') {
+        if ($pppk) {
             $pertama = HariKerja::daftar($periode, $hariLibur)[0] ?? null;
+
+            // PPPK tanpa TMT [K, CR-083, keputusan Horii 29-10]: `new DateTime('')` = saat ekspor > hari kerja pertama
+            // (:12707-12710) → `$dtTmtPegBaru` = saat ekspor → seluruh hari loop harian dilewati (mekanisme T-02). Periode
+            // tanpa hari kerja: legacy `$firstDayHK_CM` kosong juga = saat ekspor (dibuat sesudahnya, tidak "lebih kecil"),
+            // dan loop tidak punya hari kerja, jadi tanda tidak dipasang.
+            if ($tmt === '') {
+                return ['tmtMasuk' => null, 'lewatiLoopHarian' => $pertama !== null];
+            }
 
             return ['tmtMasuk' => $pertama !== null && $tmt > $pertama ? $tmt : null, 'lewatiLoopHarian' => false];
         }

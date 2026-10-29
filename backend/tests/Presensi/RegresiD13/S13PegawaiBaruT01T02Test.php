@@ -98,6 +98,28 @@ final class S13PegawaiBaruT01T02Test extends DatabaseTestCase
     }
 
     /**
+     * CR-083, keputusan Horii 29-10 malam [K `L_presensi.php:12707-12710`, `:12739-12743`]: PPPK tanpa
+     * `riwayat_mutasi_jabatan` dan tanpa `riwayat_kp` (TMT kosong) → `new DateTime('')` = saat ekspor > hari kerja pertama
+     * → seluruh hari loop dilewati: tanpa potongan presensi walau tidak pernah presensi. Rekap (lingkup semua, jenis PPPK)
+     * = laporan.
+     */
+    public function testPppkTanpaTmtTanpaPotonganPresensi(): void
+    {
+        $nip = $this->buatPegawaiDiSatker($this->satkerD13, ['created_at' => '2020-01-01 00:00:00', 'id_jenis_pegawai' => 6]);
+        $this->assertSame(0, $this->db->table('riwayat_mutasi_jabatan')->where('nip', $nip)->countAllResults());
+        $this->assertSame(0, $this->db->table('riwayat_kp')->where('nip', $nip)->countAllResults());
+
+        $laporan = $this->laporanD13($nip);
+        $this->assertSame([], array_filter($laporan['jumlah']), 'tanpa TK walau tanpa presensi');
+        $this->assertSame('0.00', $laporan['total_presensi']);
+
+        $rekap = $this->serviceRekapTukin('2026-10-27 09:00:00')->daftar($this->adminRekap(), ['bulan' => '2026-09', 'jenis_pegawai' => ['6'], 'per_page' => '100']);
+        $baris = array_column($rekap['items'], null, 'nip')[$nip] ?? null;
+        $this->assertIsArray($baris, 'PPPK tanpa jabatan tetap di populasi rekap');
+        $this->assertSame([$baris['total_presensi'], $baris['total_skp'], $baris['total_potongan']], [$laporan['total_presensi'], $laporan['total_skp'], $laporan['total_potongan']]);
+    }
+
+    /**
      * Pegawai populasi rekap dengan `created_at` tertentu, hadir semua hari kerja, plus cuti 18 Agu, konket 19 Agu, TB 20
      * Agu.
      */

@@ -81,8 +81,13 @@ Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest` (AC-D06.1/.2/.6), `Cuti
    dan `lewatiLoopHarian = true` — legacy `new DateTime('')` = saat ekspor, sehingga seluruh hari loop harian dilewati
    (rincian di README `Presensi/Tukin`). `L_presensi.php:12703-12705`, `:12739-12743`. Catatan: lewat basis data cabang
    ini tidak terbentuk karena `riwayat_kp.tmtsk` `NOT NULL` dan disaring `tmtsk <=` (legacy sama, `L_employee.php:6439`),
-   sehingga `gol_ruang` CPNS selalu membawa TMT; aturan ditanam agar setara bila data impor berbeda. PPPK tanpa TMT
-   (legacy `:12707-12710` juga `new DateTime('')`) **tidak** diubah CR-083 — menunggu keputusan.
+   sehingga `gol_ruang` CPNS selalu membawa TMT; aturan ditanam agar setara bila data impor berbeda.
+6. **PPPK tanpa TMT** [K] (CR-083, keputusan Horii 29-10 malam): PPPK (id 6, [V2] langkah 4) yang TMT-nya kosong
+   setelah langkah 1–2 (tidak ada baris `riwayat_mutasi_jabatan` maupun `riwayat_kp` yang memberi TMT) →
+   `lewatiLoopHarian = true`: legacy `new DateTime('')` = saat ekspor > hari kerja pertama → `isPegBaru`, seluruh hari loop
+   dilewati. Periode tanpa hari kerja: tanda tidak dipasang (legacy `$firstDayHK_CM` kosong = saat ekspor juga; loop tanpa
+   hari kerja, hasil sama). Cek cuti sepanjang periode tidak terpengaruh (`:12667`). `L_presensi.php:12707-12710`,
+   `:12739-12743`.
 
 Risiko yang tercatat: hasil langkah 1–2 bergantung pada kelengkapan `riwayat_kp`/`riwayat_mutasi_jabatan` hasil impor;
 butir cutover dicatat reviewer CR di PRD 5A dan runbook impor.
