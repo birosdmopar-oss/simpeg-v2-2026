@@ -38,12 +38,18 @@ dump() { # dump <berkas> <argumen mysqldump...>
 
 # 1. Penuh: master/rujukan, pegawai & jabatan (populasi rekap butuh status semua pegawai). Daftar ini = semua tabel
 #    Tier 1-3 alat impor MAKE-056 (`php spark impor:legacy`), termasuk setiap induk FK (GAP-7b/7c).
-#    `jenjang_jf` boleh tidak ada di sumber (opsional di alat impor).
+#    `jenjang_jf` boleh tidak ada di sumber (opsional di alat impor), jadi di-dump terpisah di bawah.
 dump 01_penuh.sql \
   pegawai pegawai_mutasi_jabatan riwayat_mutasi_jabatan pegawai_plt pegawai_plh pegawai_kp riwayat_kp \
   riwayat_keluarga detail_anak \
   unit satker jabatan group_jabatan sub_group_jabatan rumpun_jabatan struktur_jabatan periode_struktur_jabatan jabatan_koordinasi \
-  kelas_jabatan jenjang_jf jenis_pegawai gol_pppk lokasi_presensi jenis_cuti jenis_libur   agama jenis_status provinsi kabupaten_kota pangkat jenis_kp jenjang_pendidikan
+  kelas_jabatan jenis_pegawai gol_pppk lokasi_presensi jenis_cuti jenis_libur   agama jenis_status provinsi kabupaten_kota pangkat jenis_kp jenjang_pendidikan
+
+if mysql --defaults-extra-file="$CNF" -N -e "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA='$UP1_DB' AND TABLE_NAME='jenjang_jf'" | grep -q 1; then
+  dump 02_jenjang_jf.sql jenjang_jf
+else
+  echo "lewati jenjang_jf (tidak ada di sumber)"
+fi
 
 # 2. Rentang: transaksi presensi, izin, cuti, TB, kalender, SKP/BKN.
 dump 10_dh_online.sql           dh_online           --where="tgl BETWEEN $A AND $Z"
