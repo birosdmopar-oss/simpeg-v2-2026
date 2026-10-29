@@ -5,7 +5,7 @@
  */
 
 /** Nilai `status` satu hari pada `harian[]` laporan per pegawai (`HasilHarian::$status`). */
-export type StatusHarian = 'libur' | 'tugas_belajar' | 'cuti' | 'konket' | 'hadir' | 'TK' | 'TPM' | 'TPP' | 'di_luar_masa_kerja'
+export type StatusHarian = 'libur' | 'akhir_pekan' | 'tugas_belajar' | 'cuti' | 'konket' | 'hadir' | 'TK' | 'TPM' | 'TPP' | 'di_luar_masa_kerja'
 
 /**
  * Kode kejadian satu hari (`HasilHarian::$kategori`): TL1..3, PSW1..3 (terlambat / pulang sebelum waktunya), TPM / TPP

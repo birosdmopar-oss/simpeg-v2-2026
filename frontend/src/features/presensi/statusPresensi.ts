@@ -57,6 +57,7 @@ const AKHIR_PEKAN: InfoStatus = { kunci: 'akhir_pekan', kode: 'Akhir pekan', lab
 
 const STATUS: Record<StatusHarian, InfoStatus | null> = {
   libur: { kunci: 'libur', kode: 'Libur', label: 'Hari libur', nada: 'biru' },
+  akhir_pekan: AKHIR_PEKAN, // status eksplisit dari API (CR-076); `libur` + tanggal Sabtu/Minggu tetap dipetakan di bawah
   tugas_belajar: { kunci: 'tugas_belajar', kode: 'TB', label: 'Tugas belajar', nada: 'pink' },
   cuti: { kunci: 'cuti', kode: 'Cuti', label: 'Cuti', nada: 'ungu' },
   konket: { kunci: 'konket', kode: 'Konket', label: 'Kondisi khusus (konket) tanpa potongan', nada: 'jingga' },
