@@ -177,7 +177,9 @@ final class LaporanTukinService
         /** @var HasilTukin $h */
         $h       = $hasil['hasil'];
         $periode = $h->periode;
-        $argumen = $this->harianMentah($nip, $periode->awal, $h->akhirDihitung);
+        // T-01 (data harian tidak dimuat) dan `lewatiLoopHarian` (presensi/konket tidak dibaca): tampilan tanpa jam/konket,
+        // sama dengan angka (CR-083).
+        $argumen = $hasil['tanpa_data_harian'] || ($hasil['pegawai']->lewatiLoopHarian ?? false) ? [] : $this->harianMentah($nip, $periode->awal, $h->akhirDihitung);
 
         return [$p, [
             'identitas'      => $this->identitas($pegawai, $periode->awal) + ['predikat_skp' => $hasil['predikat_skp']],
@@ -263,11 +265,11 @@ final class LaporanTukinService
 
             if ($hh === null) {
                 [$status, $ket] = match (true) {
-                    $pegawai !== null && ! $pegawai->dalamMasaKerja($tgl) => ['di_luar_masa_kerja', ''],
-                    isset($libur[$tgl])                                   => ['libur', '(Libur) ' . $libur[$tgl]],
-                    HariKerja::nomorHari($tgl) === 6                      => ['akhir_pekan', 'Sabtu'],
-                    HariKerja::nomorHari($tgl) === 7                      => ['akhir_pekan', 'Minggu'],
-                    default                                               => [null, ''],
+                    $pegawai !== null && ($pegawai->lewatiLoopHarian || ! $pegawai->dalamMasaKerja($tgl)) => ['di_luar_masa_kerja', ''],
+                    isset($libur[$tgl])                                                                   => ['libur', '(Libur) ' . $libur[$tgl]],
+                    HariKerja::nomorHari($tgl) === 6                                                      => ['akhir_pekan', 'Sabtu'],
+                    HariKerja::nomorHari($tgl) === 7                                                      => ['akhir_pekan', 'Minggu'],
+                    default                                                                               => [null, ''],
                 };
 
                 if ($status !== null) {

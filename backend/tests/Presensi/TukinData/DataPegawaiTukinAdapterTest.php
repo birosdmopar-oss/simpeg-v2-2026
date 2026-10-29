@@ -136,6 +136,28 @@ final class DataPegawaiTukinAdapterTest extends DatabaseTestCase
         $this->assertNull($this->tmt($nip));
     }
 
+    /**
+     * CR-083: PPPK tanpa TMT (tanpa `riwayat_mutasi_jabatan` jenis 1 & `riwayat_kp`) → `lewatiLoopHarian` di jalur tunggal
+     * dan massal [K :12707-12710]; varian IL (`tanpaPegawaiBaru`) tanpa aturan pegawai baru [K IL :13494-15452].
+     */
+    public function testPppkTanpaTmtLewatiLoopJalurTunggalDanMassalKecualiIl(): void
+    {
+        $nip = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->buatRiwayatMutasiJabatan($nip, ['jenis_jabatan' => 2, 'tmtsk' => '2025-01-02']); // jenis 2 tidak memberi TMT
+        $ber = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->buatRiwayatMutasiJabatan($ber, ['tmtsk' => '2026-04-01', 'gol_pppk' => 'IX']);
+
+        $tunggal = $this->sumber()->untuk($nip, $this->april, null);
+        $this->assertSame([null, true], [$tunggal->tmtMasuk, $tunggal->lewatiLoopHarian], 'tunggal');
+        $massal = $this->sumber()->untukBanyak([$nip, $ber], $this->april, null);
+        $this->assertEquals($tunggal, $massal[$nip], 'massal = tunggal');
+        $this->assertSame(['2026-04-01', false], [$massal[$ber]->tmtMasuk, $massal[$ber]->lewatiLoopHarian], 'PPPK ber-TMT tetap');
+
+        foreach ([$this->sumber()->untuk($ber, $this->april, null, [], true), $this->sumber()->untukBanyak([$nip, $ber], $this->april, null, [], true)[$nip]] as $il) {
+            $this->assertSame([null, false], [$il->tmtMasuk, $il->lewatiLoopHarian], 'IL');
+        }
+    }
+
     public function testPegawaiTidakAdaDitolakTerkendali(): void
     {
         $this->expectException(DataTukinTidakSah::class);

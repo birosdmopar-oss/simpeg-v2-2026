@@ -142,15 +142,16 @@ final class TukinDataMassalTest extends DatabaseTestCase
     {
         $this->barisBkn(2026, 4, '03-16', '04-15');
 
-        $akhir = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 23:59:59']);
+        // `created_at` UTC (CR-083): hari terakhir 15-04 WIB = [2026-04-14 17:00, 2026-04-15 17:00) UTC.
+        $akhir = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 16:59:59']);
         $this->presensiHadir($akhir, '2026-03-16');
         $this->cuti($akhir, 1, '2026-03-17', '2026-03-17');
 
-        $rusak = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 00:00:00']);
+        $rusak = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-14 17:00:00']);
         $this->db->table('dh_online')->insert(['nip' => $rusak, 'tgl' => '2026-03-16', 'jam_masuk' => '25:00:00', 'sumber' => 1]);
         $this->cuti($rusak, 7, '2026-03-17', '2026-03-17');
 
-        $sebelum = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-14 23:59:59']);
+        $sebelum = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-14 16:59:59']);
         $this->presensiHadir($sebelum, '2026-03-16');
 
         $massal = $this->serviceTukinFase4()->siapkanBanyak([$akhir, $rusak, $sebelum], 2026, 4);
@@ -164,6 +165,32 @@ final class TukinDataMassalTest extends DatabaseTestCase
         $this->assertInstanceOf(ArgumenTukin::class, $massal[$sebelum]);
         $this->assertArrayHasKey('2026-03-16', $massal[$sebelum]->harian, 'sehari sebelum akhir: dimuat');
         $this->assertSame([$akhir, $rusak], (new SumberDataPegawaiTukin($this->db))->tanpaDataHarian([$akhir, $rusak, $sebelum], PeriodeTukin::dariBulan(2026, 4)));
+    }
+
+    /**
+     * CR-083 C (keputusan Horii 30-10): pegawai `lewatiLoopHarian` (PPPK tanpa TMT) — presensi & konket tidak dibaca
+     * (jam 25:00 bukan galat), cuti tetap dimuat dan divalidasi (jenis cuti di luar 1..6 tetap galat). Tunggal = massal.
+     */
+    public function testLewatiLoopHarianAbaikanPresensiKonketTetapValidasiCuti(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        $lewati = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->db->table('dh_online')->insert(['nip' => $lewati, 'tgl' => '2026-03-16', 'jam_masuk' => '25:00:00', 'sumber' => 1]);
+        $this->cuti($lewati, 1, '2026-03-17', '2026-03-17');
+
+        $cutiRusak = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->cuti($cutiRusak, 7, '2026-03-17', '2026-03-17');
+
+        $massal  = $this->serviceTukinFase4()->siapkanBanyak([$lewati, $cutiRusak], 2026, 4);
+        $tunggal = $this->serviceTukinFase4()->siapkan($lewati, 2026, 4);
+
+        $this->assertInstanceOf(ArgumenTukin::class, $massal[$lewati]);
+        $this->assertTrue($massal[$lewati]->pegawai?->lewatiLoopHarian);
+        $this->assertSame(['2026-03-17'], array_keys($massal[$lewati]->harian), 'hanya cuti');
+        $this->assertArrayHasKey('cuti', $massal[$lewati]->harian['2026-03-17']);
+        $this->assertEquals($tunggal, $massal[$lewati]);
+        $this->assertInstanceOf(DataTukinTidakSah::class, $massal[$cutiRusak], 'cuti tetap divalidasi (F5B-17)');
     }
 
     public function testKonfigurasiBelumLengkapSemuaNipGalat(): void

@@ -122,9 +122,10 @@ final class RekapKehadiranTest extends DatabaseTestCase
      */
     public function testPresensiPegawaiBaruTidakDibacaIkutLegacy(): void
     {
-        $baru = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-15 08:00:00']);
-        $tgl1 = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-01 08:00:00']);
-        $lama = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-08-31 23:59:59']);
+        // `created_at` UTC (CR-083): 15-09 08:00 WIB, 01-09 08:00 WIB, 31-08 23:59:59 WIB.
+        $baru = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-15 01:00:00']);
+        $tgl1 = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-01 01:00:00']);
+        $lama = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-08-31 16:59:59']);
 
         foreach ([$baru, $tgl1, $lama] as $n) {
             $this->hadir($n, '2026-09-16');

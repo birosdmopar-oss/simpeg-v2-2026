@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Presensi\TukinData;
 
+use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
 use App\Libraries\Presensi\Tukin\PeriodeTukin;
 use CodeIgniter\Database\BaseConnection;
 use Config\Presensi;
@@ -68,7 +69,7 @@ final class TukinDataService
      *
      * @throws GalatDataTukin
      */
-    public function siapkan(string $nip, int $tahun, int $bulan, ?string $hariIni = null): ArgumenTukin
+    public function siapkan(string $nip, int $tahun, int $bulan, ?string $hariIni = null, bool $tanpaPegawaiBaru = false): ArgumenTukin
     {
         $bkn     = $this->periode->barisBkn($tahun, $bulan);
         $periode = SumberPeriodeTukin::periode($tahun, $bulan, $bkn);
@@ -79,13 +80,22 @@ final class TukinDataService
         $awal  = min($sebelumnya->awal, $periode->awal);
         $libur = $this->hariLibur->untuk($awal, $periode->akhir);
 
-        return new ArgumenTukin(
-            $periode,
-            $libur,
-            $this->dataPegawai->tanpaDataHarian([$nip], $periode) === [] ? $this->harian->untuk($nip, $awal, $periode->akhir) : [],
-            $this->konfigurasi->untuk($periode),
-            $this->dataPegawai->untuk($nip, $periode, $bkn['id'] ?? null, $libur),
-        );
+        $tanpa = $this->dataPegawai->tanpaDataHarian([$nip], $periode) !== [];
+
+        try {
+            $pegawai = $this->dataPegawai->untuk($nip, $periode, $bkn['id'] ?? null, $libur, $tanpaPegawaiBaru);
+        } catch (GalatDataTukin $e) {
+            $pegawai = $e; // dilempar setelah harian & konfigurasi: urutan galat tetap harian → konfigurasi → pegawai
+        }
+
+        $harian      = $tanpa ? [] : $this->harian->untuk($nip, $awal, $periode->akhir, $pegawai instanceof DataPegawaiTukin && $pegawai->lewatiLoopHarian);
+        $konfigurasi = $this->konfigurasi->untuk($periode);
+
+        if ($pegawai instanceof GalatDataTukin) {
+            throw $pegawai;
+        }
+
+        return new ArgumenTukin($periode, $libur, $harian, $konfigurasi, $pegawai, $tanpa);
     }
 
     /**
@@ -95,7 +105,7 @@ final class TukinDataService
      *
      * @return array<array-key, ArgumenTukin|GalatDataTukin> setiap NIP masukan menjadi kunci
      */
-    public function siapkanBanyak(array $nip, int $tahun, int $bulan, ?string $hariIni = null, ?int $ukuranBatch = null): array
+    public function siapkanBanyak(array $nip, int $tahun, int $bulan, ?string $hariIni = null, ?int $ukuranBatch = null, bool $tanpaPegawaiBaru = false): array
     {
         $unik = array_values(array_unique(array_map('strval', $nip)));
 
@@ -123,8 +133,9 @@ final class TukinDataService
         $hasil = [];
 
         foreach (array_chunk($unik, $batas) as $batch) {
-            $harian  = $this->harian->untukBanyak(array_values(array_diff($batch, $tanpa)), $awal, $periode->akhir);
-            $pegawai = $this->dataPegawai->untukBanyak($batch, $periode, $bkn['id'] ?? null, $libur);
+            $pegawai = $this->dataPegawai->untukBanyak($batch, $periode, $bkn['id'] ?? null, $libur, $tanpaPegawaiBaru);
+            $lewati  = array_values(array_filter($batch, static fn (string $n): bool => ($pegawai[$n] ?? null) instanceof DataPegawaiTukin && $pegawai[$n]->lewatiLoopHarian));
+            $harian  = $this->harian->untukBanyak(array_values(array_diff($batch, $tanpa)), $awal, $periode->akhir, $lewati);
 
             foreach ($batch as $n) {
                 $h = $harian[$n] ?? [];
@@ -134,7 +145,7 @@ final class TukinDataService
                     $h instanceof GalatDataTukin           => $h,
                     $konfigurasi instanceof GalatDataTukin => $konfigurasi,
                     $p instanceof GalatDataTukin           => $p,
-                    default                                => new ArgumenTukin($periode, $libur, $h, $konfigurasi, $p),
+                    default                                => new ArgumenTukin($periode, $libur, $h, $konfigurasi, $p, in_array($n, $tanpa, true)),
                 };
             }
         }

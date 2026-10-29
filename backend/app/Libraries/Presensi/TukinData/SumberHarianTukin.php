@@ -42,17 +42,22 @@ final class SumberHarianTukin
     }
 
     /**
+     * @param bool $hanyaCutiTb pegawai `lewatiLoopHarian` [K, CR-083, keputusan Horii 30-10]: legacy tidak pernah membaca
+     *                          presensi/konket pegawai yang semua hari loopnya di-`continue` (`L_presensi.php:12739-12743`),
+     *                          jadi keduanya tidak dimuat (data tidak sah di sana bukan galat); cuti & TB tetap dimuat dan
+     *                          divalidasi (cuti sepanjang periode, `PotonganCutiPeriode`, pemutihan TB; F5B-17)
+     *
      * @return array<string, array<string, mixed>> per tanggal YYYY-MM-DD (hanya tanggal yang punya data)
      */
-    public function untuk(string $nip, string $awal, string $akhir): array
+    public function untuk(string $nip, string $awal, string $akhir, bool $hanyaCutiTb = false): array
     {
         $harian = [];
 
-        foreach ($this->presensi($nip, $awal, $akhir) as $tanggal => $presensi) {
+        foreach ($hanyaCutiTb ? [] : $this->presensi($nip, $awal, $akhir) as $tanggal => $presensi) {
             $harian[$tanggal]['presensi'] = $presensi;
         }
 
-        foreach ($this->konket($nip, $awal, $akhir) as $tanggal => $konket) {
+        foreach ($hanyaCutiTb ? [] : $this->konket($nip, $awal, $akhir) as $tanggal => $konket) {
             $harian[$tanggal]['konket'] = $konket;
         }
 
@@ -73,10 +78,11 @@ final class SumberHarianTukin
      * Masukan harian banyak pegawai sekaligus; hasil per NIP = {@see self::untuk()} NIP itu, atau galatnya.
      *
      * @param list<string> $nip
+     * @param list<string> $hanyaCutiTb NIP yang presensi & konketnya tidak dimuat (lihat {@see self::untuk()})
      *
      * @return array<array-key, array<string, array<string, mixed>>|GalatDataTukin> setiap NIP masukan menjadi kunci
      */
-    public function untukBanyak(array $nip, string $awal, string $akhir): array
+    public function untukBanyak(array $nip, string $awal, string $akhir, array $hanyaCutiTb = []): array
     {
         $unik = array_values(array_unique(array_map('strval', $nip)));
 
@@ -87,7 +93,7 @@ final class SumberHarianTukin
         $harian = array_fill_keys($unik, []);
         $galat  = [];
 
-        foreach (array_chunk($unik, self::BATCH_NIP) as $batch) {
+        foreach (array_chunk(array_values(array_diff($unik, $hanyaCutiTb)), self::BATCH_NIP) as $batch) {
             foreach ($this->barisPresensi($batch, $awal, $akhir) as $n => $baris) {
                 try {
                     foreach (self::petakanPresensi((string) $n, $baris) as $tanggal => $presensi) {

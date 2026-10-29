@@ -228,6 +228,9 @@ Port `list_lt`/`list_lt_il`, `laporan_tukin/{nip}` (`laporan_tukin_skp`), `lapor
 
 | v2 dipakai | Legacy [K] bagaimana (berkas:baris) | Gap |
 |---|---|---|
+| Per pegawai, pegawai dibuat pada hari terakhir periode (T-01): angka & tampilan ikut rekap — semua hari kerja TK, tanpa jam/konket/keterangan cuti (CR-083) | `laporan_tukin_skp` tanpa saringan `created_at`; rekap `:12209`, `:12283`, `:12346`, `:12383` | Tampilan konsisten dengan angka rekap |
+| Per pegawai, pegawai baru tanpa TMT (`lewatiLoopHarian`): semua tanggal `di_luar_masa_kerja` tanpa jam/konket (CR-083) | `laporan_tukin_skp` tanpa blok pegawai baru; rekap `:12703-12710`, `:12739-12743` | Tampilan konsisten dengan angka rekap |
+| Per pegawai, keterangan cuti tidak dicetak untuk T-01 / `lewatiLoopHarian` (CR-083) | Rekap membangun `arrKetCuti` di dalam loop dari cuti yang dimuat | Keterangan konsisten dengan rekap |
 | Layar per pegawai memakai kalkulasi rekap (K-1) | `laporan_tukin_skp` per pegawai berbeda 4 aturan dari rekap (`L_presensi.php:6510-7752` vs `:11752-13492`) | Angka layar = baris rekap; nilai SKP sebelum batas penilaian mengikuti rekap |
 | Rekap role 3 dipaksa satker akun di server | Rekap hanya dibatasi di JS (`list_lt.php:262-264`), controller tanpa cek (`Presensi.php:491`) | Celah L5B-02 ditutup |
 | Pegawai galat tetap tampil dengan `galat` | Satu galat menghentikan halaman | Rekap tidak gagal total |

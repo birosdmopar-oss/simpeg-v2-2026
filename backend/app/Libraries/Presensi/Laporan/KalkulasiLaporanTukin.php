@@ -43,13 +43,17 @@ final class KalkulasiLaporanTukin
     }
 
     /**
-     * @param list<string> $nip
+     * `tanpa_data_harian` = T-01 (CR-083): data harian tidak dimuat; bersama `pegawai->lewatiLoopHarian`, laporan per
+     * pegawai tidak menampilkan jam/konket dan keterangan cuti untuk NIP itu (legacy tidak membacanya).
      *
-     * @return array<array-key, array{hasil: HasilTukin, predikat_skp: ?string, pegawai: ?DataPegawaiTukin, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string}|array{galat: array{code: string, message: string}}>
+     * @param list<string> $nip
+     * @param bool         $il rekap IL: tanpa aturan pegawai baru [K, CR-083, keputusan Horii 30-10]
+     *
+     * @return array<array-key, array{hasil: HasilTukin, predikat_skp: ?string, pegawai: ?DataPegawaiTukin, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string, tanpa_data_harian: bool}|array{galat: array{code: string, message: string}}>
      */
-    public function hitung(array $nip, int $tahun, int $bulan, string $hariIni): array
+    public function hitung(array $nip, int $tahun, int $bulan, string $hariIni, bool $il = false): array
     {
-        $argumen = $this->data()->siapkanBanyak($nip, $tahun, $bulan, $hariIni);
+        $argumen = $this->data()->siapkanBanyak($nip, $tahun, $bulan, $hariIni, tanpaPegawaiBaru: $il);
         $periode = $this->periode($tahun, $bulan);
         $bulanTk = sprintf('%04d-%02d-01', $tahun, $bulan);
         $hasil   = [];
@@ -76,13 +80,17 @@ final class KalkulasiLaporanTukin
 
                 $adaTb       = array_filter($h->harian, static fn ($hh): bool => $hh->status === 'tugas_belajar') !== [];
                 $penyesuaian = PenyesuaianTukin::aktif($info['penyesuaian'][$n] ?? [], $bulanTk);
+                // Keterangan cuti legacy dibangun di dalam loop harian dari cuti yang dimuat; T-01 (cuti tidak dimuat) dan
+                // `lewatiLoopHarian` (semua hari di-`continue`, :12739-12743) → tanpa keterangan cuti.
+                $cuti = $a->tanpaDataHarian || ($a->pegawai->lewatiLoopHarian ?? false) ? [] : ($info['cuti'][$n] ?? []);
 
                 $hasil[$n] = [
-                    'hasil'        => $h,
-                    'predikat_skp' => $a->pegawai?->predikatSkp,
-                    'pegawai'      => $a->pegawai,
-                    'penyesuaian'  => $penyesuaian,
-                    'keterangan'   => PenyesuaianTukin::keterangan($penyesuaian, ($info['cltn'][$n] ?? false), $adaTb ? ($info['tb'][$n] ?? '') : null, $info['cuti'][$n] ?? []),
+                    'hasil'             => $h,
+                    'predikat_skp'      => $a->pegawai?->predikatSkp,
+                    'pegawai'           => $a->pegawai,
+                    'penyesuaian'       => $penyesuaian,
+                    'keterangan'        => PenyesuaianTukin::keterangan($penyesuaian, ($info['cltn'][$n] ?? false), $adaTb ? ($info['tb'][$n] ?? '') : null, $cuti),
+                    'tanpa_data_harian' => $a->tanpaDataHarian,
                 ];
             }
         }
