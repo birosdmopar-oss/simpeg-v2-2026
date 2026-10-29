@@ -3,11 +3,11 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase5/PRD_Fase5C_FE-Laporan-Regresi-SignOff.md` — **acuan utama** coder/agen paket **5C** Fase 5 (kartu Trello DEV-006). Pasangan kerja: `docs/fase5/TaskList_Fase5C.md` (pembagian paket untuk beberapa coder) |
-| Versi | **v1.0 — 29-10-2026** (v0.1 draf reviewer CR; v0.2 keputusan Horii 29-10 atas Q5C-01 dan Q5C-06; v1.0 disetujui Horii 29-10; butir ◻ lain = default) |
-| Status | **BERLAKU** — disetujui Horii 29-10-2026. Paket yang tidak menunggu MAKE-041 (MAKE-047, 050, 051, 052) boleh diambil setelah laporan C0 diterima reviewer CR |
-| Basis kode | `origin/main` = **`69be4c3`** (29-10-2026). 5A sign-off 28-10; 5B: MAKE-039/040/042/044/045 + DBV-024 di `main`; **MAKE-041 (Laporan Tukin) belum di `main`** (lolos review, perbaikan kop G1/G2 berjalan); MAKE-043 (verifikasi 5B) belum mulai |
+| Versi | **v1.1 — 29-10-2026** (v0.1 draf reviewer CR; v0.2 keputusan Horii atas Q5C-01 dan Q5C-06; v1.0 disetujui Horii; v1.1 mencatat keputusan pelaksanaan 5C, hasil QA Lapis 1, dan UP-1 sebagai tahap tersendiri — §5.1, §12) |
+| Status | **BERLAKU** — disetujui Horii 29-10-2026. Semua paket koding 5C (MAKE-047..053, CR-075..078) sudah di `main`; sisa: QA ulang + MAKE-054 + sign-off Fase 5 |
+| Basis kode | `origin/main` = **`7eac943`** (29-10-2026). 5A sign-off 28-10; 5B sign-off 29-10 (MAKE-043 `87f77c8`); MAKE-047..053 + CR-075..078 di `main` |
 | Acuan legacy | Salinan kerja legacy CI3 HEAD **`0cf7e67`** (sama dengan PRD 5B). Tampilan acuan: `views/hr/employee/presensi/` (`V/list_lt.php`, `V/rekap.php`, `V/rekap_uma.php`, layar `laporan_tukin_skp`, cetak `print/laporan_tukin_us_skp.php`) |
-| Scope | **5C** = D-12 sisa (FE Laporan Tukin, Rekap Tukin, Penyesuaian Tukin, Rekap Kehadiran, Rekap Uang Makan, map picker), D-13 lengkap (12 skenario regression suite terpisah), QA Lapis 1 Fase 5, uji paritas UP-1 data nyata, `ACTIVE_PHASE` 4→5 + hapus flag `rilis`, laporan akhir & **sign-off Horii Fase 5** |
+| Scope | **5C** = D-12 sisa (FE Laporan Tukin, Rekap Tukin, Penyesuaian Tukin, Rekap Kehadiran, Rekap Uang Makan, map picker), D-13 lengkap (12 skenario regression suite terpisah), QA Lapis 1 Fase 5, `ACTIVE_PHASE` 4→5 + hapus flag `rilis`, laporan akhir & **sign-off Horii Fase 5**. **Uji paritas UP-1 data nyata dipindah ke Tahap UP-1** (antara Fase 5 dan Fase 6, keputusan Horii 29-10; tidak menahan sign-off Fase 5, menjadi syarat masuk Fase 6 — `TaskList_Fase5_Paralel.md` §6–§7) |
 | Key | Pekerjaan baru **MAKE-047..054** (§10); perbaikan review/QA **CR-075** dst. Tidak ada skema baru (bila ternyata butuh → DBV-025, eskalasi dulu) |
 | Sumber | PRD 5A v1.1 (§7.8, §9, §11), PRD 5B v1.0 (§1.2, §6, §7.3, §7.4, §9, §10 M7), `backend/docs/progress/05-Presensi.md`, README `Controllers/Api/Presensi` + `Libraries/Presensi*`, `frontend/src/features/presensi/README.md`, AGENTS.md §1 & §3, Trello DEV-006, QASMTASK-087/088, QAUI-005, QAFUNC-006 |
 
@@ -102,6 +102,21 @@ kode** (tidak bergantung warna saja) + legenda.
 | 083 "Filter: month, unit_satker, jenis_pegawai, tukinver, format" | Filter Bulan (`UiMonthPicker`), Unit/Satker (`UiSelect` searchable, role 1 saja; role 3 tidak ditampilkan karena dipaksa server), Jenis Pegawai (multi), ekspor `UiExportMenu`; `tukinver` tidak ada (hanya `skp`, F5B-4) | §7.1 |
 | 088 seluruh butir | 12 skenario §7.6 | §7.6 |
 
+### 5.1 Keputusan pelaksanaan 5C (29-10-2026, reviewer CR + Horii)
+
+| ID | Keputusan | Asal |
+|---|---|---|
+| K5C-1 | **Warna baris** tabel harian laporan per pegawai ikut legacy [K] (`laporan_tukin_skp.php:235-262`, CSS :471-495): libur biru, akhir pekan abu-abu, konket jingga, cuti ungu, `tugas_belajar` merah muda, `di_luar_masa_kerja` abu-abu; hadir/TK/TPM/TPP tanpa warna baris. **Chip kode** `TL1`–`TL3`/`PSW1`–`PSW3`/`TPM`/`TPP`/`TK`/`CS` dari `kode[]` [V2] palet Q5C-03 (TL/PSW kuning, TK/TPM/TPP merah, CS jingga). Rekap (legacy tanpa warna): chip/sel kode saja. Token `status.*` di `tailwind.config.js`; PDF memakai palet soft yang sama | Horii "warna ikut legacy" |
+| K5C-2 | **CR-075**: `harian[].kode` = kode kejadian (kategori) di JSON laporan per pegawai | Review MAKE-047 |
+| K5C-3 | **CR-076**: `harian[]` JSON & PDF memuat **setiap tanggal** periode, ikut legacy: `di_luar_masa_kerja`, `libur` "(Libur) <nama>", status baru `akhir_pekan` ("Sabtu"/"Minggu") | Horii "ikut perilaku legacy" |
+| K5C-4 | Role 4/5 **tanpa menu** Laporan Tukin per pegawai (ikut legacy); route `/presensi/tukin/:nip` tetap terbuka (lingkup ditegakkan server). Role 4 memilih Unit/Satker di Rekap Kehadiran, semua lingkup (F5B-10) | Review MAKE-048/051 |
+| K5C-5 | Deviasi diterima: PUT penyesuaian mengirim body lengkap (MAKE-050); helper `RegresiD13` di `tests/_support` (MAKE-052) | Review |
+| K5C-6 | **CR-078 (T-01)**: bulan bawaan halaman **Tukin** (daftar, rekap, per pegawai, Saya) = bulan periode Tukin berjalan: tanggal WIB > 15 → bulan berikutnya [K `Presensi.php:110-119`]. Rekap Kehadiran & Uang Makan tetap **bulan kalender** WIB | QA Lapis 1 |
+| K5C-7 | **CR-078 (T-04)**: filter & laporan per pegawai mengikuti URL saat komponen yang sama dipakai ulang (back/forward, menu, NIP lain) lewat `onBeforeRouteUpdate`; penulisan balik ke URL hanya selama rute milik halaman aktif | QA Lapis 1 |
+| K5C-8 | **CR-077 (T-10/T-11)**: `.page-fill` menggulir sendiri bila viewport pendek (window tetap tanpa gulir); `.table-fill` tinggi minimum `18rem` (`--table-fill-min`); kartu filter tidak `fill`; sel sticky kiri ikut warna baris (T-02); pojok header sticky di bawah navbar (T-03) | QA Lapis 1 (temuan Horii) |
+| K5C-9 | **CR-078 (T-05/T-06)**: unduhan blob mengurai body galat JSON (pesan 422/`code` server tampil); fokus kembali ke ⋮ setelah `ConfirmDialog` (pola bersama) | QA Lapis 1 |
+| K5C-10 | **UP-1 = tahap tersendiri** antara Fase 5 dan Fase 6; tidak menahan sign-off Fase 5; Fase 6 terkunci sampai UP-1 selesai. Sumber data = DB server dev (salinan produksi, tetap data pribadi), DBA = DBV, jalur impor = alat impor resmi MAKE-056 (gladi cutover) | Horii 29-10 |
+
 ## 6. Matriks role × halaman 5C (v2)
 
 Guard FE hanya UX (ADR-024); server tetap menegakkan role + lingkup. Role: 1 Super Admin, 2 PNS, 3 Admin Satker,
@@ -124,7 +139,8 @@ Role 8 tidak punya halaman laporan Presensi. Halaman yang tidak boleh diakses �
 ## 7. Spesifikasi per task
 
 ### 7.1 Pola umum halaman laporan (semua paket FE)
-- **Filter bar** (`useFilterLaporan`): Bulan wajib (bawaan = bulan laporan berjalan menurut tanggal WIB klien; nilai
+- **Filter bar** (`useFilterLaporan`): Bulan wajib (bawaan = bulan laporan berjalan menurut tanggal WIB klien — halaman
+  Tukin: periode 16–15, tanggal > 15 → bulan berikutnya; Rekap Kehadiran/Uang Makan: bulan kalender, K5C-6; nilai
   `YYYY-MM`, tanpa `toISOString()`), Unit/Satker (role 1: opsi `0` Kementerian + unit + `sat_<id>`; role 3/4: lihat §6),
   Jenis Pegawai multi, Cari (bila API mendukung). Filter disimpan di query string URL agar halaman bisa dibagikan/di-refresh.
 - **Tabel:** `page-fill` + `table-fill`; header sticky; kolom identitas sticky kiri; paginasi server (`per_page` 10/25/50/100);
@@ -193,8 +209,9 @@ Role 8 tidak punya halaman laporan Presensi. Halaman yang tidak boleh diakses �
 ### 7.7 Penutup (MAKE-053) dan verifikasi (MAKE-054)
 - MAKE-053: `ACTIVE_PHASE` 4→5, hapus `rilis` grup Presensi + sesuaikan test nav; semua anak menu laporan terdaftar per role;
   README FE/BE + progres diperbarui. **Hanya setelah MAKE-047..051 di `main`.**
-- MAKE-054: verifikasi AC 5A/5B/5C, matriks halaman × role, keterlacakan DoD 076–088, checklist QA Lapis 1 5C, hasil
-  paritas UP-1 (Q5C-06), daftar blocker go-live (QC-1..5, Q5A-14, Q5A-25, UP-1), `Laporan_Akhir_Fase5.md` → ⛔ sign-off Horii.
+- MAKE-054: verifikasi AC 5A/5B/5C, matriks halaman × role, keterlacakan DoD 076–088, checklist QA Lapis 1 5C (+ QA ulang
+  CR-077/078), status Tahap UP-1 (dicatat, **bukan** syarat — K5C-10), daftar blocker go-live (QC-1..5, Q5A-14, Q5A-25, UP-1),
+  `Laporan_Akhir_Fase5.md` → ⛔ sign-off Horii.
 
 ## 8. Acceptance criteria 5C
 
@@ -210,16 +227,18 @@ Role 8 tidak punya halaman laporan Presensi. Halaman yang tidak boleh diakses �
 - **AC-FE5C.8** Komponen custom `shared/ui` saja (pemindai/elemen native tidak tampil); keyboard & ARIA teruji untuk komponen baru.
 - **AC-D13.1** 12 kelas skenario ada, bergrup `d13`, lulus lewat `composer test:d13` dan `./check.sh`.
 - **AC-5C.X1** `ACTIVE_PHASE = 5`, tidak ada `rilis` tersisa di grup Presensi, test nav diperbarui.
-- **AC-5C.X2** QA Lapis 1 5C lolos; paritas UP-1 tercatat; laporan akhir Fase 5 memuat blocker go-live.
+- **AC-5C.X2** QA Lapis 1 5C lolos; laporan akhir Fase 5 memuat blocker go-live dan status Tahap UP-1 (UP-1 bukan syarat
+  sign-off Fase 5, K5C-10).
 
 ## 9. Ketergantungan
 
-| Pihak | Butir | Status 29-10 |
+| Pihak | Butir | Status 29-10 (v1.1) |
 |---|---|---|
-| 5B MAKE-041 | API Laporan & Rekap Tukin | Belum di `main` → MAKE-048/049 menunggu (boleh mulai dari kontrak README di branch, merge setelah 041 di `main`) |
-| 5B MAKE-042 / MAKE-045 | API rekap kehadiran/uang makan, CRUD penyesuaian | Di `main` → MAKE-050/051 boleh mulai |
-| 5B MAKE-043 | Verifikasi 5B + prosedur paritas UP-1 | Belum → MAKE-054 menunggu |
-| Horii | Q5C-01 (map picker), Q5C-06 (paritas data nyata) | ✅ diputus 29-10 |
+| 5B MAKE-041 | API Laporan & Rekap Tukin | ✅ Di `main` `9968dc0` |
+| 5B MAKE-042 / MAKE-045 | API rekap kehadiran/uang makan, CRUD penyesuaian | ✅ Di `main` |
+| 5B MAKE-043 | Verifikasi 5B + prosedur paritas UP-1 | ✅ Di `main` `87f77c8` (5B sign-off 29-10) |
+| Horii | Q5C-01 (map picker), Q5C-06 (paritas data nyata), Q5C-09 (UP-1 tahap tersendiri) | ✅ diputus 29-10 |
+| Tahap UP-1 | Paritas Tukin data nyata (MAKE-055 runbook, MAKE-056 alat impor) | Di luar 5C; syarat masuk Fase 6 |
 | Cutover | QC-1..5, Q5A-14, Q5A-25 | Dicatat sebagai blocker go-live, bukan blocker 5C |
 
 ## 10. Urutan kerja (ringkas — rinci di TaskList_Fase5C.md)
@@ -238,14 +257,16 @@ C0 (baca + laporan pemahaman, tanpa commit) → **MAKE-047** fondasi → paralel
 |---|---|---|---|
 | Q5C-01 ✅ | "Map picker presensi" (DoD 087): (a) tetap `IndikatorRadius` SVG tanpa peta (5A), (b) peta tile pihak ketiga (mis. OpenStreetMap) di layar presensi pegawai, atau (c) peta untuk admin memilih titik di master Lokasi Presensi | (a) + catat gap; (b)/(c) perlu keputusan privasi, CSP & ketergantungan internet | **DIPUTUS Horii 29-10: (a) SVG** |
 | Q5C-02 | Letak menu & path halaman laporan | Anak grup **Presensi**: Laporan Tukin, Rekap Tukin, Penyesuaian Tukin, Rekap Kehadiran, Rekap Uang Makan (path §6) | ◻ |
-| Q5C-03 | Warna color-coding bila legacy tanpa warna | TL/PSW kuning, TK/TPM/TPP merah, CS jingga, cuti/TB biru, libur abu-abu — dari token desain | ◻ |
+| Q5C-03 ✅ | Warna color-coding bila legacy tanpa warna | TL/PSW kuning, TK/TPM/TPP merah, CS jingga, cuti/TB biru, libur abu-abu — dari token desain | **Diputus 29-10**: warna baris ikut legacy, chip kode palet ini (K5C-1) |
 | Q5C-04 | Cetak dari layar (pengganti cetak HTML legacy) | Tidak dibuat; cukup PDF/XLSX server | ◻ |
 | Q5C-05 | Lokasi & cara jalan suite D-13 | §7.6 (`RegresiD13`, grup `d13`, `composer test:d13`) | ◻ |
 | Q5C-06 ✅ | Uji paritas UP-1 data nyata: periode mana, siapa menjalankan, akses data | 2 periode terakhir, dijalankan reviewer bersama DBA di salinan data yang disetujui; hasil tanpa data pribadi | **DIPUTUS Horii 29-10: sesuai default** |
 | Q5C-07 | Pelaksana QA Lapis 1 5C | Reviewer CR di app demo (pola Fase 4 C-11) | ◻ |
 | Q5C-08 | Blok penanda tangan di layar Rekap Tukin | Tidak ditampilkan (hanya di berkas) | ◻ |
+| Q5C-09 ✅ | Paritas UP-1: bagian 5C atau tahap tersendiri? | — | **DIPUTUS Horii 29-10: tahap tersendiri** antara Fase 5 dan Fase 6 (K5C-10) |
 
 ## 12. Riwayat
 - v0.1 (29-10-2026): draf awal reviewer CR.
-- v1.0 (29-10-2026): disetujui Horii, berlaku.
 - v0.2 (29-10-2026): Q5C-01 = SVG `IndikatorRadius` (paket map picker dihapus, key digeser: D-13 = MAKE-052, penutup = MAKE-053, verifikasi = MAKE-054); Q5C-06 = default.
+- v1.0 (29-10-2026): disetujui Horii, berlaku.
+- v1.1 (29-10-2026): §5.1 keputusan pelaksanaan K5C-1..10 (warna legacy, CR-075/076, role 4/5, deviasi MAKE-050/052, hasil QA Lapis 1 → CR-077/078); UP-1 dipindah ke Tahap UP-1 (Q5C-09); §7.1, §7.7, §8 AC-5C.X2, §9 diperbarui.
