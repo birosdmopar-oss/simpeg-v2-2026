@@ -46,3 +46,9 @@ export const REKAP_KEHADIRAN_PILIH_UNIT_ROLES: readonly RoleCode[] = [Role.SUPER
 export const REKAP_UANG_MAKAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]
 /** Penyesuaian Tukin per NIP (5B F5B-14, PRD 5C §6): CRUD hanya Super Admin (`PenyesuaianTukinController` role 1). */
 export const PENYESUAIAN_TUKIN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
+
+/** Rekap Tukin (`hr/presensi/laporan_tukin_us_skp` = 1, 3; PRD 5C §6). Server memaksa lingkup role 3. */
+export const REKAP_TUKIN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]
+
+/** Rekap Tukin Instansi Lain (`laporan_tukin_us_skp_il` = 1). */
+export const REKAP_TUKIN_IL_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
