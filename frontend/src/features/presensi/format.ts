@@ -7,3 +7,9 @@ export function persenId(nilai: string | null | undefined): string {
   if (nilai === null || nilai === undefined || nilai === '') return '-'
   return `${nilai.replace('.', ',')}%`
 }
+
+/** "0.4" → "0,4" (koma desimal Indonesia, tanpa tanda %; header kolom sudah memuat satuan); kosong → "-". */
+export function angkaId(nilai: string | null | undefined): string {
+  if (nilai === null || nilai === undefined || nilai === '') return '-'
+  return nilai.replace('.', ',')
+}
