@@ -134,7 +134,8 @@ akun yang sama.
 
 11. **Siapkan DB scratch dan `.env` uji.**
     - Buat DB baru, mis. `simpeg_v2_t_up1` (`utf8mb4_unicode_ci`), di instance yang sama dengan skema salinan dari
-      langkah 10.
+      langkah 10. Instance ini **wajib** MySQL lokal di mesin DBA, bukan server dev atau produksi. Alat impor tidak
+      bisa mengenali host, jadi kebenaran tujuan adalah tanggung jawab DBA.
     - `.env` di repo v2 mesin DBA: grup `default` **dan** `tests` menunjuk DB scratch ini (`DBPrefix` kosong). Jangan
       menyalin `.env` dev. Untuk login uji, set `auth.captchaDriver = mock`.
     - Sebelum setiap perintah DB, cetak tujuannya dan pastikan benar:
@@ -147,7 +148,11 @@ akun yang sama.
     php spark impor:legacy --sumber=up1_legacy_salinan --zona-sumber=<WIB|UTC> \
       --konfirmasi=simpeg_v2_t_up1 --keputusan=<KERJA_UP1>/keputusan.json --dry-run
     ```
+    - Baris pertama keluaran adalah `Tujuan: host:port / nama_db — sumber: …` (tanpa user/password). Pastikan host
+      adalah mesin lokal dan nama DB adalah DB scratch. Bila salah, hentikan dan perbaiki `.env`. Karena itu dry-run
+      selalu dijalankan lebih dulu: bila tujuannya salah, belum ada yang tertulis.
     - `--zona-sumber` wajib diisi; tidak ada nilai bawaan (GAP-2). Nilainya dikonfirmasi DBV.
+    - Opsi boleh ditulis `--k=nilai` atau `--k nilai`.
     - Dry-run sekaligus memeriksa bahwa **daftar tabel ekstraksi = daftar tabel yang dibaca alat**. Tabel yang dibaca
       alat tetapi tidak ada di salinan menghasilkan `GAGAL: Tabel sumber <t> tidak ada`; perbaiki
       `up1-ekstraksi.sh` lalu ulangi langkah 8–10. Daftar lengkapnya tercetak di laporan dry-run (kolom pertama tiap
