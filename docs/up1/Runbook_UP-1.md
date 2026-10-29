@@ -1,4 +1,4 @@
-# Runbook UP-1 — uji paritas rekap Tukin v2 vs legacy (MAKE-055)
+# Runbook UP-1 — uji paritas rekap Tukin v2 vs legacy (MAKE-055, satu PR #32 bersama alat impor MAKE-056)
 
 Paket siap-jalan untuk DBA dan reviewer CR. Keputusan Horii 29-10-2026: UP-1 adalah **tahap tersendiri di antara Fase 5
 dan Fase 6**. Fase 5 di-sign-off tanpa menunggu UP-1, tetapi **Fase 6 tidak boleh mulai/lanjut sebelum UP-1 lolos**.
@@ -16,7 +16,7 @@ Isi paket:
 | `docs/up1/Runbook_UP-1.md` | Runbook ini |
 | `docs/up1/sql/up1-ekstraksi.sh` | Ekstraksi baca-saja dari DevSimpeg (`mysqldump --single-transaction --where`) per rentang periode |
 | `docs/up1/sql/up1-hitung-baris.sql` | Jumlah baris per tabel untuk rentang yang sama; dijalankan di sumber **dan** di DB v2 hasil impor |
-| `docs/up1/keputusan-impor.contoh.json` | Contoh berkas keputusan alat impor (ada di branch MAKE-056) |
+| `docs/up1/keputusan-impor.contoh.json` | Contoh berkas keputusan alat impor |
 | `docs/up1/Hasil_UP-1_TEMPLATE.md` | Lembar hasil anonim + checklist keamanan data |
 | `docs/up1/Pertanyaan_Terbuka_UP-1.md` | Keputusan yang masih ditunggu dari Horii |
 
