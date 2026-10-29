@@ -83,6 +83,39 @@ final class LaporanTukinPegawaiTest extends DatabaseTestCase
         $this->assertStringNotContainsString('Rp', $json);
     }
 
+    /**
+     * CR-075: `harian[].kode` = `HasilHarian::kategori` apa adanya (urutan sama dengan `keterangan`) untuk color-coding FE;
+     * `[]` bila tanpa kode kejadian (cuti tanpa potongan, konket). Hari libur/akhir pekan tidak masuk `harian[]`
+     * (`KalkulasiTukin` melewatinya). Field lain tidak berubah.
+     */
+    public function testHarianMemuatKodeKejadian(): void
+    {
+        $n = $this->pegawaiRekap($this->satker);
+        if ($this->db->table('jenis_cuti')->where('id_jenis_cuti', 3)->countAllResults() === 0) {
+            $this->db->table('jenis_cuti')->insert(['id_jenis_cuti' => 3, 'nama_jenis_cuti' => 'Cuti Sakit', 'status' => 1]);
+        }
+        // Cuti sakit 17-08 s.d. 08-09: hari kerja ke-15+ (04-09 dst.) dipotong CS.
+        $this->db->table('riwayat_cuti')->insert(['nip' => $n, 'id_jenis_cuti' => 3, 'nama_jenis_cuti' => 'Cuti Sakit', 'tgl_mulai' => '2026-08-17', 'tgl_akhir' => '2026-09-08', 'lama_cuti' => 17, 'status' => 1]);
+        $this->hadir($n, '2026-09-09', '07:45:00', '15:50:00'); // TL1 + PSW1
+        $this->hadir($n, '2026-09-10', null, '15:00:00');       // TPM + PSW2
+        $this->konketRekap($n, '2026-09-14', 5);
+        // 11-09 tanpa presensi → TK; 12/13-09 akhir pekan tidak masuk harian.
+
+        $harian = array_column($this->serviceLaporanTukin()->laporan($this->adminRekap(), $n, ['bulan' => '2026-09'])['harian'], null, 'tanggal');
+
+        $this->assertSame([], $harian['2026-08-17']['kode'], 'cuti sakit hari pertama tanpa potongan');
+        $this->assertSame(['CS'], $harian['2026-09-08']['kode']);
+        $this->assertSame(['TL1', 'PSW1'], $harian['2026-09-09']['kode']);
+        $this->assertSame(['TPM', 'PSW2'], $harian['2026-09-10']['kode']);
+        $this->assertSame(['TK'], $harian['2026-09-11']['kode']);
+        $this->assertSame([], $harian['2026-09-14']['kode'], 'konket');
+        $this->assertArrayNotHasKey('2026-09-12', $harian, 'akhir pekan');
+        foreach (['2026-09-09', '2026-09-10', '2026-09-11'] as $t) {
+            $this->assertSame(implode(' - ', $harian[$t]['kode']), $harian[$t]['keterangan'], "urutan kode = keterangan {$t}");
+        }
+        $this->assertSame(['tanggal', 'status', 'jam_masuk', 'jam_pulang', 'potongan', 'keterangan', 'kode', 'kategori_konket'], array_keys($harian['2026-09-09']));
+    }
+
     public function testPdfRupiahHanyaKonketKategori13YangDibayar(): void
     {
         $this->aturWebConfig(['uang_makan_gol_3' => '37000', 'uang_makan_gol_4' => '41000']);

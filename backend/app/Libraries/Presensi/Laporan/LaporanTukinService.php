@@ -221,7 +221,9 @@ final class LaporanTukinService
     /**
      * @param array<string, array{masuk: ?string, pulang: ?string, kategori: ?int}> $mentah
      *
-     * @return list<array{tanggal: string, status: string, jam_masuk: ?string, jam_pulang: ?string, potongan: string, keterangan: string, kategori_konket: ?int}>
+     * `kode` (CR-075) = `HasilHarian::kategori` apa adanya (mis. `['TL2', 'PSW1']`, `['CS']`, `[]`) untuk color-coding FE.
+     *
+     * @return list<array{tanggal: string, status: string, jam_masuk: ?string, jam_pulang: ?string, potongan: string, keterangan: string, kode: list<string>, kategori_konket: ?int}>
      */
     private function harian(HasilTukin $h, array $mentah): array
     {
@@ -243,6 +245,7 @@ final class LaporanTukinService
                     'di_luar_masa_kerja' => '',
                     default              => implode(' - ', $hh->kategori),
                 },
+                'kode'            => $hh->kategori,
                 'kategori_konket' => $hh->status === 'konket' ? $m['kategori'] : null,
             ];
         }
