@@ -243,6 +243,24 @@ akun yang sama.
     - CSV temuan, terutama yang dibuat dengan `--nip-penuh`.
 27. Pastikan tidak ada sisa di Recycle Bin, folder unduhan browser, atau cache sinkron cloud.
 
+### i½. Butir cek dari riset statis UP1-11 (R, D)
+
+Cek tambahan untuk langkah paritas (b–g) dari `Riset_Statis_UP1-11.md` §2 dan §4 (dokumen pendukung, MAKE-057).
+Hasilnya hanya jumlah, tanpa NIP. Lakukan sebelum langkah 22; temuannya dipakai saat triase langkah 23.
+
+- **T-03 puasa:** legacy hanya punya rentang puasa 2026 (hard-code). Bandingkan hanya bulan yang rentang puasanya sama
+  di kedua sisi; sebelum membandingkan Februari–April 2026, isi `rentang_puasa` v2 untuk 2026 sama dengan legacy.
+- **T-04 baris BKN:** bandingkan hanya bulan yang punya baris `bkn_periode_ekinper` (`jenis_periode IS NULL`); tanpa
+  baris itu hasil legacy bergantung pada tanggal ekspor.
+- **T-05 SKP:** setelah impor, cek nilai `DISTINCT riwayat_skp_periodik.hasil_akhir` di rentang uji; nilai yang memuat
+  backslash dicatat (legacy memakai `stripslashes`, v2 tidak).
+- **T-06 SKP ganda:** hitung NIP dengan lebih dari satu baris SKP periodik aktif pada periode yang sama; bila > 0,
+  aturannya diputus DBV/Horii sebelum perbandingan.
+- **T-07 awal periode BKN:** cek `periode_awal` semua baris BKN yang dibandingkan; periode yang mulai sebelum bulan
+  kalender N−1 membuat legacy menghitung TK pada hari-hari itu.
+- **T-01 / T-02:** selisih karena pegawai yang dibuat di hari terakhir periode (T-01) atau CPNS tanpa `tmtsk_pangkat`
+  (T-02) masuk kelompok (a) bila Horii sudah memutusnya sebagai [V2]; bila belum diputus, catat terpisah di lembar hasil.
+
 ### j. Kriteria lolos
 
 28. UP-1 **LOLOS** bila semua bulan × lingkup sudah dibandingkan dan **tidak ada temuan kelompok (c) yang masih
