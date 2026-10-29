@@ -173,6 +173,7 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
       expect(presensi(role)?.children).toEqual([
         { key: 'presensi-saya', label: 'Presensi Saya', to: '/presensi', roles: [2, 6, 7] },
         { key: 'presensi-slip-gaji', label: 'Slip Gaji', to: '/presensi/slip-gaji', roles: [2, 6, 7] },
+        { key: 'presensi-tukin-saya', label: 'Laporan Tukin Saya', to: '/presensi/tukin/saya', roles: [2, 6, 7] },
       ])
     }
   })
@@ -188,6 +189,7 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
       expect(presensi(role)?.children).toEqual([
         { key: 'presensi-slip-gaji-kelola', label: 'Kelola Slip Gaji', to: '/presensi/slip-gaji/kelola', roles: [1, 3] },
         { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: [1, 3, 4, 5] },
+        { key: 'presensi-tukin', label: 'Laporan Tukin', to: '/presensi/tukin', roles: [1, 3] },
       ])
     }
   })
@@ -200,7 +202,7 @@ describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)',
 
   it('`rilis` tidak melewati penyaringan role dan fase lebih tinggi tetap memakai anak yang sama', () => {
     expect(presensi(Role.PIMPINAN)).toBeUndefined()
-    expect(presensi(Role.PEGAWAI, 5)?.children?.map((c) => c.key)).toEqual(['presensi-saya', 'presensi-slip-gaji'])
+    expect(presensi(Role.PEGAWAI, 5)?.children?.map((c) => c.key)).toEqual(['presensi-saya', 'presensi-slip-gaji', 'presensi-tukin-saya'])
   })
 
   it('item tanpa `rilis` dengan children kosong tetap mengikuti fase (E-Kinerja fase 6)', () => {

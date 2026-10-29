@@ -9,7 +9,16 @@ import { describe, expect, it } from 'vitest'
 import { Role } from '@/features/auth/types'
 import { ACTIVE_PHASE, buildNav } from '@/shared/layouts/nav.config'
 
-import { PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from '../roles'
+import {
+  PRESENSI_ADMIN_ROLES,
+  PRESENSI_PEGAWAI_ROLES,
+  SLIP_GAJI_ADMIN_ROLES,
+  SLIP_GAJI_PEGAWAI_ROLES,
+  TUKIN_DAFTAR_ROLES,
+  TUKIN_IL_ROLES,
+  TUKIN_PER_PEGAWAI_ROLES,
+  TUKIN_SAYA_ROLES,
+} from '../roles'
 import { presensiRoutes } from '../routes.presensi'
 
 const anakPresensi = (role: (typeof Role)[keyof typeof Role]) =>
@@ -24,13 +33,13 @@ describe('navPresensi', () => {
   })
 
   it.each([
-    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi']],
-    [Role.PEGAWAI, ['Presensi Saya', 'Slip Gaji']],
-    [Role.ADMIN_SATKER, ['Kelola Slip Gaji', 'Data Presensi']],
+    [Role.SUPER_ADMIN, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin']],
+    [Role.PEGAWAI, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
+    [Role.ADMIN_SATKER, ['Kelola Slip Gaji', 'Data Presensi', 'Laporan Tukin']],
     [Role.ADMIN_VIEW_ESELON1, ['Data Presensi']],
     [Role.MENTERI, ['Data Presensi']],
-    [Role.PTT, ['Presensi Saya', 'Slip Gaji']],
-    [Role.PPPK, ['Presensi Saya', 'Slip Gaji']],
+    [Role.PTT, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
+    [Role.PPPK, ['Presensi Saya', 'Slip Gaji', 'Laporan Tukin Saya']],
     [Role.PIMPINAN, []],
   ])('role %i melihat anak Presensi %j', (role, harapan) => {
     expect(anakPresensi(role)).toEqual(harapan)
@@ -61,6 +70,8 @@ describe('navPresensi', () => {
   it.each([
     ['presensi-saya', PRESENSI_PEGAWAI_ROLES, Role.PEGAWAI],
     ['presensi-data', PRESENSI_ADMIN_ROLES, Role.MENTERI],
+    ['presensi-tukin', TUKIN_DAFTAR_ROLES, Role.ADMIN_SATKER],
+    ['presensi-tukin-saya', TUKIN_SAYA_ROLES, Role.PEGAWAI],
   ] as const)('tujuan menu %s = path route dan role route = role menu', (key, roles, role) => {
     const rute = presensiRoutes.find((r) => r.name === key)
     const anak = buildNav(role)
@@ -70,5 +81,14 @@ describe('navPresensi', () => {
     expect(anak?.to).toBe(rute?.path)
     expect(rute?.meta?.roles).toEqual(roles)
     expect(anak?.roles).toEqual(roles)
+  })
+
+  it('route Laporan Tukin (MAKE-048): role per halaman PRD 5C §6; "saya" statis sebelum ":nip" numerik; IL hanya role 1', () => {
+    const rute = (nama: string) => presensiRoutes.find((r) => r.name === nama)
+    expect(rute('presensi-tukin-il')?.meta?.roles).toEqual(TUKIN_IL_ROLES)
+    expect(rute('presensi-tukin-pegawai')?.meta?.roles).toEqual(TUKIN_PER_PEGAWAI_ROLES)
+    expect(TUKIN_PER_PEGAWAI_ROLES).not.toContain(Role.PIMPINAN)
+    expect(rute('presensi-tukin-saya')?.path).toBe('/presensi/tukin/saya')
+    expect(rute('presensi-tukin-pegawai')?.path).toBe(String.raw`/presensi/tukin/:nip(\d+)`)
   })
 })

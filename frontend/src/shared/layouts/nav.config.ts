@@ -63,7 +63,14 @@ import {
 } from '@/features/layanan/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
-import { PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from '@/features/presensi/roles'
+import {
+  PRESENSI_ADMIN_ROLES,
+  PRESENSI_PEGAWAI_ROLES,
+  SLIP_GAJI_ADMIN_ROLES,
+  SLIP_GAJI_PEGAWAI_ROLES,
+  TUKIN_DAFTAR_ROLES,
+  TUKIN_SAYA_ROLES,
+} from '@/features/presensi/roles'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { WEB_CONFIG_ROLES } from '@/features/master-data/webConfig.types'
 
@@ -174,6 +181,8 @@ const NAV: NavGroup[] = [
           { key: 'presensi-slip-gaji', label: 'Slip Gaji', to: '/presensi/slip-gaji', roles: SLIP_GAJI_PEGAWAI_ROLES },
           { key: 'presensi-slip-gaji-kelola', label: 'Kelola Slip Gaji', to: '/presensi/slip-gaji/kelola', roles: SLIP_GAJI_ADMIN_ROLES },
           { key: 'presensi-data', label: 'Data Presensi', to: '/presensi/data', roles: PRESENSI_ADMIN_ROLES },
+          { key: 'presensi-tukin', label: 'Laporan Tukin', to: '/presensi/tukin', roles: TUKIN_DAFTAR_ROLES },
+          { key: 'presensi-tukin-saya', label: 'Laporan Tukin Saya', to: '/presensi/tukin/saya', roles: TUKIN_SAYA_ROLES },
         ],
       },
       // Fase 7 (Dashboard/laporan) F-03 MAKE-036: 7 statistik (hr/chart/* = role 1, 3, 4, 5, 8); 3 pertama mengikuti
