@@ -15,3 +15,9 @@ export const PRESENSI_PEGAWAI_ROLES: readonly RoleCode[] = [Role.PEGAWAI, Role.P
 
 /** Data Presensi (`hr/presensi/list_ad|list` = 1, 3, 4, 5; F5-15). */
 export const PRESENSI_ADMIN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI]
+
+/** Rekap Kehadiran (5B MAKE-042, F5B-10; PRD 5C §6): role 1, 3, 4. Server memaksa lingkup role 3. */
+export const REKAP_KEHADIRAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1]
+
+/** Rekap Uang Makan (5B MAKE-042, F5B-20; PRD 5C §6): role 1, 3. Tab Instansi Lain hanya role 1 (F5B-6). */
+export const REKAP_UANG_MAKAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]

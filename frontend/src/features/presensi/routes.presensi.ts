@@ -4,7 +4,14 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-import { PRESENSI_ADMIN_ROLES, PRESENSI_PEGAWAI_ROLES, SLIP_GAJI_ADMIN_ROLES, SLIP_GAJI_PEGAWAI_ROLES } from './roles'
+import {
+  PRESENSI_ADMIN_ROLES,
+  PRESENSI_PEGAWAI_ROLES,
+  REKAP_KEHADIRAN_ROLES,
+  REKAP_UANG_MAKAN_ROLES,
+  SLIP_GAJI_ADMIN_ROLES,
+  SLIP_GAJI_PEGAWAI_ROLES,
+} from './roles'
 
 export const presensiRoutes: RouteRecordRaw[] = [
   {
@@ -34,6 +41,20 @@ export const presensiRoutes: RouteRecordRaw[] = [
     name: 'presensi-slip-gaji-kelola',
     component: () => import('./views/SlipGajiKelolaPage.vue'),
     meta: { roles: SLIP_GAJI_ADMIN_ROLES, title: 'Kelola Slip Gaji' },
+  },
+  {
+    // Rekap Kehadiran (5B MAKE-042, F5B-10; PRD 5C §6): role 1, 3, 4.
+    path: '/presensi/rekap-kehadiran',
+    name: 'presensi-rekap-kehadiran',
+    component: () => import('./views/RekapKehadiranPage.vue'),
+    meta: { roles: REKAP_KEHADIRAN_ROLES, title: 'Rekap Kehadiran' },
+  },
+  {
+    // Rekap Uang Makan (5B MAKE-042, F5B-20; PRD 5C §6): role 1, 3; tab Instansi Lain hanya role 1.
+    path: '/presensi/uang-makan',
+    name: 'presensi-uang-makan',
+    component: () => import('./views/RekapUangMakanPage.vue'),
+    meta: { roles: REKAP_UANG_MAKAN_ROLES, title: 'Rekap Uang Makan' },
   },
   {
     // D-14 verifikasi QR publik (ADR-032): tanpa login & tanpa `guestOnly` (bisa dibuka saat sudah login), tanpa layout
