@@ -10,7 +10,7 @@ use JsonException;
  * Berkas keputusan DBV (log 2.8, GAP-6): pemetaan nilai di luar domain yang TIDAK diputuskan coder. Hanya kode/nilai,
  * tanpa NIP/nama. Bentuk (contoh lengkap `docs/up1/keputusan-impor.contoh.json`):
  *
- *   {"status": {"<tabel>": {"<nilai legacy>": <nilai v2>, "null": 1}},
+ *   {"status": {"<tabel>": {"<nilai legacy>": <nilai v2>, "null": 1}, "<tabel>.<kolom>": {…}},
  *    "nilai":  {"<tabel>.<kolom>": {"<nilai legacy>": <nilai v2 | null>}},
  *    "tanggal_nol": {"<tabel>.<kolom>": "YYYY-MM-DD HH:MM:SS"}}
  *
@@ -74,7 +74,19 @@ final class Keputusan
      */
     public function status(string $tabel, mixed $nilai, array $domain): int|string
     {
+        return $this->domain($tabel, 'status', $nilai, $domain);
+    }
+
+    /**
+     * Nilai v2 untuk kolom ber-domain (CHECK v2) di luar domain: kolom `status` dipetakan di `status.<tabel>`, kolom
+     * lain di `status.<tabel>.<kolom>` (mis. `pegawai.jenis_kelamin`, B-01/B-02 §6 #3).
+     *
+     * @param list<int|string> $domain
+     */
+    public function domain(string $tabel, string $kolom, mixed $nilai, array $domain): int|string
+    {
         $kunci = Transformasi::kunciStatus($nilai);
+        $label = $kolom === 'status' ? $tabel : "{$tabel}.{$kolom}";
 
         foreach ($domain as $d) {
             if ((string) $d === $kunci) {
@@ -82,7 +94,7 @@ final class Keputusan
             }
         }
 
-        $peta = $this->isi['status'][$tabel] ?? [];
+        $peta = $this->isi['status'][$label] ?? [];
 
         if (is_array($peta) && array_key_exists($kunci, $peta)) {
             $hasil = $peta[$kunci];
@@ -92,7 +104,7 @@ final class Keputusan
             }
         }
 
-        throw new ImporGagal("Status {$tabel} '{$kunci}' di luar domain dan belum dipetakan di berkas keputusan.");
+        throw new ImporGagal(($kolom === 'status' ? 'Status' : 'Nilai') . " {$label} '{$kunci}' di luar domain dan belum dipetakan di berkas keputusan.");
     }
 
     /**

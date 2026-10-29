@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Libraries\Impor;
 
 /**
- * Hitung baris per tabel (tanpa data pribadi): sumber, ditulis, dilewati (seed sama), dibuang per kode aturan.
+ * Hitung baris per tabel (tanpa data pribadi): sumber, ditulis, dilewati (seed sama), dibuang per kode aturan, dan
+ * koreksi nilai per kode aturan (baris tetap ditulis, mis. rujukan yatim → NULL).
  */
 final class LaporanImpor
 {
     /**
-     * @var array<string, array{tier: int, aturan: string, sumber: int, ditulis: int, dilewati: int, dibuang: array<string, int>, catatan: string}>
+     * @var array<string, array{tier: int, aturan: string, sumber: int, ditulis: int, dilewati: int, dibuang: array<string, int>, koreksi: array<string, int>, catatan: string}>
      */
     private array $tabel = [];
 
@@ -18,7 +19,7 @@ final class LaporanImpor
     {
         $this->tabel[$def->tabel] = [
             'tier'    => $tier, 'aturan' => $def->sumberAturan, 'sumber' => $sumber, 'ditulis' => 0, 'dilewati' => 0,
-            'dibuang' => [], 'catatan' => $catatan,
+            'dibuang' => [], 'koreksi' => [], 'catatan' => $catatan,
         ];
     }
 
@@ -37,8 +38,13 @@ final class LaporanImpor
         $this->tabel[$tabel]['dibuang'][$kode] = ($this->tabel[$tabel]['dibuang'][$kode] ?? 0) + 1;
     }
 
+    public function koreksi(string $tabel, string $kode): void
+    {
+        $this->tabel[$tabel]['koreksi'][$kode] = ($this->tabel[$tabel]['koreksi'][$kode] ?? 0) + 1;
+    }
+
     /**
-     * @return array<string, array{tier: int, aturan: string, sumber: int, ditulis: int, dilewati: int, dibuang: array<string, int>, catatan: string}>
+     * @return array<string, array{tier: int, aturan: string, sumber: int, ditulis: int, dilewati: int, dibuang: array<string, int>, koreksi: array<string, int>, catatan: string}>
      */
     public function semua(): array
     {
@@ -55,26 +61,35 @@ final class LaporanImpor
         $out = [];
 
         foreach ($this->tabel as $nama => $t) {
-            $buang = [];
-
-            foreach ($t['dibuang'] as $kode => $n) {
-                $buang[] = "{$kode}={$n}";
-            }
-
             $out[] = sprintf(
-                'T%d %-26s sumber=%d ditulis=%d dilewati=%d dibuang=%d%s%s [%s]',
+                'T%d %-26s sumber=%d ditulis=%d dilewati=%d dibuang=%d%s%s%s [%s]',
                 $t['tier'],
                 $nama,
                 $t['sumber'],
                 $t['ditulis'],
                 $t['dilewati'],
                 array_sum($t['dibuang']),
-                $buang === [] ? '' : ' (' . implode(', ', $buang) . ')',
+                self::rinci($t['dibuang']),
+                $t['koreksi'] === [] ? '' : ' koreksi' . self::rinci($t['koreksi']),
                 $t['catatan'] === '' ? '' : ' — ' . $t['catatan'],
                 $t['aturan'],
             );
         }
 
         return $out;
+    }
+
+    /**
+     * @param array<string, int> $hitung
+     */
+    private static function rinci(array $hitung): string
+    {
+        $teks = [];
+
+        foreach ($hitung as $kode => $n) {
+            $teks[] = "{$kode}={$n}";
+        }
+
+        return $teks === [] ? '' : ' (' . implode(', ', $teks) . ')';
     }
 }

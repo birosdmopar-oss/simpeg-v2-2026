@@ -4,79 +4,31 @@ declare(strict_types=1);
 
 namespace Tests\Impor;
 
-use App\Libraries\Impor\DaftarTabel;
 use App\Libraries\Impor\ImporGagal;
 use App\Libraries\Impor\Keputusan;
 use App\Libraries\Impor\PengimporLegacy;
-use CodeIgniter\Database\BaseConnection;
-use Config\Database;
 use PHPUnit\Framework\Attributes\Group;
-use Tests\Support\DatabaseTestCase;
+use Tests\Support\Impor\ImporLegacyTestCase;
 
 /**
- * MAKE-056 M1 — impor Tier 1 (master) dari skema legacy sintetis ke DB test. Skema sumber = `<db_test>_lgc` dibuat
- * test dari struktur tabel v2 (`CREATE TABLE … LIKE`, tanpa FK) lalu diubah seperti legacy bila perlu; semua data
- * sintetis.
+ * MAKE-056 M1 — impor Tier 1 (master) dari skema legacy sintetis ({@see ImporLegacyTestCase}).
  *
  * @internal
  */
 #[Group('db-isolasi-penuh')]
-final class ImporLegacyTier1Test extends DatabaseTestCase
+final class ImporLegacyTier1Test extends ImporLegacyTestCase
 {
-    private string $lgc;
-    private BaseConnection $src;
-
-    /**
-     * @var array{mode: string, tz: string}
-     */
-    private array $sesiAwal;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $sesi           = $this->db->query('SELECT @@SESSION.sql_mode AS m, @@SESSION.time_zone AS z')->getRowArray();
-        $this->sesiAwal = ['mode' => (string) $sesi['m'], 'tz' => (string) $sesi['z']];
-        $this->lgc      = $this->db->getDatabase() . '_lgc';
-
-        $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}`");
-        $this->db->query("CREATE DATABASE `{$this->lgc}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-
-        foreach (DaftarTabel::tier(1) as $def) {
-            $this->db->query("CREATE TABLE `{$this->lgc}`.`{$def->tabel}` LIKE `{$this->db->getDatabase()}`.`{$this->db->prefixTable($def->tabel)}`");
-        }
-
-        $grup             = config(Database::class)->tests;
-        $grup['database'] = $this->lgc;
-        $grup['DBPrefix'] = '';
-        $this->src        = Database::connect($grup, false);
-        $this->src->query("SET SESSION sql_mode = ''");
-        $this->src->query("SET SESSION time_zone = '+00:00'");
-    }
-
-    protected function tearDown(): void
-    {
-        $this->src->close();
-        $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}`");
-        $this->db->query('SET SESSION sql_mode = ?', [$this->sesiAwal['mode']]);
-        $this->db->query('SET SESSION time_zone = ?', [$this->sesiAwal['tz']]);
-
-        parent::tearDown();
-    }
-
     private function isiLegacyDasar(): void
     {
-        $this->src->query("INSERT INTO jenis_cuti SELECT * FROM `{$this->db->getDatabase()}`.`{$this->db->prefixTable('jenis_cuti')}`");
-        $this->src->table('unit')->insert(['id_unit' => 5, 'unit' => "Biro\\'s   Umum ", 'is_upt' => 0, 'order' => 1, 'status' => 1, 'created_at' => '2026-08-16 00:30:00']);
-        $this->src->table('satker')->insertBatch([
-            ['id_satker' => 9, 'id_unit' => 5, 'satker' => 'Bagian A', 'is_upt' => 0, 'zonasi' => 1, 'order' => 1, 'status' => 1, 'created_at' => '2026-01-01 07:00:00'],
-            ['id_satker' => 10, 'id_unit' => 0, 'satker' => 'Bagian B', 'is_upt' => 0, 'zonasi' => 1, 'order' => 2, 'status' => 2, 'created_at' => '2026-01-01 07:00:00'],
-        ]);
+        $this->isiMasterDasar();
     }
 
+    /**
+     * @return array<string, array<string, mixed>>
+     */
     private function impor(string $zona = 'WIB', ?Keputusan $k = null, bool $dryRun = false): array
     {
-        return (new PengimporLegacy($this->src, $this->db, $zona, $k ?? Keputusan::kosong(), 2))->jalankan([1], $dryRun)->semua();
+        return $this->jalankanImpor([1], $zona, $k, $dryRun);
     }
 
     public function testTier1MenyalinIdApaAdanyaDenganAturanUmum(): void

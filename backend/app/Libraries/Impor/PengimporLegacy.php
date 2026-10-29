@@ -18,7 +18,11 @@ use Throwable;
  *    (R3); DATETIME tujuan dikonversi menurut tipe kolom SUMBER dan `--zona-sumber` (R1a/R1b/R2).
  * 4. Kolom FK tujuan: `0` / `''` → NULL (DBV-011 §2.10).
  * 5. Kolom teks: stripslashes PHP (kecuali `tanpaStripslashes`); `kolomNama` dinormalisasi seperti aplikasi.
- * 6. `status` (bila `statusDomain` tidak null): di luar domain → berkas keputusan, kalau tidak gagal.
+ * 6. `status` (bila `statusDomain` tidak null) dan kolom `domain`: di luar domain → berkas keputusan, kalau tidak gagal;
+ *    NULL di kolom nullable dibiarkan.
+ * 7. `kolomKode`: trim PHP (kode wilayah, DBV-011 §2.2 #7). Teks melebihi panjang kolom tujuan → gagal.
+ * 8. Rujukan FK dicek per batch terhadap tabel induk di tujuan (audit DBV-019 = 0): yatim → NULL bila kolomnya
+ *    `yatimKeNull` (dicatat), selain itu gagal dengan jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
  *
  * Kedua koneksi diawali sesi R4 (`time_zone = '+00:00'`, strict). Tujuan wajib kosong, kecuali tabel `bolehSeed`.
  */
@@ -30,6 +34,7 @@ final class PengimporLegacy
     private const TIPE_TEKS  = ['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext'];
 
     private readonly LaporanImpor $laporan;
+    private bool $dryRun = false;
 
     public function __construct(
         private readonly BaseConnection $sumber,
@@ -50,6 +55,7 @@ final class PengimporLegacy
      */
     public function jalankan(array $tier, bool $dryRun): LaporanImpor
     {
+        $this->dryRun = $dryRun;
         $this->aturSesi($this->sumber);
         $this->aturSesi($this->tujuan);
 
@@ -103,7 +109,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool}>, fk: list<string>, seed: array<string, string>}|null
+     * @return array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>}|null
      */
     private function praCek(DefinisiTabel $def): ?array
     {
@@ -127,7 +133,7 @@ final class PengimporLegacy
 
         foreach ($kolomTujuan as $nama => $t) {
             if (isset($kolomSumber[$nama])) {
-                $kolom[$nama] = ['tipeSumber' => $kolomSumber[$nama]['tipe'], 'tipeTujuan' => $t['tipe'], 'nullable' => $t['nullable']];
+                $kolom[$nama] = ['tipeSumber' => $kolomSumber[$nama]['tipe'], 'tipeTujuan' => $t['tipe'], 'nullable' => $t['nullable'], 'panjang' => $t['panjang']];
 
                 continue;
             }
@@ -160,7 +166,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool}>, fk: list<string>, seed: array<string, string>}|null $rinci
+     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>}|null $rinci
      */
     private function imporTabel(int $tier, DefinisiTabel $def, ?array $rinci, bool $dryRun): void
     {
@@ -226,6 +232,8 @@ final class PengimporLegacy
                 $tulis[] = $hasil;
             }
 
+            $tulis = $this->periksaRujukan($def, $rinci['fk'], $tulis);
+
             if ($tulis !== [] && ! $dryRun) {
                 $this->tujuan->table($def->tabel)->insertBatch($tulis);
             }
@@ -243,7 +251,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool}>, fk: list<string>, seed: array<string, string>} $rinci
+     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>} $rinci
      * @param array<string, mixed> $mentah
      *
      * @return array<string, mixed>|string
@@ -256,16 +264,20 @@ final class PengimporLegacy
             $hasil[$k] = $this->ubahNilai($def, $k, $tipe, $rinci['fk'], $mentah[$k]);
         }
 
-        if ($def->statusDomain !== null && array_key_exists('status', $hasil)) {
-            $hasil['status'] = $this->keputusan->status($def->tabel, $hasil['status'], $def->statusDomain);
+        $domain = $def->domain + ($def->statusDomain === null ? [] : ['status' => $def->statusDomain]);
+
+        foreach ($domain as $k => $nilaiSah) {
+            if (array_key_exists($k, $hasil) && ($hasil[$k] !== null || ! $rinci['kolom'][$k]['nullable'])) {
+                $hasil[$k] = $this->keputusan->domain($def->tabel, $k, $hasil[$k], $nilaiSah);
+            }
         }
 
         return $def->khusus === null ? $hasil : ($def->khusus)($hasil, $this->keputusan);
     }
 
     /**
-     * @param array{tipeSumber: string, tipeTujuan: string, nullable: bool} $tipe
-     * @param list<string>                                                 $fk
+     * @param array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null} $tipe
+     * @param array<string, array{tabel: string, kolom: string}>                       $fk
      */
     private function ubahNilai(DefinisiTabel $def, string $kolom, array $tipe, array $fk, mixed $nilai): mixed
     {
@@ -290,7 +302,7 @@ final class PengimporLegacy
                 : $nilai;
         }
 
-        if (in_array($kolom, $fk, true)) {
+        if (isset($fk[$kolom])) {
             $nilai = Transformasi::rujukan($nilai);
         }
 
@@ -299,6 +311,12 @@ final class PengimporLegacy
 
             if (in_array($kolom, $def->kolomNama, true)) {
                 $nilai = Transformasi::nama($nilai);
+            } elseif (in_array($kolom, $def->kolomKode, true)) {
+                $nilai = trim($nilai);
+            }
+
+            if ($tipe['panjang'] !== null && mb_strlen($nilai) > $tipe['panjang']) {
+                throw new ImporGagal("Panjang {$def->tabel}.{$kolom} melebihi {$tipe['panjang']} karakter.");
             }
         }
 
@@ -306,12 +324,12 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array<string, array{tipe: string, nullable: bool, adaDefault: bool, auto: bool}>
+     * @return array<string, array{tipe: string, nullable: bool, adaDefault: bool, auto: bool, panjang: int|null}>
      */
     private function kolom(BaseConnection $db, string $tabel): array
     {
         $rows = $db->query(
-            'SELECT COLUMN_NAME AS n, DATA_TYPE AS t, IS_NULLABLE AS nl, COLUMN_DEFAULT AS d, EXTRA AS e'
+            'SELECT COLUMN_NAME AS n, DATA_TYPE AS t, IS_NULLABLE AS nl, COLUMN_DEFAULT AS d, EXTRA AS e, CHARACTER_MAXIMUM_LENGTH AS p'
             . ' FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
             [$db->getDatabase(), $tabel],
         )->getResultArray();
@@ -324,6 +342,7 @@ final class PengimporLegacy
                 'nullable'   => $r['nl'] === 'YES',
                 'adaDefault' => $r['d'] !== null,
                 'auto'       => str_contains(strtolower((string) $r['e']), 'auto_increment'),
+                'panjang'    => in_array(strtolower((string) $r['t']), ['char', 'varchar'], true) ? (int) $r['p'] : null,
             ];
         }
 
@@ -331,16 +350,79 @@ final class PengimporLegacy
     }
 
     /**
-     * @return list<string>
+     * FK tabel tujuan: kolom → tabel induk (ber-prefix) + kolom induk.
+     *
+     * @return array<string, array{tabel: string, kolom: string}>
      */
     private function kolomFk(string $tabel): array
     {
         $rows = $this->tujuan->query(
-            'SELECT DISTINCT COLUMN_NAME AS n FROM information_schema.KEY_COLUMN_USAGE'
+            'SELECT COLUMN_NAME AS n, REFERENCED_TABLE_NAME AS t, REFERENCED_COLUMN_NAME AS k FROM information_schema.KEY_COLUMN_USAGE'
             . ' WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
             [$this->tujuan->getDatabase(), $tabel],
         )->getResultArray();
 
-        return array_map(static fn (array $r): string => (string) $r['n'], $rows);
+        $out = [];
+
+        foreach ($rows as $r) {
+            $out[(string) $r['n']] = ['tabel' => (string) $r['t'], 'kolom' => (string) $r['k']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Rujukan FK satu batch harus ada di tabel induk tujuan (audit yatim DBV-019 = 0). FK ke tabel yang sama (kolom
+     * tunda) dicek MySQL saat UPDATE. Dry-run tidak memeriksa rujukan, karena induk dari tier yang sama belum ditulis.
+     *
+     * @param array<string, array{tabel: string, kolom: string}> $fk
+     * @param list<array<string, mixed>>                          $tulis
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function periksaRujukan(DefinisiTabel $def, array $fk, array $tulis): array
+    {
+        if ($tulis === [] || $this->dryRun) {
+            return $tulis;
+        }
+
+        foreach ($fk as $kolom => $induk) {
+            if (in_array($kolom, $def->kolomTunda, true) || ! array_key_exists($kolom, $tulis[0])) {
+                continue;
+            }
+
+            $nilai = array_values(array_unique(array_map('strval', array_filter(array_column($tulis, $kolom), static fn ($v): bool => $v !== null))));
+
+            if ($nilai === []) {
+                continue;
+            }
+
+            $kolomInduk = $this->tujuan->escapeIdentifiers($induk['kolom']);
+            $ada        = array_map('strval', array_column(
+                $this->tujuan->query(
+                    "SELECT {$kolomInduk} AS v FROM " . $this->tujuan->escapeIdentifiers($induk['tabel']) . " WHERE {$kolomInduk} IN ?",
+                    [$nilai],
+                )->getResultArray(),
+                'v',
+            ));
+            $yatim = array_values(array_diff($nilai, $ada));
+
+            if ($yatim === []) {
+                continue;
+            }
+
+            if (! in_array($kolom, $def->yatimKeNull, true)) {
+                throw new ImporGagal(sprintf('Rujukan yatim %s.%s: %d nilai tidak ada di tabel induk (audit DBV-019).', $def->tabel, $kolom, count($yatim)));
+            }
+
+            foreach ($tulis as $i => $baris) {
+                if ($baris[$kolom] !== null && in_array((string) $baris[$kolom], $yatim, true)) {
+                    $tulis[$i][$kolom] = null;
+                    $this->laporan->koreksi($def->tabel, "{$kolom} yatim→NULL");
+                }
+            }
+        }
+
+        return $tulis;
     }
 }

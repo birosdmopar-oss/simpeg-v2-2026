@@ -45,7 +45,9 @@ DEFAULT dari DB.
 | 4 | Kolom FK tujuan (dibaca dari `information_schema`): `0`/`''` → NULL | DBV-011 §2.10, B-01/B-02 §6 #4 |
 | 5 | Teks: `stripslashes` PHP, kecuali `tanpaStripslashes` | DBV-011 §2.2 #3 |
 | 6 | `kolomNama`: whitespace → satu spasi, lalu trim | DBV-011 §2.2 #2 |
-| 7 | `status` di luar `statusDomain` (bawaan 1/2/10) → berkas keputusan, kalau tidak gagal | DBV-011 §2.4 #5 |
+| 7 | `status` di luar `statusDomain` (bawaan 1/2/10) dan kolom `domain` lain (CHECK v2) → berkas keputusan, kalau tidak gagal; NULL di kolom nullable dibiarkan | DBV-011 §2.4 #5, B-01/B-02 §6 #3 |
+| 8 | `kolomKode`: trim PHP; teks melebihi panjang kolom tujuan → gagal (mis. NIP > 30) | DBV-011 §2.2 #7, B-01/B-02 §6 #2 |
+| 9 | Rujukan FK dicek per batch terhadap tabel induk tujuan: yatim → gagal dengan jumlah, kecuali `yatimKeNull` → NULL + dicatat sebagai `koreksi`. Dry-run tidak memeriksa rujukan | DBV-019 audit = 0, B-01/B-02 §6 #6 |
 
 ## Aturan khusus tabel (`DefinisiTabel`)
 
@@ -67,9 +69,16 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 
 | Tier | Isi | Status |
 |---|---|---|
-| 1 | Master: `unit`, `satker`, `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `kelas_jabatan`, `jenjang_jf` (opsional), `jabatan`, `jabatan_koordinasi`, `periode_struktur_jabatan`, `struktur_jabatan`, `jenis_pegawai`, `gol_pppk`, `jenis_libur`, `hari_libur`, `jenis_cuti`, `web_config` | M1 |
-| 2–3 | Pegawai, snapshot & penugasan | M2 |
+| 1 | Master: `agama`, `jenis_status`, `provinsi`/`kabupaten_kota` (sentinel = seed), `pangkat`, `jenis_kp`, `unit`, `satker`, `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `kelas_jabatan`, `jenjang_jf` (opsional), `jabatan`, `jabatan_koordinasi`, `periode_struktur_jabatan`, `struktur_jabatan`, `jenis_pegawai`, `gol_pppk`, `jenis_libur`, `hari_libur`, `jenis_cuti`, `web_config` | M1 |
+| 2 | `pegawai` (domain `flag_update` 0–3, `jenis_kelamin` 1/2; NIP & kode wilayah di-trim) | M2 |
+| 3 | `riwayat_mutasi_jabatan`, `riwayat_kp` (status 0/1/2/3/10), snapshot `pegawai_mutasi_jabatan`/`pegawai_kp` (`id_riwayat_*` yatim → NULL), `pegawai_plt`, `pegawai_plh` | M2 |
 | 4–6 | Riwayat/keluarga/SKP-BKN/`absen_ijin`, lokasi + `dh_online`, cuti/TB/sisa cuti; counter AUTO_INCREMENT | M3 |
+
+## GAP terbuka
+
+- **GAP-8:** `stripslashes` untuk tabel pegawai/riwayat (T2–T3) belum tercatat per tabel di dokumen DBV. DBV-011 §2.2 #3
+  baru mendaftar master. Bawaan alat adalah stripslashes, karena form legacy memakai `addslashes` [K]. Pengecualian per
+  kolom (`tanpaStripslashes`) menunggu keputusan DBV.
 
 ## Di luar cakupan
 
@@ -80,5 +89,6 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 ## Test
 
 - `tests/unit/Impor/AturanImporTest.php`: aturan murni (transformasi, keputusan, penjaga).
-- `tests/Impor/ImporLegacyTier1Test.php` (`db-isolasi-penuh`): skema sumber sintetis `<db_test>_lgc` dibuat dari
-  struktur v2 (`CREATE TABLE … LIKE`) lalu diubah seperti legacy.
+- `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php` (`db-isolasi-penuh`), di atas
+  `Tests\Support\Impor\ImporLegacyTestCase`: skema sumber sintetis `<db_test>_lgc` dibuat dari struktur v2
+  (`CREATE TABLE … LIKE`) lalu diubah seperti legacy (kolom dibuang, tipe diubah, CHECK dilepas).
