@@ -179,7 +179,7 @@ Route di `Config/RoutesPresensiLaporan.php`, `LaporanTukinController` → `Lapor
 |---|---|---|
 | `GET api/v1/presensi/tukin/pegawai?unit_satker=&jenis_pegawai[]=&search=&page=&per_page=` | 1, 3 | Daftar pegawai aktif (snapshot jabatan jenis 1), paginasi server, `bulan_tersedia` |
 | `GET api/v1/presensi/tukin/pegawai-il?search=&page=&per_page=` | 1 | Daftar pegawai Instansi Lain (F5B-6) |
-| `GET api/v1/presensi/tukin/laporan/{nip}?bulan=` | 1–7 | Laporan per pegawai: identitas, periode, harian, jumlah, rincian & total (persen 2 desimal), penyesuaian, keterangan |
+| `GET api/v1/presensi/tukin/laporan/{nip}?bulan=` | 1–7 | Laporan per pegawai: identitas, periode, harian, jumlah, rincian & total (persen 2 desimal), penyesuaian, keterangan. `harian[]` = `{tanggal, status, jam_masuk, jam_pulang, potongan, keterangan, kode, kategori_konket}`; `kode` (CR-075, aditif) = kode kejadian hari itu apa adanya, urutan sama dengan `keterangan` (mis. `["TL2", "PSW1"]`, `["TPM", "PSW2"]`, `["TK"]`, `["CS"]`; `[]` bila tidak ada), untuk color-coding FE |
 | `GET api/v1/presensi/tukin/laporan/{nip}/pdf?bulan=` | 1–7 | PDF per pegawai (render legacy, F5B-8), `tukin_<nip>_<YYYY-MM>.pdf` |
 | `GET api/v1/presensi/tukin/rekap?bulan=&unit_satker=&jenis_pegawai[]=&page=&per_page=` | 1, 3 | Rekap: `items[] {nip, nama, unit_es1, unit_es2, pengurangan {TL,PSW,TK,TA,CUTI,TB}, total_presensi, total_skp, total_potongan, keterangan, penyesuaian, galat}` + `periode`, `jumlah_galat` |
 | `GET api/v1/presensi/tukin/rekap/xlsx?…` | 1, 3 | XLSX seluruh lingkup, tata letak legacy + blok penanda tangan (`laporan_tukin_<lingkup>_<YYYY-MM>.xlsx`) |

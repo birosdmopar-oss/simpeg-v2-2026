@@ -21,6 +21,18 @@ export default {
         danger: { DEFAULT: '#EA5455', soft: '#FDEBEB' },
         info: { DEFAULT: '#00BAD1', soft: '#E0F7FA' },
         muted: { DEFAULT: '#82868B', soft: '#F1F2F3' },
+        // Status presensi harian (laporan Presensi 5C): DEFAULT = warna teks, soft = latar chip/baris, titik = penanda legenda.
+        // Pasangan DEFAULT/soft >= 4,5:1 (diuji di features/presensi/__tests__/statusPresensi.spec.ts).
+        status: {
+          kuning: { DEFAULT: '#8a5b00', soft: '#FFF2E4', titik: '#FF9F43' },
+          merah: { DEFAULT: '#a82d2e', soft: '#FDEBEB', titik: '#EA5455' },
+          jingga: { DEFAULT: '#8f3f00', soft: '#FFE9D6', titik: '#F97316' },
+          biru: { DEFAULT: '#006672', soft: '#E0F7FA', titik: '#00BAD1' },
+          abu: { DEFAULT: '#475569', soft: '#F1F5F9', titik: '#94A3B8' },
+          hijau: { DEFAULT: '#13753d', soft: '#E6F8EF', titik: '#28C76F' },
+          ungu: { DEFAULT: '#5b3f8c', soft: '#EFE9F7', titik: '#6F519D' },
+          pink: { DEFAULT: '#9c1f5a', soft: '#FBE6F0', titik: '#D5317C' },
+        },
         legacy: {
           primary: '#1A237E',
           accent: '#E53935',
