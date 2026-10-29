@@ -60,14 +60,15 @@ final class LaporanTukinService
     /**
      * Warna latar baris PDF per status (keputusan "satu palet" 29-10-2026, sama dengan layar FE): akhir pekan abu-abu,
      * libur biru, konket jingga, cuti ungu, tugas belajar merah muda, di luar masa kerja abu-abu; baris presensi tanpa warna.
+     * Nilai = token FE `status.*.soft` (`frontend/tailwind.config.js`, MAKE-047) — ubah bersamaan.
      */
     public const WARNA_BARIS_PDF = [
-        'akhir_pekan'        => '#EEEEEE',
-        'libur'              => '#DCEAF8',
-        'konket'             => '#FCE5CD',
-        'cuti'               => '#E9DFF5',
-        'tugas_belajar'      => '#F9DDE7',
-        'di_luar_masa_kerja' => '#EEEEEE',
+        'akhir_pekan'        => '#F1F5F9', // status.abu.soft
+        'libur'              => '#E0F7FA', // status.biru.soft
+        'konket'             => '#FFE9D6', // status.jingga.soft
+        'cuti'               => '#EFE9F7', // status.ungu.soft
+        'tugas_belajar'      => '#FBE6F0', // status.pink.soft
+        'di_luar_masa_kerja' => '#F1F5F9', // status.abu.soft
     ];
 
     private readonly BaseConnection $db;
