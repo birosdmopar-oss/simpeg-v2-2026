@@ -106,6 +106,11 @@ describe('main.css', () => {
     expect(css).toMatch(/html:has\(\.page-fill\)\s*\{[^}]*overflow:\s*hidden/s)
   })
 
+  it('CR-079: .pane-fill contain size (lg) supaya min-content grid isi-penuh tidak memuat seluruh daftar panel', () => {
+    const media = css.match(/@media \(min-width: 1024px\)\s*\{[\s\S]*?html:has\(\.page-fill\)/)?.[0] ?? ''
+    expect(media).toMatch(/\.pane-fill\s*\{\s*contain:\s*size;\s*\}/)
+  })
+
   it('CR-077: sel sticky kiri memakai --sel-sticky (warna baris status) dengan cadangan putih/zebra; pojok header < z-20 navbar', () => {
     expect(css).toMatch(/\.col-sticky-kiri\s*\{[^}]*background-color:\s*var\(--sel-sticky, rgb\(255 255 255\)\)/s)
     expect(css).toMatch(/tbody tr:nth-child\(even\) > \.col-sticky-kiri\s*\{[^}]*var\(--sel-sticky, rgb\(248 250 252\)\)/s)
