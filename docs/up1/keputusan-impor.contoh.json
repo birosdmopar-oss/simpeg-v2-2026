@@ -1,0 +1,13 @@
+{
+  "catatan": "CONTOH berkas keputusan alat impor MAKE-056 (GAP-6). Isi final diputuskan DB Validator (log 2.8 DBV-011). Hanya kode/nilai; jangan isi NIP, nama, atau nominal.",
+  "status": {
+    "unit": {"null": 1},
+    "absen_ijin": {"H": "V"}
+  },
+  "nilai": {
+    "hari_libur.id_jenis_libur": {"null": 1}
+  },
+  "tanggal_nol": {
+    "hari_libur.created_at": "2020-01-01 00:00:00"
+  }
+}
