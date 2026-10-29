@@ -59,9 +59,16 @@ Perkiraan waktu bersifat kasar dan belum termasuk waktu menunggu izin.
 ### b. Pilih periode & lingkup (R, H — ±30 menit)
 
 4. **Periode.** Ambil dua periode Tukin terakhir yang sudah tutup (Q5C-06). Periode Tukin bulan `M` = tanggal 16 bulan
-   `M-1` s.d. 15 bulan `M`. Contoh: bila UP-1 dijalankan setelah 15-10-2026, `M` = September dan Oktober 2026, dengan
-   rentang data **16-08-2026 s.d. 15-10-2026**. Periode berjalan tidak dipakai karena v2 memotongnya di hari ini
-   (AC-D08.4).
+   `M-1` s.d. 15 bulan `M`. Contoh: bila UP-1 dijalankan setelah 15-10-2026, `M` = September dan Oktober 2026
+   (periode 16-08..15-09 dan 16-09..15-10). Periode berjalan tidak dipakai karena v2 memotongnya di hari ini (AC-D08.4).
+
+   **`UP1_AWAL` = awal periode SEBELUM periode pertama yang diuji.** Adapter v2 membaca `dh_online` mulai awal
+   periode sebelumnya sampai akhir periode, sedangkan legacy membaca bulan kalender N−1. Untuk contoh di atas,
+   `UP1_AWAL` = **16-07-2026**, dan rentang ini sudah mencakup bulan kalender Agustus. `UP1_AKHIR` = **15-10-2026**.
+
+   **`UP1_AWAL_CUTI` = cadangan lookback untuk `riwayat_cuti` dan `absen_ijin`.** Bawaannya `UP1_AWAL` − 6 bulan
+   (contoh: 16-01-2026), supaya rangkaian cuti sakit lintas periode terbaca utuh. Bila lingkup memuat cuti sakit yang
+   lebih panjang, perpanjang nilainya.
 5. **Lingkup per bulan:**
    - `0` (kementerian);
    - minimal satu unit dengan pegawai **cuti sakit lintas periode**;
@@ -76,21 +83,23 @@ Perkiraan waktu bersifat kasar dan belum termasuk waktu menunggu izin.
 7. Isi parameter di sesi shell. Jangan simpan ke berkas yang di-commit:
    ```bash
    export UP1_HOST=...  UP1_PORT=...  UP1_USER=...  UP1_DB=...   # akun BACA-SAJA DevSimpeg
-   export UP1_AWAL=2026-08-16  UP1_AKHIR=2026-10-15             # rentang dari langkah 4
+   export UP1_AWAL=2026-07-16  UP1_AKHIR=2026-10-15             # langkah 4 (awal = periode sebelumnya)
+   export UP1_AWAL_CUTI=2026-01-16                              # opsional; bawaan UP1_AWAL − 6 bulan
    export UP1_OUT=<KERJA_UP1>/dump
    ```
 8. Jalankan `bash docs/up1/sql/up1-ekstraksi.sh`. Password ditanya interaktif (`-p`) dan tidak disimpan. Skrip ini:
    - hanya memanggil `mysqldump --single-transaction --skip-lock-tables --no-tablespaces`, tanpa `--skip-tz-utc`
      (R1b DBV-011), tanpa trigger, routine, atau event;
    - **menyalin penuh** tabel master/rujukan dan tabel pegawai, karena populasi rekap butuh status semua pegawai;
-   - **membatasi** tabel transaksi ke rentang `UP1_AWAL..UP1_AKHIR` lewat `--where`;
+   - **membatasi** tabel transaksi ke rentang `UP1_AWAL..UP1_AKHIR` lewat `--where`, khusus `riwayat_cuti` dan `absen_ijin` mulai
+     `UP1_AWAL_CUTI`;
    - mengambil `web_config` **hanya** untuk key tarif dan jam kerja Tukin;
    - **tidak** mengambil `pengguna`, `token`, atau tabel kredensial/log lain.
 9. Jalankan `up1-hitung-baris.sql` di sumber untuk mendapat jumlah baris per tabel. Simpan sebagai
    `<KERJA_UP1>/hitung_sumber.txt`:
    ```bash
    mysql -h "$UP1_HOST" -P "$UP1_PORT" -u "$UP1_USER" -p --default-character-set=utf8mb4 -N -B \
-     -e "SET @awal='$UP1_AWAL', @akhir='$UP1_AKHIR';" -e "source docs/up1/sql/up1-hitung-baris.sql" "$UP1_DB" \
+     -e "SET @awal='$UP1_AWAL', @akhir='$UP1_AKHIR', @awal_cuti='$UP1_AWAL_CUTI';" -e "source docs/up1/sql/up1-hitung-baris.sql" "$UP1_DB" \
      > "$UP1_OUT/../hitung_sumber.txt"
    ```
 10. Restore dump ke **skema salinan legacy** terpisah di mesin DBA, mis. `up1_legacy_salinan` di instance MySQL 8.
