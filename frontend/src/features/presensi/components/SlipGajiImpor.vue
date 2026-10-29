@@ -16,7 +16,7 @@ import { UiBadge, UiButton, UiCheckbox, UiFileField, UiMonthPicker, UiNotice, Ui
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
 
 import { labelPeriode, slipGajiAdminService } from '../services/slipGajiAdmin.service'
-import type { BarisPratinjau, HasilImpor, PratinjauImpor, StatusBarisImpor } from '../types'
+import type { BarisPratinjau, GalatImpor, HasilImpor, PratinjauImpor, StatusBarisImpor } from '../types'
 
 const emit = defineEmits<{ selesai: [periode: string | null] }>()
 
@@ -51,6 +51,18 @@ function keterangan(b: BarisPratinjau): string {
   if (b.galat.length > 0) return ''
   if (b.status === 'duplikat') return timpa.value ? 'Data periode ini sudah ada; akan diperbarui (timpa).' : 'Data periode ini sudah ada; akan dilewati.'
   return 'Siap disimpan'
+}
+
+/**
+ * CR-082 (T5A-02): server kadang sudah memberi awalan lokasi "Sheet <sheet> baris <n>" (BarisImpor.php), kadang tidak (mis.
+ * NIP tidak terdaftar). Awalan hanya ditambahkan bila pesan belum berawalan lokasi apa pun, termasuk sheet lain (galat
+ * lintas sheet milik baris kunci), supaya label tidak ganda.
+ */
+const AWALAN_LOKASI = /^Sheet \S+ baris \d+\b/
+
+function labelGalat(g: GalatImpor): string {
+  if (AWALAN_LOKASI.test(g.pesan)) return g.pesan
+  return `Sheet ${g.sheet} baris ${g.baris}: ${g.pesan}`
 }
 
 function pilihBerkas(file: File | null): void {
@@ -235,7 +247,7 @@ function ulang(): void {
         <h3 class="mb-1 text-body2 font-semibold text-red-700">Rincian baris yang gagal</h3>
         <ul class="list-disc space-y-0.5 pl-5 text-body2 text-red-700" data-testid="impor-hasil-galat">
           <template v-for="b in hasil.baris" :key="`${b.nip}-${b.periode}`">
-            <li v-for="(g, i) in b.galat" :key="i">{{ g.sheet }} baris {{ g.baris }}: {{ g.pesan }}</li>
+            <li v-for="(g, i) in b.galat" :key="i">{{ labelGalat(g) }}</li>
           </template>
         </ul>
       </div>

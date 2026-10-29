@@ -142,3 +142,30 @@ describe('DataPresensiPage', () => {
     expect(testid('data-presensi-detail-kosong')).not.toBeNull()
   })
 })
+
+describe('CR-082 T5A-04: fokus setelah Hapus memuat ulang detail', () => {
+  it('Hapus lalu muat ulang → baris lama tetap terpasang; fokus pindah ke ⋮ baris tetangga, bukan body', async () => {
+    const DETAIL_SETELAH = { ...DETAIL(true), items: DETAIL(true).items.filter((b) => b.tgl !== '2026-10-27'), total: '2' }
+    let terhapus = false
+    get.mockImplementation(((url: string) => {
+      if (url === '/presensi/pegawai/199001012020011001') {
+        return terhapus ? new Promise((r) => setTimeout(() => r({ data: DETAIL_SETELAH, headers: {} }), 10)) : ok(DETAIL(true))
+      }
+      if (url === '/master/unit/options') return ok([])
+      return gagal(404)
+    }) as never)
+    del.mockImplementation(() => {
+      terhapus = true
+      return ok({}) as never
+    })
+    const { wrapper } = await mountPage('/presensi/data?nip=199001012020011001')
+
+    await selectRowAction(wrapper, 'presensi-actions-199001012020011001-2026-10-27', 'hapus')
+    tombol('Ya, hapus')?.click()
+    await new Promise((r) => setTimeout(r, 30))
+    await flushPromises()
+
+    expect(testid('data-presensi-baris-2026-10-27')).toBeNull()
+    expect(document.activeElement).toBe(testid('presensi-actions-199001012020011001-2026-10-26'))
+  })
+})

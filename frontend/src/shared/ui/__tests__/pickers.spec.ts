@@ -7,7 +7,10 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 
+import UiDatePicker from '../UiDatePicker.vue'
+import UiMonthPicker from '../UiMonthPicker.vue'
 import UiTextField from '../UiTextField.vue'
+import UiTimePicker from '../UiTimePicker.vue'
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -403,5 +406,37 @@ describe('UiMonthPicker', () => {
     expect(q('[data-testid="ui-month-panel"]')).toBeNull()
     expect(nilai()).toBe('2026-10')
     expect(document.activeElement).toBe(q('input[name="uji"]'))
+  })
+})
+
+describe('CR-081: lebar & gaya kontrol picker', () => {
+  const INPUT = { date: 'ui-date-input', time: 'ui-time-input', month: 'ui-month-input' } as const
+
+  it.each(['date', 'time', 'month'] as const)('%s lewat UiTextField: kelas field + selalu w-full min-w-0 (tidak melebihi wadah)', (type) => {
+    mountField(type)
+    const input = q<HTMLInputElement>(`[data-testid="${INPUT[type]}"]`)!
+    expect([...input.classList]).toEqual(expect.arrayContaining(['block', 'w-full', 'min-w-0', 'border', 'pr-11']))
+    expect(input.parentElement!.classList).toContain('w-full')
+    expect(input.parentElement!.classList).toContain('min-w-0')
+  })
+
+  it.each([
+    ['date', UiDatePicker],
+    ['time', UiTimePicker],
+    ['month', UiMonthPicker],
+  ] as const)('%s dipakai langsung tanpa controlClass: gaya kontrol bawaan (border, h-11, rounded) dan mengisi wadah', (type, Komponen) => {
+    mount(Komponen, { props: { modelValue: '', ariaLabel: 'Uji' }, attachTo: document.body })
+    const input = q<HTMLInputElement>(`[data-testid="${INPUT[type]}"]`)!
+    expect([...input.classList]).toEqual(expect.arrayContaining(['block', 'h-11', 'w-full', 'min-w-0', 'rounded-lg', 'border', 'border-slate-300', 'pr-11']))
+  })
+
+  it('dipakai langsung: invalid → border-danger; disabled → latar abu tanpa cincin fokus', () => {
+    mount(UiMonthPicker, { props: { modelValue: '', ariaLabel: 'Uji', invalid: true }, attachTo: document.body })
+    expect(q('[data-testid="ui-month-input"]')!.classList).toContain('border-danger')
+    document.body.innerHTML = ''
+    mount(UiMonthPicker, { props: { modelValue: '', ariaLabel: 'Uji', disabled: true }, attachTo: document.body })
+    const input = q('[data-testid="ui-month-input"]')!
+    expect(input.classList).toContain('bg-slate-100')
+    expect(input.className).not.toMatch(/focus:ring/)
   })
 })

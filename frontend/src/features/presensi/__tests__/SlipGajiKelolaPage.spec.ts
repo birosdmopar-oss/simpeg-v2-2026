@@ -198,3 +198,26 @@ describe('SlipGajiKelolaPage — Monitoring', () => {
     expect(testid('slipgaji-kosong')?.textContent).toContain('belum tersedia')
   })
 })
+
+describe('CR-082 T5A-04: fokus setelah Buka ulang memuat ulang daftar', () => {
+  it('Buka ulang lalu muat ulang → baris lama tetap terpasang; fokus kembali ke ⋮ baris itu, bukan body', async () => {
+    let dibuka = false
+    get.mockImplementation(((url: string) => {
+      if (url === '/slip-gaji') return dibuka ? new Promise((r) => setTimeout(() => r({ data: DAFTAR(), headers: {} }), 10)) : ok(DAFTAR())
+      if (url === '/master/satker/options') return ok([])
+      return gagal(404)
+    }) as never)
+    post.mockImplementation(() => ok(null) as never)
+    const wrapper = await mountPage()
+
+    await selectRowAction(wrapper, 'slipgaji-actions-12', 'buka-ulang')
+    dibuka = true
+    tombol('Ya, Buka Akses')?.click()
+    await new Promise((r) => setTimeout(r, 30))
+    await flushPromises()
+
+    expect(post).toHaveBeenCalledWith('/slip-gaji/12/buka-ulang')
+    expect(testid('slipgaji-actions-12')).not.toBeNull()
+    expect(document.activeElement).toBe(testid('slipgaji-actions-12'))
+  })
+})

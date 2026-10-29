@@ -241,7 +241,8 @@ defineExpose({ muat, periode })
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          <tr v-if="memuat">
+          <!-- CR-082 (T5A-04): baris lama tetap terpasang selama muat ulang, supaya ⋮ yang memegang fokus tidak ikut lepas. -->
+          <tr v-if="memuat && (!hasil || hasil.items.length === 0)">
             <td colspan="8" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
           </tr>
           <tr v-else-if="!hasil || hasil.items.length === 0">

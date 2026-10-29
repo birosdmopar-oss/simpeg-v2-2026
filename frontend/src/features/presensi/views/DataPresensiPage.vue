@@ -252,7 +252,8 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-if="memuatDaftar">
+              <!-- CR-082 (T5A-04): baris lama tetap terpasang selama muat ulang (fokus ⋮ tidak ikut lepas). -->
+              <tr v-if="memuatDaftar && (!daftar || daftar.items.length === 0)">
                 <td colspan="5" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
               </tr>
               <tr v-else-if="!daftar || daftar.items.length === 0">
@@ -296,7 +297,7 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-if="memuatDetail">
+              <tr v-if="memuatDetail && (!detail || detail.items.length === 0)">
                 <td :colspan="adaAksiBaris ? 8 : 7" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
               </tr>
               <tr v-else-if="!detail || detail.items.length === 0">

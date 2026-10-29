@@ -191,3 +191,18 @@ describe('tambah dan ubah', () => {
     expect(document.body.textContent).toContain('Periksa kembali isian yang ditandai.')
   })
 })
+
+describe('CR-082 T5A-04: fokus setelah Nonaktifkan memuat ulang daftar', () => {
+  it('Nonaktifkan lalu muat ulang → baris lama tetap terpasang; fokus tetap di ⋮ baris itu', async () => {
+    svc.ubahStatus.mockResolvedValue(baris({ status: 2 }))
+    const { wrapper } = await mountPage()
+    svc.daftar.mockImplementation((() => new Promise((r) => setTimeout(() => r({ items: [baris({ status: 2 })], total: 1, page: 1, per_page: 25 }), 10)))  as never)
+
+    await selectRowAction(wrapper, 'penyesuaian-actions-4', 'nonaktifkan')
+    await new Promise((r) => setTimeout(r, 30))
+    await flushPromises()
+
+    expect(svc.daftar.mock.calls.length).toBeGreaterThan(1)
+    expect(document.activeElement).toBe(q('[data-testid="penyesuaian-actions-4"]'))
+  })
+})
