@@ -7,8 +7,14 @@ v2. Acuan: PRD `docs/fase5/PRD_Fase5A_Skema-SlipGaji-Presensi.md` §7.7. Legacy 
 
 ## Kontrak
 
-`TukinDataService::siapkan(nip, tahun, bulan, ?hariIni)` → `ArgumenTukin {periode, hariLibur, harian, konfigurasi,
-pegawai}`. Rentang hari libur & harian = awal periode **sebelumnya** s.d. akhir periode berjalan (lookback cuti sakit,
+`TukinDataService::siapkan(nip, tahun, bulan, ?hariIni, tanpaPegawaiBaru = false)` → `ArgumenTukin {periode, hariLibur,
+harian, konfigurasi, pegawai, tanpaDataHarian}`. `tanpaPegawaiBaru` = varian rekap IL (tanpa aturan pegawai baru, CR-083);
+`tanpaDataHarian` = T-01. `siapkan()` tidak dipakai jalur produksi (laporan & rekap memakai `siapkanBanyak`), tetapi
+dipertahankan sebagai implementasi acuan per NIP: test kesetaraan membandingkan `siapkanBanyak()` dengan `siapkan()`,
+jadi parameternya sama (`siapkanBanyak(nip[], tahun, bulan, ?hariIni, ?ukuranBatch, tanpaPegawaiBaru = false)`). Di bawahnya
+`SumberHarianTukin::untuk(nip, awal, akhir, hanyaCutiTb = false)` / `untukBanyak(nip[], awal, akhir, hanyaCutiTb[] = [])`
+(pegawai `lewatiLoopHarian`: presensi & konket tidak dimuat) dan `SumberDataPegawaiTukin::untuk/untukBanyak(...,
+tanpaPegawaiBaru = false)`. Rentang hari libur & harian = awal periode **sebelumnya** s.d. akhir periode berjalan (lookback cuti sakit,
 README `Presensi/Tukin` "Kontrak data"). Galat terkendali = turunan `GalatDataTukin`:
 
 | Kelas | Kapan |

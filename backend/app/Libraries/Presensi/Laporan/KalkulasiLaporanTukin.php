@@ -20,7 +20,8 @@ use InvalidArgumentException;
 
 /**
  * Mesin bersama laporan per pegawai dan rekap Tukin (PRD 5B §7.3.2–7.3.3) — **satu** kalkulasi rekap (K-1, [V2] dicatat:
- * angka layar per pegawai = baris rekap). Per NIP: `TukinDataService::siapkanBanyak()` + `KalkulasiTukin::hitung()`
+ * angka layar per pegawai = baris rekap DH; untuk pegawai IL bisa berbeda dari baris rekap IL, yang tanpa aturan pegawai
+ * baru — CR-083/084). Per NIP: `TukinDataService::siapkanBanyak()` + `KalkulasiTukin::hitung()`
  * (dipotong hari ini), lalu data keterangan per batch dengan jumlah kueri tetap: `pegawai.id_jenis_status` (CLTN = 3),
  * `penyesuaian_tukin` (DBV-024), `riwayat_cuti` status 1 di periode, `riwayat_tb` status 1 (institusi) — susunan teks di
  * {@see PenyesuaianTukin}.

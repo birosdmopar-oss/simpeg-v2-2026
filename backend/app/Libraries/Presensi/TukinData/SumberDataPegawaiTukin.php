@@ -37,7 +37,7 @@ use InvalidArgumentException;
  * - `tmtKeluar` = `pegawai.tmt_status` bila `pegawai.status = 2` [V2 README Tukin].
  *
  * Varian massal {@see self::untukBanyak()} (MAKE-039, keputusan reviewer CR M0 F1 — deviasi aditif PRD 5B §3.3): aturan
- * yang sama (helper bersama {@see self::tentukanTmtMasuk()}), jumlah kueri tetap per {@see self::BATCH_NIP} NIP
+ * yang sama (helper bersama {@see self::pegawaiBaru()}), jumlah kueri tetap per {@see self::BATCH_NIP} NIP
  * (`pegawai`, `riwayat_skp_periodik`, `detail_anak`, `riwayat_kp`, dan `riwayat_mutasi_jabatan` bila ada PPPK); galat satu
  * pegawai menjadi {@see GalatDataTukin} NIP itu saja.
  */
