@@ -16,6 +16,7 @@ Isi paket:
 | `docs/up1/Runbook_UP-1.md` | Runbook ini |
 | `docs/up1/sql/up1-ekstraksi.sh` | Ekstraksi baca-saja dari DevSimpeg (`mysqldump --single-transaction --where`) per rentang periode |
 | `docs/up1/sql/up1-hitung-baris.sql` | Jumlah baris per tabel untuk rentang yang sama; dijalankan di sumber **dan** di DB v2 hasil impor |
+| `docs/up1/keputusan-impor.contoh.json` | Contoh berkas keputusan alat impor (ada di branch MAKE-056) |
 | `docs/up1/Hasil_UP-1_TEMPLATE.md` | Lembar hasil anonim + checklist keamanan data |
 | `docs/up1/Pertanyaan_Terbuka_UP-1.md` | Keputusan yang masih ditunggu dari Horii |
 
@@ -48,7 +49,7 @@ Perkiraan waktu bersifat kasar dan belum termasuk waktu menunggu izin.
 ### a. Prasyarat & izin (H, D, R — ±1 hari kalender)
 
 1. ⛔ **H** menjawab `Pertanyaan_Terbuka_UP-1.md` (P-01..P-09): siapa DBA, akun baca-saja DevSimpeg, lokasi penyimpanan,
-   jadwal, kesiapan aplikasi legacy di server dev, dan keputusan GAP impor (butir d).
+   jadwal, kesiapan aplikasi legacy di server dev, dan zona jam server legacy (GAP-2, butir d).
 2. **D** menyiapkan mesin kerja:
    - MySQL 8 untuk DB scratch. Instance uji `tools/mysql-test/` (port 3307) boleh dipakai.
    - Repo v2 di `main` terbaru dengan `composer install` dan `.env` uji yang menunjuk DB scratch (bukan salinan `.env`
@@ -124,88 +125,120 @@ Nama kolom mengikuti label [K] di dokumen DBV, yaitu nama legacy. **D** mencocok
 menjalankan skrip. Bila ada kolom yang berbeda, perbaiki `--where` di salinan lokal dan catat perbedaannya di lembar
 hasil.
 
-### d. Impor ke DB scratch v2 (D — ±½–1 hari; lihat GAP-1)
+### d. Impor ke DB scratch v2 (D — ±½ hari)
 
-11. Buat DB scratch baru (`simpeg_v2_t_up1`) lalu jalankan `php spark migrate --all` dengan `.env` uji yang menunjuk
-    DB tersebut.
-12. **Jalur impor yang ada di repo per 29-10-2026:** baru berupa **aturan tertulis**, belum ada alat (command `spark`,
-    skrip SQL transformasi) yang bisa dijalankan:
+Alat yang dipakai: `php spark impor:legacy` (MAKE-056, P-06 opsi 2). Aturannya per tabel ada di
+`backend/app/Libraries/Impor/README.md`; keputusan yang masih ditunggu dari DBV ada di bagian "Keputusan DBV yang
+dibutuhkan" di berkas yang sama. Alat menulis ke koneksi `default` dan membaca skema salinan legacy di server serta
+akun yang sama.
 
-    | Aturan | Dokumen |
-    |---|---|
-    | Urutan tier, audit/dedupe master, R1a/R1b zona waktu, counter AUTO_INCREMENT, sesi `time_zone='+00:00'` + strict | `backend/docs/db-review/DBV-011-runbook-impor-master-zona-waktu.md` §2.4–2.12, §3.2 |
-    | Pegawai & riwayat | `B-01-B-02-pegawai-riwayat-schema.md` §6 |
-    | `dh_online` (baris tanpa jam dibuang, `sumber` NULL) | `DBV-023-presensi-gaji-fase5a-schema.md` §7.1 |
-    | Cuti/TB/sisa cuti (normalisasi duplikat & saldo negatif) | `DBV-022-layanan-fase4-schema.md` §5, §13.1; DBV-011 §2.12 |
-    | `penyesuaian_tukin` (tanpa impor, diisi lewat CRUD) | `DBV-024-penyesuaian-tukin-schema.md` §5 |
-
-    > **GAP-1 — alat impor legacy → v2 belum ada.** Butir ini **tidak** dibuat diam-diam dalam paket ini. **D** perlu
-    > keputusan Horii (P-06): (1) DBA menulis SQL `INSERT … SELECT` lokal dari skema salinan ke DB scratch mengikuti
-    > aturan di atas (sekali pakai, tidak di-commit bila memuat data); atau (2) dibuat kartu MAKE terpisah untuk alat
-    > impor resmi yang juga dipakai cutover; atau (3) UP-1 menunggu alat impor cutover. Tanpa keputusan ini, langkah
-    > 13–14 tidak bisa jalan.
-
-13. Setelah impor:
-    - jalankan skrip audit `backend/docs/db-review/sql/DBV-023-audit-presensi-gaji.sql` dan `DBV-022-audit-layanan.sql`
-      di DB scratch; bagian WAJIB_0 harus kosong;
-    - jalankan `up1-hitung-baris.sql` di DB scratch dan simpan sebagai `hitung_v2.txt`.
-14. Bandingkan `hitung_sumber.txt` dengan `hitung_v2.txt`. Selisih hanya boleh berasal dari aturan impor yang
-    tercatat, mis. baris `dh_online` tanpa jam, duplikat `pegawai_sisa_cuti`. Setiap selisih dicatat di lembar hasil
-    (bagian 3).
+11. **Siapkan DB scratch dan `.env` uji.**
+    - Buat DB baru, mis. `simpeg_v2_t_up1` (`utf8mb4_unicode_ci`), di instance yang sama dengan skema salinan dari
+      langkah 10.
+    - `.env` di repo v2 mesin DBA: grup `default` **dan** `tests` menunjuk DB scratch ini (`DBPrefix` kosong). Jangan
+      menyalin `.env` dev. Untuk login uji, set `auth.captchaDriver = mock`.
+    - Sebelum setiap perintah DB, cetak tujuannya dan pastikan benar:
+      `grep -E '^database\.(default|tests)\.(hostname|port|database)' .env`.
+    - `php spark migrate --all`. Grup `default` harus sudah menunjuk DB scratch; opsi `-g` diabaikan oleh perintah ini.
+12. **Siapkan berkas keputusan** `<KERJA_UP1>/keputusan.json` dari contoh `docs/up1/keputusan-impor.contoh.json`. Isinya
+    hanya kode/nilai, diisi sesuai keputusan DBV. Simpan di folder kerja, tidak di repo.
+13. **Dry-run.** Perintah ini membaca seluruh baris dan menerapkan semua aturan tanpa menulis:
+    ```bash
+    php spark impor:legacy --sumber=up1_legacy_salinan --zona-sumber=<WIB|UTC> \
+      --konfirmasi=simpeg_v2_t_up1 --keputusan=<KERJA_UP1>/keputusan.json --dry-run
+    ```
+    - `--zona-sumber` wajib diisi; tidak ada nilai bawaan (GAP-2). Nilainya dikonfirmasi DBV.
+    - Dry-run sekaligus memeriksa bahwa **daftar tabel ekstraksi = daftar tabel yang dibaca alat**. Tabel yang dibaca
+      alat tetapi tidak ada di salinan menghasilkan `GAGAL: Tabel sumber <t> tidak ada`; perbaiki
+      `up1-ekstraksi.sh` lalu ulangi langkah 8–10. Daftar lengkapnya tercetak di laporan dry-run (kolom pertama tiap
+      baris `T<n> <tabel>`). Tabel ekstraksi yang tidak dibaca alat tidak berbahaya, tetapi catat di lembar hasil.
+    - Gagal karena nilai di luar domain, tanggal nol, atau panjang kolom → lengkapi berkas keputusan (langkah 12)
+      bersama DBV, lalu ulangi dry-run. Coder tidak memutuskan pemetaan.
+    - Rujukan FK yatim baru terdeteksi saat impor sungguhan (langkah 14), karena dry-run tidak menulis induknya.
+14. **Impor.** Perintahnya sama tanpa `--dry-run`; tambahkan `--batch=<n>` bila memori terbatas (bawaan 1000).
+    Simpan keluarannya ke `<KERJA_UP1>/laporan_impor.txt`. Isinya hanya nama tabel, jumlah, kode aturan, dan durasi
+    per tier, jadi aman dilampirkan ke lembar hasil.
+    - Impor berjalan per tier. Bila satu tier gagal, tier itu di-rollback dan tier sebelumnya tetap ada. Lanjutkan
+      dengan `--tier=<n>` setelah penyebabnya dibereskan. Bila ingin mengulang dari awal, ⛔ minta izin H untuk
+      menghapus DB scratch, lalu ulangi dari langkah 11.
+    - Tujuan yang sudah berisi membuat impor gagal-cepat (kecuali seed migration yang id dan namanya sama).
+15. **Akun uji role 1** (GAP-5b, opsi (c); tanpa kode auth baru). Dibuat DBA di DB scratch, hanya untuk ekspor v2 di
+    langkah 21:
+    - Buat password acak saat jalan. Jangan menulisnya di repo, chat, atau lembar hasil.
+    - Hash memakai algoritma v2 (`App\Libraries\Auth\PasswordVerifier::hash()` = `password_hash(..., PASSWORD_ARGON2ID)`).
+      Ketik password di prompt, bukan sebagai argumen:
+      ```bash
+      php -r 'echo password_hash(trim(fgets(STDIN)), PASSWORD_ARGON2ID), PHP_EOL;'
+      ```
+    - INSERT satu baris `pengguna` di DB scratch. Kolom wajib: `id_pengguna`, `username`, `user_level` = 1. Isi juga
+      `password` (hash di atas), `status` = `'1'` (login menolak selain itu), `nip` NULL (akun non-pegawai),
+      `must_change_password` = 0, `expired_at` NULL (tidak kedaluwarsa), `created_at` = waktu UTC. `password_legacy`
+      dibiarkan NULL. Gunakan `id_pengguna` dan `username` yang jelas sintetis, mis. `uji_up1`.
+    - Akun ikut terhapus bersama DB scratch di langkah 26.
+    - **GAP cutover (bukan UP-1, bukan MAKE-056):** jalur pembuatan akun admin awal (bootstrap) belum ada. Pertanyaan
+      ini untuk H/DBV.
+16. **Audit dan hitung baris setelah impor:**
+    - jalankan `backend/docs/db-review/sql/DBV-019-audit-yatim-fk-g02.sql`, `DBV-022-audit-layanan.sql`,
+      `DBV-023-audit-presensi-gaji.sql` di DB scratch; bagian WAJIB_0 harus kosong;
+    - jalankan `up1-hitung-baris.sql` di DB scratch dengan `@awal/@akhir/@awal_cuti` yang sama seperti langkah 9, lalu
+      simpan sebagai `hitung_v2.txt`.
+17. **Bandingkan** `hitung_sumber.txt` dengan `hitung_v2.txt`. Selisih hanya boleh berasal dari aturan yang tercatat
+    di `laporan_impor.txt`, yaitu kolom `dibuang`, mis. `DBV-023 A2 tanpa jam` dan `DBV-022 §13.1 duplikat (nip, tahun)`,
+    serta seed yang `dilewati`. Setiap selisih lain masuk kelompok (b) dan dicatat di lembar hasil (bagian 3).
 
 ### e. Isi penyesuaian Tukin (D — ±30 menit)
 
-15. Isi `penyesuaian_tukin` lewat **CRUD role 1** (F5B-21, menu Penyesuaian Tukin) untuk setiap penyesuaian yang
+18. Isi `penyesuaian_tukin` lewat **CRUD role 1** (F5B-21, menu Penyesuaian Tukin) untuk setiap penyesuaian yang
     berlaku di rentang uji. Daftarnya disiapkan sesuai P-09, tanpa membuka
     `constants.php`. Jangan isi lewat SQL.
-16. Jalankan audit `backend/docs/db-review/sql/DBV-024-audit-penyesuaian-tukin.sql` **bagian B**. B1 dan B2 harus 0;
+19. Jalankan audit `backend/docs/db-review/sql/DBV-024-audit-penyesuaian-tukin.sql` **bagian B**. B1 dan B2 harus 0;
     B3/B4 dicatat sebagai info (syarat C-2).
 
 ### f. Ekspor per bulan × lingkup (D untuk legacy, D/R untuk v2 — ±15 menit per kombinasi)
 
-17. **Legacy** (aplikasi legacy di server dev, terhadap data yang sama dengan salinan): Rekap Laporan Tukin varian SKP
+20. **Legacy** (aplikasi legacy di server dev, terhadap data yang sama dengan salinan): Rekap Laporan Tukin varian SKP
     (`laporan_tukin_us_skp`), XLSX, bulan `M`, lingkup sama, jenis pegawai **PNS**. Jangan memakai "Tukin Lama" atau
     `tukinver`. Simpan sebagai `<KERJA_UP1>/legacy_<M>_<lingkup>.xlsx`.
     > Ekspor legacy membaca DevSimpeg live, sedangkan salinan diambil pada satu waktu. Lakukan ekspor **sedekat
     > mungkin** dengan waktu ekstraksi (langkah 8), dan pastikan tidak ada entri presensi/cuti baru untuk rentang
     > uji di antaranya. Bila ada, temuannya masuk kelompok (b).
-18. **v2**: login role 1 ke aplikasi v2 yang menunjuk DB scratch, lalu
+21. **v2**: login role 1 ke aplikasi v2 yang menunjuk DB scratch, lalu
     `GET api/v1/presensi/tukin/rekap/xlsx?bulan=<M>&unit_satker=<lingkup>`. Simpan sebagai
     `<KERJA_UP1>/v2_<M>_<lingkup>.xlsx`.
 
 ### g. Bandingkan & triase (R, D — ±1–2 jam per bulan)
 
-19. Untuk tiap pasangan:
+22. Untuk tiap pasangan:
     ```bash
     php spark presensi:paritas-tukin legacy_<M>_<lingkup>.xlsx v2_<M>_<lingkup>.xlsx --csv=temuan_<M>_<lingkup>.csv
     ```
     - Kode keluar: 0 = sama, 1 = ada temuan, 2 = masukan salah.
     - Keluaran memakai NIP tersamar.
     - `--nip-penuh` hanya untuk telaah lokal **D** dan tidak dibagikan.
-20. Kelompokkan setiap temuan sesuai langkah 5 prosedur di `05-Presensi.md`:
+23. Kelompokkan setiap temuan sesuai langkah 5 prosedur di `05-Presensi.md`:
     - **(a)** deviasi [V2] yang sudah tercatat;
-    - **(b)** data salinan tidak konsisten (termasuk selisih langkah 14 dan perubahan live di langkah 17);
+    - **(b)** data salinan tidak konsisten (termasuk selisih langkah 17 dan perubahan live di langkah 20);
     - **(c)** bug v2.
-21. Untuk setiap temuan (c), **R** membuat kartu ISSUE/CR. Isinya hanya pola dan kasus sintetis, tanpa NIP, nama, atau
-    nominal nyata. **A** memperbaiki, lalu setelah fix di `main`, **D/R** mengulang langkah 18–20 untuk bulan dan
+24. Untuk setiap temuan (c), **R** membuat kartu ISSUE/CR. Isinya hanya pola dan kasus sintetis, tanpa NIP, nama, atau
+    nominal nyata. **A** memperbaiki, lalu setelah fix di `main`, **D/R** mengulang langkah 21–23 untuk bulan dan
     lingkup terkait.
 
 ### h. Lembar hasil (R — ±30 menit)
 
-22. Isi `Hasil_UP-1_TEMPLATE.md` dan simpan salinannya sebagai `docs/up1/Hasil_UP-1.md` atau di laporan MAKE-054.
+25. Isi `Hasil_UP-1_TEMPLATE.md` dan simpan salinannya sebagai `docs/up1/Hasil_UP-1.md` atau di laporan MAKE-054.
     Isinya hanya angka agregat, tanpa NIP atau nama.
 
 ### i. Bersih-bersih (D — ±30 menit; ⛔ per objek)
 
-23. ⛔ Minta izin **H** untuk setiap objek, satu per satu, lalu hapus dan centang di checklist bagian 6:
+26. ⛔ Minta izin **H** untuk setiap objek, satu per satu, lalu hapus dan centang di checklist bagian 6:
     - DB scratch `simpeg_v2_t_up1`;
     - skema salinan `up1_legacy_salinan`;
     - folder dump;
     - XLSX legacy dan XLSX v2;
     - CSV temuan, terutama yang dibuat dengan `--nip-penuh`.
-24. Pastikan tidak ada sisa di Recycle Bin, folder unduhan browser, atau cache sinkron cloud.
+27. Pastikan tidak ada sisa di Recycle Bin, folder unduhan browser, atau cache sinkron cloud.
 
 ### j. Kriteria lolos
 
-25. UP-1 **LOLOS** bila semua bulan × lingkup sudah dibandingkan dan **tidak ada temuan kelompok (c) yang masih
+28. UP-1 **LOLOS** bila semua bulan × lingkup sudah dibandingkan dan **tidak ada temuan kelompok (c) yang masih
     terbuka**. **H** menandatangani keputusan di lembar hasil, lalu reviewer membuka prasyarat Fase 6.

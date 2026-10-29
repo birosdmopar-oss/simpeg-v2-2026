@@ -25,7 +25,7 @@ Salin baris ringkasan `presensi:paritas-tukin`, versi NIP tersamar.
 | | 0 | | | | | | | | |
 | | | | | | | | | | |
 
-## 3. Selisih jumlah baris sumber vs impor (Runbook langkah 14)
+## 3. Selisih jumlah baris sumber vs impor (Runbook langkah 17)
 
 | Tabel | Sumber | v2 | Selisih | Penjelasan (aturan impor / kelompok b) |
 |---|---|---|---|---|

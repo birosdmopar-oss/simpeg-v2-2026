@@ -1,7 +1,7 @@
 -- UP-1 (MAKE-055) — hitung baris BACA-SAJA (hanya SELECT, tanpa NIP/nama).
 -- Jalankan di sumber (DevSimpeg, akun baca-saja) DAN di DB scratch v2 hasil impor dengan rentang yang sama:
 --   SET @awal = 'YYYY-MM-DD', @akhir = 'YYYY-MM-DD', @awal_cuti = 'YYYY-MM-DD';  (nilai sama dengan up1-ekstraksi.sh)  lalu  source docs/up1/sql/up1-hitung-baris.sql
--- Bandingkan kedua keluaran baris demi baris (Runbook langkah 14). Nama kolom = [K] legacy.
+-- Bandingkan kedua keluaran baris demi baris (Runbook langkah 17). Nama kolom = [K] legacy.
 
 SELECT CONCAT('-- db: ', DATABASE(), ', ', VERSION(), ', rentang ', @awal, '..', @akhir) AS info;
 SELECT IF(@awal IS NULL OR @akhir IS NULL OR @awal_cuti IS NULL, 'BERHENTI: @awal/@akhir/@awal_cuti belum di-SET', 'ok') AS prasyarat;
