@@ -2,7 +2,7 @@
 /**
  * Legenda color-coding status presensi (PRD 5C §7.2): kode → arti, urut dari yang terberat. Daftar dari satu sumber
  * (`statusPresensi.ts`) supaya selalu sama dengan chip di tabel. `ringkas` menampilkan hanya kode kejadian potongan
- * (untuk rekap yang tidak memuat status tanpa potongan).
+ * (untuk rekap yang tidak memuat status harian).
  */
 import { computed } from 'vue'
 
