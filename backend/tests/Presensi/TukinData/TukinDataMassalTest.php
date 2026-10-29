@@ -193,6 +193,30 @@ final class TukinDataMassalTest extends DatabaseTestCase
         $this->assertInstanceOf(DataTukinTidakSah::class, $massal[$cutiRusak], 'cuti tetap divalidasi (F5B-17)');
     }
 
+    /**
+     * CR-084: jalur TUNGGAL `SumberHarianTukin::untuk(..., hanyaCutiTb)` — konket pegawai `lewatiLoopHarian` tidak dibaca
+     * (presensi juga tidak), cuti tetap.
+     */
+    public function testLewatiLoopHarianJalurTunggalKonketTidakDibaca(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        $nip = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->db->table('absen_ijin')->insert([
+            'nip' => $nip, 'date_start' => '2026-03-18 00:00:00', 'date_end' => '2026-03-18 23:59:59', 'kategori' => 1, 'alasan' => 'Uji', 'status' => 'V', 'affect_tukin' => 1,
+        ]);
+        $this->presensiHadir($nip, '2026-03-16');
+        $this->cuti($nip, 1, '2026-03-17', '2026-03-17');
+
+        $a = $this->serviceTukinFase4()->siapkan($nip, 2026, 4);
+        $this->assertTrue($a->pegawai?->lewatiLoopHarian);
+        $this->assertSame(['2026-03-17'], array_keys($a->harian), 'konket 18-03 & presensi 16-03 tidak dibaca');
+
+        $sumber = new SumberHarianTukin($this->db, new SumberCutiTbFase4($this->db));
+        $this->assertArrayHasKey('2026-03-18', $sumber->untuk($nip, '2026-03-16', '2026-04-15'), 'pembanding: tanpa hanyaCutiTb konket dibaca');
+        $this->assertArrayNotHasKey('2026-03-18', $sumber->untuk($nip, '2026-03-16', '2026-04-15', true));
+    }
+
     public function testKonfigurasiBelumLengkapSemuaNipGalat(): void
     {
         $a = $this->buatPegawai();

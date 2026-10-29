@@ -158,6 +158,28 @@ final class DataPegawaiTukinAdapterTest extends DatabaseTestCase
         }
     }
 
+    /**
+     * CR-084 (B CR-083): "dibuat setelah akhir periode" (legacy `$dtCreatedAt > "akhir 23:59:59"` WIB,
+     * `L_employee.php:6429-6433`) atas `created_at` UTC — akhir 15-04: `2026-04-15 17:00:00` UTC (16-04 00:00 WIB) =
+     * setelah → pangkat ≤ akhir periode dipakai; `2026-04-15 16:59:59` UTC (15-04 23:59:59 WIB) = belum → hanya ≤ awal.
+     * Jalur tunggal (`pangkat`) dan massal (`pangkatDari`).
+     */
+    public function testDibuatSetelahAkhirPeriodeBatasZonaWaktu(): void
+    {
+        $setelah = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 17:00:00']);
+        $belum   = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 16:59:59']);
+
+        foreach ([$setelah, $belum] as $n) {
+            $this->kp($n, '2026-04-01', 'CPNS III/a'); // > awal periode, ≤ akhir periode
+        }
+
+        $massal = $this->sumber()->untukBanyak([$setelah, $belum], $this->april, null);
+        $this->assertSame('2026-04-01', $this->tmt($setelah), 'tunggal: 16-04 00:00 WIB setelah akhir');
+        $this->assertSame('2026-04-01', $massal[$setelah]->tmtMasuk, 'massal');
+        $this->assertNull($this->tmt($belum), 'tunggal: 15-04 23:59:59 WIB belum setelah akhir');
+        $this->assertNull($massal[$belum]->tmtMasuk, 'massal');
+    }
+
     public function testPegawaiTidakAdaDitolakTerkendali(): void
     {
         $this->expectException(DataTukinTidakSah::class);

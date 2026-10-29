@@ -81,6 +81,11 @@ final class S13PegawaiBaruT01T02Test extends DatabaseTestCase
             $nip   = $this->pegawaiDibuat($dibuat);
             $rekap = $this->serviceRekapTukin()->daftar($this->adminRekap(), ['bulan' => '2026-09', 'unit_satker' => 'sat_' . $this->satkerD13, 'per_page' => '100']);
             $this->assertNotContains($nip, array_column($rekap['items'], 'nip'), "{$dibuat}: dibuat 16-09 WIB");
+
+            // CR-084: batas atas tepat — bukan T-01, data harian dimuat (laporan per pegawai tidak menyaring populasi).
+            $laporan = $this->laporanD13($nip);
+            $this->assertSame([], array_filter($laporan['jumlah']), "{$dibuat}: bukan T-01");
+            $this->assertSame('cuti', self::harianD13($laporan)['2026-08-18']['status'], "{$dibuat}: cuti dimuat");
         }
     }
 

@@ -176,6 +176,23 @@ final class StrukturOrganisasiTest extends DatabaseTestCase
         }
     }
 
+    /**
+     * CR-084 (B CR-083): pejabat definitif hanya bila `created_at < tanggal acuan` (so_012025 :6430-6460) — jam dinding WIB
+     * atas `created_at` UTC. Acuan April 2026 = 30-04: dibuat `2026-04-29 16:59:59` UTC (29-04 23:59:59 WIB) tampil;
+     * `2026-04-29 17:00:00` UTC (30-04 00:00 WIB) tidak. Dua pejabat di jabatan berbeda agar tidak saling menimpa.
+     */
+    public function testPejabatBatasZonaWaktuCreatedAt(): void
+    {
+        $sek = $this->pejabatDefinitif('sekretaris', ['nama' => 'Dibuat Sebelum', 'created_at' => '2026-04-29 16:59:59']);
+        $dep = $this->pejabatDefinitif('deputi', ['nama' => 'Dibuat Tepat', 'created_at' => '2026-04-29 17:00:00']);
+
+        $data = (new StrukturService())->pohon($this->admin(), ['bulan' => '2026-04'])['data'];
+
+        $this->assertStringContainsString($sek, $data['sekretaris']['pejabat'], '29-04 23:59:59 WIB < 30-04');
+        $this->assertSame('', $data['deputi'][0]['pejabat'], '30-04 00:00 WIB tidak < 30-04');
+        $this->assertStringNotContainsString($dep, (string) json_encode($data));
+    }
+
     public function testEndpointTanpaLogin401(): void
     {
         $this->get('api/v1/struktur-organisasi')->assertStatus(401);

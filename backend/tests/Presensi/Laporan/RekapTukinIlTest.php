@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Presensi\Laporan;
 
+use App\Libraries\Presensi\Laporan\PopulasiRekap;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -89,5 +90,50 @@ final class RekapTukinIlTest extends DatabaseTestCase
 
         $dh = $this->serviceLaporanTukin()->laporan($this->adminRekap(), $tanpaTmt, ['bulan' => '2026-09']);
         $this->assertSame(['0.00', '32.00'], [$dh['total_presensi'], $dh['total_potongan']], 'pembanding jalur DH: loop dilewati');
+    }
+
+    /**
+     * CR-084: XLSX rekap IL memakai jalur IL yang sama (tanpa aturan pegawai baru) — baris dicari lewat kolom C (NIP), data
+     * mulai baris 9; H = TK, L = total presensi, M = SKP, N = total potongan.
+     */
+    public function testXlsxIlTanpaAturanPegawaiBaru(): void
+    {
+        $nip = $this->buatPegawai(['created_at' => '2020-01-01 00:00:00', 'id_jenis_pegawai' => 6], ['jenis_jabatan' => 2]);
+        $this->buatRiwayatMutasiJabatan($nip, ['jenis_jabatan' => 2]);
+
+        $tmp = (string) tempnam(sys_get_temp_dir(), 'ril');
+        file_put_contents($tmp, $this->serviceRekapTukin()->xlsx($this->adminRekap(), ['bulan' => '2026-09'], true)['isi']);
+        $s = IOFactory::load($tmp)->getActiveSheet();
+        @unlink($tmp);
+
+        $baris = null;
+
+        for ($r = 9; $r <= $s->getHighestRow(); $r++) {
+            if ((string) $s->getCell("C{$r}")->getValue() === $nip) {
+                $baris = $r;
+                break;
+            }
+        }
+
+        $this->assertNotNull($baris, 'baris PPPK IL ada di XLSX');
+        $this->assertEqualsWithDelta([13.2, 13.2, 32.0, 45.2], array_map(static fn (string $k): float => (float) $s->getCell("{$k}{$baris}")->getValue(), ['H', 'L', 'M', 'N']), 1e-9);
+    }
+
+    /**
+     * CR-084 (B CR-083): populasi IL `DATE(created_at) <= awal` dengan `created_at` UTC — awal 16-08 WIB:
+     * `2026-08-15 17:00:00` UTC (16-08 00:00 WIB) ikut; `2026-08-16 17:00:00` dan `23:59:59` UTC (17-08 WIB) tidak.
+     */
+    public function testPopulasiIlBatasZonaWaktu(): void
+    {
+        $nip = [];
+
+        foreach (['2026-08-15 17:00:00', '2026-08-16 17:00:00', '2026-08-16 23:59:59'] as $dibuat) {
+            $nip[$dibuat] = $this->buatPegawai(['created_at' => $dibuat, 'id_jenis_pegawai' => 2], ['jenis_jabatan' => 2]);
+        }
+
+        $ada = array_column((new PopulasiRekap($this->db))->il('2026-08-16'), 'nip');
+        $this->assertContains($nip['2026-08-15 17:00:00'], $ada, '16-08 00:00 WIB ikut');
+        $this->assertNotContains($nip['2026-08-16 17:00:00'], $ada, '17-08 00:00 WIB tidak ikut');
+        $this->assertNotContains($nip['2026-08-16 23:59:59'], $ada, '17-08 06:59:59 WIB tidak ikut');
     }
 }
