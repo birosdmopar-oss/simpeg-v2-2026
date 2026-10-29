@@ -240,7 +240,14 @@ Port `list_lt`/`list_lt_il`, `laporan_tukin/{nip}` (`laporan_tukin_skp`), `lapor
 
 Test: `tests/unit/Presensi/Rekap/{PenandaTangan,PenyesuaianTukin}Test.php`, `tests/Presensi/Laporan/{RekapTukin,
 LaporanTukinPegawai, RekapTukinXlsx, RekapTukinPdf, RekapTukinIl, PenandaTanganRekap, PenyesuaianTukinEfek,
-DaftarPegawaiTukin, CakupanLaporan, RoleMatriksLaporan, RekapTukinVolume}Test.php`.
+DaftarPegawaiTukin, CakupanLaporan, RoleMatriksLaporan, RekapTukinVolume, KopLaporanTukin,
+RoutePresensiLaporanKontrak}Test.php`.
+
+**Uji paritas UP-1 (5B M7 MAKE-043):** `Laporan\ParitasRekapTukin` + `php spark presensi:paritas-tukin <legacy.xlsx>
+<v2.xlsx> [--toleransi=0.01] [--csv=<path>] [--nip-penuh]` membandingkan XLSX rekap Tukin legacy (`laporan_tukin_us_skp`)
+dengan `GET presensi/tukin/rekap/xlsx` per NIP (kolom TL..TB & total; keterangan tidak dibandingkan), hanya membaca dua
+berkas, NIP tersamar bawaan. Prosedur lengkap: `backend/docs/progress/05-Presensi.md` "Prosedur paritas UP-1". Test
+`tests/unit/Presensi/Laporan/ParitasRekapTukinTest.php`.
 
 ### Rekap kehadiran & uang makan 5B (D-09b, MAKE-042)
 
