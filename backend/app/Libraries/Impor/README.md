@@ -95,7 +95,7 @@ lokal (contoh: `docs/up1/keputusan-impor.contoh.json`). Keputusan berupa aturan 
 | GAP-4 | `dm_user_lokasi_presensi` / `user_lokasi_presensi` (Mapping "tidak dimigrasi" vs G-03 §6.2 #6) | Tidak diimpor; tidak dibaca jalur Tukin | Keputusan untuk cutover (di luar UP-1) |
 | GAP-6 | Isi berkas keputusan: status/nilai di luar domain (`status`, `<tabel>.<kolom>` ber-CHECK, mis. `absen_ijin` `H`/angka lama, `pegawai.jenis_kelamin`), `hari_libur.id_jenis_libur` NULL, pengganti tanggal nol di kolom NOT NULL (R3) | Gagal-cepat bila belum dipetakan | Pemetaan per nilai dari hasil audit salinan (log 2.8) |
 | GAP-8 | `stripslashes` untuk tabel T2–T6 (DBV-011 §2.2 #3 baru mendaftar master) | `stripslashes` PHP pada semua kolom teks di bawah (form legacy `addslashes` [K]); NIP dan kode tidak terpengaruh | Daftar kolom yang disimpan MENTAH (`tanpaStripslashes`). Kandidat kuat: `riwayat_skp_periodik` dan `bkn_periode_ekinper`, karena terisi dari sinkron BKN, bukan dari form |
-| GAP-9 | Kolom DATETIME berisi waktu kejadian (`waktuBisnis`, tidak dikonversi R1a) | `absen_ijin.date_start`, `absen_ijin.date_end` | Konfirmasi daftar, termasuk apakah `riwayat_skp_periodik.waktu_dinilai` stempel (dikonversi) atau waktu bisnis |
+| GAP-9 | Kolom DATETIME berisi waktu kejadian (`waktuBisnis`, tidak dikonversi R1a) | `absen_ijin.date_start`, `absen_ijin.date_end` (diterima reviewer CR 29-10-2026) | Konfirmasi daftar, termasuk apakah `riwayat_skp_periodik.waktu_dinilai` stempel (dikonversi) atau waktu bisnis |
 | GAP-10 | Kolom domain/status yang tidak punya CHECK v2 | `bkn_periode_ekinper.status`, `detail_anak`, `pegawai_sisa_cuti`, `riwayat_tb_perpan`, snapshot: disalin apa adanya | Konfirmasi tidak perlu normalisasi |
 | GAP-11 | Pembanding seed (GAP-3) memakai id + nama, tanpa beda huruf besar/kecil | `jenis_cuti`, sentinel `provinsi` 99 / `kabupaten_kota` 9999 | Konfirmasi aturan; bila nama legacy berbeda dengan seed, pilih mana yang dipakai |
 
@@ -122,7 +122,10 @@ Kolom teks T2–T6 yang terkena `stripslashes` bawaan (GAP-8; NIP dan kode di-tr
 ## Di luar cakupan
 
 - `penyesuaian_tukin` diisi lewat CRUD (DBV-024 §5).
-- `pengguna`/`token` tidak diimpor. Akun role 1 sintetis dibuat DBA setelah impor (GAP-5).
+- `pengguna`/`token` tidak diimpor. Untuk UP-1, DBA membuat satu akun uji role 1 lewat INSERT manual dengan hash
+  `PASSWORD_ARGON2ID` (GAP-5b opsi (c); langkahnya di `docs/up1/Runbook_UP-1.md` langkah 15).
+- **GAP cutover (bukan MAKE-056):** jalur pembuatan akun admin awal (bootstrap) belum ada. Pertanyaan ini untuk
+  Horii/DBV.
 - GAP cutover `dm_user_lokasi_presensi` (GAP-4) tidak dibaca jalur Tukin. Keputusannya diserahkan ke DBV saat cutover.
 
 ## Test

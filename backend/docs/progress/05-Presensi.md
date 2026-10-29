@@ -419,7 +419,19 @@ Branch `fase5c/make-053-penutup` (dari `main` `fde58a3`; MAKE-047..052 dan CR-07
 fase 4 untuk semua role, anak per role 1–8 sesuai PRD 5C §6. Menu fase 6+ tidak berubah. Sisa 5C: MAKE-054 (verifikasi AC
 5A/5B/5C, QA Lapis 1, paritas UP-1, `Laporan_Akhir_Fase5.md`) lalu sign-off Horii Fase 5.
 
-## Persiapan tanpa skema
+## Tahap UP-1 — alat impor resmi legacy → v2 (MAKE-056, 29-10-2026)
+
+Keputusan Horii 29-10-2026 (P-06 opsi 2): UP-1 adalah tahap tersendiri di antara Fase 5 dan Fase 6, dan UP-1 sekaligus
+gladi impor cutover.
+- Branch `make-056/alat-impor-legacy`. Perintah `php spark impor:legacy` (`App\Commands\ImporLegacy`) memakai library
+  `app/Libraries/Impor/` (aturan per tabel dan daftar "Keputusan DBV yang dibutuhkan" ada di README-nya).
+- Mencakup Tier 1–6 jalur Tukin: master, pegawai, riwayat jabatan/KP + snapshot, izin/keluarga/SKP-BKN, lokasi +
+  `dh_online`, cuti/TB/sisa cuti.
+- Tanpa perubahan skema.
+- Prosedur operasional ada di `docs/up1/Runbook_UP-1.md` (PR #31, MAKE-055) langkah 11–17.
+- Test: `tests/unit/Impor`, `tests/Impor` (`db-isolasi-penuh`, skema sumber sintetis).
+
+
 
 ### CR-037 — Kalkulasi Tukin murni (bagian D-04..D-07/D-13)
 
