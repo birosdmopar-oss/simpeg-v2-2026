@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `PRD_Fase4.md` — acuan utama coder/agen AI Fase 4 (kartu Trello DEV-005, prompt eksekusi 1/2 & 2/2) |
-| Versi | **v1.5 — 28-10-2026** (revisi atas v1.4 28-10-2026, v1.3 27-10-2026, v1.2 27-10-2026, v1.1 26-10-2026, dan v1.0 18-10-2026; v1.2: kelima butir ⛔ §12 diputuskan; v1.3: hasil kueri DBA saldo cuti → Q-05 refund & saldo cutover diputuskan; v1.4: register deviasi [V2] implementasi M3–M6 + 2 endpoint gap §5 (§14.6); v1.5: deviasi & keputusan M7 FE Paket 0–10 + 2 endpoint/penanda baru §5 (§14.7); daftar perubahan di §14) |
+| Versi | **v1.6 — 29-10-2026** (revisi atas v1.5 28-10-2026, v1.4 28-10-2026, v1.3 27-10-2026, v1.2 27-10-2026, v1.1 26-10-2026, dan v1.0 18-10-2026; v1.2: kelima butir ⛔ §12 diputuskan; v1.3: hasil kueri DBA saldo cuti → Q-05 refund & saldo cutover diputuskan; v1.4: register deviasi [V2] implementasi M3–M6 + 2 endpoint gap §5 (§14.6); v1.5: deviasi & keputusan M7 FE Paket 0–10 + 2 endpoint/penanda baru §5 (§14.7); v1.6: hasil QA Lapis 1 C-11 — ekspor Status Layanan [V2] MAKE-046 dan dialog proses TB/IB `StudiProsesDialog` (§14.8); daftar perubahan di §14) |
 | Status | **BERLAKU** — disetujui user/reviewer CR 18-10-2026: keputusan D1–D19 dan **seluruh saran default §12 (butir ⛔ dan ◻) diterima**, termasuk konfirmasi Q-03 (nilai turunan dihitung server) dan Q-13 (pemanggil `process` = NIP approver tahap aktif). Perubahan berikutnya hanya lewat revisi versi oleh reviewer CR. **26-10-2026:** Horii menyetujui 13 keputusan riset take over (§14) — seluruh butir ◻ §12 = **disetujui default 26-10** dengan penyesuaian Q-08/Q-10/Q-21/Q-23; **tahap 2b** (logika murni cuti sebelum DBV-022) diizinkan (§6.1.4, §9) |
 | Basis kode | v1.0: `origin/main` = **`2b712ed`** (rujukan `path:baris` repo diambil dari `0a79e38`/`2b712ed`). v1.1: `origin/main` = **`4d4ae92`** — berkas baru yang dirujuk v1.1: `Libraries/Pdf/KopDokumen.php` (MAKE-037), `tests/_support/Libraries/PemindaiKemurnian.php`, `tests/feature/KontrakMatriksRoleTest.php` (MAKE-038: setiap route `api/v1` baru wajib punya baris kontrak role di commit yang sama) |
 | Sumber | Keputusan user D1–D19 (18-10-2026), Trello DEV-005/QASMTASK-064..075/QAUI-004/QAFUNC-005, `04-Layanan.md`, Matriks Role × Endpoint v2 Modul C, kode & DDL legacy (D1 `simpeg01_struktur_lengkap_20261001.sql`), repo v2. Daftar lengkap di Lampiran A |
@@ -51,7 +51,7 @@
 | Manual Testing **MT-00x / MTC-0xx** (MTC-026/027/028/029/037/044) | Fase tersendiri (MT) | DILARANG dimasukkan ke task list, prasyarat, status, atau ringkasan Fase 4. MTC hanya referensi |
 | Survei kepuasan layanan (`rated`, `skl`), KARPEG/KARISKARSU memakai `petugas_layanan` | F-11 / CR terpisah | Kolom `rated` [K] disimpan apa adanya; tidak ada logika survei. Perpindahan PIC Karpeg/Kariskarsu (Fase 3, `Definisi/Karpeg.php:22`) = CR terpisah, bukan Fase 4 |
 | `regenerate_sc` (admin) & cron `fix_regen_cuti` | — | Tidak ada di Matriks/DoD → tidak dikerjakan (lihat §12 Q-17) |
-| Ekspor tabel Status Layanan (tombol Export mockup) | — | Tidak ada DoD → tidak dibuat |
+| ~~Ekspor tabel Status Layanan (tombol Export mockup)~~ | ~~—~~ | ~~Tidak ada DoD → tidak dibuat~~ **29-10 (v1.6):** dibuat sebagai [V2] MAKE-046 (keputusan Horii 28-10, temuan pra-QA Lapis 1 butir 1 §6.11.8) — `GET layanan/status/ekspor` §5.5, §6.10.1a, §14.8 #1 |
 | Riwayat Organisasi (disebut SOP Fase 4) | Fase 3 B-17 (DONE) | K-19 — tidak disentuh |
 
 ---
@@ -248,7 +248,8 @@ Prefix semua path `api/v1/`; filter `jwt` di level grup; `Role::filter(...)` per
 
 | Method & path v2 | Legacy | Route | Lihat | Tulis | Catatan |
 |---|---|---|---|---|---|
-| `GET layanan/status?jenis=&status=&id_unit=&id_satker=&search=&page=&per_page=` | `layanan/index` (halaman kosong legacy) | **1–7** | role 2/6/7: semua pengajuan sendiri dari modul yang boleh dilihat role itu; role 1: semua; role 3: lingkup; role 4/5: `terapkanKeQuery` lingkup lihat PegawaiScope | — | [V2] D17; role 8 → 403 |
+| `GET layanan/status?jenis=&status=&id_unit=&id_satker=&search=&page=&per_page=` | `layanan/index` (halaman kosong legacy) | **1–7** | role 2/6/7: semua pengajuan sendiri dari modul yang boleh dilihat role itu; role 1: semua; role 3: lingkup; role 4/5: `terapkanKeQuery` lingkup lihat PegawaiScope | — | [V2] D17; role 8 → 403. **29-10 (v1.6)** + `can_export` (aditif, §14.8 #1) |
+| `GET layanan/status/ekspor?format=csv\|xlsx&jenis=&status=&id_unit=&id_satker=&search=` **29-10 (v1.6)** | — (legacy tidak punya halaman Status Layanan) | **1–7** | = `GET layanan/status` (role, lingkup, filter satu sumber), tanpa paginasi | — | [V2] MAKE-046 (§6.10.1a, §14.8 #1); role 8 → 403 |
 | `GET layanan/jenis` | `jenis_layanan` | 1–7 | semua | — | Master `jenis_layanan` aktif |
 | `GET layanan/petugas?id_jenis_layanan=` | `layanan/list_off` | 1–7 | semua (nama/NIP/jabatan PIC aktif) | — | LIHAT ikut Matriks. **28-10 (v1.4)**: role 1 melihat semua status (0/1), role 2–7 hanya PIC aktif; bentuk ListQuery, urut status DESC, id DESC |
 | `GET layanan/petugas/kandidat?search=` **28-10 (v1.4)** | pilihan dimuat di form (`L_layanan.php` `form_off`) | **1** | — | — | [V2] gap §5.5 (keputusan Horii 28-10): PNS aktif (`id_jenis_pegawai = 1`) dengan jabatan aktif di `web_config.id_satker_kepegawaian`, urut nama, `{nip, nama}` maks 50, pencarian server ≤ 100 karakter; id satker kosong → `items: []` + peringatan |
@@ -966,6 +967,14 @@ Label UI: 0 "Menunggu PIC", 3 "Diproses", 1 "Selesai", 2 "Ditolak". Antrean `mod
 - Lingkup data: role **2, 6, 7** = pengajuan **sendiri** saja, dari modul yang boleh dilihat role itu (6: cuti + TB; 7: cuti + IB; 2: semua); role **1** = semua; role **3** = `PegawaiScope::terapkanKeQuery` lingkup; role **4, 5** = monitoring lihat-saja sesuai `PegawaiScope` (`bolehLihat`) untuk role itu; role **8 → 403**. Urut `created_at DESC`.
 - Item tidak punya aksi tulis; satu aksi ⋮ "Lihat detail" (`url_detail` ke halaman modul) hanya bila pemanggil boleh melihat detail modul itu (role 4/5 tidak punya halaman detail modul → item tanpa aksi).
 
+#### 6.10.1a `GET layanan/status/ekspor` [V2] — 29-10 (v1.6), MAKE-046
+- Role, lingkup, dan filter (`jenis`, `status`, `id_unit`, `id_satker`, `search`) **sama** dengan §6.10.1 lewat satu sumber (`LayananDashboardService::rencana()`); tanpa paginasi; urut `created_at DESC`. Role 8 → 403.
+- `format` = `xlsx` (bawaan) atau `csv`; nilai lain → 422 `errors.format`. Lebih dari 20000 baris (`MAKS_EKSPOR`, sama dengan ekspor daftar pegawai) → 422 `errors.format` "persempit filter"; tanpa data → berkas berisi header saja.
+- Kolom tetap: Nama, NIP, Satker, Jenis Layanan, Ringkasan, Tanggal Diajukan (`DD-MM-YYYY`), Status (`label_status` server), PIC/Petugas (`Peran: nama; …`, atau "PIC belum ditunjuk").
+- Penulis `EksporTabel` (pola ekspor Kepegawaian MAKE-014: CSV ber-BOM, NIP teks Excel, anti formula injection; XLSX sel teks); nama `status_layanan_YYYYMMDD_HHMMSS.<ext>`, `Content-Disposition: attachment`, `nosniff`, `no-store`. **Tanpa audit** (pola ekspor daftar pegawai: data sama dengan yang tampil di daftar).
+- `GET layanan/status` memuat `can_export` (aditif; `true` untuk pemanggil yang lolos route). FE: `UiExportMenu` "Ekspor Excel" / "Ekspor CSV" di kanan atas kartu, hanya bila `can_export`.
+- Test: `LayananStatusEksporTest`, baris kontrak di `KontrakMatriksRoleTest`, `LayananStatus.spec`.
+
 #### 6.10.2 PIC `layanan/petugas` [K Layanan.php:77-222, `L_layanan.php`]
 - `GET` (1–7): daftar `{id_petugas_layanan, id_jenis_layanan, jenis_layanan, nip, nama, jabatan, satker, unit, status}`, filter `id_jenis_layanan`; urut `status DESC, id DESC`.
 - `POST`/`PUT` (role 1): `id_jenis_layanan` (jenis_layanan **aktif** — perbaikan opsi nonaktif legacy), `nip` (kandidat: pegawai `status = 1`, `id_jenis_pegawai = 1`, `pmj.id_satker = satker kepegawaian` [K `L_layanan.php:38-46`]; nilai satker kepegawaian dari `WebConfigService::value('id_satker_kepegawaian')`, §6.4.1 / Q-06(a) diputuskan 27-10), `status` (Aktif/Tidak Aktif sesuai domain DBV). Duplikat `(id_jenis_layanan, nip)` → 422 `errors.nip` "Petugas sudah terdaftar untuk layanan ini." (`L_layanan.php:192-242`). Whitelist kolom (bukan mass-assignment).
@@ -1001,8 +1010,8 @@ Label UI: 0 "Menunggu PIC", 3 "Diproses", 1 "Selesai", 2 "Ditolak". Antrean `mod
 | dialog | `EsignDialog.vue` | 1,3 | Konfirmasi + input passphrase `type="password"` (perbaikan E7), dikirim di body; galat gateway ditampilkan |
 | `/layanan/cuti/saldo` | `SaldoCutiPage.vue` | 1,3 | Tabel saldo per tahun + ⋮ Edit/Hapus, tombol Tambah |
 | `/layanan/cuti/petugas-approval` | `PetugasApprovalCutiPage.vue` | 1,3 | CRUD `pa_layanan` |
-| ~~`/layanan/tugas-belajar` (+`/:id`)~~ **28-10 (v1.5)** `/layanan/tb` (+`/:id`) (§14.7 #1) | `TbPage.vue`, `TbDetailPage.vue`, `TbFormDialog.vue`, `TbProsesDialog.vue`, `TbPerpanjanganDialog.vue` | **1,2,3,6** (tanpa 7) | Tab Saya / Perlu Persetujuan (PIC) / Monitoring; perpanjangan (role 1) |
-| ~~`/layanan/izin-belajar` (+`/:id`)~~ **28-10 (v1.5)** `/layanan/ib` (+`/:id`) (§14.7 #1) | `IbPage.vue`, `IbDetailPage.vue`, `IbFormDialog.vue`, `IbProsesDialog.vue` | **1,2,3,7** (tanpa 6) | Pola TB tanpa perpanjangan |
+| ~~`/layanan/tugas-belajar` (+`/:id`)~~ **28-10 (v1.5)** `/layanan/tb` (+`/:id`) (§14.7 #1) | `TbPage.vue`, `TbDetailPage.vue`, `TbFormDialog.vue`, ~~`TbProsesDialog.vue`~~ **29-10 (v1.6)** `StudiProsesDialog.vue` (§14.8 #2), `TbPerpanjanganDialog.vue` | **1,2,3,6** (tanpa 7) | Tab Saya / Perlu Persetujuan (PIC) / Monitoring; perpanjangan (role 1) |
+| ~~`/layanan/izin-belajar` (+`/:id`)~~ **28-10 (v1.5)** `/layanan/ib` (+`/:id`) (§14.7 #1) | `IbPage.vue`, `IbDetailPage.vue`, `IbFormDialog.vue`, ~~`IbProsesDialog.vue`~~ **29-10 (v1.6)** `StudiProsesDialog.vue` (§14.8 #2) | **1,2,3,7** (tanpa 6) | Pola TB tanpa perpanjangan |
 | `/layanan/pmk` (+`/pengajuan/:id`) | `PmkPage.vue`, `PmkDetailPage.vue`, `PmkFormDialog.vue`, `PmkProsesDialog.vue` | **1,2,3** | Tab Riwayat PMK / Pengajuan Saya / Perlu Persetujuan (PIC) / Monitoring; proses: Proses / Setujui / Tolak |
 | `/layanan/status` (`layanan-status`) | `LayananStatusPage.vue` | **1–7** | Kartu "Status Layanan", filter Unit/Satker (1,3,4,5) & Jenis & Status, pencarian, jumlah baris 10/25/50, tabel **Nama Pegawai (avatar + NIP) · Jenis Layanan · Status Layanan (UiStepper) · PIC/Petugas · Aksi ⋮** (`layanan-actions-<jenis>-<id>`), `UiPagination` |
 | `/layanan/petugas` | `PetugasLayananPage.vue` | 1 | CRUD PIC per jenis layanan (`layanan-petugas-actions-<id>`) |
@@ -1047,7 +1056,7 @@ Stepper (`UiStepper`): Cuti dua langkah = Diajukan → Atasan Langsung → Pejab
 
 #### 6.11.7 AC C-11 (QASMTASK-074, QAUI-004)
 - **AC-11.1** Timeline/pill badge per tahap dengan warna berbeda per status (tabel §6.11.4) di daftar, detail, dan Status Layanan.
-- **AC-11.2** Modal approve/reject memakai `ApprovalDialog`; Tolak tanpa alasan tidak bisa dikirim (FE) dan ditolak 422 (BE).
+- **AC-11.2** Modal approve/reject memakai `ApprovalDialog`; Tolak tanpa alasan tidak bisa dikirim (FE) dan ditolak 422 (BE). **29-10 (v1.6):** pengecualian TB/IB — `StudiProsesDialog` (bukan `ApprovalDialog`) karena Setujui memuat isian SK; perilaku Tolak setara (alasan wajib, ≤ 255 byte, 422 dari BE), §14.8 #2.
 - **AC-11.3** Form pengajuan cuti (datepicker, dropdown jenis, unggah lampiran), TB, IB, PMK tersedia dan menampilkan 422 per kolom.
 - **AC-11.4** Kalkulator sisa kuota real-time memanggil `POST cuti/hitung-lama` saat isian berubah; tidak ada logika hitung di FE.
 - **AC-11.5** Menu per role sesuai tabel §6.11.2 (TB tanpa role 7, IB tanpa role 6); Vitest per role.
@@ -1669,3 +1678,16 @@ atau perlu diketahui QA ("—" = tidak ada).
 | 16 | Catatan progres M7 | — | `04-Layanan.md` bagian M7 memuat Paket 0, 1, 2, 3, 7, 8, prasyarat Paket 4–6, dan (di branch) Paket 10 | Paket 4 (Saldo & Petugas Approval Cuti), 5 (TB), 6 (IB), dan 9 (Petugas Layanan) belum punya catatan di `04-Layanan.md`, hanya pesan commit. **Ditindaklanjuti** (catatan progres Paket 4/5/6/9, diserahkan reviewer 28-10) | R | `04-Layanan.md` |
 
 Tidak ada perubahan skema di v1.5. Status butir: #7 dan #8 di `main` `68cf14a` (Paket 10); #9 pengecualian tercatat (tanpa CR); #16 ditindaklanjuti (catatan progres Paket 4/5/6/9).
+
+### 14.8 v1.6 (29-10-2026) — hasil QA Lapis 1 C-11: ekspor Status Layanan & dialog proses TB/IB
+
+Konteks: dua butir dari catatan pra-QA Lapis 1 C-11 (checklist `docs/fase4/Checklist_QA_Lapis1_Fase4_C-11.md` §K1, §K2), diverifikasi
+ke kode `origin/main` = `6a1b7d8` (QA Lapis 1 C-11 lolos 28-10, Fase 4 sign-off Horii 29-10). Keputusan v1.0–v1.5 **tidak dihapus**:
+teks yang diganti dicoret, keputusan baru ditandai "29-10 (v1.6)". Kolom sama dengan §14.7.
+
+| # | Butir | Legacy [K] / PRD lama | v2 [V2] | Gap | Oleh | Tempat |
+|---|---|---|---|---|---|---|
+| 1 | Ekspor Status Layanan (§K1) | Legacy tidak punya halaman Status Layanan. PRD §1: ekspor "tidak ada DoD → tidak dibuat"; §6.11.8 butir 1 (Gambar 17) meminta tombol **Ekspor** | **[V2] MAKE-046** (`main` `9c64008`, `1fc2224`, `153424b`): `GET layanan/status/ekspor?format=csv\|xlsx` (§5.5, §6.10.1a), role/lingkup/filter sama dengan daftar, tanpa paginasi, batas 20000 baris → 422, tanpa audit; `can_export` di `GET layanan/status`; tombol `UiExportMenu` di kanan atas kartu | — (QA ulang reviewer 28-10 di `153424b`: menu Excel/CSV, CSV 200 header benar, XLSX valid) | H 28-10 | §1, §5.5, §6.10.1a, §6.11.8 |
+| 2 | Dialog proses TB/IB (§K2) | §6.11.5, AC-11.2, §6.11.8 butir 8: modal approve/reject memakai `ApprovalDialog`; §6.11.1 menyebut `TbProsesDialog.vue` / `IbProsesDialog.vue` | Satu dialog `StudiProsesDialog.vue` (TB & IB), **bukan** `ApprovalDialog`, karena Setujui memuat isian SK (No./Tanggal SK, Dasar SK, No. Dasar wajib — CR-071, berkas SK bila ada). Tolak setara `ApprovalDialog`: alasan wajib, ≤ 255 byte (hitung byte di FE hanya bantuan, server menegakkan), galat 422 per kolom, Esc menutup, muat di 390 px. Cuti, PMK, dan Tangguhkan tetap membungkus `ApprovalDialog`; perilaku `ApprovalDialog` tidak diubah | — (pengecualian tercatat; QA Lapis 1 F5 lolos 28-10) | R 28-10 (diterima pra-QA) | §6.11.1, §6.11.5, AC-11.2 |
+
+Tidak ada perubahan skema di v1.6.
