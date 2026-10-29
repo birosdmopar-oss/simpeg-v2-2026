@@ -205,7 +205,8 @@ onMounted(() => void muat())
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-if="memuat">
+            <!-- CR-082 (T5A-04): baris lama tetap terpasang selama muat ulang (Aktifkan/Nonaktifkan memuat ulang daftar). -->
+            <tr v-if="memuat && (!daftar || daftar.items.length === 0)">
               <td colspan="7" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
             </tr>
             <tr v-else-if="!daftar || daftar.items.length === 0">
