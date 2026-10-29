@@ -8,7 +8,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
-import { Role } from '@/features/auth/types'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
@@ -21,14 +20,14 @@ import { useFilterLaporan } from '../composables/useFilterLaporan'
 import { rekapKehadiranService, type BarisRekapKehadiran, type DaftarRekap } from '../services/rekapKehadiran.service'
 import { labelBulan } from '../formatLaporan'
 import { PER_PAGE_LAPORAN } from '../types.laporan'
+import { REKAP_KEHADIRAN_PILIH_UNIT_ROLES } from '../roles'
 
 const auth = useAuthStore()
 const crumbs = [{ label: 'Home', to: { name: 'home' } }, { label: 'Presensi' }, { label: 'Rekap Kehadiran' }]
 
-// Unit/Satker hanya role 1; role 3/4 dipaksa server (lihat `useFilterLaporan`).
-const { filter, param, unitOpsi, satkerOpsi, jenisPegawaiOpsi, muatOpsi } = useFilterLaporan({
-  bisaPilihUnit: auth.role === Role.SUPER_ADMIN,
-})
+// Unit/Satker: role 1 dan 4 boleh memilih (lingkup penuh); role 3 dipaksa server (`CakupanLaporan`).
+const bisaPilihUnit = auth.role !== null && REKAP_KEHADIRAN_PILIH_UNIT_ROLES.includes(auth.role)
+const { filter, param, unitOpsi, satkerOpsi, jenisPegawaiOpsi, muatOpsi } = useFilterLaporan({ bisaPilihUnit })
 
 const daftar = ref<DaftarRekap<BarisRekapKehadiran> | null>(null)
 const memuat = ref(false)
@@ -130,7 +129,7 @@ onMounted(() => {
           v-model:id-unit="filter.idUnit"
           v-model:id-satker="filter.idSatker"
           v-model:jenis-pegawai="filter.jenisPegawai"
-          :bisa-pilih-unit="auth.role === Role.SUPER_ADMIN"
+          :bisa-pilih-unit="bisaPilihUnit"
           :unit-opsi="unitOpsi"
           :satker-opsi="satkerOpsi"
           :jenis-pegawai-opsi="jenisPegawaiOpsi"

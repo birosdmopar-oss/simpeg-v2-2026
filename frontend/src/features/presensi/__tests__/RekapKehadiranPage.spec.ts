@@ -22,7 +22,7 @@ import { Role } from '@/features/auth/types'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
 
-import { REKAP_KEHADIRAN_ROLES } from '../roles'
+import { REKAP_KEHADIRAN_PILIH_UNIT_ROLES, REKAP_KEHADIRAN_ROLES } from '../roles'
 import { rekapKehadiranService, type BarisRekapKehadiran } from '../services/rekapKehadiran.service'
 import { presensiRoutes } from '../routes.presensi'
 import RekapKehadiranPage from '../views/RekapKehadiranPage.vue'
@@ -101,13 +101,26 @@ describe('tabel ringkas', () => {
 })
 
 describe('filter lingkup', () => {
-  it('role 1 melihat filter Unit; role 3 tidak melihat filter Unit/Satker', async () => {
-    const { wrapper: admin } = await mountPage(Role.SUPER_ADMIN)
-    expect(admin.find('[data-testid="filter-laporan"]').text()).toContain('Unit')
-    admin.unmount()
+  it('role 1 dan 4 boleh memilih Unit/Satker; role 3 tidak', () => {
+    expect(REKAP_KEHADIRAN_PILIH_UNIT_ROLES).toEqual([Role.SUPER_ADMIN, Role.ADMIN_VIEW_ESELON1])
+  })
 
-    const { wrapper: satker } = await mountPage(Role.ADMIN_SATKER)
-    expect(satker.find('[data-testid="filter-laporan"]').text()).not.toContain('Satker')
+  it('role 1 melihat filter Unit dan mengirim unit_satker', async () => {
+    const { wrapper } = await mountPage(Role.SUPER_ADMIN)
+    expect(wrapper.find('[data-testid="filter-laporan"]').text()).toContain('Unit')
+    expect(svc.daftar.mock.calls[0]?.[0].unit_satker).toBe('0')
+  })
+
+  it('role 4 melihat filter Unit dan mengirim unit_satker (lingkup penuh)', async () => {
+    const { wrapper } = await mountPage(Role.ADMIN_VIEW_ESELON1)
+    expect(wrapper.find('[data-testid="filter-laporan"]').text()).toContain('Unit')
+    expect(svc.daftar.mock.calls[0]?.[0].unit_satker).toBe('0')
+  })
+
+  it('role 3 tidak melihat filter Unit/Satker dan tidak mengirim unit_satker', async () => {
+    const { wrapper } = await mountPage(Role.ADMIN_SATKER)
+    expect(wrapper.find('[data-testid="filter-laporan"]').text()).not.toContain('Satker')
+    expect(svc.daftar.mock.calls[0]?.[0].unit_satker).toBeUndefined()
   })
 })
 

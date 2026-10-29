@@ -19,5 +19,8 @@ export const PRESENSI_ADMIN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role
 /** Rekap Kehadiran (5B MAKE-042, F5B-10; PRD 5C §6): role 1, 3, 4. Server memaksa lingkup role 3. */
 export const REKAP_KEHADIRAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1]
 
+/** Rekap Kehadiran: role yang boleh memilih Unit/Satker (role 4 lingkup penuh, server hanya memaksa role 3). */
+export const REKAP_KEHADIRAN_PILIH_UNIT_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_VIEW_ESELON1]
+
 /** Rekap Uang Makan (5B MAKE-042, F5B-20; PRD 5C §6): role 1, 3. Tab Instansi Lain hanya role 1 (F5B-6). */
 export const REKAP_UANG_MAKAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]
