@@ -123,7 +123,7 @@ onMounted(() => {
       <UiNotice v-if="notice" tone="success" data-testid="rekap-kehadiran-notice">{{ notice }}</UiNotice>
       <UiNotice v-if="failure" tone="danger" data-testid="rekap-kehadiran-failure">{{ failure }}</UiNotice>
 
-      <UiCard fill>
+      <UiCard>
         <FilterLaporanBar
           v-model:bulan="filter.bulan"
           v-model:id-unit="filter.idUnit"

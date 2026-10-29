@@ -107,7 +107,7 @@ onMounted(() => {
 
       <UiTabs v-if="bisaIl" v-model="tab" :items="tabItems" aria-label="Jenis rekap uang makan" data-testid="rekap-uang-makan-tab" />
 
-      <UiCard fill>
+      <UiCard>
         <FilterLaporanBar
           v-model:bulan="filter.bulan"
           v-model:id-unit="filter.idUnit"
