@@ -117,20 +117,26 @@
    * Pasang `col-sticky-kiri` pada `<th>`/`<td>` kolom No/Nama/NIP; kolom kedua dst. memberi offset lewat
    * `style="--sticky-kiri: <lebar kolom sebelumnya>"`. Latar dibuat tegas (bukan transparan) supaya isi yang tergulir tidak
    * tembus; baris genap mengikuti zebra halus `tr:nth-child(even)`. Header-nya menumpuk di atas header sticky atas.
+   * Baris berwarna status (CR-077 T-02) memasang `--sel-sticky` (warna SOLID setara latar barisnya) di `<tr>`, sehingga sel
+   * sticky ikut berwarna tanpa tembus; baris tanpa variabel itu tetap putih/zebra.
    */
   .col-sticky-kiri {
     position: sticky;
     left: var(--sticky-kiri, 0px);
     z-index: 5;
-    background-color: rgb(255 255 255);
+    background-color: var(--sel-sticky, rgb(255 255 255));
   }
 
   tbody tr:nth-child(even) > .col-sticky-kiri {
-    background-color: rgb(248 250 252);
+    background-color: var(--sel-sticky, rgb(248 250 252));
   }
 
+  /*
+   * Pojok header sticky: di atas header atas (z-10) dan kolom sticky (z-5), tetapi DI BAWAH pembungkus navbar sticky (z-20,
+   * RedesignShell) supaya tidak menimpa navbar saat halaman menggulir di window (layar sempit, CR-077 T-03).
+   */
   thead th.col-sticky-kiri {
-    z-index: 20;
+    z-index: 15;
     background-color: rgb(248 250 252);
   }
 
@@ -172,6 +178,27 @@
       overflow: hidden;
     }
 
+    /*
+     * CR-077: bila header halaman + tinggi minimum tabel melebihi viewport (viewport pendek, filter tinggi), `.page-fill`
+     * menggulir SENDIRI (window tetap tanpa gulir) alih-alih memeras tabel sampai 0 px. Anak langsung tidak menyusut di
+     * bawah isinya (kartu filter, judul, tab), kecuali yang memang mengisi sisa tinggi (`flex-1`, kelas utilitas menang);
+     * pembungkus `.table-fill` tidak boleh lebih pendek dari isinya (`min-content`) sehingga teks bantuan, paginasi, dan
+     * footer kartu tidak menimpa tabel.
+     */
+    .page-fill {
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .page-fill > :where(*) {
+      flex-shrink: 0;
+    }
+
+    .page-fill :has(.table-fill) {
+      min-height: min-content;
+    }
+
     .pane-fill {
       position: relative;
       height: 100%;
@@ -186,6 +213,18 @@
       min-height: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
+    }
+
+    /*
+     * CR-077: tinggi minimum wajar (±8 baris) dan `contain: size` = ukuran intrinsik wadah tabel tidak bergantung pada isi
+     * tabel, sehingga `min-content` pembungkusnya (lihat `.page-fill :has(.table-fill)`) = isi lain + tinggi minimum ini,
+     * bukan seluruh tabel; wadah tetap mengisi sisa tinggi lewat `flex: 1` dan menggulir isinya (header sticky tetap).
+     * `isolation` = konteks tumpukan sendiri: z-index header/kolom sticky di dalamnya tidak bersaing dengan navbar.
+     */
+    .table-fill {
+      min-height: var(--table-fill-min, 18rem);
+      contain: size;
+      isolation: isolate;
     }
 
     /* Pengaman: selama ada halaman isi-penuh, window tidak punya gulir sama sekali (sisa subpiksel pun terpotong). */
