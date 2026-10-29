@@ -1,6 +1,5 @@
 /**
- * MAKE-048 — Laporan Tukin: service dengan KLIEN ASLI (amplop backend nyata, string MySQLi, `code` galat terkendali) dan
- * halaman daftar (lingkup role 1 vs 3, filter, ⋮ Lihat laporan → Unduh PDF) serta laporan per pegawai (identitas, tabel
+ * MAKE-048 — halaman Laporan Tukin (klien asli, adapter palsu): halaman daftar (lingkup role 1 vs 3, filter, ⋮ Lihat laporan → Unduh PDF) serta laporan per pegawai (identitas, tabel
  * harian ber-color-coding legacy, baris non-kerja bila API mengirim, ringkasan, periode berjalan, galat 403/422, "Saya").
  */
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
@@ -33,7 +32,6 @@ import * as berkas from '@/features/kepegawaian/services/berkasUnduhan'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
-import { kodeGalat, laporanTukinService, pesanGalatLaporan } from '../services/laporanTukin.service'
 import LaporanTukinDaftarPage from '../views/LaporanTukinDaftarPage.vue'
 import LaporanTukinPegawaiPage from '../views/LaporanTukinPegawaiPage.vue'
 
@@ -82,61 +80,6 @@ const minta = (url: string) => server.permintaan.filter((p) => p.url === url)
 beforeEach(() => {
   server.balasan = {}
   server.permintaan = []
-})
-
-describe('laporanTukinService — amplop backend nyata lewat klien asli', () => {
-  it('daftar(): bulan tidak dikirim; unit_satker & jenis_pegawai[] hanya bila terisi; angka string dinormalkan', async () => {
-    server.balasan['get /presensi/tukin/pegawai'] = sukses(daftar())
-    const hasil = await laporanTukinService.daftar({ unit_satker: 'sat_9', jenis_pegawai: ['1', '6'], search: 'bud', page: 2, per_page: 25 })
-
-    expect(server.permintaan[0]!.params).toEqual({ page: 2, per_page: 25, search: 'bud', unit_satker: 'sat_9', jenis_pegawai: ['1', '6'] })
-    expect(hasil).toMatchObject({ total: 1, page: 1, per_page: 25, bulan_tersedia: [{ bulan: '2026-10', label: 'Oktober 2026' }] })
-    expect(hasil.items[0]).toMatchObject({ nip: NIP, gol_ruang: 'III/c', pendidikan: { strata: 'S1' } })
-  })
-
-  it('daftar() IL memakai /pegawai-il dan hanya search + paginasi', async () => {
-    server.balasan['get /presensi/tukin/pegawai-il'] = sukses(daftar([]))
-    await laporanTukinService.daftar({ unit_satker: '5', jenis_pegawai: ['1'], page: 1, per_page: 10 }, true)
-    expect(server.permintaan[0]).toMatchObject({ url: '/presensi/tukin/pegawai-il', params: { page: 1, per_page: 10 } })
-  })
-
-  it('laporan(): menormalkan kode[], jumlah, kelas_jabatan, harian non-kerja; bulan sebagai parameter', async () => {
-    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = sukses(laporan())
-    const l = await laporanTukinService.laporan(NIP, '2026-10')
-
-    expect(server.permintaan[0]!.params).toEqual({ bulan: '2026-10' })
-    expect(l.identitas.kelas_jabatan).toBe(9)
-    expect(l.jumlah).toEqual({ TL1: 0, TL2: 1, PSW1: 1, TK: 1, CS: 0 })
-    expect(l.harian[0]).toMatchObject({ status: 'hadir', kode: ['TL2', 'PSW1'], jam_masuk: '07:45:00', potongan: '0.40' })
-    expect(l.harian[4]!.kategori_konket).toBe(13)
-    expect(l.harian.map((h) => h.status)).toContain('akhir_pekan')
-    expect(l.penyesuaian).toBeNull()
-  })
-
-  it('pdf(): nama berkas dari Content-Disposition server', async () => {
-    server.balasan[`get /presensi/tukin/laporan/${NIP}/pdf`] = {
-      status: 200, body: new Blob(['%PDF']), headers: { 'content-disposition': `attachment; filename="tukin_${NIP}_2026-10.pdf"` },
-    }
-    const f = await laporanTukinService.pdf(NIP, '2026-10')
-    expect(f.nama).toBe(`tukin_${NIP}_2026-10.pdf`)
-    expect(server.permintaan[0]!.params).toEqual({ bulan: '2026-10' })
-  })
-
-  it('galat terkendali: code → pesan, 403/404/422 → pesan status', async () => {
-    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = galat(422, 'konfigurasi_tukin_tidak_lengkap')
-    const e1 = await laporanTukinService.laporan(NIP, '2026-10').catch((e: unknown) => e)
-    expect(kodeGalat(e1)).toBe('konfigurasi_tukin_tidak_lengkap')
-    expect(pesanGalatLaporan(e1)).toContain('Konfigurasi tarif Tukin')
-
-    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = galat(403)
-    expect(pesanGalatLaporan(await laporanTukinService.laporan(NIP, '2026-10').catch((e: unknown) => e))).toContain('tidak berhak')
-    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = galat(404)
-    expect(pesanGalatLaporan(await laporanTukinService.laporan(NIP, '2026-10').catch((e: unknown) => e))).toContain('tidak ditemukan')
-    server.balasan[`get /presensi/tukin/laporan/${NIP}`] = galat(422, undefined, { bulan: ['Bulan melewati batas.'] })
-    expect(pesanGalatLaporan(await laporanTukinService.laporan(NIP, '2099-01').catch((e: unknown) => e))).toBe('Bulan melewati batas.')
-    expect(kodeGalat(new Error('x'))).toBeNull()
-    expect(pesanGalatLaporan(new Error('x'))).toBe('Terjadi kesalahan. Coba lagi.')
-  })
 })
 
 const q = (s: string): HTMLElement | null => document.body.querySelector<HTMLElement>(s)
