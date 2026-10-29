@@ -155,7 +155,7 @@ onMounted(() => {
                 <th class="whitespace-nowrap px-3 py-3 text-right">Lain-lain</th>
                 <th class="whitespace-nowrap px-3 py-3 text-right">Cuti</th>
                 <th class="whitespace-nowrap px-3 py-3 text-right">Tidak Hadir</th>
-                <th class="whitespace-nowrap px-3 py-3 text-right" data-testid="rekap-kehadiran-kolom-tb">TB <span class="normal-case text-slate-400">(v2)</span></th>
+                <th class="whitespace-nowrap px-3 py-3 text-right" data-testid="rekap-kehadiran-kolom-tb">TB</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
