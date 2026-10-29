@@ -59,8 +59,8 @@ Halaman: `/presensi/tukin`, `/presensi/tukin/il`, `/presensi/tukin/:nip`, `/pres
 | B1 | `demo.admin` (1) | Laporan Tukin, Rekap Tukin, Penyesuaian Tukin, Rekap Kehadiran, Rekap Uang Makan (IL lewat tab/route di halaman masing-masing) | |
 | B2 | `demo.pegawai` (2) | Laporan Tukin Saya | |
 | B3 | `demo.satker` (3) | Laporan Tukin, Rekap Tukin, Rekap Kehadiran, Rekap Uang Makan (tanpa Penyesuaian Tukin, tanpa IL) | |
-| B4 | `demo.eselon1` (4) | Rekap Kehadiran (Laporan Tukin per pegawai hanya lewat tautan/NIP dalam lingkup, §6) | |
-| B5 | `demo.menteri` (5) | Tanpa anak menu laporan 5C baru (Laporan Tukin per pegawai hanya lewat tautan/NIP, §6) — konfirmasi dengan implementasi MAKE-053 | |
+| B4 | `demo.eselon1` (4) | Rekap Kehadiran (titik masuk Laporan Tukin per pegawai dalam lingkup, §6: konfirmasi dengan MAKE-048) | |
+| B5 | `demo.menteri` (5) | Tanpa anak menu laporan 5C baru (titik masuk Laporan Tukin per pegawai, §6: konfirmasi dengan MAKE-048) | |
 | B6 | `demo.ptt` (6) | Laporan Tukin Saya | |
 | B7 | `demo.pppk` (7) | Laporan Tukin Saya | |
 | B8 | `demo.pimpinan` (8) | Tanpa halaman laporan Presensi | |
@@ -95,18 +95,26 @@ Halaman: `/presensi/tukin`, `/presensi/tukin/il`, `/presensi/tukin/:nip`, `/pres
 
 ## E. Color-coding status (MAKE-047, §7.2, AC-FE5C.3, DoD 087 butir 2)
 
-Sumber kode (tidak ditebak): status harian `HasilHarian` = `hadir`, `TK`, `TPM`, `TPP`, `cuti`, `konket`, `tugas_belajar`,
-`libur`, `di_luar_masa_kerja`; kode kejadian `kategori` = `TL1`–`TL3`, `PSW1`–`PSW3`, `TPM`, `TPP`, `TK`, `CS`
-(`Libraries/Presensi/Tukin/StatusHarian.php`, `KalkulasiTukin.php`). Daftar final = laporan C0 MAKE-047; warna = legacy bila
-ada [K], bila tidak = ◻ Q5C-03 (TL/PSW kuning, TK/TPM/TPP merah, CS jingga, cuti/TB biru, libur abu-abu).
+Sumber kode (tidak ditebak): status harian `harian[].status` = `hadir`, `TK`, `TPM`, `TPP`, `cuti`, `konket`,
+`tugas_belajar`, `libur`, `di_luar_masa_kerja`; kode kejadian `harian[].kode` (CR-075) = `TL1`–`TL3`, `PSW1`–`PSW3`,
+`TPM`, `TPP`, `TK`, `CS` (`Libraries/Presensi/Tukin/StatusHarian.php`, `KalkulasiTukin.php`). **Keputusan reviewer CR
+29-10** (verifikasi legacy `views/hr/employee/presensi/laporan_tukin_skp.php:235-262` + CSS :471-495):
+
+- **(a) [K] warna latar baris** tabel harian laporan per pegawai per status, ikut legacy: libur biru, akhir pekan abu-abu,
+  konket jingga, cuti ungu, `tugas_belajar` merah muda, `di_luar_masa_kerja` abu-abu; baris `hadir`/`TK`/`TPM`/`TPP`
+  **tanpa** warna baris.
+- **(b) [V2] chip kode** `TL1`–`TL3`/`PSW1`–`PSW3`/`TPM`/`TPP`/`TK`/`CS` dari `kode[]`, palet Q5C-03 (TL/PSW kuning,
+  TK/TPM/TPP merah, CS jingga) + legenda.
+- **(c) rekap** (legacy tanpa warna): chip/sel kode saja, tanpa warna latar baris.
 
 | # | Butir | Data | Langkah | Hasil yang diharapkan | Layar | Hasil |
 |---|---|---|---|---|---|---|
-| E1 | AC-FE5C.3 | U1 | Tabel harian laporan per pegawai | Setiap status & kode punya warna + **teks kode** (tidak bergantung warna saja); hari dengan dua kode (mis. `TPM` + `PSW2`) menampilkan keduanya | 1440, 390 | |
-| E2 | AC-FE5C.3 | U1 | Legenda | `LegendaStatusPresensi` tampil di dekat tabel, memuat semua kode yang dipakai dengan label Indonesia | 1440, 390 | |
-| E3 | AC-FE5C.3 | U1 | Ukur kontras (DevTools / alat kontras) setiap chip, tema terang & gelap | Rasio teks ≥ 4.5:1; warna dari token desain (tanpa hex lepas di komponen) | 1440 | |
-| E4 | §7.2 | U1 | Bandingkan warna dengan tampilan legacy (bila legacy memberi warna) | Sama dengan legacy [K] atau sesuai ◻ Q5C-03; dicatat di laporan C0 | 1440 | |
-| E5 | — | U1 | Mode keyboard / pembaca layar pada chip | Chip tidak fokus-able tanpa aksi; teks kode terbaca | 1440 | |
+| E1 | (a) [K] | U1 | Tabel harian laporan per pegawai: bandingkan warna baris tiap status dengan legacy | Latar baris: libur biru, akhir pekan abu-abu, konket jingga, cuti ungu, tugas belajar merah muda, di luar masa kerja abu-abu; baris hadir/TK/TPM/TPP tanpa warna baris. Status juga tertulis sebagai teks (tidak bergantung warna saja) | 1440, 390 | |
+| E2 | (b) [V2], AC-FE5C.3 | U1 | Hari dengan kode kejadian | Chip per kode dari `kode[]` dengan teks kode, warna palet Q5C-03; hari dengan dua kode (mis. `TPM` + `PSW2`, `TL1` + `PSW1`) menampilkan keduanya sesuai urutan; hari `kode: []` tanpa chip | 1440, 390 | |
+| E3 | (b), AC-FE5C.3 | U1 | Legenda | `LegendaStatusPresensi` di dekat tabel: memuat warna baris (a) dan chip kode (b) dengan label Indonesia | 1440, 390 | |
+| E4 | (c) | U1 | Tabel Rekap Tukin & Rekap Kehadiran | Tanpa warna latar baris per status; kode/kolom tampil sebagai chip atau sel kode saja | 1440 | |
+| E5 | AC-FE5C.3 | U1 | Ukur kontras (DevTools / alat kontras) teks di atas setiap warna baris dan chip, tema terang & gelap | Rasio teks ≥ 4.5:1; warna dari token desain (tanpa hex lepas di komponen) | 1440 | |
+| E6 | — | U1 | Mode keyboard / pembaca layar pada chip | Chip tidak fokus-able tanpa aksi; teks kode terbaca | 1440 | |
 
 ## F. Rekap Tukin (MAKE-049, §7.4, DoD 083/087 butir 1)
 
