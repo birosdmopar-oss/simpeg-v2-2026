@@ -23,7 +23,10 @@ use Throwable;
  *   php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirmasi=<db_tujuan>
  *                          [--tier=1|semua] [--dry-run] [--keputusan=<berkas.json>] [--batch=1000]
  *
- * Tujuan = koneksi `default` (`.env` DB scratch hasil `migrate --all`). Sumber = skema lain di server & akun yang sama.
+ * Tujuan = koneksi `default` (`.env` DB scratch hasil `migrate --all`) WAJIB DB scratch di mesin lokal DBA, bukan server
+ * dev/produksi; penjaga tidak bisa mengenali host, jadi host:port + nama DB tujuan dicetak lebih dulu untuk diperiksa
+ * sebelum `--konfirmasi`. Sumber = skema salinan di server & akun yang sama. Kedua koneksi dibuat dengan `DBDebug = true`
+ * apa pun environment-nya (galat query = exception, tidak diam-diam).
  * Keluaran hanya nama tabel, jumlah, dan kode aturan. Kode keluar 0 = selesai, 1 = gagal (tier berjalan di-rollback),
  * 2 = masukan salah.
  */
@@ -48,12 +51,12 @@ class ImporLegacy extends BaseCommand
      */
     public function run(array $params): int
     {
-        $opsi = static fn (string $k): ?string => $params[$k] ?? CLI::getOption($k);
+        $opsi = static fn (string $k): ?string => self::opsi($params, $k);
 
         $sumber = $opsi('sumber');
         $zona   = $opsi('zona-sumber');
         $tier   = $opsi('tier') ?? 'semua';
-        $dryRun = array_key_exists('dry-run', $params) || CLI::getOption('dry-run') !== null;
+        $dryRun = array_key_exists('dry-run', $params) || array_key_exists('dry-run', CLI::getOptions());
         $batch  = $opsi('batch') ?? (string) config(KonfigImpor::class)->ukuranBatch;
 
         if (! is_string($sumber) || $sumber === '' || ! is_string($zona) || ! ctype_digit($batch) || (int) $batch < 1) {
@@ -65,11 +68,12 @@ class ImporLegacy extends BaseCommand
         $daftarTier = $tier === 'semua' ? range(1, DaftarTabel::TIER_MAKS) : [(int) $tier];
 
         try {
-            $tujuan = Database::connect();
+            $tujuan = self::koneksi(null);
+            CLI::write(sprintf('Tujuan: %s:%s / %s — sumber: %s (server & akun yang sama)', $tujuan->hostname, (string) $tujuan->port, $tujuan->getDatabase(), $sumber), 'yellow');
             PenjagaTujuan::periksa($tujuan->getDatabase(), $sumber, $opsi('konfirmasi'), config(KonfigImpor::class)->tujuanTerlarang);
             $keputusan = is_string($opsi('keputusan')) ? Keputusan::dariBerkas((string) $opsi('keputusan')) : Keputusan::kosong();
 
-            $laporan = (new PengimporLegacy(self::koneksiSumber($sumber), $tujuan, $zona, $keputusan, (int) $batch))
+            $laporan = (new PengimporLegacy(self::koneksi($sumber), $tujuan, $zona, $keputusan, (int) $batch))
                 ->jalankan($daftarTier, $dryRun);
         } catch (ImporGagal $e) {
             CLI::error('GAGAL: ' . $e->getMessage());
@@ -90,11 +94,42 @@ class ImporLegacy extends BaseCommand
         return EXIT_SUCCESS;
     }
 
-    private static function koneksiSumber(string $skema): BaseConnection
+    /**
+     * Nilai opsi dalam bentuk `--k nilai` maupun `--k=nilai`. Parser CLI CI4 tidak memecah `=`, sehingga
+     * `--sumber=x` tiba sebagai opsi bernama `sumber=x` tanpa nilai.
+     *
+     * @param array<int|string, string|null> $params
+     */
+    private static function opsi(array $params, string $k): ?string
     {
-        $grup             = config(Database::class)->{config(Database::class)->defaultGroup};
-        $grup['database'] = $skema;
-        $grup['DBPrefix'] = '';
+        $nilai = $params[$k] ?? CLI::getOption($k);
+
+        if (is_string($nilai)) {
+            return $nilai;
+        }
+
+        foreach ([...array_keys($params), ...array_keys(CLI::getOptions())] as $nama) {
+            if (is_string($nama) && str_starts_with($nama, $k . '=')) {
+                return substr($nama, strlen($k) + 1);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Koneksi dari grup bawaan dengan `DBDebug = true` (R-1 review PR #32). `$skema` null = tujuan (grup apa adanya);
+     * selain itu sumber: skema lain tanpa prefix.
+     */
+    private static function koneksi(?string $skema): BaseConnection
+    {
+        $grup            = config(Database::class)->{config(Database::class)->defaultGroup};
+        $grup['DBDebug'] = true;
+
+        if ($skema !== null) {
+            $grup['database'] = $skema;
+            $grup['DBPrefix'] = '';
+        }
 
         return Database::connect($grup, false);
     }

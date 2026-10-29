@@ -10,6 +10,7 @@ use App\Libraries\Impor\PengimporLegacy;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 use Tests\Support\DatabaseTestCase;
+use Throwable;
 
 /**
  * Kerangka test alat impor MAKE-056. Skema sumber `<db_test>_lgc` dibuat dari struktur tabel v2 semua tier
@@ -21,7 +22,7 @@ use Tests\Support\DatabaseTestCase;
 abstract class ImporLegacyTestCase extends DatabaseTestCase
 {
     protected string $lgc;
-    protected BaseConnection $src;
+    protected ?BaseConnection $src = null;
 
     /**
      * @var array{mode: string, tz: string}
@@ -39,6 +40,18 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
         $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}`");
         $this->db->query("CREATE DATABASE `{$this->lgc}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
+        try {
+            $this->siapkanSumber();
+        } catch (Throwable $e) {
+            // setUp gagal → tearDown tidak dipanggil PHPUnit; skema sisa dibuang di sini (R-3 review PR #32).
+            $this->buangSumber();
+
+            throw $e;
+        }
+    }
+
+    private function siapkanSumber(): void
+    {
         for ($tier = 1; $tier <= DaftarTabel::TIER_MAKS; $tier++) {
             foreach (DaftarTabel::tier($tier) as $def) {
                 $this->db->query("CREATE TABLE `{$this->lgc}`.`{$def->tabel}` LIKE `{$this->db->getDatabase()}`.`{$this->db->prefixTable($def->tabel)}`");
@@ -53,14 +66,25 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
         $this->src->query("SET SESSION time_zone = '+00:00'");
     }
 
+    /**
+     * Dipanggil juga saat test gagal (PHPUnit selalu menjalankan tearDown sesudah setUp berhasil).
+     */
     protected function tearDown(): void
     {
-        $this->src->close();
-        $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}`");
-        $this->db->query('SET SESSION sql_mode = ?', [$this->sesiAwal['mode']]);
-        $this->db->query('SET SESSION time_zone = ?', [$this->sesiAwal['tz']]);
+        try {
+            $this->buangSumber();
+            $this->db->query('SET SESSION sql_mode = ?', [$this->sesiAwal['mode']]);
+            $this->db->query('SET SESSION time_zone = ?', [$this->sesiAwal['tz']]);
+        } finally {
+            parent::tearDown();
+        }
+    }
 
-        parent::tearDown();
+    private function buangSumber(): void
+    {
+        $this->src?->close();
+        $this->src = null;
+        $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}`");
     }
 
     /**

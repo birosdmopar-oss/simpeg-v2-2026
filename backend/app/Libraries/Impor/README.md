@@ -8,11 +8,20 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
                        [--tier=1|semua] [--dry-run] [--keputusan=<berkas.json>]
 ```
 
-- **Tujuan**: koneksi `default` (`.env`), yaitu DB scratch kosong hasil `php spark migrate --all`.
+- **Tujuan**: koneksi `default` (`.env`), yaitu DB scratch kosong hasil `php spark migrate --all`. Tujuan **wajib** DB
+  scratch di mesin lokal DBA, bukan server dev atau produksi. Penjaga tidak bisa mengenali host, jadi command
+  mencetak `Tujuan: host:port / nama_db` (tanpa user/password) sebelum memeriksa `--konfirmasi`. Periksa baris itu
+  dulu; jalankan `--dry-run` pertama kali agar tidak ada yang tertulis bila tujuannya salah.
 - **Sumber**: skema salinan legacy [K] apa adanya (hasil `docs/up1/sql/up1-ekstraksi.sh`), di server dan akun yang sama.
 - **Penjaga** (`PenjagaTujuan`): tujuan ditolak bila namanya ada di `Config\ImporLegacy::$tujuanTerlarang`, berawalan
   `prod`, sama dengan sumber, atau `--konfirmasi` tidak sama persis. Port tidak dipakai sebagai syarat.
 - **`--zona-sumber`** wajib diisi dan tidak punya nilai bawaan (GAP-2). Nilainya dikonfirmasi DBA sebelum dijalankan.
+- **Opsi** boleh ditulis `--k nilai` atau `--k=nilai`. Parser CLI CI4 tidak memecah `=`, jadi command membacanya
+  sendiri.
+- **Galat DB tidak boleh diam-diam** (R-1 review PR #32). Command membuat kedua koneksi dengan `DBDebug = true` apa
+  pun environment-nya. Mesin juga memeriksa setiap hasil: kueri/tulis `false`, `transStatus()` gagal, atau
+  `transCommit()` false → `ImporGagal` dan tier di-rollback, tanpa pesan "selesai". Di dalam transaksi, CI4 bisa
+  menandai status gagal tanpa melempar exception walau `DBDebug = true`; pemeriksaan status menangkap kasus ini.
 - **Keluaran** hanya berisi nama tabel, jumlah baris, dan kode aturan. Galat DB dicetak sebagai kelas + kode saja,
   karena pesannya bisa memuat isi baris.
 
@@ -131,6 +140,8 @@ Kolom teks T2–T6 yang terkena `stripslashes` bawaan (GAP-8; NIP dan kode di-tr
 ## Test
 
 - `tests/unit/Impor/AturanImporTest.php`: aturan murni (transformasi, keputusan, penjaga).
-- `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php` (`db-isolasi-penuh`), di atas
+- `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php`,
+  `ImporLegacyGagalDbTest.php` (galat DB dengan `DBDebug` false/true; `db-isolasi-penuh`), di atas
   `Tests\Support\Impor\ImporLegacyTestCase`: skema sumber sintetis `<db_test>_lgc` dibuat dari struktur v2
-  (`CREATE TABLE … LIKE`) lalu diubah seperti legacy (kolom dibuang, tipe diubah, CHECK dilepas).
+  (`CREATE TABLE … LIKE`) lalu diubah seperti legacy (kolom dibuang, tipe diubah, CHECK dilepas). Skema itu selalu
+  di-DROP di tearDown, juga saat test gagal, dan saat setUp gagal di tengah jalan.

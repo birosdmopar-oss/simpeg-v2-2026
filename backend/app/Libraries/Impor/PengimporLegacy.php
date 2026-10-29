@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Impor;
 
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\ResultInterface;
 use Throwable;
 
 /**
@@ -27,6 +28,10 @@ use Throwable;
  * Aturan khusus tabel boleh mengembalikan kunci `__koreksi` (list kode) untuk dicatat di laporan. Sesudah setiap tier
  * di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7; PK TINYINT dengan
  * counter ≥ 128 tidak disalin, dicatat PERIKSA). Langkah ini DDL, jadi berjalan di luar transaksi tier.
+ *
+ * Setiap hasil kueri/tulis diperiksa (R-1 review PR #32): dengan `DBDebug = false` CI4 tidak melempar exception, jadi
+ * hasil `false`, `transStatus()` false, atau `transCommit()` false → {@see ImporGagal} dan tier di-rollback. Command
+ * tetap memaksa `DBDebug = true` pada kedua koneksi.
  *
  * Kedua koneksi diawali sesi R4 (`time_zone = '+00:00'`, strict). Tujuan wajib kosong, kecuali tabel `bolehSeed`.
  */
@@ -78,9 +83,9 @@ final class PengimporLegacy
 
     private function aturSesi(BaseConnection $db): void
     {
-        $db->query("SET SESSION sql_mode = '" . self::SQL_MODE . "'");
-        $db->query("SET SESSION time_zone = '+00:00'");
-        $cek = $db->query('SELECT NOW() = UTC_TIMESTAMP() AS ok')->getRowArray();
+        $this->perintah($db, "SET SESSION sql_mode = '" . self::SQL_MODE . "'");
+        $this->perintah($db, "SET SESSION time_zone = '+00:00'");
+        $cek = $this->kueri($db, 'SELECT NOW() = UTC_TIMESTAMP() AS ok')->getRowArray();
 
         if ((int) ($cek['ok'] ?? 0) !== 1) {
             throw new ImporGagal('Sesi R4 gagal: NOW() <> UTC_TIMESTAMP().');
@@ -114,7 +119,18 @@ final class PengimporLegacy
         }
 
         if (! $dryRun) {
-            $this->tujuan->transCommit();
+            if ($this->tujuan->transStatus() === false) {
+                $this->tujuan->transRollback();
+                $this->tujuan->resetTransStatus();
+
+                throw new ImporGagal("Tier {$tier} gagal di-commit (status transaksi gagal); tier di-rollback.");
+            }
+
+            if ($this->tujuan->transCommit() === false) {
+                $this->tujuan->resetTransStatus();
+
+                throw new ImporGagal("Tier {$tier} gagal di-commit.");
+            }
 
             foreach ($defs as $def) {
                 if ($rinci[$def->tabel] !== null) {
@@ -137,7 +153,8 @@ final class PengimporLegacy
             return;
         }
 
-        $tipe = $this->tujuan->query(
+        $tipe = $this->kueri(
+            $this->tujuan,
             'SELECT DATA_TYPE AS t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
             [$this->tujuan->getDatabase(), $tabel, $def->pk],
         )->getRowArray();
@@ -148,17 +165,18 @@ final class PengimporLegacy
             return;
         }
 
-        $this->tujuan->query('ALTER TABLE ' . $this->tujuan->escapeIdentifiers($tabel) . ' AUTO_INCREMENT = ' . $sumber);
+        $this->perintah($this->tujuan, 'ALTER TABLE ' . $this->tujuan->escapeIdentifiers($tabel) . ' AUTO_INCREMENT = ' . $sumber);
         $this->laporan->koreksi($def->tabel, "counter AUTO_INCREMENT {$tujuan}→{$sumber}");
     }
 
     private function counter(BaseConnection $db, string $tabel): ?int
     {
         if (! str_contains(strtolower($db->getVersion()), 'mariadb')) {
-            $db->query('SET SESSION information_schema_stats_expiry = 0');
+            $this->perintah($db, 'SET SESSION information_schema_stats_expiry = 0');
         }
 
-        $r = $db->query(
+        $r = $this->kueri(
+            $db,
             'SELECT AUTO_INCREMENT AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?',
             [$db->getDatabase(), $tabel],
         )->getRowArray();
@@ -208,14 +226,24 @@ final class PengimporLegacy
         }
 
         $seed = [];
-        $isi  = (int) $this->tujuan->table($def->tabel)->countAllResults();
+        $isi  = $this->tujuan->table($def->tabel)->countAllResults();
+
+        if (! is_int($isi)) {
+            throw new ImporGagal($this->pesanGagal($this->tujuan, "hitung tujuan {$def->tabel}"));
+        }
 
         if ($isi > 0) {
             if (! $def->bolehSeed || $def->kolomNama === []) {
                 throw new ImporGagal("Tabel tujuan {$def->tabel} tidak kosong ({$isi} baris).");
             }
 
-            foreach ($this->tujuan->table($def->tabel)->select([$def->pk, $def->kolomNama[0]])->get()->getResultArray() as $r) {
+            $hasilSeed = $this->tujuan->table($def->tabel)->select([$def->pk, $def->kolomNama[0]])->get();
+
+            if (! $hasilSeed instanceof ResultInterface) {
+                throw new ImporGagal($this->pesanGagal($this->tujuan, "baca seed {$def->tabel}"));
+            }
+
+            foreach ($hasilSeed->getResultArray() as $r) {
                 $seed[(string) $r[$def->pk]] = (string) $r[$def->kolomNama[0]];
             }
         }
@@ -234,7 +262,7 @@ final class PengimporLegacy
             return;
         }
 
-        $jumlah = (int) $this->sumber->query('SELECT COUNT(*) AS n FROM ' . $this->sumber->escapeIdentifiers($def->tabel))->getRowArray()['n'];
+        $jumlah = (int) $this->kueri($this->sumber, 'SELECT COUNT(*) AS n FROM ' . $this->sumber->escapeIdentifiers($def->tabel))->getRowArray()['n'];
         $this->laporan->mulai($tier, $def, $jumlah, $dryRun ? 'dry-run' : '');
 
         $daftarKolom = array_keys($rinci['kolom']);
@@ -249,7 +277,7 @@ final class PengimporLegacy
         do {
             $syarat = $terakhir === null ? '' : " WHERE ({$urutPk}) > (" . implode(', ', array_fill(0, count($kunci), '?')) . ')';
             $sql    = "SELECT {$pilih} FROM {$tabel}{$syarat} ORDER BY {$urutPk} LIMIT {$this->ukuranBatch}";
-            $baris  = $this->sumber->query($sql, $terakhir ?? [])->getResultArray();
+            $baris  = $this->kueri($this->sumber, $sql, $terakhir ?? [])->getResultArray();
             $tulis  = [];
 
             foreach ($baris as $mentah) {
@@ -301,7 +329,9 @@ final class PengimporLegacy
             $tulis = $this->periksaRujukan($def, $rinci['fk'], $tulis);
 
             if ($tulis !== [] && ! $dryRun) {
-                $this->tujuan->table($def->tabel)->insertBatch($tulis);
+                if ($this->tujuan->table($def->tabel)->insertBatch($tulis) === false) {
+                    throw new ImporGagal($this->pesanGagal($this->tujuan, "tulis {$def->tabel}"));
+                }
             }
 
             $this->laporan->ditulis($def->tabel, count($tulis));
@@ -311,7 +341,9 @@ final class PengimporLegacy
             foreach ($tunda as $u) {
                 $id = $u[$def->pk];
                 unset($u[$def->pk]);
-                $this->tujuan->table($def->tabel)->where($def->pk, $id)->update($u);
+                if ($this->tujuan->table($def->tabel)->where($def->pk, $id)->update($u) === false) {
+                    throw new ImporGagal($this->pesanGagal($this->tujuan, "isi kolom tunda {$def->tabel}"));
+                }
             }
         }
     }
@@ -394,7 +426,8 @@ final class PengimporLegacy
      */
     private function kolom(BaseConnection $db, string $tabel): array
     {
-        $rows = $db->query(
+        $rows = $this->kueri(
+            $db,
             'SELECT COLUMN_NAME AS n, DATA_TYPE AS t, IS_NULLABLE AS nl, COLUMN_DEFAULT AS d, EXTRA AS e, CHARACTER_MAXIMUM_LENGTH AS p'
             . ' FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
             [$db->getDatabase(), $tabel],
@@ -422,7 +455,8 @@ final class PengimporLegacy
      */
     private function kolomFk(string $tabel): array
     {
-        $rows = $this->tujuan->query(
+        $rows = $this->kueri(
+            $this->tujuan,
             'SELECT COLUMN_NAME AS n, REFERENCED_TABLE_NAME AS t, REFERENCED_COLUMN_NAME AS k FROM information_schema.KEY_COLUMN_USAGE'
             . ' WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
             [$this->tujuan->getDatabase(), $tabel],
@@ -465,7 +499,8 @@ final class PengimporLegacy
 
             $kolomInduk = $this->tujuan->escapeIdentifiers($induk['kolom']);
             $ada        = array_map('strval', array_column(
-                $this->tujuan->query(
+                $this->kueri(
+                    $this->tujuan,
                     "SELECT {$kolomInduk} AS v FROM " . $this->tujuan->escapeIdentifiers($induk['tabel']) . " WHERE {$kolomInduk} IN ?",
                     [$nilai],
                 )->getResultArray(),
@@ -490,5 +525,41 @@ final class PengimporLegacy
         }
 
         return $tulis;
+    }
+
+    /**
+     * Kueri dengan pemeriksaan hasil: `false` (DBDebug = false) → {@see ImporGagal}.
+     *
+     * @param array<int|string, mixed> $binds
+     */
+    private function kueri(BaseConnection $db, string $sql, array $binds = []): ResultInterface
+    {
+        $hasil = $db->query($sql, $binds === [] ? null : $binds);
+
+        if (! $hasil instanceof ResultInterface) {
+            throw new ImporGagal($this->pesanGagal($db, 'kueri'));
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Perintah tanpa hasil baris (SET, ALTER) dengan pemeriksaan hasil.
+     */
+    private function perintah(BaseConnection $db, string $sql): void
+    {
+        if ($db->query($sql) === false) {
+            throw new ImporGagal($this->pesanGagal($db, 'perintah sesi/DDL'));
+        }
+    }
+
+    /**
+     * Pesan galat DB tanpa isi baris: hanya langkah + kode galat (pesan MySQL bisa memuat nilai, mis. 1062).
+     */
+    private function pesanGagal(BaseConnection $db, string $langkah): string
+    {
+        $galat = $db->error();
+
+        return sprintf('Galat DB saat %s (kode %s); tier di-rollback.', $langkah, (string) ($galat['code'] ?? '?'));
     }
 }
