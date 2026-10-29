@@ -2,7 +2,7 @@
  * Unduhan berkas biner dari API (WS-2 MAKE-013): nama berkas dibaca dari `Content-Disposition` (CORS exposedHeaders),
  * cadangan `<dasar><ekstensi dari tipe blob>` bila header tidak ada/terbaca.
  */
-import { api } from '@/lib/axios'
+import { api, isApiError, type ApiEnvelope } from '@/lib/axios'
 
 export interface BerkasUnduhan {
   blob: Blob
@@ -37,16 +37,42 @@ export function namaBerkas(headers: unknown, blob: Blob, dasar: string): string 
   return `${dasar}${ekstensiTipe(blob.type)}`
 }
 
+/**
+ * Galat unduhan: interceptor `api` hanya membaca `message`/`errors` dari body JSON, sedangkan `responseType: 'blob'`
+ * membuat body galat berupa Blob. Body JSON ber-tipe blob diurai ulang dan diganti di respons asli, lalu `message` dan
+ * `errors` diperbarui, sehingga `code` dan `errors` server ikut terbawa seperti jalur JSON biasa.
+ */
+async function urainGalatBlob(error: unknown): Promise<unknown> {
+  if (!isApiError(error)) return error
+  const respons = error.original.response
+  if (!respons || !(respons.data instanceof Blob) || !respons.data.type.includes('json')) return error
+  try {
+    const body = JSON.parse(await respons.data.text()) as Partial<ApiEnvelope>
+    respons.data = body
+    return { ...error, message: body.message || error.message, errors: body.errors ?? null }
+  } catch {
+    return error
+  }
+}
+
 /** GET biner + nama berkas. */
-export async function ambilBerkas(url: string, dasar: string, params?: Record<string, string>): Promise<BerkasUnduhan> {
-  const res = await api.get<Blob>(url, { params, responseType: 'blob' })
-  return { blob: res.data, nama: namaBerkas(res.headers, res.data, dasar) }
+export async function ambilBerkas(url: string, dasar: string, params?: Record<string, string | number | string[]>): Promise<BerkasUnduhan> {
+  try {
+    const res = await api.get<Blob>(url, { params, responseType: 'blob' })
+    return { blob: res.data, nama: namaBerkas(res.headers, res.data, dasar) }
+  } catch (error) {
+    throw await urainGalatBlob(error)
+  }
 }
 
 /** POST JSON → biner + nama berkas (mis. ekspor hasil pencarian lanjutan). */
 export async function kirimBerkas(url: string, body: unknown, dasar: string): Promise<BerkasUnduhan> {
-  const res = await api.post<Blob>(url, body, { responseType: 'blob' })
-  return { blob: res.data, nama: namaBerkas(res.headers, res.data, dasar) }
+  try {
+    const res = await api.post<Blob>(url, body, { responseType: 'blob' })
+    return { blob: res.data, nama: namaBerkas(res.headers, res.data, dasar) }
+  } catch (error) {
+    throw await urainGalatBlob(error)
+  }
 }
 
 /** Simpan berkas lewat tautan sementara. */

@@ -10,7 +10,7 @@
  * tidak ada di rekap uang makan (F5B-20). Lingkup, aturan hari, dan jam kerja ditentukan server (ADR-025).
  */
 import { api } from '@/lib/axios'
-import { namaBerkas, type BerkasUnduhan } from '@/features/kepegawaian/services/berkasUnduhan'
+import { ambilBerkas, type BerkasUnduhan } from '@/features/kepegawaian/services/berkasUnduhan'
 
 const angka = (v: unknown): number => (v === null || v === undefined || v === '' ? 0 : Number(v))
 
@@ -58,12 +58,6 @@ export interface QueryRekap {
 }
 
 type Params = Record<string, string | number | string[]>
-
-/** GET biner (unduhan XLSX) + nama berkas dari `Content-Disposition`. */
-async function unduhBerkas(url: string, dasar: string, params: Params): Promise<BerkasUnduhan> {
-  const res = await api.get<Blob>(url, { params, responseType: 'blob' })
-  return { blob: res.data, nama: namaBerkas(res.headers, res.data, dasar) }
-}
 
 function paramRekap(q: QueryRekap, halaman: boolean): Params {
   const params: Params = { bulan: q.bulan }
@@ -114,7 +108,7 @@ export const rekapKehadiranService = {
 
   /** `bentuk` = `xlsx` (ringkas) atau `xlsx-harian` (grid harian). */
   async unduh(bentuk: 'xlsx' | 'xlsx-harian', q: QueryRekap): Promise<BerkasUnduhan> {
-    return unduhBerkas(`/presensi/rekap-kehadiran/${bentuk}`, `rekap_kehadiran_${bentuk === 'xlsx' ? '' : 'harian_'}${q.bulan}`, paramRekap(q, false))
+    return ambilBerkas(`/presensi/rekap-kehadiran/${bentuk}`,`rekap_kehadiran_${bentuk === 'xlsx' ? '' : 'harian_'}${q.bulan}`, paramRekap(q, false))
   },
 }
 
@@ -127,6 +121,6 @@ export const rekapUangMakanService = {
   },
 
   async unduh(q: QueryRekap, il: boolean): Promise<BerkasUnduhan> {
-    return unduhBerkas(il ? '/presensi/uang-makan/rekap-il/xlsx' : '/presensi/uang-makan/rekap/xlsx', `rekap_uang_makan_${il ? 'il_' : ''}${q.bulan}`, il ? { bulan: q.bulan } : paramRekap(q, false))
+    return ambilBerkas(il ?'/presensi/uang-makan/rekap-il/xlsx' : '/presensi/uang-makan/rekap/xlsx', `rekap_uang_makan_${il ? 'il_' : ''}${q.bulan}`, il ? { bulan: q.bulan } : paramRekap(q, false))
   },
 }
