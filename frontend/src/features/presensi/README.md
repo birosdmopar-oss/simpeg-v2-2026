@@ -84,3 +84,18 @@ tambah/ubah lewat dialog (`PenyesuaianTukinFormDialog.vue`, galat 422 per field)
   mewajibkan `bulan_mulai`, `bulan_akhir`, `persen`, dan `alasan` pada setiap PUT, jadi `ubahStatus` mengirim ulang nilai
   baris dan hanya `status` yang berubah. Risiko kecil: bila dua admin mengubah baris yang sama hampir bersamaan, perubahan
   yang lebih dulu bisa tertimpa. Backend tidak diubah (di luar lingkup 5C); diterima reviewer CR.
+
+## Rekap Tukin (MAKE-049)
+
+| Path | Role | Halaman |
+|---|---|---|
+| `/presensi/tukin/rekap` | 1, 3 | `RekapTukinPage` — rekap potongan seluruh lingkup, filter Bulan/Unit/Satker (role 1)/Jenis Pegawai |
+| `/presensi/tukin/rekap-il` | 1 | pegawai Instansi Lain (`RekapTukinIlPage`), hanya Bulan |
+
+- Service `services/rekapTukin.service.ts` (klien asli diuji): `daftar`, `ekspor('xlsx'|'pdf')`, `pesanGalatRekap` (422 `unit_satker`
+  batas PDF/lingkup `0`, `bulan`, `periode_tidak_didukung`). XLSX = seluruh lingkup tanpa paginasi; PDF hanya unit/satker ≤ batas baris.
+- `TabelRekapTukin`: 16 kolom urut XLSX PRD 5B §7.3.4 (No, Nama, NIP, Unit Es.I/II, Pengurangan TL/PSW/TK/TA/CUTI/TB, Total
+  Presensi/SKP/Potongan, Keterangan); No/Nama/NIP sticky kiri (`col-sticky-kiri`, `--sticky-kiri` 0/3rem/17rem), header dua baris
+  sticky, angka rata kanan berkoma Indonesia. Baris galat tetap tampil (penanda "Galat" + pesan, kolom angka "—").
+- [CATAT] Rekap legacy tanpa warna → v2 tanpa warna baris (hanya sel angka); blok penanda tangan hanya di berkas XLSX/PDF, tidak
+  di layar (Q5C-08). Cetak HTML legacy diganti PDF/XLSX server (Q5C-04).
