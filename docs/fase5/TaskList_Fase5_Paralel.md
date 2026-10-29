@@ -11,7 +11,7 @@ pengambil keputusan & sign-off.
 | 5A (skema, slip gaji, presensi, FE 5A) | ✅ SIGN-OFF 28-10 | M1–M8 di `main` (`54cb441`), DBV-023 |
 | 5B (cuti/TB Tukin, laporan, rekap, uang makan) | ✅ SIGN-OFF Horii 29-10 | M1–M7 di `main` (MAKE-043 `87f77c8`), DBV-024 |
 | 5C (FE laporan, D-13, penutup) | ✅ QA Lapis 1 5C lolos 29-10; MAKE-054 laporan akhir | MAKE-047..053, CR-075..081 di `main` (`6c116ac`) |
-| Fase 5 DONE | ⛔ Sign-off Horii setelah MAKE-054 + QA Lapis 1 FE 5A (Q5A-18, `Laporan_Akhir_Fase5.md` §7) | **Tidak** menunggu UP-1 (§6) |
+| Fase 5 DONE | ⛔ Sign-off Horii (keputusan butir `Laporan_Akhir_Fase5.md` §7) | **Tidak** menunggu UP-1 (§6) |
 | Tahap UP-1 | ⏳ Persiapan | §6, Trello list "Tahap UP-1" |
 
 ## 2. Daftar task (semua pelaksana)
@@ -34,7 +34,7 @@ pengambil keputusan & sign-off.
 | 14 | Perbaikan temuan QA: bulan bawaan Tukin 16–15, sinkron rute, galat unduhan blob, fokus ⋮, label TB, Predikat SKP (T-01, T-04..T-07, T-09) | CR-078 | Coder B | No. 12 | ✅ Di `main` `7eac943` | Horii |
 | 15 | QA ulang setelah CR-077/078 + `IndikatorRadius` (I1, pegawai wajib geofence + izin lokasi) | (MAKE-054) | Reviewer | No. 13–14 | ✅ Lolos; temuan T-12..T-15 → CR-079 `e9027e5`, CR-081 `6c116ac` | — |
 | 16 | Verifikasi 5C + laporan akhir Fase 5 (status Tahap UP-1 dicatat, bukan syarat) | MAKE-054 | Reviewer (+ Coder D dokumen) | No. 15 | ✅ `docs/fase5/Laporan_Akhir_Fase5.md` | Horii |
-| 16a | QA Lapis 1 FE 5A (`Checklist_QA_Lapis1_FE5A_Q5A-18.md`; GPS perangkat nyata → blocker go-live) | (MAKE-054) | Reviewer | — | Todo | — |
+| 16a | QA Lapis 1 FE 5A (`Checklist_QA_Lapis1_FE5A_Q5A-18.md`; GPS perangkat nyata → blocker go-live) | (MAKE-054) | Reviewer | — | ✅ Lolos dengan temuan rendah T5A-01..04 | — |
 | 17 | Sign-off Fase 5 | — | Horii | No. 16, 16a | ⛔ | — |
 | 18 | Sinkron Trello DEV-006 / QASMTASK-076..088 + Notion | — | Reviewer | Tiap merge / sign-off | Berjalan | — |
 

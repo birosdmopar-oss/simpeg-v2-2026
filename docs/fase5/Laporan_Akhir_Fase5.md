@@ -4,9 +4,9 @@ Acuan: PRD 5A v1.1, PRD 5B v1.0, PRD 5C v1.1 (§7.7 MAKE-054, §8 AC, §5.1 K5C-
 §6–§7 (Tahap UP-1, prasyarat Fase 6). Disusun 29-10-2026 dari `main` `6c116ac` (seluruh paket koding 5A, 5B, 5C dan
 perbaikan QA CR-075..081 sudah di `main`).
 
-> **Status:** 5A sign-off Horii 28-10-2026, 5B sign-off 29-10-2026, 5C seluruh AC berbukti (§3) dan QA Lapis 1 5C
-> **lolos** (§4). **Sign-off Fase 5 oleh Horii** menunggu laporan ini dan satu butir terbuka di §7 (QA Lapis 1 FE 5A,
-> Q5A-18). Uji paritas UP-1 **bukan** syarat sign-off Fase 5 (K5C-10); UP-1 menjadi gerbang masuk Fase 6. Fase 5 DONE
+> **Status:** 5A sign-off Horii 28-10-2026, 5B sign-off 29-10-2026, 5C seluruh AC berbukti (§3), QA Lapis 1 5C
+> **lolos** (§4), QA Lapis 1 FE 5A (Q5A-18) **lolos dengan temuan rendah** (§4.1). **Sign-off Fase 5 oleh Horii**
+> menunggu keputusan atas butir §7. Uji paritas UP-1 **bukan** syarat sign-off Fase 5 (K5C-10); UP-1 menjadi gerbang masuk Fase 6. Fase 5 DONE
 > **tidak** berarti siap go-live: blocker go-live di §8 tetap berlaku.
 
 ## 1. Laporan
@@ -14,7 +14,7 @@ perbaikan QA CR-075..081 sudah di `main`).
 ```
 Status: 5A DONE (sign-off 28-10-2026), 5B DONE (sign-off 29-10-2026),
         5C: D-12 sisa (FE laporan), D-13 suite, MAKE-053 penutup — semua di main; QA Lapis 1 5C LOLOS;
-        D-12 FE 5A: QA Lapis 1 (Q5A-18) belum dijalankan (§7)
+        D-12 FE 5A: QA Lapis 1 (Q5A-18) LOLOS dengan temuan rendah T5A-01..04 (§4.1, §7)
 Branch/SHA/CI: main 6c116ac — gate penuh ./check.sh lolos pada 6c116ac (2.988 PHPUnit, 1.436 Vitest, build);
                CI Quality gate #421 hijau. Laporan ini: docs saja (docs/make-054-laporan-akhir-fase5)
 Berkas utama: §2
@@ -74,7 +74,7 @@ Path FE relatif ke `frontend/src/features/presensi/__tests__/`, BE relatif ke `b
 | 084 | D-09b rekap kehadiran & uang makan (BE + FE) | Laporan 5B §3 D-09b; FE §3, QA §H |
 | 085 | D-10 impor Slip Gaji | Laporan 5A §3 D-10 |
 | 086 | D-11 Slip Gaji + D-09a uang makan slip | Laporan 5A §3 D-11, Laporan 5B §3 D-09a |
-| 087 | D-12 FE (5A + 5C), color-coding, map picker | FE 5A: Laporan 5A §3 FE 5A (QA Lapis 1 5A terbuka, §7); FE 5C: §3, §4; map picker: §6 |
+| 087 | D-12 FE (5A + 5C), color-coding, map picker | FE 5A: Laporan 5A §3 FE 5A + QA Lapis 1 FE 5A §4.1; FE 5C: §3, §4; map picker: §6 |
 | 088 | D-13 regresi | §3 AC-D13.1 |
 | (kartu baru) | D-14 verifikasi QR publik | Laporan 5A §3 D-14 |
 
@@ -90,6 +90,19 @@ Checklist `docs/fase5/Checklist_QA_Lapis1_Fase5C.md` (hasil diisi per butir). Di
 | Role 1 + QA ulang | 14 temuan (T-01..T-15, T-08 batal): T-01..T-09 perilaku/tampilan FE, T-10/T-11 tata letak (temuan Horii), T-12..T-15 dari QA ulang (regresi CR-077, layar sempit, kepadatan, picker meluap) |
 | Penutupan | CR-077 + CR-078 (`7eac943`), CR-079 (`e9027e5`), CR-081 (`6c116ac`); semua diverifikasi ulang di demo |
 | Map picker | I1/I2 lolos (geolokasi disimulasikan di halaman; tanpa permintaan ke penyedia peta) |
+
+### 4.1 QA Lapis 1 FE 5A (Q5A-18, AC-FE.9)
+
+Checklist `docs/fase5/Checklist_QA_Lapis1_FE5A_Q5A-18.md` (hasil diisi per butir). Dijalankan reviewer CR di app demo
+pada `6c116ac` untuk role 1, 2, 3, 6 (menu role 4/5/7/8 dari QA 5C), data slip sintetis lewat impor UI, geolokasi
+disimulasikan di halaman (pengaturan browser tidak diubah).
+
+| Hasil | Rincian |
+|---|---|
+| Lolos | Menu & 403 per role, Slip Gaji (empat keadaan, gerbang tanggal 4, modal buka sekali, isi A/B/C tanpa Pajak TK, muat ulang tanpa nominal, Cetak PDF), PDF (legacy `0cf7e67`, QR hanya bila dibuka), Kelola Slip (monitoring, detail, koreksi 28 kolom, buka ulang, ajakan impor), Impor (validasi berkas, filter periode, pratinjau galat/duplikat, timpa bawaan, simpan), Presensi Saya (jam lokal, status lokasi, radius, jendela waktu, pegawai tanpa aturan), Data Presensi (lingkup, detail, tambah/ubah/hapus manual, detik tetap), Verifikasi publik (pesan seragam, nama tersamar, 429, `noindex`) |
+| Temuan rendah | T5A-01 verifikasi tidak memuat ulang saat token berganti di SPA; T5A-02 label baris ganda di rincian galat impor; T5A-03 zona kosong QR minim (pindai fisik belum); T5A-04 fokus ke BODY setelah aksi ⋮ yang memuat ulang daftar (Kelola Slip, Data Presensi) |
+| Deviasi | D-01 PDF ikut legacy, bukan PNG Figma export PDF yang lebih lama; D-02 pilihan periode admin memuat periode masa depan yang sudah diimpor |
+| Tidak teruji di demo | G3/G4 GPS perangkat nyata lewat HTTPS, pindai QR fisik → blocker go-live §8 butir 4; F6 409 hanya pada balapan (BE `ImporSlipKonflikUniqueTest`) |
 
 ## 5. Status Tahap UP-1 (dicatat, bukan syarat sign-off Fase 5 — K5C-10)
 
@@ -127,7 +140,9 @@ Keputusan pelaksanaan 5C lengkap di PRD 5C §5.1 (K5C-1..K5C-10). Ringkas:
 
 | No | Butir | Keterangan | Usulan reviewer |
 |---|---|---|---|
-| 1 | **QA Lapis 1 FE 5A (Q5A-18, AC-FE.9)** | Checklist `Checklist_QA_Lapis1_FE5A_Q5A-18.md` sudah ada sejak 28-10, tetapi belum dijalankan. Halaman 5A (Slip Gaji, Kelola Slip, Impor, Verifikasi, Presensi Saya, Data Presensi) hanya tersentuh sebagian di QA 5C (Presensi Saya I1/I2, T-15). D-12 FE 5A masih IN_PROGRESS | Jalankan di app demo (desktop + 390 px) sebelum sign-off; uji GPS perangkat nyata lewat HTTPS (Q5A-22) dipindah ke blocker go-live §8 butir 4 |
+| 1 | Temuan rendah QA FE 5A T5A-01, T5A-02, T5A-04 | Perbaikan FE kecil (muat ulang saat token berganti, label galat impor, fokus ⋮ saat daftar dimuat ulang) | Satu CR (CR-082) sebelum sign-off, **atau** sign-off dengan temuan dicatat lalu CR-082 sesudahnya — keputusan Horii |
+| 2 | D-01 PDF slip: legacy vs PNG Figma | PDF v2 = tata letak legacy `0cf7e67` (keputusan CR-067 ikut legacy); PNG Figma export PDF versi lebih lama | Tetap ikut legacy (tidak ada perubahan); ubah ke Figma = CR baru |
+| 3 | T5A-03 zona kosong QR | Belum terbukti mengganggu | Pindai fisik di uji perangkat (§8 butir 4); CR bila gagal terbaca |
 
 Tidak ada pertanyaan ⛔ 5C lain yang terbuka (Q5C-01, Q5C-03, Q5C-06, Q5C-09 diputus; Q5C-02/04/05/07/08 ◻ default berlaku).
 
@@ -139,7 +154,7 @@ Tidak ada pertanyaan ⛔ 5C lain yang terbuka (Q5C-01, Q5C-03, Q5C-06, Q5C-09 di
    akun bootstrap admin saat impor (catatan MAKE-056).
 3. **Data produksi:** checksum kode legacy produksi (Q5A-14 / Q5B-15); nama `jenis_pegawai` id 6 (Q5A-25); cek ulang
    `gaji_pegawai` (DEPLOY-002.1); isi `penyesuaian_tukin` (lewat CRUD), tarif uang makan dan `gol_pppk` produksi.
-4. **Uji perangkat:** GPS perangkat nyata lewat HTTPS (Q5A-22).
+4. **Uji perangkat:** GPS perangkat nyata lewat HTTPS (Q5A-22, checklist FE 5A G3/G4); pindai QR slip fisik (T5A-03).
 5. **Konfirmasi bisnis:** Q5B-01 (Biro SDM/Keuangan X-1, X-5, X-6, X-10, X-12), Q5B-03 (penanda TB uang makan), Q5B-19
    (uang makan PTT/golongan di luar I–IV).
 6. **Runbook 5B:** R5B-1 (audit DBV-024 C-2), R5B-3 (batas PDF diukur di produksi), R5B-4 (id unit penanda tangan) —
