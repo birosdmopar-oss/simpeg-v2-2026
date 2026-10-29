@@ -30,6 +30,8 @@ use InvalidArgumentException;
  *      `tmtsk_pangkat` bila setelah hari kerja pertama periode (`$firstDayHK_CM`, via `HariKerja`); selain itu null.
  *      [V2] cabang PPPK rekap mengenali PPPK lewat id (legacy :12707 lewat nama `jenis_pegawai == 'PPPK'`): nama master
  *      dapat diubah lewat CRUD, cek nama bisa gagal diam-diam.
+ *   4. [K T-02, CR-083, keputusan Horii 29-10] CPNS dengan `tmtsk_pangkat` kosong → `lewatiLoopHarian` (seluruh hari
+ *      loop harian dilewati; rincian di {@see DataPegawaiTukin}).
  * - `tmtKeluar` = `pegawai.tmt_status` bila `pegawai.status = 2` [V2 README Tukin].
  *
  * Varian massal {@see self::untukBanyak()} (MAKE-039, keputusan reviewer CR M0 F1 — deviasi aditif PRD 5B §3.3): aturan
@@ -61,11 +63,14 @@ final class SumberDataPegawaiTukin
         }
 
         try {
+            $baru = $this->pegawaiBaruDariDb($nip, $pegawai, $periode, $hariLibur);
+
             return new DataPegawaiTukin(
                 $this->predikatSkp($nip, $idPeriodeBkn),
                 $this->jumlahAnak($nip, $periode->akhir),
-                $this->tmtMasuk($nip, $pegawai, $periode, $hariLibur),
+                $baru['tmtMasuk'],
                 (int) $pegawai['status'] === 2 && $pegawai['tmt_status'] !== null ? (string) $pegawai['tmt_status'] : null,
+                $baru['lewatiLoopHarian'],
             );
         } catch (InvalidArgumentException $e) {
             throw new DataTukinTidakSah("Data pegawai {$nip} untuk Tukin tidak sah: " . $e->getMessage(), 0, $e);
@@ -123,11 +128,13 @@ final class SumberDataPegawaiTukin
                 [$golRuang, $tmt] = self::pangkatDari($kp[$n] ?? [], $periode, (string) ($p['created_at'] ?? ''));
 
                 try {
+                    $baru      = self::pegawaiBaru($golRuang, $tmt, (int) ($p['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK, $mutasi[$n][0] ?? null, $periode, $hariLibur);
                     $hasil[$n] = new DataPegawaiTukin(
                         $skp[$n] ?? null,
                         $anak[$n] ?? 0,
-                        self::tentukanTmtMasuk($golRuang, $tmt, (int) ($p['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK, $mutasi[$n][0] ?? null, $periode, $hariLibur),
+                        $baru['tmtMasuk'],
                         (int) $p['status'] === 2 && $p['tmt_status'] !== null ? (string) $p['tmt_status'] : null,
+                        $baru['lewatiLoopHarian'],
                     );
                 } catch (InvalidArgumentException $e) {
                     $hasil[$n] = new DataTukinTidakSah("Data pegawai {$n} untuk Tukin tidak sah: " . $e->getMessage(), 0, $e);
@@ -178,6 +185,17 @@ final class SumberDataPegawaiTukin
      */
     public function tmtMasuk(string $nip, array $pegawai, PeriodeTukin $periode, array $hariLibur): ?string
     {
+        return $this->pegawaiBaruDariDb($nip, $pegawai, $periode, $hariLibur)['tmtMasuk'];
+    }
+
+    /**
+     * @param array<string, mixed> $pegawai baris `pegawai` (id_jenis_pegawai, created_at)
+     * @param list<string>         $hariLibur
+     *
+     * @return array{tmtMasuk: string|null, lewatiLoopHarian: bool}
+     */
+    private function pegawaiBaruDariDb(string $nip, array $pegawai, PeriodeTukin $periode, array $hariLibur): array
+    {
         [$golRuang, $tmt] = $this->pangkat($nip, $periode, (string) ($pegawai['created_at'] ?? ''));
 
         $pppk    = (int) ($pegawai['id_jenis_pegawai'] ?? 0) === Jabatan::JENIS_PEGAWAI_PPPK;
@@ -196,16 +214,21 @@ final class SumberDataPegawaiTukin
                 ->getRowArray();
         }
 
-        return self::tentukanTmtMasuk($golRuang, $tmt, $pppk, is_array($jabatan) ? $jabatan : null, $periode, $hariLibur);
+        return self::pegawaiBaru($golRuang, $tmt, $pppk, is_array($jabatan) ? $jabatan : null, $periode, $hariLibur);
     }
 
     /**
-     * Aturan `tmtMasuk` bersama jalur tunggal & massal (lihat docblock kelas butir 1–3).
+     * Aturan pegawai baru bersama jalur tunggal & massal (lihat docblock kelas butir 1–4): `tmtMasuk`, dan
+     * `lewatiLoopHarian` untuk CPNS tanpa TMT (butir 4, T-02). Publik agar cabang T-02 dapat diuji langsung:
+     * `riwayat_kp.tmtsk` `NOT NULL` dan disaring `tmtsk <=` (legacy sama, `L_employee.php:6439`), sehingga lewat basis
+     * data `gol_ruang` CPNS selalu membawa TMT.
      *
      * @param array<string, mixed>|null $jabatanPppk baris `riwayat_mutasi_jabatan` PPPK terakhir (`gol_pppk`, `tmtsk`)
      * @param list<string>              $hariLibur
+     *
+     * @return array{tmtMasuk: string|null, lewatiLoopHarian: bool}
      */
-    private static function tentukanTmtMasuk(string $golRuang, string $tmt, bool $pppk, ?array $jabatanPppk, PeriodeTukin $periode, array $hariLibur): ?string
+    public static function pegawaiBaru(string $golRuang, string $tmt, bool $pppk, ?array $jabatanPppk, PeriodeTukin $periode, array $hariLibur): array
     {
         if ($pppk && $jabatanPppk !== null) {
             $golRuang = (string) ($jabatanPppk['gol_pppk'] ?? '');
@@ -213,16 +236,47 @@ final class SumberDataPegawaiTukin
         }
 
         if (strlen($golRuang) > 5 && strtoupper(substr($golRuang, 0, 4)) === 'CPNS') {
-            return $tmt !== '' ? $tmt : null;
+            return $tmt !== '' ? ['tmtMasuk' => $tmt, 'lewatiLoopHarian' => false] : ['tmtMasuk' => null, 'lewatiLoopHarian' => true];
         }
 
         if ($pppk && $tmt !== '') {
             $pertama = HariKerja::daftar($periode, $hariLibur)[0] ?? null;
 
-            return $pertama !== null && $tmt > $pertama ? $tmt : null;
+            return ['tmtMasuk' => $pertama !== null && $tmt > $pertama ? $tmt : null, 'lewatiLoopHarian' => false];
         }
 
-        return null;
+        return ['tmtMasuk' => null, 'lewatiLoopHarian' => false];
+    }
+
+    /**
+     * NIP yang data hariannya (cuti, TB, konket, presensi) tidak dimuat [K T-01, CR-083, keputusan Horii 29-10]: legacy
+     * memuat keempatnya hanya bila `peg.created_at < '<akhir periode BKN>'` (`L_presensi.php:12209`, `:12283`, `:12346`,
+     * `:12383`) — DATETIME dibanding string tanggal (= tanggal itu pukul 00:00:00), sehingga pegawai yang dibuat pada hari
+     * terakhir periode, pukul berapa pun, tidak punya data harian. Populasi tetap `DATE(created_at) <= akhir`
+     * (`L_employee.php:6414`), jadi pegawai itu masuk rekap dengan semua hari kerja TK. Saringan di sini dibatasi pada
+     * irisan keduanya, `DATE(created_at) = akhir`: pegawai yang dibuat setelah akhir periode tidak masuk populasi rekap
+     * legacy, sehingga laporan per pegawai v2 (yang memakai kalkulasi rekap, K-1) untuknya tidak diubah;
+     * `pegawai.created_at` v2 `NOT NULL`.
+     *
+     * @param list<string> $nip
+     *
+     * @return list<string>
+     */
+    public function tanpaDataHarian(array $nip, PeriodeTukin $periode): array
+    {
+        $hasil = [];
+
+        foreach (array_chunk(array_values(array_unique(array_map('strval', $nip))), self::BATCH_NIP) as $batch) {
+            foreach ($this->db->table('pegawai')
+                ->select('nip')
+                ->whereIn('nip', $batch)
+                ->where('DATE(created_at)', $periode->akhir)
+                ->get()->getResultArray() as $b) {
+                $hasil[] = (string) $b['nip'];
+            }
+        }
+
+        return $hasil;
     }
 
     /**

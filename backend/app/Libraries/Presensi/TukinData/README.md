@@ -57,6 +57,7 @@ Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest` (AC-D06.1/.2/.6), `Cuti
 | TMT keluar | `pegawai.tmt_status` bila `pegawai.status = 2` | [V2] README Tukin |
 | TMT masuk | Lihat bagian berikut | [K] + satu [V2] |
 | Konket | `absen_ijin` `status = 'V'`, `affect_tukin = 1`, rentang `DATE(date_start)`..`DATE(date_end)` beririsan; setiap tanggal mendapat `{affect_tukin, kategori}`; tanggal tumpang tindih → baris terakhir menurut `date_start` naik | [K] `L_presensi.php:12343-12373` |
+| **T-01** pegawai dibuat pada hari terakhir periode | Cuti, TB, konket, dan presensi hanya dimuat bila `peg.created_at < '<akhir periode BKN>'` — DATETIME dibanding string tanggal (= pukul 00:00:00) — padahal populasi rekap `DATE(created_at) <= akhir` (`L_employee.php:6414`). Pegawai yang dibuat pada hari terakhir periode, pukul berapa pun, masuk rekap tanpa data harian: `harian = []`, semua hari kerja TK; data tidak sah miliknya juga tidak dibaca. `SumberDataPegawaiTukin::tanpaDataHarian` (satu kueri per 500 NIP) dipakai `TukinDataService::siapkan`/`siapkanBanyak`. Saringan dibatasi `DATE(created_at) = akhir` (irisan populasi dan saringan legacy); pegawai yang dibuat setelah akhir periode tidak masuk populasi rekap legacy, jadi laporan per pegawai v2 untuknya tidak diubah. CR-083, keputusan Horii 29-10 | [K] `L_presensi.php:12209`, `:12283`, `:12346`, `:12383` |
 | Presensi | `dh_online` per `tgl` dalam [awal periode sebelumnya, akhir periode], **tanpa saring `sumber`** (online, manual, impor legacy sama); `jam_masuk`/`jam_pulang` lokal apa adanya → `{masuk, pulang}`, NULL → null; tanggal tanpa baris → tanpa kunci `presensi` (library: TK); jam di luar 00:00:00–23:59:59 → `DataTukinTidakSah`. Legacy memuat bulan kalender N−1 dan N (`MONTH/YEAR(tgl)`); periode berjalan 16–15 tercakup penuh, hari periode sebelumnya hanya dipakai lookback cuti sakit yang tidak membaca presensi | [K] `L_presensi.php:12376-12391`, `:12850-12851` |
 
 ## TMT masuk pegawai baru (keputusan reviewer CR 20-10-2026)
@@ -76,6 +77,12 @@ Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest` (AC-D06.1/.2/.6), `Cuti
    `pegawai.jenis_pegawai == 'PPPK'` seperti legacy `L_presensi.php:12707`. Alasan: nama master `jenis_pegawai` dapat
    diubah Super Admin lewat CRUD, sehingga cek nama bisa gagal diam-diam dan membuat potongan Tukin salah; legacy sendiri
    memakai id di tempat lain (`:12621`, `L_employee.php:6580`). Satu pengenal (id 6) dipakai di semua langkah.
+5. **T-02** [K] (CR-083, keputusan Horii 29-10): CPNS (langkah 3) dengan `tmtsk_pangkat` kosong → `tmtMasuk = null`
+   dan `lewatiLoopHarian = true` — legacy `new DateTime('')` = saat ekspor, sehingga seluruh hari loop harian dilewati
+   (rincian di README `Presensi/Tukin`). `L_presensi.php:12703-12705`, `:12739-12743`. Catatan: lewat basis data cabang
+   ini tidak terbentuk karena `riwayat_kp.tmtsk` `NOT NULL` dan disaring `tmtsk <=` (legacy sama, `L_employee.php:6439`),
+   sehingga `gol_ruang` CPNS selalu membawa TMT; aturan ditanam agar setara bila data impor berbeda. PPPK tanpa TMT
+   (legacy `:12707-12710` juga `new DateTime('')`) **tidak** diubah CR-083 — menunggu keputusan.
 
 Risiko yang tercatat: hasil langkah 1–2 bergantung pada kelengkapan `riwayat_kp`/`riwayat_mutasi_jabatan` hasil impor;
 butir cutover dicatat reviewer CR di PRD 5A dan runbook impor.

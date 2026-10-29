@@ -126,10 +126,44 @@ final class TukinDataMassalTest extends DatabaseTestCase
         $this->assertCount(count($banyak), $kBanyak[0]);
         $this->assertSame($kSedikit[1], $kBanyak[1], "kueri {$kSedikit[1]} untuk " . count($sedikit) . " NIP vs {$kBanyak[1]} untuk " . count($banyak) . ' NIP');
 
-        // Batch lebih kecil: kueri per batch berulang, tetap tidak per NIP.
-        [, $kBatch] = $this->hitungKueri(static fn () => $service->siapkanBanyak($banyak, 2026, 4, null, 10));
+        // Batch lebih kecil: kueri per batch berulang, tetap tidak per NIP (CR-083: batch 15, bukan 10 — dengan ±10 kueri per
+        // batch, batch 10 membuat batas "< jumlah NIP" terlalu sempit untuk satu kueri tambahan T-01).
+        [, $kBatch] = $this->hitungKueri(static fn () => $service->siapkanBanyak($banyak, 2026, 4, null, 15));
         $this->assertLessThan(count($banyak), $kBatch);
         $this->assertGreaterThan($kBanyak[1], $kBatch);
+    }
+
+    /**
+     * CR-083 T-01 [K]: pegawai yang dibuat pada hari terakhir periode BKN (`created_at` tidak < 'akhir') tidak dimuat
+     * cuti/TB/konket/presensinya (`L_presensi.php:12209`, `:12283`, `:12346`, `:12383`) — termasuk data tidak sah, yang
+     * karenanya tidak menjadi galat. Jalur tunggal dan massal sama; sehari sebelumnya dimuat.
+     */
+    public function testT01DibuatPadaHariTerakhirPeriodeTanpaDataHarian(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        $akhir = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 23:59:59']);
+        $this->presensiHadir($akhir, '2026-03-16');
+        $this->cuti($akhir, 1, '2026-03-17', '2026-03-17');
+
+        $rusak = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 00:00:00']);
+        $this->db->table('dh_online')->insert(['nip' => $rusak, 'tgl' => '2026-03-16', 'jam_masuk' => '25:00:00', 'sumber' => 1]);
+        $this->cuti($rusak, 7, '2026-03-17', '2026-03-17');
+
+        $sebelum = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-14 23:59:59']);
+        $this->presensiHadir($sebelum, '2026-03-16');
+
+        $massal = $this->serviceTukinFase4()->siapkanBanyak([$akhir, $rusak, $sebelum], 2026, 4);
+
+        foreach ([$akhir, $rusak] as $n) {
+            $this->assertInstanceOf(ArgumenTukin::class, $massal[$n], $n);
+            $this->assertSame([], $massal[$n]->harian, "{$n}: tanpa data harian");
+            $this->assertEquals($this->serviceTukinFase4()->siapkan($n, 2026, 4), $massal[$n], "{$n}: tunggal = massal");
+        }
+
+        $this->assertInstanceOf(ArgumenTukin::class, $massal[$sebelum]);
+        $this->assertArrayHasKey('2026-03-16', $massal[$sebelum]->harian, 'sehari sebelum akhir: dimuat');
+        $this->assertSame([$akhir, $rusak], (new SumberDataPegawaiTukin($this->db))->tanpaDataHarian([$akhir, $rusak, $sebelum], PeriodeTukin::dariBulan(2026, 4)));
     }
 
     public function testKonfigurasiBelumLengkapSemuaNipGalat(): void

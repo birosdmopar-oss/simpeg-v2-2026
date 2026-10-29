@@ -16,6 +16,10 @@ use InvalidArgumentException;
  * - `tmtMasuk`: hari sebelum tanggal ini di luar masa kerja (pegawai baru, :12699-12716, :12738-12742). Adapter mengisi
  *   sesuai syarat legacy: CPNS (`gol_ruang` diawali "CPNS"), atau PPPK dengan TMT setelah hari kerja pertama periode.
  * - `tmtKeluar`: [V2] hari pada/sesudah `pegawai.tmt_status` (status 2) di luar masa kerja; legacy tidak membatasinya.
+ * - `lewatiLoopHarian`: [K T-02, CR-083] CPNS tanpa `tmtsk_pangkat` — legacy `new DateTime('')` = saat ekspor
+ *   (:12703-12705), dan `$dt < $dtTmtPegBaru` (:12739-12743) benar untuk setiap hari loop (tanggal 00:00 < saat ekspor;
+ *   loop dipotong ke hari ini, :11881-11885), sehingga **seluruh** hari loop harian dilewati tanpa potongan. Cek cuti
+ *   sepanjang periode tidak terpengaruh (legacy hanya melewati hari sebelum `tmtsk_pangkat` yang tidak kosong, :12667).
  */
 final readonly class DataPegawaiTukin
 {
@@ -24,6 +28,7 @@ final readonly class DataPegawaiTukin
         public int $jumlahAnak = 0,
         public ?string $tmtMasuk = null,
         public ?string $tmtKeluar = null,
+        public bool $lewatiLoopHarian = false,
     ) {
         if ($jumlahAnak < 0) {
             throw new InvalidArgumentException('Jumlah anak tidak boleh negatif.');

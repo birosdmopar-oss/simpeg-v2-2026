@@ -20,6 +20,10 @@ use LogicException;
  * konfigurasi dihitung sekali; harian & data pegawai dimuat per batch `Config\Presensi::$tukinBatchNip` NIP dengan jumlah
  * kueri tetap; galat per pegawai tidak menggagalkan seluruh laporan. Urutan galat per NIP sama dengan `siapkan()`
  * (harian → konfigurasi → data pegawai).
+ *
+ * [K T-01, CR-083] Pegawai yang `created_at`-nya tidak sebelum akhir periode BKN (hari terakhir periode, jam apa pun)
+ * tidak dimuat data hariannya (`harian = []`, semua hari kerja TK), seperti legacy; lihat
+ * {@see SumberDataPegawaiTukin::tanpaDataHarian()}.
  */
 final class TukinDataService
 {
@@ -78,7 +82,7 @@ final class TukinDataService
         return new ArgumenTukin(
             $periode,
             $libur,
-            $this->harian->untuk($nip, $awal, $periode->akhir),
+            $this->dataPegawai->tanpaDataHarian([$nip], $periode) === [] ? $this->harian->untuk($nip, $awal, $periode->akhir) : [],
             $this->konfigurasi->untuk($periode),
             $this->dataPegawai->untuk($nip, $periode, $bkn['id'] ?? null, $libur),
         );
@@ -115,10 +119,11 @@ final class TukinDataService
         }
 
         $batas = max(1, $ukuranBatch ?? config(Presensi::class)->tukinBatchNip);
+        $tanpa = $this->dataPegawai->tanpaDataHarian($unik, $periode);
         $hasil = [];
 
         foreach (array_chunk($unik, $batas) as $batch) {
-            $harian  = $this->harian->untukBanyak($batch, $awal, $periode->akhir);
+            $harian  = $this->harian->untukBanyak(array_values(array_diff($batch, $tanpa)), $awal, $periode->akhir);
             $pegawai = $this->dataPegawai->untukBanyak($batch, $periode, $bkn['id'] ?? null, $libur);
 
             foreach ($batch as $n) {
