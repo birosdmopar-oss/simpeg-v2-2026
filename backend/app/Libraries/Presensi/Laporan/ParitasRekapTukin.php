@@ -19,6 +19,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * kolom), sama. Keterangan tidak dibandingkan (teks legacy berisi `<br/>` dan teks penyesuaian hard-code), hanya dibawa
  * untuk telaah. Hasil memakai **NIP tersamar** (`#` + 8 heksa SHA-256) kecuali diminta penuh — laporan paritas tanpa data
  * pribadi (Q5C-06).
+ *
+ * Rekap IL (CR-085): legacy `laporan_tukin_us_skp_il` memakai kode ekspor XLSX yang sama (`L_presensi.php:15097-15440`),
+ * jadi pembacaannya sama; jenis berkas dikenali lewat judul A1 ({@see self::jenisBerkas()}) agar DH tidak dibandingkan
+ * dengan IL.
  */
 final class ParitasRekapTukin
 {
@@ -47,6 +51,32 @@ final class ParitasRekapTukin
         $pembaca->setReadDataOnly(true);
 
         return self::bacaSheet($pembaca->load($path)->getActiveSheet());
+    }
+
+    /**
+     * Jenis rekap menurut judul A1: v2 IL "… INSTANSI LAIN" ({@see RekapTukinService}); legacy IL "LAPORAN TUNJANGAN
+     * KINERJA" dengan baris kedua (nama unit/satker) kosong karena `$data['namaUnitSatker']` tidak diisi di
+     * `laporan_tukin_us_skp_il` (:15101); selain itu DH.
+     *
+     * @return 'il'|'dh'
+     */
+    public static function jenisBerkas(string $path): string
+    {
+        if (! is_file($path)) {
+            throw new InvalidArgumentException("Berkas tidak ditemukan: {$path}");
+        }
+
+        $pembaca = IOFactory::createReaderForFile($path);
+        $pembaca->setReadDataOnly(true);
+        $judul = (string) $pembaca->load($path)->getActiveSheet()->getCell('A1')->getValue();
+
+        if (str_contains(strtoupper($judul), 'INSTANSI LAIN')) {
+            return 'il';
+        }
+
+        $baris = explode("\n", $judul);
+
+        return str_starts_with(strtoupper(trim($baris[0])), 'LAPORAN TUNJANGAN KINERJA') && count($baris) > 1 && trim($baris[1]) === '' ? 'il' : 'dh';
     }
 
     /**

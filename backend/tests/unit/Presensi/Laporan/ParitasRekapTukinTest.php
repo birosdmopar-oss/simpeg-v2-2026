@@ -162,6 +162,33 @@ final class ParitasRekapTukinTest extends CIUnitTestCase
     }
 
     /**
+     * CR-085: rekap IL — legacy `laporan_tukin_us_skp_il` memakai kode ekspor yang sama dengan DH (judul A1 tanpa nama
+     * unit: baris kedua kosong), v2 berjudul "… INSTANSI LAIN". `--il` mewajibkan kedua berkas rekap IL; tanpa `--il`
+     * keduanya wajib DH; campuran → 2.
+     */
+    public function testRekapIlDanPenjagaJenisBerkas(): void
+    {
+        $legacyIl = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0]], "LAPORAN TUNJANGAN KINERJA\n\nPeriode: September 2026");
+        $v2Il     = $this->xlsxV2([$this->baris('199001012020011001', 1.5)], 'LAPORAN TUNJANGAN KINERJA INSTANSI LAIN');
+        $legacyDh = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0]], "LAPORAN TUNJANGAN KINERJA\nBIRO UJI\nPeriode: September 2026");
+        $v2Dh     = $this->xlsxV2([$this->baris('199001012020011001', 1.5)]);
+
+        $this->assertSame(['il', 'il', 'dh', 'dh'], array_map(ParitasRekapTukin::jenisBerkas(...), [$legacyIl, $v2Il, $legacyDh, $v2Dh]));
+
+        $this->resetStreamFilterBuffer();
+        $this->assertSame(0, $this->jalankan([$legacyIl, $v2Il, 'il' => null]));
+        $this->assertStringContainsString('Rekap IL — baris legacy: 1, v2: 1 | sama: 1', $this->getStreamFilterBuffer());
+
+        $this->assertSame(0, $this->jalankan([$legacyDh, $v2Dh]), 'DH tanpa --il tetap');
+
+        foreach (['IL tanpa --il' => [$legacyIl, $v2Il], 'DH dengan --il' => [$legacyDh, $v2Dh, 'il' => null], 'campuran' => [$legacyIl, $v2Dh, 'il' => null]] as $kasus => $params) {
+            $this->resetStreamFilterBuffer();
+            $this->assertSame(2, $this->jalankan($params), $kasus);
+            $this->assertStringContainsString('bukan rekap', $this->getStreamFilterBuffer(), $kasus);
+        }
+    }
+
+    /**
      * @param array<int|string, string|null> $params
      */
     private function jalankan(array $params): int
@@ -187,10 +214,10 @@ final class ParitasRekapTukinTest extends CIUnitTestCase
     /**
      * @param list<array<string, mixed>> $baris
      */
-    private function xlsxV2(array $baris): string
+    private function xlsxV2(array $baris, string $judul = 'Laporan Tunjangan Kinerja'): string
     {
         $path = $this->berkas[] = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'paritas_' . bin2hex(random_bytes(4)) . '.xlsx';
-        file_put_contents($path, EksporTukinXlsx::rekap('Laporan Tunjangan Kinerja', 'Kementerian', 'September 2026', $baris, ['kasus' => 'menteri', 'jabatan' => 'Menteri', 'nama' => 'Pejabat Uji', 'nip' => '']));
+        file_put_contents($path, EksporTukinXlsx::rekap($judul, 'Kementerian', 'September 2026', $baris, ['kasus' => 'menteri', 'jabatan' => 'Menteri', 'nama' => 'Pejabat Uji', 'nip' => '']));
 
         return $path;
     }
@@ -200,11 +227,15 @@ final class ParitasRekapTukinTest extends CIUnitTestCase
      *
      * @param list<array{0: string, 1: float, 2: float}> $baris NIP, TL, PSW
      */
-    private function xlsxLegacy(array $baris): string
+    private function xlsxLegacy(array $baris, ?string $judul = null): string
     {
         $buku  = new Spreadsheet();
         $sheet = $buku->getActiveSheet();
         $sheet->setCellValue('C7', 'NIP');
+
+        if ($judul !== null) {
+            $sheet->setCellValue('A1', $judul);
+        }
 
         foreach ($baris as $i => [$nip, $tl, $psw]) {
             $r = 9 + $i;
