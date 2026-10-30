@@ -21,8 +21,8 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * pribadi (Q5C-06).
  *
  * Rekap IL (CR-085): legacy `laporan_tukin_us_skp_il` memakai kode ekspor XLSX yang sama (`L_presensi.php:15097-15440`),
- * jadi pembacaannya sama; jenis berkas dikenali lewat judul A1 ({@see self::jenisBerkas()}) agar DH tidak dibandingkan
- * dengan IL.
+ * jadi pembacaannya sama. Jenis rekap ditentukan operator (`--il`); hanya berkas v2 yang divalidasi
+ * ({@see self::v2RekapIl()}) karena judul legacy IL tidak dapat dibedakan dari rekap DH lingkup kementerian.
  */
 final class ParitasRekapTukin
 {
@@ -54,13 +54,14 @@ final class ParitasRekapTukin
     }
 
     /**
-     * Jenis rekap menurut judul A1: v2 IL "… INSTANSI LAIN" ({@see RekapTukinService}); legacy IL "LAPORAN TUNJANGAN
-     * KINERJA" dengan baris kedua (nama unit/satker) kosong karena `$data['namaUnitSatker']` tidak diisi di
-     * `laporan_tukin_us_skp_il` (:15101); selain itu DH.
-     *
-     * @return 'il'|'dh'
+     * Berkas **v2** adalah rekap IL bila judul A1 memuat "INSTANSI LAIN" ({@see RekapTukinService}; [V2], legacy IL tidak
+     * menulisnya). Berkas legacy **tidak** dapat dikenali andal: `laporan_tukin_us_skp_il` menulis judul
+     * "LAPORAN TUNJANGAN KINERJA\n<NAMA KEMENTERIAN>\nPeriode: …" (`L_presensi.php:13803`, `:15101`) — sama persis dengan
+     * rekap DH lingkup kementerian (`:12075`, `:13143`); nama kementerian bisa kosong, dan judul DH unit/satker pun kosong
+     * bila unit tidak ditemukan (`:12015`, `:12102`). Karena itu jenis rekap ditentukan operator lewat `--il`; hanya berkas
+     * v2 yang divalidasi.
      */
-    public static function jenisBerkas(string $path): string
+    public static function v2RekapIl(string $path): bool
     {
         if (! is_file($path)) {
             throw new InvalidArgumentException("Berkas tidak ditemukan: {$path}");
@@ -68,15 +69,8 @@ final class ParitasRekapTukin
 
         $pembaca = IOFactory::createReaderForFile($path);
         $pembaca->setReadDataOnly(true);
-        $judul = (string) $pembaca->load($path)->getActiveSheet()->getCell('A1')->getValue();
 
-        if (str_contains(strtoupper($judul), 'INSTANSI LAIN')) {
-            return 'il';
-        }
-
-        $baris = explode("\n", $judul);
-
-        return str_starts_with(strtoupper(trim($baris[0])), 'LAPORAN TUNJANGAN KINERJA') && count($baris) > 1 && trim($baris[1]) === '' ? 'il' : 'dh';
+        return str_contains(strtoupper((string) $pembaca->load($path)->getActiveSheet()->getCell('A1')->getValue()), 'INSTANSI LAIN');
     }
 
     /**

@@ -17,8 +17,10 @@ use PhpOffice\PhpSpreadsheet\Reader\Exception as ReaderException;
  *
  *   php spark presensi:paritas-tukin <legacy.xlsx> <v2.xlsx> [--toleransi=0.01] [--csv=<path>] [--nip-penuh] [--il]
  *
- * `--il` = rekap Instansi Lain (CR-085): kedua berkas wajib berjudul rekap IL; tanpa `--il` keduanya wajib rekap DH
- * ({@see ParitasRekapTukin::jenisBerkas()}); campuran → kode keluar 2.
+ * `--il` = rekap Instansi Lain (CR-085): berkas v2 wajib rekap IL; tanpa `--il` berkas v2 wajib rekap DH
+ * menurut judul berkas **v2** ({@see ParitasRekapTukin::v2RekapIl()}); berkas legacy tidak dapat dikenali andal (judul
+ * legacy IL = judul DH lingkup kementerian), jadi pastikan berkas legacy diekspor dari menu Laporan Tukin Instansi Lain.
+ * Berkas v2 tidak cocok → kode keluar 2.
  *
  * Hanya membaca dua berkas lokal; tidak menyentuh database. Keluaran memakai NIP tersamar kecuali `--nip-penuh` (khusus
  * telaah lokal, jangan dibagikan). Kode keluar 0 = semua baris sama, 1 = ada temuan, 2 = masukan salah (termasuk opsi
@@ -38,7 +40,7 @@ class PresensiParitasTukin extends BaseCommand
         '--toleransi' => 'Selisih maksimum per kolom persen yang dianggap sama (bawaan 0.01)',
         '--csv'       => 'Tulis temuan ke berkas CSV',
         '--nip-penuh' => 'Tampilkan NIP penuh (telaah lokal saja; bawaan NIP tersamar)',
-        '--il'        => 'Bandingkan rekap Instansi Lain (kedua berkas wajib rekap IL)',
+        '--il'        => 'Bandingkan rekap Instansi Lain (berkas v2 wajib rekap IL; legacy dari menu Laporan Tukin Instansi Lain)',
     ];
 
     /**
@@ -69,12 +71,10 @@ class PresensiParitasTukin extends BaseCommand
         $jenis = isset($opsi['il']) ? 'il' : 'dh';
 
         try {
-            foreach (['legacy' => $legacy, 'v2' => $v2] as $sisi => $berkas) {
-                if (ParitasRekapTukin::jenisBerkas($berkas) !== $jenis) {
-                    CLI::error(sprintf('Berkas %s bukan rekap %s%s.', $sisi, strtoupper($jenis), $jenis === 'il' ? '' : ' (untuk rekap Instansi Lain pakai --il)'));
+            if (ParitasRekapTukin::v2RekapIl($v2) !== ($jenis === 'il')) {
+                CLI::error(sprintf('Berkas v2 bukan rekap %s%s.', strtoupper($jenis), $jenis === 'il' ? '' : ' (untuk rekap Instansi Lain pakai --il)'));
 
-                    return 2;
-                }
+                return 2;
             }
 
             $hasil = ParitasRekapTukin::bandingkan(ParitasRekapTukin::baca($legacy), ParitasRekapTukin::baca($v2), (float) $toleransi, $nipPenuh);

@@ -162,29 +162,33 @@ final class ParitasRekapTukinTest extends CIUnitTestCase
     }
 
     /**
-     * CR-085: rekap IL — legacy `laporan_tukin_us_skp_il` memakai kode ekspor yang sama dengan DH (judul A1 tanpa nama
-     * unit: baris kedua kosong), v2 berjudul "… INSTANSI LAIN". `--il` mewajibkan kedua berkas rekap IL; tanpa `--il`
-     * keduanya wajib DH; campuran → 2.
+     * CR-085: rekap IL — legacy `laporan_tukin_us_skp_il` memakai kode ekspor yang sama dengan DH dan menulis judul
+     * "LAPORAN TUNJANGAN KINERJA\n<NAMA KEMENTERIAN>\nPeriode: …" (`L_presensi.php:13803`, `:15101`) — sama dengan rekap DH
+     * lingkup kementerian (`:12075`), nama kementerian bisa kosong. Jenis rekap = `--il`; hanya berkas v2 ("… INSTANSI
+     * LAIN") yang divalidasi; berkas v2 tidak cocok → 2.
      */
-    public function testRekapIlDanPenjagaJenisBerkas(): void
+    public function testRekapIlDanPenjagaBerkasV2(): void
     {
-        $legacyIl = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0]], "LAPORAN TUNJANGAN KINERJA\n\nPeriode: September 2026");
-        $v2Il     = $this->xlsxV2([$this->baris('199001012020011001', 1.5)], 'LAPORAN TUNJANGAN KINERJA INSTANSI LAIN');
-        $legacyDh = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0]], "LAPORAN TUNJANGAN KINERJA\nBIRO UJI\nPeriode: September 2026");
-        $v2Dh     = $this->xlsxV2([$this->baris('199001012020011001', 1.5)]);
+        $legacyIl       = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0]], "LAPORAN TUNJANGAN KINERJA\nKEMENTERIAN UJI\nPeriode: September 2026");
+        $legacyIlKosong = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0]], "LAPORAN TUNJANGAN KINERJA\n\nPeriode: September 2026");
+        $v2Il           = $this->xlsxV2([$this->baris('199001012020011001', 1.5)], 'LAPORAN TUNJANGAN KINERJA INSTANSI LAIN');
+        $legacyDh       = $this->xlsxLegacy([['199001012020011001', 1.5, 1.0]], "LAPORAN TUNJANGAN KINERJA PNS\nBIRO UJI\nPeriode: September 2026");
+        $v2Dh           = $this->xlsxV2([$this->baris('199001012020011001', 1.5)]);
 
-        $this->assertSame(['il', 'il', 'dh', 'dh'], array_map(ParitasRekapTukin::jenisBerkas(...), [$legacyIl, $v2Il, $legacyDh, $v2Dh]));
+        $this->assertSame([true, false], [ParitasRekapTukin::v2RekapIl($v2Il), ParitasRekapTukin::v2RekapIl($v2Dh)]);
 
-        $this->resetStreamFilterBuffer();
-        $this->assertSame(0, $this->jalankan([$legacyIl, $v2Il, 'il' => null]));
-        $this->assertStringContainsString('Rekap IL — baris legacy: 1, v2: 1 | sama: 1', $this->getStreamFilterBuffer());
+        foreach (['nama kementerian terisi' => $legacyIl, 'nama kementerian kosong' => $legacyIlKosong] as $kasus => $legacy) {
+            $this->resetStreamFilterBuffer();
+            $this->assertSame(0, $this->jalankan([$legacy, $v2Il, 'il' => null]), $kasus);
+            $this->assertStringContainsString('Rekap IL — baris legacy: 1, v2: 1 | sama: 1', $this->getStreamFilterBuffer(), $kasus);
+        }
 
         $this->assertSame(0, $this->jalankan([$legacyDh, $v2Dh]), 'DH tanpa --il tetap');
 
-        foreach (['IL tanpa --il' => [$legacyIl, $v2Il], 'DH dengan --il' => [$legacyDh, $v2Dh, 'il' => null], 'campuran' => [$legacyIl, $v2Dh, 'il' => null]] as $kasus => $params) {
+        foreach (['v2 IL tanpa --il' => [$legacyIl, $v2Il], 'v2 DH dengan --il' => [$legacyIl, $v2Dh, 'il' => null]] as $kasus => $params) {
             $this->resetStreamFilterBuffer();
             $this->assertSame(2, $this->jalankan($params), $kasus);
-            $this->assertStringContainsString('bukan rekap', $this->getStreamFilterBuffer(), $kasus);
+            $this->assertStringContainsString('Berkas v2 bukan rekap', $this->getStreamFilterBuffer(), $kasus);
         }
     }
 
