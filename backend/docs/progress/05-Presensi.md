@@ -408,7 +408,16 @@ yang disetujui**; hasil yang dibagikan tanpa data pribadi. Prasyarat: DB v2 beri
    [V2] tercatat (README `Libraries/Presensi` & `TukinData`, PRD 5B §5.3/§13 — mis. F5B-17 tumpang tindih cuti, F5B-14
    penyesuaian dari tabel bukan hard-code, rentang `dh_online` per periode vs per bulan kalender), (b) data salinan tidak
    konsisten, (c) **bug v2** → kartu ISSUE/CR.
-6. **Catat hasil** (tanpa NIP/nama) di laporan MAKE-054: periode, lingkup, baris ringkasan `presensi:paritas-tukin`,
+6. **Rekap Instansi Lain (IL, CR-085).** Untuk bulan yang sama: ekspor legacy menu **Laporan Tukin Instansi Lain**
+   (`laporan_tukin_us_skp_il`, XLSX `L_presensi.php:15097-15440`), ekspor v2
+   `GET api/v1/presensi/tukin/rekap-il/xlsx?bulan=M` (role 1), lalu
+   `php spark presensi:paritas-tukin legacy_il_M.xlsx v2_il_M.xlsx --il --csv=temuan_il_M.csv`. Judul legacy IL sama
+   dengan rekap DH lingkup kementerian, jadi alat **tidak** dapat memeriksa berkas legacy — pastikan sumbernya menu IL;
+   `--il` hanya memvalidasi berkas v2 (judul "… INSTANSI LAIN", [V2]; berkas v2 tidak cocok → kode keluar 2).
+7. **Lingkup alat.** Alat hanya membandingkan kolom angka F..N (TL, PSW, TK, TA, CUTI, TB, total presensi/SKP/potongan);
+   kolom keterangan (O) hanya dibawa untuk telaah. Keterangan diverifikasi lewat suite D-13 S15
+   (`tests/Presensi/RegresiD13/S15KeteranganCutiIkutLegacyTest`) dan telaah sampel baris.
+8. **Catat hasil** (tanpa NIP/nama) di laporan MAKE-054: periode, lingkup, baris ringkasan `presensi:paritas-tukin`,
    jumlah temuan per kelompok (a)/(b)/(c), dan keputusan. UP-1 **lolos** bila tidak ada temuan kelompok (c) yang masih
    terbuka; sampai itu UP-1 tetap blocker go-live (Q5B-09).
 

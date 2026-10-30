@@ -99,6 +99,21 @@ final class S14RekapIlIkutLegacyTest extends DatabaseTestCase
     }
 
     /**
+     * B (CR-085 review): legacy menjadwalkan potongan dari seluruh `$listCuti[nip][id]` (:13903-13911, :14176-14423).
+     * Cuti besar 01-09..30-11 (id kecil) ditimpa cuti tahunan 01-09..18-09 (id besar, F5B-17) di setiap tanggal periode →
+     * tetap dipotong 01-09: CUTI 5, total 37.
+     */
+    public function testRiwayatCutiTertimpaTetapDijadwalkan(): void
+    {
+        $nip = $this->pegawaiIl();
+        $this->cuti($nip, 'besar', '2026-09-01', '2026-11-30', 65);
+        $this->cuti($nip, 'tahunan', '2026-09-01', '2026-09-18', 14);
+
+        $b = $this->barisIl($nip);
+        $this->assertSame(['5.00', '37.00'], [$b['pengurangan']['CUTI'], $b['total_potongan']]);
+    }
+
+    /**
      * Pegawai IL: snapshot & riwayat jabatan jenis 2, hadir sepanjang periode 2026-09 kecuali `$tanpa`.
      *
      * @param list<string> $tanpa

@@ -77,6 +77,21 @@ final class S15KeteranganCutiIkutLegacyTest extends DatabaseTestCase
         $this->assertStringNotContainsString('22 Agustus 2026', $ket, 'akhir pekan');
     }
 
+    /**
+     * C (CR-085 review): dua riwayat bertanggal sama → keterangan memakai riwayat pemenang per tanggal (id terbesar, F5B-17
+     * — sama dengan angka), dicocokkan per `id_riwayat_cuti`, bukan riwayat pertama yang tanggalnya sama.
+     */
+    public function testRiwayatBertanggalSamaPakaiPemenang(): void
+    {
+        $nip = $this->pegawaiHadirD13();
+        $this->cuti($nip, 'tahunan', '2026-08-20', '2026-08-20');
+        $this->cuti($nip, 'alasan_penting', '2026-08-20', '2026-08-20');
+
+        $ket = $this->laporanD13($nip)['keterangan'];
+        $this->assertStringContainsString('Cuti uji 5 (20 Agustus 2026)', $ket);
+        $this->assertStringNotContainsString('Cuti uji 1', $ket);
+    }
+
     /** IL: aturan yang sama di rekap IL (hari ini 01-09: cuti 03-09 tidak dicetak; libur 19-08 tidak dicetak). */
     public function testRekapIl(): void
     {

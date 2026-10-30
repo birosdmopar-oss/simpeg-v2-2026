@@ -41,13 +41,32 @@ final class SumberCutiTbFase4Test extends DatabaseTestCase
     #[DataProvider('jenisCuti')]
     public function testIdJenisCutiKeKodeJenis(int $id, string $kode): void
     {
-        $nip = $this->buatPegawai();
-        $this->cuti($nip, $id, '2026-03-17', '2026-03-18', 2);
+        $nip       = $this->buatPegawai();
+        $idRiwayat = $this->cuti($nip, $id, '2026-03-17', '2026-03-18', 2);
 
         $data = $this->sumber()->untuk($nip, '2026-03-16', '2026-04-15');
 
-        $this->assertSame(['jenis' => $kode, 'mulai' => '2026-03-17', 'akhir' => '2026-03-18', 'lama' => 2], $data['2026-03-17']['cuti']);
+        $this->assertSame(['id' => $idRiwayat, 'jenis' => $kode, 'mulai' => '2026-03-17', 'akhir' => '2026-03-18', 'lama' => 2], $data['2026-03-17']['cuti']);
         $this->assertArrayHasKey('2026-03-18', $data);
+    }
+
+    /**
+     * CR-085: riwayat cuti utuh (rekap IL) — status 1, beririsan [awal, akhir], urut `tgl_mulai` lalu id, termasuk riwayat
+     * yang semua tanggalnya tertimpa riwayat lain di data harian.
+     */
+    public function testRiwayatCutiBanyakUtuhUrutMulaiLaluId(): void
+    {
+        $nip     = $this->buatPegawai();
+        $besar   = $this->cuti($nip, 'besar', '2026-03-20', '2026-05-30', 72);
+        $tahunan = $this->cuti($nip, 'tahunan', '2026-03-20', '2026-04-15', 19); // id lebih besar: menimpa semua tanggal
+        $awal    = $this->cuti($nip, 'sakit', '2026-03-16', '2026-03-17', 2);
+        $this->cuti($nip, 'tahunan', '2026-03-18', '2026-03-18', 1, 2); // status 2
+        $this->cuti($nip, 'tahunan', '2026-04-20', '2026-04-21', 2);    // di luar rentang
+
+        $riwayat = $this->sumber()->riwayatCutiBanyak([$nip], '2026-03-16', '2026-04-15')[$nip];
+        $this->assertSame([$awal, $besar, $tahunan], array_column($riwayat, 'id'));
+        $this->assertSame(['jenis' => 'besar', 'mulai' => '2026-03-20', 'akhir' => '2026-05-30', 'lama' => 72], array_diff_key($riwayat[1], ['id' => 1]));
+        $this->assertSame('tahunan', $this->sumber()->untuk($nip, '2026-03-16', '2026-04-15')['2026-03-20']['cuti']['jenis'], 'harian: cuti besar tertimpa');
     }
 
     public function testHanyaStatusSatuDanEkspansiDipotongRentang(): void
@@ -61,11 +80,11 @@ final class SumberCutiTbFase4Test extends DatabaseTestCase
         $this->assertCount(0, $this->sumber()->untuk($nip, '2026-03-16', '2026-04-15'), 'status 0/2/3/4 diabaikan');
 
         // Cuti melintasi batas rentang: hanya tanggal di dalam [awal, akhir], termasuk akhir pekan (library yang melewati).
-        $this->cuti($nip, 'besar', '2026-03-10', '2026-03-22', 13);
-        $data = $this->sumber()->untuk($nip, '2026-03-16', '2026-04-15');
+        $idBesar = $this->cuti($nip, 'besar', '2026-03-10', '2026-03-22', 13);
+        $data    = $this->sumber()->untuk($nip, '2026-03-16', '2026-04-15');
 
         $this->assertSame(['2026-03-16', '2026-03-17', '2026-03-18', '2026-03-19', '2026-03-20', '2026-03-21', '2026-03-22'], array_keys($data));
-        $this->assertSame(['jenis' => 'besar', 'mulai' => '2026-03-10', 'akhir' => '2026-03-22', 'lama' => 13], $data['2026-03-21']['cuti'], 'mulai/akhir/lama asli');
+        $this->assertSame(['id' => $idBesar, 'jenis' => 'besar', 'mulai' => '2026-03-10', 'akhir' => '2026-03-22', 'lama' => 13], $data['2026-03-21']['cuti'], 'mulai/akhir/lama asli');
     }
 
     public function testJenisDiLuarSatuSampaiEnamGagalTerkendali(): void

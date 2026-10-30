@@ -142,6 +142,19 @@ final class SumberHarianTukin
     }
 
     /**
+     * Riwayat cuti utuh per NIP bila sumber cuti/TB mendukungnya ({@see SumberRiwayatCutiInterface}, rekap IL CR-085);
+     * selain itu `null` (kalkulasi IL merekonstruksi dari input harian).
+     *
+     * @param list<string> $nip
+     *
+     * @return array<string, list<array{id: int, jenis: string, mulai: string, akhir: string, lama: int}>>|null
+     */
+    public function riwayatCutiBanyak(array $nip, string $awal, string $akhir): ?array
+    {
+        return $this->cutiTb instanceof SumberRiwayatCutiInterface ? $this->cutiTb->riwayatCutiBanyak($nip, $awal, $akhir) : null;
+    }
+
+    /**
      * @return array<string, array{masuk: ?string, pulang: ?string}>
      *
      * @throws DataTukinTidakSah

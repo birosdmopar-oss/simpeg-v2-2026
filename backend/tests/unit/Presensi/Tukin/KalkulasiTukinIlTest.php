@@ -152,6 +152,57 @@ final class KalkulasiTukinIlTest extends CIUnitTestCase
         $this->assertSame(300, $this->dh($luar)->rincian['CUTI'], 'pembanding DH');
     }
 
+    /**
+     * Ambang cuti besar memakai jumlah **hari kalender** `tgl_mulai`..`tgl_akhir` (`$iLC->days`, :14301-14304), bukan
+     * `lama_cuti`: 10-08..20-09 = 42 hari (lama 30) → potong 01-08 & 01-09 → periode Sep CUTI 5.
+     */
+    public function testCutiBesarAmbangHariKalender(): void
+    {
+        $this->assertSame([500, 3700], [$this->il($this->cuti('besar', '2026-08-10', '2026-09-20', 30))->rincian['CUTI'], $this->il($this->cuti('besar', '2026-08-10', '2026-09-20', 30))->totalPotongan]);
+    }
+
+    /**
+     * Ambang cuti melahirkan memakai `lama_cuti` (:14396, :14410), bukan hari kalender: 03-08..04-09 = 33 hari, lama 25 →
+     * hanya potong 01-08 (di luar periode Sep) → CUTI 0.
+     */
+    public function testCutiMelahirkanAmbangLamaCuti(): void
+    {
+        $this->assertSame(0, $this->il($this->cuti('melahirkan', '2026-08-03', '2026-09-04', 25), 3)->rincian['CUTI']);
+    }
+
+    /** Lintas periode November (16-10..15-11): cuti besar 05-10..30-11 → potong 01-10, 01-11 → CUTI 5 di periode Nov. */
+    public function testCutiBesarLintasPeriodeNovember(): void
+    {
+        $nov    = new PeriodeTukin('2026-10-16', '2026-11-15');
+        $harian = [];
+
+        foreach (HariKerja::kalender('2026-10-05', '2026-11-15') as $t) {
+            $harian[$t] = ['cuti' => ['jenis' => 'besar', 'mulai' => '2026-10-05', 'akhir' => '2026-11-30', 'lama' => 40]];
+        }
+
+        $h = KalkulasiTukinIl::hitung($nov, [], $harian, $this->config(), '2026-12-01', new DataPegawaiTukin(null));
+        $this->assertSame([500, 3200, 3700], [$h->rincian['CUTI'], $h->totalSkp, $h->totalPotongan]);
+    }
+
+    /**
+     * B (CR-085 review): riwayat yang semua tanggalnya tertimpa (cuti besar id 100 01-09..30-11 ditimpa cuti tahunan id 101
+     * 01-09..18-09 di setiap tanggal periode) tetap dijadwalkan bila daftar riwayat utuh diberikan (legacy `$listCuti`):
+     * CUTI 5 (total 37); tanpa daftar (rekonstruksi harian) tidak terlihat (32).
+     */
+    public function testRiwayatTertimpaTetapDijadwalkan(): void
+    {
+        $harian  = $this->hanyaCuti('tahunan', '2026-09-01', '2026-09-18', 14) + $this->hadirSemua();
+        $riwayat = [
+            ['id' => 101, 'jenis' => 'tahunan', 'mulai' => '2026-09-01', 'akhir' => '2026-09-18', 'lama' => 14],
+            ['id' => 100, 'jenis' => 'besar', 'mulai' => '2026-09-01', 'akhir' => '2026-11-30', 'lama' => 65],
+            ['id' => 100, 'jenis' => 'besar', 'mulai' => '2026-09-01', 'akhir' => '2026-11-30', 'lama' => 65], // ganda → satu
+        ];
+
+        $h = KalkulasiTukinIl::hitung($this->periode, [], $harian, $this->config(), self::HARI_INI, new DataPegawaiTukin(null), $riwayat);
+        $this->assertSame([500, 3700], [$h->rincian['CUTI'], $h->totalPotongan]);
+        $this->assertSame(3200, $this->il($harian)->totalPotongan, 'tanpa daftar riwayat: tertimpa hilang');
+    }
+
     // ---------------------------------------------------------------- bantu
 
     /**

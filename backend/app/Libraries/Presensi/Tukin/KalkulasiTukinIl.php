@@ -42,6 +42,9 @@ final class KalkulasiTukinIl
      * @param array<string, array<string, mixed>> $harian    input per tanggal (lihat `StatusHarian`); cuti wajib membawa
      *                                                       `mulai`/`akhir`/`lama`
      * @param string|null                         $hariIni   tanggal proses; hari setelahnya tidak dihitung (`de_tukin`)
+     * @param list<array{id?: int, jenis: string, mulai: string, akhir: string, lama: int}>|null $riwayatCuti riwayat cuti
+     *                                                       utuh (`$listCuti`); null → direkonstruksi dari input harian
+     *                                                       (riwayat yang semua tanggalnya tertimpa tidak terlihat)
      */
     public static function hitung(
         PeriodeTukin $periode,
@@ -50,6 +53,7 @@ final class KalkulasiTukinIl
         KonfigurasiTukin $config,
         ?string $hariIni = null,
         ?DataPegawaiTukin $pegawai = null,
+        ?array $riwayatCuti = null,
     ): HasilTukin {
         foreach (array_keys($harian) as $tanggal) {
             TanggalBisnis::wajibValid((string) $tanggal, 'tanggal input harian');
@@ -62,7 +66,7 @@ final class KalkulasiTukinIl
         }
 
         $libur                         = HariKerja::himpunanLibur($hariLibur);
-        $potonganCuti                  = self::jadwalPotonganCuti($periode->awal, $akhir, $harian, $libur, $pegawai->jumlahAnak, $config);
+        $potonganCuti                  = self::jadwalPotonganCuti($periode->awal, $akhir, $harian, $libur, $pegawai->jumlahAnak, $config, $riwayatCuti);
         [$sakitAktif, $sakitBerurutan] = self::sakitSebelumPeriode($periode, $akhir, $harian, $libur);
         $jumlah                        = array_fill_keys(self::KATEGORI, 0);
         $rincian                       = array_fill_keys(self::KOLOM, 0);
@@ -146,16 +150,21 @@ final class KalkulasiTukinIl
      * - Cuti alasan penting `lama_cuti` > 14: hari kerja cuti dikelompokkan per bulan; bulan dengan hari kerja terbanyak
      *   (seri → bulan paling awal) → hari kerja pertamanya; nilai tanggal itu **diganti** 50.
      *
-     * @param array<string, array<string, mixed>> $harian
-     * @param array<string, true>                 $libur
+     * Sumber riwayat: `$riwayatCuti` (daftar utuh dari adapter, urut `tgl_mulai` lalu id, satu entri per id) atau, bila
+     * null, rekonstruksi dari input harian (riwayat bertanggal & jenis identik tergabung, yang tertimpa penuh hilang).
+     *
+     * @param array<string, array<string, mixed>>                                                 $harian
+     * @param array<string, true>                                                                 $libur
+     * @param list<array{id?: int, jenis: string, mulai: string, akhir: string, lama: int}>|null $riwayatCuti
      *
      * @return array<string, int>
      */
-    public static function jadwalPotonganCuti(string $awal, string $akhir, array $harian, array $libur, int $jumlahAnak, KonfigurasiTukin $config): array
+    public static function jadwalPotonganCuti(string $awal, string $akhir, array $harian, array $libur, int $jumlahAnak, KonfigurasiTukin $config, ?array $riwayatCuti = null): array
     {
-        $hasil = [];
+        $hasil   = [];
+        $riwayat = $riwayatCuti === null ? self::riwayatCuti($harian, $awal, $akhir) : self::saringRiwayat($riwayatCuti, $awal, $akhir);
 
-        foreach (self::riwayatCuti($harian, $awal, $akhir) as $cuti) {
+        foreach ($riwayat as $cuti) {
             if ($cuti['jenis'] === 'alasan_penting') {
                 if ($cuti['lama'] > 14) {
                     $tanggal = self::tanggalPotongAlasanPenting($cuti['mulai'], $cuti['akhir'], $libur);
@@ -247,6 +256,36 @@ final class KalkulasiTukinIl
         }
 
         return $terpilih;
+    }
+
+    /**
+     * Riwayat utuh dari adapter: beririsan [awal, akhir], urut `mulai` lalu id (stabil), satu entri per id.
+     *
+     * @param list<array{id?: int, jenis: string, mulai: string, akhir: string, lama: int}> $riwayat
+     *
+     * @return list<array{jenis: string, mulai: string, akhir: string, lama: int}>
+     */
+    private static function saringRiwayat(array $riwayat, string $awal, string $akhir): array
+    {
+        $hasil = [];
+
+        foreach ($riwayat as $i => $r) {
+            if (! isset(StatusHarian::JENIS_CUTI[$r['jenis']])) {
+                throw new InvalidArgumentException('Jenis cuti tidak dikenal pada riwayat cuti.');
+            }
+
+            $mulai  = TanggalBisnis::wajibValid($r['mulai'], 'awal cuti');
+            $sampai = TanggalBisnis::wajibValid($r['akhir'], 'akhir cuti');
+
+            if ($mulai <= $akhir && $sampai >= $awal) {
+                $kunci         = isset($r['id']) ? 'id' . $r['id'] : 'i' . $i;
+                $hasil[$kunci] = ['jenis' => $r['jenis'], 'mulai' => $mulai, 'akhir' => $sampai, 'lama' => $r['lama'], 'urut' => sprintf('%s|%012d|%06d', $mulai, $r['id'] ?? 0, $i)];
+            }
+        }
+
+        uasort($hasil, static fn (array $a, array $b): int => $a['urut'] <=> $b['urut']);
+
+        return array_values(array_map(static fn (array $r): array => ['jenis' => $r['jenis'], 'mulai' => $r['mulai'], 'akhir' => $r['akhir'], 'lama' => $r['lama']], $hasil));
     }
 
     /**

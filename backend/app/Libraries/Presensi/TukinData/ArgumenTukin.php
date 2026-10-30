@@ -19,6 +19,9 @@ final readonly class ArgumenTukin
      * @param array<string, array<string, mixed>> $harian          per tanggal YYYY-MM-DD, rentang sama dengan $hariLibur
      * @param bool                                $tanpaDataHarian T-01 (CR-083): data harian sengaja tidak dimuat
      *                                                             ({@see SumberDataPegawaiTukin::tanpaDataHarian()})
+     * @param list<array{id: int, jenis: string, mulai: string, akhir: string, lama: int}>|null $riwayatCuti rekap IL: riwayat
+     *                                                             cuti utuh [awal, de_tukin] untuk jadwal potongan (CR-085);
+     *                                                             null di DH
      */
     public function __construct(
         public PeriodeTukin $periode,
@@ -27,6 +30,7 @@ final readonly class ArgumenTukin
         public KonfigurasiTukin $konfigurasi,
         public ?DataPegawaiTukin $pegawai,
         public bool $tanpaDataHarian = false,
+        public ?array $riwayatCuti = null,
     ) {
     }
 }

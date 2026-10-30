@@ -74,7 +74,7 @@ final class KalkulasiLaporanTukin
 
                 try {
                     $h = $il
-                        ? KalkulasiTukinIl::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai)
+                        ? KalkulasiTukinIl::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai, $a->riwayatCuti)
                         : KalkulasiTukin::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai);
                 } catch (InvalidArgumentException $e) {
                     $hasil[$n] = ['galat' => ['code' => 'data_tukin_tidak_sah', 'message' => 'Data Tukin pegawai tidak sah: ' . $e->getMessage()]];
@@ -104,21 +104,17 @@ final class KalkulasiLaporanTukin
      * Keterangan cuti ikut legacy (CR-085, keputusan Horii 30-10): `$arrKetCuti` dibangun di dalam loop harian hanya untuk
      * hari cuti yang benar-benar dilalui — setelah libur/akhir pekan, TB, pegawai baru (DH), dan pemotongan ke hari ini
      * (DH :12776-12792, IL :14645-14650), satu baris per riwayat menurut urutan hari pertamanya (DH :13122, IL :15074).
-     * Diturunkan dari hari berstatus `cuti` di hasil harian; T-01 dan `lewatiLoopHarian` dengan sendirinya kosong.
+     * Diturunkan dari hari berstatus `cuti` di hasil harian, dicocokkan per `id_riwayat_cuti` (input harian `cuti.id`);
+     * T-01 dan `lewatiLoopHarian` dengan sendirinya kosong. Pemenang per tanggal = id terbesar (F5B-17, [V2]): riwayat
+     * yang semua hari terhitungnya tertimpa riwayat lain tidak muncul di keterangan.
      *
-     * @param array<string, array<string, mixed>>        $harian input harian (cuti membawa `mulai`/`akhir`)
-     * @param list<array{0: string, 1: string, 2: string}> $riwayat `riwayat_cuti` periode [nama, mulai, akhir]
+     * @param array<string, array<string, mixed>>                     $harian  input harian (cuti membawa `id`)
+     * @param array<int, array{0: string, 1: string, 2: string}> $riwayat `riwayat_cuti` periode per id [nama, mulai, akhir]
      *
      * @return list<array{0: string, 1: string, 2: string}>
      */
     private static function cutiDihitung(HasilTukin $h, array $harian, array $riwayat): array
     {
-        $nama = [];
-
-        foreach ($riwayat as [$n, $mulai, $akhir]) {
-            $nama["{$mulai}|{$akhir}"] ??= $n;
-        }
-
         $hasil = [];
 
         foreach ($h->harian as $tanggal => $hh) {
@@ -126,11 +122,10 @@ final class KalkulasiLaporanTukin
                 continue;
             }
 
-            $cuti  = $harian[$tanggal]['cuti'] ?? [];
-            $kunci = ($cuti['mulai'] ?? '') . '|' . ($cuti['akhir'] ?? '');
+            $id = (int) ($harian[$tanggal]['cuti']['id'] ?? 0);
 
-            if (! isset($hasil[$kunci]) && isset($nama[$kunci])) {
-                $hasil[$kunci] = [$nama[$kunci], (string) $cuti['mulai'], (string) $cuti['akhir']];
+            if (! isset($hasil[$id]) && isset($riwayat[$id])) {
+                $hasil[$id] = $riwayat[$id];
             }
         }
 
@@ -163,7 +158,7 @@ final class KalkulasiLaporanTukin
     /**
      * @param list<string> $nip
      *
-     * @return array{cltn: array<array-key, bool>, penyesuaian: array<array-key, list<array<string, mixed>>>, cuti: array<array-key, list<array{0: string, 1: string, 2: string}>>, tb: array<array-key, string>}
+     * @return array{cltn: array<array-key, bool>, penyesuaian: array<array-key, list<array<string, mixed>>>, cuti: array<array-key, array<int, array{0: string, 1: string, 2: string}>>, tb: array<array-key, string>}
      */
     private function info(array $nip, PeriodeTukin $periode): array
     {
@@ -182,10 +177,10 @@ final class KalkulasiLaporanTukin
             $hasil['penyesuaian'][(string) $b['nip']][] = $b;
         }
 
-        foreach ($this->db->table('riwayat_cuti')->select('nip, nama_jenis_cuti, tgl_mulai, tgl_akhir')->whereIn('nip', $nip)->where('status', 1)
+        foreach ($this->db->table('riwayat_cuti')->select('id_riwayat_cuti, nip, nama_jenis_cuti, tgl_mulai, tgl_akhir')->whereIn('nip', $nip)->where('status', 1)
             ->where('tgl_mulai <=', $periode->akhir)->where('tgl_akhir >=', $periode->awal)
             ->orderBy('nip', 'ASC')->orderBy('tgl_mulai', 'ASC')->orderBy('id_riwayat_cuti', 'ASC')->get()->getResultArray() as $b) {
-            $hasil['cuti'][(string) $b['nip']][] = [(string) $b['nama_jenis_cuti'], (string) $b['tgl_mulai'], (string) $b['tgl_akhir']];
+            $hasil['cuti'][(string) $b['nip']][(int) $b['id_riwayat_cuti']] = [(string) $b['nama_jenis_cuti'], (string) $b['tgl_mulai'], (string) $b['tgl_akhir']];
         }
 
         foreach ($this->db->table('riwayat_tb')->select('nip, institusi_pendidikan')->whereIn('nip', $nip)->where('status', 1)
