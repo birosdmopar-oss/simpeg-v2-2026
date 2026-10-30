@@ -61,6 +61,7 @@ pastikan_backend_vendor() {
     hilang="$(berkas_hilang "${BACKEND_BERKAS_KUNCI[@]}")"
     if [ -n "$hilang" ]; then
         printf 'GAGAL: berkas vendor backend masih hilang setelah composer install:\n%s\n' "$hilang" >&2
+        echo 'Pulihkan dengan: rm -rf backend/vendor && (cd backend && composer install)' >&2
         exit 1
     fi
 }
@@ -75,6 +76,7 @@ pastikan_frontend_deps() {
     hilang="$(berkas_hilang "${FRONTEND_BERKAS_KUNCI[@]}")"
     if [ -n "$hilang" ]; then
         printf 'GAGAL: berkas node_modules frontend masih hilang setelah npm ci:\n%s\n' "$hilang" >&2
+        echo 'Pulihkan dengan: rm -rf frontend/node_modules && (cd frontend && npm ci)' >&2
         exit 1
     fi
 }
