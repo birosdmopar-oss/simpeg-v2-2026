@@ -76,7 +76,7 @@ diturunkan dari diff kedua method (komentar dibuang); aturan yang tidak disebut 
 | Cuti besar | Per tanggal: tanggal 1 bulan `mulai` (hari ≤ ⌊t/2⌋) atau bulan berikutnya, +bulan ke-2/ke-3 bila hari kalender > 35 / > 65; 25 × 0,2 = 5 per tanggal potong (`:14233-14364`) | DH: tanggal 16, `lama_cuti`, 5 **menggantikan** total presensi + SKP 0 | `jadwalPotonganCuti`, kunci `CUTI_BESAR_IL` |
 | Cuti melahirkan | Anak **≥ 3**, `lama_cuti` > 0: 40 / 70 (`lama` ≥ 32) / 20 (`lama` ≥ 62) × 0,2 per tanggal potong yang sama (`:14366-14422`) | DH: anak > 3, 40/70/80 **menggantikan** total | `CUTI_MELAHIRKAN_IL_1..3` |
 | Cuti alasan penting | `lama_cuti` > 14: hari kerja cuti per bulan, bulan terbanyak (seri → paling awal) → hari kerja pertamanya; nilai tanggal itu **diganti** 50 × 0,2 (`:14180-14228`) | DH tidak memotong (`$listPotonganCuti` dihitung tetapi tidak dipakai) | `CUTI_ALASAN_PENTING_IL`; libur dimuat atas rentang penuh cuti (`$listLibur_per`, `:14016-14036`) |
-| Penerapan potongan cuti | Awal setiap tanggal loop, sebelum libur/akhir pekan/TB: `$listPotonganCuti[nip][tanggal] × 0,2` ke CUTI & total presensi (`:14587-14592`) | — | Tanggal di luar masa kerja [V2 `tmtKeluar`] tidak dipotong |
+| Penerapan potongan cuti | Awal setiap tanggal loop, sebelum libur/akhir pekan/TB: `$listPotonganCuti[nip][tanggal] × 0,2` ke CUTI & total presensi (`:14587-14592`) | — | `KalkulasiTukinIl` tidak memotong tanggal di luar masa kerja **hanya bila pemanggil lain mengisi `tmtKeluar`**; jalur rekap IL tidak mengisinya (lihat baris "Pegawai keluar") |
 | Riwayat cuti yang dimuat | Beririsan [awal, `de_tukin`] (akhir dipotong hari ini, `:13640`, `:13903-13908`), urut `tgl_mulai` | DH [awal periode lalu, akhir BKN] | Riwayat beririsan [awal, hari dihitung terakhir] |
 | Jumlah anak | `tgl_lahir`/`tgl_perkawinan` ≤ `de_tukin` (`:13840, :13851`) | DH ≤ akhir periode | `SumberDataPegawaiTukin::untukBanyak(batasAnak)` |
 | Urutan cuti sakit | `$list_LC`/`$count_CSakit`: diputus cuti jenis lain, konket, presensi/TK (`:14670`, `:14772`, `:14803`); TB/libur tidak memutus | DH: hanya baris presensi yang memutus | — |
@@ -89,7 +89,10 @@ diturunkan dari diff kedua method (komentar dibuang); aturan yang tidak disebut 
 
 Sama dengan DH: dipotong ke hari ini, precedence TB → cuti → konket → presensi, aturan TL/PSW/TPM/TPP/TK, cuti sakit hari
 ke-15+ 0,2, SKP bawaan 32 (`:14491`), `$endDateIsTB`. Selisih tepi dicatat, tidak dikerjakan: IL memuat data harian hanya
-bila `created_at < de_tukin` (ekspor tepat hari pertama periode). Jadwal potongan cuti memakai riwayat utuh per id (CR-085
+bila `created_at < de_tukin` (ekspor tepat hari pertama periode) — selisih ini ikut berlaku untuk jadwal potongan cuti (riwayat
+utuh `$listCuti` juga disaring `created_at < de_tukin`, `:13906`), sehingga pada ekspor hari pertama periode legacy tidak
+menjadwalkan potongan cuti pegawai yang dibuat hari itu, sedangkan v2 (saringan T-01 hanya hari terakhir) menjadwalkannya.
+Jadwal potongan cuti memakai riwayat utuh per id (CR-085
 review B), sehingga riwayat bertanggal identik maupun yang tertimpa penuh tetap dijadwalkan seperti legacy; status harian
 (cuti/presensi) dan keterangan tetap memakai pemenang per tanggal = id terbesar (F5B-17 [V2]).
 
@@ -137,7 +140,8 @@ periode, tanpa batas 100%) sama di kedua method.
 
 ## Perbedaan disengaja [V2]
 
-1. **Pegawai keluar di tengah periode**: hari kerja ≥ `tmt_status` dikecualikan (bug rekap, lihat tabel).
+1. **Pegawai keluar di tengah periode** (**hanya rekap DH** dan laporan per pegawai): hari kerja ≥ `tmt_status`
+   dikecualikan (bug rekap, lihat tabel). Rekap IL ikut legacy (keputusan Horii 30-10, bagian "Rekap Instansi Lain").
 2. **Cuti sepanjang periode** dihitung atas hari kerja periode tukin (`PeriodeTukin`, tidak dipotong `hariIni`) dalam
    masa kerja `DataPegawaiTukin`. Rekap menghitungnya atas `perBKN_st..perBKN_en` (`:11960-11974`): tanpa override
    Januari, dan bila tidak ada baris BKN rentangnya menjadi "hari ini" saja (`new DateTime('')`), sehingga hasilnya

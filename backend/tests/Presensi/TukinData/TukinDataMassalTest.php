@@ -217,6 +217,42 @@ final class TukinDataMassalTest extends DatabaseTestCase
         $this->assertArrayNotHasKey('2026-03-18', $sumber->untuk($nip, '2026-03-16', '2026-04-15', true));
     }
 
+    /**
+     * CR-085: kesetaraan jalur tunggal & massal varian IL (`tanpaPegawaiBaru`), hari ini 10-04 (de_tukin): pegawai keluar
+     * TMT 01-04 (tanpa data & riwayat), riwayat cuti besar tertimpa cuti tahunan (riwayat utuh 2 entri), PPPK tanpa TMT
+     * (IL: tanpa aturan pegawai baru), pegawai biasa.
+     */
+    public function testKesetaraanTunggalMassalIl(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        $keluar = $this->buatPegawai(['id_jenis_pegawai' => 1, 'status' => 2, 'tmt_status' => '2026-04-01']);
+        $this->presensiHadir($keluar, '2026-03-16');
+        $this->cuti($keluar, 'besar', '2026-03-01', '2026-05-30', 91);
+
+        $tertimpa = $this->buatPegawai(['id_jenis_pegawai' => 1]);
+        $this->cuti($tertimpa, 'besar', '2026-04-01', '2026-06-30', 91);
+        $this->cuti($tertimpa, 'tahunan', '2026-04-01', '2026-04-15', 11);
+
+        $pppk  = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $biasa = $this->buatPegawai(['id_jenis_pegawai' => 1]);
+        $this->presensiHadir($biasa, '2026-03-16');
+
+        $semua  = [$keluar, $tertimpa, $pppk, $biasa];
+        $massal = $this->serviceTukinFase4()->siapkanBanyak($semua, 2026, 4, '2026-04-10', null, true);
+
+        foreach ($semua as $n) {
+            $this->assertInstanceOf(ArgumenTukin::class, $massal[$n], $n);
+            $this->assertEquals($this->serviceTukinFase4()->siapkan($n, 2026, 4, '2026-04-10', true), $massal[$n], "tunggal = massal {$n}");
+        }
+
+        $this->assertSame([[], [], true], [$massal[$keluar]->harian, $massal[$keluar]->riwayatCuti, $massal[$keluar]->tanpaDataHarian], 'keluar ≤ de_tukin');
+        $this->assertNull($massal[$keluar]->pegawai?->tmtKeluar, 'IL tanpa tmtKeluar');
+        $this->assertSame(['besar', 'tahunan'], array_column($massal[$tertimpa]->riwayatCuti ?? [], 'jenis'), 'riwayat utuh');
+        $this->assertSame([null, false], [$massal[$pppk]->pegawai?->tmtMasuk, $massal[$pppk]->pegawai?->lewatiLoopHarian], 'PPPK tanpa TMT di IL');
+        $this->assertSame([], $massal[$biasa]->riwayatCuti);
+    }
+
     public function testKonfigurasiBelumLengkapSemuaNipGalat(): void
     {
         $a = $this->buatPegawai();

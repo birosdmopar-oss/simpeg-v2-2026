@@ -203,6 +203,21 @@ final class KalkulasiTukinIlTest extends CIUnitTestCase
         $this->assertSame(3200, $this->il($harian)->totalPotongan, 'tanpa daftar riwayat: tertimpa hilang');
     }
 
+    /**
+     * Riwayat utuh diurut `tgl_mulai` (legacy `order_by tgl_mulai ASC`, :13907; alasan penting `=` :14225) walau diberikan
+     * terbalik: cuti besar (mulai 01-08) lebih dulu (+5 pada 01-09), lalu alasan penting (mulai 01-09) menimpa 01-09 → 10,
+     * bukan 10 + 5.
+     */
+    public function testRiwayatUtuhDiurutTanggalMulai(): void
+    {
+        $terbalik = [
+            ['id' => 1, 'jenis' => 'alasan_penting', 'mulai' => '2026-09-01', 'akhir' => '2026-09-30', 'lama' => 22],
+            ['id' => 2, 'jenis' => 'besar', 'mulai' => '2026-08-01', 'akhir' => '2026-09-30', 'lama' => 61],
+        ];
+
+        $this->assertSame(['2026-08-01' => 500, '2026-09-01' => 1000], KalkulasiTukinIl::jadwalPotonganCuti('2026-08-16', '2026-09-15', [], [], 0, $this->config(), $terbalik));
+    }
+
     // ---------------------------------------------------------------- bantu
 
     /**

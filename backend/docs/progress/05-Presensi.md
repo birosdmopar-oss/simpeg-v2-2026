@@ -393,7 +393,8 @@ yang disetujui**; hasil yang dibagikan tanpa data pribadi. Prasyarat: DB v2 beri
 1. **Pilih periode & lingkup.** Untuk tiap bulan `M` dari dua periode terakhir: lingkup kementerian (`0`), ditambah minimal
    satu unit yang memuat pegawai **cuti sakit lintas periode** dan satu bulan dengan **baris BKN tidak standar** bila ada —
    catat di lembar hasil.
-2. **Ekspor legacy** (aplikasi legacy terhadap salinan data yang sama): rekap Laporan Tukin varian SKP
+2. **Ekspor legacy** (aplikasi legacy terhadap salinan data yang sama; **wajib setelah akhir periode `M`**, tanggal salinan
+   dan tanggal ekspor dicatat — loop legacy dipotong ke hari ini): rekap Laporan Tukin varian SKP
    (`laporan_tukin_us_skp`, ekspor XLSX `L_presensi.php:13139-13486`), bulan `M`, lingkup sama, jenis pegawai **PNS**
    (bawaan legacy). Jangan memakai "Tukin Lama" atau varian `tukinver` (F5B-4/F5B-5).
 3. **Ekspor v2:** `GET api/v1/presensi/tukin/rekap/xlsx?bulan=M&unit_satker=<lingkup>` sebagai role 1 (bawaan
@@ -408,7 +409,10 @@ yang disetujui**; hasil yang dibagikan tanpa data pribadi. Prasyarat: DB v2 beri
    [V2] tercatat (README `Libraries/Presensi` & `TukinData`, PRD 5B §5.3/§13 — mis. F5B-17 tumpang tindih cuti, F5B-14
    penyesuaian dari tabel bukan hard-code, rentang `dh_online` per periode vs per bulan kalender), (b) data salinan tidak
    konsisten, (c) **bug v2** → kartu ISSUE/CR.
-6. **Rekap Instansi Lain (IL, CR-085).** Untuk bulan yang sama: ekspor legacy menu **Laporan Tukin Instansi Lain**
+6. **Rekap Instansi Lain (IL, CR-085).** Untuk bulan yang sama, kedua ekspor **wajib setelah akhir periode `M`** dan atas
+   salinan data yang sama (tanggal salinan & ekspor dicatat): loop dipotong ke hari ini, dan pegawai keluar IL bergantung
+   tanggal ekspor (`tmt_status > de_tukin`, keputusan Horii 30-10); selisih tepi `created_at < de_tukin` (ekspor hari
+   pertama periode) di README `Presensi/Tukin` bagian "Rekap Instansi Lain". Ekspor legacy menu **Laporan Tukin Instansi Lain**
    (`laporan_tukin_us_skp_il`, XLSX `L_presensi.php:15097-15440`), ekspor v2
    `GET api/v1/presensi/tukin/rekap-il/xlsx?bulan=M` (role 1), lalu
    `php spark presensi:paritas-tukin legacy_il_M.xlsx v2_il_M.xlsx --il --csv=temuan_il_M.csv`. Judul legacy IL sama
