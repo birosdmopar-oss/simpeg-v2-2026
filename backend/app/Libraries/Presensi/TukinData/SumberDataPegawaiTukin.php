@@ -54,8 +54,10 @@ final class SumberDataPegawaiTukin
      * @param bool         $tanpaPegawaiBaru rekap IL [K, CR-083, keputusan Horii 30-10]: `laporan_tukin_us_skp_il`
      *                                       (`L_presensi.php:13494-15452`) tidak punya blok pegawai baru, jadi `tmtMasuk`
      *                                       null dan `lewatiLoopHarian` false
+     * @param string|null  $batasAnak        batas `tgl_lahir`/`tgl_perkawinan` jumlah anak; bawaan akhir periode. Rekap IL
+     *                                       memakai `de_tukin` = min(akhir periode, hari ini) (`L_presensi.php:13840, :13851`)
      */
-    public function untuk(string $nip, PeriodeTukin $periode, ?string $idPeriodeBkn, array $hariLibur = [], bool $tanpaPegawaiBaru = false): DataPegawaiTukin
+    public function untuk(string $nip, PeriodeTukin $periode, ?string $idPeriodeBkn, array $hariLibur = [], bool $tanpaPegawaiBaru = false, ?string $batasAnak = null): DataPegawaiTukin
     {
         $pegawai = $this->db->table('pegawai')
             ->select(['status', 'tmt_status', 'id_jenis_pegawai', 'created_at'])
@@ -72,7 +74,7 @@ final class SumberDataPegawaiTukin
 
             return new DataPegawaiTukin(
                 $this->predikatSkp($nip, $idPeriodeBkn),
-                $this->jumlahAnak($nip, $periode->akhir),
+                $this->jumlahAnak($nip, $batasAnak ?? $periode->akhir),
                 $baru['tmtMasuk'],
                 (int) $pegawai['status'] === 2 && $pegawai['tmt_status'] !== null ? (string) $pegawai['tmt_status'] : null,
                 $baru['lewatiLoopHarian'],
@@ -90,7 +92,7 @@ final class SumberDataPegawaiTukin
      *
      * @return array<array-key, DataPegawaiTukin|GalatDataTukin> setiap NIP masukan menjadi kunci
      */
-    public function untukBanyak(array $nip, PeriodeTukin $periode, ?string $idPeriodeBkn, array $hariLibur = [], bool $tanpaPegawaiBaru = false): array
+    public function untukBanyak(array $nip, PeriodeTukin $periode, ?string $idPeriodeBkn, array $hariLibur = [], bool $tanpaPegawaiBaru = false, ?string $batasAnak = null): array
     {
         $unik  = array_values(array_unique(array_map('strval', $nip)));
         $hasil = [];
@@ -103,7 +105,7 @@ final class SumberDataPegawaiTukin
             }
 
             $skp  = $this->predikatSkpBanyak($batch, $idPeriodeBkn);
-            $anak = $this->jumlahAnakBanyak($batch, $periode->akhir);
+            $anak = $this->jumlahAnakBanyak($batch, $batasAnak ?? $periode->akhir);
             $kp   = $this->kelompokkan($this->db->table('riwayat_kp')
                 ->select(['nip', 'gol_ruang', 'tmtsk'])
                 ->whereIn('nip', $batch)

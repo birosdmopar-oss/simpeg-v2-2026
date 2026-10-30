@@ -102,7 +102,9 @@ Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest` (AC-D06.1/.2/.6), `Cuti
    `:12739-12743`.
 7. **IL** [K] (CR-083, keputusan Horii 30-10): rekap IL (`laporan_tukin_us_skp_il`, `L_presensi.php:13494-15452`) tidak
    punya blok pegawai baru, jadi langkah 3–6 tidak berlaku: `tmtMasuk = null`, `lewatiLoopHarian = false`
-   (`tanpaPegawaiBaru`). Ini juga menutup selisih lama `tmtMasuk` di IL.
+   (`tanpaPegawaiBaru`). Ini juga menutup selisih lama `tmtMasuk` di IL. Varian IL juga menghitung jumlah anak s.d.
+   `de_tukin` = min(akhir periode, hari ini) (`:13840, :13851`) dan memuat libur atas rentang penuh cuti yang dimuat
+   (`:14016-14036`) — CR-085; kalkulasinya `KalkulasiTukinIl` (README `Presensi/Tukin`).
 
 Risiko yang tercatat: hasil langkah 1–2 bergantung pada kelengkapan `riwayat_kp`/`riwayat_mutasi_jabatan` hasil impor;
 butir cutover dicatat reviewer CR di PRD 5A dan runbook impor.

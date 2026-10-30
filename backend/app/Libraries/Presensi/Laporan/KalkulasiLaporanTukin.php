@@ -8,6 +8,7 @@ use App\Libraries\Presensi\Rekap\PenyesuaianTukin;
 use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
 use App\Libraries\Presensi\Tukin\HasilTukin;
 use App\Libraries\Presensi\Tukin\KalkulasiTukin;
+use App\Libraries\Presensi\Tukin\KalkulasiTukinIl;
 use App\Libraries\Presensi\Tukin\PeriodeTukin;
 use App\Libraries\Presensi\TukinData\DataTukinBelumTersedia;
 use App\Libraries\Presensi\TukinData\GalatDataTukin;
@@ -72,7 +73,9 @@ final class KalkulasiLaporanTukin
                 }
 
                 try {
-                    $h = KalkulasiTukin::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai);
+                    $h = $il
+                        ? KalkulasiTukinIl::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai)
+                        : KalkulasiTukin::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai);
                 } catch (InvalidArgumentException $e) {
                     $hasil[$n] = ['galat' => ['code' => 'data_tukin_tidak_sah', 'message' => 'Data Tukin pegawai tidak sah: ' . $e->getMessage()]];
 
@@ -81,9 +84,7 @@ final class KalkulasiLaporanTukin
 
                 $adaTb       = array_filter($h->harian, static fn ($hh): bool => $hh->status === 'tugas_belajar') !== [];
                 $penyesuaian = PenyesuaianTukin::aktif($info['penyesuaian'][$n] ?? [], $bulanTk);
-                // Keterangan cuti legacy dibangun di dalam loop harian dari cuti yang dimuat; T-01 (cuti tidak dimuat) dan
-                // `lewatiLoopHarian` (semua hari di-`continue`, :12739-12743) → tanpa keterangan cuti.
-                $cuti = $a->tanpaDataHarian || ($a->pegawai->lewatiLoopHarian ?? false) ? [] : ($info['cuti'][$n] ?? []);
+                $cuti        = self::cutiDihitung($h, $a->harian, $info['cuti'][$n] ?? []);
 
                 $hasil[$n] = [
                     'hasil'             => $h,
@@ -97,6 +98,43 @@ final class KalkulasiLaporanTukin
         }
 
         return $hasil;
+    }
+
+    /**
+     * Keterangan cuti ikut legacy (CR-085, keputusan Horii 30-10): `$arrKetCuti` dibangun di dalam loop harian hanya untuk
+     * hari cuti yang benar-benar dilalui — setelah libur/akhir pekan, TB, pegawai baru (DH), dan pemotongan ke hari ini
+     * (DH :12776-12792, IL :14645-14650), satu baris per riwayat menurut urutan hari pertamanya (DH :13122, IL :15074).
+     * Diturunkan dari hari berstatus `cuti` di hasil harian; T-01 dan `lewatiLoopHarian` dengan sendirinya kosong.
+     *
+     * @param array<string, array<string, mixed>>        $harian input harian (cuti membawa `mulai`/`akhir`)
+     * @param list<array{0: string, 1: string, 2: string}> $riwayat `riwayat_cuti` periode [nama, mulai, akhir]
+     *
+     * @return list<array{0: string, 1: string, 2: string}>
+     */
+    private static function cutiDihitung(HasilTukin $h, array $harian, array $riwayat): array
+    {
+        $nama = [];
+
+        foreach ($riwayat as [$n, $mulai, $akhir]) {
+            $nama["{$mulai}|{$akhir}"] ??= $n;
+        }
+
+        $hasil = [];
+
+        foreach ($h->harian as $tanggal => $hh) {
+            if ($hh->status !== 'cuti') {
+                continue;
+            }
+
+            $cuti  = $harian[$tanggal]['cuti'] ?? [];
+            $kunci = ($cuti['mulai'] ?? '') . '|' . ($cuti['akhir'] ?? '');
+
+            if (! isset($hasil[$kunci]) && isset($nama[$kunci])) {
+                $hasil[$kunci] = [$nama[$kunci], (string) $cuti['mulai'], (string) $cuti['akhir']];
+            }
+        }
+
+        return array_values($hasil);
     }
 
     /**

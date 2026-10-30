@@ -31,6 +31,9 @@ final readonly class KonfigurasiTukin
      * - `CUTI_MELAHIRKAN_1..3` :12555-12571 (menggantikan total potongan pada periode jadwal)
      * - `SKP_KURANG`           :12406 (predikat SKP periodik "kurang")
      * - `SKP_TIDAK_ADA`        :12400, :12636 (predikat lain atau tidak ada data)
+     * - `CUTI_BESAR_IL`, `CUTI_MELAHIRKAN_IL_1..3`, `CUTI_ALASAN_PENTING_IL`: rekap IL `laporan_tukin_us_skp_il` — potongan
+     *   cuti per tanggal potong × faktor 0,2 (:14233-14364 cuti besar 25, :14366-14422 melahirkan 40/70/20, :14180-14228
+     *   alasan penting > 14 hari 50; dipakai `KalkulasiTukinIl`, CR-085)
      */
     public const TARIF_BAWAAN = [
         'CUTI_SAKIT'        => 1,
@@ -42,13 +45,22 @@ final readonly class KonfigurasiTukin
         'CUTI_MELAHIRKAN_3' => 80,
         'SKP_KURANG'        => 16,
         'SKP_TIDAK_ADA'     => 32,
+        // Rekap IL (CR-085).
+        'CUTI_BESAR_IL'          => 25,
+        'CUTI_MELAHIRKAN_IL_1'   => 40,
+        'CUTI_MELAHIRKAN_IL_2'   => 70,
+        'CUTI_MELAHIRKAN_IL_3'   => 20,
+        'CUTI_ALASAN_PENTING_IL' => 50,
     ];
 
     /** Faktor presensi rekap legacy (`* 0.2`), dalam persen. */
     public const FAKTOR_PRESENSI_PERSEN = 20;
 
     /** Kunci tarif yang dikalikan faktor presensi. */
-    public const KUNCI_BERFAKTOR = ['TL1/PSW1', 'TL2/PSW2', 'TL3/PSW3', 'TA', 'TK', 'CUTI_SAKIT'];
+    public const KUNCI_BERFAKTOR = [
+        'TL1/PSW1', 'TL2/PSW2', 'TL3/PSW3', 'TA', 'TK', 'CUTI_SAKIT',
+        'CUTI_BESAR_IL', 'CUTI_MELAHIRKAN_IL_1', 'CUTI_MELAHIRKAN_IL_2', 'CUTI_MELAHIRKAN_IL_3', 'CUTI_ALASAN_PENTING_IL',
+    ];
 
     /** @var array<string, int> Tarif dalam basis poin (1% = 100). */
     public array $tarif;
