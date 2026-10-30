@@ -29,7 +29,10 @@ use InvalidArgumentException;
  * 6. Sama dengan DH: dipotong ke hari ini (`de_tukin`), libur/akhir pekan dilewati, precedence TB → cuti → konket →
  *    presensi, aturan TL/PSW/TPM/TPP/TK (`StatusHarian`), cuti sakit hari ke-15+ 0,2, SKP bawaan 32 (:14491).
  *
- * [V2] tetap: `tmtKeluar` (hari ≥ TMT keluar di luar masa kerja; potongan cuti pada hari itu tidak dikenakan).
+ * Pegawai keluar (keputusan Horii 30-10, [K] legacy IL): adapter mode IL tidak mengisi `tmtKeluar` dan tidak memuat data
+ * harian/riwayat cuti pegawai `status = 2` dengan `tmt_status ≤ de_tukin` (`SumberDataPegawaiTukin::keluarTanpaDataIl`).
+ * Bila `DataPegawaiTukin::tmtKeluar` tetap diisi pemanggil lain, hari ≥ TMT keluar di luar masa kerja dan potongan cuti
+ * tanggal itu tidak dikenakan.
  */
 final class KalkulasiTukinIl
 {

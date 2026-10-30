@@ -105,6 +105,8 @@ Test: `SumberCutiTbFase4Test`, `PrecedenceKombinasiTest` (AC-D06.1/.2/.6), `Cuti
    (`tanpaPegawaiBaru`). Ini juga menutup selisih lama `tmtMasuk` di IL. Varian IL juga menghitung jumlah anak s.d.
    `de_tukin` = min(akhir periode, hari ini) (`:13840, :13851`) dan memuat libur atas rentang penuh cuti yang dimuat
    (`:14016-14036`) — CR-085; kalkulasinya `KalkulasiTukinIl` (README `Presensi/Tukin`).
+   Pegawai keluar di IL ikut legacy (keputusan Horii 30-10): tanpa `tmtKeluar`; `status = 2` dengan `tmt_status ≤ de_tukin`
+   (atau NULL) → harian & riwayat cuti tidak dimuat (`keluarTanpaDataIl`, `:13906`, `:13957`, `:14045`, `:14084`).
 
 Risiko yang tercatat: hasil langkah 1–2 bergantung pada kelengkapan `riwayat_kp`/`riwayat_mutasi_jabatan` hasil impor;
 butir cutover dicatat reviewer CR di PRD 5A dan runbook impor.

@@ -114,6 +114,67 @@ final class S14RekapIlIkutLegacyTest extends DatabaseTestCase
     }
 
     /**
+     * F (keputusan Horii 30-10, [K] legacy IL): pegawai keluar `status = 2` — data harian dimuat hanya bila `tmt_status >
+     * de_tukin` (`L_presensi.php:13906`, `:13957`, `:14045`, `:14084`), tanpa `tmtKeluar`. Periode Okt (16-09..15-10, 22
+     * hari kerja), hadir 16–30 Sep, tanpa SKP.
+     */
+    public function testPegawaiKeluarIkutLegacyIl(): void
+    {
+        // TMT keluar 01-10, ekspor 30-10 (de_tukin 15-10): tanpa data → 22 TK = 13,20 + 32.
+        $tmt1 = $this->pegawaiIlKeluar('2026-10-01');
+        $this->assertSame(['13.20', '45.20'], $this->tkTotal($this->barisIl($tmt1, '2026-10-30 09:00:00', '2026-10')));
+
+        // Ekspor 05-10 (de_tukin 05-10 ≥ TMT): tanpa data, loop s.d. 05-10 → 14 TK = 8,40 + 32.
+        $this->assertSame(['8.40', '40.40'], $this->tkTotal($this->barisIl($tmt1, '2026-10-05 09:00:00', '2026-10')));
+
+        // Batas `>` ketat: TMT = de_tukin (05-10) → tanpa data.
+        $this->assertSame(['8.40', '40.40'], $this->tkTotal($this->barisIl($this->pegawaiIlKeluar('2026-10-05'), '2026-10-05 09:00:00', '2026-10')));
+
+        // TMT keluar 10-10, ekspor 05-10 (TMT > de_tukin): data dimuat → TK hanya 01, 02, 05 Okt = 1,80 + 32.
+        $tmt10 = $this->pegawaiIlKeluar('2026-10-10');
+        $this->assertSame(['1.80', '33.80'], $this->tkTotal($this->barisIl($tmt10, '2026-10-05 09:00:00', '2026-10')));
+        // … dan tanpa tmtKeluar: hari ≥ TMT tetap dihitung (ekspor 30-10, de_tukin 15-10 ≥ TMT → tanpa data, 22 TK).
+        $this->assertSame(['13.20', '45.20'], $this->tkTotal($this->barisIl($tmt10, '2026-10-30 09:00:00', '2026-10')));
+    }
+
+    /** F: cuti besar (potong 01-10) & TB ikut tidak dimuat bila TMT keluar ≤ de_tukin; dimuat bila TMT > de_tukin. */
+    public function testPegawaiKeluarCutiBesarDanTbIkutKosong(): void
+    {
+        $kosong = $this->pegawaiIlKeluar('2026-10-01');
+        $this->cuti($kosong, 'besar', '2026-09-01', '2026-11-30', 65);
+        $this->tbRekap($kosong, '2026-10-14', '2026-10-15');
+        $b = $this->barisIl($kosong, '2026-10-30 09:00:00', '2026-10');
+        $this->assertSame(['0.00', '13.20', '32.00', '45.20', ''], [$b['pengurangan']['CUTI'], $b['pengurangan']['TK'], $b['total_skp'], $b['total_potongan'], (string) $b['keterangan']]);
+
+        $dimuat = $this->pegawaiIlKeluar('2026-10-20');
+        $this->cuti($dimuat, 'besar', '2026-09-01', '2026-11-30', 65);
+        $b = $this->barisIl($dimuat, '2026-10-30 09:00:00', '2026-10');
+        $this->assertSame(['5.00', '0.00', '37.00'], [$b['pengurangan']['CUTI'], $b['pengurangan']['TK'], $b['total_potongan']]);
+    }
+
+    private function pegawaiIlKeluar(string $tmt): string
+    {
+        $nip = $this->buatPegawai(['created_at' => '2020-01-01 00:00:00', 'id_jenis_pegawai' => 2, 'status' => 2, 'tmt_status' => $tmt], ['jenis_jabatan' => 2]);
+        $this->buatRiwayatMutasiJabatan($nip, ['jenis_jabatan' => 2]);
+
+        foreach ([16, 17, 18, 21, 22, 23, 24, 25, 28, 29, 30] as $h) {
+            $this->hadir($nip, sprintf('2026-09-%02d', $h), '07:30:00', $h === 18 || $h === 25 ? '16:30:00' : '16:00:00');
+        }
+
+        return $nip;
+    }
+
+    /**
+     * @param array<string, mixed> $baris
+     *
+     * @return list<string> [TK, total potongan]
+     */
+    private function tkTotal(array $baris): array
+    {
+        return [$baris['pengurangan']['TK'], $baris['total_potongan']];
+    }
+
+    /**
      * Pegawai IL: snapshot & riwayat jabatan jenis 2, hadir sepanjang periode 2026-09 kecuali `$tanpa`.
      *
      * @param list<string> $tanpa
@@ -134,9 +195,9 @@ final class S14RekapIlIkutLegacyTest extends DatabaseTestCase
     /**
      * @return array<string, mixed>
      */
-    private function barisIl(string $nip, string $wib = '2026-10-27 09:00:00'): array
+    private function barisIl(string $nip, string $wib = '2026-10-27 09:00:00', string $bulan = '2026-09'): array
     {
-        $rekap = $this->serviceRekapTukin($wib)->daftar($this->adminRekap(), ['bulan' => '2026-09', 'per_page' => '100'], true);
+        $rekap = $this->serviceRekapTukin($wib)->daftar($this->adminRekap(), ['bulan' => $bulan, 'per_page' => '100'], true);
         $baris = array_column($rekap['items'], null, 'nip')[$nip] ?? null;
         $this->assertIsArray($baris, "NIP {$nip} ada di rekap IL");
         $this->assertNull($baris['galat']);

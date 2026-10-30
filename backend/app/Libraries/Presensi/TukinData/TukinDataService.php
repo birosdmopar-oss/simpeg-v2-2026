@@ -24,7 +24,8 @@ use LogicException;
  *
  * [K T-01, CR-083] Pegawai yang `created_at`-nya tidak sebelum akhir periode BKN (hari terakhir periode, jam apa pun)
  * tidak dimuat data hariannya (`harian = []`, semua hari kerja TK), seperti legacy; lihat
- * {@see SumberDataPegawaiTukin::tanpaDataHarian()}.
+ * {@see SumberDataPegawaiTukin::tanpaDataHarian()}. Rekap IL juga untuk pegawai keluar dengan `tmt_status ≤ de_tukin`
+ * ({@see SumberDataPegawaiTukin::keluarTanpaDataIl()}, keputusan Horii 30-10): harian & riwayat cuti kosong.
  */
 final class TukinDataService
 {
@@ -80,7 +81,8 @@ final class TukinDataService
         $awal  = min($sebelumnya->awal, $periode->awal);
         $libur = $this->hariLibur->untuk($awal, $periode->akhir);
 
-        $tanpa = $this->dataPegawai->tanpaDataHarian([$nip], $periode) !== [];
+        $tanpa = $this->dataPegawai->tanpaDataHarian([$nip], $periode) !== []
+            || ($tanpaPegawaiBaru && $this->dataPegawai->keluarTanpaDataIl([$nip], self::deTukin($periode, $hariIni)) !== []);
 
         try {
             $pegawai = $this->dataPegawai->untuk($nip, $periode, $bkn['id'] ?? null, $libur, $tanpaPegawaiBaru, $tanpaPegawaiBaru ? self::deTukin($periode, $hariIni) : null);
@@ -137,6 +139,10 @@ final class TukinDataService
 
         $batas = max(1, $ukuranBatch ?? config(Presensi::class)->tukinBatchNip);
         $tanpa = $this->dataPegawai->tanpaDataHarian($unik, $periode);
+
+        if ($tanpaPegawaiBaru) {
+            $tanpa = array_values(array_unique([...$tanpa, ...$this->dataPegawai->keluarTanpaDataIl($unik, self::deTukin($periode, $hariIni))]));
+        }
         $hasil = [];
 
         foreach (array_chunk($unik, $batas) as $batch) {
