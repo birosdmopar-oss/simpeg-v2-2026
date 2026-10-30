@@ -32,6 +32,5 @@ class RiwayatCutiModel extends BaseAuditableModel
         'keterangan_petugas_approval', 'ketua_tim', 'status', 'status_regen', 'created_at', 'updated_by',
         'approved_by', 'reason_note', 'rated', 'skip_al', 'skip_pyb', 'show_notif', 'notif_date', 'show_atasan',
         'show_pejabat', 'show_history_atasan',
-        'updated_at',
     ];
 }

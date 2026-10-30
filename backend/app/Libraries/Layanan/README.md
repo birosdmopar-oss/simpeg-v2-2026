@@ -178,4 +178,4 @@ Catatan keputusan coder M6 (dicatat untuk reviewer):
 
 ## Stempel UTC (CR-086)
 
-`created_at`/`updated_at` riwayat TB/IB/PMK, petugas/PIC, dan cuti diisi aplikasi dengan UTC (`gmdate`, otomatis lewat `BaseAuditableModel`; `StudiPengajuanService::tambah` juga mengisi `updated_at` karena default kolom bernilai). Pembaca yang menampilkan tanggal pengajuan memakai `StempelUtc` (WIB): dashboard Status Layanan mengirim `tanggal_pengajuan` ISO `+07:00`; ekspor memotong tanggal WIB; surat TB/IB memakai tanggal WIB. Aturan lengkap, audit, dan perintah normalisasi: [`../Waktu/README.md`](../Waktu/README.md).
+Sesi DB berzona UTC (driver `App\Database\MySQLi`, DBV-025), jadi default/ON UPDATE kolom audit berisi UTC. Pembaca yang menampilkan tanggal pengajuan memakai `StempelUtc` (WIB): dashboard Status Layanan mengirim `tanggal_pengajuan` ISO `+07:00`; ekspor memotong tanggal WIB; surat TB/IB memakai tanggal WIB. Aturan lengkap: [`../Waktu/README.md`](../Waktu/README.md).

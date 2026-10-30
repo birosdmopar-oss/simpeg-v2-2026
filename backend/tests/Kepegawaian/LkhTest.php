@@ -80,24 +80,18 @@ final class LkhTest extends DatabaseTestCase
         $this->assertSame(['2026-10-08', '2026-10-13', $this->nipAtasan], [$opsi['tanggal_minimal'], $opsi['tanggal_maksimal'], $opsi['atasan']['nip']]);
     }
 
-    public function testStempelCreatedAtDiisiAplikasiUtcBukanZonaSesiDb(): void
+    public function testStempelCreatedAtDanUpdatedAtBerisiUtc(): void
     {
-        // CR-086: zona sesi +14:00 membuat DEFAULT CURRENT_TIMESTAMP berbeda jauh dari UTC; aplikasi wajib mengisinya.
-        $this->db->query("SET time_zone = '+14:00'");
+        // CR-086: sesi DB berzona UTC (App\Database\MySQLi), jadi DEFAULT/ON UPDATE kolom audit berisi UTC.
+        $awal = time();
+        $row  = $this->tambah($this->pegawai, '2026-10-12');
+        $db   = $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $row['id'])->get()->getRowArray();
 
-        try {
-            $awal = time();
-            $row  = $this->tambah($this->pegawai, '2026-10-12');
-            $db   = $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $row['id'])->get()->getRowArray();
+        $this->assertEqualsWithDelta($awal, strtotime($db['created_at'] . ' UTC'), 30, 'created_at harus UTC: ' . $db['created_at']);
 
-            $this->assertEqualsWithDelta($awal, strtotime($db['created_at'] . ' UTC'), 30, 'created_at harus UTC: ' . $db['created_at']);
-
-            $this->svc()->ubah($this->pegawai, $row['id'], ['tgl_laporan' => '2026-10-12', 'kegiatan' => [$this->baris('08:00')]]);
-            $db2 = $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $row['id'])->get()->getRowArray();
-            $this->assertEqualsWithDelta($awal, strtotime($db2['updated_at'] . ' UTC'), 30, 'updated_at harus UTC: ' . $db2['updated_at']);
-        } finally {
-            $this->db->query('SET time_zone = SYSTEM');
-        }
+        $this->svc()->ubah($this->pegawai, $row['id'], ['tgl_laporan' => '2026-10-12', 'kegiatan' => [$this->baris('08:00')]]);
+        $db2 = $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $row['id'])->get()->getRowArray();
+        $this->assertEqualsWithDelta($awal, strtotime($db2['updated_at'] . ' UTC'), 30, 'updated_at harus UTC: ' . $db2['updated_at']);
     }
 
     public function testValidasiLegacy(): void

@@ -21,7 +21,7 @@ class RiwayatTbModel extends LayananModel
         'pendidikan_dasar_singkat', 'tgl_mulai', 'tgl_akhir', 'tgl_mulai_perpan', 'tgl_akhir_perpan', 'lama_tahun',
         'jenjang_pendidikan_singkat', 'institusi_pendidikan', 'jurusan_pendidikan', 'dalam_negeri',
         'lokasi_pendidikan', 'lembaga_yang_mendanai', 'up', 'tembusan', 'keterangan', 'ds_tb', 'no_ds_tb', 'tgl_ds_tb',
-        'perihal_ds_tb', 'no_sk', 'tgl_sk', 'status', 'created_at', 'updated_at', 'updated_by', 'approved_by', 'reason_note',
+        'perihal_ds_tb', 'no_sk', 'tgl_sk', 'status', 'updated_at', 'updated_by', 'approved_by', 'reason_note',
         'show_notif', 'notif_date', 'show_pl',
     ];
 }

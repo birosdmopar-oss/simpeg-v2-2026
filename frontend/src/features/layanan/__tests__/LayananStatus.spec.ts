@@ -52,7 +52,7 @@ const item = (extra: Record<string, unknown> = {}) => ({
   nama: 'Contoh Pegawai, S.E.',
   unit: 'Unit Contoh',
   satker: 'Satker Contoh',
-  tanggal_pengajuan: '2026-10-21 01:00:00',
+  tanggal_pengajuan: '2026-10-21T08:00:00+07:00', // ISO WIB (CR-086); tahap[].waktu tetap UTC tanpa zona
   status: '0',
   ringkasan: 'Tugas Belajar S.1 - Universitas Contoh',
   label_status: 'Menunggu PIC',

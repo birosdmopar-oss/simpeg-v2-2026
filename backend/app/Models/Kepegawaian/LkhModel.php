@@ -21,6 +21,6 @@ class LkhModel extends BaseAuditableModel
     protected $allowedFields = [
         'id_unit', 'id_satker', 'nip', 'tgl_laporan', 'nama', 'unit', 'satker', 'nip_atasan', 'nama_atasan', 'kegiatan',
         'output', 'jumlah_diselesaikan', 'jam_mulai', 'jam_selesai', 'catatan', 'status', 'updated_by', 'approved_by',
-        'show_notif', 'show_atasan', 'show_history_atasan', 'created_at', 'updated_at',
+        'show_notif', 'show_atasan', 'show_history_atasan',
     ];
 }

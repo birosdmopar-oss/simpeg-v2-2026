@@ -21,6 +21,5 @@ class PaLayananModel extends BaseAuditableModel
         'id_jenis_pa', 'id_jenis_pegawai', 'id_group_jabatan_pemohon', 'id_sub_group_jabatan_pemohon', 'gol_ruang_pemohon',
         'id_unit_pemohon', 'id_group_jabatan_petugas', 'id_sub_group_jabatan_petugas', 'id_unit_petugas', 'id_satker_petugas',
         'id_jabatan', 'id_jabatan_koord', 'nip', 'status', 'updated_by',
-        'created_at', 'updated_at',
     ];
 }

@@ -19,6 +19,5 @@ class PegawaiSisaCutiModel extends BaseAuditableModel
     protected $useTimestamps  = false;
     protected $allowedFields  = [
         'nip', 'tahun', 'sisa_cuti', 'sisa_cuti_n1', 'sisa_cuti_n2', 'sisa_cuti_ditangguhkan', 'utang_cuti', 'digunakan', 'updated_by',
-        'created_at', 'updated_at',
     ];
 }

@@ -41,7 +41,7 @@ class Database extends Config
         'username'     => '',
         'password'     => '',
         'database'     => '',
-        'DBDriver'     => 'MySQLi',
+        'DBDriver'     => 'App\Database\MySQLi', // zona sesi UTC (CR-086, DBV-025)
         'DBPrefix'     => '',
         'pConnect'     => false,
         'DBDebug'      => true,
@@ -179,7 +179,7 @@ class Database extends Config
         'username'     => 'root',
         'password'     => '',
         'database'     => 'simpeg_v2_testing',
-        'DBDriver'     => 'MySQLi',
+        'DBDriver'     => 'App\Database\MySQLi', // zona sesi UTC (CR-086, DBV-025)
         'DBPrefix'     => 't_', // prefix sengaja dipakai di test agar query hard-coded tanpa prefix ketahuan
         'pConnect'     => false,
         'DBDebug'      => true,
@@ -203,6 +203,15 @@ class Database extends Config
     public function __construct()
     {
         parent::__construct();
+
+        // Zona sesi UTC (CR-086, DBV-025) tidak boleh mati oleh `.env` lama (`database.default.DBDriver = MySQLi`): driver
+        // polos dipaksa ke driver aplikasi; driver kelas lain (mis. driver uji turunan driver aplikasi di phpunit.dist.xml)
+        // dibiarkan.
+        foreach (['default', 'tests'] as $grup) {
+            if (! str_contains((string) $this->{$grup}['DBDriver'], '\\')) {
+                $this->{$grup}['DBDriver'] = 'App\Database\MySQLi';
+            }
+        }
 
         // Ensure that we always set the database group to 'tests' if
         // we are currently running an automated test suite, so that

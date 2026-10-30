@@ -22,6 +22,5 @@ class KonketModel extends BaseAuditableModel
         'nip', 'date_start', 'date_end', 'kategori', 'jenis_konket', 'jenis_dinas', 'affect_tukin', 'id_parent', 'alasan',
         'file_bukti', 'status', 'updated_by', 'approved_by', 'reason_note', 'show_notif', 'notif_date', 'show_ua_upt',
         'show_ua_deputi', 'show_ua_biro',
-        'created_at', 'updated_at',
     ];
 }

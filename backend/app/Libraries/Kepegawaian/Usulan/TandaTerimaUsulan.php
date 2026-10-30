@@ -102,9 +102,6 @@ final class TandaTerimaUsulan
     }
 
     /**
-     * @return array<string, string>
-     */
-    /**
      * Kode/QR tanda terima = padanan legacy `yy . '0' . strtotime(created_at) . jenis . id` (CR-086): legacy menyimpan jam
      * dinding WIB, v2 menyimpan UTC, jadi epoch dihitung dari UTC (instan sama) dan `yy` = tahun WIB.
      */
@@ -119,6 +116,9 @@ final class TandaTerimaUsulan
         return '0000' . (StempelUtc::keWib($createdAtUtc, 'y') ?? gmdate('y')) . ($karpeg ? '1' : '0') . $id;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function webConfig(): array
     {
         $db  = $this->db();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Database\Isolasi;
 
-use CodeIgniter\Database\MySQLi\Connection as MySQLiConnection;
+use App\Database\MySQLi\Connection as MySQLiConnection;
 use Throwable;
 
 /**

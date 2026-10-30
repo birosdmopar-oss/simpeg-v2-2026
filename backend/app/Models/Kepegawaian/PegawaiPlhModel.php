@@ -22,6 +22,5 @@ class PegawaiPlhModel extends BaseAuditableModel
         'jenis_jabatan', 'jenis_jabatan_koord', 'tgl_mulai', 'tgl_akhir', 'nip_plh', 'id_jabatan', 'id_jabatan_koord',
         'id_group_jabatan', 'id_sub_group_jabatan', 'id_unit', 'id_satker', 'id_group_jabatan_plh', 'id_sub_group_jabatan_plh',
         'id_unit_plh', 'id_satker_plh', 'keterangan', 'lampiran', 'status', 'updated_by',
-        'created_at', 'updated_at',
     ];
 }

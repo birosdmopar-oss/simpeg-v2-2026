@@ -15,5 +15,5 @@ class RiwayatPmkModel extends LayananModel
     protected $primaryKey    = 'id_riwayat_pmk';
     protected $returnType    = 'array';
     protected $useTimestamps = false;
-    protected $allowedFields = ['updated_at', 'updated_by', 'created_at'];
+    protected $allowedFields = ['updated_at', 'updated_by'];
 }
