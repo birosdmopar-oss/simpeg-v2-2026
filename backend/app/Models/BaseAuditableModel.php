@@ -45,6 +45,8 @@ abstract class BaseAuditableModel extends Model
     {
         parent::__construct(...$args);
 
+        $this->beforeInsert[] = 'isiStempelUtcInsert';
+        $this->beforeUpdate[] = 'isiStempelUtcUpdate';
         $this->beforeUpdate[] = 'auditCaptureBefore';
         $this->beforeDelete[] = 'auditCaptureBefore';
         $this->afterInsert[]  = 'auditAfterInsert';
@@ -55,6 +57,40 @@ abstract class BaseAuditableModel extends Model
     // ------------------------------------------------------------------
     // Model event handlers (public agar bisa dipanggil trigger())
     // ------------------------------------------------------------------
+
+    /**
+     * Stempel audit DATETIME berisi UTC dan diisi aplikasi, bukan DEFAULT CURRENT_TIMESTAMP yang mengikuti zona sesi DB
+     * (CR-086; DBV-011 §1.2, DBV-022 G2). Hanya mengisi `created_at` yang belum dikirim pemanggil dan hanya bila kolomnya
+     * ada di `$allowedFields`; nilai eksplisit (mis. impor) tidak ditimpa.
+     *
+     * @param array<string, mixed> $eventData
+     *
+     * @return array<string, mixed>
+     */
+    public function isiStempelUtcInsert(array $eventData): array
+    {
+        if (in_array('created_at', $this->allowedFields, true) && ! array_key_exists('created_at', $eventData['data'] ?? [])) {
+            $eventData['data']['created_at'] = gmdate('Y-m-d H:i:s');
+        }
+
+        return $eventData;
+    }
+
+    /**
+     * `updated_at` saat update (kolom ON UPDATE CURRENT_TIMESTAMP akan terisi zona sesi bila tidak dikirim aplikasi).
+     *
+     * @param array<string, mixed> $eventData
+     *
+     * @return array<string, mixed>
+     */
+    public function isiStempelUtcUpdate(array $eventData): array
+    {
+        if (in_array('updated_at', $this->allowedFields, true) && ! array_key_exists('updated_at', $eventData['data'] ?? [])) {
+            $eventData['data']['updated_at'] = gmdate('Y-m-d H:i:s');
+        }
+
+        return $eventData;
+    }
 
     /**
      * @param array<string, mixed> $eventData

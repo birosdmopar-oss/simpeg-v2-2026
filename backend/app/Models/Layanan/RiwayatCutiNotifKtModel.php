@@ -17,5 +17,5 @@ class RiwayatCutiNotifKtModel extends Model
     protected $primaryKey    = 'id_riwayat_cuti';
     protected $returnType    = 'array';
     protected $useTimestamps = false;
-    protected $allowedFields = ['id_riwayat_cuti', 'nip_kt', 'status'];
+    protected $allowedFields = ['id_riwayat_cuti', 'nip_kt', 'status', 'created_at', 'updated_at'];
 }

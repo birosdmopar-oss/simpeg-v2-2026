@@ -208,7 +208,8 @@ abstract class StudiPengajuanService extends LayananStudi
             $this->kunciPegawai($nip);
             $this->periksaBentrok($nip, (string) $param['tgl_mulai'], (string) $param['tgl_akhir'], null);
 
-            $param += ['nip' => $nip, 'updated_by' => $auth->idPengguna()] + $this->snapshotPegawai($nip);
+            $stempel = $this->sekarang();
+            $param += ['nip' => $nip, 'updated_by' => $auth->idPengguna(), 'created_at' => $stempel, 'updated_at' => $stempel] + $this->snapshotPegawai($nip);
 
             if ((int) $param['status'] === StatusStudi::DISETUJUI) {
                 $param += ['approved_by' => $auth->idPengguna(), 'show_pl' => 1, 'reason_note' => null];

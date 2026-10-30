@@ -15,6 +15,7 @@ use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Pdf\DokumenPdf;
 use App\Libraries\Pdf\Pdf;
+use App\Libraries\Waktu\StempelUtc;
 use App\Models\Kepegawaian\LkhModel;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\I18n\Time;
@@ -301,8 +302,9 @@ final class LkhService implements LkhServiceInterface
             . '<tr><td style="text-align:center;font-size:8pt;">' . nl2br(esc((string) ($uns['alamat_pdf_header'] ?? $wc['pdf_header_alamat_kementerian'] ?? ''))) . '</td></tr></table>'
             . '<hr style="height:2px;" />';
 
-        // Kode legacy: id . yy(tgl_laporan) . '0' . strtotime(created_at) — waktu dibaca sebagai WIB seperti server legacy.
-        $kunci = $row['id_riwayat_lckh'] . date('y', (int) strtotime((string) $row['tgl_laporan'])) . '0' . Time::parse((string) $row['created_at'], 'Asia/Jakarta')->getTimestamp();
+        // Kode legacy: id . yy(tgl_laporan) . '0' . strtotime(created_at) — legacy menyimpan jam dinding WIB; v2 menyimpan UTC (CR-086),
+        // jadi epoch dihitung dari UTC (instan sama dengan jam dinding WIB legacy).
+        $kunci = self::kunciQr((int) $row['id_riwayat_lckh'], (string) $row['tgl_laporan'], (string) $row['created_at']);
         $html  = view('pdf/lkh', ['lkh' => $this->bentuk($row, $auth, true), 'qr' => Pdf::qrImg($kunci, 100)]);
         $judul = 'Laporan Kerja Harian ' . $row['nama'] . ' - ' . TanggalBisnis::formatIndonesia((string) $row['tgl_laporan']);
         $isi   = Pdf::renderer()->render(new DokumenPdf(
@@ -317,6 +319,14 @@ final class LkhService implements LkhServiceInterface
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * Kunci QR LKH = padanan legacy `id . yy(tgl_laporan) . '0' . strtotime(created_at)` (CR-086): epoch dari `created_at` UTC.
+     */
+    public static function kunciQr(int $id, string $tglLaporan, string $createdAtUtc): string
+    {
+        return $id . date('y', (int) strtotime($tglLaporan)) . '0' . (StempelUtc::epoch($createdAtUtc) ?? 0);
+    }
 
     public function descriptorTab(AuthContext $auth, string $nip): ?array
     {

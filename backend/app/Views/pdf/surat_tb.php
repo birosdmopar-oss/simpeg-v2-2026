@@ -12,7 +12,7 @@ use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
  * @var array{nip: string, nama: string, jabatan: string}|null $kabiro
  * @var string                                                  $tujuan  unit kepegawaian (tujuan laporan)
  */
-$tgl = static fn (?string $t): string => $t === null || $t === '' ? '' : TanggalBisnis::formatIndonesia(substr($t, 0, 10));
+$tgl = static fn (?string $t): string => $t === null || $t === '' ? '' : TanggalBisnis::formatIndonesia(\App\Libraries\Waktu\StempelUtc::tanggalWib($t) ?? substr($t, 0, 10));
 $e   = static fn (mixed $v): string => esc((string) ($v ?? ''));
 
 $dasar = "{$e($tb['ds_tb'])} nomor: {$e($tb['no_ds_tb'])}";

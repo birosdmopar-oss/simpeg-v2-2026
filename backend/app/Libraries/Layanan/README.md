@@ -175,3 +175,7 @@ Catatan keputusan coder M6 (dicatat untuk reviewer):
 6. [V2] `GET layanan/petugas/kandidat` (role 1, gap PRD §5.5, disetujui Horii 27-10): aturan kandidat satu sumber
    (`kueriKandidat`) untuk daftar dan validasi tulis. Detail modul tetap menolak role 4/5 lewat route modul (diuji
    `LayananStatusRoleTest::testDetailModulTetapMenolakRole4Dan5`), bukan hanya flag `aksi.lihat_detail`.
+
+## Stempel UTC (CR-086)
+
+`created_at`/`updated_at` riwayat TB/IB/PMK, petugas/PIC, dan cuti diisi aplikasi dengan UTC (`gmdate`, otomatis lewat `BaseAuditableModel`; `StudiPengajuanService::tambah` juga mengisi `updated_at` karena default kolom bernilai). Pembaca yang menampilkan tanggal pengajuan memakai `StempelUtc` (WIB): dashboard Status Layanan mengirim `tanggal_pengajuan` ISO `+07:00`; ekspor memotong tanggal WIB; surat TB/IB memakai tanggal WIB. Aturan lengkap, audit, dan perintah normalisasi: [`../Waktu/README.md`](../Waktu/README.md).

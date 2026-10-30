@@ -15,5 +15,5 @@ class PetugasLayananModel extends LayananModel
     protected $primaryKey    = 'id_petugas_layanan';
     protected $returnType    = 'array';
     protected $useTimestamps = false;
-    protected $allowedFields = ['id_jenis_layanan', 'nip', 'status'];
+    protected $allowedFields = ['id_jenis_layanan', 'nip', 'status', 'created_at', 'updated_at'];
 }

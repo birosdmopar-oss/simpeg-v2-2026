@@ -14,6 +14,7 @@ use App\Libraries\Kepegawaian\Riwayat\StatusRiwayat;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Libraries\Pdf\DokumenPdf;
 use App\Libraries\Pdf\Pdf;
+use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\I18n\Time;
 
@@ -68,19 +69,17 @@ final class TandaTerimaUsulan
             ->where('p.nip', $nip)->get()->getRowArray() ?? [];
 
         $karpeg = $jenis === 'karpeg';
-        // L4: waktu dibuat dibaca sebagai WIB (server legacy) supaya kode sama dengan legacy.
-        $dibuat  = Time::parse((string) $baris['created_at'], 'Asia/Jakarta')->getTimestamp();
-        $kodeJen = $karpeg ? '1' : '0';
-        $kode    = date('y', $dibuat) . '0' . $dibuat . $kodeJen . $id;
-        $berkas  = $karpeg ? Karpeg::BERKAS : Kariskarsu::BERKAS;
-        $wc      = $this->webConfig();
+        // L4/CR-086: `created_at` v2 = UTC, legacy = jam dinding WIB; epoch dari UTC sama dengan legacy, tahun 'y' = tahun WIB.
+        $kode   = self::kode((string) $baris['created_at'], $karpeg, $id);
+        $berkas = $karpeg ? Karpeg::BERKAS : Kariskarsu::BERKAS;
+        $wc     = $this->webConfig();
 
         $html = view('pdf/tanda_terima_usulan', [
             'judul'   => $karpeg ? 'KARPEG' : 'KARIS/KARSU',
             'baris'   => $baris,
             'nama'    => StrukturService::namaGelar($pegawai['glr_awal'] ?? null, (string) ($pegawai['nama'] ?? ''), $pegawai['glr_akhir'] ?? null),
             'pegawai' => $pegawai,
-            'noTiket' => '0000' . date('y', $dibuat) . $kodeJen . $id,
+            'noTiket' => self::noTiket((string) $baris['created_at'], $karpeg, $id),
             'kode'    => $kode,
             'berkas'  => $berkas,
             'qr'      => Pdf::qrImg($kode, 100),
@@ -105,6 +104,21 @@ final class TandaTerimaUsulan
     /**
      * @return array<string, string>
      */
+    /**
+     * Kode/QR tanda terima = padanan legacy `yy . '0' . strtotime(created_at) . jenis . id` (CR-086): legacy menyimpan jam
+     * dinding WIB, v2 menyimpan UTC, jadi epoch dihitung dari UTC (instan sama) dan `yy` = tahun WIB.
+     */
+    public static function kode(string $createdAtUtc, bool $karpeg, int $id): string
+    {
+        return (StempelUtc::keWib($createdAtUtc, 'y') ?? gmdate('y')) . '0' . (StempelUtc::epoch($createdAtUtc) ?? 0) . ($karpeg ? '1' : '0') . $id;
+    }
+
+    /** No. tiket legacy `0000 . yy . jenis . id`; `yy` = tahun WIB dari `created_at` UTC (CR-086). */
+    public static function noTiket(string $createdAtUtc, bool $karpeg, int $id): string
+    {
+        return '0000' . (StempelUtc::keWib($createdAtUtc, 'y') ?? gmdate('y')) . ($karpeg ? '1' : '0') . $id;
+    }
+
     private function webConfig(): array
     {
         $db  = $this->db();

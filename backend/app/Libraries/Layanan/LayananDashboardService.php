@@ -22,6 +22,7 @@ use App\Libraries\Layanan\Studi\StatusStudi;
 use App\Libraries\Layanan\Studi\TampilanStudi;
 use App\Libraries\Layanan\Tb\TbService;
 use App\Libraries\ListQuery;
+use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
 
@@ -353,7 +354,7 @@ class LayananDashboardService
                 'nama'              => $this->teks($row['nama'] ?? null) ?? $p['nama'],
                 'unit'              => $p['unit'],
                 'satker'            => $p['satker'],
-                'tanggal_pengajuan' => $row['created_at'],
+                'tanggal_pengajuan' => StempelUtc::keIsoWib((string) $row['created_at']) ?? $row['created_at'],
                 'status'            => (int) $row['status'],
             ] + ($jenis === 'cuti' ? $this->tampilCuti($row) : $this->tampilLayanan($jenis, $row, $pic[$jenis]));
 

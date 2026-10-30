@@ -13,7 +13,7 @@
  * @var string                $qr
  * @var string                $dicetak
  */
-$tgl = static fn (?string $v): string => $v === null || $v === '' ? '-' : date('d-m-Y H:i:s', (int) strtotime($v));
+$tgl = static fn (?string $v): string => $v === null || $v === '' ? '-' : \App\Libraries\Waktu\StempelUtc::keWib($v, 'd-m-Y H:i:s') ?? '-';
 ?>
 <table width="100%" cellpadding="0">
     <tr>

@@ -19,6 +19,6 @@ class RiwayatIbModel extends LayananModel
         'pendidikan_dasar_singkat', 'tgl_mulai', 'tgl_akhir', 'lama_tahun', 'jenjang_pendidikan_singkat',
         'institusi_pendidikan', 'jurusan_pendidikan', 'dalam_negeri', 'lokasi_pendidikan', 'lembaga_yang_mendanai',
         'up', 'tembusan', 'keterangan', 'ds_ib', 'no_ds_ib', 'tgl_ds_ib', 'perihal_ds_ib', 'no_sk', 'tgl_sk', 'status',
-        'updated_at', 'updated_by', 'approved_by', 'reason_note', 'show_notif', 'notif_date', 'show_pl',
+        'created_at', 'updated_at', 'updated_by', 'approved_by', 'reason_note', 'show_notif', 'notif_date', 'show_pl',
     ];
 }

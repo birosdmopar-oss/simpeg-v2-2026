@@ -60,6 +60,23 @@ final class LayananStatusTest extends DatabaseTestCase
         parent::tearDown();
     }
 
+    public function testTanggalPengajuanDitampilkanWibPadaBatas1700Utc(): void
+    {
+        // CR-086: created_at UTC. 16:59:59 UTC = 23:59:59 WIB (tanggal sama); 17:00:00 UTC = 00:00:00 WIB hari berikutnya.
+        $this->db->table('riwayat_tb')->where('id_riwayat_tb', $this->id['tb'])->update(['created_at' => '2026-11-03 16:59:59']);
+        $this->db->table('riwayat_ib')->where('id_riwayat_ib', $this->id['ib'])->update(['created_at' => '2026-11-03 17:00:00']);
+
+        $per = array_column($this->dasbor($this->pegawai)['items'], null, 'jenis');
+
+        $this->assertSame('2026-11-03', substr((string) $per['tb']['tanggal_pengajuan'], 0, 10));
+        $this->assertSame('2026-11-04', substr((string) $per['ib']['tanggal_pengajuan'], 0, 10), 'tanggal WIB hari berikutnya');
+        $this->assertSame('2026-11-04T00:00:00+07:00', $per['ib']['tanggal_pengajuan'], 'instan sama, offset WIB eksplisit');
+
+        // Urutan lintas modul memakai stempel UTC mentah: ib (17:00:00) lebih baru dari tb (16:59:59) yang lebih baru dari pmk/cuti.
+        $urut = array_column($this->dasbor($this->pegawai)['items'], 'jenis');
+        $this->assertSame(['ib', 'tb'], array_slice($urut, 0, 2));
+    }
+
     public function testPegawaiMelihatKeempatJenisUrutTerbaru(): void
     {
         $hasil = $this->dasbor($this->pegawai);

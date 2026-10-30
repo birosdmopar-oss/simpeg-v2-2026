@@ -604,3 +604,7 @@ penjaga). Target KP dibaca lewat `GET pegawai/{nip}/ak/target-kp`; tab AK tidak 
 **Test.** `tests/unit/Kepegawaian/AngkaKredit/AkPermenpanrbKonstantaTest.php` (konstanta & `akUntukKp` murni),
 `tests/Kepegawaian/AngkaKreditTest.php` (target KP dari `riwayat_ak_siasn`, izin endpoint, CRUD master kosong/terisi,
 master terisi dipakai `Ak::turunan`).
+
+## Stempel UTC pada LKH dan tanda terima usulan (CR-086)
+
+`riwayat_lckh.created_at/updated_at` diisi aplikasi dengan UTC (`LkhModel`, `$allowedFields`), bukan default DB. Kunci QR LKH (`LkhService::kunciQr`) dan kode/no. tiket tanda terima (`TandaTerimaUsulan::kode/noTiket`) menghitung epoch dari stempel UTC dan tahun dari WIB sehingga sama dengan nilai legacy (jam dinding WIB); tanggal/jam di PDF tanda terima ditampilkan WIB (`StempelUtc::keWib`). Aturan lengkap: [`Waktu/README.md`](Waktu/README.md).
