@@ -80,7 +80,9 @@ final class ImporLegacyTier1Test extends ImporLegacyTestCase
         $this->assertSame([3 => '1', 4 => '1', 6 => '2'], array_map('strval', $order));
 
         $this->assertNull($this->db->table('jabatan')->where('id_jabatan', 100)->get()->getRowArray()['id_jenjang_jf']);
-        $this->assertSame('2', (string) $this->db->table('jabatan_koordinasi')->where('id_jabatan_koordinasi', 1)->get()->getRowArray()['id_atasan_es_3_koord']);
+        $koord = $this->db->table('jabatan_koordinasi')->where('id_jabatan_koordinasi', 1)->get()->getRowArray();
+        $this->assertSame('2', (string) $koord['id_atasan_es_3_koord']);
+        $this->assertSame('2026-01-01 00:00:00', $koord['updated_at'], 'UPDATE kolom tunda tidak memicu ON UPDATE CURRENT_TIMESTAMP');
         $this->assertSame('2026-08-01 03:00:00', $this->db->table('hari_libur')->where('id_libur', 40)->get()->getRowArray()['created_at']);
 
         $this->assertSame(6, $lap['jenis_cuti']['dilewati'], 'seed migration sama → dilewati (GAP-3)');
@@ -186,6 +188,28 @@ final class ImporLegacyTier1Test extends ImporLegacyTestCase
         $this->impor(k: Keputusan::dariArray(['nilai' => ['hari_libur.id_jenis_libur' => ['null' => 1]]]));
 
         $this->assertSame('1', (string) $this->db->table('hari_libur')->where('id_libur', 41)->get()->getRowArray()['id_jenis_libur']);
+    }
+
+    public function testBentrokUniqueSesudahNormalisasiTerdeteksiDiDryRunDanCommit(): void
+    {
+        $this->isiLegacyDasar();
+        // Beda spasi tengah → identik sesudah normalisasi nama → UNIQUE uq_jenis_pegawai_nama [V2] bentrok.
+        $this->src->table('jenis_pegawai')->insertBatch([
+            ['id_jenis_pegawai' => 1, 'jenis_pegawai' => 'PNS Pusat', 'order' => 1, 'status' => 1],
+            ['id_jenis_pegawai' => 2, 'jenis_pegawai' => 'PNS  Pusat', 'order' => 2, 'status' => 1],
+        ]);
+
+        foreach ([true, false] as $dryRun) {
+            try {
+                $this->impor(dryRun: $dryRun);
+                $this->fail('Bentrok UNIQUE harus gagal (dry-run=' . var_export($dryRun, true) . ').');
+            } catch (ImporGagal $e) {
+                $this->assertStringContainsString('Bentrok UNIQUE jenis_pegawai.uq_jenis_pegawai_nama', $e->getMessage());
+                $this->assertStringNotContainsString('Pusat', $e->getMessage(), 'pesan tanpa nilai baris');
+            }
+        }
+
+        $this->assertSame(0, $this->db->table('unit')->countAllResults(), 'tier di-rollback');
     }
 
     public function testDryRunTidakMenulis(): void

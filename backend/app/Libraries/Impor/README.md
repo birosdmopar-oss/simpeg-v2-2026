@@ -33,6 +33,11 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
   - tabel sumber ada (kecuali yang `opsional`);
   - tabel tujuan ada dan kosong (kecuali `bolehSeed`);
   - kolom tujuan NOT NULL tanpa DEFAULT ada di sumber.
+- Pra-cek UNIQUE (juga saat `--dry-run`): setiap indeks UNIQUE tujuan selain PK dicek di PHP terhadap baris seed dan
+  baris yang akan ditulis, dengan pembanding seperti `utf8mb4_unicode_ci` (huruf besar/kecil dan spasi akhir
+  diabaikan). Dua baris master legacy yang hanya beda spasi tengah menjadi identik sesudah normalisasi nama → gagal
+  `Bentrok UNIQUE <tabel>.<indeks>` (tanpa nilai baris) sebelum ditulis. Galat tulis di dalam transaksi menyebut tabel
+  dan kode galat (review DBV PR #32).
 - Baris dibaca per batch, berurut PK (keyset), lalu ditransformasi di PHP dan ditulis dengan `insertBatch`. Transformasi
   di PHP dipilih karena `stripslashes` versi SQL hanya benar di MySQL 8 (DBV-011 §2.2 #3), sedangkan CI juga menguji
   MariaDB.
@@ -63,11 +68,16 @@ DEFAULT dari DB.
 - `urutan`: kolom urutan [V2] yang tidak ada di sumber diisi 1..n per lingkup, berurut PK (DBV-011 §2.4 #5).
   Contoh: `sub_group_jabatan.order` per `id_group_jabatan`.
 - `kolomTunda`: FK ke tabel yang sama ditulis NULL lebih dulu, lalu diisi setelah semua baris tabel masuk.
-  Contoh: `jabatan_koordinasi.id_atasan_es_3_koord`.
+  Contoh: `jabatan_koordinasi.id_atasan_es_3_koord`. UPDATE ini ikut menulis kolom ber-`ON UPDATE CURRENT_TIMESTAMP`
+  (dibaca dari `information_schema.COLUMNS.EXTRA`) dengan nilainya sendiri, supaya `updated_at` hasil R1a tidak
+  tertimpa waktu impor.
 - `bolehSeed` (GAP-3): untuk master yang sudah di-seed migration. Bila id dan nama sama, baris dilewati. Bila berbeda,
   impor gagal dengan menyebut tabel dan id.
 - `kunciUrut`: PK komposit untuk baca per batch, mis. `dh_online (nip, tgl)`.
-- `waktuBisnis`: kolom DATETIME berisi waktu kejadian, mis. `absen_ijin.date_start/date_end`. Kolom ini tidak dikonversi
+- `tanpaStripslashes`: kolom teks yang disalin mentah; `['*']` = semua kolom tabel (GAP-8: `bkn_periode_ekinper`,
+  `riwayat_skp_periodik`).
+- `waktuBisnis`: kolom DATETIME berisi waktu kejadian, mis. `absen_ijin.date_start/date_end`,
+  `riwayat_skp_periodik.waktu_dinilai` (GAP-9). Kolom ini tidak dikonversi
   R1a, karena tanggal izin akan bergeser sehari bila dikurangi 7 jam.
 - `khusus`: aturan per baris; boleh mengembalikan `__koreksi` (list kode) untuk dicatat. Contoh: `web_config` lewat `WebConfigImport` (G-09 §5); hasil SKIP/REVIEW tidak diimpor
   dan dihitung sebagai `dibuang`.
@@ -93,22 +103,25 @@ tidak pernah diturunkan). PK TINYINT dengan counter ≥ 128 tidak disalin dan di
 berjalan di luar transaksi tier. Bila galat terjadi di langkah ini, data tier tetap ada; ulangi dengan `--tier`
 berikutnya setelah counter dibereskan manual.
 
-## Keputusan DBV yang dibutuhkan
+## Keputusan DBV
 
-Bagian ini dijawab DB Validator sekali untuk semua butir. Isi keputusan berupa kode/nilai masuk ke berkas keputusan
-lokal (contoh: `docs/up1/keputusan-impor.contoh.json`). Keputusan berupa aturan akan diterapkan coder di `DaftarTabel`.
+Dijawab DB Validator di komentar PR #32 (30-10-2026, diverifikasi di MariaDB 10.4). Isi keputusan berupa kode/nilai
+masuk ke berkas keputusan lokal (contoh: `docs/up1/keputusan-impor.contoh.json`); keputusan berupa aturan sudah
+diterapkan di `DaftarTabel`.
 
-| No | Butir | Bawaan alat sekarang | Yang diminta dari DBV |
-|---|---|---|---|
-| GAP-2 | Jam server legacy untuk kolom DATETIME (DBV-011 §3.6 #3) | Tanpa bawaan: `--zona-sumber=WIB\|UTC` wajib diisi | Konfirmasi WIB atau UTC sebelum UP-1 dijalankan |
-| GAP-4 | `dm_user_lokasi_presensi` / `user_lokasi_presensi` (Mapping "tidak dimigrasi" vs G-03 §6.2 #6) | Tidak diimpor; tidak dibaca jalur Tukin | Keputusan untuk cutover (di luar UP-1) |
-| GAP-6 | Isi berkas keputusan: status/nilai di luar domain (`status`, `<tabel>.<kolom>` ber-CHECK, mis. `absen_ijin` `H`/angka lama, `pegawai.jenis_kelamin`), `hari_libur.id_jenis_libur` NULL, pengganti tanggal nol di kolom NOT NULL (R3) | Gagal-cepat bila belum dipetakan | Pemetaan per nilai dari hasil audit salinan (log 2.8) |
-| GAP-8 | `stripslashes` untuk tabel T2–T6 (DBV-011 §2.2 #3 baru mendaftar master) | `stripslashes` PHP pada semua kolom teks di bawah (form legacy `addslashes` [K]); NIP dan kode tidak terpengaruh | Daftar kolom yang disimpan MENTAH (`tanpaStripslashes`). Kandidat kuat: `riwayat_skp_periodik` dan `bkn_periode_ekinper`, karena terisi dari sinkron BKN, bukan dari form |
-| GAP-9 | Kolom DATETIME berisi waktu kejadian (`waktuBisnis`, tidak dikonversi R1a) | `absen_ijin.date_start`, `absen_ijin.date_end` (diterima reviewer CR 29-10-2026) | Konfirmasi daftar, termasuk apakah `riwayat_skp_periodik.waktu_dinilai` stempel (dikonversi) atau waktu bisnis |
-| GAP-10 | Kolom domain/status yang tidak punya CHECK v2 | `bkn_periode_ekinper.status`, `detail_anak`, `pegawai_sisa_cuti`, `riwayat_tb_perpan`, snapshot: disalin apa adanya | Konfirmasi tidak perlu normalisasi |
-| GAP-11 | Pembanding seed (GAP-3) memakai id + nama, tanpa beda huruf besar/kecil | `jenis_cuti`, sentinel `provinsi` 99 / `kabupaten_kota` 9999 | Konfirmasi aturan; bila nama legacy berbeda dengan seed, pilih mana yang dipakai |
+| No | Butir | Bawaan alat sekarang | Yang diminta dari DBV | Keputusan DBV (30-10-2026) |
+|---|---|---|---|---|
+| GAP-2 | Jam server legacy untuk kolom DATETIME (DBV-011 §3.6 #3) | Tanpa bawaan: `--zona-sumber=WIB\|UTC` wajib diisi | Konfirmasi WIB atau UTC sebelum UP-1 dijalankan | WIB, tetapi **dibuktikan dulu** di salinan (baca-saja): `SELECT NOW(), UTC_TIMESTAMP(), @@system_time_zone, @@global.time_zone;` lalu bandingkan `NOW()` dengan jam dinding WIB. `NOW()` = WIB → `--zona-sumber=WIB`; = UTC → `UTC`. Dicatat di lembar hasil bagian 1 (runbook langkah 12). Salah arah = semua stempel bergeser 14 jam |
+| GAP-4 | `dm_user_lokasi_presensi` / `user_lokasi_presensi` (Mapping "tidak dimigrasi" vs G-03 §6.2 #6) | Tidak diimpor; tidak dibaca jalur Tukin | Keputusan untuk cutover (di luar UP-1) | Tidak diimpor untuk UP-1 (tidak dibaca jalur Tukin). Keputusan cutover ditunda sampai jelas siapa yang membacanya; bila dipakai, jadikan tier baru, jangan ditempel ke tier 5 |
+| GAP-6 | Isi berkas keputusan: status/nilai di luar domain (`status`, `<tabel>.<kolom>` ber-CHECK, mis. `absen_ijin` `H`/angka lama, `pegawai.jenis_kelamin`), `hari_libur.id_jenis_libur` NULL, pengganti tanggal nol di kolom NOT NULL (R3) | Gagal-cepat bila belum dipetakan | Pemetaan per nilai dari hasil audit salinan (log 2.8) | Mekanisme disetujui dengan 4 syarat: (1) tidak ada pemetaan yang diisi coder; semuanya dari audit skema salinan dan dicatat di lembar hasil bagian 3; (2) status NULL/di luar domain dipetakan ke nilai yang mereproduksi perilaku legacy (kueri legacy menyaring `status = 1` → NULL → 2); `{"null": 1}` di berkas contoh hanya contoh; (3) pengganti tanggal nol di kolom NOT NULL = sentinel `2000-01-01 00:00:00`; (4) `absen_ijin.status` `H`/angka lama dipetakan hanya setelah jumlah per nilai dihitung dari salinan, dan pemetaan ke `V` disertai alasan dari kode legacy |
+| GAP-8 | `stripslashes` untuk tabel T2–T6 (DBV-011 §2.2 #3 baru mendaftar master) | `stripslashes` PHP pada semua kolom teks di bawah (form legacy `addslashes` [K]); NIP dan kode tidak terpengaruh | Daftar kolom yang disimpan MENTAH (`tanpaStripslashes`). Kandidat kuat: `riwayat_skp_periodik` dan `bkn_periode_ekinper`, karena terisi dari sinkron BKN, bukan dari form | Bawaan diterima. Seluruh kolom `bkn_periode_ekinper` dan `riwayat_skp_periodik` masuk `tanpaStripslashes` (`['*']`, terisi dari sinkron BKN). Konsekuensinya dicek lewat butir T-05 runbook; bila nilai ber-backslash dipakai rekap, lapor ke DBV sebelum perbandingan |
+| GAP-9 | Kolom DATETIME berisi waktu kejadian (`waktuBisnis`, tidak dikonversi R1a) | `absen_ijin.date_start`, `absen_ijin.date_end` (diterima reviewer CR 29-10-2026) | Konfirmasi daftar, termasuk apakah `riwayat_skp_periodik.waktu_dinilai` stempel (dikonversi) atau waktu bisnis | Daftar `absen_ijin.date_start/date_end` benar. `riwayat_skp_periodik.waktu_dinilai` juga `waktuBisnis` (nilai dari BKN, belum dipakai kode v2); bila kelak dipakai sebagai stempel, konversi sekali lewat migration |
+| GAP-10 | Kolom domain/status yang tidak punya CHECK v2 | `bkn_periode_ekinper.status`, `detail_anak`, `pegawai_sisa_cuti`, `riwayat_tb_perpan`, snapshot: disalin apa adanya | Konfirmasi tidak perlu normalisasi | Tidak perlu normalisasi; disalin apa adanya. Syarat: bagian WAJIB_0 audit DBV-022/023 dijalankan sesudah impor (runbook langkah 16) dan nilai aneh dicatat sebagai kelompok (b) |
+| GAP-11 | Pembanding seed (GAP-3) memakai id + nama, tanpa beda huruf besar/kecil | `jenis_cuti`, sentinel `provinsi` 99 / `kabupaten_kota` 9999 | Konfirmasi aturan; bila nama legacy berbeda dengan seed, pilih mana yang dipakai | Disetujui. Bila nama legacy berbeda dari seed, nama seed v2 yang dipakai dan selisihnya dicatat di lembar hasil, lewat bagian `nilai` berkas keputusan (mis. `"jenis_cuti.nama_jenis_cuti": {"Cuti Besar Lama": "Cuti Besar"}`; pemetaan nilai berjalan sebelum pembanding seed). Seed migration tidak diubah |
 
-Kolom teks T2–T6 yang terkena `stripslashes` bawaan (GAP-8; NIP dan kode di-trim, tidak diubah):
+Kolom teks T2–T6 yang terkena `stripslashes` bawaan (GAP-8; NIP dan kode di-trim, tidak diubah). Dua baris
+`bkn_periode_ekinper` dan `riwayat_skp_periodik` di bawah dicatat sebagai riwayat jawaban: sejak keputusan DBV kedua
+tabel itu disalin mentah (`tanpaStripslashes: ['*']`).
 
 | Tabel | Kolom |
 |---|---|

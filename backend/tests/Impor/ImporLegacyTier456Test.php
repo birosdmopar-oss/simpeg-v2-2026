@@ -45,7 +45,7 @@ final class ImporLegacyTier456Test extends ImporLegacyTestCase
         $this->src->table('riwayat_keluarga')->insert(['id_riwayat_keluarga' => 80, 'nip' => self::NIP_A, 'tgl_perkawinan' => '2015-05-05', 'nama_pasangan' => 'Pasangan Uji', 'status' => 1]);
         $this->src->table('detail_anak')->insert(['id_detail_anak' => 81, 'id_riwayat_keluarga' => 80, 'tgl_lahir' => '2016-06-06', 'nama' => 'Anak Uji']);
         $this->src->table('bkn_periode_ekinper')->insert(['id' => 'P-2026-08', 'nama' => 'Agustus', 'tahun' => 2026, 'periode_awal' => '2026-08-01', 'periode_akhir' => '2026-08-31', 'status' => 1]);
-        $this->src->table('riwayat_skp_periodik')->insert(['id_riwayat_skp_periodik' => 90, 'id_pns' => 'X1', 'nip' => self::NIP_A, 'nama' => 'Pegawai Uji A', 'status' => 1]);
+        $this->src->table('riwayat_skp_periodik')->insert(['id_riwayat_skp_periodik' => 90, 'id_pns' => 'X1', 'nip' => self::NIP_A, 'nama' => 'Pegawai Uji A', 'status' => 1, 'hasil_akhir' => "Baik\'", 'waktu_dinilai' => '2026-08-31 23:30:00']);
 
         $this->jalankanImpor([1, 2, 3, 4], k: Keputusan::dariArray(['status' => ['absen_ijin' => ['H' => 'V']]]));
 
@@ -59,6 +59,9 @@ final class ImporLegacyTier456Test extends ImporLegacyTestCase
         $this->assertSame(1, $this->db->table('detail_anak')->countAllResults());
         $this->assertSame(1, $this->db->table('bkn_periode_ekinper')->countAllResults());
         $this->assertSame(1, $this->db->table('riwayat_skp_periodik')->countAllResults());
+        $skp = $this->db->table('riwayat_skp_periodik')->where('id_riwayat_skp_periodik', 90)->get()->getRowArray();
+        $this->assertSame("Baik\'", $skp['hasil_akhir'], 'GAP-8: kolom SKP BKN tanpa stripslashes');
+        $this->assertSame('2026-08-31 23:30:00', $skp['waktu_dinilai'], 'GAP-9: waktu_dinilai waktu bisnis, tidak dikonversi');
     }
 
     public function testTier5DhOnlineTanpaJamDibuangDanPkKomposit(): void

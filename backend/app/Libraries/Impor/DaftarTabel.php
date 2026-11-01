@@ -164,8 +164,9 @@ final class DaftarTabel
             ),
             new DefinisiTabel('riwayat_keluarga', 'id_riwayat_keluarga', 'B-02 §6', statusDomain: [0, 1, 2, 3, 10], kolomKode: ['nip']),
             new DefinisiTabel('detail_anak', 'id_detail_anak', 'B-02 §6', statusDomain: null),
-            new DefinisiTabel('bkn_periode_ekinper', 'id', 'B-01 §3.4.1', statusDomain: null),
-            new DefinisiTabel('riwayat_skp_periodik', 'id_riwayat_skp_periodik', 'B-01 §6', statusDomain: [0, 1, 2, 10], kolomKode: ['nip']),
+            // GAP-8 (DBV 30-10): terisi dari sinkron BKN, bukan form → tanpa stripslashes. GAP-9: waktu_dinilai dari BKN, disalin apa adanya.
+            new DefinisiTabel('bkn_periode_ekinper', 'id', 'B-01 §3.4.1', tanpaStripslashes: ['*'], statusDomain: null),
+            new DefinisiTabel('riwayat_skp_periodik', 'id_riwayat_skp_periodik', 'B-01 §6', tanpaStripslashes: ['*'], statusDomain: [0, 1, 2, 10], kolomKode: ['nip'], waktuBisnis: ['waktu_dinilai']),
         ];
     }
 

@@ -25,6 +25,12 @@ use Throwable;
  * 8. Rujukan FK dicek per batch terhadap tabel induk di tujuan (audit DBV-019 = 0): yatim → NULL bila kolomnya
  *    `yatimKeNull` (dicatat), selain itu gagal dengan jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
  *
+ * 9. Indeks UNIQUE tujuan (selain PK) dicek di PHP per tabel, juga saat dry-run, terhadap baris seed dan baris yang akan
+ *    ditulis: dua baris yang identik sesudah normalisasi (mis. nama beda spasi tengah) → gagal dengan nama tabel + indeks
+ *    sebelum MySQL menolaknya (review DBV PR #32). Galat tulis di dalam transaksi menyebut tabel + kode galat.
+ * 10. UPDATE kolom tunda menyertakan kolom ber-`ON UPDATE CURRENT_TIMESTAMP` dengan nilainya sendiri, supaya stempel
+ *    hasil R1a tidak tertimpa waktu impor.
+ *
  * Aturan khusus tabel boleh mengembalikan kunci `__koreksi` (list kode) untuk dicatat di laporan. Sesudah setiap tier
  * di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7; PK TINYINT dengan
  * counter ≥ 128 tidak disalin, dicatat PERIKSA). Langkah ini DDL, jadi berjalan di luar transaksi tier.
@@ -185,7 +191,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>}|null
+     * @return array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null
      */
     private function praCek(DefinisiTabel $def): ?array
     {
@@ -225,8 +231,10 @@ final class PengimporLegacy
             throw new ImporGagal("Kolom PK {$def->tabel}.{$def->pk} tidak ada di sumber.");
         }
 
-        $seed = [];
-        $isi  = $this->tujuan->table($def->tabel)->countAllResults();
+        $onUpdate  = array_keys(array_filter($kolomTujuan, static fn (array $t): bool => $t['onUpdate']));
+        $seed      = [];
+        $barisSeed = [];
+        $isi       = $this->tujuan->table($def->tabel)->countAllResults();
 
         if (! is_int($isi)) {
             throw new ImporGagal($this->pesanGagal($this->tujuan, "hitung tujuan {$def->tabel}"));
@@ -237,22 +245,32 @@ final class PengimporLegacy
                 throw new ImporGagal("Tabel tujuan {$def->tabel} tidak kosong ({$isi} baris).");
             }
 
-            $hasilSeed = $this->tujuan->table($def->tabel)->select([$def->pk, $def->kolomNama[0]])->get();
+            $hasilSeed = $this->tujuan->table($def->tabel)->get();
 
             if (! $hasilSeed instanceof ResultInterface) {
                 throw new ImporGagal($this->pesanGagal($this->tujuan, "baca seed {$def->tabel}"));
             }
 
-            foreach ($hasilSeed->getResultArray() as $r) {
+            $barisSeed = $hasilSeed->getResultArray();
+
+            foreach ($barisSeed as $r) {
                 $seed[(string) $r[$def->pk]] = (string) $r[$def->kolomNama[0]];
             }
         }
 
-        return ['ada' => true, 'kolom' => $kolom, 'fk' => $this->kolomFk($this->tujuan->prefixTable($def->tabel)), 'seed' => $seed];
+        return [
+            'ada'       => true,
+            'kolom'     => $kolom,
+            'fk'        => $this->kolomFk($this->tujuan->prefixTable($def->tabel)),
+            'seed'      => $seed,
+            'unik'      => $this->indeksUnik($this->tujuan->prefixTable($def->tabel)),
+            'onUpdate'  => $onUpdate,
+            'barisSeed' => $barisSeed,
+        ];
     }
 
     /**
-     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>}|null $rinci
+     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null $rinci
      */
     private function imporTabel(int $tier, DefinisiTabel $def, ?array $rinci, bool $dryRun): void
     {
@@ -273,6 +291,11 @@ final class PengimporLegacy
         $urutan      = [];
         $tunda       = [];
         $terakhir    = null;
+        $dilihat     = [];
+
+        foreach ($rinci['barisSeed'] as $r) {
+            $this->catatUnik($def, $rinci['unik'], $r, $dilihat);
+        }
 
         do {
             $syarat = $terakhir === null ? '' : " WHERE ({$urutPk}) > (" . implode(', ', array_fill(0, count($kunci), '?')) . ')';
@@ -326,10 +349,14 @@ final class PengimporLegacy
                 $tulis[] = $hasil;
             }
 
+            foreach ($tulis as $r) {
+                $this->catatUnik($def, $rinci['unik'], $r, $dilihat);
+            }
+
             $tulis = $this->periksaRujukan($def, $rinci['fk'], $tulis);
 
             if ($tulis !== [] && ! $dryRun) {
-                if ($this->tujuan->table($def->tabel)->insertBatch($tulis) === false) {
+                if ($this->tujuan->table($def->tabel)->insertBatch($tulis) === false || $this->tujuan->transStatus() === false) {
                     throw new ImporGagal($this->pesanGagal($this->tujuan, "tulis {$def->tabel}"));
                 }
             }
@@ -341,7 +368,14 @@ final class PengimporLegacy
             foreach ($tunda as $u) {
                 $id = $u[$def->pk];
                 unset($u[$def->pk]);
-                if ($this->tujuan->table($def->tabel)->where($def->pk, $id)->update($u) === false) {
+                $ubah = $this->tujuan->table($def->tabel)->set($u);
+
+                foreach ($rinci['onUpdate'] as $k) {
+                    // Ditulis dengan nilainya sendiri → ON UPDATE CURRENT_TIMESTAMP tidak memicu (stempel R1a tetap).
+                    $ubah->set($k, $this->tujuan->escapeIdentifiers($k), false);
+                }
+
+                if ($ubah->where($def->pk, $id)->update() === false || $this->tujuan->transStatus() === false) {
                     throw new ImporGagal($this->pesanGagal($this->tujuan, "isi kolom tunda {$def->tabel}"));
                 }
             }
@@ -349,7 +383,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>} $rinci
+     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>} $rinci
      * @param array<string, mixed> $mentah
      *
      * @return array<string, mixed>|string
@@ -405,7 +439,7 @@ final class PengimporLegacy
         }
 
         if ($nilai !== null && in_array($tipe['tipeTujuan'], self::TIPE_TEKS, true) && in_array($tipe['tipeSumber'], self::TIPE_TEKS, true)) {
-            $nilai = in_array($kolom, $def->tanpaStripslashes, true) ? (string) $nilai : Transformasi::stripslashes((string) $nilai);
+            $nilai = $def->tanpaStripslashes === ['*'] || in_array($kolom, $def->tanpaStripslashes, true) ? (string) $nilai : Transformasi::stripslashes((string) $nilai);
 
             if (in_array($kolom, $def->kolomNama, true)) {
                 $nilai = Transformasi::nama($nilai);
@@ -422,7 +456,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array<string, array{tipe: string, nullable: bool, adaDefault: bool, auto: bool, panjang: int|null}>
+     * @return array<string, array{tipe: string, nullable: bool, adaDefault: bool, auto: bool, onUpdate: bool, panjang: int|null}>
      */
     private function kolom(BaseConnection $db, string $tabel): array
     {
@@ -441,6 +475,7 @@ final class PengimporLegacy
                 'nullable'   => $r['nl'] === 'YES',
                 'adaDefault' => $r['d'] !== null,
                 'auto'       => str_contains(strtolower((string) $r['e']), 'auto_increment'),
+                'onUpdate'   => str_contains(strtolower((string) $r['e']), 'on update'),
                 'panjang'    => in_array(strtolower((string) $r['t']), ['char', 'varchar'], true) ? (int) $r['p'] : null,
             ];
         }
@@ -469,6 +504,60 @@ final class PengimporLegacy
         }
 
         return $out;
+    }
+
+    /**
+     * Indeks UNIQUE tujuan selain PRIMARY: nama indeks → kolom (urut).
+     *
+     * @return array<string, list<string>>
+     */
+    private function indeksUnik(string $tabel): array
+    {
+        $rows = $this->kueri(
+            $this->tujuan,
+            'SELECT INDEX_NAME AS i, COLUMN_NAME AS n FROM information_schema.STATISTICS'
+            . " WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND NON_UNIQUE = 0 AND INDEX_NAME <> 'PRIMARY' ORDER BY INDEX_NAME, SEQ_IN_INDEX",
+            [$this->tujuan->getDatabase(), $tabel],
+        )->getResultArray();
+
+        $out = [];
+
+        foreach ($rows as $r) {
+            $out[(string) $r['i']][] = (string) $r['n'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Pra-cek UNIQUE di PHP (juga saat dry-run). Pembanding meniru `utf8mb4_unicode_ci` (PAD SPACE): beda huruf besar/kecil
+     * dan spasi akhir diabaikan; NULL tidak pernah bentrok. Pesan hanya menyebut tabel + indeks, tanpa nilai baris.
+     *
+     * @param array<string, list<string>>        $unik
+     * @param array<string, mixed>               $baris
+     * @param array<string, array<string, true>> $dilihat
+     */
+    private function catatUnik(DefinisiTabel $def, array $unik, array $baris, array &$dilihat): void
+    {
+        foreach ($unik as $indeks => $kolom) {
+            $bagian = [];
+
+            foreach ($kolom as $k) {
+                if (! array_key_exists($k, $baris) || $baris[$k] === null) {
+                    continue 2;
+                }
+
+                $bagian[] = mb_strtolower(rtrim((string) $baris[$k], ' '));
+            }
+
+            $kunci = implode("\x1F", $bagian);
+
+            if (isset($dilihat[$indeks][$kunci])) {
+                throw new ImporGagal("Bentrok UNIQUE {$def->tabel}.{$indeks}: dua baris identik sesudah normalisasi; tier di-rollback.");
+            }
+
+            $dilihat[$indeks][$kunci] = true;
+        }
     }
 
     /**
