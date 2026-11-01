@@ -16,6 +16,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-09 | A | (pemetaan) | Belum mulai |
 | H-10 | B | MAKE-064 | Belum mulai |
 | H-11 | A | MAKE-062 | Belum mulai |
+| H-12 | A | MAKE-062 | Belum mulai |
 | Fondasi | A / B | MAKE-058 / MAKE-063 | Belum mulai |
 
 ## Bagian A — API masuk & job terjadwal

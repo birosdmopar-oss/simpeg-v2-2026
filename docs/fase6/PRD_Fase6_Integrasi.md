@@ -2,9 +2,10 @@
 
 | Butir | Isi |
 |---|---|
-| Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder B — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder A — API masuk & job terjadwal) |
-| Versi | **v0.1 draf — 01-11-2026** (usulan keputusan F6-01..F6-24 menunggu putusan Horii; butir ⛔ di §12 wajib dijawab sebelum milestone yang disebut) |
-| Status | **DRAF.** Berlaku sebagai v1.0 setelah keputusan ⛔ diputus Horii dan dokumen masuk `main`. Koding Fase 6 terkunci **GATE-F6** (§0) |
+| Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder B — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder A — API masuk & job terjadwal) |
+| Versi | **v1.0 — 01-11-2026** (v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
+| Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
+| Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
 | Acuan legacy | Salinan kerja legacy CI3 **HEAD `0cf7e67`**. Rujukan baris bercatatan AS-09 (belum dicocokkan checksum produksi, Q5A-14). Rujukan relatif ke `application/`: `C` = `controllers/hr/services/Cron.php`, `L` = `controllers/hr/services/Local.php`, `SI` = `controllers/hr/services/Siasn.php`, `SS/` = `controllers/hr/services/siasn_sync/`, `EB` = `controllers/hr/services/Ekin_bkn.php`, `AE` = `controllers/simapi/v1/A_employee.php`, `FH` = `helpers/function_helper.php`, `LE` = `libraries/hr/L_employee.php` |
 | Scope | **Fase 6** = H-01..H-09 (`Bahan Baku SIMPEG/06-Integrasi.md`) + **H-10 e-Kinerja BKN** (baru, Tukin bergantung padanya) + **H-11 status TB/CLTN harian** (warisan Fase 4 §14.6 #2, keputusan Horii 27-10) + fondasi auth antar-sistem dan penjadwalan (§7.0) |
@@ -44,8 +45,8 @@
 | ID | Kebutuhan | Pemilik | Menahan |
 |---|---|---|---|
 | PN-1 | Akses jaringan + akun klien sandbox/produksi **BSrE** (gateway e-sign) untuk server v2 dev | Horii/TL → infra | H-02 real, exit criteria |
-| PN-2 | Akun layanan **SIASN** (API gateway + SSO) dan **e-Kinerja BKN** milik instansi; cara memperoleh token SSO produksi saat ini (Q6-08) | Horii/TL → Biro SDM/BKN | H-03, H-10 real |
-| PN-3 | **Proyek Firebase** + service account (FCM HTTP v1) untuk v2; status aplikasi Android legacy (Q6-12) | Horii/TL | H-04 real |
+| PN-2 | Akun layanan **SIASN** (API gateway + SSO) dan **e-Kinerja BKN** milik instansi; cara memperoleh token SSO produksi saat ini (F6-26, kartu pertanyaan Catatan Teknis) | Horii/TL → Biro SDM/BKN | H-03, H-10 real |
+| PN-3 | Akses ke **proyek Firebase yang sama dengan legacy** (topik presensi & app Android, F6-12/F6-13) + service account FCM HTTP v1; siapa penulis token Android setelah cutover | Horii/TL | H-04 real |
 | PN-4 | Daftar **klien SIMAPI** aktif (Pusdatin/Simanta/E-Talenta), **PIC MuDig** (pemakai `services/s_stat`, `s_dm`, `s_esign`), dan jadwal re-handshake (J3.04) | Horii/TL | H-05..H-08 go-live |
 | PN-5 | Crontab server legacy (J1.03) — daftar job yang benar-benar terjadwal | Horii → DBA | Validasi §Lampiran A.3 |
 
@@ -61,15 +62,16 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 |---|---|---|---|---|
 | H-01 | Skema integrasi | Dibagi dua: **DBV-026** (klien layanan, SIMAPI) dan **DBV-027** (integrasi keluar). `esign_hist` & `firebase_token` **sudah ada** (DBV-022), hanya ALTER bila perlu | 089 | A + B |
 | H-02 | Adapter real BSrE e-sign | `BsreEsignAdapter` implementasi `EsignGatewayInterface` tanpa ubah kontrak; `services/s_esign` untuk MuDig (bila F6-16) | 090 | B |
-| H-03 | Adapter real SIASN | Klien auth BKN + pairing `id_pns_siasn` + tarik/dorong sesuai lingkup F6-14 | 091 | B |
-| H-04 | Adapter real FCM | FCM **HTTP v1** + registrasi token + push riwayat + pengingat presensi (F6-11..F6-13) | 092 | B |
+| H-03 | Adapter real SIASN | **Ikut legacy penuh** (F6-14): klien auth BKN + pairing `id_pns_siasn` + tarik generasi 2 langsung ke tabel utama + dorong otomatis berbasis flag | 091 | B |
+| H-04 | Adapter real FCM | FCM **HTTP v1** + kanal web & Android ikut legacy + push riwayat/layanan + keanggotaan topik presensi ikut legacy (F6-11..F6-13) | 092 | B |
 | H-05 | SIMAPI autentikasi | `simapi/v1/a_auth/token`, token opak ber-hash, 1 jam | 093 | A |
 | H-06 | SIMAPI data pegawai | 26 endpoint `a_employee/*` kontrak legacy (F6-04), termasuk `change_history` (F6-06) | 094 | A |
 | H-07 | SIMAPI data mart | `a_dm/*` (4 endpoint) + `services/s_dm` (F6-10) | 095 | A |
 | H-08 | Rekomendasi KP/KGB/pensiun | `services/s_stat/*` (pull MuDig) aturan [K] (F6-09) | 096 | A |
 | H-09 | Service lokal | **Ditutup sebagai pemetaan** (F6-19): `calculate_lc` = Fase 4, `record_geolocation` = F5-12, `register_fb_token` = H-04 | 097 | A (dokumen) |
-| **H-10** | **e-Kinerja BKN** [baru] | Tarik `bkn_periode_ekinper` + `riwayat_skp_periodik` terjadwal + tombol tarik ulang admin. **Tukin bergantung** (potongan SKP, jendela periode) | (kartu baru, F6-15) | B |
-| **H-11** | **Status TB/CLTN harian** [warisan] | Command harian idempoten aktivasi/pengakhiran `pegawai.id_jenis_status` (F6-20) | (QASMTASK-096/097 catatan) | A |
+| **H-10** | **e-Kinerja BKN** [baru, Q6-09] | Tarik `bkn_periode_ekinper` + `riwayat_skp_periodik` terjadwal [K] + tombol tarik ulang admin. **Tukin bergantung** (potongan SKP, jendela periode) | QASMTASK-120 | B |
+| **H-11** | **Status TB/CLTN harian** [warisan] | Command harian idempoten aktivasi/pengakhiran `pegawai.id_jenis_status` (F6-20) | QASMTASK-121 | A |
+| **H-12** | **Auto-approval LKH** [Q6-15, ikut legacy] | Job tanggal 5: LKH bulan lalu yang belum disetujui atasan → disetujui otomatis + PDF (F6-25) | QASMTASK-122 | A |
 | §7.0 | Fondasi | Filter auth antar-sistem (ADR-036), klien HTTP keluar + log integrasi, pola penjadwalan command + crontab (ADR-037) | — | A (masuk) / B (keluar) |
 
 ### 1.2 DI LUAR scope Fase 6
@@ -84,8 +86,7 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 | `Cron` email ultah, popup notif, `fix_regen_*`, `sync_nama_pengguna`, `bwyydshyfwwvkfozwpnc` | Tidak dimigrasi (F6-21) | Nonaktif/tidak relevan di v2 |
 | Antrean email (`email_pool`) | Sudah Fase 1 (CR-014, queue `email`) | — |
 | Saldo cuti tahunan (`calculate_yearly_sc`) | Sudah Fase 4 (`cuti:saldo-tahunan`) | Hanya dijadwalkan di runbook |
-| Auto-approval LKH tanggal 5 (`C:18`, `C:87`) | **Q6-15** | Bergantung status modul LKH v2 |
-| Aplikasi mobile / API untuk app Android | Q6-12 | Fase 6 tidak membangun API mobile |
+| API mobile untuk app Android (backend penulis `firebase_token` legacy ada di luar repo) | Cutover (Q6-12) | Fase 6 menyediakan tabel + pengiriman push Android ikut legacy; siapa yang menulis token Android ke DB v2 dicatat sebagai pertanyaan cutover di DEPLOY-001.1 |
 | UI admin perbandingan SIMPEG vs SIASN | Tidak ada di legacy | Usulan masa depan |
 | MT (manual testing terpisah) | Fase MT | — |
 
@@ -175,34 +176,36 @@ B mengerjakan bagian adapter dulu dan menunda endpoint `s_esign`.
 | CR-086 | Sesi DB UTC | `App\Database\MySQLi\Connection` |
 | Q-09 (Fase 4) | Di mock, passphrase diketik admin di dialog; **mekanisme real = Fase 6** → Q6-06 | PRD Fase 4 :1295 |
 
-### 5.2 Usulan keputusan Fase 6 (◻ default berlaku bila tidak ditolak; ⛔ wajib diputus — §12)
+### 5.2 Keputusan Fase 6 (LOCKED — Horii 01-11-2026; ✔ = dijawab eksplisit, ◻ = default diterima)
 
-| ID | Usulan | Label | Status |
+| ID | Keputusan | Label | Status |
 |---|---|---|---|
 | F6-01 | Sebelum GATE-F6 terbuka hanya M0 + persiapan akses (§0.1) | — | ◻ |
-| F6-02 | **Penjadwalan = `php spark` command + crontab sistem di runbook** (pola `cuti:saldo-tahunan`, `README-deploy.md`), bukan endpoint HTTP basic-auth dan bukan "python tiap 2 detik". Endpoint `hr/services/cron/*` **tidak di-port**. ADR-037 | [V2] | ◻ |
-| F6-03 | **Auth antar-sistem satu pola** (ADR-036): tabel klien layanan (rahasia ber-hash, status, jenis klien, hak per grup endpoint, allowlist IP opsional), filter `klienLayanan` (Basic) untuk `services/*` dan `simapiToken` untuk SIMAPI. **Semua** endpoint wajib auth — termasuk yang publik di legacy (`A_dm/jabatan`, `S_stat` selain `rekomendasi_kp`, `S_dm p_*`). Klien diberi kredensial baru saat re-handshake | [V2] | ⛔ Q6-01 |
-| F6-04 | **Kontrak SIMAPI ikut legacy 1:1** [K]: path `/simapi/v1/<controller>/<method>/<nip>` (di luar `api/v1`), amplop `{"status":"01"|"02","msg","data"}`, HTTP 200, nama field & nilai teks persis (termasuk typo "Nomenlaktur", "paramater"), aturan `type` 1/2. Perbaikan hanya: auth wajib, `ORDER BY` deterministik pada riwayat yang tak berurut, bug `detil` `unit_es_3/4` diperbaiki | [K] + [V2] terbatas | ⛔ Q6-02 |
-| F6-05 | **Token SIMAPI**: opak 30+ karakter dari `random_bytes`, masa aktif 1 jam [K], disimpan SHA-256 [V2]. Karena hanya hash yang disimpan, setiap handshake **menerbitkan token baru**; token lama tetap sah sampai kedaluwarsa [V2, kompatibel]. Header `Authorization: <skema> <token>` diterima seperti legacy | [K]/[V2] | ◻ |
-| F6-06 | **`change_history`**: tabel `simapi_ch` diisi **aplikasi** (event sesudah commit dari layanan riwayat/pegawai/pengguna) — **bukan trigger DB** [V2, trigger lintas schema tidak dibawa]; format `field_name`/`field_value` pipe, `LIMIT 100`, ack-on-read lewat `simapi_auth_ch` [K]. `simapi_update`/`_hist` **tidak dibuat** (tanpa pembaca, Lampiran A.1) | [K]+[V2] | ◻ |
-| F6-07 | **`A_sinkron::ambil_seluruh_pengguna`** (ekspor hash password + email untuk E-Talenta) **tidak di-port**: hash v2 berbeda (rehash) dan berisiko. E-Talenta ikut keputusan J3.03 (view/SSO/API verifikasi). `ambil_riwayat_mutasi` di-port dengan auth | [V2] | ⛔ Q6-03 |
+| F6-02 | **Penjadwalan = `php spark` command + crontab sistem di runbook** (pola `cuti:saldo-tahunan`, `README-deploy.md`), bukan endpoint HTTP basic-auth dan bukan "python tiap 2 detik". Endpoint `hr/services/cron/*` **tidak di-port**; *jadwal & isi job* ikut legacy. ADR-037 | [V2] mekanisme, [K] isi | ◻ |
+| F6-03 | **Auth antar-sistem satu pola** (ADR-036): tabel klien layanan (rahasia ber-hash, status, jenis klien, hak per grup endpoint, allowlist IP opsional), filter `klienLayanan` (Basic) untuk `services/*` dan `simapiToken` untuk SIMAPI. **Semua** endpoint wajib auth — termasuk yang publik di legacy (`A_dm/jabatan`, `S_stat` selain `rekomendasi_kp`, `S_dm p_*`). Klien diberi kredensial baru saat re-handshake | [V2] | ✔ Q6-01 = A |
+| F6-04 | **Kontrak SIMAPI ikut legacy 1:1** [K]: path `/simapi/v1/<controller>/<method>/<nip>` (di luar `api/v1`), amplop `{"status":"01"|"02","msg","data"}`, HTTP 200, nama field & nilai teks persis (termasuk typo "Nomenlaktur", "paramater"), aturan `type` 1/2. Perbaikan hanya: auth wajib (F6-03), `ORDER BY` deterministik pada riwayat yang tak berurut, bug `detil` `unit_es_3/4` (`AE:302-317`) diperbaiki | [K] + [V2] terbatas | ✔ Q6-02 = A |
+| F6-05 | **Token SIMAPI**: opak 30 karakter, masa aktif 1 jam, header `Authorization: <skema> <token>` [K]; dibuat dari `random_bytes` dan disimpan SHA-256 [V2 keamanan dasar]. Karena hanya hash yang disimpan, setiap handshake **menerbitkan token baru**; token lama tetap sah sampai kedaluwarsa (klien tidak terdampak) | [K]/[V2] | ◻ |
+| F6-06 | **`change_history`**: tabel `simapi_ch` diisi **aplikasi** (event sesudah commit pada tabel yang sama dengan trigger legacy) — trigger DB tidak dibawa karena tabel v2 berbeda; format `field_name`/`field_value` pipe, `LIMIT 100`, ack-on-read lewat `simapi_auth_ch` [K]. `simapi_update`/`_hist` **tidak dibuat** (tanpa pembaca) | [K]+[V2] | ◻ |
+| F6-07 | **`A_sinkron::ambil_seluruh_pengguna`** (ekspor hash password + email untuk E-Talenta) **tidak di-port**; tercatat di Trello Catatan Teknis (kartu "Catatan Fase 6 — ambil_seluruh_pengguna tidak di-port") untuk ditangani bersama J3.03. `ambil_riwayat_mutasi` di-port [K] dengan auth | [V2] | ✔ Q6-03 = A |
 | F6-08 | Kredensial klien lama (`simapi_auth`, `sal_user`, `MUDIG_*`) **tidak diimpor**; klien baru dibuat lewat command `integrasi:klien` (buat/rotasi/nonaktif, rahasia ditampilkan sekali) | [V2] | ◻ |
-| F6-09 | **`services/s_stat/*` (H-08)** = API tarik untuk MuDig, **aturan deteksi ikut legacy** [K] (`LE:2416-2720` KP, `LE:1324-1376`+`FH:2400-2418` pensiun, `LE:4095-4220` KGB) dan kolom keluaran persis. Perbaikan [V2]: urutan KGB pakai kolom yang ada (`tmtsk_kgb`), cek berkas arsip lewat storage lokal (bukan HTTP fetch per URL). **Tidak** menulis tabel/notifikasi baru | [K] | ⛔ Q6-04 |
-| F6-10 | **`services/s_dm/*`** di-port dengan auth, **kecuali `p_web_config`** (membocorkan seluruh konfigurasi) | [V2] | ◻ |
-| F6-11 | **FCM HTTP v1** (service account, OAuth2 JWT via `firebase/php-jwt` yang sudah terpasang, token akses di-cache). FCM Legacy API & Instance ID (topik) sudah dihentikan Google, jadi **tidak mungkin ikut legacy** | [V2] wajib | ◻ |
-| F6-12 | **Pengingat presensi** (`pegawai_blm_masuk/pulang/lkh`): topik IID diganti **job terjadwal** yang mengirim multicast ke token pegawai yang belum presensi/LKH pada jam di `web_config` (default usulan 07:45 masuk, 16:45 pulang, 19:00 LKH; hari kerja saja; lewati libur/cuti/TB/DL) | [V2] | ⛔ Q6-11 |
-| F6-13 | **Kanal push**: Web Push di SPA v2 (pengganti `register_fb_token` + `fb_token`) — endpoint `POST api/v1/integrasi/fcm-token` (jwt, semua role), service worker, izin notifikasi diminta lewat tombol (bukan otomatis). Token Android tetap di `firebase_token` bila app mobile masih hidup (Q6-12). Penerima push riwayat ikut legacy `fcmQueue_rwy`/`fcmQueue_layanan` (admin, pegawai, atasan untuk LKH) | [K]/[V2] | ⛔ Q6-12 |
-| F6-14 | **Lingkup SIASN (H-03)** — lihat Q6-07. Usulan reviewer **opsi B**: (1) klien auth BKN (client credentials + SSO, cache, tanpa token literal); (2) pairing `pegawai.id_pns_siasn`; (3) **tarik** AK (`riwayat_ak_siasn`), SKP tahunan, golongan, pendidikan, PMK ke `riwayat_*` ikut pola generasi 2 [K] **tetapi tanpa hapus fisik** (lepas pasangan + tandai) [V2] dan `pegawai.npwp/keterangan` tidak ditimpa [V2]; (4) **dorong** jabatan/diklat/sertifikasi/kursus/dokumen lewat antrean dengan status per baris, dipicu admin (bukan otomatis setiap edit) | [K]/[V2] | ⛔ Q6-07 |
-| F6-15 | **H-10 e-Kinerja BKN masuk Fase 6** (tidak ada di `06-Integrasi.md`, tetapi Tukin bergantung): tarik periode (**upsert**, bukan insert saja [V2]) + SKP periodik per periode (upsert per kunci `id_pns`+`periode_id`+`skp_id`, unique key baru [V2]). Aturan Tukin tetap [K] (potongan 0/16/32%, default 32% bila tak ada baris); v2 menambah **peringatan** di log/command bila periode aktif belum punya data SKP | [K]/[V2] | ⛔ Q6-09 |
-| F6-16 | **`services/s_esign` untuk MuDig** di-port: auth klien layanan, berkas dikirim sebagai **unggahan multipart** (bukan path server) [V2], `esign_hist` **wajib** dicatat [V2], respons berisi PDF ber-tanda tangan (base64) [V2] | [V2] | ⛔ Q6-05 |
-| F6-17 | **BSrE**: NIK penanda tangan dari `pegawai.nik` [K]; passphrase dikirim sesuai spesifikasi gateway (body bila didukung; legacy di query string — `Esign.php:166-188`); respons sukses hanya bila berupa PDF valid (`%PDF-`) [V2, legacy menerima JSON tanpa key error]; kode BSrE disimpan di `esign_hist.status_code` | [K]/[V2] | ◻ |
-| F6-18 | **Siapa mengetik passphrase** (Q-09 Fase 4) — lihat Q6-06 | — | ⛔ Q6-06 |
+| F6-09 | **`services/s_stat/*` (H-08)** = API tarik untuk MuDig, **aturan deteksi & kolom keluaran ikut legacy persis** [K] (`LE:2416-2720` KP, `LE:1324-1376`+`FH:2400-2418` pensiun, `LE:4095-4220` KGB), termasuk KGB "24–36 bulan → hari ini" dan pensiun hanya PNS. Penyesuaian teknis: urutan KGB memakai `tmtsk_kgb` (kolom `tgl_pensiun` tidak ada, `S_stat.php:1007`), cek berkas arsip lewat storage v2 (bukan HTTP fetch). **Tidak** menulis tabel/notifikasi baru | [K] | ✔ Q6-04 = A |
+| F6-10 | **`services/s_dm/*`** di-port [K] dengan auth, **kecuali `p_web_config`** (keluarannya rusak oleh bug key `config_nama` di `S_dm.php:279` dan membocorkan konfigurasi) | [K]/[V2] | ◻ |
+| F6-11 | **FCM HTTP v1** (service account, OAuth2 JWT via `firebase/php-jwt` yang sudah terpasang, token akses di-cache). FCM Legacy API (server key) sudah dihentikan Google sehingga protokol **wajib** berganti; perilaku (siapa menerima apa, kapan) tetap ikut legacy | [V2] teknis wajib | ◻ |
+| F6-12 | **Notifikasi presensi ikut legacy**: saat presensi masuk/pulang dan saat LKH dibuat, token pegawai dimasukkan/dikeluarkan dari topik `pegawai_blm_masuk`, `pegawai_blm_pulang`, `pegawai_blm_lkh` [K `L:1834-1878`, `L:1976-2044`, `L_lkh.php:430-445`] lewat job antrean. Manajemen topik memakai endpoint Instance ID `batchAdd/batchRemove` dengan token OAuth service account (cara Firebase Admin SDK). **Pengiriman pesan ke topik tetap di luar SIMPEG** seperti legacy (Firebase console/penjadwal luar) — syaratnya proyek Firebase v2 = proyek legacy (PN-3) | [K] | ✔ Q6-11 = ikut legacy |
+| F6-13 | **Kanal push ikut legacy**: (1) **Android** — token di `firebase_token` (`platform`=2), pesan dari produsen yang sama dengan `andr_notif_queue` legacy (cuti `L_cuti.php:1106/1240/2540/3147`, support `L_support.php:1080/1290/1415`; v2: `NotifikasiService` Fase 4 + Halo Simpeg Fase 8); (2) **Web/desktop** — pengganti `register_fb_token` + `fb_token`: endpoint `POST api/v1/integrasi/fcm-token` dipanggil SPA saat halaman dimuat setelah login [K `views/template/header.php:59`], token `platform`=1, perpanjang 1 minggu [K `L:4224-4289`]; penerima push riwayat/layanan ikut `fcmQueue_rwy`/`fcmQueue_layanan` [K `FH:588-915`] (admin, pegawai, atasan untuk LKH). Penulis token Android (backend app mobile di luar repo) = pertanyaan cutover (DEPLOY-001.1) | [K] | ✔ Q6-12 = ikut legacy |
+| F6-14 | **SIASN ikut legacy penuh** (H-03): klien auth BKN (client credentials + SSO; token dari konfigurasi + cache — **tanpa token literal**, Q6-08); job berulang yang **aktif** di legacy (Lampiran A.5): pairing `id_pns_siasn` + salin data utama ke `pegawai` (`nip_lama`, `npwp`, `no_hp`, `keterangan`="Sync SIASN") [K `SI:380-507`]; tarik langsung ke tabel utama: golongan→`riwayat_kp`, pendidikan, PMK, SKP ≥2022 (rating 1↔3, **hapus fisik baris berpasangan yang tidak lagi dikembalikan BKN**), AK→`riwayat_ak_siasn`, referensi unor [K `SS/*`]; **dorong otomatis** riwayat `siasn_flag=0` atau `updated_at > siasn_lu` (jabatan, diklat, sertifikasi, kursus/seminar, SKP 2022) + antrean unggah dokumen `siasn_upload_arsip` [K]. Hanya satu implementasi per tabel tujuan (duplikat legacy dipilih yang generasi 2). **Pengaman wajib** (bukan perubahan perilaku): hapus fisik SKP hanya untuk NIP yang panggilan API-nya **berhasil** (legacy ikut menghapus saat API gagal, `Rw_skp.php:219`); salah variabel `Rw_ak.php:65` diperbaiki; `debug()` tidak dibawa | [K] | ✔ Q6-07 = ikut legacy penuh |
+| F6-15 | **H-10 e-Kinerja BKN masuk Fase 6** (Tukin bergantung). Ikut legacy: periode **hanya insert periode baru** [K `EB:9`]; SKP periodik insert baru dan update bila `hasil_akhir` berubah, kunci logis `id_pns`+`periode_id`+`skp_id` [K `EB:205`]; pemilihan periode tanggal > 19 → bulan berikutnya; periode manual dilewati. Aturan Tukin tetap [K] (potongan 0/16/32%, default 32% bila tak ada baris). Tambahan v2: UNIQUE kunci logis (Q6-10) + peringatan di log bila periode berjalan belum punya data | [K] | ✔ Q6-09 = A |
+| F6-16 | **`services/s_esign` untuk MuDig** di-port: auth klien layanan, berkas dikirim sebagai **unggahan multipart** (bukan path server) [V2], `esign_hist` **wajib** dicatat [V2], respons berisi PDF ber-tanda tangan (base64) [V2]; parameter lain & amplop [K] | [V2] | ✔ Q6-05 = A |
+| F6-17 | **BSrE ikut legacy**: NIK penanda tangan dari `pegawai.nik` PyB; `nik` & `passphrase` dikirim di query string seperti legacy (`Esign.php:166-188`, `bsre_esign.php:55-74`) — **disensor** dari semua log; kode `status_code=='1111'` = bersertifikat. Pengaman: respons dianggap sukses hanya bila berupa PDF (`%PDF-`) — legacy menulis JSON non-error sebagai berkas PDF (`bsre_esign.php:102-126`) | [K] + pengaman | ◻ |
+| F6-18 | **Passphrase e-sign real diketik penanda tangan (PyB) sendiri** di halaman tugas persetujuannya — sama dengan alur legacy `Cuti::process_esign` (`Cuti.php:688-705`, `L_cuti.php:3232-3484`). Dialog admin di mock Fase 4 diganti/diselaraskan (deviasi dari PRD Fase 4 Q-09 dicatat) | [K] | ✔ Q6-06 = A |
 | F6-19 | **H-09 ditutup sebagai pemetaan** (tanpa endpoint baru): `calculate_lc` → `POST cuti/hitung-lama`; `record_geolocation` → F5-12; `register_fb_token` → H-04; seluruh AJAX dropdown/kalkulator `Local.php` sudah diserap modul Fase 2–5 (Lampiran A.4) | — | ◻ |
-| F6-20 | **H-11 status harian** `php spark layanan:status-harian [--tanggal=] [--dry-run]`, jadwal 00:30 WIB: TB (`riwayat_tb` status 1) mencakup hari ini → `id_jenis_status=2`; CLTN (`riwayat_cuti` `id_jenis_cuti=6` status 1/4) → 3; tidak ada lagi rentang aktif dan status masih 2/3 → 1. Perpanjangan = baris riwayat baru yang bersambung (otomatis tertangani). Tidak menyentuh status selain 1/2/3. Lewat model beraudit (`updated_by` = akun sistem). Perbandingan per tanggal inklusif (sama dengan PRD Fase 4 v1.4) | [V2] (legacy tanpa cron) | ◻ |
-| F6-21 | **Tidak di-port**: SAPK lama, Siasn generasi 1 (backfill), email ultah, popup notif, `fix_regen_*`, `sync_nama_pengguna` (v2 membaca nama dari `pegawai`), `Ekinerja.php` (API masuk e-Kinerja pihak lain — Q6-14), skema `siasn_simpeg`/`sapk_simpeg` (yang dibutuhkan H-03 dibuat ulang ramping di DBV-027) | — | ◻ (Q6-14) |
+| F6-20 | **H-11 status harian** `php spark layanan:status-harian [--tanggal=] [--dry-run]`, jadwal 00:30 WIB: TB (`riwayat_tb` status 1) mencakup hari ini → `id_jenis_status=2`; CLTN (`riwayat_cuti` `id_jenis_cuti=6` status 1/4) → 3; tidak ada lagi rentang aktif dan status masih 2/3 → 1. Perpanjangan = baris riwayat baru yang bersambung. Tidak menyentuh status selain 1/2/3. Lewat model beraudit. Perbandingan per tanggal inklusif (PRD Fase 4 v1.4) | [V2] (keputusan Horii 27-10; legacy tanpa cron) | ◻ |
+| F6-21 | **Tidak di-port** (kode mati/nonaktif atau tidak relevan di v2): SAPK lama, Siasn generasi 1 backfill, email ultah, popup notif, `fix_regen_*`, `Ekinerja.php` (Q6-14), skema `siasn_simpeg`/`sapk_simpeg` (tabel yang dibutuhkan H-03 dibuat ulang ramping di DBV-027). `sync_nama_pengguna` **di-port [K]** bila v2 menyimpan nama tampilan di `pengguna` (diverifikasi M0 A) | — | ◻ |
 | F6-22 | Server Arsip remote (J3.06, F-10) **ditunda**; v2 tetap storage lokal | — | ◻ |
-| F6-23 | **Exit criteria uji real**: minimal e-sign cuti lolos di jaringan internal (06-Integrasi). Bila PN-1..PN-3 belum tersedia saat semua task selesai → lihat Q6-13 | — | ⛔ Q6-13 |
-| F6-24 | Log integrasi tunggal `integrasi_log` (arah masuk/keluar, layanan, operasi, status, durasi, kode, pesan teredaksi, `ref_id`) + command `integrasi:status` (ringkasan 24 jam). Retensi 180 hari (command pembersih terjadwal) | [V2] | ◻ |
+| F6-23 | **Exit criteria uji real**: Fase 6 boleh di-sign-off dengan mock/FakeTransport; **uji endpoint real** (e-sign cuti, SIASN/e-Kinerja, FCM) menjadi syarat **sebelum deploy** — dilacak kartu **MT-010** (list Manual Testing) dan **DEPLOY-001.1** (list Deployment) | — | ✔ Q6-13 = A |
+| F6-24 | Log integrasi tunggal `integrasi_log` (arah masuk/keluar, layanan, operasi, status, durasi, kode, pesan teredaksi, `ref_id`) + command `integrasi:status`. Retensi 180 hari (Q6-16) | [V2] | ◻ |
+| F6-25 | **Auto-approval LKH ikut legacy** (H-12): command `lkh:auto-approval` tanggal 5 [K `C:14-17`]: LKH bulan lalu yang belum disetujui → `status=1`, `auto_approval=1`, PDF LKH dibuat, dicatat (padanan `aa_lkh`). Perilaku efektif legacy: hanya status **0** yang diproses (`C:147`; status 3/revisi tertahan di antrean legacy) [K]. Bergantung modul LKH v2 (diverifikasi M0 A; bila belum ada → eskalasi) | [K] | ✔ Q6-15 = ikut legacy |
+| F6-26 | **Token SSO BKN produksi** (cara memperoleh, pemilik akun layanan, TOTP) dicatat sebagai **pertanyaan** di Trello Catatan Teknis (label Menunggu Jawaban); v2 tidak memakai token literal | — | ✔ Q6-08 |
 
 ---
 
@@ -231,10 +234,9 @@ berkas sendiri (`RoutesSimapi.php`, `RoutesServices.php`) di luar grup `api/v1`,
 | `api/v1/integrasi/fcm-token` | POST (daftar/perbarui), DELETE (lepas) | jwt, semua role | H-04 |
 | `api/v1/integrasi/bkn/tarik` | POST `{jenis: periode|skp_periodik, tahun, bulan}` | jwt, role 1 | H-10 |
 | `api/v1/integrasi/log` | GET (filter layanan/status/tanggal, paginasi) | jwt, role 1 | F6-24 |
-| `api/v1/integrasi/siasn/dorong` | POST `{modul, id_rwy[]}` | jwt, role 1 | H-03 (bila F6-14 opsi B) |
 
-FE (Jalur B): halaman **Admin → Integrasi** (role 1): log integrasi, tombol tarik ulang e-Kinerja per periode, antrean dorong
-SIASN (bila opsi B). Aksi baris lewat menu ⋮ (AGENTS.md §1).
+FE (Jalur B): halaman **Admin → Integrasi** (role 1): log integrasi dan tombol tarik ulang e-Kinerja per periode. Aksi baris
+lewat menu ⋮ (AGENTS.md §1). SIASN ikut legacy: **tanpa** UI admin sinkron/dorong (legacy tidak punya, F6-14).
 
 ### 6.3 Amplop respons kompatibilitas
 
@@ -250,12 +252,12 @@ SIASN (bila opsi B). Aksi baris lewat menu ⋮ (AGENTS.md §1).
 | `layanan:status-harian` | 00:30 setiap hari | H-11 |
 | `bkn:tarik-periode` | 01:00 setiap hari | H-10 |
 | `bkn:tarik-skp-periodik [--tahun --bulan]` | 02:00 setiap hari (periode berjalan + sebelumnya) | H-10 |
-| `siasn:tarik [--jenis=]` | 03:00 setiap hari (batch, berlanjut) | H-03 |
-| `queue:work siasn` | setiap menit (`flock`) | H-03 dorong |
-| `push:pengingat-presensi --jenis=masuk|pulang|lkh` | sesuai F6-12 | H-04 |
+| `siasn:tarik [--jenis=]` | jadwal legacy: data utama harian, golongan/SKP tiap 6 jam (batas usang 6 jam/1 hari [K `SS/*`]); jadwal pasti dicocokkan dengan crontab legacy (PN-5) | H-03 |
+| `siasn:dorong [--jenis=]` + `siasn:unggah-arsip` | berkala (ikut crontab legacy, PN-5) | H-03 dorong otomatis |
+| `lkh:auto-approval` | tanggal 5, 00:30 (ulang 01:00/01:30/02:00, idempoten) [K `C:14-17`] | H-12 |
 | `integrasi:bersihkan-log` | 04:00 Minggu | F6-24 |
 | `cuti:saldo-tahunan` (sudah ada) | 00:30 1 Januari + ulang berkala | (Fase 4, dicatat di runbook) |
-| `queue:work push` (sudah ada) | setiap menit | H-04 |
+| `queue:work push` (sudah ada) | setiap menit — termasuk job keanggotaan topik presensi (F6-12) | H-04 |
 
 ---
 
@@ -291,9 +293,12 @@ log ke `writable/logs`, kode keluar ≠ 0 bila gagal. Tabel jadwal §6.4 masuk `
 
 **DBV-027 (B)**: `integrasi_log` (F6-24); ALTER `firebase_token` (+`platform` 1 web/2 android, +`token_hash` CHAR(64)
 UNIQUE untuk deduplikasi — DQ-25); ALTER `riwayat_skp_periodik` UNIQUE (`id_pns`,`periode_id`,`skp_id`) **setelah pra-cek
-duplikat** di data impor (pola runbook UP-1); antrean dorong SIASN `siasn_antrean` (bila F6-14 opsi B: `modul`, `id_rwy`,
-`status` 0 menunggu/1 terkirim/2 gagal, `percobaan`, `pesan`, `id_rw_siasn`, waktu). Kolom `siasn_*` di `riwayat_*` sudah
-ada (tidak diubah). `esign_hist` tidak diubah (`ip_address` sudah VARCHAR(45), `status_code` sudah ada).
+duplikat** di data impor (pola runbook UP-1); tabel pendukung SIASN ikut legacy (F6-14) yang **belum** ada di v2:
+antrean unggah dokumen `siasn_upload_arsip` [K `SS/Rw_jabatan::set_queue_arsip`, `SS/Arsip`], referensi `REF_UNOR` dan
+referensi id jabatan fungsional/umum/jenis jabatan yang dipakai dorong jabatan [K `SI:3804`] — kolom diturunkan dari kode
+([I], DDL `siasn_simpeg` tidak tersedia; isi referensi diimpor saat cutover atau ditarik `Ref_unor::sync`). Dorong memakai
+kolom `siasn_flag`/`siasn_lu`/`id_rw_siasn`/`siasn_error` yang **sudah ada** di `riwayat_*` (tidak diubah). `esign_hist`
+tidak diubah (`ip_address` sudah VARCHAR(45), `status_code` sudah ada).
 
 **AC-01.1** dokumen `backend/docs/db-review/DBV-026-*.md` & `DBV-027-*.md` di-approve DBV; **AC-01.2** `firebase_token`
 tetap kosong saat cutover (tidak diimpor, FSD-FN-H-01); **AC-01.3** migration naik/turun bersih di DB scratch.
@@ -304,44 +309,72 @@ tetap kosong saat cutover (tidak diimpor, FSD-FN-H-01); **AC-01.3** migration na
 - `checkUser(nip)`: NIK dari `pegawai.nik` → `GET /api/user/status/{nik}` → `has_certificate = (status_code == '1111')` [K
   `Esign.php:16-45`]. Pesan gateway diteruskan.
 - `signPdf(pdf, nip, passphrase, options)`: multipart `file` + opsi tampilan (`tampilan`, `image`, `width`, `height`,
-  `tag_koordinat` default `##`, `reason`, `location`) [K `S_esign.php:74-84`]; gambar TTD dari storage v2 (bukan path
-  legacy). Sukses hanya bila respons PDF valid (F6-17). Kode/pesan gateway → `status_code`/`message`.
-- Kontrak `EsignGatewayInterface` **tidak berubah**; `EsignCutiService` tidak diubah kecuali pemetaan pesan.
+  `tag_koordinat` default `##`, `reason`, `location`) [K `S_esign.php:74-84`]; `nik` & `passphrase` di query string seperti
+  legacy, disensor dari log (F6-17); gambar TTD dari storage v2 (bukan path legacy). Sukses hanya bila respons PDF valid
+  (F6-17). Kode/pesan gateway → `status_code`/`message`.
+- Kontrak `EsignGatewayInterface` **tidak berubah**. Alur penanda tangan (F6-18): passphrase diketik **PyB sendiri** di
+  halaman tugas persetujuannya (legacy `Cuti::process_esign`); perubahan `EsignCutiService`/FE dari dialog admin mock Fase 4
+  dicatat sebagai deviasi terhadap PRD Fase 4 Q-09 dan diuji ulang (C-05).
 - `services/s_esign` (F6-16): `check_user?nik=` → `{status 1|2,msg,data}`; `sign_pdf` multipart → `esign_hist` wajib.
 **AC-02.1** regresi C-05 (test Fase 4 e-sign cuti) hijau dengan driver mock dan dengan adapter real + FakeTransport;
 **AC-02.2** gateway mati/timeout → `esign_hist` status 2 + `status_code` + pesan, cuti tidak berubah final; **AC-02.3**
-passphrase/NIK tidak ada di log mana pun; **AC-02.4** uji real (reviewer, jaringan internal): 1 sukses + 1 gagal (MTC-037).
+passphrase/NIK tidak ada di log mana pun; **AC-02.4** uji real (reviewer, jaringan internal): 1 sukses + 1 gagal (MTC-037) — di MT-010, sebelum deploy (F6-23).
 
-### 7.3 H-03 — SIASN (Jalur B, MAKE-067) — bergantung Q6-07
+### 7.3 H-03 — SIASN (Jalur B, MAKE-067) — ikut legacy penuh (F6-14)
 
-[K generasi 2 `SS/*`; auth `FH:2513-2721`]. Implementasi `SiasnGatewayInterface` (`getPegawai`, `getRiwayat`,
-`syncPegawai`) **tanpa ubah kontrak**; kebutuhan tambahan (unggah dokumen, simpan riwayat) = interface baru
-`SiasnDorongInterface`. Usulan (opsi B):
-- Pairing `pegawai.id_pns_siasn` dari `/pns/data-utama/{nip}` [K `SI:455-507`].
-- Tarik (command batch berlanjut, tandai `siasn_lu`): AK → `riwayat_ak_siasn` [K `SS/Rw_ak`, perbaiki salah variabel
-  `Rw_ak.php:65`], SKP tahunan ≥2022 [K `SS/Rw_skp`, rating dibalik 1↔3 dicek ke referensi BKN], golongan → `riwayat_kp`
-  [K `SS/Rw_gol`], pendidikan [K `SS/Rw_pendidikan`], PMK [K `SS/Rw_pmk`]. Baris yang tak lagi dikembalikan BKN → lepas
-  pasangan + `siasn_flag=2` + `siasn_error`, **tidak dihapus** [V2, legacy `Rw_skp.php:219` hapus fisik].
-- Dorong (opsi B): admin memilih baris → `siasn_antrean` → job `queue siasn` (unggah dokumen lalu `…/save`) [K
-  `SS/Rw_jabatan::upload_siasn`, `SS/Rw_pelatihan`, `SS/Arsip`], hasil `id_rw_siasn`/`siasn_flag`/`siasn_error`.
+[K generasi 2 `SS/*` + job berulang `SI` yang aktif; auth `FH:2513-2721`]. Implementasi `SiasnGatewayInterface`
+(`getPegawai`, `getRiwayat`, `syncPegawai`) **tanpa ubah kontrak**; kebutuhan tambahan (unggah dokumen, simpan riwayat,
+referensi) = interface baru `SiasnDorongInterface` / `SiasnReferensiInterface`.
+
+| Job v2 | Padanan legacy [K] | Tulis |
+|---|---|---|
+| `siasn:tarik --jenis=data-utama` | `SS/Data_utama::sync_dsp` + `::sync_siasn` + `SI::sync_data_utama` 380 + `SI::sync_pns_id` 455 | `pegawai.id_pns_siasn/siasn_flag/siasn_lu`, `nip_lama`, `npwp`, `no_hp`, `keterangan`="Sync SIASN" (`SI:428-438`) |
+| `--jenis=golongan` | `SS/Rw_gol::get_siasn` | `riwayat_kp` (pairing `id_rw_siasn` atau `gol_ruang`, lepas pasangan = `id_rw_siasn` NULL) + catatan duplikat (`double_riwayat_kp`) |
+| `--jenis=pendidikan` | `SS/Rw_pendidikan::get_siasn` | `riwayat_pendidikan` (PNS + `id_jenis_pegawai` 6) |
+| `--jenis=pmk` | `SS/Rw_pmk::get_siasn` | `riwayat_pmk` |
+| `--jenis=skp` | `SS/Rw_skp::get_siasn` (`SI::sync_rw_skp23` duplikat, tidak dibawa) | `riwayat_skp` ≥2022, rating 1↔3, **hapus fisik** baris berpasangan yang tak lagi dikembalikan (hanya bila API NIP itu sukses — pengaman F6-14) |
+| `--jenis=ak` | `SS/Rw_ak::sync_siasn` | `riwayat_ak_siasn` (salah variabel `:65` diperbaiki) |
+| `--jenis=ref-unor` | `SS/Ref_unor::sync` | referensi `REF_UNOR` (DBV-027) |
+| `siasn:dorong --jenis=jabatan` | `SS/Rw_jabatan::upload_siasn` 105 (= `SI::upload_rw_jabatan` 3804) | `riwayat_mutasi_jabatan` `siasn_flag=0` **atau** `siasn_lu < updated_at` → `/jabatan/unorjabatan/save` |
+| `--jenis=diklat|sertifikasi` | `SS/Rw_pelatihan::upload_rw_diklat` 164, `::upload_rw_sertifikasi` 326 | `riwayat_diklat` |
+| `--jenis=kursus` | `SI::upload_rw_kursus` 4848 | `riwayat_seminar` |
+| `--jenis=skp22` | `SI::upload_rw_skp22` 7704 (= `SS/Rw_skp::upload_rw_skp22`) | `riwayat_skp` 2022 |
+| `siasn:unggah-arsip` | `SS/Rw_jabatan::set_queue_arsip` 569, `SS/Rw_pelatihan::set_queue_arsip_sertifikasi` 406, `SS/Arsip::upload_siasn` | `siasn_upload_arsip` → `/upload-dok-rw` |
+
+Aturan umum: penulisan lewat model beraudit (`updated_by`/`approved_by` = akun sistem integrasi, padanan
+`ID_USR_DEVSIMPEG`); respons gagal BKN → `siasn_flag=2` + `siasn_error` (pesan teredaksi, BP-5); batch per NIP berlanjut
+(offset tersimpan); data usang ditentukan dari `siasn_lu` (6 jam / 1 hari [K]). Yang **tidak** dibawa: generasi 1 backfill,
+`Rw_tj` (hanya staging tanpa pembaca), data keluarga/CLTN/DP3/hukdis/masa kerja/pemberhentian/pindah instansi/PNS-unor/PWK
+(backfill sekali jalan — hasilnya ikut impor cutover), `debug()`.
 **AC-03.1** kegagalan SIASN dicatat dan tidak menggagalkan operasi utama; **AC-03.2** tarik idempoten (ulang = tanpa
-duplikat); **AC-03.3** tidak ada hapus fisik riwayat; **AC-03.4** token SSO dari konfigurasi + cache, **tidak ada token
-literal**; **AC-03.5** uji real (MTC-038) bila PN-2 tersedia.
+duplikat); **AC-03.3** hapus fisik SKP tidak terjadi untuk NIP yang panggilannya gagal; **AC-03.4** token SSO dari
+konfigurasi + cache, **tidak ada token literal**; **AC-03.5** riwayat yang diedit (`updated_at > siasn_lu`) terdorong ulang;
+**AC-03.6** uji real (MTC-038) di MT-010 bila PN-2 tersedia.
 
-### 7.4 H-04 — FCM (Jalur B, MAKE-066)
+### 7.4 H-04 — FCM (Jalur B, MAKE-066) — perilaku ikut legacy (F6-11..F6-13)
 
-- `FcmV1Adapter` implementasi `PushNotifGatewayInterface` (F6-11): `send`/`sendMulticast` (loop per token, HTTP v1 tidak
-  punya multicast native), `invalid_tokens` dari error `UNREGISTERED`/`INVALID_ARGUMENT`. Job `push-notif` yang ada
-  (`Jobs/PushNotifLayananJob.php`, hapus token invalid :66-68) **dipakai apa adanya**.
-- Registrasi token (F6-13): `POST/DELETE api/v1/integrasi/fcm-token` → upsert `firebase_token` per `token_hash`
-  (deduplikasi DQ-25), batas 10 token per NIP (terlama dibuang).
-- Push riwayat Modul B: pelanggan event `riwayatNotifikasi` (`RiwayatEngine.php:54-59`) → antre `push-notif` ke penerima
-  ikut legacy [K `FH:588-760` `fcmQueue_rwy`]: pegawai pemilik + admin (role 1/3 sesuai cakupan) + atasan untuk LKH.
-- Pengingat presensi (F6-12): `push:pengingat-presensi`.
-- FE: SDK Firebase web (versi tetap), `firebase-messaging-sw.js` di `frontend/public`, tombol "Aktifkan notifikasi" di menu
-  profil; konfigurasi web Firebase lewat env Vite (**bukan** disalin dari `header.php` legacy).
+- `FcmV1Adapter` implementasi `PushNotifGatewayInterface` (F6-11): `send`/`sendMulticast` (loop per token), `invalid_tokens`
+  dari error `UNREGISTERED`/`INVALID_ARGUMENT`. Job `push-notif` yang ada (`Jobs/PushNotifLayananJob.php`, hapus token
+  invalid :66-68) **dipakai apa adanya**.
+- **Web/desktop** (F6-13): `POST api/v1/integrasi/fcm-token` (jwt) dipanggil SPA setiap halaman dimuat setelah login dan
+  izin notifikasi diberikan [K `header.php:59`]; upsert `firebase_token` per `token_hash`, `platform`=1, `updated_at`
+  diperbarui (perpanjang 1 minggu [K `L:4224-4289`]). `DELETE` saat logout.
+- **Android** (F6-13): token `platform`=2 di `firebase_token`; pengiriman untuk produsen legacy `andr_notif_queue` (cuti,
+  support) lewat job `push-notif`. Penulis token Android = pertanyaan cutover (DEPLOY-001.1).
+- **Push riwayat/layanan** (F6-13): pelanggan event `riwayatNotifikasi` (`RiwayatEngine.php:54-59`) dan notifikasi layanan →
+  job `push-notif` ke penerima [K `FH:588-915`]: admin (`getTokenAdmin`), pegawai (`getTokenPeg`), atasan untuk LKH; judul,
+  isi, ikon, tautan ikut legacy.
+- **Topik presensi** (F6-12): `PresensiOnlineService` (masuk/pulang) dan pembuatan LKH mengantre job `fcm-topik`
+  (`{nip, tambah[], lepas[]}`) **sesudah commit** [K `L:1834-1878`, `L:1976-2044`, `L_lkh.php:430-445`]; job memanggil
+  `iid/v1:batchAdd|batchRemove` dengan token OAuth service account untuk semua token Android pegawai. Pengirim pesan topik
+  di luar SIMPEG [K].
+- FE: SDK Firebase web (versi tetap), `frontend/public/firebase-messaging-sw.js` (klik notifikasi membuka `data.link` [K
+  `html/firebase-messaging-sw.js`]), permintaan izin notifikasi; konfigurasi web Firebase lewat env Vite (**bukan** disalin
+  dari `header.php` legacy).
 **AC-04.1** regresi C-06 (notifikasi cuti/TB/IB/PMK) hijau; **AC-04.2** token invalid dihapus, tidak di-retry selamanya;
-**AC-04.3** push lewat queue, bukan sinkron; **AC-04.4** pengingat tidak dikirim di hari libur / ke pegawai cuti-TB-DL.
+**AC-04.3** push & topik lewat queue, bukan sinkron, dan kegagalannya tidak menggagalkan presensi; **AC-04.4** penerima push
+riwayat sama dengan tabel penerima legacy (test per jenis riwayat); **AC-04.5** token web terduplikasi tidak membuat baris
+baru.
 
 ### 7.5 H-05/H-06/H-07 — SIMAPI (Jalur A, MAKE-059/060)
 
@@ -373,18 +406,19 @@ Aturan [K] (Lampiran A.2) dihitung oleh kelas murni baru `Libraries/Integrasi/St
 Tabel Lampiran A.4 dipindah ke `backend/docs/progress/06-Integrasi.md` + komentar penutup di QASMTASK-097. **AC-09.1**
 setiap method `Local.php` punya padanan atau alasan "tidak di-port".
 
-### 7.8 H-10 — e-Kinerja BKN (Jalur B, MAKE-064)
+### 7.8 H-10 — e-Kinerja BKN (Jalur B, MAKE-064) — ikut legacy (F6-15)
 
 [K `EB:9` `cron_periode_skp`, `EB:205` `cron_skp_periodik`; auth `FH:2882-2921`].
-- `bkn:tarik-periode`: `GET /api_kinerja/referensi/periode` → upsert `bkn_periode_ekinper` (id, nama, tahun, bulan,
-  periode_awal/akhir, batas_pengisian, jenis_periode, status) [V2 upsert].
-- `bkn:tarik-skp-periodik`: pemilihan periode [K `EB:213-222`: tanggal > 19 → bulan berikutnya]; periode manual (mis. nama
-  berawalan `SKPManual`) dilewati [K `EB:231-234`]; `GET /api_kinerja/laporan/penilaian/{tahun}/{periode_id}` → upsert
-  `riwayat_skp_periodik` per kunci; perubahan **semua** kolom dibandingkan [V2, legacy hanya `hasil_akhir`].
-- Tombol admin `POST api/v1/integrasi/bkn/tarik` (antre job, bukan sinkron).
+- `bkn:tarik-periode`: `GET /api_kinerja/referensi/periode` → **insert periode baru saja** ke `bkn_periode_ekinper` (id,
+  nama, tahun, bulan, periode_awal/akhir, batas_pengisian, jenis_periode, status) [K].
+- `bkn:tarik-skp-periodik [--tahun --bulan]`: pemilihan periode [K `EB:213-222`: tanggal > 19 → bulan berikutnya]; periode
+  manual (`SKPManual*`) dilewati [K `EB:231-234`]; `GET /api_kinerja/laporan/penilaian/{tahun}/{periode_id}` (satu instansi
+  sekaligus) → insert baris baru, update bila `hasil_akhir` berubah, kunci logis `id_pns`+`periode_id`+`skp_id` [K].
+- Tombol admin `POST api/v1/integrasi/bkn/tarik` (antre job, bukan sinkron) — padanan pemicu URL cron legacy.
 - Peringatan (F6-15): `integrasi:status` dan log menandai periode Tukin berjalan yang belum punya baris SKP periodik.
-**AC-10.1** upsert idempoten; **AC-10.2** pegawai tanpa `id_pns_siasn` dicatat "tidak terpasang"; **AC-10.3** test
-`PeriodeTukin`/potongan SKP Fase 5 tetap hijau (tidak ada perubahan logika Tukin); **AC-10.4** uji real bila PN-2.
+**AC-10.1** idempoten (ulang = tanpa duplikat, UNIQUE Q6-10); **AC-10.2** pegawai tanpa `id_pns_siasn` dicatat "tidak
+terpasang"; **AC-10.3** test `PeriodeTukin`/potongan SKP Fase 5 tetap hijau (logika Tukin tidak diubah); **AC-10.4** uji
+real di MT-010 bila PN-2 tersedia.
 
 ### 7.9 H-11 — status TB/CLTN harian (Jalur A, MAKE-062)
 
@@ -393,6 +427,16 @@ F6-20. Sumber [K]: TB → 2 saat setujui `L_tb.php:1170-1178`, → 1 saat hapus 
 sebagai acuan efek. **AC-11.1** TB disetujui sebelum tanggal mulai → aktif tepat pada tanggal mulai; **AC-11.2** setelah
 tanggal akhir → kembali 1; **AC-11.3** perpanjangan bersambung tidak menyebabkan status berkedip; **AC-11.4** status
 selain 1/2/3 tidak disentuh; **AC-11.5** dijalankan dua kali = hasil sama; **AC-11.6** setiap perubahan teraudit.
+
+### 7.10 H-12 — Auto-approval LKH (Jalur A, bagian MAKE-062) — ikut legacy (F6-25)
+
+[K `C:18` `queue_aa_lkh`, `C:87` `process_queue_aa_lkh`, jadwal `C:14-17`]. `php spark lkh:auto-approval [--bulan=] [--dry-run]`:
+LKH bulan lalu berstatus **0** yang belum disetujui atasan → `status=1`, `auto_approval=1`, PDF LKH dibuat lewat generator
+v2, baris catatan (padanan `aa_lkh`), semua lewat model beraudit. Antrean legacy (`queue_aa_lkh`, batch 5 per 2 detik) diganti
+pemrosesan batch dalam command yang idempoten (F6-02). Status 3 (revisi) **tidak** diproses [K efektif `C:147`]. **AC-12.1**
+hanya LKH bulan lalu status 0; **AC-12.2** ulang = tanpa efek ganda; **AC-12.3** PDF gagal → LKH tidak berubah + tercatat.
+Bila modul LKH belum ada di v2 (M0 A) → eskalasi, H-12 ditunda.
+
 
 ---
 
@@ -423,47 +467,54 @@ selain 1/2/3 tidak disentuh; **AC-11.5** dijalankan dua kali = hasil sama; **AC-
 |---|---|---|
 | M0 | Laporan pemahaman ⛔ reviewer | Laporan pemahaman ⛔ reviewer |
 | M1 | DBV-026 skema klien & SIMAPI (PR [DBV]) | DBV-027 skema integrasi keluar (PR [DBV]) |
-| M2 | MAKE-062 H-11 status harian + ADR-037 (tanpa skema baru — boleh paralel dengan review DBV) | MAKE-063 klien HTTP + log + token BKN |
+| M2 | MAKE-062 H-11 status harian + H-12 auto-approval LKH + ADR-037 (tanpa skema baru — boleh paralel dengan review DBV) | MAKE-063 klien HTTP + log + token BKN |
 | M3 | MAKE-058 auth antar-sistem + ADR-036 | MAKE-064 H-10 e-Kinerja BKN |
 | M4 | MAKE-059 SIMAPI H-05/H-06/H-07 + `s_dm` | MAKE-065 H-02 BSrE + `s_esign` |
 | M5 | MAKE-060 change_history | MAKE-066 H-04 FCM (BE + FE) |
 | M6 | MAKE-061 H-08 `s_stat` | MAKE-067 H-03 SIASN |
 | M7 | Penutup A: H-09 pemetaan, runbook cron & Nginx, progres | Penutup B: progres, `integrasi:uji-koneksi` |
-| M8 | Reviewer: QA Lapis 1 Fase 6, uji real (PN), laporan akhir → ⛔ sign-off Horii | |
+| M8 | Reviewer: QA Lapis 1 Fase 6 (mock), laporan akhir → ⛔ sign-off Horii. Uji real → MT-010/DEPLOY-001.1 (sebelum deploy) | |
 
 Setiap M: branch baru dari `origin/main` → gate cepat → push → CI `quality-gate` hijau → lapor → ⛔ merge oleh reviewer CR
 (izin Horii per paket).
 
 ## 11. Definition of Done & exit criteria
 
-**Fase 6 DONE** bila: H-01..H-11 DONE (AC terpenuhi, di `main`); semua integrasi lolos test dengan mock/FakeTransport;
-regresi C-05/C-06 + Tukin Fase 5 hijau; **minimal satu konsumen (e-sign cuti) lolos uji endpoint real di jaringan internal**
-(06-Integrasi; lihat F6-23/Q6-13); QA Lapis 1 Fase 6 lolos; runbook cron + Nginx + daftar re-handshake klien tercatat;
-laporan akhir `docs/fase6/Laporan_Akhir_Fase6.md`; sign-off Horii. Trello DEV-007 + QASMTASK-089..097 (+ kartu H-10/H-11)
+**Fase 6 DONE** bila: H-01..H-12 DONE (AC terpenuhi, di `main`); semua integrasi lolos test dengan mock/FakeTransport;
+regresi C-05/C-06 + Tukin Fase 5 hijau; QA Lapis 1 Fase 6 lolos; runbook cron + Nginx + daftar re-handshake klien tercatat;
+laporan akhir `docs/fase6/Laporan_Akhir_Fase6.md`; sign-off Horii. Trello DEV-007 + QASMTASK-089..097 + QASMTASK-120..122 (H-10/H-11/H-12)
 disinkron.
+
+**Uji endpoint real** (exit criteria `06-Integrasi.md`: minimal e-sign cuti di jaringan internal; ditambah SIASN/e-Kinerja dan
+FCM) **tidak menahan sign-off Fase 6** (F6-23, Q6-13 = A) tetapi **wajib lolos sebelum deploy**: dilacak MT-010 (Manual
+Testing) dan DEPLOY-001.1 (Deployment).
 
 Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (jumlah) / Berkas bersama / Deviasi / Blocker.
 
-## 12. Register pertanyaan untuk Horii (v0.1)
+## 12. Register keputusan (v1.0 — dijawab Horii 01-11-2026)
 
-| ID | Pertanyaan | Usulan reviewer | Batas |
+| ID | Pertanyaan | Keputusan Horii | Dicatat di |
 |---|---|---|---|
-| Q6-01 ⛔ | Semua endpoint antar-sistem wajib auth (termasuk yang publik di legacy) — klien MuDig/Simanta harus menyesuaikan saat re-handshake? | **Ya** (F6-03) | Sebelum M3 A |
-| Q6-02 ⛔ | Kontrak SIMAPI dipertahankan 1:1 (amplop, HTTP 200, typo) atau versi baru + masa transisi? | **1:1** (F6-04) — klien cukup re-handshake | Sebelum M4 A |
-| Q6-03 ⛔ | `ambil_seluruh_pengguna` (hash password E-Talenta) tidak di-port? Bergantung J3.03 | **Tidak di-port** (F6-07) | Sebelum M4 A |
-| Q6-04 ⛔ | Rekomendasi KP/KGB/pensiun `s_stat` ikut aturan legacy persis (termasuk KGB "24–36 bulan → hari ini", PPPK tidak dihitung pensiun)? | **Ikut legacy** (konsumen MuDig); koreksi regulasi = keputusan Biro SDM terpisah | Sebelum M6 A |
-| Q6-05 ⛔ | `services/s_esign` untuk MuDig tetap dilayani v2 (berkas diunggah, bukan path server)? | **Ya** (F6-16) | Sebelum M4 B |
-| Q6-06 ⛔ | E-sign real: passphrase diketik siapa? (a) admin di dialog seperti mock Fase 4; (b) PyB/penanda tangan sendiri lewat halaman tugasnya | **(b)** — passphrase milik pemegang sertifikat; (a) hanya bila PyB tidak punya akses | Sebelum M4 B |
-| Q6-07 ⛔ | Lingkup SIASN: (A) ikut legacy gen-2 (tarik langsung + dorong otomatis tiap edit, termasuk hapus fisik SKP); (B) tarik langsung tanpa hapus fisik + dorong lewat antrean dipicu admin; (C) tarik saja, dorong ditunda | **(B)** | Sebelum M1 B (skema antrean) |
-| Q6-08 ⛔ | Token SSO BKN produksi saat ini diperoleh bagaimana (ditempel manual / akun ber-TOTP)? Siapa pemilik akun layanan? | Akun layanan instansi, rahasia di `.env`; v2 tidak memakai token literal | Sebelum M3 B (real) |
-| Q6-09 ⛔ | e-Kinerja BKN masuk Fase 6 (H-10, kartu Trello baru)? Default 32% saat data kosong tetap ikut legacy + peringatan? | **Ya + ya** (F6-15) | Sebelum M1 B |
-| Q6-10 ◻ | `riwayat_skp_periodik` diberi UNIQUE setelah pra-cek duplikat impor | Ya | M1 B |
-| Q6-11 ⛔ | Pengingat presensi push (masuk/pulang/LKH) tetap ada? Jam kirim? | **Ya**, 07:45 / 16:45 / 19:00 WIB hari kerja, dapat diubah di `web_config` | Sebelum M5 B |
-| Q6-12 ⛔ | Aplikasi Android legacy masih dipakai? (penulis `firebase_token` ada di luar repo) Bila ya, v2 Fase 6 hanya Web Push dan app mobile dicatat sebagai risiko cutover | **Web Push saja di Fase 6**; app mobile = keputusan terpisah | Sebelum M5 B |
-| Q6-13 ⛔ | Bila akses BSrE/SIASN/FCM belum ada saat koding selesai: sign-off Fase 6 dengan mock + uji real dipindah ke gladi cutover, atau Fase 6 menunggu? | **Sign-off dengan mock**, uji real jadi syarat gladi cutover (dicatat di DEPLOY-001) | Sebelum M8 |
-| Q6-14 ◻ | `Ekinerja.php` (API masuk atasan/bawahan untuk aplikasi e-Kinerja pihak lain, berkas 2021) tidak di-port kecuali PIC menyatakan masih dipakai | Tidak di-port | PN-4 |
-| Q6-15 ⛔ | Auto-approval LKH tanggal 5 (`C:18`, `C:87`) di-port sebagai job terjadwal? (bergantung modul LKH v2 — diverifikasi di M0 A) | **Port [K]** bila LKH v2 ada; aturan status 3 (revisi) ikut legacy | Sebelum M2 A |
-| Q6-16 ◻ | Retensi `integrasi_log` 180 hari | Ya | M1 B |
+| Q6-01 | Semua endpoint antar-sistem wajib auth (termasuk yang publik di legacy)? | **A — Ya**, klien diberi kredensial baru saat re-handshake | F6-03 |
+| Q6-02 | Kontrak SIMAPI 1:1 legacy atau versi baru? | **A — 1:1 legacy** | F6-04 |
+| Q6-03 | `ambil_seluruh_pengguna` (hash password E-Talenta) | **A — tidak di-port**; dicatat di Trello Catatan Teknis | F6-07 |
+| Q6-04 | Aturan rekomendasi KP/KGB/pensiun | **A — ikut legacy persis** | F6-09 |
+| Q6-05 | `services/s_esign` untuk MuDig | **A — dilayani, berkas diunggah** | F6-16 |
+| Q6-06 | Siapa mengetik passphrase e-sign real | **A — penanda tangan (PyB) sendiri** (= alur legacy) | F6-18 |
+| Q6-07 | Lingkup SIASN | **Ikut legacy penuh** | F6-14 |
+| Q6-08 | Token SSO BKN produksi & pemilik akun | **Dicatat sebagai pertanyaan** di Trello Catatan Teknis (Menunggu Jawaban) | F6-26, PN-2 |
+| Q6-09 | e-Kinerja BKN sebagai H-10 Fase 6 | **A — Ya**, default potongan 32% ikut legacy + peringatan | F6-15 |
+| Q6-10 | UNIQUE `riwayat_skp_periodik` setelah pra-cek duplikat | Default diterima | F6-15, DBV-027 |
+| Q6-11 | Notifikasi presensi | **Ikut legacy** (keanggotaan topik; pengirim pesan di luar SIMPEG) | F6-12 |
+| Q6-12 | Kanal push / app Android | **Ikut legacy** (web + Android) | F6-13 |
+| Q6-13 | Akses integrasi belum ada saat koding selesai | **A — sign-off dengan mock**; uji real sebelum deploy, kartu baru di Manual Testing (MT-010) & Deployment (DEPLOY-001.1) | F6-23 |
+| Q6-14 | `Ekinerja.php` (API masuk) | Default diterima — tidak di-port kecuali PIC menyatakan masih dipakai (PN-4) | F6-21 |
+| Q6-15 | Auto-approval LKH tanggal 5 | **Ikut legacy** | F6-25, H-12 |
+| Q6-16 | Retensi `integrasi_log` 180 hari | Default diterima | F6-24 |
+
+Prinsip umum Horii 01-11-2026: **"intinya ikut legacy"** — berlaku juga untuk hal yang tidak tercantum di atas. Bila coder
+menemukan perilaku legacy yang belum diputus, default = ikut legacy [K]; deviasi hanya untuk alasan teknis wajib/keamanan
+dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Integrasi.md`.
 
 ---
 
@@ -498,7 +549,7 @@ Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (ju
 
 | Legacy | v2 |
 |---|---|
-| `queue_aa_lkh` C:18, `process_queue_aa_lkh` C:87 (auto-approval LKH tgl 5) | Q6-15 |
+| `queue_aa_lkh` C:18, `process_queue_aa_lkh` C:87 (auto-approval LKH tgl 5) | H-12 (F6-25) |
 | `email_ultah_*` C:444/592 (exit), `email_ultah_send_20220206` C:730 (pengirim `email_pool`) | Tidak / sudah queue email Fase 1 |
 | `queue_popup_notif` C:886 (exit) | Tidak |
 | `process_queue_andr_notif` C:987, `process_queue_andr_topic` C:1071 (tanpa auth), `process_queue_fcm_desktop` C:1138 | H-04 (`queue:work push`, F6-11/12) |
@@ -526,7 +577,7 @@ Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (ju
 |---|---|---|
 | Auth `FH:2513-2572` (client credentials, cache `siasn_simpeg.api_token`), SSO `FH:2574-2721` (token literal / password+TOTP), e-Kinerja `FH:2916-2919` (token literal) | Token literal kedaluwarsa | `TokenBkn` (7.0.2) |
 | `SI` generasi 1 (62 method) | ±44 backfill sekali jalan, ±11 mati, ±7 berulang (`sync_pns_id` 455, `sync_data_utama` 380, `sync_rw_skp23` 7840, 4× `upload_*` "LIVE") | Pairing + F6-14 |
-| `SS/` generasi 2 (11 kelas) | `Data_utama`, `Ref_unor`, `Rw_gol`, `Rw_pendidikan`, `Rw_pmk`, `Rw_skp`, `Rw_ak`, `Rw_tj`, `Rw_jabatan`, `Rw_pelatihan`, `Arsip` | F6-14 opsi B |
+| `SS/` generasi 2 (11 kelas) | `Data_utama`, `Ref_unor`, `Rw_gol`, `Rw_pendidikan`, `Rw_pmk`, `Rw_skp`, `Rw_ak`, `Rw_tj`, `Rw_jabatan`, `Rw_pelatihan`, `Arsip` | F6-14 (ikut legacy penuh) |
 | `EB:9` periode, `EB:205` SKP periodik | Aktif, **kritis Tukin** | H-10 |
 | `Ekinerja.php` | API masuk Basic `EKINERJA_*` | Q6-14 |
 | UI SIASN legacy | `rwy/Ak.php:85,159,471` (AK SIASN), `master/C_jabatan.php:2144-2175` (JFT pairing) | Sudah Fase 3 (`AkSiasn`) / di luar Fase 6 |
@@ -557,4 +608,5 @@ Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (ju
 
 | Versi | Tanggal | Perubahan |
 |---|---|---|
-| v0.1 | 01-11-2026 | Draf awal dari riset kode legacy (`0cf7e67`) & v2 (`a320f919`); usulan F6-01..F6-24; Q6-01..Q6-16; pembagian `6_1.md`/`6_2.md` |
+| v0.1 | 01-11-2026 | Draf awal dari riset kode legacy (`0cf7e67`) & v2 (`a320f919`); usulan F6-01..F6-24; Q6-01..Q6-16; pembagian `6_1.md`/`6_2.md` (`ee6ce5a6`) |
+| v1.0 | 01-11-2026 | Keputusan Horii Q6-01..Q6-16 ("intinya ikut legacy"): SIASN ikut legacy penuh (F6-14, antrean dorong admin dihapus, tambah `siasn_upload_arsip` + referensi), notifikasi presensi & kanal push ikut legacy (F6-12/F6-13, pengingat terjadwal dihapus), e-Kinerja insert/update ikut legacy (F6-15), BSrE query string ikut legacy (F6-17), passphrase oleh PyB (F6-18), H-12 auto-approval LKH (F6-25), F6-26 pertanyaan token SSO, F6-23 uji real di MT-010/DEPLOY-001.1 |
