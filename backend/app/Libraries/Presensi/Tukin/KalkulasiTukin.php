@@ -72,7 +72,7 @@ final class KalkulasiTukin
             }
             $hariKerja++;
 
-            if (! $pegawai->dalamMasaKerja($tanggal)) {
+            if ($pegawai->lewatiLoopHarian || ! $pegawai->dalamMasaKerja($tanggal)) {
                 $hasilHarian[$tanggal] = new HasilHarian('di_luar_masa_kerja');
 
                 continue;

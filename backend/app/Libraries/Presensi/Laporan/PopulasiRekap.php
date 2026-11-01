@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Presensi\Laporan;
 
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
+use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
 
 /**
@@ -40,7 +41,7 @@ final class PopulasiRekap
         $pegawai = $this->db->table('pegawai')
             ->select('nip, nama, glr_awal, glr_akhir, created_at')
             ->groupStart()->where('status', 1)->orGroupStart()->where('status', 2)->where('tmt_status >', $awal)->groupEnd()->groupEnd()
-            ->where('DATE(created_at) <=', $akhir)
+            ->where('created_at <', StempelUtc::awalHariBerikut($akhir)) // DATE(created_at) <= akhir, WIB atas UTC (CR-083)
             ->whereIn('id_jenis_pegawai', $jenisPegawai === [] ? [0] : $jenisPegawai)
             ->orderBy('nip', 'ASC')
             ->get()->getResultArray();
@@ -59,7 +60,7 @@ final class PopulasiRekap
             ->select('peg.nip, peg.nama, peg.glr_awal, peg.glr_akhir, peg.created_at')
             ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = peg.nip', 'inner')
             ->groupStart()->where('peg.status', 1)->orGroupStart()->where('peg.status', 2)->where('peg.tmt_status >', $awal)->groupEnd()->groupEnd()
-            ->where('DATE(peg.created_at) <=', $awal)
+            ->where('peg.created_at <', StempelUtc::awalHariBerikut($awal)) // DATE(created_at) <= awal, WIB atas UTC (CR-083)
             ->where('pmj.jenis_jabatan', 2)
             ->orderBy('peg.nip', 'ASC')
             ->get()->getResultArray();

@@ -39,8 +39,10 @@ use DateTimeZone;
  *   NIP tidak ada → 404; role 3 → `PegawaiScope::bolehLihat` (satker akun, unit bila tanpa satker; fail-closed) → 403;
  *   role 1/4/5 semua NIP; `bulan` → 422.
  * - Angka = **kalkulasi rekap** {@see KalkulasiLaporanTukin} (K-1 [V2]: legacy layar per pegawai memakai `laporan_tukin_skp`
- *   yang berbeda 4 aturan dari rekap; v2 satu kalkulasi sehingga layar = baris rekap). Layar JSON persen saja, tanpa uang
- *   makan & nominal (F5B-8). Galat terkendali → 422 ber-`code`.
+ *   yang berbeda 4 aturan dari rekap; v2 satu kalkulasi sehingga layar = baris rekap **DH**). Pegawai IL: layar bisa berbeda
+ *   dari baris rekap IL (rekap IL tanpa aturan pegawai baru, CR-083); `laporan_tukin_skp` legacy punya aturan TMT CPNS
+ *   sendiri (`L_presensi.php:7054-7078`, `:7302-7310`). Layar JSON persen saja, tanpa uang makan & nominal (F5B-8). Galat
+ *   terkendali → 422 ber-`code`.
  * - PDF (TCPDF, ADR-033) = render legacy persis [K `print/laporan_tukin_skp_pdf.php:55-257`, F5B-8]: kop unit berlogo
  *   {@see KopLaporanTukin} (keputusan Horii 28-10-2026), A4 potret, identitas,
  *   tabel TANGGAL | JAM MASUK | JAM PULANG | KET. | POTONGAN PRESENSI; baris konket = tanggal + keterangan `colspan=4` + sel
@@ -177,7 +179,9 @@ final class LaporanTukinService
         /** @var HasilTukin $h */
         $h       = $hasil['hasil'];
         $periode = $h->periode;
-        $argumen = $this->harianMentah($nip, $periode->awal, $h->akhirDihitung);
+        // T-01 (data harian tidak dimuat) dan `lewatiLoopHarian` (presensi/konket tidak dibaca): tampilan tanpa jam/konket,
+        // sama dengan angka (CR-083).
+        $argumen = $hasil['tanpa_data_harian'] || ($hasil['pegawai']->lewatiLoopHarian ?? false) ? [] : $this->harianMentah($nip, $periode->awal, $h->akhirDihitung);
 
         return [$p, [
             'identitas'      => $this->identitas($pegawai, $periode->awal) + ['predikat_skp' => $hasil['predikat_skp']],
@@ -263,11 +267,11 @@ final class LaporanTukinService
 
             if ($hh === null) {
                 [$status, $ket] = match (true) {
-                    $pegawai !== null && ! $pegawai->dalamMasaKerja($tgl) => ['di_luar_masa_kerja', ''],
-                    isset($libur[$tgl])                                   => ['libur', '(Libur) ' . $libur[$tgl]],
-                    HariKerja::nomorHari($tgl) === 6                      => ['akhir_pekan', 'Sabtu'],
-                    HariKerja::nomorHari($tgl) === 7                      => ['akhir_pekan', 'Minggu'],
-                    default                                               => [null, ''],
+                    $pegawai !== null && ($pegawai->lewatiLoopHarian || ! $pegawai->dalamMasaKerja($tgl)) => ['di_luar_masa_kerja', ''],
+                    isset($libur[$tgl])                                                                   => ['libur', '(Libur) ' . $libur[$tgl]],
+                    HariKerja::nomorHari($tgl) === 6                                                      => ['akhir_pekan', 'Sabtu'],
+                    HariKerja::nomorHari($tgl) === 7                                                      => ['akhir_pekan', 'Minggu'],
+                    default                                                                               => [null, ''],
                 };
 
                 if ($status !== null) {

@@ -136,6 +136,50 @@ final class DataPegawaiTukinAdapterTest extends DatabaseTestCase
         $this->assertNull($this->tmt($nip));
     }
 
+    /**
+     * CR-083: PPPK tanpa TMT (tanpa `riwayat_mutasi_jabatan` jenis 1 & `riwayat_kp`) → `lewatiLoopHarian` di jalur tunggal
+     * dan massal [K :12707-12710]; varian IL (`tanpaPegawaiBaru`) tanpa aturan pegawai baru [K IL :13494-15452].
+     */
+    public function testPppkTanpaTmtLewatiLoopJalurTunggalDanMassalKecualiIl(): void
+    {
+        $nip = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->buatRiwayatMutasiJabatan($nip, ['jenis_jabatan' => 2, 'tmtsk' => '2025-01-02']); // jenis 2 tidak memberi TMT
+        $ber = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->buatRiwayatMutasiJabatan($ber, ['tmtsk' => '2026-04-01', 'gol_pppk' => 'IX']);
+
+        $tunggal = $this->sumber()->untuk($nip, $this->april, null);
+        $this->assertSame([null, true], [$tunggal->tmtMasuk, $tunggal->lewatiLoopHarian], 'tunggal');
+        $massal = $this->sumber()->untukBanyak([$nip, $ber], $this->april, null);
+        $this->assertEquals($tunggal, $massal[$nip], 'massal = tunggal');
+        $this->assertSame(['2026-04-01', false], [$massal[$ber]->tmtMasuk, $massal[$ber]->lewatiLoopHarian], 'PPPK ber-TMT tetap');
+
+        foreach ([$this->sumber()->untuk($ber, $this->april, null, [], true), $this->sumber()->untukBanyak([$nip, $ber], $this->april, null, [], true)[$nip]] as $il) {
+            $this->assertSame([null, false], [$il->tmtMasuk, $il->lewatiLoopHarian], 'IL');
+        }
+    }
+
+    /**
+     * CR-084 (B CR-083): "dibuat setelah akhir periode" (legacy `$dtCreatedAt > "akhir 23:59:59"` WIB,
+     * `L_employee.php:6429-6433`) atas `created_at` UTC — akhir 15-04: `2026-04-15 17:00:00` UTC (16-04 00:00 WIB) =
+     * setelah → pangkat ≤ akhir periode dipakai; `2026-04-15 16:59:59` UTC (15-04 23:59:59 WIB) = belum → hanya ≤ awal.
+     * Jalur tunggal (`pangkat`) dan massal (`pangkatDari`).
+     */
+    public function testDibuatSetelahAkhirPeriodeBatasZonaWaktu(): void
+    {
+        $setelah = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 17:00:00']);
+        $belum   = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 16:59:59']);
+
+        foreach ([$setelah, $belum] as $n) {
+            $this->kp($n, '2026-04-01', 'CPNS III/a'); // > awal periode, ≤ akhir periode
+        }
+
+        $massal = $this->sumber()->untukBanyak([$setelah, $belum], $this->april, null);
+        $this->assertSame('2026-04-01', $this->tmt($setelah), 'tunggal: 16-04 00:00 WIB setelah akhir');
+        $this->assertSame('2026-04-01', $massal[$setelah]->tmtMasuk, 'massal');
+        $this->assertNull($this->tmt($belum), 'tunggal: 15-04 23:59:59 WIB belum setelah akhir');
+        $this->assertNull($massal[$belum]->tmtMasuk, 'massal');
+    }
+
     public function testPegawaiTidakAdaDitolakTerkendali(): void
     {
         $this->expectException(DataTukinTidakSah::class);

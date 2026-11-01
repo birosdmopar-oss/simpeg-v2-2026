@@ -122,9 +122,10 @@ final class RekapKehadiranTest extends DatabaseTestCase
      */
     public function testPresensiPegawaiBaruTidakDibacaIkutLegacy(): void
     {
-        $baru = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-15 08:00:00']);
-        $tgl1 = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-01 08:00:00']);
-        $lama = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-08-31 23:59:59']);
+        // `created_at` UTC (CR-083): 15-09 08:00 WIB, 01-09 08:00 WIB, 31-08 23:59:59 WIB.
+        $baru = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-15 01:00:00']);
+        $tgl1 = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-09-01 01:00:00']);
+        $lama = $this->pegawaiRekap($this->satkerA, ['created_at' => '2026-08-31 16:59:59']);
 
         foreach ([$baru, $tgl1, $lama] as $n) {
             $this->hadir($n, '2026-09-16');
@@ -150,6 +151,39 @@ final class RekapKehadiranTest extends DatabaseTestCase
 
         $uangMakan = $this->serviceUangMakan()->daftar($this->adminRekap(), ['bulan' => '2026-09']);
         $this->assertSame(3, $uangMakan['total'], 'uang makan (F5B-2) tetap menghitung pegawai baru');
+    }
+
+    /**
+     * CR-084 (B CR-083): batas zona waktu `created_at` (UTC) vs awal bulan WIB. Grid harian `created_at < 01-09` (WIB):
+     * `2026-08-31 16:59:59` UTC dibaca, `2026-08-31 17:00:00` UTC (01-09 00:00 WIB) tidak. Ringkas `DATE(created_at) <=
+     * 01-09` (WIB): `2026-09-01 16:59:59` UTC dibaca, `2026-09-01 17:00:00` UTC (02-09 00:00 WIB) tidak.
+     */
+    public function testBatasZonaWaktuPegawaiBaru(): void
+    {
+        $n = [];
+
+        foreach (['2026-08-31 16:59:59', '2026-08-31 17:00:00', '2026-09-01 16:59:59', '2026-09-01 17:00:00'] as $dibuat) {
+            $n[$dibuat] = $this->pegawaiRekap($this->satkerA, ['created_at' => $dibuat]);
+            $this->hadir($n[$dibuat], '2026-09-16');
+        }
+
+        $item = [];
+
+        foreach ($this->serviceKehadiran()->daftar($this->adminRekap(), ['bulan' => '2026-09'])['items'] as $i) {
+            $item[$i['nip']] = [$i['hadir'], $i['tk']];
+        }
+
+        $this->assertSame([1, 21], $item[$n['2026-09-01 16:59:59']], 'ringkas: 01-09 23:59:59 WIB dibaca');
+        $this->assertSame([0, 22], $item[$n['2026-09-01 17:00:00']], 'ringkas: 02-09 00:00 WIB tidak dibaca');
+
+        $grid = [];
+
+        foreach ($this->baca($this->serviceKehadiran()->xlsxHarian($this->adminRekap(), ['bulan' => '2026-09'])['isi']) as $baris) {
+            $grid[(string) ($baris[2] ?? '')] = $baris[5 + 15] ?? null;
+        }
+
+        $this->assertSame('H', $grid[$n['2026-08-31 16:59:59']], 'harian: 31-08 23:59:59 WIB dibaca');
+        $this->assertSame('TK', $grid[$n['2026-08-31 17:00:00']], 'harian: 01-09 00:00 WIB tidak dibaca');
     }
 
     public function testValidasi422(): void

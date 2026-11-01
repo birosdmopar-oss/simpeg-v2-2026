@@ -126,10 +126,131 @@ final class TukinDataMassalTest extends DatabaseTestCase
         $this->assertCount(count($banyak), $kBanyak[0]);
         $this->assertSame($kSedikit[1], $kBanyak[1], "kueri {$kSedikit[1]} untuk " . count($sedikit) . " NIP vs {$kBanyak[1]} untuk " . count($banyak) . ' NIP');
 
-        // Batch lebih kecil: kueri per batch berulang, tetap tidak per NIP.
-        [, $kBatch] = $this->hitungKueri(static fn () => $service->siapkanBanyak($banyak, 2026, 4, null, 10));
+        // Batch lebih kecil: kueri per batch berulang, tetap tidak per NIP (CR-083: batch 15, bukan 10 — dengan ±10 kueri per
+        // batch, batch 10 membuat batas "< jumlah NIP" terlalu sempit untuk satu kueri tambahan T-01).
+        [, $kBatch] = $this->hitungKueri(static fn () => $service->siapkanBanyak($banyak, 2026, 4, null, 15));
         $this->assertLessThan(count($banyak), $kBatch);
         $this->assertGreaterThan($kBanyak[1], $kBatch);
+    }
+
+    /**
+     * CR-083 T-01 [K]: pegawai yang dibuat pada hari terakhir periode BKN (`created_at` tidak < 'akhir') tidak dimuat
+     * cuti/TB/konket/presensinya (`L_presensi.php:12209`, `:12283`, `:12346`, `:12383`) — termasuk data tidak sah, yang
+     * karenanya tidak menjadi galat. Jalur tunggal dan massal sama; sehari sebelumnya dimuat.
+     */
+    public function testT01DibuatPadaHariTerakhirPeriodeTanpaDataHarian(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        // `created_at` UTC (CR-083): hari terakhir 15-04 WIB = [2026-04-14 17:00, 2026-04-15 17:00) UTC.
+        $akhir = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-15 16:59:59']);
+        $this->presensiHadir($akhir, '2026-03-16');
+        $this->cuti($akhir, 1, '2026-03-17', '2026-03-17');
+
+        $rusak = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-14 17:00:00']);
+        $this->db->table('dh_online')->insert(['nip' => $rusak, 'tgl' => '2026-03-16', 'jam_masuk' => '25:00:00', 'sumber' => 1]);
+        $this->cuti($rusak, 7, '2026-03-17', '2026-03-17');
+
+        $sebelum = $this->buatPegawai(['id_jenis_pegawai' => 1, 'created_at' => '2026-04-14 16:59:59']);
+        $this->presensiHadir($sebelum, '2026-03-16');
+
+        $massal = $this->serviceTukinFase4()->siapkanBanyak([$akhir, $rusak, $sebelum], 2026, 4);
+
+        foreach ([$akhir, $rusak] as $n) {
+            $this->assertInstanceOf(ArgumenTukin::class, $massal[$n], $n);
+            $this->assertSame([], $massal[$n]->harian, "{$n}: tanpa data harian");
+            $this->assertEquals($this->serviceTukinFase4()->siapkan($n, 2026, 4), $massal[$n], "{$n}: tunggal = massal");
+        }
+
+        $this->assertInstanceOf(ArgumenTukin::class, $massal[$sebelum]);
+        $this->assertArrayHasKey('2026-03-16', $massal[$sebelum]->harian, 'sehari sebelum akhir: dimuat');
+        $this->assertSame([$akhir, $rusak], (new SumberDataPegawaiTukin($this->db))->tanpaDataHarian([$akhir, $rusak, $sebelum], PeriodeTukin::dariBulan(2026, 4)));
+    }
+
+    /**
+     * CR-083 C (keputusan Horii 30-10): pegawai `lewatiLoopHarian` (PPPK tanpa TMT) — presensi & konket tidak dibaca
+     * (jam 25:00 bukan galat), cuti tetap dimuat dan divalidasi (jenis cuti di luar 1..6 tetap galat). Tunggal = massal.
+     */
+    public function testLewatiLoopHarianAbaikanPresensiKonketTetapValidasiCuti(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        $lewati = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->db->table('dh_online')->insert(['nip' => $lewati, 'tgl' => '2026-03-16', 'jam_masuk' => '25:00:00', 'sumber' => 1]);
+        $this->cuti($lewati, 1, '2026-03-17', '2026-03-17');
+
+        $cutiRusak = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->cuti($cutiRusak, 7, '2026-03-17', '2026-03-17');
+
+        $massal  = $this->serviceTukinFase4()->siapkanBanyak([$lewati, $cutiRusak], 2026, 4);
+        $tunggal = $this->serviceTukinFase4()->siapkan($lewati, 2026, 4);
+
+        $this->assertInstanceOf(ArgumenTukin::class, $massal[$lewati]);
+        $this->assertTrue($massal[$lewati]->pegawai?->lewatiLoopHarian);
+        $this->assertSame(['2026-03-17'], array_keys($massal[$lewati]->harian), 'hanya cuti');
+        $this->assertArrayHasKey('cuti', $massal[$lewati]->harian['2026-03-17']);
+        $this->assertEquals($tunggal, $massal[$lewati]);
+        $this->assertInstanceOf(DataTukinTidakSah::class, $massal[$cutiRusak], 'cuti tetap divalidasi (F5B-17)');
+    }
+
+    /**
+     * CR-084: jalur TUNGGAL `SumberHarianTukin::untuk(..., hanyaCutiTb)` — konket pegawai `lewatiLoopHarian` tidak dibaca
+     * (presensi juga tidak), cuti tetap.
+     */
+    public function testLewatiLoopHarianJalurTunggalKonketTidakDibaca(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        $nip = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $this->db->table('absen_ijin')->insert([
+            'nip' => $nip, 'date_start' => '2026-03-18 00:00:00', 'date_end' => '2026-03-18 23:59:59', 'kategori' => 1, 'alasan' => 'Uji', 'status' => 'V', 'affect_tukin' => 1,
+        ]);
+        $this->presensiHadir($nip, '2026-03-16');
+        $this->cuti($nip, 1, '2026-03-17', '2026-03-17');
+
+        $a = $this->serviceTukinFase4()->siapkan($nip, 2026, 4);
+        $this->assertTrue($a->pegawai?->lewatiLoopHarian);
+        $this->assertSame(['2026-03-17'], array_keys($a->harian), 'konket 18-03 & presensi 16-03 tidak dibaca');
+
+        $sumber = new SumberHarianTukin($this->db, new SumberCutiTbFase4($this->db));
+        $this->assertArrayHasKey('2026-03-18', $sumber->untuk($nip, '2026-03-16', '2026-04-15'), 'pembanding: tanpa hanyaCutiTb konket dibaca');
+        $this->assertArrayNotHasKey('2026-03-18', $sumber->untuk($nip, '2026-03-16', '2026-04-15', true));
+    }
+
+    /**
+     * CR-085: kesetaraan jalur tunggal & massal varian IL (`tanpaPegawaiBaru`), hari ini 10-04 (de_tukin): pegawai keluar
+     * TMT 01-04 (tanpa data & riwayat), riwayat cuti besar tertimpa cuti tahunan (riwayat utuh 2 entri), PPPK tanpa TMT
+     * (IL: tanpa aturan pegawai baru), pegawai biasa.
+     */
+    public function testKesetaraanTunggalMassalIl(): void
+    {
+        $this->barisBkn(2026, 4, '03-16', '04-15');
+
+        $keluar = $this->buatPegawai(['id_jenis_pegawai' => 1, 'status' => 2, 'tmt_status' => '2026-04-01']);
+        $this->presensiHadir($keluar, '2026-03-16');
+        $this->cuti($keluar, 'besar', '2026-03-01', '2026-05-30', 91);
+
+        $tertimpa = $this->buatPegawai(['id_jenis_pegawai' => 1]);
+        $this->cuti($tertimpa, 'besar', '2026-04-01', '2026-06-30', 91);
+        $this->cuti($tertimpa, 'tahunan', '2026-04-01', '2026-04-15', 11);
+
+        $pppk  = $this->buatPegawai(['id_jenis_pegawai' => 6]);
+        $biasa = $this->buatPegawai(['id_jenis_pegawai' => 1]);
+        $this->presensiHadir($biasa, '2026-03-16');
+
+        $semua  = [$keluar, $tertimpa, $pppk, $biasa];
+        $massal = $this->serviceTukinFase4()->siapkanBanyak($semua, 2026, 4, '2026-04-10', null, true);
+
+        foreach ($semua as $n) {
+            $this->assertInstanceOf(ArgumenTukin::class, $massal[$n], $n);
+            $this->assertEquals($this->serviceTukinFase4()->siapkan($n, 2026, 4, '2026-04-10', true), $massal[$n], "tunggal = massal {$n}");
+        }
+
+        $this->assertSame([[], [], true], [$massal[$keluar]->harian, $massal[$keluar]->riwayatCuti, $massal[$keluar]->tanpaDataHarian], 'keluar ≤ de_tukin');
+        $this->assertNull($massal[$keluar]->pegawai?->tmtKeluar, 'IL tanpa tmtKeluar');
+        $this->assertSame(['besar', 'tahunan'], array_column($massal[$tertimpa]->riwayatCuti ?? [], 'jenis'), 'riwayat utuh');
+        $this->assertSame([null, false], [$massal[$pppk]->pegawai?->tmtMasuk, $massal[$pppk]->pegawai?->lewatiLoopHarian], 'PPPK tanpa TMT di IL');
+        $this->assertSame([], $massal[$biasa]->riwayatCuti);
     }
 
     public function testKonfigurasiBelumLengkapSemuaNipGalat(): void

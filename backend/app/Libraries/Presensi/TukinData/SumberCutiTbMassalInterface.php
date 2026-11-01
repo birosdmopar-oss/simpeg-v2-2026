@@ -14,7 +14,7 @@ interface SumberCutiTbMassalInterface
     /**
      * @param list<string> $nip
      *
-     * @return array<string, array<string, array{tugas_belajar?: true, cuti?: array{jenis: string, mulai: string, akhir: string, lama: int}}>|GalatDataTukin>
+     * @return array<string, array<string, array{tugas_belajar?: true, cuti?: array{id?: int, jenis: string, mulai: string, akhir: string, lama: int}}>|GalatDataTukin>
      *                                                                                                                                                         per NIP (setiap NIP masukan menjadi kunci) lalu per tanggal YYYY-MM-DD, atau galat NIP itu
      */
     public function untukBanyak(array $nip, string $awal, string $akhir): array;

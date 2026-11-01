@@ -18,7 +18,7 @@ use DateTimeImmutable;
  *
  * Cuti [K rekap `L_presensi.php:12201-12267`]: `riwayat_cuti` `status = 1` saja (Fase 4 §8) yang beririsan [awal, akhir];
  * setiap tanggal kalender `tgl_mulai..tgl_akhir` di dalam [awal, akhir] (termasuk akhir pekan/libur — library yang
- * melewatinya) mendapat `{jenis, mulai, akhir, lama}`. `jenis` = kebalikan `StatusHarian::JENIS_CUTI`; `id_jenis_cuti` di
+ * melewatinya) mendapat `{id, jenis, mulai, akhir, lama}` (`id` = `id_riwayat_cuti`, untuk keterangan per riwayat, CR-085). `jenis` = kebalikan `StatusHarian::JENIS_CUTI`; `id_jenis_cuti` di
  * luar 1..6 → {@see DataTukinTidakSah} (F5B-17; legacy diam-diam membebaskan). Tumpang tindih pada tanggal sama →
  * baris `id_riwayat_cuti` terbesar menang (F5B-17; legacy: `tgl_mulai` terbesar, seri tak pasti).
  *
@@ -29,7 +29,7 @@ use DateTimeImmutable;
  * `untuk()` = `untukBanyak([$nip])[$nip]` (satu jalur aturan); galat jenis cuti hanya menandai NIP itu di varian massal
  * dan dilempar oleh `untuk()`.
  */
-final class SumberCutiTbFase4 implements SumberCutiTbInterface, SumberCutiTbMassalInterface
+final class SumberCutiTbFase4 implements SumberCutiTbInterface, SumberCutiTbMassalInterface, SumberRiwayatCutiInterface
 {
     public const BATCH_NIP = 500;
 
@@ -96,10 +96,41 @@ final class SumberCutiTbFase4 implements SumberCutiTbInterface, SumberCutiTbMass
         return $hasil;
     }
 
+    public function riwayatCutiBanyak(array $nip, string $awal, string $akhir): array
+    {
+        $jenis = array_flip(StatusHarian::JENIS_CUTI);
+        $hasil = [];
+
+        foreach (array_chunk(array_values(array_unique(array_map('strval', $nip))), self::BATCH_NIP) as $batch) {
+            foreach ($this->db->table('riwayat_cuti')
+                ->select(['id_riwayat_cuti', 'nip', 'id_jenis_cuti', 'tgl_mulai', 'tgl_akhir', 'lama_cuti'])
+                ->whereIn('nip', $batch)
+                ->where('status', 1)
+                ->where('tgl_mulai <=', $akhir)
+                ->where('tgl_akhir >=', $awal)
+                ->orderBy('nip', 'ASC')->orderBy('tgl_mulai', 'ASC')->orderBy('id_riwayat_cuti', 'ASC')
+                ->get()->getResultArray() as $b) {
+                $idJenis = (int) $b['id_jenis_cuti'];
+
+                if (isset($jenis[$idJenis])) {
+                    $hasil[(string) $b['nip']][] = [
+                        'id'    => (int) $b['id_riwayat_cuti'],
+                        'jenis' => $jenis[$idJenis],
+                        'mulai' => (string) $b['tgl_mulai'],
+                        'akhir' => (string) $b['tgl_akhir'],
+                        'lama'  => (int) $b['lama_cuti'],
+                    ];
+                }
+            }
+        }
+
+        return $hasil;
+    }
+
     /**
      * @param list<string> $nip
      *
-     * @return array{0: array<string, array<string, array{jenis: string, mulai: string, akhir: string, lama: int}>>, 1: array<string, DataTukinTidakSah>}
+     * @return array{0: array<string, array<string, array{id: int, jenis: string, mulai: string, akhir: string, lama: int}>>, 1: array<string, DataTukinTidakSah>}
      *                                                                                                              cuti per NIP per tanggal, dan galat per NIP
      */
     private function cuti(array $nip, string $awal, string $akhir): array
@@ -131,6 +162,7 @@ final class SumberCutiTbFase4 implements SumberCutiTbInterface, SumberCutiTbMass
             }
 
             $cuti = [
+                'id'    => (int) $b['id_riwayat_cuti'],
                 'jenis' => $jenis[$id],
                 'mulai' => (string) $b['tgl_mulai'],
                 'akhir' => (string) $b['tgl_akhir'],

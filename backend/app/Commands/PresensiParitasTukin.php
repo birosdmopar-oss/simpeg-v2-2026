@@ -15,7 +15,12 @@ use PhpOffice\PhpSpreadsheet\Reader\Exception as ReaderException;
  * Uji paritas UP-1 rekap Tukin legacy vs v2 (PRD 5B §10 M7; prosedur di `backend/docs/progress/05-Presensi.md` bagian
  * "Prosedur paritas UP-1"):
  *
- *   php spark presensi:paritas-tukin <legacy.xlsx> <v2.xlsx> [--toleransi=0.01] [--csv=<path>] [--nip-penuh]
+ *   php spark presensi:paritas-tukin <legacy.xlsx> <v2.xlsx> [--toleransi=0.01] [--csv=<path>] [--nip-penuh] [--il]
+ *
+ * `--il` = rekap Instansi Lain (CR-085): berkas v2 wajib rekap IL; tanpa `--il` berkas v2 wajib rekap DH
+ * menurut judul berkas **v2** ({@see ParitasRekapTukin::v2RekapIl()}); berkas legacy tidak dapat dikenali andal (judul
+ * legacy IL = judul DH lingkup kementerian), jadi pastikan berkas legacy diekspor dari menu Laporan Tukin Instansi Lain.
+ * Berkas v2 tidak cocok → kode keluar 2.
  *
  * Hanya membaca dua berkas lokal; tidak menyentuh database. Keluaran memakai NIP tersamar kecuali `--nip-penuh` (khusus
  * telaah lokal, jangan dibagikan). Kode keluar 0 = semua baris sama, 1 = ada temuan, 2 = masukan salah (termasuk opsi
@@ -26,15 +31,16 @@ class PresensiParitasTukin extends BaseCommand
     protected $group       = 'Presensi';
     protected $name        = 'presensi:paritas-tukin';
     protected $description = 'Bandingkan XLSX rekap Tukin legacy dengan XLSX rekap Tukin v2 (uji paritas UP-1).';
-    protected $usage       = 'presensi:paritas-tukin <legacy.xlsx> <v2.xlsx> [--toleransi=0.01] [--csv=<path>] [--nip-penuh]';
+    protected $usage       = 'presensi:paritas-tukin <legacy.xlsx> <v2.xlsx> [--toleransi=0.01] [--csv=<path>] [--nip-penuh] [--il]';
     protected $arguments   = [
-        'legacy' => 'XLSX ekspor rekap Tukin legacy (laporan_tukin_us_skp)',
-        'v2'     => 'XLSX GET presensi/tukin/rekap/xlsx untuk bulan & lingkup yang sama',
+        'legacy' => 'XLSX ekspor rekap Tukin legacy (laporan_tukin_us_skp, atau _il dengan --il)',
+        'v2'     => 'XLSX GET presensi/tukin/rekap/xlsx (atau rekap IL dengan --il) untuk bulan & lingkup yang sama',
     ];
     protected $options = [
         '--toleransi' => 'Selisih maksimum per kolom persen yang dianggap sama (bawaan 0.01)',
         '--csv'       => 'Tulis temuan ke berkas CSV',
         '--nip-penuh' => 'Tampilkan NIP penuh (telaah lokal saja; bawaan NIP tersamar)',
+        '--il'        => 'Bandingkan rekap Instansi Lain (berkas v2 wajib rekap IL; legacy dari menu Laporan Tukin Instansi Lain)',
     ];
 
     /**
@@ -43,7 +49,7 @@ class PresensiParitasTukin extends BaseCommand
     public function run(array $params): int
     {
         try {
-            ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, ['toleransi' => true, 'csv' => true, 'nip-penuh' => false]);
+            ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, ['toleransi' => true, 'csv' => true, 'nip-penuh' => false, 'il' => false]);
         } catch (InvalidArgumentException $e) {
             CLI::error($e->getMessage() . ' Pemakaian: ' . $this->usage);
 
@@ -62,7 +68,15 @@ class PresensiParitasTukin extends BaseCommand
 
         [$legacy, $v2] = $argumen;
 
+        $jenis = isset($opsi['il']) ? 'il' : 'dh';
+
         try {
+            if (ParitasRekapTukin::v2RekapIl($v2) !== ($jenis === 'il')) {
+                CLI::error(sprintf('Berkas v2 bukan rekap %s%s.', strtoupper($jenis), $jenis === 'il' ? '' : ' (untuk rekap Instansi Lain pakai --il)'));
+
+                return 2;
+            }
+
             $hasil = ParitasRekapTukin::bandingkan(ParitasRekapTukin::baca($legacy), ParitasRekapTukin::baca($v2), (float) $toleransi, $nipPenuh);
         } catch (InvalidArgumentException|ReaderException $e) {
             CLI::error($e->getMessage());
@@ -72,7 +86,8 @@ class PresensiParitasTukin extends BaseCommand
 
         $r = $hasil['ringkas'];
         CLI::write(sprintf(
-            'Baris legacy: %d, v2: %d | sama: %d, beda: %d, hanya legacy: %d, hanya v2: %d, galat v2: %d, galat legacy: %d (toleransi %s)',
+            'Rekap %s — baris legacy: %d, v2: %d | sama: %d, beda: %d, hanya legacy: %d, hanya v2: %d, galat v2: %d, galat legacy: %d (toleransi %s)',
+            strtoupper($jenis),
             $r['legacy'],
             $r['v2'],
             $r['sama'],

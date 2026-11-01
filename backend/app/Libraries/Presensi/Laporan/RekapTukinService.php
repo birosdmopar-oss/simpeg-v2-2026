@@ -70,7 +70,7 @@ final class RekapTukinService
     {
         [$p, $lingkup, $periode, $populasi] = $this->siapkan($auth, $query, $il);
         $halaman                            = array_slice($populasi, ($p->page - 1) * $p->perPage, $p->perPage);
-        $baris                              = $this->baris($halaman, $p);
+        $baris                              = $this->baris($halaman, $p, $il);
 
         return [
             'items'        => $baris,
@@ -94,7 +94,7 @@ final class RekapTukinService
         [$p, $lingkup, , $populasi] = $this->siapkan($auth, $query, $il);
 
         return [
-            'isi'  => EksporTukinXlsx::rekap($this->judul($p, $il), $lingkup->nama, $p->label(), $this->baris($populasi, $p), $this->penandaTangan($lingkup)),
+            'isi'  => EksporTukinXlsx::rekap($this->judul($p, $il), $lingkup->nama, $p->label(), $this->baris($populasi, $p, $il), $this->penandaTangan($lingkup)),
             'nama' => sprintf('laporan_tukin_%s_%s.xlsx', $il ? 'il' : $lingkup->kode(), $p->kunci()),
             'mime' => EksporRekapXlsx::MIME,
         ];
@@ -175,13 +175,13 @@ final class RekapTukinService
      *
      * @return list<array<string, mixed>>
      */
-    private function baris(array $populasi, ParameterRekap $p): array
+    private function baris(array $populasi, ParameterRekap $p, bool $il = false): array
     {
         $baris = [];
 
         // Per batch (`$tukinBatchNip`): argumen & hasil harian satu batch dilepas sebelum batch berikutnya (memori, ADR-035).
         foreach (array_chunk($populasi, max(1, ($this->config ?? config(Presensi::class))->tukinBatchNip)) as $potong) {
-            array_push($baris, ...$this->barisBatch($potong, $p));
+            array_push($baris, ...$this->barisBatch($potong, $p, $il));
         }
 
         return $baris;
@@ -192,10 +192,11 @@ final class RekapTukinService
      *
      * @return list<array<string, mixed>>
      */
-    private function barisBatch(array $populasi, ParameterRekap $p): array
+    private function barisBatch(array $populasi, ParameterRekap $p, bool $il = false): array
     {
+        // IL: tanpa aturan pegawai baru [K `laporan_tukin_us_skp_il` :13494-15452, CR-083, keputusan Horii 30-10].
         $nip   = array_map(static fn (array $peg): string => (string) $peg['nip'], $populasi);
-        $hasil = $nip === [] ? [] : $this->kalkulasi->hitung($nip, $p->tahun, $p->bulan, $this->hariIni());
+        $hasil = $nip === [] ? [] : $this->kalkulasi->hitung($nip, $p->tahun, $p->bulan, $this->hariIni(), $il);
         $baris = [];
 
         foreach ($populasi as $peg) {

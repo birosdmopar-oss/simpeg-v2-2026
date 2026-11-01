@@ -10,6 +10,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Pdf\DokumenPdf;
 use App\Libraries\Pdf\Pdf;
+use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\I18n\Time;
 use DateTimeImmutable;
@@ -467,7 +468,8 @@ final class StrukturService implements StrukturServiceInterface
         $rows = $this->db()->table('riwayat_mutasi_jabatan rmj')
             ->select('rmj.nip, rmj.id_group_jabatan, rmj.jenis_jabatan_koord, rmj.id_jabatan_koord, rmj.id_jabatan, p.glr_awal, p.nama, p.glr_akhir')
             ->join('pegawai p', 'p.nip = rmj.nip', 'left')
-            ->where('rmj.status', 1)->where('rmj.tmtsk <=', $tgl)->where('rmj.jenis_jabatan', 1)->where('p.created_at <', $tgl)
+            // `p.created_at` UTC vs tanggal bisnis WIB (CR-083): legacy `created_at < 'Y-m-d'` = sebelum 00:00 WIB.
+            ->where('rmj.status', 1)->where('rmj.tmtsk <=', $tgl)->where('rmj.jenis_jabatan', 1)->where('p.created_at <', StempelUtc::awalHari($tgl))
             ->groupStart()
             ->groupStart()->where('p.status', 1)->whereIn('p.id_jenis_status', [1, 12])->groupEnd()
             ->orGroupStart()->where('p.status', 2)->where('p.tmt_status >', $tgl)->groupEnd()

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Presensi\TukinData;
 
+use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
 use App\Libraries\Presensi\Tukin\PeriodeTukin;
 use CodeIgniter\Database\BaseConnection;
 use Config\Presensi;
@@ -20,6 +21,11 @@ use LogicException;
  * konfigurasi dihitung sekali; harian & data pegawai dimuat per batch `Config\Presensi::$tukinBatchNip` NIP dengan jumlah
  * kueri tetap; galat per pegawai tidak menggagalkan seluruh laporan. Urutan galat per NIP sama dengan `siapkan()`
  * (harian → konfigurasi → data pegawai).
+ *
+ * [K T-01, CR-083] Pegawai yang `created_at`-nya tidak sebelum akhir periode BKN (hari terakhir periode, jam apa pun)
+ * tidak dimuat data hariannya (`harian = []`, semua hari kerja TK), seperti legacy; lihat
+ * {@see SumberDataPegawaiTukin::tanpaDataHarian()}. Rekap IL juga untuk pegawai keluar dengan `tmt_status ≤ de_tukin`
+ * ({@see SumberDataPegawaiTukin::keluarTanpaDataIl()}, keputusan Horii 30-10): harian & riwayat cuti kosong.
  */
 final class TukinDataService
 {
@@ -64,7 +70,7 @@ final class TukinDataService
      *
      * @throws GalatDataTukin
      */
-    public function siapkan(string $nip, int $tahun, int $bulan, ?string $hariIni = null): ArgumenTukin
+    public function siapkan(string $nip, int $tahun, int $bulan, ?string $hariIni = null, bool $tanpaPegawaiBaru = false): ArgumenTukin
     {
         $bkn     = $this->periode->barisBkn($tahun, $bulan);
         $periode = SumberPeriodeTukin::periode($tahun, $bulan, $bkn);
@@ -75,13 +81,30 @@ final class TukinDataService
         $awal  = min($sebelumnya->awal, $periode->awal);
         $libur = $this->hariLibur->untuk($awal, $periode->akhir);
 
-        return new ArgumenTukin(
-            $periode,
-            $libur,
-            $this->harian->untuk($nip, $awal, $periode->akhir),
-            $this->konfigurasi->untuk($periode),
-            $this->dataPegawai->untuk($nip, $periode, $bkn['id'] ?? null, $libur),
-        );
+        $tanpa = $this->dataPegawai->tanpaDataHarian([$nip], $periode) !== []
+            || ($tanpaPegawaiBaru && $this->dataPegawai->keluarTanpaDataIl([$nip], self::deTukin($periode, $hariIni)) !== []);
+
+        try {
+            $pegawai = $this->dataPegawai->untuk($nip, $periode, $bkn['id'] ?? null, $libur, $tanpaPegawaiBaru, $tanpaPegawaiBaru ? self::deTukin($periode, $hariIni) : null);
+        } catch (GalatDataTukin $e) {
+            $pegawai = $e; // dilempar setelah harian & konfigurasi: urutan galat tetap harian → konfigurasi → pegawai
+        }
+
+        $harian      = $tanpa ? [] : $this->harian->untuk($nip, $awal, $periode->akhir, $pegawai instanceof DataPegawaiTukin && $pegawai->lewatiLoopHarian);
+        $konfigurasi = $this->konfigurasi->untuk($periode);
+
+        if ($pegawai instanceof GalatDataTukin) {
+            throw $pegawai;
+        }
+
+        $riwayat = null;
+
+        if ($tanpaPegawaiBaru) {
+            $riwayat = $tanpa ? [] : $this->riwayatIl([$nip], $periode, $hariIni)[$nip] ?? null;
+            $libur   = $this->liburIl($libur, [$harian], $awal, $periode->akhir, [$riwayat ?? []]);
+        }
+
+        return new ArgumenTukin($periode, $libur, $harian, $konfigurasi, $pegawai, $tanpa, $riwayat);
     }
 
     /**
@@ -91,7 +114,7 @@ final class TukinDataService
      *
      * @return array<array-key, ArgumenTukin|GalatDataTukin> setiap NIP masukan menjadi kunci
      */
-    public function siapkanBanyak(array $nip, int $tahun, int $bulan, ?string $hariIni = null, ?int $ukuranBatch = null): array
+    public function siapkanBanyak(array $nip, int $tahun, int $bulan, ?string $hariIni = null, ?int $ukuranBatch = null, bool $tanpaPegawaiBaru = false): array
     {
         $unik = array_values(array_unique(array_map('strval', $nip)));
 
@@ -115,11 +138,19 @@ final class TukinDataService
         }
 
         $batas = max(1, $ukuranBatch ?? config(Presensi::class)->tukinBatchNip);
+        $tanpa = $this->dataPegawai->tanpaDataHarian($unik, $periode);
+
+        if ($tanpaPegawaiBaru) {
+            $tanpa = array_values(array_unique([...$tanpa, ...$this->dataPegawai->keluarTanpaDataIl($unik, self::deTukin($periode, $hariIni))]));
+        }
         $hasil = [];
 
         foreach (array_chunk($unik, $batas) as $batch) {
-            $harian  = $this->harian->untukBanyak($batch, $awal, $periode->akhir);
-            $pegawai = $this->dataPegawai->untukBanyak($batch, $periode, $bkn['id'] ?? null, $libur);
+            $pegawai = $this->dataPegawai->untukBanyak($batch, $periode, $bkn['id'] ?? null, $libur, $tanpaPegawaiBaru, $tanpaPegawaiBaru ? self::deTukin($periode, $hariIni) : null);
+            $lewati  = array_values(array_filter($batch, static fn (string $n): bool => ($pegawai[$n] ?? null) instanceof DataPegawaiTukin && $pegawai[$n]->lewatiLoopHarian));
+            $harian  = $this->harian->untukBanyak(array_values(array_diff($batch, $tanpa)), $awal, $periode->akhir, $lewati);
+            $riwayat = $tanpaPegawaiBaru ? $this->riwayatIl(array_values(array_diff($batch, $tanpa)), $periode, $hariIni) + array_fill_keys($tanpa, []) : [];
+            $liburN  = $tanpaPegawaiBaru ? $this->liburIl($libur, $harian, $awal, $periode->akhir, array_map(static fn (?array $r): array => $r ?? [], $riwayat)) : $libur;
 
             foreach ($batch as $n) {
                 $h = $harian[$n] ?? [];
@@ -129,12 +160,87 @@ final class TukinDataService
                     $h instanceof GalatDataTukin           => $h,
                     $konfigurasi instanceof GalatDataTukin => $konfigurasi,
                     $p instanceof GalatDataTukin           => $p,
-                    default                                => new ArgumenTukin($periode, $libur, $h, $konfigurasi, $p),
+                    default                                => new ArgumenTukin($periode, $liburN, $h, $konfigurasi, $p, in_array($n, $tanpa, true), $tanpaPegawaiBaru ? ($riwayat[$n] ?? null) : null),
                 };
             }
         }
 
         return $hasil;
+    }
+
+    /**
+     * `de_tukin` rekap IL (`L_presensi.php:13640`): akhir periode dipotong ke hari ini.
+     */
+    private static function deTukin(PeriodeTukin $periode, ?string $hariIni): string
+    {
+        return $hariIni !== null && $hariIni < $periode->akhir ? $hariIni : $periode->akhir;
+    }
+
+    /**
+     * Riwayat cuti utuh rekap IL per NIP (`$listCuti`, `L_presensi.php:13903-13911`): cuti status 1 yang beririsan
+     * [awal periode, `de_tukin`]. Sumber tanpa dukungan riwayat → `null` per NIP (kalkulasi merekonstruksi dari harian);
+     * NIP tanpa riwayat → `[]`. T-01 tidak dimuat (sama dengan data harian).
+     *
+     * @param list<string> $nip
+     *
+     * @return array<array-key, list<array{id: int, jenis: string, mulai: string, akhir: string, lama: int}>|null>
+     */
+    private function riwayatIl(array $nip, PeriodeTukin $periode, ?string $hariIni): array
+    {
+        if ($nip === []) {
+            return [];
+        }
+
+        $riwayat = $this->harian->riwayatCutiBanyak($nip, $periode->awal, self::deTukin($periode, $hariIni));
+
+        if ($riwayat === null) {
+            return array_fill_keys($nip, null);
+        }
+
+        $hasil = [];
+
+        foreach ($nip as $n) {
+            $hasil[$n] = $riwayat[$n] ?? [];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Libur rekap IL mencakup rentang penuh cuti yang dimuat (`$listLibur_per` atas `[mind_cuti, maxd_cuti]`,
+     * :14016-14036) — dibutuhkan jadwal potong cuti alasan penting (hari kerja per bulan di seluruh rentang cuti).
+     *
+     * @param list<string>                                                                   $libur
+     * @param array<array-key, array<string, array<string, mixed>>|GalatDataTukin>             $harian  per NIP (galat diabaikan)
+     * @param array<array-key, list<array{id: int, jenis: string, mulai: string, akhir: string, lama: int}>> $riwayat riwayat cuti utuh per NIP
+     *
+     * @return list<string>
+     */
+    private function liburIl(array $libur, array $harian, string $awal, string $akhir, array $riwayat = []): array
+    {
+        [$min, $max] = [$awal, $akhir];
+
+        foreach ($riwayat as $daftar) {
+            foreach ($daftar as $r) {
+                $min = min($min, $r['mulai']);
+                $max = max($max, $r['akhir']);
+            }
+        }
+
+        foreach ($harian as $perTanggal) {
+            if (! is_array($perTanggal)) {
+                continue;
+            }
+
+            foreach ($perTanggal as $input) {
+                if (isset($input['cuti']['mulai'], $input['cuti']['akhir'])) {
+                    $min = min($min, (string) $input['cuti']['mulai']);
+                    $max = max($max, (string) $input['cuti']['akhir']);
+                }
+            }
+        }
+
+        return $min === $awal && $max === $akhir ? $libur : $this->hariLibur->untuk($min, $max);
     }
 
     /**

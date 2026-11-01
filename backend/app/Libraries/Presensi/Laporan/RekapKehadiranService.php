@@ -15,6 +15,7 @@ use App\Libraries\Presensi\Rekap\KlasifikasiKehadiran;
 use App\Libraries\Presensi\Tukin\PeriodeTukin;
 use App\Libraries\Presensi\TukinData\KonfigurasiTukinDariWebConfig;
 use App\Libraries\Presensi\TukinData\RentangPuasaGanda;
+use App\Libraries\Waktu\StempelUtc;
 use Closure;
 use CodeIgniter\Database\BaseConnection;
 use DateTimeImmutable;
@@ -170,11 +171,14 @@ final class RekapKehadiranService
         $libur   = $this->libur($p);
         $hariIni = $this->hariIni();
         $baca    = [];
+        // `created_at` UTC vs tanggal bisnis WIB (CR-083): `created_at < awal` = sebelum 00:00 WIB awal; `DATE(created_at)
+        // <= awal` = sebelum 00:00 WIB hari sesudah awal.
+        $batas = $harian ? StempelUtc::awalHari($p->awal) : StempelUtc::awalHariBerikut($p->awal);
 
         foreach ($populasi as $peg) {
             $dibuat = (string) ($peg['dibuat'] ?? '');
 
-            if ($harian ? $dibuat < $p->awal : substr($dibuat, 0, 10) <= $p->awal) {
+            if ($dibuat !== '' && $dibuat < $batas) {
                 $baca[(string) $peg['nip']] = true;
             }
         }

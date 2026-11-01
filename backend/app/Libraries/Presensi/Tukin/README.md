@@ -52,13 +52,49 @@ atau `web_config`; "hari ini" diinjeksikan lewat parameter `hariIni`. Kemurnian 
 | **Urutan pengganti total**: pemutihan TB (0) → cuti besar (presensi = 5, SKP 0) → cuti melahirkan (total = 40/70/80) → cuti sepanjang periode (SKP 0) → presensi + SKP | `:13026-13057` | [K] | `HasilTukin::alasan` |
 | Total tanpa batas 100% | `:13053-13057` | [K] | — |
 | Pegawai baru: hari sebelum TMT (`tmtsk_pangkat`) dilewati tanpa potongan, bila CPNS (`gol_ruang` diawali "CPNS") atau PPPK dengan TMT setelah hari kerja pertama | `:12699-12716`, `:12738-12742` | [K] | `DataPegawaiTukin::tmtMasuk` (syarat CPNS/PPPK diputuskan adapter) |
-| Pegawai keluar (`status = 2`) di tengah periode: hari ≥ `tmt_status` dikecualikan | Rekap memasukkan pegawai bila `tmt_status > awal periode` (`L_employee.php:6414`), tetapi presensi/cuti/TB/konket hanya dimuat bila `tmt_status > akhir periode` (`:12209` dst.), sehingga semua hari kerja menjadi TK | **[V2]** | `DataPegawaiTukin::tmtKeluar`. Perbaikan bug: legacy memotong TK pada hari yang masih masa kerja |
+| **IL** `laporan_tukin_us_skp_il`: algoritma tersendiri ikut legacy (keputusan Horii 30-10) — lihat bagian "Rekap Instansi Lain" | `:13494-15452` (loop harian `:14565`) | [K] (CR-083, CR-085) | `KalkulasiTukinIl` lewat `KalkulasiLaporanTukin::hitung(il: true)` dari `RekapTukinService` IL |
+| **Keterangan cuti**: satu baris per riwayat cuti yang **hari cutinya dilalui loop** (setelah libur/akhir pekan, TB, pegawai baru, pemotongan ke hari ini), urut hari pertama | DH `:12776-12792`, IL `:14645-14650`; teks `:13122`, IL `:15074` | [K] (CR-085, keputusan Horii 30-10) | `KalkulasiLaporanTukin::cutiDihitung` dari hari berstatus `cuti`, dicocokkan per `id_riwayat_cuti` (input harian `cuti.id`). Konsekuensi F5B-17 [V2] (pemenang per tanggal = id terbesar, legacy = `tgl_mulai` terbesar): riwayat yang semua hari terhitungnya tertimpa tidak muncul di keterangan |
+| **T-02** CPNS atau PPPK tanpa `tmtsk_pangkat` (PPPK: saat ekspor > hari kerja pertama, bila periode punya hari kerja): `new DateTime('')` = saat ekspor, dan `$dt` (tanggal 00:00) `< $dtTmtPegBaru` benar untuk setiap hari loop yang dipotong ke hari ini (`:11881-11885`), sehingga **seluruh** hari loop harian dilewati tanpa potongan, berapa pun jam ekspornya (kecuali ekspor tepat 00:00:00.000000, diabaikan). Cek cuti sepanjang periode tidak terpengaruh (`:12667` hanya melewati hari sebelum `tmtsk_pangkat` yang tidak kosong) | `:12703-12710`, `:12739-12743` | [K] (CR-083, keputusan Horii 29-10; PPPK keputusan Horii 29-10 malam) | `DataPegawaiTukin::lewatiLoopHarian` (diisi adapter `SumberDataPegawaiTukin::pegawaiBaru`) |
+| Pegawai keluar (`status = 2`) di tengah periode: hari ≥ `tmt_status` dikecualikan | Rekap memasukkan pegawai bila `tmt_status > awal periode` (`L_employee.php:6414`), tetapi presensi/cuti/TB/konket hanya dimuat bila `tmt_status > akhir periode BKN` (DH `:12209` dst.; IL `tmt_status > de_tukin` = akhir **dipotong ke hari ini**, `:13906`, `:13957`, `:14045`, `:14084`), sehingga semua hari kerja menjadi TK | **[V2]** | `DataPegawaiTukin::tmtKeluar`. Perbaikan bug: legacy memotong TK pada hari yang masih masa kerja |
 | Potongan dalam integer basis poin | — | [V2] | Lihat "Presisi" |
 
 Tarif yang di rekap di-hard-code menjadi kunci konfigurasi opsional dengan nilai bawaan rekap
 (`KonfigurasiTukin::TARIF_BAWAAN`): `CUTI_SAKIT` = 1 (× 0,2), `CUTI_BESAR_1..3` = 5, `CUTI_MELAHIRKAN_1..3` =
 40/70/80, `SKP_KURANG` = 16, `SKP_TIDAK_ADA` = 32. Kunci `web_config` wajib: `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`,
 `TA`, `TK` (`LKH` tidak dipakai).
+
+## Rekap Instansi Lain (IL) — `laporan_tukin_us_skp_il` (CR-085)
+
+Keputusan Horii 30-10: algoritma rekap IL **ikut legacy** `laporan_tukin_us_skp_il` (`L_presensi.php:13494-15452`, loop
+harian `:14565`), di library murni `KalkulasiTukinIl`; rekap DH (`KalkulasiTukin`) tidak berubah. Tabel di bawah
+diturunkan dari diff kedua method (komentar dibuang); aturan yang tidak disebut **sama** dengan DH.
+
+| Aturan IL | Legacy `_il` [K] | Beda dengan DH | v2 |
+|---|---|---|---|
+| Pegawai baru (CPNS/PPPK TMT) | Tidak ada blok `isPegBaru` | DH `:12702-12743` | `tanpaPegawaiBaru`: `tmtMasuk` null, `lewatiLoopHarian` false |
+| Cuti sepanjang periode → SKP 0 | Tidak ada `cutiFullPeriode` | DH `:12665-12678` | Tidak diterapkan |
+| Cuti besar | Per tanggal: tanggal 1 bulan `mulai` (hari ≤ ⌊t/2⌋) atau bulan berikutnya, +bulan ke-2/ke-3 bila hari kalender > 35 / > 65; 25 × 0,2 = 5 per tanggal potong (`:14233-14364`) | DH: tanggal 16, `lama_cuti`, 5 **menggantikan** total presensi + SKP 0 | `jadwalPotonganCuti`, kunci `CUTI_BESAR_IL` |
+| Cuti melahirkan | Anak **≥ 3**, `lama_cuti` > 0: 40 / 70 (`lama` ≥ 32) / 20 (`lama` ≥ 62) × 0,2 per tanggal potong yang sama (`:14366-14422`) | DH: anak > 3, 40/70/80 **menggantikan** total | `CUTI_MELAHIRKAN_IL_1..3` |
+| Cuti alasan penting | `lama_cuti` > 14: hari kerja cuti per bulan, bulan terbanyak (seri → paling awal) → hari kerja pertamanya; nilai tanggal itu **diganti** 50 × 0,2 (`:14180-14228`) | DH tidak memotong (`$listPotonganCuti` dihitung tetapi tidak dipakai) | `CUTI_ALASAN_PENTING_IL`; libur dimuat atas rentang penuh cuti (`$listLibur_per`, `:14016-14036`) |
+| Penerapan potongan cuti | Awal setiap tanggal loop, sebelum libur/akhir pekan/TB: `$listPotonganCuti[nip][tanggal] × 0,2` ke CUTI & total presensi (`:14587-14592`) | — | `KalkulasiTukinIl` tidak memotong tanggal di luar masa kerja **hanya bila pemanggil lain mengisi `tmtKeluar`**; jalur rekap IL tidak mengisinya (lihat baris "Pegawai keluar") |
+| Riwayat cuti yang dimuat | Beririsan [awal, `de_tukin`] (akhir dipotong hari ini, `:13640`, `:13903-13908`), urut `tgl_mulai` | DH [awal periode lalu, akhir BKN] | Riwayat beririsan [awal, hari dihitung terakhir] |
+| Jumlah anak | `tgl_lahir`/`tgl_perkawinan` ≤ `de_tukin` (`:13840, :13851`) | DH ≤ akhir periode | `SumberDataPegawaiTukin::untukBanyak(batasAnak)` |
+| Urutan cuti sakit | `$list_LC`/`$count_CSakit`: diputus cuti jenis lain, konket, presensi/TK (`:14670`, `:14772`, `:14803`); TB/libur tidak memutus | DH: hanya baris presensi yang memutus | — |
+| Bawaan cuti sakit periode lalu | Hanya cuti sakit yang `MONTH(tgl_mulai)`/`MONTH(tgl_akhir)` ∈ {bulan(hari kerja terakhir lalu − 1 bulan), bulan(hari kerja pertama ini)} (`$listCS`, `:13872-13890`; tanpa saring tahun) | DH memakai seluruh cuti periode lalu | Saringan bulan atas `mulai`/`akhir` input harian |
+| Akhir loop | `total_skp = endDateIsTB ? 0 : potonganSKP`; total presensi **tidak** dinolkan; `total_skp = 0` dari hari TB/cuti besar/melahirkan ditimpa (`:15008-15014`) | DH: pemutihan TB → total 0; cuti besar/melahirkan/sepanjang periode | `HasilTukin::alasan` null |
+| Riwayat cuti hard-code 2023 (id 5969/6029/5752/5830) | `:14234-14295` | — | Tidak diport (periode < 2024-04 tidak didukung) |
+| Pegawai keluar (`status = 2`) | Data harian hanya dimuat bila `tmt_status > de_tukin` (`:13906`, `:13957`, `:14045`, `:14084`) → pegawai yang keluar sebelum hari ini/akhir periode tanpa data harian (semua hari kerja TK); tanpa `tmtKeluar` | DH: `tmt_status > akhir BKN` + [V2] `tmtKeluar` (#1, tidak berubah) | **[K] ikut legacy IL (keputusan Horii 30-10)**: tanpa `tmtKeluar`; `status = 2` dengan `tmt_status ≤ de_tukin` (atau NULL; DATE vs string tanggal, `>` ketat, tanpa zona waktu) → data harian **dan** riwayat jadwal potongan kosong → semua hari kerja TK, potongan cuti 0, SKP tetap (`:14110`); keterangan cuti/TB ikut kosong. Hasil bergantung tanggal ekspor, seperti legacy. `SumberDataPegawaiTukin::keluarTanpaDataIl` |
+| Riwayat cuti untuk jadwal potongan | Seluruh `$listCuti[nip][id]` (`:13903-13911`, `:14176-14423`), bukan pemenang per tanggal | — | Daftar riwayat utuh per NIP (`SumberRiwayatCutiInterface`, urut `tgl_mulai` lalu id, satu entri per id) lewat `ArgumenTukin::riwayatCuti` |
+| XLSX | Kode ekspor sama dengan DH (`:15097-15440`); judul A1 "LAPORAN TUNJANGAN KINERJA\n<nama kementerian>\nPeriode: …" (`:13803`, `:15101`) = judul DH lingkup kementerian | — | `EksporTukinXlsx::rekap`; judul v2 "LAPORAN TUNJANGAN KINERJA INSTANSI LAIN" **[V2]**; paritas `--il` (jenis rekap dari operator, hanya berkas v2 divalidasi) |
+
+Sama dengan DH: dipotong ke hari ini, precedence TB → cuti → konket → presensi, aturan TL/PSW/TPM/TPP/TK, cuti sakit hari
+ke-15+ 0,2, SKP bawaan 32 (`:14491`), `$endDateIsTB`. Selisih tepi dicatat, tidak dikerjakan: IL memuat data harian hanya
+bila `created_at < de_tukin` (ekspor tepat hari pertama periode) — selisih ini ikut berlaku untuk jadwal potongan cuti (riwayat
+utuh `$listCuti` juga disaring `created_at < de_tukin`, `:13906`), sehingga pada ekspor hari pertama periode legacy tidak
+menjadwalkan potongan cuti pegawai yang dibuat hari itu, sedangkan v2 (saringan T-01 hanya hari terakhir) menjadwalkannya.
+Jadwal potongan cuti memakai riwayat utuh per id (CR-085
+review B), sehingga riwayat bertanggal identik maupun yang tertimpa penuh tetap dijadwalkan seperti legacy; status harian
+(cuti/presensi) dan keterangan tetap memakai pemenang per tanggal = id terbesar (F5B-17 [V2]).
 
 ## Kontrak data
 
@@ -95,13 +131,17 @@ Tarif yang di rekap di-hard-code menjadi kunci konfigurasi opsional dengan nilai
 | Jumlah anak cuti melahirkan | `detail_anak` lahir s.d. akhir periode (`:12170-12198`) | `SUM(riwayat_keluarga.jumlah_anak)` (`:6886-6893`) |
 | Konket memutus urutan cuti sakit | Tidak (`:12828-12846`) | Ya (`:7425`) |
 | Dipotong sampai hari ini | Ya (`:11881-11885`) | Ya (`:6640-6643`, `:7124-7128`) — tidak berbeda |
+| Pegawai dibuat pada hari terakhir periode (T-01) | Cuti/TB/konket/presensi tidak dimuat → semua hari kerja TK (`:12209`, `:12283`, `:12346`, `:12383`) | Tanpa saringan `created_at` (data dimuat). v2 (K-1): angka **dan** tampilan ikut rekap — tanpa jam/konket (CR-083) |
+| Pegawai baru tanpa TMT (`lewatiLoopHarian`, CPNS/PPPK) | Seluruh hari loop dilewati (`:12703-12710`, `:12739-12743`) | Tanpa blok pegawai baru (dihitung biasa). v2 (K-1): ikut rekap; semua tanggal tampil `di_luar_masa_kerja` tanpa jam/konket, termasuk libur/akhir pekan (CR-083) |
+| Keterangan cuti untuk T-01 / `lewatiLoopHarian` | Tidak ada: `arrKetCuti` dibangun di dalam loop dari cuti yang dimuat | v2 (K-1): ikut rekap, keterangan cuti tidak dicetak (CR-083) |
 
 Perhitungan lain (faktor 0,2, tanpa LKH, tanpa TB 25%, cuti besar/melahirkan, urutan pengganti, cuti sepanjang
 periode, tanpa batas 100%) sama di kedua method.
 
 ## Perbedaan disengaja [V2]
 
-1. **Pegawai keluar di tengah periode**: hari kerja ≥ `tmt_status` dikecualikan (bug rekap, lihat tabel).
+1. **Pegawai keluar di tengah periode** (**hanya rekap DH** dan laporan per pegawai): hari kerja ≥ `tmt_status`
+   dikecualikan (bug rekap, lihat tabel). Rekap IL ikut legacy (keputusan Horii 30-10, bagian "Rekap Instansi Lain").
 2. **Cuti sepanjang periode** dihitung atas hari kerja periode tukin (`PeriodeTukin`, tidak dipotong `hariIni`) dalam
    masa kerja `DataPegawaiTukin`. Rekap menghitungnya atas `perBKN_st..perBKN_en` (`:11960-11974`): tanpa override
    Januari, dan bila tidak ada baris BKN rentangnya menjadi "hari ini" saja (`new DateTime('')`), sehingga hasilnya

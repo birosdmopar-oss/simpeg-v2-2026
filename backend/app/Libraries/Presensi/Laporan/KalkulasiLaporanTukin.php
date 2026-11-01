@@ -8,6 +8,7 @@ use App\Libraries\Presensi\Rekap\PenyesuaianTukin;
 use App\Libraries\Presensi\Tukin\DataPegawaiTukin;
 use App\Libraries\Presensi\Tukin\HasilTukin;
 use App\Libraries\Presensi\Tukin\KalkulasiTukin;
+use App\Libraries\Presensi\Tukin\KalkulasiTukinIl;
 use App\Libraries\Presensi\Tukin\PeriodeTukin;
 use App\Libraries\Presensi\TukinData\DataTukinBelumTersedia;
 use App\Libraries\Presensi\TukinData\GalatDataTukin;
@@ -20,7 +21,8 @@ use InvalidArgumentException;
 
 /**
  * Mesin bersama laporan per pegawai dan rekap Tukin (PRD 5B §7.3.2–7.3.3) — **satu** kalkulasi rekap (K-1, [V2] dicatat:
- * angka layar per pegawai = baris rekap). Per NIP: `TukinDataService::siapkanBanyak()` + `KalkulasiTukin::hitung()`
+ * angka layar per pegawai = baris rekap DH; untuk pegawai IL bisa berbeda dari baris rekap IL, yang tanpa aturan pegawai
+ * baru — CR-083/084). Per NIP: `TukinDataService::siapkanBanyak()` + `KalkulasiTukin::hitung()`
  * (dipotong hari ini), lalu data keterangan per batch dengan jumlah kueri tetap: `pegawai.id_jenis_status` (CLTN = 3),
  * `penyesuaian_tukin` (DBV-024), `riwayat_cuti` status 1 di periode, `riwayat_tb` status 1 (institusi) — susunan teks di
  * {@see PenyesuaianTukin}.
@@ -43,13 +45,17 @@ final class KalkulasiLaporanTukin
     }
 
     /**
-     * @param list<string> $nip
+     * `tanpa_data_harian` = T-01 (CR-083): data harian tidak dimuat; bersama `pegawai->lewatiLoopHarian`, laporan per
+     * pegawai tidak menampilkan jam/konket dan keterangan cuti untuk NIP itu (legacy tidak membacanya).
      *
-     * @return array<array-key, array{hasil: HasilTukin, predikat_skp: ?string, pegawai: ?DataPegawaiTukin, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string}|array{galat: array{code: string, message: string}}>
+     * @param list<string> $nip
+     * @param bool         $il rekap IL: tanpa aturan pegawai baru [K, CR-083, keputusan Horii 30-10]
+     *
+     * @return array<array-key, array{hasil: HasilTukin, predikat_skp: ?string, pegawai: ?DataPegawaiTukin, penyesuaian: array{persen: string, alasan: string}|null, keterangan: string, tanpa_data_harian: bool}|array{galat: array{code: string, message: string}}>
      */
-    public function hitung(array $nip, int $tahun, int $bulan, string $hariIni): array
+    public function hitung(array $nip, int $tahun, int $bulan, string $hariIni, bool $il = false): array
     {
-        $argumen = $this->data()->siapkanBanyak($nip, $tahun, $bulan, $hariIni);
+        $argumen = $this->data()->siapkanBanyak($nip, $tahun, $bulan, $hariIni, tanpaPegawaiBaru: $il);
         $periode = $this->periode($tahun, $bulan);
         $bulanTk = sprintf('%04d-%02d-01', $tahun, $bulan);
         $hasil   = [];
@@ -67,7 +73,9 @@ final class KalkulasiLaporanTukin
                 }
 
                 try {
-                    $h = KalkulasiTukin::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai);
+                    $h = $il
+                        ? KalkulasiTukinIl::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai, $a->riwayatCuti)
+                        : KalkulasiTukin::hitung($a->periode, $a->hariLibur, $a->harian, $a->konfigurasi, $hariIni, $a->pegawai);
                 } catch (InvalidArgumentException $e) {
                     $hasil[$n] = ['galat' => ['code' => 'data_tukin_tidak_sah', 'message' => 'Data Tukin pegawai tidak sah: ' . $e->getMessage()]];
 
@@ -76,18 +84,52 @@ final class KalkulasiLaporanTukin
 
                 $adaTb       = array_filter($h->harian, static fn ($hh): bool => $hh->status === 'tugas_belajar') !== [];
                 $penyesuaian = PenyesuaianTukin::aktif($info['penyesuaian'][$n] ?? [], $bulanTk);
+                $cuti        = self::cutiDihitung($h, $a->harian, $info['cuti'][$n] ?? []);
 
                 $hasil[$n] = [
-                    'hasil'        => $h,
-                    'predikat_skp' => $a->pegawai?->predikatSkp,
-                    'pegawai'      => $a->pegawai,
-                    'penyesuaian'  => $penyesuaian,
-                    'keterangan'   => PenyesuaianTukin::keterangan($penyesuaian, ($info['cltn'][$n] ?? false), $adaTb ? ($info['tb'][$n] ?? '') : null, $info['cuti'][$n] ?? []),
+                    'hasil'             => $h,
+                    'predikat_skp'      => $a->pegawai?->predikatSkp,
+                    'pegawai'           => $a->pegawai,
+                    'penyesuaian'       => $penyesuaian,
+                    'keterangan'        => PenyesuaianTukin::keterangan($penyesuaian, ($info['cltn'][$n] ?? false), $adaTb ? ($info['tb'][$n] ?? '') : null, $cuti),
+                    'tanpa_data_harian' => $a->tanpaDataHarian,
                 ];
             }
         }
 
         return $hasil;
+    }
+
+    /**
+     * Keterangan cuti ikut legacy (CR-085, keputusan Horii 30-10): `$arrKetCuti` dibangun di dalam loop harian hanya untuk
+     * hari cuti yang benar-benar dilalui — setelah libur/akhir pekan, TB, pegawai baru (DH), dan pemotongan ke hari ini
+     * (DH :12776-12792, IL :14645-14650), satu baris per riwayat menurut urutan hari pertamanya (DH :13122, IL :15074).
+     * Diturunkan dari hari berstatus `cuti` di hasil harian, dicocokkan per `id_riwayat_cuti` (input harian `cuti.id`);
+     * T-01 dan `lewatiLoopHarian` dengan sendirinya kosong. Pemenang per tanggal = id terbesar (F5B-17, [V2]): riwayat
+     * yang semua hari terhitungnya tertimpa riwayat lain tidak muncul di keterangan.
+     *
+     * @param array<string, array<string, mixed>>                     $harian  input harian (cuti membawa `id`)
+     * @param array<int, array{0: string, 1: string, 2: string}> $riwayat `riwayat_cuti` periode per id [nama, mulai, akhir]
+     *
+     * @return list<array{0: string, 1: string, 2: string}>
+     */
+    private static function cutiDihitung(HasilTukin $h, array $harian, array $riwayat): array
+    {
+        $hasil = [];
+
+        foreach ($h->harian as $tanggal => $hh) {
+            if ($hh->status !== 'cuti') {
+                continue;
+            }
+
+            $id = (int) ($harian[$tanggal]['cuti']['id'] ?? 0);
+
+            if (! isset($hasil[$id]) && isset($riwayat[$id])) {
+                $hasil[$id] = $riwayat[$id];
+            }
+        }
+
+        return array_values($hasil);
     }
 
     /**
@@ -116,7 +158,7 @@ final class KalkulasiLaporanTukin
     /**
      * @param list<string> $nip
      *
-     * @return array{cltn: array<array-key, bool>, penyesuaian: array<array-key, list<array<string, mixed>>>, cuti: array<array-key, list<array{0: string, 1: string, 2: string}>>, tb: array<array-key, string>}
+     * @return array{cltn: array<array-key, bool>, penyesuaian: array<array-key, list<array<string, mixed>>>, cuti: array<array-key, array<int, array{0: string, 1: string, 2: string}>>, tb: array<array-key, string>}
      */
     private function info(array $nip, PeriodeTukin $periode): array
     {
@@ -135,10 +177,10 @@ final class KalkulasiLaporanTukin
             $hasil['penyesuaian'][(string) $b['nip']][] = $b;
         }
 
-        foreach ($this->db->table('riwayat_cuti')->select('nip, nama_jenis_cuti, tgl_mulai, tgl_akhir')->whereIn('nip', $nip)->where('status', 1)
+        foreach ($this->db->table('riwayat_cuti')->select('id_riwayat_cuti, nip, nama_jenis_cuti, tgl_mulai, tgl_akhir')->whereIn('nip', $nip)->where('status', 1)
             ->where('tgl_mulai <=', $periode->akhir)->where('tgl_akhir >=', $periode->awal)
             ->orderBy('nip', 'ASC')->orderBy('tgl_mulai', 'ASC')->orderBy('id_riwayat_cuti', 'ASC')->get()->getResultArray() as $b) {
-            $hasil['cuti'][(string) $b['nip']][] = [(string) $b['nama_jenis_cuti'], (string) $b['tgl_mulai'], (string) $b['tgl_akhir']];
+            $hasil['cuti'][(string) $b['nip']][(int) $b['id_riwayat_cuti']] = [(string) $b['nama_jenis_cuti'], (string) $b['tgl_mulai'], (string) $b['tgl_akhir']];
         }
 
         foreach ($this->db->table('riwayat_tb')->select('nip, institusi_pendidikan')->whereIn('nip', $nip)->where('status', 1)

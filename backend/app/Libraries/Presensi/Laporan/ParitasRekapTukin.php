@@ -19,6 +19,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * kolom), sama. Keterangan tidak dibandingkan (teks legacy berisi `<br/>` dan teks penyesuaian hard-code), hanya dibawa
  * untuk telaah. Hasil memakai **NIP tersamar** (`#` + 8 heksa SHA-256) kecuali diminta penuh — laporan paritas tanpa data
  * pribadi (Q5C-06).
+ *
+ * Rekap IL (CR-085): legacy `laporan_tukin_us_skp_il` memakai kode ekspor XLSX yang sama (`L_presensi.php:15097-15440`),
+ * jadi pembacaannya sama. Jenis rekap ditentukan operator (`--il`); hanya berkas v2 yang divalidasi
+ * ({@see self::v2RekapIl()}) karena judul legacy IL tidak dapat dibedakan dari rekap DH lingkup kementerian.
  */
 final class ParitasRekapTukin
 {
@@ -47,6 +51,26 @@ final class ParitasRekapTukin
         $pembaca->setReadDataOnly(true);
 
         return self::bacaSheet($pembaca->load($path)->getActiveSheet());
+    }
+
+    /**
+     * Berkas **v2** adalah rekap IL bila judul A1 memuat "INSTANSI LAIN" ({@see RekapTukinService}; [V2], legacy IL tidak
+     * menulisnya). Berkas legacy **tidak** dapat dikenali andal: `laporan_tukin_us_skp_il` menulis judul
+     * "LAPORAN TUNJANGAN KINERJA\n<NAMA KEMENTERIAN>\nPeriode: …" (`L_presensi.php:13803`, `:15101`) — sama persis dengan
+     * rekap DH lingkup kementerian (`:12075`, `:13143`); nama kementerian bisa kosong, dan judul DH unit/satker pun kosong
+     * bila unit tidak ditemukan (`:12015`, `:12102`). Karena itu jenis rekap ditentukan operator lewat `--il`; hanya berkas
+     * v2 yang divalidasi.
+     */
+    public static function v2RekapIl(string $path): bool
+    {
+        if (! is_file($path)) {
+            throw new InvalidArgumentException("Berkas tidak ditemukan: {$path}");
+        }
+
+        $pembaca = IOFactory::createReaderForFile($path);
+        $pembaca->setReadDataOnly(true);
+
+        return str_contains(strtoupper((string) $pembaca->load($path)->getActiveSheet()->getCell('A1')->getValue()), 'INSTANSI LAIN');
     }
 
     /**
