@@ -1,7 +1,7 @@
 # Progres Fase 6 — Modul H: Integrasi & API Eksternal
 
-Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalur A, Qoder A) dan `docs/fase6/6_1.md`
-(Jalur B, Qoder B). ⛔ GATE-F6: koding mulai setelah Tahap UP-1 di-sign-off Horii.
+Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalur A, Qoder B) dan `docs/fase6/6_1.md`
+(Jalur B, Qoder A). ⛔ GATE-F6: koding mulai setelah Tahap UP-1 di-sign-off Horii.
 
 ## Status
 
@@ -21,8 +21,8 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 ## Bagian A — API masuk & job terjadwal
 
-(diisi Qoder A per milestone: keputusan, deviasi, catatan)
+(diisi Qoder B per milestone: keputusan, deviasi, catatan)
 
 ## Bagian B — Klien integrasi keluar
 
-(diisi Qoder B per milestone: keputusan, deviasi, catatan)
+(diisi Qoder A per milestone: keputusan, deviasi, catatan)
