@@ -97,10 +97,11 @@ Isi paket:
 9. Jalankan `up1-hitung-baris.sql` di sumber untuk mendapat jumlah baris per tabel. Simpan sebagai
    `<KERJA_UP1>/hitung_sumber.txt`:
    ```bash
-   mysql -h "$UP1_HOST" -P "$UP1_PORT" -u "$UP1_USER" -p --default-character-set=utf8mb4 -N -B \
-     -e "SET @awal='$UP1_AWAL', @akhir='$UP1_AKHIR', @awal_cuti='$UP1_AWAL_CUTI';" -e "source docs/up1/sql/up1-hitung-baris.sql" "$UP1_DB" \
+   { echo "SET @awal='$UP1_AWAL', @akhir='$UP1_AKHIR', @awal_cuti='$UP1_AWAL_CUTI';"; cat docs/up1/sql/up1-hitung-baris.sql; } \
+     | mysql -h "$UP1_HOST" -P "$UP1_PORT" -u "$UP1_USER" -p --default-character-set=utf8mb4 -N -B "$UP1_DB" \
      > "$UP1_OUT/../hitung_sumber.txt"
    ```
+   `source` tidak diproses dari `-e` (ERROR 1064, dibuktikan DBV 30-10), jadi variabel dan skrip dialirkan lewat stdin.
 10. Restore dump ke **skema salinan legacy** terpisah di mesin DBA, mis. `up1_legacy_salinan` di instance MySQL 8.
     Bersihkan trigger dan kolom `password_decode` sesuai DBV-011 §2.4 langkah 1. Skrip ekstraksi tidak mengambil
     trigger dan tidak mengambil `pengguna`, jadi langkah ini cukup verifikasi bahwa keduanya kosong.
@@ -126,8 +127,8 @@ hasil.
 ### d. Impor ke DB scratch v2 (D)
 
 Alat yang dipakai: `php spark impor:legacy` (MAKE-056, P-06 opsi 2). Aturannya per tabel ada di
-`backend/app/Libraries/Impor/README.md`; keputusan yang masih ditunggu dari DBV ada di bagian "Keputusan DBV yang
-dibutuhkan" di berkas yang sama. Alat menulis ke koneksi `default` dan membaca skema salinan legacy di server serta
+`backend/app/Libraries/Impor/README.md`; keputusan DBV (30-10-2026) ada di bagian "Keputusan DBV" di berkas yang
+sama. Alat menulis ke koneksi `default` dan membaca skema salinan legacy di server serta
 akun yang sama.
 
 11. **Siapkan DB scratch dan `.env` uji.**
@@ -139,8 +140,41 @@ akun yang sama.
     - Sebelum setiap perintah DB, cetak tujuannya dan pastikan benar:
       `grep -E '^database\.(default|tests)\.(hostname|port|database)' .env`.
     - `php spark migrate --all`. Grup `default` harus sudah menunjuk DB scratch; opsi `-g` diabaikan oleh perintah ini.
-12. **Siapkan berkas keputusan** `<KERJA_UP1>/keputusan.json` dari contoh `docs/up1/keputusan-impor.contoh.json`. Isinya
-    hanya kode/nilai, diisi sesuai keputusan DBV. Simpan di folder kerja, tidak di repo.
+12. **Siapkan berkas keputusan dan zona sumber.**
+    - **Zona sumber (GAP-2).** Jalankan di DevSimpeg (akun baca-saja), lalu bandingkan `NOW()` dengan jam dinding WIB
+      saat itu:
+      ```sql
+      SELECT NOW(), UTC_TIMESTAMP(), @@system_time_zone, @@global.time_zone;
+      ```
+      `NOW()` = jam WIB → `--zona-sumber=WIB`; `NOW()` = `UTC_TIMESTAMP()` → `--zona-sumber=UTC`. Catat keempat nilai
+      dan zona yang dipilih di lembar hasil bagian 1. Salah arah membuat semua stempel bergeser 14 jam.
+    - **Berkas keputusan** `<KERJA_UP1>/keputusan.json` dari contoh `docs/up1/keputusan-impor.contoh.json`. Isinya hanya
+      kode/nilai, simpan di folder kerja, tidak di repo. Syarat DBV (GAP-6):
+      1. tidak ada pemetaan yang diisi coder; semuanya dari audit skema salinan dan dicatat di lembar hasil bagian 3;
+      2. status NULL/di luar domain dipetakan ke nilai yang mereproduksi perilaku legacy (kueri legacy menyaring
+         `status = 1` → NULL dipetakan ke 2); `{"null": 1}` di berkas contoh hanya contoh;
+      3. tanggal nol di kolom NOT NULL diganti sentinel **`2000-01-01 00:00:00`** (bagian `tanggal_nol`);
+      4. `absen_ijin.status` `H`/angka lama dipetakan hanya setelah jumlah per nilai dihitung dari salinan, dan pemetaan
+         ke `V` disertai alasan dari kode legacy.
+      Nama master legacy yang berbeda dari seed v2 (GAP-11) dipetakan ke nama seed di bagian `nilai`, mis.
+      `"jenis_cuti.nama_jenis_cuti": {"Cuti Besar Lama": "Cuti Besar"}`; selisihnya dicatat di lembar hasil.
+    - **Pra-cek UNIQUE [V2]** (wajib sebelum langkah 13). Dua baris master legacy yang hanya beda spasi tengah atau huruf
+      besar/kecil menjadi identik sesudah normalisasi nama dan melanggar UNIQUE v2. Daftar indeks UNIQUE di DB scratch:
+      ```sql
+      SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS kolom
+      FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = 'simpeg_v2_t_up1' AND NON_UNIQUE = 0 AND INDEX_NAME <> 'PRIMARY'
+      GROUP BY TABLE_NAME, INDEX_NAME;
+      ```
+      Untuk setiap indeks satu kolom nama pada tabel Tier 1, hitung kelompok bentrok di skema salinan (hanya jumlah):
+      ```sql
+      SELECT COUNT(*) FROM (
+        SELECT LOWER(TRIM(REGEXP_REPLACE(<kolom>, '[[:space:]]+', ' '))) AS k FROM <tabel>
+        WHERE <kolom> IS NOT NULL GROUP BY k HAVING COUNT(*) > 1
+      ) x;
+      ```
+      Hasil > 0 → DBV memutus (perbaiki data salinan atau petakan nama di bagian `nilai`) sebelum langkah 13. Dry-run
+      juga memeriksa semua indeks UNIQUE dan gagal dengan `Bentrok UNIQUE <tabel>.<indeks>` (tanpa nilai baris).
 13. **Dry-run.** Perintah ini membaca seluruh baris dan menerapkan semua aturan tanpa menulis:
     ```bash
     php spark impor:legacy --sumber=up1_legacy_salinan --zona-sumber=<WIB|UTC> \
@@ -149,14 +183,14 @@ akun yang sama.
     - Baris pertama keluaran adalah `Tujuan: host:port / nama_db — sumber: …` (tanpa user/password). Pastikan host
       adalah mesin lokal dan nama DB adalah DB scratch. Bila salah, hentikan dan perbaiki `.env`. Karena itu dry-run
       selalu dijalankan lebih dulu: bila tujuannya salah, belum ada yang tertulis.
-    - `--zona-sumber` wajib diisi; tidak ada nilai bawaan (GAP-2). Nilainya dikonfirmasi DBV.
+    - `--zona-sumber` wajib diisi; tidak ada nilai bawaan. Nilainya dari pembuktian GAP-2 di langkah 12.
     - Opsi boleh ditulis `--k=nilai` atau `--k nilai`.
     - Dry-run sekaligus memeriksa bahwa **daftar tabel ekstraksi = daftar tabel yang dibaca alat**. Tabel yang dibaca
       alat tetapi tidak ada di salinan menghasilkan `GAGAL: Tabel sumber <t> tidak ada`; perbaiki
       `up1-ekstraksi.sh` lalu ulangi langkah 8–10. Daftar lengkapnya tercetak di laporan dry-run (kolom pertama tiap
       baris `T<n> <tabel>`). Tabel ekstraksi yang tidak dibaca alat tidak berbahaya, tetapi catat di lembar hasil.
-    - Gagal karena nilai di luar domain, tanggal nol, atau panjang kolom → lengkapi berkas keputusan (langkah 12)
-      bersama DBV, lalu ulangi dry-run. Coder tidak memutuskan pemetaan.
+    - Gagal karena nilai di luar domain, tanggal nol, panjang kolom, atau `Bentrok UNIQUE` → lengkapi berkas
+      keputusan (langkah 12) bersama DBV, lalu ulangi dry-run. Coder tidak memutuskan pemetaan.
     - Rujukan FK yatim baru terdeteksi saat impor sungguhan (langkah 14), karena dry-run tidak menulis induknya.
 14. **Impor.** Perintahnya sama tanpa `--dry-run`; tambahkan `--batch=<n>` bila memori terbatas (bawaan 1000).
     Simpan keluarannya ke `<KERJA_UP1>/laporan_impor.txt`. Isinya hanya nama tabel, jumlah, kode aturan, dan durasi
@@ -183,8 +217,8 @@ akun yang sama.
 16. **Audit dan hitung baris setelah impor:**
     - jalankan `backend/docs/db-review/sql/DBV-019-audit-yatim-fk-g02.sql`, `DBV-022-audit-layanan.sql`,
       `DBV-023-audit-presensi-gaji.sql` di DB scratch; bagian WAJIB_0 harus kosong;
-    - jalankan `up1-hitung-baris.sql` di DB scratch dengan `@awal/@akhir/@awal_cuti` yang sama seperti langkah 9, lalu
-      simpan sebagai `hitung_v2.txt`.
+    - jalankan `up1-hitung-baris.sql` di DB scratch dengan bentuk perintah dan `@awal/@akhir/@awal_cuti` yang sama
+      seperti langkah 9 (stdin, bukan `source` dari `-e`), lalu simpan sebagai `hitung_v2.txt`.
 17. **Bandingkan** `hitung_sumber.txt` dengan `hitung_v2.txt`. Selisih hanya boleh berasal dari aturan yang tercatat
     di `laporan_impor.txt`, yaitu kolom `dibuang`, mis. `DBV-023 A2 tanpa jam` dan `DBV-022 §13.1 duplikat (nip, tahun)`,
     serta seed yang `dilewati`. Setiap selisih lain masuk kelompok (b) dan dicatat di lembar hasil (bagian 3).
@@ -218,6 +252,11 @@ akun yang sama.
     - Kode keluar: 0 = sama, 1 = ada temuan, 2 = masukan salah.
     - Keluaran memakai NIP tersamar.
     - `--nip-penuh` hanya untuk telaah lokal **D** dan tidak dibagikan.
+    - **Rekap Instansi Lain (IL, CR-085).** Untuk setiap bulan `M`, bandingkan juga rekap IL mengikuti langkah 6
+      "Prosedur paritas UP-1" di `backend/docs/progress/05-Presensi.md`: kedua ekspor setelah akhir periode `M` atas
+      salinan yang sama, legacy menu Laporan Tukin Instansi Lain, v2 `rekap-il/xlsx`, lalu
+      `php spark presensi:paritas-tukin legacy_il_<M>.xlsx v2_il_<M>.xlsx --il --csv=temuan_il_<M>.csv`. Pastikan berkas
+      legacy berasal dari menu IL (alat hanya memvalidasi berkas v2).
 23. Kelompokkan setiap temuan sesuai langkah 5 prosedur di `05-Presensi.md`:
     - **(a)** deviasi [V2] yang sudah tercatat;
     - **(b)** data salinan tidak konsisten (termasuk selisih langkah 17 dan perubahan live di langkah 20);

@@ -14,6 +14,7 @@ Isi hanya angka agregat dan id lingkup.
 | Bulan Tukin diuji (`M`) | 1. … 2. … |
 | Lingkup | `0`; unit `<id>` (cuti sakit lintas periode); bulan BKN tidak standar: … / tidak ada |
 | Engine DB scratch | MySQL … |
+| Zona sumber (GAP-2, Runbook langkah 12) | `NOW()` … · `UTC_TIMESTAMP()` … · `@@system_time_zone` … · `@@global.time_zone` … · jam dinding WIB … → `--zona-sumber=` … |
 | Pelaksana | DBA: … · Reviewer CR: … |
 
 ## 2. Ringkasan paritas per bulan × lingkup

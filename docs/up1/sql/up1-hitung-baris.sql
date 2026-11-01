@@ -1,6 +1,6 @@
 -- UP-1 (MAKE-055) — hitung baris BACA-SAJA (hanya SELECT, tanpa NIP/nama).
 -- Jalankan di sumber (DevSimpeg, akun baca-saja) DAN di DB scratch v2 hasil impor dengan rentang yang sama:
---   SET @awal = 'YYYY-MM-DD', @akhir = 'YYYY-MM-DD', @awal_cuti = 'YYYY-MM-DD';  (nilai sama dengan up1-ekstraksi.sh)  lalu  source docs/up1/sql/up1-hitung-baris.sql
+--   SET @awal = 'YYYY-MM-DD', @akhir = 'YYYY-MM-DD', @awal_cuti = 'YYYY-MM-DD';  (nilai sama dengan up1-ekstraksi.sh)  lalu alirkan lewat stdin (Runbook langkah 9; `source` dari `mysql -e` gagal)
 -- Bandingkan kedua keluaran baris demi baris (Runbook langkah 17). Nama kolom = [K] legacy.
 
 SELECT CONCAT('-- db: ', DATABASE(), ', ', VERSION(), ', rentang ', @awal, '..', @akhir) AS info;
