@@ -141,7 +141,7 @@ Item `GET layanan/status`:
 ```json
 {
   "jenis": "tb", "jenis_layanan": "Tugas Belajar", "id": 12, "nip": "199001012015011001", "nama": "Contoh Pegawai, S.E.",
-  "unit": "Unit Contoh", "satker": "Satker Contoh", "tanggal_pengajuan": "2026-10-21 01:00:00", "status": 0,
+  "unit": "Unit Contoh", "satker": "Satker Contoh", "tanggal_pengajuan": "2026-10-21T08:00:00+07:00", "status": 0,
   "ringkasan": "Tugas Belajar S.1 - Universitas Contoh (Manajemen), 01-01-2027 s/d 31-12-2028",
   "label_status": "Menunggu PIC", "nada_status": "warning",
   "tahap": [
@@ -154,6 +154,8 @@ Item `GET layanan/status`:
 }
 ```
 
+- Waktu: `tanggal_pengajuan` ISO-8601 dengan offset WIB `+07:00` (potongan 10 karakter = tanggal bisnis WIB; instan sama dengan
+  `created_at` UTC); `tahap[].waktu` tetap stempel UTC `Y-m-d H:i:s` tanpa zona (klien mem-parse sebagai UTC). CR-086.
 - `tahap`, `label_status`, `nada_status` dari penyaji modul yang sama dengan halaman modul (`CutiPenyaji`, `TampilanStudi`,
   `TampilanPmk`); tahap cuti diberi `waktu` (Diajukan = `created_at`, Selesai = `updated_at` bila final).
 - `petugas`: cuti = Atasan Langsung & Pejabat Berwenang dari snapshot (`nama_atasan_langsung`, `nama_yang_menyetujui`;

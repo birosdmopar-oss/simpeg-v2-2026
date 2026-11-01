@@ -26,4 +26,19 @@ final class DatabaseConfigTest extends CIUnitTestCase
             $this->assertSame('utf8mb4_unicode_ci', $settings['DBCollat'], "{$group}.DBCollat");
         }
     }
+
+    public function testKoneksiAplikasiMemakaiDriverSesiUtc(): void
+    {
+        $config = config(Database::class);
+
+        // CR-086 / DBV-025: grup default selalu driver aplikasi (zona sesi UTC), walau .env lama menyetel DBDriver = MySQLi.
+        $this->assertSame('App\\Database\\MySQLi', $config->default['DBDriver']);
+
+        // Grup tests boleh diganti phpunit.dist.xml dengan driver kelas lain, asal turunan driver aplikasi.
+        $driverTests = $config->tests['DBDriver'];
+        $this->assertTrue(
+            $driverTests === 'App\\Database\\MySQLi' || is_subclass_of($driverTests . '\\Connection', \App\Database\MySQLi\Connection::class),
+            "tests.DBDriver {$driverTests} harus driver aplikasi atau turunannya",
+        );
+    }
 }
