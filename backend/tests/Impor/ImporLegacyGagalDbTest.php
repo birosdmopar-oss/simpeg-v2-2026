@@ -78,8 +78,9 @@ final class ImporLegacyGagalDbTest extends ImporLegacyTestCase
 
         $keluaran = $this->getStreamFilterBuffer();
         $this->assertStringContainsString("Tujuan: {$this->db->hostname}:{$this->db->port} / {$this->db->getDatabase()}", $keluaran, 'tujuan dicetak sebelum konfirmasi (R-2)');
-        // Di dalam transaksi CI4 tidak selalu melempar exception walau DBDebug = true; pemeriksaan status tetap menangkapnya.
-        $this->assertMatchesRegularExpression('/GAGAL( \(CodeIgniter\\Database\\Exceptions\\DatabaseException\): kode 1048|: Tier 2 gagal di-commit)/', $keluaran);
+        // Di dalam transaksi CI4 tidak selalu melempar exception walau DBDebug = true; status transaksi diperiksa sesudah
+        // setiap tulis, jadi pesannya menyebut tabel + kode galat (review DBV PR #32).
+        $this->assertMatchesRegularExpression('/GAGAL( \(CodeIgniter\\Database\\Exceptions\\DatabaseException\): kode 1048|: Galat DB saat tulis pegawai \(kode 1048\))/', $keluaran);
         $this->assertStringNotContainsString('Impor selesai', $keluaran);
         $this->assertSame(0, $this->db->table('pegawai')->countAllResults());
     }
