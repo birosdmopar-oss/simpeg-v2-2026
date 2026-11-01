@@ -27,7 +27,10 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
 
 ## Cara kerja
 
-- Kedua koneksi diawali sesi R4 (`time_zone = '+00:00'` + strict, DBV-011 §2.4 #6, §3.2).
+- Kedua koneksi diawali sesi R4 (`time_zone = '+00:00'` + strict, DBV-011 §2.4 #6, §3.2). Sejak CR-086 driver aplikasi
+  `App\Database\MySQLi` sudah memasang `time_zone = '+00:00'` saat connect di kedua koneksi (sumber salinan legacy dan
+  tujuan); sesi R4 alat tetap dipasang sebagai jaminan dan diverifikasi (`NOW() = UTC_TIMESTAMP()`). Skrip
+  `mysqldump`/`mysql` CLI UP-1 (`docs/up1/sql`) tidak memakai driver ini, jadi tidak terpengaruh.
 - Impor berjalan per tier. Setiap tier punya satu transaksi tujuan; bila ada galat, tier itu di-rollback.
 - Pra-cek per tabel:
   - tabel sumber ada (kecuali yang `opsional`);

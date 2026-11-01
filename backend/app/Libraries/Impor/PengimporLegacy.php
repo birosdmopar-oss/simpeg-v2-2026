@@ -39,7 +39,10 @@ use Throwable;
  * hasil `false`, `transStatus()` false, atau `transCommit()` false → {@see ImporGagal} dan tier di-rollback. Command
  * tetap memaksa `DBDebug = true` pada kedua koneksi.
  *
- * Kedua koneksi diawali sesi R4 (`time_zone = '+00:00'`, strict). Tujuan wajib kosong, kecuali tabel `bolehSeed`.
+ * Kedua koneksi diawali sesi R4 (`time_zone = '+00:00'`, strict). Sejak CR-086 driver aplikasi `App\Database\MySQLi`
+ * sudah memasang `time_zone = '+00:00'` saat connect di kedua koneksi (sumber salinan legacy dan tujuan); `aturSesi()`
+ * tetap dipertahankan sebagai jaminan + verifikasi (`NOW() = UTC_TIMESTAMP()`). Skrip `mysqldump`/`mysql` CLI UP-1 tidak
+ * memakai driver ini, jadi tidak terpengaruh. Tujuan wajib kosong, kecuali tabel `bolehSeed`.
  */
 final class PengimporLegacy
 {
