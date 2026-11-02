@@ -6,13 +6,13 @@
 # Host/akun/password DB dev ditanya saat jalan dan TIDAK disimpan. Data nyata hanya ada di folder kerja (bawaan
 # C:\UP1_kerja, di luar repo & folder sinkron cloud) dan di skema up1_legacy_salinan. Yang boleh dibagikan hanya
 # ringkasan_untuk_pr.txt (jam, tanggal, nama tabel, jumlah, id unit; tanpa NIP/nama/host/akun).
-# Periode bawaan = P-05 (bulan Tukin Sep & Okt 2026); ubah lewat UP1_AWAL/UP1_AKHIR/UP1_AWAL_CUTI/UP1_BULAN_UJI.
+# Periode bawaan = P-05 (bulan Tukin Apr & Mei 2026, diubah 02-11-2026); ubah lewat UP1_AWAL/UP1_AKHIR/UP1_AWAL_CUTI/UP1_BULAN_UJI.
 # Isi tabel & saringan sama dengan up1-ekstraksi.sh + up1-hitung-baris.sql (Runbook langkah 7–10). Kueri memakai literal,
 # bukan @variabel (ERROR 1267 collation di MySQL 8); BKN disaring numerik tahun*100+bulan karena periode_* = 'MM-DD'.
 set -euo pipefail
 
-AWAL=${UP1_AWAL:-2026-07-16}; AKHIR=${UP1_AKHIR:-2026-10-15}; AWAL_CUTI=${UP1_AWAL_CUTI:-2026-01-16}   # P-05
-BULAN_UJI=${UP1_BULAN_UJI:-202609 202610}            # bulan Tukin yang dibandingkan: wajib tepat satu baris BKN (T-04)
+AWAL=${UP1_AWAL:-2026-02-16}; AKHIR=${UP1_AKHIR:-2026-05-15}; AWAL_CUTI=${UP1_AWAL_CUTI:-2025-08-16}   # P-05
+BULAN_UJI=${UP1_BULAN_UJI:-202604 202605}            # bulan Tukin yang dibandingkan: wajib tepat satu baris BKN (T-04)
 for v in "$AWAL" "$AKHIR" "$AWAL_CUTI"; do [[ "$v" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "tanggal harus YYYY-MM-DD: $v" >&2; exit 2; }; done
 [[ "$BULAN_UJI" =~ ^[0-9]{6}( [0-9]{6})*$ ]] || { echo "UP1_BULAN_UJI harus YYYYMM dipisah spasi" >&2; exit 2; }
 BKN_DARI="${AWAL:0:4}${AWAL:5:2}"; BKN_SAMPAI="${AKHIR:0:4}${AKHIR:5:2}"; BKN_YM="CAST(tahun AS UNSIGNED)*100 + CAST(bulan AS UNSIGNED)"

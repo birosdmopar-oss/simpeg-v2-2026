@@ -21,7 +21,7 @@ UP1-04 **selesai** bila keempat butir "Yang dilaporkan" di bawah sudah dikirim k
 | Akun | khusus UP-1, baca-saja (`SELECT` + `SHOW VIEW`) skema SIMPEG di server dev; dicabut segera setelah UP1-09 (P-02) |
 | Lingkup data | 2 periode uji + tabel di runbook bagian c saja (P-03) |
 | Penyimpanan | folder lokal di luar repo/cloud; skema salinan di MySQL lokal (P-04) |
-| Periode uji | bulan Tukin **September & Oktober 2026** → `UP1_AWAL=2026-07-16`, `UP1_AKHIR=2026-10-15`, `UP1_AWAL_CUTI=2026-01-16` (P-05) |
+| Periode uji | bulan Tukin **April & Mei 2026** → `UP1_AWAL=2026-02-16`, `UP1_AKHIR=2026-05-15`, `UP1_AWAL_CUTI=2025-08-16` (P-05, diubah Horii 02-11-2026 dari Sep & Okt 2026) |
 | Ekspor legacy | langkah 20 nanti (P-07) |
 
 ## Yang sudah dicek (02-11-2026, kueri baca-saja, tanpa data pribadi)
@@ -35,7 +35,12 @@ UP1-04 **selesai** bila keempat butir "Yang dilaporkan" di bawah sudah dikirim k
 - **Collation:** di MySQL 8, kolom VARCHAR `utf8mb4_unicode_ci` yang dibandingkan dengan `@variabel` sesi memicu
   ERROR 1267, sehingga `up1-hitung-baris.sql` berhenti di klien GUI. Saringan BKN kini numerik, jadi tidak lagi
   membandingkan VARCHAR dengan variabel.
-- **Kesegaran data:** `dh_online` dan `riwayat_cuti` terisi melewati 15-10-2026; baris BKN tersedia per bulan.
+- **Cakupan data (`sql/up1-cek-periode.sql`):** DB dev = salinan prod ±20-05-2026 (stempel `absen_ijin` terakhir
+  20-05-2026). `dh_online` penuh per bulan s.d. April 2026, Mei terisi s.d. ±20-05, Juli–Oktober kosong (hanya baris
+  lepas). Karena itu periode uji Sep & Okt 2026 diganti April & Mei 2026 (P-05). Baris BKN 2026-04 dan 2026-05
+  masing-masing 1 baris.
+- **Kueri baca tanpa terminal:** `sql/up1-baca.sql` (HeidiSQL, satu tabel hasil: zona, BKN, jumlah baris, kontrol,
+  kandidat lingkup) memakai periode yang sama dengan `up1-ambil.sh`.
 
 ## Langkah (satu perintah)
 

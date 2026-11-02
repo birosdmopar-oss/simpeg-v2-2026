@@ -60,6 +60,9 @@ Isi paket:
 4. **Periode.** Ambil dua periode Tukin terakhir yang sudah tutup (Q5C-06). Periode Tukin bulan `M` = tanggal 16 bulan
    `M-1` s.d. 15 bulan `M`. Contoh: bila UP-1 dijalankan setelah 15-10-2026, `M` = September dan Oktober 2026
    (periode 16-08..15-09 dan 16-09..15-10). Periode berjalan tidak dipakai karena v2 memotongnya di hari ini (AC-D08.4).
+   "Sudah tutup" dihitung terhadap **tanggal salinan sumber**, bukan hari ini: presensi kedua bulan harus terisi di
+   sumber (cek `sql/up1-cek-periode.sql`). UP-1 ini: DB dev = salinan prod ±20-05-2026 → `M` = **April & Mei 2026**,
+   `UP1_AWAL` = 16-02-2026, `UP1_AKHIR` = 15-05-2026, `UP1_AWAL_CUTI` = 16-08-2025 (P-05, diubah 02-11-2026).
 
    **`UP1_AWAL` = awal periode SEBELUM periode pertama yang diuji.** Adapter v2 membaca `dh_online` mulai awal
    periode sebelumnya sampai akhir periode, sedangkan legacy membaca bulan kalender N−1. Untuk contoh di atas,
@@ -82,8 +85,8 @@ Isi paket:
 7. Isi parameter di sesi shell. Jangan simpan ke berkas yang di-commit:
    ```bash
    export UP1_HOST=...  UP1_PORT=...  UP1_USER=...  UP1_DB=...   # akun BACA-SAJA DevSimpeg
-   export UP1_AWAL=2026-07-16  UP1_AKHIR=2026-10-15             # langkah 4 (awal = periode sebelumnya)
-   export UP1_AWAL_CUTI=2026-01-16                              # opsional; bawaan UP1_AWAL − 6 bulan
+   export UP1_AWAL=2026-02-16  UP1_AKHIR=2026-05-15             # langkah 4 (awal = periode sebelumnya)
+   export UP1_AWAL_CUTI=2025-08-16                              # opsional; bawaan UP1_AWAL − 6 bulan
    export UP1_OUT=<KERJA_UP1>/dump
    ```
    **Cara singkat (CR-088):** `bash docs/up1/sql/up1-ambil.sh` menjalankan langkah 7–10 dalam satu perintah (cek zona &
