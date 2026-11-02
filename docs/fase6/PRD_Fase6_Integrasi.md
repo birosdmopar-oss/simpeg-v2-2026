@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder A — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder B — API masuk & job terjadwal) |
-| Versi | **v1.0b — 02-11-2026** (CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
+| Versi | **v1.0c — 02-11-2026** (CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
 | Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
 | Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
@@ -279,6 +279,23 @@ plaintext; **AC-F.2** klien status 2/10 ditolak; **AC-F.3** IP di luar allowlist
 sampai `expires_in − 60 dtk`; refresh bila 401 sekali). **AC-K.1** tanpa nilai rahasia di log (uji redaksi); **AC-K.2** GET
 di-retry maks 3, POST tidak; **AC-K.3** timeout tercatat sebagai kegagalan; **AC-K.4** driver real tanpa config → exception
 saat dibuat.
+
+**Kontrak log bersama Jalur A & B (CR-091, usulan Jalur B disepakati Horii 02-11-2026).** Kedua jalur menulis `integrasi_log` lewat **satu antarmuka yang sama**;
+Jalur A **tidak** membuat antarmuka/penulis log sendiri:
+
+- `App\Interfaces\Integrasi\IntegrasiLogInterface` — satu metode `catat(CatatanIntegrasi $catatan): void`. Implementasi wajib
+  menyimpan pesan yang **sudah teredaksi** (BP-5) dan **tidak boleh** menggagalkan operasi bisnis bila penulisan log gagal
+  (BP-7: kegagalan log cukup dicatat ke log berkas).
+- `App\Libraries\Integrasi\Log\CatatanIntegrasi` — objek nilai satu baris `integrasi_log` (DBV-027): konstanta
+  `ARAH_KELUAR = 1` (Jalur B), `ARAH_MASUK = 2` (Jalur A), `SUKSES = 1`, `GAGAL = 2`, `PESAN_MAKS = 1000`; konstruktor
+  `(int $arah, string $layanan, string $operasi, int $status, ?int $httpStatus = null, ?string $kode = null,
+  ?string $pesan = null, ?int $durasiMs = null, int $percobaan = 1, ?string $refId = null, ?int $idKlien = null)`.
+  `idKlien` diisi Jalur A (klien layanan, tanpa FK); `pesan` diredaksi pemanggil lalu dipotong penulis log ke
+  `PESAN_MAKS`. URL, query, header, dan body **tidak** dicatat (path BKN/BSrE/SIMAPI bisa memuat NIP/NIK).
+- Implementasi `App\Libraries\Integrasi\Log\IntegrasiLog` dibuat Jalur B (MAKE-063) dan didaftarkan sebagai service.
+  Bila Jalur A butuh pencatatan sebelum MAKE-063 masuk `main`, A memakai implementasi no-op dari antarmuka yang sama
+  (berkas antarmuka + objek nilai boleh ikut commit A **persis** sesuai kontrak di atas; yang masuk `main` lebih dulu
+  dipakai, yang lain menyesuaikan tanpa mengubah tanda tangan). Perubahan kontrak = CR baru, disepakati kedua jalur lewat reviewer.
 
 **7.0.3 Penjadwalan (Jalur A, ADR-037)** — command + crontab `/etc/cron.d` dengan `flock` (pola `README-deploy.md:137-161`),
 log ke `writable/logs`, kode keluar ≠ 0 bila gagal. Tabel jadwal §6.4 masuk `README-deploy.md`.
@@ -612,3 +629,4 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 | v1.0 | 01-11-2026 | Keputusan Horii Q6-01..Q6-16 ("intinya ikut legacy"): SIASN ikut legacy penuh (F6-14, antrean dorong admin dihapus, tambah `siasn_upload_arsip` + referensi), notifikasi presensi & kanal push ikut legacy (F6-12/F6-13, pengingat terjadwal dihapus), e-Kinerja insert/update ikut legacy (F6-15), BSrE query string ikut legacy (F6-17), passphrase oleh PyB (F6-18), H-12 auto-approval LKH (F6-25), F6-26 pertanyaan token SSO, F6-23 uji real di MT-010/DEPLOY-001.1 |
 | v1.0a | 01-11-2026 | Penugasan Horii: Jalur A (`6_2.md`) → Qoder B, Jalur B (`6_1.md`) → Qoder A (sesi reviewer CR) |
 | v1.0b | 02-11-2026 | CR-090 (keputusan Horii 02-11-2026, Q2 B0 Jalur B): AC-03.5 dan kriteria dorong otomatis SIASN ikut legacy per tabel — dorong ulang `updated_at > siasn_lu` hanya untuk jabatan; diklat, sertifikasi, kursus/seminar, SKP 2022 hanya `id_rw_siasn IS NULL` + `siasn_flag=0`, tanpa kolom `siasn_lu` baru di DBV-027 (F6-14, tabel `siasn:dorong`, AC-03.5) |
+| v1.0c | 02-11-2026 | CR-091, usulan Jalur B disepakati Horii 02-11-2026: kontrak log bersama Jalur A & B di §7.0.2 — `IntegrasiLogInterface::catat(CatatanIntegrasi)` + objek nilai `CatatanIntegrasi` (arah 1 keluar/2 masuk); Jalur A tidak membuat antarmuka log sendiri |
