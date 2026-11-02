@@ -87,13 +87,13 @@ jadi datanya tetap diperlakukan sebagai data pribadi nyata. DBA UP-1 = **DBV** (
 | U1 | Keputusan P-01..P-09 (`docs/up1/Pertanyaan_Terbuka_UP-1.md`) | UP1-01 | Horii | — | ⏳ P-01, P-06, sebagian P-02 terjawab |
 | U2 | Paket siap-jalan UP-1 (runbook, skrip ekstraksi baca-saja, template hasil) | MAKE-055 | Coder (ReadOne) → Reviewer | U1 dikunci → merge | ⏳ PR terbuka, jangan merge |
 | U3 | Alat impor resmi legacy → v2 (±35 tabel jalur Tukin, gladi cutover) | MAKE-056 | Coder (ReadOne), review CR + DBV | P-06 ✅ | ⏳ PR #32: review CR selesai, CI hijau; menunggu review DBV + izin Horii |
-| U4 | Ekstraksi salinan dari DB server dev + audit jumlah baris | UP1-04 | DBV | P-02..P-05 | Todo |
+| U4 | Ekstraksi salinan dari DB server dev + audit jumlah baris | UP1-04 | DBV | P-02..P-05 | ✅ 02-11 (Horii, Export HeidiSQL) |
 | U5 | Ekstraktor redaksi daftar penyesuaian Tukin legacy (P-09) | UP1-05 | Reviewer, izin Horii | P-09 | Todo |
-| U6 | Impor → penyesuaian (CRUD) → ekspor legacy & v2 → `presensi:paritas-tukin` → triase | UP1-06 | DBV + Reviewer | U3, U4, U5 | Todo |
-| U7 | Perbaikan bug kelompok (c) lewat kartu CR + uji ulang | UP1-07 | Coder → Reviewer | U6 | Todo |
-| U8 | Lembar hasil anonim + **sign-off UP-1** | UP1-08 | Reviewer → Horii | U7 | Todo |
+| U6 | Impor → penyesuaian (CRUD) → ekspor legacy & v2 → `presensi:paritas-tukin` → triase | UP1-06 | DBV + Reviewer | U3, U4, U5 | ✅ 02-11 |
+| U7 | Perbaikan bug kelompok (c) lewat kartu CR + uji ulang | UP1-07 | Coder → Reviewer | U6 | ✅ 02-11 (0 temuan c) |
+| U8 | Lembar hasil anonim + **sign-off UP-1** | UP1-08 | Reviewer → Horii | U7 | ✅ LOLOS 02-11 (`docs/up1/Hasil_UP-1.md`) |
 | U9 | Bersih-bersih salinan data & DB scratch (izin Horii per objek) | UP1-09 | DBV | U8 | Todo |
-| U10 | Buka prasyarat Fase 6 (GATE-F6 Done) | UP1-10 | Horii → Reviewer | U8 | Todo |
+| U10 | Buka prasyarat Fase 6 (GATE-F6 Done) | UP1-10 | Horii → Reviewer | U8 | ✅ 02-11 |
 
 ## 7. Prasyarat Fase 6
 

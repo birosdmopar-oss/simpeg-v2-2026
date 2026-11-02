@@ -36,7 +36,7 @@
 ### 0.1 GATE-F6 (keputusan Horii 29-10, K5C-10)
 
 - **Koding Fase 6 (termasuk migration DBV) tidak boleh dimulai sebelum Tahap UP-1 di-sign-off Horii** (UP1-08 → UP1-10,
-  Trello `GATE-F6`). Status 01-11: UP1-04 berjalan di DBV (PR #34).
+  Trello `GATE-F6`). **Status 02-11-2026: TERBUKA** — UP-1 LOLOS disetujui Horii (`docs/up1/Hasil_UP-1.md`), gerbang dibuka atas perintah Horii.
 - **Boleh sebelum gerbang terbuka** (◻ F6-01): membaca PRD, M0 (laporan pemahaman tanpa commit kode), menyiapkan permintaan
   akses non-teknis (§0.2), dan menjawab pertanyaan §12.
 
@@ -180,7 +180,7 @@ B mengerjakan bagian adapter dulu dan menunda endpoint `s_esign`.
 
 | ID | Keputusan | Label | Status |
 |---|---|---|---|
-| F6-01 | Sebelum GATE-F6 terbuka hanya M0 + persiapan akses (§0.1) | — | ◻ |
+| F6-01 | Sebelum GATE-F6 terbuka hanya M0 + persiapan akses (§0.1). GATE-F6 terbuka 02-11-2026 | — | ✔ |
 | F6-02 | **Penjadwalan = `php spark` command + crontab sistem di runbook** (pola `cuti:saldo-tahunan`, `README-deploy.md`), bukan endpoint HTTP basic-auth dan bukan "python tiap 2 detik". Endpoint `hr/services/cron/*` **tidak di-port**; *jadwal & isi job* ikut legacy. ADR-037 | [V2] mekanisme, [K] isi | ◻ |
 | F6-03 | **Auth antar-sistem satu pola** (ADR-036): tabel klien layanan (rahasia ber-hash, status, jenis klien, hak per grup endpoint, allowlist IP opsional), filter `klienLayanan` (Basic) untuk `services/*` dan `simapiToken` untuk SIMAPI. **Semua** endpoint wajib auth — termasuk yang publik di legacy (`A_dm/jabatan`, `S_stat` selain `rekomendasi_kp`, `S_dm p_*`). Klien diberi kredensial baru saat re-handshake | [V2] | ✔ Q6-01 = A |
 | F6-04 | **Kontrak SIMAPI ikut legacy 1:1** [K]: path `/simapi/v1/<controller>/<method>/<nip>` (di luar `api/v1`), amplop `{"status":"01"|"02","msg","data"}`, HTTP 200, nama field & nilai teks persis (termasuk typo "Nomenlaktur", "paramater"), aturan `type` 1/2. Perbaikan hanya: auth wajib (F6-03), `ORDER BY` deterministik pada riwayat yang tak berurut, bug `detil` `unit_es_3/4` (`AE:302-317`) diperbaiki | [K] + [V2] terbatas | ✔ Q6-02 = A |

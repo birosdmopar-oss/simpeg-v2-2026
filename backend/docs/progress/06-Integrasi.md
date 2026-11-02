@@ -1,7 +1,7 @@
 # Progres Fase 6 — Modul H: Integrasi & API Eksternal
 
 Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalur A, Qoder B) dan `docs/fase6/6_1.md`
-(Jalur B, Qoder A). ⛔ GATE-F6: koding mulai setelah Tahap UP-1 di-sign-off Horii.
+(Jalur B, Qoder A). ✅ GATE-F6 terbuka 02-11-2026 (UP-1 LOLOS, `docs/up1/Hasil_UP-1.md`).
 
 ## Status
 
