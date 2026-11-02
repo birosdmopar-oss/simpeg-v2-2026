@@ -60,6 +60,9 @@ Isi paket:
 4. **Periode.** Ambil dua periode Tukin terakhir yang sudah tutup (Q5C-06). Periode Tukin bulan `M` = tanggal 16 bulan
    `M-1` s.d. 15 bulan `M`. Contoh: bila UP-1 dijalankan setelah 15-10-2026, `M` = September dan Oktober 2026
    (periode 16-08..15-09 dan 16-09..15-10). Periode berjalan tidak dipakai karena v2 memotongnya di hari ini (AC-D08.4).
+   "Sudah tutup" dihitung terhadap **tanggal salinan sumber**, bukan hari ini: presensi kedua bulan harus terisi di
+   sumber (cek `sql/up1-cek-periode.sql`). UP-1 ini: DB dev = salinan prod ±20-05-2026 → `M` = **April & Mei 2026**,
+   `UP1_AWAL` = 16-02-2026, `UP1_AKHIR` = 15-05-2026, `UP1_AWAL_CUTI` = 16-08-2025 (P-05, diubah 02-11-2026).
 
    **`UP1_AWAL` = awal periode SEBELUM periode pertama yang diuji.** Adapter v2 membaca `dh_online` mulai awal
    periode sebelumnya sampai akhir periode, sedangkan legacy membaca bulan kalender N−1. Untuk contoh di atas,
@@ -82,10 +85,13 @@ Isi paket:
 7. Isi parameter di sesi shell. Jangan simpan ke berkas yang di-commit:
    ```bash
    export UP1_HOST=...  UP1_PORT=...  UP1_USER=...  UP1_DB=...   # akun BACA-SAJA DevSimpeg
-   export UP1_AWAL=2026-07-16  UP1_AKHIR=2026-10-15             # langkah 4 (awal = periode sebelumnya)
-   export UP1_AWAL_CUTI=2026-01-16                              # opsional; bawaan UP1_AWAL − 6 bulan
+   export UP1_AWAL=2026-02-16  UP1_AKHIR=2026-05-15             # langkah 4 (awal = periode sebelumnya)
+   export UP1_AWAL_CUTI=2025-08-16                              # opsional; bawaan UP1_AWAL − 6 bulan
    export UP1_OUT=<KERJA_UP1>/dump
    ```
+   **Cara singkat (CR-088):** `bash docs/up1/sql/up1-ambil.sh` menjalankan langkah 7–10 dalam satu perintah (cek zona &
+   BKN, ekstraksi, hitung baris, restore ke `up1_legacy_salinan` di 3307, verifikasi) dan menulis
+   `ringkasan_untuk_pr.txt` tanpa data pribadi. Langkah 7–10 di bawah tetap berlaku sebagai cara manual.
 8. Jalankan `bash docs/up1/sql/up1-ekstraksi.sh`. Password ditanya interaktif (`-p`) dan tidak disimpan. Skrip ini:
    - hanya memanggil `mysqldump --single-transaction --skip-lock-tables --no-tablespaces`, tanpa `--skip-tz-utc`
      (R1b DBV-011), tanpa trigger, routine, atau event;
@@ -115,9 +121,9 @@ Daftar tabel minimal (dari prosedur UP-1 dan kode jalur Tukin `Libraries/Presens
 | Rujukan pegawai | `agama`, `jenis_status`, `provinsi`, `kabupaten_kota`, `pangkat`, `jenis_kp`, `jenjang_pendidikan` | penuh |
 | Presensi | `dh_online` (`tgl`), `lokasi_presensi` (penuh) | rentang |
 | Izin & dinas | `absen_ijin` (`date_start`/`date_end` tumpang tindih) | rentang |
-| Cuti & TB | `riwayat_cuti` (`tgl_mulai`/`tgl_akhir` tumpang tindih), `jenis_cuti`, `pegawai_sisa_cuti` (tahun rentang), `riwayat_tb`, `riwayat_tb_perpan` | rentang (TB: tumpang tindih) |
+| Cuti & TB | `riwayat_cuti` (`tgl_mulai`/`tgl_akhir` tumpang tindih), `jenis_cuti`, `pegawai_sisa_cuti` (tahun rentang), `riwayat_tb` (juga TB lama yang perpanjangannya beririsan periode), `riwayat_tb_perpan` | rentang (TB: tumpang tindih) |
 | Kalender | `hari_libur` (tumpang tindih), `jenis_libur` | rentang |
-| SKP/BKN | `bkn_periode_ekinper` (`periode_awal`/`periode_akhir`), `riwayat_skp_periodik` (`periode_awal_skp`/`periode_akhir_skp`) | rentang |
+| SKP/BKN | `bkn_periode_ekinper` (`tahun`/`bulan`; `periode_awal`/`periode_akhir` berformat `MM-DD`), `riwayat_skp_periodik` (`periode_awal_skp`/`periode_akhir_skp`) | rentang |
 | Konfigurasi | `web_config` key `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK`, `jam_*_normal`, `jam_*_puasa` | key tertentu |
 
 Nama kolom mengikuti label [K] di dokumen DBV, yaitu nama legacy. **D** mencocokkannya dengan DDL DevSimpeg sebelum

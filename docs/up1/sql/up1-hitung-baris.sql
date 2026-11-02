@@ -2,6 +2,8 @@
 -- Jalankan di sumber (DevSimpeg, akun baca-saja) DAN di DB scratch v2 hasil impor dengan rentang yang sama:
 --   SET @awal = 'YYYY-MM-DD', @akhir = 'YYYY-MM-DD', @awal_cuti = 'YYYY-MM-DD';  (nilai sama dengan up1-ekstraksi.sh)  lalu alirkan lewat stdin (Runbook langkah 9; `source` dari `mysql -e` gagal)
 -- Bandingkan kedua keluaran baris demi baris (Runbook langkah 17). Nama kolom = [K] legacy.
+-- Kolom VARCHAR tidak dibandingkan langsung dengan @variabel: di MySQL 8 variabel sesi ber-collation
+-- utf8mb4_0900_ai_ci dan bentrok dengan kolom utf8mb4_unicode_ci (ERROR 1267, CR-088). BKN disaring numerik.
 
 SELECT CONCAT('-- db: ', DATABASE(), ', ', VERSION(), ', rentang ', @awal, '..', @akhir) AS info;
 SELECT IF(@awal IS NULL OR @akhir IS NULL OR @awal_cuti IS NULL, 'BERHENTI: @awal/@akhir/@awal_cuti belum di-SET', 'ok') AS prasyarat;
@@ -38,10 +40,13 @@ UNION ALL SELECT 'riwayat_cuti', COUNT(*) FROM riwayat_cuti WHERE tgl_mulai <= @
 UNION ALL SELECT 'pegawai_sisa_cuti', COUNT(*) FROM pegawai_sisa_cuti
           WHERE tahun BETWEEN YEAR(@awal) AND YEAR(@akhir)
 UNION ALL SELECT 'riwayat_tb', COUNT(*) FROM riwayat_tb
-          WHERE tgl_mulai <= @akhir AND (tgl_akhir IS NULL OR tgl_akhir >= @awal)
+          WHERE (tgl_mulai <= @akhir AND (tgl_akhir IS NULL OR tgl_akhir >= @awal))
+             OR id_riwayat_tb IN (SELECT id_riwayat_tb FROM riwayat_tb_perpan
+                                   WHERE tgl_mulai_perpan <= @akhir AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= @awal))
 UNION ALL SELECT 'hari_libur', COUNT(*) FROM hari_libur WHERE tgl_mulai <= @akhir AND tgl_akhir >= @awal
 UNION ALL SELECT 'bkn_periode_ekinper', COUNT(*) FROM bkn_periode_ekinper
-          WHERE periode_awal <= @akhir AND periode_akhir >= @awal
+          WHERE CAST(tahun AS UNSIGNED)*100 + CAST(bulan AS UNSIGNED)
+                BETWEEN YEAR(@awal)*100 + MONTH(@awal) AND YEAR(@akhir)*100 + MONTH(@akhir)
 UNION ALL SELECT 'riwayat_skp_periodik', COUNT(*) FROM riwayat_skp_periodik
           WHERE periode_awal_skp <= @akhir AND periode_akhir_skp >= @awal
 UNION ALL SELECT 'web_config_tukin', COUNT(*) FROM web_config
@@ -63,8 +68,14 @@ SELECT pmj.id_unit, rc.id_jenis_cuti, COUNT(*) n
    AND DATE_FORMAT(DATE_SUB(rc.tgl_mulai, INTERVAL 15 DAY), '%Y-%m')
        <> DATE_FORMAT(DATE_SUB(rc.tgl_akhir, INTERVAL 15 DAY), '%Y-%m')
  GROUP BY pmj.id_unit, rc.id_jenis_cuti ORDER BY n DESC LIMIT 20;
--- Baris BKN tidak standar: periode yang tidak mulai tanggal 1 atau tidak berakhir di akhir bulan.
-SELECT tahun, bulan, COUNT(*) n FROM bkn_periode_ekinper
- WHERE periode_awal <= @akhir AND periode_akhir >= @awal
-   AND (DAY(periode_awal) <> 1 OR periode_akhir <> LAST_DAY(periode_awal))
- GROUP BY tahun, bulan ORDER BY tahun, bulan;
+-- Baris BKN tidak standar: bulan M yang tidak berperiode 16 (M−1) s.d. 15 M, atau punya lebih dari satu baris
+-- (`periode_awal/akhir` berformat 'MM-DD'; v2 menolak bulan dengan baris ganda, `SumberPeriodeTukin`).
+SELECT tahun, bulan, MIN(periode_awal) awal, MAX(periode_akhir) akhir, COUNT(*) n FROM bkn_periode_ekinper
+ WHERE jenis_periode IS NULL
+   AND CAST(tahun AS UNSIGNED)*100 + CAST(bulan AS UNSIGNED)
+       BETWEEN YEAR(@awal)*100 + MONTH(@awal) AND YEAR(@akhir)*100 + MONTH(@akhir)
+ GROUP BY tahun, bulan
+HAVING COUNT(*) > 1
+    OR MIN(periode_awal) <> DATE_FORMAT(DATE_SUB(STR_TO_DATE(CONCAT(tahun, '-', bulan, '-16'), '%Y-%m-%d'), INTERVAL 1 MONTH), '%m-%d')
+    OR MAX(periode_akhir) <> CONCAT(bulan, '-15')
+ ORDER BY tahun, bulan;
