@@ -47,7 +47,7 @@ SELECT COUNT(*) AS kunci_ganda, COALESCE(SUM(n), 0) AS baris_terlibat
 FROM (
     SELECT COUNT(*) AS n
     FROM riwayat_skp_periodik
-    WHERE periode_id IS NOT NULL AND skp_id IS NOT NULL
+    WHERE id_pns IS NOT NULL AND periode_id IS NOT NULL AND skp_id IS NOT NULL
     GROUP BY id_pns, periode_id, skp_id
     HAVING COUNT(*) > 1
 ) d;
@@ -57,7 +57,7 @@ SELECT status_set, COUNT(*) AS kunci
 FROM (
     SELECT GROUP_CONCAT(DISTINCT status ORDER BY status) AS status_set
     FROM riwayat_skp_periodik
-    WHERE periode_id IS NOT NULL AND skp_id IS NOT NULL
+    WHERE id_pns IS NOT NULL AND periode_id IS NOT NULL AND skp_id IS NOT NULL
     GROUP BY id_pns, periode_id, skp_id
     HAVING COUNT(*) > 1
 ) d
@@ -86,6 +86,9 @@ FROM (
     SELECT 1 FROM firebase_token WHERE fcm_token IS NOT NULL GROUP BY SHA2(fcm_token, 256) HAVING COUNT(*) > 1
 ) d;
 
+-- A6b [WAJIB_0] Baris token lama tanpa `nip` (setelah ALTER menjadi platform 2 dan wajib ber-nip, CHECK pemilik).
+SELECT COUNT(*) AS token_tanpa_nip FROM firebase_token WHERE nip IS NULL;
+
 -- A7 [STOP] Username akun sistem integrasi belum dipakai (0).
 SELECT COUNT(*) AS username_terpakai FROM pengguna WHERE username = 'sistem.integrasi';
 
@@ -97,6 +100,9 @@ SELECT COUNT(*) AS username_terpakai FROM pengguna WHERE username = 'sistem.inte
 SELECT COUNT(*) AS akun_sistem_bisa_login
 FROM pengguna
 WHERE username = 'sistem.integrasi' AND (status <> '0' OR password IS NOT NULL OR password_legacy IS NOT NULL);
+
+-- B1b [WAJIB_0] Akun sistem integrasi berlevel admin (1 Super Admin, 3 Admin Satker) — hak minimum (DBV-Q10).
+SELECT COUNT(*) AS akun_sistem_level_admin FROM pengguna WHERE username = 'sistem.integrasi' AND user_level IN (1, 3);
 
 -- B2 [WAJIB_0] Token tanpa hash (aplikasi wajib mengisi `token_hash` saat upsert, F6-13).
 SELECT COUNT(*) AS token_tanpa_hash FROM firebase_token WHERE fcm_token IS NOT NULL AND token_hash IS NULL;

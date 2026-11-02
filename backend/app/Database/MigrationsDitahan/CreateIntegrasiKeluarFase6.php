@@ -23,7 +23,7 @@ use Throwable;
  *   - ALTER `firebase_token`: `nip` NULL-able, `id_pengguna`, `platform` 1 web / 2 android, `token_hash` UNIQUE,
  *     `refresh_date` [K `fb_token`] + CHECK pemilik token per platform (F6-13, DQ-25).
  *   - ALTER `riwayat_skp_periodik` UNIQUE (`id_pns`, `periode_id`, `skp_id`) (Q6-10) — pra-cek duplikat lebih dulu.
- *   - Seed akun sistem integrasi `pengguna` (username `sistem.integrasi`, status '0', tanpa password) untuk
+ *   - Seed akun sistem integrasi `pengguna` (username `sistem.integrasi`, role 8 non-admin, status '0', tanpa password) untuk
  *     `updated_by`/`approved_by` penulisan SIASN/e-Kinerja (PRD §8; pengecualian "migration tanpa seed").
  *
  * Semua pra-cek dijalankan SEBELUM DDL apa pun; DDL MySQL ter-commit per statement, jadi bila satu langkah gagal up()
@@ -41,6 +41,9 @@ class CreateIntegrasiKeluarFase6 extends Migration
     ];
 
     public const AKUN_SISTEM = 'sistem.integrasi';
+
+    /** Role 8 (Pimpinan): level non-admin dengan rujukan hak paling sedikit; akun tidak bisa login (DBV-Q10). */
+    public const LEVEL_AKUN_SISTEM = 8;
 
     public const JENIS_REFERENSI = [
         'jabatan_fungsional', 'jabatan_fungsional_umum', 'jenis_jabatan', 'latihan_struktural', 'tk_pendidikan',
@@ -75,7 +78,7 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
             $this->exec(
                 "INSERT INTO {$this->t('pengguna')} (`nip`, `username`, `name`, `email`, `password`, `password_legacy`, `user_level`, `status`, `must_change_password`, `created_at`, `updated_at`)
-                 VALUES (NULL, " . $this->db->escape(self::AKUN_SISTEM) . ", 'Sistem Integrasi', NULL, NULL, NULL, 1, '0', 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+                 VALUES (NULL, " . $this->db->escape(self::AKUN_SISTEM) . ", 'Sistem Integrasi', NULL, NULL, NULL, " . self::LEVEL_AKUN_SISTEM . ", '0', 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
                 'INSERT akun sistem integrasi',
             );
         } catch (Throwable $e) {
@@ -111,13 +114,14 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
     /**
      * Pra-cek sebelum DDL apa pun (tanpa NIP/nilai di pesan): duplikat kunci UNIQUE `riwayat_skp_periodik` (aturan
-     * pemilihan baris diputus DBV — DBV-027 §5), duplikat token FCM, dan username akun sistem yang sudah dipakai.
+     * pemilihan baris diputus DBV — DBV-027 §5), duplikat token FCM (langkah dedup DBV-027 §3.7), baris token lama tanpa
+     * `nip` (melanggar CHECK pemilik setelah menjadi platform 2), dan username akun sistem yang sudah dipakai.
      */
     private function praCek(): void
     {
         $dupSkp = (int) ($this->db->query(
             "SELECT COUNT(*) AS n FROM (SELECT 1 FROM {$this->t('riwayat_skp_periodik')}
-             WHERE `periode_id` IS NOT NULL AND `skp_id` IS NOT NULL
+             WHERE `id_pns` IS NOT NULL AND `periode_id` IS NOT NULL AND `skp_id` IS NOT NULL
              GROUP BY `id_pns`, `periode_id`, `skp_id` HAVING COUNT(*) > 1) d",
         )->getRow()->n ?? 0);
 
@@ -132,6 +136,14 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
         if ($dupToken > 0) {
             throw new RuntimeException("DBV-027: {$dupToken} token FCM ganda di firebase_token; deduplikasi sebelum migrate.");
+        }
+
+        $tanpaNip = (int) ($this->db->query(
+            "SELECT COUNT(*) AS n FROM {$this->t('firebase_token')} WHERE `nip` IS NULL",
+        )->getRow()->n ?? 0);
+
+        if ($tanpaNip > 0) {
+            throw new RuntimeException("DBV-027: {$tanpaNip} baris firebase_token tanpa nip; baris lama menjadi platform 2 dan wajib ber-nip (CHECK pemilik).");
         }
 
         $akun = (int) ($this->db->query(

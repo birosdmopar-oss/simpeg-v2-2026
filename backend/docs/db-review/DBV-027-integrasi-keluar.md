@@ -41,7 +41,7 @@ belum dicocokkan checksum produksi, AS-09). Berkas rahasia legacy (PRD Cara paka
 | 6 | `siasn_referensi` | CREATE [V2 gabungan] | 7 tabel referensi `siasn_simpeg.*` yang dipakai job aktif → satu tabel ber-`jenis` |
 | 7 | `firebase_token` | ALTER | `nip` NULL-able, `id_pengguna` (FK), `platform` 1/2, `token_hash` UNIQUE, `refresh_date` [K `fb_token`], CHECK pemilik |
 | 8 | `riwayat_skp_periodik` | ALTER | UNIQUE (`id_pns`, `periode_id`, `skp_id`) (Q6-10) setelah **pra-cek duplikat** |
-| 9 | `pengguna` | INSERT 1 baris | Akun sistem integrasi `sistem.integrasi` untuk `updated_by`/`approved_by` (PRD §8) — pengecualian "migration tanpa seed" |
+| 9 | `pengguna` | INSERT 1 baris | Akun sistem integrasi `sistem.integrasi` (role 8 non-admin, nonaktif, tanpa password) untuk `updated_by`/`approved_by` (PRD §8) — pengecualian "migration tanpa seed" |
 
 **Tidak** berubah: `esign_hist` (PRD §7.1), kolom `siasn_*` di `pegawai`/`riwayat_*` (dorong memakai kolom yang ada), ENUM
 `audit_logs.event`, `bkn_periode_ekinper`.
@@ -255,6 +255,23 @@ buang DEFAULT + constraint).
 - **`refresh_date` [K]**: diperpanjang 1 minggu saat SPA mendaftar ulang; di legacy **tidak ada pembaca** lain (tidak
   dipakai menyaring penerima). Dipertahankan untuk paritas + bahan pembersihan token basi kelak (DBV-Q9).
 - Baris lama (bila ada) → `platform = 2` (padanan `firebase_token` legacy = Android). AC-01.2: tabel kosong saat cutover.
+  Pra-cek menolak migrate bila ada baris lama tanpa `nip` (setelah menjadi platform 2 akan melanggar CHECK pemilik; di
+  skema DBV-022 `nip` NOT NULL sehingga normalnya 0 — audit A6b).
+- **Token ganda di lingkungan berisi (dev/demo dengan token Fase 4).** Pra-cek menolak migrate bila ada token ganda
+  (audit A6). Saat cutover tabel kosong, jadi aman. Untuk dev/demo, langkah dedup manual sebelum migrate — simpan baris
+  `id_firebase_token` **terbesar** per token (pendaftaran terakhir), hapus sisanya:
+
+  ```sql
+  DELETE f FROM firebase_token f
+  JOIN (SELECT SHA2(fcm_token, 256) AS h, MAX(id_firebase_token) AS simpan
+        FROM firebase_token WHERE fcm_token IS NOT NULL
+        GROUP BY SHA2(fcm_token, 256) HAVING COUNT(*) > 1) d
+    ON SHA2(f.fcm_token, 256) = d.h AND f.id_firebase_token <> d.simpan;
+  ```
+
+  Alternatifnya, langkah yang sama dijalankan deterministik di dalam migration sebelum UNIQUE (DBV-Q13). Token push
+  hanya cache pendaftaran perangkat (dibuat ulang saat aplikasi/SPA mendaftar), jadi kehilangan baris ganda tidak
+  menghilangkan data bisnis.
 - FK `id_pengguna` RESTRICT: `pengguna` dihapus lunak (`deleted_at`), jadi RESTRICT tidak menghalangi alur v2.
 
 ### 3.8 ALTER `riwayat_skp_periodik` UNIQUE (Q6-10, F6-15)
@@ -285,12 +302,17 @@ Penulisan oleh job (tarik SIASN ke `riwayat_*`/`pegawai`, e-Kinerja, dorong) but
 
 | Opsi | Isi | Plus | Minus |
 |---|---|---|---|
-| **(a) — rekomendasi** | Baris `pengguna` khusus: `username = 'sistem.integrasi'`, `name = 'Sistem Integrasi'`, `nip`/`email`/`password`/`password_legacy` NULL, `status = '0'`, `user_level = 1`, di-seed migration ini; aplikasi mencari id lewat username (`Config\Integrations` menyimpan **username**, bukan id, agar sama di semua lingkungan) | Pelaku nyata di audit & tampilan ("Sistem Integrasi"), konsisten dengan kolom tanpa FK | Pengecualian "migration tanpa seed" (G-02) |
+| **(a) — rekomendasi** | Baris `pengguna` khusus: `username = 'sistem.integrasi'`, `name = 'Sistem Integrasi'`, `nip`/`email`/`password`/`password_legacy` NULL, `status = '0'`, `user_level = 8`, di-seed migration ini; aplikasi mencari id lewat username (`Config\Integrations` menyimpan **username**, bukan id, agar sama di semua lingkungan) | Pelaku nyata di audit & tampilan ("Sistem Integrasi"), konsisten dengan kolom tanpa FK | Pengecualian "migration tanpa seed" (G-02) |
 | (b) | Konstanta/konfigurasi id tanpa baris baru (mis. `0`) | Tanpa seed | Audit merujuk id yang tidak ada; tampilan pelaku kosong; rawan bentrok bila id dipakai akun nyata |
 
 Pengaman opsi (a): akun **tidak bisa login** — `status = '0'` ditolak `AuthService` (`AuthService.php:69`), dan walau
-diaktifkan tetap ditolak karena tanpa password maupun hash legacy (diuji, Bagian 8). `user_level = 1` hanya label
-pelaku; tidak memberi akses karena akun tidak bisa memperoleh token (DBV-Q10: alternatif level lain). Pengecualian seed
+diaktifkan tetap ditolak karena tanpa password maupun hash legacy (diuji, Bagian 8).
+
+**Level akun (hak minimum, DBV-Q10).** Akun hanya penanda pelaku dan tidak pernah login, jadi tidak perlu hak admin.
+Dipilih **role 8 (Pimpinan)**: level non-admin dengan jejak hak paling kecil di kode v2 (rujukan `Role::PIMPINAN` 8,
+dibanding `ADMIN_VIEW_ESELON1` 28, `MENTERI` 25, `PTT` 22; hitungan `grep` `app/` di `main` `84917849`), dan menurut
+aturan akun non-pegawai (A-01, `2026-09-25-130100`) role 1/3/4/5/8 boleh tanpa NIP. Tidak ada pembaca yang memfilter
+pelaku sistem berdasarkan level. Penjaga ganda: audit B1 (bisa login) dan B1b (level admin 1/3) wajib 0. Pengecualian seed
 setara preseden data wajib migration lain (mis. `jenis_rwy`, `jenis_cuti` seed DBV-022) — dicatat eksplisit di sini.
 Pra-cek: migration menolak bila username sudah dipakai. down() menghapus baris akun (setelah `firebase_token`
 dikembalikan, karena token web bisa merujuknya).
@@ -305,11 +327,12 @@ pra-cek **sebelum DDL apa pun** dan berhenti dengan pesan jumlah (tanpa NIP) bil
 ```sql
 SELECT COUNT(*) AS kunci_ganda, COALESCE(SUM(n), 0) AS baris_terlibat
 FROM (SELECT COUNT(*) AS n FROM riwayat_skp_periodik
-      WHERE periode_id IS NOT NULL AND skp_id IS NOT NULL
+      WHERE id_pns IS NOT NULL AND periode_id IS NOT NULL AND skp_id IS NOT NULL
       GROUP BY id_pns, periode_id, skp_id HAVING COUNT(*) > 1) d;
 ```
 
-(= audit A3; rincian per himpunan status di A3b.) Data UP-1 (laporan reviewer CR, angka saja): ada NIP dengan > 1 baris
+(= audit A3; rincian per himpunan status di A3b.) Kolom ber-NULL dikecualikan karena UNIQUE MySQL/MariaDB membolehkan
+NULL ganda — grup ber-NULL bukan pelanggaran (`id_pns` sendiri NOT NULL di DDL, kondisinya dipasang untuk ketegasan). Data UP-1 (laporan reviewer CR, angka saja): ada NIP dengan > 1 baris
 SKP aktif per periode (April 4 NIP, Mei 8 NIP) — kuncinya **berbeda** dari UNIQUE ini (`skp_id` lain, mis. SKP
 Plt/Plh/PJ `is_skp_plt_plh_pjb`), jadi tidak melanggar UNIQUE; audit A5 memantaunya. Legacy sendiri tidak membuat
 duplikat kunci ini (insert hanya bila kunci belum ada), sehingga duplikat hanya mungkin dari salinan data/jalur lain.
@@ -351,9 +374,11 @@ di-commit).
 | A3b | INFO | Rincian A3 per himpunan status |
 | A4 | INFO | Baris `periode_id`/`skp_id` NULL |
 | A5 | INFO | NIP > 1 baris SKP aktif per periode (kunci berbeda; Tukin memakai id terkecil) |
-| A6 | WAJIB_0 | Token FCM ganda |
+| A6 | WAJIB_0 | Token FCM ganda (langkah dedup Bagian 3.7) |
+| A6b | WAJIB_0 | Baris token lama tanpa `nip` |
 | A7 | STOP | Username akun sistem sudah dipakai |
 | B1 | WAJIB_0 | Akun sistem bisa login (status ≠ 0 atau ada password) |
+| B1b | WAJIB_0 | Akun sistem berlevel admin (1/3) |
 | B2 | WAJIB_0 | Token tanpa `token_hash` |
 | B3 | INFO | Token per platform |
 | B4 | INFO | Antrean unggah arsip per status |
@@ -372,7 +397,7 @@ DB scratch tunggal Jalur B `simpeg_v2_t_fase6b` di instance uji **MySQL 8.0.30**
 `tests` (prefix `t_`), semua migration `main` `02141174`. Draf dijalankan lewat kelasnya (`CreateIntegrasiKeluarFase6::up()
 /down()`) dari test sementara bertanda `db-isolasi-penuh` (tidak di-commit; menjadi dasar test skema Bagian 9). Bukan DB dev.
 
-### 8.2 Hasil (02-11-2026) — 6 test, 92 assertion, lolos
+### 8.2 Hasil (02-11-2026) — 7 test, 96 assertion, lolos
 
 | Uji | Hasil |
 |---|---|
@@ -385,11 +410,13 @@ DB scratch tunggal Jalur B `simpeg_v2_t_fase6b` di instance uji **MySQL 8.0.30**
 | `siasn_upload_arsip` (`rw_name`,`id_rw`,`id_da`) ganda; status 4 | ✅ ditolak 1062 / 3819 |
 | `double_riwayat_kp` NIP ganda; `siasn_referensi` jenis di luar daftar; `integrasi_log` arah 3 / status 0 | ✅ ditolak 1062 / 3819 / 3819 |
 | Hapus pegawai yang punya baris SIASN | ✅ ditolak 1451 |
-| Akun sistem: `status '0'`, tanpa password; login ditolak (`AuthException`), juga setelah `status` diubah '1' | ✅ |
+| Akun sistem: role 8, `status '0'`, tanpa password; login ditolak (`AuthException`), juga setelah `status` diubah '1' | ✅ |
+| Pra-cek token FCM ganda: up() berhenti sebelum DDL (pesan jumlah) | ✅ |
+| Pra-cek baris token lama tanpa `nip`: up() berhenti sebelum DDL (diuji dengan skema DBV-022 dilonggarkan sementara di test) | ✅ |
 | Pra-cek duplikat SKP: up() berhenti sebelum DDL, pesan berisi jumlah tanpa NIP, tabel baru tidak terbentuk | ✅ |
 | Gagal di tengah (tabel `siasn_referensi` sudah ada): 5 tabel yang sempat dibuat di-DROP, `firebase_token` tidak berubah | ✅ |
 | `down()` → tabel hilang, kolom `firebase_token` & indeks `riwayat_skp_periodik` sama dengan sebelum, akun terhapus; `up()` ulang berhasil | ✅ |
-| Seluruh kueri audit (18 SELECT) berjalan tanpa galat sintaks setelah `up()` | ✅ |
+| Seluruh kueri audit (20 SELECT) berjalan tanpa galat sintaks setelah `up()` | ✅ |
 
 ### 8.3 Permintaan verifikasi MariaDB 10.4 (lingkungan DB Validator)
 Mohon jalankan draf (atau DDL Bagian 3) + skrip audit di MariaDB 10.4, terutama: CHECK `chk_firebase_token_pemilik` pada
@@ -419,9 +446,11 @@ bisa login, kueri audit berjalan), ditambah registry NIP (`NipReferenceRegistryT
 | DBV-Q7 | 7 tabel referensi digabung `siasn_referensi` | Setujui; alternatif 7 tabel terpisah nama legacy |
 | DBV-Q8 | `token_hash` UNIQUE global (satu perangkat satu pemilik) vs per akun (`id_pengguna`,`token_hash`) seperti legacy | Global |
 | DBV-Q9 | `refresh_date` dipertahankan walau tanpa pembaca | Setujui (paritas, bahan pembersihan) |
-| DBV-Q10 | Akun sistem opsi (a), `user_level = 1`, status '0' | Setujui; alternatif level lain bila DBV menghendaki |
+| DBV-Q10 | Level akun sistem: role 8 (non-admin, hak minimum) — bukan 1 | Setujui; diputus DBV/Horii (Bagian 4) |
+| DBV-Q10b | Akun sistem opsi (a) baris `pengguna` + seed migration vs opsi (b) konstanta id | Opsi (a) |
 | DBV-Q11 | Kolom tabel kerja SIASN berlabel [I] (DDL `siasn_simpeg`/`siasn_upload_arsip`/`double_riwayat_kp` tidak tersedia) | Cocokkan dengan dump D1 bila tersedia di lingkungan DBV |
 | DBV-Q12 | Timestamp migration saat dipindah | Lebih baru dari `2026-10-28-100000` dan dari DBV-026 bila masuk lebih dulu |
+| DBV-Q13 | Token FCM ganda di lingkungan berisi: pra-cek gagal + dedup manual (Bagian 3.7) atau dedup deterministik di migration (simpan id terbesar) | Pra-cek + dedup manual (perilaku migration tidak menghapus data diam-diam) |
 
 ---
 
