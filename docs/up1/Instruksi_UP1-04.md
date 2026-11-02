@@ -19,7 +19,7 @@ UP1-04 **selesai** bila keempat butir "Yang dilaporkan" di bawah sudah dikirim k
 | Butir | Nilai |
 |---|---|
 | Akun | khusus UP-1, baca-saja (`SELECT` + `SHOW VIEW`) skema SIMPEG di server dev; dicabut segera setelah UP1-09 (P-02) |
-| Lingkup data | 2 periode uji + tabel di runbook bagian c saja (P-03) |
+| Lingkup data | 2 periode uji + tabel di runbook bagian c saja (P-03); jalur Export HeidiSQL: penuh sementara lalu dipangkas (penyesuaian P-03, 02-11-2026) |
 | Penyimpanan | folder lokal di luar repo/cloud; skema salinan di MySQL lokal (P-04) |
 | Periode uji | bulan Tukin **April & Mei 2026** → `UP1_AWAL=2026-02-16`, `UP1_AKHIR=2026-05-15`, `UP1_AWAL_CUTI=2025-08-16` (P-05, diubah Horii 02-11-2026 dari Sep & Okt 2026) |
 | Ekspor legacy | langkah 20 nanti (P-07) |
@@ -58,6 +58,25 @@ UP1-04 **selesai** bila keempat butir "Yang dilaporkan" di bawah sudah dikirim k
 - [ ] **3. Laporkan** isi `C:\UP1_kerja\ringkasan_untuk_pr.txt` sebagai komentar di PR ini.
 
 Cara manual (tanpa skrip satu perintah) tetap mengikuti runbook langkah 7–10.
+
+## Jalur Export HeidiSQL (dipakai 02-11-2026, penyesuaian P-03)
+
+Dipakai bila kredensial DB dev tidak boleh dimasukkan ke skrip. Pembagian: Horii mengekspor, reviewer CR melanjutkan
+di mesin yang sama.
+
+1. **Horii — Export.** Di sesi HeidiSQL DB dev: klik kanan DB → *Export database as SQL*; centang hanya 41 tabel di
+   runbook bagian c (31 master/pegawai + `jenjang_jf` bila ada + 9 tabel transaksi + `web_config`; **tanpa**
+   `pengguna`, `token`, view, trigger, routine, event); Table(s) *Create*, Data *Insert*, Database(s) kosong; Output
+   *Single .sql file* ke folder kerja `C:\UP1_kerja\`.
+2. **Reviewer — restore** berkas itu ke `up1_legacy_salinan` di MySQL lokal 3307 (DB baru; berhenti bila sudah ada).
+3. **Reviewer — pangkas** dengan `sql/up1-pangkas.sql` (baris di luar periode uji & key non-Tukin dihapus; hanya
+   berlaku di `up1_legacy_salinan`).
+4. **Reviewer — verifikasi:** jumlah baris salinan = hasil `sql/up1-baca.sql` di DB dev; tanpa trigger; tanpa
+   `pengguna`/`token`. Hasil (angka saja) dilaporkan di PR ini.
+5. **Horii — izin hapus** berkas export penuh setelah verifikasi lolos.
+
+Reviewer hanya menjalankan perintah yang keluarannya jumlah/status; baris data tidak pernah ditampilkan atau
+disalin ke repo, PR, Trello, atau chat.
 
 ## Yang dilaporkan ke reviewer CR
 
