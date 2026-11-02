@@ -2,15 +2,15 @@
 
 | Butir | Isi |
 |---|---|
-| Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder B — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder A — API masuk & job terjadwal) |
+| Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder A — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder B — API masuk & job terjadwal) |
 | Versi | **v1.0 — 01-11-2026** (v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
 | Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
 | Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
 | Acuan legacy | Salinan kerja legacy CI3 **HEAD `0cf7e67`**. Rujukan baris bercatatan AS-09 (belum dicocokkan checksum produksi, Q5A-14). Rujukan relatif ke `application/`: `C` = `controllers/hr/services/Cron.php`, `L` = `controllers/hr/services/Local.php`, `SI` = `controllers/hr/services/Siasn.php`, `SS/` = `controllers/hr/services/siasn_sync/`, `EB` = `controllers/hr/services/Ekin_bkn.php`, `AE` = `controllers/simapi/v1/A_employee.php`, `FH` = `helpers/function_helper.php`, `LE` = `libraries/hr/L_employee.php` |
 | Scope | **Fase 6** = H-01..H-09 (`Bahan Baku SIMPEG/06-Integrasi.md`) + **H-10 e-Kinerja BKN** (baru, Tukin bergantung padanya) + **H-11 status TB/CLTN harian** (warisan Fase 4 §14.6 #2, keputusan Horii 27-10) + fondasi auth antar-sistem dan penjadwalan (§7.0) |
-| Pelaksana | **Qoder A** (`6_2.md`) dan **Qoder B** (`6_1.md`) paralel; **Reviewer** = reviewer CR (review, gate, merge, QA, uji real); **Horii** = keputusan & sign-off; **DBV** = review skema |
-| Key | Qoder A: **DBV-026**, **MAKE-058..062**; Qoder B: **DBV-027**, **MAKE-063..067**. Perbaikan review/QA: CR-088 dst. ADR baru: **ADR-036** (auth antar-sistem), **ADR-037** (penjadwalan job) |
+| Pelaksana | **Qoder B** (`6_2.md`, Jalur A) dan **Qoder A** (`6_1.md`, Jalur B — sesi reviewer CR sendiri; milestone-nya tetap lewat gate penuh + CI + izin Horii per paket) paralel (penugasan Horii 01-11-2026); **Reviewer** = reviewer CR (review, gate, merge, QA, uji real); **Horii** = keputusan & sign-off; **DBV** = review skema |
+| Key | Qoder B: **DBV-026**, **MAKE-058..062**; Qoder A: **DBV-027**, **MAKE-063..067**. Perbaikan review/QA: CR-088 dst. ADR baru: **ADR-036** (auth antar-sistem), **ADR-037** (penjadwalan job) |
 | Sumber | `06-Integrasi.md` (H-01..H-09, exit criteria); FSD §6 FSD-FN-H-01..09; SRS-FR-007/009/011/033/034/051, SRS-NFR-041; PRD-FR-015/027; RTM; PRD Fase 4 v1.5 (§1.2, D9, D18, Q-09, §14.6); PRD 5A (F5-12, §9); PRD 5B (§1.2, §9); PRD Fase 7 (§1.2 H-08); `PRD_20261001.md` J2.07, J3.01..J3.06, AS-09; DBV-022 §2.19/2.20, DQ-25; Matriks Role × Endpoint Modul H; Trello DEV-007, GATE-F6, QAFUNC-007, QASMTASK-089..097; riset kode legacy & v2 01-11-2026 (Lampiran A) |
 
 ## Cara pakai (WAJIB dibaca)
@@ -129,8 +129,8 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 
 | Jalur | Pelaksana | Berkas | Isi |
 |---|---|---|---|
-| **A — API masuk & job terjadwal** | Qoder A (`6_2.md`) | `Controllers/Simapi/*`, `Controllers/Services/*`, `Libraries/Integrasi/Simapi/*`, `Libraries/Integrasi/Stat/*`, `Libraries/Integrasi/Klien/*`, `Filters/KlienLayananFilter.php`, `Filters/SimapiTokenFilter.php`, `Commands/Integrasi*Klien*.php`, `Commands/LayananStatusHarian.php`, `Config/RoutesSimapi.php`, `Config/RoutesServices.php`, migration DBV-026 | H-05..H-09, H-11, ADR-036, ADR-037 |
-| **B — Klien integrasi keluar** | Qoder B (`6_1.md`) | `Libraries/Integrasi/Http/*`, `Libraries/Esign/Bsre*`, `Libraries/Push/Fcm*`, `Libraries/Siasn/*` (selain mock), `Libraries/Bkn/*`, `Jobs/*Fcm*|*Siasn*|*Bkn*`, `Commands/Bkn*`, `Commands/Siasn*`, `Commands/Integrasi*UjiKoneksi*`, `Config/RoutesIntegrasi.php`, `frontend/src/features/integrasi/*`, `frontend/public/firebase-messaging-sw.js`, migration DBV-027 | H-02, H-03, H-04, H-10 |
+| **A — API masuk & job terjadwal** | Qoder B (`6_2.md`) | `Controllers/Simapi/*`, `Controllers/Services/*`, `Libraries/Integrasi/Simapi/*`, `Libraries/Integrasi/Stat/*`, `Libraries/Integrasi/Klien/*`, `Filters/KlienLayananFilter.php`, `Filters/SimapiTokenFilter.php`, `Commands/Integrasi*Klien*.php`, `Commands/LayananStatusHarian.php`, `Config/RoutesSimapi.php`, `Config/RoutesServices.php`, migration DBV-026 | H-05..H-09, H-11, ADR-036, ADR-037 |
+| **B — Klien integrasi keluar** | Qoder A (`6_1.md`) | `Libraries/Integrasi/Http/*`, `Libraries/Esign/Bsre*`, `Libraries/Push/Fcm*`, `Libraries/Siasn/*` (selain mock), `Libraries/Bkn/*`, `Jobs/*Fcm*|*Siasn*|*Bkn*`, `Commands/Bkn*`, `Commands/Siasn*`, `Commands/Integrasi*UjiKoneksi*`, `Config/RoutesIntegrasi.php`, `frontend/src/features/integrasi/*`, `frontend/public/firebase-messaging-sw.js`, migration DBV-027 | H-02, H-03, H-04, H-10 |
 
 **Berkas BERSAMA — hanya ADITIF, commit TERPISAH, yang merge belakangan menggabungkan `origin/main`:**
 `Config/Services.php`, `Config/Filters.php` (alias baru milik A; B hanya memakai), `Config/Routing.php`,
@@ -463,7 +463,7 @@ Bila modul LKH belum ada di v2 (M0 A) → eskalasi, H-12 ditunda.
 
 ## 10. Urutan kerja (ringkas; rincian di `6_1.md` / `6_2.md`)
 
-| M | Qoder A (`6_2.md`) | Qoder B (`6_1.md`) |
+| M | Qoder B (`6_2.md`) | Qoder A (`6_1.md`) |
 |---|---|---|
 | M0 | Laporan pemahaman ⛔ reviewer | Laporan pemahaman ⛔ reviewer |
 | M1 | DBV-026 skema klien & SIMAPI (PR [DBV]) | DBV-027 skema integrasi keluar (PR [DBV]) |
@@ -610,3 +610,4 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 |---|---|---|
 | v0.1 | 01-11-2026 | Draf awal dari riset kode legacy (`0cf7e67`) & v2 (`a320f919`); usulan F6-01..F6-24; Q6-01..Q6-16; pembagian `6_1.md`/`6_2.md` (`ee6ce5a6`) |
 | v1.0 | 01-11-2026 | Keputusan Horii Q6-01..Q6-16 ("intinya ikut legacy"): SIASN ikut legacy penuh (F6-14, antrean dorong admin dihapus, tambah `siasn_upload_arsip` + referensi), notifikasi presensi & kanal push ikut legacy (F6-12/F6-13, pengingat terjadwal dihapus), e-Kinerja insert/update ikut legacy (F6-15), BSrE query string ikut legacy (F6-17), passphrase oleh PyB (F6-18), H-12 auto-approval LKH (F6-25), F6-26 pertanyaan token SSO, F6-23 uji real di MT-010/DEPLOY-001.1 |
+| v1.0a | 01-11-2026 | Penugasan Horii: Jalur A (`6_2.md`) → Qoder B, Jalur B (`6_1.md`) → Qoder A (sesi reviewer CR) |
