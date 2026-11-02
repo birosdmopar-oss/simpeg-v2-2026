@@ -59,7 +59,9 @@ dump 13_pegawai_sisa_cuti.sql   pegawai_sisa_cuti   --where="tahun BETWEEN $TAHU
 dump 14_riwayat_tb.sql          riwayat_tb          --where="tgl_mulai <= $Z AND (tgl_akhir IS NULL OR tgl_akhir >= $A)"
 dump 15_riwayat_tb_perpan.sql   riwayat_tb_perpan   --where="tgl_mulai_perpan <= $Z AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= $A)"
 dump 16_hari_libur.sql          hari_libur          --where="tgl_mulai <= $Z AND tgl_akhir >= $A"
-dump 17_bkn_periode_ekinper.sql bkn_periode_ekinper --where="periode_awal <= $Z AND periode_akhir >= $A"
+# bkn_periode_ekinper.periode_awal/akhir berformat 'MM-DD' (tahun & bulan di kolom sendiri) -> saring per tahun-bulan.
+BKN_DARI="${UP1_AWAL:0:4}${UP1_AWAL:5:2}"; BKN_SAMPAI="${UP1_AKHIR:0:4}${UP1_AKHIR:5:2}"
+dump 17_bkn_periode_ekinper.sql bkn_periode_ekinper   --where="CAST(tahun AS UNSIGNED)*100 + CAST(bulan AS UNSIGNED) BETWEEN $BKN_DARI AND $BKN_SAMPAI"
 dump 18_riwayat_skp_periodik.sql riwayat_skp_periodik --where="periode_awal_skp <= $Z AND periode_akhir_skp >= $A"
 
 # 3. Konfigurasi: hanya key tarif & jam kerja Tukin.

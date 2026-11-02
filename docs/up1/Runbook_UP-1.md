@@ -86,6 +86,9 @@ Isi paket:
    export UP1_AWAL_CUTI=2026-01-16                              # opsional; bawaan UP1_AWAL − 6 bulan
    export UP1_OUT=<KERJA_UP1>/dump
    ```
+   **Cara singkat (CR-088):** `bash docs/up1/sql/up1-ambil.sh` menjalankan langkah 7–10 dalam satu perintah (cek zona &
+   BKN, ekstraksi, hitung baris, restore ke `up1_legacy_salinan` di 3307, verifikasi) dan menulis
+   `ringkasan_untuk_pr.txt` tanpa data pribadi. Langkah 7–10 di bawah tetap berlaku sebagai cara manual.
 8. Jalankan `bash docs/up1/sql/up1-ekstraksi.sh`. Password ditanya interaktif (`-p`) dan tidak disimpan. Skrip ini:
    - hanya memanggil `mysqldump --single-transaction --skip-lock-tables --no-tablespaces`, tanpa `--skip-tz-utc`
      (R1b DBV-011), tanpa trigger, routine, atau event;
@@ -117,7 +120,7 @@ Daftar tabel minimal (dari prosedur UP-1 dan kode jalur Tukin `Libraries/Presens
 | Izin & dinas | `absen_ijin` (`date_start`/`date_end` tumpang tindih) | rentang |
 | Cuti & TB | `riwayat_cuti` (`tgl_mulai`/`tgl_akhir` tumpang tindih), `jenis_cuti`, `pegawai_sisa_cuti` (tahun rentang), `riwayat_tb`, `riwayat_tb_perpan` | rentang (TB: tumpang tindih) |
 | Kalender | `hari_libur` (tumpang tindih), `jenis_libur` | rentang |
-| SKP/BKN | `bkn_periode_ekinper` (`periode_awal`/`periode_akhir`), `riwayat_skp_periodik` (`periode_awal_skp`/`periode_akhir_skp`) | rentang |
+| SKP/BKN | `bkn_periode_ekinper` (`tahun`/`bulan`; `periode_awal`/`periode_akhir` berformat `MM-DD`), `riwayat_skp_periodik` (`periode_awal_skp`/`periode_akhir_skp`) | rentang |
 | Konfigurasi | `web_config` key `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK`, `jam_*_normal`, `jam_*_puasa` | key tertentu |
 
 Nama kolom mengikuti label [K] di dokumen DBV, yaitu nama legacy. **D** mencocokkannya dengan DDL DevSimpeg sebelum
