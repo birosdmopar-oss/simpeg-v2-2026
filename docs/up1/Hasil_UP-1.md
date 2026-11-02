@@ -99,11 +99,12 @@ Butir cek riset UP1-11 (Runbook i½):
 | Objek | Pemegang | Lokasi (jenis) | Dibuat | Izin hapus Horii | Dihapus |
 |---|---|---|---|---|---|
 | Berkas Export HeidiSQL (pengganti dump `up1-ekstraksi.sh`) | Horii | folder kerja terbatas, lokal | 02-11-2026 | ✅ 02-11-2026 | ✅ 02-11-2026 |
-| Skema salinan legacy `up1_legacy_salinan` | Horii / reviewer CR | instance MySQL lokal (3307) | 02-11-2026 | ⏳ | ⏳ |
-| DB scratch v2 `simpeg_v2_t_up1` | reviewer CR | instance uji 3307 | 02-11-2026 | ⏳ | ⏳ |
-| XLSX legacy (lingkup 0, 6, unit 7) | Horii | folder kerja terbatas | 02-11-2026 | ⏳ | ⏳ |
-| XLSX v2 | reviewer CR | folder kerja terbatas | 02-11-2026 | ⏳ | ⏳ |
-| CSV temuan (+ `--nip-penuh`) | reviewer CR | folder kerja terbatas | 02-11-2026 | ⏳ | ⏳ |
+| Skema salinan legacy `up1_legacy_salinan` | Horii / reviewer CR | instance MySQL lokal (3307) | 02-11-2026 | ✅ 02-11-2026 | ✅ 02-11-2026 (reviewer, terverifikasi) |
+| DB scratch v2 `simpeg_v2_t_up1` (+ DB uji CR-089 `simpeg_v2_t_cr089`) | reviewer CR | instance uji 3307 | 02-11-2026 | ✅ 02-11-2026 | ✅ 02-11-2026 (reviewer, terverifikasi) |
+| XLSX legacy (lingkup 0, 6, unit 7) | Horii | folder kerja terbatas (+ salinan di folder unduhan) | 02-11-2026 | ✅ 02-11-2026 | Unduhan: ✅ 02-11-2026 (reviewer); folder kerja: dihapus Horii |
+| XLSX v2 | reviewer CR | folder kerja terbatas | 02-11-2026 | ✅ 02-11-2026 | Folder kerja: dihapus Horii |
+| CSV temuan (+ `--nip-penuh`) | reviewer CR | folder kerja terbatas | 02-11-2026 | ✅ 02-11-2026 | Folder kerja: dihapus Horii |
+| Skrip ekspor v2 sementara (tidak di-commit) | reviewer CR | worktree lokal | 02-11-2026 | ✅ 02-11-2026 | ✅ 02-11-2026 (reviewer) |
 
 Pemeriksaan:
 
@@ -111,9 +112,10 @@ Pemeriksaan:
       tidak disentuh.
 - [x] `constants.php` legacy tidak dibuka.
 - [x] Folder kerja di luar repo.
-- [ ] Folder kerja di luar folder sinkron cloud (konfirmasi Horii).
+- [x] Folder kerja di luar folder sinkron cloud (lokasi default lokal, konfirmasi Horii 02-11-2026).
 - [x] Tidak ada data nyata di repo, PR, Trello, atau Notion. Catatan: satu nama pegawai sempat tercetak di keluaran
       perintah lokal sesi reviewer saat memeriksa judul XLSX; tidak disalin ke repo, Trello, atau laporan.
 - [x] `.env` dev tidak disalin (koneksi lewat variabel lingkungan); DB tujuan bukan `simpeg_v2`,
       `simpeg_v2_testing`, atau 3306.
-- [ ] Semua objek di tabel atas dihapus setelah izin, termasuk Recycle Bin dan folder unduhan (langkah 26).
+- [x] Semua objek di tabel atas dihapus setelah izin (langkah 26): DB, unduhan, dan skrip oleh reviewer (dihapus
+      permanen, tanpa Recycle Bin); folder kerja (XLSX, CSV, laporan impor/audit) dihapus Horii dengan Shift+Delete.
