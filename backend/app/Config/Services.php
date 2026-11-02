@@ -506,6 +506,30 @@ class Services extends BaseService
     }
 
     /**
+     * Penulis log integrasi bersama Jalur A & B (PRD Fase 6 §7.0.2, kontrak CR-091; tabel `integrasi_log` DBV-027).
+     */
+    public static function integrasiLog(bool $getShared = true): \App\Interfaces\Integrasi\IntegrasiLogInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('integrasiLog');
+        }
+
+        return new \App\Libraries\Integrasi\Log\IntegrasiLog(\Config\Database::connect());
+    }
+
+    /**
+     * Klien HTTP keluar bersama Fase 6 (BP-3/BP-5, MAKE-063): transport cURL + log integrasi + redaksi.
+     */
+    public static function klienHttp(bool $getShared = true): \App\Libraries\Integrasi\Http\KlienHttp
+    {
+        if ($getShared) {
+            return static::getSharedInstance('klienHttp');
+        }
+
+        return new \App\Libraries\Integrasi\Http\KlienHttp(new \App\Libraries\Integrasi\Http\CurlTransport(), static::integrasiLog());
+    }
+
+    /**
      * Penerbit surat cuti belum-TTE saat efek final (PRD Fase 4 §6.5.2): SuratCutiService (MAKE-023; di M3 berupa no-op).
      */
     public static function penerbitSuratCuti(bool $getShared = true): \App\Interfaces\Layanan\PenerbitSuratCutiInterface
