@@ -29,6 +29,14 @@ final class AturanImporTest extends CIUnitTestCase
         $this->assertSame('Biro Umum', Transformasi::nama("  Biro\t\n  Umum "));
     }
 
+    public function testKodeMembuangKarakterTakTerlihatLaluTrim(): void
+    {
+        // CR-089: U+200C di depan NIP (temuan UP1-06), U+200B/U+FEFF/U+2060 di tengah & akhir.
+        $this->assertSame('000000000000000001', Transformasi::kode(" \u{200C}000000000\u{200B}000000001\u{FEFF}\u{2060} "));
+        $this->assertSame('31', Transformasi::kode(' 31 '));
+        $this->assertNull(Transformasi::kode(null));
+    }
+
     /**
      * @return iterable<string, array{mixed, mixed}>
      */

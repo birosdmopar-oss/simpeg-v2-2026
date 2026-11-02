@@ -161,6 +161,45 @@ final class ImporLegacyTier1Test extends ImporLegacyTestCase
         $this->assertSame('2', (string) $this->db->table('unit')->where('id_unit', 5)->get()->getRowArray()['status']);
     }
 
+    public function testUnitIsUpt2DipetakanKe0SesuaiG02(): void
+    {
+        $this->isiLegacyDasar();
+        $this->lepasCheck('unit');
+        $this->src->table('unit')->insert(['id_unit' => 6, 'unit' => 'Unit UPT', 'is_upt' => 2, 'order' => 2, 'status' => 1, 'created_at' => '2026-01-01 07:00:00']);
+
+        $lap = $this->impor();
+
+        $isUpt = array_column($this->db->table('unit')->orderBy('id_unit')->get()->getResultArray(), 'is_upt', 'id_unit');
+        $this->assertSame([5 => '0', 6 => '0'], array_map('strval', $isUpt));
+        $this->assertSame(['G-02 #9 is_upt 2→0' => 1], $lap['unit']['koreksi']);
+    }
+
+    public function testIsUptLuarDomainGagalSaatDryRunLaluDipetakanKeputusan(): void
+    {
+        $this->isiLegacyDasar();
+        $this->lepasCheck('unit');
+        $this->lepasCheck('satker');
+        $this->src->query('UPDATE unit SET is_upt = 3 WHERE id_unit = 5');
+        $this->src->query('UPDATE satker SET is_upt = 2 WHERE id_satker = 9');
+
+        foreach (["Nilai unit.is_upt '3'", "Nilai satker.is_upt '2'"] as $i => $pesan) {
+            try {
+                $this->impor(dryRun: true);
+                $this->fail("{$pesan} harus gagal saat dry-run (sebelum CHECK MySQL).");
+            } catch (ImporGagal $e) {
+                $this->assertStringContainsString($pesan, $e->getMessage());
+            }
+
+            if ($i === 0) {
+                $this->src->query('UPDATE unit SET is_upt = 1 WHERE id_unit = 5');
+            }
+        }
+
+        $this->impor(k: Keputusan::dariArray(['status' => ['satker.is_upt' => ['2' => 0]]]));
+        $this->assertSame('0', (string) $this->db->table('satker')->where('id_satker', 9)->get()->getRowArray()['is_upt']);
+        $this->assertSame('1', (string) $this->db->table('unit')->where('id_unit', 5)->get()->getRowArray()['is_upt']);
+    }
+
     public function testTanggalNolNotNullButuhKeputusan(): void
     {
         $this->isiLegacyDasar();

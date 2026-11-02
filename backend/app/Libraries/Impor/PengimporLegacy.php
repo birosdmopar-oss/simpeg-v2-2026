@@ -21,7 +21,8 @@ use Throwable;
  * 5. Kolom teks: stripslashes PHP (kecuali `tanpaStripslashes`); `kolomNama` dinormalisasi seperti aplikasi.
  * 6. `status` (bila `statusDomain` tidak null) dan kolom `domain`: di luar domain → berkas keputusan, kalau tidak gagal;
  *    NULL di kolom nullable dibiarkan.
- * 7. `kolomKode`: trim PHP (kode wilayah, DBV-011 §2.2 #7). Teks melebihi panjang kolom tujuan → gagal.
+ * 7. `kolomKode`: karakter tak terlihat dibuang lalu trim PHP (kode wilayah DBV-011 §2.2 #7; NIP CR-089, dicatat di
+ *    laporan). Teks melebihi panjang kolom tujuan → gagal.
  * 8. Rujukan FK dicek per batch terhadap tabel induk di tujuan (audit DBV-019 = 0): yatim → NULL bila kolomnya
  *    `yatimKeNull` (dicatat), selain itu gagal dengan jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
  *
@@ -447,7 +448,13 @@ final class PengimporLegacy
             if (in_array($kolom, $def->kolomNama, true)) {
                 $nilai = Transformasi::nama($nilai);
             } elseif (in_array($kolom, $def->kolomKode, true)) {
-                $nilai = trim($nilai);
+                $kode = (string) Transformasi::kode($nilai);
+
+                if ($kode !== trim($nilai)) {
+                    $this->laporan->koreksi($def->tabel, "{$kolom} karakter tak terlihat dibuang");
+                }
+
+                $nilai = $kode;
             }
 
             if ($tipe['panjang'] !== null && mb_strlen($nilai) > $tipe['panjang']) {

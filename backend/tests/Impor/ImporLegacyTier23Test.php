@@ -112,6 +112,18 @@ final class ImporLegacyTier23Test extends ImporLegacyTestCase
         $this->assertSame('2', (string) $this->db->table('pegawai')->where('nip', self::NIP_B)->get()->getRowArray()['jenis_kelamin']);
     }
 
+    public function testNipBerkarakterTakTerlihatDibersihkanDanDicatat(): void
+    {
+        // CR-089 (temuan UP1-06): NIP riwayat berawalan U+200C sama dengan NIP pegawai menurut collation legacy.
+        $this->src->query("UPDATE riwayat_mutasi_jabatan SET nip = CONCAT(UNHEX('E2808C'), nip) WHERE id_riwayat_mutasi_jabatan = 50");
+
+        $lap = $this->jalankanImpor([1, 2, 3]);
+
+        $this->assertSame(self::NIP_A, $this->db->table('riwayat_mutasi_jabatan')->where('id_riwayat_mutasi_jabatan', 50)->get()->getRowArray()['nip']);
+        $this->assertSame(['nip karakter tak terlihat dibuang' => 1], $lap['riwayat_mutasi_jabatan']['koreksi']);
+        $this->assertSame([], $lap['riwayat_kp']['koreksi']);
+    }
+
     public function testNipMelebihiPanjangKolomGagal(): void
     {
         // Legacy V4: kolom NIP VARCHAR(50) (B-01 §6 #2); v2 VARCHAR(30).

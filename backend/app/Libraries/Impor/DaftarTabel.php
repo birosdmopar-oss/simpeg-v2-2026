@@ -60,8 +60,8 @@ final class DaftarTabel
             new DefinisiTabel('pangkat', 'id_pangkat', 'G-04 §6.3/6.4', kolomNama: ['pangkat']),
             new DefinisiTabel('jenis_kp', 'id_jenis_kp', 'G-04 §6.4 (id 1/2/6 hard-code)', kolomNama: ['jenis_kp']),
             new DefinisiTabel('jenjang_pendidikan', 'id_jenjang_pendidikan', 'G-04/G-05 §6.3', kolomNama: ['jenjang_pendidikan']),
-            new DefinisiTabel('unit', 'id_unit', $g02, kolomNama: ['unit']),
-            new DefinisiTabel('satker', 'id_satker', $g02, kolomNama: ['satker']),
+            new DefinisiTabel('unit', 'id_unit', $g02, kolomNama: ['unit'], khusus: self::unit(...)),
+            new DefinisiTabel('satker', 'id_satker', $g02, kolomNama: ['satker'], domain: ['is_upt' => [0, 1]]),
             new DefinisiTabel('group_jabatan', 'id_group_jabatan', $g02, kolomNama: ['group_jabatan']),
             new DefinisiTabel(
                 'sub_group_jabatan',
@@ -251,6 +251,30 @@ final class DaftarTabel
             ),
             new DefinisiTabel('riwayat_tb_perpan', 'id_riwayat_tb_perpan', 'DBV-022 §5', statusDomain: null),
         ];
+    }
+
+    /**
+     * `unit.is_upt` 2 ("TIDAK" dari form legacy `unit/form.php:44`) → 0 = G-02 Bagian 4 #9, dicatat di laporan. Nilai
+     * lain di luar 0/1 (CHECK `chk_unit_is_upt`) → berkas keputusan, kalau tidak gagal — juga saat dry-run (CR-089).
+     *
+     * @param array<string, mixed> $baris
+     *
+     * @return array<string, mixed>
+     */
+    private static function unit(array $baris, Keputusan $keputusan): array
+    {
+        if (! array_key_exists('is_upt', $baris)) {
+            return $baris;
+        }
+
+        if (Transformasi::kunciStatus($baris['is_upt']) === '2') {
+            $baris['is_upt']    = 0;
+            $baris['__koreksi'] = ['G-02 #9 is_upt 2→0'];
+        }
+
+        $baris['is_upt'] = $keputusan->domain('unit', 'is_upt', $baris['is_upt'], [0, 1]);
+
+        return $baris;
     }
 
     /**

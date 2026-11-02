@@ -37,6 +37,16 @@ final class Transformasi
     }
 
     /**
+     * Kode/NIP (`kolomKode`): karakter tak terlihat (U+200B–U+200F, U+2060, U+FEFF) dibuang lalu trim. Collation legacy
+     * `utf8mb4_unicode_ci` mengabaikan karakter itu saat membandingkan, v2 membandingkan persis (CR-089, temuan UP1-06:
+     * NIP riwayat berawalan U+200C → rujukan yatim).
+     */
+    public static function kode(?string $nilai): ?string
+    {
+        return $nilai === null ? null : trim((string) preg_replace('/[\x{200B}-\x{200F}\x{2060}\x{FEFF}]/u', '', $nilai));
+    }
+
+    /**
      * Id rujukan `0` / `''` → NULL (DBV-011 §2.10, B-01/B-02 §6 #4).
      */
     public static function rujukan(mixed $nilai): mixed

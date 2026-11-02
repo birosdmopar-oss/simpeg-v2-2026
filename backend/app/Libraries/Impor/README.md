@@ -63,7 +63,7 @@ DEFAULT dari DB.
 | 5 | Teks: `stripslashes` PHP, kecuali `tanpaStripslashes` | DBV-011 §2.2 #3 |
 | 6 | `kolomNama`: whitespace → satu spasi, lalu trim | DBV-011 §2.2 #2 |
 | 7 | `status` di luar `statusDomain` (bawaan 1/2/10) dan kolom `domain` lain (CHECK v2) → berkas keputusan, kalau tidak gagal; NULL di kolom nullable dibiarkan | DBV-011 §2.4 #5, B-01/B-02 §6 #3 |
-| 8 | `kolomKode`: trim PHP; teks melebihi panjang kolom tujuan → gagal (mis. NIP > 30) | DBV-011 §2.2 #7, B-01/B-02 §6 #2 |
+| 8 | `kolomKode`: karakter tak terlihat (U+200B–U+200F, U+2060, U+FEFF) dibuang lalu trim PHP, jumlah baris dicatat di laporan (`<kolom> karakter tak terlihat dibuang`); teks melebihi panjang kolom tujuan → gagal (mis. NIP > 30) | DBV-011 §2.2 #7, B-01/B-02 §6 #2, CR-089 (UP1-06: NIP berawalan U+200C, legacy `unicode_ci` mengabaikannya) |
 | 9 | Rujukan FK dicek per batch terhadap tabel induk tujuan: yatim → gagal dengan jumlah, kecuali `yatimKeNull` → NULL + dicatat sebagai `koreksi`. Dry-run tidak memeriksa rujukan | DBV-019 audit = 0, B-01/B-02 §6 #6 |
 
 ## Aturan khusus tabel (`DefinisiTabel`)
@@ -94,7 +94,7 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 
 | Tier | Isi | Status |
 |---|---|---|
-| 1 | Master: `agama`, `jenis_status`, `provinsi`/`kabupaten_kota` (sentinel = seed), `pangkat`, `jenis_kp`, `jenjang_pendidikan`, `unit`, `satker`, `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `kelas_jabatan`, `jenjang_jf` (opsional), `jabatan`, `jabatan_koordinasi`, `periode_struktur_jabatan`, `struktur_jabatan`, `jenis_pegawai`, `gol_pppk`, `jenis_libur`, `hari_libur`, `jenis_cuti`, `web_config` | M1 |
+| 1 | Master: `agama`, `jenis_status`, `provinsi`/`kabupaten_kota` (sentinel = seed), `pangkat`, `jenis_kp`, `jenjang_pendidikan`, `unit` (`is_upt` 2 → 0 = G-02 Bagian 4 #9, dicatat; nilai lain di luar 0/1 → berkas keputusan, CR-089), `satker` (domain `is_upt` 0/1, CR-089), `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `kelas_jabatan`, `jenjang_jf` (opsional), `jabatan`, `jabatan_koordinasi`, `periode_struktur_jabatan`, `struktur_jabatan`, `jenis_pegawai`, `gol_pppk`, `jenis_libur`, `hari_libur`, `jenis_cuti`, `web_config` | M1 |
 | 2 | `pegawai` (domain `flag_update` 0–3, `jenis_kelamin` 1/2; NIP & kode wilayah di-trim) | M2 |
 | 3 | `riwayat_mutasi_jabatan`, `riwayat_kp` (status 0/1/2/3/10), snapshot `pegawai_mutasi_jabatan`/`pegawai_kp` (`id_riwayat_*` yatim → NULL), `pegawai_plt`, `pegawai_plh` | M2 |
 | 4 | `absen_ijin` (status W/V/X/10, `affect_tukin`/`jenis_dinas` ber-domain, rentang izin = waktu bisnis), `riwayat_keluarga`, `detail_anak`, `bkn_periode_ekinper`, `riwayat_skp_periodik` | M3 |
