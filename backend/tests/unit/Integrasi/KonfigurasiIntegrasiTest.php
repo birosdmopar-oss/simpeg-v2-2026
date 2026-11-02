@@ -47,4 +47,10 @@ final class KonfigurasiIntegrasiTest extends CIUnitTestCase
     {
         $this->assertSame(180, config(Integrations::class)->logRetensiHari);
     }
+
+    public function testServiceLogDanKlienTerdaftar(): void
+    {
+        $this->assertInstanceOf(\App\Interfaces\Integrasi\IntegrasiLogInterface::class, service('integrasiLog', false));
+        $this->assertInstanceOf(\App\Libraries\Integrasi\Http\KlienHttp::class, service('klienHttp', false));
+    }
 }
