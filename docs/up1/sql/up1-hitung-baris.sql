@@ -40,7 +40,9 @@ UNION ALL SELECT 'riwayat_cuti', COUNT(*) FROM riwayat_cuti WHERE tgl_mulai <= @
 UNION ALL SELECT 'pegawai_sisa_cuti', COUNT(*) FROM pegawai_sisa_cuti
           WHERE tahun BETWEEN YEAR(@awal) AND YEAR(@akhir)
 UNION ALL SELECT 'riwayat_tb', COUNT(*) FROM riwayat_tb
-          WHERE tgl_mulai <= @akhir AND (tgl_akhir IS NULL OR tgl_akhir >= @awal)
+          WHERE (tgl_mulai <= @akhir AND (tgl_akhir IS NULL OR tgl_akhir >= @awal))
+             OR id_riwayat_tb IN (SELECT id_riwayat_tb FROM riwayat_tb_perpan
+                                   WHERE tgl_mulai_perpan <= @akhir AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= @awal))
 UNION ALL SELECT 'hari_libur', COUNT(*) FROM hari_libur WHERE tgl_mulai <= @akhir AND tgl_akhir >= @awal
 UNION ALL SELECT 'bkn_periode_ekinper', COUNT(*) FROM bkn_periode_ekinper
           WHERE CAST(tahun AS UNSIGNED)*100 + CAST(bulan AS UNSIGNED)

@@ -121,7 +121,7 @@ Daftar tabel minimal (dari prosedur UP-1 dan kode jalur Tukin `Libraries/Presens
 | Rujukan pegawai | `agama`, `jenis_status`, `provinsi`, `kabupaten_kota`, `pangkat`, `jenis_kp`, `jenjang_pendidikan` | penuh |
 | Presensi | `dh_online` (`tgl`), `lokasi_presensi` (penuh) | rentang |
 | Izin & dinas | `absen_ijin` (`date_start`/`date_end` tumpang tindih) | rentang |
-| Cuti & TB | `riwayat_cuti` (`tgl_mulai`/`tgl_akhir` tumpang tindih), `jenis_cuti`, `pegawai_sisa_cuti` (tahun rentang), `riwayat_tb`, `riwayat_tb_perpan` | rentang (TB: tumpang tindih) |
+| Cuti & TB | `riwayat_cuti` (`tgl_mulai`/`tgl_akhir` tumpang tindih), `jenis_cuti`, `pegawai_sisa_cuti` (tahun rentang), `riwayat_tb` (juga TB lama yang perpanjangannya beririsan periode), `riwayat_tb_perpan` | rentang (TB: tumpang tindih) |
 | Kalender | `hari_libur` (tumpang tindih), `jenis_libur` | rentang |
 | SKP/BKN | `bkn_periode_ekinper` (`tahun`/`bulan`; `periode_awal`/`periode_akhir` berformat `MM-DD`), `riwayat_skp_periodik` (`periode_awal_skp`/`periode_akhir_skp`) | rentang |
 | Konfigurasi | `web_config` key `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK`, `jam_*_normal`, `jam_*_puasa` | key tertentu |

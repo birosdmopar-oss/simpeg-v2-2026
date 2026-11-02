@@ -80,7 +80,9 @@ dump 10_dh_online.sql            dh_online            --where="tgl BETWEEN $A AN
 dump 11_absen_ijin.sql           absen_ijin           --where="date_start <= $Z AND date_end >= $AC"
 dump 12_riwayat_cuti.sql         riwayat_cuti         --where="tgl_mulai <= $Z AND tgl_akhir >= $AC"
 dump 13_pegawai_sisa_cuti.sql    pegawai_sisa_cuti    --where="tahun BETWEEN ${AWAL:0:4} AND ${AKHIR:0:4}"
-dump 14_riwayat_tb.sql           riwayat_tb           --where="tgl_mulai <= $Z AND (tgl_akhir IS NULL OR tgl_akhir >= $A)"
+# riwayat_tb: ikut juga TB yang rentang aslinya sudah lewat tetapi perpanjangannya (riwayat_tb_perpan) beririsan
+# periode — tanpa induk itu perpanjangan menjadi yatim (FK CASCADE, temuan UP1-04 02-11-2026).
+dump 14_riwayat_tb.sql           riwayat_tb           --where="(tgl_mulai <= $Z AND (tgl_akhir IS NULL OR tgl_akhir >= $A)) OR id_riwayat_tb IN (SELECT id_riwayat_tb FROM riwayat_tb_perpan WHERE tgl_mulai_perpan <= $Z AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= $A))"
 dump 15_riwayat_tb_perpan.sql    riwayat_tb_perpan    --where="tgl_mulai_perpan <= $Z AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= $A)"
 dump 16_hari_libur.sql           hari_libur           --where="tgl_mulai <= $Z AND tgl_akhir >= $A"
 dump 17_bkn_periode_ekinper.sql  bkn_periode_ekinper  --where="$BKN_YM BETWEEN $BKN_DARI AND $BKN_SAMPAI"
@@ -116,7 +118,7 @@ UNION ALL SELECT 'dh_online_tanpa_jam', COUNT(*) FROM dh_online WHERE tgl BETWEE
 UNION ALL SELECT 'absen_ijin', COUNT(*) FROM absen_ijin WHERE date_start <= $Z AND date_end >= $AC
 UNION ALL SELECT 'riwayat_cuti', COUNT(*) FROM riwayat_cuti WHERE tgl_mulai <= $Z AND tgl_akhir >= $AC
 UNION ALL SELECT 'pegawai_sisa_cuti', COUNT(*) FROM pegawai_sisa_cuti WHERE tahun BETWEEN ${AWAL:0:4} AND ${AKHIR:0:4}
-UNION ALL SELECT 'riwayat_tb', COUNT(*) FROM riwayat_tb WHERE tgl_mulai <= $Z AND (tgl_akhir IS NULL OR tgl_akhir >= $A)
+UNION ALL SELECT 'riwayat_tb', COUNT(*) FROM riwayat_tb WHERE (tgl_mulai <= $Z AND (tgl_akhir IS NULL OR tgl_akhir >= $A)) OR id_riwayat_tb IN (SELECT id_riwayat_tb FROM riwayat_tb_perpan WHERE tgl_mulai_perpan <= $Z AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= $A))
 UNION ALL SELECT 'riwayat_tb_perpan', COUNT(*) FROM riwayat_tb_perpan WHERE tgl_mulai_perpan <= $Z AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= $A)
 UNION ALL SELECT 'hari_libur', COUNT(*) FROM hari_libur WHERE tgl_mulai <= $Z AND tgl_akhir >= $A
 UNION ALL SELECT 'bkn_periode_ekinper', COUNT(*) FROM bkn_periode_ekinper WHERE $BKN_YM BETWEEN $BKN_DARI AND $BKN_SAMPAI

@@ -13,10 +13,13 @@ DELETE FROM riwayat_cuti WHERE DATABASE() = 'up1_legacy_salinan'
    AND (tgl_mulai <= '2026-05-15' AND tgl_akhir >= '2025-08-16') IS NOT TRUE;
 DELETE FROM pegawai_sisa_cuti WHERE DATABASE() = 'up1_legacy_salinan'
    AND (tahun BETWEEN 2026 AND 2026) IS NOT TRUE;
-DELETE FROM riwayat_tb WHERE DATABASE() = 'up1_legacy_salinan'
-   AND (tgl_mulai <= '2026-05-15' AND (tgl_akhir IS NULL OR tgl_akhir >= '2026-02-16')) IS NOT TRUE;
+-- riwayat_tb_perpan punya FK ke riwayat_tb dengan ON DELETE CASCADE: pangkas perpanjangan DULU, lalu hapus TB yang
+-- rentangnya lewat DAN tidak punya perpanjangan tersisa (TB lama yang diperpanjang ke periode uji tetap ikut).
 DELETE FROM riwayat_tb_perpan WHERE DATABASE() = 'up1_legacy_salinan'
    AND (tgl_mulai_perpan <= '2026-05-15' AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= '2026-02-16')) IS NOT TRUE;
+DELETE FROM riwayat_tb WHERE DATABASE() = 'up1_legacy_salinan'
+   AND (tgl_mulai <= '2026-05-15' AND (tgl_akhir IS NULL OR tgl_akhir >= '2026-02-16')) IS NOT TRUE
+   AND id_riwayat_tb NOT IN (SELECT id_riwayat_tb FROM riwayat_tb_perpan);
 DELETE FROM hari_libur WHERE DATABASE() = 'up1_legacy_salinan'
    AND (tgl_mulai <= '2026-05-15' AND tgl_akhir >= '2026-02-16') IS NOT TRUE;
 DELETE FROM bkn_periode_ekinper WHERE DATABASE() = 'up1_legacy_salinan'

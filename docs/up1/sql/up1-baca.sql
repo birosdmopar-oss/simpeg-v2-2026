@@ -61,7 +61,9 @@ SELECT bagian, item, nilai FROM (
   UNION ALL SELECT 3, 28, '3 jumlah baris', 'pegawai_sisa_cuti', COUNT(*) FROM pegawai_sisa_cuti
          WHERE tahun BETWEEN 2026 AND 2026
   UNION ALL SELECT 3, 29, '3 jumlah baris', 'riwayat_tb', COUNT(*) FROM riwayat_tb
-         WHERE tgl_mulai <= '2026-05-15' AND (tgl_akhir IS NULL OR tgl_akhir >= '2026-02-16')
+         WHERE (tgl_mulai <= '2026-05-15' AND (tgl_akhir IS NULL OR tgl_akhir >= '2026-02-16'))
+            OR id_riwayat_tb IN (SELECT id_riwayat_tb FROM riwayat_tb_perpan
+                                  WHERE tgl_mulai_perpan <= '2026-05-15' AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= '2026-02-16'))
   UNION ALL SELECT 3, 30, '3 jumlah baris', 'riwayat_tb_perpan', COUNT(*) FROM riwayat_tb_perpan
          WHERE tgl_mulai_perpan <= '2026-05-15' AND (tgl_akhir_perpan IS NULL OR tgl_akhir_perpan >= '2026-02-16')
   UNION ALL SELECT 3, 31, '3 jumlah baris', 'hari_libur', COUNT(*) FROM hari_libur
