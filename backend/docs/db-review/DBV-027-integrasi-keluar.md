@@ -2,7 +2,7 @@
 
 **Key review:** `DBV-027` (Fase 6, H-01 bagian B, QASMTASK-089). Judul PR: `[DBV-027] Skema Fase 6 Jalur B: integrasi
 keluar (log integrasi, SIASN, firebase_token, UNIQUE SKP periodik)`. Branch `fase6/dbv-027-integrasi-keluar` (dari `main`
-`02141174`). Alur PRD Fase 6 §2.1 / `6_1.md` B1: PR `[DBV]`, DB Validator me-review/approve, lalu migration dipindah dari
+`02141174`, digabung `main` `84917849`). Alur PRD Fase 6 §2.1 / `6_1.md` B1: PR `[DBV]`, DB Validator me-review/approve, lalu migration dipindah dari
 `MigrationsDitahan/` ke `Migrations/` + registry NIP + test skema; reviewer CR me-merge setelah CI hijau. B2 (MAKE-063)
 menunggu DBV-027 di `main`.
 
@@ -12,9 +12,9 @@ laporan B0 diterima reviewer CR 02-11-2026 (jawaban Q1–Q8 dipakai di dokumen i
 
 **Penulis:** pelaksana Fase 6 Jalur B, 02-11-2026.
 
-**Asal kebutuhan:** PRD `docs/fase6/PRD_Fase6_Integrasi.md` v1.0 §7.1 (DBV-027), §7.0.2, §7.3, §7.4, §7.8, §8; keputusan
+**Asal kebutuhan:** PRD `docs/fase6/PRD_Fase6_Integrasi.md` v1.0b (CR-090) §7.1 (DBV-027), §7.0.2, §7.3, §7.4, §7.8, §8; keputusan
 Horii 01-11-2026 F6-13, F6-14 ("SIASN ikut legacy penuh"), F6-15, F6-24, Q6-10, Q6-16; jawaban reviewer CR atas B0 (Q1
-padanan `dsp`, Q2 dorong ikut legacy, Q7 akun sistem).
+padanan `dsp`, Q7 akun sistem); keputusan Horii 02-11-2026 (Q2 B0): dorong diklat/sertifikasi/kursus/SKP 2022 ikut legacy.
 
 **Rujukan:** `DBV-024-penyesuaian-tukin-schema.md` (pola dokumen, draf ditahan → dipindah setelah approve),
 `DBV-022-layanan-fase4-schema.md` Bagian 2.19/2.20 (`firebase_token`, DQ-25/26), `B-01-B-02-pegawai-riwayat-schema.md`
@@ -274,7 +274,7 @@ menolak baris tanpa `periode_id`/`skp_id`. Pra-cek & aturan duplikat: Bagian 5.
 | UNIQUE `siasn_upload_arsip` | [V2] | Idempoten antrean (BP-6) |
 | `firebase_token` per akun (web) | [K] `fb_token.id_user` | Penerima admin tanpa NIP |
 | `token_hash` UNIQUE global | [V2] DQ-25 | Deduplikasi; satu perangkat satu pemilik (DBV-Q8) |
-| Tanpa ALTER `siasn_lu` di `riwayat_diklat`/`riwayat_seminar`/`riwayat_skp` | [K] Q2 B0 | Dorong legacy tabel itu hanya `id_rw_siasn IS NULL AND siasn_flag = 0`; menunggu konfirmasi Horii atas penyempitan AC-03.5 — bila Horii memilih AC-03.5 untuk semua tabel, ALTER ditambahkan ke DBV-027 sebelum approve |
+| Tanpa ALTER `siasn_lu` di `riwayat_diklat`/`riwayat_seminar`/`riwayat_skp` | [K] **keputusan Horii 02-11-2026 (Q2 B0)**, PRD v1.0b (CR-090) | Dorong otomatis diklat, sertifikasi, kursus/seminar, SKP 2022 hanya `id_rw_siasn IS NULL AND siasn_flag = 0` (ikut legacy); AC-03.5 (`updated_at > siasn_lu`) hanya untuk tabel yang punya `siasn_lu` dan memakainya di legacy (jabatan) |
 
 ---
 
