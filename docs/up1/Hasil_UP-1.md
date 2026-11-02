@@ -90,8 +90,8 @@ Butir cek riset UP1-11 (Runbook i½):
 - [x] Semua bulan × lingkup rencana (0 dan unit 6, April & Mei 2026) sudah dibandingkan; IL dan unit 7 tidak
       dibandingkan atas keputusan Horii (bagian 2)
 - [x] Tidak ada temuan (c) yang masih terbuka
-- **UP-1:** LOLOS (usulan reviewer CR; menunggu persetujuan Horii)
-- Disetujui Horii: … (tanggal)
+- **UP-1:** LOLOS
+- Disetujui Horii: 02-11-2026
 - Setelah LOLOS, prasyarat Fase 6 (GATE-F6) dibuka oleh reviewer CR.
 
 ## 6. Checklist keamanan data
