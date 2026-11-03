@@ -24,11 +24,14 @@ final class Permintaan
         public readonly string $layanan,
         public readonly string $operasi,
         public readonly array $query = [],
+        #[\SensitiveParameter]
         public readonly array $header = [],
         public readonly mixed $json = null,
+        #[\SensitiveParameter]
         public readonly ?array $form = null,
         public readonly ?array $multipart = null,
         public readonly ?string $refId = null,
+        #[\SensitiveParameter]
         public readonly array $rahasia = [],
     ) {
     }
@@ -38,7 +41,7 @@ final class Permintaan
      *
      * @param list<string> $nilai
      */
-    public function denganRahasia(array $nilai): self
+    public function denganRahasia(#[\SensitiveParameter] array $nilai): self
     {
         return new self(
             $this->metode,

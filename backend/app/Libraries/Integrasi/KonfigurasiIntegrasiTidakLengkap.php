@@ -7,17 +7,18 @@ namespace App\Libraries\Integrasi;
 use RuntimeException;
 
 /**
- * Driver integrasi real dibuat dengan konfigurasi kosong (AC-K.4). Pesan memuat nama kunci `.env`, bukan nilai.
+ * Driver integrasi real dibuat dengan konfigurasi kosong atau tidak sah (AC-K.4). Pesan memuat nama kunci `.env`, bukan
+ * nilai.
  */
 final class KonfigurasiIntegrasiTidakLengkap extends RuntimeException
 {
     /**
      * @param list<string> $kunci
      */
-    public function __construct(public readonly string $layanan, public readonly array $kunci)
+    public function __construct(public readonly string $layanan, public readonly array $kunci, string $masalah = 'kosong (isi di .env server)')
     {
         $env = array_map(static fn (string $k): string => "integrations.{$layanan}.{$k}", $kunci);
 
-        parent::__construct("Konfigurasi integrasi '{$layanan}' belum lengkap: " . implode(', ', $env) . ' kosong (isi di .env server).');
+        parent::__construct("Konfigurasi integrasi '{$layanan}' belum lengkap: " . implode(', ', $env) . " {$masalah}.");
     }
 }
