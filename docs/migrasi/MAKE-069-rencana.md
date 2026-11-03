@@ -1,6 +1,7 @@
 # MAKE-069 — Rencana impor cutover tahap 2
 
-**Status:** rencana (belum ada kode). Kode menunggu DBV-027 di `main` dan lampu hijau reviewer CR.
+**Status:** DIKERJAKAN (branch `make-069/impor-tahap2`, review CR tuntas): T7–T12, akun, bootstrap admin, berkas lampiran.
+Belum di kode: T12b Halo Simpeg (menunggu DBV-028) dan tiket lama (menunggu sortir F-02).
 **Keputusan:** Horii 03-11-2026 (K-M1, K-M2, K-M3 opsi A, K-M4 opsi 1, K-M12, impor cutover opsi (b)); DBV 03-11-2026 (Z-1); reviewer CR
 03-11-2026 (K-M5, K-M11); DBV-029 (K-M6..K-M10, `backend/docs/db-review/DBV-029-impor-cutover-tahap2.md`, branch
 `docs/dbv-029-impor-tahap2`, ikut kode).
@@ -14,7 +15,10 @@ MAKE-056 memegang tabel jalur Tukin (Tier 1–6). MAKE-069 memegang semua tabel 
 `pengguna`, bootstrap admin awal, dan pemindahan berkas lampiran. Tabel kerja SIASN (paket B3, DBV-027) menjadi tier
 **terakhir** karena `siasn_upload_arsip` merujuk riwayat dan `document_attachment` (syarat K-6 DBV-027).
 
-Tier dinomori lanjutan MAKE-056; nomor final ditetapkan saat kode.
+Tier dinomori lanjutan MAKE-056. **Nomor di kode saat ini:** T7–T12 seperti tabel di bawah; tier SIASN = **T13**
+(`DaftarTabel::TIER_MAKS`, selalu terakhir — dikunci `UrutanTierTest`). T12b dan tiket lama belum ada di kode; saat
+ditambahkan keduanya disisipkan SEBELUM tier SIASN dan nomor tier SIASN bergeser. Label "T13" di dokumen DBV-029 =
+tiket lama (penomoran rencana), bukan tier SIASN di kode.
 
 | Tier | Isi | Tabel |
 |---|---|---|
@@ -24,9 +28,9 @@ Tier dinomori lanjutan MAKE-056; nomor final ditetapkan saat kode.
 | T10 | Riwayat non-Tukin | `riwayat_kgb`, `riwayat_pendidikan`, `riwayat_diklat`, `riwayat_seminar`, `riwayat_skp`, `riwayat_lckh`, `riwayat_hukdis`, `riwayat_ak`, `riwayat_ak_siasn`, `konv_ak`, `ignore_konv_ak`, `riwayat_alamat`, `riwayat_karpeg`, `riwayat_kariskarsu`, `riwayat_tanda_jasa`, `riwayat_organisasi`, lalu `document_attachment` paling akhir |
 | T11 | Snapshot | `pegawai_cpns`, `pegawai_pns`, `pegawai_kgb`, `pegawai_pendidikan`, `pegawai_diklat`, `pegawai_hukdis`, `pegawai_ak`, `pegawai_ak_siasn`, `pegawai_keluarga`, `pegawai_alamat`, `pegawai_alamat_kantor`, `pegawai_tanda_jasa`, `pegawai_mutasi_jabatan` |
 | T12 | Layanan sisa (DBV-022 §5) | `jenis_layanan`, `jenis_pa`, `question_category` → `petugas_layanan`, `pa_layanan` → `riwayat_cuti_notif_kt`, `riwayat_ib`, `riwayat_pmk_req` → `riwayat_pmk` → `esign_hist` |
-| T12b | Halo Simpeg master (**skema menyusul DBV-028**) | `help_desk_contact`, `support_officer`, `officer_category` |
-| T13 | Tiket lama (hasil sortir Fase 7 F-02) | `disiplin_ticket` ← legacy `inbox`, `disiplin_ticket_msg` ← legacy `inbox_msg` |
-| Terakhir | SIASN (B3) | `siasn_ref_unor`, `siasn_referensi`, `siasn_upload_arsip`, `double_riwayat_kp` |
+| T12b | Halo Simpeg master (**skema menyusul DBV-028**) — belum di kode | `help_desk_contact`, `support_officer`, `officer_category` |
+| (T13 rencana) | Tiket lama (hasil sortir Fase 7 F-02) — belum di kode | `disiplin_ticket` ← legacy `inbox`, `disiplin_ticket_msg` ← legacy `inbox_msg` |
+| T13 di kode (terakhir) | SIASN (B3) | `siasn_ref_unor`, `siasn_referensi`, `siasn_upload_arsip`, `double_riwayat_kp` |
 
 **Dibuat kosong (tidak ada tier):** `token`, `login_attempts`, `forgot_attempts` (A-01); `audit_logs`, `queue_jobs`,
 `queue_jobs_failed` (tabel v2); `inbox`/`inbox_msg` v2 (DBV-022 §3.4); `firebase_token` (PRD Fase 6 AC-01.2);
@@ -216,12 +220,12 @@ v2 (PDF LKH, tanda terima) tidak disalin. Cara salin, volume, dan jendela waktu:
 ## 6. Urutan runbook cutover
 
 1. `migrate` di DB kosong.
-2. Impor MAKE-056 (T1–T6), lalu MAKE-069 T7–T13.
-3. Salin berkas sesuai manifest, lalu `lampiran:periksa`.
-4. Tier SIASN (B3) dengan `--sumber-siasn`.
-5. `integrasi:siapkan-akun-sistem`.
-6. `akun:bootstrap-admin` bila diperlukan.
-7. Cron integrasi diaktifkan.
+2. `php spark impor:legacy … --jejak=<KERJA>/jejak.json [--sumber-siasn=<skema>]` — MAKE-056 T1–T6, MAKE-069 T7–T12,
+   lalu tier SIASN (T13, terakhir). T10/T11 transaksi per tabel; terhenti → `--tier N --lanjut`.
+3. `integrasi:siapkan-akun-sistem` (sesudah T8 `pengguna`, Z-1).
+4. `akun:bootstrap-admin` bila diperlukan (terminal interaktif).
+5. `lampiran:manifest` → `lampiran:tarik` (alamat dasar https dari operator) → `lampiran:periksa`.
+6. Cron integrasi diaktifkan.
 
 ## 7. Keputusan yang masih ditunggu
 
