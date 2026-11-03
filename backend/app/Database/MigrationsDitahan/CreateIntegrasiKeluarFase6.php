@@ -23,8 +23,8 @@ use Throwable;
  *   - ALTER `firebase_token`: `nip` NULL-able, `id_pengguna`, `platform` 1 web / 2 android, `token_hash` UNIQUE per pemilik,
  *     `refresh_date` [K `fb_token`] + CHECK pemilik token per platform (F6-13, DQ-25).
  *   - ALTER `riwayat_skp_periodik` UNIQUE (`id_pns`, `periode_id`, `skp_id`) (Q6-10) — pra-cek duplikat lebih dulu.
- *   - Seed akun sistem integrasi `pengguna` (username `sistem.integrasi`, role 1 ikut legacy, status '0', tanpa password) untuk
- *     `updated_by`/`approved_by` penulisan SIASN/e-Kinerja (PRD §8; pengecualian "migration tanpa seed").
+ *   - TANPA seed akun: akun sistem integrasi dibuat command `integrasi:siapkan-akun-sistem` sesudah impor `pengguna`
+ *     (keputusan DBV Z-1 opsi c, DBV-027 §4) — migration ini murni skema.
  *
  * Semua pra-cek dijalankan SEBELUM DDL apa pun; DDL MySQL ter-commit per statement, jadi bila satu langkah gagal up()
  * membatalkan langkah yang sudah jalan pada run itu (urutan terbalik) lalu melempar ulang galat. down() kebalikan up().
@@ -39,14 +39,6 @@ class CreateIntegrasiKeluarFase6 extends Migration
         'siasn_ref_unor',
         'siasn_referensi',
     ];
-
-    public const AKUN_SISTEM = 'sistem.integrasi';
-
-    /**
-     * Role 1 — ikut legacy (keputusan Horii 03-11-2026, DBV-Q10): padanan akun developer `ID_USR_DEVSIMPEG` yang dipakai
-     * cron sebagai pelaku. Risiko hak tinggi diterima; dimitigasi akun nonaktif tanpa password (tidak bisa login).
-     */
-    public const LEVEL_AKUN_SISTEM = 1;
 
     public const JENIS_REFERENSI = [
         'jabatan_fungsional', 'jabatan_fungsional_umum', 'jenis_jabatan', 'latihan_struktural', 'tk_pendidikan',
@@ -78,12 +70,6 @@ class CreateIntegrasiKeluarFase6 extends Migration
                 'UNIQUE riwayat_skp_periodik',
             );
             $batal[] = fn () => $this->exec("ALTER TABLE {$this->t('riwayat_skp_periodik')} DROP INDEX `uq_rsp_pns_periode_skp`", 'DROP UNIQUE riwayat_skp_periodik');
-
-            $this->exec(
-                "INSERT INTO {$this->t('pengguna')} (`nip`, `username`, `name`, `email`, `password`, `password_legacy`, `user_level`, `status`, `must_change_password`, `created_at`, `updated_at`)
-                 VALUES (NULL, " . $this->db->escape(self::AKUN_SISTEM) . ", 'Sistem Integrasi', NULL, NULL, NULL, " . self::LEVEL_AKUN_SISTEM . ", '0', 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-                'INSERT akun sistem integrasi',
-            );
         } catch (Throwable $e) {
             foreach (array_reverse($batal) as $langkah) {
                 try {
@@ -99,12 +85,9 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
     public function down(): void
     {
-        // firebase_token lebih dulu: token web merujuk akun (termasuk akun sistem) lewat FK id_pengguna.
         if ($this->adaKolom('firebase_token', 'platform')) {
             $this->kembalikanFirebaseToken();
         }
-
-        $this->exec("DELETE FROM {$this->t('pengguna')} WHERE `username` = " . $this->db->escape(self::AKUN_SISTEM) . ' AND `nip` IS NULL', 'DELETE akun sistem integrasi');
 
         if ($this->adaIndeks('riwayat_skp_periodik', 'uq_rsp_pns_periode_skp')) {
             $this->exec("ALTER TABLE {$this->t('riwayat_skp_periodik')} DROP INDEX `uq_rsp_pns_periode_skp`", 'DROP UNIQUE riwayat_skp_periodik');
@@ -118,7 +101,7 @@ class CreateIntegrasiKeluarFase6 extends Migration
     /**
      * Pra-cek sebelum DDL apa pun (tanpa NIP/nilai di pesan): duplikat kunci UNIQUE `riwayat_skp_periodik` (aturan
      * pemilihan baris diputus DBV — DBV-027 §5), duplikat token FCM (langkah dedup DBV-027 §3.7), baris token lama tanpa
-     * `nip` (melanggar CHECK pemilik setelah menjadi platform 2), dan username akun sistem yang sudah dipakai.
+     * `nip` (melanggar CHECK pemilik setelah menjadi platform 2).
      */
     private function praCek(): void
     {
@@ -147,14 +130,6 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
         if ($tanpaNip > 0) {
             throw new RuntimeException("DBV-027: {$tanpaNip} baris firebase_token tanpa nip; baris lama menjadi platform 2 dan wajib ber-nip (CHECK pemilik).");
-        }
-
-        $akun = (int) ($this->db->query(
-            "SELECT COUNT(*) AS n FROM {$this->t('pengguna')} WHERE `username` = " . $this->db->escape(self::AKUN_SISTEM),
-        )->getRow()->n ?? 0);
-
-        if ($akun > 0) {
-            throw new RuntimeException('DBV-027: username akun sistem integrasi sudah dipakai di pengguna.');
         }
     }
 

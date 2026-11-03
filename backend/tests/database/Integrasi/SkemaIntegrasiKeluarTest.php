@@ -6,7 +6,6 @@ namespace Tests\Database\Integrasi;
 
 use App\Constants\AkunSistem;
 use App\Database\Migrations\CreateIntegrasiKeluarFase6;
-use App\Exceptions\AuthException;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Support\DatabaseTestCase;
@@ -17,8 +16,8 @@ require_once APPPATH . 'Database/MigrationsDitahan/CreateIntegrasiKeluarFase6.ph
 
 /**
  * DBV-027 — test skema draf migration (DBV-027 §8.2/§9): tabel baru (engine/collation), CHECK/UNIQUE/FK, `firebase_token`
- * per pemilik per kanal (T2 opsi a: web `nip` NULL), `siasn_upload_arsip.id_da` NOT NULL (T4), akun sistem tidak bisa
- * login, kueri audit, down() → skema lama lalu up() ulang (T1: `DROP CONSTRAINT`, jalan di MySQL 8 & MariaDB 10.4),
+ * per pemilik per kanal (T2 opsi a: web `nip` NULL), `siasn_upload_arsip.id_da` NOT NULL (T4), tanpa seed akun sistem
+ * (Z-1 opsi c), kueri audit, down() → skema lama lalu up() ulang (T1: `DROP CONSTRAINT`, jalan di MySQL 8 & MariaDB 10.4),
  * pra-cek sebelum DDL, dan pembatalan gagal-di-tengah. Masih memuat draf di `MigrationsDitahan/`; saat draf dipindah ke
  * `Migrations/` (setelah approve DBV) `require_once` dihapus dan test ini menjadi test skema permanen §9.
  *
@@ -65,12 +64,10 @@ final class SkemaIntegrasiKeluarTest extends DatabaseTestCase
         }
 
 
-        // akun sistem
-        $akun = $this->db->table('pengguna')->where('username', CreateIntegrasiKeluarFase6::AKUN_SISTEM)->get()->getRowArray();
-        $this->assertNotNull($akun);
-        $this->assertSame(AkunSistem::USERNAME, CreateIntegrasiKeluarFase6::AKUN_SISTEM, 'penjaga T3 memakai username seed yang sama');
-        $this->assertSame(['0', null, null, null, '1'], [$akun['status'], $akun['password'], $akun['password_legacy'], $akun['nip'], (string) $akun['user_level']]);
-        $idAkun = (int) $akun['id_pengguna'];
+        // Z-1 opsi (c): migration murni skema — akun sistem dibuat command integrasi:siapkan-akun-sistem, bukan seed.
+        $this->assertSame(0, $this->db->table('pengguna')->where('username', AkunSistem::USERNAME)->countAllResults());
+        $this->db->table('pengguna')->insert(['username' => 'uji.web', 'user_level' => 3, 'status' => '1']);
+        $idAkun = (int) $this->db->insertID();
 
         // firebase_token
         $fb = fn (array $r) => $this->db->table('firebase_token')->insert($r + ['created_at' => '2026-11-02 00:00:00']);
@@ -123,26 +120,6 @@ final class SkemaIntegrasiKeluarTest extends DatabaseTestCase
         $this->assertDbError([1451], fn () => $this->db->table('pegawai')->where('nip', $nip)->delete());
     }
 
-    public function testAkunSistemTidakBisaLogin(): void
-    {
-        $this->up();
-        $auth = service('authService', false);
-
-        foreach (['', 'apa-saja'] as $password) {
-            try {
-                $auth->login(CreateIntegrasiKeluarFase6::AKUN_SISTEM, $password, 'captcha-uji', '127.0.0.1');
-                $this->fail('login harus ditolak');
-            } catch (AuthException) {
-                $this->addToAssertionCount(1);
-            }
-        }
-
-        // Diaktifkan pun (status '1') tetap tidak bisa: tanpa password maupun hash legacy.
-        $this->db->table('pengguna')->where('username', CreateIntegrasiKeluarFase6::AKUN_SISTEM)->update(['status' => '1']);
-        $this->expectException(AuthException::class);
-        $auth->login(CreateIntegrasiKeluarFase6::AKUN_SISTEM, '', 'captcha-uji-2', '127.0.0.1');
-    }
-
     public function testKueriAuditBerjalan(): void
     {
         $sql   = (string) file_get_contents(ROOTPATH . 'docs/db-review/sql/DBV-027-audit-integrasi-keluar.sql');
@@ -165,7 +142,7 @@ final class SkemaIntegrasiKeluarTest extends DatabaseTestCase
             return $n;
         };
         $this->up();
-        $this->assertSame(20, $jalan());
+        $this->assertSame(19, $jalan());
     }
 
     public function testDownMengembalikanSkemaLamaLaluUpUlang(): void
@@ -182,7 +159,6 @@ final class SkemaIntegrasiKeluarTest extends DatabaseTestCase
 
         $this->assertSame($sebelum, $this->skemaColumns('firebase_token'));
         $this->assertSame($idxSebelum, $this->skemaIndexes('riwayat_skp_periodik'));
-        $this->assertSame(0, $this->db->table('pengguna')->where('username', CreateIntegrasiKeluarFase6::AKUN_SISTEM)->countAllResults());
 
         $this->up();
         $this->assertTrue($this->skemaTableExists('integrasi_log'));

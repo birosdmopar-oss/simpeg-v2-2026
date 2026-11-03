@@ -91,14 +91,15 @@ FROM (
 -- A6b [WAJIB_0] Baris token lama tanpa `nip` (setelah ALTER menjadi platform 2 dan wajib ber-nip, CHECK pemilik).
 SELECT COUNT(*) AS token_tanpa_nip FROM firebase_token WHERE nip IS NULL;
 
--- A7 [STOP] Username akun sistem integrasi belum dipakai (0).
-SELECT COUNT(*) AS username_terpakai FROM pengguna WHERE username = 'sistem.integrasi';
+-- (A7 dihapus — keputusan DBV Z-1 opsi c: migration tidak lagi men-seed akun sistem. Pemeriksaan akun pindah ke command
+--  `integrasi:siapkan-akun-sistem`, yang menolak akun menyimpang; lihat DBV-027 §4.)
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- B. SETELAH MIGRATION / JOB INTEGRASI BERJALAN
 -- ---------------------------------------------------------------------------------------------------------------------
 
--- B1 [WAJIB_0] Akun sistem integrasi bisa login (harus nonaktif dan tanpa password).
+-- B1 [WAJIB_0] Akun sistem integrasi bisa login (harus nonaktif dan tanpa password). Dijalankan sesudah command
+--    `integrasi:siapkan-akun-sistem` (runbook cutover: sesudah impor `pengguna`, sebelum cron integrasi aktif).
 SELECT COUNT(*) AS akun_sistem_bisa_login
 FROM pengguna
 WHERE username = 'sistem.integrasi' AND (status <> '0' OR password IS NOT NULL OR password_legacy IS NOT NULL);

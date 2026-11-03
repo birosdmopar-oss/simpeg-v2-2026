@@ -10,18 +10,21 @@ use CodeIgniter\Test\FeatureTestTrait;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
+use Tests\Support\Integrasi\AkunSistemUjiTrait;
 
 /**
  * DBV-027 T3 — akun sistem integrasi (`sistem.integrasi`, role 1 ikut legacy DBV-Q10) bukan akun manusia: login ditolak
  * walau sudah diaktifkan dan diberi password (defense in depth), tidak tampil di daftar Manajemen Akun, dan semua aksi
  * (lihat, edit, aktifkan, reset password, ubah level, hapus) ditolak 403 — juga untuk Super Admin.
  *
- * Akun dibuat langsung di test (seed migration DBV-027 masih draf ditahan), dalam bentuk terburuk: aktif + ber-password.
+ * Akun dibuat lewat service command `integrasi:siapkan-akun-sistem` (Z-1 opsi c), lalu diubah ke bentuk terburuk (aktif +
+ * ber-password, seolah dirusak langsung di DB) untuk membuktikan penjaga berbasis username.
  *
  * @internal
  */
 final class AkunSistemTerkunciTest extends DatabaseTestCase
 {
+    use AkunSistemUjiTrait;
     use AuthTestTrait;
     use FeatureTestTrait;
 
@@ -34,7 +37,9 @@ final class AkunSistemTerkunciTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
-        $this->sistem = $this->buatAkunTanpaNip(AkunSistem::USERNAME, Role::SUPER_ADMIN, ['name' => 'Sistem Integrasi']);
+        $this->sistem = $this->siapkanAkunSistem();
+        $this->db->table('pengguna')->where('id_pengguna', $this->sistem['id_pengguna'])
+            ->update(['status' => '1', 'password' => password_hash(AuthSeeder::PASSWORD, PASSWORD_ARGON2ID)]);
     }
 
     protected function tearDown(): void

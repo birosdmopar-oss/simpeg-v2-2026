@@ -41,7 +41,7 @@ belum dicocokkan checksum produksi, AS-09). Berkas rahasia legacy (PRD Cara paka
 | 6 | `siasn_referensi` | CREATE [V2 gabungan] | 7 tabel referensi `siasn_simpeg.*` yang dipakai job aktif → satu tabel ber-`jenis` |
 | 7 | `firebase_token` | ALTER | `nip` NULL-able, `id_pengguna` (FK), `platform` 1/2, `token_hash` UNIQUE **per pemilik** [K] (keputusan Horii 03-11-2026), `refresh_date` [K `fb_token`], CHECK pemilik |
 | 8 | `riwayat_skp_periodik` | ALTER | UNIQUE (`id_pns`, `periode_id`, `skp_id`) (Q6-10) setelah **pra-cek duplikat** |
-| 9 | `pengguna` | INSERT 1 baris | Akun sistem integrasi `sistem.integrasi` (role 1 ikut legacy — keputusan Horii 03-11-2026; nonaktif, tanpa password) untuk `updated_by`/`approved_by` (PRD §8) — pengecualian "migration tanpa seed" |
+| 9 | `pengguna` | — (tanpa seed) | Akun sistem integrasi `sistem.integrasi` dibuat command `integrasi:siapkan-akun-sistem` sesudah impor `pengguna` (keputusan DBV Z-1 opsi c, Bagian 4); migration murni skema |
 
 **Tidak** berubah: `esign_hist` (PRD §7.1), kolom `siasn_*` di `pegawai`/`riwayat_*` (dorong memakai kolom yang ada), ENUM
 `audit_logs.event`, `bkn_periode_ekinper`.
@@ -312,11 +312,33 @@ Penulisan oleh job (tarik SIASN ke `riwayat_*`/`pegawai`, e-Kinerja, dorong) but
 
 | Opsi | Isi | Plus | Minus |
 |---|---|---|---|
-| **(a) — rekomendasi** | Baris `pengguna` khusus: `username = 'sistem.integrasi'`, `name = 'Sistem Integrasi'`, `nip`/`email`/`password`/`password_legacy` NULL, `status = '0'`, `user_level = 1`, di-seed migration ini; aplikasi mencari id lewat username (`Config\Integrations` menyimpan **username**, bukan id, agar sama di semua lingkungan) | Pelaku nyata di audit & tampilan ("Sistem Integrasi"), konsisten dengan kolom tanpa FK | Pengecualian "migration tanpa seed" (G-02) |
+| (a) — semula | Baris `pengguna` di-seed migration ini | Pelaku nyata di audit & tampilan | Pengecualian "migration tanpa seed" (G-02); **PK bentrok saat cutover** (Z-1, lihat di bawah) |
 | (b) | Konstanta/konfigurasi id tanpa baris baru (mis. `0`) | Tanpa seed | Audit merujuk id yang tidak ada; tampilan pelaku kosong; rawan bentrok bila id dipakai akun nyata |
+| **(c) — DIPUTUS DBV (Z-1)** | Baris `pengguna` khusus (`username = 'sistem.integrasi'`, `name = 'Sistem Integrasi'`, `nip`/`email`/`password`/`password_legacy` NULL, `status = '0'`, `user_level = 1`, `must_change_password = 0`, stempel UTC) dibuat **command idempoten `integrasi:siapkan-akun-sistem`**, bukan migration; aplikasi mencari id lewat username | Pelaku nyata; tanpa pengecualian seed; aman terhadap impor PK legacy | Langkah runbook tambahan |
 
-Pengaman opsi (a): akun **tidak bisa login** — `status = '0'` ditolak `AuthService` (`AuthService.php:69`), dan walau
-diaktifkan tetap ditolak karena tanpa password maupun hash legacy (diuji, Bagian 8).
+**Z-1 — PK akun sistem bentrok saat cutover (temuan ReadOne, diputus DBV opsi c).** Bila di-seed migration, di DB v2 kosong
+akun mendapat id AUTO_INCREMENT 1, lalu impor `pengguna` yang menyalin id legacy apa adanya bentrok PK. Karena itu:
+
+- **Migration murni skema** — INSERT akun, pra-cek username (audit A7 lama), dan DELETE akun di `down()` dihapus; DDL lain
+  tidak berubah. Pengecualian seed G-02 **dihapus**.
+- **Command `php spark integrasi:siapkan-akun-sistem`** (`App\Commands\IntegrasiSiapkanAkunSistem` →
+  `App\Libraries\Integrasi\AkunSistemIntegrasi::siapkan()`), transaksi tunggal, aman diulang: belum ada → dibuat;
+  sudah ada & sesuai → no-op, exit 0; sudah ada tetapi **menyimpang** (status ≠ '0', ada `password`/`password_legacy`,
+  `nip` terisi, level ≠ 1, terhapus) → exit ≠ 0 dengan **nama kolom saja** (tanpa nilai), tidak diperbaiki otomatis.
+  Pemeriksaan ini menggantikan audit A7 lama (sekarang menjadi pra-cek command).
+- **Runbook cutover** (masuk README-deploy bagian B pada B7): langkah baru **sesudah impor `pengguna`** dan **sebelum cron
+  integrasi aktif** → jalankan command → audit B1 (WAJIB_0) + B1b (INFO). Dev/demo: jalankan command sekali setelah
+  migrate.
+- **Impor `pengguna`** ke tujuan yang sudah berisi akun sistem harus **GAGAL dengan jumlah** (pola GAP-3, bukan
+  `bolehSeed`) — dikerjakan ReadOne di MAKE-069; dicatat di sini.
+- **Penulis H-03/H-10 (dan dorong SIASN)** mengambil id lewat `AkunSistemIntegrasi::id()` di **awal job**; akun tidak ada /
+  menyimpang → `AkunSistemTidakSiap`, job **gagal eksplisit** (exit ≠ 0, tercatat di log), tidak pernah menulis pelaku
+  NULL/0.
+- Test memakai service yang sama (bukan INSERT tiruan): `tests/database/Integrasi/AkunSistemIntegrasiTest.php` (idempoten 2× = 1
+  baris, menolak akun menyimpang, `id()` tanpa akun gagal eksplisit, exit code command).
+
+Pengaman: akun **tidak bisa login** — `status = '0'` ditolak `AuthService`, walau diaktifkan tetap ditolak karena tanpa
+password maupun hash legacy, ditambah penjaga kode T3 di bawah.
 
 **Level akun — keputusan Horii 03-11-2026 (DBV-Q10): ikut legacy, `user_level = 1`.** Padanan legacy = akun developer
 `ID_USR_DEVSIMPEG` (nilai tidak dibuka; konstanta di berkas rahasia) yang dipakai cron legacy sebagai pelaku
@@ -327,13 +349,10 @@ pernah login. **Mitigasi:** akun nonaktif (`status = '0'`) tanpa password maupun
 
 **Penjaga di kode (temuan T3 DBV, keputusan reviewer CR 03-11-2026).** Status '0' tanpa password belum cukup karena admin
 bisa mengaktifkan akun / mengisi password lewat Manajemen Akun. Karena itu (`App\Constants\AkunSistem`, username sama
-dengan seed): login akun sistem selalu ditolak (`AuthService::login`, sebelum cek status/password); Manajemen Akun
+dengan command): login akun sistem selalu ditolak (`AuthService::login`, sebelum cek status/password); Manajemen Akun
 **menyembunyikan** akun dari daftar dan **menolak 403** lihat/edit/aktifkan/nonaktifkan/reset password/ubah level/hapus,
 termasuk untuk Super Admin (`UserService::findInScope`). Diuji `tests/Auth/AkunSistemTerkunciTest.php`. PR menjadi
-`[CR][DBV]` (kode penjaga masuk `main` bersama seed akunnya). Pengecualian seed
-setara preseden data wajib migration lain (mis. `jenis_rwy`, `jenis_cuti` seed DBV-022) — dicatat eksplisit di sini.
-Pra-cek: migration menolak bila username sudah dipakai. down() menghapus baris akun (setelah `firebase_token`
-dikembalikan, karena token web bisa merujuknya).
+`[CR][DBV]` (kode penjaga dan command akun sistem masuk `main` bersama skemanya).
 
 ---
 
@@ -394,8 +413,7 @@ di-commit).
 | A5 | INFO | NIP > 1 baris SKP aktif per periode (kunci berbeda; Tukin memakai id terkecil) |
 | A6 | WAJIB_0 | Token FCM ganda per pemilik (`nip` + token; langkah dedup Bagian 3.7) |
 | A6b | WAJIB_0 | Baris token lama tanpa `nip` |
-| A7 | STOP | Username akun sistem sudah dipakai |
-| B1 | WAJIB_0 | Akun sistem bisa login (status ≠ 0 atau ada password) |
+| B1 | WAJIB_0 | Akun sistem bisa login (status ≠ 0 atau ada password) — sesudah command `integrasi:siapkan-akun-sistem` |
 | B1b | INFO | Level & status akun sistem (ikut legacy = 1, DBV-Q10) |
 | B2 | WAJIB_0 | Token tanpa `token_hash` |
 | B3 | INFO | Token per platform |
@@ -430,13 +448,13 @@ supaya CI MySQL 8.0 & MariaDB 10.4 menjalankannya; saat pemindahan `require_once
 | `siasn_upload_arsip` (`rw_name`,`id_rw`,`id_da`) ganda; status 4; `id_da` NULL (T4) | ✅ ditolak 1062 / 3819 / 1048 |
 | `double_riwayat_kp` NIP ganda; `siasn_referensi` jenis di luar daftar; `integrasi_log` arah 3 / status 0 | ✅ ditolak 1062 / 3819 / 3819 |
 | Hapus pegawai yang punya baris SIASN | ✅ ditolak 1451 |
-| Akun sistem: role 1 (ikut legacy), `status '0'`, tanpa password; login ditolak (`AuthException`), juga setelah `status` diubah '1' | ✅ |
+| Migration tidak membuat akun sistem (Z-1 opsi c); akun & penjaganya diuji di `AkunSistemIntegrasiTest` dan `AkunSistemTerkunciTest` | ✅ |
 | Pra-cek token FCM ganda per pemilik: up() berhenti sebelum DDL (pesan jumlah) | ✅ |
 | Pra-cek baris token lama tanpa `nip`: up() berhenti sebelum DDL (diuji dengan skema DBV-022 dilonggarkan sementara di test) | ✅ |
 | Pra-cek duplikat SKP: up() berhenti sebelum DDL, pesan berisi jumlah tanpa NIP, tabel baru tidak terbentuk | ✅ |
 | Gagal di tengah (tabel `siasn_referensi` sudah ada): 5 tabel yang sempat dibuat di-DROP, `firebase_token` tidak berubah | ✅ |
 | `down()` → tabel hilang, kolom `firebase_token` & indeks `riwayat_skp_periodik` sama dengan sebelum, akun terhapus; `up()` ulang berhasil. CHECK dilepas `DROP CONSTRAINT` hanya bila ada (T1; `DROP CHECK` khusus MySQL gagal diam-diam di MariaDB 10.4 — dibuktikan DBV di CI #482, perbaikan lolos CI #483) | ✅ |
-| Seluruh kueri audit (20 SELECT) berjalan tanpa galat sintaks setelah `up()` | ✅ |
+| Seluruh kueri audit (19 SELECT; A7 dihapus Z-1) berjalan tanpa galat sintaks setelah `up()` | ✅ |
 
 ### 8.3 Permintaan verifikasi MariaDB 10.4 (lingkungan DB Validator)
 Mohon jalankan draf (atau DDL Bagian 3) + skrip audit di MariaDB 10.4, terutama: CHECK `chk_firebase_token_pemilik` pada
@@ -448,8 +466,8 @@ pada `siasn_referensi`. CI `quality-gate` (MySQL 8.0 & MariaDB 10.4) juga menjal
 ## 9. Rencana test skema (setelah approve)
 
 `tests/database/Integrasi/SkemaIntegrasiKeluarTest.php` (`extends DatabaseTestCase`, `db-isolasi-penuh`): isi test
-sementara Bagian 8 (struktur/collation, CHECK 3819/4025, 1062/1451/1452, pra-cek, siklus `down()/up()`, akun sistem tidak
-bisa login, kueri audit berjalan), ditambah registry NIP (`NipReferenceRegistryTest`, `TabelAnakNipTest`, `NipCascadeTest`).
+sementara Bagian 8 (struktur/collation, CHECK 3819/4025, 1062/1451/1452, pra-cek, siklus `down()/up()`, tanpa seed akun,
+kueri audit berjalan; dasar tambahan `SkemaIntegrasiKeluarDbvTest` dari branch `ci/dbv027-mariadb`), ditambah registry NIP (`NipReferenceRegistryTest`, `TabelAnakNipTest`, `NipCascadeTest`).
 
 ---
 
@@ -467,7 +485,7 @@ bisa login, kueri audit berjalan), ditambah registry NIP (`NipReferenceRegistryT
 | DBV-Q8 | Kunci unik token FCM | **Diputus Horii 03-11-2026: ikut legacy** — UNIQUE per pemilik (`id_pengguna`,`token_hash`) web dan (`nip`,`token_hash`) android; baris web `nip` NULL (T2 opsi a) |
 | DBV-Q9 | `refresh_date` dipertahankan walau tanpa pembaca | Setujui (paritas, bahan pembersihan) |
 | DBV-Q10 | Level akun sistem | **Diputus Horii 03-11-2026: ikut legacy** — `user_level = 1` (padanan `ID_USR_DEVSIMPEG`), risiko diterima dengan mitigasi Bagian 4 |
-| DBV-Q10b | Akun sistem opsi (a) baris `pengguna` + seed migration vs opsi (b) konstanta id | Opsi (a) |
+| DBV-Q10b | Cara membuat akun sistem | **Diputus DBV: opsi (c)** — command idempoten `integrasi:siapkan-akun-sistem` sesudah impor `pengguna` (Z-1, Bagian 4) |
 | DBV-Q11 | Kolom tabel kerja SIASN berlabel [I] (DDL `siasn_simpeg`/`siasn_upload_arsip`/`double_riwayat_kp` tidak tersedia) | Cocokkan dengan dump D1 bila tersedia di lingkungan DBV |
 | DBV-Q12 | Timestamp migration saat dipindah | Lebih baru dari `2026-10-28-100000` dan dari DBV-026 bila masuk lebih dulu |
 | DBV-Q13 | Token FCM ganda di lingkungan berisi: pra-cek gagal + dedup manual (Bagian 3.7) atau dedup deterministik di migration (simpan id terbesar) | Pra-cek + dedup manual (perilaku migration tidak menghapus data diam-diam) |
@@ -491,7 +509,7 @@ bisa login, kueri audit berjalan), ditambah registry NIP (`NipReferenceRegistryT
 - [ ] UNIQUE `riwayat_skp_periodik` + pra-cek + aturan duplikat (DBV-Q1)
 - [ ] Tabel kerja SIASN [I] (DBV-Q3..Q7, Q11)
 - [ ] `integrasi_log` (DBV-Q2), retensi 180 hari oleh command
-- [ ] Akun sistem integrasi (Bagian 4; level 1 diputus Horii, DBV-Q10) — tidak bisa login; penjaga kode T3 (login, Manajemen Akun)
+- [ ] Akun sistem integrasi (Bagian 4; level 1 diputus Horii, DBV-Q10; dibuat command, Z-1 opsi c) — tidak bisa login; penjaga kode T3 (login, Manajemen Akun)
 - [ ] Registry NIP fase 6 (Bagian 6)
 - [ ] Skrip audit hanya SELECT, hanya jumlah; klasifikasi A/B
 - [ ] Verifikasi MariaDB 10.4 (Bagian 8.3)
