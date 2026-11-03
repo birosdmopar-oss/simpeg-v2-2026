@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Libraries\Integrasi\Log;
 
+use App\Libraries\Bkn\Ekinerja\PemilihPeriode;
 use CodeIgniter\Database\BaseConnection;
+use DateTimeImmutable;
 
 /**
  * Ringkasan `integrasi_log` untuk `php spark integrasi:status` (F6-24): per layanan × arah dalam jendela N jam terakhir —
  * jumlah sukses/gagal, waktu & kode kegagalan terakhir. Hanya agregat (tanpa `pesan`/`ref_id`), aman ditampilkan di
- * terminal/log cron. Peringatan periode Tukin tanpa SKP periodik ditambahkan B3 (MAKE-064).
+ * terminal/log cron. {@see self::peringatanEkinerja()}: periode Tukin berjalan yang belum punya baris SKP periodik (F6-15).
  */
 final class StatusIntegrasi
 {
@@ -56,5 +58,31 @@ final class StatusIntegrasi
         }
 
         return $hasil;
+    }
+
+    /**
+     * Peringatan F6-15 (MAKE-064): periode e-Kinerja yang sedang dipakai Tukin (aturan pemilihan sama dengan cron, tanggal
+     * WIB > 19 → bulan berikutnya) belum ada di `bkn_periode_ekinper` atau belum punya satu pun baris
+     * `riwayat_skp_periodik` aktif — tanpa data itu Tukin memakai potongan SKP bawaan 32% [K]. Null = aman.
+     */
+    public function peringatanEkinerja(?DateTimeImmutable $sekarang = null): ?string
+    {
+        $pilih   = PemilihPeriode::untuk($sekarang ?? new DateTimeImmutable('now'));
+        $label   = $pilih['tahun'] . '-' . $pilih['bulan'];
+        $periode = $this->db->table('bkn_periode_ekinper')->select('id')
+            ->where('tahun', $pilih['tahun'])->where('bulan', $pilih['bulan'])->where('jenis_periode', null)
+            ->orderBy('id', 'ASC')->get(1)->getRowArray();
+
+        if ($periode === null) {
+            $pesan = "Periode e-Kinerja {$label} belum ada di bkn_periode_ekinper (jalankan bkn:tarik-periode).";
+        } elseif ($this->db->table('riwayat_skp_periodik')->where('periode_id', $periode['id'])->where('status', 1)->countAllResults() === 0) {
+            $pesan = "Periode Tukin {$label} belum punya data SKP periodik e-Kinerja; tanpa data, potongan SKP bawaan 32% berlaku (jalankan bkn:tarik-skp-periodik).";
+        } else {
+            return null;
+        }
+
+        log_message('warning', '[integrasi:ekinerja] ' . $pesan);
+
+        return $pesan;
     }
 }

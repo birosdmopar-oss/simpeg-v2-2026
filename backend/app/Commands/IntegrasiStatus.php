@@ -13,7 +13,8 @@ use InvalidArgumentException;
 
 /**
  * `php spark integrasi:status [--jam=24]` (PRD Fase 6 F6-24): ringkasan sukses/gagal per layanan dari `integrasi_log`.
- * Hanya agregat; tanpa pesan/rujukan. Kode keluar 0 (informasi), 1 bila ada kegagalan dalam jendela (untuk pemantauan cron).
+ * Hanya agregat; tanpa pesan/rujukan. Ditambah peringatan periode Tukin tanpa SKP periodik e-Kinerja (F6-15). Kode keluar
+ * 0 (informasi), 1 bila ada kegagalan dalam jendela atau peringatan (untuk pemantauan cron).
  */
 class IntegrasiStatus extends BaseCommand
 {
@@ -41,13 +42,19 @@ class IntegrasiStatus extends BaseCommand
             return EXIT_USER_INPUT;
         }
 
-        $jam   = (int) $jam;
-        $baris = (new StatusIntegrasi(db_connect()))->ringkasan($jam);
+        $jam        = (int) $jam;
+        $status     = new StatusIntegrasi(db_connect());
+        $baris      = $status->ringkasan($jam);
+        $peringatan = $status->peringatanEkinerja();
+
+        if ($peringatan !== null) {
+            CLI::write('PERINGATAN: ' . $peringatan, 'yellow');
+        }
 
         if ($baris === []) {
             CLI::write("Tidak ada catatan integrasi dalam {$jam} jam terakhir.");
 
-            return EXIT_SUCCESS;
+            return $peringatan === null ? EXIT_SUCCESS : EXIT_ERROR;
         }
 
         CLI::table(array_map(static fn (array $b): array => [
@@ -59,6 +66,6 @@ class IntegrasiStatus extends BaseCommand
             $b['kode_terakhir'] ?? '-',
         ], $baris), ['Layanan', 'Arah', 'Sukses', 'Gagal', 'Gagal terakhir (UTC)', 'Kode']);
 
-        return array_sum(array_column($baris, 'gagal')) > 0 ? EXIT_ERROR : EXIT_SUCCESS;
+        return array_sum(array_column($baris, 'gagal')) > 0 || $peringatan !== null ? EXIT_ERROR : EXIT_SUCCESS;
     }
 }
