@@ -571,7 +571,6 @@ class Services extends BaseService
             static::esignGateway(),
             static::cutiNotifikasiService(),
             null,
-            trim(config(Integrations::class)->esign['qrLogo']) ?: null,
             static::cacheService(),
         );
     }
