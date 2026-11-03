@@ -513,6 +513,8 @@ class CutiService
             }
 
             $this->db->table('riwayat_cuti_notif_kt')->where('id_riwayat_cuti', $id)->delete();
+            // DBV-030 Q2: token publik surat ikut dihapus di transaksi yang sama (FK RESTRICT) → URL publik 404.
+            $this->db->table('surat_cuti_token')->where('id_riwayat_cuti', $id)->delete();
 
             if (! $this->model()->delete($id)) {
                 throw new \RuntimeException('Pengajuan cuti gagal dihapus.');

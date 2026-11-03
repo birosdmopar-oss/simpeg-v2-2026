@@ -17,8 +17,8 @@ use Tests\Support\DatabaseTestCase;
 use Tests\Support\Layanan\EsignUjiTrait;
 
 /**
- * MAKE-065 kerangka langkah 3 — route publik surat cuti ber-token (PRD Fase 6 v1.0f §7.2) dengan repo token PALSU
- * (tabel `surat_cuti_token` DBV-030 belum di `main`):
+ * MAKE-065 langkah 3 — route publik surat cuti ber-token (PRD Fase 6 v1.0f §7.2) dengan repo token PALSU (lepas dari
+ * tabel `surat_cuti_token`; token nyata DBV-030 diuji {@see TokenSuratCutiTest}):
  * - AC-02.8 (Q6-23): verifikasi data minimal tanpa NIP/unduh PDF; status "belum" sebelum TTE, "ditandatangani" + nama &
  *   tanggal WIB sesudah TTE; token salah → 404 seragam;
  * - AC-02.7 (Q6-22): PDF ber-TTE `inline`; token salah/nonaktif/surat tanpa TTE → 404 seragam; throttle; `no-store` +
