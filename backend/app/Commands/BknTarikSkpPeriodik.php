@@ -12,6 +12,8 @@ use App\Libraries\Integrasi\Http\GalatTransport;
 use App\Libraries\Integrasi\KonfigurasiIntegrasiTidakLengkap;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
+use CodeIgniter\Database\Exceptions\DatabaseException;
+use DateTimeImmutable;
 use InvalidArgumentException;
 
 /**
@@ -21,7 +23,9 @@ use InvalidArgumentException;
  * `--bulan` wajib berpasangan (tarik ulang periode tertentu). `--sebelumnya` = tarik juga satu periode sebelum periode
  * terpilih/diminta. PRD §6.4 "periode berjalan + sebelumnya" = JADWAL (runbook memakai `--sebelumnya`); command bawaan =
  * legacy (satu periode, `EB:205`). Jadwal runbook 02:00 WIB.
- * Kode keluar: 0 berhasil / dilewati manual, 1 gagal / periode belum ada, 3 masukan salah.
+ * Dengan `--sebelumnya`, periode kedua tetap dicoba walau periode pertama gagal (galat transport/token/DB).
+ * Kode keluar: 0 berhasil / dilewati manual, 1 gagal / periode belum ada (`EXIT_ERROR`), 7 masukan salah
+ * (`EXIT_USER_INPUT`).
  */
 class BknTarikSkpPeriodik extends BaseCommand
 {
@@ -51,17 +55,28 @@ class BknTarikSkpPeriodik extends BaseCommand
 
         try {
             $tarik = TarikEkinerja::dariLayanan();
-            $h     = $tarik->skpPeriodik($tahun, $bulan, null, $dryRun);
-            $kode  = $this->laporkan($h, $dryRun);
-
-            if (isset($opsi['sebelumnya'])) {
-                $lalu = PemilihPeriode::sebelum($h['tahun'], (int) $h['bulan']);
-                $kode = max($kode, $this->laporkan($tarik->skpPeriodik($lalu['tahun'], (int) $lalu['bulan'], null, $dryRun), $dryRun));
-            }
-        } catch (GalatTokenBkn|GalatTransport|KonfigurasiIntegrasiTidakLengkap $e) {
+        } catch (KonfigurasiIntegrasiTidakLengkap $e) {
             CLI::error('Tarik SKP periodik GAGAL: ' . $e->getMessage());
 
             return EXIT_ERROR;
+        }
+
+        $pilih   = $tahun !== null && $bulan !== null ? ['tahun' => $tahun, 'bulan' => sprintf('%02d', $bulan)] : PemilihPeriode::untuk(new DateTimeImmutable('now'));
+        $periode = [$pilih];
+
+        if (isset($opsi['sebelumnya'])) {
+            $periode[] = PemilihPeriode::sebelum($pilih['tahun'], (int) $pilih['bulan']);
+        }
+
+        $kode = EXIT_SUCCESS;
+
+        foreach ($periode as $p) {
+            try {
+                $kode = max($kode, $this->laporkan($tarik->skpPeriodik($p['tahun'], (int) $p['bulan'], null, $dryRun), $dryRun));
+            } catch (GalatTokenBkn|GalatTransport|DatabaseException $e) {
+                CLI::error("Tarik SKP periodik {$p['tahun']}-{$p['bulan']} GAGAL: " . $e->getMessage());
+                $kode = EXIT_ERROR;
+            }
         }
 
         return $kode;

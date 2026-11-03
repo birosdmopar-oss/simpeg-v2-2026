@@ -41,7 +41,7 @@ class BknTarikPeriode extends BaseCommand
 
         try {
             $hasil = TarikEkinerja::dariLayanan()->periode(isset($opsi['dry-run']));
-        } catch (GalatTokenBkn|GalatTransport|KonfigurasiIntegrasiTidakLengkap $e) {
+        } catch (GalatTokenBkn|GalatTransport|KonfigurasiIntegrasiTidakLengkap|\CodeIgniter\Database\Exceptions\DatabaseException $e) {
             CLI::error('Tarik periode e-Kinerja GAGAL: ' . $e->getMessage());
 
             return EXIT_ERROR;

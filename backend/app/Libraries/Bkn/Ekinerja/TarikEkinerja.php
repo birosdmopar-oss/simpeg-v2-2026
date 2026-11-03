@@ -7,6 +7,7 @@ namespace App\Libraries\Bkn\Ekinerja;
 use App\Interfaces\Integrasi\IntegrasiLogInterface;
 use App\Libraries\Integrasi\Log\CatatanIntegrasi;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use DateTimeImmutable;
 
 /**
@@ -15,7 +16,9 @@ use DateTimeImmutable;
  * `integrasi_log` (jumlah saja; kode alasan penolakan tanpa NIP/nama).
  *
  * Status hasil: `ok`, `gagal` (HTTP/respons tidak sah), `periode_tidak_ada` (periode bulan itu belum ada di
- * `bkn_periode_ekinper`; jalankan `bkn:tarik-periode` dulu), `dilewati_manual` (id berawalan `SKPManual`).
+ * `bkn_periode_ekinper`; jalankan `bkn:tarik-periode` dulu), `dilewati_manual` (id berawalan `SKPManual`). Galat DB saat
+ * menyimpan ({@see SinkronEkinerja}, transaksi dibatalkan) dicatat `gagal` dengan kode `galat_db` lalu
+ * {@see DatabaseException} dilempar ulang agar command keluar ≠ 0 dan job `bkn-tarik` di-retry.
  */
 final class TarikEkinerja
 {
@@ -63,7 +66,13 @@ final class TarikEkinerja
             return $this->ringkas('tarik_periode', self::STATUS_GAGAL, $respons->status, ['baru' => 0, 'sudah_ada' => 0], $alasan, null, $dryRun) + ['baru' => 0, 'sudah_ada' => 0];
         }
 
-        $hasil = $dryRun ? $this->perkiraanPeriode($peta['baris']) : $this->sinkron->simpanPeriode($peta['baris']);
+        try {
+            $hasil = $dryRun ? $this->sinkron->perkiraanPeriode($peta['baris']) : $this->sinkron->simpanPeriode($peta['baris']);
+        } catch (DatabaseException $e) {
+            $this->ringkas('tarik_periode', self::STATUS_GAGAL, $respons->status, ['baru' => 0, 'sudah_ada' => 0], $alasan + ['galat_db' => 0], null, $dryRun);
+
+            throw $e;
+        }
 
         return $this->ringkas('tarik_periode', self::STATUS_OK, $respons->status, $hasil, $alasan, null, $dryRun) + $hasil;
     }
@@ -100,23 +109,17 @@ final class TarikEkinerja
             return $dasar + $this->ringkas('tarik_skp_periodik', self::STATUS_GAGAL, $respons->status, $nol, $alasan, $id, $dryRun) + $nol;
         }
 
-        $hasil = $dryRun ? ['baru' => count($peta['baris'])] + $nol : $this->sinkron->simpanSkpPeriodik($peta['baris']);
+        try {
+            $hasil = $dryRun ? $this->sinkron->perkiraanSkpPeriodik($peta['baris']) : $this->sinkron->simpanSkpPeriodik($peta['baris']);
+        } catch (DatabaseException $e) {
+            $this->ringkas('tarik_skp_periodik', self::STATUS_GAGAL, $respons->status, $nol, $alasan + ['galat_db' => 0], $id, $dryRun);
+
+            throw $e;
+        }
 
         $hasil += $nol;
 
         return $dasar + $this->ringkas('tarik_skp_periodik', self::STATUS_OK, $respons->status, $hasil, $alasan, $id, $dryRun) + $hasil;
-    }
-
-    /**
-     * @param list<array<string, int|string|null>> $baris
-     *
-     * @return array{baru: int, sudah_ada: int}
-     */
-    private function perkiraanPeriode(array $baris): array
-    {
-        $ada = $baris === [] ? 0 : $this->db->table('bkn_periode_ekinper')->whereIn('id', array_column($baris, 'id'))->countAllResults();
-
-        return ['baru' => count($baris) - $ada, 'sudah_ada' => $ada];
     }
 
     /**
