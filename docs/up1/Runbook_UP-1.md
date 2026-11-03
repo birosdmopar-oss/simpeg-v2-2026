@@ -99,6 +99,11 @@ Isi paket:
    - **membatasi** tabel transaksi ke rentang `UP1_AWAL..UP1_AKHIR` lewat `--where`, khusus `riwayat_cuti` dan `absen_ijin` mulai
      `UP1_AWAL_CUTI`;
    - mengambil `web_config` **hanya** untuk key tarif dan jam kerja Tukin;
+   - mengambil penuh tabel kerja SIASN `siasn_upload_arsip` dan `double_riwayat_kp` (tier SIASN alat impor,
+     DBV-027 K-6/K-8);
+   - bila `UP1_DB_SIASN` diisi, mengambil 8 tabel skema `siasn_simpeg` (`REF_UNOR` + 7 referensi, K-9) tepat sesudah
+     dump utama ke `<UP1_OUT>/siasn/` (hentikan job tarik SIASN selama ekstraksi agar snapshot-nya sama). Dump ini
+     di-restore ke skema **terpisah**, mis. `up1_legacy_salinan_siasn`, bukan ke skema salinan utama;
    - **tidak** mengambil `pengguna`, `token`, atau tabel kredensial/log lain.
 9. Jalankan `up1-hitung-baris.sql` di sumber untuk mendapat jumlah baris per tabel. Simpan sebagai
    `<KERJA_UP1>/hitung_sumber.txt`:
@@ -124,6 +129,7 @@ Daftar tabel minimal (dari prosedur UP-1 dan kode jalur Tukin `Libraries/Presens
 | Cuti & TB | `riwayat_cuti` (`tgl_mulai`/`tgl_akhir` tumpang tindih), `jenis_cuti`, `pegawai_sisa_cuti` (tahun rentang), `riwayat_tb` (juga TB lama yang perpanjangannya beririsan periode), `riwayat_tb_perpan` | rentang (TB: tumpang tindih) |
 | Kalender | `hari_libur` (tumpang tindih), `jenis_libur` | rentang |
 | SKP/BKN | `bkn_periode_ekinper` (`tahun`/`bulan`; `periode_awal`/`periode_akhir` berformat `MM-DD`), `riwayat_skp_periodik` (`periode_awal_skp`/`periode_akhir_skp`) | rentang |
+| SIASN (tier SIASN) | `siasn_upload_arsip`, `double_riwayat_kp`; opsional skema `siasn_simpeg`: `REF_UNOR`, `JABATAN_FUNGSIONAL_ID`, `JABATAN_FUNGSIONAL_UMUM_ID`, `JENIS_JABATAN_ID`, `LATIHAN_STRUKTURAL_ID`, `TK_PENDIDIKAN`, `JENIS_KP_ID`, `GOLONGAN_ID` | penuh |
 | Konfigurasi | `web_config` key `TL1/PSW1`, `TL2/PSW2`, `TL3/PSW3`, `TA`, `TK`, `jam_*_normal`, `jam_*_puasa` | key tertentu |
 
 Nama kolom mengikuti label [K] di dokumen DBV, yaitu nama legacy. **D** mencocokkannya dengan DDL DevSimpeg sebelum
@@ -184,8 +190,13 @@ akun yang sama.
 13. **Dry-run.** Perintah ini membaca seluruh baris dan menerapkan semua aturan tanpa menulis:
     ```bash
     php spark impor:legacy --sumber=up1_legacy_salinan --zona-sumber=<WIB|UTC> \
-      --konfirmasi=simpeg_v2_t_up1 --keputusan=<KERJA_UP1>/keputusan.json --dry-run
+      --konfirmasi=simpeg_v2_t_up1 --keputusan=<KERJA_UP1>/keputusan.json --dry-run \
+      [--sumber-siasn=up1_legacy_salinan_siasn]
     ```
+    - `--sumber-siasn` = skema salinan `siasn_simpeg` (langkah 8). Tanpa opsi itu `siasn_ref_unor` dan
+      `siasn_referensi` dilaporkan `dilewati: tanpa --sumber-siasn`; tier SIASN lain tetap jalan. Tier SIASN selalu
+      terakhir; sebelum MAKE-069 mengimpor riwayat lain dan `document_attachment`, INFO rujukannya menyebut
+      "belum diimpor (kosong)" — normal untuk UP-1.
     - Baris pertama keluaran adalah `Tujuan: host:port / nama_db — sumber: …` (tanpa user/password). Pastikan host
       adalah mesin lokal dan nama DB adalah DB scratch. Bila salah, hentikan dan perbaiki `.env`. Karena itu dry-run
       selalu dijalankan lebih dulu: bila tujuannya salah, belum ada yang tertulis.

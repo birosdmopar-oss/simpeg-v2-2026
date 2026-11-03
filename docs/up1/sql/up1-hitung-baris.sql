@@ -49,6 +49,8 @@ UNION ALL SELECT 'bkn_periode_ekinper', COUNT(*) FROM bkn_periode_ekinper
                 BETWEEN YEAR(@awal)*100 + MONTH(@awal) AND YEAR(@akhir)*100 + MONTH(@akhir)
 UNION ALL SELECT 'riwayat_skp_periodik', COUNT(*) FROM riwayat_skp_periodik
           WHERE periode_awal_skp <= @akhir AND periode_akhir_skp >= @awal
+UNION ALL SELECT 'siasn_upload_arsip', COUNT(*) FROM siasn_upload_arsip
+UNION ALL SELECT 'double_riwayat_kp', COUNT(*) FROM double_riwayat_kp
 UNION ALL SELECT 'web_config_tukin', COUNT(*) FROM web_config
           WHERE config_name IN ('TL1/PSW1','TL2/PSW2','TL3/PSW3','TA','TK','jam_masuk_normal','jam_pulang_normal',
                                 'jam_pulang_jumat_normal','jam_masuk_puasa','jam_pulang_puasa','jam_pulang_jumat_puasa');

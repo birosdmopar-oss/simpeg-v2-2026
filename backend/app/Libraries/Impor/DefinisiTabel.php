@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Impor;
 
 use Closure;
+use CodeIgniter\Database\BaseConnection;
 
 /**
  * Definisi impor satu tabel. Kolom yang disalin = irisan kolom sumber [K] dan kolom v2 (nama legacy dipertahankan);
@@ -29,6 +30,12 @@ final class DefinisiTabel
      * @param list<string>                  $yatimKeNull       FK nullable yang rujukannya tidak ada di tujuan → NULL + dicatat (snapshot `id_riwayat_*`, B-01/B-02 §6 #6); FK lain yang yatim → gagal
      * @param list<string>                  $kunciUrut         kolom PK komposit untuk baca per batch (bawaan `[$pk]`)
      * @param list<string>                  $waktuBisnis       kolom DATETIME berisi waktu bisnis (mis. rentang izin), bukan stempel → tidak dikonversi R1a
+     * @param string|null                   $sumber            nama tabel sumber bila berbeda dari tujuan (dicari tanpa beda huruf besar/kecil, `lower_case_table_names`)
+     * @param bool                          $skemaSiasn        dibaca dari skema `--sumber-siasn` (salinan `siasn_simpeg`); tanpa opsi itu → dilewati + dilaporkan (DBV-027 K-9)
+     * @param array<string, string>         $petaKolom         kolom tujuan → kolom sumber bila namanya berbeda (mis. `id_siasn` ← `ID`)
+     * @param array<string, int|string>     $konstanta         kolom tujuan yang diisi nilai tetap (mis. `siasn_referensi.jenis`)
+     * @param (Closure(BaseConnection, string, Keputusan): array<int|string, string>)|null $praPindai lintasan baca pertama atas seluruh sumber (koneksi, nama tabel sumber); hasil = PK sumber → kode aturan baris yang tidak diimpor. Boleh melempar {@see ImporGagal} (juga saat dry-run)
+     * @param (Closure(BaseConnection): array<string, int>)|null $pascaImpor hitung INFO di tujuan sesudah tabel ditulis (bukan dry-run): kode → jumlah
      */
     public function __construct(
         public readonly string $tabel,
@@ -47,6 +54,20 @@ final class DefinisiTabel
         public readonly array $yatimKeNull = [],
         public readonly array $kunciUrut = [],
         public readonly array $waktuBisnis = [],
+        public readonly ?string $sumber = null,
+        public readonly bool $skemaSiasn = false,
+        public readonly array $petaKolom = [],
+        public readonly array $konstanta = [],
+        public readonly ?Closure $praPindai = null,
+        public readonly ?Closure $pascaImpor = null,
     ) {
+    }
+
+    /**
+     * Kunci laporan: nama tabel tujuan, ditambah tabel sumber bila beberapa sumber mengisi satu tujuan.
+     */
+    public function kunci(): string
+    {
+        return $this->sumber === null ? $this->tabel : "{$this->tabel}<{$this->sumber}";
     }
 }
