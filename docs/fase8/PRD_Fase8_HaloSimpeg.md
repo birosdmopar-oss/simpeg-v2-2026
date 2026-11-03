@@ -2,15 +2,15 @@
 
 | Butir | Isi |
 |---|---|
-| Dokumen | `docs/fase8/PRD_Fase8_HaloSimpeg.md` — **acuan utama** coder/agen AI Fase 8 (Bahan Baku `08-HaloSimpeg.md` E-01..E-08). Pembagian kerja per jalur ditulis setelah Q8-14 diputus |
-| Versi | **v0.1 (DRAF) — 03-11-2026** (riset kode legacy + v2; riwayat §Lampiran D). Belum berlaku: menunggu keputusan Horii atas Q8-01..Q8-15 (§12) |
-| Status | **DRAF untuk review.** Seluruh keputusan F8-xx di §5.2 berstatus **◻ usulan** (default yang diambil bila Horii tidak menolak). Koding Fase 8 terkunci sampai PRD ini v1.0 berlaku di `main` (§0) |
+| Dokumen | `docs/fase8/PRD_Fase8_HaloSimpeg.md` — **acuan utama** coder/agen AI Fase 8 (Bahan Baku `08-HaloSimpeg.md` E-01..E-08). Pembagian kerja paralel: [`8_1.md`](8_1.md) (Jalur BE) dan [`8_2.md`](8_2.md) (Jalur FE) |
+| Versi | **v1.0 — 03-11-2026** (keputusan Horii 03-11-2026 atas Q8-01..Q8-15: semua ikut saran; v0.1 `70466eac`; riwayat §Lampiran D) |
+| Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 8 terkunci gerbang §0.1 |
 | Prinsip | **"Intinya ikut legacy"** (prinsip umum Horii 01-11-2026 pada Fase 6, dipakai sebagai default di sini): perilaku bisnis & kontrak ikut legacy [K]. Deviasi [V2] hanya bila (a) keputusan eksplisit Horii, atau (b) teknis wajib/keamanan dasar — setiap deviasi tercatat di §5.2 dan Lampiran B |
 | Basis kode | `origin/main` = **`f7b9221e`** (rujukan `path:baris` repo dari commit ini) |
 | Acuan legacy | Salinan kerja legacy CI3 (HEAD `0cf7e67`, sama dengan Fase 6; rujukan baris bercatatan AS-09, belum dicocokkan checksum produksi, Q5A-14). Rujukan relatif ke `application/`: `LS` = `libraries/hr/L_support.php`, `SC` = `controllers/hr/Support.php`, `MC` = `core/MY_Controller.php`, `LN` = `libraries/hr/L_notification.php`, `CR` = `controllers/hr/services/Cron.php`, `VI` = `views/hr/support/inbox.php`, `VD` = `views/hr/support/detail.php`, `VM` = `views/template/modal.php` |
 | Scope | **Fase 8** = E-01..E-08 (`Bahan Baku SIMPEG/08-HaloSimpeg.md`) + ekspor rekap petugas (E-09, baru; ada di legacy `LS:1600`, tidak ada di Bahan Baku) + penyediaan titik sambung notifikasi ke Fase 6 (MAKE-066) dan lonceng Fase 7 (F-08). **Penutup seluruh development** (sign-off Horii) |
-| Pelaksana | Ditetapkan setelah Q8-14. **Reviewer** = reviewer CR (review, gate, merge, QA); **Horii** = keputusan & sign-off; **DBV** = review skema |
-| Key (usulan) | Skema: **DBV-028**. Pekerjaan baru: **MAKE-069..MAKE-073** (nomor berikutnya setelah MAKE-068 Fase 6; reviewer menetapkan final). Perbaikan review/QA: CR-094 dst. ADR baru: tidak ada (usulan) |
+| Pelaksana | **Dua jalur paralel** (Q8-14 = B): **Jalur BE** ([`8_1.md`](8_1.md)) dan **Jalur FE** ([`8_2.md`](8_2.md)). **Reviewer** = reviewer CR (review, gate, merge, QA); **Horii** = keputusan & sign-off; **DBV** = review skema |
+| Key | Skema: **DBV-028**. Pekerjaan baru: **MAKE-070..MAKE-074** (MAKE-069 dipakai paket impor cutover tahap 2). Perbaikan review/QA: CR-094 dst. ADR baru: tidak ada |
 | Sumber | `08-HaloSimpeg.md` (E-01..E-08, exit criteria); Matriks Role × Endpoint Modul E (dicocokkan saat M0); PRD Fase 4 (§C-01, D10, N1/N9–N13, K-22, `docs/fase4/PRD_Fase4.md:50,126,148,265,1130,1184,1406,1506`); DBV-022 §2.14, §3 (`backend/docs/db-review/DBV-022-layanan-fase4-schema.md`); PRD Fase 6 F6-12/F6-13 (`docs/fase6/PRD_Fase6_Integrasi.md:194-195`); `Mapping_Migrasi_Tidak_Dimigrasi.md:52`; PRD Fase 7 (F-02, F-08); frontend redesign `67fa7678` (branch `feat/frontend-ui-redesign`); riset kode legacy & v2 03-11-2026 (Lampiran A) |
 
 ## Cara pakai (WAJIB dibaca)
@@ -64,15 +64,15 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 | Task | Judul | Inti v2 | Key (usulan) |
 |---|---|---|---|
 | E-01 | Skema pendukung helpdesk | **DBV-028**: `support_officer`, `officer_category`, `help_desk_contact` (belum ada); verifikasi `question_category`, `disiplin_ticket`, `disiplin_ticket_msg` (**sudah ada**, DBV-022 — tidak dibuat ulang); ALTER indeks/kolom bila perlu | DBV-028 |
-| E-02 | Master kategori & petugas | CRUD `question_category` dan `support_officer` + `officer_category` (role 1) ikut legacy `LS:213-813` | MAKE-069 |
-| E-03 | Buat tiket | `disiplin_ticket` + pesan pertama + lampiran dalam satu transaksi `LS:937-1095`; **tidak** menyentuh `inbox` | MAKE-070 |
-| E-04 | Thread percakapan | Daftar tiket, baca thread, balas, tandai baca, lampiran `LS:817-927`, `LS:1097-1430`; cakupan data per pemilik/petugas kategori | MAKE-070 |
-| E-05 | Tutup tiket | `close_inbox` `LS:1432-1470`; hapus tiket `LS:1472-1503` sesuai Q8-03 | MAKE-070 |
-| E-06 | Notifikasi tiket | Push (queue `push`) ke pihak lawan + penghitung belum dibaca; titik sambung ke MAKE-066 (F6-13) dan lonceng F-08; **tidak** menulis `inbox` | MAKE-071 |
-| E-07 | Kontak helpdesk | CRUD `help_desk_contact` (role 1) `LS:14-210` + tampilan daftar (Q8-12) | MAKE-069 |
-| E-08 | Frontend | Ubah `frontend/src/features/halo-simpeg/` dari data contoh ke API; tampilan pegawai vs petugas | MAKE-072 |
-| E-09 | Ekspor rekap petugas | `export_hs` `LS:1600-1830` (xlsx; periode) — baru dibanding Bahan Baku | MAKE-073 |
-| Penutup | Progres, README modul, runbook cutover (impor master), QA Lapis 1, sign-off | `backend/docs/progress/08-HaloSimpeg.md` | MAKE-073 |
+| E-02 | Master kategori & petugas | CRUD `question_category` dan `support_officer` + `officer_category` (role 1) ikut legacy `LS:213-813` | MAKE-070 |
+| E-03 | Buat tiket | `disiplin_ticket` + pesan pertama + lampiran dalam satu transaksi `LS:937-1095`; **tidak** menyentuh `inbox` | MAKE-071 |
+| E-04 | Thread percakapan | Daftar tiket, baca thread, balas, tandai baca, lampiran `LS:817-927`, `LS:1097-1430`; cakupan data per pemilik/petugas kategori | MAKE-071 |
+| E-05 | Tutup tiket | `close_inbox` `LS:1432-1470`; hapus tiket `LS:1472-1503` sesuai Q8-03 | MAKE-071 |
+| E-06 | Notifikasi tiket | Push (queue `push`) ke pihak lawan + penghitung belum dibaca; titik sambung ke MAKE-066 (F6-13) dan lonceng F-08; **tidak** menulis `inbox` | MAKE-072 |
+| E-07 | Kontak helpdesk | CRUD `help_desk_contact` (role 1) `LS:14-210` + tampilan daftar (Q8-12) | MAKE-070 |
+| E-08 | Frontend | Ubah `frontend/src/features/halo-simpeg/` dari data contoh ke API; tampilan pegawai vs petugas | MAKE-073 |
+| E-09 | Ekspor rekap petugas | `export_hs` `LS:1600-1830` (xlsx; periode) — baru dibanding Bahan Baku | MAKE-074 |
+| Penutup | Progres, README modul, runbook cutover (impor master), QA Lapis 1, sign-off | `backend/docs/progress/08-HaloSimpeg.md` | MAKE-074 |
 
 ### 1.2 DI LUAR scope Fase 8
 
@@ -124,7 +124,7 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 
 ## 3. Pembagian kerja & anti-tabrakan
 
-Pembagian jalur menunggu **Q8-14**. Usulan berkas milik per bagian (agar bila dibagi dua jalur tidak bertabrakan):
+Pembagian **dua jalur paralel** (Q8-14 = B): **Jalur BE** ([`8_1.md`](8_1.md): DBV-028, MAKE-070, MAKE-071, MAKE-072, MAKE-074 bagian BE) dan **Jalur FE** ([`8_2.md`](8_2.md): MAKE-073 dan tombol ekspor MAKE-074). FE mulai setelah kontrak API master (MAKE-070) dan tiket (MAKE-071) **dibekukan** di README `Controllers/Api/HaloSimpeg` dan disetujui reviewer; sebelum itu FE hanya menyiapkan kerangka terhadap kontrak di §6.1. Berkas milik per bagian:
 
 | Bagian | Berkas | Isi |
 |---|---|---|
@@ -132,6 +132,14 @@ Pembagian jalur menunggu **Q8-14**. Usulan berkas milik per bagian (agar bila di
 | **BE-2 tiket** | `Controllers/Api/HaloSimpeg/{Tiket,Pesan}Controller.php`, `Libraries/HaloSimpeg/{TiketService,PercakapanService,AksesTiket,LampiranTiket,RekapTiket}.php`, `Models/HaloSimpeg/{DisiplinTicket,DisiplinTicketMsg}Model.php` | E-03, E-04, E-05, E-09 |
 | **BE-3 notifikasi** | `Libraries/HaloSimpeg/{TicketNotifService,PenerimaTiket}.php`, `Jobs/PushHaloSimpegJob.php` | E-06 |
 | **FE** | `frontend/src/features/halo-simpeg/*`, `frontend/src/router`/`nav.config.ts` (item Halo Simpeg), `frontend/src/shared/layouts/*` (badge) | E-08 |
+
+| Jalur | Pelaksana | Berkas milik | Tidak boleh disentuh |
+|---|---|---|---|
+| **BE** | satu pelaksana (ditunjuk reviewer) | semua `backend/`, `docs/fase8/8_1.md`, `backend/docs/db-review/DBV-028-*.md` | `frontend/` |
+| **FE** | satu pelaksana (ditunjuk reviewer) | `frontend/src/features/halo-simpeg/*`, item menu `halo` di `nav.config.ts`, router, badge layout, `docs/fase8/8_2.md` | `backend/` (kebutuhan kontrak baru → CR ke jalur BE lewat reviewer) |
+
+Titik temu: kontrak API beku (§6.1) dan fixture JSON sintetis respons API yang dipakai bersama sebagai bahan test FE; perubahan kontrak
+setelah beku = CR yang disepakati kedua jalur lewat reviewer.
 
 **Berkas BERSAMA — hanya ADITIF, commit TERPISAH:** `Config/Routing.php` (+ `Config/RoutesHaloSimpeg.php` baru),
 `Config/Services.php`, `Config/Queue.php` (`$jobHandlers`), `Config/Filters.php`, `.env.example`, `README-deploy.md`,
@@ -175,32 +183,32 @@ Pembagian jalur menunggu **Q8-14**. Usulan berkas milik per bagian (agar bila di
 | CR-086 | Sesi DB UTC; stempel audit UTC diisi aplikasi | `App\Database\MySQLi\Connection` |
 | AGENTS.md §1, §3 | Aksi baris lewat ⋮; komponen custom | AGENTS.md |
 
-### 5.2 Keputusan Fase 8 (USULAN — ◻ default bila Horii tidak menolak; ❓ = butuh jawaban eksplisit di §12)
+### 5.2 Keputusan Fase 8 (LOCKED — Horii 03-11-2026; ✔ Q8-xx = dijawab eksplisit di §12, ✔ (default diterima) = usulan tanpa pertanyaan yang tidak ditolak)
 
 | ID | Keputusan | Label | Status |
 |---|---|---|---|
-| F8-01 | Koding menunggu PRD v1.0 berlaku; M4 (push real) menunggu MAKE-066; M1–M3 paralel dengan Fase 6 (§0.1) | — | ◻ |
-| F8-02 | **Model data = tiket per topik** (kategori + subjek + pesan pertama), bukan satu utas per pegawai. Tampilan boleh bergaya chat (Gambar 33/34) tetapi unit data tetap tiket; data impor `inbox` legacy cocok 1:1 | [K `LS:937-1007`] | ❓ Q8-15 |
-| F8-03 | **Skema baru hanya tiga tabel** (DBV-028): `support_officer`, `officer_category`, `help_desk_contact`. Kolom ikut legacy ([K]/[I] dari kode karena DDL produksi tidak ada di repo); deviasi [V2]: status 0/1 bertipe tinyint + CHECK, UNIQUE `(id_support_officer, id_question_category)`, FK RESTRICT (kebijakan V1), `support_officer.id_user` → `pengguna.id_pengguna` | [K]+[V2] | ◻ |
-| F8-04 | **Pembuat tiket** = role pegawai (`UL_PEGAWAI` 2, 6, 7) yang punya NIP [K `SC:608`]; melihat daftar/percakapan = role 1–7 [K `SC:466,498,550`]; **role 8 (Pimpinan) tidak punya akses** [K, tidak ada di daftar legacy]. Matriks Bahan Baku "role 1–7 sebagai pengguna" dibaca sebagai akses daftar/baca, bukan pembuatan | [K] | ❓ Q8-01 |
-| F8-05 | **Master (kategori, petugas, kontak) hanya role 1** untuk tulis [K `SC:13,39,…,438`]; kategori aktif dibaca semua role 1–7 untuk form tiket [K `LS:931`] | [K] | ◻ |
-| F8-06 | **Petugas harus berstatus aktif** untuk melihat/menjawab tiket (legacy hanya memeriksa status untuk push & popup, bukan akses: `SC:507-523` vs `LS:1035`, `MC:272`). Petugas dinonaktifkan → kehilangan akses antrean (tiket miliknya sendiri tetap terlihat) | [V2] keamanan | ❓ Q8-02 |
-| F8-07 | **Kandidat petugas** = pegawai aktif satker kepegawaian + akun role 1 aktif [K `LS:468-491`]. Satker diambil dari konfigurasi (bukan literal `'101'`): memakai `WebConfigService::value('id_satker_kepegawaian')` seperti PIC layanan (Q-06a Fase 4), dan peringatan bila kosong (pola `PetugasLayananService::PERINGATAN_SATKER_KOSONG`) | [K]+[V2] | ❓ Q8-11 |
-| F8-08 | **Siapa yang menutup**: petugas kategori tiket itu dan pemilik tiket [K controller `SC:676-690`; UI legacy hanya menampilkan tombol untuk petugas `VI:133`]. Tutup: `status=1`, `allow_reply=0`, `is_read=1`, `is_read_off=1` [K `LS:1444-1449`] **dan `closed_by` diisi** (kolom ada tetapi tidak pernah ditulis legacy) [V2 perbaikan]. **Tanpa buka kembali**; pegawai membuat tiket baru [K `LS:1117`] | [K]+[V2] | ❓ Q8-04 |
-| F8-09 | **Hapus tiket**: petugas kategori itu (dan role 1 yang juga petugas) — bukan pemilik; hapus fisik [K `LS:1485`] dengan snapshot `before` di `audit_logs`; berkas lampiran ikut dihapus dari storage (legacy meninggalkan berkas yatim, B-2). Legacy controller juga mengizinkan pemilik yang bukan petugas menghapus (`SC:728-733`) walau UI tidak menampilkannya — tidak dibawa. Alternatif hapus lunak butuh ALTER skema | [K]+[V2] | ❓ Q8-03 |
-| F8-10 | **Balas**: syarat tiket `status=0` dan `allow_reply=1` [K `LS:1116-1123`]; pelaku = pemilik atau petugas aktif kategorinya. Pesan: teks wajib, lampiran opsional (5 MB, 9 ekstensi) [K `LS:1552-1565`, `LS:963-975`]. Penanda baca otomatis: balasan pemilik → `is_read_off=2`; balasan petugas → `is_read=2` [I — logika trigger `inbox_msg_afIns`, DBV-022 `:301`; M0 mencocokkan dengan D1:7730-7739 lewat reviewer] | [K]+[I] | ◻ |
-| F8-11 | **Pengingat 24 jam** (`notify_pic`/`notify_at`): petugas dapat mencentang saat membalas; reset ke 2 bila petugas membalas lagi [K `LS:1172-1178`, `LS:1348-1352`]. Tiket `perlu_tindak` = `status=0` dan (`is_read_off=2` atau `notify_pic=1` dan `notify_at < sekarang`) [K `MC:292`] | [K] | ◻ |
-| F8-12 | **Popup login petugas dihapus**; diganti badge pada menu Halo Simpeg + panel "Perlu ditindak" di halaman petugas (legacy: modal saat login, hanya role 2/6, `MC:268-305`, `VM:734-807`) | [V2] UX | ❓ Q8-07 |
-| F8-13 | **Penerima push** — tiket baru → petugas aktif kategori (akun aktif); balasan petugas → pemilik; balasan pemilik → petugas aktif kategori [K `LS:1029-1075`, `LS:1202-1285`]. Perbaikan: akun petugas **semua role** diikutkan (legacy hanya `UserLevel='2'`, sehingga petugas role 1/6 tidak pernah dapat push, B-5); token dideduplikasi per perangkat | [K]+[V2] | ◻ |
-| F8-14 | **Perubahan status (tutup) memberi notifikasi** ke pihak lawan sesuai Bahan Baku E-06 (legacy tidak) | [V2] | ❓ Q8-05 |
-| F8-15 | **Kanal push**: Android ikut legacy; **web ditambahkan** karena infrastruktur web push Fase 6 sudah ada dan petugas bekerja di web (legacy hanya Android untuk Halo Simpeg) | [K]+[V2] | ❓ Q8-09 |
-| F8-16 | **Payload push**: judul "Halo Simpeg", isi = teks pesan terpotong; `data` = `{modul:'halo-simpeg', id_inbox, url}` + kunci kompatibilitas Android yang dikonfirmasi PN8-1. Legacy mengirim seluruh baris tiket (nip, jabatan, satker, nama pengirim) — **tidak** dibawa kecuali pemilik app Android memastikan membutuhkannya | [V2] privasi | ❓ Q8-08 |
-| F8-17 | **Lampiran** memakai `AturanLampiran`/`ValidasiBerkas` yang ada (BP8-5); path `halo-simpeg/{nip}/{id_inbox}/…` di storage lokal; unduh lewat endpoint ber-otorisasi. Berkas lampiran impor (path legacy `arsip/{nip}/inbox/…`) dicocokkan saat cutover | [K]+[V2] | ❓ Q8-10 |
-| F8-18 | **Kontak helpdesk**: CRUD role 1 [K `SC:11-160`]; daftar kontak aktif dapat dibaca semua role 1–7 (di halaman Halo Simpeg) — legacy hanya menampilkannya ke admin | [K]+[V2] | ❓ Q8-12 |
-| F8-19 | **Lonceng**: Fase 8 menyediakan `GET halo-simpeg/tiket/ringkasan` (jumlah belum dibaca sisi pemilik + sisi petugas [K `LN:12-60`]) dan **tidak** menulis ke `inbox`. Konsumsi oleh lonceng terpadu F-08 = keputusan Q8-06 | [K]+[V2] | ❓ Q8-06 |
-| F8-20 | **Ekspor rekap** `export_hs` ikut legacy: hanya petugas; periode berdasar tanggal tiket (inklusif); kolom NO, ID PERTANYAAN, KATEGORI, NAMA PENANYA, NIP PENANYA, PERTANYAAN / JAWABAN, TIMESTAMP; xlsx [K `LS:1600-1830`, `SC:751-786`]. Perbaikan: sertakan tiket yang periode-nya cocok walau petugas belum menulis, urut tiket lalu pesan | [K]+[V2] | ◻ |
-| F8-21 | **Impor master**: `support_officer`, `officer_category`, `help_desk_contact` dipindah saat cutover (daftar petugas dan kategori berlaku langsung); `id_user` dipetakan ke `id_pengguna` v2 lewat tabel pemetaan UP-1; baris tanpa pemetaan dilaporkan, bukan dibuang diam-diam | [V2] | ❓ Q8-13 |
-| F8-22 | **Tidak dibawa**: popup modal login (F8-12), `firebase_message_logs` (digantikan `integrasi_log` Fase 6), `andr_notif_queue` (digantikan queue `push`), file view bertanggal (`inbox_20220216.php` dst.), cabang debug berkode-keras NIP (`SC:469`), log `mylog` rusak (B-9) | — | ◻ |
+| F8-01 | Koding menunggu PRD v1.0 berlaku; M4 (push real) menunggu MAKE-066; M1–M3 paralel dengan Fase 6 (§0.1) | — | ✔ (default diterima) |
+| F8-02 | **Model data = tiket per topik** (kategori + subjek + pesan pertama), bukan satu utas per pegawai. Tampilan boleh bergaya chat (Gambar 33/34) tetapi unit data tetap tiket; data impor `inbox` legacy cocok 1:1 | [K `LS:937-1007`] | ✔ Q8-15 |
+| F8-03 | **Skema baru hanya tiga tabel** (DBV-028): `support_officer`, `officer_category`, `help_desk_contact`. Kolom ikut legacy ([K]/[I] dari kode karena DDL produksi tidak ada di repo); deviasi [V2]: status 0/1 bertipe tinyint + CHECK, UNIQUE `(id_support_officer, id_question_category)`, FK RESTRICT (kebijakan V1), `support_officer.id_user` → `pengguna.id_pengguna` | [K]+[V2] | ✔ (default diterima) |
+| F8-04 | **Pembuat tiket** = role pegawai (`UL_PEGAWAI` 2, 6, 7) yang punya NIP [K `SC:608`]; melihat daftar/percakapan = role 1–7 [K `SC:466,498,550`]; **role 8 (Pimpinan) tidak punya akses** [K, tidak ada di daftar legacy]. Matriks Bahan Baku "role 1–7 sebagai pengguna" dibaca sebagai akses daftar/baca, bukan pembuatan | [K] | ✔ Q8-01 |
+| F8-05 | **Master (kategori, petugas, kontak) hanya role 1** untuk tulis [K `SC:13,39,…,438`]; kategori aktif dibaca semua role 1–7 untuk form tiket [K `LS:931`] | [K] | ✔ (default diterima) |
+| F8-06 | **Petugas harus berstatus aktif** untuk melihat/menjawab tiket (legacy hanya memeriksa status untuk push & popup, bukan akses: `SC:507-523` vs `LS:1035`, `MC:272`). Petugas dinonaktifkan → kehilangan akses antrean (tiket miliknya sendiri tetap terlihat) | [V2] keamanan | ✔ Q8-02 |
+| F8-07 | **Kandidat petugas** = pegawai aktif satker kepegawaian + akun role 1 aktif [K `LS:468-491`]. Satker diambil dari konfigurasi (bukan literal `'101'`): memakai `WebConfigService::value('id_satker_kepegawaian')` seperti PIC layanan (Q-06a Fase 4), dan peringatan bila kosong (pola `PetugasLayananService::PERINGATAN_SATKER_KOSONG`) | [K]+[V2] | ✔ Q8-11, **bersyarat**: setelah Biro SDM mengonfirmasi satker `101` = satker kepegawaian |
+| F8-08 | **Siapa yang menutup**: petugas kategori tiket itu dan pemilik tiket [K controller `SC:676-690`; UI legacy hanya menampilkan tombol untuk petugas `VI:133`]. Tutup: `status=1`, `allow_reply=0`, `is_read=1`, `is_read_off=1` [K `LS:1444-1449`] **dan `closed_by` diisi** (kolom ada tetapi tidak pernah ditulis legacy) [V2 perbaikan]. **Tanpa buka kembali**; pegawai membuat tiket baru [K `LS:1117`] | [K]+[V2] | ✔ Q8-04 |
+| F8-09 | **Hapus tiket**: petugas kategori itu (dan role 1 yang juga petugas) — bukan pemilik; hapus fisik [K `LS:1485`] dengan snapshot `before` di `audit_logs`; berkas lampiran ikut dihapus dari storage (legacy meninggalkan berkas yatim, B-2). Legacy controller juga mengizinkan pemilik yang bukan petugas menghapus (`SC:728-733`) walau UI tidak menampilkannya — tidak dibawa. Alternatif hapus lunak butuh ALTER skema | [K]+[V2] | ✔ Q8-03 |
+| F8-10 | **Balas**: syarat tiket `status=0` dan `allow_reply=1` [K `LS:1116-1123`]; pelaku = pemilik atau petugas aktif kategorinya. Pesan: teks wajib, lampiran opsional (5 MB, 9 ekstensi) [K `LS:1552-1565`, `LS:963-975`]. Penanda baca otomatis: balasan pemilik → `is_read_off=2`; balasan petugas → `is_read=2` [I — logika trigger `inbox_msg_afIns`, DBV-022 `:301`; M0 mencocokkan dengan D1:7730-7739 lewat reviewer] | [K]+[I] | ✔ (default diterima) |
+| F8-11 | **Pengingat 24 jam** (`notify_pic`/`notify_at`): petugas dapat mencentang saat membalas; reset ke 2 bila petugas membalas lagi [K `LS:1172-1178`, `LS:1348-1352`]. Tiket `perlu_tindak` = `status=0` dan (`is_read_off=2` atau `notify_pic=1` dan `notify_at < sekarang`) [K `MC:292`] | [K] | ✔ (default diterima) |
+| F8-12 | **Popup login petugas dihapus**; diganti badge pada menu Halo Simpeg + panel "Perlu ditindak" di halaman petugas (legacy: modal saat login, hanya role 2/6, `MC:268-305`, `VM:734-807`) | [V2] UX | ✔ Q8-07 |
+| F8-13 | **Penerima push** — tiket baru → petugas aktif kategori (akun aktif); balasan petugas → pemilik; balasan pemilik → petugas aktif kategori [K `LS:1029-1075`, `LS:1202-1285`]. Perbaikan: akun petugas **semua role** diikutkan (legacy hanya `UserLevel='2'`, sehingga petugas role 1/6 tidak pernah dapat push, B-5); token dideduplikasi per perangkat | [K]+[V2] | ✔ (default diterima) |
+| F8-14 | **Perubahan status (tutup) memberi notifikasi** ke pihak lawan sesuai Bahan Baku E-06 (legacy tidak) | [V2] | ✔ Q8-05 |
+| F8-15 | **Kanal push**: Android ikut legacy; **web ditambahkan** karena infrastruktur web push Fase 6 sudah ada dan petugas bekerja di web (legacy hanya Android untuk Halo Simpeg) | [K]+[V2] | ✔ Q8-09 |
+| F8-16 | **Payload push**: judul "Halo Simpeg", isi = teks pesan terpotong; `data` = `{modul:'halo-simpeg', id_inbox, url}` + kunci kompatibilitas Android yang dikonfirmasi PN8-1. Legacy mengirim seluruh baris tiket (nip, jabatan, satker, nama pengirim) — **tidak** dibawa kecuali pemilik app Android memastikan membutuhkannya | [V2] privasi | ✔ Q8-08, **bersyarat**: payload minimal setelah pemilik app Android mengonfirmasi (PN8-1); sebelum itu hanya kunci `data` yang dibaca app |
+| F8-17 | **Lampiran** memakai `AturanLampiran`/`ValidasiBerkas` yang ada (BP8-5); path `halo-simpeg/{nip}/{id_inbox}/…` di storage lokal; unduh lewat endpoint ber-otorisasi. Berkas lampiran impor (path legacy `arsip/{nip}/inbox/…`) dicocokkan saat cutover | [K]+[V2] | ✔ Q8-10 |
+| F8-18 | **Kontak helpdesk**: CRUD role 1 [K `SC:11-160`]; daftar kontak aktif dapat dibaca semua role 1–7 (di halaman Halo Simpeg) — legacy hanya menampilkannya ke admin | [K]+[V2] | ✔ Q8-12 |
+| F8-19 | **Lonceng**: Fase 8 menyediakan `GET halo-simpeg/tiket/ringkasan` (jumlah belum dibaca sisi pemilik + sisi petugas [K `LN:12-60`]) dan **tidak** menulis ke `inbox`. Konsumsi oleh lonceng terpadu F-08 = keputusan Q8-06 | [K]+[V2] | ✔ Q8-06 (sumber lonceng hanya bila F-08 sudah ada saat M5; selain itu badge menu saja dan disambung di F-08) |
+| F8-20 | **Ekspor rekap** `export_hs` ikut legacy: hanya petugas; periode berdasar tanggal tiket (inklusif); kolom NO, ID PERTANYAAN, KATEGORI, NAMA PENANYA, NIP PENANYA, PERTANYAAN / JAWABAN, TIMESTAMP; xlsx [K `LS:1600-1830`, `SC:751-786`]. Perbaikan: sertakan tiket yang periode-nya cocok walau petugas belum menulis, urut tiket lalu pesan | [K]+[V2] | ✔ (default diterima) |
+| F8-21 | **Impor master**: `support_officer`, `officer_category`, `help_desk_contact` dipindah saat cutover (daftar petugas dan kategori berlaku langsung); `id_user` dipetakan ke `id_pengguna` v2 lewat tabel pemetaan UP-1; baris tanpa pemetaan dilaporkan, bukan dibuang diam-diam | [V2] | ✔ Q8-13 |
+| F8-22 | **Tidak dibawa**: popup modal login (F8-12), `firebase_message_logs` (digantikan `integrasi_log` Fase 6), `andr_notif_queue` (digantikan queue `push`), file view bertanggal (`inbox_20220216.php` dst.), cabang debug berkode-keras NIP (`SC:469`), log `mylog` rusak (B-9) | — | ✔ (default diterima) |
 
 ---
 
@@ -301,7 +309,7 @@ Domain `is_read`/`is_read_off` (1/2) dan `notify_pic` (0/1/2) tidak diubah.
 `disiplin_ticket(_msg)`/`question_category` tidak dibuat ulang; **AC-E01.3** tes skema menegaskan FK, UNIQUE, CHECK; **AC-E01.4**
 tes skema `inbox`/`inbox_msg` (Fase 4, `SkemaInboxTicketTest`) tetap hijau.
 
-### 7.2 E-02 + E-07 — Master (MAKE-069)
+### 7.2 E-02 + E-07 — Master (MAKE-070 BE; layar admin di MAKE-073)
 
 [K `LS:14-813`, `SC:11-460`].
 - **Kategori:** `question_category` (≤250 karakter), `status` 0/1, nama unik (`LS:392-424`, pesan "Kategori sudah terdaftar …"). Hapus
@@ -319,7 +327,7 @@ kategori; **AC-E02.3** petugas duplikat ditolak 422; **AC-E02.4** hapus kategori
 pegawai aktif satker kepegawaian + role 1; **AC-E02.6** semua tulis tercatat di `audit_logs`; **AC-E07.1** role 1–7 melihat kontak
 aktif, hanya role 1 melihat semua dan mengubah.
 
-### 7.3 E-03 — Buat tiket (MAKE-070)
+### 7.3 E-03 — Buat tiket (MAKE-071)
 
 [K `LS:937-1095`, `LS:1505-1550`, `SC:606-659`].
 - Input: `id_question_category` (kategori **aktif**, `LS:931`), `subject` (≤250), `msg` (wajib; batas panjang [V2] di
@@ -338,7 +346,7 @@ gagal di tengah transaksi → tidak ada tiket, pesan, atau berkas sisa; **AC-E03
 snapshot jabatan/satker tersimpan; **AC-E03.9** melebihi throttle → 429; **AC-E03.10** push antre sesudah commit dan kegagalan
 antrean tidak menggagalkan tiket.
 
-### 7.4 E-04 — Daftar & percakapan (MAKE-070)
+### 7.4 E-04 — Daftar & percakapan (MAKE-071)
 
 [K `LS:817-927`, `LS:1097-1305`, `LS:1307-1430`, `LS:1567-1597`, `VI`, `VD`].
 - **Daftar** (`peran=saya|petugas`): `saya` = `sender` = pengguna; `petugas` = `id_question_category` ∈ kategori petugas aktif
@@ -361,7 +369,7 @@ pihak berhak, header aman (`Content-Disposition`, tipe dari daftar); **AC-E04.8*
 teks dengan tanda kutip/backslash tersimpan utuh (BP8-4); **AC-E04.10** balasan petugas dengan `ingatkan_24_jam` menyetel
 `notify_pic=1`, `notify_at` = +24 jam UTC, dan balasan petugas berikutnya mereset ke 2.
 
-### 7.5 E-05 — Tutup & hapus (MAKE-070)
+### 7.5 E-05 — Tutup & hapus (MAKE-071)
 
 [K `LS:1432-1503`, `SC:661-749`]. Tutup: F8-08; sudah ditutup → 422 "Percakapan ini telah ditutup sebelumnya …" (`SC:672`).
 Hapus: F8-09 (fisik + audit `before` + hapus berkas). Setelah ditutup tidak bisa dibalas; alur berujung ke satu node akhir
@@ -372,7 +380,7 @@ Hapus: F8-09 (fisik + audit `before` + hapus berkas). Setelah ditutup tidak bisa
 audit dan menghapus pesan serta berkas lampiran tiket itu saja; **AC-E05.6** tidak ada tiket Open yang tak bisa ditutup (test
 alur penuh buat → balas → tutup).
 
-### 7.6 E-06 — Notifikasi tiket (MAKE-071)
+### 7.6 E-06 — Notifikasi tiket (MAKE-072)
 
 [K `LS:1029-1090`, `LS:1202-1300`, `LS:1373-1425`, `CR:987-1066`].
 - `TicketNotifService` dipanggil **sesudah commit** oleh `TiketService`/`PercakapanService`; menentukan penerima (`PenerimaTiket`),
@@ -393,7 +401,7 @@ CI tidak memanggil layanan nyata; **AC-E06.5** payload tidak memuat NIP, jabatan
 alur approval Fase 4 (dua test regresi, BP8-1); **AC-E06.7** petugas role 1 dan role 6 (bukan hanya role 2) menerima push (perbaikan B-5);
 **AC-E06.8** uji push sampai ke perangkat (Bahan Baku E-06) dilakukan **real** oleh reviewer sebelum deploy — dilacak MT/DEPLOY (bukan sign-off).
 
-### 7.7 E-08 — Frontend (MAKE-072)
+### 7.7 E-08 — Frontend (MAKE-073)
 
 Per §6.3. Detail: halaman daftar tiket dengan `UiSearchInput`, `UiSelect` (kategori/status), `UiBadge` (Open/Closed, belum dibaca);
 thread bergaya gelembung (Gambar 33/34) dengan lampiran; form tiket baru (kategori, subjek, pesan, `UiFileField`); aksi baris tiket
@@ -410,12 +418,12 @@ dioperasikan keyboard dan beraria benar; **AC-E08.5** halaman admin memakai `pag
 
 ### 7.8 Verifikasi "thread tidak ter-mix" (exit criteria Bahan Baku)
 
-Paket test lintas modul (milik MAKE-070/071, dijalankan di CI): (1) dua tiket berbeda dengan pesan bersilang tidak saling
+Paket test lintas modul (milik MAKE-071/072, dijalankan di CI): (1) dua tiket berbeda dengan pesan bersilang tidak saling
 menampakkan pesan; (2) alur penuh Halo Simpeg tidak menambah baris `inbox`/`inbox_msg`; (3) alur penuh cuti/TB/IB/PMK (Fase 4)
 tidak menambah baris `disiplin_ticket(_msg)` (AC-06.4, `NotifikasiTidakKeTicketingTest` yang sudah ada tetap hijau); (4) petugas kategori A tidak melihat tiket kategori B; (5) lonceng/ringkasan
 tidak memuat notifikasi approval.
 
-### 7.9 E-09 — Ekspor rekap petugas (MAKE-073)
+### 7.9 E-09 — Ekspor rekap petugas (MAKE-074)
 
 F8-20 [K `LS:1600-1830`, `SC:751-786`]. Parameter `ds`, `de` (wajib, inklusif), `format=xlsx` (satu-satunya format legacy,
 `SC:763`). Judul "REKAP PIC HALO SIMPEG {nama}" + periode; kolom bernomor; Excel lewat library yang sudah dipakai (ADR-032/035),
@@ -440,25 +448,25 @@ sinkron dengan batas baris. NIP penanya sebagai teks. Tombol ekspor di halaman p
 | Dari | Ke | Catatan |
 |---|---|---|
 | PRD Fase 8 v1.0 di `main` | Semua koding | F8-01 |
-| DBV-028 | MAKE-069 → MAKE-070 → MAKE-071/072 | skema dulu |
-| MAKE-069 (master) | MAKE-070 (tiket butuh kategori & petugas) | |
+| DBV-028 | MAKE-070 → MAKE-071 → MAKE-072/073 | skema dulu; MAKE-073 (FE) menunggu kontrak API MAKE-071 beku |
+| MAKE-070 (master) | MAKE-071 (tiket butuh kategori & petugas) | |
 | MAKE-066 (Fase 6 B5) | M4 push real | mock sebelum itu |
 | DBV-027 (`firebase_token.platform`, `token_hash`) | M4 | dari Fase 6 |
 | Fase 7 F-08 (lonceng) | Q8-06 = B | konsumen `ringkasan` |
 | Fase 7 F-02 + UP-1 | Impor data tiket & master | bukan koding |
 | PN8-1 / PN-3 | Uji push real, payload Android | sebelum deploy |
 
-## 10. Urutan kerja (usulan; rincian per jalur menunggu Q8-14)
+## 10. Urutan kerja (rincian per jalur: `8_1.md` BE, `8_2.md` FE)
 
 | M | Isi | Key | Menunggu |
 |---|---|---|---|
 | M0 | Laporan pemahaman ⛔ reviewer | — | PRD v1.0 |
 | M1 | Skema pendukung (PR `[DBV]`), E-01 | DBV-028 | M0 |
-| M2 | Master kategori/petugas/kontak BE + FE admin, E-02/E-07 | MAKE-069 | M1 di `main` |
-| M3 | Tiket, percakapan, tutup/hapus, lampiran, ringkasan BE, E-03/E-04/E-05 | MAKE-070 | M2 |
-| M4 | Notifikasi push + penerima + job, E-06 | MAKE-071 | M3; MAKE-066 untuk real |
-| M5 | Frontend pemilik/petugas, E-08 | MAKE-072 | kontrak API M3 beku |
-| M6 | Ekspor rekap, penutup (progres, README, runbook cutover), E-09 | MAKE-073 | M3, M5 |
+| M2 | Master kategori/petugas/kontak — **BE** (layar admin FE ada di M5), E-02/E-07 | MAKE-070 | M1 di `main` |
+| M3 | Tiket, percakapan, tutup/hapus, lampiran, ringkasan BE, E-03/E-04/E-05 | MAKE-071 | M2 |
+| M4 | Notifikasi push + penerima + job, E-06 | MAKE-072 | M3; MAKE-066 untuk real |
+| M5 | Frontend pemilik/petugas **dan layar admin** Kategori/Petugas/Kontak, E-08 | MAKE-073 | kontrak API M2 + M3 beku |
+| M6 | Ekspor rekap (BE) + tombol ekspor (FE kecil lewat Jalur FE), penutup (progres, README, runbook cutover), E-09 | MAKE-074 | M3, M5 |
 | M7 | Reviewer: QA Lapis 1 Fase 8, laporan akhir → ⛔ sign-off Horii (penutup seluruh development) | — | M6 |
 
 Setiap M: branch baru dari `origin/main` → gate cepat → push → CI `quality-gate` hijau → lapor → ⛔ merge oleh reviewer CR (izin Horii per paket).
@@ -473,27 +481,29 @@ wajib lolos sebelum deploy (MT/DEPLOY, pola F6-23).
 
 Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (jumlah) / Berkas bersama / Deviasi / Blocker.
 
-## 12. Register pertanyaan untuk Horii (Q8-xx) — menunggu jawaban
+## 12. Register keputusan (v1.0 — dijawab Horii 03-11-2026: semua ikut saran)
 
-Setiap pertanyaan: opsi + **saran** (◻ = default bila tidak dijawab).
+Setiap baris: pertanyaan, opsi, saran, dan keputusan. Syarat pada Q8-06, Q8-08, dan Q8-11 tetap berlaku.
 
-| ID | Pertanyaan | Opsi | Saran |
-|---|---|---|---|
-| Q8-01 | **Siapa boleh membuat tiket?** Legacy: hanya akun pegawai (`UL_PEGAWAI` 2, 6, 7); role 1–7 dapat melihat daftar. Mock redesign mengizinkan role 4/5; Bahan Baku menulis "role 1–7 sebagai pengguna" | **A** ikut legacy (2, 6, 7). **B** semua role 1–7 yang memiliki NIP. **C** semua role 1–7 | **A** (prinsip ikut legacy; role 1/3/4/5 boleh tanpa NIP sehingga tidak punya identitas pelapor) |
-| Q8-02 | **Petugas nonaktif**: legacy tetap mengizinkan petugas nonaktif membuka/menjawab tiket (hanya push & popup yang memeriksa status). Apakah akses antrean ikut dinonaktifkan? | **A** ya, hanya petugas aktif (F8-06). **B** ikut legacy persis | **A** (kebocoran akses pasca-penonaktifan; perubahan kecil) |
-| Q8-03 | **Hapus tiket**: legacy hapus fisik oleh petugas kategori (pesan ikut hilang, berkas lampiran yatim; N9–N13) | **A** hapus fisik + audit snapshot + hapus berkas (F8-09). **B** hapus lunak (ALTER skema + filter di semua kueri). **C** tidak ada hapus, hanya tutup | **A** (ikut legacy; B bila DBV/Horii menginginkan jejak penuh) |
-| Q8-04 | **Tutup tiket**: siapa yang boleh, dan apakah perlu "buka kembali"? Legacy controller mengizinkan petugas kategori dan pemilik; UI hanya petugas; tidak ada buka kembali | **A** petugas kategori + pemilik, tanpa buka kembali (F8-08). **B** A + petugas boleh membuka kembali. **C** hanya petugas | **A** |
-| Q8-05 | **Notifikasi saat tiket ditutup** ke pihak lawan (legacy tidak ada; Bahan Baku E-06 menyebut "perubahan status") | **A** kirim. **B** tidak (legacy) | **A** |
-| Q8-06 | **Notifikasi tiket di lonceng/pusat notifikasi** (F-08, Fase 7)? | **A** hanya badge menu Halo Simpeg + halaman sendiri. **B** A + sumber tersendiri di lonceng terpadu yang membaca `ringkasan` (tanpa menulis `inbox`) | **B** bila F-08 sudah ada saat M5; selain itu **A** dan sambungkan di F-08 |
-| Q8-07 | **Popup login petugas** (legacy: modal "PIC Halo Simpeg" saat login, hanya role 2/6, tiket belum dibaca atau pengingat 24 jam jatuh tempo; `MC:268-305`) | **A** diganti badge + panel "Perlu ditindak" (F8-12). **B** modal saat login seperti legacy | **A** |
-| Q8-08 | **Payload push Android**: legacy mengirim seluruh baris tiket (NIP, jabatan, satker, nama pengirim, kategori) di `data` | **A** kompatibel penuh (ikut legacy). **B** minimal (`modul`, `id_inbox`, `url`) + kunci yang dikonfirmasi pemilik app Android (PN8-1) | **B** setelah pemilik app mengonfirmasi; sebelum itu **A** terbatas pada kunci yang app baca |
-| Q8-09 | **Kanal push**: legacy hanya Android untuk Halo Simpeg | **A** Android saja. **B** Android + web (F8-15) | **B** (infrastruktur web push Fase 6 sudah ada; petugas bekerja di web) |
-| Q8-10 | **Lampiran**: legacy 9 ekstensi, 5 MB; v2 sudah punya aturan identik + validasi isi | **A** ikut legacy via `AturanLampiran` (F8-17). **B** perketat (pdf/jpg/png saja) | **A** |
-| Q8-11 | **Sumber kandidat petugas**: legacy hard-code satker `'101'` | **A** pakai `id_satker_kepegawaian` (Web Config) seperti PIC layanan; konfirmasi `101` = satker kepegawaian. **B** kunci konfigurasi baru khusus Halo Simpeg | **A** (satu sumber kebenaran) setelah Biro SDM mengonfirmasi |
-| Q8-12 | **Kontak helpdesk**: legacy hanya admin yang melihat daftar; Bahan Baku E-07 "view UL_ALL" | **A** ikut legacy (role 1 saja). **B** role 1–7 melihat kontak aktif | **B** |
-| Q8-13 | **Impor master** (`support_officer`, `officer_category`, `help_desk_contact`) dan **nama kolom** (`id_user` vs `nip` di Bahan Baku E-01) | **A** impor master dengan `id_user`→`id_pengguna` (pemetaan UP-1); skema ikut legacy. **B** buat ulang manual lewat UI saat cutover. **C** skema memakai `nip` seperti Bahan Baku | **A** (impor lurus; DQ-4) |
-| Q8-14 | **Pembagian pelaksana**: satu coder BE→FE berurutan atau dua jalur paralel (BE: M1–M4, FE: M5 setelah kontrak API M3 beku)? Pelaksana jalur? | **A** satu jalur berurutan. **B** dua jalur paralel (pola Fase 6) | **B** bila ada dua pelaksana; kontrak API M3 dibekukan di PRD sebelum FE mulai |
-| Q8-15 | **Model percakapan**: desain Figma/mock = satu utas per pegawai (drawer); legacy = tiket per topik dengan kategori + subjek (data impor bertipe ini) | **A** ikut legacy: tiket per topik, tampilan chat per tiket (F8-02). **B** satu utas per pegawai (menyimpang; kategori/petugas dan impor perlu rancang ulang) | **A** |
+| ID | Pertanyaan | Opsi | Saran | Keputusan |
+|---|---|---|---|---|
+| Q8-01 | **Siapa boleh membuat tiket?** Legacy: hanya akun pegawai (`UL_PEGAWAI` 2, 6, 7); role 1–7 dapat melihat daftar. Mock redesign mengizinkan role 4/5; Bahan Baku menulis "role 1–7 sebagai pengguna" | **A** ikut legacy (2, 6, 7). **B** semua role 1–7 yang memiliki NIP. **C** semua role 1–7 | **A** (prinsip ikut legacy; role 1/3/4/5 boleh tanpa NIP sehingga tidak punya identitas pelapor) | **Ikut saran (Horii 03-11-2026).** |
+| Q8-02 | **Petugas nonaktif**: legacy tetap mengizinkan petugas nonaktif membuka/menjawab tiket (hanya push & popup yang memeriksa status). Apakah akses antrean ikut dinonaktifkan? | **A** ya, hanya petugas aktif (F8-06). **B** ikut legacy persis | **A** (kebocoran akses pasca-penonaktifan; perubahan kecil) | **Ikut saran (Horii 03-11-2026).** |
+| Q8-03 | **Hapus tiket**: legacy hapus fisik oleh petugas kategori (pesan ikut hilang, berkas lampiran yatim; N9–N13) | **A** hapus fisik + audit snapshot + hapus berkas (F8-09). **B** hapus lunak (ALTER skema + filter di semua kueri). **C** tidak ada hapus, hanya tutup | **A** (ikut legacy; B bila DBV/Horii menginginkan jejak penuh) | **Ikut saran (Horii 03-11-2026).** |
+| Q8-04 | **Tutup tiket**: siapa yang boleh, dan apakah perlu "buka kembali"? Legacy controller mengizinkan petugas kategori dan pemilik; UI hanya petugas; tidak ada buka kembali | **A** petugas kategori + pemilik, tanpa buka kembali (F8-08). **B** A + petugas boleh membuka kembali. **C** hanya petugas | **A** | **Ikut saran (Horii 03-11-2026).** |
+| Q8-05 | **Notifikasi saat tiket ditutup** ke pihak lawan (legacy tidak ada; Bahan Baku E-06 menyebut "perubahan status") | **A** kirim. **B** tidak (legacy) | **A** | **Ikut saran (Horii 03-11-2026).** |
+| Q8-06 | **Notifikasi tiket di lonceng/pusat notifikasi** (F-08, Fase 7)? | **A** hanya badge menu Halo Simpeg + halaman sendiri. **B** A + sumber tersendiri di lonceng terpadu yang membaca `ringkasan` (tanpa menulis `inbox`) | **B** bila F-08 sudah ada saat M5; selain itu **A** dan sambungkan di F-08 | **Ikut saran (Horii 03-11-2026).** Sumber lonceng hanya bila F-08 sudah ada saat M5. |
+| Q8-07 | **Popup login petugas** (legacy: modal "PIC Halo Simpeg" saat login, hanya role 2/6, tiket belum dibaca atau pengingat 24 jam jatuh tempo; `MC:268-305`) | **A** diganti badge + panel "Perlu ditindak" (F8-12). **B** modal saat login seperti legacy | **A** | **Ikut saran (Horii 03-11-2026).** |
+| Q8-08 | **Payload push Android**: legacy mengirim seluruh baris tiket (NIP, jabatan, satker, nama pengirim, kategori) di `data` | **A** kompatibel penuh (ikut legacy). **B** minimal (`modul`, `id_inbox`, `url`) + kunci yang dikonfirmasi pemilik app Android (PN8-1) | **B** setelah pemilik app mengonfirmasi; sebelum itu **A** terbatas pada kunci yang app baca | **Ikut saran (Horii 03-11-2026).** **Bersyarat:** payload minimal setelah pemilik app Android mengonfirmasi (PN8-1). |
+| Q8-09 | **Kanal push**: legacy hanya Android untuk Halo Simpeg | **A** Android saja. **B** Android + web (F8-15) | **B** (infrastruktur web push Fase 6 sudah ada; petugas bekerja di web) | **Ikut saran (Horii 03-11-2026).** |
+| Q8-10 | **Lampiran**: legacy 9 ekstensi, 5 MB; v2 sudah punya aturan identik + validasi isi | **A** ikut legacy via `AturanLampiran` (F8-17). **B** perketat (pdf/jpg/png saja) | **A** | **Ikut saran (Horii 03-11-2026).** |
+| Q8-11 | **Sumber kandidat petugas**: legacy hard-code satker `'101'` | **A** pakai `id_satker_kepegawaian` (Web Config) seperti PIC layanan; konfirmasi `101` = satker kepegawaian. **B** kunci konfigurasi baru khusus Halo Simpeg | **A** (satu sumber kebenaran) setelah Biro SDM mengonfirmasi | **Ikut saran (Horii 03-11-2026).** **Bersyarat:** setelah Biro SDM mengonfirmasi satker `101` = satker kepegawaian. |
+| Q8-12 | **Kontak helpdesk**: legacy hanya admin yang melihat daftar; Bahan Baku E-07 "view UL_ALL" | **A** ikut legacy (role 1 saja). **B** role 1–7 melihat kontak aktif | **B** | **Ikut saran (Horii 03-11-2026).** |
+| Q8-13 | **Impor master** (`support_officer`, `officer_category`, `help_desk_contact`) dan **nama kolom** (`id_user` vs `nip` di Bahan Baku E-01) | **A** impor master dengan `id_user`→`id_pengguna` (pemetaan UP-1); skema ikut legacy. **B** buat ulang manual lewat UI saat cutover. **C** skema memakai `nip` seperti Bahan Baku | **A** (impor lurus; DQ-4) | **Ikut saran (Horii 03-11-2026).** |
+| Q8-14 | **Pembagian pelaksana**: satu coder BE→FE berurutan atau dua jalur paralel (BE: M1–M4, FE: M5 setelah kontrak API M3 beku)? Pelaksana jalur? | **A** satu jalur berurutan. **B** dua jalur paralel (pola Fase 6) | **B** bila ada dua pelaksana; kontrak API M3 dibekukan di PRD sebelum FE mulai | **Ikut saran (Horii 03-11-2026).** Pembagian jalur: §3, `8_1.md`, `8_2.md`. |
+| Q8-15 | **Model percakapan**: desain Figma/mock = satu utas per pegawai (drawer); legacy = tiket per topik dengan kategori + subjek (data impor bertipe ini) | **A** ikut legacy: tiket per topik, tampilan chat per tiket (F8-02). **B** satu utas per pegawai (menyimpang; kategori/petugas dan impor perlu rancang ulang) | **A** | **Ikut saran (Horii 03-11-2026).** |
+
+**Trigger `inbox_msg_afIns`** (D1:7730-7739) tetap berlabel [I] dan menjadi kewajiban M0; ekstraksi oleh DBA/Horii menyusul (dump D1 tidak ada di mesin reviewer).
 
 Prinsip umum: bila coder menemukan perilaku legacy yang belum diputus, default = ikut legacy [K]; deviasi hanya untuk alasan
 teknis wajib/keamanan dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/08-HaloSimpeg.md`.
@@ -599,3 +609,4 @@ teknis wajib/keamanan dasar dan **wajib** dicatat di laporan milestone + `backen
 | Versi | Tanggal | Perubahan |
 |---|---|---|
 | v0.1 | 03-11-2026 | Draf awal dari riset kode legacy (`0cf7e67`: `L_support`, `Support`, `MY_Controller`, `L_notification`, `Cron`, view support) dan v2 (`f7b9221e`): usulan F8-01..F8-22, pertanyaan Q8-01..Q8-15, peta legacy → v2, anomali B-1..B-18, risiko R8-1..R8-9, milestone M0..M7. Tidak ada kode dan tidak ada migration |
+| v1.0 | 03-11-2026 | Keputusan Horii 03-11-2026: Q8-01..Q8-15 semua ikut saran (F8-xx menjadi ✔; syarat Q8-06, Q8-08, Q8-11 tetap dicatat); key final DBV-028 dan MAKE-070..074 (MAKE-069 dipakai paket impor cutover tahap 2); dua jalur paralel BE/FE (§3, `8_1.md`, `8_2.md`); trigger `inbox_msg_afIns` tetap [I] + kewajiban M0 |
