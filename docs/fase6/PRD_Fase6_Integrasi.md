@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder A — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder B — API masuk & job terjadwal) |
-| Versi | **v1.0d — 03-11-2026** (CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
+| Versi | **v1.0e — 03-11-2026** (CR-093: keputusan A0 v2 Jalur A; CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
 | Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
 | Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
@@ -71,7 +71,7 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 | H-09 | Service lokal | **Ditutup sebagai pemetaan** (F6-19): `calculate_lc` = Fase 4, `record_geolocation` = F5-12, `register_fb_token` = H-04 | 097 | A (dokumen) |
 | **H-10** | **e-Kinerja BKN** [baru, Q6-09] | Tarik `bkn_periode_ekinper` + `riwayat_skp_periodik` terjadwal [K] + tombol tarik ulang admin. **Tukin bergantung** (potongan SKP, jendela periode) | QASMTASK-120 | B |
 | **H-11** | **Status TB/CLTN harian** [warisan] | Command harian idempoten aktivasi/pengakhiran `pegawai.id_jenis_status` (F6-20) | QASMTASK-121 | A |
-| **H-12** | **Auto-approval LKH** [Q6-15, ikut legacy] | Job tanggal 5: LKH bulan lalu yang belum disetujui atasan → disetujui otomatis + PDF (F6-25) | QASMTASK-122 | A |
+| **H-12** | **Auto-approval LKH** [Q6-15, ikut legacy] | Job tanggal 5: LKH bulan lalu yang belum disetujui atasan → disetujui otomatis; PDF on-demand v2 (F6-25, CR-093) | QASMTASK-122 | A |
 | §7.0 | Fondasi | Filter auth antar-sistem (ADR-036), klien HTTP keluar + log integrasi, pola penjadwalan command + crontab (ADR-037) | — | A (masuk) / B (keluar) |
 
 ### 1.2 DI LUAR scope Fase 6
@@ -204,7 +204,7 @@ B mengerjakan bagian adapter dulu dan menunda endpoint `s_esign`.
 | F6-22 | Server Arsip remote (J3.06, F-10) **ditunda**; v2 tetap storage lokal | — | ◻ |
 | F6-23 | **Exit criteria uji real**: Fase 6 boleh di-sign-off dengan mock/FakeTransport; **uji endpoint real** (e-sign cuti, SIASN/e-Kinerja, FCM) menjadi syarat **sebelum deploy** — dilacak kartu **MT-010** (list Manual Testing) dan **DEPLOY-001.1** (list Deployment) | — | ✔ Q6-13 = A |
 | F6-24 | Log integrasi tunggal `integrasi_log` (arah masuk/keluar, layanan, operasi, status, durasi, kode, pesan teredaksi, `ref_id`) + command `integrasi:status`. Retensi 180 hari (Q6-16) | [V2] | ◻ |
-| F6-25 | **Auto-approval LKH ikut legacy** (H-12): command `lkh:auto-approval` tanggal 5 [K `C:14-17`]: LKH bulan lalu yang belum disetujui → `status=1`, `auto_approval=1`, PDF LKH dibuat, dicatat (padanan `aa_lkh`). Perilaku efektif legacy: hanya status **0** yang diproses (`C:147`; status 3/revisi tertahan di antrean legacy) [K]. Bergantung modul LKH v2 (diverifikasi M0 A; bila belum ada → eskalasi) | [K] | ✔ Q6-15 = ikut legacy |
+| F6-25 | **Auto-approval LKH ikut legacy** (H-12): command `lkh:auto-approval` tanggal 5 [K `C:14-17`]: LKH bulan lalu yang belum disetujui → `status=1`, `auto_approval=1`, dicatat lewat audit (padanan `aa_lkh`). **PDF ikut v2: dibuat saat diminta, tidak disimpan** (CR-093, keputusan Horii 03-11-2026 atas A0 v2 Jalur A; MAKE-013; legacy menyimpan `file_lckh` — deviasi [V2]); tanpa tabel `aa_lkh` baru. Perilaku efektif legacy: hanya status **0** yang diproses (`C:147`; status 3/revisi tertahan di antrean legacy) [K]. Bergantung modul LKH v2 (diverifikasi M0 A; bila belum ada → eskalasi) | [K] | ✔ Q6-15 = ikut legacy |
 | F6-26 | **Token SSO BKN produksi** (cara memperoleh, pemilik akun layanan, TOTP) dicatat sebagai **pertanyaan** di Trello Catatan Teknis (label Menunggu Jawaban); v2 tidak memakai token literal | — | ✔ Q6-08 |
 
 ---
@@ -424,6 +424,8 @@ baru.
   "NIP not valid" [K, termasuk status 10]. `foto` = URL berkas v2 (endpoint yang sudah ada).
 - **change_history** (MAKE-060): penulis `simapi_ch` = pelanggan event sesudah commit untuk tabel yang sama dengan trigger
   legacy (`pegawai`, `pengguna`, `detail_anak`, 13 `riwayat_*` — Lampiran A.1); `field_value` hanya kolom yang dikirim legacy.
+  Baris `pengguna` akun sistem integrasi (`sistem.integrasi`, tanpa NIP, [V2] DBV-027) **tidak** dicatat; perubahan data pegawai
+  yang dilakukan akun sistem tetap dicatat (CR-093, keputusan Horii 03-11-2026 atas A0 v2 Jalur A).
 - **H-07** `a_dm/*` [K `A_dm.php`] + `s_dm/*` (F6-10).
 **AC-05.1** token kedaluwarsa → status 02 "Token is not valid" (MTC-038); **AC-06.1** test kontrak per method: nama field,
 urutan, nilai teks sama dengan fixture yang diturunkan dari kode legacy; **AC-06.2** request tanpa token → 02;
@@ -466,13 +468,14 @@ sebagai acuan efek. **AC-11.1** TB disetujui sebelum tanggal mulai → aktif tep
 tanggal akhir → kembali 1; **AC-11.3** perpanjangan bersambung tidak menyebabkan status berkedip; **AC-11.4** status
 selain 1/2/3 tidak disentuh; **AC-11.5** dijalankan dua kali = hasil sama; **AC-11.6** setiap perubahan teraudit.
 
-### 7.10 H-12 — Auto-approval LKH (Jalur A, bagian MAKE-062) — ikut legacy (F6-25)
+### 7.10 H-12 — Auto-approval LKH (Jalur A, MAKE-068) — ikut legacy (F6-25)
 
 [K `C:18` `queue_aa_lkh`, `C:87` `process_queue_aa_lkh`, jadwal `C:14-17`]. `php spark lkh:auto-approval [--bulan=] [--dry-run]`:
-LKH bulan lalu berstatus **0** yang belum disetujui atasan → `status=1`, `auto_approval=1`, PDF LKH dibuat lewat generator
-v2, baris catatan (padanan `aa_lkh`), semua lewat model beraudit. Antrean legacy (`queue_aa_lkh`, batch 5 per 2 detik) diganti
+LKH bulan lalu berstatus **0** yang belum disetujui atasan → `status=1`, `auto_approval=1`, semua lewat model beraudit; catatan
+= kolom `riwayat_lckh.auto_approval` + jejak audit (padanan `aa_lkh`, **tanpa tabel baru**). **PDF tidak dibangkitkan/disimpan oleh
+job** — PDF LKH v2 dibuat saat diminta (MAKE-013) (CR-093, keputusan Horii 03-11-2026 atas A0 v2 Jalur A; deviasi [V2] dari legacy `file_lckh`). Antrean legacy (`queue_aa_lkh`, batch 5 per 2 detik) diganti
 pemrosesan batch dalam command yang idempoten (F6-02). Status 3 (revisi) **tidak** diproses [K efektif `C:147`]. **AC-12.1**
-hanya LKH bulan lalu status 0; **AC-12.2** ulang = tanpa efek ganda; **AC-12.3** PDF gagal → LKH tidak berubah + tercatat.
+hanya LKH bulan lalu status 0; **AC-12.2** ulang = tanpa efek ganda; **AC-12.3** job tidak membangkitkan/menyimpan PDF; PDF LKH auto-approval tersedia lewat endpoint PDF yang ada (CR-093, keputusan Horii 03-11-2026 atas A0 v2 Jalur A).
 Bila modul LKH belum ada di v2 (M0 A) → eskalasi, H-12 ditunda.
 
 
@@ -505,7 +508,7 @@ Bila modul LKH belum ada di v2 (M0 A) → eskalasi, H-12 ditunda.
 |---|---|---|
 | M0 | Laporan pemahaman ⛔ reviewer | Laporan pemahaman ⛔ reviewer |
 | M1 | DBV-026 skema klien & SIMAPI (PR [DBV]) | DBV-027 skema integrasi keluar (PR [DBV]) |
-| M2 | MAKE-062 H-11 status harian + H-12 auto-approval LKH + ADR-037 (tanpa skema baru — boleh paralel dengan review DBV) | MAKE-063 klien HTTP + log + token BKN |
+| M2 | MAKE-062 H-11 status harian + ADR-037, lalu MAKE-068 H-12 auto-approval LKH (tanpa skema baru — boleh paralel dengan review DBV; CR-093) | MAKE-063 klien HTTP + log + token BKN |
 | M3 | MAKE-058 auth antar-sistem + ADR-036 | MAKE-064 H-10 e-Kinerja BKN |
 | M4 | MAKE-059 SIMAPI H-05/H-06/H-07 + `s_dm` | MAKE-065 H-02 BSrE + `s_esign` |
 | M5 | MAKE-060 change_history | MAKE-066 H-04 FCM (BE + FE) |
@@ -653,3 +656,4 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 | v1.0b | 02-11-2026 | CR-090 (keputusan Horii 02-11-2026, Q2 B0 Jalur B): AC-03.5 dan kriteria dorong otomatis SIASN ikut legacy per tabel — dorong ulang `updated_at > siasn_lu` hanya untuk jabatan; diklat, sertifikasi, kursus/seminar, SKP 2022 hanya `id_rw_siasn IS NULL` + `siasn_flag=0`, tanpa kolom `siasn_lu` baru di DBV-027 (F6-14, tabel `siasn:dorong`, AC-03.5) |
 | v1.0c | 02-11-2026 | CR-091, usulan Jalur B disepakati Horii 02-11-2026: kontrak log bersama Jalur A & B di §7.0.2 — `IntegrasiLogInterface::catat(CatatanIntegrasi)` + objek nilai `CatatanIntegrasi` (arah 1 keluar/2 masuk); Jalur A tidak membuat antarmuka log sendiri |
 | v1.0d | 03-11-2026 | CR-092: Q6-17 (keputusan Horii 02-11-2026 = A, ekstraksi bentuk auth BKN tanpa nilai; pilihan B = tunggu dokumentasi BKN/PN-2) + §7.0.2 "Bentuk auth BKN" (token gateway, SSO, varian e-Kinerja, dua header SIASN, token literal e-Kinerja legacy) + desain `TokenBkn` (token statis `.env` / SSO + cache, tanpa literal) |
+| v1.0e | 03-11-2026 | CR-093, keputusan Horii 03-11-2026 atas A0 v2 Jalur A: PDF auto-approval LKH ikut v2 (on-demand, tidak disimpan; AC-12.3 disesuaikan), catatan = kolom `auto_approval` + audit tanpa tabel `aa_lkh`; H-12 dipisah ke MAKE-068 (A2b); akun sistem integrasi dikecualikan dari `simapi_ch` |
