@@ -530,6 +530,18 @@ class Services extends BaseService
     }
 
     /**
+     * Penyedia token BKN (gateway/SSO SIASN, token e-Kinerja) — MAKE-063, bentuk ikut legacy (CR-092/Q6-17).
+     */
+    public static function tokenBkn(bool $getShared = true): \App\Libraries\Bkn\TokenBkn
+    {
+        if ($getShared) {
+            return static::getSharedInstance('tokenBkn');
+        }
+
+        return new \App\Libraries\Bkn\TokenBkn(static::klienHttp(), static::cacheService(), config(Integrations::class)->bkn);
+    }
+
+    /**
      * Penerbit surat cuti belum-TTE saat efek final (PRD Fase 4 §6.5.2): SuratCutiService (MAKE-023; di M3 berupa no-op).
      */
     public static function penerbitSuratCuti(bool $getShared = true): \App\Interfaces\Layanan\PenerbitSuratCutiInterface
