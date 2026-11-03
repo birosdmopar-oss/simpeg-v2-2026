@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder A — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder B — API masuk & job terjadwal) |
-| Versi | **v1.0c — 02-11-2026** (CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
+| Versi | **v1.0d — 03-11-2026** (CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
 | Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
 | Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
@@ -280,6 +280,27 @@ sampai `expires_in − 60 dtk`; refresh bila 401 sekali). **AC-K.1** tanpa nilai
 di-retry maks 3, POST tidak; **AC-K.3** timeout tercatat sebagai kegagalan; **AC-K.4** driver real tanpa config → exception
 saat dibuat.
 
+**Bentuk auth BKN (Q6-17 = A, CR-092).** Diekstrak dari `FH:2513-2955` tanpa nilai; nama konstanta legacy hanya rujukan
+(isinya di `constants.php`, tidak dibuka). Semua permintaan token: POST `application/x-www-form-urlencoded`.
+
+| Jalur legacy | Header ke endpoint token | Body | Field respons dibaca | Cache legacy |
+|---|---|---|---|---|
+| Token API gateway `getTokenApi_siasn` | `Authorization: Basic base64(user:pass)` (`SIASN_API_USER/PASS`) | `grant_type=client_credentials` | `access_token`, `expires_in`, `token_type`, `scope` | `siasn_simpeg.api_token` (`expired_at > NOW()`; `expired_at` tidak dihitung di PHP) |
+| Token SSO `getTokenSSO_siasn` | `Authorization: Basic` (kredensial gateway yang sama) | `grant_type=password`, `client_id`, `username`, `password` (`SIASN_SSO_*`) | `access_token`, `expires_in`, `refresh_token`, `refresh_expires_in`, `token_type`, `not_before_policy`, `session_state`, `scope` | `siasn_simpeg.api_ssobkn` |
+| SSO varian e-Kinerja `getTokenSSO_siasn_2` | sama | sama + `totp` (**nilai tetap**, tanpa algoritma TOTP) dengan `EKIN_API_*`/`EKIN_SSO_*` | sama | sama |
+
+Pemakaian token: **SIASN** (`getApi_siasn`, `postApi_siasn`, `*Arsip`) mengirim **dua header** `Authorization: Bearer <token
+gateway>` + `Auth: bearer <token SSO>` + `accept: application/json` (POST `Content-Type: application/json`, unggah arsip
+multipart); **e-Kinerja** — cron aktif `EB::cron_periode_skp`/`cron_skp_periodik` memanggil `getApi_bkn_ekinerja` dengan satu
+header `Authorization: Bearer` memakai **token literal hard-code `FH:2919`** (temuan keamanan legacy; nilai tidak dibaca);
+versi lama `getApi_bkn` (`*_20240614`, `_spe`, `_test`) memakai token SSO varian e-Kinerja.
+
+Desain `TokenBkn` v2 (tanpa token literal, Q6-08): strategi per layanan lewat `Config\Integrations` — **(i)** token statis
+dari `.env` (`bkn.ekinerjaToken`, kosong bawaan; padanan perilaku legacy aktif e-Kinerja) dan **(ii)** alur SSO password grant
+(+ Basic gateway, `totp` opsional dari konfigurasi; kosong = tidak dikirim) dengan cache `CacheService` sampai
+`expires_in − 60 dtk` dan refresh sekali saat 401. e-Kinerja: (i) bila terisi, selain itu (ii). SIASN: wajib token gateway +
+token SSO di dua header. Semua kunci `.env` kosong di `.env.example`; nilai token/kredensial tidak pernah masuk log (AC-K.1).
+
 **Kontrak log bersama Jalur A & B (CR-091, usulan Jalur B disepakati Horii 02-11-2026).** Kedua jalur menulis `integrasi_log` lewat **satu antarmuka yang sama**;
 Jalur A **tidak** membuat antarmuka/penulis log sendiri:
 
@@ -528,6 +549,7 @@ Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (ju
 | Q6-14 | `Ekinerja.php` (API masuk) | Default diterima — tidak di-port kecuali PIC menyatakan masih dipakai (PN-4) | F6-21 |
 | Q6-15 | Auto-approval LKH tanggal 5 | **Ikut legacy** | F6-25, H-12 |
 | Q6-16 | Retensi `integrasi_log` 180 hari | Default diterima | F6-24 |
+| Q6-17 | **(02-11-2026, B2 Jalur B)** Sumber bentuk auth BKN untuk `TokenBkn` — helper token legacy `FH:2513-2921` ada di daftar terlarang dibuka (berisi kredensial literal). Pilihan: **A** — reviewer CR mengekstrak **bentuk saja** lewat skrip redaksi (literal disamarkan kecuali nama field/header/path; keluaran ditolak otomatis bila memuat host/IP/string mirip token), hasil diteruskan ke pelaksana; **B** — tunggu dokumentasi resmi API BKN saat akses PN-2 tersedia (aman tetapi menahan TokenBkn/B2, B3 tarik, B6) | **A** (keputusan Horii 02-11-2026; ekstraksi dijalankan 02-11, nilai tidak pernah dibaca/ditampilkan). Hasil & desain di §7.0.2 "Bentuk auth BKN" (CR-092) | §7.0.2, F6-26 |
 
 Prinsip umum Horii 01-11-2026: **"intinya ikut legacy"** — berlaku juga untuk hal yang tidak tercantum di atas. Bila coder
 menemukan perilaku legacy yang belum diputus, default = ikut legacy [K]; deviasi hanya untuk alasan teknis wajib/keamanan
@@ -630,3 +652,4 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 | v1.0a | 01-11-2026 | Penugasan Horii: Jalur A (`6_2.md`) → Qoder B, Jalur B (`6_1.md`) → Qoder A (sesi reviewer CR) |
 | v1.0b | 02-11-2026 | CR-090 (keputusan Horii 02-11-2026, Q2 B0 Jalur B): AC-03.5 dan kriteria dorong otomatis SIASN ikut legacy per tabel — dorong ulang `updated_at > siasn_lu` hanya untuk jabatan; diklat, sertifikasi, kursus/seminar, SKP 2022 hanya `id_rw_siasn IS NULL` + `siasn_flag=0`, tanpa kolom `siasn_lu` baru di DBV-027 (F6-14, tabel `siasn:dorong`, AC-03.5) |
 | v1.0c | 02-11-2026 | CR-091, usulan Jalur B disepakati Horii 02-11-2026: kontrak log bersama Jalur A & B di §7.0.2 — `IntegrasiLogInterface::catat(CatatanIntegrasi)` + objek nilai `CatatanIntegrasi` (arah 1 keluar/2 masuk); Jalur A tidak membuat antarmuka log sendiri |
+| v1.0d | 03-11-2026 | CR-092: Q6-17 (keputusan Horii 02-11-2026 = A, ekstraksi bentuk auth BKN tanpa nilai; pilihan B = tunggu dokumentasi BKN/PN-2) + §7.0.2 "Bentuk auth BKN" (token gateway, SSO, varian e-Kinerja, dua header SIASN, token literal e-Kinerja legacy) + desain `TokenBkn` (token statis `.env` / SSO + cache, tanpa literal) |
