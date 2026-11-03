@@ -66,6 +66,13 @@ class AuthService
             throw AuthException::invalidCredentials(AuthException::REASON_NOT_FOUND);
         }
 
+        // DBV-027 T3: akun sistem integrasi bukan akun manusia — ditolak walau diaktifkan/diberi password.
+        if (\App\Constants\AkunSistem::adalah($user)) {
+            $this->lockout->recordFailure($username, $ip);
+
+            throw AuthException::invalidCredentials(AuthException::REASON_INACTIVE);
+        }
+
         if ((string) $user['status'] !== PenggunaModel::STATUS_ACTIVE) {
             $this->lockout->recordFailure($username, $ip);
 

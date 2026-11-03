@@ -83,7 +83,8 @@ class UserService
         $page    = $query->page();
         $perPage = $query->perPage(self::PER_PAGE_DEFAULT, self::PER_PAGE_MAX);
 
-        $builder = $this->pengguna->builder()->where('deleted_at', null);
+        // DBV-027 T3: akun sistem integrasi disembunyikan dari daftar (bukan akun manusia).
+        $builder = $this->pengguna->builder()->where('deleted_at', null)->where('username !=', \App\Constants\AkunSistem::USERNAME);
 
         if ($actor->role() === Role::ADMIN_SATKER) {
             $builder->where('id_satker', $actor->idSatker())
@@ -457,6 +458,11 @@ class UserService
 
         if ($row === null) {
             throw new NotFoundException('Akun tidak ditemukan.');
+        }
+
+        if (\App\Constants\AkunSistem::adalah($row)) {
+            // DBV-027 T3: lihat/edit/aktifkan/reset password/ubah level/hapus akun sistem integrasi selalu ditolak.
+            throw new ForbiddenException('Akun sistem integrasi tidak dapat dikelola.');
         }
 
         if ($actor->role() === Role::ADMIN_SATKER && (string) $row['id_satker'] !== $actor->idSatker()) {
