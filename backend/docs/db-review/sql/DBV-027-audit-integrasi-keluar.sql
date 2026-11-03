@@ -80,10 +80,11 @@ FROM (
 GROUP BY periode_id
 ORDER BY periode_id;
 
--- A6 [WAJIB_0] Token FCM ganda (dedup sebelum UNIQUE `token_hash`). Tabel kosong saat cutover (AC-01.2): normalnya 0.
-SELECT COUNT(*) AS token_ganda
+-- A6 [WAJIB_0] Token FCM ganda per pemilik (dedup sebelum UNIQUE `nip`+`token_hash`, DBV-Q8 ikut legacy). Tabel kosong
+--    saat cutover (AC-01.2): normalnya 0. Semua baris lama ber-nip (platform 2).
+SELECT COUNT(*) AS token_ganda_per_pemilik
 FROM (
-    SELECT 1 FROM firebase_token WHERE fcm_token IS NOT NULL GROUP BY SHA2(fcm_token, 256) HAVING COUNT(*) > 1
+    SELECT 1 FROM firebase_token WHERE fcm_token IS NOT NULL GROUP BY nip, SHA2(fcm_token, 256) HAVING COUNT(*) > 1
 ) d;
 
 -- A6b [WAJIB_0] Baris token lama tanpa `nip` (setelah ALTER menjadi platform 2 dan wajib ber-nip, CHECK pemilik).
@@ -101,8 +102,8 @@ SELECT COUNT(*) AS akun_sistem_bisa_login
 FROM pengguna
 WHERE username = 'sistem.integrasi' AND (status <> '0' OR password IS NOT NULL OR password_legacy IS NOT NULL);
 
--- B1b [WAJIB_0] Akun sistem integrasi berlevel admin (1 Super Admin, 3 Admin Satker) — hak minimum (DBV-Q10).
-SELECT COUNT(*) AS akun_sistem_level_admin FROM pengguna WHERE username = 'sistem.integrasi' AND user_level IN (1, 3);
+-- B1b [INFO] Level akun sistem integrasi (ikut legacy = 1, keputusan Horii 03-11-2026 DBV-Q10; pengamannya B1).
+SELECT user_level, status FROM pengguna WHERE username = 'sistem.integrasi';
 
 -- B2 [WAJIB_0] Token tanpa hash (aplikasi wajib mengisi `token_hash` saat upsert, F6-13).
 SELECT COUNT(*) AS token_tanpa_hash FROM firebase_token WHERE fcm_token IS NOT NULL AND token_hash IS NULL;

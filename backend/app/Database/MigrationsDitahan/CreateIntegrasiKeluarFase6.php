@@ -20,10 +20,10 @@ use Throwable;
  *   - `double_riwayat_kp` [K tabel `simpeg01`, kolom [I] dari `SS/Rw_gol`] — NIP dengan golongan ganda di SIASN.
  *   - `siasn_ref_unor` [K padanan `siasn_simpeg.REF_UNOR`, kolom dari `SS/Ref_unor::sync`].
  *   - `siasn_referensi` [V2 gabungan 7 tabel referensi `siasn_simpeg.*_ID`/`TK_PENDIDIKAN` yang dipakai job aktif].
- *   - ALTER `firebase_token`: `nip` NULL-able, `id_pengguna`, `platform` 1 web / 2 android, `token_hash` UNIQUE,
+ *   - ALTER `firebase_token`: `nip` NULL-able, `id_pengguna`, `platform` 1 web / 2 android, `token_hash` UNIQUE per pemilik,
  *     `refresh_date` [K `fb_token`] + CHECK pemilik token per platform (F6-13, DQ-25).
  *   - ALTER `riwayat_skp_periodik` UNIQUE (`id_pns`, `periode_id`, `skp_id`) (Q6-10) — pra-cek duplikat lebih dulu.
- *   - Seed akun sistem integrasi `pengguna` (username `sistem.integrasi`, role 8 non-admin, status '0', tanpa password) untuk
+ *   - Seed akun sistem integrasi `pengguna` (username `sistem.integrasi`, role 1 ikut legacy, status '0', tanpa password) untuk
  *     `updated_by`/`approved_by` penulisan SIASN/e-Kinerja (PRD §8; pengecualian "migration tanpa seed").
  *
  * Semua pra-cek dijalankan SEBELUM DDL apa pun; DDL MySQL ter-commit per statement, jadi bila satu langkah gagal up()
@@ -42,8 +42,11 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
     public const AKUN_SISTEM = 'sistem.integrasi';
 
-    /** Role 8 (Pimpinan): level non-admin dengan rujukan hak paling sedikit; akun tidak bisa login (DBV-Q10). */
-    public const LEVEL_AKUN_SISTEM = 8;
+    /**
+     * Role 1 — ikut legacy (keputusan Horii 03-11-2026, DBV-Q10): padanan akun developer `ID_USR_DEVSIMPEG` yang dipakai
+     * cron sebagai pelaku. Risiko hak tinggi diterima; dimitigasi akun nonaktif tanpa password (tidak bisa login).
+     */
+    public const LEVEL_AKUN_SISTEM = 1;
 
     public const JENIS_REFERENSI = [
         'jabatan_fungsional', 'jabatan_fungsional_umum', 'jenis_jabatan', 'latihan_struktural', 'tk_pendidikan',
@@ -131,11 +134,11 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
         $dupToken = (int) ($this->db->query(
             "SELECT COUNT(*) AS n FROM (SELECT 1 FROM {$this->t('firebase_token')} WHERE `fcm_token` IS NOT NULL
-             GROUP BY SHA2(`fcm_token`, 256) HAVING COUNT(*) > 1) d",
+             GROUP BY `nip`, SHA2(`fcm_token`, 256) HAVING COUNT(*) > 1) d",
         )->getRow()->n ?? 0);
 
         if ($dupToken > 0) {
-            throw new RuntimeException("DBV-027: {$dupToken} token FCM ganda di firebase_token; deduplikasi sebelum migrate.");
+            throw new RuntimeException("DBV-027: {$dupToken} token FCM ganda per pemilik (nip) di firebase_token; deduplikasi sebelum migrate (DBV-027 §3.7).");
         }
 
         $tanpaNip = (int) ($this->db->query(
@@ -164,7 +167,7 @@ class CreateIntegrasiKeluarFase6 extends Migration
                 MODIFY `nip` VARCHAR(30) NULL DEFAULT NULL COMMENT 'Pemilik token Android (platform 2); token web boleh tanpa NIP',
                 ADD COLUMN `id_pengguna` INT UNSIGNED NULL DEFAULT NULL COMMENT 'Akun pemilik token web (platform 1) [K fb_token.id_user]' AFTER `nip`,
                 ADD COLUMN `platform` TINYINT NOT NULL DEFAULT 2 COMMENT '1: web/desktop (padanan fb_token), 2: android (padanan firebase_token legacy)' AFTER `id_pengguna`,
-                ADD COLUMN `token_hash` CHAR(64) NULL DEFAULT NULL COMMENT 'SHA-256 hex fcm_token untuk deduplikasi (DQ-25)' AFTER `fcm_token`,
+                ADD COLUMN `token_hash` CHAR(64) NULL DEFAULT NULL COMMENT 'SHA-256 hex fcm_token; unik per pemilik (DQ-25, DBV-Q8 ikut legacy)' AFTER `fcm_token`,
                 ADD COLUMN `refresh_date` DATETIME NULL DEFAULT NULL COMMENT 'UTC; diperpanjang 1 minggu saat SPA mendaftar ulang [K fb_token.refresh_date]' AFTER `token_hash`",
             'ALTER firebase_token kolom',
         );
@@ -174,8 +177,8 @@ class CreateIntegrasiKeluarFase6 extends Migration
         $this->exec(
             "ALTER TABLE {$t}
                 ALTER COLUMN `platform` DROP DEFAULT,
-                ADD UNIQUE KEY `uq_firebase_token_hash` (`token_hash`),
-                ADD KEY `idx_firebase_token_pengguna` (`id_pengguna`),
+                ADD UNIQUE KEY `uq_firebase_token_pengguna_hash` (`id_pengguna`, `token_hash`),
+                ADD UNIQUE KEY `uq_firebase_token_nip_hash` (`nip`, `token_hash`),
                 ADD CONSTRAINT `fk_id_pengguna_fbt_to_pengguna` FOREIGN KEY (`id_pengguna`) REFERENCES {$this->t('pengguna')} (`id_pengguna`) " . self::RESTRICT . ',
                 ADD CONSTRAINT `chk_firebase_token_platform` CHECK (`platform` IN (1, 2)),
                 ADD CONSTRAINT `chk_firebase_token_pemilik` CHECK ((`platform` = 1 AND `id_pengguna` IS NOT NULL) OR (`platform` = 2 AND `nip` IS NOT NULL))',
@@ -201,7 +204,7 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
         $this->exec("DELETE FROM {$t} WHERE `nip` IS NULL", 'DELETE token web tanpa NIP');
 
-        foreach (['uq_firebase_token_hash', 'idx_firebase_token_pengguna'] as $indeks) {
+        foreach (['uq_firebase_token_pengguna_hash', 'uq_firebase_token_nip_hash'] as $indeks) {
             if ($this->adaIndeks('firebase_token', $indeks)) {
                 $this->exec("ALTER TABLE {$t} DROP INDEX `{$indeks}`", "DROP INDEX {$indeks}");
             }
