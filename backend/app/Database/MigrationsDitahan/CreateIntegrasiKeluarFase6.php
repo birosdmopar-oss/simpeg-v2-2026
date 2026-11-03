@@ -164,7 +164,7 @@ class CreateIntegrasiKeluarFase6 extends Migration
 
         $this->exec(
             "ALTER TABLE {$t}
-                MODIFY `nip` VARCHAR(30) NULL DEFAULT NULL COMMENT 'Pemilik token Android (platform 2); token web boleh tanpa NIP',
+                MODIFY `nip` VARCHAR(30) NULL DEFAULT NULL COMMENT 'Pemilik token Android (platform 2); NULL untuk token web (pemilik = id_pengguna)',
                 ADD COLUMN `id_pengguna` INT UNSIGNED NULL DEFAULT NULL COMMENT 'Akun pemilik token web (platform 1) [K fb_token.id_user]' AFTER `nip`,
                 ADD COLUMN `platform` TINYINT NOT NULL DEFAULT 2 COMMENT '1: web/desktop (padanan fb_token), 2: android (padanan firebase_token legacy)' AFTER `id_pengguna`,
                 ADD COLUMN `token_hash` CHAR(64) NULL DEFAULT NULL COMMENT 'SHA-256 hex fcm_token; unik per pemilik (DQ-25, DBV-Q8 ikut legacy)' AFTER `fcm_token`,
@@ -181,28 +181,29 @@ class CreateIntegrasiKeluarFase6 extends Migration
                 ADD UNIQUE KEY `uq_firebase_token_nip_hash` (`nip`, `token_hash`),
                 ADD CONSTRAINT `fk_id_pengguna_fbt_to_pengguna` FOREIGN KEY (`id_pengguna`) REFERENCES {$this->t('pengguna')} (`id_pengguna`) " . self::RESTRICT . ',
                 ADD CONSTRAINT `chk_firebase_token_platform` CHECK (`platform` IN (1, 2)),
-                ADD CONSTRAINT `chk_firebase_token_pemilik` CHECK ((`platform` = 1 AND `id_pengguna` IS NOT NULL) OR (`platform` = 2 AND `nip` IS NOT NULL))',
+                ADD CONSTRAINT `chk_firebase_token_pemilik` CHECK ((`platform` = 1 AND `id_pengguna` IS NOT NULL AND `nip` IS NULL) OR (`platform` = 2 AND `nip` IS NOT NULL))',
             'ALTER firebase_token constraint',
         );
     }
 
     /**
-     * Kembali ke skema DBV-022 (`nip` NOT NULL). Token web tanpa NIP tidak bisa disimpan di skema lama → baris itu
-     * dihapus lebih dulu (token web hanya cache pendaftaran ulang SPA, dibuat lagi saat halaman dimuat).
+     * Kembali ke skema DBV-022 (`nip` NOT NULL). Token web (`nip` NULL, pemilik = akun) tidak bisa disimpan di skema lama →
+     * baris itu dihapus lebih dulu (token web hanya cache pendaftaran ulang SPA, dibuat lagi saat halaman dimuat).
+     *
+     * Constraint dilepas dengan `DROP CONSTRAINT` / `DROP FOREIGN KEY` (MySQL ≥ 8.0.19 dan MariaDB ≥ 10.2; `DROP CHECK`
+     * khusus MySQL — temuan T1 DBV) dan hanya bila ada (pembatalan up() di tengah jalan); galat lain tidak ditelan.
      */
     private function kembalikanFirebaseToken(): void
     {
         $t = $this->t('firebase_token');
 
-        foreach (['DROP CHECK `chk_firebase_token_pemilik`', 'DROP CHECK `chk_firebase_token_platform`', 'DROP FOREIGN KEY `fk_id_pengguna_fbt_to_pengguna`'] as $aksi) {
-            try {
-                $this->exec("ALTER TABLE {$t} {$aksi}", "ALTER firebase_token {$aksi}");
-            } catch (Throwable) {
-                // Belum sempat dibuat (pembatalan up() di tengah jalan) — lanjut.
+        foreach (['chk_firebase_token_pemilik' => 'DROP CONSTRAINT', 'chk_firebase_token_platform' => 'DROP CONSTRAINT', 'fk_id_pengguna_fbt_to_pengguna' => 'DROP FOREIGN KEY'] as $nama => $aksi) {
+            if ($this->adaConstraint('firebase_token', $nama)) {
+                $this->exec("ALTER TABLE {$t} {$aksi} `{$nama}`", "ALTER firebase_token {$aksi} {$nama}");
             }
         }
 
-        $this->exec("DELETE FROM {$t} WHERE `nip` IS NULL", 'DELETE token web tanpa NIP');
+        $this->exec("DELETE FROM {$t} WHERE `nip` IS NULL", 'DELETE token web (tanpa NIP)');
 
         foreach (['uq_firebase_token_pengguna_hash', 'uq_firebase_token_nip_hash'] as $indeks) {
             if ($this->adaIndeks('firebase_token', $indeks)) {
@@ -268,7 +269,7 @@ class CreateIntegrasiKeluarFase6 extends Migration
                 `rw_name` VARCHAR(50) NOT NULL COMMENT 'Rw Jabatan | Rw Sertifikasi [K]',
                 `id_rw` INT NOT NULL COMMENT 'PK baris riwayat sumber (riwayat_mutasi_jabatan / riwayat_diklat)',
                 `id_rw_siasn` VARCHAR(100) NULL DEFAULT NULL COMMENT 'id riwayat di SIASN (tujuan unggah)',
-                `id_da` INT NULL DEFAULT NULL COMMENT 'document_attachment.id_attachment sumber berkas; tanpa FK',
+                `id_da` INT NOT NULL COMMENT 'document_attachment.id_attachment sumber berkas (selalu diisi [K]); tanpa FK',
                 `arsip_path` VARCHAR(200) NULL DEFAULT NULL COMMENT 'Salinan document_attachment.path saat diantre',
                 `arsip_name` VARCHAR(255) NULL DEFAULT NULL,
                 `status` TINYINT NOT NULL DEFAULT 0 COMMENT '0: antre, 1: terunggah, 2: gagal, 3: diproses [K]',
@@ -340,6 +341,14 @@ class CreateIntegrasiKeluarFase6 extends Migration
         return $this->db->query(
             'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
             [$this->nama($tabel), $kolom],
+        )->getRow() !== null;
+    }
+
+    private function adaConstraint(string $tabel, string $nama): bool
+    {
+        return $this->db->query(
+            'SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? LIMIT 1',
+            [$this->nama($tabel), $nama],
         )->getRow() !== null;
     }
 

@@ -81,7 +81,8 @@ GROUP BY periode_id
 ORDER BY periode_id;
 
 -- A6 [WAJIB_0] Token FCM ganda per pemilik (dedup sebelum UNIQUE `nip`+`token_hash`, DBV-Q8 ikut legacy). Tabel kosong
---    saat cutover (AC-01.2): normalnya 0. Semua baris lama ber-nip (platform 2).
+--    saat cutover (AC-01.2): normalnya 0. Semua baris lama ber-nip (platform 2), jadi pemiliknya = nip. Baris web
+--    (platform 1, `nip` NULL, T2 opsi a) baru ada sesudah migrate dan dijaga UNIQUE (`id_pengguna`, `token_hash`).
 SELECT COUNT(*) AS token_ganda_per_pemilik
 FROM (
     SELECT 1 FROM firebase_token WHERE fcm_token IS NOT NULL GROUP BY nip, SHA2(fcm_token, 256) HAVING COUNT(*) > 1
