@@ -1,7 +1,7 @@
 # MAKE-069 — Rencana impor cutover tahap 2
 
 **Status:** rencana (belum ada kode). Kode menunggu DBV-027 di `main` dan lampu hijau reviewer CR.
-**Keputusan:** Horii 03-11-2026 (K-M1, K-M2, K-M3, K-M12, impor cutover opsi (b)); DBV 03-11-2026 (Z-1); reviewer CR
+**Keputusan:** Horii 03-11-2026 (K-M1, K-M2, K-M3 opsi A, K-M12, impor cutover opsi (b)); DBV 03-11-2026 (Z-1); reviewer CR
 03-11-2026 (K-M5, K-M11).
 **Mesin:** sama dengan MAKE-056 (`backend/app/Libraries/Impor/`, command `impor:legacy`): irisan kolom [K], R1a WIB→UTC,
 `stripslashes` bawaan, berkas keputusan, pra-cek UNIQUE, counter AUTO_INCREMENT, satu transaksi per tier, laporan hanya
@@ -121,23 +121,47 @@ Tier dinomori lanjutan MAKE-056; nomor final ditetapkan saat kode.
 Admin role 1 legacy yang diimpor tetap bisa login dengan password lamanya, lalu wajib ganti (T8). Bootstrap dipakai untuk
 lingkungan kosong (UP/QA) dan keadaan darurat.
 
-## 4. Berkas lampiran (K-M3)
+## 4. Berkas lampiran (K-M3, keputusan Horii 03-11-2026 — menggantikan keputusan K-M3 sebelumnya)
 
 Legacy menyimpan berkas di dua tempat (`pathToSrc()`/`fixArsipPath()`, `function_helper.php:314`): path `arsip/...` di
 server arsip, path `assets/upload/...` di server aplikasi. `LocalStorageAdapter` v2 hanya menerima segmen
-`[A-Za-z0-9._-]`, sehingga path legacy (diawali `/`, bisa berspasi) tidak bisa dipakai apa adanya.
+`[A-Za-z0-9._-]`, sehingga path legacy (diawali `/`, bisa berspasi) tidak terbaca apa adanya (temuan Z-2).
 
-Alur (langkah runbook, server arsip legacy tidak dipakai sebagai adapter):
-1. Alat impor menulis path v2 aman deterministik ke kolom berkas, mis. `legacy/<sha256(path lama)>.<ext>`, dan membuat
-   **manifest** (tabel, kolom, id, path lama, path v2) di folder kerja — tidak di repo.
-2. DBA/infra menyalin berkas dari kedua sumber sesuai manifest, dengan checksum.
-3. `php spark lampiran:periksa` melaporkan jumlah path yang tidak ada di storage per tabel/kolom, tanpa nama berkas.
+| Opsi | Isi | Status |
+|---|---|---|
+| **A** | Path di DB **tetap legacy** (`arsip/...`, `assets/upload/...`, termasuk awalan `/` dan spasi), disalin apa adanya. Berkas fisik disalin ke storage v2 dengan **struktur folder relatif yang sama**. Adapter v2 diberi normalisasi baca untuk path legacy | **DIPILIH** |
+| B | Path v2 baru aman deterministik (`legacy/<sha256(path lama)>.<ext>`) lewat manifest; kolom DB ditulis path baru; adapter tidak diubah | Dibatalkan (keputusan K-M3 sebelumnya) |
+| C | Berkas tetap di server arsip legacy; v2 membaca lewat adapter remote baca-saja mengikuti `fixArsipPath`; server lama dipertahankan | Tidak dipilih |
+
+**Alasan A:** data dan perilaku sama dengan legacy ("intinya ikut legacy"); path tidak berubah sehingga rujukan lain tetap
+cocok — mis. `siasn_upload_arsip.arsip_path`, yang dipakai legacy sebagai kunci anti-antre-ulang (`nip***id_rw***arsip_path`,
+`SS/Rw_jabatan::set_queue_arsip`); server legacy bisa dimatikan setelah cutover.
+
+**Risiko A:** adapter menerima bentuk path yang lebih longgar, jadi validasi traversal wajib ketat dan diuji.
+
+**Perubahan adapter (commit terpisah, berkas bersama Kepegawaian `Lampiran/LocalStorageAdapter.php`):**
+- normalisasi baca: buang `/` di awal dan izinkan spasi di segmen;
+- tetap ditolak: segmen `.`/`..`, path absolut sesudah normalisasi (termasuk huruf drive / `\`), byte kontrol dan karakter
+  tak terlihat, NUL, dan hasil resolusi yang keluar dari akar storage (dicek dengan `realpath` atas berkas yang ada; symlink
+  yang menunjuk ke luar akar ditolak);
+- aturan tulis untuk berkas baru v2 tidak berubah (segmen `[A-Za-z0-9._-]`);
+- test keamanan path (PHPUnit): traversal (`../`, `..\`, campuran, ter-encode), path absolut, byte kontrol,
+  symlink keluar akar (bila didukung OS uji), serta path legacy sah (awalan `/`, spasi) terbaca;
+- bentuk path yang dihasilkan `fixArsipPath()` legacy dicek saat kode, agar normalisasi v2 mencakup variasi yang sama.
+
+**Alur runbook:**
+1. Alat impor menyalin kolom path apa adanya dan membuat **manifest** di folder kerja (tidak di repo): daftar path unik yang
+   harus disalin per sumber (`arsip/…` → server arsip, `assets/upload/…` → server aplikasi), tanpa penggantian nama.
+2. DBA/infra menyalin berkas dari kedua sumber ke akar storage v2 dengan struktur folder relatif yang sama, lalu mencatat
+   checksum di manifest.
+3. `php spark lampiran:periksa` melaporkan jumlah path yang tidak ada di storage atau checksum-nya berbeda, per tabel/kolom,
+   tanpa nama berkas.
 
 Kolom berkas (daftar final dari audit skema salinan): `document_attachment.path`, `pegawai.foto`/`pegawai_foto`,
 `riwayat_karpeg.file_*`, `absen_ijin.file_bukti..5`, `pegawai_plt`/`pegawai_plh.lampiran`, `riwayat_lckh.file_lckh`,
 `riwayat_cuti` (`file_bukti`, `file_sc_*`, `file_surat_cuti`), `riwayat_tb` (`file_sp`, `file_1..3`, `file_surat_tb`),
 `riwayat_tb_perpan.file_sperpan`, `riwayat_mutasi_jabatan.f_spmt/f_bapel`, `riwayat_skp_periodik.f_arsip_*`, lampiran
-tiket Halo Simpeg. Kolom milik tabel MAKE-056 ikut ditulis ulang lewat manifest yang sama. Berkas yang dibangkitkan ulang
+tiket Halo Simpeg. Kolom milik tabel MAKE-056 ikut masuk manifest yang sama (path tidak diubah). Berkas yang dibangkitkan ulang
 v2 (PDF LKH, tanda terima) tidak disalin. Akses, volume, dan jendela salin: DBA (K-M4).
 
 ## 5. Perubahan mesin yang dibutuhkan
@@ -151,7 +175,8 @@ v2 (PDF LKH, tanda terima) tidak disalin. Akses, volume, dan jendela salin: DBA 
 | `khusus` dengan sanitizer | `faq_article` |
 | `praPindai` (lintasan baca pertama) | B3 `riwayat_skp_periodik` |
 | `petaKolom`, `konstanta` | B3 `siasn_referensi` |
-| Penulis manifest berkas + `lampiran:periksa` | Bagian 4 |
+| Penulis manifest berkas (daftar salin + checksum) + `lampiran:periksa` | Bagian 4 |
+| Normalisasi baca path legacy di `LocalStorageAdapter` + test keamanan path (commit terpisah) | Bagian 4, opsi A |
 | Command `akun:bootstrap-admin`, `integrasi:siapkan-akun-sistem` | Bagian 3 |
 | Transaksi per tabel (opsional) | T10/T11 (K-M8) |
 
