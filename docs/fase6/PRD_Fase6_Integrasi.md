@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder A — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder B — API masuk & job terjadwal) |
-| Versi | **v1.0e — 03-11-2026** (CR-093: keputusan A0 v2 Jalur A; CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
+| Versi | **v1.0f — 03-11-2026** (CR-097: TLS BSrE ikut legacy Q6-18 + e-sign cuti F6-18 Q6-19..Q6-23; CR-093: keputusan A0 v2 Jalur A; CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
 | Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
 | Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
@@ -110,7 +110,7 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 |---|---|---|
 | BP-1 | **Interface + adapter** (ADR-015). Adapter real = kelas baru di `Libraries/<Esign|Push|Siasn|Bkn>/`, didaftarkan di cabang `match` `Config/Services.php:466-506`. **Kontrak interface tidak berubah**; kebutuhan baru = interface baru | SRS-FR-009, regresi C-05/C-06 |
 | BP-2 | Semua alamat & kredensial dari `Config\Integrations` + `.env` (`.env.example` diisi **kosong**). Driver `real` dengan konfigurasi kosong → **gagal saat dibuat** (exception jelas), bukan saat dipanggil | Repo publik; fail fast |
-| BP-3 | Satu klien HTTP keluar bersama (`Libraries/Integrasi/Http/KlienHttp`, di atas `CURLRequest` CI4): timeout koneksi 5 dtk / total 30 dtk (dapat dikonfigurasi), **TLS verify aktif** (pengecualian hanya untuk gateway internal tanpa TLS, dicatat di `.env`), retry **hanya** untuk GET idempoten (maks 3, backoff + jitter). **POST bertransaksi (sign, save) tidak di-retry otomatis** | Legacy mematikan verify (B-14) dan tanpa retry |
+| BP-3 | Satu klien HTTP keluar bersama (`Libraries/Integrasi/Http/KlienHttp`, di atas `CURLRequest` CI4): timeout koneksi 5 dtk / total 30 dtk (dapat dikonfigurasi), **TLS verify aktif** (pengecualian hanya untuk gateway internal tanpa TLS, dicatat di `.env`; **e-sign BSrE boleh tanpa verifikasi TLS ikut legacy — Q6-18 = B, CR-097**: bawaan tetap aktif, `esign.tlsVerify=false` hanya di `.env` server, peringatan log + `integrasi:status`, jalur upgrade `esign.caBundle`; BKN tetap wajib aktif), retry **hanya** untuk GET idempoten (maks 3, backoff + jitter). **POST bertransaksi (sign, save) tidak di-retry otomatis** | Legacy mematikan verify (B-14) dan tanpa retry |
 | BP-4 | **Panggilan eksternal tidak pernah di dalam transaksi DB.** Catat percobaan di log integrasi di luar transaksi bisnis (pola `EsignCutiService.php:19-58`) | Rollback tidak bisa membatalkan efek eksternal |
 | BP-5 | **Redaksi log:** passphrase, token, header `Authorization`, NIK, client secret **tidak pernah** masuk log/DB/respons. Body respons eksternal disimpan maksimal 1.000 karakter setelah redaksi | Legacy menyimpan payload mentah (Lampiran B) |
 | BP-6 | **Idempoten:** job & command aman diulang (upsert per kunci alami, cek sebelum tulis), punya `--dry-run`, dan dilindungi kunci (`flock` di crontab + kunci aplikasi bila job bisa tumpang tindih) | Cron legacy berjalan berulang |
@@ -197,7 +197,7 @@ B mengerjakan bagian adapter dulu dan menunda endpoint `s_esign`.
 | F6-15 | **H-10 e-Kinerja BKN masuk Fase 6** (Tukin bergantung). Ikut legacy: periode **hanya insert periode baru** [K `EB:9`]; SKP periodik insert baru dan update bila `hasil_akhir` berubah, kunci logis `id_pns`+`periode_id`+`skp_id` [K `EB:205`]; pemilihan periode tanggal > 19 → bulan berikutnya; periode manual dilewati. Aturan Tukin tetap [K] (potongan 0/16/32%, default 32% bila tak ada baris). Tambahan v2: UNIQUE kunci logis (Q6-10) + peringatan di log bila periode berjalan belum punya data | [K] | ✔ Q6-09 = A |
 | F6-16 | **`services/s_esign` untuk MuDig** di-port: auth klien layanan, berkas dikirim sebagai **unggahan multipart** (bukan path server) [V2], `esign_hist` **wajib** dicatat [V2], respons berisi PDF ber-tanda tangan (base64) [V2]; parameter lain & amplop [K] | [V2] | ✔ Q6-05 = A |
 | F6-17 | **BSrE ikut legacy**: NIK penanda tangan dari `pegawai.nik` PyB; `nik` & `passphrase` dikirim di query string seperti legacy (`Esign.php:166-188`, `bsre_esign.php:55-74`) — **disensor** dari semua log; kode `status_code=='1111'` = bersertifikat. Pengaman: respons dianggap sukses hanya bila berupa PDF (`%PDF-`) — legacy menulis JSON non-error sebagai berkas PDF (`bsre_esign.php:102-126`) | [K] + pengaman | ◻ |
-| F6-18 | **Passphrase e-sign real diketik penanda tangan (PyB) sendiri** di halaman tugas persetujuannya — sama dengan alur legacy `Cuti::process_esign` (`Cuti.php:688-705`, `L_cuti.php:3232-3484`). Dialog admin di mock Fase 4 diganti/diselaraskan (deviasi dari PRD Fase 4 Q-09 dicatat) | [K] | ✔ Q6-06 = A |
+| F6-18 | **Passphrase e-sign real diketik penanda tangan (PyB) sendiri** di halaman tugas persetujuannya — sama dengan alur legacy `Cuti::process_esign` (`Cuti.php:688-705`, `L_cuti.php:3232-3484`). Dialog admin di mock Fase 4 diganti/diselaraskan (deviasi dari PRD Fase 4 Q-09 dicatat). Rincian alur (CR-097, §7.2): Q6-19 dua langkah, Q6-20 pembatas passphrase, Q6-21 passphrase hanya Setujui/Penangguhan, Q6-22 QR TTE ikut legacy, Q6-23 QR kaki verifikasi publik | [K] | ✔ Q6-06 = A; Q6-19..Q6-23 (03-11) |
 | F6-19 | **H-09 ditutup sebagai pemetaan** (tanpa endpoint baru): `calculate_lc` → `POST cuti/hitung-lama`; `record_geolocation` → F5-12; `register_fb_token` → H-04; seluruh AJAX dropdown/kalkulator `Local.php` sudah diserap modul Fase 2–5 (Lampiran A.4) | — | ◻ |
 | F6-20 | **H-11 status harian** `php spark layanan:status-harian [--tanggal=] [--dry-run]`, jadwal 00:30 WIB: TB (`riwayat_tb` status 1) mencakup hari ini → `id_jenis_status=2`; CLTN (`riwayat_cuti` `id_jenis_cuti=6` status 1/4) → 3; tidak ada lagi rentang aktif dan status masih 2/3 → 1. Perpanjangan = baris riwayat baru yang bersambung. Tidak menyentuh status selain 1/2/3. Lewat model beraudit. Perbandingan per tanggal inklusif (PRD Fase 4 v1.4) | [V2] (keputusan Horii 27-10; legacy tanpa cron) | ◻ |
 | F6-21 | **Tidak di-port** (kode mati/nonaktif atau tidak relevan di v2): SAPK lama, Siasn generasi 1 backfill, email ultah, popup notif, `fix_regen_*`, `Ekinerja.php` (Q6-14), skema `siasn_simpeg`/`sapk_simpeg` (tabel yang dibutuhkan H-03 dibuat ulang ramping di DBV-027). `sync_nama_pengguna` **di-port [K]** bila v2 menyimpan nama tampilan di `pengguna` (diverifikasi M0 A) | — | ◻ |
@@ -348,8 +348,68 @@ tetap kosong saat cutover (tidak diimpor, FSD-FN-H-01); **AC-01.3** migration na
   `Esign.php:16-45`]. Pesan gateway diteruskan.
 - `signPdf(pdf, nip, passphrase, options)`: multipart `file` + opsi tampilan (`tampilan`, `image`, `width`, `height`,
   `tag_koordinat` default `##`, `reason`, `location`) [K `S_esign.php:74-84`]; `nik` & `passphrase` di query string seperti
-  legacy, disensor dari log (F6-17); gambar TTD dari storage v2 (bukan path legacy). Sukses hanya bila respons PDF valid
+  legacy, disensor dari log (F6-17); gambar TTD = QR per tanda tangan (Q6-22 di bawah). Sukses hanya bila respons PDF valid
   (F6-17). Kode/pesan gateway → `status_code`/`message`.
+- **TLS ke gateway BSrE (Q6-18 = B, ikut legacy, CR-097).** Legacy mematikan verifikasi peer & host
+  (`bsre_esign.php:92-93`, B-10). v2: `esign.tlsVerify` bawaan **true** (config + `.env.example`); nilai `false` hanya disetel
+  di `.env` server sebagai "gateway internal" (BP-3) dan **khusus e-sign** — BKN tetap wajib true. Saat `false`:
+  - verifikasi peer & host mati (sama dengan legacy);
+  - `log_message('warning')` sekali per proses;
+  - `integrasi:status` dan `integrasi:uji-koneksi esign` menampilkan "TLS BSrE: TIDAK DIVERIFIKASI".
+
+  Opsi `esign.caBundle` (path CA di luar repo/webroot) disiapkan agar **upgrade ke TLS ketat cukup lewat `.env`**:
+  1. infra mengecek sertifikat gateway (penerbit, nama host, masa berlaku, HTTPS);
+  2. `tlsVerify=true` (+ `caBundle` bila CA internal);
+  3. `uji-koneksi esign`;
+  4. satu tanda tangan uji.
+
+  Langkah ini ditulis di README-deploy.
+
+  **Gap diterima:** MITM di jalur jaringan bisa menyadap client secret, NIK, passphrase, dan PDF, atau mengembalikan PDF palsu
+  (cek `%PDF-` tidak membuktikan keaslian). Keamanan bergantung pada jalur internal/VPN. Opsi ini juga berpotensi menjadi temuan
+  audit. Rincian opsi A/B dan gap: Trello Catatan Teknis "Keputusan TLS BSrE".
+- **Alur e-sign cuti (keputusan Horii 03-11-2026, CR-097; rincian opsi & gap: Trello Catatan Teknis "Keputusan e-sign cuti
+  F6-18").**
+  - **Q6-19 = B, dua langkah.** Dialog persetujuan PyB berisi passphrase. FE memanggil persetujuan (`process`), lalu
+    `POST cuti/{id}/esign`. E-sign **hanya oleh PyB pemilik tugas** (cek kepemilikan, bukan role); admin role 1/3 tidak lagi
+    menerbitkan TTE.
+    - Tanda tangan gagal → persetujuan **tetap tersimpan**, surat tanpa TTE, PyB dapat mengulang dari tugasnya.
+    - Ini deviasi dari legacy `L_cuti:3232-3484` (satu langkah; sign gagal → persetujuan tidak disimpan). Opsi A (satu langkah)
+      tidak dipilih karena risiko regresi C-04.
+  - **Q6-20 = ya, pembatas percobaan passphrase [V2]:** 5 percobaan / 15 menit per PyB per cuti (pola LockoutService). Legacy
+    tanpa pembatas; BSrE mengunci sertifikat bila salah berulang.
+  - **Q6-21 = P-1, passphrase hanya untuk Setujui (1) / Penangguhan (4); Tolak tanpa passphrase.** Ikut tampilan legacy
+    (`approval_cuti.php:316`). Validasi server legacy (`L_cuti:3667-3674`) mewajibkan passphrase untuk semua status, sehingga
+    PyB bersertifikat tidak bisa menolak (bug, diperbaiki). Surat hanya dibuat untuk status 1/4 (`L_cuti:3264`).
+  - **Q6-22 = Q-1, QR gambar TTE ikut legacy:** QR berisi URL **langsung ke PDF bertanda tangan**, terbuka **tanpa login**
+    (legacy `L_cuti:3364-3389`: URL arsip publik `arsip/{NIP}/cuti/co_{NIP}_{tgl}_{waktu}_{acak 4}_signed.pdf`). Parameter QR
+    dan TTE ikut legacy: logo tengah, 300px, `tag_koordinat ##`, 50x50, visible, `reason`, `location`.
+    - Bentuk v2, perilaku tetap sama:
+      - satu route publik tanpa `jwt` yang hanya mengalirkan PDF surat cuti bertanda tangan;
+      - URL memakai **token acak**, bukan path ber-NIP;
+      - throttle publik, 404 seragam, `no-store` + `noindex`, `inline`;
+      - log tanpa token/IP;
+      - token nonaktif bila surat dicabut.
+    - **Gap diterima:**
+      - siapa pun yang memegang QR/URL dapat mengunduh surat utuh (nama, NIP, jabatan, alasan & alamat cuti, data PyB);
+      - URL bocor berarti akses permanen sampai surat dicabut;
+      - perlu justifikasi pelindungan data pribadi/audit;
+      - QR bukan bukti keaslian (bukti = tanda tangan digital di PDF);
+      - QR surat legacy lama tetap menunjuk server arsip legacy.
+    - Opsi lain yang tidak dipilih:
+      - Q-2 verifikasi publik;
+      - Q-3 URL ber-login;
+      - Q-4 tanpa QR;
+      - Q-5 QR ke validator resmi.
+  - **Q6-23 = Q-2, QR kaki surat diganti verifikasi publik [V2].** QR kaki v2 saat ini (`SuratCutiService`, teks
+    `SIMPEG/CUTI/{id}/{nip}`, memuat NIP, tidak bisa dipakai verifikasi) diganti URL halaman verifikasi publik **pola slip
+    D-14** (ADR-032):
+    - token acak 64 heks; DB menyimpan hash + salinan terenkripsi;
+    - throttle, 404 seragam;
+    - data minimal: jenis surat, nama penandatangan, tanggal tanda tangan, status "ditandatangani elektronik"/"belum";
+      **tanpa NIP dan tanpa unduh PDF**.
+    - Token yang sama dipakai URL PDF Q6-22. Surat tanpa TTE tetap mendapat QR kaki berstatus "belum".
+  - Token surat = perubahan skema → **DBV-030** (`[CR][DBV]`, PR, review DB Validator).
 - Kontrak `EsignGatewayInterface` **tidak berubah**. Alur penanda tangan (F6-18): passphrase diketik **PyB sendiri** di
   halaman tugas persetujuannya (legacy `Cuti::process_esign`); perubahan `EsignCutiService`/FE dari dialog admin mock Fase 4
   dicatat sebagai deviasi terhadap PRD Fase 4 Q-09 dan diuji ulang (C-05).
@@ -357,6 +417,27 @@ tetap kosong saat cutover (tidak diimpor, FSD-FN-H-01); **AC-01.3** migration na
 **AC-02.1** regresi C-05 (test Fase 4 e-sign cuti) hijau dengan driver mock dan dengan adapter real + FakeTransport;
 **AC-02.2** gateway mati/timeout → `esign_hist` status 2 + `status_code` + pesan, cuti tidak berubah final; **AC-02.3**
 passphrase/NIK tidak ada di log mana pun; **AC-02.4** uji real (reviewer, jaringan internal): 1 sukses + 1 gagal (MTC-037) — di MT-010, sebelum deploy (F6-23).
+**AC-02.5** (CR-097):
+- `esign.tlsVerify=false` diterima untuk e-sign, tetapi `false` untuk BKN ditolak fail-fast;
+- saat `false` muncul peringatan log + baris "TLS BSrE: TIDAK DIVERIFIKASI" di `integrasi:status`;
+- `esign.caBundle` tak terbaca → galat konfigurasi.
+
+**AC-02.6** (CR-097):
+- e-sign oleh selain PyB pemilik tugas → 403;
+- tanda tangan gagal → persetujuan tetap tersimpan dan PyB bisa mengulang;
+- percobaan ke-6 dalam 15 menit → ditolak pembatas;
+- Tolak tidak meminta passphrase.
+
+**AC-02.7** (CR-097) — route PDF publik Q6-22:
+- token sah → PDF bertanda tangan;
+- token salah/nonaktif/surat tanpa TTE → 404 seragam;
+- throttle aktif; header `no-store` + `noindex`;
+- tidak ada route publik untuk berkas lain.
+
+**AC-02.8** (CR-097) — halaman verifikasi Q6-23:
+- menampilkan data minimal tanpa NIP dan tanpa unduh PDF;
+- token salah → 404 seragam;
+- QR kaki surat tidak lagi memuat NIP.
 
 ### 7.3 H-03 — SIASN (Jalur B, MAKE-067) — ikut legacy penuh (F6-14)
 
@@ -553,6 +634,12 @@ Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (ju
 | Q6-15 | Auto-approval LKH tanggal 5 | **Ikut legacy** | F6-25, H-12 |
 | Q6-16 | Retensi `integrasi_log` 180 hari | Default diterima | F6-24 |
 | Q6-17 | **(02-11-2026, B2 Jalur B)** Sumber bentuk auth BKN untuk `TokenBkn` — helper token legacy `FH:2513-2921` ada di daftar terlarang dibuka (berisi kredensial literal). Pilihan: **A** — reviewer CR mengekstrak **bentuk saja** lewat skrip redaksi (literal disamarkan kecuali nama field/header/path; keluaran ditolak otomatis bila memuat host/IP/string mirip token), hasil diteruskan ke pelaksana; **B** — tunggu dokumentasi resmi API BKN saat akses PN-2 tersedia (aman tetapi menahan TokenBkn/B2, B3 tarik, B6) | **A** (keputusan Horii 02-11-2026; ekstraksi dijalankan 02-11, nilai tidak pernah dibaca/ditampilkan). Hasil & desain di §7.0.2 "Bentuk auth BKN" (CR-092) | §7.0.2, F6-26 |
+| Q6-18 | **(03-11-2026, B4a Jalur B)** TLS ke gateway BSrE — legacy mematikan verifikasi peer & host (`bsre_esign.php:92-93`). Pilihan:<br>**A** — wajib TLS ketat seperti BKN (+ `esign.caBundle` untuk CA internal);<br>**B** — ikut legacy, `esign.tlsVerify=false` boleh khusus e-sign di `.env` server | **B — ikut legacy** (keputusan Horii 03-11-2026).<br>Bawaan tetap `true`; peringatan log + `integrasi:status`; upgrade ke A lewat `esign.caBundle`/`tlsVerify` tanpa ubah kode.<br>Gap: MITM (client secret, NIK, passphrase, PDF), PDF palsu, audit. Trello Catatan Teknis "Keputusan TLS BSrE" (CR-097) | §7.2, BP-3, B-10 |
+| Q6-19 | **(03-11-2026, B4a)** Alur persetujuan + tanda tangan PyB. Pilihan:<br>**A** — satu langkah seperti legacy (sign gagal → persetujuan tidak disimpan);<br>**B** — dua langkah di halaman yang sama | **B** (keputusan Horii 03-11-2026).<br>E-sign hanya oleh PyB pemilik tugas; sign gagal → persetujuan tetap, surat tanpa TTE, bisa diulang. Deviasi dari legacy dicatat; regresi C-04/C-05 (CR-097) | §7.2, F6-18 |
+| Q6-20 | **(03-11-2026, B4a)** Pembatas percobaan passphrase (legacy tidak punya) | **Ya [V2]** — 5 percobaan / 15 menit per PyB per cuti, pola LockoutService (CR-097) | §7.2, AC-02.6 |
+| Q6-21 | **(03-11-2026, B4a)** Passphrase saat PyB menolak — tampilan legacy hanya meminta untuk Setujui/Penangguhan, server legacy mewajibkan untuk semua status (PyB bersertifikat tidak bisa menolak). Pilihan:<br>**P-1** ikut tampilan;<br>**P-2** ikut server;<br>**P-3** ikut keduanya | **P-1** — passphrase hanya untuk Setujui (1)/Penangguhan (4); Tolak tanpa passphrase. Memperbaiki bug legacy (CR-097) | §7.2, AC-02.6 |
+| Q6-22 | **(03-11-2026, B4a)** Isi QR gambar TTE. Pilihan:<br>**Q-1** ikut legacy (URL langsung ke PDF bertanda tangan, tanpa login);<br>**Q-2** halaman verifikasi publik data minimal;<br>**Q-3** URL ber-login;<br>**Q-4** tanpa QR;<br>**Q-5** QR ke validator resmi | **Q-1 — ikut legacy** (keputusan Horii 03-11-2026).<br>v2: route publik khusus PDF surat TTE, token acak (bukan path ber-NIP), throttle, 404 seragam, `no-store`/`noindex`, token nonaktif saat dicabut.<br>Gap diterima: surat utuh (data pribadi) bisa diunduh pemegang QR/URL, URL bocor = akses sampai dicabut, QR bukan bukti keaslian. Trello Catatan Teknis "Keputusan e-sign cuti F6-18" (CR-097) | §7.2, AC-02.7, DBV-030 |
+| Q6-23 | **(03-11-2026, B4a)** QR kaki surat cuti v2 (teks `SIMPEG/CUTI/{id}/{nip}`, memuat NIP) | **Q-2 [V2]** — URL halaman verifikasi publik pola slip D-14 (ADR-032): data minimal tanpa NIP/PDF; token sama dengan Q6-22 (CR-097) | §7.2, AC-02.8, DBV-030 |
 
 Prinsip umum Horii 01-11-2026: **"intinya ikut legacy"** — berlaku juga untuk hal yang tidak tercantum di atas. Bila coder
 menemukan perilaku legacy yang belum diputus, default = ikut legacy [K]; deviasi hanya untuk alasan teknis wajib/keamanan
@@ -637,7 +724,7 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 | B-7 | Kontrak respons tidak seragam, HTTP selalu 200 | Dipertahankan hanya untuk endpoint kompatibilitas (F6-04) |
 | B-8 | `change_history` ack-on-read (data hilang bila klien gagal) | [K] (F6-06) — dicatat sebagai risiko klien |
 | B-9 | `detil` `unit_es_3/4` selalu kosong (`AE:302-317`); riwayat tanpa ORDER BY | Diperbaiki (F6-04) |
-| B-10 | E-sign: passphrase/NIK di query string, TLS off, JSON non-error = sukses, `continue` di `switch` | F6-17, BP-3 |
+| B-10 | E-sign: passphrase/NIK di query string, TLS off, JSON non-error = sukses, `continue` di `switch` | F6-17, BP-3; TLS off **ikut legacy khusus e-sign** (Q6-18 = B, CR-097), QR TTE ikut legacy (Q6-22) |
 | B-11 | FCM Legacy API/IID (dihentikan Google), hapus-lalu-kirim, token invalid tidak dibersihkan | F6-11, job `push-notif` |
 | B-12 | Token SSO/e-Kinerja literal di kode, tanpa refresh | 7.0.2 |
 | B-13 | SIASN: hapus fisik SKP saat API gagal (`Rw_skp.php:219`), salah variabel `Rw_ak.php:65`, salah salin tabel, dua jalur menulis tabel sama, data SIASN menimpa `npwp`/`keterangan` | F6-14 |
@@ -657,3 +744,4 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 | v1.0c | 02-11-2026 | CR-091, usulan Jalur B disepakati Horii 02-11-2026: kontrak log bersama Jalur A & B di §7.0.2 — `IntegrasiLogInterface::catat(CatatanIntegrasi)` + objek nilai `CatatanIntegrasi` (arah 1 keluar/2 masuk); Jalur A tidak membuat antarmuka log sendiri |
 | v1.0d | 03-11-2026 | CR-092: Q6-17 (keputusan Horii 02-11-2026 = A, ekstraksi bentuk auth BKN tanpa nilai; pilihan B = tunggu dokumentasi BKN/PN-2) + §7.0.2 "Bentuk auth BKN" (token gateway, SSO, varian e-Kinerja, dua header SIASN, token literal e-Kinerja legacy) + desain `TokenBkn` (token statis `.env` / SSO + cache, tanpa literal) |
 | v1.0e | 03-11-2026 | CR-093, keputusan Horii 03-11-2026 atas A0 v2 Jalur A: PDF auto-approval LKH ikut v2 (on-demand, tidak disimpan; AC-12.3 disesuaikan), catatan = kolom `auto_approval` + audit tanpa tabel `aa_lkh`; H-12 dipisah ke MAKE-068 (A2b); akun sistem integrasi dikecualikan dari `simapi_ch` |
+| v1.0f | 03-11-2026 | CR-097, keputusan Horii 03-11-2026 atas B4a Jalur B (MAKE-065):<br>- Q6-18 TLS BSrE ikut legacy (B) + jalur upgrade `esign.caBundle`;<br>- Q6-19 alur dua langkah (B);<br>- Q6-20 pembatas passphrase 5/15 menit [V2];<br>- Q6-21 passphrase hanya Setujui/Penangguhan (P-1);<br>- Q6-22 QR TTE ikut legacy (Q-1, URL PDF tanpa login, token acak);<br>- Q6-23 QR kaki surat verifikasi publik (Q-2, pola D-14).<br><br>§7.2, BP-3, B-10, AC-02.5..AC-02.8; skema token → DBV-030. Rincian opsi & gap di Trello Catatan Teknis |
