@@ -15,9 +15,11 @@ class Integrations extends BaseConfig
 {
     /**
      * E-sign (H-02): `driver` `mock` | `bsre` (MAKE-065). `username`/`password` = client id/secret Basic BSrE [K]. `tlsVerify`
-     * WAJIB true untuk `bsre` (legacy mematikan verifikasi; tidak diikuti, BP-3); `timeout` detik total > 0.
+     * bawaan true; `false` hanya dari `.env` server — TLS BSrE ikut legacy atas keputusan Horii 03-11-2026 (kartu Catatan
+     * Teknis), peer & host tidak diverifikasi. Upgrade ke TLS ketat lewat `tlsVerify = true` (+ `caBundle` = path CA internal
+     * di luar repo/webroot; kosong = CA sistem). `timeout` detik total > 0.
      *
-     * @var array{driver: string, baseUrl: string, username: string, password: string, tlsVerify: bool, timeout: float}
+     * @var array{driver: string, baseUrl: string, username: string, password: string, tlsVerify: bool|string, caBundle: string, timeout: float|string}
      */
     public array $esign = [
         'driver'    => 'mock',
@@ -25,6 +27,7 @@ class Integrations extends BaseConfig
         'username'  => '',
         'password'  => '',
         'tlsVerify' => true,
+        'caBundle'  => '',
         'timeout'   => 30.0,
     ];
 
