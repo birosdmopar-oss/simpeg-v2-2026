@@ -15,6 +15,7 @@ use CodeIgniter\Test\Mock\MockCache;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use RuntimeException;
+use Tests\Support\Integrasi\KunciRsaUji;
 use Tests\Support\Integrasi\LogIntegrasiTiruan;
 
 /**
@@ -42,24 +43,7 @@ final class FcmV1AdapterTest extends CIUnitTestCase
     public static function setUpBeforeClass(): void
     {
         parent::setUpBeforeClass();
-        $opsi  = ['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA];
-        $kunci = openssl_pkey_new($opsi);
-
-        if ($kunci === false) {
-            // Windows tanpa openssl.cnf: pakai konfigurasi minimal sementara.
-            $cnf = tempnam(sys_get_temp_dir(), 'cnf');
-            file_put_contents((string) $cnf, '[req]
-distinguished_name=dn
-[dn]
-');
-            $opsi['config'] = $cnf;
-            $kunci          = openssl_pkey_new($opsi);
-        }
-
-        self::assertNotFalse($kunci);
-        openssl_pkey_export($kunci, $privat, null, $opsi);
-        self::$kunciPrivat = (string) $privat;
-        self::$kunciPublik = (string) (openssl_pkey_get_details($kunci)['key'] ?? '');
+        ['privat' => self::$kunciPrivat, 'publik' => self::$kunciPublik] = KunciRsaUji::pasangan();
     }
 
     protected function setUp(): void

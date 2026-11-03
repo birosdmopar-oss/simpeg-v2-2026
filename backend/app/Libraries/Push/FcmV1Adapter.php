@@ -187,6 +187,14 @@ final class FcmV1Adapter implements PushNotifGatewayInterface
     }
 
     /**
+     * Buang token akses tersimpan (HTTP 401) supaya permintaan berikutnya meminta token baru.
+     */
+    public function lupakanTokenAkses(): void
+    {
+        $this->cache->invalidate(self::CACHE_TOKEN);
+    }
+
+    /**
      * @param array<string, string> $data
      */
     private function kirim(string $deviceToken, string $title, string $body, array $data): Respons
@@ -209,7 +217,7 @@ final class FcmV1Adapter implements PushNotifGatewayInterface
         ));
 
         if ($respons->status === 401) {
-            $this->cache->invalidate(self::CACHE_TOKEN);
+            $this->lupakanTokenAkses();
         }
 
         return $respons;
