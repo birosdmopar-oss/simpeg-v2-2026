@@ -53,6 +53,8 @@ final class PathLegacyTest extends CIUnitTestCase
         yield 'backslash' => ['arsip\\rw jabatan\\SK 01.pdf', 'arsip/rw jabatan/SK 01.pdf'];
         yield 'titik-garis' => ['./arsip/./rw jabatan//SK 01.pdf', 'arsip/rw jabatan/SK 01.pdf'];
         yield 'aplikasi' => ['assets/upload/foto/a.jpg', 'assets/upload/foto/a.jpg'];
+        // `//host` tanpa skema = path relatif biasa, selalu di bawah akar / alamat dasar.
+        yield 'garis ganda di awal' => ['//host-lain/x.pdf', 'host-lain/x.pdf'];
     }
 
     #[DataProvider('sah')]
@@ -70,7 +72,12 @@ final class PathLegacyTest extends CIUnitTestCase
         yield 'traversal backslash' => ['arsip\\..\\rahasia'];
         yield 'ter-encode' => ['arsip/%2e%2e/rahasia'];
         yield 'skema' => ['http://host-lain/x.pdf'];
-        yield 'skema relatif' => ['//host-lain/x.pdf'];
+        yield 'titik dua di tengah' => ['arsip/a:b.pdf'];
+        yield 'UTF-8 tidak sah' => ["arsip/\xff\x00.pdf"];
+        yield 'UTF-8 tidak sah tanpa NUL' => ["arsip/\xc3\x28.pdf"];
+        yield 'U+2028' => ["arsip/a\u{2028}b.pdf"];
+        yield 'NBSP' => ["arsip/a\u{00A0}b.pdf"];
+        yield 'menjadi kosong' => ['./'];
         yield 'huruf drive' => ['C:/Windows/win.ini'];
         yield 'byte kontrol' => ["arsip/a\0.pdf"];
         yield 'baris baru' => ["arsip/a\n.pdf"];
@@ -82,13 +89,6 @@ final class PathLegacyTest extends CIUnitTestCase
     #[DataProvider('tidakSah')]
     public function testNormalisasiMenolak(string $mentah): void
     {
-        // `//host` tanpa skema dinormalisasi menjadi path relatif `host-lain/x.pdf` (aman: selalu di bawah akar/alamat dasar).
-        if ($mentah === '//host-lain/x.pdf') {
-            $this->assertSame('host-lain/x.pdf', PathLegacy::normalisasi($mentah));
-
-            return;
-        }
-
         $this->assertNull(PathLegacy::normalisasi($mentah));
     }
 

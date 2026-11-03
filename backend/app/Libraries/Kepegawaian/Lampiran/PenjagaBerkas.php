@@ -7,6 +7,7 @@ namespace App\Libraries\Kepegawaian\Lampiran;
 use App\Interfaces\Kepegawaian\StorageAdapterInterface;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\ConnectionInterface;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -102,8 +103,11 @@ final class PenjagaBerkas
                 if ($db->table($tabel)->where($kolom, $path)->countAllResults() === 0) {
                     $this->storage->hapus($path);
                 }
+            } catch (InvalidArgumentException) {
+                // Path legacy hasil impor (MAKE-069 K-M3 opsi A) tidak dihapus fisik; log tanpa path (review S-5).
+                log_message('info', 'Berkas lampiran berpath legacy tidak dihapus fisik (ref {ref}).', ['ref' => substr(sha1((string) $path), 0, 12)]);
             } catch (Throwable $e) {
-                log_message('error', 'Kompensasi berkas lampiran gagal untuk {path}: {pesan}', ['path' => $path, 'pesan' => $e->getMessage()]);
+                log_message('error', 'Kompensasi berkas lampiran gagal (ref {ref}): {kelas}', ['ref' => substr(sha1((string) $path), 0, 12), 'kelas' => $e::class]);
             }
         }
 

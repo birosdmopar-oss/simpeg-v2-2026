@@ -7,8 +7,9 @@ namespace App\Libraries\Kepegawaian\Lampiran;
 /**
  * Normalisasi path berkas legacy (MAKE-069 K-M3 opsi A): path di DB tetap seperti legacy, berkas disalin dengan struktur
  * folder relatif yang sama. Mengikuti `fixArsipPath()` legacy (`\` dan `./` → `/`, `/` di awal dibuang) dan menolak
- * semua yang bisa keluar dari akar penyimpanan atau dipakai untuk SSRF saat ditarik lewat URL: segmen `..`, skema/huruf
- * drive (`x:`), `%` (traversal ter-encode), byte kontrol/tak terlihat, NUL. Spasi di dalam segmen diizinkan (path legacy).
+ * semua yang bisa keluar dari akar penyimpanan atau dipakai untuk SSRF saat ditarik lewat URL: segmen `..`, `:` di mana
+ * pun (skema/huruf drive), `%` (traversal ter-encode), UTF-8 tidak sah, byte kontrol/tak terlihat, NUL, pemisah baris
+ * U+2028/U+2029, NBSP. Spasi biasa di dalam segmen diizinkan (path legacy).
  */
 final class PathLegacy
 {
@@ -23,7 +24,8 @@ final class PathLegacy
     {
         $p = trim($path);
 
-        if ($p === '' || preg_match('/[\p{C}%]/u', $p) === 1 || preg_match('#^[A-Za-z][A-Za-z0-9+.\-]*:#', $p) === 1) {
+        // preg_match() = false pada UTF-8 tidak sah → `!== 0` ikut menolaknya (review S-1).
+        if ($p === '' || ! mb_check_encoding($p, 'UTF-8') || preg_match('/[\p{C}\p{Zl}\p{Zp}\x{00A0}%:]/u', $p) !== 0) {
             return null;
         }
 
