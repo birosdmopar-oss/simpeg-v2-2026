@@ -16,7 +16,8 @@ use RuntimeException;
  * - Kunci PER PEMILIK (keputusan Horii 03-11-2026, DBV-Q8 ikut legacy `fb_token.id_user + fcm_token`): (`id_pengguna`,
  *   `token_hash`) dengan `platform = 1`. Token sama milik akun lain tidak disentuh.
  * - Baru → INSERT dengan `refresh_date` = sekarang + 1 minggu; sudah ada → `refresh_date` diperpanjang 1 minggu hanya bila
- *   sudah lewat [K :4254-4261]. `nip` diisi NIP akun (bila ada) supaya penerima "pegawai" ditemukan per NIP.
+ *   sudah lewat [K :4254-4261]. `nip` selalu NULL untuk token web (DBV-027 T2 opsi a: pemilik token web = akun saja,
+ *   CHECK pemilik); penerima "pegawai" di kanal web dicari lewat `pengguna.nip` → `id_pengguna`.
  * - Lepas (logout, [V2] — legacy tidak punya): hapus baris token itu milik akun ini saja.
  * - Isi token tidak pernah dikembalikan/dicatat; stempel waktu UTC.
  */
@@ -52,7 +53,7 @@ final class TokenFcmService
 
         if ($ada === null) {
             $this->db->table('firebase_token')->insert([
-                'nip'          => $auth->nip(),
+                'nip'          => null,
                 'id_pengguna'  => $idPengguna,
                 'platform'     => self::PLATFORM_WEB,
                 'fcm_token'    => $token,

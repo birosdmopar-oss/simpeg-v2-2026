@@ -11,6 +11,7 @@ use App\Libraries\Integrasi\Http\FakeTransport;
 use App\Libraries\Integrasi\Http\KlienHttp;
 use App\Libraries\Push\AntreTopikFcm;
 use App\Libraries\Push\FcmV1Adapter;
+use App\Libraries\Push\TokenFcmService;
 use App\Libraries\Push\TopikFcm;
 use CodeIgniter\Queue\Interfaces\QueueInterface;
 use CodeIgniter\Test\FeatureTestTrait;
@@ -162,7 +163,7 @@ final class FcmTopikTest extends DatabaseTestCase
 
     private function token(string $nip, string $token, int $platform, string $dibuat, int|string|null $idPengguna = null): void
     {
-        $this->db->table('firebase_token')->insert(['nip' => $nip, 'id_pengguna' => $idPengguna, 'platform' => $platform, 'fcm_token' => $token, 'token_hash' => hash('sha256', $token), 'created_at' => $dibuat]);
+        $this->db->table('firebase_token')->insert(['nip' => $platform === TokenFcmService::PLATFORM_WEB ? null : $nip, 'id_pengguna' => $idPengguna, 'platform' => $platform, 'fcm_token' => $token, 'token_hash' => hash('sha256', $token), 'created_at' => $dibuat]);
     }
 
     private function pasangFcm(FakeTransport $transport): void

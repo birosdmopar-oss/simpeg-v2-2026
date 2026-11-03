@@ -46,7 +46,7 @@ final class TokenFcmTest extends DatabaseTestCase
         $this->assertSame(1, $this->db->table('firebase_token')->countAllResults(), 'AC-04.5 tanpa baris ganda');
     }
 
-    public function testTokenSamaAkunLainTercatatTerpisahDanNipPegawaiDisimpan(): void
+    public function testTokenSamaAkunLainTercatatTerpisahDanTokenWebTanpaNip(): void
     {
         $nip     = $this->buatPegawai();
         $pegawai = $this->buatAkunTanpaNip('pegawai.uji.fcm', Role::PEGAWAI, ['nip' => $nip]);
@@ -55,7 +55,7 @@ final class TokenFcmTest extends DatabaseTestCase
         $this->assertSame('baru', $this->daftar($pegawai, 'tok-bersama'));
         $this->assertSame('baru', $this->daftar($admin, 'tok-bersama'), 'DBV-Q8 per pemilik: ikut legacy fb_token');
         $this->assertSame(2, $this->db->table('firebase_token')->countAllResults());
-        $this->assertSame($nip, $this->db->table('firebase_token')->where('id_pengguna', $pegawai['id_pengguna'])->get()->getRow()->nip);
+        $this->assertNull($this->db->table('firebase_token')->where('id_pengguna', $pegawai['id_pengguna'])->get()->getRow()->nip, 'DBV-027 T2 opsi a: pemilik token web = akun');
 
         $r = $this->asUser($admin)->withBodyFormat('json')->delete(self::URL, ['fcm_token' => 'tok-bersama']);
         $r->assertStatus(200);
