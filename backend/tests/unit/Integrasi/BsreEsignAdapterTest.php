@@ -210,7 +210,7 @@ uji
     public function testDriverBsreDiServicesGagalSaatDibuatBilaKonfigurasiKosong(): void
     {
         $esign                             = config(Integrations::class)->esign;
-        config(Integrations::class)->esign = ['driver' => 'bsre', 'baseUrl' => '', 'username' => '', 'password' => '', 'tlsVerify' => true, 'caBundle' => '', 'qrLogo' => '', 'timeout' => 30.0];
+        config(Integrations::class)->esign = ['driver' => 'bsre', 'baseUrl' => '', 'username' => '', 'password' => '', 'tlsVerify' => true, 'caBundle' => '', 'timeout' => 30.0];
 
         try {
             $this->expectException(KonfigurasiIntegrasiTidakLengkap::class);

@@ -89,7 +89,6 @@ class EsignCutiService
         private readonly EsignGatewayInterface $gateway,
         private readonly ?CutiNotifikasiService $notifikasi = null,
         private readonly ?TautanSuratCutiInterface $tautan = null,
-        private readonly ?string $logoQr = null,
         private readonly ?CacheService $cache = null,
     ) {
     }
@@ -302,7 +301,7 @@ class EsignCutiService
                 'id_rw'         => (int) $cuti['id_riwayat_cuti'],
             ];
             $url = $this->tautan?->urlPdfTte((int) $cuti['id_riwayat_cuti']);
-            $qr  = $url === null ? null : QrTtd::png($url, $this->logoQr);
+            $qr  = $url === null ? null : QrTtd::png($url);
 
             if ($qr !== null) {
                 $opsi['imageTTD'] = $qr;

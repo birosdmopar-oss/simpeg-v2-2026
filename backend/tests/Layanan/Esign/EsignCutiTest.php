@@ -254,7 +254,7 @@ final class EsignCutiTest extends DatabaseTestCase
 
         if (extension_loaded('gd')) {
             $this->assertStringStartsWith("\x89PNG", (string) $gateway->opsi['imageTTD']);
-            $this->assertSame([300, 300], array_slice((array) getimagesizefromstring((string) $gateway->opsi['imageTTD']), 0, 2));
+            $this->assertSame([320, 320], array_slice((array) getimagesizefromstring((string) $gateway->opsi['imageTTD']), 0, 2));
         }
 
         $tanpa = new class () extends MockEsignAdapter {

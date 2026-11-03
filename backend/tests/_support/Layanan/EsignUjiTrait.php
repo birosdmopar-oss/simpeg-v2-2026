@@ -63,7 +63,6 @@ trait EsignUjiTrait
             $gateway ?? new MockEsignAdapter($tanpaSertifikat),
             $this->notifikasiUji,
             $tautan,
-            null,
             $cache,
         );
     }
