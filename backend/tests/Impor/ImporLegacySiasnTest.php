@@ -119,9 +119,10 @@ final class ImporLegacySiasnTest extends ImporLegacyTestCase
 
     public function testTanpaSumberSiasnReferensiDilewatiDanArsipDiimpor(): void
     {
+        // Kunci (Rw Jabatan, 5, 50): terunggah lebih dulu walau id lebih kecil. Backslash: respons BKN & error_msg mentah,
+        // arsip_path ikut stripslashes.
+        $this->src->table('siasn_upload_arsip')->insert($this->arsip(1, 'Rw Jabatan', 5, 50, 1, ['resp_dok_uri' => 'peremajaan\dok\1.pdf', 'error_msg' => "Gagal \\'x\\'", 'arsip_path' => "arsip/uji/Bu\\'s.pdf"]));
         $this->src->table('siasn_upload_arsip')->insertBatch([
-            // Kunci (Rw Jabatan, 5, 50): terunggah lebih dulu walau id lebih kecil.
-            $this->arsip(1, 'Rw Jabatan', 5, 50, 1),
             $this->arsip(2, 'Rw Jabatan', 5, 50, 2),
             $this->arsip(3, 'Rw Jabatan', 5, 50, 0),
             // Kunci (Rw Sertifikasi, 6, 60): tanpa unggahan → id terbesar.
@@ -145,11 +146,14 @@ final class ImporLegacySiasnTest extends ImporLegacyTestCase
         $this->assertSame(2, $sua['koreksi']['INFO id_rw Rw Jabatan tanpa rujukan: riwayat_mutasi_jabatan belum diimpor (kosong)']);
         $this->assertSame(1, $sua['koreksi']['INFO id_rw Rw Sertifikasi tanpa rujukan: riwayat_diklat belum diimpor (kosong)']);
 
-        $baris = $this->db->table('siasn_upload_arsip')->select('id_siasn_upload_arsip, status, error_msg, created_at')->orderBy('id_siasn_upload_arsip')->get()->getResultArray();
+        $baris = $this->db->table('siasn_upload_arsip')->select('id_siasn_upload_arsip, status, error_msg, resp_dok_uri, arsip_path, created_at')->orderBy('id_siasn_upload_arsip')->get()->getResultArray();
         $this->assertSame(['1', '5', '6'], array_column($baris, 'id_siasn_upload_arsip'));
         $this->assertSame('2', $baris[2]['status']);
         $this->assertSame(AturanSiasn::PESAN_TERHENTI, $baris[2]['error_msg']);
         $this->assertSame('2026-06-01 01:00:00', $baris[0]['created_at'], 'R1a WIB→UTC');
+        $this->assertSame('peremajaan\dok\1.pdf', $baris[0]['resp_dok_uri'], 'respons BKN disalin mentah');
+        $this->assertSame("Gagal \'x\'", $baris[0]['error_msg'], 'pesan galat disalin mentah');
+        $this->assertSame("arsip/uji/Bu's.pdf", $baris[0]['arsip_path'], 'arsip_path ikut stripslashes (DBV-029)');
 
         $this->assertSame(1, $this->db->table('double_riwayat_kp')->where('nip', self::NIP_B)->countAllResults());
     }

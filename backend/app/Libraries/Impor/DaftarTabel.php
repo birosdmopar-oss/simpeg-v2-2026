@@ -312,6 +312,9 @@ final class DaftarTabel
             'siasn_upload_arsip',
             'id_siasn_upload_arsip',
             'DBV-027 §3.3, K-6/K-7',
+            // Respons BKN & pesan galat ditulis mentah oleh legacy (SS/Arsip :73-112); arsip_path/arsip_name ikut
+            // stripslashes bawaan agar sama dengan document_attachment.path hasil impor (DBV-029).
+            tanpaStripslashes: ['resp_dok_id', 'resp_dok_nama', 'resp_dok_uri', 'resp_object', 'resp_slug', 'error_msg'],
             statusDomain: [0, 1, 2, 3],
             kolomKode: ['nip'],
             khusus: static fn (array $b): array => AturanSiasn::terhentiSaatCutover($b),

@@ -124,6 +124,8 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
   memuat NIP berbeda → gagal dengan jumlah grup (DBV memutus per kasus). Kunci ber-NULL tidak dikelompokkan.
 - `siasn_upload_arsip` (K-6/K-7): semua status diimpor, `id_rw`/`id_da` apa adanya. Kunci UNIQUE `uq_sua_rw_da`
   ganda → satu per kunci, prioritas `status = 1` lalu id terbesar (`DBV-027 K-6 kunci ganda`). `id_da` NULL → gagal.
+  Kolom respons BKN (`resp_*`) dan `error_msg` disalin mentah; `arsip_path`/`arsip_name` ikut `stripslashes` agar sama
+  dengan `document_attachment.path` hasil impor (DBV-029).
   `status = 3` → `2` dengan `error_msg` "Terhenti saat cutover — periksa di SIASN sebelum mengantre ulang"
   (`DBV-027 K-7 status 3→2`). `id_da`/`id_rw` tanpa baris di `document_attachment` / `riwayat_mutasi_jabatan`
   (`Rw Jabatan`) / `riwayat_diklat` (`Rw Sertifikasi`) → INFO; bila tabel induknya masih kosong, kodenya menyebut
