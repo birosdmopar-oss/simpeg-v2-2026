@@ -7,6 +7,7 @@
  *   POST   cuti/{id}/process                            `{aksi, reason_note?, atas_nama?}`
  *   POST   cuti/{id}/tunda                              tunda pengingat
  *   POST   cuti/{id}/esign                              tanda tangani surat `{passphrase}` (penanda tangan pemilik tugas, F6-18)
+ *   GET    cuti/{id}/esign/status                       cek sertifikat sebelum passphrase `{status: aktif|tidak_aktif|galat, pesan}`
  *   DELETE cuti/{id}                                    hapus
  *   GET    cuti/pengingat                               antrean persetujuan yang belum ditunda
  *   GET    cuti/{id}/lampiran | cuti/{id}/surat         unduh berkas
@@ -212,6 +213,12 @@ export const cutiService = {
   },
 
   /** Terbitkan surat cuti ber-TTE (role 1, 3). Passphrase hanya di body JSON; tidak pernah di URL/query. */
+  async esignStatus(id: number): Promise<{ status: 'aktif' | 'tidak_aktif' | 'galat'; pesan: string }> {
+    const { data } = await api.get<{ status?: unknown; pesan?: unknown }>(`/cuti/${id}/esign/status`)
+    const status = data.status === 'aktif' || data.status === 'tidak_aktif' ? data.status : 'galat'
+    return { status, pesan: typeof data.pesan === 'string' ? data.pesan : '' }
+  },
+
   async esign(id: number, passphrase: string): Promise<CutiItem> {
     const { data } = await api.post<Record<string, unknown>>(`/cuti/${id}/esign`, { passphrase })
     return normalisasiCuti(data)

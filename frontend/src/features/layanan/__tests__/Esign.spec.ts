@@ -22,6 +22,7 @@ vi.mock('../services/cuti.service', () => ({
     create: vi.fn(),
     update: vi.fn(),
     esign: vi.fn(),
+    esignStatus: vi.fn(),
   },
 }))
 
@@ -95,6 +96,7 @@ beforeEach(() => {
   for (const fn of Object.values(svc)) fn.mockReset()
   svc.pengingat.mockResolvedValue({ items: [], total: 0 })
   svc.list.mockImplementation(async () => daftar([]))
+  svc.esignStatus.mockResolvedValue({ status: 'aktif', pesan: 'Sertifikat elektronik aktif.' })
 })
 
 describe('EsignDialog — passphrase', () => {
@@ -282,5 +284,35 @@ describe('CutiPage — dua langkah PyB (F6-18 K1/K3a)', () => {
 
     expect(q('[data-testid="esign-error"]')?.textContent).toContain('Terlalu banyak percobaan')
     expect(svc.process).not.toHaveBeenCalled()
+  })
+})
+
+describe('CutiPage — cek sertifikat sebelum passphrase', () => {
+  it('sertifikat tidak aktif: pesan tampil, dialog passphrase tidak dibuka', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { esign: true })]))
+    svc.esignStatus.mockResolvedValue({ status: 'tidak_aktif', pesan: 'Sertifikat elektronik Anda tidak aktif; surat cuti diterbitkan tanpa tanda tangan elektronik.' })
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
+    await flushPromises()
+
+    expect(svc.esignStatus).toHaveBeenCalledWith(7)
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
+    expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('tidak aktif')
+  })
+
+  it('layanan tidak terhubung: pesan galat, coba lagi berhasil membuka dialog', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { esign: true })]))
+    svc.esignStatus.mockResolvedValueOnce({ status: 'galat', pesan: 'Layanan tanda tangan elektronik tidak dapat dihubungi. Coba lagi.' })
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
+    await flushPromises()
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
+    expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('tidak dapat dihubungi')
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
+    await flushPromises()
+    expect(q('[data-testid="esign-dialog"]')).not.toBeNull()
   })
 })
