@@ -198,6 +198,28 @@ tabel itu disalin mentah (`tanpaStripslashes: ['*']`).
 | `riwayat_tb` | `nama`, `gol_ruang`, `pangkat`, `jabatan`, `unit`, `satker`, `pendidikan_dasar_singkat`, `jenjang_pendidikan_singkat`, `institusi_pendidikan`, `jurusan_pendidikan`, `lokasi_pendidikan`, `lembaga_yang_mendanai`, `up`, `tembusan`, `file_sp`, `file_1`, `file_2`, `file_3`, `keterangan`, `rs_admin_upt`, `sp_admin_deputi`, `rs_admin_deputi`, `ds_tb`, `no_ds_tb`, `perihal_ds_tb`, `no_sk`, `file_surat_tb`, `reason_note` |
 | `riwayat_tb_perpan` | `file_sperpan` |
 
+## Akun dan berkas lampiran (MAKE-069)
+
+Urutan sesudah impor tier (operator; tanpa alamat atau kredensial di repo):
+
+1. `php spark integrasi:siapkan-akun-sistem` — akun sistem integrasi dibuat SESUDAH T8 `pengguna` (Z-1).
+2. Bila perlu: `php spark akun:bootstrap-admin --username=<u> --nama=<n> --konfirmasi=<db>` di terminal interaktif.
+   Password acak tampil sekali, tidak masuk log/berkas/audit; akun wajib ganti password saat login pertama. Admin
+   legacy hasil impor tetap bisa login dengan password lamanya (lalu wajib ganti, K-M2).
+3. `php spark lampiran:manifest --keluaran=<KERJA>/manifest.json --konfirmasi=<db>` — path unik dari kolom berkas
+   (`ManifestLampiran::KOLOM`) sesudah impor (sudah `stripslashes`), dinormalisasi seperti `fixArsipPath`
+   (`PathLegacy`); path tidak sah hanya dihitung. Manifest berisi nama berkas nyata: folder kerja di luar repo dan di
+   luar folder sinkron cloud.
+4. `php spark lampiran:tarik --manifest=<KERJA>/manifest.json [--sumber=arsip|aplikasi]` dengan alamat dasar diisi
+   operator lewat `--dasar-arsip`/`--dasar-aplikasi` atau env `LAMPIRAN_DASAR_ARSIP`/`LAMPIRAN_DASAR_APLIKASI` (K-M4
+   opsi 1). Berurutan dengan `--jeda-ms` (bawaan 200), TLS verify, redirect tidak diikuti, retry terbatas 5xx/timeout,
+   404 dicatat. Respons halaman login dihitung `butuh_login`; alat berhenti di `--ambang-login`. Bisa diulang untuk
+   delta saat freeze (checksum sama → dilewati). Agen/coder TIDAK menjalankan langkah ini ke server mana pun.
+5. `php spark lampiran:periksa --manifest=<KERJA>/manifest.json` — jumlah ada/hilang/beda checksum per kolom.
+
+Storage v2 (`LocalStorageAdapter`) membaca path legacy apa adanya (K-M3 opsi A); tulis berkas baru tetap memakai aturan
+segmen ketat.
+
 ## Di luar cakupan
 
 - `penyesuaian_tukin` diisi lewat CRUD (DBV-024 §5).
