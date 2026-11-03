@@ -33,6 +33,28 @@ final class Permintaan
     ) {
     }
 
+    /**
+     * Salinan dengan nilai rahasia tambahan (mis. token yang dipasang penyedia token) — permintaan asli tidak berubah.
+     *
+     * @param list<string> $nilai
+     */
+    public function denganRahasia(array $nilai): self
+    {
+        return new self(
+            $this->metode,
+            $this->url,
+            $this->layanan,
+            $this->operasi,
+            $this->query,
+            $this->header,
+            $this->json,
+            $this->form,
+            $this->multipart,
+            $this->refId,
+            array_values(array_unique([...$this->rahasia, ...array_filter($nilai, static fn (string $s): bool => $s !== '')])),
+        );
+    }
+
     public function idempoten(): bool
     {
         return strtoupper($this->metode) === 'GET';
