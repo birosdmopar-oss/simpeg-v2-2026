@@ -25,7 +25,8 @@ concurrency:
 env:
   PHP_VERSION: '8.4'
   PHP_EXTENSIONS: intl, mbstring, mysqli, curl, gd, zip, sodium, fileinfo
-  NODE_VERSION: '22'
+  # Samakan dengan frontend/.nvmrc (24). Versi aman: 22.23.4 / 24.22.1 / 26.12.1 (CR-094, ISSUE-054).
+  NODE_VERSION: '24'
   # Jumlah shard PHPUnit per DB. Ubah BERSAMAAN dengan matrix.shard di job phpunit (dicek otomatis di job itu).
   PHPUNIT_SHARDS: 4
 
@@ -48,11 +49,14 @@ jobs:
           coverage: none
           tools: composer:v2
 
+      - name: Catat versi PHP (CR-094)
+        run: php -v
+
       - name: Lokasi cache Composer
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('backend/composer.lock') }}
@@ -86,6 +90,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Catat versi Node (CR-094)
+        run: node -v
 
       - name: npm ci
         run: npm ci --no-audit --no-fund
@@ -164,11 +171,14 @@ jobs:
           coverage: none
           tools: composer:v2
 
+      - name: Catat versi PHP (CR-094)
+        run: php -v
+
       - name: Lokasi cache Composer
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('backend/composer.lock') }}
