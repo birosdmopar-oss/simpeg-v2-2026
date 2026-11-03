@@ -1,7 +1,7 @@
 # MAKE-069 — Rencana impor cutover tahap 2
 
 **Status:** rencana (belum ada kode). Kode menunggu DBV-027 di `main` dan lampu hijau reviewer CR.
-**Keputusan:** Horii 03-11-2026 (K-M1, K-M2, K-M3 opsi A, K-M12, impor cutover opsi (b)); DBV 03-11-2026 (Z-1); reviewer CR
+**Keputusan:** Horii 03-11-2026 (K-M1, K-M2, K-M3 opsi A, K-M4 opsi 1, K-M12, impor cutover opsi (b)); DBV 03-11-2026 (Z-1); reviewer CR
 03-11-2026 (K-M5, K-M11); DBV-029 (K-M6..K-M10, `backend/docs/db-review/DBV-029-impor-cutover-tahap2.md`, branch
 `docs/dbv-029-impor-tahap2`, ikut kode).
 **Mesin:** sama dengan MAKE-056 (`backend/app/Libraries/Impor/`, command `impor:legacy`): irisan kolom [K], R1a WIB→UTC,
@@ -170,9 +170,22 @@ yang disimpan di v2 dan yang dipakai manifest **wajib nilai sesudah `stripslashe
 **Alur runbook:**
 1. Alat impor menyalin kolom path (sesudah `stripslashes`, tanpa perubahan lain) dan membuat **manifest** di folder kerja (tidak di repo): daftar path unik yang
    harus disalin per sumber (`arsip/…` → server arsip, `assets/upload/…` → server aplikasi), tanpa penggantian nama.
-2. Berkas dari kedua sumber disalin ke akar storage v2 dengan struktur folder relatif yang sama, lalu checksum dicatat di
-   manifest. **Cara salin menunggu K-M4** (Horii sedang meninjau opsi tanpa akses ke server legacy); desain tidak
-   mengandalkan rsync dari server legacy.
+2. **Tarik lewat URL legacy, tanpa masuk server (K-M4 opsi 1, keputusan Horii 03-11-2026).** Legacy menyajikan berkas
+   lewat HTTP (`pathToSrc()`): `arsip/…` dari alamat dasar server arsip, `assets/upload/…` dari alamat dasar aplikasi.
+   `php spark lampiran:tarik --manifest=<berkas> --dasar-arsip=<url> --dasar-aplikasi=<url> [--jeda-ms=<n>]`:
+   - alamat dasar hanya lewat opsi/env saat jalan — tidak pernah di config repo, `.env.example`, log, atau laporan;
+     nilainya diisi operator (Horii/TL); agen tidak membuka `constants.php` dan tidak menjalankan alat ini ke server
+     mana pun;
+   - path manifest = nilai sesudah `stripslashes` + normalisasi `fixArsipPath` (`\` dan `./` → `/`, `/` awal dibuang);
+     URL = alamat dasar + path tervalidasi (tolak `..`, path absolut, byte kontrol, skema/host di path — cegah SSRF);
+     redirect ke host lain tidak diikuti; TLS verify aktif;
+   - disimpan ke akar storage v2 dengan struktur relatif sama, tulis atomik (sementara → rename); berkas yang
+     checksum-nya sama dilewati, jadi bisa dilanjutkan dan diulang untuk delta saat freeze;
+   - laju dibatasi (`--jeda-ms`, satu koneksi), timeout, retry terbatas untuk 5xx/timeout; 404 dicatat tanpa retry;
+   - sha256 dicatat ke manifest;
+   - respons halaman login (HTML / redirect ke login) dihitung `butuh_login` dan alat berhenti setelah ambang;
+   - keluaran hanya jumlah per sumber/tabel/kolom: berhasil, 404, galat lain, dilewati, butuh_login — tanpa nama
+     berkas, NIP, host, atau URL.
 3. `php spark lampiran:periksa` melaporkan jumlah path yang tidak ada di storage atau checksum-nya berbeda, per tabel/kolom,
    tanpa nama berkas.
 
@@ -194,7 +207,7 @@ v2 (PDF LKH, tanda terima) tidak disalin. Cara salin, volume, dan jendela waktu:
 | `khusus` dengan sanitizer | `faq_article` |
 | `praPindai` (lintasan baca pertama) | B3 `riwayat_skp_periodik` |
 | `petaKolom`, `konstanta` | B3 `siasn_referensi` |
-| Penulis manifest berkas (daftar salin + checksum) + `lampiran:periksa` | Bagian 4 |
+| Penulis manifest berkas (daftar salin + checksum), `lampiran:tarik` (HTTP, transport bisa diganti untuk test), `lampiran:periksa` | Bagian 4 |
 | Normalisasi baca path legacy di `LocalStorageAdapter` + test keamanan path (commit terpisah) | Bagian 4, opsi A |
 | Command `akun:bootstrap-admin`, `integrasi:siapkan-akun-sistem` | Bagian 3 |
 | Transaksi per tabel + pra-cek tier di depan + berkas jejak + `--tier N --lanjut` | T10/T11 (K-M8) |
@@ -212,10 +225,9 @@ v2 (PDF LKH, tanda terima) tidak disalin. Cara salin, volume, dan jendela waktu:
 
 ## 7. Keputusan yang masih ditunggu
 
-K-M6..K-M10 sudah diputus DBV (DBV-029) dan dimasukkan ke Bagian 1–5.
+K-M4 (opsi 1, tarik lewat URL) dan K-M6..K-M10 (DBV-029) sudah diputus dan dimasukkan ke Bagian 1–5.
 
 | Kode | Pemutus | Butir |
 |---|---|---|
-| K-M4 | Horii (sedang ditinjau) | Cara salin berkas, termasuk opsi tanpa akses ke server legacy; volume; jendela waktu |
 | — | DBV-028 | Skema `support_officer`, `officer_category`, `help_desk_contact` |
 | — | Fase 7 F-02 | Hasil sortir `inbox` legacy untuk T13 |
