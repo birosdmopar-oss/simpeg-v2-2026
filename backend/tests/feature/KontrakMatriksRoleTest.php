@@ -151,6 +151,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/cuti/([0-9]+)/process'            => [1, 2, 3, 6, 7],
             'POST api/v1/cuti/([0-9]+)/tunda'              => [1, 2, 3, 6, 7],
             'POST api/v1/cuti/([0-9]+)/esign'              => self::JWT, // F6-18 K1: penanda tangan pemilik tugas (service)
+            'GET api/v1/cuti/([0-9]+)/esign/status'        => self::JWT, // cek sertifikat sebelum passphrase (service)
             'GET api/v1/cuti/([0-9]+)/lampiran'            => [1, 2, 3, 6, 7],
             'GET api/v1/cuti/([0-9]+)/surat'               => [1, 2, 3, 6, 7],
 

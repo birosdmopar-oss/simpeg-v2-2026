@@ -570,6 +570,9 @@ class Services extends BaseService
             new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
             static::esignGateway(),
             static::cutiNotifikasiService(),
+            null,
+            trim(config(Integrations::class)->esign['qrLogo']) ?: null,
+            static::cacheService(),
         );
     }
 
