@@ -284,9 +284,25 @@ Tidak ada temuan yang mengubah DDL. Persetujuan tidak bergantung pada V-01.
 | DBV-030-Q4 | **Setuju** `token_enkripsi` NOT NULL (VARBINARY(255) cukup, 13.2) |
 | DBV-030-Q5 | **Setuju**: timestamp > `2026-11-03-100000`. Migration terakhir di `main` saat divalidasi memang `2026-11-03-100000_CreateIntegrasiKeluarFase6`; pelaksana wajib cek ulang `origin/main` dan branch yang masuk lebih dulu (mis. DBV-029) tepat sebelum memindahkan |
 
-### 13.5 Verifikasi pemindahan (langkah 4)
-**Belum ada.** Branch masih di `1ada0674` saat validasi ini ditulis (draf masih di `MigrationsDitahan/`). Setelah pelaksana
-mem-push pemindahan, DBV memeriksa dan mencatat hasilnya di bagian ini: (1) DDL di `Migrations/` identik dengan draf
-@`227805a9` (beda hanya docblok); (2) timestamp sesuai Q5; (3) test skema permanen ada (`require_once` ke
-`MigrationsDitahan` dihapus, `MigrationsDitahan/CreateSuratCutiToken.php` tidak tersisa); (4) test lama tidak dilonggarkan;
-(5) CI MySQL 8.0 + MariaDB 10.4 hijau.
+### 13.5 Verifikasi pemindahan (langkah 4) — PR #36 HEAD `4626fcbd`, 03-11-2026
+Satu commit di atas `b52154f5`, tanpa force, dari pelaksana. Hasil: **SETUJU @`4626fcbd`**.
+
+| # | Cek | Hasil |
+|---|---|---|
+| 1 | DDL di `Migrations/` identik dengan draf @`227805a9` | ✅ `git diff -M 227805a9 4626fcbd` pada migration: rename 96%, hanya 2 baris docblock berubah, tidak ada baris SQL berubah. `CREATE TABLE` hasil `up()` migration permanen sama persis dengan hasil `up()` draf (diekstrak dari `mysqldump --no-data`, nol selisih) |
+| 2 | Timestamp sesuai Q5 | ✅ `2026-11-03-110000` > migration terakhir `origin/main` `2026-11-03-100000_CreateIntegrasiKeluarFase6`; tidak ada branch DBV lain yang membawa migration lebih baru (DBV-029 hanya dokumen) |
+| 3 | Test skema permanen ada; draf tidak tersisa | ✅ `SkemaSuratCutiTokenTest.php` memakai `VERSION = '2026-11-03-110000'` tanpa `require_once`; `MigrationsDitahan/` hanya berisi tiga berkas FK lain |
+| 4 | Test lama tidak dilonggarkan | ✅ semua assertion `testStrukturDanConstraint` utuh (engine/collation, tipe kolom, tanpa NIP, 1062 ×2, CHECK ×3 + satu diterima, 1452, 1451); `testDownLaluUpKembali` ditambah assertion indeks UNIQUE; 5 kueri audit kini juga diperiksa hasilnya; ditambah `testKueriAuditBerjalanDanB2MenangkapHeksBesar` |
+| 5 | `up/down/up` migration permanen di `simpeg_v2_t_dbv030v` (MySQL 8.0.30) | ✅ `migrate` memasang; `migrate:rollback` menyisakan skema yang sama persis tanpa tabel token; `migrate` ulang identik. (Perbandingan mengecualikan tabel bantu yang ditinggalkan `phpunit` di DB scratch) |
+| 6 | `SkemaSuratCutiTokenTest` di DB scratch | ✅ 3 test, 20 assertion |
+| 7 | CI Quality gate #524 untuk `4626fcbd` (dicek lewat browser) | ✅ sukses: PHPStan + CS-Fixer, Frontend (1443 test Vitest), PHPUnit MySQL 8.0 shard 1–4 dan MariaDB 10.4 shard 1–4 (10 job hijau). Run PR #525 dilewati, tanpa pengaruh |
+
+**V-01 (bentuk perbaikan audit B2):** bentuk saran DBV `BINARY token_hash NOT REGEXP …` memang ditolak MySQL 8.0 (charset
+`binary` tidak bisa dipakai di `regexp_like`); koreksi diterima. Bentuk pelaksana
+`WHERE token_hash NOT REGEXP '^[0-9a-f]{64}$' OR BINARY token_hash <> BINARY LOWER(token_hash)` **diterima**: sintaks portabel
+(jalan di MySQL 8.0.30 lokal serta CI MySQL 8.0 dan MariaDB 10.4), hanya SELECT, dan terbukti menangkap hash huruf besar (test
+menyisipkan hash `strtoupper` → B2 = 1, lalu 0 setelah dikembalikan ke huruf kecil). V-01 **tuntas**; kalimat §12.4 "aman
+karena audit B2 WAJIB_0" kini benar.
+
+Syarat aplikasi Q2/Q3 (hapus token dulu di `CutiService::hapus`; rotasi hanya sebelum TTE) tetap menjadi acuan review MAKE-065
+dan bukan bagian persetujuan skema ini.
