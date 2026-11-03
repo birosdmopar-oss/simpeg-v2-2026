@@ -576,6 +576,33 @@ class Services extends BaseService
     }
 
     /**
+     * Token publik surat cuti (PRD Fase 6 v1.0f Q6-22/Q6-23, MAKE-065). Bawaan NoOp sampai tabel DBV-030 di `main`.
+     */
+    public static function tokenSuratCuti(bool $getShared = true): \App\Interfaces\Layanan\TokenSuratCutiInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('tokenSuratCuti');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\TokenSuratCutiNoOp();
+    }
+
+    /**
+     * Verifikasi & PDF publik surat cuti ber-token (Q6-22/Q6-23, AC-02.7/AC-02.8).
+     */
+    public static function verifikasiSuratCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\VerifikasiSuratCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('verifikasiSuratCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\VerifikasiSuratCutiService(
+            static::tokenSuratCuti(),
+            new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
+        );
+    }
+
+    /**
      * Cuti online (MAKE-022 M3): kabel service ber-DB (PRD Fase 4 §6.2–§6.4).
      */
     public static function cutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\CutiService

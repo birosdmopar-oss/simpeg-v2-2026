@@ -46,3 +46,10 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->get('cuti/(:num)/lampiran', 'CutiController::lampiran/$1', $cuti);
     $routes->get('cuti/(:num)/surat', 'CutiController::surat/$1', $cuti);
 });
+
+// --- F6-18 Q6-22/Q6-23 (PRD Fase 6 v1.0f, MAKE-065): surat cuti ber-token PUBLIK tanpa `jwt`; filter `throttle`
+// (ThrottlePublikFilter). Verifikasi data minimal (QR kaki surat) dan PDF surat ber-TTE (QR tanda tangan). 404 seragam. ---
+$routes->group('api/v1/publik', ['namespace' => 'App\Controllers\Api\Layanan', 'filter' => 'throttle'], static function (RouteCollection $routes): void {
+    $routes->get('surat-cuti/(:segment)/pdf', 'SuratCutiPublikController::pdf/$1');
+    $routes->get('surat-cuti/(:segment)', 'SuratCutiPublikController::verifikasi/$1');
+});

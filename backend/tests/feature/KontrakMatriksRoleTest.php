@@ -184,6 +184,9 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'GET api/v1/slip-gaji/([0-9]+)'             => [1, 3],
             'PUT api/v1/slip-gaji/([0-9]+)'             => [1, 3],
             'GET api/v1/publik/verifikasi-slip/([^/]+)' => self::PUBLIK,
+            // F6-18 Q6-22/Q6-23 (MAKE-065): surat cuti ber-token publik, filter throttle.
+            'GET api/v1/publik/surat-cuti/([^/]+)/pdf' => self::PUBLIK,
+            'GET api/v1/publik/surat-cuti/([^/]+)'     => self::PUBLIK,
 
             // Modul D — Fase 5A D-02/D-03 presensi (MAKE-032): Matriks Bagian 2 `hr/services/local/po_in|po_out`,
             // `hr/presensi/view_presensi|list_ptt` = 2, 6, 7; `hr/presensi/list_ad|list` = 1, 3, 4, 5 (role 3 lingkup satker,
