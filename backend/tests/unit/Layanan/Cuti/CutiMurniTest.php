@@ -31,7 +31,7 @@ final class CutiMurniTest extends CIUnitTestCase
     ];
 
     /** Kelas tidak murni (DB atau I/O berkas/GD, mis. `QrTtd` MAKE-065 Q6-22) tanpa sufiks `Service`. */
-    private const BER_DB = ['ResetTundaCuti', 'ApproverTerjangkau', 'AtasanLangsungCuti', 'PejabatBerwenangCuti', 'OpsiCuti', 'PenerbitSuratCutiNoOp', 'QrTtd'];
+    private const BER_DB = ['ResetTundaCuti', 'ApproverTerjangkau', 'AtasanLangsungCuti', 'PejabatBerwenangCuti', 'OpsiCuti', 'PenerbitSuratCutiNoOp', 'QrTtd', 'TokenSuratCutiNoOp'];
 
     public function testSemuaKelasCutiMurni(): void
     {

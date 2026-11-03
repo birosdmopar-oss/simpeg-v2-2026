@@ -78,6 +78,24 @@ class SuratCutiService implements PenerbitSuratCutiInterface
         return $this->lampiran()->ambil($nip, (int) $daftar[0]['id_attachment']);
     }
 
+    /**
+     * Versi ber-TTE terbaru milik cuti, atau null (dipakai route PDF publik Q6-22).
+     *
+     * @return array{lampiran: array<string, mixed>, isi: string}|null
+     */
+    public function tte(string $nip, int $idCuti): ?array
+    {
+        $daftar = $this->lampiran()->daftar($nip, CutiService::ID_SURAT_TTE, $idCuti);
+
+        if ($daftar === []) {
+            return null;
+        }
+
+        usort($daftar, static fn (array $a, array $b): int => (int) $b['id_attachment'] <=> (int) $a['id_attachment']);
+
+        return $this->lampiran()->ambil($nip, (int) $daftar[0]['id_attachment']);
+    }
+
     public function adaTte(string $nip, int $idCuti): bool
     {
         return $this->lampiran()->daftar($nip, CutiService::ID_SURAT_TTE, $idCuti) !== [];
