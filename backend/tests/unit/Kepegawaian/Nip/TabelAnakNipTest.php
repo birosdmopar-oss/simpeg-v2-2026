@@ -156,8 +156,9 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
         $this->assertSame($harapan, $aktual);
         $this->assertCount(74, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
-        $this->assertCount(12, TabelAnakNip::perKeberadaan(KeberadaanV2::TidakDiimpor));
-        $this->assertCount(6, TabelAnakNip::perKeberadaan(KeberadaanV2::BelumDiputuskan));
+        // DBV-029 K-M7: layanan_pegawai pindah dari BelumDiputuskan ke TidakDiimpor.
+        $this->assertCount(13, TabelAnakNip::perKeberadaan(KeberadaanV2::TidakDiimpor));
+        $this->assertCount(5, TabelAnakNip::perKeberadaan(KeberadaanV2::BelumDiputuskan));
     }
 
     public function testFase3SamaDenganDrafB01B02(): void
