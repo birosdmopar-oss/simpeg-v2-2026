@@ -25,7 +25,16 @@ File terkait di repo ini:
 
 ## 1. Setup satu kali di server dev
 
-Prasyarat di server: `git`, `php >= 8.2` (+ ext mysqli, intl, mbstring, json), `composer`, `node >= 20` + `npm`, MySQL 8.x, web server (nginx/Apache).
+Prasyarat di server: `git`, `php` dengan patch aman (+ ext mysqli, intl, mbstring, json), `composer`, `node` dengan patch aman + `npm`, MySQL 8.x, web server (nginx/Apache).
+
+**Versi minimum aman (CR-094, ISSUE-053 dan ISSUE-054):**
+
+| Runtime | Versi minimum aman | Alasan |
+|---|---|---|
+| PHP | 8.2.35 (cabang 8.2); atau 8.3.36, 8.4.27, 8.5.12 | PHP2Shell, CVE-2026-109618 / CVE-2026-109619 (RCE di PHP core) |
+| Node.js | 22.23.4 (cabang 22); 24.22.1 (cabang 24, dipakai proyek, lihat `frontend/.nvmrc`); 26.12.1 | Node2Shell, CVE-2026-111497 (dekoder Brotli). Node 20 sudah EOL dan tidak mendapat patch. |
+
+Versi di bawah daftar di atas tidak boleh dipakai di server, termasuk Node 20 dan PHP 8.2.x di bawah 8.2.35. `composer.json` masih `php ^8.2`; menaikkan batas itu adalah keputusan terpisah.
 
 PHP untuk unduhan PDF dokumen F-09 (MAKE-037, ADR-034): `memory_limit` ≥ 256M dan batas waktu request ≥ 30 detik (`max_execution_time` PHP-FPM serta timeout proxy web server, mis. `fastcgi_read_timeout`). PDF 1.700 baris terukur ±238 MB dan ±10 detik di mesin dev.
 
@@ -102,6 +111,7 @@ server {
         root /var/www/simpeg-v2/current/backend/public;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root/index.php;
+        # php8.3-fpm harus ≥ 8.3.36 (PHP2Shell, CVE-2026-109618/109619)
         fastcgi_pass unix:/run/php/php8.3-fpm.sock;
     }
 }
