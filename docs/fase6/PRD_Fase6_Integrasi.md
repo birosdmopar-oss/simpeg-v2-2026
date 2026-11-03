@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder A — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder B — API masuk & job terjadwal) |
-| Versi | **v1.0f — 03-11-2026** (CR-097: TLS BSrE ikut legacy Q6-18 + e-sign cuti F6-18 Q6-19..Q6-23; CR-093: keputusan A0 v2 Jalur A; CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
+| Versi | **v1.0g — 03-11-2026** (CR-098: aturan H-11 status TB/CLTN harian Q6-24..Q6-27; CR-097: TLS BSrE ikut legacy Q6-18 + e-sign cuti F6-18 Q6-19..Q6-23; CR-093: keputusan A0 v2 Jalur A; CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
 | Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
 | Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
@@ -199,7 +199,7 @@ B mengerjakan bagian adapter dulu dan menunda endpoint `s_esign`.
 | F6-17 | **BSrE ikut legacy**: NIK penanda tangan dari `pegawai.nik` PyB; `nik` & `passphrase` dikirim di query string seperti legacy (`Esign.php:166-188`, `bsre_esign.php:55-74`) — **disensor** dari semua log; kode `status_code=='1111'` = bersertifikat. Pengaman: respons dianggap sukses hanya bila berupa PDF (`%PDF-`) — legacy menulis JSON non-error sebagai berkas PDF (`bsre_esign.php:102-126`) | [K] + pengaman | ◻ |
 | F6-18 | **Passphrase e-sign real diketik penanda tangan (PyB) sendiri** di halaman tugas persetujuannya — sama dengan alur legacy `Cuti::process_esign` (`Cuti.php:688-705`, `L_cuti.php:3232-3484`). Dialog admin di mock Fase 4 diganti/diselaraskan (deviasi dari PRD Fase 4 Q-09 dicatat). Rincian alur (CR-097, §7.2): Q6-19 dua langkah, Q6-20 pembatas passphrase, Q6-21 passphrase hanya Setujui/Penangguhan, Q6-22 QR TTE ikut legacy, Q6-23 QR kaki verifikasi publik | [K] | ✔ Q6-06 = A; Q6-19..Q6-23 (03-11) |
 | F6-19 | **H-09 ditutup sebagai pemetaan** (tanpa endpoint baru): `calculate_lc` → `POST cuti/hitung-lama`; `record_geolocation` → F5-12; `register_fb_token` → H-04; seluruh AJAX dropdown/kalkulator `Local.php` sudah diserap modul Fase 2–5 (Lampiran A.4) | — | ◻ |
-| F6-20 | **H-11 status harian** `php spark layanan:status-harian [--tanggal=] [--dry-run]`, jadwal 00:30 WIB: TB (`riwayat_tb` status 1) mencakup hari ini → `id_jenis_status=2`; CLTN (`riwayat_cuti` `id_jenis_cuti=6` status 1/4) → 3; tidak ada lagi rentang aktif dan status masih 2/3 → 1. Perpanjangan = baris riwayat baru yang bersambung. Tidak menyentuh status selain 1/2/3. Lewat model beraudit. Perbandingan per tanggal inklusif (PRD Fase 4 v1.4) | [V2] (keputusan Horii 27-10; legacy tanpa cron) | ◻ |
+| F6-20 | **H-11 status harian** `php spark layanan:status-harian [--tanggal=] [--dry-run]`, jadwal 00:30 WIB: TB (`riwayat_tb` status 1) mencakup hari ini → `id_jenis_status=2`; CLTN (`riwayat_cuti` `id_jenis_cuti=6` **status 1**; status 4 tidak — CR-098 Q6-25, ikut legacy) → 3; tidak ada lagi rentang aktif dan status masih 2/3 → 1 **hanya bila dijelaskan riwayat yang sudah berakhir** (Q6-26). Bentrok TB+CLTN → Q6-24; `--tanggal` → Q6-27 (rincian §7.9). Perpanjangan = baris riwayat baru yang bersambung. Tidak menyentuh status selain 1/2/3. Lewat model beraudit. Perbandingan per tanggal inklusif (PRD Fase 4 v1.4) | [V2] (keputusan Horii 27-10; legacy tanpa cron) | ◻; Q6-24..Q6-27 (03-11) |
 | F6-21 | **Tidak di-port** (kode mati/nonaktif atau tidak relevan di v2): SAPK lama, Siasn generasi 1 backfill, email ultah, popup notif, `fix_regen_*`, `Ekinerja.php` (Q6-14), skema `siasn_simpeg`/`sapk_simpeg` (tabel yang dibutuhkan H-03 dibuat ulang ramping di DBV-027). `sync_nama_pengguna` **di-port [K]** bila v2 menyimpan nama tampilan di `pengguna` (diverifikasi M0 A) | — | ◻ |
 | F6-22 | Server Arsip remote (J3.06, F-10) **ditunda**; v2 tetap storage lokal | — | ◻ |
 | F6-23 | **Exit criteria uji real**: Fase 6 boleh di-sign-off dengan mock/FakeTransport; **uji endpoint real** (e-sign cuti, SIASN/e-Kinerja, FCM) menjadi syarat **sebelum deploy** — dilacak kartu **MT-010** (list Manual Testing) dan **DEPLOY-001.1** (list Deployment) | — | ✔ Q6-13 = A |
@@ -549,6 +549,29 @@ sebagai acuan efek. **AC-11.1** TB disetujui sebelum tanggal mulai → aktif tep
 tanggal akhir → kembali 1; **AC-11.3** perpanjangan bersambung tidak menyebabkan status berkedip; **AC-11.4** status
 selain 1/2/3 tidak disentuh; **AC-11.5** dijalankan dua kali = hasil sama; **AC-11.6** setiap perubahan teraudit.
 
+**Aturan tambahan (CR-098, diputus reviewer CR dan disetujui Horii 03-11-2026 atas pertanyaan A2a Jalur A).** Fakta legacy:
+- TB/CLTN hanya diubah saat persetujuan/hapus (event, tanpa cron);
+- CLTN → 3 **hanya untuk status 1** (`L_cuti.php:2423-2433`, `:3032-3041`, `:3494-3502`);
+- hapus mengembalikan → 1 hanya bila status masih kode jenisnya (`L_tb.php:745-758`, `L_cuti.php:1369-1377`);
+- tidak ada validasi bentrok TB vs CLTN (persetujuan terakhir yang menang);
+- tidak ada pemulihan sesudah tanggal akhir.
+
+Aturan:
+- **Q6-24 — bentrok TB dan CLTN aktif bersamaan.**
+  - Status saat ini 2 atau 3 dan rentang jenis itu masih aktif → tidak diubah (tidak berkedip).
+  - Selain itu pilih rentang dengan `tgl_mulai` paling akhir; seri → TB (2).
+  - Jumlah bentrok dilaporkan sebagai INFO.
+- **Q6-25 — status 4 (Ditangguhkan):** ikut legacy, hanya CLTN **status 1** yang menjadikan 3. Penangguhan legacy hanya untuk cuti tahunan (`approval_cuti.php:203`).
+- **Q6-26 — pemulihan status usang (termasuk run pertama).**
+  - Status 2/3 → 1 hanya bila dijelaskan riwayat yang sudah berakhir (TB status 1 untuk 2; CLTN status 1 untuk 3; `tgl_akhir` < tanggal proses) dan tidak ada rentang aktif.
+  - Pegawai berstatus 2/3 **tanpa riwayat pendukung** (isian manual/impor) tidak disentuh; dilaporkan sebagai INFO jumlah untuk Biro SDM.
+  - Runbook: run pertama wajib `--dry-run`, jumlahnya direview, baru run nyata.
+- **Q6-27 — `--tanggal`:** tanggal masa depan ditolak (`EXIT_USER_INPUT`); tanggal lampau hanya bersama `--dry-run`. Run nyata selalu hari ini (WIB); job stateless, jadi run yang terlewat cukup dijalankan ulang hari ini.
+
+**AC-11.7** bentrok TB+CLTN mengikuti Q6-24 (kedua cabang diuji); **AC-11.8** CLTN status 4 tidak mengubah status;
+**AC-11.9** 2/3 tanpa riwayat pendukung tidak disentuh dan terhitung INFO; **AC-11.10** `--tanggal` masa depan ditolak,
+`--tanggal` lampau tanpa `--dry-run` ditolak.
+
 ### 7.10 H-12 — Auto-approval LKH (Jalur A, MAKE-068) — ikut legacy (F6-25)
 
 [K `C:18` `queue_aa_lkh`, `C:87` `process_queue_aa_lkh`, jadwal `C:14-17`]. `php spark lkh:auto-approval [--bulan=] [--dry-run]`:
@@ -640,6 +663,10 @@ Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (ju
 | Q6-21 | **(03-11-2026, B4a)** Passphrase saat PyB menolak — tampilan legacy hanya meminta untuk Setujui/Penangguhan, server legacy mewajibkan untuk semua status (PyB bersertifikat tidak bisa menolak). Pilihan:<br>**P-1** ikut tampilan;<br>**P-2** ikut server;<br>**P-3** ikut keduanya | **P-1** — passphrase hanya untuk Setujui (1)/Penangguhan (4); Tolak tanpa passphrase. Memperbaiki bug legacy (CR-097) | §7.2, AC-02.6 |
 | Q6-22 | **(03-11-2026, B4a)** Isi QR gambar TTE. Pilihan:<br>**Q-1** ikut legacy (URL langsung ke PDF bertanda tangan, tanpa login);<br>**Q-2** halaman verifikasi publik data minimal;<br>**Q-3** URL ber-login;<br>**Q-4** tanpa QR;<br>**Q-5** QR ke validator resmi | **Q-1 — ikut legacy** (keputusan Horii 03-11-2026).<br>v2: route publik khusus PDF surat TTE, token acak (bukan path ber-NIP), throttle, 404 seragam, `no-store`/`noindex`, token nonaktif saat dicabut.<br>Gap diterima: surat utuh (data pribadi) bisa diunduh pemegang QR/URL, URL bocor = akses sampai dicabut, QR bukan bukti keaslian. Trello Catatan Teknis "Keputusan e-sign cuti F6-18" (CR-097) | §7.2, AC-02.7, DBV-030 |
 | Q6-23 | **(03-11-2026, B4a)** QR kaki surat cuti v2 (teks `SIMPEG/CUTI/{id}/{nip}`, memuat NIP) | **Q-2 [V2]** — URL halaman verifikasi publik pola slip D-14 (ADR-032): data minimal tanpa NIP/PDF; token sama dengan Q6-22 (CR-097) | §7.2, AC-02.8, DBV-030 |
+| Q6-24 | **(03-11-2026, A2a Jalur A)** Bentrok TB dan CLTN aktif bersamaan (legacy: persetujuan terakhir menang, tanpa validasi) | Status 2/3 yang rentangnya masih aktif dipertahankan; selain itu `tgl_mulai` terbaru, seri → TB; jumlah bentrok = INFO (CR-098) | §7.9, AC-11.7 |
+| Q6-25 | **(03-11-2026, A2a)** CLTN status 4 (Ditangguhkan) — F6-20 v1.0 menulis "status 1/4" | **Ikut legacy: hanya status 1** → 3 (`L_cuti:2423`, `:3032`, `:3494`); penangguhan legacy hanya cuti tahunan (CR-098) | F6-20, §7.9, AC-11.8 |
+| Q6-26 | **(03-11-2026, A2a)** Pemulihan status 2/3 usang pada run pertama | → 1 hanya bila dijelaskan riwayat yang sudah berakhir; tanpa riwayat pendukung → tidak disentuh + INFO; run pertama wajib `--dry-run` (CR-098) | F6-20, §7.9, AC-11.9 |
+| Q6-27 | **(03-11-2026, A2a)** `--tanggal` masa depan / lampau | Masa depan ditolak; lampau hanya bersama `--dry-run`; run nyata = hari ini WIB (CR-098) | §7.9, AC-11.10 |
 
 Prinsip umum Horii 01-11-2026: **"intinya ikut legacy"** — berlaku juga untuk hal yang tidak tercantum di atas. Bila coder
 menemukan perilaku legacy yang belum diputus, default = ikut legacy [K]; deviasi hanya untuk alasan teknis wajib/keamanan
@@ -745,3 +772,4 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 | v1.0d | 03-11-2026 | CR-092: Q6-17 (keputusan Horii 02-11-2026 = A, ekstraksi bentuk auth BKN tanpa nilai; pilihan B = tunggu dokumentasi BKN/PN-2) + §7.0.2 "Bentuk auth BKN" (token gateway, SSO, varian e-Kinerja, dua header SIASN, token literal e-Kinerja legacy) + desain `TokenBkn` (token statis `.env` / SSO + cache, tanpa literal) |
 | v1.0e | 03-11-2026 | CR-093, keputusan Horii 03-11-2026 atas A0 v2 Jalur A: PDF auto-approval LKH ikut v2 (on-demand, tidak disimpan; AC-12.3 disesuaikan), catatan = kolom `auto_approval` + audit tanpa tabel `aa_lkh`; H-12 dipisah ke MAKE-068 (A2b); akun sistem integrasi dikecualikan dari `simapi_ch` |
 | v1.0f | 03-11-2026 | CR-097, keputusan Horii 03-11-2026 atas B4a Jalur B (MAKE-065):<br>- Q6-18 TLS BSrE ikut legacy (B) + jalur upgrade `esign.caBundle`;<br>- Q6-19 alur dua langkah (B);<br>- Q6-20 pembatas passphrase 5/15 menit [V2];<br>- Q6-21 passphrase hanya Setujui/Penangguhan (P-1);<br>- Q6-22 QR TTE ikut legacy (Q-1, URL PDF tanpa login, token acak);<br>- Q6-23 QR kaki surat verifikasi publik (Q-2, pola D-14).<br><br>§7.2, BP-3, B-10, AC-02.5..AC-02.8; skema token → DBV-030. Rincian opsi & gap di Trello Catatan Teknis |
+| v1.0g | 03-11-2026 | CR-098, keputusan atas pertanyaan A2a Jalur A (MAKE-062, H-11; diputus reviewer CR, disetujui Horii 03-11-2026, balasan di Trello DEV-007):<br>- F6-20 "CLTN status 1/4" dikoreksi menjadi status 1 (Q6-25, ikut legacy);<br>- Q6-24 bentrok TB+CLTN;<br>- Q6-26 pemulihan status usang hanya bila dijelaskan riwayat berakhir;<br>- Q6-27 `--tanggal`.<br><br>§7.9 + AC-11.7..AC-11.10, `6_2.md` A2a |
