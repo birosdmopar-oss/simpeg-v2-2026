@@ -472,8 +472,10 @@ class Services extends BaseService
         $driver = config(Integrations::class)->esign['driver'];
 
         return match ($driver) {
-            'mock'  => new MockEsignAdapter(),
-            default => throw new RuntimeException("Esign driver '{$driver}' belum tersedia (adapter real dikerjakan di Fase 6)."),
+            'mock' => new MockEsignAdapter(),
+            // Fase 6 Jalur B (MAKE-065, H-02): BSrE real; konfigurasi kosong/TLS mati gagal saat dibuat (AC-K.4).
+            'bsre'  => new \App\Libraries\Esign\BsreEsignAdapter(static::klienHttp(), config(Integrations::class)->esign),
+            default => throw new RuntimeException("Esign driver '{$driver}' belum tersedia."),
         };
     }
 
