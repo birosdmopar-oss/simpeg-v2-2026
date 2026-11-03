@@ -44,6 +44,11 @@ use Throwable;
  * sudah memasang `time_zone = '+00:00'` saat connect di kedua koneksi (sumber salinan legacy dan tujuan); `aturSesi()`
  * tetap dipertahankan sebagai jaminan + verifikasi (`NOW() = UTC_TIMESTAMP()`). Skrip `mysqldump`/`mysql` CLI UP-1 tidak
  * memakai driver ini, jadi tidak terpengaruh. Tujuan wajib kosong, kecuali tabel `bolehSeed`.
+ *
+ * Sumber kedua opsional = salinan skema `siasn_simpeg` (`--sumber-siasn`, DBV-027 K-9) untuk definisi `skemaSiasn`; tanpa
+ * koneksi itu tabelnya dilewati dan dilaporkan. Nama tabel sumber dicari tanpa beda huruf besar/kecil (`REF_UNOR`,
+ * `*_ID` di server `lower_case_table_names` ≠ 0). `praPindai` (lintasan baca pertama) menandai baris yang tidak diimpor,
+ * juga saat dry-run; `pascaImpor` menghitung INFO di tujuan sesudah commit.
  */
 final class PengimporLegacy
 {
@@ -61,6 +66,7 @@ final class PengimporLegacy
         private readonly string $zonaSumber,
         private readonly Keputusan $keputusan,
         private readonly int $ukuranBatch = 1000,
+        private readonly ?BaseConnection $sumberSiasn = null,
     ) {
         if (! in_array($zonaSumber, [Transformasi::ZONA_WIB, Transformasi::ZONA_UTC], true)) {
             throw new ImporGagal('--zona-sumber wajib WIB atau UTC (GAP-2).');
@@ -81,6 +87,10 @@ final class PengimporLegacy
         $this->dryRun = $dryRun;
         $this->aturSesi($this->sumber);
         $this->aturSesi($this->tujuan);
+
+        if ($this->sumberSiasn !== null) {
+            $this->aturSesi($this->sumberSiasn);
+        }
 
         foreach ($tier as $t) {
             $mulai = hrtime(true);
@@ -108,7 +118,7 @@ final class PengimporLegacy
         $rinci = [];
 
         foreach ($defs as $def) {
-            $rinci[$def->tabel] = $this->praCek($def);
+            $rinci[$def->kunci()] = $this->dilewatiSiasn($def) ? null : $this->praCek($def);
         }
 
         if (! $dryRun) {
@@ -117,7 +127,7 @@ final class PengimporLegacy
 
         try {
             foreach ($defs as $def) {
-                $this->imporTabel($tier, $def, $rinci[$def->tabel], $dryRun);
+                $this->imporTabel($tier, $def, $rinci[$def->kunci()], $dryRun);
             }
         } catch (Throwable $e) {
             if (! $dryRun) {
@@ -143,19 +153,57 @@ final class PengimporLegacy
             }
 
             foreach ($defs as $def) {
-                if ($rinci[$def->tabel] !== null) {
-                    $this->salinCounter($def);
+                $r = $rinci[$def->kunci()];
+
+                if ($r === null) {
+                    continue;
+                }
+
+                $this->salinCounter($def, $r['sumber']);
+
+                foreach ($def->pascaImpor === null ? [] : ($def->pascaImpor)($this->tujuan) as $kode => $n) {
+                    if ($n > 0) {
+                        $this->laporan->koreksi($def->kunci(), $kode, $n);
+                    }
                 }
             }
         }
     }
 
+    private function dilewatiSiasn(DefinisiTabel $def): bool
+    {
+        return $def->skemaSiasn && $this->sumberSiasn === null;
+    }
+
+    private function sumberDari(DefinisiTabel $def): BaseConnection
+    {
+        return $def->skemaSiasn && $this->sumberSiasn !== null ? $this->sumberSiasn : $this->sumber;
+    }
+
+    /**
+     * Nama tabel sumber sebenarnya (tanpa beda huruf besar/kecil); null bila tidak ada.
+     */
+    private function namaSumber(BaseConnection $db, string $nama): ?string
+    {
+        $rows = $this->kueri(
+            $db,
+            'SELECT TABLE_NAME AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND LOWER(TABLE_NAME) = LOWER(?)',
+            [$db->getDatabase(), $nama],
+        )->getResultArray();
+
+        if (count($rows) > 1) {
+            throw new ImporGagal("Tabel sumber {$nama} ada lebih dari satu (beda huruf besar/kecil).");
+        }
+
+        return $rows === [] ? null : (string) $rows[0]['n'];
+    }
+
     /**
      * Counter AUTO_INCREMENT tujuan = counter sumber bila lebih besar (DBV-011 §2.7). Tidak pernah diturunkan.
      */
-    private function salinCounter(DefinisiTabel $def): void
+    private function salinCounter(DefinisiTabel $def, string $namaSumber): void
     {
-        $sumber = $this->counter($this->sumber, $def->tabel);
+        $sumber = $this->counter($this->sumberDari($def), $namaSumber);
         $tabel  = $this->tujuan->prefixTable($def->tabel);
         $tujuan = $this->counter($this->tujuan, $tabel);
 
@@ -170,13 +218,13 @@ final class PengimporLegacy
         )->getRowArray();
 
         if (strtolower((string) ($tipe['t'] ?? '')) === 'tinyint' && $sumber >= 128) {
-            $this->laporan->koreksi($def->tabel, "PERIKSA counter TINYINT {$sumber} tidak disalin");
+            $this->laporan->koreksi($def->kunci(), "PERIKSA counter TINYINT {$sumber} tidak disalin");
 
             return;
         }
 
         $this->perintah($this->tujuan, 'ALTER TABLE ' . $this->tujuan->escapeIdentifiers($tabel) . ' AUTO_INCREMENT = ' . $sumber);
-        $this->laporan->koreksi($def->tabel, "counter AUTO_INCREMENT {$tujuan}→{$sumber}");
+        $this->laporan->koreksi($def->kunci(), "counter AUTO_INCREMENT {$tujuan}→{$sumber}");
     }
 
     private function counter(BaseConnection $db, string $tabel): ?int
@@ -195,18 +243,25 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null
+     * @return array{ada: bool, sumber: string, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null
      */
     private function praCek(DefinisiTabel $def): ?array
     {
-        $kolomSumber = $this->kolom($this->sumber, $def->tabel);
+        $src        = $this->sumberDari($def);
+        $namaSumber = $this->namaSumber($src, $def->sumber ?? $def->tabel);
 
-        if ($kolomSumber === []) {
+        if ($namaSumber === null) {
             if ($def->opsional) {
                 return null;
             }
 
-            throw new ImporGagal("Tabel sumber {$def->tabel} tidak ada.");
+            throw new ImporGagal('Tabel sumber ' . ($def->sumber ?? $def->tabel) . ' tidak ada.');
+        }
+
+        $kolomSumber = [];
+
+        foreach ($this->kolom($src, $namaSumber) as $n => $t) {
+            $kolomSumber[strtolower($n)] = ['nama' => $n] + $t;
         }
 
         $kolomTujuan = $this->kolom($this->tujuan, $this->tujuan->prefixTable($def->tabel));
@@ -218,13 +273,21 @@ final class PengimporLegacy
         $kolom = [];
 
         foreach ($kolomTujuan as $nama => $t) {
-            if (isset($kolomSumber[$nama])) {
-                $kolom[$nama] = ['tipeSumber' => $kolomSumber[$nama]['tipe'], 'tipeTujuan' => $t['tipe'], 'nullable' => $t['nullable'], 'panjang' => $t['panjang']];
+            $asal = strtolower($def->petaKolom[$nama] ?? $nama);
+
+            if (! array_key_exists($nama, $def->konstanta) && isset($kolomSumber[$asal])) {
+                $kolom[$nama] = [
+                    'src'        => $kolomSumber[$asal]['nama'],
+                    'tipeSumber' => $kolomSumber[$asal]['tipe'],
+                    'tipeTujuan' => $t['tipe'],
+                    'nullable'   => $t['nullable'],
+                    'panjang'    => $t['panjang'],
+                ];
 
                 continue;
             }
 
-            $diisi = $def->urutan !== null && $def->urutan['kolom'] === $nama;
+            $diisi = ($def->urutan !== null && $def->urutan['kolom'] === $nama) || array_key_exists($nama, $def->konstanta);
 
             if (! $t['nullable'] && ! $t['adaDefault'] && ! $t['auto'] && ! $diisi) {
                 throw new ImporGagal("Kolom {$def->tabel}.{$nama} NOT NULL tanpa DEFAULT tidak ada di sumber.");
@@ -264,6 +327,7 @@ final class PengimporLegacy
 
         return [
             'ada'       => true,
+            'sumber'    => $namaSumber,
             'kolom'     => $kolom,
             'fk'        => $this->kolomFk($this->tujuan->prefixTable($def->tabel)),
             'seed'      => $seed,
@@ -274,28 +338,29 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null $rinci
+     * @param array{ada: bool, sumber: string, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null $rinci
      */
     private function imporTabel(int $tier, DefinisiTabel $def, ?array $rinci, bool $dryRun): void
     {
         if ($rinci === null) {
-            $this->laporan->mulai($tier, $def, 0, 'tidak ada di sumber (opsional)');
+            $this->laporan->mulai($tier, $def, 0, $this->dilewatiSiasn($def) ? 'dilewati: tanpa --sumber-siasn (DBV-027 K-9)' : 'tidak ada di sumber (opsional)');
 
             return;
         }
 
-        $jumlah = (int) $this->kueri($this->sumber, 'SELECT COUNT(*) AS n FROM ' . $this->sumber->escapeIdentifiers($def->tabel))->getRowArray()['n'];
+        $src    = $this->sumberDari($def);
+        $tabel  = $src->escapeIdentifiers($rinci['sumber']);
+        $jumlah = (int) $this->kueri($src, 'SELECT COUNT(*) AS n FROM ' . $tabel)->getRowArray()['n'];
         $this->laporan->mulai($tier, $def, $jumlah, $dryRun ? 'dry-run' : '');
 
-        $daftarKolom = array_keys($rinci['kolom']);
-        $pilih       = implode(', ', array_map(fn (string $k): string => $this->sumber->escapeIdentifiers($k), $daftarKolom));
-        $kunci       = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
-        $urutPk      = implode(', ', array_map(fn (string $k): string => $this->sumber->escapeIdentifiers($k), $kunci));
-        $tabel       = $this->sumber->escapeIdentifiers($def->tabel);
-        $urutan      = [];
-        $tunda       = [];
-        $terakhir    = null;
-        $dilihat     = [];
+        $pilih    = implode(', ', array_map(static fn (string $k, array $t): string => $src->escapeIdentifiers($t['src']) . ' AS ' . $src->escapeIdentifiers($k), array_keys($rinci['kolom']), $rinci['kolom']));
+        $kunci    = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
+        $urutPk   = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($rinci['kolom'][$k]['src']), $kunci));
+        $buang    = $def->praPindai === null ? [] : ($def->praPindai)($src, $rinci['sumber'], $this->keputusan);
+        $urutan   = [];
+        $tunda    = [];
+        $terakhir = null;
+        $dilihat  = [];
 
         foreach ($rinci['barisSeed'] as $r) {
             $this->catatUnik($def, $rinci['unik'], $r, $dilihat);
@@ -304,21 +369,28 @@ final class PengimporLegacy
         do {
             $syarat = $terakhir === null ? '' : " WHERE ({$urutPk}) > (" . implode(', ', array_fill(0, count($kunci), '?')) . ')';
             $sql    = "SELECT {$pilih} FROM {$tabel}{$syarat} ORDER BY {$urutPk} LIMIT {$this->ukuranBatch}";
-            $baris  = $this->kueri($this->sumber, $sql, $terakhir ?? [])->getResultArray();
+            $baris  = $this->kueri($src, $sql, $terakhir ?? [])->getResultArray();
             $tulis  = [];
 
             foreach ($baris as $mentah) {
                 $terakhir = array_map(static fn (string $k): mixed => $mentah[$k], $kunci);
-                $hasil    = $this->ubahBaris($def, $rinci, $mentah);
+
+                if (isset($buang[(string) $mentah[$def->pk]])) {
+                    $this->laporan->dibuang($def->kunci(), $buang[(string) $mentah[$def->pk]]);
+
+                    continue;
+                }
+
+                $hasil = $this->ubahBaris($def, $rinci, $mentah);
 
                 if (is_string($hasil)) {
-                    $this->laporan->dibuang($def->tabel, $hasil);
+                    $this->laporan->dibuang($def->kunci(), $hasil);
 
                     continue;
                 }
 
                 foreach ($hasil['__koreksi'] ?? [] as $kode) {
-                    $this->laporan->koreksi($def->tabel, (string) $kode);
+                    $this->laporan->koreksi($def->kunci(), (string) $kode);
                 }
 
                 unset($hasil['__koreksi']);
@@ -345,7 +417,7 @@ final class PengimporLegacy
                         throw new ImporGagal("Seed {$def->tabel} id {$id} berbeda dengan sumber (GAP-3).");
                     }
 
-                    $this->laporan->dilewati($def->tabel);
+                    $this->laporan->dilewati($def->kunci());
 
                     continue;
                 }
@@ -365,7 +437,7 @@ final class PengimporLegacy
                 }
             }
 
-            $this->laporan->ditulis($def->tabel, count($tulis));
+            $this->laporan->ditulis($def->kunci(), count($tulis));
         } while (count($baris) === $this->ukuranBatch);
 
         if ($tunda !== [] && ! $dryRun) {
@@ -387,7 +459,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, kolom: array<string, array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>} $rinci
+     * @param array{ada: bool, sumber: string, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>} $rinci
      * @param array<string, mixed> $mentah
      *
      * @return array<string, mixed>|string
@@ -408,11 +480,13 @@ final class PengimporLegacy
             }
         }
 
+        $hasil = $def->konstanta + $hasil;
+
         return $def->khusus === null ? $hasil : ($def->khusus)($hasil, $this->keputusan);
     }
 
     /**
-     * @param array{tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null} $tipe
+     * @param array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null} $tipe
      * @param array<string, array{tabel: string, kolom: string}>                       $fk
      */
     private function ubahNilai(DefinisiTabel $def, string $kolom, array $tipe, array $fk, mixed $nilai): mixed
@@ -451,7 +525,7 @@ final class PengimporLegacy
                 $kode = (string) Transformasi::kode($nilai);
 
                 if ($kode !== trim($nilai)) {
-                    $this->laporan->koreksi($def->tabel, "{$kolom} karakter tak terlihat dibuang");
+                    $this->laporan->koreksi($def->kunci(), "{$kolom} karakter tak terlihat dibuang");
                 }
 
                 $nilai = $kode;
@@ -618,7 +692,7 @@ final class PengimporLegacy
             foreach ($tulis as $i => $baris) {
                 if ($baris[$kolom] !== null && in_array((string) $baris[$kolom], $yatim, true)) {
                     $tulis[$i][$kolom] = null;
-                    $this->laporan->koreksi($def->tabel, "{$kolom} yatim→NULL");
+                    $this->laporan->koreksi($def->kunci(), "{$kolom} yatim→NULL");
                 }
             }
         }

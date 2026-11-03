@@ -13,7 +13,22 @@ use Config\WebConfig;
  */
 final class DaftarTabel
 {
-    public const TIER_MAKS = 6;
+    public const TIER_MAKS = 7;
+
+    /**
+     * `siasn_referensi.jenis` → tabel legacy `siasn_simpeg` + kolom pemetaan lokal (null = dicari lewat `NAMA`), DBV-027 §3.6.
+     *
+     * @var array<string, array{0: string, 1: string|null}>
+     */
+    private const REFERENSI_SIASN = [
+        'jabatan_fungsional'      => ['JABATAN_FUNGSIONAL_ID', null],
+        'jabatan_fungsional_umum' => ['JABATAN_FUNGSIONAL_UMUM_ID', null],
+        'jenis_jabatan'           => ['JENIS_JABATAN_ID', 'id_group_jabatan'],
+        'latihan_struktural'      => ['LATIHAN_STRUKTURAL_ID', 'id_diklat'],
+        'tk_pendidikan'           => ['TK_PENDIDIKAN', 'id_jenjang_pendidikan'],
+        'jenis_kp'                => ['JENIS_KP_ID', 'id_jenis_kp'],
+        'golongan'                => ['GOLONGAN_ID', 'id_pangkat'],
+    ];
 
     private function __construct()
     {
@@ -31,6 +46,7 @@ final class DaftarTabel
             4       => self::tier4(),
             5       => self::tier5(),
             6       => self::tier6(),
+            7       => self::tier7(),
             default => throw new ImporGagal("Tier {$tier} belum tersedia."),
         };
     }
@@ -166,7 +182,17 @@ final class DaftarTabel
             new DefinisiTabel('detail_anak', 'id_detail_anak', 'B-02 §6', statusDomain: null),
             // GAP-8 (DBV 30-10): terisi dari sinkron BKN, bukan form → tanpa stripslashes. GAP-9: waktu_dinilai dari BKN, disalin apa adanya.
             new DefinisiTabel('bkn_periode_ekinper', 'id', 'B-01 §3.4.1', tanpaStripslashes: ['*'], statusDomain: null),
-            new DefinisiTabel('riwayat_skp_periodik', 'id_riwayat_skp_periodik', 'B-01 §6', tanpaStripslashes: ['*'], statusDomain: [0, 1, 2, 10], kolomKode: ['nip'], waktuBisnis: ['waktu_dinilai']),
+            // DBV-027 K-3/K-4: UNIQUE (id_pns, periode_id, skp_id) — kunci ganda diselesaikan sebelum tulis, seperti pembaca Tukin.
+            new DefinisiTabel(
+                'riwayat_skp_periodik',
+                'id_riwayat_skp_periodik',
+                'B-01 §6, DBV-027 K-3/K-4',
+                tanpaStripslashes: ['*'],
+                statusDomain: [0, 1, 2, 10],
+                kolomKode: ['nip'],
+                waktuBisnis: ['waktu_dinilai'],
+                praPindai: AturanSiasn::skpPeriodik(...),
+            ),
         ];
     }
 
@@ -251,6 +277,49 @@ final class DaftarTabel
             ),
             new DefinisiTabel('riwayat_tb_perpan', 'id_riwayat_tb_perpan', 'DBV-022 §5', statusDomain: null),
         ];
+    }
+
+    /**
+     * T7 — tabel kerja SIASN Fase 6 (DBV-027 §13.3). Dijalankan sesudah riwayat dan `document_attachment` diimpor
+     * (syarat K-6); nomor tier bergeser ke paling akhir saat tier MAKE-069 ditambahkan. `siasn_ref_unor` dan
+     * `siasn_referensi` dibaca dari skema `--sumber-siasn` (K-9); isinya dari sinkron BKN dan pemetaan lokal, jadi disalin
+     * mentah (pola GAP-8). `siasn_status_pegawai` (padanan `dsp`, K-5) dan `firebase_token` (AC-01.2) tidak diimpor.
+     *
+     * @return list<DefinisiTabel>
+     */
+    private static function tier7(): array
+    {
+        $defs = [
+            new DefinisiTabel('siasn_ref_unor', 'id', 'DBV-027 §3.5, K-9', tanpaStripslashes: ['*'], statusDomain: null, sumber: 'REF_UNOR', skemaSiasn: true),
+        ];
+
+        foreach (self::REFERENSI_SIASN as $jenis => [$tabel, $lokal]) {
+            $defs[] = new DefinisiTabel(
+                'siasn_referensi',
+                'id_siasn',
+                'DBV-027 §3.6, K-9',
+                tanpaStripslashes: ['*'],
+                statusDomain: null,
+                sumber: $tabel,
+                skemaSiasn: true,
+                petaKolom: ['id_siasn' => 'ID', 'nama' => 'NAMA'] + ($lokal === null ? [] : ['id_lokal' => $lokal]),
+                konstanta: ['jenis' => $jenis],
+            );
+        }
+
+        $defs[] = new DefinisiTabel('double_riwayat_kp', 'nip', 'DBV-027 §3.4, K-8', statusDomain: null, kolomKode: ['nip']);
+        $defs[] = new DefinisiTabel(
+            'siasn_upload_arsip',
+            'id_siasn_upload_arsip',
+            'DBV-027 §3.3, K-6/K-7',
+            statusDomain: [0, 1, 2, 3],
+            kolomKode: ['nip'],
+            khusus: static fn (array $b): array => AturanSiasn::terhentiSaatCutover($b),
+            praPindai: AturanSiasn::uploadArsip(...),
+            pascaImpor: AturanSiasn::rujukanArsip(...),
+        );
+
+        return $defs;
     }
 
     /**
