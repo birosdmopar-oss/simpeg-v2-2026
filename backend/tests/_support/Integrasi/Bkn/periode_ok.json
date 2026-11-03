@@ -1,0 +1,11 @@
+{
+  "success": "1",
+  "data": [
+    {"id": "PER-UJI-2026-10", "nama": "Periode Uji Oktober 2026", "tahun": "2026", "periode_awal": "09-16", "periode_akhir": "10-15", "batas_pengisian": "10-20", "jenis_periode": ""},
+    {"id": "PER-UJI-2026-11", "nama": "Periode Uji November 2026", "tahun": "2026", "periode_awal": "10-16", "periode_akhir": "11-15", "batas_pengisian": "", "jenis_periode": null},
+    {"id": "PER-UJI-TAHUNAN-2026", "nama": "Periode Uji Tahunan 2026", "tahun": "2026", "periode_awal": "01-01", "periode_akhir": "12-31", "batas_pengisian": "", "jenis_periode": "TAHUNAN"},
+    {"id": "SKPManualUji2026", "nama": "Periode Manual Uji", "tahun": "2026", "periode_awal": "11-16", "periode_akhir": "12-15", "batas_pengisian": "", "jenis_periode": ""},
+    {"id": "PER-UJI-RUSAK", "nama": "Periode Rusak", "tahun": "2026", "periode_awal": "16-09", "periode_akhir": "2026-10-15", "batas_pengisian": "", "jenis_periode": ""},
+    {"id": "", "nama": "Tanpa Id", "tahun": "2026", "periode_awal": "09-16", "periode_akhir": "10-15"}
+  ]
+}
