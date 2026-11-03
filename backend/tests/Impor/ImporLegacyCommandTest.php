@@ -60,7 +60,7 @@ final class ImporLegacyCommandTest extends ImporLegacyTestCase
         yield 'tak dikenal' => ['--sumbr=x --zona-sumber=WIB', 'Opsi --sumbr tidak dikenal'];
         yield 'tanpa nilai' => ['--sumber --zona-sumber=WIB', 'Opsi --sumber wajib diberi nilai'];
         yield 'ganda' => ['--sumber=a --sumber=b --zona-sumber=WIB', 'diberikan lebih dari sekali'];
-        yield 'tier tak sah' => ['--sumber=a --zona-sumber=WIB --tier=9', 'Pemakaian:'];
+        yield 'tier tak sah' => ['--sumber=a --zona-sumber=WIB --tier=99', 'Pemakaian:'];
         yield 'tanpa zona' => ['--sumber=a', 'Pemakaian:'];
         yield 'argumen lebih' => ['x --sumber=a --zona-sumber=WIB', 'Pemakaian:'];
     }
@@ -79,14 +79,14 @@ final class ImporLegacyCommandTest extends ImporLegacyTestCase
     {
         $db = $this->db->getDatabase();
 
-        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$db} --zona-sumber=WIB --konfirmasi={$db} --tier=7 --dry-run");
+        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$db} --zona-sumber=WIB --konfirmasi={$db} --tier=13 --dry-run");
         $keluaran = $this->getStreamFilterBuffer();
         $this->assertStringContainsString("sumber SIASN: {$db}", $keluaran, 'dicetak sebelum konfirmasi (R-2)');
         $this->assertStringContainsString('GAGAL: Database sumber dan tujuan sama.', $keluaran);
 
         // Salinan siasn_simpeg tanpa salah satu dari 8 tabel → gagal (snapshot tidak lengkap, K-9).
         $this->siapkanSumberSiasn(['GOLONGAN_ID' => 'id_pangkat']);
-        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$this->lgc}_sia --zona-sumber=WIB --konfirmasi={$db} --tier=7 --dry-run");
+        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$this->lgc}_sia --zona-sumber=WIB --konfirmasi={$db} --tier=13 --dry-run");
         $this->assertStringContainsString('GAGAL: Tabel sumber JABATAN_FUNGSIONAL_ID tidak ada.', $this->getStreamFilterBuffer());
     }
 

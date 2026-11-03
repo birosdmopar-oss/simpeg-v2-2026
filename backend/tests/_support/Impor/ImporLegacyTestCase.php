@@ -67,6 +67,15 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
             }
         }
 
+        // `pengguna` legacy: PK `id`, NIP di `id_pegawai`, `UserLevel`, hash md5 di `password`, plaintext `password_decode`
+        // (A-01 §2) — bukan bentuk v2.
+        // Dua ALTER: DROP `password` + CHANGE `password_legacy` → `password` dalam satu ALTER membuat kolom baru selalu
+        // kosong di MySQL 8.0.30.
+        $this->db->query("ALTER TABLE `{$this->lgc}`.`pengguna` DROP COLUMN `password`");
+        $this->db->query("ALTER TABLE `{$this->lgc}`.`pengguna` CHANGE `id_pengguna` `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,"
+            . ' CHANGE `nip` `id_pegawai` VARCHAR(30) NULL, CHANGE `user_level` `UserLevel` TINYINT UNSIGNED NOT NULL,'
+            . ' CHANGE `password_legacy` `password` VARCHAR(32) NULL, ADD COLUMN `password_decode` VARCHAR(100) NULL');
+
         $grup             = config(Database::class)->tests;
         $grup['database'] = $this->lgc;
         $grup['DBPrefix'] = '';
@@ -97,6 +106,18 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
         $this->sia = null;
         $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}`");
         $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}_sia`");
+
+        if (is_file($this->berkasJejak())) {
+            unlink($this->berkasJejak());
+        }
+    }
+
+    /**
+     * Berkas jejak tier per tabel (K-M8) milik test ini; dihapus di tearDown.
+     */
+    protected function berkasJejak(): string
+    {
+        return WRITEPATH . 'impor_jejak_' . $this->db->getDatabase() . '.json';
     }
 
     /**
@@ -157,8 +178,8 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
      *
      * @return array<string, array<string, mixed>>
      */
-    protected function jalankanImpor(array $tier, string $zona = 'WIB', ?Keputusan $k = null, bool $dryRun = false): array
+    protected function jalankanImpor(array $tier, string $zona = 'WIB', ?Keputusan $k = null, bool $dryRun = false, bool $lanjut = false): array
     {
-        return (new PengimporLegacy($this->src, $this->db, $zona, $k ?? Keputusan::kosong(), 2, $this->sia))->jalankan($tier, $dryRun)->semua();
+        return (new PengimporLegacy($this->src, $this->db, $zona, $k ?? Keputusan::kosong(), 2, $this->sia, $this->berkasJejak()))->jalankan($tier, $dryRun, $lanjut)->semua();
     }
 }

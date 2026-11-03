@@ -58,7 +58,7 @@ final class TabelAnakNip
         ['filled_form_digital', 'nip', 'fk_nip_ffd_to_pegawai', false, KeberadaanV2::Ada, 7, 'F-01', 'Isian form digital'],
         ['ignore_konv_ak', 'nip', 'fk_nip_ignorekonvak_to_pegawai', false, KeberadaanV2::Ada, 3, 'B-02', 'Angka kredit (B-15); nip bagian PK (draf DBV-013)'],
         ['konv_ak', 'nip', 'fk_nip_konvak_to_pegawai', false, KeberadaanV2::Ada, 3, 'B-02', 'Angka kredit (B-15), draf DBV-013'],
-        ['layanan_pegawai', 'nip', 'fk_nip_laypeg_to_pegawai', false, KeberadaanV2::BelumDiputuskan, null, null, 'Dipakai L_employee/L_notification legacy; tidak ada di Mapping Migrasi maupun C-01'],
+        ['layanan_pegawai', 'nip', 'fk_nip_laypeg_to_pegawai', false, KeberadaanV2::TidakDiimpor, null, null, 'Tidak dimigrasi (DBV-029 K-M7): tanpa penulis legacy aktif; notifikasi diganti NotifikasiService Fase 4'],
         ['login_mysapk', 'nip', 'fk_nip_loginsapk_to_pegawai', false, KeberadaanV2::BelumDiputuskan, null, null, 'Log login MySAPK (controllers/User.php); tidak ada di Mapping Migrasi'],
         ['pegawai_ak', 'nip', 'fk_nip_cak_to_peg', false, KeberadaanV2::Ada, 3, 'B-01', 'Snapshot aktif (ADR-006), draf DBV-012'],
         ['pegawai_ak_siasn', 'nip', 'fk_nip_peg_ak_siasn_01', false, KeberadaanV2::Ada, 3, 'B-01', 'Snapshot riwayat_ak_siasn yang diisi trigger; masuk B-01 di revisi D1 draf DBV-012 (keputusan 8 #6, belum disetujui)'],

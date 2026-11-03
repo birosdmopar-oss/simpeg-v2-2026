@@ -33,9 +33,13 @@ final class DefinisiTabel
      * @param string|null                   $sumber            nama tabel sumber bila berbeda dari tujuan (dicari tanpa beda huruf besar/kecil, `lower_case_table_names`)
      * @param bool                          $skemaSiasn        dibaca dari skema `--sumber-siasn` (salinan `siasn_simpeg`); tanpa opsi itu → dilewati + dilaporkan (DBV-027 K-9)
      * @param array<string, string>         $petaKolom         kolom tujuan → kolom sumber bila namanya berbeda (mis. `id_siasn` ← `ID`)
-     * @param array<string, int|string>     $konstanta         kolom tujuan yang diisi nilai tetap (mis. `siasn_referensi.jenis`)
+     * @param array<string, int|string|null> $konstanta        kolom tujuan yang diisi nilai tetap (mis. `siasn_referensi.jenis`; NULL = tidak diambil dari sumber walau namanya sama)
      * @param (Closure(BaseConnection, string, Keputusan): array<int|string, string>)|null $praPindai lintasan baca pertama atas seluruh sumber (koneksi, nama tabel sumber); hasil = PK sumber → kode aturan baris yang tidak diimpor. Boleh melempar {@see ImporGagal} (juga saat dry-run)
      * @param (Closure(BaseConnection): array<string, int>)|null $pascaImpor hitung INFO di tujuan sesudah tabel ditulis (bukan dry-run): kode → jumlah
+     * @param string|null                   $saringSumber      syarat SQL baris sumber yang diimpor (mis. `pegawai_hist.flag_update = 1`); jumlah sumber = sesudah saringan
+     * @param list<string>                  $kolomDilarang     kolom sumber yang tidak pernah di-SELECT (rahasia, mis. `pengguna.password_decode`)
+     * @param array{kolom: string, nama: string, lingkup: list<string>}|null $isiUrutan [V2] kolom urutan yang tidak ada di sumber → 1..n per lingkup, urut nama (G-01 #4, G-04/05 P8)
+     * @param array<string, array{0: string, 1: string}> $rujukan rujukan wajib tanpa FK di tujuan (FK masih ditahan): kolom → [tabel induk, kolom induk]; yatim → gagal
      */
     public function __construct(
         public readonly string $tabel,
@@ -60,6 +64,10 @@ final class DefinisiTabel
         public readonly array $konstanta = [],
         public readonly ?Closure $praPindai = null,
         public readonly ?Closure $pascaImpor = null,
+        public readonly ?string $saringSumber = null,
+        public readonly array $kolomDilarang = [],
+        public readonly ?array $isiUrutan = null,
+        public readonly array $rujukan = [],
     ) {
     }
 

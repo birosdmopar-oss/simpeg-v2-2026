@@ -44,12 +44,12 @@ Rujukan baris D1 = dump struktur produksi `simpeg01_struktur_lengkap_20261001.sq
 |---|---|---|
 | `d_riwayat_cuti` (arsip trigger) | Tidak dimigrasi | `docs/fase4/PRD_Fase4.md` §6 C-01 "Tabel yang TIDAK dibuat" |
 | Cadangan bertanggal: `riwayat_cuti_2020…`, `riwayat_tb_20201204`, `riwayat_ib_20201213`, `pa_layanan_20211122`, `petugas_approval_20211122`, `inbox_msg_20251027`, `pegawai_sisa_cuti_20xx` / `_2024…2026` | Tidak dimigrasi | PRD_Fase4 C-01 |
-| `layanan`, `layanan_pegawai`, `riwayat_layanan` | Belum diputuskan / tidak diimpor (registry) | PRD_Fase4 C-01 |
+| `layanan`, `layanan_pegawai`, `riwayat_layanan` | Tidak dimigrasi (tanpa penulis legacy aktif; DBA melapor jumlah `layanan_pegawai` status 0/3 sebelum cutover) | DBV-029 K-M7 |
 | Antrean push: `fb_pn_queue`, `andr_notif_queue`, `andr_topic_queue`, `firebase_message_logs` | Tidak dimigrasi | PRD_Fase4 C-01 |
 | `fb_token` (token desktop per `id_user`) | Tidak dimigrasi (kecuali DBV memutuskan lain) | PRD_Fase4 C-01 #20 |
 | `firebase_token` | Dibuat kosong (Tier 6, tidak dimigrasi) | PRD_Fase4 C-01 #20 (D18) |
 | `email_notification` | Tidak dimigrasi | PRD_Fase4 C-01 |
-| `support_officer`, `officer_category`, `help_desk_contact` | Bukan Fase 4 (diputuskan di Fase 8) | PRD_Fase4 C-01 |
+| `support_officer`, `officer_category`, `help_desk_contact` | **Diimpor** saat cutover (MAKE-069 T12b, skema DBV-028) — bukan lagi "tidak dimigrasi" | PRD Fase 8 F8-21, Q8-13 |
 
 ## 5. Presensi & Slip Gaji (Fase 5A, DBV-023)
 

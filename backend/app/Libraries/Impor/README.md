@@ -121,7 +121,13 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 | 4 | `absen_ijin` (status W/V/X/10, `affect_tukin`/`jenis_dinas` ber-domain, rentang izin = waktu bisnis), `riwayat_keluarga`, `detail_anak`, `bkn_periode_ekinper`, `riwayat_skp_periodik` (kunci UNIQUE ganda → lihat T4 DBV-027 di bawah) | M3, B3 |
 | 5 | `lokasi_presensi`, `dh_online` (baris tanpa jam masuk & pulang dibuang `DBV-023 A2`; `sumber` NULL) | M3 |
 | 6 | `pegawai_sisa_cuti` (duplikat `(nip, tahun)` → id terkecil, saldo negatif → 0), `riwayat_cuti` (6 kolom ber-domain), `riwayat_tb`, `riwayat_tb_perpan` | M3 |
-| 7 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
+| 7 | MAKE-069 master sisa: wilayah `kecamatan`/`kelurahan` (seed, `order` urut nama), `kantor`, kursem, `bidang_pendidikan`/`jurusan_pendidikan` (`order` urut nama), G-06 (`jenis_konket.old_id` K-M9a + audit WAJIB_0 `absen_ijin.kategori`), G-02b sisa, sertifikasi, `dm_ak_jf`, FAQ (sanitizer + `content_stripped` ulang, K-M9c), `jenis_rwy` (seed) | MAKE-069 |
+| 8 | `pengguna`: `id` legacy, `password_decode` tidak di-SELECT, md5 → `password_legacy`, `must_change_password` (role 1; role 2/6 password = NIP), NIP wajib ada di `pegawai`, tujuan wajib kosong (akun sistem dibuat sesudahnya) | MAKE-069 |
+| 9 | `pegawai_hist` (`flag_update = 1`, satu per NIP id terbesar, K-M9b), `pegawai_foto`, `dm_user_lokasi_presensi` (status 1, JSON wajib terurai, K-M6) | MAKE-069 |
+| 10 | Riwayat non-Tukin (16 tabel) lalu `document_attachment` — **transaksi per tabel + `--jejak`/`--lanjut`** (K-M8) | MAKE-069 |
+| 11 | Snapshot `pegawai_*` lain — transaksi per tabel (K-M8); `id_riwayat_*` NOT NULL yatim → gagal | MAKE-069 |
+| 12 | Layanan sisa DBV-022 §5 (`jenis_layanan`/`jenis_pa` seed, `question_category`, petugas, `pa_layanan`, notifikasi KT, IB, PMK, `esign_hist`) | MAKE-069 |
+| 13 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
 
 **Aturan DBV-027 §13.3 (B3).** Pesan dan laporan hanya jumlah.
 
@@ -140,8 +146,14 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 - `double_riwayat_kp` (K-8): apa adanya; NIP tanpa `pegawai` → gagal (rujukan yatim).
 - Tidak diimpor: `siasn_status_pegawai` (dibangun job data-utama, K-5), `siasn_simpeg.dsp`, `firebase_token`/`fb_token`
   (PRD Fase 6 AC-01.2).
-- **Urutan:** T7 dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
-  Nomor tier SIASN bergeser ke paling akhir saat tier MAKE-069 ditambahkan.
+- **Urutan:** tier SIASN (T13, selalu terakhir) dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
+  Tier MAKE-069 berikutnya (T12b Halo Simpeg — DBV-028, tiket lama — F-02) disisipkan sebelum tier SIASN.
+
+**Transaksi per tabel (DBV-029 K-M8, `DaftarTabel::TIER_PER_TABEL`).** Seluruh tier dipra-cek dulu; tiap tabel satu
+transaksi, counter dan INFO sesudah commit tabel itu, lalu dicatat di `--jejak=<berkas>` (folder kerja, satu per DB
+tujuan; wajib kecuali dry-run). Gagal di tengah: tabel selesai tetap ter-commit, pesan menyebut jumlah selesai/gagal/belum.
+`--tier N --lanjut` melewati tabel yang tercatat dan jumlah/PK maks/keputusan tujuannya masih sama; tabel tidak cocok →
+gagal tanpa menghapus apa pun. Mengulang tabel yang sudah selesai = pulihkan cadangan DB sebelum tier (bukan TRUNCATE).
 
 Sesudah setiap tier di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7;
 tidak pernah diturunkan). PK TINYINT dengan counter ≥ 128 tidak disalin dan dicatat `PERIKSA`. Langkah ini DDL, jadi
