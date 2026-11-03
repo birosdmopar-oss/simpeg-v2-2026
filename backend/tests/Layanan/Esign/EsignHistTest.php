@@ -9,7 +9,6 @@ use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
-use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Layanan\Cuti\CutiService;
 use App\Libraries\Layanan\Cuti\EsignCutiService;
 use App\Libraries\Layanan\Cuti\SuratCutiService;
@@ -33,9 +32,12 @@ final class EsignHistTest extends DatabaseTestCase
 
     protected $seed = MasterDataSeeder::class;
 
+    /**
+     * Penanda tangan (PyB) cuti terakhir — pemilik tugas e-sign (F6-18 K1).
+     */
     private function admin(): AuthContext
     {
-        return $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawai(), 1));
+        return $this->penandaTerakhir ?? throw new \RuntimeException('cutiFinal() belum dipanggil');
     }
 
     public function testNipTanpaSertifikat404MockDicatatGagalDanStatusCutiTetap(): void
@@ -109,7 +111,7 @@ final class EsignHistTest extends DatabaseTestCase
         };
         $this->lampiranUji = new FakeAttachmentService();
 
-        $svc = new EsignCutiService($this->db, $this->cutiService(), new SuratCutiService($this->db, $lampiran), new MockEsignAdapter(), new PegawaiScope($this->db));
+        $svc = new EsignCutiService($this->db, $this->cutiService(), new SuratCutiService($this->db, $lampiran), new MockEsignAdapter());
 
         try {
             $svc->terbitkan($this->admin(), $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
@@ -152,7 +154,7 @@ final class EsignHistTest extends DatabaseTestCase
                 return ['status_code' => '500', 'message' => str_repeat('x', 400), 'nip' => $nip, 'has_certificate' => false, 'certificate_expires_at' => null];
             }
         };
-        $svc = new EsignCutiService($this->db, $this->cutiService(), new SuratCutiService($this->db, $this->lampiranUji), $gateway, new PegawaiScope($this->db));
+        $svc = new EsignCutiService($this->db, $this->cutiService(), new SuratCutiService($this->db, $this->lampiranUji), $gateway);
 
         try {
             $svc->terbitkan($this->admin(), $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);

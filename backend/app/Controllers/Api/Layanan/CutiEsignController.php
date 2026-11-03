@@ -9,8 +9,10 @@ use App\Libraries\Layanan\Cuti\EsignCutiService;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
- * Penerbitan surat cuti ber-TTE (PRD Fase 4 §6.5, C-05) — `POST cuti/{id}/esign`, role 1 dan 3. Passphrase hanya dibaca
- * dari body JSON dan tidak pernah dicatat atau dikembalikan.
+ * Penandatanganan surat cuti ber-TTE (PRD Fase 4 §6.5 C-05; PRD Fase 6 F6-18, keputusan Horii 03-11-2026) —
+ * `POST cuti/{id}/esign`: semua akun login lolos filter, hanya penanda tangan pemilik tugas yang diterima service (403
+ * selainnya), batas 5 percobaan gagal / 15 menit (429). Passphrase hanya dibaca dari body JSON dan tidak pernah dicatat,
+ * disimpan, atau dikembalikan.
  */
 final class CutiEsignController extends ApiController
 {

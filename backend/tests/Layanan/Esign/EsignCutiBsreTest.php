@@ -117,8 +117,11 @@ final class EsignCutiBsreTest extends DatabaseTestCase
         );
     }
 
+    /**
+     * Penanda tangan (PyB) cuti terakhir — pemilik tugas e-sign (F6-18 K1).
+     */
     private function adminAuth(): \App\Libraries\Auth\AuthContext
     {
-        return $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawai(), 1));
+        return $this->penandaTerakhir ?? throw new \RuntimeException('cutiFinal() belum dipanggil');
     }
 }

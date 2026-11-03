@@ -569,7 +569,6 @@ class Services extends BaseService
             static::cutiService(),
             new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
             static::esignGateway(),
-            static::pegawaiScope(),
             static::cutiNotifikasiService(),
         );
     }
