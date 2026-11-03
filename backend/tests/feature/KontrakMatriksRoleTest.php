@@ -204,6 +204,9 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/presensi/tukin/penyesuaian/([0-9]+)' => [1],
             // Fase 6 Jalur B MAKE-064 (H-10): tombol tarik ulang e-Kinerja hanya Super Admin (PRD Fase 6 §6.2).
             'POST api/v1/integrasi/bkn/tarik' => [1],
+            // MAKE-066 (H-04, F6-13): token push web — semua akun login.
+            'POST api/v1/integrasi/fcm-token'   => self::JWT,
+            'DELETE api/v1/integrasi/fcm-token' => self::JWT,
             // 5B M6 MAKE-042: rekap kehadiran 1, 3, 4 (F5B-10); rekap uang makan 1, 3; varian IL hanya 1 (F5B-6).
             'GET api/v1/presensi/rekap-kehadiran'             => [1, 3, 4],
             'GET api/v1/presensi/rekap-kehadiran/xlsx'        => [1, 3, 4],
