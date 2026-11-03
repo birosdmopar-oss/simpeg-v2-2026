@@ -221,3 +221,67 @@ ada), siklus `down()/up()`, kueri audit berjalan.
 **DBV APPROVE @`227805a9`** — 03-11-2026, DBV (sesi WS-2 atas perintah Horii). Syarat merge §10 tetap: migration dipindah ke
 `Migrations/` dengan DDL **tidak berubah** + timestamp DBV-030-Q5, test skema permanen, syarat aplikasi Q2/Q3 di MAKE-065, CI
 hijau MySQL 8.0 & MariaDB 10.4, diverifikasi DBV sebelum reviewer CR me-merge.
+
+---
+
+## 13. Validasi ulang DBV (independen, 03-11-2026)
+
+Atas perintah Horii 03-11-2026 (lewat reviewer CR), peran DB Validator DBV-030 dialihkan ke sesi Worker Fix Bug untuk
+validasi ulang independen atas persetujuan §12 (@`227805a9`). Sesi ini tidak ikut menulis draf maupun review §12.
+SHA yang divalidasi: **`227805a9`** (isi DDL sama dengan `36ae1a4c`; `1ada0674` hanya menambah dokumen).
+**Keputusan: SETUJU @`227805a9`**, dengan satu temuan non-blok (13.3) dan satu koreksi atas klaim §12.4.
+
+### 13.1 Verifikasi
+Lingkungan: MySQL 8.0.30 lokal (3307), DB scratch BARU `simpeg_v2_t_dbv030v` (dibuat kosong, `.env` ditulis sendiri,
+bukan salinan `.env` dev), prefix kosong.
+
+| Uji | Hasil |
+|---|---|
+| `migrate --all` pada `main` `51f2b84c` (60 migration terdaftar sesudah draf dipasang) | ✅ |
+| Draf dipasang sebagai `Migrations/2026-11-03-110000_CreateSuratCutiToken.php` (lokal, tidak di-commit) → `migrate` | ✅ `up()` berhasil |
+| `SHOW CREATE TABLE` | ✅ sama dengan Bagian 3.1; komentar UTF-8 (tanda panah) tersimpan benar (diperiksa dengan klien `utf8mb4`) |
+| `migrate:rollback` → `mysqldump --no-data` dibandingkan dengan snapshot sebelum `up()` | ✅ **identik** (nol selisih) |
+| `migrate` ulang → snapshot dibandingkan dengan `up()` pertama | ✅ identik |
+| 5 kueri audit pada tabel kosong | ✅ tanpa galat; semua WAJIB_0 = 0 |
+| 5 kueri audit dengan data sintetis (4 cuti status 1/4/0/1; 3 token, satu `token_enkripsi` kosong, satu hash huruf besar) | B1 = 1 ✅ (token aktif pada cuti status 0), B3 = 1 ✅, B4 = 3 aktif ✅, B5 = 1 ✅ (cuti final tanpa token), **B2 = 0 ✗** (lihat 13.3) |
+| `SkemaSuratCutiTokenTest` (draf ditahan, grup `db-isolasi-penuh`) pada DB yang sama | ✅ 3 test, 14 assertion |
+
+Data sintetis dihapus dan migration di-rollback setelah uji; DB scratch tidak dihapus (menunggu izin Horii).
+
+### 13.2 Kesesuaian aturan skema proyek (cek ulang)
+| Aturan | Hasil |
+|---|---|
+| Label [K]/[V2]/[I] | ✅ murni [V2]; legacy tidak punya tabel token |
+| `ENGINE=InnoDB`, tabel & kolom string `utf8mb4_unicode_ci` | ✅ (`token_hash`; `token_enkripsi` biner tanpa collation) |
+| Status 1/2/10 | ✅ 1/2 dengan CHECK berpasangan `nonaktif_at`; 10 tidak dipakai karena baris ikut dihapus keras |
+| FK `RESTRICT/RESTRICT`, tipe sama dengan induk | ✅ `INT` = `riwayat_cuti.id_riwayat_cuti INT` (bertanda, sama dengan induk); tidak ada CHECK pada kolom FK dengan aksi CASCADE/SET NULL |
+| Migration di `main` tidak diedit; `down()` bersih | ✅ CREATE tabel baru; `down()` = `DROP TABLE IF EXISTS`, identik terbukti |
+| Tanpa kolom NIP | ✅ |
+| Indeks | ✅ pencarian publik lewat `uk_sct_token_hash`, hapus/ambil per cuti lewat `uk_sct_id_riwayat_cuti`; tidak perlu indeks `status` (tidak pernah dicari tanpa hash/cuti) |
+| `created_by INT NULL` tanpa FK | ✅ sama dengan pola `created_by` di `lokasi_presensi`, `riwayat_tb_ib`, `riwayat_pmk`, `dh_online` |
+| Pola `gaji_pegawai_qr_history` / `TokenSlipService` | ✅ hash SHA-256 heks + salinan terenkripsi + UNIQUE hash + FK RESTRICT. Beda sah: satu baris per cuti (bukan riwayat) karena PDF TTE tetap dan rotasi dilarang sesudah TTE (Q3); `token_hash` CHAR(64) (slip memakai VARCHAR(64) pada `qr_token`) sama-sama muat |
+| Panjang `token_enkripsi` | ✅ keluaran Encrypter CI4 untuk token 64 karakter (HMAC 32 + IV 16 + isi 64 = 112 byte mentah, ±150 bila base64) < 255 |
+| Stempel UTC | ✅ `DEFAULT CURRENT_TIMESTAMP`/`ON UPDATE` hanya cadangan; sesi DB UTC sejak CR-086 |
+
+### 13.3 Temuan
+| ID | Berat | Isi |
+|---|---|---|
+| V-01 | Non-blok | **Kueri audit B2 tidak mendeteksi heks huruf besar.** `REGEXP` mengikuti collation kolom (`utf8mb4_unicode_ci`, tidak peka huruf): hash `UPPER(SHA2(...))` lolos sebagai "sah" (B2 = 0 pada uji 13.1). Klaim §12.4 "aman karena audit B2 WAJIB_0" karena itu tidak berlaku sepenuhnya. Dampak nyata kecil (aplikasi menulis `hash('sha256', …)` huruf kecil; UNIQUE dan pencarian toh tidak peka huruf). Saran perbaikan oleh pelaksana (bukan DDL): `WHERE BINARY token_hash NOT REGEXP '^[0-9a-f]{64}$'` pada `DBV-030-audit-token-surat-cuti.sql` B2 dan kata-kata §12.4 disesuaikan. Tidak mengubah skema. |
+
+Tidak ada temuan yang mengubah DDL. Persetujuan tidak bergantung pada V-01.
+
+### 13.4 Konfirmasi keputusan Q1–Q5 (§12.3)
+| ID | Sikap |
+|---|---|
+| DBV-030-Q1 | **Setuju** tabel terpisah (`riwayat_cuti` tabel [K], tidak ditambah kolom [V2]) |
+| DBV-030-Q2 | **Setuju** FK RESTRICT, syarat MAKE-065 (`CutiService::hapus` menghapus token dulu di transaksi yang sama) dipertahankan; harus diuji di PR aplikasi |
+| DBV-030-Q3 | **Setuju** satu token per cuti; rotasi hanya sebelum TTE (syarat aplikasi, diuji AC-02.7/02.8) |
+| DBV-030-Q4 | **Setuju** `token_enkripsi` NOT NULL (VARBINARY(255) cukup, 13.2) |
+| DBV-030-Q5 | **Setuju**: timestamp > `2026-11-03-100000`. Migration terakhir di `main` saat divalidasi memang `2026-11-03-100000_CreateIntegrasiKeluarFase6`; pelaksana wajib cek ulang `origin/main` dan branch yang masuk lebih dulu (mis. DBV-029) tepat sebelum memindahkan |
+
+### 13.5 Verifikasi pemindahan (langkah 4)
+**Belum ada.** Branch masih di `1ada0674` saat validasi ini ditulis (draf masih di `MigrationsDitahan/`). Setelah pelaksana
+mem-push pemindahan, DBV memeriksa dan mencatat hasilnya di bagian ini: (1) DDL di `Migrations/` identik dengan draf
+@`227805a9` (beda hanya docblok); (2) timestamp sesuai Q5; (3) test skema permanen ada (`require_once` ke
+`MigrationsDitahan` dihapus, `MigrationsDitahan/CreateSuratCutiToken.php` tidak tersisa); (4) test lama tidak dilonggarkan;
+(5) CI MySQL 8.0 + MariaDB 10.4 hijau.
