@@ -5,6 +5,7 @@
  */
 import { describeApiError, splitValidationErrors } from '@/features/kepegawaian/services/apiErrors'
 import { simpanBerkas } from '@/features/kepegawaian/services/berkasUnduhan'
+import { type ApiError, isApiError } from '@/lib/axios'
 import { ref } from 'vue'
 
 import { cutiService } from '../services/cuti.service'
@@ -15,6 +16,11 @@ export interface NoticeCuti {
   text: string
 }
 
+/**
+ * F6-18 K1 (keputusan Horii 03-11-2026): dua langkah di halaman tugas yang sama — sesudah Setujui/Tangguhkan tersimpan,
+ * bila server mengizinkan `aksi.esign` (penanda tangan pemilik tugas), dialog tanda tangan langsung dibuka. Tolak tidak
+ * pernah meminta passphrase (K3a). Tanda tangan gagal → persetujuan tetap tersimpan; ulangi lewat item ⋮ "Tanda tangani".
+ */
 const PESAN_PROSES: Record<AksiProsesCuti, string> = {
   setujui: 'Pengajuan cuti disetujui.',
   tolak: 'Pengajuan cuti ditolak.',
@@ -48,10 +54,7 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
     } else if (key === 'setujui-atas-nama' || key === 'tolak-atas-nama' || key === 'tangguhkan-atas-nama') {
       bukaProses(row, key.replace('-atas-nama', '') as AksiProsesCuti, true)
     } else if (key === 'esign') {
-      esignRow.value = row
-      esignErrors.value = {}
-      esignUmum.value = ''
-      esignOpen.value = true
+      bukaEsign(row)
     } else if (key === 'tunda') {
       void tunda(row)
     } else if (key === 'surat') {
@@ -60,6 +63,13 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
       hapusRow.value = row
       hapusOpen.value = true
     }
+  }
+
+  function bukaEsign(row: CutiItem): void {
+    esignRow.value = row
+    esignErrors.value = {}
+    esignUmum.value = ''
+    esignOpen.value = true
   }
 
   function bukaProses(row: CutiItem, aksi: AksiProsesCuti, atasNama: boolean): void {
@@ -76,10 +86,12 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
     prosesBusy.value = true
     prosesError.value = ''
     try {
-      await cutiService.process(row.id, payload)
+      const hasil = await cutiService.process(row.id, payload)
       prosesOpen.value = false
-      notice.value = { tone: 'success', text: PESAN_PROSES[payload.aksi] }
+      const lanjutTtd = payload.aksi !== 'tolak' && hasil.aksi?.esign === true
+      notice.value = { tone: 'success', text: lanjutTtd ? `${PESAN_PROSES[payload.aksi]} Lanjutkan tanda tangan elektronik.` : PESAN_PROSES[payload.aksi] }
       await onSelesai('proses', row.id)
+      if (lanjutTtd) bukaEsign(hasil)
     } catch (e) {
       prosesError.value = describeApiError(e).message
     } finally {
@@ -97,12 +109,20 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
     try {
       await cutiService.esign(row.id, passphrase)
       esignOpen.value = false
-      notice.value = { tone: 'success', text: 'Surat cuti ber-TTE diterbitkan.' }
+      notice.value = { tone: 'success', text: 'Surat cuti ditandatangani secara elektronik.' }
       await onSelesai('esign', row.id)
     } catch (e) {
       const v = splitValidationErrors(e, ['passphrase', 'nip', 'status'])
       esignErrors.value = v.fields
-      esignUmum.value = v.general.length ? v.general.join(' ') : Object.keys(v.fields).length ? '' : describeApiError(e).message
+      // 429 batas percobaan (F6-18 K2): pesan server memuat sisa waktu tunggu.
+      const terkunci = isApiError(e) && e.status === 429 && e.message !== ''
+      esignUmum.value = terkunci
+        ? (e as ApiError).message
+        : v.general.length
+          ? v.general.join(' ')
+          : Object.keys(v.fields).length
+            ? ''
+            : describeApiError(e).message
     } finally {
       esignBusy.value = false
     }

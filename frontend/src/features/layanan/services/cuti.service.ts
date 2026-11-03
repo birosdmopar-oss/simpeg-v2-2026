@@ -6,7 +6,7 @@
  *   GET    cuti/{id}                                    detail (+ lampiran, surat, riwayat approval)
  *   POST   cuti/{id}/process                            `{aksi, reason_note?, atas_nama?}`
  *   POST   cuti/{id}/tunda                              tunda pengingat
- *   POST   cuti/{id}/esign                              terbitkan surat ber-TTE `{passphrase}` (role 1, 3)
+ *   POST   cuti/{id}/esign                              tanda tangani surat `{passphrase}` (penanda tangan pemilik tugas, F6-18)
  *   DELETE cuti/{id}                                    hapus
  *   GET    cuti/pengingat                               antrean persetujuan yang belum ditunda
  *   GET    cuti/{id}/lampiran | cuti/{id}/surat         unduh berkas

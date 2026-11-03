@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * Dialog Terbitkan TTE surat cuti (PRD §6.5, C-05): konfirmasi + passphrase penanda tangan. Passphrase HANYA hidup di
+ * Dialog tanda tangan elektronik surat cuti (PRD Fase 4 §6.5 C-05; F6-18 K1 keputusan Horii 03-11-2026): passphrase
+ * diketik penanda tangan (PyB) sendiri sesudah persetujuan tersimpan. Passphrase HANYA hidup di
  * variabel lokal dialog ini: tidak masuk store, storage, URL, atau log; dikosongkan segera setelah dikirim, saat dialog
  * ditutup, dan saat komponen dilepas. Input bertipe password (komponen `UiTextField`), tanpa isi-otomatis browser.
  * Galat server per kolom (`errors.passphrase`, `errors.nip`, `errors.status`) diteruskan pemanggil lewat `errors`/`umum`.
@@ -62,9 +63,9 @@ function tutup(): void {
       >
         <div class="mb-4 flex items-start justify-between gap-3">
           <div>
-            <DialogTitle class="text-h5 text-slate-900">Terbitkan TTE{{ subject ? ` ${subject}` : '' }}</DialogTitle>
+            <DialogTitle class="text-h5 text-slate-900">Tanda tangani{{ subject ? ` ${subject}` : '' }}</DialogTitle>
             <DialogDescription class="text-body2 text-slate-500">
-              Surat cuti akan ditandatangani secara elektronik oleh pejabat yang berwenang. Masukkan passphrase penanda tangan; passphrase tidak disimpan.
+              Persetujuan Anda sudah tersimpan. Masukkan passphrase sertifikat elektronik Anda untuk menandatangani surat cuti; passphrase tidak disimpan. Bila gagal, Anda dapat mengulang dari menu ⋮ "Tanda tangani".
             </DialogDescription>
           </div>
           <DialogClose :disabled="loading" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">
@@ -90,7 +91,7 @@ function tutup(): void {
 
           <div class="mt-6 flex justify-end gap-2">
             <UiButton type="button" appearance="soft" variant="secondary" :disabled="loading" @click="tutup">Batal</UiButton>
-            <UiButton type="submit" :loading="loading" data-testid="esign-confirm">Terbitkan TTE</UiButton>
+            <UiButton type="submit" :loading="loading" data-testid="esign-confirm">Tanda tangani</UiButton>
           </div>
         </form>
       </DialogContent>
