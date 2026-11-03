@@ -12,9 +12,13 @@ use RuntimeException;
  * Penyimpanan berkas lampiran di disk lokal (B-18, MAKE-009). Satu-satunya adapter Fase 3: arsip remote legacy tidak
  * disalin (repo publik); adapter remote menyusul di Fase 6 di balik StorageAdapterInterface yang sama.
  *
- * Akar default `writable/uploads/lampiran` (sudah diabaikan git). Path relatif hanya boleh berisi segmen
+ * Akar default `writable/uploads/lampiran` (sudah diabaikan git). Path relatif untuk TULIS/HAPUS hanya boleh berisi segmen
  * `[A-Za-z0-9._-]` tanpa `.`/`..`, sehingga tidak pernah keluar dari akar. Tulis atomik: berkas sementara di folder
  * tujuan lalu rename.
+ *
+ * BACA (`ada`/`baca`) juga menerima path legacy hasil impor (MAKE-069 K-M3 opsi A: path di DB tetap legacy, berkas disalin
+ * dengan struktur relatif sama) lewat {@see PathLegacy::normalisasi()}; hasil resolusi `realpath` wajib tetap di dalam akar
+ * (symlink ke luar akar ditolak).
  */
 final class LocalStorageAdapter implements StorageAdapterInterface
 {
@@ -66,12 +70,19 @@ final class LocalStorageAdapter implements StorageAdapterInterface
 
     public function ada(string $path): bool
     {
-        return is_file($this->lengkap($path));
+        $lengkap = $this->lengkapBaca($path);
+
+        return $lengkap !== null && is_file($lengkap);
     }
 
     public function baca(string $path): string
     {
-        $lengkap = $this->lengkap($path);
+        $lengkap = $this->lengkapBaca($path);
+
+        if ($lengkap === null) {
+            throw new RuntimeException('Berkas lampiran tidak ditemukan di penyimpanan.');
+        }
+
 
         if (! is_file($lengkap)) {
             throw new RuntimeException('Berkas lampiran tidak ditemukan di penyimpanan.');
@@ -84,6 +95,38 @@ final class LocalStorageAdapter implements StorageAdapterInterface
         }
 
         return $isi;
+    }
+
+    /**
+     * Path absolut untuk dibaca: aturan ketat, atau path legacy ternormalisasi. Berkas yang ada wajib ber-`realpath` di dalam
+     * akar; null = berkas ada tetapi keluar akar (symlink). Path tidak sah → InvalidArgumentException.
+     */
+    private function lengkapBaca(string $path): ?string
+    {
+        try {
+            $lengkap = $this->lengkap($path);
+        } catch (InvalidArgumentException $e) {
+            $normal = PathLegacy::normalisasi($path);
+
+            if ($normal === null) {
+                throw $e;
+            }
+
+            $lengkap = $this->akar . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normal);
+        }
+
+        if (! file_exists($lengkap)) {
+            return $lengkap;
+        }
+
+        $nyata = realpath($lengkap);
+        $akar  = realpath($this->akar);
+
+        if ($nyata === false || $akar === false || ! str_starts_with($nyata, $akar . DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+
+        return $nyata;
     }
 
     /**
