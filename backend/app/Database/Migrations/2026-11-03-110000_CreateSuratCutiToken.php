@@ -10,8 +10,8 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-030 (Fase 6 Jalur B, MAKE-065 F6-18 K3b/K3c) — DRAF DITAHAN sampai disetujui DB Validator; dipindah ke
- * `Migrations/` dengan timestamp baru setelah approve (pola DBV-024/DBV-027). Dokumen:
+ * DBV-030 (Fase 6 Jalur B, MAKE-065 F6-18 Q6-22/Q6-23) — disetujui DB Validator @227805a9 (validasi ulang §13), dipindah
+ * dari `MigrationsDitahan/` tanpa perubahan DDL (pola DBV-024/DBV-027). Dokumen:
  * backend/docs/db-review/DBV-030-token-surat-cuti.md.
  *
  * `surat_cuti_token` [V2] — satu token publik acak per surat cuti (keputusan Horii 03-11-2026, kartu Catatan Teknis):

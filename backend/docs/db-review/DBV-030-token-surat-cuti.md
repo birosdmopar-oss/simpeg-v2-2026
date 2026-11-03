@@ -5,8 +5,13 @@ Branch `fase6/dbv-030-token-surat-cuti` (dari `main` `51f2b84c`). Alur `[CR][DBV
 lalu migration dipindah dari `MigrationsDitahan/` ke `Migrations/` + test skema; reviewer CR me-merge dengan izin Horii.
 
 **Status:** ✅ **disetujui DB Validator @`227805a9` (03-11-2026)** — DBV dikerjakan sesi WS-2 atas perintah Horii; hasil &
-keputusan di Bagian 12. Draf migration masih **DITAHAN** di `app/Database/MigrationsDitahan/CreateSuratCutiToken.php`
-sampai dipindah ke `Migrations/` (syarat §10, §12.5).
+keputusan di Bagian 12 (validasi ulang §13). **Pemindahan:** migration dipindah tanpa perubahan DDL ke
+`app/Database/Migrations/2026-11-03-110000_CreateSuratCutiToken.php` (Q5: lebih baru dari DBV-027 `2026-11-03-100000`,
+migration terakhir di `main` saat itu) + test skema permanen `tests/database/Layanan/SkemaSuratCutiTokenTest.php` + kueri
+audit B2 menangkap heks huruf besar (V-01: bentuk saran `BINARY token_hash NOT REGEXP …` ditolak MySQL 8 — "Character set
+'binary' cannot be used … regexp_like" — sehingga dipakai `token_hash NOT REGEXP '^[0-9a-f]{64}$' OR BINARY token_hash <>
+BINARY LOWER(token_hash)`, setara dan berjalan di MySQL 8 & MariaDB 10.4); menunggu verifikasi DBV lalu merge dengan izin
+Horii.
 
 **Penulis:** pelaksana Fase 6 Jalur B, 03-11-2026.
 

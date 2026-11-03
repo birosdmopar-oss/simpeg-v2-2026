@@ -23,8 +23,11 @@ FROM surat_cuti_token t
 JOIN riwayat_cuti c ON c.id_riwayat_cuti = t.id_riwayat_cuti
 WHERE t.status = 1 AND c.status NOT IN (1, 4);
 
--- B2 [WAJIB_0] Hash bukan 64 heks huruf kecil (aplikasi wajib menulis hash('sha256', token)).
-SELECT COUNT(*) AS hash_tidak_sah FROM surat_cuti_token WHERE token_hash NOT REGEXP '^[0-9a-f]{64}$';
+-- B2 [WAJIB_0] Hash bukan 64 heks huruf kecil (aplikasi wajib menulis hash('sha256', token)). REGEXP mengikuti collation
+--    _ci sehingga heks huruf BESAR lolos (temuan V-01 DBV); huruf besar ditangkap perbandingan BINARY dengan LOWER().
+--    (`BINARY token_hash NOT REGEXP …` ditolak MySQL 8: "Character set 'binary' cannot be used … regexp_like".)
+SELECT COUNT(*) AS hash_tidak_sah FROM surat_cuti_token
+WHERE token_hash NOT REGEXP '^[0-9a-f]{64}$' OR BINARY token_hash <> BINARY LOWER(token_hash);
 
 -- B3 [WAJIB_0] Salinan terenkripsi kosong (QR tidak bisa dicetak ulang).
 SELECT COUNT(*) AS enkripsi_kosong FROM surat_cuti_token WHERE token_enkripsi IS NULL OR LENGTH(token_enkripsi) = 0;
