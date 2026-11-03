@@ -500,7 +500,9 @@ class Services extends BaseService
         $driver = config(Integrations::class)->push['driver'];
 
         return match ($driver) {
-            'mock'  => new MockFcmAdapter(),
+            'mock' => new MockFcmAdapter(),
+            // Fase 6 MAKE-066 (F6-11): FCM HTTP v1; konfigurasi kosong gagal saat dibuat (AC-K.4).
+            'fcm'   => new \App\Libraries\Push\FcmV1Adapter(static::klienHttp(), static::cacheService(), config(Integrations::class)->push),
             default => throw new RuntimeException("Push driver '{$driver}' belum tersedia (adapter real dikerjakan di Fase 6)."),
         };
     }
