@@ -9,11 +9,12 @@ lalu migration dipindah dari `MigrationsDitahan/` ke `Migrations/` + test skema;
 
 **Penulis:** pelaksana Fase 6 Jalur B, 03-11-2026.
 
-**Asal kebutuhan:** keputusan Horii 03-11-2026 F6-18 (kartu Trello Catatan Teknis `V8elXqPu`; PRD Fase 6 v1.0f CR-097):
-- **K3b** — gambar QR tanda tangan BSrE (`imageTTD`) berisi URL LANGSUNG ke PDF surat cuti ber-TTE yang terbuka tanpa login
+**Asal kebutuhan:** keputusan Horii 03-11-2026 F6-18 (kartu Trello Catatan Teknis `V8elXqPu`; PRD Fase 6 v1.0f CR-097,
+§7.2, **Q6-22** dan **Q6-23**, **AC-02.7** dan **AC-02.8**):
+- **K3b = Q6-22 (Q-1, ikut legacy)** — gambar QR tanda tangan BSrE (`imageTTD`) berisi URL LANGSUNG ke PDF surat cuti ber-TTE yang terbuka tanpa login
   (ikut legacy `L_cuti.php` yang memuat `ARSIP/{nip}/cuti/{berkas}_signed.pdf`). Bentuk v2: token acak tak tertebak, bukan
   path ber-NIP.
-- **K3c** — QR kaki surat (`SuratCutiService::render`, kini teks `SIMPEG/CUTI/{id}/{nip}`) diganti URL halaman verifikasi
+- **K3c = Q6-23 (Q-2, [V2])** — QR kaki surat (`SuratCutiService::render`, kini teks `SIMPEG/CUTI/{id}/{nip}`) diganti URL halaman verifikasi
   publik pola slip D-14 (ADR-032, `TokenSlipService`/`VerifikasiSlipService`): token 64 heks; DB menyimpan hash + salinan
   terenkripsi untuk cetak ulang; data minimal (jenis surat, nama penanda tangan, tanggal tanda tangan, status TTE) tanpa NIP
   dan tanpa unduh PDF. **Token yang sama** dipakai URL PDF K3b. Surat tanpa TTE tetap ber-QR kaki berstatus "belum".
@@ -94,11 +95,11 @@ Usulan ini dipilih atas CASCADE agar penghapusan tetap eksplisit di kode (ADR-00
 
 | Butir | Keputusan | Alasan |
 |---|---|---|
-| Token acak, bukan path ber-NIP | [V2] keputusan Horii 03-11-2026 K3b | Perilaku legacy (URL publik langsung ke PDF) dipertahankan tanpa URL yang bisa ditebak dari NIP |
+| Token acak, bukan path ber-NIP | [V2] keputusan Horii 03-11-2026 Q6-22 | Perilaku legacy (URL publik langsung ke PDF) dipertahankan tanpa URL yang bisa ditebak dari NIP |
 | Hash + enkripsi | [V2] pola D-14/ADR-032 | Kebocoran DB tidak membuka URL; QR bisa dicetak ulang |
-| Satu token per cuti | [V2] K3c | Token sama untuk QR kaki dan QR tanda tangan |
+| Satu token per cuti | [V2] Q6-23 (token sama dengan Q6-22) | Token sama untuk QR kaki dan QR tanda tangan |
 
-## 4. Pemakaian aplikasi (MAKE-065 langkah 3, setelah approve)
+## 4. Pemakaian aplikasi (MAKE-065 langkah 3, setelah approve; diuji AC-02.7 dan AC-02.8)
 
 - Token terbit saat surat belum TTE dibuat (status final 1/4); QR kaki memuat URL verifikasi.
 - Sebelum menandatangani, `TautanSuratCutiInterface::urlPdfTte()` memakai token yang sama untuk URL PDF di QR `imageTTD`.
