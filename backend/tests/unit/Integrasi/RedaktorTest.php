@@ -51,7 +51,11 @@ final class RedaktorTest extends CIUnitTestCase
 
     public function testPesanCurlTanpaHost(): void
     {
-        $this->assertSame('cURL error 6: Could not resolve hostname', CurlTransport::pesanAman('6 : Could not resolve host: api.contoh.internal'));
+        // Teks curl_strerror bergantung versi libcurl — kunci awalan + kesamaan dengan curl_strerror, bukan teksnya.
+        $pesan = CurlTransport::pesanAman('6 : Could not resolve host: api.contoh.internal');
+        $this->assertStringStartsWith('cURL error 6: ', $pesan);
+        $this->assertSame('cURL error 6: ' . curl_strerror(6), $pesan);
+        $this->assertStringNotContainsString('api.contoh.internal', $pesan);
         $this->assertStringNotContainsString('10.1.2.3', CurlTransport::pesanAman('7 : Failed to connect to 10.1.2.3 port 443'));
         $this->assertStringNotContainsString('contoh', CurlTransport::pesanAman('galat tak terduga ke https://contoh.internal/x'));
     }
