@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -202,6 +202,8 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/presensi/tukin/penyesuaian'            => [1],
             'PUT api/v1/presensi/tukin/penyesuaian/([0-9]+)'    => [1],
             'DELETE api/v1/presensi/tukin/penyesuaian/([0-9]+)' => [1],
+            // Fase 6 Jalur B MAKE-064 (H-10): tombol tarik ulang e-Kinerja hanya Super Admin (PRD Fase 6 §6.2).
+            'POST api/v1/integrasi/bkn/tarik' => [1],
             // 5B M6 MAKE-042: rekap kehadiran 1, 3, 4 (F5B-10); rekap uang makan 1, 3; varian IL hanya 1 (F5B-6).
             'GET api/v1/presensi/rekap-kehadiran'             => [1, 3, 4],
             'GET api/v1/presensi/rekap-kehadiran/xlsx'        => [1, 3, 4],
