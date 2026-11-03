@@ -8,6 +8,7 @@ use App\Libraries\Bkn\Ekinerja\PemetaEkinerja;
 use App\Libraries\Bkn\Ekinerja\SinkronEkinerja;
 use App\Libraries\Presensi\TukinData\SumberDataPegawaiTukin;
 use App\Libraries\Presensi\TukinData\SumberPeriodeTukin;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
@@ -77,6 +78,66 @@ final class SinkronEkinerjaTest extends DatabaseTestCase
         (new SinkronEkinerja($this->db))->simpanSkpPeriodik([$baris[0]]);
 
         $this->assertDbError([1062], fn () => $this->db->table('riwayat_skp_periodik')->insert($baris[0]));
+    }
+
+    public function testKunciGandaTarikBersamaanGagalUtuhTanpaSetengahJadi(): void
+    {
+        $baris = PemetaEkinerja::skpPeriodik($this->fixture('skp_periodik_ok.json'))['baris'];
+        (new SinkronEkinerja($this->db))->simpanSkpPeriodik([$baris[0]]);
+
+        // Proses lain menyisipkan kunci baris kedua di antara baca dan tulis; batch ini juga memperbarui baris pertama.
+        $baris[0]['hasil_akhir'] = 'SANGAT BAIK';
+        $lain                    = $baris[1] + ['created_at' => gmdate('Y-m-d H:i:s')];
+        $sinkron                 = new SinkronEkinerja($this->db, fn () => $this->db->table('riwayat_skp_periodik')->insert($lain));
+
+        try {
+            $sinkron->simpanSkpPeriodik($baris);
+            $this->fail('1062 harus menggagalkan simpan, bukan rollback diam-diam');
+        } catch (DatabaseException $e) {
+            $this->assertStringContainsString('SKP periodik', $e->getMessage() . ($e->getPrevious()?->getMessage() ?? ''));
+        }
+
+        $this->assertSame('BAIK', $this->db->table('riwayat_skp_periodik')->where('skp_id', $baris[0]['skp_id'])->get()->getRow()->hasil_akhir, 'update ikut dibatalkan');
+        $this->assertSame(2, $this->db->table('riwayat_skp_periodik')->countAllResults());
+        $this->assertTrue($this->db->transStatus(), 'status transaksi koneksi dipulihkan');
+
+        $this->assertSame(1, (new SinkronEkinerja($this->db))->simpanSkpPeriodik($baris)['diperbarui'], 'koneksi tetap dapat menulis sesudahnya');
+    }
+
+    public function testNilaiDitolakStrictGagalTanpaBarisSetengahJadi(): void
+    {
+        $baris            = PemetaEkinerja::skpPeriodik($this->fixture('skp_periodik_ok.json'))['baris'];
+        $baris[1]['nama'] = str_repeat('x', 300);
+
+        try {
+            (new SinkronEkinerja($this->db))->simpanSkpPeriodik($baris);
+            $this->fail('nilai terlalu panjang harus menggagalkan simpan');
+        } catch (DatabaseException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame(0, $this->db->table('riwayat_skp_periodik')->countAllResults(), 'baris pertama ikut dibatalkan');
+        $this->assertTrue($this->db->transStatus());
+    }
+
+    public function testPeriodeGandaTarikBersamaanGagal(): void
+    {
+        $baris   = PemetaEkinerja::periode($this->fixture('periode_ok.json'))['baris'];
+        $sinkron = new SinkronEkinerja($this->db, fn () => $this->db->table('bkn_periode_ekinper')->insert($baris[1] + ['created_at' => gmdate('Y-m-d H:i:s')]));
+
+        $this->expectException(DatabaseException::class);
+        $sinkron->simpanPeriode($baris);
+    }
+
+    public function testKunciDinormalisasiTrimHurufKecil(): void
+    {
+        $baris = PemetaEkinerja::skpPeriodik($this->fixture('skp_periodik_ok.json'))['baris'];
+        (new SinkronEkinerja($this->db))->simpanSkpPeriodik($baris);
+
+        $baris[0]['id_pns'] = strtolower((string) $baris[0]['id_pns']);
+        $baris[1]['skp_id'] = strtoupper((string) $baris[1]['skp_id']) . ' ';
+
+        $this->assertSame(['baru' => 0, 'tetap' => 2], array_intersect_key((new SinkronEkinerja($this->db))->simpanSkpPeriodik($baris), ['baru' => 0, 'tetap' => 0]));
     }
 
     /**

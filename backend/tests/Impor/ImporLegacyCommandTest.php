@@ -74,4 +74,29 @@ final class ImporLegacyCommandTest extends ImporLegacyTestCase
         $this->assertStringContainsString($pesan, $keluaran);
         $this->assertStringNotContainsString('Tujuan:', $keluaran);
     }
+
+    public function testSumberSiasnDicetakDanDijagaSepertiSumber(): void
+    {
+        $db = $this->db->getDatabase();
+
+        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$db} --zona-sumber=WIB --konfirmasi={$db} --tier=7 --dry-run");
+        $keluaran = $this->getStreamFilterBuffer();
+        $this->assertStringContainsString("sumber SIASN: {$db}", $keluaran, 'dicetak sebelum konfirmasi (R-2)');
+        $this->assertStringContainsString('GAGAL: Database sumber dan tujuan sama.', $keluaran);
+
+        // Salinan siasn_simpeg tanpa salah satu dari 8 tabel → gagal (snapshot tidak lengkap, K-9).
+        $this->siapkanSumberSiasn(['GOLONGAN_ID' => 'id_pangkat']);
+        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$this->lgc}_sia --zona-sumber=WIB --konfirmasi={$db} --tier=7 --dry-run");
+        $this->assertStringContainsString('GAGAL: Tabel sumber JABATAN_FUNGSIONAL_ID tidak ada.', $this->getStreamFilterBuffer());
+    }
+
+    public function testSemuaTierTanpaTabelSiasnDiSalinanGagalMenyebutTabel(): void
+    {
+        // Salinan lama (ekstraksi sebelum B3) tanpa siasn_upload_arsip: gagal jelas, bukan diam (review P-3).
+        $this->src->query('DROP TABLE siasn_upload_arsip');
+        $db = $this->db->getDatabase();
+
+        command("impor:legacy --sumber={$this->lgc} --zona-sumber=WIB --konfirmasi={$db} --dry-run");
+        $this->assertStringContainsString('GAGAL: Tabel sumber siasn_upload_arsip tidak ada.', $this->getStreamFilterBuffer());
+    }
 }

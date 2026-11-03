@@ -145,6 +145,58 @@ final class TarikEkinerjaTest extends DatabaseTestCase
         $this->assertStringContainsString('[dry-run] Periode e-Kinerja: baru 3, sudah ada 1, ditolak 2.', $this->getStreamFilterBuffer());
     }
 
+    public function testGalatDbDicatatGagalLaluDilemparUlang(): void
+    {
+        $this->periode('PER-UJI-2026-10', 2026, '10');
+        $baris = \App\Libraries\Bkn\Ekinerja\PemetaEkinerja::skpPeriodik((array) json_decode((string) file_get_contents(SUPPORTPATH . 'Integrasi/Bkn/skp_periodik_ok.json'), true))['baris'];
+        $tarik = new TarikEkinerja(
+            new \App\Libraries\Bkn\Ekinerja\EkinerjaKlien(service('tokenBkn'), self::DASAR),
+            new \App\Libraries\Bkn\Ekinerja\SinkronEkinerja($this->db, fn () => $this->db->table('riwayat_skp_periodik')->insert($baris[1] + ['created_at' => gmdate('Y-m-d H:i:s')])),
+            $this->db,
+            new IntegrasiLog($this->db),
+        );
+        $this->transport->antreBerkas(200, SUPPORTPATH . 'Integrasi/Bkn/skp_periodik_ok.json');
+
+        try {
+            $tarik->skpPeriodik(2026, 10);
+            $this->fail('galat DB harus dilempar ulang');
+        } catch (\CodeIgniter\Database\Exceptions\DatabaseException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $log = $this->db->table('integrasi_log')->where('operasi', 'tarik_skp_periodik')->get()->getRowArray();
+        $this->assertSame(['gagal', '2'], [$log['kode'], (string) $log['status']]);
+        $this->assertStringContainsString('ditolak:galat_db=0', (string) $log['pesan']);
+        $this->assertSame(1, $this->db->table('riwayat_skp_periodik')->countAllResults(), 'hanya baris proses lain');
+    }
+
+    public function testSebelumnyaTetapDicobaWalauPeriodePertamaGagalTransport(): void
+    {
+        $this->periode('PER-UJI-2026-10', 2026, '10');
+        $this->periode('PER-UJI-2026-09', 2026, '09');
+        $this->transport
+            ->antre(new \App\Libraries\Integrasi\Http\GalatTransport('timeout', true), new \App\Libraries\Integrasi\Http\GalatTransport('timeout', true), new \App\Libraries\Integrasi\Http\GalatTransport('timeout', true))
+            ->antreJson(200, ['success' => '1', 'data' => []]);
+
+        command('bkn:tarik-skp-periodik --tahun=2026 --bulan=10 --sebelumnya');
+
+        $keluaran = $this->getStreamFilterBuffer();
+        $this->assertStringContainsString('2026-10 GAGAL', $keluaran);
+        $this->assertStringContainsString('Periode 2026-09 (PER-UJI-2026-09): baru 0', $keluaran);
+    }
+
+    public function testDryRunSkpMemperkirakanBaruDariDataYangAda(): void
+    {
+        $this->periode('PER-UJI-2026-10', 2026, '10');
+        $this->transport->antreBerkas(200, SUPPORTPATH . 'Integrasi/Bkn/skp_periodik_ok.json')->antreBerkas(200, SUPPORTPATH . 'Integrasi/Bkn/skp_periodik_ok.json');
+        $tarik = TarikEkinerja::dariLayanan();
+        $tarik->skpPeriodik(2026, 10);
+
+        $h = $tarik->skpPeriodik(2026, 10, null, true);
+
+        $this->assertSame([0, 2], [$h['baru'], $h['tetap']], 'dry-run memakai data yang ada');
+    }
+
     public function testJobMenarikDanMelemparBilaGagal(): void
     {
         $this->transport->antreBerkas(200, SUPPORTPATH . 'Integrasi/Bkn/periode_ok.json');

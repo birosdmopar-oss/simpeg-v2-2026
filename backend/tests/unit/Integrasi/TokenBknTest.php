@@ -138,6 +138,71 @@ final class TokenBknTest extends CIUnitTestCase
         $this->assertContains('gw-baru', $tercatat[5]['permintaan']->rahasia, 'token disensor dari log respons');
     }
 
+    public function testEkinerjaSso401MembuangTokenDanMengulangSekali(): void
+    {
+        $this->transport
+            ->antreJson(200, ['access_token' => 'ekin-lama', 'expires_in' => 3600])
+            ->antreJson(401, ['message' => 'expired'])
+            ->antreJson(200, ['access_token' => 'ekin-baru', 'expires_in' => 3600])
+            ->antreJson(200, ['data' => []]);
+        $bkn = $this->bkn();
+
+        $r = $bkn->kirimEkinerja(static fn (array $h): Permintaan => new Permintaan('GET', 'https://kinerja.contoh/api_kinerja/referensi/periode', 'ekinerja', 'periode', header: $h));
+
+        $this->assertSame(200, $r->status);
+        $tercatat = $this->transport->tercatat();
+        $this->assertCount(4, $tercatat);
+        $this->assertSame('Bearer ekin-baru', $tercatat[3]['permintaan']->header['Authorization']);
+        $this->assertSame('ekin-baru', $bkn->tokenEkinerja(), 'token baru tersimpan di cache');
+        $this->assertCount(4, $this->transport->tercatat());
+    }
+
+    public function testTlsVerifyDanTimeoutDariKonfigurasiSampaiKeOpsiTransport(): void
+    {
+        $this->transport->antreJson(200, ['access_token' => 'tok-gw', 'expires_in' => 3600]);
+
+        $this->bkn(['tlsVerify' => 'true', 'timeout' => '7.5'])->tokenGateway();
+
+        $opsi = $this->transport->tercatat()[0]['opsi'];
+        $this->assertSame([5.0, 7.5, true], [$opsi->connectTimeout, $opsi->timeout, $opsi->verifyTls]);
+    }
+
+    public function testTlsMatiAtauTimeoutKosongDitolakSaatPastikan(): void
+    {
+        foreach ([['tlsVerify' => ''], ['tlsVerify' => '0'], ['tlsVerify' => false], ['timeout' => ''], ['timeout' => 0]] as $ubah) {
+            foreach (['pastikanSiasn', 'pastikanEkinerja'] as $metode) {
+                try {
+                    $this->bkn($ubah)->{$metode}();
+                    $this->fail("{$metode} harus menolak " . json_encode($ubah));
+                } catch (KonfigurasiIntegrasiTidakLengkap $e) {
+                    $this->assertSame([array_key_first($ubah)], $e->kunci);
+                }
+            }
+        }
+
+        $this->assertSame([], $this->transport->tercatat(), 'tidak ada permintaan keluar dengan TLS mati');
+    }
+
+    public function testParameterKredensialBertandaSensitive(): void
+    {
+        $periksa = static function (string $kelas, string $metode, array $nama): array {
+            $tanda = [];
+
+            foreach ((new \ReflectionMethod($kelas, $metode))->getParameters() as $p) {
+                if (in_array($p->getName(), $nama, true)) {
+                    $tanda[$p->getName()] = $p->getAttributes(\SensitiveParameter::class) !== [];
+                }
+            }
+
+            return $tanda;
+        };
+
+        $this->assertSame(['user' => true, 'pass' => true, 'body' => true], $periksa(TokenBkn::class, 'minta', ['user', 'pass', 'body']));
+        $this->assertSame(['password' => true, 'totp' => true], $periksa(TokenBkn::class, 'bodySso', ['password', 'totp']));
+        $this->assertSame(['header' => true, 'form' => true, 'rahasia' => true], $periksa(Permintaan::class, '__construct', ['header', 'form', 'rahasia']));
+        $this->assertSame(['rahasia' => true], $periksa(\App\Libraries\Integrasi\Http\Redaktor::class, 'teks', ['rahasia']));
+    }
+
     public function testEkinerjaStatis401TidakDiulang(): void
     {
         $this->transport->antreJson(401, ['message' => 'token tidak sah']);

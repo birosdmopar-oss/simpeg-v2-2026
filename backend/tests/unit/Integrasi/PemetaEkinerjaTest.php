@@ -99,6 +99,38 @@ final class PemetaEkinerjaTest extends CIUnitTestCase
         $this->assertSame([['urutan' => 5, 'alasan' => 'periode_akhir_tidak_sah'], ['urutan' => 6, 'alasan' => 'id_tidak_sah']], $h['ditolak']);
     }
 
+    public function testTipeDanPanjangKolomDitolakPerBaris(): void
+    {
+        $dasar = ['id' => 'PNS-1', 'periode_id' => 'P-1', 'skp_id' => 'S-1', 'nip' => '199001012020011001', 'nama' => 'Uji'];
+        $data  = [
+            $dasar,
+            ['nama' => str_repeat('n', 256)] + $dasar,
+            ['jenis' => 'dua'] + $dasar,
+            ['skp_jenis_jabatan' => '99999999999'] + $dasar,
+            ['tahun_skp' => '1800'] + $dasar,
+            ['golru' => 'III/a-terlalu-panjang'] + $dasar,
+            ['jenis' => '2', 'tahun_skp' => '2026', 'is_skp_plt_plh_pjb' => '0'] + $dasar,
+        ];
+
+        $h = PemetaEkinerja::skpPeriodik(['success' => '1', 'data' => $data]);
+
+        $this->assertCount(2, $h['baris'], 'baris sah tetap diproses');
+        $this->assertSame([
+            ['urutan' => 2, 'alasan' => 'nama_terlalu_panjang'],
+            ['urutan' => 3, 'alasan' => 'jenis_tidak_sah'],
+            ['urutan' => 4, 'alasan' => 'skp_jenis_jabatan_tidak_sah'],
+            ['urutan' => 5, 'alasan' => 'tahun_skp_tidak_sah'],
+            ['urutan' => 6, 'alasan' => 'golru_terlalu_panjang'],
+        ], $h['ditolak']);
+
+        $p = PemetaEkinerja::periode(['success' => '1', 'data' => [
+            ['id' => 'P1', 'tahun' => '2026', 'periode_akhir' => '10-15', 'nama' => str_repeat('n', 151)],
+            ['id' => 'P2', 'tahun' => '1800', 'periode_akhir' => '10-15'],
+            ['id' => 'P3', 'tahun' => '2026', 'periode_akhir' => '10-15', 'batas_pengisian' => '2026-10-31-x'],
+        ]]);
+        $this->assertSame(['nama_terlalu_panjang', 'tahun_tidak_sah', 'batas_pengisian_terlalu_panjang'], array_column($p['ditolak'], 'alasan'));
+    }
+
     public function testResponsTidakSuksesTidakSah(): void
     {
         foreach ([null, ['success' => '0', 'data' => []], ['success' => '1'], ['success' => '1', 'data' => 'x']] as $r) {
@@ -125,7 +157,7 @@ final class PemetaEkinerjaTest extends CIUnitTestCase
             ['urutan' => 4, 'alasan' => 'skp_id_kosong'],
             ['urutan' => 5, 'alasan' => 'waktu_dinilai_tidak_sah'],
         ], $h['ditolak']);
-        $this->assertSame('PNS-UJI-001**PER-UJI-2026-10**SKP-UJI-001', PemetaEkinerja::kunci($satu));
+        $this->assertSame('pns-uji-001**per-uji-2026-10**skp-uji-001', PemetaEkinerja::kunci($satu));
     }
 
     /**

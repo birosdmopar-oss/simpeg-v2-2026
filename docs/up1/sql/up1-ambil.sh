@@ -17,6 +17,7 @@ for v in "$AWAL" "$AKHIR" "$AWAL_CUTI"; do [[ "$v" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2
 [[ "$BULAN_UJI" =~ ^[0-9]{6}( [0-9]{6})*$ ]] || { echo "UP1_BULAN_UJI harus YYYYMM dipisah spasi" >&2; exit 2; }
 BKN_DARI="${AWAL:0:4}${AWAL:5:2}"; BKN_SAMPAI="${AKHIR:0:4}${AKHIR:5:2}"; BKN_YM="CAST(tahun AS UNSIGNED)*100 + CAST(bulan AS UNSIGNED)"
 KERJA=${UP1_KERJA:-/c/UP1_kerja}; DUMP=$KERJA/dump; SALINAN=${UP1_SALINAN:-up1_legacy_salinan}
+SALINAN_SIASN=${SALINAN}_siasn   # salinan siasn_simpeg (tier SIASN, DBV-027 K-9); diisi bila nama skemanya diberikan
 LOKAL_HOST=127.0.0.1; LOKAL_PORT=3307
 
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'   # argumen SQL berisi '/' tidak boleh diubah Git Bash
@@ -35,7 +36,8 @@ esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
 echo "Koneksi DB dev (akun BACA-SAJA). Tidak ada yang disimpan."
 read -r -p "  Host      : " H; read -r -p "  Port [3306]: " P; P=${P:-3306}
-read -r -p "  User      : " U; read -r -p "  Nama DB   : " D; read -r -s -p "  Password  : " PW; echo
+read -r -p "  User      : " U; read -r -p "  Nama DB   : " D
+read -r -p "  Skema siasn_simpeg (kosong = lewati): " DS; read -r -s -p "  Password  : " PW; echo
 printf '[client]\nhost="%s"\nport=%s\nuser="%s"\npassword="%s"\ndefault-character-set=utf8mb4\n' \
   "$(esc "$H")" "$P" "$(esc "$U")" "$(esc "$PW")" > "$CNF_DEV"; unset PW
 CNFW_DEV="$(cygpath -w "$CNF_DEV")"; CNFW_LOKAL="$(cygpath -w "$CNF_LOKAL")"
@@ -51,6 +53,7 @@ lokal() { mysql --defaults-extra-file="$CNFW_LOKAL" "$@"; }
 
 dev -N -e "SELECT 1" >/dev/null || gagal "tidak bisa masuk ke DB dev"
 [ -z "$(lokal -N -e "SHOW DATABASES LIKE '$SALINAN'")" ] || gagal "skema $SALINAN sudah ada di 3307. Hapus dulu (keputusan Horii) lalu ulangi."
+[ -z "$DS" ] || [ -z "$(lokal -N -e "SHOW DATABASES LIKE '$SALINAN_SIASN'")" ] || gagal "skema $SALINAN_SIASN sudah ada di 3307. Hapus dulu (keputusan Horii) lalu ulangi."
 MULAI="$(date '+%Y-%m-%d %H:%M') WIB"
 RINGKAS=$KERJA/ringkasan_untuk_pr.txt
 { echo "UP1-04 — ringkasan (tanpa NIP/nama/host/akun)"; echo "Tanggal salinan: $MULAI"; echo "Rentang: $AWAL..$AKHIR, cuti/izin sejak $AWAL_CUTI, BKN $BKN_DARI..$BKN_SAMPAI"; } > "$RINGKAS"
@@ -87,7 +90,18 @@ dump 15_riwayat_tb_perpan.sql    riwayat_tb_perpan    --where="tgl_mulai_perpan 
 dump 16_hari_libur.sql           hari_libur           --where="tgl_mulai <= $Z AND tgl_akhir >= $A"
 dump 17_bkn_periode_ekinper.sql  bkn_periode_ekinper  --where="$BKN_YM BETWEEN $BKN_DARI AND $BKN_SAMPAI"
 dump 18_riwayat_skp_periodik.sql riwayat_skp_periodik --where="periode_awal_skp <= $Z AND periode_akhir_skp >= $A"
+dump 21_siasn_kerja.sql         siasn_upload_arsip double_riwayat_kp
 dump 20_web_config.sql web_config --where="config_name IN ('TL1/PSW1','TL2/PSW2','TL3/PSW3','TA','TK','jam_masuk_normal','jam_pulang_normal','jam_pulang_jumat_normal','jam_masuk_puasa','jam_pulang_puasa','jam_pulang_jumat_puasa')"
+
+# siasn_simpeg: tepat sesudah dump simpeg01 (snapshot sedekat mungkin; hentikan job tarik SIASN selama ekstraksi).
+if [ -n "$DS" ]; then
+  mkdir -p "$KERJA/dump_siasn"
+  mysqldump --defaults-extra-file="$CNFW_DEV" --single-transaction --skip-lock-tables --no-tablespaces --skip-triggers \
+    --default-character-set=utf8mb4 --set-gtid-purged=OFF "$DS" REF_UNOR JABATAN_FUNGSIONAL_ID JABATAN_FUNGSIONAL_UMUM_ID JENIS_JABATAN_ID LATIHAN_STRUKTURAL_ID TK_PENDIDIKAN JENIS_KP_ID GOLONGAN_ID > "$KERJA/dump_siasn/30_siasn_simpeg.sql"
+  echo "  ok dump_siasn/30_siasn_simpeg.sql"
+else
+  echo "  lewati siasn_simpeg: impor tanpa --sumber-siasn"
+fi
 
 # --- 3. Hitung baris (sumber) ------------------------------------------------------------------------------------
 HITUNG="SELECT 'pegawai' tabel, COUNT(*) n FROM pegawai
@@ -123,6 +137,8 @@ UNION ALL SELECT 'riwayat_tb_perpan', COUNT(*) FROM riwayat_tb_perpan WHERE tgl_
 UNION ALL SELECT 'hari_libur', COUNT(*) FROM hari_libur WHERE tgl_mulai <= $Z AND tgl_akhir >= $A
 UNION ALL SELECT 'bkn_periode_ekinper', COUNT(*) FROM bkn_periode_ekinper WHERE $BKN_YM BETWEEN $BKN_DARI AND $BKN_SAMPAI
 UNION ALL SELECT 'riwayat_skp_periodik', COUNT(*) FROM riwayat_skp_periodik WHERE periode_awal_skp <= $Z AND periode_akhir_skp >= $A
+UNION ALL SELECT 'siasn_upload_arsip', COUNT(*) FROM siasn_upload_arsip
+UNION ALL SELECT 'double_riwayat_kp', COUNT(*) FROM double_riwayat_kp
 UNION ALL SELECT 'web_config_tukin', COUNT(*) FROM web_config WHERE config_name IN ('TL1/PSW1','TL2/PSW2','TL3/PSW3','TA','TK','jam_masuk_normal','jam_pulang_normal','jam_pulang_jumat_normal','jam_masuk_puasa','jam_pulang_puasa','jam_pulang_jumat_puasa');"
 KONTROL="SELECT DATE_FORMAT(tgl, '%Y-%m') bulan, COUNT(*) n FROM dh_online WHERE tgl BETWEEN $A AND $Z GROUP BY bulan ORDER BY bulan;
 SELECT id_jenis_cuti, status, COUNT(*) n FROM riwayat_cuti WHERE tgl_mulai <= $Z AND tgl_akhir >= $AC GROUP BY id_jenis_cuti, status ORDER BY id_jenis_cuti, status;"
@@ -140,6 +156,11 @@ dev -B -e "$HITUNG" > "$KERJA/hitung_sumber.txt"
 langkah "5/6 Restore ke $SALINAN (MySQL lokal $LOKAL_PORT)"
 lokal -e "CREATE DATABASE \`$SALINAN\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 for f in "$DUMP"/*.sql; do lokal "$SALINAN" < "$f" || gagal "restore $(basename "$f")"; echo "  ok $(basename "$f")"; done
+if [ -n "$DS" ]; then
+  lokal -e "CREATE DATABASE \`$SALINAN_SIASN\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  lokal "$SALINAN_SIASN" < "$KERJA/dump_siasn/30_siasn_simpeg.sql" || gagal "restore siasn_simpeg"
+  echo "  ok $SALINAN_SIASN (8 tabel; impor dengan --sumber-siasn=$SALINAN_SIASN)"
+fi
 
 # --- 5. Verifikasi ------------------------------------------------------------------------------------------------
 langkah "6/6 Verifikasi salinan"
@@ -155,4 +176,4 @@ echo "SELESAI. Tempel isi berkas ini sebagai komentar di PR UP1-04 (tanpa NIP/na
 echo "  $(cygpath -w "$RINGKAS")"
 echo "Dump berisi data pribadi ada di $(cygpath -w "$DUMP"). Salinan sudah di $SALINAN, jadi dump boleh dihapus."
 read -r -p "Hapus folder dump sekarang? (y/N) " HAPUS
-if [ "${HAPUS:-N}" = "y" ] || [ "${HAPUS:-N}" = "Y" ]; then rm -rf "$DUMP"; echo "dump dihapus (cek juga Recycle Bin bila ada)."; fi
+if [ "${HAPUS:-N}" = "y" ] || [ "${HAPUS:-N}" = "Y" ]; then rm -rf "$DUMP" "$KERJA/dump_siasn"; echo "dump dihapus (cek juga Recycle Bin bila ada)."; fi

@@ -44,7 +44,7 @@ final class CurlTransport implements TransportHttpInterface
         } catch (HTTPException $e) {
             $pesan = $e->getMessage();
 
-            throw new GalatTransport($pesan, stripos($pesan, 'timed out') !== false || str_contains($pesan, '28 '), $e);
+            throw new GalatTransport(self::pesanAman($pesan), stripos($pesan, 'timed out') !== false || str_contains($pesan, '28 '), $e);
         }
 
         $header = [];
@@ -72,5 +72,18 @@ final class CurlTransport implements TransportHttpInterface
         }
 
         return $hasil;
+    }
+
+    /**
+     * Pesan galat cURL tanpa host/IP/URL tujuan (alamat layanan dari `.env` server tidak masuk log, BP-5): sisakan nomor
+     * galat + teks generik `curl_strerror`.
+     */
+    public static function pesanAman(string $pesan): string
+    {
+        if (preg_match('/^\s*(\d{1,3})\s*:/', $pesan, $m) === 1 && function_exists('curl_strerror')) {
+            return 'cURL error ' . $m[1] . ': ' . (curl_strerror((int) $m[1]) ?? 'galat transport');
+        }
+
+        return 'Galat transport HTTP (rincian alamat disembunyikan).';
     }
 }

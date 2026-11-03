@@ -6,6 +6,7 @@ sekaligus menjadi gladi cutover. Prosedur operasionalnya ada di `docs/up1/Runboo
 ```
 php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirmasi=<db_tujuan>
                        [--tier=1|semua] [--dry-run] [--keputusan=<berkas.json>]
+                       [--sumber-siasn=<skema_salinan_siasn_simpeg>]
 ```
 
 - **Tujuan**: koneksi `default` (`.env`), yaitu DB scratch kosong hasil `php spark migrate --all`. Tujuan **wajib** DB
@@ -13,6 +14,14 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
   mencetak `Tujuan: host:port / nama_db` (tanpa user/password) sebelum memeriksa `--konfirmasi`. Periksa baris itu
   dulu; jalankan `--dry-run` pertama kali agar tidak ada yang tertulis bila tujuannya salah.
 - **Sumber**: skema salinan legacy [K] apa adanya (hasil `docs/up1/sql/up1-ekstraksi.sh`), di server dan akun yang sama.
+- **Sumber SIASN** (`--sumber-siasn`, DBV-027 K-9): salinan skema `siasn_simpeg` (`REF_UNOR` + 7 tabel referensi) dari
+  **snapshot yang sama** dengan sumber utama, di server dan akun yang sama; dibaca langsung, tidak disalin ke skema
+  `simpeg01`. Tanpa opsi ini `siasn_ref_unor` dan `siasn_referensi` dilaporkan `dilewati: tanpa --sumber-siasn`; tabel
+  T7 lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
+  beda huruf besar/kecil (`lower_case_table_names`). Skema ini juga melewati penjaga di bawah. Contoh:
+  `php spark impor:legacy --sumber=up1_legacy_salinan --sumber-siasn=up1_legacy_salinan_siasn --zona-sumber=WIB
+  --konfirmasi=<db_tujuan> --dry-run`. Ekstraksinya: `docs/up1/sql/up1-ekstraksi.sh` (`UP1_DB_SIASN`) atau
+  `up1-ambil.sh`.
 - **Penjaga** (`PenjagaTujuan`): tujuan ditolak bila namanya ada di `Config\ImporLegacy::$tujuanTerlarang`, berawalan
   `prod`, sama dengan sumber, atau `--konfirmasi` tidak sama persis. Port tidak dipakai sebagai syarat.
 - **`--zona-sumber`** wajib diisi dan tidak punya nilai bawaan (GAP-2). Nilainya dikonfirmasi DBA sebelum dijalankan.
@@ -84,6 +93,18 @@ DEFAULT dari DB.
   R1a, karena tanggal izin akan bergeser sehari bila dikurangi 7 jam.
 - `khusus`: aturan per baris; boleh mengembalikan `__koreksi` (list kode) untuk dicatat. Contoh: `web_config` lewat `WebConfigImport` (G-09 §5); hasil SKIP/REVIEW tidak diimpor
   dan dihitung sebagai `dibuang`.
+- `sumber` / `skemaSiasn` / `petaKolom` / `konstanta` (B3): tabel sumber bernama lain (dibaca dari skema
+  `--sumber-siasn` bila `skemaSiasn`), kolom sumber bernama lain (`siasn_referensi.id_siasn` ← `ID`), dan kolom tujuan
+  bernilai tetap (`siasn_referensi.jenis`). Beberapa sumber boleh mengisi satu tujuan; laporan memakai kunci
+  `tujuan<SUMBER` (mis. `siasn_referensi<GOLONGAN_ID`).
+- `praPindai` (B3): lintasan baca pertama atas seluruh sumber (hanya kolom aturan), juga saat dry-run. Hasilnya daftar
+  PK yang tidak diimpor beserta kode aturan; boleh menggagalkan impor dengan jumlah saja. Dipakai
+  `AturanSiasn::skpPeriodik` dan `AturanSiasn::uploadArsip`.
+- `pascaImpor` (B3): hitung INFO di tujuan sesudah tier di-commit (bukan dry-run), dicatat sebagai koreksi.
+- Pra-cek B3 (sebelum apa pun ditulis, juga dry-run): kolom yang disebut di `petaKolom` wajib ada di sumber; kunci baca
+  sumber wajib unik sesudah normalisasi untuk tabel ber-`sumber`/`skemaSiasn` atau ber-PK `kolomKode` (ganda → gagal
+  dengan jumlah); `praPindai` dijalankan di fase ini. Sesudah tiap tabel, `sumber = ditulis + dilewati + dibuang`
+  (rekonsiliasi) — selisih → gagal.
 
 ## Berkas keputusan
 
@@ -97,9 +118,30 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 | 1 | Master: `agama`, `jenis_status`, `provinsi`/`kabupaten_kota` (sentinel = seed), `pangkat`, `jenis_kp`, `jenjang_pendidikan`, `unit` (`is_upt` 2 → 0 = G-02 Bagian 4 #9, dicatat; nilai lain di luar 0/1 → berkas keputusan, CR-089), `satker` (domain `is_upt` 0/1, CR-089), `group_jabatan`, `sub_group_jabatan`, `rumpun_jabatan`, `kelas_jabatan`, `jenjang_jf` (opsional), `jabatan`, `jabatan_koordinasi`, `periode_struktur_jabatan`, `struktur_jabatan`, `jenis_pegawai`, `gol_pppk`, `jenis_libur`, `hari_libur`, `jenis_cuti`, `web_config` | M1 |
 | 2 | `pegawai` (domain `flag_update` 0–3, `jenis_kelamin` 1/2; NIP & kode wilayah di-trim) | M2 |
 | 3 | `riwayat_mutasi_jabatan`, `riwayat_kp` (status 0/1/2/3/10), snapshot `pegawai_mutasi_jabatan`/`pegawai_kp` (`id_riwayat_*` yatim → NULL), `pegawai_plt`, `pegawai_plh` | M2 |
-| 4 | `absen_ijin` (status W/V/X/10, `affect_tukin`/`jenis_dinas` ber-domain, rentang izin = waktu bisnis), `riwayat_keluarga`, `detail_anak`, `bkn_periode_ekinper`, `riwayat_skp_periodik` | M3 |
+| 4 | `absen_ijin` (status W/V/X/10, `affect_tukin`/`jenis_dinas` ber-domain, rentang izin = waktu bisnis), `riwayat_keluarga`, `detail_anak`, `bkn_periode_ekinper`, `riwayat_skp_periodik` (kunci UNIQUE ganda → lihat T4 DBV-027 di bawah) | M3, B3 |
 | 5 | `lokasi_presensi`, `dh_online` (baris tanpa jam masuk & pulang dibuang `DBV-023 A2`; `sumber` NULL) | M3 |
 | 6 | `pegawai_sisa_cuti` (duplikat `(nip, tahun)` → id terkecil, saldo negatif → 0), `riwayat_cuti` (6 kolom ber-domain), `riwayat_tb`, `riwayat_tb_perpan` | M3 |
+| 7 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
+
+**Aturan DBV-027 §13.3 (B3).** Pesan dan laporan hanya jumlah.
+
+- `riwayat_skp_periodik` (K-3/K-4), UNIQUE `uq_rsp_pns_periode_skp` (`id_pns`, `periode_id`, `skp_id`): per kunci
+  ganda dipertahankan baris yang dibaca Tukin (`status = 1` dan `hasil_akhir IS NOT NULL`, string kosong = terisi),
+  lalu id terkecil; sisanya `dibuang` `DBV-027 K-3 kunci ganda`. Status dinilai sesudah berkas keputusan. Grup yang
+  memuat NIP berbeda → gagal dengan jumlah grup (DBV memutus per kasus). Kunci ber-NULL tidak dikelompokkan.
+- `siasn_upload_arsip` (K-6/K-7): semua status diimpor, `id_rw`/`id_da` apa adanya. Kunci UNIQUE `uq_sua_rw_da`
+  ganda → satu per kunci, prioritas `status = 1` lalu id terbesar (`DBV-027 K-6 kunci ganda`). `id_da` NULL → gagal.
+  Kolom respons BKN (`resp_*`) dan `error_msg` disalin mentah; `arsip_path`/`arsip_name` ikut `stripslashes` agar sama
+  dengan `document_attachment.path` hasil impor (DBV-029).
+  `status = 3` → `2` dengan `error_msg` "Terhenti saat cutover — periksa di SIASN sebelum mengantre ulang"
+  (`DBV-027 K-7 status 3→2`). `id_da`/`id_rw` tanpa baris di `document_attachment` / `riwayat_mutasi_jabatan`
+  (`Rw Jabatan`) / `riwayat_diklat` (`Rw Sertifikasi`) → INFO; bila tabel induknya masih kosong, kodenya menyebut
+  "belum diimpor (kosong)", artinya T7 dijalankan sebelum riwayat dan lampiran (MAKE-069) diimpor.
+- `double_riwayat_kp` (K-8): apa adanya; NIP tanpa `pegawai` → gagal (rujukan yatim).
+- Tidak diimpor: `siasn_status_pegawai` (dibangun job data-utama, K-5), `siasn_simpeg.dsp`, `firebase_token`/`fb_token`
+  (PRD Fase 6 AC-01.2).
+- **Urutan:** T7 dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
+  Nomor tier SIASN bergeser ke paling akhir saat tier MAKE-069 ditambahkan.
 
 Sesudah setiap tier di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7;
 tidak pernah diturunkan). PK TINYINT dengan counter ≥ 128 tidak disalin dan dicatat `PERIKSA`. Langkah ini DDL, jadi
@@ -152,11 +194,15 @@ tabel itu disalin mentah (`tanpaStripslashes: ['*']`).
 - **GAP cutover (bukan MAKE-056):** jalur pembuatan akun admin awal (bootstrap) belum ada. Pertanyaan ini untuk
   Horii/DBV.
 - GAP cutover `dm_user_lokasi_presensi` (GAP-4) tidak dibaca jalur Tukin. Keputusannya diserahkan ke DBV saat cutover.
+- Tabel non-Tukin (riwayat lain, `document_attachment`, `pengguna`, Halo Simpeg) dan pemindahan berkas: paket MAKE-069
+  (rencana: `docs/migrasi/MAKE-069-rencana.md` di branch `docs/make-069-rencana`).
 
 ## Test
 
 - `tests/unit/Impor/AturanImporTest.php`: aturan murni (transformasi, keputusan, penjaga).
+- `tests/unit/Impor/UrutanTierTest.php`: tier SIASN selalu `TIER_MAKS` dan sesudah tabel induk rujukannya.
 - `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php`,
+  `ImporLegacySiasnTest.php` (B3: kunci ganda SKP, tier SIASN, skema `--sumber-siasn` huruf besar),
   `ImporLegacyGagalDbTest.php` (galat DB dengan `DBDebug` false/true; `db-isolasi-penuh`), di atas
   `Tests\Support\Impor\ImporLegacyTestCase`: skema sumber sintetis `<db_test>_lgc` dibuat dari struktur v2
   (`CREATE TABLE … LIKE`) lalu diubah seperti legacy (kolom dibuang, tipe diubah, CHECK dilepas). Skema itu selalu

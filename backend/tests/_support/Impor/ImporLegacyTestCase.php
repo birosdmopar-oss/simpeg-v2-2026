@@ -15,7 +15,8 @@ use Throwable;
 /**
  * Kerangka test alat impor MAKE-056. Skema sumber `<db_test>_lgc` dibuat dari struktur tabel v2 semua tier
  * (`CREATE TABLE … LIKE`, tanpa FK), lalu diubah seperti legacy bila perlu oleh test. Semua data sintetis. Sesi
- * `sql_mode`/`time_zone` koneksi test dipulihkan sesudah tiap test (alat mengatur sesi R4).
+ * `sql_mode`/`time_zone` koneksi test dipulihkan sesudah tiap test (alat mengatur sesi R4). Definisi `skemaSiasn` tidak
+ * dibuat di skema itu; test SIASN membuat skema kedua `<db_test>_sia` lewat {@see siapkanSumberSiasn()}.
  *
  * Subkelas wajib bertanda `#[Group('db-isolasi-penuh')]` (DDL skema kedua, commit per tier).
  */
@@ -23,6 +24,7 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
 {
     protected string $lgc;
     protected ?BaseConnection $src = null;
+    protected ?BaseConnection $sia = null;
 
     /**
      * @var array{mode: string, tz: string}
@@ -52,9 +54,16 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
 
     private function siapkanSumber(): void
     {
+        $dibuat = [];
+
         for ($tier = 1; $tier <= DaftarTabel::TIER_MAKS; $tier++) {
             foreach (DaftarTabel::tier($tier) as $def) {
+                if ($def->skemaSiasn || isset($dibuat[$def->tabel])) {
+                    continue;
+                }
+
                 $this->db->query("CREATE TABLE `{$this->lgc}`.`{$def->tabel}` LIKE `{$this->db->getDatabase()}`.`{$this->db->prefixTable($def->tabel)}`");
+                $dibuat[$def->tabel] = true;
             }
         }
 
@@ -84,7 +93,35 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
     {
         $this->src?->close();
         $this->src = null;
+        $this->sia?->close();
+        $this->sia = null;
         $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}`");
+        $this->db->query("DROP DATABASE IF EXISTS `{$this->lgc}_sia`");
+    }
+
+    /**
+     * Skema kedua tiruan `siasn_simpeg` (`<db_test>_sia`): `REF_UNOR` berkolom sama dengan v2 dan tujuh tabel referensi
+     * berbentuk legacy (`ID`, `NAMA`, kolom pemetaan lokal). Nama huruf besar sengaja dipakai (K-9).
+     *
+     * @param array<string, string|null> $referensi nama tabel → kolom pemetaan lokal
+     */
+    protected function siapkanSumberSiasn(array $referensi): void
+    {
+        $sia = "{$this->lgc}_sia";
+        $this->db->query("DROP DATABASE IF EXISTS `{$sia}`");
+        $this->db->query("CREATE DATABASE `{$sia}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $this->db->query("CREATE TABLE `{$sia}`.`REF_UNOR` LIKE `{$this->db->getDatabase()}`.`{$this->db->prefixTable('siasn_ref_unor')}`");
+
+        foreach ($referensi as $tabel => $lokal) {
+            $this->db->query("CREATE TABLE `{$sia}`.`{$tabel}` (`ID` VARCHAR(100) NOT NULL, `NAMA` VARCHAR(255) NULL"
+                . ($lokal === null ? '' : ", `{$lokal}` INT NULL") . ', PRIMARY KEY (`ID`)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        }
+
+        $grup             = config(Database::class)->tests;
+        $grup['database'] = $sia;
+        $grup['DBPrefix'] = '';
+        $this->sia        = Database::connect($grup, false);
+        $this->sia->query("SET SESSION sql_mode = ''");
     }
 
     /**
@@ -122,6 +159,6 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
      */
     protected function jalankanImpor(array $tier, string $zona = 'WIB', ?Keputusan $k = null, bool $dryRun = false): array
     {
-        return (new PengimporLegacy($this->src, $this->db, $zona, $k ?? Keputusan::kosong(), 2))->jalankan($tier, $dryRun)->semua();
+        return (new PengimporLegacy($this->src, $this->db, $zona, $k ?? Keputusan::kosong(), 2, $this->sia))->jalankan($tier, $dryRun)->semua();
     }
 }

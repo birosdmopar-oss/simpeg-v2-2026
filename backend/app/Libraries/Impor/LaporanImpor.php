@@ -24,7 +24,7 @@ final class LaporanImpor
 
     public function mulai(int $tier, DefinisiTabel $def, int $sumber, string $catatan = ''): void
     {
-        $this->tabel[$def->tabel] = [
+        $this->tabel[$def->kunci()] = [
             'tier'    => $tier, 'aturan' => $def->sumberAturan, 'sumber' => $sumber, 'ditulis' => 0, 'dilewati' => 0,
             'dibuang' => [], 'koreksi' => [], 'catatan' => $catatan,
         ];
@@ -58,9 +58,9 @@ final class LaporanImpor
         return $this->waktu;
     }
 
-    public function koreksi(string $tabel, string $kode): void
+    public function koreksi(string $tabel, string $kode, int $n = 1): void
     {
-        $this->tabel[$tabel]['koreksi'][$kode] = ($this->tabel[$tabel]['koreksi'][$kode] ?? 0) + 1;
+        $this->tabel[$tabel]['koreksi'][$kode] = ($this->tabel[$tabel]['koreksi'][$kode] ?? 0) + $n;
     }
 
     /**
