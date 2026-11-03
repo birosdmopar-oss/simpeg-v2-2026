@@ -23,7 +23,7 @@ use InvalidArgumentException;
  * - `esign`/`fcm`: adapter real menyusul (MAKE-065/MAKE-066).
  *
  * Keluaran tidak pernah memuat token, kredensial, alamat, atau data; rincian kegagalan teredaksi ada di `integrasi_log`.
- * Kode keluar: 0 berhasil, 1 gagal, 3 masukan salah / belum tersedia.
+ * Kode keluar: 0 berhasil, 1 gagal (`EXIT_ERROR`), 7 masukan salah / belum tersedia (`EXIT_USER_INPUT`).
  */
 class IntegrasiUjiKoneksi extends BaseCommand
 {

@@ -28,8 +28,9 @@ use Closure;
  *   e-Kinerja satu header `Authorization: Bearer <token>`. Respons 401 → token dibuang dan permintaan diulang SEKALI.
  *
  * Tidak ada token/kredensial literal di kode (Q6-08, AC-03.4); nilai rahasia diteruskan ke {@see Permintaan::$rahasia}
- * agar tersensor dari log (AC-K.1). Validasi konfigurasi per pemakaian: {@see self::pastikanSiasn()} /
- * {@see self::pastikanEkinerja()} dipanggil konstruktor adapter (AC-K.4).
+ * agar tersensor dari log (AC-K.1); parameter kredensial bertanda `#[\SensitiveParameter]` agar tidak tercetak di
+ * backtrace log. Validasi konfigurasi per pemakaian: {@see self::pastikanSiasn()} / {@see self::pastikanEkinerja()}
+ * dipanggil konstruktor adapter (AC-K.4), termasuk `tlsVerify` wajib true dan `timeout` > 0.
  */
 final class TokenBkn
 {
@@ -58,6 +59,7 @@ final class TokenBkn
         KonfigurasiIntegrasi::pastikan(self::LAYANAN, $this->konfigurasi, [
             'baseUrlApi', 'tokenUrlGateway', 'tokenUrlSso', 'clientId', 'clientSecret', 'ssoClientId', 'ssoUsername', 'ssoPassword',
         ]);
+        $this->opsi();
     }
 
     public function pastikanEkinerja(): void
@@ -67,6 +69,7 @@ final class TokenBkn
             : ['baseUrlEkinerja', 'tokenUrlSso', 'ekinerjaApiUser', 'ekinerjaApiPass', 'ekinerjaSsoClientId', 'ekinerjaSsoUsername', 'ekinerjaSsoPassword'];
 
         KonfigurasiIntegrasi::pastikan(self::LAYANAN, $this->konfigurasi, $wajib);
+        $this->opsi();
     }
 
     /**
@@ -174,7 +177,7 @@ final class TokenBkn
     /**
      * @return array<string, string>
      */
-    private function bodySso(string $clientId, string $username, string $password, string $totp): array
+    private function bodySso(string $clientId, string $username, #[\SensitiveParameter] string $password, #[\SensitiveParameter] string $totp): array
     {
         $body = ['grant_type' => 'password', 'client_id' => $clientId, 'username' => $username, 'password' => $password];
 
@@ -216,7 +219,7 @@ final class TokenBkn
     /**
      * @param array<string, string> $body
      */
-    private function minta(string $operasi, string $url, string $user, string $pass, array $body): Respons
+    private function minta(string $operasi, string $url, #[\SensitiveParameter] string $user, #[\SensitiveParameter] string $pass, #[\SensitiveParameter] array $body): Respons
     {
         $rahasia = array_values(array_filter([$user, $pass, $body['password'] ?? '', $body['totp'] ?? '', base64_encode($user . ':' . $pass)], static fn (string $s): bool => $s !== ''));
 
@@ -231,11 +234,12 @@ final class TokenBkn
         ), $this->opsi());
     }
 
+    /**
+     * TLS BKN wajib aktif; `tlsVerify`/`timeout` divalidasi ketat (fail-fast lewat pastikan*, AC-K.4).
+     */
     private function opsi(): OpsiTransport
     {
-        $timeout = (float) ($this->konfigurasi['timeout'] ?? 30.0);
-
-        return new OpsiTransport(min(5.0, $timeout), $timeout, (bool) ($this->konfigurasi['tlsVerify'] ?? true));
+        return KonfigurasiIntegrasi::opsiTransport(self::LAYANAN, $this->konfigurasi, wajibTls: true);
     }
 
     private function teks(string $kunci): string
