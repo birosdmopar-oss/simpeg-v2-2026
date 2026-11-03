@@ -25,6 +25,7 @@ B-01/B-02, README alat impor (`backend/app/Libraries/Impor/README.md`). Rujukan 
 | K-M8 | **Setuju** transaksi per tabel untuk T10/T11, dengan pra-cek seluruh tier di depan, counter sesudah commit tabel, dan `--lanjut` berbasis berkas jejak |
 | K-M9 | `old_id` hanya ada di `jenis_konket` → angka sah disalin; NULL/bukan angka/ganda → gagal ke berkas keputusan. `pegawai_hist`: dikonfirmasi `flag_update = 1`, **satu per NIP (baris terbaru)**. FAQ: dikonfirmasi `stripslashes` → `HtmlSanitizer` → `content_stripped` dihitung ulang |
 | K-M10 | `waktuBisnis` T7–T13: **tidak ada**. `tanpaStripslashes` T7–T13: **tidak ada**. Rincian per kolom di Bagian 5 |
+| K-S1 | Tier SIASN (B3): `siasn_ref_unor`, `siasn_referensi` mentah (`['*']`); `double_riwayat_kp`, `siasn_upload_arsip.arsip_path`/`arsip_name` `stripslashes` bawaan; `siasn_upload_arsip` `resp_*` (5 kolom) + `error_msg` mentah. Rincian di Bagian 6 |
 
 ---
 
@@ -185,6 +186,25 @@ Pengecualian di masa depan hanya bila audit menemukan penulis **tanpa** `addslas
 
 ---
 
-## 6. Hal di luar keputusan ini
+## 6. K-S1 — `stripslashes` tier SIASN (B3, MAKE-056 `make-056/b3-impor-fase6`)
+
+Pertanyaan pelaksana B3 (ReadOne, branch `make-056/b3-impor-fase6` @`e6fcd1fe`), diputus DBV 03-11-2026 dari penulis legacy
+(rujukan relatif `controllers/hr/services/siasn_sync/` = `SS/`):
+
+| Tabel / kolom | Keputusan | Dasar [K] |
+|---|---|---|
+| `siasn_ref_unor` (semua kolom) | **Mentah** — `tanpaStripslashes ['*']` | `SS/Ref_unor.php:53-67` (insert) dan `:83-93` (update) menyalin field respons API apa adanya (`NamaUnor`, `NamaJabatan`, …) tanpa `addslashes`, lalu `insert_batch`/`update_batch` `siasn_simpeg.REF_UNOR` `:111`/`:118`. Kolom pemetaan lokal (`id_jabatan`, `id_unit`, `id_satker`, `lvl_uker`) angka, tidak terpengaruh |
+| `siasn_referensi` (7 tabel sumber, semua kolom) | **Mentah** — `tanpaStripslashes ['*']` | Tidak ada penulis di job aktif; satu-satunya penulis di kode `controllers/Tester.php::reinsert_jfu_siasn_20250117` `:785-799` menyalin baris apa adanya lewat `insert_batch` tanpa `addslashes`; sisanya diisi di luar kode (impor referensi BKN). Pembaca `SS/Rw_jabatan` mencocokkan `NAMA` mentah |
+| `double_riwayat_kp` | `stripslashes` bawaan | Hanya `nip` + stempel (`SS/Rw_gol.php:136-141`, `:392-393`); tidak berpengaruh |
+| `siasn_upload_arsip.arsip_path` | `stripslashes` bawaan | Ditulis = `document_attachment.path` apa adanya (`SS/Rw_jabatan.php:638`, `SS/Rw_pelatihan.php:471`); kunci anti-antre-ulang legacy membandingkan nilai mentah keduanya (`Rw_jabatan :581/:631`, `Rw_pelatihan :420/:464`). Karena `document_attachment.path` diimpor dengan `stripslashes` (Bagian 5.2), kolom ini wajib diperlakukan sama agar tetap identik. Catatan: pemroses `SS/Arsip.php:70` membuka `pathToSrc($row['arsip_path'])` **tanpa** `stripslashes`; untuk path tanpa `'` `"` `\` hasilnya sama, penyimpangan dilaporkan `lampiran:periksa` |
+| `siasn_upload_arsip.arsip_name` | `stripslashes` bawaan | `"Sertifikat {$row['nama_diklat']}"` (`SS/Rw_pelatihan.php:472`) memakai nama tersimpan ber-`addslashes` dari form, atau konstanta (`SS/Rw_jabatan.php:639`) |
+| `siasn_upload_arsip.resp_dok_id`, `resp_dok_nama`, `resp_dok_uri`, `resp_object`, `resp_slug`, `error_msg` | **Mentah** — `tanpaStripslashes` per kolom | `resp_*` = `$respFile['data'][…]` respons BKN tanpa `addslashes` (`SS/Arsip.php:73-79`); `error_msg` = string literal kode + angka (`:84-112`). Mentah menjaga backslash dari respons BKN (mis. di `dok_uri`) |
+| `siasn_upload_arsip` kolom lain (`nip`, `rw_name`, `id_rw`, `id_rw_siasn`, `id_da`, `status`) | `stripslashes` bawaan | Kode/angka/konstanta, tidak terpengaruh |
+
+Aturan lain tier SIASN tetap DBV-027 §13.3 (K-3..K-9).
+
+---
+
+## 7. Hal di luar keputusan ini
 - T12b (DBV-028) dan T13 (hasil sortir F-02) belum punya skema/sumber final; klasifikasi kolomnya mengikuti DBV-028 / sortir.
-- Tier SIASN: DBV-027 §13.3 (K-3..K-9).
+- Tier SIASN selain `stripslashes`: DBV-027 §13.3 (K-3..K-9).
