@@ -65,6 +65,22 @@ final class StatusIntegrasi
      * WIB > 19 → bulan berikutnya) belum ada di `bkn_periode_ekinper` atau belum punya satu pun baris
      * `riwayat_skp_periodik` aktif — tanpa data itu Tukin memakai potongan SKP bawaan 32% [K]. Null = aman.
      */
+    /**
+     * Status TLS e-sign untuk `integrasi:status` (keputusan Horii 03-11-2026): driver `bsre` dengan `tlsVerify` false →
+     * baris peringatan; selain itu null.
+     *
+     * @param array<string, mixed> $esign `Config\Integrations::$esign`
+     */
+    public function peringatanTlsEsign(array $esign): ?string
+    {
+        $tls  = $esign['tlsVerify'] ?? true;
+        $mati = $tls === false || (is_string($tls) && in_array(strtolower(trim($tls)), ['false', '0'], true)) || $tls === 0;
+
+        return ($esign['driver'] ?? 'mock') === 'bsre' && $mati
+            ? 'TLS BSrE: TIDAK DIVERIFIKASI (esign.tlsVerify = false; upgrade lewat .env, lihat README-deploy bagian e-sign).'
+            : null;
+    }
+
     public function peringatanEkinerja(?DateTimeImmutable $sekarang = null): ?string
     {
         $pilih   = PemilihPeriode::untuk($sekarang ?? new DateTimeImmutable('now'));

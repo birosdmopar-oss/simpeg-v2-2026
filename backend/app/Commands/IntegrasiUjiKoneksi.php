@@ -7,6 +7,7 @@ namespace App\Commands;
 use App\Libraries\Bkn\GalatTokenBkn;
 use App\Libraries\Bkn\TokenBkn;
 use App\Libraries\Cli\OpsiCli;
+use App\Libraries\Esign\BsreEsignAdapter;
 use App\Libraries\Integrasi\Http\GalatTransport;
 use App\Libraries\Integrasi\Http\Permintaan;
 use App\Libraries\Integrasi\KonfigurasiIntegrasiTidakLengkap;
@@ -20,7 +21,8 @@ use InvalidArgumentException;
  *
  * - `bkn`  : token e-Kinerja (statis atau SSO) lalu `GET referensi/periode` (hanya baca); dicetak status HTTP + jumlah baris.
  * - `siasn`: token API gateway + token SSO (dua header SIASN); tidak memanggil data pegawai.
- * - `esign`/`fcm`: adapter real menyusul (MAKE-065/MAKE-066).
+ * - `esign`: driver `bsre` — satu cek status NIK fiktif (kredensial & jaringan), menampilkan status TLS BSrE.
+ * - `fcm`: adapter real menyusul (MAKE-066).
  *
  * Keluaran tidak pernah memuat token, kredensial, alamat, atau data; rincian kegagalan teredaksi ada di `integrasi_log`.
  * Kode keluar: 0 berhasil, 1 gagal (`EXIT_ERROR`), 7 masukan salah / belum tersedia (`EXIT_USER_INPUT`).
@@ -55,6 +57,7 @@ class IntegrasiUjiKoneksi extends BaseCommand
             return match ($layanan) {
                 'bkn'   => $this->bkn(service('tokenBkn')),
                 'siasn' => $this->siasn(service('tokenBkn')),
+                'esign' => $this->esign(),
                 default => $this->belumTersedia($layanan),
             };
         } catch (KonfigurasiIntegrasiTidakLengkap $e) {
@@ -96,9 +99,33 @@ class IntegrasiUjiKoneksi extends BaseCommand
         return EXIT_SUCCESS;
     }
 
+    private function esign(): int
+    {
+        $gateway = service('esignGateway', false);
+
+        if (! $gateway instanceof BsreEsignAdapter) {
+            CLI::error('Uji koneksi esign hanya untuk integrations.esign.driver = bsre.');
+
+            return EXIT_USER_INPUT;
+        }
+
+        CLI::write($gateway->tlsDiverifikasi() ? 'TLS BSrE: diverifikasi.' : 'TLS BSrE: TIDAK DIVERIFIKASI (esign.tlsVerify = false).', $gateway->tlsDiverifikasi() ? 'green' : 'yellow');
+        $hasil = $gateway->ujiKoneksi();
+
+        if (! $hasil['ok']) {
+            CLI::error("Uji koneksi esign GAGAL: HTTP {$hasil['http']} — {$hasil['pesan']}");
+
+            return EXIT_ERROR;
+        }
+
+        CLI::write("Uji koneksi esign OK: gateway menjawab HTTP {$hasil['http']}.", 'green');
+
+        return EXIT_SUCCESS;
+    }
+
     private function belumTersedia(string $layanan): int
     {
-        CLI::error("Uji koneksi {$layanan} belum tersedia: adapter real dikerjakan di " . ($layanan === 'esign' ? 'MAKE-065' : 'MAKE-066') . '.');
+        CLI::error("Uji koneksi {$layanan} belum tersedia: adapter real dikerjakan di MAKE-066.");
 
         return EXIT_USER_INPUT;
     }

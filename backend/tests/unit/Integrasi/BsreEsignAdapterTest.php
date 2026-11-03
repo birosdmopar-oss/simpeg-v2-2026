@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Integrasi;
 
 use App\Libraries\Esign\BsreEsignAdapter;
+use App\Libraries\Integrasi\Http\CurlTransport;
 use App\Libraries\Integrasi\Http\FakeTransport;
 use App\Libraries\Integrasi\Http\GalatTransport;
 use App\Libraries\Integrasi\Http\KlienHttp;
@@ -49,9 +50,9 @@ final class BsreEsignAdapterTest extends CIUnitTestCase
         $this->log       = new LogIntegrasiTiruan();
     }
 
-    public function testKonfigurasiKosongAtauTlsMatiDitolakSaatDibuat(): void
+    public function testKonfigurasiKosongAtauTidakSahDitolakSaatDibuat(): void
     {
-        foreach ([[['baseUrl' => ''], 'baseUrl'], [['tlsVerify' => false], 'tlsVerify'], [['tlsVerify' => ''], 'tlsVerify'], [['timeout' => 0], 'timeout']] as [$ubah, $kunci]) {
+        foreach ([[['baseUrl' => ''], 'baseUrl'], [['tlsVerify' => ''], 'tlsVerify'], [['tlsVerify' => 'tidak'], 'tlsVerify'], [['timeout' => 0], 'timeout'], [['caBundle' => '/tidak/ada/ca.pem'], 'caBundle']] as [$ubah, $kunci]) {
             try {
                 $this->bsre($ubah);
                 $this->fail('harus ditolak: ' . $kunci);
@@ -62,6 +63,51 @@ final class BsreEsignAdapterTest extends CIUnitTestCase
         }
 
         $this->assertSame([], $this->transport->tercatat());
+    }
+
+    public function testTlsBsreIkutLegacyBolehFalseDariEnvDanCaBundleDiteruskan(): void
+    {
+        // Keputusan Horii 03-11-2026 (kartu Catatan Teknis): esign boleh tlsVerify=false; BKN tetap wajib true (TokenBknTest).
+        $this->transport->antreJson(200, ['status_code' => '1111'])->antreJson(200, ['status_code' => '1111']);
+
+        $mati = $this->bsre(['tlsVerify' => 'false']);
+        $this->assertFalse($mati->tlsDiverifikasi());
+        $mati->checkUser('199001012020011001');
+        $this->assertFalse($this->transport->tercatat()[0]['opsi']->verifyTls);
+        $this->assertSame(false, CurlTransport::opsiKlien($this->transport->tercatat()[0]['opsi'])['verify'], 'peer & host tidak diverifikasi');
+
+        $ca = (string) tempnam(sys_get_temp_dir(), 'ca');
+        file_put_contents($ca, '-----BEGIN CERTIFICATE-----
+uji
+-----END CERTIFICATE-----
+');
+
+        try {
+            $ketat = $this->bsre(['caBundle' => $ca]);
+            $this->assertTrue($ketat->tlsDiverifikasi());
+            $ketat->checkUser('199001012020011001');
+            $opsi = CurlTransport::opsiKlien($this->transport->tercatat()[1]['opsi']);
+            $this->assertSame([$ca, false], [$opsi['verify'], $opsi['allow_redirects']], 'caBundle → CAINFO, redirect tidak diikuti');
+        } finally {
+            unlink($ca);
+        }
+    }
+
+    public function testBawaanRepoTlsTrue(): void
+    {
+        $this->assertTrue(config(Integrations::class)->esign['tlsVerify']);
+        $this->assertSame('', config(Integrations::class)->esign['caBundle']);
+        $this->assertSame(['verify' => true, 'allow_redirects' => false], array_intersect_key(CurlTransport::opsiKlien(new \App\Libraries\Integrasi\Http\OpsiTransport()), ['verify' => 1, 'allow_redirects' => 1]));
+    }
+
+    public function testUjiKoneksiNikFiktifDanTolakKredensial(): void
+    {
+        $this->transport->antreJson(200, ['status_code' => '2021', 'message' => 'NIK tidak terdaftar'])->antreJson(401, ['error' => 'Unauthorized']);
+        $bsre = $this->bsre();
+
+        $this->assertSame(['ok' => true, 'http' => '200'], array_intersect_key($bsre->ujiKoneksi(), ['ok' => 1, 'http' => 1]));
+        $this->assertSame(['ok' => false, 'http' => '401'], array_intersect_key($bsre->ujiKoneksi(), ['ok' => 1, 'http' => 1]));
+        $this->assertStringEndsWith('/api/user/status/0000000000000000', $this->transport->tercatat()[0]['permintaan']->url);
     }
 
     public function testCekStatus1111BersertifikatDanBentukPermintaan(): void
@@ -164,7 +210,7 @@ final class BsreEsignAdapterTest extends CIUnitTestCase
     public function testDriverBsreDiServicesGagalSaatDibuatBilaKonfigurasiKosong(): void
     {
         $esign                             = config(Integrations::class)->esign;
-        config(Integrations::class)->esign = ['driver' => 'bsre', 'baseUrl' => '', 'username' => '', 'password' => '', 'tlsVerify' => true, 'timeout' => 30.0];
+        config(Integrations::class)->esign = ['driver' => 'bsre', 'baseUrl' => '', 'username' => '', 'password' => '', 'tlsVerify' => true, 'caBundle' => '', 'timeout' => 30.0];
 
         try {
             $this->expectException(KonfigurasiIntegrasiTidakLengkap::class);

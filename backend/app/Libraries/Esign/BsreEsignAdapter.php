@@ -25,7 +25,10 @@ use Closure;
  *   `nik` & `passphrase` di query string ikut legacy. Sukses HANYA bila badan respons PDF (`%PDF-`); legacy menulis JSON
  *   non-error sebagai berkas PDF — pengaman F6-17. Galat gateway (JSON `error`/`message`/`status_code`) → `status_code`
  *   kode gateway (atau HTTP), `message` teredaksi. POST tidak di-retry (BP-3).
- * - TLS: `tlsVerify` WAJIB true (legacy mematikan verifikasi `bsre_esign.php:92-93`, tidak diikuti — BP-3); `timeout` > 0.
+ * - TLS: ikut legacy atas keputusan Horii 03-11-2026 (kartu Catatan Teknis): `esign.tlsVerify = false` dari `.env` server
+ *   mematikan verifikasi peer & host seperti `bsre_esign.php:92-93` — peringatan dicatat sekali per proses dan tampil di
+ *   `integrasi:status`/`integrasi:uji-koneksi esign`. Upgrade ke TLS ketat cukup lewat `.env` (`tlsVerify = true`, plus
+ *   `caBundle` bila CA internal). Bawaan repo tetap `true`. Pengaman lain tetap berlaku (redaksi, PDF-only, tanpa redirect).
  *   Konfigurasi divalidasi saat dibuat (AC-K.4).
  * - Kegagalan jaringan tidak senyap: `status_code` `timeout`/`koneksi` + pesan teredaksi (kontrak).
  * - NIK, passphrase, dan kredensial tidak pernah masuk log/DB/respons/pesan galat (BP-5, AC-02.3): diteruskan ke
@@ -61,6 +64,8 @@ final class BsreEsignAdapter implements EsignGatewayInterface
     /** @var Closure(): string */
     private readonly Closure $jam;
 
+    private static bool $sudahDiperingatkan = false;
+
     /**
      * @param array<string, mixed>          $konfigurasi `Config\Integrations::$esign`
      * @param (Closure(string): ?string)|null $nikDari     NIP → NIK penanda tangan (bawaan `pegawai.nik`)
@@ -74,7 +79,7 @@ final class BsreEsignAdapter implements EsignGatewayInterface
         ?Closure $jam = null,
     ) {
         KonfigurasiIntegrasi::pastikan('esign', $konfigurasi, ['baseUrl', 'username', 'password']);
-        $this->opsi    = KonfigurasiIntegrasi::opsiTransport('esign', $konfigurasi, wajibTls: true);
+        $this->opsi    = KonfigurasiIntegrasi::opsiTransport('esign', $konfigurasi);
         $this->baseUrl = rtrim(trim((string) $konfigurasi['baseUrl']), '/');
         $this->nikDari = $nikDari ?? static function (string $nip): ?string {
             $nik = db_connect()->table('pegawai')->select('nik')->where('nip', $nip)->get(1)->getRow()?->nik;
@@ -82,6 +87,43 @@ final class BsreEsignAdapter implements EsignGatewayInterface
             return is_string($nik) && trim($nik) !== '' ? trim($nik) : null;
         };
         $this->jam = $jam ?? static fn (): string => date('Y-m-d H:i:s');
+
+        if (! $this->opsi->verifyTls && ! self::$sudahDiperingatkan) {
+            self::$sudahDiperingatkan = true;
+            log_message('warning', 'TLS BSrE TIDAK DIVERIFIKASI (integrations.esign.tlsVerify = false, ikut legacy atas keputusan Horii 03-11-2026).');
+        }
+    }
+
+    public function tlsDiverifikasi(): bool
+    {
+        return $this->opsi->verifyTls;
+    }
+
+    /**
+     * Uji koneksi nyata (`integrasi:uji-koneksi esign`, BP-11): satu `GET /api/user/status/{nik-uji}` dengan NIK nol fiktif —
+     * berhasil bila gateway menjawab JSON dan kredensial diterima (bukan 401/403). Tidak menandatangani apa pun.
+     *
+     * @return array{ok: bool, http: string, pesan: string}
+     */
+    public function ujiKoneksi(): array
+    {
+        try {
+            $respons = $this->klien->kirim(new Permintaan(
+                metode: 'GET',
+                url: $this->baseUrl . '/api/user/status/0000000000000000',
+                layanan: self::LAYANAN,
+                operasi: 'uji_koneksi',
+                header: $this->header(),
+                rahasia: $this->rahasia(),
+            ), $this->opsi);
+        } catch (GalatTransport $e) {
+            return ['ok' => false, 'http' => $e->timeout ? 'timeout' : 'koneksi', 'pesan' => $this->bersih($e->getMessage())];
+        }
+
+        $json = $respons->json();
+        $ok   = is_array($json) && ! in_array($respons->status, [401, 403], true) && $respons->status < 500;
+
+        return ['ok' => $ok, 'http' => (string) $respons->status, 'pesan' => $this->bersih($this->pesan($json ?? [], $ok ? 'Gateway menjawab.' : 'Gateway menolak/galat.'))];
     }
 
     public function checkUser(string $nip): array
