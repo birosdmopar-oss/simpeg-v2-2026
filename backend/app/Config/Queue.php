@@ -47,5 +47,7 @@ class Queue extends BaseQueue
         'dummy'                => DummyJob::class,
         'reset-password-email' => ResetPasswordEmailJob::class,
         'push-notif'           => PushNotifLayananJob::class,
+        // Fase 6 Jalur B (MAKE-064): tarik ulang e-Kinerja dari tombol admin, antrean `integrasi`.
+        'bkn-tarik' => \App\Jobs\BknTarikJob::class,
     ];
 }
