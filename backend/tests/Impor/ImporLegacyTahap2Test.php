@@ -154,12 +154,16 @@ final class ImporLegacyTahap2Test extends ImporLegacyTestCase
         $this->src->table('jenis_konket')->insertBatch([
             ['id_jenis_konket' => 2, 'jenis_konket' => 'Dinas Luar', 'old_id' => ' 4 ', 'affect_tukin' => 1, 'status' => 1],
             ['id_jenis_konket' => 3, 'jenis_konket' => 'Lama', 'old_id' => 'x', 'affect_tukin' => 1, 'status' => 1],
-            ['id_jenis_konket' => 5, 'jenis_konket' => 'Dibuang', 'old_id' => null, 'affect_tukin' => 1, 'status' => 1],
+            ['id_jenis_konket' => 4, 'jenis_konket' => 'Tugas Belajar', 'old_id' => '8', 'affect_tukin' => 1, 'status' => 1],
+            ['id_jenis_konket' => 5, 'jenis_konket' => 'Izin', 'old_id' => null, 'affect_tukin' => 1, 'status' => 1],
+            ['id_jenis_konket' => 6, 'jenis_konket' => 'Sakit', 'old_id' => '9', 'affect_tukin' => 1, 'status' => 1],
+            ['id_jenis_konket' => 7, 'jenis_konket' => 'Dibuang', 'old_id' => null, 'affect_tukin' => 1, 'status' => 1],
         ]);
         $this->src->query('ALTER TABLE bidang_pendidikan DROP COLUMN `order`');
         $this->src->table('bidang_pendidikan')->insertBatch([
             ['id_bidang_pendidikan' => 1, 'bidang_pendidikan' => 'Teknik', 'status' => 1],
             ['id_bidang_pendidikan' => 2, 'bidang_pendidikan' => 'agama', 'status' => 1],
+            ['id_bidang_pendidikan' => 98, 'bidang_pendidikan' => 'Lainnya', 'status' => 1],
         ]);
         $this->src->query('ALTER TABLE faq_article DROP COLUMN `order`');
         $this->src->table('faq_topic')->insert(['id_faq_topic' => 1, 'faq_topic' => 'Umum', 'status' => 1]);
@@ -173,19 +177,19 @@ final class ImporLegacyTahap2Test extends ImporLegacyTestCase
             $this->jalankanImpor([7], dryRun: true);
             $this->fail('old_id tidak sah tanpa keputusan harus gagal (K-M9a).');
         } catch (ImporGagal $e) {
-            $this->assertStringContainsString('jenis_konket: 2 old_id NULL/kosong/bukan angka', $e->getMessage());
+            $this->assertStringContainsString('jenis_konket: 3 old_id NULL/kosong/bukan angka', $e->getMessage());
         }
 
-        $k       = Keputusan::dariArray(['baris' => ['jenis_konket.old_id' => ['3' => 7, '5' => '__buang']]]);
+        $k       = Keputusan::dariArray(['baris' => ['jenis_konket.old_id' => ['3' => 7, '5' => 11, '7' => '__buang']]]);
         $laporan = $this->jalankanImpor([7], k: $k);
 
-        $this->assertSame(['4', '7'], array_column($this->db->table('jenis_konket')->select('old_id')->orderBy('id_jenis_konket')->get()->getResultArray(), 'old_id'));
+        $this->assertSame(['4', '7', '8', '11', '9'], array_column($this->db->table('jenis_konket')->select('old_id')->orderBy('id_jenis_konket')->get()->getResultArray(), 'old_id'));
         $this->assertSame(['DBV-029 K-M9a keputusan: tidak diimpor' => 1], $laporan['jenis_konket']['dibuang']);
         $this->assertArrayHasKey('WAJIB_0 absen_ijin.kategori tanpa jenis_konket.old_id', $laporan['jenis_konket']['koreksi'] + ['WAJIB_0 absen_ijin.kategori tanpa jenis_konket.old_id' => 0]);
 
         $urut = array_column($this->db->table('bidang_pendidikan')->select('id_bidang_pendidikan, order')->get()->getResultArray(), 'order', 'id_bidang_pendidikan');
         ksort($urut);
-        $this->assertSame([1 => '2', 2 => '1'], $urut, 'urut nama tanpa beda huruf: agama (id 2) lalu Teknik (id 1)');
+        $this->assertSame([1 => '3', 2 => '1', 98 => '2'], $urut, 'urut nama tanpa beda huruf: agama, Lainnya, Teknik');
 
         $faq = $this->db->table('faq_article')->select('id_faq_article, content, content_stripped, order')->orderBy('id_faq_article')->get()->getResultArray();
         $this->assertStringNotContainsString('<script>', $faq[1]['content']);
@@ -242,7 +246,81 @@ final class ImporLegacyTahap2Test extends ImporLegacyTestCase
         $this->assertSame(0, $pengimpor($this)->jalankan([10], true)->semua()['riwayat_kgb']['sumber']);
 
         $this->expectException(ImporGagal::class);
-        $this->expectExceptionMessage('Tier 10 memakai transaksi per tabel dan butuh --jejak (DBV-029 K-M8).');
+        $this->expectExceptionMessage('Tier 10 memakai transaksi per tabel dan butuh --jejak (DBV-029 K-M8); tidak ada yang ditulis.');
         $pengimpor($this)->jalankan([10], false);
+    }
+
+    public function testIdHardCodeWajibAdaDanJenisRwyHanyaSeed(): void
+    {
+        $this->src->table('tanda_jasa')->insert(['id_tanda_jasa' => 26, 'tanda_jasa' => 'SL X', 'status' => 1]);
+
+        try {
+            $this->jalankanImpor([7], dryRun: true);
+            $this->fail('ID hard-code yang hilang harus gagal (review P-6).');
+        } catch (ImporGagal $e) {
+            $this->assertStringContainsString('tanda_jasa: id hard-code aturan v2 tidak ada di sumber: 27, 28', $e->getMessage());
+        }
+
+        $this->src->table('tanda_jasa')->insertBatch([['id_tanda_jasa' => 27, 'tanda_jasa' => 'SL XX', 'status' => 1], ['id_tanda_jasa' => 28, 'tanda_jasa' => 'SL XXX', 'status' => 1]]);
+        $this->src->query("INSERT INTO jenis_rwy SELECT * FROM `{$this->db->getDatabase()}`.`{$this->db->prefixTable('jenis_rwy')}`");
+        $this->src->table('jenis_rwy')->insert(['id_jenis_rwy' => 900, 'kode' => 'X_UJI', 'jenis_rwy' => 'Di luar seed', 'status' => 1]);
+
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('jenis_rwy: 1 id sumber di luar seed migration');
+        $this->jalankanImpor([7], dryRun: true);
+    }
+
+    public function testJenisHukdisDenganTingkatYatimGagal(): void
+    {
+        $this->src->table('jenis_hukdis')->insert(['id_jenis_hukdis' => 1, 'id_tingkat_hukdis' => 9, 'jenis_hukdis' => 'Teguran', 'status' => 1]);
+
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('Rujukan yatim jenis_hukdis.id_tingkat_hukdis: 1 nilai');
+        $this->jalankanImpor([7]);
+    }
+
+    public function testLintasanKeringTierPerTabelMenolakSebelumTulisApaPun(): void
+    {
+        $this->src->table('riwayat_kgb')->insert(['id_riwayat_kgb' => 1, 'nip' => self::NIP_A, 'tmtsk' => '2026-01-01', 'tgl_sk' => '2026-01-01', 'status' => 1]);
+        $this->lepasCheck('riwayat_seminar');
+        $this->src->table('riwayat_seminar')->insert(['id_riwayat_seminar' => 1, 'nip' => self::NIP_A, 'nama_seminar' => 'Uji', 'status' => 77]);
+
+        try {
+            $this->jalankanImpor([10]);
+            $this->fail('Status di luar domain di tabel berikutnya harus gagal di lintasan kering (review P-2).');
+        } catch (ImporGagal $e) {
+            $this->assertStringContainsString('lintasan kering tier 10; belum ada yang ditulis', $e->getMessage());
+        }
+
+        $this->assertSame(0, $this->db->table('riwayat_kgb')->countAllResults(), 'tabel pertama tidak ter-commit');
+        $this->assertFileDoesNotExist($this->berkasJejak());
+    }
+
+    public function testLanjutTidakMelewatiTabelYangTercatatKosongDanMemeriksaSumber(): void
+    {
+        // Semua tabel T10 tercatat kosong.
+        $this->jalankanImpor([10]);
+        $this->assertSame(0, json_decode((string) file_get_contents($this->berkasJejak()), true)['tabel']['riwayat_kgb']['baris']);
+
+        // Snapshot baru: sumber kini berisi → entri baris 0 tidak dianggap "sudah" (review P-3).
+        $this->src->table('riwayat_kgb')->insert(['id_riwayat_kgb' => 1, 'nip' => self::NIP_A, 'tmtsk' => '2026-01-01', 'tgl_sk' => '2026-01-01', 'status' => 1]);
+        $laporan = $this->jalankanImpor([10], lanjut: true);
+        $this->assertSame(1, $laporan['riwayat_kgb']['ditulis']);
+
+        // Jumlah sumber berubah sesudah dicatat → --lanjut gagal.
+        $this->src->table('riwayat_kgb')->insert(['id_riwayat_kgb' => 2, 'nip' => self::NIP_A, 'tmtsk' => '2026-01-01', 'tgl_sk' => '2026-01-01', 'status' => 1]);
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('--lanjut: riwayat_kgb tidak cocok dengan berkas jejak');
+        $this->jalankanImpor([10], lanjut: true);
+    }
+
+    public function testLanjutGagalBilaZonaSumberBerbeda(): void
+    {
+        $this->src->table('riwayat_kgb')->insert(['id_riwayat_kgb' => 1, 'nip' => self::NIP_A, 'tmtsk' => '2026-01-01', 'tgl_sk' => '2026-01-01', 'status' => 1]);
+        $this->jalankanImpor([10]);
+
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('--lanjut: riwayat_kgb tidak cocok');
+        $this->jalankanImpor([10], 'UTC', lanjut: true);
     }
 }

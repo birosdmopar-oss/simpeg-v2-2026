@@ -46,14 +46,15 @@ final class BootstrapAdmin
             throw new RuntimeException('Email tidak valid.');
         }
 
-        $tabel = $this->db->table('pengguna');
-        $aktif = $tabel->where('user_level', self::ROLE_ADMIN)->where('status', '1')->where('deleted_at', null)->countAllResults();
+        // Dengan DBDebug mati, countAllResults() yang gagal mengembalikan 0 — jangan dibaca sebagai "tidak ada" (review B-1).
+        $aktif = $this->hitung($this->db->table('pengguna')->where('user_level', self::ROLE_ADMIN)->where('status', '1')->where('deleted_at', null));
+        $sama  = $this->hitung($this->db->table('pengguna')->where('username', $username));
 
         if ($aktif > 0 && ! $tambahan) {
             throw new RuntimeException("Sudah ada {$aktif} akun admin role 1 aktif; pakai --tambahan bila memang perlu admin lain.");
         }
 
-        if ($this->db->table('pengguna')->where('username', $username)->countAllResults() > 0) {
+        if ($sama > 0) {
             throw new RuntimeException('Username sudah dipakai.');
         }
 
@@ -77,20 +78,45 @@ final class BootstrapAdmin
             'updated_at'           => gmdate('Y-m-d H:i:s'),
         ];
 
-        $this->db->transException(false)->transStart();
-        $this->db->table('pengguna')->insert($baris);
-        $id = (int) $this->db->insertID();
-        // Audit tanpa hash/password (ADR-012): hanya identitas & peran.
-        model(AuditLogModel::class)->record('pengguna', $id, 'create', null, [
-            'username' => $username, 'user_level' => self::ROLE_ADMIN, 'status' => '1', 'must_change_password' => 1, 'sumber' => 'akun:bootstrap-admin',
-        ]);
-        $this->db->transComplete();
+        $this->db->transBegin();
 
-        if ($this->db->transStatus() === false || $id < 1) {
+        try {
+            $ok = $this->db->table('pengguna')->insert($baris) !== false;
+            $id = (int) $this->db->insertID();
+            // Audit tanpa hash/password (ADR-012): hanya identitas & peran.
+            if ($ok && $id > 0) {
+                $ok = model(AuditLogModel::class)->record('pengguna', $id, 'create', null, [
+                    'username' => $username, 'user_level' => self::ROLE_ADMIN, 'status' => '1', 'must_change_password' => 1, 'sumber' => 'akun:bootstrap-admin',
+                ]) > 0;
+            }
+
+            $ok = $ok && $id > 0 && $this->db->transStatus();
+        } catch (\Throwable $e) {
+            $this->db->transRollback();
+            $this->db->resetTransStatus();
+
+            throw new RuntimeException('Akun admin gagal dibuat (transaksi di-rollback).', 0, $e);
+        }
+
+        if (! $ok || $this->db->transCommit() === false) {
+            $this->db->transRollback();
+            $this->db->resetTransStatus();
+
             throw new RuntimeException('Akun admin gagal dibuat (transaksi di-rollback).');
         }
 
         return ['id' => $id, 'password' => $password];
+    }
+
+    private function hitung(\CodeIgniter\Database\BaseBuilder $kueri): int
+    {
+        $n = $kueri->countAllResults();
+
+        if (! is_int($n) || (int) ($this->db->error()['code'] ?? 0) !== 0) {
+            throw new RuntimeException('Galat DB saat memeriksa akun yang ada.');
+        }
+
+        return $n;
     }
 
     /**

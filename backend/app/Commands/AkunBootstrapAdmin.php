@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Libraries\Auth\BootstrapAdmin;
+use App\Libraries\Cli\KoneksiCli;
 use App\Libraries\Cli\OpsiCli;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -62,7 +63,7 @@ class AkunBootstrapAdmin extends BaseCommand
             return EXIT_USER_INPUT;
         }
 
-        $db = db_connect();
+        $db = KoneksiCli::buka();
         CLI::write(sprintf('Tujuan: %s:%s / %s', $db->hostname, (string) $db->port, $db->getDatabase()), 'yellow');
 
         if (($opsi['konfirmasi'] ?? null) !== $db->getDatabase()) {

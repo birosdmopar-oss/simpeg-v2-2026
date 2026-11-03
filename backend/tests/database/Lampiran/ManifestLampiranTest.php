@@ -6,6 +6,8 @@ namespace Tests\Database\Lampiran;
 
 use App\Libraries\Lampiran\ManifestLampiran;
 use CodeIgniter\Test\StreamFilterTrait;
+use Config\Database;
+use RuntimeException;
 use Tests\Support\DatabaseTestCase;
 
 /**
@@ -60,6 +62,35 @@ final class ManifestLampiranTest extends DatabaseTestCase
             $this->assertCount(2, ManifestLampiran::baca($berkas)['berkas']);
         } finally {
             @unlink($berkas);
+        }
+    }
+
+    public function testPathBedaHurufBesarKecilAdalahBerkasBerbeda(): void
+    {
+        $this->db->table('document_attachment')->insertBatch([
+            ['NIP' => self::NIP, 'path' => 'arsip/Kasus/A.pdf'],
+            ['NIP' => self::NIP, 'path' => 'arsip/kasus/a.pdf'],
+        ]);
+
+        $m = ManifestLampiran::bangun($this->db);
+
+        $this->assertArrayHasKey('arsip/Kasus/A.pdf', $m['berkas']);
+        $this->assertArrayHasKey('arsip/kasus/a.pdf', $m['berkas'], 'GROUP BY BINARY (review P-1)');
+    }
+
+    public function testKolomBerkasTidakAdaGagalBukanDilewati(): void
+    {
+        $grup             = config(Database::class)->tests;
+        $grup['DBDebug']  = false;
+        $grup['DBPrefix'] = 'zz_tidak_ada_';
+        $db               = Database::connect($grup, false);
+
+        try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('tidak ada di DB tujuan');
+            ManifestLampiran::bangun($db);
+        } finally {
+            $db->close();
         }
     }
 }

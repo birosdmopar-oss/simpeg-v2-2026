@@ -40,6 +40,7 @@ final class DefinisiTabel
      * @param list<string>                  $kolomDilarang     kolom sumber yang tidak pernah di-SELECT (rahasia, mis. `pengguna.password_decode`)
      * @param array{kolom: string, nama: string, lingkup: list<string>}|null $isiUrutan [V2] kolom urutan yang tidak ada di sumber → 1..n per lingkup, urut nama (G-01 #4, G-04/05 P8)
      * @param array<string, array{0: string, 1: string}> $rujukan rujukan wajib tanpa FK di tujuan (FK masih ditahan): kolom → [tabel induk, kolom induk]; yatim → gagal
+     * @param bool                          $hanyaSeed         semua id sumber wajib ada di seed migration (`bolehSeed`); id lain → gagal (mis. `jenis_rwy`)
      */
     public function __construct(
         public readonly string $tabel,
@@ -68,6 +69,7 @@ final class DefinisiTabel
         public readonly array $kolomDilarang = [],
         public readonly ?array $isiUrutan = null,
         public readonly array $rujukan = [],
+        public readonly bool $hanyaSeed = false,
     ) {
     }
 

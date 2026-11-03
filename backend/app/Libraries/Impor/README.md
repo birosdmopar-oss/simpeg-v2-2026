@@ -17,7 +17,7 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
 - **Sumber SIASN** (`--sumber-siasn`, DBV-027 K-9): salinan skema `siasn_simpeg` (`REF_UNOR` + 7 tabel referensi) dari
   **snapshot yang sama** dengan sumber utama, di server dan akun yang sama; dibaca langsung, tidak disalin ke skema
   `simpeg01`. Tanpa opsi ini `siasn_ref_unor` dan `siasn_referensi` dilaporkan `dilewati: tanpa --sumber-siasn`; tabel
-  T7 lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
+  tabel tier SIASN (T13) lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
   beda huruf besar/kecil (`lower_case_table_names`). Skema ini juga melewati penjaga di bawah. Contoh:
   `php spark impor:legacy --sumber=up1_legacy_salinan --sumber-siasn=up1_legacy_salinan_siasn --zona-sumber=WIB
   --konfirmasi=<db_tujuan> --dry-run`. Ekstraksinya: `docs/up1/sql/up1-ekstraksi.sh` (`UP1_DB_SIASN`) atau
@@ -142,7 +142,7 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
   `status = 3` → `2` dengan `error_msg` "Terhenti saat cutover — periksa di SIASN sebelum mengantre ulang"
   (`DBV-027 K-7 status 3→2`). `id_da`/`id_rw` tanpa baris di `document_attachment` / `riwayat_mutasi_jabatan`
   (`Rw Jabatan`) / `riwayat_diklat` (`Rw Sertifikasi`) → INFO; bila tabel induknya masih kosong, kodenya menyebut
-  "belum diimpor (kosong)", artinya T7 dijalankan sebelum riwayat dan lampiran (MAKE-069) diimpor.
+  "belum diimpor (kosong)", artinya tier SIASN (T13) dijalankan sebelum riwayat dan lampiran (MAKE-069) diimpor.
 - `double_riwayat_kp` (K-8): apa adanya; NIP tanpa `pegawai` → gagal (rujukan yatim).
 - Tidak diimpor: `siasn_status_pegawai` (dibangun job data-utama, K-5), `siasn_simpeg.dsp`, `firebase_token`/`fb_token`
   (PRD Fase 6 AC-01.2).

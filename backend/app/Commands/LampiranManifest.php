@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Libraries\Cli\KoneksiCli;
 use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Lampiran\ManifestLampiran;
 use CodeIgniter\CLI\BaseCommand;
@@ -51,7 +52,7 @@ class LampiranManifest extends BaseCommand
             return EXIT_USER_INPUT;
         }
 
-        $db = db_connect();
+        $db = KoneksiCli::buka();
         CLI::write(sprintf('Tujuan: %s:%s / %s', $db->hostname, (string) $db->port, $db->getDatabase()), 'yellow');
 
         if (($opsi['konfirmasi'] ?? null) !== $db->getDatabase()) {

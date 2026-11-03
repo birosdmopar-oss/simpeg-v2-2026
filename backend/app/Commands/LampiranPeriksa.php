@@ -62,8 +62,8 @@ class LampiranPeriksa extends BaseCommand
         $kurang = 0;
 
         foreach ($hasil as $label => $h) {
-            CLI::write(sprintf('%s: ada=%d hilang=%d beda_checksum=%d', $label, $h['ada'], $h['hilang'], $h['beda_checksum']));
-            $kurang += $h['hilang'] + $h['beda_checksum'];
+            CLI::write(sprintf('%s: ada=%d hilang=%d beda_checksum=%d tidak_sah=%d', $label, $h['ada'], $h['hilang'], $h['beda_checksum'], $h['tidak_sah']));
+            $kurang += $h['hilang'] + $h['beda_checksum'] + $h['tidak_sah'];
         }
 
         if ($kurang > 0) {

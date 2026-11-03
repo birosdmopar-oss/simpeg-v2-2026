@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Libraries\Cli\KoneksiCli;
 use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Impor\DaftarTabel;
 use App\Libraries\Impor\ImporGagal;
@@ -12,8 +13,6 @@ use App\Libraries\Impor\PengimporLegacy;
 use App\Libraries\Impor\PenjagaTujuan;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
-use CodeIgniter\Database\BaseConnection;
-use Config\Database;
 use Config\ImporLegacy as KonfigImpor;
 use InvalidArgumentException;
 use Throwable;
@@ -90,9 +89,21 @@ class ImporLegacy extends BaseCommand
         }
 
         $daftarTier = $tier === 'semua' ? range(1, DaftarTabel::TIER_MAKS) : [(int) $tier];
+        $perTabel   = array_values(array_intersect($daftarTier, DaftarTabel::TIER_PER_TABEL));
+
+        // Review P-4: ditolak SEBELUM koneksi/tulis apa pun — tanpa ini `--tier=semua` sempat commit T1–T9 lalu gagal di T10.
+        if (! $dryRun && $jejak === null && $perTabel !== []) {
+            CLI::error(sprintf('Tier %s memakai transaksi per tabel: wajib --jejak=<berkas> (DBV-029 K-M8). Tidak ada yang ditulis.', implode(', ', $perTabel)));
+
+            return EXIT_USER_INPUT;
+        }
+
+        if ($lanjut && $perTabel === []) {
+            CLI::write('Peringatan: --lanjut hanya berlaku untuk tier per tabel (' . implode(', ', DaftarTabel::TIER_PER_TABEL) . '); tier lain tetap wajib kosong.', 'yellow');
+        }
 
         try {
-            $tujuan = self::koneksi(null);
+            $tujuan = KoneksiCli::baru(null);
             CLI::write(sprintf('Tujuan: %s:%s / %s — sumber: %s, sumber SIASN: %s (server & akun yang sama)', $tujuan->hostname, (string) $tujuan->port, $tujuan->getDatabase(), $sumber, is_string($siasn) ? $siasn : '-'), 'yellow');
             $konfirmasi = $opsi['konfirmasi'] ?? null;
             $berkas     = $opsi['keputusan'] ?? null;
@@ -104,7 +115,7 @@ class ImporLegacy extends BaseCommand
 
             $keputusan = is_string($berkas) ? Keputusan::dariBerkas($berkas) : Keputusan::kosong();
 
-            $laporan = (new PengimporLegacy(self::koneksi($sumber), $tujuan, $zona, $keputusan, (int) $batch, is_string($siasn) ? self::koneksi($siasn) : null, is_string($jejak) ? $jejak : null))
+            $laporan = (new PengimporLegacy(KoneksiCli::baru($sumber), $tujuan, $zona, $keputusan, (int) $batch, is_string($siasn) ? KoneksiCli::baru($siasn) : null, is_string($jejak) ? $jejak : null))
                 ->jalankan($daftarTier, $dryRun, $lanjut);
         } catch (ImporGagal $e) {
             CLI::error('GAGAL: ' . $e->getMessage());
@@ -123,22 +134,5 @@ class ImporLegacy extends BaseCommand
         CLI::write($dryRun ? 'Dry-run selesai, tidak ada yang ditulis.' : 'Impor selesai.', 'green');
 
         return EXIT_SUCCESS;
-    }
-
-    /**
-     * Koneksi dari grup bawaan dengan `DBDebug = true` (R-1 review PR #32). `$skema` null = tujuan (grup apa adanya);
-     * selain itu sumber: skema lain tanpa prefix.
-     */
-    private static function koneksi(?string $skema): BaseConnection
-    {
-        $grup            = config(Database::class)->{config(Database::class)->defaultGroup};
-        $grup['DBDebug'] = true;
-
-        if ($skema !== null) {
-            $grup['database'] = $skema;
-            $grup['DBPrefix'] = '';
-        }
-
-        return Database::connect($grup, false);
     }
 }

@@ -27,7 +27,8 @@ final class TransportCurl implements TransportHttp
             return ['status' => 0, 'tipe' => '', 'lokasi' => null, 'isi' => ''];
         }
 
-        $isi = '';
+        $isi   = '';
+        $besar = false;
         curl_setopt_array($ch, [
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_SSL_VERIFYPEER => true,
@@ -36,8 +37,10 @@ final class TransportCurl implements TransportHttp
             CURLOPT_CONNECTTIMEOUT => 15,
             CURLOPT_TIMEOUT        => $this->timeoutDetik,
             CURLOPT_HEADER         => false,
-            CURLOPT_WRITEFUNCTION  => function ($c, string $potong) use (&$isi): int {
+            CURLOPT_WRITEFUNCTION  => function ($c, string $potong) use (&$isi, &$besar): int {
                 if (strlen($isi) + strlen($potong) > $this->maksByte) {
+                    $besar = true;
+
                     return 0; // batalkan: melebihi batas
                 }
 
@@ -47,7 +50,14 @@ final class TransportCurl implements TransportHttp
             },
         ]);
 
-        $ok     = curl_exec($ch);
+        $ok = curl_exec($ch);
+
+        if ($besar) {
+            curl_close($ch);
+
+            return ['status' => -1, 'tipe' => '', 'lokasi' => null, 'isi' => ''];
+        }
+
         $status = $ok === false ? 0 : (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         $tipe   = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
         $lokasi = curl_getinfo($ch, CURLINFO_REDIRECT_URL);

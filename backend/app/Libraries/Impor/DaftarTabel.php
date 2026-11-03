@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Impor;
 
 use App\Libraries\MasterData\WebConfigImport;
+use CodeIgniter\Database\BaseConnection;
 use Config\WebConfig;
 
 /**
@@ -309,8 +310,8 @@ final class DaftarTabel
             new DefinisiTabel('kantor', 'id_kantor', 'G-07/G-08 F10', kolomNama: ['nama_kantor']),
             new DefinisiTabel('bidang_kursem', 'id_bidang_kursem', 'G-07/G-08 F9', kolomNama: ['bidang_kursem'], isiUrutan: $nama('bidang_kursem')),
             new DefinisiTabel('instansi_kursem', 'id_instansi_kursem', 'G-07/G-08 F9', kolomNama: ['instansi_kursem'], isiUrutan: $nama('instansi_kursem')),
-            new DefinisiTabel('bidang_pendidikan', 'id_bidang_pendidikan', 'G-04/G-05 P8/P12', kolomNama: ['bidang_pendidikan'], isiUrutan: $nama('bidang_pendidikan')),
-            new DefinisiTabel('jurusan_pendidikan', 'id_jurusan_pendidikan', 'G-04/G-05 P8/P12', kolomNama: ['jurusan_pendidikan'], isiUrutan: $nama('jurusan_pendidikan', ['id_bidang_pendidikan'])),
+            new DefinisiTabel('bidang_pendidikan', 'id_bidang_pendidikan', 'G-04/G-05 P8/P12', kolomNama: ['bidang_pendidikan'], praPindai: AturanTahap2::wajibAda('id_bidang_pendidikan', [98]), isiUrutan: $nama('bidang_pendidikan')),
+            new DefinisiTabel('jurusan_pendidikan', 'id_jurusan_pendidikan', 'G-04/G-05 P8/P12', kolomNama: ['jurusan_pendidikan'], praPindai: AturanTahap2::wajibAda('id_jurusan_pendidikan', [1185]), isiUrutan: $nama('jurusan_pendidikan', ['id_bidang_pendidikan'])),
             new DefinisiTabel('diklat', 'id_diklat', 'G-06 B8', kolomNama: ['nama_diklat'], domain: ['jenis_diklat' => [1, 2, 3, 4, 5]]),
             new DefinisiTabel('tingkat_hukdis', 'id_tingkat_hukdis', 'G-06 B8', kolomNama: ['tingkat_hukdis']),
             new DefinisiTabel('jenis_hukdis', 'id_jenis_hukdis', 'G-06 B8', kolomNama: ['jenis_hukdis']),
@@ -321,10 +322,10 @@ final class DaftarTabel
                 kolomNama: ['jenis_konket'],
                 khusus: AturanTahap2::jenisKonket(...),
                 domain: ['affect_tukin' => [1, 2]],
-                praPindai: AturanTahap2::oldIdTidakSah(...),
+                praPindai: static fn (BaseConnection $db, string $t, Keputusan $k): array => (AturanTahap2::wajibAda('id_jenis_konket', [2, 4, 5, 6]))($db, $t, $k) + AturanTahap2::oldIdTidakSah($db, $t, $k),
                 pascaImpor: AturanTahap2::auditKategoriKonket(...),
             ),
-            new DefinisiTabel('tanda_jasa', 'id_tanda_jasa', 'G-06 B8', kolomNama: ['tanda_jasa']),
+            new DefinisiTabel('tanda_jasa', 'id_tanda_jasa', 'G-06 B8', kolomNama: ['tanda_jasa'], praPindai: AturanTahap2::wajibAda('id_tanda_jasa', [26, 27, 28])),
             new DefinisiTabel('subrumpun_jabatan', 'id_subrumpun_jabatan', 'G-02b §6.5', kolomNama: ['subrumpun_jabatan']),
             new DefinisiTabel('jabatan_akademik', 'id_jabatan_akademik', 'G-02b §6.5', kolomNama: ['jabatan_akademik'], domain: ['is_atasan' => [1, 2]]),
             new DefinisiTabel('peta_jabatan', 'id_peta_jabatan', 'G-02b §6.5'),
@@ -342,7 +343,7 @@ final class DaftarTabel
                 isiUrutan: $nama('title', ['id_faq_sub_topic']),
             ),
             new DefinisiTabel('faq_related_article', 'id_article_main', 'G-10', statusDomain: null, kunciUrut: ['id_article_main', 'id_article_related']),
-            new DefinisiTabel('jenis_rwy', 'id_jenis_rwy', 'B-01/B-02 §3.5.9 (seed)', kolomNama: ['jenis_rwy'], bolehSeed: true, opsional: true),
+            new DefinisiTabel('jenis_rwy', 'id_jenis_rwy', 'B-01/B-02 §3.5.9 (seed)', kolomNama: ['jenis_rwy'], bolehSeed: true, opsional: true, hanyaSeed: true),
         ];
     }
 

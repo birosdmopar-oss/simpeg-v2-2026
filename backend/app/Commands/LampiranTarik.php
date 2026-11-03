@@ -7,19 +7,20 @@ namespace App\Commands;
 use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Lampiran\ManifestLampiran;
 use App\Libraries\Lampiran\PenarikLampiran;
-use App\Libraries\Lampiran\TransportCurl;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 /**
  * MAKE-069 K-M4 opsi 1 — tarik berkas lampiran legacy lewat URL, tanpa masuk server:
  *
  *   php spark lampiran:tarik --manifest=<berkas.json> [--dasar-arsip=<url>] [--dasar-aplikasi=<url>] [--akar=<folder>]
  *                            [--sumber=arsip|aplikasi|semua] [--jeda-ms=200] [--ulang=2] [--ambang-login=5] [--timeout=60]
+ *                            [--izinkan-http]
  *
- * Alamat dasar diisi OPERATOR saat jalan (opsi, atau env `LAMPIRAN_DASAR_ARSIP` / `LAMPIRAN_DASAR_APLIKASI`); tidak pernah
+ * Alamat dasar wajib https; http hanya dengan `--izinkan-http` (peringatan dicetak — dokumen pribadi pegawai). Alamat dasar diisi OPERATOR saat jalan (opsi, atau env `LAMPIRAN_DASAR_ARSIP` / `LAMPIRAN_DASAR_APLIKASI`); tidak pernah
  * ada di config repo, `.env.example`, log, atau laporan. Satu koneksi berurutan dengan jeda (server produksi). Keluaran
  * hanya jumlah per sumber dan per kolom; manifest diperbarui (sha256 + hasil) agar bisa dilanjutkan dan diulang untuk
  * delta saat freeze. Kode keluar: 0 selesai, 1 berhenti karena butuh login / galat, EXIT_USER_INPUT masukan salah.
@@ -29,7 +30,7 @@ class LampiranTarik extends BaseCommand
     protected $group       = 'Lampiran';
     protected $name        = 'lampiran:tarik';
     protected $description = 'Menarik berkas lampiran legacy lewat URL ke storage v2 sesuai manifest (MAKE-069).';
-    protected $usage       = 'lampiran:tarik --manifest=<berkas.json> [--dasar-arsip=<url>] [--dasar-aplikasi=<url>] [--akar=<folder>] [--sumber=arsip|aplikasi|semua] [--jeda-ms=200] [--ulang=2] [--ambang-login=5] [--timeout=60]';
+    protected $usage       = 'lampiran:tarik --manifest=<berkas.json> [--dasar-arsip=<url>] [--dasar-aplikasi=<url>] [--akar=<folder>] [--sumber=arsip|aplikasi|semua] [--jeda-ms=200] [--ulang=2] [--ambang-login=5] [--timeout=60] [--izinkan-http]';
     protected $options     = [
         '--manifest'       => 'Berkas manifest dari lampiran:manifest',
         '--dasar-arsip'    => 'Alamat dasar server arsip legacy (atau env LAMPIRAN_DASAR_ARSIP)',
@@ -40,6 +41,7 @@ class LampiranTarik extends BaseCommand
         '--ulang'          => 'Ulang untuk 5xx/galat transport (bawaan 2; 404 tidak diulang)',
         '--ambang-login'   => 'Berhenti setelah n respons halaman login (bawaan 5)',
         '--timeout'        => 'Batas waktu per permintaan dalam detik (bawaan 60)',
+        '--izinkan-http'   => 'Izinkan alamat dasar http (tanpa TLS) — hanya bila server legacy tidak punya https',
     ];
 
     /**
@@ -50,7 +52,7 @@ class LampiranTarik extends BaseCommand
         try {
             ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, [
                 'manifest' => true, 'dasar-arsip' => true, 'dasar-aplikasi' => true, 'akar' => true, 'sumber' => true,
-                'jeda-ms'  => true, 'ulang' => true, 'ambang-login' => true, 'timeout' => true,
+                'jeda-ms'  => true, 'ulang' => true, 'ambang-login' => true, 'timeout' => true, 'izinkan-http' => false,
             ]);
         } catch (InvalidArgumentException $e) {
             CLI::error($e->getMessage() . ' Pemakaian: ' . $this->usage);
@@ -96,7 +98,12 @@ class LampiranTarik extends BaseCommand
             return EXIT_USER_INPUT;
         }
 
-        $akar = is_string($opsi['akar'] ?? null) ? (string) $opsi['akar'] : WRITEPATH . 'uploads/lampiran';
+        $akar        = is_string($opsi['akar'] ?? null) ? (string) $opsi['akar'] : WRITEPATH . 'uploads/lampiran';
+        $izinkanHttp = isset($opsi['izinkan-http']);
+
+        if ($izinkanHttp) {
+            CLI::write('PERINGATAN: --izinkan-http — berkas pribadi pegawai bisa terkirim tanpa enkripsi bila alamat dasar http.', 'yellow');
+        }
 
         try {
             if (! is_dir($akar) && ! @mkdir($akar, 0750, true) && ! is_dir($akar)) {
@@ -108,7 +115,7 @@ class LampiranTarik extends BaseCommand
             $pilih           = $manifest;
             $pilih['berkas'] = array_filter($manifest['berkas'], static fn (array $b): bool => isset($dasar[$b['sumber']]));
 
-            $penarik = new PenarikLampiran(new TransportCurl($angka['timeout']), $dasar, $akar, $angka['jeda-ms'], $angka['ulang'], max(1, $angka['ambang-login']));
+            $penarik = new PenarikLampiran(service('transportLampiran', $angka['timeout']), $dasar, $akar, $angka['jeda-ms'], $angka['ulang'], max(1, $angka['ambang-login']), null, $izinkanHttp);
             $simpan  = static function (array $sebagian) use (&$manifest, $manifestPath): void {
                 $manifest['berkas'] = $sebagian['berkas'] + $manifest['berkas'];
                 ManifestLampiran::tulis($manifestPath, $manifest);
@@ -120,6 +127,11 @@ class LampiranTarik extends BaseCommand
             return EXIT_USER_INPUT;
         } catch (RuntimeException $e) {
             CLI::error('GAGAL: ' . $e->getMessage());
+
+            return EXIT_ERROR;
+        } catch (Throwable $e) {
+            // Pesan generik: trace bisa memuat path berkas / NIP (review S-3).
+            CLI::error('GAGAL (' . $e::class . '). Manifest yang sudah tersimpan bisa dilanjutkan.');
 
             return EXIT_ERROR;
         }

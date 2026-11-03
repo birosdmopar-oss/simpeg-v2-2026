@@ -46,11 +46,12 @@ final class PenarikLampiran
         private readonly int $ulang = 2,
         private readonly int $ambangLogin = 5,
         ?Closure $tidur = null,
+        bool $izinkanHttp = false,
     ) {
         $bersih = [];
 
         foreach ($dasar as $sumber => $url) {
-            $bersih[$sumber] = self::alamatDasar($url);
+            $bersih[$sumber] = self::alamatDasar($url, $izinkanHttp);
         }
 
         $this->dasar = $bersih;
@@ -64,15 +65,16 @@ final class PenarikLampiran
     }
 
     /**
-     * Alamat dasar wajib http(s) dengan host, tanpa user-info/query/fragmen; dikembalikan berakhiran `/`.
+     * Alamat dasar wajib https (http hanya dengan izin eksplisit — dokumen pribadi pegawai, review P-7) dengan host, tanpa
+     * user-info/query/fragmen; dikembalikan berakhiran `/`.
      */
-    public static function alamatDasar(string $url): string
+    public static function alamatDasar(string $url, bool $izinkanHttp = false): string
     {
         $u = parse_url(trim($url));
 
-        if (! is_array($u) || ! in_array(strtolower($u['scheme'] ?? ''), ['http', 'https'], true) || ($u['host'] ?? '') === ''
+        if (! is_array($u) || ! in_array(strtolower($u['scheme'] ?? ''), $izinkanHttp ? ['http', 'https'] : ['https'], true) || ($u['host'] ?? '') === ''
             || isset($u['user']) || isset($u['pass']) || isset($u['query']) || isset($u['fragment'])) {
-            throw new InvalidArgumentException('Alamat dasar wajib http(s)://host[/path] tanpa kredensial, query, atau fragmen.');
+            throw new InvalidArgumentException('Alamat dasar wajib https://host[/path] (http hanya dengan --izinkan-http) tanpa kredensial, query, atau fragmen.');
         }
 
         return rtrim(trim($url), '/') . '/';
@@ -159,6 +161,10 @@ final class PenarikLampiran
             }
 
             $r = $this->transport->ambil($url);
+
+            if ($r['status'] === -1) {
+                return 'galat'; // melebihi batas ukuran: tidak diulang
+            }
 
             if ($r['status'] === 0 || $r['status'] >= 500) {
                 if ($coba < $this->ulang) {

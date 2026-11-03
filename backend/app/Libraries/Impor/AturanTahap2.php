@@ -276,6 +276,32 @@ final class AturanTahap2
         return ['INFO target_lp tanpa lokasi_presensi' => $lp, 'INFO target_peg/excl_peg tanpa pegawai' => $peg];
     }
 
+    /**
+     * ID yang di-hard-code aturan v2 wajib ada di sumber (B-01/B-02 §6 #10, rencana MAKE-069 T7); hilang → gagal menyebut id.
+     *
+     * @param list<int> $id
+     *
+     * @return \Closure(BaseConnection, string, Keputusan): array<int|string, string>
+     */
+    public static function wajibAda(string $pk, array $id): \Closure
+    {
+        return static function (BaseConnection $db, string $tabel, Keputusan $keputusan) use ($pk, $id): array {
+            // Tabel sumber kosong (lingkungan uji/dev) tidak diperiksa; salinan produksi selalu berisi master ini.
+            if ((int) (self::semua($db, "SELECT COUNT(*) AS n FROM `{$tabel}`")[0]['n'] ?? 0) === 0) {
+                return [];
+            }
+
+            $ada    = array_map('intval', array_column(self::semua($db, "SELECT `{$pk}` AS i FROM `{$tabel}` WHERE `{$pk}` IN (" . implode(',', $id) . ')'), 'i'));
+            $hilang = array_values(array_diff($id, $ada));
+
+            if ($hilang !== []) {
+                throw new ImporGagal("{$tabel}: id hard-code aturan v2 tidak ada di sumber: " . implode(', ', $hilang) . ' (B-01/B-02 §6 #10).');
+            }
+
+            return [];
+        };
+    }
+
     private static function oldId(mixed $nilai): ?int
     {
         $v = trim((string) $nilai);

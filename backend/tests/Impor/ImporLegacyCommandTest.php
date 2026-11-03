@@ -99,4 +99,16 @@ final class ImporLegacyCommandTest extends ImporLegacyTestCase
         command("impor:legacy --sumber={$this->lgc} --zona-sumber=WIB --konfirmasi={$db} --dry-run");
         $this->assertStringContainsString('GAGAL: Tabel sumber siasn_upload_arsip tidak ada.', $this->getStreamFilterBuffer());
     }
+
+    public function testTierPerTabelTanpaJejakDitolakSebelumKoneksi(): void
+    {
+        $db = $this->db->getDatabase();
+
+        command("impor:legacy --sumber={$this->lgc} --zona-sumber=WIB --konfirmasi={$db}");
+        $keluaran = $this->getStreamFilterBuffer();
+
+        $this->assertStringContainsString('wajib --jejak=<berkas> (DBV-029 K-M8). Tidak ada yang ditulis.', $keluaran);
+        $this->assertStringNotContainsString('Tujuan:', $keluaran, 'ditolak sebelum koneksi (review P-4)');
+        $this->assertSame(0, $this->db->table('unit')->countAllResults());
+    }
 }

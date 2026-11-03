@@ -63,11 +63,12 @@ final class ManifestLampiran
 
             foreach ($kolom as $k) {
                 if (! self::adaKolom($db, $nama, $k)) {
-                    continue;
+                    throw new RuntimeException("Kolom berkas {$tabel}.{$k} tidak ada di DB tujuan (migrate --all belum lengkap?).");
                 }
 
                 $label = "{$tabel}.{$k}";
-                $hasil = $db->query("SELECT `{$k}` AS p, COUNT(*) AS n FROM `{$nama}` WHERE `{$k}` IS NOT NULL AND TRIM(`{$k}`) <> '' GROUP BY `{$k}`");
+                // BINARY: path yang beda huruf besar/kecil, aksen, atau spasi akhir adalah berkas berbeda (review P-1).
+                $hasil = $db->query("SELECT MIN(`{$k}`) AS p, COUNT(*) AS n FROM `{$nama}` WHERE `{$k}` IS NOT NULL AND TRIM(`{$k}`) <> '' GROUP BY BINARY `{$k}`");
 
                 if (! $hasil instanceof ResultInterface) {
                     throw new RuntimeException("Galat DB saat membaca {$label}.");
@@ -118,7 +119,7 @@ final class ManifestLampiran
         $json      = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $sementara = $berkas . '.tmp';
 
-        if ($json === false || file_put_contents($sementara, $json) === false || ! rename($sementara, $berkas)) {
+        if ($json === false || file_put_contents($sementara, $json) === false || ! @chmod($sementara, 0600) || ! rename($sementara, $berkas)) {
             @unlink($sementara);
 
             throw new RuntimeException('Manifest gagal ditulis.');
@@ -158,6 +159,10 @@ final class ManifestLampiran
     {
         $hasil = $db->query('SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?', [$db->getDatabase(), $tabel, $kolom]);
 
-        return $hasil instanceof ResultInterface && $hasil->getRowArray() !== null;
+        if (! $hasil instanceof ResultInterface) {
+            throw new RuntimeException('Galat DB saat memeriksa kolom berkas.');
+        }
+
+        return $hasil->getRowArray() !== null;
     }
 }

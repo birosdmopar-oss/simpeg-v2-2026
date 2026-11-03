@@ -76,6 +76,18 @@ use RuntimeException;
  */
 class Services extends BaseService
 {
+    /**
+     * Transport HTTP `lampiran:tarik` (MAKE-069): TLS verify, tanpa redirect, batas ukuran. Test meng-inject transport palsu.
+     */
+    public static function transportLampiran(int $timeoutDetik = 60, bool $getShared = true): \App\Libraries\Lampiran\TransportHttp
+    {
+        if ($getShared) {
+            return static::getSharedInstance('transportLampiran', $timeoutDetik);
+        }
+
+        return new \App\Libraries\Lampiran\TransportCurl($timeoutDetik);
+    }
+
     public static function authContext(bool $getShared = true): AuthContext
     {
         if ($getShared) {

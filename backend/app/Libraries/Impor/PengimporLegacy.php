@@ -93,6 +93,12 @@ final class PengimporLegacy
             throw new ImporGagal('--lanjut butuh --jejak (DBV-029 K-M8).');
         }
 
+        $perTabel = array_values(array_intersect($tier, DaftarTabel::TIER_PER_TABEL));
+
+        if (! $dryRun && $this->berkasJejak === null && $perTabel !== []) {
+            throw new ImporGagal(sprintf('Tier %s memakai transaksi per tabel dan butuh --jejak (DBV-029 K-M8); tidak ada yang ditulis.', implode(', ', $perTabel)));
+        }
+
         $this->aturSesi($this->sumber);
         $this->aturSesi($this->tujuan);
 
@@ -137,8 +143,7 @@ final class PengimporLegacy
         foreach ($defs as $def) {
             $k = $def->kunci();
 
-            if ($perTabel && $this->lanjut && isset($jejak[$k])) {
-                $this->cocokJejak($def, $jejak[$k]);
+            if ($perTabel && $this->lanjut && isset($jejak[$k]) && $this->cocokJejak($def, $jejak[$k])) {
                 $sudah[$k] = true;
                 $rinci[$k] = null;
 
@@ -146,6 +151,24 @@ final class PengimporLegacy
             }
 
             $rinci[$k] = $this->dilewatiSiasn($def) ? null : $this->praCek($def);
+        }
+
+        // P-2 (K-M8 #1): untuk tier per tabel, lintasan kering atas SELURUH tabel (transformasi, domain, tanggal nol,
+        // panjang, UNIQUE) sebelum transaksi pertama — gagal di sini → belum ada yang ditulis di tier ini.
+        if ($perTabel && ! $dryRun) {
+            $this->dryRun = true;
+
+            try {
+                foreach ($defs as $def) {
+                    if (! isset($sudah[$def->kunci()])) {
+                        $this->imporTabel($tier, $def, $rinci[$def->kunci()], true);
+                    }
+                }
+            } catch (ImporGagal $e) {
+                throw new ImporGagal($e->getMessage() . " (lintasan kering tier {$tier}; belum ada yang ditulis di tier ini)", 0, $e);
+            } finally {
+                $this->dryRun = false;
+            }
         }
 
         $kelompok = $perTabel ? array_map(static fn (DefinisiTabel $d): array => [$d], $defs) : [$defs];
@@ -229,16 +252,22 @@ final class PengimporLegacy
                     continue;
                 }
 
-                $this->salinCounter($def, $r['sumber']);
+                try {
+                    $this->salinCounter($def, $r['sumber']);
 
-                foreach ($def->pascaImpor === null ? [] : ($def->pascaImpor)($this->tujuan) as $kode => $n) {
-                    if ($n > 0) {
-                        $this->laporan->koreksi($def->kunci(), $kode, $n);
+                    foreach ($def->pascaImpor === null ? [] : ($def->pascaImpor)($this->tujuan) as $kode => $n) {
+                        if ($n > 0) {
+                            $this->laporan->koreksi($def->kunci(), $kode, $n);
+                        }
                     }
-                }
 
-                if ($catatJejak) {
-                    $this->tulisJejak($tier, $def);
+                    if ($catatJejak) {
+                        $this->tulisJejak($tier, $def);
+                    }
+                } catch (Throwable $e) {
+                    $pesan = $e instanceof ImporGagal ? $e->getMessage() : sprintf('Galat %s (kode %s).', $e::class, (string) $e->getCode());
+
+                    throw new ImporGagal("SESUDAH COMMIT {$def->kunci()}: {$pesan} Data tabel ini SUDAH tersimpan (tidak di-rollback); bereskan langkah ini lalu lanjutkan.", 0, $e);
                 }
             }
         }
@@ -323,7 +352,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array<string, array{tier: int, baris: int, pkMaks: string|null, keputusan: string}>
+     * @return array<string, array{tier: int, baris: int, pkMaks: string|null, keputusan: string, sumber?: string, zona?: string, sumberBaris?: int}>
      */
     private function bacaJejak(): array
     {
@@ -341,7 +370,7 @@ final class PengimporLegacy
             throw new ImporGagal('Berkas jejak milik database tujuan lain (satu berkas per DB tujuan).');
         }
 
-        /** @var array<string, array{tier: int, baris: int, pkMaks: string|null, keputusan: string}> */
+        /** @var array<string, array{tier: int, baris: int, pkMaks: string|null, keputusan: string, sumber?: string, zona?: string, sumberBaris?: int}> */
         return $isi['tabel'];
     }
 
@@ -349,15 +378,36 @@ final class PengimporLegacy
      * --lanjut: tabel di berkas jejak dilewati hanya bila jumlah baris, PK maks, dan keputusan tujuan sama; selain itu
      * gagal tanpa menghapus apa pun (K-M8 #6).
      *
-     * @param array{tier: int, baris: int, pkMaks: string|null, keputusan: string} $catat
+     * @param array{tier: int, baris: int, pkMaks: string|null, keputusan: string, sumber?: string, zona?: string, sumberBaris?: int} $catat
      */
-    private function cocokJejak(DefinisiTabel $def, array $catat): void
+    private function cocokJejak(DefinisiTabel $def, array $catat): bool
     {
+        // Tabel yang tercatat kosong selalu diimpor ulang: sumber bisa berisi (snapshot freeze baru, pulih cadangan).
+        if ($catat['baris'] === 0) {
+            return false;
+        }
+
         [$baris, $pkMaks] = $this->ringkasTujuan($def);
 
-        if ($baris !== $catat['baris'] || $pkMaks !== $catat['pkMaks'] || $catat['keputusan'] !== $this->keputusan->sidik()) {
-            throw new ImporGagal("--lanjut: {$def->kunci()} tidak cocok dengan berkas jejak (jumlah/PK maks/keputusan); tidak ada yang dihapus.");
+        if ($baris !== $catat['baris'] || $pkMaks !== $catat['pkMaks'] || $catat['keputusan'] !== $this->keputusan->sidik()
+            || ($catat['sumber'] ?? null) !== $this->sumberDari($def)->getDatabase() || ($catat['zona'] ?? null) !== $this->zonaSumber
+            || ($catat['sumberBaris'] ?? null) !== $this->jumlahSumber($def)) {
+            throw new ImporGagal("--lanjut: {$def->kunci()} tidak cocok dengan berkas jejak (jumlah/PK maks tujuan, keputusan, sumber, zona, atau jumlah sumber); tidak ada yang dihapus.");
         }
+
+        return true;
+    }
+
+    private function jumlahSumber(DefinisiTabel $def): int
+    {
+        $src  = $this->sumberDari($def);
+        $nama = $this->namaSumber($src, $def->sumber ?? $def->tabel);
+
+        if ($nama === null) {
+            return -1;
+        }
+
+        return (int) $this->kueri($src, 'SELECT COUNT(*) AS n FROM ' . $src->escapeIdentifiers($nama) . ($def->saringSumber === null ? '' : " WHERE ({$def->saringSumber})"))->getRowArray()['n'];
     }
 
     private function tulisJejak(int $tier, DefinisiTabel $def): void
@@ -368,9 +418,17 @@ final class PengimporLegacy
 
         $tabel                = $this->bacaJejak();
         [$baris, $pkMaks]     = $this->ringkasTujuan($def);
-        $tabel[$def->kunci()] = ['tier' => $tier, 'baris' => $baris, 'pkMaks' => $pkMaks, 'keputusan' => $this->keputusan->sidik()];
-        $json                 = json_encode(['tujuan' => $this->tujuan->getDatabase(), 'tabel' => $tabel], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $sementara            = $this->berkasJejak . '.tmp';
+        $tabel[$def->kunci()] = [
+            'tier'        => $tier,
+            'baris'       => $baris,
+            'pkMaks'      => $pkMaks,
+            'keputusan'   => $this->keputusan->sidik(),
+            'sumber'      => $this->sumberDari($def)->getDatabase(),
+            'zona'        => $this->zonaSumber,
+            'sumberBaris' => $this->laporan->semua()[$def->kunci()]['sumber'],
+        ];
+        $json      = json_encode(['tujuan' => $this->tujuan->getDatabase(), 'tabel' => $tabel], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $sementara = $this->berkasJejak . '.tmp';
 
         if ($json === false || file_put_contents($sementara, $json) === false || ! rename($sementara, $this->berkasJejak)) {
             throw new ImporGagal("Berkas jejak gagal ditulis sesudah {$def->kunci()} ter-commit; catat manual sebelum --lanjut.");
@@ -558,6 +616,15 @@ final class PengimporLegacy
         }
 
         $this->periksaKunciSumber($def, $src, $namaSumber, $kolom);
+
+        if ($def->hanyaSeed) {
+            $id     = array_map('strval', array_column($this->kueri($src, 'SELECT ' . $src->escapeIdentifiers($kolom[$def->pk]['src']) . ' AS i FROM ' . $src->escapeIdentifiers($namaSumber))->getResultArray(), 'i'));
+            $diLuar = count(array_diff($id, array_map('strval', array_keys($seed))));
+
+            if ($diLuar > 0) {
+                throw new ImporGagal("{$def->tabel}: {$diLuar} id sumber di luar seed migration; tambahkan lewat migration (review P-6).");
+            }
+        }
 
         return [
             'ada'    => true,

@@ -116,7 +116,7 @@ final class PenarikLampiranTest extends CIUnitTestCase
 
     public function testAlamatDasarDitolakBilaBukanHttpAtauBerkredensial(): void
     {
-        foreach (['ftp://x.test/', 'https://user:rahasia@x.test/', 'https://x.test/?a=1', 'x.test', 'file:///etc'] as $salah) {
+        foreach (['ftp://x.test/', 'https://user:rahasia@x.test/', 'https://x.test/?a=1', 'x.test', 'file:///etc', 'http://x.test/'] as $salah) {
             try {
                 PenarikLampiran::alamatDasar($salah);
                 $this->fail("Alamat dasar {$salah} harus ditolak.");
@@ -125,7 +125,7 @@ final class PenarikLampiranTest extends CIUnitTestCase
             }
         }
 
-        $this->assertSame('http://x.test/a/', PenarikLampiran::alamatDasar('http://x.test/a'));
+        $this->assertSame('https://x.test/a/', PenarikLampiran::alamatDasar('https://x.test/a'));
     }
 
     public function testTarikResumeDan404DanRetry5xx(): void
@@ -155,7 +155,7 @@ final class PenarikLampiranTest extends CIUnitTestCase
         $this->assertNotContains($u . 'a.pdf', $this->diminta);
 
         $periksa = PemeriksaLampiran::periksa($m, $this->akar);
-        $this->assertSame(['ada' => 2, 'hilang' => 2, 'beda_checksum' => 0], $periksa['document_attachment.path']);
+        $this->assertSame(['ada' => 2, 'hilang' => 2, 'beda_checksum' => 0, 'tidak_sah' => 0], $periksa['document_attachment.path']);
 
         file_put_contents($this->akar . '/arsip/a.pdf', 'diubah');
         $this->assertSame(1, PemeriksaLampiran::periksa($m, $this->akar)['document_attachment.path']['beda_checksum']);
@@ -189,5 +189,34 @@ final class PenarikLampiranTest extends CIUnitTestCase
 
         $this->assertSame(['galat' => 1], $hasil['per_sumber']['aplikasi']);
         $this->assertSame([$u], $this->diminta, 'Location tidak pernah diminta');
+    }
+
+    public function testHttpHanyaDenganIzinEksplisit(): void
+    {
+        try {
+            PenarikLampiran::alamatDasar('http://x.test/');
+            $this->fail('http tanpa izin harus ditolak (review P-7).');
+        } catch (InvalidArgumentException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame('http://x.test/', PenarikLampiran::alamatDasar('http://x.test', true));
+    }
+
+    public function testResponsMelebihiBatasTidakDiulang(): void
+    {
+        $u             = 'https://arsip.contoh.test/simpeg/arsip/besar.pdf';
+        $this->respons = [$u => [['status' => -1, 'tipe' => '', 'lokasi' => null, 'isi' => '']]];
+        $m             = self::manifest(['arsip/besar.pdf' => 'arsip']);
+
+        $this->assertSame(['galat' => 1], $this->penarik()->tarik($m)['per_sumber']['arsip']);
+        $this->assertSame([$u], $this->diminta, 'batas ukuran tidak di-retry (review S-3)');
+    }
+
+    public function testPemeriksaMenolakPathManifestTidakSah(): void
+    {
+        $m = self::manifest(['arsip/../rahasia' => 'arsip', '/arsip/a.pdf' => 'arsip']);
+
+        $this->assertSame(['ada' => 0, 'hilang' => 0, 'beda_checksum' => 0, 'tidak_sah' => 2], PemeriksaLampiran::periksa($m, $this->akar)['document_attachment.path']);
     }
 }

@@ -7,6 +7,7 @@ namespace Tests\Database\Auth;
 use App\Libraries\Auth\BootstrapAdmin;
 use App\Libraries\Auth\PasswordPolicy;
 use CodeIgniter\Test\StreamFilterTrait;
+use Config\Database;
 use RuntimeException;
 use Tests\Support\DatabaseTestCase;
 
@@ -79,5 +80,22 @@ final class BootstrapAdminTest extends DatabaseTestCase
         command("akun:bootstrap-admin --username=admin.cli --nama=Admin --konfirmasi={$db} --paksa-non-interaktif");
         $this->assertMatchesRegularExpression('/Password awal \(tampil sekali, wajib diganti saat login pertama\):\S*\R[A-Za-z0-9]{24}\R/', $this->getStreamFilterBuffer());
         $this->assertSame(1, $this->db->table('pengguna')->where('username', 'admin.cli')->countAllResults());
+    }
+
+    public function testQueryGagalTidakDibacaSebagaiNol(): void
+    {
+        // Prefix tabel tidak ada + DBDebug mati: countAllResults() = false, bukan 0 (review B-1).
+        $grup             = config(Database::class)->tests;
+        $grup['DBDebug']  = false;
+        $grup['DBPrefix'] = 'zz_tidak_ada_';
+        $db               = Database::connect($grup, false);
+
+        try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Galat DB saat memeriksa akun yang ada.');
+            (new BootstrapAdmin($db))->buat('admin.x', 'Admin', null, false);
+        } finally {
+            $db->close();
+        }
     }
 }
