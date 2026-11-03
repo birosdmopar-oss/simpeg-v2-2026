@@ -280,8 +280,9 @@ final class DaftarTabel
     }
 
     /**
-     * T7 — tabel kerja SIASN Fase 6 (DBV-027 §13.3). Dijalankan sesudah riwayat dan `document_attachment` diimpor
-     * (syarat K-6); nomor tier bergeser ke paling akhir saat tier MAKE-069 ditambahkan. `siasn_ref_unor` dan
+     * T7 — tabel kerja SIASN Fase 6 (DBV-027 §13.3), selalu tier TERAKHIR (`TIER_MAKS`, dikunci test). Rujukan
+     * `id_rw`/`id_da` menunjuk `riwayat_mutasi_jabatan` (T3), `riwayat_diklat` dan `document_attachment` (belum ada di
+     * alat ini; menyusul MAKE-069 sebagai tier sebelum SIASN). Sampai itu INFO rujukan menyebut induk belum diimpor. `siasn_ref_unor` dan
      * `siasn_referensi` dibaca dari skema `--sumber-siasn` (K-9); isinya dari sinkron BKN dan pemetaan lokal, jadi disalin
      * mentah (pola GAP-8). `siasn_status_pegawai` (padanan `dsp`, K-5) dan `firebase_token` (AC-01.2) tidak diimpor.
      *

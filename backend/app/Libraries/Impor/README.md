@@ -18,7 +18,10 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
   **snapshot yang sama** dengan sumber utama, di server dan akun yang sama; dibaca langsung, tidak disalin ke skema
   `simpeg01`. Tanpa opsi ini `siasn_ref_unor` dan `siasn_referensi` dilaporkan `dilewati: tanpa --sumber-siasn`; tabel
   T7 lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
-  beda huruf besar/kecil (`lower_case_table_names`). Skema ini juga melewati penjaga di bawah.
+  beda huruf besar/kecil (`lower_case_table_names`). Skema ini juga melewati penjaga di bawah. Contoh:
+  `php spark impor:legacy --sumber=up1_legacy_salinan --sumber-siasn=up1_legacy_salinan_siasn --zona-sumber=WIB
+  --konfirmasi=<db_tujuan> --dry-run`. Ekstraksinya: `docs/up1/sql/up1-ekstraksi.sh` (`UP1_DB_SIASN`) atau
+  `up1-ambil.sh`.
 - **Penjaga** (`PenjagaTujuan`): tujuan ditolak bila namanya ada di `Config\ImporLegacy::$tujuanTerlarang`, berawalan
   `prod`, sama dengan sumber, atau `--konfirmasi` tidak sama persis. Port tidak dipakai sebagai syarat.
 - **`--zona-sumber`** wajib diisi dan tidak punya nilai bawaan (GAP-2). Nilainya dikonfirmasi DBA sebelum dijalankan.
@@ -98,6 +101,10 @@ DEFAULT dari DB.
   PK yang tidak diimpor beserta kode aturan; boleh menggagalkan impor dengan jumlah saja. Dipakai
   `AturanSiasn::skpPeriodik` dan `AturanSiasn::uploadArsip`.
 - `pascaImpor` (B3): hitung INFO di tujuan sesudah tier di-commit (bukan dry-run), dicatat sebagai koreksi.
+- Pra-cek B3 (sebelum apa pun ditulis, juga dry-run): kolom yang disebut di `petaKolom` wajib ada di sumber; kunci baca
+  sumber wajib unik sesudah normalisasi untuk tabel ber-`sumber`/`skemaSiasn` atau ber-PK `kolomKode` (ganda → gagal
+  dengan jumlah); `praPindai` dijalankan di fase ini. Sesudah tiap tabel, `sumber = ditulis + dilewati + dibuang`
+  (rekonsiliasi) — selisih → gagal.
 
 ## Berkas keputusan
 
@@ -193,6 +200,7 @@ tabel itu disalin mentah (`tanpaStripslashes: ['*']`).
 ## Test
 
 - `tests/unit/Impor/AturanImporTest.php`: aturan murni (transformasi, keputusan, penjaga).
+- `tests/unit/Impor/UrutanTierTest.php`: tier SIASN selalu `TIER_MAKS` dan sesudah tabel induk rujukannya.
 - `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php`,
   `ImporLegacySiasnTest.php` (B3: kunci ganda SKP, tier SIASN, skema `--sumber-siasn` huruf besar),
   `ImporLegacyGagalDbTest.php` (galat DB dengan `DBDebug` false/true; `db-isolasi-penuh`), di atas

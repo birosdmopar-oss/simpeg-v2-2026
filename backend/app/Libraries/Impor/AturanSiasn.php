@@ -78,7 +78,7 @@ final class AturanSiasn
 
     /**
      * K-6 — kunci UNIQUE `uq_sua_rw_da` (rw_name, id_rw, id_da): satu baris per kunci, prioritas `status = 1` (terunggah,
-     * mencegah unggah ulang ke BKN) lalu id terbesar. `id_da` NULL → gagal (kolom NOT NULL).
+     * mencegah unggah ulang ke BKN) lalu id terbesar. `rw_name`/`id_rw`/`id_da` NULL → gagal dengan jumlah (kolom NOT NULL).
      *
      * @return array<int|string, string> id sumber → kode aturan (kunci angka menjadi int di PHP)
      */
@@ -86,24 +86,31 @@ final class AturanSiasn
     {
         $grup    = [];
         $tanpaDa = 0;
+        $tanpaRw = 0;
 
         foreach (self::baca($db, $tabel, 'id_siasn_upload_arsip', ['rw_name', 'id_rw', 'id_da', 'status']) as $r) {
+            if ($r['rw_name'] === null || $r['id_rw'] === null) {
+                $tanpaRw++;
+
+                continue;
+            }
+
             if ($r['id_da'] === null) {
                 $tanpaDa++;
 
                 continue;
             }
 
-            $kunci = self::kunci([Transformasi::stripslashes($r['rw_name'] === null ? null : (string) $r['rw_name']), $r['id_rw'], $r['id_da']]);
-
-            if ($kunci === null) {
-                continue;
-            }
+            $kunci = (string) self::kunci([Transformasi::stripslashes((string) $r['rw_name']), $r['id_rw'], $r['id_da']]);
 
             $grup[$kunci][] = [
                 'id'       => (int) $r['id_siasn_upload_arsip'],
                 'unggahan' => self::status($keputusan, 'siasn_upload_arsip', $r['status'], [0, 1, 2, 3]) === '1',
             ];
+        }
+
+        if ($tanpaRw > 0) {
+            throw new ImporGagal("siasn_upload_arsip: {$tanpaRw} baris rw_name/id_rw NULL (NOT NULL, DBV-027 K-6).");
         }
 
         if ($tanpaDa > 0) {

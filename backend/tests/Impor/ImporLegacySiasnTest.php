@@ -6,6 +6,7 @@ namespace Tests\Impor;
 
 use App\Libraries\Impor\AturanSiasn;
 use App\Libraries\Impor\ImporGagal;
+use App\Libraries\Impor\Keputusan;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\Impor\ImporLegacyTestCase;
 
@@ -132,6 +133,7 @@ final class ImporLegacySiasnTest extends ImporLegacyTestCase
             $this->arsip(6, 'Rw Jabatan', 7, 70, 3),
         ]);
         $this->src->table('double_riwayat_kp')->insert(['nip' => self::NIP_B, 'created_at' => '2026-06-01 08:00:00']);
+        $this->src->query('ALTER TABLE siasn_upload_arsip AUTO_INCREMENT = 500');
 
         $laporan = $this->jalankanImpor([7]);
 
@@ -145,6 +147,7 @@ final class ImporLegacySiasnTest extends ImporLegacyTestCase
         $this->assertSame(3, $sua['koreksi']['INFO id_da tanpa rujukan: document_attachment belum diimpor (kosong)']);
         $this->assertSame(2, $sua['koreksi']['INFO id_rw Rw Jabatan tanpa rujukan: riwayat_mutasi_jabatan belum diimpor (kosong)']);
         $this->assertSame(1, $sua['koreksi']['INFO id_rw Rw Sertifikasi tanpa rujukan: riwayat_diklat belum diimpor (kosong)']);
+        $this->assertSame(1, $sua['koreksi']['counter AUTO_INCREMENT 7→500'], 'counter disalin dari sumber');
 
         $baris = $this->db->table('siasn_upload_arsip')->select('id_siasn_upload_arsip, status, error_msg, resp_dok_uri, arsip_path, created_at')->orderBy('id_siasn_upload_arsip')->get()->getResultArray();
         $this->assertSame(['1', '5', '6'], array_column($baris, 'id_siasn_upload_arsip'));
@@ -212,5 +215,104 @@ final class ImporLegacySiasnTest extends ImporLegacyTestCase
             ['jenis' => 'jabatan_fungsional', 'id_siasn' => 'jf-1', 'nama' => 'Analis Uji', 'id_lokal' => null],
             ['jenis' => 'jenis_kp', 'id_siasn' => '31', 'nama' => 'Reguler', 'id_lokal' => '1'],
         ], $ref);
+    }
+
+    public function testDryRunArsipMenghitungK6K7TanpaMenulisDanTanpaInfo(): void
+    {
+        $this->src->table('siasn_upload_arsip')->insertBatch([
+            // Dua baris terunggah dengan kunci sama → id terbesar menang.
+            $this->arsip(1, 'Rw Jabatan', 5, 50, 1),
+            $this->arsip(2, 'Rw Jabatan', 5, 50, 1),
+            $this->arsip(3, 'Rw Jabatan', 7, 70, 3),
+        ]);
+
+        $kering = $this->jalankanImpor([7], dryRun: true)['siasn_upload_arsip'];
+        $this->assertSame(['DBV-027 K-6 kunci ganda' => 1], $kering['dibuang']);
+        $this->assertSame(['DBV-027 K-7 status 3→2' => 1], $kering['koreksi'], 'INFO rujukan hanya sesudah tulis');
+        $this->assertSame(0, $this->db->table('siasn_upload_arsip')->countAllResults());
+
+        $this->jalankanImpor([7]);
+        $this->assertSame(['2', '3'], array_column($this->db->table('siasn_upload_arsip')->select('id_siasn_upload_arsip')->orderBy('id_siasn_upload_arsip')->get()->getResultArray(), 'id_siasn_upload_arsip'));
+    }
+
+    public function testInfoRujukanIndukTerisiDanRwNameLain(): void
+    {
+        $this->db->table('document_attachment')->insert(['id_attachment' => 50, 'NIP' => self::NIP_A]);
+        $this->src->table('siasn_upload_arsip')->insertBatch([
+            $this->arsip(1, 'Rw Jabatan', 5, 50, 0),
+            $this->arsip(2, 'Rw Jabatan', 6, 51, 0),
+            $this->arsip(3, 'Rw Lain', 6, 50, 0),
+        ]);
+
+        $koreksi = $this->jalankanImpor([7])['siasn_upload_arsip']['koreksi'];
+        $this->assertSame(1, $koreksi['INFO id_da tanpa rujukan di document_attachment']);
+        $this->assertSame(1, $koreksi['INFO rw_name di luar Rw Jabatan/Rw Sertifikasi']);
+        $this->assertArrayNotHasKey('INFO id_da tanpa rujukan: document_attachment belum diimpor (kosong)', $koreksi);
+    }
+
+    public function testArsipRwNameAtauIdRwNullGagal(): void
+    {
+        $this->src->query('ALTER TABLE siasn_upload_arsip MODIFY rw_name VARCHAR(50) NULL, MODIFY id_rw INT NULL');
+        $this->src->table('siasn_upload_arsip')->insertBatch([$this->arsip(1, 'Rw Jabatan', 5, 50, 0, ['rw_name' => null]), $this->arsip(2, 'Rw Jabatan', 6, 60, 0)]);
+
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('siasn_upload_arsip: 1 baris rw_name/id_rw NULL (NOT NULL, DBV-027 K-6).');
+
+        $this->jalankanImpor([7], dryRun: true);
+    }
+
+    public function testSkpStatusDariBerkasKeputusan(): void
+    {
+        $this->lepasCheck('riwayat_skp_periodik');
+        $this->src->table('riwayat_skp_periodik')->insertBatch([
+            $this->skp(10, self::NIP_A, 'p-4', 's-1', 2, 'Baik'),
+            // Status lama 7 dipetakan ke 1 oleh berkas keputusan → baris Tukin.
+            $this->skp(11, self::NIP_A, 'p-4', 's-1', 7, 'Baik'),
+        ]);
+
+        $laporan = $this->jalankanImpor([4], k: Keputusan::dariArray(['status' => ['riwayat_skp_periodik' => ['7' => 1]]]));
+        $this->assertSame(['DBV-027 K-3 kunci ganda' => 1], $laporan['riwayat_skp_periodik']['dibuang']);
+        $this->assertSame(['11'], array_column($this->db->table('riwayat_skp_periodik')->select('id_riwayat_skp_periodik')->get()->getResultArray(), 'id_riwayat_skp_periodik'));
+    }
+
+    public function testSkpGrupDenganNipNullDanNipTerisiGagal(): void
+    {
+        $this->src->query('ALTER TABLE riwayat_skp_periodik MODIFY nip VARCHAR(50) NULL');
+        $this->src->table('riwayat_skp_periodik')->insertBatch([
+            $this->skp(10, self::NIP_A, 'p-4', 's-1', 1, 'Baik'),
+            $this->skp(11, self::NIP_A, 'p-4', 's-1', 1, 'Baik', ['nip' => null]),
+        ]);
+
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('1 grup kunci (id_pns, periode_id, skp_id) berisi NIP berbeda');
+
+        $this->jalankanImpor([4], dryRun: true);
+    }
+
+    public function testKolomPetaKolomTidakAdaDiSumberGagal(): void
+    {
+        $referensi                = self::REFERENSI;
+        $referensi['JENIS_KP_ID'] = null;
+        $this->siapkanSumberSiasn($referensi);
+
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessageMatches('/^Kolom sumber jenis_kp_id\.id_jenis_kp \(untuk siasn_referensi\.id_lokal\) tidak ada\.$/i');
+
+        $this->jalankanImpor([7], dryRun: true);
+    }
+
+    public function testKunciSumberGandaSesudahNormalisasiGagal(): void
+    {
+        $this->src->query('ALTER TABLE double_riwayat_kp DROP PRIMARY KEY');
+        $this->src->table('double_riwayat_kp')->insertBatch([
+            ['nip' => self::NIP_A, 'created_at' => '2026-06-01 08:00:00'],
+            ['nip' => self::NIP_A . "\u{200B}", 'created_at' => '2026-06-01 08:00:00'],
+            ['nip' => self::NIP_B, 'created_at' => '2026-06-01 08:00:00'],
+        ]);
+
+        $this->expectException(ImporGagal::class);
+        $this->expectExceptionMessage('Kunci sumber double_riwayat_kp (nip) ganda sesudah normalisasi: 1 nilai.');
+
+        $this->jalankanImpor([7], dryRun: true);
     }
 }

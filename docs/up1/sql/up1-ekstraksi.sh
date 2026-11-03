@@ -8,6 +8,8 @@
 #                                       kalender N-1). UP1_AKHIR = tanggal 15 bulan M terakhir.
 #   UP1_AWAL_CUTI (opsional)            lookback riwayat_cuti & absen_ijin; bawaan UP1_AWAL - 6 bulan
 #   UP1_OUT                             folder kerja terbatas, di luar repo & di luar folder sinkron cloud
+#   UP1_DB_SIASN (opsional)             nama skema siasn_simpeg di server yang sama (tier SIASN alat impor, DBV-027 K-9);
+#                                       kosong = 8 tabelnya tidak diambil dan impor dijalankan tanpa --sumber-siasn
 #
 # Hanya mysqldump --single-transaction (tanpa kunci, tanpa tulis). Tanpa trigger/routine/event. Tidak mengambil
 # pengguna/token/tabel kredensial. Nama kolom = [K] legacy; cocokkan dengan DDL sumber sebelum dijalankan.
@@ -66,8 +68,25 @@ BKN_DARI="${UP1_AWAL:0:4}${UP1_AWAL:5:2}"; BKN_SAMPAI="${UP1_AKHIR:0:4}${UP1_AKH
 dump 17_bkn_periode_ekinper.sql bkn_periode_ekinper   --where="CAST(tahun AS UNSIGNED)*100 + CAST(bulan AS UNSIGNED) BETWEEN $BKN_DARI AND $BKN_SAMPAI"
 dump 18_riwayat_skp_periodik.sql riwayat_skp_periodik --where="periode_awal_skp <= $Z AND periode_akhir_skp >= $A"
 
-# 3. Konfigurasi: hanya key tarif & jam kerja Tukin.
+# 3. Tabel kerja SIASN Fase 6 (tier SIASN alat impor, DBV-027 K-6/K-8): penuh, dari skema yang sama.
+dump 21_siasn_kerja.sql siasn_upload_arsip double_riwayat_kp
+
+# 4. Konfigurasi: hanya key tarif & jam kerja Tukin.
 dump 20_web_config.sql web_config --where="config_name IN ('TL1/PSW1','TL2/PSW2','TL3/PSW3','TA','TK',
   'jam_masuk_normal','jam_pulang_normal','jam_pulang_jumat_normal','jam_masuk_puasa','jam_pulang_puasa','jam_pulang_jumat_puasa')"
+
+# 5. Skema siasn_simpeg (K-9): REF_UNOR + 7 referensi, dijalankan TEPAT sesudah dump di atas agar snapshot-nya sama
+#    (mysqldump tidak bisa memilih tabel dari dua skema dalam satu transaksi; tabel ini hanya diubah job SIASN, jadi
+#    hentikan job tarik SIASN selama ekstraksi). Di-restore ke skema tersendiri, mis. up1_legacy_salinan_siasn, BUKAN ke
+#    skema salinan utama. Nama tabel huruf besar dipertahankan.
+if [ -n "${UP1_DB_SIASN:-}" ]; then
+  mkdir -p "$UP1_OUT/siasn"
+  mysqldump --defaults-extra-file="$CNF" --single-transaction --skip-lock-tables --no-tablespaces \
+    --skip-triggers --default-character-set=utf8mb4 --set-gtid-purged=OFF "$UP1_DB_SIASN" \
+    REF_UNOR JABATAN_FUNGSIONAL_ID JABATAN_FUNGSIONAL_UMUM_ID JENIS_JABATAN_ID LATIHAN_STRUKTURAL_ID TK_PENDIDIKAN JENIS_KP_ID GOLONGAN_ID > "$UP1_OUT/siasn/30_siasn_simpeg.sql"
+  echo "ok siasn/30_siasn_simpeg.sql"
+else
+  echo "lewati siasn_simpeg (UP1_DB_SIASN kosong): impor tanpa --sumber-siasn, siasn_ref_unor/siasn_referensi dilewati"
+fi
 
 echo "Selesai. Berkas di $UP1_OUT (data pribadi nyata — jangan dibagikan)."

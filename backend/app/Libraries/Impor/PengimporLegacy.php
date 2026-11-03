@@ -170,6 +170,41 @@ final class PengimporLegacy
         }
     }
 
+    /**
+     * Kunci baca sumber harus unik sesudah normalisasi untuk tabel yang PK-nya tidak dijamin skema sumber (nama tabel lain,
+     * skema SIASN) atau berubah oleh `kolomKode` (trim/karakter tak terlihat): ganda dalam satu batch → 1062, ganda di
+     * batas batch → terlewat oleh keyset `>`. Gagal dengan jumlah saja, juga saat dry-run.
+     *
+     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}> $kolom
+     */
+    private function periksaKunciSumber(DefinisiTabel $def, BaseConnection $src, string $namaSumber, array $kolom): void
+    {
+        $kunci = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
+
+        if ($def->sumber === null && ! $def->skemaSiasn && array_intersect($kunci, $def->kolomKode) === []) {
+            return;
+        }
+
+        $pilih  = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($kolom[$k]['src']) . ' AS ' . $src->escapeIdentifiers($k), $kunci));
+        $hasil  = $this->kueri($src, "SELECT {$pilih} FROM " . $src->escapeIdentifiers($namaSumber))->getResultArray();
+        $hitung = [];
+
+        foreach ($hasil as $r) {
+            $bagian = array_map(
+                static fn (string $k): string => mb_strtolower(rtrim((string) (in_array($k, $def->kolomKode, true) ? Transformasi::kode($r[$k] === null ? null : (string) $r[$k]) : $r[$k]), ' ')),
+                $kunci,
+            );
+            $k          = implode("\x1F", $bagian);
+            $hitung[$k] = ($hitung[$k] ?? 0) + 1;
+        }
+
+        $ganda = count(array_filter($hitung, static fn (int $n): bool => $n > 1));
+
+        if ($ganda > 0) {
+            throw new ImporGagal(sprintf('Kunci sumber %s (%s) ganda sesudah normalisasi: %d nilai.', $def->kunci(), implode(', ', $kunci), $ganda));
+        }
+    }
+
     private function dilewatiSiasn(DefinisiTabel $def): bool
     {
         return $def->skemaSiasn && $this->sumberSiasn === null;
@@ -243,7 +278,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @return array{ada: bool, sumber: string, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null
+     * @return array{ada: bool, sumber: string, buang: array<int|string, string>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null
      */
     private function praCek(DefinisiTabel $def): ?array
     {
@@ -274,6 +309,10 @@ final class PengimporLegacy
 
         foreach ($kolomTujuan as $nama => $t) {
             $asal = strtolower($def->petaKolom[$nama] ?? $nama);
+
+            if (isset($def->petaKolom[$nama]) && ! isset($kolomSumber[$asal])) {
+                throw new ImporGagal("Kolom sumber {$namaSumber}.{$def->petaKolom[$nama]} (untuk {$def->tabel}.{$nama}) tidak ada.");
+            }
 
             if (! array_key_exists($nama, $def->konstanta) && isset($kolomSumber[$asal])) {
                 $kolom[$nama] = [
@@ -325,9 +364,12 @@ final class PengimporLegacy
             }
         }
 
+        $this->periksaKunciSumber($def, $src, $namaSumber, $kolom);
+
         return [
             'ada'       => true,
             'sumber'    => $namaSumber,
+            'buang'     => $def->praPindai === null ? [] : ($def->praPindai)($src, $namaSumber, $this->keputusan),
             'kolom'     => $kolom,
             'fk'        => $this->kolomFk($this->tujuan->prefixTable($def->tabel)),
             'seed'      => $seed,
@@ -338,7 +380,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, sumber: string, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null $rinci
+     * @param array{ada: bool, sumber: string, buang: array<int|string, string>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>}|null $rinci
      */
     private function imporTabel(int $tier, DefinisiTabel $def, ?array $rinci, bool $dryRun): void
     {
@@ -356,7 +398,7 @@ final class PengimporLegacy
         $pilih    = implode(', ', array_map(static fn (string $k, array $t): string => $src->escapeIdentifiers($t['src']) . ' AS ' . $src->escapeIdentifiers($k), array_keys($rinci['kolom']), $rinci['kolom']));
         $kunci    = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
         $urutPk   = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($rinci['kolom'][$k]['src']), $kunci));
-        $buang    = $def->praPindai === null ? [] : ($def->praPindai)($src, $rinci['sumber'], $this->keputusan);
+        $buang    = $rinci['buang'];
         $urutan   = [];
         $tunda    = [];
         $terakhir = null;
@@ -440,6 +482,12 @@ final class PengimporLegacy
             $this->laporan->ditulis($def->kunci(), count($tulis));
         } while (count($baris) === $this->ukuranBatch);
 
+        $t = $this->laporan->semua()[$def->kunci()];
+
+        if ($t['sumber'] !== $t['ditulis'] + $t['dilewati'] + array_sum($t['dibuang'])) {
+            throw new ImporGagal(sprintf('Rekonsiliasi %s: sumber %d ≠ ditulis %d + dilewati %d + dibuang %d.', $def->kunci(), $t['sumber'], $t['ditulis'], $t['dilewati'], array_sum($t['dibuang'])));
+        }
+
         if ($tunda !== [] && ! $dryRun) {
             foreach ($tunda as $u) {
                 $id = $u[$def->pk];
@@ -459,7 +507,7 @@ final class PengimporLegacy
     }
 
     /**
-     * @param array{ada: bool, sumber: string, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>} $rinci
+     * @param array{ada: bool, sumber: string, buang: array<int|string, string>, kolom: array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}>, fk: array<string, array{tabel: string, kolom: string}>, seed: array<string, string>, unik: array<string, list<string>>, onUpdate: list<string>, barisSeed: list<array<string, mixed>>} $rinci
      * @param array<string, mixed> $mentah
      *
      * @return array<string, mixed>|string
