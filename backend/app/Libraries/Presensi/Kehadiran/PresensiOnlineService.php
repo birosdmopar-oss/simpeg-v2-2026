@@ -239,6 +239,8 @@ final class PresensiOnlineService
         ];
         $status = $this->tulis($db, $auth, $nip, $tgl, $masuk, $data);
         $row    = $this->baris($db, $nip, $tgl) ?? throw new RuntimeException('Baris presensi hilang setelah ditulis.');
+        // F6-12 (Fase 6 MAKE-066): keanggotaan topik presensi FCM ikut legacy, diantre sesudah commit; gagal tidak dilempar.
+        (new \App\Libraries\Push\AntreTopikFcm())->presensi($db, $nip, $tgl, $masuk);
 
         return [$status, [
             'tgl'                                             => $tgl,

@@ -197,6 +197,8 @@ final class LkhService implements LkhServiceInterface
             'status'      => self::MENUNGGU,
             'updated_by'  => $auth->idPengguna(),
         ] + $aktif));
+        // F6-12 (Fase 6 MAKE-066): LKH dibuat → keluar dari topik `pegawai_blm_lkh` [K `L_lkh.php:430-445`].
+        (new \App\Libraries\Push\AntreTopikFcm())->lkhDibuat($nip);
 
         return $this->detail($auth, $id);
     }

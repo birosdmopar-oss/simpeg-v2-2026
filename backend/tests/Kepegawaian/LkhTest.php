@@ -80,6 +80,23 @@ final class LkhTest extends DatabaseTestCase
         $this->assertSame(['2026-10-08', '2026-10-13', $this->nipAtasan], [$opsi['tanggal_minimal'], $opsi['tanggal_maksimal'], $opsi['atasan']['nip']]);
     }
 
+    public function testTambahMengantreLepasTopikBelumLkhBilaDriverFcm(): void
+    {
+        // F6-12 (Fase 6 MAKE-066) [K `L_lkh.php:430-445`]: LKH dibuat → job `fcm-topik` lepas `pegawai_blm_lkh`.
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+
+        try {
+            $this->tambah($this->pegawai, '2026-10-12');
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $job = $this->db->table('queue_jobs')->where('queue', 'push')->get()->getResultArray();
+        $this->assertCount(1, $job);
+        $this->assertSame(['job' => 'fcm-topik', 'data' => ['nip' => $this->nip, 'tambah' => [], 'lepas' => ['pegawai_blm_lkh']]], array_intersect_key((array) json_decode($job[0]['payload'], true), ['job' => 1, 'data' => 1]));
+    }
+
     public function testStempelCreatedAtDanUpdatedAtBerisiUtc(): void
     {
         // CR-086: sesi DB berzona UTC (App\Database\MySQLi), jadi DEFAULT/ON UPDATE kolom audit berisi UTC.
