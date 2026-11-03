@@ -57,7 +57,7 @@ final class CurlTransport implements TransportHttpInterface
     }
 
     /**
-     * @param list<array{nama: string, isi: string, namaBerkas?: string}> $bagian
+     * @param list<array{nama: string, isi: string, namaBerkas?: string, mime?: string}> $bagian
      *
      * @return array<string, \CURLStringFile|string>
      */
@@ -67,7 +67,7 @@ final class CurlTransport implements TransportHttpInterface
 
         foreach ($bagian as $b) {
             $hasil[$b['nama']] = isset($b['namaBerkas'])
-                ? new \CURLStringFile($b['isi'], $b['namaBerkas'], 'application/pdf')
+                ? new \CURLStringFile($b['isi'], $b['namaBerkas'], $b['mime'] ?? 'application/pdf')
                 : $b['isi'];
         }
 

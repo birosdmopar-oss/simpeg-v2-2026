@@ -14,7 +14,8 @@ use CodeIgniter\Config\BaseConfig;
 class Integrations extends BaseConfig
 {
     /**
-     * `tlsVerify` false hanya untuk gateway internal tanpa TLS yang dicatat di `.env` (BP-3); `timeout` detik total.
+     * E-sign (H-02): `driver` `mock` | `bsre` (MAKE-065). `username`/`password` = client id/secret Basic BSrE [K]. `tlsVerify`
+     * WAJIB true untuk `bsre` (legacy mematikan verifikasi; tidak diikuti, BP-3); `timeout` detik total > 0.
      *
      * @var array{driver: string, baseUrl: string, username: string, password: string, tlsVerify: bool, timeout: float}
      */

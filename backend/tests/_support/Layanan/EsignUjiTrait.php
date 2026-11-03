@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Layanan;
 
+use App\Interfaces\EsignGatewayInterface;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Layanan\Cuti\EsignCutiService;
@@ -45,8 +46,9 @@ trait EsignUjiTrait
 
     /**
      * @param list<string> $tanpaSertifikat
+     * @param EsignGatewayInterface|null $gateway gateway lain (mis. adapter BSrE real + FakeTransport, MAKE-065 AC-02.1)
      */
-    protected function esignService(array $tanpaSertifikat = []): EsignCutiService
+    protected function esignService(array $tanpaSertifikat = [], ?EsignGatewayInterface $gateway = null): EsignCutiService
     {
         $svc = $this->cutiService();
 
@@ -54,7 +56,7 @@ trait EsignUjiTrait
             $this->db,
             $svc,
             new SuratCutiService($this->db, $this->lampiranUji),
-            new MockEsignAdapter($tanpaSertifikat),
+            $gateway ?? new MockEsignAdapter($tanpaSertifikat),
             new PegawaiScope($this->db),
             $this->notifikasiUji,
         );
