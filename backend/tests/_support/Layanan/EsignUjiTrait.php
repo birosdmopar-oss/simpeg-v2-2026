@@ -52,7 +52,7 @@ trait EsignUjiTrait
      * @param list<string> $tanpaSertifikat
      * @param EsignGatewayInterface|null $gateway gateway lain (mis. adapter BSrE real + FakeTransport, MAKE-065 AC-02.1)
      */
-    protected function esignService(array $tanpaSertifikat = [], ?EsignGatewayInterface $gateway = null, ?\App\Interfaces\Layanan\TautanSuratCutiInterface $tautan = null): EsignCutiService
+    protected function esignService(array $tanpaSertifikat = [], ?EsignGatewayInterface $gateway = null, ?\App\Interfaces\Layanan\TautanSuratCutiInterface $tautan = null, ?\App\Libraries\CacheService $cache = null): EsignCutiService
     {
         $svc = $this->cutiService();
 
@@ -63,6 +63,8 @@ trait EsignUjiTrait
             $gateway ?? new MockEsignAdapter($tanpaSertifikat),
             $this->notifikasiUji,
             $tautan,
+            null,
+            $cache,
         );
     }
 }

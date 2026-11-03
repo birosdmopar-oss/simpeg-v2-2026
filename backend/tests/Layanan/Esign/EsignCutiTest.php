@@ -272,6 +272,82 @@ final class EsignCutiTest extends DatabaseTestCase
         $this->assertFalse($tanpa->adaGambar, 'token belum tersedia (DBV-030) → tanpa gambar');
     }
 
+    public function testStatusSertifikatAktifDiCacheTidakAktifDanGalatTidakDiCache(): void
+    {
+        ['id' => $id, 'a' => $a] = $this->cutiFinal();
+        $gateway                 = new class () extends MockEsignAdapter {
+            public int $panggilan = 0;
+
+            public string $kode = '200';
+
+            public function checkUser(string $nip): array
+            {
+                $this->panggilan++;
+
+                return ['status_code' => $this->kode, 'message' => 'uji', 'nip' => $nip, 'has_certificate' => $this->kode === '200', 'certificate_expires_at' => null];
+            }
+        };
+        $cache = new \App\Libraries\CacheService(new \CodeIgniter\Test\Mock\MockCache(), 'uji_');
+
+        $gateway->kode = 'timeout';
+        $svc           = $this->esignService([], $gateway, null, $cache);
+        $this->assertSame(EsignCutiService::SERTIFIKAT_GALAT, $svc->statusSertifikat($a['pyb']['auth'], $id)['status']);
+        $gateway->kode = '200';
+        $this->assertSame(EsignCutiService::SERTIFIKAT_AKTIF, $svc->statusSertifikat($a['pyb']['auth'], $id)['status'], 'galat tidak di-cache');
+        $this->assertSame(EsignCutiService::SERTIFIKAT_AKTIF, $svc->statusSertifikat($a['pyb']['auth'], $id)['status']);
+        $this->assertSame(2, $gateway->panggilan, 'aktif di-cache per NIP');
+        $this->assertSame(0, $this->db->table('esign_hist')->countAllResults(), 'cek status tidak menulis esign_hist / pembatas');
+
+        ['id' => $id2, 'a' => $b] = $this->cutiFinal();
+        $tidak                    = $this->esignService([$b['pyb']['nip']])->statusSertifikat($b['pyb']['auth'], $id2);
+        $this->assertSame(EsignCutiService::SERTIFIKAT_TIDAK_AKTIF, $tidak['status']);
+        $this->assertStringContainsString('tanpa tanda tangan elektronik', $tidak['pesan']);
+    }
+
+    public function testStatusSertifikatHanyaPemilikDanBelumBerTte(): void
+    {
+        ['id' => $id, 'a' => $a] = $this->cutiFinal();
+
+        try {
+            $this->esignService()->statusSertifikat($a['al']['auth'], $id);
+            $this->fail('bukan penanda tangan harus 403');
+        } catch (ForbiddenException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->esignService()->terbitkan($a['pyb']['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+
+        try {
+            $this->esignService()->statusSertifikat($a['pyb']['auth'], $id);
+            $this->fail('sudah ber-TTE harus 422');
+        } catch (ValidationException $e) {
+            $this->assertSame([EsignCutiService::PESAN_SUDAH_TTE], $e->getErrors()['status']);
+        }
+    }
+
+    public function testGatewayMatiTidakDihitungPembatas(): void
+    {
+        ['id' => $id] = $this->cutiFinal();
+        $mati         = new class () extends MockEsignAdapter {
+            public function signPdf(string $pdfContent, string $nip, string $passphrase, array $options = []): array
+            {
+                return ['status_code' => 'timeout', 'message' => 'Operation timed out', 'signed_pdf' => null, 'signed_at' => null, 'signature_id' => null];
+            }
+        };
+
+        for ($i = 0; $i < EsignCutiService::BATAS_PERCOBAAN + 1; $i++) {
+            try {
+                $this->esignService([], $mati)->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+            } catch (ValidationException) {
+                // gateway mati: dicatat, tidak dihitung K2
+            }
+        }
+
+        $this->assertSame(EsignCutiService::BATAS_PERCOBAAN + 1, $this->db->table('esign_hist')->where('id_rw', $id)->where('status_code', 'timeout')->countAllResults());
+        $this->esignService()->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+        $this->assertSame(1, $this->db->table('esign_hist')->where('id_rw', $id)->where('status', '1')->countAllResults(), 'tidak terkunci');
+    }
+
     public function testBarisTidakAdaMengembalikan404(): void
     {
         $this->expectException(\App\Exceptions\NotFoundException::class);

@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Interfaces\EsignGatewayInterface;
 use App\Interfaces\Layanan\TautanSuratCutiInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\CacheService;
 use App\Models\AuditLogModel;
 use App\Models\Layanan\EsignHistModel;
 use CodeIgniter\Database\BaseConnection;
@@ -27,6 +28,11 @@ use Throwable;
  * - K2 [V2]: maksimal 5 percobaan gagal per penanda tangan per cuti dalam 15 menit (pola LockoutService, dihitung dari
  *   `esign_hist` status 2) → 429 `esign_terkunci`.
  * - K3b: `imageTTD` = QR berisi URL publik PDF ber-TTE ({@see TautanSuratCutiInterface}); belum tersedia → tanpa gambar.
+ * - Cek sertifikat sebelum meminta passphrase ({@see self::statusSertifikat()}, ikut legacy `Cuti.php:687-705`
+ *   `checkStatus` saat membuka halaman proses; putusan reviewer 03-11-2026): tidak aktif → passphrase tidak diminta, surat
+ *   tanpa TTE; gateway mati → galat, boleh diulang, TIDAK dihitung pembatas K2.
+ *
+ * Rujukan PRD Fase 6 v1.0f (CR-097): Q6-19 (K1), Q6-20 (K2), Q6-21 (Tolak tanpa passphrase), Q6-22 (QR TTE), AC-02.6.
  *
  * Urutan: baris ada (404) → pemilik tugas (403) → batas percobaan (429) → body (422) → status 1/4 dan belum ber-TTE (422)
  * → penanda tangan (422) → `checkUser` + `signPdf` → transaksi bisnis (kunci, cek ulang, simpan PDF ber-TTE, audit) →
@@ -60,6 +66,18 @@ class EsignCutiService
 
     public const KODE_TERKUNCI = 'esign_terkunci';
 
+    public const SERTIFIKAT_AKTIF = 'aktif';
+
+    public const SERTIFIKAT_TIDAK_AKTIF = 'tidak_aktif';
+
+    public const SERTIFIKAT_GALAT = 'galat';
+
+    /** Detik cache hasil cek sertifikat per penanda tangan (kunci = hash NIP; NIK tidak disimpan). */
+    public const CACHE_SERTIFIKAT_DETIK = 300;
+
+    /** Kode gateway mati/timeout dari adapter — bukan percobaan passphrase, tidak dihitung pembatas K2. */
+    private const KODE_GATEWAY_MATI = ['timeout', 'koneksi'];
+
     private const ALASAN = 'Dokumen ini ditandatangani secara elektronik menggunakan Aplikasi SIMPEG Kemenpar';
 
     private const LOKASI = 'Jakarta';
@@ -72,7 +90,51 @@ class EsignCutiService
         private readonly ?CutiNotifikasiService $notifikasi = null,
         private readonly ?TautanSuratCutiInterface $tautan = null,
         private readonly ?string $logoQr = null,
+        private readonly ?CacheService $cache = null,
     ) {
+    }
+
+    /**
+     * `GET cuti/{id}/esign/status` — cek sertifikat penanda tangan (pemilik tugas saja) sebelum dialog passphrase. Hasil
+     * aktif/tidak aktif di-cache {@see self::CACHE_SERTIFIKAT_DETIK} detik per NIP (tanpa NIK); galat gateway tidak di-cache.
+     *
+     * @return array{status: string, pesan: string}
+     */
+    public function statusSertifikat(AuthContext $auth, int $id): array
+    {
+        $cuti   = $this->cuti->ambil($id) ?? throw new NotFoundException();
+        $nipTtd = self::penandaTangan($cuti);
+
+        if ($nipTtd === null || $auth->nip() === null || $auth->nip() !== $nipTtd) {
+            throw new ForbiddenException(self::PESAN_BUKAN_PENANDA);
+        }
+
+        $this->periksaBisaDiterbitkan($cuti, (string) $cuti['nip'], $id);
+
+        $kunci     = 'esign_sertifikat_' . hash('sha256', $nipTtd);
+        $tersimpan = $this->cache?->get($kunci);
+
+        if (is_array($tersimpan) && is_string($tersimpan['status'] ?? null) && is_string($tersimpan['pesan'] ?? null)) {
+            return ['status' => $tersimpan['status'], 'pesan' => $tersimpan['pesan']];
+        }
+
+        try {
+            $cek = $this->gateway->checkUser($nipTtd);
+        } catch (Throwable) {
+            return ['status' => self::SERTIFIKAT_GALAT, 'pesan' => 'Layanan tanda tangan elektronik tidak dapat dihubungi. Coba lagi.'];
+        }
+
+        if (in_array($cek['status_code'], self::KODE_GATEWAY_MATI, true) || preg_match('/^5\d\d$/', $cek['status_code']) === 1) {
+            return ['status' => self::SERTIFIKAT_GALAT, 'pesan' => 'Layanan tanda tangan elektronik tidak dapat dihubungi. Coba lagi.'];
+        }
+
+        $hasil = $cek['status_code'] === '200'
+            ? ['status' => self::SERTIFIKAT_AKTIF, 'pesan' => 'Sertifikat elektronik aktif.']
+            : ['status' => self::SERTIFIKAT_TIDAK_AKTIF, 'pesan' => 'Sertifikat elektronik Anda tidak aktif; surat cuti diterbitkan tanpa tanda tangan elektronik.'];
+
+        $this->cache?->set($kunci, $hasil, self::CACHE_SERTIFIKAT_DETIK);
+
+        return $hasil;
     }
 
     /**
@@ -193,14 +255,16 @@ class EsignCutiService
     }
 
     /**
-     * K2 [V2]: {@see self::BATAS_PERCOBAAN} percobaan gagal (esign_hist status 2) dalam {@see self::JENDELA_MENIT} menit
-     * untuk penanda tangan + cuti yang sama → 429 sampai percobaan tertua keluar jendela.
+     * K2 [V2] (Q6-20): {@see self::BATAS_PERCOBAAN} percobaan gagal (esign_hist status 2, kecuali gateway mati/timeout)
+     * dalam {@see self::JENDELA_MENIT} menit untuk penanda tangan + cuti yang sama → 429 sampai percobaan tertua keluar
+     * jendela.
      */
     private function periksaBatasPercobaan(string $nip, int $id): void
     {
         $batas = gmdate('Y-m-d H:i:s', time() - self::JENDELA_MENIT * 60);
         $gagal = $this->db->table('esign_hist')->select('created_at')
             ->where(['modul' => self::MODUL, 'id_rw' => $id, 'nip' => $nip, 'status' => EsignHistModel::STATUS_GAGAL])
+            ->groupStart()->where('status_code', null)->orWhereNotIn('status_code', self::KODE_GATEWAY_MATI)->groupEnd()
             ->where('created_at >=', $batas)->orderBy('created_at', 'DESC')->get(self::BATAS_PERCOBAAN)->getResultArray();
 
         if (count($gagal) < self::BATAS_PERCOBAAN) {

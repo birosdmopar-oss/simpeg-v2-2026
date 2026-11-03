@@ -25,6 +25,14 @@ final class CutiEsignController extends ApiController
         );
     }
 
+    /**
+     * `GET cuti/{id}/esign/status` — cek sertifikat penanda tangan sebelum dialog passphrase (ikut legacy `Cuti.php:687-705`).
+     */
+    public function status(int $id): ResponseInterface
+    {
+        return $this->respondSuccess($this->service()->statusSertifikat(service('authContext'), $id));
+    }
+
     private function service(): EsignCutiService
     {
         return service('esignCutiService');
