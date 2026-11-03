@@ -6,9 +6,9 @@ keluar (log integrasi, SIASN, firebase_token, UNIQUE SKP periodik)`. Branch `fas
 `MigrationsDitahan/` ke `Migrations/` + registry NIP + test skema; reviewer CR me-merge setelah CI hijau. B2 (MAKE-063)
 menunggu DBV-027 di `main`.
 
-**Status:** ⏳ **menunggu review DB Validator.** Draf migration **DITAHAN** di
-`app/Database/MigrationsDitahan/CreateIntegrasiKeluarFase6.php` (tidak dijalankan `spark migrate`). Pra-review sisi CR:
-laporan B0 diterima reviewer CR 02-11-2026 (jawaban Q1–Q8 dipakai di dokumen ini).
+**Status:** ✅ **disetujui DB Validator @`890eb1df` (03-11-2026)** — DBV diambil alih sesi WS-2 atas penugasan Horii
+03-11-2026; hasil & keputusan di Bagian 13. Draf migration masih **DITAHAN** di
+`app/Database/MigrationsDitahan/CreateIntegrasiKeluarFase6.php` sampai dipindah ke `Migrations/` (syarat §11, §13.5).
 
 **Penulis:** pelaksana Fase 6 Jalur B, 02-11-2026.
 
@@ -504,12 +504,81 @@ kueri audit berjalan; dasar tambahan `SkemaIntegrasiKeluarDbvTest` dari branch `
 
 ## 12. Checklist DB Validator
 
-- [ ] Nama tabel/kolom/FK/CHECK/indeks (Bagian 3)
-- [ ] `firebase_token`: `nip` NULL-able, `id_pengguna` + FK, CHECK pemilik, `token_hash` UNIQUE per pemilik (DBV-Q8, diputus Horii), `refresh_date` (DBV-Q9)
-- [ ] UNIQUE `riwayat_skp_periodik` + pra-cek + aturan duplikat (DBV-Q1)
-- [ ] Tabel kerja SIASN [I] (DBV-Q3..Q7, Q11)
-- [ ] `integrasi_log` (DBV-Q2), retensi 180 hari oleh command
-- [ ] Akun sistem integrasi (Bagian 4; level 1 diputus Horii, DBV-Q10; dibuat command, Z-1 opsi c) — tidak bisa login; penjaga kode T3 (login, Manajemen Akun)
-- [ ] Registry NIP fase 6 (Bagian 6)
-- [ ] Skrip audit hanya SELECT, hanya jumlah; klasifikasi A/B
-- [ ] Verifikasi MariaDB 10.4 (Bagian 8.3)
+- [x] Nama tabel/kolom/FK/CHECK/indeks (Bagian 3)
+- [x] `firebase_token`: `nip` NULL-able, `id_pengguna` + FK, CHECK pemilik, `token_hash` UNIQUE per pemilik (DBV-Q8, diputus Horii), `refresh_date` (DBV-Q9)
+- [x] UNIQUE `riwayat_skp_periodik` + pra-cek + aturan duplikat (DBV-Q1)
+- [x] Tabel kerja SIASN [I] (DBV-Q3..Q7, Q11)
+- [x] `integrasi_log` (DBV-Q2), retensi 180 hari oleh command
+- [x] Akun sistem integrasi (Bagian 4; level 1 diputus Horii, DBV-Q10; dibuat command, Z-1 opsi c) — tidak bisa login; penjaga kode T3 (login, Manajemen Akun)
+- [x] Registry NIP fase 6 (Bagian 6)
+- [x] Skrip audit hanya SELECT, hanya jumlah; klasifikasi A/B
+- [x] Verifikasi MariaDB 10.4 (Bagian 8.3)
+
+---
+
+## 13. Hasil review DB Validator
+
+**DBV diambil alih sesi WS-2 atas penugasan Horii 03-11-2026** (peran DB Validator PR #35 dialihkan dari DBV biasa;
+independen dari penulis PR dan reviewer CR). SHA kode yang direview: **`890eb1df`** (draf
+`MigrationsDitahan/CreateIntegrasiKeluarFase6.php`, skrip audit, service/command akun sistem, penjaga CR-096).
+
+### 13.1 Verifikasi
+| Uji | Lingkungan | Hasil |
+|---|---|---|
+| `migrate --all` DB kosong → draf `up()` → 19 kueri audit → `down()` → `up()` | MySQL 8.0.30 lokal (3307, DB scratch DBV) | ✅ audit tanpa galat, WAJIB_0 = 0; `mysqldump --no-data` setelah `down()` **identik** dengan sebelum `up()`; `up()` ulang identik dengan `up()` pertama; migration tidak membuat baris `pengguna` (Z-1) |
+| Pra-cek dengan data sintetis (NIP palsu): kunci SKP ganda, token ganda per pemilik, token lama tanpa `nip` | MySQL 8.0.30 lokal | ✅ ketiganya berhenti **sebelum DDL** (tabel baru 0, kolom `firebase_token` tidak berubah, migration tidak tercatat); pesan hanya jumlah, tanpa NIP. Kontrol negatif lolos: baris `periode_id` NULL ganda, dan token sama milik NIP berbeda (DBV-Q8 per pemilik) tidak memblokir |
+| Gagal di tengah (`siasn_referensi` sudah ada) | MySQL 8.0.30 lokal | ✅ tabel yang sempat dibuat di-DROP, skema pulih |
+| Langkah dedup manual §3.7 | MySQL 8.0.30 lokal | ✅ menyisakan id terbesar per kunci; baris lama → platform 2, `token_hash` = SHA2 |
+| `integrasi:siapkan-akun-sistem` | MySQL 8.0.30 lokal | ✅ jalan 1 = dibuat (level 1, status '0', nip/email/password/password_legacy NULL), jalan 2 = sudah ada (exit 0, tetap 1 baris); akun menyimpang (status '1') → exit 1, hanya nama kolom, tidak diperbaiki; argumen salah → exit 7 |
+| Test DBV `SkemaIntegrasiKeluarDbvTest` (struktur/collation, CHECK 3819/4025, UNIQUE 1062, FK 1452/1451, `id_da` NOT NULL 1048, token per pemilik per kanal, akun lewat service, `down()/up()`, pra-cek) + `AkunSistemIntegrasiTest` + `AkunSistemTerkunciTest` | MySQL 8.0.30 lokal | ✅ 13 test, 244 assertion |
+| Draf dipasang sebagai migration di seluruh suite (keadaan "sesudah dipindah") + test DBV | CI `quality-gate` MySQL 8.0 + MariaDB 10.4, branch sementara `ci/dbv027-mariadb` | ✅ CI #489 (`07eb331b`): test DBV lolos di MariaDB 10.4 (shard 2: 1.018 test tanpa error) dan MySQL 8.0; suite tidak rusak oleh `down()`/`up()`. Merah hanya test lama yang mengunci skema sebelum DBV-027 (registry NIP fase 6, fixture `firebase_token` tanpa `platform`, `RiwayatSchemaTest`, `SkemaLayananTest`) — diselesaikan saat pemindahan (§13.5) |
+| Test PR `SkemaIntegrasiKeluarTest` (draf ditahan) | CI `quality-gate` PR, MySQL 8.0 + MariaDB 10.4 | ✅ CI #487 (`890eb1df`) hijau semua job, 4 shard MySQL 8.0 + 4 shard MariaDB 10.4 |
+| T1 (MariaDB): sebelum perbaikan, `down()` gagal "Unknown column 'id_pengguna' in 'CHECK'" (`DROP CHECK` khusus MySQL, galat ditelan) | CI #482 | ✅ ditemukan DBV, diperbaiki `DROP CONSTRAINT` bersyarat tanpa menelan galat (CI #483, #485) |
+
+### 13.2 Keputusan
+| ID | Keputusan DBV |
+|---|---|
+| DBV-Q1 | **Setuju**, dengan urutan total: per kunci (`id_pns`,`periode_id`,`skp_id`) pertahankan satu baris — prioritas `status = 1 AND hasil_akhir IS NOT NULL`, lalu `id_riwayat_skp_periodik` terkecil (= baris yang dibaca Tukin); lainnya tidak diimpor (rincian K-3/K-4 §13.3) |
+| DBV-Q2 | **Setuju.** `id_klien` **tanpa FK** (log append-only, retensi 180 hari, tidak boleh menahan penonaktifan/rotasi klien); tipenya sama dengan PK tabel klien DBV-026 (INT UNSIGNED) — bila DBV-026 memakai tipe lain, disamakan lewat DBV-026. Kolom cocok dengan kontrak `CatatanIntegrasi` CR-091 (PRD §7.0.2); `PESAN_MAKS` 1000 = `VARCHAR(1000)` |
+| DBV-Q3 | **Setuju** (tanpa indeks tambahan, `du_lu` DATE). Job generasi 2 `SS/*` hanya menulis flag 0/1/2 → CHECK benar; nilai 3–6 di `dsp` legacy hanya dari `SI` generasi 1 yang tidak di-port (F6-21) → `dsp` tidak diimpor (K-5) |
+| DBV-Q4 | **Setuju**: `id_da` tanpa FK, UNIQUE (`rw_name`,`id_rw`,`id_da`), `id_da` NOT NULL (T4; legacy selalu mengisinya) |
+| DBV-Q5 | **Setuju** |
+| DBV-Q6 | **Setuju** — tipe pemetaan `id_jabatan`/`id_unit`/`id_satker` INT = PK master v2 |
+| DBV-Q7 | **Setuju** (satu tabel ber-`jenis`; CHECK `IN` string lolos di MariaDB 10.4) |
+| DBV-Q8 | Diputus Horii 03-11-2026 (ikut legacy, per pemilik) — diverifikasi: `uq_firebase_token_pengguna_hash`, `uq_firebase_token_nip_hash`, CHECK pemilik per kanal (web `nip` NULL, T2), pra-cek/A6/dedup per pemilik |
+| DBV-Q9 | **Setuju** |
+| DBV-Q10 | Diputus Horii 03-11-2026 (level 1 ikut legacy) — diverifikasi: akun `status '0'`, tanpa password/hash legacy; B1 WAJIB_0, B1b INFO; penjaga kode CR-096 (keputusan reviewer CR 03-11-2026): akun disembunyikan dari daftar Manajemen Akun, dikunci dari semua aksi, login ditolak walau aktif dan ber-password (`AkunSistemTerkunciTest`) |
+| DBV-Q10b | **Opsi (c) — Z-1** (temuan ReadOne 03-11-2026: seed AUTO_INCREMENT bentrok PK dengan id legacy yang disalin impor `pengguna`): migration murni skema; akun dibuat command idempoten `integrasi:siapkan-akun-sistem` SESUDAH impor `pengguna` dan SEBELUM cron integrasi aktif; akun menyimpang ditolak tanpa perbaikan otomatis; penulis H-03/H-10 memakai `AkunSistemIntegrasi::id()` yang gagal eksplisit bila akun tidak siap; impor `pengguna` ke tujuan yang sudah berisi akun ini gagal. Pengecualian seed G-02 tidak dipakai |
+| DBV-Q11 | **Risiko diterima.** D1 lengkap tidak tersedia di lingkungan DBV; dump UP-1 hanya memuat DDL `riwayat_skp_periodik` (cocok: tiga kolom VARCHAR(150), tanpa unique key = B-14). Kolom [I] dicocokkan dengan kode: `siasn_upload_arsip` = seluruh kolom yang ditulis `SS/Rw_jabatan::set_queue_arsip`, `SS/Rw_pelatihan::set_queue_arsip_sertifikasi`, `SS/Arsip::upload_siasn` (+`created_at`/`updated_at` [V2]); tipe `id_rw`/`id_da` INT dan `arsip_path` VARCHAR(200) = kolom sumber v2; `siasn_ref_unor` = 15 kolom yang ditulis `SS/Ref_unor::sync`. Catatan cutover: cocokkan dengan D1 saat tersedia |
+| DBV-Q12 | Timestamp saat dipindah lebih baru dari migration terakhir di `main` **dan** dari migration DBV-026 bila masuk lebih dulu |
+| DBV-Q13 | **Setuju** pra-cek + dedup manual (migration tidak menghapus data diam-diam) |
+
+### 13.3 Keputusan cutover (impor tabel DBV-027, bahan alat impor B3 / MAKE-069)
+Prinsip: token FCM **tidak** diimpor (AC-01.2), `siasn_simpeg.dsp` **tidak** diimpor; `siasn_upload_arsip` (semua status),
+`siasn_ref_unor`, `siasn_referensi`, `double_riwayat_kp` **diimpor** (PK/id legacy disalin apa adanya, pola `DefinisiTabel`).
+Pelanggaran yang tidak diputus di bawah → impor **gagal dengan jumlah saja** (tanpa NIP/id).
+
+| ID | Keputusan DBV |
+|---|---|
+| K-3 (Q1) | "`hasil_akhir` terisi" = `hasil_akhir IS NOT NULL` (string kosong dihitung terisi), sama dengan pembaca Tukin `SumberDataPegawaiTukin::predikatSkp` (`status = 1`, `IS NOT NULL`, `ORDER BY id ASC`). Urutan per kunci: (1) `status = 1 AND hasil_akhir IS NOT NULL`, (2) id terkecil; baris lain tidak diimpor, jumlahnya dilaporkan |
+| K-4 | Grup kunci (`id_pns`,`periode_id`,`skp_id`) yang memuat **NIP berbeda** → impor **gagal** dengan jumlah grup; DBV memutus per kasus (identitas `id_pns` ↔ NIP tidak ditebak alat) |
+| K-5 | `siasn_status_pegawai` dibangun job `siasn:tarik --jenis=data-utama` (baris per pegawai aktif, semua flag 0, semua `_lu` NULL), **tanpa** stempel dari `dsp` — tarik ulang penuh pertama setelah cutover setara siklus legacy |
+| K-6 (Q11/T4) | Impor semua baris, `id_rw`/`id_da` apa adanya. Kunci v2 (`rw_name`,`id_rw`,`id_da`) ganda → simpan **satu** per kunci: prioritas `status = 1` (terunggah; mencegah unggah ulang ke BKN), lalu id terbesar; sisanya tidak diimpor, jumlah dilaporkan. `id_da` NULL → impor **gagal** dengan jumlah (`id_da` NOT NULL). `id_rw`/`id_da` yang tidak lagi ada di tabel sumber v2 → diimpor (tanpa FK) + jumlah INFO; pemroses menandai gagal saat berkas tidak ada. Syarat: `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap |
+| K-7 | Baris `status = 3` (diproses) saat cutover → **`status = 2`** dengan `error_msg` tetap "Terhenti saat cutover — periksa di SIASN sebelum mengantre ulang", **bukan** 0: legacy hanya mengambil `status = 0` sehingga baris 3 yang terhenti tidak pernah diulang otomatis [K], dan status 0 berisiko unggah ganda ke BKN. Audit B5 tetap 0 |
+| K-8 | `double_riwayat_kp` **diimpor apa adanya** (`Rw_gol` hanya menambah, tidak pernah menghapus). NIP yang tidak ada di `pegawai` v2 → gagal dengan jumlah (FK) |
+| K-9 | Alat impor membaca **dua skema** pada salinan yang sama lewat opsi `--sumber-siasn=<skema>` (akun baca-saja yang sama), bukan menyalin tabel `siasn_simpeg` ke skema `simpeg01` (nama huruf besar `REF_UNOR`/`*_ID` rawan `lower_case_table_names`; salinan sumber tetap utuh). Syarat: ekstraksi cutover mengambil `simpeg01` dan 8 tabel `siasn_simpeg` (`REF_UNOR` + 7 referensi) **pada snapshot yang sama**; `siasn_upload_arsip` dibaca dari `simpeg01`; tanpa `--sumber-siasn` → tabel SIASN dilaporkan dilewati, bukan diam |
+
+### 13.4 Catatan non-blok
+- MAKE-066: token web disimpan `nip` NULL (pemilik = `id_pengguna`, T2). `PushNotifLayananJob` Fase 4 (`WHERE nip = penerima`)
+  hanya menjangkau token Android; penerima web pegawai dicari lewat `pengguna.nip` → `id_pengguna` (padanan legacy
+  `fb_token.id_user` join `pengguna`).
+- B5 bergantung pada `updated_at`: job unggah arsip wajib mengisi `updated_at` saat status → 3.
+- `down()` menghapus token web (cache pendaftaran SPA) karena skema DBV-022 tidak bisa menyimpannya — diterima untuk rollback.
+- `App\Constants\AkunSistem` docblock masih menyebut "sama dengan seed migration DBV-027"; seed sudah tidak ada (Z-1) — rapikan
+  saat pemindahan.
+
+### 13.5 Persetujuan
+**DBV APPROVE @`890eb1df`** — 03-11-2026, DBV (sesi WS-2 atas penugasan Horii). Syarat merge §11 tetap: migration dipindah ke
+`Migrations/` dengan DDL **tidak berubah** dari `890eb1df` + timestamp sesuai DBV-Q12, registry NIP fase 6 + test skema
+permanen + perbaikan test lama yang mengunci skema sebelum DBV-027 (daftar dari CI #483), CI hijau MySQL 8.0 & MariaDB 10.4,
+diverifikasi DBV sebelum reviewer CR me-merge.
