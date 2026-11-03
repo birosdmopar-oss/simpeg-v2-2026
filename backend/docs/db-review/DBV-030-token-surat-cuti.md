@@ -4,8 +4,9 @@
 Branch `fase6/dbv-030-token-surat-cuti` (dari `main` `51f2b84c`). Alur `[CR][DBV]`: PR, DB Validator me-review/approve,
 lalu migration dipindah dari `MigrationsDitahan/` ke `Migrations/` + test skema; reviewer CR me-merge dengan izin Horii.
 
-**Status:** ⏳ **menunggu review DB Validator.** Draf migration **DITAHAN** di
-`app/Database/MigrationsDitahan/CreateSuratCutiToken.php` (tidak dijalankan `spark migrate`).
+**Status:** ✅ **disetujui DB Validator @`227805a9` (03-11-2026)** — DBV dikerjakan sesi WS-2 atas perintah Horii; hasil &
+keputusan di Bagian 12. Draf migration masih **DITAHAN** di `app/Database/MigrationsDitahan/CreateSuratCutiToken.php`
+sampai dipindah ke `Migrations/` (syarat §10, §12.5).
 
 **Penulis:** pelaksana Fase 6 Jalur B, 03-11-2026.
 
@@ -164,8 +165,59 @@ ada), siklus `down()/up()`, kueri audit berjalan.
 
 ## 11. Checklist DB Validator
 
-- [ ] Nama tabel/kolom/FK/CHECK/indeks (Bagian 3)
-- [ ] Hash + enkripsi, tanpa NIP, tanpa token mentah
-- [ ] FK RESTRICT + hapus cuti (DBV-030-Q2)
-- [ ] Satu token per cuti (DBV-030-Q3)
-- [ ] Skrip audit hanya SELECT, hanya jumlah
+- [x] Nama tabel/kolom/FK/CHECK/indeks (Bagian 3)
+- [x] Hash + enkripsi, tanpa NIP, tanpa token mentah
+- [x] FK RESTRICT + hapus cuti (DBV-030-Q2)
+- [x] Satu token per cuti (DBV-030-Q3)
+- [x] Skrip audit hanya SELECT, hanya jumlah
+
+---
+
+## 12. Hasil review DB Validator
+
+**DBV dikerjakan sesi WS-2 atas perintah Horii 03-11-2026** (independen dari penulis PR dan reviewer CR). SHA yang direview:
+**`227805a9`** (DDL sama dengan `36ae1a4c`; `227805a9` hanya dokumen). **Keputusan: SETUJU.**
+
+### 12.1 Verifikasi
+| Uji | Lingkungan | Hasil |
+|---|---|---|
+| `migrate --all` (`main`, 59 migration) → draf sebagai migration lokal → `up()` → 5 kueri audit → `down()` → `up()` | MySQL 8.0.30 lokal (3307, DB scratch DBV `simpeg_v2_t_dbv030`, `.env` dari `.env.example`) | ✅ audit tanpa galat, WAJIB_0 = 0; `mysqldump --no-data` sesudah `down()` **identik** dengan sebelum `up()`; `up()` ulang identik |
+| DDL hasil (`SHOW CREATE TABLE`) | MySQL 8.0.30 lokal | ✅ sama dengan Bagian 3.1; komentar UTF-8 tersimpan benar |
+| `SkemaSuratCutiTokenTest` (draf ditahan) | MySQL 8.0.30 lokal | ✅ 3 test, 14 assertion |
+| PHPStan + PHP-CS-Fixer (draf + test) | lokal | ✅ bersih |
+| Quality gate (draf lewat test, matriks PHPUnit 8 job MySQL 8.0 + MariaDB 10.4) | CI #518 (`36ae1a4c`) | ✅ hijau |
+
+### 12.2 Kesesuaian aturan skema proyek
+| Aturan | Hasil |
+|---|---|
+| Label [K]/[V2]/[I] | ✅ tabel murni [V2] (legacy tanpa tabel token, Bagian 2); deviasi tercatat 3.4 |
+| `ENGINE=InnoDB`, `utf8mb4_unicode_ci` tabel & kolom string | ✅ |
+| Status 1/2/10 | ✅ diterima 1/2 saja: baris tidak pernah "dihapus lunak" — ikut dihapus keras bersama cuti (3.3); CHECK berpasangan `nonaktif_at` |
+| FK `RESTRICT/RESTRICT` (ADR-008), tipe = PK induk | ✅ `id_riwayat_cuti INT` = `riwayat_cuti.id_riwayat_cuti INT` |
+| Migration di `main` tidak diedit; `down()` | ✅ CREATE tabel baru saja; `down()` = DROP, terbukti identik |
+| Tanpa kolom NIP / registry NIP | ✅ tidak ada kolom NIP; `TabelAnakNip` tidak berubah |
+| Rahasia | ✅ hanya hash + salinan terenkripsi; token mentah tidak disimpan; audit hanya jumlah |
+| Stempel (DBV-025) | ✅ catatan: `created_at DEFAULT CURRENT_TIMESTAMP` / `updated_at ON UPDATE CURRENT_TIMESTAMP` diterima sebagai **cadangan** (sesi DB UTC sejak CR-086, DBV-025); aplikasi tetap mengisi UTC eksplisit |
+
+### 12.3 Keputusan
+| ID | Keputusan DBV |
+|---|---|
+| DBV-030-Q1 | **Setuju tabel terpisah.** `riwayat_cuti` tabel [K] (DBV-022) tidak ditambah kolom [V2]; token dipakai dua URL dan punya siklus sendiri (aktif/nonaktif) |
+| DBV-030-Q2 | **Setuju FK RESTRICT**, dengan syarat MAKE-065: `CutiService::hapus` menghapus baris `surat_cuti_token` cuti itu **di transaksi yang sama sebelum** menghapus `riwayat_cuti` (kini baru `riwayat_cuti_notif_kt`, `CutiService.php` fungsi `hapus`) + test (hapus cuti ber-token berhasil, token ikut hilang, URL 404). Tanpa itu hapus cuti ber-token gagal 1451 |
+| DBV-030-Q3 | **Setuju satu token per cuti** (UNIQUE `id_riwayat_cuti`, rotasi = UPDATE + `audit_logs`), dengan batas: **rotasi hanya boleh sebelum surat ber-TTE.** PDF ber-TTE bersifat tetap dan memuat QR berisi token itu (Q6-22), sehingga rotasi sesudah TTE membuat QR di PDF bertanda tangan mati tanpa bisa dicetak ulang. Sesudah TTE yang diizinkan hanya **nonaktif** (status 2, mis. surat dicabut) dan aktif kembali (status 1, `nonaktif_at` NULL), keduanya tercatat di `audit_logs`. Diterapkan di aplikasi + test MAKE-065 |
+| DBV-030-Q4 | **Setuju `token_enkripsi` NOT NULL** (pola `gaji_pegawai.qr_token_enkripsi` VARBINARY(255); keluaran Encrypter CI4 untuk token 64 karakter jauh di bawah 255 byte); audit B3 WAJIB_0 |
+| DBV-030-Q5 | Timestamp saat dipindah **lebih baru dari migration terakhir di `main`** (kini `2026-11-03-100000`, DBV-027) **dan** dari migration lain yang masuk lebih dulu (mis. DBV-026) |
+
+### 12.4 Catatan non-blok
+- **Surat cuti legacy ber-TTE (cutover):** QR di PDF lama menunjuk URL legacy ber-path NIP di server arsip (Bagian 2), bukan
+  token v2; tabel ini kosong saat cutover (audit B5 = surat final tanpa token, INFO). Bila server arsip legacy dimatikan, QR di
+  surat lama tidak lagi terbuka. Perlakuan (pengalihan pola URL legacy ke storage v2 yang mempertahankan path legacy — K-M3
+  opsi A, DBV-029 — atau diterima mati) diputus di runbook cutover/Horii, bukan skema.
+- `token_hash` ber-collation `utf8mb4_unicode_ci` (tidak peka huruf besar/kecil): aman karena aplikasi selalu menulis heks huruf
+  kecil (audit B2 WAJIB_0).
+- Test permanen §8: saat pemindahan, `require_once` `MigrationsDitahan` dihapus dan versi migration disesuaikan (pola DBV-027).
+
+### 12.5 Persetujuan
+**DBV APPROVE @`227805a9`** — 03-11-2026, DBV (sesi WS-2 atas perintah Horii). Syarat merge §10 tetap: migration dipindah ke
+`Migrations/` dengan DDL **tidak berubah** + timestamp DBV-030-Q5, test skema permanen, syarat aplikasi Q2/Q3 di MAKE-065, CI
+hijau MySQL 8.0 & MariaDB 10.4, diverifikasi DBV sebelum reviewer CR me-merge.
