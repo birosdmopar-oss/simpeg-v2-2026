@@ -47,6 +47,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesPresensi.php',
         // Modul D — Presensi paket 5B (MAKE-045 dst.): laporan Tukin, rekap, penyesuaian Tukin (PRD 5B §6).
         APPPATH . 'Config/RoutesPresensiLaporan.php',
+        // Modul H Jalur B — integrasi keluar (Fase 6, MAKE-064 dst.): `api/v1/integrasi/*`.
+        APPPATH . 'Config/RoutesIntegrasi.php',
     ];
 
     /**
