@@ -570,21 +570,24 @@ class Services extends BaseService
             new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
             static::esignGateway(),
             static::cutiNotifikasiService(),
-            null,
+            static::tokenSuratCuti(),
             static::cacheService(),
         );
     }
 
     /**
-     * Token publik surat cuti (PRD Fase 6 v1.0f Q6-22/Q6-23, MAKE-065). Bawaan NoOp sampai tabel DBV-030 di `main`.
+     * Token publik surat cuti (PRD Fase 6 v1.0f Q6-22/Q6-23, MAKE-065; tabel DBV-030). URL publik dari `App::$baseURL`:
+     * verifikasi `verify/surat-cuti/{token}` (halaman SPA) dan PDF `api/v1/publik/surat-cuti/{token}/pdf`.
      */
-    public static function tokenSuratCuti(bool $getShared = true): \App\Interfaces\Layanan\TokenSuratCutiInterface
+    public static function tokenSuratCuti(bool $getShared = true): \App\Libraries\Layanan\Cuti\TokenSuratCutiService
     {
         if ($getShared) {
             return static::getSharedInstance('tokenSuratCuti');
         }
 
-        return new \App\Libraries\Layanan\Cuti\TokenSuratCutiNoOp();
+        $dasar = rtrim((string) config(\Config\App::class)->baseURL, '/');
+
+        return new \App\Libraries\Layanan\Cuti\TokenSuratCutiService(db_connect(), $dasar . '/verify/surat-cuti/', $dasar . '/api/v1/publik/surat-cuti/');
     }
 
     /**
