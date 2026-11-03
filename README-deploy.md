@@ -170,6 +170,20 @@ Worker lewat cron user `deploy` (pola sama dengan §1a):
 
 Job dicoba ulang tiap 60 detik sampai 5 percobaan, lalu pindah ke `queue_jobs_failed` (`php spark queue:failed`); tidak retry selamanya. Penerima tanpa token perangkat (`firebase_token`) ditandai `push_status = 3` tanpa galat. Pantau: baris `queue_jobs` queue `push` yang lebih tua dari 10 menit berarti worker tidak berjalan; `inbox_msg.push_status = 2` berarti push gagal (log `[NotifikasiService]` / `[MockFcmAdapter]`).
 
+### 1c. E-sign BSrE (MAKE-065, PRD Fase 6 §7.2 H-02)
+
+Driver real: `integrations.esign.driver = bsre` di `.env` server, dengan `baseUrl` (alamat gateway BSrE), `username`/`password` (client id/secret Basic), `tlsVerify`, `caBundle`, dan `timeout`. Nilai hanya di `.env` server, tidak di repo. Konfigurasi kosong atau tidak sah membuat `esignGateway` gagal saat dibuat (pesan menyebut nama kunci, tanpa nilai).
+
+**TLS — keputusan Horii 03-11-2026 (kartu Catatan Teknis): ikut legacy.** `integrations.esign.tlsVerify = false` diizinkan **khusus e-sign**. Dengan nilai itu peer dan host gateway tidak diverifikasi, sama dengan legacy. Bawaan repo tetap `true`, dan BKN selalu wajib `true`. Risikonya: koneksi bisa disadap/dipalsukan oleh pihak di jaringan antara server dan gateway (*man-in-the-middle*), padahal NIK dan passphrase ikut terkirim. Selama `false`, aplikasi menulis peringatan sekali per proses di log, dan `php spark integrasi:status` serta `php spark integrasi:uji-koneksi esign` menampilkan `TLS BSrE: TIDAK DIVERIFIKASI`. Pengaman lain tetap berlaku: NIK, passphrase, dan kredensial disensor dari semua log; passphrase tidak disimpan; tanda tangan sukses hanya bila balasan berupa PDF; redirect tidak diikuti.
+
+Langkah upgrade ke TLS ketat (cukup lewat `.env`, tanpa ubah kode):
+
+1. Pastikan gateway diakses lewat `https://` dan cek sertifikatnya, mis. `openssl s_client -connect <host>:443 -showcerts` dari server aplikasi. Catat penerbitnya; jangan tulis host/IP di repo.
+2. Bila sertifikat diterbitkan CA internal, simpan berkas CA (PEM) **di luar repo dan webroot**, lalu isi `integrations.esign.caBundle = <path berkas>`. Kosongkan bila CA publik (memakai CA sistem).
+3. Set `integrations.esign.tlsVerify = true`.
+4. Jalankan `php spark integrasi:uji-koneksi esign`: harus `TLS BSrE: diverifikasi.` dan `Uji koneksi esign OK`. Path `caBundle` yang salah gagal saat konfigurasi dibaca.
+5. Lakukan satu tanda tangan uji (surat cuti uji oleh PyB bersertifikat), lalu periksa `esign_hist` status `1`.
+
 ---
 
 ## 2. Cara push (operator deploy)
