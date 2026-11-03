@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Libraries\Bkn\Ekinerja\PemilihPeriode;
 use App\Libraries\Bkn\Ekinerja\TarikEkinerja;
 use App\Libraries\Bkn\GalatTokenBkn;
 use App\Libraries\Cli\OpsiCli;
@@ -17,7 +18,9 @@ use InvalidArgumentException;
  * `php spark bkn:tarik-skp-periodik [--tahun=YYYY --bulan=M] [--dry-run]` (H-10, F6-15) — tarik penilaian SKP periodik
  * satu periode e-Kinerja [K `Ekin_bkn::cron_skp_periodik`]: tanpa opsi = periode terpilih (tanggal WIB > 19 → bulan
  * berikutnya), periode `SKPManual*` dilewati; INSERT kunci baru, UPDATE bila `hasil_akhir` berubah. `--tahun` dan
- * `--bulan` wajib berpasangan (tarik ulang periode tertentu). Jadwal runbook 02:00 WIB (PRD §6.4).
+ * `--bulan` wajib berpasangan (tarik ulang periode tertentu). `--sebelumnya` = tarik juga satu periode sebelum periode
+ * terpilih/diminta. PRD §6.4 "periode berjalan + sebelumnya" = JADWAL (runbook memakai `--sebelumnya`); command bawaan =
+ * legacy (satu periode, `EB:205`). Jadwal runbook 02:00 WIB.
  * Kode keluar: 0 berhasil / dilewati manual, 1 gagal / periode belum ada, 3 masukan salah.
  */
 class BknTarikSkpPeriodik extends BaseCommand
@@ -25,17 +28,18 @@ class BknTarikSkpPeriodik extends BaseCommand
     protected $group       = 'Integrasi';
     protected $name        = 'bkn:tarik-skp-periodik';
     protected $description = 'Tarik penilaian SKP periodik e-Kinerja BKN untuk satu periode.';
-    protected $usage       = 'bkn:tarik-skp-periodik [--tahun=YYYY --bulan=M] [--dry-run]';
+    protected $usage       = 'bkn:tarik-skp-periodik [--tahun=YYYY --bulan=M] [--sebelumnya] [--dry-run]';
     protected $options     = [
-        '--tahun'   => 'Tahun periode (berpasangan dengan --bulan).',
-        '--bulan'   => 'Bulan periode 1-12 (berpasangan dengan --tahun).',
-        '--dry-run' => 'Hanya hitung, tanpa menulis.',
+        '--tahun'      => 'Tahun periode (berpasangan dengan --bulan).',
+        '--bulan'      => 'Bulan periode 1-12 (berpasangan dengan --tahun).',
+        '--sebelumnya' => 'Tarik juga satu periode sebelum periode terpilih/diminta (jadwal PRD §6.4).',
+        '--dry-run'    => 'Hanya hitung, tanpa menulis.',
     ];
 
     public function run(array $params): int
     {
         try {
-            ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, ['tahun' => true, 'bulan' => true, 'dry-run' => false]);
+            ['argumen' => $argumen, 'opsi' => $opsi] = OpsiCli::urai($params, ['tahun' => true, 'bulan' => true, 'sebelumnya' => false, 'dry-run' => false]);
             [$tahun, $bulan]                         = $this->tahunBulan($argumen, $opsi);
         } catch (InvalidArgumentException $e) {
             CLI::error($e->getMessage() . ' Pemakaian: ' . $this->usage);
@@ -46,13 +50,28 @@ class BknTarikSkpPeriodik extends BaseCommand
         $dryRun = isset($opsi['dry-run']);
 
         try {
-            $h = TarikEkinerja::dariLayanan()->skpPeriodik($tahun, $bulan, null, $dryRun);
+            $tarik = TarikEkinerja::dariLayanan();
+            $h     = $tarik->skpPeriodik($tahun, $bulan, null, $dryRun);
+            $kode  = $this->laporkan($h, $dryRun);
+
+            if (isset($opsi['sebelumnya'])) {
+                $lalu = PemilihPeriode::sebelum($h['tahun'], (int) $h['bulan']);
+                $kode = max($kode, $this->laporkan($tarik->skpPeriodik($lalu['tahun'], (int) $lalu['bulan'], null, $dryRun), $dryRun));
+            }
         } catch (GalatTokenBkn|GalatTransport|KonfigurasiIntegrasiTidakLengkap $e) {
             CLI::error('Tarik SKP periodik GAGAL: ' . $e->getMessage());
 
             return EXIT_ERROR;
         }
 
+        return $kode;
+    }
+
+    /**
+     * @param array{status: string, http: int|null, periode_id: string|null, tahun: int, bulan: string, baru: int, diperbarui: int, tetap: int, tidak_terpasang: int, tidak_dikenal: int, ditolak: int} $h
+     */
+    private function laporkan(array $h, bool $dryRun): int
+    {
         $label   = ($dryRun ? '[dry-run] ' : '') . "Periode {$h['tahun']}-{$h['bulan']}";
         $periode = $h['periode_id'] ?? '-';
 

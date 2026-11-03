@@ -31,6 +31,16 @@ final class PemilihPeriode
         return ['tahun' => (int) $awal->format('Y'), 'bulan' => $awal->format('m')];
     }
 
+    /**
+     * Satu periode sebelum (tahun, bulan) — untuk `bkn:tarik-skp-periodik --sebelumnya` (PRD §6.4).
+     *
+     * @return array{tahun: int, bulan: string}
+     */
+    public static function sebelum(int $tahun, int $bulan): array
+    {
+        return $bulan === 1 ? ['tahun' => $tahun - 1, 'bulan' => '12'] : ['tahun' => $tahun, 'bulan' => sprintf('%02d', $bulan - 1)];
+    }
+
     public static function manual(string $idPeriode): bool
     {
         return str_starts_with($idPeriode, self::AWALAN_MANUAL);

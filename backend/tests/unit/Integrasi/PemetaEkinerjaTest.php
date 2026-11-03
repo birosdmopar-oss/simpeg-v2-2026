@@ -69,6 +69,12 @@ final class PemetaEkinerjaTest extends CIUnitTestCase
         $this->assertSame(['tahun' => $tahun, 'bulan' => $bulan], PemilihPeriode::untuk(new DateTimeImmutable(str_replace(' UTC', '', $waktu), $zona)));
     }
 
+    public function testPeriodeSebelum(): void
+    {
+        $this->assertSame(['tahun' => 2026, 'bulan' => '09'], PemilihPeriode::sebelum(2026, 10));
+        $this->assertSame(['tahun' => 2025, 'bulan' => '12'], PemilihPeriode::sebelum(2026, 1));
+    }
+
     public function testPeriodeManualBerawalanSkpManual(): void
     {
         $this->assertTrue(PemilihPeriode::manual('SKPManualFeb2025'));

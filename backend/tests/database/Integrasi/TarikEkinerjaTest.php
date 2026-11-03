@@ -131,6 +131,15 @@ final class TarikEkinerjaTest extends DatabaseTestCase
         $this->assertStringContainsString('Periode 2026-10 (PER-UJI-2026-10): baru 2', $this->getStreamFilterBuffer());
 
         $this->resetStreamFilterBuffer();
+        $this->periode('PER-UJI-2026-09', 2026, '09');
+        $this->transport->antreBerkas(200, SUPPORTPATH . 'Integrasi/Bkn/skp_periodik_ok.json')->antreJson(200, ['success' => '1', 'data' => []]);
+        command('bkn:tarik-skp-periodik --tahun=2026 --bulan=10 --sebelumnya --dry-run');
+        $keluaran = $this->getStreamFilterBuffer();
+        $this->assertStringContainsString('[dry-run] Periode 2026-10 (PER-UJI-2026-10)', $keluaran);
+        $this->assertStringContainsString('[dry-run] Periode 2026-09 (PER-UJI-2026-09): baru 0', $keluaran);
+        $this->assertSame(self::DASAR . '/laporan/penilaian/2026/PER-UJI-2026-09', $this->transport->tercatat()[2]['permintaan']->url);
+
+        $this->resetStreamFilterBuffer();
         $this->transport->antreBerkas(200, SUPPORTPATH . 'Integrasi/Bkn/periode_ok.json');
         command('bkn:tarik-periode --dry-run');
         $this->assertStringContainsString('[dry-run] Periode e-Kinerja: baru 3, sudah ada 1, ditolak 2.', $this->getStreamFilterBuffer());
