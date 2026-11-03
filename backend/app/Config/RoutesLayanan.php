@@ -40,7 +40,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Layanan', 'filter'
     $routes->delete('cuti/(:num)', 'CutiController::delete/$1', $cuti);
     $routes->post('cuti/(:num)/process', 'CutiController::process/$1', $cuti);
     $routes->post('cuti/(:num)/tunda', 'CutiController::tunda/$1', $cuti);
-    $routes->post('cuti/(:num)/esign', 'CutiEsignController::esign/$1', $admin); // role 1, 3 (C-05)
+    // F6-18 K1 (keputusan Horii 03-11-2026): semua akun login; hanya penanda tangan pemilik tugas (cek di service).
+    $routes->post('cuti/(:num)/esign', 'CutiEsignController::esign/$1');
     $routes->get('cuti/(:num)/lampiran', 'CutiController::lampiran/$1', $cuti);
     $routes->get('cuti/(:num)/surat', 'CutiController::surat/$1', $cuti);
 });
