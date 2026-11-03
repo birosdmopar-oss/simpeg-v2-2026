@@ -13,15 +13,16 @@ use InvalidArgumentException;
  * transaksi: salin baris pegawai ke NIP baru → arahkan ulang setiap kolom di registry ini → hapus baris lama. Legacy
  * cukup `UPDATE pegawai SET nip` karena FK-nya `ON UPDATE CASCADE` (`libraries/hr/L_employee.php:586-587`).
  *
- * Isi (89 entri):
+ * Isi (92 entri):
  * - {@see JenisRujukanNip::FkLegacy} (75): semua `REFERENCES pegawai (nip)` di dump struktur produksi 01-10-2026 (D1,
  *   285 tabel), 70 tabel. Semuanya `ON UPDATE CASCADE`; nama FK legacy dicatat.
  * - {@see JenisRujukanNip::NonFkUbahNipLegacy} (1): `pengguna.username`, diganti kode Ubah NIP legacy.
  * - {@see JenisRujukanNip::NonFkSlipGaji} (1): `gaji_pegawai.nip`.
- * - {@see JenisRujukanNip::NonFkFkV2} (8): tanpa FK di legacy tetapi ber-FK di v2 — `riwayat_cuti.nip_atasan_langsung`/
+ * - {@see JenisRujukanNip::NonFkFkV2} (11): tanpa FK di legacy tetapi ber-FK di v2 — `riwayat_cuti.nip_atasan_langsung`/
  *   `nip_yang_menyetujui`, `petugas_layanan.nip`, `pa_layanan.nip`, `disiplin_ticket.nip` (FK ditahan
  *   `AddFkNipLayananFase4`), `inbox.nip_penerima`, `firebase_token.nip` (FK di CREATE) — DBV-022;
- *   `penyesuaian_tukin.nip` (tabel [V2] pengganti hard-code legacy, FK di CREATE) — DBV-024.
+ *   `penyesuaian_tukin.nip` (tabel [V2] pengganti hard-code legacy, FK di CREATE) — DBV-024;
+ *   `siasn_status_pegawai.nip`, `siasn_upload_arsip.nip`, `double_riwayat_kp.nip` (tabel kerja SIASN, FK di CREATE) — DBV-027.
  * - {@see JenisRujukanNip::NonFkKeputusanV2} (1): `jabatan_koordinasi.nip`, tanpa FK dan tidak diganti legacy, ikut
  *   dikoreksi atas keputusan #10 WS2.md (MAKE-010).
  * - {@see JenisRujukanNip::JsonArrayNip} (2): `dm_user_lokasi_presensi.target_peg`/`excl_peg` (JSON array NIP, pasangan
@@ -156,8 +157,8 @@ final class TabelAnakNip
         ],
         [
             'firebase_token', 'nip', JenisRujukanNip::NonFkFkV2,
-            '[K] firebase_token.nip tanpa FK (D1:1156-1163); [V2] FK RESTRICT DBV-022 Bagian 2.20', false, KeberadaanV2::Ada, 4, 'C-01',
-            'Token push FCM per perangkat (C-06 mock; real H-04 Fase 6)',
+            '[K] firebase_token.nip tanpa FK (D1:1156-1163); [V2] FK RESTRICT DBV-022 Bagian 2.20; NULL-able DBV-027 (token web)', true, KeberadaanV2::Ada, 4, 'C-01',
+            'Token push FCM Android per NIP (C-06 mock; real H-04 Fase 6); token web ber-nip NULL (pemilik akun) tidak tersentuh',
         ],
         [
             'petugas_layanan', 'nip', JenisRujukanNip::NonFkFkV2,
@@ -182,6 +183,24 @@ final class TabelAnakNip
             '[K-kode] libraries/hr/L_presensi.php:11755-11806 (daftar NIP & periode di-hard-code, tanpa tabel); [V2] tabel baru DBV-024',
             false, KeberadaanV2::Ada, 5, 'D-08',
             'Penyesuaian Tukin per NIP (fk_nip_ptk_to_pegawai RESTRICT di CREATE, DBV-Q6); ikut koreksi NIP B-06',
+        ],
+        [
+            'siasn_status_pegawai', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K-kode] siasn_simpeg.dsp.nip (controllers/hr/services/siasn_sync/*); [V2] tabel padanan DBV-027 Bagian 3.2',
+            false, KeberadaanV2::Ada, 6, 'H-03',
+            'Stempel & flag tarik SIASN per NIP (fk_nip_ssp_to_pegawai RESTRICT di CREATE); ikut koreksi NIP B-06',
+        ],
+        [
+            'siasn_upload_arsip', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K] simpeg01.siasn_upload_arsip.nip tanpa FK; [V2] DBV-027 Bagian 3.3',
+            false, KeberadaanV2::Ada, 6, 'H-03',
+            'Antrean unggah arsip riwayat ke SIASN (fk_nip_sua_to_pegawai RESTRICT di CREATE); ikut koreksi NIP B-06',
+        ],
+        [
+            'double_riwayat_kp', 'nip', JenisRujukanNip::NonFkFkV2,
+            '[K] simpeg01.double_riwayat_kp.nip; [V2] DBV-027 Bagian 3.4',
+            false, KeberadaanV2::Ada, 6, 'H-03',
+            'NIP dengan golongan ganda di SIASN (fk_nip_drkp_to_pegawai RESTRICT di CREATE); ikut koreksi NIP B-06',
         ],
         [
             'riwayat_cuti', 'ketua_tim', JenisRujukanNip::DaftarNipBerpemisah,

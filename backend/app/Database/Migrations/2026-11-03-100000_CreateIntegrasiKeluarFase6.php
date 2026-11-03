@@ -10,8 +10,8 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-027 (Fase 6 Jalur B, H-01 bagian B) — DRAF DITAHAN sampai disetujui DB Validator; dipindah ke `Migrations/` dengan
- * timestamp baru setelah approve (pola DBV-024). Dokumen: backend/docs/db-review/DBV-027-integrasi-keluar.md.
+ * DBV-027 (Fase 6 Jalur B, H-01 bagian B) — disetujui DB Validator @890eb1df (DBV-027 Bagian 13), dipindah dari
+ * `MigrationsDitahan/` tanpa perubahan DDL (pola DBV-024). Dokumen: backend/docs/db-review/DBV-027-integrasi-keluar.md.
  *
  * Isi (PRD Fase 6 §7.1, F6-14, F6-15, F6-24, §8):
  *   - `integrasi_log` [V2] — log integrasi masuk/keluar teredaksi (F6-24), retensi 180 hari oleh command.

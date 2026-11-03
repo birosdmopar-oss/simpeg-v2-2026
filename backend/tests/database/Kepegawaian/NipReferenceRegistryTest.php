@@ -130,6 +130,12 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
         '2026-10-28-100000' => [
             'fk_nip_ptk_to_pegawai' => ['penyesuaian_tukin', 'nip'],
         ],
+        // DBV-027 (Fase 6 Jalur B): tabel kerja SIASN, FK NIP RESTRICT di CREATE.
+        '2026-11-03-100000' => [
+            'fk_nip_drkp_to_pegawai' => ['double_riwayat_kp', 'nip'],
+            'fk_nip_ssp_to_pegawai'  => ['siasn_status_pegawai', 'nip'],
+            'fk_nip_sua_to_pegawai'  => ['siasn_upload_arsip', 'nip'],
+        ],
     ];
 
     /**
@@ -139,6 +145,7 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
         'pengguna.nip'            => 'K2/DBV-010: akun non-pegawai tanpa NIP',
         'riwayat_lckh.nip_atasan' => '[K] D1 riwayat_lckh.nip_atasan DEFAULT NULL',
         'esign_hist.nip'          => '[K] D1 esign_hist.nip DEFAULT NULL (DBV-022 Bagian 2.19)',
+        'firebase_token.nip'      => 'DBV-027 T2 opsi (a): token web (platform 1) ber-nip NULL, pemilik = id_pengguna',
     ];
 
     /**

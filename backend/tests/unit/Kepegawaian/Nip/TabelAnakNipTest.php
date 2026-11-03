@@ -45,11 +45,11 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
     public function testJumlahPerJenis(): void
     {
-        $this->assertCount(89, TabelAnakNip::semua());
+        $this->assertCount(92, TabelAnakNip::semua());
         $this->assertCount(75, TabelAnakNip::perJenis(JenisRujukanNip::FkLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkUbahNipLegacy));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkSlipGaji));
-        $this->assertCount(8, TabelAnakNip::perJenis(JenisRujukanNip::NonFkFkV2));
+        $this->assertCount(11, TabelAnakNip::perJenis(JenisRujukanNip::NonFkFkV2));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::NonFkKeputusanV2));
         $this->assertCount(2, TabelAnakNip::perJenis(JenisRujukanNip::JsonArrayNip));
         $this->assertCount(1, TabelAnakNip::perJenis(JenisRujukanNip::DaftarNipBerpemisah));
@@ -147,7 +147,7 @@ final class TabelAnakNipTest extends CIUnitTestCase
 
     public function testJumlahPerFaseDanKeberadaan(): void
     {
-        $harapan = [0 => 1, 1 => 2, 2 => 4, 3 => 40, 4 => 16, 5 => 3, 6 => 0, 7 => 5, 8 => 0];
+        $harapan = [0 => 1, 1 => 2, 2 => 4, 3 => 40, 4 => 16, 5 => 3, 6 => 3, 7 => 5, 8 => 0];
         $aktual  = [];
 
         for ($fase = TabelAnakNip::FASE_MIN; $fase <= TabelAnakNip::FASE_MAX; $fase++) {
@@ -155,7 +155,7 @@ final class TabelAnakNipTest extends CIUnitTestCase
         }
 
         $this->assertSame($harapan, $aktual);
-        $this->assertCount(71, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
+        $this->assertCount(74, TabelAnakNip::perKeberadaan(KeberadaanV2::Ada));
         $this->assertCount(12, TabelAnakNip::perKeberadaan(KeberadaanV2::TidakDiimpor));
         $this->assertCount(6, TabelAnakNip::perKeberadaan(KeberadaanV2::BelumDiputuskan));
     }

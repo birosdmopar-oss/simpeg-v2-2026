@@ -417,6 +417,9 @@ final class NipCascadeTest extends DatabaseTestCase
             'riwayat_cuti_notif_kt' => ['id_riwayat_cuti' => $this->sisip('riwayat_cuti', ['nip' => $pegawaiLain, 'id_jenis_cuti' => 1])],
             // Fase 5A (DBV-023): `chk_dh_online_jam` menolak baris tanpa jam masuk maupun pulang.
             'dh_online' => ['tgl' => '2020-01-01', 'jam_masuk' => '07:30:00'],
+            // Fase 6 (DBV-027): baris ber-NIP = token Android (CHECK pemilik); token web ber-`nip` NULL tidak ikut koreksi NIP.
+            'firebase_token'     => ['platform' => 2, 'fcm_token' => 'tok-uji', 'token_hash' => hash('sha256', 'tok-uji')],
+            'siasn_upload_arsip' => ['rw_name' => 'Rw Jabatan', 'status' => 0],
         ];
 
         foreach (TabelAnakNip::sampaiFase(NipCascadeService::FASE) as $r) {

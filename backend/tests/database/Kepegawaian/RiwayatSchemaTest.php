@@ -105,6 +105,21 @@ final class RiwayatSchemaTest extends DatabaseTestCase
         40 => 'riwayat_pendidikan', 41 => 'riwayat_mutasi_jabatan', 42 => 'riwayat_pmk',
     ];
 
+    /**
+     * Ekspektasi D1 B-02 ditambah deviasi [V2] migration sesudahnya: UNIQUE `uq_rsp_pns_periode_skp` (id_pns, periode_id,
+     * skp_id) di `riwayat_skp_periodik` (DBV-027, Q6-10).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function spekB02(): array
+    {
+        $spek                                                              = SkemaD1::B02;
+        $spek['riwayat_skp_periodik']['indexes']['uq_rsp_pns_periode_skp'] = ['id_pns', 'periode_id', 'skp_id'];
+        $spek['riwayat_skp_periodik']['uniques'][]                         = 'uq_rsp_pns_periode_skp';
+
+        return $spek;
+    }
+
     protected function tearDown(): void
     {
         if ($this->adaYangDilepas()) {
@@ -120,7 +135,7 @@ final class RiwayatSchemaTest extends DatabaseTestCase
 
     public function testSchemaMatchesD1(): void
     {
-        $this->assertSkemaD1(SkemaD1::B02, self::JENIS_RWY);
+        $this->assertSkemaD1(self::spekB02(), self::JENIS_RWY);
     }
 
     /**
@@ -275,7 +290,7 @@ final class RiwayatSchemaTest extends DatabaseTestCase
         }
 
         $this->pasangUlang();
-        $this->assertSkemaD1(SkemaD1::B02, self::JENIS_RWY);
+        $this->assertSkemaD1(self::spekB02(), self::JENIS_RWY);
     }
 
     /**
@@ -308,6 +323,6 @@ final class RiwayatSchemaTest extends DatabaseTestCase
 
         $this->db->query('DROP TABLE ' . $this->skemaQuoted(self::BLOCKER));
         $this->pasangUlang();
-        $this->assertSkemaD1(SkemaD1::B02, self::JENIS_RWY);
+        $this->assertSkemaD1(self::spekB02(), self::JENIS_RWY);
     }
 }

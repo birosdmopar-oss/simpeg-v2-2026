@@ -43,7 +43,8 @@ final class PushNotifJobTest extends DatabaseTestCase
 
     private function tambahToken(string $nip, string $token): void
     {
-        $this->db->table('firebase_token')->insert(['nip' => $nip, 'fcm_token' => $token, 'created_at' => '2026-11-02 00:00:00']);
+        // DBV-027: token ber-NIP = Android (platform 2, CHECK pemilik), unik per (nip, token_hash).
+        $this->db->table('firebase_token')->insert(['nip' => $nip, 'platform' => 2, 'fcm_token' => $token, 'token_hash' => hash('sha256', $token), 'created_at' => '2026-11-02 00:00:00']);
     }
 
     private function pushStatus(int $id): int

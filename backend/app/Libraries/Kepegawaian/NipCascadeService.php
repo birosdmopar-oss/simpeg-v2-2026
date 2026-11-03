@@ -59,14 +59,16 @@ use Throwable;
  *  - Balapan NIP baru didaftarkan proses lain (1062 pada salinan `pegawai`) → 422 `nip_baru`.
  *  - Cakupan per fase: `FASE` = 4 sejak DBV-022 M2 (tabel Modul C Layanan); `FASE` = 5 sejak DBV-023 M2 (Fase 5A:
  *    `dh_online.nip` ber-FK RESTRICT ikut diarahkan ulang; `gaji_pegawai.nip` = `NonFkSlipGaji` [K] TIDAK diarahkan —
- *    slip lama tetap ber-NIP lama, PRD 5A §3.4 — lewat self::TIDAK_DIARAHKAN).
+ *    slip lama tetap ber-NIP lama, PRD 5A §3.4 — lewat self::TIDAK_DIARAHKAN); `FASE` = 6 sejak DBV-027 (Fase 6:
+ *    `siasn_status_pegawai`, `siasn_upload_arsip`, `double_riwayat_kp` ber-FK RESTRICT; `firebase_token.nip` kini NULL-able,
+ *    baris token web ber-`nip` NULL tidak tersentuh).
  */
 final class NipCascadeService implements NipCascadeInterface
 {
     /**
-     * Cakupan registry pada fase berjalan (Fase 5, DBV-023 M2).
+     * Cakupan registry pada fase berjalan (Fase 6, DBV-027: tabel kerja SIASN).
      */
-    public const FASE = 5;
+    public const FASE = 6;
 
     /**
      * Kolom registry yang tidak diarahkan ulang dengan UPDATE (tabel.kolom huruf kecil => alasan).

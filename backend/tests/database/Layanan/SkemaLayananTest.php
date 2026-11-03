@@ -46,14 +46,15 @@ final class SkemaLayananTest extends DatabaseTestCase
         }
 
         [$fk, $ditahan, $bukanRestrict] = $this->skemaForeignKeys(SkemaLayanan::TABEL, SkemaLayanan::FK_DITAHAN);
-        $harapan                        = SkemaLayanan::FK;
+        // DBV-027 (Fase 6) menambah FK `firebase_token.id_pengguna` dan CHECK platform/pemilik token di tabel DBV-022 ini.
+        $harapan = SkemaLayanan::FK + ['fk_id_pengguna_fbt_to_pengguna' => ['firebase_token', 'id_pengguna', 'pengguna', 'id_pengguna']];
         ksort($harapan, SORT_STRING | SORT_FLAG_CASE);
         $this->assertSame($harapan, $fk, 'FK DBV-022 (nama [K]/[V2], kolom, induk)');
         $this->assertSame([], $ditahan, 'FK NIP approver/petugas masih ditahan (AddFkNipLayananFase4)');
         $this->assertSame([], $bukanRestrict, 'semua FK Modul C RESTRICT/RESTRICT (K1)');
 
         $check        = array_map(static fn (array $c): string => $c[0], $this->skemaChecks(SkemaLayanan::TABEL));
-        $harapanCheck = SkemaLayanan::CHECK;
+        $harapanCheck = SkemaLayanan::CHECK + ['chk_firebase_token_pemilik' => 'firebase_token', 'chk_firebase_token_platform' => 'firebase_token'];
         ksort($harapanCheck, SORT_STRING);
         // MariaDB menambah CHECK json_valid implisit (nama = kolom JSON) — hanya CHECK bernama chk_* yang dibandingkan.
         $this->assertSame($harapanCheck, array_filter($check, static fn (string $nama): bool => str_starts_with($nama, 'chk_'), ARRAY_FILTER_USE_KEY));
@@ -81,12 +82,14 @@ final class SkemaLayananTest extends DatabaseTestCase
         foreach ([
             'pegawai_sisa_cuti' => 'nip', 'riwayat_cuti_notif_kt' => 'nip_kt', 'riwayat_tb' => 'nip', 'riwayat_ib' => 'nip',
             'riwayat_pmk'       => 'nip', 'riwayat_pmk_req' => 'nip', 'inbox' => 'nip_penerima', 'disiplin_ticket' => 'nip',
-            'petugas_layanan'   => 'nip', 'firebase_token' => 'nip',
+            'petugas_layanan'   => 'nip',
         ] as $tabel => $kolom) {
             $this->assertSame('varchar(30)', $this->skemaColumns($tabel)[$kolom], "{$tabel}.{$kolom}");
         }
 
         $this->assertSame('varchar(30) null', $this->skemaColumns('pa_layanan')['nip']);
+        // DBV-027 T2 opsi (a): `firebase_token.nip` NULL-able (token web ber-nip NULL, pemilik = id_pengguna).
+        $this->assertSame('varchar(30) null', $this->skemaColumns('firebase_token')['nip']);
         $this->assertSame('varchar(30) null', $this->skemaColumns('esign_hist')['nip']);
         $this->assertSame('decimal(10,2)', $this->skemaColumns('riwayat_tb')['lama_tahun']);
         $this->assertSame('decimal(10,2)', $this->skemaColumns('riwayat_ib')['lama_tahun']);

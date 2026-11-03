@@ -7,8 +7,10 @@ keluar (log integrasi, SIASN, firebase_token, UNIQUE SKP periodik)`. Branch `fas
 menunggu DBV-027 di `main`.
 
 **Status:** ✅ **disetujui DB Validator @`890eb1df` (03-11-2026)** — DBV diambil alih sesi WS-2 atas penugasan Horii
-03-11-2026; hasil & keputusan di Bagian 13. Draf migration masih **DITAHAN** di
-`app/Database/MigrationsDitahan/CreateIntegrasiKeluarFase6.php` sampai dipindah ke `Migrations/` (syarat §11, §13.5).
+03-11-2026; hasil & keputusan di Bagian 13. **Langkah 3 (pemindahan):** migration dipindah tanpa perubahan DDL ke
+`app/Database/Migrations/2026-11-03-100000_CreateIntegrasiKeluarFase6.php` (DBV-Q12) + test skema permanen
+`tests/database/Integrasi/SkemaIntegrasiKeluarTest.php` + registry NIP Fase 6 (Bagian 6) + penyesuaian test lama;
+menunggu verifikasi DBV (langkah 4) lalu merge reviewer CR.
 
 **Penulis:** pelaksana Fase 6 Jalur B, 02-11-2026.
 
@@ -85,8 +87,9 @@ pairing + salin data utama dalam satu langkah `siasn:tarik --jenis=data-utama` d
 
 ## 3. Skema v2 usulan
 
-Sumber kebenaran DDL = draf `app/Database/MigrationsDitahan/CreateIntegrasiKeluarFase6.php` (`create()`,
-`alterFirebaseToken()`); blok di bawah diringkas dari draf (komentar kolom lengkap ada di draf).
+Sumber kebenaran DDL = `app/Database/Migrations/2026-11-03-100000_CreateIntegrasiKeluarFase6.php` (`create()`,
+`alterFirebaseToken()`; semula draf `MigrationsDitahan/`); blok di bawah diringkas dari migration (komentar kolom lengkap
+ada di sana).
 
 ### 3.1 `integrasi_log` [V2] (F6-24)
 
