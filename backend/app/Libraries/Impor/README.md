@@ -17,7 +17,7 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
 - **Sumber SIASN** (`--sumber-siasn`, DBV-027 K-9): salinan skema `siasn_simpeg` (`REF_UNOR` + 7 tabel referensi) dari
   **snapshot yang sama** dengan sumber utama, di server dan akun yang sama; dibaca langsung, tidak disalin ke skema
   `simpeg01`. Tanpa opsi ini `siasn_ref_unor` dan `siasn_referensi` dilaporkan `dilewati: tanpa --sumber-siasn`; tabel
-  T7 lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
+  tabel tier SIASN (T13) lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
   beda huruf besar/kecil (`lower_case_table_names`). Skema ini juga melewati penjaga di bawah. Contoh:
   `php spark impor:legacy --sumber=up1_legacy_salinan --sumber-siasn=up1_legacy_salinan_siasn --zona-sumber=WIB
   --konfirmasi=<db_tujuan> --dry-run`. Ekstraksinya: `docs/up1/sql/up1-ekstraksi.sh` (`UP1_DB_SIASN`) atau
@@ -121,7 +121,13 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 | 4 | `absen_ijin` (status W/V/X/10, `affect_tukin`/`jenis_dinas` ber-domain, rentang izin = waktu bisnis), `riwayat_keluarga`, `detail_anak`, `bkn_periode_ekinper`, `riwayat_skp_periodik` (kunci UNIQUE ganda → lihat T4 DBV-027 di bawah) | M3, B3 |
 | 5 | `lokasi_presensi`, `dh_online` (baris tanpa jam masuk & pulang dibuang `DBV-023 A2`; `sumber` NULL) | M3 |
 | 6 | `pegawai_sisa_cuti` (duplikat `(nip, tahun)` → id terkecil, saldo negatif → 0), `riwayat_cuti` (6 kolom ber-domain), `riwayat_tb`, `riwayat_tb_perpan` | M3 |
-| 7 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
+| 7 | MAKE-069 master sisa: wilayah `kecamatan`/`kelurahan` (seed, `order` urut nama), `kantor`, kursem, `bidang_pendidikan`/`jurusan_pendidikan` (`order` urut nama), G-06 (`jenis_konket.old_id` K-M9a + audit WAJIB_0 `absen_ijin.kategori`), G-02b sisa, sertifikasi, `dm_ak_jf`, FAQ (sanitizer + `content_stripped` ulang, K-M9c), `jenis_rwy` (seed) | MAKE-069 |
+| 8 | `pengguna`: `id` legacy, `password_decode` tidak di-SELECT, md5 → `password_legacy`, `must_change_password` (role 1; role 2/6 password = NIP), NIP wajib ada di `pegawai`, tujuan wajib kosong (akun sistem dibuat sesudahnya) | MAKE-069 |
+| 9 | `pegawai_hist` (`flag_update = 1`, satu per NIP id terbesar, K-M9b), `pegawai_foto`, `dm_user_lokasi_presensi` (status 1, JSON wajib terurai, K-M6) | MAKE-069 |
+| 10 | Riwayat non-Tukin (16 tabel) lalu `document_attachment` — **transaksi per tabel + `--jejak`/`--lanjut`** (K-M8) | MAKE-069 |
+| 11 | Snapshot `pegawai_*` lain — transaksi per tabel (K-M8); `id_riwayat_*` NOT NULL yatim → gagal | MAKE-069 |
+| 12 | Layanan sisa DBV-022 §5 (`jenis_layanan`/`jenis_pa` seed, `question_category`, petugas, `pa_layanan`, notifikasi KT, IB, PMK, `esign_hist`) | MAKE-069 |
+| 13 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
 
 **Aturan DBV-027 §13.3 (B3).** Pesan dan laporan hanya jumlah.
 
@@ -136,12 +142,18 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
   `status = 3` → `2` dengan `error_msg` "Terhenti saat cutover — periksa di SIASN sebelum mengantre ulang"
   (`DBV-027 K-7 status 3→2`). `id_da`/`id_rw` tanpa baris di `document_attachment` / `riwayat_mutasi_jabatan`
   (`Rw Jabatan`) / `riwayat_diklat` (`Rw Sertifikasi`) → INFO; bila tabel induknya masih kosong, kodenya menyebut
-  "belum diimpor (kosong)", artinya T7 dijalankan sebelum riwayat dan lampiran (MAKE-069) diimpor.
+  "belum diimpor (kosong)", artinya tier SIASN (T13) dijalankan sebelum riwayat dan lampiran (MAKE-069) diimpor.
 - `double_riwayat_kp` (K-8): apa adanya; NIP tanpa `pegawai` → gagal (rujukan yatim).
 - Tidak diimpor: `siasn_status_pegawai` (dibangun job data-utama, K-5), `siasn_simpeg.dsp`, `firebase_token`/`fb_token`
   (PRD Fase 6 AC-01.2).
-- **Urutan:** T7 dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
-  Nomor tier SIASN bergeser ke paling akhir saat tier MAKE-069 ditambahkan.
+- **Urutan:** tier SIASN (T13, selalu terakhir) dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
+  Tier MAKE-069 berikutnya (T12b Halo Simpeg — DBV-028, tiket lama — F-02) disisipkan sebelum tier SIASN.
+
+**Transaksi per tabel (DBV-029 K-M8, `DaftarTabel::TIER_PER_TABEL`).** Seluruh tier dipra-cek dulu; tiap tabel satu
+transaksi, counter dan INFO sesudah commit tabel itu, lalu dicatat di `--jejak=<berkas>` (folder kerja, satu per DB
+tujuan; wajib kecuali dry-run). Gagal di tengah: tabel selesai tetap ter-commit, pesan menyebut jumlah selesai/gagal/belum.
+`--tier N --lanjut` melewati tabel yang tercatat dan jumlah/PK maks/keputusan tujuannya masih sama; tabel tidak cocok →
+gagal tanpa menghapus apa pun. Mengulang tabel yang sudah selesai = pulihkan cadangan DB sebelum tier (bukan TRUNCATE).
 
 Sesudah setiap tier di-commit, counter AUTO_INCREMENT tujuan disamakan dengan sumber bila lebih kecil (DBV-011 §2.7;
 tidak pernah diturunkan). PK TINYINT dengan counter ≥ 128 tidak disalin dan dicatat `PERIKSA`. Langkah ini DDL, jadi
@@ -185,6 +197,28 @@ tabel itu disalin mentah (`tanpaStripslashes: ['*']`).
 | `riwayat_cuti` | `nama`, `pangkat`, `gol_ruang`, `jabatan`, `satker`, `nama_jenis_cuti`, `satuan_lama_cuti`, `no_telp_saat_cuti`, `alamat_saat_cuti`, `file_bukti`, `keterangan`, `nip_atasan_langsung`, `nama_atasan_langsung`, `jabatan_atasan_langsung`, `reason_note_al`, `nip_yang_menyetujui`, `nama_yang_menyetujui`, `jabatan_yang_menyetujui`, `reason_note_pyb`, `file_sc_unsign`, `file_sc_signed_bef`, `file_surat_cuti`, `keterangan_petugas_approval`, `ketua_tim`, `reason_note` |
 | `riwayat_tb` | `nama`, `gol_ruang`, `pangkat`, `jabatan`, `unit`, `satker`, `pendidikan_dasar_singkat`, `jenjang_pendidikan_singkat`, `institusi_pendidikan`, `jurusan_pendidikan`, `lokasi_pendidikan`, `lembaga_yang_mendanai`, `up`, `tembusan`, `file_sp`, `file_1`, `file_2`, `file_3`, `keterangan`, `rs_admin_upt`, `sp_admin_deputi`, `rs_admin_deputi`, `ds_tb`, `no_ds_tb`, `perihal_ds_tb`, `no_sk`, `file_surat_tb`, `reason_note` |
 | `riwayat_tb_perpan` | `file_sperpan` |
+
+## Akun dan berkas lampiran (MAKE-069)
+
+Urutan sesudah impor tier (operator; tanpa alamat atau kredensial di repo):
+
+1. `php spark integrasi:siapkan-akun-sistem` — akun sistem integrasi dibuat SESUDAH T8 `pengguna` (Z-1).
+2. Bila perlu: `php spark akun:bootstrap-admin --username=<u> --nama=<n> --konfirmasi=<db>` di terminal interaktif.
+   Password acak tampil sekali, tidak masuk log/berkas/audit; akun wajib ganti password saat login pertama. Admin
+   legacy hasil impor tetap bisa login dengan password lamanya (lalu wajib ganti, K-M2).
+3. `php spark lampiran:manifest --keluaran=<KERJA>/manifest.json --konfirmasi=<db>` — path unik dari kolom berkas
+   (`ManifestLampiran::KOLOM`) sesudah impor (sudah `stripslashes`), dinormalisasi seperti `fixArsipPath`
+   (`PathLegacy`); path tidak sah hanya dihitung. Manifest berisi nama berkas nyata: folder kerja di luar repo dan di
+   luar folder sinkron cloud.
+4. `php spark lampiran:tarik --manifest=<KERJA>/manifest.json [--sumber=arsip|aplikasi]` dengan alamat dasar diisi
+   operator lewat `--dasar-arsip`/`--dasar-aplikasi` atau env `LAMPIRAN_DASAR_ARSIP`/`LAMPIRAN_DASAR_APLIKASI` (K-M4
+   opsi 1). Berurutan dengan `--jeda-ms` (bawaan 200), TLS verify, redirect tidak diikuti, retry terbatas 5xx/timeout,
+   404 dicatat. Respons halaman login dihitung `butuh_login`; alat berhenti di `--ambang-login`. Bisa diulang untuk
+   delta saat freeze (checksum sama → dilewati). Agen/coder TIDAK menjalankan langkah ini ke server mana pun.
+5. `php spark lampiran:periksa --manifest=<KERJA>/manifest.json` — jumlah ada/hilang/beda checksum per kolom.
+
+Storage v2 (`LocalStorageAdapter`) membaca path legacy apa adanya (K-M3 opsi A); tulis berkas baru tetap memakai aturan
+segmen ketat.
 
 ## Di luar cakupan
 

@@ -211,8 +211,12 @@ final class AttachmentService implements AttachmentServiceInterface
     {
         try {
             $this->storage->hapus($path);
+        } catch (InvalidArgumentException) {
+            // Path legacy hasil impor (MAKE-069 K-M3 opsi A): berkas fisik TIDAK dihapus aplikasi (tulis/hapus memakai aturan
+            // ketat); hanya rujukan DB yang berubah. Log tanpa path (review S-5).
+            log_message('info', 'Berkas lampiran berpath legacy tidak dihapus fisik (ref {ref}).', ['ref' => substr(sha1($path), 0, 12)]);
         } catch (Throwable $e) {
-            log_message('error', 'Berkas lampiran {path} gagal dihapus: {pesan}', ['path' => $path, 'pesan' => $e->getMessage()]);
+            log_message('error', 'Berkas lampiran gagal dihapus (ref {ref}): {kelas}', ['ref' => substr(sha1($path), 0, 12), 'kelas' => $e::class]);
         }
     }
 

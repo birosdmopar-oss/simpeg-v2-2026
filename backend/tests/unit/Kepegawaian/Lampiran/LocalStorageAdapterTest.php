@@ -70,16 +70,50 @@ final class LocalStorageAdapterTest extends CIUnitTestCase
     public static function pathTidakValidProvider(): array
     {
         return [
-            'naik folder'       => ['../luar.pdf'],
-            'naik di tengah'    => ['2026/../../luar.pdf'],
+            'naik folder'    => ['../luar.pdf'],
+            'naik di tengah' => ['2026/../../luar.pdf'],
+            'null byte'      => ["a.pdf\0.txt"],
+            'kosong'         => [''],
+            'ter-encode'     => ['2026/%2e%2e/luar.pdf'],
+            'huruf drive'    => ['C:/Windows/win.ini'],
+        ];
+    }
+
+    /**
+     * Bentuk path legacy (MAKE-069 K-M3 opsi A): ditolak saat TULIS/HAPUS (aturan ketat), tetapi BACA menormalisasinya
+     * (`PathLegacy`) — berkas yang tidak ada → "tidak ditemukan", bukan path tidak valid. Tetap di dalam akar.
+     *
+     * @return array<string, array{string}>
+     */
+    public static function pathLegacyProvider(): array
+    {
+        return [
             'absolut'           => ['/etc/passwd'],
             'titik'             => ['./a.pdf'],
             'segmen kosong'     => ['2026//a.pdf'],
             'garis miring kiri' => ['2026\\a.pdf'],
-            'null byte'         => ["a.pdf\0.txt"],
             'spasi'             => ['nama berkas.pdf'],
-            'kosong'            => [''],
         ];
+    }
+
+    #[DataProvider('pathLegacyProvider')]
+    public function testPathLegacyHanyaUntukBaca(string $path): void
+    {
+        $adapter = new LocalStorageAdapter($this->akar);
+
+        foreach ([static fn () => $adapter->simpan($path, 'x'), static fn () => $adapter->hapus($path)] as $i => $aksi) {
+            try {
+                $aksi();
+                $this->fail("aksi tulis #{$i} seharusnya menolak path legacy");
+            } catch (InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
+        $this->assertFalse($adapter->ada($path));
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('tidak ditemukan');
+        $adapter->baca($path);
     }
 
     #[DataProvider('pathTidakValidProvider')]
