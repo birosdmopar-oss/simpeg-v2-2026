@@ -47,22 +47,37 @@ class Integrations extends BaseConfig
     ];
 
     /**
-     * Kerangka layanan BKN (e-Kinerja H-10, SIASN H-03) — Fase 6 MAKE-063. Alamat & kredensial hanya dari `.env` server
-     * (BP-2); bentuk jalur token (API gateway, SSO, e-Kinerja) dilengkapi bersama `TokenBkn` setelah bentuk legacy
-     * dipastikan (tanpa token literal, F6-26/AC-03.4).
+     * Layanan BKN (e-Kinerja H-10, SIASN H-03) — Fase 6 MAKE-063, bentuk auth ikut legacy (CR-092/Q6-17, ekstraksi bentuk
+     * tanpa nilai). Alamat & kredensial hanya dari `.env` server (BP-2); tidak ada token literal di kode (Q6-08).
      *
-     * @var array{baseUrlApi: string, baseUrlSso: string, baseUrlEkinerja: string, clientId: string, clientSecret: string, ssoUsername: string, ssoPassword: string, tlsVerify: bool, timeout: float}
+     * - `tokenUrlGateway` + `clientId`/`clientSecret`: token API gateway (POST form, Basic, `grant_type=client_credentials`).
+     * - `tokenUrlSso` + `ssoClientId`/`ssoUsername`/`ssoPassword` (+ `ssoTotp` opsional): token SSO (POST form, Basic
+     *   kredensial gateway, `grant_type=password`). SIASN dipanggil dengan DUA header (gateway + SSO).
+     * - e-Kinerja: `ekinerjaToken` (token statis, padanan cron legacy aktif) bila terisi; bila kosong, SSO e-Kinerja dengan
+     *   kredensial `ekinerja*` (Basic `ekinerjaApiUser`/`ekinerjaApiPass` + `ekinerjaSso*`, `totp` opsional).
+     *
+     * @var array<string, bool|float|string>
      */
     public array $bkn = [
-        'baseUrlApi'      => '',
-        'baseUrlSso'      => '',
-        'baseUrlEkinerja' => '',
-        'clientId'        => '',
-        'clientSecret'    => '',
-        'ssoUsername'     => '',
-        'ssoPassword'     => '',
-        'tlsVerify'       => true,
-        'timeout'         => 30.0,
+        'baseUrlApi'          => '',
+        'baseUrlEkinerja'     => '',
+        'tokenUrlGateway'     => '',
+        'tokenUrlSso'         => '',
+        'clientId'            => '',
+        'clientSecret'        => '',
+        'ssoClientId'         => '',
+        'ssoUsername'         => '',
+        'ssoPassword'         => '',
+        'ssoTotp'             => '',
+        'ekinerjaToken'       => '',
+        'ekinerjaApiUser'     => '',
+        'ekinerjaApiPass'     => '',
+        'ekinerjaSsoClientId' => '',
+        'ekinerjaSsoUsername' => '',
+        'ekinerjaSsoPassword' => '',
+        'ekinerjaSsoTotp'     => '',
+        'tlsVerify'           => true,
+        'timeout'             => 30.0,
     ];
 
     /**
