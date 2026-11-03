@@ -19,3 +19,16 @@ Route Jalur B (integrasi keluar, PRD Fase 6 §6.2): `app/Config/RoutesIntegrasi.
 - **202:** `{"status": "success", "data": {"jenis": "skp_periodik", "tahun": 2026, "bulan": 10, "antre": true}}`.
 - **422:** `errors.jenis` (bukan `periode`/`skp_periodik`); `errors.tahun` / `errors.bulan` (tidak berpasangan, di luar
   2000–2100 / 1–12).
+
+## `POST | DELETE api/v1/integrasi/fcm-token` — token push web/desktop (H-04, MAKE-066)
+
+- **Akses:** semua akun login (`jwt`). Padanan `Local::register_fb_token` legacy; SPA memanggil `POST` setiap halaman dimuat
+  setelah login dan izin notifikasi diberikan, `DELETE` saat logout.
+- **Body JSON:** `{"fcm_token": "<token FCM perangkat>"}` (tanpa spasi, maks 4.096 karakter).
+- **Kunci per pemilik** (keputusan Horii 03-11-2026, DBV-Q8 ikut legacy): akun + token (`platform` = 1 web); `nip` akun
+  ikut disimpan bila ada. Token yang sama milik akun lain tidak disentuh.
+- **POST 200:** `{"status": "success", "data": {"status": "baru" | "diperpanjang" | "sudah_terdaftar"}}` — baru disimpan
+  dengan masa berlaku 1 minggu; sudah ada dan lewat masa → diperpanjang 1 minggu; selain itu tanpa perubahan.
+- **DELETE 200:** `{"status": "success", "data": {"dihapus": 0 | 1}}` — hanya token akun pemanggil.
+- **422:** `errors.fcm_token`. Isi token tidak pernah dikembalikan atau dicatat.
+
