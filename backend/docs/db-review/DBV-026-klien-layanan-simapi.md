@@ -349,3 +349,17 @@ dibuat. Lebar kolom, indeks non-FK, aturan ON DELETE/UPDATE legacy, isi `simapi_
 | A5 | MAKE-060 | Ack `simapi_auth_ch` tahan balapan: dua `change_history` serentak dari klien yang sama membaca `MAX` yang sama, sehingga INSERT penanda kedua bertabrakan PK 1062. Pakai kunci baris klien (`SELECT … FOR UPDATE` pada `klien_layanan`) dalam satu transaksi baca+tandai, atau `INSERT IGNORE` + respons hanya baris yang berhasil ditandai; diuji |
 | A6 | MAKE-060 | Koreksi NIP (B-06) tidak mengubah baris `simapi_ch` lama (Q6). Baris baru yang dihasilkan perubahan NIP mengikuti cabang trigger legacy `IF OLD.nip != NEW.nip` (ISSUE-056 P14) begitu D1 tersedia |
 | A7 | go-live | `simapi_jd` terisi (Q3) sebelum klien jenis 2 diaktifkan; tanpa seed, FK `fk_simapi_ch_jd` menolak setiap penulisan `simapi_ch` (1452) |
+
+### 13.3 Verifikasi pemindahan DBV (04-11-2026)
+
+SHA pemindahan: **`c8c8efae`** (di atas merge `main` `5ff9af14`, commit merge `28a31dca`). **Keputusan: SETUJU @`c8c8efae`**,
+dengan syarat CI `quality-gate` #575 untuk SHA itu hijau (MySQL 8.0 & MariaDB 10.4); hasil CI dinilai reviewer CR.
+
+| Syarat 13.1 | Hasil |
+|---|---|
+| 1. Migration `Migrations/2026-11-04-100000_CreateKlienLayananSimapi.php`, DDL tidak berubah | ✅ `git diff -M 79f00bb5 c8c8efae` di `app/Database` = rename + docblock saja; `MigrationsDitahan/` tidak lagi memuat DBV-026. Timestamp lebih baru dari `2026-11-03-110000` (Q9). Di DB scratch DBV `simpeg_v2_t_dbv026r` (MySQL 8.0.30, 3307): `migrate --all` menjalankan hanya migration ini; `mysqldump --no-data` keenam tabel **identik** dengan potret persetujuan 12.1; rollback → 0 dari 6 tabel; `up` ulang identik |
+| 2. Test skema permanen | ✅ `SkemaKlienSimapiTest` tanpa `require_once`, pola `lepasSejak`/`pasangUlang` (DBV-030), ditambah assertion B2 heks huruf besar = 1: 4 test, 54 assertion OK |
+| 3. Q6: README, tanpa perubahan registry | ✅ README Kepegawaian memindahkan `simapi_ch.nip` ke baris tabel v2 ("tidak diarahkan ulang"), daftar tabel legacy 17 → 16 kolom; `TabelAnakNip`/`JenisRujukanNip` tidak berubah. Entri `simapi_ch.nip` di `NipReferenceRegistryTest::NON_FK` **sesuai Q6**: konstanta itu adalah klasifikasi wajib setiap kolom bernama NIP di skema (FK di registry atau non-FK beserta alasan, berdampingan dengan `gaji_pegawai.nip`), bukan cakupan koreksi B-06. `NipReferenceRegistryTest` 3 test / 239 assertion OK; `NipCascadeTest` 11 test / 450 assertion OK |
+| Lain | ✅ komentar B7 audit dirapikan (12.4); berkas lain di delta berasal dari merge `main` (CR-101, CR-103), di luar DBV-026 |
+
+**DBV SETUJU pemindahan @`c8c8efae`** — 04-11-2026, DBV (sesi WS-2 atas perintah Horii). Merge oleh reviewer CR dengan izin Horii.
