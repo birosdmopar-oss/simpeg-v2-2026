@@ -588,8 +588,9 @@ class Services extends BaseService
     }
 
     /**
-     * Token publik surat cuti (PRD Fase 6 v1.0f Q6-22/Q6-23, MAKE-065; tabel DBV-030). URL publik dari `App::$baseURL`:
-     * verifikasi `verify/surat-cuti/{token}` (halaman SPA) dan PDF `api/v1/publik/surat-cuti/{token}/pdf`.
+     * Token publik surat cuti (PRD Fase 6 v1.0f Q6-22/Q6-23, MAKE-065; tabel DBV-030). Dasar URL publik =
+     * `layanan.urlPublikSurat` (gagal-cepat bila tidak sah; wajib https di production, review B4a P5): verifikasi
+     * `verify/surat-cuti/{token}` (halaman SPA) dan PDF `api/v1/publik/surat-cuti/{token}/pdf`.
      */
     public static function tokenSuratCuti(bool $getShared = true): \App\Libraries\Layanan\Cuti\TokenSuratCutiService
     {
@@ -597,7 +598,7 @@ class Services extends BaseService
             return static::getSharedInstance('tokenSuratCuti');
         }
 
-        $dasar = rtrim((string) config(\Config\App::class)->baseURL, '/');
+        $dasar = rtrim(config(\Config\Layanan::class)->urlPublikSurat(), '/');
 
         return new \App\Libraries\Layanan\Cuti\TokenSuratCutiService(db_connect(), $dasar . '/verify/surat-cuti/', $dasar . '/api/v1/publik/surat-cuti/');
     }

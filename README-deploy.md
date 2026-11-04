@@ -184,6 +184,18 @@ Langkah upgrade ke TLS ketat (cukup lewat `.env`, tanpa ubah kode):
 4. Jalankan `php spark integrasi:uji-koneksi esign`: harus `TLS BSrE: diverifikasi.` dan `Uji koneksi esign OK`. Path `caBundle` yang salah gagal saat konfigurasi dibaca.
 5. Lakukan satu tanda tangan uji (surat cuti uji oleh PyB bersertifikat), lalu periksa `esign_hist` status `1`.
 
+**URL publik QR surat cuti (Q6-22/Q6-23).** Isi `layanan.urlPublikSurat = https://<alamat publik SIMPEG>/` di `.env` server **sebelum tanda tangan pertama**. QR kaki surat berisi `<dasar>/verify/surat-cuti/{token}` dan QR tanda tangan berisi `<dasar>/api/v1/publik/surat-cuti/{token}/pdf`; keduanya dibekukan permanen di PDF ber-TTE, jadi alamat ini tidak boleh berubah sesudah dipakai. Di production nilai kosong, bukan URL absolut, atau bukan `https` membuat layanan token gagal saat dibuat (pesan menyebut kunci, tanpa nilai). Di luar production nilai kosong memakai `app.baseURL`.
+
+**Cabut akses publik satu surat cuti** (mis. surat dibatalkan, PDF beredar ke pihak yang tidak berhak). Akses berlaku sampai dicabut (Q6-22):
+
+```bash
+php spark surat-cuti:token --id=<id_riwayat_cuti>             # lihat status: aktif / nonaktif / belum ada
+php spark surat-cuti:token --id=<id_riwayat_cuti> --nonaktif  # halaman verifikasi + PDF publik → 404
+php spark surat-cuti:token --id=<id_riwayat_cuti> --aktif     # pulihkan token yang sama
+```
+
+Setiap perubahan tercatat di `audit_logs` (`entity` `surat_cuti_token`, `jenis_audit` `cuti.token_surat`, `sumber` `cli`). Keluaran hanya status, tanpa token, URL, atau NIP. Token surat yang sudah ber-TTE tidak bisa diganti (DBV-030 Q3), hanya dinonaktifkan. Menghapus cuti menghapus tokennya juga (DBV-030 Q2).
+
 ---
 
 ## 2. Cara push (operator deploy)
