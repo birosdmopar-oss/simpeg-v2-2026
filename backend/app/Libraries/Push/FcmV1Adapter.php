@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Push;
 
 use App\Interfaces\PushNotifGatewayInterface;
+use App\Interfaces\PushPlatformInterface;
 use App\Libraries\CacheService;
 use App\Libraries\Integrasi\Http\GalatTransport;
 use App\Libraries\Integrasi\Http\KlienHttp;
@@ -26,11 +27,15 @@ use RuntimeException;
  * - Kirim: `POST https://fcm.googleapis.com/v1/projects/{projectId}/messages:send`
  *   `{message: {token, notification: {title, body}, data}}`; `data` = pasangan string (kontrak). Sukses → `status_code`
  *   '200' + `message_id` (`name`). Gagal → kode HTTP sebagai `status_code`, `message` = status galat FCM.
- * - `sendMulticast` = loop per token (F6-11); `invalid_tokens` = token dengan galat `UNREGISTERED` / `INVALID_ARGUMENT`
- *   (dihapus job `push-notif`, AC-04.2). POST tidak di-retry otomatis (BP-3); retry = antrean job.
+ * - `sendMulticast` = loop per token (F6-11); `invalid_tokens` = token dengan galat `UNREGISTERED`, atau `INVALID_ARGUMENT`
+ *   yang pesannya menyebut registration token (dihapus job push, AC-04.2). `INVALID_ARGUMENT` lain (payload ditolak, mis.
+ *   data terlalu besar) TIDAK menghapus token. POST tidak di-retry otomatis (BP-3); retry = antrean job.
+ * - Per platform ({@see PushPlatformInterface}): web → `webpush.notification.icon` (= `data.icon` bila ada), tautan tetap di
+ *   `data.link` (dibuka service worker; `webpush.fcm_options.link` sengaja tidak dipakai karena wajib URL https absolut);
+ *   Android → `android.priority` HIGH + `notification.sound` default + `click_action` = judul [K `Cron.php:1036-1046`].
  * - Token perangkat, token akses, dan kunci privat tidak pernah masuk log (AC-K.1, BP-5).
  */
-final class FcmV1Adapter implements PushNotifGatewayInterface
+final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInterface
 {
     public const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
@@ -40,7 +45,7 @@ final class FcmV1Adapter implements PushNotifGatewayInterface
 
     private const CACHE_TOKEN = 'fcm_token_akses';
 
-    private const KODE_TOKEN_TIDAK_SAH = ['UNREGISTERED', 'INVALID_ARGUMENT'];
+    public const IKON_BAWAAN = '/assets/images/logo-simpeg-v1-200x200.png';
 
     private string $projectId;
 
@@ -89,56 +94,21 @@ final class FcmV1Adapter implements PushNotifGatewayInterface
 
     public function send(string $deviceToken, string $title, string $body, array $data = []): array
     {
-        if (trim($deviceToken) === '') {
-            return ['status_code' => '400', 'message' => 'Device token kosong.', 'message_id' => null];
-        }
-
-        try {
-            $respons = $this->kirim($deviceToken, $title, $body, $data);
-        } catch (GalatTransport $e) {
-            return ['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => $e->getMessage(), 'message_id' => null];
-        }
-
-        $json = $respons->json() ?? [];
-
-        if ($respons->sukses()) {
-            return ['status_code' => '200', 'message' => 'Terkirim.', 'message_id' => is_string($json['name'] ?? null) ? $json['name'] : null];
-        }
-
-        return ['status_code' => (string) $respons->status, 'message' => $this->statusGalat($json), 'message_id' => null];
+        return $this->kirimSatu($deviceToken, $title, $body, $data, null)[0];
     }
 
     public function sendMulticast(array $deviceTokens, string $title, string $body, array $data = []): array
     {
-        $sukses   = 0;
-        $gagal    = 0;
-        $invalid  = [];
-        $terakhir = '';
+        return $this->multicast(null, $deviceTokens, $title, $body, $data);
+    }
 
-        foreach ($deviceTokens as $token) {
-            $hasil = $this->send($token, $title, $body, $data);
-
-            if ($hasil['status_code'] === '200') {
-                $sukses++;
-
-                continue;
-            }
-
-            $gagal++;
-            $terakhir = $hasil['message'];
-
-            if (in_array($hasil['message'], self::KODE_TOKEN_TIDAK_SAH, true)) {
-                $invalid[] = $token;
-            }
+    public function sendMulticastPlatform(int $platform, array $deviceTokens, string $title, string $body, array $data = []): array
+    {
+        if (! in_array($platform, [self::WEB, self::ANDROID], true)) {
+            throw new RuntimeException("Platform push {$platform} tidak dikenal.");
         }
 
-        return [
-            'status_code'    => $sukses > 0 || $gagal === 0 ? '200' : '502',
-            'message'        => sprintf('Multicast %d sukses, %d gagal%s.', $sukses, $gagal, $terakhir !== '' ? " (terakhir: {$terakhir})" : ''),
-            'success_count'  => $sukses,
-            'failure_count'  => $gagal,
-            'invalid_tokens' => $invalid,
-        ];
+        return $this->multicast($platform, $deviceTokens, $title, $body, $data);
     }
 
     /**
@@ -195,15 +165,86 @@ final class FcmV1Adapter implements PushNotifGatewayInterface
     }
 
     /**
+     * @param list<string>          $deviceTokens
+     * @param array<string, string> $data
+     *
+     * @return array{status_code: string, message: string, success_count: int, failure_count: int, invalid_tokens: list<string>}
+     */
+    private function multicast(?int $platform, array $deviceTokens, string $title, string $body, array $data): array
+    {
+        $sukses   = 0;
+        $gagal    = 0;
+        $invalid  = [];
+        $terakhir = '';
+
+        foreach ($deviceTokens as $token) {
+            [$hasil, $tidakSah] = $this->kirimSatu($token, $title, $body, $data, $platform);
+
+            if ($hasil['status_code'] === '200') {
+                $sukses++;
+
+                continue;
+            }
+
+            $gagal++;
+            $terakhir = $hasil['message'];
+
+            if ($tidakSah) {
+                $invalid[] = $token;
+            }
+        }
+
+        return [
+            'status_code'    => $sukses > 0 || $gagal === 0 ? '200' : '502',
+            'message'        => sprintf('Multicast %d sukses, %d gagal%s.', $sukses, $gagal, $terakhir !== '' ? " (terakhir: {$terakhir})" : ''),
+            'success_count'  => $sukses,
+            'failure_count'  => $gagal,
+            'invalid_tokens' => $invalid,
+        ];
+    }
+
+    /**
+     * @param array<string, string> $data
+     *
+     * @return array{0: array{status_code: string, message: string, message_id: string|null}, 1: bool} hasil + token tidak sah
+     */
+    private function kirimSatu(string $deviceToken, string $title, string $body, array $data, ?int $platform): array
+    {
+        if (trim($deviceToken) === '') {
+            return [['status_code' => '400', 'message' => 'Device token kosong.', 'message_id' => null], false];
+        }
+
+        try {
+            $respons = $this->kirim($deviceToken, $title, $body, $data, $platform);
+        } catch (GalatTransport $e) {
+            return [['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => $e->getMessage(), 'message_id' => null], false];
+        }
+
+        $json = $respons->json() ?? [];
+
+        if ($respons->sukses()) {
+            return [['status_code' => '200', 'message' => 'Terkirim.', 'message_id' => is_string($json['name'] ?? null) ? $json['name'] : null], false];
+        }
+
+        return [['status_code' => (string) $respons->status, 'message' => $this->statusGalat($json), 'message_id' => null], $this->tokenTidakSah($json)];
+    }
+
+    /**
      * @param array<string, string> $data
      */
-    private function kirim(string $deviceToken, string $title, string $body, array $data): Respons
+    private function kirim(string $deviceToken, string $title, string $body, array $data, ?int $platform): Respons
     {
         $akses = $this->tokenAkses();
         $pesan = ['token' => $deviceToken, 'notification' => ['title' => $title, 'body' => $body]];
 
         if ($data !== []) {
             $pesan['data'] = array_map('strval', $data);
+        }
+
+        if ($platform === self::WEB) {
+            $pesan['webpush'] = ['notification' => ['icon' => (string) ($data['icon'] ?? self::IKON_BAWAAN)]];
+        } elseif ($platform === self::ANDROID) {
+            $pesan['android'] = ['priority' => 'HIGH', 'notification' => ['sound' => 'default', 'click_action' => $title]];
         }
 
         $respons = $this->klien->kirim(new Permintaan(
@@ -239,5 +280,24 @@ final class FcmV1Adapter implements PushNotifGatewayInterface
         }
 
         return is_string($galat['status'] ?? null) ? $galat['status'] : 'FCM gagal';
+    }
+
+    /**
+     * Token perangkat tidak sah/tidak terdaftar (AC-04.2): `UNREGISTERED`, atau `INVALID_ARGUMENT` yang pesannya menyebut
+     * registration token. `INVALID_ARGUMENT` karena payload tidak menghapus token.
+     *
+     * @param array<mixed> $json
+     */
+    private function tokenTidakSah(array $json): bool
+    {
+        $status = $this->statusGalat($json);
+
+        if ($status === 'UNREGISTERED') {
+            return true;
+        }
+
+        $pesan = is_array($json['error'] ?? null) && is_string($json['error']['message'] ?? null) ? $json['error']['message'] : '';
+
+        return $status === 'INVALID_ARGUMENT' && stripos($pesan, 'registration token') !== false;
     }
 }

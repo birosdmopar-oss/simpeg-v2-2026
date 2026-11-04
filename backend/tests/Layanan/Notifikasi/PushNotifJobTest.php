@@ -140,6 +140,25 @@ final class PushNotifJobTest extends DatabaseTestCase
         $this->assertSame(['token-hidup'], $sisa);
     }
 
+    public function testTokenWebAkunPenerimaIkutDikirimiPerPlatform(): void
+    {
+        // MAKE-066 (F6-13): token web (platform 1, nip NULL, pemilik = akun) milik akun ber-NIP penerima ikut menerima push.
+        $nip  = $this->buatPegawai();
+        $mock = new MockFcmAdapter();
+        Services::injectMock('pushNotifGateway', $mock);
+        $idAkun = $this->buatAkunUntuk($nip, \App\Constants\Role::PEGAWAI);
+        $this->tambahToken($nip, 'token-android');
+        $this->db->table('firebase_token')->insert(['nip' => null, 'id_pengguna' => $idAkun, 'platform' => 1, 'fcm_token' => 'token-web', 'token_hash' => hash('sha256', 'token-web'), 'created_at' => '2026-11-04 00:00:00']);
+        $nonaktif = $this->buatPegawai();
+        $this->db->table('firebase_token')->insert(['nip' => null, 'id_pengguna' => $this->buatAkunUntuk($nonaktif, \App\Constants\Role::PEGAWAI, ['status' => '0']), 'platform' => 1, 'fcm_token' => 'token-web-nonaktif', 'token_hash' => hash('sha256', 'token-web-nonaktif'), 'created_at' => '2026-11-04 00:00:00']);
+        $id = $this->pesanBaru($nip);
+
+        $this->assertSame(PushNotifLayananJob::HASIL_TERKIRIM, (new PushNotifLayananJob(['id_inbox_msg' => $id]))->process());
+
+        $this->assertSame([['token-web', 1], ['token-android', 2]], array_map(static fn (array $k): array => [$k['token'], $k['platform']], $mock->sent()));
+        $this->assertSame(PushNotifLayananJob::HASIL_TANPA_TOKEN, (new PushNotifLayananJob(['id_inbox_msg' => $this->pesanBaru($nonaktif)]))->process(), 'akun nonaktif tidak dikirimi');
+    }
+
     public function testJobTerdaftarDiKonfigurasiQueue(): void
     {
         $this->assertSame(PushNotifLayananJob::class, config(\Config\Queue::class)->jobHandlers[NotifikasiService::JOB]);

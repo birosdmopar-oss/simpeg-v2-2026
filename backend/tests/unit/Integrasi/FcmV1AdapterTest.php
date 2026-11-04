@@ -20,7 +20,7 @@ use Tests\Support\Integrasi\LogIntegrasiTiruan;
 
 /**
  * MAKE-066 (H-04, F6-11) — adapter FCM HTTP v1 dengan FakeTransport (tanpa jaringan): JWT RS256 service account → token
- * akses (cache), `messages:send`, multicast + `invalid_tokens` dari UNREGISTERED/INVALID_ARGUMENT (AC-04.2), POST tanpa
+ * akses (cache), `messages:send`, multicast + `invalid_tokens` dari UNREGISTERED/INVALID_ARGUMENT token (AC-04.2), POST tanpa
  * retry, 401 membuang token akses, fail-fast konfigurasi (AC-K.4), tanpa token/kunci di log (AC-K.1). Kunci RSA dibuat saat
  * test berjalan (tidak ada kunci di repo).
  *
@@ -109,14 +109,34 @@ final class FcmV1AdapterTest extends CIUnitTestCase
             ->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599])
             ->antreJson(200, ['name' => 'm/1'])
             ->antreJson(404, ['error' => ['status' => 'NOT_FOUND', 'details' => [['@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError', 'errorCode' => 'UNREGISTERED']]]])
-            ->antreJson(400, ['error' => ['status' => 'INVALID_ARGUMENT']])
+            ->antreJson(400, ['error' => ['status' => 'INVALID_ARGUMENT', 'message' => 'The registration token is not a valid FCM registration token']])
+            ->antreJson(400, ['error' => ['status' => 'INVALID_ARGUMENT', 'message' => 'Request contains an invalid argument: data too big']])
             ->antreJson(503, ['error' => ['status' => 'UNAVAILABLE']])
             ->antre(new GalatTransport('Operation timed out', true));
 
-        $r = $this->fcm()->sendMulticast(['tok-a', 'tok-b', 'tok-c', 'tok-d', 'tok-e'], 'Judul', 'Isi');
+        $r = $this->fcm()->sendMulticast(['tok-a', 'tok-b', 'tok-c', 'tok-d', 'tok-e', 'tok-f'], 'Judul', 'Isi');
 
-        $this->assertSame(['200', 1, 4, ['tok-b', 'tok-c']], [$r['status_code'], $r['success_count'], $r['failure_count'], $r['invalid_tokens']]);
-        $this->assertCount(6, $this->transport->tercatat(), 'POST 503/timeout tidak di-retry (BP-3)');
+        $this->assertSame(['200', 1, 5, ['tok-b', 'tok-c']], [$r['status_code'], $r['success_count'], $r['failure_count'], $r['invalid_tokens']], 'INVALID_ARGUMENT payload (tok-d) tidak menghapus token');
+        $this->assertCount(7, $this->transport->tercatat(), 'POST 503/timeout tidak di-retry (BP-3)');
+    }
+
+    public function testPesanPerPlatform(): void
+    {
+        $this->transport->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599])
+            ->antreJson(200, ['name' => 'm/w'])->antreJson(200, ['name' => 'm/a']);
+        $fcm = $this->fcm();
+
+        $fcm->sendMulticastPlatform(FcmV1Adapter::WEB, ['tok-web'], 'Riwayat KGB Disetujui', 'Data: x', ['link' => '/pegawai/1/riwayat?tab=kgb']);
+        $fcm->sendMulticastPlatform(FcmV1Adapter::ANDROID, ['tok-andr'], 'Cuti', 'Isi', ['modul' => 'cuti']);
+
+        $web = $this->transport->tercatat()[1]['permintaan']->json['message'];
+        $this->assertSame(['icon' => FcmV1Adapter::IKON_BAWAAN], $web['webpush']['notification']);
+        $this->assertSame('/pegawai/1/riwayat?tab=kgb', $web['data']['link']);
+        $this->assertArrayNotHasKey('fcm_options', $web['webpush']);
+        $this->assertSame(['priority' => 'HIGH', 'notification' => ['sound' => 'default', 'click_action' => 'Cuti']], $this->transport->tercatat()[2]['permintaan']->json['message']['android']);
+
+        $this->expectException(RuntimeException::class);
+        $fcm->sendMulticastPlatform(9, ['t'], 'J', 'I');
     }
 
     public function testSemuaGagalDan401MembuangTokenAkses(): void

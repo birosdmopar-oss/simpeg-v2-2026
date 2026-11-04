@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Libraries\Push;
 
 use App\Interfaces\PushNotifGatewayInterface;
+use App\Interfaces\PushPlatformInterface;
 
 /**
  * Mock adapter FCM (F0-17). Payload push ditulis ke log lokal (writable/logs) — tidak ada koneksi jaringan.
  */
-class MockFcmAdapter implements PushNotifGatewayInterface
+class MockFcmAdapter implements PushNotifGatewayInterface, PushPlatformInterface
 {
     public const LOG_PREFIX = '[MockFcmAdapter]';
 
@@ -18,6 +19,8 @@ class MockFcmAdapter implements PushNotifGatewayInterface
      */
     private array $sent = [];
 
+    private ?int $platform = null;
+
     public function send(string $deviceToken, string $title, string $body, array $data = []): array
     {
         if ($deviceToken === '') {
@@ -25,7 +28,7 @@ class MockFcmAdapter implements PushNotifGatewayInterface
         }
 
         $messageId = 'mock-msg-' . bin2hex(random_bytes(6));
-        $payload   = ['token' => $deviceToken, 'title' => $title, 'body' => $body, 'data' => $data, 'message_id' => $messageId];
+        $payload   = ['token' => $deviceToken, 'title' => $title, 'body' => $body, 'data' => $data, 'message_id' => $messageId, 'platform' => $this->platform];
 
         $this->sent[] = $payload;
 
@@ -58,6 +61,21 @@ class MockFcmAdapter implements PushNotifGatewayInterface
             'failure_count'  => count($invalid),
             'invalid_tokens' => $invalid,
         ];
+    }
+
+    /**
+     * Platform dicatat di kunci `platform` payload terkirim (hanya mock; `null` = tanpa platform) supaya test consumer bisa
+     * memeriksa kanal tanpa mengubah `data`.
+     */
+    public function sendMulticastPlatform(int $platform, array $deviceTokens, string $title, string $body, array $data = []): array
+    {
+        $this->platform = $platform;
+
+        try {
+            return $this->sendMulticast($deviceTokens, $title, $body, $data);
+        } finally {
+            $this->platform = null;
+        }
     }
 
     /**

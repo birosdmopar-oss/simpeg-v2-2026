@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Layanan\InboxMsgModel;
+use App\Libraries\Push\PenerimaTokenFcm;
+use App\Libraries\Push\PengirimPushFcm;
 use CodeIgniter\Queue\BaseJob;
 use CodeIgniter\Queue\Interfaces\JobInterface;
 use RuntimeException;
@@ -13,9 +15,11 @@ use RuntimeException;
  * Job `push-notif` di antrean `push` (PRD Fase 4 v1.3 §6.6.3, C-06): kirim push mock FCM untuk satu `inbox_msg`.
  * Worker: `php spark queue:work push --stop-when-empty --max-time 55` (README-deploy.md §1b).
  *
- * Token = baris `firebase_token` milik `inbox.nip_penerima`. Tanpa token → `push_status = 3`, selesai tanpa galat. Sukses →
- * 1. Gagal → 2 dan dilempar agar worker mencoba ulang sampai {@see self::TRIES}, lalu `queue_jobs_failed` (tidak retry
- * selamanya, H-04). Token yang dilaporkan tidak valid dihapus. Payload `{title, body, data: {modul, id_rwy, url}}`;
+ * Token (PRD Fase 6 F6-13, MAKE-066) = token Android (`platform` 2) milik `inbox.nip_penerima` [K `andr_notif_queue`] +
+ * token web (`platform` 1) milik akun ber-NIP itu [K `fcmQueue_layanan` → `fb_token`], lewat {@see PenerimaTokenFcm}.
+ * Tanpa token → `push_status = 3`, selesai tanpa galat. Sukses → 1. Gagal → 2 dan dilempar agar worker mencoba ulang
+ * sampai {@see self::TRIES}, lalu `queue_jobs_failed` (tidak retry selamanya, H-04). Token yang dilaporkan tidak valid
+ * dihapus per baris (`id_firebase_token`). Payload `{title, body, data: {modul, id_rwy, url}}`;
  * tidak memuat NIK/passphrase dan isi token tidak pernah dicatat. Idempoten: pesan yang sudah terkirim tidak dikirim ulang.
  */
 class PushNotifLayananJob extends BaseJob implements JobInterface
@@ -47,27 +51,24 @@ class PushNotifLayananJob extends BaseJob implements JobInterface
             return self::HASIL_DILEWATI;
         }
 
-        $model  = new InboxMsgModel();
-        $tokens = $db->table('firebase_token')->select('fcm_token')->where('nip', $pesan['nip_penerima'])->where('fcm_token IS NOT NULL', null, false)->get()->getResultArray();
-        $daftar = array_values(array_filter(array_map(static fn (array $r): string => trim((string) $r['fcm_token']), $tokens), static fn (string $t): bool => $t !== ''));
+        $model    = new InboxMsgModel();
+        $nip      = (string) $pesan['nip_penerima'];
+        $tokens   = new PenerimaTokenFcm($db);
+        $penerima = array_merge($tokens->android([$nip]), $tokens->webAkunNip([$nip]));
 
-        if ($daftar === []) {
+        if ($penerima === []) {
             $model->update($idMsg, ['push_status' => InboxMsgModel::PUSH_TANPA_TOKEN]);
 
             return self::HASIL_TANPA_TOKEN;
         }
 
-        $hasil = service('pushNotifGateway')->sendMulticast($daftar, (string) $pesan['judul'], (string) $pesan['isi'], [
+        $hasil = (new PengirimPushFcm(service('pushNotifGateway'), $db))->kirim($penerima, (string) $pesan['judul'], (string) $pesan['isi'], [
             'modul'  => (string) $pesan['modul'],
             'id_rwy' => (string) $pesan['id_rwy'],
             'url'    => (string) $pesan['url'],
         ]);
 
-        if ($hasil['invalid_tokens'] !== []) {
-            $db->table('firebase_token')->where('nip', $pesan['nip_penerima'])->whereIn('fcm_token', $hasil['invalid_tokens'])->delete();
-        }
-
-        if ($hasil['success_count'] > 0) {
+        if ($hasil['sukses'] > 0) {
             $model->update($idMsg, ['push_status' => InboxMsgModel::PUSH_TERKIRIM]);
 
             return self::HASIL_TERKIRIM;
@@ -75,6 +76,6 @@ class PushNotifLayananJob extends BaseJob implements JobInterface
 
         $model->update($idMsg, ['push_status' => InboxMsgModel::PUSH_GAGAL]);
 
-        throw new RuntimeException('Push inbox_msg=' . $idMsg . ' gagal: ' . $hasil['message']);
+        throw new RuntimeException('Push inbox_msg=' . $idMsg . ' gagal: ' . $hasil['pesan']);
     }
 }
