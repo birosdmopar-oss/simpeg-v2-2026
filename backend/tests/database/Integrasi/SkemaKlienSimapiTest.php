@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Database\Integrasi;
 
-use App\Database\Migrations\CreateKlienLayananSimapi;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\SkemaKepegawaianTestTrait;
 
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKlienLayananSimapi.php';
-
 /**
- * DBV-026 — test skema draf klien layanan & SIMAPI (DBV-026 §7/§8): struktur & collation, UNIQUE username (1062), CHECK
+ * DBV-026 — test skema klien layanan & SIMAPI (DBV-026 §7/§8): struktur & collation, UNIQUE username (1062), CHECK
  * jenis/status/action (3819 MySQL / 4025 MariaDB), SET hak, FK RESTRICT (1451/1452), siklus down()/up(), kueri audit
- * berjalan. Masih memuat draf di `MigrationsDitahan/`; saat dipindah (setelah approve DBV) `require_once` dihapus.
+ * berjalan. Disetujui DBV @79f00bb5; migration `Migrations/2026-11-04-100000_CreateKlienLayananSimapi.php`.
  *
  * @internal
  */
@@ -24,22 +21,16 @@ final class SkemaKlienSimapiTest extends DatabaseTestCase
 {
     use SkemaKepegawaianTestTrait;
 
+    private const VERSION = '2026-11-04-100000';
+
+    private const TABEL = ['klien_layanan', 'simapi_jd', 'simapi_token', 'simapi_auth_jd', 'simapi_ch', 'simapi_auth_ch'];
+
     private const CHECK = [3819, 4025];
-
-    private CreateKlienLayananSimapi $m;
-
-    private bool $naik = false;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->m = new CreateKlienLayananSimapi();
-    }
 
     protected function tearDown(): void
     {
-        if ($this->naik) {
-            $this->m->down();
+        if ($this->adaYangDilepas()) {
+            $this->pasangUlang();
         }
 
         parent::tearDown();
@@ -47,9 +38,7 @@ final class SkemaKlienSimapiTest extends DatabaseTestCase
 
     public function testStrukturDanCollation(): void
     {
-        $this->naik();
-
-        foreach (CreateKlienLayananSimapi::TABEL as $tabel) {
+        foreach (self::TABEL as $tabel) {
             $info = $this->skemaTableInfo($tabel);
             $this->assertSame(['InnoDB', 'utf8mb4_unicode_ci'], [$info['ENGINE'] ?? null, $info['TABLE_COLLATION'] ?? null], $tabel);
 
@@ -73,7 +62,6 @@ final class SkemaKlienSimapiTest extends DatabaseTestCase
 
     public function testConstraint(): void
     {
-        $this->naik();
         $klien = fn (string $u, array $lebih = []) => $this->db->table('klien_layanan')->insert($lebih + ['nama' => 'Uji', 'username' => $u, 'rahasia_hash' => password_hash('x', PASSWORD_DEFAULT), 'jenis' => 2, 'hak' => 'simapi']);
 
         $klien('simanta');
@@ -113,47 +101,52 @@ final class SkemaKlienSimapiTest extends DatabaseTestCase
 
     public function testDownLaluUpKembali(): void
     {
-        $this->naik();
-        $this->m->down();
-        $this->naik = false;
+        $this->lepasSejak(self::VERSION);
 
-        foreach (CreateKlienLayananSimapi::TABEL as $tabel) {
+        foreach (self::TABEL as $tabel) {
             $this->assertFalse($this->skemaTableExists($tabel), $tabel);
         }
 
-        $this->naik();
+        $this->pasangUlang();
 
-        foreach (CreateKlienLayananSimapi::TABEL as $tabel) {
+        foreach (self::TABEL as $tabel) {
             $this->assertTrue($this->skemaTableExists($tabel), $tabel);
         }
     }
 
-    public function testKueriAuditBerjalan(): void
+    public function testKueriAuditBerjalanDanB2MenangkapHeksBesar(): void
     {
-        $this->naik();
-        $sql = (string) preg_replace('/^\s*--.*$/m', '', (string) file_get_contents(ROOTPATH . 'docs/db-review/sql/DBV-026-audit-klien-simapi.sql'));
-        $n   = 0;
+        $this->db->table('klien_layanan')->insert(['nama' => 'Uji', 'username' => 'simanta', 'rahasia_hash' => password_hash('x', PASSWORD_DEFAULT), 'jenis' => 2, 'hak' => 'simapi']);
+        $id = (int) $this->db->insertID();
+        $this->db->table('simapi_token')->insert(['token_hash' => strtoupper(hash('sha256', 'besar')), 'id_klien' => $id, 'expired_at' => '2026-11-04 01:00:00']);
+
+        $hasil = $this->jalankanAudit();
+
+        $this->assertCount(8, $hasil);
+        $this->assertSame(0, (int) $hasil[0][0]['rahasia_bukan_hash']);
+        $this->assertSame(1, (int) $hasil[1][0]['token_hash_tidak_sah'], 'heks huruf BESAR tertangkap (BINARY)');
+    }
+
+    /**
+     * @return list<list<array<string, mixed>>>
+     */
+    private function jalankanAudit(): array
+    {
+        $sql   = (string) preg_replace('/^\s*--.*$/m', '', (string) file_get_contents(ROOTPATH . 'docs/db-review/sql/DBV-026-audit-klien-simapi.sql'));
+        $hasil = [];
 
         foreach (array_filter(array_map('trim', explode(';', $sql))) as $q) {
-            foreach (CreateKlienLayananSimapi::TABEL as $tabel) {
+            foreach (self::TABEL as $tabel) {
                 $q = (string) preg_replace('/(FROM|JOIN)\s+' . $tabel . '\b/', '$1 ' . $this->db->prefixTable($tabel), $q);
             }
 
             try {
-                $this->db->query($q)->getResultArray();
+                $hasil[] = $this->db->query($q)->getResultArray();
             } catch (\Throwable $e) {
                 throw new RuntimeException($e->getMessage() . "\n" . $q);
             }
-
-            $n++;
         }
 
-        $this->assertSame(8, $n);
-    }
-
-    private function naik(): void
-    {
-        $this->m->up();
-        $this->naik = true;
+        return $hasil;
     }
 }

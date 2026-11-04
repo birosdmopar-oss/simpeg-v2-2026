@@ -10,8 +10,8 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-026 (Fase 6 Jalur A, H-01 bagian A, PRD §7.0.1/§7.1) — DRAF DITAHAN sampai disetujui DB Validator; dipindah ke
- * `Migrations/` dengan timestamp baru setelah approve (pola DBV-027/DBV-030). Dokumen:
+ * DBV-026 (Fase 6 Jalur A, H-01 bagian A, PRD §7.0.1/§7.1) — disetujui DB Validator @79f00bb5 (04-11-2026), dipindah dari
+ * `MigrationsDitahan/` tanpa perubahan DDL (pola DBV-027/DBV-030). Dokumen:
  * backend/docs/db-review/DBV-026-klien-layanan-simapi.md.
  *
  * Enam tabel baru, tanpa ALTER tabel lama dan tanpa data lama (F6-08: kredensial klien lama tidak diimpor; token,
@@ -25,7 +25,8 @@ use Throwable;
  *   - `simapi_ch` [K-kode] — baris perubahan (format pipe), diisi aplikasi sesudah commit (F6-06, MAKE-060);
  *   - `simapi_auth_ch` [K-kode] — penanda baris sudah dikirim per klien (ack-on-read).
  *
- * `simapi_ch.nip` tanpa FK (log riwayat; baris DELETE pegawai tetap tersimpan, tidak ikut Ubah NIP) — DBV-026-Q6.
+ * `simapi_ch.nip` tanpa FK (log riwayat; baris DELETE pegawai tetap tersimpan, tidak ikut Ubah NIP) — DBV-026-Q6:
+ * di luar registry NIP, tercatat di README modul Kepegawaian.
  * up() gagal → tabel yang sempat dibuat di-DROP (urutan anak dulu); down() men-DROP keenam tabel.
  */
 class CreateKlienLayananSimapi extends Migration

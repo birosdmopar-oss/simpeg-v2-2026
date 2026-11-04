@@ -40,7 +40,7 @@ SELECT jenis, status, COUNT(*) AS klien FROM klien_layanan GROUP BY jenis, statu
 -- B6 [INFO] Token kedaluwarsa yang masih tersimpan (bahan pembersihan berkala).
 SELECT COUNT(*) AS token_kedaluwarsa FROM simapi_token WHERE expired_at <= UTC_TIMESTAMP();
 
--- B7 [INFO] Baris change history per jenis data dan baris yang belum diambil klien type 2 aktif mana pun.
+-- B7 [INFO] Baris change history per jenis data, dan baris yang belum ditandai terkirim ke klien mana pun.
 SELECT ch.id_simapi_jd, COUNT(*) AS baris FROM simapi_ch ch GROUP BY ch.id_simapi_jd ORDER BY ch.id_simapi_jd;
 
 SELECT COUNT(*) AS baris_belum_dikirim
