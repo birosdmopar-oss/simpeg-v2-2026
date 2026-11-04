@@ -26,6 +26,8 @@ final class Permintaan
         public readonly array $query = [],
         #[\SensitiveParameter]
         public readonly array $header = [],
+        // Payload JSON bisa memuat id PNS/NIP (dorong SIASN, saran review B6 M2 #3).
+        #[\SensitiveParameter]
         public readonly mixed $json = null,
         #[\SensitiveParameter]
         public readonly ?array $form = null,
