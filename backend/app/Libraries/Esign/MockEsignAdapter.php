@@ -44,7 +44,7 @@ class MockEsignAdapter implements EsignGatewayInterface
         ];
     }
 
-    public function signPdf(string $pdfContent, string $nip, string $passphrase, array $options = []): array
+    public function signPdf(string $pdfContent, string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
     {
         if ($pdfContent === '') {
             return [

@@ -30,5 +30,5 @@ interface EsignGatewayInterface
      *
      * @return array{status_code: string, message: string, signed_pdf: string|null, signed_at: string|null, signature_id: string|null}
      */
-    public function signPdf(string $pdfContent, string $nip, string $passphrase, array $options = []): array;
+    public function signPdf(string $pdfContent, string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array;
 }

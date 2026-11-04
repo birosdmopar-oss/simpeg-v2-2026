@@ -51,6 +51,10 @@ class IntegrasiStatus extends BaseCommand
             CLI::write('PERINGATAN: ' . $peringatan, 'yellow');
         }
 
+        if (($tls = $status->peringatanTlsEsign(config('Integrations')->esign)) !== null) {
+            CLI::write($tls, 'yellow');
+        }
+
         if ($baris === []) {
             CLI::write("Tidak ada catatan integrasi dalam {$jam} jam terakhir.");
 

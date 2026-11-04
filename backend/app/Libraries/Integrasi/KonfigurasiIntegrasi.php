@@ -44,6 +44,7 @@ final class KonfigurasiIntegrasi
      * - `tlsVerify`: bool, atau teks `true`/`false`/`1`/`0`; tidak ada → true; lainnya ditolak. `$wajibTls` (BKN) menolak
      *   nilai false.
      * - `timeout`: angka detik > 0; tidak ada → 30; kosong/0/negatif/bukan angka ditolak.
+     * - `caBundle`: kosong/tidak ada = CA sistem; terisi wajib berkas yang terbaca (fail-fast), dipakai bila `tlsVerify`.
      *
      * @param array<string, mixed> $konfigurasi
      *
@@ -68,9 +69,15 @@ final class KonfigurasiIntegrasi
         }
 
         $timeout = (float) $timeout;
+        $ca      = $konfigurasi['caBundle'] ?? '';
+        $ca      = is_string($ca) ? trim($ca) : null;
+
+        if ($ca === null || ($ca !== '' && (! is_file($ca) || ! is_readable($ca)))) {
+            throw new KonfigurasiIntegrasiTidakLengkap($layanan, ['caBundle'], 'tidak terbaca (path berkas CA di luar repo/webroot, kosong = CA sistem)');
+        }
 
         try {
-            return new OpsiTransport(min(5.0, $timeout), $timeout, $tls);
+            return new OpsiTransport(min(5.0, $timeout), $timeout, $tls, $ca === '' ? null : $ca);
         } catch (InvalidArgumentException) {
             throw new KonfigurasiIntegrasiTidakLengkap($layanan, ['timeout'], 'tidak sah (angka detik > 0)');
         }

@@ -56,8 +56,8 @@ final class NotifikasiTidakKeTicketingTest extends DatabaseTestCase
             $this->approvalService()->process($b['al']['auth'], $idB, ['aksi' => $aksi, 'reason_note' => 'Alasan uji']);
         }
 
-        // e-sign sesudah final
-        $this->esignService()->terbitkan($admin['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+        // e-sign sesudah final oleh PyB pemilik tugas (F6-18 K1)
+        $this->esignService()->terbitkan($a['pyb']['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
 
         $this->assertGreaterThan(0, $this->db->table('inbox')->countAllResults(), 'notifikasi v2 terisi');
         $this->assertSame(0, $this->db->table('disiplin_ticket')->countAllResults());
