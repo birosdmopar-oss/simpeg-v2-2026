@@ -225,6 +225,26 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
 7. Batas [V2]: maks 10 token web per akun (yang terlama dibuang), pendaftaran token dibatasi 20 permintaan/60 detik per akun (429).
 8. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`; galat per token pada topik presensi (HTTP 200 dengan `results[].error`) tercatat sebagai `warning` `[fcm-topik]` di log aplikasi dan hitungannya ada di hasil job.
 
+### 1e. Job terjadwal Fase 6 (ADR-037, PRD Fase 6 §6.4) — bagian Jalur A
+
+Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint HTTP cron). Jam di bawah mengikuti zona waktu server: pastikan server berzona WIB (Asia/Jakarta) atau geser jamnya. Kode keluar ≠ 0 berarti ada yang gagal. Keluaran hanya jumlah, tanpa NIP/nama.
+
+| Command | Jadwal (WIB) | Task |
+|---|---|---|
+| `layanan:status-harian` | 00:30 setiap hari | H-11 (MAKE-062) |
+
+```bash
+# /etc/cron.d/simpeg-v2-status-harian
+30 0 * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-status-harian.lock php spark layanan:status-harian >> /var/www/simpeg-v2/logs/status-harian.log 2>&1
+```
+
+`layanan:status-harian` (H-11, Q6-24..Q6-27):
+
+1. Prasyarat: `php spark integrasi:siapkan-akun-sistem` sudah dijalankan sesudah impor `pengguna` (pelaku audit = akun sistem; belum siap → kode keluar 1 tanpa menulis). `--dry-run` tidak butuh akun.
+2. **Run pertama di lingkungan baru WAJIB `--dry-run`** dan jumlahnya direview Biro SDM sebelum run nyata: `php spark layanan:status-harian --dry-run`. Baris INFO "status 2/3 tanpa riwayat pendukung" = pegawai berstatus TB/CLTN tanpa riwayat TB/CLTN (isian manual/impor) yang sengaja tidak disentuh; "bentrok TB+CLTN" dan "celah TB" dilaporkan untuk ditinjau.
+3. `--tanggal=YYYY-MM-DD` hanya bersama `--dry-run` untuk tanggal lampau (dihitung terhadap status pegawai SAAT INI); tanggal masa depan ditolak. Run nyata selalu hari ini WIB dan aman diulang (idempoten); run yang terlewat cukup dijalankan ulang hari itu.
+4. Hanya `pegawai.id_jenis_status` 1/2/3 dari pegawai berstatus aktif yang diubah; setiap perubahan tercatat di `audit_logs` (`jenis_audit` `layanan.status_harian`).
+
 ---
 
 ## 2. Cara push (operator deploy)
