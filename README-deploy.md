@@ -344,6 +344,10 @@ Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint 
 
 `pengguna:sinkron-nama` (padanan legacy `sync_nama_pengguna`): menyamakan `pengguna.name` akun pegawai (role 2, status aktif, ber-NIP, pegawai aktif) dengan nama bergelar; hanya mengubah yang berbeda, idempoten, akun sistem dikecualikan, `--dry-run` tersedia, prasyarat akun sistem sama. Jadwal di atas masih usulan.
 
+**Server berzona UTC.** Jam `cron.d` mengikuti zona server. Bila server UTC, geser 7 jam: `layanan:status-harian` pukul 00:30 WIB = `30 17 * * *` (hari sebelumnya, UTC) dan `pengguna:sinkron-nama` pukul 01:00 WIB = `0 18 * * *`; atau pasang `CRON_TZ=Asia/Jakarta` di baris pertama berkas `cron.d` bila cron server mendukungnya. Run nyata `layanan:status-harian` selalu memakai tanggal WIB hari ini dari aplikasi, bukan dari jam cron.
+
+**Pemantauan.** Kode keluar ≠ 0 berarti ada kegagalan (`1` = galat/kunci sibuk/akun sistem belum siap/ada pegawai gagal, `7` = opsi salah). Pantau dengan pembungkus yang mengirim peringatan bila keluar ≠ 0 (mis. `|| echo "layanan:status-harian gagal" | mail ...` atau pemantau cron yang ada) dan lihat baris `ERROR` di `writable/logs` (cabang, kelas, kode; tanpa NIP/nama). Baris INFO "celah TB" = hari ini jatuh di celah antara akhir TB (atau perpanjangan) dan perpanjangan berikutnya; "segmen riwayat tidak sah" = riwayat TB/CLTN bertanggal rusak yang dilewati (perlu ditinjau Biro SDM).
+
 ---
 
 ## 2. Cara push (operator deploy)
