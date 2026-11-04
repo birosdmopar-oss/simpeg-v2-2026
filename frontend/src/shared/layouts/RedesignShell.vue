@@ -13,6 +13,7 @@ import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
+import NotifikasiPushShell from '@/features/integrasi/components/NotifikasiPushShell.vue'
 import PengingatCutiShell from '@/features/layanan/components/PengingatCutiShell.vue'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
 import { UiBreadcrumb, type Crumb } from '@/shared/ui'
@@ -156,6 +157,9 @@ async function logout(): Promise<void> {
         </div>
 
         <UiBreadcrumb v-if="breadcrumbs?.length" :items="breadcrumbs" class="mt-4 block" />
+
+        <!-- Izin & pendaftaran token push web (PRD Fase 6 F6-13, MAKE-066). -->
+        <NotifikasiPushShell v-if="!auth.mustChangePassword" />
 
         <main id="main-content" ref="mainEl" class="mt-4" tabindex="-1">
           <slot />
