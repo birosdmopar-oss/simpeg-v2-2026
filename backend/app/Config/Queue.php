@@ -49,5 +49,11 @@ class Queue extends BaseQueue
         'push-notif'           => PushNotifLayananJob::class,
         // Fase 6 Jalur B (MAKE-064): tarik ulang e-Kinerja dari tombol admin, antrean `integrasi`.
         'bkn-tarik' => \App\Jobs\BknTarikJob::class,
+        // Fase 6 Jalur B (MAKE-066, F6-12): keanggotaan topik presensi FCM, antrean `push`.
+        'fcm-topik' => \App\Jobs\FcmTopikJob::class,
+        // Fase 6 Jalur B (MAKE-066, F6-13): push web riwayat/usulan/LKH/Konket ke penerima legacy, antrean `push`.
+        'push-riwayat' => \App\Jobs\PushRiwayatJob::class,
+        // Fase 6 Jalur B (MAKE-066, F6-13): push generik per NIP (titik sambung Halo Simpeg Fase 8), antrean `push`.
+        'push-pesan' => \App\Jobs\PushPesanJob::class,
     ];
 }

@@ -197,6 +197,12 @@ final class LkhService implements LkhServiceInterface
             'status'      => self::MENUNGGU,
             'updated_by'  => $auth->idPengguna(),
         ] + $aktif));
+        // F6-12 (Fase 6 MAKE-066): LKH dibuat → keluar dari topik `pegawai_blm_lkh` [K `L_lkh.php:430-445`].
+        (new \App\Libraries\Push\AntreTopikFcm())->lkhDibuat($nip);
+        // F6-13 (Fase 6 MAKE-066): push web ke atasan langsung [K `L_lkh.php:329-332`].
+        (new \App\Libraries\Push\AntrePushRiwayat())->antre(1, 'lkh', $id);
+        // F6-13 (review MAKE-066 P1): push Android ke atasan ikut legacy `andr_notif_queue` [K `L_lkh.php:335-404`].
+        (new \App\Libraries\Push\PushAndroidLkhKonket())->lkhDiajukan($id, true);
 
         return $this->detail($auth, $id);
     }
@@ -225,6 +231,13 @@ final class LkhService implements LkhServiceInterface
 
         $model = new LkhModel($this->db());
         $model->withActor($auth, static fn () => $model->update($id, $param));
+
+        // F6-13 (Fase 6 MAKE-066): perubahan yang kembali menunggu → push web ke atasan [K `L_lkh.php:540-543`].
+        if (($param['status'] ?? null) === self::MENUNGGU) {
+            (new \App\Libraries\Push\AntrePushRiwayat())->antre(3, 'lkh', $id);
+            // F6-13 (review MAKE-066 P1): push Android ke atasan [K `L_lkh.php:579-640`].
+            (new \App\Libraries\Push\PushAndroidLkhKonket())->lkhDiajukan($id, false);
+        }
 
         return $this->detail($auth, $id);
     }
@@ -281,6 +294,10 @@ final class LkhService implements LkhServiceInterface
             'updated_by'  => $auth->idPengguna(),
             'show_notif'  => 1,
         ]));
+        // F6-13 (Fase 6 MAKE-066): hasil verifikasi → push web ke pegawai [K `L_lkh.php:1065-1067`].
+        (new \App\Libraries\Push\AntrePushRiwayat())->antre(2, 'lkh', $id, [self::DISETUJUI => 'Disetujui', self::DITOLAK => 'Ditolak'][$status] ?? 'Butuh Revisi');
+        // F6-13 (review MAKE-066 P1): push Android ke pegawai [K `L_lkh.php:1071-1140`].
+        (new \App\Libraries\Push\PushAndroidLkhKonket())->lkhDiproses($id);
 
         return $this->detail($auth, $id);
     }

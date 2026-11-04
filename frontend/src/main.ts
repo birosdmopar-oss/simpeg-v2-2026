@@ -5,6 +5,7 @@ import App from './App.vue'
 import './assets/main.css'
 import { handlePasswordChangeRequired } from './features/auth/passwordChangeRequired'
 import { useAuthStore } from './features/auth/stores/auth.store'
+import { hapusTokenPushLokal } from './features/integrasi/composables/notifikasiPush'
 import { setAuthFailureHandler, setPasswordChangeRequiredHandler } from './lib/axios'
 import router from './router'
 
@@ -16,6 +17,8 @@ app.use(router)
 
 // Refresh token gagal (sesi habis / dicabut): kosongkan store lalu ke halaman login (F0-09 + A-11).
 setAuthFailureHandler(() => {
+  // Token push web di perangkat ini dibuang (review MAKE-066 P2); DELETE server tidak mungkin tanpa sesi.
+  void hapusTokenPushLokal()
   useAuthStore(pinia).clearSession()
   const current = router.currentRoute.value
   if (current.name !== 'login') {

@@ -14,4 +14,8 @@ use CodeIgniter\Router\RouteCollection;
 $routes->group('api/v1/integrasi', ['namespace' => 'App\Controllers\Api\Integrasi', 'filter' => 'jwt'], static function (RouteCollection $routes): void {
     // H-10 (MAKE-064): tarik ulang e-Kinerja — antre job, bukan sinkron.
     $routes->post('bkn/tarik', 'BknTarikController::tarik', ['filter' => Role::filter(Role::SUPER_ADMIN)]);
+
+    // H-04 (MAKE-066, F6-13): token push web/desktop — semua akun login (padanan Local::register_fb_token).
+    $routes->post('fcm-token', 'FcmTokenController::daftar');
+    $routes->delete('fcm-token', 'FcmTokenController::lepas');
 });

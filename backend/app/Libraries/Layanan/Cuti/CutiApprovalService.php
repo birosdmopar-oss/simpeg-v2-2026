@@ -160,6 +160,8 @@ class CutiApprovalService
         });
 
         $this->notifikasi?->antrekan($idNotif);
+        // F6-13 (Fase 6 MAKE-066): push Android keputusan cuti ikut legacy `andr_notif_queue` [K `L_cuti.php:2462-2548`].
+        (new \App\Libraries\Push\PushAndroidCuti())->diproses($this->muat($id), $auth);
 
         return $this->cuti->itemDetail($auth, $this->muat($id));
     }

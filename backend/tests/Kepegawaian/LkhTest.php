@@ -80,6 +80,100 @@ final class LkhTest extends DatabaseTestCase
         $this->assertSame(['2026-10-08', '2026-10-13', $this->nipAtasan], [$opsi['tanggal_minimal'], $opsi['tanggal_maksimal'], $opsi['atasan']['nip']]);
     }
 
+    public function testTambahMengantreLepasTopikBelumLkhBilaDriverFcm(): void
+    {
+        // F6-12 (Fase 6 MAKE-066) [K `L_lkh.php:430-445`]: LKH dibuat → job `fcm-topik` lepas `pegawai_blm_lkh`.
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+
+        try {
+            $this->tambah($this->pegawai, '2026-10-12');
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $job = $this->jobPush('fcm-topik');
+        $this->assertSame([['nip' => $this->nip, 'tambah' => [], 'lepas' => ['pegawai_blm_lkh']]], $job);
+    }
+
+    public function testPushWebRiwayatLkhIkutLegacyBilaDriverFcm(): void
+    {
+        // F6-13 (Fase 6 MAKE-066) [K `L_lkh.php:331/542/1067`]: tambah → tipe 1 (atasan), ubah kembali menunggu → tipe 3,
+        // proses → tipe 2 (pegawai) dengan aksi legacy.
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+
+        try {
+            $a = $this->tambah($this->pegawai, '2026-10-12');
+            $this->svc()->proses($this->atasan, $a['id'], 'revisi', 'Rinci output');
+            $this->svc()->ubah($this->pegawai, $a['id'], ['kegiatan' => [$this->baris('08:00')]]);
+            $this->svc()->proses($this->atasan, $a['id'], 'setujui', null);
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $this->assertSame([
+            ['tipe' => 1, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => null],
+            ['tipe' => 2, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => 'Butuh Revisi'],
+            ['tipe' => 3, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => null],
+            ['tipe' => 2, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => 'Disetujui'],
+        ], $this->jobPush('push-riwayat'));
+
+        // review MAKE-066 P1 [K `L_lkh.php:335-404/579-640/1071-1140`]: kanal Android ikut legacy.
+        $tgl  = \App\Libraries\Push\TemplatPushRiwayat::tanggal('2026-10-12');
+        $nama = (string) $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $a['id'])->get()->getRowArray()['nama'];
+        $andr = $this->jobPush('push-pesan');
+        $this->assertSame([
+            [[$this->nipAtasan], 'Monitoring LKH', "{$nama} telah mengajukan LKH untuk tanggal {$tgl}", 'Menunggu'],
+            [[$this->nip], 'LKH', "LKH anda pada tanggal {$tgl} diubah menjadi \"Revisi\" oleh Atasan Uji", 'Direvisi'],
+            [[$this->nipAtasan], 'Monitoring LKH', "{$nama} telah mengubah LKH untuk tanggal {$tgl}", 'Menunggu'],
+            [[$this->nip], 'LKH', "LKH anda pada tanggal {$tgl} disetujui oleh Atasan Uji", 'Disetujui'],
+        ], array_map(static fn (array $d): array => [$d['nip'], $d['judul'], $d['isi'], json_decode($d['data']['data'], true)['status_str']], $andr));
+
+        $baris = json_decode($andr[0]['data']['data'], true);
+        $this->assertArrayNotHasKey('kegiatan', $baris);
+        $this->assertSame(['', 'Rapat', (int) $a['id']], [$baris['file_lckh_url'], $baris['detail'][1]['kegiatan'], (int) $baris['id_riwayat_lckh']]);
+    }
+
+    public function testPushTipe3HanyaBilaStatusKembaliMenunggu(): void
+    {
+        // review MAKE-066 P8: role 1 mengubah LKH (status tidak dipaksa 0) → tanpa push tipe 3 / Android "mengubah".
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+        $admin                                    = $this->aktor(Role::SUPER_ADMIN)[1];
+
+        try {
+            $a = $this->tambah($this->pegawai, '2026-10-12');
+            $this->svc()->proses($this->atasan, $a['id'], 'setujui', null);
+            $this->svc()->ubah($admin, $a['id'], ['kegiatan' => [$this->baris('08:00')]]);
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $this->assertSame([1, 2], array_column($this->jobPush('push-riwayat'), 'tipe'));
+        $this->assertSame(['Monitoring LKH', 'LKH'], array_column($this->jobPush('push-pesan'), 'judul'));
+    }
+
+    /**
+     * Data job antrean `push` bernama $nama, urut masuk.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function jobPush(string $nama): array
+    {
+        $hasil = [];
+
+        foreach ($this->db->table('queue_jobs')->where('queue', 'push')->orderBy('id', 'ASC')->get()->getResultArray() as $r) {
+            $p = (array) json_decode((string) $r['payload'], true);
+
+            if (($p['job'] ?? null) === $nama) {
+                $hasil[] = (array) $p['data'];
+            }
+        }
+
+        return $hasil;
+    }
+
     public function testStempelCreatedAtDanUpdatedAtBerisiUtc(): void
     {
         // CR-086: sesi DB berzona UTC (App\Database\MySQLi), jadi DEFAULT/ON UPDATE kolom audit berisi UTC.

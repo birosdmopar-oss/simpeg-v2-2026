@@ -202,6 +202,70 @@ final class KonketTest extends DatabaseTestCase
         $this->assertSame(0, $this->db->table('absen_ijin')->whereIn('id', $hapus['ids'])->where('status !=', '10')->countAllResults());
     }
 
+    public function testPushWebRiwayatKonketIkutLegacyBilaDriverFcm(): void
+    {
+        // F6-13 (Fase 6 MAKE-066) [K `L_konket.php:370/563/1888`]: ajukan → tipe 1 (admin), ubah pegawai (kembali W) → tipe 3,
+        // proses → tipe 2 (pegawai) "Disetujui"/"Ditolak". Driver mock tidak mengantre.
+        $this->tambah($this->pegawai, $this->data('2026-10-01'));
+        $this->assertSame(0, $this->db->table('queue_jobs')->where('queue', 'push')->countAllResults());
+
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+
+        try {
+            $row = $this->tambah($this->pegawai, $this->data('2026-10-05'));
+            $this->svc()->ubah($this->pegawai, $row['id'], ['alasan' => 'Diubah'] + $this->data('2026-10-05'), null);
+            $this->svc()->proses($this->admin, $row['id'], 'tolak', 'Bukti tidak sesuai');
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $data = array_column(array_filter(
+            array_map(static fn (array $r): array => (array) json_decode((string) $r['payload'], true), $this->db->table('queue_jobs')->where('queue', 'push')->orderBy('id', 'ASC')->get()->getResultArray()),
+            static fn (array $j): bool => $j['job'] === 'push-riwayat',
+        ), 'data');
+        $this->assertSame([
+            ['tipe' => 1, 'jenis' => 'konket', 'id' => $row['id'], 'aksi' => null],
+            ['tipe' => 3, 'jenis' => 'konket', 'id' => $row['id'], 'aksi' => null],
+            ['tipe' => 2, 'jenis' => 'konket', 'id' => $row['id'], 'aksi' => 'Ditolak'],
+        ], $data);
+    }
+
+    public function testPushAndroidProsesKePemohonDanPesertaGabunganIkutLegacy(): void
+    {
+        // review MAKE-066 P1 [K `L_konket.php:1891-1972`]: proses → Android pemohon + peserta dinas gabungan aktif; admin ubah tanpa
+        // status kembali W → tanpa push tipe 3 (P8).
+        $p1                                       = $this->buatPegawai();
+        $p2                                       = $this->buatPegawai();
+        $dinas                                    = ['kategori' => 8, 'jenis_dinas' => 1];
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+
+        try {
+            $row = $this->tambah($this->pegawai, $dinas + ['peserta' => [$p1, $p2]] + $this->data('2026-10-05'));
+            $this->svc()->ubah($this->pegawai, $row['id'], $dinas + ['peserta' => [$p1], 'alasan' => 'Rapat'] + $this->data('2026-10-05'), null);
+            $this->svc()->ubah($this->admin, $row['id'], $dinas + ['peserta' => [$p1], 'alasan' => 'Rapat koordinasi'] + $this->data('2026-10-05'), null);
+            $this->svc()->proses($this->adminSatker, $row['id'], 'setujui', null);
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $jobs = array_map(static fn (array $r): array => (array) json_decode((string) $r['payload'], true), $this->db->table('queue_jobs')->where('queue', 'push')->orderBy('id', 'ASC')->get()->getResultArray());
+        $this->assertSame([1, 3, 2], array_column(array_column(array_filter($jobs, static fn (array $j): bool => $j['job'] === 'push-riwayat'), 'data'), 'tipe'), 'ubah admin (status tetap) tanpa tipe 3');
+
+        $android = array_column(array_filter($jobs, static fn (array $j): bool => $j['job'] === 'push-pesan'), 'data');
+        $tgl     = \App\Libraries\Push\TemplatPushRiwayat::tanggal('2026-10-05');
+        $this->assertSame([
+            [[$this->nip], 'Konfirmasi Ketidakhadiran', "Konfirmasi Ketidakhadiran anda pada tanggal {$tgl} s/d {$tgl} Disetujui oleh Admin", 'android'],
+            [[$p1], 'Konfirmasi Ketidakhadiran', "Konfirmasi Ketidakhadiran anda pada tanggal {$tgl} s/d {$tgl} Disetujui oleh Admin", 'android'],
+        ], array_map(static fn (array $d): array => [$d['nip'], $d['judul'], $d['isi'], $d['kanal']], $android), 'peserta keluar (p2) tidak dikirimi');
+
+        $baris = json_decode($android[0]['data']['data'], true);
+        $this->assertSame(['title', 'body', 'data'], array_keys($android[0]['data']));
+        $this->assertSame(['', 'Disetujui', 8], [$baris['file_bukti_url'], $baris['status_str'], (int) $baris['jenis']['old_id']]);
+        $this->assertSame((int) $row['id'], (int) $baris['id']);
+    }
+
     public function testProsesTolakWajibAlasanDanHanyaMenunggu(): void
     {
         $row = $this->tambah($this->pegawai, $this->data('2026-10-05'));

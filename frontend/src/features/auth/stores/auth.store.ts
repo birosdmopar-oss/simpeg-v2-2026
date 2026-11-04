@@ -7,6 +7,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import { lepasTokenPush } from '@/features/integrasi/composables/notifikasiPush'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
 import { isApiError } from '@/lib/axios'
 
@@ -83,6 +84,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
+    // Token push web perangkat ini dilepas selagi sesi masih sah (PRD Fase 6 F6-13, MAKE-066); gagal tidak menahan Keluar.
+    await lepasTokenPush()
     try {
       await authService.logout()
     } finally {

@@ -193,6 +193,8 @@ final class KonketService implements KonketServiceInterface
         $param['affect_tukin'] ??= 1;
 
         $id = $this->tulis($auth, null, $param, $berkas, $this->daftarPeserta($auth, $param, $data, $nip));
+        // F6-13 (Fase 6 MAKE-066): push web ke admin pembawah sesudah commit [K `L_konket.php:368-371`].
+        (new \App\Libraries\Push\AntrePushRiwayat())->antre(1, 'konket', $id);
 
         return $this->detail($auth, $id);
     }
@@ -218,6 +220,11 @@ final class KonketService implements KonketServiceInterface
         }
 
         $this->tulis($auth, $id, $param, $berkas, $this->daftarPeserta($auth, $param, $data, (string) $lama['nip']), $lama);
+
+        // F6-13 (Fase 6 MAKE-066): perubahan yang kembali menunggu → push web ke admin [K `L_konket.php:561-565`].
+        if (($param['status'] ?? null) === self::W) {
+            (new \App\Libraries\Push\AntrePushRiwayat())->antre(3, 'konket', $id);
+        }
 
         return $this->detail($auth, $id);
     }
@@ -313,6 +320,10 @@ final class KonketService implements KonketServiceInterface
                 $model->withActor($auth, static fn () => $model->update($idProses, $param));
             }
         });
+        // F6-13 (Fase 6 MAKE-066): hasil proses → push web ke pegawai sesudah commit [K `L_konket.php:1885-1889`].
+        (new \App\Libraries\Push\AntrePushRiwayat())->antre(2, 'konket', $id, $param['status'] === self::V ? 'Disetujui' : 'Ditolak');
+        // F6-13 (review MAKE-066 P1): push Android ke pemohon + peserta dinas gabungan [K `L_konket.php:1891-1972`].
+        (new \App\Libraries\Push\PushAndroidLkhKonket())->konketDiproses($id, $auth);
 
         return $this->detail($auth, $id);
     }

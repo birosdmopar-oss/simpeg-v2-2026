@@ -32,6 +32,9 @@ use CodeIgniter\HotReloader\HotReloader;
 // Fase 7 F-03 (MAKE-036, PRD F7-12a): setiap transisi riwayat/snapshot menghapus cache statistik `dashboard_stat_*`.
 Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [StatistikCache::class, 'invalidasiDariEvent']);
 
+// Fase 6 H-04 (MAKE-066, F6-13): push web riwayat ke penerima legacy `fcmQueue_rwy` (hanya driver push `fcm`).
+Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [\App\Libraries\Push\AntrePushRiwayat::class, 'dariEvent']);
+
 // Fase 4 C-04 (MAKE-022, PRD §6.4.7): login sukses mereset penanda tunda pengingat persetujuan cuti milik NIP itu.
 Events::on(AuthService::EVENT_LOGIN_SUKSES, [ResetTundaCuti::class, 'tangani']);
 
