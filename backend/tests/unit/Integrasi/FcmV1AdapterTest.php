@@ -28,7 +28,7 @@ use Tests\Support\Integrasi\LogIntegrasiTiruan;
  */
 final class FcmV1AdapterTest extends CIUnitTestCase
 {
-    private const TOKEN_URI = 'https://oauth.contoh/token';
+    private const TOKEN_URI = 'https://oauth2.googleapis.com/token';
 
     private static string $kunciPrivat = '';
 
@@ -164,6 +164,29 @@ final class FcmV1AdapterTest extends CIUnitTestCase
         $this->assertStringNotContainsString('tok-perangkat-rahasia', $teks);
         $this->assertStringNotContainsString('akses-rahasia', $teks);
         $this->assertStringNotContainsString('PRIVATE KEY', $teks);
+    }
+
+    public function testTokenUriDipatokDanKunciPrivatTidakDiProperti(): void
+    {
+        // CR-099 S1/S6.
+        $fcm = $this->fcm();
+        $this->assertStringNotContainsString('PRIVATE KEY', print_r($fcm, true));
+        $this->assertStringNotContainsString(self::$kunciPrivat, var_export((array) $fcm, true));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('token_uri bukan endpoint OAuth Google');
+        new FcmV1Adapter($this->klien(), new CacheService($this->cache, 'u_'), ['projectId' => 'proyek-uji', 'credentialsPath' => '/x.json'], static fn (): string => (string) json_encode(['client_email' => 'sa@contoh', 'private_key' => self::$kunciPrivat, 'token_uri' => 'https://penyerang.contoh/token']));
+    }
+
+    public function testGalatOAuthMenjadiKirimanGagalBukanTokenTidakSah(): void
+    {
+        // CR-099 S2: token akses gagal → multicast melaporkan gagal tanpa melempar dan tanpa menghapus token perangkat.
+        $this->transport->antreJson(500, ['error' => 'internal'])->antreJson(500, ['error' => 'internal']);
+
+        $r = $this->fcm()->sendMulticast(['tok-a', 'tok-b'], 'J', 'I');
+
+        $this->assertSame(['502', 0, 2, []], [$r['status_code'], $r['success_count'], $r['failure_count'], $r['invalid_tokens']]);
+        $this->assertStringContainsString('Token akses FCM gagal diperoleh', $r['message']);
     }
 
     public function testDriverFcmDiServicesGagalSaatDibuatBilaKonfigurasiKosong(): void

@@ -11,8 +11,9 @@ use CodeIgniter\Database\BaseConnection;
 /**
  * Pengirim push bersama job antrean `push` (PRD Fase 6 §7.4, MAKE-066): token dari {@see PenerimaTokenFcm} dikelompokkan per
  * platform lalu dikirim lewat gateway (bentuk pesan per kanal bila gateway mendukung {@see PushPlatformInterface}).
- * Token yang dilaporkan tidak sah dihapus menurut `id_firebase_token` barisnya (AC-04.2; legacy tidak membersihkan, B-11),
- * sehingga tidak di-retry selamanya. Isi token tidak pernah dicatat.
+ * Token yang dilaporkan tidak sah dihapus menurut `token_hash` + `platform` (semua pemilik; token yang ditolak FCM tidak sah
+ * untuk siapa pun — CR-099 S3; legacy tidak membersihkan, B-11), sehingga tidak di-retry selamanya. Isi token tidak pernah
+ * dicatat.
  */
 final class PengirimPushFcm
 {
@@ -47,10 +48,10 @@ final class PengirimPushFcm
             $hasil['gagal'] += $r['failure_count'];
             $hasil['pesan'] = $r['message'];
 
-            $ids = array_values(array_filter(array_map(static fn (string $t): ?int => $idPerToken[$t] ?? null, $r['invalid_tokens'])));
+            $hash = array_values(array_unique(array_map(static fn (string $t): string => hash('sha256', $t), array_values(array_intersect($r['invalid_tokens'], $tokens)))));
 
-            if ($ids !== []) {
-                $this->db->table('firebase_token')->whereIn('id_firebase_token', $ids)->delete();
+            if ($hash !== []) {
+                $this->db->table('firebase_token')->where('platform', $platform)->whereIn('token_hash', $hash)->delete();
                 $hasil['dihapus'] += $this->db->affectedRows();
             }
         }

@@ -195,7 +195,9 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
 4. Frontend (web push): isi konfigurasi web Firebase proyek yang sama di `frontend/.env.production` (`VITE_FIREBASE_*`, lihat `frontend/.env.example`). Nilai web Firebase bukan rahasia, tetapi tetap tidak disalin dari `header.php` legacy; ambil dari Firebase console.
 5. Token web (`platform` 1) didaftarkan SPA lewat `POST api/v1/integrasi/fcm-token`. **Token Android (`platform` 2) tidak punya endpoint di SIMPEG v2** (legacy pun tidak): backend app mobile di luar repo yang menulis `firebase_token` legacy harus diarahkan menulis ke `firebase_token` DB v2 — `nip` pemilik, `platform` = 2, `fcm_token`, `token_hash` = SHA-256 heks token (unik per `nip` + `token_hash`), `id_pengguna` NULL. Siapa dan bagaimana caranya = pertanyaan cutover DEPLOY-001.1 (PRD Fase 6 §7.4); sampai terjawab, push Android dan topik presensi tidak punya penerima. Token yang dilaporkan FCM tidak terdaftar dihapus otomatis.
    Kontrak `data` push Android cuti mengikuti legacy apa adanya (`{title, body, data: JSON baris riwayat_cuti + file_bukti_url + status_str}`) karena app Android bergantung padanya; TB/IB/PMK tidak dikirim ke Android (legacy hanya cuti dan support).
-6. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`.
+6. Berkas service account wajib ber-`token_uri` `https://oauth2.googleapis.com/token` (berkas lain ditolak). Kunci privat dibaca dari berkas hanya saat menandatangani JWT; **token akses OAuth (±1 jam) disimpan di cache aplikasi** (handler cache CI4, bawaan berkas di `writable/cache`) — pastikan `writable/` tidak terjangkau dari web dan hanya dibaca user PHP.
+7. Batas [V2]: maks 10 token web per akun (yang terlama dibuang), pendaftaran token dibatasi 20 permintaan/60 detik per akun (429).
+8. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`; galat per token pada topik presensi (HTTP 200 dengan `results[].error`) tercatat sebagai `warning` `[fcm-topik]` di log aplikasi dan hitungannya ada di hasil job.
 
 ---
 

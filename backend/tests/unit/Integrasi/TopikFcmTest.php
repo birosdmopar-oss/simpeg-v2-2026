@@ -100,7 +100,7 @@ final class TopikFcmTest extends CIUnitTestCase
             $klien,
             new CacheService(new MockCache(), 'u_'),
             ['projectId' => 'proyek-uji', 'credentialsPath' => '/di/luar/repo/sa.json'],
-            static fn (): string => (string) json_encode(['client_email' => 'sa-uji@proyek-uji.contoh', 'private_key' => KunciRsaUji::pasangan()['privat'], 'token_uri' => 'https://oauth.contoh/token']),
+            static fn (): string => (string) json_encode(['client_email' => 'sa-uji@proyek-uji.contoh', 'private_key' => KunciRsaUji::pasangan()['privat'], 'token_uri' => 'https://oauth2.googleapis.com/token']),
         );
 
         return new TopikFcm($klien, $fcm);

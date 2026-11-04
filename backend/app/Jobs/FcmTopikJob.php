@@ -16,6 +16,9 @@ use CodeIgniter\Queue\Interfaces\JobInterface;
  * Token = DISTINCT `fcm_token` Android (`platform` = 2) milik `nip`, terbaru dulu [K `L:1834-1840`]; tanpa token → selesai
  * tanpa galat (legacy tidak mengantre). `lepas` dijalankan sebelum `tambah`. Gagal HTTP/koneksi → dilempar agar worker
  * mencoba ulang sampai {@see self::TRIES}, lalu `queue_jobs_failed`; batchAdd/batchRemove idempoten sehingga aman diulang.
+ * Galat per token (`results[].error`, HTTP tetap 200 sehingga `integrasi_log` mencatat sukses) TIDAK hilang (BP-7, CR-099):
+ * dicatat `log_message('warning')` per topik dengan jumlah ok/galat (tanpa token) dan hitungan total ikut di hasil job
+ * (`selesai ok=N galat=M`).
  */
 class FcmTopikJob extends BaseJob implements JobInterface
 {
@@ -48,16 +51,27 @@ class FcmTopikJob extends BaseJob implements JobInterface
         }
 
         $topik = TopikFcm::dariLayanan();
+        $ok    = 0;
+        $galat = 0;
 
-        foreach ($this->daftar('lepas') as $t) {
-            $topik->ubah($t, false, $tokens);
+        foreach ([[false, $this->daftar('lepas')], [true, $this->daftar('tambah')]] as [$tambah, $daftar]) {
+            foreach ($daftar as $t) {
+                $hasil = $topik->ubah($t, $tambah, $tokens);
+                $ok += $hasil['ok'];
+                $galat += $hasil['galat'];
+
+                if ($hasil['galat'] > 0) {
+                    log_message('warning', '[fcm-topik] {aksi} topik {topik}: {ok} token ok, {galat} token ditolak FCM.', [
+                        'aksi'  => $tambah ? 'tambah' : 'lepas',
+                        'topik' => $t,
+                        'ok'    => $hasil['ok'],
+                        'galat' => $hasil['galat'],
+                    ]);
+                }
+            }
         }
 
-        foreach ($this->daftar('tambah') as $t) {
-            $topik->ubah($t, true, $tokens);
-        }
-
-        return self::HASIL_SELESAI;
+        return self::HASIL_SELESAI . " ok={$ok} galat={$galat}";
     }
 
     /**

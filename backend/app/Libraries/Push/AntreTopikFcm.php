@@ -40,6 +40,11 @@ final class AntreTopikFcm
 
     public function presensi(BaseConnection $db, string $nip, string $tgl, bool $masuk): void
     {
+        // Driver bukan fcm → tidak ada yang diantre; jangan query LKH sia-sia (CR-099 S4).
+        if ($this->driver !== 'fcm') {
+            return;
+        }
+
         if ($masuk) {
             $this->antre($nip, [TopikFcm::BLM_PULANG], [TopikFcm::BLM_MASUK]);
 

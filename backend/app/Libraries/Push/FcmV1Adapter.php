@@ -33,7 +33,10 @@ use RuntimeException;
  * - Per platform ({@see PushPlatformInterface}): web → `webpush.notification.icon` (= `data.icon` bila ada), tautan tetap di
  *   `data.link` (dibuka service worker; `webpush.fcm_options.link` sengaja tidak dipakai karena wajib URL https absolut);
  *   Android → `android.priority` HIGH + `notification.sound` default + `click_action` = judul [K `Cron.php:1036-1046`].
- * - Token perangkat, token akses, dan kunci privat tidak pernah masuk log (AC-K.1, BP-5).
+ * - Token perangkat, token akses, dan kunci privat tidak pernah masuk log (AC-K.1, BP-5). Kunci privat TIDAK disimpan di
+ *   properti (CR-099 S1): berkas dibaca ulang hanya saat menandatangani JWT (token akses di-cache ±1 jam di cache aplikasi);
+ *   parameter token/kunci bertanda `#[\SensitiveParameter]`. `token_uri` dipatok ke {@see self::TOKEN_URI} (S6).
+ * - Galat OAuth (token akses gagal diperoleh) dihitung sebagai kiriman gagal, bukan dilempar dari tengah multicast (S2).
  */
 final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInterface
 {
@@ -45,13 +48,20 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
 
     private const CACHE_TOKEN = 'fcm_token_akses';
 
+    /** Endpoint token OAuth Google; berkas service account dengan `token_uri` lain ditolak (CR-099 S6). */
+    public const TOKEN_URI = 'https://oauth2.googleapis.com/token';
+
     /** Ikon notifikasi web (aset SPA `frontend/public`; ikon legacy `/assets/images/logo-simpeg-v1-200x200.png` tidak ada di v2). */
     public const IKON_BAWAAN = '/apple-touch-icon.png';
 
     private string $projectId;
 
-    /** @var array{client_email: string, private_key: string, token_uri: string} */
-    private array $akun;
+    private string $clientEmail;
+
+    private string $credentialsPath;
+
+    /** @var Closure(string): string */
+    private Closure $baca;
 
     /** @var Closure(): int */
     private Closure $waktu;
@@ -82,18 +92,12 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
             return $isi;
         };
 
-        $data = json_decode($baca(trim((string) $konfigurasi['credentialsPath'])), true);
-
-        foreach (['client_email', 'private_key', 'token_uri'] as $kunci) {
-            if (! is_array($data) || ! is_string($data[$kunci] ?? null) || trim($data[$kunci]) === '') {
-                throw new RuntimeException("Berkas service account FCM tidak sah: kolom {$kunci} kosong.");
-            }
-        }
-
-        $this->akun = ['client_email' => $data['client_email'], 'private_key' => $data['private_key'], 'token_uri' => $data['token_uri']];
+        $this->baca            = $baca;
+        $this->credentialsPath = trim((string) $konfigurasi['credentialsPath']);
+        $this->clientEmail     = $this->akunLayanan()['client_email'];
     }
 
-    public function send(string $deviceToken, string $title, string $body, array $data = []): array
+    public function send(#[\SensitiveParameter] string $deviceToken, string $title, string $body, array $data = []): array
     {
         return $this->kirimSatu($deviceToken, $title, $body, $data, null)[0];
     }
@@ -125,16 +129,16 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
 
         $iat = ($this->waktu)();
         $jwt = JWT::encode([
-            'iss'   => $this->akun['client_email'],
+            'iss'   => $this->clientEmail,
             'scope' => self::SCOPE,
-            'aud'   => $this->akun['token_uri'],
+            'aud'   => self::TOKEN_URI,
             'iat'   => $iat,
             'exp'   => $iat + 3600,
-        ], $this->akun['private_key'], 'RS256');
+        ], $this->akunLayanan()['private_key'], 'RS256');
 
         $respons = $this->klien->kirim(new Permintaan(
             metode: 'POST',
-            url: $this->akun['token_uri'],
+            url: self::TOKEN_URI,
             layanan: 'fcm',
             operasi: 'token_oauth',
             form: ['grant_type' => self::GRANT, 'assertion' => $jwt],
@@ -209,7 +213,7 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
      *
      * @return array{0: array{status_code: string, message: string, message_id: string|null}, 1: bool} hasil + token tidak sah
      */
-    private function kirimSatu(string $deviceToken, string $title, string $body, array $data, ?int $platform): array
+    private function kirimSatu(#[\SensitiveParameter] string $deviceToken, string $title, string $body, array $data, ?int $platform): array
     {
         if (trim($deviceToken) === '') {
             return [['status_code' => '400', 'message' => 'Device token kosong.', 'message_id' => null], false];
@@ -219,6 +223,9 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
             $respons = $this->kirim($deviceToken, $title, $body, $data, $platform);
         } catch (GalatTransport $e) {
             return [['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => $e->getMessage(), 'message_id' => null], false];
+        } catch (RuntimeException $e) {
+            // Token akses OAuth gagal diperoleh (CR-099 S2): kiriman gagal, token perangkat tidak dianggap tidak sah.
+            return [['status_code' => 'oauth', 'message' => $e->getMessage(), 'message_id' => null], false];
         }
 
         $json = $respons->json() ?? [];
@@ -233,7 +240,7 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
     /**
      * @param array<string, string> $data
      */
-    private function kirim(string $deviceToken, string $title, string $body, array $data, ?int $platform): Respons
+    private function kirim(#[\SensitiveParameter] string $deviceToken, string $title, string $body, array $data, ?int $platform): Respons
     {
         $akses = $this->tokenAkses();
         $pesan = ['token' => $deviceToken, 'notification' => ['title' => $title, 'body' => $body]];
@@ -263,6 +270,28 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
         }
 
         return $respons;
+    }
+
+    /**
+     * Isi berkas service account (dibaca saat dibutuhkan; kunci privat tidak disimpan di properti, CR-099 S1).
+     *
+     * @return array{client_email: string, private_key: string}
+     */
+    private function akunLayanan(): array
+    {
+        $data = json_decode(($this->baca)($this->credentialsPath), true);
+
+        foreach (['client_email', 'private_key', 'token_uri'] as $kunci) {
+            if (! is_array($data) || ! is_string($data[$kunci] ?? null) || trim($data[$kunci]) === '') {
+                throw new RuntimeException("Berkas service account FCM tidak sah: kolom {$kunci} kosong.");
+            }
+        }
+
+        if (rtrim($data['token_uri'], '/') !== self::TOKEN_URI) {
+            throw new RuntimeException('Berkas service account FCM tidak sah: token_uri bukan endpoint OAuth Google.');
+        }
+
+        return ['client_email' => $data['client_email'], 'private_key' => $data['private_key']];
     }
 
     /**

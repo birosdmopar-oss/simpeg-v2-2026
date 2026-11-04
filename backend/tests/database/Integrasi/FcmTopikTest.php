@@ -123,12 +123,29 @@ final class FcmTopikTest extends DatabaseTestCase
 
         $hasil = (new FcmTopikJob(['nip' => $nip, 'tambah' => [TopikFcm::BLM_PULANG], 'lepas' => [TopikFcm::BLM_MASUK, 'topik_asing']]))->process();
 
-        $this->assertSame(FcmTopikJob::HASIL_SELESAI, $hasil);
+        $this->assertSame(FcmTopikJob::HASIL_SELESAI . ' ok=4 galat=0', $hasil);
         $catat = array_map(static fn (array $c): array => [$c['permintaan']->url, $c['permintaan']->json['to'] ?? null, $c['permintaan']->json['registration_tokens'] ?? null], array_slice($transport->tercatat(), 1));
         $this->assertSame([
             [TopikFcm::URL_LEPAS, '/topics/pegawai_blm_masuk', ['tok-android-2', 'tok-android-1']],
             [TopikFcm::URL_TAMBAH, '/topics/pegawai_blm_pulang', ['tok-android-2', 'tok-android-1']],
         ], $catat);
+    }
+
+    public function testGalatPerTokenTercatatDanMasukHasilJob(): void
+    {
+        // CR-099 (B1, BP-7): batchAdd HTTP 200 dengan results[].error tidak boleh hilang tanpa jejak.
+        $nip = $this->buatPegawai();
+        $this->token($nip, 'tok-android-1', 2, '2026-10-01 00:00:00');
+        $this->token($nip, 'tok-android-2', 2, '2026-10-02 00:00:00');
+        $transport = (new FakeTransport())
+            ->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599])
+            ->antreJson(200, ['results' => [['error' => 'NOT_FOUND'], ['error' => 'INVALID_ARGUMENT']]]);
+        $this->pasangFcm($transport);
+
+        $hasil = (new FcmTopikJob(['nip' => $nip, 'tambah' => [TopikFcm::BLM_LKH], 'lepas' => []]))->process();
+
+        $this->assertSame(FcmTopikJob::HASIL_SELESAI . ' ok=0 galat=2', $hasil);
+        $this->assertLogContains('warning', '[fcm-topik] tambah topik pegawai_blm_lkh: 0 token ok, 2 token ditolak FCM.');
     }
 
     public function testJobTanpaTokenAndroidSelesaiTanpaHttp(): void
@@ -175,7 +192,7 @@ final class FcmTopikTest extends DatabaseTestCase
             $klien,
             new CacheService(new MockCache(), 'u_'),
             ['projectId' => 'proyek-uji', 'credentialsPath' => '/di/luar/repo/sa.json'],
-            static fn (): string => (string) json_encode(['client_email' => 'sa-uji@proyek-uji.contoh', 'private_key' => KunciRsaUji::pasangan()['privat'], 'token_uri' => 'https://oauth.contoh/token']),
+            static fn (): string => (string) json_encode(['client_email' => 'sa-uji@proyek-uji.contoh', 'private_key' => KunciRsaUji::pasangan()['privat'], 'token_uri' => 'https://oauth2.googleapis.com/token']),
         ));
     }
 }

@@ -58,14 +58,16 @@ final class PushRiwayatTest extends DatabaseTestCase
 
     public function testListenerEventHanyaDriverFcmDanJenisLegacy(): void
     {
-        // Terdaftar di Config\Events; listener bisa sudah dilepas test lain dalam proses yang sama
-        // (RiwayatUjiTrait::lepasEngine → Events::removeAllListeners) — pasang ulang hanya bila hilang (pola StatistikCache).
-        $this->assertStringContainsString("[\App\Libraries\Push\AntrePushRiwayat::class, 'dariEvent']", (string) file_get_contents(APPPATH . 'Config/Events.php'));
+        // Pendaftaran di Config\Events dijaga EventsPushTerdaftarTest (CR-099 P7). Listener bisa sudah dilepas test lain
+        // dalam proses yang sama (RiwayatUjiTrait::lepasEngine → Events::removeAllListeners).
         $listener = [AntrePushRiwayat::class, 'dariEvent'];
 
-        if (! in_array($listener, Events::listeners(RiwayatEngine::EVENT_NOTIFIKASI), true)) {
-            Events::on(RiwayatEngine::EVENT_NOTIFIKASI, $listener);
+        // Tepat satu salinan (Config/Events.php bisa termuat ulang oleh EventsPushTerdaftarTest dalam proses yang sama).
+        while (Events::removeListener(RiwayatEngine::EVENT_NOTIFIKASI, $listener)) {
+            // lepas semua salinan
         }
+
+        Events::on(RiwayatEngine::EVENT_NOTIFIKASI, $listener);
 
         $payload = ['tipe' => RiwayatEngine::NOTIF_DIAJUKAN, 'jenis' => 'kp', 'nip' => '1', 'id' => 5, 'status' => 0, 'aksi' => null, 'reason_note' => null];
 
@@ -126,6 +128,11 @@ final class PushRiwayatTest extends DatabaseTestCase
         (new PushRiwayatJob(['tipe' => 1, 'jenis' => 'organisasi', 'id' => $this->organisasi($upt)]))->process();
         $this->assertSame('tok-upt', $this->mock->sent()[1]['token']);
         $this->assertCount(2, $this->mock->sent());
+
+        // CR-099 S5: baris pmj dengan unit kosong → legacy `id_unit=''` → tanpa penerima (bukan Super Admin).
+        $tanpaUnit = $this->buatPegawai();
+        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $tanpaUnit)->update(['id_unit' => null]);
+        $this->assertSame(PushRiwayatJob::HASIL_TANPA_TOKEN, (new PushRiwayatJob(['tipe' => 1, 'jenis' => 'organisasi', 'id' => $this->organisasi($tanpaUnit)]))->process());
     }
 
     public function testDiprosesKePegawaiDenganKeteranganTolak(): void

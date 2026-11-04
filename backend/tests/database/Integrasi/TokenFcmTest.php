@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace Tests\Database\Integrasi;
 
 use App\Constants\Role;
+use App\Exceptions\TooManyRequestsException;
+use App\Libraries\Push\TokenFcmService;
 use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\Mock\MockCache;
+use CodeIgniter\Throttle\Throttler;
+use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
@@ -63,6 +68,44 @@ final class TokenFcmTest extends DatabaseTestCase
         $this->assertSame(1, $this->db->table('firebase_token')->countAllResults(), 'token akun lain tidak disentuh');
     }
 
+    public function testPendaftaranBersamaanMenjadiSudahTerdaftarBukan500(): void
+    {
+        // CR-099 P3 (AC-04.5): baris yang sama masuk dari permintaan lain antara SELECT dan INSERT → 1062 → sudah_terdaftar.
+        $admin = $this->buatAkunTanpaNip('admin.uji.fcm4', Role::SUPER_ADMIN);
+        $sisip = fn (): bool => $this->db->table('firebase_token')->insert(['nip' => null, 'id_pengguna' => $admin['id_pengguna'], 'platform' => 1, 'fcm_token' => 'tok-balapan', 'token_hash' => hash('sha256', 'tok-balapan'), 'created_at' => gmdate('Y-m-d H:i:s')]);
+        $svc   = new TokenFcmService($this->db, static function () use ($sisip): void {
+            $sisip();
+        });
+
+        $this->assertSame(['status' => 'sudah_terdaftar'], $svc->daftar($this->authUntukAkun((int) $admin['id_pengguna']), ['fcm_token' => 'tok-balapan']));
+        $this->assertSame(1, $this->db->table('firebase_token')->countAllResults());
+    }
+
+    public function testMaksimalSepuluhTokenWebPerAkunDanThrottle(): void
+    {
+        // CR-099 P4: token web ke-11 membuang yang terlama; POST melewati kapasitas per akun → 429.
+        $throttler = new Throttler(new MockCache());
+        $throttler->setTestTime(1_790_000_000);
+        Services::injectMock('throttler', $throttler);
+        $admin = $this->buatAkunTanpaNip('admin.uji.fcm5', Role::SUPER_ADMIN);
+        $auth  = $this->authUntukAkun((int) $admin['id_pengguna']);
+        $svc   = new TokenFcmService($this->db);
+
+        for ($i = 1; $i <= TokenFcmService::MAKS_TOKEN_WEB + 1; $i++) {
+            $svc->daftar($auth, ['fcm_token' => "tok-{$i}"]);
+        }
+
+        $sisa = array_column($this->db->table('firebase_token')->where('id_pengguna', $admin['id_pengguna'])->orderBy('id_firebase_token', 'ASC')->get()->getResultArray(), 'fcm_token');
+        $this->assertSame(array_map(static fn (int $i): string => "tok-{$i}", range(2, TokenFcmService::MAKS_TOKEN_WEB + 1)), $sisa);
+
+        for ($i = TokenFcmService::MAKS_TOKEN_WEB + 2; $i <= TokenFcmService::THROTTLE_KAPASITAS; $i++) {
+            $svc->daftar($auth, ['fcm_token' => 'tok-ulang']);
+        }
+
+        $this->expectException(TooManyRequestsException::class);
+        $svc->daftar($auth, ['fcm_token' => 'tok-ulang']);
+    }
+
     public function testValidasiDanWajibLogin(): void
     {
         $admin = $this->buatAkunTanpaNip('admin.uji.fcm3', Role::SUPER_ADMIN);
@@ -72,6 +115,12 @@ final class TokenFcmTest extends DatabaseTestCase
         }
 
         $this->assertSame(0, $this->db->table('firebase_token')->countAllResults());
+    }
+
+    protected function tearDown(): void
+    {
+        Services::reset(true);
+        parent::tearDown();
     }
 
     public function testTanpaLoginDitolak(): void
