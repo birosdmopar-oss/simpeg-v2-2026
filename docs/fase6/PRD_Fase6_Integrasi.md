@@ -3,7 +3,7 @@
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase6/PRD_Fase6_Integrasi.md` — **acuan utama** coder/agen AI Fase 6 (Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122). Pembagian kerja paralel: [`6_1.md`](6_1.md) (Qoder A — klien integrasi keluar) dan [`6_2.md`](6_2.md) (Qoder B — API masuk & job terjadwal) |
-| Versi | **v1.0h — 04-11-2026** (CR-099: kanal Android F6-13 ikut legacy penuh Q6-28..Q6-29; CR-098: aturan H-11 status TB/CLTN harian Q6-24..Q6-27; CR-097: TLS BSrE ikut legacy Q6-18 + e-sign cuti F6-18 Q6-19..Q6-23; CR-093: keputusan A0 v2 Jalur A; CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
+| Versi | **v1.0i — 04-11-2026** (CR-100: aturan B6 SIASN tarik/dorong/unggah arsip Q6-30..Q6-35; CR-099: kanal Android F6-13 ikut legacy penuh Q6-28..Q6-29; CR-098: aturan H-11 status TB/CLTN harian Q6-24..Q6-27; CR-097: TLS BSrE ikut legacy Q6-18 + e-sign cuti F6-18 Q6-19..Q6-23; CR-093: keputusan A0 v2 Jalur A; CR-092: bentuk auth BKN Q6-17; CR-091: kontrak log bersama A/B; CR-090: AC-03.5 ikut legacy; v0.1 `ee6ce5a6`; v1.0 memuat keputusan Horii 01-11-2026 atas Q6-01..Q6-16 — prinsip umum: **"intinya ikut legacy"**; riwayat §Lampiran C) |
 | Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 6 terkunci **GATE-F6** (§0) |
 | Prinsip | **Ikut legacy** (keputusan Horii 01-11) untuk perilaku bisnis & kontrak. Deviasi [V2] hanya bila (a) diputus eksplisit Horii (F6-03, F6-07, F6-16) atau (b) teknis wajib/keamanan dasar (F6-05, F6-11, BP-3/5/8/9) — setiap deviasi tercatat di §5.2 |
 | Basis kode | `origin/main` = **`a320f919`** (rujukan `path:baris` repo dari commit ini) |
@@ -470,6 +470,70 @@ duplikat); **AC-03.3** hapus fisik SKP tidak terjadi untuk NIP yang panggilannya
 konfigurasi + cache, **tidak ada token literal**; **AC-03.5** riwayat yang diedit (`updated_at > siasn_lu`) terdorong ulang **hanya untuk tabel yang memakai `siasn_lu` di legacy** (jabatan); diklat, sertifikasi, kursus/seminar, dan SKP 2022 hanya terdorong saat belum pernah terkirim (`id_rw_siasn IS NULL`, `siasn_flag=0`), tanpa ALTER `siasn_lu` [K `SS/Rw_pelatihan`, `SI:4858`, `SI:7714`; keputusan Horii 02-11-2026, Q2 B0 Jalur B];
 **AC-03.6** uji real (MTC-038) di MT-010 bila PN-2 tersedia.
 
+**Aturan B6 (CR-100, diputus reviewer CR dan disetujui Horii 04-11-2026 saat koding/review MAKE-067; rincian di `Libraries/Siasn/README.md`).**
+Prinsip: ikut legacy; deviasi hanya untuk bug legacy yang merusak data atau berisiko duplikat di BKN.
+
+- **Q6-30 — pengaman aksi destruktif `siasn:tarik`** (perluasan F6-14). Lepas pasangan (golongan/pendidikan/PMK) dan hapus fisik SKP
+  HANYA untuk NIP yang API-nya sukses dengan data sah. Tidak destruktif bila:
+  - status ≠ sukses (HTTP/timeout/koneksi/token/`code≠1`/JSON tidak sah);
+  - `code=1` dengan `data` kosong (INFO `data_kosong`);
+  - ada baris yang ditolak validasi atau elemen bukan objek (INFO `ditolak_tanpa_destruktif`);
+  - `data` bukan daftar (dianggap `respons` gagal).
+
+  Command menolak berjalan bila driver ≠ `bkn`. Hapus fisik SKP hanya bila batch punya sisip/ubah (ikut legacy `Rw_skp:201`).
+- **Q6-31 — perbaikan bug legacy `siasn:tarik`:**
+  - PMK dipasangkan lewat `tgl_sk`; cocok ganda tidak dipasangkan/disisipkan (INFO `pairing_ganda`);
+  - `siasn_lu` = waktu tarik (legacy mengisi string);
+  - `masaKerjaTahun` dibaca (legacy salah ketik);
+  - lepas pasangan PMK tidak bergantung sisip;
+  - `Rw_ak:65` memakai baris AK yang benar + penjaga `isset`;
+  - hapus AK tidak dibawa (legacy mengomentarinya);
+  - referensi tak terpetakan → bawaan legacy + INFO;
+  - `du_lu` = tanggal bisnis WIB, stempel `_lu` lain UTC;
+  - daftar status disinkronkan setiap tarik;
+  - flag macet dipulihkan (`du = 2` usang setelah 6 jam);
+  - `GET_LOCK` per jenis;
+  - `updated_by`/`approved_by` = akun sistem;
+  - tanpa `audit_logs` per baris; ringkasan jumlah per batch di `integrasi_log`.
+- **Q6-32 — anti-duplikat `siasn:dorong`:**
+  - POST tidak di-retry (401 diulang sekali lewat token baru);
+  - hasil ditulis per baris segera sesudah POST, dengan tulis ulang sekali;
+  - bila tetap gagal sesudah POST sukses → baris TIDAK dipilih lagi (`hasil_tidak_tersimpan`, log critical, `refId` tabel:pk);
+  - galat token / 401 kedua menghentikan batch tanpa menandai baris;
+  - jabatan sukses tanpa id mempertahankan `id_rw_siasn` lama;
+  - UPDATE bersyarat `updated_at` snapshot (edit selama batch tetap terdorong);
+  - timeout/koneksi → flag 2 + INFO `status_tidak_diketahui` (operator memeriksa duplikat di BKN);
+  - penanda proses jabatan flag 3 tanpa menggeser `updated_at`.
+- **Q6-33 — bentuk POST SIASN** (ekstraksi bentuk `postApi_siasn`/`postApi_siasnArsip` `FH:2796-2881`, keputusan Horii 04-11-2026 opsi A, pola Q6-17; nilai tidak pernah dibaca):
+  - body JSON;
+  - header `Auth: bearer` + `Authorization: Bearer` + `Content-Type: application/json` + `accept: application/json`;
+  - sukses = `success` truthy terbatas (`true`/`"true"`/`1`/`"1"`);
+  - unggah: multipart `id_riwayat`, `id_ref_dokumen`, berkas di field `file` (PDF).
+
+  Deviasi: v2 tidak mengikuti redirect (legacy `FOLLOWLOCATION`), 3xx = gagal.
+- **Q6-34 — konfigurasi & data dorong:**
+  - ID instansi/satker/unor bawaan dari `.env` (`integrations.bkn.siasnInstansiId`/`siasnSatkerId`/`siasnUnorBawaan`, kosong di repo; dorong jabatan gagal-cepat bila kosong);
+  - diklat ber-`keterangan` NULL ikut didorong (bug semantik NULL legacy);
+  - tanggal wajib kosong → tidak dikirim, flag 2 "Data tidak lengkap";
+  - sukses tanpa id → flag 1 + INFO;
+  - `siasn_error` disensor (tanpa NIP/payload, dipotong per byte);
+  - " **Upload To SIASN**" + `updated_by` sistem (tidak ditambah berulang; `keterangan` dipotong per byte);
+  - satker NULL ikut terbuang (ikut legacy);
+  - `riwayat_skp.updated_at` diisi eksplisit.
+- **Q6-35 — `siasn:unggah-arsip`:**
+  - antre hanya PDF (`file_size` legacy KB vs v2 byte tidak dipakai); ukuran ≤ 1 MB dicek dari isi saat unggah, dengan `%PDF` di 1024 byte pertama;
+  - `--limit` bawaan 1, `--langkah=semua|antre|unggah`;
+  - kode 36 = "SK Jabatan JFT" (ikut legacy);
+  - antre sertifikasi hanya PNS;
+  - berkas dibaca lewat storage v2 (path legacy MAKE-069);
+  - sesudah POST baris tidak kembali ke status 0; gagal tulis → status 3 + critical;
+  - hanya `NotFoundException` = berkas hilang (status 2);
+  - `ref-unor` tanpa hapus, pemetaan lokal tidak disentuh.
+
+**AC-03.7** (CR-100) baris ditolak / data kosong / data bukan daftar / driver mock → tanpa hapus/lepas; **AC-03.8** POST
+sukses yang gagal tercatat tidak di-POST ulang (dorong dan unggah arsip); **AC-03.9** galat token menghentikan batch tanpa
+menandai baris; **AC-03.10** bentuk POST/multipart sesuai Q6-33 (test transport).
+
 ### 7.4 H-04 — FCM (Jalur B, MAKE-066) — perilaku ikut legacy (F6-11..F6-13)
 
 - `FcmV1Adapter` implementasi `PushNotifGatewayInterface` (F6-11): `send`/`sendMulticast` (loop per token), `invalid_tokens`
@@ -670,6 +734,12 @@ Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (ju
 | Q6-27 | **(03-11-2026, A2a)** `--tanggal` masa depan / lampau | Masa depan ditolak; lampau hanya bersama `--dry-run`; run nyata = hari ini WIB (CR-098) | §7.9, AC-11.10 |
 | Q6-28 | **(04-11-2026, B5 Jalur B)** Cakupan kanal Android — F6-13 v1.0 hanya menyebut cuti/support, padahal legacy `andr_notif_queue` juga diisi LKH (`L_lkh.php:401/637/1138`) dan Konket (`L_konket.php:1972`) | **Ikut legacy penuh**: cuti, support, LKH, Konket ke Android dengan teks & bentuk `data` legacy; TB/IB/PMK hanya web (legacy tanpa push Android). Ditemukan review kode MAKE-066 (CR-099) | F6-13, §7.4 |
 | Q6-29 | **(04-11-2026, B5)** Popup "Informasi" `Cron.php:953` (`queue_popup_notif`) ke Android | Milik Popup Fase 7 (F-04): B5 hanya menyediakan titik sambung `AntrePushPesan`, tidak mengirim (CR-099) | F6-13, Fase 7 F-04 |
+| Q6-30 | **(04-11-2026, B6 Jalur B)** Cakupan pengaman aksi destruktif `siasn:tarik` | Hanya NIP sukses dengan data sah; data kosong/baris ditolak/data bukan daftar/driver mock → tanpa hapus/lepas; hapus SKP hanya bila batch ada sisip/ubah (CR-100) | §7.3, AC-03.7 |
+| Q6-31 | **(04-11-2026, B6)** Bug legacy tarik (PMK pairing mati, `siasn_lu` string, salah ketik masa kerja, `Rw_ak:65`, dll.) | Diperbaiki; rincian §7.3 (CR-100) | §7.3 |
+| Q6-32 | **(04-11-2026, B6)** Risiko duplikat di BKN saat dorong | POST tanpa retry, tulis per baris + tulis ulang sekali, hasil tidak tersimpan tidak dipilih lagi, token galat hentikan batch, id lama dipertahankan, INFO `status_tidak_diketahui` (CR-100) | §7.3, AC-03.8, AC-03.9 |
+| Q6-33 | **(04-11-2026, B6)** Bentuk POST SIASN (helper `FH:2796-2881` terlarang). Pilihan:<br>**A** — ekstraksi bentuk (pola Q6-17);<br>**B** — asumsi + konfirmasi uji real;<br>**C** — tunggu dokumen BKN | **A** (keputusan Horii 04-11-2026). JSON + dua header token + `accept`, sukses truthy terbatas, multipart field `file`; v2 tanpa redirect (CR-100) | §7.3, AC-03.10 |
+| Q6-34 | **(04-11-2026, B6)** Konfigurasi instansi & data dorong | `.env` untuk ID instansi/satker/unor; perbaikan NULL/tanggal kosong; ikut legacy selebihnya (CR-100) | §7.3 |
+| Q6-35 | **(04-11-2026, B6)** Unggah arsip SIASN | Antre PDF, ukuran dari isi, tanpa unggah ulang sesudah POST, ref-unor tanpa hapus (CR-100) | §7.3 |
 
 Prinsip umum Horii 01-11-2026: **"intinya ikut legacy"** — berlaku juga untuk hal yang tidak tercantum di atas. Bila coder
 menemukan perilaku legacy yang belum diputus, default = ikut legacy [K]; deviasi hanya untuk alasan teknis wajib/keamanan
@@ -777,3 +847,4 @@ dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/06-Int
 | v1.0f | 03-11-2026 | CR-097, keputusan Horii 03-11-2026 atas B4a Jalur B (MAKE-065):<br>- Q6-18 TLS BSrE ikut legacy (B) + jalur upgrade `esign.caBundle`;<br>- Q6-19 alur dua langkah (B);<br>- Q6-20 pembatas passphrase 5/15 menit [V2];<br>- Q6-21 passphrase hanya Setujui/Penangguhan (P-1);<br>- Q6-22 QR TTE ikut legacy (Q-1, URL PDF tanpa login, token acak);<br>- Q6-23 QR kaki surat verifikasi publik (Q-2, pola D-14).<br><br>§7.2, BP-3, B-10, AC-02.5..AC-02.8; skema token → DBV-030. Rincian opsi & gap di Trello Catatan Teknis |
 | v1.0g | 03-11-2026 | CR-098, keputusan atas pertanyaan A2a Jalur A (MAKE-062, H-11; diputus reviewer CR, disetujui Horii 03-11-2026, balasan di Trello DEV-007):<br>- F6-20 "CLTN status 1/4" dikoreksi menjadi status 1 (Q6-25, ikut legacy);<br>- Q6-24 bentrok TB+CLTN;<br>- Q6-26 pemulihan status usang hanya bila dijelaskan riwayat berakhir;<br>- Q6-27 `--tanggal`.<br><br>§7.9 + AC-11.7..AC-11.10, `6_2.md` A2a |
 | v1.0h | 04-11-2026 | CR-099, keputusan atas review kode B5 MAKE-066 (disetujui Horii 04-11-2026): F6-13 kanal Android ikut legacy penuh — cuti, support, **LKH, Konket** (Q6-28); TB/IB/PMK hanya web; popup "Informasi" = Fase 7 (Q6-29). §5.2 F6-13, §7.4, register §12, `6_1.md` B5 |
+| v1.0i | 04-11-2026 | CR-100, aturan B6 MAKE-067 SIASN (putusan reviewer CR saat koding/review, disetujui Horii 04-11-2026; Q6-33 = keputusan Horii opsi A): Q6-30 pengaman destruktif tarik, Q6-31 bug legacy tarik, Q6-32 anti-duplikat dorong, Q6-33 bentuk POST hasil ekstraksi, Q6-34 konfigurasi & data dorong, Q6-35 unggah arsip; §7.3 + AC-03.7..AC-03.10 |
