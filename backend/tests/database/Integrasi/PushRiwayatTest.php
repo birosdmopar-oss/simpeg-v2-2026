@@ -178,7 +178,7 @@ final class PushRiwayatTest extends DatabaseTestCase
         $this->db->table('firebase_token')->insert(['nip' => $nip, 'platform' => 2, 'fcm_token' => 'tok-android', 'token_hash' => hash('sha256', 'tok-android'), 'created_at' => '2026-11-04 00:00:00']);
 
         $antre = new AntrePushPesan();
-        $this->assertTrue($antre->antre([$nip, $nip, ' '], 'Halo Simpeg', 'Pesan baru', ['id_inbox' => 7]));
+        $this->assertTrue($antre->antre([$nip, $nip, ' '], 'Halo Simpeg', 'Pesan baru', ['id_inbox' => '7']));
         $this->assertFalse($antre->antre([$nip], 'Halo Simpeg', 'x', [], 'sms'), 'kanal tidak dikenal');
         $this->assertFalse($antre->antre([], 'Halo Simpeg', 'x'));
         $this->assertFalse((new AntrePushPesan(static fn (): QueueInterface => throw new RuntimeException('antrean mati')))->antre([$nip], 'J', 'I'));
