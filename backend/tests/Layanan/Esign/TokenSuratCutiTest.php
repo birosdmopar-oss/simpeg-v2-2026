@@ -13,6 +13,7 @@ use App\Libraries\Layanan\Cuti\TokenSuratCutiService;
 use App\Libraries\Layanan\Cuti\VerifikasiSuratCutiService;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\Mock\MockCache;
+use CodeIgniter\Test\StreamFilterTrait;
 use CodeIgniter\Throttle\Throttler;
 use Config\Encryption;
 use Config\Services;
@@ -33,6 +34,7 @@ final class TokenSuratCutiTest extends DatabaseTestCase
 {
     use EsignUjiTrait;
     use FeatureTestTrait;
+    use StreamFilterTrait;
 
     private const KUNCI = 'phpunit-only-encryption-key-surat-cuti-0123456789ab';
 
@@ -207,6 +209,50 @@ final class TokenSuratCutiTest extends DatabaseTestCase
 
         $this->token()->nonaktifkan($this->authUntukAkun($this->buatAkunUntuk($this->buatPegawai(), 1)), $id);
         $this->panggil("api/v1/publik/surat-cuti/{$mentah}/pdf")->assertStatus(404);
+    }
+
+    /**
+     * P4 review B4a: jalur operator `php spark surat-cuti:token` — status / nonaktif / aktif beraudit (`sumber` cli), keluaran
+     * hanya status (tanpa token, URL, NIP); masukan salah → ditolak tanpa tulis.
+     */
+    public function testCommandOperatorNonaktifAktifBeraudit(): void
+    {
+        ['id' => $id, 'a' => $a] = $this->cutiFinal();
+        $token                   = $this->token();
+        Services::injectMock('tokenSuratCuti', $token);
+        $mentah = (string) $token->untukCuti($id);
+
+        $keluaran = [];
+
+        foreach (["--id={$id}", "--id={$id} --nonaktif", "--id {$id}", "--id={$id} --aktif", '--id=999999 --nonaktif', "--id={$id} --nonaktif --aktif", '--id=abc', '--nonaktif'] as $argumen) {
+            $this->resetStreamFilterBuffer();
+            command("surat-cuti:token {$argumen}");
+            $keluaran[$argumen] = $this->getStreamFilterBuffer();
+        }
+
+        $this->assertStringContainsString("Token surat cuti {$id}: aktif", $keluaran["--id={$id}"]);
+        $this->assertStringContainsString("Token surat cuti {$id}: nonaktif", $keluaran["--id={$id} --nonaktif"]);
+        $this->assertStringContainsString("Token surat cuti {$id}: nonaktif", $keluaran["--id {$id}"]);
+        $this->assertStringContainsString("Token surat cuti {$id}: aktif", $keluaran["--id={$id} --aktif"]);
+        $this->assertStringContainsString('Cuti 999999 tidak ditemukan.', $keluaran['--id=999999 --nonaktif']);
+
+        foreach (["--id={$id} --nonaktif --aktif", '--id=abc', '--nonaktif'] as $salah) {
+            $this->assertStringContainsString('Pemakaian:', $keluaran[$salah], $salah);
+        }
+
+        $semua = implode("\n", $keluaran);
+        $this->assertStringNotContainsString($mentah, $semua, 'tanpa token');
+        $this->assertStringNotContainsString('/surat-cuti/', $semua, 'tanpa URL');
+        $this->assertStringNotContainsString($a['pemohon']['nip'], $semua, 'tanpa NIP');
+
+        $audit = $this->db->table('audit_logs')->where(['entity' => 'surat_cuti_token', 'entity_id' => (string) $id])->get()->getResultArray();
+        $this->assertSame([['nonaktif', 'cli'], ['aktif', 'cli']], array_map(static function (array $r): array {
+            $sesudah = json_decode((string) $r['after_json'], true);
+
+            return [$sesudah['aksi'], $sesudah['sumber']];
+        }, $audit));
+        $this->assertSame([null, null], array_column($audit, 'id_pengguna_actor'));
+        $this->assertSame($id, $token->idCutiAktif($mentah));
     }
 
     private function token(): TokenSuratCutiService
