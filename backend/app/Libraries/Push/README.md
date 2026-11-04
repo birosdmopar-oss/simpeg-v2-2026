@@ -15,5 +15,8 @@ legacy** (PRD Fase 6 F6-11..F6-13, Q6-11/Q6-12, CR-099). Konfigurasi & operasion
   (titik sambung Halo Simpeg Fase 8) → `push-pesan`; `AntreTopikFcm` (presensi, LKH; `TopikFcm`) → `fcm-topik`.
 - Token web: `TokenFcmService` (`POST|DELETE api/v1/integrasi/fcm-token`, semua akun login; unik per pemilik + hash token,
   DBV-Q8). Token Android (`platform` 2) tidak punya endpoint di v2 — penulisnya pertanyaan cutover DEPLOY-001.1.
+- Uji koneksi (CR-101): `php spark integrasi:uji-koneksi fcm` → `FcmV1Adapter::ujiKoneksi()` — token akses OAuth baru +
+  `messages:send` `validate_only` ke topik `simpeg-uji-koneksi` (tanpa kirim ke perangkat); hasil hanya kode, tanpa
+  projectId/token/kunci.
 - Semua job di antrean `push`. Pesan ke topik presensi tetap dikirim di luar SIMPEG seperti legacy (syarat proyek Firebase
   sama, PN-3).

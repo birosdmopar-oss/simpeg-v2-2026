@@ -72,7 +72,8 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
 
 - Dipindah ke sesi WS-2 (keputusan Horii 03-11); temuan review B5 = CR-099. Kanal ikut legacy (web `fcmQueue_*`, Android
   `andr_notif_queue`, topik presensi), PMK web (Q-B5a). Penulis token Android = pertanyaan cutover DEPLOY-001.1.
-- `integrasi:uji-koneksi fcm` belum tersedia (cabang "belum tersedia" di command) — dicatat di B7 untuk tindak lanjut.
+- `integrasi:uji-koneksi fcm` semula masih "belum tersedia" (temuan B7) → diperbaiki CR-101: token OAuth baru +
+  `messages:send` `validate_only` ke topik uji, tanpa kirim ke perangkat.
 
 ### B6 — MAKE-067 SIASN (H-03, main `6cd50e69`)
 
@@ -98,4 +99,4 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
 
 - PN-5 crontab legacy → validasi jadwal §1e. PN-3 proyek Firebase + service account. DEPLOY-001.1 penulis token Android.
 - ADR-037 (pola penjadwalan, Jalur A): §1e menyesuaikan bila berbeda.
-- B4b menunggu MAKE-058. `integrasi:uji-koneksi fcm` belum ada.
+- B4b menunggu MAKE-058.
