@@ -84,7 +84,7 @@ final class SuratCutiPublikTest extends DatabaseTestCase
         $this->esignService()->terbitkan($a['pyb']['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
         $pdf = $svc->pdfTte($token);
         $this->assertStringStartsWith('%PDF', $pdf['isi']);
-        $this->assertStringNotContainsString($a['pemohon']['nip'], $pdf['nama'], 'nama berkas tanpa NIP');
+        $this->assertSame(VerifikasiSuratCutiService::NAMA_BERKAS, $pdf['nama'], 'S6: nama berkas generik tanpa id cuti / NIP');
 
         foreach ([str_repeat('a', 64), strtoupper($token), substr($token, 1), $token . ' ', 'bukan-token'] as $salah) {
             $this->assertSame(VerifikasiSuratCutiService::PESAN_TIDAK_DITEMUKAN, $this->pesan404(static fn () => $svc->pdfTte($salah)));

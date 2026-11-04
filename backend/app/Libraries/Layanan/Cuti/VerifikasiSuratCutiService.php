@@ -26,6 +26,9 @@ final class VerifikasiSuratCutiService
 {
     public const PESAN_TIDAK_DITEMUKAN = 'Dokumen tidak ditemukan atau tidak valid.';
 
+    /** Nama berkas PDF publik (`Content-Disposition: inline`). */
+    public const NAMA_BERKAS = 'surat_cuti_ber_tte.pdf';
+
     public const JENIS_SURAT = 'Surat Cuti';
 
     public const STATUS_DITANDATANGANI = 'ditandatangani';
@@ -74,7 +77,8 @@ final class VerifikasiSuratCutiService
             throw new NotFoundException(self::PESAN_TIDAK_DITEMUKAN);
         }
 
-        return ['isi' => $tte['isi'], 'nama' => 'surat_cuti_' . (int) $cuti['id_riwayat_cuti'] . '.pdf'];
+        // S6 review B4a: nama berkas generik — tanpa id cuti (urutan id bisa ditebak) maupun NIP.
+        return ['isi' => $tte['isi'], 'nama' => self::NAMA_BERKAS];
     }
 
     /**

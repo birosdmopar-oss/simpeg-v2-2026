@@ -204,6 +204,8 @@ final class TokenSuratCutiTest extends DatabaseTestCase
         $pdf->assertStatus(200);
         $this->assertSame('application/pdf', explode(';', $pdf->response()->getHeaderLine('Content-Type'))[0]);
         $this->assertStringStartsWith('inline', $pdf->response()->getHeaderLine('Content-Disposition'));
+        $this->assertStringContainsString(VerifikasiSuratCutiService::NAMA_BERKAS, $pdf->response()->getHeaderLine('Content-Disposition'));
+        $this->assertStringNotContainsString((string) $id, $pdf->response()->getHeaderLine('Content-Disposition'));
         $this->assertSame('noindex, nofollow', $pdf->response()->getHeaderLine('X-Robots-Tag'));
         $this->assertStringContainsString('no-store', $pdf->response()->getHeaderLine('Cache-Control'));
 
