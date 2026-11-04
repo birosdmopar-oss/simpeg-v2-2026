@@ -1,6 +1,6 @@
 /**
  * MAKE-066 (F6-13) — `public/firebase-messaging-sw.js`: pesan FCM `{notification, data}` ditampilkan; klik membuka
- * `data.link` relatif se-origin (tab terbuka difokuskan lalu diarahkan, atau jendela baru); tautan ke host lain diabaikan
+ * `data.link` relatif se-origin di jendela baru (tab terbuka TIDAK dinavigasi, CR-099 P5); tautan ke host lain diabaikan
  * [K legacy `notificationclick`]. Dijalankan dalam lingkup `self` palsu.
  */
 import { readFileSync } from 'node:fs'
@@ -61,18 +61,13 @@ describe('firebase-messaging-sw.js', () => {
     ])
   })
 
-  it('klik: tab se-origin difokuskan lalu diarahkan; tanpa tab → jendela baru; host lain diabaikan', async () => {
-    const tab = { url: 'https://simpeg.contoh/beranda', focus: vi.fn(), navigate: vi.fn(async () => null) }
-    tab.focus.mockResolvedValue(tab)
-    lingkup.clients.matchAll.mockResolvedValueOnce([tab])
+  it('klik: selalu jendela baru tanpa menavigasi tab terbuka; host lain diabaikan', async () => {
     const close = vi.fn()
 
     await jalankan('notificationclick', { notification: { close, data: { link: '/konket' } } })
     expect(close).toHaveBeenCalled()
-    expect(tab.navigate).toHaveBeenCalledWith('https://simpeg.contoh/konket')
-
-    await jalankan('notificationclick', { notification: { close, data: { link: '/lkh/verifikasi' } } })
-    expect(lingkup.clients.openWindow).toHaveBeenCalledWith('https://simpeg.contoh/lkh/verifikasi')
+    expect(lingkup.clients.openWindow).toHaveBeenCalledWith('https://simpeg.contoh/konket')
+    expect(lingkup.clients.matchAll).not.toHaveBeenCalled()
 
     await jalankan('notificationclick', { notification: { close, data: { link: 'https://jahat.contoh/x' } } })
     expect(lingkup.clients.openWindow).toHaveBeenCalledOnce()

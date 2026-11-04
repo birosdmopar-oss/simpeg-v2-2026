@@ -8,6 +8,9 @@
  * - SDK modular `@firebase/app` + `@firebase/messaging` dimuat dinamis (tidak masuk bundle awal); service worker
  *   `public/firebase-messaging-sw.js` menampilkan notifikasi dan membuka `data.link`.
  * - Izin browser hanya diminta dari klik pengguna ({@link aktifkanNotifikasiPush}, banner `NotifikasiPushShell`).
+ * - Keluar (CR-099 P2): menunggu pendaftaran yang masih berjalan, `DELETE` ke server, lalu `deleteToken` di klien — masing-
+ *   masing dibatasi {@link BATAS_LEPAS_MS} agar tombol Keluar tidak tertahan. Sesi berakhir (refresh gagal): hanya
+ *   `deleteToken` di klien ({@link hapusTokenPushLokal}); token server tetap sampai dilepas/dibuang FCM.
  * - Kegagalan apa pun (browser tanpa dukungan, jaringan, FCM) tidak pernah menggagalkan alur aplikasi; token tidak pernah
  *   dicatat ke konsol.
  */
@@ -30,7 +33,26 @@ const NAMA_APP = 'simpeg-push'
 
 const KUNCI_NANTI = 'integrasi-notifikasi-push-nanti'
 
+/** Batas tunggu tiap langkah pelepasan token saat Keluar (ms). */
+export const BATAS_LEPAS_MS = 3000
+
+type Messaging = import('@firebase/messaging').Messaging
+
 let tokenAktif: string | null = null
+let messagingAktif: Messaging | null = null
+let pendaftaran: Promise<boolean> | null = null
+
+/** Selesai dalam `ms` atau berhenti menunggu (hasil `undefined`); galat ditelan. */
+async function denganBatas<T>(kerja: Promise<T>, ms: number): Promise<T | undefined> {
+  let pewaktu: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([kerja, new Promise<undefined>((selesai) => (pewaktu = setTimeout(() => selesai(undefined), ms)))])
+  } catch {
+    return undefined
+  } finally {
+    clearTimeout(pewaktu)
+  }
+}
 
 function env(nama: string): string {
   return String((import.meta.env as Record<string, unknown>)[nama] ?? '').trim()
@@ -74,8 +96,10 @@ async function ambilToken(konfigurasi: KonfigurasiFirebaseWeb): Promise<string> 
   const { vapidKey, ...opsiApp } = konfigurasi
   const app = getApps().some((a) => a.name === NAMA_APP) ? getApp(NAMA_APP) : initializeApp(opsiApp, NAMA_APP)
   const registrasi = await navigator.serviceWorker.register(SW_PATH)
+  const messaging = getMessaging(app)
+  messagingAktif = messaging
 
-  return getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: registrasi })
+  return getToken(messaging, { vapidKey, serviceWorkerRegistration: registrasi })
 }
 
 /**
@@ -83,21 +107,31 @@ async function ambilToken(konfigurasi: KonfigurasiFirebaseWeb): Promise<string> 
  *
  * @returns true bila token terdaftar
  */
-export async function daftarkanTokenPush(): Promise<boolean> {
+export function daftarkanTokenPush(): Promise<boolean> {
   const konfigurasi = konfigurasiFirebase()
 
-  if (konfigurasi === null || izinNotifikasi() !== 'granted') return false
+  if (konfigurasi === null || izinNotifikasi() !== 'granted') return Promise.resolve(false)
 
-  try {
-    const token = await ambilToken(konfigurasi)
-    if (!token) return false
-    await fcmTokenService.daftar(token)
-    tokenAktif = token
-    return true
-  } catch {
-    console.warn('[notifikasi-push] pendaftaran token push gagal; aplikasi tetap berjalan.')
-    return false
-  }
+  const kerja = (async (): Promise<boolean> => {
+    try {
+      const token = await ambilToken(konfigurasi)
+      if (!token) return false
+      // Token dicatat sebelum POST supaya Keluar di tengah pendaftaran tetap melepasnya.
+      tokenAktif = token
+      await fcmTokenService.daftar(token)
+      return true
+    } catch {
+      console.warn('[notifikasi-push] pendaftaran token push gagal; aplikasi tetap berjalan.')
+      return false
+    }
+  })()
+
+  pendaftaran = kerja
+  void kerja.finally(() => {
+    if (pendaftaran === kerja) pendaftaran = null
+  })
+
+  return kerja
 }
 
 /** Minta izin notifikasi (WAJIB dari klik pengguna) lalu daftarkan token bila diizinkan. */
@@ -115,19 +149,31 @@ export async function aktifkanNotifikasiPush(): Promise<IzinNotifikasi> {
   return izin
 }
 
-/** Lepas token perangkat ini dari akun (dipanggil saat Keluar, sebelum sesi diakhiri). Gagal → diabaikan. */
+/** Lepas token perangkat ini dari akun (dipanggil saat Keluar, sebelum sesi diakhiri). Gagal/lambat → diabaikan. */
 export async function lepasTokenPush(): Promise<void> {
+  if (pendaftaran !== null) await denganBatas(pendaftaran, BATAS_LEPAS_MS)
+
   const token = tokenAktif
   tokenAktif = null
 
-  if (token === null) return
+  // Gagal/timeout: token server tetap tercatat untuk akun ini sampai dilepas lagi atau dibuang karena tidak sah di FCM;
+  // token di klien tetap dihapus sehingga perangkat tidak menerima push lagi.
+  if (token !== null) await denganBatas(fcmTokenService.lepas(token), BATAS_LEPAS_MS)
+  await hapusTokenPushLokal()
+}
 
-  try {
-    await fcmTokenService.lepas(token)
-  } catch {
-    // Sesi tetap diakhiri; token tetap tercatat untuk akun ini sampai dilepas pada logout berikutnya atau dihapus karena
-    // dilaporkan tidak sah oleh FCM.
-  }
+/** Hapus token FCM di klien (`deleteToken`) — saat Keluar dan saat sesi berakhir (refresh gagal). Gagal → diabaikan. */
+export async function hapusTokenPushLokal(): Promise<void> {
+  const messaging = messagingAktif
+  messagingAktif = null
+  tokenAktif = null
+
+  if (messaging === null) return
+
+  await denganBatas(
+    import('@firebase/messaging').then(({ deleteToken }) => deleteToken(messaging)),
+    BATAS_LEPAS_MS,
+  )
 }
 
 /** Pengguna memilih "Nanti" pada banner izin — disimpan per browser; gagal akses penyimpanan → tidak fatal. */
@@ -150,4 +196,6 @@ export function tandaiDitunda(): void {
 /** Untuk test. */
 export function _resetNotifikasiPush(): void {
   tokenAktif = null
+  messagingAktif = null
+  pendaftaran = null
 }

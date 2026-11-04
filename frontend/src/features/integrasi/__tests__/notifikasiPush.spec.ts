@@ -11,10 +11,11 @@ const fb = vi.hoisted(() => ({
   getApp: vi.fn((nama: string) => ({ name: nama })),
   getMessaging: vi.fn(() => ({ messaging: true })),
   getToken: vi.fn(async (): Promise<string> => 'tok-perangkat'),
+  deleteToken: vi.fn(async (): Promise<boolean> => true),
 }))
 
 vi.mock('@firebase/app', () => ({ initializeApp: fb.initializeApp, getApps: fb.getApps, getApp: fb.getApp }))
-vi.mock('@firebase/messaging', () => ({ getMessaging: fb.getMessaging, getToken: fb.getToken }))
+vi.mock('@firebase/messaging', () => ({ getMessaging: fb.getMessaging, getToken: fb.getToken, deleteToken: fb.deleteToken }))
 
 const svc = vi.hoisted(() => ({ daftar: vi.fn(async () => 'baru'), lepas: vi.fn(async () => 1) }))
 vi.mock('../services/fcmToken.service', () => ({ fcmTokenService: svc }))
@@ -22,7 +23,9 @@ vi.mock('../services/fcmToken.service', () => ({ fcmTokenService: svc }))
 import {
   _resetNotifikasiPush,
   aktifkanNotifikasiPush,
+  BATAS_LEPAS_MS,
   daftarkanTokenPush,
+  hapusTokenPushLokal,
   izinNotifikasi,
   konfigurasiFirebase,
   lepasTokenPush,
@@ -57,6 +60,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
   Reflect.deleteProperty(navigator, 'serviceWorker')
@@ -124,7 +128,58 @@ describe('pendaftaran token', () => {
   })
 })
 
-describe('lepas saat Keluar', () => {
+describe('lepas saat Keluar (CR-099 P2)', () => {
+  it('Keluar: DELETE ke server lalu deleteToken di klien', async () => {
+    izin = 'granted'
+    await daftarkanTokenPush()
+
+    await lepasTokenPush()
+
+    expect(svc.lepas).toHaveBeenCalledWith('tok-perangkat')
+    expect(fb.deleteToken).toHaveBeenCalledWith({ messaging: true })
+  })
+
+  it('Keluar sebelum pendaftaran selesai tetap melepas token', async () => {
+    izin = 'granted'
+    let lanjut: (t: string) => void = () => {}
+    fb.getToken.mockImplementationOnce(() => new Promise<string>((r) => (lanjut = r)))
+
+    const daftar = daftarkanTokenPush()
+    const lepas = lepasTokenPush()
+    await vi.waitFor(() => expect(fb.getToken).toHaveBeenCalled())
+    lanjut('tok-lambat')
+    await daftar
+    await lepas
+
+    expect(svc.lepas).toHaveBeenCalledWith('tok-lambat')
+    expect(fb.deleteToken).toHaveBeenCalledOnce()
+  })
+
+  it('DELETE yang menggantung / gagal jaringan tidak menahan Keluar lebih dari batas', async () => {
+    izin = 'granted'
+    await daftarkanTokenPush()
+    vi.useFakeTimers()
+    svc.lepas.mockImplementationOnce(() => new Promise(() => {}))
+
+    const lepas = lepasTokenPush()
+    await vi.advanceTimersByTimeAsync(BATAS_LEPAS_MS + 10)
+
+    await expect(lepas).resolves.toBeUndefined()
+    expect(fb.deleteToken).toHaveBeenCalledOnce()
+  })
+
+  it('sesi berakhir: hapus token lokal saja tanpa memanggil server', async () => {
+    izin = 'granted'
+    await daftarkanTokenPush()
+
+    await hapusTokenPushLokal()
+
+    expect(fb.deleteToken).toHaveBeenCalledOnce()
+    expect(svc.lepas).not.toHaveBeenCalled()
+    await lepasTokenPush()
+    expect(svc.lepas).not.toHaveBeenCalled()
+  })
+
   it('melepas token terdaftar sekali; tanpa token tidak memanggil backend; gagal ditelan', async () => {
     await lepasTokenPush()
     expect(svc.lepas).not.toHaveBeenCalled()

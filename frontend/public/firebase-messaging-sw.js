@@ -5,8 +5,9 @@
  * SDK modular dengan registrasi service worker ini, sedangkan pesan FCM diterima sebagai event `push` biasa
  * `{notification: {title, body, icon}, data: {link, …}}` lalu ditampilkan di sini.
  *
- * Klik notifikasi membuka `data.link` [K legacy `notificationclick`]; v2 menerima tautan relatif SPA dan HANYA membuka
- * alamat se-origin (tautan ke host lain diabaikan). Bila tab SIMPEG sudah terbuka, tab itu difokuskan lalu diarahkan.
+ * Klik notifikasi membuka `data.link` di jendela/tab BARU (`openWindow`, ikut legacy `notificationclick` — tab yang sudah
+ * terbuka tidak dinavigasi agar isian form tidak hilang, CR-099 P5); v2 menerima tautan relatif SPA dan HANYA membuka
+ * alamat se-origin (tautan ke host lain diabaikan).
  */
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
@@ -44,13 +45,5 @@ self.addEventListener('notificationclick', (event) => {
 
   if (tujuan.origin !== self.location.origin) return
 
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((jendela) => {
-      const tab = jendela.find((c) => new URL(c.url).origin === self.location.origin && 'focus' in c)
-      if (tab) {
-        return tab.focus().then((c) => (c && 'navigate' in c ? c.navigate(tujuan.href) : undefined))
-      }
-      return self.clients.openWindow ? self.clients.openWindow(tujuan.href) : undefined
-    }),
-  )
+  if (self.clients.openWindow) event.waitUntil(self.clients.openWindow(tujuan.href))
 })
