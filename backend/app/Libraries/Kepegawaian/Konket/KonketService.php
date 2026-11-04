@@ -322,6 +322,8 @@ final class KonketService implements KonketServiceInterface
         });
         // F6-13 (Fase 6 MAKE-066): hasil proses → push web ke pegawai sesudah commit [K `L_konket.php:1885-1889`].
         (new \App\Libraries\Push\AntrePushRiwayat())->antre(2, 'konket', $id, $param['status'] === self::V ? 'Disetujui' : 'Ditolak');
+        // F6-13 (CR-099 P1): push Android ke pemohon + peserta dinas gabungan [K `L_konket.php:1891-1972`].
+        (new \App\Libraries\Push\PushAndroidLkhKonket())->konketDiproses($id, $auth);
 
         return $this->detail($auth, $id);
     }

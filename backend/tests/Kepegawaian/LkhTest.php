@@ -118,6 +118,40 @@ final class LkhTest extends DatabaseTestCase
             ['tipe' => 3, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => null],
             ['tipe' => 2, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => 'Disetujui'],
         ], $this->jobPush('push-riwayat'));
+
+        // CR-099 P1 [K `L_lkh.php:335-404/579-640/1071-1140`]: kanal Android ikut legacy.
+        $tgl  = \App\Libraries\Push\TemplatPushRiwayat::tanggal('2026-10-12');
+        $nama = (string) $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $a['id'])->get()->getRowArray()['nama'];
+        $andr = $this->jobPush('push-pesan');
+        $this->assertSame([
+            [[$this->nipAtasan], 'Monitoring LKH', "{$nama} telah mengajukan LKH untuk tanggal {$tgl}", 'Menunggu'],
+            [[$this->nip], 'LKH', "LKH anda pada tanggal {$tgl} diubah menjadi \"Revisi\" oleh Atasan Uji", 'Direvisi'],
+            [[$this->nipAtasan], 'Monitoring LKH', "{$nama} telah mengubah LKH untuk tanggal {$tgl}", 'Menunggu'],
+            [[$this->nip], 'LKH', "LKH anda pada tanggal {$tgl} disetujui oleh Atasan Uji", 'Disetujui'],
+        ], array_map(static fn (array $d): array => [$d['nip'], $d['judul'], $d['isi'], json_decode($d['data']['data'], true)['status_str']], $andr));
+
+        $baris = json_decode($andr[0]['data']['data'], true);
+        $this->assertArrayNotHasKey('kegiatan', $baris);
+        $this->assertSame(['', 'Rapat', (int) $a['id']], [$baris['file_lckh_url'], $baris['detail'][1]['kegiatan'], (int) $baris['id_riwayat_lckh']]);
+    }
+
+    public function testPushTipe3HanyaBilaStatusKembaliMenunggu(): void
+    {
+        // CR-099 P8: role 1 mengubah LKH (status tidak dipaksa 0) → tanpa push tipe 3 / Android "mengubah".
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+        $admin                                    = $this->aktor(Role::SUPER_ADMIN)[1];
+
+        try {
+            $a = $this->tambah($this->pegawai, '2026-10-12');
+            $this->svc()->proses($this->atasan, $a['id'], 'setujui', null);
+            $this->svc()->ubah($admin, $a['id'], ['kegiatan' => [$this->baris('08:00')]]);
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $this->assertSame([1, 2], array_column($this->jobPush('push-riwayat'), 'tipe'));
+        $this->assertSame(['Monitoring LKH', 'LKH'], array_column($this->jobPush('push-pesan'), 'judul'));
     }
 
     /**
