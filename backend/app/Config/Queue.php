@@ -53,5 +53,7 @@ class Queue extends BaseQueue
         'fcm-topik' => \App\Jobs\FcmTopikJob::class,
         // Fase 6 Jalur B (MAKE-066, F6-13): push web riwayat/usulan/LKH/Konket ke penerima legacy, antrean `push`.
         'push-riwayat' => \App\Jobs\PushRiwayatJob::class,
+        // Fase 6 Jalur B (MAKE-066, F6-13): push generik per NIP (titik sambung Halo Simpeg Fase 8), antrean `push`.
+        'push-pesan' => \App\Jobs\PushPesanJob::class,
     ];
 }

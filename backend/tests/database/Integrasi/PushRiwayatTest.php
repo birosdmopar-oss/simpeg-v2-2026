@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Database\Integrasi;
 
 use App\Constants\Role;
+use App\Jobs\PushPesanJob;
 use App\Jobs\PushRiwayatJob;
 use App\Libraries\Kepegawaian\Riwayat\RiwayatEngine;
+use App\Libraries\Push\AntrePushPesan;
 use App\Libraries\Push\AntrePushRiwayat;
 use App\Libraries\Push\MockFcmAdapter;
 use App\Libraries\Push\PenerimaTokenFcm;
@@ -166,6 +168,32 @@ final class PushRiwayatTest extends DatabaseTestCase
         $this->assertSame(PushRiwayatJob::HASIL_TANPA_TOKEN, (new PushRiwayatJob(['tipe' => 2, 'jenis' => 'organisasi', 'id' => $this->organisasi($nip), 'aksi' => 'Disetujui']))->process());
         $this->assertSame(PushRiwayatJob::HASIL_DILEWATI, (new PushRiwayatJob(['tipe' => 2, 'jenis' => 'organisasi', 'id' => 999999]))->process());
         $this->assertSame(PushRiwayatJob::class, config(\Config\Queue::class)->jobHandlers[PushRiwayatJob::NAMA]);
+    }
+
+    public function testTitikSambungPushPesanPerKanal(): void
+    {
+        // Halo Simpeg (Fase 8) [K `L_support.php:1080`]: produsen generik, kanal Android bawaan.
+        $nip = $this->buatPegawai();
+        $this->web($this->buatAkunUntuk($nip, Role::PEGAWAI), 'tok-web');
+        $this->db->table('firebase_token')->insert(['nip' => $nip, 'platform' => 2, 'fcm_token' => 'tok-android', 'token_hash' => hash('sha256', 'tok-android'), 'created_at' => '2026-11-04 00:00:00']);
+
+        $antre = new AntrePushPesan();
+        $this->assertTrue($antre->antre([$nip, $nip, ' '], 'Halo Simpeg', 'Pesan baru', ['id_inbox' => 7]));
+        $this->assertFalse($antre->antre([$nip], 'Halo Simpeg', 'x', [], 'sms'), 'kanal tidak dikenal');
+        $this->assertFalse($antre->antre([], 'Halo Simpeg', 'x'));
+        $this->assertFalse((new AntrePushPesan(static fn (): QueueInterface => throw new RuntimeException('antrean mati')))->antre([$nip], 'J', 'I'));
+
+        $job = $this->db->table('queue_jobs')->where('queue', 'push')->get()->getResultArray();
+        $this->assertCount(1, $job);
+        $data = (array) json_decode((string) $job[0]['payload'], true)['data'];
+        $this->assertSame(['nip' => [$nip], 'judul' => 'Halo Simpeg', 'isi' => 'Pesan baru', 'data' => ['id_inbox' => '7'], 'kanal' => 'android'], $data);
+
+        $this->assertSame(PushPesanJob::HASIL_TERKIRIM, (new PushPesanJob($data))->process());
+        $this->assertSame([['tok-android', 2]], array_map(static fn (array $k): array => [$k['token'], $k['platform']], $this->mock->sent()));
+
+        (new PushPesanJob(['kanal' => 'semua'] + $data))->process();
+        $this->assertSame(['tok-web', 'tok-android'], array_column(array_slice($this->mock->sent(), 1), 'token'));
+        $this->assertSame(PushPesanJob::HASIL_TANPA_TOKEN, (new PushPesanJob(['nip' => ['tidak-ada']] + $data))->process());
     }
 
     /**

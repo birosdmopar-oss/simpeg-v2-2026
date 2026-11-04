@@ -25,8 +25,9 @@ Route Jalur B (integrasi keluar, PRD Fase 6 §6.2): `app/Config/RoutesIntegrasi.
 - **Akses:** semua akun login (`jwt`). Padanan `Local::register_fb_token` legacy; SPA memanggil `POST` setiap halaman dimuat
   setelah login dan izin notifikasi diberikan, `DELETE` saat logout.
 - **Body JSON:** `{"fcm_token": "<token FCM perangkat>"}` (tanpa spasi, maks 4.096 karakter).
-- **Kunci per pemilik** (keputusan Horii 03-11-2026, DBV-Q8 ikut legacy): akun + token (`platform` = 1 web); `nip` akun
-  ikut disimpan bila ada. Token yang sama milik akun lain tidak disentuh.
+- **Kunci per pemilik** (keputusan Horii 03-11-2026, DBV-Q8 ikut legacy): akun + token (`platform` = 1 web). Token web
+  **selalu** `nip` NULL (DBV-027, CHECK pemilik); penerima pegawai di kanal web dicari lewat `pengguna.nip` → `id_pengguna`.
+  Token yang sama milik akun lain tidak disentuh.
 - **POST 200:** `{"status": "success", "data": {"status": "baru" | "diperpanjang" | "sudah_terdaftar"}}` — baru disimpan
   dengan masa berlaku 1 minggu; sudah ada dan lewat masa → diperpanjang 1 minggu; selain itu tanpa perubahan.
 - **DELETE 200:** `{"status": "success", "data": {"dihapus": 0 | 1}}` — hanya token akun pemanggil.

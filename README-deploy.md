@@ -170,6 +170,32 @@ Worker lewat cron user `deploy` (pola sama dengan §1a):
 
 Job dicoba ulang tiap 60 detik sampai 5 percobaan, lalu pindah ke `queue_jobs_failed` (`php spark queue:failed`); tidak retry selamanya. Penerima tanpa token perangkat (`firebase_token`) ditandai `push_status = 3` tanpa galat. Pantau: baris `queue_jobs` queue `push` yang lebih tua dari 10 menit berarti worker tidak berjalan; `inbox_msg.push_status = 2` berarti push gagal (log `[NotifikasiService]` / `[MockFcmAdapter]`).
 
+### 1c. Push FCM HTTP v1 (Fase 6 H-04, MAKE-066)
+
+Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM Legacy API/server key legacy sudah dihentikan Google). Worker tetap cron `queue:work push` di §1b; job di queue `push`:
+
+| Job | Isi | Kanal |
+|---|---|---|
+| `push-notif` | notifikasi layanan (`inbox_msg`) cuti/TB/IB/PMK | Android (`firebase_token.platform` 2, per NIP) + web (akun ber-NIP) |
+| `push-riwayat` | riwayat/usulan/LKH/Konket ke penerima legacy (admin pembawah, atasan LKH, petugas Karpeg/Kariskarsu, pegawai) | web |
+| `push-pesan` | push generik per NIP (titik sambung Halo Simpeg Fase 8) | Android (bawaan) / web |
+| `fcm-topik` | keanggotaan topik `pegawai_blm_masuk` / `pegawai_blm_pulang` / `pegawai_blm_lkh` sesudah presensi/LKH | Android |
+
+1. Proyek Firebase **sama dengan legacy** (PN-3): topik presensi dan app Android memakai proyek itu. Pesan ke topik tetap dikirim **di luar SIMPEG** (Firebase console / penjadwal luar) seperti legacy.
+2. Buat service account dengan peran pengirim FCM, unduh berkas JSON-nya ke server di **luar repo dan luar webroot**, mis. `/etc/simpeg-v2/fcm-sa.json`, pemilik user PHP-FPM/`deploy`, `chmod 600`. Jangan pernah commit berkas ini atau menempelkan isinya ke tiket/chat.
+3. Isi `shared/backend.env`:
+
+   ```ini
+   integrations.push.driver = fcm
+   integrations.push.projectId = <ID proyek Firebase>
+   integrations.push.credentialsPath = /etc/simpeg-v2/fcm-sa.json
+   ```
+
+   Konfigurasi kosong atau berkas tidak terbaca → adapter gagal saat dibuat (job masuk `queue_jobs_failed`, pesan menyebut nama key saja).
+4. Frontend (web push): isi konfigurasi web Firebase proyek yang sama di `frontend/.env.production` (`VITE_FIREBASE_*`, lihat `frontend/.env.example`). Nilai web Firebase bukan rahasia, tetapi tetap tidak disalin dari `header.php` legacy; ambil dari Firebase console.
+5. Token web (`platform` 1) didaftarkan SPA lewat `POST api/v1/integrasi/fcm-token`; token Android (`platform` 2) ditulis backend app mobile di luar repo (pertanyaan cutover DEPLOY-001.1). Token yang dilaporkan FCM tidak terdaftar dihapus otomatis.
+6. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`.
+
 ---
 
 ## 2. Cara push (operator deploy)
