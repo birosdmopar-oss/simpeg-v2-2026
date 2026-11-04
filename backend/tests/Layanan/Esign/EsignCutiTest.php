@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Layanan\Esign;
 
 use App\Exceptions\ForbiddenException;
+use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Layanan\Cuti\CutiService;
@@ -169,15 +170,31 @@ final class EsignCutiTest extends DatabaseTestCase
             'pegawai lain'                                               => $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawai(), 2)),
         ];
 
+        $cuti    = (array) $this->cutiService()->ambil($id);
+        $ditolak = [];
+
         foreach ($lain as $nama => $auth) {
-            try {
-                $this->esignService()->terbitkan($auth, $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
-                $this->fail("{$nama} harus ditolak.");
-            } catch (ForbiddenException $e) {
-                $this->assertSame(EsignCutiService::PESAN_BUKAN_PENANDA, $e->getMessage(), $nama);
+            // S4 review B4a: cuti yang tidak boleh dilihat → 404 seragam (tanpa oracle id); terlihat tetapi bukan penanda → 403.
+            $terlihat = $this->cutiService()->bolehLihat($auth, $cuti);
+
+            foreach (['terbitkan', 'statusSertifikat'] as $aksi) {
+                try {
+                    $aksi === 'terbitkan'
+                        ? $this->esignService()->terbitkan($auth, $id, ['passphrase' => self::PASSPHRASE_UJI], null, null)
+                        : $this->esignService()->statusSertifikat($auth, $id);
+                    $this->fail("{$nama} {$aksi} harus ditolak.");
+                } catch (ForbiddenException $e) {
+                    $this->assertTrue($terlihat, "{$nama} {$aksi}: 403 hanya untuk yang boleh melihat");
+                    $this->assertSame(EsignCutiService::PESAN_BUKAN_PENANDA, $e->getMessage(), $nama);
+                    $ditolak[$nama] = 403;
+                } catch (NotFoundException) {
+                    $this->assertFalse($terlihat, "{$nama} {$aksi}: 404 hanya untuk yang tidak boleh melihat");
+                    $ditolak[$nama] = 404;
+                }
             }
         }
 
+        $this->assertSame([403, 403, 404], [$ditolak['super admin'], $ditolak['pemohon'], $ditolak['pegawai lain']]);
         $this->assertSame(0, $this->db->table('esign_hist')->countAllResults(), 'penolakan tidak menulis percobaan');
     }
 
@@ -348,6 +365,120 @@ final class EsignCutiTest extends DatabaseTestCase
         $this->assertSame(1, $this->db->table('esign_hist')->where('id_rw', $id)->where('status', '1')->countAllResults(), 'tidak terkunci');
     }
 
+    /**
+     * P2 review B4a: 5xx, `502` bukan-PDF, exception adapter, dan `checkUser` 5xx = galat gateway — tercatat `gateway`, pesan
+     * generik (S1: rincian/passphrase tidak ke pengguna maupun esign_hist), TIDAK dihitung pembatas.
+     */
+    public function testGalatGateway5xxDanExceptionTidakDihitungPembatasDanPesanGenerik(): void
+    {
+        ['id' => $id] = $this->cutiFinal();
+        $galat        = new class () extends MockEsignAdapter {
+            public int $ke = 0;
+
+            public function checkUser(string $nip): array
+            {
+                return $this->ke === 0
+                    ? ['status_code' => '503', 'message' => 'checkUser down', 'nip' => $nip, 'has_certificate' => false, 'certificate_expires_at' => null]
+                    : parent::checkUser($nip);
+            }
+
+            public function signPdf(string $pdfContent, string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
+            {
+                return match ($this->ke % 3) {
+                    1       => ['status_code' => '503', 'message' => 'Service Unavailable ' . $passphrase, 'signed_pdf' => null, 'signed_at' => null, 'signature_id' => null],
+                    2       => ['status_code' => '502', 'message' => 'Balasan gateway bukan PDF.', 'signed_pdf' => null, 'signed_at' => null, 'signature_id' => null],
+                    default => throw new \RuntimeException('galat tak terduga berisi ' . $passphrase),
+                };
+            }
+        };
+
+        for ($i = 0; $i < EsignCutiService::BATAS_PERCOBAAN + 2; $i++) {
+            $galat->ke = $i;
+
+            try {
+                $this->esignService([], $galat)->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+                $this->fail('galat gateway harus 422');
+            } catch (ValidationException $e) {
+                $this->assertSame([EsignCutiService::PESAN_GALAT_GATEWAY], array_values($e->getErrors())[0]);
+            }
+        }
+
+        $hist = $this->db->table('esign_hist')->where('id_rw', $id)->get()->getResultArray();
+        $this->assertSame(array_fill(0, EsignCutiService::BATAS_PERCOBAAN + 2, EsignCutiService::KODE_GALAT_GATEWAY), array_column($hist, 'status_code'));
+        $this->assertSame([EsignCutiService::PESAN_GALAT_GATEWAY], array_values(array_unique(array_column($hist, 'keterangan'))));
+        $this->assertStringNotContainsString(self::PASSPHRASE_UJI, (string) json_encode($hist));
+
+        $this->esignService()->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+        $this->assertSame(1, $this->db->table('esign_hist')->where('id_rw', $id)->where('status', '1')->countAllResults(), 'tidak terkunci');
+    }
+
+    /**
+     * P1 review B4a: kunci per cuti dipegang permintaan lain (koneksi kedua) → 409 tanpa memanggil gateway dan tanpa baris
+     * `esign_hist`; sesudah dilepas, penandatanganan berjalan.
+     */
+    public function testKunciDipegangPermintaanLainDitolak409TanpaGateway(): void
+    {
+        ['id' => $id] = $this->cutiFinal();
+        $gateway      = new class () extends MockEsignAdapter {
+            public int $panggilan = 0;
+
+            public function checkUser(string $nip): array
+            {
+                $this->panggilan++;
+
+                return parent::checkUser($nip);
+            }
+        };
+        $lain = \Config\Database::connect('tests', false);
+        $nama = \App\Libraries\Layanan\Cuti\KunciSuratCuti::nama($this->db, $id);
+
+        try {
+            $this->assertSame('1', (string) $lain->query('SELECT GET_LOCK(?, 0) AS dapat', [$nama])->getRowArray()['dapat']);
+
+            try {
+                $this->esignService([], $gateway)->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+                $this->fail('kunci dipegang harus 409');
+            } catch (\App\Exceptions\ApiException $e) {
+                $this->assertSame([409, \App\Libraries\Layanan\Cuti\KunciSuratCuti::KODE_SIBUK], [$e->getStatusCode(), $e->getKode()]);
+            }
+
+            $this->assertSame(0, $gateway->panggilan, 'gateway tidak dipanggil');
+            $this->assertSame(0, $this->db->table('esign_hist')->where('id_rw', $id)->countAllResults());
+        } finally {
+            $lain->query('SELECT RELEASE_LOCK(?)', [$nama]);
+            $lain->close();
+        }
+
+        $this->esignService([], $gateway)->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+        $this->assertSame(1, $this->db->table('esign_hist')->where('id_rw', $id)->where('status', '1')->countAllResults());
+        $this->assertSame('1', (string) $this->db->query('SELECT IS_FREE_LOCK(?) AS bebas', [$nama])->getRowArray()['bebas'], 'kunci dilepas');
+    }
+
+    /**
+     * S3 review B4a: 401/403/429 dari gateway saat cek sertifikat = galat (bukan "tidak aktif"), tidak di-cache.
+     */
+    public function testStatusSertifikat401403429GalatTidakDiCache(): void
+    {
+        ['id' => $id, 'a' => $a] = $this->cutiFinal();
+        $gateway                 = new class () extends MockEsignAdapter {
+            public string $kode = '401';
+
+            public function checkUser(string $nip): array
+            {
+                return ['status_code' => $this->kode, 'message' => 'uji', 'nip' => $nip, 'has_certificate' => false, 'certificate_expires_at' => null];
+            }
+        };
+        $svc = $this->esignService([], $gateway, null, new \App\Libraries\CacheService(new \CodeIgniter\Test\Mock\MockCache(), 'uji_'));
+
+        foreach (['401', '403', '429', '500'] as $kode) {
+            $gateway->kode = $kode;
+            $this->assertSame(EsignCutiService::SERTIFIKAT_GALAT, $svc->statusSertifikat($a['pyb']['auth'], $id)['status'], $kode);
+        }
+
+        $gateway->kode = '200';
+        $this->assertSame(EsignCutiService::SERTIFIKAT_AKTIF, $svc->statusSertifikat($a['pyb']['auth'], $id)['status'], 'galat tidak di-cache');
+    }
+
     public function testBarisTidakAdaMengembalikan404(): void
     {
         $this->expectException(\App\Exceptions\NotFoundException::class);
@@ -359,9 +490,9 @@ final class EsignCutiTest extends DatabaseTestCase
         ['id' => $id] = $this->cutiFinal();
         $this->db->table('riwayat_cuti')->where('id_riwayat_cuti', $id)->update(['nip_yang_menyetujui' => null, 'nip_atasan_langsung' => null]);
 
-        // F6-18 K1: tanpa penanda tangan tidak ada pemilik tugas → 403.
+        // F6-18 K1: tanpa penanda tangan tidak ada pemilik tugas → 403 (super admin boleh melihat cuti, S4 review B4a).
         $this->expectException(ForbiddenException::class);
-        $this->esignService()->terbitkan($this->admin()['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+        $this->esignService()->terbitkan($this->authUntukAkun($this->buatAkunUntuk($this->buatPegawai(), 1)), $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
     }
 
     public function testLangkahTunggalTanpaPybMemakaiNipAtasanLangsung(): void

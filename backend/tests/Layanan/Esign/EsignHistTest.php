@@ -151,7 +151,8 @@ final class EsignHistTest extends DatabaseTestCase
         $gateway = new class () extends MockEsignAdapter {
             public function checkUser(string $nip): array
             {
-                return ['status_code' => '500', 'message' => str_repeat('x', 400), 'nip' => $nip, 'has_certificate' => false, 'certificate_expires_at' => null];
+                // Jawaban gateway non-galat (sertifikat tidak aktif): pesannya disimpan. Galat 5xx kini pesan generik (review B4a P2).
+                return ['status_code' => '2011', 'message' => str_repeat('x', 400), 'nip' => $nip, 'has_certificate' => false, 'certificate_expires_at' => null];
             }
         };
         $svc = new EsignCutiService($this->db, $this->cutiService(), new SuratCutiService($this->db, $this->lampiranUji), $gateway);
