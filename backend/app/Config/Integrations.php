@@ -59,6 +59,9 @@ class Integrations extends BaseConfig
      *   kredensial gateway, `grant_type=password`). SIASN dipanggil dengan DUA header (gateway + SSO).
      * - e-Kinerja: `ekinerjaToken` (token statis, padanan cron legacy aktif) bila terisi; bila kosong, SSO e-Kinerja dengan
      *   kredensial `ekinerja*` (Basic `ekinerjaApiUser`/`ekinerjaApiPass` + `ekinerjaSso*`, `totp` opsional).
+     * - Dorong jabatan SIASN (MAKE-067 M2): `siasnInstansiId` / `siasnSatkerId` (padanan konstanta legacy
+     *   `SIASN_INS_KEMENPAR` / `SIASN_SAT_KEMENPAR`) dan `siasnUnorBawaan` (unor cadangan [K `Rw_jabatan:175`]); wajib
+     *   diisi sebelum `siasn:dorong --jenis=jabatan`.
      *
      * @var array<string, bool|float|string>
      */
@@ -80,6 +83,9 @@ class Integrations extends BaseConfig
         'ekinerjaSsoUsername' => '',
         'ekinerjaSsoPassword' => '',
         'ekinerjaSsoTotp'     => '',
+        'siasnInstansiId'     => '',
+        'siasnSatkerId'       => '',
+        'siasnUnorBawaan'     => '',
         'tlsVerify'           => true,
         'timeout'             => 30.0,
     ];
