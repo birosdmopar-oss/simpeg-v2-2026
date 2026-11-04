@@ -498,8 +498,11 @@ class Services extends BaseService
         $driver = config(Integrations::class)->siasn['driver'];
 
         return match ($driver) {
-            'mock'  => new MockSiasnAdapter(),
-            default => throw new RuntimeException("SIASN driver '{$driver}' belum tersedia (adapter real dikerjakan di Fase 6)."),
+            'mock' => new MockSiasnAdapter(),
+            // Fase 6 Jalur B (MAKE-067, H-03): SIASN BKN nyata; alamat & token dari blok `integrations.bkn.*`
+            // (`baseUrlApi` + token gateway/SSO), konfigurasi kosong gagal saat dibuat (AC-K.4).
+            'bkn'   => new \App\Libraries\Siasn\SiasnAdapter(static::tokenBkn(), (string) config(Integrations::class)->bkn['baseUrlApi']),
+            default => throw new RuntimeException("SIASN driver '{$driver}' belum tersedia."),
         };
     }
 
