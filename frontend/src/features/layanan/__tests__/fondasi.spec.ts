@@ -60,6 +60,7 @@ describe('routes.layanan.ts', () => {
       LAYANAN_ROUTE.PMK_DETAIL,
       LAYANAN_ROUTE.STATUS,
       LAYANAN_ROUTE.PETUGAS,
+      LAYANAN_ROUTE.VERIFIKASI_SURAT_CUTI,
     ])
   })
 })

@@ -6,7 +6,8 @@
  *   GET    cuti/{id}                                    detail (+ lampiran, surat, riwayat approval)
  *   POST   cuti/{id}/process                            `{aksi, reason_note?, atas_nama?}`
  *   POST   cuti/{id}/tunda                              tunda pengingat
- *   POST   cuti/{id}/esign                              terbitkan surat ber-TTE `{passphrase}` (role 1, 3)
+ *   POST   cuti/{id}/esign                              tanda tangani surat `{passphrase}` (penanda tangan pemilik tugas, F6-18)
+ *   GET    cuti/{id}/esign/status                       cek sertifikat sebelum passphrase `{status: aktif|tidak_aktif|galat, pesan}`
  *   DELETE cuti/{id}                                    hapus
  *   GET    cuti/pengingat                               antrean persetujuan yang belum ditunda
  *   GET    cuti/{id}/lampiran | cuti/{id}/surat         unduh berkas
@@ -211,7 +212,20 @@ export const cutiService = {
     return normalisasiCuti(data)
   },
 
-  /** Terbitkan surat cuti ber-TTE (role 1, 3). Passphrase hanya di body JSON; tidak pernah di URL/query. */
+  /**
+   * Cek sertifikat penanda tangan sebelum dialog passphrase (F6-18, MAKE-065). Status di luar `aktif`/`tidak_aktif`
+   * diperlakukan sebagai `galat` (boleh diulang).
+   */
+  async esignStatus(id: number): Promise<{ status: 'aktif' | 'tidak_aktif' | 'galat'; pesan: string }> {
+    const { data } = await api.get<{ status?: unknown; pesan?: unknown }>(`/cuti/${id}/esign/status`)
+    const status = data.status === 'aktif' || data.status === 'tidak_aktif' ? data.status : 'galat'
+    return { status, pesan: typeof data.pesan === 'string' ? data.pesan : '' }
+  },
+
+  /**
+   * Terbitkan surat cuti ber-TTE — hanya penanda tangan pemilik tugas (PyB; langkah tunggal tanpa PyB → AL, Q6-19).
+   * Passphrase hanya di body JSON; tidak pernah di URL/query.
+   */
   async esign(id: number, passphrase: string): Promise<CutiItem> {
     const { data } = await api.post<Record<string, unknown>>(`/cuti/${id}/esign`, { passphrase })
     return normalisasiCuti(data)

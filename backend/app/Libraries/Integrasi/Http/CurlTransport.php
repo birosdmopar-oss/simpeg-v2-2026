@@ -18,12 +18,7 @@ final class CurlTransport implements TransportHttpInterface
     public function kirim(Permintaan $permintaan, OpsiTransport $opsi): Respons
     {
         /** @var CURLRequest $klien */
-        $klien = Services::curlrequest([
-            'timeout'         => $opsi->timeout,
-            'connect_timeout' => $opsi->connectTimeout,
-            'verify'          => $opsi->verifyTls,
-            'http_errors'     => false,
-        ], null, null, false);
+        $klien = Services::curlrequest(self::opsiKlien($opsi), null, null, false);
 
         $opsiCi = ['headers' => $permintaan->header];
 
@@ -57,7 +52,7 @@ final class CurlTransport implements TransportHttpInterface
     }
 
     /**
-     * @param list<array{nama: string, isi: string, namaBerkas?: string}> $bagian
+     * @param list<array{nama: string, isi: string, namaBerkas?: string, mime?: string}> $bagian
      *
      * @return array<string, \CURLStringFile|string>
      */
@@ -67,11 +62,29 @@ final class CurlTransport implements TransportHttpInterface
 
         foreach ($bagian as $b) {
             $hasil[$b['nama']] = isset($b['namaBerkas'])
-                ? new \CURLStringFile($b['isi'], $b['namaBerkas'], 'application/pdf')
+                ? new \CURLStringFile($b['isi'], $b['namaBerkas'], $b['mime'] ?? 'application/pdf')
                 : $b['isi'];
         }
 
         return $hasil;
+    }
+
+    /**
+     * Opsi klien CI4 dari {@see OpsiTransport}: `verify` false = peer DAN host tidak diverifikasi (CI4: VERIFYPEER false,
+     * VERIFYHOST 0) — hanya e-sign, keputusan Horii 03-11-2026; `caBundle` = CURLOPT_CAINFO + verifikasi penuh; redirect
+     * tidak pernah diikuti (pengaman BP-3).
+     *
+     * @return array{timeout: float, connect_timeout: float, verify: bool|string, allow_redirects: false, http_errors: false}
+     */
+    public static function opsiKlien(OpsiTransport $opsi): array
+    {
+        return [
+            'timeout'         => $opsi->timeout,
+            'connect_timeout' => $opsi->connectTimeout,
+            'verify'          => $opsi->verifyTls ? ($opsi->caBundle ?? true) : false,
+            'allow_redirects' => false,
+            'http_errors'     => false,
+        ];
     }
 
     /**

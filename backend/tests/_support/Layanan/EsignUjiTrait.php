@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\Layanan;
 
+use App\Interfaces\EsignGatewayInterface;
 use App\Libraries\Esign\MockEsignAdapter;
-use App\Libraries\Kepegawaian\Scope\PegawaiScope;
 use App\Libraries\Layanan\Cuti\EsignCutiService;
 use App\Libraries\Layanan\Cuti\SuratCutiService;
 
@@ -18,6 +18,9 @@ trait EsignUjiTrait
     use CutiUjiTrait;
 
     protected const PASSPHRASE_UJI = 'RAHASIA-PASS-9X7Q';
+
+    /** Akun penanda tangan (PyB) cuti terakhir dari {@see self::cutiFinal()} — pemilik tugas e-sign (F6-18 K1). */
+    protected ?\App\Libraries\Auth\AuthContext $penandaTerakhir = null;
 
     /**
      * Cuti berstatus final (1 atau 4) dengan PyB bernik terdaftar.
@@ -32,6 +35,8 @@ trait EsignUjiTrait
             $this->db->table('pegawai')->where('nip', $a['pyb']['nip'])->update(['nik' => '3171000000000001']);
         }
 
+        $this->penandaTerakhir = $a['pyb']['auth'];
+
         $id = $this->buatBarisCuti($a['pemohon']['nip'], [
             'nama'                => 'Pemohon Uji', 'jabatan' => 'Analis', 'satker' => 'Biro Uji', 'mker_th' => 10, 'mker_bl' => 3,
             'status'              => $status, 'status_al' => 1, 'status_pyb' => $status,
@@ -45,8 +50,9 @@ trait EsignUjiTrait
 
     /**
      * @param list<string> $tanpaSertifikat
+     * @param EsignGatewayInterface|null $gateway gateway lain (mis. adapter BSrE real + FakeTransport, MAKE-065 AC-02.1)
      */
-    protected function esignService(array $tanpaSertifikat = []): EsignCutiService
+    protected function esignService(array $tanpaSertifikat = [], ?EsignGatewayInterface $gateway = null, ?\App\Interfaces\Layanan\TautanSuratCutiInterface $tautan = null, ?\App\Libraries\CacheService $cache = null): EsignCutiService
     {
         $svc = $this->cutiService();
 
@@ -54,9 +60,10 @@ trait EsignUjiTrait
             $this->db,
             $svc,
             new SuratCutiService($this->db, $this->lampiranUji),
-            new MockEsignAdapter($tanpaSertifikat),
-            new PegawaiScope($this->db),
+            $gateway ?? new MockEsignAdapter($tanpaSertifikat),
             $this->notifikasiUji,
+            $tautan,
+            $cache,
         );
     }
 }
