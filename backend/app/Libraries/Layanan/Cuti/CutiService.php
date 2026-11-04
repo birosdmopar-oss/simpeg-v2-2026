@@ -760,6 +760,8 @@ class CutiService
         });
 
         $this->notifikasi?->antrekan($idNotif);
+        // F6-13 (Fase 6 MAKE-066): push Android ikut legacy `andr_notif_queue` [K `L_cuti.php:1063-1110/1196-1245`].
+        (new \App\Libraries\Push\PushAndroidCuti())->diajukan($this->ambil($idBaru) ?? [], $lama === null);
 
         return $this->itemDetail($auth, $this->ambil($idBaru) ?? throw new NotFoundException());
     }
