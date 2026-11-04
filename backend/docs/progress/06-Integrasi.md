@@ -57,7 +57,7 @@ hanya aktif di `rekomendasi_kp`; v2 memakai `klienLayanan` (hak `stat`, F6-03).
 | Legacy `id_riwayat` | Kode v2 | Tabel riwayat | `id_entri` (padanan) | Dipakai |
 |---|---|---|---|---|
 | 11 | `kp` | `riwayat_kp` | `id_riwayat_kp` (pegawai_cpns / pegawai_pns / pegawai_kp) | KP, pensiun, KGB |
-| 10 | `kgb` | `riwayat_kgb` | `id_riwayat_kgb` (pegawai_kgb) — usulan Q10 | KGB |
+| 10 | `kgb` | `riwayat_kgb` | PK `riwayat_kgb` (Q10 disetujui) | KGB |
 | 32 | `skp` | `riwayat_skp` | `id_riwayat_skp` | KP, pensiun |
 | 9 (jabatan) | `jabatan` | `riwayat_mutasi_jabatan` | `id_riwayat_mutasi_jabatan` | KP varian `_uns` |
 | — (`pegawai_ak.file_pak`) | tidak ada | — | — | KP (`arsip_last_pak`), Q8 |
@@ -66,9 +66,14 @@ Cek "ada/tidak": `AttachmentServiceInterface::daftar(nip, idRiwayat, idEntri)` l
 `GET pegawai/{nip}/lampiran/{id}/unduh`. Legacy memanggil HTTP dan mengecek 200; v2 tidak memakai HTTP.
 
 **Keputusan terbuka (diteruskan ke reviewer lewat lead):**
-- Q5: varian `rekomendasi_kp_uns` (satker/unit pemanggil) — usul hanya `get_all_*`, varian `_uns` tidak diimplementasi.
-- Q8: `arsip_last_pak` — usul `null` + deviasi [V2], atau cek StorageAdapter bila path masih valid.
-- Q10: `id_entri` arsip KGB — usul PK `riwayat_kgb`.
+- Q5 **MENUNGGU HORII** (jangan dikode): varian `rekomendasi_kp_uns` (S_stat.php:433) tidak memakai identitas pemanggil.
+  Filter diambil dari `$_GET['id_satker']` / `$_GET['id_unit']` (:456–457); auth dikomentari (:446–447); varian ini
+  memuat `file_pak` (:627) dan arsip jabatan/PAK (:600–638). Usul reviewer ke Horii: pertahankan varian, filter dari
+  parameter query, wajib auth klien [V2 auth].
+- Q8 (PAK, `arsip_last_pak`): pakai preseden v2 (KolomBerkas/storage). Path ada di storage v2 → URL berkas v2; kosong atau
+  path impor belum ada di storage → null/kosong. Dicatat [V2] di README modul, sama dengan `file_lckh` dan PMK
+  (README Api/Layanan :105).
+- Q10 **DISETUJUI**: `id_entri` arsip KGB = PK `riwayat_kgb`.
 - Q9 (diputuskan lead): keluaran DD-MM-YYYY persis legacy; ISO internal di kelas murni, konversi di penyaji.
 
 **Usulan struktur kelas (belum dibuat):** `Libraries/Integrasi/Stat/RekomendasiKp`, `RekomendasiKgb`,
