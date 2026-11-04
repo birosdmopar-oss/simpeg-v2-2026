@@ -92,9 +92,52 @@ final class LkhTest extends DatabaseTestCase
             config(\Config\Integrations::class)->push = $push;
         }
 
-        $job = $this->db->table('queue_jobs')->where('queue', 'push')->get()->getResultArray();
-        $this->assertCount(1, $job);
-        $this->assertSame(['job' => 'fcm-topik', 'data' => ['nip' => $this->nip, 'tambah' => [], 'lepas' => ['pegawai_blm_lkh']]], array_intersect_key((array) json_decode($job[0]['payload'], true), ['job' => 1, 'data' => 1]));
+        $job = $this->jobPush('fcm-topik');
+        $this->assertSame([['nip' => $this->nip, 'tambah' => [], 'lepas' => ['pegawai_blm_lkh']]], $job);
+    }
+
+    public function testPushWebRiwayatLkhIkutLegacyBilaDriverFcm(): void
+    {
+        // F6-13 (Fase 6 MAKE-066) [K `L_lkh.php:331/542/1067`]: tambah → tipe 1 (atasan), ubah kembali menunggu → tipe 3,
+        // proses → tipe 2 (pegawai) dengan aksi legacy.
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+
+        try {
+            $a = $this->tambah($this->pegawai, '2026-10-12');
+            $this->svc()->proses($this->atasan, $a['id'], 'revisi', 'Rinci output');
+            $this->svc()->ubah($this->pegawai, $a['id'], ['kegiatan' => [$this->baris('08:00')]]);
+            $this->svc()->proses($this->atasan, $a['id'], 'setujui', null);
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $this->assertSame([
+            ['tipe' => 1, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => null],
+            ['tipe' => 2, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => 'Butuh Revisi'],
+            ['tipe' => 3, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => null],
+            ['tipe' => 2, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => 'Disetujui'],
+        ], $this->jobPush('push-riwayat'));
+    }
+
+    /**
+     * Data job antrean `push` bernama $nama, urut masuk.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function jobPush(string $nama): array
+    {
+        $hasil = [];
+
+        foreach ($this->db->table('queue_jobs')->where('queue', 'push')->orderBy('id', 'ASC')->get()->getResultArray() as $r) {
+            $p = (array) json_decode((string) $r['payload'], true);
+
+            if (($p['job'] ?? null) === $nama) {
+                $hasil[] = (array) $p['data'];
+            }
+        }
+
+        return $hasil;
     }
 
     public function testStempelCreatedAtDanUpdatedAtBerisiUtc(): void

@@ -202,6 +202,32 @@ final class KonketTest extends DatabaseTestCase
         $this->assertSame(0, $this->db->table('absen_ijin')->whereIn('id', $hapus['ids'])->where('status !=', '10')->countAllResults());
     }
 
+    public function testPushWebRiwayatKonketIkutLegacyBilaDriverFcm(): void
+    {
+        // F6-13 (Fase 6 MAKE-066) [K `L_konket.php:370/563/1888`]: ajukan → tipe 1 (admin), ubah pegawai (kembali W) → tipe 3,
+        // proses → tipe 2 (pegawai) "Disetujui"/"Ditolak". Driver mock tidak mengantre.
+        $this->tambah($this->pegawai, $this->data('2026-10-01'));
+        $this->assertSame(0, $this->db->table('queue_jobs')->where('queue', 'push')->countAllResults());
+
+        $push                                     = config(\Config\Integrations::class)->push;
+        config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
+
+        try {
+            $row = $this->tambah($this->pegawai, $this->data('2026-10-05'));
+            $this->svc()->ubah($this->pegawai, $row['id'], ['alasan' => 'Diubah'] + $this->data('2026-10-05'), null);
+            $this->svc()->proses($this->admin, $row['id'], 'tolak', 'Bukti tidak sesuai');
+        } finally {
+            config(\Config\Integrations::class)->push = $push;
+        }
+
+        $data = array_map(static fn (array $r): array => (array) json_decode((string) $r['payload'], true)['data'], $this->db->table('queue_jobs')->where('queue', 'push')->orderBy('id', 'ASC')->get()->getResultArray());
+        $this->assertSame([
+            ['tipe' => 1, 'jenis' => 'konket', 'id' => $row['id'], 'aksi' => null],
+            ['tipe' => 3, 'jenis' => 'konket', 'id' => $row['id'], 'aksi' => null],
+            ['tipe' => 2, 'jenis' => 'konket', 'id' => $row['id'], 'aksi' => 'Ditolak'],
+        ], $data);
+    }
+
     public function testProsesTolakWajibAlasanDanHanyaMenunggu(): void
     {
         $row = $this->tambah($this->pegawai, $this->data('2026-10-05'));
