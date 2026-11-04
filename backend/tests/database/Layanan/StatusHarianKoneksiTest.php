@@ -53,9 +53,9 @@ final class StatusHarianKoneksiTest extends DatabaseTestCase
         (new AkunSistemIntegrasi($this->db))->siapkan();
         $nip = $this->buatPegawai(['id_jenis_status' => 1]);
         $this->db->table('riwayat_tb')->insert([
-            'nip' => $nip, 'tgl_mulai' => '2026-01-01', 'tgl_akhir' => '2026-12-31', 'status' => 1, 'jenjang_pendidikan_singkat' => 'S2',
+            'nip'                  => $nip, 'tgl_mulai' => '2026-01-01', 'tgl_akhir' => '2026-12-31', 'status' => 1, 'jenjang_pendidikan_singkat' => 'S2',
             'institusi_pendidikan' => 'Universitas Uji', 'jurusan_pendidikan' => 'Jurusan Uji', 'dalam_negeri' => 1,
-            'lokasi_pendidikan' => 'Kota Uji', 'lembaga_yang_mendanai' => 'Lembaga Uji',
+            'lokasi_pendidikan'    => 'Kota Uji', 'lembaga_yang_mendanai' => 'Lembaga Uji',
         ]);
 
         return [$nip, (new AkunSistemIntegrasi($this->db))->id()];
