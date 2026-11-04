@@ -218,6 +218,11 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
    ```
 
    Konfigurasi kosong atau berkas tidak terbaca → adapter gagal saat dibuat (job masuk `queue_jobs_failed`, pesan menyebut nama key saja).
+
+   Uji dari server sesudah konfigurasi (CR-101): `php spark integrasi:uji-koneksi fcm` — meminta token akses OAuth baru lalu
+   `messages:send` dengan `validate_only` ke topik uji, jadi **tidak ada pesan yang sampai ke perangkat**. Harus
+   `Uji koneksi fcm OK`. `GAGAL: token akses OAuth …` = berkas/kunci service account salah atau dicabut; `PERMISSION_DENIED`
+   = service account tanpa peran pengirim FCM; `NOT_FOUND` = `projectId` salah. Keluaran tanpa projectId/token/kunci.
 4. Frontend (web push): isi konfigurasi web Firebase proyek yang sama di `frontend/.env.production` (`VITE_FIREBASE_*`, lihat `frontend/.env.example`). Nilai web Firebase bukan rahasia, tetapi tetap tidak disalin dari `header.php` legacy; ambil dari Firebase console.
 5. Token web (`platform` 1) didaftarkan SPA lewat `POST api/v1/integrasi/fcm-token`. **Token Android (`platform` 2) tidak punya endpoint di SIMPEG v2** (legacy pun tidak): backend app mobile di luar repo yang menulis `firebase_token` legacy harus diarahkan menulis ke `firebase_token` DB v2 — `nip` pemilik, `platform` = 2, `fcm_token`, `token_hash` = SHA-256 heks token (unik per `nip` + `token_hash`), `id_pengguna` NULL. Siapa dan bagaimana caranya = pertanyaan cutover DEPLOY-001.1 (PRD Fase 6 §7.4); sampai terjawab, push Android dan topik presensi tidak punya penerima. Token yang dilaporkan FCM tidak terdaftar dihapus otomatis.
    Kontrak `data` push Android mengikuti legacy apa adanya (`{title, body, data: JSON baris sumber + kolom tambahan legacy}`, mis. cuti `file_bukti_url` + `status_str`) karena app Android bergantung padanya; TB/IB/PMK tidak dikirim ke Android (legacy pun tidak).
