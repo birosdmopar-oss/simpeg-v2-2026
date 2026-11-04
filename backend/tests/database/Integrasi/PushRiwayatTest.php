@@ -58,6 +58,15 @@ final class PushRiwayatTest extends DatabaseTestCase
 
     public function testListenerEventHanyaDriverFcmDanJenisLegacy(): void
     {
+        // Terdaftar di Config\Events; listener bisa sudah dilepas test lain dalam proses yang sama
+        // (RiwayatUjiTrait::lepasEngine → Events::removeAllListeners) — pasang ulang hanya bila hilang (pola StatistikCache).
+        $this->assertStringContainsString("[\App\Libraries\Push\AntrePushRiwayat::class, 'dariEvent']", (string) file_get_contents(APPPATH . 'Config/Events.php'));
+        $listener = [AntrePushRiwayat::class, 'dariEvent'];
+
+        if (! in_array($listener, Events::listeners(RiwayatEngine::EVENT_NOTIFIKASI), true)) {
+            Events::on(RiwayatEngine::EVENT_NOTIFIKASI, $listener);
+        }
+
         $payload = ['tipe' => RiwayatEngine::NOTIF_DIAJUKAN, 'jenis' => 'kp', 'nip' => '1', 'id' => 5, 'status' => 0, 'aksi' => null, 'reason_note' => null];
 
         Events::trigger(RiwayatEngine::EVENT_NOTIFIKASI, $payload);

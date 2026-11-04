@@ -176,9 +176,9 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
 
 | Job | Isi | Kanal |
 |---|---|---|
-| `push-notif` | notifikasi layanan (`inbox_msg`) cuti/TB/IB/PMK | Android (`firebase_token.platform` 2, per NIP) + web (akun ber-NIP) |
+| `push-notif` | notifikasi layanan (`inbox_msg`) cuti/TB/IB/PMK [K `fcmQueue_layanan`] | web (akun ber-NIP penerima) |
 | `push-riwayat` | riwayat/usulan/LKH/Konket ke penerima legacy (admin pembawah, atasan LKH, petugas Karpeg/Kariskarsu, pegawai) | web |
-| `push-pesan` | push generik per NIP (titik sambung Halo Simpeg Fase 8) | Android (bawaan) / web |
+| `push-pesan` | Android cuti dengan teks & `data` legacy `andr_notif_queue` (ajukan/ubah → atasan, keputusan → pemohon + PyB) dan titik sambung Halo Simpeg Fase 8 | Android (`firebase_token.platform` 2, per NIP) |
 | `fcm-topik` | keanggotaan topik `pegawai_blm_masuk` / `pegawai_blm_pulang` / `pegawai_blm_lkh` sesudah presensi/LKH | Android |
 
 1. Proyek Firebase **sama dengan legacy** (PN-3): topik presensi dan app Android memakai proyek itu. Pesan ke topik tetap dikirim **di luar SIMPEG** (Firebase console / penjadwal luar) seperti legacy.
@@ -193,7 +193,8 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
 
    Konfigurasi kosong atau berkas tidak terbaca → adapter gagal saat dibuat (job masuk `queue_jobs_failed`, pesan menyebut nama key saja).
 4. Frontend (web push): isi konfigurasi web Firebase proyek yang sama di `frontend/.env.production` (`VITE_FIREBASE_*`, lihat `frontend/.env.example`). Nilai web Firebase bukan rahasia, tetapi tetap tidak disalin dari `header.php` legacy; ambil dari Firebase console.
-5. Token web (`platform` 1) didaftarkan SPA lewat `POST api/v1/integrasi/fcm-token`; token Android (`platform` 2) ditulis backend app mobile di luar repo (pertanyaan cutover DEPLOY-001.1). Token yang dilaporkan FCM tidak terdaftar dihapus otomatis.
+5. Token web (`platform` 1) didaftarkan SPA lewat `POST api/v1/integrasi/fcm-token`. **Token Android (`platform` 2) tidak punya endpoint di SIMPEG v2** (legacy pun tidak): backend app mobile di luar repo yang menulis `firebase_token` legacy harus diarahkan menulis ke `firebase_token` DB v2 — `nip` pemilik, `platform` = 2, `fcm_token`, `token_hash` = SHA-256 heks token (unik per `nip` + `token_hash`), `id_pengguna` NULL. Siapa dan bagaimana caranya = pertanyaan cutover DEPLOY-001.1 (PRD Fase 6 §7.4); sampai terjawab, push Android dan topik presensi tidak punya penerima. Token yang dilaporkan FCM tidak terdaftar dihapus otomatis.
+   Kontrak `data` push Android cuti mengikuti legacy apa adanya (`{title, body, data: JSON baris riwayat_cuti + file_bukti_url + status_str}`) karena app Android bergantung padanya; TB/IB/PMK tidak dikirim ke Android (legacy hanya cuti dan support).
 6. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`.
 
 ---

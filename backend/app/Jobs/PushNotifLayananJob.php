@@ -15,8 +15,10 @@ use RuntimeException;
  * Job `push-notif` di antrean `push` (PRD Fase 4 v1.3 §6.6.3, C-06): kirim push mock FCM untuk satu `inbox_msg`.
  * Worker: `php spark queue:work push --stop-when-empty --max-time 55` (README-deploy.md §1b).
  *
- * Token (PRD Fase 6 F6-13, MAKE-066) = token Android (`platform` 2) milik `inbox.nip_penerima` [K `andr_notif_queue`] +
- * token web (`platform` 1) milik akun ber-NIP itu [K `fcmQueue_layanan` → `fb_token`], lewat {@see PenerimaTokenFcm}.
+ * Kanal (PRD Fase 6 F6-13, MAKE-066; keputusan reviewer 04-11-2026, ikut legacy) = token **web** (`platform` 1) milik akun
+ * ber-NIP `inbox.nip_penerima` [K `fcmQueue_layanan` → `fb_token`], lewat {@see PenerimaTokenFcm}. Kanal Android TIDAK dari
+ * inbox: legacy `andr_notif_queue` hanya cuti (teks & data legacy, {@see \App\Libraries\Push\PushAndroidCuti}) dan support
+ * (Halo Simpeg), sehingga TB/IB/PMK hanya web.
  * Tanpa token → `push_status = 3`, selesai tanpa galat. Sukses → 1. Gagal → 2 dan dilempar agar worker mencoba ulang
  * sampai {@see self::TRIES}, lalu `queue_jobs_failed` (tidak retry selamanya, H-04). Token yang dilaporkan tidak valid
  * dihapus per baris (`id_firebase_token`). Payload `{title, body, data: {modul, id_rwy, url}}`;
@@ -54,7 +56,7 @@ class PushNotifLayananJob extends BaseJob implements JobInterface
         $model    = new InboxMsgModel();
         $nip      = (string) $pesan['nip_penerima'];
         $tokens   = new PenerimaTokenFcm($db);
-        $penerima = array_merge($tokens->android([$nip]), $tokens->webAkunNip([$nip]));
+        $penerima = $tokens->webAkunNip([$nip]);
 
         if ($penerima === []) {
             $model->update($idMsg, ['push_status' => InboxMsgModel::PUSH_TANPA_TOKEN]);
