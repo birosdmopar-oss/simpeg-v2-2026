@@ -230,6 +230,15 @@ describe('cutiService — amplop backend nyata lewat klien asli', () => {
     expect(item.aksi.unduh_surat).toBe(true)
   })
 
+  it('esignStatus() membuka amplop dan menormalkan status tak dikenal menjadi galat', async () => {
+    server.balasan['get /cuti/12/esign/status'] = sukses({ status: 'tidak_aktif', pesan: 'Sertifikat elektronik Anda tidak aktif.' })
+    expect(await cutiService.esignStatus(12)).toEqual({ status: 'tidak_aktif', pesan: 'Sertifikat elektronik Anda tidak aktif.' })
+    expect(server.permintaan[0]!.url).toBe('/cuti/12/esign/status')
+
+    server.balasan['get /cuti/12/esign/status'] = sukses({ status: 'lain' })
+    expect(await cutiService.esignStatus(12)).toEqual({ status: 'galat', pesan: '' })
+  })
+
   it('esign() 422: galat per kolom passphrase/nip/status diteruskan tanpa membuka passphrase', async () => {
     server.balasan['post /cuti/12/esign'] = {
       status: 422,

@@ -4,24 +4,40 @@ declare(strict_types=1);
 
 namespace App\Libraries\Layanan\Cuti;
 
-use App\Constants\Role;
+use App\Exceptions\ApiException;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\EsignGatewayInterface;
-use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
+use App\Interfaces\Layanan\TautanSuratCutiInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\CacheService;
 use App\Models\AuditLogModel;
 use App\Models\Layanan\EsignHistModel;
 use CodeIgniter\Database\BaseConnection;
 use Throwable;
 
 /**
- * Penerbitan surat cuti ber-TTE lewat gateway e-sign (mock di Fase 4) — PRD Fase 4 v1.3 §6.5, C-05. `POST cuti/{id}/esign`.
+ * Penandatanganan surat cuti ber-TTE lewat gateway e-sign — PRD Fase 4 v1.3 §6.5 (C-05), diselaraskan PRD Fase 6 F6-18
+ * (keputusan Horii 03-11-2026, kartu Catatan Teknis): `POST cuti/{id}/esign`.
  *
- * Urutan (§6.5.3): role (filter route) → baris ada (404) → lingkup role 3 (403) → body (422) → status 1/4 dan belum
- * ber-TTE (422) → penanda tangan (422) → `checkUser` + `signPdf` → transaksi bisnis (kunci, cek ulang, simpan PDF ber-TTE,
- * audit) → `esign_hist`.
+ * - K1 (dua langkah, deviasi dari PRD Fase 4 Q-09 dialog admin): passphrase diketik **penanda tangan sendiri** (PyB; langkah
+ *   tunggal tanpa PyB → AL) di halaman tugasnya SESUDAH persetujuan tersimpan. Hanya pemilik tugas (NIP akun = NIP penanda
+ *   tangan) yang boleh menandatangani — bukan berdasarkan role. Gagal → persetujuan tetap tersimpan, surat tanpa TTE, dan
+ *   penanda tangan boleh mengulang (legacy `Cuti::process_esign` membatalkan persetujuan — deviasi dicatat).
+ * - K2 [V2]: maksimal 5 percobaan gagal per penanda tangan per cuti dalam 15 menit (pola LockoutService, dihitung dari
+ *   `esign_hist` status 2) → 429 `esign_terkunci`.
+ * - K3b: `imageTTD` = QR berisi URL publik PDF ber-TTE ({@see TautanSuratCutiInterface}); belum tersedia → tanpa gambar.
+ * - Cek sertifikat sebelum meminta passphrase ({@see self::statusSertifikat()}, ikut legacy `Cuti.php:687-705`
+ *   `checkStatus` saat membuka halaman proses; putusan reviewer 03-11-2026): tidak aktif → passphrase tidak diminta, surat
+ *   tanpa TTE; gateway mati → galat, boleh diulang, TIDAK dihitung pembatas K2.
+ *
+ * Rujukan PRD Fase 6 v1.0f (CR-097): Q6-19 (K1), Q6-20 (K2), Q6-21 (Tolak tanpa passphrase), Q6-22 (QR TTE), AC-02.6.
+ *
+ * Urutan: baris ada & boleh dilihat (404) → pemilik tugas (403) → kunci per cuti (409, {@see KunciSuratCuti}) → batas
+ * percobaan (429) → body (422) → status 1/4 dan belum ber-TTE (422)
+ * → penanda tangan (422) → `checkUser` + `signPdf` → transaksi bisnis (kunci, cek ulang, simpan PDF ber-TTE, audit) →
+ * `esign_hist`.
  *
  * Passphrase hanya dibaca dari body, diteruskan ke gateway, dan tidak pernah disimpan, dicatat, atau dikembalikan
  * (juga tidak di `esign_hist`, `audit_logs`, respons, maupun pesan galat). Percobaan GAGAL dicatat `esign_hist`
@@ -43,7 +59,46 @@ class EsignCutiService
 
     public const PESAN_NIK = 'NIK pejabat belum terdaftar.';
 
-    private const ALASAN = 'Persetujuan cuti';
+    public const PESAN_BUKAN_PENANDA = 'Hanya pejabat penanda tangan surat cuti ini yang dapat menandatangani.';
+
+    public const BATAS_PERCOBAAN = 5;
+
+    public const JENDELA_MENIT = 15;
+
+    public const KODE_TERKUNCI = 'esign_terkunci';
+
+    public const SERTIFIKAT_AKTIF = 'aktif';
+
+    public const SERTIFIKAT_TIDAK_AKTIF = 'tidak_aktif';
+
+    public const SERTIFIKAT_GALAT = 'galat';
+
+    /** Detik cache hasil cek sertifikat per penanda tangan (kunci = hash NIP; NIK tidak disimpan). */
+    public const CACHE_SERTIFIKAT_DETIK = 300;
+
+    /** Kode gateway mati/timeout dari adapter. */
+    private const KODE_GATEWAY_MATI = ['timeout', 'koneksi'];
+
+    /** `esign_hist.status_code` galat gateway (5xx, balasan bukan PDF, exception adapter) — review B4a P2. */
+    public const KODE_GALAT_GATEWAY = 'gateway';
+
+    /** `esign_hist.status_code` galat internal (PDF ber-TTE gagal disimpan) — review B4a P2. */
+    public const KODE_GALAT_INTERNAL = 'internal';
+
+    /** `esign_hist.status_code` NIK penanda tangan belum terdaftar (data, bukan percobaan passphrase). */
+    public const KODE_NIK_KOSONG = 'nik_kosong';
+
+    /**
+     * Kode `esign_hist` yang BUKAN percobaan passphrase sehingga tidak dihitung pembatas K2 (Q6-20). Galat gateway
+     * diklasifikasikan satu tempat oleh {@see self::galatGateway()}, juga dipakai {@see self::statusSertifikat()}.
+     */
+    public const KODE_BUKAN_PERCOBAAN = ['timeout', 'koneksi', self::KODE_GALAT_GATEWAY, self::KODE_GALAT_INTERNAL, self::KODE_NIK_KOSONG];
+
+    public const PESAN_GALAT_GATEWAY = 'Layanan tanda tangan elektronik tidak dapat dihubungi. Coba lagi.';
+
+    public const PESAN_GALAT_INTERNAL = 'Surat cuti ber-TTE gagal disimpan. Coba lagi.';
+
+    private const ALASAN = 'Dokumen ini ditandatangani secara elektronik menggunakan Aplikasi SIMPEG Kemenpar';
 
     private const LOKASI = 'Jakarta';
 
@@ -52,9 +107,100 @@ class EsignCutiService
         private readonly CutiService $cuti,
         private readonly SuratCutiService $surat,
         private readonly EsignGatewayInterface $gateway,
-        private readonly PegawaiScopeInterface $scope,
         private readonly ?CutiNotifikasiService $notifikasi = null,
+        private readonly ?TautanSuratCutiInterface $tautan = null,
+        private readonly ?CacheService $cache = null,
     ) {
+    }
+
+    /**
+     * `GET cuti/{id}/esign/status` — cek sertifikat penanda tangan (pemilik tugas saja) sebelum dialog passphrase. Hasil
+     * aktif/tidak aktif di-cache {@see self::CACHE_SERTIFIKAT_DETIK} detik per NIP (tanpa NIK); galat gateway tidak di-cache.
+     *
+     * @return array{status: string, pesan: string}
+     */
+    public function statusSertifikat(AuthContext $auth, int $id): array
+    {
+        $cuti   = $this->cutiPenanda($auth, $id);
+        $nipTtd = (string) self::penandaTangan($cuti);
+
+        $this->periksaBisaDiterbitkan($cuti, (string) $cuti['nip'], $id);
+
+        $kunci     = 'esign_sertifikat_' . hash('sha256', $nipTtd);
+        $tersimpan = $this->cache?->get($kunci);
+
+        if (is_array($tersimpan) && is_string($tersimpan['status'] ?? null) && is_string($tersimpan['pesan'] ?? null)) {
+            return ['status' => $tersimpan['status'], 'pesan' => $tersimpan['pesan']];
+        }
+
+        try {
+            $cek = $this->gateway->checkUser($nipTtd);
+        } catch (Throwable) {
+            return ['status' => self::SERTIFIKAT_GALAT, 'pesan' => self::PESAN_GALAT_GATEWAY];
+        }
+
+        // S3 review B4a: 401/403/429 = kredensial aplikasi / pembatasan gateway, bukan status sertifikat → galat, tidak di-cache.
+        if (self::galatGateway($cek['status_code']) || in_array($cek['status_code'], ['401', '403', '429'], true)) {
+            return ['status' => self::SERTIFIKAT_GALAT, 'pesan' => self::PESAN_GALAT_GATEWAY];
+        }
+
+        $hasil = $cek['status_code'] === '200'
+            ? ['status' => self::SERTIFIKAT_AKTIF, 'pesan' => 'Sertifikat elektronik aktif.']
+            : ['status' => self::SERTIFIKAT_TIDAK_AKTIF, 'pesan' => 'Sertifikat elektronik Anda tidak aktif; surat cuti diterbitkan tanpa tanda tangan elektronik.'];
+
+        $this->cache?->set($kunci, $hasil, self::CACHE_SERTIFIKAT_DETIK);
+
+        return $hasil;
+    }
+
+    /**
+     * Galat gateway (bukan jawaban atas passphrase): kode kosong, timeout/koneksi, atau HTTP 5xx (termasuk `502` balasan
+     * sukses yang bukan PDF). Satu-satunya klasifikasi untuk pembatas K2 dan cek sertifikat (review B4a P2).
+     */
+    public static function galatGateway(?string $kode): bool
+    {
+        return $kode === null || $kode === '' || in_array($kode, self::KODE_GATEWAY_MATI, true) || preg_match('/^5\d\d$/', $kode) === 1;
+    }
+
+    /**
+     * Cuti yang boleh ditandatangani akun ini: tidak terlihat → 404 seragam (S4 review B4a, pola `bolehLihat`, tanpa oracle
+     * id); terlihat tetapi bukan penanda tangan → 403.
+     *
+     * @return array<string, mixed>
+     */
+    private function cutiPenanda(AuthContext $auth, int $id): array
+    {
+        $cuti = $this->cuti->ambil($id);
+
+        if ($cuti === null || ! $this->cuti->bolehLihat($auth, $cuti)) {
+            throw new NotFoundException();
+        }
+
+        $nipTtd = self::penandaTangan($cuti);
+
+        if ($nipTtd === null || $auth->nip() === null || $auth->nip() !== $nipTtd) {
+            throw new ForbiddenException(self::PESAN_BUKAN_PENANDA);
+        }
+
+        return $cuti;
+    }
+
+    /**
+     * Penanda tangan = NIP PyB; langkah tunggal tanpa PyB → NIP AL; keduanya kosong (eselon I) → null.
+     *
+     * @param array<string, mixed> $cuti
+     */
+    public static function penandaTangan(array $cuti): ?string
+    {
+        foreach (['nip_yang_menyetujui', 'nip_atasan_langsung'] as $kolom) {
+            $nip = trim((string) ($cuti[$kolom] ?? ''));
+
+            if ($nip !== '') {
+                return $nip;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -64,16 +210,23 @@ class EsignCutiService
      */
     public function terbitkan(AuthContext $auth, int $id, array $in, ?string $ip, ?string $userAgent): array
     {
-        $cuti = $this->cuti->ambil($id) ?? throw new NotFoundException();
-        $role = (int) $auth->role();
+        $cuti   = $this->cutiPenanda($auth, $id);
+        $nipTtd = (string) self::penandaTangan($cuti);
 
-        if (! in_array($role, [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true)) {
-            throw new ForbiddenException('Anda tidak berwenang menerbitkan surat cuti.');
-        }
+        // P1 review B4a: satu percobaan per cuti pada satu waktu — pembatas dihitung SEBELUM gateway dan baris gagal ditulis
+        // SESUDAHNYA, sehingga tanpa kunci permintaan serentak sama-sama lolos pembatas.
+        return KunciSuratCuti::dengan($this->db, $id, fn (): array => $this->terbitkanTerkunci($auth, $id, $cuti, $nipTtd, $in, $ip, $userAgent));
+    }
 
-        if ($role === Role::ADMIN_SATKER && ! $this->scope->bolehProses($auth, (string) $cuti['nip'])) {
-            throw new ForbiddenException('Cuti pegawai ini di luar lingkup Anda.');
-        }
+    /**
+     * @param array<string, mixed> $cuti
+     * @param array<string, mixed> $in
+     *
+     * @return array<string, mixed>
+     */
+    private function terbitkanTerkunci(AuthContext $auth, int $id, array $cuti, string $nipTtd, array $in, ?string $ip, ?string $userAgent): array
+    {
+        $this->periksaBatasPercobaan($nipTtd, $id);
 
         $passphrase = $in['passphrase'] ?? null;
 
@@ -84,8 +237,7 @@ class EsignCutiService
         $nipPemohon = (string) $cuti['nip'];
         $this->periksaBisaDiterbitkan($cuti, $nipPemohon, $id);
 
-        $nipTtd = $this->nipPenandaTangan($cuti) ?? throw ValidationException::forField('nip', self::PESAN_PEJABAT);
-        $ttd    = $this->db->table('pegawai')->where('nip', $nipTtd)->get()->getRowArray();
+        $ttd = $this->db->table('pegawai')->where('nip', $nipTtd)->get()->getRowArray();
 
         if ($ttd === null) {
             throw ValidationException::forField('nip', self::PESAN_PEJABAT);
@@ -104,7 +256,7 @@ class EsignCutiService
         $catat = fn (string $status, string $keterangan, ?string $kode) => $this->catat($ttd, $id, (string) ($sumber['lampiran']['path'] ?? $sumber['lampiran']['basename'] ?? ''), $status, $keterangan, $kode, $ip, $userAgent);
 
         if (trim((string) ($ttd['nik'] ?? '')) === '') {
-            $catat(EsignHistModel::STATUS_GAGAL, self::PESAN_NIK, null);
+            $catat(EsignHistModel::STATUS_GAGAL, self::PESAN_NIK, self::KODE_NIK_KOSONG);
 
             throw ValidationException::forField('nip', self::PESAN_NIK);
         }
@@ -133,7 +285,8 @@ class EsignCutiService
                 ], $auth->idPengguna(), $auth->nip());
             });
         } catch (Throwable $e) {
-            $catat(EsignHistModel::STATUS_GAGAL, 'Dokumen ditandatangani gateway tetapi gagal disimpan: ' . $this->bersihkan($e->getMessage(), $passphrase), $hasil['kode']);
+            log_message('error', 'E-sign cuti {id}: PDF ber-TTE gagal disimpan: {galat}', ['id' => $id, 'galat' => mb_substr($this->bersihkan($e::class . ': ' . $e->getMessage(), $passphrase), 0, 500)]);
+            $catat(EsignHistModel::STATUS_GAGAL, 'Dokumen ditandatangani gateway tetapi gagal disimpan.', self::KODE_GALAT_INTERNAL);
 
             throw $e;
         }
@@ -160,21 +313,26 @@ class EsignCutiService
     }
 
     /**
-     * Penanda tangan = NIP PyB; langkah tunggal tanpa PyB → NIP AL; keduanya kosong (eselon I) → null.
-     *
-     * @param array<string, mixed> $cuti
+     * K2 [V2] (Q6-20): {@see self::BATAS_PERCOBAAN} percobaan gagal (esign_hist status 2, kecuali
+     * {@see self::KODE_BUKAN_PERCOBAAN}) dalam {@see self::JENDELA_MENIT} menit untuk penanda tangan + cuti yang sama → 429
+     * sampai percobaan tertua keluar jendela. Dipanggil di dalam {@see KunciSuratCuti} (P1).
      */
-    private function nipPenandaTangan(array $cuti): ?string
+    private function periksaBatasPercobaan(string $nip, int $id): void
     {
-        foreach (['nip_yang_menyetujui', 'nip_atasan_langsung'] as $kolom) {
-            $nip = trim((string) ($cuti[$kolom] ?? ''));
+        $batas = gmdate('Y-m-d H:i:s', time() - self::JENDELA_MENIT * 60);
+        $gagal = $this->db->table('esign_hist')->select('created_at')
+            ->where(['modul' => self::MODUL, 'id_rw' => $id, 'nip' => $nip, 'status' => EsignHistModel::STATUS_GAGAL])
+            ->groupStart()->where('status_code', null)->orWhereNotIn('status_code', self::KODE_BUKAN_PERCOBAAN)->groupEnd()
+            ->where('created_at >=', $batas)->orderBy('created_at', 'DESC')->get(self::BATAS_PERCOBAAN)->getResultArray();
 
-            if ($nip !== '') {
-                return $nip;
-            }
+        if (count($gagal) < self::BATAS_PERCOBAAN) {
+            return;
         }
 
-        return null;
+        $tertua = strtotime($gagal[self::BATAS_PERCOBAAN - 1]['created_at'] . ' UTC');
+        $menit  = max(1, (int) ceil(($tertua + self::JENDELA_MENIT * 60 - time()) / 60));
+
+        throw new ApiException("Terlalu banyak percobaan tanda tangan. Coba lagi dalam {$menit} menit.", 429, null, self::KODE_TERKUNCI);
     }
 
     /**
@@ -182,25 +340,44 @@ class EsignCutiService
      *
      * @return array{pdf: string|null, pesan: string, kode: string|null, field: string}
      */
-    private function tandatangani(string $nip, string $passphrase, string $pdf, array $cuti): array
+    private function tandatangani(string $nip, #[\SensitiveParameter] string $passphrase, string $pdf, array $cuti): array
     {
         try {
             $cek = $this->gateway->checkUser($nip);
+
+            if (self::galatGateway($cek['status_code'])) {
+                return $this->galatLayanan('checkUser', $cek['status_code'], $cek['message'], $passphrase, 'nip');
+            }
 
             if ($cek['status_code'] !== '200') {
                 return ['pdf' => null, 'pesan' => $this->bersihkan($cek['message'], $passphrase), 'kode' => $cek['status_code'], 'field' => 'nip'];
             }
 
-            $r = $this->gateway->signPdf($pdf, $nip, $passphrase, [
+            $opsi = [
                 'tag_koordinat' => '##',
                 'tampilan'      => 'visible',
+                'width'         => '50',
+                'height'        => '50',
                 'reason'        => self::ALASAN,
                 'location'      => self::LOKASI,
                 'modul'         => self::MODUL,
                 'id_rw'         => (int) $cuti['id_riwayat_cuti'],
-            ]);
+            ];
+            $url = $this->tautan?->urlPdfTte((int) $cuti['id_riwayat_cuti']);
+            $qr  = $url === null ? null : QrTtd::png($url);
+
+            if ($qr !== null) {
+                $opsi['imageTTD'] = $qr;
+            }
+
+            $r = $this->gateway->signPdf($pdf, $nip, $passphrase, $opsi);
         } catch (Throwable $e) {
-            return ['pdf' => null, 'pesan' => $this->bersihkan($e->getMessage(), $passphrase), 'kode' => null, 'field' => 'passphrase'];
+            // S1 review B4a: exception tak terduga → pesan generik ke pengguna & esign_hist; rincian hanya di log, teredaksi.
+            return $this->galatLayanan('exception', null, $e::class . ': ' . $e->getMessage(), $passphrase, 'passphrase');
+        }
+
+        if (self::galatGateway($r['status_code'])) {
+            return $this->galatLayanan('signPdf', $r['status_code'], $r['message'], $passphrase, 'passphrase');
         }
 
         $pesan = $this->bersihkan($r['message'], $passphrase);
@@ -210,6 +387,26 @@ class EsignCutiService
         }
 
         return ['pdf' => $r['signed_pdf'], 'pesan' => $pesan, 'kode' => $r['status_code'], 'field' => 'passphrase'];
+    }
+
+    /**
+     * Galat gateway → pesan generik dan `status_code` {@see self::KODE_GALAT_GATEWAY} (tidak dihitung pembatas); kode asli
+     * dan pesan gateway hanya di log, teredaksi.
+     *
+     * @return array{pdf: null, pesan: string, kode: string, field: string}
+     */
+    private function galatLayanan(string $tahap, ?string $kode, string $rincian, #[\SensitiveParameter] string $passphrase, string $field): array
+    {
+        log_message('warning', 'E-sign cuti: galat gateway pada {tahap} (kode {kode}): {rincian}', [
+            'tahap'   => $tahap,
+            'kode'    => $kode ?? '-',
+            'rincian' => mb_substr($this->bersihkan($rincian, $passphrase), 0, 500),
+        ]);
+
+        // timeout/koneksi tetap tercatat apa adanya (sudah dikecualikan pembatas); galat gateway lain → satu kode khusus.
+        $kode = in_array($kode, self::KODE_GATEWAY_MATI, true) ? (string) $kode : self::KODE_GALAT_GATEWAY;
+
+        return ['pdf' => null, 'pesan' => self::PESAN_GALAT_GATEWAY, 'kode' => $kode, 'field' => $field];
     }
 
     /**
@@ -244,7 +441,7 @@ class EsignCutiService
     /**
      * Buang passphrase dari teks yang akan disimpan/dikembalikan (pesan gateway/exception) dan batasi panjangnya.
      */
-    private function bersihkan(string $teks, string $passphrase): string
+    private function bersihkan(string $teks, #[\SensitiveParameter] string $passphrase): string
     {
         return $passphrase === '' ? $teks : str_replace($passphrase, '***', $teks);
     }

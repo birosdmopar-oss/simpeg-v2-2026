@@ -1,5 +1,5 @@
 /**
- * Item ⋮ per baris cuti (AGENTS.md §1): Edit → Lihat detail → Setujui/Tolak/Tangguhkan → Setujui/Tolak/Tangguhkan atas nama → Tunda → Terbitkan TTE → Unduh surat
+ * Item ⋮ per baris cuti (AGENTS.md §1): Edit → Lihat detail → Setujui/Tolak/Tangguhkan → Setujui/Tolak/Tangguhkan atas nama → Tunda → Tanda tangani → Unduh surat
  * → Hapus (`danger`, paling bawah). Semua hak dari `aksi {}` server — FE hanya menyembunyikan/menonaktifkan item.
  */
 import type { RowAction } from '@/shared/components/rowActions'
@@ -25,7 +25,7 @@ export function aksiBarisCuti(row: CutiItem, { busy = false, detail = true }: Op
     { key: 'tolak-atas-nama', label: 'Tolak atas nama', hidden: !a.proses_atas_nama, disabled: busy },
     { key: 'tangguhkan-atas-nama', label: 'Tangguhkan atas nama', hidden: !a.tangguhkan_atas_nama, disabled: busy },
     { key: 'tunda', label: 'Tunda', hidden: !a.tunda, disabled: busy },
-    { key: 'esign', label: 'Terbitkan TTE', hidden: !a.esign, disabled: busy },
+    { key: 'esign', label: 'Tanda tangani', hidden: !a.esign, disabled: busy },
     { key: 'surat', label: 'Unduh surat', hidden: !a.unduh_surat, disabled: busy },
     { key: 'hapus', label: 'Hapus', danger: true, hidden: !a.hapus, disabled: busy },
   ]

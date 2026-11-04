@@ -30,7 +30,23 @@ class SuratCutiService implements PenerbitSuratCutiInterface
     public function __construct(
         private readonly ?BaseConnection $db = null,
         private readonly ?AttachmentServiceInterface $lampiran = null,
+        private readonly ?TokenSuratCutiService $token = null,
     ) {
+    }
+
+    /**
+     * Isi QR kaki surat (PRD Fase 6 v1.0f Q6-23, AC-02.8): URL halaman verifikasi publik ber-token — tanpa NIP (dulu teks
+     * `SIMPEG/CUTI/{id}/{nip}`). Token sama dengan URL PDF QR tanda tangan (Q6-22). Null bila token tidak dapat dipulihkan
+     * (QR tidak dicetak, pola slip).
+     *
+     * @param array<string, mixed> $cuti baris `riwayat_cuti`
+     */
+    public function tautanVerifikasi(array $cuti): ?string
+    {
+        $token  = $this->token ?? service('tokenSuratCuti');
+        $mentah = $token->untukCuti((int) $cuti['id_riwayat_cuti']);
+
+        return $mentah === null ? null : $token->urlVerifikasi($mentah);
     }
 
     /**
@@ -78,6 +94,24 @@ class SuratCutiService implements PenerbitSuratCutiInterface
         return $this->lampiran()->ambil($nip, (int) $daftar[0]['id_attachment']);
     }
 
+    /**
+     * Versi ber-TTE terbaru milik cuti, atau null (dipakai route PDF publik Q6-22).
+     *
+     * @return array{lampiran: array<string, mixed>, isi: string}|null
+     */
+    public function tte(string $nip, int $idCuti): ?array
+    {
+        $daftar = $this->lampiran()->daftar($nip, CutiService::ID_SURAT_TTE, $idCuti);
+
+        if ($daftar === []) {
+            return null;
+        }
+
+        usort($daftar, static fn (array $a, array $b): int => (int) $b['id_attachment'] <=> (int) $a['id_attachment']);
+
+        return $this->lampiran()->ambil($nip, (int) $daftar[0]['id_attachment']);
+    }
+
     public function adaTte(string $nip, int $idCuti): bool
     {
         return $this->lampiran()->daftar($nip, CutiService::ID_SURAT_TTE, $idCuti) !== [];
@@ -88,11 +122,11 @@ class SuratCutiService implements PenerbitSuratCutiInterface
      */
     public function render(array $cuti): string
     {
-        $id   = (int) $cuti['id_riwayat_cuti'];
+        $url  = $this->tautanVerifikasi($cuti);
         $html = view('pdf/surat_cuti', [
             'dataset'  => $cuti,
             'tglSurat' => $this->tanggalSurat((string) ($cuti['created_at'] ?? '')),
-            'qr'       => Pdf::qrImg('SIMPEG/CUTI/' . $id . '/' . (string) $cuti['nip']),
+            'qr'       => $url === null ? '' : Pdf::qrImg($url),
         ]);
 
         return Pdf::renderer()->render(new DokumenPdf('Surat Cuti ' . (string) $cuti['nama'], $html, KopDokumen::html(null, null, $this->db), marginAtasKop: 42));

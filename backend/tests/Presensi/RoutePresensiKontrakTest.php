@@ -48,6 +48,11 @@ final class RoutePresensiKontrakTest extends CIUnitTestCase
         }
 
         $this->assertGreaterThan(10, $diperiksa);
-        $this->assertSame(['GET api/v1/publik/verifikasi-slip/([^/]+)'], $tanpaJwt);
+        // Publik tanpa jwt: verifikasi slip (ADR-032) + surat cuti ber-token (MAKE-065, PRD Fase 6 v1.0f Q6-22/Q6-23).
+        $this->assertEqualsCanonicalizing([
+            'GET api/v1/publik/verifikasi-slip/([^/]+)',
+            'GET api/v1/publik/surat-cuti/([^/]+)/pdf',
+            'GET api/v1/publik/surat-cuti/([^/]+)',
+        ], $tanpaJwt);
     }
 }

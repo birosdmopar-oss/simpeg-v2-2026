@@ -15,7 +15,7 @@ final class Permintaan
      * @param array<string, scalar|null>                                    $query
      * @param array<string, string>                                         $header
      * @param array<string, scalar>|null                                    $form
-     * @param list<array{nama: string, isi: string, namaBerkas?: string}>|null $multipart
+     * @param list<array{nama: string, isi: string, namaBerkas?: string, mime?: string}>|null $multipart
      * @param list<string>                                                  $rahasia
      */
     public function __construct(

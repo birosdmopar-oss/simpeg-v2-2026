@@ -513,6 +513,8 @@ class CutiService
             }
 
             $this->db->table('riwayat_cuti_notif_kt')->where('id_riwayat_cuti', $id)->delete();
+            // DBV-030 Q2: token publik surat ikut dihapus di transaksi yang sama (FK RESTRICT) → URL publik 404.
+            $this->db->table('surat_cuti_token')->where('id_riwayat_cuti', $id)->delete();
 
             if (! $this->model()->delete($id)) {
                 throw new \RuntimeException('Pengajuan cuti gagal dihapus.');
@@ -627,8 +629,8 @@ class CutiService
             'proses'     => $proses,
             'tangguhkan' => $proses && (int) $cuti['id_jenis_cuti'] === AturanCuti::JENIS_TAHUNAN,
             'tunda'      => $tunda,
-            'esign'      => in_array($role, [Role::SUPER_ADMIN, Role::ADMIN_SATKER], true) && in_array($status, StatusCuti::EFEK_FINAL, true) && ! $adaSuratTte
-                && ($role === Role::SUPER_ADMIN || $this->scope->bolehProses($auth, (string) $cuti['nip'])),
+            // F6-18 K1 (keputusan Horii 03-11-2026): hanya penanda tangan pemilik tugas, sesudah final, belum ber-TTE.
+            'esign'                => $nip !== null && $nip === EsignCutiService::penandaTangan($cuti) && in_array($status, StatusCuti::EFEK_FINAL, true) && ! $adaSuratTte,
             'unduh_surat'          => in_array($status, StatusCuti::EFEK_FINAL, true) && $adaSurat,
             'proses_atas_nama'     => $atasNama,
             'tangguhkan_atas_nama' => $atasNama && (int) $cuti['id_jenis_cuti'] === AturanCuti::JENIS_TAHUNAN,

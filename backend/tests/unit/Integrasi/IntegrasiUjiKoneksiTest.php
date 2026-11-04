@@ -47,8 +47,12 @@ final class IntegrasiUjiKoneksiTest extends CIUnitTestCase
         $this->assertStringContainsString('Layanan wajib salah satu dari bkn, siasn, esign, fcm', $this->getStreamFilterBuffer());
 
         $this->resetStreamFilterBuffer();
-        command('integrasi:uji-koneksi esign');
+        command('integrasi:uji-koneksi fcm');
         $this->assertStringContainsString('belum tersedia', $this->getStreamFilterBuffer());
+
+        $this->resetStreamFilterBuffer();
+        command('integrasi:uji-koneksi esign');
+        $this->assertStringContainsString('hanya untuk integrations.esign.driver = bsre', $this->getStreamFilterBuffer(), 'driver mock bawaan');
     }
 
     public function testKonfigurasiKosongDitolak(): void

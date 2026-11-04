@@ -44,6 +44,3 @@ export const STATUS_LAYANAN_FILTER_UNIT_ROLES: readonly RoleCode[] = [
 
 /** Petugas Layanan (PIC) — hanya Super Admin. */
 export const PETUGAS_LAYANAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
-
-/** Terbitkan TTE surat cuti (1, 3; `aksi.esign` dari server). */
-export const ESIGN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_SATKER]

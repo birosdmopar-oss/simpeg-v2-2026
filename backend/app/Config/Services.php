@@ -484,8 +484,12 @@ class Services extends BaseService
         $driver = config(Integrations::class)->esign['driver'];
 
         return match ($driver) {
-            'mock'  => new MockEsignAdapter(),
-            default => throw new RuntimeException("Esign driver '{$driver}' belum tersedia (adapter real dikerjakan di Fase 6)."),
+            'mock' => new MockEsignAdapter(),
+            // Fase 6 Jalur B (MAKE-065, H-02): BSrE real; konfigurasi kosong/tidak sah gagal saat dibuat (AC-K.4).
+            // `tlsVerify = false` DIIZINKAN khusus e-sign (keputusan Horii 03-11-2026, ikut legacy) dengan peringatan log
+            // sekali per proses; lihat README-deploy §1c.
+            'bsre'  => new \App\Libraries\Esign\BsreEsignAdapter(static::klienHttp(), config(Integrations::class)->esign),
+            default => throw new RuntimeException("Esign driver '{$driver}' belum tersedia."),
         };
     }
 
@@ -581,8 +585,40 @@ class Services extends BaseService
             static::cutiService(),
             new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
             static::esignGateway(),
-            static::pegawaiScope(),
             static::cutiNotifikasiService(),
+            static::tokenSuratCuti(),
+            static::cacheService(),
+        );
+    }
+
+    /**
+     * Token publik surat cuti (PRD Fase 6 v1.0f Q6-22/Q6-23, MAKE-065; tabel DBV-030). Dasar URL publik =
+     * `layanan.urlPublikSurat` (gagal-cepat bila tidak sah; wajib https di production, review B4a P5): verifikasi
+     * `verify/surat-cuti/{token}` (halaman SPA) dan PDF `api/v1/publik/surat-cuti/{token}/pdf`.
+     */
+    public static function tokenSuratCuti(bool $getShared = true): \App\Libraries\Layanan\Cuti\TokenSuratCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('tokenSuratCuti');
+        }
+
+        $dasar = rtrim(config(\Config\Layanan::class)->urlPublikSurat(), '/');
+
+        return new \App\Libraries\Layanan\Cuti\TokenSuratCutiService(db_connect(), $dasar . '/verify/surat-cuti/', $dasar . '/api/v1/publik/surat-cuti/');
+    }
+
+    /**
+     * Verifikasi & PDF publik surat cuti ber-token (Q6-22/Q6-23, AC-02.7/AC-02.8).
+     */
+    public static function verifikasiSuratCutiService(bool $getShared = true): \App\Libraries\Layanan\Cuti\VerifikasiSuratCutiService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('verifikasiSuratCutiService');
+        }
+
+        return new \App\Libraries\Layanan\Cuti\VerifikasiSuratCutiService(
+            static::tokenSuratCuti(),
+            new \App\Libraries\Layanan\Cuti\SuratCutiService(null, static::attachmentService()),
         );
     }
 

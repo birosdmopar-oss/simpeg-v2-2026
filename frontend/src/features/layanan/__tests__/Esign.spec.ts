@@ -1,5 +1,6 @@
 /**
- * Paket 3 M7 (MAKE-026) — Terbitkan TTE surat cuti: item ⋮ hanya bila `aksi.esign` server (urutan AGENTS §1), dialog
+ * Paket 3 M7 (MAKE-026), diselaraskan F6-18 (keputusan Horii 03-11-2026) — Tanda tangani surat cuti: item ⋮ hanya bila
+ * `aksi.esign` server (penanda tangan pemilik tugas; urutan AGENTS §1), dua langkah sesudah Setujui/Tangguhkan, dialog
  * passphrase bertipe password yang dikosongkan setelah kirim/tutup dan tidak bocor ke storage/URL, galat 422 per kolom
  * (`passphrase`/`nip`/`status`), sukses → muat ulang. Service dengan klien asli ada di cuti.service.amplop.spec.
  */
@@ -21,6 +22,7 @@ vi.mock('../services/cuti.service', () => ({
     create: vi.fn(),
     update: vi.fn(),
     esign: vi.fn(),
+    esignStatus: vi.fn(),
   },
 }))
 
@@ -94,6 +96,7 @@ beforeEach(() => {
   for (const fn of Object.values(svc)) fn.mockReset()
   svc.pengingat.mockResolvedValue({ items: [], total: 0 })
   svc.list.mockImplementation(async () => daftar([]))
+  svc.esignStatus.mockResolvedValue({ status: 'aktif', pesan: 'Sertifikat elektronik aktif.' })
 })
 
 describe('EsignDialog — passphrase', () => {
@@ -155,8 +158,8 @@ describe('EsignDialog — passphrase', () => {
   })
 })
 
-describe('CutiPage — Terbitkan TTE', () => {
-  it('item hanya bila aksi.esign dan berurutan: Tunda → Terbitkan TTE → Unduh surat → Hapus (danger)', async () => {
+describe('CutiPage — Tanda tangani', () => {
+  it('item hanya bila aksi.esign dan berurutan: Tunda → Tanda tangani → Unduh surat → Hapus (danger)', async () => {
     svc.list.mockImplementation(async () => daftar([baris(7, { esign: true, unduh_surat: true, hapus: true }), baris(8, { unduh_surat: true })]))
     const wrapper = await mountPage(Role.SUPER_ADMIN)
 
@@ -178,7 +181,7 @@ describe('CutiPage — Terbitkan TTE', () => {
 
     expect(svc.esign).toHaveBeenCalledWith(7, PASS)
     expect(q('[data-testid="esign-dialog"]')).toBeNull()
-    expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('ber-TTE')
+    expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('ditandatangani secara elektronik')
     expect(svc.list.mock.calls.length).toBeGreaterThan(panggilanAwal)
     expect(document.body.innerHTML).not.toContain(PASS)
     expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(PASS)
@@ -214,5 +217,102 @@ describe('CutiPage — Terbitkan TTE', () => {
     await flushPromises()
 
     expect(q('[data-testid="esign-error"]')?.textContent).toContain('tidak berhak')
+  })
+})
+
+describe('CutiPage — dua langkah PyB (F6-18 K1/K3a)', () => {
+  it('Setujui tersimpan lalu dialog tanda tangan langsung terbuka bila server mengizinkan aksi.esign', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { proses: true, tangguhkan: true })]))
+    svc.process.mockResolvedValue(baris(7, { esign: true }))
+    svc.esign.mockResolvedValue(baris(7))
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'setujui')
+    await flushPromises()
+    q<HTMLButtonElement>('[data-testid="approval-confirm"]')!.click()
+    await flushPromises()
+
+    expect(svc.process).toHaveBeenCalledWith(7, { aksi: 'setujui', reason_note: '' })
+    expect(q('[data-testid="esign-dialog"]')).not.toBeNull()
+    expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('Lanjutkan tanda tangan elektronik')
+
+    ketik('[data-testid="esign-passphrase"] input', PASS)
+    q<HTMLButtonElement>('[data-testid="esign-confirm"]')!.click()
+    await flushPromises()
+    expect(svc.esign).toHaveBeenCalledWith(7, PASS)
+    expect(document.body.innerHTML).not.toContain(PASS)
+  })
+
+  it('Tolak tidak pernah meminta passphrase (K3a)', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { proses: true })]))
+    svc.process.mockResolvedValue(baris(7, { esign: true }))
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'tolak')
+    await flushPromises()
+    ketik('[data-testid="approval-reason"]', 'Kuota tidak cukup')
+    q<HTMLButtonElement>('[data-testid="approval-confirm"]')!.click()
+    await flushPromises()
+
+    expect(svc.process).toHaveBeenCalled()
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
+  })
+
+  it('Setujui tanpa hak tanda tangan (bukan penanda tangan) tidak membuka dialog', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { proses: true })]))
+    svc.process.mockResolvedValue(baris(7))
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'setujui')
+    await flushPromises()
+    q<HTMLButtonElement>('[data-testid="approval-confirm"]')!.click()
+    await flushPromises()
+
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
+  })
+
+  it('tanda tangan gagal 429: pesan tampil, persetujuan tidak diulang', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { esign: true })]))
+    svc.esign.mockRejectedValueOnce({ ...apiError(429), message: 'Terlalu banyak percobaan tanda tangan. Coba lagi dalam 15 menit.' } as ApiError)
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
+    await flushPromises()
+    ketik('[data-testid="esign-passphrase"] input', PASS)
+    q<HTMLButtonElement>('[data-testid="esign-confirm"]')!.click()
+    await flushPromises()
+
+    expect(q('[data-testid="esign-error"]')?.textContent).toContain('Terlalu banyak percobaan')
+    expect(svc.process).not.toHaveBeenCalled()
+  })
+})
+
+describe('CutiPage — cek sertifikat sebelum passphrase', () => {
+  it('sertifikat tidak aktif: pesan tampil, dialog passphrase tidak dibuka', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { esign: true })]))
+    svc.esignStatus.mockResolvedValue({ status: 'tidak_aktif', pesan: 'Sertifikat elektronik Anda tidak aktif; surat cuti diterbitkan tanpa tanda tangan elektronik.' })
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
+    await flushPromises()
+
+    expect(svc.esignStatus).toHaveBeenCalledWith(7)
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
+    expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('tidak aktif')
+  })
+
+  it('layanan tidak terhubung: pesan galat, coba lagi berhasil membuka dialog', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { esign: true })]))
+    svc.esignStatus.mockResolvedValueOnce({ status: 'galat', pesan: 'Layanan tanda tangan elektronik tidak dapat dihubungi. Coba lagi.' })
+    const wrapper = await mountPage(Role.PEGAWAI)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
+    await flushPromises()
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
+    expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('tidak dapat dihubungi')
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
+    await flushPromises()
+    expect(q('[data-testid="esign-dialog"]')).not.toBeNull()
   })
 })

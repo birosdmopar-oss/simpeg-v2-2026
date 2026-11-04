@@ -23,6 +23,7 @@ export const LAYANAN_ROUTE = {
   PMK_DETAIL: 'layanan-pmk-detail',
   STATUS: 'layanan-status',
   PETUGAS: 'layanan-petugas',
+  VERIFIKASI_SURAT_CUTI: 'verifikasi-surat-cuti',
 } as const
 
 export const layananRoutes: RouteRecordRaw[] = [
@@ -105,5 +106,13 @@ export const layananRoutes: RouteRecordRaw[] = [
     name: LAYANAN_ROUTE.PETUGAS,
     component: () => import('./views/PetugasLayananPage.vue'),
     meta: { roles: PETUGAS_LAYANAN_ROLES, title: 'Petugas Layanan' },
+  },
+  {
+    // F6-18 Q6-23 (PRD Fase 6 v1.0f, MAKE-065): verifikasi QR kaki surat cuti — publik tanpa login & tanpa layout aplikasi,
+    // pola `/verify/slip/:token` (ADR-032). Path dicetak di QR surat, jadi tetap.
+    path: '/verify/surat-cuti/:token',
+    name: LAYANAN_ROUTE.VERIFIKASI_SURAT_CUTI,
+    component: () => import('./views/VerifikasiSuratCutiPage.vue'),
+    meta: { requiresAuth: false, title: 'Verifikasi Surat Cuti' },
   },
 ]

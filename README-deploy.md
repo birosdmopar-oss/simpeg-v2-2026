@@ -170,7 +170,33 @@ Worker lewat cron user `deploy` (pola sama dengan §1a):
 
 Job dicoba ulang tiap 60 detik sampai 5 percobaan, lalu pindah ke `queue_jobs_failed` (`php spark queue:failed`); tidak retry selamanya. Penerima tanpa token perangkat (`firebase_token`) ditandai `push_status = 3` tanpa galat. Pantau: baris `queue_jobs` queue `push` yang lebih tua dari 10 menit berarti worker tidak berjalan; `inbox_msg.push_status = 2` berarti push gagal (log `[NotifikasiService]` / `[MockFcmAdapter]`).
 
-### 1c. Push FCM HTTP v1 (Fase 6 H-04, MAKE-066)
+### 1c. E-sign BSrE (MAKE-065, PRD Fase 6 §7.2 H-02)
+
+Driver real: `integrations.esign.driver = bsre` di `.env` server, dengan `baseUrl` (alamat gateway BSrE), `username`/`password` (client id/secret Basic), `tlsVerify`, `caBundle`, dan `timeout`. Nilai hanya di `.env` server, tidak di repo. Konfigurasi kosong atau tidak sah membuat `esignGateway` gagal saat dibuat (pesan menyebut nama kunci, tanpa nilai).
+
+**TLS — keputusan Horii 03-11-2026 (kartu Catatan Teknis): ikut legacy.** `integrations.esign.tlsVerify = false` diizinkan **khusus e-sign**. Dengan nilai itu peer dan host gateway tidak diverifikasi, sama dengan legacy. Bawaan repo tetap `true`, dan BKN selalu wajib `true`. Risikonya: koneksi bisa disadap/dipalsukan oleh pihak di jaringan antara server dan gateway (*man-in-the-middle*), padahal NIK dan passphrase ikut terkirim. Selama `false`, aplikasi menulis peringatan sekali per proses di log, dan `php spark integrasi:status` serta `php spark integrasi:uji-koneksi esign` menampilkan `TLS BSrE: TIDAK DIVERIFIKASI`. Pengaman lain tetap berlaku: NIK, passphrase, dan kredensial disensor dari semua log; passphrase tidak disimpan; tanda tangan sukses hanya bila balasan berupa PDF; redirect tidak diikuti.
+
+Langkah upgrade ke TLS ketat (cukup lewat `.env`, tanpa ubah kode):
+
+1. Pastikan gateway diakses lewat `https://` dan cek sertifikatnya, mis. `openssl s_client -connect <host>:443 -showcerts` dari server aplikasi. Catat penerbitnya; jangan tulis host/IP di repo.
+2. Bila sertifikat diterbitkan CA internal, simpan berkas CA (PEM) **di luar repo dan webroot**, lalu isi `integrations.esign.caBundle = <path berkas>`. Kosongkan bila CA publik (memakai CA sistem).
+3. Set `integrations.esign.tlsVerify = true`.
+4. Jalankan `php spark integrasi:uji-koneksi esign`: harus `TLS BSrE: diverifikasi.` dan `Uji koneksi esign OK`. Path `caBundle` yang salah gagal saat konfigurasi dibaca.
+5. Lakukan satu tanda tangan uji (surat cuti uji oleh PyB bersertifikat), lalu periksa `esign_hist` status `1`.
+
+**URL publik QR surat cuti (Q6-22/Q6-23).** Isi `layanan.urlPublikSurat = https://<alamat publik SIMPEG>/` di `.env` server **sebelum tanda tangan pertama**. QR kaki surat berisi `<dasar>/verify/surat-cuti/{token}` dan QR tanda tangan berisi `<dasar>/api/v1/publik/surat-cuti/{token}/pdf`; keduanya dibekukan permanen di PDF ber-TTE, jadi alamat ini tidak boleh berubah sesudah dipakai. Di production nilai kosong, bukan URL absolut, atau bukan `https` membuat layanan token gagal saat dibuat (pesan menyebut kunci, tanpa nilai). Di luar production nilai kosong memakai `app.baseURL`.
+
+**Cabut akses publik satu surat cuti** (mis. surat dibatalkan, PDF beredar ke pihak yang tidak berhak). Akses berlaku sampai dicabut (Q6-22):
+
+```bash
+php spark surat-cuti:token --id=<id_riwayat_cuti>             # lihat status: aktif / nonaktif / belum ada
+php spark surat-cuti:token --id=<id_riwayat_cuti> --nonaktif  # halaman verifikasi + PDF publik → 404
+php spark surat-cuti:token --id=<id_riwayat_cuti> --aktif     # pulihkan token yang sama
+```
+
+Setiap perubahan tercatat di `audit_logs` (`entity` `surat_cuti_token`, `jenis_audit` `cuti.token_surat`, `sumber` `cli`). Keluaran hanya status, tanpa token, URL, atau NIP. Token surat yang sudah ber-TTE tidak bisa diganti (DBV-030 Q3), hanya dinonaktifkan. Menghapus cuti menghapus tokennya juga (DBV-030 Q2).
+
+### 1d. Push FCM HTTP v1 (Fase 6 H-04, MAKE-066)
 
 Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM Legacy API/server key legacy sudah dihentikan Google). Worker tetap cron `queue:work push` di §1b; job di queue `push`:
 
@@ -178,7 +204,7 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
 |---|---|---|
 | `push-notif` | notifikasi layanan (`inbox_msg`) cuti/TB/IB/PMK [K `fcmQueue_layanan`] | web (akun ber-NIP penerima) |
 | `push-riwayat` | riwayat/usulan/LKH/Konket ke penerima legacy (admin pembawah, atasan LKH, petugas Karpeg/Kariskarsu, pegawai) | web |
-| `push-pesan` | Android cuti dengan teks & `data` legacy `andr_notif_queue` (ajukan/ubah → atasan, keputusan → pemohon + PyB) dan titik sambung Halo Simpeg Fase 8 | Android (`firebase_token.platform` 2, per NIP) |
+| `push-pesan` | Android dengan teks & `data` legacy `andr_notif_queue`: cuti (ajukan/ubah → atasan, keputusan → pemohon + PyB), LKH (ajukan/ubah → atasan, proses → pegawai), Konket (proses → pemohon + peserta dinas gabungan); titik sambung Halo Simpeg Fase 8 | Android (`firebase_token.platform` 2, per NIP) |
 | `fcm-topik` | keanggotaan topik `pegawai_blm_masuk` / `pegawai_blm_pulang` / `pegawai_blm_lkh` sesudah presensi/LKH | Android |
 
 1. Proyek Firebase **sama dengan legacy** (PN-3): topik presensi dan app Android memakai proyek itu. Pesan ke topik tetap dikirim **di luar SIMPEG** (Firebase console / penjadwal luar) seperti legacy.
@@ -194,7 +220,7 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
    Konfigurasi kosong atau berkas tidak terbaca → adapter gagal saat dibuat (job masuk `queue_jobs_failed`, pesan menyebut nama key saja).
 4. Frontend (web push): isi konfigurasi web Firebase proyek yang sama di `frontend/.env.production` (`VITE_FIREBASE_*`, lihat `frontend/.env.example`). Nilai web Firebase bukan rahasia, tetapi tetap tidak disalin dari `header.php` legacy; ambil dari Firebase console.
 5. Token web (`platform` 1) didaftarkan SPA lewat `POST api/v1/integrasi/fcm-token`. **Token Android (`platform` 2) tidak punya endpoint di SIMPEG v2** (legacy pun tidak): backend app mobile di luar repo yang menulis `firebase_token` legacy harus diarahkan menulis ke `firebase_token` DB v2 — `nip` pemilik, `platform` = 2, `fcm_token`, `token_hash` = SHA-256 heks token (unik per `nip` + `token_hash`), `id_pengguna` NULL. Siapa dan bagaimana caranya = pertanyaan cutover DEPLOY-001.1 (PRD Fase 6 §7.4); sampai terjawab, push Android dan topik presensi tidak punya penerima. Token yang dilaporkan FCM tidak terdaftar dihapus otomatis.
-   Kontrak `data` push Android cuti mengikuti legacy apa adanya (`{title, body, data: JSON baris riwayat_cuti + file_bukti_url + status_str}`) karena app Android bergantung padanya; TB/IB/PMK tidak dikirim ke Android (legacy hanya cuti dan support).
+   Kontrak `data` push Android mengikuti legacy apa adanya (`{title, body, data: JSON baris sumber + kolom tambahan legacy}`, mis. cuti `file_bukti_url` + `status_str`) karena app Android bergantung padanya; TB/IB/PMK tidak dikirim ke Android (legacy pun tidak).
 6. Berkas service account wajib ber-`token_uri` `https://oauth2.googleapis.com/token` (berkas lain ditolak). Kunci privat dibaca dari berkas hanya saat menandatangani JWT; **token akses OAuth (±1 jam) disimpan di cache aplikasi** (handler cache CI4, bawaan berkas di `writable/cache`) — pastikan `writable/` tidak terjangkau dari web dan hanya dibaca user PHP.
 7. Batas [V2]: maks 10 token web per akun (yang terlama dibuang), pendaftaran token dibatasi 20 permintaan/60 detik per akun (429).
 8. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`; galat per token pada topik presensi (HTTP 200 dengan `results[].error`) tercatat sebagai `warning` `[fcm-topik]` di log aplikasi dan hitungannya ada di hasil job.
