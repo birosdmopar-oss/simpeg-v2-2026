@@ -44,7 +44,7 @@ final class StatusHarianTest extends DatabaseTestCase
 
     private function service(?AuditLogModel $audit = null): StatusHarianService
     {
-        return new StatusHarianService($this->db, $audit ?? new AuditLogModel());
+        return new StatusHarianService($this->db, $audit === null ? null : static fn (): AuditLogModel => $audit);
     }
 
     /**
@@ -172,8 +172,8 @@ final class StatusHarianTest extends DatabaseTestCase
 
     public function testAc116SetiapPerubahanTeraudit(): void
     {
-        $nip = $this->pegawai();
-        $this->tb($nip, '2026-01-01', '2026-12-31');
+        $nip  = $this->pegawai();
+        $idTb = $this->tb($nip, '2026-01-01', '2026-12-31');
 
         $this->service()->jalankan('2026-06-01', false, $this->pelaku);
 
@@ -183,7 +183,7 @@ final class StatusHarianTest extends DatabaseTestCase
         $this->assertNull($baris['nip_actor']);
         $this->assertSame(['id_jenis_status' => 1], json_decode((string) $baris['before_json'], true));
         $this->assertEquals(
-            ['id_jenis_status' => 2, 'jenis_audit' => 'layanan.status_harian', 'alasan' => 'tb_aktif'],
+            ['id_jenis_status' => 2, 'jenis_audit' => 'layanan.status_harian', 'alasan' => 'tb_aktif', 'jenis_riwayat' => 'tb', 'id_riwayat' => $idTb],
             json_decode((string) $baris['after_json'], true),
         );
         $peg = $this->db->table('pegawai')->where('nip', $nip)->get()->getRowArray();
@@ -317,6 +317,143 @@ final class StatusHarianTest extends DatabaseTestCase
         } finally {
             $lain->query('SELECT RELEASE_LOCK(?)', [$kunci]);
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Review reviewer CR 04-11 (B-1, P-1, saran 1/2/6 dan test yang kurang)
+
+    public function testAuditMenyertakanRiwayatPenentu(): void
+    {
+        $nip  = $this->pegawai();
+        $idTb = $this->tb($nip, '2026-01-01', '2026-12-31');
+
+        $this->service()->jalankan('2026-06-01', false, $this->pelaku);
+
+        $baris = $this->db->table('audit_logs')->where('entity', 'pegawai')->where('entity_id', $nip)->get()->getRowArray();
+        $this->assertEquals(
+            ['id_jenis_status' => 2, 'jenis_audit' => 'layanan.status_harian', 'alasan' => 'tb_aktif', 'jenis_riwayat' => 'tb', 'id_riwayat' => $idTb],
+            json_decode((string) $baris['after_json'], true),
+        );
+    }
+
+    public function testRiwayatBerubahSesudahPemuatanAwalMembatalkanPerubahan(): void
+    {
+        $nip  = $this->pegawai();
+        $idTb = $this->tb($nip, '2026-01-01', '2026-12-31');
+
+        // Admin menghapus riwayat sesudah pemuatan awal dan sebelum transaksi pegawai (muat ulang di dalam transaksi).
+        $service = new StatusHarianService($this->db, null, function () use ($idTb): void {
+            $this->db->table('riwayat_tb')->where('id_riwayat_tb', $idTb)->delete();
+        });
+
+        $hasil = $service->jalankan('2026-06-01', false, $this->pelaku);
+
+        $this->assertSame(1, $this->statusPegawai($nip), 'status tidak diubah berdasarkan data basi');
+        $this->assertSame(1, $hasil['info']['berubah_saat_proses']);
+        $this->assertSame(0, $hasil['berubah']);
+        $this->assertSame(0, $this->jumlahAudit());
+    }
+
+    public function testStatusPegawaiBerubahSesudahPemuatanAwalDilewati(): void
+    {
+        $nip = $this->pegawai();
+        $this->tb($nip, '2026-01-01', '2026-12-31');
+
+        $service = new StatusHarianService($this->db, null, function () use ($nip): void {
+            $this->db->table('pegawai')->where('nip', $nip)->update(['id_jenis_status' => 12]);
+        });
+
+        $hasil = $service->jalankan('2026-06-01', false, $this->pelaku);
+
+        $this->assertSame(12, $this->statusPegawai($nip));
+        $this->assertSame(1, $hasil['info']['berubah_saat_proses']);
+    }
+
+    public function testKunciDilepasSesudahRunNormalDanSesudahException(): void
+    {
+        $kunci = StatusHarianService::namaKunci($this->db);
+        $bebas = fn (): bool => (string) $this->db->query('SELECT IS_FREE_LOCK(?) AS bebas', [$kunci])->getRowArray()['bebas'] === '1';
+
+        $this->service()->jalankan('2026-06-01', false, $this->pelaku);
+        $this->assertTrue($bebas(), 'sesudah run normal');
+
+        $nip = $this->pegawai();
+        $this->tb($nip, '2026-01-01', '2026-12-31');
+        $meledak = new StatusHarianService($this->db, null, static function (): void {
+            throw new RuntimeException('hook meledak (uji)');
+        });
+
+        try {
+            $meledak->jalankan('2026-06-01', false, $this->pelaku);
+            $this->fail('exception harus merambat');
+        } catch (RuntimeException) {
+            $this->assertTrue($bebas(), 'sesudah exception');
+        }
+    }
+
+    public function testBeberapaTbStatus1DanCltnStatus3TidakDihitung(): void
+    {
+        $banyakTb = $this->pegawai();
+        $this->tb($banyakTb, '2024-01-01', '2024-12-31');
+        $this->tb($banyakTb, '2026-01-01', '2026-12-31');
+        $cltnProses = $this->pegawai();
+        $this->cltn($cltnProses, '2026-01-01', '2026-12-31', 3);
+
+        $this->service()->jalankan('2026-06-01', false, $this->pelaku);
+
+        $this->assertSame(2, $this->statusPegawai($banyakTb), 'TB aktif dipilih di antara beberapa TB');
+        $this->assertSame(1, $this->statusPegawai($cltnProses), 'CLTN status 3 (diproses) bukan CLTN disetujui');
+    }
+
+    public function testStatusNullDenganTbAktifTidakDisentuh(): void
+    {
+        $nip = $this->pegawai();
+        $this->db->table('pegawai')->where('nip', $nip)->update(['id_jenis_status' => null]);
+        $this->tb($nip, '2026-01-01', '2026-12-31');
+
+        $hasil = $this->service()->jalankan('2026-06-01', false, $this->pelaku);
+
+        $this->assertNull($this->db->table('pegawai')->select('id_jenis_status')->where('nip', $nip)->get()->getRowArray()['id_jenis_status']);
+        $this->assertSame(1, $hasil['info']['dilewati_status_lain']);
+    }
+
+    public function testPemulihanCltnDanBentrokDariStatus3(): void
+    {
+        $pulih = $this->pegawai(3);
+        $this->cltn($pulih, '2025-01-01', '2025-12-31');
+        $bentrok3 = $this->pegawai(3);
+        $this->tb($bentrok3, '2026-01-01', '2026-12-31');
+        $this->cltn($bentrok3, '2026-03-01', '2027-02-28');
+        $berpindah = $this->pegawai(3);
+        $this->tb($berpindah, '2026-01-01', '2026-12-31');
+        $this->cltn($berpindah, '2025-01-01', '2025-12-31');
+
+        $hasil = $this->service()->jalankan('2026-06-01', false, $this->pelaku);
+
+        $this->assertSame(1, $this->statusPegawai($pulih), 'CLTN 3 → 1 setelah berakhir');
+        $this->assertSame(3, $this->statusPegawai($bentrok3), 'bentrok dari status 3 dan CLTN aktif → tidak berkedip');
+        $this->assertSame(2, $this->statusPegawai($berpindah), 'CLTN berakhir, TB aktif → 2');
+        $this->assertSame(1, $hasil['pulih_cltn']);
+        $this->assertSame(1, $hasil['info']['bentrok']);
+    }
+
+    public function testKegagalanPerPegawaiTercatatDiLogTanpaNip(): void
+    {
+        $gagal = $this->pegawai();
+        $this->tb($gagal, '2026-01-01', '2026-12-31');
+
+        $audit = new class () extends AuditLogModel {
+            public function record(string $entity, string|int $entityId, string $event, ?array $before, ?array $after, ?int $actorId = null, ?string $actorNip = null): int
+            {
+                throw new RuntimeException("audit gagal untuk {$entityId}");
+            }
+        };
+
+        $this->service($audit)->jalankan('2026-06-01', false, $this->pelaku);
+
+        $log = (string) file_get_contents(WRITEPATH . 'logs/log-' . date('Y-m-d') . '.log');
+        $this->assertStringContainsString('layanan:status-harian gagal pada tulis: RuntimeException kode 0', $log);
+        $this->assertStringNotContainsString("audit gagal untuk {$gagal}", $log, 'pesan galat (bisa memuat NIP) tidak dicatat');
     }
 
     // ---------------------------------------------------------------------------------------------------------------

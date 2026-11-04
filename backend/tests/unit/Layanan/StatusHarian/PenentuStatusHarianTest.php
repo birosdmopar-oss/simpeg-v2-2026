@@ -229,4 +229,34 @@ final class PenentuStatusHarianTest extends CIUnitTestCase
         $this->expectException(InvalidArgumentException::class);
         PenentuStatusHarian::tentukan(1, [], [], $tanggal);
     }
+
+    public function testSegmenTidakSahDilewatiDanDitandai(): void
+    {
+        $tb = [
+            self::tb('0000-00-00', '2026-12-31'),
+            self::tb('2026-09-01', '2026-01-01'),
+            self::tb('2025-01-01', '2025-12-31'),
+        ];
+
+        $k = PenentuStatusHarian::tentukan(2, $tb, [], '2026-06-01');
+
+        $this->assertTrue($k->segmenTidakSah);
+        $this->assertSame(1, $k->statusBaru, 'hanya segmen sah (berakhir 2025) yang dihitung');
+        $this->assertFalse(PenentuStatusHarian::tentukan(1, [self::tb('2026-01-01', '2026-12-31')], [], '2026-06-01')->segmenTidakSah);
+    }
+
+    public function testKeputusanMenunjukRiwayatPenentu(): void
+    {
+        $tb   = [['id' => 11] + self::tb('2024-01-01', '2024-12-31'), ['id' => 12] + self::tb('2026-01-01', '2026-12-31')];
+        $cltn = [['id' => 21] + self::cltn('2026-03-01', '2027-02-28')];
+
+        $aktifTb = PenentuStatusHarian::tentukan(1, $tb, [], '2026-06-01');
+        $this->assertSame(['tb', 12], [$aktifTb->jenisRiwayat, $aktifTb->idRiwayat]);
+
+        $bentrok = PenentuStatusHarian::tentukan(1, $tb, $cltn, '2026-06-01');
+        $this->assertSame([3, 'cuti', 21], [$bentrok->statusBaru, $bentrok->jenisRiwayat, $bentrok->idRiwayat]);
+
+        $pulih = PenentuStatusHarian::tentukan(2, [$tb[0]], [], '2026-06-01');
+        $this->assertSame([1, 'tb', 11], [$pulih->statusBaru, $pulih->jenisRiwayat, $pulih->idRiwayat]);
+    }
 }

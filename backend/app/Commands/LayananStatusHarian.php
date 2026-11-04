@@ -12,7 +12,6 @@ use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Layanan\StatusHarian\StatusHarianService;
 use App\Libraries\Layanan\StatusHarian\StatusHarianSibuk;
 use App\Libraries\Layanan\Studi\RentangTanggal;
-use App\Models\AuditLogModel;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use CodeIgniter\Database\Exceptions\DatabaseException;
@@ -87,14 +86,16 @@ class LayananStatusHarian extends BaseCommand
         try {
             $db     = KoneksiCli::buka();
             $pelaku = $dryRun ? null : (new AkunSistemIntegrasi($db))->id();
-            $hasil  = (new StatusHarianService($db, new AuditLogModel()))->jalankan($tanggal, $dryRun, $pelaku);
+            $hasil  = (new StatusHarianService($db))->jalankan($tanggal, $dryRun, $pelaku);
         } catch (AkunSistemTidakSiap|StatusHarianSibuk $e) {
             // Pesan kelas-kelas ini disusun aplikasi tanpa NIP/nilai rahasia.
+            log_message('error', 'layanan:status-harian gagal: ' . (new ReflectionClass($e))->getShortName() . '.');
             CLI::error('Status harian GAGAL: ' . $e->getMessage());
 
             return EXIT_ERROR;
         } catch (Throwable $e) {
             // Pesan galat DB bisa memuat NIP → hanya kelas & kode.
+            log_message('error', 'layanan:status-harian gagal: ' . (new ReflectionClass($e))->getShortName() . ' kode ' . $e->getCode() . '.');
             CLI::error('Status harian GAGAL: ' . ($e instanceof DatabaseException ? 'galat basis data' : 'galat tak terduga') . ' (' . (new ReflectionClass($e))->getShortName() . ', kode ' . $e->getCode() . ').');
 
             return EXIT_ERROR;
@@ -104,7 +105,7 @@ class LayananStatusHarian extends BaseCommand
 
         $ringkas = sprintf(
             '%sStatus harian %s: diperiksa %d, %s %d (TB aktif %d, CLTN aktif %d, pulih dari TB %d, pulih dari CLTN %d), gagal %d. '
-            . 'INFO: bentrok TB+CLTN %d, celah TB %d, status 2/3 tanpa riwayat pendukung %d, dilewati pegawai tidak aktif %d, dilewati status lain %d, berubah saat proses %d.',
+            . 'INFO: bentrok TB+CLTN %d, celah TB (hari ini di antara dua segmen) %d, status 2/3 tanpa riwayat pendukung %d, segmen riwayat tidak sah %d, dilewati pegawai tidak aktif %d, dilewati status lain %d, berubah saat proses %d.',
             $dryRun ? '[dry-run] ' : '',
             $hasil['tanggal'],
             $hasil['diperiksa'],
@@ -118,6 +119,7 @@ class LayananStatusHarian extends BaseCommand
             $i['bentrok'],
             $i['celah_tb'],
             $i['tanpa_riwayat'],
+            $i['segmen_tidak_sah'],
             $i['dilewati_nonaktif'],
             $i['dilewati_status_lain'],
             $i['berubah_saat_proses'],

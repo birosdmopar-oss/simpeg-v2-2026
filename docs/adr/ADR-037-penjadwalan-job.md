@@ -31,8 +31,9 @@
 5. **Idempoten dan aman diulang** (BP-6): setiap job stateless terhadap jadwal (tidak mengandalkan "terakhir jalan"), punya
    `--dry-run`, dan run yang terlewat cukup dijalankan ulang. Job yang bergantung tanggal menerima `--tanggal` hanya untuk
    `--dry-run` lampau; run nyata selalu hari ini WIB (Q6-27).
-6. **Log:** keluaran command diarahkan cron ke `writable/logs`/`/var/www/simpeg-v2/logs/<nama>.log`, berisi jumlah saja (tanpa
-   NIP, nama, token). Command juga menulis satu baris ringkasan lewat `log_message('info', …)`. Kegagalan per baris tidak
+6. **Log:** log UTAMA = keluaran command yang diarahkan cron ke `/var/www/simpeg-v2/logs/<nama>.log`, berisi jumlah saja (tanpa
+   NIP, nama, token). `log_message('info', …)` hanya tambahan untuk development (ambang production hanya sampai `error`, `Config/Logger.php`);
+   kegagalan (kunci sibuk, akun belum siap, galat DB, kegagalan per baris) ditulis `log_message('error', …)` berisi cabang, kelas, dan kode — tanpa pesan DB/NIP. Kegagalan per baris tidak
    menghentikan baris lain (BP-7) tetapi menaikkan kode keluar.
 7. **Pelaku tulis = akun sistem** (`AkunSistemIntegrasi::id()`, DBV-027 Z-1). Belum disiapkan = job gagal sebelum menulis.
    `--dry-run` tidak butuh akun.

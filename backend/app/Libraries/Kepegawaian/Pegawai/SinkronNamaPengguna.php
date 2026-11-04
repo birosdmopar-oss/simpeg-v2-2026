@@ -8,7 +8,9 @@ use App\Constants\AkunSistem;
 use App\Constants\Role;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Models\AuditLogModel;
+use Closure;
 use CodeIgniter\Database\BaseConnection;
+use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
@@ -36,9 +38,13 @@ final class SinkronNamaPengguna
 
     private const STATUS_AKTIF = 1;
 
+    /**
+     * @param (Closure(BaseConnection): AuditLogModel)|null $pabrikAudit pembuat model audit pada koneksi yang diberikan
+     *                                                                   (bawaan `new AuditLogModel($db)`, satu koneksi dengan transaksi); hanya untuk test
+     */
     public function __construct(
         private readonly BaseConnection $db,
-        private readonly AuditLogModel $audit,
+        private readonly ?Closure $pabrikAudit = null,
     ) {
     }
 
@@ -185,7 +191,7 @@ final class SinkronNamaPengguna
 
             $this->db->table('pengguna')->where('id_pengguna', $idPengguna)->update(['name' => $baru, 'updated_at' => gmdate('Y-m-d H:i:s')]);
 
-            $this->audit->record(
+            $idAudit = ($this->pabrikAudit !== null ? ($this->pabrikAudit)($this->db) : new AuditLogModel($this->db))->record(
                 'pengguna',
                 $idPengguna,
                 AuditLogModel::EVENT_UPDATE,
@@ -195,7 +201,8 @@ final class SinkronNamaPengguna
                 null,
             );
 
-            if ($this->db->transStatus() === false) {
+            if ($idAudit <= 0 || $this->db->transStatus() === false) {
+                $this->catatGagal('tulis', null);
                 $this->db->transRollback();
                 $this->db->resetTransStatus();
 
@@ -206,11 +213,25 @@ final class SinkronNamaPengguna
             $this->db->resetTransStatus();
 
             return 'ok';
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            $this->catatGagal('tulis', $e);
             $this->db->transRollback();
             $this->db->resetTransStatus();
 
             return 'gagal';
         }
+    }
+
+    /**
+     * Jejak kegagalan per akun: cabang, kelas pendek, kode saja — pesan galat DB bisa memuat nama/NIP (pola SiasnTarik).
+     */
+    private function catatGagal(string $cabang, ?Throwable $e): void
+    {
+        log_message('error', sprintf(
+            'pengguna:sinkron-nama gagal pada %s: %s kode %s.',
+            $cabang,
+            $e === null ? 'tanpa pengecualian' : (new ReflectionClass($e))->getShortName(),
+            $e === null ? '-' : (string) $e->getCode(),
+        ));
     }
 }

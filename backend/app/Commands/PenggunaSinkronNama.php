@@ -10,7 +10,6 @@ use App\Libraries\Integrasi\AkunSistemIntegrasi;
 use App\Libraries\Integrasi\AkunSistemTidakSiap;
 use App\Libraries\Kepegawaian\Pegawai\SinkronNamaPengguna;
 use App\Libraries\Kepegawaian\Pegawai\SinkronNamaSibuk;
-use App\Models\AuditLogModel;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use CodeIgniter\Database\Exceptions\DatabaseException;
@@ -60,14 +59,16 @@ class PenggunaSinkronNama extends BaseCommand
         try {
             $db     = KoneksiCli::buka();
             $pelaku = $dryRun ? null : (new AkunSistemIntegrasi($db))->id();
-            $hasil  = (new SinkronNamaPengguna($db, new AuditLogModel()))->jalankan($dryRun, $pelaku);
+            $hasil  = (new SinkronNamaPengguna($db))->jalankan($dryRun, $pelaku);
         } catch (AkunSistemTidakSiap|SinkronNamaSibuk $e) {
             // Pesan kelas-kelas ini disusun aplikasi tanpa NIP/nilai rahasia.
+            log_message('error', 'pengguna:sinkron-nama gagal: ' . (new ReflectionClass($e))->getShortName() . '.');
             CLI::error('Sinkron nama GAGAL: ' . $e->getMessage());
 
             return EXIT_ERROR;
         } catch (Throwable $e) {
             // Pesan galat DB bisa memuat nama/NIP → hanya kelas & kode.
+            log_message('error', 'pengguna:sinkron-nama gagal: ' . (new ReflectionClass($e))->getShortName() . ' kode ' . $e->getCode() . '.');
             CLI::error('Sinkron nama GAGAL: ' . ($e instanceof DatabaseException ? 'galat basis data' : 'galat tak terduga') . ' (' . (new ReflectionClass($e))->getShortName() . ', kode ' . $e->getCode() . ').');
 
             return EXIT_ERROR;

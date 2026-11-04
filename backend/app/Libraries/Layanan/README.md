@@ -195,4 +195,7 @@ Sesi DB berzona UTC (driver `App\Database\MySQLi`, DBV-025), jadi default/ON UPD
 - Keluaran hanya jumlah (tanpa NIP/nama); INFO: bentrok TB+CLTN, celah TB, 2/3 tanpa riwayat pendukung, dilewati
   (pegawai tidak aktif / status lain), berubah saat proses.
 - Tanggal masa depan ditolak; tanggal lampau hanya bersama `--dry-run` (dihitung terhadap status pegawai saat ini).
+- Audit dan update pegawai berada pada satu koneksi/transaksi (model audit dibuat dari koneksi layanan; keputusan dihitung ulang di dalam transaksi setelah riwayat TB/CLTN dikunci `FOR UPDATE`). `after_json` audit memuat `jenis_riwayat` dan `id_riwayat` penentu.
+- Deviasi: tulis lewat query builder + `audit_logs` manual, BUKAN event `PegawaiModel`, sama dengan `EfekFinalCutiService`; pelanggan event perubahan `pegawai` (A5 `change_history`) tidak terpicu oleh job ini, jadi A5 perlu menangani perubahan `id_jenis_status` dari job harian secara terpisah bila diperlukan.
+- INFO `celah_tb` = pegawai berstatus 2 yang hari ini jatuh di celah antara dua segmen TB dan karena itu dikembalikan ke 1.
 - Test: `tests/unit/Layanan/StatusHarian/*`, `tests/database/Layanan/StatusHarianTest.php`.

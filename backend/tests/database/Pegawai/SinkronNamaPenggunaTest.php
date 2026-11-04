@@ -44,7 +44,7 @@ final class SinkronNamaPenggunaTest extends DatabaseTestCase
 
     private function service(?AuditLogModel $audit = null): SinkronNamaPengguna
     {
-        return new SinkronNamaPengguna($this->db, $audit ?? new AuditLogModel());
+        return new SinkronNamaPengguna($this->db, $audit === null ? null : static fn (): AuditLogModel => $audit);
     }
 
     /**
