@@ -315,6 +315,35 @@ CA bundle BSrE disimpan **di luar repo dan luar webroot** (mis. `/etc/simpeg-v2/
 §1c dan §1d. `integrasi:uji-koneksi fcm` belum tersedia (adapter FCM dipantau lewat `integrasi_log` layanan `fcm` dan
 `queue:failed`, §1d).
 
+### 1f. Auto-approval LKH tanggal 5 (H-12, MAKE-068, PRD Fase 6 §6.4, §7.10, F6-25)
+
+Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint HTTP cron). Jam mengikuti zona waktu
+server: pastikan server berzona WIB (Asia/Jakarta) atau geser jamnya. Kode keluar ≠ 0 berarti ada yang gagal. Keluaran
+hanya jumlah, tanpa NIP/nama.
+
+| Command | Jadwal (WIB) | Task |
+|---|---|---|
+| `lkh:auto-approval` | tanggal 5 pukul 00:30, ulang 01:00 / 01:30 / 02:00 | H-12 (MAKE-068) |
+
+```bash
+# /etc/cron.d/simpeg-v2-lkh-auto-approval
+30 0 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+0 1 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+30 1 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+0 2 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+```
+
+`lkh:auto-approval` (H-12):
+
+1. Prasyarat: `php spark integrasi:siapkan-akun-sistem` sudah dijalankan sesudah impor `pengguna` (pelaku = akun sistem; belum
+   siap → kode keluar 1 tanpa menulis). `--dry-run` tidak butuh akun.
+2. Hanya LKH bulan lalu berstatus 0 (menunggu atasan) yang disetujui: `status=1`, `auto_approval=1`. Status 3 (revisi) tidak
+   diproses. PDF tidak dibuat atau disimpan oleh job; PDF LKH Disetujui dibuat saat diminta (CR-093).
+3. Run nyata hanya untuk bulan lalu. `--bulan=YYYY-MM` dan `--dry-run` dipakai untuk pemeriksaan: `--dry-run` boleh bulan
+   lampau lain, bulan berjalan/masa depan ditolak. Jalankan `--dry-run` dahulu di lingkungan baru dan periksa jumlahnya.
+4. Aman diulang: run kedua tidak menyetujui apa pun dan tidak menambah audit. Ulangan 01:00–02:00 hanya menutup LKH yang
+   terlewat atau gagal sebelumnya.
+
 ---
 
 ## 2. Cara push (operator deploy)
