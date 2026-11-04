@@ -5,11 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\Integrasi;
 
 use App\Interfaces\SiasnGatewayInterface;
-use App\Libraries\Bkn\TokenBkn;
-use App\Libraries\CacheService;
 use App\Libraries\Integrasi\AkunSistemIntegrasi;
-use App\Libraries\Integrasi\Http\FakeTransport;
-use App\Libraries\Integrasi\Http\KlienHttp;
 use App\Libraries\Integrasi\Http\Respons;
 use App\Libraries\Integrasi\Log\IntegrasiLog;
 use App\Libraries\Siasn\SiasnAdapter;
@@ -18,12 +14,11 @@ use App\Libraries\Siasn\Tarik\RencanaTarik;
 use App\Libraries\Siasn\Tarik\TarikSiasn;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
-use CodeIgniter\Test\Mock\MockCache;
 use CodeIgniter\Test\StreamFilterTrait;
-use Config\Integrations;
 use Config\Services;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
+use Tests\Support\Integrasi\SiasnUjiTrait;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
@@ -37,9 +32,8 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 final class SiasnTarikTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
+    use SiasnUjiTrait;
     use StreamFilterTrait;
-
-    private const DASAR = 'https://siasn.contoh/apisiasn/1.0';
 
     private const NIP_A = '199001012020011001';
 
@@ -49,46 +43,16 @@ final class SiasnTarikTest extends DatabaseTestCase
 
     protected $seed = MasterDataSeeder::class;
 
-    private FakeTransport $transport;
-
-    private SiasnAdapter $adapter;
-
-    private int $idAkun;
-
-    /** @var array<string, bool|float|string> */
-    private array $bknAsli;
-
     protected function setUp(): void
     {
         parent::setUp();
         $this->resetStreamFilterBuffer();
-        $this->transport = new FakeTransport();
-        $this->bknAsli   = config(Integrations::class)->bkn;
-        $konfig          = [
-            'baseUrlApi'      => self::DASAR,
-            'tokenUrlGateway' => 'https://gateway.contoh/oauth2/token',
-            'tokenUrlSso'     => 'https://sso.contoh/token',
-            'clientId'        => 'klien-uji',
-            'clientSecret'    => 'rahasia-uji',
-            'ssoClientId'     => 'sso-klien-uji',
-            'ssoUsername'     => 'pengguna-uji',
-            'ssoPassword'     => 'sandi-uji',
-        ] + $this->bknAsli;
-        config(Integrations::class)->bkn = $konfig;
-
-        $token = new TokenBkn(new KlienHttp($this->transport, new IntegrasiLog($this->db), tidur: static function (int $ms): void {
-        }), new CacheService(new MockCache(), 'uji_'), $konfig);
-        Services::injectMock('tokenBkn', $token);
-        $this->adapter = new SiasnAdapter($token, self::DASAR);
-        $akun          = new AkunSistemIntegrasi($this->db);
-        $akun->siapkan();
-        $this->idAkun = $akun->id();
+        $this->siapkanSiasn();
     }
 
     protected function tearDown(): void
     {
-        config(Integrations::class)->bkn = $this->bknAsli;
-        Services::reset(true);
+        $this->pulihkanSiasn();
         parent::tearDown();
     }
 
@@ -117,7 +81,7 @@ final class SiasnTarikTest extends DatabaseTestCase
         $status = array_column($this->db->table('siasn_status_pegawai')->get()->getResultArray(), null, 'nip');
         $this->assertArrayNotHasKey(self::NIP_C, $status, 'pegawai tidak aktif keluar dari daftar [K sync_dsp]');
         $this->assertSame(['0', gmdate('Y-m-d')], [(string) $status[self::NIP_A]['du'], $status[self::NIP_A]['du_lu']]);
-        $this->assertSame('/pns/data-utama/' . self::NIP_A, substr($this->transport->tercatat()[2]['permintaan']->url, strlen(self::DASAR)));
+        $this->assertSame('/pns/data-utama/' . self::NIP_A, substr($this->transport->tercatat()[2]['permintaan']->url, strlen(self::DASAR_SIASN)));
         $this->assertSame('Bearer gw-uji', $this->transport->tercatat()[2]['permintaan']->header['Authorization']);
         $this->assertSame('bearer sso-uji', $this->transport->tercatat()[2]['permintaan']->header['Auth']);
 
@@ -267,17 +231,6 @@ final class SiasnTarikTest extends DatabaseTestCase
         $keluar = $this->getStreamFilterBuffer();
         $this->assertStringContainsString('[dry-run] Tarik SIASN golongan: NIP 1 (sukses 1, gagal 0); sisip 1', $keluar);
         $this->assertStringNotContainsString(self::NIP_A, $keluar);
-    }
-
-    private function tarik(): TarikSiasn
-    {
-        return new TarikSiasn($this->db, $this->adapter, new IntegrasiLog($this->db), new AkunSistemIntegrasi($this->db), TarikSiasn::semuaJenis());
-    }
-
-    private function antreToken(): void
-    {
-        $this->transport->antreJson(200, ['access_token' => 'gw-uji', 'expires_in' => 3600])
-            ->antreJson(200, ['access_token' => 'sso-uji', 'expires_in' => 3600]);
     }
 
     /**

@@ -57,8 +57,9 @@ final class TarikGolongan implements JenisTarikSiasn
         $nips      = array_map('strval', array_keys($hasil));
         $pangkat   = array_column($db->table('pangkat')->where('status', 1)->orderBy('order', 'ASC')->get()->getResultArray(), null, 'gol_ruang');
         $jenisKpSi = array_column($db->table('siasn_referensi')->select('id_siasn, id_lokal')->where('jenis', 'jenis_kp')->get()->getResultArray(), 'id_lokal', 'id_siasn');
-        $jenisKp   = array_column($db->table('jenis_kp')->where('status', 1)->get()->getResultArray(), 'jenis_kp', 'id_jenis_kp');
-        $ganda     = array_column($db->table('double_riwayat_kp')->select('nip')->get()->getResultArray(), 'nip', 'nip');
+        // Semua baris master (FK `riwayat_kp.id_jenis_kp`); pemetaan ke id yang tidak ada = tidak terpetakan → bawaan 3.
+        $jenisKp = array_column($db->table('jenis_kp')->get()->getResultArray(), 'jenis_kp', 'id_jenis_kp');
+        $ganda   = array_column($db->table('double_riwayat_kp')->select('nip')->get()->getResultArray(), 'nip', 'nip');
 
         $berpasangan = $perGol = [];
 
@@ -177,12 +178,9 @@ final class TarikGolongan implements JenisTarikSiasn
         $idJenisKp = 3;
         $namaKp    = 'Reguler';
 
-        if ($jenisKpId !== null && isset($jenisKpSi[$jenisKpId]) && (string) $jenisKpSi[$jenisKpId] !== '') {
+        if ($jenisKpId !== null && isset($jenisKpSi[$jenisKpId]) && isset($jenisKp[(int) $jenisKpSi[$jenisKpId]])) {
             $idJenisKp = (int) $jenisKpSi[$jenisKpId];
-
-            if (isset($jenisKp[$idJenisKp])) {
-                $namaKp = (string) $jenisKp[$idJenisKp];
-            }
+            $namaKp    = (string) $jenisKp[$idJenisKp];
         }
 
         $p = $pangkat[$golRuang] ?? null;

@@ -57,7 +57,7 @@ final class TarikSiasn
      */
     public static function semuaJenis(): array
     {
-        $daftar = [new TarikDataUtama(), new TarikGolongan()];
+        $daftar = [new TarikDataUtama(), new TarikGolongan(), new TarikPendidikan(), new TarikPmk(), new TarikSkp(), new TarikAk()];
 
         return array_combine(array_map(static fn (JenisTarikSiasn $j): string => $j->nama(), $daftar), $daftar);
     }
