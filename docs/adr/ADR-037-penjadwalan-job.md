@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | **Diusulkan 04-11-2026** (Fase 6 Jalur A, MAKE-062; disetujui lewat review CR) |
-| **Cakupan** | Semua job berkala Fase 6: `layanan:status-harian`, `lkh:auto-approval`, `bkn:tarik-periode`, `bkn:tarik-skp-periodik`, `siasn:tarik`, `siasn:dorong`, `siasn:unggah-arsip`, `integrasi:bersihkan-log` (jadwal di PRD Fase 6 §6.4) |
+| **Cakupan** | Semua job berkala Fase 6: `layanan:status-harian`, `pengguna:sinkron-nama`, `lkh:auto-approval`, `bkn:tarik-periode`, `bkn:tarik-skp-periodik`, `siasn:tarik`, `siasn:dorong`, `siasn:unggah-arsip`, `integrasi:bersihkan-log` (jadwal di PRD Fase 6 §6.4) |
 | **Pemilik pelaksanaan** | Fase 6 Jalur A (pola, command harian dan LKH) dan Jalur B (command integrasi keluar) |
 | **Terkait** | PRD Fase 6 F6-02, F6-20, BP-6, BP-7, §7.0.3; `README-deploy.md` bagian 1e; pola `cuti:saldo-tahunan` (Fase 4) dan worker `queue:work` (bagian 1a/1b) |
 
@@ -38,6 +38,10 @@
    `--dry-run` tidak butuh akun.
 8. **Run pertama di lingkungan baru wajib `--dry-run`** untuk job yang mengubah data massal; jumlahnya direview sebelum run
    nyata (mis. `layanan:status-harian`, Q6-26).
+
+## 2a. Jadwal USULAN yang belum pasti (PN-5)
+
+Legacy `Cron.php` memuat endpoint tanpa jadwal tertulis di repo: `sync_nama_pengguna` (F6-21 bersyarat, kini `pengguna:sinkron-nama`) tidak punya jadwal legacy yang diketahui. Usulan: harian 01:00 WIB, sesudah `layanan:status-harian` (00:30). Jadwal pasti dicocokkan dengan crontab server legacy sebelum cutover (PN-5); sampai itu, command boleh dijalankan manual setelah impor atau perubahan data pegawai.
 
 ## 3. Alternatif
 
