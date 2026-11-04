@@ -85,16 +85,48 @@ final class TarikGolongan implements JenisTarikSiasn
             }
 
             $golDiproses = [];
+            $utuh        = true;
 
             foreach ($h['data'] as $si) {
-                if (! is_array($si) || trim((string) (is_scalar($si['golongan'] ?? null) ? $si['golongan'] : '')) === '') {
+                if (! is_array($si)) {
+                    $utuh = false;
+
                     continue;
                 }
 
                 try {
-                    $kolom = $this->kolom($si, $pangkat, $jenisKpSi, $jenisKp);
+                    // Baris tanpa `id` bukan riwayat golongan SIASN yang dikenali (mis. data contoh driver mock) — ditolak
+                    // SEBELUM aturan "golongan kosong dilewati", agar tidak ada lepas atas jawaban yang tidak dikenali (B-1).
+                    NilaiSiasn::teks($si, 'id', 100) ?? throw new NilaiTidakSah('id', 'tipe');
                 } catch (NilaiTidakSah $e) {
                     $rencana->tolak($e->alasan);
+                    $utuh = false;
+
+                    continue;
+                }
+
+                if (trim((string) (is_scalar($si['golongan'] ?? null) ? $si['golongan'] : '')) === '') {
+                    continue;
+                }
+
+                try {
+                    // Ganda dideteksi dari golongan sebelum kolom lain diurai, seperti `golProcessed` legacy [K `:129-143`].
+                    $gol = $this->golRuang($si);
+
+                    if (isset($golDiproses[$gol])) {
+                        if (! isset($ganda[$nip])) {
+                            $rencana->sisip('double_riwayat_kp', ['nip' => $nip, 'created_at' => $sekarang], 'ganda');
+                            $ganda[$nip] = $nip;
+                        }
+
+                        continue;
+                    }
+
+                    $golDiproses[$gol] = true;
+                    $kolom             = $this->kolom($si, $pangkat, $jenisKpSi, $jenisKp);
+                } catch (NilaiTidakSah $e) {
+                    $rencana->tolak($e->alasan);
+                    $utuh = false;
 
                     continue;
                 }
@@ -103,19 +135,7 @@ final class TarikGolongan implements JenisTarikSiasn
                     $rencana->info['referensi_tak_terpetakan']++;
                 }
 
-                $gol = $kolom['gol_ruang'];
-
-                if (isset($golDiproses[$gol])) {
-                    if (! isset($ganda[$nip])) {
-                        $rencana->sisip('double_riwayat_kp', ['nip' => $nip, 'created_at' => $sekarang], 'ganda');
-                        $ganda[$nip] = $nip;
-                    }
-
-                    continue;
-                }
-
-                $golDiproses[$gol] = true;
-                $idSiasn           = (string) $kolom['id_rw_siasn'];
+                $idSiasn = (string) $kolom['id_rw_siasn'];
 
                 if (isset($berpasangan[$nip][$idSiasn])) {
                     $ada = $berpasangan[$nip][$idSiasn];
@@ -148,6 +168,13 @@ final class TarikGolongan implements JenisTarikSiasn
                     'created_at'  => $sekarang,
                 ] + $this->dataDasar($kolom, $idAkun, $sekarang));
             }
+
+            if (! $utuh) {
+                // Review B6 M1 B-1a: ada baris yang ditolak/tidak berbentuk objek → pasangannya bisa jadi masih ada di SIASN;
+                // tanpa lepas untuk NIP ini.
+                unset($berpasangan[$nip]);
+                $rencana->info['ditolak_tanpa_destruktif']++;
+            }
         }
 
         foreach ($berpasangan as $perNip) {
@@ -157,6 +184,23 @@ final class TarikGolongan implements JenisTarikSiasn
         }
 
         return $rencana;
+    }
+
+    /**
+     * `gol_ruang` lokal dari baris SIASN: `jenisKPId` 211 → `CPNS <golongan>` [K `:129`].
+     *
+     * @param array<string, mixed> $si
+     */
+    private function golRuang(array $si): string
+    {
+        $golongan = (string) NilaiSiasn::teks($si, 'golongan', 10);
+        $golRuang = NilaiSiasn::teks($si, 'jenisKPId', 100) === '211' ? trim("CPNS {$golongan}") : $golongan;
+
+        if (mb_strlen($golRuang) > 10) {
+            throw new NilaiTidakSah('golongan', 'panjang');
+        }
+
+        return $golRuang;
     }
 
     /**
@@ -171,13 +215,8 @@ final class TarikGolongan implements JenisTarikSiasn
      */
     private function kolom(array $si, array $pangkat, array $jenisKpSi, array $jenisKp): array
     {
-        $golongan  = (string) NilaiSiasn::teks($si, 'golongan', 10);
         $jenisKpId = NilaiSiasn::teks($si, 'jenisKPId', 100);
-        $golRuang  = $jenisKpId === '211' ? trim("CPNS {$golongan}") : $golongan;
-
-        if (mb_strlen($golRuang) > 10) {
-            throw new NilaiTidakSah('golongan', 'panjang');
-        }
+        $golRuang  = $this->golRuang($si);
 
         $idJenisKp     = 3;
         $namaKp        = 'Reguler';

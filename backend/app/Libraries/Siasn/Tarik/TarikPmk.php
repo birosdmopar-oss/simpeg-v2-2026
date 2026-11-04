@@ -19,7 +19,7 @@ use CodeIgniter\Database\BaseConnection;
  * - `siasn_lu` = waktu tarik (legacy menulis teks "Sync SIASN" ke DATETIME, `:148`);
  * - masa kerja tahun dibaca dari `masaKerjaTahun` (legacy salah ketik `tasaKerjaTahun` → selalu 0, `:142`), bawaan 0;
  * - lepas pasangan berjalan juga tanpa sisip (syarat legacy `count($paramUpd)` ganda, `:183`), hanya untuk NIP yang API-nya
- *   sukses dengan data tidak kosong (pengaman F6-14).
+ *   sukses dengan data tidak kosong dan tanpa baris ditolak (pengaman F6-14, review B6 M1 B-1a).
  */
 final class TarikPmk implements JenisTarikSiasn
 {
@@ -73,8 +73,12 @@ final class TarikPmk implements JenisTarikSiasn
                 continue;
             }
 
+            $utuh = true;
+
             foreach ($h['data'] as $si) {
                 if (! is_array($si)) {
+                    $utuh = false;
+
                     continue;
                 }
 
@@ -130,7 +134,15 @@ final class TarikPmk implements JenisTarikSiasn
                     ]);
                 } catch (NilaiTidakSah $e) {
                     $rencana->tolak($e->alasan);
+                    $utuh = false;
                 }
+            }
+
+            if (! $utuh) {
+                // Review B6 M1 B-1a: baris ditolak/tidak berbentuk objek → pasangannya bisa jadi masih ada di SIASN; tanpa
+                // hapus/lepas untuk NIP ini.
+                unset($berpasangan[$nip]);
+                $rencana->info['ditolak_tanpa_destruktif']++;
             }
         }
 

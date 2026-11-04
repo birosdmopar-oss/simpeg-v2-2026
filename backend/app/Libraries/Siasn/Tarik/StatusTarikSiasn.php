@@ -6,6 +6,8 @@ namespace App\Libraries\Siasn\Tarik;
 
 use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\Exceptions\DatabaseException;
+use Throwable;
 
 /**
  * Status tarik SIASN per NIP per jenis (`siasn_status_pegawai`, padanan `siasn_simpeg.dsp` [K], DBV-027):
@@ -31,6 +33,9 @@ final class StatusTarikSiasn
     }
 
     /**
+     * Satu transaksi pola proyek (review B6 M1 B-3); INSERT IGNORE agar dua `siasn:tarik` jenis berbeda yang menyinkronkan
+     * bersamaan tidak bertabrakan di PK `nip` (P-5).
+     *
      * @return array{tambah: int, hapus: int}
      */
     public function sinkronDaftar(string $sekarang): array
@@ -39,15 +44,36 @@ final class StatusTarikSiasn
             ->whereNotIn('nip', self::NIP_DILEWATI)->get()->getResultArray(), 'nip', 'nip');
         $ada = array_column($this->db->table(self::TABEL)->select('nip')->get()->getResultArray(), 'nip', 'nip');
 
-        $tambah = array_values(array_diff_key($aktif, $ada));
-        $hapus  = array_values(array_diff_key($ada, $aktif));
+        $tambah = array_values(array_map('strval', array_diff_key($aktif, $ada)));
+        $hapus  = array_values(array_map('strval', array_diff_key($ada, $aktif)));
 
-        foreach (array_chunk($tambah, 500) as $potong) {
-            $this->db->table(self::TABEL)->insertBatch(array_map(static fn (string $nip): array => ['nip' => $nip, 'created_at' => $sekarang, 'updated_at' => $sekarang], $potong));
+        if ($tambah === [] && $hapus === []) {
+            return ['tambah' => 0, 'hapus' => 0];
         }
 
-        foreach (array_chunk($hapus, 500) as $potong) {
-            $this->db->table(self::TABEL)->whereIn('nip', $potong)->delete();
+        $this->db->transBegin();
+
+        try {
+            foreach (array_chunk($tambah, 500) as $potong) {
+                $baris = array_map(static fn (string $nip): array => ['nip' => $nip, 'created_at' => $sekarang, 'updated_at' => $sekarang], $potong);
+                $this->wajib($this->db->table(self::TABEL)->ignore(true)->insertBatch($baris), 'sisip daftar status');
+            }
+
+            foreach (array_chunk($hapus, 500) as $potong) {
+                $this->wajib($this->db->table(self::TABEL)->whereIn('nip', $potong)->delete(), 'hapus daftar status');
+            }
+
+            if (! $this->db->transStatus()) {
+                throw new DatabaseException('Sinkron daftar status SIASN gagal.');
+            }
+
+            $this->db->transCommit();
+            $this->db->resetTransStatus();
+        } catch (Throwable $e) {
+            $this->db->transRollback();
+            $this->db->resetTransStatus();
+
+            throw $e instanceof DatabaseException ? $e : new DatabaseException('Sinkron daftar status SIASN gagal: ' . $e::class, 0, $e);
         }
 
         return ['tambah' => count($tambah), 'hapus' => count($hapus)];
@@ -72,7 +98,12 @@ final class StatusTarikSiasn
             $qb->where('s.nip', $nip);
         } elseif ($k === 'du') {
             $hariIni = (string) StempelUtc::tanggalWib($sekarang);
-            $qb->where('s.du', 0)->groupStart()->where('s.du_lu <', $hariIni)->orWhere('s.du_lu', null)->groupEnd();
+            $batas   = gmdate('Y-m-d H:i:s', (int) strtotime($sekarang . ' UTC') - self::USANG_DETIK);
+            // `du = 2` lebih dari 6 jam = macet (proses terputus tanpa sempat batal) → dipilih lagi (review B6 M1 P-1).
+            $qb->groupStart()
+                ->groupStart()->where('s.du', 0)->groupStart()->where('s.du_lu <', $hariIni)->orWhere('s.du_lu', null)->groupEnd()->groupEnd()
+                ->orGroupStart()->where('s.du', 2)->where('s.updated_at <', $batas)->groupEnd()
+                ->groupEnd();
         } else {
             $batas = gmdate('Y-m-d H:i:s', (int) strtotime($sekarang . ' UTC') - self::USANG_DETIK);
             $qb->groupStart()->where("s.{$k}", 0)->orWhere("s.{$k}_lu <", $batas)->orWhere("s.{$k}_lu", null)->groupEnd();
@@ -118,6 +149,16 @@ final class StatusTarikSiasn
             return;
         }
 
-        $this->db->table(self::TABEL)->whereIn('nip', $nip)->update($data + ['updated_at' => $sekarang]);
+        $this->wajib($this->db->table(self::TABEL)->whereIn('nip', $nip)->update($data + ['updated_at' => $sekarang]), 'tandai status');
+    }
+
+    /**
+     * Galat tulis tidak boleh senyap walau `DBDebug` mati (review B6 M1 B-3).
+     */
+    private function wajib(mixed $hasil, string $langkah): void
+    {
+        if ($hasil === false) {
+            throw new DatabaseException("Status tarik SIASN gagal pada {$langkah}.");
+        }
     }
 }

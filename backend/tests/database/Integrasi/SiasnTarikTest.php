@@ -41,6 +41,8 @@ final class SiasnTarikTest extends DatabaseTestCase
 
     private const NIP_C = '199001012020011003';
 
+    private const NIP_D = '199001012020011004';
+
     protected $seed = MasterDataSeeder::class;
 
     protected function setUp(): void
@@ -99,7 +101,7 @@ final class SiasnTarikTest extends DatabaseTestCase
 
     public function testGolonganUbahPasangSisipGandaTolakDanLepasHanyaUntukNipYangSukses(): void
     {
-        foreach ([self::NIP_A, self::NIP_B, self::NIP_C] as $nip) {
+        foreach ([self::NIP_A, self::NIP_B, self::NIP_C, self::NIP_D] as $nip) {
             $this->buatPegawai(['nip' => $nip, 'id_jenis_pegawai' => 1]);
         }
 
@@ -108,6 +110,7 @@ final class SiasnTarikTest extends DatabaseTestCase
         $r3 = $this->kp(self::NIP_A, ['gol_ruang' => 'II/d', 'id_rw_siasn' => 'GOL-LAMA', 'tmtsk' => '2010-04-01']);
         $rB = $this->kp(self::NIP_B, ['gol_ruang' => 'III/a', 'id_rw_siasn' => 'GOL-B', 'tmtsk' => '2015-01-01']);
         $rC = $this->kp(self::NIP_C, ['gol_ruang' => 'III/a', 'id_rw_siasn' => 'GOL-C', 'tmtsk' => '2015-01-01']);
+        $rD = $this->kp(self::NIP_D, ['gol_ruang' => 'IV/a', 'id_rw_siasn' => 'GOL-D', 'tmtsk' => '2024-02-01']);
 
         $this->antreToken();
         $this->transport->antreJson(200, ['code' => 1, 'data' => [
@@ -115,20 +118,23 @@ final class SiasnTarikTest extends DatabaseTestCase
             $this->gol('GOL-2', 'III/b', '01-04-2019'),
             $this->gol('GOL-3', 'III/c', '01-04-2023', ['masaKerjaGolonganTahun' => '8', 'masaKerjaGolonganBulan' => '0']),
             $this->gol('GOL-4', 'III/b', '01-04-2020'),
-            $this->gol('GOL-5', 'IV/a', '31-02-2024'),
             $this->gol('GOL-6', '', '01-01-2000'),
         ]]);
         $this->transport->antre(new Respons(500, 'galat'), new Respons(500, 'galat'), new Respons(500, 'galat'));
         $this->transport->antreJson(200, ['code' => 1, 'data' => []]);
+        // NIP D: satu-satunya baris ditolak (tanggal tidak sah, id berbeda dari pasangan lokal).
+        $this->transport->antreJson(200, ['code' => 1, 'data' => [$this->gol('GOL-5', 'IV/a', '31-02-2024')]]);
 
         $h = $this->tarik()->jalankan('golongan');
 
-        $this->assertSame([3, 2, 1], [$h['nip'], $h['sukses'], $h['gagal']]);
+        $this->assertSame([4, 3, 1], [$h['nip'], $h['sukses'], $h['gagal']]);
         $this->assertSame(['sisip' => 1, 'ubah' => 1, 'pasang' => 1, 'lepas' => 1, 'hapus' => 0, 'ganda' => 1], $h['jumlah']);
         $this->assertSame(['tmtGolongan_tanggal' => 1], $h['ditolak']);
-        // Putusan reviewer (2) & (c): NIP C sukses + data kosong; jenisKPId '101' tanpa pemetaan → bawaan "Reguler" (4 baris).
-        $this->assertSame(['data_kosong' => 1, 'pairing_ganda' => 0, 'referensi_tak_terpetakan' => 4], $h['info']);
-        $this->assertStringContainsString('data_kosong 1, pairing_ganda 0, referensi_tak_terpetakan 4', (string) $this->db->table('integrasi_log')->where('operasi', 'tarik_golongan')->get()->getRow()->pesan);
+        // Putusan reviewer (2) & (c): NIP C sukses + data kosong; jenisKPId '101' tanpa pemetaan → bawaan "Reguler" (3 baris;
+        // baris ganda tidak diurai). Review B6 M1 B-1a: NIP D punya baris ditolak → tanpa lepas.
+        $this->assertSame(['data_kosong' => 1, 'pairing_ganda' => 0, 'referensi_tak_terpetakan' => 3, 'ditolak_tanpa_destruktif' => 1], $h['info']);
+        $this->assertStringContainsString('data_kosong 1, pairing_ganda 0, referensi_tak_terpetakan 3, ditolak_tanpa_destruktif 1', (string) $this->db->table('integrasi_log')->where('operasi', 'tarik_golongan')->get()->getRow()->pesan);
+        $this->assertSame('GOL-D', $this->db->table('riwayat_kp')->where('id_riwayat_kp', $rD)->get()->getRow()->id_rw_siasn, 'B-1a: baris ditolak → pasangan tidak dilepas');
 
         $kp = array_column($this->db->table('riwayat_kp')->whereIn('nip', [self::NIP_A, self::NIP_B, self::NIP_C])->get()->getResultArray(), null, 'id_riwayat_kp');
         $this->assertSame(['SK-BARU', '2014-12-20', 'Sync SIASN', (string) $this->idAkun], [$kp[$r1]['no_sk'], $kp[$r1]['tgl_sk'], $kp[$r1]['keterangan'], (string) $kp[$r1]['updated_by']]);

@@ -80,8 +80,12 @@ final class TarikSkp implements JenisTarikSiasn
                 continue;
             }
 
+            $utuh = true;
+
             foreach ($h['data'] as $si) {
                 if (! is_array($si)) {
+                    $utuh = false;
+
                     continue;
                 }
 
@@ -132,7 +136,15 @@ final class TarikSkp implements JenisTarikSiasn
                     ]);
                 } catch (NilaiTidakSah $e) {
                     $rencana->tolak($e->alasan);
+                    $utuh = false;
                 }
+            }
+
+            if (! $utuh) {
+                // Review B6 M1 B-1a: baris ditolak/tidak berbentuk objek → pasangannya bisa jadi masih ada di SIASN; tanpa
+                // hapus/lepas untuk NIP ini.
+                unset($berpasangan[$nip]);
+                $rencana->info['ditolak_tanpa_destruktif']++;
             }
         }
 

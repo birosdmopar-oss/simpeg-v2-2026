@@ -34,6 +34,9 @@ trait SiasnUjiTrait
     /** @var array<string, bool|float|string> */
     private array $bknAsli;
 
+    /** @var array{driver: string, baseUrl: string, clientId: string, clientSecret: string} */
+    private array $siasnAsli;
+
     protected function siapkanSiasn(): void
     {
         $this->transport = new FakeTransport();
@@ -49,6 +52,9 @@ trait SiasnUjiTrait
             'ssoPassword'     => 'sandi-uji',
         ] + $this->bknAsli;
         config(Integrations::class)->bkn = $konfig;
+        $this->siasnAsli                 = config(Integrations::class)->siasn;
+        // Driver nyata (adapter di atas FakeTransport): siasn:tarik menolak driver lain (review B6 M1 B-1c).
+        config(Integrations::class)->siasn = ['driver' => 'bkn'] + $this->siasnAsli;
 
         $token = new TokenBkn(new KlienHttp($this->transport, new IntegrasiLog($this->db), tidur: static function (int $ms): void {
         }), new CacheService(new MockCache(), 'uji_'), $konfig);
@@ -62,7 +68,8 @@ trait SiasnUjiTrait
 
     protected function pulihkanSiasn(): void
     {
-        config(Integrations::class)->bkn = $this->bknAsli;
+        config(Integrations::class)->bkn   = $this->bknAsli;
+        config(Integrations::class)->siasn = $this->siasnAsli;
         Services::reset(true);
     }
 

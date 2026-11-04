@@ -7,11 +7,15 @@ namespace App\Commands;
 use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Integrasi\AkunSistemTidakSiap;
 use App\Libraries\Integrasi\KonfigurasiIntegrasiTidakLengkap;
+use App\Libraries\Siasn\Tarik\SiasnTarikSibuk;
+use App\Libraries\Siasn\Tarik\SiasnTidakSiap;
 use App\Libraries\Siasn\Tarik\TarikSiasn;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use InvalidArgumentException;
+use ReflectionClass;
+use Throwable;
 
 /**
  * `php spark siasn:tarik --jenis=<jenis> [--limit=N] [--nip=<nip>] [--dry-run]` (H-03, F6-14 ikut legacy penuh; PRD Fase 6
@@ -20,7 +24,8 @@ use InvalidArgumentException;
  * menarik satu NIP tanpa syarat usang. Tanpa UI admin (legacy tidak punya).
  *
  * Kode keluar: 0 berhasil (termasuk sebagian NIP gagal di sisi SIASN — dicatat, AC-03.1), 1 konfigurasi/akun sistem belum
- * siap atau galat DB (`EXIT_ERROR`), 7 masukan salah (`EXIT_USER_INPUT`). Keluaran hanya jumlah, tanpa NIP/nama.
+ * siap, driver SIASN bukan `bkn`, jenis yang sama sedang berjalan, atau galat DB/lainnya (`EXIT_ERROR`; galat DB hanya
+ * dicetak kelas & kodenya), 7 masukan salah (`EXIT_USER_INPUT`). Keluaran hanya jumlah, tanpa NIP/nama.
  */
 class SiasnTarik extends BaseCommand
 {
@@ -61,8 +66,14 @@ class SiasnTarik extends BaseCommand
 
         try {
             $h = TarikSiasn::dariLayanan()->jalankan($jenis, (int) $limit, is_string($nip) ? $nip : null, isset($opsi['dry-run']));
-        } catch (KonfigurasiIntegrasiTidakLengkap|AkunSistemTidakSiap|DatabaseException $e) {
+        } catch (KonfigurasiIntegrasiTidakLengkap|AkunSistemTidakSiap|SiasnTidakSiap|SiasnTarikSibuk $e) {
+            // Pesan kelas-kelas ini disusun aplikasi tanpa nilai rahasia/NIP.
             CLI::error("Tarik SIASN {$jenis} GAGAL: " . $e->getMessage());
+
+            return EXIT_ERROR;
+        } catch (Throwable $e) {
+            // Review B6 M1 P-6: pesan galat DB/lainnya bisa memuat NIP (mis. "Duplicate entry") → hanya kelas & kode ke log cron.
+            CLI::error("Tarik SIASN {$jenis} GAGAL: " . ($e instanceof DatabaseException ? 'galat basis data' : 'galat tak terduga') . ' (' . (new ReflectionClass($e))->getShortName() . ', kode ' . $e->getCode() . ').');
 
             return EXIT_ERROR;
         }

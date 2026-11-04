@@ -50,7 +50,12 @@ final class SiasnAdapter implements SiasnGatewayInterface
         $hasil = $this->ambil('data-utama', $nip);
         $data  = $hasil['data'];
 
-        return ['status_code' => $hasil['status_code'], 'message' => $hasil['message'], 'data' => is_array($data) && ! array_is_list($data) ? $data : null];
+        if ($hasil['status_code'] === self::SUKSES && (! is_array($data) || ($data !== [] && array_is_list($data)))) {
+            // Data utama = satu objek; daftar = bentuk tidak sah (review B6 M1 B-1b).
+            return ['status_code' => 'respons', 'message' => 'Balasan SIASN tidak sah.', 'data' => null];
+        }
+
+        return ['status_code' => $hasil['status_code'], 'message' => $hasil['message'], 'data' => is_array($data) ? $data : null];
     }
 
     public function getRiwayat(string $nip, string $jenis): array
@@ -59,11 +64,17 @@ final class SiasnAdapter implements SiasnGatewayInterface
         $hasil = $this->ambil($jalur, $nip);
         $data  = $hasil['data'];
 
-        return [
-            'status_code' => $hasil['status_code'],
-            'message'     => $hasil['message'],
-            'data'        => is_array($data) ? array_values(array_filter($data, 'is_array')) : [],
-        ];
+        if ($hasil['status_code'] !== self::SUKSES) {
+            return ['status_code' => $hasil['status_code'], 'message' => $hasil['message'], 'data' => []];
+        }
+
+        // Riwayat = daftar baris objek. Objek (bukan daftar) atau elemen bukan objek = tidak sah → gagal, sehingga tidak ada
+        // aksi destruktif atas jawaban yang bentuknya tidak dikenali (review B6 M1 B-1b).
+        if (! is_array($data) || ! array_is_list($data) || array_filter($data, static fn (mixed $b): bool => ! is_array($b) || ($b !== [] && array_is_list($b))) !== []) {
+            return ['status_code' => 'respons', 'message' => 'Balasan SIASN tidak sah.', 'data' => []];
+        }
+
+        return ['status_code' => self::SUKSES, 'message' => $hasil['message'], 'data' => $data];
     }
 
     public function syncPegawai(string $nip, array $payload): array
@@ -83,6 +94,8 @@ final class SiasnAdapter implements SiasnGatewayInterface
                 self::LAYANAN,
                 str_replace('-', '_', $jalur),
                 header: $h,
+                // NIP ada di path: disensor dari integrasi_log (saran review B6 M1 #7).
+                rahasia: [$nip],
             ));
         } catch (GalatTransport $e) {
             return ['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => 'Layanan SIASN tidak dapat dihubungi.', 'data' => null];

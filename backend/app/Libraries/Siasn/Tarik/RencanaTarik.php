@@ -29,11 +29,12 @@ final class RencanaTarik
      * Informasi tanpa aksi (putusan reviewer B6 M1): `data_kosong` = NIP dengan jawaban sukses tetapi data kosong (tanpa
      * aksi destruktif), `pairing_ganda` = baris SIASN yang cocok ke lebih dari satu baris lokal (tidak dipasangkan dan tidak
      * disisipkan), `referensi_tak_terpetakan` = kode referensi SIASN (jenis KP / jenjang) tanpa pemetaan ke master lokal
-     * (bawaan legacy dipakai).
+     * (bawaan legacy dipakai), `ditolak_tanpa_destruktif` = NIP yang punya baris SIASN ditolak/tidak berbentuk objek
+     * sehingga hapus/lepas pasangannya dibatalkan (review B6 M1 B-1a).
      *
-     * @var array{data_kosong: int, pairing_ganda: int, referensi_tak_terpetakan: int}
+     * @var array{data_kosong: int, pairing_ganda: int, referensi_tak_terpetakan: int, ditolak_tanpa_destruktif: int}
      */
-    public array $info = ['data_kosong' => 0, 'pairing_ganda' => 0, 'referensi_tak_terpetakan' => 0];
+    public array $info = ['data_kosong' => 0, 'pairing_ganda' => 0, 'referensi_tak_terpetakan' => 0, 'ditolak_tanpa_destruktif' => 0];
 
     /**
      * @param array<string, mixed> $data
