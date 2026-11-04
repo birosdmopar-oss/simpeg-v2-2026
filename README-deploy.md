@@ -230,6 +230,95 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
 7. Batas [V2]: maks 10 token web per akun (yang terlama dibuang), pendaftaran token dibatasi 20 permintaan/60 detik per akun (429).
 8. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`; galat per token pada topik presensi (HTTP 200 dengan `results[].error`) tercatat sebagai `warning` `[fcm-topik]` di log aplikasi dan hitungannya ada di hasil job.
 
+### 1e. BKN e-Kinerja & SIASN (Fase 6 H-10/H-03, MAKE-063/064/067)
+
+Integrasi keluar ke BKN berjalan lewat command terjadwal dan satu worker antrean, tanpa panggilan BKN di dalam request
+pengguna. Ringkasan modul: `backend/app/Libraries/Bkn/README.md`, `backend/app/Libraries/Siasn/README.md`.
+
+**Urutan aktivasi (sekali, sesudah cutover data):**
+
+1. Isi `shared/backend.env` (nilai hanya di server; daftar kunci lengkap di `backend/.env.example` blok "BKN e-Kinerja &
+   SIASN"): `integrations.bkn.baseUrlApi`, `baseUrlEkinerja`, `tokenUrlGateway`, `tokenUrlSso`, `clientId`/`clientSecret`,
+   `ssoClientId`/`ssoUsername`/`ssoPassword` (+ `ssoTotp` bila dipakai), token e-Kinerja (`ekinerjaToken` statis **atau**
+   `ekinerjaApiUser`/`ekinerjaApiPass` + `ekinerjaSso*`), untuk dorong jabatan `siasnInstansiId`/`siasnSatkerId`/
+   `siasnUnorBawaan`, lalu `integrations.siasn.driver = bkn`. `integrations.bkn.tlsVerify` **wajib** `true` (berbeda
+   dengan e-sign §1c). Konfigurasi kosong/tidak sah → command/job gagal dengan nama kunci saja, tanpa nilai.
+2. **Sesudah impor `pengguna` dan sebelum cron diaktifkan:** `php spark integrasi:siapkan-akun-sistem` (idempoten). Akun
+   `sistem.integrasi` dipakai sebagai pelaku `updated_by`; tanpa akun ini semua command BKN/SIASN keluar 1 (DBV-027 §4,
+   Z-1 opsi c). Akun menyimpang dilaporkan nama kolomnya saja dan tidak diperbaiki otomatis.
+3. Uji koneksi manual dari server: `php spark integrasi:uji-koneksi bkn` (token e-Kinerja + `GET referensi/periode`, hanya
+   baca) dan `php spark integrasi:uji-koneksi siasn` (token gateway + SSO, tanpa data pegawai). Uji ini **tidak** bagian
+   `check.sh`.
+4. Uji kering satu per satu dengan `--dry-run` (tanpa tulis; permintaan GET ke BKN tetap dikirim untuk `siasn:tarik`), lalu
+   aktifkan cron di bawah.
+
+**Worker antrean `integrasi`** — job `bkn-tarik` dari tombol admin "tarik ulang e-Kinerja" (`POST api/v1/integrasi/bkn/tarik`,
+super admin). Pola sama dengan §1a/§1b (antrean ini terpisah dari `push`):
+
+```bash
+# /etc/cron.d/simpeg-v2-queue-integrasi
+* * * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-queue-integrasi.lock php spark queue:work integrasi --stop-when-empty --max-time 55 >> /var/www/simpeg-v2/logs/queue-integrasi.log 2>&1
+```
+
+**Jadwal command (PRD Fase 6 §6.4).** Jam = WIB; sesuaikan bila zona waktu server bukan WIB. Jadwal SIASN di bawah adalah
+**usulan sementara** dengan batas usang legacy (6 jam / 1 hari [K `SS/*`]) dan wajib dicocokkan dengan crontab server
+legacy (**PN-5**) sebelum go-live. Pola baku crontab (lock, log, pemantauan) ditetapkan ADR-037 (Jalur A); bila ADR-037
+berbeda, ADR-037 yang berlaku dan baris di bawah disesuaikan.
+
+```bash
+# /etc/cron.d/simpeg-v2-integrasi-bkn  (contoh; variabel lingkungan cron, satu per baris)
+B=/var/www/simpeg-v2/current/backend
+L=/var/www/simpeg-v2/logs
+# e-Kinerja (H-10): periode baru harian; SKP periodik periode terpilih + satu periode sebelumnya (--sebelumnya)
+0  1 * * *   deploy cd $B && php spark bkn:tarik-periode                    >> $L/bkn.log 2>&1
+0  2 * * *   deploy cd $B && php spark bkn:tarik-skp-periodik --sebelumnya  >> $L/bkn.log 2>&1
+# SIASN tarik (H-03): batch kecil berulang; tiap jalan hanya mengambil NIP yang sudah usang (data utama 1 hari, lainnya 6 jam)
+*/15 * * * * deploy cd $B && php spark siasn:tarik --jenis=data-utama --limit=50 >> $L/siasn.log 2>&1
+3-59/15 * * * * deploy cd $B && php spark siasn:tarik --jenis=golongan   --limit=50 >> $L/siasn.log 2>&1
+6-59/15 * * * * deploy cd $B && php spark siasn:tarik --jenis=skp        --limit=50 >> $L/siasn.log 2>&1
+9-59/15 * * * * deploy cd $B && php spark siasn:tarik --jenis=pendidikan --limit=50 >> $L/siasn.log 2>&1
+12-59/30 * * * * deploy cd $B && php spark siasn:tarik --jenis=pmk       --limit=50 >> $L/siasn.log 2>&1
+27-59/30 * * * * deploy cd $B && php spark siasn:tarik --jenis=ak        --limit=50 >> $L/siasn.log 2>&1
+30 4 * * *   deploy cd $B && php spark siasn:tarik --jenis=ref-unor                >> $L/siasn.log 2>&1
+# SIASN dorong (H-03): berkala, tidak bersamaan dengan tarik jenis yang sama (skp vs skp22)
+10 */2 * * * deploy cd $B && php spark siasn:dorong --jenis=jabatan     >> $L/siasn.log 2>&1
+20 */2 * * * deploy cd $B && php spark siasn:dorong --jenis=diklat      >> $L/siasn.log 2>&1
+25 */2 * * * deploy cd $B && php spark siasn:dorong --jenis=sertifikasi >> $L/siasn.log 2>&1
+35 */2 * * * deploy cd $B && php spark siasn:dorong --jenis=kursus      >> $L/siasn.log 2>&1
+50 */2 * * * deploy cd $B && php spark siasn:dorong --jenis=skp22       >> $L/siasn.log 2>&1
+# Arsip SIASN: unggah 1 baris tiap menit [K "every minute" limit 1]; antre lebih jarang, di luar menit dorong jabatan/sertifikasi
+* * * * *    deploy cd $B && php spark siasn:unggah-arsip --langkah=unggah >> $L/siasn-arsip.log 2>&1
+45 * * * *   deploy cd $B && php spark siasn:unggah-arsip --langkah=antre  >> $L/siasn-arsip.log 2>&1
+# Pemeliharaan & pemantauan log integrasi (F6-24)
+0  4 * * 0   deploy cd $B && php spark integrasi:bersihkan-log             >> $L/integrasi.log 2>&1
+5  * * * *   deploy cd $B && php spark integrasi:status --jam=1 > /dev/null 2>&1 || echo "integrasi:status: ada kegagalan/peringatan" | logger -t simpeg-v2
+```
+
+Setiap command memegang kunci DB (`GET_LOCK`) per jenis: jalan kedua jenis yang sama ditolak "sedang berjalan" (exit 1,
+tanpa panggilan API), jadi tumpang tindih tidak merusak data, tetapi baris log exit 1 itu tanda jadwal terlalu rapat.
+`--limit` bawaan 20 baris/NIP per jalan (tarik maks 500); naikkan hanya bila antrean menumpuk.
+
+**Kode keluar & pemantauan.** `0` = berhasil (termasuk sebagian NIP/baris gagal di sisi BKN, tercatat); `1` = konfigurasi
+belum lengkap, akun sistem belum siap, driver bukan `bkn`, jenis yang sama sedang berjalan, token/otorisasi BKN ditolak
+(batch dihentikan tanpa menulis baris), atau galat DB; `7` = opsi salah. Keluaran dan `integrasi_log` hanya jumlah, tanpa
+NIP/nama/token. `php spark integrasi:status` keluar 1 bila ada kegagalan dalam jendela atau periode Tukin berjalan belum punya
+SKP periodik e-Kinerja (F6-15). Job `bkn-tarik` yang gagal permanen ada di `php spark queue:failed`.
+
+**Risiko duplikat di BKN (wajib dibaca operator).** POST ke SIASN (dorong riwayat, unggah dokumen) tidak pernah di-retry
+otomatis, tetapi BKN bisa sudah memproses permintaan yang balasannya tidak sampai:
+
+- `status_tidak_diketahui` di ringkasan `dorong_<jenis>` / `unggah_arsip` = timeout/koneksi putus saat POST. Periksa riwayat
+  itu di SIASN sebelum didorong lagi; jabatan gagal otomatis dicoba lagi setelah 6 jam [K], jenis lain tidak.
+- `hasil_tidak_tersimpan` (`integrasi_log` kode itu, `ref_id` = `<tabel>:<id>` atau `siasn_upload_arsip:<id>`) = POST
+  terkirim tetapi hasilnya gagal ditulis ke DB v2 (dicoba dua kali, juga log `critical`). Baris sengaja **tidak** dipilih
+  lagi (sekali-dorong flag 3 + `siasn_error` "Hasil tidak tersimpan…"; jabatan flag 3/1 dengan `siasn_lu` sekarang; arsip
+  tetap status 3). Operator memeriksa SIASN, lalu menyetel baris itu secara manual sesuai hasilnya.
+- 5xx berulang pada `siasn_error` jabatan = kemungkinan riwayat ganda di BKN (legacy pun begitu); periksa di SIASN.
+
+**Lokasi berkas rahasia.** Semua kredensial BKN/BSrE/FCM hanya di `shared/backend.env`. Berkas service account FCM dan
+CA bundle BSrE disimpan **di luar repo dan luar webroot** (mis. `/etc/simpeg-v2/`, `chmod 600`, pemilik user PHP) — lihat
+§1c dan §1d. Uji koneksi FCM: `php spark integrasi:uji-koneksi fcm` (validate_only, tanpa kirim ke perangkat, §1d).
+
 ---
 
 ## 2. Cara push (operator deploy)
