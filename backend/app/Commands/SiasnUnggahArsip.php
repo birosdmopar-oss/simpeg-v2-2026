@@ -82,7 +82,7 @@ class SiasnUnggahArsip extends BaseCommand
         if ($h['unggah'] !== null) {
             $u = $h['unggah'];
             CLI::write(sprintf(
-                '%sUnggah arsip SIASN: %s %d; sukses %d, gagal %d, berkas hilang %d, tidak sah %d, status tidak diketahui %d.',
+                '%sUnggah arsip SIASN: %s %d; sukses %d, gagal %d, berkas hilang %d, tidak sah %d, status tidak diketahui %d, tidak tersimpan %d.',
                 $awal,
                 $h['dry_run'] ? 'akan diproses' : 'diproses',
                 $u['diproses'],
@@ -91,7 +91,8 @@ class SiasnUnggahArsip extends BaseCommand
                 $u['berkas_hilang'],
                 $u['tidak_sah'],
                 $u['status_tidak_diketahui'],
-            ), 'green');
+                $u['tidak_tersimpan'],
+            ), $u['tidak_tersimpan'] > 0 ? 'yellow' : 'green');
         }
 
         return EXIT_SUCCESS;

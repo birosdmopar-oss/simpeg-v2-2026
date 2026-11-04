@@ -18,7 +18,8 @@ use CodeIgniter\Database\BaseConnection;
  *   satker baris & `pegawai_mutasi_jabatan` ≠ 171, PNS aktif berpasangan SIASN × lampiran `jenis_rwy` 9 (SK Jabatan) /
  *   36 (SK Jabatan JFT [K label]) / 41 (Perjanjian Kerja) berekstensi PDF;
  * - Sertifikasi: `riwayat_diklat.jenis_diklat = 5` yang sudah terkirim, PNS aktif × lampiran `jenis_rwy` 5;
- * - kunci anti-antre-ulang legacy `nip***id_rw***arsip_path` DAN UNIQUE (`rw_name`,`id_rw`,`id_da`) lewat INSERT IGNORE;
+ * - kunci anti-antre-ulang legacy `nip***id_rw***arsip_path` DAN UNIQUE (`rw_name`,`id_rw`,`id_da`) dicek lebih dulu di memori,
+ *   lalu INSERT biasa (bukan IGNORE; pelanggaran UNIQUE akibat proses lain = galat DB, batch antre di-rollback);
  *   `arsip_path` = `document_attachment.path` apa adanya; hanya path yang lolos {@see PathLegacy::normalisasi()}.
  * - DEVIASI (putusan reviewer B6 M3 Q2(b)): saring ukuran legacy `file_size < 1200` [K `Rw_jabatan:603`] tidak dipakai
  *   saat antre karena unit `document_attachment.file_size` campuran (baris impor legacy KB, unggahan v2 byte); antre hanya

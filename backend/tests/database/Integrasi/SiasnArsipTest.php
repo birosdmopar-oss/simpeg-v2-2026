@@ -131,7 +131,7 @@ final class SiasnArsipTest extends DatabaseTestCase
 
         $h = $this->unggah('2026-11-04 02:00:00')->jalankan('unggah', 10);
 
-        $this->assertSame(['diproses' => 4, 'sukses' => 1, 'gagal' => 1, 'berkas_hilang' => 1, 'tidak_sah' => 1, 'status_tidak_diketahui' => 1], $h['unggah']);
+        $this->assertSame(['diproses' => 4, 'sukses' => 1, 'gagal' => 1, 'berkas_hilang' => 1, 'tidak_sah' => 1, 'status_tidak_diketahui' => 1, 'tidak_tersimpan' => 0], $h['unggah']);
         $r = array_column($this->db->table('siasn_upload_arsip')->get()->getResultArray(), null, 'id_siasn_upload_arsip');
         $this->assertSame(['1', 'DOK-1', 'peremajaan/uji/sk.pdf', '872', null], [(string) $r[$id[0]]['status'], $r[$id[0]]['resp_dok_id'], $r[$id[0]]['resp_dok_uri'], $r[$id[0]]['resp_slug'], $r[$id[0]]['error_msg']]);
         $this->assertSame(['2', 'Berkas tidak ditemukan.'], [(string) $r[$id[1]]['status'], $r[$id[1]]['error_msg']]);
@@ -169,7 +169,7 @@ final class SiasnArsipTest extends DatabaseTestCase
                 throw new RuntimeException('tidak dipakai');
             }
 
-            public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = []): array
+            public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = [], ?string $refId = null): array
             {
                 throw new RuntimeException('proses terhenti');
             }

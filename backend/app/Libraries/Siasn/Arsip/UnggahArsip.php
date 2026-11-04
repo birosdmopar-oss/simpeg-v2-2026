@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Siasn\Arsip;
 
+use App\Exceptions\NotFoundException;
 use App\Interfaces\Integrasi\IntegrasiLogInterface;
 use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
 use App\Interfaces\SiasnDorongInterface;
@@ -30,11 +31,15 @@ use Throwable;
  * - berkas dibaca lewat storage v2 (`attachmentService->ambil`, normalisasi path legacy MAKE-069); tidak ada → status 2
  *   "Berkas tidak ditemukan" (DBV-Q4);
  * - wajib PDF dan ≤ 1 MB dari isi berkas [K `:87`], selain itu status 2 "Invalid file type or file size, size: …MB" [K];
+ *   tanda `%PDF` dicari di 1024 byte pertama (DEVIASI saran review B6 M3 #5: PDF sah boleh diawali sampah/BOM);
  * - `POST upload-dok-rw` multipart, `id_riwayat` = `id_rw_siasn`, `id_ref_dokumen` 872 (jabatan) / 881 (sertifikasi) [K];
  *   TIDAK di-retry (BP-3); sukses (`code == 1`) → status 1 + `resp_dok_id/dok_nama/dok_uri/object/slug` MENTAH (dipotong
  *   panjang kolom); gagal → status 2 + `error_msg` legacy ("Failed to upload to SIASN, size: …MB" / timeout → "Timeout
  *   upload, size: …MB", dihitung INFO `status_tidak_diketahui`);
- * - hasil ditulis per baris; exception → baris status 3 yang belum selesai dikembalikan ke 0; ringkasan jumlah saja.
+ * - hasil ditulis per baris; exception SEBELUM POST → baris status 3 dikembalikan ke 0. Sesudah POST (sukses maupun gagal)
+ *   baris TIDAK pernah dikembalikan ke 0 (review B6 M3 B-1, mencegah unggah ganda): tulis gagal → coba sekali lagi → tetap
+ *   gagal → baris dibiarkan status 3 (K-7: tidak diulang otomatis) + log `critical` + `integrasi_log` `hasil_tidak_tersimpan`
+ *   (refId `siasn_upload_arsip:<id>`); ringkasan jumlah saja.
  *
  * Bentuk permintaan unggah ({@see SiasnAdapter::unggahDokumen()}) dikonfirmasi ekstraksi bentuk `postApi_siasnArsip`
  * 04-11 (keputusan Horii opsi A).
@@ -92,7 +97,7 @@ final class UnggahArsip
     /**
      * @param 'antre'|'semua'|'unggah' $langkah
      *
-     * @return array{antre: array{baru: int, sudah_ada: int, path_tidak_sah: int}|null, unggah: array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int}|null, dry_run: bool}
+     * @return array{antre: array{baru: int, sudah_ada: int, path_tidak_sah: int}|null, unggah: array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int, tidak_tersimpan: int}|null, dry_run: bool}
      *
      * @throws SiasnTarikSibuk
      * @throws DatabaseException
@@ -122,14 +127,21 @@ final class UnggahArsip
     }
 
     /**
-     * @return array{antre: array{baru: int, sudah_ada: int, path_tidak_sah: int}|null, unggah: array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int}|null, dry_run: bool}
+     * @return array{antre: array{baru: int, sudah_ada: int, path_tidak_sah: int}|null, unggah: array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int, tidak_tersimpan: int}|null, dry_run: bool}
      */
     private function proses(string $langkah, int $limit, bool $dryRun): array
     {
         $antre = null;
 
         if ($langkah !== 'unggah') {
-            $antre = (new AntreArsip($this->db))->jalankan($dryRun, $this->sekarang());
+            try {
+                $antre = (new AntreArsip($this->db))->jalankan($dryRun, $this->sekarang());
+            } catch (Throwable $e) {
+                // Saran review B6 M3 #8: antre gagal tercatat (tanpa NIP/path).
+                $this->catat('antre_arsip', CatatanIntegrasi::GAGAL, $e instanceof DatabaseException ? 'galat_db' : 'galat', 'antre gagal: ' . $e::class);
+
+                throw $e;
+            }
 
             if (! $dryRun && $antre['baru'] > 0) {
                 $this->catat('antre_arsip', CatatanIntegrasi::SUKSES, null, "baru {$antre['baru']}, sudah_ada {$antre['sudah_ada']}, path_tidak_sah {$antre['path_tidak_sah']}");
@@ -140,11 +152,11 @@ final class UnggahArsip
     }
 
     /**
-     * @return array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int}
+     * @return array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int, tidak_tersimpan: int}
      */
     private function unggah(int $limit, bool $dryRun): array
     {
-        $hasil = ['diproses' => 0, 'sukses' => 0, 'gagal' => 0, 'berkas_hilang' => 0, 'tidak_sah' => 0, 'status_tidak_diketahui' => 0];
+        $hasil = ['diproses' => 0, 'sukses' => 0, 'gagal' => 0, 'berkas_hilang' => 0, 'tidak_sah' => 0, 'status_tidak_diketahui' => 0, 'tidak_tersimpan' => 0];
         $baris = $this->db->table('siasn_upload_arsip')->where('status', 0)->orderBy('id_siasn_upload_arsip', 'ASC')->limit($limit)->get()->getResultArray();
 
         if ($baris === [] || $dryRun) {
@@ -162,9 +174,20 @@ final class UnggahArsip
 
         try {
             foreach ($baris as $b) {
+                $idBaris = (int) $b['id_siasn_upload_arsip'];
                 $hasil['diproses']++;
-                $this->tulis((int) $b['id_siasn_upload_arsip'], $this->satu($b, $hasil));
-                unset($belum[(int) $b['id_siasn_upload_arsip']]);
+                [$data, $terkirim] = $this->satu($b, $hasil);
+
+                if (! $terkirim) {
+                    $this->tulis($idBaris, $data);
+                    unset($belum[$idBaris]);
+
+                    continue;
+                }
+
+                // POST SUDAH terjadi: keluarkan dari daftar pemulihan SEBELUM menulis (review B6 M3 B-1).
+                unset($belum[$idBaris]);
+                $this->tulisSesudahPost($idBaris, $data, $hasil);
             }
         } catch (Throwable $e) {
             try {
@@ -180,19 +203,46 @@ final class UnggahArsip
             throw $e;
         }
 
-        $semua = $hasil['sukses'] === $hasil['diproses'];
+        $semua = $hasil['sukses'] === $hasil['diproses'] && $hasil['tidak_tersimpan'] === 0;
         $this->catat('unggah_arsip', $semua ? CatatanIntegrasi::SUKSES : CatatanIntegrasi::GAGAL, $semua ? null : 'sebagian_gagal', $this->pesan($hasil));
 
         return $hasil;
     }
 
     /**
-     * Proses satu baris antrean → data UPDATE-nya.
+     * Tulis hasil sesudah POST: gagal → coba sekali lagi → tetap gagal → baris dibiarkan status 3 (tidak diunggah ulang
+     * otomatis, K-7) + log `critical` + `integrasi_log` `hasil_tidak_tersimpan` (tanpa NIP).
+     *
+     * @param array<string, mixed>                                                                                                                  $data
+     * @param array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int, tidak_tersimpan: int} $hasil
+     */
+    private function tulisSesudahPost(int $id, array $data, array &$hasil): void
+    {
+        $galat = null;
+
+        for ($coba = 0; $coba < 2; $coba++) {
+            try {
+                $this->tulis($id, $data);
+
+                return;
+            } catch (Throwable $e) {
+                $galat = $e;
+            }
+        }
+
+        $hasil['tidak_tersimpan']++;
+        $ref = 'siasn_upload_arsip:' . $id;
+        log_message('critical', 'Unggah arsip SIASN: POST terkirim tetapi hasil tidak tersimpan ({ref}, status {status}, {kelas}); baris dibiarkan status 3, periksa SIASN.', ['ref' => $ref, 'status' => (string) $data['status'], 'kelas' => $galat::class]);
+        $this->log->catat(new CatatanIntegrasi(CatatanIntegrasi::ARAH_KELUAR, SiasnAdapter::LAYANAN, 'unggah_arsip', CatatanIntegrasi::GAGAL, null, 'hasil_tidak_tersimpan', "{$ref} status {$data['status']}", refId: $ref));
+    }
+
+    /**
+     * Proses satu baris antrean → [data UPDATE-nya, apakah POST sudah terjadi].
      *
      * @param array<string, mixed>                                                                                            $b
-     * @param array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int} $hasil
+     * @param array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int, tidak_tersimpan: int} $hasil
      *
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: bool}
      */
     private function satu(array $b, array &$hasil): array
     {
@@ -201,15 +251,16 @@ final class UnggahArsip
         if ($idRwSiasn === '') {
             $hasil['tidak_sah']++;
 
-            return $this->gagal('Riwayat belum memiliki id SIASN.');
+            return [$this->gagal('Riwayat belum memiliki id SIASN.'), false];
         }
 
         try {
             $berkas = $this->lampiran->ambil((string) $b['nip'], (int) $b['id_da']);
-        } catch (Throwable) {
+        } catch (NotFoundException) {
+            // Hanya "tidak ada" yang permanen (review B6 M3 P-2); galat lain dilempar → status 3 kembali ke 0 (POST belum terjadi).
             $hasil['berkas_hilang']++;
 
-            return $this->gagal('Berkas tidak ditemukan.');
+            return [$this->gagal('Berkas tidak ditemukan.'), false];
         }
 
         $isi      = $berkas['isi'];
@@ -218,13 +269,18 @@ final class UnggahArsip
         $nama     = basename(str_replace('\\', '/', (string) $b['arsip_path']));
         $ekstensi = strtolower(pathinfo($nama, PATHINFO_EXTENSION));
 
-        if ($ekstensi !== 'pdf' || ! str_starts_with($isi, '%PDF') || $ukuran > self::BATAS_BYTE) {
+        if ($ekstensi !== 'pdf' || ! str_contains(substr($isi, 0, 1024), '%PDF') || $ukuran > self::BATAS_BYTE) {
             $hasil['tidak_sah']++;
 
-            return $this->gagal("Invalid file type or file size, size: {$ukuranMb}MB");
+            return [$this->gagal("Invalid file type or file size, size: {$ukuranMb}MB"), false];
         }
 
-        $balasan = $this->siasn->unggahDokumen($idRwSiasn, self::SLUG[(string) $b['rw_name']] ?? '872', $isi, $nama, [(string) $b['nip']]);
+        if (! isset(self::SLUG[(string) $b['rw_name']])) {
+            // `rw_name` tidak dikenal → 872 seperti legacy (saran review B6 M3 #6).
+            log_message('info', 'Unggah arsip SIASN: rw_name tidak dikenal pada siasn_upload_arsip:{id}, dipakai id_ref_dokumen 872.', ['id' => (string) $b['id_siasn_upload_arsip']]);
+        }
+
+        $balasan = $this->siasn->unggahDokumen($idRwSiasn, self::SLUG[(string) $b['rw_name']] ?? '872', $isi, $nama, [(string) $b['nip']], 'siasn_upload_arsip:' . $b['id_siasn_upload_arsip']);
 
         if (in_array($balasan['status_code'], ['token', '401'], true)) {
             // Pola review B6 M2 P-3: token BKN ditolak → hentikan tanpa menulis baris (status 3 dikembalikan ke 0).
@@ -235,7 +291,7 @@ final class UnggahArsip
             $hasil['sukses']++;
             $d = $balasan['data'];
 
-            return [
+            return [[
                 'status'        => 1,
                 'error_msg'     => null,
                 'resp_dok_id'   => self::potong($d['dok_id'] ?? null, 100),
@@ -244,7 +300,7 @@ final class UnggahArsip
                 'resp_object'   => self::potong($d['object'] ?? null, 255),
                 'resp_slug'     => self::potong($d['slug'] ?? null, 50),
                 'updated_at'    => $this->sekarang(),
-            ];
+            ], true];
         }
 
         $hasil['gagal']++;
@@ -252,10 +308,10 @@ final class UnggahArsip
         if (in_array($balasan['status_code'], ['timeout', 'koneksi'], true)) {
             $hasil['status_tidak_diketahui']++;
 
-            return $this->gagal("Timeout upload, size: {$ukuranMb}MB");
+            return [$this->gagal("Timeout upload, size: {$ukuranMb}MB"), true];
         }
 
-        return $this->gagal("Failed to upload to SIASN, size: {$ukuranMb}MB");
+        return [$this->gagal("Failed to upload to SIASN, size: {$ukuranMb}MB"), true];
     }
 
     /**
@@ -285,11 +341,11 @@ final class UnggahArsip
     }
 
     /**
-     * @param array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int} $h
+     * @param array{diproses: int, sukses: int, gagal: int, berkas_hilang: int, tidak_sah: int, status_tidak_diketahui: int, tidak_tersimpan: int} $h
      */
     private function pesan(array $h): string
     {
-        return "diproses {$h['diproses']}, sukses {$h['sukses']}, gagal {$h['gagal']}, berkas_hilang {$h['berkas_hilang']}, tidak_sah {$h['tidak_sah']}, status_tidak_diketahui {$h['status_tidak_diketahui']}";
+        return "diproses {$h['diproses']}, sukses {$h['sukses']}, gagal {$h['gagal']}, berkas_hilang {$h['berkas_hilang']}, tidak_sah {$h['tidak_sah']}, status_tidak_diketahui {$h['status_tidak_diketahui']}, tidak_tersimpan {$h['tidak_tersimpan']}";
     }
 
     private function catat(string $operasi, int $status, ?string $kode, string $pesan): void

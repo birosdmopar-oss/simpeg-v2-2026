@@ -129,7 +129,7 @@ final class SiasnDorongTest extends DatabaseTestCase
 
         $this->assertSame([1, 1], $this->ringkas($this->dorong()->jalankan('diklat'), ['baris', 'sukses']), 'keterangan NULL ikut, "Sync SIASN" tidak (usulan Q3)');
         $this->assertSame([2, 1, 1], $this->ringkas($this->dorong()->jalankan('sertifikasi'), ['baris', 'sukses', 'tidak_sah']));
-        $this->assertSame([2, 1, 1], $this->ringkas($this->dorong()->jalankan('skp22'), ['baris', 'sukses', 'tidak_sah']));
+        $this->assertSame([2, 1, 1], $this->ringkas($this->dorong('2026-11-04 03:00:00')->jalankan('skp22'), ['baris', 'sukses', 'tidak_sah']));
 
         $kirim = array_values(array_filter($this->transport->tercatat(), static fn (array $t): bool => $t['permintaan']->metode === 'POST' && str_ends_with($t['permintaan']->url, '/save')));
         $this->assertSame(['LAT-IV', 360, 'DIKLATPIM/2021', 'LAN RI', '30-06-2021'], [$kirim[0]['permintaan']->json['latihanStrukturalId'], $kirim[0]['permintaan']->json['jumlahJam'], $kirim[0]['permintaan']->json['nomor'], $kirim[0]['permintaan']->json['institusiPenyelenggara'], $kirim[0]['permintaan']->json['tanggal']]);
@@ -142,6 +142,8 @@ final class SiasnDorongTest extends DatabaseTestCase
         $this->assertSame('SKP-BARU', $this->db->table('riwayat_skp')->where('id_riwayat_skp', $k1)->get()->getRow()->id_rw_siasn, 'id skp22 = mapData');
         $k2r = $this->db->table('riwayat_skp')->where('id_riwayat_skp', $k2)->get()->getRow();
         $this->assertSame(['3', 'Data Invalid, kategori_nilai_prestasi:Istimewa'], [(string) $k2r->siasn_flag, $k2r->siasn_error], '[K Rw_skp:599-607]');
+        // riwayat_skp.updated_at tanpa ON UPDATE → diisi eksplisit (UTC) bersama updated_by (review B6 #A).
+        $this->assertSame(['2026-11-04 03:00:00', '2026-11-04 03:00:00'], [$this->db->table('riwayat_skp')->where('id_riwayat_skp', $k1)->get()->getRow()->updated_at, $k2r->updated_at]);
     }
 
     public function testJabatanKriteriaDorongUlangPayloadDanStempel(): void
@@ -217,7 +219,7 @@ final class SiasnDorongTest extends DatabaseTestCase
                 return ['status_code' => '200', 'message' => 'OK', 'data' => ['rwJabatanId' => 'RJ-1']];
             }
 
-            public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = []): array
+            public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = [], ?string $refId = null): array
             {
                 throw new RuntimeException('tidak dipakai');
             }

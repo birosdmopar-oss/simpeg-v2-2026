@@ -156,7 +156,14 @@ final class TarikRefUnor
                 throw $e;
             }
 
-            $this->catat($sukses ? CatatanIntegrasi::SUKSES : CatatanIntegrasi::GAGAL, $sukses ? null : 'gagal_' . $hasil['status_code'], $rencana, $tetap);
+            // Saran review B6 M3 #14: sebagian baris ditolak → GAGAL `sebagian_ditolak` (yang sah tetap ditulis).
+            $ditolak = array_sum($rencana->ditolak) > 0;
+            $this->catat(
+                $sukses && ! $ditolak ? CatatanIntegrasi::SUKSES : CatatanIntegrasi::GAGAL,
+                $sukses ? ($ditolak ? 'sebagian_ditolak' : null) : 'gagal_' . $hasil['status_code'],
+                $rencana,
+                $tetap,
+            );
         }
 
         return ['jenis' => 'ref-unor', 'sukses' => $sukses, 'sisip' => $rencana->jumlah['sisip'], 'ubah' => $rencana->jumlah['ubah'], 'tetap' => $tetap, 'ditolak' => $rencana->ditolak, 'dry_run' => $dryRun];

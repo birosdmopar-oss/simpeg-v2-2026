@@ -102,10 +102,16 @@ final class DorongSkp22 extends DorongDasar
         ];
     }
 
+    public function dataSukses(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array
+    {
+        // `riwayat_skp.updated_at` tanpa ON UPDATE → diisi eksplisit (UTC) agar sejalan dengan `updated_by` (review B6 #A).
+        return ['updated_at' => $sekarang] + parent::dataSukses($baris, $idSiasn, $idAkun, $sekarang);
+    }
+
     public function dataGagal(array $baris, ?string $kode, string $pesan, int $idAkun, string $sekarang): array
     {
         // Payload tidak sah (kuadran tidak dikenal) → flag 3 [K `:603`]; gagal kirim → flag 2 seperti lainnya.
-        return ['siasn_flag' => $kode === null ? 3 : 2] + parent::dataGagal($baris, $kode, $pesan, $idAkun, $sekarang);
+        return ['siasn_flag' => $kode === null ? 3 : 2, 'updated_at' => $sekarang] + parent::dataGagal($baris, $kode, $pesan, $idAkun, $sekarang);
     }
 
     /**

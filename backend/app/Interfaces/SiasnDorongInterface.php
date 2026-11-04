@@ -33,5 +33,5 @@ interface SiasnDorongInterface
      *
      * @return array{status_code: string, message: string, data: mixed}
      */
-    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, #[\SensitiveParameter] array $rahasia = []): array;
+    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, #[\SensitiveParameter] string $isi, #[\SensitiveParameter] string $namaBerkas, #[\SensitiveParameter] array $rahasia = [], ?string $refId = null): array;
 }

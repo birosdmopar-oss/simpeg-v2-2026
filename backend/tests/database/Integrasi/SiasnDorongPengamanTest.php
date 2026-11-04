@@ -92,6 +92,40 @@ final class SiasnDorongPengamanTest extends DatabaseTestCase
         $this->assertCount($jumlah, $this->transport->tercatat());
     }
 
+    public function testGagalKirimTidakTersimpanSekaliDorongTidakTerpilihLagiDanJabatanTunduk6Jam(): void
+    {
+        // Review B6 M3 P-1: balasan gagal (5xx) lalu tulis gagal → baris TIDAK dipulihkan ke flag asal (POST sudah terjadi).
+        $k = $this->seminar();
+        $this->antreToken();
+        $this->transport->antre(new Respons(503, 'x'));
+
+        $h = $this->dorong(['kursus' => $this->rusak(new DorongKursus(), false, true)])->jalankan('kursus');
+
+        $this->assertSame([1, 1], [$h['gagal'], $h['tidak_tersimpan']]);
+        $r = $this->db->table('riwayat_seminar')->where('id_riwayat_seminar', $k)->get()->getRow();
+        $this->assertSame(['3', DorongDasar::PESAN_TIDAK_TERSIMPAN, null], [(string) $r->siasn_flag, $r->siasn_error, $r->id_rw_siasn]);
+        $this->assertSame(1, $this->db->table('integrasi_log')->where(['kode' => 'hasil_tidak_tersimpan', 'ref_id' => "riwayat_seminar:{$k}"])->countAllResults());
+        $this->assertStringContainsString('tidak_tersimpan 1', (string) $this->db->table('integrasi_log')->where(['operasi' => 'dorong_kursus', 'kode' => 'sebagian_gagal'])->get()->getRow()->pesan, 'saran #13');
+
+        $jumlah = count($this->transport->tercatat());
+        $this->assertSame(0, $this->dorong()->jalankan('kursus')['baris'], 'tidak terpilih lagi → tanpa POST ulang');
+        $this->assertCount($jumlah, $this->transport->tercatat());
+
+        // Jabatan: tetap flag 3 dengan siasn_lu = sekarang → baru dipilih lagi setelah 6 jam [K] (siasn_lu NULL = langsung).
+        $j = $this->rmj([]);
+        $this->transport->antre(new Respons(500, 'x'));
+        $h = $this->dorong(['jabatan' => $this->rusak(DorongSiasn::semuaJenis()['jabatan'], false, true)], '2026-11-04 01:00:00')->jalankan('jabatan');
+
+        $this->assertSame([1, 1], [$h['gagal'], $h['tidak_tersimpan']]);
+        $r = $this->db->table('riwayat_mutasi_jabatan')->where('id_riwayat_mutasi_jabatan', $j)->get()->getRow();
+        $this->assertSame(['3', '2026-11-04 01:00:00', DorongDasar::PESAN_TIDAK_TERSIMPAN], [(string) $r->siasn_flag, $r->siasn_lu, $r->siasn_error]);
+
+        $jumlah = count($this->transport->tercatat());
+        $this->assertSame(0, $this->dorong(null, '2026-11-04 06:59:00')->jalankan('jabatan')['baris'], '< 6 jam tidak dipilih');
+        $this->assertCount($jumlah, $this->transport->tercatat());
+        $this->assertSame(1, $this->dorong(null, '2026-11-04 07:01:00')->jalankan('jabatan', 20, null, true)['baris'], 'aturan 6 jam [K]');
+    }
+
     public function testJabatanSuksesTanpaIdMempertahankanIdLamaDanEditSelamaBatchTerdorongUlang(): void
     {
         $lama = $this->rmj(['id_rw_siasn' => 'RJ-LAMA', 'siasn_flag' => 1, 'siasn_lu' => '2026-01-01 00:00:00', 'updated_at' => '2026-02-01 00:00:00']);
@@ -259,7 +293,7 @@ final class SiasnDorongPengamanTest extends DatabaseTestCase
                 return ($this->balas)($jalur, $payload);
             }
 
-            public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = []): array
+            public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = [], ?string $refId = null): array
             {
                 throw new RuntimeException('tidak dipakai');
             }
@@ -271,10 +305,16 @@ final class SiasnDorongPengamanTest extends DatabaseTestCase
      */
     private function kursusRusak(): JenisDorongSiasn
     {
-        $asli = new DorongKursus();
+        return $this->rusak(new DorongKursus(), true, false);
+    }
 
-        return new class ($asli) implements JenisDorongSiasn {
-            public function __construct(private readonly DorongKursus $asli)
+    /**
+     * Jenis yang data hasilnya (sukses dan/atau gagal) memakai kolom tak dikenal → penulisan hasil selalu gagal.
+     */
+    private function rusak(JenisDorongSiasn $asli, bool $suksesRusak, bool $gagalRusak): JenisDorongSiasn
+    {
+        return new class ($asli, $suksesRusak, $gagalRusak) implements JenisDorongSiasn {
+            public function __construct(private readonly JenisDorongSiasn $asli, private readonly bool $suksesRusak, private readonly bool $gagalRusak)
             {
             }
 
@@ -305,7 +345,7 @@ final class SiasnDorongPengamanTest extends DatabaseTestCase
 
             public function flagProses(): ?int
             {
-                return null;
+                return $this->asli->flagProses();
             }
 
             public function payload(BaseConnection $db, array $baris): array
@@ -320,7 +360,7 @@ final class SiasnDorongPengamanTest extends DatabaseTestCase
 
             public function dataSukses(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array
             {
-                return ['kolom_tidak_ada' => 1];
+                return $this->suksesRusak ? ['kolom_tidak_ada' => 1] : $this->asli->dataSukses($baris, $idSiasn, $idAkun, $sekarang);
             }
 
             public function dataTidakTersimpan(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array
@@ -335,7 +375,7 @@ final class SiasnDorongPengamanTest extends DatabaseTestCase
 
             public function dataGagal(array $baris, ?string $kode, string $pesan, int $idAkun, string $sekarang): array
             {
-                return $this->asli->dataGagal($baris, $kode, $pesan, $idAkun, $sekarang);
+                return $this->gagalRusak ? ['kolom_tidak_ada' => 1] : $this->asli->dataGagal($baris, $kode, $pesan, $idAkun, $sekarang);
             }
         };
     }

@@ -89,7 +89,8 @@ gagal diulang lewat siklus berikutnya sesuai kriteria tabel). Kriteria per tabel
   `siasnUnorBawaan`.
 - `--dry-run`: tanpa POST, tanpa tulis. Kode keluar sama dengan `siasn:tarik`. Ringkasan `integrasi_log` `dorong_<jenis>`:
   `baris`, `terkirim`, `sukses`, `gagal`, `tidak_sah`, `sukses_tanpa_id`, `status_tidak_diketahui` (timeout/koneksi saat
-  POST — status di SIASN tidak diketahui; periksa duplikat di BKN sebelum riwayat itu didorong lagi).
+  POST — status di SIASN tidak diketahui; periksa duplikat di BKN sebelum riwayat itu didorong lagi), `tidak_tersimpan`
+  (hasil POST gagal ditulis; > 0 → kode `sebagian_gagal`).
 - Bentuk permintaan POST **dikonfirmasi ekstraksi 04-11 (keputusan Horii, opsi A)** atas `postApi_siasn`: body JSON,
   header `Auth: bearer <SSO>` + `Authorization: Bearer <gateway>` + `Content-Type: application/json` + `accept:
   application/json`; sukses truthy. **Deviasi keamanan:** legacy `CURLOPT_FOLLOWLOCATION = true`, v2 TIDAK mengikuti
@@ -101,7 +102,9 @@ gagal diulang lewat siklus berikutnya sesuai kriteria tabel). Kriteria per tabel
 Padanan `SS/Ref_unor::sync` → `GET {baseUrlApi}/referensi/ref-unor` (satu panggilan untuk instansi, tanpa `--nip`/`--limit`)
 ke `siasn_ref_unor`: id baru → INSERT dengan pemetaan lokal (`id_jabatan`, `id_unit`, `id_satker`, `lvl_uker`) NULL; berubah
 → UPDATE kolom respons saja, **pemetaan lokal tidak disentuh**; tanpa hapus [K]. Satu transaksi; jawaban gagal → tanpa tulis,
-keluar 1. Ringkasan `tarik_ref_unor`: `sisip`, `ubah`, `tetap`, `ditolak`.
+keluar 1. Ringkasan `tarik_ref_unor`: `sisip`, `ubah`, `tetap`, `ditolak`; ada baris ditolak → kode `sebagian_ditolak`
+(baris sah tetap ditulis). `Id` ganda dalam satu jawaban → satu baris, nilai terakhir. Nilai teks di-`trim` sebelum
+disimpan/dibandingkan — deviasi kecil dari legacy yang menyalin apa adanya (saran review B6 M3 #15, dicatat).
 
 ## `php spark siasn:unggah-arsip` (M3)
 
@@ -116,10 +119,23 @@ php spark siasn:unggah-arsip [--langkah=semua|antre|unggah] [--limit=N] [--dry-r
 - **unggah** (padanan `SS/Arsip::upload_siasn`): status 0 urut id, bawaan 1 baris per jalan [K] → status 3 + `updated_at` →
   berkas dibaca lewat storage v2 → wajib PDF ≤ 1 MB → `POST upload-dok-rw` multipart (`id_riwayat` = `id_rw_siasn`,
   `id_ref_dokumen` 872 jabatan / 881 sertifikasi), tanpa retry → status 1 + `resp_*` mentah, atau status 2 + `error_msg`
-  (berkas tidak ditemukan / "Invalid file type or file size" / "Failed to upload to SIASN" / "Timeout upload" = status di
-  SIASN tidak diketahui). Exception → status 3 kembali ke 0.
-- Ringkasan `antre_arsip` (`baru`, `sudah_ada`, `path_tidak_sah`) dan `unggah_arsip` (`diproses`, `sukses`, `gagal`,
-  `berkas_hilang`, `tidak_sah`, `status_tidak_diketahui`).
+  (berkas tidak ditemukan / "Invalid file type or file size" / "Failed to upload to SIASN" — termasuk `code ≠ 1` dan 3xx /
+  "Timeout upload" = status di SIASN tidak diketahui). Galat token/401 → berhenti, status 3 kembali ke 0. Exception
+  SEBELUM POST (mis. galat DB saat membaca berkas — hanya "tidak ada" yang menjadi status 2 permanen) → status 3 kembali ke 0.
+- **Sesudah POST baris tidak pernah kembali ke 0** (review B6 M3 B-1, mencegah unggah ganda): hasil gagal ditulis → dicoba
+  sekali lagi → tetap gagal → baris DIBIARKAN status 3 (K-7: tidak diulang otomatis), log `critical`, `integrasi_log`
+  `unggah_arsip` kode `hasil_tidak_tersimpan` refId `siasn_upload_arsip:<id>`. Operator memeriksa dokumen di SIASN lalu
+  menyetel status baris itu secara manual.
+- Ringkasan `antre_arsip` (`baru`, `sudah_ada`, `path_tidak_sah`; antre gagal → GAGAL `galat_db`/`galat`) dan `unggah_arsip`
+  (`diproses`, `sukses`, `gagal`, `berkas_hilang`, `tidak_sah`, `status_tidak_diketahui`, `tidak_tersimpan`).
+- **Deviasi / catatan (saran review B6 M3):**
+  - #5 tanda `%PDF` dicari di **1024 byte pertama** isi berkas (legacy memeriksa mime), agar PDF sah berawalan BOM/spasi
+    tidak ditolak; ekstensi tetap wajib `.pdf`.
+  - #6 `rw_name` tidak dikenal → `id_ref_dokumen` 872 seperti legacy, dicatat log INFO.
+  - #12 nama berkas yang dikirim = basename `arsip_path` saja; v2 tidak menambah NIP ke nama berkas (deviasi, mengurangi
+    data pribadi di SIASN).
+  - #9 jadwal (runbook B7, PN-5): `--langkah=unggah` tiap menit (1 baris per jalan [K]); `--langkah=antre` lebih jarang
+    (mis. tiap jam), tidak bersamaan dengan `siasn:dorong --jenis=jabatan`/`sertifikasi`.
 - Bentuk unggah **dikonfirmasi ekstraksi 04-11 (keputusan Horii, opsi A)** atas `postApi_siasnArsip`: multipart dengan
   `id_riwayat`, `id_ref_dokumen`, dan berkas di field `file` (basename + mime `application/pdf`; boundary dibentuk klien
   HTTP), dua header token + `accept: application/json`, balasan JSON. Redirect tidak diikuti (deviasi keamanan yang sama).
@@ -129,11 +145,17 @@ php spark siasn:unggah-arsip [--langkah=semua|antre|unggah] [--limit=N] [--dry-r
 - **Hasil POST sukses tidak pernah memicu POST ulang:** gagal ditulis → dicoba sekali lagi → data minimal (sekali-dorong:
   flag 3; jabatan: flag 1 + `siasn_lu = updated_at`) + `siasn_error` "Hasil tidak tersimpan; periksa BKN …", log `critical`,
   `integrasi_log` kode `hasil_tidak_tersimpan` (tabel:pk + id SIASN). Bila itu pun gagal, batch berhenti.
+- **Hasil POST gagal pun tidak memicu POST ulang langsung** (review B6 M3 P-1; timeout/5xx bisa sudah diproses BKN): baris
+  tidak dipulihkan ke flag asal; tulis gagal dua kali → log `critical` + `hasil_tidak_tersimpan`, lalu data minimal:
+  sekali-dorong flag 3, jabatan **tetap flag 3 dengan `siasn_lu = updated_at = sekarang`** sehingga baru terpilih lagi
+  sesudah 6 jam [K] (dengan `siasn_lu` NULL baris akan langsung terpilih lagi).
 - **Galat token / 401 kedua** → batch berhenti tanpa menulis baris (exit 1). Baris sekali-dorong tetap flag 0.
 - **502/503/504 atau 2xx bukan JSON** bisa berarti BKN sudah memproses. Jabatan gagal diulang setiap 6 jam (flag 2/3), jadi
   ada risiko riwayat ganda di BKN; periksa di SIASN bila `siasn_error` berisi kode 5xx berulang (saran #2, dicatat).
 - **Selisih kecil payload jabatan** ikut legacy (mis. `jenis_mutasi` selain 1/2 → MJ, unor cadangan saat `id_unit` NULL tidak
   cocok → unor bawaan) (saran #6, dicatat).
-- **`riwayat_skp.updated_at` tanpa ON UPDATE:** nilai tidak berubah saat dorong; tidak dipakai kriteria SKP 2022 (saran #7, dicatat).
+- **`riwayat_skp.updated_at` tanpa ON UPDATE:** diisi eksplisit (UTC) saat hasil dorong SKP 2022 ditulis, sejalan dengan
+  `updated_by` (putusan review B6); tidak dipakai kriteria SKP 2022. Snapshot `updated_at` bersyarat (P-2) hanya untuk
+  jabatan (tabel sekali-dorong tidak punya `siasn_lu`).
 - **Jadwal:** `siasn:tarik --jenis=skp` dan `siasn:dorong --jenis=skp22` memakai kunci berbeda; jadwalkan tidak bersamaan di
   runbook (B7, PN-5) (saran #8, dicatat).

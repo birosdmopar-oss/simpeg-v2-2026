@@ -160,7 +160,7 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
      *
      * @return array{status_code: string, message: string, data: mixed}
      */
-    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, #[\SensitiveParameter] array $rahasia = []): array
+    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, #[\SensitiveParameter] string $isi, #[\SensitiveParameter] string $namaBerkas, #[\SensitiveParameter] array $rahasia = [], ?string $refId = null): array
     {
         try {
             $respons = $this->token->kirimSiasn(fn (array $h): Permintaan => new Permintaan(
@@ -174,6 +174,7 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
                     ['nama' => 'id_ref_dokumen', 'isi' => $idRefDokumen],
                     ['nama' => 'file', 'isi' => $isi, 'namaBerkas' => $namaBerkas, 'mime' => 'application/pdf'],
                 ],
+                refId: $refId,
                 rahasia: array_values(array_filter($rahasia, static fn (string $s): bool => $s !== '')),
             ));
         } catch (GalatTransport $e) {
