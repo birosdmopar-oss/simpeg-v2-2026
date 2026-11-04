@@ -31,6 +31,8 @@ final class Permintaan
         public readonly mixed $json = null,
         #[\SensitiveParameter]
         public readonly ?array $form = null,
+        // Isi berkas unggahan (dokumen pegawai, saran review B6 M3 #11).
+        #[\SensitiveParameter]
         public readonly ?array $multipart = null,
         public readonly ?string $refId = null,
         #[\SensitiveParameter]
