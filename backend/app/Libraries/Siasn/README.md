@@ -59,3 +59,33 @@ hanya bila batch itu punya sisip/ubah SKP (ikut legacy `Rw_skp.php:201`). AK tid
 | `pairing_ganda` | PMK: satu `tgl_sk` cocok ke > 1 baris lokal — tidak dipasangkan dan tidak disisipkan. |
 | `referensi_tak_terpetakan` | Jenis KP / jenjang SIASN tanpa pemetaan ke master — bawaan legacy (jenis KP 3, jenjang NULL). |
 | `ditolak_tanpa_destruktif` | NIP yang punya baris ditolak / berbentuk tidak dikenal — lepas/hapus untuk NIP itu dibatalkan. |
+
+## `php spark siasn:dorong` (M2)
+
+```
+php spark siasn:dorong --jenis=<jabatan|diklat|sertifikasi|kursus|skp22> [--limit=N] [--nip=<nip>] [--dry-run]
+```
+
+Padanan `upload_*` legacy → `POST {baseUrlApi}/{jalur}/save` (JSON, dua header token), **tidak di-retry otomatis** (BP-3;
+gagal diulang lewat siklus berikutnya sesuai kriteria tabel). Kriteria per tabel (CR-090):
+
+| Jenis | Tabel | Dipilih bila | Id dari balasan |
+|---|---|---|---|
+| `jabatan` | `riwayat_mutasi_jabatan` | belum terkirim (`id_rw_siasn IS NULL` + flag 0), **diubah sesudah terkirim** (`siasn_lu < updated_at`), atau gagal/diproses (flag 2/3) > 6 jam; `jenis_jabatan = 1`, kelompok 1/2/3, TMT ≥ 2020, satker ≠ 171 | `mapData.rwJabatanId` |
+| `diklat` | `riwayat_diklat` (`jenis_diklat = 1`, bukan hasil tarik) | belum terkirim, sekali | `mapData.rwDiklatId` |
+| `sertifikasi` | `riwayat_diklat` (`jenis_diklat = 5`) | belum terkirim, sekali | `mapData.rwSertifikasiId` |
+| `kursus` | `riwayat_seminar` | belum terkirim, sekali | `mapData.rwKursusId` |
+| `skp22` | `riwayat_skp` tahun 2022 | belum terkirim, sekali | `mapData` |
+
+- Pegawai aktif berpasangan SIASN (`pegawai.id_pns_siasn`); PNS saja kecuali sertifikasi [K].
+- Payload divalidasi sebelum dikirim (mis. tanggal wajib); tidak sah → tidak dikirim, `siasn_flag = 2` (SKP 2022 kuadran
+  tidak dikenal: 3 [K]) + `siasn_error` alasan.
+- Sukses (HTTP 2xx + `success === true`) → `id_rw_siasn` (bila sah), flag 1, `keterangan` + " **Upload To SIASN**",
+  `updated_by` akun sistem; jabatan juga `siasn_lu = updated_at = sekarang`. Gagal → flag 2 (jabatan "Internal Server Error"
+  → 3), `siasn_error` = kode + pesan BKN dengan id PNS/NIP disensor, tanpa payload. Hasil ditulis per baris segera sesudah
+  POST.
+- Jabatan ditandai `siasn_flag = 3` sebelum dikirim tanpa menggeser `updated_at`; exception → penanda dipulihkan.
+- Konfigurasi tambahan untuk jabatan (hanya `.env` server): `integrations.bkn.siasnInstansiId`, `siasnSatkerId`,
+  `siasnUnorBawaan`.
+- `--dry-run`: tanpa POST, tanpa tulis. Kode keluar sama dengan `siasn:tarik`. Ringkasan `integrasi_log` `dorong_<jenis>`:
+  `baris`, `terkirim`, `sukses`, `gagal`, `tidak_sah`, `sukses_tanpa_id`.

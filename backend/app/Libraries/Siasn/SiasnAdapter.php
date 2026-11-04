@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Siasn;
 
+use App\Interfaces\SiasnDorongInterface;
 use App\Interfaces\SiasnGatewayInterface;
 use App\Libraries\Bkn\GalatTokenBkn;
 use App\Libraries\Bkn\TokenBkn;
@@ -23,9 +24,11 @@ use InvalidArgumentException;
  * - kode HTTP lain (mis. `'404'`, `'500'`), `'respons'` (badan bukan JSON / `code` ≠ 1 / `data` bukan array),
  *   `'timeout'` / `'koneksi'` (galat transport), `'token'` (token BKN gagal diperoleh).
  * Kegagalan tidak pernah dilempar (kontrak: kegagalan SIASN dicatat dan tidak menggagalkan operasi utama, AC-03.1); pesan
- * tanpa host, token, maupun NIP. Dorong (`syncPegawai`) belum didukung di sini — M2 memakai `SiasnDorongInterface`.
+ * tanpa host, token, maupun NIP. Dorong riwayat memakai {@see SiasnDorongInterface::simpanRiwayat()} (M2): POST JSON
+ * `{baseUrlApi}/{jalur}`, TIDAK di-retry otomatis (BP-3; 401 → token diperbarui lalu dikirim sekali lagi, permintaan
+ * ditolak sebelum diproses); `syncPegawai` kontrak lama tidak dipakai.
  */
-final class SiasnAdapter implements SiasnGatewayInterface
+final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface
 {
     public const LAYANAN = 'siasn';
 
@@ -80,6 +83,49 @@ final class SiasnAdapter implements SiasnGatewayInterface
     public function syncPegawai(string $nip, array $payload): array
     {
         return ['status_code' => 'tidak_didukung', 'message' => 'Dorong SIASN memakai SiasnDorongInterface (MAKE-067 M2).', 'data' => null, 'synced_at' => null];
+    }
+
+    public function simpanRiwayat(string $jalur, array $payload, array $rahasia = []): array
+    {
+        try {
+            $respons = $this->token->kirimSiasn(fn (array $h): Permintaan => new Permintaan(
+                'POST',
+                rtrim($this->baseUrl, '/') . '/' . ltrim($jalur, '/'),
+                self::LAYANAN,
+                'simpan_' . str_replace(['/', '-'], '_', preg_replace('#/save$#', '', $jalur) ?? $jalur),
+                header: $h + ['Content-Type' => 'application/json'],
+                json: $payload,
+                rahasia: array_values(array_filter($rahasia, static fn (string $s): bool => $s !== '')),
+            ));
+        } catch (GalatTransport $e) {
+            return ['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => 'Layanan SIASN tidak dapat dihubungi; status di SIASN tidak diketahui.', 'data' => null];
+        } catch (GalatTokenBkn) {
+            return ['status_code' => 'token', 'message' => 'Token BKN tidak dapat diperoleh.', 'data' => null];
+        }
+
+        return self::uraiSimpan($respons);
+    }
+
+    /**
+     * Balasan simpan [K `$resp['success']` + `$resp['mapData']`]: sukses hanya bila HTTP 2xx dan `success === true`.
+     * Pesan BKN (dipotong) dibawa agar pemanggil bisa mencatat alasan gagal; pemanggil menyensor nilai rahasianya.
+     *
+     * @return array{status_code: string, message: string, data: mixed}
+     */
+    public static function uraiSimpan(Respons $respons): array
+    {
+        $json  = $respons->json();
+        $pesan = is_array($json) && is_scalar($json['message'] ?? null) ? mb_substr(trim((string) $json['message']), 0, 200) : '';
+
+        if (! $respons->sukses()) {
+            return ['status_code' => (string) $respons->status, 'message' => $pesan !== '' ? $pesan : "SIASN membalas HTTP {$respons->status}.", 'data' => null];
+        }
+
+        if (! is_array($json) || ($json['success'] ?? null) !== true) {
+            return ['status_code' => 'respons', 'message' => $pesan !== '' ? $pesan : 'Balasan SIASN tidak sah.', 'data' => null];
+        }
+
+        return ['status_code' => self::SUKSES, 'message' => $pesan !== '' ? $pesan : 'OK', 'data' => $json['mapData'] ?? null];
     }
 
     /**
