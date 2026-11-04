@@ -44,7 +44,7 @@ kolom [K-kode] dipertahankan agar padanan legacy jelas; kunci `username` legacy 
 ## 2. Sumber legacy
 
 **D1 tidak tersedia di mesin pelaksana** (sama dengan DBV-027, DBV-Q11): tabel `simapi_*` tidak ada di kode legacy maupun
-duplikat struktur lokal. Permintaan potongan DDL D1 + isi `simapi_jd` + badan trigger penulis `simapi_ch` sudah diteruskan
+duplikat struktur lokal. Pencocokan D1 (DDL, isi `simapi_jd`, trigger penulis `simapi_ch`) = **ISSUE-056** (Bagian 9a), diteruskan
 reviewer ke Horii (04-11-2026). Kolom berikut diturunkan dari kode legacy:
 
 | Tabel legacy | Kolom dipakai kode | Rujukan |
@@ -201,6 +201,37 @@ Test di atas dipertahankan sebagai test permanen (hapus `require_once` draf saat
 | DBV-026-Q7 | Token per handshake (banyak baris per klien) vs satu baris per klien seperti legacy | Banyak baris (F6-05); pembersihan token kedaluwarsa oleh command berkala (B6) |
 | DBV-026-Q8 | FK `simapi_auth_ch` → `simapi_ch` RESTRICT (pembersihan riwayat harus menghapus penanda dulu) | RESTRICT (ADR-008); retensi `simapi_ch` belum diputus (legacy tanpa pembersihan) |
 | DBV-026-Q9 | Timestamp migration saat dipindah | Lebih baru dari migration terakhir di `main` |
+
+## 9a. Pencocokan D1 (ISSUE-056)
+
+Keputusan Horii 04-11-2026: pencocokan dengan DDL D1 dijadikan **ISSUE-056** (Trello 🚩 Issues `E0tqBYSG`) dan diproses
+kemudian; DBV-026 berjalan dengan label [K-kode]/[I] (risiko sama dengan DBV-027 / DBV-Q11). QASMTASK-089/093/094/095 tidak
+Done sebelum ISSUE-056 diimplementasikan.
+
+| # | Objek | Yang dicocokkan dengan D1 | Nilai draf |
+|---|---|---|---|
+| P1 | `simapi_auth.username` → `klien_layanan.username` | Tipe/lebar, collation | VARCHAR(100) |
+| P2 | `simapi_auth.type` → `klien_layanan.jenis` | Domain nilai (1/2 saja atau lebih) | TINYINT CHECK 1/2/3 (3 = [V2]) |
+| P3 | `simapi_auth.ip_address` → `ip_allowlist` | Tipe/lebar, satu IP atau daftar | VARCHAR(1000) daftar |
+| P4 | `simapi_token.expired_at`, `status` | Tipe, domain status | DATETIME; CHECK 1/2 |
+| P5 | `simapi_jd.id_simapi_jd`, `jenis_data` | Tipe PK, lebar, UNIQUE | INT AI; VARCHAR(100) UNIQUE |
+| P6 | **Seed `simapi_jd`** | Seluruh baris master (id + jenis_data) — id wajib sama dengan legacy | Belum ada seed (Q3) |
+| P7 | `simapi_ch.id_simapi_ch` | Tipe (INT/BIGINT, unsigned) | BIGINT UNSIGNED |
+| P8 | `simapi_ch.id_rwy` | Tipe (INT id riwayat / VARCHAR NIP untuk `pegawai`) | VARCHAR(50) NULL [I] |
+| P9 | `simapi_ch.nip` | Lebar, NULL | VARCHAR(30) NULL |
+| P10 | `simapi_ch.action` | Tipe dan nilai DELETE (kode hanya menguji `'1'`) | TINYINT CHECK 1/2 [I] |
+| P11 | `simapi_ch.action_at` | Tipe; zona (`NOW()` server) | DATETIME (Q5) |
+| P12 | `simapi_ch.field_name` / `field_value` | Tipe (TEXT/LONGTEXT/VARCHAR) | TEXT NULL |
+| P13 | Indeks legacy `simapi_ch`, `simapi_auth_ch`, `simapi_auth_jd` | Indeks/UNIQUE yang ada di D1 | Lihat 3.4–3.6 |
+| P14 | **Trigger penulis `simapi_ch`** (pegawai, pengguna, detail_anak, 13 `riwayat_*`) | Per tabel: `id_simapi_jd`, isi `id_rwy`, nilai `action` per INSERT/UPDATE/DELETE, daftar kolom dan urutan di `field_name`/`field_value`, pemisah | Bahan MAKE-060 (bukan DDL tabel); fixture kontrak A5 menunggu ini |
+
+**Rencana koreksi bila D1 berbeda:**
+1. Bila DBV-026 belum di `main`: draf di `MigrationsDitahan/` dikoreksi langsung, dokumen ini diperbarui, DBV me-review ulang delta.
+2. Bila DBV-026 sudah di `main`: migration yang sudah ada **tidak diedit**; koreksi lewat migration ALTER baru dengan key
+   DBV baru (dokumen review tersendiri, pra-cek data, `down()` bersih, test skema), lalu alur `[DBV]` biasa.
+3. Seed `simapi_jd` (P6): migration/seeder terpisah dengan id eksplisit — tidak bergantung koreksi DDL.
+4. Trigger (P14): tidak menjadi DDL v2; dipakai sebagai spesifikasi penulis event MAKE-060 dan fixture kontrak; koreksi di
+   kode aplikasi + test, tanpa DBV kecuali mengubah tabel.
 
 ## 10. Syarat merge (⛔)
 
