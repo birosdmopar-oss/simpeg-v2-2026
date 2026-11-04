@@ -16,7 +16,7 @@ use CodeIgniter\Queue\Interfaces\JobInterface;
  * Token = DISTINCT `fcm_token` Android (`platform` = 2) milik `nip`, terbaru dulu [K `L:1834-1840`]; tanpa token → selesai
  * tanpa galat (legacy tidak mengantre). `lepas` dijalankan sebelum `tambah`. Gagal HTTP/koneksi → dilempar agar worker
  * mencoba ulang sampai {@see self::TRIES}, lalu `queue_jobs_failed`; batchAdd/batchRemove idempoten sehingga aman diulang.
- * Galat per token (`results[].error`, HTTP tetap 200 sehingga `integrasi_log` mencatat sukses) TIDAK hilang (BP-7, CR-099):
+ * Galat per token (`results[].error`, HTTP tetap 200 sehingga `integrasi_log` mencatat sukses) TIDAK hilang (BP-7, review MAKE-066):
  * dicatat `log_message('warning')` per topik dengan jumlah ok/galat (tanpa token) dan hitungan total ikut di hasil job
  * (`selesai ok=N galat=M`).
  */

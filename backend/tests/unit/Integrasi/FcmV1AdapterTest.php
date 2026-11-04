@@ -168,7 +168,7 @@ final class FcmV1AdapterTest extends CIUnitTestCase
 
     public function testTokenUriDipatokDanKunciPrivatTidakDiProperti(): void
     {
-        // CR-099 S1/S6.
+        // review MAKE-066 S1/S6.
         $fcm = $this->fcm();
         $this->assertStringNotContainsString('PRIVATE KEY', print_r($fcm, true));
         $this->assertStringNotContainsString(self::$kunciPrivat, var_export((array) $fcm, true));
@@ -180,7 +180,7 @@ final class FcmV1AdapterTest extends CIUnitTestCase
 
     public function testGalatOAuthMenjadiKirimanGagalBukanTokenTidakSah(): void
     {
-        // CR-099 S2: token akses gagal → multicast melaporkan gagal tanpa melempar dan tanpa menghapus token perangkat.
+        // review MAKE-066 S2: token akses gagal → multicast melaporkan gagal tanpa melempar dan tanpa menghapus token perangkat.
         $this->transport->antreJson(500, ['error' => 'internal'])->antreJson(500, ['error' => 'internal']);
 
         $r = $this->fcm()->sendMulticast(['tok-a', 'tok-b'], 'J', 'I');

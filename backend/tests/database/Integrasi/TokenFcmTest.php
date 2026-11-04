@@ -70,7 +70,7 @@ final class TokenFcmTest extends DatabaseTestCase
 
     public function testPendaftaranBersamaanMenjadiSudahTerdaftarBukan500(): void
     {
-        // CR-099 P3 (AC-04.5): baris yang sama masuk dari permintaan lain antara SELECT dan INSERT → 1062 → sudah_terdaftar.
+        // review MAKE-066 P3 (AC-04.5): baris yang sama masuk dari permintaan lain antara SELECT dan INSERT → 1062 → sudah_terdaftar.
         $admin = $this->buatAkunTanpaNip('admin.uji.fcm4', Role::SUPER_ADMIN);
         $sisip = fn (): bool => $this->db->table('firebase_token')->insert(['nip' => null, 'id_pengguna' => $admin['id_pengguna'], 'platform' => 1, 'fcm_token' => 'tok-balapan', 'token_hash' => hash('sha256', 'tok-balapan'), 'created_at' => gmdate('Y-m-d H:i:s')]);
         $svc   = new TokenFcmService($this->db, static function () use ($sisip): void {
@@ -83,7 +83,7 @@ final class TokenFcmTest extends DatabaseTestCase
 
     public function testMaksimalSepuluhTokenWebPerAkunDanThrottle(): void
     {
-        // CR-099 P4: token web ke-11 membuang yang terlama; POST melewati kapasitas per akun → 429.
+        // review MAKE-066 P4: token web ke-11 membuang yang terlama; POST melewati kapasitas per akun → 429.
         $throttler = new Throttler(new MockCache());
         $throttler->setTestTime(1_790_000_000);
         Services::injectMock('throttler', $throttler);

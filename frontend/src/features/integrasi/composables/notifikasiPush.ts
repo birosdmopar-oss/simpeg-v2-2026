@@ -8,7 +8,7 @@
  * - SDK modular `@firebase/app` + `@firebase/messaging` dimuat dinamis (tidak masuk bundle awal); service worker
  *   `public/firebase-messaging-sw.js` menampilkan notifikasi dan membuka `data.link`.
  * - Izin browser hanya diminta dari klik pengguna ({@link aktifkanNotifikasiPush}, banner `NotifikasiPushShell`).
- * - Keluar (CR-099 P2): menunggu pendaftaran yang masih berjalan, `DELETE` ke server, lalu `deleteToken` di klien — masing-
+ * - Keluar (review MAKE-066 P2): menunggu pendaftaran yang masih berjalan, `DELETE` ke server, lalu `deleteToken` di klien — masing-
  *   masing dibatasi {@link BATAS_LEPAS_MS} agar tombol Keluar tidak tertahan. Sesi berakhir (refresh gagal): hanya
  *   `deleteToken` di klien ({@link hapusTokenPushLokal}); token server tetap sampai dilepas/dibuang FCM.
  * - Kegagalan apa pun (browser tanpa dukungan, jaringan, FCM) tidak pernah menggagalkan alur aplikasi; token tidak pernah

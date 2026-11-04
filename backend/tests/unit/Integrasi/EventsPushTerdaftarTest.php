@@ -10,7 +10,7 @@ use CodeIgniter\Events\Events;
 use CodeIgniter\Test\CIUnitTestCase;
 
 /**
- * CR-099 P7 — pendaftaran pelanggan push riwayat di `Config/Events.php` dijaga test tersendiri: listener dikosongkan lalu
+ * review MAKE-066 P7 — pendaftaran pelanggan push riwayat di `Config/Events.php` dijaga test tersendiri: listener dikosongkan lalu
  * berkas konfigurasi dimuat ulang (tidak bergantung pada urutan test lain yang melepas listener).
  *
  * @internal

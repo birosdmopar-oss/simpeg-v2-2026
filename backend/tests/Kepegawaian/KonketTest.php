@@ -233,7 +233,7 @@ final class KonketTest extends DatabaseTestCase
 
     public function testPushAndroidProsesKePemohonDanPesertaGabunganIkutLegacy(): void
     {
-        // CR-099 P1 [K `L_konket.php:1891-1972`]: proses → Android pemohon + peserta dinas gabungan aktif; admin ubah tanpa
+        // review MAKE-066 P1 [K `L_konket.php:1891-1972`]: proses → Android pemohon + peserta dinas gabungan aktif; admin ubah tanpa
         // status kembali W → tanpa push tipe 3 (P8).
         $p1                                       = $this->buatPegawai();
         $p2                                       = $this->buatPegawai();

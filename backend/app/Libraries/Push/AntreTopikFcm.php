@@ -40,7 +40,7 @@ final class AntreTopikFcm
 
     public function presensi(BaseConnection $db, string $nip, string $tgl, bool $masuk): void
     {
-        // Driver bukan fcm → tidak ada yang diantre; jangan query LKH sia-sia (CR-099 S4).
+        // Driver bukan fcm → tidak ada yang diantre; jangan query LKH sia-sia (review MAKE-066 S4).
         if ($this->driver !== 'fcm') {
             return;
         }

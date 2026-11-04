@@ -119,7 +119,7 @@ final class LkhTest extends DatabaseTestCase
             ['tipe' => 2, 'jenis' => 'lkh', 'id' => $a['id'], 'aksi' => 'Disetujui'],
         ], $this->jobPush('push-riwayat'));
 
-        // CR-099 P1 [K `L_lkh.php:335-404/579-640/1071-1140`]: kanal Android ikut legacy.
+        // review MAKE-066 P1 [K `L_lkh.php:335-404/579-640/1071-1140`]: kanal Android ikut legacy.
         $tgl  = \App\Libraries\Push\TemplatPushRiwayat::tanggal('2026-10-12');
         $nama = (string) $this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $a['id'])->get()->getRowArray()['nama'];
         $andr = $this->jobPush('push-pesan');
@@ -137,7 +137,7 @@ final class LkhTest extends DatabaseTestCase
 
     public function testPushTipe3HanyaBilaStatusKembaliMenunggu(): void
     {
-        // CR-099 P8: role 1 mengubah LKH (status tidak dipaksa 0) → tanpa push tipe 3 / Android "mengubah".
+        // review MAKE-066 P8: role 1 mengubah LKH (status tidak dipaksa 0) → tanpa push tipe 3 / Android "mengubah".
         $push                                     = config(\Config\Integrations::class)->push;
         config(\Config\Integrations::class)->push = ['driver' => 'fcm', 'projectId' => '', 'credentialsPath' => ''];
         $admin                                    = $this->aktor(Role::SUPER_ADMIN)[1];

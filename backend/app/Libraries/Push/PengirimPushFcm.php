@@ -12,7 +12,7 @@ use CodeIgniter\Database\BaseConnection;
  * Pengirim push bersama job antrean `push` (PRD Fase 6 §7.4, MAKE-066): token dari {@see PenerimaTokenFcm} dikelompokkan per
  * platform lalu dikirim lewat gateway (bentuk pesan per kanal bila gateway mendukung {@see PushPlatformInterface}).
  * Token yang dilaporkan tidak sah dihapus menurut `token_hash` + `platform` (semua pemilik; token yang ditolak FCM tidak sah
- * untuk siapa pun — CR-099 S3; legacy tidak membersihkan, B-11), sehingga tidak di-retry selamanya. Isi token tidak pernah
+ * untuk siapa pun — review MAKE-066 S3; legacy tidak membersihkan, B-11), sehingga tidak di-retry selamanya. Isi token tidak pernah
  * dicatat.
  */
 final class PengirimPushFcm

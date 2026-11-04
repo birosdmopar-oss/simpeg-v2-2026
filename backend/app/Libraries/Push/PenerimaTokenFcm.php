@@ -91,7 +91,7 @@ final class PenerimaTokenFcm
     /**
      * Token web admin yang membawahi pegawai — `getTokenAdmin` [K `FH:474-554`], unit/satker dari `pegawai_mutasi_jabatan`:
      * tanpa baris pmj, unit Lain-lain (7), atau unit kepegawaian (`web_config.id_unit_kepegawaian`) → semua Super Admin (1);
-     * baris pmj dengan unit kosong → tanpa penerima (legacy `id_unit=''`, CR-099 S5);
+     * baris pmj dengan unit kosong → tanpa penerima (legacy `id_unit=''`, review MAKE-066 S5);
      * UPT (6) → Admin Satker (3) unit 6 satker sama; unit lain → Admin Satker (3) unit itu tanpa satker.
      *
      * @return list<array{id: int, token: string, platform: int}>
@@ -106,7 +106,7 @@ final class PenerimaTokenFcm
 
         $pmj = $this->db->table('pegawai_mutasi_jabatan')->select('id_unit, id_satker')->where('nip', $nip)->get(1)->getRowArray();
 
-        // Baris pmj ada tetapi unit kosong → legacy mencari admin `id_unit=''` = tidak ada penerima (CR-099 S5).
+        // Baris pmj ada tetapi unit kosong → legacy mencari admin `id_unit=''` = tidak ada penerima (review MAKE-066 S5).
         if ($pmj !== null && trim((string) $pmj['id_unit']) === '') {
             return [];
         }

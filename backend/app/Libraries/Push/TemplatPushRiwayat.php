@@ -153,7 +153,7 @@ final class TemplatPushRiwayat
             'seminar'    => self::pilih([1 => 'Seminar', 2 => 'Kursus'], $s('jenis_seminar')) . " - {$s('nama_seminar')}",
             'tanda-jasa' => ((int) $s('id_tanda_jasa') === self::TANDA_JASA_LAIN ? $s('tanda_jasa_lain') : $s('tanda_jasa')) . ' - ' . self::tanggal($b['tgl_sertifikat'] ?? null),
             'skp'        => "{$s('tahun')} - " . ((float) $s('nilai_prestasi_kerja') > 0 ? str_replace('.', ',', (string) ((float) $s('nilai_prestasi_kerja') + 0)) : '0') . " [{$s('kategori_nilai_prestasi')}]",
-            // `created_at` v2 = UTC (CR-086); legacy menyimpan jam dinding WIB → tanggal bisnis WIB (BP-10, CR-099 P6).
+            // `created_at` v2 = UTC (CR-086); legacy menyimpan jam dinding WIB → tanggal bisnis WIB (BP-10, review MAKE-066 P6).
             'karpeg'     => 'Permohonan tanggal ' . self::tanggal(StempelUtc::tanggalWib($s('created_at') ?: null)),
             'kariskarsu' => "({$s('jenis_permohonan')}) " . self::tanggal(StempelUtc::tanggalWib($s('created_at') ?: null)),
             'lkh'        => 'LKH ' . self::tanggal($b['tgl_laporan'] ?? null),

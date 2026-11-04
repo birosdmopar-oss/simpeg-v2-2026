@@ -11,7 +11,7 @@ use Throwable;
 
 /**
  * Push **Android** LKH dan Konket ikut legacy `andr_notif_queue` (PRD Fase 6 §7.4 F6-13, MAKE-066; koreksi reviewer
- * 04-11-2026 CR-099 P1: kanal Android ikut legacy penuh) — dipanggil SESUDAH commit:
+ * 04-11-2026 review MAKE-066 P1: kanal Android ikut legacy penuh) — dipanggil SESUDAH commit:
  *
  * - LKH diajukan [K `L_lkh.php:335-404`] / diubah kembali menunggu [K `:579-640`] → atasan (`nip_atasan`), judul
  *   "Monitoring LKH", isi "{nama} telah mengajukan|mengubah LKH untuk tanggal {tgl}", `status_str` "Menunggu";

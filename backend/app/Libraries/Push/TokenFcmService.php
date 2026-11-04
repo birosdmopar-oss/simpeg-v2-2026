@@ -22,8 +22,8 @@ use RuntimeException;
  *   sudah lewat [K :4254-4261]. `nip` selalu NULL untuk token web (DBV-027 T2 opsi a: pemilik token web = akun saja,
  *   CHECK pemilik); penerima "pegawai" di kanal web dicari lewat `pengguna.nip` → `id_pengguna`.
  * - Pendaftaran bersamaan (dua tab) → 1062 UNIQUE (`id_pengguna`, `token_hash`) ditangkap menjadi `sudah_terdaftar` (AC-04.5,
- *   CR-099 P3), bukan 500.
- * - [V2] CR-099 P4: maks {@see self::MAKS_TOKEN_WEB} token web per akun (yang terlama dibuang saat token baru masuk) dan
+ *   review MAKE-066 P3), bukan 500.
+ * - [V2] review MAKE-066 P4: maks {@see self::MAKS_TOKEN_WEB} token web per akun (yang terlama dibuang saat token baru masuk) dan
  *   throttle {@see self::THROTTLE_KAPASITAS} POST per {@see self::THROTTLE_DETIK} detik per akun (429).
  * - Lepas (logout, [V2] — legacy tidak punya): hapus baris token itu milik akun ini saja.
  * - Isi token tidak pernah dikembalikan/dicatat; stempel waktu UTC.
@@ -139,7 +139,7 @@ final class TokenFcmService
     }
 
     /**
-     * Sisakan {@see self::MAKS_TOKEN_WEB} token web terbaru milik akun (CR-099 P4).
+     * Sisakan {@see self::MAKS_TOKEN_WEB} token web terbaru milik akun (review MAKE-066 P4).
      */
     private function pangkasTokenWeb(int $idPengguna): void
     {

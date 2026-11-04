@@ -29,7 +29,7 @@ final class KunciRsaUji
 
         try {
             if ($kunci === false) {
-                // Windows tanpa openssl.cnf: pakai konfigurasi minimal sementara (dihapus sesudahnya, CR-099 S7).
+                // Windows tanpa openssl.cnf: pakai konfigurasi minimal sementara (dihapus sesudahnya, review MAKE-066 S7).
                 $cnf = tempnam(sys_get_temp_dir(), 'cnf');
                 file_put_contents((string) $cnf, "[req]\ndistinguished_name=dn\n[dn]\n");
                 $opsi['config'] = $cnf;

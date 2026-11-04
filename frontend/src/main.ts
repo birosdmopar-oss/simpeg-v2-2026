@@ -17,7 +17,7 @@ app.use(router)
 
 // Refresh token gagal (sesi habis / dicabut): kosongkan store lalu ke halaman login (F0-09 + A-11).
 setAuthFailureHandler(() => {
-  // Token push web di perangkat ini dibuang (CR-099 P2); DELETE server tidak mungkin tanpa sesi.
+  // Token push web di perangkat ini dibuang (review MAKE-066 P2); DELETE server tidak mungkin tanpa sesi.
   void hapusTokenPushLokal()
   useAuthStore(pinia).clearSession()
   const current = router.currentRoute.value

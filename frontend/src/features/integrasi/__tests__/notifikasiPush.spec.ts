@@ -128,7 +128,7 @@ describe('pendaftaran token', () => {
   })
 })
 
-describe('lepas saat Keluar (CR-099 P2)', () => {
+describe('lepas saat Keluar (review MAKE-066 P2)', () => {
   it('Keluar: DELETE ke server lalu deleteToken di klien', async () => {
     izin = 'granted'
     await daftarkanTokenPush()

@@ -34,7 +34,7 @@ final class TemplatPushRiwayatTest extends CIUnitTestCase
         yield 'tanda jasa' => ['tanda-jasa', ['id_tanda_jasa' => 44, 'tanda_jasa' => 'X', 'tanda_jasa_lain' => 'Penghargaan Lain', 'tgl_sertifikat' => '2026-08-17'], 'Penghargaan Lain - 17 Agustus 2026'];
         yield 'skp' => ['skp', ['tahun' => 2025, 'nilai_prestasi_kerja' => '88.50', 'kategori_nilai_prestasi' => 'Baik'], '2025 - 88,5 [Baik]'];
         yield 'karpeg' => ['karpeg', ['created_at' => '2026-11-03 02:00:00'], 'Permohonan tanggal 3 November 2026'];
-        // created_at UTC 2026-01-08 17:30 = 9 Januari 2026 00:30 WIB (CR-099 P6).
+        // created_at UTC 2026-01-08 17:30 = 9 Januari 2026 00:30 WIB (review MAKE-066 P6).
         yield 'kariskarsu' => ['kariskarsu', ['jenis_permohonan' => 'Baru', 'created_at' => '2026-01-08 17:30:00'], '(Baru) 9 Januari 2026'];
         yield 'lkh' => ['lkh', ['tgl_laporan' => '2026-10-12'], 'LKH 12 Oktober 2026'];
         yield 'konket' => ['konket', ['kategori' => 8, 'jenis_dinas' => 1, 'date_start' => '2026-10-01', 'date_end' => '2026-10-03'], '(Dinas Luar GABUNGAN) 1 Oktober 2026 s/d 3 Oktober 2026'];
@@ -66,7 +66,7 @@ final class TemplatPushRiwayatTest extends CIUnitTestCase
 
     public function testTanggalKarpegDariCreatedAtUtcKeTanggalWib(): void
     {
-        // CR-099 P6 (BP-10): 00:00–06:59 WIB = hari sebelumnya di UTC.
+        // review MAKE-066 P6 (BP-10): 00:00–06:59 WIB = hari sebelumnya di UTC.
         foreach (['2026-11-02 17:00:00' => '3 November 2026', '2026-11-02 23:59:59' => '3 November 2026', '2026-11-03 16:59:59' => '3 November 2026', '2026-11-03 17:00:00' => '4 November 2026'] as $utc => $wib) {
             $this->assertSame("Data: Permohonan tanggal {$wib}", T::susun(2, 'karpeg', ['created_at' => $utc], null, 'Disetujui')['isi'] ?? null, $utc);
         }

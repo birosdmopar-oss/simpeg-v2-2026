@@ -1,6 +1,6 @@
 /**
  * MAKE-066 (F6-13) — `public/firebase-messaging-sw.js`: pesan FCM `{notification, data}` ditampilkan; klik membuka
- * `data.link` relatif se-origin di jendela baru (tab terbuka TIDAK dinavigasi, CR-099 P5); tautan ke host lain diabaikan
+ * `data.link` relatif se-origin di jendela baru (tab terbuka TIDAK dinavigasi, review MAKE-066 P5); tautan ke host lain diabaikan
  * [K legacy `notificationclick`]. Dijalankan dalam lingkup `self` palsu.
  */
 import { readFileSync } from 'node:fs'

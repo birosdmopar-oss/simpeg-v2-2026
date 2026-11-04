@@ -133,7 +133,7 @@ final class FcmTopikTest extends DatabaseTestCase
 
     public function testGalatPerTokenTercatatDanMasukHasilJob(): void
     {
-        // CR-099 (B1, BP-7): batchAdd HTTP 200 dengan results[].error tidak boleh hilang tanpa jejak.
+        // review MAKE-066 (B1, BP-7): batchAdd HTTP 200 dengan results[].error tidak boleh hilang tanpa jejak.
         $nip = $this->buatPegawai();
         $this->token($nip, 'tok-android-1', 2, '2026-10-01 00:00:00');
         $this->token($nip, 'tok-android-2', 2, '2026-10-02 00:00:00');

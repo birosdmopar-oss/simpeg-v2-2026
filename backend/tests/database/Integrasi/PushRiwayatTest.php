@@ -58,7 +58,7 @@ final class PushRiwayatTest extends DatabaseTestCase
 
     public function testListenerEventHanyaDriverFcmDanJenisLegacy(): void
     {
-        // Pendaftaran di Config\Events dijaga EventsPushTerdaftarTest (CR-099 P7). Listener bisa sudah dilepas test lain
+        // Pendaftaran di Config\Events dijaga EventsPushTerdaftarTest (review MAKE-066 P7). Listener bisa sudah dilepas test lain
         // dalam proses yang sama (RiwayatUjiTrait::lepasEngine → Events::removeAllListeners).
         $listener = [AntrePushRiwayat::class, 'dariEvent'];
 
@@ -129,7 +129,7 @@ final class PushRiwayatTest extends DatabaseTestCase
         $this->assertSame('tok-upt', $this->mock->sent()[1]['token']);
         $this->assertCount(2, $this->mock->sent());
 
-        // CR-099 S5: baris pmj dengan unit kosong → legacy `id_unit=''` → tanpa penerima (bukan Super Admin).
+        // review MAKE-066 S5: baris pmj dengan unit kosong → legacy `id_unit=''` → tanpa penerima (bukan Super Admin).
         $tanpaUnit = $this->buatPegawai();
         $this->db->table('pegawai_mutasi_jabatan')->where('nip', $tanpaUnit)->update(['id_unit' => null]);
         $this->assertSame(PushRiwayatJob::HASIL_TANPA_TOKEN, (new PushRiwayatJob(['tipe' => 1, 'jenis' => 'organisasi', 'id' => $this->organisasi($tanpaUnit)]))->process());

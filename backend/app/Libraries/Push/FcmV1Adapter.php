@@ -34,7 +34,7 @@ use RuntimeException;
  *   `data.link` (dibuka service worker; `webpush.fcm_options.link` sengaja tidak dipakai karena wajib URL https absolut);
  *   Android → `android.priority` HIGH + `notification.sound` default + `click_action` = judul [K `Cron.php:1036-1046`].
  * - Token perangkat, token akses, dan kunci privat tidak pernah masuk log (AC-K.1, BP-5). Kunci privat TIDAK disimpan di
- *   properti (CR-099 S1): berkas dibaca ulang hanya saat menandatangani JWT (token akses di-cache ±1 jam di cache aplikasi);
+ *   properti (review MAKE-066 S1): berkas dibaca ulang hanya saat menandatangani JWT (token akses di-cache ±1 jam di cache aplikasi);
  *   parameter token/kunci bertanda `#[\SensitiveParameter]`. `token_uri` dipatok ke {@see self::TOKEN_URI} (S6).
  * - Galat OAuth (token akses gagal diperoleh) dihitung sebagai kiriman gagal, bukan dilempar dari tengah multicast (S2).
  */
@@ -48,7 +48,7 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
 
     private const CACHE_TOKEN = 'fcm_token_akses';
 
-    /** Endpoint token OAuth Google; berkas service account dengan `token_uri` lain ditolak (CR-099 S6). */
+    /** Endpoint token OAuth Google; berkas service account dengan `token_uri` lain ditolak (review MAKE-066 S6). */
     public const TOKEN_URI = 'https://oauth2.googleapis.com/token';
 
     /** Ikon notifikasi web (aset SPA `frontend/public`; ikon legacy `/assets/images/logo-simpeg-v1-200x200.png` tidak ada di v2). */
@@ -224,7 +224,7 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
         } catch (GalatTransport $e) {
             return [['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => $e->getMessage(), 'message_id' => null], false];
         } catch (RuntimeException $e) {
-            // Token akses OAuth gagal diperoleh (CR-099 S2): kiriman gagal, token perangkat tidak dianggap tidak sah.
+            // Token akses OAuth gagal diperoleh (review MAKE-066 S2): kiriman gagal, token perangkat tidak dianggap tidak sah.
             return [['status_code' => 'oauth', 'message' => $e->getMessage(), 'message_id' => null], false];
         }
 
@@ -273,7 +273,7 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
     }
 
     /**
-     * Isi berkas service account (dibaca saat dibutuhkan; kunci privat tidak disimpan di properti, CR-099 S1).
+     * Isi berkas service account (dibaca saat dibutuhkan; kunci privat tidak disimpan di properti, review MAKE-066 S1).
      *
      * @return array{client_email: string, private_key: string}
      */

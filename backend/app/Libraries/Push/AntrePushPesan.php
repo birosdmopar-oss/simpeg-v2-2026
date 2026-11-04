@@ -17,7 +17,7 @@ use Throwable;
  *
  * Produsen lain legacy: popup "Informasi" Android [K `Cron::queue_popup_notif` C:886-953, judul "Informasi", isi "Informasi
  * {keterangan}", data = baris popup + `file_url`] milik modul Popup Fase 7 (F-04) — memakai titik ini saat modul itu
- * dibangun; TIDAK dikirim di B5 (CR-099 P1).
+ * dibangun; TIDAK dikirim di B5 (review MAKE-066 P1).
  *
  * Kanal: `android` (bawaan, ikut legacy `andr_notif_queue`), `web`, atau `semua`. Job diantre untuk driver apa pun, sama
  * dengan push inbox Fase 4 (driver `mock` hanya mencatat payload). Kegagalan mengantre dicatat sebagai peringatan dan TIDAK

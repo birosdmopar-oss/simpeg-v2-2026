@@ -6,7 +6,7 @@
  * `{notification: {title, body, icon}, data: {link, …}}` lalu ditampilkan di sini.
  *
  * Klik notifikasi membuka `data.link` di jendela/tab BARU (`openWindow`, ikut legacy `notificationclick` — tab yang sudah
- * terbuka tidak dinavigasi agar isian form tidak hilang, CR-099 P5); v2 menerima tautan relatif SPA dan HANYA membuka
+ * terbuka tidak dinavigasi agar isian form tidak hilang, review MAKE-066 P5); v2 menerima tautan relatif SPA dan HANYA membuka
  * alamat se-origin (tautan ke host lain diabaikan).
  */
 self.addEventListener('install', () => self.skipWaiting())
