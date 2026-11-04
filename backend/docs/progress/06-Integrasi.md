@@ -43,6 +43,13 @@ Keputusan implementasi (reviewer CR 04-11-2026):
 - Pegawai berstatus 3 dengan TB aktif tanpa CLTN aktif menjadi 2 (Q6-24 butir "selain itu"); status 2/3 hanya dipulihkan ke 1
   bila ada riwayat TB (untuk 2) atau CLTN status 1 (untuk 3) yang sudah berakhir.
 
+`pengguna:sinkron-nama [--dry-run]` (F6-21 bersyarat; padanan legacy `Cron.php:2818-2877` `sync_nama_pengguna`, reviewer CR 04-11-2026):
+`Libraries/Kepegawaian/Pegawai/SinkronNamaPengguna`, `Commands/PenggunaSinkronNama`. `pengguna.name` (kolom ada di v2) disamakan dengan
+`StrukturService::namaGelar` untuk pengguna `status = 1`, `user_level = 2` (`Role::PEGAWAI`, padanan `UserLevel 2` legacy), ber-NIP, pegawai
+`status = 1`; hanya bila berbeda dan nama tidak kosong; akun sistem dan soft-delete dikecualikan; dipotong 150 karakter (INFO);
+transaksi kecil per akun + `audit_logs` (`jenis_audit` `pengguna.sinkron_nama`, pelaku akun sistem); `GET_LOCK`. Jadwal harian 01:00
+WIB masih USULAN (PN-5).
+
 ## Bagian B — Klien integrasi keluar
 
 (diisi Qoder A per milestone: keputusan, deviasi, catatan)
