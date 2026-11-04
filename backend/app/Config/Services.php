@@ -485,7 +485,9 @@ class Services extends BaseService
 
         return match ($driver) {
             'mock' => new MockEsignAdapter(),
-            // Fase 6 Jalur B (MAKE-065, H-02): BSrE real; konfigurasi kosong/TLS mati gagal saat dibuat (AC-K.4).
+            // Fase 6 Jalur B (MAKE-065, H-02): BSrE real; konfigurasi kosong/tidak sah gagal saat dibuat (AC-K.4).
+            // `tlsVerify = false` DIIZINKAN khusus e-sign (keputusan Horii 03-11-2026, ikut legacy) dengan peringatan log
+            // sekali per proses; lihat README-deploy §1c.
             'bsre'  => new \App\Libraries\Esign\BsreEsignAdapter(static::klienHttp(), config(Integrations::class)->esign),
             default => throw new RuntimeException("Esign driver '{$driver}' belum tersedia."),
         };
