@@ -224,6 +224,22 @@ final class BiodataTest extends DatabaseTestCase
         $this->service()->foto($this->auth(Role::SUPER_ADMIN), $nip);
     }
 
+    public function testFotoLegacyHasilTarikHanyaGambarRasterYangInline(): void
+    {
+        // MAKE-069 K-M3 opsi A: path legacy dibaca dari storage v2; isinya tidak lewat ValidasiBerkas (review P-5).
+        $folder = $this->akarLampiranUji() . '/arsip/uji';
+        is_dir($folder) || mkdir($folder, 0750, true);
+        file_put_contents($folder . '/foto lama.jpg', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', true));
+        file_put_contents($folder . '/foto svg.jpg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+
+        $nip = $this->pegawaiLengkap(['foto' => '/arsip/uji/foto lama.jpg']);
+        $this->assertSame('image/png', $this->service()->foto($this->auth(Role::SUPER_ADMIN), $nip)['mime']);
+
+        $this->db->table('pegawai')->where('nip', $nip)->update(['foto' => '/arsip/uji/foto svg.jpg']);
+        $this->expectException(NotFoundException::class);
+        $this->service()->foto($this->auth(Role::SUPER_ADMIN), $nip);
+    }
+
     #[Group('db-isolasi-penuh')]
     public function testRollbackSesudahFotoDisimpanMengompensasiBerkas(): void
     {

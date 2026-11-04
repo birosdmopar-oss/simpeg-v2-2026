@@ -36,7 +36,7 @@ final class Keputusan
     public static function dariArray(array $isi): self
     {
         foreach (array_keys($isi) as $bagian) {
-            if (! in_array($bagian, ['status', 'nilai', 'tanggal_nol', 'catatan'], true)) {
+            if (! in_array($bagian, ['status', 'nilai', 'baris', 'tanggal_nol', 'catatan'], true)) {
                 throw new ImporGagal("Bagian berkas keputusan tidak dikenal: {$bagian}.");
             }
         }
@@ -132,5 +132,30 @@ final class Keputusan
         $v = $this->isi['tanggal_nol']["{$tabel}.{$kolom}"] ?? null;
 
         return is_string($v) ? $v : null;
+    }
+
+    /**
+     * Keputusan per baris (MAKE-069, mis. `jenis_konket.old_id` per `id_jenis_konket`, DBV-029 §4.1): bagian `baris`,
+     * kunci `<tabel>.<kolom>` → PK sumber → nilai pengganti, atau `"__buang"` = baris tidak diimpor.
+     *
+     * @return array{ada: bool, nilai: mixed}
+     */
+    public function baris(string $tabel, string $kolom, string $pk): array
+    {
+        $peta = $this->isi['baris']["{$tabel}.{$kolom}"] ?? null;
+
+        if (! is_array($peta) || ! array_key_exists($pk, $peta)) {
+            return ['ada' => false, 'nilai' => null];
+        }
+
+        return ['ada' => true, 'nilai' => $peta[$pk]];
+    }
+
+    /**
+     * Sidik isi berkas keputusan untuk berkas jejak (K-M8): sama → keputusan yang sama.
+     */
+    public function sidik(): string
+    {
+        return hash('sha256', (string) json_encode($this->isi));
     }
 }

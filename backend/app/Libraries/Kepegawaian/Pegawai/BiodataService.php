@@ -126,7 +126,7 @@ final class BiodataService implements BiodataServiceInterface
             throw new NotFoundException('Foto pegawai tidak tersedia.');
         }
 
-        return ['isi' => $isi, 'mime' => self::mime($isi), 'nama' => 'foto_' . $nip . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+        return ['isi' => $isi, 'mime' => self::mimeGambar($isi, 'Foto pegawai tidak tersedia.'), 'nama' => 'foto_' . $nip . '.' . pathinfo($path, PATHINFO_EXTENSION)];
     }
 
     public function antreanPengajuan(AuthContext $auth, array $filter = []): array
@@ -148,7 +148,7 @@ final class BiodataService implements BiodataServiceInterface
             throw new NotFoundException('Foto pengajuan tidak tersedia.');
         }
 
-        return ['isi' => $isi, 'mime' => self::mime($isi), 'nama' => 'foto_pengajuan_' . $idHist . '.' . pathinfo((string) $path, PATHINFO_EXTENSION)];
+        return ['isi' => $isi, 'mime' => self::mimeGambar($isi, 'Foto pengajuan tidak tersedia.'), 'nama' => 'foto_pengajuan_' . $idHist . '.' . pathinfo((string) $path, PATHINFO_EXTENSION)];
     }
 
     public function prosesPengajuan(AuthContext $auth, int $idHist, string $aksi, ?string $reasonNote): array
@@ -159,6 +159,21 @@ final class BiodataService implements BiodataServiceInterface
     private function approval(): ApprovalBiodata
     {
         return new ApprovalBiodata($this->koneksi(), $this->scope());
+    }
+
+    /**
+     * Foto disajikan `inline`, jadi hanya gambar raster aman. Foto legacy hasil tarik (MAKE-069) tidak lewat
+     * `ValidasiBerkas`; isi lain (SVG/HTML → stored XSS) dijawab 404 (review MAKE-069 P-5).
+     */
+    private static function mimeGambar(string $isi, string $pesan): string
+    {
+        $mime = self::mime($isi);
+
+        if (! in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+            throw new NotFoundException($pesan);
+        }
+
+        return $mime;
     }
 
     private static function mime(string $isi): string
