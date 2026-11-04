@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Layanan\Esign;
 
+use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\Layanan\Cuti\KunciSuratCuti;
 use App\Libraries\Layanan\Cuti\SuratCutiService;
 use App\Libraries\Layanan\Cuti\TokenSuratCutiService;
 use App\Libraries\Layanan\Cuti\VerifikasiSuratCutiService;
@@ -101,7 +103,7 @@ final class TokenSuratCutiTest extends DatabaseTestCase
         $token->aktifkan($auth, $id);
         $this->assertSame($id, $token->idCutiAktif($lama));
 
-        $baru = $token->rotasi($auth, $id, false);
+        $baru = $token->rotasi($auth, $id);
         $this->assertNotSame($lama, $baru);
         $this->assertNull($token->idCutiAktif($lama), 'URL lama mati');
         $this->assertSame($id, $token->idCutiAktif($baru));
@@ -110,14 +112,57 @@ final class TokenSuratCutiTest extends DatabaseTestCase
         $this->assertSame(['nonaktif', 'aktif', 'rotasi'], array_map(static fn (array $r): string => (string) json_decode((string) $r['after_json'], true)['aksi'], $audit));
         $this->assertStringNotContainsString($baru, (string) json_encode($audit), 'audit tanpa nilai token');
 
+        // P3a review B4a: status TTE dibaca service sendiri dari lampiran surat ber-TTE (bukan argumen pemanggil).
+        $this->esignService([], null, $token)->terbitkan($a['pyb']['auth'], $id, ['passphrase' => self::PASSPHRASE_UJI], null, null);
+
         try {
-            $token->rotasi($auth, $id, true);
+            $token->rotasi($auth, $id);
             $this->fail('rotasi sesudah TTE harus ditolak (DBV-030 Q3)');
         } catch (ValidationException $e) {
             $this->assertSame([TokenSuratCutiService::PESAN_ROTASI_SESUDAH_TTE], $e->getErrors()['token']);
         }
 
         $this->assertSame($id, $token->idCutiAktif($baru), 'token tetap');
+        $this->assertSame(3, $this->db->table('audit_logs')->where(['entity' => 'surat_cuti_token', 'entity_id' => (string) $id])->countAllResults(), 'penolakan tanpa audit');
+
+        // Sesudah TTE: nonaktif / aktif tetap boleh.
+        $this->assertSame(TokenSuratCutiService::NONAKTIF, $token->nonaktifkan(null, $id));
+        $this->assertSame(TokenSuratCutiService::AKTIF, $token->aktifkan(null, $id));
+    }
+
+    /**
+     * P3c review B4a: rotasi/nonaktif tidak bisa berjalan saat kunci surat cuti dipegang (mis. e-sign sedang membuat QR
+     * ber-token) → 409, token tidak berubah, tanpa audit. Cuti tidak ada → 404.
+     */
+    public function testRotasiDanStatusDitolakSaatKunciDipegangDanCutiTidakAda404(): void
+    {
+        ['id' => $id] = $this->cutiFinal();
+        $token        = $this->token();
+        $lama         = (string) $token->untukCuti($id);
+        $lain         = \Config\Database::connect('tests', false);
+        $nama         = KunciSuratCuti::nama($this->db, $id);
+
+        try {
+            $lain->query('SELECT GET_LOCK(?, 0)', [$nama]);
+
+            foreach (['rotasi', 'nonaktifkan'] as $aksi) {
+                try {
+                    $token->{$aksi}(null, $id);
+                    $this->fail("{$aksi} harus 409 saat kunci dipegang");
+                } catch (ApiException $e) {
+                    $this->assertSame([409, KunciSuratCuti::KODE_SIBUK], [$e->getStatusCode(), $e->getKode()]);
+                }
+            }
+        } finally {
+            $lain->query('SELECT RELEASE_LOCK(?)', [$nama]);
+            $lain->close();
+        }
+
+        $this->assertSame($id, $token->idCutiAktif($lama), 'token tidak berubah');
+        $this->assertSame(0, $this->db->table('audit_logs')->where('entity', 'surat_cuti_token')->countAllResults());
+
+        $this->expectException(NotFoundException::class);
+        $token->rotasi(null, 999999);
     }
 
     public function testHapusCutiMenghapusTokenDiTransaksiSamaLalu404(): void
@@ -166,7 +211,9 @@ final class TokenSuratCutiTest extends DatabaseTestCase
 
     private function token(): TokenSuratCutiService
     {
-        return new TokenSuratCutiService($this->db, 'http://localhost:8080/verify/surat-cuti/', 'http://localhost:8080/api/v1/publik/surat-cuti/');
+        $this->cutiService(); // menyiapkan lampiran palsu bersama ($this->lampiranUji) untuk cek surat ber-TTE
+
+        return new TokenSuratCutiService($this->db, 'http://localhost:8080/verify/surat-cuti/', 'http://localhost:8080/api/v1/publik/surat-cuti/', null, $this->lampiranUji);
     }
 
     private function panggil(string $url): \CodeIgniter\Test\TestResponse
