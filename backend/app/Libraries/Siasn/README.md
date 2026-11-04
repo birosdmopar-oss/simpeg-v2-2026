@@ -92,3 +92,30 @@ gagal diulang lewat siklus berikutnya sesuai kriteria tabel). Kriteria per tabel
   POST — status di SIASN tidak diketahui; periksa duplikat di BKN sebelum riwayat itu didorong lagi).
 - Bentuk permintaan POST (body JSON + `Content-Type: application/json`, `success` boolean) masih **asumsi** sampai bentuk
   `postApi_siasn` legacy dikonfirmasi (B6 M2 Q2); semua ada di `SiasnAdapter::simpanRiwayat()` / `uraiSimpan()`.
+
+## `php spark siasn:tarik --jenis=ref-unor` (M3)
+
+Padanan `SS/Ref_unor::sync` → `GET {baseUrlApi}/referensi/ref-unor` (satu panggilan untuk instansi, tanpa `--nip`/`--limit`)
+ke `siasn_ref_unor`: id baru → INSERT dengan pemetaan lokal (`id_jabatan`, `id_unit`, `id_satker`, `lvl_uker`) NULL; berubah
+→ UPDATE kolom respons saja, **pemetaan lokal tidak disentuh**; tanpa hapus [K]. Satu transaksi; jawaban gagal → tanpa tulis,
+keluar 1. Ringkasan `tarik_ref_unor`: `sisip`, `ubah`, `tetap`, `ditolak`.
+
+## `php spark siasn:unggah-arsip` (M3)
+
+```
+php spark siasn:unggah-arsip [--langkah=semua|antre|unggah] [--limit=N] [--dry-run]
+```
+
+- **antre** (padanan `set_queue_arsip` + `set_queue_arsip_sertifikasi`): lampiran PDF `jenis_rwy` 9/36/41 riwayat jabatan dan 5
+  sertifikasi yang SUDAH terkirim (`id_rw_siasn` terisi) → `siasn_upload_arsip` status 0. Anti-antre-ulang: kunci legacy
+  `nip***id_rw***arsip_path` + UNIQUE (`rw_name`,`id_rw`,`id_da`). `arsip_path` = `document_attachment.path` apa adanya; path
+  yang tidak lolos normalisasi (`PathLegacy`) tidak diantre.
+- **unggah** (padanan `SS/Arsip::upload_siasn`): status 0 urut id, bawaan 1 baris per jalan [K] → status 3 + `updated_at` →
+  berkas dibaca lewat storage v2 → wajib PDF ≤ 1 MB → `POST upload-dok-rw` multipart (`id_riwayat` = `id_rw_siasn`,
+  `id_ref_dokumen` 872 jabatan / 881 sertifikasi), tanpa retry → status 1 + `resp_*` mentah, atau status 2 + `error_msg`
+  (berkas tidak ditemukan / "Invalid file type or file size" / "Failed to upload to SIASN" / "Timeout upload" = status di
+  SIASN tidak diketahui). Exception → status 3 kembali ke 0.
+- Ringkasan `antre_arsip` (`baru`, `sudah_ada`, `path_tidak_sah`) dan `unggah_arsip` (`diproses`, `sukses`, `gagal`,
+  `berkas_hilang`, `tidak_sah`, `status_tidak_diketahui`).
+- Bentuk unggah (nama field berkas `file`, balasan `{code, data}`) masih **asumsi** di `SiasnAdapter::unggahDokumen()` sampai
+  bentuk `postApi_siasnArsip` legacy dikonfirmasi (B6 M3 Q1).

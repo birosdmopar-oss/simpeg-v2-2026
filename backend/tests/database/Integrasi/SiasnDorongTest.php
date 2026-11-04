@@ -212,6 +212,11 @@ final class SiasnDorongTest extends DatabaseTestCase
 
                 return ['status_code' => '200', 'message' => 'OK', 'data' => ['rwJabatanId' => 'RJ-1']];
             }
+
+            public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = []): array
+            {
+                throw new RuntimeException('tidak dipakai');
+            }
         };
         $dorong = new DorongSiasn($this->db, $putus, new IntegrasiLog($this->db), new AkunSistemIntegrasi($this->db), DorongSiasn::semuaJenis());
 

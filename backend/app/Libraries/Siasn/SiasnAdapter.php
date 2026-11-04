@@ -6,6 +6,7 @@ namespace App\Libraries\Siasn;
 
 use App\Interfaces\SiasnDorongInterface;
 use App\Interfaces\SiasnGatewayInterface;
+use App\Interfaces\SiasnReferensiInterface;
 use App\Libraries\Bkn\GalatTokenBkn;
 use App\Libraries\Bkn\TokenBkn;
 use App\Libraries\Integrasi\Http\GalatTransport;
@@ -28,7 +29,7 @@ use InvalidArgumentException;
  * `{baseUrlApi}/{jalur}`, TIDAK di-retry otomatis (BP-3; 401 → token diperbarui lalu dikirim sekali lagi, permintaan
  * ditolak sebelum diproses); `syncPegawai` kontrak lama tidak dipakai.
  */
-final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface
+final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface, SiasnReferensiInterface
 {
     public const LAYANAN = 'siasn';
 
@@ -128,20 +129,81 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface
         return ['status_code' => self::SUKSES, 'message' => $pesan !== '' ? $pesan : 'OK', 'data' => $json['mapData'] ?? null];
     }
 
+    public function refUnor(): array
+    {
+        $hasil = $this->kirimGet('referensi/ref-unor', 'ref_unor', []);
+        $data  = $hasil['data'];
+
+        if ($hasil['status_code'] !== self::SUKSES) {
+            return ['status_code' => $hasil['status_code'], 'message' => $hasil['message'], 'data' => []];
+        }
+
+        if (! is_array($data) || ! array_is_list($data) || array_filter($data, static fn (mixed $b): bool => ! is_array($b) || ($b !== [] && array_is_list($b))) !== []) {
+            return ['status_code' => 'respons', 'message' => 'Balasan SIASN tidak sah.', 'data' => []];
+        }
+
+        return ['status_code' => self::SUKSES, 'message' => $hasil['message'], 'data' => $data];
+    }
+
+    /**
+     * Unggah dokumen riwayat [K `SS/Arsip::upload_siasn` → `postApi_siasnArsip`]: POST multipart `upload-dok-rw` dengan
+     * `id_riwayat` + `id_ref_dokumen` + berkas. ASUMSI bentuk (helper legacy terlarang dibuka; review B6 M3 Q1): nama field
+     * berkas `file`, dua header token yang sama, balasan `{code, data: {dok_id, dok_nama, dok_uri, object, slug}}` — sukses
+     * bila HTTP 2xx + `code == 1`. TIDAK di-retry otomatis (BP-3).
+     *
+     * @param list<string> $rahasia
+     *
+     * @return array{status_code: string, message: string, data: mixed}
+     */
+    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = []): array
+    {
+        try {
+            $respons = $this->token->kirimSiasn(fn (array $h): Permintaan => new Permintaan(
+                'POST',
+                rtrim($this->baseUrl, '/') . '/upload-dok-rw',
+                self::LAYANAN,
+                'upload_dok_rw',
+                header: $h,
+                multipart: [
+                    ['nama' => 'id_riwayat', 'isi' => $idRiwayatSiasn],
+                    ['nama' => 'id_ref_dokumen', 'isi' => $idRefDokumen],
+                    ['nama' => 'file', 'isi' => $isi, 'namaBerkas' => $namaBerkas, 'mime' => 'application/pdf'],
+                ],
+                rahasia: array_values(array_filter($rahasia, static fn (string $s): bool => $s !== '')),
+            ));
+        } catch (GalatTransport $e) {
+            return ['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => 'Layanan SIASN tidak dapat dihubungi; status di SIASN tidak diketahui.', 'data' => null];
+        } catch (GalatTokenBkn) {
+            return ['status_code' => 'token', 'message' => 'Token BKN tidak dapat diperoleh.', 'data' => null];
+        }
+
+        return self::urai($respons);
+    }
+
     /**
      * @return array{status_code: string, message: string, data: mixed}
      */
     private function ambil(string $jalur, string $nip): array
     {
+        // NIP ada di path: disensor dari integrasi_log (saran review B6 M1 #7).
+        return $this->kirimGet('pns/' . $jalur . '/' . rawurlencode($nip), str_replace('-', '_', $jalur), [$nip]);
+    }
+
+    /**
+     * @param list<string> $rahasia
+     *
+     * @return array{status_code: string, message: string, data: mixed}
+     */
+    private function kirimGet(string $path, string $operasi, array $rahasia): array
+    {
         try {
             $respons = $this->token->kirimSiasn(fn (array $h): Permintaan => new Permintaan(
                 'GET',
-                rtrim($this->baseUrl, '/') . '/pns/' . $jalur . '/' . rawurlencode($nip),
+                rtrim($this->baseUrl, '/') . '/' . $path,
                 self::LAYANAN,
-                str_replace('-', '_', $jalur),
+                $operasi,
                 header: $h,
-                // NIP ada di path: disensor dari integrasi_log (saran review B6 M1 #7).
-                rahasia: [$nip],
+                rahasia: $rahasia,
             ));
         } catch (GalatTransport $e) {
             return ['status_code' => $e->timeout ? 'timeout' : 'koneksi', 'message' => 'Layanan SIASN tidak dapat dihubungi.', 'data' => null];

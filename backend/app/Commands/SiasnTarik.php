@@ -9,6 +9,7 @@ use App\Libraries\Integrasi\AkunSistemTidakSiap;
 use App\Libraries\Integrasi\KonfigurasiIntegrasiTidakLengkap;
 use App\Libraries\Siasn\Tarik\SiasnTarikSibuk;
 use App\Libraries\Siasn\Tarik\SiasnTidakSiap;
+use App\Libraries\Siasn\Tarik\TarikRefUnor;
 use App\Libraries\Siasn\Tarik\TarikSiasn;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -32,7 +33,7 @@ class SiasnTarik extends BaseCommand
     protected $group       = 'Integrasi';
     protected $name        = 'siasn:tarik';
     protected $description = 'Tarik data SIASN BKN per jenis untuk satu batch NIP (ikut legacy SS/*).';
-    protected $usage       = 'siasn:tarik --jenis=<data-utama|golongan|pendidikan|pmk|skp|ak> [--limit=N] [--nip=<nip>] [--dry-run]';
+    protected $usage       = 'siasn:tarik --jenis=<data-utama|golongan|pendidikan|pmk|skp|ak|ref-unor> [--limit=N] [--nip=<nip>] [--dry-run]';
     protected $options     = [
         '--jenis'   => 'Jenis tarik (wajib).',
         '--limit'   => 'Jumlah NIP per batch (bawaan 20).',
@@ -57,14 +58,20 @@ class SiasnTarik extends BaseCommand
         $limit = $opsi['limit'] ?? (string) TarikSiasn::LIMIT_BAWAAN;
         $nip   = $opsi['nip'] ?? null;
 
-        if ($argumen !== [] || ! is_string($jenis) || ! isset(TarikSiasn::semuaJenis()[$jenis]) || ! is_string($limit) || ! ctype_digit($limit)
-            || (int) $limit < 1 || (int) $limit > 500 || ($nip !== null && (! is_string($nip) || preg_match('/^[0-9A-Za-z.-]{1,30}$/', $nip) !== 1))) {
-            CLI::error('Isi --jenis yang dikenal, --limit 1-500, dan --nip yang sah. Pemakaian: ' . $this->usage);
+        $refUnor = $jenis === 'ref-unor';
+
+        if ($argumen !== [] || ! is_string($jenis) || (! $refUnor && ! isset(TarikSiasn::semuaJenis()[$jenis])) || ! is_string($limit) || ! ctype_digit($limit)
+            || (int) $limit < 1 || (int) $limit > 500 || ($nip !== null && ($refUnor || ! is_string($nip) || preg_match('/^[0-9A-Za-z.-]{1,30}$/', $nip) !== 1))) {
+            CLI::error('Isi --jenis yang dikenal, --limit 1-500, dan --nip yang sah (ref-unor tanpa --nip). Pemakaian: ' . $this->usage);
 
             return EXIT_USER_INPUT;
         }
 
         try {
+            if ($refUnor) {
+                return $this->refUnor(TarikRefUnor::dariLayanan()->jalankan(isset($opsi['dry-run'])));
+            }
+
             $h = TarikSiasn::dariLayanan()->jalankan($jenis, (int) $limit, is_string($nip) ? $nip : null, isset($opsi['dry-run']));
         } catch (KonfigurasiIntegrasiTidakLengkap|AkunSistemTidakSiap|SiasnTidakSiap|SiasnTarikSibuk $e) {
             // Pesan kelas-kelas ini disusun aplikasi tanpa nilai rahasia/NIP.
@@ -101,6 +108,28 @@ class SiasnTarik extends BaseCommand
 
         foreach (array_filter($h['info']) as $info => $n) {
             CLI::write("  info {$info}: {$n}");
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+    /**
+     * @param array{jenis: string, sukses: bool, sisip: int, ubah: int, tetap: int, ditolak: array<string, int>, dry_run: bool} $h
+     */
+    private function refUnor(array $h): int
+    {
+        $baris = sprintf('%sTarik SIASN ref-unor: %s; sisip %d, ubah %d, tetap %d, ditolak %d.', $h['dry_run'] ? '[dry-run] ' : '', $h['sukses'] ? 'sukses' : 'GAGAL (tanpa tulis)', $h['sisip'], $h['ubah'], $h['tetap'], array_sum($h['ditolak']));
+
+        if (! $h['sukses']) {
+            CLI::error($baris);
+
+            return EXIT_ERROR;
+        }
+
+        CLI::write($baris, 'green');
+
+        foreach ($h['ditolak'] as $alasan => $n) {
+            CLI::write("  ditolak {$alasan}: {$n}");
         }
 
         return EXIT_SUCCESS;
