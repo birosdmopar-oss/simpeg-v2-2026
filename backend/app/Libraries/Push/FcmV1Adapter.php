@@ -37,6 +37,8 @@ use RuntimeException;
  *   properti (review MAKE-066 S1): berkas dibaca ulang hanya saat menandatangani JWT (token akses di-cache ±1 jam di cache aplikasi);
  *   parameter token/kunci bertanda `#[\SensitiveParameter]`. `token_uri` dipatok ke {@see self::TOKEN_URI} (S6).
  * - Galat OAuth (token akses gagal diperoleh) dihitung sebagai kiriman gagal, bukan dilempar dari tengah multicast (S2).
+ * - {@see self::ujiKoneksi()} (`integrasi:uji-koneksi fcm`, CR-101): token akses baru + `messages:send` `validate_only` ke
+ *   topik uji — tanpa pesan ke perangkat mana pun.
  */
 final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInterface
 {
@@ -50,6 +52,9 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
 
     /** Endpoint token OAuth Google; berkas service account dengan `token_uri` lain ditolak (review MAKE-066 S6). */
     public const TOKEN_URI = 'https://oauth2.googleapis.com/token';
+
+    /** Topik untuk uji koneksi `validate_only` (tidak ada perangkat yang berlangganan; pesan tidak dikirim). */
+    public const TOPIK_UJI = 'simpeg-uji-koneksi';
 
     /** Ikon notifikasi web (aset SPA `frontend/public`; ikon legacy `/assets/images/logo-simpeg-v1-200x200.png` tidak ada di v2). */
     public const IKON_BAWAAN = '/apple-touch-icon.png';
@@ -167,6 +172,54 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
     public function lupakanTokenAkses(): void
     {
         $this->cache->invalidate(self::CACHE_TOKEN);
+    }
+
+    /**
+     * Uji koneksi nyata (`integrasi:uji-koneksi fcm`, BP-11, CR-101): token akses OAuth BARU (cache dibuang dulu agar
+     * kredensial service account benar-benar diuji; worker berikutnya meminta token lagi) lalu satu `messages:send`
+     * `validate_only: true` ke {@see self::TOPIK_UJI} — FCM memeriksa proyek, izin service account, dan bentuk pesan TANPA
+     * mengirim ke perangkat mana pun. Hasil hanya kode (`ok`, `token_oauth`, status galat FCM mis. `PERMISSION_DENIED` /
+     * `NOT_FOUND`, `respons`); projectId, token, dan kunci tidak pernah dikembalikan. Rincian teredaksi di `integrasi_log`.
+     *
+     * @return array{ok: bool, http: string, kode: string}
+     */
+    public function ujiKoneksi(): array
+    {
+        $this->lupakanTokenAkses();
+
+        try {
+            $akses = $this->tokenAkses();
+        } catch (GalatTransport $e) {
+            return ['ok' => false, 'http' => $e->timeout ? 'timeout' : 'koneksi', 'kode' => 'token_oauth'];
+        } catch (RuntimeException) {
+            return ['ok' => false, 'http' => '-', 'kode' => 'token_oauth'];
+        }
+
+        try {
+            $respons = $this->klien->kirim(new Permintaan(
+                metode: 'POST',
+                url: sprintf(self::URL_KIRIM, rawurlencode($this->projectId)),
+                layanan: 'fcm',
+                operasi: 'uji_koneksi',
+                header: ['Authorization' => 'Bearer ' . $akses, 'Content-Type' => 'application/json'],
+                json: ['validate_only' => true, 'message' => ['topic' => self::TOPIK_UJI, 'notification' => ['title' => 'Uji koneksi SIMPEG', 'body' => 'validate_only']]],
+                rahasia: [$akses],
+            ));
+        } catch (GalatTransport $e) {
+            return ['ok' => false, 'http' => $e->timeout ? 'timeout' : 'koneksi', 'kode' => 'messages_send'];
+        }
+
+        if ($respons->status === 401) {
+            $this->lupakanTokenAkses();
+        }
+
+        if ($respons->sukses()) {
+            return ['ok' => true, 'http' => (string) $respons->status, 'kode' => 'ok'];
+        }
+
+        $json = $respons->json();
+
+        return ['ok' => false, 'http' => (string) $respons->status, 'kode' => is_array($json) ? $this->statusGalat($json) : 'respons'];
     }
 
     /**

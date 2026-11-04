@@ -13,3 +13,6 @@ Service/business logic modul ini (`App\Libraries\Integrasi\*`). Kalkulasi, busin
   `AntrePushRiwayat` (event `riwayatNotifikasi`, LKH, Konket) → `push-riwayat`; `AntrePushPesan` (titik sambung Halo
   Simpeg Fase 8) → `push-pesan`; `AntreTopikFcm` (presensi, LKH) → `fcm-topik`.
 - Token web: `TokenFcmService` (`POST|DELETE api/v1/integrasi/fcm-token`). Konfigurasi & operasional: `README-deploy.md` §1d.
+- Uji koneksi (CR-101): `php spark integrasi:uji-koneksi fcm` → `FcmV1Adapter::ujiKoneksi()` — token akses OAuth baru +
+  `messages:send` `validate_only` ke topik `simpeg-uji-koneksi` (tanpa kirim ke perangkat); hasil hanya kode, tanpa
+  projectId/token/kunci.
