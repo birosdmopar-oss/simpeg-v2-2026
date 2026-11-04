@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Siasn\Tarik;
 
+use App\Libraries\Waktu\StempelUtc;
 use CodeIgniter\Database\BaseConnection;
 
 /**
@@ -14,7 +15,8 @@ use CodeIgniter\Database\BaseConnection;
  * - Pilih batch: riwayat → flag `0` atau stempel lebih lama dari 6 jam atau kosong [K `SS/Rw_*::get_siasn`]; data utama
  *   → `du = 0` dan `du_lu` sebelum hari ini atau kosong [K `Data_utama::sync_siasn`]. Urut NIP, dibatasi `limit`.
  * - Tandai: proses = `2` + stempel sekarang; selesai = `1` + stempel (data utama: `0` + tanggal hari ini); batal (galat DB)
- *   = `0` [K]. Stempel UTC.
+ *   = `0` [K]. Stempel DATETIME `_lu` dalam UTC; `du_lu` (DATE "per hari") = tanggal bisnis WIB (BP-10, putusan reviewer
+ *   B6 (f)) agar batas hari sama dengan legacy (`date("Ymd")` waktu server WIB).
  */
 final class StatusTarikSiasn
 {
@@ -69,7 +71,7 @@ final class StatusTarikSiasn
             // Tarik manual satu NIP: tanpa syarat usang.
             $qb->where('s.nip', $nip);
         } elseif ($k === 'du') {
-            $hariIni = substr($sekarang, 0, 10);
+            $hariIni = (string) StempelUtc::tanggalWib($sekarang);
             $qb->where('s.du', 0)->groupStart()->where('s.du_lu <', $hariIni)->orWhere('s.du_lu', null)->groupEnd();
         } else {
             $batas = gmdate('Y-m-d H:i:s', (int) strtotime($sekarang . ' UTC') - self::USANG_DETIK);
@@ -94,7 +96,7 @@ final class StatusTarikSiasn
     public function tandaiSelesai(JenisTarikSiasn $jenis, array $nip, string $sekarang): void
     {
         $k = $jenis->kolomStatus();
-        $this->tandai($nip, $k === 'du' ? ['du' => 0, 'du_lu' => substr($sekarang, 0, 10)] : [$k => 1, "{$k}_lu" => $sekarang], $sekarang);
+        $this->tandai($nip, $k === 'du' ? ['du' => 0, 'du_lu' => (string) StempelUtc::tanggalWib($sekarang)] : [$k => 1, "{$k}_lu" => $sekarang], $sekarang);
     }
 
     /**

@@ -26,6 +26,16 @@ final class RencanaTarik
     public array $ditolak = [];
 
     /**
+     * Informasi tanpa aksi (putusan reviewer B6 M1): `data_kosong` = NIP dengan jawaban sukses tetapi data kosong (tanpa
+     * aksi destruktif), `pairing_ganda` = baris SIASN yang cocok ke lebih dari satu baris lokal (tidak dipasangkan dan tidak
+     * disisipkan), `referensi_tak_terpetakan` = kode referensi SIASN (jenis KP / jenjang) tanpa pemetaan ke master lokal
+     * (bawaan legacy dipakai).
+     *
+     * @var array{data_kosong: int, pairing_ganda: int, referensi_tak_terpetakan: int}
+     */
+    public array $info = ['data_kosong' => 0, 'pairing_ganda' => 0, 'referensi_tak_terpetakan' => 0];
+
+    /**
      * @param array<string, mixed> $data
      */
     public function sisip(string $tabel, array $data, string $hitung = 'sisip'): void

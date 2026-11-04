@@ -99,6 +99,10 @@ final class TarikGolongan implements JenisTarikSiasn
                     continue;
                 }
 
+                if ($kolom['tak_terpetakan']) {
+                    $rencana->info['referensi_tak_terpetakan']++;
+                }
+
                 $gol = $kolom['gol_ruang'];
 
                 if (isset($golDiproses[$gol])) {
@@ -175,12 +179,16 @@ final class TarikGolongan implements JenisTarikSiasn
             throw new NilaiTidakSah('golongan', 'panjang');
         }
 
-        $idJenisKp = 3;
-        $namaKp    = 'Reguler';
+        $idJenisKp     = 3;
+        $namaKp        = 'Reguler';
+        $takTerpetakan = false;
 
         if ($jenisKpId !== null && isset($jenisKpSi[$jenisKpId]) && isset($jenisKp[(int) $jenisKpSi[$jenisKpId]])) {
             $idJenisKp = (int) $jenisKpSi[$jenisKpId];
             $namaKp    = (string) $jenisKp[$idJenisKp];
+        } elseif ($jenisKpId !== null) {
+            // Putusan reviewer B6 (c): bawaan legacy 3 "Reguler" + dihitung INFO referensi_tak_terpetakan.
+            $takTerpetakan = true;
         }
 
         $p = $pangkat[$golRuang] ?? null;
@@ -203,6 +211,7 @@ final class TarikGolongan implements JenisTarikSiasn
             'jumlah_kredit_tambahan' => NilaiSiasn::desimal($si, 'jumlahKreditTambahan', 12),
             'mker_th'                => NilaiSiasn::bulat($si, 'masaKerjaGolonganTahun', 0, 127),
             'mker_bl'                => NilaiSiasn::bulat($si, 'masaKerjaGolonganBulan', 0, 127),
+            'tak_terpetakan'         => $takTerpetakan,
         ];
     }
 

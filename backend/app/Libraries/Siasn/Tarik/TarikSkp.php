@@ -17,7 +17,9 @@ use CodeIgniter\Database\BaseConnection;
  * - ada + rating/kuadran berubah atau belum berpasangan → UPDATE penilai, rating, kuadran, `id_rw_siasn` [K `:121-139`];
  *   belum ada → INSERT `siasn_flag = 4` ("unduh dari SIASN"), `status = 1` [K `:145-173`];
  * - HAPUS FISIK baris berpasangan yang tidak lagi dikembalikan BKN [K `:184-220`] — HANYA untuk NIP yang panggilan API-nya
- *   SUKSES dengan data tidak kosong (pengaman wajib F6-14 / AC-03.3; legacy ikut menghapus saat API gagal, `:219`).
+ *   SUKSES dengan data tidak kosong (pengaman wajib F6-14 / AC-03.3; legacy ikut menghapus saat API gagal, `:219`), dan
+ *   hanya bila batch itu punya sisip/ubah SKP — ikut legacy (blok hapus berada di dalam `if (count($paramIns) > 0 ||
+ *   count($paramUpd) > 0)`, `:201`; putusan reviewer B6 (d): aksi destruktif tidak diperluas).
  */
 final class TarikSkp implements JenisTarikSiasn
 {
@@ -132,6 +134,10 @@ final class TarikSkp implements JenisTarikSiasn
                     $rencana->tolak($e->alasan);
                 }
             }
+        }
+
+        if ($rencana->sisip === [] && $rencana->ubah === []) {
+            return $rencana;
         }
 
         foreach ($berpasangan as $perNip) {

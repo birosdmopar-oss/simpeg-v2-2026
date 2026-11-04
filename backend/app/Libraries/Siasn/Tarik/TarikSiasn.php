@@ -9,6 +9,7 @@ use App\Interfaces\SiasnGatewayInterface;
 use App\Libraries\Integrasi\AkunSistemIntegrasi;
 use App\Libraries\Integrasi\Log\CatatanIntegrasi;
 use App\Libraries\Siasn\SiasnAdapter;
+use Closure;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use InvalidArgumentException;
@@ -32,6 +33,7 @@ final class TarikSiasn
 
     /**
      * @param array<string, JenisTarikSiasn> $jenis nama → jenis
+     * @param (Closure(): string)|null       $jam   waktu sekarang UTC `Y-m-d H:i:s` (test); bawaan `gmdate()`
      */
     public function __construct(
         private readonly BaseConnection $db,
@@ -39,7 +41,13 @@ final class TarikSiasn
         private readonly IntegrasiLogInterface $log,
         private readonly AkunSistemIntegrasi $akun,
         private readonly array $jenis,
+        private readonly ?Closure $jam = null,
     ) {
+    }
+
+    private function sekarang(): string
+    {
+        return $this->jam === null ? gmdate('Y-m-d H:i:s') : ($this->jam)();
     }
 
     /**
@@ -63,14 +71,14 @@ final class TarikSiasn
     }
 
     /**
-     * @return array{jenis: string, nip: int, sukses: int, gagal: int, jumlah: array<string, int>, ditolak: array<string, int>, dry_run: bool}
+     * @return array{jenis: string, nip: int, sukses: int, gagal: int, jumlah: array<string, int>, ditolak: array<string, int>, info: array<string, int>, dry_run: bool}
      */
     public function jalankan(string $nama, int $limit = self::LIMIT_BAWAAN, ?string $nip = null, bool $dryRun = false): array
     {
         $jenis    = $this->jenis[$nama] ?? throw new InvalidArgumentException("Jenis tarik SIASN '{$nama}' tidak dikenal.");
         $idAkun   = $this->akun->id();
         $status   = new StatusTarikSiasn($this->db);
-        $sekarang = gmdate('Y-m-d H:i:s');
+        $sekarang = $this->sekarang();
 
         if (! $dryRun) {
             $status->sinkronDaftar($sekarang);
@@ -91,17 +99,20 @@ final class TarikSiasn
         $sukses  = count(array_filter($hasil, static fn (array $h): bool => $h['status_code'] === SiasnAdapter::SUKSES));
         $rencana = $jenis->rencana($this->db, $hasil, $idAkun, $sekarang);
 
+        // Putusan reviewer B6 M1 (2): sukses dengan data kosong = INFO, tanpa aksi destruktif (dijaga tiap jenis).
+        $rencana->info['data_kosong'] = count(array_filter($hasil, static fn (array $h): bool => $h['status_code'] === SiasnAdapter::SUKSES && $h['data'] === []));
+
         if (! $dryRun) {
             try {
                 (new PenulisTarik($this->db))->terapkan($rencana);
             } catch (DatabaseException $e) {
-                $status->tandaiBatal($jenis, $daftar, gmdate('Y-m-d H:i:s'));
+                $status->tandaiBatal($jenis, $daftar, $this->sekarang());
                 $this->catat($nama, CatatanIntegrasi::GAGAL, 'galat_db', count($daftar), $sukses, $rencana);
 
                 throw $e;
             }
 
-            $status->tandaiSelesai($jenis, $daftar, gmdate('Y-m-d H:i:s'));
+            $status->tandaiSelesai($jenis, $daftar, $this->sekarang());
             $this->catat($nama, $sukses === count($daftar) ? CatatanIntegrasi::SUKSES : CatatanIntegrasi::GAGAL, $sukses === count($daftar) ? null : 'sebagian_gagal', count($daftar), $sukses, $rencana);
         }
 
@@ -112,6 +123,7 @@ final class TarikSiasn
             'gagal'   => count($daftar) - $sukses,
             'jumlah'  => $rencana->jumlah,
             'ditolak' => $rencana->ditolak,
+            'info'    => $rencana->info,
             'dry_run' => $dryRun,
         ];
     }
@@ -119,8 +131,10 @@ final class TarikSiasn
     private function catat(string $nama, int $statusLog, ?string $kode, int $nip, int $sukses, RencanaTarik $r): void
     {
         $j     = $r->jumlah;
+        $i     = $r->info;
         $pesan = "nip {$nip}, sukses {$sukses}, gagal " . ($nip - $sukses)
-            . ", sisip {$j['sisip']}, ubah {$j['ubah']}, pasang {$j['pasang']}, lepas {$j['lepas']}, hapus {$j['hapus']}, ganda {$j['ganda']}, ditolak " . array_sum($r->ditolak);
+            . ", sisip {$j['sisip']}, ubah {$j['ubah']}, pasang {$j['pasang']}, lepas {$j['lepas']}, hapus {$j['hapus']}, ganda {$j['ganda']}, ditolak " . array_sum($r->ditolak)
+            . ", data_kosong {$i['data_kosong']}, pairing_ganda {$i['pairing_ganda']}, referensi_tak_terpetakan {$i['referensi_tak_terpetakan']}";
 
         $this->log->catat(new CatatanIntegrasi(CatatanIntegrasi::ARAH_KELUAR, SiasnAdapter::LAYANAN, 'tarik_' . str_replace('-', '_', $nama), $statusLog, null, $kode, $pesan));
     }

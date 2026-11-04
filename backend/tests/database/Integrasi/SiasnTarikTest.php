@@ -80,7 +80,7 @@ final class SiasnTarikTest extends DatabaseTestCase
 
         $status = array_column($this->db->table('siasn_status_pegawai')->get()->getResultArray(), null, 'nip');
         $this->assertArrayNotHasKey(self::NIP_C, $status, 'pegawai tidak aktif keluar dari daftar [K sync_dsp]');
-        $this->assertSame(['0', gmdate('Y-m-d')], [(string) $status[self::NIP_A]['du'], $status[self::NIP_A]['du_lu']]);
+        $this->assertSame(['0', \App\Libraries\Waktu\StempelUtc::tanggalWib(gmdate('Y-m-d H:i:s'))], [(string) $status[self::NIP_A]['du'], $status[self::NIP_A]['du_lu']]);
         $this->assertSame('/pns/data-utama/' . self::NIP_A, substr($this->transport->tercatat()[2]['permintaan']->url, strlen(self::DASAR_SIASN)));
         $this->assertSame('Bearer gw-uji', $this->transport->tercatat()[2]['permintaan']->header['Authorization']);
         $this->assertSame('bearer sso-uji', $this->transport->tercatat()[2]['permintaan']->header['Auth']);
@@ -126,6 +126,9 @@ final class SiasnTarikTest extends DatabaseTestCase
         $this->assertSame([3, 2, 1], [$h['nip'], $h['sukses'], $h['gagal']]);
         $this->assertSame(['sisip' => 1, 'ubah' => 1, 'pasang' => 1, 'lepas' => 1, 'hapus' => 0, 'ganda' => 1], $h['jumlah']);
         $this->assertSame(['tmtGolongan_tanggal' => 1], $h['ditolak']);
+        // Putusan reviewer (2) & (c): NIP C sukses + data kosong; jenisKPId '101' tanpa pemetaan → bawaan "Reguler" (4 baris).
+        $this->assertSame(['data_kosong' => 1, 'pairing_ganda' => 0, 'referensi_tak_terpetakan' => 4], $h['info']);
+        $this->assertStringContainsString('data_kosong 1, pairing_ganda 0, referensi_tak_terpetakan 4', (string) $this->db->table('integrasi_log')->where('operasi', 'tarik_golongan')->get()->getRow()->pesan);
 
         $kp = array_column($this->db->table('riwayat_kp')->whereIn('nip', [self::NIP_A, self::NIP_B, self::NIP_C])->get()->getResultArray(), null, 'id_riwayat_kp');
         $this->assertSame(['SK-BARU', '2014-12-20', 'Sync SIASN', (string) $this->idAkun], [$kp[$r1]['no_sk'], $kp[$r1]['tgl_sk'], $kp[$r1]['keterangan'], (string) $kp[$r1]['updated_by']]);
@@ -150,6 +153,33 @@ final class SiasnTarikTest extends DatabaseTestCase
         ]]);
         $ulang = $this->tarik()->jalankan('golongan', 20, self::NIP_A);
         $this->assertSame(['sisip' => 0, 'ubah' => 0, 'pasang' => 0, 'lepas' => 0, 'hapus' => 0, 'ganda' => 0], $ulang['jumlah']);
+    }
+
+    /**
+     * Putusan reviewer B6 (f): `du_lu` = tanggal bisnis WIB (BP-10). Pukul 01:30 WIB (18:30 UTC hari sebelumnya) dicatat
+     * tanggal WIB; tarik lagi pukul 06:00 WIB hari yang sama tidak memilih NIP; lewat 00:00 WIB berikutnya (masih tanggal
+     * UTC yang sama dengan stempel UTC sebelumnya + 1) dipilih lagi.
+     */
+    public function testDuLuMemakaiTanggalWibLintasTengahMalam(): void
+    {
+        $this->buatPegawai(['nip' => self::NIP_A, 'id_jenis_pegawai' => 1, 'id_pns_siasn' => 'PNS-UJI-A']);
+        $jam   = '2026-11-04 18:30:00';
+        $tarik = new TarikSiasn($this->db, $this->adapter, new IntegrasiLog($this->db), new AkunSistemIntegrasi($this->db), TarikSiasn::semuaJenis(), static function () use (&$jam): string {
+            return $jam;
+        });
+
+        $this->antreToken();
+        $this->transport->antreJson(200, ['code' => 1, 'data' => ['id' => 'PNS-UJI-A']]);
+        $this->assertSame(1, $tarik->jalankan('data-utama')['nip']);
+        $this->assertSame('2026-11-05', $this->db->table('siasn_status_pegawai')->where('nip', self::NIP_A)->get()->getRow()->du_lu, '01:30 WIB = tanggal WIB 5 Nov (UTC masih 4 Nov)');
+
+        $jam = '2026-11-04 23:00:00'; // 06:00 WIB tanggal 5
+        $this->assertSame(0, $tarik->jalankan('data-utama')['nip'], 'hari WIB yang sama tidak diulang');
+
+        $jam = '2026-11-05 17:00:00'; // 6 Nov 00:00 WIB
+        $this->transport->antreJson(200, ['code' => 1, 'data' => ['id' => 'PNS-UJI-A']]);
+        $this->assertSame(1, $tarik->jalankan('data-utama')['nip'], 'hari WIB berikutnya dipilih lagi');
+        $this->assertSame('2026-11-06', $this->db->table('siasn_status_pegawai')->where('nip', self::NIP_A)->get()->getRow()->du_lu);
     }
 
     public function testDryRunTanpaTulisApaPun(): void

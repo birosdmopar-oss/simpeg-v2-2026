@@ -106,7 +106,12 @@ final class TarikPendidikan implements JenisTarikSiasn
                     $tk = NilaiSiasn::teks($si, 'tkPendidikanId', 100);
                     // Pemetaan ke jenjang yang tidak ada di master (FK) = tidak terpetakan (NULL), seperti legacy.
                     $jenjang = $tk !== null && isset($tkPendidikan[$tk]) && array_key_exists((int) $tkPendidikan[$tk], $singkat) ? (int) $tkPendidikan[$tk] : null;
-                    $kunci   = $jenjang . '-' . substr($tglLulus, 0, 4);
+
+                    if ($tk !== null && $jenjang === null) {
+                        // Putusan reviewer B6 (c): jenjang NULL seperti legacy + INFO referensi_tak_terpetakan.
+                        $rencana->info['referensi_tak_terpetakan']++;
+                    }
+                    $kunci = $jenjang . '-' . substr($tglLulus, 0, 4);
 
                     if (isset($tanpaPasangan[$nip][$kunci])) {
                         $ada = $tanpaPasangan[$nip][$kunci];

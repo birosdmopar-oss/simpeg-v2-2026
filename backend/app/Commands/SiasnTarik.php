@@ -88,6 +88,10 @@ class SiasnTarik extends BaseCommand
             CLI::write("  ditolak {$alasan}: {$n}");
         }
 
+        foreach (array_filter($h['info']) as $info => $n) {
+            CLI::write("  info {$info}: {$n}");
+        }
+
         return EXIT_SUCCESS;
     }
 }

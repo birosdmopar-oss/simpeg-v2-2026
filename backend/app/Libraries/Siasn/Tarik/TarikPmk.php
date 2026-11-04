@@ -10,11 +10,12 @@ use CodeIgniter\Database\BaseConnection;
 
 /**
  * `siasn:tarik --jenis=pmk` — padanan `SS/Rw_pmk::get_siasn` [K `Rw_pmk.php:10-245`] (`pns/rw-masakerja`) ke
- * `riwayat_pmk`, PNS aktif. Bug legacy diperbaiki (usulan B6 Q3/Q4, menunggu putusan reviewer):
+ * `riwayat_pmk`, PNS aktif. Bug legacy diperbaiki (putusan reviewer B6 Q3/Q4):
  *
  * - pairing berdasarkan `tgl_sk` untuk baris lokal tanpa pasangan (legacy mensyaratkan kolom `tgl_lulus` yang tidak ada
  *   di `riwayat_pmk`, `:57`, sehingga pairing tidak pernah terjadi dan riwayat tersisip ganda), lalu `id_rw_siasn` dipasang
- *   (pembaruan pairing legacy dikomentari, `:193-195`);
+ *   (pembaruan pairing legacy dikomentari, `:193-195`); satu `tgl_sk` cocok ke >1 baris lokal → tidak dipasangkan dan
+ *   tidak disisipkan, dihitung INFO `pairing_ganda`;
  * - `siasn_lu` = waktu tarik (legacy menulis teks "Sync SIASN" ke DATETIME, `:148`);
  * - masa kerja tahun dibaca dari `masaKerjaTahun` (legacy salah ketik `tasaKerjaTahun` → selalu 0, `:142`), bawaan 0;
  * - lepas pasangan berjalan juga tanpa sisip (syarat legacy `count($paramUpd)` ganda, `:183`), hanya untuk NIP yang API-nya
@@ -59,7 +60,7 @@ final class TarikPmk implements JenisTarikSiasn
             if (trim((string) $baris['id_rw_siasn']) !== '') {
                 $berpasangan[$baris['nip']][(string) $baris['id_rw_siasn']] = $baris;
             } elseif ((string) $baris['tgl_sk'] !== '') {
-                $perTglSk[$baris['nip']][(string) $baris['tgl_sk']] = $baris;
+                $perTglSk[$baris['nip']][(string) $baris['tgl_sk']][] = $baris;
             }
         }
 
@@ -89,7 +90,14 @@ final class TarikPmk implements JenisTarikSiasn
                     $tglSk = NilaiSiasn::tanggal($si, 'tanggalSk') ?? throw new NilaiTidakSah('tanggalSk', 'tanggal');
 
                     if (isset($perTglSk[$nip][$tglSk])) {
-                        $ada = $perTglSk[$nip][$tglSk];
+                        if (count($perTglSk[$nip][$tglSk]) > 1) {
+                            // Putusan reviewer B6 Q3: satu tgl_sk cocok ke >1 baris lokal → tidak dipasangkan, tidak disisipkan.
+                            $rencana->info['pairing_ganda']++;
+
+                            continue;
+                        }
+
+                        $ada = $perTglSk[$nip][$tglSk][0];
                         unset($perTglSk[$nip][$tglSk]);
                         $rencana->ubah(self::TABEL, ['id_riwayat_pmk' => (int) $ada['id_riwayat_pmk']], [
                             'id_rw_siasn' => $idSiasn, 'siasn_flag' => 1, 'siasn_lu' => $sekarang, 'updated_by' => $idAkun, 'updated_at' => $sekarang,

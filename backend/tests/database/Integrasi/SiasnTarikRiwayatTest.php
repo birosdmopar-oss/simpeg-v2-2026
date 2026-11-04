@@ -73,6 +73,7 @@ final class SiasnTarikRiwayatTest extends DatabaseTestCase
 
         $this->assertSame(['sisip' => 1, 'ubah' => 1, 'pasang' => 1, 'lepas' => 0, 'hapus' => 1, 'ganda' => 0], $h['jumlah']);
         $this->assertSame(['nipNrpPenilai_panjang' => 1], $h['ditolak']);
+        $this->assertSame(1, $h['info']['data_kosong']);
 
         $skp = array_column($this->db->table('riwayat_skp')->get()->getResultArray(), null, 'id_riwayat_skp');
         $this->assertSame(['3', '2', 'Sangat Baik', 'IV/a', (string) $this->idAkun], [(string) $skp[$s1]['rating_skp'], (string) $skp[$s1]['rating_perilaku'], $skp[$s1]['kategori_nilai_prestasi'], $skp[$s1]['gol_ruang_penilai'], (string) $skp[$s1]['updated_by']]);
@@ -84,6 +85,25 @@ final class SiasnTarikRiwayatTest extends DatabaseTestCase
 
         $baru = $this->db->table('riwayat_skp')->where('id_rw_siasn', 'SKP-5')->get()->getRowArray();
         $this->assertSame(['2025', '2025-01-02', '2025-12-30', '1', '3', 'Butuh Perbaikan', '4', '1', 'Sync SIASN'], [(string) $baru['tahun'], $baru['tgl_mulai'], $baru['tgl_akhir'], (string) $baru['rating_skp'], (string) $baru['rating_perilaku'], $baru['kategori_nilai_prestasi'], (string) $baru['siasn_flag'], (string) $baru['status'], $baru['keterangan']]);
+    }
+
+    /**
+     * Putusan reviewer B6 (d) — ikut legacy: hapus fisik SKP hanya bila batch itu punya sisip/ubah SKP (blok hapus legacy
+     * berada di dalam `if (count($paramIns) > 0 || count($paramUpd) > 0)`, `Rw_skp.php:201`).
+     */
+    public function testSkpTanpaSisipUbahDalamBatchTidakMenghapus(): void
+    {
+        $this->buatPegawai(['nip' => self::NIP_A, 'id_jenis_pegawai' => 1]);
+        $tetap  = $this->skp(self::NIP_A, ['tahun' => 2022, 'id_rw_siasn' => 'SKP-1', 'rating_skp' => 3, 'rating_perilaku' => 2, 'kategori_nilai_prestasi' => 'Baik']);
+        $hilang = $this->skp(self::NIP_A, ['tahun' => 2023, 'id_rw_siasn' => 'SKP-HILANG']);
+
+        $this->antreToken();
+        $this->antreData([$this->dataSkp('SKP-1', 2022, '1', '2', 'BAIK')]);
+
+        $h = $this->tarik()->jalankan('skp');
+
+        $this->assertSame(['sisip' => 0, 'ubah' => 0, 'pasang' => 0, 'lepas' => 0, 'hapus' => 0, 'ganda' => 0], $h['jumlah']);
+        $this->assertSame(2, $this->db->table('riwayat_skp')->whereIn('id_riwayat_skp', [$tetap, $hilang])->countAllResults(), 'tanpa sisip/ubah → tanpa hapus');
     }
 
     public function testPendidikanPasangSisipLainLainDanLepas(): void
@@ -113,6 +133,7 @@ final class SiasnTarikRiwayatTest extends DatabaseTestCase
 
         $this->assertSame(1, $h['nip'], 'PNS (1) dan PPPK (6) saja');
         $this->assertSame(['sisip' => 2, 'ubah' => 0, 'pasang' => 1, 'lepas' => 1, 'hapus' => 0, 'ganda' => 0], $h['jumlah']);
+        $this->assertSame(1, $h['info']['referensi_tak_terpetakan'], 'TK-HILANG → jenjang NULL (putusan reviewer (c))');
 
         $rw = array_column($this->db->table('riwayat_pendidikan')->where('nip', self::NIP_A)->get()->getResultArray(), null, 'id_rw_siasn');
         $this->assertSame((string) $p2, (string) $rw['DIDIK-2']['id_riwayat_pendidikan']);
@@ -127,12 +148,23 @@ final class SiasnTarikRiwayatTest extends DatabaseTestCase
         $this->assertArrayNotHasKey('DIDIK-5', $rw, 'tanpa tanggal & tahun lulus dilewati');
     }
 
-    public function testPmkPasangLewatTglSkSisipTolakDanLepas(): void
+    /**
+     * Putusan reviewer B6 Q1–Q4 untuk PMK: pasang lewat `tgl_sk` (Q3), `tgl_sk` cocok ke >1 baris lokal → tidak dipasangkan
+     * dan tidak disisipkan + INFO `pairing_ganda` (Q3), `siasn_lu` UTC & `masaKerjaTahun` (Q4), API gagal → `id_rw_siasn`
+     * tetap (Q1), sukses + data kosong → tanpa unpair + INFO `data_kosong` (Q2), unpair berjalan tanpa sisip (Q4).
+     */
+    public function testPmkPasangLewatTglSkPairingGandaSisipTolakDanLepas(): void
     {
         $this->buatPegawai(['nip' => self::NIP_A, 'id_jenis_pegawai' => 1]);
+        $this->buatPegawai(['nip' => self::NIP_B, 'id_jenis_pegawai' => 1]);
+        $this->buatPegawai(['nip' => self::NIP_C, 'id_jenis_pegawai' => 1]);
         $m1 = $this->pmk(self::NIP_A, ['tgl_sk' => '2008-01-10', 'id_rw_siasn' => 'PMK-1']);
         $m2 = $this->pmk(self::NIP_A, ['tgl_sk' => '2010-05-01']);
         $m3 = $this->pmk(self::NIP_A, ['tgl_sk' => '2012-03-01', 'id_rw_siasn' => 'PMK-LAMA']);
+        $g1 = $this->pmk(self::NIP_A, ['tgl_sk' => '2014-07-01', 'no_sk' => 'SK-GANDA-1']);
+        $g2 = $this->pmk(self::NIP_A, ['tgl_sk' => '2014-07-01', 'no_sk' => 'SK-GANDA-2']);
+        $mB = $this->pmk(self::NIP_B, ['tgl_sk' => '2011-01-01', 'id_rw_siasn' => 'PMK-B']);
+        $mC = $this->pmk(self::NIP_C, ['tgl_sk' => '2011-01-01', 'id_rw_siasn' => 'PMK-C']);
 
         $this->antreToken();
         $this->antreData([
@@ -140,18 +172,34 @@ final class SiasnTarikRiwayatTest extends DatabaseTestCase
             ['id' => 'PMK-2', 'tanggalSk' => '01-05-2010'],
             ['id' => 'PMK-3', 'idPns' => 'PNS-UJI-A', 'nomorSk' => 'SK-PMK-3', 'tanggalSk' => '02-02-2020', 'nomorBkn' => 'BKN-3', 'tanggalBkn' => '03-02-2020', 'pengalaman' => 'PT Contoh', 'tanggalAwal' => '01-01-2005', 'tanggalSelesai' => '31-12-2007', 'masaKerjaTahun' => '3', 'masaKerjaBulan' => '0', 'dinilai' => 'Ya'],
             ['id' => 'PMK-4', 'tanggalSk' => '2020/02/02'],
+            ['id' => 'PMK-G', 'tanggalSk' => '01-07-2014'],
         ]);
+        $this->transport->antre(new Respons(500, 'galat'), new Respons(500, 'galat'), new Respons(500, 'galat'));
+        $this->antreData([]);
 
         $h = $this->tarik()->jalankan('pmk');
 
         $this->assertSame(['sisip' => 1, 'ubah' => 0, 'pasang' => 1, 'lepas' => 1, 'hapus' => 0, 'ganda' => 0], $h['jumlah']);
         $this->assertSame(['tanggalSk_tanggal' => 1], $h['ditolak']);
+        $this->assertSame(['data_kosong' => 1, 'pairing_ganda' => 1, 'referensi_tak_terpetakan' => 0], $h['info']);
 
-        $rw = array_column($this->db->table('riwayat_pmk')->where('nip', self::NIP_A)->get()->getResultArray(), null, 'id_riwayat_pmk');
+        $rw = array_column($this->db->table('riwayat_pmk')->get()->getResultArray(), null, 'id_riwayat_pmk');
         $this->assertSame(['PMK-1', 'PMK-2', null], [$rw[$m1]['id_rw_siasn'], $rw[$m2]['id_rw_siasn'], $rw[$m3]['id_rw_siasn']]);
+        $this->assertSame([null, null], [$rw[$g1]['id_rw_siasn'], $rw[$g2]['id_rw_siasn']], 'Q3: pairing ganda tidak dipasangkan');
+        $this->assertSame(0, $this->db->table('riwayat_pmk')->where('id_rw_siasn', 'PMK-G')->countAllResults(), 'Q3: pairing ganda tidak disisipkan');
+        $this->assertSame('PMK-B', $rw[$mB]['id_rw_siasn'], 'Q1: API gagal → tidak di-unpair');
+        $this->assertSame('PMK-C', $rw[$mC]['id_rw_siasn'], 'Q2: data kosong → tidak di-unpair');
+
         $baru = $this->db->table('riwayat_pmk')->where('id_rw_siasn', 'PMK-3')->get()->getRowArray();
         $this->assertSame(['SK-PMK-3', '2020-02-02', 'PT Contoh', '3', '0', '1', '1', (string) $this->idAkun], [$baru['no_sk'], $baru['tgl_sk'], $baru['instansi'], (string) $baru['mker_th'], (string) $baru['mker_bl'], (string) $baru['siasn_flag'], (string) $baru['status'], (string) $baru['updated_by']]);
-        $this->assertNotNull($baru['siasn_lu'], 'siasn_lu = waktu tarik (legacy menulis teks ke DATETIME)');
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string) $baru['siasn_lu'], 'Q4: siasn_lu = waktu tarik UTC (legacy menulis teks)');
+
+        // Q4: unpair berjalan sendiri — NIP C kini mengembalikan riwayat lain saja, tanpa ada yang disisipkan.
+        $this->pmk(self::NIP_C, ['tgl_sk' => '2013-01-01', 'id_rw_siasn' => 'PMK-C2']);
+        $this->antreData([['id' => 'PMK-C2', 'tanggalSk' => '01-01-2013']]);
+        $u = $this->tarik()->jalankan('pmk', 20, self::NIP_C);
+        $this->assertSame(['sisip' => 0, 'ubah' => 0, 'pasang' => 0, 'lepas' => 1, 'hapus' => 0, 'ganda' => 0], $u['jumlah']);
+        $this->assertNull($this->db->table('riwayat_pmk')->where('id_riwayat_pmk', $mC)->get()->getRow()->id_rw_siasn);
     }
 
     public function testAkMembandingkanBarisAkYangBenarDanJabatanPadaTanggalSkTanpaHapus(): void
