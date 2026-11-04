@@ -19,10 +19,11 @@ interface SiasnDorongInterface
      *
      * @param array<string, mixed> $payload
      * @param list<string>         $rahasia nilai yang disensor dari log (mis. id PNS SIASN)
+     * @param string|null          $refId   rujukan baris lokal `<tabel>:<pk>` untuk `integrasi_log` (tanpa NIP)
      *
      * @return array{status_code: string, message: string, data: mixed}
      */
-    public function simpanRiwayat(string $jalur, array $payload, array $rahasia = []): array;
+    public function simpanRiwayat(string $jalur, #[\SensitiveParameter] array $payload, #[\SensitiveParameter] array $rahasia = [], ?string $refId = null): array;
 
     /**
      * Unggah dokumen (PDF) sebuah riwayat SIASN [K `postApi_siasnArsip` → `upload-dok-rw`]. `status_code` `'200'` bila
@@ -32,5 +33,5 @@ interface SiasnDorongInterface
      *
      * @return array{status_code: string, message: string, data: mixed}
      */
-    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = []): array;
+    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, #[\SensitiveParameter] array $rahasia = []): array;
 }

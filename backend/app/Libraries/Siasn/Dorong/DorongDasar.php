@@ -15,10 +15,36 @@ abstract class DorongDasar implements JenisDorongSiasn
 {
     public const PENANDA = '**Upload To SIASN**';
 
+    /** Pesan `siasn_error` bila hasil POST sukses gagal disimpan (review B6 M2 B-1). */
+    public const PESAN_TIDAK_TERSIMPAN = 'Hasil tidak tersimpan; periksa BKN sebelum didorong lagi.';
+
     protected const NIP_DILEWATI = ['-', '1'];
 
-    /** Panjang kolom `siasn_error` (TINYTEXT di riwayat_diklat/seminar/skp). */
-    protected const ERROR_MAKS = 255;
+    /** Batas BYTE kolom TINYTEXT (`siasn_error`, `keterangan` riwayat_diklat/seminar) — strictOn menolak yang lebih panjang. */
+    protected const TINYTEXT_BYTE = 255;
+
+    /** Batas byte `siasn_error`; null = tanpa batas praktis. */
+    protected function errorMaksByte(): int
+    {
+        return self::TINYTEXT_BYTE;
+    }
+
+    /** Batas byte `keterangan`; null = kolom panjang (MEDIUMTEXT). */
+    protected function keteranganMaksByte(): ?int
+    {
+        return self::TINYTEXT_BYTE;
+    }
+
+    public function rahasia(array $baris): array
+    {
+        return array_values(array_filter([trim((string) ($baris['pns_id'] ?? '')), trim((string) ($baris['nip'] ?? ''))], static fn (string $s): bool => $s !== ''));
+    }
+
+    public function dataTidakTersimpan(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array
+    {
+        // Flag 3 tidak terpilih lagi untuk tabel sekali-dorong (kriteria flag 0, CR-090).
+        return ['id_rw_siasn' => $idSiasn, 'siasn_flag' => 3, 'siasn_error' => self::PESAN_TIDAK_TERSIMPAN];
+    }
 
     /** Kunci id di `mapData`; null = `mapData` itu sendiri id-nya (skp22). */
     abstract protected function kunciId(): ?string;
@@ -43,13 +69,11 @@ abstract class DorongDasar implements JenisDorongSiasn
 
     public function dataSukses(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array
     {
-        $keterangan = trim((string) ($baris['keterangan'] ?? ''));
-
         return [
             'id_rw_siasn' => $idSiasn,
             'siasn_flag'  => 1,
             'siasn_error' => null,
-            'keterangan'  => $keterangan !== '' ? "{$keterangan} " . self::PENANDA : self::PENANDA,
+            'keterangan'  => $this->keteranganPenanda($baris['keterangan'] ?? null),
             'updated_by'  => $idAkun,
         ];
     }
@@ -59,9 +83,31 @@ abstract class DorongDasar implements JenisDorongSiasn
         return [
             'id_rw_siasn' => null,
             'siasn_flag'  => 2,
-            'siasn_error' => mb_substr($pesan, 0, self::ERROR_MAKS),
+            'siasn_error' => mb_strcut($pesan, 0, $this->errorMaksByte()),
             'updated_by'  => $idAkun,
         ];
+    }
+
+    /**
+     * `keterangan` + penanda [K] — tidak ditambah ulang bila sudah ada (saran review B6 M2 #5); bila tidak muat di kolom
+     * (dihitung BYTE, review B-1) penanda dilewati dan keterangan asal dipertahankan.
+     */
+    protected function keteranganPenanda(mixed $keterangan): ?string
+    {
+        $asal = trim((string) $keterangan);
+
+        if (str_contains($asal, self::PENANDA)) {
+            return $asal;
+        }
+
+        $baru = $asal !== '' ? "{$asal} " . self::PENANDA : self::PENANDA;
+        $maks = $this->keteranganMaksByte();
+
+        if ($maks === null || strlen($baru) <= $maks) {
+            return $baru;
+        }
+
+        return $asal !== '' ? mb_strcut($asal, 0, $maks) : null;
     }
 
     /**

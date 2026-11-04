@@ -119,3 +119,17 @@ php spark siasn:unggah-arsip [--langkah=semua|antre|unggah] [--limit=N] [--dry-r
   `berkas_hilang`, `tidak_sah`, `status_tidak_diketahui`).
 - Bentuk unggah (nama field berkas `file`, balasan `{code, data}`) masih **asumsi** di `SiasnAdapter::unggahDokumen()` sampai
   bentuk `postApi_siasnArsip` legacy dikonfirmasi (B6 M3 Q1).
+
+## Catatan risiko dorong (review kode B6 M2)
+
+- **Hasil POST sukses tidak pernah memicu POST ulang:** gagal ditulis → dicoba sekali lagi → data minimal (sekali-dorong:
+  flag 3; jabatan: flag 1 + `siasn_lu = updated_at`) + `siasn_error` "Hasil tidak tersimpan; periksa BKN …", log `critical`,
+  `integrasi_log` kode `hasil_tidak_tersimpan` (tabel:pk + id SIASN). Bila itu pun gagal, batch berhenti.
+- **Galat token / 401 kedua** → batch berhenti tanpa menulis baris (exit 1). Baris sekali-dorong tetap flag 0.
+- **502/503/504 atau 2xx bukan JSON** bisa berarti BKN sudah memproses. Jabatan gagal diulang setiap 6 jam (flag 2/3), jadi
+  ada risiko riwayat ganda di BKN; periksa di SIASN bila `siasn_error` berisi kode 5xx berulang (saran #2, dicatat).
+- **Selisih kecil payload jabatan** ikut legacy (mis. `jenis_mutasi` selain 1/2 → MJ, unor cadangan saat `id_unit` NULL tidak
+  cocok → unor bawaan) (saran #6, dicatat).
+- **`riwayat_skp.updated_at` tanpa ON UPDATE:** nilai tidak berubah saat dorong; tidak dipakai kriteria SKP 2022 (saran #7, dicatat).
+- **Jadwal:** `siasn:tarik --jenis=skp` dan `siasn:dorong --jenis=skp22` memakai kunci berbeda; jadwalkan tidak bersamaan di
+  runbook (B7, PN-5) (saran #8, dicatat).

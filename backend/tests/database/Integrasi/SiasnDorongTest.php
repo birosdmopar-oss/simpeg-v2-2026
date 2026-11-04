@@ -204,7 +204,7 @@ final class SiasnDorongTest extends DatabaseTestCase
         $putus = new class () implements SiasnDorongInterface {
             public int $ke = 0;
 
-            public function simpanRiwayat(string $jalur, array $payload, array $rahasia = []): array
+            public function simpanRiwayat(string $jalur, array $payload, array $rahasia = [], ?string $refId = null): array
             {
                 if (++$this->ke === 2) {
                     throw new RuntimeException('proses terhenti');

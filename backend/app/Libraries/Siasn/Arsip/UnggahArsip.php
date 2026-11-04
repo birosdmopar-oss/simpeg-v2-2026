@@ -10,6 +10,7 @@ use App\Interfaces\SiasnDorongInterface;
 use App\Libraries\Cli\KoneksiCli;
 use App\Libraries\Integrasi\AkunSistemIntegrasi;
 use App\Libraries\Integrasi\Log\CatatanIntegrasi;
+use App\Libraries\Siasn\Dorong\SiasnTokenGagal;
 use App\Libraries\Siasn\SiasnAdapter;
 use App\Libraries\Siasn\Tarik\PenulisTarik;
 use App\Libraries\Siasn\Tarik\RencanaTarik;
@@ -95,6 +96,7 @@ final class UnggahArsip
      *
      * @throws SiasnTarikSibuk
      * @throws DatabaseException
+     * @throws \App\Libraries\Siasn\Dorong\SiasnTokenGagal token/otorisasi BKN ditolak (batch dihentikan)
      * @throws \App\Libraries\Integrasi\AkunSistemTidakSiap
      */
     public function jalankan(string $langkah = 'semua', int $limit = self::LIMIT_BAWAAN, bool $dryRun = false): array
@@ -223,6 +225,11 @@ final class UnggahArsip
         }
 
         $balasan = $this->siasn->unggahDokumen($idRwSiasn, self::SLUG[(string) $b['rw_name']] ?? '872', $isi, $nama, [(string) $b['nip']]);
+
+        if (in_array($balasan['status_code'], ['token', '401'], true)) {
+            // Pola review B6 M2 P-3: token BKN ditolak → hentikan tanpa menulis baris (status 3 dikembalikan ke 0).
+            throw new SiasnTokenGagal('Token/otorisasi BKN ditolak; unggah arsip dihentikan tanpa menulis hasil baris.');
+        }
 
         if ($balasan['status_code'] === SiasnAdapter::SUKSES && is_array($balasan['data'])) {
             $hasil['sukses']++;

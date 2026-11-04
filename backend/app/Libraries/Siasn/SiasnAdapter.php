@@ -26,8 +26,9 @@ use InvalidArgumentException;
  *   `'timeout'` / `'koneksi'` (galat transport), `'token'` (token BKN gagal diperoleh).
  * Kegagalan tidak pernah dilempar (kontrak: kegagalan SIASN dicatat dan tidak menggagalkan operasi utama, AC-03.1); pesan
  * tanpa host, token, maupun NIP. Dorong riwayat memakai {@see SiasnDorongInterface::simpanRiwayat()} (M2): POST JSON
- * `{baseUrlApi}/{jalur}`, TIDAK di-retry otomatis (BP-3; 401 → token diperbarui lalu dikirim sekali lagi, permintaan
- * ditolak sebelum diproses); `syncPegawai` kontrak lama tidak dipakai.
+ * `{baseUrlApi}/{jalur}`, TIDAK di-retry otomatis (BP-3). 401 → token diperbarui lalu dikirim sekali lagi — ASUMSI
+ * (saran review B6 M2 #1c): gateway menolak permintaan 401 sebelum diproses; 401 kedua → `status_code` `'401'` dan
+ * pemanggil menghentikan batch. `syncPegawai` kontrak lama tidak dipakai.
  */
 final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface, SiasnReferensiInterface
 {
@@ -86,7 +87,7 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
         return ['status_code' => 'tidak_didukung', 'message' => 'Dorong SIASN memakai SiasnDorongInterface (MAKE-067 M2).', 'data' => null, 'synced_at' => null];
     }
 
-    public function simpanRiwayat(string $jalur, array $payload, array $rahasia = []): array
+    public function simpanRiwayat(string $jalur, #[\SensitiveParameter] array $payload, #[\SensitiveParameter] array $rahasia = [], ?string $refId = null): array
     {
         try {
             $respons = $this->token->kirimSiasn(fn (array $h): Permintaan => new Permintaan(
@@ -96,6 +97,7 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
                 'simpan_' . str_replace(['/', '-'], '_', preg_replace('#/save$#', '', $jalur) ?? $jalur),
                 header: $h + ['Content-Type' => 'application/json'],
                 json: $payload,
+                refId: $refId,
                 rahasia: array_values(array_filter($rahasia, static fn (string $s): bool => $s !== '')),
             ));
         } catch (GalatTransport $e) {
@@ -155,7 +157,7 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
      *
      * @return array{status_code: string, message: string, data: mixed}
      */
-    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, array $rahasia = []): array
+    public function unggahDokumen(string $idRiwayatSiasn, string $idRefDokumen, string $isi, string $namaBerkas, #[\SensitiveParameter] array $rahasia = []): array
     {
         try {
             $respons = $this->token->kirimSiasn(fn (array $h): Permintaan => new Permintaan(

@@ -57,6 +57,25 @@ interface JenisDorongSiasn
     public function dataSukses(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array;
 
     /**
+     * Data UPDATE minimal bila data sukses gagal ditulis sesudah POST sukses (review B6 M2 B-1): baris TIDAK boleh
+     * terpilih lagi (mencegah duplikat di BKN).
+     *
+     * @param array<string, mixed> $baris
+     *
+     * @return array<string, mixed>
+     */
+    public function dataTidakTersimpan(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array;
+
+    /**
+     * Nilai yang disensor dari log dan `siasn_error` (id PNS, NIP, NIP penilai, …).
+     *
+     * @param array<string, mixed> $baris
+     *
+     * @return list<string>
+     */
+    public function rahasia(array $baris): array;
+
+    /**
      * Data UPDATE sesudah gagal (kode `status_code` adapter) atau payload tidak sah (`$kode` = null).
      *
      * @param array<string, mixed> $baris

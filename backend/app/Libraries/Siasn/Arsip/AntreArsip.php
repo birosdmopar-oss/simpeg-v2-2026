@@ -20,8 +20,9 @@ use CodeIgniter\Database\BaseConnection;
  * - Sertifikasi: `riwayat_diklat.jenis_diklat = 5` yang sudah terkirim, PNS aktif × lampiran `jenis_rwy` 5;
  * - kunci anti-antre-ulang legacy `nip***id_rw***arsip_path` DAN UNIQUE (`rw_name`,`id_rw`,`id_da`) lewat INSERT IGNORE;
  *   `arsip_path` = `document_attachment.path` apa adanya; hanya path yang lolos {@see PathLegacy::normalisasi()}.
- * - Saring ukuran legacy `file_size < 1200` tidak dipakai saat antre (unit KB legacy vs byte v2 — usulan B6 M3 Q2(b));
- *   ukuran diperiksa dari isi berkas saat unggah ({@see UnggahArsip}).
+ * - DEVIASI (putusan reviewer B6 M3 Q2(b)): saring ukuran legacy `file_size < 1200` [K `Rw_jabatan:603`] tidak dipakai
+ *   saat antre karena unit `document_attachment.file_size` campuran (baris impor legacy KB, unggahan v2 byte); antre hanya
+ *   menyaring PDF, ukuran diperiksa dari ISI berkas saat unggah (≤ 1 MB [K `Arsip:87`], {@see UnggahArsip}).
  */
 final class AntreArsip
 {

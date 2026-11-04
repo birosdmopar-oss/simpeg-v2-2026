@@ -157,7 +157,7 @@ final class SiasnArsipTest extends DatabaseTestCase
         $this->assertSame([], $this->transport->tercatat());
 
         $putus = new class () implements SiasnDorongInterface {
-            public function simpanRiwayat(string $jalur, array $payload, array $rahasia = []): array
+            public function simpanRiwayat(string $jalur, array $payload, array $rahasia = [], ?string $refId = null): array
             {
                 throw new RuntimeException('tidak dipakai');
             }

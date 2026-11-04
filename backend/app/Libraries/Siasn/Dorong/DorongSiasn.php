@@ -10,8 +10,6 @@ use App\Libraries\Cli\KoneksiCli;
 use App\Libraries\Integrasi\AkunSistemIntegrasi;
 use App\Libraries\Integrasi\Log\CatatanIntegrasi;
 use App\Libraries\Siasn\SiasnAdapter;
-use App\Libraries\Siasn\Tarik\PenulisTarik;
-use App\Libraries\Siasn\Tarik\RencanaTarik;
 use App\Libraries\Siasn\Tarik\SiasnTarikSibuk;
 use App\Libraries\Siasn\Tarik\SiasnTidakSiap;
 use Closure;
@@ -98,6 +96,7 @@ final class DorongSiasn
      *
      * @throws SiasnTarikSibuk
      * @throws DatabaseException
+     * @throws SiasnTokenGagal token/otorisasi BKN ditolak (batch dihentikan)
      */
     public function jalankan(string $nama, int $limit = self::LIMIT_BAWAAN, ?string $nip = null, bool $dryRun = false): array
     {
@@ -160,23 +159,31 @@ final class DorongSiasn
                     continue;
                 }
 
-                $rahasia = array_values(array_filter([(string) ($b['pns_id'] ?? ''), (string) ($b['nip'] ?? '')]));
-                $balasan = $this->siasn->simpanRiwayat($jenis->jalur(), $payload, $rahasia);
+                $rahasia = $jenis->rahasia($b);
+                $balasan = $this->siasn->simpanRiwayat($jenis->jalur(), $payload, $rahasia, $jenis->tabel() . ':' . $id);
+
+                if (in_array($balasan['status_code'], ['token', '401'], true)) {
+                    // Review B6 M2 P-3: hentikan batch TANPA menulis baris ini (dipulihkan bersama sisanya).
+                    throw new SiasnTokenGagal('Token/otorisasi BKN ditolak; dorong dihentikan tanpa menulis hasil baris.');
+                }
+
                 $hasil['terkirim']++;
 
                 if ($balasan['status_code'] === SiasnAdapter::SUKSES) {
                     $idSiasn = $jenis->idDariBalasan($balasan['data']);
                     $hasil['sukses']++;
                     $hasil['sukses_tanpa_id'] += $idSiasn === null ? 1 : 0;
-                    $data = $jenis->dataSukses($b, $idSiasn, $idAkun, $this->sekarang());
-                } else {
-                    $hasil['gagal']++;
-                    // Putusan reviewer B6 M2 Q9: timeout/koneksi → status di SIASN tidak diketahui (operator memeriksa duplikat).
-                    $hasil['status_tidak_diketahui'] += in_array($balasan['status_code'], ['timeout', 'koneksi'], true) ? 1 : 0;
-                    $data = $jenis->dataGagal($b, $balasan['status_code'], self::pesanAman($balasan, $rahasia), $idAkun, $this->sekarang());
+                    // POST sukses SUDAH terjadi: baris tidak boleh kembali ke penanda asal (review B6 M2 B-1).
+                    unset($belum[$id]);
+                    $this->tulisSesudahSukses($nama, $jenis, $b, $id, $idSiasn, $idAkun);
+
+                    continue;
                 }
 
-                $this->tulis($jenis, $id, $data);
+                $hasil['gagal']++;
+                // Putusan reviewer B6 M2 Q9: timeout/koneksi → status di SIASN tidak diketahui (operator memeriksa duplikat).
+                $hasil['status_tidak_diketahui'] += in_array($balasan['status_code'], ['timeout', 'koneksi'], true) ? 1 : 0;
+                $this->tulis($jenis, $id, $jenis->dataGagal($b, $balasan['status_code'], self::pesanAman($balasan, $rahasia), $idAkun, $this->sekarang()), self::snapshot($b));
                 unset($belum[$id]);
             }
         } catch (Throwable $e) {
@@ -237,22 +244,105 @@ final class DorongSiasn
     }
 
     /**
-     * @param array<string, mixed> $data
+     * Tulis hasil POST sukses (review B6 M2 B-1): gagal → coba sekali lagi → gagal lagi → data minimal
+     * {@see JenisDorongSiasn::dataTidakTersimpan()} agar baris TIDAK terpilih lagi (mencegah duplikat di BKN), plus log
+     * `critical` dan `integrasi_log` kode `hasil_tidak_tersimpan` (tabel, pk, id SIASN; tanpa NIP). Bila data minimal pun
+     * gagal (DB tidak dapat ditulis), batch dihentikan.
+     *
+     * @param array<string, mixed> $b
      */
-    private function tulis(JenisDorongSiasn $jenis, int $id, array $data): void
+    private function tulisSesudahSukses(string $nama, JenisDorongSiasn $jenis, array $b, int $id, ?string $idSiasn, int $idAkun): void
     {
-        $r = new RencanaTarik();
-        $r->ubah($jenis->tabel(), [$jenis->pk() => $id], $data);
-        (new PenulisTarik($this->db))->terapkan($r);
+        $galat = null;
+
+        for ($coba = 0; $coba < 2; $coba++) {
+            try {
+                $this->tulis($jenis, $id, $jenis->dataSukses($b, $idSiasn, $idAkun, $this->sekarang()), self::snapshot($b));
+
+                return;
+            } catch (Throwable $e) {
+                $galat = $e;
+            }
+        }
+
+        $ref = $jenis->tabel() . ':' . $id . ' id_siasn ' . ($idSiasn ?? '-');
+        log_message('critical', 'Dorong SIASN: POST sukses tetapi hasil tidak tersimpan ({ref}, {kelas}); periksa BKN sebelum didorong lagi.', ['ref' => $ref, 'kelas' => $galat::class]);
+        $this->log->catat(new CatatanIntegrasi(CatatanIntegrasi::ARAH_KELUAR, SiasnAdapter::LAYANAN, 'dorong_' . $nama, CatatanIntegrasi::GAGAL, null, 'hasil_tidak_tersimpan', $ref, refId: $jenis->tabel() . ':' . $id));
+
+        try {
+            $this->tulis($jenis, $id, $jenis->dataTidakTersimpan($b, $idSiasn, $idAkun, $this->sekarang()));
+        } catch (Throwable $e) {
+            throw $e instanceof DatabaseException ? $e : new DatabaseException('Hasil dorong SIASN tidak tersimpan.', 0, $e);
+        }
     }
 
     /**
-     * Pesan gagal untuk `siasn_error`: kode + pesan adapter (≤ 200), nilai rahasia (id PNS, NIP) disensor.
+     * Stempel `updated_at` saat baris dipilih (jabatan) — UPDATE bersyarat agar edit pengguna selama batch tidak hilang dari
+     * dorong ulang (review B6 M2 P-2).
+     *
+     * @param array<string, mixed> $b
+     */
+    private static function snapshot(array $b): ?string
+    {
+        return isset($b['updated_at']) && is_string($b['updated_at']) && $b['updated_at'] !== '' ? $b['updated_at'] : null;
+    }
+
+    /**
+     * UPDATE satu baris dalam transaksi pola proyek. Bila data membawa `updated_at` dan ada `$snapshot`: syarat
+     * `updated_at = snapshot`; 0 baris (pengguna mengubah riwayat selama batch) → hasil tetap ditulis tetapi `updated_at`
+     * pengguna dipertahankan dan `siasn_lu = snapshot`, sehingga riwayat itu terpilih lagi (`siasn_lu < updated_at`).
+     *
+     * @param array<string, mixed> $data
+     */
+    private function tulis(JenisDorongSiasn $jenis, int $id, array $data, ?string $snapshot = null): void
+    {
+        $bersyarat = $snapshot !== null && array_key_exists('updated_at', $data);
+
+        $this->db->transBegin();
+
+        try {
+            $qb = $this->db->table($jenis->tabel())->where($jenis->pk(), $id);
+
+            if ($bersyarat) {
+                $qb->where('updated_at', $snapshot);
+            }
+
+            if ($qb->update($data) === false) {
+                throw new DatabaseException('Hasil dorong SIASN gagal ditulis.');
+            }
+
+            if ($bersyarat && $this->db->affectedRows() === 0) {
+                $ulang = $data;
+                unset($ulang['updated_at']);
+                $ulang['siasn_lu'] = $snapshot;
+
+                if ($this->db->table($jenis->tabel())->where($jenis->pk(), $id)->set($ulang)->set('updated_at', 'updated_at', false)->update() === false) {
+                    throw new DatabaseException('Hasil dorong SIASN gagal ditulis.');
+                }
+            }
+
+            if (! $this->db->transStatus()) {
+                throw new DatabaseException('Transaksi hasil dorong SIASN gagal.');
+            }
+
+            $this->db->transCommit();
+            $this->db->resetTransStatus();
+        } catch (Throwable $e) {
+            $this->db->transRollback();
+            $this->db->resetTransStatus();
+
+            throw $e instanceof DatabaseException ? $e : new DatabaseException('Hasil dorong SIASN gagal ditulis: ' . $e::class, 0, $e);
+        }
+    }
+
+    /**
+     * Pesan gagal untuk `siasn_error`: kode + pesan adapter, nilai rahasia (id PNS, NIP, NIP penilai) disensor; dipotong per
+     * BYTE (kolom TINYTEXT, review B6 M2 P-4).
      *
      * @param array{status_code: string, message: string, data: mixed} $balasan
      * @param list<string>                                              $rahasia
      */
-    public static function pesanAman(array $balasan, array $rahasia): string
+    public static function pesanAman(array $balasan, #[\SensitiveParameter] array $rahasia): string
     {
         $pesan = $balasan['message'] === 'Internal Server Error' ? $balasan['message'] : match ($balasan['status_code']) {
             'timeout', 'koneksi' => 'Gagal terhubung (' . $balasan['status_code'] . '); status di SIASN tidak diketahui.',
@@ -265,7 +355,7 @@ final class DorongSiasn
             $pesan = str_replace($r, '***', $pesan);
         }
 
-        return mb_substr($pesan, 0, 255);
+        return mb_strcut($pesan, 0, 255);
     }
 
     private function sekarang(): string

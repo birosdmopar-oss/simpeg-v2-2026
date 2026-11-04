@@ -128,23 +128,48 @@ final class DorongJabatan extends DorongDasar
         ];
     }
 
+    /** `siasn_error` TEXT; dibatasi agar tetap ringkas. */
+    protected function errorMaksByte(): int
+    {
+        return 1000;
+    }
+
+    /** `keterangan` MEDIUMTEXT. */
+    protected function keteranganMaksByte(): ?int
+    {
+        return null;
+    }
+
     public function dataSukses(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array
     {
-        return ['siasn_lu' => $sekarang, 'updated_at' => $sekarang] + parent::dataSukses($baris, $idSiasn, $idAkun, $sekarang);
+        // Review B6 M2 P-1: sukses tanpa id tidak menimpa pasangan lama (edit berikutnya tetap memperbarui riwayat yang sama).
+        return ['siasn_lu' => $sekarang, 'updated_at' => $sekarang] + parent::dataSukses($baris, $idSiasn ?? $this->idLama($baris), $idAkun, $sekarang);
     }
 
     public function dataGagal(array $baris, ?string $kode, string $pesan, int $idAkun, string $sekarang): array
     {
-        $id = trim((string) $baris['id_rw_siasn']) !== '' ? (string) $baris['id_rw_siasn'] : null;
-
         return [
-            'id_rw_siasn' => $id,
+            'id_rw_siasn' => $this->idLama($baris),
             'siasn_flag'  => $pesan === 'Internal Server Error' ? 3 : 2,
-            'siasn_error' => mb_substr($pesan, 0, 1000),
+            'siasn_error' => mb_strcut($pesan, 0, $this->errorMaksByte()),
             'siasn_lu'    => $sekarang,
             'updated_at'  => $sekarang,
             'updated_by'  => $idAkun,
         ];
+    }
+
+    public function dataTidakTersimpan(array $baris, ?string $idSiasn, int $idAkun, string $sekarang): array
+    {
+        // Flag 3 jabatan dipilih lagi setelah 6 jam → tandai SELESAI (flag 1, siasn_lu = updated_at) agar tidak di-POST ulang.
+        return ['id_rw_siasn' => $idSiasn ?? $this->idLama($baris), 'siasn_flag' => 1, 'siasn_error' => self::PESAN_TIDAK_TERSIMPAN, 'siasn_lu' => $sekarang, 'updated_at' => $sekarang];
+    }
+
+    /**
+     * @param array<string, mixed> $baris
+     */
+    private function idLama(array $baris): ?string
+    {
+        return trim((string) $baris['id_rw_siasn']) !== '' ? (string) $baris['id_rw_siasn'] : null;
     }
 
     /**

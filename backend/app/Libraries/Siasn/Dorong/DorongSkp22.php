@@ -46,6 +46,20 @@ final class DorongSkp22 extends DorongDasar
         return null;
     }
 
+    /** `riwayat_skp.keterangan` MEDIUMTEXT (`siasn_error` TINYTEXT tetap 255 byte). */
+    protected function keteranganMaksByte(): ?int
+    {
+        return null;
+    }
+
+    public function rahasia(array $baris): array
+    {
+        // Saran review B6 M2 #4: NIP penilai ikut disensor.
+        $nipPenilai = trim((string) ($baris['nip_atasan_penilai'] ?? ''));
+
+        return array_values(array_unique([...parent::rahasia($baris), ...($nipPenilai !== '' ? [$nipPenilai] : [])]));
+    }
+
     public function pilih(BaseConnection $db, int $limit, ?string $nip, string $sekarang): array
     {
         $qb = $db->table('riwayat_skp rw')->select('rw.*, peg.id_pns_siasn AS pns_id')

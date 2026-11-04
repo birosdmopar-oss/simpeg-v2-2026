@@ -8,6 +8,7 @@ use App\Libraries\Cli\OpsiCli;
 use App\Libraries\Integrasi\AkunSistemTidakSiap;
 use App\Libraries\Integrasi\KonfigurasiIntegrasiTidakLengkap;
 use App\Libraries\Siasn\Dorong\DorongSiasn;
+use App\Libraries\Siasn\Dorong\SiasnTokenGagal;
 use App\Libraries\Siasn\Tarik\SiasnTarikSibuk;
 use App\Libraries\Siasn\Tarik\SiasnTidakSiap;
 use CodeIgniter\CLI\BaseCommand;
@@ -65,7 +66,7 @@ class SiasnDorong extends BaseCommand
 
         try {
             $h = DorongSiasn::dariLayanan()->jalankan($jenis, (int) $limit, is_string($nip) ? $nip : null, isset($opsi['dry-run']));
-        } catch (KonfigurasiIntegrasiTidakLengkap|AkunSistemTidakSiap|SiasnTidakSiap|SiasnTarikSibuk $e) {
+        } catch (KonfigurasiIntegrasiTidakLengkap|AkunSistemTidakSiap|SiasnTidakSiap|SiasnTarikSibuk|SiasnTokenGagal $e) {
             CLI::error("Dorong SIASN {$jenis} GAGAL: " . $e->getMessage());
 
             return EXIT_ERROR;
