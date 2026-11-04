@@ -45,7 +45,8 @@ final class FcmV1Adapter implements PushNotifGatewayInterface, PushPlatformInter
 
     private const CACHE_TOKEN = 'fcm_token_akses';
 
-    public const IKON_BAWAAN = '/assets/images/logo-simpeg-v1-200x200.png';
+    /** Ikon notifikasi web (aset SPA `frontend/public`; ikon legacy `/assets/images/logo-simpeg-v1-200x200.png` tidak ada di v2). */
+    public const IKON_BAWAAN = '/apple-touch-icon.png';
 
     private string $projectId;
 
