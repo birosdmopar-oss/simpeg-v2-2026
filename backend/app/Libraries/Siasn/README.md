@@ -1,19 +1,20 @@
 # SIASN BKN (H-03, MAKE-067)
 
 Integrasi SIASN BKN Fase 6 Jalur B — **ikut legacy penuh** (PRD Fase 6 §7.3, F6-14). Tanpa UI admin; dijalankan lewat
-command terjadwal (crontab runbook, PN-5).
+command terjadwal (jadwal & pemantauan: `README-deploy.md` §1e; dicocokkan dengan crontab legacy, PN-5).
 
 - `SiasnAdapter` — adapter nyata `SiasnGatewayInterface` (kontrak tidak diubah): `GET {bkn.baseUrlApi}/pns/{jalur}/{nip}`
   dengan dua header token (`TokenBkn::kirimSiasn`, 401 → ulang sekali), GET di-retry `KlienHttp`, NIP disensor dari
   `integrasi_log`. Sukses hanya bila HTTP 2xx + `code == 1` + `data` berbentuk benar (data utama = objek, riwayat = daftar
   objek); selain itu `status_code` gagal (`'respons'`, kode HTTP, `'timeout'`, `'koneksi'`, `'token'`), tidak pernah
   dilempar.
-- `Tarik/*` — `siasn:tarik` (M1). Dorong (M2) dan arsip/referensi unor (M3) menyusul.
+- `Tarik/*` — `siasn:tarik` (M1; `ref-unor` M3), `Dorong/*` — `siasn:dorong` (M2), `Arsip/*` — `siasn:unggah-arsip` (M3).
+  Token BKN: `Libraries/Bkn/README.md`.
 
 ## `php spark siasn:tarik`
 
 ```
-php spark siasn:tarik --jenis=<data-utama|golongan|pendidikan|pmk|skp|ak> [--limit=N] [--nip=<nip>] [--dry-run]
+php spark siasn:tarik --jenis=<data-utama|golongan|pendidikan|pmk|skp|ak|ref-unor> [--limit=N] [--nip=<nip>] [--dry-run]
 ```
 
 | Opsi | Arti |

@@ -68,6 +68,50 @@ final class FcmV1AdapterTest extends CIUnitTestCase
         new FcmV1Adapter($this->klien(), new CacheService($this->cache, 'u_'), ['projectId' => 'proyek-uji', 'credentialsPath' => '/x.json'], static fn (): string => (string) json_encode(['client_email' => 'sa@contoh', 'token_uri' => self::TOKEN_URI]));
     }
 
+    public function testUjiKoneksiTokenBaruValidateOnlyKeTopikTanpaKirimKePerangkat(): void
+    {
+        // CR-101: token tersimpan dibuang dulu → kredensial service account benar-benar diuji.
+        (new CacheService($this->cache, 'u_'))->set('fcm_token_akses', 'akses-lama', 600);
+        $this->transport->antreJson(200, ['access_token' => 'akses-baru', 'expires_in' => 3599]);
+        $this->transport->antreJson(200, ['name' => 'projects/proyek-uji/messages/fake_message_id']);
+
+        $hasil = $this->fcm()->ujiKoneksi();
+
+        $this->assertSame(['ok' => true, 'http' => '200', 'kode' => 'ok'], $hasil);
+        [$token, $kirim] = array_column($this->transport->tercatat(), 'permintaan');
+        $this->assertSame(self::TOKEN_URI, $token->url, 'token baru, bukan dari cache');
+        $this->assertSame(['POST', 'Bearer akses-baru'], [$kirim->metode, $kirim->header['Authorization'] ?? null]);
+        $this->assertTrue($kirim->json['validate_only'], 'validate_only: tidak ada pesan terkirim');
+        $this->assertSame(FcmV1Adapter::TOPIK_UJI, $kirim->json['message']['topic']);
+        $this->assertArrayNotHasKey('token', $kirim->json['message'], 'tanpa token perangkat');
+        $this->assertStringNotContainsString('proyek-uji', (string) json_encode($hasil));
+        $this->assertStringNotContainsString('akses-baru', (string) json_encode($this->log->isi));
+    }
+
+    public function testUjiKoneksiGagalTokenIzinDanKoneksiHanyaKode(): void
+    {
+        $this->transport->antreJson(400, ['error' => 'invalid_grant']);
+        $this->assertSame(['ok' => false, 'http' => '-', 'kode' => 'token_oauth'], $this->fcm()->ujiKoneksi());
+
+        $this->transport->antre(new GalatTransport('putus', true));
+        $this->assertSame(['ok' => false, 'http' => 'timeout', 'kode' => 'token_oauth'], $this->fcm()->ujiKoneksi());
+
+        $this->transport->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599]);
+        $this->transport->antreJson(403, ['error' => ['code' => 403, 'status' => 'PERMISSION_DENIED', 'message' => 'Permission denied on resource project proyek-uji']]);
+        $hasil = $this->fcm()->ujiKoneksi();
+        $this->assertSame(['ok' => false, 'http' => '403', 'kode' => 'PERMISSION_DENIED'], $hasil);
+        $this->assertStringNotContainsString('proyek-uji', (string) json_encode($hasil), 'pesan FCM (memuat projectId) tidak dikembalikan');
+
+        $this->transport->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599]);
+        $this->transport->antre(new GalatTransport('putus', false));
+        $this->assertSame(['ok' => false, 'http' => 'koneksi', 'kode' => 'messages_send'], $this->fcm()->ujiKoneksi());
+
+        $this->transport->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599]);
+        $this->transport->antre(new \App\Libraries\Integrasi\Http\Respons(502, 'bukan json'));
+        $this->assertSame(['ok' => false, 'http' => '502', 'kode' => 'respons'], $this->fcm()->ujiKoneksi());
+        $this->assertCount(8, $this->transport->tercatat(), 'POST tanpa retry');
+    }
+
     public function testTokenAksesJwtServiceAccountDanCache(): void
     {
         $this->transport->antreJson(200, ['access_token' => 'akses-uji', 'expires_in' => 3599, 'token_type' => 'Bearer']);
