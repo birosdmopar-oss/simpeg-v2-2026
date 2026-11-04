@@ -6,30 +6,43 @@ namespace App\Commands;
 
 use App\Libraries\Cli\KoneksiCli;
 use App\Libraries\Cli\OpsiCli;
+use App\Libraries\Integrasi\AkunSistemIntegrasi;
+use App\Libraries\Integrasi\AkunSistemTidakSiap;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
-use App\Libraries\Kepegawaian\Lkh\LkhAutoApproval as PenyetujuanOtomatisLkh;
+use App\Libraries\Kepegawaian\Lkh\AutoApproval\AutoApprovalService;
+use App\Libraries\Kepegawaian\Lkh\AutoApproval\AutoApprovalSibuk;
+use App\Libraries\Kepegawaian\Lkh\AutoApproval\PenentuAutoApproval;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
-use DateTimeImmutable;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use InvalidArgumentException;
-use RuntimeException;
+use ReflectionClass;
+use Throwable;
 
 /**
- * `php spark lkh:auto-approval [--bulan=YYYY-MM] [--dry-run]` (H-12, F6-25): LKH bulan lalu yang masih Menunggu
- * disetujui otomatis (`auto_approval = 1`). Bawaan `--bulan` = bulan lalu dari tanggal bisnis hari ini.
- * Jadwal: tanggal 5 setiap bulan (ikut legacy `queue_aa_lkh`, ADR-037).
+ * Auto-approval LKH bulan lalu (H-12, MAKE-068, PRD Fase 6 §7.10, F6-25, CR-093):
+ *
+ *   php spark lkh:auto-approval [--bulan=YYYY-MM] [--dry-run]
+ *
+ * Jadwal runbook: tanggal 5 pukul 00:30 WIB, ulang 01:00/01:30/02:00 (PRD §6.4, ADR-037); tiap jalan aman diulang.
+ * Bawaan `--bulan` = bulan lalu dari tanggal bisnis WIB hari ini. Run nyata hanya untuk bulan lalu; `--dry-run` boleh bulan
+ * lampau lain (dihitung terhadap data saat ini); bulan berjalan dan masa depan ditolak. Kode keluar ≠ 0 bila ada LKH gagal
+ * diproses. Keluaran hanya jumlah, tanpa NIP/nama.
  */
 class LkhAutoApproval extends BaseCommand
 {
     protected $group       = 'LKH';
     protected $name        = 'lkh:auto-approval';
-    protected $description = 'Setujui otomatis LKH bulan lalu yang masih menunggu (ikut legacy, tanggal 5).';
+    protected $description = 'Menyetujui otomatis LKH bulan lalu yang masih menunggu (status 0) dengan auto_approval = 1; idempoten.';
     protected $usage       = 'lkh:auto-approval [--bulan=YYYY-MM] [--dry-run]';
     protected $options     = [
-        '--bulan'   => 'Bulan laporan yang diproses, YYYY-MM (bawaan: bulan lalu).',
-        '--dry-run' => 'Hanya hitung LKH yang akan disetujui.',
+        '--bulan'   => 'Bulan laporan, YYYY-MM. Bawaan: bulan lalu. Run nyata hanya bulan lalu.',
+        '--dry-run' => 'Hanya menghitung LKH yang akan disetujui, tanpa menulis dan tanpa akun sistem.',
     ];
 
+    /**
+     * @param array<int|string, string|null> $params
+     */
     public function run(array $params): int
     {
         try {
@@ -40,32 +53,65 @@ class LkhAutoApproval extends BaseCommand
             return EXIT_USER_INPUT;
         }
 
-        $bulan = $opsi['bulan'] ?? null;
+        $hariIni = TanggalBisnis::hariIni();
+        $dryRun  = isset($opsi['dry-run']);
+        $bulan   = $opsi['bulan'] ?? PenentuAutoApproval::bulanLalu($hariIni);
 
-        if ($argumen !== [] || ($bulan !== null && ! is_string($bulan))) {
-            CLI::error('Pemakaian: ' . $this->usage);
+        if ($argumen !== [] || ! is_string($bulan)) {
+            CLI::error('Argumen berlebih atau --bulan tanpa nilai. Pemakaian: ' . $this->usage);
 
             return EXIT_USER_INPUT;
         }
 
-        $bulan ??= (new DateTimeImmutable(TanggalBisnis::hariIni() . ' first day of last month'))->format('Y-m');
-
         try {
-            $hasil = (new PenyetujuanOtomatisLkh(KoneksiCli::buka()))->jalankan($bulan, isset($opsi['dry-run']));
+            $tolak = PenentuAutoApproval::tolakBulan($bulan, $hariIni, $dryRun);
         } catch (InvalidArgumentException $e) {
             CLI::error($e->getMessage() . ' Pemakaian: ' . $this->usage);
 
             return EXIT_USER_INPUT;
-        } catch (RuntimeException $e) {
-            // Mencakup akun sistem integrasi belum siap dan lock yang dipegang proses lain; pesan tanpa data pribadi.
-            CLI::error($e->getMessage());
+        }
+
+        if ($tolak !== null) {
+            CLI::error($tolak . ' Pemakaian: ' . $this->usage);
+
+            return EXIT_USER_INPUT;
+        }
+
+        try {
+            $db     = KoneksiCli::buka();
+            $pelaku = $dryRun ? null : (new AkunSistemIntegrasi($db))->id();
+            $hasil  = (new AutoApprovalService($db))->jalankan($bulan, $dryRun, $pelaku);
+        } catch (AkunSistemTidakSiap|AutoApprovalSibuk $e) {
+            // Pesan kelas-kelas ini disusun aplikasi tanpa NIP/nilai rahasia.
+            CLI::error('Auto-approval LKH GAGAL: ' . $e->getMessage());
+
+            return EXIT_ERROR;
+        } catch (Throwable $e) {
+            // Pesan galat DB bisa memuat NIP → hanya kelas & kode.
+            CLI::error('Auto-approval LKH GAGAL: ' . ($e instanceof DatabaseException ? 'galat basis data' : 'galat tak terduga') . ' (' . (new ReflectionClass($e))->getShortName() . ', kode ' . $e->getCode() . ').');
 
             return EXIT_ERROR;
         }
 
-        CLI::write(
-            ($hasil['dry_run'] ? '[dry-run] ' : '') . "Auto-approval LKH bulan {$hasil['bulan']}: kandidat {$hasil['kandidat']}, disetujui {$hasil['disetujui']}.",
+        $ringkas = sprintf(
+            '%sAuto-approval LKH %s: kandidat %d, %s %d, sudah berubah saat proses %d, gagal %d.',
+            $hasil['dry_run'] ? '[dry-run] ' : '',
+            $hasil['bulan'],
+            $hasil['kandidat'],
+            $hasil['dry_run'] ? 'akan disetujui' : 'disetujui',
+            $hasil['dry_run'] ? $hasil['kandidat'] : $hasil['disetujui'],
+            $hasil['berubah_saat_proses'],
+            $hasil['gagal'],
         );
+
+        CLI::write($ringkas);
+        log_message('info', 'lkh:auto-approval ' . trim(str_replace('[dry-run] ', 'dry-run: ', $ringkas)));
+
+        if ($hasil['gagal'] > 0) {
+            CLI::error('Ada LKH yang gagal diproses; jalankan ulang (idempoten).');
+
+            return EXIT_ERROR;
+        }
 
         return EXIT_SUCCESS;
     }
