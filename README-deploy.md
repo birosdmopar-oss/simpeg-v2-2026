@@ -315,7 +315,7 @@ CA bundle BSrE disimpan **di luar repo dan luar webroot** (mis. `/etc/simpeg-v2/
 §1c dan §1d. `integrasi:uji-koneksi fcm` belum tersedia (adapter FCM dipantau lewat `integrasi_log` layanan `fcm` dan
 `queue:failed`, §1d).
 
-### 1f. Auto-approval LKH tanggal 5 (H-12, MAKE-068, PRD Fase 6 §6.4, §7.10, F6-25)
+### 1g. Auto-approval LKH tanggal 5 (H-12, MAKE-068, PRD Fase 6 §6.4, §7.10, F6-25)
 
 Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint HTTP cron). Jam mengikuti zona waktu
 server: pastikan server berzona WIB (Asia/Jakarta) atau geser jamnya. Kode keluar ≠ 0 berarti ada yang gagal. Keluaran

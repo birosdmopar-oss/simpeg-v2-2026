@@ -16,7 +16,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-09 | A | (pemetaan) | Belum mulai |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
 | H-11 | A | MAKE-062 | Belum mulai |
-| H-12 | A | MAKE-062 | Belum mulai |
+| H-12 | A | MAKE-068 | Kode di branch `fase6/a-lokal/make-068-lkh-auto-approval`, belum merge |
 | Fondasi | A / B | MAKE-058 / MAKE-063 | B: MAKE-063 di main `74039dc7`; A: diisi Jalur A |
 
 ## Bagian A — API masuk & job terjadwal
@@ -25,7 +25,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 ### A2b — MAKE-068 auto-approval LKH (H-12, F6-25)
 
-- Command `lkh:auto-approval [--bulan=YYYY-MM] [--dry-run]` (`App\Commands\LkhAutoApproval`), jadwal runbook `README-deploy.md` §1f.
+- Command `lkh:auto-approval [--bulan=YYYY-MM] [--dry-run]` (`App\Commands\LkhAutoApproval`), jadwal runbook `README-deploy.md` §1g.
 - Lapisan: `Libraries/Kepegawaian/Lkh/AutoApproval/` — `PenentuAutoApproval` (murni: bulan lalu, rentang, penolakan bulan),
   `AutoApprovalService` (kunci `GET_LOCK` tunggu 0, transaksi per LKH, hitungan), `PenyetujuLkh` (kunci baris `FOR UPDATE`,
   cek status 0 dan bulan, ubah lewat `LkhModel` beraudit).
