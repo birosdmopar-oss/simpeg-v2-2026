@@ -23,6 +23,59 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 (diisi Qoder B per milestone: keputusan, deviasi, catatan)
 
+### A6 — analisis legacy `services/s_stat` (MAKE-061, H-08)
+
+Analisis saja (belum ada kode). Sumber legacy: `controllers/services/S_stat.php`, `libraries/hr/L_employee.php`
+(`get_all_kp` 2416, `get_all_kgb` 4095, `get_all_pensiun` 1324), `helpers/function_helper.php` 2400–2418. Berkas
+terlarang tidak dibuka.
+
+**Endpoint (PRD §7.6; varian bertanggal dikecualikan):** `rekomendasi_kp`, `rekomendasi_kp_uns` (menunggu keputusan
+Q5), `rekomendasi_pensiun`, `rekomendasi_kgb`, `list_tb`, `list_ib`, `list_karpeg`, `list_kariskarsu`. Auth legacy
+hanya aktif di `rekomendasi_kp`; v2 memakai `klienLayanan` (hak `stat`, F6-03).
+
+**Aturan (Lampiran A.2, keputusan Q1–Q4 lead):**
+- KGB: populasi status 1 dan `id_jenis_pegawai` ∈ {1, 6}; TMT terakhir = maks(`pegawai_kgb.tmtsk`, `pegawai_cpns.tmtsk`)
+  untuk PNS, `pmj.tmtsk` untuk PPPK (deviasi [V2]: baris `pegawai_kgb` terbaru, bukan baris acak). Selisih bulan
+  `y*12+m`: > 36 → +4 tahun lalu +2 tahun sampai ≥ sekarang; 24–36 → hari ini; < 24 → +2 tahun. Filter tahun TMT ∈
+  {tahun ini, tahun depan}.
+- Pensiun: populasi status 1 dan `id_jenis_pegawai` = 1; `tgl_pensiun` = tanggal lahir + masa kerja tahun + 1 bulan,
+  lalu tanggal 1 (legacy FH:2400–2418). Masa kerja: `umur_pensiun` jabatan > 0 menang; selain itu 60 (grup 1, sub 1/2);
+  selain itu 58. Filter tahun(`tgl_pensiun`) = tahun ini.
+- KP: filter tahun(`tgl_kp`) = tahun ini; aturan periode 4-tahunan dan percepatan struktural sesuai AC-08.1.
+- Waktu "sekarang" diinjeksi (tanggal bisnis WIB); kelas murni tidak membaca jam.
+
+**Kolom keluaran (fixture kontrak, urutan = legacy; tanggal DD-MM-YYYY sesuai Q9):**
+- KP: `nama, nip, gol_ruang, tmtsk_pangkat, tgl_kp, periode_kp, kp_bl, pangkat, jabatan, eselon, id_unit, id_satker,
+  satker, strata, arsip_cpns[], arsip_pns[], arsip_last_kp[], arsip_skp{tahun_n1: [], tahun_n2: []}`.
+- KGB: `nama, nip, tmtsk_kgb, kgb_th, kgb_bl, no_sk_last_kgb, tmtsk_last_kgb, gaji_last_kgb, eselon, jabatan, satker,
+  id_unit, id_satker, gol_ruang, id_jenis_pegawai, jenis_pegawai, arsip_kp[], arsip_kgb[]`.
+- Pensiun: `nama, nip, tgl_lahir, jabatan, tmtsk_jabatan, satker, eselon, pensiun_th, pensiun_bl, tgl_pensiun, id_unit,
+  id_satker, usia_th, usia_bl, arsip_cpns[], arsip_pns[], arsip_last_kp[], arsip_skp{}`.
+
+**Pemetaan arsip legacy → v2** (`id_riwayat` legacy = kode `jenis_rwy` v2, `database` migrasi CreateJenisRwy):
+
+| Legacy `id_riwayat` | Kode v2 | Tabel riwayat | `id_entri` (padanan) | Dipakai |
+|---|---|---|---|---|
+| 11 | `kp` | `riwayat_kp` | `id_riwayat_kp` (pegawai_cpns / pegawai_pns / pegawai_kp) | KP, pensiun, KGB |
+| 10 | `kgb` | `riwayat_kgb` | `id_riwayat_kgb` (pegawai_kgb) — usulan Q10 | KGB |
+| 32 | `skp` | `riwayat_skp` | `id_riwayat_skp` | KP, pensiun |
+| 9 (jabatan) | `jabatan` | `riwayat_mutasi_jabatan` | `id_riwayat_mutasi_jabatan` | KP varian `_uns` |
+| — (`pegawai_ak.file_pak`) | tidak ada | — | — | KP (`arsip_last_pak`), Q8 |
+
+Cek "ada/tidak": `AttachmentServiceInterface::daftar(nip, idRiwayat, idEntri)` lalu berkas di storage; URL unduh
+`GET pegawai/{nip}/lampiran/{id}/unduh`. Legacy memanggil HTTP dan mengecek 200; v2 tidak memakai HTTP.
+
+**Keputusan terbuka (diteruskan ke reviewer lewat lead):**
+- Q5: varian `rekomendasi_kp_uns` (satker/unit pemanggil) — usul hanya `get_all_*`, varian `_uns` tidak diimplementasi.
+- Q8: `arsip_last_pak` — usul `null` + deviasi [V2], atau cek StorageAdapter bila path masih valid.
+- Q10: `id_entri` arsip KGB — usul PK `riwayat_kgb`.
+- Q9 (diputuskan lead): keluaran DD-MM-YYYY persis legacy; ISO internal di kelas murni, konversi di penyaji.
+
+**Usulan struktur kelas (belum dibuat):** `Libraries/Integrasi/Stat/RekomendasiKp`, `RekomendasiKgb`,
+`RekomendasiPensiun` (murni, `sekarang` diinjeksi); `StatService` (DB, filter tahun, batch `WHERE IN`, query builder
+saja); penyaji ke amplop legacy `{status,msg,data}` lewat `ResponsSimapi` (A4); endpoint di bawah `klienLayanan:stat`
+(A3, `RoutesServices` A4).
+
 ## Bagian B — Klien integrasi keluar
 
 Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin Horii. Dokumentasi modul:
