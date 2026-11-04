@@ -81,7 +81,7 @@ final class DorongJabatan extends DorongDasar
             ->where(['rw.status' => 1, 'rw.jenis_jabatan' => 1])
             ->whereIn('rw.id_group_jabatan', [1, 2, 3])
             ->where('rw.tmtsk >=', '2020-01-01')
-            // Ikut legacy `!= '171'`: baris ber-satker NULL ikut terbuang (usulan B6 M2 Q10).
+            // Ikut legacy `!= '171'`: baris ber-satker NULL ikut terbuang (putusan reviewer B6 M2 Q10).
             ->where('rw.id_satker <>', self::SATKER_DIKECUALIKAN)->where('pmj.id_satker <>', self::SATKER_DIKECUALIKAN)
             ->groupStart()
             ->groupStart()->where('rw.id_rw_siasn IS NULL')->where('rw.siasn_flag', 0)->groupEnd()

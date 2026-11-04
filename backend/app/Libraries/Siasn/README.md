@@ -88,4 +88,7 @@ gagal diulang lewat siklus berikutnya sesuai kriteria tabel). Kriteria per tabel
 - Konfigurasi tambahan untuk jabatan (hanya `.env` server): `integrations.bkn.siasnInstansiId`, `siasnSatkerId`,
   `siasnUnorBawaan`.
 - `--dry-run`: tanpa POST, tanpa tulis. Kode keluar sama dengan `siasn:tarik`. Ringkasan `integrasi_log` `dorong_<jenis>`:
-  `baris`, `terkirim`, `sukses`, `gagal`, `tidak_sah`, `sukses_tanpa_id`.
+  `baris`, `terkirim`, `sukses`, `gagal`, `tidak_sah`, `sukses_tanpa_id`, `status_tidak_diketahui` (timeout/koneksi saat
+  POST — status di SIASN tidak diketahui; periksa duplikat di BKN sebelum riwayat itu didorong lagi).
+- Bentuk permintaan POST (body JSON + `Content-Type: application/json`, `success` boolean) masih **asumsi** sampai bentuk
+  `postApi_siasn` legacy dikonfirmasi (B6 M2 Q2); semua ada di `SiasnAdapter::simpanRiwayat()` / `uraiSimpan()`.

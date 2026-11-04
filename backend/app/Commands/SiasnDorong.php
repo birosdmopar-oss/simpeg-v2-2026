@@ -76,7 +76,7 @@ class SiasnDorong extends BaseCommand
         }
 
         CLI::write(sprintf(
-            '%sDorong SIASN %s: baris %d; %s %d, sukses %d, gagal %d, tidak sah %d, sukses tanpa id %d.',
+            '%sDorong SIASN %s: baris %d; %s %d, sukses %d, gagal %d, tidak sah %d, sukses tanpa id %d, status tidak diketahui %d.',
             $h['dry_run'] ? '[dry-run] ' : '',
             $h['jenis'],
             $h['baris'],
@@ -86,6 +86,7 @@ class SiasnDorong extends BaseCommand
             $h['gagal'],
             $h['tidak_sah'],
             $h['sukses_tanpa_id'],
+            $h['status_tidak_diketahui'],
         ), 'green');
 
         return EXIT_SUCCESS;

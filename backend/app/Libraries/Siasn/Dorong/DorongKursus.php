@@ -11,7 +11,7 @@ use CodeIgniter\Database\BaseConnection;
  * mati: `debug(); exit()`): `riwayat_seminar` aktif, belum pernah terkirim (`id_rw_siasn IS NULL` + `siasn_flag = 0`,
  * tanpa dorong ulang — CR-090), PNS aktif berpasangan SIASN → `POST kursus/save`, id = `mapData.rwKursusId`.
  * Seminar (`jenis_seminar = 1`) → jenis diklat 9 "SEMINAR/WORKSHOP/SEJENISNYA", lainnya 3 "DIKLAT TEKNIS"; jam bawaan 30;
- * nomor bawaan `SERT/<tahun>`. Tanggal sertifikat wajib (legacy memakai tanggal hari ini bila kosong — usulan B6 M2 Q4).
+ * nomor bawaan `SERT/<tahun>`. Tanggal sertifikat wajib (legacy memakai tanggal hari ini bila kosong — putusan reviewer B6 M2 Q4).
  */
 final class DorongKursus extends DorongDasar
 {

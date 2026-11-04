@@ -11,7 +11,7 @@ use CodeIgniter\Database\BaseConnection;
  * sertifikasi (`riwayat_diklat.jenis_diklat = 5`) aktif dengan rumpun & lembaga sertifikasi di master (INNER JOIN [K]),
  * belum pernah terkirim (`id_rw_siasn IS NULL` + `siasn_flag = 0`, CR-090), pegawai aktif berpasangan SIASN (tanpa saring
  * jenis pegawai [K]) → `POST sertifikasi/save`, id = `mapData.rwSertifikasiId`. Nama kunci `masaBerlakuSertSelasai` ikut
- * API BKN apa adanya [K]. Tanggal sertifikat dan masa berlaku wajib (usulan B6 M2 Q4; legacy memakai hari ini).
+ * API BKN apa adanya [K]. Tanggal sertifikat dan masa berlaku wajib (putusan reviewer B6 M2 Q4; legacy memakai hari ini).
  */
 final class DorongSertifikasi extends DorongDasar
 {

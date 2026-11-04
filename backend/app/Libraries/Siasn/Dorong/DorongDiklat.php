@@ -9,10 +9,11 @@ use CodeIgniter\Database\BaseConnection;
 /**
  * `siasn:dorong --jenis=diklat` — padanan `SS/Rw_pelatihan::upload_rw_diklat` [K `Rw_pelatihan.php:164-253`]: diklat
  * struktural (`jenis_diklat = 1`) aktif, belum pernah terkirim (`id_rw_siasn IS NULL` + `siasn_flag = 0`, CR-090), bukan
- * hasil tarik (`keterangan` ≠ "Sync SIASN"; baris tanpa keterangan IKUT — usulan B6 M2 Q3, legacy membuangnya karena
- * NULL ≠ '…' di SQL), PNS aktif berpasangan → `POST diklat/save`, id = `mapData.rwDiklatId`. Latihan struktural dari
- * `siasn_referensi` jenis `latihan_struktural` (`id_diklat` ≠ 8); bawaan penyelenggara "LAN RI", jam 360, nomor
- * `DIKLATPIM/<tahun>`. Tanggal sertifikat wajib (usulan Q4).
+ * hasil tarik (`keterangan` ≠ "Sync SIASN"; baris tanpa keterangan IKUT — putusan reviewer B6 M2 Q3, DEVIASI atas bug
+ * semantik NULL legacy: `keterangan != 'Sync SIASN'` membuang baris ber-keterangan NULL), PNS aktif berpasangan →
+ * `POST diklat/save`, id = `mapData.rwDiklatId`. Latihan struktural dari `siasn_referensi` jenis `latihan_struktural`
+ * (`id_diklat` ≠ 8); bawaan penyelenggara "LAN RI", jam 360, nomor `DIKLATPIM/<tahun>`. Tanggal sertifikat wajib
+ * (putusan Q4).
  */
 final class DorongDiklat extends DorongDasar
 {

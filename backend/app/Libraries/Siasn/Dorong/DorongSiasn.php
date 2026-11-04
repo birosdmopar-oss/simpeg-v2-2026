@@ -29,11 +29,11 @@ use Throwable;
  * 3. baris dipilih ({@see JenisDorongSiasn::pilih()}); jenis berpenanda proses (jabatan) ditandai lebih dulu;
  * 4. per baris: payload divalidasi (tidak sah → tidak dikirim, flag gagal + alasan) → POST di LUAR transaksi, TIDAK di-retry
  *    otomatis (BP-3) → hasil DITULIS SEGERA dalam transaksinya sendiri (POST yang sukses tidak hilang bila proses terhenti
- *    di baris berikutnya; usulan B6 M2 Q6); id SIASN disimpan hanya dari balasan sukses yang sah;
+ *    di baris berikutnya; putusan reviewer B6 M2 Q6); id SIASN disimpan hanya dari balasan sukses yang sah;
  * 5. exception apa pun → penanda proses baris yang belum selesai dikembalikan, ringkasan `galat`, dilempar ulang;
  * 6. satu ringkasan `integrasi_log` (`dorong_<jenis>`, jumlah saja; batch kosong tidak dicatat).
  *
- * `siasn_error` = pesan BKN dipotong dengan id PNS & NIP disensor, tanpa payload (usulan Q7). `dryRun`: tanpa POST dan
+ * `siasn_error` = pesan BKN dipotong dengan id PNS & NIP disensor, tanpa payload (putusan Q7). `dryRun`: tanpa POST dan
  * tanpa tulis apa pun; hanya jumlah yang akan dikirim / tidak sah.
  */
 final class DorongSiasn
@@ -94,7 +94,7 @@ final class DorongSiasn
     }
 
     /**
-     * @return array{jenis: string, baris: int, terkirim: int, sukses: int, gagal: int, tidak_sah: int, sukses_tanpa_id: int, dry_run: bool}
+     * @return array{jenis: string, baris: int, terkirim: int, sukses: int, gagal: int, tidak_sah: int, sukses_tanpa_id: int, status_tidak_diketahui: int, dry_run: bool}
      *
      * @throws SiasnTarikSibuk
      * @throws DatabaseException
@@ -123,12 +123,12 @@ final class DorongSiasn
     }
 
     /**
-     * @return array{jenis: string, baris: int, terkirim: int, sukses: int, gagal: int, tidak_sah: int, sukses_tanpa_id: int, dry_run: bool}
+     * @return array{jenis: string, baris: int, terkirim: int, sukses: int, gagal: int, tidak_sah: int, sukses_tanpa_id: int, status_tidak_diketahui: int, dry_run: bool}
      */
     private function proses(string $nama, JenisDorongSiasn $jenis, int $idAkun, int $limit, ?string $nip, bool $dryRun): array
     {
         $baris = $jenis->pilih($this->db, $limit, $nip, $this->sekarang());
-        $hasil = ['jenis' => $nama, 'baris' => count($baris), 'terkirim' => 0, 'sukses' => 0, 'gagal' => 0, 'tidak_sah' => 0, 'sukses_tanpa_id' => 0, 'dry_run' => $dryRun];
+        $hasil = ['jenis' => $nama, 'baris' => count($baris), 'terkirim' => 0, 'sukses' => 0, 'gagal' => 0, 'tidak_sah' => 0, 'sukses_tanpa_id' => 0, 'status_tidak_diketahui' => 0, 'dry_run' => $dryRun];
 
         /** @var array<int, int> $belum id baris berpenanda proses yang belum ditulis hasilnya → flag asal */
         $belum = [];
@@ -171,6 +171,8 @@ final class DorongSiasn
                     $data = $jenis->dataSukses($b, $idSiasn, $idAkun, $this->sekarang());
                 } else {
                     $hasil['gagal']++;
+                    // Putusan reviewer B6 M2 Q9: timeout/koneksi → status di SIASN tidak diketahui (operator memeriksa duplikat).
+                    $hasil['status_tidak_diketahui'] += in_array($balasan['status_code'], ['timeout', 'koneksi'], true) ? 1 : 0;
                     $data = $jenis->dataGagal($b, $balasan['status_code'], self::pesanAman($balasan, $rahasia), $idAkun, $this->sekarang());
                 }
 
@@ -272,11 +274,11 @@ final class DorongSiasn
     }
 
     /**
-     * @param array{jenis: string, baris: int, terkirim: int, sukses: int, gagal: int, tidak_sah: int, sukses_tanpa_id: int, dry_run: bool} $h
+     * @param array{jenis: string, baris: int, terkirim: int, sukses: int, gagal: int, tidak_sah: int, sukses_tanpa_id: int, status_tidak_diketahui: int, dry_run: bool} $h
      */
     private function catat(string $nama, int $status, ?string $kode, array $h): void
     {
-        $pesan = "baris {$h['baris']}, terkirim {$h['terkirim']}, sukses {$h['sukses']}, gagal {$h['gagal']}, tidak_sah {$h['tidak_sah']}, sukses_tanpa_id {$h['sukses_tanpa_id']}";
+        $pesan = "baris {$h['baris']}, terkirim {$h['terkirim']}, sukses {$h['sukses']}, gagal {$h['gagal']}, tidak_sah {$h['tidak_sah']}, sukses_tanpa_id {$h['sukses_tanpa_id']}, status_tidak_diketahui {$h['status_tidak_diketahui']}";
 
         $this->log->catat(new CatatanIntegrasi(CatatanIntegrasi::ARAH_KELUAR, SiasnAdapter::LAYANAN, 'dorong_' . $nama, $status, null, $kode, $pesan));
     }

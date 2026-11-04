@@ -197,7 +197,9 @@ final class SiasnDorongTest extends DatabaseTestCase
         $this->buatPegawai(['nip' => self::NIP_A, 'id_jenis_pegawai' => 1, 'id_pns_siasn' => 'PNS-UJI-A']);
         $r1 = $this->rmj(['tmtsk' => '2021-01-01']);
         $r2 = $this->rmj(['tmtsk' => '2022-01-01']);
-        $this->db->table('riwayat_mutasi_jabatan')->whereIn('id_riwayat_mutasi_jabatan', [$r1, $r2])->set('updated_at', '2026-03-01 00:00:00')->update();
+        // r3: pernah terkirim lalu gagal lama (flag 2, siasn_lu = updated_at) — dipilih lewat aturan "gagal > 6 jam".
+        $r3 = $this->rmj(['tmtsk' => '2023-01-01', 'id_rw_siasn' => 'RJ-3', 'siasn_flag' => 2, 'siasn_lu' => '2026-03-01 00:00:00']);
+        $this->db->table('riwayat_mutasi_jabatan')->whereIn('id_riwayat_mutasi_jabatan', [$r1, $r2, $r3])->set('updated_at', '2026-03-01 00:00:00')->update();
 
         $putus = new class () implements SiasnDorongInterface {
             public int $ke = 0;
@@ -223,6 +225,8 @@ final class SiasnDorongTest extends DatabaseTestCase
         $rw = array_column($this->db->table('riwayat_mutasi_jabatan')->get()->getResultArray(), null, 'id_riwayat_mutasi_jabatan');
         $this->assertSame(['RJ-1', '1'], [$rw[$r1]['id_rw_siasn'], (string) $rw[$r1]['siasn_flag']], 'POST sukses sebelum terhenti tetap tercatat (tulis per baris)');
         $this->assertSame(['0', '2026-03-01 00:00:00'], [(string) $rw[$r2]['siasn_flag'], $rw[$r2]['updated_at']], 'penanda proses dipulihkan, updated_at tidak bergeser');
+        $this->assertSame(['2', '2026-03-01 00:00:00', '2026-03-01 00:00:00'], [(string) $rw[$r3]['siasn_flag'], $rw[$r3]['siasn_lu'], $rw[$r3]['updated_at']]);
+        $this->assertSame(0, $this->db->table('riwayat_mutasi_jabatan')->where('id_riwayat_mutasi_jabatan', $r3)->where('siasn_lu < updated_at', null, false)->countAllResults(), 'penanda flag 3 tidak membuat siasn_lu < updated_at benar palsu (dorong ulang palsu)');
         $this->assertSame('galat', $this->db->table('integrasi_log')->where('operasi', 'dorong_jabatan')->get()->getRow()->kode);
     }
 
@@ -259,7 +263,8 @@ final class SiasnDorongTest extends DatabaseTestCase
         $this->antreToken();
         $this->transport->antre(new GalatTransport('putus', true));
         $h = $this->dorong()->jalankan('kursus');
-        $this->assertSame(1, $h['gagal']);
+        $this->assertSame([1, 1], [$h['gagal'], $h['status_tidak_diketahui']], 'putusan Q9: INFO status_tidak_diketahui');
+        $this->assertStringContainsString('status_tidak_diketahui 1', (string) $this->db->table('integrasi_log')->where('operasi', 'dorong_kursus')->get()->getRow()->pesan);
         $this->assertCount(3, $this->transport->tercatat(), '2 token + 1 POST (tanpa retry)');
         $this->assertSame('Gagal terhubung (timeout); status di SIASN tidak diketahui.', $this->db->table('riwayat_seminar')->where('id_riwayat_seminar', $s)->get()->getRow()->siasn_error);
 
