@@ -179,3 +179,20 @@ Catatan keputusan coder M6 (dicatat untuk reviewer):
 ## Stempel UTC (CR-086)
 
 Sesi DB berzona UTC (driver `App\Database\MySQLi`, DBV-025), jadi default/ON UPDATE kolom audit berisi UTC. Pembaca yang menampilkan tanggal pengajuan memakai `StempelUtc` (WIB): dashboard Status Layanan mengirim `tanggal_pengajuan` ISO `+07:00`; ekspor memotong tanggal WIB; surat TB/IB memakai tanggal WIB. Aturan lengkap: [`../Waktu/README.md`](../Waktu/README.md).
+
+## Status harian TB/CLTN (`StatusHarian/`, MAKE-062, PRD Fase 6 §7.9)
+
+`php spark layanan:status-harian [--dry-run] [--tanggal=YYYY-MM-DD]` (00:30 WIB, ADR-037) menyelaraskan
+`pegawai.id_jenis_status` (1 aktif, 2 TB, 3 CLTN) dengan riwayat TB (`riwayat_tb` status 1 + `riwayat_tb_perpan`) dan CLTN
+(`riwayat_cuti` `id_jenis_cuti = 6` status 1) pada tanggal proses.
+
+| Berkas | Lapisan | Isi |
+|---|---|---|
+| `PenentuStatusHarian`, `KeputusanStatusHarian` | murni (dipindai `StatusHarianMurniTest`) | aturan Q6-24..Q6-27: segmen induk/perpanjangan, bentrok, pemulihan; tanggal diinjeksi |
+| `StatusHarianService`, `StatusHarianSibuk` | ber-DB | populasi (batch 500), transaksi kecil per pegawai, `audit_logs` (`jenis_audit` `layanan.status_harian`), `GET_LOCK` |
+
+- Pelaku audit = `AkunSistemIntegrasi::id()`; dry-run tidak menulis dan tidak butuh akun.
+- Keluaran hanya jumlah (tanpa NIP/nama); INFO: bentrok TB+CLTN, celah TB, 2/3 tanpa riwayat pendukung, dilewati
+  (pegawai tidak aktif / status lain), berubah saat proses.
+- Tanggal masa depan ditolak; tanggal lampau hanya bersama `--dry-run` (dihitung terhadap status pegawai saat ini).
+- Test: `tests/unit/Layanan/StatusHarian/*`, `tests/database/Layanan/StatusHarianTest.php`.
