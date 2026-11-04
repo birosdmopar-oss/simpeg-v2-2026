@@ -23,6 +23,18 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 (diisi Qoder B per milestone: keputusan, deviasi, catatan)
 
+### A2b — MAKE-068 auto-approval LKH (H-12, F6-25)
+
+- Command `lkh:auto-approval [--bulan=YYYY-MM] [--dry-run]` (`App\Commands\LkhAutoApproval`), jadwal runbook `README-deploy.md` §1f.
+- Lapisan: `Libraries/Kepegawaian/Lkh/AutoApproval/` — `PenentuAutoApproval` (murni: bulan lalu, rentang, penolakan bulan),
+  `AutoApprovalService` (kunci `GET_LOCK` tunggu 0, transaksi per LKH, hitungan), `PenyetujuLkh` (kunci baris `FOR UPDATE`,
+  cek status 0 dan bulan, ubah lewat `LkhModel` beraudit).
+- Keputusan CR-093: PDF tidak dibangkitkan atau disimpan job; catatan = kolom `riwayat_lckh.auto_approval` + `audit_logs`, tanpa
+  tabel `aa_lkh`. `LkhModel::allowedFields` menambah `auto_approval` (tanpa migrasi).
+- Ikut legacy: pegawai tidak aktif dan atasan tidak difilter; job tidak mengirim push (`show_notif` tidak diubah).
+- Test: `tests/unit/Kepegawaian/Lkh/AutoApproval/PenentuAutoApprovalTest.php`, `tests/database/Kepegawaian/LkhAutoApprovalTest.php`
+  (AC-12.1, AC-12.2, AC-12.3; status revisi; dry-run; galat sebagian; kunci sibuk; pelaku wajib).
+
 ## Bagian B — Klien integrasi keluar
 
 Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin Horii. Dokumentasi modul:
