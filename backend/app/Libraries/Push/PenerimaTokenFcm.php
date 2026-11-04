@@ -103,9 +103,9 @@ final class PenerimaTokenFcm
             return [];
         }
 
-        $pmj   = $this->db->table('pegawai_mutasi_jabatan')->select('id_unit, id_satker')->where('nip', $nip)->get(1)->getRowArray();
-        $unit  = $pmj === null || $pmj['id_unit'] === null ? null : (int) $pmj['id_unit'];
-        $q     = $this->web();
+        $pmj  = $this->db->table('pegawai_mutasi_jabatan')->select('id_unit, id_satker')->where('nip', $nip)->get(1)->getRowArray();
+        $unit = $pmj === null || $pmj['id_unit'] === null ? null : (int) $pmj['id_unit'];
+        $q    = $this->web();
 
         if ($unit === null || $unit === self::UNIT_LAIN || ($this->unitKepegawaian !== null && $unit === $this->unitKepegawaian)) {
             return $this->baris($q->where('p.user_level', Role::SUPER_ADMIN));

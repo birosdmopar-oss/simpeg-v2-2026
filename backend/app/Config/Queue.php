@@ -51,5 +51,7 @@ class Queue extends BaseQueue
         'bkn-tarik' => \App\Jobs\BknTarikJob::class,
         // Fase 6 Jalur B (MAKE-066, F6-12): keanggotaan topik presensi FCM, antrean `push`.
         'fcm-topik' => \App\Jobs\FcmTopikJob::class,
+        // Fase 6 Jalur B (MAKE-066, F6-13): push web riwayat/usulan/LKH/Konket ke penerima legacy, antrean `push`.
+        'push-riwayat' => \App\Jobs\PushRiwayatJob::class,
     ];
 }
