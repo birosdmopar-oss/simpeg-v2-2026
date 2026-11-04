@@ -61,11 +61,6 @@ final class StatusIntegrasi
     }
 
     /**
-     * Peringatan F6-15 (MAKE-064): periode e-Kinerja yang sedang dipakai Tukin (aturan pemilihan sama dengan cron, tanggal
-     * WIB > 19 → bulan berikutnya) belum ada di `bkn_periode_ekinper` atau belum punya satu pun baris
-     * `riwayat_skp_periodik` aktif — tanpa data itu Tukin memakai potongan SKP bawaan 32% [K]. Null = aman.
-     */
-    /**
      * Status TLS e-sign untuk `integrasi:status` (keputusan Horii 03-11-2026): driver `bsre` dengan `tlsVerify` false →
      * baris peringatan; selain itu null.
      *
@@ -81,6 +76,11 @@ final class StatusIntegrasi
             : null;
     }
 
+    /**
+     * Peringatan F6-15 (MAKE-064): periode e-Kinerja yang sedang dipakai Tukin (aturan pemilihan sama dengan cron, tanggal
+     * WIB > 19 → bulan berikutnya) belum ada di `bkn_periode_ekinper` atau belum punya satu pun baris
+     * `riwayat_skp_periodik` aktif — tanpa data itu Tukin memakai potongan SKP bawaan 32% [K]. Null = aman.
+     */
     public function peringatanEkinerja(?DateTimeImmutable $sekarang = null): ?string
     {
         $pilih   = PemilihPeriode::untuk($sekarang ?? new DateTimeImmutable('now'));
