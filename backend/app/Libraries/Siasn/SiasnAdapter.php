@@ -110,7 +110,9 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
     }
 
     /**
-     * Balasan simpan [K `$resp['success']` + `$resp['mapData']`]: sukses hanya bila HTTP 2xx dan `success === true`.
+     * Balasan simpan [K `$resp['success']` + `$resp['mapData']`]: sukses bila HTTP 2xx dan `success` TRUTHY seperti legacy
+     * (`isset($resp['success']) && $resp['success']`, bentuk dikonfirmasi ekstraksi 04-11, keputusan Horii opsi A) — hanya
+     * `true`, `"true"`, `1`, `"1"` yang diterima (bukan cast longgar).
      * Pesan BKN (dipotong) dibawa agar pemanggil bisa mencatat alasan gagal; pemanggil menyensor nilai rahasianya.
      *
      * @return array{status_code: string, message: string, data: mixed}
@@ -124,7 +126,7 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
             return ['status_code' => (string) $respons->status, 'message' => $pesan !== '' ? $pesan : "SIASN membalas HTTP {$respons->status}.", 'data' => null];
         }
 
-        if (! is_array($json) || ($json['success'] ?? null) !== true) {
+        if (! is_array($json) || ! in_array($json['success'] ?? null, [true, 'true', 1, '1'], true)) {
             return ['status_code' => 'respons', 'message' => $pesan !== '' ? $pesan : 'Balasan SIASN tidak sah.', 'data' => null];
         }
 
@@ -149,9 +151,10 @@ final class SiasnAdapter implements SiasnGatewayInterface, SiasnDorongInterface,
 
     /**
      * Unggah dokumen riwayat [K `SS/Arsip::upload_siasn` → `postApi_siasnArsip`]: POST multipart `upload-dok-rw` dengan
-     * `id_riwayat` + `id_ref_dokumen` + berkas. ASUMSI bentuk (helper legacy terlarang dibuka; review B6 M3 Q1): nama field
-     * berkas `file`, dua header token yang sama, balasan `{code, data: {dok_id, dok_nama, dok_uri, object, slug}}` — sukses
-     * bila HTTP 2xx + `code == 1`. TIDAK di-retry otomatis (BP-3).
+     * `id_riwayat` + `id_ref_dokumen` + berkas di field `file` (basename + mime `application/pdf`; boundary multipart dibentuk
+     * klien HTTP), dua header token yang sama + `accept: application/json` — bentuk dikonfirmasi ekstraksi 04-11 (keputusan
+     * Horii opsi A). Balasan `{code, data: {dok_id, dok_nama, dok_uri, object, slug}}`, sukses bila HTTP 2xx + `code == 1`.
+     * TIDAK di-retry otomatis (BP-3).
      *
      * @param list<string> $rahasia
      *

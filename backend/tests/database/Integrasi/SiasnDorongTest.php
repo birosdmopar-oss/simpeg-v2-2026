@@ -87,6 +87,10 @@ final class SiasnDorongTest extends DatabaseTestCase
 
         $kirim = $this->transport->tercatat()[3]['permintaan'];
         $this->assertSame(['POST', self::DASAR_SIASN . '/kursus/save'], [$kirim->metode, $kirim->url]);
+        // Header postApi_siasn (ekstraksi 04-11): Auth + Authorization + Content-Type JSON + accept.
+        $this->assertSame(['application/json', 'application/json'], [$kirim->header['Content-Type'] ?? null, $kirim->header['accept'] ?? null]);
+        $this->assertStringStartsWith('bearer ', $kirim->header['Auth'] ?? '');
+        $this->assertStringStartsWith('Bearer ', $kirim->header['Authorization'] ?? '');
         $this->assertSame(['9', 'SEMINAR/WORKSHOP/SEJENISNYA', 30, 'SERT/2024', 'PNS-UJI-A', 2024, '05-03-2024', 'KEMENPAR'], [
             $kirim->json['jenisDiklatId'], $kirim->json['jenisKursusSertipikat'], $kirim->json['jumlahJam'], $kirim->json['nomorSertipikat'],
             $kirim->json['pnsOrangId'], $kirim->json['tahunKursus'], $kirim->json['tanggalKursus'], $kirim->json['institusiPenyelenggara'],
@@ -300,7 +304,16 @@ final class SiasnDorongTest extends DatabaseTestCase
     public function testUraiSimpanHanyaSuccessTrue(): void
     {
         $this->assertSame('200', SiasnAdapter::uraiSimpan(new Respons(200, '{"success":true,"mapData":{"rwKursusId":"K"}}'))['status_code']);
-        $this->assertSame('respons', SiasnAdapter::uraiSimpan(new Respons(200, '{"success":"true","mapData":{}}'))['status_code'], 'string bukan boolean');
+        // Truthy legacy (ekstraksi 04-11): hanya true/"true"/1/"1".
+        foreach (['true', '"true"', '1', '"1"'] as $ya) {
+            $this->assertSame('200', SiasnAdapter::uraiSimpan(new Respons(200, '{"success":' . $ya . ',"mapData":{}}'))['status_code'], $ya);
+        }
+
+        foreach (['false', '"false"', '0', '"0"', '"ya"', '2', 'null', '""'] as $tidak) {
+            $this->assertSame('respons', SiasnAdapter::uraiSimpan(new Respons(200, '{"success":' . $tidak . ',"mapData":{}}'))['status_code'], $tidak);
+        }
+
+        $this->assertSame('302', SiasnAdapter::uraiSimpan(new Respons(302, ''))['status_code'], '3xx = gagal (redirect tidak diikuti)');
         $this->assertSame('respons', SiasnAdapter::uraiSimpan(new Respons(200, '{"success":false,"message":"NIP salah"}'))['status_code']);
         $this->assertSame('respons', SiasnAdapter::uraiSimpan(new Respons(200, '<html>'))['status_code']);
         $this->assertSame(['422', 'Validasi gagal'], array_values(array_intersect_key(SiasnAdapter::uraiSimpan(new Respons(422, '{"message":"Validasi gagal"}')), ['status_code' => 1, 'message' => 1])));

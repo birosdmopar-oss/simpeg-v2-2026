@@ -143,6 +143,13 @@ final class SiasnArsipTest extends DatabaseTestCase
         $this->assertCount(2, $post, 'tanpa retry POST');
         $this->assertSame([['id_riwayat', 'RJ-1'], ['id_ref_dokumen', '872'], ['file', 'sk.pdf']], array_map(static fn (array $b): array => [$b['nama'], $b['namaBerkas'] ?? $b['isi']], $post[0]['permintaan']->multipart));
         $this->assertSame('881', $post[1]['permintaan']->multipart[1]['isi'], 'sertifikasi → 881 [K]');
+        $this->assertSame('application/pdf', $post[0]['permintaan']->multipart[2]['mime'] ?? null);
+        // postApi_siasnArsip (ekstraksi 04-11): accept + token; Content-Type multipart dibentuk klien HTTP (boundary).
+        $hdr = $post[0]['permintaan']->header;
+        $this->assertSame('application/json', $hdr['accept'] ?? null);
+        $this->assertArrayHasKey('Auth', $hdr);
+        $this->assertArrayHasKey('Authorization', $hdr);
+        $this->assertArrayNotHasKey('Content-Type', $hdr, 'Content-Type multipart tidak disetel manual');
         $this->assertStringNotContainsString(self::NIP_A, (string) json_encode($this->db->table('integrasi_log')->get()->getResultArray()));
     }
 

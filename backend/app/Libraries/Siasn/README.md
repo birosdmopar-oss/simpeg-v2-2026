@@ -80,7 +80,7 @@ gagal diulang lewat siklus berikutnya sesuai kriteria tabel). Kriteria per tabel
 - Pegawai aktif berpasangan SIASN (`pegawai.id_pns_siasn`); PNS saja kecuali sertifikasi [K].
 - Payload divalidasi sebelum dikirim (mis. tanggal wajib); tidak sah → tidak dikirim, `siasn_flag = 2` (SKP 2022 kuadran
   tidak dikenal: 3 [K]) + `siasn_error` alasan.
-- Sukses (HTTP 2xx + `success === true`) → `id_rw_siasn` (bila sah), flag 1, `keterangan` + " **Upload To SIASN**",
+- Sukses (HTTP 2xx + `success` truthy legacy: `true`/`"true"`/`1`/`"1"`) → `id_rw_siasn` (bila sah), flag 1, `keterangan` + " **Upload To SIASN**",
   `updated_by` akun sistem; jabatan juga `siasn_lu = updated_at = sekarang`. Gagal → flag 2 (jabatan "Internal Server Error"
   → 3), `siasn_error` = kode + pesan BKN dengan id PNS/NIP disensor, tanpa payload. Hasil ditulis per baris segera sesudah
   POST.
@@ -90,8 +90,11 @@ gagal diulang lewat siklus berikutnya sesuai kriteria tabel). Kriteria per tabel
 - `--dry-run`: tanpa POST, tanpa tulis. Kode keluar sama dengan `siasn:tarik`. Ringkasan `integrasi_log` `dorong_<jenis>`:
   `baris`, `terkirim`, `sukses`, `gagal`, `tidak_sah`, `sukses_tanpa_id`, `status_tidak_diketahui` (timeout/koneksi saat
   POST — status di SIASN tidak diketahui; periksa duplikat di BKN sebelum riwayat itu didorong lagi).
-- Bentuk permintaan POST (body JSON + `Content-Type: application/json`, `success` boolean) masih **asumsi** sampai bentuk
-  `postApi_siasn` legacy dikonfirmasi (B6 M2 Q2); semua ada di `SiasnAdapter::simpanRiwayat()` / `uraiSimpan()`.
+- Bentuk permintaan POST **dikonfirmasi ekstraksi 04-11 (keputusan Horii, opsi A)** atas `postApi_siasn`: body JSON,
+  header `Auth: bearer <SSO>` + `Authorization: Bearer <gateway>` + `Content-Type: application/json` + `accept:
+  application/json`; sukses truthy. **Deviasi keamanan:** legacy `CURLOPT_FOLLOWLOCATION = true`, v2 TIDAK mengikuti
+  redirect — balasan 3xx = gagal (`siasn_error` "HTTP 3xx: …"). Semua ada di `SiasnAdapter::simpanRiwayat()` /
+  `uraiSimpan()`.
 
 ## `php spark siasn:tarik --jenis=ref-unor` (M3)
 
@@ -117,8 +120,9 @@ php spark siasn:unggah-arsip [--langkah=semua|antre|unggah] [--limit=N] [--dry-r
   SIASN tidak diketahui). Exception → status 3 kembali ke 0.
 - Ringkasan `antre_arsip` (`baru`, `sudah_ada`, `path_tidak_sah`) dan `unggah_arsip` (`diproses`, `sukses`, `gagal`,
   `berkas_hilang`, `tidak_sah`, `status_tidak_diketahui`).
-- Bentuk unggah (nama field berkas `file`, balasan `{code, data}`) masih **asumsi** di `SiasnAdapter::unggahDokumen()` sampai
-  bentuk `postApi_siasnArsip` legacy dikonfirmasi (B6 M3 Q1).
+- Bentuk unggah **dikonfirmasi ekstraksi 04-11 (keputusan Horii, opsi A)** atas `postApi_siasnArsip`: multipart dengan
+  `id_riwayat`, `id_ref_dokumen`, dan berkas di field `file` (basename + mime `application/pdf`; boundary dibentuk klien
+  HTTP), dua header token + `accept: application/json`, balasan JSON. Redirect tidak diikuti (deviasi keamanan yang sama).
 
 ## Catatan risiko dorong (review kode B6 M2)
 

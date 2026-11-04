@@ -13,8 +13,8 @@ interface SiasnDorongInterface
     /**
      * Simpan satu riwayat ke SIASN [K `postApi_siasn`]. `jalur` = path relatif (mis. `diklat/save`).
      *
-     * `status_code`: `'200'` bila HTTP 2xx dan `success === true`; selain itu kode HTTP, `'respons'` (badan tidak sah /
-     * `success` bukan true), `'timeout'` / `'koneksi'` (status di SIASN tidak diketahui), atau `'token'`. `data` =
+     * `status_code`: `'200'` bila HTTP 2xx dan `success` truthy legacy (`true`/`"true"`/`1`/`"1"`); selain itu kode HTTP,
+     * `'respons'` (badan tidak sah / `success` tidak truthy), `'timeout'` / `'koneksi'` (status di SIASN tidak diketahui), atau `'token'`. `data` =
      * `mapData` balasan (array atau skalar) saat sukses, selain itu null. `message` = pesan singkat tanpa host/token.
      *
      * @param array<string, mixed> $payload

@@ -36,8 +36,8 @@ use Throwable;
  *   upload, size: …MB", dihitung INFO `status_tidak_diketahui`);
  * - hasil ditulis per baris; exception → baris status 3 yang belum selesai dikembalikan ke 0; ringkasan jumlah saja.
  *
- * Bentuk permintaan unggah = asumsi di {@see SiasnAdapter::unggahDokumen()} sampai bentuk `postApi_siasnArsip` legacy
- * dikonfirmasi (B6 M3 Q1).
+ * Bentuk permintaan unggah ({@see SiasnAdapter::unggahDokumen()}) dikonfirmasi ekstraksi bentuk `postApi_siasnArsip`
+ * 04-11 (keputusan Horii opsi A).
  */
 final class UnggahArsip
 {
