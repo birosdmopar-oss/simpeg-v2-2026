@@ -5,7 +5,9 @@ Branch `fase6/a-lokal/dbv-026-klien-simapi` (dari `main` `158e4b98`). Alur `[DBV
 lalu migration dipindah dari `MigrationsDitahan/` ke `Migrations/` + test skema permanen; reviewer CR me-merge dengan izin
 Horii.
 
-**Status:** ⏳ draf, menunggu review DB Validator.
+**Status:** ✅ **disetujui DB Validator @`79f00bb5` (04-11-2026)** — DBV dikerjakan sesi WS-2 atas perintah Horii (lewat
+reviewer CR); hasil & keputusan di Bagian 12, syarat pemindahan dan syarat aplikasi di Bagian 13. **DBV-026-Q6 diputus
+berbeda dari usulan:** `simapi_ch.nip` tidak masuk registry `TabelAnakNip` dan tidak ada case `JenisRujukanNip` baru (12.3).
 
 **Penulis:** helper Jalur A Fase 6 (di bawah lead Jalur A), 04-11-2026.
 
@@ -242,8 +244,108 @@ Done sebelum ISSUE-056 diimplementasikan.
 
 ## 11. Checklist DB Validator
 
-- [ ] Nama tabel/kolom/FK/CHECK/indeks (Bagian 3)
-- [ ] Rahasia & token hanya hash (BP-8)
-- [ ] `simapi_ch.nip` tanpa FK + registry NIP (Q6)
-- [ ] Kolom ⚑ dicocokkan D1 atau risiko diterima (Q4)
-- [ ] Kueri audit (Bagian 6)
+- [x] Nama tabel/kolom/FK/CHECK/indeks (Bagian 3)
+- [x] Rahasia & token hanya hash (BP-8)
+- [x] `simapi_ch.nip` tanpa FK + registry NIP (Q6 — di luar registry, README modul; 12.3)
+- [x] Kolom ⚑ dicocokkan D1 atau risiko diterima (Q4 — risiko diterima, topologi FK dicocokkan ERD; 12.3)
+- [x] Kueri audit (Bagian 6 — diuji dengan data pelanggaran; 12.1)
+
+---
+
+## 12. Hasil review DB Validator
+
+**DBV dikerjakan sesi WS-2 atas perintah Horii 04-11-2026** (lewat reviewer CR; independen dari penulis PR). SHA yang
+direview: **`79f00bb5`** (DDL sama dengan `bc11c67f`; `79f00bb5` hanya dokumen). **Keputusan: SETUJU**, dengan keputusan
+Q6 berbeda dari usulan dan syarat aplikasi di Bagian 13.
+
+### 12.1 Verifikasi
+
+Lingkungan: MySQL 8.0.30 lokal (3307), DB scratch BARU `simpeg_v2_t_dbv026r` (dibuat kosong oleh DBV, bukan DB pelaksana
+`simpeg_v2_t_dbv026`; `.env` ditulis sendiri, bukan salinan `.env` dev), worktree terpisah.
+
+| Uji | Hasil |
+|---|---|
+| `SkemaKlienSimapiTest` (draf ditahan) | ✅ 4 test, 51 assertion |
+| `migrate --all` (`main`) → draf disalin lokal sebagai migration (tidak di-commit) → `up()` → potret → `migrate:rollback` → `up()` ulang | ✅ `up()` hanya menjalankan migration ini; sesudah `down()` 0 dari 6 tabel tersisa, 140 tabel lain utuh; `mysqldump --no-data` sesudah `up()` ulang **identik** dengan `up()` pertama |
+| DDL hasil (`SHOW CREATE`) | ✅ sama dengan Bagian 3: 6 PK, 2 UNIQUE, 6 FK `RESTRICT/RESTRICT` (padanan 6 dari 8 FK legacy; 2 sisanya milik `simapi_update_hist` yang tidak dibuat), 4 CHECK, indeks sesuai; tipe kolom FK = PK induk (`INT UNSIGNED` klien, `INT` jd, `BIGINT UNSIGNED` ch) |
+| Kueri audit dengan data uji (tiap WAJIB_0 diberi tepat satu pelanggaran + baris sah: bcrypt & argon2id, heks huruf besar, token aktif klien nonaktif, jenis 1 tanpa `simapi`, klien status 10 dengan `simapi` yang harus dikecualikan) | ✅ B1 = B2 = B3 = B4 = 1 (tepat yang disisipkan); B5–B7 INFO sesuai data; skrip hanya SELECT |
+| Hash token huruf besar dengan nilai sama | ✅ ditolak PK 1062 (collation `_ci`), sesuai catatan DBV-030 12.4 |
+| Quality gate (draf lewat test, matriks PHPUnit 8 job MySQL 8.0 + MariaDB 10.4, PHPStan + CS-Fixer) | ✅ CI #566 (`bc11c67f`) hijau, dicek lewat halaman Actions |
+
+Data uji dihapus dan migration lokal di-rollback; DB scratch kembali ke keadaan `main`.
+
+### 12.2 Kesesuaian aturan skema proyek
+
+| Aturan | Hasil |
+|---|---|
+| Label [K]/[K-kode]/[V2]/[I] | ✅ per kolom (Bagian 3); D1 tidak tersedia → [K-kode]/[I] dengan risiko DBV-Q11 (Q4) |
+| `ENGINE=InnoDB`, `utf8mb4_unicode_ci` tabel & kolom string | ✅ (diuji test + dump) |
+| Status 1/2/10 | ✅ `klien_layanan` 1/2/10 + `deleted_at`; `simapi_token` 1/2 diterima (token tidak dihapus lunak; dicabut = 2, kedaluwarsa dibersihkan keras, 13.2); tabel lain tanpa status ikut legacy |
+| FK `RESTRICT/RESTRICT` (ADR-008), nama `fk_*`/`uk_*`/`idx_*`/`chk_*` | ✅ |
+| Migration di `main` tidak diedit; `down()` | ✅ hanya CREATE tabel baru; `down()` = DROP urutan anak dulu, terbukti bersih |
+| Registry NIP | ✅ dengan keputusan Q6 (12.3): tanpa entri `TabelAnakNip`; test B-21 (`NipCascadeTest::testRegistryCocokDenganSkema`) hanya memeriksa FK ke `pegawai(nip)` sehingga tidak terpengaruh |
+| Rahasia (BP-8) | ✅ tanpa kolom rahasia/token mentah; audit hanya jumlah |
+| Stempel (DBV-025) | ✅ `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE CURRENT_TIMESTAMP` diterima sebagai cadangan (sesi DB UTC sejak CR-086); aplikasi tetap mengisi UTC eksplisit |
+
+**Bukti tambahan untuk Q4/P13 (D1 tetap tidak tersedia).** Di mesin DBV ada diagram ER struktur produksi `simpeg01.erd`
+(DBeaver, 21-09-2026, di luar repo, tanpa data dan **tanpa kolom**). Isinya mengonfirmasi 8 tabel `simapi_*` dan 8 FK legacy:
+`simapi_token`/`simapi_auth_jd`/`simapi_auth_ch`/`simapi_update_hist` → `simapi_auth` (kolom `username`),
+`simapi_ch`/`simapi_auth_jd` → `simapi_jd`, `simapi_auth_ch` → `simapi_ch`, `simapi_update_hist` → `simapi_update`. Topologi
+FK draf (dengan `id_klien` menggantikan `username`) **sama** dengan legacy, tanpa FK yang hilang atau tambahan untuk tabel yang
+dibuat. Lebar kolom, indeks non-FK, aturan ON DELETE/UPDATE legacy, isi `simapi_jd`, dan trigger tetap butuh D1 (ISSUE-056).
+
+### 12.3 Keputusan
+
+| ID | Keputusan DBV |
+|---|---|
+| DBV-026-Q1 | **Setuju SET.** Lima nilai tetap, dibaca per request. Syarat: nilai baru hanya **ditambah di akhir** daftar (ALTER ber-DBV); urutan/nama nilai lama tidak diubah (SET disimpan sebagai bitmask posisi) |
+| DBV-026-Q2 | **Setuju VARCHAR(1000)**, NULL = semua IP. Syarat MAKE-058: command menormalkan (tanpa spasi, tanpa entri ganda) dan menolak entri yang bukan IPv4/IPv6/CIDR sah sebelum simpan; filter tidak pernah menganggap string kosong sebagai "semua IP" (kosong ditolak saat simpan, simpan NULL) |
+| DBV-026-Q3 | **Setuju ditunda.** Seed `simapi_jd` lewat migration/seeder terpisah ber-id eksplisit = legacy (ISSUE-056 P6), tanpa data pribadi, ber-DBV. Syarat go-live: `simapi_jd` terisi sebelum klien jenis 2 diaktifkan (13.2) |
+| DBV-026-Q4 | **Risiko diterima** (pola DBV-027 / DBV-Q11) untuk kolom ⚑; topologi FK sudah cocok dengan ERD produksi (12.2). Koreksi mengikuti rencana 9a: sebelum di `main` draf dikoreksi + review delta; sesudah di `main` lewat migration ALTER key DBV baru |
+| DBV-026-Q5 | **Setuju UTC** untuk `expired_at`, `action_at`, `created_at`. Filter token membandingkan dengan `UTC_TIMESTAMP()` (atau `NOW()` di sesi aplikasi yang sudah UTC); penyaji `change_history` mengonversi `action_at` ke WIB berformat `Y-m-d H:i:s` saat menulis respons (paritas nilai `NOW()` WIB legacy). Kueri audit dan alat di luar aplikasi wajib memakai `UTC_TIMESTAMP()` (B3/B6 sudah) |
+| DBV-026-Q6 | **Setuju tanpa FK dan tidak ikut Ubah NIP; usulan case `JenisRujukanNip::NonFkLogRiwayat` DITOLAK.** `TabelAnakNip` adalah cakupan koreksi NIP: entri yang tidak diarahkan ulang butuh pengecualian ganda (case + `NipCascadeService::TIDAK_DIARAHKAN`), dan bila salah satu terlewat, log riwayat ikut ter-UPDATE sehingga bertentangan dengan legacy. Keputusan B-06 sudah menaruh kolom NIP tanpa FK yang tidak diganti legacy **di luar registry**, terdaftar di README modul (`app/Libraries/Kepegawaian/README.md` bagian "Kolom NIP tanpa FK di luar registry", yang sudah memuat `simapi_update.nip` sebagai log H-01 dan `simapi_ch` sebagai tabel legacy). Saat pemindahan: `simapi_ch` dipindah dari baris "Tabel legacy lain yang tidak ada di Mapping" ke baris tabel v2 dengan keterangan "log riwayat SIMAPI, DBV-026, tidak diarahkan ulang"; `TabelAnakNip`, `JenisRujukanNip`, dan jumlah entri registry tidak berubah. Bagian 8 kalimat registry dibaca sesuai keputusan ini |
+| DBV-026-Q7 | **Setuju banyak baris per handshake** (F6-05), dengan syarat pembersihan berkala (13.2) dan pencabutan token saat klien dinonaktifkan |
+| DBV-026-Q8 | **Setuju RESTRICT.** Retensi `simapi_ch` belum diputus (legacy tanpa pembersihan); bila kelak diputus, penanda `simapi_auth_ch` dihapus lebih dulu dalam transaksi yang sama, lewat dokumen DBV/runbook tersendiri |
+| DBV-026-Q9 | Timestamp saat dipindah **lebih baru dari migration terakhir di `main` saat itu** (kini `2026-11-03-110000`, DBV-030) dan dari migration lain yang masuk lebih dulu |
+
+### 12.4 Catatan non-blok
+
+- **`up()` gagal → `down()` men-DROP keenam nama tabel dengan `IF EXISTS`**, termasuk tabel bernama sama yang sudah ada
+  sebelum `up()` (penyebab `CREATE` gagal). DB v2 terpisah dan tabel `simapi_*` legacy tidak diimpor (F6-08), jadi risikonya
+  kecil; pola sama dengan DBV-027/DBV-030. Saran (tidak wajib): `up()` mencatat tabel yang benar-benar dibuat dan hanya
+  men-DROP itu saat gagal.
+- Komentar B7 kedua di kueri audit menyebut "klien type 2 aktif", padahal kuerinya menghitung baris tanpa penanda dari klien
+  mana pun. Angkanya tetap benar sebagai INFO; komentar boleh dirapikan saat pemindahan.
+- `token_hash` ber-collation `utf8mb4_unicode_ci`: aman karena aplikasi menulis heks huruf kecil (`hash('sha256', …)`) dan
+  audit B2 WAJIB_0 (pola DBV-030).
+- Baris Mapping Migrasi baru tumpang tindih dengan baris lama "Antrean `simapi_*`"; isinya tidak bertentangan dan lebih
+  rinci, boleh dibiarkan.
+
+### 12.5 Persetujuan
+
+**DBV APPROVE @`79f00bb5`** — 04-11-2026, DBV (sesi WS-2 atas perintah Horii). Syarat merge §10 tetap, ditambah Bagian 13.
+
+---
+
+## 13. Syarat pemindahan dan syarat aplikasi
+
+### 13.1 Pemindahan (sebelum merge, diverifikasi DBV)
+
+1. Migration dipindah ke `app/Database/Migrations/<timestamp Q9>_CreateKlienLayananSimapi.php` dengan DDL **tidak berubah**
+   dari `79f00bb5` (perubahan hanya atas permintaan DBV dan dicatat di sini).
+2. Test skema permanen: `require_once` `MigrationsDitahan` dihapus, test tetap menguji struktur/constraint/`down()`/audit
+   (pola DBV-027/DBV-030).
+3. README modul Kepegawaian diperbarui sesuai Q6; **tidak** ada perubahan `TabelAnakNip`/`JenisRujukanNip`.
+4. CI `quality-gate` hijau (MySQL 8.0 & MariaDB 10.4) pada SHA pemindahan; DBV memverifikasi delta lalu melapor ke reviewer CR.
+
+### 13.2 Syarat aplikasi (MAKE-058/059/060; diuji di paket masing-masing, bukan syarat merge DBV-026)
+
+| # | Paket | Syarat |
+|---|---|---|
+| A1 | MAKE-058 | `integrasi:klien nonaktif` (dan hapus/status 10) mencabut semua token aktif klien itu (`simapi_token.status = 2`) di transaksi yang sama → audit B3 = 0 |
+| A2 | MAKE-058 | Pembersihan berkala token kedaluwarsa (DELETE `expired_at < UTC_TIMESTAMP() - INTERVAL n`), dijadwalkan di runbook; B6 = bahan pemantauan |
+| A3 | MAKE-058 | Validasi `ip_allowlist` (Q2) dan `hak` sesuai jenis (B4 = 0) di command |
+| A4 | MAKE-059 | Filter `simapiToken` mencari baris lewat PK `token_hash` = SHA-256 heks huruf kecil dari elemen kedua header `Authorization` (panjang dibatasi sebelum di-hash), lalu `status = 1 AND expired_at > UTC_TIMESTAMP()` dan klien status 1 (Q5). Perbandingan rahasia klien tetap `password_verify`; `hash_equals` (BP-8) dipakai bila ada perbandingan hash di PHP |
+| A5 | MAKE-060 | Ack `simapi_auth_ch` tahan balapan: dua `change_history` serentak dari klien yang sama membaca `MAX` yang sama, sehingga INSERT penanda kedua bertabrakan PK 1062. Pakai kunci baris klien (`SELECT … FOR UPDATE` pada `klien_layanan`) dalam satu transaksi baca+tandai, atau `INSERT IGNORE` + respons hanya baris yang berhasil ditandai; diuji |
+| A6 | MAKE-060 | Koreksi NIP (B-06) tidak mengubah baris `simapi_ch` lama (Q6). Baris baru yang dihasilkan perubahan NIP mengikuti cabang trigger legacy `IF OLD.nip != NEW.nip` (ISSUE-056 P14) begitu D1 tersedia |
+| A7 | go-live | `simapi_jd` terisi (Q3) sebelum klien jenis 2 diaktifkan; tanpa seed, FK `fk_simapi_ch_jd` menolak setiap penulisan `simapi_ch` (1452) |
