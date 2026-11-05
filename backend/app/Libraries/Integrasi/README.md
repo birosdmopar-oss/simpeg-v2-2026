@@ -46,3 +46,20 @@ lewat `Libraries\Cli\KoneksiCli`.
 - Kredensial dan alamat hanya di `.env` server; `backend/.env.example` berisi kunci kosong.
 - Command penulis memakai `GET_LOCK` per jenis (run kedua → exit 1 tanpa panggilan API), transaksi pola proyek, dan
   ringkasan `integrasi_log` berisi jumlah saja (tanpa NIP/nama/token).
+
+## Auth antar-sistem — klien layanan dan token SIMAPI (`Klien/`, MAKE-058, ADR-036)
+
+Fondasi Jalur A untuk SIMAPI dan `services/*` (PRD Fase 6 §7.0.1). Filter `klienLayanan:<hak>` (HTTP Basic) dan `simapiToken` ada di
+`app/Filters/`; konfigurasi di `Config\KlienLayanan`; identitas klien request berjalan di service `klienSaatIni`.
+
+| Berkas | Lapisan | Isi |
+|---|---|---|
+| `AllowlistIp`, `HakKlien` | murni | normalisasi/pencocokan IP·CIDR (kosong ditolak, gagal tertutup); jenis ↔ hak (audit B4) |
+| `PembangkitKredensial` | acak | rahasia (`random_bytes`), token (`random_int`), `password_hash`, SHA-256 token |
+| `PenyimpanKlien` | ber-DB | buat/rotasi/status/daftar/bersihkan-token; satu transaksi + audit satu koneksi; pencabutan token |
+| `PengesahKlien` | ber-DB | Basic: `password_verify` selalu dijalankan, status, allowlist, hak |
+| `TokenSimapi` | ber-DB | terbit (SHA-256 PK) dan validasi (elemen kedua header, bentuk dibatasi sebelum hash, kedaluwarsa/dicabut) |
+| `KlienSaatIni`, `ResponsAuthKlien` | — | identitas klien per request; amplop gagal per grup (SIMAPI 200 "02", services 401 int 2) |
+
+Command: `php spark integrasi:klien buat|rotasi|nonaktif|aktifkan|hapus|daftar|bersihkan-token`. Rahasia ditampilkan sekali. Test:
+`tests/unit/Integrasi/Klien/*`, `tests/database/Integrasi/{KlienLayananTest,FilterAuthKlienTest,IntegrasiKlienCommandTest}.php`.
