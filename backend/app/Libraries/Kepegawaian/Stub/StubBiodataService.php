@@ -25,6 +25,11 @@ final class StubBiodataService implements BiodataServiceInterface
         throw new BelumTersediaException('foto pegawai');
     }
 
+    public function fotoSistem(string $nip): ?array
+    {
+        throw new BelumTersediaException('foto pegawai');
+    }
+
     public function antreanPengajuan(AuthContext $auth, array $filter = []): array
     {
         throw new BelumTersediaException('antrean pengajuan biodata');

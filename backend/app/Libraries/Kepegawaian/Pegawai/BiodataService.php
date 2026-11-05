@@ -111,6 +111,11 @@ final class BiodataService implements BiodataServiceInterface
             throw new ForbiddenException('Anda tidak berhak mengakses data pegawai ini.');
         }
 
+        return $this->fotoSistem($nip) ?? throw new NotFoundException('Foto pegawai tidak tersedia.');
+    }
+
+    public function fotoSistem(string $nip): ?array
+    {
         $row   = $this->koneksi()->table('pegawai')->select('foto')->where('nip', $nip)->get()->getRowArray();
         $path  = is_array($row) ? (string) ($row['foto'] ?? '') : '';
         $kolom = $this->berkas ?? new KolomBerkas();
@@ -123,7 +128,7 @@ final class BiodataService implements BiodataServiceInterface
         }
 
         if ($isi === null) {
-            throw new NotFoundException('Foto pegawai tidak tersedia.');
+            return null;
         }
 
         return ['isi' => $isi, 'mime' => self::mimeGambar($isi, 'Foto pegawai tidak tersedia.'), 'nama' => 'foto_' . $nip . '.' . pathinfo($path, PATHINFO_EXTENSION)];

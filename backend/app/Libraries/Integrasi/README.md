@@ -102,9 +102,13 @@ Keputusan dan penyimpangan:
   `pegawai_diklat` tidak punya `jenis_diklat` (sama dengan D1), jadi `pelatihan_struktural_terakhir` selalu memakai nama diklat.
 - **[V2]** `email` = akun aktif dengan `id_pengguna` terkecil (`pengguna.nip` di v2 UNIQUE, legacy GROUP BY acak). Perhatikan
   `pengguna.status` ENUM('0','1') dibandingkan sebagai string.
-- **[V2] ⚑ MENUNGGU HORII** `foto` = `PenyajiPegawai::urlFoto()` (satu fungsi), sementara `site_url('api/v1/pegawai/{nip}/foto')` bila kolom
-  `foto` terisi, selain itu "". Endpoint itu butuh JWT pengguna, jadi klien SIMAPI belum bisa mengambilnya; usul reviewer = endpoint unduh
-  khusus klien layanan (pola Q6-38). Test mengunci bentuk sekarang.
+- **[V2] `foto` (keputusan Horii = A, pola Q6-38):** `PenyajiPegawai::urlFoto()` = URL absolut `simapi/v1/a_employee/foto/{nip}` bila kolom
+  `foto` terisi DAN berkasnya ada di storage v2, selain itu "". Endpoint itu memakai `simapiToken` (token salah → amplop "02" "Token is not
+  valid") dan sumber foto yang sama dengan `api/v1/pegawai/{nip}/foto` (`BiodataService::fotoSistem`, tanpa lingkup pengguna). NIP asing,
+  tanpa foto, berkas tidak ada, atau bukan gambar → 404 seragam (body kosong); mime dari isi, `nosniff`, `no-store`, nama generik
+  `foto_{nip}.{ext}`; path tidak pernah keluar; log hanya kode hasil. Cakupan NIP = aturan "NIP not valid" (termasuk status 10).
+  Gap (daftar re-handshake PN-4): klien wajib mengirim token SIMAPI saat mengambil foto, bentuk URL berubah dari legacy; foto legacy yang
+  belum dimigrasi ke storage v2 tidak tersedia (URL "").
 - **[V2]** urutan baris: riwayat tanpa ORDER BY di legacy (`riwayat_pendidikan`, `riwayat_pelatihan`, `riwayat_kp`) diurut PK ASC; setiap
   urutan diberi kunci sekunder PK (legacy bergantung urutan fisik). Baris status 10 tidak dikirim: `struktur_jabatan` (`A_dm.php:274` tanpa
   filter; legacy tak punya kolom status dan menghapus keras, jadi status 10 v2 = baris yang di legacy sudah tidak ada) dan

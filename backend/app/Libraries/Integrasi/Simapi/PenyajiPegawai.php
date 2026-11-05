@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Libraries\Integrasi\Simapi;
 
+use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Lkh\AtasanLangsung;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
 use InvalidArgumentException;
+use Throwable;
 
 /**
  * MAKE-059 (H-06) — data pegawai SIMAPI `a_employee/{method}/{nip}` [K `controllers/simapi/v1/A_employee.php`, rujukan baris
@@ -18,7 +20,7 @@ use InvalidArgumentException;
  *  - [V2] riwayat tanpa ORDER BY di legacy (`riwayat_pendidikan`, `riwayat_pelatihan`, `riwayat_kp`) diurut PK ASC, dan
  *    setiap urutan diberi kunci sekunder PK agar stabil (legacy bergantung urutan fisik InnoDB = PK);
  *  - [V2] `email` = akun `pengguna` aktif dengan `id_pengguna` terkecil (legacy LEFT JOIN + GROUP BY: baris acak);
- *  - [V2] `foto` = URL endpoint foto v2 (`api/v1/pegawai/{nip}/foto`), legacy `pathToSrc()` ke berkas legacy;
+ *  - [V2] `foto` = URL endpoint foto khusus klien SIMAPI (`simapi/v1/a_employee/foto/{nip}`, keputusan Horii), legacy `pathToSrc()`;
  *  - [K] bug legacy B-9 (keputusan Horii 04-11, Q6-36): `detil` tidak memilih nama `atasan_es_3/_4(_koord)` (`AE:278`),
  *    jadi bagian `unit_es_3/4` yang berasal dari atasan selalu "" — dipertahankan.
  *
@@ -55,7 +57,7 @@ final class PenyajiPegawai
         'riwayat_hukdis'                => 'Data riwayat hukuman disiplin tidak tersedia',
     ];
 
-    public function __construct(private readonly BaseConnection $db, private readonly ?AtasanLangsung $atasan = null)
+    public function __construct(private readonly BaseConnection $db, private readonly ?AtasanLangsung $atasan = null, private readonly ?KolomBerkas $berkas = null)
     {
     }
 
@@ -162,7 +164,7 @@ final class PenyajiPegawai
             'status'               => self::sama($r['status'], '1') ? 'Aktif' : 'Tidak Aktif',
             'jenis_status'         => Nilai::mentah($r['jenis_status_upd']),
             'tmt_status'           => Nilai::mentah($r['tmt_status']),
-            'foto'                 => self::kosong($r['foto']) ? '' : self::urlFoto($nip),
+            'foto'                 => $this->urlFoto($nip, (string) ($r['foto'] ?? '')),
         ];
 
         if (! $detil) {
@@ -218,12 +220,23 @@ final class PenyajiPegawai
     }
 
     /**
-     * SATU-SATUNYA titik pembentuk URL `foto` SIMAPI. Sementara = endpoint foto v2 (JWT pengguna); MENUNGGU keputusan Horii
-     * (usul reviewer: endpoint unduh khusus klien layanan, pola Q6-38). Ganti di sini saja.
+     * SATU-SATUNYA titik pembentuk URL `foto` SIMAPI. Keputusan Horii (= A, pola Q6-38): URL absolut endpoint foto khusus klien
+     * SIMAPI `simapi/v1/a_employee/foto/{nip}` (token SIMAPI). "" bila kolom `foto` kosong atau berkas tidak ada di storage v2
+     * (mis. foto legacy belum dimigrasi). Path berkas tidak pernah keluar.
      */
-    public static function urlFoto(string $nip): string
+    public function urlFoto(string $nip, string $path): string
     {
-        return site_url('api/v1/pegawai/' . rawurlencode($nip) . '/foto');
+        if ($path === '') {
+            return '';
+        }
+
+        try {
+            $ada = ($this->berkas ?? new KolomBerkas())->ada($path);
+        } catch (Throwable) {
+            $ada = false; // path arsip remote legacy / tidak valid bagi adapter
+        }
+
+        return $ada ? site_url('simapi/v1/a_employee/foto/' . rawurlencode($nip)) : '';
     }
 
     /**

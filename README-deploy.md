@@ -422,6 +422,8 @@ Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) w
    memanggilnya diberi tahu saat re-handshake (§1h langkah 3).
    Sampaikan juga: `a_sinkron/ambil_riwayat_mutasi` kini menjawab token salah/kedaluwarsa dengan "Token is not valid" (legacy: "Invalid Token or
    IP Address"/"Token Expired"), dan `a_dm/jabatan` kini butuh token.
+   Foto pegawai (`foto` di `data_umum`/`detil`) kini URL `simapi/v1/a_employee/foto/{nip}` yang WAJIB dipanggil dengan token SIMAPI; foto yang
+   belum dimigrasi ke storage v2 bernilai "".
 3. **Klien `services/s_dm`** dibuat dengan hak `dm` (§1h langkah 2); seluruh method `s_dm` kini butuh Basic, termasuk `p_*` yang di legacy publik.
 
 ---

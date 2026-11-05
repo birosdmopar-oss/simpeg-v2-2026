@@ -6,8 +6,10 @@ namespace Tests\Database\Integrasi;
 
 use App\Libraries\Integrasi\Simapi\PenyajiPegawai;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Services;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Integrasi\SimapiUjiTrait;
+use Tests\Support\Kepegawaian\FakeStorageAdapter;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
@@ -163,7 +165,7 @@ final class SimapiEmployeeTest extends DatabaseTestCase
 
         $umum = $this->emp('data_umum', $nip)['data'];
         $this->assertSame(['Perempuan', 'Menikah', 'Aktif', 'Lahir Lain', 'pertama@contoh.test'], [$umum['jenis_kelamin'], $umum['status_pernikahan'], $umum['status'], $umum['provinsi_lahir'], $umum['email']]);
-        $this->assertStringEndsWith('api/v1/pegawai/' . $nip . '/foto', $umum['foto'], 'foto = URL endpoint v2');
+        $this->assertSame('', $umum['foto'], 'berkas foto belum ada di storage v2 → ""');
 
         $this->db->table('pengguna')->where('id_pengguna', $akun)->update(['status' => '0']);
         $this->assertNull($this->emp('data_umum', $nip)['data']['email'], 'akun nonaktif tidak dipakai [K peng.status=1]');
@@ -237,6 +239,49 @@ final class SimapiEmployeeTest extends DatabaseTestCase
         (new \App\Libraries\Integrasi\Klien\PenyimpanKlien($this->db))->ubahStatus('pusdatin', \App\Libraries\Integrasi\Klien\PenyimpanKlien::STATUS_NONAKTIF);
 
         $this->assertSame(['status' => '02', 'msg' => 'Token is not valid', 'data' => []], $this->emp('data_umum', $nip));
+    }
+
+    /**
+     * Keputusan Horii (= A): foto lewat endpoint khusus klien SIMAPI `a_employee/foto/{nip}` (token SIMAPI), 404 seragam.
+     */
+    public function testFotoKhususKlienSimapi(): void
+    {
+        $storage = new FakeStorageAdapter();
+        Services::injectMock('storageAdapter', $storage);
+        Services::resetSingle('biodataService');
+        $png = (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', true);
+
+        $ada = $this->buatPegawai(['foto' => 'pegawai/rahasia-dir/foto asli.png', 'status' => 10]);
+        $storage->simpan('pegawai/rahasia-dir/foto asli.png', $png);
+        $tanpaBerkas = $this->buatPegawai(['foto' => 'arsip/lama/foto.jpg']);
+        $tanpaFoto   = $this->buatPegawai();
+        $bukanGambar = $this->buatPegawai(['foto' => 'pegawai/x.png']);
+        $storage->simpan('pegawai/x.png', '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+
+        $url = $this->emp('data_umum', $ada)['data']['foto'];
+        $this->assertStringEndsWith('simapi/v1/a_employee/foto/' . $ada, $url, 'URL absolut endpoint foto SIMAPI');
+        $this->assertSame('', $this->emp('data_umum', $tanpaBerkas)['data']['foto'], 'berkas belum dimigrasi → ""');
+        $this->assertSame('', $this->emp('data_umum', $tanpaFoto)['data']['foto']);
+
+        $this->assertSame(['status' => '02', 'msg' => 'Token is not valid', 'data' => []], $this->jsonUji($this->tanpaAuthUji('simapi/v1/a_employee/foto/' . $ada)));
+
+        $res = $this->simapiUji('simapi/v1/a_employee/foto/' . $ada, $this->token);
+        $res->assertStatus(200);
+        $this->assertSame($png, (string) $res->response()->getBody());
+        $this->assertStringStartsWith('image/png', $res->response()->getHeaderLine('Content-Type'));
+        $this->assertSame('nosniff', $res->response()->getHeaderLine('X-Content-Type-Options'));
+        $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame('inline; filename="foto_' . $ada . '.png"', $res->response()->getHeaderLine('Content-Disposition'));
+        $this->assertStringNotContainsString('rahasia-dir', $res->response()->getHeaderLine('Content-Disposition') . $url, 'path tidak bocor');
+
+        foreach ([$tanpaBerkas, $tanpaFoto, $bukanGambar, '999999999999999999'] as $nip) {
+            $r = $this->simapiUji('simapi/v1/a_employee/foto/' . $nip, $this->token);
+            $r->assertStatus(404);
+            $this->assertSame('', (string) $r->response()->getBody(), '404 seragam tanpa alasan');
+        }
+
+        Services::resetSingle('storageAdapter');
+        Services::resetSingle('biodataService');
     }
 
     public function testNamaUnitPortFixUnitName(): void
