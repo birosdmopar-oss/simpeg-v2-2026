@@ -8,12 +8,15 @@ use CodeIgniter\HTTP\ResponseInterface;
 use stdClass;
 
 /**
- * Fase 6 Jalur A — amplop respons bisnis endpoint kompatibilitas `services/*` (`s_stat` A6 MAKE-061, `s_dm` A4
- * MAKE-059, `s_esign` B4b), PRD Fase 6 §6.3 [K]: `{"status":1,"msg":"","data":…}` sukses, `{"status":2,"msg":"…","data":…}`
- * gagal bisnis — `status` INT (bukan string "01"/"02" SIMAPI), HTTP 200 untuk respons bisnis. Kegagalan auth (401)
+ * Fase 6 Jalur A — amplop respons bisnis endpoint kompatibilitas `services/*` (PRD Fase 6 §6.3 [K]):
+ * `{"status":1,"msg":"","data":…}` sukses, `{"status":2,"msg":"…","data":…}` gagal bisnis, HTTP 200. Kegagalan auth (401)
  * dan throttle (429) ditangani filter A3 ({@see \App\Libraries\Integrasi\Klien\ResponsAuthKlien}), bukan di sini.
  *
- * Berkas bersama Jalur A (keputusan lead 05-11-2026): siapa merge duluan membuat, yang lain memakai tanpa membuat kembar.
+ * Tipe `status` per sub-group [K] (diverifikasi reviewer 05-11-2026): `s_stat` (`S_stat.php:24`) dan `s_dm` (`S_dm.php:24`)
+ * memakai bilangan bulat `1`/`2`; `s_esign` (`S_esign.php:12,57,122`) memakai STRING `"1"`/`"2"`. Pemanggil memilih lewat
+ * parameter `$statusString` (bawaan INT); bentuk lain amplop sama. Bukan amplop SIMAPI `"01"`/`"02"`.
+ *
+ * Berkas bersama Jalur A (keputusan lead 05-11-2026): A6 `s_stat` dan A4 `s_dm` memakai mode INT, B4b `s_esign` mode string.
  */
 final class ResponsLayanan
 {
@@ -28,9 +31,9 @@ final class ResponsLayanan
     /**
      * @param array<mixed>|stdClass $data
      */
-    public static function sukses(array|stdClass $data, string $msg = ''): ResponseInterface
+    public static function sukses(array|stdClass $data, string $msg = '', bool $statusString = false): ResponseInterface
     {
-        return self::amplop(self::SUKSES, $msg, $data, 200);
+        return self::amplop(self::SUKSES, $msg, $data, 200, $statusString);
     }
 
     /**
@@ -38,27 +41,27 @@ final class ResponsLayanan
      *
      * @param array<mixed>|stdClass|null $data
      */
-    public static function gagal(string $msg, array|stdClass|null $data = null): ResponseInterface
+    public static function gagal(string $msg, array|stdClass|null $data = null, bool $statusString = false): ResponseInterface
     {
-        return self::amplop(self::GAGAL, $msg, $data ?? new stdClass(), 200);
+        return self::amplop(self::GAGAL, $msg, $data ?? new stdClass(), 200, $statusString);
     }
 
     /**
-     * Sumber daya tidak ada / tidak boleh diakses — 404 SERAGAM dengan amplop INT (endpoint unduh berkas Q6-38).
+     * Sumber daya tidak ada / tidak boleh diakses — 404 SERAGAM dengan amplop yang sama (endpoint unduh berkas Q6-38).
      */
-    public static function tidakDitemukan(string $msg = 'Berkas tidak ditemukan.'): ResponseInterface
+    public static function tidakDitemukan(string $msg = 'Berkas tidak ditemukan.', bool $statusString = false): ResponseInterface
     {
-        return self::amplop(self::GAGAL, $msg, new stdClass(), 404);
+        return self::amplop(self::GAGAL, $msg, new stdClass(), 404, $statusString);
     }
 
     /**
      * @param array<mixed>|stdClass $data
      */
-    private static function amplop(int $status, string $msg, array|stdClass $data, int $http): ResponseInterface
+    private static function amplop(int $status, string $msg, array|stdClass $data, int $http, bool $statusString): ResponseInterface
     {
         return service('response')
             ->setStatusCode($http)
             ->setHeader('Cache-Control', 'no-store')
-            ->setJSON(['status' => $status, 'msg' => $msg, 'data' => $data]);
+            ->setJSON(['status' => $statusString ? (string) $status : $status, 'msg' => $msg, 'data' => $data]);
     }
 }
