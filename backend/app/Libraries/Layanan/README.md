@@ -144,6 +144,11 @@ Catatan keputusan coder M5 (dicatat untuk reviewer):
 2. **[V2] Rentang efek `id_jenis_status` per tanggal inklusif** (disetujui Horii 27-10). Legacy `L_tb.php:1169-1179` /
    `:746-757` membandingkan dengan jam sekarang sehingga hari terakhir TB tidak ikut. Gap "TB disetujui sebelum mulai / TB
    berakhir → status tidak berubah otomatis" sama dengan legacy, tidak dikerjakan M5.
+   **CR-102 (hapus TB):** `TbService::sebelumHapus` mengembalikan `id_jenis_status` 2 → 1 bila hari ini berada di rentang
+   gabungan induk + semua perpanjangan (termasuk celah di antaranya), dihitung sebelum perpanjangan dihapus. Di luar
+   rentang gabungan status tidak diubah. Catatan INFO: bila pegawai masih punya TB lain status 1 yang berjalan, hapus satu
+   TB tetap mengembalikan status ke 1 (perilaku legacy `L_tb.php:745-758`); job `layanan:status-harian` menaikkannya lagi
+   ke 2 pada run berikutnya.
 3. **`dalam_negeri` tidak divalidasi [K]**; kolom NOT NULL → 1 (Dalam Negeri) bila kosong/di luar 1|2 (bukan 422).
 4. **Ubah oleh role 1 pada TB disetujui** menyimpan perubahan data tetapi status tetap 1 (`status` lain → 422
    `errors.status`): status final tidak punya transisi keluar (single end node). Status 0 → 1 lewat ubah role 1 memberi efek
