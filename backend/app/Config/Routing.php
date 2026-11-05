@@ -49,8 +49,6 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesPresensiLaporan.php',
         // Modul H Jalur B — integrasi keluar (Fase 6, MAKE-064 dst.): `api/v1/integrasi/*`.
         APPPATH . 'Config/RoutesIntegrasi.php',
-        // Modul H Jalur B — `services/s_esign/*` untuk MuDig (Fase 6, MAKE-065 B4b); digabung ke RoutesServices.php Jalur A.
-        APPPATH . 'Config/RoutesServicesEsign.php',
     ];
 
     /**
