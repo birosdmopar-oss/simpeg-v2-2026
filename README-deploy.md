@@ -446,7 +446,11 @@ Perubahan perilaku yang HARUS diberitahukan ke klien (daftar pemberitahuan re-ha
 - Kegagalan auth: SIMAPI HTTP 200 `{"status":"02"}` ("Authentication failed" / "Token is not valid", pesan seragam termasuk untuk
   `ambil_riwayat_mutasi`); `services/*` HTTP 401. Throttle HTTP 429 dengan `Retry-After`.
 - `a_sinkron/ambil_seluruh_pengguna` dan `s_dm/p_web_config` tidak tersedia (404).
-- URL berkas arsip dan foto pegawai tidak lagi terbuka: lewat endpoint unduh khusus klien layanan (Q6-38/Q6-39) dengan kredensial klien.
+- URL berkas arsip dan foto tidak lagi terbuka tanpa login. `services/s_stat` (MuDig): kolom `arsip_*`/`file_*` berisi URL ke
+  `GET services/s_stat/berkas/{jenis}/{nip}/{id}[/{kolom}]` yang butuh Basic klien `stat` (Q6-38). SIMAPI `a_employee`: `foto` berisi URL
+  `GET simapi/v1/a_employee/foto/{nip}` yang butuh token SIMAPI di header `Authorization` (Q6-39). Klien harus mengirim kredensial/token
+  saat mengambil berkas dan menyesuaikan bentuk URL; berkas/foto yang belum dimigrasikan mengembalikan 404 seragam.
+- Bentuk `a_auth/token`: `data` hanya berisi `token` (tanpa `expired_at`, Q6-02); kegagalan bisnis SIMAPI memakai `data: []`.
 - `a_employee/detil` `unit_es_3`/`unit_es_4` tetap kosong seperti legacy (bug legacy yang sengaja tidak diubah, Q6-36).
 - `rekomendasi_kp_uns` dengan `id_satker`/`id_unit` mengembalikan `data: []` seperti legacy (Q6-37).
 - Tanggal bisnis dan waktu simpan: DB menyimpan UTC; respons SIMAPI `change_history` (A5) menampilkan WIB seperti legacy.
