@@ -319,6 +319,30 @@ otomatis, tetapi BKN bisa sudah memproses permintaan yang balasannya tidak sampa
 CA bundle BSrE disimpan **di luar repo dan luar webroot** (mis. `/etc/simpeg-v2/`, `chmod 600`, pemilik user PHP) — lihat
 §1c dan §1d. Uji koneksi FCM: `php spark integrasi:uji-koneksi fcm` (validate_only, tanpa kirim ke perangkat, §1d).
 
+### 1h. Auth antar-sistem — klien layanan dan token SIMAPI (MAKE-058, ADR-036) — bagian Jalur A
+
+Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) wajib auth; klien dibuat operator, bukan diimpor (F6-08).
+
+1. **Header `Authorization` harus sampai ke PHP.** Nginx: pada blok `location ~ \.php$` tambahkan `fastcgi_param HTTP_AUTHORIZATION $http_authorization;`
+   (Apache: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1`). Tanpa ini semua klien Basic ditolak "Authentication failed". Uji:
+   panggil endpoint dengan kredensial sah dari alamat yang diizinkan dan pastikan bukan 401.
+2. **Buat klien** (rahasia tampil SEKALI; kirim lewat kanal aman di luar repo, jangan ditempel di tiket/chat):
+   ```bash
+   php spark integrasi:klien buat --nama="<sistem>" --username=<huruf-kecil> --jenis=<1|2|3> --hak=<simapi|stat|dm|esign|sinkron,…> [--ip=<ip/cidr,…>]
+   ```
+   Jenis 1/2 (SIMAPI) wajib berhak `simapi`; jenis 3 (layanan) tidak boleh. Tanpa `--ip` = semua IP; isi `--ip` dengan IP/CIDR keluar klien bila
+   diketahui (kosong ditolak). Lainnya: `rotasi <username>` (rahasia baru, token dicabut), `nonaktif|aktifkan|hapus <username>`, `daftar`.
+3. **Re-handshake klien** (cutover): beri tiap klien username + rahasia baru dan alamat endpoint baru; kredensial lama tidak berlaku.
+4. **Pembersihan token kedaluwarsa** (mingguan, idempoten; `--dry-run` untuk menghitung):
+   ```bash
+   # /etc/cron.d/simpeg-v2-bersihkan-token
+   15 4 * * 0 deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-bersihkan-token.lock php spark integrasi:klien bersihkan-token >> /var/www/simpeg-v2/logs/bersihkan-token.log 2>&1
+   ```
+   Retensi bawaan 7 hari sejak kedaluwarsa (`Config\KlienLayanan::$tokenRetensiHari`). Jam mengikuti zona waktu server (lihat §1f).
+5. **Pemantauan.** Kegagalan auth tercatat di `integrasi_log` (arah masuk; kode `tidak_sah`, `tidak_aktif`, `ip_ditolak`, `hak_kurang`,
+   `token_tidak_sah`, `throttle_*`; tanpa username/rahasia/IP). Lonjakan `tidak_sah` dari satu klien = rahasia salah/dirotasi; `ip_ditolak` =
+   IP keluar klien berubah.
+
 ---
 
 ## 2. Cara push (operator deploy)
