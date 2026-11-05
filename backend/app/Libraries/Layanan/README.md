@@ -144,6 +144,11 @@ Catatan keputusan coder M5 (dicatat untuk reviewer):
 2. **[V2] Rentang efek `id_jenis_status` per tanggal inklusif** (disetujui Horii 27-10). Legacy `L_tb.php:1169-1179` /
    `:746-757` membandingkan dengan jam sekarang sehingga hari terakhir TB tidak ikut. Gap "TB disetujui sebelum mulai / TB
    berakhir → status tidak berubah otomatis" sama dengan legacy, tidak dikerjakan M5.
+   **CR-102 (hapus TB):** `TbService::sebelumHapus` mengembalikan `id_jenis_status` 2 → 1 bila hari ini berada di rentang
+   gabungan induk + semua perpanjangan (termasuk celah di antaranya), dihitung sebelum perpanjangan dihapus. Di luar
+   rentang gabungan status tidak diubah. Catatan INFO: bila pegawai masih punya TB lain status 1 yang berjalan, hapus satu
+   TB tetap mengembalikan status ke 1 (perilaku legacy `L_tb.php:745-758`); job `layanan:status-harian` menaikkannya lagi
+   ke 2 pada run berikutnya.
 3. **`dalam_negeri` tidak divalidasi [K]**; kolom NOT NULL → 1 (Dalam Negeri) bila kosong/di luar 1|2 (bukan 422).
 4. **Ubah oleh role 1 pada TB disetujui** menyimpan perubahan data tetapi status tetap 1 (`status` lain → 422
    `errors.status`): status final tidak punya transisi keluar (single end node). Status 0 → 1 lewat ubah role 1 memberi efek
@@ -179,3 +184,33 @@ Catatan keputusan coder M6 (dicatat untuk reviewer):
 ## Stempel UTC (CR-086)
 
 Sesi DB berzona UTC (driver `App\Database\MySQLi`, DBV-025), jadi default/ON UPDATE kolom audit berisi UTC. Pembaca yang menampilkan tanggal pengajuan memakai `StempelUtc` (WIB): dashboard Status Layanan mengirim `tanggal_pengajuan` ISO `+07:00`; ekspor memotong tanggal WIB; surat TB/IB memakai tanggal WIB. Aturan lengkap: [`../Waktu/README.md`](../Waktu/README.md).
+
+## Status harian TB/CLTN (`StatusHarian/`, MAKE-062, PRD Fase 6 §7.9)
+
+`php spark layanan:status-harian [--dry-run] [--tanggal=YYYY-MM-DD]` (00:30 WIB, ADR-037) menyelaraskan
+`pegawai.id_jenis_status` (1 aktif, 2 TB, 3 CLTN) dengan riwayat TB (`riwayat_tb` status 1 + `riwayat_tb_perpan`) dan CLTN
+(`riwayat_cuti` `id_jenis_cuti = 6` status 1) pada tanggal proses.
+
+| Berkas | Lapisan | Isi |
+|---|---|---|
+| `PenentuStatusHarian`, `KeputusanStatusHarian` | murni (dipindai `StatusHarianMurniTest`) | aturan Q6-24..Q6-27: segmen induk/perpanjangan, bentrok, pemulihan; tanggal diinjeksi |
+| `StatusHarianService`, `StatusHarianSibuk` | ber-DB | populasi (batch 500), transaksi kecil per pegawai, `audit_logs` (`jenis_audit` `layanan.status_harian`), `GET_LOCK` |
+
+- Pelaku audit = `AkunSistemIntegrasi::id()`; dry-run tidak menulis dan tidak butuh akun.
+- Keluaran hanya jumlah (tanpa NIP/nama); INFO: bentrok TB+CLTN, celah TB, 2/3 tanpa riwayat pendukung, dilewati
+  (pegawai tidak aktif / status lain), berubah saat proses.
+- Tanggal masa depan ditolak; tanggal lampau hanya bersama `--dry-run` (dihitung terhadap status pegawai saat ini).
+- Audit dan update pegawai berada pada satu koneksi/transaksi (model audit dibuat dari koneksi layanan; keputusan dihitung ulang di dalam transaksi setelah riwayat TB/CLTN dikunci `FOR UPDATE`). `after_json` audit memuat `jenis_riwayat` dan `id_riwayat` penentu.
+- Deviasi: tulis lewat query builder + `audit_logs` manual, BUKAN event `PegawaiModel`, sama dengan `EfekFinalCutiService`; pelanggan event perubahan `pegawai` (A5 `change_history`) tidak terpicu oleh job ini, jadi A5 perlu menangani perubahan `id_jenis_status` dari job harian secara terpisah bila diperlukan.
+- INFO `celah_tb` = pegawai berstatus 2 yang hari ini jatuh di celah antara dua segmen TB dan karena itu dikembalikan ke 1.
+- Test: `tests/unit/Layanan/StatusHarian/*`, `tests/database/Layanan/StatusHarianTest.php`.
+
+### Catatan sadar — `pengguna:sinkron-nama` dan kunci `layanan:status-harian` (review A2a, reviewer CR 05-11-2026)
+
+- **Rumus nama [V2].** Legacy `formatNamaGelar` (`function_helper.php:102`) memakai `stripslashes` per bagian, hanya men-trim hasil akhir, dan menambahkan
+  gelar akhir apa adanya bila tidak kosong. v2 memakai `StrukturService::namaGelar` (trim tiap bagian, tanpa `stripslashes`): nama berspasi di
+  ujung atau bergelar hanya spasi menghasilkan teks sedikit lebih rapi; sama dengan tampilan nama di seluruh v2. Data impor yang berisi
+  backslash-escape terbawa apa adanya.
+- **Kunci.** `layanan:status-harian` mengunci baris pegawai lalu riwayat TB/CLTN-nya (`FOR UPDATE`); `riwayat_tb_perpan` tidak ikut dikunci, dan urutan
+  kunci pegawai → riwayat dapat berbalik dengan alur admin yang mengunci riwayat → pegawai (potensi deadlock). Dampaknya dihitung `gagal` untuk
+  pegawai itu dan diproses ulang pada run berikutnya (idempoten); perilaku ini disadari, bukan bug.
