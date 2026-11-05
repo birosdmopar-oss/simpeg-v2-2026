@@ -49,6 +49,9 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesPresensiLaporan.php',
         // Modul H Jalur B — integrasi keluar (Fase 6, MAKE-064 dst.): `api/v1/integrasi/*`.
         APPPATH . 'Config/RoutesIntegrasi.php',
+        // Modul H Jalur A — kompatibilitas legacy (Fase 6, MAKE-059 dst.): SIMAPI `simapi/v1/*` dan `services/*` (berkas bersama).
+        APPPATH . 'Config/RoutesSimapi.php',
+        APPPATH . 'Config/RoutesServices.php',
     ];
 
     /**
