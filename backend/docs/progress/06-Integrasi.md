@@ -86,8 +86,10 @@ Cek "ada/tidak": `AttachmentServiceInterface::daftar(nip, idRiwayat, idEntri)` l
 
 **Usulan struktur kelas (belum dibuat):** `Libraries/Integrasi/Stat/RekomendasiKp`, `RekomendasiKgb`,
 `RekomendasiPensiun` (murni, `sekarang` diinjeksi); `StatService` (DB, filter tahun, batch `WHERE IN`, query builder
-saja); penyaji ke amplop legacy `{status,msg,data}` lewat `ResponsSimapi` (A4); endpoint di bawah `klienLayanan:stat`
-(A3, `RoutesServices` A4).
+saja); penyaji ke amplop `services/*` (status INT 1 sukses, 2 gagal; HTTP 200 untuk respons bisnis, 401 hanya auth gagal;
+PRD §6) dengan responder sendiri, BUKAN `ResponsSimapi` (SIMAPI memakai string "01"/"02"). Endpoint di bawah
+`klienLayanan:stat` (A3, filter `App\Filters\KlienLayananFilter`). Route `services/s_stat/*` boleh ditambahkan aditif di
+berkas route milik A6 tanpa menunggu A4; nama berkas dikoordinasikan dengan lead.
 
 ## Bagian B — Klien integrasi keluar
 
