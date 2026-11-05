@@ -12,7 +12,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
 | H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | Belum mulai |
-| H-08 | A | MAKE-061 | Belum mulai |
+| H-08 | A | MAKE-061 | A6 selesai (versi lokal, Worker Fable) di branch `fase6/a-lokal/make-061-s-stat`, menunggu review |
 | H-09 | A | (pemetaan) | Belum mulai |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
 | H-11 | A | MAKE-062 | A2a selesai (versi lokal), menunggu review |
@@ -77,6 +77,31 @@ Keputusan implementasi:
 - Throttle: bucket kegagalan per IP (sukses tidak menghabiskannya) dan per klien; log penolakan maks sekali per kunci per jendela; ambang di `Config\KlienLayanan` (120/IP, 600/klien per 60 detik) — usulan
   awal, disetel setelah ada data trafik klien nyata.
 - Tidak ada perubahan kontrak: amplop gagal SIMAPI HTTP 200 `{"status":"02"}`, `services/*` HTTP 401 `{"status":2}` (PRD §6.3).
+
+### A6 — MAKE-061 `services/s_stat` (H-08, versi lokal)
+
+Pelaksana: Worker Fable (take over dari Worker Haiku 05-11-2026; analisis Haiku di branch `fase6/a-lokal/make-061-analisis`).
+Branch `fase6/a-lokal/make-061-s-stat`. Isi: `Controllers/Services/SStatController`, `Config/RoutesServices.php` (berkas bersama
+`services/*`, didaftarkan di `Routing::$routeFiles`), `Libraries/Integrasi/Stat/{KalenderStat,RekomendasiKp,RekomendasiKgb,
+RekomendasiPensiun,PenyajiStat,StatService}`, `Libraries/Integrasi/Layanan/ResponsLayanan` (amplop INT bersama A4/B4b). Dokumen:
+`Libraries/Integrasi/README.md` (bagian s_stat: keputusan, anomali [K], deviasi [V2], tabel perbedaan vs `Kalkulasi/*`, gap),
+`Controllers/Services/README.md` (endpoint & kolom).
+
+Keputusan implementasi (reviewer/Horii 05-11-2026):
+- Q6-37 = A: `rekomendasi_kp_uns` berfilter → `data: []` (`[K] bug legacy Q6-37`, dikunci AC-08.4).
+- Q6-38 = A: URL arsip MuDig = endpoint unduh klien `GET services/s_stat/berkas/{jenis}/{nip}/{id}[/{kolom}]` di balik
+  `klienLayanan:stat`; daftar putih jenis (kp/skp/jabatan/kgb; pak/tb/ib/karpeg/kariskarsu + kolom `file_*` persis migration v2);
+  404 seragam; `skp` dibatasi status 1 tahun Y-1/Y-2; tanpa pembatasan per populasi rekomendasi; semua URL lewat
+  `PenyajiStat::urlBerkas()`.
+- Format tanggal ikut kode legacy (`d M Y`, `M Y`, `F`), bukan DD-MM-YYYY (Q9 dikoreksi); edge `gol_ruang` kosong direplikasi;
+  KGB hanya `arsip_last_kgb`; `file_*` daftar = URL/kosong [V2].
+- Perbedaan aturan dengan `Kepegawaian/Kalkulasi/{KenaikanPangkat,KenaikanGajiBerkala,Pensiun}` dicatat di README modul;
+  `Pensiun::batasUsia()` dipakai ulang (identik), `tanggalPensiun()` TIDAK (legacy meluap bulan).
+
+Test: `tests/unit/Integrasi/Stat/{RekomendasiKpTest,RekomendasiKgbPensiunTest,StatMurniTest}` (AC-08.1 matriks tanggal batas,
+anomali [K], penyaji, kemurnian), `tests/database/Integrasi/StatServiceTest` (AC-08.2 kolom per endpoint, arsip storage,
+Q6-37, aturan unduh), `tests/database/Integrasi/SStatKontrakTest` (AC-08.3 401 amplop INT, AC-08.4, HTTP 200 amplop INT,
+`list_tb` tanpa path internal, unduh 200 header aman / 404 seragam).
 
 ## Bagian B — Klien integrasi keluar
 
