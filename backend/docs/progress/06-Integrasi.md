@@ -147,7 +147,7 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
 ### B4b — `services/s_esign` untuk MuDig (F6-16, branch `fase6/make-065-s-esign`)
 
 - Dimulai sesudah A3 MAKE-058 di main `c926770f`. `check_user` + `sign_pdf` dengan filter `klienLayanan:esign`; route =
-  sub-group `s_esign` di `Config/RoutesServices.php` + responder `ResponsLayanan` (kerangka Jalur A, ditambahkan sesudah di main).
+  sub-group `s_esign` di `Config/RoutesServices.php` + responder `ResponsLayanan` mode string (kerangka Jalur A main `539f4c7c`).
 - Putusan reviewer U1–U6 (05-11): ikut legacy untuk kontrak klien — `status` string "1"/"2" (PRD §6.3 akan dikoreksi CR docs),
   `msg` `check_user` selalu null (bug legacy), parameter wajib hanya `nik`/`passphrase`/`file`/`imageTTD`, `ip_address`/
   `user_agent` dari POST.

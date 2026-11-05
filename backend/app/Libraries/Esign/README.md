@@ -30,7 +30,7 @@ publik QR, dan pencabutan akses publik: `README-deploy.md` §1c.
 
 Port `controllers/services/S_esign.php`. Controller `Controllers/Services/SEsignController` (filter `klienLayanan:esign`,
 MAKE-058/ADR-036), logika `LayananEsignMudig`, batas unggahan `Config\EsignMudig`. Route = sub-group `s_esign` di
-`Config/RoutesServices.php` (kerangka Jalur A; ditambahkan sesudah kerangka di main). Runbook: `README-deploy.md` §1c.
+`Config/RoutesServices.php` (berkas bersama Jalur A), responder `ResponsLayanan` mode string. Runbook: `README-deploy.md` §1c.
 
 Amplop [K] `{"status":"1"|"2","msg","data"}` — `status` **string** seperti `S_esign.php` (berbeda dengan `s_stat`/`s_dm` yang
 int), HTTP 200; auth gagal 401 dari filter.
