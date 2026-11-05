@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Database\Integrasi;
 
+use App\Interfaces\EsignGatewayInterface;
 use App\Libraries\Esign\BsreEsignAdapter;
 use App\Libraries\Esign\LayananEsignMudig;
+use App\Libraries\Esign\MockEsignAdapter;
 use App\Libraries\Integrasi\Http\FakeTransport;
 use App\Libraries\Integrasi\Http\GalatTransport;
 use App\Libraries\Integrasi\Http\KlienHttp;
@@ -16,7 +18,9 @@ use CodeIgniter\Test\Mock\MockCache;
 use CodeIgniter\Test\TestResponse;
 use CodeIgniter\Throttle\Throttler;
 use Config\EsignMudig;
+use Config\Integrations;
 use Config\Services;
+use RuntimeException;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Integrasi\LogIntegrasiTiruan;
@@ -24,7 +28,7 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
 /**
  * MAKE-065 B4b (H-02, F6-16 / Q6-05 = A) — `services/s_esign/{check_user,sign_pdf}` lewat pipeline route sungguhan: auth
- * `klienLayanan:esign`, amplop [K] `{"status":1|2,"msg","data"}` HTTP 200, unggahan multipart, `esign_hist` wajib per
+ * `klienLayanan:esign`, amplop [K] `{"status":"1"|"2","msg","data"}` (status STRING) HTTP 200, unggahan multipart, `esign_hist` wajib per
  * percobaan, PDF ber-TTE base64, NIK langsung ke gateway (tanpa `pegawai.nik`), dan NIK/passphrase tidak bocor ke respons
  * maupun log (AC-02.3). Adapter BSrE nyata + FakeTransport (tanpa jaringan); nilai fiktif.
  *
@@ -145,9 +149,9 @@ final class SEsignMudigTest extends DatabaseTestCase
         $this->assertSame(self::PDF_TTE, base64_decode($badan['data']['signed_file'], true));
 
         $p = $this->transport->tercatat()[0]['permintaan'];
-        $this->assertSame(['nik' => self::NIK, 'passphrase' => self::PASS, 'tampilan' => 'visible', 'width' => '50', 'height' => '50', 'tag_koordinat' => '##', 'reason' => 'Persetujuan MuDig', 'location' => 'Jakarta', 'image' => 'true'], $p->query);
+        $this->assertSame(['nik' => self::NIK, 'passphrase' => self::PASS, 'tampilan' => 'visible', 'width' => '50', 'height' => '50', 'tag_koordinat' => '##', 'reason' => 'Persetujuan MuDig', 'location' => 'Jakarta', 'image' => '1'], $p->query, 'image bawaan legacy true → "1" (S2)');
         $this->assertSame([self::PDF, "\x89PNG\r\n\x1a\n"], [$p->multipart[0]['isi'], substr((string) $p->multipart[1]['isi'], 0, 8)]);
-        $this->assertSame(['surat.pdf', '12'], [$p->multipart[0]['namaBerkas'], $p->refId]);
+        $this->assertSame(['surat.pdf', '12', 'ttd.png', 'image/png'], [$p->multipart[0]['namaBerkas'], $p->refId, $p->multipart[1]['namaBerkas'], $p->multipart[1]['mime']]);
 
         $hist = $this->db->table('esign_hist')->get()->getResultArray();
         $this->assertCount(1, $hist);
@@ -221,6 +225,129 @@ final class SEsignMudigTest extends DatabaseTestCase
         $this->assertSame(0, $this->db->table('esign_hist')->countAllResults());
     }
 
+    public function testJpegMimeDanNamaDiteruskanImagePostIdRwNonAngkaDanPemotonganKolom(): void
+    {
+        $this->transport->antre(new Respons(200, self::PDF_TTE));
+        $ua = str_repeat('é', 200) . 'Z';
+
+        $badan = $this->badan($this->tandaTangani($this->param(['image' => 'false', 'id_rw' => '12a', 'user_agent' => $ua, 'ip_address' => str_repeat('1', 60)]), self::PDF, $this->jpeg(), 'tanda tangan.jpg'));
+
+        $this->assertSame('1', $badan['status']);
+        $p = $this->transport->tercatat()[0]['permintaan'];
+        $this->assertSame(['tanda tangan.jpg', 'image/jpeg', 'false', null], [$p->multipart[1]['namaBerkas'], $p->multipart[1]['mime'], $p->query['image'], $p->refId]);
+
+        $h = $this->db->table('esign_hist')->get()->getRowArray();
+        $this->assertNull($h['id_rw'], 'id_rw non-angka → NULL');
+        $this->assertSame(str_repeat('1', 45), $h['ip_address']);
+        $this->assertLessThanOrEqual(255, strlen((string) $h['user_agent']), 'TINYTEXT dibatasi byte (P1a)');
+        $this->assertSame(str_repeat('é', 127), $h['user_agent'], 'dipotong di batas karakter utuh (mb_strcut)');
+    }
+
+    public function testNikTidakSahDitolakTanpaGateway(): void
+    {
+        foreach (['..', '../x', '3201 0101', str_repeat('1', 33)] as $nik) {
+            $this->assertSame(['status' => '2', 'msg' => 'Invalid parameter.', 'data' => []], $this->badan($this->cekPengguna($nik)), $nik);
+            $this->assertSame('Invalid parameter.', $this->badan($this->tandaTangani($this->param(['nik' => $nik])))['msg'], $nik);
+        }
+
+        $this->assertSame([], $this->transport->tercatat());
+        $this->assertSame(0, $this->db->table('esign_hist')->countAllResults());
+    }
+
+    public function testCheckUserMenerimaPostSepertiLegacy(): void
+    {
+        $this->transport->antreJson(200, ['status_code' => '1111', 'message' => 'ok']);
+
+        $res = $this->withHeaders(['Authorization' => $this->basic])->call('post', 'services/s_esign/check_user?nik=' . self::NIK);
+
+        $res->assertStatus(200);
+        $this->assertSame(['status' => '1', 'msg' => null, 'data' => []], $this->badan($res));
+    }
+
+    public function testExceptionAdapterStatus2KodeGalatTanpaRincian(): void
+    {
+        Services::injectMock('esignGatewayNikLangsung', new class () implements EsignGatewayInterface {
+            public function checkUser(#[\SensitiveParameter] string $nip): array
+            {
+                throw new RuntimeException('rincian rahasia ' . $nip);
+            }
+
+            public function signPdf(#[\SensitiveParameter] string $pdfContent, #[\SensitiveParameter] string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
+            {
+                throw new RuntimeException('rincian rahasia ' . $nip);
+            }
+        });
+
+        $badan = $this->badan($this->tandaTangani($this->param()));
+
+        $this->assertSame(['status' => '2', 'msg' => LayananEsignMudig::PESAN_GALAT, 'data' => []], $badan);
+        $h = $this->db->table('esign_hist')->get()->getRowArray();
+        $this->assertSame(['2', LayananEsignMudig::KODE_GALAT, LayananEsignMudig::PESAN_GALAT], [$h['status'], $h['status_code'], $h['keterangan']]);
+    }
+
+    public function testHistGagalSesudahSuksesTetapMengembalikanPdfGagalSebelumnyaDilempar(): void
+    {
+        // P1b: dokumen sudah ber-TTE → hasil sukses + PDF tetap dikembalikan walau esign_hist gagal ditulis.
+        $gateway = service('esignGatewayNikLangsung');
+        $rusak   = static function (array $baris): void {
+            throw new RuntimeException('Data too long; SQL ' . $baris['nik']);
+        };
+        $layanan = new LayananEsignMudig($gateway, $this->db, $rusak);
+        $gambar  = ['isi' => $this->png(), 'nama' => 'ttd.png', 'mime' => 'image/png'];
+
+        $this->transport->antre(new Respons(200, self::PDF_TTE));
+        $hasil = $layanan->tandaTangani($this->param(), self::PDF, 'surat.pdf', $gambar);
+        $this->assertSame(['1', self::PDF_TTE], [$hasil['status'], base64_decode($hasil['data']['signed_file'], true)]);
+
+        // Gagal gateway + gagal catat → dilempar (controller: status "2" galat umum).
+        $this->transport->antreJson(400, ['status_code' => '2031', 'error' => 'salah']);
+        $this->expectException(RuntimeException::class);
+        $layanan->tandaTangani($this->param(), self::PDF, 'surat.pdf', $gambar);
+    }
+
+    public function testBadanBukanPdfDariAdapterBukanSukses(): void
+    {
+        // S5 berlapis: adapter (mis. mock rusak) melapor 200 tanpa PDF → tetap gagal.
+        Services::injectMock('esignGatewayNikLangsung', new class () implements EsignGatewayInterface {
+            public function checkUser(#[\SensitiveParameter] string $nip): array
+            {
+                return ['status_code' => '200', 'message' => 'ok', 'nip' => '', 'has_certificate' => true, 'certificate_expires_at' => null];
+            }
+
+            public function signPdf(#[\SensitiveParameter] string $pdfContent, #[\SensitiveParameter] string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
+            {
+                return ['status_code' => '200', 'message' => 'ok', 'signed_pdf' => '{"bukan":"pdf"}', 'signed_at' => null, 'signature_id' => null];
+            }
+        });
+
+        $badan = $this->badan($this->tandaTangani($this->param()));
+
+        $this->assertSame('2', $badan['status']);
+        $this->assertSame(['2', '502'], array_values($this->db->table('esign_hist')->select('status, status_code')->get()->getRowArray()));
+    }
+
+    public function testFactoryAsliNikLangsungMockDanBsre(): void
+    {
+        $asli = config(Integrations::class)->esign;
+
+        try {
+            config(Integrations::class)->esign = ['driver' => 'mock'] + $asli;
+            $this->assertInstanceOf(MockEsignAdapter::class, Services::esignGatewayNikLangsung(false));
+
+            config(Integrations::class)->esign = ['driver' => 'bsre', 'baseUrl' => 'https://bsre.contoh', 'username' => 'u', 'password' => 'p', 'tlsVerify' => true, 'timeout' => 20] + $asli;
+            Services::injectMock('klienHttp', new KlienHttp($this->transport, $this->log));
+            $this->transport->antreJson(200, ['status_code' => '1111', 'message' => 'ok']);
+
+            $hasil = Services::esignGatewayNikLangsung(false)->checkUser(self::NIK);
+
+            $this->assertSame('200', $hasil['status_code']);
+            $this->assertSame('https://bsre.contoh/api/user/status/' . self::NIK, $this->transport->tercatat()[0]['permintaan']->url, 'NIK langsung, tanpa pegawai.nik');
+        } finally {
+            config(Integrations::class)->esign = $asli;
+            Services::resetSingle('klienHttp');
+        }
+    }
+
     /**
      * @param list<string> $hak
      */
@@ -260,7 +387,7 @@ final class SEsignMudigTest extends DatabaseTestCase
     /**
      * @param array<string, string> $param
      */
-    private function tandaTangani(array $param, ?string $pdf = self::PDF, ?string $gambar = 'png'): TestResponse
+    private function tandaTangani(array $param, ?string $pdf = self::PDF, ?string $gambar = 'png', string $namaGambar = 'ttd.png'): TestResponse
     {
         $berkas = [];
 
@@ -269,7 +396,7 @@ final class SEsignMudigTest extends DatabaseTestCase
         }
 
         if ($gambar !== null) {
-            $berkas['imageTTD'] = $this->unggahan('ttd.png', 'image/png', $gambar === 'png' ? $this->png() : $gambar);
+            $berkas['imageTTD'] = $this->unggahan($namaGambar, 'image/png', $gambar === 'png' ? $this->png() : $gambar);
         }
 
         // FileCollection membaca $_FILES lewat service superglobals (pola LampiranEndpointTest).
@@ -293,6 +420,15 @@ final class SEsignMudigTest extends DatabaseTestCase
         $this->berkasTmp[] = $tmp;
 
         return ['name' => $nama, 'type' => $tipe, 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => strlen($isi)];
+    }
+
+    private function jpeg(): string
+    {
+        $img = imagecreatetruecolor(2, 2);
+        ob_start();
+        imagejpeg($img);
+
+        return (string) ob_get_clean();
     }
 
     private function png(): string

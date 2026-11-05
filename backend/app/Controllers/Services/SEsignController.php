@@ -25,6 +25,9 @@ use Throwable;
  */
 final class SEsignController extends BaseController
 {
+    /**
+     * GET atau POST (legacy menerima metode apa pun, review B4b S7); `nik` dari query string seperti legacy (`$_GET`).
+     */
     public function checkUser(): ResponseInterface
     {
         return $this->jalankan(fn (): array => $this->layanan()->cekPengguna(is_string($n = $this->request->getGet('nik')) ? $n : ''));
@@ -37,8 +40,15 @@ final class SEsignController extends BaseController
             $cfg  = config(EsignMudig::class);
             $pdf  = $this->berkas('file', $cfg->pdfMaks, static fn (string $isi): bool => str_contains(substr($isi, 0, 1024), '%PDF'));
             $ttd  = $this->berkas('imageTTD', $cfg->gambarMaks, static fn (string $isi): bool => ($info = @getimagesizefromstring($isi)) !== false && in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true));
+            $gbr  = null;
 
-            return $this->layanan()->tandaTangani(is_array($post) ? $post : [], $pdf['isi'] ?? null, $pdf['nama'] ?? null, $ttd['isi'] ?? null);
+            if ($ttd !== null) {
+                // MIME dari isi (padanan `mime_content_type` legacy, S1); nama = basename unggahan, bawaan sesuai jenis.
+                $jenis = (int) ((@getimagesizefromstring($ttd['isi']) ?: [2 => IMAGETYPE_PNG])[2]);
+                $gbr   = ['isi' => $ttd['isi'], 'mime' => image_type_to_mime_type($jenis), 'nama' => $ttd['nama'] !== '' ? $ttd['nama'] : 'ttd' . image_type_to_extension($jenis)];
+            }
+
+            return $this->layanan()->tandaTangani(is_array($post) ? $post : [], $pdf['isi'] ?? null, $pdf['nama'] ?? null, $gbr);
         });
     }
 

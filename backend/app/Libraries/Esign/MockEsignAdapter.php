@@ -30,7 +30,7 @@ class MockEsignAdapter implements EsignGatewayInterface
         $this->withoutCertificate = $withoutCertificate;
     }
 
-    public function checkUser(string $nip): array
+    public function checkUser(#[\SensitiveParameter] string $nip): array
     {
         $has = ! in_array($nip, $this->withoutCertificate, true);
 
@@ -45,7 +45,7 @@ class MockEsignAdapter implements EsignGatewayInterface
         ];
     }
 
-    public function signPdf(string $pdfContent, string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
+    public function signPdf(#[\SensitiveParameter] string $pdfContent, #[\SensitiveParameter] string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
     {
         if ($pdfContent === '') {
             return [
