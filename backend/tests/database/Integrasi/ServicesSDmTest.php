@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Database\Integrasi;
 
-use App\Libraries\MasterData\WebConfigService;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
@@ -88,19 +87,16 @@ final class ServicesSDmTest extends DatabaseTestCase
     {
         $kep  = $this->buatUnit();
         $lain = $this->buatUnit();
-        // Nilai web_config disuntik lewat tiruan: validasi ID_REF WebConfigService memakai cache referensi yang tidak
-        // mengikuti rollback antar-test (id unit berulang), di luar cakupan endpoint ini.
-        $wc = $this->createMock(WebConfigService::class);
-        $wc->method('value')->willReturnCallback(static fn (string $k) => $k === 'id_unit_kepegawaian' ? $kep : null);
-        Services::injectMock('webConfigService', $wc);
+        $this->db->table('web_config')->insert(['config_name' => 'id_unit_kepegawaian', 'config_value' => (string) $kep]);
 
         $this->assertSame([(string) $lain], array_column($this->jsonUji($this->sdm('p_list_unit_wo_kep'))['data'], 'id_unit'));
+    }
 
-        $wc2 = $this->createMock(WebConfigService::class);
-        $wc2->method('value')->willReturn(null);
-        Services::injectMock('webConfigService', $wc2);
+    public function testListUnitTanpaUnitKepegawaianTerdaftar(): void
+    {
+        $this->buatUnit();
+
         $this->assertSame(['status' => 2, 'msg' => 'Unit Kepegawaian tidak ditemukan didalam sistem.', 'data' => []], $this->jsonUji($this->sdm('p_list_unit_wo_kep')));
-        Services::resetSingle('webConfigService');
     }
 
     public function testGetUnitDanSatker(): void

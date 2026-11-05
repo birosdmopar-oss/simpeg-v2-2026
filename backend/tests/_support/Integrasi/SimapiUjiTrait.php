@@ -24,6 +24,10 @@ trait SimapiUjiTrait
     protected function pasangSimapiUji(): void
     {
         Services::injectMock('cache', new MockCache());
+        // cacheService/webConfigService bersama membungkus cache dari test sebelumnya (nilai web_config + id referensi
+        // yang tidak ikut rollback) — buat ulang di atas MockCache segar agar test tidak bergantung urutan.
+        Services::resetSingle('cacheService');
+        Services::resetSingle('webConfigService');
         $this->logSimapi = new LogIntegrasiTiruan();
         Services::injectMock('integrasiLog', $this->logSimapi);
         $throttler = new Throttler(new MockCache());
@@ -35,6 +39,8 @@ trait SimapiUjiTrait
     protected function lepasSimapiUji(): void
     {
         Services::resetSingle('cache');
+        Services::resetSingle('cacheService');
+        Services::resetSingle('webConfigService');
         Services::resetSingle('integrasiLog');
         Services::resetSingle('throttler');
         Services::resetSingle('klienSaatIni');
