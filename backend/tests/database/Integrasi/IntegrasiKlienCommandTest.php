@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\Integrasi;
 
 use App\Commands\IntegrasiKlien;
+use App\Libraries\Integrasi\Klien\PembangkitKredensial;
 use App\Libraries\Integrasi\Klien\PengesahKlien;
 use App\Libraries\Integrasi\Klien\TokenSimapi;
 use CodeIgniter\Test\StreamFilterTrait;
@@ -100,7 +101,7 @@ final class IntegrasiKlienCommandTest extends DatabaseTestCase
         $lama         = $this->rahasiaDari($keluaran);
         $id           = (int) $this->db->table('klien_layanan')->get()->getRowArray()['id_klien'];
         $token        = new TokenSimapi($this->db);
-        $t1           = $token->terbitkan($id)['token'];
+        $t1           = $this->terbit($id)['token'];
 
         [$kode, $keluaran] = $this->jalankan(['rotasi', 'simanta']);
         $this->assertSame(EXIT_SUCCESS, $kode);
@@ -109,7 +110,7 @@ final class IntegrasiKlienCommandTest extends DatabaseTestCase
         $this->assertStringContainsString('token aktif dicabut: 1', $keluaran);
         $this->assertNull($token->periksa('Bearer ' . $t1));
 
-        $t2                = $token->terbitkan($id)['token'];
+        $t2                = $this->terbit($id)['token'];
         [$kode, $keluaran] = $this->jalankan(['nonaktif', 'simanta']);
         $this->assertSame(EXIT_SUCCESS, $kode);
         $this->assertStringContainsString('dinonaktifkan', $keluaran);
@@ -139,5 +140,17 @@ final class IntegrasiKlienCommandTest extends DatabaseTestCase
 
         $this->assertSame(EXIT_USER_INPUT, $this->jalankan(['bersihkan-token', 'hari' => '0'])[0]);
         $this->assertSame(EXIT_USER_INPUT, $this->jalankan(['bersihkan-token', 'hari' => 'x'])[0]);
+    }
+
+    /**
+     * Terbitkan token untuk klien dengan sidik rahasia saat ini (seperti filter Basic lalu handshake).
+     *
+     * @return array{token: string, expired_at: string}
+     */
+    private function terbit(int $id): array
+    {
+        $baris = $this->db->table('klien_layanan')->select('rahasia_hash')->where('id_klien', $id)->get()->getRowArray();
+
+        return (new TokenSimapi($this->db))->terbitkan($id, PembangkitKredensial::sidik((string) ($baris['rahasia_hash'] ?? '')));
     }
 }

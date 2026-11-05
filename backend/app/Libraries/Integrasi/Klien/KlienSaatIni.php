@@ -15,10 +15,24 @@ final class KlienSaatIni
 
     private ?int $jenis = null;
 
-    public function set(int $idKlien, int $jenis): void
+    private ?string $sidikRahasia = null;
+
+    /**
+     * @param string|null $sidikRahasia sidik rahasia klien yang baru saja diverifikasi (hanya jalur Basic; null untuk jalur token)
+     */
+    public function set(int $idKlien, int $jenis, ?string $sidikRahasia = null): void
     {
-        $this->id    = $idKlien;
-        $this->jenis = $jenis;
+        $this->id           = $idKlien;
+        $this->jenis        = $jenis;
+        $this->sidikRahasia = $sidikRahasia;
+    }
+
+    /**
+     * Sidik rahasia untuk {@see TokenSimapi::terbitkan()} (menolak handshake bila rahasia dirotasi sesudah verifikasi).
+     */
+    public function sidikRahasia(): ?string
+    {
+        return $this->sidikRahasia;
     }
 
     public function id(): ?int

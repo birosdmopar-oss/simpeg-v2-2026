@@ -14,8 +14,10 @@ use Throwable;
  * disimpan sebagai SHA-256 heks huruf kecil di PK `simapi_token.token_hash` (token mentah tidak pernah disimpan atau
  * dicatat), satu baris per handshake, masa aktif {@see \Config\KlienLayanan::$tokenTtlDetik}.
  *
- * Terbit: dalam satu transaksi yang mengunci baris klien (`FOR UPDATE`) dan memeriksa ulang `status = 1`, sehingga handshake
- * yang berlomba dengan `nonaktif`/`hapus`/`rotasi` tidak menerbitkan token untuk klien yang baru dicabut (review S-3).
+ * Terbit: dalam satu transaksi yang mengunci baris klien (`FOR UPDATE`) dan memeriksa ulang `status = 1` DAN sidik rahasia
+ * (`PembangkitKredensial::sidik` dari `rahasia_hash`, dibawa filter lewat `KlienSaatIni`). Handshake yang berlomba dengan
+ * `nonaktif`/`hapus` (status berubah) atau `rotasi` (rahasia berubah, status tetap 1) tidak menerbitkan token untuk klien yang
+ * baru dicabut atau yang rahasianya sudah diganti (review S-3).
  *
  * Validasi: nilai header `Authorization` dipecah spasi dan token = ELEMEN KEDUA [K `AE:30-47`] (skema bebas); bentuk token
  * (panjang tetap + karakter) dan panjang header dibatasi SEBELUM di-hash; pencarian lewat PK `token_hash`, lalu
@@ -39,9 +41,11 @@ final class TokenSimapi
      *
      * @return array{token: string, expired_at: string}
      *
-     * @throws KlienTidakAktif klien tidak ada atau bukan status 1 (termasuk dinonaktifkan saat handshake berjalan)
+     * @param string $sidikRahasia sidik rahasia yang diverifikasi pengesah pada request ini
+     *
+     * @throws KlienTidakAktif klien tidak ada, bukan status 1, atau rahasianya berubah sejak diverifikasi (rotasi saat handshake berjalan)
      */
-    public function terbitkan(int $idKlien): array
+    public function terbitkan(int $idKlien, string $sidikRahasia): array
     {
         if ($this->db->transBegin() === false) {
             $this->db->resetTransStatus();
@@ -50,11 +54,11 @@ final class TokenSimapi
         }
 
         try {
-            $sql   = $this->db->table('klien_layanan')->select('status')->where('id_klien', $idKlien)->limit(1)->getCompiledSelect() . ' FOR UPDATE';
+            $sql   = $this->db->table('klien_layanan')->select('status, rahasia_hash')->where('id_klien', $idKlien)->limit(1)->getCompiledSelect() . ' FOR UPDATE';
             $klien = $this->db->query($sql)->getRowArray();
 
-            if ($klien === null || (int) $klien['status'] !== PenyimpanKlien::STATUS_AKTIF) {
-                throw new KlienTidakAktif('Klien tidak aktif; token tidak diterbitkan.');
+            if ($klien === null || (int) $klien['status'] !== PenyimpanKlien::STATUS_AKTIF || ! hash_equals(PembangkitKredensial::sidik((string) $klien['rahasia_hash']), $sidikRahasia)) {
+                throw new KlienTidakAktif('Klien tidak aktif atau rahasia berubah; token tidak diterbitkan.');
             }
 
             $hasil = $this->sisipToken($idKlien);

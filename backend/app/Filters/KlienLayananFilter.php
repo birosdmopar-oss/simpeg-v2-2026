@@ -71,7 +71,7 @@ class KlienLayananFilter implements FilterInterface
             return ResponsAuthKlien::terlaluBanyak($simapi, $thr->getTokenTime());
         }
 
-        service('klienSaatIni')->set((int) $hasil['id_klien'], (int) $hasil['jenis']);
+        service('klienSaatIni')->set((int) $hasil['id_klien'], (int) $hasil['jenis'], $hasil['sidik']);
 
         return null;
     }

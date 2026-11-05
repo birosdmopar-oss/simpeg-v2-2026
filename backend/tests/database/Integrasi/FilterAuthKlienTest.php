@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\Integrasi;
 
 use App\Filters\KlienLayananFilter;
+use App\Libraries\Integrasi\Klien\PembangkitKredensial;
 use App\Libraries\Integrasi\Klien\PenyimpanKlien;
 use App\Libraries\Integrasi\Klien\TokenSimapi;
 use App\Libraries\Integrasi\Log\CatatanIntegrasi;
@@ -55,7 +56,7 @@ final class FilterAuthKlienTest extends DatabaseTestCase
         Services::superglobals()->setServer('REMOTE_ADDR', self::IP);
 
         $this->withRoutes([
-            ['get', '__uji/stat', static fn () => service('response')->setJSON(['id' => service('klienSaatIni')->id(), 'jenis' => service('klienSaatIni')->jenis()]), ['filter' => 'klienLayanan:stat']],
+            ['get', '__uji/stat', static fn () => service('response')->setJSON(['id' => service('klienSaatIni')->id(), 'jenis' => service('klienSaatIni')->jenis(), 'sidik' => service('klienSaatIni')->sidikRahasia()]), ['filter' => 'klienLayanan:stat']],
             ['get', '__uji/simapi-auth', static fn () => service('response')->setJSON(['id' => service('klienSaatIni')->id()]), ['filter' => 'klienLayanan:simapi']],
             ['get', '__uji/simapi-data', static fn () => service('response')->setJSON(['status' => '01', 'id' => service('klienSaatIni')->id()]), ['filter' => 'simapiToken']],
         ]);
@@ -96,7 +97,9 @@ final class FilterAuthKlienTest extends DatabaseTestCase
         $res = $this->withHeaders(['Authorization' => $this->basic('mudig', $this->rahasia)])->call('get', '__uji/stat');
 
         $res->assertStatus(200);
-        $this->assertSame(['id' => $this->idKlien, 'jenis' => 3], json_decode($res->getJSON(), true));
+        $badan = json_decode($res->getJSON(), true);
+        $this->assertSame([$this->idKlien, 3], [$badan['id'], $badan['jenis']]);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{16}$/', (string) $badan['sidik'], 'sidik rahasia dibawa ke KlienSaatIni untuk terbitkan()');
         $this->assertSame([], $this->log->isi, 'sukses tidak ditulis ke log (hanya kegagalan)');
     }
 
@@ -171,7 +174,7 @@ final class FilterAuthKlienTest extends DatabaseTestCase
     public function testTokenSimapiMelewatkanKlienDanMenolakSisanya(): void
     {
         $this->klien('simanta', 2, ['simapi']);
-        $token = (new TokenSimapi($this->db))->terbitkan($this->idKlien)['token'];
+        $token = $this->terbit($this->idKlien)['token'];
 
         $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data');
         $res->assertStatus(200);
@@ -189,7 +192,7 @@ final class FilterAuthKlienTest extends DatabaseTestCase
     public function testTokenKedaluwarsaDanDicabutMengembalikanTokenNotValid(): void
     {
         $this->klien('simanta', 2, ['simapi']);
-        $token = (new TokenSimapi($this->db))->terbitkan($this->idKlien)['token'];
+        $token = $this->terbit($this->idKlien)['token'];
         $this->db->table('simapi_token')->update(['expired_at' => gmdate('Y-m-d H:i:s', time() - 5)]);
 
         $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data');
@@ -257,7 +260,7 @@ final class FilterAuthKlienTest extends DatabaseTestCase
         $cfg                      = config(KlienLayanan::class);
         $cfg->throttleIpKapasitas = 2;
         $this->klien('simanta', 2, ['simapi']);
-        $token = (new TokenSimapi($this->db))->terbitkan($this->idKlien)['token'];
+        $token = $this->terbit($this->idKlien)['token'];
 
         for ($i = 0; $i < 5; $i++) {
             $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data')->assertStatus(200);
@@ -285,5 +288,17 @@ final class FilterAuthKlienTest extends DatabaseTestCase
                 $this->addToAssertionCount(1);
             }
         }
+    }
+
+    /**
+     * Terbitkan token untuk klien dengan sidik rahasia saat ini (seperti filter Basic lalu handshake).
+     *
+     * @return array{token: string, expired_at: string}
+     */
+    private function terbit(int $id): array
+    {
+        $baris = $this->db->table('klien_layanan')->select('rahasia_hash')->where('id_klien', $id)->get()->getRowArray();
+
+        return (new TokenSimapi($this->db))->terbitkan($id, PembangkitKredensial::sidik((string) ($baris['rahasia_hash'] ?? '')));
     }
 }

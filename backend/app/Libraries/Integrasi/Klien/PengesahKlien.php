@@ -35,7 +35,7 @@ final class PengesahKlien
     }
 
     /**
-     * @return array{hasil: string, id_klien: int|null, jenis: int|null}
+     * @return array{hasil: string, id_klien: int|null, jenis: int|null, sidik: string|null}
      */
     public function periksa(#[\SensitiveParameter] string $username, #[\SensitiveParameter] string $rahasia, #[\SensitiveParameter] string $ip, string $hak): array
     {
@@ -46,25 +46,25 @@ final class PengesahKlien
         $cocok = password_verify($rahasia, $klien === null ? self::hashTiruan() : (string) $klien['rahasia_hash']);
 
         if ($klien === null || ! $cocok) {
-            return ['hasil' => self::TIDAK_SAH, 'id_klien' => $klien === null ? null : (int) $klien['id_klien'], 'jenis' => null];
+            return ['hasil' => self::TIDAK_SAH, 'id_klien' => $klien === null ? null : (int) $klien['id_klien'], 'jenis' => null, 'sidik' => null];
         }
 
         $id    = (int) $klien['id_klien'];
         $jenis = (int) $klien['jenis'];
 
         if ((int) $klien['status'] !== PenyimpanKlien::STATUS_AKTIF) {
-            return ['hasil' => self::TIDAK_AKTIF, 'id_klien' => $id, 'jenis' => null];
+            return ['hasil' => self::TIDAK_AKTIF, 'id_klien' => $id, 'jenis' => null, 'sidik' => null];
         }
 
         if (! AllowlistIp::cocok($ip, $klien['ip_allowlist'] === null ? null : (string) $klien['ip_allowlist'])) {
-            return ['hasil' => self::IP_DITOLAK, 'id_klien' => $id, 'jenis' => null];
+            return ['hasil' => self::IP_DITOLAK, 'id_klien' => $id, 'jenis' => null, 'sidik' => null];
         }
 
         if (! in_array($hak, HakKlien::dariKolom((string) $klien['hak']), true)) {
-            return ['hasil' => self::HAK_KURANG, 'id_klien' => $id, 'jenis' => null];
+            return ['hasil' => self::HAK_KURANG, 'id_klien' => $id, 'jenis' => null, 'sidik' => null];
         }
 
-        return ['hasil' => self::DITERIMA, 'id_klien' => $id, 'jenis' => $jenis];
+        return ['hasil' => self::DITERIMA, 'id_klien' => $id, 'jenis' => $jenis, 'sidik' => PembangkitKredensial::sidik((string) $klien['rahasia_hash'])];
     }
 
     public static function hashTiruan(): string

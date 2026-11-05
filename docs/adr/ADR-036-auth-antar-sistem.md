@@ -26,8 +26,9 @@
    allowlist IP → hak → throttle per klien. Semua kegagalan memberi respons **seragam** "Authentication failed"; alasan (`tidak_sah`,
    `tidak_aktif`, `ip_ditolak`, `hak_kurang`, `throttle_*`) hanya masuk `integrasi_log` (arah masuk, `id_klien`), tanpa username/rahasia/IP.
 3. **Allowlist IP**: dinormalkan saat simpan (tanpa spasi/duplikat, IPv6 kanonik), entri kosong atau bukan IPv4/IPv6/CIDR **ditolak**; string
-   kosong tidak pernah berarti "semua IP" (disimpan NULL); filter gagal tertutup. IP klien = `getIPAddress()` CI4 (proxy tepercaya lewat
-   konfigurasi aplikasi, bukan header mentah).
+   kosong tidak pernah berarti "semua IP" (disimpan NULL); filter gagal tertutup. IP klien = `getIPAddress()` CI4 = `REMOTE_ADDR`. Di belakang proxy/LB,
+   `REMOTE_ADDR` dibuat IP asli klien di server web (Nginx `real_ip` dengan `set_real_ip_from` hanya untuk CIDR proxy tepercaya); `$proxyIPs`
+   aplikasi tidak dipakai karena tidak dapat diisi lewat `.env`. IPv4-mapped IPv6 dinormalkan ke IPv4 (klien dan entri).
 4. **Token SIMAPI** (handshake `a_auth/token`, F6-05): 30 karakter `[A-Za-z0-9]` dari `random_int`, masa aktif 1 jam, **disimpan SHA-256 heks huruf
    kecil** sebagai PK `simapi_token.token_hash`; satu baris per handshake (token lama tetap sah sampai kedaluwarsa). Filter **`simapiToken`**
    mengambil token dari **elemen kedua** header `Authorization` [K `AE:30-47`] (skema bebas), membatasi panjang header dan bentuk token
@@ -66,3 +67,10 @@
   tanpa itu semua klien Basic gagal. Dicatat di README-deploy bagian 1h.
 - Klien baru dibuat operator lewat command; kredensial dikirim lewat kanal aman di luar repo.
 - Menambah grup endpoint = menambah nilai SET `hak` (ALTER ber-DBV, DBV-026-Q1) dan memasang filter `klienLayanan:<hak>`.
+- **Batasan yang disadari** (review MAKE-058): (N-2) pencatatan kegagalan per IP memakai get-lalu-simpan di cache; pada cache berkas,
+  kegagalan serentak dari satu IP bisa melewati ambang sedikit sebelum bucket penuh (cukup untuk membatasi banjir; bukan batas keras).
+  (N-3) kunci bucket memakai IP utuh; penyerang IPv6 dapat berganti alamat dalam satu /64 untuk menghindari bucket (allowlist klien
+  tetap menjadi pagar utama). Dapat diperketat (handler cache dengan `increment()`, atau kunci per /64) bila data trafik menunjukkan perlu.
+- **Untuk A4 (MAKE-059):** controller `a_auth` yang menerbitkan token wajib memanggil `TokenSimapi::terbitkan($idKlien, $sidikRahasia)` dengan
+  `KlienSaatIni::sidikRahasia()` dan memetakan `KlienTidakAktif` ke respons gagal SERAGAM "Authentication failed" (bukan pesan khusus),
+  sama dengan kegagalan Basic.

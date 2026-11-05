@@ -108,9 +108,9 @@ final class KlienLayananTest extends DatabaseTestCase
     {
         $a  = $this->klien('simanta');
         $b  = $this->klien('pusdatin', 1);
-        $t1 = $this->token()->terbitkan($a['id']);
-        $this->token()->terbitkan($a['id']);
-        $tLain = $this->token()->terbitkan($b['id']);
+        $t1 = $this->terbit($a['id']);
+        $this->terbit($a['id']);
+        $tLain = $this->terbit($b['id']);
 
         $hasil = $this->penyimpan()->ubahStatus('simanta', PenyimpanKlien::STATUS_NONAKTIF);
 
@@ -122,7 +122,7 @@ final class KlienLayananTest extends DatabaseTestCase
         $this->penyimpan()->ubahStatus('simanta', PenyimpanKlien::STATUS_AKTIF);
         $this->assertNull($this->token()->periksa('Bearer ' . $t1['token']), 'diaktifkan kembali tidak menghidupkan token yang sudah dicabut');
 
-        $this->token()->terbitkan($a['id']);
+        $this->terbit($a['id']);
         $hapus = $this->penyimpan()->ubahStatus('simanta', PenyimpanKlien::STATUS_DIHAPUS);
         $this->assertSame(1, $hapus['token_dicabut']);
         $baris = $this->db->table('klien_layanan')->where('id_klien', $a['id'])->get()->getRowArray();
@@ -154,7 +154,7 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testRotasiMenggantiRahasiaDanMencabutToken(): void
     {
         $lama = $this->klien();
-        $tok  = $this->token()->terbitkan($lama['id']);
+        $tok  = $this->terbit($lama['id']);
 
         $baru = $this->penyimpan()->rotasi('simanta');
 
@@ -170,7 +170,7 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testAuditGagalMembatalkanPerubahan(): void
     {
         $this->klien();
-        $tok   = $this->token()->terbitkan((int) $this->db->table('klien_layanan')->get()->getRowArray()['id_klien']);
+        $tok   = $this->terbit((int) $this->db->table('klien_layanan')->get()->getRowArray()['id_klien']);
         $gagal = fn (BaseConnection $koneksi): AuditLogModel => new class ($koneksi) extends AuditLogModel {
             public function record(string $entity, string|int $entityId, string $event, ?array $before, ?array $after, ?int $actorId = null, ?string $actorNip = null): int
             {
@@ -192,7 +192,7 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testDaftarTanpaRahasiaDenganJumlahTokenAktif(): void
     {
         $a = $this->klien();
-        $this->token()->terbitkan($a['id']);
+        $this->terbit($a['id']);
         $this->db->table('simapi_token')->insert(['token_hash' => str_repeat('a', 64), 'id_klien' => $a['id'], 'status' => 1, 'expired_at' => '2000-01-01 00:00:00', 'created_at' => '2000-01-01 00:00:00']);
 
         $daftar = $this->penyimpan()->daftar();
@@ -206,7 +206,7 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testBersihkanTokenKedaluwarsaDenganRetensiDanDryRun(): void
     {
         $a = $this->klien();
-        $this->token()->terbitkan($a['id']);
+        $this->terbit($a['id']);
         $this->db->table('simapi_token')->insertBatch([
             ['token_hash' => str_repeat('a', 64), 'id_klien' => $a['id'], 'status' => 1, 'expired_at' => gmdate('Y-m-d H:i:s', time() - 10 * 86400), 'created_at' => gmdate('Y-m-d H:i:s', time() - 11 * 86400)],
             ['token_hash' => str_repeat('b', 64), 'id_klien' => $a['id'], 'status' => 2, 'expired_at' => gmdate('Y-m-d H:i:s', time() - 3 * 86400), 'created_at' => gmdate('Y-m-d H:i:s', time() - 4 * 86400)],
@@ -230,7 +230,10 @@ final class KlienLayananTest extends DatabaseTestCase
         $klien    = $this->klien('simanta', 2, ['simapi'], '203.0.113.0/24');
         $pengesah = new PengesahKlien($this->db);
 
-        $this->assertSame(['hasil' => 'diterima', 'id_klien' => $klien['id'], 'jenis' => 2], $pengesah->periksa('simanta', $klien['rahasia'], '203.0.113.9', 'simapi'));
+        $diterima = $pengesah->periksa('simanta', $klien['rahasia'], '203.0.113.9', 'simapi');
+        $this->assertSame(['diterima', $klien['id'], 2], [$diterima['hasil'], $diterima['id_klien'], $diterima['jenis']]);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{16}$/', (string) $diterima['sidik']);
+        $this->assertNull($pengesah->periksa('simanta', 'rahasia-salah', '203.0.113.9', 'simapi')['sidik'], 'sidik hanya untuk yang diterima');
         $this->assertSame('tidak_sah', $pengesah->periksa('simanta', 'rahasia-salah', '203.0.113.9', 'simapi')['hasil']);
         $this->assertSame('tidak_sah', $pengesah->periksa('tidak-ada', $klien['rahasia'], '203.0.113.9', 'simapi')['hasil']);
         $this->assertSame('tidak_sah', $pengesah->periksa('', '', '203.0.113.9', 'simapi')['hasil']);
@@ -255,7 +258,7 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testTokenDiterbitkanSebagaiHashDenganMasaAktifSatuJam(): void
     {
         $klien = $this->klien();
-        $t     = $this->token()->terbitkan($klien['id']);
+        $t     = $this->terbit($klien['id']);
 
         $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{30}$/', $t['token']);
         $baris = $this->db->table('simapi_token')->get()->getRowArray();
@@ -265,7 +268,7 @@ final class KlienLayananTest extends DatabaseTestCase
         $this->assertSame(1, (int) $baris['status']);
         $this->assertStringNotContainsString($t['token'], json_encode($this->db->table('simapi_token')->get()->getResultArray(), JSON_THROW_ON_ERROR));
 
-        $this->token()->terbitkan($klien['id']);
+        $this->terbit($klien['id']);
         $this->assertSame(2, $this->db->table('simapi_token')->countAllResults(), 'satu baris per handshake; token lama tetap sah');
         $this->assertNotNull($this->token()->periksa('Basic ' . $t['token']), 'skema bebas, elemen kedua = token');
     }
@@ -273,7 +276,7 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testTokenKedaluwarsaDicabutDanBentukSalahDitolak(): void
     {
         $klien = $this->klien();
-        $t     = $this->token()->terbitkan($klien['id']);
+        $t     = $this->terbit($klien['id']);
 
         $this->assertSame(['id_klien' => $klien['id'], 'jenis' => 2], $this->token()->periksa('Bearer ' . $t['token']));
 
@@ -295,7 +298,7 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testTokenKlienTanpaHakSimapiDitolak(): void
     {
         $klien = $this->klien();
-        $t     = $this->token()->terbitkan($klien['id']);
+        $t     = $this->terbit($klien['id']);
         $this->db->table('klien_layanan')->where('id_klien', $klien['id'])->update(['hak' => 'stat']);
 
         $this->assertNull($this->token()->periksa('Bearer ' . $t['token']));
@@ -333,7 +336,7 @@ final class KlienLayananTest extends DatabaseTestCase
 
         foreach ([$klien['id'], 99999] as $id) {
             try {
-                $this->token()->terbitkan($id);
+                $this->terbit($id);
                 $this->fail("klien {$id}: token tidak boleh diterbitkan");
             } catch (KlienTidakAktif) {
                 $this->addToAssertionCount(1);
@@ -346,12 +349,49 @@ final class KlienLayananTest extends DatabaseTestCase
     public function testJumlahTokenDicabutHanyaYangMasihBerlaku(): void
     {
         $klien = $this->klien();
-        $this->token()->terbitkan($klien['id']);
+        $this->terbit($klien['id']);
         $this->db->table('simapi_token')->insert(['token_hash' => str_repeat('d', 64), 'id_klien' => $klien['id'], 'status' => 1, 'expired_at' => '2000-01-01 00:00:00', 'created_at' => '2000-01-01 00:00:00']);
 
         $hasil = $this->penyimpan()->ubahStatus('simanta', PenyimpanKlien::STATUS_NONAKTIF);
 
         $this->assertSame(1, $hasil['token_dicabut'], 'konsisten dengan daftar: token kedaluwarsa tidak dihitung');
         $this->assertSame(0, $this->db->table('simapi_token')->where('status', 1)->countAllResults(), 'semua status 1 tetap dibersihkan');
+    }
+
+    /**
+     * Terbitkan token untuk klien dengan sidik rahasia saat ini (seperti filter Basic lalu handshake).
+     *
+     * @return array{token: string, expired_at: string}
+     */
+    private function terbit(int $id): array
+    {
+        $baris = $this->db->table('klien_layanan')->select('rahasia_hash')->where('id_klien', $id)->get()->getRowArray();
+
+        return (new TokenSimapi($this->db))->terbitkan($id, PembangkitKredensial::sidik((string) ($baris['rahasia_hash'] ?? '')));
+    }
+
+    public function testHandshakeDenganRahasiaLamaSetelahRotasiTidakMenerbitkanToken(): void
+    {
+        $klien   = $this->klien();
+        $hasil   = (new PengesahKlien($this->db))->periksa('simanta', $klien['rahasia'], '203.0.113.7', 'simapi');
+        $sidikLm = (string) $hasil['sidik'];
+        $this->assertSame(PengesahKlien::DITERIMA, $hasil['hasil']);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{16}$/', $sidikLm);
+
+        // Rotasi berlomba setelah verifikasi: status tetap 1, hanya rahasia berganti.
+        $baru = $this->penyimpan()->rotasi('simanta');
+
+        try {
+            $this->token()->terbitkan($klien['id'], $sidikLm);
+            $this->fail('token tidak boleh terbit untuk rahasia yang sudah dirotasi (S-3)');
+        } catch (KlienTidakAktif) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame(0, $this->db->table('simapi_token')->countAllResults());
+
+        $sidikBaru = (string) (new PengesahKlien($this->db))->periksa('simanta', $baru['rahasia'], '203.0.113.7', 'simapi')['sidik'];
+        $this->assertNotSame($sidikLm, $sidikBaru, 'sidik berubah setiap rotasi');
+        $this->assertNotEmpty($this->token()->terbitkan($klien['id'], $sidikBaru)['token']);
     }
 }
