@@ -68,8 +68,8 @@ Command: `php spark integrasi:klien buat|rotasi|nonaktif|aktifkan|hapus|daftar|b
 
 Endpoint masuk dengan path dan kontrak legacy (PRD Fase 6 §6.1/§6.3, H-05..H-07). Route: `Config/RoutesSimapi.php`
 (`simapi/v1/*`, di luar `api/v1`, tanpa `jwt`/`cors`); controller tipis `Controllers/Simapi/*`; logika di kelas penyaji di bawah ini
-(query builder, tanpa SQL string). `services/s_dm`: penyaji sudah ada; controller + sub-group `s_dm` di `Config/RoutesServices.php`
-ditambahkan sesudah kerangka `services` (berkas bersama + `ResponsLayanan`, dibuat Fable) ada di main.
+(query builder, tanpa SQL string). `services/s_dm`: sub-group `s_dm` (`klienLayanan:dm`) di `Config/RoutesServices.php` bersama,
+controller `Controllers/Services/SDmController`, amplop `ResponsLayanan` (A6; status INT, `data: []` eksplisit saat gagal = legacy).
 
 | Berkas | Isi |
 |---|---|
@@ -81,7 +81,7 @@ ditambahkan sesudah kerangka `services` (berkas bersama + `ResponsLayanan`, dibu
 | `Layanan/PenyajiSDm` | `services/s_dm/*` (baris `unit`/`satker` utuh + `unit_str`/`satker_str`) |
 
 Fixture kontrak (sintetis, diturunkan dari kode legacy, rujukan baris di tiap entri): `tests/_support/Integrasi/Simapi/*.json`.
-Test: `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest}.php`.
+Test: `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest,ServicesSDmTest}.php`.
 
 Keputusan dan penyimpangan:
 
@@ -123,3 +123,74 @@ Keputusan dan penyimpangan:
   koordinator/subkoordinator, lewat `fixUnitName`) yang terisi. Dikunci `SimapiEmployeeTest::testDetilUnitEs34IkutLegacyB9`.
   *Opsi perbaikan v2 (TIDAK diimplementasi, menunggu keputusan):* pilih juga `pmj.atasan_es_3_koord, pmj.atasan_es_3, pmj.atasan_es_4_koord,
   pmj.atasan_es_4` di kueri `detil` (versi `_koord` didahulukan, sama dengan `AE:306/312/316`) lalu terapkan `fixUnitName`.
+
+## `services/s_stat` — rekomendasi KP/KGB/pensiun & daftar TB/IB/Karpeg/Kariskarsu (`Stat/`, MAKE-061, H-08)
+
+API tarik MuDig (PRD Fase 6 §7.6, F6-09 **ikut legacy persis**), port `controllers/services/S_stat.php` + `libraries/hr/L_employee.php`
+(`get_all_kp` :2416-2720, `get_all_pensiun` :1324-1376, `get_all_kgb` :4095-4220) + `helpers/function_helper.php` (`getEselon` :164,
+`dateToUser` :972, `getTanggalPensiun` :2400-2418). Endpoint & kolom: `Controllers/Services/README.md`.
+
+| Berkas | Lapisan | Isi |
+|---|---|---|
+| `KalenderStat` | murni | parse `!Y-m-d`; semantik legacy `strtotime('')` → 1970-01-01, `new DateTime('')` → hari ini; selisih bulan `y*12+m` |
+| `RekomendasiKp` | murni | deteksi reguler (`% 4`, plafon pendidikan/eselon, periode 1 Apr/1 Okt) dan percepatan struktural (TMT struktural terawal + 1 th); kolom turunan MuDig (`mker_*_new`, `pangkat_new` = `order+1`) |
+| `RekomendasiKgb` | murni | acuan = maks(KGB terakhir, TMT CPNS) PNS / maks(KGB, TMT jabatan) PPPK; > 36 bln → +4 th lalu +2 sampai ≥ hari ini; 24–36 → hari ini; < 24 → +2 th |
+| `RekomendasiPensiun` | murni | BUP = `Kalkulasi\Pensiun::batasUsia()` (identik); tanggal = legacy `lahir + BUP th + 1 bln` → `Y-m-01` **dengan luapan bulan** |
+| `PenyajiStat` | murni | format legacy `d M Y` / `M Y` / `F` (Inggris, locale C), eselon, nama bergelar, **satu-satunya pembangun URL berkas** (`urlBerkas`), daftar putih jenis/kolom unduh, nama unduhan generik |
+| `StatService` | ber-DB | populasi lewat query builder (prefix-aman), `WHERE IN` per 500 NIP, TMT struktural terawal berbatch, arsip `document_attachment` yang **ada di storage v2** (bukan HTTP fetch), `list_*`, pembacaan berkas untuk endpoint unduh (404 seragam) |
+| `Layanan/ResponsLayanan` | — | amplop bisnis INT `services/*` (bersama A4/B4b): sukses 1, gagal 2, HTTP 200; `tidakDitemukan()` 404 |
+
+"Hari ini" diinjeksi (tanggal bisnis WIB, Q4); kelas murni dijaga `tests/unit/Integrasi/Stat/StatMurniTest.php` (daftar eksplisit).
+
+Keputusan & anomali legacy yang DIPERTAHANKAN (prinsip Horii "ikut legacy"; reviewer 05-11-2026):
+- **Format tanggal** keluaran = `dateToUser()` tanpa format → `date("d M Y")` ("01 Apr 2026"), `periode_kp` "Apr 2026", `kp_bl`
+  "April" (bulan Inggris). Keluaran MuDig (`rekomendasi_kp_uns`) dan KGB memakai tanggal mentah `Y-m-d` seperti legacy.
+- **`[K] perilaku legacy get_all_kp`**: `gol_ruang` kosong/tak dikenal memberi urutan `null` dan `null < n` = true → pegawai
+  tanpa golongan ikut terdeteksi reguler bila plafon pendidikannya ada, dan yang golongannya tak dikenal ikut percepatan bila
+  bereselon; TMT pangkat kosong dibaca tahun 1970 (siklus `% 4` bisa pas). Dikunci test, tidak "diperbaiki".
+- **`[K] bug legacy Q6-37`**: `rekomendasi_kp_uns` dengan `id_unit`/`id_satker` tidak kosong → `data: []` (`status` 1, `msg` "").
+  Opsi B ditolak; opsi upgrade C hanya dicatat di PRD.
+- `rekomendasi_kgb` hanya mengeluarkan `arsip_last_kgb` (arsip KP diambil legacy tetapi tidak dikeluarkan); `minMonth/maxMonth`
+  legacy tidak dipakai dan tidak di-port.
+- `mker_new` saat masa kerja lama 0 dihitung dari digit NIP ke-9..14 sebagai tahun-bulan CPNS [K]; NIP tak membentuk tanggal
+  sah → hari ini ([V2] penjaga; legacy fatal).
+
+Deviasi [V2] (teknis/keamanan, F6-03/F6-09/Q6-38):
+- Auth wajib (`klienLayanan:stat`) untuk semua endpoint, termasuk yang publik di legacy; 401 amplop INT.
+- Arsip dicek di storage v2 (`StorageAdapterInterface::ada()`), bukan `exif_imagetype` + HTTP 200; URL = endpoint unduh klien
+  `services/s_stat/berkas/…` (Q6-38 opsi A, Horii 05-11-2026). Kolom `file_*` pada `list_*` tidak mengeluarkan path internal
+  (URL atau kosong). Path impor legacy yang belum ada di storage v2 → kosong / 404.
+- Urutan KGB `tmtsk_kgb` ASC lalu NIP (legacy `array_multisort` pada kolom `tgl_pensiun` yang tidak ada → tak terurut); `list_tb`/
+  `list_ib` urut PK ASC (legacy tanpa ORDER BY).
+- Waktu "sekarang" tanpa jam (legacy `new DateTime()` berjam): hanya berbeda bila tanggal acuan KGB + 4/+2 tahun jatuh tepat
+  hari ini.
+- Nilai `id_unit`/`id_satker`/`id_jenis_kp` dsb. dikeluarkan sebagai string (seperti CI3); NULL → "".
+
+Perbedaan dengan kalkulasi v2 yang ada (PRD §7.6 — dicatat, TIDAK disamakan):
+
+| Topik | `Kepegawaian/Kalkulasi/*` (input riwayat per pegawai) | `Integrasi/Stat/*` (deteksi populasi legacy) |
+|---|---|---|
+| KP | `KenaikanPangkat::proyeksiReguler()`: TMT terakhir + 4 th → periode 1 Apr/1 Okt berikutnya; `proyeksiPercepatan()`: TMT struktural + 1 th | tahun TMT berjarak kelipatan 4 dari **tahun berjalan** (bukan +4 dari TMT), plafon pendidikan/eselon, bulan TMT → periode tahun ini/depan; percepatan dibandingkan dengan reguler |
+| KGB | `KenaikanGajiBerkala::proyeksiBerikutnya()`: acuan pendahulu per TMT, jatuh tempo + 2 th, toleransi "hari ini" | tiga cabang bulan (>36 → +4/+2 bertingkat, 24–36 → hari ini, <24 → +2), acuan maks(KGB, CPNS/jabatan) |
+| Pensiun | `Pensiun::tanggalPensiun()` menjepit ke awal bulan (31-01-1968 → 2026-02-01) | luapan bulan legacy dipertahankan (→ 2026-03-01); BUP sama (`batasUsia` dipakai ulang) |
+
+Perbaikan review MAKE-061 (05-11-2026): `sp_admin_deputi` `riwayat_tb/ib` adalah path berkas legacy (`L_tb.php:799`,
+`L_ib.php:619`) → masuk daftar putih kolom berkas (URL/kosong), bukan path mentah (B1); `rekomendasi_kp_uns` diurut
+`gol_ruang_old` DESC, `id_satker` ASC [K S_stat:477-479] (P1); `lu_ppen` kp_uns selalu `null` [K S_stat:722] (P2); urutan kunci
+`arsip_*` mengikuti assignment berantai legacy (kanan → kiri) dan `arsip_skp` {Y-2, Y-1} (P3); kolom `file_*` `list_tb`/`list_ib`
+yang kosong diisi URL lampiran v2 `document_attachment` kode 46–50 (`BerkasStudi`, tag = nama kolom; `file_surat_*` kode 47/50)
+agar MuDig menerima berkas pasca-cutover — jenis unduh `lampiran_tb`/`surat_tb`/`lampiran_ib`/`surat_ib` (P4); filter
+`id_unit`/`id_satker` tidak di-trim dan parameter array dianggap terisi (S4); NULL kolom tetap `null` seperti CI3 (S5);
+`pegawai_ak` tanpa `id_riwayat_ak` dilewati (S3); arsip disaring per entri sebelum cek storage (S6); endpoint unduh mencatat
+jenis + kode hasil saja (S7). Batas ukuran: isi berkas dibaca utuh ke memori lewat `StorageAdapterInterface::baca()` (tanpa
+streaming; adapter belum punya API ukuran) — berkas unduhan s_stat adalah lampiran ≤ 5 MB sesuai `AturanLampiran`/`BerkasStudi`;
+batas/stream dicatat sebagai tindak lanjut bila adapter mendukung (S8 reviewer). Tambahan review ulang: pemecah tie urutan
+`nama` ASC lalu `nip` dan ORDER BY deterministik pada query pensiun/KGB (S1); `arsip_skp` format MuDig hanya memakai baris SKP
+terakhir per tahun [K S_stat:581] (S2); log endpoint unduh hanya mencatat jenis dalam daftar putih (`lain` untuk lainnya) (N2).
+Batasan yang diterima (N1): untuk slot TB/IB yang punya lebih dari satu lampiran v2, hanya lampiran terbaru per slot yang
+dikeluarkan di `file_*` (legacy memang satu path per kolom).
+
+Gap untuk re-handshake PN-4 / runbook (dicatat, bukan dikerjakan di sini): MuDig wajib mengirim Basic auth juga saat mengunduh
+arsip dan bentuk URL arsip berubah (dulu URL berkas terbuka); berkas impor yang belum dimigrasi ke storage v2 tidak dapat diunduh
+(kolom kosong/404); hak `stat` hanya untuk klien jenis layanan (MuDig); per satker/unit tetap kosong (Q6-37).
+

@@ -51,6 +51,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesIntegrasi.php',
         // Modul H Jalur A — kompatibilitas legacy SIMAPI `simapi/v1/*` (Fase 6, MAKE-059).
         APPPATH . 'Config/RoutesSimapi.php',
+        // Modul H Jalur A — endpoint kompatibilitas legacy `services/*` (MAKE-061 s_stat; s_dm A4; s_esign B4b), auth klienLayanan.
+        APPPATH . 'Config/RoutesServices.php',
     ];
 
     /**

@@ -12,7 +12,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
 | H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di branch `fase6/a-lokal/make-059-simapi`, menunggu review; MAKE-060 belum mulai |
-| H-08 | A | MAKE-061 | Belum mulai |
+| H-08 | A | MAKE-061 | A6 selesai (versi lokal, Worker Fable) di branch `fase6/a-lokal/make-061-s-stat`, menunggu review |
 | H-09 | A | (pemetaan) | Belum mulai |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
 | H-11 | A | MAKE-062 | A2a selesai (versi lokal), menunggu review |
@@ -87,9 +87,35 @@ Route `Config/RoutesSimapi.php`, controller `Controllers/Simapi/*`, penyaji `Lib
   (`a_dm/jabatan` butuh token) diuji di `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest}.php`.
 - Syarat DBV-026 §13.2 yang relevan untuk A4: A4 (filter token) dipakai dari MAKE-058; A5 (ack `simapi_auth_ch` tahan balapan) dan A6/A7
   (NIP koreksi, isi `simapi_jd`) milik MAKE-060 (`change_history`), tidak disentuh di A4.
-- `services/s_dm`: penyaji `Layanan/PenyajiSDm` siap; controller + sub-group menunggu kerangka `services` (RoutesServices + `ResponsLayanan`, Fable) di main.
+- `services/s_dm`: sub-group `s_dm` (`klienLayanan:dm`) di `Config/RoutesServices.php` bersama + `Controllers/Services/SDmController`, memakai
+  `ResponsLayanan` dari A6 (status INT bawaan, `data: []` eksplisit pada gagal = legacy). Test `tests/database/Integrasi/ServicesSDmTest.php`.
 - B-9 ikut legacy (Q6-36); opsi perbaikan v2 hanya dicatat di README modul.
 - Tidak dibuat: `ambil_seluruh_pengguna` (Q6-03 = A), `p_web_config` (F6-10), `change_history` (MAKE-060).
+
+### A6 — MAKE-061 `services/s_stat` (H-08, versi lokal)
+
+Pelaksana: Worker Fable (take over dari Worker Haiku 05-11-2026; analisis Haiku di branch `fase6/a-lokal/make-061-analisis`).
+Branch `fase6/a-lokal/make-061-s-stat`. Isi: `Controllers/Services/SStatController`, `Config/RoutesServices.php` (berkas bersama
+`services/*`, didaftarkan di `Routing::$routeFiles`), `Libraries/Integrasi/Stat/{KalenderStat,RekomendasiKp,RekomendasiKgb,
+RekomendasiPensiun,PenyajiStat,StatService}`, `Libraries/Integrasi/Layanan/ResponsLayanan` (amplop INT bersama A4/B4b). Dokumen:
+`Libraries/Integrasi/README.md` (bagian s_stat: keputusan, anomali [K], deviasi [V2], tabel perbedaan vs `Kalkulasi/*`, gap),
+`Controllers/Services/README.md` (endpoint & kolom).
+
+Keputusan implementasi (reviewer/Horii 05-11-2026):
+- Q6-37 = A: `rekomendasi_kp_uns` berfilter → `data: []` (`[K] bug legacy Q6-37`, dikunci AC-08.4).
+- Q6-38 = A: URL arsip MuDig = endpoint unduh klien `GET services/s_stat/berkas/{jenis}/{nip}/{id}[/{kolom}]` di balik
+  `klienLayanan:stat`; daftar putih jenis (kp/skp/jabatan/kgb; pak/tb/ib/karpeg/kariskarsu + kolom `file_*` persis migration v2);
+  404 seragam; `skp` dibatasi status 1 tahun Y-1/Y-2; tanpa pembatasan per populasi rekomendasi; semua URL lewat
+  `PenyajiStat::urlBerkas()`.
+- Format tanggal ikut kode legacy (`d M Y`, `M Y`, `F`), bukan DD-MM-YYYY (Q9 dikoreksi); edge `gol_ruang` kosong direplikasi;
+  KGB hanya `arsip_last_kgb`; `file_*` daftar = URL/kosong [V2].
+- Perbedaan aturan dengan `Kepegawaian/Kalkulasi/{KenaikanPangkat,KenaikanGajiBerkala,Pensiun}` dicatat di README modul;
+  `Pensiun::batasUsia()` dipakai ulang (identik), `tanggalPensiun()` TIDAK (legacy meluap bulan).
+
+Test: `tests/unit/Integrasi/Stat/{RekomendasiKpTest,RekomendasiKgbPensiunTest,StatMurniTest}` (AC-08.1 matriks tanggal batas,
+anomali [K], penyaji, kemurnian), `tests/database/Integrasi/StatServiceTest` (AC-08.2 kolom per endpoint, arsip storage,
+Q6-37, aturan unduh), `tests/database/Integrasi/SStatKontrakTest` (AC-08.3 401 amplop INT, AC-08.4, HTTP 200 amplop INT,
+`list_tb` tanpa path internal, unduh 200 header aman / 404 seragam).
 
 ## Bagian B — Klien integrasi keluar
 
