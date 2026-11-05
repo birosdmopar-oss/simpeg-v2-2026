@@ -73,12 +73,6 @@ final class SEsignMudigTest extends DatabaseTestCase
         );
         Services::injectMock('esignGatewayNikLangsung', $bsre);
 
-        // Route sementara di test sampai kerangka `Config/RoutesServices.php` (Jalur A) di main; sesudahnya route sungguhan.
-        $this->withRoutes([
-            ['get', 'services/s_esign/check_user', '\\App\\Controllers\\Services\\SEsignController::checkUser', ['filter' => 'klienLayanan:esign']],
-            ['post', 'services/s_esign/sign_pdf', '\\App\\Controllers\\Services\\SEsignController::signPdf', ['filter' => 'klienLayanan:esign']],
-        ]);
-
         $this->klien('mudig', ['esign']);
         $this->buatPegawai(['nip' => self::NIP, 'id_jenis_pegawai' => 1]);
     }

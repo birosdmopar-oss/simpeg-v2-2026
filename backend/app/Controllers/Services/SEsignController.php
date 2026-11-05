@@ -6,6 +6,7 @@ namespace App\Controllers\Services;
 
 use App\Controllers\BaseController;
 use App\Libraries\Esign\LayananEsignMudig;
+use App\Libraries\Integrasi\Layanan\ResponsLayanan;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\IncomingRequest;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -58,7 +59,10 @@ final class SEsignController extends BaseController
             $hasil = ['status' => '2', 'msg' => LayananEsignMudig::PESAN_GALAT, 'data' => []];
         }
 
-        return $this->response->setStatusCode(200)->setHeader('Cache-Control', 'no-store')->setJSON($hasil);
+        // Responder bersama `services/*` mode STRING (`S_esign.php` [K]); HTTP 200 + `Cache-Control: no-store`.
+        return $hasil['status'] === '1'
+            ? ResponsLayanan::sukses($hasil['data'], $hasil['msg'], true)
+            : ResponsLayanan::gagal($hasil['msg'], $hasil['data'], true);
     }
 
     /**
