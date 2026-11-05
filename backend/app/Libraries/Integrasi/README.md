@@ -88,7 +88,8 @@ Keputusan dan penyimpangan:
 - **Auth.** `a_auth/token` = filter `klienLayanan:simapi` lalu `TokenSimapi::terbitkan($idKlien, KlienSaatIni::sidikRahasia())`; token baru
   per handshake (F6-05), `data` hanya `{"token"}` (Q6-02); `KlienTidakAktif` (balapan nonaktif/rotasi) → "Authentication failed"
   seragam (ADR-036 §4). Endpoint lain `simapiToken` — termasuk `a_dm/jabatan` yang di legacy tanpa auth (F6-03, AC-07.1) dan
-  `ambil_riwayat_mutasi` (pesan token legacy endpoint itu diganti "Token is not valid" seragam). `services/s_dm/*` seluruhnya
+  `ambil_riwayat_mutasi` ([V2] pesan token legacy endpoint itu "Invalid Token or IP Address"/"Token Expired" diganti "Token is not valid"
+  seragam filter, AC-05.1; masuk daftar pemberitahuan re-handshake PN-4). `services/s_dm/*` seluruhnya
   `klienLayanan:dm` (legacy `p_*` publik).
 - **Type klien** = `klien_layanan.jenis`. `a_dm` selain `jabatan` hanya type 2; type lain menerima `{"status":"01","msg":"","data":[]}` [K].
   `a_employee` tanpa batas type (batas type `change_history` milik MAKE-060).
@@ -101,10 +102,14 @@ Keputusan dan penyimpangan:
   `pegawai_diklat` tidak punya `jenis_diklat` (sama dengan D1), jadi `pelatihan_struktural_terakhir` selalu memakai nama diklat.
 - **[V2]** `email` = akun aktif dengan `id_pengguna` terkecil (`pengguna.nip` di v2 UNIQUE, legacy GROUP BY acak). Perhatikan
   `pengguna.status` ENUM('0','1') dibandingkan sebagai string.
-- **[V2]** `foto` = `site_url('api/v1/pegawai/{nip}/foto')` (endpoint foto v2 yang sudah ada) bila kolom `foto` terisi, selain itu "".
+- **[V2] ⚑ MENUNGGU HORII** `foto` = `PenyajiPegawai::urlFoto()` (satu fungsi), sementara `site_url('api/v1/pegawai/{nip}/foto')` bila kolom
+  `foto` terisi, selain itu "". Endpoint itu butuh JWT pengguna, jadi klien SIMAPI belum bisa mengambilnya; usul reviewer = endpoint unduh
+  khusus klien layanan (pola Q6-38). Test mengunci bentuk sekarang.
 - **[V2]** urutan baris: riwayat tanpa ORDER BY di legacy (`riwayat_pendidikan`, `riwayat_pelatihan`, `riwayat_kp`) diurut PK ASC; setiap
-  urutan diberi kunci sekunder PK (legacy bergantung urutan fisik). Baris master v2 status 10 (= hapus keras legacy) tidak dikirim
-  (`struktur_jabatan`, `p_get_unit`, `p_get_satker`).
+  urutan diberi kunci sekunder PK (legacy bergantung urutan fisik). Baris master v2 status 10 tidak dikirim (`struktur_jabatan`, `p_get_unit`,
+  `p_get_satker`): kueri legacy di sana TANPA filter status (`A_dm.php:274`, `S_dm.php:175`, `:247`) karena legacy menghapus keras
+  (`struktur_jabatan` legacy tak punya kolom status); status 10 v2 = baris yang di legacy sudah tidak ada. Daftar lain memfilter `status = 1`
+  persis legacy.
 - **[V2]** teks tidak di-`stripslashes` ulang (impor UP-1 sudah menormalkan, Impor README #5).
 - **[K] bug legacy B-9 (keputusan Horii 04-11, Q6-36): ikut legacy.** `detil` tidak memilih nama `atasan_es_3(_koord)`/`atasan_es_4(_koord)`
   (`AE:278`), jadi bagian `unit_es_3`/`unit_es_4` yang berasal dari atasan selalu ""; hanya unit dari jabatan sendiri (sub group 3/4 atau

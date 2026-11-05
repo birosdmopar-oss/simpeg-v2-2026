@@ -420,6 +420,8 @@ Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) w
    tanpa token harus menjawab HTTP 200 `{"status":"02","msg":"Token is not valid",...}` dari v2.
 2. **Endpoint yang sengaja tidak ada di v2** (404): `simapi/v1/a_sinkron/ambil_seluruh_pengguna`, `services/s_dm/p_web_config`. Klien yang masih
    memanggilnya diberi tahu saat re-handshake (§1h langkah 3).
+   Sampaikan juga: `a_sinkron/ambil_riwayat_mutasi` kini menjawab token salah/kedaluwarsa dengan "Token is not valid" (legacy: "Invalid Token or
+   IP Address"/"Token Expired"), dan `a_dm/jabatan` kini butuh token.
 3. **Klien `services/s_dm`** dibuat dengan hak `dm` (§1h langkah 2); seluruh method `s_dm` kini butuh Basic, termasuk `p_*` yang di legacy publik.
 
 ---

@@ -162,7 +162,7 @@ final class PenyajiPegawai
             'status'               => self::sama($r['status'], '1') ? 'Aktif' : 'Tidak Aktif',
             'jenis_status'         => Nilai::mentah($r['jenis_status_upd']),
             'tmt_status'           => Nilai::mentah($r['tmt_status']),
-            'foto'                 => self::kosong($r['foto']) ? '' : site_url('api/v1/pegawai/' . rawurlencode($nip) . '/foto'),
+            'foto'                 => self::kosong($r['foto']) ? '' : self::urlFoto($nip),
         ];
 
         if (! $detil) {
@@ -215,6 +215,15 @@ final class PenyajiPegawai
         }
 
         return [$atasanEs3, $atasanEs4];
+    }
+
+    /**
+     * SATU-SATUNYA titik pembentuk URL `foto` SIMAPI. Sementara = endpoint foto v2 (JWT pengguna); MENUNGGU keputusan Horii
+     * (usul reviewer: endpoint unduh khusus klien layanan, pola Q6-38). Ganti di sini saja.
+     */
+    public static function urlFoto(string $nip): string
+    {
+        return site_url('api/v1/pegawai/' . rawurlencode($nip) . '/foto');
     }
 
     /**
