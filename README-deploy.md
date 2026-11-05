@@ -413,6 +413,44 @@ Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) w
    `token_tidak_sah`, `throttle_*`; tanpa username/rahasia/IP). Lonjakan `tidak_sah` dari satu klien = rahasia salah/dirotasi; `ip_ditolak` =
    IP keluar klien berubah.
 
+### 1i. Nginx `/simapi/` dan `/services/`, daftar re-handshake klien (A7, Jalur A)
+
+Kedua jalur kompatibilitas ini dilayani aplikasi yang sama dengan `api/v1` (rute di `Config/RoutesSimapi.php` dan `Config/RoutesServices.php`,
+tanpa JWT/CORS SPA); auth ada di filter `klienLayanan:<hak>` dan `simapiToken` (§1h, ADR-036).
+
+1. **Routing.** Tidak perlu blok `location` khusus: `try_files $uri $uri/ /index.php?$query_string` yang sama dengan aplikasi sudah mencakup
+   `/simapi/v1/...` dan `/services/...`. Izinkan metode GET dan POST (SIMAPI legacy menerima keduanya). Header `Authorization` harus diteruskan
+   ke PHP (§1h langkah 1) dan IP klien asli harus sampai sebagai `REMOTE_ADDR` (§1h langkah 5).
+2. **Jangan mencatat kredensial.** Format log akses Nginx untuk dua jalur ini tidak boleh memuat header `Authorization` maupun query yang
+   berisi token/NIP bila dapat dihindari; log aplikasi sudah tanpa username/rahasia/IP (ADR-036).
+3. **Batas waktu dan ukuran respons.** `s_stat/rekomendasi_*` dan `a_sinkron/ambil_riwayat_mutasi` mengembalikan daftar tanpa paginasi (ikut
+   legacy, untuk sinkron MuDig/E-Talenta). Ukur waktu dan ukuran respons pada data nyata saat uji klien; naikkan `fastcgi_read_timeout`/`send_timeout`
+   untuk dua jalur ini bila perlu, jangan global. `limit_req` Nginx per IP boleh dipasang di atas throttle aplikasi (bukan penggantinya).
+4. **Pembatasan jaringan.** Allowlist IP klien di aplikasi (`integrasi:klien buat --ip=...`) adalah pagar utama; bila infrastruktur
+   mengizinkan, tambahkan pembatasan firewall/ACL ke alamat keluar klien yang diketahui.
+5. **Job terjadwal Jalur A** (ringkasan; rinci di §1f-§1h): `layanan:status-harian` 00:30, `pengguna:sinkron-nama` 01:00 (usulan, PN-5),
+   `lkh:auto-approval` tanggal 5 00:30 (+ ulang 01:00/01:30/02:00), `integrasi:klien bersihkan-token` mingguan.
+
+**Daftar langkah re-handshake klien (cutover; tanpa nama host dan kredensial di repo).** Kredensial dan token lama TIDAK diimpor (F6-08):
+
+| Langkah | Isi |
+|---|---|
+| 1 | Inventaris klien aktif di legacy (SIMAPI lama/Pusdatin → jenis 1, SIMAPI baru/Simanta → jenis 2, MuDig → jenis 3 dengan hak `stat`/`dm`/`esign`, penarik sinkron E-Talenta) dan IP keluar masing-masing |
+| 2 | Operator membuat klien baru dengan `integrasi:klien buat` (username huruf kecil, hak sesuai jenis, `--ip` bila diketahui); rahasia dikirim lewat kanal aman di luar repo |
+| 3 | Klien mengganti alamat dasar dan kredensial; SIMAPI: `GET/POST simapi/v1/a_auth/token` dengan Basic, lalu `Authorization: <skema> <token>` (token 30 karakter, 1 jam); `services/*`: Basic di setiap permintaan |
+| 4 | Uji bersama klien dengan data uji: token, satu method tiap kelompok, dan endpoint `services/*` yang dipakai |
+| 5 | Cabut/nonaktifkan akses legacy saat cutover (legacy read-only, ADR-031); klien yang belum pindah mendapat "Authentication failed" |
+
+Perubahan perilaku yang HARUS diberitahukan ke klien (daftar pemberitahuan re-handshake, PN-4):
+- Semua endpoint wajib auth; endpoint yang publik di legacy (`a_dm/jabatan`, `s_stat/*` selain `rekomendasi_kp`, `s_dm/p_*`) kini butuh kredensial.
+- Kegagalan auth: SIMAPI HTTP 200 `{"status":"02"}` ("Authentication failed" / "Token is not valid", pesan seragam termasuk untuk
+  `ambil_riwayat_mutasi`); `services/*` HTTP 401. Throttle HTTP 429 dengan `Retry-After`.
+- `a_sinkron/ambil_seluruh_pengguna` dan `s_dm/p_web_config` tidak tersedia (404).
+- URL berkas arsip dan foto pegawai tidak lagi terbuka: lewat endpoint unduh khusus klien layanan (Q6-38/Q6-39) dengan kredensial klien.
+- `a_employee/detil` `unit_es_3`/`unit_es_4` tetap kosong seperti legacy (bug legacy yang sengaja tidak diubah, Q6-36).
+- `rekomendasi_kp_uns` dengan `id_satker`/`id_unit` mengembalikan `data: []` seperti legacy (Q6-37).
+- Tanggal bisnis dan waktu simpan: DB menyimpan UTC; respons SIMAPI `change_history` (A5) menampilkan WIB seperti legacy.
+
 ---
 
 ## 2. Cara push (operator deploy)
