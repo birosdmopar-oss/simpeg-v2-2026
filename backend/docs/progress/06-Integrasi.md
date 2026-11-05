@@ -35,7 +35,7 @@ Keputusan implementasi:
 - A1 (cabut token saat nonaktif/hapus) dan A2 (pembersihan berkala) dan A3 (validasi allowlist/hak) DBV-026 §13.2 dipenuhi dan diuji.
 - `rotasi` ikut mencabut semua token klien (rahasia lama dianggap bocor) — keputusan MAKE-058, bukan syarat DBV.
 - Hanya kegagalan auth yang ditulis ke `integrasi_log` (arah masuk, `id_klien`); keberhasilan tidak, karena volume SIMAPI tinggi.
-- Throttle per IP (termasuk percobaan gagal) dan per klien; ambang di `Config\KlienLayanan` (120/IP, 600/klien per 60 detik) — usulan
+- Throttle: bucket kegagalan per IP (sukses tidak menghabiskannya) dan per klien; log penolakan maks sekali per kunci per jendela; ambang di `Config\KlienLayanan` (120/IP, 600/klien per 60 detik) — usulan
   awal, disetel setelah ada data trafik klien nyata.
 - Tidak ada perubahan kontrak: amplop gagal SIMAPI HTTP 200 `{"status":"02"}`, `services/*` HTTP 401 `{"status":2}` (PRD §6.3).
 
