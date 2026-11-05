@@ -11,9 +11,11 @@ use App\Libraries\Esign\BsreEsignAdapter;
 use App\Libraries\Integrasi\Http\GalatTransport;
 use App\Libraries\Integrasi\Http\Permintaan;
 use App\Libraries\Integrasi\KonfigurasiIntegrasiTidakLengkap;
+use App\Libraries\Push\FcmV1Adapter;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * `php spark integrasi:uji-koneksi <bkn|siasn|esign|fcm>` (PRD Fase 6 BP-11, F6-23): uji koneksi NYATA ke layanan luar —
@@ -22,10 +24,11 @@ use InvalidArgumentException;
  * - `bkn`  : token e-Kinerja (statis atau SSO) lalu `GET referensi/periode` (hanya baca); dicetak status HTTP + jumlah baris.
  * - `siasn`: token API gateway + token SSO (dua header SIASN); tidak memanggil data pegawai.
  * - `esign`: driver `bsre` — satu cek status NIK fiktif (kredensial & jaringan), menampilkan status TLS BSrE.
- * - `fcm`: adapter real menyusul (MAKE-066).
+ * - `fcm`  : driver `fcm` — token akses OAuth service account (baru, bukan dari cache) lalu `messages:send` `validate_only`
+ *   ke topik uji (CR-101): memeriksa kredensial, proyek, dan izin TANPA mengirim pesan ke perangkat.
  *
  * Keluaran tidak pernah memuat token, kredensial, alamat, atau data; rincian kegagalan teredaksi ada di `integrasi_log`.
- * Kode keluar: 0 berhasil, 1 gagal (`EXIT_ERROR`), 7 masukan salah / belum tersedia (`EXIT_USER_INPUT`).
+ * Kode keluar: 0 berhasil, 1 gagal (`EXIT_ERROR`), 7 masukan salah / driver bukan adapter nyata (`EXIT_USER_INPUT`).
  */
 class IntegrasiUjiKoneksi extends BaseCommand
 {
@@ -58,7 +61,7 @@ class IntegrasiUjiKoneksi extends BaseCommand
                 'bkn'   => $this->bkn(service('tokenBkn')),
                 'siasn' => $this->siasn(service('tokenBkn')),
                 'esign' => $this->esign(),
-                default => $this->belumTersedia($layanan),
+                default => $this->fcm(),
             };
         } catch (KonfigurasiIntegrasiTidakLengkap $e) {
             CLI::error($e->getMessage());
@@ -123,10 +126,43 @@ class IntegrasiUjiKoneksi extends BaseCommand
         return EXIT_SUCCESS;
     }
 
-    private function belumTersedia(string $layanan): int
+    private function fcm(): int
     {
-        CLI::error("Uji koneksi {$layanan} belum tersedia: adapter real dikerjakan di MAKE-066.");
+        if (config('Integrations')->push['driver'] !== 'fcm') {
+            CLI::error('Uji koneksi fcm hanya untuk integrations.push.driver = fcm.');
 
-        return EXIT_USER_INPUT;
+            return EXIT_USER_INPUT;
+        }
+
+        try {
+            $gateway = service('pushNotifGateway', false);
+        } catch (KonfigurasiIntegrasiTidakLengkap $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            // Pesan adapter hanya menyebut kunci/kolom (berkas service account tidak terbaca/tidak sah), tanpa nilai.
+            CLI::error('Uji koneksi fcm GAGAL: ' . $e->getMessage());
+
+            return EXIT_ERROR;
+        }
+
+        if (! $gateway instanceof FcmV1Adapter) {
+            CLI::error('Uji koneksi fcm hanya untuk integrations.push.driver = fcm.');
+
+            return EXIT_USER_INPUT;
+        }
+
+        $hasil = $gateway->ujiKoneksi();
+
+        if (! $hasil['ok']) {
+            CLI::error($hasil['kode'] === 'token_oauth'
+                ? "Uji koneksi fcm GAGAL: token akses OAuth service account tidak diperoleh ({$hasil['http']})."
+                : "Uji koneksi fcm GAGAL: messages:send validate_only {$hasil['kode']} (HTTP {$hasil['http']}).");
+
+            return EXIT_ERROR;
+        }
+
+        CLI::write("Uji koneksi fcm OK: token akses OAuth diperoleh, messages:send validate_only (topik uji, tanpa kirim ke perangkat) HTTP {$hasil['http']}.", 'green');
+
+        return EXIT_SUCCESS;
     }
 }

@@ -245,10 +245,10 @@ Status v2 per entri berasal dari `0x-*.md`, Mapping Migrasi, dan draf DBV-012/DB
 
 Legacy tidak mengganti kolom-kolom ini saat Ubah NIP. Kolom ini masuk registry hanya bila B-06 memutuskan untuk ikut mengoreksinya:
 - Tabel v2 Fase 3 (draf DBV-013, tetap tanpa FK): `riwayat_skp.nip_penilai`, `riwayat_skp.nip_atasan_penilai`, `riwayat_skp_periodik.nip`, `riwayat_skp_periodik.pegawai_atasan_nip`.
-- Tabel v2 lain menurut Mapping Migrasi: `petugas_layanan.nip` (Tier 3, C-01 menurut draf DBV-012), `inbox.nip` (C-01), `firebase_token.nip` (H-01, disiapkan kosong), `simapi_update.nip` (H-01, log).
+- Tabel v2 lain menurut Mapping Migrasi: `petugas_layanan.nip` (Tier 3, C-01 menurut draf DBV-012), `inbox.nip` (C-01), `firebase_token.nip` (H-01, disiapkan kosong), `simapi_update.nip` (H-01, log), `simapi_ch.nip` (log riwayat SIMAPI, DBV-026, tidak diarahkan ulang).
 - Jejak di `main` (A-01): `audit_logs.nip_actor` (D-8), `login_attempts.username`, `forgot_attempts.username` (legacy `forgot_attempts.nip`), dan `token.nip` (terdaftar sebagai FK legacy, tetapi di v2 menjadi jejak D-7).
 - Bukan rujukan: `pegawai.nip_lama`, `pegawai_hist.nip_lama` (NIP lama).
-- Tabel legacy lain yang tidak ada di Mapping (17 kolom): `absen_real`, `andr_topic_queue`, `dh_online_coordinate`, `fd_dig`, `firebase_message_logs`, `form_kesehatan`, `ina`, `jabatan_koordinasi`, `jabatan_plt.nip_plt`, `kda_pegawai`, `pa_layanan`, `peg_email`, `pegawai_jabatan`, `riwayat_jabatan`, `riwayat_mutasi_req`, `siasn_upload_arsip`, `simapi_ch`. Ditambah 103 kolom bernama NIP di tabel cadangan, staging, dan uji (`*_YYYYMMDD`, `d_*`, `test_*`, `sapk_*_src`).
+- Tabel legacy lain yang tidak ada di Mapping (16 kolom): `absen_real`, `andr_topic_queue`, `dh_online_coordinate`, `fd_dig`, `firebase_message_logs`, `form_kesehatan`, `ina`, `jabatan_koordinasi`, `jabatan_plt.nip_plt`, `kda_pegawai`, `pa_layanan`, `peg_email`, `pegawai_jabatan`, `riwayat_jabatan`, `riwayat_mutasi_req`, `siasn_upload_arsip`. Ditambah 103 kolom bernama NIP di tabel cadangan, staging, dan uji (`*_YYYYMMDD`, `d_*`, `test_*`, `sapk_*_src`).
 
 Di dump D1, cabang trigger yang bereaksi pada perubahan NIP (`IF OLD.nip != NEW.nip` di `pegawai_afUpd` dan `riwayat_*_afUpd`) hanya menentukan NIP mana yang ditulis ke log sinkron SIMAPI (`simapi_update`, `simapi_ch`). Cabang itu tidak mengubah kolom NIP di tabel lain. Log ini tidak di-port ke B-06; perannya diputuskan di H-05..H-07.
 
