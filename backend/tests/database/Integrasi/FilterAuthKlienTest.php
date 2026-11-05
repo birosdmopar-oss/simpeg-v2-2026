@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Database\Integrasi;
 
+use App\Filters\KlienLayananFilter;
 use App\Libraries\Integrasi\Klien\PenyimpanKlien;
 use App\Libraries\Integrasi\Klien\TokenSimapi;
 use App\Libraries\Integrasi\Log\CatatanIntegrasi;
@@ -12,6 +13,7 @@ use CodeIgniter\Test\Mock\MockCache;
 use CodeIgniter\Throttle\Throttler;
 use Config\KlienLayanan;
 use Config\Services;
+use LogicException;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Integrasi\LogIntegrasiTiruan;
 
@@ -34,9 +36,17 @@ final class FilterAuthKlienTest extends DatabaseTestCase
 
     private int $idKlien = 0;
 
+    private int $ipAsli = 0;
+
+    private int $klienAsli = 0;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $cfg             = config(KlienLayanan::class);
+        $this->ipAsli    = $cfg->throttleIpKapasitas;
+        $this->klienAsli = $cfg->throttleKlienKapasitas;
+        Services::injectMock('cache', new MockCache());
         $this->log = new LogIntegrasiTiruan();
         Services::injectMock('integrasiLog', $this->log);
         $throttler = new Throttler(new MockCache());
@@ -53,6 +63,10 @@ final class FilterAuthKlienTest extends DatabaseTestCase
 
     protected function tearDown(): void
     {
+        $cfg                         = config(KlienLayanan::class);
+        $cfg->throttleIpKapasitas    = $this->ipAsli;
+        $cfg->throttleKlienKapasitas = $this->klienAsli;
+        Services::resetSingle('cache');
         Services::resetSingle('integrasiLog');
         Services::resetSingle('throttler');
         Services::resetSingle('klienSaatIni');
@@ -189,27 +203,87 @@ final class FilterAuthKlienTest extends DatabaseTestCase
         $this->assertSame('Token is not valid', json_decode($res->getJSON(), true)['msg'], 'AC-F.5 klien nonaktif / token dicabut');
     }
 
-    public function testThrottlePerKlienDanPerIp429(): void
+    public function testThrottlePerKlien429DenganLogMaksimalSekaliPerJendela(): void
     {
-        $cfg                         = config(KlienLayanan::class);
-        $cfg->throttleKlienKapasitas = 2;
-        $cfg->throttleIpKapasitas    = 5;
+        config(KlienLayanan::class)->throttleKlienKapasitas = 2;
         $this->klien('mudig', 3, ['stat']);
         $header = $this->basic('mudig', $this->rahasia);
 
         $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(200);
         $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(200);
-        $res = $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat');
-        $res->assertStatus(429);
-        $this->assertGreaterThanOrEqual(1, (int) $res->response()->getHeaderLine('Retry-After'));
-        $this->assertSame('Too many requests', json_decode($res->getJSON(), true)['msg']);
 
-        // IP: lima percobaan gagal menghabiskan kapasitas IP, berikutnya 429 walau rahasia benar.
-        Services::injectMock('throttler', (new Throttler(new MockCache()))->setTestTime(1_790_000_100));
-        for ($i = 0; $i < 5; $i++) {
+        for ($i = 0; $i < 25; $i++) {
+            $res = $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat');
+            $res->assertStatus(429);
+            $this->assertSame('Too many requests', json_decode($res->getJSON(), true)['msg']);
+            $this->assertGreaterThanOrEqual(1, (int) $res->response()->getHeaderLine('Retry-After'));
+        }
+
+        $baris = array_values(array_filter($this->log->isi, static fn (CatatanIntegrasi $c): bool => $c->kode === 'throttle_klien'));
+        $this->assertCount(1, $baris, 'B-1: 25 permintaan ter-throttle → paling banyak 1 baris log per jendela');
+        $this->assertSame([429, $this->idKlien], [$baris[0]->httpStatus, $baris[0]->idKlien]);
+    }
+
+    public function testBucketIpHanyMenghitungKegagalanDanPenuhDitolakSebelumVerifikasi(): void
+    {
+        $cfg                         = config(KlienLayanan::class);
+        $cfg->throttleIpKapasitas    = 3;
+        $cfg->throttleKlienKapasitas = 1000;
+        $this->klien('mudig', 3, ['stat']);
+        $header = $this->basic('mudig', $this->rahasia);
+
+        // P-2: permintaan SUKSES tidak menghabiskan bucket IP (kapasitas 3, 12 sukses).
+        for ($i = 0; $i < 12; $i++) {
+            $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(200);
+        }
+
+        // Tiga kegagalan mengisi bucket; sesudahnya bahkan kredensial benar ditolak 429 (tanpa password_verify).
+        for ($i = 0; $i < 3; $i++) {
             $this->withHeaders(['Authorization' => $this->basic('mudig', 'salah')])->call('get', '__uji/stat')->assertStatus(401);
         }
 
-        $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(429);
+        for ($i = 0; $i < 30; $i++) {
+            $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(429);
+        }
+
+        $baris = array_values(array_filter($this->log->isi, static fn (CatatanIntegrasi $c): bool => $c->kode === 'throttle_ip'));
+        $this->assertCount(1, $baris, 'B-1: 30 permintaan ter-throttle IP → 1 baris log');
+        $this->assertSame([429, null], [$baris[0]->httpStatus, $baris[0]->idKlien]);
+        $this->assertStringNotContainsString(self::IP, $this->log->semuaTeks());
+    }
+
+    public function testBucketIpTokenSimapiDanLogSekali(): void
+    {
+        $cfg                      = config(KlienLayanan::class);
+        $cfg->throttleIpKapasitas = 2;
+        $this->klien('simanta', 2, ['simapi']);
+        $token = (new TokenSimapi($this->db))->terbitkan($this->idKlien)['token'];
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data')->assertStatus(200);
+        }
+
+        $this->withHeaders(['Authorization' => 'Bearer salah'])->call('get', '__uji/simapi-data')->assertStatus(200);
+        $this->withHeaders(['Authorization' => 'Bearer salah'])->call('get', '__uji/simapi-data')->assertStatus(200);
+
+        for ($i = 0; $i < 15; $i++) {
+            $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data')->assertStatus(429);
+        }
+
+        $baris = array_values(array_filter($this->log->isi, static fn (CatatanIntegrasi $c): bool => $c->kode === 'throttle_ip'));
+        $this->assertCount(1, $baris);
+        $this->assertSame(429, $baris[0]->httpStatus);
+    }
+
+    public function testFilterKlienLayananMenolakArgumenSalah(): void
+    {
+        foreach ([[], null, ['stat', 'dm'], ['admin'], ['']] as $argumen) {
+            try {
+                (new KlienLayananFilter())->before(Services::request(), $argumen);
+                $this->fail('argumen filter salah harus melempar LogicException');
+            } catch (LogicException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 }

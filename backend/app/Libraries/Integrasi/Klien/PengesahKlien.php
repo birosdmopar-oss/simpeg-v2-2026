@@ -8,9 +8,9 @@ use CodeIgniter\Database\BaseConnection;
 
 /**
  * MAKE-058 — pengesah klien layanan (HTTP Basic, PRD Fase 6 §7.0.1; AC-F.1..F.3). Urutan: cari username → SELALU
- * `password_verify` (hash tiruan bila username tak dikenal, supaya waktu respons tidak membedakan) → status 1 → allowlist IP
- * → hak. Semua kegagalan dilaporkan ke pemanggil sebagai SATU alasan internal (untuk log); respons ke klien seragam
- * "Authentication failed". Rahasia tidak pernah dicatat.
+ * `password_verify` (hash tiruan KONSTAN bila username tak dikenal, supaya waktu respons tidak membedakan) → status 1 →
+ * allowlist IP → hak. Semua kegagalan dilaporkan ke pemanggil sebagai SATU alasan internal (untuk log); respons ke klien
+ * seragam "Authentication failed". Rahasia tidak pernah dicatat.
  */
 final class PengesahKlien
 {
@@ -20,7 +20,15 @@ final class PengesahKlien
     public const IP_DITOLAK  = 'ip_ditolak';
     public const HAK_KURANG  = 'hak_kurang';
 
-    private static ?string $hashTiruan = null;
+    /**
+     * Hash tiruan KONSTAN (rahasia acak yang dibuang) dengan parameter bawaan yang sama dengan
+     * {@see PembangkitKredensial::hashRahasia()}: `password_verify` untuk username tak dikenal memakan waktu sama dengan klien
+     * nyata, tanpa membuat hash baru per request (review MAKE-058 P-1). Test memastikan parameternya tidak menyimpang dari
+     * bawaan PHP.
+     */
+    public const HASH_TIRUAN_ARGON2ID = '$argon2id$v=19$m=65536,t=4,p=1$SHNRRzlCUTFhOEJJUzV6Qw$sIv1ujycvQFV9MLWSC2QsjdVsc0woDt27B2lStzFD4g';
+
+    public const HASH_TIRUAN_BCRYPT = '$2y$12$Rhgsm6FMezOti0zcDkNoOeEHyO6AnrMAXfuTi64z9XstzLxkR9IEW';
 
     public function __construct(private readonly BaseConnection $db)
     {
@@ -29,7 +37,7 @@ final class PengesahKlien
     /**
      * @return array{hasil: string, id_klien: int|null, jenis: int|null}
      */
-    public function periksa(string $username, #[\SensitiveParameter] string $rahasia, string $ip, string $hak): array
+    public function periksa(#[\SensitiveParameter] string $username, #[\SensitiveParameter] string $rahasia, #[\SensitiveParameter] string $ip, string $hak): array
     {
         $klien = $username === '' ? null : $this->db->table('klien_layanan')
             ->select('id_klien, rahasia_hash, jenis, hak, ip_allowlist, status')
@@ -59,8 +67,8 @@ final class PengesahKlien
         return ['hasil' => self::DITERIMA, 'id_klien' => $id, 'jenis' => $jenis];
     }
 
-    private static function hashTiruan(): string
+    public static function hashTiruan(): string
     {
-        return self::$hashTiruan ??= PembangkitKredensial::hashRahasia(bin2hex(random_bytes(16)));
+        return defined('PASSWORD_ARGON2ID') ? self::HASH_TIRUAN_ARGON2ID : self::HASH_TIRUAN_BCRYPT;
     }
 }

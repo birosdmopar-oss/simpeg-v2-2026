@@ -27,7 +27,7 @@ class KlienLayanan extends BaseConfig
     /** Throttle per klien terautentikasi: permintaan per `throttleDetik`. */
     public int $throttleKlienKapasitas = 600;
 
-    /** Throttle percobaan auth per IP (termasuk yang gagal): permintaan per `throttleDetik`. */
+    /** Bucket KEGAGALAN auth per IP: kegagalan per `throttleDetik` sebelum 429 (permintaan sukses tidak dihitung). */
     public int $throttleIpKapasitas = 120;
 
     public int $throttleDetik = 60;

@@ -82,6 +82,10 @@ final class AllowlistIpDanHakKlienTest extends CIUnitTestCase
             'salah satu dari beberapa'        => ['10.1.2.3', '203.0.113.7,10.0.0.0/8', true],
             'ip klien tidak sah'              => ['bukan-ip', '203.0.113.0/24', false],
             'ip klien kosong'                 => ['', '203.0.113.0/24', false],
+            'klien ipv4-mapped vs entri ipv4' => ['::ffff:203.0.113.7', '203.0.113.0/24', true],
+            'klien ipv4-mapped di luar'       => ['::ffff:198.51.100.7', '203.0.113.0/24', false],
+            'entri ipv4-mapped cidr'          => ['203.0.113.7', '::ffff:203.0.113.0/120', true],
+            'entri ipv4-mapped persis'        => ['203.0.113.7', '::ffff:203.0.113.7', true],
         ];
     }
 
@@ -89,6 +93,15 @@ final class AllowlistIpDanHakKlienTest extends CIUnitTestCase
     public function testKecocokan(string $ip, string $allowlist, bool $harapan): void
     {
         $this->assertSame($harapan, AllowlistIp::cocok($ip, AllowlistIp::normalisasi($allowlist)), "{$ip} vs {$allowlist}");
+    }
+
+    public function testEntriTersimpanRusakGagalTertutup(): void
+    {
+        foreach (['10.0.0.0/', '10.0.0.0/x', '10.0.0.0/-1', '10.0.0.0/99', '0.0.0.0/', '/8', '', ' , '] as $rusak) {
+            $this->assertFalse(AllowlistIp::cocok('10.1.2.3', $rusak), "entri rusak [{$rusak}] tidak boleh meloloskan siapa pun");
+        }
+
+        $this->assertTrue(AllowlistIp::cocok('10.1.2.3', ',10.0.0.0/8'), 'entri kosong dilewati, entri sah tetap berlaku');
     }
 
     public function testUraiHakUrutanSetTanpaGanda(): void

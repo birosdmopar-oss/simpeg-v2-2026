@@ -9,7 +9,6 @@ use Closure;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use InvalidArgumentException;
-use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
@@ -215,11 +214,16 @@ final class PenyimpanKlien
 
     // ------------------------------------------------------------------------------------------------------------
 
+    /**
+     * Cabut semua token berstatus 1 milik klien (termasuk yang sudah kedaluwarsa, supaya bersih); mengembalikan jumlah token
+     * yang MASIH BERLAKU saat dicabut (konsisten dengan `daftar`).
+     */
     private function cabutToken(int $idKlien): int
     {
+        $berlaku = $this->db->table('simapi_token')->where('id_klien', $idKlien)->where('status', 1)->where('expired_at > UTC_TIMESTAMP()', null, false)->countAllResults();
         $this->db->table('simapi_token')->where('id_klien', $idKlien)->where('status', 1)->update(['status' => 2]);
 
-        return $this->db->affectedRows();
+        return $berlaku;
     }
 
     /**
@@ -274,17 +278,16 @@ final class PenyimpanKlien
                 throw new RuntimeException('Transaksi klien layanan gagal.');
             }
 
-            $this->db->transCommit();
+            if ($this->db->transCommit() === false) {
+                throw new RuntimeException('Transaksi klien layanan gagal di-commit.');
+            }
+
             $this->db->resetTransStatus();
 
             return $hasil;
         } catch (Throwable $e) {
             $this->db->transRollback();
             $this->db->resetTransStatus();
-
-            if (! $e instanceof InvalidArgumentException) {
-                log_message('error', 'integrasi:klien gagal: ' . (new ReflectionClass($e))->getShortName() . ' kode ' . $e->getCode() . '.');
-            }
 
             throw $e;
         }

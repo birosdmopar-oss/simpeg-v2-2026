@@ -36,8 +36,8 @@
 5. **Respons gagal per grup** (BP-12): SIMAPI = HTTP 200 `{"status":"02","msg":"Authentication failed"|"Token is not valid","data":{}}`
    [K]; `services/*` = HTTP 401 `{"status":2,"msg":"Authentication failed","data":{}}` + `WWW-Authenticate: Basic` [V2]; throttle = 429
    dengan `Retry-After` pada kedua grup. Tidak ada `Set-Cookie`, `Cache-Control: no-store`.
-6. **Throttle** (`Config\KlienLayanan`): per IP (termasuk percobaan gagal) dan per klien terautentikasi; jendela 60 detik; ambang bawaan
-   120/IP dan 600/klien dapat diubah lewat konfigurasi.
+6. **Throttle** (`Config\KlienLayanan`): bucket KEGAGALAN per IP (hanya percobaan gagal yang dihitung; bucket penuh ditolak 429 sebelum `password_verify`) dan per klien terautentikasi; jendela 60 detik; ambang bawaan
+   120 kegagalan/IP dan 600 permintaan/klien dapat diubah lewat konfigurasi. Penolakan throttle ditulis ke `integrasi_log` paling banyak sekali per kunci per jendela (bukan per request). Hash tiruan untuk username tak dikenal adalah konstanta berparameter sama dengan hash nyata (tidak dibuat per request).
 7. **Pengelolaan lewat command** `php spark integrasi:klien buat|rotasi|nonaktif|aktifkan|hapus|daftar|bersihkan-token`. Rahasia dibangkitkan
    `random_bytes` dan **ditampilkan sekali** di keluaran; tidak masuk DB mentah, audit, atau log. Semua perubahan satu transaksi pada satu
    koneksi bersama `audit_logs` (aktor NULL = CLI).

@@ -7,11 +7,15 @@ namespace App\Libraries\Integrasi\Klien;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use RuntimeException;
+use Throwable;
 
 /**
  * MAKE-058 — token SIMAPI (PRD Fase 6 F6-05, DBV-026 §13.2 A4; AC-F.5). Token opak `[A-Za-z0-9]` dibuat dari `random_int`,
  * disimpan sebagai SHA-256 heks huruf kecil di PK `simapi_token.token_hash` (token mentah tidak pernah disimpan atau
  * dicatat), satu baris per handshake, masa aktif {@see \Config\KlienLayanan::$tokenTtlDetik}.
+ *
+ * Terbit: dalam satu transaksi yang mengunci baris klien (`FOR UPDATE`) dan memeriksa ulang `status = 1`, sehingga handshake
+ * yang berlomba dengan `nonaktif`/`hapus`/`rotasi` tidak menerbitkan token untuk klien yang baru dicabut (review S-3).
  *
  * Validasi: nilai header `Authorization` dipecah spasi dan token = ELEMEN KEDUA [K `AE:30-47`] (skema bebas); bentuk token
  * (panjang tetap + karakter) dan panjang header dibatasi SEBELUM di-hash; pencarian lewat PK `token_hash`, lalu
@@ -31,50 +35,49 @@ final class TokenSimapi
     }
 
     /**
-     * Terbitkan token baru untuk klien (handshake). Token mentah dikembalikan SEKALI ke pemanggil.
+     * Terbitkan token baru untuk klien aktif (handshake). Token mentah dikembalikan SEKALI ke pemanggil.
      *
      * @return array{token: string, expired_at: string}
+     *
+     * @throws KlienTidakAktif klien tidak ada atau bukan status 1 (termasuk dinonaktifkan saat handshake berjalan)
      */
     public function terbitkan(int $idKlien): array
     {
-        $kedaluwarsa = gmdate('Y-m-d H:i:s', time() + $this->ttlDetik);
+        if ($this->db->transBegin() === false) {
+            $this->db->resetTransStatus();
 
-        for ($percobaan = 0; $percobaan < 3; $percobaan++) {
-            $token = PembangkitKredensial::token($this->panjang);
-
-            try {
-                $ok = $this->db->table('simapi_token')->insert([
-                    'token_hash' => PembangkitKredensial::hashToken($token),
-                    'id_klien'   => $idKlien,
-                    'status'     => 1,
-                    'expired_at' => $kedaluwarsa,
-                    'created_at' => gmdate('Y-m-d H:i:s'),
-                ]);
-
-                if ($ok === false) {
-                    // Koneksi tanpa DBDebug: insert mengembalikan false alih-alih melempar.
-                    if ((int) ($this->db->error()['code'] ?? 0) === self::ER_DUP_ENTRY) {
-                        continue;
-                    }
-
-                    throw new RuntimeException('Token SIMAPI gagal disimpan.');
-                }
-
-                return ['token' => $token, 'expired_at' => $kedaluwarsa];
-            } catch (DatabaseException $e) {
-                if ((int) $e->getCode() !== self::ER_DUP_ENTRY) {
-                    throw $e;
-                }
-            }
+            throw new RuntimeException('Transaksi token SIMAPI tidak dapat dimulai.');
         }
 
-        throw new RuntimeException('Token SIMAPI gagal diterbitkan (tabrakan hash berulang).');
+        try {
+            $sql   = $this->db->table('klien_layanan')->select('status')->where('id_klien', $idKlien)->limit(1)->getCompiledSelect() . ' FOR UPDATE';
+            $klien = $this->db->query($sql)->getRowArray();
+
+            if ($klien === null || (int) $klien['status'] !== PenyimpanKlien::STATUS_AKTIF) {
+                throw new KlienTidakAktif('Klien tidak aktif; token tidak diterbitkan.');
+            }
+
+            $hasil = $this->sisipToken($idKlien);
+
+            if ($this->db->transStatus() === false || $this->db->transCommit() === false) {
+                throw new RuntimeException('Token SIMAPI gagal diterbitkan (transaksi).');
+            }
+
+            $this->db->resetTransStatus();
+
+            return $hasil;
+        } catch (Throwable $e) {
+            $this->db->transRollback();
+            $this->db->resetTransStatus();
+
+            throw $e;
+        }
     }
 
     /**
      * Token dari nilai header `Authorization` ("<skema> <token>"), atau null bila bentuknya tidak sah. Tanpa DB.
      */
-    public function ekstrak(string $header): ?string
+    public function ekstrak(#[\SensitiveParameter] string $header): ?string
     {
         if ($header === '' || strlen($header) > $this->headerMaks) {
             return null;
@@ -92,9 +95,9 @@ final class TokenSimapi
     }
 
     /**
-     * @return array{id_klien: int, jenis: int}|null klien pemilik token yang masih berlaku, atau null (tidak sah/kedaluwarsa/dicabut)
+     * @return array{id_klien: int, jenis: int}|null klien pemilik token yang masih berlaku, atau null (tidak sah/kedaluwarsa/dicabut/klien nonaktif)
      */
-    public function periksa(string $header): ?array
+    public function periksa(#[\SensitiveParameter] string $header): ?array
     {
         $token = $this->ekstrak($header);
 
@@ -118,5 +121,48 @@ final class TokenSimapi
         }
 
         return ['id_klien' => (int) $baris['id_klien'], 'jenis' => (int) $baris['jenis']];
+    }
+
+    /**
+     * @return array{token: string, expired_at: string}
+     */
+    private function sisipToken(int $idKlien): array
+    {
+        $kedaluwarsa = gmdate('Y-m-d H:i:s', time() + $this->ttlDetik);
+
+        for ($percobaan = 0; $percobaan < 3; $percobaan++) {
+            $token = PembangkitKredensial::token($this->panjang);
+
+            try {
+                $ok = $this->db->table('simapi_token')->insert([
+                    'token_hash' => PembangkitKredensial::hashToken($token),
+                    'id_klien'   => $idKlien,
+                    'status'     => 1,
+                    'expired_at' => $kedaluwarsa,
+                    'created_at' => gmdate('Y-m-d H:i:s'),
+                ]);
+
+                if ($ok === false) {
+                    // Koneksi tanpa DBDebug: insert mengembalikan false alih-alih melempar.
+                    if ((int) ($this->db->error()['code'] ?? 0) === self::ER_DUP_ENTRY) {
+                        $this->db->resetTransStatus();
+
+                        continue;
+                    }
+
+                    throw new RuntimeException('Token SIMAPI gagal disimpan.');
+                }
+
+                return ['token' => $token, 'expired_at' => $kedaluwarsa];
+            } catch (DatabaseException $e) {
+                if ((int) $e->getCode() !== self::ER_DUP_ENTRY) {
+                    throw $e;
+                }
+
+                $this->db->resetTransStatus();
+            }
+        }
+
+        throw new RuntimeException('Token SIMAPI gagal diterbitkan (tabrakan hash berulang).');
     }
 }

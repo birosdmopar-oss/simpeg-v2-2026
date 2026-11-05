@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Database\Integrasi;
 
+use App\Libraries\Integrasi\Klien\KlienTidakAktif;
 use App\Libraries\Integrasi\Klien\PembangkitKredensial;
 use App\Libraries\Integrasi\Klien\PengesahKlien;
 use App\Libraries\Integrasi\Klien\PenyimpanKlien;
@@ -309,5 +310,48 @@ final class KlienLayananTest extends DatabaseTestCase
 
         $this->expectException(InvalidArgumentException::class);
         PembangkitKredensial::rahasia(8);
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Review MAKE-058 (P-1, S-3, S-6)
+
+    public function testHashTiruanKonstanSamaParameterDenganHashNyata(): void
+    {
+        $tiruan = password_get_info(PengesahKlien::hashTiruan());
+        $nyata  = password_get_info(PembangkitKredensial::hashRahasia('x'));
+
+        $this->assertSame($nyata['algo'], $tiruan['algo'], 'algoritma sama (P-1)');
+        $this->assertSame($nyata['options'], $tiruan['options'], 'parameter biaya sama dengan bawaan PHP; perbarui konstanta bila PHP mengubah bawaan');
+        $this->assertFalse(password_needs_rehash(PengesahKlien::hashTiruan(), defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_BCRYPT));
+        $this->assertFalse(password_verify('apa-saja', PengesahKlien::hashTiruan()));
+    }
+
+    public function testTerbitkanUntukKlienTidakAktifAtauTidakAdaDitolak(): void
+    {
+        $klien = $this->klien();
+        $this->penyimpan()->ubahStatus('simanta', PenyimpanKlien::STATUS_NONAKTIF);
+
+        foreach ([$klien['id'], 99999] as $id) {
+            try {
+                $this->token()->terbitkan($id);
+                $this->fail("klien {$id}: token tidak boleh diterbitkan");
+            } catch (KlienTidakAktif) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
+        $this->assertSame(0, $this->db->table('simapi_token')->countAllResults());
+    }
+
+    public function testJumlahTokenDicabutHanyaYangMasihBerlaku(): void
+    {
+        $klien = $this->klien();
+        $this->token()->terbitkan($klien['id']);
+        $this->db->table('simapi_token')->insert(['token_hash' => str_repeat('d', 64), 'id_klien' => $klien['id'], 'status' => 1, 'expired_at' => '2000-01-01 00:00:00', 'created_at' => '2000-01-01 00:00:00']);
+
+        $hasil = $this->penyimpan()->ubahStatus('simanta', PenyimpanKlien::STATUS_NONAKTIF);
+
+        $this->assertSame(1, $hasil['token_dicabut'], 'konsisten dengan daftar: token kedaluwarsa tidak dihitung');
+        $this->assertSame(0, $this->db->table('simapi_token')->where('status', 1)->countAllResults(), 'semua status 1 tetap dibersihkan');
     }
 }
