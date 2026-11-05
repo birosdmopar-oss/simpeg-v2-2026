@@ -8,7 +8,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | Task | Jalur | Key | Status |
 |---|---|---|---|
 | H-01 | A + B | DBV-026, DBV-027 | B: DBV-027 di main `c3c6213f` (+ DBV-030 `4c2d96a5`); A: diisi Jalur A |
-| H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` menunggu MAKE-058 (A3) |
+| H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` di branch `fase6/make-065-s-esign` |
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
 | H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | Belum mulai |
@@ -119,9 +119,13 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
 - Deviasi dicatat: gagal tanda tangan tidak membatalkan persetujuan (legacy membatalkan); Tolak tanpa passphrase.
 - ISSUE-055 (saran S5 review B4a) ditahan.
 
-### B4b — `services/s_esign` (belum)
+### B4b — `services/s_esign` untuk MuDig (F6-16, branch `fase6/make-065-s-esign`)
 
-- Menunggu fondasi Jalur A MAKE-058 (A3, filter auth antar-sistem ADR-036).
+- Dimulai sesudah A3 MAKE-058 di main `c926770f`. `check_user` + `sign_pdf` dengan filter `klienLayanan:esign`; route di
+  `Config/RoutesServicesEsign.php` (digabung ke `RoutesServices.php` Jalur A oleh paket yang merge belakangan).
+- Ikut legacy: parameter & bawaan, pesan, `msg` `check_user` selalu null (bug legacy), `ip_address`/`user_agent` dari POST.
+- Deviasi [V2] F6-16: unggahan multipart (bukan path server), `nama_lengkap`/`modul` wajib dan `esign_hist` selalu dicatat,
+  `data.signed_file` = base64 PDF (legacy: path server), sukses hanya bila gateway mengembalikan PDF, batas 10 MB/2 MB.
 
 ### B5 — MAKE-066 Push FCM HTTP v1 (H-04, main `9debb366`)
 
@@ -154,4 +158,4 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
 
 - PN-5 crontab legacy → validasi jadwal §1e. PN-3 proyek Firebase + service account. DEPLOY-001.1 penulis token Android.
 - ADR-037 (pola penjadwalan, Jalur A): §1e menyesuaikan bila berbeda.
-- B4b menunggu MAKE-058.
+- B4b: kontrak baru untuk PIC MuDig (PN-4, re-handshake) — lihat README-deploy §1c.

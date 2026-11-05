@@ -26,4 +26,18 @@ publik QR, dan pencabutan akses publik: `README-deploy.md` §1c.
   minimal, tanpa NIP/unduh) dan PDF publik; throttle, 404 seragam, `no-store` + `noindex`. Dasar URL =
   `layanan.urlPublikSurat` (https wajib di production).
 
-B4b (`services/s_esign` untuk MuDig) menunggu fondasi Jalur A (MAKE-058).
+## `services/s_esign` untuk MuDig (F6-16 / Q6-05 = A, MAKE-065 B4b)
+
+Port `controllers/services/S_esign.php`. Route `Config/RoutesServicesEsign.php` (filter `klienLayanan:esign`, MAKE-058/ADR-036),
+controller `Controllers/Services/SEsignController`, logika `LayananEsignMudig`. Runbook: `README-deploy.md` §1c.
+
+| Endpoint | Masukan | Keluaran `{"status":1|2,"msg","data"}` (HTTP 200; auth gagal 401) |
+|---|---|---|
+| `GET services/s_esign/check_user` | `nik` | `status` 1 bila gateway `1111`; `msg` selalu `null` [K bug legacy], `data` `[]` |
+| `POST services/s_esign/sign_pdf` | multipart `file` (PDF ≤ 10 MB) + `imageTTD` (JPEG/PNG ≤ 2 MB); `nik`, `passphrase`, `nama_lengkap`, `modul` wajib; `tampilan`, `width`, `height`, `tag_koordinat`, `reason`, `location` (bawaan legacy); `nip`, `id_rw`, `file_pdf_to_sign`, `ip_address`, `user_agent` untuk `esign_hist` | sukses: `msg` "Berhasil menandatangani dokumen secara digital.", `data.signed_file` = base64 PDF ber-TTE; gagal: pesan gateway teredaksi; parameter kurang/berkas tidak sah: "Invalid parameter." |
+
+- NIK dikirim pemanggil, jadi gateway dibuat lewat `Services::esignGatewayNikLangsung()` (BSrE tanpa pencarian `pegawai.nik`; mock
+  tanpa menulis pengenal ke log). Kontrak `EsignGatewayInterface` tidak berubah.
+- `esign_hist` wajib [V2]: satu baris per percobaan yang sampai ke gateway (status 1/2, `status_code` gateway). `nip` yang tidak ada di
+  `pegawai` disimpan NULL; `id_rw` hanya angka; `file_pdf_to_sign` kosong → nama berkas unggahan.
+- Berkas tidak ditulis ke disk aplikasi. Respons `Cache-Control: no-store`. NIK/passphrase tidak masuk respons/log.

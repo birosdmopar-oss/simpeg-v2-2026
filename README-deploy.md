@@ -196,6 +196,18 @@ php spark surat-cuti:token --id=<id_riwayat_cuti> --aktif     # pulihkan token y
 
 Setiap perubahan tercatat di `audit_logs` (`entity` `surat_cuti_token`, `jenis_audit` `cuti.token_surat`, `sumber` `cli`). Keluaran hanya status, tanpa token, URL, atau NIP. Token surat yang sudah ber-TTE tidak bisa diganti (DBV-030 Q3), hanya dinonaktifkan. Menghapus cuti menghapus tokennya juga (DBV-030 Q2).
 
+**`services/s_esign` untuk MuDig (F6-16, MAKE-065 B4b).** Endpoint `GET services/s_esign/check_user?nik=` dan `POST services/s_esign/sign_pdf` (multipart) memakai gateway yang sama (`integrations.esign.*`); NIK dikirim MuDig langsung, bukan dari `pegawai.nik`.
+
+1. Prasyarat §1h: Nginx meneruskan `/services/` ke backend v2 dan header `Authorization` sampai ke PHP.
+2. Buat klien MuDig dengan hak `esign` (bisa digabung dengan `stat`/`dm` pada klien yang sama):
+   `php spark integrasi:klien buat --nama="MuDig" --username=<huruf-kecil> --jenis=3 --hak=esign[,stat,dm] [--ip=<ip/cidr>]`.
+3. Batas unggahan: PDF maks 10 MB, gambar tanda tangan (`imageTTD`, JPEG/PNG) maks 2 MB. Nginx `client_max_body_size` dan PHP
+   `upload_max_filesize`/`post_max_size` minimal 13M, kalau tidak permintaan besar ditolak sebelum sampai aplikasi.
+4. Kontrak untuk PIC MuDig (PN-4, re-handshake): parameter dan amplop `{"status":1|2,"msg","data"}` sama dengan legacy; yang berubah
+   adalah auth (username + rahasia baru), `file` dan `imageTTD` dikirim sebagai **unggahan berkas** (bukan path server),
+   `nama_lengkap` dan `modul` wajib, dan PDF ber-TTE dikembalikan sebagai base64 di `data.signed_file` (bukan path server). Auth gagal → HTTP 401.
+5. Setiap percobaan tanda tangan tercatat di `esign_hist` (`modul` dari MuDig).
+
 ### 1d. Push FCM HTTP v1 (Fase 6 H-04, MAKE-066)
 
 Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM Legacy API/server key legacy sudah dihentikan Google). Worker tetap cron `queue:work push` di §1b; job di queue `push`:
