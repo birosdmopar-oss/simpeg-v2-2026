@@ -103,6 +103,39 @@ anomali [K], penyaji, kemurnian), `tests/database/Integrasi/StatServiceTest` (AC
 Q6-37, aturan unduh), `tests/database/Integrasi/SStatKontrakTest` (AC-08.3 401 amplop INT, AC-08.4, HTTP 200 amplop INT,
 `list_tb` tanpa path internal, unduh 200 header aman / 404 seragam).
 
+
+### A7 — H-09 pemetaan `Local.php` → v2 (AC-09.1) dan penutup Jalur A
+
+Sumber: `controllers/hr/services/Local.php` (legacy, AJAX sesi login; 56 method publik, `L:9-4604`). Aturan PRD Lampiran A.4: **setiap method punya
+padanan v2 atau alasan "tidak di-port"**. Hanya endpoint dengan sesi login pengguna; tidak ada yang dibuka ke klien antar-sistem (itu SIMAPI
+`a_*`/`services/*`, bagian A4–A6). Padanan dituliskan per kelompok dengan DAFTAR method lengkap (baris legacy); "Fase N" = modul v2 yang
+sudah di `main`. Kolom v2 menyebut jalur, bukan jaminan paritas field-per-field (itu uji modul masing-masing).
+
+| # | Method (baris `Local.php`) | Padanan v2 / alasan |
+|---|---|---|
+| 1 | `list_kab_kota` (9), `list_kecamatan` (23), `list_kelurahan` (37), `list_kd_pos` (51) | Master Data Fase 2 — wilayah (`master/*` dan opsi bertingkat modul biodata/alamat) |
+| 2 | `list_jur_pend` (69), `list_bid_pend` (93), `list_jsp` (121), `list_diklat` (138), `list_pangkat` (170), `list_jft` (190), `list_jenis_hukdis` (212), `list_sgj` (294), `list_subrumpun_jabatan` (309) | Master Data Fase 2 — dropdown referensi pendidikan, diklat, pangkat, jabatan, hukuman disiplin (`master/*`, `*/opsi`) |
+| 3 | `list_satker` (323), `list_jabatan_sub_satker` (348), `list_jabatan_koord_satker` (379), `list_pmj_sub_satker` (447), `list_pmj_sub_satker_20250204` (407), `list_sgj_pj` (4475), `list_jab_pj` (4494) | Struktur/jabatan Fase 3 (`jabatan`, `master/*`, opsi jabatan); varian bertanggal `_20250204` = kode lama, tidak di-port |
+| 4 | `list_atasan_jabatan` (467), `list_all_atasan` (779), `list_all_atasan_dmkoord` (1147), `list_all_atasan_bkp` (1287) | Fase 3/4 — pencari atasan (RBAC v2, `AtasanLangsung`/`cuti/petugas-approval/opsi`/`lkh/opsi`); `_bkp` = salinan lama, tidak di-port |
+| 5 | `po_in` (1737), `po_out` (1884), `preview_po` (2050) | Fase 5 — `presensi/masuk`, `presensi/pulang`, `presensi/cek-lokasi`; antre topik FCM saat masuk/pulang = F6-12 (Jalur B) |
+| 6 | `get_list_user_lokasi_presensi` (4604) | Fase 5 — lokasi presensi (`presensi/cek-lokasi`, master lokasi) |
+| 7 | `record_geolocation` (4071) | Tidak di-port: GET yang menulis `user_geo` (F5-12) |
+| 8 | `calculate_lc` (2147), `calculate_lc_20220601` (2085), `calculate_lk` (2211), `info_cuti_ad` (2487), `info_cuti_ad_20211028` (2267), `info_cuti_ad2` (2759), `info_cuti_ad2_20250514` (2861) | Fase 4 — `cuti/hitung-lama`, `cuti/opsi`, kuota/saldo cuti; varian bertanggal = kode lama, tidak di-port |
+| 9 | `calculate_ltb` (3185), `detail_tb_ad` (3220) | Fase 4 — TB/IB (`tb/opsi`, form TB; perhitungan lama studi di `LamaTahunStudi`) |
+| 10 | `calculate_mker_ak` (4423), `calc_mker_pmk_req` (4574), `peg_selected_pmk_req` (4537) | Fase 3/4 — `pmk/hitung-mker`, `pmk/opsi`, hitung AK |
+| 11 | `list_arsip_rwy_data` (3272), `connect_arsip` (3475), `delete_arsip` (3724), `update_arsip_name` (3809) | Fase 3 — lampiran riwayat (`pegawai/{nip}/lampiran`, unduh/hapus, `AttachmentService`); `connect_arsip` (GET yang mengubah data) dan penyambungan arsip lewat path server tidak dibawa |
+| 12 | `update_foto_pegawai` (3892) | Fase 3 — `pegawai/{nip}/foto` (unggah dengan RBAC v2) |
+| 13 | `get_list_anak` (4384) | Fase 3 — `pegawai/{nip}/riwayat/keluarga/{id}/anak` |
+| 14 | `list_unit_es_3` (3940), `list_unit_es_4` (4002) | Tidak di-port: kode mati (tanpa pemanggil), PRD Lampiran A.4 |
+| 15 | `validate_cp` (229) | Tidak di-port: kode mati (PRD Lampiran A.4) |
+| 16 | `list_faq_subtop` (4125), `rate_faq` (4139) | Fase 7 — FAQ publik/admin (`faq`); penilaian FAQ = fitur FAQ v2 |
+| 17 | `get_list_fd_users` (4291), `get_list_popup_users` (4322), `get_list_banner_users` (4353) | Fase 7/8 — pengumuman, popup, banner pengguna (modul Pengumuman v2) |
+| 18 | `register_fb_token` (4224) | Fase 6 H-04 (F6-13) — `fcm-token` (`POST api/v1/integrasi/fcm-token`, MAKE-066) |
+
+Cakupan: 56 method terpetakan (baris 1-18 di atas menjumlah semuanya). Method yang "mengubah data lewat GET" (`record_geolocation`,
+`connect_arsip`) sengaja tidak dibawa. Pemeriksaan padanan per-endpoint dilakukan modul pemiliknya (QA Fase 3-8); dokumen ini hanya
+memenuhi AC-09.1. Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel ini.
+
 ## Bagian B — Klien integrasi keluar
 
 Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin Horii. Dokumentasi modul:
