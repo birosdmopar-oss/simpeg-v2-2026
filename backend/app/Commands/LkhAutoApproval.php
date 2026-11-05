@@ -84,11 +84,13 @@ class LkhAutoApproval extends BaseCommand
         } catch (AkunSistemTidakSiap|AutoApprovalSibuk $e) {
             // Pesan kelas-kelas ini disusun aplikasi tanpa NIP/nilai rahasia.
             CLI::error('Auto-approval LKH GAGAL: ' . $e->getMessage());
+            log_message('error', 'lkh:auto-approval gagal: ' . $this->ringkasGalat($e));
 
             return EXIT_ERROR;
         } catch (Throwable $e) {
             // Pesan galat DB bisa memuat NIP → hanya kelas & kode.
             CLI::error('Auto-approval LKH GAGAL: ' . ($e instanceof DatabaseException ? 'galat basis data' : 'galat tak terduga') . ' (' . (new ReflectionClass($e))->getShortName() . ', kode ' . $e->getCode() . ').');
+            log_message('error', 'lkh:auto-approval gagal: ' . $this->ringkasGalat($e));
 
             return EXIT_ERROR;
         }
@@ -109,10 +111,19 @@ class LkhAutoApproval extends BaseCommand
 
         if ($hasil['gagal'] > 0) {
             CLI::error('Ada LKH yang gagal diproses; jalankan ulang (idempoten).');
+            log_message('error', 'lkh:auto-approval gagal: ' . $hasil['gagal'] . ' LKH tidak diproses.');
 
             return EXIT_ERROR;
         }
 
         return EXIT_SUCCESS;
+    }
+
+    /**
+     * Kelas pendek dan kode galat saja; pesan galat (bisa memuat NIP) tidak pernah masuk log.
+     */
+    private function ringkasGalat(Throwable $e): string
+    {
+        return (new ReflectionClass($e))->getShortName() . ($e->getCode() !== 0 ? ' kode ' . $e->getCode() : '') . '.';
     }
 }

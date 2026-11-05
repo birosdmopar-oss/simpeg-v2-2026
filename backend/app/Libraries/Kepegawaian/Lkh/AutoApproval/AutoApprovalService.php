@@ -6,6 +6,7 @@ namespace App\Libraries\Kepegawaian\Lkh\AutoApproval;
 
 use App\Libraries\Kepegawaian\Lkh\LkhService;
 use CodeIgniter\Database\BaseConnection;
+use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
@@ -128,6 +129,7 @@ final class AutoApprovalService
     {
         if ($this->db->transBegin() === false) {
             $this->db->resetTransStatus();
+            $this->catatGagal('mulai transaksi');
 
             return 'gagal';
         }
@@ -138,6 +140,7 @@ final class AutoApprovalService
             if ($this->db->transStatus() === false) {
                 $this->db->transRollback();
                 $this->db->resetTransStatus();
+                $this->catatGagal('tulis');
 
                 return 'gagal';
             }
@@ -146,11 +149,23 @@ final class AutoApprovalService
             $this->db->resetTransStatus();
 
             return $akhirBaris;
-        } catch (Throwable) {
+        } catch (Throwable $e) {
             $this->db->transRollback();
             $this->db->resetTransStatus();
+            $this->catatGagal('tulis', $e);
 
             return 'gagal';
         }
+    }
+
+    /**
+     * Jejak galat per LKH tanpa pesan galat DB dan tanpa NIP/ID: hanya cabang, kelas, dan kode.
+     */
+    private function catatGagal(string $cabang, ?Throwable $e = null): void
+    {
+        $kelas = $e === null ? '-' : (new ReflectionClass($e))->getShortName();
+        $kode  = $e === null ? '-' : (string) $e->getCode();
+
+        log_message('error', sprintf('lkh:auto-approval gagal pada %s: %s kode %s.', $cabang, $kelas, $kode));
     }
 }

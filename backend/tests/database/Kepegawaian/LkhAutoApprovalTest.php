@@ -8,6 +8,7 @@ use App\Libraries\Kepegawaian\Lkh\AutoApproval\AutoApprovalService;
 use App\Libraries\Kepegawaian\Lkh\AutoApproval\AutoApprovalSibuk;
 use App\Libraries\Kepegawaian\Lkh\AutoApproval\PenyetujuLkh;
 use App\Libraries\Kepegawaian\Lkh\LkhService;
+use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 use RuntimeException;
 use Tests\Support\DatabaseTestCase;
@@ -92,8 +93,70 @@ final class LkhAutoApprovalTest extends DatabaseTestCase
 
         $this->layanan()->jalankan('2026-10', false, (int) $akun['id_pengguna']);
 
+        $dokumenSebelum = $this->db->table('document_attachment')->countAllResults();
+
+        $this->layanan()->jalankan('2026-10', false, (int) $akun['id_pengguna']);
+
         $this->assertNull($this->db->table('riwayat_lckh')->where('id_riwayat_lckh', $id)->get()->getRowArray()['file_lckh']);
+        $this->assertSame($dokumenSebelum, $this->db->table('document_attachment')->countAllResults(), 'tidak ada berkas/lampiran baru');
         $this->assertFalse($this->db->tableExists('aa_lkh'));
+    }
+
+    /**
+     * Status diubah pihak lain sesudah dimuat dan sebelum transaksi LKH: cek di dalam transaksi menolak tulis, dihitung
+     * `berubah_saat_proses`, dan tidak menghentikan LKH lain.
+     */
+    public function testBerubahSaatProsesDihitungTanpaMenghentikan(): void
+    {
+        $akun      = $this->siapkanAkunSistem();
+        $ubah      = $this->barisLkh('2026-10-14', LkhService::MENUNGGU);
+        $lainnya   = $this->barisLkh('2026-10-15', LkhService::MENUNGGU);
+        $penyetuju = new class ($this->db, $ubah) extends PenyetujuLkh {
+            public function __construct(private readonly BaseConnection $dbUbah, private readonly int $idUbah)
+            {
+                parent::__construct($dbUbah);
+            }
+
+            public function setujui(int $id, string $awal, string $akhir, int $pelaku): string
+            {
+                if ($id === $this->idUbah) {
+                    // Pihak lain (atasan) menyetujui lebih dulu.
+                    $this->dbUbah->table('riwayat_lckh')->where('id_riwayat_lckh', $id)->update(['status' => LkhService::DISETUJUI]);
+                }
+
+                return parent::setujui($id, $awal, $akhir, $pelaku);
+            }
+        };
+
+        $hasil = (new AutoApprovalService($this->db, $penyetuju))->jalankan('2026-10', false, (int) $akun['id_pengguna']);
+
+        $this->assertSame([2, 1, 1, 0], [$hasil['kandidat'], $hasil['disetujui'], $hasil['berubah_saat_proses'], $hasil['gagal']]);
+        $this->assertSame(['1', '2'], $this->kolomLkh($ubah, ['status', 'auto_approval']), 'tidak ditimpa oleh job');
+        $this->assertSame(['1', '1'], $this->kolomLkh($lainnya, ['status', 'auto_approval']));
+    }
+
+    /**
+     * Setelah run selesai, baik sukses maupun gagal, kunci `GET_LOCK` dilepas sehingga run berikutnya bisa mengambilnya.
+     */
+    public function testKunciDilepasSesudahGalat(): void
+    {
+        $akun = $this->siapkanAkunSistem();
+        $this->barisLkh('2026-10-16', LkhService::MENUNGGU);
+
+        $penyetuju = new class ($this->db) extends PenyetujuLkh {
+            public function setujui(int $id, string $awal, string $akhir, int $pelaku): string
+            {
+                throw new RuntimeException('galat uji');
+            }
+        };
+
+        $hasil = (new AutoApprovalService($this->db, $penyetuju))->jalankan('2026-10', false, (int) $akun['id_pengguna']);
+        $this->assertSame(1, $hasil['gagal']);
+
+        $kunci = AutoApprovalService::namaKunci($this->db);
+        $bebas = $this->db->query('SELECT IS_FREE_LOCK(?) AS bebas', [$kunci])->getRowArray();
+
+        $this->assertSame('1', (string) $bebas['bebas'], 'kunci harus dilepas sesudah galat');
     }
 
     public function testStatusRevisiTidakDiproses(): void
