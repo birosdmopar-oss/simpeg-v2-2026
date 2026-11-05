@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Config;
 
 use App\Filters\JwtAuthFilter;
+use App\Filters\KlienLayananFilter;
 use App\Filters\RoleFilter;
+use App\Filters\SimapiTokenFilter;
 use App\Filters\ThrottlePublikFilter;
 use CodeIgniter\Config\Filters as BaseFilters;
 use CodeIgniter\Filters\Cors;
@@ -44,6 +46,9 @@ class Filters extends BaseFilters
         'role' => RoleFilter::class,
         // Fase 5A (MAKE-031): rate limit endpoint publik verifikasi QR slip (30/60 detik/IP, PRD 5A §6.7).
         'throttle' => ThrottlePublikFilter::class,
+        // Fase 6 Jalur A (MAKE-058, ADR-036): auth antar-sistem — 'klienLayanan:<hak>' (HTTP Basic) dan 'simapiToken' (token SIMAPI).
+        'klienLayanan' => KlienLayananFilter::class,
+        'simapiToken'  => SimapiTokenFilter::class,
     ];
 
     /**

@@ -348,6 +348,71 @@ Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint 
 
 **Pemantauan.** Kode keluar ≠ 0 berarti ada kegagalan (`1` = galat/kunci sibuk/akun sistem belum siap/ada pegawai gagal, `7` = opsi salah). Pantau dengan pembungkus yang mengirim peringatan bila keluar ≠ 0 (mis. `|| echo "layanan:status-harian gagal" | mail ...` atau pemantau cron yang ada) dan lihat baris `ERROR` di `writable/logs` (cabang, kelas, kode; tanpa NIP/nama). Baris INFO "celah TB" = hari ini jatuh di celah antara akhir TB (atau perpanjangan) dan perpanjangan berikutnya; "segmen riwayat tidak sah" = riwayat TB/CLTN bertanggal rusak yang dilewati (perlu ditinjau Biro SDM).
 
+### 1g. Auto-approval LKH tanggal 5 (H-12, MAKE-068, PRD Fase 6 §6.4, §7.10, F6-25)
+
+Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint HTTP cron). Jam mengikuti zona waktu
+server: pastikan server berzona WIB (Asia/Jakarta) atau geser jamnya. Kode keluar ≠ 0 berarti ada yang gagal. Keluaran
+hanya jumlah, tanpa NIP/nama.
+
+| Command | Jadwal (WIB) | Task |
+|---|---|---|
+| `lkh:auto-approval` | tanggal 5 pukul 00:30, ulang 01:00 / 01:30 / 02:00 | H-12 (MAKE-068) |
+
+```bash
+# /etc/cron.d/simpeg-v2-lkh-auto-approval
+30 0 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+0 1 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+30 1 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+0 2 5 * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-lkh-auto-approval.lock php spark lkh:auto-approval >> /var/www/simpeg-v2/logs/lkh-auto-approval.log 2>&1
+```
+
+`lkh:auto-approval` (H-12):
+
+1. Prasyarat: `php spark integrasi:siapkan-akun-sistem` sudah dijalankan sesudah impor `pengguna` (pelaku = akun sistem; belum
+   siap → kode keluar 1 tanpa menulis). `--dry-run` tidak butuh akun.
+2. Hanya LKH bulan lalu berstatus 0 (menunggu atasan) yang disetujui: `status=1`, `auto_approval=1`. Status 3 (revisi) tidak
+   diproses. PDF tidak dibuat atau disimpan oleh job; PDF LKH Disetujui dibuat saat diminta (CR-093).
+3. Run nyata hanya untuk bulan lalu. `--bulan=YYYY-MM` dan `--dry-run` dipakai untuk pemeriksaan: `--dry-run` boleh bulan
+   lampau lain, bulan berjalan/masa depan ditolak. Jalankan `--dry-run` dahulu di lingkungan baru dan periksa jumlahnya.
+4. Aman diulang: run kedua tidak menyetujui apa pun dan tidak menambah audit. Ulangan 01:00–02:00 hanya menutup LKH yang
+   terlewat atau gagal sebelumnya.
+
+### 1h. Auth antar-sistem — klien layanan dan token SIMAPI (MAKE-058, ADR-036) — bagian Jalur A
+
+Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) wajib auth; klien dibuat operator, bukan diimpor (F6-08).
+
+1. **Header `Authorization` harus sampai ke PHP.** Nginx: pada blok `location ~ \.php$` tambahkan `fastcgi_param HTTP_AUTHORIZATION $http_authorization;`
+   (Apache: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1`). Tanpa ini semua klien Basic ditolak "Authentication failed". Uji:
+   panggil endpoint dengan kredensial sah dari alamat yang diizinkan dan pastikan bukan 401.
+2. **Buat klien** (rahasia tampil SEKALI; kirim lewat kanal aman di luar repo, jangan ditempel di tiket/chat):
+   ```bash
+   php spark integrasi:klien buat --nama="<sistem>" --username=<huruf-kecil> --jenis=<1|2|3> --hak=<simapi|stat|dm|esign|sinkron,…> [--ip=<ip/cidr,…>]
+   ```
+   Jenis 1/2 (SIMAPI) wajib berhak `simapi`; jenis 3 (layanan) tidak boleh. Tanpa `--ip` = semua IP; isi `--ip` dengan IP/CIDR keluar klien bila
+   diketahui (kosong ditolak). Lainnya: `rotasi <username>` (rahasia baru, token dicabut), `nonaktif|aktifkan|hapus <username>`, `daftar`.
+3. **Re-handshake klien** (cutover): beri tiap klien username + rahasia baru dan alamat endpoint baru; kredensial lama tidak berlaku.
+4. **Pembersihan token kedaluwarsa** (mingguan, idempoten; `--dry-run` untuk menghitung):
+   ```bash
+   # /etc/cron.d/simpeg-v2-bersihkan-token
+   15 4 * * 0 deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-bersihkan-token.lock php spark integrasi:klien bersihkan-token >> /var/www/simpeg-v2/logs/bersihkan-token.log 2>&1
+   ```
+   Retensi bawaan 7 hari sejak kedaluwarsa (`Config\KlienLayanan::$tokenRetensiHari`). Jam mengikuti zona waktu server (lihat §1f).
+5. **IP klien di belakang proxy/load balancer (wajib dicek sebelum go-live).** Allowlist dan bucket kegagalan memakai `getIPAddress()` CI4. Bila server
+   di belakang proxy, `REMOTE_ADDR` = IP proxy: allowlist membandingkan IP proxy dan semua klien berbagi satu bucket (satu penyerang anonim dapat
+   mengunci semua klien). Cek topologi dulu. Bila ada proxy/LB, buat `REMOTE_ADDR` = IP asli klien di **Nginx** (modul `real_ip`), TANPA
+   konfigurasi aplikasi (`$proxyIPs` di `Config/App.php` tidak dapat diisi lewat `.env`):
+   ```nginx
+   set_real_ip_from <CIDR proxy/LB tepercaya>;
+   real_ip_header X-Forwarded-For;
+   real_ip_recursive on;
+   ```
+   Hanya CIDR proxy tepercaya yang boleh di `set_real_ip_from` (header dari sumber lain diabaikan, jadi klien tidak dapat memalsukan IP).
+   Uji pasca-deploy (wajib): (a) klien dengan allowlist yang HANYA berisi IP proxy/LB harus DITOLAK; (b) klien dengan allowlist berisi IP asli
+   klien harus DITERIMA; (c) 6 percobaan gagal dari satu IP uji tidak boleh mengunci klien lain.
+6. **Pemantauan.** Kegagalan auth tercatat di `integrasi_log` (arah masuk; kode `tidak_sah`, `tidak_aktif`, `ip_ditolak`, `hak_kurang`,
+   `token_tidak_sah`, `throttle_*`; tanpa username/rahasia/IP). Lonjakan `tidak_sah` dari satu klien = rahasia salah/dirotasi; `ip_ditolak` =
+   IP keluar klien berubah.
+
 ---
 
 ## 2. Cara push (operator deploy)

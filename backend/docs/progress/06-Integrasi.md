@@ -16,7 +16,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-09 | A | (pemetaan) | Belum mulai |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
 | H-11 | A | MAKE-062 | A2a selesai (versi lokal), menunggu review |
-| H-12 | A | MAKE-062 | Belum mulai |
+| H-12 | A | MAKE-068 | Kode di branch `fase6/a-lokal/make-068-lkh-auto-approval`, belum merge |
 | Fondasi | A / B | MAKE-058 / MAKE-063 | B: MAKE-063 di main `74039dc7`; A: diisi Jalur A |
 
 ## Bagian A — API masuk & job terjadwal
@@ -49,6 +49,34 @@ Keputusan implementasi (reviewer CR 04-11-2026):
 `status = 1`; hanya bila berbeda dan nama tidak kosong; akun sistem dan soft-delete dikecualikan; dipotong 150 karakter (INFO);
 transaksi kecil per akun + `audit_logs` (`jenis_audit` `pengguna.sinkron_nama`, pelaku akun sistem); `GET_LOCK`. Jadwal harian 01:00
 WIB masih USULAN (PN-5).
+
+### A2b — MAKE-068 auto-approval LKH (H-12, F6-25)
+
+- Command `lkh:auto-approval [--bulan=YYYY-MM] [--dry-run]` (`App\Commands\LkhAutoApproval`), jadwal runbook `README-deploy.md` §1g.
+- Lapisan: `Libraries/Kepegawaian/Lkh/AutoApproval/` — `PenentuAutoApproval` (murni: bulan lalu, rentang, penolakan bulan),
+  `AutoApprovalService` (kunci `GET_LOCK` tunggu 0, transaksi per LKH, hitungan), `PenyetujuLkh` (kunci baris `FOR UPDATE`,
+  cek status 0 dan bulan, ubah lewat `LkhModel` beraudit).
+- Keputusan CR-093: PDF tidak dibangkitkan atau disimpan job; catatan = kolom `riwayat_lckh.auto_approval` + `audit_logs`, tanpa
+  tabel `aa_lkh`. `LkhModel::allowedFields` menambah `auto_approval` (tanpa migrasi).
+- Ikut legacy: pegawai tidak aktif dan atasan tidak difilter; job tidak mengirim push (`show_notif` tidak diubah).
+- Test: `tests/unit/Kepegawaian/Lkh/AutoApproval/PenentuAutoApprovalTest.php`, `tests/database/Kepegawaian/LkhAutoApprovalTest.php`
+  (AC-12.1, AC-12.2, AC-12.3; status revisi; dry-run; galat sebagian; kunci sibuk; pelaku wajib).
+
+### A3 — MAKE-058 auth antar-sistem + ADR-036 (versi lokal)
+
+Filter `klienLayanan:<hak>` (Basic) dan `simapiToken`, `Libraries/Integrasi/Klien/*`, `Config\KlienLayanan`, service `klienSaatIni`,
+command `integrasi:klien buat|rotasi|nonaktif|aktifkan|hapus|daftar|bersihkan-token`. ADR-036; runbook `README-deploy.md` §1h.
+
+Keputusan implementasi:
+- Syarat DBV-026 §13.2 "A4" (pencarian PK `token_hash`, panjang dibatasi sebelum hash, `status = 1 AND expired_at > UTC_TIMESTAMP()`,
+  klien status 1) dipenuhi di MAKE-058 karena filter token termasuk fondasi Jalur A (6_2.md §A3); A4 (MAKE-059) hanya memakainya.
+  Konfirmasi reviewer CR 05-11-2026; dokumen DBV tidak diubah.
+- A1 (cabut token saat nonaktif/hapus) dan A2 (pembersihan berkala) dan A3 (validasi allowlist/hak) DBV-026 §13.2 dipenuhi dan diuji.
+- `rotasi` ikut mencabut semua token klien (rahasia lama dianggap bocor) — keputusan MAKE-058, bukan syarat DBV.
+- Hanya kegagalan auth yang ditulis ke `integrasi_log` (arah masuk, `id_klien`); keberhasilan tidak, karena volume SIMAPI tinggi.
+- Throttle: bucket kegagalan per IP (sukses tidak menghabiskannya) dan per klien; log penolakan maks sekali per kunci per jendela; ambang di `Config\KlienLayanan` (120/IP, 600/klien per 60 detik) — usulan
+  awal, disetel setelah ada data trafik klien nyata.
+- Tidak ada perubahan kontrak: amplop gagal SIMAPI HTTP 200 `{"status":"02"}`, `services/*` HTTP 401 `{"status":2}` (PRD §6.3).
 
 ## Bagian B — Klien integrasi keluar
 

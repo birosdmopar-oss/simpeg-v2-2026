@@ -539,6 +539,18 @@ class Services extends BaseService
     }
 
     /**
+     * Identitas klien layanan yang lolos filter `klienLayanan`/`simapiToken` pada request berjalan (MAKE-058, ADR-036).
+     */
+    public static function klienSaatIni(bool $getShared = true): \App\Libraries\Integrasi\Klien\KlienSaatIni
+    {
+        if ($getShared) {
+            return static::getSharedInstance('klienSaatIni');
+        }
+
+        return new \App\Libraries\Integrasi\Klien\KlienSaatIni();
+    }
+
+    /**
      * Klien HTTP keluar bersama Fase 6 (BP-3/BP-5, MAKE-063): transport cURL + log integrasi + redaksi.
      */
     public static function klienHttp(bool $getShared = true): \App\Libraries\Integrasi\Http\KlienHttp

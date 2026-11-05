@@ -1,0 +1,304 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Database\Integrasi;
+
+use App\Filters\KlienLayananFilter;
+use App\Libraries\Integrasi\Klien\PembangkitKredensial;
+use App\Libraries\Integrasi\Klien\PenyimpanKlien;
+use App\Libraries\Integrasi\Klien\TokenSimapi;
+use App\Libraries\Integrasi\Log\CatatanIntegrasi;
+use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\Mock\MockCache;
+use CodeIgniter\Throttle\Throttler;
+use Config\KlienLayanan;
+use Config\Services;
+use LogicException;
+use Tests\Support\DatabaseTestCase;
+use Tests\Support\Integrasi\LogIntegrasiTiruan;
+
+/**
+ * MAKE-058 (A3) — filter `klienLayanan:<hak>` dan `simapiToken` lewat pipeline route sungguhan (FeatureTestTrait):
+ * AC-F.1..F.5 pada lapisan HTTP — amplop gagal per grup (SIMAPI 200 "02" / services 401 int 2), pesan seragam untuk semua
+ * alasan, log akses masuk tanpa rahasia/IP, throttle 429, dan identitas klien tersedia di `klienSaatIni`.
+ *
+ * @internal
+ */
+final class FilterAuthKlienTest extends DatabaseTestCase
+{
+    use FeatureTestTrait;
+
+    private const IP = '203.0.113.9';
+
+    private LogIntegrasiTiruan $log;
+
+    private string $rahasia = '';
+
+    private int $idKlien = 0;
+
+    private int $ipAsli = 0;
+
+    private int $klienAsli = 0;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $cfg             = config(KlienLayanan::class);
+        $this->ipAsli    = $cfg->throttleIpKapasitas;
+        $this->klienAsli = $cfg->throttleKlienKapasitas;
+        Services::injectMock('cache', new MockCache());
+        $this->log = new LogIntegrasiTiruan();
+        Services::injectMock('integrasiLog', $this->log);
+        $throttler = new Throttler(new MockCache());
+        $throttler->setTestTime(1_790_000_000);
+        Services::injectMock('throttler', $throttler);
+        Services::superglobals()->setServer('REMOTE_ADDR', self::IP);
+
+        $this->withRoutes([
+            ['get', '__uji/stat', static fn () => service('response')->setJSON(['id' => service('klienSaatIni')->id(), 'jenis' => service('klienSaatIni')->jenis(), 'sidik' => service('klienSaatIni')->sidikRahasia()]), ['filter' => 'klienLayanan:stat']],
+            ['get', '__uji/simapi-auth', static fn () => service('response')->setJSON(['id' => service('klienSaatIni')->id()]), ['filter' => 'klienLayanan:simapi']],
+            ['get', '__uji/simapi-data', static fn () => service('response')->setJSON(['status' => '01', 'id' => service('klienSaatIni')->id()]), ['filter' => 'simapiToken']],
+        ]);
+    }
+
+    protected function tearDown(): void
+    {
+        $cfg                         = config(KlienLayanan::class);
+        $cfg->throttleIpKapasitas    = $this->ipAsli;
+        $cfg->throttleKlienKapasitas = $this->klienAsli;
+        Services::resetSingle('cache');
+        Services::resetSingle('integrasiLog');
+        Services::resetSingle('throttler');
+        Services::resetSingle('klienSaatIni');
+        Services::superglobals()->setServer('REMOTE_ADDR', '127.0.0.1');
+        parent::tearDown();
+    }
+
+    /**
+     * @param list<string> $hak
+     */
+    private function klien(string $username, int $jenis, array $hak, ?string $ip = null): void
+    {
+        $r             = (new PenyimpanKlien($this->db))->buat('Sistem Uji', $username, $jenis, $hak, $ip);
+        $this->rahasia = $r['rahasia'];
+        $this->idKlien = $r['id'];
+    }
+
+    private function basic(string $username, string $rahasia): string
+    {
+        return 'Basic ' . base64_encode($username . ':' . $rahasia);
+    }
+
+    public function testServicesBerhasilMembawaIdentitasKlien(): void
+    {
+        $this->klien('mudig', 3, ['stat']);
+
+        $res = $this->withHeaders(['Authorization' => $this->basic('mudig', $this->rahasia)])->call('get', '__uji/stat');
+
+        $res->assertStatus(200);
+        $badan = json_decode($res->getJSON(), true);
+        $this->assertSame([$this->idKlien, 3], [$badan['id'], $badan['jenis']]);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{16}$/', (string) $badan['sidik'], 'sidik rahasia dibawa ke KlienSaatIni untuk terbitkan()');
+        $this->assertSame([], $this->log->isi, 'sukses tidak ditulis ke log (hanya kegagalan)');
+    }
+
+    public function testServicesGagalSeragam401DenganAmplopInt(): void
+    {
+        $this->klien('mudig', 3, ['stat']);
+        $kasus = [
+            ['', []],
+            ['Bearer abc', []],
+            ['Basic !!!', []],
+            ['Basic ' . base64_encode('mudig'), []],
+            [$this->basic('mudig', 'salah'), []],
+            [$this->basic('tidak-ada', $this->rahasia), []],
+            ['Basic ' . str_repeat('A', 600), []],
+        ];
+
+        foreach ($kasus as [$header]) {
+            $res = $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat');
+
+            $res->assertStatus(401);
+            $this->assertSame(['status' => 2, 'msg' => 'Authentication failed', 'data' => []], json_decode($res->getJSON(), true));
+            $this->assertStringContainsString('Basic', $res->response()->getHeaderLine('WWW-Authenticate'));
+        }
+    }
+
+    public function testSimapiGagalHttp200DenganStatus02(): void
+    {
+        $this->klien('simanta', 2, ['simapi']);
+
+        $res = $this->withHeaders(['Authorization' => $this->basic('simanta', 'salah')])->call('get', '__uji/simapi-auth');
+
+        $res->assertStatus(200);
+        $this->assertSame(['status' => '02', 'msg' => 'Authentication failed', 'data' => []], json_decode($res->getJSON(), true));
+    }
+
+    public function testKlienTanpaHakIpDitolakDanNonaktifDitolak(): void
+    {
+        $this->klien('mudig', 3, ['stat'], '198.51.100.0/24');
+        $res = $this->withHeaders(['Authorization' => $this->basic('mudig', $this->rahasia)])->call('get', '__uji/stat');
+        $res->assertStatus(401);
+
+        $this->klien('dm-saja', 3, ['dm']);
+        $res = $this->withHeaders(['Authorization' => $this->basic('dm-saja', $this->rahasia)])->call('get', '__uji/stat');
+        $res->assertStatus(401);
+
+        $this->klien('stat-ok', 3, ['stat']);
+        $header = $this->basic('stat-ok', $this->rahasia);
+        $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(200);
+
+        (new PenyimpanKlien($this->db))->ubahStatus('stat-ok', PenyimpanKlien::STATUS_NONAKTIF);
+        $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(401);
+    }
+
+    public function testLogAksesMasukTanpaRahasiaUsernameAtauIp(): void
+    {
+        $this->klien('mudig', 3, ['stat']);
+        $this->withHeaders(['Authorization' => $this->basic('mudig', 'rahasia-salah-xyz')])->call('get', '__uji/stat');
+        $this->withHeaders(['Authorization' => $this->basic('tidak-ada', 'x')])->call('get', '__uji/stat');
+
+        $this->assertCount(2, $this->log->isi);
+        [$satu, $dua] = $this->log->isi;
+        $this->assertSame([CatatanIntegrasi::ARAH_MASUK, 'services', 'auth_klien', CatatanIntegrasi::GAGAL, 401, 'tidak_sah'], [$satu->arah, $satu->layanan, $satu->operasi, $satu->status, $satu->httpStatus, $satu->kode]);
+        $this->assertSame($this->idKlien, $satu->idKlien, 'username dikenal → id klien tercatat');
+        $this->assertNull($dua->idKlien, 'username tak dikenal → tanpa id');
+
+        $semua = $this->log->semuaTeks();
+        foreach (['rahasia-salah-xyz', 'mudig', self::IP, $this->rahasia] as $terlarang) {
+            $this->assertStringNotContainsString($terlarang, $semua, "log memuat {$terlarang}");
+        }
+    }
+
+    public function testTokenSimapiMelewatkanKlienDanMenolakSisanya(): void
+    {
+        $this->klien('simanta', 2, ['simapi']);
+        $token = $this->terbit($this->idKlien)['token'];
+
+        $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data');
+        $res->assertStatus(200);
+        $this->assertSame(['status' => '01', 'id' => $this->idKlien], json_decode($res->getJSON(), true));
+
+        foreach (['', 'Bearer', 'Bearer salah', 'Bearer ' . strtoupper($token), 'Bearer ' . $token . 'x'] as $header) {
+            $res = $this->withHeaders(['Authorization' => $header])->call('get', '__uji/simapi-data');
+            $res->assertStatus(200);
+            $this->assertSame(['status' => '02', 'msg' => 'Token is not valid', 'data' => []], json_decode($res->getJSON(), true), "header [{$header}]");
+        }
+
+        $this->assertStringNotContainsString($token, $this->log->semuaTeks());
+    }
+
+    public function testTokenKedaluwarsaDanDicabutMengembalikanTokenNotValid(): void
+    {
+        $this->klien('simanta', 2, ['simapi']);
+        $token = $this->terbit($this->idKlien)['token'];
+        $this->db->table('simapi_token')->update(['expired_at' => gmdate('Y-m-d H:i:s', time() - 5)]);
+
+        $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data');
+        $this->assertSame('Token is not valid', json_decode($res->getJSON(), true)['msg'], 'AC-F.5 kedaluwarsa');
+
+        $this->db->table('simapi_token')->update(['expired_at' => gmdate('Y-m-d H:i:s', time() + 600)]);
+        $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data')->assertStatus(200);
+
+        (new PenyimpanKlien($this->db))->ubahStatus('simanta', PenyimpanKlien::STATUS_NONAKTIF);
+        $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data');
+        $this->assertSame('Token is not valid', json_decode($res->getJSON(), true)['msg'], 'AC-F.5 klien nonaktif / token dicabut');
+    }
+
+    public function testThrottlePerKlien429DenganLogMaksimalSekaliPerJendela(): void
+    {
+        config(KlienLayanan::class)->throttleKlienKapasitas = 2;
+        $this->klien('mudig', 3, ['stat']);
+        $header = $this->basic('mudig', $this->rahasia);
+
+        $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(200);
+        $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(200);
+
+        for ($i = 0; $i < 25; $i++) {
+            $res = $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat');
+            $res->assertStatus(429);
+            $this->assertSame('Too many requests', json_decode($res->getJSON(), true)['msg']);
+            $this->assertGreaterThanOrEqual(1, (int) $res->response()->getHeaderLine('Retry-After'));
+        }
+
+        $baris = array_values(array_filter($this->log->isi, static fn (CatatanIntegrasi $c): bool => $c->kode === 'throttle_klien'));
+        $this->assertCount(1, $baris, 'B-1: 25 permintaan ter-throttle → paling banyak 1 baris log per jendela');
+        $this->assertSame([429, $this->idKlien], [$baris[0]->httpStatus, $baris[0]->idKlien]);
+    }
+
+    public function testBucketIpHanyMenghitungKegagalanDanPenuhDitolakSebelumVerifikasi(): void
+    {
+        $cfg                         = config(KlienLayanan::class);
+        $cfg->throttleIpKapasitas    = 3;
+        $cfg->throttleKlienKapasitas = 1000;
+        $this->klien('mudig', 3, ['stat']);
+        $header = $this->basic('mudig', $this->rahasia);
+
+        // P-2: permintaan SUKSES tidak menghabiskan bucket IP (kapasitas 3, 12 sukses).
+        for ($i = 0; $i < 12; $i++) {
+            $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(200);
+        }
+
+        // Tiga kegagalan mengisi bucket; sesudahnya bahkan kredensial benar ditolak 429 (tanpa password_verify).
+        for ($i = 0; $i < 3; $i++) {
+            $this->withHeaders(['Authorization' => $this->basic('mudig', 'salah')])->call('get', '__uji/stat')->assertStatus(401);
+        }
+
+        for ($i = 0; $i < 30; $i++) {
+            $this->withHeaders(['Authorization' => $header])->call('get', '__uji/stat')->assertStatus(429);
+        }
+
+        $baris = array_values(array_filter($this->log->isi, static fn (CatatanIntegrasi $c): bool => $c->kode === 'throttle_ip'));
+        $this->assertCount(1, $baris, 'B-1: 30 permintaan ter-throttle IP → 1 baris log');
+        $this->assertSame([429, null], [$baris[0]->httpStatus, $baris[0]->idKlien]);
+        $this->assertStringNotContainsString(self::IP, $this->log->semuaTeks());
+    }
+
+    public function testBucketIpTokenSimapiDanLogSekali(): void
+    {
+        $cfg                      = config(KlienLayanan::class);
+        $cfg->throttleIpKapasitas = 2;
+        $this->klien('simanta', 2, ['simapi']);
+        $token = $this->terbit($this->idKlien)['token'];
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data')->assertStatus(200);
+        }
+
+        $this->withHeaders(['Authorization' => 'Bearer salah'])->call('get', '__uji/simapi-data')->assertStatus(200);
+        $this->withHeaders(['Authorization' => 'Bearer salah'])->call('get', '__uji/simapi-data')->assertStatus(200);
+
+        for ($i = 0; $i < 15; $i++) {
+            $this->withHeaders(['Authorization' => 'Bearer ' . $token])->call('get', '__uji/simapi-data')->assertStatus(429);
+        }
+
+        $baris = array_values(array_filter($this->log->isi, static fn (CatatanIntegrasi $c): bool => $c->kode === 'throttle_ip'));
+        $this->assertCount(1, $baris);
+        $this->assertSame(429, $baris[0]->httpStatus);
+    }
+
+    public function testFilterKlienLayananMenolakArgumenSalah(): void
+    {
+        foreach ([[], null, ['stat', 'dm'], ['admin'], ['']] as $argumen) {
+            try {
+                (new KlienLayananFilter())->before(Services::request(), $argumen);
+                $this->fail('argumen filter salah harus melempar LogicException');
+            } catch (LogicException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    /**
+     * Terbitkan token untuk klien dengan sidik rahasia saat ini (seperti filter Basic lalu handshake).
+     *
+     * @return array{token: string, expired_at: string}
+     */
+    private function terbit(int $id): array
+    {
+        $baris = $this->db->table('klien_layanan')->select('rahasia_hash')->where('id_klien', $id)->get()->getRowArray();
+
+        return (new TokenSimapi($this->db))->terbitkan($id, PembangkitKredensial::sidik((string) ($baris['rahasia_hash'] ?? '')));
+    }
+}
