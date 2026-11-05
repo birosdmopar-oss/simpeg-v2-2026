@@ -15,6 +15,7 @@ use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\Mock\MockCache;
 use CodeIgniter\Test\TestResponse;
 use CodeIgniter\Throttle\Throttler;
+use Config\EsignMudig;
 use Config\Services;
 use Tests\Support\Database\Seeds\MasterDataSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -72,6 +73,12 @@ final class SEsignMudigTest extends DatabaseTestCase
         );
         Services::injectMock('esignGatewayNikLangsung', $bsre);
 
+        // Route sementara di test sampai kerangka `Config/RoutesServices.php` (Jalur A) di main; sesudahnya route sungguhan.
+        $this->withRoutes([
+            ['get', 'services/s_esign/check_user', '\\App\\Controllers\\Services\\SEsignController::checkUser', ['filter' => 'klienLayanan:esign']],
+            ['post', 'services/s_esign/sign_pdf', '\\App\\Controllers\\Services\\SEsignController::signPdf', ['filter' => 'klienLayanan:esign']],
+        ]);
+
         $this->klien('mudig', ['esign']);
         $this->buatPegawai(['nip' => self::NIP, 'id_jenis_pegawai' => 1]);
     }
@@ -102,8 +109,8 @@ final class SEsignMudigTest extends DatabaseTestCase
         $tidak = $this->badan($this->cekPengguna(self::NIK));
 
         // [K] `msg` legacy selalu null (S_esign.php:41 membaca kunci `message` yang tidak ada).
-        $this->assertSame(['status' => 1, 'msg' => null, 'data' => []], $ok);
-        $this->assertSame(['status' => 2, 'msg' => null, 'data' => []], $tidak);
+        $this->assertSame(['status' => '1', 'msg' => null, 'data' => []], $ok, 'status STRING ikut S_esign.php');
+        $this->assertSame(['status' => '2', 'msg' => null, 'data' => []], $tidak);
         $this->assertSame('https://bsre.contoh/api/user/status/' . self::NIK, $this->transport->tercatat()[0]['permintaan']->url, 'NIK langsung, bukan dari pegawai.nik');
         $this->assertTidakBocor((string) json_encode([$ok, $tidak]));
     }
@@ -113,7 +120,7 @@ final class SEsignMudigTest extends DatabaseTestCase
         $res = $this->withHeaders(['Authorization' => $this->basic])->call('get', 'services/s_esign/check_user');
 
         $res->assertStatus(200);
-        $this->assertSame(['status' => 2, 'msg' => 'Invalid parameter.', 'data' => []], $this->badan($res));
+        $this->assertSame(['status' => '2', 'msg' => 'Invalid parameter.', 'data' => []], $this->badan($res));
         $this->assertSame([], $this->transport->tercatat());
     }
 
@@ -140,7 +147,7 @@ final class SEsignMudigTest extends DatabaseTestCase
         $res->assertStatus(200);
         $this->assertStringContainsString('no-store', $res->response()->getHeaderLine('Cache-Control'));
         $badan = $this->badan($res);
-        $this->assertSame([1, 'Berhasil menandatangani dokumen secara digital.'], [$badan['status'], $badan['msg']]);
+        $this->assertSame(['1', 'Berhasil menandatangani dokumen secara digital.'], [$badan['status'], $badan['msg']]);
         $this->assertSame(self::PDF_TTE, base64_decode($badan['data']['signed_file'], true));
 
         $p = $this->transport->tercatat()[0]['permintaan'];
@@ -162,41 +169,59 @@ final class SEsignMudigTest extends DatabaseTestCase
         $this->transport->antreJson(400, ['status_code' => '2031', 'error' => 'Passphrase ' . self::PASS . ' salah untuk nik ' . self::NIK])
             ->antre(new GalatTransport('Operation timed out', true));
 
-        $gagal   = $this->badan($this->tandaTangani($this->param(['nip' => '199912312099121999', 'file_pdf_to_sign' => ''])));
+        // Tanpa nama_lengkap/modul tetap diproses (legacy lolos, U3): NIP tak dikenal → nama '' dan modul bawaan 'MuDig'.
+        $gagal   = $this->badan($this->tandaTangani($this->param(['nip' => '199912312099121999', 'file_pdf_to_sign' => '', 'nama_lengkap' => '', 'modul' => ''])));
         $timeout = $this->badan($this->tandaTangani($this->param()));
 
-        $this->assertSame(2, $gagal['status']);
+        $this->assertSame('2', $gagal['status']);
         $this->assertSame([], $gagal['data']);
-        $this->assertSame(2, $timeout['status']);
+        $this->assertSame('2', $timeout['status']);
         $this->assertCount(2, $this->transport->tercatat(), 'POST tidak di-retry (BP-3)');
 
         $hist = $this->db->table('esign_hist')->orderBy('id_esign_hist')->get()->getResultArray();
-        $this->assertSame([[null, '2', '2031', 'surat.pdf'], [self::NIP, '2', 'timeout', 'arsip/surat-uji.pdf']], array_map(static fn (array $h): array => [$h['nip'], $h['status'], $h['status_code'], $h['file_pdf_to_sign']], $hist));
+        $this->assertSame([[null, '2', '2031', 'surat.pdf', '', 'MuDig'], [self::NIP, '2', 'timeout', 'arsip/surat-uji.pdf', 'Pejabat Uji', 'Mudig Uji']], array_map(static fn (array $h): array => [$h['nip'], $h['status'], $h['status_code'], $h['file_pdf_to_sign'], $h['nama_lengkap'], $h['modul']], $hist));
         $this->assertSame($gagal['msg'], $hist[0]['keterangan']);
+
+        // NIP dikenal + nama_lengkap kosong → nama bergelar dari pegawai.
+        $this->db->table('pegawai')->where('nip', self::NIP)->update(['glr_awal' => 'Dr.', 'nama' => 'Pegawai Uji', 'glr_akhir' => 'M.Si.']);
+        $this->transport->antreJson(400, ['status_code' => '2031', 'error' => 'gagal']);
+        $this->tandaTangani($this->param(['nama_lengkap' => '']));
+        $this->assertSame('Dr. Pegawai Uji, M.Si.', $this->db->table('esign_hist')->orderBy('id_esign_hist', 'DESC')->get(1)->getRow()->nama_lengkap);
         $this->assertTidakBocor((string) json_encode([$gagal, $timeout]) . $hist[0]['keterangan'] . $hist[1]['keterangan']);
     }
 
     public function testParameterTidakLengkapAtauBerkasTidakSahInvalidParameterTanpaGatewayDanTanpaHist(): void
     {
         $kasus = [
-            'tanpa nama_lengkap' => [$this->param(['nama_lengkap' => '']), true, true],
-            'tanpa modul'        => [$this->param(['modul' => ' ']), true, true],
-            'modul > 50'         => [$this->param(['modul' => str_repeat('m', 51)]), true, true],
-            'tanpa passphrase'   => [$this->param(['passphrase' => '']), true, true],
-            'tanpa nik'          => [$this->param(['nik' => '']), true, true],
-            'tanpa file'         => [$this->param(), false, true],
-            'tanpa imageTTD'     => [$this->param(), true, false],
+            'tanpa passphrase' => [$this->param(['passphrase' => '']), true, true],
+            'tanpa nik'        => [$this->param(['nik' => '']), true, true],
+            'tanpa file'       => [$this->param(), false, true],
+            'tanpa imageTTD'   => [$this->param(), true, false],
         ];
 
         foreach ($kasus as $nama => [$param, $pdf, $gambar]) {
             $badan = $this->badan($this->tandaTangani($param, $pdf ? self::PDF : null, $gambar ? $this->png() : null));
-            $this->assertSame(['status' => 2, 'msg' => LayananEsignMudig::PESAN_PARAMETER, 'data' => []], $badan, $nama);
+            $this->assertSame(['status' => '2', 'msg' => LayananEsignMudig::PESAN_PARAMETER, 'data' => []], $badan, $nama);
         }
 
         $bukanPdf = $this->badan($this->tandaTangani($this->param(), 'bukan pdf', $this->png()));
         $this->assertSame('Invalid parameter.', $bukanPdf['msg'], 'file bukan PDF');
         $bukanGambar = $this->badan($this->tandaTangani($this->param(), self::PDF, 'GIF89a bukan png'));
         $this->assertSame('Invalid parameter.', $bukanGambar['msg'], 'imageTTD bukan JPEG/PNG');
+
+        // Batas unggahan dari Config\EsignMudig (U5), bukan hard-code.
+        $cfg   = config(EsignMudig::class);
+        $batas = [$cfg->pdfMaks, $cfg->gambarMaks];
+
+        try {
+            $cfg->pdfMaks = strlen(self::PDF) - 1;
+            $this->assertSame(['2', 'Invalid parameter.'], array_values(array_slice($this->badan($this->tandaTangani($this->param())), 0, 2)), 'PDF lewat batas');
+            $cfg->pdfMaks    = $batas[0];
+            $cfg->gambarMaks = strlen($this->png()) - 1;
+            $this->assertSame(['2', 'Invalid parameter.'], array_values(array_slice($this->badan($this->tandaTangani($this->param())), 0, 2)), 'gambar lewat batas');
+        } finally {
+            [$cfg->pdfMaks, $cfg->gambarMaks] = $batas;
+        }
 
         $this->assertSame([], $this->transport->tercatat());
         $this->assertSame(0, $this->db->table('esign_hist')->countAllResults());

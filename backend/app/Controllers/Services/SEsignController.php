@@ -9,23 +9,21 @@ use App\Libraries\Esign\LayananEsignMudig;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\IncomingRequest;
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\EsignMudig;
 use Throwable;
 
 /**
  * `services/s_esign/{check_user,sign_pdf}` untuk MuDig (H-02, F6-16, MAKE-065 B4b) — filter `klienLayanan:esign` (MAKE-058,
- * ADR-036). Amplop [K] `{"status":1|2,"msg","data"}` HTTP 200 (auth gagal 401 oleh filter). Logika: {@see LayananEsignMudig}.
+ * ADR-036). Amplop [K] `{"status":"1"|"2","msg","data"}` (status STRING ikut `S_esign.php`) HTTP 200; auth gagal 401 oleh
+ * filter. Logika: {@see LayananEsignMudig}.
  *
- * Unggahan [V2]: `file` (PDF, `%PDF` di 1024 byte pertama, maks {@see self::PDF_MAKS}) dan `imageTTD` (JPEG/PNG, maks
- * {@see self::GAMBAR_MAKS}); berkas tidak pernah ditulis ke disk aplikasi.
+ * Unggahan [V2]: `file` (PDF, `%PDF` di 1024 byte pertama) dan `imageTTD` (JPEG/PNG), batas di {@see EsignMudig}; berkas
+ * tidak pernah ditulis ke disk aplikasi.
  *
  * @property IncomingRequest $request
  */
 final class SEsignController extends BaseController
 {
-    public const PDF_MAKS = 10 * 1024 * 1024;
-
-    public const GAMBAR_MAKS = 2 * 1024 * 1024;
-
     public function checkUser(): ResponseInterface
     {
         return $this->jalankan(fn (): array => $this->layanan()->cekPengguna(is_string($n = $this->request->getGet('nik')) ? $n : ''));
@@ -35,8 +33,9 @@ final class SEsignController extends BaseController
     {
         return $this->jalankan(function (): array {
             $post = $this->request->getPost();
-            $pdf  = $this->berkas('file', self::PDF_MAKS, static fn (string $isi): bool => str_contains(substr($isi, 0, 1024), '%PDF'));
-            $ttd  = $this->berkas('imageTTD', self::GAMBAR_MAKS, static fn (string $isi): bool => ($info = @getimagesizefromstring($isi)) !== false && in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true));
+            $cfg  = config(EsignMudig::class);
+            $pdf  = $this->berkas('file', $cfg->pdfMaks, static fn (string $isi): bool => str_contains(substr($isi, 0, 1024), '%PDF'));
+            $ttd  = $this->berkas('imageTTD', $cfg->gambarMaks, static fn (string $isi): bool => ($info = @getimagesizefromstring($isi)) !== false && in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true));
 
             return $this->layanan()->tandaTangani(is_array($post) ? $post : [], $pdf['isi'] ?? null, $pdf['nama'] ?? null, $ttd['isi'] ?? null);
         });
@@ -48,7 +47,7 @@ final class SEsignController extends BaseController
     }
 
     /**
-     * @param callable(): array{status: int, msg: string|null, data: array<string, string>} $kerja
+     * @param callable(): array{status: string, msg: string|null, data: array<string, string>} $kerja
      */
     private function jalankan(callable $kerja): ResponseInterface
     {
@@ -56,7 +55,7 @@ final class SEsignController extends BaseController
             $hasil = $kerja();
         } catch (Throwable $e) {
             log_message('error', '[s_esign] galat {kelas} di {berkas}:{baris}.', ['kelas' => $e::class, 'berkas' => clean_path($e->getFile()), 'baris' => $e->getLine()]);
-            $hasil = ['status' => 2, 'msg' => LayananEsignMudig::PESAN_GALAT, 'data' => []];
+            $hasil = ['status' => '2', 'msg' => LayananEsignMudig::PESAN_GALAT, 'data' => []];
         }
 
         return $this->response->setStatusCode(200)->setHeader('Cache-Control', 'no-store')->setJSON($hasil);
