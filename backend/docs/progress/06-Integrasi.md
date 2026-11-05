@@ -80,15 +80,14 @@ Keputusan implementasi:
 
 ### A4 — MAKE-059 SIMAPI `a_auth`, `a_employee`, `a_dm`, `ambil_riwayat_mutasi`, `services/s_dm` (versi lokal)
 
-Route `Config/RoutesSimapi.php` dan `Config/RoutesServices.php` (berkas bersama dengan A6 `s_stat`), controller `Controllers/Simapi/*`,
-`Controllers/Services/SDmController`, penyaji `Libraries/Integrasi/Simapi/*` dan `Libraries/Integrasi/Layanan/*` (rincian & keputusan:
+Route `Config/RoutesSimapi.php`, controller `Controllers/Simapi/*`, penyaji `Libraries/Integrasi/Simapi/*` dan `Libraries/Integrasi/Layanan/*` (rincian & keputusan:
 `app/Libraries/Integrasi/README.md` bagian "Kompatibilitas legacy"). Fixture kontrak `tests/_support/Integrasi/Simapi/*.json`.
 
 - AC-05.1 (token kedaluwarsa → 02), AC-06.1 (kontrak 25 method: field, urutan, nilai teks), AC-06.2 (tanpa token → 02), AC-07.1
-  (`a_dm/jabatan` butuh token) diuji di `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest,ServicesSDmTest}.php`.
+  (`a_dm/jabatan` butuh token) diuji di `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest}.php`.
 - Syarat DBV-026 §13.2 yang relevan untuk A4: A4 (filter token) dipakai dari MAKE-058; A5 (ack `simapi_auth_ch` tahan balapan) dan A6/A7
   (NIP koreksi, isi `simapi_jd`) milik MAKE-060 (`change_history`), tidak disentuh di A4.
-- `ResponsLayanan` (amplop INT `services/*`) dibuat di A4 dengan nama/kontrak yang disepakati dengan A6; A6 memakainya, bukan membuat kembaran.
+- `services/s_dm`: penyaji `Layanan/PenyajiSDm` siap; controller + sub-group menunggu kerangka `services` (RoutesServices + `ResponsLayanan`, Fable) di main.
 - B-9 ikut legacy (Q6-36); opsi perbaikan v2 hanya dicatat di README modul.
 - Tidak dibuat: `ambil_seluruh_pengguna` (Q6-03 = A), `p_web_config` (F6-10), `change_history` (MAKE-060).
 

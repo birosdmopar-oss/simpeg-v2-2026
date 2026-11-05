@@ -67,14 +67,13 @@ Command: `php spark integrasi:klien buat|rotasi|nonaktif|aktifkan|hapus|daftar|b
 ## Kompatibilitas legacy — SIMAPI dan `services/s_dm` (`Simapi/`, `Layanan/`, MAKE-059)
 
 Endpoint masuk dengan path dan kontrak legacy (PRD Fase 6 §6.1/§6.3, H-05..H-07). Route: `Config/RoutesSimapi.php`
-(`simapi/v1/*`) dan `Config/RoutesServices.php` (berkas BERSAMA `services/*`: satu `group('services')`, sub-group per controller
-dengan filter `klienLayanan:<hak>`). Keduanya di luar `api/v1`, tanpa `jwt`/`cors`. Controller tipis di `Controllers/Simapi/*` dan
-`Controllers/Services/*`; logika di kelas penyaji di bawah ini (query builder, tanpa SQL string).
+(`simapi/v1/*`, di luar `api/v1`, tanpa `jwt`/`cors`); controller tipis `Controllers/Simapi/*`; logika di kelas penyaji di bawah ini
+(query builder, tanpa SQL string). `services/s_dm`: penyaji sudah ada; controller + sub-group `s_dm` di `Config/RoutesServices.php`
+ditambahkan sesudah kerangka `services` (berkas bersama + `ResponsLayanan`, dibuat Fable) ada di main.
 
 | Berkas | Isi |
 |---|---|
 | `Simapi/ResponsSimapi` | amplop SIMAPI HTTP 200 `{"status":"01"|"02","msg","data"}` (status STRING; `data` gagal = `[]` [K]) |
-| `Layanan/ResponsLayanan` | amplop bisnis `services/*` HTTP 200 `{"status":1|2,"msg","data"}` (INT); dipakai bersama `s_dm` dan `s_stat` |
 | `Simapi/Nilai` | bentuk nilai legacy: string/null seperti `row_array()`; field ber-`stripslashes` legacy → "" bila NULL |
 | `Simapi/PenyajiPegawai` | 25 method `a_employee` (`METHOD` = daftar + pesan "Data … tidak tersedia"), port `fixUnitName()` |
 | `Simapi/PenyajiDm` | `a_dm/group_jabatan|sub_group_jabatan|jabatan|struktur_jabatan` |
@@ -82,7 +81,7 @@ dengan filter `klienLayanan:<hak>`). Keduanya di luar `api/v1`, tanpa `jwt`/`cor
 | `Layanan/PenyajiSDm` | `services/s_dm/*` (baris `unit`/`satker` utuh + `unit_str`/`satker_str`) |
 
 Fixture kontrak (sintetis, diturunkan dari kode legacy, rujukan baris di tiap entri): `tests/_support/Integrasi/Simapi/*.json`.
-Test: `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest,ServicesSDmTest}.php`.
+Test: `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest}.php`.
 
 Keputusan dan penyimpangan:
 
