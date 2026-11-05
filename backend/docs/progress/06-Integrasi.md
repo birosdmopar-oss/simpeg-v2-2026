@@ -11,7 +11,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` menunggu MAKE-058 (A3) |
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
-| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | Belum mulai |
+| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di branch `fase6/a-lokal/make-059-simapi`, menunggu review; MAKE-060 belum mulai |
 | H-08 | A | MAKE-061 | Belum mulai |
 | H-09 | A | (pemetaan) | Belum mulai |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
@@ -77,6 +77,20 @@ Keputusan implementasi:
 - Throttle: bucket kegagalan per IP (sukses tidak menghabiskannya) dan per klien; log penolakan maks sekali per kunci per jendela; ambang di `Config\KlienLayanan` (120/IP, 600/klien per 60 detik) — usulan
   awal, disetel setelah ada data trafik klien nyata.
 - Tidak ada perubahan kontrak: amplop gagal SIMAPI HTTP 200 `{"status":"02"}`, `services/*` HTTP 401 `{"status":2}` (PRD §6.3).
+
+### A4 — MAKE-059 SIMAPI `a_auth`, `a_employee`, `a_dm`, `ambil_riwayat_mutasi`, `services/s_dm` (versi lokal)
+
+Route `Config/RoutesSimapi.php` dan `Config/RoutesServices.php` (berkas bersama dengan A6 `s_stat`), controller `Controllers/Simapi/*`,
+`Controllers/Services/SDmController`, penyaji `Libraries/Integrasi/Simapi/*` dan `Libraries/Integrasi/Layanan/*` (rincian & keputusan:
+`app/Libraries/Integrasi/README.md` bagian "Kompatibilitas legacy"). Fixture kontrak `tests/_support/Integrasi/Simapi/*.json`.
+
+- AC-05.1 (token kedaluwarsa → 02), AC-06.1 (kontrak 25 method: field, urutan, nilai teks), AC-06.2 (tanpa token → 02), AC-07.1
+  (`a_dm/jabatan` butuh token) diuji di `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest,ServicesSDmTest}.php`.
+- Syarat DBV-026 §13.2 yang relevan untuk A4: A4 (filter token) dipakai dari MAKE-058; A5 (ack `simapi_auth_ch` tahan balapan) dan A6/A7
+  (NIP koreksi, isi `simapi_jd`) milik MAKE-060 (`change_history`), tidak disentuh di A4.
+- `ResponsLayanan` (amplop INT `services/*`) dibuat di A4 dengan nama/kontrak yang disepakati dengan A6; A6 memakainya, bukan membuat kembaran.
+- B-9 ikut legacy (Q6-36); opsi perbaikan v2 hanya dicatat di README modul.
+- Tidak dibuat: `ambil_seluruh_pengguna` (Q6-03 = A), `p_web_config` (F6-10), `change_history` (MAKE-060).
 
 ## Bagian B — Klien integrasi keluar
 

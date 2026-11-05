@@ -63,3 +63,52 @@ Fondasi Jalur A untuk SIMAPI dan `services/*` (PRD Fase 6 §7.0.1). Filter `klie
 
 Command: `php spark integrasi:klien buat|rotasi|nonaktif|aktifkan|hapus|daftar|bersihkan-token`. Rahasia ditampilkan sekali. Test:
 `tests/unit/Integrasi/Klien/*`, `tests/database/Integrasi/{KlienLayananTest,FilterAuthKlienTest,IntegrasiKlienCommandTest}.php`.
+
+## Kompatibilitas legacy — SIMAPI dan `services/s_dm` (`Simapi/`, `Layanan/`, MAKE-059)
+
+Endpoint masuk dengan path dan kontrak legacy (PRD Fase 6 §6.1/§6.3, H-05..H-07). Route: `Config/RoutesSimapi.php`
+(`simapi/v1/*`) dan `Config/RoutesServices.php` (berkas BERSAMA `services/*`: satu `group('services')`, sub-group per controller
+dengan filter `klienLayanan:<hak>`). Keduanya di luar `api/v1`, tanpa `jwt`/`cors`. Controller tipis di `Controllers/Simapi/*` dan
+`Controllers/Services/*`; logika di kelas penyaji di bawah ini (query builder, tanpa SQL string).
+
+| Berkas | Isi |
+|---|---|
+| `Simapi/ResponsSimapi` | amplop SIMAPI HTTP 200 `{"status":"01"|"02","msg","data"}` (status STRING; `data` gagal = `[]` [K]) |
+| `Layanan/ResponsLayanan` | amplop bisnis `services/*` HTTP 200 `{"status":1|2,"msg","data"}` (INT); dipakai bersama `s_dm` dan `s_stat` |
+| `Simapi/Nilai` | bentuk nilai legacy: string/null seperti `row_array()`; field ber-`stripslashes` legacy → "" bila NULL |
+| `Simapi/PenyajiPegawai` | 25 method `a_employee` (`METHOD` = daftar + pesan "Data … tidak tersedia"), port `fixUnitName()` |
+| `Simapi/PenyajiDm` | `a_dm/group_jabatan|sub_group_jabatan|jabatan|struktur_jabatan` |
+| `Simapi/PenyajiSinkron` | `a_sinkron/ambil_riwayat_mutasi` (seluruh baris, tanpa filter status [K]) |
+| `Layanan/PenyajiSDm` | `services/s_dm/*` (baris `unit`/`satker` utuh + `unit_str`/`satker_str`) |
+
+Fixture kontrak (sintetis, diturunkan dari kode legacy, rujukan baris di tiap entri): `tests/_support/Integrasi/Simapi/*.json`.
+Test: `tests/database/Integrasi/{SimapiAuthDmSinkronTest,SimapiEmployeeTest,ServicesSDmTest}.php`.
+
+Keputusan dan penyimpangan:
+
+- **Auth.** `a_auth/token` = filter `klienLayanan:simapi` lalu `TokenSimapi::terbitkan($idKlien, KlienSaatIni::sidikRahasia())`; token baru
+  per handshake (F6-05), `data` hanya `{"token"}` (Q6-02); `KlienTidakAktif` (balapan nonaktif/rotasi) → "Authentication failed"
+  seragam (ADR-036 §4). Endpoint lain `simapiToken` — termasuk `a_dm/jabatan` yang di legacy tanpa auth (F6-03, AC-07.1) dan
+  `ambil_riwayat_mutasi` (pesan token legacy endpoint itu diganti "Token is not valid" seragam). `services/s_dm/*` seluruhnya
+  `klienLayanan:dm` (legacy `p_*` publik).
+- **Type klien** = `klien_layanan.jenis`. `a_dm` selain `jabatan` hanya type 2; type lain menerima `{"status":"01","msg":"","data":[]}` [K].
+  `a_employee` tanpa batas type (batas type `change_history` milik MAKE-060).
+- **Tidak dibuat:** `a_sinkron/ambil_seluruh_pengguna` (Q6-03 = A), `services/s_dm/p_web_config` (F6-10), `a_employee/change_history`
+  (MAKE-060) → 404.
+- **NIP** [K]: kosong → "Invalid paramater" (ejaan legacy; legacy tanpa segmen NIP = galat PHP), tidak ada di `pegawai` → "NIP not valid";
+  status 10 TIDAK ditolak (ikut legacy).
+- **Nilai** [K]: pemetaan teks (jenis kelamin, status pernikahan, Aktif/Tidak Aktif, jenis jabatan "Nomenlaktur" ejaan legacy, status JFT,
+  jenis kursus/seminar, jenis diklat), kode "lain" (99/9999/9999999/9999999999/98/1185, tanda jasa `LAIN-LAIN`), NEM untuk jenjang 1/2/3.
+  `pegawai_diklat` tidak punya `jenis_diklat` (sama dengan D1), jadi `pelatihan_struktural_terakhir` selalu memakai nama diklat.
+- **[V2]** `email` = akun aktif dengan `id_pengguna` terkecil (`pengguna.nip` di v2 UNIQUE, legacy GROUP BY acak). Perhatikan
+  `pengguna.status` ENUM('0','1') dibandingkan sebagai string.
+- **[V2]** `foto` = `site_url('api/v1/pegawai/{nip}/foto')` (endpoint foto v2 yang sudah ada) bila kolom `foto` terisi, selain itu "".
+- **[V2]** urutan baris: riwayat tanpa ORDER BY di legacy (`riwayat_pendidikan`, `riwayat_pelatihan`, `riwayat_kp`) diurut PK ASC; setiap
+  urutan diberi kunci sekunder PK (legacy bergantung urutan fisik). Baris master v2 status 10 (= hapus keras legacy) tidak dikirim
+  (`struktur_jabatan`, `p_get_unit`, `p_get_satker`).
+- **[V2]** teks tidak di-`stripslashes` ulang (impor UP-1 sudah menormalkan, Impor README #5).
+- **[K] bug legacy B-9 (keputusan Horii 04-11, Q6-36): ikut legacy.** `detil` tidak memilih nama `atasan_es_3(_koord)`/`atasan_es_4(_koord)`
+  (`AE:278`), jadi bagian `unit_es_3`/`unit_es_4` yang berasal dari atasan selalu ""; hanya unit dari jabatan sendiri (sub group 3/4 atau
+  koordinator/subkoordinator, lewat `fixUnitName`) yang terisi. Dikunci `SimapiEmployeeTest::testDetilUnitEs34IkutLegacyB9`.
+  *Opsi perbaikan v2 (TIDAK diimplementasi, menunggu keputusan):* pilih juga `pmj.atasan_es_3_koord, pmj.atasan_es_3, pmj.atasan_es_4_koord,
+  pmj.atasan_es_4` di kueri `detil` (versi `_koord` didahulukan, sama dengan `AE:306/312/316`) lalu terapkan `fixUnitName`.
