@@ -10,6 +10,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Layanan\PetugasLayananService;
 use App\Libraries\Layanan\Studi\AturanStudi;
 use App\Libraries\Layanan\Studi\BerkasStudi;
+use App\Libraries\Layanan\Studi\RentangTanggal;
 use App\Libraries\Layanan\Studi\StatusStudi;
 use App\Libraries\Layanan\StudiPengajuanService;
 use App\Models\Layanan\LayananModel;
@@ -119,6 +120,9 @@ class TbService extends StudiPengajuanService
         $id    = (int) $row['id_riwayat_tb'];
         $model = new RiwayatTbPerpanModel($this->koneksi());
 
+        // CR-102: rentang dihitung sebelum perpanjangan dihapus; hanya induk tidak cukup bila TB dihapus saat perpanjangan berjalan.
+        $dalamRentang = $this->hariIniDalamRentangGabungan($row);
+
         foreach ($this->koneksi()->table('riwayat_tb_perpan')->select('id_riwayat_tb_perpan')->where('id_riwayat_tb', $id)->get()->getResultArray() as $perpan) {
             $this->hapusLampiran($nip, BerkasStudi::KODE_TB_PERPAN, (int) $perpan['id_riwayat_tb_perpan']);
             $model->withActor($auth, static fn () => $model->delete((int) $perpan['id_riwayat_tb_perpan']));
@@ -126,13 +130,42 @@ class TbService extends StudiPengajuanService
 
         parent::sebelumHapus($auth, $row);
 
-        if ((int) $row['status'] === StatusStudi::DISETUJUI && $this->hariIniDalamTb($row)) {
+        if ((int) $row['status'] === StatusStudi::DISETUJUI && $dalamRentang) {
             $pegawai = $this->pegawai($nip);
 
             if ($pegawai !== null && (int) $pegawai['status'] === 1 && (int) $pegawai['id_jenis_status'] === self::JENIS_STATUS_TB) {
                 $this->ubahJenisStatus($auth, $nip, self::JENIS_STATUS_AKTIF);
             }
         }
+    }
+
+    /**
+     * CR-102: hari ini berada di rentang gabungan induk dan semua perpanjangannya (termasuk celah di antaranya). Dihitung
+     * sebelum perpanjangan dihapus. Di luar rentang gabungan, status pegawai tidak diubah.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function hariIniDalamRentangGabungan(array $row): bool
+    {
+        $awal  = (string) $row['tgl_mulai'];
+        $akhir = (string) $row['tgl_akhir'];
+
+        $perpan = $this->koneksi()->table('riwayat_tb_perpan')->select('tgl_mulai_perpan, tgl_akhir_perpan')
+            ->where('id_riwayat_tb', (int) $row['id_riwayat_tb'])->get()->getResultArray();
+
+        foreach ($perpan as $p) {
+            if ($p['tgl_mulai_perpan'] !== null) {
+                $awal = min($awal, (string) $p['tgl_mulai_perpan']);
+            }
+
+            if ($p['tgl_akhir_perpan'] !== null) {
+                $akhir = max($akhir, (string) $p['tgl_akhir_perpan']);
+            }
+        }
+
+        $hariIni = $this->hariIni();
+
+        return RentangTanggal::beririsan($awal, $akhir, $hariIni, $hariIni);
     }
 
     protected function lampiranMilikBaris(array $da, array $row): bool
