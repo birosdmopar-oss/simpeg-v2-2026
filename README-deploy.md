@@ -201,12 +201,15 @@ Setiap perubahan tercatat di `audit_logs` (`entity` `surat_cuti_token`, `jenis_a
 1. Prasyarat §1h: Nginx meneruskan `/services/` ke backend v2 dan header `Authorization` sampai ke PHP.
 2. Buat klien MuDig dengan hak `esign` (bisa digabung dengan `stat`/`dm` pada klien yang sama):
    `php spark integrasi:klien buat --nama="MuDig" --username=<huruf-kecil> --jenis=3 --hak=esign[,stat,dm] [--ip=<ip/cidr>]`.
-3. Batas unggahan: PDF maks 10 MB, gambar tanda tangan (`imageTTD`, JPEG/PNG) maks 2 MB. Nginx `client_max_body_size` dan PHP
-   `upload_max_filesize`/`post_max_size` minimal 13M, kalau tidak permintaan besar ditolak sebelum sampai aplikasi.
-4. Kontrak untuk PIC MuDig (PN-4, re-handshake): parameter dan amplop `{"status":1|2,"msg","data"}` sama dengan legacy; yang berubah
-   adalah auth (username + rahasia baru), `file` dan `imageTTD` dikirim sebagai **unggahan berkas** (bukan path server),
-   `nama_lengkap` dan `modul` wajib, dan PDF ber-TTE dikembalikan sebagai base64 di `data.signed_file` (bukan path server). Auth gagal → HTTP 401.
-5. Setiap percobaan tanda tangan tercatat di `esign_hist` (`modul` dari MuDig).
+3. Batas unggahan (`Config\EsignMudig`, bisa diubah lewat `.env` `esignMudig.pdfMaks`/`esignMudig.gambarMaks`, byte): PDF maks 10 MB,
+   gambar tanda tangan (`imageTTD`, JPEG/PNG) maks 2 MB. Nginx `client_max_body_size` untuk `/services/` minimal 12 MB (disarankan
+   13M karena overhead multipart) dan PHP `upload_max_filesize`/`post_max_size` setara; kalau tidak, permintaan besar ditolak sebelum
+   sampai aplikasi. Lewat batas di aplikasi → `status` "2" "Invalid parameter.".
+4. Kontrak untuk PIC MuDig (PN-4, re-handshake): parameter, parameter wajib (`nik`, `passphrase`, `file`, `imageTTD`), dan amplop
+   `{"status":"1"|"2","msg","data"}` (status string) sama dengan legacy. Yang berubah: auth (username + rahasia baru, gagal → HTTP 401),
+   `file` dan `imageTTD` dikirim sebagai **unggahan berkas** (bukan path server), dan PDF ber-TTE dikembalikan sebagai base64 di
+   `data.signed_file` (bukan path server).
+5. Setiap percobaan tanda tangan tercatat di `esign_hist`; `modul` bawaan `MuDig` bila tidak dikirim.
 
 ### 1d. Push FCM HTTP v1 (Fase 6 H-04, MAKE-066)
 
