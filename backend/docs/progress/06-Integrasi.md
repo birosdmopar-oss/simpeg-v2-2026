@@ -29,9 +29,9 @@ Analisis saja (belum ada kode). Sumber legacy: `controllers/services/S_stat.php`
 (`get_all_kp` 2416, `get_all_kgb` 4095, `get_all_pensiun` 1324), `helpers/function_helper.php` 2400–2418. Berkas
 terlarang tidak dibuka.
 
-**Endpoint (PRD §7.6; varian bertanggal dikecualikan):** `rekomendasi_kp`, `rekomendasi_kp_uns` (menunggu keputusan
-Q5), `rekomendasi_pensiun`, `rekomendasi_kgb`, `list_tb`, `list_ib`, `list_karpeg`, `list_kariskarsu`. Auth legacy
-hanya aktif di `rekomendasi_kp`; v2 memakai `klienLayanan` (hak `stat`, F6-03).
+**Endpoint (PRD §7.6; varian bertanggal dikecualikan):** `rekomendasi_kp`, `rekomendasi_kp_uns` (putusan Q5, di bawah),
+`rekomendasi_pensiun`, `rekomendasi_kgb`, `list_tb`, `list_ib`, `list_karpeg`, `list_kariskarsu`. Auth legacy hanya aktif
+di `rekomendasi_kp`; v2 memakai `klienLayanan` (hak `stat`, F6-03) untuk semua endpoint.
 
 **Aturan (Lampiran A.2, keputusan Q1–Q4 lead):**
 - KGB: populasi status 1 dan `id_jenis_pegawai` ∈ {1, 6}; TMT terakhir = maks(`pegawai_kgb.tmtsk`, `pegawai_cpns.tmtsk`)
@@ -65,11 +65,19 @@ hanya aktif di `rekomendasi_kp`; v2 memakai `klienLayanan` (hak `stat`, F6-03).
 Cek "ada/tidak": `AttachmentServiceInterface::daftar(nip, idRiwayat, idEntri)` lalu berkas di storage; URL unduh
 `GET pegawai/{nip}/lampiran/{id}/unduh`. Legacy memanggil HTTP dan mengecek 200; v2 tidak memakai HTTP.
 
-**Keputusan terbuka (diteruskan ke reviewer lewat lead):**
-- Q5 **MENUNGGU HORII** (jangan dikode): varian `rekomendasi_kp_uns` (S_stat.php:433) tidak memakai identitas pemanggil.
-  Filter diambil dari `$_GET['id_satker']` / `$_GET['id_unit']` (:456–457); auth dikomentari (:446–447); varian ini
-  memuat `file_pak` (:627) dan arsip jabatan/PAK (:600–638). Usul reviewer ke Horii: pertahankan varian, filter dari
-  parameter query, wajib auth klien [V2 auth].
+**Keputusan:**
+- Q5 **DIPUTUSKAN HORII = A, ikut legacy persis** (dicatat PRD Q6-37 + AC-08.4 di CR-104, branch
+  `docs/cr-104-db-scratch-b9` @58be744f, belum di main). Fakta legacy: `rekomendasi_kp_uns` (S_stat.php:433) mengambil
+  filter dari `$_GET['id_satker']` / `$_GET['id_unit']` (:456–457), auth dikomentari (:446–447), memuat `file_pak` (:627)
+  dan arsip jabatan/PAK (:600–638).
+  - Route `services/s_stat/rekomendasi_kp_uns` dipertahankan; auth klien wajib (F6-03).
+  - Tanpa `id_satker`/`id_unit`: semua pegawai, format kolom MuDig (`get_all_kp('2')`, LE:2416–2720).
+  - Dengan `id_satker` atau `id_unit` tidak kosong: `{"status":1,"msg":"","data":[]}`. Ini replikasi bug legacy `[K]`
+    Q6-37: `get_kp_satker`/`get_kp_unit` mengembalikan format SIMPEG tanpa `tmt_kp_new`, sehingga S_stat:485 melewati
+    semua baris. Dikunci dengan test kontrak, komentar `[K] bug legacy Q6-37`.
+  - Opsi B (filter diabaikan) DITOLAK. Opsi C (filter diperbaiki) hanya dicatat sebagai upgrade, tidak dikode.
+  - Varian satker/unit `rekomendasi_pensiun` dan `rekomendasi_kgb` (S_stat:52–54, :68–70) hanya kode dikomentari:
+    TIDAK di-port, hanya `get_all_*`. Varian bertanggal (`*_20230516`, `*_20230706`) kode mati: tidak di-port.
 - Q8 (PAK, `arsip_last_pak`): pakai preseden v2 (KolomBerkas/storage). Path ada di storage v2 → URL berkas v2; kosong atau
   path impor belum ada di storage → null/kosong. Dicatat [V2] di README modul, sama dengan `file_lckh` dan PMK
   (README Api/Layanan :105).
