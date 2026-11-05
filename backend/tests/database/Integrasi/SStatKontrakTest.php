@@ -105,7 +105,8 @@ final class SStatKontrakTest extends DatabaseTestCase
         $this->assertSame('2026-04-01', $tanpa['data'][0]['tmt_kp_new']);
 
         // [K] bug legacy Q6-37 (AC-08.4): dengan id_satker atau id_unit → data [] dengan status 1 dan msg "".
-        foreach (['?id_satker=1', '?id_unit=1', '?id_satker=1&id_unit=1', '?id_unit=abc'] as $q) {
+        // S4: tanpa trim ("%20" = berfilter) dan parameter array dianggap terisi (tanpa 500).
+        foreach (['?id_satker=1', '?id_unit=1', '?id_satker=1&id_unit=1', '?id_unit=abc', '?id_unit=%20', '?id_unit[]=1', '?id_satker[a]=1'] as $q) {
             $res = $this->basic('mudig', $this->rahasia)->call('get', 'services/s_stat/rekomendasi_kp_uns' . $q);
             $res->assertStatus(200);
             $this->assertSame('{"status":1,"msg":"","data":[]}', (string) preg_replace('/\s+/', '', $res->getJSON()), $q);

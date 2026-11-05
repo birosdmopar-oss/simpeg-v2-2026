@@ -65,18 +65,18 @@ final class StatService
             $r                  = array_fill_keys(self::KOLOM_KP, '');
             $r['nama']          = PenyajiStat::namaGelar($row['glr_awal'], (string) $row['nama'], $row['glr_akhir']);
             $r['nip']           = $nip;
-            $r['gol_ruang']     = (string) ($row['gol_ruang'] ?? '');
+            $r['gol_ruang']     = self::teks($row['gol_ruang'] ?? null);
             $r['tmtsk_pangkat'] = PenyajiStat::tanggalPengguna($row['tmtsk_pangkat'] ?? null);
             $r['tgl_kp']        = PenyajiStat::tanggalPengguna($det['tgl_kp']);
             $r['periode_kp']    = PenyajiStat::periodeKp($det['tgl_kp']);
             $r['kp_bl']         = PenyajiStat::bulanKp($det['tgl_kp']);
-            $r['pangkat']       = (string) ($row['pangkat'] ?? '');
-            $r['jabatan']       = (string) ($row['jabatan'] ?? '');
+            $r['pangkat']       = self::teks($row['pangkat'] ?? null);
+            $r['jabatan']       = self::teks($row['jabatan'] ?? null);
             $r['eselon']        = PenyajiStat::eselon($row['id_sub_group_jabatan'] ?? null);
             $r['id_unit']       = self::teks($row['id_unit'] ?? null);
             $r['id_satker']     = self::teks($row['id_satker'] ?? null);
-            $r['satker']        = (string) ($row['satker'] ?? '');
-            $r['strata']        = (string) ($row['jenjang_pendidikan_singkat'] ?? '');
+            $r['satker']        = self::teks($row['satker'] ?? null);
+            $r['strata']        = self::teks($row['jenjang_pendidikan_singkat'] ?? null);
             $r['id_jenis_kp']   = self::teks($row['id_jenis_kp'] ?? null); // [K] LE:2480 ikut keluar walau di luar arrColumn
 
             $master[$nip] = $r;
@@ -87,19 +87,20 @@ final class StatService
         usort($daftar, static fn (array $a, array $b): int => [$b['gol_ruang'], $a['id_satker']] <=> [$a['gol_ruang'], $b['id_satker']]);
 
         $nips     = array_column($daftar, 'nip');
-        $arsipKp  = $this->arsipPerEntri($nips, 'kp');
-        $arsipSkp = $this->arsipPerEntri($nips, 'skp');
         $cpns     = $this->snapshotPerNip('pegawai_cpns', $nips);
         $pns      = $this->snapshotPerNip('pegawai_pns', $nips);
         $kp       = $this->snapshotPerNip('pegawai_kp', $nips);
         $skp      = $this->skpPerNip($nips, [$tahun - 1, $tahun - 2], false);
+        $arsipKp  = $this->arsipPerEntri($nips, 'kp', self::entriSnapshot([$cpns, $pns, $kp], 'id_riwayat_kp'));
+        $arsipSkp = $this->arsipPerEntri($nips, 'skp', self::entriSkp($skp));
 
         foreach ($daftar as &$r) {
             $nip                = $r['nip'];
             $r['arsip_cpns']    = $this->urlArsip($arsipKp, $nip, $cpns[$nip]['id_riwayat_kp'] ?? null);
             $r['arsip_pns']     = $this->urlArsip($arsipKp, $nip, $pns[$nip]['id_riwayat_kp'] ?? null);
             $r['arsip_last_kp'] = $this->urlArsip($arsipKp, $nip, $kp[$nip]['id_riwayat_kp'] ?? null);
-            $r['arsip_skp']     = $this->arsipSkp($arsipSkp, $skp[$nip] ?? [], [$tahun - 1, $tahun - 2]);
+            // [K] S_stat:230: kunci tahun dibuat Y-2 dulu (assignment berantai kanan → kiri), lalu Y-1.
+            $r['arsip_skp'] = $this->arsipSkp($arsipSkp, $skp[$nip] ?? [], [$tahun - 2, $tahun - 1]);
         }
         unset($r);
 
@@ -141,31 +142,36 @@ final class StatService
             $daftar[]         = $m;
         }
 
+        // Urut gol_ruang_old DESC, id_satker ASC [K S_stat:477-479] (P1).
+        usort($daftar, static fn (array $a, array $b): int => [$b['gol_ruang_old'], $a['id_satker']] <=> [$a['gol_ruang_old'], $b['id_satker']]);
+
         $nips     = array_column($daftar, 'nip');
-        $arsipKp  = $this->arsipPerEntri($nips, 'kp');
-        $arsipSkp = $this->arsipPerEntri($nips, 'skp');
-        $arsipJab = $this->arsipPerEntri($nips, 'jabatan');
         $cpns     = $this->snapshotPerNip('pegawai_cpns', $nips);
         $pns      = $this->snapshotPerNip('pegawai_pns', $nips);
         $kp       = $this->snapshotPerNip('pegawai_kp', $nips);
         $pmj      = $this->snapshotPerNip('pegawai_mutasi_jabatan', $nips);
         $pak      = $this->snapshotPerNip('pegawai_ak', $nips);
         $skp      = $this->skpPerNip($nips, [$tahun - 1, $tahun - 2], true);
+        $arsipKp  = $this->arsipPerEntri($nips, 'kp', self::entriSnapshot([$cpns, $pns, $kp], 'id_riwayat_kp'));
+        $arsipSkp = $this->arsipPerEntri($nips, 'skp', self::entriSkp($skp));
+        $arsipJab = $this->arsipPerEntri($nips, 'jabatan', self::entriSnapshot([$pmj], 'id_riwayat_mutasi_jabatan'));
 
         foreach ($daftar as &$r) {
-            $nip                 = $r['nip'];
-            $r['arsip_cpns']     = $this->urlArsip($arsipKp, $nip, $cpns[$nip]['id_riwayat_kp'] ?? null);
-            $r['arsip_pns']      = $this->urlArsip($arsipKp, $nip, $pns[$nip]['id_riwayat_kp'] ?? null);
-            $r['arsip_last_kp']  = $this->urlArsip($arsipKp, $nip, $kp[$nip]['id_riwayat_kp'] ?? null);
-            $r['arsip_skp']      = $this->arsipSkp($arsipSkp, $skp[$nip] ?? [], [$tahun - 1, $tahun - 2]);
-            $r['arsip_last_jab'] = $this->urlArsip($arsipJab, $nip, $pmj[$nip]['id_riwayat_mutasi_jabatan'] ?? null);
+            $nip = $r['nip'];
+            // [K] S_stat:638 assignment berantai (kanan → kiri): urutan kunci arsip_last_pak, arsip_last_jab, arsip_skp
+            // {Y-2, Y-1}, arsip_last_kp, arsip_pns, arsip_cpns (P3).
             $r['arsip_last_pak'] = $this->urlFilePak($pak[$nip] ?? null);
+            $r['arsip_last_jab'] = $this->urlArsip($arsipJab, $nip, $pmj[$nip]['id_riwayat_mutasi_jabatan'] ?? null);
+            $r['arsip_skp']      = $this->arsipSkp($arsipSkp, $skp[$nip] ?? [], [$tahun - 2, $tahun - 1]);
+            $r['arsip_last_kp']  = $this->urlArsip($arsipKp, $nip, $kp[$nip]['id_riwayat_kp'] ?? null);
+            $r['arsip_pns']      = $this->urlArsip($arsipKp, $nip, $pns[$nip]['id_riwayat_kp'] ?? null);
+            $r['arsip_cpns']     = $this->urlArsip($arsipKp, $nip, $cpns[$nip]['id_riwayat_kp'] ?? null);
 
             // [K] S_stat:687-703
             $r['lu_ppak'] = null;
 
             if (isset($pak[$nip])) {
-                $r['lu_ppak'] = self::teks($pak[$nip]['updated_at'] ?? null) !== '' ? $pak[$nip]['updated_at'] : ($pak[$nip]['created_at'] ?? null);
+                $r['lu_ppak'] = (string) ($pak[$nip]['updated_at'] ?? '') !== '' ? $pak[$nip]['updated_at'] : ($pak[$nip]['created_at'] ?? null);
                 $r['ak_old']  = $pak[$nip]['nilai_ak'] ?? null;
             }
 
@@ -173,7 +179,7 @@ final class StatService
             $r['lu_ppns']    = $pns[$nip]['updated_at'] ?? null;
             $r['lu_pkp']     = $kp[$nip]['updated_at'] ?? null;
             $r['lu_pmj']     = $pmj[$nip]['updated_at'] ?? null;
-            $r['lu_ppen']    = $r['lu_ppen'] ?? null;
+            $r['lu_ppen']    = null; // [K] S_stat:722 membaca `lu_ppen` dari baris pegawai_cpns yang tidak punya kolom itu → selalu NULL (P2)
             $r['lu_rskp_y1'] = $skp[$nip][$tahun - 1]['updated_at'] ?? null;
             $r['lu_rskp_y2'] = $skp[$nip][$tahun - 2]['updated_at'] ?? null;
         }
@@ -220,9 +226,9 @@ final class StatService
             $r['nama']          = PenyajiStat::namaGelar($row['glr_awal'], (string) $row['nama'], $row['glr_akhir']);
             $r['nip']           = (string) $row['nip'];
             $r['tgl_lahir']     = PenyajiStat::tanggalPengguna($row['tgl_lahir'] ?? null);
-            $r['jabatan']       = (string) ($row['jabatan'] ?? '');
+            $r['jabatan']       = self::teks($row['jabatan'] ?? null);
             $r['tmtsk_jabatan'] = PenyajiStat::tanggalPengguna($row['tmtsk_jabatan'] ?? null);
-            $r['satker']        = (string) ($row['satker'] ?? '');
+            $r['satker']        = self::teks($row['satker'] ?? null);
             $r['eselon']        = PenyajiStat::eselon($row['id_sub_group_jabatan'] ?? null);
             $r['pensiun_th']    = $p['pensiun_th'];
             $r['pensiun_bl']    = $p['pensiun_bl'];
@@ -238,12 +244,12 @@ final class StatService
         usort($daftar, static fn (array $a, array $b): int => [$b['tgl_pensiun'], $a['id_satker']] <=> [$a['tgl_pensiun'], $b['id_satker']]);
 
         $nips     = array_column($daftar, 'nip');
-        $arsipKp  = $this->arsipPerEntri($nips, 'kp');
-        $arsipSkp = $this->arsipPerEntri($nips, 'skp');
         $cpns     = $this->snapshotPerNip('pegawai_cpns', $nips);
         $pns      = $this->snapshotPerNip('pegawai_pns', $nips);
         $kp       = $this->snapshotPerNip('pegawai_kp', $nips);
         $skp      = $this->skpPerNip($nips, [$tahun - 1], false);
+        $arsipKp  = $this->arsipPerEntri($nips, 'kp', self::entriSnapshot([$cpns, $pns, $kp], 'id_riwayat_kp'));
+        $arsipSkp = $this->arsipPerEntri($nips, 'skp', self::entriSkp($skp));
 
         foreach ($daftar as &$r) {
             $nip                = $r['nip'];
@@ -302,13 +308,13 @@ final class StatService
             $r['tmtsk_last_kgb']   = $k['tmtsk_last_kgb'];
             $r['gaji_last_kgb']    = $k['gaji_last_kgb'];
             $r['eselon']           = PenyajiStat::eselon($row['id_sub_group_jabatan'] ?? null);
-            $r['jabatan']          = (string) ($row['jabatan'] ?? '');
-            $r['satker']           = (string) ($row['satker'] ?? '');
+            $r['jabatan']          = self::teks($row['jabatan'] ?? null);
+            $r['satker']           = self::teks($row['satker'] ?? null);
             $r['id_unit']          = self::teks($row['id_unit'] ?? null);
             $r['id_satker']        = self::teks($row['id_satker'] ?? null);
-            $r['gol_ruang']        = (string) ((string) $row['id_jenis_pegawai'] === RekomendasiKgb::JENIS_PPPK ? ($row['gol_pppk'] ?? '') : ($row['gol_ruang'] ?? ''));
+            $r['gol_ruang']        = self::teks((string) $row['id_jenis_pegawai'] === RekomendasiKgb::JENIS_PPPK ? ($row['gol_pppk'] ?? null) : ($row['gol_ruang'] ?? null));
             $r['id_jenis_pegawai'] = self::teks($row['id_jenis_pegawai'] ?? null);
-            $r['jenis_pegawai']    = (string) ($row['jenis_pegawai'] ?? '');
+            $r['jenis_pegawai']    = self::teks($row['jenis_pegawai'] ?? null);
             $daftar[]              = $r;
         }
 
@@ -316,8 +322,8 @@ final class StatService
         usort($daftar, static fn (array $a, array $b): int => [$a['tmtsk_kgb'], $a['nip']] <=> [$b['tmtsk_kgb'], $b['nip']]);
 
         $nips     = array_column($daftar, 'nip');
-        $arsipKgb = $this->arsipPerEntri($nips, 'kgb');
         $kgb      = $this->snapshotPerNip('pegawai_kgb', $nips);
+        $arsipKgb = $this->arsipPerEntri($nips, 'kgb', self::entriSnapshot([$kgb], 'id_riwayat_kgb'));
 
         foreach ($daftar as &$r) {
             // [K] S_stat:1085-1088: hanya arsip_last_kgb (arsip KP kode 11 di-fetch legacy tetapi tidak dikeluarkan).
@@ -491,14 +497,14 @@ final class StatService
             $m['nip']               = $nip;
             $m['nama']              = PenyajiStat::namaGelar($row['glr_awal'], (string) $row['nama'], $row['glr_akhir']);
             $m['tgl_lulus']         = self::teks($row['tgl_lulus'] ?? null);
-            $m['jen_pend_sh']       = (string) ($row['jenjang_pendidikan_singkat'] ?? '');
-            $m['jen_pen']           = (string) ($row['jenjang_pendidikan'] ?? '');
-            $m['bid_pen']           = ($row['bidang_pendidikan'] ?? '') === 'LAIN-LAIN' ? (string) ($row['bidang_pendidikan_lain'] ?? '') : (string) ($row['bidang_pendidikan'] ?? '');
+            $m['jen_pend_sh']       = self::teks($row['jenjang_pendidikan_singkat'] ?? null);
+            $m['jen_pen']           = self::teks($row['jenjang_pendidikan'] ?? null);
+            $m['bid_pen']           = ($row['bidang_pendidikan'] ?? '') === 'LAIN-LAIN' ? self::teks($row['bidang_pendidikan_lain'] ?? null) : self::teks($row['bidang_pendidikan'] ?? null);
             $m['lu_ppen']           = $row['lu_ppen'] ?? null;
             $m['id_pangkat_old']    = self::teks($row['id_pangkat'] ?? null);
             $m['tmt_kp_old']        = self::teks($row['tmtsk_pangkat'] ?? null);
-            $m['pangkat_old']       = (string) ($row['pangkat'] ?? '');
-            $m['gol_ruang_old']     = (string) ($row['gol_ruang'] ?? '');
+            $m['pangkat_old']       = self::teks($row['pangkat'] ?? null);
+            $m['gol_ruang_old']     = self::teks($row['gol_ruang'] ?? null);
             $m['mker_th_old']       = self::teks($row['mker_th'] ?? null);
             $m['mker_bl_old']       = self::teks($row['mker_bl'] ?? null);
             $m['mker_old']          = "{$m['mker_th_old']} Tahun {$m['mker_bl_old']} Bulan";
@@ -506,14 +512,14 @@ final class StatService
             $m['order_pangkat_old'] = self::teks($row['order_pangkat_old'] ?? null);
             $m['tmt_jab']           = self::teks($row['tmtsk_jabatan'] ?? null);
             $m['id_gr_jab']         = self::teks($row['id_group_jabatan'] ?? null);
-            $m['gr_jab']            = (string) ($row['group_jabatan'] ?? '');
-            $m['sub_gr_jab']        = (string) ($row['sub_group_jabatan'] ?? '');
-            $m['jabatan']           = (string) ($row['jabatan'] ?? '');
+            $m['gr_jab']            = self::teks($row['group_jabatan'] ?? null);
+            $m['sub_gr_jab']        = self::teks($row['sub_group_jabatan'] ?? null);
+            $m['jabatan']           = self::teks($row['jabatan'] ?? null);
             $m['ak_old']            = self::teks($row['kredit_jft'] ?? null);
             $m['id_unit']           = self::teks($row['id_unit'] ?? null);
             $m['id_satker']         = self::teks($row['id_satker'] ?? null);
-            $m['unit']              = (string) ($row['unit'] ?? '');
-            $m['satker']            = (string) ($row['satker'] ?? '');
+            $m['unit']              = self::teks($row['unit'] ?? null);
+            $m['satker']            = self::teks($row['satker'] ?? null);
             $m['ins_induk']         = $this->insInduk;
 
             $hasil[$nip] = [$row, $det, $m];
@@ -621,11 +627,13 @@ final class StatService
      * Arsip `document_attachment` per NIP per `id_entri` untuk satu jenis (kode `jenis_rwy`), hanya yang berkasnya ADA di
      * storage v2 — menggantikan HTTP fetch legacy [V2]. Nilai = URL unduh klien.
      *
-     * @param list<string> $nips
+     * @param list<string>                     $nips
+     * @param array<string, array<string, true>> $entriPerNip nip => id_entri yang dirujuk keluaran (S6: baris lain dilewati
+     *                                                      sebelum cek storage)
      *
      * @return array<string, array<string, list<string>>>
      */
-    private function arsipPerEntri(array $nips, string $jenis): array
+    private function arsipPerEntri(array $nips, string $jenis, array $entriPerNip): array
     {
         $hasil = [];
         $kode  = PenyajiStat::JENIS_LAMPIRAN[$jenis];
@@ -641,7 +649,7 @@ final class StatService
             foreach ($rows as $r) {
                 $path = (string) ($r['path'] ?? '');
 
-                if ($path === '' || ! $this->adaDiStorage($path)) {
+                if (! isset($entriPerNip[(string) $r['NIP']][(string) $r['id_entri']]) || $path === '' || ! $this->adaDiStorage($path)) {
                     continue;
                 }
 
@@ -707,12 +715,14 @@ final class StatService
     private function urlFilePak(?array $pak): array
     {
         $path = (string) ($pak['file_pak'] ?? '');
+        $id   = $pak['id_riwayat_ak'] ?? null;
 
-        if ($pak === null || $path === '' || ! $this->adaDiStorage($path)) {
+        // S3: tanpa id_riwayat_ak URL unduh tidak dapat dibentuk → dilewati (bukan URL rusak).
+        if ($pak === null || $id === null || $id === '' || $path === '' || ! $this->adaDiStorage($path)) {
             return [];
         }
 
-        return [$this->penyaji->urlBerkas('pak', (string) $pak['nip'], (string) ($pak['id_riwayat_ak'] ?? ''), 'file_pak')];
+        return [$this->penyaji->urlBerkas('pak', (string) $pak['nip'], (string) $id, 'file_pak')];
     }
 
     /**
@@ -732,7 +742,74 @@ final class StatService
             ->orderBy("r.{$pk}", 'ASC')
             ->get()->getResultArray();
 
-        return $this->gantiKolomBerkas($rows, $jenis, $pk, $kolomBerkas);
+        return $this->gantiKolomBerkas($rows, $jenis, $pk, $kolomBerkas, $this->lampiranStudi($jenis, $rows, $pk));
+    }
+
+    /**
+     * P4 (keputusan reviewer 05-11-2026): berkas TB/IB yang dibuat lewat v2 tersimpan di `document_attachment` kode 46–50
+     * (`BerkasStudi`: tag = nama kolom untuk 46/49, tanpa tag untuk 47/50), bukan di kolom `file_*`. Agar MuDig tetap
+     * menerima berkas pasca-cutover, kolom `file_*` yang kosong diisi URL lampiran v2 (berkas terbaru per slot yang ada di
+     * storage). Hasil: pk => kolom => URL.
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function lampiranStudi(string $jenis, array $rows, string $pk): array
+    {
+        $sumber = PenyajiStat::SUMBER_LAMPIRAN_STUDI[$jenis] ?? [];
+        $hasil  = [];
+
+        if ($sumber === [] || $rows === []) {
+            return $hasil;
+        }
+
+        $pkPerNip = [];
+
+        foreach ($rows as $r) {
+            $pkPerNip[(string) $r['nip']][(string) $r[$pk]] = true;
+        }
+
+        $kodeKeJenis = [];
+
+        foreach ($sumber as [$jenisLampiran]) {
+            $kodeKeJenis[PenyajiStat::JENIS_LAMPIRAN[$jenisLampiran]] = $jenisLampiran;
+        }
+
+        foreach (array_chunk(array_keys($pkPerNip), self::BATCH) as $potongan) {
+            $da = $this->db->table('document_attachment')
+                ->select('id_attachment, NIP, id_riwayat, id_entri, tag, path')
+                ->whereIn('id_riwayat', array_keys($kodeKeJenis))
+                ->whereIn('NIP', $potongan)
+                ->orderBy('id_attachment', 'DESC')
+                ->get()->getResultArray();
+
+            foreach ($da as $r) {
+                $nip   = (string) $r['NIP'];
+                $entri = (string) $r['id_entri'];
+
+                if (! isset($pkPerNip[$nip][$entri])) {
+                    continue;
+                }
+
+                $jenisLampiran = $kodeKeJenis[(int) $r['id_riwayat']];
+                $tag           = $r['tag'] === null || $r['tag'] === '' ? null : (string) $r['tag'];
+
+                foreach ($sumber as $kolom => [$jenisKolom, $tagKolom]) {
+                    if ($jenisKolom !== $jenisLampiran || $tagKolom !== $tag || isset($hasil[$entri][$kolom])) {
+                        continue;
+                    }
+
+                    $path = (string) ($r['path'] ?? '');
+
+                    if ($path !== '' && $this->adaDiStorage($path)) {
+                        $hasil[$entri][$kolom] = $this->penyaji->urlLampiran($jenisLampiran, $nip, (int) $r['id_attachment']);
+                    }
+                }
+            }
+        }
+
+        return $hasil;
     }
 
     /**
@@ -759,19 +836,23 @@ final class StatService
     /**
      * Ganti path internal kolom berkas dengan URL unduh klien (ada di storage) atau '' (P3 [V2]).
      *
-     * @param list<array<string, mixed>> $rows
-     * @param list<string>               $kolomBerkas
+     * @param list<array<string, mixed>>           $rows
+     * @param list<string>                         $kolomBerkas
+     * @param array<string, array<string, string>> $lampiranV2  pk => kolom => URL lampiran v2 (P4), dipakai bila kolom kosong
      *
      * @return list<array<string, mixed>>
      */
-    private function gantiKolomBerkas(array $rows, string $jenis, string $pk, array $kolomBerkas): array
+    private function gantiKolomBerkas(array $rows, string $jenis, string $pk, array $kolomBerkas, array $lampiranV2 = []): array
     {
         foreach ($rows as &$r) {
             foreach ($kolomBerkas as $kolom) {
-                $path      = (string) ($r[$kolom] ?? '');
-                $r[$kolom] = $path !== '' && $this->adaDiStorage($path)
-                    ? $this->penyaji->urlBerkas($jenis, (string) $r['nip'], (string) $r[$pk], $kolom)
-                    : '';
+                $path = (string) ($r[$kolom] ?? '');
+
+                if ($path !== '' && $this->adaDiStorage($path)) {
+                    $r[$kolom] = $this->penyaji->urlBerkas($jenis, (string) $r['nip'], (string) $r[$pk], $kolom);
+                } else {
+                    $r[$kolom] = $lampiranV2[(string) $r[$pk]][$kolom] ?? '';
+                }
             }
         }
         unset($r);
@@ -797,8 +878,57 @@ final class StatService
             'jabatan' => $this->adaSnapshot(['pegawai_mutasi_jabatan'], 'id_riwayat_mutasi_jabatan', $nip, $idEntri),
             'skp'     => $this->db->table('riwayat_skp')->where('nip', $nip)->where('id_riwayat_skp', $idEntri)->where('status', 1)
                 ->whereIn('tahun', [$tahun - 1, $tahun - 2])->countAllResults() > 0,
+            'lampiran_tb', 'surat_tb' => $this->db->table('riwayat_tb')->where('nip', $nip)->where('id_riwayat_tb', $idEntri)
+                ->whereIn('status', self::STATUS_TB_IB)->countAllResults() > 0,
+            'lampiran_ib', 'surat_ib' => $this->db->table('riwayat_ib')->where('nip', $nip)->where('id_riwayat_ib', $idEntri)
+                ->whereIn('status', self::STATUS_TB_IB)->countAllResults() > 0,
             default => false,
         };
+    }
+
+    /**
+     * Himpunan `id_entri` per NIP dari baris snapshot (S6).
+     *
+     * @param list<array<string, array<string, mixed>>> $snapshot
+     *
+     * @return array<string, array<string, true>>
+     */
+    private static function entriSnapshot(array $snapshot, string $kolom): array
+    {
+        $hasil = [];
+
+        foreach ($snapshot as $perNip) {
+            foreach ($perNip as $nip => $row) {
+                $id = $row[$kolom] ?? null;
+
+                if ($id !== null && $id !== '') {
+                    $hasil[(string) $nip][(string) $id] = true;
+                }
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @param array<string, array<int|string, mixed>> $skp hasil {@see self::skpPerNip()}
+     *
+     * @return array<string, array<string, true>>
+     */
+    private static function entriSkp(array $skp): array
+    {
+        $hasil = [];
+
+        foreach ($skp as $nip => $perTahun) {
+            /** @var list<array<string, mixed>> $baris */
+            $baris = $perTahun['_semua'] ?? [];
+
+            foreach ($baris as $r) {
+                $hasil[(string) $nip][(string) $r['id_riwayat_skp']] = true;
+            }
+        }
+
+        return $hasil;
     }
 
     /**
@@ -842,8 +972,11 @@ final class StatService
         }
     }
 
-    private static function teks(mixed $nilai): string
+    /**
+     * Nilai kolom seperti CI3: NULL tetap `null`, selain itu string (S5).
+     */
+    private static function teks(mixed $nilai): ?string
     {
-        return $nilai === null ? '' : (string) $nilai;
+        return $nilai === null ? null : (string) $nilai;
     }
 }

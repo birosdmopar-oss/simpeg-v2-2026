@@ -122,6 +122,6 @@ final class RekomendasiKgbPensiunTest extends CIUnitTestCase
         $this->assertSame('http://localhost:8080/services/s_stat/berkas/tb/199001012015011001/7/file_sp', $p->urlBerkas('tb', '199001012015011001', 7, 'file_sp'));
         $this->assertSame('s_stat_kp_12.pdf', PenyajiStat::namaUnduhan('kp', 12, 'arsip/kp/x/y.PDF'));
         $this->assertSame('s_stat_tb_7.bin', PenyajiStat::namaUnduhan('tb', 7, 'arsip/tanpa-ekstensi'));
-        $this->assertSame(['kp' => 11, 'skp' => 32, 'jabatan' => 9, 'kgb' => 10], PenyajiStat::JENIS_LAMPIRAN);
+        $this->assertSame(['kp' => 11, 'skp' => 32, 'jabatan' => 9, 'kgb' => 10, 'lampiran_tb' => 46, 'surat_tb' => 47, 'lampiran_ib' => 49, 'surat_ib' => 50], PenyajiStat::JENIS_LAMPIRAN);
     }
 }

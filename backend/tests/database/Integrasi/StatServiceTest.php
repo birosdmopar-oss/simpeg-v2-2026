@@ -93,7 +93,7 @@ final class StatServiceTest extends DatabaseTestCase
         $this->assertStringStartsWith('Dr. Pegawai Fixture', $r['nama']);
         $this->assertSame([self::BASE . "services/s_stat/berkas/kp/{$a}/{$idAda}"], $r['arsip_last_kp'], 'hanya yang ada di storage, hanya entri snapshot');
         $this->assertSame([], $r['arsip_cpns']);
-        $this->assertSame([2025 => [self::BASE . "services/s_stat/berkas/skp/{$a}/{$idArsipSkp}"], 2024 => []], $r['arsip_skp']);
+        $this->assertSame([2024 => [], 2025 => [self::BASE . "services/s_stat/berkas/skp/{$a}/{$idArsipSkp}"]], $r['arsip_skp'], '[K] kunci Y-2 dulu, lalu Y-1 (S_stat:230)');
         $this->assertSame('01 Oct 2026', $daftar[1]['tgl_kp']);
         $this->assertSame('October', $daftar[1]['kp_bl']);
     }
@@ -102,6 +102,8 @@ final class StatServiceTest extends DatabaseTestCase
     {
         [$a] = $this->pegawaiKp('2022-04-01', 'III/a', ['mker_th' => 10, 'mker_bl' => 5, 'gaji_pokok' => 3000000]);
         $this->pendidikan($a, 'LAIN-LAIN', 'Pariwisata');
+        [$d] = $this->pegawaiKp('2022-04-01', 'III/b'); // P1: gol_ruang_old DESC (string) → III/b sebelum III/a
+        $this->pendidikan($d);
         $rmj = $this->buatRiwayatMutasiJabatan($a);
         $this->db->table('pegawai_mutasi_jabatan')->where('nip', $a)->update(['id_riwayat_mutasi_jabatan' => $rmj, 'kredit_jft' => 12.5]);
         $idJab = $this->lampiran($a, 9, (string) $rmj, 'arsip/jab/a.pdf', true);
@@ -118,13 +120,16 @@ final class StatServiceTest extends DatabaseTestCase
         $this->assertSame([], $this->service->rekomendasiKpUns(self::HARI_INI, '3', ''));
 
         $daftar = $this->service->rekomendasiKpUns(self::HARI_INI, '', '');
-        $this->assertCount(1, $daftar);
-        $r = $daftar[0];
+        $this->assertSame([$d, $a], array_column($daftar, 'nip'), 'P1 [K S_stat:477-479]: gol_ruang_old DESC, id_satker ASC');
+        $r = $daftar[1];
 
+        // P3 [K S_stat:638]: urutan kunci arsip dari assignment berantai (kanan → kiri); lu_ppen sudah ada di kolom MuDig.
         $this->assertSame(
-            array_merge(StatService::KOLOM_MUDIG, ['arsip_cpns', 'arsip_pns', 'arsip_last_kp', 'arsip_skp', 'arsip_last_jab', 'arsip_last_pak', 'lu_ppak', 'lu_pcpns', 'lu_ppns', 'lu_pkp', 'lu_pmj', 'lu_rskp_y1', 'lu_rskp_y2']),
+            array_merge(StatService::KOLOM_MUDIG, ['arsip_last_pak', 'arsip_last_jab', 'arsip_skp', 'arsip_last_kp', 'arsip_pns', 'arsip_cpns', 'lu_ppak', 'lu_pcpns', 'lu_ppns', 'lu_pkp', 'lu_pmj', 'lu_rskp_y1', 'lu_rskp_y2']),
             array_keys($r),
         );
+        $this->assertNull($r['lu_ppen'], 'P2 [K S_stat:722]: selalu NULL');
+        $this->assertSame([2024, 2025], array_keys($r['arsip_skp']), 'arsip_skp {Y-2, Y-1}');
         $this->assertSame('2026-04-01', $r['tmt_kp_new'], 'format MuDig: tanggal mentah');
         $this->assertSame('2022-04-01', $r['tmt_kp_old']);
         $this->assertSame(['3', 'Reguler'], [$r['id_jenis_kp'], $r['jenis_kp']]);
@@ -212,15 +217,32 @@ final class StatServiceTest extends DatabaseTestCase
         $this->storage->simpan('arsip/tb/sp.pdf', '%PDF-tb');
         $this->storage->simpan('arsip/tb/sp2.pdf', '%PDF-tb2');
 
+        // B1: sp_admin_deputi = path berkas legacy → URL/kosong. P4: file_2 kosong tetapi ada lampiran v2 kode 46 tag file_2;
+        // file_surat_tb kosong tetapi ada SK kode 47 (tanpa tag); lampiran tag file_3 ada di DB tapi tidak di storage → kosong.
+        $this->db->table('riwayat_tb')->where('id_riwayat_tb', $idTb)->update(['sp_admin_deputi' => 'arsip/tb/sp-deputi.pdf']);
+        $this->storage->simpan('arsip/tb/sp-deputi.pdf', '%PDF-deputi');
+        $idLamp2  = $this->lampiranTag($a, 46, (string) $idTb, 'file_2', 'arsip/tb/v2-file2.pdf', true);
+        $idLamp2b = $this->lampiranTag($a, 46, (string) $idTb, 'file_2', 'arsip/tb/v2-file2-baru.pdf', true); // terbaru menang
+        $this->lampiranTag($a, 46, (string) $idTb, 'file_3', 'arsip/tb/v2-file3-hilang.pdf', false);
+        $idSk = $this->lampiranTag($a, 47, (string) $idTb, null, 'arsip/tb/v2-sk.pdf', true);
+
         $tb = $this->service->listTb();
         $this->assertSame([$idTb], array_map(static fn (array $r): int => (int) $r['id_riwayat_tb'], $tb));
         $r = $tb[0];
         $this->assertSame(self::BASE . "services/s_stat/berkas/tb/{$a}/{$idTb}/file_sp", $r['file_sp']);
         $this->assertSame('', $r['file_1'], 'path impor yang tidak ada di storage → kosong');
-        $this->assertSame('', $r['file_2']);
+        $this->assertSame(self::BASE . "services/s_stat/berkas/lampiran_tb/{$a}/{$idLamp2b}", $r['file_2'], 'P4: lampiran v2 terbaru untuk slot file_2');
+        $this->assertSame('', $r['file_3'], 'lampiran v2 yang tidak ada di storage → kosong');
+        $this->assertSame(self::BASE . "services/s_stat/berkas/surat_tb/{$a}/{$idSk}", $r['file_surat_tb'], 'P4: SK TB kode 47');
+        $this->assertSame(self::BASE . "services/s_stat/berkas/tb/{$a}/{$idTb}/sp_admin_deputi", $r['sp_admin_deputi'], 'B1: path legacy tidak keluar mentah');
+        $this->assertNotSame($idLamp2, $idLamp2b);
+        $this->assertSame(['isi' => '%PDF-1.4', 'nama' => "s_stat_lampiran_tb_{$idLamp2b}.pdf"], $this->service->berkasLampiran('lampiran_tb', $a, $idLamp2b, self::HARI_INI));
+        $this->assertSame(['isi' => '%PDF-deputi', 'nama' => "s_stat_tb_{$idTb}.pdf"], $this->service->berkasKolom('tb', $a, $idTb, 'sp_admin_deputi'));
         $this->assertSame(['id_unit', 'id_satker'], array_slice(array_keys($r), -2));
         $this->assertStringNotContainsString('arsip/tb', json_encode($tb, JSON_THROW_ON_ERROR), 'path internal tidak pernah keluar');
         $this->assertNotContains($idTb2, array_map(static fn (array $r): int => (int) $r['id_riwayat_tb'], $tb));
+        $idLampTolak = $this->lampiranTag($a, 46, (string) $idTb2, 'file_sp', 'arsip/tb/v2-tolak.pdf', true);
+        $this->assertNull($this->service->berkasLampiran('lampiran_tb', $a, $idLampTolak, self::HARI_INI), 'baris status 2 tidak muncul di list_tb → 404');
 
         $idK = $this->kartu('riwayat_karpeg', $a, 1, ['file_1' => 'arsip/karpeg/1.pdf']);
         $this->kartu('riwayat_karpeg', $a, 2, []);
@@ -383,6 +405,18 @@ final class StatServiceTest extends DatabaseTestCase
 
         if ($diStorage) {
             $this->storage->simpan($path, $isi);
+        }
+
+        return $id;
+    }
+
+    private function lampiranTag(string $nip, int $kode, string $idEntri, ?string $tag, string $path, bool $diStorage): int
+    {
+        $this->db->table('document_attachment')->insert(['NIP' => $nip, 'id_riwayat' => $kode, 'id_entri' => $idEntri, 'tag' => $tag, 'path' => $path, 'display_name' => basename($path), 'file_ext' => 'pdf', 'file_type' => 'application/pdf']);
+        $id = (int) $this->db->insertID();
+
+        if ($diStorage) {
+            $this->storage->simpan($path, '%PDF-1.4');
         }
 
         return $id;

@@ -114,6 +114,18 @@ Perbedaan dengan kalkulasi v2 yang ada (PRD §7.6 — dicatat, TIDAK disamakan):
 | KGB | `KenaikanGajiBerkala::proyeksiBerikutnya()`: acuan pendahulu per TMT, jatuh tempo + 2 th, toleransi "hari ini" | tiga cabang bulan (>36 → +4/+2 bertingkat, 24–36 → hari ini, <24 → +2), acuan maks(KGB, CPNS/jabatan) |
 | Pensiun | `Pensiun::tanggalPensiun()` menjepit ke awal bulan (31-01-1968 → 2026-02-01) | luapan bulan legacy dipertahankan (→ 2026-03-01); BUP sama (`batasUsia` dipakai ulang) |
 
+Perbaikan review MAKE-061 (05-11-2026): `sp_admin_deputi` `riwayat_tb/ib` adalah path berkas legacy (`L_tb.php:799`,
+`L_ib.php:619`) → masuk daftar putih kolom berkas (URL/kosong), bukan path mentah (B1); `rekomendasi_kp_uns` diurut
+`gol_ruang_old` DESC, `id_satker` ASC [K S_stat:477-479] (P1); `lu_ppen` kp_uns selalu `null` [K S_stat:722] (P2); urutan kunci
+`arsip_*` mengikuti assignment berantai legacy (kanan → kiri) dan `arsip_skp` {Y-2, Y-1} (P3); kolom `file_*` `list_tb`/`list_ib`
+yang kosong diisi URL lampiran v2 `document_attachment` kode 46–50 (`BerkasStudi`, tag = nama kolom; `file_surat_*` kode 47/50)
+agar MuDig menerima berkas pasca-cutover — jenis unduh `lampiran_tb`/`surat_tb`/`lampiran_ib`/`surat_ib` (P4); filter
+`id_unit`/`id_satker` tidak di-trim dan parameter array dianggap terisi (S4); NULL kolom tetap `null` seperti CI3 (S5);
+`pegawai_ak` tanpa `id_riwayat_ak` dilewati (S3); arsip disaring per entri sebelum cek storage (S6); endpoint unduh mencatat
+jenis + kode hasil saja (S7). Batas ukuran: isi berkas dibaca utuh ke memori lewat `StorageAdapterInterface::baca()` (tanpa
+streaming; adapter belum punya API ukuran) — berkas unduhan s_stat adalah lampiran ≤ 5 MB sesuai `AturanLampiran`/`BerkasStudi`;
+batas/stream dicatat sebagai tindak lanjut bila adapter mendukung (S2/S8 reviewer).
+
 Gap untuk re-handshake PN-4 / runbook (dicatat, bukan dikerjakan di sini): MuDig wajib mengirim Basic auth juga saat mengunduh
 arsip dan bentuk URL arsip berubah (dulu URL berkas terbuka); berkas impor yang belum dimigrasi ke storage v2 tidak dapat diunduh
 (kolom kosong/404); hak `stat` hanya untuk klien jenis layanan (MuDig); per satker/unit tetap kosong (Q6-37).

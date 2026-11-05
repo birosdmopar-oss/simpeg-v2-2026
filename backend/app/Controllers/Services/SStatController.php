@@ -35,8 +35,9 @@ final class SStatController extends BaseController
      */
     public function rekomendasiKpUns(): ResponseInterface
     {
-        $idUnit   = trim((string) $this->request->getGet('id_unit'));
-        $idSatker = trim((string) $this->request->getGet('id_satker'));
+        // S4: tanpa trim (legacy `!= ''`: "%20" dianggap berfilter → data []); parameter berbentuk array dianggap terisi.
+        $idUnit   = self::teksQuery($this->request->getGet('id_unit'));
+        $idSatker = self::teksQuery($this->request->getGet('id_satker'));
 
         return $this->daftar('rekomendasi_kp_uns', $this->service()->rekomendasiKpUns($this->hariIni(), $idUnit, $idSatker));
     }
@@ -78,7 +79,7 @@ final class SStatController extends BaseController
     {
         $berkas = ctype_digit($id) ? $this->service()->berkasLampiran($jenis, $nip, (int) $id, $this->hariIni()) : null;
 
-        return $berkas === null ? ResponsLayanan::tidakDitemukan() : $this->unduh($berkas);
+        return $this->hasilUnduh('lampiran', $jenis, $berkas);
     }
 
     /**
@@ -88,7 +89,7 @@ final class SStatController extends BaseController
     {
         $berkas = ctype_digit($id) ? $this->service()->berkasKolom($jenis, $nip, (int) $id, $kolom) : null;
 
-        return $berkas === null ? ResponsLayanan::tidakDitemukan() : $this->unduh($berkas);
+        return $this->hasilUnduh('kolom', $jenis, $berkas);
     }
 
     /**
@@ -99,6 +100,27 @@ final class SStatController extends BaseController
         log_message('debug', 's_stat {aksi}: {jumlah} baris', ['aksi' => $aksi, 'jumlah' => count($data)]);
 
         return ResponsLayanan::sukses($data);
+    }
+
+    /**
+     * S7: log hanya jenis + kode hasil (tanpa NIP/nama/path).
+     *
+     * @param array{isi: string, nama: string}|null $berkas
+     */
+    private function hasilUnduh(string $bentuk, string $jenis, ?array $berkas): ResponseInterface
+    {
+        log_message('debug', 's_stat berkas {bentuk}/{jenis}: {kode}', ['bentuk' => $bentuk, 'jenis' => $jenis, 'kode' => $berkas === null ? 404 : 200]);
+
+        return $berkas === null ? ResponsLayanan::tidakDitemukan() : $this->unduh($berkas);
+    }
+
+    private static function teksQuery(mixed $nilai): string
+    {
+        if (is_array($nilai)) {
+            return 'array';
+        }
+
+        return is_scalar($nilai) ? (string) $nilai : '';
     }
 
     /**

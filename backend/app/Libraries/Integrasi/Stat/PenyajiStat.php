@@ -21,13 +21,28 @@ use App\Libraries\Kepegawaian\Struktur\StrukturService;
 final class PenyajiStat
 {
     /** Jenis lampiran `document_attachment` yang boleh diunduh → kode `jenis_rwy` v2. */
-    public const JENIS_LAMPIRAN = ['kp' => 11, 'skp' => 32, 'jabatan' => 9, 'kgb' => 10];
+    public const JENIS_LAMPIRAN = [
+        'kp' => 11, 'skp' => 32, 'jabatan' => 9, 'kgb' => 10,
+        // P4 (keputusan reviewer 05-11-2026): berkas TB/IB pasca-cutover tersimpan di document_attachment kode 46–50
+        // (`Layanan\Studi\BerkasStudi`), dipetakan ke kolom `file_*` list_tb/list_ib bila kolom legacy kosong.
+        'lampiran_tb' => 46, 'surat_tb' => 47, 'lampiran_ib' => 49, 'surat_ib' => 50,
+    ];
+
+    /**
+     * Sumber lampiran v2 per kolom `file_*` list_tb/list_ib (P4): kolom => [jenis lampiran, tag] — tag = nama kolom untuk
+     * slot multi-berkas (kode 46/49), null untuk kode satu-slot (47/50). `sp_admin_deputi` (B1: path berkas legacy
+     * `L_tb.php:799`, `L_ib.php:619`) tidak punya padanan v2 → hanya URL berkas kolom/kosong.
+     */
+    public const SUMBER_LAMPIRAN_STUDI = [
+        'tb' => ['file_sp' => ['lampiran_tb', 'file_sp'], 'file_1' => ['lampiran_tb', 'file_1'], 'file_2' => ['lampiran_tb', 'file_2'], 'file_3' => ['lampiran_tb', 'file_3'], 'file_surat_tb' => ['surat_tb', null]],
+        'ib' => ['file_sp' => ['lampiran_ib', 'file_sp'], 'file_1' => ['lampiran_ib', 'file_1'], 'file_2' => ['lampiran_ib', 'file_2'], 'file_surat_ib' => ['surat_ib', null]],
+    ];
 
     /** Jenis berkas kolom yang boleh diunduh → [tabel, PK, daftar putih kolom] (nama kolom persis migration v2). */
     public const JENIS_KOLOM = [
         'pak'        => ['pegawai_ak', 'id_riwayat_ak', ['file_pak']],
-        'tb'         => ['riwayat_tb', 'id_riwayat_tb', ['file_sp', 'file_1', 'file_2', 'file_3', 'file_surat_tb']],
-        'ib'         => ['riwayat_ib', 'id_riwayat_ib', ['file_sp', 'file_1', 'file_2', 'file_surat_ib']],
+        'tb'         => ['riwayat_tb', 'id_riwayat_tb', ['file_sp', 'file_1', 'file_2', 'file_3', 'sp_admin_deputi', 'file_surat_tb']],
+        'ib'         => ['riwayat_ib', 'id_riwayat_ib', ['file_sp', 'file_1', 'file_2', 'sp_admin_deputi', 'file_surat_ib']],
         'karpeg'     => ['riwayat_karpeg', 'id_riwayat_karpeg', ['file_surat_hilang', 'file_1', 'file_2', 'file_3', 'file_4', 'file_5', 'file_tanda_terima']],
         'kariskarsu' => ['riwayat_kariskarsu', 'id_riwayat_kariskarsu', ['file_1', 'file_2', 'file_3', 'file_4', 'file_5', 'file_surat_hilang', 'file_alasan', 'file_tanda_terima']],
     ];
