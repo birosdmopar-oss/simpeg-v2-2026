@@ -66,8 +66,8 @@ Cek "ada/tidak": `AttachmentServiceInterface::daftar(nip, idRiwayat, idEntri)` l
 `GET pegawai/{nip}/lampiran/{id}/unduh`. Legacy memanggil HTTP dan mengecek 200; v2 tidak memakai HTTP.
 
 **Keputusan:**
-- Q5 **DIPUTUSKAN HORII = A, ikut legacy persis** (dicatat PRD Q6-37 + AC-08.4 di CR-104, branch
-  `docs/cr-104-db-scratch-b9` @58be744f, belum di main). Fakta legacy: `rekomendasi_kp_uns` (S_stat.php:433) mengambil
+- Q5 **DIPUTUSKAN HORII = A, ikut legacy persis** (dicatat PRD Q6-37 + AC-08.4, PRD Fase 6 v1.0j di main
+  `58be744f`). Fakta legacy: `rekomendasi_kp_uns` (S_stat.php:433) mengambil
   filter dari `$_GET['id_satker']` / `$_GET['id_unit']` (:456–457), auth dikomentari (:446–447), memuat `file_pak` (:627)
   dan arsip jabatan/PAK (:600–638).
   - Route `services/s_stat/rekomendasi_kp_uns` dipertahankan; auth klien wajib (F6-03).
