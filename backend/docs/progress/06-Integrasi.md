@@ -154,6 +154,9 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
 - Deviasi [V2] F6-16: unggahan multipart (bukan path server), `esign_hist` selalu dicatat (isian kosong diisi bawaan: nama dari
   `pegawai`, `modul` 'MuDig'), `data.signed_file` = base64 PDF (legacy: path server), sukses hanya bila gateway mengembalikan
   PDF, batas 10 MB/2 MB di `Config\EsignMudig`.
+- Review kode B4b @85b9b515 (0 blokir, 3 perlu, 7 saran) diperbaiki: TINYTEXT dipotong byte; PDF tetap dikembalikan bila
+  `esign_hist` gagal sesudah TTE (pengecualian dicatat); `SensitiveParameter` pada NIK/PDF adapter; kunci `.env` huruf kecil;
+  MIME/nama gambar & `image` diteruskan; validasi NIK; `check_user` GET/POST; `zend.exception_ignore_args` di runbook.
 
 ### B5 — MAKE-066 Push FCM HTTP v1 (H-04, main `9debb366`)
 
