@@ -319,6 +319,35 @@ otomatis, tetapi BKN bisa sudah memproses permintaan yang balasannya tidak sampa
 CA bundle BSrE disimpan **di luar repo dan luar webroot** (mis. `/etc/simpeg-v2/`, `chmod 600`, pemilik user PHP) — lihat
 §1c dan §1d. Uji koneksi FCM: `php spark integrasi:uji-koneksi fcm` (validate_only, tanpa kirim ke perangkat, §1d).
 
+### 1f. Job terjadwal Fase 6 (ADR-037, PRD Fase 6 §6.4) — bagian Jalur A
+
+Job = command `php spark` + `cron.d` user `deploy` + `flock -n` (tanpa endpoint HTTP cron). Jam di bawah mengikuti zona waktu server: pastikan server berzona WIB (Asia/Jakarta) atau geser jamnya. Kode keluar ≠ 0 berarti ada yang gagal. Keluaran hanya jumlah, tanpa NIP/nama.
+
+| Command | Jadwal (WIB) | Task |
+|---|---|---|
+| `layanan:status-harian` | 00:30 setiap hari | H-11 (MAKE-062) |
+| `pengguna:sinkron-nama` | 01:00 setiap hari (USULAN, PN-5: dicocokkan dengan crontab legacy) | F6-21 bersyarat (MAKE-062) |
+
+```bash
+# /etc/cron.d/simpeg-v2-status-harian
+30 0 * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-status-harian.lock php spark layanan:status-harian >> /var/www/simpeg-v2/logs/status-harian.log 2>&1
+# /etc/cron.d/simpeg-v2-sinkron-nama (usulan)
+0 1 * * * deploy cd /var/www/simpeg-v2/current/backend && flock -n /tmp/simpeg-v2-sinkron-nama.lock php spark pengguna:sinkron-nama >> /var/www/simpeg-v2/logs/sinkron-nama.log 2>&1
+```
+
+`layanan:status-harian` (H-11, Q6-24..Q6-27):
+
+1. Prasyarat: `php spark integrasi:siapkan-akun-sistem` sudah dijalankan sesudah impor `pengguna` (pelaku audit = akun sistem; belum siap → kode keluar 1 tanpa menulis). `--dry-run` tidak butuh akun.
+2. **Run pertama di lingkungan baru WAJIB `--dry-run`** dan jumlahnya direview Biro SDM sebelum run nyata: `php spark layanan:status-harian --dry-run`. Baris INFO "status 2/3 tanpa riwayat pendukung" = pegawai berstatus TB/CLTN tanpa riwayat TB/CLTN (isian manual/impor) yang sengaja tidak disentuh; "bentrok TB+CLTN" dan "celah TB" dilaporkan untuk ditinjau.
+3. `--tanggal=YYYY-MM-DD` hanya bersama `--dry-run` untuk tanggal lampau (dihitung terhadap status pegawai SAAT INI); tanggal masa depan ditolak. Run nyata selalu hari ini WIB dan aman diulang (idempoten); run yang terlewat cukup dijalankan ulang hari itu.
+4. Hanya `pegawai.id_jenis_status` 1/2/3 dari pegawai berstatus aktif yang diubah; setiap perubahan tercatat di `audit_logs` (`jenis_audit` `layanan.status_harian`).
+
+`pengguna:sinkron-nama` (padanan legacy `sync_nama_pengguna`): menyamakan `pengguna.name` akun pegawai (role 2, status aktif, ber-NIP, pegawai aktif) dengan nama bergelar; hanya mengubah yang berbeda, idempoten, akun sistem dikecualikan, `--dry-run` tersedia, prasyarat akun sistem sama. Jadwal di atas masih usulan.
+
+**Server berzona UTC.** Jam `cron.d` mengikuti zona server. Bila server UTC, geser 7 jam: `layanan:status-harian` pukul 00:30 WIB = `30 17 * * *` (hari sebelumnya, UTC) dan `pengguna:sinkron-nama` pukul 01:00 WIB = `0 18 * * *`; atau pasang `CRON_TZ=Asia/Jakarta` di baris pertama berkas `cron.d` bila cron server mendukungnya. Run nyata `layanan:status-harian` selalu memakai tanggal WIB hari ini dari aplikasi, bukan dari jam cron.
+
+**Pemantauan.** Kode keluar ≠ 0 berarti ada kegagalan (`1` = galat/kunci sibuk/akun sistem belum siap/ada pegawai gagal, `7` = opsi salah). Pantau dengan pembungkus yang mengirim peringatan bila keluar ≠ 0 (mis. `|| echo "layanan:status-harian gagal" | mail ...` atau pemantau cron yang ada) dan lihat baris `ERROR` di `writable/logs` (cabang, kelas, kode; tanpa NIP/nama). Baris INFO "celah TB" = hari ini jatuh di celah antara akhir TB (atau perpanjangan) dan perpanjangan berikutnya; "segmen riwayat tidak sah" = riwayat TB/CLTN bertanggal rusak yang dilewati (perlu ditinjau Biro SDM).
+
 ### 1h. Auth antar-sistem — klien layanan dan token SIMAPI (MAKE-058, ADR-036) — bagian Jalur A
 
 Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) wajib auth; klien dibuat operator, bukan diimpor (F6-08).
