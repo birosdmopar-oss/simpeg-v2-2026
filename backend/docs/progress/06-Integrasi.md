@@ -121,11 +121,14 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
 
 ### B4b — `services/s_esign` untuk MuDig (F6-16, branch `fase6/make-065-s-esign`)
 
-- Dimulai sesudah A3 MAKE-058 di main `c926770f`. `check_user` + `sign_pdf` dengan filter `klienLayanan:esign`; route di
-  `Config/RoutesServicesEsign.php` (digabung ke `RoutesServices.php` Jalur A oleh paket yang merge belakangan).
-- Ikut legacy: parameter & bawaan, pesan, `msg` `check_user` selalu null (bug legacy), `ip_address`/`user_agent` dari POST.
-- Deviasi [V2] F6-16: unggahan multipart (bukan path server), `nama_lengkap`/`modul` wajib dan `esign_hist` selalu dicatat,
-  `data.signed_file` = base64 PDF (legacy: path server), sukses hanya bila gateway mengembalikan PDF, batas 10 MB/2 MB.
+- Dimulai sesudah A3 MAKE-058 di main `c926770f`. `check_user` + `sign_pdf` dengan filter `klienLayanan:esign`; route =
+  sub-group `s_esign` di `Config/RoutesServices.php` + responder `ResponsLayanan` (kerangka Jalur A, ditambahkan sesudah di main).
+- Putusan reviewer U1–U6 (05-11): ikut legacy untuk kontrak klien — `status` string "1"/"2" (PRD §6.3 akan dikoreksi CR docs),
+  `msg` `check_user` selalu null (bug legacy), parameter wajib hanya `nik`/`passphrase`/`file`/`imageTTD`, `ip_address`/
+  `user_agent` dari POST.
+- Deviasi [V2] F6-16: unggahan multipart (bukan path server), `esign_hist` selalu dicatat (isian kosong diisi bawaan: nama dari
+  `pegawai`, `modul` 'MuDig'), `data.signed_file` = base64 PDF (legacy: path server), sukses hanya bila gateway mengembalikan
+  PDF, batas 10 MB/2 MB di `Config\EsignMudig`.
 
 ### B5 — MAKE-066 Push FCM HTTP v1 (H-04, main `9debb366`)
 
