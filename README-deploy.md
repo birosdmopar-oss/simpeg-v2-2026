@@ -370,10 +370,16 @@ Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) w
    Retensi bawaan 7 hari sejak kedaluwarsa (`Config\KlienLayanan::$tokenRetensiHari`). Jam mengikuti zona waktu server (lihat §1f).
 5. **IP klien di belakang proxy/load balancer (wajib dicek sebelum go-live).** Allowlist dan bucket kegagalan memakai `getIPAddress()` CI4. Bila server
    di belakang proxy, `REMOTE_ADDR` = IP proxy: allowlist membandingkan IP proxy dan semua klien berbagi satu bucket (satu penyerang anonim dapat
-   mengunci semua klien). Cek topologi: bila ada proxy/LB, isi `app.proxyIPs` di `.env` server dengan IP proxy tepercaya (CI4 lalu membaca IP asli
-   dari header yang ditetapkan proxy) atau pastikan proxy meneruskan IP asli sebagai `REMOTE_ADDR` (mis. modul `real_ip` Nginx dengan `set_real_ip_from`).
-   Uji pasca-deploy: klien dengan allowlist yang SENGAJA salah wajib ditolak, klien dari IP sah wajib diterima, dan 6 percobaan gagal dari satu IP uji
-   tidak boleh mengunci klien lain.
+   mengunci semua klien). Cek topologi dulu. Bila ada proxy/LB, buat `REMOTE_ADDR` = IP asli klien di **Nginx** (modul `real_ip`), TANPA
+   konfigurasi aplikasi (`$proxyIPs` di `Config/App.php` tidak dapat diisi lewat `.env`):
+   ```nginx
+   set_real_ip_from <CIDR proxy/LB tepercaya>;
+   real_ip_header X-Forwarded-For;
+   real_ip_recursive on;
+   ```
+   Hanya CIDR proxy tepercaya yang boleh di `set_real_ip_from` (header dari sumber lain diabaikan, jadi klien tidak dapat memalsukan IP).
+   Uji pasca-deploy (wajib): (a) klien dengan allowlist yang HANYA berisi IP proxy/LB harus DITOLAK; (b) klien dengan allowlist berisi IP asli
+   klien harus DITERIMA; (c) 6 percobaan gagal dari satu IP uji tidak boleh mengunci klien lain.
 6. **Pemantauan.** Kegagalan auth tercatat di `integrasi_log` (arah masuk; kode `tidak_sah`, `tidak_aktif`, `ip_ditolak`, `hak_kurang`,
    `token_tidak_sah`, `throttle_*`; tanpa username/rahasia/IP). Lonjakan `tidak_sah` dari satu klien = rahasia salah/dirotasi; `ip_ditolak` =
    IP keluar klien berubah.
