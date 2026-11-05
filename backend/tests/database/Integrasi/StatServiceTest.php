@@ -60,6 +60,9 @@ final class StatServiceTest extends DatabaseTestCase
         [$a, $rkA] = $this->pegawaiKp('2022-04-01', 'III/a'); // reguler → 1 April 2026
         [$b]       = $this->pegawaiKp('2023-04-01', 'III/a'); // siklus tidak pas → tidak masuk
         [$c]       = $this->pegawaiKp('2022-10-01', 'II/a');  // 1 Oktober 2026; gol lebih rendah → diurut setelah III/a
+        $satkerA   = (int) $this->db->table('pegawai_mutasi_jabatan')->select('id_satker')->where('nip', $a)->get()->getRow('id_satker');
+        [$e]       = $this->pegawaiKp('2022-04-01', 'III/a', [], ['nama' => 'Aaa Pertama'], ['id_satker' => $satkerA]); // S1: tie gol+satker → nama ASC
+        $this->pendidikan($e);
         $this->pendidikan($a, 'Hukum');
         $this->pendidikan($b);
         $this->pendidikan($c);
@@ -76,7 +79,7 @@ final class StatServiceTest extends DatabaseTestCase
 
         $daftar = $this->service->rekomendasiKp(self::HARI_INI);
 
-        $this->assertSame([$a, $c], array_column($daftar, 'nip'), 'gol_ruang DESC, id_satker ASC; b tidak masuk');
+        $this->assertSame([$e, $a, $c], array_column($daftar, 'nip'), 'gol_ruang DESC, id_satker ASC, nama ASC (S1); b tidak masuk');
         $this->assertSame(
             array_merge(StatService::KOLOM_KP, ['id_jenis_kp', 'arsip_cpns', 'arsip_pns', 'arsip_last_kp', 'arsip_skp']),
             array_keys($daftar[0]),
@@ -90,12 +93,14 @@ final class StatServiceTest extends DatabaseTestCase
         $this->assertSame('S.1', $r['strata']);
         $this->assertSame('3', $r['id_jenis_kp']);
         $this->assertSame('Penata Muda', $r['pangkat']);
+        $this->assertSame('Dr. Aaa Pertama, M.Si.', $r['nama']);
+        $r = $daftar[1];
         $this->assertStringStartsWith('Dr. Pegawai Fixture', $r['nama']);
         $this->assertSame([self::BASE . "services/s_stat/berkas/kp/{$a}/{$idAda}"], $r['arsip_last_kp'], 'hanya yang ada di storage, hanya entri snapshot');
         $this->assertSame([], $r['arsip_cpns']);
         $this->assertSame([2024 => [], 2025 => [self::BASE . "services/s_stat/berkas/skp/{$a}/{$idArsipSkp}"]], $r['arsip_skp'], '[K] kunci Y-2 dulu, lalu Y-1 (S_stat:230)');
-        $this->assertSame('01 Oct 2026', $daftar[1]['tgl_kp']);
-        $this->assertSame('October', $daftar[1]['kp_bl']);
+        $this->assertSame('01 Oct 2026', $daftar[2]['tgl_kp']);
+        $this->assertSame('October', $daftar[2]['kp_bl']);
     }
 
     public function testRekomendasiKpUnsFormatMudigDanQ637(): void
@@ -111,9 +116,11 @@ final class StatServiceTest extends DatabaseTestCase
         $this->db->table('pegawai_ak')->insert(['nip' => $a, 'id_riwayat_ak' => $rak, 'nilai_ak' => 150.25, 'file_pak' => 'arsip/pak/a.pdf']);
         $this->storage->simpan('arsip/pak/a.pdf', '%PDF-pak');
         // SKP MuDig ketat: 2025 (Jan–Des) masuk; 2024 mulai Maret → tidak masuk.
-        $idSkp25 = $this->skp($a, 2025, 1, '2025-02-01', '2025-12-31');
+        $idSkp25  = $this->skp($a, 2025, 1, '2025-02-01', '2025-12-31');
+        $idSkp25b = $this->skp($a, 2025, 1, '2025-01-05', '2025-12-31'); // S2: urut tgl_mulai DESC → baris ini terakhir → menang
         $this->skp($a, 2024, 1, '2024-03-01', '2024-12-31');
         $this->lampiran($a, 32, (string) $idSkp25, 'arsip/skp/a-2025.pdf', true);
+        $idArsip25b = $this->lampiran($a, 32, (string) $idSkp25b, 'arsip/skp/a-2025b.pdf', true);
 
         // [K] bug legacy Q6-37: filter tidak kosong → kosong.
         $this->assertSame([], $this->service->rekomendasiKpUns(self::HARI_INI, '', '12'));
@@ -144,7 +151,7 @@ final class StatServiceTest extends DatabaseTestCase
         $this->assertSame([self::BASE . "services/s_stat/berkas/jabatan/{$a}/{$idJab}"], $r['arsip_last_jab']);
         $this->assertSame([self::BASE . "services/s_stat/berkas/pak/{$a}/{$rak}/file_pak"], $r['arsip_last_pak']);
         $this->assertArrayHasKey(2025, $r['arsip_skp']);
-        $this->assertCount(1, $r['arsip_skp'][2025]);
+        $this->assertSame([self::BASE . "services/s_stat/berkas/skp/{$a}/{$idArsip25b}"], $r['arsip_skp'][2025], 'S2 [K S_stat:581]: hanya baris SKP terakhir per tahun');
         $this->assertSame([], $r['arsip_skp'][2024]);
         $this->assertNotNull($r['lu_rskp_y1']);
         $this->assertNull($r['lu_rskp_y2'], 'SKP 2024 tidak lolos saringan ketat MuDig');
@@ -207,6 +214,8 @@ final class StatServiceTest extends DatabaseTestCase
         $this->assertSame([self::BASE . "services/s_stat/berkas/kgb/{$a}/{$idKgb}"], $r['arsip_last_kgb']);
         $this->assertArrayNotHasKey('arsip_kp', $r);
         $this->assertSame('2026-11-05', $daftar[0]['tmtsk_kgb']);
+        $this->assertNull($daftar[0]['gaji_last_kgb'], 'S5: NULL tetap null');
+        $this->assertSame('SK-B', $daftar[0]['no_sk_last_kgb']);
     }
 
     public function testListTbDanKarpegTanpaPathInternal(): void
@@ -348,12 +357,14 @@ final class StatServiceTest extends DatabaseTestCase
      * Pegawai PNS + riwayat KP + snapshot `pegawai_kp`; mengembalikan [nip, id_riwayat_kp].
      *
      * @param array<string, mixed> $kp
+     * @param array<string, mixed> $pegawai
+     * @param array<string, mixed> $pmj
      *
      * @return array{0: string, 1: int}
      */
-    private function pegawaiKp(string $tmtsk, string $golRuang, array $kp = []): array
+    private function pegawaiKp(string $tmtsk, string $golRuang, array $kp = [], array $pegawai = [], array $pmj = []): array
     {
-        $nip = $this->buatPegawai(['id_jenis_pegawai' => 1, 'glr_awal' => 'Dr.', 'glr_akhir' => 'M.Si.']);
+        $nip = $this->buatPegawai(['id_jenis_pegawai' => 1, 'glr_awal' => 'Dr.', 'glr_akhir' => 'M.Si.'] + $pegawai, $pmj);
         $rk  = $this->riwayatKp($nip, $tmtsk);
         $this->db->table('pegawai_kp')->insert(array_merge([
             'nip'      => $nip, 'id_riwayat_kp' => $rk, 'id_jenis_kp' => 3, 'id_pangkat' => $this->idPangkatIIIa, 'tmtsk' => $tmtsk, 'tgl_sk' => $tmtsk,

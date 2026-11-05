@@ -69,6 +69,12 @@ final class RekomendasiKgbPensiunTest extends CIUnitTestCase
 
         $tanpa = $k->hitung(['id_jenis_pegawai' => '1', 'tmtsk_kgb' => '', 'tmtsk_cpns' => '2025-01-01', 'no_sk_last_kgb' => 'SK-9']);
         $this->assertSame(['', '', ''], [$tanpa['no_sk_last_kgb'], $tanpa['tmtsk_last_kgb'], $tanpa['gaji_last_kgb']]);
+
+        // S5 [K LE:4141-4143]: kolom NULL pada baris KGB tetap null (bukan "").
+        $nol = $k->hitung(['id_jenis_pegawai' => '1', 'tmtsk_kgb' => '2025-03-01', 'no_sk_last_kgb' => null, 'gaji_last_kgb' => null]);
+        $this->assertNull($nol['no_sk_last_kgb']);
+        $this->assertNull($nol['gaji_last_kgb']);
+        $this->assertSame('2025-03-01', $nol['tmtsk_last_kgb']);
     }
 
     public function testPensiunBatasUsiaSamaDenganKalkulasiV2(): void

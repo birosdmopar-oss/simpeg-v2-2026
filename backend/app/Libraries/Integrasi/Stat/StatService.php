@@ -84,7 +84,8 @@ final class StatService
 
         // Urut gol_ruang DESC, id_satker ASC [K S_stat:46-48] — array_multisort SORT_REGULAR; sort stabil PHP 8.
         $daftar = array_values($master);
-        usort($daftar, static fn (array $a, array $b): int => [$b['gol_ruang'], $a['id_satker']] <=> [$a['gol_ruang'], $b['id_satker']]);
+        // S1: pemecah tie `nama` ASC lalu `nip` (array_multisort legacy membandingkan isi baris; kunci pertama = nama).
+        usort($daftar, static fn (array $a, array $b): int => [$b['gol_ruang'], $a['id_satker'], $a['nama'], $a['nip']] <=> [$a['gol_ruang'], $b['id_satker'], $b['nama'], $b['nip']]);
 
         $nips     = array_column($daftar, 'nip');
         $cpns     = $this->snapshotPerNip('pegawai_cpns', $nips);
@@ -143,7 +144,7 @@ final class StatService
         }
 
         // Urut gol_ruang_old DESC, id_satker ASC [K S_stat:477-479] (P1).
-        usort($daftar, static fn (array $a, array $b): int => [$b['gol_ruang_old'], $a['id_satker']] <=> [$a['gol_ruang_old'], $b['id_satker']]);
+        usort($daftar, static fn (array $a, array $b): int => [$b['gol_ruang_old'], $a['id_satker'], $a['nama'], $a['nip']] <=> [$a['gol_ruang_old'], $b['id_satker'], $b['nama'], $b['nip']]);
 
         $nips     = array_column($daftar, 'nip');
         $cpns     = $this->snapshotPerNip('pegawai_cpns', $nips);
@@ -162,7 +163,7 @@ final class StatService
             // {Y-2, Y-1}, arsip_last_kp, arsip_pns, arsip_cpns (P3).
             $r['arsip_last_pak'] = $this->urlFilePak($pak[$nip] ?? null);
             $r['arsip_last_jab'] = $this->urlArsip($arsipJab, $nip, $pmj[$nip]['id_riwayat_mutasi_jabatan'] ?? null);
-            $r['arsip_skp']      = $this->arsipSkp($arsipSkp, $skp[$nip] ?? [], [$tahun - 2, $tahun - 1]);
+            $r['arsip_skp']      = $this->arsipSkp($arsipSkp, $skp[$nip] ?? [], [$tahun - 2, $tahun - 1], true); // S2 [K S_stat:581]
             $r['arsip_last_kp']  = $this->urlArsip($arsipKp, $nip, $kp[$nip]['id_riwayat_kp'] ?? null);
             $r['arsip_pns']      = $this->urlArsip($arsipKp, $nip, $pns[$nip]['id_riwayat_kp'] ?? null);
             $r['arsip_cpns']     = $this->urlArsip($arsipKp, $nip, $cpns[$nip]['id_riwayat_kp'] ?? null);
@@ -209,6 +210,7 @@ final class StatService
             ->join('jabatan jab', 'jab.id_jabatan = pmj.id_jabatan', 'left')
             ->where('peg.status', 1)
             ->where('peg.id_jenis_pegawai', 1)
+            ->orderBy('peg.nip', 'ASC') // S1: deterministik sebelum usort
             ->get()->getResultArray();
 
         $daftar = [];
@@ -241,7 +243,7 @@ final class StatService
         }
 
         // Urut tgl_pensiun DESC, id_satker ASC [K S_stat:751-753].
-        usort($daftar, static fn (array $a, array $b): int => [$b['tgl_pensiun'], $a['id_satker']] <=> [$a['tgl_pensiun'], $b['id_satker']]);
+        usort($daftar, static fn (array $a, array $b): int => [$b['tgl_pensiun'], $a['id_satker'], $a['nama'], $a['nip']] <=> [$a['tgl_pensiun'], $b['id_satker'], $b['nama'], $b['nip']]);
 
         $nips     = array_column($daftar, 'nip');
         $cpns     = $this->snapshotPerNip('pegawai_cpns', $nips);
@@ -287,6 +289,7 @@ final class StatService
             ->join('pegawai_mutasi_jabatan pmj', 'pmj.nip = peg.nip', 'left')
             ->where('peg.status', 1)
             ->whereIn('peg.id_jenis_pegawai', [1, 6])
+            ->orderBy('peg.nip', 'ASC')
             ->get()->getResultArray();
 
         $daftar = [];
@@ -683,16 +686,25 @@ final class StatService
      *
      * @return array<int, list<string>>
      */
-    private function arsipSkp(array $arsip, array $skpNip, array $tahun): array
+    private function arsipSkp(array $arsip, array $skpNip, array $tahun, bool $hanyaTerakhir = false): array
     {
         $hasil = [];
+        $baris = [];
 
         foreach ($tahun as $th) {
             $hasil[$th] = [];
+
+            // S2 [K S_stat:581]: format MuDig hanya memakai baris SKP terakhir per tahun (`$list_SKP[nip][tahun] = $row`);
+            // format SIMPEG (S_stat:181) memakai semua baris.
+            if ($hanyaTerakhir && isset($skpNip[$th]) && is_array($skpNip[$th])) {
+                $baris[] = $skpNip[$th];
+            }
         }
 
-        /** @var list<array<string, mixed>> $baris */
-        $baris = $skpNip['_semua'] ?? [];
+        if (! $hanyaTerakhir) {
+            /** @var list<array<string, mixed>> $baris */
+            $baris = $skpNip['_semua'] ?? [];
+        }
 
         foreach ($baris as $r) {
             $th = (int) $r['tahun'];

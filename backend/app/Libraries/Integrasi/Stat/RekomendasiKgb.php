@@ -36,7 +36,7 @@ final class RekomendasiKgb
      * @param array<string, mixed> $r `id_jenis_pegawai`, `tmtsk_kgb` (KGB terakhir), `no_sk_last_kgb`, `gaji_last_kgb`,
      *                                `tmtsk_cpns`, `tmtsk_pmj`
      *
-     * @return array{tmtsk_kgb: string, kgb_th: int|string, kgb_bl: int|string, no_sk_last_kgb: string, tmtsk_last_kgb: string, gaji_last_kgb: string}
+     * @return array{tmtsk_kgb: string, kgb_th: int|string, kgb_bl: int|string, no_sk_last_kgb: mixed, tmtsk_last_kgb: string, gaji_last_kgb: mixed}
      */
     public function hitung(array $r): array
     {
@@ -44,10 +44,11 @@ final class RekomendasiKgb
         $last  = '';
 
         if (KalenderStat::valid((string) ($r['tmtsk_kgb'] ?? ''))) {
-            $last                    = (string) $r['tmtsk_kgb'];
-            $hasil['no_sk_last_kgb'] = (string) ($r['no_sk_last_kgb'] ?? '');
+            $last = (string) $r['tmtsk_kgb'];
+            // S5 [K LE:4141-4143]: nilai kolom disalin apa adanya — NULL tetap null, bukan "".
+            $hasil['no_sk_last_kgb'] = $r['no_sk_last_kgb'] ?? null;
             $hasil['tmtsk_last_kgb'] = $last;
-            $hasil['gaji_last_kgb']  = (string) ($r['gaji_last_kgb'] ?? '');
+            $hasil['gaji_last_kgb']  = $r['gaji_last_kgb'] ?? null;
         }
 
         $pembanding = (string) ($r['id_jenis_pegawai'] ?? '') === self::JENIS_PPPK

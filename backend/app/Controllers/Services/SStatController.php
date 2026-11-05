@@ -109,7 +109,9 @@ final class SStatController extends BaseController
      */
     private function hasilUnduh(string $bentuk, string $jenis, ?array $berkas): ResponseInterface
     {
-        log_message('debug', 's_stat berkas {bentuk}/{jenis}: {kode}', ['bentuk' => $bentuk, 'jenis' => $jenis, 'kode' => $berkas === null ? 404 : 200]);
+        // N2: jenis dari URL tidak dicatat mentah — di luar daftar putih dicatat `lain`.
+        $jenisLog = isset(PenyajiStat::JENIS_LAMPIRAN[$jenis]) || isset(PenyajiStat::JENIS_KOLOM[$jenis]) ? $jenis : 'lain';
+        log_message('debug', 's_stat berkas {bentuk}/{jenis}: {kode}', ['bentuk' => $bentuk, 'jenis' => $jenisLog, 'kode' => $berkas === null ? 404 : 200]);
 
         return $berkas === null ? ResponsLayanan::tidakDitemukan() : $this->unduh($berkas);
     }

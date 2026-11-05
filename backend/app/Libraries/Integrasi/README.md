@@ -124,7 +124,11 @@ agar MuDig menerima berkas pasca-cutover — jenis unduh `lampiran_tb`/`surat_tb
 `pegawai_ak` tanpa `id_riwayat_ak` dilewati (S3); arsip disaring per entri sebelum cek storage (S6); endpoint unduh mencatat
 jenis + kode hasil saja (S7). Batas ukuran: isi berkas dibaca utuh ke memori lewat `StorageAdapterInterface::baca()` (tanpa
 streaming; adapter belum punya API ukuran) — berkas unduhan s_stat adalah lampiran ≤ 5 MB sesuai `AturanLampiran`/`BerkasStudi`;
-batas/stream dicatat sebagai tindak lanjut bila adapter mendukung (S2/S8 reviewer).
+batas/stream dicatat sebagai tindak lanjut bila adapter mendukung (S8 reviewer). Tambahan review ulang: pemecah tie urutan
+`nama` ASC lalu `nip` dan ORDER BY deterministik pada query pensiun/KGB (S1); `arsip_skp` format MuDig hanya memakai baris SKP
+terakhir per tahun [K S_stat:581] (S2); log endpoint unduh hanya mencatat jenis dalam daftar putih (`lain` untuk lainnya) (N2).
+Batasan yang diterima (N1): untuk slot TB/IB yang punya lebih dari satu lampiran v2, hanya lampiran terbaru per slot yang
+dikeluarkan di `file_*` (legacy memang satu path per kolom).
 
 Gap untuk re-handshake PN-4 / runbook (dicatat, bukan dikerjakan di sini): MuDig wajib mengirim Basic auth juga saat mengunduh
 arsip dan bentuk URL arsip berubah (dulu URL berkas terbuka); berkas impor yang belum dimigrasi ke storage v2 tidak dapat diunduh
