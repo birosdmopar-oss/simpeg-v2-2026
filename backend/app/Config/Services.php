@@ -508,7 +508,7 @@ class Services extends BaseService
 
         return match ($driver) {
             'mock'  => new MockEsignAdapter([], false),
-            'bsre'  => new \App\Libraries\Esign\BsreEsignAdapter(static::klienHttp(), config(Integrations::class)->esign, static fn (string $nik): ?string => trim($nik) !== '' ? trim($nik) : null),
+            'bsre'  => new \App\Libraries\Esign\BsreEsignAdapter(static::klienHttp(), config(Integrations::class)->esign, static fn (#[\SensitiveParameter] string $nik): ?string => trim($nik) !== '' ? trim($nik) : null),
             default => throw new RuntimeException("Esign driver '{$driver}' belum tersedia."),
         };
     }
