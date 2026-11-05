@@ -213,6 +213,16 @@ final class SimapiEmployeeTest extends DatabaseTestCase
         $this->assertSame([], $d['atasan_langsung'], 'getAL kosong → []');
     }
 
+    public function testTokenKlienNonaktifDitolak(): void
+    {
+        $nip = $this->buatPegawai();
+        $this->assertSame('01', $this->emp('data_umum', $nip)['status']);
+
+        (new \App\Libraries\Integrasi\Klien\PenyimpanKlien($this->db))->ubahStatus('pusdatin', \App\Libraries\Integrasi\Klien\PenyimpanKlien::STATUS_NONAKTIF);
+
+        $this->assertSame(['status' => '02', 'msg' => 'Token is not valid', 'data' => []], $this->emp('data_umum', $nip));
+    }
+
     public function testNamaUnitPortFixUnitName(): void
     {
         $this->assertSame('Umum', PenyajiPegawai::namaUnit('Kepala Subbagian Umum'));

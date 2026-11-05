@@ -36,7 +36,8 @@ class AAuth extends BaseController
         } catch (KlienTidakAktif) {
             return ResponsAuthKlien::gagal(true);
         } catch (RuntimeException $e) {
-            log_message('error', 'SIMAPI a_auth/token gagal: {pesan}', ['pesan' => $e->getMessage()]);
+            // Hanya kelas + kode: pesan DatabaseException bisa memuat SQL/nilai (hash token).
+            log_message('error', 'SIMAPI a_auth/token gagal: ' . (new \ReflectionClass($e))->getShortName() . ' kode ' . $e->getCode() . '.');
 
             return ResponsSimapi::gagal(ResponsSimapi::PESAN_SERVER);
         }

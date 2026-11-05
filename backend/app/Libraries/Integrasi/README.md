@@ -110,6 +110,8 @@ Keputusan dan penyimpangan:
   `p_get_satker`): kueri legacy di sana TANPA filter status (`A_dm.php:274`, `S_dm.php:175`, `:247`) karena legacy menghapus keras
   (`struktur_jabatan` legacy tak punya kolom status); status 10 v2 = baris yang di legacy sudah tidak ada. Daftar lain memfilter `status = 1`
   persis legacy.
+- **[K]** daftar riwayat dan `ambil_riwayat_mutasi` tanpa LIMIT, ikut legacy (riwayat per NIP kecil; `ambil_riwayat_mutasi` memang
+  seluruh tabel untuk sinkron E-Talenta). Bila volume menjadi masalah, paginasi = perubahan kontrak (perlu keputusan).
 - **[V2]** teks tidak di-`stripslashes` ulang (impor UP-1 sudah menormalkan, Impor README #5).
 - **[K] bug legacy B-9 (keputusan Horii 04-11, Q6-36): ikut legacy.** `detil` tidak memilih nama `atasan_es_3(_koord)`/`atasan_es_4(_koord)`
   (`AE:278`), jadi bagian `unit_es_3`/`unit_es_4` yang berasal dari atasan selalu ""; hanya unit dari jabatan sendiri (sub group 3/4 atau
