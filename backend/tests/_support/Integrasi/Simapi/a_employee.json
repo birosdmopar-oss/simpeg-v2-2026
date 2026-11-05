@@ -1,0 +1,487 @@
+{
+    "_keterangan": "MAKE-059 fixture kontrak SIMAPI a_employee (sintetis, tanpa data nyata): nama field dan urutannya per method, diturunkan dari blok $result['data'] di controllers/simapi/v1/A_employee.php. 'kunci' = field data (per baris bila 'daftar'); 'kunci_anak' = field daftar_anak.",
+    "data_umum": {
+        "_rujukan": "A_employee.php:195",
+        "daftar": false,
+        "kunci": [
+            "nip",
+            "nama",
+            "glr_awal",
+            "glr_akhir",
+            "tgl_lahir",
+            "provinsi_lahir",
+            "kabupaten_kota_lahir",
+            "agama",
+            "jenis_kelamin",
+            "npwp",
+            "email",
+            "no_hp",
+            "no_telp_kerabat",
+            "status_pernikahan",
+            "jenis_pegawai",
+            "status",
+            "jenis_status",
+            "tmt_status",
+            "foto"
+        ]
+    },
+    "detil": {
+        "_rujukan": "A_employee.php:321",
+        "daftar": false,
+        "kunci": [
+            "nip",
+            "nama",
+            "glr_awal",
+            "glr_akhir",
+            "tgl_lahir",
+            "provinsi_lahir",
+            "kabupaten_kota_lahir",
+            "agama",
+            "jenis_kelamin",
+            "npwp",
+            "email",
+            "no_hp",
+            "no_telp_kerabat",
+            "status_pernikahan",
+            "jenis_pegawai",
+            "status",
+            "jenis_status",
+            "tmt_status",
+            "foto",
+            "tmt_jabatan",
+            "jabatan",
+            "jabatan_koordinasi",
+            "unit_es_1",
+            "unit_es_2",
+            "unit_es_3",
+            "unit_es_4",
+            "atasan_langsung",
+            "tmt_kp",
+            "gol_ruang",
+            "pangkat",
+            "gaji_pokok",
+            "tgl_lulus",
+            "jenjang_pendidikan_singkat",
+            "institusi_pendidikan",
+            "jurusan_pendidikan",
+            "nilai_pendidikan"
+        ]
+    },
+    "alamat_rumah": {
+        "_rujukan": "A_employee.php:435",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "alamat",
+            "provinsi",
+            "kabupaten_kota",
+            "kecamatan",
+            "kelurahan",
+            "kode_pos"
+        ]
+    },
+    "alamat_kantor": {
+        "_rujukan": "A_employee.php:519",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "alamat",
+            "provinsi",
+            "kabupaten_kota",
+            "kecamatan",
+            "kelurahan",
+            "kode_pos",
+            "nama_kantor",
+            "lantai",
+            "telp",
+            "faks"
+        ]
+    },
+    "keluarga": {
+        "_rujukan": "A_employee.php:598",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "urutan_perkawinan",
+            "tgl_perkawinan",
+            "kota_perkawinan",
+            "nama_pasangan",
+            "jumlah_anak",
+            "daftar_anak"
+        ],
+        "kunci_anak": [
+            "id_rwy",
+            "id_rwy_perkawinan",
+            "urutan_anak",
+            "tgl_lahir_anak",
+            "nama_anak",
+            "tempat_lahir_anak"
+        ]
+    },
+    "riwayat_keluarga": {
+        "_rujukan": "A_employee.php:685",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "urutan_perkawinan",
+            "tgl_perkawinan",
+            "kota_perkawinan",
+            "nama_pasangan",
+            "jumlah_anak",
+            "daftar_anak"
+        ],
+        "kunci_anak": [
+            "id_rwy",
+            "id_rwy_perkawinan",
+            "urutan_anak",
+            "tgl_lahir_anak",
+            "nama_anak",
+            "tempat_lahir_anak"
+        ]
+    },
+    "pendidikan_terakhir": {
+        "_rujukan": "A_employee.php:787",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tgl_lulus",
+            "no_ijazah",
+            "institusi_pendidikan",
+            "jenjang_pendidikan_singkat",
+            "bidang_pendidikan",
+            "jurusan_pendidikan",
+            "nilai"
+        ]
+    },
+    "riwayat_pendidikan": {
+        "_rujukan": "A_employee.php:871",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tgl_lulus",
+            "no_ijazah",
+            "institusi_pendidikan",
+            "jenjang_pendidikan_singkat",
+            "bidang_pendidikan",
+            "jurusan_pendidikan",
+            "nilai"
+        ]
+    },
+    "pelatihan_struktural_terakhir": {
+        "_rujukan": "A_employee.php:962",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "jenis_pelatihan",
+            "nama_pelatihan",
+            "no_sertifikat",
+            "tgl_sertifikat",
+            "jumlah_jp",
+            "instansi_penyelenggara",
+            "keterangan"
+        ]
+    },
+    "riwayat_pelatihan": {
+        "_rujukan": "A_employee.php:1050",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "jenis_pelatihan",
+            "nama_pelatihan",
+            "no_sertifikat",
+            "tgl_sertifikat",
+            "jumlah_jp",
+            "instansi_penyelenggara",
+            "keterangan"
+        ]
+    },
+    "skp_terakhir": {
+        "_rujukan": "A_employee.php:1128",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tahun",
+            "tgl_mulai",
+            "tgl_akhir",
+            "nip_penilai",
+            "nama_penilai",
+            "jabatan_penilai",
+            "nip_atasan_penilai",
+            "nama_atasan_penilai",
+            "jabatan_atasan_penilai",
+            "nilai_skp",
+            "nilai_perilaku",
+            "nilai_prestasi_kerja",
+            "kategori_nilai"
+        ]
+    },
+    "riwayat_skp": {
+        "_rujukan": "A_employee.php:1209",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tahun",
+            "tgl_mulai",
+            "tgl_akhir",
+            "nip_penilai",
+            "nama_penilai",
+            "jabatan_penilai",
+            "nip_atasan_penilai",
+            "nama_atasan_penilai",
+            "jabatan_atasan_penilai",
+            "nilai_skp",
+            "nilai_perilaku",
+            "nilai_prestasi_kerja",
+            "kategori_nilai"
+        ]
+    },
+    "riwayat_kursus_seminar": {
+        "_rujukan": "A_employee.php:1293",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "jenis",
+            "tgl_sertifikat",
+            "no_sertifikat",
+            "bidang",
+            "nama",
+            "jumlah_jp",
+            "instansi_penyelenggara",
+            "keterangan"
+        ]
+    },
+    "riwayat_organisasi": {
+        "_rujukan": "A_employee.php:1372",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tgl_mulai",
+            "tgl_akhir",
+            "nama_organisasi",
+            "kedudukan",
+            "keterangan"
+        ]
+    },
+    "pengangkatan_cpns": {
+        "_rujukan": "A_employee.php:1454",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "jenis_kp",
+            "gol",
+            "ruang",
+            "gol_ruang",
+            "pangkat",
+            "mker_th",
+            "mker_bl",
+            "gaji_pokok"
+        ]
+    },
+    "pengangkatan_pns": {
+        "_rujukan": "A_employee.php:1539",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "jenis_kp",
+            "gol",
+            "ruang",
+            "gol_ruang",
+            "pangkat",
+            "mker_th",
+            "mker_bl",
+            "gaji_pokok"
+        ]
+    },
+    "kp_terakhir": {
+        "_rujukan": "A_employee.php:1624",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "jenis_kp",
+            "gol",
+            "ruang",
+            "gol_ruang",
+            "pangkat",
+            "mker_th",
+            "mker_bl",
+            "gaji_pokok"
+        ]
+    },
+    "riwayat_kp": {
+        "_rujukan": "A_employee.php:1710",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "jenis_kp",
+            "gol",
+            "ruang",
+            "gol_ruang",
+            "pangkat",
+            "mker_th",
+            "mker_bl",
+            "gaji_pokok"
+        ]
+    },
+    "jabatan_terakhir": {
+        "_rujukan": "A_employee.php:1791",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "id_jabatan",
+            "id_jabatan_koordinasi",
+            "jabatan",
+            "jabatan_koordinasi",
+            "jabatan_lain",
+            "kelas_jabatan",
+            "group_jabatan",
+            "sub_group_jabatan",
+            "unit",
+            "satker",
+            "atasan_es_1",
+            "atasan_es_2",
+            "atasan_es_3",
+            "atasan_es_4",
+            "kredit_jft",
+            "no_induk_jft",
+            "status_jft"
+        ]
+    },
+    "riwayat_jabatan": {
+        "_rujukan": "A_employee.php:1879",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "jenis_jabatan",
+            "jenis_jabatan_koordinasi",
+            "id_jabatan",
+            "id_jabatan_koordinasi",
+            "jabatan",
+            "jabatan_koordinasi",
+            "jabatan_lain",
+            "kelas_jabatan",
+            "group_jabatan",
+            "sub_group_jabatan",
+            "unit",
+            "satker",
+            "atasan_es_1",
+            "atasan_es_2",
+            "atasan_es_3",
+            "atasan_es_4",
+            "kredit_jft",
+            "no_induk_jft",
+            "status_jft"
+        ]
+    },
+    "kgb_terakhir": {
+        "_rujukan": "A_employee.php:1971",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "mker_gol_th",
+            "gaji_pokok",
+            "jabatan_yang_menandatangani"
+        ]
+    },
+    "riwayat_kgb": {
+        "_rujukan": "A_employee.php:2045",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "mker_gol_th",
+            "gaji_pokok",
+            "jabatan_yang_menandatangani"
+        ]
+    },
+    "tj_terakhir": {
+        "_rujukan": "A_employee.php:2126",
+        "daftar": false,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tgl_sertifikat",
+            "no_sertifikat",
+            "tanda_jasa",
+            "negara",
+            "keterangan"
+        ]
+    },
+    "riwayat_tj": {
+        "_rujukan": "A_employee.php:2205",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tgl_sertifikat",
+            "no_sertifikat",
+            "tanda_jasa",
+            "negara",
+            "keterangan"
+        ]
+    },
+    "riwayat_hukdis": {
+        "_rujukan": "A_employee.php:2291",
+        "daftar": true,
+        "kunci": [
+            "id_rwy",
+            "nip",
+            "tmtsk",
+            "tgl_sk",
+            "no_sk",
+            "tingkat_hukdis",
+            "jenis_hukdis",
+            "gol",
+            "ruang",
+            "gol_ruang",
+            "pangkat",
+            "masa_hukuman",
+            "akhir_hukdis",
+            "aturan_dilanggar",
+            "alasan_hukuman",
+            "keterangan"
+        ]
+    }
+}
