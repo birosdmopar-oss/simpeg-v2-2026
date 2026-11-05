@@ -63,3 +63,14 @@ Fondasi Jalur A untuk SIMAPI dan `services/*` (PRD Fase 6 §7.0.1). Filter `klie
 
 Command: `php spark integrasi:klien buat|rotasi|nonaktif|aktifkan|hapus|daftar|bersihkan-token`. Rahasia ditampilkan sekali. Test:
 `tests/unit/Integrasi/Klien/*`, `tests/database/Integrasi/{KlienLayananTest,FilterAuthKlienTest,IntegrasiKlienCommandTest}.php`.
+
+## Endpoint kompatibilitas `services/*` — pola berkas bersama (Jalur A, kerangka MAKE-061)
+
+Route path legacy `services/<controller>/<method>` (di luar `api/v1`, PRD Fase 6 §3/§6.1) ada di SATU berkas bersama
+`Config/RoutesServices.php` (didaftarkan di `Config\Routing::$routeFiles`): satu `$routes->group('services', …)` tanpa filter
+`jwt`/`cors`, lalu satu sub-group per controller dengan filter hak masing-masing — `s_stat` (`klienLayanan:stat`, A6 MAKE-061),
+`s_dm` (`klienLayanan:dm`, A4 MAKE-059), `s_esign` (`klienLayanan:esign`, B4b). Controller tipis di `Controllers/Services/*`,
+logika di `Libraries/Integrasi/*`. Amplop bisnis INT `{"status":1|2,"msg","data"}` HTTP 200 lewat `Layanan/ResponsLayanan`
+(bukan amplop SIMAPI "01"/"02"); auth gagal 401 / throttle 429 sudah ditangani filter A3 (`Klien/ResponsAuthKlien`). Setiap paket
+hanya MENAMBAH sub-group-nya sendiri (aditif); yang merge belakangan menggabungkan `origin/main`.
+
