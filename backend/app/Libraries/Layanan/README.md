@@ -204,3 +204,13 @@ Sesi DB berzona UTC (driver `App\Database\MySQLi`, DBV-025), jadi default/ON UPD
 - Deviasi: tulis lewat query builder + `audit_logs` manual, BUKAN event `PegawaiModel`, sama dengan `EfekFinalCutiService`; pelanggan event perubahan `pegawai` (A5 `change_history`) tidak terpicu oleh job ini, jadi A5 perlu menangani perubahan `id_jenis_status` dari job harian secara terpisah bila diperlukan.
 - INFO `celah_tb` = pegawai berstatus 2 yang hari ini jatuh di celah antara dua segmen TB dan karena itu dikembalikan ke 1.
 - Test: `tests/unit/Layanan/StatusHarian/*`, `tests/database/Layanan/StatusHarianTest.php`.
+
+### Catatan sadar — `pengguna:sinkron-nama` dan kunci `layanan:status-harian` (review A2a, reviewer CR 05-11-2026)
+
+- **Rumus nama [V2].** Legacy `formatNamaGelar` (`function_helper.php:102`) memakai `stripslashes` per bagian, hanya men-trim hasil akhir, dan menambahkan
+  gelar akhir apa adanya bila tidak kosong. v2 memakai `StrukturService::namaGelar` (trim tiap bagian, tanpa `stripslashes`): nama berspasi di
+  ujung atau bergelar hanya spasi menghasilkan teks sedikit lebih rapi; sama dengan tampilan nama di seluruh v2. Data impor yang berisi
+  backslash-escape terbawa apa adanya.
+- **Kunci.** `layanan:status-harian` mengunci baris pegawai lalu riwayat TB/CLTN-nya (`FOR UPDATE`); `riwayat_tb_perpan` tidak ikut dikunci, dan urutan
+  kunci pegawai → riwayat dapat berbalik dengan alur admin yang mengunci riwayat → pegawai (potensi deadlock). Dampaknya dihitung `gagal` untuk
+  pegawai itu dan diproses ulang pada run berikutnya (idempoten); perilaku ini disadari, bukan bug.
