@@ -483,5 +483,548 @@
             "alasan_hukuman",
             "keterangan"
         ]
-    }
+    },
+    "_nilai_teks": [
+        {
+            "_rujukan": "AE:1884",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "jenis_jabatan": 1
+            },
+            "field": "jenis_jabatan",
+            "nilai": "Nomenlaktur"
+        },
+        {
+            "_rujukan": "AE:1884",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "jenis_jabatan": 2
+            },
+            "field": "jenis_jabatan",
+            "nilai": "Instansi Lain"
+        },
+        {
+            "_rujukan": "AE:1884",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "jenis_jabatan": 3
+            },
+            "field": "jenis_jabatan",
+            "nilai": "Pelaksana Tugas (PLT)"
+        },
+        {
+            "_rujukan": "AE:1885",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "jenis_jabatan_koord": 1
+            },
+            "field": "jenis_jabatan_koordinasi",
+            "nilai": "Koordinator"
+        },
+        {
+            "_rujukan": "AE:1885",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "jenis_jabatan_koord": 2
+            },
+            "field": "jenis_jabatan_koordinasi",
+            "nilai": "Subkoordinator"
+        },
+        {
+            "_rujukan": "AE:1885",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "jenis_jabatan_koord": 3
+            },
+            "field": "jenis_jabatan_koordinasi",
+            "nilai": "Tidak Ada"
+        },
+        {
+            "_rujukan": "AE:1902",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "status_jft": 1
+            },
+            "field": "status_jft",
+            "nilai": "Aktif"
+        },
+        {
+            "_rujukan": "AE:1902",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "status_jft": 2
+            },
+            "field": "status_jft",
+            "nilai": "Pembebasan Sementara"
+        },
+        {
+            "_rujukan": "AE:1902",
+            "method": "riwayat_jabatan",
+            "tabel": "riwayat_mutasi_jabatan",
+            "set": {
+                "status_jft": null
+            },
+            "field": "status_jft",
+            "nilai": ""
+        },
+        {
+            "_rujukan": "AE:1812",
+            "method": "jabatan_terakhir",
+            "tabel": "pegawai_mutasi_jabatan",
+            "set": {
+                "status_jft": 1
+            },
+            "field": "status_jft",
+            "nilai": "Aktif"
+        },
+        {
+            "_rujukan": "AE:1812",
+            "method": "jabatan_terakhir",
+            "tabel": "pegawai_mutasi_jabatan",
+            "set": {
+                "status_jft": 2
+            },
+            "field": "status_jft",
+            "nilai": "Pembebasan Sementara"
+        },
+        {
+            "_rujukan": "AE:1812",
+            "method": "jabatan_terakhir",
+            "tabel": "pegawai_mutasi_jabatan",
+            "set": {
+                "status_jft": null
+            },
+            "field": "status_jft",
+            "nilai": ""
+        },
+        {
+            "_rujukan": "AE:1808",
+            "method": "jabatan_terakhir",
+            "tabel": "pegawai_mutasi_jabatan",
+            "set": {
+                "atasan_es_3_koord": "Koord X",
+                "atasan_es_3": "Es3 X"
+            },
+            "field": "atasan_es_3",
+            "nilai": "Koord X"
+        },
+        {
+            "_rujukan": "AE:1809",
+            "method": "jabatan_terakhir",
+            "tabel": "pegawai_mutasi_jabatan",
+            "set": {
+                "atasan_es_4_koord": null,
+                "atasan_es_4": "Es4 X"
+            },
+            "field": "atasan_es_4",
+            "nilai": "Es4 X"
+        },
+        {
+            "_rujukan": "AE:203",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "jenis_kelamin": 1
+            },
+            "field": "jenis_kelamin",
+            "nilai": "Laki-laki"
+        },
+        {
+            "_rujukan": "AE:203",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "jenis_kelamin": 2
+            },
+            "field": "jenis_kelamin",
+            "nilai": "Perempuan"
+        },
+        {
+            "_rujukan": "AE:208",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "status_pernikahan": 1
+            },
+            "field": "status_pernikahan",
+            "nilai": "Menikah"
+        },
+        {
+            "_rujukan": "AE:208",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "status_pernikahan": 2
+            },
+            "field": "status_pernikahan",
+            "nilai": "Tidak Menikah"
+        },
+        {
+            "_rujukan": "AE:210",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "status": 1
+            },
+            "field": "status",
+            "nilai": "Aktif"
+        },
+        {
+            "_rujukan": "AE:210",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "status": 2
+            },
+            "field": "status",
+            "nilai": "Tidak Aktif"
+        },
+        {
+            "_rujukan": "AE:210",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "status": 10
+            },
+            "field": "status",
+            "nilai": "Tidak Aktif"
+        },
+        {
+            "_rujukan": "AE:200",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "id_provinsi_lahir": 99,
+                "provinsi_lahir_lain": "Prov Lain"
+            },
+            "field": "provinsi_lahir",
+            "nilai": "Prov Lain"
+        },
+        {
+            "_rujukan": "AE:201",
+            "method": "data_umum",
+            "tabel": "pegawai",
+            "set": {
+                "id_kabupaten_kota_lahir": 9999,
+                "kabupaten_kota_lahir_lain": "Kab Lain"
+            },
+            "field": "kabupaten_kota_lahir",
+            "nilai": "Kab Lain"
+        },
+        {
+            "_rujukan": "AE:1295",
+            "method": "riwayat_kursus_seminar",
+            "tabel": "riwayat_seminar",
+            "set": {
+                "jenis_seminar": 1
+            },
+            "field": "jenis",
+            "nilai": "Seminar"
+        },
+        {
+            "_rujukan": "AE:1295",
+            "method": "riwayat_kursus_seminar",
+            "tabel": "riwayat_seminar",
+            "set": {
+                "jenis_seminar": 2
+            },
+            "field": "jenis",
+            "nilai": "Kursus"
+        },
+        {
+            "_rujukan": "AE:1052 getJenisDiklat FH:220",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 1
+            },
+            "field": "jenis_pelatihan",
+            "nilai": "Struktural"
+        },
+        {
+            "_rujukan": "AE:1052 getJenisDiklat FH:220",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 2
+            },
+            "field": "jenis_pelatihan",
+            "nilai": "Teknis"
+        },
+        {
+            "_rujukan": "AE:1052 getJenisDiklat FH:220",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 3
+            },
+            "field": "jenis_pelatihan",
+            "nilai": "Fungsional"
+        },
+        {
+            "_rujukan": "AE:1052 getJenisDiklat FH:220",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 4
+            },
+            "field": "jenis_pelatihan",
+            "nilai": "Prajabatan"
+        },
+        {
+            "_rujukan": "AE:1052 getJenisDiklat FH:220",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 5
+            },
+            "field": "jenis_pelatihan",
+            "nilai": "Sertifikasi"
+        },
+        {
+            "_rujukan": "AE:1042-1043",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 3,
+                "deskripsi": "PIM",
+                "sub_group_jabatan": "Es.III"
+            },
+            "field": "nama_pelatihan",
+            "nilai": "PIM (Es.III)"
+        },
+        {
+            "_rujukan": "AE:1045-1046",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 4,
+                "deskripsi": "Latsar",
+                "nama_diklat": "Diklat Y"
+            },
+            "field": "nama_pelatihan",
+            "nilai": "Latsar (Diklat Y)"
+        },
+        {
+            "_rujukan": "AE:1041",
+            "method": "riwayat_pelatihan",
+            "tabel": "riwayat_diklat",
+            "set": {
+                "jenis_diklat": 2,
+                "nama_diklat": "Diklat Z"
+            },
+            "field": "nama_pelatihan",
+            "nilai": "Diklat Z"
+        },
+        {
+            "_rujukan": "AE:438",
+            "method": "alamat_rumah",
+            "tabel": "pegawai_alamat",
+            "set": {
+                "id_provinsi": 99,
+                "provinsi_lain": "P Lain"
+            },
+            "field": "provinsi",
+            "nilai": "P Lain"
+        },
+        {
+            "_rujukan": "AE:439",
+            "method": "alamat_rumah",
+            "tabel": "pegawai_alamat",
+            "set": {
+                "id_kabupaten_kota": 9999,
+                "kabupaten_kota_lain": "K Lain"
+            },
+            "field": "kabupaten_kota",
+            "nilai": "K Lain"
+        },
+        {
+            "_rujukan": "AE:440",
+            "method": "alamat_rumah",
+            "tabel": "pegawai_alamat",
+            "set": {
+                "id_kecamatan": 9999999,
+                "kecamatan_lain": "Kec Lain"
+            },
+            "field": "kecamatan",
+            "nilai": "Kec Lain"
+        },
+        {
+            "_rujukan": "AE:441",
+            "method": "alamat_rumah",
+            "tabel": "pegawai_alamat",
+            "set": {
+                "id_kelurahan": 9999999999,
+                "kelurahan_lain": "Kel Lain"
+            },
+            "field": "kelurahan",
+            "nilai": "Kel Lain"
+        },
+        {
+            "_rujukan": "AE:438",
+            "method": "alamat_kantor",
+            "tabel": "pegawai_alamat_kantor",
+            "set": {
+                "id_provinsi": 99,
+                "provinsi_lain": "P Lain"
+            },
+            "field": "provinsi",
+            "nilai": "P Lain"
+        },
+        {
+            "_rujukan": "AE:439",
+            "method": "alamat_kantor",
+            "tabel": "pegawai_alamat_kantor",
+            "set": {
+                "id_kabupaten_kota": 9999,
+                "kabupaten_kota_lain": "K Lain"
+            },
+            "field": "kabupaten_kota",
+            "nilai": "K Lain"
+        },
+        {
+            "_rujukan": "AE:440",
+            "method": "alamat_kantor",
+            "tabel": "pegawai_alamat_kantor",
+            "set": {
+                "id_kecamatan": 9999999,
+                "kecamatan_lain": "Kec Lain"
+            },
+            "field": "kecamatan",
+            "nilai": "Kec Lain"
+        },
+        {
+            "_rujukan": "AE:441",
+            "method": "alamat_kantor",
+            "tabel": "pegawai_alamat_kantor",
+            "set": {
+                "id_kelurahan": 9999999999,
+                "kelurahan_lain": "Kel Lain"
+            },
+            "field": "kelurahan",
+            "nilai": "Kel Lain"
+        },
+        {
+            "_rujukan": "AE:793",
+            "method": "pendidikan_terakhir",
+            "tabel": "pegawai_pendidikan",
+            "set": {
+                "id_bidang_pendidikan": 98,
+                "bidang_pendidikan_lain": "Bidang Lain"
+            },
+            "field": "bidang_pendidikan",
+            "nilai": "Bidang Lain"
+        },
+        {
+            "_rujukan": "AE:794",
+            "method": "pendidikan_terakhir",
+            "tabel": "pegawai_pendidikan",
+            "set": {
+                "id_jurusan_pendidikan": 1185,
+                "jurusan_pendidikan_lain": "Jurusan Lain"
+            },
+            "field": "jurusan_pendidikan",
+            "nilai": "Jurusan Lain"
+        },
+        {
+            "_rujukan": "AE:795",
+            "method": "pendidikan_terakhir",
+            "tabel": "pegawai_pendidikan",
+            "set": {
+                "id_jenjang_pendidikan": 3,
+                "nem": "40.00",
+                "ipk": "3.00"
+            },
+            "field": "nilai",
+            "nilai": "40.00"
+        },
+        {
+            "_rujukan": "AE:795",
+            "method": "pendidikan_terakhir",
+            "tabel": "pegawai_pendidikan",
+            "set": {
+                "id_jenjang_pendidikan": 5,
+                "nem": "40.00",
+                "ipk": "3.00"
+            },
+            "field": "nilai",
+            "nilai": "3.00"
+        },
+        {
+            "_rujukan": "AE:793",
+            "method": "riwayat_pendidikan",
+            "tabel": "riwayat_pendidikan",
+            "set": {
+                "id_bidang_pendidikan": 98,
+                "bidang_pendidikan_lain": "Bidang Lain"
+            },
+            "field": "bidang_pendidikan",
+            "nilai": "Bidang Lain"
+        },
+        {
+            "_rujukan": "AE:794",
+            "method": "riwayat_pendidikan",
+            "tabel": "riwayat_pendidikan",
+            "set": {
+                "id_jurusan_pendidikan": 1185,
+                "jurusan_pendidikan_lain": "Jurusan Lain"
+            },
+            "field": "jurusan_pendidikan",
+            "nilai": "Jurusan Lain"
+        },
+        {
+            "_rujukan": "AE:795",
+            "method": "riwayat_pendidikan",
+            "tabel": "riwayat_pendidikan",
+            "set": {
+                "id_jenjang_pendidikan": 3,
+                "nem": "40.00",
+                "ipk": "3.00"
+            },
+            "field": "nilai",
+            "nilai": "40.00"
+        },
+        {
+            "_rujukan": "AE:795",
+            "method": "riwayat_pendidikan",
+            "tabel": "riwayat_pendidikan",
+            "set": {
+                "id_jenjang_pendidikan": 5,
+                "nem": "40.00",
+                "ipk": "3.00"
+            },
+            "field": "nilai",
+            "nilai": "3.00"
+        },
+        {
+            "_rujukan": "AE:355",
+            "method": "detil",
+            "tabel": "pegawai_pendidikan",
+            "set": {
+                "id_jurusan_pendidikan": 1185,
+                "jurusan_pendidikan_lain": "Jurusan Lain"
+            },
+            "field": "jurusan_pendidikan",
+            "nilai": "Jurusan Lain"
+        },
+        {
+            "_rujukan": "AE:2209",
+            "method": "riwayat_tj",
+            "tabel": "riwayat_tanda_jasa",
+            "set": {
+                "tanda_jasa": "LAIN-LAIN",
+                "tanda_jasa_lain": "TJ Lain"
+            },
+            "field": "tanda_jasa",
+            "nilai": "TJ Lain"
+        }
+    ]
 }

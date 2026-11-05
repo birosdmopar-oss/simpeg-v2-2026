@@ -24,7 +24,7 @@ final class PenyajiDm
     public function groupJabatan(): array
     {
         $rows = $this->db->table('group_jabatan')->select('id_group_jabatan, group_jabatan')
-            ->where('status', 1)->orderBy('order', 'ASC')->get()->getResultArray();
+            ->where('status', 1)->orderBy('order', 'ASC')->orderBy('id_group_jabatan', 'ASC')->get()->getResultArray();
 
         return array_map(static fn (array $r): array => [
             'id_group_jabatan' => Nilai::mentah($r['id_group_jabatan']),

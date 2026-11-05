@@ -83,6 +83,22 @@ final class SimapiAuthDmSinkronTest extends DatabaseTestCase
         $this->assertSame($gagal, $this->jsonUji($this->simapiUji('simapi/v1/a_dm/jabatan', $token)), 'AC-05.1 token kedaluwarsa');
     }
 
+    /**
+     * Review P1: `data` gagal SIMAPI = `[]` di BODY MENTAH (json_decode assoc menyamakan `{}` dan `[]`), termasuk gagal auth.
+     */
+    public function testDataGagalSimapiArrayKosongDiBodyMentah(): void
+    {
+        $this->klienUji('simanta', 2, ['simapi']);
+
+        $auth  = (string) $this->withHeaders(['Authorization' => 'Basic ' . base64_encode('simanta:salah')])->call('get', 'simapi/v1/a_auth/token')->getJSON();
+        $token = (string) $this->tanpaAuthUji('simapi/v1/a_dm/jabatan')->getJSON();
+
+        foreach ([$auth, $token] as $body) {
+            $this->assertSame([], json_decode($body, false)->data, $body);
+            $this->assertStringNotContainsString('{}', $body);
+        }
+    }
+
     public function testAmbilSeluruhPenggunaTidakAda(): void
     {
         $token = $this->tokenUji($this->klienUji('simanta', 2, ['simapi']));
@@ -168,12 +184,13 @@ final class SimapiAuthDmSinkronTest extends DatabaseTestCase
         $nip = $this->buatPegawai();
         $this->buatRiwayatMutasiJabatan($nip, ['tmtsk' => '2010-01-01', 'rumpun_jabatan' => 'Rumpun A']);
         $this->buatRiwayatMutasiJabatan($nip, ['tmtsk' => '2020-01-01', 'status' => 0]);
+        $this->buatRiwayatMutasiJabatan($nip, ['tmtsk' => '2015-01-01', 'status' => 10]);
 
         $badan = $this->jsonUji($this->simapiUji('simapi/v1/a_sinkron/ambil_riwayat_mutasi', $token));
 
         $this->assertSame(['01', 'Berhasil mengambil 2 data riwayat mutasi jabatan terupdate'], [$badan['status'], $badan['msg']]);
         $this->assertSame($kontrak['ambil_riwayat_mutasi']['kunci'], array_keys($badan['data'][0]));
-        $this->assertSame(['2020-01-01', '2010-01-01'], array_column($badan['data'], 'tmtsk'), 'tanpa filter status, TMT DESC');
+        $this->assertSame(['2020-01-01', '2010-01-01'], array_column($badan['data'], 'tmtsk'), 'status 0 ikut, status 10 tidak (review P2), TMT DESC');
         $this->assertSame([null, 'Rumpun A'], array_column($badan['data'], 'rumpun_jabatan'));
     }
 }

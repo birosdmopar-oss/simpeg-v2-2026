@@ -179,6 +179,22 @@ final class SimapiEmployeeTest extends DatabaseTestCase
         $this->assertSame('Kepala Biro', $this->emp('kgb_terakhir', $nip)['data']['jabatan_yang_menandatangani']);
     }
 
+    /**
+     * Review P3 / AC-06.1: setiap cabang pemetaan nilai teks legacy (fixture `_nilai_teks`, rujukan baris AE per kasus).
+     */
+    public function testNilaiTeksSemuaCabangSesuaiFixture(): void
+    {
+        $nip = $this->pegawaiLengkap();
+
+        foreach ($this->fixtureKontrak('a_employee')['_nilai_teks'] as $k) {
+            $this->db->table($k['tabel'])->where('nip', $k['nip'] ?? $nip)->update($k['set']);
+            $data  = $this->emp($k['method'], $nip)['data'];
+            $baris = array_is_list($data) ? $data[0] : $data;
+
+            $this->assertSame($k['nilai'], $baris[$k['field']], "{$k['method']}.{$k['field']} " . json_encode($k['set']) . " ({$k['_rujukan']})");
+        }
+    }
+
     public function testRiwayatHanyaStatus1DanUrutTmt(): void
     {
         $nip = $this->buatPegawai();

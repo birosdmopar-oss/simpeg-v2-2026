@@ -73,11 +73,11 @@ ditambahkan sesudah kerangka `services` (berkas bersama + `ResponsLayanan`, dibu
 
 | Berkas | Isi |
 |---|---|
-| `Simapi/ResponsSimapi` | amplop SIMAPI HTTP 200 `{"status":"01"|"02","msg","data"}` (status STRING; `data` gagal = `[]` [K]) |
+| `Simapi/ResponsSimapi` | amplop SIMAPI HTTP 200 `{"status":"01"|"02","msg","data"}` (status STRING; `data` gagal = `[]` [K], termasuk gagal auth lewat `ResponsAuthKlien`) |
 | `Simapi/Nilai` | bentuk nilai legacy: string/null seperti `row_array()`; field ber-`stripslashes` legacy → "" bila NULL |
 | `Simapi/PenyajiPegawai` | 25 method `a_employee` (`METHOD` = daftar + pesan "Data … tidak tersedia"), port `fixUnitName()` |
 | `Simapi/PenyajiDm` | `a_dm/group_jabatan|sub_group_jabatan|jabatan|struktur_jabatan` |
-| `Simapi/PenyajiSinkron` | `a_sinkron/ambil_riwayat_mutasi` (seluruh baris, tanpa filter status [K]) |
+| `Simapi/PenyajiSinkron` | `a_sinkron/ambil_riwayat_mutasi` (seluruh baris kecuali status 10 [V2]) |
 | `Layanan/PenyajiSDm` | `services/s_dm/*` (baris `unit`/`satker` utuh + `unit_str`/`satker_str`) |
 
 Fixture kontrak (sintetis, diturunkan dari kode legacy, rujukan baris di tiap entri): `tests/_support/Integrasi/Simapi/*.json`.
@@ -106,10 +106,11 @@ Keputusan dan penyimpangan:
   `foto` terisi, selain itu "". Endpoint itu butuh JWT pengguna, jadi klien SIMAPI belum bisa mengambilnya; usul reviewer = endpoint unduh
   khusus klien layanan (pola Q6-38). Test mengunci bentuk sekarang.
 - **[V2]** urutan baris: riwayat tanpa ORDER BY di legacy (`riwayat_pendidikan`, `riwayat_pelatihan`, `riwayat_kp`) diurut PK ASC; setiap
-  urutan diberi kunci sekunder PK (legacy bergantung urutan fisik). Baris master v2 status 10 tidak dikirim (`struktur_jabatan`, `p_get_unit`,
-  `p_get_satker`): kueri legacy di sana TANPA filter status (`A_dm.php:274`, `S_dm.php:175`, `:247`) karena legacy menghapus keras
-  (`struktur_jabatan` legacy tak punya kolom status); status 10 v2 = baris yang di legacy sudah tidak ada. Daftar lain memfilter `status = 1`
-  persis legacy.
+  urutan diberi kunci sekunder PK (legacy bergantung urutan fisik). Baris status 10 tidak dikirim: `struktur_jabatan` (`A_dm.php:274` tanpa
+  filter; legacy tak punya kolom status dan menghapus keras, jadi status 10 v2 = baris yang di legacy sudah tidak ada) dan
+  `ambil_riwayat_mutasi` (legacy tanpa filter, hapus keras `L_jabatan.php:1712`; v2 hapus lunak). `p_get_unit`/`p_get_satker` (`S_dm.php:175`,
+  `:247`): legacy JUGA hapus lunak status 10 (`L_jabatan.php:2580-2593`, `:2818-2831`) dan mengirimnya — menyaring status 10 di v2 adalah
+  DEVIASI [V2] (unit/satker terhapus tidak dikirim ke klien). Daftar lain memfilter `status = 1` persis legacy.
 - **[K]** daftar riwayat dan `ambil_riwayat_mutasi` tanpa LIMIT, ikut legacy (riwayat per NIP kecil; `ambil_riwayat_mutasi` memang
   seluruh tabel untuk sinkron E-Talenta). Bila volume menjadi masalah, paginasi = perubahan kontrak (perlu keputusan).
 - **[V2]** teks tidak di-`stripslashes` ulang (impor UP-1 sudah menormalkan, Impor README #5).
