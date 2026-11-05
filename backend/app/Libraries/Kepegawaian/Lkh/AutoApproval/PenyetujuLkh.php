@@ -66,12 +66,16 @@ class PenyetujuLkh
         $auth->setClaims(['sub' => (string) $pelaku]);
         $model = new LkhModel($this->db);
 
-        $model->withActor($auth, static fn () => $model->update($id, [
+        $ubah = $model->withActor($auth, static fn () => $model->update($id, [
             'status'        => LkhService::DISETUJUI,
             'auto_approval' => 1,
             'approved_by'   => $pelaku,
             'updated_by'    => $pelaku,
         ]));
+
+        if ($ubah === false) {
+            throw new RuntimeException('Auto-approval LKH gagal menulis baris.');
+        }
 
         return self::OK;
     }
