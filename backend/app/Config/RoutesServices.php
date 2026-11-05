@@ -20,6 +20,10 @@ use CodeIgniter\Router\RouteCollection;
  *   GET services/s_stat/berkas/{jenis}/{nip}/{id}          unduh lampiran kp|skp|jabatan|kgb (Q6-38 [V2]) → 404 seragam
  *   GET services/s_stat/berkas/{jenis}/{nip}/{id}/{kolom}  unduh berkas kolom pak|tb|ib|karpeg|kariskarsu
  *
+ * s_esign (klienLayanan:esign, Jalur B MAKE-065 B4b, F6-16), amplop STRING `{"status":"1"|"2","msg","data"}` HTTP 200 [K]:
+ *   GET  services/s_esign/check_user?nik=   status sertifikat BSrE (S_esign:9; `msg` selalu null, bug legacy)
+ *   POST services/s_esign/sign_pdf          multipart file + imageTTD → data.signed_file base64 PDF ber-TTE (S_esign:54)
+ *
  * @var RouteCollection $routes
  */
 $routes->group('services', ['namespace' => 'App\Controllers\Services'], static function (RouteCollection $routes): void {
@@ -34,5 +38,10 @@ $routes->group('services', ['namespace' => 'App\Controllers\Services'], static f
         $routes->get('list_kariskarsu', 'SStatController::listKariskarsu');
         $routes->get('berkas/(:segment)/(:segment)/(:num)', 'SStatController::berkasLampiran/$1/$2/$3');
         $routes->get('berkas/(:segment)/(:segment)/(:num)/(:segment)', 'SStatController::berkasKolom/$1/$2/$3/$4');
+    });
+
+    $routes->group('s_esign', ['filter' => 'klienLayanan:esign'], static function (RouteCollection $routes): void {
+        $routes->get('check_user', 'SEsignController::checkUser');
+        $routes->post('sign_pdf', 'SEsignController::signPdf');
     });
 });
