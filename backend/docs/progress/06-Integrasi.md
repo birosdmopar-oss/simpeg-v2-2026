@@ -11,7 +11,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` di main (`c3af17a1`) |
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
-| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di main `d115e50d`; MAKE-060 A5a (`change_history` ack-on-read + kerangka penulis `simapi_ch`) di main (`14fb37ec`, `dbcd8188`); **A5b (penulis event `simapi_ch`) menunggu D1/ISSUE-056 dari Horii** |
+| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di main `d115e50d`; MAKE-060 A5a (`change_history` ack-on-read + kerangka penulis `simapi_ch`) di main `67b46538`; **A5b (penulis event `simapi_ch`) menunggu D1/ISSUE-056 dari Horii** |
 | H-08 | A | MAKE-061 | Di main `539f4c7c` (Worker Fable) |
 | H-09 | A | (pemetaan) | Selesai (dokumen, bagian A7 di bawah; AC-09.1: 56 method `Local.php`); ikut branch `fase6/a-lokal/penutup-a` |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
@@ -160,9 +160,11 @@ memenuhi AC-09.1. Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel in
 | A2b auto-approval LKH | MAKE-068 | Selesai | `5a8764c4` |
 | A3 auth antar-sistem + ADR-036 | MAKE-058 | Selesai | `c926770f` |
 | A4 SIMAPI `a_auth`, `a_employee` (25 method), `a_dm`, `ambil_riwayat_mutasi`, `services/s_dm` | MAKE-059 | Selesai | `d115e50d` |
-| A5a `a_employee/change_history` ack-on-read + kerangka penulis `simapi_ch` | MAKE-060 | Selesai | `14fb37ec`, `dbcd8188` |
+| A5a `a_employee/change_history` ack-on-read + kerangka penulis `simapi_ch` | MAKE-060 | Selesai | `67b46538` |
 | A5b penulis event `simapi_ch` per tabel + seed `simapi_jd` | MAKE-060 | **Menunggu D1/ISSUE-056 dari Horii** | — |
 | A6 `services/s_stat` | MAKE-061 | Selesai | `539f4c7c` |
+| Pengaman `ImporSlipUjiTrait` + `check.sh` (aturan satu PHPUnit per DB scratch) | CR-108 | Selesai | `5d7d5778` |
+| TTE cuti atas nama (Q6-40, Jalur B) | MAKE-075 | Selesai | `07a5df0c` |
 | A7 pemetaan H-09 + runbook (README-deploy §1j) + ringkasan | (CR/dokumen) | Dokumen selesai; ditutup final setelah A5b | branch `fase6/a-lokal/penutup-a` |
 
 Keputusan Horii/reviewer yang membentuk Jalur A (lengkap di PRD §12): Q6-01 semua endpoint wajib auth; Q6-02 kontrak SIMAPI 1:1 (kecuali
