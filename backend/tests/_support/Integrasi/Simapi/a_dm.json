@@ -1,0 +1,20 @@
+{
+    "_keterangan": "MAKE-059 fixture kontrak SIMAPI a_dm (sintetis, tanpa data nyata): nama field dan urutannya per baris data, diturunkan dari kode legacy controllers/simapi/v1/A_dm.php.",
+    "group_jabatan": {
+        "_rujukan": "A_dm.php:59-62",
+        "kunci": ["id_group_jabatan", "group_jabatan"]
+    },
+    "sub_group_jabatan": {
+        "_rujukan": "A_dm.php:121-126 (group 1), :139-143 (group lain, tanpa group_jabatan)",
+        "kunci": ["id_group_jabatan", "group_jabatan", "id_sub_group_jabatan", "sub_group_jabatan"],
+        "kunci_group_lain": ["id_group_jabatan", "id_sub_group_jabatan", "sub_group_jabatan"]
+    },
+    "jabatan": {
+        "_rujukan": "A_dm.php:204-216",
+        "kunci": ["id_jabatan", "jabatan", "id_group_jabatan", "group_jabatan", "id_sub_group_jabatan", "sub_group_jabatan", "id_unit", "unit", "id_satker", "satker", "umur_pensiun"]
+    },
+    "struktur_jabatan": {
+        "_rujukan": "A_dm.php:279-286",
+        "kunci": ["id_struktur_jabatan", "id_jabatan", "jabatan", "id_jabatan_atasan", "jabatan_atasan", "level_struktur"]
+    }
+}

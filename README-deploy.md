@@ -413,6 +413,19 @@ Semua endpoint masuk dari sistem lain (SIMAPI `/simapi/v1/*` dan `services/*`) w
    `token_tidak_sah`, `throttle_*`; tanpa username/rahasia/IP). Lonjakan `tidak_sah` dari satu klien = rahasia salah/dirotasi; `ip_ditolak` =
    IP keluar klien berubah.
 
+### 1i. Endpoint kompatibilitas legacy SIMAPI dan `services/s_dm` (MAKE-059) — bagian Jalur A
+
+1. **Routing web server.** Path tetap sama dengan legacy: `/simapi/v1/...` dan `/services/...` harus diteruskan ke `backend/public/index.php`
+   v2 (front controller CI4), sama seperti `/api/`. Tanpa ini klien SIMAPI/layanan menerima 404 dari web server. Uji: `GET /simapi/v1/a_dm/jabatan`
+   tanpa token harus menjawab HTTP 200 `{"status":"02","msg":"Token is not valid",...}` dari v2.
+2. **Endpoint yang sengaja tidak ada di v2** (404): `simapi/v1/a_sinkron/ambil_seluruh_pengguna`, `services/s_dm/p_web_config`. Klien yang masih
+   memanggilnya diberi tahu saat re-handshake (§1h langkah 3).
+   Sampaikan juga: `a_sinkron/ambil_riwayat_mutasi` kini menjawab token salah/kedaluwarsa dengan "Token is not valid" (legacy: "Invalid Token or
+   IP Address"/"Token Expired"), dan `a_dm/jabatan` kini butuh token.
+   Foto pegawai (`foto` di `data_umum`/`detil`) kini URL `simapi/v1/a_employee/foto/{nip}` yang WAJIB dipanggil dengan token SIMAPI; foto yang
+   belum dimigrasi ke storage v2 bernilai "".
+3. **Klien `services/s_dm`** dibuat dengan hak `dm` (§1h langkah 2); seluruh method `s_dm` kini butuh Basic, termasuk `p_*` yang di legacy publik.
+
 ---
 
 ## 2. Cara push (operator deploy)
