@@ -81,13 +81,36 @@ pastikan_frontend_deps() {
     fi
 }
 
+# CR-108: berkas tracked di backend/ yang terhapus selama PHPUnit (dulu: pembersih test ImporSlip menjalankan glob('*')
+# di cwd backend/ saat setUp gagal) menggagalkan gate. Tidak memulihkan otomatis: pulihkan dengan `git checkout --`
+# sesudah penyebabnya diketahui. Di luar repo git (mis. arsip sumber) pemeriksaan dilewati dengan peringatan.
+cek_berkas_backend_terhapus() {
+    if ! command -v git >/dev/null 2>&1 || ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo 'PERINGATAN: bukan repo git; pemeriksaan berkas tracked backend/ yang terhapus dilewati.' >&2
+        return 0
+    fi
+    local terhapus
+    terhapus="$(git -C "$ROOT_DIR" ls-files --deleted -- backend)"
+    if [ -n "$terhapus" ]; then
+        printf 'GAGAL: berkas tracked di backend/ terhapus selama PHPUnit:\n%s\n' "$terhapus" >&2
+        echo 'Cari test penyebabnya, lalu pulihkan dengan: git checkout -- <berkas>' >&2
+        return 1
+    fi
+}
+
 # Menjalankan PHPUnit lalu memastikan keluarannya memuat ringkasan hasil ("OK (…)" / "Tests: …").
 # Tanpa ringkasan, runner dianggap tidak berjalan (mis. include gagal) dan gate ikut gagal.
-# Keluaran tetap tampil; exit code PHPUnit dipertahankan (tidak lewat pipa yang menelannya).
+# Keluaran tetap tampil; exit code PHPUnit dipertahankan (tidak lewat pipa yang menelannya); berkas tracked
+# backend/ yang terhapus selama PHPUnit menggagalkan gate (CR-108).
 jalankan_phpunit() {
     local log_file status=0
     log_file="$(mktemp)"
     vendor/bin/phpunit --no-coverage "$@" 2>&1 | tee "$log_file" || status=$?
+    if ! cek_berkas_backend_terhapus; then
+        rm -f "$log_file"
+        [ "$status" -ne 0 ] || status=1
+        exit "$status"
+    fi
     if [ "$status" -ne 0 ]; then
         rm -f "$log_file"
         exit "$status"
