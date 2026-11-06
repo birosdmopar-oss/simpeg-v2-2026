@@ -34,6 +34,12 @@ use Throwable;
  *
  * Rujukan PRD Fase 6 v1.0f (CR-097): Q6-19 (K1), Q6-20 (K2), Q6-21 (Tolak tanpa passphrase), Q6-22 (QR TTE), AC-02.6.
  *
+ * Pengecualian Q6-40 (ISSUE-055 opsi d, MAKE-075): `atas_nama` = Super Admin menandatangani "atas nama" penanda tangan
+ * dengan passphrase pejabat itu, hanya bila keputusan final cuti diproses atas nama ({@see TteAtasNama}). Gateway tetap
+ * memakai identitas penanda tangan (NIK PyB/AL), `esign_hist.nip` = penanda tangan, pembatas K2 per penanda tangan + cuti
+ * (percobaan admin ikut dihitung dan mengunci pejabat juga), audit `cuti.esign_terbit` mencatat pelaku = admin +
+ * `atas_nama: true` + `nip_penanda`.
+ *
  * Urutan: baris ada & boleh dilihat (404) → pemilik tugas (403) → kunci per cuti (409, {@see KunciSuratCuti}) → batas
  * percobaan (429) → body (422) → status 1/4 dan belum ber-TTE (422)
  * → penanda tangan (422) → `checkUser` + `signPdf` → transaksi bisnis (kunci, cek ulang, simpan PDF ber-TTE, audit) →
@@ -119,9 +125,9 @@ class EsignCutiService
      *
      * @return array{status: string, pesan: string}
      */
-    public function statusSertifikat(AuthContext $auth, int $id): array
+    public function statusSertifikat(AuthContext $auth, int $id, bool $atasNama = false): array
     {
-        $cuti   = $this->cutiPenanda($auth, $id);
+        $cuti   = $this->cutiPenanda($auth, $id, $atasNama);
         $nipTtd = (string) self::penandaTangan($cuti);
 
         $this->periksaBisaDiterbitkan($cuti, (string) $cuti['nip'], $id);
@@ -164,16 +170,25 @@ class EsignCutiService
 
     /**
      * Cuti yang boleh ditandatangani akun ini: tidak terlihat → 404 seragam (S4 review B4a, pola `bolehLihat`, tanpa oracle
-     * id); terlihat tetapi bukan penanda tangan → 403.
+     * id); terlihat tetapi bukan penanda tangan → 403. `$atasNama` (Q6-40): Super Admin pada cuti yang final-nya diproses
+     * atas nama ({@see TteAtasNama}), selain itu 403.
      *
      * @return array<string, mixed>
      */
-    private function cutiPenanda(AuthContext $auth, int $id): array
+    private function cutiPenanda(AuthContext $auth, int $id, bool $atasNama = false): array
     {
         $cuti = $this->cuti->ambil($id);
 
         if ($cuti === null || ! $this->cuti->bolehLihat($auth, $cuti)) {
             throw new NotFoundException();
+        }
+
+        if ($atasNama) {
+            if (! TteAtasNama::boleh($this->db, $auth, $cuti)) {
+                throw new ForbiddenException(TteAtasNama::PESAN_DITOLAK);
+            }
+
+            return $cuti;
         }
 
         $nipTtd = self::penandaTangan($cuti);
@@ -204,18 +219,19 @@ class EsignCutiService
     }
 
     /**
-     * @param array<string, mixed> $in `{passphrase}` (body JSON)
+     * @param array<string, mixed> $in `{passphrase, atas_nama?}` (body JSON)
      *
      * @return array<string, mixed> item cuti terbaru
      */
-    public function terbitkan(AuthContext $auth, int $id, array $in, ?string $ip, ?string $userAgent): array
+    public function terbitkan(AuthContext $auth, int $id, #[\SensitiveParameter] array $in, ?string $ip, ?string $userAgent): array
     {
-        $cuti   = $this->cutiPenanda($auth, $id);
-        $nipTtd = (string) self::penandaTangan($cuti);
+        $atasNama = ($in['atas_nama'] ?? false) === true || in_array($in['atas_nama'] ?? null, ['true', '1', 1], true);
+        $cuti     = $this->cutiPenanda($auth, $id, $atasNama);
+        $nipTtd   = (string) self::penandaTangan($cuti);
 
         // P1 review B4a: satu percobaan per cuti pada satu waktu — pembatas dihitung SEBELUM gateway dan baris gagal ditulis
         // SESUDAHNYA, sehingga tanpa kunci permintaan serentak sama-sama lolos pembatas.
-        return KunciSuratCuti::dengan($this->db, $id, fn (): array => $this->terbitkanTerkunci($auth, $id, $cuti, $nipTtd, $in, $ip, $userAgent));
+        return KunciSuratCuti::dengan($this->db, $id, fn (): array => $this->terbitkanTerkunci($auth, $id, $cuti, $nipTtd, $in, $ip, $userAgent, $atasNama));
     }
 
     /**
@@ -224,7 +240,7 @@ class EsignCutiService
      *
      * @return array<string, mixed>
      */
-    private function terbitkanTerkunci(AuthContext $auth, int $id, array $cuti, string $nipTtd, array $in, ?string $ip, ?string $userAgent): array
+    private function terbitkanTerkunci(AuthContext $auth, int $id, array $cuti, string $nipTtd, #[\SensitiveParameter] array $in, ?string $ip, ?string $userAgent, bool $atasNama = false): array
     {
         $this->periksaBatasPercobaan($nipTtd, $id);
 
@@ -270,10 +286,15 @@ class EsignCutiService
         }
 
         try {
-            $this->cuti->dalamTransaksi(function () use ($auth, $id, $nipPemohon, $hasil, $nipTtd): void {
+            $this->cuti->dalamTransaksi(function () use ($auth, $id, $nipPemohon, $hasil, $nipTtd, $atasNama): void {
                 $this->cuti->kunciPegawai($nipPemohon);
                 $baru = $this->cuti->ambil($id, true) ?? throw new NotFoundException();
                 $this->periksaBisaDiterbitkan($baru, $nipPemohon, $id);
+
+                // Q6-40: syarat atas nama dicek ulang di baris terkunci (keputusan final bisa berubah sejak cek awal).
+                if ($atasNama && ! TteAtasNama::boleh($this->db, $auth, $baru)) {
+                    throw new ForbiddenException(TteAtasNama::PESAN_DITOLAK);
+                }
 
                 $berkas = $this->surat->simpanTte($nipPemohon, $id, (string) $hasil['pdf']);
 
@@ -282,7 +303,7 @@ class EsignCutiService
                     'status'        => $baru['status'],
                     'nip_penanda'   => $nipTtd,
                     'id_attachment' => $berkas['id_attachment'] ?? null,
-                ], $auth->idPengguna(), $auth->nip());
+                ] + ($atasNama ? ['atas_nama' => true] : []), $auth->idPengguna(), $auth->nip());
             });
         } catch (Throwable $e) {
             log_message('error', 'E-sign cuti {id}: PDF ber-TTE gagal disimpan: {galat}', ['id' => $id, 'galat' => mb_substr($this->bersihkan($e::class . ': ' . $e->getMessage(), $passphrase), 0, 500)]);
