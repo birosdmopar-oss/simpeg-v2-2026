@@ -184,7 +184,8 @@ final class LayananEsignMudig
      *  - `modul` kosong → {@see self::MODUL_BAWAAN}; dipotong {@see self::MODUL_MAKS};
      *  - `file_pdf_to_sign` kosong → nama berkas unggahan; `id_rw` hanya angka (lainnya NULL);
      *  - `ip_address`/`user_agent` dari POST [K], dipotong panjang kolom (VARCHAR = karakter `mb_substr`, TINYTEXT = byte
-     *    `mb_strcut`); `status_code` = kode gateway.
+     *    `mb_strcut`); `status_code` = kode gateway. Semua teks dari klien/gateway di-`mb_scrub` (byte UTF-8 tidak sah →
+     *    `?`), agar MySQL strict utf8mb4 tidak menolak insert (review B4b R1).
      *
      * @param array<string, mixed> $param
      */
@@ -214,8 +215,8 @@ final class LayananEsignMudig
             'status'           => $sukses ? EsignHistModel::STATUS_BERHASIL : EsignHistModel::STATUS_GAGAL,
             'status_code'      => $kode !== '' ? mb_substr($kode, 0, 10) : null,
             'ip_address'       => $ip !== null ? mb_substr($ip, 0, 45) : null,
-            'user_agent'       => $ua !== null ? mb_strcut($ua, 0, self::TINYTEXT_BYTE, 'UTF-8') : null,
-            'keterangan'       => $keterangan !== null ? mb_strcut($keterangan, 0, self::TINYTEXT_BYTE, 'UTF-8') : null,
+            'user_agent'       => $ua !== null ? mb_strcut(mb_scrub($ua, 'UTF-8'), 0, self::TINYTEXT_BYTE, 'UTF-8') : null,
+            'keterangan'       => $keterangan !== null ? mb_strcut(mb_scrub($keterangan, 'UTF-8'), 0, self::TINYTEXT_BYTE, 'UTF-8') : null,
             'created_at'       => gmdate('Y-m-d H:i:s'),
         ]);
     }
@@ -235,6 +236,7 @@ final class LayananEsignMudig
 
     private static function teks(mixed $nilai): ?string
     {
-        return is_scalar($nilai) && trim((string) $nilai) !== '' ? trim((string) $nilai) : null;
+        // R1: byte UTF-8 tidak sah dari klien diganti `?` (mb_scrub) sebelum dipakai/dipotong/disimpan.
+        return is_scalar($nilai) && trim((string) $nilai) !== '' ? trim(mb_scrub((string) $nilai, 'UTF-8')) : null;
     }
 }

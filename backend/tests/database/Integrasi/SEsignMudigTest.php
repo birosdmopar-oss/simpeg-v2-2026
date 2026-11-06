@@ -243,6 +243,23 @@ final class SEsignMudigTest extends DatabaseTestCase
         $this->assertSame(str_repeat('é', 127), $h['user_agent'], 'dipotong di batas karakter utuh (mb_strcut)');
     }
 
+    public function testUtf8TidakSahDiScrubInsertTetapSuksesTermasukPesanGateway(): void
+    {
+        // R1: "\xFF" dari klien/gateway tidak boleh menggagalkan insert esign_hist (MySQL strict utf8mb4, 1366).
+        $this->transport->antre(new Respons(200, self::PDF_TTE))
+            ->antreJson(400, ['status_code' => '2031', 'error' => "gagal \xFF gateway"]);
+
+        $ok    = $this->badan($this->tandaTangani($this->param(['user_agent' => "\xFFab", 'nama_lengkap' => "Nama \xFE", 'modul' => "M\xFF", 'file_pdf_to_sign' => "f\xFF.pdf", 'ip_address' => "1\xFF"])));
+        $gagal = $this->badan($this->tandaTangani($this->param(['user_agent' => "\xFF"])));
+
+        $this->assertSame(['1', '2'], [$ok['status'], $gagal['status']]);
+        $hist = $this->db->table('esign_hist')->orderBy('id_esign_hist')->get()->getResultArray();
+        $this->assertCount(2, $hist, 'TTE sukses dan gagal tetap tercatat');
+        $this->assertSame(['?ab', 'Nama ?', 'M?', 'f?.pdf', '1?'], [$hist[0]['user_agent'], $hist[0]['nama_lengkap'], $hist[0]['modul'], $hist[0]['file_pdf_to_sign'], $hist[0]['ip_address']]);
+        $this->assertSame('?', $hist[1]['user_agent']);
+        $this->assertTrue(mb_check_encoding((string) $hist[1]['keterangan'], 'UTF-8'));
+    }
+
     public function testNikTidakSahDitolakTanpaGateway(): void
     {
         foreach (['..', '../x', '3201 0101', str_repeat('1', 33)] as $nik) {
