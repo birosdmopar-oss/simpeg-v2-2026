@@ -26,6 +26,25 @@ publik QR, dan pencabutan akses publik: `README-deploy.md` §1c.
   minimal, tanpa NIP/unduh) dan PDF publik; throttle, 404 seragam, `no-store` + `noindex`. Dasar URL =
   `layanan.urlPublikSurat` (https wajib di production).
 
+### TTE atas nama (Q6-40, ISSUE-055 opsi d, MAKE-075)
+
+Pengecualian F6-18/Q6-19 ikut legacy (`L_cuti.php:3668-3673`, `Cuti.php:796`): Super Admin boleh menandatangani surat cuti
+"atas nama" penanda tangan (PyB; langkah tunggal tanpa PyB → AL) dengan passphrase pejabat itu.
+
+- **Tafsir [V2] "berhak atas nama"** (putusan reviewer 06-11-2026, `Layanan/Cuti/TteAtasNama`): role 1 mana pun (bukan hanya
+  admin yang memproses) DAN keputusan FINAL cuti (status 1/4) tercatat sebagai keputusan atas nama — entri audit
+  `cuti.process_atas_nama` TERAKHIR yang final untuk cuti itu, dengan status sama dengan status cuti sekarang — DAN surat
+  belum ber-TTE. Final oleh pejabat sendiri tetap hanya pejabat itu; atas nama di tahap AL yang belum final tidak membuka TTE.
+- Alur sama dengan pejabat (dua langkah): sesudah Setujui/Tangguhkan atas nama yang final, dialog TTE langsung terbuka dalam
+  mode atas nama; menutup dialog = surat tanpa TTE (legacy `allow_esign = 2`); ulangi lewat ⋮ "Tanda tangani atas nama"
+  (`aksi.esign_atas_nama`). Tolak tidak meminta passphrase. API: `GET cuti/{id}/esign/status?atas_nama=1`,
+  `POST cuti/{id}/esign` `{passphrase, atas_nama: true}` — route & limiter yang sama; syarat dicek ulang di baris terkunci.
+- TTE atas identitas pejabat (NIK PyB/AL); `esign_hist.nip`/`nik` = pejabat; pembatas Q6-20 per pejabat + cuti dipakai bersama
+  (percobaan admin mana pun ikut dihitung dan mengunci pejabat juga); audit `cuti.esign_terbit` dengan pelaku = admin,
+  `atas_nama: true`, `nip_penanda`. Passphrase tidak disimpan/di-log/di-audit.
+- Risiko diterima Horii: passphrase pejabat diketahui admin (sama dengan legacy). Opsi upgrade (tidak dikode): pejabat
+  menandatangani sendiri dari daftar "menunggu TTE" + notifikasi (rekomendasi reviewer a + b).
+
 ## `services/s_esign` untuk MuDig (F6-16 / Q6-05 = A, MAKE-065 B4b)
 
 Port `controllers/services/S_esign.php`. Controller `Controllers/Services/SEsignController` (filter `klienLayanan:esign`,

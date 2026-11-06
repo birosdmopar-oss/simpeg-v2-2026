@@ -172,6 +172,13 @@ Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin 
   `esign_hist` gagal sesudah TTE (pengecualian dicatat); `SensitiveParameter` pada NIK/PDF adapter; kunci `.env` huruf kecil;
   MIME/nama gambar & `image` diteruskan; validasi NIK; `check_user` GET/POST; `zend.exception_ignore_args` di runbook.
 
+### MAKE-075 — TTE surat cuti atas nama (Q6-40, ISSUE-055 opsi d, branch `fase6/make-075-tte-atas-nama`)
+
+- Super Admin boleh menandatangani atas nama pejabat dengan passphrase pejabat bila keputusan final cuti diproses atas nama
+  (audit `cuti.process_atas_nama` terakhir yang final; tafsir [V2] putusan reviewer 06-11). TTE atas identitas pejabat,
+  `esign_hist` pejabat, Q6-20 bersama, audit pelaku admin + `atas_nama`. FE: dialog TTE mode atas nama sesudah proses atas
+  nama final + item ⋮ "Tanda tangani atas nama". Rincian: `Libraries/Esign/README.md`.
+
 ### B5 — MAKE-066 Push FCM HTTP v1 (H-04, main `9debb366`)
 
 - Dipindah ke sesi WS-2 (keputusan Horii 03-11); temuan review B5 = CR-099. Kanal ikut legacy (web `fcmQueue_*`, Android
