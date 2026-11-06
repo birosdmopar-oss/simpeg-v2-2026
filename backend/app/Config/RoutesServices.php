@@ -20,6 +20,10 @@ use CodeIgniter\Router\RouteCollection;
  *   GET services/s_stat/berkas/{jenis}/{nip}/{id}          unduh lampiran kp|skp|jabatan|kgb (Q6-38 [V2]) → 404 seragam
  *   GET services/s_stat/berkas/{jenis}/{nip}/{id}/{kolom}  unduh berkas kolom pak|tb|ib|karpeg|kariskarsu
  *
+ * s_dm (klienLayanan:dm), amplop INT, data gagal [] [K] — MAKE-059, F6-10 (`p_web_config` sengaja tidak ada):
+ *   GET services/s_dm/list_unit | p_list_unit | p_list_unit_wo_kep | p_get_unit?id_unit | list_satker?id_unit | p_list_satker?id_unit
+ *       | p_get_satker?id_satker
+ *
  * @var RouteCollection $routes
  */
 $routes->group('services', ['namespace' => 'App\Controllers\Services'], static function (RouteCollection $routes): void {
@@ -34,5 +38,16 @@ $routes->group('services', ['namespace' => 'App\Controllers\Services'], static f
         $routes->get('list_kariskarsu', 'SStatController::listKariskarsu');
         $routes->get('berkas/(:segment)/(:segment)/(:num)', 'SStatController::berkasLampiran/$1/$2/$3');
         $routes->get('berkas/(:segment)/(:segment)/(:num)/(:segment)', 'SStatController::berkasKolom/$1/$2/$3/$4');
+    });
+
+    // H-07 / F6-10 [K S_dm.php] — MAKE-059.
+    $routes->group('s_dm', ['filter' => 'klienLayanan:dm'], static function (RouteCollection $routes): void {
+        $routes->get('list_unit', 'SDmController::listUnit');
+        $routes->get('list_satker', 'SDmController::listSatker');
+        $routes->get('p_list_unit', 'SDmController::pListUnit');
+        $routes->get('p_list_unit_wo_kep', 'SDmController::pListUnitWoKep');
+        $routes->get('p_get_unit', 'SDmController::pGetUnit');
+        $routes->get('p_list_satker', 'SDmController::pListSatker');
+        $routes->get('p_get_satker', 'SDmController::pGetSatker');
     });
 });
