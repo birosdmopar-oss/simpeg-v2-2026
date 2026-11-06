@@ -7,17 +7,17 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 | Task | Jalur | Key | Status |
 |---|---|---|---|
-| H-01 | A + B | DBV-026, DBV-027 | B: DBV-027 di main `c3c6213f` (+ DBV-030 `4c2d96a5`); A: diisi Jalur A |
-| H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` di branch `fase6/make-065-s-esign` |
+| H-01 | A + B | DBV-026, DBV-027 | A: DBV-026 di main `7185bdd5`; B: DBV-027 di main `c3c6213f` (+ DBV-030 `4c2d96a5`) |
+| H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` di main (`c3af17a1`) |
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
-| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di branch `fase6/a-lokal/make-059-simapi`, menunggu review; MAKE-060 belum mulai |
-| H-08 | A | MAKE-061 | A6 selesai (versi lokal, Worker Fable) di branch `fase6/a-lokal/make-061-s-stat`, menunggu review |
-| H-09 | A | (pemetaan) | Belum mulai |
+| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di main `d115e50d`; MAKE-060 A5a (`change_history` ack-on-read + kerangka penulis `simapi_ch`) di main (`14fb37ec`, `dbcd8188`); **A5b (penulis event `simapi_ch`) menunggu D1/ISSUE-056 dari Horii** |
+| H-08 | A | MAKE-061 | Di main `539f4c7c` (Worker Fable) |
+| H-09 | A | (pemetaan) | Selesai (dokumen, bagian A7 di bawah; AC-09.1: 56 method `Local.php`); ikut branch `fase6/a-lokal/penutup-a` |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
-| H-11 | A | MAKE-062 | A2a selesai (versi lokal), menunggu review |
-| H-12 | A | MAKE-068 | Kode di branch `fase6/a-lokal/make-068-lkh-auto-approval`, belum merge |
-| Fondasi | A / B | MAKE-058 / MAKE-063 | B: MAKE-063 di main `74039dc7`; A: diisi Jalur A |
+| H-11 | A | MAKE-062 | Di main `c2b8e2d7` (+ `pengguna:sinkron-nama`, ADR-037) |
+| H-12 | A | MAKE-068 | Di main `5a8764c4` |
+| Fondasi | A / B | MAKE-058 / MAKE-063 | A: MAKE-058 (auth antar-sistem, ADR-036) di main `c926770f`; B: MAKE-063 di main `74039dc7` |
 
 ## Bagian A — API masuk & job terjadwal
 
@@ -149,6 +149,35 @@ sudah di `main`. Kolom v2 menyebut jalur, bukan jaminan paritas field-per-field 
 Cakupan: 56 method terpetakan (baris 1-18 di atas menjumlah semuanya). Method yang "mengubah data lewat GET" (`record_geolocation`,
 `connect_arsip`) sengaja tidak dibawa. Pemeriksaan padanan per-endpoint dilakukan modul pemiliknya (QA Fase 3-8); dokumen ini hanya
 memenuhi AC-09.1. Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel ini.
+
+**Ringkasan status Jalur A (per 06-11-2026, main `07a5df0c`)** — pelaksana: Worker Fix Bug (lead; A2a, A3, A7), ReadOne (A1, A4, A5), Worker Haiku
+(A2b), Worker Fable (A6, sejak 05-11); reviewer CR; merge atas izin Horii.
+
+| Milestone | Key | Status | SHA di main |
+|---|---|---|---|
+| A1 skema klien layanan & SIMAPI | DBV-026 | Selesai | `7185bdd5` (PR #37) |
+| A2a status TB/CLTN harian + `pengguna:sinkron-nama` + ADR-037 | MAKE-062 | Selesai | `c2b8e2d7` |
+| A2b auto-approval LKH | MAKE-068 | Selesai | `5a8764c4` |
+| A3 auth antar-sistem + ADR-036 | MAKE-058 | Selesai | `c926770f` |
+| A4 SIMAPI `a_auth`, `a_employee` (25 method), `a_dm`, `ambil_riwayat_mutasi`, `services/s_dm` | MAKE-059 | Selesai | `d115e50d` |
+| A5a `a_employee/change_history` ack-on-read + kerangka penulis `simapi_ch` | MAKE-060 | Selesai | `14fb37ec`, `dbcd8188` |
+| A5b penulis event `simapi_ch` per tabel + seed `simapi_jd` | MAKE-060 | **Menunggu D1/ISSUE-056 dari Horii** | — |
+| A6 `services/s_stat` | MAKE-061 | Selesai | `539f4c7c` |
+| A7 pemetaan H-09 + runbook (README-deploy §1j) + ringkasan | (CR/dokumen) | Dokumen selesai; ditutup final setelah A5b | branch `fase6/a-lokal/penutup-a` |
+
+Keputusan Horii/reviewer yang membentuk Jalur A (lengkap di PRD §12): Q6-01 semua endpoint wajib auth; Q6-02 kontrak SIMAPI 1:1 (kecuali
+perbaikan terbatas); Q6-03 `ambil_seluruh_pengguna` tidak di-port; Q6-24..Q6-27 aturan H-11; Q6-36 B-9 `unit_es_3/4` ikut legacy; Q6-37 filter
+`rekomendasi_kp_uns` ikut legacy; Q6-38 URL arsip/berkas `s_stat` lewat endpoint unduh klien; Q6-39 foto SIMAPI lewat endpoint foto klien;
+F6-21 `sync_nama_pengguna` di-port (`pengguna:sinkron-nama`).
+
+Sisa / pertanyaan terbuka Jalur A:
+- **A5b** — penulis `simapi_ch` dari event tabel (F6-06) dan seed `simapi_jd` menunggu DDL D1 (ISSUE-056, trigger legacy) dari Horii (DBV-026 §9a);
+  sebelum itu `change_history` mengembalikan tabel kosong.
+- **PN-4** daftar pemberitahuan re-handshake klien (README-deploy §1i/§1j); **PN-5** jadwal pasti `pengguna:sinkron-nama` dan job Cron lain
+  dicocokkan dengan crontab server legacy sebelum cutover.
+- Ambang throttle auth antar-sistem (120 kegagalan/IP, 600/klien per 60 detik) adalah usulan awal; disetel dari trafik klien nyata.
+- Padanan H-09 baru level kelompok; pemeriksaan per-endpoint dilakukan modul pemilik (QA Fase 3-8).
+- Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel pemetaan H-09.
 
 ## Bagian B — Klien integrasi keluar
 
