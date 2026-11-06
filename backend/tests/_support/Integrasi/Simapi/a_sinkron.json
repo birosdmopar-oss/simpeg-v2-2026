@@ -1,0 +1,7 @@
+{
+    "_keterangan": "MAKE-059 fixture kontrak SIMAPI a_sinkron (sintetis): field per baris, diturunkan dari controllers/simapi/v1/A_sinkron.php.",
+    "ambil_riwayat_mutasi": {
+        "_rujukan": "A_sinkron.php:94",
+        "kunci": ["nip", "rumpun_jabatan", "subrumpun_jabatan", "tmtsk"]
+    }
+}

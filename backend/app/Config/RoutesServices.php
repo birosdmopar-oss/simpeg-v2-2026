@@ -20,6 +20,10 @@ use CodeIgniter\Router\RouteCollection;
  *   GET services/s_stat/berkas/{jenis}/{nip}/{id}          unduh lampiran kp|skp|jabatan|kgb (Q6-38 [V2]) → 404 seragam
  *   GET services/s_stat/berkas/{jenis}/{nip}/{id}/{kolom}  unduh berkas kolom pak|tb|ib|karpeg|kariskarsu
  *
+ * s_dm (klienLayanan:dm), amplop INT, data gagal [] [K] — MAKE-059, F6-10 (`p_web_config` sengaja tidak ada):
+ *   GET services/s_dm/list_unit | p_list_unit | p_list_unit_wo_kep | p_get_unit?id_unit | list_satker?id_unit | p_list_satker?id_unit
+ *       | p_get_satker?id_satker
+ *
  * s_esign (klienLayanan:esign, Jalur B MAKE-065 B4b, F6-16), amplop STRING `{"status":"1"|"2","msg","data"}` HTTP 200 [K]:
  *   GET|POST services/s_esign/check_user?nik= status sertifikat BSrE (S_esign:9; `msg` selalu null, bug legacy)
  *   POST services/s_esign/sign_pdf          multipart file + imageTTD → data.signed_file base64 PDF ber-TTE (S_esign:54)
@@ -40,6 +44,18 @@ $routes->group('services', ['namespace' => 'App\Controllers\Services'], static f
         $routes->get('berkas/(:segment)/(:segment)/(:num)/(:segment)', 'SStatController::berkasKolom/$1/$2/$3/$4');
     });
 
+    // H-07 / F6-10 [K S_dm.php] — MAKE-059.
+    $routes->group('s_dm', ['filter' => 'klienLayanan:dm'], static function (RouteCollection $routes): void {
+        $routes->get('list_unit', 'SDmController::listUnit');
+        $routes->get('list_satker', 'SDmController::listSatker');
+        $routes->get('p_list_unit', 'SDmController::pListUnit');
+        $routes->get('p_list_unit_wo_kep', 'SDmController::pListUnitWoKep');
+        $routes->get('p_get_unit', 'SDmController::pGetUnit');
+        $routes->get('p_list_satker', 'SDmController::pListSatker');
+        $routes->get('p_get_satker', 'SDmController::pGetSatker');
+    });
+
+    // H-02 / F6-16 [K S_esign.php] — MAKE-065 B4b.
     $routes->group('s_esign', ['filter' => 'klienLayanan:esign'], static function (RouteCollection $routes): void {
         $routes->match(['GET', 'POST'], 'check_user', 'SEsignController::checkUser');
         $routes->post('sign_pdf', 'SEsignController::signPdf');

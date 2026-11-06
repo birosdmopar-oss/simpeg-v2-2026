@@ -38,6 +38,16 @@ interface BiodataServiceInterface
     public function foto(AuthContext $auth, string $nip): array;
 
     /**
+     * Sumber foto yang sama dengan {@see foto()} TANPA lingkup pengguna — hanya untuk pemanggil sistem yang sudah
+     * diautentikasi sendiri (MAKE-059: endpoint foto klien SIMAPI). null = pegawai/foto/berkas tidak ada.
+     *
+     * @return array{isi: string, mime: string, nama: string}|null
+     *
+     * @throws \App\Exceptions\NotFoundException berkas ada tetapi bukan gambar
+     */
+    public function fotoSistem(string $nip): ?array;
+
+    /**
      * B-04 (MAKE-011): antrean pengajuan biodata yang menunggu (`flag_update` 1) — role 1, 3 (403 selain itu), disaring
      * lingkup jalur PROSES.
      *
