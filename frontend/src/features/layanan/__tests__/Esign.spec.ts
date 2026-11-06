@@ -43,7 +43,7 @@ const PASS = 'rahasia-Passphrase-123'
 const apiError = (status: number, errors: Record<string, string[]> | null = null): ApiError =>
   ({ status, message: `HTTP ${status}`, errors, isNetworkError: false, original: new Error('x') }) as ApiError
 
-const AKSI = { ubah: false, hapus: false, proses: false, tangguhkan: false, tunda: false, esign: false, unduh_surat: false, proses_atas_nama: false, tangguhkan_atas_nama: false }
+const AKSI = { ubah: false, hapus: false, proses: false, tangguhkan: false, tunda: false, esign: false, esign_atas_nama: false, unduh_surat: false, proses_atas_nama: false, tangguhkan_atas_nama: false }
 
 const baris = (id: number, aksi: Partial<typeof AKSI> = {}): CutiItem =>
   ({
@@ -179,7 +179,7 @@ describe('CutiPage — Tanda tangani', () => {
     q<HTMLButtonElement>('[data-testid="esign-confirm"]')!.click()
     await flushPromises()
 
-    expect(svc.esign).toHaveBeenCalledWith(7, PASS)
+    expect(svc.esign).toHaveBeenCalledWith(7, PASS, false)
     expect(q('[data-testid="esign-dialog"]')).toBeNull()
     expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('ditandatangani secara elektronik')
     expect(svc.list.mock.calls.length).toBeGreaterThan(panggilanAwal)
@@ -239,7 +239,7 @@ describe('CutiPage — dua langkah PyB (F6-18 K1/K3a)', () => {
     ketik('[data-testid="esign-passphrase"] input', PASS)
     q<HTMLButtonElement>('[data-testid="esign-confirm"]')!.click()
     await flushPromises()
-    expect(svc.esign).toHaveBeenCalledWith(7, PASS)
+    expect(svc.esign).toHaveBeenCalledWith(7, PASS, false)
     expect(document.body.innerHTML).not.toContain(PASS)
   })
 
@@ -296,7 +296,7 @@ describe('CutiPage — cek sertifikat sebelum passphrase', () => {
     await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
     await flushPromises()
 
-    expect(svc.esignStatus).toHaveBeenCalledWith(7)
+    expect(svc.esignStatus).toHaveBeenCalledWith(7, false)
     expect(q('[data-testid="esign-dialog"]')).toBeNull()
     expect(q('[data-testid="cuti-notice"]')?.textContent).toContain('tidak aktif')
   })
@@ -314,5 +314,75 @@ describe('CutiPage — cek sertifikat sebelum passphrase', () => {
     await selectRowAction(wrapper, 'cuti-actions-7', 'esign')
     await flushPromises()
     expect(q('[data-testid="esign-dialog"]')).not.toBeNull()
+  })
+})
+
+describe('CutiPage — TTE atas nama (Q6-40, MAKE-075)', () => {
+  it('item ⋮ "Tanda tangani atas nama" hanya bila aksi.esign_atas_nama, sesudah "Tanda tangani"', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { esign_atas_nama: true, unduh_surat: true }), baris(8, { unduh_surat: true })]))
+    const wrapper = await mountPage(Role.SUPER_ADMIN)
+
+    expect((await rowMenuActions(wrapper, 'cuti-actions-7')).map((a) => a.key)).toEqual(['detail', 'esign-atas-nama', 'surat'])
+    expect((await rowMenuActions(wrapper, 'cuti-actions-8')).map((a) => a.key)).toEqual(['detail', 'surat'])
+  })
+
+  it('Setujui atas nama final lalu dialog atas nama terbuka; passphrase dikirim dengan atas_nama dan tidak tertinggal', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { proses_atas_nama: true })]))
+    svc.process.mockResolvedValue({ ...baris(7, { esign_atas_nama: true }), nama_yang_menyetujui: 'Pejabat Uji' } as CutiItem)
+    svc.esign.mockResolvedValue(baris(7))
+    const wrapper = await mountPage(Role.SUPER_ADMIN)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'setujui-atas-nama')
+    await flushPromises()
+    ketik('[data-testid="approval-reason"]', 'PyB tak terjangkau')
+    q<HTMLButtonElement>('[data-testid="approval-confirm"]')!.click()
+    await flushPromises()
+
+    expect(svc.process).toHaveBeenCalledWith(7, expect.objectContaining({ aksi: 'setujui', atas_nama: true }))
+    expect(svc.esignStatus).toHaveBeenCalledWith(7, true)
+    expect(q('[data-testid="esign-dialog"]')).not.toBeNull()
+    expect(q('[data-testid="esign-atas-nama"]')?.textContent).toContain('Pejabat Uji')
+
+    ketik('[data-testid="esign-passphrase"] input', PASS)
+    q<HTMLButtonElement>('[data-testid="esign-confirm"]')!.click()
+    await flushPromises()
+
+    expect(svc.esign).toHaveBeenCalledWith(7, PASS, true)
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
+    expect(document.body.innerHTML).not.toContain(PASS)
+    expect(JSON.stringify(window.sessionStorage) + JSON.stringify(window.localStorage)).not.toContain(PASS)
+  })
+
+  it('menutup dialog atas nama = surat tanpa TTE; ulangi lewat ⋮ memakai mode atas nama', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { esign_atas_nama: true })]))
+    svc.esign.mockRejectedValueOnce({ ...apiError(429), message: 'Terlalu banyak percobaan tanda tangan. Coba lagi dalam 15 menit.' } as ApiError)
+    const wrapper = await mountPage(Role.SUPER_ADMIN)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'esign-atas-nama')
+    await flushPromises()
+    expect(q('[data-testid="esign-atas-nama"]')).not.toBeNull()
+    ketik('[data-testid="esign-passphrase"] input', PASS)
+    q<HTMLButtonElement>('[data-testid="esign-confirm"]')!.click()
+    await flushPromises()
+
+    expect(svc.esign).toHaveBeenCalledWith(7, PASS, true)
+    expect(q('[data-testid="esign-error"]')?.textContent).toContain('Terlalu banyak percobaan')
+    expect(q<HTMLInputElement>('[data-testid="esign-passphrase"] input')!.value).toBe('')
+    expect(svc.process).not.toHaveBeenCalled()
+  })
+
+  it('Tolak atas nama tidak membuka dialog TTE', async () => {
+    svc.list.mockImplementation(async () => daftar([baris(7, { proses_atas_nama: true })]))
+    svc.process.mockResolvedValue(baris(7, { esign_atas_nama: true }))
+    const wrapper = await mountPage(Role.SUPER_ADMIN)
+
+    await selectRowAction(wrapper, 'cuti-actions-7', 'tolak-atas-nama')
+    await flushPromises()
+    ketik('[data-testid="approval-reason"]', 'Tidak memenuhi syarat')
+    q<HTMLButtonElement>('[data-testid="approval-confirm"]')!.click()
+    await flushPromises()
+
+    expect(svc.process).toHaveBeenCalled()
+    expect(q('[data-testid="esign-dialog"]')).toBeNull()
   })
 })

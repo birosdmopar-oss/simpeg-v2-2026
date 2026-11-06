@@ -7,7 +7,7 @@
  *   POST   cuti/{id}/process                            `{aksi, reason_note?, atas_nama?}`
  *   POST   cuti/{id}/tunda                              tunda pengingat
  *   POST   cuti/{id}/esign                              tanda tangani surat `{passphrase}` (penanda tangan pemilik tugas, F6-18)
- *   GET    cuti/{id}/esign/status                       cek sertifikat sebelum passphrase `{status: aktif|tidak_aktif|galat, pesan}`
+ *   GET    cuti/{id}/esign/status[?atas_nama=1]         cek sertifikat sebelum passphrase `{status: aktif|tidak_aktif|galat, pesan}`
  *   DELETE cuti/{id}                                    hapus
  *   GET    cuti/pengingat                               antrean persetujuan yang belum ditunda
  *   GET    cuti/{id}/lampiran | cuti/{id}/surat         unduh berkas
@@ -216,18 +216,19 @@ export const cutiService = {
    * Cek sertifikat penanda tangan sebelum dialog passphrase (F6-18, MAKE-065). Status di luar `aktif`/`tidak_aktif`
    * diperlakukan sebagai `galat` (boleh diulang).
    */
-  async esignStatus(id: number): Promise<{ status: 'aktif' | 'tidak_aktif' | 'galat'; pesan: string }> {
-    const { data } = await api.get<{ status?: unknown; pesan?: unknown }>(`/cuti/${id}/esign/status`)
+  async esignStatus(id: number, atasNama = false): Promise<{ status: 'aktif' | 'tidak_aktif' | 'galat'; pesan: string }> {
+    const { data } = await api.get<{ status?: unknown; pesan?: unknown }>(`/cuti/${id}/esign/status`, atasNama ? { params: { atas_nama: 1 } } : undefined)
     const status = data.status === 'aktif' || data.status === 'tidak_aktif' ? data.status : 'galat'
     return { status, pesan: typeof data.pesan === 'string' ? data.pesan : '' }
   },
 
   /**
-   * Terbitkan surat cuti ber-TTE — hanya penanda tangan pemilik tugas (PyB; langkah tunggal tanpa PyB → AL, Q6-19).
+   * Terbitkan surat cuti ber-TTE — penanda tangan pemilik tugas (PyB; langkah tunggal tanpa PyB → AL, Q6-19), atau
+   * `atasNama` (Q6-40, MAKE-075): Super Admin pada cuti yang final-nya diproses atas nama, dengan passphrase pejabat.
    * Passphrase hanya di body JSON; tidak pernah di URL/query.
    */
-  async esign(id: number, passphrase: string): Promise<CutiItem> {
-    const { data } = await api.post<Record<string, unknown>>(`/cuti/${id}/esign`, { passphrase })
+  async esign(id: number, passphrase: string, atasNama = false): Promise<CutiItem> {
+    const { data } = await api.post<Record<string, unknown>>(`/cuti/${id}/esign`, atasNama ? { passphrase, atas_nama: true } : { passphrase })
     return normalisasiCuti(data)
   },
 
