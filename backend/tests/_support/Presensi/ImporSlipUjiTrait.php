@@ -23,7 +23,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  */
 trait ImporSlipUjiTrait
 {
-    private string $dirPratinjau = '';
+    /**
+     * Direktori pratinjau milik test ini; null = siapkanImporSlip() belum berjalan (mis. setUp gagal lebih dulu).
+     */
+    private ?string $dirPratinjau = null;
 
     /**
      * @var list<string>
@@ -32,18 +35,20 @@ trait ImporSlipUjiTrait
 
     protected function siapkanImporSlip(): void
     {
-        $this->dirPratinjau = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'slip-impor-uji-' . bin2hex(random_bytes(4)) . DIRECTORY_SEPARATOR;
+        $this->dirPratinjau = DirPratinjauUji::buat();
 
         config(Presensi::class)->direktoriPratinjau = $this->dirPratinjau;
     }
 
+    /**
+     * Aman dipanggil dari tearDown() walau setUp() gagal sebelum siapkanImporSlip() (CR-108): hanya direktori
+     * pratinjau & berkas sementara milik test di temp sistem yang dihapus — lihat DirPratinjauUji.
+     */
     protected function bersihkanImporSlip(): void
     {
-        foreach ([...$this->berkasSementara, ...(glob($this->dirPratinjau . '*') ?: [])] as $berkas) {
-            @unlink($berkas);
-        }
+        DirPratinjauUji::bersihkan($this->dirPratinjau, $this->berkasSementara);
 
-        @rmdir($this->dirPratinjau);
+        $this->dirPratinjau    = null;
         $this->berkasSementara = [];
         Services::resetSingle('request');
         config(Presensi::class)->direktoriPratinjau = WRITEPATH . 'uploads/slip-impor/';
@@ -56,7 +61,7 @@ trait ImporSlipUjiTrait
      */
     protected function isiDirPratinjau(): array
     {
-        return array_map('basename', glob($this->dirPratinjau . '*') ?: []);
+        return DirPratinjauUji::isi($this->dirPratinjau);
     }
 
     /**
@@ -215,7 +220,7 @@ trait ImporSlipUjiTrait
 
     private function tempSlip(string $akhiran): string
     {
-        $path                    = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'slipuji' . bin2hex(random_bytes(5)) . $akhiran;
+        $path                    = DirPratinjauUji::berkasSementara($akhiran);
         $this->berkasSementara[] = $path;
 
         return $path;
