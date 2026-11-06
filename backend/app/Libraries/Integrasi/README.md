@@ -115,6 +115,10 @@ Keputusan dan penyimpangan:
   `ambil_riwayat_mutasi` (legacy tanpa filter, hapus keras `L_jabatan.php:1712`; v2 hapus lunak). `p_get_unit`/`p_get_satker` (`S_dm.php:175`,
   `:247`): legacy JUGA hapus lunak status 10 (`L_jabatan.php:2580-2593`, `:2818-2831`) dan mengirimnya — menyaring status 10 di v2 adalah
   DEVIASI [V2] (unit/satker terhapus tidak dikirim ke klien). Daftar lain memfilter `status = 1` persis legacy.
+- **[K] `services/s_dm` baris utuh** (`SELECT *` legacy, `S_dm.php:41`, `:83`, `:175`, `:244`): kolom `unit`/`satker` v2 = kolom D1 (DBV-008),
+  termasuk kolom audit legacy `created_at`/`updated_at`/`updated_by` (`updated_by` = id akun pengubah, sama dengan legacy). Tidak ada kolom v2
+  baru yang ikut keluar. Beda nilai: waktu audit v2 disimpan UTC (legacy waktu server). `p_get_satker` menambah `unit` (nama unit induk) [K].
+- **[K] `services/s_dm` hanya GET**: semua parameter legacy dibaca dari `$_GET` (`id_unit`, `id_satker`); method lain → 404.
 - **[K]** daftar riwayat dan `ambil_riwayat_mutasi` tanpa LIMIT, ikut legacy (riwayat per NIP kecil; `ambil_riwayat_mutasi` memang
   seluruh tabel untuk sinkron E-Talenta). Bila volume menjadi masalah, paginasi = perubahan kontrak (perlu keputusan).
 - **[V2]** teks tidak di-`stripslashes` ulang (impor UP-1 sudah menormalkan, Impor README #5).
