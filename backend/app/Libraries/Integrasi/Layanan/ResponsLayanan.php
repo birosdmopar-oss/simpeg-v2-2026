@@ -17,6 +17,7 @@ use stdClass;
  * parameter `$statusString` (bawaan INT); bentuk lain amplop sama. Bukan amplop SIMAPI `"01"`/`"02"`.
  *
  * Berkas bersama Jalur A (keputusan lead 05-11-2026): A6 `s_stat` dan A4 `s_dm` memakai mode INT, B4b `s_esign` mode string.
+ * `msg` boleh null (aditif, B4b): `s_esign/check_user` legacy selalu mengirim `"msg":null` (putusan reviewer U2).
  */
 final class ResponsLayanan
 {
@@ -31,7 +32,7 @@ final class ResponsLayanan
     /**
      * @param array<mixed>|stdClass $data
      */
-    public static function sukses(array|stdClass $data, string $msg = '', bool $statusString = false): ResponseInterface
+    public static function sukses(array|stdClass $data, ?string $msg = '', bool $statusString = false): ResponseInterface
     {
         return self::amplop(self::SUKSES, $msg, $data, 200, $statusString);
     }
@@ -41,7 +42,7 @@ final class ResponsLayanan
      *
      * @param array<mixed>|stdClass|null $data
      */
-    public static function gagal(string $msg, array|stdClass|null $data = null, bool $statusString = false): ResponseInterface
+    public static function gagal(?string $msg, array|stdClass|null $data = null, bool $statusString = false): ResponseInterface
     {
         return self::amplop(self::GAGAL, $msg, $data ?? new stdClass(), 200, $statusString);
     }
@@ -57,7 +58,7 @@ final class ResponsLayanan
     /**
      * @param array<mixed>|stdClass $data
      */
-    private static function amplop(int $status, string $msg, array|stdClass $data, int $http, bool $statusString): ResponseInterface
+    private static function amplop(int $status, ?string $msg, array|stdClass $data, int $http, bool $statusString): ResponseInterface
     {
         return service('response')
             ->setStatusCode($http)

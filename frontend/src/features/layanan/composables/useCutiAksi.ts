@@ -22,6 +22,10 @@ export interface NoticeCuti {
  * pernah meminta passphrase (K3a). Tanda tangan gagal → persetujuan tetap tersimpan; ulangi lewat item ⋮ "Tanda tangani".
  * Sebelum dialog dibuka, sertifikat penanda tangan dicek (`esignStatus`, ikut legacy `Cuti.php:687-705`): tidak aktif →
  * pesan tanpa meminta passphrase (surat tanpa TTE); layanan tidak terhubung → pesan galat, bisa dicoba lagi.
+ *
+ * Q6-40 (MAKE-075): sesudah Setujui/Tangguhkan ATAS NAMA yang final, bila server mengizinkan `aksi.esign_atas_nama`, dialog
+ * yang sama dibuka dalam mode atas nama (passphrase pejabat, TTE atas identitas pejabat). Menutup dialog = surat tanpa TTE;
+ * ulangi lewat item ⋮ "Tanda tangani atas nama".
  */
 const PESAN_PROSES: Record<AksiProsesCuti, string> = {
   setujui: 'Pengajuan cuti disetujui.',
@@ -42,6 +46,8 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
 
   const esignOpen = ref(false)
   const esignRow = ref<CutiItem | null>(null)
+  /** Dialog TTE dibuka dalam mode atas nama (Q6-40). */
+  const esignAtasNama = ref(false)
   const esignBusy = ref(false)
   const esignErrors = ref<Record<string, string>>({})
   const esignUmum = ref('')
@@ -57,6 +63,8 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
       bukaProses(row, key.replace('-atas-nama', '') as AksiProsesCuti, true)
     } else if (key === 'esign') {
       void bukaEsign(row)
+    } else if (key === 'esign-atas-nama') {
+      void bukaEsign(row, true)
     } else if (key === 'tunda') {
       void tunda(row)
     } else if (key === 'surat') {
@@ -67,15 +75,16 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
     }
   }
 
-  async function bukaEsign(row: CutiItem): Promise<void> {
+  async function bukaEsign(row: CutiItem, atasNama = false): Promise<void> {
     busyId.value = row.id
     try {
-      const cek = await cutiService.esignStatus(row.id)
+      const cek = await cutiService.esignStatus(row.id, atasNama)
       if (cek.status !== 'aktif') {
         notice.value = { tone: 'danger', text: cek.pesan || 'Sertifikat elektronik tidak dapat diperiksa.' }
         return
       }
       esignRow.value = row
+      esignAtasNama.value = atasNama
       esignErrors.value = {}
       esignUmum.value = ''
       esignOpen.value = true
@@ -102,10 +111,11 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
     try {
       const hasil = await cutiService.process(row.id, payload)
       prosesOpen.value = false
-      const lanjutTtd = payload.aksi !== 'tolak' && hasil.aksi?.esign === true
+      const atasNama = payload.atas_nama === true && hasil.aksi?.esign_atas_nama === true
+      const lanjutTtd = payload.aksi !== 'tolak' && (hasil.aksi?.esign === true || atasNama)
       notice.value = { tone: 'success', text: lanjutTtd ? `${PESAN_PROSES[payload.aksi]} Lanjutkan tanda tangan elektronik.` : PESAN_PROSES[payload.aksi] }
       await onSelesai('proses', row.id)
-      if (lanjutTtd) await bukaEsign(hasil)
+      if (lanjutTtd) await bukaEsign(hasil, atasNama && hasil.aksi?.esign !== true)
     } catch (e) {
       prosesError.value = describeApiError(e).message
     } finally {
@@ -121,7 +131,7 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
     esignErrors.value = {}
     esignUmum.value = ''
     try {
-      await cutiService.esign(row.id, passphrase)
+      await cutiService.esign(row.id, passphrase, esignAtasNama.value)
       esignOpen.value = false
       notice.value = { tone: 'success', text: 'Surat cuti ditandatangani secara elektronik.' }
       await onSelesai('esign', row.id)
@@ -194,6 +204,7 @@ export function useCutiAksi(onSelesai: (aksi: 'proses' | 'tunda' | 'hapus' | 'es
     prosesError,
     esignOpen,
     esignRow,
+    esignAtasNama,
     esignBusy,
     esignErrors,
     esignUmum,

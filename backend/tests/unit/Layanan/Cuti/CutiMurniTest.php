@@ -30,8 +30,8 @@ final class CutiMurniTest extends CIUnitTestCase
         'SaldoTahunanCuti', 'SnapshotSaldoCuti', 'StatusCuti', 'TransisiCuti', 'ValidasiTanggalCuti',
     ];
 
-    /** Kelas tidak murni (DB atau I/O berkas/GD, mis. `QrTtd` MAKE-065 Q6-22) tanpa sufiks `Service`. */
-    private const BER_DB = ['ResetTundaCuti', 'ApproverTerjangkau', 'AtasanLangsungCuti', 'PejabatBerwenangCuti', 'OpsiCuti', 'PenerbitSuratCutiNoOp', 'QrTtd', 'KunciSuratCuti'];
+    /** Kelas tidak murni (DB atau I/O berkas/GD, mis. `QrTtd` MAKE-065 Q6-22, `TteAtasNama` MAKE-075 Q6-40) tanpa sufiks `Service`. */
+    private const BER_DB = ['ResetTundaCuti', 'ApproverTerjangkau', 'AtasanLangsungCuti', 'PejabatBerwenangCuti', 'OpsiCuti', 'PenerbitSuratCutiNoOp', 'QrTtd', 'KunciSuratCuti', 'TteAtasNama'];
 
     public function testSemuaKelasCutiMurni(): void
     {

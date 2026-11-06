@@ -630,9 +630,12 @@ class CutiService
             'tangguhkan' => $proses && (int) $cuti['id_jenis_cuti'] === AturanCuti::JENIS_TAHUNAN,
             'tunda'      => $tunda,
             // F6-18 K1 (keputusan Horii 03-11-2026): hanya penanda tangan pemilik tugas, sesudah final, belum ber-TTE.
-            'esign'                => $nip !== null && $nip === EsignCutiService::penandaTangan($cuti) && in_array($status, StatusCuti::EFEK_FINAL, true) && ! $adaSuratTte,
-            'unduh_surat'          => in_array($status, StatusCuti::EFEK_FINAL, true) && $adaSurat,
-            'proses_atas_nama'     => $atasNama,
+            'esign'            => $nip !== null && $nip === EsignCutiService::penandaTangan($cuti) && in_array($status, StatusCuti::EFEK_FINAL, true) && ! $adaSuratTte,
+            'unduh_surat'      => in_array($status, StatusCuti::EFEK_FINAL, true) && $adaSurat,
+            'proses_atas_nama' => $atasNama,
+            // Q6-40 (MAKE-075): Super Admin, keputusan final diproses atas nama, belum ber-TTE, bukan penanda tangan sendiri.
+            'esign_atas_nama' => $role === Role::SUPER_ADMIN && in_array($status, StatusCuti::EFEK_FINAL, true) && ! $adaSuratTte
+                && $nip !== EsignCutiService::penandaTangan($cuti) && TteAtasNama::finalAtasNama($this->db, $cuti),
             'tangguhkan_atas_nama' => $atasNama && (int) $cuti['id_jenis_cuti'] === AturanCuti::JENIS_TAHUNAN,
         ];
     }
@@ -1143,7 +1146,7 @@ class CutiService
 
     /**
      * @param array<string, mixed> $cuti
-     * @param array{lampiran: bool, surat: bool} $ada
+     * @param array{lampiran: bool, surat: bool, tte?: bool} $ada
      *
      * @return array<string, mixed>
      */
@@ -1153,8 +1156,9 @@ class CutiService
         $nipPyb  = $this->tekstuPlain($cuti['nip_yang_menyetujui'] ?? null);
         $tunggal = TransisiCuti::langkahTunggal($nipAl, $nipPyb);
         $eselonI = (int) ($cuti['id_sub_group_jabatan'] ?? 0) === 1;
-        $aksi    = $this->aksi($auth, $cuti, false, $ada['surat']);
-        $ekstra  = ['ada_lampiran' => $ada['lampiran'], 'ada_surat' => $ada['surat']];
+        // MAKE-075: daftar ikut tahu surat ber-TTE (item ⋮ "Tanda tangani"/"… atas nama" tersembunyi sesudah TTE).
+        $aksi   = $this->aksi($auth, $cuti, $ada['tte'] ?? false, $ada['surat']);
+        $ekstra = ['ada_lampiran' => $ada['lampiran'], 'ada_surat' => $ada['surat']];
 
         if ($tandaiAtasNama) {
             $ekstra['perlu_atas_nama'] = $this->tahapTakTerjangkau($cuti) !== null;
@@ -1214,7 +1218,7 @@ class CutiService
     /**
      * @param list<int> $ids
      *
-     * @return array<int, array{lampiran: bool, surat: bool}>
+     * @return array<int, array{lampiran: bool, surat: bool, tte: bool}>
      */
     private function adaBerkas(array $ids): array
     {
@@ -1222,7 +1226,7 @@ class CutiService
             return [];
         }
 
-        $hasil = array_fill_keys($ids, ['lampiran' => false, 'surat' => false]);
+        $hasil = array_fill_keys($ids, ['lampiran' => false, 'surat' => false, 'tte' => false]);
         $rows  = $this->db->table('document_attachment')->select('id_entri, id_riwayat')
             ->whereIn('id_riwayat', [self::ID_LAMPIRAN, self::ID_SURAT_BELUM_TTE, self::ID_SURAT_TTE])->whereIn('id_entri', array_map('strval', $ids))
             ->get()->getResultArray();
@@ -1235,6 +1239,10 @@ class CutiService
             }
 
             $hasil[(int) $r['id_entri']][(int) $r['id_riwayat'] === self::ID_LAMPIRAN ? 'lampiran' : 'surat'] = true;
+
+            if ((int) $r['id_riwayat'] === self::ID_SURAT_TTE) {
+                $hasil[(int) $r['id_entri']]['tte'] = true;
+            }
         }
 
         return $hasil;

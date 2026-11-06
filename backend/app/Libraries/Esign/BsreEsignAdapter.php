@@ -81,7 +81,7 @@ final class BsreEsignAdapter implements EsignGatewayInterface
         KonfigurasiIntegrasi::pastikan('esign', $konfigurasi, ['baseUrl', 'username', 'password']);
         $this->opsi    = KonfigurasiIntegrasi::opsiTransport('esign', $konfigurasi);
         $this->baseUrl = rtrim(trim((string) $konfigurasi['baseUrl']), '/');
-        $this->nikDari = $nikDari ?? static function (string $nip): ?string {
+        $this->nikDari = $nikDari ?? static function (#[\SensitiveParameter] string $nip): ?string {
             $nik = db_connect()->table('pegawai')->select('nik')->where('nip', $nip)->get(1)->getRow()?->nik;
 
             return is_string($nik) && trim($nik) !== '' ? trim($nik) : null;
@@ -126,7 +126,7 @@ final class BsreEsignAdapter implements EsignGatewayInterface
         return ['ok' => $ok, 'http' => (string) $respons->status, 'pesan' => $this->bersih($this->pesan($json ?? [], $ok ? 'Gateway menjawab.' : 'Gateway menolak/galat.'))];
     }
 
-    public function checkUser(string $nip): array
+    public function checkUser(#[\SensitiveParameter] string $nip): array
     {
         $dasar = ['nip' => $nip, 'has_certificate' => false, 'certificate_expires_at' => null];
         $nik   = ($this->nikDari)($nip);
@@ -159,9 +159,13 @@ final class BsreEsignAdapter implements EsignGatewayInterface
     }
 
     /**
-     * @param array<string, mixed> $options opsi tampilan {@see self::OPSI_QUERY} + `imageTTD` (biner gambar) + `namaBerkas`
+     * `$nip` bertanda `SensitiveParameter`: pada `services/s_esign` berisi NIK (factory `esignGatewayNikLangsung`, review B4b P2).
+     *
+     * @param array<string, mixed> $options opsi tampilan {@see self::OPSI_QUERY} + `imageTTD` (biner gambar; `imageTTDMime`/
+     *                                      `imageTTDNama` opsional, bawaan PNG) + `image` (override nilai query, s_esign) +
+     *                                      `namaBerkas`
      */
-    public function signPdf(string $pdfContent, string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
+    public function signPdf(#[\SensitiveParameter] string $pdfContent, #[\SensitiveParameter] string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
     {
         $gagal = ['signed_pdf' => null, 'signed_at' => null, 'signature_id' => null];
 
@@ -192,10 +196,18 @@ final class BsreEsignAdapter implements EsignGatewayInterface
 
         // Visualisasi gambar hanya bila imageTTD dikirim [K `Esign::sign` opsi 2/3]; tanpa gambar = `image=false`.
         $query['image'] = $gambar !== null ? 'true' : 'false';
-        $bagian         = [['nama' => 'file', 'isi' => $pdfContent, 'namaBerkas' => is_string($options['namaBerkas'] ?? null) ? $options['namaBerkas'] : 'dokumen.pdf']];
+
+        // `services/s_esign` meneruskan nilai `image` dari pemanggil [K `S_esign.php:79`] (review B4b S2).
+        if (is_scalar($options['image'] ?? null) && (string) $options['image'] !== '') {
+            $query['image'] = (string) $options['image'];
+        }
+
+        $bagian = [['nama' => 'file', 'isi' => $pdfContent, 'namaBerkas' => is_string($options['namaBerkas'] ?? null) ? $options['namaBerkas'] : 'dokumen.pdf']];
 
         if ($gambar !== null) {
-            $bagian[] = ['nama' => 'imageTTD', 'isi' => $gambar, 'namaBerkas' => 'ttd.png', 'mime' => 'image/png'];
+            $mime     = is_string($options['imageTTDMime'] ?? null) && $options['imageTTDMime'] !== '' ? $options['imageTTDMime'] : 'image/png';
+            $nama     = is_string($options['imageTTDNama'] ?? null) && $options['imageTTDNama'] !== '' ? $options['imageTTDNama'] : 'ttd.png';
+            $bagian[] = ['nama' => 'imageTTD', 'isi' => $gambar, 'namaBerkas' => $nama, 'mime' => $mime];
         }
 
         try {

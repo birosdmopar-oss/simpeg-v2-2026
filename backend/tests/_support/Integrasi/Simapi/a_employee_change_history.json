@@ -1,0 +1,13 @@
+{
+    "_keterangan": "MAKE-060 fixture kontrak SIMAPI a_employee/change_history (sintetis): field per baris, diturunkan dari controllers/simapi/v1/A_employee.php select :84 dikurangi id_simapi_ch (:97).",
+    "_rujukan": "A_employee.php:84, :97-98",
+    "kunci": [
+        "jenis_data",
+        "id_rwy",
+        "nip",
+        "action",
+        "action_at",
+        "field_name",
+        "field_value"
+    ]
+}

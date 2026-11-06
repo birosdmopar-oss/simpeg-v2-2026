@@ -6,6 +6,8 @@
  * ditutup, dan saat komponen dilepas. Input bertipe password (komponen `UiTextField`), tanpa isi-otomatis browser.
  * Galat server per kolom (`errors.passphrase`, `errors.nip`, `errors.status`) diteruskan pemanggil lewat `errors`/`umum`.
  * Pemanggil menutup dialog setelah request berhasil (pola ApprovalDialog).
+ * `atasNama` (Q6-40, MAKE-075): Super Admin menandatangani atas nama pejabat (nama di `atasNama`) dengan passphrase pejabat;
+ * menutup dialog = surat terbit tanpa TTE (ikut legacy).
  */
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
@@ -14,8 +16,8 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import { UiButton, UiTextField } from '@/shared/ui'
 
 const props = withDefaults(
-  defineProps<{ open: boolean; subject?: string; loading?: boolean; errors?: Record<string, string>; umum?: string }>(),
-  { subject: '', loading: false, errors: () => ({}), umum: '' },
+  defineProps<{ open: boolean; subject?: string; loading?: boolean; errors?: Record<string, string>; umum?: string; atasNama?: string }>(),
+  { subject: '', loading: false, errors: () => ({}), umum: '', atasNama: '' },
 )
 
 const emit = defineEmits<{ 'update:open': [value: boolean]; confirm: [passphrase: string] }>()
@@ -63,8 +65,11 @@ function tutup(): void {
       >
         <div class="mb-4 flex items-start justify-between gap-3">
           <div>
-            <DialogTitle class="text-h5 text-slate-900">Tanda tangani{{ subject ? ` ${subject}` : '' }}</DialogTitle>
-            <DialogDescription class="text-body2 text-slate-500">
+            <DialogTitle class="text-h5 text-slate-900">{{ atasNama ? 'Tanda tangani atas nama' : 'Tanda tangani' }}{{ subject ? ` ${subject}` : '' }}</DialogTitle>
+            <DialogDescription v-if="atasNama" class="text-body2 text-slate-500" data-testid="esign-atas-nama">
+              Persetujuan atas nama sudah tersimpan. Masukkan passphrase sertifikat elektronik {{ atasNama }} untuk menandatangani surat cuti atas nama pejabat tersebut; passphrase tidak disimpan. Tutup dialog bila surat diterbitkan tanpa tanda tangan elektronik; Anda dapat mengulang dari menu ⋮ "Tanda tangani atas nama".
+            </DialogDescription>
+            <DialogDescription v-else class="text-body2 text-slate-500">
               Persetujuan Anda sudah tersimpan. Masukkan passphrase sertifikat elektronik Anda untuk menandatangani surat cuti; passphrase tidak disimpan. Bila gagal, Anda dapat mengulang dari menu ⋮ "Tanda tangani".
             </DialogDescription>
           </div>

@@ -187,6 +187,7 @@ const catatan = computed(() => {
       :loading="aksi.esignBusy.value"
       :errors="aksi.esignErrors.value"
       :umum="aksi.esignUmum.value"
+      :atas-nama="aksi.esignAtasNama.value ? (aksi.esignRow.value?.nama_yang_menyetujui ?? aksi.esignRow.value?.nama_atasan_langsung ?? 'pejabat penanda tangan') : ''"
       @update:open="(v) => (aksi.esignOpen.value = v)"
       @confirm="aksi.esign"
     />
