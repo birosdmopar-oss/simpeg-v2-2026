@@ -24,6 +24,10 @@ use CodeIgniter\Router\RouteCollection;
  *   GET services/s_dm/list_unit | p_list_unit | p_list_unit_wo_kep | p_get_unit?id_unit | list_satker?id_unit | p_list_satker?id_unit
  *       | p_get_satker?id_satker
  *
+ * s_esign (klienLayanan:esign, Jalur B MAKE-065 B4b, F6-16), amplop STRING `{"status":"1"|"2","msg","data"}` HTTP 200 [K]:
+ *   GET|POST services/s_esign/check_user?nik= status sertifikat BSrE (S_esign:9; `msg` selalu null, bug legacy)
+ *   POST services/s_esign/sign_pdf          multipart file + imageTTD → data.signed_file base64 PDF ber-TTE (S_esign:54)
+ *
  * @var RouteCollection $routes
  */
 $routes->group('services', ['namespace' => 'App\Controllers\Services'], static function (RouteCollection $routes): void {
@@ -49,5 +53,11 @@ $routes->group('services', ['namespace' => 'App\Controllers\Services'], static f
         $routes->get('p_get_unit', 'SDmController::pGetUnit');
         $routes->get('p_list_satker', 'SDmController::pListSatker');
         $routes->get('p_get_satker', 'SDmController::pGetSatker');
+    });
+
+    // H-02 / F6-16 [K S_esign.php] — MAKE-065 B4b.
+    $routes->group('s_esign', ['filter' => 'klienLayanan:esign'], static function (RouteCollection $routes): void {
+        $routes->match(['GET', 'POST'], 'check_user', 'SEsignController::checkUser');
+        $routes->post('sign_pdf', 'SEsignController::signPdf');
     });
 });

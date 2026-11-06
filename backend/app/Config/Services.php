@@ -493,6 +493,26 @@ class Services extends BaseService
         };
     }
 
+    /**
+     * Gateway e-sign untuk `services/s_esign` (MuDig, MAKE-065 B4b, F6-16): pemanggil mengirim NIK penanda tangan langsung
+     * [K `S_esign.php`], jadi argumen `$nip` kontrak {@see EsignGatewayInterface} diperlakukan sebagai NIK — adapter BSrE
+     * tanpa pencarian `pegawai.nik`, mock tanpa menulis pengenal ke log. Kontrak interface tidak berubah.
+     */
+    public static function esignGatewayNikLangsung(bool $getShared = true): EsignGatewayInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('esignGatewayNikLangsung');
+        }
+
+        $driver = config(Integrations::class)->esign['driver'];
+
+        return match ($driver) {
+            'mock'  => new MockEsignAdapter([], false),
+            'bsre'  => new \App\Libraries\Esign\BsreEsignAdapter(static::klienHttp(), config(Integrations::class)->esign, static fn (#[\SensitiveParameter] string $nik): ?string => trim($nik) !== '' ? trim($nik) : null),
+            default => throw new RuntimeException("Esign driver '{$driver}' belum tersedia."),
+        };
+    }
+
     public static function siasnGateway(bool $getShared = true): SiasnGatewayInterface
     {
         if ($getShared) {

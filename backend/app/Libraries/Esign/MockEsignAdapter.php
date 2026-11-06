@@ -23,17 +23,18 @@ class MockEsignAdapter implements EsignGatewayInterface
 
     /**
      * @param list<string> $withoutCertificate
+     * @param bool         $catatPengenal      false = pengenal (NIK pada `services/s_esign`, MAKE-065 B4b) tidak ditulis ke log
      */
-    public function __construct(array $withoutCertificate = [])
+    public function __construct(array $withoutCertificate = [], private readonly bool $catatPengenal = true)
     {
         $this->withoutCertificate = $withoutCertificate;
     }
 
-    public function checkUser(string $nip): array
+    public function checkUser(#[\SensitiveParameter] string $nip): array
     {
         $has = ! in_array($nip, $this->withoutCertificate, true);
 
-        log_message('info', '[MockEsignAdapter] checkUser nip={nip} has_certificate={has}', ['nip' => $nip, 'has' => $has ? 'true' : 'false']);
+        log_message('info', '[MockEsignAdapter] checkUser nip={nip} has_certificate={has}', ['nip' => $this->catatPengenal ? $nip : '-', 'has' => $has ? 'true' : 'false']);
 
         return [
             'status_code'            => $has ? '200' : '404',
@@ -44,7 +45,7 @@ class MockEsignAdapter implements EsignGatewayInterface
         ];
     }
 
-    public function signPdf(string $pdfContent, string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
+    public function signPdf(#[\SensitiveParameter] string $pdfContent, #[\SensitiveParameter] string $nip, #[\SensitiveParameter] string $passphrase, array $options = []): array
     {
         if ($pdfContent === '') {
             return [
@@ -66,7 +67,7 @@ class MockEsignAdapter implements EsignGatewayInterface
             ];
         }
 
-        log_message('info', '[MockEsignAdapter] signPdf nip={nip} bytes={bytes}', ['nip' => $nip, 'bytes' => strlen($pdfContent)]);
+        log_message('info', '[MockEsignAdapter] signPdf nip={nip} bytes={bytes}', ['nip' => $this->catatPengenal ? $nip : '-', 'bytes' => strlen($pdfContent)]);
 
         return [
             'status_code'  => '200',

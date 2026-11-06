@@ -26,4 +26,34 @@ publik QR, dan pencabutan akses publik: `README-deploy.md` §1c.
   minimal, tanpa NIP/unduh) dan PDF publik; throttle, 404 seragam, `no-store` + `noindex`. Dasar URL =
   `layanan.urlPublikSurat` (https wajib di production).
 
-B4b (`services/s_esign` untuk MuDig) menunggu fondasi Jalur A (MAKE-058).
+## `services/s_esign` untuk MuDig (F6-16 / Q6-05 = A, MAKE-065 B4b)
+
+Port `controllers/services/S_esign.php`. Controller `Controllers/Services/SEsignController` (filter `klienLayanan:esign`,
+MAKE-058/ADR-036), logika `LayananEsignMudig`, batas unggahan `Config\EsignMudig`. Route = sub-group `s_esign` di
+`Config/RoutesServices.php` (berkas bersama Jalur A), responder `ResponsLayanan` mode string. Runbook: `README-deploy.md` §1c.
+
+Amplop [K] `{"status":"1"|"2","msg","data"}` — `status` **string** seperti `S_esign.php` (berbeda dengan `s_stat`/`s_dm` yang
+int), HTTP 200; auth gagal 401 dari filter.
+
+| Endpoint | Masukan | Keluaran |
+|---|---|---|
+| `GET\|POST services/s_esign/check_user` | `nik` (query, seperti `$_GET` legacy) | `status` "1" bila gateway `1111`; `msg` selalu `null` [K bug legacy: kunci `message` vs `msg`], `data` `[]` |
+| `POST services/s_esign/sign_pdf` | wajib [K]: `nik`, `passphrase`, multipart `file` (PDF, ≤ `pdfMaks` 10 MB) dan `imageTTD` (JPEG/PNG, ≤ `gambarMaks` 2 MB); opsional dengan bawaan legacy: `tampilan`, `width`, `height`, `tag_koordinat`, `reason`, `location`; untuk `esign_hist`: `nama_lengkap`, `modul`, `nip`, `id_rw`, `file_pdf_to_sign`, `ip_address`, `user_agent` | sukses: `msg` "Berhasil menandatangani dokumen secara digital.", `data.signed_file` = base64 PDF ber-TTE; gagal: pesan gateway teredaksi; parameter wajib kurang/berkas tidak sah/lewat batas: "Invalid parameter." |
+
+- NIK dikirim pemanggil, jadi gateway dibuat lewat `Services::esignGatewayNikLangsung()` (BSrE tanpa pencarian `pegawai.nik`; mock
+  tanpa menulis pengenal ke log). Kontrak `EsignGatewayInterface` tidak berubah.
+- `esign_hist` wajib [V2] tanpa menambah parameter wajib (legacy hanya mencatat bila `nama_lengkap`, `modul`, `file_pdf_to_sign`
+  dikirim): satu baris per percobaan yang sampai ke gateway (status 1/2, `status_code` = kode gateway). Isian kosong:
+  `nama_lengkap` → nama bergelar `pegawai` bila NIP dikenal, selain itu `''`; `modul` → `'MuDig'`; `file_pdf_to_sign` → nama
+  berkas unggahan (basename, 256); `nip` tak dikenal → NULL; `id_rw` hanya angka (lainnya NULL); `ip_address`/`user_agent` dari
+  POST [K], dipotong panjang kolom.
+- Berkas tidak ditulis ke disk aplikasi. Respons `Cache-Control: no-store`. NIK/passphrase (dan NIK pada argumen `$nip` adapter)
+  bertanda `#[\SensitiveParameter]`, tidak masuk respons/log. NIK harus `^[0-9A-Za-z]{1,32}$` (selain itu "Invalid parameter.").
+- `imageTTD` diteruskan dengan MIME dari isi + nama unggahan (padanan `mime_content_type` + basename legacy); `image` diteruskan
+  dari POST, bawaan legacy `true` (= `"1"` setelah `http_build_query`). Sukses hanya bila hasil gateway benar-benar PDF (`%PDF-`,
+  diperiksa adapter dan layanan).
+- Kolom TINYTEXT (`user_agent`, `keterangan`) dipotong 255 **byte** (`mb_strcut`); VARCHAR dipotong per karakter.
+- **Pengecualian "esign_hist wajib"** (review B4b P1b): bila pencatatan gagal SESUDAH gateway mengembalikan PDF ber-TTE, respons
+  tetap sukses + PDF (menolak memicu MuDig mengulang = tanda tangan ganda); kegagalan ke `log_message('error')` tanpa PII.
+  Bila gateway gagal DAN pencatatan gagal → `status` "2" galat umum.
+- Keterbatasan (ikut legacy, review B4b S4): tidak ada pembatas percobaan passphrase per penanda tangan; hanya throttle per klien A3.
