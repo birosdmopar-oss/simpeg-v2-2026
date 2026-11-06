@@ -97,7 +97,8 @@ Keputusan dan penyimpangan:
 - **`a_employee/change_history` (MAKE-060, `Simapi/PenyajiChangeHistory`)** [K `AE:20-118`]: type 2 saja; filter `simapi_auth_jd` (kosong =
   semua); `id_simapi_ch > MAX(ack klien)`, ASC, LIMIT 100; ditandai di `simapi_auth_ch` dalam transaksi yang sama dengan kunci baris klien
   (`FOR UPDATE`, DBV-026 §13.2 A5) + `INSERT IGNORE`; `action` 1 → "INSERT / UPDATE", lain → "DELETE"; `action_at` UTC → WIB. Koreksi NIP
-  (B-06) tidak menyentuh `simapi_ch` (di luar `TabelAnakNip`, A6). **Penulis `simapi_ch` BELUM ada**: spesifikasi trigger legacy per tabel
+  (B-06) tidak menyentuh `simapi_ch` (di luar `TabelAnakNip`, A6). **Penulis `simapi_ch` = KERANGKA** `Simapi/PencatatPerubahan` (event `simapiPerubahan`, terdaftar di `Config/Events.php`, no-op karena
+  `SPESIFIKASI` kosong ⚑; tanpa pemancar di layanan pemilik): spesifikasi trigger legacy per tabel
   (P14) dan seed `simapi_jd` (P6) menunggu D1 (ISSUE-056); sampai itu endpoint selalu mengembalikan data kosong di lingkungan nyata.
 - **NIP** [K]: kosong → "Invalid paramater" (ejaan legacy; legacy tanpa segmen NIP = galat PHP), tidak ada di `pegawai` → "NIP not valid";
   status 10 TIDAK ditolak (ikut legacy).
