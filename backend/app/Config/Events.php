@@ -38,6 +38,9 @@ Events::on(RiwayatEngine::EVENT_NOTIFIKASI, [\App\Libraries\Push\AntrePushRiwaya
 // Fase 4 C-04 (MAKE-022, PRD §6.4.7): login sukses mereset penanda tunda pengingat persetujuan cuti milik NIP itu.
 Events::on(AuthService::EVENT_LOGIN_SUKSES, [ResetTundaCuti::class, 'tangani']);
 
+// Fase 6 Jalur A (MAKE-060): penulis log SIMAPI `simapi_ch` sesudah commit; spesifikasi per tabel menunggu D1 (no-op sampai diisi).
+Events::on(\App\Libraries\Integrasi\Simapi\PencatatPerubahan::EVENT, [\App\Libraries\Integrasi\Simapi\PencatatPerubahan::class, 'dariEvent']);
+
 Events::on('pre_system', static function (): void {
     if (ENVIRONMENT !== 'testing') {
         $value = ini_get('zlib.output_compression');

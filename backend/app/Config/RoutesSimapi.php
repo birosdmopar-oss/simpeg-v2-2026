@@ -17,9 +17,11 @@ $routes->group('simapi/v1', ['namespace' => 'App\Controllers\Simapi'], static fu
 
     $routes->group('', ['filter' => 'simapiToken'], static function (RouteCollection $routes): void {
         // H-06 [K A_employee.php]: 25 method `a_employee/{method}/{nip}`; tanpa NIP → "Invalid paramater" [V2: legacy galat PHP].
-        // `change_history` milik MAKE-060 (A5).
         // [V2] foto khusus klien SIMAPI (keputusan Horii = A, pola Q6-38): URL `foto` di data_umum/detil menunjuk ke sini.
         $routes->get('a_employee/foto/(:segment)', 'AEmployee::foto/$1');
+
+        // MAKE-060 (F6-06) [K AE:20-118]: ack-on-read, hanya klien type 2.
+        $routes->match(['GET', 'POST'], 'a_employee/change_history', 'AEmployee::changeHistory');
 
         foreach (array_keys(PenyajiPegawai::METHOD) as $method) {
             $routes->match(['GET', 'POST'], 'a_employee/' . $method, 'AEmployee::sajikan/' . $method);
