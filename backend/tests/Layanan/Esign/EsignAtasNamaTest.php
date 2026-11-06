@@ -115,6 +115,19 @@ final class EsignAtasNamaTest extends DatabaseTestCase
         }
 
         $this->assertSame([], $this->lampiranUji->daftar($a['pemohon']['nip'], CutiService::ID_SURAT_TTE, $id), 'surat tanpa TTE');
+
+        // S1 review: status final terminal — pejabat tidak bisa memutus ulang (mis. 4 → 4) sesudah keputusan atas nama, jadi
+        // entri atas nama final terakhir = keputusan final terakhir.
+        foreach (['setujui', 'tangguhkan'] as $aksiUlang) {
+            try {
+                $this->approvalService()->process($a['pyb']['auth'], $id, ['aksi' => $aksiUlang]);
+                $this->fail("pejabat memproses ulang cuti final ({$aksiUlang}) harus ditolak");
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('status', $e->getErrors(), $aksiUlang);
+            }
+        }
+
+        $this->assertSame(4, (int) $this->cutiService()->ambil($id)['status']);
         $this->assertTrue($this->aksi($admin['auth'], $id)['esign_atas_nama'], 'bisa diulang (Q6-19)');
         $this->assertSame(0, $this->db->table('esign_hist')->countAllResults());
     }

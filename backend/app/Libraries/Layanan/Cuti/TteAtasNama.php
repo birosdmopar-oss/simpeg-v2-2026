@@ -62,7 +62,11 @@ final class TteAtasNama
             $statusAudit = (int) ($after['status'] ?? 0);
 
             if (in_array($statusAudit, StatusCuti::EFEK_FINAL, true)) {
-                // Entri final atas nama TERAKHIR: berlaku hanya bila status cuti masih hasil keputusan itu.
+                // Entri final atas nama TERAKHIR: berlaku hanya bila status cuti masih hasil keputusan itu. Entri ini
+                // otomatis juga keputusan final TERAKHIR secara umum (saran review S1): status final 1/4 bersifat terminal —
+                // {@see TransisiCuti::tahapAktif()} hanya untuk status 0/3, sehingga cuti final tidak bisa diproses lagi
+                // (oleh pejabat maupun atas nama) dan tidak ada keputusan pejabat sesudahnya (dikunci test
+                // EsignAtasNamaTest::testTanpaPassphraseSuratTanpaTteDanBisaDiulang).
                 return $statusAudit === $status;
             }
         }
