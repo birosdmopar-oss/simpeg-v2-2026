@@ -98,8 +98,11 @@ Keputusan dan penyimpangan:
   semua); `id_simapi_ch > MAX(ack klien)`, ASC, LIMIT 100; ditandai di `simapi_auth_ch` dalam transaksi yang sama dengan kunci baris klien
   (`FOR UPDATE`, DBV-026 §13.2 A5) + `INSERT IGNORE`; `action` 1 → "INSERT / UPDATE", lain → "DELETE"; `action_at` UTC → WIB. Koreksi NIP
   (B-06) tidak menyentuh `simapi_ch` (di luar `TabelAnakNip`, A6). **Penulis `simapi_ch` (A5b)** = `Simapi/AturanTrigger` (port trigger D1 per tabel, murni; DBV-031 §4; fixture
-  `tests/_support/Integrasi/Simapi/simapi_ch_trigger.json`) + `Simapi/PencatatPerubahan` (antrean per koneksi: `catat()` sebelum commit,
-  `setelahCommit()` menulis hanya sesudah commit terluar, `batal()` saat rollback; galat hanya dilog; nip kosong dilewati). Pemancar di
+  `tests/_support/Integrasi/Simapi/simapi_ch_trigger.json`) + `Simapi/PencatatPerubahan` (`catat()` sesudah tulisan bisnis). **[V2] Log ditulis DI DALAM transaksi
+  pemilik** dibungkus SAVEPOINT unik (setara trigger; keputusan reviewer 09-11 opsi B, menggantikan kalimat PRD F6-06 "event sesudah
+  commit"): commit → baris ada, rollback lewat jalur apa pun → hilang; insert log gagal → ROLLBACK TO SAVEPOINT + log, status transaksi
+  dipulihkan hanya bila sebelumnya baik; di luar transaksi ditulis langsung; nip kosong dilewati. Catatan: pemilik transaksi yang
+  memakai `transException(true)` akan me-rollback seluruh transaksinya bila insert log gagal (aturan proyek: jangan transException(true)). Pemancar di
   layanan pemilik dipasang bertahap; impor cutover (`Libraries/Impor`) sengaja tidak memancar (opsi a).
 - **NIP** [K]: kosong → "Invalid paramater" (ejaan legacy; legacy tanpa segmen NIP = galat PHP), tidak ada di `pegawai` → "NIP not valid";
   status 10 TIDAK ditolak (ikut legacy).

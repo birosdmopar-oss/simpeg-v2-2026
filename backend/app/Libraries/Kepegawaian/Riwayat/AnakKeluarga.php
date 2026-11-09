@@ -385,7 +385,6 @@ final class AnakKeluarga
         } catch (Throwable $e) {
             $db->transRollback();
             $db->resetTransStatus();
-            PencatatPerubahan::batal($db);
             $this->selesaikanLampiran();
             $this->notifTertunda = null;
 
@@ -396,7 +395,6 @@ final class AnakKeluarga
             $error = $db->error();
             $db->transRollback();
             $db->resetTransStatus();
-            PencatatPerubahan::batal($db);
             $this->selesaikanLampiran();
             $this->notifTertunda = null;
 
@@ -405,7 +403,6 @@ final class AnakKeluarga
 
         $db->transCommit();
         $db->resetTransStatus();
-        PencatatPerubahan::setelahCommit($db); // MAKE-060 A5b
         $this->selesaikanLampiran();
         $this->kirimNotifikasi();
 

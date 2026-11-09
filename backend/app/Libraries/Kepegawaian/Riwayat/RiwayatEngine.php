@@ -732,7 +732,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
      */
     /**
      * MAKE-060 A5b (F6-06) — pemancar log SIMAPI `simapi_ch` (pengganti trigger legacy) untuk tabel riwayat ini; tabel yang
-     * tidak ber-trigger di legacy diabaikan {@see AturanTrigger}. Dipanggil di dalam transaksi; ditulis sesudah commit terluar.
+     * tidak ber-trigger di legacy diabaikan {@see AturanTrigger}. Dipanggil di dalam transaksi; ditulis di transaksi yang sama (savepoint, setara trigger).
      *
      * @param array<string, mixed>|null $lama
      * @param array<string, mixed>|null $baru
@@ -752,7 +752,6 @@ final class RiwayatEngine implements RiwayatServiceInterface
         } catch (Throwable $e) {
             $db->transRollback();
             $db->resetTransStatus();
-            PencatatPerubahan::batal($db);
             $this->selesaikanLampiran();
 
             throw $e;
@@ -762,7 +761,6 @@ final class RiwayatEngine implements RiwayatServiceInterface
             $error = $db->error();
             $db->transRollback();
             $db->resetTransStatus();
-            PencatatPerubahan::batal($db);
             $this->selesaikanLampiran();
 
             throw new DatabaseException('Penulisan riwayat gagal: ' . $error['message'], (int) $error['code']);
@@ -770,7 +768,6 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
         $db->transCommit();
         $db->resetTransStatus();
-        PencatatPerubahan::setelahCommit($db); // MAKE-060 A5b: log SIMAPI hanya sesudah commit terluar
         $this->selesaikanLampiran();
 
         return $hasil;

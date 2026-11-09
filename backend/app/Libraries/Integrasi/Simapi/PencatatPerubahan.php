@@ -9,22 +9,21 @@ use Throwable;
 
 /**
  * MAKE-060 A5b (F6-06) — penulis `simapi_ch` pengganti trigger DB legacy (aturan per tabel: {@see AturanTrigger}). Penulis data
- * (layanan pemilik tabel sumber) memanggil:
- *  1. {@see catat()} SEBELUM commit, dengan baris lama/baru yang sudah dibacanya, pada koneksi & transaksi yang sama — aturan
- *     dievaluasi saat itu (lookup NIP keluarga ikut membaca di transaksi yang sama) lalu hasilnya DIANTREKAN per koneksi;
- *  2. {@see setelahCommit()} sesudah commit miliknya — antrean ditulis hanya bila transaksi TERLUAR sudah selesai
- *     (`transDepth === 0`); di dalam transaksi pemanggil lain, penulisan menunggu `setelahCommit()` pemilik transaksi terluar;
- *  3. {@see batal()} pada rollback — antrean dibuang (tidak ada baris log untuk perubahan yang batal).
- * Dipanggil di luar transaksi (`transDepth === 0`), {@see catat()} langsung menulis.
+ * (layanan pemilik tabel sumber) memanggil {@see catat()} tepat sesudah tulisan bisnisnya, dengan baris lama/baru, pada koneksi
+ * yang sama.
  *
- * Aditif murni: galat apa pun di sini hanya dicatat ke log (kelas + kode, tanpa NIP), tidak pernah dilempar ke operasi bisnis.
- * Baris tanpa NIP tidak ditulis (DBV-031 N2/§3.3; akun tanpa NIP CR-093). `simapi_jd` belum di-seed → FK menolak → dilog.
- * Impor cutover (`Libraries/Impor`) sengaja TIDAK memanggil kelas ini (antrean mulai kosong, keputusan Horii 09-11 opsi a).
+ * [V2, keputusan reviewer 09-11-2026 opsi B] Setara trigger: di dalam transaksi pemilik (`transDepth > 0`) baris log ditulis
+ * DI DALAM transaksi itu, dibungkus SAVEPOINT unik — commit pemilik → baris ada; rollback lewat jalur apa pun → baris hilang
+ * bersama data bisnis. Insert log gagal → `ROLLBACK TO SAVEPOINT`, galat hanya dilog (kelas + kode, tanpa NIP), dan status
+ * transaksi CI4 dipulihkan HANYA bila sebelum savepoint masih baik (kegagalan bisnis sebelumnya tidak pernah ditutupi).
+ * Di luar transaksi: ditulis langsung sesudah tulisan bisnis, galat hanya dilog.
+ *
+ * Baris tanpa NIP tidak ditulis (DBV-031 N2/§3.3; akun tanpa NIP CR-093). Impor cutover (`Libraries/Impor`) sengaja TIDAK
+ * memanggil kelas ini (antrean mulai kosong, keputusan Horii 09-11 opsi a).
  */
 final class PencatatPerubahan
 {
-    /** @var array<int, list<array<string, mixed>>> antrean per koneksi (spl_object_id) */
-    private static array $antrean = [];
+    private static int $urutan = 0;
 
     private function __construct()
     {
@@ -41,74 +40,92 @@ final class PencatatPerubahan
                 'nip_keluarga' => static fn (mixed $id): ?string => self::nipKeluarga($db, $id),
                 'url_foto'     => static fn (string $nip, string $path): string => (new PenyajiPegawai($db))->urlFoto($nip, $path),
             ]);
-
-            $baris = array_values(array_filter($baris, static fn (array $b): bool => Nilai::teks($b['nip']) !== ''));
-
-            if ($baris === []) {
-                return;
-            }
-
-            if ($db->transDepth === 0) {
-                self::tulis($db, $baris);
-
-                return;
-            }
-
-            self::$antrean[spl_object_id($db)] = array_merge(self::$antrean[spl_object_id($db)] ?? [], $baris);
         } catch (Throwable $e) {
             self::log($e);
-        }
-    }
 
-    /**
-     * Panggil sesudah commit milik penulis. Menulis antrean bila tidak ada lagi transaksi terbuka di koneksi itu.
-     */
-    public static function setelahCommit(BaseConnection $db): void
-    {
-        if ($db->transDepth !== 0) {
             return;
         }
 
-        $baris = self::$antrean[spl_object_id($db)] ?? [];
-        unset(self::$antrean[spl_object_id($db)]);
+        $baris = array_values(array_filter($baris, static fn (array $b): bool => Nilai::teks($b['nip']) !== ''));
 
-        if ($baris !== []) {
-            self::tulis($db, $baris);
+        if ($baris === []) {
+            return;
         }
-    }
 
-    /**
-     * Panggil pada rollback: perubahan batal → antrean koneksi dibuang.
-     */
-    public static function batal(BaseConnection $db): void
-    {
-        unset(self::$antrean[spl_object_id($db)]);
-    }
+        if ($db->transDepth === 0) {
+            self::tulisLangsung($db, $baris);
 
-    /**
-     * Jumlah baris yang masih menunggu (untuk test).
-     */
-    public static function tertunda(BaseConnection $db): int
-    {
-        return count(self::$antrean[spl_object_id($db)] ?? []);
+            return;
+        }
+
+        self::tulisDalamTransaksi($db, $baris);
     }
 
     /**
      * @param list<array<string, mixed>> $baris
      */
-    private static function tulis(BaseConnection $db, array $baris): void
+    private static function tulisLangsung(BaseConnection $db, array $baris): void
     {
         try {
-            $sekarang = gmdate('Y-m-d H:i:s');
-
             foreach ($baris as $b) {
-                if ($db->table('simapi_ch')->insert($b + ['action_at' => $sekarang]) === false) {
+                if (self::insert($db, $b) === false) {
                     self::log(null, (int) ($db->error()['code'] ?? 0));
                 }
             }
         } catch (Throwable $e) {
             self::log($e);
         }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baris
+     */
+    private static function tulisDalamTransaksi(BaseConnection $db, array $baris): void
+    {
+        $statusSebelum = $db->transStatus();
+        $titik         = 'sp_simapi_' . (++self::$urutan);
+
+        try {
+            if ($db->simpleQuery('SAVEPOINT ' . $titik) === false) {
+                self::log(null, (int) ($db->error()['code'] ?? 0));
+
+                return;
+            }
+        } catch (Throwable $e) {
+            self::log($e);
+
+            return;
+        }
+
+        try {
+            foreach ($baris as $b) {
+                if (self::insert($db, $b) === false) {
+                    throw new \RuntimeException('Insert simapi_ch gagal.', (int) ($db->error()['code'] ?? 0));
+                }
+            }
+
+            $db->simpleQuery('RELEASE SAVEPOINT ' . $titik);
+        } catch (Throwable $e) {
+            try {
+                $db->simpleQuery('ROLLBACK TO SAVEPOINT ' . $titik);
+            } catch (Throwable) {
+                // Galat asli lebih penting.
+            }
+
+            if ($statusSebelum) {
+                $db->resetTransStatus(); // hanya memulihkan kegagalan log; kegagalan bisnis sebelumnya tetap
+            }
+
+            self::log($e);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $b
+     */
+    private static function insert(BaseConnection $db, array $b): bool
+    {
+        return (bool) $db->table('simapi_ch')->insert($b + ['action_at' => gmdate('Y-m-d H:i:s')]);
     }
 
     private static function nipKeluarga(BaseConnection $db, mixed $idKeluarga): ?string

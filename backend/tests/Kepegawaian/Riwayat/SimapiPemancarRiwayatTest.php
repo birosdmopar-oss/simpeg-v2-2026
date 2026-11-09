@@ -27,17 +27,14 @@ final class SimapiPemancarRiwayatTest extends DatabaseTestCase
 
     private AuthContext $admin;
 
-    private AuthContext $adminSatker;
-
     protected function setUp(): void
     {
         parent::setUp();
         $this->pasangEngineNyata([new Kgb(), new Kp()]);
         $this->siapkanMasterKp();
-        $idSatker          = $this->buatSatker();
-        $this->nip         = $this->buatPegawaiDiSatker($idSatker);
-        $this->admin       = $this->aktor(Role::SUPER_ADMIN)[1];
-        $this->adminSatker = $this->aktor(Role::ADMIN_SATKER, [], $idSatker)[1];
+        $idSatker    = $this->buatSatker();
+        $this->nip   = $this->buatPegawaiDiSatker($idSatker);
+        $this->admin = $this->aktor(Role::SUPER_ADMIN)[1];
     }
 
     protected function tearDown(): void
