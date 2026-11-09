@@ -103,7 +103,7 @@ Keputusan dan penyimpangan:
   commit"): commit → baris ada, rollback lewat jalur apa pun → hilang; insert log gagal → ROLLBACK TO SAVEPOINT + log, status transaksi
   dipulihkan hanya bila sebelumnya baik; di luar transaksi ditulis langsung; nip kosong dilewati. Catatan: pemilik transaksi yang
   memakai `transException(true)` akan me-rollback seluruh transaksinya bila insert log gagal (aturan proyek: jangan transException(true)). Pemancar di
-  layanan pemilik dipasang bertahap; impor cutover (`Libraries/Impor`) sengaja tidak memancar (opsi a).
+  layanan pemilik: lihat test arsitektur `PemancarSimapiArsitekturTest`; impor cutover sengaja tidak memancar (opsi a).
 - **NIP** [K]: kosong → "Invalid paramater" (ejaan legacy; legacy tanpa segmen NIP = galat PHP), tidak ada di `pegawai` → "NIP not valid";
   status 10 TIDAK ditolak (ikut legacy).
 - **Nilai** [K]: pemetaan teks (jenis kelamin, status pernikahan, Aktif/Tidak Aktif, jenis jabatan "Nomenlaktur" ejaan legacy, status JFT,

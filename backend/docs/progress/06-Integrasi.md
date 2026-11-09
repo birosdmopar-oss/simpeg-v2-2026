@@ -117,6 +117,14 @@ anomali [K], penyaji, kemurnian), `tests/database/Integrasi/StatServiceTest` (AC
 Q6-37, aturan unduh), `tests/database/Integrasi/SStatKontrakTest` (AC-08.3 401 amplop INT, AC-08.4, HTTP 200 amplop INT,
 `list_tb` tanpa path internal, unduh 200 header aman / 404 seragam).
 
+### A5b — MAKE-060 penulis `simapi_ch` (isi spesifikasi dari D1)
+
+Branch `fase6/a-lokal/make-060-a5b`. `Simapi/AturanTrigger` (port 47 trigger D1 penulis simapi_ch, 15 tabel; semantik CONCAT/COALESCE/NULL
+MySQL), `Simapi/PencatatPerubahan` (opsi B: tulis di transaksi pemilik dengan SAVEPOINT, setara trigger), pemancar di semua penulis
+(README Integrasi), fixture `tests/_support/Integrasi/Simapi/simapi_ch_trigger.json`, test arsitektur penulis
+`tests/unit/Integrasi/PemancarSimapiArsitekturTest.php`. Keputusan: Q1 semua penulis, Q2 NipCascade ikut trigger, Q3 impor tidak memancar,
+opsi B (Horii 09-11; koreksi PRD F6-06 = CR-110 reviewer). Penulis `simapi_update` = MAKE-076.
+
 ## Bagian B — Klien integrasi keluar
 
 Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin Horii. Dokumentasi modul:
