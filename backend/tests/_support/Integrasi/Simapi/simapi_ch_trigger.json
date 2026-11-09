@@ -1,0 +1,137 @@
+{
+    "_keterangan": "MAKE-060 A5b fixture kontrak penulis simapi_ch, DITURUNKAN dari definisi trigger produksi D1 (ISSUE-056, struktur saja; isi mentah tidak disalin): per tabel sumber id_simapi_jd, daftar field_name (urutan pipe), dan peristiwa yang menulis. Dipakai AturanTriggerTest.",
+    "detail_anak": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 14,
+        "field_name": "id_rwy|id_rwy_perkawinan|urutan_anak|tgl_lahir_anak|nama_anak|tempat_lahir_anak"
+    },
+    "pegawai": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 1,
+        "field_name": "nip|nama|glr_awal|glr_akhir|tgl_lahir|provinsi_lahir|kabupaten_kota_lahir|agama|jenis_kelamin|email|jenis_pegawai|status|foto"
+    },
+    "pengguna": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE"
+        ],
+        "id_simapi_jd": 1,
+        "field_name": "nip|email"
+    },
+    "riwayat_alamat": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 2,
+        "field_name": "id_rwy|nip|jenis_alamat|alamat|provinsi|kabupaten_kota|kecamatan|kelurahan|kode_pos|nama_kantor|lantai|telp|faks"
+    },
+    "riwayat_diklat": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 5,
+        "field_name": "id_rwy|nip|jenis_pelatihan|nama_pelatihan|no_sertifikat|tgl_sertifikat|jumlah_jp|instansi_penyelenggara|keterangan"
+    },
+    "riwayat_hukdis": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 13,
+        "field_name": "id_rwy|nip|tmtsk|tgl_sk|no_sk|tingkat_hukdis|jenis_hukdis|gol|ruang|gol_ruang|pangkat|masa_hukuman|akhir_hukdis|aturan_dilanggar|alasan_hukuman|keterangan"
+    },
+    "riwayat_keluarga": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 3,
+        "field_name": "id_rwy|nip|urutan_perkawinan|tgl_perkawinan|kota_perkawinan|nama_pasangan|jumlah_anak"
+    },
+    "riwayat_kgb": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 11,
+        "field_name": "id_rwy|nip|tmtsk|tgl_sk|no_sk|mker_gol_th|gaji_pokok|jabatan_yang_menandatangani"
+    },
+    "riwayat_kp": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 9,
+        "field_name": "id_rwy|nip|tmtsk|tgl_sk|no_sk|jenis_kp|gol|ruang|gol_ruang|pangkat|mker_th|mker_bl|gaji_pokok"
+    },
+    "riwayat_mutasi_jabatan": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 10,
+        "field_name": "id_rwy|nip|tmtsk|tgl_sk|no_sk|jenis_jabatan|jenis_jabatan_koordinasi|jabatan|jabatan_koordinasi|jabatan_lain|kelas_jabatan|group_jabatan|sub_group_jabatan|unit|satker|atasan_es_1|atasan_es_2|atasan_es_3|atasan_es_4|kredit_jft|no_induk_jft|status_jft"
+    },
+    "riwayat_organisasi": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 7,
+        "field_name": "id_rwy|nip|tgl_mulai|tgl_akhir|nama_organisasi|kedudukan|keterangan"
+    },
+    "riwayat_pendidikan": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 4,
+        "field_name": "id_rwy|nip|tgl_lulus|no_ijazah|institusi_pendidikan|jenjang_pendidikan_singkat|bidang_pendidikan|jurusan_pendidikan|nilai"
+    },
+    "riwayat_seminar": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 6,
+        "field_name": "id_rwy|nip|jenis|tgl_sertifikat|no_sertifikat|bidang|nama|jumlah_jp|instansi_penyelenggara|keterangan"
+    },
+    "riwayat_skp": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 8,
+        "field_name": "id_rwy|nip|tahun|tgl_mulai|tgl_akhir|nip_penilai|nama_penilai|jabatan_penilai|nip_atasan_penilai|nama_atasan_penilai|jabatan_atasan_penilai|nilai_skp|nilai_perilaku|nilai_prestasi_kerja|kategori_nilai|rating_skp|rating_perilaku"
+    },
+    "riwayat_tanda_jasa": {
+        "peristiwa": [
+            "INSERT",
+            "UPDATE",
+            "DELETE"
+        ],
+        "id_simapi_jd": 12,
+        "field_name": "id_rwy|nip|tgl_sertifikat|no_sertifikat|tanda_jasa|negara|keterangan"
+    }
+}

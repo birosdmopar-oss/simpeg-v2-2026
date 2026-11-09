@@ -8,82 +8,122 @@ use CodeIgniter\Database\BaseConnection;
 use Throwable;
 
 /**
- * MAKE-060 (F6-06) — KERANGKA penulis `simapi_ch` (pengganti trigger DB legacy AFTER INSERT/UPDATE/DELETE pada `pegawai`,
- * `pengguna`, `detail_anak`, dan 13 `riwayat_*`). Dipanggil SESUDAH commit oleh pelanggan event {@see EVENT}; tulisan log tidak
- * boleh menggagalkan operasi pemilik data (galat hanya dicatat).
+ * MAKE-060 A5b (F6-06) — penulis `simapi_ch` pengganti trigger DB legacy (aturan per tabel: {@see AturanTrigger}). Penulis data
+ * (layanan pemilik tabel sumber) memanggil:
+ *  1. {@see catat()} SEBELUM commit, dengan baris lama/baru yang sudah dibacanya, pada koneksi & transaksi yang sama — aturan
+ *     dievaluasi saat itu (lookup NIP keluarga ikut membaca di transaksi yang sama) lalu hasilnya DIANTREKAN per koneksi;
+ *  2. {@see setelahCommit()} sesudah commit miliknya — antrean ditulis hanya bila transaksi TERLUAR sudah selesai
+ *     (`transDepth === 0`); di dalam transaksi pemanggil lain, penulisan menunggu `setelahCommit()` pemilik transaksi terluar;
+ *  3. {@see batal()} pada rollback — antrean dibuang (tidak ada baris log untuk perubahan yang batal).
+ * Dipanggil di luar transaksi (`transDepth === 0`), {@see catat()} langsung menulis.
  *
- * ⚑ {@see SPESIFIKASI} SENGAJA KOSONG: per tabel, `id_simapi_jd`, isi `id_rwy`, nilai `action`, serta daftar & urutan kolom
- * `field_name`/`field_value` (pemisah `|`) wajib persis trigger legacy — sumbernya hanya DDL D1 (ISSUE-056 P14), seed `simapi_jd`
- * (P6) juga dari D1. Dilarang menebak (keputusan reviewer 06-11-2026). Selama kosong, setiap event diabaikan (no-op) dan tidak ada
- * pemancar event yang dipasang di layanan pemilik (MAKE-060 tahap A5b).
- *
- * Bentuk entri saat diisi (A5b):
- *   'riwayat_kp' => ['jenis_data' => '<simapi_jd.jenis_data>', 'id' => '<kolom id_rwy>', 'kolom' => ['<kolom1>', '<kolom2>', …]]
- * `id_simapi_jd` dicari lewat `jenis_data` (UNIQUE) sehingga tidak bergantung angka id. Baris akun sistem integrasi
- * (`pengguna` tanpa NIP, `sistem.integrasi`) tidak dicatat (PRD §7.5, CR-093).
+ * Aditif murni: galat apa pun di sini hanya dicatat ke log (kelas + kode, tanpa NIP), tidak pernah dilempar ke operasi bisnis.
+ * Baris tanpa NIP tidak ditulis (DBV-031 N2/§3.3; akun tanpa NIP CR-093). `simapi_jd` belum di-seed → FK menolak → dilog.
+ * Impor cutover (`Libraries/Impor`) sengaja TIDAK memanggil kelas ini (antrean mulai kosong, keputusan Horii 09-11 opsi a).
  */
 final class PencatatPerubahan
 {
-    public const EVENT = 'simapiPerubahan';
+    /** @var array<int, list<array<string, mixed>>> antrean per koneksi (spl_object_id) */
+    private static array $antrean = [];
 
-    public const AKSI_SIMPAN = 1; // INSERT / UPDATE [K AE:98]
-    public const AKSI_HAPUS  = 2; // DELETE
-
-    /** @var array<string, array{jenis_data: string, id: string, kolom: list<string>}> ⚑ menunggu D1 (ISSUE-056 P14) */
-    public const SPESIFIKASI = [];
-
-    /**
-     * @param array<string, array{jenis_data: string, id: string, kolom: list<string>}> $spesifikasi
-     */
-    public function __construct(private readonly BaseConnection $db, private readonly array $spesifikasi = self::SPESIFIKASI)
+    private function __construct()
     {
     }
 
     /**
-     * Pelanggan event: `['tabel' => string, 'aksi' => 1|2, 'baris' => array<string, mixed>]`.
-     *
-     * @param array{tabel?: mixed, aksi?: mixed, baris?: mixed} $payload
+     * @param array<string, mixed>|null $lama baris SEBELUM perubahan (UPDATE/DELETE)
+     * @param array<string, mixed>|null $baru baris SESUDAH perubahan (INSERT/UPDATE)
      */
-    public static function dariEvent(array $payload): void
+    public static function catat(BaseConnection $db, string $tabel, string $peristiwa, ?array $lama, ?array $baru): void
     {
         try {
-            (new self(db_connect()))->catat((string) ($payload['tabel'] ?? ''), (int) ($payload['aksi'] ?? 0), is_array($payload['baris'] ?? null) ? $payload['baris'] : []);
+            $baris = AturanTrigger::baris($tabel, $peristiwa, $lama, $baru, [
+                'nip_keluarga' => static fn (mixed $id): ?string => self::nipKeluarga($db, $id),
+                'url_foto'     => static fn (string $nip, string $path): string => (new PenyajiPegawai($db))->urlFoto($nip, $path),
+            ]);
+
+            $baris = array_values(array_filter($baris, static fn (array $b): bool => Nilai::teks($b['nip']) !== ''));
+
+            if ($baris === []) {
+                return;
+            }
+
+            if ($db->transDepth === 0) {
+                self::tulis($db, $baris);
+
+                return;
+            }
+
+            self::$antrean[spl_object_id($db)] = array_merge(self::$antrean[spl_object_id($db)] ?? [], $baris);
         } catch (Throwable $e) {
-            log_message('error', 'SIMAPI pencatat perubahan gagal: ' . (new \ReflectionClass($e))->getShortName() . ' kode ' . $e->getCode() . '.');
+            self::log($e);
         }
     }
 
     /**
-     * @param array<string, mixed> $baris nilai SESUDAH perubahan (INSERT/UPDATE) atau SEBELUM (DELETE)
-     *
-     * @return bool true bila satu baris `simapi_ch` ditulis
+     * Panggil sesudah commit milik penulis. Menulis antrean bila tidak ada lagi transaksi terbuka di koneksi itu.
      */
-    public function catat(string $tabel, int $aksi, array $baris): bool
+    public static function setelahCommit(BaseConnection $db): void
     {
-        $spek = $this->spesifikasi[$tabel] ?? null;
-
-        if ($spek === null || ! in_array($aksi, [self::AKSI_SIMPAN, self::AKSI_HAPUS], true)) {
-            return false;
+        if ($db->transDepth !== 0) {
+            return;
         }
 
-        if ($tabel === 'pengguna' && Nilai::teks($baris['nip'] ?? null) === '') {
-            return false; // akun sistem/non-pegawai tidak dicatat (CR-093)
+        $baris = self::$antrean[spl_object_id($db)] ?? [];
+        unset(self::$antrean[spl_object_id($db)]);
+
+        if ($baris !== []) {
+            self::tulis($db, $baris);
+        }
+    }
+
+    /**
+     * Panggil pada rollback: perubahan batal → antrean koneksi dibuang.
+     */
+    public static function batal(BaseConnection $db): void
+    {
+        unset(self::$antrean[spl_object_id($db)]);
+    }
+
+    /**
+     * Jumlah baris yang masih menunggu (untuk test).
+     */
+    public static function tertunda(BaseConnection $db): int
+    {
+        return count(self::$antrean[spl_object_id($db)] ?? []);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $baris
+     */
+    private static function tulis(BaseConnection $db, array $baris): void
+    {
+        try {
+            $sekarang = gmdate('Y-m-d H:i:s');
+
+            foreach ($baris as $b) {
+                if ($db->table('simapi_ch')->insert($b + ['action_at' => $sekarang]) === false) {
+                    self::log(null, (int) ($db->error()['code'] ?? 0));
+                }
+            }
+        } catch (Throwable $e) {
+            self::log($e);
+        }
+    }
+
+    private static function nipKeluarga(BaseConnection $db, mixed $idKeluarga): ?string
+    {
+        if ($idKeluarga === null || (string) $idKeluarga === '') {
+            return null;
         }
 
-        $jd = $this->db->table('simapi_jd')->select('id_simapi_jd')->where('jenis_data', $spek['jenis_data'])->get()->getRowArray();
+        $r = $db->table('riwayat_keluarga')->select('nip')->where('id_riwayat_keluarga', $idKeluarga)->limit(1)->get()->getRowArray();
 
-        if ($jd === null) {
-            return false; // seed simapi_jd belum ada (DBV-026 §13.2 A7)
-        }
+        return $r === null ? null : Nilai::mentah($r['nip']);
+    }
 
-        return (bool) $this->db->table('simapi_ch')->insert([
-            'id_simapi_jd' => (int) $jd['id_simapi_jd'],
-            'id_rwy'       => Nilai::mentah($baris[$spek['id']] ?? null),
-            'nip'          => Nilai::mentah($baris['nip'] ?? null),
-            'action'       => $aksi,
-            'action_at'    => gmdate('Y-m-d H:i:s'),
-            'field_name'   => implode('|', $spek['kolom']),
-            'field_value'  => implode('|', array_map(static fn (string $k): string => Nilai::teks($baris[$k] ?? null), $spek['kolom'])),
-        ]);
+    private static function log(?Throwable $e, int $kode = 0): void
+    {
+        log_message('error', 'SIMAPI pencatat perubahan gagal: ' . ($e === null ? 'DB' : (new \ReflectionClass($e))->getShortName()) . ' kode ' . ($e?->getCode() ?? $kode) . '.');
     }
 }
