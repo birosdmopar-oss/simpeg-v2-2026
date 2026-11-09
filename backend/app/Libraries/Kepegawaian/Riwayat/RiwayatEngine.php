@@ -14,6 +14,8 @@ use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
 use App\Interfaces\Kepegawaian\RiwayatServiceInterface;
 use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Models\Kepegawaian\RiwayatModel;
 use Closure;
@@ -152,7 +154,10 @@ final class RiwayatEngine implements RiwayatServiceInterface
                 $d->afterApprove($this->baris($d, $nip, $id), $auth);
             }
 
-            return $this->baris($d, $nip, $id);
+            $baru = $this->baris($d, $nip, $id);
+            $this->catatSimapi($d, AturanTrigger::INSERT, null, $baru);
+
+            return $baru;
         });
 
         if ($status === StatusRiwayat::Menunggu) {
@@ -216,7 +221,13 @@ final class RiwayatEngine implements RiwayatServiceInterface
                 $d->afterApprove($this->baris($d, $nip, $id), $auth);
             }
 
-            return [$this->baris($d, $nip, $id), $statusBaru];
+            $baru = $this->baris($d, $nip, $id);
+
+            if ($data !== []) {
+                $this->catatSimapi($d, AturanTrigger::UPDATE, $lama, $baru);
+            }
+
+            return [$baru, $statusBaru];
         });
 
         if ($statusBaru === StatusRiwayat::Menunggu) {
@@ -236,12 +247,15 @@ final class RiwayatEngine implements RiwayatServiceInterface
         $this->transaksi(function () use ($d, $auth, $role, $nip, $id): void {
             $this->kunciPegawai($nip);
 
-            $statusLama = $this->statusDari($d, $this->barisTerkunci($d, $nip, $id));
+            $lama       = $this->barisTerkunci($d, $nip, $id);
+            $statusLama = $this->statusDari($d, $lama);
             $this->jagaHapus($d, $role, $statusLama);
 
             $data  = $this->stempelPelaku($d, $auth, [$d->kolomStatus() => $this->nilaiStatus($d, StatusRiwayat::Dihapus)]);
             $model = $this->model($d);
             $model->withActor($auth, static fn () => $model->hapusLunak($id, $data));
+            // Hapus lunak = UPDATE status 10 → trigger legacy tidak menulis (AturanTrigger), dicatat untuk kelengkapan.
+            $this->catatSimapi($d, AturanTrigger::UPDATE, $lama, $data + $lama);
 
             if ($statusLama === StatusRiwayat::Disetujui) {
                 $this->snapshot()->sinkronkan($d, $nip, $auth);
@@ -273,7 +287,8 @@ final class RiwayatEngine implements RiwayatServiceInterface
         $row = $this->transaksi(function () use ($d, $auth, $nip, $id, $aksi, $catatan, $statusBaru): array {
             $this->kunciPegawai($nip);
 
-            $statusLama = $this->statusDari($d, $this->barisTerkunci($d, $nip, $id));
+            $lama       = $this->barisTerkunci($d, $nip, $id);
+            $statusLama = $this->statusDari($d, $lama);
             $this->jagaProses($statusLama);
 
             $data = $this->tandaiNotifikasi($d, $statusLama, $statusBaru, [
@@ -298,7 +313,10 @@ final class RiwayatEngine implements RiwayatServiceInterface
             // Hook aditif MAKE-008: setujui DAN tolak lewat proses (mis. AK mengisi appr_at/appr_by).
             $d->afterProses($aksi, $this->baris($d, $nip, $id), $auth);
 
-            return $this->baris($d, $nip, $id);
+            $baru = $this->baris($d, $nip, $id);
+            $this->catatSimapi($d, AturanTrigger::UPDATE, $lama, $baru);
+
+            return $baru;
         });
 
         $this->notifikasi(self::NOTIF_DIPROSES, $d, $row);
@@ -712,6 +730,18 @@ final class RiwayatEngine implements RiwayatServiceInterface
      *
      * @return T
      */
+    /**
+     * MAKE-060 A5b (F6-06) — pemancar log SIMAPI `simapi_ch` (pengganti trigger legacy) untuk tabel riwayat ini; tabel yang
+     * tidak ber-trigger di legacy diabaikan {@see AturanTrigger}. Dipanggil di dalam transaksi; ditulis sesudah commit terluar.
+     *
+     * @param array<string, mixed>|null $lama
+     * @param array<string, mixed>|null $baru
+     */
+    private function catatSimapi(RiwayatDefinisi $d, string $peristiwa, ?array $lama, ?array $baru): void
+    {
+        PencatatPerubahan::catat($this->db(), $d->tabel(), $peristiwa, $lama, $baru);
+    }
+
     private function transaksi(Closure $work): mixed
     {
         $db = $this->db();
@@ -722,6 +752,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
         } catch (Throwable $e) {
             $db->transRollback();
             $db->resetTransStatus();
+            PencatatPerubahan::batal($db);
             $this->selesaikanLampiran();
 
             throw $e;
@@ -731,6 +762,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
             $error = $db->error();
             $db->transRollback();
             $db->resetTransStatus();
+            PencatatPerubahan::batal($db);
             $this->selesaikanLampiran();
 
             throw new DatabaseException('Penulisan riwayat gagal: ' . $error['message'], (int) $error['code']);
@@ -738,6 +770,7 @@ final class RiwayatEngine implements RiwayatServiceInterface
 
         $db->transCommit();
         $db->resetTransStatus();
+        PencatatPerubahan::setelahCommit($db); // MAKE-060 A5b: log SIMAPI hanya sesudah commit terluar
         $this->selesaikanLampiran();
 
         return $hasil;
