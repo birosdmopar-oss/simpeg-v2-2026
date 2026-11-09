@@ -6,6 +6,8 @@ namespace App\Libraries\Auth;
 
 use App\Constants\Role;
 use App\Exceptions\ValidationException;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 
@@ -145,6 +147,8 @@ class AccountProvisioner
                 // MAKE-020 [V2]: password awal diatur sistem (NIP / acak / dari admin) → wajib ganti saat login pertama.
                 'must_change_password' => 1,
             ] + PasswordExpiry::forNewAccount(PenggunaModel::STATUS_ACTIVE, time()));
+            $dbSimapi = db_connect();
+            PencatatPerubahan::catat($dbSimapi, 'pengguna', AturanTrigger::INSERT, null, PencatatPerubahan::baca($dbSimapi, 'pengguna', 'id_pengguna', (int) $id)); // MAKE-060 A5b
         } catch (DatabaseException $e) {
             if ($e->getCode() === PenggunaModel::ER_FK_TANPA_INDUK && ! $this->pengguna->nipTerdaftarPegawai($nip)) {
                 throw self::nipTidakTerdaftar();

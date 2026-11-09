@@ -10,6 +10,8 @@ use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AccountProvisioner;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Models\AuditLogModel;
 use App\Models\Kepegawaian\PegawaiFotoModel;
@@ -133,11 +135,14 @@ final class SiklusPegawai
             }
 
             // Audit otomatis model: event `delete`, before = baris pegawai (NIP, nama bergelar) — padanan mylog legacy.
-            $model = new PegawaiModel($this->db);
+            $model      = new PegawaiModel($this->db);
+            $lamaSimapi = PencatatPerubahan::baca($this->db, 'pegawai', 'nip', $nip);
             if ($model->withActor($auth, static fn () => $model->delete($nip)) === false) {
                 // DBDebug mati: query builder mengembalikan false, bukan exception.
                 throw (int) $this->db->error()['code'] === 1451 ? self::masihTerkait() : self::gagalTulis($this->db);
             }
+
+            PencatatPerubahan::catat($this->db, 'pegawai', AturanTrigger::DELETE, $lamaSimapi, null); // MAKE-060 A5b
 
             // Penjaga berkas: path dibuang sesudah commit bila tidak lagi dirujuk tabel.kolom asalnya.
             foreach ($galeri as $baris) {
@@ -175,11 +180,14 @@ final class SiklusPegawai
     private function lepasAkun(AuthContext $auth, string $nip): void
     {
         foreach ($this->db->table('pengguna')->select('id_pengguna, nip, status')->where('nip', $nip)->get()->getResultArray() as $akun) {
-            $id = (int) $akun['id_pengguna'];
+            $id         = (int) $akun['id_pengguna'];
+            $lamaSimapi = PencatatPerubahan::baca($this->db, 'pengguna', 'id_pengguna', $id);
 
             if ($this->db->table('pengguna')->where('id_pengguna', $id)->update(['nip' => null, 'status' => '0', 'updated_at' => gmdate('Y-m-d H:i:s')]) === false) {
                 throw self::gagalTulis($this->db);
             }
+
+            PencatatPerubahan::sesudahUbah($this->db, 'pengguna', 'id_pengguna', $id, $lamaSimapi); // MAKE-060 A5b
 
             service('jwt')->revokeAllForUser($id);
             (new AuditLogModel($this->db))->record(
@@ -225,6 +233,7 @@ final class SiklusPegawai
             'created_at'  => $sekarang,
             'updated_by'  => $auth->idPengguna(),
         ]), false));
+        PencatatPerubahan::catat($this->db, 'pegawai', AturanTrigger::INSERT, null, PencatatPerubahan::baca($this->db, 'pegawai', 'nip', $nip)); // MAKE-060 A5b
 
         $fotoModel = new PegawaiFotoModel($this->db);
         $fotoModel->withActor($auth, static fn () => $fotoModel->insert(['nip' => $nip, 'foto' => $path, 'created_at' => $sekarang]));

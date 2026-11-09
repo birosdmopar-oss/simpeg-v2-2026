@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Interfaces\Kepegawaian\PegawaiScopeProsesInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\ListQuery;
 use App\Models\AuditLogModel;
@@ -258,7 +259,9 @@ final class ApprovalBiodata
         }
 
         $pegawaiModel = new PegawaiModel($this->db);
+        $lamaSimapi   = PencatatPerubahan::baca($this->db, 'pegawai', 'nip', $nip);
         $pegawaiModel->withActor($auth, static fn () => $pegawaiModel->update($nip, $ubahPegawai));
+        PencatatPerubahan::sesudahUbah($this->db, 'pegawai', 'nip', $nip, $lamaSimapi); // MAKE-060 A5b
 
         if ($flag !== PegawaiHistModel::FLAG_DISETUJUI) {
             return;
@@ -290,11 +293,15 @@ final class ApprovalBiodata
             return false;
         }
 
+        $lamaSimapi = PencatatPerubahan::baca($this->db, 'pengguna', 'id_pengguna', (int) $akun['id_pengguna']);
+
         if ($this->db->table('pengguna')->where('id_pengguna', (int) $akun['id_pengguna'])->update(['email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')]) === false) {
             $error = $this->db->error();
 
             throw new DatabaseException('Sinkron email akun gagal: ' . $error['message'], (int) $error['code']);
         }
+
+        PencatatPerubahan::sesudahUbah($this->db, 'pengguna', 'id_pengguna', (int) $akun['id_pengguna'], $lamaSimapi); // MAKE-060 A5b
 
         (new AuditLogModel($this->db))->record('pengguna', (int) $akun['id_pengguna'], AuditLogModel::EVENT_UPDATE, ['email' => $akun['email']], ['email' => $email], $auth->idPengguna(), $auth->nip());
 

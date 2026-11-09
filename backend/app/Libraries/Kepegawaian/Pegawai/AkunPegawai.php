@@ -7,6 +7,7 @@ namespace App\Libraries\Kepegawaian\Pegawai;
 use App\Constants\Role;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Auth\JwtService;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Models\AuditLogModel;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
@@ -47,13 +48,16 @@ final class AkunPegawai
         $jumlah = 0;
 
         foreach ($builder->get()->getResultArray() as $akun) {
-            $id = (int) $akun['id_pengguna'];
+            $id         = (int) $akun['id_pengguna'];
+            $lamaSimapi = PencatatPerubahan::baca($db, 'pengguna', 'id_pengguna', $id);
 
             if ($db->table('pengguna')->where('id_pengguna', $id)->update(['status' => '0', 'updated_at' => gmdate('Y-m-d H:i:s')]) === false) {
                 $error = $db->error();
 
                 throw new DatabaseException('Nonaktifkan akun pegawai gagal: ' . $error['message'], (int) $error['code']);
             }
+
+            PencatatPerubahan::sesudahUbah($db, 'pengguna', 'id_pengguna', $id, $lamaSimapi); // MAKE-060 A5b
 
             ($jwt ?? service('jwt'))->revokeAllForUser($id);
             (new AuditLogModel($db))->record('pengguna', $id, AuditLogModel::EVENT_UPDATE, ['status' => '1'], ['status' => '0', 'alasan' => $alasan], $auth->idPengguna(), $auth->nip());

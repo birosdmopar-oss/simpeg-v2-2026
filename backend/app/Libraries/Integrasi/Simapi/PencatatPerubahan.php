@@ -62,6 +62,39 @@ final class PencatatPerubahan
     }
 
     /**
+     * Baris sumber saat ini (untuk `lama` sebelum tulis, atau `baru` sesudahnya) pada koneksi/transaksi yang sama; null = tidak ada
+     * atau galat (dilog). Prefix-safe lewat query builder.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function baca(BaseConnection $db, string $tabel, string $kolom, mixed $kunci): ?array
+    {
+        try {
+            $r = $db->table($tabel)->where($kolom, $kunci)->limit(1)->get()->getRowArray();
+
+            return is_array($r) ? $r : null;
+        } catch (Throwable $e) {
+            self::log($e);
+
+            return null;
+        }
+    }
+
+    /**
+     * Pintasan penulis UPDATE: baca baris SESUDAH tulisan bisnis lalu {@see catat()} dengan `$lama` yang dibaca sebelumnya.
+     *
+     * @param array<string, mixed>|null $lama
+     */
+    public static function sesudahUbah(BaseConnection $db, string $tabel, string $kolom, mixed $kunci, ?array $lama): void
+    {
+        if ($lama === null) {
+            return;
+        }
+
+        self::catat($db, $tabel, AturanTrigger::UPDATE, $lama, self::baca($db, $tabel, $kolom, $kunci));
+    }
+
+    /**
      * @param list<array<string, mixed>> $baris
      */
     private static function tulisLangsung(BaseConnection $db, array $baris): void
