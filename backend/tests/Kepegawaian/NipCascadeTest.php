@@ -67,6 +67,25 @@ final class NipCascadeTest extends DatabaseTestCase
         parent::tearDown();
     }
 
+    /**
+     * MAKE-060 A5b: log SIMAPI ikut trigger legacy — INSERT pegawai baru (NIP baru), UPDATE riwayat cabang ganti NIP (baris
+     * memakai OLD.nip), DELETE pegawai lama (NIP lama).
+     */
+    public function testLogSimapiIkutTriggerLegacy(): void
+    {
+        [$lama, $super] = $this->siapkan();
+        $idRwy          = $this->buatRiwayatMutasiJabatan($lama, ['status' => 1]);
+
+        (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
+
+        $ch = array_map(
+            static fn (array $r): array => [(int) $r['id_simapi_jd'], $r['nip'], (int) $r['action'], $r['id_rwy'] === null ? null : (int) $r['id_rwy']],
+            $this->db->table('simapi_ch')->orderBy('id_simapi_ch')->get()->getResultArray(),
+        );
+
+        $this->assertSame([[1, self::NIP_BARU, 1, null], [10, $lama, 1, $idRwy], [1, $lama, 2, null]], $ch);
+    }
+
     public function testCascadeSeluruhTabelRegistryDalamSatuTransaksi(): void
     {
         [$lama, $super] = $this->siapkan();

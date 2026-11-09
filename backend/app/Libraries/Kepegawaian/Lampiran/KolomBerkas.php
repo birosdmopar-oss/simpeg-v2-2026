@@ -18,11 +18,11 @@ use CodeIgniter\HTTP\Files\UploadedFile;
  * path-nya. Pola pakai di dalam transaksi pemanggil:
  *
  *   $kolom = new KolomBerkas();
- *   $db->transException(true)->transStart();
+ *   $db->transBegin();   // pola proyek: tanpa transException(true) (MAKE-060 A5b: log simapi_ch pakai savepoint)
  *   $path = $kolom->simpan($berkas, $aturan, 'riwayat_karpeg', 'file_1', 'file_1');
  *   $kolom->hapus($lama['file_1'], 'riwayat_karpeg', 'file_1');   // berkas lama, bila diganti
  *   $db->table('riwayat_karpeg')->where(...)->update(['file_1' => $path]);
- *   $db->transComplete();
+ *   $db->transStatus() ? $db->transCommit() : $db->transRollback(); $db->resetTransStatus();
  *   $kolom->selesaikan();   // juga sesudah rollback (di blok catch/finally)
  *
  * Berbeda dengan AttachmentService, helper ini TIDAK merekonsiliasi secara oportunistik: path baru belum dirujuk
