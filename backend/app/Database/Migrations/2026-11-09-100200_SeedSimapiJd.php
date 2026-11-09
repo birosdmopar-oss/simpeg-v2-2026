@@ -12,8 +12,8 @@ use RuntimeException;
  * DBV-031 (ISSUE-056 P6, DBV-026 §13.2 A7) — isi master `simapi_jd` 14 baris dengan id EKSPLISIT sama dengan legacy (id
  * dipakai klien dan penulis `simapi_ch`). Data referensi, tanpa data pribadi. Dokumen: backend/docs/db-review/DBV-031-simapi-d1.md.
  *
- * Pra-cek: tabel harus kosong; isi berbeda → gagal jelas tanpa mengubah data (baris yang sudah sama persis dilewati, jadi
- * aman diulang). down() menghapus hanya 14 id ini dan gagal bila sudah dirujuk `simapi_ch`/`simapi_auth_jd` (FK RESTRICT).
+ * Pra-cek: baris yang sudah ada harus identik dengan master (subset identik diterima dan dilewati, jadi aman diulang); id yang
+ * berisi lain → gagal jelas tanpa mengubah data. down() menghapus hanya 14 id ini dan gagal bila sudah dirujuk `simapi_ch`/`simapi_auth_jd` (FK RESTRICT).
  */
 class SeedSimapiJd extends Migration
 {

@@ -30,7 +30,7 @@
 | P5 | `simapi_jd` | `id_simapi_jd` TINYINT AI, `jenis_data` VARCHAR(100) TANPA UNIQUE (isi unik) | INT AI, UNIQUE | **Tetap** [V2] (isi 14 baris unik) |
 | P6 | Seed `simapi_jd` | 14 baris (AUTO_INCREMENT 15) | kosong | **Seed** 14 id eksplisit (§2.3) |
 | P7 | `simapi_ch.id_simapi_ch` | BIGINT signed | BIGINT UNSIGNED | **Tetap** [V2] |
-| P8 | `simapi_ch.id_rwy` | INT NULL (NULL untuk Data Umum/pengguna dan DELETE) | VARCHAR(50) NULL [I] | **Koreksi** → INT NULL [K] |
+| P8 | `simapi_ch.id_rwy` | INT NULL (NULL hanya untuk jd 1 `pegawai`/`pengguna`; riwayat & anak mengisi id juga saat DELETE) | VARCHAR(50) NULL [I] | **Koreksi** → INT NULL [K] |
 | P9 | `simapi_ch.nip` | VARCHAR(30) NOT NULL | VARCHAR(30) NULL | **Koreksi** → NOT NULL [K] — lihat §3.3 |
 | P10 | `simapi_ch.action` | TINYINT 1 INSERT/UPDATE, 2 DELETE | CHECK 1/2 | **Tetap** (cocok) |
 | P11 | `simapi_ch.action_at` | DEFAULT CURRENT_TIMESTAMP (WIB server) | diisi aplikasi UTC (DBV-026-Q5) | **Tetap** [V2]; dikirim WIB |
@@ -46,15 +46,17 @@
 (tanpa mengubah data): `nip` NULL atau `id_rwy` bukan bilangan bulat → migration gagal dengan jumlah baris yang melanggar.
 `down()` mengembalikan tipe DBV-026; bila sudah ada `field_name`/`field_value` > 64 KB (batas TEXT) atau `nip` panjang, `down()`
 gagal (mode strict) — rollback skema hanya aman sebelum data besar tertulis (catatan review CR, tidak memblokir).
+Pra-cek `id_rwy` menerima sampai 10 digit; nilai di atas batas INT ditolak ALTER (1264) dengan jelas dan data tetap utuh
+(ALTER atomik) — diterima (review DBV N1).
 
 ### 2.2 Tabel baru
 
-`simapi_update` [K D1]: `id_simapi_update` INT UNSIGNED AI PK, `nip` VARCHAR(30) NOT NULL (tanpa FK, log), `last_action`
+`simapi_update` [K D1]: `id_simapi_update` INT UNSIGNED AI PK ([V2]; legacy signed), `nip` VARCHAR(30) NOT NULL (tanpa FK, log), `last_action`
 VARCHAR(30) NOT NULL + CHECK IN ('INSERT','UPDATE','DELETE') [V2; nilai yang dipakai trigger D1 persis tiga itu],
 `last_update` DATETIME NOT NULL (UTC [V2]), `nama_field`/`nilai_lama`/`nilai_baru` MEDIUMTEXT NULL (pipe), `created_at`;
 KEY `nip` [V2].
 
-`simapi_update_hist` [K D1]: `id_klien` (FK `klien_layanan` RESTRICT; legacy `username`), `id_simapi_update` (FK RESTRICT),
+`simapi_update_hist` [K D1]: `id_klien` (FK `klien_layanan` RESTRICT; legacy `username`), `id_simapi_update` INT UNSIGNED ([V2]; FK RESTRICT),
 PK (`id_klien`, `id_simapi_update`), `created_at`. Pola `simapi_auth_ch`.
 
 `simapi_update.nip` di luar registry NIP (`TabelAnakNip`), sama dengan `simapi_ch.nip` (DBV-026-Q6): log riwayat, koreksi NIP tidak
@@ -120,10 +122,23 @@ NULL → '' lewat COALESCE):
 | `riwayat_kgb` | 11 | id riwayat | NEW/OLD.nip | 8 | idem |
 | `riwayat_tanda_jasa` | 12 | id riwayat | NEW/OLD.nip | 7 | idem |
 | `riwayat_hukdis` | 13 | id riwayat | NEW/OLD.nip | 16 | idem |
-| `detail_anak` | 14 | id anak (NULL saat DEL) | lookup `riwayat_keluarga.nip` | 6 | INS/UPD → 1; DEL → 2 |
+| `detail_anak` | 14 | id anak (juga saat DEL, OLD.id) | lookup `riwayat_keluarga.nip` | 6 | INS/UPD → 1; DEL → 2 |
 
-Cabang ganti NIP (`OLD.nip != NEW.nip`): baris ditulis dengan **OLD.nip**. Penulis `simapi_update` (MAKE-076): `pegawai`
-(INS/UPD/DEL), `pegawai_mutasi_jabatan` (INS/UPD/DEL), `pengguna` (INS/UPD; termasuk username|password|email). Tulisan lain di
+Cabang ganti NIP (`OLD.nip != NEW.nip`): baris ditulis dengan **OLD.nip**. "id riwayat" = NEW.id saat INS/UPD dan OLD.id saat
+DEL (juga `detail_anak`); NULL hanya untuk jd 1.
+
+Penulis `simapi_update` (MAKE-076) — nilai `last_action` per peristiwa TIDAK seragam (review DBV T2):
+
+| Tabel sumber | Peristiwa | `last_action` | `nip` | Catatan |
+|---|---|---|---|---|
+| `pegawai` | INSERT | 'INSERT' | NEW.nip | `nilai_lama` NULL |
+| `pegawai` | UPDATE | 'UPDATE' | NEW.nip (cabang ganti NIP: OLD.nip) | hanya bila kolom terpantau berubah |
+| `pegawai` | DELETE | 'DELETE' | OLD.nip | `nama_field`/`nilai_lama`/`nilai_baru` NULL |
+| `pegawai_mutasi_jabatan` | INSERT | 'UPDATE' | NEW.nip | `nilai_lama` '\|\|' |
+| `pegawai_mutasi_jabatan` | UPDATE | 'UPDATE' | NEW/OLD.nip | |
+| `pegawai_mutasi_jabatan` | DELETE | 'UPDATE' | OLD.nip | `nilai_baru` '\|\|' |
+| `pengguna` | INSERT | 'UPDATE' | `id_pegawai` | `nilai_lama` '\|\|'; field username\|password\|email |
+| `pengguna` | UPDATE | 'UPDATE' | `id_pegawai` | | Tulisan lain di
 trigger yang sama (tabel SIASN, URL arsip foto) di luar scope; URL foto v2 lewat `PenyajiPegawai::urlFoto()` (Q6-39). Rincian
 urutan kolom per tabel menjadi fixture kontrak A5b.
 
@@ -133,3 +148,7 @@ urutan kolom per tabel menjadi fixture kontrak A5b.
 NOT NULL `nip` (1048), PK ganda (1062), FK (1451/1452), pra-cek ALTER gagal jelas tanpa mengubah data, seed menolak isi berbeda,
 siklus `down()`/`up()`. Audit `DBV-031-audit-simapi-d1.sql`: seed lengkap, nip kosong, `last_action` di luar domain, penanda tanpa
 induk (hanya jumlah).
+
+## 6. Keputusan DB Validator
+
+_(diisi DB Validator)_

@@ -15,7 +15,8 @@ use RuntimeException;
  *   - P9  `nip` VARCHAR(30) NULL → NOT NULL [K D1] (penulis tidak mencatat akun tanpa NIP, CR-093);
  *   - P12 `field_name` TEXT → MEDIUMTEXT, `field_value` TEXT → LONGTEXT [K D1].
  *
- * Pra-cek SEBELUM ALTER (tanpa mengubah data): ada `nip` NULL/'' atau `id_rwy` bukan bilangan bulat → gagal jelas.
+ * Pra-cek SEBELUM ALTER (tanpa mengubah data): ada `nip` NULL atau `id_rwy` bukan bilangan bulat → gagal jelas (`nip` ''
+ * ditangkap audit C2).
  * down() mengembalikan tipe DBV-026 (TEXT, VARCHAR NULL); data yang lebih panjang dari TEXT akan ditolak MySQL → gagal jelas.
  */
 class AlterSimapiChD1 extends Migration
