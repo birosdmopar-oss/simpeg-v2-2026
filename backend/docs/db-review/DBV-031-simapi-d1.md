@@ -76,7 +76,7 @@ valid" di `detail`/`pegawai_update` (MAKE-076). API baru (`simapi/v1/*`) tetap: 
 ### 3.2 Status token (P4)
 
 Kode legacy hanya menulis status 1 (A_auth.php, A_pegawai.php); nilai 3 tidak pernah ditulis kode. Bila baris token legacy ikut
-diimpor, status 3 dipetakan ke 2. **Usulan: token TIDAK diimpor** (F6-05 hash + CSPRNG; klien re-handshake, PN-4).
+diimpor, status 3 dipetakan ke 2. **Token TIDAK diimpor** (keputusan Horii 09-11-2026; F6-05 hash + CSPRNG; klien re-handshake, PN-4).
 
 ### 3.3 `nip` NOT NULL (P9)
 
@@ -89,12 +89,13 @@ menolak kasus sah. `detail_anak` yang induk keluarganya tidak ditemukan → tida
 `action_at` dan `last_update` disimpan UTC [V2]. `change_history` (A5a) dan `pegawai_update` (MAKE-076) WAJIB mengirim WIB
 `Y-m-d H:i:s`, setara `NOW()` server legacy.
 
-### 3.5 Data lama tidak dimigrasi (USULAN, keputusan final Horii)
+### 3.5 Data lama tidak dimigrasi (KEPUTUSAN Horii 09-11-2026, opsi a)
 
-`simapi_ch` (±12 juta baris), `simapi_auth_ch`, `simapi_update` (±56 ribu), `simapi_update_hist` legacy **usul tidak dimigrasi**:
-antrean mulai kosong saat cutover; perubahan sebelum freeze yang belum diambil klien dianggap selesai.
-Risiko: klien yang tertinggal menarik perubahan sebelum freeze kehilangan baris itu → mitigasi: umumkan jadwal freeze ke klien
-(PN-4) agar menarik antrean sampai kosong sebelum cutover; bila perlu klien melakukan tarik penuh (`detail`/`data_umum`) sekali
+`simapi_ch` (±12 juta baris), `simapi_auth_ch`, `simapi_update` (±56 ribu), `simapi_update_hist` legacy **TIDAK dimigrasi**
+(keputusan Horii 09-11-2026, opsi a): antrean v2 mulai kosong saat cutover; perubahan sebelum cutover yang belum diambil klien
+dianggap selesai saat freeze. `simapi_token` juga tidak diimpor (klien re-handshake, §3.2).
+Risiko: klien yang tertinggal menarik perubahan sebelum freeze kehilangan baris itu → mitigasi (masuk daftar PN re-handshake):
+klien diminta menarik antrean `change_history`/`pegawai_update` sampai habis sebelum freeze; bila perlu klien melakukan tarik penuh (`detail`/`data_umum`) sekali
 sesudah cutover. Dicatat juga di `docs/migrasi/Mapping_Migrasi_Tidak_Dimigrasi.md`.
 
 ## 4. Ringkasan trigger D1 (P14) — spesifikasi turunan, tanpa isi mentah
