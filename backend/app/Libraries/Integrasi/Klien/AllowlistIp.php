@@ -54,6 +54,15 @@ final class AllowlistIp
     }
 
     /**
+     * MAKE-076 (Q6-41, DBV-031 §3.1) — varian API SIMAPI lama `simapi/a_pegawai/*`: allowlist WAJIB berisi (NULL/kosong = ditolak,
+     * setara kolom `simapi_auth.ip_address` legacy yang selalu dicocokkan) lalu IP harus cocok.
+     */
+    public static function cocokWajib(string $ip, ?string $allowlist): bool
+    {
+        return $allowlist !== null && trim($allowlist) !== '' && self::cocok($ip, $allowlist);
+    }
+
+    /**
      * Apakah `$ip` diizinkan oleh `$allowlist` (bentuk simpan). `null` = semua; kosong atau IP tak sah = ditolak.
      */
     public static function cocok(string $ip, ?string $allowlist): bool

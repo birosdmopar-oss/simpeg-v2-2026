@@ -104,6 +104,27 @@ Keputusan dan penyimpangan:
   dipulihkan hanya bila sebelumnya baik; di luar transaksi ditulis langsung; nip kosong dilewati. Catatan: pemilik transaksi yang
   memakai `transException(true)` akan me-rollback seluruh transaksinya bila insert log gagal (aturan proyek: jangan transException(true)). Pemancar di
   layanan pemilik: lihat test arsitektur `PemancarSimapiArsitekturTest`; impor cutover sengaja tidak memancar (opsi a).
+- **API SIMAPI lama `simapi/a_pegawai/{token,detail,pegawai_update}` (MAKE-076, Q6-41, `Controllers/Simapi/APegawai`,
+  `Simapi/PenyajiPegawaiLama`)** [K `controllers/simapi/A_pegawai.php`]: path legacy tanpa `v1`, GET+POST. Auth `token` = filter
+  `klienLayanan:simapi,ipwajib` (Basic), lainnya `simapiToken:ipwajib`: allowlist WAJIB berisi dan IP cocok untuk SEMUA klien (setara
+  `simapi_auth.ip_address` legacy; NULL/kosong → gagal), tanpa cek `type` (DBV-031 §3.1). Pesan & amplop persis legacy: "Authentication
+  failed", "Token is not valid", "Invalid paramater", "NIP not valid", "Server error, please try again.", `data` `[]`.
+  - **[V2] token**: hash + CSPRNG satu tabel dengan `simapi/v1/a_auth/token`; tiap handshake menerbitkan token BARU (legacy mengembalikan
+    token lama yang belum kedaluwarsa) dan token aktif lain milik klien TIDAK dicabut (klien yang memakai v1 dan a_pegawai bergantian aman).
+  - **`detail/{nip}`**: 11 kunci urutan legacy; `foto` = `urlFoto()` (Q6-39); **`password` = hash yang sedang berlaku untuk akun**
+    (`password` Argon2id bila terisi, selain itu `password_legacy` MD5 = persis nilai legacy untuk akun yang belum login ulang; keputusan
+    reviewer 09-11, opsi b). **[V2] format hash bisa MD5 atau Argon2id** — masuk daftar PN re-handshake: klien diberi tahu format hash
+    berubah setelah pegawai login ulang (koreksi PRD CR-110). Pegawai tanpa akun → username/password/email `null` (LEFT JOIN legacy).
+  - **`pegawai_update`**: ≤100 baris `simapi_update` yang belum ada di `simapi_update_hist` klien itu, id ASC, lalu ditandai (ack-on-read).
+    [V2] baca + tandai SATU transaksi yang mengunci BARIS KLIEN (`klien_layanan … FOR UPDATE`, pola change_history; klien berbeda tidak
+    saling menunggu), `INSERT IGNORE`; galat → rollback, "Server error" (legacy tetap mengirim walau penanda gagal). `last_update` UTC → WIB.
+  - **Penulis `simapi_update`** = `Simapi/AturanTriggerUpdate` (port trigger D1 `pegawai`, `pegawai_mutasi_jabatan`, `pengguna`; fixture
+    `tests/_support/Integrasi/Simapi/simapi_update_trigger.json`) lewat `PencatatPerubahan::catat()` yang sama (savepoint opsi B). `last_action`:
+    `pegawai` INSERT/UPDATE/DELETE; pmj & `pengguna` selalu 'UPDATE'. Kolom `password` dibandingkan memakai hash berlaku, jadi ganti password
+    (`PasswordService`), reset (`ResetPasswordService`), koreksi NIP dan **rehash otomatis MD5 → Argon2id saat login (`PasswordVerifier`,
+    keputusan reviewer Q1)** ikut tercatat. [V2] `pegawai` INSERT: legacy menulis `MD5(nip)` (password bawaan legacy) → v2 memakai hash akun
+    ber-NIP sama bila sudah ada, selain itu ''. Penulis pmj = `SnapshotSync` (snapshot jabatan) — pmj ganti NIP saja tidak menulis (kolom
+    terpantau jabatan/unit/satker). Pengecualian test arsitektur dipisah per tabel log (`simapi_ch` vs `simapi_update`).
 - **NIP** [K]: kosong → "Invalid paramater" (ejaan legacy; legacy tanpa segmen NIP = galat PHP), tidak ada di `pegawai` → "NIP not valid";
   status 10 TIDAK ditolak (ikut legacy).
 - **Nilai** [K]: pemetaan teks (jenis kelamin, status pernikahan, Aktif/Tidak Aktif, jenis jabatan "Nomenlaktur" ejaan legacy, status JFT,

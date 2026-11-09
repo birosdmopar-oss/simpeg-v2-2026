@@ -278,7 +278,7 @@ final class KlienLayananTest extends DatabaseTestCase
         $klien = $this->klien();
         $t     = $this->terbit($klien['id']);
 
-        $this->assertSame(['id_klien' => $klien['id'], 'jenis' => 2], $this->token()->periksa('Bearer ' . $t['token']));
+        $this->assertSame(['id_klien' => $klien['id'], 'jenis' => 2, 'ip_allowlist' => null], $this->token()->periksa('Bearer ' . $t['token']));
 
         $hash = hash('sha256', $t['token']);
         $this->db->table('simapi_token')->where('token_hash', $hash)->update(['expired_at' => gmdate('Y-m-d H:i:s', time() - 1)]);

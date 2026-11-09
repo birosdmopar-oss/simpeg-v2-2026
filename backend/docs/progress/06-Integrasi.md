@@ -125,6 +125,16 @@ MySQL), `Simapi/PencatatPerubahan` (opsi B: tulis di transaksi pemilik dengan SA
 `tests/unit/Integrasi/PemancarSimapiArsitekturTest.php`. Keputusan: Q1 semua penulis, Q2 NipCascade ikut trigger, Q3 impor tidak memancar,
 opsi B (Horii 09-11; koreksi PRD F6-06 = CR-110 reviewer). Penulis `simapi_update` = MAKE-076.
 
+### MAKE-076 — API SIMAPI lama `simapi/a_pegawai/*` + penulis `simapi_update` (Q6-41)
+
+Branch `fase6/a-lokal/make-076-simapi-lama`. `Controllers/Simapi/APegawai` + `Simapi/PenyajiPegawaiLama` (token/detail/pegawai_update
+ikut `A_pegawai.php`; allowlist wajib `ipwajib` untuk filter `klienLayanan`/`simapiToken`), `Simapi/AturanTriggerUpdate` (port trigger D1
+`pegawai`/`pegawai_mutasi_jabatan`/`pengguna`) lewat `PencatatPerubahan`, pemancar baru di `PasswordService`, `ResetPasswordService`,
+`PasswordVerifier` (rehash), `SnapshotSync` (pmj), `NipCascadeService` (akun). Keputusan reviewer 09-11: R3 token satu tabel tanpa
+mencabut token lain, R6 kunci baris klien, Q2 password = hash berlaku (MD5/Argon2id, PN re-handshake), Q1 rehash dicatat. Test:
+`tests/unit/Integrasi/AturanTriggerUpdateTest`, `tests/database/Integrasi/{SimapiAPegawaiTest,SimapiPemancarUpdateTest}`, test arsitektur
+P2 per tabel log.
+
 ## Bagian B — Klien integrasi keluar
 
 Pelaksana Jalur B (`docs/fase6/6_1.md`); reviewer CR; merge per paket atas izin Horii. Dokumentasi modul:

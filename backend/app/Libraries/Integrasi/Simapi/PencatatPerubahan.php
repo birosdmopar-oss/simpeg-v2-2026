@@ -8,7 +8,8 @@ use CodeIgniter\Database\BaseConnection;
 use Throwable;
 
 /**
- * MAKE-060 A5b (F6-06) — penulis `simapi_ch` pengganti trigger DB legacy (aturan per tabel: {@see AturanTrigger}). Penulis data
+ * MAKE-060 A5b (F6-06) + MAKE-076 (Q6-41) — penulis log `simapi_ch` dan `simapi_update` pengganti trigger DB legacy (aturan per
+ * tabel: {@see AturanTrigger}, {@see AturanTriggerUpdate}). Penulis data
  * (layanan pemilik tabel sumber) memanggil {@see catat()} tepat sesudah tulisan bisnisnya, dengan baris lama/baru, pada koneksi
  * yang sama.
  *
@@ -48,9 +49,9 @@ final class PencatatPerubahan
         // Review P3: lookup (NIP keluarga, foto) DAN insert di dalam satu savepoint — query gagal apa pun di sini (yang di CI4
         // menurunkan status transaksi tanpa exception) dipulihkan, sehingga transaksi bisnis tidak ikut gagal.
         self::dalamSavepoint($db, static function () use ($db, $tabel, $peristiwa, $lama, $baru): void {
-            foreach (self::susun($db, $tabel, $peristiwa, $lama, $baru) as $b) {
-                if (self::insert($db, $b) === false) {
-                    throw new \RuntimeException('Insert simapi_ch gagal.', (int) ($db->error()['code'] ?? 0));
+            foreach (self::susun($db, $tabel, $peristiwa, $lama, $baru) as [$log, $b]) {
+                if (self::insert($db, $log, $b) === false) {
+                    throw new \RuntimeException('Insert log SIMAPI gagal.', (int) ($db->error()['code'] ?? 0));
                 }
             }
         });
@@ -60,16 +61,22 @@ final class PencatatPerubahan
      * @param array<string, mixed>|null $lama
      * @param array<string, mixed>|null $baru
      *
-     * @return list<array<string, mixed>>
+     * @return list<array{0: string, 1: array<string, mixed>}> [tabel log, baris]
      */
     private static function susun(BaseConnection $db, string $tabel, string $peristiwa, ?array $lama, ?array $baru): array
     {
-        $baris = AturanTrigger::baris($tabel, $peristiwa, $lama, $baru, [
-            'nip_keluarga' => static fn (mixed $id): ?string => self::nipKeluarga($db, $id),
-            'url_foto'     => static fn (string $nip, string $path): string => (new PenyajiPegawai($db))->urlFoto($nip, $path),
-        ]);
+        $urlFoto = static fn (string $nip, string $path): string => (new PenyajiPegawai($db))->urlFoto($nip, $path);
+        $hasil   = [];
 
-        return array_values(array_filter($baris, static fn (array $b): bool => Nilai::teks($b['nip']) !== ''));
+        foreach (AturanTrigger::baris($tabel, $peristiwa, $lama, $baru, ['nip_keluarga' => static fn (mixed $id): ?string => self::nipKeluarga($db, $id), 'url_foto' => $urlFoto]) as $b) {
+            $hasil[] = ['simapi_ch', $b];
+        }
+
+        foreach (AturanTriggerUpdate::baris($tabel, $peristiwa, $lama, $baru, ['url_foto' => $urlFoto, 'hash_akun' => static fn (string $nip): ?string => self::hashAkun($db, $nip)]) as $b) {
+            $hasil[] = ['simapi_update', $b];
+        }
+
+        return array_values(array_filter($hasil, static fn (array $x): bool => Nilai::teks($x[1]['nip']) !== ''));
     }
 
     /**
@@ -119,13 +126,13 @@ final class PencatatPerubahan
     }
 
     /**
-     * @param list<array<string, mixed>> $baris
+     * @param list<array{0: string, 1: array<string, mixed>}> $baris
      */
     private static function tulisLangsung(BaseConnection $db, array $baris): void
     {
         try {
-            foreach ($baris as $b) {
-                if (self::insert($db, $b) === false) {
+            foreach ($baris as [$log, $b]) {
+                if (self::insert($db, $log, $b) === false) {
                     self::log(null, (int) ($db->error()['code'] ?? 0));
                 }
             }
@@ -183,9 +190,21 @@ final class PencatatPerubahan
     /**
      * @param array<string, mixed> $b
      */
-    private static function insert(BaseConnection $db, array $b): bool
+    private static function insert(BaseConnection $db, string $log, array $b): bool
     {
-        return (bool) $db->table('simapi_ch')->insert($b + ['action_at' => gmdate('Y-m-d H:i:s')]);
+        $kini = gmdate('Y-m-d H:i:s');
+
+        return (bool) $db->table($log)->insert($log === 'simapi_update' ? $b + ['last_update' => $kini, 'created_at' => $kini] : $b + ['action_at' => $kini]);
+    }
+
+    /**
+     * Hash password berlaku akun ber-NIP itu (`pegawai` INSERT, [V2] pengganti `MD5(nip)` legacy); null bila tidak ada akun.
+     */
+    private static function hashAkun(BaseConnection $db, #[\SensitiveParameter] string $nip): ?string
+    {
+        $r = $db->table('pengguna')->select('password, password_legacy')->where('nip', $nip)->limit(1)->get()->getRowArray();
+
+        return $r === null ? null : AturanTriggerUpdate::hashBerlaku($r);
     }
 
     private static function nipKeluarga(BaseConnection $db, mixed $idKeluarga): ?string

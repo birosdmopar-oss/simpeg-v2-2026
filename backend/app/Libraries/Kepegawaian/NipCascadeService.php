@@ -228,7 +228,8 @@ final class NipCascadeService implements NipCascadeInterface
         }
 
         // Akun pegawai: username = NIP baru + password = NIP baru [K] (L_employee.php:589-599, keputusan user 13-10-2026).
-        $akunLama    = $db->table('pengguna')->select('id_pengguna, username, nip')->where('nip', $baru)->get()->getResultArray();
+        // MAKE-076: baris penuh dibaca sebelum UPDATE untuk log simapi_update (trigger pengguna: username|password berubah).
+        $akunLama    = $db->table('pengguna')->where('nip', $baru)->get()->getResultArray();
         $akunDiganti = $db->table('pengguna')->where('nip', $baru)->update([
             'username'            => $baru,
             'password'            => $this->passwords()->hash($baru),
@@ -247,6 +248,10 @@ final class NipCascadeService implements NipCascadeInterface
             $db->table('pengguna')->where('nip', $baru)->where('status', PenggunaModel::STATUS_ACTIVE)->update(PasswordExpiry::forPasswordChange(PenggunaModel::STATUS_ACTIVE, time())),
             'pengguna.expired_at',
         );
+
+        foreach ($akunLama as $akun) {
+            PencatatPerubahan::sesudahUbah($db, 'pengguna', 'id_pengguna', (int) $akun['id_pengguna'], $akun); // MAKE-076
+        }
 
         // Audit akun (reset password karena koreksi NIP): `pengguna` tidak punya kolom updated_by, pelaku dicatat di audit.
         foreach ($akunLama as $akun) {

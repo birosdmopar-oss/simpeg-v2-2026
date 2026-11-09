@@ -6,6 +6,8 @@ namespace App\Libraries\Kepegawaian\Riwayat;
 
 use App\Interfaces\Kepegawaian\SnapshotSyncInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Models\AuditLogModel;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\Exceptions\DatabaseException;
@@ -85,6 +87,7 @@ final class SnapshotSync implements SnapshotSyncInterface
         if ($terpilih === null) {
             if ($before !== null) {
                 $this->wajib($db->table($aturan->tabel)->where($aturan->kunci, $nilaiKunci)->delete());
+                PencatatPerubahan::catat($db, $aturan->tabel, AturanTrigger::DELETE, $before, null); // MAKE-076 (pegawai_mutasi_jabatan → simapi_update)
                 $this->catatAudit($aturan->tabel, $nilaiKunci, AuditLogModel::EVENT_DELETE, $before, null, $actor);
             }
 
@@ -115,6 +118,7 @@ final class SnapshotSync implements SnapshotSyncInterface
 
         /** @var array<string, mixed>|null $after */
         $after = $db->table($aturan->tabel)->where($aturan->kunci, $nilaiKunci)->get()->getRowArray();
+        PencatatPerubahan::catat($db, $aturan->tabel, $before === null ? AturanTrigger::INSERT : AturanTrigger::UPDATE, $before, $after); // MAKE-076
         $this->catatAudit($aturan->tabel, $nilaiKunci, $event, $before, $after, $actor);
     }
 

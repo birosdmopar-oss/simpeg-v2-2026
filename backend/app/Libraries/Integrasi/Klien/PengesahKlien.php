@@ -37,7 +37,7 @@ final class PengesahKlien
     /**
      * @return array{hasil: string, id_klien: int|null, jenis: int|null, sidik: string|null}
      */
-    public function periksa(#[\SensitiveParameter] string $username, #[\SensitiveParameter] string $rahasia, #[\SensitiveParameter] string $ip, string $hak): array
+    public function periksa(#[\SensitiveParameter] string $username, #[\SensitiveParameter] string $rahasia, #[\SensitiveParameter] string $ip, string $hak, bool $ipWajib = false): array
     {
         $klien = $username === '' ? null : $this->db->table('klien_layanan')
             ->select('id_klien, rahasia_hash, jenis, hak, ip_allowlist, status')
@@ -56,7 +56,10 @@ final class PengesahKlien
             return ['hasil' => self::TIDAK_AKTIF, 'id_klien' => $id, 'jenis' => null, 'sidik' => null];
         }
 
-        if (! AllowlistIp::cocok($ip, $klien['ip_allowlist'] === null ? null : (string) $klien['ip_allowlist'])) {
+        $allowlist = $klien['ip_allowlist'] === null ? null : (string) $klien['ip_allowlist'];
+
+        // MAKE-076: `$ipWajib` = API SIMAPI lama (allowlist kosong → ditolak untuk semua klien, Q6-41).
+        if (! ($ipWajib ? AllowlistIp::cocokWajib($ip, $allowlist) : AllowlistIp::cocok($ip, $allowlist))) {
             return ['hasil' => self::IP_DITOLAK, 'id_klien' => $id, 'jenis' => null, 'sidik' => null];
         }
 
