@@ -32,7 +32,7 @@ final class SimapiPemancarPegawaiTest extends DatabaseTestCase
 
     public function testAkunPegawaiBaruDicatat(): void
     {
-        $nip = $this->buatPegawai();
+        $nip      = $this->buatPegawai();
         $pengguna = new PenggunaModel();
         (new AccountProvisioner($pengguna, new PasswordVerifier($pengguna)))->provisionForPegawai(['nip' => $nip, 'nama' => 'Uji', 'email' => 'uji@contoh.test']);
 

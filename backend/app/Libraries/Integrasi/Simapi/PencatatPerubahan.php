@@ -35,30 +35,41 @@ final class PencatatPerubahan
      */
     public static function catat(BaseConnection $db, string $tabel, string $peristiwa, ?array $lama, ?array $baru): void
     {
-        try {
-            $baris = AturanTrigger::baris($tabel, $peristiwa, $lama, $baru, [
-                'nip_keluarga' => static fn (mixed $id): ?string => self::nipKeluarga($db, $id),
-                'url_foto'     => static fn (string $nip, string $path): string => (new PenyajiPegawai($db))->urlFoto($nip, $path),
-            ]);
-        } catch (Throwable $e) {
-            self::log($e);
-
-            return;
-        }
-
-        $baris = array_values(array_filter($baris, static fn (array $b): bool => Nilai::teks($b['nip']) !== ''));
-
-        if ($baris === []) {
-            return;
-        }
-
         if ($db->transDepth === 0) {
-            self::tulisLangsung($db, $baris);
+            try {
+                self::tulisLangsung($db, self::susun($db, $tabel, $peristiwa, $lama, $baru));
+            } catch (Throwable $e) {
+                self::log($e);
+            }
 
             return;
         }
 
-        self::tulisDalamTransaksi($db, $baris);
+        // Review P3: lookup (NIP keluarga, foto) DAN insert di dalam satu savepoint — query gagal apa pun di sini (yang di CI4
+        // menurunkan status transaksi tanpa exception) dipulihkan, sehingga transaksi bisnis tidak ikut gagal.
+        self::dalamSavepoint($db, static function () use ($db, $tabel, $peristiwa, $lama, $baru): void {
+            foreach (self::susun($db, $tabel, $peristiwa, $lama, $baru) as $b) {
+                if (self::insert($db, $b) === false) {
+                    throw new \RuntimeException('Insert simapi_ch gagal.', (int) ($db->error()['code'] ?? 0));
+                }
+            }
+        });
+    }
+
+    /**
+     * @param array<string, mixed>|null $lama
+     * @param array<string, mixed>|null $baru
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function susun(BaseConnection $db, string $tabel, string $peristiwa, ?array $lama, ?array $baru): array
+    {
+        $baris = AturanTrigger::baris($tabel, $peristiwa, $lama, $baru, [
+            'nip_keluarga' => static fn (mixed $id): ?string => self::nipKeluarga($db, $id),
+            'url_foto'     => static fn (string $nip, string $path): string => (new PenyajiPegawai($db))->urlFoto($nip, $path),
+        ]);
+
+        return array_values(array_filter($baris, static fn (array $b): bool => Nilai::teks($b['nip']) !== ''));
     }
 
     /**
@@ -69,11 +80,24 @@ final class PencatatPerubahan
      */
     public static function baca(BaseConnection $db, string $tabel, string $kolom, mixed $kunci): ?array
     {
+        // Review P3: SELECT gagal di dalam transaksi menurunkan status CI4 → dipulihkan bila sebelumnya baik.
+        $statusSebelum = $db->transStatus();
+
         try {
-            $r = $db->table($tabel)->where($kolom, $kunci)->limit(1)->get()->getRowArray();
+            $hasil = $db->table($tabel)->where($kolom, $kunci)->limit(1)->get();
+
+            if ($hasil === false) {
+                throw new \RuntimeException('Baca sumber log SIMAPI gagal.', (int) ($db->error()['code'] ?? 0));
+            }
+
+            $r = $hasil->getRowArray();
 
             return is_array($r) ? $r : null;
         } catch (Throwable $e) {
+            if ($db->transDepth > 0 && $statusSebelum) {
+                $db->resetTransStatus();
+            }
+
             self::log($e);
 
             return null;
@@ -111,9 +135,12 @@ final class PencatatPerubahan
     }
 
     /**
-     * @param list<array<string, mixed>> $baris
+     * Jalankan `$kerja` di dalam SAVEPOINT unik; galat (exception atau status CI4 turun) → ROLLBACK TO SAVEPOINT + log, status
+     * transaksi dipulihkan hanya bila sebelum savepoint masih baik.
+     *
+     * @param \Closure(): void $kerja
      */
-    private static function tulisDalamTransaksi(BaseConnection $db, array $baris): void
+    private static function dalamSavepoint(BaseConnection $db, \Closure $kerja): void
     {
         $statusSebelum = $db->transStatus();
         $titik         = 'sp_simapi_' . (++self::$urutan);
@@ -131,10 +158,10 @@ final class PencatatPerubahan
         }
 
         try {
-            foreach ($baris as $b) {
-                if (self::insert($db, $b) === false) {
-                    throw new \RuntimeException('Insert simapi_ch gagal.', (int) ($db->error()['code'] ?? 0));
-                }
+            $kerja();
+
+            if ($statusSebelum && ! $db->transStatus()) {
+                throw new \RuntimeException('Query log SIMAPI gagal (status transaksi turun).');
             }
 
             $db->simpleQuery('RELEASE SAVEPOINT ' . $titik);

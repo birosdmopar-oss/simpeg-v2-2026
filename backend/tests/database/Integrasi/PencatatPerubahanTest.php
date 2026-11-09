@@ -113,6 +113,41 @@ final class PencatatPerubahanTest extends DatabaseTestCase
         $this->assertSame([[self::NIP, '9', '1'], [self::NIP, '9', '2']], array_map(static fn (array $r): array => [$r['nip'], (string) $r['id_rwy'], (string) $r['action']], $rows), 'keluarga tidak ada → tidak ditulis');
     }
 
+    public function testBacaGagalDalamTransaksiTidakMenggagalkanBisnis(): void
+    {
+        $this->db->transBegin();
+        $this->bisnis('Uji P3a');
+        $this->assertNull(P::baca($this->db, 'pegawai', 'kolom_tidak_ada', 1), 'SELECT gagal → null');
+        $this->assertTrue($this->db->transStatus(), 'status bisnis dipulihkan (P3)');
+        $this->db->transCommit();
+
+        $this->assertSame(1, $this->db->table('agama')->where('agama', 'Uji P3a')->countAllResults());
+    }
+
+    /**
+     * Review P3: lookup di dalam catat() (NIP keluarga) gagal → savepoint dipulihkan, bisnis tetap commit, 0 baris log.
+     */
+    #[Group('db-isolasi-penuh')]
+    public function testLookupGagalDalamTransaksiBisnisTetapCommit(): void
+    {
+        $asli = $this->db->prefixTable('riwayat_keluarga');
+        $this->db->query("RENAME TABLE {$asli} TO {$asli}_p3");
+
+        try {
+            $this->db->transBegin();
+            $this->bisnis('Uji P3b');
+            P::catat($this->db, 'detail_anak', T::INSERT, null, ['id_detail_anak' => '9', 'id_riwayat_keluarga' => '55', 'nama' => 'Anak']);
+            $this->assertTrue($this->db->transStatus(), 'status bisnis dipulihkan');
+            $this->db->transCommit();
+        } finally {
+            $this->db->query("RENAME TABLE {$asli}_p3 TO {$asli}");
+        }
+
+        $this->assertSame(1, $this->db->table('agama')->where('agama', 'Uji P3b')->countAllResults(), 'bisnis tersimpan');
+        $this->assertSame(0, $this->jumlah(), '0 baris log');
+        $this->db->table('agama')->where('agama', 'Uji P3b')->delete();
+    }
+
     #[Group('db-isolasi-penuh')]
     public function testBersarangTerlihatKoneksiLainSesudahCommitTerluar(): void
     {
