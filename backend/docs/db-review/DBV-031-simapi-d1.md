@@ -135,11 +135,12 @@ Penulis `simapi_update` (MAKE-076) — nilai `last_action` per peristiwa TIDAK s
 | `pegawai` | UPDATE | 'UPDATE' | NEW.nip (cabang ganti NIP: OLD.nip) | hanya bila kolom terpantau berubah |
 | `pegawai` | DELETE | 'DELETE' | OLD.nip | `nama_field`/`nilai_lama`/`nilai_baru` NULL |
 | `pegawai_mutasi_jabatan` | INSERT | 'UPDATE' | NEW.nip | `nilai_lama` '\|\|' |
-| `pegawai_mutasi_jabatan` | UPDATE | 'UPDATE' | NEW/OLD.nip | |
+| `pegawai_mutasi_jabatan` | UPDATE | 'UPDATE' | NEW.nip | hanya bila kolom terpantau berubah |
 | `pegawai_mutasi_jabatan` | DELETE | 'UPDATE' | OLD.nip | `nilai_baru` '\|\|' |
 | `pengguna` | INSERT | 'UPDATE' | `id_pegawai` | `nilai_lama` '\|\|'; field username\|password\|email |
-| `pengguna` | UPDATE | 'UPDATE' | `id_pegawai` | | Tulisan lain di
-trigger yang sama (tabel SIASN, URL arsip foto) di luar scope; URL foto v2 lewat `PenyajiPegawai::urlFoto()` (Q6-39). Rincian
+| `pengguna` | UPDATE | 'UPDATE' | `id_pegawai` | |
+
+Tulisan lain di trigger yang sama (tabel SIASN, URL arsip foto) di luar scope; URL foto v2 lewat `PenyajiPegawai::urlFoto()` (Q6-39). Rincian
 urutan kolom per tabel menjadi fixture kontrak A5b.
 
 ## 5. Uji
@@ -151,4 +152,38 @@ induk (hanya jumlah).
 
 ## 6. Keputusan DB Validator
 
-_(diisi DB Validator)_
+**Status: SETUJU @cdcc9445 (09-11-2026)**, ditambah perapian dokumen §4 di commit keputusan ini. Review oleh sesi WS-2 sebagai DB
+Validator atas izin [#3-WorkloadSimapiD1] (Horii 09-11-2026). Pencocokan dilakukan sendiri terhadap berkas D1 (DDL 8 tabel
+`simapi_*`, isi `simapi_jd`, 47 trigger); isi mentah tidak disalin.
+
+### 6.1 Verifikasi
+
+- DB scratch baru di MySQL 8.0 lokal: `SkemaSimapiD1Test`, `SkemaKlienSimapiTest`, `NipReferenceRegistryTest` OK (15 test / 326
+  assertion).
+- `SHOW CREATE TABLE` `simapi_ch`, `simapi_update`, `simapi_update_hist` sesudah migrasi cocok dengan §2 dan D1: tipe kolom,
+  NOT NULL, MEDIUMTEXT/LONGTEXT, `utf8mb4_unicode_ci`, FK RESTRICT/RESTRICT, CHECK `last_action`.
+- Seed `simapi_jd` 14 id = isi D1; audit C1–C4 = 0.
+- CI #643 @7062e441 hijau (PHPStan/CS, frontend, 8 shard PHPUnit MySQL 8.0 + MariaDB 10.4); gate penuh @e1d5d6fc lolos (laporan
+  pelaksana); commit sesudahnya hanya dokumen/komentar.
+- Aturan: migration di `main` tidak diedit; prefix-safe (`prefixTable` / query builder); `down()` bersih; pra-cek sebelum DDL tanpa
+  mengubah data; seed tanpa data pribadi dengan id eksplisit = legacy; `nip` log di luar registry NIP (`NON_FK`, README).
+
+### 6.2 Keputusan P1–P14
+
+Disetujui sesuai tabel §1 dengan koreksi review yang sudah masuk:
+- **T1** `id_rwy`: trigger DELETE `riwayat_*`/`detail_anak` mengisi id baris yang dihapus; NULL hanya untuk jenis data 1
+  (`pegawai`, `pengguna`).
+- **T2** `simapi_update.last_action` per peristiwa (§4): hanya `pegawai` memakai `INSERT`/`DELETE`; `pegawai_mutasi_jabatan` dan
+  `pengguna` selalu `UPDATE`. Perapian DBV: `pegawai_mutasi_jabatan` UPDATE memakai NEW.nip saja dan hanya bila kolom terpantau
+  berubah; tabel dipisah dari paragraf sesudahnya.
+- **T3** docblock pra-cek `AlterSimapiChD1` dan `SeedSimapiJd` disamakan dengan kode.
+- §3.5 data lama tidak dimigrasi = keputusan Horii 09-11 (opsi a); tidak mengubah skema.
+
+### 6.3 Catatan non-blok
+
+- **N1** Pra-cek `id_rwy` menerima angka 10 digit di atas batas INT; ALTER lalu gagal jelas (1264) dan data utuh. Diterima (§2.1).
+- **N2** Syarat A5b/MAKE-076: penulis `simapi_ch`/`simapi_update` wajib melewati baris tanpa NIP untuk SEMUA tabel sumber sebelum
+  INSERT dan mengirim `id_rwy` sebagai bilangan bulat; jangan bergantung pada galat DB (1048/1366) yang hanya tercatat di log.
+- **N3** `id_simapi_update` INT UNSIGNED = [V2] (legacy signed) (§2.2).
+- **N4** `down()` `AlterSimapiChD1` mengembalikan `field_*` ke TEXT dan gagal bila sudah ada nilai > 64 KB (catatan reviewer CR,
+  disetujui; rollback skema hanya sebelum data panjang tertulis) (§2.1).
