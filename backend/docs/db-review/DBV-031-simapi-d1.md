@@ -44,7 +44,8 @@
 
 `id_rwy` INT NULL, `nip` VARCHAR(30) NOT NULL, `field_name` MEDIUMTEXT NULL, `field_value` LONGTEXT NULL. Pra-cek sebelum ALTER
 (tanpa mengubah data): `nip` NULL atau `id_rwy` bukan bilangan bulat → migration gagal dengan jumlah baris yang melanggar.
-`down()` mengembalikan tipe DBV-026.
+`down()` mengembalikan tipe DBV-026; bila sudah ada `field_name`/`field_value` > 64 KB (batas TEXT) atau `nip` panjang, `down()`
+gagal (mode strict) — rollback skema hanya aman sebelum data besar tertulis (catatan review CR, tidak memblokir).
 
 ### 2.2 Tabel baru
 
