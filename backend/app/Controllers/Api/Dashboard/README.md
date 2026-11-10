@@ -92,3 +92,40 @@ Nama berkas `{jenis}_{lingkup}{id}_{YmdHis}.{pdf|xlsx}`; header `X-Content-Type-
 **Audit (F7-27):** setiap unduhan berhasil dicatat di `audit_logs` (`entity` `dokumen_unduhan`, `entity_id` = jenis, `event` `create`, `after_json` `{jenis, format, lingkup, id, parameter, jumlah_baris}`); dicatat sesudah berkas dibangun, kegagalan audit → 500 (fail-closed). 401/403/404/422/429 tidak diaudit.
 
 Kode galat: 401 tanpa token; 403 role di luar matriks / lingkup di luar hak; 404 jenis tidak dikenal, `GET dokumen/baperjakat/{pdf|xlsx}` (harus POST), unit/satker tidak ada; 422 parameter tidak sah, rentang pensiun, body Baperjakat (termasuk NIP tidak ada / nonaktif / di luar scope → `errors.nip`, maks 20 NIP ditampilkan), fallback PDF di atas; 429 throttle.
+
+## F-13 Beranda per role (MAKE-087, Jalur D) — `BerandaController`
+
+PRD Fase 7 v2.0 §5.10. Config: `Config\Dashboard`. Logika: `Libraries\Dashboard\Beranda\RingkasanBeranda`.
+
+### `GET api/v1/dashboard/ringkasan` (jwt, role 1–8)
+
+Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
+
+**Admin (role 1/3/4/5/8)** — padanan tile `views/user/dashboard_ad.php:46-200`:
+
+```json
+{"status": "success", "data": {
+  "keluarga": "admin",
+  "lingkup": {"jenis": "kementerian|satker|unit", "id": null},
+  "tampilan_komposisi": "donut|angka",
+  "tanggal": "2026-11-10",
+  "total_aktif": 1200,
+  "tile": [{"kode": "pns", "label": "Total PNS", "kelompok": "komposisi", "jumlah": 1000, "persen": 83}, "..."]
+}}
+```
+
+- `tile` berurutan seperti view legacy: `pns`, `ptt`, `non_pns`, `staf_khusus`, `tenaga_ahli` (kelompok `komposisi`),
+  `tb`, `ib`, `cltn`, `cuti`, `presensi_online` (kelompok `hari_ini`), `pppk` (`komposisi`). `persen` = round(jumlah /
+  total_aktif × 100), 0 bila total 0.
+- Lingkup: role 1/4/5/8 = kementerian; role 3 = satker akun (bila `id_satker` ada) atau unit akun, lewat
+  `pegawai_mutasi_jabatan` persis legacy dashboard. Satker ada tetapi bukan angka kanonik → semua 0 (fail-closed).
+- "Hari ini" = tanggal bisnis WIB (`tanggal`). TB kementerian termasuk periode perpanjangan; role 3 tanpa (Q7-41 [K]).
+- Pengecualian NIP `dashboard.nipDisembunyikan` (Q7-41) diterapkan di tile yang sama dengan legacy (lihat docblock
+  `RingkasanBeranda`); NIP tidak pernah ada di respons.
+- `tampilan_komposisi` = saklar `Config\Dashboard::$tampilanKomposisi` (Q7-36): `donut` [V2] / `angka` (persis legacy).
+  Data sama untuk kedua mode.
+- Cache: angka komposisi/total/CLTN per lingkup `ttlRingkasanDetik` (bawaan 900); TB/IB/cuti/presensi online selalu baru.
+
+**Pegawai (role 2/6/7)** — kerangka M1: `{"keluarga": "pegawai"}`; kartu prediksi, kelengkapan data, bawahan di M2.
+
+Kode galat: 401 tanpa token.

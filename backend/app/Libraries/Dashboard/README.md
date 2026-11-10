@@ -10,3 +10,11 @@ Service/business logic modul ini (`App\Libraries\Dashboard\*`). Kalkulasi, busin
 - `StatistikCache` — key `dashboard_stat_{jenis}_{lingkup}_{id}_{scope}`, TTL 900, invalidasi lewat listener event riwayat + hook `PegawaiModel`; jalur lain basi ≤ TTL (lihat docblock kelas).
 
 Kontrak endpoint: `app/Controllers/Api/Dashboard/README.md`; keputusan: `docs/fase7/PRD_Fase7_Statistik-GeneratorDokumen.md` §5.
+
+## F-13 Beranda (MAKE-087, Jalur D) — `App\Libraries\Dashboard\Beranda\*`
+
+- `RingkasanBeranda` — `GET dashboard/ringkasan`: keluarga admin = tile komposisi + status hari ini per lingkup (kementerian
+  / satker / unit) dengan aturan hitung, letak pengecualian NIP (Q7-41), dan TB perpanjangan ikut `L_user::dashboard_sa|
+  dashboard_satker|dashboard_unit` legacy; cache angka tetap lewat `CacheService`. Keluarga pegawai = kerangka (M2).
+- Konfigurasi: `Config\Dashboard` (`$tampilanKomposisi` Q7-36, `$nipDisembunyikan` Q7-41 hanya `.env` server,
+  `$idJabatanDirektur` Q7-38, `$ttlRingkasanDetik`).
