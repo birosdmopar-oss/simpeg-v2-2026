@@ -82,7 +82,13 @@ export const beritaPortalService = {
       tanggal: data.tanggal ?? null,
       foto_url: data.foto_url ?? null,
       isi: data.isi ?? '',
+      lampiran: data.lampiran ?? null,
     }
+  },
+  /** Lampiran berita sebagai blob (cookie httpOnly ikut); `path` relatif terhadap base API. */
+  async lampiranBlob(path: string): Promise<Blob> {
+    const { data } = await api.get<Blob>(path, { responseType: 'blob' })
+    return data
   },
   async kategori(): Promise<BeritaKategoriOpsi[]> {
     const { data } = await api.get<Array<{ id: number | string; nama: string }>>('/konten/berita/kategori')

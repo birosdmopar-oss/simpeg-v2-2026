@@ -12,6 +12,7 @@ import type {
   DiboRow,
   DiboRowApi,
   JenisMasterKonten,
+  LampiranBerita,
   MasterKontenRow,
   StatusBerita,
 } from '../types'
@@ -32,6 +33,7 @@ export function mapBerita(r: BeritaKelolaRowApi): BeritaKelolaRow {
     id_kategori: r.id_kategori == null ? '' : String(r.id_kategori),
     penulis: r.penulis ?? '',
     publish_at: r.publish_at ?? '',
+    ada_lampiran: r.ada_lampiran === true,
     status: (['0', '1', '2', '10'].includes(s) ? s : '0') as StatusBerita,
   }
 }
@@ -47,29 +49,51 @@ export function mapDibo(r: DiboRowApi): DiboRow {
   }
 }
 
+function toFormData(form: BeritaForm, lampiran: File | null): FormData {
+  const fd = new FormData()
+  fd.append('judul', form.judul.trim())
+  fd.append('id_kategori', form.id_kategori)
+  fd.append('isi', form.isi)
+  fd.append('publish_at', form.publish_jam ? `${form.publish_at} ${form.publish_jam}` : form.publish_at)
+  fd.append('target', form.target)
+  if (lampiran) fd.append('lampiran', lampiran)
+  return fd
+}
+
 export const beritaKelolaService = {
   async list(params: { page: number; per_page: number; status?: string }): Promise<{ items: BeritaKelolaRow[]; total: number }> {
     const { data } = await api.get<Daftar<BeritaKelolaRowApi>>('/konten/berita', { params: { ...params, kelola: 1 } })
     return { items: (data?.items ?? []).map(mapBerita), total: data?.total ?? 0 }
   },
-  async detail(id: string): Promise<BeritaForm> {
-    const { data } = await api.get<{ judul: string; id_kategori: number | string; isi?: string; publish_at?: string; target?: string }>(
-      `/konten/berita/${id}`,
-    )
+  async detail(id: string): Promise<{ form: BeritaForm; lampiran: LampiranBerita | null }> {
+    const { data } = await api.get<{
+      judul: string
+      id_kategori: number | string
+      isi?: string
+      publish_at?: string
+      publish_jam?: string
+      target?: string
+      lampiran?: LampiranBerita | null
+    }>(`/konten/berita/${id}`)
     return {
-      judul: data.judul,
-      id_kategori: String(data.id_kategori ?? ''),
-      isi: data.isi ?? '',
-      publish_at: data.publish_at ?? '',
-      target: data.target ?? '',
+      form: {
+        judul: data.judul,
+        id_kategori: String(data.id_kategori ?? ''),
+        isi: data.isi ?? '',
+        publish_at: data.publish_at ?? '',
+        publish_jam: data.publish_jam ?? '',
+        target: data.target ?? '',
+      },
+      lampiran: data.lampiran ?? null,
     }
   },
-  async create(form: BeritaForm): Promise<BeritaKelolaRow> {
-    const { data } = await api.post<BeritaKelolaRowApi>('/konten/berita', form)
+  /** Multipart: lampiran opsional (satu berkas); tanpa berkas saat ubah, lampiran lama dipertahankan. */
+  async create(form: BeritaForm, lampiran: File | null): Promise<BeritaKelolaRow> {
+    const { data } = await api.post<BeritaKelolaRowApi>('/konten/berita', toFormData(form, lampiran))
     return mapBerita(data)
   },
-  async update(id: string, form: BeritaForm): Promise<BeritaKelolaRow> {
-    const { data } = await api.put<BeritaKelolaRowApi>(`/konten/berita/${id}`, form)
+  async update(id: string, form: BeritaForm, lampiran: File | null): Promise<BeritaKelolaRow> {
+    const { data } = await api.post<BeritaKelolaRowApi>(`/konten/berita/${id}`, toFormData(form, lampiran))
     return mapBerita(data)
   },
   /** Persetujuan (role 1): setuju / tolak (Q7-07/08). */

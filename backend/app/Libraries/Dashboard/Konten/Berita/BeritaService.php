@@ -14,6 +14,8 @@ use App\Models\Konten\NewsModel;
 use Closure;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\HTTP\Files\UploadedFile;
+use Config\Konten;
 use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
@@ -41,6 +43,7 @@ final class BeritaService
 
     public const DITOLAK = 2;
 
+
     private const PER_PAGE_DEFAULT = 9;
 
     private const PER_PAGE_MAX = 100;
@@ -55,16 +58,19 @@ final class BeritaService
 
     private readonly SanitasiBerita $sanitasi;
 
+    private readonly PenyimpananLampiran $lampiran;
+
     /** @var Closure(): DateTimeImmutable */
     private readonly Closure $jam;
 
     /**
      * @param (Closure(): DateTimeImmutable)|null $jam
      */
-    public function __construct(?BaseConnection $db = null, ?SanitasiBerita $sanitasi = null, ?Closure $jam = null)
+    public function __construct(?BaseConnection $db = null, ?SanitasiBerita $sanitasi = null, ?Closure $jam = null, ?PenyimpananLampiran $lampiran = null)
     {
         $this->db       = $db ?? db_connect();
         $this->sanitasi = $sanitasi ?? new SanitasiBerita();
+        $this->lampiran = $lampiran ?? new PenyimpananLampiran();
         $this->jam      = $jam ?? static fn (): DateTimeImmutable => new DateTimeImmutable('now', new DateTimeZone('UTC'));
     }
 
@@ -164,13 +170,14 @@ final class BeritaService
 
         return [
             'items' => array_map(fn (array $r): array => [
-                'id'          => (int) $r['id_news'],
-                'judul'       => (string) $r['title'],
-                'kategori'    => (string) ($r['category'] ?? ''),
-                'id_kategori' => (int) $r['id_news_category'],
-                'penulis'     => (string) ($r['penulis'] ?? ''),
-                'publish_at'  => $this->iso((string) $r['publish_at']),
-                'status'      => (int) $r['status'],
+                'id'           => (int) $r['id_news'],
+                'judul'        => (string) $r['title'],
+                'kategori'     => (string) ($r['category'] ?? ''),
+                'id_kategori'  => (int) $r['id_news_category'],
+                'penulis'      => (string) ($r['penulis'] ?? ''),
+                'publish_at'   => $this->iso((string) $r['publish_at']),
+                'ada_lampiran' => (string) ($r['lampiran'] ?? '') !== '',
+                'status'       => (int) $r['status'],
             ], $rows),
             'total'    => $total,
             'page'     => $page,
@@ -203,6 +210,8 @@ final class BeritaService
             'tanggal'     => $this->iso((string) $r['publish_at']),
             'publish_at'  => (new DateTimeImmutable((string) $r['publish_at'], new DateTimeZone('UTC')))->setTimezone($zona)->format('Y-m-d'),
             'foto_url'    => null,
+            'lampiran'    => $this->infoLampiran($r),
+            'publish_jam' => (new DateTimeImmutable((string) $r['publish_at'], new DateTimeZone('UTC')))->setTimezone($zona)->format('H:i'),
             'isi'         => (string) $r['news'],
             'status'      => (int) $r['status'],
             'target'      => $this->tokenTarget($r),
@@ -250,17 +259,18 @@ final class BeritaService
      *
      * @return array<string, mixed>
      */
-    public function buat(AuthContext $auth, array $input): array
+    public function buat(AuthContext $auth, array $input, ?UploadedFile $lampiran = null): array
     {
         $this->wajibPengelola($auth);
         $nilai = $this->validasi($auth, $input);
         $admin = (int) $auth->role() === Role::SUPER_ADMIN;
         $aktor = (int) $auth->idPengguna();
+        $kunci = $this->simpanLampiran($lampiran);
 
         $this->db->transStart();
 
         try {
-            $id = (new NewsModel())->insert($nilai['kolom'] + [
+            $id = (new NewsModel())->insert($nilai['kolom'] + ['lampiran' => $kunci] + [
                 'status'            => $admin ? self::TERBIT : self::MENUNGGU,
                 'ul_creator'        => (int) $auth->role(),
                 'id_unit_creator'   => $admin ? null : $this->angka($auth->idUnit()),
@@ -274,11 +284,14 @@ final class BeritaService
             $this->db->transComplete();
         } catch (Throwable $e) {
             $this->batalTransaksi();
+            $this->hapusLampiranDiam($kunci);
 
             throw $e;
         }
 
         if (! $this->db->transStatus()) {
+            $this->hapusLampiranDiam($kunci);
+
             throw new ApiException('Gagal menyimpan berita.', 500);
         }
 
@@ -290,17 +303,23 @@ final class BeritaService
      *
      * @return array<string, mixed>
      */
-    public function ubah(AuthContext $auth, int $id, array $input): array
+    public function ubah(AuthContext $auth, int $id, array $input, ?UploadedFile $lampiran = null): array
     {
         $this->wajibPengelola($auth);
         $lama  = $this->ambilKelola($auth, $id);
         $nilai = $this->validasi($auth, $input);
         $admin = (int) $auth->role() === Role::SUPER_ADMIN;
+        $kunci = $this->simpanLampiran($lampiran);
 
         $data = $nilai['kolom'] + ['updated_at' => gmdate('Y-m-d H:i:s'), 'updated_by' => (int) $auth->idPengguna()];
 
-        // [V2] Role 3 mengubah berita → kembali menunggu persetujuan (isi yang sudah terbit tidak boleh berubah tanpa approval).
-        if (! $admin) {
+        // Tanpa berkas baru, lampiran lama dipertahankan (legacy: unggah hanya mengganti, tanpa opsi hapus).
+        if ($kunci !== null) {
+            $data['lampiran'] = $kunci;
+        }
+
+        // [V2] saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu` (lihat docblock config): false = ikut legacy, status tetap.
+        if (! $admin && config(Konten::class)->beritaUbahRole3KembaliMenunggu) {
             $data += ['status' => self::MENUNGGU, 'approved_at' => null, 'approved_by' => null, 'reason_note' => null, 'show_notif' => null];
         }
 
@@ -312,15 +331,21 @@ final class BeritaService
             $this->db->transComplete();
         } catch (Throwable $e) {
             $this->batalTransaksi();
+            $this->hapusLampiranDiam($kunci);
 
             throw $e;
         }
 
         if (! $this->db->transStatus()) {
+            $this->hapusLampiranDiam($kunci);
+
             throw new ApiException('Gagal menyimpan berita.', 500);
         }
 
-        unset($lama);
+        // Berkas lama dihapus SETELAH commit (legacy L_news.php:717).
+        if ($kunci !== null) {
+            $this->hapusLampiranDiam((string) ($lama['lampiran'] ?? ''));
+        }
 
         return $this->detail($auth, $id);
     }
@@ -328,7 +353,7 @@ final class BeritaService
     public function hapus(AuthContext $auth, int $id): void
     {
         $this->wajibPengelola($auth);
-        $this->ambilKelola($auth, $id);
+        $lama = $this->ambilKelola($auth, $id);
 
         $this->db->transStart();
         (new NewsModel())->delete($id);
@@ -337,6 +362,31 @@ final class BeritaService
         if (! $this->db->transStatus()) {
             throw new ApiException('Gagal menghapus berita.', 500);
         }
+
+        // Hapus berita menghapus lampirannya setelah commit (legacy L_news.php:812).
+        $this->hapusLampiranDiam((string) ($lama['lampiran'] ?? ''));
+    }
+
+    /**
+     * Isi lampiran: aturan visibilitas sama dengan detail. Tanpa lampiran / bukan hak pembaca → 404.
+     *
+     * @return array{isi: string, mime: string, nama: string}
+     */
+    public function bacaLampiran(AuthContext $auth, int $id): array
+    {
+        $r = $this->db->table('news')->where('id_news', $id)->get()->getRowArray();
+
+        if (! is_array($r) || ! $this->boleh($auth, $r) || (string) ($r['lampiran'] ?? '') === '' || ! $this->lampiran->ada((string) $r['lampiran'])) {
+            throw new NotFoundException('Lampiran tidak ditemukan.');
+        }
+
+        $ext = strtolower(pathinfo((string) $r['lampiran'], PATHINFO_EXTENSION));
+
+        return [
+            'isi'  => $this->lampiran->baca((string) $r['lampiran']),
+            'mime' => PenyimpananLampiran::MIME[$ext] ?? 'application/octet-stream',
+            'nama' => 'lampiran-berita-' . $id . '.' . $ext,
+        ];
     }
 
     /**
@@ -410,6 +460,52 @@ final class BeritaService
     // ------------------------------------------------------------------
     // Internal
     // ------------------------------------------------------------------
+
+    /**
+     * @param array<string, mixed> $r
+     *
+     * @return array{nama: string, tipe: string, url: string}|null
+     */
+    private function infoLampiran(array $r): ?array
+    {
+        $kunci = (string) ($r['lampiran'] ?? '');
+
+        if ($kunci === '') {
+            return null;
+        }
+
+        $ext = strtolower(pathinfo($kunci, PATHINFO_EXTENSION));
+
+        return [
+            'nama' => 'lampiran-berita-' . $r['id_news'] . '.' . $ext,
+            'tipe' => PenyimpananLampiran::MIME[$ext] ?? 'application/octet-stream',
+            'url'  => '/konten/berita/' . $r['id_news'] . '/lampiran',
+        ];
+    }
+
+    private function simpanLampiran(?UploadedFile $berkas): ?string
+    {
+        if ($berkas === null || $berkas->getError() === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+
+        $periksa = $this->lampiran->periksa($berkas);
+
+        return $this->lampiran->simpan($periksa['isi'], $periksa['ekstensi']);
+    }
+
+    private function hapusLampiranDiam(?string $kunci): void
+    {
+        if ($kunci === null || $kunci === '') {
+            return;
+        }
+
+        try {
+            $this->lampiran->hapus($kunci);
+        } catch (Throwable) {
+            // Berkas yatim tidak boleh menggagalkan permintaan; dibersihkan manual.
+        }
+    }
 
     private function dasar(): BaseBuilder
     {

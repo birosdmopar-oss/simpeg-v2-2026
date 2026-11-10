@@ -4,7 +4,7 @@
  * persetujuan (Setujui/Tolak) khusus role 1. Aksi baris lewat menu ⋮ (AGENTS.md bagian 1): Edit → Setujui/Tolak →
  * Hapus (ConfirmDialog). Kolom Status hanya badge. Endpoint masih draf.
  */
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
+import { Check, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
@@ -230,7 +230,10 @@ onMounted(() => {
             <td colspan="6" class="px-4 py-8 text-center text-slate-500">Belum ada berita yang cocok.</td>
           </tr>
           <tr v-for="row in items" v-else :key="row.id" class="hover:bg-slate-50" :data-testid="`konten-berita-row-${row.id}`">
-            <td class="px-4 py-3 font-medium text-slate-800">{{ row.judul }}</td>
+            <td class="px-4 py-3 font-medium text-slate-800">
+              {{ row.judul }}
+              <Paperclip v-if="row.ada_lampiran" class="ml-1 inline h-3.5 w-3.5 text-slate-500" aria-label="Ada lampiran" role="img" data-testid="berita-ada-lampiran" />
+            </td>
             <td class="px-4 py-3 text-slate-600">{{ row.kategori || '—' }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.penulis || '—' }}</td>
             <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ row.publish_at ? fmt(row.publish_at) : '—' }}</td>

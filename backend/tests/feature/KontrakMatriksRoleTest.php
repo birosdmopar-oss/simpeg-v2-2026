@@ -125,6 +125,8 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/konten/berita'                           => [1, 3],
             'POST api/v1/konten/berita/dibuka'                    => [1, 2, 3, 4, 5, 6, 7, 8],
             'GET api/v1/konten/berita/([0-9]+)'                   => [1, 2, 3, 4, 5, 6, 7, 8],
+            'GET api/v1/konten/berita/([0-9]+)/lampiran'          => [1, 2, 3, 4, 5, 6, 7, 8],
+            'POST api/v1/konten/berita/([0-9]+)'                  => [1, 3],
             'PUT api/v1/konten/berita/([0-9]+)'                   => [1, 3],
             'DELETE api/v1/konten/berita/([0-9]+)'                => [1, 3],
             'POST api/v1/konten/berita/([0-9]+)/proses'           => [1],

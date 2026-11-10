@@ -181,3 +181,15 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - Sanitasi berita memakai ulang `Libraries/Html/HtmlSanitizer` (kini menerima whitelist opsional; default tidak berubah) dengan `p,br,strong,b,em,i,ul,ol,li,a[href]`.
 - CI memakai `DBPrefix = t_` untuk grup `tests`: SQL mentah wajib `prefixTable()`; `select()` beralias harus SETELAH `join()`; total dari builder terpisah
   tanpa join (clone + countAllResults mengosongkan pelacakan alias koneksi CI4).
+
+- **Berita — paritas legacy (cek 10-11, `application/libraries/hr/L_news.php`, `views/hr/news/*`):**
+  - **Lampiran DIBAWA** (legacy memakainya): unggah satu berkas JPG/JPEG/PNG/GIF/PDF ≤ 5 MB (`insert:282-340`, `update:489-545`), "Lihat Lampiran" di detail
+    (`detail.php:15`), ikon di daftar (`list.php:97`), berkas lama dihapus setelah commit saat diganti (`:717`) dan saat berita dihapus (`:812`); ubah tanpa
+    berkas mempertahankan lampiran lama (tanpa opsi hapus). v2: penyimpanan privat kunci acak `berita/<hex32>.<ext>` (perbaikan `nl_{publish_at}` yang bisa
+    saling menimpa), `GET konten/berita/{id}/lampiran` terautentikasi dengan visibilitas yang sama dengan detail.
+  - **Jam terbit** dibawa (`pub_date` + `pub_time` wajib di `form.php:62-66`): masukan WIB `Y-m-d H:i`, disimpan UTC.
+  - **Role 3 mengubah berita → kembali menunggu = [V2], BUKAN legacy**: form ubah legacy tidak punya field status, `update` (`:489`, `set_param:877` hanya
+    mengisi status bila terkirim) membiarkan status. Diberi saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu` (default true; false = paritas legacy) —
+    menunggu keputusan Horii.
+  - Target tunggal (`set_param:894-925`: `sat_<id>` → satker, `0` → kementerian, selain itu unit) = skema [K]. Salinan `category`/`unit_satker_target` tidak dibawa
+    (diturunkan saat baca). `news.show_notif` nilai awal menunggu D1.

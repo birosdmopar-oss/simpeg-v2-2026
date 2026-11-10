@@ -33,12 +33,26 @@ final class BeritaController extends ApiController
 
     public function create(): ResponseInterface
     {
-        return $this->respondSuccess($this->service()->buat(service('authContext'), $this->payload()), 201);
+        return $this->respondSuccess($this->service()->buat(service('authContext'), $this->payload(), $this->request->getFile('lampiran')), 201);
     }
 
     public function update(int|string $id): ResponseInterface
     {
-        return $this->respondSuccess($this->service()->ubah(service('authContext'), $this->idValid($id), $this->payload()));
+        return $this->respondSuccess($this->service()->ubah(service('authContext'), $this->idValid($id), $this->payload(), $this->request->getFile('lampiran')));
+    }
+
+    /** Lampiran berita (satu berkas) terautentikasi: aturan visibilitas sama dengan detail; tanpa cache. */
+    public function lampiran(int|string $id): ResponseInterface
+    {
+        $hasil = $this->service()->bacaLampiran(service('authContext'), $this->idValid($id));
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setContentType($hasil['mime'], '')
+            ->setHeader('Content-Disposition', 'inline; filename="' . $hasil['nama'] . '"')
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('Cache-Control', 'private, no-store')
+            ->setBody($hasil['isi']);
     }
 
     public function delete(int|string $id): ResponseInterface

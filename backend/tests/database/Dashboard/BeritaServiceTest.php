@@ -250,6 +250,25 @@ final class BeritaServiceTest extends DatabaseTestCase
         $this->assertSame(0, $this->db->table('news')->countAllResults());
     }
 
+    public function testSaklarParitasLegacyUbahRole3TidakMengembalikanKeMenunggu(): void
+    {
+        $konfig = config(\Config\Konten::class);
+        $semula = $konfig->beritaUbahRole3KembaliMenunggu;
+        $svc    = $this->service();
+        $r      = $svc->buat($this->satker3A, $this->input(['id_kategori' => $this->kategoriAp]));
+        $svc->proses($this->admin, $r['id'], ['aksi' => 'setuju']);
+
+        $konfig->beritaUbahRole3KembaliMenunggu = false;
+
+        try {
+            $u = $svc->ubah($this->satker3A, $r['id'], $this->input(['id_kategori' => $this->kategoriAp, 'judul' => 'Revisi legacy']));
+            $this->assertSame(1, $u['status'], 'paritas legacy: status tetap terbit');
+            $this->assertGreaterThan(0, $this->db->table('news_flag')->where('id_news', $r['id'])->countAllResults());
+        } finally {
+            $konfig->beritaUbahRole3KembaliMenunggu = $semula;
+        }
+    }
+
     public function testAdminUbahTargetMenghitungUlangPenanda(): void
     {
         $svc          = $this->service();

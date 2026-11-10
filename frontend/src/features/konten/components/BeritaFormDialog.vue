@@ -12,11 +12,12 @@ import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
 import type { SelectOption } from '@/shared/ui'
-import { UiTeksSederhana } from '@/shared/ui'
+import { UiFileField, UiTeksSederhana } from '@/shared/ui'
 import UiButton from '@/shared/ui/UiButton.vue'
+import UiTextField from '@/shared/ui/UiTextField.vue'
 
 import { beritaKelolaService } from '../services/kelolaTeks.service'
-import type { BeritaForm, BeritaKelolaRow } from '../types'
+import type { BeritaForm, BeritaKelolaRow, LampiranBerita } from '../types'
 
 const props = defineProps<{
   open: boolean
@@ -29,7 +30,12 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: BeritaKelolaRow] }>()
 
 const isEdit = computed(() => props.row !== null)
-const kosong = (): BeritaForm => ({ judul: '', id_kategori: '', isi: '', publish_at: '', target: '' })
+const LAMPIRAN_EKSTENSI = ['jpg', 'jpeg', 'png', 'gif', 'pdf']
+const LAMPIRAN_MAKS_MB = 5
+
+const kosong = (): BeritaForm => ({ judul: '', id_kategori: '', isi: '', publish_at: '', publish_jam: '', target: '' })
+const lampiran = ref<File | null>(null)
+const lampiranLama = ref<LampiranBerita | null>(null)
 const form = reactive<BeritaForm>(kosong())
 const submitting = ref(false)
 const submitted = ref(false)
@@ -44,9 +50,13 @@ watch(
     formError.value = ''
     serverErrors.value = {}
     Object.assign(form, kosong())
+    lampiran.value = null
+    lampiranLama.value = null
     if (row) {
       try {
-        Object.assign(form, await beritaKelolaService.detail(row.id))
+        const d = await beritaKelolaService.detail(row.id)
+        Object.assign(form, d.form)
+        lampiranLama.value = d.lampiran
       } catch (e) {
         formError.value = `Gagal memuat berita. ${isApiError(e) ? e.message : ''}`.trim()
       }
@@ -61,6 +71,7 @@ const errors = computed(() => {
   if (form.id_kategori === '') e.id_kategori = 'Kategori wajib dipilih.'
   if (form.isi.trim() === '') e.isi = 'Isi berita wajib diisi.'
   if (form.publish_at === '') e.publish_at = 'Tanggal terbit wajib diisi.'
+  if (form.publish_jam === '') e.publish_jam = 'Jam terbit wajib diisi.'
   if (form.target === '') e.target = 'Target wajib dipilih.'
   return e
 })
@@ -76,7 +87,7 @@ async function onSubmit(): Promise<void> {
   if (Object.keys(errors.value).length > 0 || submitting.value) return
   submitting.value = true
   try {
-    const saved = props.row ? await beritaKelolaService.update(props.row.id, form) : await beritaKelolaService.create(form)
+    const saved = props.row ? await beritaKelolaService.update(props.row.id, form, lampiran.value) : await beritaKelolaService.create(form, lampiran.value)
     emit('saved', saved)
     emit('update:open', false)
   } catch (e) {
@@ -122,6 +133,15 @@ async function onSubmit(): Promise<void> {
             :error="err('id_kategori')"
           />
           <FormField v-model="form.publish_at" name="publish_at" label="Tanggal Terbit" type="date" required :error="err('publish_at')" />
+          <UiTextField
+            v-model="form.publish_jam"
+            type="time"
+            label="Jam Terbit (WIB)"
+            name="publish_jam"
+            required
+            :state="err('publish_jam') ? 'error' : 'default'"
+            :help-text="err('publish_jam')"
+          />
 
           <div :class="FORM_WIDE_CLASS">
             <UiTeksSederhana v-model="form.isi" label="Isi berita" :invalid="submitted && !!errors.isi" :disabled="submitting" />
@@ -140,6 +160,18 @@ async function onSubmit(): Promise<void> {
             :options="opsiUnitSatker.map((o) => ({ value: o.value, label: o.label }))"
             :error="err('target')"
           />
+
+          <div :class="FORM_WIDE_CLASS">
+            <UiFileField
+              label="Lampiran (opsional)"
+              :allowed="LAMPIRAN_EKSTENSI"
+              :max-mb="LAMPIRAN_MAKS_MB"
+              :hint="lampiranLama ? `Lampiran saat ini: ${lampiranLama.nama}. Pilih berkas baru untuk menggantinya.` : 'JPG, JPEG, PNG, GIF, atau PDF'"
+              :disabled="submitting"
+              @change="lampiran = $event"
+            />
+            <p v-if="err('lampiran')" class="mt-1 text-body2 text-danger" role="alert">{{ err('lampiran') }}</p>
+          </div>
 
           <div :class="FORM_ACTIONS_CLASS">
             <DialogClose as-child>

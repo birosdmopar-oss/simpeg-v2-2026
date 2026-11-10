@@ -66,6 +66,9 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Konten', 'filter' 
     $routes->get('konten/berita', 'BeritaController::index', $semua);
     $routes->post('konten/berita', 'BeritaController::create', $kelolaBerita);
     $routes->get('konten/berita/(:num)', 'BeritaController::show/$1', $semua);
+    $routes->get('konten/berita/(:num)/lampiran', 'BeritaController::lampiran/$1', $semua);
+    // Ubah dengan lampiran = multipart (PHP tidak mengurai multipart pada PUT) → POST ke id; PUT JSON tetap untuk tanpa berkas.
+    $routes->post('konten/berita/(:num)', 'BeritaController::update/$1', $kelolaBerita);
     $routes->put('konten/berita/(:num)', 'BeritaController::update/$1', $kelolaBerita);
     $routes->delete('konten/berita/(:num)', 'BeritaController::delete/$1', $kelolaBerita);
     $routes->post('konten/berita/(:num)/proses', 'BeritaController::proses/$1', $admin);

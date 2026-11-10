@@ -117,6 +117,7 @@ export interface BeritaKelolaRowApi {
   id_kategori?: number | string | null
   penulis?: string | null
   publish_at?: string | null
+  ada_lampiran?: boolean
   status?: number | string | null
 }
 
@@ -127,6 +128,7 @@ export interface BeritaKelolaRow {
   id_kategori: string
   penulis: string
   publish_at: string
+  ada_lampiran: boolean
   status: StatusBerita
 }
 
@@ -135,10 +137,19 @@ export interface BeritaForm {
   id_kategori: string
   /** HTML terbatas dari UiTeksSederhana. */
   isi: string
-  /** Y-m-d. */
+  /** Y-m-d (WIB). */
   publish_at: string
+  /** HH:mm (WIB), jam terbit seperti `pub_time` legacy. */
+  publish_jam: string
   /** Target tunggal: "0" seluruh kementerian, "<id_unit>", atau "sat_<id_satker>" (berita tidak memakai daftar pegawai). */
   target: string
+}
+
+/** Lampiran berita (satu berkas JPG/JPEG/PNG/GIF/PDF ≤ 5 MB, paritas legacy); `url` relatif terhadap base API. */
+export interface LampiranBerita {
+  nama: string
+  tipe: string
+  url: string
 }
 
 export interface DiboRowApi {
@@ -187,6 +198,7 @@ export interface BeritaDetailApi {
   foto_url?: string | null
   /** HTML terbatas; dibersihkan ulang di FE sebelum ditampilkan. */
   isi?: string | null
+  lampiran?: LampiranBerita | null
 }
 
 export interface BeritaDetail {
@@ -197,6 +209,7 @@ export interface BeritaDetail {
   tanggal: string | null
   foto_url: string | null
   isi: string
+  lampiran: LampiranBerita | null
 }
 
 export interface BeritaKategoriOpsi {
