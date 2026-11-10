@@ -101,3 +101,70 @@ export interface KontenGambarListApi {
   items?: KontenGambarRowApi[]
   total?: number
 }
+
+/** Berita kelola (draf kontrak PRD §5.5): status 0 menunggu persetujuan, 1 disetujui, 2 ditolak/nonaktif, 10 dihapus. */
+export type StatusBerita = '0' | '1' | '2' | '10'
+
+export interface BeritaKelolaRowApi {
+  id: number | string
+  judul: string
+  kategori?: string | null
+  id_kategori?: number | string | null
+  penulis?: string | null
+  publish_at?: string | null
+  status?: number | string | null
+}
+
+export interface BeritaKelolaRow {
+  id: string
+  judul: string
+  kategori: string
+  id_kategori: string
+  penulis: string
+  publish_at: string
+  status: StatusBerita
+}
+
+export interface BeritaForm {
+  judul: string
+  id_kategori: string
+  /** HTML terbatas dari UiTeksSederhana. */
+  isi: string
+  /** Y-m-d. */
+  publish_at: string
+  target: SpesifikasiTarget
+}
+
+export interface DiboRowApi {
+  id: number | string
+  judul: string
+  jenis?: string | null
+  id_jenis?: number | string | null
+  keterangan?: string | null
+  status?: number | string | null
+}
+
+export interface DiboRow {
+  id: string
+  judul: string
+  jenis: string
+  id_jenis: string
+  keterangan: string
+  status: '1' | '2' | '10'
+}
+
+export interface DiboForm {
+  judul: string
+  id_jenis: string
+  keterangan: string
+}
+
+/** Master sederhana (kategori berita / jenis DIBO): nama + urutan + status. */
+export interface MasterKontenRow {
+  id: string
+  nama: string
+  urutan: number
+  status: '1' | '2' | '10'
+}
+
+export type JenisMasterKonten = 'berita-kategori' | 'dibo-jenis'
