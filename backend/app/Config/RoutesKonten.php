@@ -49,4 +49,24 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Konten', 'filter' 
         $routes->post("konten/{$jalur}/(:num)", "{$c}::update/$1", $admin);
         $routes->delete("konten/{$jalur}/(:num)", "{$c}::delete/$1", $admin);
     }
+
+    // F-07 Berita (MAKE-081, PRD §5.5/§6): baca = semua role login (visibilitas di service); kelola = role 1, 3; proses = role 1.
+    $kelolaBerita = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)];
+
+    foreach (['berita/kategori' => 'BeritaKategoriController', 'dibo-jenis' => 'DiboJenisController'] as $jalur => $c) {
+        $routes->get("konten/{$jalur}", "{$c}::index", $semua);
+        $routes->post("konten/{$jalur}", "{$c}::create", $admin);
+        $routes->put("konten/{$jalur}/(:num)", "{$c}::update/$1", $admin);
+        $routes->patch("konten/{$jalur}/(:num)/status", "{$c}::status/$1", $admin);
+        $routes->post("konten/{$jalur}/(:num)/urutan", "{$c}::urutan/$1", $admin);
+        $routes->delete("konten/{$jalur}/(:num)", "{$c}::delete/$1", $admin);
+    }
+
+    $routes->post('konten/berita/dibuka', 'BeritaController::dibuka', $semua);
+    $routes->get('konten/berita', 'BeritaController::index', $semua);
+    $routes->post('konten/berita', 'BeritaController::create', $kelolaBerita);
+    $routes->get('konten/berita/(:num)', 'BeritaController::show/$1', $semua);
+    $routes->put('konten/berita/(:num)', 'BeritaController::update/$1', $kelolaBerita);
+    $routes->delete('konten/berita/(:num)', 'BeritaController::delete/$1', $kelolaBerita);
+    $routes->post('konten/berita/(:num)/proses', 'BeritaController::proses/$1', $admin);
 });
