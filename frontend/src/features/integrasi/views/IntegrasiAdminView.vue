@@ -17,11 +17,10 @@ import { isApiError } from '@/lib/axios'
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
 import { UiBadge, UiButton, UiPagination, UiSelect, UiTextField } from '@/shared/ui'
-import { formatApiDateTime } from '@/shared/utils/dateTime'
 
 import LogIntegrasiDetailDialog from '../components/LogIntegrasiDetailDialog.vue'
 import TarikEkinerjaDialog from '../components/TarikEkinerjaDialog.vue'
-import { LABEL_ARAH, LABEL_STATUS, labelLayanan, type LogIntegrasiFilter, type LogIntegrasiRow, type TarikEkinerjaHasil } from '../integrasi.types'
+import { formatWaktuWib, LABEL_ARAH, LABEL_STATUS, labelLayanan, type LogIntegrasiFilter, type LogIntegrasiRow, type TarikEkinerjaHasil } from '../integrasi.types'
 import { logIntegrasiService } from '../services/logIntegrasi.service'
 
 const PER_PAGE = 25
@@ -103,7 +102,7 @@ function resetFilter(): void {
 const adaFilter = computed(() => Boolean(layanan.value || status.value || tanggalMulai.value || tanggalSelesai.value))
 
 function waktu(row: LogIntegrasiRow): string {
-  return formatApiDateTime(row.created_at) ?? row.created_at
+  return formatWaktuWib(row.created_at)
 }
 
 function http(row: LogIntegrasiRow): string {
@@ -205,7 +204,7 @@ onMounted(() => {
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            <th class="px-4 py-3">Waktu</th>
+            <th class="px-4 py-3">Waktu (WIB)</th>
             <th class="px-4 py-3">Layanan</th>
             <th class="px-4 py-3">Arah</th>
             <th class="px-4 py-3">Operasi</th>

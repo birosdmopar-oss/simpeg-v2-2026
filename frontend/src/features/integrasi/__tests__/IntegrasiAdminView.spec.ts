@@ -19,10 +19,9 @@ import router from '@/router'
 import { rowMenuActions, selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { buildNav } from '@/shared/layouts/nav.config'
 import { UiTextField } from '@/shared/ui'
-import { formatApiDateTime } from '@/shared/utils/dateTime'
 
 import TarikEkinerjaDialog from '../components/TarikEkinerjaDialog.vue'
-import type { DaftarLogIntegrasi, LogIntegrasiRow } from '../integrasi.types'
+import { formatWaktuWib, type DaftarLogIntegrasi, type LogIntegrasiRow } from '../integrasi.types'
 import { logIntegrasiService } from '../services/logIntegrasi.service'
 import IntegrasiAdminView from '../views/IntegrasiAdminView.vue'
 
@@ -112,7 +111,9 @@ describe('IntegrasiAdminView — log integrasi', () => {
     expect(gagal).toContain('500')
     expect(gagal).toContain('E500')
     expect(gagal).toContain('Gagal')
-    expect(gagal).toContain(formatApiDateTime('2026-11-02 03:00:00')!)
+    // 03:00 UTC = 10.00 WIB, tidak bergantung zona browser.
+    expect(gagal).toContain('10.00 WIB')
+    expect(gagal).toContain(formatWaktuWib('2026-11-02 03:00:00'))
 
     const sukses = wrapper.get('[data-testid="integrasi-log-row-4"]').text()
     expect(sukses).toContain('SIMAPI')

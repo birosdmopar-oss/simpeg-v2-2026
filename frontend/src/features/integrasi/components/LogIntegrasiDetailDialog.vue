@@ -8,9 +8,8 @@ import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPor
 import { computed } from 'vue'
 
 import { UiBadge } from '@/shared/ui'
-import { formatApiDateTime } from '@/shared/utils/dateTime'
 
-import { LABEL_ARAH, LABEL_STATUS, labelLayanan, type LogIntegrasiRow } from '../integrasi.types'
+import { formatWaktuWib, LABEL_ARAH, LABEL_STATUS, labelLayanan, type LogIntegrasiRow } from '../integrasi.types'
 
 const props = defineProps<{ open: boolean; row: LogIntegrasiRow | null }>()
 const emit = defineEmits<{ 'update:open': [open: boolean] }>()
@@ -21,7 +20,7 @@ const rincian = computed<{ label: string; nilai: string }[]>(() => {
   const r = props.row
   if (!r) return []
   return [
-    { label: 'Waktu', nilai: formatApiDateTime(r.created_at) ?? r.created_at },
+    { label: 'Waktu', nilai: formatWaktuWib(r.created_at) },
     { label: 'Layanan', nilai: labelLayanan(r.layanan) },
     { label: 'Arah', nilai: LABEL_ARAH[r.arah] ?? String(r.arah) },
     { label: 'Operasi', nilai: r.operasi },

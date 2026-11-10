@@ -3,6 +3,7 @@
  * `backend/app/Controllers/Api/Integrasi/README.md` — `GET api/v1/integrasi/log` dan `POST api/v1/integrasi/bkn/tarik`.
  */
 import { Role, type RoleCode } from '@/features/auth/types'
+import { API_DATETIME_FORMAT, formatApiDateTime } from '@/shared/utils/dateTime'
 
 /** Halaman Integrasi: Super Admin saja (kedua endpoint `Role::filter(SUPER_ADMIN)`). */
 export const INTEGRASI_ADMIN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
@@ -13,7 +14,7 @@ export type StatusLogIntegrasi = 1 | 2
 /** `integrasi_log.arah`: 1 keluar (v2 memanggil layanan luar), 2 masuk (klien memanggil v2). */
 export type ArahLogIntegrasi = 1 | 2
 
-/** Satu baris `integrasi_log` (DBV-027); `created_at` UTC tanpa zona (tampil lewat `formatApiDateTime`). */
+/** Satu baris `integrasi_log` (DBV-027); `created_at` UTC tanpa zona (tampil WIB lewat `formatWaktuWib`). */
 export interface LogIntegrasiRow {
   id_integrasi_log: number
   arah: ArahLogIntegrasi
@@ -82,4 +83,16 @@ export const LABEL_LAYANAN: Readonly<Record<string, string>> = {
 
 export function labelLayanan(kode: string): string {
   return LABEL_LAYANAN[kode] ?? kode
+}
+
+/** Opsi tampilan waktu log: format bawaan API v2, selalu zona WIB (filter tanggal juga tanggal WIB). */
+export const WAKTU_WIB: Readonly<Intl.DateTimeFormatOptions> = Object.freeze({ ...API_DATETIME_FORMAT, timeZone: 'Asia/Jakarta' })
+
+/**
+ * `created_at` (UTC tanpa zona, CR-086) → "2 Nov 2026, 10.00 WIB", apa pun zona browser — selaras dengan filter tanggal
+ * yang juga tanggal WIB. Tidak terbaca → teks apa adanya.
+ */
+export function formatWaktuWib(createdAt: string): string {
+  const teks = formatApiDateTime(createdAt, WAKTU_WIB)
+  return teks === null ? createdAt : `${teks} WIB`
 }
