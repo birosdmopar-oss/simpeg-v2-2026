@@ -47,7 +47,6 @@ const notice = ref('')
 const busy = ref(false)
 
 const opsiUnitSatker = ref<SelectOption[]>([])
-const opsiPegawai = ref<SelectOption[]>([])
 
 const formOpen = ref(false)
 const editing = ref<KontenGambarRow | null>(null)
@@ -81,7 +80,7 @@ async function load(): Promise<void> {
 
 async function loadOpsi(): Promise<void> {
   try {
-    ;[opsiUnitSatker.value, opsiPegawai.value] = await Promise.all([svc.value.opsiUnitSatker(), svc.value.opsiPegawai()])
+    opsiUnitSatker.value = await svc.value.opsiUnitSatker()
   } catch (e) {
     error.value = `Gagal memuat pilihan target. ${pesan(e, '')}`.trim()
   }
@@ -269,7 +268,6 @@ onMounted(() => {
       :jenis="jenis"
       :row="editing"
       :opsi-unit-satker="opsiUnitSatker"
-      :opsi-pegawai="opsiPegawai"
       @saved="onSaved"
     />
 

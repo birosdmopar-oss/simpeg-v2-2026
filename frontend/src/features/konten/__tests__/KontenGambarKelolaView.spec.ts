@@ -13,7 +13,6 @@ const svc = vi.hoisted(() => ({
   geser: vi.fn(),
   remove: vi.fn(),
   opsiUnitSatker: vi.fn(),
-  opsiPegawai: vi.fn(),
   target: vi.fn(),
 }))
 
@@ -56,7 +55,6 @@ describe('KontenGambarKelolaView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     svc.opsiUnitSatker.mockResolvedValue([])
-    svc.opsiPegawai.mockResolvedValue([])
     svc.list.mockResolvedValue({ items: [baris({ id: '1' }), baris({ id: '2', status: '2', keterangan: 'Cuti' })], total: 2 })
   })
 

@@ -114,13 +114,25 @@ final class KontenGambarService
     }
 
     /**
-     * @return array{unit_satker: list<string>, pegawai: list<string>, kecuali: list<string>}
+     * Target tersimpan + label "NIP - nama" untuk NIP yang dipilih/dikecualikan (agar form ubah menampilkan nama; pencarian
+     * pegawai di form memakai `GET pegawai?search=`, bukan daftar semua pegawai).
+     *
+     * @return array{unit_satker: list<string>, pegawai: list<string>, kecuali: list<string>, label_pegawai: array<string, string>}
      */
     public function target(int $id): array
     {
-        $r = $this->ambil($id);
+        $r     = $this->ambil($id);
+        $spes  = SpesifikasiTarget::dariKolom($r['target_uns'] ?? null, $r['target_peg'] ?? null, $r['excl_peg'] ?? null);
+        $nip   = array_values(array_unique([...$spes->pegawai, ...$spes->kecuali]));
+        $label = [];
 
-        return SpesifikasiTarget::dariKolom($r['target_uns'] ?? null, $r['target_peg'] ?? null, $r['excl_peg'] ?? null)->keArray();
+        if ($nip !== []) {
+            foreach ($this->db->table('pegawai')->select('nip, glr_awal, nama, glr_akhir')->whereIn('nip', $nip)->get()->getResultArray() as $p) {
+                $label[(string) $p['nip']] = $p['nip'] . ' - ' . self::namaLengkap($p);
+            }
+        }
+
+        return $spes->keArray() + ['label_pegawai' => $label];
     }
 
     /**
@@ -308,18 +320,6 @@ final class KontenGambarService
         }
 
         return $opsi;
-    }
-
-    /**
-     * Opsi pegawai aktif "NIP - nama" untuk TargetPicker.
-     *
-     * @return list<array{value: string, label: string}>
-     */
-    public function opsiPegawai(): array
-    {
-        $rows = $this->db->table('pegawai')->select('nip, glr_awal, nama, glr_akhir')->where('status', 1)->orderBy('nama', 'ASC')->get()->getResultArray();
-
-        return array_map(static fn (array $r): array => ['value' => (string) $r['nip'], 'label' => $r['nip'] . ' - ' . self::namaLengkap($r)], $rows);
     }
 
     // ------------------------------------------------------------------

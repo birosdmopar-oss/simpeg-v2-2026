@@ -6,19 +6,23 @@
  * target pegawai bila seluruh kementerian). Komponen murni tampilan: pemanggil memasok opsi; nilai `{unit_satker, pegawai, kecuali}`.
  */
 import { X } from 'lucide-vue-next'
-import { computed } from "vue"
+import { computed, ref } from 'vue'
 
 import type { SelectOption } from '@/shared/ui'
 import { UiSelect } from '@/shared/ui'
 
-import { SEMUA_KEMENTERIAN } from "../target"
-import type { SpesifikasiTarget } from "../types"
+import { SEMUA_KEMENTERIAN } from '../target'
+import type { SpesifikasiTarget } from '../types'
+import PencarianPegawai, { type HasilPegawai } from './PencarianPegawai.vue'
 
 const props = withDefaults(
   defineProps<{
     modelValue: SpesifikasiTarget
     opsiUnitSatker: SelectOption[]
-    opsiPegawai: SelectOption[]
+    /** Pencarian pegawai sisi-server (min. 3 huruf); hasil {value: NIP, label}. */
+    cariPegawai: (kata: string) => Promise<HasilPegawai[]>
+    /** Label "NIP - nama" untuk NIP pada target tersimpan (form ubah). */
+    labelPegawai?: Record<string, string>
     disabled?: boolean
     invalid?: boolean
     pesanKosong?: string
@@ -37,7 +41,9 @@ const unitLabel = computed(() => {
   m.set(SEMUA_KEMENTERIAN, m.get(SEMUA_KEMENTERIAN) ?? 'Seluruh kementerian')
   return m
 })
-const pegawaiLabel = computed(() => new Map(props.opsiPegawai.map((o) => [String(o.value), o.label])))
+/** Label pegawai: dari target tersimpan (`labelPegawai`) dan dari pilihan di sesi ini; NIP saja bila tak dikenal. */
+const labelDipilih = ref<Record<string, string>>({})
+const pegawaiLabel = computed(() => new Map(Object.entries({ ...props.labelPegawai, ...labelDipilih.value })))
 
 function set(patch: Partial<SpesifikasiTarget>): void {
   emit('update:modelValue', { ...props.modelValue, ...patch })
@@ -51,9 +57,9 @@ function tambahUnit(v: string | number | null): void {
   set({ unit_satker: [...props.modelValue.unit_satker, nilai] })
 }
 
-function tambahPegawai(kunci: 'pegawai' | 'kecuali', v: string | number | null): void {
-  const nilai = String(v ?? '')
+function tambahPegawai(kunci: 'pegawai' | 'kecuali', nilai: string, label: string): void {
   if (nilai === '' || props.modelValue[kunci].includes(nilai)) return
+  labelDipilih.value = { ...labelDipilih.value, [nilai]: label }
   set({ [kunci]: [...props.modelValue[kunci], nilai] })
 }
 
@@ -105,15 +111,11 @@ const opsiUnit = computed<SelectOption[]>(() =>
 
     <section aria-labelledby="tp-pegawai">
       <h3 id="tp-pegawai" class="text-body1 font-medium text-slate-700">Pegawai tertentu</h3>
-      <UiSelect
-        model-value=""
-        searchable
-        label=""
-        aria-label="Tambah pegawai target"
-        placeholder="Tambah pegawai…"
-        :options="opsiPegawai"
+      <PencarianPegawai
+        label="Cari pegawai target"
+        :cari="cariPegawai"
         :disabled="disabled || semua"
-        @update:model-value="(v) => tambahPegawai('pegawai', v)"
+        @pilih="(nip, label) => tambahPegawai('pegawai', nip, label)"
       />
       <p v-if="semua" class="mt-1 text-body2 text-slate-500" data-testid="target-pegawai-nonaktif">
         Tidak dipakai karena target seluruh kementerian.
@@ -141,15 +143,12 @@ const opsiUnit = computed<SelectOption[]>(() =>
 
     <section aria-labelledby="tp-kecuali">
       <h3 id="tp-kecuali" class="text-body1 font-medium text-slate-700">Kecualikan pegawai</h3>
-      <UiSelect
-        model-value=""
-        searchable
-        label=""
-        aria-label="Tambah pegawai yang dikecualikan"
-        placeholder="Kecualikan pegawai…"
-        :options="opsiPegawai"
+      <PencarianPegawai
+        label="Cari pegawai yang dikecualikan"
+        placeholder="Cari pegawai yang dikecualikan (min. 3 huruf)…"
+        :cari="cariPegawai"
         :disabled="disabled"
-        @update:model-value="(v) => tambahPegawai('kecuali', v)"
+        @pilih="(nip, label) => tambahPegawai('kecuali', nip, label)"
       />
       <ul class="mt-2 flex flex-wrap gap-2" data-testid="target-kecuali-daftar">
         <li

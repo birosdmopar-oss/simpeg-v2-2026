@@ -36,7 +36,6 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Konten', 'filter' 
     )];
 
     $routes->get('konten/opsi/unit-satker', 'PopupController::opsiUnitSatker', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_SATKER)]); // role 3: target berita
-    $routes->get('konten/opsi/pegawai', 'PopupController::opsiPegawai', $admin);
 
     foreach (['popup' => 'PopupController', 'banner' => 'BannerController'] as $jalur => $c) {
         $routes->get("konten/{$jalur}/aktif", "{$c}::aktif", $bernip);

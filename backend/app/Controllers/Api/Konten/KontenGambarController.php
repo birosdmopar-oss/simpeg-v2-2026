@@ -87,11 +87,6 @@ abstract class KontenGambarController extends ApiController
         return $this->respondSuccess($this->service()->opsiUnitSatker());
     }
 
-    public function opsiPegawai(): ResponseInterface
-    {
-        return $this->respondSuccess($this->service()->opsiPegawai());
-    }
-
     private function service(): KontenGambarService
     {
         return new KontenGambarService($this->jenis());

@@ -13,7 +13,7 @@ const s = vi.hoisted(() => ({
   berita: { list: vi.fn(), proses: vi.fn(), remove: vi.fn() },
   dibo: { list: vi.fn(), setStatus: vi.fn(), remove: vi.fn() },
   master: { list: vi.fn(), setStatus: vi.fn(), geser: vi.fn(), remove: vi.fn(), simpan: vi.fn() },
-  popup: { opsiUnitSatker: vi.fn(), opsiPegawai: vi.fn() },
+  popup: { opsiUnitSatker: vi.fn() },
 }))
 
 vi.mock('../services/kelolaTeks.service', () => ({
@@ -49,7 +49,6 @@ beforeEach(() => {
   document.body.innerHTML = ''
   vi.clearAllMocks()
   s.popup.opsiUnitSatker.mockResolvedValue([])
-  s.popup.opsiPegawai.mockResolvedValue([])
   s.master.list.mockResolvedValue([
     { id: '1', nama: 'Umum', urutan: 1, status: '1' },
     { id: '2', nama: 'Cuti', urutan: 2, status: '2' },

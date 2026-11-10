@@ -8,6 +8,7 @@ import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, reactive, ref, watch } from 'vue'
 
+import { pegawaiService } from '@/features/kepegawaian/services/pegawai.service'
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
@@ -18,6 +19,7 @@ import UiTextField from '@/shared/ui/UiTextField.vue'
 
 import { GAMBAR_EKSTENSI, GAMBAR_MAKS_MB, kelolaService } from '../services/kelola.service'
 import type { JenisKontenGambar, KontenGambarForm, KontenGambarRow, SpesifikasiTarget } from '../types'
+import type { HasilPegawai } from './PencarianPegawai.vue'
 import TargetPicker from './TargetPicker.vue'
 
 const props = defineProps<{
@@ -25,7 +27,6 @@ const props = defineProps<{
   jenis: JenisKontenGambar
   row: KontenGambarRow | null
   opsiUnitSatker: SelectOption[]
-  opsiPegawai: SelectOption[]
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: KontenGambarRow] }>()
 
@@ -34,6 +35,17 @@ const isEdit = computed(() => props.row !== null)
 const svc = computed(() => kelolaService(props.jenis))
 
 const kosongTarget = (): SpesifikasiTarget => ({ unit_satker: [], pegawai: [], kecuali: [] })
+const labelPegawai = ref<Record<string, string>>({})
+
+/** Pencarian pegawai sisi-server (`GET pegawai?search=`, min. 3 huruf, maks. 10 hasil) — pola PegawaiPicker Modul C. */
+async function cariPegawai(kata: string): Promise<HasilPegawai[]> {
+  const hasil = await pegawaiService.list({ page: 1, per_page: 10, search: kata })
+
+  return hasil.items.map((p) => ({
+    value: p.nip,
+    label: `${p.nip} - ${[p.glr_awal, p.nama].filter(Boolean).join(' ')}${p.glr_akhir ? `, ${p.glr_akhir}` : ''}`,
+  }))
+}
 const form = reactive<KontenGambarForm>({ keterangan: '', url: '', tgl_mulai: '', tgl_akhir: '', jam_mulai: '', jam_akhir: '', target: kosongTarget() })
 const berkas = ref<File | null>(null)
 const submitting = ref(false)
@@ -56,9 +68,12 @@ watch(
     form.jam_mulai = row?.jam_mulai ?? ''
     form.jam_akhir = row?.jam_akhir ?? ''
     form.target = kosongTarget()
+    labelPegawai.value = {}
     if (row) {
       try {
-        form.target = await svc.value.target(row.id)
+        const t = await svc.value.target(row.id)
+        form.target = t.target
+        labelPegawai.value = t.labelPegawai
       } catch (err) {
         formError.value = `Gagal memuat target. ${isApiError(err) ? err.message : ''}`.trim()
       }
@@ -174,7 +189,8 @@ async function onSubmit(): Promise<void> {
             <TargetPicker
               v-model="form.target"
               :opsi-unit-satker="opsiUnitSatker"
-              :opsi-pegawai="opsiPegawai"
+              :cari-pegawai="cariPegawai"
+              :label-pegawai="labelPegawai"
               :disabled="submitting"
               :invalid="submitted"
             />

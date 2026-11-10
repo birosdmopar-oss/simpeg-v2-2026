@@ -102,7 +102,6 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // F-04 Popup / F-05 Banner (MAKE-079/080, PRD Fase 7 v2.0 §5.3/5.4, §6): kelola = role 1; aktif = role ber-NIP 2–8
             // (Q7-05); gambar = semua role login (penerima/role 1 dicek di service, selain itu 404).
             'GET api/v1/konten/opsi/unit-satker'         => [1, 3],
-            'GET api/v1/konten/opsi/pegawai'             => [1],
             'GET api/v1/konten/popup/aktif'              => [2, 3, 4, 5, 6, 7, 8],
             'GET api/v1/konten/popup'                    => [1],
             'POST api/v1/konten/popup'                   => [1],

@@ -30,6 +30,14 @@ class HtmlSanitizer
     private ?HTMLPurifier $purifier = null;
 
     /**
+     * @param string|null $allowed whitelist HTML.Allowed HTMLPurifier; null = {@see self::ALLOWED_HTML}. Konten dengan
+     *                              whitelist lebih sempit (mis. berita Fase 7, Q7-10) memakai kelas yang sama dengan nilai sendiri.
+     */
+    public function __construct(private readonly ?string $allowed = null)
+    {
+    }
+
+    /**
      * HTML aman sesuai whitelist. Teks di luar tag dipertahankan; tag/atribut di luar whitelist dibuang.
      */
     public function sanitize(string $html): string
@@ -70,7 +78,7 @@ class HtmlSanitizer
         $config = HTMLPurifier_Config::createDefault();
         $config->set('Core.Encoding', 'UTF-8');
         $config->set('Cache.DefinitionImpl', null);
-        $config->set('HTML.Allowed', self::ALLOWED_HTML);
+        $config->set('HTML.Allowed', $this->allowed ?? self::ALLOWED_HTML);
         $config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'mailto' => true]);
         $config->set('Attr.AllowedFrameTargets', ['_blank']);
         $config->set('HTML.TargetNoopener', true);

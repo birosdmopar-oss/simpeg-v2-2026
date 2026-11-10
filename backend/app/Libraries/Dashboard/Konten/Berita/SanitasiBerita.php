@@ -4,24 +4,29 @@ declare(strict_types=1);
 
 namespace App\Libraries\Dashboard\Konten\Berita;
 
-use HTMLPurifier;
-use HTMLPurifier_Config;
+use App\Libraries\Html\HtmlSanitizer;
 
 /**
- * Sanitasi isi berita (PRD Fase 7 v2.0 Q7-10, anomali legacy XSS tersimpan): whitelist HTMLPurifier SAMA dengan editor FE
- * (`UiTeksSederhana`): `p, br, strong, em, ul, ol, li, a[href]`. Tanpa atribut lain (style, class, handler on-event, target), URI hanya
- * http, https, mailto. Teks di luar tag dipertahankan; tag lain dibuang. Dijalankan saat TULIS (semua GET mengirim konten
- * bersih; FE membersihkan ulang saat render).
+ * Sanitasi isi berita (PRD Fase 7 v2.0 Q7-10, anomali legacy XSS tersimpan). Memakai ulang {@see HtmlSanitizer} (HTMLPurifier,
+ * tanpa dependensi baru) dengan whitelist yang SAMA dengan editor FE (`UiTeksSederhana`): `p, br, strong, b, em, i, ul, ol, li,
+ * a[href]`. Tanpa atribut lain (style, class, handler on-event, target — jadi `rel=noopener` tidak diperlukan), URI hanya http,
+ * https, mailto. Teks di luar tag dipertahankan; tag lain dibuang. Dijalankan saat TULIS (semua GET mengirim konten bersih; FE
+ * membersihkan ulang saat render).
  */
 final class SanitasiBerita
 {
-    public const ALLOWED_HTML = 'p,br,strong,em,ul,ol,li,a[href]';
+    public const ALLOWED_HTML = 'p,br,strong,b,em,i,ul,ol,li,a[href]';
 
-    private ?HTMLPurifier $purifier = null;
+    private readonly HtmlSanitizer $sanitizer;
+
+    public function __construct(?HtmlSanitizer $sanitizer = null)
+    {
+        $this->sanitizer = $sanitizer ?? new HtmlSanitizer(self::ALLOWED_HTML);
+    }
 
     public function bersihkan(string $html): string
     {
-        return trim($this->purifier()->purify($html));
+        return $this->sanitizer->sanitize($html);
     }
 
     /**
@@ -29,9 +34,7 @@ final class SanitasiBerita
      */
     public static function adaIsi(string $html): bool
     {
-        $teks = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-        return preg_match('/[^\s\x{00A0}\x{200B}]/u', $teks) === 1;
+        return HtmlSanitizer::hasVisibleContent(strip_tags($html));
     }
 
     /**
@@ -49,21 +52,5 @@ final class SanitasiBerita
         $spasi  = mb_strrpos($potong, ' ');
 
         return rtrim($spasi !== false && $spasi > $panjang * 0.6 ? mb_substr($potong, 0, $spasi) : $potong) . '…';
-    }
-
-    private function purifier(): HTMLPurifier
-    {
-        if ($this->purifier !== null) {
-            return $this->purifier;
-        }
-
-        $config = HTMLPurifier_Config::createDefault();
-        $config->set('Core.Encoding', 'UTF-8');
-        $config->set('Cache.DefinitionImpl', null);
-        $config->set('HTML.Allowed', self::ALLOWED_HTML);
-        $config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'mailto' => true]);
-        $config->set('AutoFormat.RemoveEmpty', true);
-
-        return $this->purifier = new HTMLPurifier($config);
     }
 }

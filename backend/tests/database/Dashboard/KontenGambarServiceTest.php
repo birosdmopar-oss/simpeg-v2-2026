@@ -176,6 +176,13 @@ final class KontenGambarServiceTest extends DatabaseTestCase
         $this->assertSame(0, $this->db->table('user_banner')->where('id_banner', $b['id'])->countAllResults());
         $this->assertSame(2, $svc->daftar([])['total']);
 
+        // Q7-16: audit hapus menyimpan snapshot baris SEBELUM dihapus (termasuk kunci berkas).
+        $audit = $this->db->table('audit_logs')->where(['entity' => 'banner', 'entity_id' => (string) $b['id'], 'event' => 'delete'])->get()->getRowArray();
+        $this->assertIsArray($audit);
+        $sebelum = json_decode((string) $audit['before_json'], true);
+        $this->assertSame($file, $sebelum['file']);
+        $this->assertSame('2026-11-30', $sebelum['tgl_akhir']);
+
         $this->expectException(NotFoundException::class);
         $svc->hapus($b['id']);
     }
@@ -234,11 +241,25 @@ final class KontenGambarServiceTest extends DatabaseTestCase
         $this->assertStringContainsString('Pegawai Fixture', $hasil['items'][0]['nama']);
     }
 
-    public function testOpsiTargetUnitSatkerDanPegawai(): void
+    public function testTargetMengembalikanLabelPegawai(): void
+    {
+        [, $p1, $p2] = $this->satkerDenganDuaPegawai();
+        $svc         = $this->service(JenisGambar::Popup);
+        $r           = $svc->buat($this->input(['target' => ['unit_satker' => ['0'], 'pegawai' => [$p1], 'kecuali' => [$p2]]]), $this->gambar(300, 200), 1);
+
+        $t = $svc->target($r['id']);
+
+        $this->assertSame(['0'], $t['unit_satker']);
+        $this->assertSame([$p1], $t['pegawai']);
+        $this->assertSame([$p2], $t['kecuali']);
+        $this->assertEqualsCanonicalizing([$p1, $p2], array_map('strval', array_keys($t['label_pegawai'])));
+        $this->assertStringStartsWith($p1 . ' - ', $t['label_pegawai'][$p1]);
+    }
+
+    public function testOpsiTargetUnitSatker(): void
     {
         $unit   = $this->buatUnit(['unit' => 'Unit Uji Opsi']);
         $satker = $this->buatSatker($unit, ['satker' => 'Satker Uji Opsi']);
-        $nip    = $this->buatPegawaiDiSatker($satker, ['nama' => 'Budi Uji']);
         $svc    = $this->service(JenisGambar::Popup);
 
         // Kunci numerik-string menjadi int di array PHP → cari lewat nilai, bukan kunci.
@@ -256,7 +277,6 @@ final class KontenGambarServiceTest extends DatabaseTestCase
         $this->assertSame('Seluruh kementerian', $label($unitSatker, '0'));
         $this->assertSame('Unit Uji Opsi', $label($unitSatker, (string) $unit));
         $this->assertSame('Satker Uji Opsi', $label($unitSatker, "sat_{$satker}"));
-        $this->assertStringContainsString('Budi Uji', (string) $label($svc->opsiPegawai(), $nip));
     }
 
     // ------------------------------------------------------------------

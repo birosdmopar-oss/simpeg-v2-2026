@@ -74,16 +74,16 @@ export function kelolaService(jenis: JenisKontenGambar) {
     async remove(id: string): Promise<void> {
       await api.delete(`${base}/${id}`)
     },
-    async target(id: string): Promise<SpesifikasiTarget> {
-      const { data } = await api.get<SpesifikasiTarget>(`${base}/${id}/target`)
-      return { unit_satker: data?.unit_satker ?? [], pegawai: data?.pegawai ?? [], kecuali: data?.kecuali ?? [] }
+    /** Target tersimpan + label "NIP - nama" untuk NIP yang dipilih/dikecualikan. */
+    async target(id: string): Promise<{ target: SpesifikasiTarget; labelPegawai: Record<string, string> }> {
+      const { data } = await api.get<SpesifikasiTarget & { label_pegawai?: Record<string, string> }>(`${base}/${id}/target`)
+      return {
+        target: { unit_satker: data?.unit_satker ?? [], pegawai: data?.pegawai ?? [], kecuali: data?.kecuali ?? [] },
+        labelPegawai: data?.label_pegawai ?? {},
+      }
     },
     async opsiUnitSatker(): Promise<SelectOption[]> {
       const { data } = await api.get<Array<{ value: string; label: string }>>('/konten/opsi/unit-satker')
-      return data ?? []
-    },
-    async opsiPegawai(): Promise<SelectOption[]> {
-      const { data } = await api.get<Array<{ value: string; label: string }>>('/konten/opsi/pegawai')
       return data ?? []
     },
   }

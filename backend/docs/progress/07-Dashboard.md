@@ -171,3 +171,13 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   utama (migration DBV-032 di `main`); lalu ganti satu baris `return` (catatan di Services.php). Mengganti sekarang merusak `tests/Notifikasi`.
 - Belum dibawa: lampiran berita (`news.lampiran`, FE belum memakai), hitung berita per kategori. Nilai awal `news.show_notif` ⚑ D1.
 - Test: `BeritaServiceTest` (12), `SumberBeritaTest` (4), `KontrakMatriksRoleTest` (+19 baris), FE `KelolaTeks.spec` (+penolakan beralasan).
+
+- **Hapus popup/banner = fisik (bukan hapus lunak)**, bukti legacy `application/libraries/hr/L_announcement.php`: `delete_popup` (:313) memanggil
+  `m_simpeg->delete("popup", "id_popup='{$id}'")` lalu `unlink(PS_BASE . $popup['file'])` setelah commit; `delete_dashban` (:1467) idem untuk `banner`.
+  Tabel `popup`/`banner` legacy tanpa kolom status (DBV-032 §3.1/3.3). v2: baris + berkas gambar privat dihapus; `user_*` ikut lewat FK CASCADE;
+  audit Q7-16 menyimpan snapshot baris sebelum dihapus (`BaseAuditableModel`, dicek di `KontenGambarServiceTest::testGeserDanHapus`).
+- **Pemilih pegawai target = pencarian server** (`GET pegawai?search=`, min. 3 huruf, debounce 300 ms, pola `PegawaiPicker` Modul C); daftar semua
+  pegawai TIDAK dikirim. `GET konten/{popup|banner}/{id}/target` menambah `label_pegawai` agar form ubah menampilkan nama.
+- Sanitasi berita memakai ulang `Libraries/Html/HtmlSanitizer` (kini menerima whitelist opsional; default tidak berubah) dengan `p,br,strong,b,em,i,ul,ol,li,a[href]`.
+- CI memakai `DBPrefix = t_` untuk grup `tests`: SQL mentah wajib `prefixTable()`; `select()` beralias harus SETELAH `join()`; total dari builder terpisah
+  tanpa join (clone + countAllResults mengosongkan pelacakan alias koneksi CI4).

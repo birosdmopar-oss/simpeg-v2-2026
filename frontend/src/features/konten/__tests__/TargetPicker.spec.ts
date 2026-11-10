@@ -25,20 +25,31 @@ const UiSelectStub = defineComponent({
   },
 })
 
+/** PencarianPegawai diganti stub: tombol per pegawai yang memancarkan pilih(nip, label). */
+const PencarianStub = defineComponent({
+  props: { label: String, disabled: Boolean },
+  emits: ['pilih'],
+  setup(props, { emit }) {
+    return () =>
+      h("div", { "data-stub": props.label, "data-disabled": String(props.disabled) }, [
+        h('button', { type: 'button', 'data-opt': 'P1', onClick: () => emit('pilih', 'P1', 'P1 - Pegawai Satu') }, 'P1'),
+        h('button', { type: 'button', 'data-opt': 'P2', onClick: () => emit('pilih', 'P2', 'P2 - Pegawai Dua') }, 'P2'),
+      ])
+  },
+})
+
 const unit = [
   { value: '11', label: 'Unit A' },
   { value: 'sat_5', label: 'Satker B' },
 ]
-const pegawai = [
-  { value: 'P1', label: 'Pegawai Satu' },
-  { value: 'P2', label: 'Pegawai Dua' },
-]
+const labelPegawai = { P1: 'P1 - Pegawai Satu', P2: 'P2 - Pegawai Dua' }
+const cariPegawai = async () => []
 const kosong = (): SpesifikasiTarget => ({ unit_satker: [], pegawai: [], kecuali: [] })
 
 function pasang(model: SpesifikasiTarget, extra: Record<string, unknown> = {}) {
   return mount(TargetPicker, {
-    props: { modelValue: model, opsiUnitSatker: unit, opsiPegawai: pegawai, ...extra },
-    global: { stubs: { UiSelect: UiSelectStub } },
+    props: { modelValue: model, opsiUnitSatker: unit, cariPegawai, labelPegawai, ...extra },
+    global: { stubs: { UiSelect: UiSelectStub, PencarianPegawai: PencarianStub } },
   })
 }
 
@@ -55,9 +66,9 @@ describe('TargetPicker', () => {
     await stub(w, 'Tambah unit atau satuan kerja').get('[data-opt="11"]').trigger('click')
     expect(w.emitted('update:modelValue')).toHaveLength(1) // duplikat diabaikan
 
-    await stub(w, 'Tambah pegawai target').get('[data-opt="P1"]').trigger('click')
+    await stub(w, 'Cari pegawai target').get('[data-opt="P1"]').trigger('click')
     expect(terakhir(w).pegawai).toEqual(['P1'])
-    await stub(w, 'Tambah pegawai yang dikecualikan').get('[data-opt="P2"]').trigger('click')
+    await stub(w, 'Cari pegawai yang dikecualikan').get('[data-opt="P2"]').trigger('click')
     expect(terakhir(w).kecuali).toEqual(['P2'])
   })
 
@@ -69,7 +80,7 @@ describe('TargetPicker', () => {
 
   it('target seluruh kementerian: pilihan pegawai dimatikan dengan keterangan; unit lain tidak bisa ditambah', async () => {
     const w = pasang({ unit_satker: ['0'], pegawai: [], kecuali: [] })
-    expect(stub(w, 'Tambah pegawai target').attributes('data-disabled')).toBe('true')
+    expect(stub(w, 'Cari pegawai target').attributes('data-disabled')).toBe('true')
     expect(w.find('[data-testid="target-pegawai-nonaktif"]').exists()).toBe(true)
     expect(w.get('[data-testid="target-unit-daftar"]').text()).toContain('Seluruh kementerian')
     await stub(w, 'Tambah unit atau satuan kerja').get('[data-opt="11"]').trigger('click')
@@ -81,9 +92,9 @@ describe('TargetPicker', () => {
     const hapusUnit = w.get('[aria-label="Hapus Unit A"]')
     await hapusUnit.trigger('click')
     expect(terakhir(w).unit_satker).toEqual([])
-    await w.get('[aria-label="Hapus Pegawai Satu"]').trigger('click')
+    await w.get('[aria-label="Hapus P1 - Pegawai Satu"]').trigger('click')
     expect(terakhir(w).pegawai).toEqual([])
-    await w.get('[aria-label="Hapus pengecualian Pegawai Dua"]').trigger('click')
+    await w.get('[aria-label="Hapus pengecualian P2 - Pegawai Dua"]').trigger('click')
     expect(terakhir(w).kecuali).toEqual([])
   })
 
