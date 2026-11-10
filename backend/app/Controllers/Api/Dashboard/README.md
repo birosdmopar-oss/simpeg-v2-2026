@@ -132,7 +132,8 @@ Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
   ≤ tahun berjalan (kementerian PNS+PPPK, satker/unit PNS); Tanda Jasa kementerian ≤ tahun acuan (tahun depan bila bulan ≥ 9),
   satker/unit tepat 1 Agustus tahun berjalan/depan. Tanpa pengecualian NIP. Cache per lingkup + tanggal.
 
-**Pegawai (role 2/6/7)** — `{"keluarga": "pegawai", "tanggal": "2026-11-10", "prediksi": [...]}` (M2b). `prediksi` per kartu
+**Pegawai (role 2/6/7)** — `{"keluarga": "pegawai", "tanggal": "2026-11-10", "prediksi": [...], "bawahan": {...},
+"kelengkapan": [...]}` (M2b). `prediksi` per kartu
 `{kode, label, tanggal|null, teks ("Bulan Tahun")|null, sisa ("N Tahun M Bulan")|null}` + khusus `kp`: `jenis` `ST|JF`,
 `pangkat_puncak`, `ak` `{sekarang, target, kurang}` (JF). Role 2: `pensiun` (BUP jabatan), `kp` (port `next_kp`; JF bila
 `pmj.id_group_jabatan` = 2 → AK `AkPermenpanrb`), `tj` (port `next_tj`), `kgb` (`next_kgb`); role 7: `pensiun` = `pmj.mhpk_akhir`
@@ -140,8 +141,12 @@ Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
 
 `bawahan` (role 2 saja, ikut `dashboard_pns`): `{atasan, presensi: [{nama, jam_masuk, jam_pulang}], ak: [{order, nama, nip,
 gol_ruang, satker, jabatan, ak_now, ak_kp, kurang}]}` — bawahan dari `pmj.id_atasan_es_*` / `*_koord` milik jabatan atasan
-(Eselon I tanpa bawahan, cabang mati legacy); presensi `dh_online` hari ini; AK hanya bawahan JF. Kelengkapan data: menunggu
-keputusan (butir terbuka).
+(Eselon I tanpa bawahan, cabang mati legacy); presensi `dh_online` hari ini; AK hanya bawahan JF.
+
+`kelengkapan` (role 2 dengan `pegawai.id_jenis_pegawai = 1`; selain itu `[]`): `[{kode, label, persen}]` hanya kartu < 100%,
+urut legacy `L_user.php:647-700` — `data-umum` (Data Umum), `alamat`, `keluarga`, `pendidikan`, `kp` (Data Pangkat), `jabatan`,
+`kgb`, `tanda-jasa`. `kode` = tab Detail Pegawai (FE menautkan ke `/pegawai/{nip}?tab=<kode>`). Aturan per kartu dan deviasi
+(Q-D13..Q-D17): `app/Libraries/Dashboard/README.md` bagian "Kelengkapan data".
 
 Kode galat: 401 tanpa token.
 
@@ -166,15 +171,14 @@ ini atau besok; selain itu / tanpa foto → 404 seragam. Header sama dengan `peg
 
 ### Butir terbuka
 
-- **Q-D18** (menunggu Horii): pengecualian NIP ulang tahun legacy (1 NIP hardcode + `NIP_TESTER` dari berkas terlarang) belum
-  diterapkan; titik sambung `UlangTahunBeranda::nipDikecualikan()` (kosong).
-- **Q-D12** (menunggu Horii): legacy `$whereHide_nip` tidak berlaku untuk beberapa akun tertentu (daftar id pengguna hardcode).
-  Q7-41 hanya memuat daftar NIP; v2 saat ini memakai pengecualian untuk semua akun. Kunci `.env` tambahan belum dibuat.
+- **Q-D18 (A, Horii 10-11-2026):** pengecualian NIP ulang tahun legacy lewat `.env` rahasia `dashboard.nipDikecualikanUlangTahun`
+  (diisi operator dari legacy; kosong = tanpa pengecualian); berlaku untuk daftar dan foto (404).
+- **Q-D12 (A, Horii 10-11-2026):** akun di `.env` rahasia `dashboard.penggunaLihatSemua` (daftar `id_pengguna`) tidak memakai
+  pengecualian `dashboard.nipDisembunyikan` (persis legacy: `$whereHide_nip` kosong untuk akun tertentu); kosong = semua akun
+  memakai pengecualian.
 - **Deviasi [V2] Tanda Jasa satker/unit** (Horii 10-11-2026): tahun acuan sama dengan kementerian; rollback
   `Config\Dashboard::$tandaJasaIkutLegacy = true`. Rincian (a)–(d): `app/Libraries/Dashboard/README.md`.
 - **[I] KP satker/unit:** `get_kp_satker|unit` legacy menghitung percepatan juga untuk `gol_ruang` kosong; v2 memakai perilaku
   `get_all_kp` di semua lingkup (dicek saat QA).
-- **Kelengkapan data** (`kd_*` legacy): bug legacy perlu keputusan sebelum di-port (kd_rdiklat selalu ≥ 100, kd_rkgb/kd_rtj
-  bisa > 100, kd_rpangkat_2 butuh kode lampiran dari berkas terlarang + loop tak berujung, syarat `id_jenis_pegawai = 1`).
-  Q-D13..Q-D17 menunggu Horii; belum ada kartu kelengkapan di beranda pegawai (lanjutan MAKE-087).
+- **Kelengkapan data (Q-D13..Q-D17, semua A, Horii 10-11-2026):** diterapkan; rincian deviasi di README library.
 - **M3 (lanjutan MAKE-087):** pemasangan komponen Jalur A (popup, banner, berita) dan Jalur B (ringkasan SKL) setelah komponennya ada di `main`.

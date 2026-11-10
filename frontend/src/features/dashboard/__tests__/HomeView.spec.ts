@@ -186,6 +186,7 @@ const pegawai = (kartu: KartuPrediksi[], bawahan: RingkasanPegawai['bawahan'] = 
   tanggal: '2026-11-10',
   prediksi: kartu,
   bawahan,
+  kelengkapan: [],
 })
 
 describe('HomeView — kartu prediksi pegawai M2b', () => {
@@ -311,6 +312,37 @@ describe('HomeView — ulang tahun (Q7-45)', () => {
 
     expect(wrapper.get('[data-testid="beranda-ulang-tahun-ini"] [role="alert"]').text()).toBe('Gagal.')
     expect(wrapper.find('[data-testid="beranda-pengingat"]').exists()).toBe(true)
+  })
+})
+
+describe('HomeView — kelengkapan data pegawai', () => {
+  it('kartu < 100%: label, persen, bar, tautan ke tab Detail Pegawai milik sendiri', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue({
+      ...pegawai([]),
+      kelengkapan: [
+        { kode: 'data-umum', label: 'Data Umum', persen: 27 },
+        { kode: 'kp', label: 'Data Pangkat', persen: 67 },
+      ],
+    })
+    setActivePinia(createPinia())
+    useAuthStore().user = { username: 'uji', user_level: Role.PEGAWAI, nip: '199001012020011001' } as User
+    const wrapper = mount(HomeView, { global: { plugins: [router], stubs: { RedesignShell: { template: '<div><slot /></div>' } } } })
+    await flushPromises()
+
+    const kartu = wrapper.findAll('[data-testid^="beranda-kelengkapan-"]')
+    expect(kartu.map((k) => k.text())).toEqual(['Data Umum27%', 'Data Pangkat67%'])
+    const umum = wrapper.get('[data-testid="beranda-kelengkapan-data-umum"] a')
+    expect(umum.attributes('href')).toBe('/pegawai/199001012020011001?tab=data-umum')
+    expect(umum.attributes('aria-label')).toBe('Klik Untuk Melengkapi Data Umum Anda: 27%')
+    expect(wrapper.get('[data-testid="beranda-kelengkapan-data-umum"] [role="progressbar"]').attributes('aria-valuenow')).toBe('27')
+    expect(wrapper.get('[data-testid="beranda-kelengkapan-kp"] a').attributes('href')).toBe('/pegawai/199001012020011001?tab=kp')
+  })
+
+  it('tanpa kartu kelengkapan bila daftar kosong', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([]))
+    const wrapper = await mountAs(Role.PEGAWAI)
+
+    expect(wrapper.find('[data-testid="beranda-kelengkapan"]').exists()).toBe(false)
   })
 })
 

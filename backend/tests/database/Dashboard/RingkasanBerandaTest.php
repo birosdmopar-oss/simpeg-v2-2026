@@ -40,10 +40,11 @@ final class RingkasanBerandaTest extends DatabaseTestCase
     {
         parent::setUp();
         Time::setTestNow('2026-11-10 09:00:00', 'Asia/Jakarta');
-        $this->configAsli                           = clone config(Dashboard::class);
-        config(Dashboard::class)->ttlRingkasanDetik = 0;
-        config(Dashboard::class)->nipDisembunyikan  = '';
-        config(Dashboard::class)->tampilanKomposisi = Dashboard::KOMPOSISI_DONUT;
+        $this->configAsli                            = clone config(Dashboard::class);
+        config(Dashboard::class)->ttlRingkasanDetik  = 0;
+        config(Dashboard::class)->nipDisembunyikan   = '';
+        config(Dashboard::class)->penggunaLihatSemua = '';
+        config(Dashboard::class)->tampilanKomposisi  = Dashboard::KOMPOSISI_DONUT;
 
         // Master jenis pegawai 1..6 (nama sintetis) untuk FK pegawai.id_jenis_pegawai; baris bawaan migration dipakai bila ada.
         foreach ([1 => 'PNS', 2 => 'PTT', 3 => 'Non PNS', 4 => 'Staf Khusus', 5 => 'Tenaga Ahli', 6 => 'PPPK'] as $id => $nama) {
@@ -60,10 +61,11 @@ final class RingkasanBerandaTest extends DatabaseTestCase
 
     protected function tearDown(): void
     {
-        $asli                    = config(Dashboard::class);
-        $asli->ttlRingkasanDetik = $this->configAsli->ttlRingkasanDetik;
-        $asli->nipDisembunyikan  = $this->configAsli->nipDisembunyikan;
-        $asli->tampilanKomposisi = $this->configAsli->tampilanKomposisi;
+        $asli                     = config(Dashboard::class);
+        $asli->ttlRingkasanDetik  = $this->configAsli->ttlRingkasanDetik;
+        $asli->nipDisembunyikan   = $this->configAsli->nipDisembunyikan;
+        $asli->penggunaLihatSemua = $this->configAsli->penggunaLihatSemua;
+        $asli->tampilanKomposisi  = $this->configAsli->tampilanKomposisi;
         Time::setTestNow();
         Services::reset(true);
         $this->clearAuthState();
@@ -147,6 +149,28 @@ final class RingkasanBerandaTest extends DatabaseTestCase
         $this->assertSame(0, $this->tile($data, 'tb')['jumlah']);
         $this->assertSame(0, $this->tile($data, 'presensi_online')['jumlah']);
         $this->assertStringNotContainsString($sembunyi, json_encode($data, JSON_THROW_ON_ERROR), 'NIP tidak bocor ke respons');
+    }
+
+    public function testPenggunaLihatSemuaTanpaPengecualianNipQd12(): void
+    {
+        $satker   = $this->buatSatker();
+        $sembunyi = $this->pegawai($satker, 1);
+        $this->pegawai($satker, 1);
+        config(Dashboard::class)->nipDisembunyikan = $sembunyi;
+
+        $biasa                                       = $this->buatAkunTanpaNip('admin.biasa', Role::SUPER_ADMIN);
+        $khusus                                      = $this->buatAkunTanpaNip('admin.lihat.semua', Role::SUPER_ADMIN);
+        config(Dashboard::class)->penggunaLihatSemua = ' 999999 , ' . $khusus['id_pengguna'] . ' ';
+
+        $this->assertSame(1, $this->tile($this->dataSebagai($biasa), 'pns')['jumlah'], 'akun lain tetap memakai pengecualian');
+        $this->assertSame(2, $this->tile($this->dataSebagai($khusus), 'pns')['jumlah'], 'akun di daftar melihat semua [K]');
+
+        config(Dashboard::class)->ttlRingkasanDetik = 900;
+        $cache                                      = new CacheService(new MockCache());
+        $r                                          = fn (array $akun): array => (new RingkasanBeranda($this->db, config(Dashboard::class), $cache, self::HARI_INI))
+            ->ringkasan($this->authUntukAkun((int) $akun['id_pengguna']));
+        $this->assertSame(2, $this->tile($r($khusus), 'pns')['jumlah']);
+        $this->assertSame(1, $this->tile($r($biasa), 'pns')['jumlah'], 'kunci cache dibedakan per daftar pengecualian yang berlaku');
     }
 
     public function testRole3SatkerLingkupTbTanpaPerpanDanLetakPengecualian(): void
@@ -248,7 +272,7 @@ final class RingkasanBerandaTest extends DatabaseTestCase
             $res  = $this->withHeaders(['Authorization' => 'Bearer ' . $this->issueTokensForUser($this->db->table('pengguna')->where('id_pengguna', $akun)->get()->getRowArray())['access_token']])->get(self::URL);
             $res->assertStatus(200);
             $data = json_decode($res->getJSON(), true)['data'];
-            $this->assertSame(['keluarga', 'tanggal', 'prediksi', 'bawahan'], array_keys($data), (string) $role);
+            $this->assertSame(['keluarga', 'tanggal', 'prediksi', 'bawahan', 'kelengkapan'], array_keys($data), (string) $role);
             $this->assertSame(['atasan' => false, 'presensi' => [], 'ak' => []], $data['bawahan'], 'tanpa bawahan');
             $this->assertSame('pegawai', $data['keluarga']);
             $this->assertSame($harapan[$role], array_column($data['prediksi'], 'kode'), (string) $role);
