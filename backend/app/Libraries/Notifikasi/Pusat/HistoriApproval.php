@@ -100,7 +100,7 @@ final class HistoriApproval
      */
     private function sumberTabel(AuthContext $auth, string $kunci, string $judul, string $tabel, string $pk, string $kolomStatus, string $kolomUa, int $tahun, int $bln, string $url, array $label): ?array
     {
-        if (! $this->db->tableExists($tabel)) {
+        if (! $this->db->tableExists($this->db->prefixTable($tabel), false)) {
             return null;
         }
 

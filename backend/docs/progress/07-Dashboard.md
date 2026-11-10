@@ -139,3 +139,16 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - Sisa M2: kelengkapan data (`kd_*`, Q-D13..D17 menunggu Horii), Q-D18 (pengecualian NIP ulang tahun), Q-D12.
 - 10-11: `ButuhApprovalCard` memakai `useRingkasanNotifikasi()` asli `@/features/notifikasi` (F-08 MAKE-085 di `main`);
   adapter sementara dihapus; ikut aturan lonceng (`ACTIVE_PHASE < FASE_LONCENG` → "—" tanpa tautan/polling).
+
+## F-08 Pusat Notifikasi — MAKE-085 (Jalur C, PRD Fase 7 v2.0 §5.9)
+
+- 10-11: BE + FE di `main` `7cacf4d5`. Kontrak: `app/Controllers/Api/Notifikasi/README.md`, `frontend/src/features/notifikasi/README.md`.
+  Butir terbuka: histori PIC TB/IB/PMK (`show_pl`) DITUNDA (Horii 10-11); sumber berita NoOp sampai DBV-032 + F-07.
+- 10-11 CR-113 (CI #711 merah, 6 failure `PusatNotifikasiTest`, hanya pada proses pertama di DB baru): `SumberShowNotif` dan
+  `HistoriApproval` memakai `tableExists($tabel)`. Mode cache CI4 bisa basi, karena tabel dari `CREATE TABLE` SQL mentah
+  tidak masuk cache `table_names`; mode `false` tanpa prefix → `SHOW TABLES LIKE` tanpa `t_`. Diganti ke
+  `tableExists($db->prefixTable($tabel), false)`. Ditambah test regresi cache basi (`PusatNotifikasiTest`) dan guard
+  `tests/unit/Arsitektur/TableExistsBerprefixTest` (semua `->tableExists(` di app/).
+- Catatan: `getFieldNames()` CI4 juga ber-cache per tabel (`dataCache['field_names']`). Di modul ini aman karena kolom
+  sumber tidak diubah sesudah dibaca dalam satu proses. Bila kelak ada migration/test yang mengubah kolom di tengah
+  proses, pakai `information_schema.COLUMNS`.

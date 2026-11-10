@@ -192,7 +192,7 @@ final class SumberShowNotif implements SumberDaftar
         $hasil = [];
 
         foreach ($calon as $kunci => $c) {
-            if (! $this->db->tableExists($c['tabel'])) {
+            if (! $this->db->tableExists($this->db->prefixTable($c['tabel']), false)) {
                 continue;
             }
 
