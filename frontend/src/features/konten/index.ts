@@ -7,3 +7,6 @@ export { default as BeritaTerbaruWidget } from './components/BeritaTerbaruWidget
 export { default as PopupAktifDialog } from './components/PopupAktifDialog.vue'
 export { ROUTE_DETAIL_BERITA, ROUTE_PORTAL_BERITA } from './routes'
 export { resetSesiKonten } from './sesi'
+export { default as TargetPicker } from './components/TargetPicker.vue'
+export { SEMUA_KEMENTERIAN } from './target'
+export type { SpesifikasiTarget } from './types'

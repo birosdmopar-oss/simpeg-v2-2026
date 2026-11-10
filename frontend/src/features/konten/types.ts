@@ -51,3 +51,10 @@ export interface BeritaRingkas {
   tanggal: string | null
   foto_url: string | null
 }
+
+/** Spesifikasi target popup/banner/form digital (PRD Fase 7 v2.0): "0" = kementerian, "<id_unit>", "sat_<id_satker>"; NIP pegawai. */
+export interface SpesifikasiTarget {
+  unit_satker: string[]
+  pegawai: string[]
+  kecuali: string[]
+}
