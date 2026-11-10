@@ -28,7 +28,7 @@ final class DirekturBeranda
      */
     public function daftar(): array
     {
-        $id = array_values(array_map('intval', $this->config->idJabatanDirektur));
+        $id = array_map('intval', $this->config->idJabatanDirektur);
 
         if ($id === []) {
             return [];
