@@ -28,4 +28,12 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
     $routes->get('dokumen/(:segment)/pdf', 'DokumenController::pdf/$1', $laporan);
     $routes->get('dokumen/(:segment)/xlsx', 'DokumenController::xlsx/$1', $laporan);
     $routes->get('dokumen/(:segment)', 'DokumenController::daftar/$1', $laporan);
+
+    // F-13 beranda per role (MAKE-087, Jalur D, PRD Fase 7 v2.0 §5.10): semua akun login (jwt grup); bentuk per keluarga role.
+    $routes->get('dashboard/ringkasan', 'BerandaController::ringkasan');
+    // Masa kerja direktur politeknik: role 1, 4 [K `dashboard_ad.php:201`].
+    // Ulang tahun hari ini/besok (Q7-45) + foto hanya untuk NIP di daftar itu (Q-D19): semua akun login.
+    $routes->get('dashboard/ulang-tahun/(:segment)/foto', 'BerandaController::fotoUlangTahun/$1');
+    $routes->get('dashboard/ulang-tahun', 'BerandaController::ulangTahun');
+    $routes->get('dashboard/direktur', 'BerandaController::direktur', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_VIEW_ESELON1)]);
 });

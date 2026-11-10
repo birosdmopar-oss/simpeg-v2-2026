@@ -10,3 +10,22 @@ Struktur feature-based (ADR-019):
 - `schemas/` — skema Zod untuk VeeValidate (ADR-026)
 
 Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
+
+## Beranda per role (F-13, MAKE-087, Jalur D)
+
+- `views/HomeView.vue` (route `home`): sapaan + `data-testid="home-role"` (MTC-001), lalu `AdminDashboard` (role 1/3/4/5/8)
+  atau `PegawaiDashboard` (role 2/6/7) sesuai `ADMIN_DASHBOARD_ROLES` (`types.ts`). Data `services/beranda.service.ts`
+  (`GET /dashboard/ringkasan`); galat tampil sebagai pesan tanpa merusak halaman.
+- `components/KomposisiPegawaiCard.vue` — saklar Q7-36 dari backend: `donut` (donut jenis pegawai + tile status hari ini)
+  atau `angka` (11 tile berurutan legacy + bar persen, tanpa chart). Rollback ke tampilan legacy cukup lewat
+  `Config\Dashboard::$tampilanKomposisi` di backend.
+- M2a: `PengingatCards` (Pensiun → `/dokumen/pensiun`; KP/TJ/KGB tanpa tautan, Q7-37), `ButuhApprovalCard` (role 1/3 di
+  keluarga admin; angka dari `useRingkasanNotifikasi()` `@/features/notifikasi`, tautan ke `notifikasi?tab=butuh-approval`;
+  ikut aturan lonceng Jalur C: "—" tanpa tautan/polling selama `ACTIVE_PHASE < FASE_LONCENG`), `DirekturCard` (role 1/4, `GET /dashboard/direktur`).
+- M2b: `PegawaiDashboard` → `PrediksiCards` (teks view legacy: "-" bila kosong, "Sudah di Pangkat Puncak", JF "AK / target"
+  + "Kurang N AK") dan `ButuhApprovalCard` untuk role 2; `BawahanCards` (presensi & AK bawahan) bila akun atasan.
+- `UlangTahunCard` (hari ini / besok, semua role) di atas `UiCarouselPanel` (baru di `shared/ui`: pola WAI-ARIA carousel,
+  ←/→/Home/End, Jeda/Putar, berhenti saat hover/fokus & `prefers-reduced-motion`); foto lewat blob
+  `GET /dashboard/ulang-tahun/{kunci}/foto`, cadangan avatar inisial. `PresensiSayaCard` = tautan Presensi Saya (Q7-42).
+- Kerangka M1: slot banner/popup/berita (Jalur A `@/features/konten`), Butuh Approval (Jalur C `@/features/notifikasi`),
+  pengingat/prediksi/ulang tahun/direktur diisi M2–M3. Figma beranda belum ada; tata letak mengikuti mockup redesign.
