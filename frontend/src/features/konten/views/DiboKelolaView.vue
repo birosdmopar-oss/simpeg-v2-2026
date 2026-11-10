@@ -167,24 +167,28 @@ onMounted(() => {
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            <th class="px-4 py-3">Judul</th>
+            <th class="px-4 py-3">Nomor</th>
+            <th class="px-4 py-3">Tahun</th>
+            <th class="px-4 py-3">Tentang</th>
             <th class="px-4 py-3">Jenis</th>
-            <th class="px-4 py-3">Keterangan</th>
+            <th class="px-4 py-3">Berkas</th>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           <tr v-if="loading">
-            <td colspan="5" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
+            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
           </tr>
           <tr v-else-if="items.length === 0">
-            <td colspan="5" class="px-4 py-8 text-center text-slate-500">Belum ada DIBO yang cocok.</td>
+            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Belum ada DIBO yang cocok.</td>
           </tr>
           <tr v-for="row in items" v-else :key="row.id" class="hover:bg-slate-50" :data-testid="`konten-dibo-row-${row.id}`">
-            <td class="px-4 py-3 font-medium text-slate-800">{{ row.judul }}</td>
+            <td class="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{{ row.nomor }}</td>
+            <td class="px-4 py-3 text-slate-600">{{ row.tahun }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ row.tentang }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.jenis || '—' }}</td>
-            <td class="px-4 py-3 text-slate-600">{{ row.keterangan || '—' }}</td>
+            <td class="px-4 py-3 text-slate-600">{{ row.berkas.length }}</td>
             <td class="px-4 py-3">
               <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium" :class="KELAS[row.status]" :data-status="row.status">
                 {{ LABEL[row.status] }}
@@ -193,7 +197,7 @@ onMounted(() => {
             <td class="px-4 py-3 text-right">
               <RowActionsMenu
                 :actions="rowActions(row)"
-                :label="`Aksi untuk ${row.judul}`"
+                :label="`Aksi untuk DIBO ${row.nomor}`"
                 :testid="`konten-dibo-actions-${row.id}`"
                 @select="onRowAction(row, $event)"
               />

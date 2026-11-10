@@ -62,6 +62,14 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Konten', 'filter' 
         $routes->delete("konten/{$jalur}/(:num)", "{$c}::delete/$1", $admin);
     }
 
+    // F-12 DIBO (MAKE-082, §5.6): baca = semua role login (hanya status aktif; `?kelola=1` = role 1); kelola = role 1.
+    $routes->get('konten/dibo', 'DiboController::index', $semua);
+    $routes->post('konten/dibo', 'DiboController::create', $admin);
+    $routes->get('konten/dibo/(:num)/berkas/(:num)', 'DiboController::berkasUnduh/$1/$2', $semua);
+    $routes->post('konten/dibo/(:num)', 'DiboController::update/$1', $admin);
+    $routes->patch('konten/dibo/(:num)/status', 'DiboController::status/$1', $admin);
+    $routes->delete('konten/dibo/(:num)', 'DiboController::delete/$1', $admin);
+
     $routes->post('konten/berita/dibuka', 'BeritaController::dibuka', $semua);
     $routes->get('konten/berita', 'BeritaController::index', $semua);
     $routes->post('konten/berita', 'BeritaController::create', $kelolaBerita);

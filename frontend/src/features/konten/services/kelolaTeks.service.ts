@@ -8,6 +8,7 @@ import type {
   BeritaForm,
   BeritaKelolaRow,
   BeritaKelolaRowApi,
+  DiboBerkasInput,
   DiboForm,
   DiboRow,
   DiboRowApi,
@@ -41,10 +42,13 @@ export function mapBerita(r: BeritaKelolaRowApi): BeritaKelolaRow {
 export function mapDibo(r: DiboRowApi): DiboRow {
   return {
     id: String(r.id),
-    judul: r.judul,
+    nomor: r.nomor,
+    tahun: String(r.tahun ?? ''),
+    tentang: r.tentang,
     jenis: r.jenis ?? '',
     id_jenis: r.id_jenis == null ? '' : String(r.id_jenis),
     keterangan: r.keterangan ?? '',
+    berkas: r.berkas ?? [],
     status: status3(r.status),
   }
 }
@@ -110,14 +114,20 @@ export const diboKelolaService = {
     const { data } = await api.get<Daftar<DiboRowApi>>('/konten/dibo', { params: { ...params, kelola: 1 } })
     return { items: (data?.items ?? []).map(mapDibo), total: data?.total ?? 0 }
   },
-  /** Berkas DIBO multipart `berkas`; opsional saat ubah. */
-  async simpan(id: string | null, form: DiboForm, berkas: File | null): Promise<DiboRow> {
+  /** Multipart `file_1..3`; saat ubah, berkas yang tidak dikirim dipertahankan, `hapus_file_2/3 = 1` menghapusnya. */
+  async simpan(id: string | null, form: DiboForm, berkas: DiboBerkasInput): Promise<DiboRow> {
     const fd = new FormData()
-    fd.append('judul', form.judul.trim())
     fd.append('id_jenis', form.id_jenis)
+    fd.append('nomor', form.nomor.trim())
+    fd.append('tahun', form.tahun.trim())
+    fd.append('tentang', form.tentang.trim())
     fd.append('keterangan', form.keterangan.trim())
-    if (berkas) fd.append('berkas', berkas)
-    if (id) fd.append('_method', 'PUT')
+    for (const no of [1, 2, 3] as const) {
+      const f = berkas[no]
+      if (f) fd.append(`file_${no}`, f)
+    }
+    if (berkas.hapus2) fd.append('hapus_file_2', '1')
+    if (berkas.hapus3) fd.append('hapus_file_3', '1')
     const { data } = await api.post<DiboRowApi>(id ? `/konten/dibo/${id}` : '/konten/dibo', fd)
     return mapDibo(data)
   },

@@ -142,6 +142,13 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'PATCH api/v1/konten/dibo-jenis/([0-9]+)/status'      => [1],
             'POST api/v1/konten/dibo-jenis/([0-9]+)/urutan'       => [1],
             'DELETE api/v1/konten/dibo-jenis/([0-9]+)'            => [1],
+            // F-12 DIBO (MAKE-082, §5.6): baca = semua role login (status aktif saja); kelola = role 1.
+            'GET api/v1/konten/dibo'                          => [1, 2, 3, 4, 5, 6, 7, 8],
+            'POST api/v1/konten/dibo'                         => [1],
+            'GET api/v1/konten/dibo/([0-9]+)/berkas/([0-9]+)' => [1, 2, 3, 4, 5, 6, 7, 8],
+            'POST api/v1/konten/dibo/([0-9]+)'                => [1],
+            'PATCH api/v1/konten/dibo/([0-9]+)/status'        => [1],
+            'DELETE api/v1/konten/dibo/([0-9]+)'              => [1],
             // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
             // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
             'GET api/v1/tb'                            => [1, 2, 3, 6],

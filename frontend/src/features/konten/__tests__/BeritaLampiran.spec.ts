@@ -123,3 +123,33 @@ describe('beritaKelolaService — multipart', () => {
     expect(body.has('lampiran')).toBe(false)
   })
 })
+
+import { diboKelolaService } from '../services/kelolaTeks.service'
+
+describe('diboKelolaService — multipart', () => {
+  const form = { id_jenis: '2', nomor: ' PER-1/2026 ', tahun: '2026', tentang: ' Cuti ', keterangan: '' }
+
+  it('simpan mengirim file_1..3 dan penanda hapus berkas 2/3', async () => {
+    post.mockResolvedValue({ data: { id: 5, nomor: 'PER-1/2026', tahun: 2026, tentang: 'Cuti', berkas: [1, 2], status: 1 } })
+    const f1 = new File(['a'], 'a.pdf')
+    const r = await diboKelolaService.simpan(null, form, { 1: f1, 2: null, 3: null, hapus2: false, hapus3: true })
+
+    const [url, body] = post.mock.calls.at(-1) as [string, FormData]
+    expect(url).toBe('/konten/dibo')
+    expect(body.get('nomor')).toBe('PER-1/2026')
+    expect(body.get('tentang')).toBe('Cuti')
+    expect((body.get('file_1') as File).name).toBe('a.pdf')
+    expect(body.has('file_2')).toBe(false)
+    expect(body.get('hapus_file_3')).toBe('1')
+    expect(body.has('hapus_file_2')).toBe(false)
+    expect(r.berkas).toEqual([1, 2])
+  })
+
+  it('ubah memakai POST ke id tanpa _method', async () => {
+    post.mockResolvedValue({ data: { id: 5, nomor: 'N', tahun: 2026, tentang: 'T', status: 1 } })
+    await diboKelolaService.simpan('5', form, { 1: null, 2: null, 3: null, hapus2: false, hapus3: false })
+    const [url, body] = post.mock.calls.at(-1) as [string, FormData]
+    expect(url).toBe('/konten/dibo/5')
+    expect(body.has('_method')).toBe(false)
+  })
+})

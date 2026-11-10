@@ -206,3 +206,17 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - Catatan: `getFieldNames()` CI4 juga ber-cache per tabel (`dataCache['field_names']`). Di modul ini aman karena kolom
   sumber tidak diubah sesudah dibaca dalam satu proses. Bila kelak ada migration/test yang mengubah kolom di tengah
   proses, pakai `information_schema.COLUMNS`.
+
+#### Jalur A — F-12 DIBO inti (MAKE-082), branch `fase7/make-079-popup`
+
+- BE: `Libraries/Dashboard/Konten/Dibo/{DiboService,PenyimpananDibo}`, `Models/Konten/DiboModel`, `Controllers/Api/Konten/DiboController`, rute
+  `konten/dibo*` di `RoutesKonten.php`; master `jenis_dibo` lewat `MasterKontenService` (sudah ada, M3).
+- Aturan (legacy `L_dibo.php:77-270,546-608`, views `hr/dibo`): wajib jenis (aktif), nomor, tahun, tentang; `file_1` wajib saat tambah; `file_1..3`
+  PDF/XLS/XLSX/DOC/DOCX ≤ 5 MB (paritas), tipe dari ISI berkas; ubah: berkas tak dikirim dipertahankan, `hapus_file_2/3 = 1` menghapus (padanan
+  `deleted_file[]`), berkas lama dihapus setelah commit. Berkas PRIVAT kunci acak `dibo/<hex32>.<ext>` (legacy: `assets/upload/dibo` publik di webroot),
+  unduh `GET konten/dibo/{id}/berkas/{1..3}` terautentikasi (attachment, no-store).
+- **Baca semua role HANYA status 1** (Q7-13) — perbaikan anomali legacy: filter status dikomentari (`L_dibo.php:12-27,62-66`) sehingga semua status tampil ke
+  semua role; admin (role 1) juga boleh mengunduh berkas status 2/10. Legacy `detail` menolak role 1 (`userAuth` 2–8): v2 mengizinkan. Filter jenis/tahun/cari
+  nomor|tentang + paginasi. Status 1 aktif / 2 dicabut [K] / 10 dihapus [V2: hapus lunak, berkas dipertahankan, bisa dipulihkan]. Audit Q7-16 otomatis.
+- Test: `DiboServiceTest` (8), `DiboEndpointTest` (3), `KontrakMatriksRoleTest` (+6 baris); FE `KelolaTeks.spec` + `BeritaLampiran.spec` (multipart DIBO).
+- Tidak dibawa/menunggu: duplikat jenis+nomor+tahun tidak dicek (legacy juga tidak; anomali dicatat M0 §4.2).

@@ -113,7 +113,7 @@ describe('BeritaKelolaView', () => {
 
 describe('DiboKelolaView', () => {
   it('menu aktif: Edit, Nonaktifkan, Hapus; Nonaktifkan memanggil service', async () => {
-    s.dibo.list.mockResolvedValue({ items: [{ id: '3', judul: 'Dok', jenis: 'Umum', id_jenis: '1', keterangan: '', status: '1' }], total: 1 })
+    s.dibo.list.mockResolvedValue({ items: [{ id: '3', nomor: 'PER-1', tahun: '2026', tentang: 'Dok', jenis: 'Umum', id_jenis: '1', keterangan: '', berkas: [1], status: '1' }], total: 1 })
     s.dibo.setStatus.mockResolvedValue(undefined)
     const w = await pasang(DiboKelolaView, 1)
     expect(await aksi(w, 'konten-dibo-actions-3')).toEqual(['edit', 'deactivate', 'delete'])
@@ -124,7 +124,7 @@ describe('DiboKelolaView', () => {
   })
 
   it('baris dihapus hanya punya Pulihkan', async () => {
-    s.dibo.list.mockResolvedValue({ items: [{ id: '4', judul: 'Lama', jenis: '', id_jenis: '', keterangan: '', status: '10' }], total: 1 })
+    s.dibo.list.mockResolvedValue({ items: [{ id: '4', nomor: 'PER-0', tahun: '2020', tentang: 'Lama', jenis: '', id_jenis: '', keterangan: '', berkas: [], status: '10' }], total: 1 })
     const w = await pasang(DiboKelolaView, 1)
     expect(await aksi(w, 'konten-dibo-actions-4')).toEqual(['restore'])
     w.unmount()

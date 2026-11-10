@@ -154,26 +154,44 @@ export interface LampiranBerita {
 
 export interface DiboRowApi {
   id: number | string
-  judul: string
+  nomor: string
+  tahun: number | string
+  tentang: string
   jenis?: string | null
   id_jenis?: number | string | null
   keterangan?: string | null
+  /** Nomor berkas yang ada (1..3). */
+  berkas?: number[] | null
   status?: number | string | null
 }
 
 export interface DiboRow {
   id: string
-  judul: string
+  nomor: string
+  tahun: string
+  tentang: string
   jenis: string
   id_jenis: string
   keterangan: string
+  berkas: number[]
   status: '1' | '2' | '10'
 }
 
 export interface DiboForm {
-  judul: string
   id_jenis: string
+  nomor: string
+  tahun: string
+  tentang: string
   keterangan: string
+}
+
+/** Berkas form DIBO: pilihan baru per nomor (null = tidak diganti) + penanda hapus berkas 2/3 (legacy `deleted_file[]`). */
+export interface DiboBerkasInput {
+  1: File | null
+  2: File | null
+  3: File | null
+  hapus2: boolean
+  hapus3: boolean
 }
 
 /** Master sederhana (kategori berita / jenis DIBO): nama + urutan + status. */
