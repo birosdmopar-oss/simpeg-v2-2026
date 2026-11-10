@@ -202,3 +202,25 @@ export interface BeritaKategoriOpsi {
   id: string
   nama: string
 }
+
+/** DIBO untuk dibaca semua role (PRD §5.6, Q7-12/13): hanya status 1; unduh berkas 1..3 terautentikasi. Draf kontrak. */
+export interface DiboBacaRowApi {
+  id: KontenApiId
+  nomor: string
+  tahun: number | string
+  tentang: string
+  keterangan?: string | null
+  jenis?: string | null
+  /** Nomor berkas yang tersedia (1..3). */
+  berkas?: number[] | null
+}
+
+export interface DiboBacaRow {
+  id: string
+  nomor: string
+  tahun: string
+  tentang: string
+  keterangan: string
+  jenis: string
+  berkas: number[]
+}

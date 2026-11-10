@@ -11,6 +11,8 @@ import type {
   BeritaDetailApi,
   BeritaKategoriOpsi,
   BeritaListApi,
+  DiboBacaRow,
+  DiboBacaRowApi,
   BeritaRingkas,
   BeritaRingkasApi,
   PopupAktif,
@@ -82,5 +84,50 @@ export const beritaPortalService = {
   /** Mereset penanda berita baru (`news_flag`) saat portal dibuka (Q7-09). */
   async dibuka(): Promise<void> {
     await api.post('/konten/berita/dibuka')
+  },
+}
+
+const dibacaNama = (header: unknown, cadangan: string): string => {
+  const h = typeof header === 'string' ? header : ''
+  const nama = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(h)?.[1]
+  try {
+    return nama ? decodeURIComponent(nama) : cadangan
+  } catch {
+    return nama ?? cadangan
+  }
+}
+
+/** DIBO baca (semua role): daftar bersaring, jenis, dan unduh berkas terautentikasi (PRD §5.6, Q7-12/13/14). */
+export const diboBacaService = {
+  async list(params: { page: number; per_page: number; q?: string; jenis?: string; tahun?: string }): Promise<{ items: DiboBacaRow[]; total: number }> {
+    const { data } = await api.get<{ items?: DiboBacaRowApi[]; total?: number }>('/konten/dibo', { params })
+    return {
+      items: (data?.items ?? []).map((r) => ({
+        id: toId(r.id),
+        nomor: r.nomor,
+        tahun: String(r.tahun ?? ''),
+        tentang: r.tentang,
+        keterangan: r.keterangan ?? '',
+        jenis: r.jenis ?? '',
+        berkas: r.berkas ?? [],
+      })),
+      total: data?.total ?? 0,
+    }
+  },
+  async jenis(): Promise<Array<{ id: string; nama: string }>> {
+    const { data } = await api.get<Array<{ id: KontenApiId; nama: string }>>('/konten/dibo-jenis')
+    return (data ?? []).map((j) => ({ id: toId(j.id), nama: j.nama }))
+  },
+  /** Mengunduh berkas ke-`no` lewat tautan sementara; nama dari Content-Disposition. */
+  async unduh(id: string, no: number, cadangan: string): Promise<void> {
+    const res = await api.get<Blob>(`/konten/dibo/${id}/berkas/${no}`, { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = dibacaNama(res.headers?.['content-disposition'], cadangan)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   },
 }

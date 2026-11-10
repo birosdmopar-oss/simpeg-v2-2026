@@ -20,6 +20,7 @@ const rute = (path: string, name: string, halaman: HalamanKonten, title: string,
 export const kontenRoutes: RouteRecordRaw[] = [
   rute('/berita', ROUTE_PORTAL_BERITA, 'portal', 'Berita'),
   rute('/berita/:id', ROUTE_DETAIL_BERITA, 'detail', 'Detail Berita'),
+  rute('/dibo', 'konten-dibo', 'dibo-baca', 'DIBO'),
   rute('/konten/berita', 'konten-berita-kelola', 'berita-kelola', 'Kelola Berita', { roles: KONTEN_BERITA_ROLES }),
   rute('/konten/berita-kategori', 'konten-berita-kategori', 'berita-kategori', 'Kategori Berita', { roles: KONTEN_ADMIN_ROLES }),
   rute('/konten/popup', 'konten-popup-kelola', 'popup', 'Popup', { roles: KONTEN_ADMIN_ROLES }),

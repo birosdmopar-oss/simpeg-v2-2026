@@ -253,6 +253,7 @@ const NAV: NavGroup[] = [
     // Fase 7 konten admin (MAKE-079..082): phase 7 (tersembunyi sampai ACTIVE_PHASE >= 7, pola F7-14); QA lewat URL langsung.
     items: [
       { key: 'berita', label: 'Portal Berita', icon: Newspaper, to: { name: 'konten-berita' }, phase: 7 },
+      { key: 'konten-dibo-baca', label: 'DIBO', icon: Files, to: { name: 'konten-dibo' }, phase: 7 },
       { key: 'konten-berita-kelola', label: 'Kelola Berita', icon: Newspaper, to: { name: 'konten-berita-kelola' }, roles: KONTEN_BERITA_ROLES, phase: 7 },
       {
         key: 'konten-admin',
