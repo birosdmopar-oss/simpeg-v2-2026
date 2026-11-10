@@ -162,12 +162,14 @@ Bentuk header token SIMAPI mengikuti legacy (elemen kedua header `Authorization`
 | N2 | Q6-16 | `php spark integrasi:bersihkan-log --dry-run` | Jumlah calon hapus > 180 hari (0 di demo), tanpa menghapus | |
 | N3 | K.1 | Cari rahasia klien, token SIMAPI, passphrase, NIK sintetis di `writable/logs/*` dan `integrasi_log` | Tidak ditemukan | |
 | N4 | §11 | Baca `README-deploy.md` §1b–§1h | Runbook cron + Nginx (`/simapi/`, `/services/`, `Authorization`) + daftar re-handshake klien tercatat | |
+| N5 | F6-24 / §6.2 | `GET api/v1/integrasi/log` (role 1, filter layanan/status/tanggal, paginasi) | — | N/A — deviasi K1 |
+| N6 | §6.2 FE | Halaman Admin → Integrasi (log integrasi + tombol tarik ulang e-Kinerja per periode, aksi baris ⋮) | — (tarik ulang tetap diuji lewat API di J2) | N/A — deviasi K1 |
 
 ## K. Keputusan / pertanyaan pra-QA (ketidaksesuaian PRD ↔ kode)
 
 | # | Temuan | Usulan |
 |---|---|---|
-| K1 | PRD §6.2 + F6-24 mencantumkan `GET api/v1/integrasi/log` (filter layanan/status/tanggal, paginasi, role 1) dan halaman FE **Admin → Integrasi** (log + tombol tarik ulang e-Kinerja per periode). Di `main` `75361d0d` belum ada: route hanya `bkn/tarik` dan `fcm-token`, fitur FE `integrasi` hanya push. Pemantauan hanya lewat `integrasi:status`. | Putusan Horii: (a) kerjakan sebagai paket Jalur B sebelum sign-off; (b) tunda (catat deviasi, pemantauan lewat CLI + log berkas). Sampai diputus, butir terkait tidak diuji di UI |
+| K1 | PRD §6.2 + F6-24 mencantumkan `GET api/v1/integrasi/log` (filter layanan/status/tanggal, paginasi, role 1) dan halaman FE **Admin → Integrasi** (log + tombol tarik ulang e-Kinerja per periode). Di `main` `75361d0d` belum ada: route hanya `bkn/tarik` dan `fcm-token`, fitur FE `integrasi` hanya push. Pemantauan hanya lewat `integrasi:status`. | **Keputusan: (b) deviasi, Horii 10-11-2026** — ditunda ke fase berikutnya dan dicatat di laporan akhir Fase 6; pemantauan Fase 6 lewat `integrasi:status` + log berkas. Butir yang bergantung ditandai "N/A — deviasi K1" (N5, N6) |
 | K2 | Push web (E1) butuh konfigurasi Firebase web `VITE_FIREBASE_*`; di demo kosong → banner izin & pendaftaran token otomatis nonaktif (sesuai desain). | QA E1 lewat API langsung; uji SPA + service worker di MT-010 dengan proyek Firebase (PN-3) |
 | K3 | H-03 SIASN dan H-10 e-Kinerja tidak punya jalur mock (driver wajib `bkn`/konfigurasi BKN, by design B6 M1 B-1c). | QA Lapis 1 hanya penolakan + bukti test otomatis (D2, J4); alur nyata di MT-010 |
 | K4 | Q6-42 butir rollback (G4) hanya teramati bila form gagal di dalam transaksi pemilik; validasi 422 biasanya ditolak sebelum transaksi. | Bila G4 tidak bisa memicu rollback di UI, terima bukti test otomatis `PencatatPerubahanTest` |
