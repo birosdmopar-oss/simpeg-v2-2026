@@ -33,8 +33,14 @@ onMounted(async () => {
   }
 })
 
+/** Ikut legacy (`pu_image.php`): popup baru bisa ditutup pada gambar TERAKHIR; sebelum itu hanya "Berikutnya". */
 function onUpdate(v: boolean): void {
+  if (!v && !terakhir.value) return
   open.value = v
+}
+
+function tahan(e: Event): void {
+  if (!terakhir.value) e.preventDefault()
 }
 
 function berikutnya(): void {
@@ -54,10 +60,14 @@ function sebelumnya(): void {
         v-if="aktif"
         class="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-4 shadow-panel"
         data-testid="konten-popup-aktif"
+        @escape-key-down="tahan"
+        @pointer-down-outside="tahan"
+        @interact-outside="tahan"
       >
         <DialogTitle class="sr-only">Pengumuman {{ indeks + 1 }} dari {{ daftar.length }}</DialogTitle>
         <DialogDescription class="sr-only">{{ aktif.keterangan ?? 'Pengumuman SIMPEG' }}</DialogDescription>
         <DialogClose
+          v-if="terakhir"
           class="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-slate-600 shadow hover:bg-slate-100"
           aria-label="Tutup"
           data-testid="konten-popup-tutup"

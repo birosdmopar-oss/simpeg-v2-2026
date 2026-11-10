@@ -79,6 +79,25 @@ describe('PopupAktifDialog', () => {
     expect(tampil()).not.toBeNull()
   })
 
+  it('ikut legacy: tidak bisa ditutup (Esc/X) sebelum gambar terakhir; di gambar terakhir X menutup', async () => {
+    popupAktif.mockResolvedValue([gambar('1'), gambar('2')])
+    mount(PopupAktifDialog, { attachTo: document.body })
+    await flushPromises()
+    const q = (id: string) => document.body.querySelector<HTMLButtonElement>(`[data-testid="${id}"]`)
+    expect(q('konten-popup-tutup')).toBeNull()
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(tampil()).not.toBeNull()
+
+    q('konten-popup-berikutnya')?.click()
+    await flushPromises()
+    expect(q('konten-popup-tutup')).not.toBeNull()
+    q('konten-popup-tutup')?.click()
+    await flushPromises()
+    expect(tampil()).toBeNull()
+  })
+
   it('carousel: berikutnya/sebelumnya; tombol Berikutnya hilang di gambar terakhir', async () => {
     popupAktif.mockResolvedValue([gambar('1'), gambar('2')])
     mount(PopupAktifDialog, { attachTo: document.body })
