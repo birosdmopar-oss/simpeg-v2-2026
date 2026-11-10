@@ -20,6 +20,9 @@ import type { JenisKontenGambar, KontenGambarRow } from '../types'
 
 const props = defineProps<{ jenis: JenisKontenGambar }>()
 
+/** Popup/banner legacy tanpa kolom status (M0_B §1.1); status/soft delete baru [V2] hanya bila DBV-032 menetapkannya. Sampai itu pasti: aksi, badge, dan filter status disembunyikan; Hapus = hapus permanen. */
+const ADA_STATUS = false
+
 const nama = computed(() => (props.jenis === 'popup' ? 'Popup' : 'Banner'))
 const svc = computed(() => kelolaService(props.jenis))
 const tid = (s: string) => `konten-${props.jenis}-${s}`
@@ -121,11 +124,11 @@ function rowActions(row: KontenGambarRow, index: number): RowAction[] {
   const dihapus = row.status === '10'
   return [
     { key: 'edit', label: 'Edit', icon: Pencil, hidden: dihapus },
-    { key: 'deactivate', label: 'Nonaktifkan', icon: PowerOff, hidden: row.status !== '1', disabled: busy.value },
-    { key: 'activate', label: 'Aktifkan', icon: Power, hidden: row.status !== '2', disabled: busy.value },
+    { key: 'deactivate', label: 'Nonaktifkan', icon: PowerOff, hidden: !ADA_STATUS || row.status !== '1', disabled: busy.value },
+    { key: 'activate', label: 'Aktifkan', icon: Power, hidden: !ADA_STATUS || row.status !== '2', disabled: busy.value },
     { key: 'up', label: 'Naikkan urutan', icon: ArrowUp, hidden: dihapus, disabled: busy.value || (page.value === 1 && index === 0) },
     { key: 'down', label: 'Turunkan urutan', icon: ArrowDown, hidden: dihapus, disabled: busy.value || (page.value === totalPages.value && index === items.value.length - 1) },
-    { key: 'restore', label: 'Pulihkan', icon: RotateCcw, hidden: !dihapus, disabled: busy.value },
+    { key: 'restore', label: 'Pulihkan', icon: RotateCcw, hidden: !ADA_STATUS || !dihapus, disabled: busy.value },
     { key: 'delete', label: 'Hapus', icon: Trash2, danger: true, hidden: dihapus },
   ]
 }
@@ -149,7 +152,7 @@ async function onConfirmDelete(): Promise<void> {
   confirm.value.loading = true
   try {
     await svc.value.remove(row.id)
-    notice.value = `${nama.value} dihapus; bisa dipulihkan lewat filter status Dihapus.`
+    notice.value = `${nama.value} dihapus.`
     confirm.value.open = false
     await load()
   } catch (e) {
@@ -188,7 +191,7 @@ onMounted(() => {
     <p v-if="notice" class="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800" role="status">{{ notice }}</p>
     <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
 
-    <div class="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
+    <div v-if="ADA_STATUS" class="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
       <UiSelect
         v-model="statusFilter"
         :options="STATUS_FILTER"
@@ -210,16 +213,16 @@ onMounted(() => {
             <th class="px-4 py-3">Periode</th>
             <th class="px-4 py-3">Urutan</th>
             <th class="px-4 py-3">Penerima</th>
-            <th class="px-4 py-3">Status</th>
+            <th v-if="ADA_STATUS" class="px-4 py-3">Status</th>
             <th class="px-4 py-3 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           <tr v-if="loading">
-            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
+            <td :colspan="ADA_STATUS ? 7 : 6" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
           </tr>
           <tr v-else-if="items.length === 0">
-            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Belum ada {{ nama.toLowerCase() }} yang cocok.</td>
+            <td :colspan="ADA_STATUS ? 7 : 6" class="px-4 py-8 text-center text-slate-500">Belum ada {{ nama.toLowerCase() }} yang cocok.</td>
           </tr>
           <tr v-for="(row, i) in items" v-else :key="row.id" class="hover:bg-slate-50" :data-testid="tid(`row-${row.id}`)">
             <td class="px-4 py-3">
@@ -230,7 +233,7 @@ onMounted(() => {
             <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ fmt(row.tgl_mulai) }} – {{ fmt(row.tgl_akhir) }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.urutan }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.jumlah_penerima }}</td>
-            <td class="px-4 py-3">
+            <td v-if="ADA_STATUS" class="px-4 py-3">
               <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium" :class="STATUS_CLASS[row.status]" :data-status="row.status">
                 {{ STATUS_LABEL[row.status] }}
               </span>
@@ -272,7 +275,7 @@ onMounted(() => {
     <ConfirmDialog
       v-model:open="confirm.open"
       :title="`Hapus ${nama.toLowerCase()} ini?`"
-      description="Data tidak dihapus permanen: statusnya menjadi Dihapus sehingga tidak lagi tampil, dan bisa dipulihkan."
+      description="Data dihapus permanen dan tidak bisa dipulihkan."
       danger
       confirm-label="Hapus"
       :loading="confirm.loading"
