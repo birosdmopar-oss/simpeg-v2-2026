@@ -221,12 +221,13 @@ describe('HomeView — kartu prediksi pegawai M2b', () => {
     [Role.PEGAWAI, true],
     [Role.PTT, false],
     [Role.PPPK, false],
-  ])('role %i: Butuh Approval %s; tanpa kartu prediksi bila daftar kosong', async (role, approval) => {
+  ])('role %i: Butuh Approval %s; tanpa kartu prediksi bila daftar kosong; tautan Presensi Saya', async (role, approval) => {
     vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([]))
     const wrapper = await mountAs(role)
 
     expect(wrapper.find('[data-testid="beranda-prediksi"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="beranda-butuh-approval"]').exists()).toBe(approval)
+    expect(wrapper.get('[data-testid="beranda-presensi-saya"]').attributes('href')).toBe('/presensi')
   })
 })
 
