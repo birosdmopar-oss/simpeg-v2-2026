@@ -55,9 +55,6 @@ final class PembangkitKredensial
     }
 
     /**
-     * SHA-256 heks huruf kecil dari token mentah (kunci pencarian `simapi_token.token_hash`).
-     */
-    /**
      * Sidik pendek rahasia klien saat ini (SHA-256 dari `rahasia_hash`, 16 heks): berubah setiap rotasi. Dibawa filter lewat
      * `KlienSaatIni` dan diperiksa ulang di dalam transaksi terbit token, supaya handshake yang lolos dengan rahasia LAMA tidak
      * menerbitkan token sesudah rotasi (review MAKE-058 S-3). Bukan rahasia; tidak dapat dipakai memulihkan hash.
@@ -67,6 +64,9 @@ final class PembangkitKredensial
         return substr(hash('sha256', $hashRahasia), 0, 16);
     }
 
+    /**
+     * SHA-256 heks huruf kecil dari token mentah (kunci pencarian `simapi_token.token_hash`).
+     */
     public static function hashToken(#[\SensitiveParameter] string $token): string
     {
         return hash('sha256', $token);

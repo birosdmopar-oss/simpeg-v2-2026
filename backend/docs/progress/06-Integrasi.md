@@ -7,17 +7,17 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 | Task | Jalur | Key | Status |
 |---|---|---|---|
-| H-01 | A + B | DBV-026, DBV-027 | B: DBV-027 di main `c3c6213f` (+ DBV-030 `4c2d96a5`); A: diisi Jalur A |
-| H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` di branch `fase6/make-065-s-esign` |
+| H-01 | A + B | DBV-026, DBV-027 | A: DBV-026 di main `7185bdd5`; B: DBV-027 di main `c3c6213f` (+ DBV-030 `4c2d96a5`) |
+| H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` di main (`c3af17a1`) |
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
-| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di branch `fase6/a-lokal/make-059-simapi`, menunggu review; MAKE-060 belum mulai |
-| H-08 | A | MAKE-061 | A6 selesai (versi lokal, Worker Fable) di branch `fase6/a-lokal/make-061-s-stat`, menunggu review |
-| H-09 | A | (pemetaan) | Belum mulai |
+| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di main `d115e50d`; MAKE-060 A5a (`change_history` ack-on-read + kerangka penulis `simapi_ch`) di main `67b46538`, A5b (penulis `simapi_ch` = trigger D1) di main `2c72332f`; DBV-031 `e2f91113`; MAKE-076 (`simapi/a_pegawai` + penulis `simapi_update`) `b6e74d23` |
+| H-08 | A | MAKE-061 | Di main `539f4c7c` (Worker Fable) |
+| H-09 | A | (pemetaan) | Selesai (dokumen, bagian A7 di bawah; AC-09.1: 56 method `Local.php`); ikut branch `fase6/a-lokal/penutup-a` |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
-| H-11 | A | MAKE-062 | A2a selesai (versi lokal), menunggu review |
-| H-12 | A | MAKE-068 | Kode di branch `fase6/a-lokal/make-068-lkh-auto-approval`, belum merge |
-| Fondasi | A / B | MAKE-058 / MAKE-063 | B: MAKE-063 di main `74039dc7`; A: diisi Jalur A |
+| H-11 | A | MAKE-062 | Di main `c2b8e2d7` (+ `pengguna:sinkron-nama`, ADR-037) |
+| H-12 | A | MAKE-068 | Di main `5a8764c4` |
+| Fondasi | A / B | MAKE-058 / MAKE-063 | A: MAKE-058 (auth antar-sistem, ADR-036) di main `c926770f`; B: MAKE-063 di main `74039dc7` |
 
 ## Bagian A — API masuk & job terjadwal
 
@@ -134,6 +134,72 @@ ikut `A_pegawai.php`; allowlist wajib `ipwajib` untuk filter `klienLayanan`/`sim
 mencabut token lain, R6 kunci baris klien, Q2 password = hash berlaku (MD5/Argon2id, PN re-handshake), Q1 rehash dicatat. Test:
 `tests/unit/Integrasi/AturanTriggerUpdateTest`, `tests/database/Integrasi/{SimapiAPegawaiTest,SimapiPemancarUpdateTest}`, test arsitektur
 P2 per tabel log.
+
+### A7 — H-09 pemetaan `Local.php` → v2 (AC-09.1) dan penutup Jalur A
+
+Sumber: `controllers/hr/services/Local.php` (legacy, AJAX sesi login; 56 method publik, `L:9-4604`). Aturan PRD Lampiran A.4: **setiap method punya
+padanan v2 atau alasan "tidak di-port"**. Hanya endpoint dengan sesi login pengguna; tidak ada yang dibuka ke klien antar-sistem (itu SIMAPI
+`a_*`/`services/*`, bagian A4–A6). Padanan dituliskan per kelompok dengan DAFTAR method lengkap (baris legacy); "Fase N" = modul v2 yang
+sudah di `main`. Kolom v2 menyebut jalur, bukan jaminan paritas field-per-field (itu uji modul masing-masing).
+
+| # | Method (baris `Local.php`) | Padanan v2 / alasan |
+|---|---|---|
+| 1 | `list_kab_kota` (9), `list_kecamatan` (23), `list_kelurahan` (37), `list_kd_pos` (51) | Master Data Fase 2 — wilayah (`master/*` dan opsi bertingkat modul biodata/alamat) |
+| 2 | `list_jur_pend` (69), `list_bid_pend` (93), `list_jsp` (121), `list_diklat` (138), `list_pangkat` (170), `list_jft` (190), `list_jenis_hukdis` (212), `list_sgj` (294), `list_subrumpun_jabatan` (309) | Master Data Fase 2 — dropdown referensi pendidikan, diklat, pangkat, jabatan, hukuman disiplin (`master/*`, `*/opsi`) |
+| 3 | `list_satker` (323), `list_jabatan_sub_satker` (348), `list_jabatan_koord_satker` (379), `list_pmj_sub_satker` (447), `list_pmj_sub_satker_20250204` (407), `list_sgj_pj` (4475), `list_jab_pj` (4494) | Struktur/jabatan Fase 3 (`jabatan`, `master/*`, opsi jabatan); varian bertanggal `_20250204` = kode lama, tidak di-port |
+| 4 | `list_atasan_jabatan` (467), `list_all_atasan` (779), `list_all_atasan_dmkoord` (1147), `list_all_atasan_bkp` (1287) | Fase 3/4 — pencari atasan (RBAC v2, `AtasanLangsung`/`cuti/petugas-approval/opsi`/`lkh/opsi`); `_bkp` = salinan lama, tidak di-port |
+| 5 | `po_in` (1737), `po_out` (1884), `preview_po` (2050) | Fase 5 — `presensi/masuk`, `presensi/pulang`, `presensi/cek-lokasi`; antre topik FCM saat masuk/pulang = F6-12 (Jalur B) |
+| 6 | `get_list_user_lokasi_presensi` (4604) | Fase 5 — lokasi presensi (`presensi/cek-lokasi`, master lokasi) |
+| 7 | `record_geolocation` (4071) | Tidak di-port: GET yang menulis `user_geo` (F5-12) |
+| 8 | `calculate_lc` (2147), `calculate_lc_20220601` (2085), `calculate_lk` (2211), `info_cuti_ad` (2487), `info_cuti_ad_20211028` (2267), `info_cuti_ad2` (2759), `info_cuti_ad2_20250514` (2861) | Fase 4 — `cuti/hitung-lama`, `cuti/opsi`, kuota/saldo cuti; varian bertanggal = kode lama, tidak di-port |
+| 9 | `calculate_ltb` (3185), `detail_tb_ad` (3220) | Fase 4 — TB/IB (`tb/opsi`, form TB; perhitungan lama studi di `LamaTahunStudi`) |
+| 10 | `calculate_mker_ak` (4423), `calc_mker_pmk_req` (4574), `peg_selected_pmk_req` (4537) | Fase 3/4 — `pmk/hitung-mker`, `pmk/opsi`, hitung AK |
+| 11 | `list_arsip_rwy_data` (3272), `connect_arsip` (3475), `delete_arsip` (3724), `update_arsip_name` (3809) | Fase 3 — lampiran riwayat (`pegawai/{nip}/lampiran`, unduh/hapus, `AttachmentService`); `connect_arsip` (GET yang mengubah data) dan penyambungan arsip lewat path server tidak dibawa |
+| 12 | `update_foto_pegawai` (3892) | Fase 3 — `pegawai/{nip}/foto` (unggah dengan RBAC v2) |
+| 13 | `get_list_anak` (4384) | Fase 3 — `pegawai/{nip}/riwayat/keluarga/{id}/anak` |
+| 14 | `list_unit_es_3` (3940), `list_unit_es_4` (4002) | Tidak di-port: kode mati (tanpa pemanggil), PRD Lampiran A.4 |
+| 15 | `validate_cp` (229) | Tidak di-port: kode mati (PRD Lampiran A.4) |
+| 16 | `list_faq_subtop` (4125), `rate_faq` (4139) | Fase 7 — FAQ publik/admin (`faq`); penilaian FAQ = fitur FAQ v2 |
+| 17 | `get_list_fd_users` (4291), `get_list_popup_users` (4322), `get_list_banner_users` (4353) | Fase 7/8 — pengumuman, popup, banner pengguna (modul Pengumuman v2) |
+| 18 | `register_fb_token` (4224) | Fase 6 H-04 (F6-13) — `fcm-token` (`POST api/v1/integrasi/fcm-token`, MAKE-066) |
+
+Cakupan: 56 method terpetakan (baris 1-18 di atas menjumlah semuanya). Method yang "mengubah data lewat GET" (`record_geolocation`,
+`connect_arsip`) sengaja tidak dibawa. Pemeriksaan padanan per-endpoint dilakukan modul pemiliknya (QA Fase 3-8); dokumen ini hanya
+memenuhi AC-09.1. Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel ini.
+
+**Ringkasan status Jalur A (per 10-11-2026, main `b6e74d23`)** — pelaksana: Worker Fix Bug (lead; A2a, A3, A7), ReadOne (A1, A4, A5), Worker Haiku
+(A2b), Worker Fable (A6, sejak 05-11); reviewer CR; merge atas izin Horii.
+
+| Milestone | Key | Status | SHA di main |
+|---|---|---|---|
+| A1 skema klien layanan & SIMAPI | DBV-026 | Selesai | `7185bdd5` (PR #37) |
+| A2a status TB/CLTN harian + `pengguna:sinkron-nama` + ADR-037 | MAKE-062 | Selesai | `c2b8e2d7` |
+| A2b auto-approval LKH | MAKE-068 | Selesai | `5a8764c4` |
+| A3 auth antar-sistem + ADR-036 | MAKE-058 | Selesai | `c926770f` |
+| A4 SIMAPI `a_auth`, `a_employee` (25 method), `a_dm`, `ambil_riwayat_mutasi`, `services/s_dm` | MAKE-059 | Selesai | `d115e50d` |
+| A5a `a_employee/change_history` ack-on-read + kerangka penulis `simapi_ch` | MAKE-060 | Selesai | `67b46538` |
+| A5b penulis `simapi_ch` = port trigger D1 (opsi B: log di transaksi pemilik dengan savepoint) | MAKE-060 | Selesai | `2c72332f` |
+| Koreksi D1: tabel `simapi_update`/`_hist` + seed `simapi_jd` | DBV-031 | Selesai | `e2f91113` (PR #38) |
+| API SIMAPI lama `simapi/a_pegawai` (token/detail/pegawai_update) + penulis `simapi_update` | MAKE-076 | Selesai | `b6e74d23` |
+| PRD v1.0n (Q6-41: API SIMAPI lama ikut legacy) | CR-109 | Selesai | `3d4ca7b8` |
+| A6 `services/s_stat` | MAKE-061 | Selesai | `539f4c7c` |
+| Pengaman `ImporSlipUjiTrait` + `check.sh` (aturan satu PHPUnit per DB scratch) | CR-108 | Selesai | `5d7d5778` |
+| TTE cuti atas nama (Q6-40, Jalur B) | MAKE-075 | Selesai | `07a5df0c` |
+| A7 pemetaan H-09 + runbook (README-deploy §1j) + ringkasan | (CR/dokumen) | Dokumen selesai (final setelah A5b/MAKE-076 di main) | branch `fase6/a-lokal/penutup-a` |
+
+Keputusan Horii/reviewer yang membentuk Jalur A (lengkap di PRD §12): Q6-01 semua endpoint wajib auth; Q6-02 kontrak SIMAPI 1:1 (kecuali
+perbaikan terbatas); Q6-03 `ambil_seluruh_pengguna` tidak di-port; Q6-24..Q6-27 aturan H-11; Q6-36 B-9 `unit_es_3/4` ikut legacy; Q6-37 filter
+`rekomendasi_kp_uns` ikut legacy; Q6-38 URL arsip/berkas `s_stat` lewat endpoint unduh klien; Q6-39 foto SIMAPI lewat endpoint foto klien;
+F6-21 `sync_nama_pengguna` di-port (`pengguna:sinkron-nama`).
+
+Sisa / pertanyaan terbuka Jalur A:
+- ISSUE-056 (D1) dan ISSUE-057 selesai di kode (A5b, DBV-031, MAKE-076). Koreksi teks PRD F6-06/Q6-41 dikerjakan reviewer terpisah (CR-110);
+  bagian ini tidak mengubah PRD.
+- **PN-4** daftar pemberitahuan re-handshake klien (README-deploy §1i/§1j); **PN-5** jadwal pasti `pengguna:sinkron-nama` dan job Cron lain
+  dicocokkan dengan crontab server legacy sebelum cutover.
+- Ambang throttle auth antar-sistem (120 kegagalan/IP, 600/klien per 60 detik) adalah usulan awal; disetel dari trafik klien nyata.
+- Padanan H-09 baru level kelompok; pemeriksaan per-endpoint dilakukan modul pemilik (QA Fase 3-8).
+- Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel pemetaan H-09.
 
 ## Bagian B — Klien integrasi keluar
 
