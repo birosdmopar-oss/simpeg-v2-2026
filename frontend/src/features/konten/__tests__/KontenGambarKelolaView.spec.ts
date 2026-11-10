@@ -31,6 +31,8 @@ const baris = (o: Partial<KontenGambarRow>): KontenGambarRow => ({
   gambar_url: null,
   tgl_mulai: '2026-03-01',
   tgl_akhir: '2026-03-31',
+  jam_mulai: '',
+  jam_akhir: '',
   urutan: 1,
   status: '1',
   jumlah_penerima: 10,

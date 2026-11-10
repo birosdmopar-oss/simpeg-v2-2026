@@ -221,6 +221,19 @@ final class KontenGambarServiceTest extends DatabaseTestCase
         $svc->bacaGambar($r['id'], Role::PEGAWAI, $p2);
     }
 
+    public function testPenerimaBerisiNipDanNama(): void
+    {
+        [, $p1, $p2] = $this->satkerDenganDuaPegawai();
+        $svc         = $this->service(JenisGambar::Popup);
+        $r           = $svc->buat($this->input(['target' => ['pegawai' => [$p1, $p2]]]), $this->gambar(300, 200), 1);
+
+        $hasil = $svc->penerima($r['id'], []);
+
+        $this->assertSame(2, $hasil['total']);
+        $this->assertEqualsCanonicalizing([$p1, $p2], array_column($hasil['items'], 'nip'));
+        $this->assertStringContainsString('Pegawai Fixture', $hasil['items'][0]['nama']);
+    }
+
     public function testOpsiTargetUnitSatkerDanPegawai(): void
     {
         $unit   = $this->buatUnit(['unit' => 'Unit Uji Opsi']);
@@ -228,11 +241,22 @@ final class KontenGambarServiceTest extends DatabaseTestCase
         $nip    = $this->buatPegawaiDiSatker($satker, ['nama' => 'Budi Uji']);
         $svc    = $this->service(JenisGambar::Popup);
 
-        $opsi = array_column($svc->opsiUnitSatker(), 'label', 'value');
-        $this->assertSame('Seluruh kementerian', $opsi['0']);
-        $this->assertSame('Unit Uji Opsi', $opsi[(string) $unit]);
-        $this->assertSame('Satker Uji Opsi', $opsi["sat_{$satker}"]);
-        $this->assertStringContainsString('Budi Uji', array_column($svc->opsiPegawai(), 'label', 'value')[$nip]);
+        // Kunci numerik-string menjadi int di array PHP → cari lewat nilai, bukan kunci.
+        $label = static function (array $opsi, string $nilai): ?string {
+            foreach ($opsi as $o) {
+                if ($o['value'] === $nilai) {
+                    return $o['label'];
+                }
+            }
+
+            return null;
+        };
+
+        $unitSatker = $svc->opsiUnitSatker();
+        $this->assertSame('Seluruh kementerian', $label($unitSatker, '0'));
+        $this->assertSame('Unit Uji Opsi', $label($unitSatker, (string) $unit));
+        $this->assertSame('Satker Uji Opsi', $label($unitSatker, "sat_{$satker}"));
+        $this->assertStringContainsString('Budi Uji', (string) $label($svc->opsiPegawai(), $nip));
     }
 
     // ------------------------------------------------------------------

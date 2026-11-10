@@ -15,6 +15,7 @@ import type {
   DiboBacaRowApi,
   BeritaRingkas,
   BeritaRingkasApi,
+  KontenApiId,
   PopupAktif,
   PopupAktifApi,
 } from '../types'

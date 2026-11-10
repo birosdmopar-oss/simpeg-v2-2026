@@ -95,8 +95,11 @@ final class KontenGambarService
         $u       = $this->jenis->tabelPenerima()->value;
 
         $total = (int) $this->db->table($t)->countAllResults();
+        // SQL mentah tidak diberi prefix otomatis oleh Query Builder (grup tests memakai DBPrefix t_) → prefixTable() eksplisit.
+        $tp    = $this->db->prefixTable($t);
+        $up    = $this->db->prefixTable($u);
         $baris = $this->db->table($t)
-            ->select("{$t}.*, (SELECT COUNT(*) FROM {$u} WHERE {$u}.{$k} = {$t}.{$k}) AS jumlah_penerima", false)
+            ->select("{$tp}.*, (SELECT COUNT(*) FROM {$up} WHERE {$up}.{$k} = {$tp}.{$k}) AS jumlah_penerima", false)
             ->orderBy("{$t}.order", 'ASC')
             ->orderBy("{$t}.{$k}", 'ASC')
             ->limit($perPage, ($page - 1) * $perPage)
@@ -137,8 +140,8 @@ final class KontenGambarService
 
         $total = (int) $this->db->table($u)->where($k, $id)->countAllResults();
         $rows  = $this->db->table("{$u} up")
-            ->select('up.nip, peg.glr_awal, peg.nama, peg.glr_akhir')
             ->join('pegawai peg', 'peg.nip = up.nip', 'left')
+            ->select('up.nip, peg.glr_awal, peg.nama, peg.glr_akhir')
             ->where("up.{$k}", $id)
             ->orderBy('up.nip', 'ASC')
             ->limit($perPage, ($page - 1) * $perPage)

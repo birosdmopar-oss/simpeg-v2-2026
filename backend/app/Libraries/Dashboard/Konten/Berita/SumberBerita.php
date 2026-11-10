@@ -125,9 +125,11 @@ final class SumberBerita implements SumberNotifikasiInterface
             return ['items' => [], 'total' => 0, 'url_fe' => null];
         }
 
-        $b = $this->antreanDasar()->where('news.status', BeritaService::MENUNGGU);
+        $saring = static function (BaseBuilder $b): void {
+            $b->where('news.status', BeritaService::MENUNGGU);
+        };
 
-        return ['items' => $this->halaman($b, 'news.created_at', $page, $perPage), 'total' => (int) (clone $b)->countAllResults(), 'url_fe' => self::URL_KELOLA];
+        return ['items' => $this->halaman($saring, 'news.created_at', $page, $perPage), 'total' => $this->total($saring), 'url_fe' => self::URL_KELOLA];
     }
 
     public function histori(AuthContext $auth, string $bulan, int $page, int $perPage): array
@@ -138,14 +140,15 @@ final class SumberBerita implements SumberNotifikasiInterface
             return ['items' => [], 'total' => 0];
         }
 
-        $awal  = new DateTimeImmutable($bulan . '-01 00:00:00', new DateTimeZone('UTC'));
-        $akhir = $awal->modify('+1 month');
-        $b     = $this->antreanDasar()
-            ->where('news.approved_by', $id)
-            ->where('news.approved_at >=', $awal->format('Y-m-d H:i:s'))
-            ->where('news.approved_at <', $akhir->format('Y-m-d H:i:s'));
+        $awal   = new DateTimeImmutable($bulan . '-01 00:00:00', new DateTimeZone('UTC'));
+        $akhir  = $awal->modify('+1 month');
+        $saring = static function (BaseBuilder $b) use ($id, $awal, $akhir): void {
+            $b->where('news.approved_by', $id)
+                ->where('news.approved_at >=', $awal->format('Y-m-d H:i:s'))
+                ->where('news.approved_at <', $akhir->format('Y-m-d H:i:s'));
+        };
 
-        return ['items' => $this->halaman($b, 'news.approved_at', $page, $perPage), 'total' => (int) (clone $b)->countAllResults()];
+        return ['items' => $this->halaman($saring, 'news.approved_at', $page, $perPage), 'total' => $this->total($saring)];
     }
 
     public function jumlahLonceng(AuthContext $auth): int
@@ -177,21 +180,38 @@ final class SumberBerita implements SumberNotifikasiInterface
         return $b->where('news.id_unit_creator', $unit !== null && ctype_digit($unit) ? (int) $unit : 0);
     }
 
+    /**
+     * Total tanpa join: countAllResults() pada builder beralias mengosongkan pelacakan alias koneksi CI4 sehingga query
+     * berikutnya salah memberi prefix DBPrefix pada alias (lihat BeritaService::portal()).
+     *
+     * @param callable(BaseBuilder): void $saring
+     */
+    private function total(callable $saring): int
+    {
+        $b = $this->db->table('news');
+        $saring($b);
+
+        return (int) $b->countAllResults();
+    }
+
     private function antreanDasar(): BaseBuilder
     {
+        // join dulu, baru select (alias join harus dikenal sebelum select; lihat BeritaService::dasar).
         return $this->db->table('news')
-            ->select('news.id_news, news.title, news.status, news.reason_note, news.approved_at, news.created_at, p.name AS pembuat, p.nip AS nip_pembuat, u.unit AS nama_unit', false)
             ->join('pengguna p', 'p.id_pengguna = news.created_by', 'left')
-            ->join('unit u', 'u.id_unit = news.id_unit_creator', 'left');
+            ->join('unit u', 'u.id_unit = news.id_unit_creator', 'left')
+            ->select('news.id_news, news.title, news.status, news.reason_note, news.approved_at, news.created_at, p.name AS pembuat, p.nip AS nip_pembuat, u.unit AS nama_unit');
     }
 
     /**
      * @return list<array<string, mixed>>
      */
-    private function halaman(BaseBuilder $b, string $urut, int $page, int $perPage): array
+    private function halaman(callable $saring, string $urut, int $page, int $perPage): array
     {
         $perPage = max(1, $perPage);
-        $rows    = (clone $b)->orderBy($urut, 'DESC')->orderBy('news.id_news', 'DESC')->limit($perPage, (max(1, $page) - 1) * $perPage)->get()->getResultArray();
+        $b       = $this->antreanDasar();
+        $saring($b);
+        $rows = $b->orderBy($urut, 'DESC')->orderBy('news.id_news', 'DESC')->limit($perPage, (max(1, $page) - 1) * $perPage)->get()->getResultArray();
 
         return array_map(fn (array $r): array => $this->item($r) + [
             'dibaca'        => true,

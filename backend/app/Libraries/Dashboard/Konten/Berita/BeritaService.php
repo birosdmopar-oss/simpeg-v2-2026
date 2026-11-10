@@ -85,24 +85,32 @@ final class BeritaService
         $page    = $p->page();
         $perPage = $p->perPage(self::PER_PAGE_DEFAULT, self::PER_PAGE_MAX);
 
-        $b = $this->dasar();
-        $this->batasTampil($b, $auth);
-
         $kategori = $p->string('kategori');
+        $q        = trim($p->string('q'));
 
-        if ($kategori !== '' && ctype_digit($kategori)) {
-            $b->where('news.id_news_category', (int) $kategori);
-        }
+        // Filter hanya merujuk kolom news.* sehingga bisa dipasang ke builder total (tanpa join) dan builder baris (dengan join).
+        $saring = function (BaseBuilder $b) use ($auth, $kategori, $q): void {
+            $this->batasTampil($b, $auth);
 
-        $q = trim($p->string('q'));
+            if ($kategori !== '' && ctype_digit($kategori)) {
+                $b->where('news.id_news_category', (int) $kategori);
+            }
 
-        if ($q !== '') {
-            $like = ListQuery::likeLiteral($this->db, $q);
-            $b->groupStart()->like('news.title', $like)->orLike('news.news', $like)->groupEnd();
-        }
+            if ($q !== '') {
+                $like = ListQuery::likeLiteral($this->db, $q);
+                $b->groupStart()->like('news.title', $like)->orLike('news.news', $like)->groupEnd();
+            }
+        };
 
-        $total = (clone $b)->countAllResults();
-        $rows  = $b->orderBy('news.publish_at', 'DESC')->orderBy('news.id_news', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+        // Total dihitung dari builder TERPISAH tanpa join: countAllResults() pada klon builder beralias mengosongkan pelacakan
+        // alias koneksi CI4, sehingga query berikutnya salah memberi prefix DBPrefix pada alias join.
+        $hitung = $this->db->table('news');
+        $saring($hitung);
+        $total = (int) $hitung->countAllResults();
+
+        $b = $this->dasar();
+        $saring($b);
+        $rows = $b->orderBy('news.publish_at', 'DESC')->orderBy('news.id_news', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
 
         return [
             'items' => array_map(fn (array $r): array => [
@@ -134,20 +142,25 @@ final class BeritaService
         $page    = $p->page();
         $perPage = $p->perPage(20, self::PER_PAGE_MAX);
 
-        $b = $this->dasar();
-
-        if ((int) $auth->role() === Role::ADMIN_SATKER) {
-            $this->batasMilik($b, $auth);
-        }
-
         $status = $p->string('status');
 
-        if (in_array($status, ['0', '1', '2'], true)) {
-            $b->where('news.status', (int) $status);
-        }
+        $saring = function (BaseBuilder $b) use ($auth, $status): void {
+            if ((int) $auth->role() === Role::ADMIN_SATKER) {
+                $this->batasMilik($b, $auth);
+            }
 
-        $total = (clone $b)->countAllResults();
-        $rows  = $b->orderBy('news.publish_at', 'DESC')->orderBy('news.id_news', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+            if (in_array($status, ['0', '1', '2'], true)) {
+                $b->where('news.status', (int) $status);
+            }
+        };
+
+        $hitung = $this->db->table('news');
+        $saring($hitung);
+        $total = (int) $hitung->countAllResults();
+
+        $b = $this->dasar();
+        $saring($b);
+        $rows = $b->orderBy('news.publish_at', 'DESC')->orderBy('news.id_news', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
 
         return [
             'items' => array_map(fn (array $r): array => [
@@ -400,10 +413,11 @@ final class BeritaService
 
     private function dasar(): BaseBuilder
     {
+        // join dulu, baru select: alias join belum dikenal bila select dipanggil lebih awal (prefix DB salah dipasang ke alias).
         return $this->db->table('news')
-            ->select('news.*, nc.category, p.name AS penulis')
             ->join('news_category nc', 'nc.id_news_category = news.id_news_category', 'left')
-            ->join('pengguna p', 'p.id_pengguna = news.created_by', 'left');
+            ->join('pengguna p', 'p.id_pengguna = news.created_by', 'left')
+            ->select('news.*, nc.category, p.name AS penulis');
     }
 
     /**

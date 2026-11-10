@@ -109,7 +109,7 @@ const basis = (j: JenisMasterKonten): string => (j === 'dibo-jenis' ? '/konten/d
 
 export function masterKontenService(jenis: JenisMasterKonten) {
   const b = basis(jenis)
-  const map = (r: { id: number | string; nama: string; urutan?: number | null; status?: number | string | null }): MasterKontenRow => ({
+  const map = (r: { id: number | string; nama: string; urutan?: number | null; status?: number | string | null; allow_ap?: number | null }): MasterKontenRow => ({
     id: String(r.id),
     nama: r.nama,
     urutan: Number(r.urutan ?? 0),
