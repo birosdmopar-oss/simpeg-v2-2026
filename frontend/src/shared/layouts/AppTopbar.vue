@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * Topbar navy membulat (Laporan Redesign §4, Gambar 12): judul sistem di kiri, lonceng notifikasi di kanan.
- * Titik merah pada lonceng hanya muncul bila `unread > 0` — pusat notifikasi (F-08) baru ada di Fase 7,
- * jadi sampai saat itu lonceng tampil tanpa titik agar tidak menyesatkan.
+ * Titik merah pada lonceng hanya muncul bila `unread > 0`. Angkanya dari Pusat Notifikasi F-08 (MAKE-085,
+ * `useRingkasanNotifikasi`, dipasang RedesignShell); klik lonceng memancarkan `open-notifikasi`.
  * Di layar < lg tersedia tombol hamburger untuk membuka sidebar.
  */
 import { Bell, Menu } from 'lucide-vue-next'
@@ -12,7 +12,7 @@ withDefaults(defineProps<{ title?: string; unread?: number }>(), {
   unread: 0,
 })
 
-defineEmits<{ 'open-menu': [] }>()
+defineEmits<{ 'open-menu': []; 'open-notifikasi': [] }>()
 </script>
 
 <template>
@@ -38,6 +38,7 @@ defineEmits<{ 'open-menu': [] }>()
       class="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/90 transition hover:bg-white/10 focus-visible:ring-white/60 focus-visible:ring-offset-brand-primary"
       :aria-label="unread > 0 ? `Notifikasi, ${unread} belum dibaca` : 'Notifikasi'"
       data-testid="topbar-bell"
+      @click="$emit('open-notifikasi')"
     >
       <Bell class="h-5 w-5" aria-hidden="true" />
       <span

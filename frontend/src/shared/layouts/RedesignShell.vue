@@ -16,6 +16,7 @@ import { ROLE_LABELS } from '@/features/auth/types'
 import NotifikasiPushShell from '@/features/integrasi/components/NotifikasiPushShell.vue'
 import PengingatCutiShell from '@/features/layanan/components/PengingatCutiShell.vue'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
+import { NOTIFIKASI_ROLES, resetRingkasanNotifikasi, useRingkasanNotifikasi } from '@/features/notifikasi'
 import { UiBreadcrumb, type Crumb } from '@/shared/ui'
 
 import AppSidebar from './AppSidebar.vue'
@@ -105,11 +106,30 @@ const groups = computed(() => (auth.mustChangePassword ? [] : buildNav(auth.role
 const userName = computed(() => auth.user?.name ?? auth.user?.username ?? 'Pengguna')
 const userSubtitle = computed(() => auth.user?.nip ?? (auth.role ? ROLE_LABELS[auth.role] : ''))
 
+/**
+ * Lonceng F-08 (MAKE-085): angka dari `useRingkasanNotifikasi` (singleton, polling 60 detik), dimuat ulang tiap pindah
+ * halaman. Klik lonceng → Pusat Notifikasi untuk role yang punya halamannya (Q7-29); role lain tetap melihat angka saja.
+ */
+const lonceng = useRingkasanNotifikasi()
+const unread = computed(() => (auth.mustChangePassword ? 0 : lonceng.total.value))
+watch(
+  () => router.currentRoute.value.fullPath,
+  () => {
+    if (!auth.mustChangePassword) void lonceng.muatUlang()
+  },
+)
+
+function bukaNotifikasi(): void {
+  if (auth.mustChangePassword || auth.role === null || !NOTIFIKASI_ROLES.includes(auth.role)) return
+  void router.push('/notifikasi')
+}
+
 async function logout(): Promise<void> {
   try {
     await auth.logout()
   } finally {
     resetPengingatCuti()
+    resetRingkasanNotifikasi()
     await router.push({ name: 'login' })
   }
 }
@@ -153,7 +173,7 @@ async function logout(): Promise<void> {
           class="sticky top-0 z-20 -mx-4 -mt-4 bg-gradient-to-b from-slate-100 via-slate-100/90 to-transparent px-4 pb-3 pt-4 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5"
           data-testid="app-topbar-sticky"
         >
-          <AppTopbar @open-menu="mobileOpen = true" />
+          <AppTopbar :unread="unread" @open-menu="mobileOpen = true" @open-notifikasi="bukaNotifikasi" />
         </div>
 
         <UiBreadcrumb v-if="breadcrumbs?.length" :items="breadcrumbs" class="mt-4 block" />
