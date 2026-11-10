@@ -37,8 +37,10 @@ use Config\Dashboard;
  * predikat daftar `PegawaiScope` yang untuk unit tertentu ikut UPT/BPO). Aturan "satker ada" sama dengan `PegawaiScope`:
  * satker bukan NULL/'' tetapi bukan angka kanonik → tanpa data (fail-closed), tidak jatuh ke unit.
  *
- * Cache: hitungan jenis pegawai/CLTN dan total di-cache per lingkup selama `ttlRingkasanDetik` (0 = tanpa cache); angka
- * "hari ini" (TB, IB, cuti, presensi online) selalu dihitung ulang.
+ * `pengingat` = 4 kartu Pensiun / Naik Pangkat / Tanda Jasa / KGB ({@see PengingatBeranda}; tanpa pengecualian NIP, ikut legacy).
+ *
+ * Cache: hitungan jenis pegawai/CLTN/total dan pengingat (kunci + tanggal) di-cache per lingkup selama `ttlRingkasanDetik`
+ * (0 = tanpa cache); angka "hari ini" (TB, IB, cuti, presensi online) selalu dihitung ulang.
  *
  * **Pegawai (role 2/6/7)** — kerangka M1: `{keluarga: 'pegawai'}`; kartu prediksi, kelengkapan data, bawahan menyusul M2.
  */
@@ -79,6 +81,18 @@ final class RingkasanBeranda
         ['kode' => 'pppk', 'label' => 'Total PPPK', 'kelompok' => self::KELOMPOK_KOMPOSISI],
     ];
 
+    /**
+     * 4 kartu pengingat `dashboard_ad.php:8-37` (label `<small>` legacy); hitungan {@see PengingatBeranda}.
+     *
+     * @var list<array{kode: string, label: string}>
+     */
+    public const PENGINGAT = [
+        ['kode' => 'pensiun', 'label' => 'Pensiun'],
+        ['kode' => 'kp', 'label' => 'Naik Pangkat'],
+        ['kode' => 'tj', 'label' => 'Tanda Jasa'],
+        ['kode' => 'kgb', 'label' => 'KGB'],
+    ];
+
     /** `id_jenis_pegawai` per kode komposisi [K]. */
     private const JENIS_PEGAWAI = ['pns' => 1, 'ptt' => 2, 'non_pns' => 3, 'staf_khusus' => 4, 'tenaga_ahli' => 5, 'pppk' => 6];
 
@@ -117,9 +131,13 @@ final class RingkasanBeranda
         $lingkup = $this->lingkup($auth);
         $tanggal = $this->hariIni ?? TanggalBisnis::hariIni();
 
-        $tetap   = $this->ingat($lingkup, fn (): array => $this->hitungTetap($lingkup));
-        $hariIni = $this->hitungHariIni($lingkup, $tanggal);
-        $total   = $tetap['total_aktif'];
+        /** @var array{total_aktif: int, jenis: array<string, int>, cltn: int} $tetap */
+        $tetap = $this->ingat('tetap', $lingkup, '', fn (): array => $this->hitungTetap($lingkup));
+
+        /** @var array{pensiun: int, kp: int, tj: int, kgb: int} $pengingat */
+        $pengingat = $this->ingat('pengingat', $lingkup, $tanggal, fn (): array => (new PengingatBeranda($this->db, $tanggal))->hitung($lingkup));
+        $hariIni   = $this->hitungHariIni($lingkup, $tanggal);
+        $total     = $tetap['total_aktif'];
 
         $tile = [];
 
@@ -134,6 +152,7 @@ final class RingkasanBeranda
             'tampilan_komposisi' => $this->config->modeKomposisi(),
             'tanggal'            => $tanggal,
             'total_aktif'        => $total,
+            'pengingat'          => array_map(static fn (array $k): array => $k + ['jumlah' => $pengingat[$k['kode']]], self::PENGINGAT),
             'tile'               => $tile,
         ];
     }
@@ -260,12 +279,14 @@ final class RingkasanBeranda
     }
 
     /**
-     * @param array{jenis: string, id: int|null, kosong: bool} $lingkup
-     * @param callable(): array{total_aktif: int, jenis: array<string, int>, cltn: int} $hitung
+     * Cache per jenis hitungan + lingkup (+ $tanggal bila hasilnya bergantung tanggal, mis. pengingat).
      *
-     * @return array{total_aktif: int, jenis: array<string, int>, cltn: int}
+     * @param array{jenis: string, id: int|null, kosong: bool} $lingkup
+     * @param callable(): array<string, mixed>                  $hitung
+     *
+     * @return array<string, mixed>
      */
-    private function ingat(array $lingkup, callable $hitung): array
+    private function ingat(string $jenis, array $lingkup, string $tanggal, callable $hitung): array
     {
         $ttl = $this->config->ttlRingkasanDetik;
 
@@ -274,9 +295,9 @@ final class RingkasanBeranda
         }
 
         // Sidik daftar NIP (bukan isinya) supaya perubahan konfigurasi tidak memakai angka lama; NIP tidak masuk kunci.
-        $kunci = sprintf('dashboard_beranda_%s_%s_%s', $lingkup['jenis'], $lingkup['id'] ?? 'x', substr(hash('sha256', implode(',', $this->config->daftarNipDisembunyikan())), 0, 12));
+        $kunci = sprintf('dashboard_beranda_%s_%s_%s_%s_%s', $jenis, $lingkup['jenis'], $lingkup['id'] ?? 'x', $tanggal === '' ? 'x' : $tanggal, substr(hash('sha256', implode(',', $this->config->daftarNipDisembunyikan())), 0, 12));
 
-        /** @var array{total_aktif: int, jenis: array<string, int>, cltn: int} */
+        /** @var array<string, mixed> */
         return $this->cache->remember($kunci, $ttl, $hitung(...));
     }
 
