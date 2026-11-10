@@ -25,7 +25,7 @@ describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
 
   // Menu lengkap per role (urut sidebar): Kepegawaian Fase 3 lalu menu main.
   it.each([
-    [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Layanan', 'Presensi', 'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ']],
+    [Role.SUPER_ADMIN, ['Beranda', ...FASE3_MENUS, 'Layanan', 'Presensi', 'Master Data', 'Angka Kredit JF', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'Integrasi', 'FAQ']],
     [Role.PEGAWAI, ['Beranda', 'Struktur Organisasi', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Verifikasi LKH', 'Layanan', 'Presensi', 'FAQ']],
     [Role.ADMIN_SATKER, ['Beranda', 'Daftar Pegawai', 'Pengajuan Data Umum', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Verifikasi LKH', 'Layanan', 'Presensi', 'Manajemen Akun', 'FAQ']],
     [Role.ADMIN_VIEW_ESELON1, ['Beranda', 'Daftar Pegawai', 'Struktur Organisasi', 'Plt/Plh', 'Usulan Konket', 'Usulan Karpeg/Karis', 'Layanan', 'Presensi', 'Hari Libur', 'FAQ']],
@@ -94,6 +94,7 @@ describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
       'web-config': { name: 'web-config' },
       'hari-libur': { name: 'hari-libur' },
       users: { name: 'users' },
+      integrasi: { name: 'integrasi-admin' },
       faq: { name: 'faq' },
     })
   })
@@ -125,7 +126,7 @@ describe('buildNav — fase 2 (sebelum B-20 penutup)', () => {
   })
 
   it('Super Admin melihat menu main saja', () => {
-    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'FAQ'])
+    expect(labels(Role.SUPER_ADMIN, 2)).toEqual(['Beranda', 'Master Data', 'Web Config', 'Hari Libur', 'Manajemen Akun', 'Integrasi', 'FAQ'])
   })
 })
 
