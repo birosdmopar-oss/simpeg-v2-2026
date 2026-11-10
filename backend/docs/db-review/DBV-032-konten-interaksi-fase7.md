@@ -278,8 +278,8 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
 | # | Pertanyaan | Usulan |
 |---|---|---|
 | DBV-032-Q1 | `form_digital` menyimpan pilihan target (JSON) atau tidak | Simpan seperti popup [I], agar form bisa diedit ulang. Final mengikuti D1 |
-| DBV-032-Q2 | Salinan nama `news.category` / `news.unit_satker_target` | Tidak dibawa; diturunkan dengan join (nama tidak basi). Jalur A konfirmasi |
-| DBV-032-Q3 | FK `news.id_unit_target/id_satker_target/id_*_creator` ke master unit/satker | Tanpa FK di draf (tipe dan nilai '0' legacy ⚑). Dipasang bila D1 membuktikan yatim = 0 |
+| DBV-032-Q2 | Salinan nama `news.category` / `news.unit_satker_target` | Tidak dibawa; nama diturunkan dengan join ke `news_category`/`unit`/`satker` (target kementerian memakai `web_config`). **Disetujui Jalur A 10-11** (tanpa kebutuhan histori) |
+| DBV-032-Q3 | FK `news.id_unit_target/id_satker_target/id_*_creator` ke master unit/satker | Tanpa FK di draf; semua kolom NULL-able [K-kode]: target kementerian = NULL (`L_news::set_param` 866-930; '0' hanya ada di input form, tidak disimpan); `id_*_creator` = NULL untuk role 1 dan role 3 tanpa satker. Tipe ikut D1; FK dipasang bila D1 membuktikan yatim = 0. **Disetujui Jalur A 10-11** |
 | DBV-032-Q4 | Nama kategori unik | Aplikasi saja, karena status 2/10 boleh berulang |
 | DBV-032-Q5 | PK sintetis tabel anak | Dipakai; bila D1 menunjukkan PK komposit, UNIQUE tetap dan PK sintetis tetap [V2] (impor tidak memakainya) |
 | DBV-032-Q6 | CHECK `JSON_VALID` di kolom target/skema/jawaban | Dipakai (MySQL 8 & MariaDB); impor menormalkan `addslashes` lebih dulu |
