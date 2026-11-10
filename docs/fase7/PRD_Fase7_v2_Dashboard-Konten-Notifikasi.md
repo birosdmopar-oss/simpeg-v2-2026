@@ -3,7 +3,7 @@
 | Atribut | Isi |
 |---|---|
 | Versi | **v2.0 — 10-11-2026** (CR-112; disusun reviewer CR dari laporan M0 empat jalur `wt/f7-m0/M0_*.md`) |
-| Status | **DRAF untuk review Horii.** 8 keputusan prioritas DIKUNCI Horii 10-11-2026; 39 keputusan lain = **bawaan (saran) — belum dikonfirmasi Horii**, dikunci saat PRD ini diizinkan masuk `main` (§4) |
+| Status | **BERLAKU — disetujui Horii 10-11-2026** (izin merge). 8 keputusan prioritas dipilih Horii; 39 keputusan lain = bawaan (saran) **dikonfirmasi Horii 10-11-2026** ("ikut bawaan semua") — semua dikunci (§4) |
 | Scope | Fase 7 sisa: F-01, F-02, F-04, F-05, F-06, F-07, F-08, F-11, F-12, F-13 + ISSUE-058 (deviasi K1 Fase 6). **F-03 & F-09 tetap diatur PRD v1.0** (`PRD_Fase7_Statistik-GeneratorDokumen.md`, Done). **F-10 Arsip Digital DITUNDA** (Horii 20-10-2026 & 10-11-2026) |
 | Izin kerja | [#4-WorkloadParalelFase7] (Horii 10-11-2026) — anggota & batas di §3 |
 | Acuan | PRD v1.0 Fase 7 (§2 aturan, §3 anti-tabrakan, §5 F7-1..27 tetap berlaku untuk F-03/F-09 dan sebagai pola); PRD Fase 8 v1.0 (BP8-1, PN8-2, Q8-06); PRD Fase 4 (D10, DBV-022); PRD Fase 6 v1.0o (§6.2, F6-24, Q6-29); `Bahan Baku SIMPEG/07-*` (DoD Trello QASMTASK-098..110) |
@@ -87,8 +87,8 @@ sambung yang disebut di §7 (mis. `features/presensi` hanya lewat ekspor kompone
 ---
 
 ## 4. Register keputusan Fase 7 (Q7-01..Q7-47)
-Status: **🔒 = dikunci Horii 10-11-2026**; **◻ = bawaan (saran reviewer/jalur), belum dikonfirmasi Horii** — dianggap berlaku bila PRD ini
-diizinkan masuk `main` tanpa koreksi. Rincian opsi & perbandingan: `Keputusan_Q7_Fase7.md`, `Perbandingan_8_Prioritas_Q7.md` (folder kerja Horii).
+Status: **🔒 = dipilih Horii 10-11-2026**; **◻ = bawaan (saran reviewer/jalur), dikonfirmasi Horii 10-11-2026** ("ikut bawaan semua"). Semua
+butir dikunci. Rincian opsi & perbandingan: `Keputusan_Q7_Fase7.md`, `Perbandingan_8_Prioritas_Q7.md` (folder kerja Horii).
 
 ### 4.1 Dikunci Horii (8 prioritas)
 | # | Keputusan | Label |
@@ -102,7 +102,7 @@ diizinkan masuk `main` tanpa koreksi. Rincian opsi & perbandingan: `Keputusan_Q7
 | Q7-41 🔒 | Pengecualian NIP dari hitungan dashboard **ikut legacy** (`$whereHide_nip`), daftar NIP dari konfigurasi rahasia server `dashboard.nipDisembunyikan` (kosong = tanpa pengecualian); hitungan TB role 3 tanpa perpanjangan [K] | [K] |
 | Q7-04 🔒 | Push popup Android **tidak dikirim** (legacy `Cron::queue_popup_notif` mati, `exit()`); titik sambung tetap | [K] |
 
-### 4.2 Bawaan — belum dikonfirmasi Horii (◻)
+### 4.2 Bawaan — dikonfirmasi Horii 10-11-2026 (◻)
 | # | Keputusan bawaan | Label |
 |---|---|---|
 | Q7-01 | Pemilik form digital & SKL = Jalur B | — |
@@ -302,10 +302,10 @@ F-02 eksekusi data nyata = cutover (bukan syarat sign-off).
 |---|---|---|---|
 | Q7-36 | Komposisi pegawai di dashboard admin tampil sebagai angka + persen (`views/user/dashboard_ad.php:47-180`), tanpa chart | Donut komposisi + tile angka | Ubah `Config\Dashboard::$tampilanKomposisi` dari `'donut'` ke `'angka'` (tanpa ubah kode/API/DB); test menjaga kedua mode |
 | Q7-10 | Editor HTML WYSIWYG, isi disimpan hampir mentah | Editor teks sederhana + pembersihan server | Tidak disarankan (celah XSS); bila perlu editor kaya → CR baru dengan pustaka yang disetujui |
-| Bawaan lain [V2] di §4.2 | — | — | Dikoreksi Horii saat review PRD ini |
+| Bawaan lain [V2] di §4.2 | Lihat label [V2] per butir | — | Perubahan sesudah kunci = CR baru atas keputusan Horii |
 
 ## Lampiran B — Riwayat versi
 | Versi | Tanggal | Isi |
 |---|---|---|
 | v1.0 | 21-10-2026 | `PRD_Fase7_Statistik-GeneratorDokumen.md` — F-03, F-09 (Done) |
-| v2.0 | 10-11-2026 | CR-112: sisa Fase 7 + ISSUE-058 dari M0 empat jalur; 8 keputusan dikunci Horii, 39 bawaan |
+| v2.0 | 10-11-2026 | CR-112: sisa Fase 7 + ISSUE-058 dari M0 empat jalur; 8 keputusan dipilih Horii, 39 bawaan dikonfirmasi Horii; disetujui masuk `main` |
