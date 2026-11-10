@@ -173,6 +173,16 @@ mengklasifikasi seluruh baris (juga saat dry-run):
 - `id_question_category` yatim → gagal: FK legacy `SET NULL` tidak menyisakan yatim, jadi yatim = T12 belum dijalankan.
 - Eksekusi data nyata hanya saat cutover (runbook, izin Horii). Fase 7 = dry-run atas fixture sintetis
   (`tests/Impor/ImporLegacyTiketLamaTest.php`).
+- Review WS-2 (DB Validator, SETUJU tanpa blok) — tindak lanjut non-blok:
+  - **N1:** keputusan untuk id yang tidak ambigu / tidak ada di snapshot dilaporkan sebagai `keputusan_tak_terpakai`
+    di manifest dan INFO `F-02 INFO keputusan tiket/pesan tak terpakai` di laporan impor.
+  - **N2:** tiket yang SEMUA pesannya diputus `__buang` dinilai ulang menjadi A-ESK "tanpa pesan" (eskalasi).
+  - **N3:** manifest menghitung kelas T-NORM/M-NORM dan `di_luar_domain` per `<tabel>.<kolom>` → nilai → jumlah, agar
+    bagian `status` berkas keputusan bisa disiapkan sejak dry-run.
+  - **N4:** `stripslashes` bawaan berlaku untuk semua kolom teks tiket/pesan (bukan hanya `msg`), diterima apa adanya
+    (R8-5, DBV-011 §2.2 #3).
+  - **N5:** di salinan legacy `closed_by` selalu NULL (penulis `close_inbox` tidak mengisinya); catatan untuk Fase 8.
+  - **N6:** INFO `F-02 INFO kategori NULL` = jumlah tiket berkategori NULL (kategori dihapus, FK legacy SET NULL).
 
 **Transaksi per tabel (DBV-029 K-M8, `DaftarTabel::TIER_PER_TABEL`).** Seluruh tier dipra-cek dulu; tiap tabel satu
 transaksi, counter dan INFO sesudah commit tabel itu, lalu dicatat di `--jejak=<berkas>` (folder kerja, satu per DB

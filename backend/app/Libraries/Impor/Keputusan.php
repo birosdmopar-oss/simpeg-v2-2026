@@ -152,6 +152,18 @@ final class Keputusan
     }
 
     /**
+     * PK sumber yang punya keputusan di bagian `baris` `<tabel>.<kolom>` (untuk melaporkan keputusan tak terpakai, F-02).
+     *
+     * @return list<string>
+     */
+    public function barisDiputus(string $tabel, string $kolom): array
+    {
+        $peta = $this->isi['baris']["{$tabel}.{$kolom}"] ?? null;
+
+        return is_array($peta) ? array_map('strval', array_keys($peta)) : [];
+    }
+
+    /**
      * Sidik isi berkas keputusan untuk berkas jejak (K-M8): sama → keputusan yang sama.
      */
     public function sidik(): string

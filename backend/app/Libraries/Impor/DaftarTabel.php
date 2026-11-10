@@ -508,28 +508,30 @@ final class DaftarTabel
      */
     private static function tierTiketLama(): array
     {
-        $r = 'F-02 MAKE-086, DBV-022 §2.10/§2.11';
+        $r      = 'F-02 MAKE-086, DBV-022 §2.10/§2.11';
+        $aturan = new AturanTiketLama();
 
         return [
             new DefinisiTabel(
                 'disiplin_ticket',
                 'id_inbox',
                 $r,
-                statusDomain: [0, 1],
-                domain: ['allow_reply' => [0, 1], 'is_read' => [1, 2], 'is_read_off' => [1, 2], 'notify_pic' => [0, 1, 2]],
+                statusDomain: AturanTiketLama::STATUS_TIKET,
+                domain: AturanTiketLama::DOMAIN_TIKET,
                 kolomKode: ['nip'],
                 sumber: 'inbox',
-                praPindai: AturanTiketLama::tiket(...),
-                pascaImpor: AturanTiketLama::infoTiket(...),
+                praPindai: $aturan->tiket(...),
+                pascaImpor: $aturan->infoTiket(...),
             ),
             new DefinisiTabel(
                 'disiplin_ticket_msg',
                 'id_inbox_msg',
                 $r,
                 statusDomain: null,
-                domain: ['show_notif' => [0, 1], 'is_read' => [0, 1]],
+                domain: AturanTiketLama::DOMAIN_PESAN,
                 sumber: 'inbox_msg',
-                praPindai: AturanTiketLama::pesan(...),
+                praPindai: $aturan->pesan(...),
+                pascaImpor: $aturan->infoPesan(...),
             ),
         ];
     }

@@ -92,7 +92,9 @@ final class ImporLegacyTiketLamaTest extends ImporLegacyTestCase
         $this->assertSame(5, $tiket['sumber']);
         $this->assertSame(4, $tiket['ditulis']);
         $this->assertSame([AturanTiketLama::DIBUANG_KEPUTUSAN => 1], $tiket['dibuang']);
-        $this->assertSame(['F-02 INFO pengirim tanpa akun v2' => 4], array_intersect_key($tiket['koreksi'], ['F-02 INFO pengirim tanpa akun v2' => 0]));
+        $this->assertSame(4, $tiket['koreksi'][AturanTiketLama::INFO_PENGIRIM] ?? null);
+        $this->assertSame(1, $tiket['koreksi'][AturanTiketLama::INFO_KATEGORI_NULL] ?? null, 'N6: tiket berkategori NULL');
+        $this->assertArrayNotHasKey(AturanTiketLama::INFO_TAK_TERPAKAI_TIKET, $tiket['koreksi']);
 
         $pesan = $laporan['disiplin_ticket_msg<inbox_msg'];
         $this->assertSame(6, $pesan['sumber']);
@@ -111,6 +113,30 @@ final class ImporLegacyTiketLamaTest extends ImporLegacyTestCase
 
         $this->assertSame(0, $this->db->table('inbox')->countAllResults(), 'inbox v2 (notifikasi) tidak ditulis (Q7-28)');
         $this->assertSame(0, $this->db->table('inbox_msg')->countAllResults());
+    }
+
+    public function testKeputusanTakTerpakaiDilaporkan(): void
+    {
+        $k       = $this->keputusan([AturanTiketLama::KUNCI_TIKET => ['3' => AturanTiketLama::BUANG, '4' => AturanTiketLama::IMPOR, '1' => AturanTiketLama::IMPOR, '99' => AturanTiketLama::BUANG]]);
+        $laporan = $this->jalankanImpor([self::TIER], k: $k);
+
+        $this->assertSame(2, $laporan['disiplin_ticket<inbox']['koreksi'][AturanTiketLama::INFO_TAK_TERPAKAI_TIKET] ?? null, 'N1: id tidak ambigu (1) dan tidak ada di snapshot (99)');
+        $this->assertSame(['tiket' => 2, 'pesan' => 0], (new AturanTiketLama())->manifest($this->src, 'inbox', 'inbox_msg', $k)['keputusan_tak_terpakai']);
+    }
+
+    public function testTiketYangSemuaPesannyaDibuangMenjadiTanpaPesan(): void
+    {
+        // N2: satu-satunya pesan tiket 5 diputus "__buang" → tiket 5 = A-ESK tanpa pesan, wajib diputus juga.
+        $k = $this->keputusan([AturanTiketLama::KUNCI_PESAN => ['14' => AturanTiketLama::BUANG, '15' => AturanTiketLama::BUANG]]);
+
+        try {
+            $this->jalankanImpor([self::TIER], dryRun: true, k: $k);
+            $this->fail('tiket tanpa pesan sesudah keputusan pesan wajib dieskalasi');
+        } catch (ImporGagal $e) {
+            $this->assertStringContainsString('inbox: 1 baris ambigu belum diputuskan (' . AturanTiketLama::A_TANPA_PESAN . ': 1)', $e->getMessage());
+        }
+
+        $this->assertSame(['5' => AturanTiketLama::A_TANPA_PESAN], (new AturanTiketLama())->manifest($this->src, 'inbox', 'inbox_msg', $k)['eskalasi']['tiket']);
     }
 
     public function testPesanTanpaIndukHanyaBolehDibuang(): void
@@ -140,6 +166,10 @@ final class ImporLegacyTiketLamaTest extends ImporLegacyTestCase
             $this->assertStringContainsString("disiplin_ticket.is_read '0' di luar domain", $e->getMessage());
         }
 
+        $manifest = (new AturanTiketLama())->manifest($this->src, 'inbox', 'inbox_msg', $this->keputusan());
+        $this->assertSame(['disiplin_ticket.is_read' => ['0' => 1]], $manifest['di_luar_domain'], 'N3: nilai di luar domain dihitung sejak dry-run');
+        $this->assertSame(1, $manifest['tiket']['kelas']['T-NORM'] ?? null);
+
         $isi           = $this->isiKeputusan();
         $isi['status'] = ['disiplin_ticket.is_read' => ['0' => 2]];
         $laporan       = $this->jalankanImpor([self::TIER], k: Keputusan::dariArray($isi));
@@ -149,7 +179,7 @@ final class ImporLegacyTiketLamaTest extends ImporLegacyTestCase
 
     public function testManifestDanCommandSortirInboxTanpaMenulisDb(): void
     {
-        $manifest = AturanTiketLama::manifest($this->src, 'inbox', 'inbox_msg', Keputusan::kosong());
+        $manifest = (new AturanTiketLama())->manifest($this->src, 'inbox', 'inbox_msg', Keputusan::kosong());
 
         $this->assertSame(['total' => 5, 'kelas' => ['T-OK' => 3, 'A-ESK belum diputuskan' => 2]], $manifest['tiket']);
         $this->assertSame(['3' => AturanTiketLama::A_PENGIRIM, '4' => AturanTiketLama::A_TANPA_PESAN], $manifest['eskalasi']['tiket']);
@@ -157,7 +187,7 @@ final class ImporLegacyTiketLamaTest extends ImporLegacyTestCase
         $this->assertSame(6, $manifest['pesan']['total']);
         $this->assertSame(6, array_sum($manifest['pesan']['kelas']));
 
-        $sesudah = AturanTiketLama::manifest($this->src, 'inbox', 'inbox_msg', $this->keputusan());
+        $sesudah = (new AturanTiketLama())->manifest($this->src, 'inbox', 'inbox_msg', $this->keputusan());
         $this->assertSame(['T-OK' => 3, 'A-ESK dibuang' => 1, 'A-ESK diimpor' => 1], $sesudah['tiket']['kelas']);
         $this->assertSame(['M-OK' => 4, 'M-IKUT dibuang' => 1, 'M-ESK dibuang' => 1], $sesudah['pesan']['kelas']);
         $this->assertSame(['tiket' => [], 'pesan' => []], $sesudah['eskalasi']);

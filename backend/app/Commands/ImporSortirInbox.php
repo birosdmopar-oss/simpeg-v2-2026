@@ -68,7 +68,7 @@ class ImporSortirInbox extends BaseCommand
             $keputusan = is_string($berkas) ? Keputusan::dariBerkas($berkas) : Keputusan::kosong();
             CLI::write(sprintf('Sumber: %s:%s / %s (dibaca saja)', $db->hostname, (string) $db->port, $db->getDatabase()), 'yellow');
 
-            $manifest = AturanTiketLama::manifest($db, $this->tabel($db, 'inbox'), $this->tabel($db, 'inbox_msg'), $keputusan);
+            $manifest = (new AturanTiketLama())->manifest($db, $this->tabel($db, 'inbox'), $this->tabel($db, 'inbox_msg'), $keputusan);
             $isi      = json_encode(['dibuat_utc' => gmdate('Y-m-d\TH:i:s\Z'), 'sumber' => $db->getDatabase()] + $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
             if (@file_put_contents($keluaran, $isi . "\n") === false) {
@@ -90,6 +90,16 @@ class ImporSortirInbox extends BaseCommand
             foreach ($manifest[$k]['kelas'] as $kelas => $n) {
                 CLI::write("  {$kelas}: {$n}");
             }
+        }
+
+        foreach ($manifest['di_luar_domain'] as $kolom => $nilai) {
+            CLI::write("Di luar domain {$kolom}: " . implode(', ', array_map(static fn (string $v, int $n): string => "{$v}={$n}", array_map('strval', array_keys($nilai)), $nilai)) . ' (petakan di bagian status berkas keputusan)');
+        }
+
+        $tak = $manifest['keputusan_tak_terpakai'];
+
+        if ($tak['tiket'] + $tak['pesan'] > 0) {
+            CLI::write("Keputusan tak terpakai: tiket {$tak['tiket']}, pesan {$tak['pesan']} (id tidak ambigu atau tidak ada di snapshot; periksa berkas keputusan).", 'yellow');
         }
 
         $esk = count($manifest['eskalasi']['tiket']) + count($manifest['eskalasi']['pesan']);
