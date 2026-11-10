@@ -79,6 +79,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // gender|eselon|education|gol` = 1, 3, 4, 5, 8 (role 3 terbatas satker/unit di service, PegawaiScope).
             // F-13 beranda (MAKE-087, PRD Fase 7 v2.0 §6): semua akun login; bentuk respons per keluarga role.
             'GET api/v1/dashboard/ringkasan'    => self::JWT,
+            'GET api/v1/dashboard/direktur'     => [1, 4],
             'GET api/v1/statistik/lingkup'      => [1, 3, 4, 5, 8],
             'GET api/v1/statistik/([^/]+)/xlsx' => [1, 3, 4, 5, 8],
             'GET api/v1/statistik/([^/]+)'      => [1, 3, 4, 5, 8],

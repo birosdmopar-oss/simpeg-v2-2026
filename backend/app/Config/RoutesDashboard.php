@@ -31,4 +31,6 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
 
     // F-13 beranda per role (MAKE-087, Jalur D, PRD Fase 7 v2.0 §5.10): semua akun login (jwt grup); bentuk per keluarga role.
     $routes->get('dashboard/ringkasan', 'BerandaController::ringkasan');
+    // Masa kerja direktur politeknik: role 1, 4 [K `dashboard_ad.php:201`].
+    $routes->get('dashboard/direktur', 'BerandaController::direktur', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_VIEW_ESELON1)]);
 });
