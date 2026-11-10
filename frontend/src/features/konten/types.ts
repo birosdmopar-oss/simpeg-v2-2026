@@ -58,3 +58,46 @@ export interface SpesifikasiTarget {
   pegawai: string[]
   kecuali: string[]
 }
+
+/** Jenis konten bergambar yang dikelola role 1 (popup/banner berbagi bentuk dan penargetan). */
+export type JenisKontenGambar = 'popup' | 'banner'
+
+/** Baris daftar kelola (GET /konten/{popup|banner}); draf, dikunci saat BE F-04/F-05 masuk. */
+export interface KontenGambarRowApi {
+  id: KontenApiId
+  keterangan?: string | null
+  url?: string | null
+  gambar_url?: string | null
+  /** DATE (Y-m-d). */
+  tgl_mulai: string
+  tgl_akhir: string
+  urutan?: number | null
+  /** 1 aktif, 2 tidak aktif, 10 dihapus. */
+  status?: number | string | null
+  jumlah_penerima?: number | null
+}
+
+export interface KontenGambarRow {
+  id: string
+  keterangan: string
+  url: string
+  gambar_url: string | null
+  tgl_mulai: string
+  tgl_akhir: string
+  urutan: number
+  status: '1' | '2' | '10'
+  jumlah_penerima: number
+}
+
+export interface KontenGambarForm {
+  keterangan: string
+  url: string
+  tgl_mulai: string
+  tgl_akhir: string
+  target: SpesifikasiTarget
+}
+
+export interface KontenGambarListApi {
+  items?: KontenGambarRowApi[]
+  total?: number
+}

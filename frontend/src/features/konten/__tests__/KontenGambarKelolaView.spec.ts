@@ -1,0 +1,112 @@
+/**
+ * Halaman kelola popup/banner: daftar, menu ⋮ (urutan item & disabled), konfirmasi hapus, pemetaan service.
+ * Service di-mock; form dialog di-stub (diuji terpisah lewat validasi di bawah).
+ */
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { KontenGambarRow } from '../types'
+
+const svc = vi.hoisted(() => ({
+  list: vi.fn(),
+  setStatus: vi.fn(),
+  geser: vi.fn(),
+  remove: vi.fn(),
+  opsiUnitSatker: vi.fn(),
+  opsiPegawai: vi.fn(),
+  target: vi.fn(),
+}))
+
+vi.mock('../services/kelola.service', async (orig) => ({
+  ...(await orig<typeof import('../services/kelola.service')>()),
+  kelolaService: () => svc,
+}))
+
+import KontenGambarKelolaView from '../views/KontenGambarKelolaView.vue'
+
+const baris = (o: Partial<KontenGambarRow>): KontenGambarRow => ({
+  id: '1',
+  keterangan: 'Libur Lebaran',
+  url: '',
+  gambar_url: null,
+  tgl_mulai: '2026-03-01',
+  tgl_akhir: '2026-03-31',
+  urutan: 1,
+  status: '1',
+  jumlah_penerima: 10,
+  ...o,
+})
+
+function pasang(jenis: 'popup' | 'banner' = 'popup') {
+  return mount(KontenGambarKelolaView, {
+    props: { jenis },
+    global: { stubs: { KontenGambarFormDialog: true }, mocks: {} },
+    attachTo: document.body,
+  })
+}
+
+async function bukaMenu(w: ReturnType<typeof pasang>, jenis: string, id: string) {
+  await w.get(`[data-testid="konten-${jenis}-actions-${id}"]`).trigger('click')
+  await flushPromises()
+}
+
+describe('KontenGambarKelolaView', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    svc.opsiUnitSatker.mockResolvedValue([])
+    svc.opsiPegawai.mockResolvedValue([])
+    svc.list.mockResolvedValue({ items: [baris({ id: '1' }), baris({ id: '2', status: '2', keterangan: 'Cuti' })], total: 2 })
+  })
+
+  it('memuat daftar dan menampilkan badge status (tanpa aksi di luar menu ⋮)', async () => {
+    const w = pasang()
+    await flushPromises()
+    expect(svc.list).toHaveBeenCalledWith({ page: 1, per_page: 20, status: undefined })
+    expect(w.get('[data-testid="konten-popup-row-1"]').text()).toContain('Libur Lebaran')
+    expect(w.get('[data-testid="konten-popup-row-2"]').get('[data-status]').text()).toBe('Tidak Aktif')
+    expect(w.get('[data-testid="konten-popup-row-1"]').findAll('button')).toHaveLength(1)
+    w.unmount()
+  })
+
+  it('menu baris: Edit, Nonaktifkan, urutan, Hapus; baris pertama tidak bisa dinaikkan', async () => {
+    const w = pasang()
+    await flushPromises()
+    await bukaMenu(w, 'popup', '1')
+    const aksi = [...document.body.querySelectorAll('[data-action]')].map((e) => e.getAttribute('data-action'))
+    expect(aksi).toEqual(['edit', 'deactivate', 'up', 'down', 'delete'])
+    expect((document.body.querySelector('[data-action="up"]') as HTMLElement).getAttribute('aria-disabled') ?? (document.body.querySelector('[data-action="up"]') as HTMLButtonElement).disabled).toBeTruthy()
+    w.unmount()
+  })
+
+  it('Nonaktifkan memanggil service lalu memuat ulang', async () => {
+    svc.setStatus.mockResolvedValue(undefined)
+    const w = pasang('banner')
+    await flushPromises()
+    await bukaMenu(w, 'banner', '1')
+    ;(document.body.querySelector('[data-action="deactivate"]') as HTMLElement).click()
+    await flushPromises()
+    expect(svc.setStatus).toHaveBeenCalledWith('1', '2')
+    expect(svc.list).toHaveBeenCalledTimes(2)
+    expect(w.text()).toContain('Banner dinonaktifkan.')
+    w.unmount()
+  })
+
+  it('Hapus meminta konfirmasi dulu', async () => {
+    svc.remove.mockResolvedValue(undefined)
+    const w = pasang()
+    await flushPromises()
+    await bukaMenu(w, 'popup', '1')
+    ;(document.body.querySelector('[data-action="delete"]') as HTMLElement).click()
+    await flushPromises()
+    expect(svc.remove).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('galat muat tampil sebagai pesan', async () => {
+    svc.list.mockRejectedValue(new Error('x'))
+    const w = pasang()
+    await flushPromises()
+    expect(w.get('[role="alert"]').text()).toContain('Gagal memuat popup.')
+    w.unmount()
+  })
+})
