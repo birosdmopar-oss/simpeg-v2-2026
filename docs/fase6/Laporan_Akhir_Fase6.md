@@ -4,7 +4,8 @@ Acuan: PRD Fase 6 **v1.0o** (`docs/fase6/PRD_Fase6_Integrasi.md`, §11 DoD, §12
 `6_2.md` (Jalur A), progres `backend/docs/progress/06-Integrasi.md`, checklist `docs/fase6/Checklist_QA_Lapis1_Fase6.md`.
 Disusun reviewer CR 10-11-2026 dari `main` `75361d0d` (seluruh paket H-01..H-12 sudah di `main`) ditambah CR-111.
 
-> **Status:** **siap sign-off Horii.** H-01..H-12 di `main`; regresi gate penuh lolos; QA Lapis 1 Fase 6 (mode mock)
+> **Status:** **FASE 6 DONE — sign-off Horii 10-11-2026** (`main` `f10fd0af`); Trello & Notion disinkron 10-11-2026 (§9).
+> H-01..H-12 di `main`; regresi gate penuh lolos; QA Lapis 1 Fase 6 (mode mock)
 > **lolos** — satu temuan (T1) diperbaiki CR-111 sebelum sign-off (keputusan Horii 10-11-2026). Satu deviasi tercatat:
 > **K1** (log integrasi via API + halaman Admin → Integrasi) ditunda ke fase berikutnya (keputusan Horii 10-11-2026).
 > Uji endpoint real (BSrE, SIASN, e-Kinerja, FCM) **bukan** syarat sign-off (F6-23, Q6-13 = A) tetapi **wajib lolos
@@ -69,8 +70,8 @@ keluar) — Handling Case, WS-2 (B5); DB Validator WS-2; reviewer CR; setiap mer
 | QA Lapis 1 Fase 6 lolos | §4 |
 | Runbook cron + Nginx + daftar re-handshake klien | `README-deploy.md` §1b–§1j (QA N4 ✅): jadwal command, worker `push`/`integrasi`, Nginx `/simapi/`, `/services/`, header `Authorization`, real IP; daftar klien re-handshake (PN-4) |
 | Laporan akhir | Dokumen ini |
-| Sign-off Horii | ⏳ |
-| Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122 disinkron | ⏳ sesudah sign-off (§9) |
+| Sign-off Horii | ✅ 10-11-2026 (`main` `f10fd0af`) |
+| Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122 disinkron | ✅ 10-11-2026 (§9) |
 
 ## 4. QA Lapis 1 Fase 6 (mode mock)
 
@@ -166,3 +167,5 @@ Tidak ada pertanyaan ⛔ Fase 6 lain yang terbuka.
 - Sinkron Trello DEV-007 + QASMTASK-089..097 + QASMTASK-120..122 (H-10/H-11/H-12), ISSUE-055..057, kartu K1 di fase
   berikutnya; komentar penutup QASMTASK-097 dari tabel pemetaan H-09 (progres A7). Notion baris Fase 6 → selesai.
 - Bersih-bersih worktree dan DB scratch Fase 6 (izin Horii 10-11-2026, hanya sesudah sign-off).
+
+**Terlaksana 10-11-2026:** Trello DEV-007, QASMTASK-089..097, QASMTASK-120..122, ISSUE-055, ISSUE-056 → Done (butir akses/uji endpoint real, "Lolos MTC-0xx", dan `record_geolocation` sengaja tidak dicentang — alasan di baris Status kartu); kartu baru ISSUE-058 (deviasi K1, Todo); komentar blocker deploy §8 di MT-010 dan DEPLOY-001.1. Notion baris H.1–H.4 Selesai, Ringkasan Fase 6 dan Konteks per 10-11-2026. Worktree dan DB scratch Fase 6 dihapus.

@@ -5,6 +5,8 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 ## Status
 
+**FASE 6 DONE — sign-off Horii 10-11-2026** (`main` `f10fd0af`; laporan `docs/fase6/Laporan_Akhir_Fase6.md`). Temuan QA T1 diperbaiki CR-111; deviasi K1 → ISSUE-058.
+
 | Task | Jalur | Key | Status |
 |---|---|---|---|
 | H-01 | A + B | DBV-026, DBV-027 | A: DBV-026 di main `7185bdd5`; B: DBV-027 di main `c3c6213f` (+ DBV-030 `4c2d96a5`) |
