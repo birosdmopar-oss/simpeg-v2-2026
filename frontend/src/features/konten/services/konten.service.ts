@@ -7,6 +7,9 @@ import { api } from '@/lib/axios'
 import type {
   BannerAktif,
   BannerAktifApi,
+  BeritaDetail,
+  BeritaDetailApi,
+  BeritaKategoriOpsi,
   BeritaListApi,
   BeritaRingkas,
   BeritaRingkasApi,
@@ -51,5 +54,33 @@ export const kontenService = {
   async beritaTerbaru(limit: number): Promise<BeritaRingkas[]> {
     const { data } = await api.get<BeritaListApi>('/konten/berita', { params: { per_page: limit, terbaru: 1 } })
     return (data?.items ?? []).map(mapBeritaRingkas)
+  },
+}
+
+/** Portal berita: daftar (cari, filter kategori, paginasi), detail, kategori (PRD §5.5). */
+export const beritaPortalService = {
+  async list(params: { page: number; per_page: number; q?: string; kategori?: string }): Promise<{ items: BeritaRingkas[]; total: number }> {
+    const { data } = await api.get<BeritaListApi>('/konten/berita', { params })
+    return { items: (data?.items ?? []).map(mapBeritaRingkas), total: data?.total ?? 0 }
+  },
+  async detail(id: string): Promise<BeritaDetail> {
+    const { data } = await api.get<BeritaDetailApi>(`/konten/berita/${id}`)
+    return {
+      id: toId(data.id),
+      judul: data.judul,
+      kategori: data.kategori ?? '',
+      penulis: data.penulis ?? '',
+      tanggal: data.tanggal ?? null,
+      foto_url: data.foto_url ?? null,
+      isi: data.isi ?? '',
+    }
+  },
+  async kategori(): Promise<BeritaKategoriOpsi[]> {
+    const { data } = await api.get<Array<{ id: number | string; nama: string }>>('/konten/berita/kategori')
+    return (data ?? []).map((k) => ({ id: toId(k.id), nama: k.nama }))
+  },
+  /** Mereset penanda berita baru (`news_flag`) saat portal dibuka (Q7-09). */
+  async dibuka(): Promise<void> {
+    await api.post('/konten/berita/dibuka')
   },
 }

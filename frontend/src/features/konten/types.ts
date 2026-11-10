@@ -175,3 +175,30 @@ export interface MasterKontenRow {
 }
 
 export type JenisMasterKonten = 'berita-kategori' | 'dibo-jenis'
+
+/** Portal berita (PRD §5.5): detail. Draf kontrak. */
+export interface BeritaDetailApi {
+  id: KontenApiId
+  judul: string
+  kategori?: string | null
+  penulis?: string | null
+  tanggal?: string | null
+  foto_url?: string | null
+  /** HTML terbatas; dibersihkan ulang di FE sebelum ditampilkan. */
+  isi?: string | null
+}
+
+export interface BeritaDetail {
+  id: string
+  judul: string
+  kategori: string
+  penulis: string
+  tanggal: string | null
+  foto_url: string | null
+  isi: string
+}
+
+export interface BeritaKategoriOpsi {
+  id: string
+  nama: string
+}
