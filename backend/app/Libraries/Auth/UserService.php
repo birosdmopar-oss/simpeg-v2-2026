@@ -8,6 +8,8 @@ use App\Constants\Role;
 use App\Exceptions\ForbiddenException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\ListQuery;
 use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\PenggunaModel;
@@ -234,6 +236,8 @@ class UserService
             // MAKE-020 [V2]: password dipilih admin, bukan pemilik → wajib ganti saat login pertama.
             'must_change_password' => 1,
         ] + PasswordExpiry::forNewAccount($status, time())), $nip, $username, null);
+        $dbSimapi = db_connect();
+        PencatatPerubahan::catat($dbSimapi, 'pengguna', AturanTrigger::INSERT, null, PencatatPerubahan::baca($dbSimapi, 'pengguna', 'id_pengguna', (int) $id)); // MAKE-060 A5b
 
         return PenggunaModel::toPublic($this->pengguna->find((int) $id));
     }
@@ -388,12 +392,15 @@ class UserService
         }
 
         if ($update !== []) {
+            $dbSimapi   = db_connect();
+            $lamaSimapi = PencatatPerubahan::baca($dbSimapi, 'pengguna', 'id_pengguna', $id);
             $this->translateDuplicate(
                 fn () => $this->pengguna->update($id, $update),
                 isset($update['nip']) ? (string) $update['nip'] : null,
                 isset($update['username']) ? (string) $update['username'] : null,
                 $id,
             );
+            PencatatPerubahan::sesudahUbah($dbSimapi, 'pengguna', 'id_pengguna', $id, $lamaSimapi); // MAKE-060 A5b
         }
 
         // Token reset dipetakan ke akun lewat username: rename membatalkan token yang masih tertunda untuk username lama.

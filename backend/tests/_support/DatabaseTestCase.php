@@ -154,6 +154,9 @@ abstract class DatabaseTestCase extends CIUnitTestCase
         }
 
         if (self::$keadaan === self::BELUM_SIAP) {
+            // MAKE-060 A5b: data tertinggal (mis. log `simapi_ch` dari test berisolasi penuh yang merujuk seed `simapi_jd`) membuat
+            // down() migration data gagal karena FK RESTRICT. Regress tetap membuang semua tabel, jadi isinya dikosongkan dulu.
+            $this->kosongkanSebelumRegress();
             $this->regressDatabase();
             $this->migrateDatabase();
 
@@ -164,6 +167,27 @@ abstract class DatabaseTestCase extends CIUnitTestCase
             self::$sidikMigrations      = $this->sidikMigrations();
             self::$seedTerpasang        = '';
             self::$keadaan              = self::BERSIH;
+        }
+    }
+
+    /**
+     * Kosongkan isi semua tabel (kecuali `migrations`) tanpa memeriksa FK, sebelum regress. Hanya data; skema tidak disentuh,
+     * sehingga down() setiap migration berjalan di atas tabel kosong.
+     */
+    private function kosongkanSebelumRegress(): void
+    {
+        $migrations = $this->db->prefixTable('migrations');
+
+        $this->db->query('SET FOREIGN_KEY_CHECKS = 0');
+
+        try {
+            foreach ($this->tabelDasar() as $table) {
+                if ($table !== $migrations) {
+                    $this->db->query('DELETE FROM ' . $this->kutip($table));
+                }
+            }
+        } finally {
+            $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
         }
     }
 

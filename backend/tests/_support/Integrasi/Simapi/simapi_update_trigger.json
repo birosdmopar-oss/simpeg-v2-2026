@@ -1,0 +1,17 @@
+{
+    "_keterangan": "MAKE-076 fixture kontrak penulis simapi_update, DITURUNKAN dari definisi trigger produksi D1 (ISSUE-056, struktur saja; isi mentah dan host arsip tidak disalin): per tabel sumber dan peristiwa, last_action, sumber nip, nama_field (urutan pipe) atau daftar kolom terpantau UPDATE (urutan tetap), dan nilai sisi kosong. Dipakai AturanTriggerUpdateTest.",
+    "pegawai": {
+        "INSERT": {"last_action": "INSERT", "nip": "NEW.nip", "syarat": "NEW.status=1", "nama_field": "nip|nama_lengkap|foto|username|password|email|jabatan|unit_kerja|satuan_kerja|jenis_pegawai|status", "nilai_lama": null},
+        "UPDATE": {"last_action": "UPDATE", "nip": "NEW.nip (ganti NIP: OLD.nip)", "syarat": "NEW.status=1 dan kolom terpantau berubah", "terpantau": ["nama_lengkap", "nip", "status", "jenis_pegawai", "foto"]},
+        "DELETE": {"last_action": "DELETE", "nip": "OLD.nip", "nama_field": null, "nilai_lama": null, "nilai_baru": null}
+    },
+    "pegawai_mutasi_jabatan": {
+        "INSERT": {"last_action": "UPDATE", "nip": "NEW.nip", "nama_field": "jabatan|unit_kerja|satuan_kerja", "nilai_lama": "||"},
+        "UPDATE": {"last_action": "UPDATE", "nip": "NEW.nip", "syarat": "kolom terpantau berubah (OLD.x != NEW.x)", "terpantau": ["jabatan", "unit_kerja", "satuan_kerja"]},
+        "DELETE": {"last_action": "UPDATE", "nip": "OLD.nip", "nama_field": "jabatan|unit_kerja|satuan_kerja", "nilai_baru": "||"}
+    },
+    "pengguna": {
+        "INSERT": {"last_action": "UPDATE", "nip": "NEW.id_pegawai", "syarat": "level 2/6/7 dan status 1", "nama_field": "username|password|email", "nilai_lama": "||"},
+        "UPDATE": {"last_action": "UPDATE", "nip": "NEW.id_pegawai", "syarat": "level 2/6/7, status 1, kolom terpantau berubah", "terpantau": ["username", "password", "email"]}
+    }
+}

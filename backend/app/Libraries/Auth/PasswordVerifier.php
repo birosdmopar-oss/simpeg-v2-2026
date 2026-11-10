@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Auth;
 
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Models\Auth\PenggunaModel;
 use Config\Auth as AuthConfig;
 
@@ -90,9 +91,14 @@ class PasswordVerifier
         // Lewat Model agar audit (masked) tetap tercatat (ADR-012). Rehash hanya terjadi setelah pemilik akun
         // membuktikan password-nya sendiri, jadi actor audit = pemilik akun. Saat login AuthContext masih kosong;
         // tanpa withActor() audit rehash tercatat dengan actor NULL (T-02).
+        $db         = db_connect();
+        $lamaSimapi = PencatatPerubahan::baca($db, 'pengguna', 'id_pengguna', (int) $user['id_pengguna']);
+
         $this->pengguna->withActor(
             $user,
             fn (): bool => $this->pengguna->update((int) $user['id_pengguna'], ['password' => $hash, 'password_legacy' => null]),
         );
+        // MAKE-076 (keputusan reviewer Q1 09-11): rehash MD5 → Argon2id mengubah hash berlaku → dicatat ke simapi_update.
+        PencatatPerubahan::sesudahUbah($db, 'pengguna', 'id_pengguna', (int) $user['id_pengguna'], $lamaSimapi);
     }
 }

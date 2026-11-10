@@ -13,6 +13,8 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Auth\JwtService;
 use App\Libraries\Auth\PasswordExpiry;
 use App\Libraries\Auth\PasswordVerifier;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Nip\FormatNip;
 use App\Libraries\Kepegawaian\Nip\JenisRujukanNip;
 use App\Libraries\Kepegawaian\Nip\RujukanNip;
@@ -180,6 +182,9 @@ final class NipCascadeService implements NipCascadeInterface
             throw $e;
         }
 
+        // MAKE-060 A5b: trigger INSERT pegawai legacy (NIP baru).
+        PencatatPerubahan::catat($db, 'pegawai', AturanTrigger::INSERT, null, PencatatPerubahan::baca($db, 'pegawai', 'nip', $baru));
+
         $tabel    = [];
         $dilewati = [];
         $ada      = $this->tabelAda($db);
@@ -209,12 +214,22 @@ final class NipCascadeService implements NipCascadeInterface
                 continue;
             }
 
+            // MAKE-060 A5b: riwayat_* ber-trigger legacy → baris lama dibaca sebelum UPDATE nip (cabang OLD.nip != NEW.nip).
+            $lamaSimapi = isset(AturanTrigger::RIWAYAT[$rujukan->tabel]) && $rujukan->kolomDiV2() === 'nip'
+                ? $db->table($rujukan->tabel)->where('nip', $lama)->get()->getResultArray()
+                : [];
+
             $this->wajibBerhasil($db, $db->table($rujukan->tabel)->where($rujukan->kolomDiV2(), $lama)->update([$rujukan->kolomDiV2() => $baru]), $kunci);
             $tabel[$kunci] = $db->affectedRows();
+
+            foreach ($lamaSimapi as $baris) {
+                PencatatPerubahan::catat($db, $rujukan->tabel, AturanTrigger::UPDATE, $baris, ['nip' => $baru] + $baris);
+            }
         }
 
         // Akun pegawai: username = NIP baru + password = NIP baru [K] (L_employee.php:589-599, keputusan user 13-10-2026).
-        $akunLama    = $db->table('pengguna')->select('id_pengguna, username, nip')->where('nip', $baru)->get()->getResultArray();
+        // MAKE-076: baris penuh dibaca sebelum UPDATE untuk log simapi_update (trigger pengguna: username|password berubah).
+        $akunLama    = $db->table('pengguna')->where('nip', $baru)->get()->getResultArray();
         $akunDiganti = $db->table('pengguna')->where('nip', $baru)->update([
             'username'            => $baru,
             'password'            => $this->passwords()->hash($baru),
@@ -233,6 +248,10 @@ final class NipCascadeService implements NipCascadeInterface
             $db->table('pengguna')->where('nip', $baru)->where('status', PenggunaModel::STATUS_ACTIVE)->update(PasswordExpiry::forPasswordChange(PenggunaModel::STATUS_ACTIVE, time())),
             'pengguna.expired_at',
         );
+
+        foreach ($akunLama as $akun) {
+            PencatatPerubahan::sesudahUbah($db, 'pengguna', 'id_pengguna', (int) $akun['id_pengguna'], $akun); // MAKE-076
+        }
 
         // Audit akun (reset password karena koreksi NIP): `pengguna` tidak punya kolom updated_by, pelaku dicatat di audit.
         foreach ($akunLama as $akun) {
@@ -255,6 +274,8 @@ final class NipCascadeService implements NipCascadeInterface
 
         // FK RESTRICT: tabel anak di luar registry yang masih menunjuk NIP lama menggagalkan DELETE → rollback penuh.
         $this->wajibBerhasil($db, $db->table('pegawai')->where('nip', $lama)->delete(), 'pegawai (hapus lama)');
+        // MAKE-060 A5b: trigger DELETE pegawai legacy (NIP lama). `pengguna.nip` tanpa email berubah → trigger tidak menulis.
+        PencatatPerubahan::catat($db, 'pegawai', AturanTrigger::DELETE, $pegawai, null);
 
         (new AuditLogModel($db))->record(
             'pegawai',

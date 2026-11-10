@@ -99,7 +99,7 @@ final class TokenSimapi
     }
 
     /**
-     * @return array{id_klien: int, jenis: int}|null klien pemilik token yang masih berlaku, atau null (tidak sah/kedaluwarsa/dicabut/klien nonaktif)
+     * @return array{id_klien: int, jenis: int, ip_allowlist: string|null}|null klien pemilik token yang masih berlaku, atau null (tidak sah/kedaluwarsa/dicabut/klien nonaktif)
      */
     public function periksa(#[\SensitiveParameter] string $header): ?array
     {
@@ -111,7 +111,7 @@ final class TokenSimapi
 
         $hash  = PembangkitKredensial::hashToken($token);
         $baris = $this->db->table('simapi_token t')
-            ->select('t.token_hash, t.id_klien, k.jenis, k.hak')
+            ->select('t.token_hash, t.id_klien, k.jenis, k.hak, k.ip_allowlist')
             ->join('klien_layanan k', 'k.id_klien = t.id_klien')
             ->where('t.token_hash', $hash)->where('t.status', 1)->where('t.expired_at > UTC_TIMESTAMP()', null, false)->where('k.status', 1)
             ->get()->getRowArray();
@@ -124,7 +124,7 @@ final class TokenSimapi
             return null;
         }
 
-        return ['id_klien' => (int) $baris['id_klien'], 'jenis' => (int) $baris['jenis']];
+        return ['id_klien' => (int) $baris['id_klien'], 'jenis' => (int) $baris['jenis'], 'ip_allowlist' => $baris['ip_allowlist'] === null ? null : (string) $baris['ip_allowlist']];
     }
 
     /**

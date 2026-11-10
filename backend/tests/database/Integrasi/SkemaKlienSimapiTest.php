@@ -57,7 +57,8 @@ final class SkemaKlienSimapiTest extends DatabaseTestCase
         $this->assertArrayNotHasKey('token', $t, 'tanpa token mentah');
 
         $c = $this->skemaColumns('simapi_ch');
-        $this->assertSame(['bigint unsigned', 'varchar(30) null', 'text null', 'text null'], [$c['id_simapi_ch'], $c['nip'], $c['field_name'], $c['field_value']]);
+        // Tipe akhir sesudah koreksi D1 DBV-031 (P8/P9/P12).
+        $this->assertSame(['bigint unsigned', 'varchar(30)', 'mediumtext null', 'longtext null'], [$c['id_simapi_ch'], $c['nip'], $c['field_name'], $c['field_value']]);
     }
 
     public function testConstraint(): void
@@ -85,7 +86,7 @@ final class SkemaKlienSimapiTest extends DatabaseTestCase
         $this->db->table('simapi_auth_jd')->insert(['id_klien' => $id, 'id_simapi_jd' => $jd]);
         $this->assertDbError([1062], fn () => $this->db->table('simapi_auth_jd')->insert(['id_klien' => $id, 'id_simapi_jd' => $jd]));
 
-        $ch = fn (array $lebih = []) => $this->db->table('simapi_ch')->insert($lebih + ['id_simapi_jd' => $jd, 'id_rwy' => '7', 'nip' => null, 'action' => 1, 'action_at' => '2026-11-04 00:00:00', 'field_name' => 'a|b', 'field_value' => '1|2']);
+        $ch = fn (array $lebih = []) => $this->db->table('simapi_ch')->insert($lebih + ['id_simapi_jd' => $jd, 'id_rwy' => 7, 'nip' => '000000000000000002', 'action' => 1, 'action_at' => '2026-11-04 00:00:00', 'field_name' => 'a|b', 'field_value' => '1|2']);
         $ch();
         $idCh = (int) $this->db->insertID();
         $this->assertDbError(self::CHECK, fn () => $ch(['action' => 3]));

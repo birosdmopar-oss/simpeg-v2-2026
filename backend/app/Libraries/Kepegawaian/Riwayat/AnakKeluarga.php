@@ -10,6 +10,8 @@ use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Riwayat\Definisi\Keluarga;
 use App\Libraries\MasterData\MasterField;
 use App\Models\Kepegawaian\RiwayatModel;
@@ -85,6 +87,7 @@ final class AnakKeluarga
 
             $model = $this->model();
             $id    = (int) $model->withActor($auth, static fn () => $model->insert($bersih + ['id_riwayat_keluarga' => $idKeluarga]));
+            PencatatPerubahan::catat($this->koneksi(), self::TABEL, AturanTrigger::INSERT, null, $this->anak($idKeluarga, $id));
             $this->simpanAkte($d, $nip, $id, $akte);
             $this->perbaruiInduk($d, $auth, $nip, $idKeluarga);
 
@@ -110,11 +113,12 @@ final class AnakKeluarga
 
         return $this->transaksi(function () use ($d, $auth, $nip, $idKeluarga, $idAnak, $bersih, $akte): array {
             $this->jagaTulis($d, $auth, $this->kunciInduk($d, $nip, $idKeluarga), false);
-            $this->anak($idKeluarga, $idAnak);
+            $lamaAnak = $this->anak($idKeluarga, $idAnak);
 
             if ($bersih !== []) {
                 $model = $this->model();
                 $model->withActor($auth, static fn () => $model->update($idAnak, $bersih));
+                PencatatPerubahan::catat($this->koneksi(), self::TABEL, AturanTrigger::UPDATE, $lamaAnak, $this->anak($idKeluarga, $idAnak));
             }
 
             if ($akte !== null) {
@@ -135,7 +139,7 @@ final class AnakKeluarga
 
         $this->transaksi(function () use ($d, $auth, $nip, $idKeluarga, $idAnak): void {
             $this->jagaTulis($d, $auth, $this->kunciInduk($d, $nip, $idKeluarga), true);
-            $this->anak($idKeluarga, $idAnak);
+            $lamaAnak = $this->anak($idKeluarga, $idAnak);
 
             foreach ($this->lampiran()->daftar($nip, Keluarga::LAMPIRAN_AKTE_ANAK, $idAnak) as $akte) {
                 $this->lampiran()->hapus($nip, (int) $akte['id_attachment']);
@@ -143,6 +147,7 @@ final class AnakKeluarga
 
             $model = $this->model();
             $model->withActor($auth, static fn () => $model->delete($idAnak));
+            PencatatPerubahan::catat($this->koneksi(), self::TABEL, AturanTrigger::DELETE, $lamaAnak, null);
             $this->perbaruiInduk($d, $auth, $nip, $idKeluarga);
         });
     }
@@ -334,6 +339,8 @@ final class AnakKeluarga
 
         $model = new RiwayatModel($d, $this->koneksi()->getFieldNames($d->tabel()), $this->koneksi());
         $model->withActor($auth, static fn () => $model->update($idKeluarga, $data));
+        // MAKE-060 A5b: UPDATE riwayat_keluarga (jumlah_anak/status) = trigger keluarga legacy.
+        PencatatPerubahan::catat($this->koneksi(), $d->tabel(), AturanTrigger::UPDATE, $induk, $this->induk($d, $nip, $idKeluarga, false));
 
         if ($this->status($d, $induk) === StatusRiwayat::Disetujui) {
             service('snapshotSync')->sinkronkan($d, $nip, $auth);

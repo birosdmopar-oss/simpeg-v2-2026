@@ -38,3 +38,15 @@ $routes->group('simapi/v1', ['namespace' => 'App\Controllers\Simapi'], static fu
         $routes->match(['GET', 'POST'], 'a_sinkron/ambil_riwayat_mutasi', 'ASinkron::ambilRiwayatMutasi');
     });
 });
+
+// MAKE-076 (Q6-41) [K `controllers/simapi/A_pegawai.php`]: API SIMAPI lama di path legacy `simapi/a_pegawai/*` (tanpa `v1`). Allowlist IP
+// WAJIB berisi dan cocok untuk semua klien (`ipwajib`, DBV-031 §3.1); tanpa cek type.
+$routes->group('simapi/a_pegawai', ['namespace' => 'App\Controllers\Simapi'], static function (RouteCollection $routes): void {
+    $routes->match(['GET', 'POST'], 'token', 'APegawai::token', ['filter' => 'klienLayanan:simapi,ipwajib']);
+
+    $routes->group('', ['filter' => 'simapiToken:ipwajib'], static function (RouteCollection $routes): void {
+        $routes->match(['GET', 'POST'], 'detail', 'APegawai::detail');
+        $routes->match(['GET', 'POST'], 'detail/(:segment)', 'APegawai::detail/$1');
+        $routes->match(['GET', 'POST'], 'pegawai_update', 'APegawai::pegawaiUpdate');
+    });
+});

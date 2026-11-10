@@ -12,6 +12,7 @@ use App\Interfaces\Kepegawaian\AttachmentServiceInterface;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Interfaces\Layanan\NotifikasiLayananInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Kalkulasi\TanggalBisnis;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
@@ -326,7 +327,9 @@ abstract class LayananStudi
     {
         $model = new PegawaiModel($this->koneksi());
         $param = ['id_jenis_status' => $idJenisStatus, 'updated_at' => gmdate('Y-m-d H:i:s'), 'updated_by' => $auth->idPengguna()];
+        $lama  = PencatatPerubahan::baca($this->koneksi(), 'pegawai', 'nip', $nip);
         $model->withActor($auth, static fn () => $model->update($nip, $param));
+        PencatatPerubahan::sesudahUbah($this->koneksi(), 'pegawai', 'nip', $nip, $lama); // MAKE-060 A5b
     }
 
     // ------------------------------------------------------------------------------------------------------------

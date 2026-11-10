@@ -6,6 +6,7 @@ namespace App\Libraries\Kepegawaian\Pegawai;
 
 use App\Constants\AkunSistem;
 use App\Constants\Role;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Struktur\StrukturService;
 use App\Models\AuditLogModel;
 use Closure;
@@ -189,7 +190,9 @@ final class SinkronNamaPengguna
                 return 'berubah_saat_proses';
             }
 
+            $lamaSimapi = PencatatPerubahan::baca($this->db, 'pengguna', 'id_pengguna', $idPengguna);
             $this->db->table('pengguna')->where('id_pengguna', $idPengguna)->update(['name' => $baru, 'updated_at' => gmdate('Y-m-d H:i:s')]);
+            PencatatPerubahan::sesudahUbah($this->db, 'pengguna', 'id_pengguna', $idPengguna, $lamaSimapi); // MAKE-060 A5b
 
             $idAudit = ($this->pabrikAudit !== null ? ($this->pabrikAudit)($this->db) : new AuditLogModel($this->db))->record(
                 'pengguna',

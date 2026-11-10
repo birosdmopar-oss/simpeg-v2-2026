@@ -27,13 +27,18 @@ use LogicException;
  */
 class KlienLayananFilter implements FilterInterface
 {
+    public const IP_WAJIB = 'ipwajib';
+
     /**
      * @param list<string>|null $arguments
      */
     public function before(RequestInterface $request, $arguments = null): ?ResponseInterface
     {
-        if (count($arguments ?? []) !== 1 || ! in_array($arguments[0], HakKlien::SEMUA, true)) {
-            throw new LogicException('Filter klienLayanan wajib diberi tepat satu hak sah, mis. klienLayanan:stat.');
+        $arguments ??= [];
+
+        // MAKE-076: argumen kedua opsional `ipwajib` (API SIMAPI lama: allowlist kosong → ditolak).
+        if (! in_array(count($arguments), [1, 2], true) || ! in_array($arguments[0], HakKlien::SEMUA, true) || (count($arguments) === 2 && $arguments[1] !== self::IP_WAJIB)) {
+            throw new LogicException('Filter klienLayanan wajib diberi tepat satu hak sah (opsional ",ipwajib"), mis. klienLayanan:stat.');
         }
 
         $hak      = $arguments[0];
@@ -52,7 +57,7 @@ class KlienLayananFilter implements FilterInterface
         }
 
         [$username, $rahasia] = self::urai($request->getHeaderLine('Authorization'), $cfg->headerMaks);
-        $hasil                = (new PengesahKlien(db_connect()))->periksa($username, $rahasia, $ip, $hak);
+        $hasil                = (new PengesahKlien(db_connect()))->periksa($username, $rahasia, $ip, $hak, ($arguments[1] ?? null) === self::IP_WAJIB);
 
         if ($hasil['hasil'] !== PengesahKlien::DITERIMA) {
             $pembatas->catatGagal($kunciIp, $cfg->throttleDetik);

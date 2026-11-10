@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\BiodataServiceInterface;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Lampiran\KolomBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use App\Models\AuditLogModel;
@@ -244,7 +245,9 @@ final class BiodataService implements BiodataServiceInterface
             $param['flag_update'] = PegawaiHistModel::FLAG_TANPA;
             $param['updated_at']  = $sekarang;
             $param['updated_by']  = $auth->idPengguna();
+            $lamaSimapi           = PencatatPerubahan::baca($db, 'pegawai', 'nip', $nip);
             $pegawaiModel->withActor($auth, static fn () => $pegawaiModel->update($nip, $param));
+            PencatatPerubahan::sesudahUbah($db, 'pegawai', 'nip', $nip, $lamaSimapi); // MAKE-060 A5b
 
             // B-05 [K] trigger pegawai_afUpd (D1:7975): status 1 → 2 menonaktifkan akun UserLevel 2 (PNS) + sesi dicabut.
             if ((int) $pegawai['status'] === 1 && (int) ($param['status'] ?? 1) === 2) {
@@ -287,11 +290,13 @@ final class BiodataService implements BiodataServiceInterface
             }
         }
 
+        $lamaSimapi = PencatatPerubahan::baca($db, 'pegawai', 'nip', $nip);
         $pegawaiModel->withActor($auth, static fn () => $pegawaiModel->update($nip, [
             'flag_update' => PegawaiHistModel::FLAG_DIAJUKAN,
             'updated_at'  => $sekarang,
             'updated_by'  => $auth->idPengguna(),
         ]));
+        PencatatPerubahan::sesudahUbah($db, 'pegawai', 'nip', $nip, $lamaSimapi); // MAKE-060 A5b (trigger UPDATE pegawai legacy)
 
         $kolomHist = array_flip($db->getFieldNames('pegawai_hist') ?: []);
         $pengajuan = array_intersect_key(array_merge($pegawai, $param), $kolomHist);
@@ -337,11 +342,15 @@ final class BiodataService implements BiodataServiceInterface
             return;
         }
 
+        $lamaSimapi = PencatatPerubahan::baca($db, 'pengguna', 'id_pengguna', (int) $akun['id_pengguna']);
+
         if ($db->table('pengguna')->where('id_pengguna', (int) $akun['id_pengguna'])->update(['email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')]) === false) {
             $error = $db->error();
 
             throw new DatabaseException('Sinkron email akun gagal: ' . $error['message'], (int) $error['code']);
         }
+
+        PencatatPerubahan::sesudahUbah($db, 'pengguna', 'id_pengguna', (int) $akun['id_pengguna'], $lamaSimapi); // MAKE-060 A5b
 
         (new AuditLogModel($db))->record(
             'pengguna',

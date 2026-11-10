@@ -172,6 +172,7 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
         'disiplin_ticket.nip'                     => 'FK DITAHAN AddFkNipLayananFase4 sampai audit yatim = 0 (DBV-022 DQ-4) — diarahkan ulang B-06',
         'gaji_pegawai.nip'                        => '[K] legacy tanpa FK (NonFkSlipGaji, DBV-023): tidak ikut Ubah NIP, slip lama tetap ber-NIP lama (PRD 5A §3.4)',
         'simapi_ch.nip'                           => 'log riwayat SIMAPI tanpa FK (DBV-026-Q6): di luar TabelAnakNip, tidak diarahkan ulang B-06',
+        'simapi_update.nip'                       => 'antrean API SIMAPI lama tanpa FK (DBV-031, pola DBV-026-Q6): di luar TabelAnakNip, tidak diarahkan ulang B-06',
     ];
 
     /**

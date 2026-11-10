@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Layanan\Cuti;
 
 use App\Interfaces\Layanan\PenerbitSuratCutiInterface;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Kepegawaian\Kalkulasi\HasilKalkulasi;
 use App\Models\AuditLogModel;
 use CodeIgniter\Database\BaseConnection;
@@ -96,7 +97,9 @@ class EfekFinalCutiService
      */
     private function tulisStatusPegawai(string $nip, int $statusBaru, array $penanda, array $sebelum): void
     {
+        $lamaSimapi = PencatatPerubahan::baca($this->db, 'pegawai', 'nip', $nip);
         $this->db->table('pegawai')->where('nip', $nip)->update(['id_jenis_status' => $statusBaru]);
+        PencatatPerubahan::sesudahUbah($this->db, 'pegawai', 'nip', $nip, $lamaSimapi); // MAKE-060 A5b
 
         (new AuditLogModel())->record(
             'pegawai',

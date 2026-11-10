@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filters;
 
 use App\Interfaces\Integrasi\IntegrasiLogInterface;
+use App\Libraries\Integrasi\Klien\AllowlistIp;
 use App\Libraries\Integrasi\Klien\PembatasKegagalan;
 use App\Libraries\Integrasi\Klien\ResponsAuthKlien;
 use App\Libraries\Integrasi\Klien\TokenSimapi;
@@ -43,6 +44,12 @@ class SimapiTokenFilter implements FilterInterface
         }
 
         $klien = (new TokenSimapi(db_connect(), $cfg->tokenPanjang, $cfg->tokenTtlDetik, $cfg->headerMaks))->periksa($request->getHeaderLine('Authorization'));
+
+        // MAKE-076 `simapiToken:ipwajib` (API SIMAPI lama, Q6-41): IP wajib cocok dengan allowlist berisi [K `A_pegawai` join
+        // `simapi_auth.ip_address`]; gagal → pesan token yang sama.
+        if ($klien !== null && in_array(KlienLayananFilter::IP_WAJIB, $arguments ?? [], true) && ! AllowlistIp::cocokWajib($ip, $klien['ip_allowlist'])) {
+            $klien = null;
+        }
 
         if ($klien === null) {
             $pembatas->catatGagal($kunciIp, $cfg->throttleDetik);

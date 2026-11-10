@@ -6,6 +6,7 @@ namespace App\Libraries\Auth;
 
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Models\Auth\PenggunaModel;
 
 /**
@@ -36,6 +37,9 @@ class PasswordService
 
         $this->assertNewPassword($newPassword, $confirmation, $oldPassword);
 
+        $db         = db_connect();
+        $lamaSimapi = PencatatPerubahan::baca($db, 'pengguna', 'id_pengguna', $idPengguna);
+
         $this->pengguna->update($idPengguna, [
             'password'            => $this->passwords->hash($newPassword),
             'password_legacy'     => null,
@@ -43,6 +47,7 @@ class PasswordService
             // MAKE-020 [V2]: pemilik memilih password sendiri → penanda wajib ganti dilepas.
             'must_change_password' => 0,
         ] + PasswordExpiry::forPasswordChange((string) $user['status'], time()));
+        PencatatPerubahan::sesudahUbah($db, 'pengguna', 'id_pengguna', $idPengguna, $lamaSimapi); // MAKE-076 (simapi_update password)
 
         // Seluruh sesi lama tidak berlaku lagi (MTC-006).
         $this->jwt->revokeAllForUser($idPengguna);

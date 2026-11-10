@@ -11,7 +11,7 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 | H-02 | B | MAKE-065 | B4a di main `07ac6711`; B4b `services/s_esign` di main (`c3af17a1`) |
 | H-03 | B | MAKE-067 | Di main `6cd50e69` |
 | H-04 | B | MAKE-066 | Di main `9debb366` (dikerjakan sesi WS-2) |
-| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di main `d115e50d`; MAKE-060 A5a (`change_history` ack-on-read + kerangka penulis `simapi_ch`) di main `67b46538`; **A5b (penulis event `simapi_ch`) menunggu D1/ISSUE-056 dari Horii** |
+| H-05/H-06/H-07 | A | MAKE-059, MAKE-060 | MAKE-059 (A4) di main `d115e50d`; MAKE-060 A5a (`change_history` ack-on-read + kerangka penulis `simapi_ch`) di main `67b46538`, A5b (penulis `simapi_ch` = trigger D1) di main `2c72332f`; DBV-031 `e2f91113`; MAKE-076 (`simapi/a_pegawai` + penulis `simapi_update`) `b6e74d23` |
 | H-08 | A | MAKE-061 | Di main `539f4c7c` (Worker Fable) |
 | H-09 | A | (pemetaan) | Selesai (dokumen, bagian A7 di bawah; AC-09.1: 56 method `Local.php`); ikut branch `fase6/a-lokal/penutup-a` |
 | H-10 | B | MAKE-064 | Di main `74039dc7` |
@@ -117,6 +117,23 @@ anomali [K], penyaji, kemurnian), `tests/database/Integrasi/StatServiceTest` (AC
 Q6-37, aturan unduh), `tests/database/Integrasi/SStatKontrakTest` (AC-08.3 401 amplop INT, AC-08.4, HTTP 200 amplop INT,
 `list_tb` tanpa path internal, unduh 200 header aman / 404 seragam).
 
+### A5b — MAKE-060 penulis `simapi_ch` (isi spesifikasi dari D1)
+
+Branch `fase6/a-lokal/make-060-a5b`. `Simapi/AturanTrigger` (port 47 trigger D1 penulis simapi_ch, 15 tabel; semantik CONCAT/COALESCE/NULL
+MySQL), `Simapi/PencatatPerubahan` (opsi B: tulis di transaksi pemilik dengan SAVEPOINT, setara trigger), pemancar di semua penulis
+(README Integrasi), fixture `tests/_support/Integrasi/Simapi/simapi_ch_trigger.json`, test arsitektur penulis
+`tests/unit/Integrasi/PemancarSimapiArsitekturTest.php`. Keputusan: Q1 semua penulis, Q2 NipCascade ikut trigger, Q3 impor tidak memancar,
+opsi B (Horii 09-11; koreksi PRD F6-06 = CR-110 reviewer). Penulis `simapi_update` = MAKE-076.
+
+### MAKE-076 — API SIMAPI lama `simapi/a_pegawai/*` + penulis `simapi_update` (Q6-41)
+
+Branch `fase6/a-lokal/make-076-simapi-lama`. `Controllers/Simapi/APegawai` + `Simapi/PenyajiPegawaiLama` (token/detail/pegawai_update
+ikut `A_pegawai.php`; allowlist wajib `ipwajib` untuk filter `klienLayanan`/`simapiToken`), `Simapi/AturanTriggerUpdate` (port trigger D1
+`pegawai`/`pegawai_mutasi_jabatan`/`pengguna`) lewat `PencatatPerubahan`, pemancar baru di `PasswordService`, `ResetPasswordService`,
+`PasswordVerifier` (rehash), `SnapshotSync` (pmj), `NipCascadeService` (akun). Keputusan reviewer 09-11: R3 token satu tabel tanpa
+mencabut token lain, R6 kunci baris klien, Q2 password = hash berlaku (MD5/Argon2id, PN re-handshake), Q1 rehash dicatat. Test:
+`tests/unit/Integrasi/AturanTriggerUpdateTest`, `tests/database/Integrasi/{SimapiAPegawaiTest,SimapiPemancarUpdateTest}`, test arsitektur
+P2 per tabel log.
 
 ### A7 — H-09 pemetaan `Local.php` → v2 (AC-09.1) dan penutup Jalur A
 
@@ -150,7 +167,7 @@ Cakupan: 56 method terpetakan (baris 1-18 di atas menjumlah semuanya). Method ya
 `connect_arsip`) sengaja tidak dibawa. Pemeriksaan padanan per-endpoint dilakukan modul pemiliknya (QA Fase 3-8); dokumen ini hanya
 memenuhi AC-09.1. Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel ini.
 
-**Ringkasan status Jalur A (per 06-11-2026, main `07a5df0c`)** — pelaksana: Worker Fix Bug (lead; A2a, A3, A7), ReadOne (A1, A4, A5), Worker Haiku
+**Ringkasan status Jalur A (per 10-11-2026, main `b6e74d23`)** — pelaksana: Worker Fix Bug (lead; A2a, A3, A7), ReadOne (A1, A4, A5), Worker Haiku
 (A2b), Worker Fable (A6, sejak 05-11); reviewer CR; merge atas izin Horii.
 
 | Milestone | Key | Status | SHA di main |
@@ -161,11 +178,14 @@ memenuhi AC-09.1. Komentar penutup QASMTASK-097 disiapkan reviewer dari tabel in
 | A3 auth antar-sistem + ADR-036 | MAKE-058 | Selesai | `c926770f` |
 | A4 SIMAPI `a_auth`, `a_employee` (25 method), `a_dm`, `ambil_riwayat_mutasi`, `services/s_dm` | MAKE-059 | Selesai | `d115e50d` |
 | A5a `a_employee/change_history` ack-on-read + kerangka penulis `simapi_ch` | MAKE-060 | Selesai | `67b46538` |
-| A5b penulis event `simapi_ch` per tabel + seed `simapi_jd` | MAKE-060 | **Menunggu D1/ISSUE-056 dari Horii** | — |
+| A5b penulis `simapi_ch` = port trigger D1 (opsi B: log di transaksi pemilik dengan savepoint) | MAKE-060 | Selesai | `2c72332f` |
+| Koreksi D1: tabel `simapi_update`/`_hist` + seed `simapi_jd` | DBV-031 | Selesai | `e2f91113` (PR #38) |
+| API SIMAPI lama `simapi/a_pegawai` (token/detail/pegawai_update) + penulis `simapi_update` | MAKE-076 | Selesai | `b6e74d23` |
+| PRD v1.0n (Q6-41: API SIMAPI lama ikut legacy) | CR-109 | Selesai | `3d4ca7b8` |
 | A6 `services/s_stat` | MAKE-061 | Selesai | `539f4c7c` |
 | Pengaman `ImporSlipUjiTrait` + `check.sh` (aturan satu PHPUnit per DB scratch) | CR-108 | Selesai | `5d7d5778` |
 | TTE cuti atas nama (Q6-40, Jalur B) | MAKE-075 | Selesai | `07a5df0c` |
-| A7 pemetaan H-09 + runbook (README-deploy §1j) + ringkasan | (CR/dokumen) | Dokumen selesai; ditutup final setelah A5b | branch `fase6/a-lokal/penutup-a` |
+| A7 pemetaan H-09 + runbook (README-deploy §1j) + ringkasan | (CR/dokumen) | Dokumen selesai (final setelah A5b/MAKE-076 di main) | branch `fase6/a-lokal/penutup-a` |
 
 Keputusan Horii/reviewer yang membentuk Jalur A (lengkap di PRD §12): Q6-01 semua endpoint wajib auth; Q6-02 kontrak SIMAPI 1:1 (kecuali
 perbaikan terbatas); Q6-03 `ambil_seluruh_pengguna` tidak di-port; Q6-24..Q6-27 aturan H-11; Q6-36 B-9 `unit_es_3/4` ikut legacy; Q6-37 filter
@@ -173,8 +193,8 @@ perbaikan terbatas); Q6-03 `ambil_seluruh_pengguna` tidak di-port; Q6-24..Q6-27 
 F6-21 `sync_nama_pengguna` di-port (`pengguna:sinkron-nama`).
 
 Sisa / pertanyaan terbuka Jalur A:
-- **A5b** — penulis `simapi_ch` dari event tabel (F6-06) dan seed `simapi_jd` menunggu DDL D1 (ISSUE-056, trigger legacy) dari Horii (DBV-026 §9a);
-  sebelum itu `change_history` mengembalikan tabel kosong.
+- ISSUE-056 (D1) dan ISSUE-057 selesai di kode (A5b, DBV-031, MAKE-076). Koreksi teks PRD F6-06/Q6-41 dikerjakan reviewer terpisah (CR-110);
+  bagian ini tidak mengubah PRD.
 - **PN-4** daftar pemberitahuan re-handshake klien (README-deploy §1i/§1j); **PN-5** jadwal pasti `pengguna:sinkron-nama` dan job Cron lain
   dicocokkan dengan crontab server legacy sebelum cutover.
 - Ambang throttle auth antar-sistem (120 kegagalan/IP, 600/klien per 60 detik) adalah usulan awal; disetel dari trafik klien nyata.

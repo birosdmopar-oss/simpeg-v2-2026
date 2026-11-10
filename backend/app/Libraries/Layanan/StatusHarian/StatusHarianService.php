@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Layanan\StatusHarian;
 
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Layanan\Cuti\AturanCuti;
 use App\Libraries\Layanan\Cuti\StatusCuti;
 use App\Libraries\Layanan\Studi\StatusStudi;
@@ -320,11 +321,13 @@ final class StatusHarianService
                 return $this->batal('berubah_saat_proses');
             }
 
+            $lamaSimapi = PencatatPerubahan::baca($this->db, 'pegawai', 'nip', $nip);
             $this->db->table('pegawai')->where('nip', $nip)->update([
                 'id_jenis_status' => $k->statusBaru,
                 'updated_at'      => gmdate('Y-m-d H:i:s'),
                 'updated_by'      => $idPelaku,
             ]);
+            PencatatPerubahan::sesudahUbah($this->db, 'pegawai', 'nip', $nip, $lamaSimapi); // MAKE-060 A5b
 
             $idAudit = $this->modelAudit()->record(
                 'pegawai',

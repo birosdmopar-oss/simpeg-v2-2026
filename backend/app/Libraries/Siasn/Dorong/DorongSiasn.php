@@ -9,6 +9,8 @@ use App\Interfaces\SiasnDorongInterface;
 use App\Libraries\Cli\KoneksiCli;
 use App\Libraries\Integrasi\AkunSistemIntegrasi;
 use App\Libraries\Integrasi\Log\CatatanIntegrasi;
+use App\Libraries\Integrasi\Simapi\AturanTrigger;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Libraries\Siasn\SiasnAdapter;
 use App\Libraries\Siasn\Tarik\SiasnTarikSibuk;
 use App\Libraries\Siasn\Tarik\SiasnTidakSiap;
@@ -234,6 +236,7 @@ final class DorongSiasn
             $asal[(int) $b[$jenis->pk()]] = (int) $b['siasn_flag'];
         }
 
+        $lama  = $this->lamaSimapi($jenis, array_keys($asal));
         $hasil = $this->db->table($jenis->tabel())->whereIn($jenis->pk(), array_keys($asal))
             ->set('siasn_flag', (int) $jenis->flagProses())->set('updated_at', 'updated_at', false)->update();
 
@@ -241,7 +244,36 @@ final class DorongSiasn
             throw new DatabaseException('Penanda proses dorong SIASN gagal.');
         }
 
+        $this->catatSimapi($jenis, $lama);
+
         return $asal;
+    }
+
+    /**
+     * MAKE-060 A5b: tabel riwayat ber-trigger legacy → baris lama dibaca sebelum UPDATE (trigger legacy menyala untuk tulisan
+     * dorong SIASN juga).
+     *
+     * @param list<int|string> $id
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function lamaSimapi(JenisDorongSiasn $jenis, array $id): array
+    {
+        if ($id === [] || ! isset(AturanTrigger::RIWAYAT[$jenis->tabel()])) {
+            return [];
+        }
+
+        return $this->db->table($jenis->tabel())->whereIn($jenis->pk(), $id)->get()->getResultArray();
+    }
+
+    /**
+     * @param list<array<string, mixed>> $lama
+     */
+    private function catatSimapi(JenisDorongSiasn $jenis, array $lama): void
+    {
+        foreach ($lama as $baris) {
+            PencatatPerubahan::sesudahUbah($this->db, $jenis->tabel(), $jenis->pk(), $baris[$jenis->pk()] ?? null, $baris);
+        }
     }
 
     /**
@@ -251,7 +283,9 @@ final class DorongSiasn
     {
         try {
             foreach ($belum as $id => $flag) {
+                $lama = $this->lamaSimapi($jenis, [$id]);
                 $this->db->table($jenis->tabel())->where($jenis->pk(), $id)->set('siasn_flag', $flag)->set('updated_at', 'updated_at', false)->update();
+                $this->catatSimapi($jenis, $lama);
             }
         } catch (Throwable $e) {
             log_message('error', 'Dorong SIASN: penanda proses gagal dikembalikan ({kelas}).', ['kelas' => $e::class]);
@@ -325,7 +359,8 @@ final class DorongSiasn
         $this->db->transBegin();
 
         try {
-            $qb = $this->db->table($jenis->tabel())->where($jenis->pk(), $id);
+            $lama = $this->lamaSimapi($jenis, [$id]);
+            $qb   = $this->db->table($jenis->tabel())->where($jenis->pk(), $id);
 
             if ($bersyarat) {
                 $qb->where('updated_at', $snapshot);
@@ -344,6 +379,8 @@ final class DorongSiasn
                     throw new DatabaseException('Hasil dorong SIASN gagal ditulis.');
                 }
             }
+
+            $this->catatSimapi($jenis, $lama);
 
             if (! $this->db->transStatus()) {
                 throw new DatabaseException('Transaksi hasil dorong SIASN gagal.');

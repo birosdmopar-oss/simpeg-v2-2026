@@ -8,6 +8,7 @@ use App\Exceptions\TooManyRequestsException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\CaptchaVerifierInterface;
 use App\Interfaces\ResetTokenNotifierInterface;
+use App\Libraries\Integrasi\Simapi\PencatatPerubahan;
 use App\Models\Auth\ForgotAttemptModel;
 use App\Models\Auth\PenggunaModel;
 use CodeIgniter\Database\BaseConnection;
@@ -189,6 +190,8 @@ class ResetPasswordService
                 throw self::consumedToken($this->attempts->find($tokenId) ?? $row);
             }
 
+            $lamaSimapi = PencatatPerubahan::baca($this->db, 'pengguna', 'id_pengguna', $userId);
+
             // Tidak ada sesi login pada jalur reset → actor audit = pemilik akun (ISSUE-005).
             $updated = $this->pengguna->withActor($user, fn (): bool => $this->pengguna->update($userId, [
                 'password'            => $hash,
@@ -198,6 +201,7 @@ class ResetPasswordService
                 'must_change_password' => 0,
             ] + PasswordExpiry::forPasswordChange((string) $user['status'], $now)));
             $this->assertStep($updated, 'password baru tidak tersimpan');
+            PencatatPerubahan::sesudahUbah($this->db, 'pengguna', 'id_pengguna', $userId, $lamaSimapi); // MAKE-076 (simapi_update password)
 
             $invalidated = $this->attempts->invalidateOtherTokens((string) $row['username'], $tokenId, $now);
             $this->assertStep($invalidated >= 0, 'token reset lain tidak dapat dibatalkan');
