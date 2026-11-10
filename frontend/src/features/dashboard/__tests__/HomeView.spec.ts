@@ -3,7 +3,7 @@
  * (donut + tile status hari ini) atau `angka` (semua tile berurutan legacy + bar persen, tanpa chart; Q7-36); pegawai
  * 2/6/7 → PegawaiDashboard; galat memuat tampil tanpa merusak sapaan (`home-role` MTC-001 tetap ada).
  * M2a: 4 kartu pengingat (label legacy, hanya Pensiun bertautan ke /dokumen/pensiun — Q7-37), kartu Butuh Approval hanya
- * role 1/3 di keluarga admin ("—" sampai ringkasan Jalur C tersedia), tabel direktur hanya role 1/4 (+ galat lokal).
+ * role 1/3 di keluarga admin ("—" tanpa tautan selama ACTIVE_PHASE < FASE_LONCENG; fase 7 di ButuhApprovalCard.spec), tabel direktur hanya role 1/4 (+ galat lokal).
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { AxiosError } from 'axios'
@@ -99,7 +99,7 @@ describe('HomeView — kartu admin M2a', () => {
     expect(berandaService.direktur).toHaveBeenCalledTimes(direktur ? 1 : 0)
   })
 
-  it('Butuh Approval "—" tanpa tautan selama ringkasan Jalur C belum tersedia', async () => {
+  it('Butuh Approval "—" tanpa tautan selama lonceng Jalur C belum dibuka (ACTIVE_PHASE < FASE_LONCENG)', async () => {
     vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
     const wrapper = await mountAs(Role.SUPER_ADMIN)
 

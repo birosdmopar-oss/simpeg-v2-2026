@@ -177,5 +177,4 @@ ini atau besok; selain itu / tanpa foto → 404 seragam. Header sama dengan `peg
 - **Kelengkapan data** (`kd_*` legacy): bug legacy perlu keputusan sebelum di-port (kd_rdiklat selalu ≥ 100, kd_rkgb/kd_rtj
   bisa > 100, kd_rpangkat_2 butuh kode lampiran dari berkas terlarang + loop tak berujung, syarat `id_jenis_pegawai = 1`).
   Q-D13..Q-D17 menunggu Horii; belum ada kartu kelengkapan di beranda pegawai (lanjutan MAKE-087).
-- **M3 (lanjutan MAKE-087):** pemasangan komponen Jalur A (popup, banner, berita), Jalur C (ringkasan notifikasi, mengganti
-  adapter sementara `ringkasanNotifikasi.ts`), dan Jalur B (ringkasan SKL) setelah komponennya ada di `main`.
+- **M3 (lanjutan MAKE-087):** pemasangan komponen Jalur A (popup, banner, berita) dan Jalur B (ringkasan SKL) setelah komponennya ada di `main`.

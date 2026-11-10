@@ -9,9 +9,9 @@
 import { computed } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { BUTUH_APPROVAL_ROLES } from '@/features/notifikasi'
 import { PRESENSI_PEGAWAI_ROLES } from '@/features/presensi/roles'
 
-import { BUTUH_APPROVAL_ROLES } from '../composables/ringkasanNotifikasi'
 import type { RingkasanPegawai } from '../types'
 
 import BawahanCards from './BawahanCards.vue'

@@ -11,8 +11,8 @@
 import { computed } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { BUTUH_APPROVAL_ROLES } from '@/features/notifikasi'
 
-import { BUTUH_APPROVAL_ROLES } from '../composables/ringkasanNotifikasi'
 import { DIREKTUR_ROLES, type RingkasanAdmin } from '../types'
 
 import ButuhApprovalCard from './ButuhApprovalCard.vue'

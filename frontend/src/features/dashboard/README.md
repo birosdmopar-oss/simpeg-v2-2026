@@ -20,8 +20,8 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   atau `angka` (11 tile berurutan legacy + bar persen, tanpa chart). Rollback ke tampilan legacy cukup lewat
   `Config\Dashboard::$tampilanKomposisi` di backend.
 - M2a: `PengingatCards` (Pensiun → `/dokumen/pensiun`; KP/TJ/KGB tanpa tautan, Q7-37), `ButuhApprovalCard` (role 1/3 di
-  keluarga admin; adapter SEMENTARA `composables/ringkasanNotifikasi.ts` berbentuk kontrak Jalur C — hapus dan impor
-  `@/features/notifikasi` begitu F-08 di `main`), `DirekturCard` (role 1/4, `GET /dashboard/direktur`).
+  keluarga admin; angka dari `useRingkasanNotifikasi()` `@/features/notifikasi`, tautan ke `notifikasi?tab=butuh-approval`;
+  ikut aturan lonceng Jalur C: "—" tanpa tautan/polling selama `ACTIVE_PHASE < FASE_LONCENG`), `DirekturCard` (role 1/4, `GET /dashboard/direktur`).
 - M2b: `PegawaiDashboard` → `PrediksiCards` (teks view legacy: "-" bila kosong, "Sudah di Pangkat Puncak", JF "AK / target"
   + "Kurang N AK") dan `ButuhApprovalCard` untuk role 2; `BawahanCards` (presensi & AK bawahan) bila akun atasan.
 - `UlangTahunCard` (hari ini / besok, semua role) di atas `UiCarouselPanel` (baru di `shared/ui`: pola WAI-ARIA carousel,

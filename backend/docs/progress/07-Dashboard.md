@@ -137,3 +137,5 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   Saya (Q7-42; komponen Fase 5 tidak ada), ulang tahun (`UlangTahunBeranda`, `dashboard/ulang-tahun` + foto Q-D19,
   Config Q-D20) + `UiCarouselPanel`. Q7-44 dikoreksi: tautan update FK PTT legacy dikomentari → tidak dipasang.
 - Sisa M2: kelengkapan data (`kd_*`, Q-D13..D17 menunggu Horii), Q-D18 (pengecualian NIP ulang tahun), Q-D12.
+- 10-11: `ButuhApprovalCard` memakai `useRingkasanNotifikasi()` asli `@/features/notifikasi` (F-08 MAKE-085 di `main`);
+  adapter sementara dihapus; ikut aturan lonceng (`ACTIVE_PHASE < FASE_LONCENG` → "—" tanpa tautan/polling).
