@@ -66,11 +66,19 @@ export interface KartuPrediksi {
   ak?: { sekarang: number; target: number; kurang: number } | null
 }
 
-/** Keluarga pegawai (role 2/6/7). Role 2: 4 kartu; role 7: Pensiun + KGB; role 6: kosong. */
+/** Bawahan atasan (role 2, `dashboard_pns.php:207-232`, :331-385). */
+export interface BawahanBeranda {
+  atasan: boolean
+  presensi: { nama: string; jam_masuk: string; jam_pulang: string }[]
+  ak: { order: number; nama: string; nip: string; gol_ruang: string; satker: string; jabatan: string; ak_now: number; ak_kp: number; kurang: number }[]
+}
+
+/** Keluarga pegawai (role 2/6/7). Role 2: 4 kartu + bawahan; role 7: Pensiun + KGB; role 6: kosong. */
 export interface RingkasanPegawai {
   keluarga: 'pegawai'
   tanggal: string
   prediksi: KartuPrediksi[]
+  bawahan: BawahanBeranda
 }
 
 export type RingkasanBeranda = RingkasanAdmin | RingkasanPegawai

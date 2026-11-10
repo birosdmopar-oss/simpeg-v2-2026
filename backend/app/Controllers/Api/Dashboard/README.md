@@ -136,7 +136,12 @@ Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
 `{kode, label, tanggal|null, teks ("Bulan Tahun")|null, sisa ("N Tahun M Bulan")|null}` + khusus `kp`: `jenis` `ST|JF`,
 `pangkat_puncak`, `ak` `{sekarang, target, kurang}` (JF). Role 2: `pensiun` (BUP jabatan), `kp` (port `next_kp`; JF bila
 `pmj.id_group_jabatan` = 2 → AK `AkPermenpanrb`), `tj` (port `next_tj`), `kgb` (`next_kgb`); role 7: `pensiun` = `pmj.mhpk_akhir`
-+ `kgb`; role 6: `[]`. KP/TJ/KGB `null` bila tidak sebelum tanggal pensiun. Kelengkapan data & bawahan: M2b berikutnya.
++ `kgb`; role 6: `[]`. KP/TJ/KGB `null` bila tidak sebelum tanggal pensiun.
+
+`bawahan` (role 2 saja, ikut `dashboard_pns`): `{atasan, presensi: [{nama, jam_masuk, jam_pulang}], ak: [{order, nama, nip,
+gol_ruang, satker, jabatan, ak_now, ak_kp, kurang}]}` — bawahan dari `pmj.id_atasan_es_*` / `*_koord` milik jabatan atasan
+(Eselon I tanpa bawahan, cabang mati legacy); presensi `dh_online` hari ini; AK hanya bawahan JF. Kelengkapan data: menunggu
+keputusan (butir terbuka).
 
 Kode galat: 401 tanpa token.
 
@@ -153,3 +158,5 @@ DESC; masa kerja sampai hari ini WIB ('' bila < 1 bulan). 401/403.
 - **[I] KP satker/unit:** `get_kp_satker|unit` legacy menghitung percepatan juga untuk `gol_ruang` kosong; v2 memakai perilaku
   `get_all_kp` di semua lingkup (dicek saat QA).
 - **Ulang tahun** (`dashboard/ulang-tahun`, Q7-45): menunggu jawaban reviewer soal sumber aturan pemilihan.
+- **Kelengkapan data** (`kd_*` legacy): bug legacy perlu keputusan sebelum di-port (kd_rdiklat selalu ≥ 100, kd_rkgb/kd_rtj
+  bisa > 100, kd_rpangkat_2 butuh kode lampiran dari berkas terlarang + loop tak berujung, syarat `id_jenis_pegawai = 1`).

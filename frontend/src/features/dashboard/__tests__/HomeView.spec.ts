@@ -173,7 +173,14 @@ const prediksi = (kode: KartuPrediksi['kode'], label: string, extra: Partial<Kar
   kode, label, tanggal: null, teks: null, sisa: null, ...extra,
 })
 
-const pegawai = (kartu: KartuPrediksi[]): RingkasanPegawai => ({ keluarga: 'pegawai', tanggal: '2026-11-10', prediksi: kartu })
+const tanpaBawahan = { atasan: false, presensi: [], ak: [] }
+
+const pegawai = (kartu: KartuPrediksi[], bawahan: RingkasanPegawai['bawahan'] = tanpaBawahan): RingkasanPegawai => ({
+  keluarga: 'pegawai',
+  tanggal: '2026-11-10',
+  prediksi: kartu,
+  bawahan,
+})
 
 describe('HomeView — kartu prediksi pegawai M2b', () => {
   it('role 2: 4 kartu teks legacy (judul, label, sisa; "-" bila kosong)', async () => {
@@ -220,6 +227,37 @@ describe('HomeView — kartu prediksi pegawai M2b', () => {
 
     expect(wrapper.find('[data-testid="beranda-prediksi"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="beranda-butuh-approval"]').exists()).toBe(approval)
+  })
+})
+
+describe('HomeView — bawahan atasan M2b', () => {
+  it('atasan: tabel presensi bawahan (Nama, Jam Masuk, Jam Pulang) + AK bawahan JF', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([], {
+      atasan: true,
+      presensi: [{ nama: 'Staf Umum, S.E.', jam_masuk: '07:31:00', jam_pulang: '' }],
+      ak: [{ order: 12.5, nama: 'Fungsional', nip: '199001012020011002', gol_ruang: 'III/a', satker: 'Satker Fixture', jabatan: 'JF Fixture', ak_now: 87.5, ak_kp: 100, kurang: -12.5 }],
+    }))
+    const wrapper = await mountAs(Role.PEGAWAI)
+
+    expect(wrapper.get('[data-testid="beranda-bawahan-presensi-0"]').findAll('td').map((t) => t.text())).toEqual(['Staf Umum, S.E.', '07:31:00', ''])
+    expect(wrapper.get('[data-testid="beranda-bawahan-ak-199001012020011002"]').findAll('td').map((t) => t.text())).toEqual([
+      '12,5', 'Fungsional', '199001012020011002', 'III/a', 'Satker Fixture', 'JF Fixture', '87,5', '100', '-12,5',
+    ])
+  })
+
+  it('atasan tanpa bawahan JF: hanya tabel presensi', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([], { atasan: true, presensi: [{ nama: 'A', jam_masuk: '', jam_pulang: '' }], ak: [] }))
+    const wrapper = await mountAs(Role.PEGAWAI)
+
+    expect(wrapper.find('[data-testid="beranda-bawahan-presensi"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="beranda-bawahan-ak"]').exists()).toBe(false)
+  })
+
+  it('bukan atasan: tanpa bagian bawahan', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([]))
+    const wrapper = await mountAs(Role.PEGAWAI)
+
+    expect(wrapper.find('[data-testid="beranda-bawahan"]').exists()).toBe(false)
   })
 })
 
