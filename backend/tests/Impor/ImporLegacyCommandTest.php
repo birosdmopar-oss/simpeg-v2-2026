@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Impor;
 
+use App\Libraries\Impor\DaftarTabel;
 use CodeIgniter\Config\Factories;
 use CodeIgniter\Test\StreamFilterTrait;
 use Config\ImporLegacy;
@@ -79,14 +80,14 @@ final class ImporLegacyCommandTest extends ImporLegacyTestCase
     {
         $db = $this->db->getDatabase();
 
-        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$db} --zona-sumber=WIB --konfirmasi={$db} --tier=13 --dry-run");
+        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$db} --zona-sumber=WIB --konfirmasi={$db} --tier=" . DaftarTabel::TIER_MAKS . ' --dry-run');
         $keluaran = $this->getStreamFilterBuffer();
         $this->assertStringContainsString("sumber SIASN: {$db}", $keluaran, 'dicetak sebelum konfirmasi (R-2)');
         $this->assertStringContainsString('GAGAL: Database sumber dan tujuan sama.', $keluaran);
 
         // Salinan siasn_simpeg tanpa salah satu dari 8 tabel → gagal (snapshot tidak lengkap, K-9).
         $this->siapkanSumberSiasn(['GOLONGAN_ID' => 'id_pangkat']);
-        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$this->lgc}_sia --zona-sumber=WIB --konfirmasi={$db} --tier=13 --dry-run");
+        command("impor:legacy --sumber={$this->lgc} --sumber-siasn={$this->lgc}_sia --zona-sumber=WIB --konfirmasi={$db} --tier=" . DaftarTabel::TIER_MAKS . ' --dry-run');
         $this->assertStringContainsString('GAGAL: Tabel sumber JABATAN_FUNGSIONAL_ID tidak ada.', $this->getStreamFilterBuffer());
     }
 
