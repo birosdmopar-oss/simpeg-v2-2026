@@ -782,7 +782,9 @@ class Services extends BaseService
     // Modul F Jalur C — Pusat Notifikasi F-08 (Fase 7, MAKE-085; PRD Fase 7 v2.0 §7).
 
     /**
-     * Sumber notifikasi berita (F-07 Jalur A). NoOp sampai `SumberBerita` ada di `main`; Jalur A mengganti satu baris ini.
+     * Sumber notifikasi berita (F-07 Jalur A). NoOp sampai tabel `news` ada di skema utama (migration DBV-032 di `main`);
+     * saat itu Jalur A mengganti SATU baris `return` di bawah dengan
+     * `new \App\Libraries\Dashboard\Konten\Berita\SumberBerita(db_connect())` (kelas + test sudah ada, MAKE-081).
      */
     public static function sumberNotifikasiBerita(bool $getShared = true): \App\Interfaces\Notifikasi\SumberNotifikasiInterface
     {
