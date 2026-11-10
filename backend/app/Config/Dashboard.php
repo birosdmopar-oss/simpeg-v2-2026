@@ -41,6 +41,16 @@ class Dashboard extends BaseConfig
     public array $idJabatanDirektur = [1914, 617, 616, 150, 149, 41];
 
     /**
+     * Kartu Tanda Jasa beranda role 3 (satker/unit) — deviasi [V2] keputusan Horii 10-11-2026 (README `Libraries/Dashboard`,
+     * "Deviasi dari legacy — Tanda Jasa satker/unit").
+     * `false` (bawaan, [V2]): tahun acuan sama dengan kementerian (tahun berjalan bila bulan < 9, tahun depan bila ≥ 9) untuk
+     * proyeksi dan tanggal pembanding, sehingga kartu tidak ≈0 pada September–Desember.
+     * `true`: persis legacy `L_user::dashboard_satker|unit` (proyeksi selalu tahun berjalan; pembanding 1 Agustus tahun depan
+     * mulai September → praktis 0). Kementerian tidak terpengaruh saklar ini.
+     */
+    public bool $tandaJasaIkutLegacy = false;
+
+    /**
      * Masa cache ringkasan beranda per lingkup (detik). Angka "hari ini" (TB, IB, CLTN, cuti, presensi online) tidak di-cache.
      */
     public int $ttlRingkasanDetik = 900;

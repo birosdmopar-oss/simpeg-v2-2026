@@ -11,6 +11,7 @@ use App\Libraries\Integrasi\Stat\RekomendasiKp;
 use App\Libraries\Integrasi\Stat\RekomendasiPensiun;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use Config\Dashboard;
 
 /**
  * 4 kartu pengingat beranda admin — Pensiun, Naik Pangkat, Tanda Jasa, KGB (`views/user/dashboard_ad.php:8-37`) [K].
@@ -23,9 +24,11 @@ use CodeIgniter\Database\BaseConnection;
  * - KP: PNS aktif; tahun `tgl_kp` (deteksi `get_all_kp`) = tahun berjalan. **[I] beda tepi legacy:** `get_kp_satker|unit`
  *   menghitung percepatan juga untuk `gol_ruang` kosong (indeks tak terdefinisi), `get_all_kp` tidak; di sini semua lingkup
  *   memakai perilaku `get_all_kp` (PNS tanpa golongan sangat jarang; dicatat di README).
- * - Tanda Jasa: PNS aktif. Kementerian: tahun acuan = tahun berjalan bila bulan < 9, selain itu tahun depan; dihitung bila
- *   tahun penghargaan ≤ tahun acuan. Satker/unit: proyeksi tahun berjalan; dihitung bila tanggal penghargaan TEPAT
- *   `{tahun}-08-01` (bulan < 9) atau `{tahun+1}-08-01` (bulan ≥ 9).
+ * - Tanda Jasa: PNS aktif. Kementerian [K]: tahun acuan = tahun berjalan bila bulan < 9, selain itu tahun depan; dihitung bila
+ *   tahun penghargaan ≤ tahun acuan. Satker/unit [V2 bawaan, Horii 10-11-2026]: tahun proyeksi SAMA dengan acuan kementerian;
+ *   dihitung bila tanggal penghargaan TEPAT `{acuan}-08-01` (operator `=` legacy dipertahankan). Saklar
+ *   `Config\Dashboard::$tandaJasaIkutLegacy = true` → persis legacy (proyeksi selalu tahun berjalan; pembanding sama) sehingga
+ *   ≈0 pada September–Desember. Rincian: README "Deviasi dari legacy — Tanda Jasa satker/unit".
  * - KGB: kementerian PNS + PPPK (`id_jenis_pegawai` 1, 6), satker/unit PNS saja; tahun TMT KGB berikutnya ≤ tahun berjalan.
  * Pengecualian NIP (`$whereHide_nip`) TIDAK dipakai di kartu ini (legacy tidak memakainya).
  */
@@ -33,7 +36,7 @@ final class PengingatBeranda
 {
     private const BATCH = 1000;
 
-    public function __construct(private readonly BaseConnection $db, private readonly string $hariIni)
+    public function __construct(private readonly BaseConnection $db, private readonly string $hariIni, private readonly ?Dashboard $config = null)
     {
     }
 
@@ -141,7 +144,10 @@ final class PengingatBeranda
         $tahun       = $this->tahun();
         $bulan       = (int) substr($this->hariIni, 5, 2);
         $kementerian = $lingkup['jenis'] === RingkasanBeranda::LINGKUP_KEMENTERIAN;
-        $acuan       = $kementerian && $bulan >= 9 ? $tahun + 1 : $tahun;
+        $acuanKem    = $bulan >= 9 ? $tahun + 1 : $tahun;
+        // Satker/unit: [K] legacy proyeksi selalu tahun berjalan; [V2] bawaan (Horii 10-11-2026) sama dengan kementerian.
+        $ikutLegacy = ! $kementerian && ($this->config?->tandaJasaIkutLegacy ?? false);
+        $acuan      = $ikutLegacy ? $tahun : $acuanKem;
 
         $b = $this->db->table('pegawai peg')
             ->select('peg.nip, pcpns.tmtsk AS tmtsk_cpns')
@@ -153,8 +159,9 @@ final class PengingatBeranda
 
         $rows     = $b->get()->getResultArray();
         $dimiliki = $this->tandaJasaDimiliki(array_column($rows, 'nip'));
-        $sasaran  = sprintf('%04d-08-01', $bulan < 9 ? $tahun : $tahun + 1);
-        $n        = 0;
+        // Pembanding satker/unit `=` [K] = `{tahun acuan kementerian}-08-01` di kedua mode; yang berbeda hanya tahun proyeksi.
+        $sasaran = sprintf('%04d-08-01', $acuanKem);
+        $n       = 0;
 
         foreach ($rows as $r) {
             $p = ProyeksiTandaJasa::berikutnya($r['tmtsk_cpns'] ?? null, $acuan, $dimiliki[(string) $r['nip']] ?? []);

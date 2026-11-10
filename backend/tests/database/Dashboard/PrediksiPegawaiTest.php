@@ -78,6 +78,29 @@ final class PrediksiPegawaiTest extends DatabaseTestCase
         $this->assertSame([null, null, null], [$kartu['kp']['tanggal'], $kartu['tj']['tanggal'], $kartu['kgb']['tanggal']]);
     }
 
+    public function testPercepatanStrukturalLebihAwalDariReguler(): void
+    {
+        $nip = $this->pns('1975-05-20');
+
+        if ($this->db->table('group_jabatan')->where('id_group_jabatan', 1)->countAllResults() === 0) {
+            $this->db->table('group_jabatan')->insert(['id_group_jabatan' => 1, 'group_jabatan' => 'Struktural', 'status' => 1]);
+        }
+
+        if ($this->db->table('sub_group_jabatan')->where('id_sub_group_jabatan', 4)->countAllResults() === 0) {
+            $this->db->table('sub_group_jabatan')->insert(['id_sub_group_jabatan' => 4, 'id_group_jabatan' => 1, 'sub_group_jabatan' => 'E.IV', 'status' => 1]);
+        }
+
+        $this->db->table('pegawai_mutasi_jabatan')->where('nip', $nip)->update(['id_group_jabatan' => 1, 'id_sub_group_jabatan' => 4]);
+        $this->kp($nip, 'III/a', '2024-04-01');                       // reguler → 2028-04-01
+        // Jabatan Eselon IV pertama 15-03-2026 → +1 tahun = 15-03-2027 → periode 01-04-2027 (golongan III/a < minimum E.IV III/c).
+        $this->buatRiwayatMutasiJabatan($nip, ['id_sub_group_jabatan' => 4, 'tmtsk' => '2026-03-15']);
+        $this->buatRiwayatMutasiJabatan($nip, ['id_sub_group_jabatan' => 4, 'tmtsk' => '2026-09-01']); // bukan yang terawal
+
+        $kp = $this->perKode((new PrediksiPegawai($this->db, self::HARI_INI))->kartu(Role::PEGAWAI, $nip))['kp'];
+
+        $this->assertSame(['2027-04-01', 'April 2027'], [$kp['tanggal'], $kp['teks']]);
+    }
+
     public function testPangkatPuncakTanpaTanggal(): void
     {
         $nip = $this->pns('1970-05-20');

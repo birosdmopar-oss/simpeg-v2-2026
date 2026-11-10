@@ -68,7 +68,8 @@ final class PengingatBerandaTest extends DatabaseTestCase
 
     protected function tearDown(): void
     {
-        config(Dashboard::class)->ttlRingkasanDetik = 900;
+        config(Dashboard::class)->ttlRingkasanDetik   = 900;
+        config(Dashboard::class)->tandaJasaIkutLegacy = false;
         Time::setTestNow();
         Services::reset(true);
         $this->clearAuthState();
@@ -96,7 +97,7 @@ final class PengingatBerandaTest extends DatabaseTestCase
         $this->assertSame(1, $this->kartu($this->ringkasan($this->adminSatker()), 'pensiun'));
     }
 
-    public function testTandaJasaKementerianVsSatkerSebelumSeptember(): void
+    public function testTandaJasaSebelumSeptemberSamaDiKeduaMode(): void
     {
         Time::setTestNow('2026-05-10 09:00:00', 'Asia/Jakarta');
         $this->pnsCpns('2016-03-01');                                // X → 2026-08-01
@@ -105,19 +106,32 @@ final class PengingatBerandaTest extends DatabaseTestCase
         $this->tandaJasa($punya, ProyeksiTandaJasa::ID_X);
         $this->pnsCpns('2016-09-01');                                // 9 tahun → tidak ada
 
-        $this->assertSame(2, $this->kartu($this->ringkasan($this->kementerian()), 'tj'), 'kementerian: ≤ tahun acuan');
-        $this->assertSame(1, $this->kartu($this->ringkasan($this->adminSatker()), 'tj'), 'satker: tepat 1 Agustus tahun berjalan');
+        foreach ([false, true] as $legacy) {
+            config(Dashboard::class)->tandaJasaIkutLegacy = $legacy;
+            $mode                                         = $legacy ? 'legacy' : 'v2';
+            $this->assertSame(2, $this->kartu($this->ringkasan($this->kementerian()), 'tj'), "kementerian ≤ acuan ({$mode})");
+            $this->assertSame(1, $this->kartu($this->ringkasan($this->adminSatker()), 'tj'), "satker tepat 1 Agustus ({$mode})");
+            $this->assertSame(1, $this->kartu($this->ringkasan($this->adminUnit()), 'tj'), "unit tepat 1 Agustus ({$mode})");
+        }
     }
 
-    public function testTandaJasaMulaiSeptemberAcuanTahunDepan(): void
+    public function testTandaJasaMulaiSeptemberSatkerUnitV2TidakLagiNol(): void
     {
         Time::setTestNow('2026-10-10 09:00:00', 'Asia/Jakarta');
-        $this->pnsCpns('2016-03-01');                                // kementerian acuan 2027 → X 2026-08-01 ≤ 2027
-        $this->pnsCpns('2016-09-01');                                // kementerian: 10 th per 2027-08-01 → X 2027-08-01
+        $this->pnsCpns('2016-03-01');                                // acuan 2027: X 2026-08-01 (terlewat)
+        $this->pnsCpns('2016-09-01');                                // acuan 2027: 10 th per 2027-08-01 → X 2027-08-01
 
-        $this->assertSame(2, $this->kartu($this->ringkasan($this->kementerian()), 'tj'));
-        // [K] satker: proyeksi tetap tahun berjalan (2016-09-01 baru 9 th), sasaran 2027-08-01 → tidak ada yang cocok.
+        // [V2] bawaan: satker/unit memakai tahun acuan kementerian (2027) → pegawai yang genap pada 01-08-2027 terhitung.
+        config(Dashboard::class)->tandaJasaIkutLegacy = false;
+        $this->assertSame(2, $this->kartu($this->ringkasan($this->kementerian()), 'tj'), 'kementerian tidak berubah');
+        $this->assertSame(1, $this->kartu($this->ringkasan($this->adminSatker()), 'tj'));
+        $this->assertSame(1, $this->kartu($this->ringkasan($this->adminUnit()), 'tj'));
+
+        // Saklar rollback: persis legacy — proyeksi tahun berjalan (2016-09-01 baru 9 th), sasaran 2027-08-01 → 0.
+        config(Dashboard::class)->tandaJasaIkutLegacy = true;
+        $this->assertSame(2, $this->kartu($this->ringkasan($this->kementerian()), 'tj'), 'kementerian tidak terpengaruh saklar');
         $this->assertSame(0, $this->kartu($this->ringkasan($this->adminSatker()), 'tj'));
+        $this->assertSame(0, $this->kartu($this->ringkasan($this->adminUnit()), 'tj'));
     }
 
     public function testKgbKementerianTermasukPppkSatkerHanyaPns(): void

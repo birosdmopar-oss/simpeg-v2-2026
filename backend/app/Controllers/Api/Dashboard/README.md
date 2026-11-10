@@ -155,6 +155,8 @@ DESC; masa kerja sampai hari ini WIB ('' bila < 1 bulan). 401/403.
 
 - **Q-D12** (menunggu Horii): legacy `$whereHide_nip` tidak berlaku untuk beberapa akun tertentu (daftar id pengguna hardcode).
   Q7-41 hanya memuat daftar NIP; v2 saat ini memakai pengecualian untuk semua akun. Kunci `.env` tambahan belum dibuat.
+- **Deviasi [V2] Tanda Jasa satker/unit** (Horii 10-11-2026): tahun acuan sama dengan kementerian; rollback
+  `Config\Dashboard::$tandaJasaIkutLegacy = true`. Rincian (a)–(d): `app/Libraries/Dashboard/README.md`.
 - **[I] KP satker/unit:** `get_kp_satker|unit` legacy menghitung percepatan juga untuk `gol_ruang` kosong; v2 memakai perilaku
   `get_all_kp` di semua lingkup (dicek saat QA).
 - **Ulang tahun** (`dashboard/ulang-tahun`, Q7-45): menunggu jawaban reviewer soal sumber aturan pemilihan.

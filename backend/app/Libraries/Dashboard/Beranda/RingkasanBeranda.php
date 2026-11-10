@@ -147,7 +147,7 @@ final class RingkasanBeranda
         $tetap = $this->ingat('tetap', $lingkup, '', fn (): array => $this->hitungTetap($lingkup));
 
         /** @var array{pensiun: int, kp: int, tj: int, kgb: int} $pengingat */
-        $pengingat = $this->ingat('pengingat', $lingkup, $tanggal, fn (): array => (new PengingatBeranda($this->db, $tanggal))->hitung($lingkup));
+        $pengingat = $this->ingat('pengingat', $lingkup, $tanggal, fn (): array => (new PengingatBeranda($this->db, $tanggal, $this->config))->hitung($lingkup));
         $hariIni   = $this->hitungHariIni($lingkup, $tanggal);
         $total     = $tetap['total_aktif'];
 
@@ -307,7 +307,9 @@ final class RingkasanBeranda
         }
 
         // Sidik daftar NIP (bukan isinya) supaya perubahan konfigurasi tidak memakai angka lama; NIP tidak masuk kunci.
-        $kunci = sprintf('dashboard_beranda_%s_%s_%s_%s_%s', $jenis, $lingkup['jenis'], $lingkup['id'] ?? 'x', $tanggal === '' ? 'x' : $tanggal, substr(hash('sha256', implode(',', $this->config->daftarNipDisembunyikan())), 0, 12));
+        // Sidik konfigurasi yang memengaruhi hasil: daftar NIP (Q7-41) dan saklar Tanda Jasa satker/unit; NIP tidak masuk kunci.
+        $sidik = substr(hash('sha256', implode(',', $this->config->daftarNipDisembunyikan()) . '|tj' . (int) $this->config->tandaJasaIkutLegacy), 0, 12);
+        $kunci = sprintf('dashboard_beranda_%s_%s_%s_%s_%s', $jenis, $lingkup['jenis'], $lingkup['id'] ?? 'x', $tanggal === '' ? 'x' : $tanggal, $sidik);
 
         /** @var array<string, mixed> */
         return $this->cache->remember($kunci, $ttl, $hitung(...));
