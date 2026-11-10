@@ -24,7 +24,9 @@ Kontrak API: `backend/app/Controllers/Api/Notifikasi/README.md`. PRD Fase 7 v2.0
   - Klik lonceng membuka `/notifikasi` untuk role yang punya halamannya.
   - Logout memanggil `resetRingkasanNotifikasi`.
 - `shared/layouts/AppTopbar.vue`: event `open-notifikasi`.
-- `shared/layouts/nav.config.ts`: item `notifikasi` `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7). Lonceng tetap aktif.
+- `shared/layouts/nav.config.ts`: item `notifikasi` `phase: FASE_LONCENG` (7), tersembunyi sampai ACTIVE_PHASE ≥ 7.
+- Lonceng (angka, polling, klik) juga menunggu `ACTIVE_PHASE ≥ FASE_LONCENG` (keputusan reviewer 10-11-2026, pola F7-14):
+  sebelum itu tampil polos tanpa titik merah. QA lewat URL `/notifikasi` langsung.
 - `router/index.ts`: `notifikasiRoutes`.
 
 ## Catatan

@@ -182,31 +182,21 @@ describe('NotifikasiPage — tab per role (Q7-29)', () => {
   })
 })
 
-describe('Lonceng topbar (RedesignShell)', () => {
-  async function mountShell(role: RoleCode) {
-    loginAs(role)
+describe('Lonceng topbar (RedesignShell) — ACTIVE_PHASE < FASE_LONCENG', () => {
+  it('lonceng tanpa angka, tanpa polling ringkasan, dan klik tidak berpindah sampai penutup Fase 7', async () => {
+    loginAs(Role.PEGAWAI)
     const router = routerUji()
     await router.push('/')
     await router.isReady()
     const wrapper = mount(RedesignShell, { global: { plugins: [router] }, attachTo: document.body })
     await flushPromises()
-    return { wrapper, router }
-  }
 
-  it('titik merah + label jumlah dari ringkasan; klik membuka Pusat Notifikasi', async () => {
-    const { wrapper, router } = await mountShell(Role.PEGAWAI)
     const bell = wrapper.get('[data-testid="topbar-bell"]')
-    expect(bell.attributes('aria-label')).toBe('Notifikasi, 3 belum dibaca')
-    expect(bell.find('span').exists()).toBe(true)
+    expect(bell.attributes('aria-label')).toBe('Notifikasi')
+    expect(bell.find('span').exists()).toBe(false)
+    expect(get.mock.calls.filter(([p]) => p === '/notifikasi/ringkasan')).toHaveLength(0)
 
     await bell.trigger('click')
-    await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/notifikasi')
-  })
-
-  it('role tanpa halaman notifikasi: klik lonceng tidak berpindah', async () => {
-    const { wrapper, router } = await mountShell(Role.MENTERI)
-    await wrapper.get('[data-testid="topbar-bell"]').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/')
   })

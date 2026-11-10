@@ -20,3 +20,9 @@ export const NOTIFIKASI_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.PEG
  * punya halaman Butuh Approval. UL 7 tidak termasuk: legacy hanya mengisi penanda petugas untuk UL 2 (`MY_Controller:46-68`).
  */
 export const BUTUH_APPROVAL_ROLES: readonly RoleCode[] = NOTIFIKASI_APPROVAL_ROLES
+
+/**
+ * Fase menu tempat lonceng topbar dinyalakan (sama dengan item menu `notifikasi` `phase: 7`; keputusan reviewer
+ * 10-11-2026): selama `ACTIVE_PHASE` < nilai ini lonceng tampil tanpa angka dan tanpa polling.
+ */
+export const FASE_LONCENG = 7
