@@ -248,7 +248,8 @@ final class RingkasanBerandaTest extends DatabaseTestCase
             $res  = $this->withHeaders(['Authorization' => 'Bearer ' . $this->issueTokensForUser($this->db->table('pengguna')->where('id_pengguna', $akun)->get()->getRowArray())['access_token']])->get(self::URL);
             $res->assertStatus(200);
             $data = json_decode($res->getJSON(), true)['data'];
-            $this->assertSame(['keluarga', 'tanggal', 'prediksi'], array_keys($data), (string) $role);
+            $this->assertSame(['keluarga', 'tanggal', 'prediksi', 'bawahan'], array_keys($data), (string) $role);
+            $this->assertSame(['atasan' => false, 'presensi' => [], 'ak' => []], $data['bawahan'], 'tanpa bawahan');
             $this->assertSame('pegawai', $data['keluarga']);
             $this->assertSame($harapan[$role], array_column($data['prediksi'], 'kode'), (string) $role);
         }

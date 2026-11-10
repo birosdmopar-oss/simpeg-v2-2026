@@ -43,7 +43,8 @@ use Config\Dashboard;
  * (0 = tanpa cache); angka "hari ini" (TB, IB, cuti, presensi online) selalu dihitung ulang.
  *
  * **Pegawai (role 2/6/7)** — `{keluarga: 'pegawai', tanggal, prediksi}`: kartu prediksi {@see PrediksiPegawai} (role 2: Pensiun,
- * Naik Pangkat, Tanda Jasa, KGB; role 7: Pensiun (akhir masa perjanjian) + KGB; role 6: kosong). Kelengkapan data & bawahan: M2b-2.
+ * Naik Pangkat, Tanda Jasa, KGB; role 7: Pensiun (akhir masa perjanjian) + KGB; role 6: kosong) dan `bawahan` {@see BawahanPegawai}
+ * (role 2 saja). Kelengkapan data: menyusul.
  */
 final class RingkasanBeranda
 {
@@ -121,12 +122,16 @@ final class RingkasanBeranda
             return $this->admin($auth);
         }
 
-        $nip = $auth->nip();
+        $nip     = $auth->nip();
+        $tanggal = $this->hariIni ?? TanggalBisnis::hariIni();
+        $adaNip  = $role !== null && $nip !== null && $nip !== '';
 
         return [
             'keluarga' => self::KELUARGA_PEGAWAI,
-            'tanggal'  => $this->hariIni ?? TanggalBisnis::hariIni(),
-            'prediksi' => $role === null || $nip === null || $nip === '' ? [] : (new PrediksiPegawai($this->db, $this->hariIni ?? TanggalBisnis::hariIni()))->kartu($role, $nip),
+            'tanggal'  => $tanggal,
+            'prediksi' => $adaNip ? (new PrediksiPegawai($this->db, $tanggal))->kartu($role, $nip) : [],
+            // [K] presensi & AK bawahan hanya di dashboard_pns (role 2); PTT/PPPK tanpa bagian ini.
+            'bawahan' => $adaNip && $role === Role::PEGAWAI ? (new BawahanPegawai($this->db, $tanggal))->untuk($nip) : ['atasan' => false, 'presensi' => [], 'ak' => []],
         ];
     }
 
