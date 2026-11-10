@@ -55,6 +55,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesServices.php',
         // Modul F Jalur C — Pusat Notifikasi & Inbox (Fase 7, MAKE-085): `api/v1/notifikasi*`.
         APPPATH . 'Config/RoutesNotifikasi.php',
+        // Modul F Jalur A — konten admin (Fase 7, MAKE-079..082): popup, banner; berita dan DIBO menyusul (api/v1/konten/*).
+        APPPATH . 'Config/RoutesKonten.php',
     ];
 
     /**

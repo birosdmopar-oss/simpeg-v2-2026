@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi|konten)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -99,6 +99,28 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/notifikasi/baca'              => [2, 3, 6, 7],
             'GET api/v1/notifikasi'                    => [2, 3, 6, 7],
             'DELETE api/v1/notifikasi/([^/]+)/([^/]+)' => [1, 2, 6, 7],
+            // F-04 Popup / F-05 Banner (MAKE-079/080, PRD Fase 7 v2.0 §5.3/5.4, §6): kelola = role 1; aktif = role ber-NIP 2–8
+            // (Q7-05); gambar = semua role login (penerima/role 1 dicek di service, selain itu 404).
+            'GET api/v1/konten/opsi/unit-satker'         => [1],
+            'GET api/v1/konten/opsi/pegawai'             => [1],
+            'GET api/v1/konten/popup/aktif'              => [2, 3, 4, 5, 6, 7, 8],
+            'GET api/v1/konten/popup'                    => [1],
+            'POST api/v1/konten/popup'                   => [1],
+            'GET api/v1/konten/popup/([0-9]+)/target'    => [1],
+            'GET api/v1/konten/popup/([0-9]+)/penerima'  => [1],
+            'GET api/v1/konten/popup/([0-9]+)/gambar'    => [1, 2, 3, 4, 5, 6, 7, 8],
+            'POST api/v1/konten/popup/([0-9]+)/urutan'   => [1],
+            'POST api/v1/konten/popup/([0-9]+)'          => [1],
+            'DELETE api/v1/konten/popup/([0-9]+)'        => [1],
+            'GET api/v1/konten/banner/aktif'             => [2, 3, 4, 5, 6, 7, 8],
+            'GET api/v1/konten/banner'                   => [1],
+            'POST api/v1/konten/banner'                  => [1],
+            'GET api/v1/konten/banner/([0-9]+)/target'   => [1],
+            'GET api/v1/konten/banner/([0-9]+)/penerima' => [1],
+            'GET api/v1/konten/banner/([0-9]+)/gambar'   => [1, 2, 3, 4, 5, 6, 7, 8],
+            'POST api/v1/konten/banner/([0-9]+)/urutan'  => [1],
+            'POST api/v1/konten/banner/([0-9]+)'         => [1],
+            'DELETE api/v1/konten/banner/([0-9]+)'       => [1],
             // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
             // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
             'GET api/v1/tb'                            => [1, 2, 3, 6],
