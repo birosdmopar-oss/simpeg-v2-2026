@@ -15,9 +15,9 @@ MAKE-056 memegang tabel jalur Tukin (Tier 1–6). MAKE-069 memegang semua tabel 
 `pengguna`, bootstrap admin awal, dan pemindahan berkas lampiran. Tabel kerja SIASN (paket B3, DBV-027) menjadi tier
 **terakhir** karena `siasn_upload_arsip` merujuk riwayat dan `document_attachment` (syarat K-6 DBV-027).
 
-Tier dinomori lanjutan MAKE-056. **Nomor di kode saat ini:** T7–T12 seperti tabel di bawah; tier SIASN = **T13**
-(`DaftarTabel::TIER_MAKS`, selalu terakhir — dikunci `UrutanTierTest`). T12b dan tiket lama belum ada di kode; saat
-ditambahkan keduanya disisipkan SEBELUM tier SIASN dan nomor tier SIASN bergeser. Label "T13" di dokumen DBV-029 =
+Tier dinomori lanjutan MAKE-056. **Nomor di kode saat ini:** T7–T12 seperti tabel di bawah; tiket lama = **T13**
+(MAKE-086 F-02); tier SIASN = **T14** (`DaftarTabel::TIER_MAKS`, selalu terakhir — dikunci `UrutanTierTest`). T12b belum
+ada di kode; saat ditambahkan disisipkan SEBELUM tier SIASN dan nomor tier SIASN bergeser. Label "T13" di dokumen DBV-029 =
 tiket lama (penomoran rencana), bukan tier SIASN di kode.
 
 | Tier | Isi | Tabel |
@@ -29,8 +29,8 @@ tiket lama (penomoran rencana), bukan tier SIASN di kode.
 | T11 | Snapshot | `pegawai_cpns`, `pegawai_pns`, `pegawai_kgb`, `pegawai_pendidikan`, `pegawai_diklat`, `pegawai_hukdis`, `pegawai_ak`, `pegawai_ak_siasn`, `pegawai_keluarga`, `pegawai_alamat`, `pegawai_alamat_kantor`, `pegawai_tanda_jasa`, `pegawai_mutasi_jabatan` |
 | T12 | Layanan sisa (DBV-022 §5) | `jenis_layanan`, `jenis_pa`, `question_category` → `petugas_layanan`, `pa_layanan` → `riwayat_cuti_notif_kt`, `riwayat_ib`, `riwayat_pmk_req` → `riwayat_pmk` → `esign_hist` |
 | T12b | Halo Simpeg master (**skema menyusul DBV-028**) — belum di kode | `help_desk_contact`, `support_officer`, `officer_category` |
-| (T13 rencana) | Tiket lama (hasil sortir Fase 7 F-02) — belum di kode | `disiplin_ticket` ← legacy `inbox`, `disiplin_ticket_msg` ← legacy `inbox_msg` |
-| T13 di kode (terakhir) | SIASN (B3) | `siasn_ref_unor`, `siasn_referensi`, `siasn_upload_arsip`, `double_riwayat_kp` |
+| T13 | Tiket lama (sortir Fase 7 F-02, MAKE-086) | `disiplin_ticket` ← legacy `inbox`, `disiplin_ticket_msg` ← legacy `inbox_msg` |
+| T14 (terakhir) | SIASN (B3) | `siasn_ref_unor`, `siasn_referensi`, `siasn_upload_arsip`, `double_riwayat_kp` |
 
 **Dibuat kosong (tidak ada tier):** `token`, `login_attempts`, `forgot_attempts` (A-01); `audit_logs`, `queue_jobs`,
 `queue_jobs_failed` (tabel v2); `inbox`/`inbox_msg` v2 (DBV-022 §3.4); `firebase_token` (PRD Fase 6 AC-01.2);
@@ -111,8 +111,9 @@ dikonversi R1a dan semua kolom teks ikut `stripslashes` bawaan. Kolom `siasn_lu`
 - `status` legacy varchar `'1'`/`'0'` → tinyint; nilai lain → berkas keputusan.
 
 ### T13 tiket lama
-- Sumber = hasil sortir Fase 7 F-02 (PRD Fase 8 PN8-2), bukan `inbox` mentah. Tanpa hasil F-02 → tier dilaporkan
-  **dilewati**.
+- **Di kode sejak MAKE-086 (F-02): tier 13** (`DaftarTabel::tierTiketLama`, `AturanTiketLama`; tier SIASN menjadi 14).
+  Sumber = `inbox`/`inbox_msg` salinan legacy, disortir di `praPindai` (kelas + eskalasi per id lewat berkas keputusan
+  bagian `baris`, daftar eskalasi dari `php spark impor:sortir-inbox`). Rincian: `backend/app/Libraries/Impor/README.md`.
 - `sender`/`receiver`/`closed_by`/`msg_sender`/`msg_receiver` tanpa FK (sentinel 0 = semua petugas, DQ-4/6): disalin;
   id akun yang tidak ada → INFO.
 - Isi percakapan data pribadi: tidak masuk laporan, log, atau fixture (PRD Fase 8 #7).
@@ -221,7 +222,7 @@ v2 (PDF LKH, tanda terima) tidak disalin. Cara salin, volume, dan jendela waktu:
 
 1. `migrate` di DB kosong.
 2. `php spark impor:legacy … --jejak=<KERJA>/jejak.json [--sumber-siasn=<skema>]` — MAKE-056 T1–T6, MAKE-069 T7–T12,
-   lalu tier SIASN (T13, terakhir). T10/T11 transaksi per tabel; terhenti → `--tier N --lanjut`.
+   lalu tiket lama (T13, sesudah daftar eskalasi F-02 diputus), lalu tier SIASN (T14, terakhir). T10/T11 transaksi per tabel; terhenti → `--tier N --lanjut`.
 3. `integrasi:siapkan-akun-sistem` (sesudah T8 `pengguna`, Z-1).
 4. `akun:bootstrap-admin` bila diperlukan (terminal interaktif).
 5. `lampiran:manifest` → `lampiran:tarik` (alamat dasar https dari operator) → `lampiran:periksa`.

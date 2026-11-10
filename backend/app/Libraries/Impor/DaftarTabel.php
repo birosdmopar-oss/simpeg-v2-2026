@@ -14,7 +14,7 @@ use Config\WebConfig;
  */
 final class DaftarTabel
 {
-    public const TIER_MAKS = 13;
+    public const TIER_MAKS = 14;
 
     /**
      * Tier dengan satu transaksi per tabel + berkas jejak (DBV-029 K-M8): riwayat non-Tukin dan snapshot.
@@ -60,7 +60,8 @@ final class DaftarTabel
             10      => self::tier10(),
             11      => self::tier11(),
             12      => self::tier12(),
-            13      => self::tierSiasn(),
+            13      => self::tierTiketLama(),
+            14      => self::tierSiasn(),
             default => throw new ImporGagal("Tier {$tier} belum tersedia."),
         };
     }
@@ -495,7 +496,48 @@ final class DaftarTabel
     }
 
     /**
-     * T13 — tabel kerja SIASN Fase 6 (DBV-027 §13.3), selalu tier TERAKHIR (`TIER_MAKS`, dikunci test). Rujukan
+     * T13 — tiket lama Halo Simpeg, hasil sortir F-02 (Fase 7 MAKE-086, PRD Fase 7 v2.0 §5.2, Q7-28; MAKE-069 rencana "T13",
+     * PRD Fase 8 PN8-2). SELURUH `inbox`/`inbox_msg` legacy = tiket (penulis tunggal `L_support.php`) → `disiplin_ticket(_msg)`
+     * rename 1:1 (DBV-022 §2.10/§2.11, PK `id_inbox` tetap); `inbox` v2 (notifikasi) TIDAK ditulis (DBV-022 §3.4).
+     * Kelas & eskalasi: {@see AturanTiketLama}. Prasyarat: T8 `pengguna`, T12 `question_category` (FK RESTRICT; kategori
+     * yatim → gagal karena legacy FK SET NULL tidak menyisakan yatim — yatim berarti T12 belum dijalankan).
+     * `sender`/`receiver`/`closed_by`/`msg_*` tanpa FK (sentinel 0 = semua petugas, DQ-4/DQ-6): disalin, akun tidak ada →
+     * INFO. Pesan ber-`addslashes` legacy (`LS:1576`) → `stripslashes` bawaan (R8-5).
+     *
+     * @return list<DefinisiTabel>
+     */
+    private static function tierTiketLama(): array
+    {
+        $r      = 'F-02 MAKE-086, DBV-022 §2.10/§2.11';
+        $aturan = new AturanTiketLama();
+
+        return [
+            new DefinisiTabel(
+                'disiplin_ticket',
+                'id_inbox',
+                $r,
+                statusDomain: AturanTiketLama::STATUS_TIKET,
+                domain: AturanTiketLama::DOMAIN_TIKET,
+                kolomKode: ['nip'],
+                sumber: 'inbox',
+                praPindai: $aturan->tiket(...),
+                pascaImpor: $aturan->infoTiket(...),
+            ),
+            new DefinisiTabel(
+                'disiplin_ticket_msg',
+                'id_inbox_msg',
+                $r,
+                statusDomain: null,
+                domain: AturanTiketLama::DOMAIN_PESAN,
+                sumber: 'inbox_msg',
+                praPindai: $aturan->pesan(...),
+                pascaImpor: $aturan->infoPesan(...),
+            ),
+        ];
+    }
+
+    /**
+     * T14 — tabel kerja SIASN Fase 6 (DBV-027 §13.3), selalu tier TERAKHIR (`TIER_MAKS`, dikunci test). Rujukan
      * `id_rw`/`id_da` menunjuk `riwayat_mutasi_jabatan` (T3), `riwayat_diklat` dan `document_attachment` (belum ada di
      * T10 MAKE-069). Bila dijalankan sebelum induknya terisi, INFO rujukan menyebut induk belum diimpor. `siasn_ref_unor` dan
      * `siasn_referensi` dibaca dari skema `--sumber-siasn` (K-9); isinya dari sinkron BKN dan pemetaan lokal, jadi disalin
