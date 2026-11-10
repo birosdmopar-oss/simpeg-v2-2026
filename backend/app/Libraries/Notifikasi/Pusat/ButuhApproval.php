@@ -81,10 +81,10 @@ final class ButuhApproval
             }
         } else {
             $grup[] = $this->grupLayanan($auth, 'lkh', 'Verifikasi LKH', '/lkh/verifikasi?tab=verifikasi');
-            $grup[] = $this->grupLayanan($auth, 'cuti', 'Persetujuan Cuti', '/layanan/cuti?mode=persetujuan');
-            $grup[] = $this->grupLayanan($auth, 'tb', 'Tugas Belajar', '/layanan/tb?mode=pic');
-            $grup[] = $this->grupLayanan($auth, 'ib', 'Izin Belajar', '/layanan/ib?mode=pic');
-            $grup[] = $this->grupLayanan($auth, 'pmk', 'PMK', '/layanan/pmk?mode=pic');
+            $grup[] = $this->grupLayanan($auth, 'cuti', 'Persetujuan Cuti', '/layanan/cuti?tab=persetujuan');
+            $grup[] = $this->grupLayanan($auth, 'tb', 'Tugas Belajar', '/layanan/tb');
+            $grup[] = $this->grupLayanan($auth, 'ib', 'Izin Belajar', '/layanan/ib');
+            $grup[] = $this->grupLayanan($auth, 'pmk', 'PMK', '/layanan/pmk?tab=pic');
         }
 
         return array_values(array_filter($grup, static fn (array $g): bool => $g['jumlah'] > 0));
