@@ -3,6 +3,7 @@
  * HTML (script/atribut/tautan berbahaya) dan menampilkan pesan untuk 403/404.
  */
 import { flushPromises, mount } from '@vue/test-utils'
+import { AxiosError } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -90,13 +91,23 @@ describe('BeritaDetailView', () => {
     w.unmount()
   })
 
-  it('403/404 → pesan tidak tersedia', async () => {
-    svc.detail.mockRejectedValue(Object.assign(new Error('x'), { status: 404, message: 'x', errors: null, isNetworkError: false }))
+  it.each([403, 404])('%i → pesan tidak tersedia, bukan pesan server', async (status) => {
+    svc.detail.mockRejectedValue({ status, message: 'pesan server', errors: null, isNetworkError: false, original: new AxiosError('x') })
     const router = buatRouter()
     await router.push('/berita/9')
     const w = mount(BeritaDetailView, { global: { plugins: [router] } })
     await flushPromises()
-    expect(w.get('[role="alert"]').text()).toMatch(/Gagal memuat berita|tidak ditemukan/)
+    expect(w.get('[role="alert"]').text()).toBe('Berita tidak ditemukan atau tidak tersedia untuk Anda.')
+    w.unmount()
+  })
+
+  it('500 → pesan server', async () => {
+    svc.detail.mockRejectedValue({ status: 500, message: 'pesan server', errors: null, isNetworkError: false, original: new AxiosError('x') })
+    const router = buatRouter()
+    await router.push('/berita/9')
+    const w = mount(BeritaDetailView, { global: { plugins: [router] } })
+    await flushPromises()
+    expect(w.get('[role="alert"]').text()).toBe('pesan server')
     w.unmount()
   })
 })
