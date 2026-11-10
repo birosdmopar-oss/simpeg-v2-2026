@@ -35,6 +35,7 @@ const busy = ref(false)
 const formOpen = ref(false)
 const editing = ref<MasterKontenRow | null>(null)
 const nama = ref('')
+const allowAp = ref(false)
 const submitting = ref(false)
 const submitted = ref(false)
 const formError = ref('')
@@ -58,6 +59,7 @@ async function load(): Promise<void> {
 function bukaForm(row: MasterKontenRow | null): void {
   editing.value = row
   nama.value = row?.nama ?? ''
+  allowAp.value = row?.allow_ap ?? false
   submitted.value = false
   formError.value = ''
   formOpen.value = true
@@ -69,7 +71,7 @@ async function onSubmit(): Promise<void> {
   submitting.value = true
   formError.value = ''
   try {
-    await svc.value.simpan(editing.value?.id ?? null, nama.value.trim())
+    await svc.value.simpan(editing.value?.id ?? null, nama.value.trim(), allowAp.value)
     notice.value = editing.value ? `${judul.value} diperbarui.` : `${judul.value} ditambahkan.`
     formOpen.value = false
     await load()
@@ -211,6 +213,14 @@ onMounted(() => void load())
           <form class="flex flex-col gap-4" novalidate :data-testid="`konten-${jenis}-form`" @submit.prevent="onSubmit">
             <p v-if="formError" :class="FORM_ALERT_CLASS" role="alert">{{ formError }}</p>
             <FormField v-model="nama" name="nama" label="Nama" required :error="namaError" />
+            <FormField
+              v-if="jenis === 'berita-kategori'"
+              :model-value="allowAp ? '1' : '0'"
+              name="allow_ap"
+              label="Boleh dipakai penulis berita (role 3)"
+              type="checkbox"
+              @update:model-value="allowAp = $event === '1'"
+            />
             <div :class="FORM_ACTIONS_CLASS">
               <DialogClose as-child>
                 <UiButton variant="secondary" appearance="soft">Batal</UiButton>

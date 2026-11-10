@@ -84,6 +84,8 @@ export interface KontenGambarRow {
   gambar_url: string | null
   tgl_mulai: string
   tgl_akhir: string
+  jam_mulai: string
+  jam_akhir: string
   urutan: number
   status: '1' | '2' | '10'
   jumlah_penerima: number
@@ -94,6 +96,9 @@ export interface KontenGambarForm {
   url: string
   tgl_mulai: string
   tgl_akhir: string
+  /** HH:mm WIB; hanya popup (DATETIME), banner DATE. */
+  jam_mulai: string
+  jam_akhir: string
   target: SpesifikasiTarget
 }
 
@@ -164,6 +169,8 @@ export interface MasterKontenRow {
   id: string
   nama: string
   urutan: number
+  /** Kategori berita: boleh dipakai role 3 (`allow_ap`). */
+  allow_ap: boolean
   status: '1' | '2' | '10'
 }
 

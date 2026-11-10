@@ -14,6 +14,7 @@ import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS 
 import type { SelectOption } from '@/shared/ui'
 import { UiFileField } from '@/shared/ui'
 import UiButton from '@/shared/ui/UiButton.vue'
+import UiTextField from '@/shared/ui/UiTextField.vue'
 
 import { GAMBAR_EKSTENSI, GAMBAR_MAKS_MB, kelolaService } from '../services/kelola.service'
 import type { JenisKontenGambar, KontenGambarForm, KontenGambarRow, SpesifikasiTarget } from '../types'
@@ -33,7 +34,7 @@ const isEdit = computed(() => props.row !== null)
 const svc = computed(() => kelolaService(props.jenis))
 
 const kosongTarget = (): SpesifikasiTarget => ({ unit_satker: [], pegawai: [], kecuali: [] })
-const form = reactive<KontenGambarForm>({ keterangan: '', url: '', tgl_mulai: '', tgl_akhir: '', target: kosongTarget() })
+const form = reactive<KontenGambarForm>({ keterangan: '', url: '', tgl_mulai: '', tgl_akhir: '', jam_mulai: '', jam_akhir: '', target: kosongTarget() })
 const berkas = ref<File | null>(null)
 const submitting = ref(false)
 const submitted = ref(false)
@@ -52,6 +53,8 @@ watch(
     form.url = row?.url ?? ''
     form.tgl_mulai = row?.tgl_mulai ?? ''
     form.tgl_akhir = row?.tgl_akhir ?? ''
+    form.jam_mulai = row?.jam_mulai ?? ''
+    form.jam_akhir = row?.jam_akhir ?? ''
     form.target = kosongTarget()
     if (row) {
       try {
@@ -69,6 +72,8 @@ const errors = computed(() => {
   if (!form.tgl_mulai) e.tgl_mulai = 'Tanggal mulai wajib diisi.'
   if (!form.tgl_akhir) e.tgl_akhir = 'Tanggal selesai wajib diisi.'
   else if (form.tgl_mulai && form.tgl_akhir < form.tgl_mulai) e.tgl_akhir = 'Tanggal selesai tidak boleh sebelum tanggal mulai.'
+  if (props.jenis === 'popup' && form.tgl_mulai && form.tgl_akhir === form.tgl_mulai && form.jam_mulai && form.jam_akhir && form.jam_akhir < form.jam_mulai)
+    e.jam_akhir = 'Jam selesai tidak boleh sebelum jam mulai.'
   if (form.url.trim() !== '' && !/^https?:\/\//i.test(form.url.trim())) e.url = 'Tautan harus diawali http:// atau https://.'
   if (!isEdit.value && !berkas.value) e.berkas = 'Gambar wajib diunggah.'
   return e
@@ -124,6 +129,16 @@ async function onSubmit(): Promise<void> {
 
           <FormField v-model="form.tgl_mulai" name="tgl_mulai" label="Tanggal Mulai" type="date" required :error="err('tgl_mulai')" />
           <FormField v-model="form.tgl_akhir" name="tgl_akhir" label="Tanggal Selesai" type="date" required :error="err('tgl_akhir')" />
+          <UiTextField v-if="jenis === 'popup'" v-model="form.jam_mulai" type="time" label="Jam Mulai (WIB)" name="jam_mulai" />
+          <UiTextField
+            v-if="jenis === 'popup'"
+            v-model="form.jam_akhir"
+            type="time"
+            label="Jam Selesai (WIB)"
+            name="jam_akhir"
+            :state="err('jam_akhir') ? 'error' : 'default'"
+            :help-text="err('jam_akhir')"
+          />
           <FormField
             v-model="form.url"
             name="url"

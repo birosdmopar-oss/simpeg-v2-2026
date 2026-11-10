@@ -80,7 +80,7 @@ async function loadOpsi(): Promise<void> {
   const g = kelolaService('popup')
   try {
     const [kat, unit, peg] = await Promise.all([masterKontenService('berita-kategori').list(), g.opsiUnitSatker(), g.opsiPegawai()])
-    opsiKategori.value = kat.filter((k) => k.status === '1').map((k) => ({ value: k.id, label: k.nama }))
+    opsiKategori.value = kat.filter((k) => k.status === '1' && (adalahAdmin.value || k.allow_ap)).map((k) => ({ value: k.id, label: k.nama }))
     opsiUnitSatker.value = unit
     opsiPegawai.value = peg
   } catch (e) {

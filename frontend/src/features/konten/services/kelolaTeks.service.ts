@@ -114,6 +114,7 @@ export function masterKontenService(jenis: JenisMasterKonten) {
     nama: r.nama,
     urutan: Number(r.urutan ?? 0),
     status: status3(r.status),
+    allow_ap: Number(r.allow_ap ?? 0) === 1,
   })
   type Api = Parameters<typeof map>[0]
   return {
@@ -122,8 +123,9 @@ export function masterKontenService(jenis: JenisMasterKonten) {
       const items = Array.isArray(data) ? data : (data?.items ?? [])
       return items.map(map)
     },
-    async simpan(id: string | null, nama: string): Promise<MasterKontenRow> {
-      const { data } = id ? await api.put<Api>(`${b}/${id}`, { nama }) : await api.post<Api>(b, { nama })
+    async simpan(id: string | null, nama: string, allowAp = false): Promise<MasterKontenRow> {
+      const body = jenis === 'berita-kategori' ? { nama, allow_ap: allowAp ? 1 : 0 } : { nama }
+      const { data } = id ? await api.put<Api>(`${b}/${id}`, body) : await api.post<Api>(b, body)
       return map(data)
     },
     async setStatus(id: string, status: '1' | '2'): Promise<void> {

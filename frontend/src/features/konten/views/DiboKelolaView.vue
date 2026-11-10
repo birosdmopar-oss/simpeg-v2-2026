@@ -17,11 +17,11 @@ import DiboFormDialog from '../components/DiboFormDialog.vue'
 import { diboKelolaService, masterKontenService } from '../services/kelolaTeks.service'
 import type { DiboRow } from '../types'
 
-const LABEL = { '1': 'Aktif', '2': 'Tidak Aktif', '10': 'Dihapus' } as const
+const LABEL = { '1': 'Aktif', '2': 'Dicabut', '10': 'Dihapus' } as const
 const KELAS = { '1': 'bg-green-100 text-green-800', '2': 'bg-slate-200 text-slate-600', '10': 'bg-red-100 text-red-700' } as const
 const FILTER: SelectOption[] = [
   { value: '1', label: 'Aktif' },
-  { value: '2', label: 'Tidak Aktif' },
+  { value: '2', label: 'Dicabut' },
   { value: '10', label: 'Dihapus' },
 ]
 
@@ -160,7 +160,7 @@ onMounted(() => {
     <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
 
     <div class="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
-      <UiSelect v-model="statusFilter" :options="FILTER" clearable size="sm" placeholder="Aktif & Tidak Aktif" aria-label="Filter status" class="w-52" />
+      <UiSelect v-model="statusFilter" :options="FILTER" clearable size="sm" placeholder="Aktif & Dicabut" aria-label="Filter status" class="w-52" />
     </div>
 
     <div class="table-fill overflow-x-auto rounded-lg border border-slate-200 bg-white">

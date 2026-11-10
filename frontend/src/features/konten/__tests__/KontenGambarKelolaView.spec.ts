@@ -96,3 +96,13 @@ describe('KontenGambarKelolaView', () => {
     w.unmount()
   })
 })
+
+describe('mapRow (DBV-032 §3.1/3.3)', () => {
+  it('popup DATETIME dipecah ke tanggal + jam; banner DATE tanpa jam', async () => {
+    const { mapRow } = await import('../services/kelola.service')
+    const popup = mapRow({ id: 1, tgl_mulai: '2026-03-01 08:30:00', tgl_akhir: '2026-03-31 17:00:00' })
+    expect([popup.tgl_mulai, popup.jam_mulai, popup.tgl_akhir, popup.jam_akhir]).toEqual(['2026-03-01', '08:30', '2026-03-31', '17:00'])
+    const banner = mapRow({ id: 2, tgl_mulai: '2026-03-01', tgl_akhir: '2026-03-31' })
+    expect([banner.tgl_mulai, banner.jam_mulai]).toEqual(['2026-03-01', ''])
+  })
+})

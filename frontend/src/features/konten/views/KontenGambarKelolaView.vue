@@ -230,7 +230,7 @@ onMounted(() => {
               <span v-else class="text-slate-400">—</span>
             </td>
             <td class="px-4 py-3 text-slate-800">{{ row.keterangan || '—' }}</td>
-            <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ fmt(row.tgl_mulai) }} – {{ fmt(row.tgl_akhir) }}</td>
+            <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ fmt(row.tgl_mulai) }}{{ jenis === 'popup' && row.jam_mulai ? ` ${row.jam_mulai}` : '' }} – {{ fmt(row.tgl_akhir) }}{{ jenis === 'popup' && row.jam_akhir ? ` ${row.jam_akhir}` : '' }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.urutan }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.jumlah_penerima }}</td>
             <td v-if="ADA_STATUS" class="px-4 py-3">

@@ -24,20 +24,24 @@ export function mapRow(r: KontenGambarRowApi): KontenGambarRow {
     keterangan: r.keterangan ?? '',
     url: r.url ?? '',
     gambar_url: r.gambar_url ?? null,
-    tgl_mulai: r.tgl_mulai,
-    tgl_akhir: r.tgl_akhir,
+    tgl_mulai: r.tgl_mulai.slice(0, 10),
+    tgl_akhir: r.tgl_akhir.slice(0, 10),
+    jam_mulai: r.tgl_mulai.slice(11, 16),
+    jam_akhir: r.tgl_akhir.slice(11, 16),
     urutan: Number(r.urutan ?? 0),
     status: status === '2' || status === '10' ? status : '1',
     jumlah_penerima: Number(r.jumlah_penerima ?? 0),
   }
 }
 
-function toFormData(form: KontenGambarForm, berkas: File | null): FormData {
+function toFormData(form: KontenGambarForm, berkas: File | null, jenis: JenisKontenGambar): FormData {
   const fd = new FormData()
   fd.append('keterangan', form.keterangan.trim())
   fd.append('url', form.url.trim())
-  fd.append('tgl_mulai', form.tgl_mulai)
-  fd.append('tgl_akhir', form.tgl_akhir)
+  // Popup = DATETIME WIB (DBV-032 §3.1); banner = DATE (§3.3).
+  const waktu = (tgl: string, jam: string): string => (jenis === 'popup' ? `${tgl} ${jam || '00:00'}` : tgl)
+  fd.append('tgl_mulai', waktu(form.tgl_mulai, form.jam_mulai))
+  fd.append('tgl_akhir', waktu(form.tgl_akhir, form.jam_akhir || '23:59'))
   fd.append('target', JSON.stringify(form.target))
   if (berkas) fd.append('berkas', berkas)
   return fd
@@ -51,12 +55,12 @@ export function kelolaService(jenis: JenisKontenGambar) {
       return { items: (data?.items ?? []).map(mapRow), total: data?.total ?? 0 }
     },
     async create(form: KontenGambarForm, berkas: File): Promise<KontenGambarRow> {
-      const { data } = await api.post<KontenGambarRowApi>(base, toFormData(form, berkas))
+      const { data } = await api.post<KontenGambarRowApi>(base, toFormData(form, berkas, jenis))
       return mapRow(data)
     },
     /** Gambar opsional saat ubah: tanpa berkas, gambar lama dipertahankan. */
     async update(id: string, form: KontenGambarForm, berkas: File | null): Promise<KontenGambarRow> {
-      const fd = toFormData(form, berkas)
+      const fd = toFormData(form, berkas, jenis)
       fd.append('_method', 'PUT')
       const { data } = await api.post<KontenGambarRowApi>(`${base}/${id}`, fd)
       return mapRow(data)
