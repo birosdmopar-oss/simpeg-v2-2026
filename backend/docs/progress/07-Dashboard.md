@@ -102,3 +102,19 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 
   `nav.config.spec.ts` (+1: Dokumen 4 anak, role 1/3/4/5/8, tetap tersembunyi). Uji mutasi: pembacaan body Blob dimatikan → 3 test gagal.
 - **Catatan:** QA visual oleh coder 2 lewat URL langsung (menu `phase: 7`, F7-14, PRD Q-2), tanpa preview browser di M4. Mockup halaman Dokumen tidak ada; layout mengikuti halaman laporan (PRD Q-3).
+
+## F-13 Frontend Dashboard — MAKE-087 (Jalur D, PRD Fase 7 v2.0 §5.10)
+
+### M1 — kerangka + `Config\Dashboard` (branch `fase7/make-087-dashboard`)
+
+- `Config\Dashboard`: `$tampilanKomposisi` donut/angka (Q7-36), `$nipDisembunyikan` (Q7-41, `.env` server saja),
+  `$idJabatanDirektur` (Q7-38), `$ttlRingkasanDetik`.
+- `GET api/v1/dashboard/ringkasan` (jwt): keluarga admin = 11 tile `dashboard_ad` (komposisi + status hari ini, persen
+  terhadap total aktif) per lingkup kementerian/satker/unit, letak pengecualian NIP & TB perpanjangan ikut legacy;
+  keluarga pegawai = kerangka.
+- FE `HomeView` → `AdminDashboard` (`KomposisiPegawaiCard` dua mode) / `PegawaiDashboard` (kerangka); `home-role` tetap.
+- Berkas bersama (aditif, commit terpisah): `Config/RoutesDashboard.php`, `tests/feature/KontrakMatriksRoleTest.php`
+  (+route, +prefiks `dashboard`), `README-deploy.md` §1k, progres ini.
+- Test: `tests/database/Dashboard/RingkasanBerandaTest.php` (11), `features/dashboard/__tests__/{HomeView,beranda.amplop}.spec.ts`.
+- Sisa M2: pengingat Pensiun/KP/TJ/KGB, ulang tahun (Q7-45), direktur (Q7-38), keluarga pegawai (prediksi, kelengkapan,
+  bawahan), `UiCarouselPanel`. M3: pasang komponen Jalur A/B/C.
