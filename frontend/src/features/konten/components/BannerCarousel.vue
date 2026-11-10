@@ -7,6 +7,7 @@
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import GambarKonten from './GambarKonten.vue'
 import { kontenService } from '../services/konten.service'
 import type { BannerAktif } from '../types'
 
@@ -102,9 +103,9 @@ onBeforeUnmount(bersihkanTimer)
     @focusout="tahan(false)"
   >
     <a v-if="aktif.url" :href="aktif.url" target="_blank" rel="noopener noreferrer" data-testid="konten-banner-tautan">
-      <img :src="aktif.gambar_url" :alt="aktif.keterangan ?? 'Banner'" class="aspect-[4/1] w-full object-cover" />
+      <GambarKonten :path="aktif.gambar_url" :alt="aktif.keterangan ?? 'Banner'" class="aspect-[4/1] w-full object-cover" />
     </a>
-    <img v-else :src="aktif.gambar_url" :alt="aktif.keterangan ?? 'Banner'" class="aspect-[4/1] w-full object-cover" />
+    <GambarKonten v-else :path="aktif.gambar_url" :alt="aktif.keterangan ?? 'Banner'" class="aspect-[4/1] w-full object-cover" />
 
     <template v-if="daftar.length > 1">
       <button

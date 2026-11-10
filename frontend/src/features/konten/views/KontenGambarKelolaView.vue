@@ -14,6 +14,7 @@ import type { RowAction } from '@/shared/components/rowActions'
 import type { SelectOption } from '@/shared/ui'
 import { UiSelect } from '@/shared/ui'
 
+import GambarKonten from '../components/GambarKonten.vue'
 import KontenGambarFormDialog from '../components/KontenGambarFormDialog.vue'
 import { kelolaService } from '../services/kelola.service'
 import type { JenisKontenGambar, KontenGambarRow } from '../types'
@@ -226,7 +227,7 @@ onMounted(() => {
           </tr>
           <tr v-for="(row, i) in items" v-else :key="row.id" class="hover:bg-slate-50" :data-testid="tid(`row-${row.id}`)">
             <td class="px-4 py-3">
-              <img v-if="row.gambar_url" :src="row.gambar_url" :alt="row.keterangan || nama" class="h-12 w-24 rounded object-cover" />
+              <GambarKonten v-if="row.gambar_url" :path="row.gambar_url" :alt="row.keterangan || nama" class="h-12 w-24 rounded object-cover" />
               <span v-else class="text-slate-400">—</span>
             </td>
             <td class="px-4 py-3 text-slate-800">{{ row.keterangan || '—' }}</td>

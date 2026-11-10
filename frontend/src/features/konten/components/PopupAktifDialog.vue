@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, onMounted, ref } from 'vue'
 
+import GambarKonten from './GambarKonten.vue'
 import { kontenService } from '../services/konten.service'
 import { popupSudahDitampilkan, tandaiPopupDitampilkan } from '../sesi'
 import type { PopupAktif } from '../types'
@@ -81,9 +82,9 @@ function sebelumnya(): void {
           rel="noopener noreferrer"
           data-testid="konten-popup-tautan"
         >
-          <img :src="aktif.gambar_url" :alt="aktif.keterangan ?? 'Pengumuman'" class="w-full rounded-xl" />
+          <GambarKonten :path="aktif.gambar_url" :alt="aktif.keterangan ?? 'Pengumuman'" class="w-full rounded-xl" />
         </a>
-        <img v-else :src="aktif.gambar_url" :alt="aktif.keterangan ?? 'Pengumuman'" class="w-full rounded-xl" />
+        <GambarKonten v-else :path="aktif.gambar_url" :alt="aktif.keterangan ?? 'Pengumuman'" class="w-full rounded-xl" />
         <div v-if="daftar.length > 1" class="mt-3 flex items-center justify-between">
           <button
             type="button"

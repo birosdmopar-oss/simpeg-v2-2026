@@ -6,7 +6,7 @@ import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/konten.service', () => ({
-  kontenService: { popupAktif: vi.fn(), bannerAktif: vi.fn(), beritaTerbaru: vi.fn() },
+  kontenService: { popupAktif: vi.fn(), bannerAktif: vi.fn(), beritaTerbaru: vi.fn(), gambarBlob: vi.fn(async () => new Blob(['x'])) },
 }))
 
 import BannerCarousel from '../components/BannerCarousel.vue'
@@ -29,6 +29,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   resetSesiKonten()
   stubMatchMedia(false)
+  URL.createObjectURL = vi.fn(() => 'blob:uji')
+  URL.revokeObjectURL = vi.fn()
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -103,15 +105,15 @@ describe('PopupAktifDialog', () => {
     mount(PopupAktifDialog, { attachTo: document.body })
     await flushPromises()
     const q = (id: string) => document.body.querySelector<HTMLButtonElement>(`[data-testid="${id}"]`)
-    expect(document.body.querySelector('img')?.getAttribute('src')).toBe('/g/1.png')
+    expect(document.body.querySelector('img')?.getAttribute('data-gambar')).toBe('/g/1.png')
     expect(q('konten-popup-sebelumnya')?.disabled).toBe(true)
     q('konten-popup-berikutnya')?.click()
     await flushPromises()
-    expect(document.body.querySelector('img')?.getAttribute('src')).toBe('/g/2.png')
+    expect(document.body.querySelector('img')?.getAttribute('data-gambar')).toBe('/g/2.png')
     expect(q('konten-popup-berikutnya')).toBeNull()
     q('konten-popup-sebelumnya')?.click()
     await flushPromises()
-    expect(document.body.querySelector('img')?.getAttribute('src')).toBe('/g/1.png')
+    expect(document.body.querySelector('img')?.getAttribute('data-gambar')).toBe('/g/1.png')
   })
 })
 
@@ -140,14 +142,14 @@ describe('BannerCarousel', () => {
     await flushPromises()
     const root = w.get('[data-testid="konten-banner"]')
     expect(root.classes()).toContain('mt-4')
-    expect(w.get('img').attributes('src')).toBe('/g/1.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/1.png')
     expect(w.findAll('[data-testid="konten-banner-indikator"]')).toHaveLength(3)
     await w.get('[data-testid="konten-banner-sebelumnya"]').trigger('click')
-    expect(w.get('img').attributes('src')).toBe('/g/3.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/3.png')
     await root.trigger('keydown', { key: 'ArrowRight' })
-    expect(w.get('img').attributes('src')).toBe('/g/1.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/1.png')
     await w.findAll('[data-testid="konten-banner-indikator"]')[1]!.trigger('click')
-    expect(w.get('img').attributes('src')).toBe('/g/2.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/2.png')
   })
 
   it('autoplay berjalan, berhenti saat hover dan saat dijeda', async () => {
@@ -157,18 +159,18 @@ describe('BannerCarousel', () => {
     await flushPromises()
     vi.advanceTimersByTime(1000)
     await flushPromises()
-    expect(w.get('img').attributes('src')).toBe('/g/2.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/2.png')
 
     await w.get('[data-testid="konten-banner"]').trigger('mouseenter')
     vi.advanceTimersByTime(3000)
     await flushPromises()
-    expect(w.get('img').attributes('src')).toBe('/g/2.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/2.png')
     await w.get('[data-testid="konten-banner"]').trigger('mouseleave')
 
     await w.get('[data-testid="konten-banner-jeda"]').trigger('click')
     vi.advanceTimersByTime(3000)
     await flushPromises()
-    expect(w.get('img').attributes('src')).toBe('/g/2.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/2.png')
   })
 
   it('prefers-reduced-motion: tanpa autoplay dan tanpa tombol jeda', async () => {
@@ -179,7 +181,7 @@ describe('BannerCarousel', () => {
     await flushPromises()
     vi.advanceTimersByTime(5000)
     await flushPromises()
-    expect(w.get('img').attributes('src')).toBe('/g/1.png')
+    expect(w.get('img').attributes('data-gambar')).toBe('/g/1.png')
     expect(w.find('[data-testid="konten-banner-jeda"]').exists()).toBe(false)
   })
 })

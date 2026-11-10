@@ -57,6 +57,12 @@ export const kontenService = {
     const { data } = await api.get<BeritaListApi>('/konten/berita', { params: { per_page: limit, terbaru: 1 } })
     return (data?.items ?? []).map(mapBeritaRingkas)
   },
+
+  /** Berkas gambar privat popup/banner sebagai blob (cookie httpOnly ikut; `path` relatif terhadap base API). */
+  async gambarBlob(path: string): Promise<Blob> {
+    const { data } = await api.get<Blob>(path, { responseType: 'blob' })
+    return data
+  },
 }
 
 /** Portal berita: daftar (cari, filter kategori, paginasi), detail, kategori (PRD §5.5). */
