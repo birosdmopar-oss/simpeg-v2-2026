@@ -11,6 +11,18 @@ Struktur feature-based (ADR-019):
 
 Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
 
+## Admin → Integrasi (MAKE-078, ISSUE-058)
+
+- Route `/integrasi` (`routes.integrasi.ts`, role 1 `INTEGRASI_ADMIN_ROLES`), menu Pengaturan → Integrasi (`nav.config.ts`,
+  `phase: 6` + `rilis`). Figma halaman ini belum ada: tata letak mengikuti halaman daftar Hari Libur (`page-fill` +
+  `table-fill`).
+- `services/logIntegrasi.service.ts` — `GET /integrasi/log` (filter kosong tidak dikirim) dan `POST /integrasi/bkn/tarik`.
+- `views/IntegrasiAdminView.vue` — tabel log (filter layanan dari `layanan_tersedia`, status, rentang tanggal WIB,
+  `UiPagination`, badge status, waktu `created_at` UTC ditampilkan WIB lewat `formatWaktuWib`); aksi baris ⋮ hanya "Lihat detail"
+  (`components/LogIntegrasiDetailDialog.vue`) karena log baca-saja.
+- `components/TarikEkinerjaDialog.vue` — tombol level halaman "Tarik Ulang e-Kinerja": `skp_periodik` (bulan opsional; kosong =
+  periode terpilih otomatis) atau `periode`. 202 = job diantre di antrean `integrasi`; hasilnya muncul di log setelah diproses.
+
 ## Push web FCM (H-04, MAKE-066)
 
 - `services/fcmToken.service.ts` — `POST|DELETE /integrasi/fcm-token` (amplop dibuka interceptor `@/lib/axios`).

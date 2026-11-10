@@ -32,6 +32,7 @@ import {
   MousePointerClick,
   Network,
   Newspaper,
+  Plug,
   Settings,
   TrendingUp,
   UserCheck,
@@ -43,6 +44,7 @@ import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
 import { DOKUMEN_ROLES } from '@/features/dokumen/types'
+import { INTEGRASI_ADMIN_ROLES } from '@/features/integrasi/integrasi.types'
 import {
   AK_JF_ROLES,
   BIODATA_PROSES_ROLES,
@@ -259,6 +261,9 @@ const NAV: NavGroup[] = [
       { key: 'web-config', label: 'Web Config', icon: Settings, to: { name: 'web-config' }, roles: WEB_CONFIG_ROLES, phase: 2 },
       { key: 'hari-libur', label: 'Hari Libur', icon: CalendarDays, to: { name: 'hari-libur' }, roles: HARI_LIBUR_READ_ROLES, phase: 2 },
       { key: 'users', label: 'Manajemen Akun', icon: UserCog, to: { name: 'users' }, roles: USER_MANAGEMENT_ROLES, phase: 1 },
+      // MAKE-078 (ISSUE-058, PRD Fase 6 §6.2): Admin → Integrasi, role 1. Fase 6 sudah DONE tetapi ACTIVE_PHASE masih 5 →
+      // `rilis` (hapus saat ACTIVE_PHASE ≥ 6).
+      { key: 'integrasi', label: 'Integrasi', icon: Plug, to: { name: 'integrasi-admin' }, roles: INTEGRASI_ADMIN_ROLES, phase: 6, rilis: true },
     ],
   },
   {

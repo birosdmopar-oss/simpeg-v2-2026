@@ -11,6 +11,7 @@ import { passwordResetEnabled } from '@/features/auth/config'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
 import { dokumenRoutes } from '@/features/dokumen/routes.dokumen'
+import { integrasiRoutes } from '@/features/integrasi/routes.integrasi'
 import { pegawaiRoutes } from '@/features/kepegawaian/routes.pegawai'
 import { riwayatRoutes } from '@/features/kepegawaian/routes.riwayat'
 import { laporanRoutes } from '@/features/laporan/routes.laporan'
@@ -113,6 +114,8 @@ const routes: RouteRecordRaw[] = [
   ...dokumenRoutes,
   // Modul F — Fase 7 F-08 Pusat Notifikasi (MAKE-085).
   ...notifikasiRoutes,
+  // Modul H — Fase 6 Admin → Integrasi: log integrasi + tarik ulang e-Kinerja (MAKE-078, ISSUE-058).
+  ...integrasiRoutes,
   // Modul D — Fase 5A Presensi & Slip Gaji (MAKE-034), termasuk rute publik `/verify/slip/:token`.
   ...presensiRoutes,
   // Modul C — Fase 4 Layanan & Approval (MAKE-026): route ditambah per paket di routes.layanan.ts.
