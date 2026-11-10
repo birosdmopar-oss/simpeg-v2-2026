@@ -73,11 +73,16 @@ final class PenyimpananGambar
      * Kunci tidak valid (mis. `../`, segmen terlarang, byte nol — hanya mungkin bila kolom di DB rusak/diubah) = berkas tidak ada,
      * bukan galat 500: adapter melempar InvalidArgumentException untuk path di luar aturannya.
      */
-    public function ada(string $kunci): bool
+    public function ada(string $kunci, string $jenis = '', int $id = 0): bool
     {
         try {
             return $this->adapter->ada($kunci);
         } catch (InvalidArgumentException) {
+            // Tanda data diubah: catat HANYA jenis konten + id baris (bukan isi kunci/path, agar log tidak memuat masukan berbahaya).
+            if ($jenis !== '') {
+                log_message('warning', 'Kunci berkas {jenis} tidak valid (data diubah?): id={id}', ['jenis' => $jenis, 'id' => $id]);
+            }
+
             return false;
         }
     }

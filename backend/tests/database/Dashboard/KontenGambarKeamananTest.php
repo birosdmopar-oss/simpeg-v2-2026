@@ -84,6 +84,8 @@ final class KontenGambarKeamananTest extends DatabaseTestCase
             } catch (NotFoundException) {
                 $this->addToAssertionCount(1);
             }
+
+            $this->assertLogged('warning', 'Kunci berkas popup tidak valid (data diubah?): id=' . $r['id']);
         }
     }
 

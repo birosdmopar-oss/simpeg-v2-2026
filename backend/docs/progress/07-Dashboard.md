@@ -227,3 +227,5 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   hanya dari id angka + ekstensi `[a-z0-9]{1,5}` (selain itu `bin`) lewat `NamaBerkas::ekstensi()` — CR/LF, kutip, titik-koma, garis miring tidak pernah masuk header;
   (4) berkas palsu ditolak 422 (PHP/HTML/SVG berskrip/PDF yang menyamar .pdf/.png/.docx, ekstensi terlarang .php/.html/.svg, ZIP polos bernama .docx, berkas kosong). Test:
   `NamaBerkasTest` (13), `DiboServiceTest` (+3 skenario, 10 kasus palsu), `BeritaLampiranTest` (+3), `KontenGambarKeamananTest` (baru), `DiboEndpointTest` (+indeks).
+  Tambahan: kunci tak valid yang terdeteksi dicatat `log_message('warning', 'Kunci berkas {jenis} tidak valid (data diubah?): id={id}')` — HANYA jenis konten
+  (`popup`/`banner`/`lampiran-berita`/`dibo`) + id baris, bukan isi kunci/path (tanda data diubah; log tidak memuat masukan berbahaya). Diuji dengan `assertLogged`.

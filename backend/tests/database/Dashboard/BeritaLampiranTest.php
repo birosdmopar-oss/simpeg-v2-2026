@@ -209,6 +209,8 @@ final class BeritaLampiranTest extends DatabaseTestCase
             } catch (NotFoundException) {
                 $this->addToAssertionCount(1);
             }
+
+            $this->assertLogged('warning', 'Kunci berkas lampiran-berita tidak valid (data diubah?): id=' . $r['id']);
         }
     }
 

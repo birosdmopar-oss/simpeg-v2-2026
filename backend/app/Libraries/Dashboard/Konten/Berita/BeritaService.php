@@ -377,7 +377,7 @@ final class BeritaService
     {
         $r = $this->db->table('news')->where('id_news', $id)->get()->getRowArray();
 
-        if (! is_array($r) || ! $this->boleh($auth, $r) || (string) ($r['lampiran'] ?? '') === '' || ! $this->lampiran->ada((string) $r['lampiran'])) {
+        if (! is_array($r) || ! $this->boleh($auth, $r) || (string) ($r['lampiran'] ?? '') === '' || ! $this->lampiran->ada((string) $r['lampiran'], 'lampiran-berita', $id)) {
             throw new NotFoundException('Lampiran tidak ditemukan.');
         }
 

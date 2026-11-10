@@ -150,7 +150,7 @@ final class DiboService
 
         $kunci = (string) ($r['file_' . $no] ?? '');
 
-        if ($kunci === '' || ! $this->berkas->ada($kunci)) {
+        if ($kunci === '' || ! $this->berkas->ada($kunci, 'dibo', $id)) {
             throw new NotFoundException('Berkas tidak ditemukan.');
         }
 

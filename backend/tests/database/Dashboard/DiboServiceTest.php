@@ -295,6 +295,9 @@ final class DiboServiceTest extends DatabaseTestCase
             } catch (NotFoundException) {
                 $this->addToAssertionCount(1);
             }
+
+            // Peringatan hanya memuat jenis + id baris, TIDAK memuat isi kunci/path.
+            $this->assertLogged('warning', 'Kunci berkas dibo tidak valid (data diubah?): id=' . $r['id']);
         }
     }
 

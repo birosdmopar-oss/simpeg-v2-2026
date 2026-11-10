@@ -381,7 +381,7 @@ final class KontenGambarService
 
         $kunci = (string) $r['file'];
 
-        if (! $boleh || ! $this->gambar->ada($kunci)) {
+        if (! $boleh || ! $this->gambar->ada($kunci, $this->jenis->value, $id)) {
             throw new NotFoundException('Gambar tidak ditemukan.');
         }
 
