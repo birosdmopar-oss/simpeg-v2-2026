@@ -6,7 +6,8 @@ use App\Constants\Role;
 use CodeIgniter\Router\RouteCollection;
 
 /**
- * Route Modul F Jalur A — konten admin Fase 7 (MAKE-079 Popup, MAKE-080 Banner; PRD v2.0 §5.3/5.4, §6). Dimuat lewat
+ * Route Modul F Jalur A — konten admin Fase 7 (MAKE-079 Popup, MAKE-080 Banner, MAKE-081 Berita + kategori, jenis DIBO untuk
+ * MAKE-082; PRD v2.0 §5.3–5.6, §6). Dimuat lewat
  * Config\Routing::$routeFiles. Filter `jwt` di level GRUP; `role:*` per route. Kelola = role 1; `aktif` = role ber-NIP
  * 2–8 (Q7-05); `gambar` = semua role login (penerima dicek di service, role 1 untuk pratinjau; selain itu 404). Kontrak
  * role di KontrakMatriksRoleTest.
