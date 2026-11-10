@@ -47,121 +47,121 @@ Bentuk header token SIMAPI mengikuti legacy (elemen kedua header `Authorization`
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| A1 | F.1 | `php spark integrasi:klien daftar`; cek kolom `rahasia_hash` tabel `klien_layanan`; cari rahasia K1 di `writable/logs/*` dan `integrasi_log` | Daftar tanpa rahasia; DB hanya hash; rahasia tidak ada di log mana pun | |
-| A2 | F.2 | Panggil `services/s_stat/list_tb` dengan K4 (nonaktif) | HTTP 401 `{"status":2,"msg":"Authentication failed","data":{}}`; `integrasi_log` arah masuk alasan tanpa username/rahasia/IP | |
-| A3 | F.3 | Panggil `services/s_stat/list_tb` dengan K5 (IP di luar allowlist) | 401 seragam (pesan sama dengan A2) | |
-| A4 | — | Hak salah: K1 (hak `simapi`) memanggil `services/s_stat/list_tb`; K3 memanggil `simapi/v1/a_auth/token` | 401 seragam / SIMAPI `{"status":"02","msg":"Authentication failed"}` HTTP 200 | |
-| A5 | F.4 | Ulangi A2 dengan rahasia salah sampai melewati kapasitas throttle IP (`Config\KlienLayanan`) | 429 `Too many requests` + `Retry-After`; log throttle maksimal sekali per jendela | |
-| A6 | F.5 | Token SIMAPI K1: pakai sesudah `integrasi:klien rotasi qa.simapi` (token dicabut) | `{"status":"02","msg":"Token is not valid"}` HTTP 200 | |
-| A7 | — | `integrasi:klien rotasi qa.simapi` → perbarui `KLIEN_QA_F6.md` (skrip `--rotasi` atau manual) | Rahasia baru tampil sekali; rahasia lama ditolak | |
+| A1 | F.1 | `php spark integrasi:klien daftar`; cek kolom `rahasia_hash` tabel `klien_layanan`; cari rahasia K1 di `writable/logs/*` dan `integrasi_log` | Daftar tanpa rahasia; DB hanya hash; rahasia tidak ada di log mana pun | ✅ daftar tanpa rahasia; `rahasia_hash` Argon2id; rahasia K1–K5 tidak ada di log berkas maupun `integrasi_log` (lihat N3) |
+| A2 | F.2 | Panggil `services/s_stat/list_tb` dengan K4 (nonaktif) | HTTP 401 `{"status":2,"msg":"Authentication failed","data":{}}`; `integrasi_log` arah masuk alasan tanpa username/rahasia/IP | ✅ 401 amplop seragam; `integrasi_log` hanya kode alasan |
+| A3 | F.3 | Panggil `services/s_stat/list_tb` dengan K5 (IP di luar allowlist) | 401 seragam (pesan sama dengan A2) | ✅ 401, pesan sama dengan A2 |
+| A4 | — | Hak salah: K1 (hak `simapi`) memanggil `services/s_stat/list_tb`; K3 memanggil `simapi/v1/a_auth/token` | 401 seragam / SIMAPI `{"status":"02","msg":"Authentication failed"}` HTTP 200 | ✅ s_stat 401 seragam; SIMAPI `"02"` HTTP 200 |
+| A5 | F.4 | Ulangi A2 dengan rahasia salah sampai melewati kapasitas throttle IP (`Config\KlienLayanan`) | 429 `Too many requests` + `Retry-After`; log throttle maksimal sekali per jendela | ❌ T1 — di demo Windows throttle tidak pernah aktif (401 terus, tanpa 429) |
+| A6 | F.5 | Token SIMAPI K1: pakai sesudah `integrasi:klien rotasi qa.simapi` (token dicabut) | `{"status":"02","msg":"Token is not valid"}` HTTP 200 | ✅ `Token is not valid` HTTP 200 |
+| A7 | — | `integrasi:klien rotasi qa.simapi` → perbarui `KLIEN_QA_F6.md` (skrip `--rotasi` atau manual) | Rahasia baru tampil sekali; rahasia lama ditolak | ✅ rahasia baru tampil sekali, rahasia lama ditolak; `KLIEN_QA_F6.md` diperbarui |
 
 ## B. H-01 Skema (DBV-026, DBV-027, DBV-030, DBV-031)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| B1 | 01.3 | Cek tabel di DB demo: `klien_layanan`, `simapi_token`, `simapi_jd`, `simapi_auth_jd`, `simapi_ch`, `simapi_auth_ch`, `simapi_update`, `simapi_update_hist`, `integrasi_log`, `siasn_*`, `bkn_periode_ekinper`, `surat_cuti_token` | Semua ada (migrate demo dari `main`); collation `utf8mb4_unicode_ci` | |
-| B2 | 01.2 | `firebase_token` di DB demo hasil impor/seed | Kosong sebelum login berizin notifikasi (tidak diimpor) | |
+| B1 | 01.3 | Cek tabel di DB demo: `klien_layanan`, `simapi_token`, `simapi_jd`, `simapi_auth_jd`, `simapi_ch`, `simapi_auth_ch`, `simapi_update`, `simapi_update_hist`, `integrasi_log`, `siasn_*`, `bkn_periode_ekinper`, `surat_cuti_token` | Semua ada (migrate demo dari `main`); collation `utf8mb4_unicode_ci` | ✅ semua tabel ada, collation `utf8mb4_unicode_ci` |
+| B2 | 01.2 | `firebase_token` di DB demo hasil impor/seed | Kosong sebelum login berizin notifikasi (tidak diimpor) | ✅ kosong sebelum E1 |
 
 ## C. H-02 E-sign BSrE (mode mock) — C-05, F6-18, Q6-19..Q6-23, Q6-40, F6-16
 
 | # | AC | Langkah (UI kecuali disebut) | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| C1 | 02.6 | `demo.pyb` → Cuti → C7 ⋮ "Tanda tangani" → cek sertifikat → passphrase apa saja → Tanda tangani | Surat ber-TTE terbit (PDF mock, trailer mock); `esign_hist` status 1 penanda tangan PyB; tanpa passphrase di log/DB | |
-| C2 | 02.6 | Pada cuti final lain: akun selain PyB (mis. `demo.admin` tanpa atas nama, `demo.pemohon`) membuka ⋮ | Item "Tanda tangani" tidak tampil; panggilan API langsung `POST api/v1/cuti/{id}/esign` → 403 | |
-| C3 | Q6-40 | `demo.atasan` → Cuti → C6 ⋮ "Setujui" (tahap AL, alur biasa) → `demo.admin` → Cuti → C6 ⋮ "Setujui atas nama" tahap PyB (alasan wajib) | Sesudah keputusan atas nama yang final: dialog **"Tanda tangani atas nama"** terbuka otomatis dengan nama pejabat. Atas nama di tahap AL yang belum final tidak membuka TTE — tidak bisa dipicu dengan C6 (AL terjangkau), bukti test otomatis `EsignAtasNamaTest` | |
-| C3a | Q6-40 | Tutup dialog C3 tanpa passphrase | Surat terbit tanpa TTE; ⋮ "Tanda tangani atas nama" tersedia untuk mengulang | |
-| C3b | Q6-40 / Q6-20 | ⋮ "Tanda tangani atas nama" → passphrase → Tanda tangani | TTE terbit; `esign_hist.nip` = PyB; audit `cuti.esign_terbit` pelaku = admin, `atas_nama: true`; sesudahnya item ⋮ tersembunyi dan PyB tidak bisa menandatangani ulang | |
-| C3c | Q6-40 | Akun bukan role 1 (mis. `demo.pemohon`) memanggil `GET api/v1/cuti/{id C6}/esign/status?atas_nama=1` | 403 | |
-| C4 | 02.7 / 02.8 | Buka QR kaki surat C1 (halaman `/verify/surat-cuti/{token}`) dan URL PDF publik di QR TTE; ubah satu karakter token | Data minimal tanpa NIP, tanpa unduh; PDF publik ber-TTE; token salah → 404 seragam; header `no-store` + `noindex`; `php spark surat-cuti:token --id=<C7> --nonaktif` → keduanya 404, `--aktif` pulih | |
-| C5 | F6-16 | `GET services/s_esign/check_user?nik=<NIK sintetis>` dengan K3; lalu `POST services/s_esign/sign_pdf` multipart `file` (PDF kecil) + `imageTTD` (PNG kecil) + `nik`, `passphrase` | check_user `{"status":"1","msg":null,"data":[]}` (status STRING, msg null [K]); sign_pdf `status "1"`, `data.signed_file` base64 PDF; `esign_hist` modul `MuDig` | |
-| C5a | F6-16 | sign_pdf tanpa `imageTTD` / berkas bukan PDF / NIK berisi `..` | `{"status":"2","msg":"Invalid parameter.","data":[]}`; tanpa baris `esign_hist` | |
-| C6x | 02.5 | `php spark integrasi:status` | Baris status TLS BSrE tampil (mock: tidak relevan → catat isi); exit 0 bila tanpa kegagalan | |
+| C1 | 02.6 | `demo.pyb` → Cuti → C7 ⋮ "Tanda tangani" → cek sertifikat → passphrase apa saja → Tanda tangani | Surat ber-TTE terbit (PDF mock, trailer mock); `esign_hist` status 1 penanda tangan PyB; tanpa passphrase di log/DB | ✅ |
+| C2 | 02.6 | Pada cuti final lain: akun selain PyB (mis. `demo.admin` tanpa atas nama, `demo.pemohon`) membuka ⋮ | Item "Tanda tangani" tidak tampil; panggilan API langsung `POST api/v1/cuti/{id}/esign` → 403 | ✅ item tidak tampil; API 403 |
+| C3 | Q6-40 | `demo.atasan` → Cuti → C6 ⋮ "Setujui" (tahap AL, alur biasa) → `demo.admin` → Cuti → C6 ⋮ "Setujui atas nama" tahap PyB (alasan wajib) | Sesudah keputusan atas nama yang final: dialog **"Tanda tangani atas nama"** terbuka otomatis dengan nama pejabat. Atas nama di tahap AL yang belum final tidak membuka TTE — tidak bisa dipicu dengan C6 (AL terjangkau), bukti test otomatis `EsignAtasNamaTest` | ✅ |
+| C3a | Q6-40 | Tutup dialog C3 tanpa passphrase | Surat terbit tanpa TTE; ⋮ "Tanda tangani atas nama" tersedia untuk mengulang | ✅ |
+| C3b | Q6-40 / Q6-20 | ⋮ "Tanda tangani atas nama" → passphrase → Tanda tangani | TTE terbit; `esign_hist.nip` = PyB; audit `cuti.esign_terbit` pelaku = admin, `atas_nama: true`; sesudahnya item ⋮ tersembunyi dan PyB tidak bisa menandatangani ulang | ✅ |
+| C3c | Q6-40 | Akun bukan role 1 (mis. `demo.pemohon`) memanggil `GET api/v1/cuti/{id C6}/esign/status?atas_nama=1` | 403 | ✅ 403 untuk akun bukan role 1 yang memiliki akses baris; catatan T2 (akun tanpa akses baris → 404 seragam) |
+| C4 | 02.7 / 02.8 | Buka QR kaki surat C1 (halaman `/verify/surat-cuti/{token}`) dan URL PDF publik di QR TTE; ubah satu karakter token | Data minimal tanpa NIP, tanpa unduh; PDF publik ber-TTE; token salah → 404 seragam; header `no-store` + `noindex`; `php spark surat-cuti:token --id=<C7> --nonaktif` → keduanya 404, `--aktif` pulih | ✅ |
+| C5 | F6-16 | `GET services/s_esign/check_user?nik=<NIK sintetis>` dengan K3; lalu `POST services/s_esign/sign_pdf` multipart `file` (PDF kecil) + `imageTTD` (PNG kecil) + `nik`, `passphrase` | check_user `{"status":"1","msg":null,"data":[]}` (status STRING, msg null [K]); sign_pdf `status "1"`, `data.signed_file` base64 PDF; `esign_hist` modul `MuDig` | ✅ |
+| C5a | F6-16 | sign_pdf tanpa `imageTTD` / berkas bukan PDF / NIK berisi `..` | `{"status":"2","msg":"Invalid parameter.","data":[]}`; tanpa baris `esign_hist` | ✅ tanpa baris `esign_hist` |
+| C6x | 02.5 | `php spark integrasi:status` | Baris status TLS BSrE tampil (mock: tidak relevan → catat isi); exit 0 bila tanpa kegagalan | ✅ exit 0; mode mock tidak menampilkan baris TLS (peringatan hanya muncul bila konfigurasi BSrE berisiko) — catatan T2 |
 
 ## D. H-03 SIASN [mock-terbatas] (MAKE-067, F6-14)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| D1 | 03.7 | `php spark siasn:tarik --jenis=data-utama --dry-run`, `siasn:dorong --jenis=jabatan --dry-run`, `siasn:unggah-arsip --dry-run` dengan driver mock | Ditolak eksplisit (driver wajib `bkn`), exit ≠ 0, tanpa mengubah data/antrean; pesan tanpa rahasia | |
-| D2 | 03.1–03.10 | Rujukan bukti otomatis: kelas `tests/database/Integrasi/Siasn*Test.php` di log gate penuh regresi | Hijau (dilaporkan pelaksana regresi) | |
+| D1 | 03.7 | `php spark siasn:tarik --jenis=data-utama --dry-run`, `siasn:dorong --jenis=jabatan --dry-run`, `siasn:unggah-arsip --dry-run` dengan driver mock | Ditolak eksplisit (driver wajib `bkn`), exit ≠ 0, tanpa mengubah data/antrean; pesan tanpa rahasia | ✅ ditolak eksplisit, exit ≠ 0, tanpa rahasia |
+| D2 | 03.1–03.10 | Rujukan bukti otomatis: kelas `tests/database/Integrasi/Siasn*Test.php` di log gate penuh regresi | Hijau (dilaporkan pelaksana regresi) | ✅ regresi gate penuh Fase 6 lolos (3813 test, EXIT=0) |
 
 ## E. H-04 Push FCM (mode mock) — C-06, F6-11..F6-13
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| E1 | F6-13 | Login `demo.pegawai`; bila konfigurasi Firebase web kosong di demo, banner izin notifikasi tidak muncul (lihat §K2); uji API: `POST api/v1/integrasi/fcm-token {token:"qa-f6-token-1"}` dua kali (Bearer JWT dari login) | Satu baris `firebase_token` platform 1 (AC-04.5 dedup), `updated_at` diperbarui; `DELETE` yang sama menghapus baris | |
-| E2 | 04.1 / C-06 | Dengan token E1 terdaftar: proses cuti/TB/IB/PMK milik `demo.pegawai` dari akun approver (mis. setujui IB I1 sebagai PIC) | Push diantre (`queue:work push`), payload mock tertulis di `writable/logs` `[MockFcmAdapter]` dengan judul/isi/tautan ikut legacy; tanpa galat di alur UI | |
-| E3 | 04.3 | Presensi masuk/pulang `demo.pegawai` (bila menu presensi online tersedia di demo) | Job `fcm-topik` diantre sesudah commit; presensi tetap sukses walau worker mati | |
-| E4 | — | `php spark integrasi:uji-koneksi fcm` (driver mock) | Ditolak "hanya untuk integrations.push.driver = fcm", exit 7 (CR-101) | |
+| E1 | F6-13 | Login `demo.pegawai`; bila konfigurasi Firebase web kosong di demo, banner izin notifikasi tidak muncul (lihat §K2); uji API: `POST api/v1/integrasi/fcm-token {token:"qa-f6-token-1"}` dua kali (Bearer JWT dari login) | Satu baris `firebase_token` platform 1 (AC-04.5 dedup), `updated_at` diperbarui; `DELETE` yang sama menghapus baris | ✅ satu baris platform 1, `DELETE` menghapus; catatan T2 (kunci `fcm_token`; `updated_at` diperbarui saat jatuh tempo refresh) |
+| E2 | 04.1 / C-06 | Dengan token E1 terdaftar: proses cuti/TB/IB/PMK milik `demo.pegawai` dari akun approver (mis. setujui IB I1 sebagai PIC) | Push diantre (`queue:work push`), payload mock tertulis di `writable/logs` `[MockFcmAdapter]` dengan judul/isi/tautan ikut legacy; tanpa galat di alur UI | ✅ 8 payload `[MockFcmAdapter]` (cuti C6: diajukan, disetujui AL, disetujui PyB, TTE terbit) ikut legacy; 0 failed job |
+| E3 | 04.3 | Presensi masuk/pulang `demo.pegawai` (bila menu presensi online tersedia di demo) | Job `fcm-topik` diantre sesudah commit; presensi tetap sukses walau worker mati | ✅ masuk sukses tanpa worker; driver mock tidak mengantre (by design); dengan driver `fcm` sementara → job `fcm-topik` antrean `push` (tambah `pegawai_blm_pulang`, lepas `pegawai_blm_masuk`) — catatan T2 |
+| E4 | — | `php spark integrasi:uji-koneksi fcm` (driver mock) | Ditolak "hanya untuk integrations.push.driver = fcm", exit 7 (CR-101) | ✅ exit 7 |
 
 ## F. H-05/H-06/H-07 SIMAPI v1 (MAKE-059/060)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| F1 | 05 | `GET/POST simapi/v1/a_auth/token` dengan K1 | `{"status":"01","msg":…,"data":{"token":"…"}}` (data.token saja, CR-106) | |
-| F2 | 06.2 | `a_employee/data_umum/<nip>` tanpa token / token acak; tanpa NIP | `{"status":"02","msg":"Token is not valid","data":[]}` HTTP 200; tanpa NIP → "Invalid paramater" [K ejaan legacy] | |
-| F3 | 06.1 | Dengan token: beberapa dari 25 method Lampiran A.1 (mis. `data_umum`, `detil`, `riwayat_jabatan`, `riwayat_pendidikan`, `riwayat_kgb`) untuk NIP demo; ikuti URL `foto` di `data_umum` (`a_employee/foto/…`); NIP tak ada; NIP status 10 | Field & urutan sesuai Lampiran A.1; data kosong → pesan "Data … tidak tersedia"; NIP tak ada/status 10 → "NIP not valid"; foto hanya dengan token | |
-| F4 | 06.3 / Q6-42 | Edit biodata `demo.pegawai` lewat UI Kepegawaian, lalu `change_history` dua kali dengan K1 (jenis 2; klien jenis 1 ditolak) | Panggilan pertama memuat perubahan (field_value sesuai trigger legacy D1); kedua tidak mengulang (ack-on-read); filter `simapi_auth_jd` berlaku bila diisi | |
-| F5 | 07.1 | `a_dm/jabatan` tanpa token; `a_dm/group_jabatan` dengan token | Tanpa token → 02; dengan token → data | |
-| F6 | F6-07 | `a_sinkron/ambil_riwayat_mutasi` dengan token | Amplop `"01"`, data sesuai Lampiran A.1 | |
+| F1 | 05 | `GET/POST simapi/v1/a_auth/token` dengan K1 | `{"status":"01","msg":…,"data":{"token":"…"}}` (data.token saja, CR-106) | ✅ `data.token` saja |
+| F2 | 06.2 | `a_employee/data_umum/<nip>` tanpa token / token acak; tanpa NIP | `{"status":"02","msg":"Token is not valid","data":[]}` HTTP 200; tanpa NIP → "Invalid paramater" [K ejaan legacy] | ✅ |
+| F3 | 06.1 | Dengan token: beberapa dari 25 method Lampiran A.1 (mis. `data_umum`, `detil`, `riwayat_jabatan`, `riwayat_pendidikan`, `riwayat_kgb`) untuk NIP demo; ikuti URL `foto` di `data_umum` (`a_employee/foto/…`); NIP tak ada; NIP status 10 | Field & urutan sesuai Lampiran A.1; data kosong → pesan "Data … tidak tersedia"; NIP tak ada/status 10 → "NIP not valid"; foto hanya dengan token | ✅ untuk NIP demo yang ada datanya; foto & NIP status 10 tidak ada di data demo → bukti test otomatis (T2) |
+| F4 | 06.3 / Q6-42 | Edit biodata `demo.pegawai` lewat UI Kepegawaian, lalu `change_history` dua kali dengan K1 (jenis 2; klien jenis 1 ditolak) | Panggilan pertama memuat perubahan (field_value sesuai trigger legacy D1); kedua tidak mengulang (ack-on-read); filter `simapi_auth_jd` berlaku bila diisi | ✅ ack-on-read; klien jenis 1 ditolak |
+| F5 | 07.1 | `a_dm/jabatan` tanpa token; `a_dm/group_jabatan` dengan token | Tanpa token → 02; dengan token → data | ✅ |
+| F6 | F6-07 | `a_sinkron/ambil_riwayat_mutasi` dengan token | Amplop `"01"`, data sesuai Lampiran A.1 | ✅ |
 
 ## G. API SIMAPI lama (Q6-41, MAKE-076) + penulis log (Q6-42)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| G1 | Q6-41 | `simapi/a_pegawai/token` dengan K2 dari 127.0.0.1; ulangi dengan klien tanpa allowlist cocok | Token terbit; IP tidak cocok → `"02"` (cek IP wajib) | |
-| G2 | Q6-41 | `simapi/a_pegawai/detail/<nip>` dengan token G1 | Amplop `"01"`, field ikut legacy termasuk `password` = hash akun v2 (Argon2id) — risiko diterima Q6-41 | |
-| G3 | Q6-42 | Ubah data `demo.pegawai` (biodata/jabatan) atau password via UI; lalu `simapi/a_pegawai/pegawai_update` dua kali | Panggilan pertama memuat perubahan (`simapi_update`), kedua tidak mengulang (`_hist` ack-on-read); data:[] saat kosong | |
-| G4 | Q6-42 | Simpan form riwayat yang ditolak validasi (422) | Tidak ada baris `simapi_ch`/`simapi_update` baru (rollback = log hilang) | |
+| G1 | Q6-41 | `simapi/a_pegawai/token` dengan K2 dari 127.0.0.1; ulangi dengan klien tanpa allowlist cocok | Token terbit; IP tidak cocok → `"02"` (cek IP wajib) | ✅ catatan T3 (allowlist K2 di demo ditambah `::1`) |
+| G2 | Q6-41 | `simapi/a_pegawai/detail/<nip>` dengan token G1 | Amplop `"01"`, field ikut legacy termasuk `password` = hash akun v2 (Argon2id) — risiko diterima Q6-41 | ✅ `password` = hash Argon2id akun v2 |
+| G3 | Q6-42 | Ubah data `demo.pegawai` (biodata/jabatan) atau password via UI; lalu `simapi/a_pegawai/pegawai_update` dua kali | Panggilan pertama memuat perubahan (`simapi_update`), kedua tidak mengulang (`_hist` ack-on-read); data:[] saat kosong | ✅ termasuk ganti password; panggilan kedua `data:[]` |
+| G4 | Q6-42 | Simpan form riwayat yang ditolak validasi (422) | Tidak ada baris `simapi_ch`/`simapi_update` baru (rollback = log hilang) | ✅ tanpa baris `simapi_ch`/`simapi_update` baru |
 
 ## H. H-08 `services/s_stat` + `s_dm` (MAKE-061, MAKE-059)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| H1 | 08.2 | K3: `s_stat/rekomendasi_kp`, `rekomendasi_kp_uns`, `rekomendasi_pensiun`, `rekomendasi_kgb`, `list_tb`, `list_ib`, `list_karpeg`, `list_kariskarsu` | Amplop INT `{"status":1,…}`; kolom sesuai Lampiran A.2 | |
-| H2 | 08.4 | `rekomendasi_kp_uns?id_satker=<id>` | `{"status":1,"msg":"","data":[]}` (bug legacy Q6-37) | |
-| H3 | 08.5 | Ikuti satu URL `arsip_*` dari H1 dengan K3; tanpa auth; ubah NIP/id | Dengan auth → berkas; tanpa auth → 401; selain itu 404 seragam; path internal tidak tampil | |
-| H4 | 08.3 | H1 tanpa auth | 401 | |
-| H5 | F6-10 | K3: `s_dm/list_unit`, `list_satker`, `p_list_unit`, `p_get_unit?id_unit=`, `p_get_satker?id_satker=` | Amplop INT, data gagal `[]` [K]; `p_web_config` tidak ada (404) | |
+| H1 | 08.2 | K3: `s_stat/rekomendasi_kp`, `rekomendasi_kp_uns`, `rekomendasi_pensiun`, `rekomendasi_kgb`, `list_tb`, `list_ib`, `list_karpeg`, `list_kariskarsu` | Amplop INT `{"status":1,…}`; kolom sesuai Lampiran A.2 | ✅ |
+| H2 | 08.4 | `rekomendasi_kp_uns?id_satker=<id>` | `{"status":1,"msg":"","data":[]}` (bug legacy Q6-37) | ✅ |
+| H3 | 08.5 | Ikuti satu URL `arsip_*` dari H1 dengan K3; tanpa auth; ubah NIP/id | Dengan auth → berkas; tanpa auth → 401; selain itu 404 seragam; path internal tidak tampil | ✅ |
+| H4 | 08.3 | H1 tanpa auth | 401 | ✅ |
+| H5 | F6-10 | K3: `s_dm/list_unit`, `list_satker`, `p_list_unit`, `p_get_unit?id_unit=`, `p_get_satker?id_satker=` | Amplop INT, data gagal `[]` [K]; `p_web_config` tidak ada (404) | ✅ `p_web_config` 404 |
 
 ## I. H-09 Pemetaan
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| I1 | 09.1 | Baca tabel pemetaan `Local.php` di `backend/docs/progress/06-Integrasi.md` | Setiap method punya padanan atau alasan "tidak di-port" | |
+| I1 | 09.1 | Baca tabel pemetaan `Local.php` di `backend/docs/progress/06-Integrasi.md` | Setiap method punya padanan atau alasan "tidak di-port" | ✅ |
 
 ## J. H-10 e-Kinerja BKN [mock-terbatas] (MAKE-064)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| J1 | K.4 | `php spark bkn:tarik-periode --dry-run` dengan `.env` demo tanpa konfigurasi BKN | Galat konfigurasi menyebut nama kunci saja, exit ≠ 0, tanpa nilai rahasia | |
-| J2 | §6.2 | `POST api/v1/integrasi/bkn/tarik` sebagai `demo.admin` `{jenis:"periode"}`; sebagai `demo.pegawai` | Admin → 202 (job diantre antrean `integrasi`); bukan role 1 → 403 | |
-| J3 | F6-15 | `php spark integrasi:status` | Peringatan periode Tukin berjalan tanpa SKP periodik (DB demo kosong `riwayat_skp_periodik`) | |
-| J4 | 10.1–10.3 | Rujukan bukti otomatis: `tests/database/Integrasi/Bkn*`/`Ekinerja*` + Tukin Fase 5 di log gate penuh regresi | Hijau | |
+| J1 | K.4 | `php spark bkn:tarik-periode --dry-run` dengan `.env` demo tanpa konfigurasi BKN | Galat konfigurasi menyebut nama kunci saja, exit ≠ 0, tanpa nilai rahasia | ✅ hanya nama kunci |
+| J2 | §6.2 | `POST api/v1/integrasi/bkn/tarik` sebagai `demo.admin` `{jenis:"periode"}`; sebagai `demo.pegawai` | Admin → 202 (job diantre antrean `integrasi`); bukan role 1 → 403 | ✅ admin 202, pegawai 403 |
+| J3 | F6-15 | `php spark integrasi:status` | Peringatan periode Tukin berjalan tanpa SKP periodik (DB demo kosong `riwayat_skp_periodik`) | ✅ peringatan periode tampil |
+| J4 | 10.1–10.3 | Rujukan bukti otomatis: `tests/database/Integrasi/Bkn*`/`Ekinerja*` + Tukin Fase 5 di log gate penuh regresi | Hijau | ✅ regresi gate penuh lolos |
 
 ## L. H-11 Status TB/CLTN harian (MAKE-062)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| L1 | Q6-26 | `php spark layanan:status-harian --dry-run` | Ringkasan: T6 2→1 (pemulihan), S6 tanpa riwayat pendukung = INFO (tidak disentuh); tanpa perubahan DB | |
-| L2 | 11.5 / 11.6 | Run nyata dua kali | Run 1 menerapkan; run 2 tanpa perubahan; setiap perubahan teraudit | |
-| L3 | 11.10 | `--tanggal=<besok>`; `--tanggal=<kemarin>` tanpa `--dry-run` | Keduanya ditolak (exit 7) | |
+| L1 | Q6-26 | `php spark layanan:status-harian --dry-run` | Ringkasan: T6 2→1 (pemulihan), S6 tanpa riwayat pendukung = INFO (tidak disentuh); tanpa perubahan DB | ✅ |
+| L2 | 11.5 / 11.6 | Run nyata dua kali | Run 1 menerapkan; run 2 tanpa perubahan; setiap perubahan teraudit | ✅ |
+| L3 | 11.10 | `--tanggal=<besok>`; `--tanggal=<kemarin>` tanpa `--dry-run` | Keduanya ditolak (exit 7) | ✅ exit 7 |
 
 ## M. H-12 Auto-approval LKH (MAKE-068)
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| M1 | 12.1 | `php spark lkh:auto-approval --dry-run` lalu run nyata | L6 status 0 bulan lalu → 1 + `auto_approval=1`; baris status 3 tidak disentuh | |
-| M2 | 12.2 | Run nyata kedua | Tanpa efek ganda, tanpa audit baru | |
-| M3 | 12.3 | Unduh PDF LKH bulan lalu `demo.pegawai` dari UI | PDF dibangkitkan saat diminta (job tidak menyimpan PDF) | |
+| M1 | 12.1 | `php spark lkh:auto-approval --dry-run` lalu run nyata | L6 status 0 bulan lalu → 1 + `auto_approval=1`; baris status 3 tidak disentuh | ✅ |
+| M2 | 12.2 | Run nyata kedua | Tanpa efek ganda, tanpa audit baru | ✅ |
+| M3 | 12.3 | Unduh PDF LKH bulan lalu `demo.pegawai` dari UI | PDF dibangkitkan saat diminta (job tidak menyimpan PDF) | ✅ lewat endpoint UI `GET api/v1/lkh/{id}/pdf` → 200 `application/pdf`; baris revisi → 422 "tersedia setelah disetujui"; tidak ada PDF LKH tersimpan di `writable` |
 
 ## N. Operasional log & runbook
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| N1 | F6-24 | `php spark integrasi:status --jam=24` sesudah bagian A–M | Agregat sukses/gagal per layanan; exit 1 bila ada kegagalan (A2–A5 sengaja gagal) | |
-| N2 | Q6-16 | `php spark integrasi:bersihkan-log --dry-run` | Jumlah calon hapus > 180 hari (0 di demo), tanpa menghapus | |
-| N3 | K.1 | Cari rahasia klien, token SIMAPI, passphrase, NIK sintetis di `writable/logs/*` dan `integrasi_log` | Tidak ditemukan | |
-| N4 | §11 | Baca `README-deploy.md` §1b–§1h | Runbook cron + Nginx (`/simapi/`, `/services/`, `Authorization`) + daftar re-handshake klien tercatat | |
+| N1 | F6-24 | `php spark integrasi:status --jam=24` sesudah bagian A–M | Agregat sukses/gagal per layanan; exit 1 bila ada kegagalan (A2–A5 sengaja gagal) | ✅ exit 1 (kegagalan A2–A5 sengaja) |
+| N2 | Q6-16 | `php spark integrasi:bersihkan-log --dry-run` | Jumlah calon hapus > 180 hari (0 di demo), tanpa menghapus | ✅ 0 calon hapus |
+| N3 | K.1 | Cari rahasia klien, token SIMAPI, passphrase, NIK sintetis di `writable/logs/*` dan `integrasi_log` | Tidak ditemukan | ✅ rahasia K1–K5, passphrase uji, NIK sintetis, token Bearer: 0 temuan di log berkas & `integrasi_log` |
+| N4 | §11 | Baca `README-deploy.md` §1b–§1h | Runbook cron + Nginx (`/simapi/`, `/services/`, `Authorization`) + daftar re-handshake klien tercatat | ✅ |
 | N5 | F6-24 / §6.2 | `GET api/v1/integrasi/log` (role 1, filter layanan/status/tanggal, paginasi) | — | N/A — deviasi K1 |
 | N6 | §6.2 FE | Halaman Admin → Integrasi (log integrasi + tombol tarik ulang e-Kinerja per periode, aksi baris ⋮) | — (tarik ulang tetap diuji lewat API di J2) | N/A — deviasi K1 |
 
@@ -177,4 +177,11 @@ Bentuk header token SIMAPI mengikuti legacy (elemen kedua header `Authorization`
 
 ## T. Temuan
 
-(diisi reviewer saat QA)
+Hasil QA Lapis 1 oleh reviewer CR, 10-11-2026, di app demo `main` `75361d0d` (DB `simpeg_v2_t_app_demo` direset lalu diisi
+`seed_demo.php` → `qa_fase4_data.php` → `qa_fase6_data.php`). Ringkasan: **54 butir lolos, 1 gagal (A5 → T1), 2 N/A (deviasi K1)**.
+
+| # | Butir | Temuan | Dampak | Usulan / status |
+|---|---|---|---|---|
+| T1 | A5 | Kunci cache `PembatasKegagalan` memakai karakter `\|` (pola `klgg\|…`, `klog\|…`). Di Windows karakter itu tidak sah untuk nama berkas, sehingga handler cache berkas CI4 gagal menulis tanpa galat dan throttle 429 tidak pernah aktif. Terbukti: `file_put_contents` dengan nama berisi `\|` mengembalikan `false` di mesin demo. | Hanya server Windows / handler cache berkas; Linux (target produksi) tidak terdampak nama berkas, tetapi kunci tetap rapuh bila handler cache diganti. | Ubah kunci menjadi hash (mis. `md5`) atau ganti `\|` dengan karakter aman, plus test kunci. **Terbuka — menunggu keputusan Horii** (perbaiki sebelum sign-off atau dicatat sebagai catatan deploy) |
+| T2 | C3c, C6x, E1, E3, F3, prasyarat | Koreksi teks checklist (tidak memblokir): (a) E1 kunci payload `fcm_token`, bukan `token`; `updated_at` hanya diperbarui saat jatuh tempo refresh, bukan setiap duplikat; (b) C3c — akun tanpa akses baris menerima 404 seragam, 403 hanya untuk akun yang bisa melihat baris; (c) C6x — mode mock tidak punya baris TLS; (d) E3 — driver mock tidak mengantre `fcm-topik`, diuji dengan driver `fcm` sementara di `.env` demo lalu dipulihkan (berkas identik) dan job uji dihapus; (e) F3 — data demo tidak memuat foto pegawai dan NIP status 10; (f) `reset_demo.sh` sudah tidak ada, reset demo manual (drop/create DB → `migrate --all` → seed). | Dokumentasi | Dicatat; perilaku kode sesuai PRD/legacy |
+| T3 | G1 | Allowlist K2 `127.0.0.1` menolak akses dari `localhost` karena sumbernya `::1` (IPv6). Di demo allowlist diubah menjadi `127.0.0.1,::1`. | Catatan deploy: allowlist harus memuat alamat sumber sebenarnya (IPv6, IP di balik proxy/Nginx) | Informasi untuk re-handshake klien SIMAPI lama (README-deploy) |
