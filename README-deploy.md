@@ -501,6 +501,8 @@ Kunci `.env` backend (opsional; tanpa isi = perilaku bawaan):
 dashboard.nipDisembunyikan =
 # Q7-36: tampilan komposisi pegawai di beranda admin. donut (bawaan, [V2]) | angka (persis legacy, rollback tanpa deploy kode).
 dashboard.tampilanKomposisi = donut
+# Deviasi [V2] Horii 10-11-2026: kartu Tanda Jasa satker/unit memakai tahun acuan kementerian. true = persis legacy (≈0 Sep–Des).
+dashboard.tandaJasaIkutLegacy = false
 ```
 
 Cache ringkasan beranda per lingkup (`Config\Dashboard::$ttlRingkasanDetik`, 900 detik) memakai cache aplikasi; perubahan
