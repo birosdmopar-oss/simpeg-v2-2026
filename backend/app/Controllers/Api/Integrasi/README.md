@@ -20,6 +20,24 @@ Route Jalur B (integrasi keluar, PRD Fase 6 §6.2): `app/Config/RoutesIntegrasi.
 - **422:** `errors.jenis` (bukan `periode`/`skp_periodik`); `errors.tahun` / `errors.bulan` (tidak berpasangan, di luar
   2000–2100 / 1–12).
 
+## `GET api/v1/integrasi/log` — daftar log integrasi (F6-24, MAKE-078 / ISSUE-058)
+
+- **Role:** 1 (Super Admin); lainnya 403. Dipakai halaman FE Admin → Integrasi (`/integrasi`). Baca-saja; penulis log tetap
+  `Libraries\Integrasi\Log\IntegrasiLog`. Kueri: `Libraries\Integrasi\Log\DaftarLogIntegrasi`.
+- **Query (opsional):** `layanan` (kode penulis log, `[a-z0-9_]{1,30}`, cocok persis — mis. `bkn`, `ekinerja`, `bsre`,
+  `siasn`, `fcm`, `simapi`, `services`), `status` (`1` sukses / `2` gagal), `tanggal_mulai` / `tanggal_selesai`
+  (`YYYY-MM-DD` tanggal **WIB** inklusif; `created_at` disimpan UTC sehingga rentangnya [mulai 00:00 WIB, selesai+1 00:00
+  WIB) dalam UTC), `page`, `per_page` (pola `ListQuery`: bawaan 25, maks 100 — dijepit). Parameter kosong diabaikan.
+- **Urutan:** `created_at` DESC lalu `id_integrasi_log` DESC (terbaru dulu).
+- **200:** `{"status": "success", "data": {"items": [...], "total": 3, "page": 1, "per_page": 25, "layanan_tersedia": ["bkn", ...]}}`.
+  Setiap item hanya kolom `integrasi_log` (DBV-027): `id_integrasi_log`, `arah` (1 keluar / 2 masuk), `layanan`, `operasi`,
+  `status`, `http_status` (null = tanpa respons), `kode`, `pesan` (sudah teredaksi saat ditulis, BP-5), `durasi_ms`,
+  `percobaan`, `ref_id`, `id_klien`, `created_at` (UTC tanpa zona). Tanpa join ke data pegawai/akun. `layanan_tersedia` =
+  kode layanan yang ada di tabel (pilihan filter; tidak ikut tersaring).
+- **422** (semua parameter salah sekaligus, `errors.<parameter>`): `layanan` di luar pola, `status` bukan 1/2, tanggal bukan
+  `YYYY-MM-DD` / tidak ada di kalender, `tanggal_selesai` < `tanggal_mulai`, `page` bukan 1..1.000.000, parameter berbentuk
+  array.
+
 ## `POST | DELETE api/v1/integrasi/fcm-token` — token push web/desktop (H-04, MAKE-066)
 
 - **Akses:** semua akun login (`jwt`). Padanan `Local::register_fb_token` legacy; SPA memanggil `POST` setiap halaman dimuat
