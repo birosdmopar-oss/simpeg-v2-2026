@@ -28,4 +28,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
     $routes->get('dokumen/(:segment)/pdf', 'DokumenController::pdf/$1', $laporan);
     $routes->get('dokumen/(:segment)/xlsx', 'DokumenController::xlsx/$1', $laporan);
     $routes->get('dokumen/(:segment)', 'DokumenController::daftar/$1', $laporan);
+
+    // F-13 beranda per role (MAKE-087, Jalur D, PRD Fase 7 v2.0 §5.10): semua akun login (jwt grup); bentuk per keluarga role.
+    $routes->get('dashboard/ringkasan', 'BerandaController::ringkasan');
 });

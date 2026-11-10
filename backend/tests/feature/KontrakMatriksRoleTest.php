@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -77,6 +77,8 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
 
             // Modul F — Fase 7 F-03 statistik (MAKE-036): Matriks Bagian 2 `hr/chart/unit_kerja`, `hr/chart/usia|jabatan|
             // gender|eselon|education|gol` = 1, 3, 4, 5, 8 (role 3 terbatas satker/unit di service, PegawaiScope).
+            // F-13 beranda (MAKE-087, PRD Fase 7 v2.0 §6): semua akun login; bentuk respons per keluarga role.
+            'GET api/v1/dashboard/ringkasan'    => self::JWT,
             'GET api/v1/statistik/lingkup'      => [1, 3, 4, 5, 8],
             'GET api/v1/statistik/([^/]+)/xlsx' => [1, 3, 4, 5, 8],
             'GET api/v1/statistik/([^/]+)'      => [1, 3, 4, 5, 8],
