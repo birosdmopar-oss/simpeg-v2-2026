@@ -78,11 +78,13 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // Modul F — Fase 7 F-03 statistik (MAKE-036): Matriks Bagian 2 `hr/chart/unit_kerja`, `hr/chart/usia|jabatan|
             // gender|eselon|education|gol` = 1, 3, 4, 5, 8 (role 3 terbatas satker/unit di service, PegawaiScope).
             // F-13 beranda (MAKE-087, PRD Fase 7 v2.0 §6): semua akun login; bentuk respons per keluarga role.
-            'GET api/v1/dashboard/ringkasan'    => self::JWT,
-            'GET api/v1/dashboard/direktur'     => [1, 4],
-            'GET api/v1/statistik/lingkup'      => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)/xlsx' => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)'      => [1, 3, 4, 5, 8],
+            'GET api/v1/dashboard/ringkasan'                => self::JWT,
+            'GET api/v1/dashboard/direktur'                 => [1, 4],
+            'GET api/v1/dashboard/ulang-tahun'              => self::JWT,
+            'GET api/v1/dashboard/ulang-tahun/([^/]+)/foto' => self::JWT,
+            'GET api/v1/statistik/lingkup'                  => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)/xlsx'             => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)'                  => [1, 3, 4, 5, 8],
             // F-09 generator dokumen (MAKE-037): Matriks Bagian 2 `hr/document/duk|nominatif|pensiun|baperjakat` = 1, 3, 4, 5, 8.
             'POST api/v1/dokumen/baperjakat/pdf'  => [1, 3, 4, 5, 8],
             'POST api/v1/dokumen/baperjakat/xlsx' => [1, 3, 4, 5, 8],
