@@ -157,3 +157,17 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - FE: `features/konten` (kelola popup/banner/berita/DIBO/master, portal berita, DIBO baca, `GambarKonten` blob, `TargetPicker`,
   `UiTeksSederhana`); rute dan menu `phase: 7`.
 - Sisa: berita (MAKE-081, sanitasi HTMLPurifier + approval + `SumberBerita`), DIBO (MAKE-082); antrean dialog menunggu MAKE-083.
+
+#### Jalur A — M3 F-07 Berita + master (MAKE-081, bagian dari MAKE-082), branch `fase7/make-079-popup`
+
+- BE: `Konten/Berita/{BeritaService,SanitasiBerita,SumberBerita}`, `Konten/{JenisMaster,MasterKontenService}` (kategori berita + jenis DIBO),
+  `Models/Konten/{News,NewsCategory,JenisDibo}Model`, `Controllers/Api/Konten/{Berita,BeritaKategori,DiboJenis,MasterKonten}Controller`,
+  rute di `RoutesKonten.php` (`konten/berita*`, `konten/berita/kategori*`, `konten/dibo-jenis*`).
+- Aturan: baca semua role (terbit + `publish_at` + target kementerian/unit/satker; role 1 semua yang terbit di portal dan semua di detail; detail =
+  aturan portal, perbaikan anomali legacy); kelola role 1,3; role 3 → menunggu, kategori `allow_ap`, hanya miliknya; ubah oleh role 3
+  kembali menunggu [V2]; proses role 1 (alasan wajib bila tolak, hanya status 0); isi disanitasi HTMLPurifier `p,br,strong,em,ul,ol,li,a[href]`;
+  `news_flag` per berita (tanpa DELETE global legacy), `POST konten/berita/dibuka` mereset penanda pembaca; publish_at disimpan UTC (masukan WIB).
+- `SumberBerita` (kontrak A↔C) siap + teruji, tetapi binding `Services::sumberNotifikasiBerita()` TETAP NoOp sampai tabel `news` ada di skema
+  utama (migration DBV-032 di `main`); lalu ganti satu baris `return` (catatan di Services.php). Mengganti sekarang merusak `tests/Notifikasi`.
+- Belum dibawa: lampiran berita (`news.lampiran`, FE belum memakai), hitung berita per kategori. Nilai awal `news.show_notif` ⚑ D1.
+- Test: `BeritaServiceTest` (12), `SumberBeritaTest` (4), `KontrakMatriksRoleTest` (+19 baris), FE `KelolaTeks.spec` (+penolakan beralasan).

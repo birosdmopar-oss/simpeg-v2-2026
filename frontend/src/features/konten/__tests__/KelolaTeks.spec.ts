@@ -71,6 +71,30 @@ describe('BeritaKelolaView', () => {
     w.unmount()
   })
 
+  it('Tolak meminta alasan lalu mengirimnya ke service', async () => {
+    s.berita.proses.mockResolvedValue(undefined)
+    const w = await pasang(BeritaKelolaView, 1)
+    await aksi(w, 'konten-berita-actions-5')
+    ;(document.body.querySelector('[data-action="reject"]') as HTMLElement).click()
+    await flushPromises()
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 0))
+
+    const form = document.body.querySelector('[data-testid="berita-tolak-form"]') as HTMLFormElement
+    form.dispatchEvent(new Event('submit', { cancelable: true }))
+    await flushPromises()
+    expect(s.berita.proses).not.toHaveBeenCalled()
+    expect(document.body.querySelector('#berita-alasan-galat')?.textContent).toContain('wajib')
+
+    const area = document.body.querySelector('#berita-alasan') as HTMLTextAreaElement
+    area.value = 'Kurang lengkap'
+    area.dispatchEvent(new Event('input'))
+    form.dispatchEvent(new Event('submit', { cancelable: true }))
+    await flushPromises()
+    expect(s.berita.proses).toHaveBeenCalledWith('5', 'tolak', 'Kurang lengkap')
+    w.unmount()
+  })
+
   it('role 3 tidak melihat persetujuan', async () => {
     const w = await pasang(BeritaKelolaView, 3)
     expect(await aksi(w, 'konten-berita-actions-5')).toEqual(['edit', 'delete'])

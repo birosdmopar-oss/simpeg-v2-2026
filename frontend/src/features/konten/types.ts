@@ -137,7 +137,8 @@ export interface BeritaForm {
   isi: string
   /** Y-m-d. */
   publish_at: string
-  target: SpesifikasiTarget
+  /** Target tunggal: "0" seluruh kementerian, "<id_unit>", atau "sat_<id_satker>" (berita tidak memakai daftar pegawai). */
+  target: string
 }
 
 export interface DiboRowApi {

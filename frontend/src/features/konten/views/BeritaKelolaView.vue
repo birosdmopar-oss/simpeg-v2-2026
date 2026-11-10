@@ -5,6 +5,7 @@
  * Hapus (ConfirmDialog). Kolom Status hanya badge. Endpoint masih draf.
  */
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
+import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -14,6 +15,7 @@ import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
 import type { SelectOption } from '@/shared/ui'
 import { UiSelect } from '@/shared/ui'
+import UiButton from '@/shared/ui/UiButton.vue'
 
 import BeritaFormDialog from '../components/BeritaFormDialog.vue'
 import { kelolaService } from '../services/kelola.service'
@@ -48,11 +50,13 @@ const busy = ref(false)
 
 const opsiKategori = ref<SelectOption[]>([])
 const opsiUnitSatker = ref<SelectOption[]>([])
-const opsiPegawai = ref<SelectOption[]>([])
 
 const formOpen = ref(false)
 const editing = ref<BeritaKelolaRow | null>(null)
 const confirm = ref<{ open: boolean; row: BeritaKelolaRow | null; loading: boolean }>({ open: false, row: null, loading: false })
+
+/** Penolakan butuh alasan (server menolak tanpa alasan, 422). */
+const tolak = ref<{ open: boolean; row: BeritaKelolaRow | null; alasan: string; kirim: boolean; galat: string }>({ open: false, row: null, alasan: '', kirim: false, galat: '' })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 const tanggal = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
@@ -79,10 +83,9 @@ async function load(): Promise<void> {
 async function loadOpsi(): Promise<void> {
   const g = kelolaService('popup')
   try {
-    const [kat, unit, peg] = await Promise.all([masterKontenService('berita-kategori').list(), g.opsiUnitSatker(), g.opsiPegawai()])
+    const [kat, unit] = await Promise.all([masterKontenService('berita-kategori').list(), g.opsiUnitSatker()])
     opsiKategori.value = kat.filter((k) => k.status === '1' && (adalahAdmin.value || k.allow_ap)).map((k) => ({ value: k.id, label: k.nama }))
     opsiUnitSatker.value = unit
-    opsiPegawai.value = peg
   } catch (e) {
     error.value = `Gagal memuat pilihan form. ${pesan(e, '')}`.trim()
   }
@@ -133,8 +136,29 @@ function onRowAction(row: BeritaKelolaRow, key: string): void {
     editing.value = row
     formOpen.value = true
   } else if (key === 'approve') void jalankan(() => beritaKelolaService.proses(row.id, 'setuju'), 'Berita disetujui.', 'Gagal menyetujui.')
-  else if (key === 'reject') void jalankan(() => beritaKelolaService.proses(row.id, 'tolak'), 'Berita ditolak.', 'Gagal menolak.')
+  else if (key === 'reject') tolak.value = { open: true, row, alasan: '', kirim: false, galat: '' }
   else if (key === 'delete') confirm.value = { open: true, row, loading: false }
+}
+
+async function onKirimTolak(): Promise<void> {
+  const t = tolak.value
+  if (!t.row || t.kirim) return
+  if (t.alasan.trim() === '') {
+    t.galat = 'Alasan penolakan wajib diisi.'
+    return
+  }
+  t.kirim = true
+  t.galat = ''
+  try {
+    await beritaKelolaService.proses(t.row.id, 'tolak', t.alasan.trim())
+    notice.value = 'Berita ditolak.'
+    t.open = false
+    await load()
+  } catch (e) {
+    t.galat = pesan(e, 'Gagal menolak.')
+  } finally {
+    t.kirim = false
+  }
 }
 
 async function onConfirmDelete(): Promise<void> {
@@ -241,10 +265,44 @@ onMounted(() => {
       :row="editing"
       :opsi-kategori="opsiKategori"
       :opsi-unit-satker="opsiUnitSatker"
-      :opsi-pegawai="opsiPegawai"
       :perlu-persetujuan="!adalahAdmin"
       @saved="onSaved"
     />
+
+    <DialogRoot v-model:open="tolak.open">
+      <DialogPortal>
+        <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
+        <DialogContent
+          class="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-panel focus:outline-none"
+        >
+          <DialogTitle class="text-h5 font-semibold text-slate-900">Tolak berita</DialogTitle>
+          <DialogDescription class="mb-3 text-sm text-slate-500">
+            Alasan dikirim ke penulis berita "{{ tolak.row?.judul }}".
+          </DialogDescription>
+          <form class="flex flex-col gap-3" novalidate data-testid="berita-tolak-form" @submit.prevent="onKirimTolak">
+            <label class="flex flex-col gap-1 text-body1 font-medium text-slate-700" for="berita-alasan">
+              Alasan penolakan
+              <textarea
+                id="berita-alasan"
+                v-model="tolak.alasan"
+                rows="4"
+                maxlength="1000"
+                class="w-full rounded-xl border border-slate-300 p-3 text-body1 font-normal text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary/50"
+                :aria-invalid="tolak.galat ? 'true' : undefined"
+                :aria-describedby="tolak.galat ? 'berita-alasan-galat' : undefined"
+              />
+            </label>
+            <p v-if="tolak.galat" id="berita-alasan-galat" class="text-body2 text-danger" role="alert">{{ tolak.galat }}</p>
+            <div class="flex justify-end gap-2">
+              <DialogClose as-child>
+                <UiButton variant="secondary" appearance="soft">Batal</UiButton>
+              </DialogClose>
+              <UiButton type="submit" :disabled="tolak.kirim">{{ tolak.kirim ? 'Mengirim...' : 'Tolak' }}</UiButton>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
 
     <ConfirmDialog
       v-model:open="confirm.open"

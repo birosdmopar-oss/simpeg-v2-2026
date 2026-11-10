@@ -53,7 +53,7 @@ export const beritaKelolaService = {
     return { items: (data?.items ?? []).map(mapBerita), total: data?.total ?? 0 }
   },
   async detail(id: string): Promise<BeritaForm> {
-    const { data } = await api.get<{ judul: string; id_kategori: number | string; isi?: string; publish_at?: string; target?: BeritaForm['target'] }>(
+    const { data } = await api.get<{ judul: string; id_kategori: number | string; isi?: string; publish_at?: string; target?: string }>(
       `/konten/berita/${id}`,
     )
     return {
@@ -61,7 +61,7 @@ export const beritaKelolaService = {
       id_kategori: String(data.id_kategori ?? ''),
       isi: data.isi ?? '',
       publish_at: data.publish_at ?? '',
-      target: data.target ?? { unit_satker: [], pegawai: [], kecuali: [] },
+      target: data.target ?? '',
     }
   },
   async create(form: BeritaForm): Promise<BeritaKelolaRow> {
@@ -73,8 +73,8 @@ export const beritaKelolaService = {
     return mapBerita(data)
   },
   /** Persetujuan (role 1): setuju / tolak (Q7-07/08). */
-  async proses(id: string, aksi: 'setuju' | 'tolak'): Promise<void> {
-    await api.post(`/konten/berita/${id}/proses`, { aksi })
+  async proses(id: string, aksi: 'setuju' | 'tolak', alasan?: string): Promise<void> {
+    await api.post(`/konten/berita/${id}/proses`, aksi === 'tolak' ? { aksi, alasan } : { aksi })
   },
   async remove(id: string): Promise<void> {
     await api.delete(`/konten/berita/${id}`)

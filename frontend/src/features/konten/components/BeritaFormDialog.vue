@@ -17,21 +17,19 @@ import UiButton from '@/shared/ui/UiButton.vue'
 
 import { beritaKelolaService } from '../services/kelolaTeks.service'
 import type { BeritaForm, BeritaKelolaRow } from '../types'
-import TargetPicker from './TargetPicker.vue'
 
 const props = defineProps<{
   open: boolean
   row: BeritaKelolaRow | null
   opsiKategori: SelectOption[]
   opsiUnitSatker: SelectOption[]
-  opsiPegawai: SelectOption[]
   /** Role 3: berita menunggu persetujuan. */
   perluPersetujuan?: boolean
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [row: BeritaKelolaRow] }>()
 
 const isEdit = computed(() => props.row !== null)
-const kosong = (): BeritaForm => ({ judul: '', id_kategori: '', isi: '', publish_at: '', target: { unit_satker: [], pegawai: [], kecuali: [] } })
+const kosong = (): BeritaForm => ({ judul: '', id_kategori: '', isi: '', publish_at: '', target: '' })
 const form = reactive<BeritaForm>(kosong())
 const submitting = ref(false)
 const submitted = ref(false)
@@ -63,9 +61,9 @@ const errors = computed(() => {
   if (form.id_kategori === '') e.id_kategori = 'Kategori wajib dipilih.'
   if (form.isi.trim() === '') e.isi = 'Isi berita wajib diisi.'
   if (form.publish_at === '') e.publish_at = 'Tanggal terbit wajib diisi.'
+  if (form.target === '') e.target = 'Target wajib dipilih.'
   return e
 })
-const targetKosong = computed(() => form.target.unit_satker.length === 0 && form.target.pegawai.length === 0)
 
 function err(f: string): string | undefined {
   return serverErrors.value[f] ?? (submitted.value ? errors.value[f] : undefined)
@@ -75,7 +73,7 @@ async function onSubmit(): Promise<void> {
   submitted.value = true
   formError.value = ''
   serverErrors.value = {}
-  if (Object.keys(errors.value).length > 0 || targetKosong.value || submitting.value) return
+  if (Object.keys(errors.value).length > 0 || submitting.value) return
   submitting.value = true
   try {
     const saved = props.row ? await beritaKelolaService.update(props.row.id, form) : await beritaKelolaService.create(form)
@@ -130,9 +128,18 @@ async function onSubmit(): Promise<void> {
             <p v-if="err('isi')" class="mt-1 text-body2 text-danger" role="alert">{{ err('isi') }}</p>
           </div>
 
-          <div :class="FORM_WIDE_CLASS">
-            <TargetPicker v-model="form.target" :opsi-unit-satker="opsiUnitSatker" :opsi-pegawai="opsiPegawai" :disabled="submitting" :invalid="submitted" />
-          </div>
+          <FormField
+            v-model="form.target"
+            name="target"
+            label="Target"
+            type="select"
+            required
+            placeholder="Pilih target"
+            :class="FORM_WIDE_CLASS"
+            hint="Seluruh kementerian, satu unit, atau satu satker."
+            :options="opsiUnitSatker.map((o) => ({ value: o.value, label: o.label }))"
+            :error="err('target')"
+          />
 
           <div :class="FORM_ACTIONS_CLASS">
             <DialogClose as-child>
