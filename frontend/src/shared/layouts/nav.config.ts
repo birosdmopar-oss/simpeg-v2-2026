@@ -66,6 +66,7 @@ import {
 } from '@/features/layanan/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
+import { KONTEN_ADMIN_ROLES, KONTEN_BERITA_ROLES } from '@/features/konten/roles'
 import { FASE_LONCENG, NOTIFIKASI_ROLES } from '@/features/notifikasi/roles'
 import {
   PENYESUAIAN_TUKIN_ROLES,
@@ -249,7 +250,25 @@ const NAV: NavGroup[] = [
   {
     key: 'berita',
     title: 'Berita',
-    items: [{ key: 'berita', label: 'Portal Berita', icon: Newspaper, phase: 7 }],
+    // Fase 7 konten admin (MAKE-079..082): phase 7 (tersembunyi sampai ACTIVE_PHASE >= 7, pola F7-14); QA lewat URL langsung.
+    items: [
+      { key: 'berita', label: 'Portal Berita', icon: Newspaper, to: { name: 'konten-berita' }, phase: 7 },
+      { key: 'konten-berita-kelola', label: 'Kelola Berita', icon: Newspaper, to: { name: 'konten-berita-kelola' }, roles: KONTEN_BERITA_ROLES, phase: 7 },
+      {
+        key: 'konten-admin',
+        label: 'Kelola Konten',
+        icon: Files,
+        roles: KONTEN_ADMIN_ROLES,
+        phase: 7,
+        children: [
+          { key: 'konten-popup', label: 'Popup', to: { name: 'konten-popup-kelola' } },
+          { key: 'konten-banner', label: 'Banner', to: { name: 'konten-banner-kelola' } },
+          { key: 'konten-berita-kategori', label: 'Kategori Berita', to: { name: 'konten-berita-kategori' } },
+          { key: 'konten-dibo', label: 'DIBO', to: { name: 'konten-dibo-kelola' } },
+          { key: 'konten-dibo-jenis', label: 'Jenis DIBO', to: { name: 'konten-dibo-jenis' } },
+        ],
+      },
+    ],
   },
   {
     key: 'pengaturan',

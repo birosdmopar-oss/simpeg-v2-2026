@@ -65,7 +65,7 @@ describe('buildNav — fase aktif 5 (penutup 5C Fase 5)', () => {
 
   it('menu fase 5+ tanpa `rilis` belum tampil untuk siapa pun', () => {
     const all = Object.values(Role).flatMap((r) => labels(r))
-    for (const later of ['Laporan', 'Arsip', 'E-Kinerja', 'E-Talenta', 'Portal Berita', 'Halo Simpeg']) {
+    for (const later of ['Laporan', 'Arsip', 'E-Kinerja', 'E-Talenta', 'Portal Berita', 'Kelola Berita', 'Kelola Konten', 'Halo Simpeg']) {
       expect(all).not.toContain(later)
     }
   })
