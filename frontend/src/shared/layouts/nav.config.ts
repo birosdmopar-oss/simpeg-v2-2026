@@ -17,6 +17,7 @@
 import {
   AlarmClock,
   BadgeCheck,
+  Bell,
   Briefcase,
   ClipboardCheck,
   Database,
@@ -65,6 +66,7 @@ import {
 } from '@/features/layanan/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
+import { FASE_LONCENG, NOTIFIKASI_ROLES } from '@/features/notifikasi/roles'
 import {
   PENYESUAIAN_TUKIN_ROLES,
   PRESENSI_ADMIN_ROLES,
@@ -130,7 +132,12 @@ export interface NavGroup {
 const NAV: NavGroup[] = [
   {
     key: 'main',
-    items: [{ key: 'home', label: 'Beranda', icon: House, to: { name: 'home' }, phase: 0 }],
+    items: [
+      { key: 'home', label: 'Beranda', icon: House, to: { name: 'home' }, phase: 0 },
+      // Fase 7 F-08 MAKE-085: Pusat Notifikasi (legacy menu Notifikasi / Butuh Approval / Histori Approval, Q7-29). Tetap
+      // `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7); lonceng topbar membuka halaman yang sama.
+      { key: 'notifikasi', label: 'Notifikasi', icon: Bell, to: '/notifikasi', roles: NOTIFIKASI_ROLES, phase: FASE_LONCENG },
+    ],
   },
   {
     key: 'kepegawaian',

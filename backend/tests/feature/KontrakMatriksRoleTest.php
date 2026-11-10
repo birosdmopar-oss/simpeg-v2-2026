@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -90,6 +90,15 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/dokumen/baperjakat/xlsx' => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)/pdf'      => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)/xlsx'     => [1, 3, 4, 5, 8],
+            // F-08 Pusat Notifikasi (MAKE-085, PRD Fase 7 v2.0 §6, Q7-29 ikut legacy): daftar/baca `hr/notification/index`
+            // = 2, 3, 6, 7 (`NC:12`); hapus = 1, 2, 6, 7 (`NC:120`); butuh approval & histori = 1, 2, 3 (`NC:39,68`);
+            // ringkasan lonceng = semua role login (`MY_Controller:20-175`).
+            'GET api/v1/notifikasi/ringkasan'          => self::JWT,
+            'GET api/v1/notifikasi/butuh-approval'     => [1, 2, 3],
+            'GET api/v1/notifikasi/histori-approval'   => [1, 2, 3],
+            'POST api/v1/notifikasi/baca'              => [2, 3, 6, 7],
+            'GET api/v1/notifikasi'                    => [2, 3, 6, 7],
+            'DELETE api/v1/notifikasi/([^/]+)/([^/]+)' => [1, 2, 6, 7],
             // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
             // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
             'GET api/v1/tb'                            => [1, 2, 3, 6],

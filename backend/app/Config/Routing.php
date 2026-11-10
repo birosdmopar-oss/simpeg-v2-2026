@@ -53,6 +53,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesSimapi.php',
         // Modul H Jalur A — endpoint kompatibilitas legacy `services/*` (MAKE-061 s_stat; s_dm A4; s_esign B4b), auth klienLayanan.
         APPPATH . 'Config/RoutesServices.php',
+        // Modul F Jalur C — Pusat Notifikasi & Inbox (Fase 7, MAKE-085): `api/v1/notifikasi*`.
+        APPPATH . 'Config/RoutesNotifikasi.php',
     ];
 
     /**
