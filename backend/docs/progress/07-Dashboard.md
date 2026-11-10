@@ -133,5 +133,7 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   `ProyeksiTandaJasa::prediksiPegawai`; KGB `RekomendasiKgb`; AK JF `AkPermenpanrb`); FE `PrediksiCards`.
 - Test: `PrediksiPegawaiTest` (6), `ProyeksiTandaJasaTest` (+8 next_tj), `HomeView.spec` (+6).
 - Tahap 2: `BawahanPegawai` + `BawahanCards` (presensi & AK bawahan atasan role 2); `BawahanPegawaiTest` (3), `HomeView.spec` (+3).
-- Sisa M2b: kelengkapan data (`kd_*` legacy — menunggu keputusan bug legacy), presensi hari ini (Q7-42), update FK PTT,
-  ulang tahun + `UiCarouselPanel` (menunggu jawaban sumber aturan).
+- Tahap 3: deviasi [V2] Tanda Jasa satker/unit + saklar rollback (Horii 10-11), fixture percepatan next_kp, tautan Presensi
+  Saya (Q7-42; komponen Fase 5 tidak ada), ulang tahun (`UlangTahunBeranda`, `dashboard/ulang-tahun` + foto Q-D19,
+  Config Q-D20) + `UiCarouselPanel`. Q7-44 dikoreksi: tautan update FK PTT legacy dikomentari → tidak dipasang.
+- Sisa M2: kelengkapan data (`kd_*`, Q-D13..D17 menunggu Horii), Q-D18 (pengecualian NIP ulang tahun), Q-D12.

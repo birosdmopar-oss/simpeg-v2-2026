@@ -151,7 +151,23 @@ Kode galat: 401 tanpa token.
 dengan `pmj.id_jabatan` ∈ `Config\Dashboard::$idJabatanDirektur` (Q7-38), satu baris per jabatan (TMT terbaru), urut TMT
 DESC; masa kerja sampai hari ini WIB ('' bila < 1 bulan). 401/403.
 
+### `GET api/v1/dashboard/ulang-tahun?hari=ini|besok` (jwt, role 1–8) — Q7-45
+
+`{"hari": "ini", "items": [{nip|null, nama, tanggal_lahir ("10 November 1985"), jenis_pegawai|null, jabatan, satker|null,
+khusus, ada_foto, foto_kunci}]}`. Aturan pemilihan [K] `helpers/function_helper.php:1419-1475` (getTodayBday/getTomorrowBday):
+bulan-hari `tgl_lahir` = hari ini/besok WIB, `pegawai.status = 1`, `pmj.id_satker` ∉ `Config\Dashboard::$idSatkerDikecualikanUlangTahun`
+([171]; tanpa snapshot jabatan ikut tersaring), satu baris per NIP, seluruh kementerian; urutan [I] NIP ASC. Field = view
+`dashboard_ad.php:250-298`; baris `nip = '1'` → `khusus` (nama, tanggal, `$labelJabatanNipSatu`). `hari` lain → 422.
+
+### `GET api/v1/dashboard/ulang-tahun/{nip}/foto` (jwt, role 1–8) — Q-D19
+
+Foto (`BiodataServiceInterface::fotoSistem`, tanpa cek lingkup PegawaiScope) HANYA bila `{nip}` ada di daftar ulang tahun hari
+ini atau besok; selain itu / tanpa foto → 404 seragam. Header sama dengan `pegawai/{nip}/foto` (`no-store`, `nosniff`).
+
 ### Butir terbuka
+
+- **Q-D18** (menunggu Horii): pengecualian NIP ulang tahun legacy (1 NIP hardcode + `NIP_TESTER` dari berkas terlarang) belum
+  diterapkan; titik sambung `UlangTahunBeranda::nipDikecualikan()` (kosong).
 
 - **Q-D12** (menunggu Horii): legacy `$whereHide_nip` tidak berlaku untuk beberapa akun tertentu (daftar id pengguna hardcode).
   Q7-41 hanya memuat daftar NIP; v2 saat ini memakai pengecualian untuk semua akun. Kunci `.env` tambahan belum dibuat.
@@ -159,6 +175,5 @@ DESC; masa kerja sampai hari ini WIB ('' bila < 1 bulan). 401/403.
   `Config\Dashboard::$tandaJasaIkutLegacy = true`. Rincian (a)–(d): `app/Libraries/Dashboard/README.md`.
 - **[I] KP satker/unit:** `get_kp_satker|unit` legacy menghitung percepatan juga untuk `gol_ruang` kosong; v2 memakai perilaku
   `get_all_kp` di semua lingkup (dicek saat QA).
-- **Ulang tahun** (`dashboard/ulang-tahun`, Q7-45): menunggu jawaban reviewer soal sumber aturan pemilihan.
 - **Kelengkapan data** (`kd_*` legacy): bug legacy perlu keputusan sebelum di-port (kd_rdiklat selalu ≥ 100, kd_rkgb/kd_rtj
   bisa > 100, kd_rpangkat_2 butuh kode lampiran dari berkas terlarang + loop tak berujung, syarat `id_jenis_pegawai = 1`).

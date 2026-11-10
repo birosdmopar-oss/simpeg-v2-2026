@@ -16,6 +16,9 @@ Kontrak endpoint: `app/Controllers/Api/Dashboard/README.md`; keputusan: `docs/fa
 - `RingkasanBeranda` — `GET dashboard/ringkasan`: keluarga admin = tile komposisi + status hari ini per lingkup (kementerian
   / satker / unit) dengan aturan hitung, letak pengecualian NIP (Q7-41), dan TB perpanjangan ikut `L_user::dashboard_sa|
   dashboard_satker|dashboard_unit` legacy; cache angka tetap lewat `CacheService`. Keluarga pegawai = kerangka (M2).
+- `PengingatBeranda` (4 kartu admin), `DirekturBeranda` (role 1/4), `PrediksiPegawai` + `BawahanPegawai` (beranda pegawai),
+  `UlangTahunBeranda` (Q7-45, aturan `function_helper.php:1419-1475`; urutan [I] NIP ASC; Q-D18 titik sambung kosong),
+  `ProyeksiTandaJasa` (port murni `get_all_tj` + `next_tj`).
 - Konfigurasi: `Config\Dashboard` (`$tampilanKomposisi` Q7-36, `$nipDisembunyikan` Q7-41 hanya `.env` server,
   `$idJabatanDirektur` Q7-38, `$ttlRingkasanDetik`).
 
