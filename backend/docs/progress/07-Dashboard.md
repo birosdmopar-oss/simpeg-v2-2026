@@ -132,4 +132,6 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - BE `PrediksiPegawai` (port `next_kp` sendiri karena `RekomendasiKp::deteksi`/`get_all_kp` hanya tahun berjalan; `next_tj` =
   `ProyeksiTandaJasa::prediksiPegawai`; KGB `RekomendasiKgb`; AK JF `AkPermenpanrb`); FE `PrediksiCards`.
 - Test: `PrediksiPegawaiTest` (6), `ProyeksiTandaJasaTest` (+8 next_tj), `HomeView.spec` (+6).
-- Sisa M2b: kelengkapan data (`kd_*` legacy, 9 fungsi), presensi & AK bawahan, presensi hari ini (Q7-42), update FK PTT.
+- Tahap 2: `BawahanPegawai` + `BawahanCards` (presensi & AK bawahan atasan role 2); `BawahanPegawaiTest` (3), `HomeView.spec` (+3).
+- Sisa M2b: kelengkapan data (`kd_*` legacy — menunggu keputusan bug legacy), presensi hari ini (Q7-42), update FK PTT,
+  ulang tahun + `UiCarouselPanel` (menunggu jawaban sumber aturan).
