@@ -17,6 +17,7 @@
 import {
   AlarmClock,
   BadgeCheck,
+  Bell,
   Briefcase,
   ClipboardCheck,
   Database,
@@ -31,6 +32,7 @@ import {
   MousePointerClick,
   Network,
   Newspaper,
+  Plug,
   Settings,
   TrendingUp,
   UserCheck,
@@ -42,6 +44,7 @@ import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
 import { DOKUMEN_ROLES } from '@/features/dokumen/types'
+import { INTEGRASI_ADMIN_ROLES } from '@/features/integrasi/integrasi.types'
 import {
   AK_JF_ROLES,
   BIODATA_PROSES_ROLES,
@@ -63,6 +66,7 @@ import {
 } from '@/features/layanan/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
+import { FASE_LONCENG, NOTIFIKASI_ROLES } from '@/features/notifikasi/roles'
 import {
   PENYESUAIAN_TUKIN_ROLES,
   PRESENSI_ADMIN_ROLES,
@@ -128,7 +132,12 @@ export interface NavGroup {
 const NAV: NavGroup[] = [
   {
     key: 'main',
-    items: [{ key: 'home', label: 'Beranda', icon: House, to: { name: 'home' }, phase: 0 }],
+    items: [
+      { key: 'home', label: 'Beranda', icon: House, to: { name: 'home' }, phase: 0 },
+      // Fase 7 F-08 MAKE-085: Pusat Notifikasi (legacy menu Notifikasi / Butuh Approval / Histori Approval, Q7-29). Tetap
+      // `phase: 7` (tersembunyi sampai ACTIVE_PHASE ≥ 7); lonceng topbar membuka halaman yang sama.
+      { key: 'notifikasi', label: 'Notifikasi', icon: Bell, to: '/notifikasi', roles: NOTIFIKASI_ROLES, phase: FASE_LONCENG },
+    ],
   },
   {
     key: 'kepegawaian',
@@ -252,6 +261,9 @@ const NAV: NavGroup[] = [
       { key: 'web-config', label: 'Web Config', icon: Settings, to: { name: 'web-config' }, roles: WEB_CONFIG_ROLES, phase: 2 },
       { key: 'hari-libur', label: 'Hari Libur', icon: CalendarDays, to: { name: 'hari-libur' }, roles: HARI_LIBUR_READ_ROLES, phase: 2 },
       { key: 'users', label: 'Manajemen Akun', icon: UserCog, to: { name: 'users' }, roles: USER_MANAGEMENT_ROLES, phase: 1 },
+      // MAKE-078 (ISSUE-058, PRD Fase 6 §6.2): Admin → Integrasi, role 1. Fase 6 sudah DONE tetapi ACTIVE_PHASE masih 5 →
+      // `rilis` (hapus saat ACTIVE_PHASE ≥ 6).
+      { key: 'integrasi', label: 'Integrasi', icon: Plug, to: { name: 'integrasi-admin' }, roles: INTEGRASI_ADMIN_ROLES, phase: 6, rilis: true },
     ],
   },
   {

@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -77,14 +77,28 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
 
             // Modul F — Fase 7 F-03 statistik (MAKE-036): Matriks Bagian 2 `hr/chart/unit_kerja`, `hr/chart/usia|jabatan|
             // gender|eselon|education|gol` = 1, 3, 4, 5, 8 (role 3 terbatas satker/unit di service, PegawaiScope).
-            'GET api/v1/statistik/lingkup'      => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)/xlsx' => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)'      => [1, 3, 4, 5, 8],
+            // F-13 beranda (MAKE-087, PRD Fase 7 v2.0 §6): semua akun login; bentuk respons per keluarga role.
+            'GET api/v1/dashboard/ringkasan'                => self::JWT,
+            'GET api/v1/dashboard/direktur'                 => [1, 4],
+            'GET api/v1/dashboard/ulang-tahun'              => self::JWT,
+            'GET api/v1/dashboard/ulang-tahun/([^/]+)/foto' => self::JWT,
+            'GET api/v1/statistik/lingkup'                  => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)/xlsx'             => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)'                  => [1, 3, 4, 5, 8],
             // F-09 generator dokumen (MAKE-037): Matriks Bagian 2 `hr/document/duk|nominatif|pensiun|baperjakat` = 1, 3, 4, 5, 8.
             'POST api/v1/dokumen/baperjakat/pdf'  => [1, 3, 4, 5, 8],
             'POST api/v1/dokumen/baperjakat/xlsx' => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)/pdf'      => [1, 3, 4, 5, 8],
             'GET api/v1/dokumen/([^/]+)/xlsx'     => [1, 3, 4, 5, 8],
+            // F-08 Pusat Notifikasi (MAKE-085, PRD Fase 7 v2.0 §6, Q7-29 ikut legacy): daftar/baca `hr/notification/index`
+            // = 2, 3, 6, 7 (`NC:12`); hapus = 1, 2, 6, 7 (`NC:120`); butuh approval & histori = 1, 2, 3 (`NC:39,68`);
+            // ringkasan lonceng = semua role login (`MY_Controller:20-175`).
+            'GET api/v1/notifikasi/ringkasan'          => self::JWT,
+            'GET api/v1/notifikasi/butuh-approval'     => [1, 2, 3],
+            'GET api/v1/notifikasi/histori-approval'   => [1, 2, 3],
+            'POST api/v1/notifikasi/baca'              => [2, 3, 6, 7],
+            'GET api/v1/notifikasi'                    => [2, 3, 6, 7],
+            'DELETE api/v1/notifikasi/([^/]+)/([^/]+)' => [1, 2, 6, 7],
             // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
             // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
             'GET api/v1/tb'                            => [1, 2, 3, 6],
@@ -208,6 +222,8 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/presensi/tukin/penyesuaian/([0-9]+)' => [1],
             // Fase 6 Jalur B MAKE-064 (H-10): tombol tarik ulang e-Kinerja hanya Super Admin (PRD Fase 6 §6.2).
             'POST api/v1/integrasi/bkn/tarik' => [1],
+            // MAKE-078 (ISSUE-058, F6-24): log integrasi halaman Admin → Integrasi — Super Admin saja.
+            'GET api/v1/integrasi/log' => [1],
             // MAKE-066 (H-04, F6-13): token push web — semua akun login.
             'POST api/v1/integrasi/fcm-token'   => self::JWT,
             'DELETE api/v1/integrasi/fcm-token' => self::JWT,

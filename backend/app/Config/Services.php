@@ -778,4 +778,30 @@ class Services extends BaseService
 
         return new StatusTugasBelajar();
     }
+
+    // Modul F Jalur C — Pusat Notifikasi F-08 (Fase 7, MAKE-085; PRD Fase 7 v2.0 §7).
+
+    /**
+     * Sumber notifikasi berita (F-07 Jalur A). NoOp sampai `SumberBerita` ada di `main`; Jalur A mengganti satu baris ini.
+     */
+    public static function sumberNotifikasiBerita(bool $getShared = true): \App\Interfaces\Notifikasi\SumberNotifikasiInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('sumberNotifikasiBerita');
+        }
+
+        return new \App\Libraries\Notifikasi\Pusat\SumberNotifikasiNoOp('berita');
+    }
+
+    /**
+     * Penghitung tiket Halo Simpeg untuk lonceng (Q8-06 = B, BP8-1). NoOp (null) sampai Fase 8.
+     */
+    public static function ringkasanTiket(bool $getShared = true): \App\Interfaces\Notifikasi\RingkasanTiketInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('ringkasanTiket');
+        }
+
+        return new \App\Libraries\Notifikasi\Pusat\RingkasanTiketNoOp();
+    }
 }

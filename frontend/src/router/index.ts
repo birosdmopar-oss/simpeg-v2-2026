@@ -11,12 +11,14 @@ import { passwordResetEnabled } from '@/features/auth/config'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
 import { dokumenRoutes } from '@/features/dokumen/routes.dokumen'
+import { integrasiRoutes } from '@/features/integrasi/routes.integrasi'
 import { pegawaiRoutes } from '@/features/kepegawaian/routes.pegawai'
 import { riwayatRoutes } from '@/features/kepegawaian/routes.riwayat'
 import { laporanRoutes } from '@/features/laporan/routes.laporan'
 import { layananRoutes } from '@/features/layanan/routes.layanan'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
+import { notifikasiRoutes } from '@/features/notifikasi/routes.notifikasi'
 import { presensiRoutes } from '@/features/presensi/routes.presensi'
 
 declare module 'vue-router' {
@@ -110,6 +112,10 @@ const routes: RouteRecordRaw[] = [
   ...laporanRoutes,
   // Modul F — Fase 7 F-09 generator dokumen (MAKE-037).
   ...dokumenRoutes,
+  // Modul F — Fase 7 F-08 Pusat Notifikasi (MAKE-085).
+  ...notifikasiRoutes,
+  // Modul H — Fase 6 Admin → Integrasi: log integrasi + tarik ulang e-Kinerja (MAKE-078, ISSUE-058).
+  ...integrasiRoutes,
   // Modul D — Fase 5A Presensi & Slip Gaji (MAKE-034), termasuk rute publik `/verify/slip/:token`.
   ...presensiRoutes,
   // Modul C — Fase 4 Layanan & Approval (MAKE-026): route ditambah per paket di routes.layanan.ts.
