@@ -21,6 +21,13 @@ export interface TileBeranda {
   persen: number
 }
 
+/** Kartu pengingat `dashboard_ad.php:8-37`: Pensiun, Naik Pangkat, Tanda Jasa, KGB. */
+export interface KartuPengingat {
+  kode: 'pensiun' | 'kp' | 'tj' | 'kgb'
+  label: string
+  jumlah: number
+}
+
 export interface RingkasanAdmin {
   keluarga: 'admin'
   lingkup: { jenis: 'kementerian' | 'satker' | 'unit'; id: number | null }
@@ -29,8 +36,19 @@ export interface RingkasanAdmin {
   /** Tanggal bisnis WIB `YYYY-MM-DD` yang dipakai angka "hari ini". */
   tanggal: string
   total_aktif: number
+  pengingat: KartuPengingat[]
   tile: TileBeranda[]
 }
+
+/** Baris tabel "Masa Kerja Direktur Politeknik" (role 1/4, `GET /dashboard/direktur`). */
+export interface DirekturPoliteknik {
+  nama: string
+  politeknik: string
+  masa_kerja: string
+}
+
+/** Tabel direktur hanya role 1 & 4 [K `dashboard_ad.php:201`]. */
+export const DIREKTUR_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_VIEW_ESELON1]
 
 /** Kerangka M1: kartu prediksi/kelengkapan/bawahan menyusul (M2). */
 export interface RingkasanPegawai {

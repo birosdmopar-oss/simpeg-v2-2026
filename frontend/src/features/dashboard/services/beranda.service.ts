@@ -4,11 +4,16 @@
  */
 import { api } from '@/lib/axios'
 
-import type { RingkasanBeranda } from '../types'
+import type { DirekturPoliteknik, RingkasanBeranda } from '../types'
 
 export const berandaService = {
   async ringkasan(): Promise<RingkasanBeranda> {
     const { data } = await api.get<RingkasanBeranda>('/dashboard/ringkasan')
     return data
+  },
+
+  async direktur(): Promise<DirekturPoliteknik[]> {
+    const { data } = await api.get<{ items: DirekturPoliteknik[] }>('/dashboard/direktur')
+    return data.items
   },
 }

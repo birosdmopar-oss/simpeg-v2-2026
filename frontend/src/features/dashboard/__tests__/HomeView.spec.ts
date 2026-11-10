@@ -2,16 +2,19 @@
  * MAKE-087 (F-13 M1) — beranda per keluarga role: admin 1/3/4/5/8 → AdminDashboard dengan komposisi pegawai mode `donut`
  * (donut + tile status hari ini) atau `angka` (semua tile berurutan legacy + bar persen, tanpa chart; Q7-36); pegawai
  * 2/6/7 → PegawaiDashboard; galat memuat tampil tanpa merusak sapaan (`home-role` MTC-001 tetap ada).
+ * M2a: 4 kartu pengingat (label legacy, hanya Pensiun bertautan ke /dokumen/pensiun — Q7-37), kartu Butuh Approval hanya
+ * role 1/3 di keluarga admin ("—" sampai ringkasan Jalur C tersedia), tabel direktur hanya role 1/4 (+ galat lokal).
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { AxiosError } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/beranda.service', () => ({ berandaService: { ringkasan: vi.fn() } }))
+vi.mock('../services/beranda.service', () => ({ berandaService: { ringkasan: vi.fn(), direktur: vi.fn() } }))
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role, type RoleCode, type User } from '@/features/auth/types'
+import router from '@/router'
 
 import { berandaService } from '../services/beranda.service'
 import type { RingkasanAdmin, TileBeranda } from '../types'
@@ -25,6 +28,12 @@ const admin = (tampilan: RingkasanAdmin['tampilan_komposisi']): RingkasanAdmin =
   tampilan_komposisi: tampilan,
   tanggal: '2026-11-10',
   total_aktif: 1200,
+  pengingat: [
+    { kode: 'pensiun', label: 'Pensiun', jumlah: 12 },
+    { kode: 'kp', label: 'Naik Pangkat', jumlah: 1340 },
+    { kode: 'tj', label: 'Tanda Jasa', jumlah: 7 },
+    { kode: 'kgb', label: 'KGB', jumlah: 0 },
+  ],
   tile: [
     tile('pns', 'Total PNS', 'komposisi', 1000, 83),
     tile('ptt', 'Total PTT', 'komposisi', 100, 8),
@@ -43,13 +52,73 @@ const admin = (tampilan: RingkasanAdmin['tampilan_komposisi']): RingkasanAdmin =
 async function mountAs(role: RoleCode) {
   setActivePinia(createPinia())
   useAuthStore().user = { username: 'uji', user_level: role } as User
-  const wrapper = mount(HomeView, { global: { stubs: { RedesignShell: { template: '<div><slot /></div>' } } } })
+  const wrapper = mount(HomeView, { global: { plugins: [router], stubs: { RedesignShell: { template: '<div><slot /></div>' } } } })
   await flushPromises()
   return wrapper
 }
 
 beforeEach(() => {
   vi.mocked(berandaService.ringkasan).mockReset()
+  vi.mocked(berandaService.direktur).mockReset().mockResolvedValue([
+    { nama: 'Dr. Direktur Fixture, M.Par.', politeknik: 'Politeknik Fixture', masa_kerja: '2 Tahun 3 Bulan' },
+    { nama: 'Direktur Baru', politeknik: 'Politeknik Lain', masa_kerja: '' },
+  ])
+})
+
+describe('HomeView — kartu admin M2a', () => {
+  it('4 kartu pengingat berlabel legacy; hanya Pensiun bertautan ke Proyeksi Pensiun', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
+    const wrapper = await mountAs(Role.SUPER_ADMIN)
+
+    const kartu = wrapper.findAll('[data-testid^="beranda-pengingat-"]')
+    expect(kartu.map((k) => k.text())).toEqual(['12Pensiun', '1.340Naik Pangkat', '7Tanda Jasa', '0KGB'])
+    expect(wrapper.get('[data-testid="beranda-pengingat-pensiun"] a').attributes('href')).toBe('/dokumen/pensiun')
+    for (const kode of ['kp', 'tj', 'kgb']) {
+      expect(wrapper.find(`[data-testid="beranda-pengingat-${kode}"] a`).exists()).toBe(false)
+    }
+  })
+
+  it.each([
+    [Role.SUPER_ADMIN, true, true],
+    [Role.ADMIN_SATKER, true, false],
+    [Role.ADMIN_VIEW_ESELON1, false, true],
+    [Role.MENTERI, false, false],
+    [Role.PIMPINAN, false, false],
+  ])('role %i: Butuh Approval %s, tabel direktur %s', async (role, approval, direktur) => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
+    const wrapper = await mountAs(role)
+
+    expect(wrapper.find('[data-testid="beranda-butuh-approval"]').exists()).toBe(approval)
+    expect(wrapper.find('[data-testid="beranda-direktur"]').exists()).toBe(direktur)
+    expect(berandaService.direktur).toHaveBeenCalledTimes(direktur ? 1 : 0)
+  })
+
+  it('Butuh Approval "—" tanpa tautan selama ringkasan Jalur C belum tersedia', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
+    const wrapper = await mountAs(Role.SUPER_ADMIN)
+
+    const kartu = wrapper.get('[data-testid="beranda-butuh-approval"]')
+    expect(kartu.text()).toContain('—')
+    expect(kartu.text()).toContain('Butuh Approval')
+    expect(kartu.find('a').exists()).toBe(false)
+  })
+
+  it('tabel direktur: Nama, Politeknik, Masa Kerja ("—" bila kosong)', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
+    const wrapper = await mountAs(Role.SUPER_ADMIN)
+
+    expect(wrapper.get('[data-testid="beranda-direktur-0"]').findAll('td').map((t) => t.text())).toEqual(['Dr. Direktur Fixture, M.Par.', 'Politeknik Fixture', '2 Tahun 3 Bulan'])
+    expect(wrapper.get('[data-testid="beranda-direktur-1"]').findAll('td')[2]?.text()).toBe('—')
+  })
+
+  it('galat tabel direktur hanya di kartunya', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
+    vi.mocked(berandaService.direktur).mockRejectedValue({ status: 500, message: 'Gagal.', errors: null, isNetworkError: false, original: new AxiosError('x') })
+    const wrapper = await mountAs(Role.SUPER_ADMIN)
+
+    expect(wrapper.get('[data-testid="beranda-direktur"] [role="alert"]').text()).toBe('Gagal.')
+    expect(wrapper.find('[data-testid="beranda-pengingat"]').exists()).toBe(true)
+  })
 })
 
 describe('HomeView — keluarga admin', () => {

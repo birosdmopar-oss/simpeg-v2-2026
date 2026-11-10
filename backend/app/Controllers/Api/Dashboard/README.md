@@ -110,6 +110,7 @@ Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
   "tampilan_komposisi": "donut|angka",
   "tanggal": "2026-11-10",
   "total_aktif": 1200,
+  "pengingat": [{"kode": "pensiun", "label": "Pensiun", "jumlah": 12}, {"kode": "kp", "label": "Naik Pangkat", "jumlah": 40}, "..."],
   "tile": [{"kode": "pns", "label": "Total PNS", "kelompok": "komposisi", "jumlah": 1000, "persen": 83}, "..."]
 }}
 ```
@@ -126,6 +127,25 @@ Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
   Data sama untuk kedua mode.
 - Cache: angka komposisi/total/CLTN per lingkup `ttlRingkasanDetik` (bawaan 900); TB/IB/cuti/presensi online selalu baru.
 
+- `pengingat` (M2): 4 kartu `dashboard_ad.php:8-37` — `pensiun`, `kp` (Naik Pangkat), `tj` (Tanda Jasa), `kgb` — ikut
+  `L_user::dashboard_*` + `L_employee::get_*` per lingkup (rincian `PengingatBeranda`): Pensiun/KP tahun berjalan (PNS); KGB
+  ≤ tahun berjalan (kementerian PNS+PPPK, satker/unit PNS); Tanda Jasa kementerian ≤ tahun acuan (tahun depan bila bulan ≥ 9),
+  satker/unit tepat 1 Agustus tahun berjalan/depan. Tanpa pengecualian NIP. Cache per lingkup + tanggal.
+
 **Pegawai (role 2/6/7)** — kerangka M1: `{"keluarga": "pegawai"}`; kartu prediksi, kelengkapan data, bawahan di M2.
 
 Kode galat: 401 tanpa token.
+
+### `GET api/v1/dashboard/direktur` (role 1, 4)
+
+`{"items": [{"nama": "Dr. Nama, M.Par.", "politeknik": "Politeknik …", "masa_kerja": "2 Tahun 3 Bulan"}]}` — pegawai aktif
+dengan `pmj.id_jabatan` ∈ `Config\Dashboard::$idJabatanDirektur` (Q7-38), satu baris per jabatan (TMT terbaru), urut TMT
+DESC; masa kerja sampai hari ini WIB ('' bila < 1 bulan). 401/403.
+
+### Butir terbuka
+
+- **Q-D12** (menunggu Horii): legacy `$whereHide_nip` tidak berlaku untuk beberapa akun tertentu (daftar id pengguna hardcode).
+  Q7-41 hanya memuat daftar NIP; v2 saat ini memakai pengecualian untuk semua akun. Kunci `.env` tambahan belum dibuat.
+- **[I] KP satker/unit:** `get_kp_satker|unit` legacy menghitung percepatan juga untuk `gol_ruang` kosong; v2 memakai perilaku
+  `get_all_kp` di semua lingkup (dicek saat QA).
+- **Ulang tahun** (`dashboard/ulang-tahun`, Q7-45): menunggu jawaban reviewer soal sumber aturan pemilihan.
