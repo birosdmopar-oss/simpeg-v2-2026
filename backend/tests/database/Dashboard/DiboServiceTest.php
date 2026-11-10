@@ -256,6 +256,84 @@ final class DiboServiceTest extends DatabaseTestCase
         $svc->setStatus($this->admin, $r['id'], '10');
     }
 
+    public function testIndeksBerkasDiLuarSatuSampaiTigaMenghasilkan404(): void
+    {
+        $svc = $this->service();
+        $r   = $svc->buat($this->admin, $this->input(), [1 => $this->pdf()]);
+
+        foreach ([0, 4, -1, 99, PHP_INT_MAX] as $no) {
+            try {
+                $svc->bacaBerkas($this->admin, $r['id'], $no);
+                $this->fail("Harus 404 untuk indeks {$no}");
+            } catch (NotFoundException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
+        // indeks sah tetapi berkas tidak ada → 404 juga
+        $this->expectException(NotFoundException::class);
+        $svc->bacaBerkas($this->admin, $r['id'], 3);
+    }
+
+    public function testKunciBerkasRusakTidakBisaMenembusPath(): void
+    {
+        $svc = $this->service();
+        $r   = $svc->buat($this->admin, $this->input(), [1 => $this->pdf()]);
+
+        // berkas "rahasia" DI LUAR akar penyimpanan
+        $luar = dirname($this->akar) . '/luar_' . bin2hex(random_bytes(4)) . '.pdf';
+        file_put_contents($luar, "%PDF-1.4\nRAHASIA\n%%EOF\n");
+        $this->tmp[] = $luar;
+        $nama        = basename($luar);
+
+        foreach (['../' . basename($this->akar) . '/../' . $nama, '../' . $nama, 'dibo/../../' . $nama, '/etc/passwd', 'C:/Windows/win.ini', "dibo/x.pdf\0.png", $luar] as $jahat) {
+            $this->db->table('dibo')->where('id_dibo', $r['id'])->update(['file_1' => $jahat]);
+
+            try {
+                $hasil = $svc->bacaBerkas($this->admin, $r['id'], 1);
+                $this->fail('Kunci "' . addcslashes($jahat, "\0") . '" tidak boleh terbaca: ' . substr($hasil['isi'], 0, 20));
+            } catch (NotFoundException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testNamaUnduhanTidakPernahMemuatEkstensiBerbahaya(): void
+    {
+        $svc  = $this->service();
+        $r    = $svc->buat($this->admin, $this->input(), [1 => $this->pdf()]);
+        $baca = $svc->bacaBerkas($this->admin, $r['id'], 1);
+
+        $this->assertMatchesRegularExpression('/^dibo-' . $r['id'] . '-1\.pdf\z/', $baca['nama']);
+        $this->assertDoesNotMatchRegularExpression('/[\r\n";\\\\\/ ]/', $baca['nama']);
+    }
+
+    /**
+     * @dataProvider provBerkasPalsu
+     */
+    public function testBerkasPalsuDitolak(string $isi, string $ekstensi): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->service()->buat($this->admin, $this->input(), [1 => $this->berkas($isi, $ekstensi)]);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function provBerkasPalsu(): iterable
+    {
+        yield 'PHP bernama .pdf' => ["<?php system('id');", 'pdf'];
+        yield 'HTML+script bernama .pdf' => ['<html><script>alert(1)</script></html>', 'pdf'];
+        yield 'HTML bernama .docx' => ['<html><body>x</body></html>', 'docx'];
+        yield 'PDF bernama .xlsx (isi != ekstensi)' => ["%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF\n", 'xlsx'];
+        yield 'ZIP polos bernama .docx' => ["PK\x03\x04" . str_repeat("\0", 64), 'docx'];
+        yield 'teks bernama .doc' => ['hanya teks biasa', 'doc'];
+        yield 'ekstensi ganda .php.pdf berisi PHP' => ['<?php echo 1;', 'php.pdf'];
+        yield 'ekstensi terlarang .php' => ["%PDF-1.4\n%%EOF\n", 'php'];
+        yield 'ekstensi terlarang .html' => ["%PDF-1.4\n%%EOF\n", 'html'];
+        yield 'berkas kosong' => ['', 'pdf'];
+    }
+
     // ------------------------------------------------------------------
 
     private function service(): DiboService

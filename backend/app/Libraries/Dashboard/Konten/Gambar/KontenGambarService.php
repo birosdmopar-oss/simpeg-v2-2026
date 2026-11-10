@@ -8,6 +8,7 @@ use App\Constants\Role;
 use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use App\Libraries\Dashboard\Konten\NamaBerkas;
 use App\Libraries\Dashboard\Konten\Penargetan\PemekarTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\SinkronPenerima;
 use App\Libraries\Dashboard\Konten\Penargetan\SpesifikasiTarget;
@@ -384,7 +385,7 @@ final class KontenGambarService
             throw new NotFoundException('Gambar tidak ditemukan.');
         }
 
-        $ext = strtolower(pathinfo($kunci, PATHINFO_EXTENSION));
+        $ext = NamaBerkas::ekstensi($kunci);
 
         return ['isi' => $this->gambar->baca($kunci), 'mime' => self::MIME[$ext] ?? 'application/octet-stream', 'nama' => $this->jenis->value . '-' . $id . '.' . $ext];
     }

@@ -9,6 +9,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Dashboard\Konten\NamaBerkas;
 use App\Libraries\ListQuery;
 use App\Models\Konten\NewsModel;
 use Closure;
@@ -380,7 +381,7 @@ final class BeritaService
             throw new NotFoundException('Lampiran tidak ditemukan.');
         }
 
-        $ext = strtolower(pathinfo((string) $r['lampiran'], PATHINFO_EXTENSION));
+        $ext = NamaBerkas::ekstensi((string) $r['lampiran']);
 
         return [
             'isi'  => $this->lampiran->baca((string) $r['lampiran']),
@@ -474,7 +475,7 @@ final class BeritaService
             return null;
         }
 
-        $ext = strtolower(pathinfo($kunci, PATHINFO_EXTENSION));
+        $ext = NamaBerkas::ekstensi($kunci);
 
         return [
             'nama' => 'lampiran-berita-' . $r['id_news'] . '.' . $ext,

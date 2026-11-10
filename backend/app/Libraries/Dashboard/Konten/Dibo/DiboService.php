@@ -9,6 +9,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Dashboard\Konten\NamaBerkas;
 use App\Libraries\ListQuery;
 use App\Models\Konten\DiboModel;
 use CodeIgniter\Database\BaseBuilder;
@@ -153,7 +154,7 @@ final class DiboService
             throw new NotFoundException('Berkas tidak ditemukan.');
         }
 
-        $ext = strtolower(pathinfo($kunci, PATHINFO_EXTENSION));
+        $ext = NamaBerkas::ekstensi($kunci);
 
         return [
             'isi'  => $this->berkas->baca($kunci),

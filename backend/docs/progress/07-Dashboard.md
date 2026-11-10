@@ -220,3 +220,10 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   nomor|tentang + paginasi. Status 1 aktif / 2 dicabut [K] / 10 dihapus [V2: hapus lunak, berkas dipertahankan, bisa dipulihkan]. Audit Q7-16 otomatis.
 - Test: `DiboServiceTest` (8), `DiboEndpointTest` (3), `KontrakMatriksRoleTest` (+6 baris); FE `KelolaTeks.spec` + `BeritaLampiran.spec` (multipart DIBO).
 - Tidak dibawa/menunggu: duplikat jenis+nomor+tahun tidak dicek (legacy juga tidak; anomali dicatat M0 §4.2).
+
+- **Self-review keamanan unggah/unduh (Jalur A, 10-11)** — popup/banner, lampiran berita, DIBO: (1) indeks berkas DIBO di luar 1..3 (termasuk 0, -1, 99, 2^32) → 404 (service + HTTP); (2) kunci
+  penyimpanan di DB yang rusak/diubah (`../`, `dibo/../../x`, path absolut, byte nol) tidak bisa membaca berkas di luar akar — TEMUAN: adapter melempar
+  `InvalidArgumentException` sehingga hasilnya 500; kini `ada()` pada `PenyimpananGambar/Lampiran/Dibo` menganggap kunci tak valid = tidak ada → 404; (3) nama unduhan
+  hanya dari id angka + ekstensi `[a-z0-9]{1,5}` (selain itu `bin`) lewat `NamaBerkas::ekstensi()` — CR/LF, kutip, titik-koma, garis miring tidak pernah masuk header;
+  (4) berkas palsu ditolak 422 (PHP/HTML/SVG berskrip/PDF yang menyamar .pdf/.png/.docx, ekstensi terlarang .php/.html/.svg, ZIP polos bernama .docx, berkas kosong). Test:
+  `NamaBerkasTest` (13), `DiboServiceTest` (+3 skenario, 10 kasus palsu), `BeritaLampiranTest` (+3), `KontenGambarKeamananTest` (baru), `DiboEndpointTest` (+indeks).

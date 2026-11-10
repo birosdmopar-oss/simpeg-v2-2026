@@ -191,6 +191,59 @@ final class BeritaLampiranTest extends DatabaseTestCase
         $this->assertSame('2026-11-01 01:30:00', (string) $this->db->table('news')->where('id_news', $id)->get()->getRow()->publish_at, 'disimpan UTC');
     }
 
+    public function testKunciLampiranRusakTidakBisaMenembusPath(): void
+    {
+        $svc = $this->service();
+        $r   = $svc->buat($this->admin, $this->input(), $this->png());
+
+        $luar = dirname($this->akar) . '/luar_' . bin2hex(random_bytes(4)) . '.pdf';
+        file_put_contents($luar, "%PDF-1.4\nRAHASIA\n%%EOF\n");
+        $this->tmp[] = $luar;
+
+        foreach (['../' . basename($luar), 'berita/../../' . basename($luar), '/etc/passwd', $luar] as $jahat) {
+            $this->db->table('news')->where('id_news', $r['id'])->update(['lampiran' => $jahat]);
+
+            try {
+                $svc->bacaLampiran($this->admin, $r['id']);
+                $this->fail('Kunci tidak boleh terbaca: ' . $jahat);
+            } catch (NotFoundException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testNamaUnduhanLampiranAman(): void
+    {
+        $r = $this->service()->buat($this->admin, $this->input(), $this->pdf());
+        $b = $this->service()->bacaLampiran($this->admin, $r['id']);
+
+        $this->assertSame('lampiran-berita-' . $r['id'] . '.pdf', $b['nama']);
+        $this->assertDoesNotMatchRegularExpression('/[\r\n";\\\\\/ ]/', $b['nama']);
+    }
+
+    /**
+     * @dataProvider provBerkasPalsu
+     */
+    public function testLampiranPalsuDitolak(string $isi, string $ekstensi): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->service()->buat($this->admin, $this->input(), $this->berkas($isi, $ekstensi));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function provBerkasPalsu(): iterable
+    {
+        yield 'PHP bernama .png' => ["<?php system('id');", 'png'];
+        yield 'HTML+script bernama .pdf' => ['<html><script>alert(1)</script></html>', 'pdf'];
+        yield 'SVG berskrip bernama .png' => ['<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>', 'png'];
+        yield 'PDF bernama .png (isi != ekstensi)' => ["%PDF-1.4\n%%EOF\n", 'png'];
+        yield 'ekstensi terlarang .svg' => ['<svg xmlns="http://www.w3.org/2000/svg"/>', 'svg'];
+        yield 'ekstensi terlarang .html' => ['<html></html>', 'html'];
+        yield 'berkas kosong' => ['', 'pdf'];
+    }
+
     // ------------------------------------------------------------------
 
     private function service(): BeritaService

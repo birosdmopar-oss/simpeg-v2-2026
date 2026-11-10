@@ -108,6 +108,9 @@ final class DiboEndpointTest extends DatabaseTestCase
         $this->assertStringStartsWith('%PDF', $ok->response()->getBody());
 
         $this->asRole(Role::PEGAWAI)->get("api/v1/konten/dibo/{$this->idAktif}/berkas/2")->assertStatus(404);
+        foreach ([0, 4, 99, 4294967296] as $no) {
+            $this->asRole(Role::SUPER_ADMIN)->get("api/v1/konten/dibo/{$this->idAktif}/berkas/{$no}")->assertStatus(404);
+        }
         $this->asRole(Role::PEGAWAI)->get("api/v1/konten/dibo/{$this->idDicabut}/berkas/1")->assertStatus(404);
         $this->asRole(Role::SUPER_ADMIN)->get("api/v1/konten/dibo/{$this->idDicabut}/berkas/1")->assertStatus(200);
 

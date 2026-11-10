@@ -10,6 +10,7 @@ use App\Libraries\Kepegawaian\Lampiran\ValidasiBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Konten;
+use InvalidArgumentException;
 
 /**
  * Lampiran berita (PRD Fase 7 v2.0 Q7-14; legacy `L_news.php:282-340,489-545`): satu berkas JPG/JPEG/PNG/GIF/PDF ≤ 5 MB
@@ -54,9 +55,17 @@ final class PenyimpananLampiran
         return $kunci;
     }
 
+    /**
+     * Kunci tidak valid (mis. `../`, segmen terlarang, byte nol — hanya mungkin bila kolom di DB rusak/diubah) = berkas tidak ada,
+     * bukan galat 500: adapter melempar InvalidArgumentException untuk path di luar aturannya.
+     */
     public function ada(string $kunci): bool
     {
-        return $this->adapter->ada($kunci);
+        try {
+            return $this->adapter->ada($kunci);
+        } catch (InvalidArgumentException) {
+            return false;
+        }
     }
 
     public function baca(string $kunci): string

@@ -10,6 +10,7 @@ use App\Libraries\Kepegawaian\Lampiran\ValidasiBerkas;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Konten;
+use InvalidArgumentException;
 
 /**
  * Berkas DIBO `file_1..3` (PRD Fase 7 v2.0 Q7-14; legacy `L_dibo.php:77-270,598-608`): PDF/XLS/XLSX/DOC/DOCX ≤ 5 MB, tipe dari
@@ -57,9 +58,17 @@ final class PenyimpananDibo
         return $kunci;
     }
 
+    /**
+     * Kunci tidak valid (mis. `../`, segmen terlarang, byte nol — hanya mungkin bila kolom di DB rusak/diubah) = berkas tidak ada,
+     * bukan galat 500: adapter melempar InvalidArgumentException untuk path di luar aturannya.
+     */
     public function ada(string $kunci): bool
     {
-        return $this->adapter->ada($kunci);
+        try {
+            return $this->adapter->ada($kunci);
+        } catch (InvalidArgumentException) {
+            return false;
+        }
     }
 
     public function baca(string $kunci): string
