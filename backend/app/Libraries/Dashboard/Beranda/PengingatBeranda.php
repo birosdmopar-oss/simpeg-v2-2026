@@ -146,7 +146,7 @@ final class PengingatBeranda
         $kementerian = $lingkup['jenis'] === RingkasanBeranda::LINGKUP_KEMENTERIAN;
         $acuanKem    = $bulan >= 9 ? $tahun + 1 : $tahun;
         // Satker/unit: [K] legacy proyeksi selalu tahun berjalan; [V2] bawaan (Horii 10-11-2026) sama dengan kementerian.
-        $ikutLegacy = ! $kementerian && ($this->config?->tandaJasaIkutLegacy ?? false);
+        $ikutLegacy = ! $kementerian && ($this->config->tandaJasaIkutLegacy ?? false);
         $acuan      = $ikutLegacy ? $tahun : $acuanKem;
 
         $b = $this->db->table('pegawai peg')
