@@ -89,6 +89,15 @@ final class SanitasiBeritaTest extends CIUnitTestCase
         $this->assertStringContainsString('Isi', $bersih);
     }
 
+    public function testScriptIframeDanTagAktifLainDibuang(): void
+    {
+        $bersih = (new SanitasiBerita())->bersihkan('<p>awal</p><iframe src="https://jahat.test"></iframe><script>alert(1)</script><object data="x"></object><embed src="x"><form action="x"><input name="a"></form><svg onload="x()"></svg><style>p{color:red}</style><p>akhir</p>');
+
+        $this->assertDoesNotMatchRegularExpression('/<(iframe|script|object|embed|form|input|svg|style)\b|alert|jahat|onload/i', $bersih);
+        $this->assertStringContainsString('awal', $bersih);
+        $this->assertStringContainsString('akhir', $bersih);
+    }
+
     public function testAdaIsiDanRingkasan(): void
     {
         $this->assertFalse(SanitasiBerita::adaIsi('<p></p>'));
