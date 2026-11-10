@@ -17,17 +17,17 @@ klien). Rahasia klien layanan uji ditulis skrip ke `KLIEN_QA_F6.md` di folder de
 
 | Kode | Data | Untuk bagian |
 |---|---|---|
-| Akun | akun demo Fase 4 (`demo.admin` 1, `demo.pemohon`, `demo.atasan`, `demo.pyb`, `demo.pegawai`, `demo.eselon1` 4, `demo.pimpinan` 8, dst.) + akun sistem `sistem.integrasi` (dibuat `integrasi:siapkan-akun-sistem`) | semua |
+| Akun | akun demo Fase 4 (`demo.admin` 1, `demo.pemohon`, `demo.atasan`, `demo.pyb`, `demo.pegawai`, dst.; `demo.admin`/`demo.eselon1`/`demo.menteri`/`demo.pimpinan`/`demo.satker` = akun peran tanpa NIP) + akun sistem `sistem.integrasi` (dibuat `integrasi:siapkan-akun-sistem`) | semua |
 | K1 | Klien `qa.simapi` — jenis 2 (SIMAPI baru), hak `simapi`, tanpa allowlist | F |
 | K2 | Klien `qa.lama` — jenis 1 (SIMAPI lama), hak `simapi`, allowlist `127.0.0.1` (Q6-41 IP wajib) | G |
 | K3 | Klien `qa.mudig` — jenis 3, hak `stat,dm,esign`, tanpa allowlist | C5, H |
 | K4 | Klien `qa.nonaktif` — jenis 3, hak `stat`, lalu dinonaktifkan | A |
 | K5 | Klien `qa.ipsalah` — jenis 3, hak `stat`, allowlist `203.0.113.0/24` (bukan IP demo) | A |
-| C6 | Cuti Tahunan `demo.pegawai` menunggu AL; AL = pegawai `demo.eselon1` (role 4), PyB = pegawai `demo.pimpinan` (role 8) → keduanya tak terjangkau, menu atas nama tersedia; NIK PyB diisi sintetis | C3 (Q6-40) |
+| C6 | Cuti Tahunan `demo.pegawai` menunggu AL; AL = `demo.atasan` (memproses sendiri), PyB = pegawai demo **tanpa akun** (dipilih skrip, tak terjangkau → menu atas nama untuk `demo.admin` di tahap PyB); NIK sintetis PyB diisi bila kosong. `demo.pyb` tidak dipakai karena terjangkau | C3 (Q6-40) |
 | C7 | Cuti Tahunan `demo.pemohon` final (disetujui PyB sendiri), belum ber-TTE | C1, C2 |
 | T6 | TB `demo.pppk` disetujui, rentang sudah berakhir, `pegawai.id_jenis_status` = 2 (status usang) | L |
 | S6 | Pegawai `demo.ptt` `id_jenis_status` = 3 tanpa CLTN pendukung (isian manual) | L |
-| L6 | LKH `demo.pegawai` bulan lalu status 0 (2 baris) + 1 baris status 3 (revisi) | M |
+| L6 | LKH `demo.pegawai` bulan lalu status 0 (2 baris) + 1 baris status 3 (revisi), atasan `demo.atasan` | M |
 
 Isi kolom Hasil: ✅ lolos / ❌ gagal (+ nomor temuan di §T) / — tidak berlaku. Bukti: keluaran perintah (tanpa rahasia), tangkapan
 layar UI, atau isi baris DB demo yang relevan (tanpa NIK/NIP di laporan).
@@ -68,7 +68,7 @@ Bentuk header token SIMAPI mengikuti legacy (elemen kedua header `Authorization`
 |---|---|---|---|---|
 | C1 | 02.6 | `demo.pyb` → Cuti → C7 ⋮ "Tanda tangani" → cek sertifikat → passphrase apa saja → Tanda tangani | Surat ber-TTE terbit (PDF mock, trailer mock); `esign_hist` status 1 penanda tangan PyB; tanpa passphrase di log/DB | |
 | C2 | 02.6 | Pada cuti final lain: akun selain PyB (mis. `demo.admin` tanpa atas nama, `demo.pemohon`) membuka ⋮ | Item "Tanda tangani" tidak tampil; panggilan API langsung `POST api/v1/cuti/{id}/esign` → 403 | |
-| C3 | Q6-40 | `demo.admin` → Cuti → C6 ⋮ "Setujui atas nama" (alasan) → C6 ⋮ "Setujui atas nama" tahap PyB (alasan) | Sesudah tahap PyB final: dialog **"Tanda tangani atas nama"** terbuka otomatis dengan nama pejabat; tahap AL (belum final) tidak membuka dialog | |
+| C3 | Q6-40 | `demo.atasan` → Cuti → C6 ⋮ "Setujui" (tahap AL, alur biasa) → `demo.admin` → Cuti → C6 ⋮ "Setujui atas nama" tahap PyB (alasan wajib) | Sesudah keputusan atas nama yang final: dialog **"Tanda tangani atas nama"** terbuka otomatis dengan nama pejabat. Atas nama di tahap AL yang belum final tidak membuka TTE — tidak bisa dipicu dengan C6 (AL terjangkau), bukti test otomatis `EsignAtasNamaTest` | |
 | C3a | Q6-40 | Tutup dialog C3 tanpa passphrase | Surat terbit tanpa TTE; ⋮ "Tanda tangani atas nama" tersedia untuk mengulang | |
 | C3b | Q6-40 / Q6-20 | ⋮ "Tanda tangani atas nama" → passphrase → Tanda tangani | TTE terbit; `esign_hist.nip` = PyB; audit `cuti.esign_terbit` pelaku = admin, `atas_nama: true`; sesudahnya item ⋮ tersembunyi dan PyB tidak bisa menandatangani ulang | |
 | C3c | Q6-40 | Akun bukan role 1 (mis. `demo.pemohon`) memanggil `GET api/v1/cuti/{id C6}/esign/status?atas_nama=1` | 403 | |
