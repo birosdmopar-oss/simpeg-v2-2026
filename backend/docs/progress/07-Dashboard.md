@@ -126,3 +126,10 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - FE: `PengingatCards`, `ButuhApprovalCard` (adapter sementara kontrak Jalur C), `DirekturCard` di `AdminDashboard`.
 - Test: `PengingatBerandaTest` (6), `DirekturBerandaTest` (3), `ProyeksiTandaJasaTest` (12), `HomeView.spec` (+M2a).
 - Terbuka: Q-D12, tepi [I] KP satker/unit, ulang tahun (menunggu reviewer). Berikutnya M2b keluarga pegawai.
+
+### M2b (tahap 1) — prediksi pegawai
+
+- BE `PrediksiPegawai` (port `next_kp` sendiri karena `RekomendasiKp::deteksi`/`get_all_kp` hanya tahun berjalan; `next_tj` =
+  `ProyeksiTandaJasa::prediksiPegawai`; KGB `RekomendasiKgb`; AK JF `AkPermenpanrb`); FE `PrediksiCards`.
+- Test: `PrediksiPegawaiTest` (6), `ProyeksiTandaJasaTest` (+8 next_tj), `HomeView.spec` (+6).
+- Sisa M2b: kelengkapan data (`kd_*` legacy, 9 fungsi), presensi & AK bawahan, presensi hari ini (Q7-42), update FK PTT.
