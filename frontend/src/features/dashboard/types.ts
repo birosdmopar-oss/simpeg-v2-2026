@@ -50,9 +50,27 @@ export interface DirekturPoliteknik {
 /** Tabel direktur hanya role 1 & 4 [K `dashboard_ad.php:201`]. */
 export const DIREKTUR_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_VIEW_ESELON1]
 
-/** Kerangka M1: kartu prediksi/kelengkapan/bawahan menyusul (M2). */
+/** Kartu prediksi pegawai (`dashboard_pns.php:40-96`): Pensiun, Naik Pangkat, Tanda Jasa, KGB. */
+export interface KartuPrediksi {
+  kode: 'pensiun' | 'kp' | 'tj' | 'kgb'
+  label: string
+  /** `YYYY-MM-DD`; null = tidak ada prediksi (tampil "-"). */
+  tanggal: string | null
+  /** "Bulan Tahun", mis. "April 2027". */
+  teks: string | null
+  /** "N Tahun M Bulan"; '-' untuk Tanda Jasa yang sudah lewat. */
+  sisa: string | null
+  /** Hanya `kp`: ST (struktural/umum) atau JF (angka kredit). */
+  jenis?: 'ST' | 'JF'
+  pangkat_puncak?: boolean
+  ak?: { sekarang: number; target: number; kurang: number } | null
+}
+
+/** Keluarga pegawai (role 2/6/7). Role 2: 4 kartu; role 7: Pensiun + KGB; role 6: kosong. */
 export interface RingkasanPegawai {
   keluarga: 'pegawai'
+  tanggal: string
+  prediksi: KartuPrediksi[]
 }
 
 export type RingkasanBeranda = RingkasanAdmin | RingkasanPegawai

@@ -17,7 +17,7 @@ import { Role, type RoleCode, type User } from '@/features/auth/types'
 import router from '@/router'
 
 import { berandaService } from '../services/beranda.service'
-import type { RingkasanAdmin, TileBeranda } from '../types'
+import type { KartuPrediksi, RingkasanAdmin, RingkasanPegawai, TileBeranda } from '../types'
 import HomeView from '../views/HomeView.vue'
 
 const tile = (kode: string, label: string, kelompok: TileBeranda['kelompok'], jumlah: number, persen: number): TileBeranda => ({ kode, label, kelompok, jumlah, persen })
@@ -169,9 +169,63 @@ describe('HomeView — keluarga admin', () => {
   })
 })
 
+const prediksi = (kode: KartuPrediksi['kode'], label: string, extra: Partial<KartuPrediksi> = {}): KartuPrediksi => ({
+  kode, label, tanggal: null, teks: null, sisa: null, ...extra,
+})
+
+const pegawai = (kartu: KartuPrediksi[]): RingkasanPegawai => ({ keluarga: 'pegawai', tanggal: '2026-11-10', prediksi: kartu })
+
+describe('HomeView — kartu prediksi pegawai M2b', () => {
+  it('role 2: 4 kartu teks legacy (judul, label, sisa; "-" bila kosong)', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([
+      prediksi('pensiun', 'Pensiun', { tanggal: '2028-06-01', teks: 'Juni 2028', sisa: '1 Tahun 6 Bulan' }),
+      prediksi('kp', 'Naik Pangkat', { tanggal: '2027-04-01', teks: 'April 2027', sisa: '4 Bulan', jenis: 'ST', pangkat_puncak: false, ak: null }),
+      prediksi('tj', 'Tanda Jasa', { tanggal: '2026-08-01', teks: 'Agustus 2026', sisa: '-' }),
+      prediksi('kgb', 'KGB'),
+    ]))
+    const wrapper = await mountAs(Role.PEGAWAI)
+
+    const isi = (kode: string) => ['judul', 'label', 'ket'].map((t) => wrapper.get(`[data-testid="beranda-prediksi-${kode}"] [data-testid="${t}"]`).text())
+    expect(isi('pensiun')).toEqual(['Juni 2028', 'Pensiun', '1 Tahun 6 Bulan'])
+    expect(isi('kp')).toEqual(['April 2027', 'Naik Pangkat', '4 Bulan'])
+    expect(isi('tj')).toEqual(['Agustus 2026', 'Tanda Jasa', '-'])
+    expect(isi('kgb')).toEqual(['-', 'KGB', '-'])
+  })
+
+  it('KP JF: "AK sekarang / target" + "Kurang N AK" (koma desimal)', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([
+      prediksi('kp', 'Naik Pangkat', { jenis: 'JF', pangkat_puncak: false, ak: { sekarang: 87.5, target: 100, kurang: 12.5 } }),
+    ]))
+    const wrapper = await mountAs(Role.PEGAWAI)
+
+    expect(wrapper.get('[data-testid="beranda-prediksi-kp"] [data-testid="judul"]').text()).toBe('87,5 / 100')
+    expect(wrapper.get('[data-testid="beranda-prediksi-kp"] [data-testid="ket"]').text()).toBe('Kurang 12,5 AK')
+  })
+
+  it('KP pangkat puncak: "Sudah di Pangkat Puncak"', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([prediksi('kp', 'Naik Pangkat', { jenis: 'ST', pangkat_puncak: true, ak: null })]))
+    const wrapper = await mountAs(Role.PEGAWAI)
+
+    expect(wrapper.get('[data-testid="beranda-prediksi-kp"] [data-testid="label"]').text()).toBe('Sudah di Pangkat Puncak')
+    expect(wrapper.get('[data-testid="beranda-prediksi-kp"] [data-testid="ket"]').text()).toBe('')
+  })
+
+  it.each([
+    [Role.PEGAWAI, true],
+    [Role.PTT, false],
+    [Role.PPPK, false],
+  ])('role %i: Butuh Approval %s; tanpa kartu prediksi bila daftar kosong', async (role, approval) => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([]))
+    const wrapper = await mountAs(role)
+
+    expect(wrapper.find('[data-testid="beranda-prediksi"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="beranda-butuh-approval"]').exists()).toBe(approval)
+  })
+})
+
 describe('HomeView — keluarga pegawai & galat', () => {
   it.each([Role.PEGAWAI, Role.PTT, Role.PPPK])('role %i → PegawaiDashboard', async (role) => {
-    vi.mocked(berandaService.ringkasan).mockResolvedValue({ keluarga: 'pegawai' })
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(pegawai([]))
     const wrapper = await mountAs(role)
 
     expect(wrapper.find('[data-testid="beranda-pegawai"]').exists()).toBe(true)

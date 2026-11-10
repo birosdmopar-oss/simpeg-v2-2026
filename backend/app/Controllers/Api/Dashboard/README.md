@@ -132,7 +132,11 @@ Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
   ≤ tahun berjalan (kementerian PNS+PPPK, satker/unit PNS); Tanda Jasa kementerian ≤ tahun acuan (tahun depan bila bulan ≥ 9),
   satker/unit tepat 1 Agustus tahun berjalan/depan. Tanpa pengecualian NIP. Cache per lingkup + tanggal.
 
-**Pegawai (role 2/6/7)** — kerangka M1: `{"keluarga": "pegawai"}`; kartu prediksi, kelengkapan data, bawahan di M2.
+**Pegawai (role 2/6/7)** — `{"keluarga": "pegawai", "tanggal": "2026-11-10", "prediksi": [...]}` (M2b). `prediksi` per kartu
+`{kode, label, tanggal|null, teks ("Bulan Tahun")|null, sisa ("N Tahun M Bulan")|null}` + khusus `kp`: `jenis` `ST|JF`,
+`pangkat_puncak`, `ak` `{sekarang, target, kurang}` (JF). Role 2: `pensiun` (BUP jabatan), `kp` (port `next_kp`; JF bila
+`pmj.id_group_jabatan` = 2 → AK `AkPermenpanrb`), `tj` (port `next_tj`), `kgb` (`next_kgb`); role 7: `pensiun` = `pmj.mhpk_akhir`
++ `kgb`; role 6: `[]`. KP/TJ/KGB `null` bila tidak sebelum tanggal pensiun. Kelengkapan data & bawahan: M2b berikutnya.
 
 Kode galat: 401 tanpa token.
 

@@ -22,5 +22,7 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
 - M2a: `PengingatCards` (Pensiun → `/dokumen/pensiun`; KP/TJ/KGB tanpa tautan, Q7-37), `ButuhApprovalCard` (role 1/3 di
   keluarga admin; adapter SEMENTARA `composables/ringkasanNotifikasi.ts` berbentuk kontrak Jalur C — hapus dan impor
   `@/features/notifikasi` begitu F-08 di `main`), `DirekturCard` (role 1/4, `GET /dashboard/direktur`).
+- M2b: `PegawaiDashboard` → `PrediksiCards` (teks view legacy: "-" bila kosong, "Sudah di Pangkat Puncak", JF "AK / target"
+  + "Kurang N AK") dan `ButuhApprovalCard` untuk role 2.
 - Kerangka M1: slot banner/popup/berita (Jalur A `@/features/konten`), Butuh Approval (Jalur C `@/features/notifikasi`),
   pengingat/prediksi/ulang tahun/direktur diisi M2–M3. Figma beranda belum ada; tata letak mengikuti mockup redesign.
