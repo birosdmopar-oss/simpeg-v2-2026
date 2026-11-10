@@ -18,6 +18,7 @@ import BawahanCards from './BawahanCards.vue'
 import ButuhApprovalCard from './ButuhApprovalCard.vue'
 import PrediksiCards from './PrediksiCards.vue'
 import PresensiSayaCard from './PresensiSayaCard.vue'
+import UlangTahunCard from './UlangTahunCard.vue'
 
 const props = defineProps<{ ringkasan: RingkasanPegawai | null }>()
 
@@ -35,5 +36,9 @@ const punyaPresensi = computed(() => auth.role !== null && PRESENSI_PEGAWAI_ROLE
       <ButuhApprovalCard v-if="punyaApproval" />
     </div>
     <BawahanCards v-if="ringkasan?.bawahan?.atasan" :bawahan="ringkasan.bawahan" />
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <UlangTahunCard hari="ini" />
+      <UlangTahunCard hari="besok" />
+    </div>
   </div>
 </template>

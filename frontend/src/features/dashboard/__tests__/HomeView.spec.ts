@@ -10,14 +10,16 @@ import { AxiosError } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/beranda.service', () => ({ berandaService: { ringkasan: vi.fn(), direktur: vi.fn() } }))
+vi.mock('../services/beranda.service', () => ({
+  berandaService: { ringkasan: vi.fn(), direktur: vi.fn(), ulangTahun: vi.fn(), fotoUlangTahun: vi.fn() },
+}))
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role, type RoleCode, type User } from '@/features/auth/types'
 import router from '@/router'
 
 import { berandaService } from '../services/beranda.service'
-import type { KartuPrediksi, RingkasanAdmin, RingkasanPegawai, TileBeranda } from '../types'
+import type { KartuPrediksi, RingkasanAdmin, RingkasanPegawai, TileBeranda, UlangTahunItem } from '../types'
 import HomeView from '../views/HomeView.vue'
 
 const tile = (kode: string, label: string, kelompok: TileBeranda['kelompok'], jumlah: number, persen: number): TileBeranda => ({ kode, label, kelompok, jumlah, persen })
@@ -58,6 +60,10 @@ async function mountAs(role: RoleCode) {
 }
 
 beforeEach(() => {
+  vi.mocked(berandaService.ulangTahun).mockReset().mockResolvedValue([])
+  vi.mocked(berandaService.fotoUlangTahun).mockReset().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+  URL.createObjectURL = vi.fn(() => 'blob:foto-uji')
+  URL.revokeObjectURL = vi.fn()
   vi.mocked(berandaService.ringkasan).mockReset()
   vi.mocked(berandaService.direktur).mockReset().mockResolvedValue([
     { nama: 'Dr. Direktur Fixture, M.Par.', politeknik: 'Politeknik Fixture', masa_kerja: '2 Tahun 3 Bulan' },
@@ -259,6 +265,52 @@ describe('HomeView — bawahan atasan M2b', () => {
     const wrapper = await mountAs(Role.PEGAWAI)
 
     expect(wrapper.find('[data-testid="beranda-bawahan"]').exists()).toBe(false)
+  })
+})
+
+describe('HomeView — ulang tahun (Q7-45)', () => {
+  const ultah = (extra: Partial<UlangTahunItem> = {}): UlangTahunItem => ({
+    nip: '198511102010012001', nama: 'Ani', tanggal_lahir: '10 November 1985', jenis_pegawai: 'PNS', jabatan: 'Analis (Ketua Tim)',
+    satker: 'Satker Fixture', khusus: false, ada_foto: true, foto_kunci: '198511102010012001', ...extra,
+  })
+
+  it.each([Role.SUPER_ADMIN, Role.PEGAWAI, Role.PTT])('role %i: kartu hari ini & besok, field view legacy, foto dimuat', async (role) => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(role === Role.SUPER_ADMIN ? admin('donut') : pegawai([]))
+    vi.mocked(berandaService.ulangTahun).mockImplementation(async (hari) => (hari === 'ini' ? [ultah()] : []))
+    const wrapper = await mountAs(role)
+
+    expect(berandaService.ulangTahun).toHaveBeenCalledWith('ini')
+    expect(berandaService.ulangTahun).toHaveBeenCalledWith('besok')
+    const item = wrapper.get('[data-testid="beranda-ulang-tahun-ini-item"]')
+    expect(['nama', 'tgl', 'nip', 'jabatan', 'satker'].map((t) => item.get(`[data-testid="${t}"]`).text())).toEqual([
+      'Ani', '10 November 1985', 'PNS / 198511102010012001', 'Analis (Ketua Tim)', 'Satker Fixture',
+    ])
+    expect(berandaService.fotoUlangTahun).toHaveBeenCalledWith('198511102010012001')
+    expect(item.find('img').attributes('src')).toBe('blob:foto-uji')
+    expect(wrapper.get('[data-testid="beranda-ulang-tahun-besok"]').text()).toContain('Tidak ada pegawai yang berulang tahun.')
+  })
+
+  it('baris khusus: hanya nama, tanggal lahir, jabatan; tanpa foto tidak memanggil endpoint foto', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
+    vi.mocked(berandaService.ulangTahun).mockImplementation(async (hari) =>
+      hari === 'ini' ? [ultah({ nip: null, jenis_pegawai: null, satker: null, khusus: true, jabatan: 'Menteri Pariwisata', ada_foto: false, foto_kunci: '1' })] : [],
+    )
+    const wrapper = await mountAs(Role.SUPER_ADMIN)
+
+    const item = wrapper.get('[data-testid="beranda-ulang-tahun-ini-item"]')
+    expect(item.find('[data-testid="nip"]').exists()).toBe(false)
+    expect(item.find('[data-testid="satker"]').exists()).toBe(false)
+    expect(item.get('[data-testid="jabatan"]').text()).toBe('Menteri Pariwisata')
+    expect(berandaService.fotoUlangTahun).not.toHaveBeenCalled()
+  })
+
+  it('galat memuat ulang tahun hanya di kartunya', async () => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(admin('donut'))
+    vi.mocked(berandaService.ulangTahun).mockRejectedValue({ status: 500, message: 'Gagal.', errors: null, isNetworkError: false, original: new AxiosError('x') })
+    const wrapper = await mountAs(Role.SUPER_ADMIN)
+
+    expect(wrapper.get('[data-testid="beranda-ulang-tahun-ini"] [role="alert"]').text()).toBe('Gagal.')
+    expect(wrapper.find('[data-testid="beranda-pengingat"]').exists()).toBe(true)
   })
 })
 

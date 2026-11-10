@@ -47,6 +47,25 @@ export interface DirekturPoliteknik {
   masa_kerja: string
 }
 
+/** Satu pegawai berulang tahun (`GET /dashboard/ulang-tahun`, view `dashboard_ad.php:250-298`). */
+export interface UlangTahunItem {
+  /** null untuk baris khusus (`khusus`). */
+  nip: string | null
+  nama: string
+  /** "10 November 1985". */
+  tanggal_lahir: string
+  jenis_pegawai: string | null
+  jabatan: string
+  satker: string | null
+  /** Baris `nip = '1'`: hanya nama, tanggal lahir, dan label jabatan. */
+  khusus: boolean
+  ada_foto: boolean
+  /** Kunci `GET /dashboard/ulang-tahun/{kunci}/foto`. */
+  foto_kunci: string
+}
+
+export type HariUlangTahun = 'ini' | 'besok'
+
 /** Tabel direktur hanya role 1 & 4 [K `dashboard_ad.php:201`]. */
 export const DIREKTUR_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMIN_VIEW_ESELON1]
 

@@ -24,5 +24,8 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   `@/features/notifikasi` begitu F-08 di `main`), `DirekturCard` (role 1/4, `GET /dashboard/direktur`).
 - M2b: `PegawaiDashboard` → `PrediksiCards` (teks view legacy: "-" bila kosong, "Sudah di Pangkat Puncak", JF "AK / target"
   + "Kurang N AK") dan `ButuhApprovalCard` untuk role 2; `BawahanCards` (presensi & AK bawahan) bila akun atasan.
+- `UlangTahunCard` (hari ini / besok, semua role) di atas `UiCarouselPanel` (baru di `shared/ui`: pola WAI-ARIA carousel,
+  ←/→/Home/End, Jeda/Putar, berhenti saat hover/fokus & `prefers-reduced-motion`); foto lewat blob
+  `GET /dashboard/ulang-tahun/{kunci}/foto`, cadangan avatar inisial. `PresensiSayaCard` = tautan Presensi Saya (Q7-42).
 - Kerangka M1: slot banner/popup/berita (Jalur A `@/features/konten`), Butuh Approval (Jalur C `@/features/notifikasi`),
   pengingat/prediksi/ulang tahun/direktur diisi M2–M3. Figma beranda belum ada; tata letak mengikuti mockup redesign.

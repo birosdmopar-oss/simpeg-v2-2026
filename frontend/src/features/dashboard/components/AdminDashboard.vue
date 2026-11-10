@@ -4,7 +4,8 @@
  * 1. 4 kartu pengingat Pensiun / Naik Pangkat / Tanda Jasa / KGB (`PengingatCards`) [K];
  * 2. kartu Butuh Approval (Jalur C) untuk role yang angkanya berlaku (`BUTUH_APPROVAL_ROLES`: 1, 3 di keluarga ini);
  * 3. komposisi pegawai + status hari ini (`KomposisiPegawaiCard`, saklar Q7-36);
- * 4. masa kerja direktur politeknik (role 1/4, `DirekturCard`) [K].
+ * 4. masa kerja direktur politeknik (role 1/4, `DirekturCard`) [K];
+ * 5. ulang tahun hari ini / besok (`UlangTahunCard`, Q7-45) [K].
  * Slot M3: banner (`BannerCarousel`, Jalur A) di atas, berita terbaru (Jalur A), ulang tahun, ringkasan SKL (Jalur B).
  */
 import { computed } from 'vue'
@@ -18,6 +19,7 @@ import ButuhApprovalCard from './ButuhApprovalCard.vue'
 import DirekturCard from './DirekturCard.vue'
 import KomposisiPegawaiCard from './KomposisiPegawaiCard.vue'
 import PengingatCards from './PengingatCards.vue'
+import UlangTahunCard from './UlangTahunCard.vue'
 
 defineProps<{ ringkasan: RingkasanAdmin }>()
 
@@ -38,5 +40,9 @@ const punyaDirektur = computed(() => auth.role !== null && DIREKTUR_ROLES.includ
     </div>
     <KomposisiPegawaiCard :ringkasan="ringkasan" />
     <DirekturCard v-if="punyaDirektur" />
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <UlangTahunCard hari="ini" />
+      <UlangTahunCard hari="besok" />
+    </div>
   </div>
 </template>
