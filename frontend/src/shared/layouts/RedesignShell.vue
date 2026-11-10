@@ -16,12 +16,12 @@ import { ROLE_LABELS } from '@/features/auth/types'
 import NotifikasiPushShell from '@/features/integrasi/components/NotifikasiPushShell.vue'
 import PengingatCutiShell from '@/features/layanan/components/PengingatCutiShell.vue'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
-import { NOTIFIKASI_ROLES, resetRingkasanNotifikasi, useRingkasanNotifikasi } from '@/features/notifikasi'
+import { FASE_LONCENG, NOTIFIKASI_ROLES, resetRingkasanNotifikasi, useRingkasanNotifikasi } from '@/features/notifikasi'
 import { UiBreadcrumb, type Crumb } from '@/shared/ui'
 
 import AppSidebar from './AppSidebar.vue'
 import AppTopbar from './AppTopbar.vue'
-import { buildNav } from './nav.config'
+import { ACTIVE_PHASE, buildNav } from './nav.config'
 
 const props = defineProps<{ breadcrumbs?: Crumb[] }>()
 
@@ -109,18 +109,21 @@ const userSubtitle = computed(() => auth.user?.nip ?? (auth.role ? ROLE_LABELS[a
 /**
  * Lonceng F-08 (MAKE-085): angka dari `useRingkasanNotifikasi` (singleton, polling 60 detik), dimuat ulang tiap pindah
  * halaman. Klik lonceng → Pusat Notifikasi untuk role yang punya halamannya (Q7-29); role lain tetap melihat angka saja.
+ * Mengikuti fase menu (keputusan reviewer 10-11-2026, pola F7-14): selama `ACTIVE_PHASE < FASE_LONCENG` lonceng tetap
+ * tanpa angka, tanpa polling, dan klik tidak berpindah — dibuka di penutup Fase 7.
  */
-const lonceng = useRingkasanNotifikasi()
-const unread = computed(() => (auth.mustChangePassword ? 0 : lonceng.total.value))
+const loncengAktif = ACTIVE_PHASE >= FASE_LONCENG
+const lonceng = loncengAktif ? useRingkasanNotifikasi() : null
+const unread = computed(() => (lonceng === null || auth.mustChangePassword ? 0 : lonceng.total.value))
 watch(
   () => router.currentRoute.value.fullPath,
   () => {
-    if (!auth.mustChangePassword) void lonceng.muatUlang()
+    if (lonceng !== null && !auth.mustChangePassword) void lonceng.muatUlang()
   },
 )
 
 function bukaNotifikasi(): void {
-  if (auth.mustChangePassword || auth.role === null || !NOTIFIKASI_ROLES.includes(auth.role)) return
+  if (!loncengAktif || auth.mustChangePassword || auth.role === null || !NOTIFIKASI_ROLES.includes(auth.role)) return
   void router.push('/notifikasi')
 }
 
