@@ -71,6 +71,64 @@ final class ProyeksiTandaJasa
         return null;
     }
 
+    /**
+     * Prediksi Tanda Jasa satu pegawai untuk kartu beranda pegawai — port `L_employee::next_tj` (`L_employee.php:2910-3040`) [K],
+     * BERBEDA dari {@see self::berikutnya()} (`get_all_tj`):
+     * - lama bekerja per **31 Desember tahun berjalan**;
+     * - ≥ 30: XXX bila belum punya (selain itu tidak ada); 20–29: XX bila belum punya, selain itu XXX (+30); 10–19: X bila
+     *   belum punya, selain itu XX (+20); < 10 (atau TMT CPNS tidak ada — legacy: string kosong < 10): X (+10);
+     * - dibulatkan ke 1 Agustus seperti `get_all_tj`; bila tanggal itu sudah lewat dari hari ini → naik satu tingkat dengan
+     *   tanggal + 10 tahun (XXX yang lewat → tidak ada);
+     * - tanpa TMT CPNS: dasar `strtotime("+N year")` legacy = hari ini (kuirk legacy dipertahankan).
+     *
+     * @param list<int> $dimiliki
+     *
+     * @return array{tgl_penghargaan: string, tanda_jasa: string}|null
+     */
+    public static function prediksiPegawai(?string $tmtCpns, string $hariIni, array $dimiliki): ?array
+    {
+        $hari  = new DateTimeImmutable($hariIni);
+        $cpns  = self::tanggal($tmtCpns);
+        $lama  = $cpns === null ? null : (new DateTimeImmutable($hari->format('Y') . '-12-31'))->diff($cpns)->y;
+        $punya = static fn (int $id): bool => in_array($id, $dimiliki, true);
+
+        if ($lama !== null && $lama >= 30) {
+            if ($punya(self::ID_XXX)) {
+                return null;
+            }
+            [$idx, $tambah] = [3, 30];
+        } elseif ($lama !== null && $lama >= 20) {
+            [$idx, $tambah] = $punya(self::ID_XX) ? [3, 30] : [2, 20];
+        } elseif ($lama !== null && $lama >= 10) {
+            [$idx, $tambah] = $punya(self::ID_X) ? [2, 20] : [1, 10];
+        } else {
+            [$idx, $tambah] = [1, 10];
+        }
+
+        $dasar = $cpns ?? $hari;
+        $tgl   = $dasar->modify(sprintf('+%d year', $tambah));
+        $tahun = (int) $tgl->format('Y') + ((int) $tgl->format('n') <= 8 ? 0 : 1);
+        $hasil = sprintf('%04d-08-01', $tahun);
+
+        if ($hasil < $hariIni) {
+            if ($idx >= 3) {
+                return null;
+            }
+
+            $idx++;
+            $hasil = sprintf('%04d-08-01', $tahun + 10);
+        }
+
+        return ['tgl_penghargaan' => $hasil, 'tanda_jasa' => self::LABEL_INDEKS[$idx]];
+    }
+
+    /** @var array<int, string> */
+    private const LABEL_INDEKS = [
+        1 => 'Satyalancana Karya Satya X Tahun',
+        2 => 'Satyalancana Karya Satya XX Tahun',
+        3 => 'Satyalancana Karya Satya XXX Tahun',
+    ];
+
     private static function tanggal(?string $ymd): ?DateTimeImmutable
     {
         if ($ymd === null || preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $ymd, $m) !== 1 || ! checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {

@@ -42,7 +42,8 @@ use Config\Dashboard;
  * Cache: hitungan jenis pegawai/CLTN/total dan pengingat (kunci + tanggal) di-cache per lingkup selama `ttlRingkasanDetik`
  * (0 = tanpa cache); angka "hari ini" (TB, IB, cuti, presensi online) selalu dihitung ulang.
  *
- * **Pegawai (role 2/6/7)** — kerangka M1: `{keluarga: 'pegawai'}`; kartu prediksi, kelengkapan data, bawahan menyusul M2.
+ * **Pegawai (role 2/6/7)** — `{keluarga: 'pegawai', tanggal, prediksi}`: kartu prediksi {@see PrediksiPegawai} (role 2: Pensiun,
+ * Naik Pangkat, Tanda Jasa, KGB; role 7: Pensiun (akhir masa perjanjian) + KGB; role 6: kosong). Kelengkapan data & bawahan: M2b-2.
  */
 final class RingkasanBeranda
 {
@@ -120,7 +121,13 @@ final class RingkasanBeranda
             return $this->admin($auth);
         }
 
-        return ['keluarga' => self::KELUARGA_PEGAWAI];
+        $nip = $auth->nip();
+
+        return [
+            'keluarga' => self::KELUARGA_PEGAWAI,
+            'tanggal'  => $this->hariIni ?? TanggalBisnis::hariIni(),
+            'prediksi' => $role === null || $nip === null || $nip === '' ? [] : (new PrediksiPegawai($this->db, $this->hariIni ?? TanggalBisnis::hariIni()))->kartu($role, $nip),
+        ];
     }
 
     /**

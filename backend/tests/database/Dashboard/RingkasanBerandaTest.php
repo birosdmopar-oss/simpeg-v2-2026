@@ -238,14 +238,19 @@ final class RingkasanBerandaTest extends DatabaseTestCase
         $this->assertSame(1, $this->tile($kedua, 'presensi_online')['jumlah'], 'hari ini tidak di-cache');
     }
 
-    public function testPegawaiKerangkaM1(): void
+    public function testKeluargaPegawaiJumlahKartuPrediksiPerRole(): void
     {
+        $harapan = [Role::PEGAWAI => ['pensiun', 'kp', 'tj', 'kgb'], Role::PTT => [], Role::PPPK => ['pensiun', 'kgb']];
+
         foreach (Role::UL_PEGAWAI as $role) {
             $nip  = $this->pegawai($this->buatSatker(), 1);
             $akun = $this->buatAkunUntuk($nip, $role);
             $res  = $this->withHeaders(['Authorization' => 'Bearer ' . $this->issueTokensForUser($this->db->table('pengguna')->where('id_pengguna', $akun)->get()->getRowArray())['access_token']])->get(self::URL);
             $res->assertStatus(200);
-            $this->assertSame(['keluarga' => 'pegawai'], json_decode($res->getJSON(), true)['data'], (string) $role);
+            $data = json_decode($res->getJSON(), true)['data'];
+            $this->assertSame(['keluarga', 'tanggal', 'prediksi'], array_keys($data), (string) $role);
+            $this->assertSame('pegawai', $data['keluarga']);
+            $this->assertSame($harapan[$role], array_column($data['prediksi'], 'kode'), (string) $role);
         }
     }
 

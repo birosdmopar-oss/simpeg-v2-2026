@@ -36,6 +36,33 @@ final class ProyeksiTandaJasaTest extends CIUnitTestCase
     }
 
     /**
+     * Port `next_tj` (prediksi pegawai), hari ini 10-11-2026 → lama bekerja per 31-12-2026.
+     *
+     * @return iterable<string, array{0: string|null, 1: list<int>, 2: array{tgl_penghargaan: string, tanda_jasa: string}|null}>
+     */
+    public static function kasusPegawai(): iterable
+    {
+        yield '<10 th → X (+10), Agustus akan datang' => ['2020-03-01', [], ['tgl_penghargaan' => '2030-08-01', 'tanda_jasa' => 'Satyalancana Karya Satya X Tahun']];
+        yield '10–19 belum punya X, tanggal lewat → XX +10' => ['2014-03-01', [], ['tgl_penghargaan' => '2034-08-01', 'tanda_jasa' => 'Satyalancana Karya Satya XX Tahun']];
+        yield '10–19 sudah punya X → XX (+20)' => ['2014-03-01', [ProyeksiTandaJasa::ID_X], ['tgl_penghargaan' => '2034-08-01', 'tanda_jasa' => 'Satyalancana Karya Satya XX Tahun']];
+        yield '10–19 belum punya X, Agustus depan' => ['2016-10-01', [], ['tgl_penghargaan' => '2027-08-01', 'tanda_jasa' => 'Satyalancana Karya Satya X Tahun']];
+        yield '20–29 sudah punya XX → XXX (+30)' => ['2000-03-01', [ProyeksiTandaJasa::ID_XX], ['tgl_penghargaan' => '2030-08-01', 'tanda_jasa' => 'Satyalancana Karya Satya XXX Tahun']];
+        yield '≥30 sudah punya XXX → tidak ada' => ['1990-03-01', [ProyeksiTandaJasa::ID_XXX], null];
+        yield '≥30 XXX sudah lewat → tidak ada' => ['1990-03-01', [], null];
+        yield 'tanpa TMT CPNS → X dari hari ini + 10 (kuirk legacy)' => [null, [], ['tgl_penghargaan' => '2037-08-01', 'tanda_jasa' => 'Satyalancana Karya Satya X Tahun']];
+    }
+
+    /**
+     * @param list<int>                                               $dimiliki
+     * @param array{tgl_penghargaan: string, tanda_jasa: string}|null $harapan
+     */
+    #[DataProvider('kasusPegawai')]
+    public function testPrediksiPegawai(?string $cpns, array $dimiliki, ?array $harapan): void
+    {
+        $this->assertSame($harapan, ProyeksiTandaJasa::prediksiPegawai($cpns, '2026-11-10', $dimiliki));
+    }
+
+    /**
      * @param list<int>                                                  $dimiliki
      * @param array{tgl_penghargaan: string, tanda_jasa: string}|null $harapan
      */
