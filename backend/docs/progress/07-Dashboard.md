@@ -139,3 +139,21 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - Sisa M2: kelengkapan data (`kd_*`, Q-D13..D17 menunggu Horii), Q-D18 (pengecualian NIP ulang tahun), Q-D12.
 - 10-11: `ButuhApprovalCard` memakai `useRingkasanNotifikasi()` asli `@/features/notifikasi` (F-08 MAKE-085 di `main`);
   adapter sementara dihapus; ikut aturan lonceng (`ACTIVE_PHASE < FASE_LONCENG` → "—" tanpa tautan/polling).
+
+### Jalur A — konten admin (MAKE-079 Popup, MAKE-080 Banner), branch `fase7/make-079-popup` (lokal, belum di main)
+
+- BE: `Libraries/Dashboard/Konten/Penargetan/{SpesifikasiTarget,PemekarTarget,SinkronPenerima,TabelPenerima}` (dipakai juga Jalur B
+  untuk form digital), `Konten/Gambar/{JenisGambar,PenyimpananGambar,KontenGambarService}`, `Models/Konten/{Popup,Banner}Model`
+  (audit otomatis, Q7-16), `Controllers/Api/Konten/{Popup,Banner}Controller`, `Config/RoutesKonten.php`, `Config/Konten.php`.
+- Endpoint (`api/v1/konten/{popup|banner}`): daftar, buat/ubah (POST multipart `berkas`), hapus, `urutan` naik/turun, `target`,
+  `penerima`, `aktif` (role 2–8), `gambar` (terautentikasi; role 1 atau penerima, selain itu 404); `konten/opsi/{unit-satker,pegawai}`.
+- Keputusan: penargetan pegawai eksplisit ikut legacy (tanpa cek status; diabaikan bila "0"); gambar privat kunci acak,
+  banner wajib rasio 4:1 (±2%) lebar 800–4000 px, popup sisi 200–4000 px (angka ⚑ keputusan v2, `Config\Konten`); popup periode
+  DATETIME WIB, banner DATE; popup/banner tanpa status/soft delete (Hapus permanen) sampai DBV-032 menetapkan lain.
+- ⚑ Bergantung draf DBV-032 (kolom bisa berubah setelah D1): `popup/banner.{tgl_*,order,url,file,keterangan,target_uns,target_peg,excl_peg}`,
+  `user_popup/user_banner`, nama kolom induk di `TabelPenerima`.
+- Test: `SpesifikasiTargetTest` (12), `KontenPenargetanTest` (4), `KontenGambarServiceTest` (9), `KontenGambarEndpointTest` (3),
+  `KontrakMatriksRoleTest` (+20 baris kontrak). Test database memuat migration draf `MigrationsDitahan/` (grup `db-isolasi-penuh`).
+- FE: `features/konten` (kelola popup/banner/berita/DIBO/master, portal berita, DIBO baca, `GambarKonten` blob, `TargetPicker`,
+  `UiTeksSederhana`); rute dan menu `phase: 7`.
+- Sisa: berita (MAKE-081, sanitasi HTMLPurifier + approval + `SumberBerita`), DIBO (MAKE-082); antrean dialog menunggu MAKE-083.
