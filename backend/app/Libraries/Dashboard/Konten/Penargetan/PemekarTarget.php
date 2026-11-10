@@ -12,8 +12,9 @@ use CodeIgniter\Database\BaseConnection;
  * - `"0"` → semua pegawai `status = 1`;
  * - `"<id_unit>"` / `"sat_<id_satker>"` → pegawai `status = 1` yang `pegawai_mutasi_jabatan.id_unit` / `id_satker`-nya cocok
  *   (snapshot jabatan aktif, PK nip);
- * - pegawai yang dipilih eksplisit ikut bila `status = 1` [V2]: legacy memasukkan NIP apa adanya, v2 menolak pegawai
- *   nonaktif agar FK dan tampilan tetap konsisten (deviasi kecil, dicatat di README);
+ * - pegawai yang dipilih eksplisit ikut APA ADANYA, tanpa cek status [K] (legacy `L_announcement.php:561-586` menambahkan NIP
+ *   tanpa filter status; hanya turunan unit/satker `peg.status = 1`, :477/:542). Hanya NIP yang ADA di `pegawai` yang
+ *   ikut (FK `user_*` -> pegawai); pilihan pegawai DIABAIKAN bila target seluruh kementerian (`!$allKem`, :561);
  * - `kecuali` dikurangkan terakhir, dan menang atas semua sumber lain.
  * Urutan hasil: NIP menaik (deterministik untuk test dan sinkron).
  */
@@ -55,8 +56,8 @@ final class PemekarTarget
             }
         }
 
-        if ($target->pegawai !== []) {
-            $nip = array_merge($nip, $this->kolomNip($this->db->table('pegawai peg')->select('peg.nip')->where('peg.status', 1)->whereIn('peg.nip', $target->pegawai)));
+        if ($target->pegawai !== [] && ! $target->seluruhKementerian()) {
+            $nip = array_merge($nip, $this->kolomNip($this->db->table('pegawai peg')->select('peg.nip')->whereIn('peg.nip', $target->pegawai)));
         }
 
         $nip = array_values(array_unique($nip));

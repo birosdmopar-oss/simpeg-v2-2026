@@ -70,8 +70,8 @@ final class KontenPenargetanTest extends DatabaseTestCase
         $this->assertSame([$a1, $b1], $hasil === [] ? [] : array_values(array_intersect($hasil, [$a1, $a2, $b1])));
         $this->assertNotContains($a2, $hasil);
 
-        // pegawai nonaktif yang dipilih eksplisit tidak ikut [V2]
-        $this->assertNotContains($nonaktif, $pemekar->pekarkan(SpesifikasiTarget::dariArray(['pegawai' => [$nonaktif]])));
+        // pegawai nonaktif yang dipilih eksplisit TETAP ikut [K] (legacy L_announcement.php:561-586); NIP tak dikenal diabaikan
+        $this->assertSame([$nonaktif], $pemekar->pekarkan(SpesifikasiTarget::dariArray(['pegawai' => [$nonaktif, '000000000000000099']])));
     }
 
     public function testSeluruhKementerianSemuaPegawaiAktifTanpaDuplikat(): void
@@ -80,7 +80,8 @@ final class KontenPenargetanTest extends DatabaseTestCase
         $p1       = $this->buatPegawaiDiSatker($satker);
         $nonaktif = $this->buatPegawai(['status' => 2], ['id_satker' => $satker]);
 
-        $hasil = (new PemekarTarget($this->db))->pekarkan(SpesifikasiTarget::dariArray(['unit_satker' => ['0'], 'pegawai' => [$p1]]));
+        // pilihan pegawai diabaikan bila seluruh kementerian [K] (!$allKem): nonaktif eksplisit pun tidak ikut
+        $hasil = (new PemekarTarget($this->db))->pekarkan(SpesifikasiTarget::dariArray(['unit_satker' => ['0'], 'pegawai' => [$p1, $nonaktif]]));
 
         $this->assertContains($p1, $hasil);
         $this->assertNotContains($nonaktif, $hasil);
