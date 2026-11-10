@@ -118,3 +118,11 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - Test: `tests/database/Dashboard/RingkasanBerandaTest.php` (11), `features/dashboard/__tests__/{HomeView,beranda.amplop}.spec.ts`.
 - Sisa M2: pengingat Pensiun/KP/TJ/KGB, ulang tahun (Q7-45), direktur (Q7-38), keluarga pegawai (prediksi, kelengkapan,
   bawahan), `UiCarouselPanel`. M3: pasang komponen Jalur A/B/C.
+
+### M2a — beranda admin (branch yang sama)
+
+- BE: `pengingat` di `dashboard/ringkasan` (`PengingatBeranda` + `ProyeksiTandaJasa` port `get_all_tj`; kalkulasi KP/KGB/Pensiun
+  memakai ulang kelas murni `Integrasi\Stat` tanpa mengubahnya), `GET dashboard/direktur` (`DirekturBeranda`, role 1/4).
+- FE: `PengingatCards`, `ButuhApprovalCard` (adapter sementara kontrak Jalur C), `DirekturCard` di `AdminDashboard`.
+- Test: `PengingatBerandaTest` (6), `DirekturBerandaTest` (3), `ProyeksiTandaJasaTest` (12), `HomeView.spec` (+M2a).
+- Terbuka: Q-D12, tepi [I] KP satker/unit, ulang tahun (menunggu reviewer). Berikutnya M2b keluarga pegawai.
