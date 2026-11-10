@@ -51,6 +51,20 @@ class Dashboard extends BaseConfig
     public bool $tandaJasaIkutLegacy = false;
 
     /**
+     * Ulang tahun beranda (Q7-45, ikut legacy `helpers/function_helper.php:1419-1475` getTodayBday/getTomorrowBday): satker yang
+     * dikecualikan (`pmj.id_satker != 171`) — Q-D20 (A), bukan rahasia.
+     *
+     * @var list<int>
+     */
+    public array $idSatkerDikecualikanUlangTahun = [171];
+
+    /**
+     * Label jabatan untuk baris khusus `nip = '1'` di kartu ulang tahun (view `dashboard_ad.php:270-276`): hanya nama, tanggal
+     * lahir, dan label ini (tanpa NIP/satker) — Q-D20 (A).
+     */
+    public string $labelJabatanNipSatu = 'Menteri Pariwisata';
+
+    /**
      * Masa cache ringkasan beranda per lingkup (detik). Angka "hari ini" (TB, IB, CLTN, cuti, presensi online) tidak di-cache.
      */
     public int $ttlRingkasanDetik = 900;
