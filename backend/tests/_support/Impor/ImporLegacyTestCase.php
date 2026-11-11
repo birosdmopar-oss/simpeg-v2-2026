@@ -56,12 +56,24 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
     {
         $dibuat = [];
 
+        // Dua lintasan: tabel bernama sama dengan tujuan v2 dulu, baru sumber bernama lain (`sumber`, mis. `inbox` →
+        // `disiplin_ticket` F-02) yang belum ada. Tanpa ini, sumber yang juga tabel v2 (mis. `filled_form_digital` untuk
+        // turunan `user_form_digital`, MAKE-089) terbuat dari struktur tabel yang salah.
+        $defs = [];
+
         for ($tier = 1; $tier <= DaftarTabel::TIER_MAKS; $tier++) {
-            foreach (DaftarTabel::tier($tier) as $def) {
-                // Tabel bernama lain di legacy (`sumber`, mis. `inbox` → `disiplin_ticket`, F-02) dibuat dengan nama sumbernya.
+            array_push($defs, ...DaftarTabel::tier($tier));
+        }
+
+        foreach ([false, true] as $pakaiSumber) {
+            foreach ($defs as $def) {
+                if ($def->skemaSiasn || ($def->sumber !== null) !== $pakaiSumber) {
+                    continue;
+                }
+
                 $nama = $def->sumber ?? $def->tabel;
 
-                if ($def->skemaSiasn || isset($dibuat[$nama])) {
+                if (isset($dibuat[$nama]) || ($pakaiSumber && $this->adaTabelV2($nama, $defs))) {
                     continue;
                 }
 
@@ -85,6 +97,20 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
         $this->src        = Database::connect($grup, false);
         $this->src->query("SET SESSION sql_mode = ''");
         $this->src->query("SET SESSION time_zone = '+00:00'");
+    }
+
+    /**
+     * @param list<\App\Libraries\Impor\DefinisiTabel> $defs
+     */
+    private function adaTabelV2(string $nama, array $defs): bool
+    {
+        foreach ($defs as $d) {
+            if ($d->sumber === null && ! $d->skemaSiasn && $d->tabel === $nama) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
