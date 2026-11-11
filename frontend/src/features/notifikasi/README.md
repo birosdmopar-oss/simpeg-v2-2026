@@ -33,3 +33,5 @@ Kontrak API: `backend/app/Controllers/Api/Notifikasi/README.md`. PRD Fase 7 v2.0
 - Tanpa frame Figma untuk halaman ini (mockup `67fa7678` hanya punya topbar): mengikuti pola halaman daftar lain
   (AGENTS.md §3.6).
 - "Buka" menandai dibaca lalu membuka `url_fe` (Q7-31). Hapus hanya untuk notifikasi riwayat (`dapat_dihapus`, Q7-33).
+
+Catatan: `berita_belum_dibaca` kini angka (sumber berita F-07 aktif); hanya `tiket_belum_dibaca` yang null sampai Fase 8.

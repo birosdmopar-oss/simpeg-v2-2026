@@ -16,7 +16,7 @@ antarmuka `Interfaces/Notifikasi/`.
   - S3 antrean approval.
   - S4 histori approval.
   - Sumber modul lain lewat `SumberNotifikasiInterface`: berita F-07, binding `Services::sumberNotifikasiBerita()`
-    (NoOp sampai F-07 di `main`).
+    (`SumberBerita`, aktif sejak DBV-032 + F-07; `berita_belum_dibaca` = angka, bukan null).
 - **BP8-1:** tiket Halo Simpeg hanya angka lewat `RingkasanTiketInterface` (`Services::ringkasanTiket()`, NoOp/null sampai
   Fase 8). Kode modul ini dilarang memuat nama tabel tiket atau tabel berita (`PusatNotifikasiArsitekturTest`).
 - **Waktu** dikirim UTC ISO `YYYY-MM-DDTHH:MM:SSZ`.

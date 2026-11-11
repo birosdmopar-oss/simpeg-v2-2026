@@ -170,8 +170,8 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   aturan portal, perbaikan anomali legacy); kelola role 1,3; role 3 → menunggu, kategori `allow_ap`, hanya miliknya; ubah oleh role 3
   kembali menunggu [V2]; proses role 1 (alasan wajib bila tolak, hanya status 0); isi disanitasi HTMLPurifier `p,br,strong,em,ul,ol,li,a[href]`;
   `news_flag` per berita (tanpa DELETE global legacy), `POST konten/berita/dibuka` mereset penanda pembaca; publish_at disimpan UTC (masukan WIB).
-- `SumberBerita` (kontrak A↔C) siap + teruji, tetapi binding `Services::sumberNotifikasiBerita()` TETAP NoOp sampai tabel `news` ada di skema
-  utama (migration DBV-032 di `main`); lalu ganti satu baris `return` (catatan di Services.php). Mengganti sekarang merusak `tests/Notifikasi`.
+- `SumberBerita` (kontrak A↔C) siap + teruji, tetapi binding `Services::sumberNotifikasiBerita()` kini memakai `SumberBerita` (11-11, setelah DBV-032 di `main`);
+  `PusatNotifikasiTest` menguncinya (berita = 0 tanpa berita terbit; tiket tetap null sampai Fase 8). Tanpa `tableExists` di kode konten.
 - Belum dibawa: lampiran berita (`news.lampiran`, FE belum memakai), hitung berita per kategori. Nilai awal `news.show_notif` ⚑ D1.
 - Test: `BeritaServiceTest` (12), `SumberBeritaTest` (4), `KontrakMatriksRoleTest` (+19 baris), FE `KelolaTeks.spec` (+penolakan beralasan).
 
@@ -201,7 +201,7 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 ## F-08 Pusat Notifikasi — MAKE-085 (Jalur C, PRD Fase 7 v2.0 §5.9)
 
 - 10-11: BE + FE di `main` `7cacf4d5`. Kontrak: `app/Controllers/Api/Notifikasi/README.md`, `frontend/src/features/notifikasi/README.md`.
-  Butir terbuka: histori PIC TB/IB/PMK (`show_pl`) DITUNDA (Horii 10-11); sumber berita NoOp sampai DBV-032 + F-07.
+  Butir terbuka: histori PIC TB/IB/PMK (`show_pl`) DITUNDA (Horii 10-11); sumber berita AKTIF sejak 11-11 (`SumberBerita`, F-07 + DBV-032); tiket tetap null sampai Fase 8.
 - 10-11 CR-113 (CI #711 merah, 6 failure `PusatNotifikasiTest`, hanya pada proses pertama di DB baru): `SumberShowNotif` dan
   `HistoriApproval` memakai `tableExists($tabel)`. Mode cache CI4 bisa basi, karena tabel dari `CREATE TABLE` SQL mentah
   tidak masuk cache `table_names`; mode `false` tanpa prefix → `SHOW TABLES LIKE` tanpa `t_`. Diganti ke
