@@ -7,6 +7,7 @@ namespace Tests\Notifikasi;
 use App\Constants\Role;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\FeatureTestTrait;
+use Config\Database;
 use Config\Services;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
@@ -43,6 +44,29 @@ final class PusatNotifikasiTest extends DatabaseTestCase
         $this->clearAuthState();
         Services::reset(true);
         parent::tearDown();
+    }
+
+    /**
+     * CR-113 (CI #711): cache daftar tabel CI4 yang basi — seperti sesudah migrasi awal di proses ber-DB baru, ketika tabel
+     * dari `CREATE TABLE` SQL mentah tidak pernah masuk cache — tidak boleh menyembunyikan sumber riwayat (S2) dan histori (S4).
+     */
+    public function testCacheDaftarTabelBasiTidakMenyembunyikanSumberRiwayat(): void
+    {
+        $idAlamat = $this->riwayatAlamat($this->nipPegawai, ['status' => 1, 'show_notif' => 1, 'show_ua_biro' => 1, 'notif_date' => Time::now('Asia/Jakarta')->format('Y-m') . '-01 03:00:00']);
+        $this->notifLayanan($this->nipPegawai, '2026-11-01 08:00:00');
+
+        $basi = static function (): void {
+            $db                           = Database::connect();
+            $db->dataCache['table_names'] = [$db->prefixTable('migrations')];
+        };
+
+        $basi();
+        $daftar = $this->json($this->asRole(Role::PEGAWAI)->get(self::BASE))['data'];
+        $this->assertContains("alamat:{$idAlamat}", array_column($daftar['items'], 'id'), 'S2 tetap terbaca walau cache tabel basi');
+
+        $basi();
+        $histori = $this->json($this->asRole(Role::SUPER_ADMIN)->get(self::BASE . '/histori-approval'))['data'];
+        $this->assertContains("alamat:{$idAlamat}", array_column($histori['items'], 'id'), 'S4 tetap terbaca walau cache tabel basi');
     }
 
     public function testRingkasanBerlakuUntukSemuaRoleDenganSumberNoOpNull(): void
