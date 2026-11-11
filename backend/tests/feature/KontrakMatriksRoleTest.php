@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|form-digital|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
