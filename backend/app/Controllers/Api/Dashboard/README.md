@@ -92,3 +92,93 @@ Nama berkas `{jenis}_{lingkup}{id}_{YmdHis}.{pdf|xlsx}`; header `X-Content-Type-
 **Audit (F7-27):** setiap unduhan berhasil dicatat di `audit_logs` (`entity` `dokumen_unduhan`, `entity_id` = jenis, `event` `create`, `after_json` `{jenis, format, lingkup, id, parameter, jumlah_baris}`); dicatat sesudah berkas dibangun, kegagalan audit → 500 (fail-closed). 401/403/404/422/429 tidak diaudit.
 
 Kode galat: 401 tanpa token; 403 role di luar matriks / lingkup di luar hak; 404 jenis tidak dikenal, `GET dokumen/baperjakat/{pdf|xlsx}` (harus POST), unit/satker tidak ada; 422 parameter tidak sah, rentang pensiun, body Baperjakat (termasuk NIP tidak ada / nonaktif / di luar scope → `errors.nip`, maks 20 NIP ditampilkan), fallback PDF di atas; 429 throttle.
+
+## F-13 Beranda per role (MAKE-087, Jalur D) — `BerandaController`
+
+PRD Fase 7 v2.0 §5.10. Config: `Config\Dashboard`. Logika: `Libraries\Dashboard\Beranda\RingkasanBeranda`.
+
+### `GET api/v1/dashboard/ringkasan` (jwt, role 1–8)
+
+Bentuk respons menurut keluarga role ikut legacy (`User.php:526-567`).
+
+**Admin (role 1/3/4/5/8)** — padanan tile `views/user/dashboard_ad.php:46-200`:
+
+```json
+{"status": "success", "data": {
+  "keluarga": "admin",
+  "lingkup": {"jenis": "kementerian|satker|unit", "id": null},
+  "tampilan_komposisi": "donut|angka",
+  "tanggal": "2026-11-10",
+  "total_aktif": 1200,
+  "pengingat": [{"kode": "pensiun", "label": "Pensiun", "jumlah": 12}, {"kode": "kp", "label": "Naik Pangkat", "jumlah": 40}, "..."],
+  "tile": [{"kode": "pns", "label": "Total PNS", "kelompok": "komposisi", "jumlah": 1000, "persen": 83}, "..."]
+}}
+```
+
+- `tile` berurutan seperti view legacy: `pns`, `ptt`, `non_pns`, `staf_khusus`, `tenaga_ahli` (kelompok `komposisi`),
+  `tb`, `ib`, `cltn`, `cuti`, `presensi_online` (kelompok `hari_ini`), `pppk` (`komposisi`). `persen` = round(jumlah /
+  total_aktif × 100), 0 bila total 0.
+- Lingkup: role 1/4/5/8 = kementerian; role 3 = satker akun (bila `id_satker` ada) atau unit akun, lewat
+  `pegawai_mutasi_jabatan` persis legacy dashboard. Satker ada tetapi bukan angka kanonik → semua 0 (fail-closed).
+- "Hari ini" = tanggal bisnis WIB (`tanggal`). TB kementerian termasuk periode perpanjangan; role 3 tanpa (Q7-41 [K]).
+- Pengecualian NIP `dashboard.nipDisembunyikan` (Q7-41) diterapkan di tile yang sama dengan legacy (lihat docblock
+  `RingkasanBeranda`); NIP tidak pernah ada di respons.
+- `tampilan_komposisi` = saklar `Config\Dashboard::$tampilanKomposisi` (Q7-36): `donut` [V2] / `angka` (persis legacy).
+  Data sama untuk kedua mode.
+- Cache: angka komposisi/total/CLTN per lingkup `ttlRingkasanDetik` (bawaan 900); TB/IB/cuti/presensi online selalu baru.
+
+- `pengingat` (M2): 4 kartu `dashboard_ad.php:8-37` — `pensiun`, `kp` (Naik Pangkat), `tj` (Tanda Jasa), `kgb` — ikut
+  `L_user::dashboard_*` + `L_employee::get_*` per lingkup (rincian `PengingatBeranda`): Pensiun/KP tahun berjalan (PNS); KGB
+  ≤ tahun berjalan (kementerian PNS+PPPK, satker/unit PNS); Tanda Jasa kementerian ≤ tahun acuan (tahun depan bila bulan ≥ 9),
+  satker/unit tepat 1 Agustus tahun berjalan/depan. Tanpa pengecualian NIP. Cache per lingkup + tanggal.
+
+**Pegawai (role 2/6/7)** — `{"keluarga": "pegawai", "tanggal": "2026-11-10", "prediksi": [...], "bawahan": {...},
+"kelengkapan": [...]}` (M2b). `prediksi` per kartu
+`{kode, label, tanggal|null, teks ("Bulan Tahun")|null, sisa ("N Tahun M Bulan")|null}` + khusus `kp`: `jenis` `ST|JF`,
+`pangkat_puncak`, `ak` `{sekarang, target, kurang}` (JF). Role 2: `pensiun` (BUP jabatan), `kp` (port `next_kp`; JF bila
+`pmj.id_group_jabatan` = 2 → AK `AkPermenpanrb`), `tj` (port `next_tj`), `kgb` (`next_kgb`); role 7: `pensiun` = `pmj.mhpk_akhir`
++ `kgb`; role 6: `[]`. KP/TJ/KGB `null` bila tidak sebelum tanggal pensiun.
+
+`bawahan` (role 2 saja, ikut `dashboard_pns`): `{atasan, presensi: [{nama, jam_masuk, jam_pulang}], ak: [{order, nama, nip,
+gol_ruang, satker, jabatan, ak_now, ak_kp, kurang}]}` — bawahan dari `pmj.id_atasan_es_*` / `*_koord` milik jabatan atasan
+(Eselon I tanpa bawahan, cabang mati legacy); presensi `dh_online` hari ini; AK hanya bawahan JF.
+
+`kelengkapan` (role 2 dengan `pegawai.id_jenis_pegawai = 1`; selain itu `[]`): `[{kode, label, persen}]` hanya kartu < 100%,
+urut legacy `L_user.php:647-700` — `data-umum` (Data Umum), `alamat`, `keluarga`, `pendidikan`, `kp` (Data Pangkat), `jabatan`,
+`kgb`, `tanda-jasa`. `kode` = tab Detail Pegawai (FE menautkan ke `/pegawai/{nip}?tab=<kode>`). Aturan per kartu dan deviasi
+(Q-D13..Q-D17): `app/Libraries/Dashboard/README.md` bagian "Kelengkapan data".
+
+Kode galat: 401 tanpa token.
+
+### `GET api/v1/dashboard/direktur` (role 1, 4)
+
+`{"items": [{"nama": "Dr. Nama, M.Par.", "politeknik": "Politeknik …", "masa_kerja": "2 Tahun 3 Bulan"}]}` — pegawai aktif
+dengan `pmj.id_jabatan` ∈ `Config\Dashboard::$idJabatanDirektur` (Q7-38), satu baris per jabatan (TMT terbaru), urut TMT
+DESC; masa kerja sampai hari ini WIB ('' bila < 1 bulan). 401/403.
+
+### `GET api/v1/dashboard/ulang-tahun?hari=ini|besok` (jwt, role 1–8) — Q7-45
+
+`{"hari": "ini", "items": [{nip|null, nama, tanggal_lahir ("10 November 1985"), jenis_pegawai|null, jabatan, satker|null,
+khusus, ada_foto, foto_kunci}]}`. Aturan pemilihan [K] `helpers/function_helper.php:1419-1475` (getTodayBday/getTomorrowBday):
+bulan-hari `tgl_lahir` = hari ini/besok WIB, `pegawai.status = 1`, `pmj.id_satker` ∉ `Config\Dashboard::$idSatkerDikecualikanUlangTahun`
+([171]; tanpa snapshot jabatan ikut tersaring), satu baris per NIP, seluruh kementerian; urutan [I] NIP ASC. Field = view
+`dashboard_ad.php:250-298`; baris `nip = '1'` → `khusus` (nama, tanggal, `$labelJabatanNipSatu`). `hari` lain → 422.
+
+### `GET api/v1/dashboard/ulang-tahun/{nip}/foto` (jwt, role 1–8) — Q-D19
+
+Foto (`BiodataServiceInterface::fotoSistem`, tanpa cek lingkup PegawaiScope) HANYA bila `{nip}` ada di daftar ulang tahun hari
+ini atau besok; selain itu / tanpa foto → 404 seragam. Header sama dengan `pegawai/{nip}/foto` (`no-store`, `nosniff`).
+
+### Butir terbuka
+
+- **Q-D18 (A, Horii 10-11-2026):** pengecualian NIP ulang tahun legacy lewat `.env` rahasia `dashboard.nipDikecualikanUlangTahun`
+  (diisi operator dari legacy; kosong = tanpa pengecualian); berlaku untuk daftar dan foto (404).
+- **Q-D12 (A, Horii 10-11-2026):** akun di `.env` rahasia `dashboard.penggunaLihatSemua` (daftar `id_pengguna`) tidak memakai
+  pengecualian `dashboard.nipDisembunyikan` (persis legacy: `$whereHide_nip` kosong untuk akun tertentu); kosong = semua akun
+  memakai pengecualian.
+- **Deviasi [V2] Tanda Jasa satker/unit** (Horii 10-11-2026): tahun acuan sama dengan kementerian; rollback
+  `Config\Dashboard::$tandaJasaIkutLegacy = true`. Rincian (a)–(d): `app/Libraries/Dashboard/README.md`.
+- **[I] KP satker/unit:** `get_kp_satker|unit` legacy menghitung percepatan juga untuk `gol_ruang` kosong; v2 memakai perilaku
+  `get_all_kp` di semua lingkup (dicek saat QA).
+- **Kelengkapan data (Q-D13..Q-D17, semua A, Horii 10-11-2026):** diterapkan; rincian deviasi di README library.
+- **M3 (lanjutan MAKE-087):** pemasangan komponen Jalur A (popup, banner, berita) dan Jalur B (ringkasan SKL) setelah komponennya ada di `main`.

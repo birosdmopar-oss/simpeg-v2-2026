@@ -7,6 +7,12 @@ Acuan: `docs/fase6/PRD_Fase6_Integrasi.md`. Pembagian: `docs/fase6/6_2.md` (Jalu
 
 **FASE 6 DONE — sign-off Horii 10-11-2026** (`main` `f10fd0af`; laporan `docs/fase6/Laporan_Akhir_Fase6.md`). Temuan QA T1 diperbaiki CR-111; deviasi K1 → ISSUE-058.
 
+**ISSUE-058 (deviasi K1) — MAKE-078, Fase 7 Jalur D** (branch `fase7/make-078-integrasi-log`): `GET api/v1/integrasi/log`
+(role 1; filter layanan/status/tanggal WIB, paginasi, 422 per parameter; kueri `Log\DaftarLogIntegrasi`) + halaman FE
+Admin → Integrasi `/integrasi` (tabel log, ⋮ "Lihat detail", tombol Tarik Ulang e-Kinerja ke `POST bkn/tarik` yang sudah
+ada). K1 (§6.2 baris 244: halaman Admin → Integrasi) **selesai di branch**; status "di main" menyusul setelah merge. QA
+memakai butir N5/N6 `docs/fase6/Checklist_QA_Lapis1_Fase6.md`.
+
 | Task | Jalur | Key | Status |
 |---|---|---|---|
 | H-01 | A + B | DBV-026, DBV-027 | A: DBV-026 di main `7185bdd5`; B: DBV-027 di main `c3c6213f` (+ DBV-030 `4c2d96a5`) |

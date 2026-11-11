@@ -102,3 +102,56 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 
   `nav.config.spec.ts` (+1: Dokumen 4 anak, role 1/3/4/5/8, tetap tersembunyi). Uji mutasi: pembacaan body Blob dimatikan → 3 test gagal.
 - **Catatan:** QA visual oleh coder 2 lewat URL langsung (menu `phase: 7`, F7-14, PRD Q-2), tanpa preview browser di M4. Mockup halaman Dokumen tidak ada; layout mengikuti halaman laporan (PRD Q-3).
+
+## F-13 Frontend Dashboard — MAKE-087 (Jalur D, PRD Fase 7 v2.0 §5.10)
+
+### M1 — kerangka + `Config\Dashboard` (branch `fase7/make-087-dashboard`)
+
+- `Config\Dashboard`: `$tampilanKomposisi` donut/angka (Q7-36), `$nipDisembunyikan` (Q7-41, `.env` server saja),
+  `$idJabatanDirektur` (Q7-38), `$ttlRingkasanDetik`.
+- `GET api/v1/dashboard/ringkasan` (jwt): keluarga admin = 11 tile `dashboard_ad` (komposisi + status hari ini, persen
+  terhadap total aktif) per lingkup kementerian/satker/unit, letak pengecualian NIP & TB perpanjangan ikut legacy;
+  keluarga pegawai = kerangka.
+- FE `HomeView` → `AdminDashboard` (`KomposisiPegawaiCard` dua mode) / `PegawaiDashboard` (kerangka); `home-role` tetap.
+- Berkas bersama (aditif, commit terpisah): `Config/RoutesDashboard.php`, `tests/feature/KontrakMatriksRoleTest.php`
+  (+route, +prefiks `dashboard`), `README-deploy.md` §1k, progres ini.
+- Test: `tests/database/Dashboard/RingkasanBerandaTest.php` (11), `features/dashboard/__tests__/{HomeView,beranda.amplop}.spec.ts`.
+- Sisa M2: pengingat Pensiun/KP/TJ/KGB, ulang tahun (Q7-45), direktur (Q7-38), keluarga pegawai (prediksi, kelengkapan,
+  bawahan), `UiCarouselPanel`. M3: pasang komponen Jalur A/B/C.
+
+### M2a — beranda admin (branch yang sama)
+
+- BE: `pengingat` di `dashboard/ringkasan` (`PengingatBeranda` + `ProyeksiTandaJasa` port `get_all_tj`; kalkulasi KP/KGB/Pensiun
+  memakai ulang kelas murni `Integrasi\Stat` tanpa mengubahnya), `GET dashboard/direktur` (`DirekturBeranda`, role 1/4).
+- FE: `PengingatCards`, `ButuhApprovalCard` (adapter sementara kontrak Jalur C), `DirekturCard` di `AdminDashboard`.
+- Test: `PengingatBerandaTest` (6), `DirekturBerandaTest` (3), `ProyeksiTandaJasaTest` (12), `HomeView.spec` (+M2a).
+- Terbuka: Q-D12, tepi [I] KP satker/unit, ulang tahun (menunggu reviewer). Berikutnya M2b keluarga pegawai.
+
+### M2b (tahap 1) — prediksi pegawai
+
+- BE `PrediksiPegawai` (port `next_kp` sendiri karena `RekomendasiKp::deteksi`/`get_all_kp` hanya tahun berjalan; `next_tj` =
+  `ProyeksiTandaJasa::prediksiPegawai`; KGB `RekomendasiKgb`; AK JF `AkPermenpanrb`); FE `PrediksiCards`.
+- Test: `PrediksiPegawaiTest` (6), `ProyeksiTandaJasaTest` (+8 next_tj), `HomeView.spec` (+6).
+- Tahap 2: `BawahanPegawai` + `BawahanCards` (presensi & AK bawahan atasan role 2); `BawahanPegawaiTest` (3), `HomeView.spec` (+3).
+- Tahap 3: deviasi [V2] Tanda Jasa satker/unit + saklar rollback (Horii 10-11), fixture percepatan next_kp, tautan Presensi
+  Saya (Q7-42; komponen Fase 5 tidak ada), ulang tahun (`UlangTahunBeranda`, `dashboard/ulang-tahun` + foto Q-D19,
+  Config Q-D20) + `UiCarouselPanel`. Q7-44 dikoreksi: tautan update FK PTT legacy dikomentari → tidak dipasang.
+- Sisa M2: kelengkapan data (`kd_*`, Q-D13..D17 menunggu Horii), Q-D18 (pengecualian NIP ulang tahun), Q-D12.
+- 10-11: `ButuhApprovalCard` memakai `useRingkasanNotifikasi()` asli `@/features/notifikasi` (F-08 MAKE-085 di `main`);
+  adapter sementara dihapus; ikut aturan lonceng (`ACTIVE_PHASE < FASE_LONCENG` → "—" tanpa tautan/polling).
+- Lanjutan MAKE-087 (branch `fase7/make-087-kelengkapan`, 10-11): kelengkapan data `KelengkapanData` + `KelengkapanCards`
+  (Q-D13..Q-D17 A), `.env` rahasia `dashboard.penggunaLihatSemua` (Q-D12 A) dan `dashboard.nipDikecualikanUlangTahun`
+  (Q-D18 A). Sisa: M3 (komponen Jalur A dan B).
+
+## F-08 Pusat Notifikasi — MAKE-085 (Jalur C, PRD Fase 7 v2.0 §5.9)
+
+- 10-11: BE + FE di `main` `7cacf4d5`. Kontrak: `app/Controllers/Api/Notifikasi/README.md`, `frontend/src/features/notifikasi/README.md`.
+  Butir terbuka: histori PIC TB/IB/PMK (`show_pl`) DITUNDA (Horii 10-11); sumber berita NoOp sampai DBV-032 + F-07.
+- 10-11 CR-113 (CI #711 merah, 6 failure `PusatNotifikasiTest`, hanya pada proses pertama di DB baru): `SumberShowNotif` dan
+  `HistoriApproval` memakai `tableExists($tabel)`. Mode cache CI4 bisa basi, karena tabel dari `CREATE TABLE` SQL mentah
+  tidak masuk cache `table_names`; mode `false` tanpa prefix → `SHOW TABLES LIKE` tanpa `t_`. Diganti ke
+  `tableExists($db->prefixTable($tabel), false)`. Ditambah test regresi cache basi (`PusatNotifikasiTest`) dan guard
+  `tests/unit/Arsitektur/TableExistsBerprefixTest` (semua `->tableExists(` di app/).
+- Catatan: `getFieldNames()` CI4 juga ber-cache per tabel (`dataCache['field_names']`). Di modul ini aman karena kolom
+  sumber tidak diubah sesudah dibaca dalam satu proses. Bila kelak ada migration/test yang mengubah kolom di tengah
+  proses, pakai `information_schema.COLUMNS`.

@@ -491,6 +491,29 @@ Perubahan perilaku yang HARUS diberitahukan ke klien (daftar pemberitahuan re-ha
 
 ---
 
+### 1k. Beranda per role (F-13, MAKE-087, PRD Fase 7 v2.0 §5.10)
+
+Kunci `.env` backend (opsional; tanpa isi = perilaku bawaan):
+
+```ini
+# Q7-41 (ikut legacy $whereHide_nip): NIP yang dikecualikan dari hitungan beranda, dipisah koma. RAHASIA — hanya di
+# shared/backend.env server, tidak pernah di repo. Kosong = tanpa pengecualian.
+dashboard.nipDisembunyikan =
+# Q-D12 (ikut legacy): id_pengguna yang TIDAK memakai pengecualian di atas, dipisah koma. RAHASIA. Kosong = semua akun memakai.
+dashboard.penggunaLihatSemua =
+# Q-D18 (ikut legacy getTodayBday/getTomorrowBday): NIP yang tidak ditampilkan di kartu ulang tahun (fotonya juga 404),
+# dipisah koma; operator mengisi dari legacy. RAHASIA. Kosong = tanpa pengecualian.
+dashboard.nipDikecualikanUlangTahun =
+# Q7-36: tampilan komposisi pegawai di beranda admin. donut (bawaan, [V2]) | angka (persis legacy, rollback tanpa deploy kode).
+dashboard.tampilanKomposisi = donut
+# Deviasi [V2] Horii 10-11-2026: kartu Tanda Jasa satker/unit memakai tahun acuan kementerian. true = persis legacy (≈0 Sep–Des).
+dashboard.tandaJasaIkutLegacy = false
+```
+
+Cache ringkasan beranda per lingkup (`Config\Dashboard::$ttlRingkasanDetik`, 900 detik) memakai cache aplikasi; perubahan
+`dashboard.nipDisembunyikan` / `dashboard.penggunaLihatSemua` langsung berlaku (sidik daftar yang berlaku untuk akun ada di
+kunci cache). Daftar ulang tahun tidak di-cache.
+
 ## 2. Cara push (operator deploy)
 
 Satu kali: tambahkan remote ke bare repo server dev.

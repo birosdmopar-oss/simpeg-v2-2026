@@ -58,12 +58,15 @@ abstract class ImporLegacyTestCase extends DatabaseTestCase
 
         for ($tier = 1; $tier <= DaftarTabel::TIER_MAKS; $tier++) {
             foreach (DaftarTabel::tier($tier) as $def) {
-                if ($def->skemaSiasn || isset($dibuat[$def->tabel])) {
+                // Tabel bernama lain di legacy (`sumber`, mis. `inbox` → `disiplin_ticket`, F-02) dibuat dengan nama sumbernya.
+                $nama = $def->sumber ?? $def->tabel;
+
+                if ($def->skemaSiasn || isset($dibuat[$nama])) {
                     continue;
                 }
 
-                $this->db->query("CREATE TABLE `{$this->lgc}`.`{$def->tabel}` LIKE `{$this->db->getDatabase()}`.`{$this->db->prefixTable($def->tabel)}`");
-                $dibuat[$def->tabel] = true;
+                $this->db->query("CREATE TABLE `{$this->lgc}`.`{$nama}` LIKE `{$this->db->getDatabase()}`.`{$this->db->prefixTable($def->tabel)}`");
+                $dibuat[$nama] = true;
             }
         }
 

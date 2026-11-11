@@ -23,6 +23,7 @@ export function createShellRouter(): Router {
       { path: '/master-ak-jf', name: 'master-ak-jf', component: stub },
       { path: '/hari-libur', name: 'hari-libur', component: stub },
       { path: '/web-config', name: 'web-config', component: stub },
+      { path: '/integrasi', name: 'integrasi-admin', component: stub },
       { path: '/faq/:id?', name: 'faq', component: stub },
       { path: '/ganti-password', name: 'change-password', component: stub },
       { path: '/pegawai', name: 'pegawai-list', component: stub },
