@@ -6,7 +6,7 @@ Branch `fase7/dbv-032-skema-dashboard` (dari `main` `57914b45`). Alur `[DBV]`:
 2. Migration dipindah dari `MigrationsDitahan/` ke `Migrations/`, test skema dijadikan permanen, dan registry NIP diperbarui.
 3. Reviewer CR me-merge dengan izin Horii.
 
-**Status:** ⏳ draf. **PR [DBV] baru dibuka setelah D1 Fase 7 (G7-2, Q7-27) diterima**, karena kolom ⚑ belum dikunci.
+**Status:** ⏳ draf, **dicocokkan dengan D1 Fase 7 (11-11-2026, §2a)**. SHOW CREATE `skl`, `jenis_dibo`, `dibo` masih **menunggu D1 lanjutan**; pembukaan PR [DBV] diputuskan reviewer.
 
 **Penulis:** Jalur B Fase 7, 10-11-2026.
 
@@ -89,6 +89,50 @@ Pencocokan dengan D1 Fase 7 (`D1_fase7/ambil_d1_fase7.sql`, milik Horii, G7-2) m
 | `user_form_digital` | `L_announcement.php:2432`, 2494-2495; dihapus saat submit `controllers/hr/Announcement.php:584` | `MY_Controller.php:246-250`, `Local.php:4299-4305` | — |
 | `filled_form_digital` | `Announcement.php:511-518`, 567, 580-581 | `Announcement.php:495`, `MY_Controller.php:252-255`, `L_announcement.php:2822-2828` | cek-lalu-insert tanpa kunci (race) |
 | `skl` | `Announcement.php:697-707` | `Announcement.php:679`, `libraries/hr/L_survey.php:22-29` | cek-lalu-insert (race) |
+
+## 2a. Pencocokan D1 Fase 7 (11-11-2026)
+
+Sumber: hasil `ambil_d1_fase7.sql` blok 1–10 dari produksi legacy (struktur dan agregat, tanpa NIP), di luar repo.
+**SHOW CREATE `skl`, `jenis_dibo`, `dibo` belum diterima.** Kolom ketiga tabel itu tetap ⚑ (menunggu D1 lanjutan);
+PK/indeks/FK-nya sudah dicocokkan dari blok indeks/FK.
+
+**Temuan umum:**
+- 13/13 tabel ada, semuanya InnoDB.
+- Kelompok ganda = 0 untuk semua kunci UNIQUE v2, termasuk `skl (nip,jenis_rwy,id_rwy)` dan `news_flag (id_user,id_news)` yang di legacy belum UNIQUE. UNIQUE v2 aman untuk impor.
+- Baris yatim = 0 untuk semua relasi yang dicek.
+- Collation: `dibo`, `news`, `news_category`, `news_flag` di legacy memakai `utf8mb4_0900_ai_ci`, sisanya `utf8mb4_unicode_ci`. v2 tetap `utf8mb4_unicode_ci` (standar proyek). **Impor:** konversi eksplisit saat membaca; perbandingan string antar-collation jangan dilakukan di SQL lintas DB.
+- Volume besar: `user_popup` ±1,2 juta baris, `user_banner` ±250 ribu. **Impor bertahap** (batch per induk), lihat Bagian 10.
+- Trigger `news.news_beUpd`: status 0 → 1/2 mengisi `show_notif = 1` dan `notif_date = NOW()`. **v2 tanpa trigger**; service persetujuan/penolakan berita (Jalur A) wajib mengisi kedua kolom dalam UPDATE yang sama.
+
+**Disesuaikan ke D1 (draf diubah 11-11):**
+
+| Tabel.kolom | Sebelum | Sesudah | Label |
+|---|---|---|---|
+| `popup/banner.order`, `form_digital.order` | DEFAULT 0 | DEFAULT 1 | [K] |
+| `popup/banner.url` | VARCHAR(500) | VARCHAR(255) | [K] |
+| `news_category.allow_ap` | 0/1, DEFAULT 0 | 1 ya / 2 tidak, DEFAULT 2 (legacy ENUM '1','2') | [K] |
+| `news.show_notif` | NULL, CHECK 1/2/3 | NOT NULL DEFAULT 0, CHECK 0–3 (0 = belum ada notifikasi) | [K] |
+| `news.notif_date` | tidak ada | DATETIME NULL (diisi service, pengganti trigger) | [K] |
+| `news_flag.created_at` | tidak ada | DATETIME NULL DEFAULT CURRENT_TIMESTAMP | [K] |
+| `form_digital.form_digital`, `filled_form_digital.response` | MEDIUMTEXT | LONGTEXT | [K] |
+| `popup.tgl_*` DATETIME; `banner/form_digital.tgl_*` DATE | ⚑ | dikunci | [K] |
+
+**Tetap berbeda dari legacy (deviasi v2 yang disengaja):**
+
+| Hal | Legacy | v2 | Alasan |
+|---|---|---|---|
+| PK tabel anak `user_popup/user_banner/user_form_digital/filled_form_digital` | PK komposit (nip, id_induk) | PK sintetis + UNIQUE (id_induk, nip) + KEY nip | DBV-032-Q5; dipakai Penargetan Jalur A. Ganda = 0, impor aman |
+| `news_flag` | tanpa PK/UNIQUE | PK sintetis + UNIQUE (id_user, id_news) | ganda = 0 |
+| `skl (nip,jenis_rwy,id_rwy)` | KEY biasa | UNIQUE | Q7-21 idempoten; ganda = 0 |
+| FK NIP | CASCADE/CASCADE | RESTRICT/RESTRICT | registry `TabelAnakNip`, koreksi NIP lewat aplikasi |
+| FK `filled_form_digital → form_digital` | CASCADE | RESTRICT | hapus form = lunak (Q7-19) |
+| FK `news_flag.id_user → pengguna` | CASCADE | RESTRICT | pengguna v2 dihapus lunak |
+| Tipe PK/FK | `int` | `INT UNSIGNED` | konvensi v2; nilai legacy positif |
+| `keterangan` | TINYTEXT | TEXT | superset, impor aman |
+| `target_uns` | VARCHAR(255) | MEDIUMTEXT + CHECK JSON | superset, impor aman |
+| `news_category.status` | 0 nonaktif / 1 aktif | 1/2/10 | 0 → 2 saat impor |
+| `news.category`, `news.unit_satker_target` | salinan nama | tidak dibawa | DBV-032-Q2 |
+| Kolom konstan popup/banner/form (`target`, `type`, `id_unit_satker`, `unit_satker`) dan `*_desc` | ada | tidak dibawa | Q7-03/Q7-47; lihat DBV-032-Q9 |
 
 ## 3. Skema v2 usulan
 
@@ -277,14 +321,17 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
 
 | # | Pertanyaan | Usulan |
 |---|---|---|
-| DBV-032-Q1 | `form_digital` menyimpan pilihan target (JSON) atau tidak | Simpan seperti popup [I], agar form bisa diedit ulang. Final mengikuti D1 |
+| DBV-032-Q1 | `form_digital` menyimpan pilihan target (JSON) atau tidak | ✅ D1: legacy `form_digital` memiliki `target_uns`/`target_peg`/`excl_peg`; disimpan seperti popup [K] |
 | DBV-032-Q2 | Salinan nama `news.category` / `news.unit_satker_target` | Tidak dibawa; nama diturunkan dengan join ke `news_category`/`unit`/`satker` (target kementerian memakai `web_config`) [V2]. **Disetujui Jalur A 10-11** (tanpa kebutuhan histori); catatan impor di Bagian 10 |
 | DBV-032-Q3 | FK `news.id_unit_target/id_satker_target/id_*_creator` ke master unit/satker | Tanpa FK di draf; semua kolom NULL-able [K-kode]: target kementerian = NULL (`L_news::set_param` 866-930; '0' hanya ada di input form, tidak disimpan); `id_*_creator` = NULL untuk role 1 dan role 3 tanpa satker. Tipe ikut D1; FK dipasang bila D1 membuktikan yatim = 0. Disetujui Jalur A 10-11; **keputusan akhir DB Validator** |
 | DBV-032-Q4 | Nama kategori unik | Aplikasi saja, karena status 2/10 boleh berulang |
-| DBV-032-Q5 | PK sintetis tabel anak | Dipakai; bila D1 menunjukkan PK komposit, UNIQUE tetap dan PK sintetis tetap [V2] (impor tidak memakainya) |
+| DBV-032-Q5 | PK sintetis tabel anak | D1: legacy PK komposit (nip, id_induk); `news_flag` tanpa PK. Usulan tetap PK sintetis + UNIQUE [V2] (impor tidak memakainya; ganda = 0) |
 | DBV-032-Q6 | CHECK `JSON_VALID` di kolom target/skema/jawaban | Dipakai (MySQL 8 & MariaDB); impor menormalkan `addslashes` lebih dulu |
-| DBV-032-Q7 | Tipe tanggal popup (DATETIME) vs banner/form (DATE) | Ikut legacy; dikunci D1 |
-| DBV-032-Q8 | `news.show_notif` DEFAULT | NULL di draf; ikut DEFAULT D1 |
+| DBV-032-Q7 | Tipe tanggal popup (DATETIME) vs banner/form (DATE) | ✅ Dikunci D1 11-11 (sesuai draf) |
+| DBV-032-Q8 | `news.show_notif` DEFAULT | ✅ D1: NOT NULL DEFAULT 0; draf disesuaikan (CHECK 0–3) + `notif_date` ditambahkan |
+| DBV-032-Q9 | D1 menunjukkan `popup.target` bervariasi (1/2/3) dan ada 1 popup `type` = 2 (video); `banner.target` 1/3; `form_digital.target` 1/3 | Usulan: tetap tidak dibawa (Q7-03 [V2]). `target` dapat diturunkan dari isi `target_uns`/`target_peg` saat impor (⚑ dicek pada data impor); popup video tunggal dicatat sebagai pengecualian impor. **Keputusan reviewer/Horii** karena menyentuh keputusan PRD Q7-03 |
+| DBV-032-Q10 | `news.id_news_category` legacy NULL-able (FK SET NULL), draf NOT NULL | Tetap NOT NULL bila jumlah NULL di produksi = 0 (⚑ minta angka di D1 lanjutan); bila > 0, impor memetakan ke kategori bawaan |
+| DBV-032-Q11 | Legacy memasang FK `news` ke `unit`, `satker`, `user_level`, `pengguna` (ON DELETE SET NULL) | Relevan untuk Q3: data legacy bersih karena FK. Usulan tetap tanpa FK di v2 (konsisten `*_by` tanpa FK; unit/satker v2 berstatus lunak); keputusan DB Validator |
 
 ## 10. Langkah pemindahan (setelah approve + izin Horii)
 
@@ -298,6 +345,10 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
    - kolom legacy `news.category` dan `news.unit_satker_target` (salinan nama, [V2] tidak dibawa, Q2) dilewati;
      `id_news_category`/`id_*_target` yang dipakai;
    - target `user_form_digital` dari `filled`.
+   - **D1 11-11:** `news_category.allow_ap` ENUM '1'/'2' → TINYINT 1/2; `news.show_notif` 0 tetap 0; `news.status` ENUM → TINYINT;
+     baca 4 tabel ber-collation `utf8mb4_0900_ai_ci` dengan konversi eksplisit;
+   - `user_popup` (±1,2 juta) dan `user_banner` (±250 ribu) diimpor **bertahap per induk** dalam batch, dengan
+     `INSERT IGNORE`-setara (UNIQUE) agar bisa diulang.
    Eksekusinya mengikuti tiket impor Q7-24.
 4. `docs/progress/07-Dashboard.md` diperbarui.
 

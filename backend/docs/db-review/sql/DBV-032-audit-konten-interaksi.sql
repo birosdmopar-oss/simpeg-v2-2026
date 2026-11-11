@@ -64,7 +64,7 @@ SELECT 'WAJIB_0 news status di luar 0-2' AS butir, COUNT(*) AS jumlah FROM news 
 
 SELECT 'WAJIB_0 news target di luar 1-3' AS butir, COUNT(*) AS jumlah FROM news WHERE target IS NULL OR target NOT IN (1, 2, 3);
 
-SELECT 'WAJIB_0 news_category allow_ap di luar 0-1' AS butir, COUNT(*) AS jumlah FROM news_category WHERE allow_ap IS NULL OR allow_ap NOT IN (0, 1);
+SELECT 'WAJIB_0 news_category allow_ap di luar 1-2' AS butir, COUNT(*) AS jumlah FROM news_category WHERE allow_ap IS NULL OR allow_ap NOT IN ('1', '2');
 
 SELECT 'WAJIB_0 periode terbalik popup' AS butir, COUNT(*) AS jumlah FROM popup WHERE tgl_akhir < tgl_mulai;
 

@@ -92,7 +92,7 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
             $this->assertSame(['mediumtext null', 'mediumtext null', 'mediumtext null'], [$kolom['target_uns'], $kolom['target_peg'], $kolom['excl_peg']], $tabel);
         }
 
-        $this->assertSame('tinyint null', $this->skemaColumns('news')['show_notif']);
+        $this->assertSame('tinyint not null', $this->skemaColumns('news')['show_notif']);
         $this->assertSame('int', $this->skemaColumns('skl')['id_rwy']);
 
         foreach (['inbox', 'inbox_msg'] as $tabel) {
@@ -130,7 +130,7 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
         $this->assertDbError(self::CHECK, fn () => $this->sisip('news_category', ['category' => 'X', 'status' => 0]));
         $berita = $this->sisip('news', ['id_news_category' => $kategori, 'title' => 'Judul', 'news' => '<p>isi</p>', 'publish_at' => '2026-11-10 00:00:00', 'ul_creator' => 1]);
         $this->assertDbError(self::CHECK, fn () => $this->sisip('news', ['id_news_category' => $kategori, 'title' => 'J', 'news' => 'x', 'publish_at' => '2026-11-10 00:00:00', 'ul_creator' => 1, 'status' => 3]));
-        $this->assertDbError(self::CHECK, fn () => $this->sisip('news', ['id_news_category' => $kategori, 'title' => 'J', 'news' => 'x', 'publish_at' => '2026-11-10 00:00:00', 'ul_creator' => 1, 'show_notif' => 0]));
+        $this->assertDbError(self::CHECK, fn () => $this->sisip('news', ['id_news_category' => $kategori, 'title' => 'J', 'news' => 'x', 'publish_at' => '2026-11-10 00:00:00', 'ul_creator' => 1, 'show_notif' => 4]));
         $this->assertDbError([1452], fn () => $this->sisip('news', ['id_news_category' => 999999, 'title' => 'J', 'news' => 'x', 'publish_at' => '2026-11-10 00:00:00', 'ul_creator' => 1]));
         $this->assertDbError([1451], fn () => $this->db->table('news_category')->where('id_news_category', $kategori)->delete());
 
