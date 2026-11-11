@@ -93,11 +93,22 @@ export interface BawahanBeranda {
 }
 
 /** Keluarga pegawai (role 2/6/7). Role 2: 4 kartu + bawahan; role 7: Pensiun + KGB; role 6: kosong. */
+/**
+ * Kartu kelengkapan data (role 2, PNS; `L_user::dashboard_pns` + `kd_r*` [K]): hanya yang < 100%, urut legacy. `kode` =
+ * tab Detail Pegawai (`data-umum`, `alamat`, `keluarga`, `pendidikan`, `kp`, `jabatan`, `kgb`, `tanda-jasa`).
+ */
+export interface KartuKelengkapan {
+  kode: string
+  label: string
+  persen: number
+}
+
 export interface RingkasanPegawai {
   keluarga: 'pegawai'
   tanggal: string
   prediksi: KartuPrediksi[]
   bawahan: BawahanBeranda
+  kelengkapan: KartuKelengkapan[]
 }
 
 export type RingkasanBeranda = RingkasanAdmin | RingkasanPegawai

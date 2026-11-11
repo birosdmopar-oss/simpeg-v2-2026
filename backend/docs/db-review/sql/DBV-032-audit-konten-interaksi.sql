@@ -60,11 +60,19 @@ SELECT 'WAJIB_0 skl rate di luar 1-5' AS butir, COUNT(*) AS jumlah FROM skl WHER
 
 SELECT 'WAJIB_0 skl jenis_rwy di luar 1-5' AS butir, COUNT(*) AS jumlah FROM skl WHERE jenis_rwy IS NULL OR jenis_rwy NOT BETWEEN 1 AND 5;
 
-SELECT 'WAJIB_0 news status di luar 0-2' AS butir, COUNT(*) AS jumlah FROM news WHERE status IS NULL OR status NOT IN (0, 1, 2);
+SELECT 'WAJIB_0 news status di luar 0-2' AS butir, COUNT(*) AS jumlah FROM news WHERE status IS NULL OR status NOT IN ('0', '1', '2'); -- legacy ENUM: bandingkan sebagai string, bukan indeks
 
-SELECT 'WAJIB_0 news target di luar 1-3' AS butir, COUNT(*) AS jumlah FROM news WHERE target IS NULL OR target NOT IN (1, 2, 3);
+SELECT 'WAJIB_0 news target di luar 1-3' AS butir, COUNT(*) AS jumlah FROM news WHERE target IS NULL OR target NOT IN ('1', '2', '3'); -- legacy ENUM
 
-SELECT 'WAJIB_0 news_category allow_ap di luar 0-1' AS butir, COUNT(*) AS jumlah FROM news_category WHERE allow_ap IS NULL OR allow_ap NOT IN (0, 1);
+SELECT 'WAJIB_0 news show_notif di luar 0-3' AS butir, COUNT(*) AS jumlah FROM news WHERE show_notif IS NULL OR show_notif NOT IN (0, 1, 2, 3);
+
+SELECT 'WAJIB_0 news_category status di luar 0/1' AS butir, COUNT(*) AS jumlah FROM news_category WHERE status IS NULL OR status NOT IN (0, 1);
+
+SELECT 'WAJIB_0 dibo status di luar 1/2' AS butir, COUNT(*) AS jumlah FROM dibo WHERE status IS NULL OR status NOT IN (1, 2);
+
+SELECT 'WAJIB_0 jenis_dibo status di luar 1/2' AS butir, COUNT(*) AS jumlah FROM jenis_dibo WHERE status IS NULL OR status NOT IN (1, 2);
+
+SELECT 'WAJIB_0 news_category allow_ap di luar 1-2' AS butir, COUNT(*) AS jumlah FROM news_category WHERE allow_ap IS NULL OR allow_ap NOT IN ('1', '2');
 
 SELECT 'WAJIB_0 periode terbalik popup' AS butir, COUNT(*) AS jumlah FROM popup WHERE tgl_akhir < tgl_mulai;
 
@@ -104,6 +112,21 @@ FROM news_flag f LEFT JOIN news n ON n.id_news = f.id_news WHERE n.id_news IS NU
 
 SELECT 'INFO dibo tanpa jenis' AS butir, COUNT(*) AS jumlah
 FROM dibo d LEFT JOIN jenis_dibo j ON j.id_jenis_dibo = d.id_jenis_dibo WHERE j.id_jenis_dibo IS NULL;
+
+SELECT 'INFO dibo kolom NULL (jenis/nomor/tahun, dihitung per baris)' AS butir, COUNT(*) AS jumlah
+FROM dibo WHERE id_jenis_dibo IS NULL OR nomor IS NULL OR nomor = '' OR tahun IS NULL;
+
+SELECT 'INFO news tanpa kategori (NULL)' AS butir, COUNT(*) AS jumlah FROM news WHERE id_news_category IS NULL;
+
+SELECT 'INFO news ul_creator NULL' AS butir, COUNT(*) AS jumlah FROM news WHERE ul_creator IS NULL;
+
+SELECT 'INFO news id_unit_target/id_unit_creator yatim terhadap unit' AS butir, COUNT(*) AS jumlah
+FROM news n LEFT JOIN unit ut ON ut.id_unit = n.id_unit_target LEFT JOIN unit uc ON uc.id_unit = n.id_unit_creator
+WHERE (n.id_unit_target IS NOT NULL AND ut.id_unit IS NULL) OR (n.id_unit_creator IS NOT NULL AND uc.id_unit IS NULL);
+
+SELECT 'INFO news id_satker_target/id_satker_creator yatim terhadap satker' AS butir, COUNT(*) AS jumlah
+FROM news n LEFT JOIN satker st ON st.id_satker = n.id_satker_target LEFT JOIN satker sc ON sc.id_satker = n.id_satker_creator
+WHERE (n.id_satker_target IS NOT NULL AND st.id_satker IS NULL) OR (n.id_satker_creator IS NOT NULL AND sc.id_satker IS NULL);
 
 SELECT 'INFO NIP yatim terhadap pegawai (5 tabel)' AS butir, SUM(n) AS jumlah FROM (
     SELECT COUNT(*) AS n FROM user_popup a LEFT JOIN pegawai p ON p.nip = a.nip WHERE p.nip IS NULL

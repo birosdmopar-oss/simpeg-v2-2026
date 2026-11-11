@@ -139,6 +139,9 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - Sisa M2: kelengkapan data (`kd_*`, Q-D13..D17 menunggu Horii), Q-D18 (pengecualian NIP ulang tahun), Q-D12.
 - 10-11: `ButuhApprovalCard` memakai `useRingkasanNotifikasi()` asli `@/features/notifikasi` (F-08 MAKE-085 di `main`);
   adapter sementara dihapus; ikut aturan lonceng (`ACTIVE_PHASE < FASE_LONCENG` → "—" tanpa tautan/polling).
+- Lanjutan MAKE-087 (branch `fase7/make-087-kelengkapan`, 10-11): kelengkapan data `KelengkapanData` + `KelengkapanCards`
+  (Q-D13..Q-D17 A), `.env` rahasia `dashboard.penggunaLihatSemua` (Q-D12 A) dan `dashboard.nipDikecualikanUlangTahun`
+  (Q-D18 A). Sisa: M3 (komponen Jalur A dan B).
 
 ### Jalur A — konten admin (MAKE-079 Popup, MAKE-080 Banner), branch `fase7/make-079-popup` (lokal, belum di main)
 

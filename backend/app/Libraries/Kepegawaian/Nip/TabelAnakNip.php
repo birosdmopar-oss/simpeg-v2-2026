@@ -25,9 +25,10 @@ use InvalidArgumentException;
  *   `siasn_status_pegawai.nip`, `siasn_upload_arsip.nip`, `double_riwayat_kp.nip` (tabel kerja SIASN, FK di CREATE) — DBV-027.
  * - {@see JenisRujukanNip::NonFkKeputusanV2} (1): `jabatan_koordinasi.nip`, tanpa FK dan tidak diganti legacy, ikut
  *   dikoreksi atas keputusan #10 WS2.md (MAKE-010).
- * - {@see JenisRujukanNip::JsonArrayNip} (2): `dm_user_lokasi_presensi.target_peg`/`excl_peg` (JSON array NIP, pasangan
+ * - {@see JenisRujukanNip::JsonArrayNip} (8): `dm_user_lokasi_presensi.target_peg`/`excl_peg` (JSON array NIP, pasangan
  *   `*_desc` "NIP - Nama"), pengganti `user_lokasi_presensi` yang tidak dibuat di v2 (keputusan user 13-10-2026,
- *   MAKE-011).
+ *   MAKE-011);
+ *   `popup`/`banner`/`form_digital` `target_peg`/`excl_peg` (6, Fase 7, tanpa `*_desc`, DBV-032).
  * - {@see JenisRujukanNip::DaftarNipBerpemisah} (1): `riwayat_cuti.ketua_tim` (NIP dipisah `***`, DBV-022 DQ-15).
  *
  * Label sumber: **[K]** = DDL dump struktur produksi D1; **[K-kode]** = kode legacy (path relatif ke `application/`);
@@ -225,6 +226,42 @@ final class TabelAnakNip
             '[K-kode] libraries/hr/master/Lm_lokasi.php:720-758 (JSON array NIP, excl_peg_desc "NIP - Nama")',
             true, KeberadaanV2::Ada, 2, 'G-03',
             'Pengecualian aturan lokasi presensi per NIP; elemen array (+ awalan excl_peg_desc) diganti saat koreksi NIP (MAKE-011)',
+        ],
+        [
+            'popup', 'target_peg', JenisRujukanNip::JsonArrayNip,
+            '[K] D1 Fase 7 (salinan dev) popup.target_peg MEDIUMTEXT JSON array NIP; [V2] tanpa target_peg_desc (Q7-47), DBV-032',
+            true, KeberadaanV2::Ada, 7, 'F-01',
+            'Target F-04 popup per NIP; elemen array diganti saat koreksi NIP (tanpa kolom _desc)',
+        ],
+        [
+            'popup', 'excl_peg', JenisRujukanNip::JsonArrayNip,
+            '[K] D1 Fase 7 (salinan dev) popup.excl_peg MEDIUMTEXT JSON array NIP; [V2] tanpa excl_peg_desc (Q7-47), DBV-032',
+            true, KeberadaanV2::Ada, 7, 'F-01',
+            'Pengecualian F-04 popup per NIP; elemen array diganti saat koreksi NIP (tanpa kolom _desc)',
+        ],
+        [
+            'banner', 'target_peg', JenisRujukanNip::JsonArrayNip,
+            '[K] D1 Fase 7 (salinan dev) banner.target_peg MEDIUMTEXT JSON array NIP; [V2] tanpa target_peg_desc (Q7-47), DBV-032',
+            true, KeberadaanV2::Ada, 7, 'F-01',
+            'Target F-05 banner per NIP; elemen array diganti saat koreksi NIP (tanpa kolom _desc)',
+        ],
+        [
+            'banner', 'excl_peg', JenisRujukanNip::JsonArrayNip,
+            '[K] D1 Fase 7 (salinan dev) banner.excl_peg MEDIUMTEXT JSON array NIP; [V2] tanpa excl_peg_desc (Q7-47), DBV-032',
+            true, KeberadaanV2::Ada, 7, 'F-01',
+            'Pengecualian F-05 banner per NIP; elemen array diganti saat koreksi NIP (tanpa kolom _desc)',
+        ],
+        [
+            'form_digital', 'target_peg', JenisRujukanNip::JsonArrayNip,
+            '[K] D1 Fase 7 (salinan dev) form_digital.target_peg MEDIUMTEXT JSON array NIP; [V2] tanpa target_peg_desc (Q7-47), DBV-032',
+            true, KeberadaanV2::Ada, 7, 'F-01',
+            'Target F-06 form digital per NIP; elemen array diganti saat koreksi NIP (tanpa kolom _desc)',
+        ],
+        [
+            'form_digital', 'excl_peg', JenisRujukanNip::JsonArrayNip,
+            '[K] D1 Fase 7 (salinan dev) form_digital.excl_peg MEDIUMTEXT JSON array NIP; [V2] tanpa excl_peg_desc (Q7-47), DBV-032',
+            true, KeberadaanV2::Ada, 7, 'F-01',
+            'Pengecualian F-06 form digital per NIP; elemen array diganti saat koreksi NIP (tanpa kolom _desc)',
         ],
     ];
 

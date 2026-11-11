@@ -28,7 +28,8 @@ use Config\Dashboard;
  * - IB / cuti: `status = 1` dan hari ini dalam [tgl_mulai, tgl_akhir] (cuti dibandingkan per tanggal);
  * - presensi online: baris `dh_online` bertanggal hari ini; "hari ini" = tanggal bisnis WIB (`TanggalBisnis::hariIni`).
  *
- * Pengecualian NIP (Q7-41, `Config\Dashboard::$nipDisembunyikan`, ikut letak `$whereHide_nip` legacy):
+ * Pengecualian NIP (Q7-41, `Config\Dashboard::$nipDisembunyikan`, ikut letak `$whereHide_nip` legacy; tidak berlaku untuk
+ * akun di `$penggunaLihatSemua`, Q-D12 A — {@see Dashboard::nipDisembunyikanUntuk()}):
  * - kementerian: semua tile, TIDAK pada `total_aktif`;
  * - satker: tile jenis pegawai + CLTN + PPPK dan `total_aktif`; TIDAK pada TB/IB/cuti/presensi online;
  * - unit: tile jenis pegawai + CLTN + PPPK; TIDAK pada `total_aktif`, TB/IB/cuti/presensi online.
@@ -44,7 +45,7 @@ use Config\Dashboard;
  *
  * **Pegawai (role 2/6/7)** — `{keluarga: 'pegawai', tanggal, prediksi}`: kartu prediksi {@see PrediksiPegawai} (role 2: Pensiun,
  * Naik Pangkat, Tanda Jasa, KGB; role 7: Pensiun (akhir masa perjanjian) + KGB; role 6: kosong) dan `bawahan` {@see BawahanPegawai}
- * (role 2 saja). Kelengkapan data: menyusul.
+ * (role 2 saja), `kelengkapan` {@see KelengkapanData} (role 2, PNS; kartu < 100%).
  */
 final class RingkasanBeranda
 {
@@ -103,6 +104,13 @@ final class RingkasanBeranda
     /** Tile yang memakai pengecualian NIP di lingkup role 3 (satker & unit) [K]. */
     private const SEMBUNYI_ROLE3 = ['pns', 'ptt', 'non_pns', 'staf_khusus', 'tenaga_ahli', 'cltn', 'pppk'];
 
+    /**
+     * Pengecualian NIP yang berlaku untuk akun pada panggilan {@see self::admin()} berjalan (Q-D12).
+     *
+     * @var list<string>
+     */
+    private array $nipSembunyi = [];
+
     public function __construct(
         private readonly BaseConnection $db,
         private readonly Dashboard $config,
@@ -131,7 +139,8 @@ final class RingkasanBeranda
             'tanggal'  => $tanggal,
             'prediksi' => $adaNip ? (new PrediksiPegawai($this->db, $tanggal))->kartu($role, $nip) : [],
             // [K] presensi & AK bawahan hanya di dashboard_pns (role 2); PTT/PPPK tanpa bagian ini.
-            'bawahan' => $adaNip && $role === Role::PEGAWAI ? (new BawahanPegawai($this->db, $tanggal))->untuk($nip) : ['atasan' => false, 'presensi' => [], 'ak' => []],
+            'bawahan'     => $adaNip && $role === Role::PEGAWAI ? (new BawahanPegawai($this->db, $tanggal))->untuk($nip) : ['atasan' => false, 'presensi' => [], 'ak' => []],
+            'kelengkapan' => $adaNip ? (new KelengkapanData($this->db, $tanggal))->kartu($role, $nip) : [],
         ];
     }
 
@@ -140,8 +149,9 @@ final class RingkasanBeranda
      */
     private function admin(AuthContext $auth): array
     {
-        $lingkup = $this->lingkup($auth);
-        $tanggal = $this->hariIni ?? TanggalBisnis::hariIni();
+        $lingkup           = $this->lingkup($auth);
+        $tanggal           = $this->hariIni ?? TanggalBisnis::hariIni();
+        $this->nipSembunyi = $this->config->nipDisembunyikanUntuk($auth->idPengguna());
 
         /** @var array{total_aktif: int, jenis: array<string, int>, cltn: int} $tetap */
         $tetap = $this->ingat('tetap', $lingkup, '', fn (): array => $this->hitungTetap($lingkup));
@@ -281,7 +291,7 @@ final class RingkasanBeranda
             $b->whereIn('nip', fn (BaseBuilder $sub): BaseBuilder => $sub->select('nip')->from('pegawai_mutasi_jabatan')->where($kolom, $lingkup['id']));
         }
 
-        $nip = $sembunyi ? $this->config->daftarNipDisembunyikan() : [];
+        $nip = $sembunyi ? $this->nipSembunyi : [];
 
         if ($nip !== []) {
             $b->whereNotIn('nip', $nip);
@@ -306,9 +316,8 @@ final class RingkasanBeranda
             return $hitung();
         }
 
-        // Sidik daftar NIP (bukan isinya) supaya perubahan konfigurasi tidak memakai angka lama; NIP tidak masuk kunci.
-        // Sidik konfigurasi yang memengaruhi hasil: daftar NIP (Q7-41) dan saklar Tanda Jasa satker/unit; NIP tidak masuk kunci.
-        $sidik = substr(hash('sha256', implode(',', $this->config->daftarNipDisembunyikan()) . '|tj' . (int) $this->config->tandaJasaIkutLegacy), 0, 12);
+        // Sidik konfigurasi (daftar NIP yang BERLAKU untuk akun ini, Q-D12) yang memengaruhi hasil: daftar NIP (Q7-41) dan saklar Tanda Jasa satker/unit; NIP tidak masuk kunci.
+        $sidik = substr(hash('sha256', implode(',', $this->nipSembunyi) . '|tj' . (int) $this->config->tandaJasaIkutLegacy), 0, 12);
         $kunci = sprintf('dashboard_beranda_%s_%s_%s_%s_%s', $jenis, $lingkup['jenis'], $lingkup['id'] ?? 'x', $tanggal === '' ? 'x' : $tanggal, $sidik);
 
         /** @var array<string, mixed> */

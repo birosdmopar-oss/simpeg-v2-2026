@@ -48,7 +48,10 @@ final class NipCascadeTest extends DatabaseTestCase
     /**
      * Kolom JSON array NIP (diuji terpisah di testJsonDmUserLokasiPresensi).
      */
-    private const KOLOM_JSON = ['dm_user_lokasi_presensi.target_peg', 'dm_user_lokasi_presensi.excl_peg'];
+    private const KOLOM_JSON = [
+        'dm_user_lokasi_presensi.target_peg', 'dm_user_lokasi_presensi.excl_peg',
+        'popup.target_peg', 'popup.excl_peg', 'banner.target_peg', 'banner.excl_peg', 'form_digital.target_peg', 'form_digital.excl_peg',
+    ];
 
     /**
      * Kolom daftar NIP berpemisah `***` (diuji terpisah di testDaftarKetuaTimRiwayatCuti, DBV-022 DQ-15).
@@ -203,6 +206,25 @@ final class NipCascadeTest extends DatabaseTestCase
         $this->assertSame([$lama . '9'], json_decode((string) $baris($c)['target_peg'], true));
         $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.target_peg']);
         $this->assertSame(1, $hasil['tabel']['dm_user_lokasi_presensi.excl_peg']);
+    }
+
+    public function testJsonTargetKontenFase7TanpaDesc(): void
+    {
+        // DBV-032: popup/banner/form_digital menyimpan target_peg/excl_peg tanpa pasangan *_desc (Q7-47).
+        [$lama, $super] = $this->siapkan();
+        $lain           = $this->buatPegawai();
+        $popup          = $this->sisip('popup', ['tgl_mulai' => '2020-01-01 00:00:00', 'tgl_akhir' => '2020-01-02 00:00:00', 'target_peg' => json_encode([$lain, $lama]), 'excl_peg' => json_encode([$lama . '9'])]);
+        $banner         = $this->sisip('banner', ['tgl_mulai' => '2020-01-01', 'tgl_akhir' => '2020-01-02', 'excl_peg' => json_encode([$lama])]);
+        $form           = $this->sisip('form_digital', ['tgl_mulai' => '2020-01-01', 'tgl_akhir' => '2020-01-02', 'form_digital' => '{}', 'target_peg' => json_encode([$lama])]);
+
+        $hasil = (new NipCascadeService())->koreksi($super, $lama, self::NIP_BARU);
+
+        $kolom = fn (string $t, string $pk, int $id, string $k): mixed => json_decode((string) $this->db->table($t)->where($pk, $id)->get()->getRowArray()[$k], true);
+        $this->assertSame([$lain, self::NIP_BARU], $kolom('popup', 'id_popup', $popup, 'target_peg'));
+        $this->assertSame([$lama . '9'], $kolom('popup', 'id_popup', $popup, 'excl_peg'), 'NIP lama sebagai awalan NIP lain tidak berubah');
+        $this->assertSame([self::NIP_BARU], $kolom('banner', 'id_banner', $banner, 'excl_peg'));
+        $this->assertSame([self::NIP_BARU], $kolom('form_digital', 'id_form_digital', $form, 'target_peg'));
+        $this->assertSame([1, 0, 1, 1], [$hasil['tabel']['popup.target_peg'], $hasil['tabel']['popup.excl_peg'], $hasil['tabel']['banner.excl_peg'], $hasil['tabel']['form_digital.target_peg']]);
     }
 
     /**
@@ -439,6 +461,12 @@ final class NipCascadeTest extends DatabaseTestCase
             // Fase 6 (DBV-027): baris ber-NIP = token Android (CHECK pemilik); token web ber-`nip` NULL tidak ikut koreksi NIP.
             'firebase_token'     => ['platform' => 2, 'fcm_token' => 'tok-uji', 'token_hash' => hash('sha256', 'tok-uji')],
             'siasn_upload_arsip' => ['rw_name' => 'Rw Jabatan', 'status' => 0],
+            // Fase 7 (DBV-032): tabel anak konten/interaksi merujuk induknya (FK); kolom JSON ber-CHECK JSON_VALID.
+            'user_popup'          => ['id_popup' => $this->sisip('popup', ['tgl_mulai' => '2020-01-01 00:00:00', 'tgl_akhir' => '2020-01-02 00:00:00'])],
+            'user_banner'         => ['id_banner' => $this->sisip('banner', ['tgl_mulai' => '2020-01-01', 'tgl_akhir' => '2020-01-02'])],
+            'user_form_digital'   => ['id_form_digital' => $idForm = $this->sisip('form_digital', ['tgl_mulai' => '2020-01-01', 'tgl_akhir' => '2020-01-02', 'form_digital' => '{}'])],
+            'filled_form_digital' => ['id_form_digital' => $idForm, 'response' => '{}'],
+            'skl'                 => ['jenis_rwy' => 1, 'id_rwy' => 1, 'rate' => 5],
         ];
 
         foreach (TabelAnakNip::sampaiFase(NipCascadeService::FASE) as $r) {

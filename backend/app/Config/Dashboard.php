@@ -9,7 +9,8 @@ use CodeIgniter\Config\BaseConfig;
 /**
  * Beranda / dashboard per role (F-13, MAKE-087; PRD Fase 7 v2.0 §5.10). Milik Jalur D.
  *
- * Override `.env` (opsional, pola BaseConfig): `dashboard.tampilanKomposisi`, `dashboard.nipDisembunyikan`.
+ * Override `.env` (opsional, pola BaseConfig): `dashboard.tampilanKomposisi`, `dashboard.nipDisembunyikan`,
+ * `dashboard.penggunaLihatSemua`, `dashboard.nipDikecualikanUlangTahun`, `dashboard.tandaJasaIkutLegacy`.
  */
 class Dashboard extends BaseConfig
 {
@@ -31,6 +32,20 @@ class Dashboard extends BaseConfig
      * Kosong = tanpa pengecualian. Hitungan mana yang memakai pengecualian mengikuti legacy per lingkup — lihat `RingkasanBeranda`.
      */
     public string $nipDisembunyikan = '';
+
+    /**
+     * Akun yang TIDAK memakai pengecualian {@see self::$nipDisembunyikan} (Q-D12 A, ikut legacy: `$whereHide_nip` kosong
+     * untuk daftar `id` pengguna hardcode di `L_user::dashboard_sa|satker|unit`): `id_pengguna` dipisah koma.
+     * **RAHASIA server: isi HANYA lewat `.env` server `dashboard.penggunaLihatSemua`.** Kosong = semua akun memakai pengecualian.
+     */
+    public string $penggunaLihatSemua = '';
+
+    /**
+     * NIP yang tidak ditampilkan di kartu ulang tahun (Q-D18 A, ikut pengecualian legacy `getTodayBday`/`getTomorrowBday`),
+     * dipisah koma. **RAHASIA server: isi HANYA lewat `.env` server `dashboard.nipDikecualikanUlangTahun`** (operator mengisi
+     * dari legacy). Kosong = tanpa pengecualian.
+     */
+    public string $nipDikecualikanUlangTahun = '';
 
     /**
      * `id_jabatan` "Direktur Politeknik" untuk tabel masa kerja direktur (role 1/4; Q7-38 — legacy hardcode `$arrIdDir` di
@@ -79,8 +94,38 @@ class Dashboard extends BaseConfig
      */
     public function daftarNipDisembunyikan(): array
     {
-        $nip = array_filter(array_map('trim', explode(',', $this->nipDisembunyikan)), static fn (string $v): bool => $v !== '');
+        return self::daftar($this->nipDisembunyikan);
+    }
 
-        return array_values(array_unique($nip));
+    /**
+     * Pengecualian NIP yang berlaku untuk akun ini (Q-D12): kosong bila `$idPengguna` ada di {@see self::$penggunaLihatSemua}.
+     *
+     * @return list<string>
+     */
+    public function nipDisembunyikanUntuk(?int $idPengguna): array
+    {
+        if ($idPengguna !== null && in_array((string) $idPengguna, self::daftar($this->penggunaLihatSemua), true)) {
+            return [];
+        }
+
+        return $this->daftarNipDisembunyikan();
+    }
+
+    /**
+     * @return list<string> NIP unik tanpa spasi; kosong bila tidak dikonfigurasi (Q-D18)
+     */
+    public function daftarNipDikecualikanUlangTahun(): array
+    {
+        return self::daftar($this->nipDikecualikanUlangTahun);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function daftar(string $nilai): array
+    {
+        $isi = array_filter(array_map('trim', explode(',', $nilai)), static fn (string $v): bool => $v !== '');
+
+        return array_values(array_unique($isi));
     }
 }

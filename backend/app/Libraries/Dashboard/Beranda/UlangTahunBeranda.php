@@ -17,8 +17,8 @@ use DateTimeImmutable;
  * hari ini / besok (WIB), `pegawai.status = 1`, `pegawai_mutasi_jabatan.id_satker` ∉ `Config\Dashboard::$idSatkerDikecualikanUlangTahun`
  * (legacy `!= '171'`; karena LEFT JOIN + pembanding, pegawai tanpa snapshot jabatan / id_satker NULL ikut tersaring), satu
  * baris per NIP, seluruh kementerian untuk semua role. Urutan [I]: NIP ASC (legacy tanpa ORDER).
- * Pengecualian NIP legacy (1 NIP hardcode + `NIP_TESTER`): Q-D18 belum diputus → BELUM diterapkan; titik sambung
- * {@see self::nipDikecualikan()} (kosong).
+ * Pengecualian NIP legacy (1 NIP hardcode + `NIP_TESTER`): Q-D18 (A) → daftar `.env` rahasia
+ * `dashboard.nipDikecualikanUlangTahun` diisi operator ({@see self::nipDikecualikan()}); berlaku juga untuk foto (404).
  *
  * Field = yang ditampilkan view (`views/user/dashboard_ad.php:250-298`, sama di view pegawai): foto, nama bergelar,
  * tanggal lahir ("1 April 1970"), "jenis pegawai / NIP", jabatan (+ " (jabatan koordinator)" bila ada), satker. Baris
@@ -100,12 +100,13 @@ final class UlangTahunBeranda
     }
 
     /**
-     * Titik sambung Q-D18 (pengecualian NIP legacy `getTodayBday`): belum diputus Horii → kosong.
+     * Q-D18 (A): pengecualian NIP legacy `getTodayBday`/`getTomorrowBday` dari `.env` rahasia
+     * `dashboard.nipDikecualikanUlangTahun` ({@see Dashboard::daftarNipDikecualikanUlangTahun()}); kosong = tanpa pengecualian.
      *
      * @return list<string>
      */
     private function nipDikecualikan(): array
     {
-        return [];
+        return $this->config->daftarNipDikecualikanUlangTahun();
     }
 }

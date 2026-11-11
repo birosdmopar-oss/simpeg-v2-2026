@@ -37,12 +37,14 @@ final class UlangTahunBerandaTest extends DatabaseTestCase
     {
         parent::setUp();
         Time::setTestNow('2026-11-10 09:00:00', 'Asia/Jakarta');
-        $this->satkerAsli = config(Dashboard::class)->idSatkerDikecualikanUlangTahun;
+        $this->satkerAsli                                   = config(Dashboard::class)->idSatkerDikecualikanUlangTahun;
+        config(Dashboard::class)->nipDikecualikanUlangTahun = '';
     }
 
     protected function tearDown(): void
     {
         config(Dashboard::class)->idSatkerDikecualikanUlangTahun = $this->satkerAsli;
+        config(Dashboard::class)->nipDikecualikanUlangTahun      = '';
         Time::setTestNow();
         Services::reset(true);
         $this->clearAuthState();
@@ -122,6 +124,21 @@ final class UlangTahunBerandaTest extends DatabaseTestCase
 
         $this->asUser($akun)->get(self::URL . '/' . $lain . '/foto')->assertStatus(404);
         $this->asUser($akun)->get(self::URL . '/199999999999999999/foto')->assertStatus(404);
+    }
+
+    public function testPengecualianNipUlangTahunDariEnvJugaUntukFotoQd18(): void
+    {
+        $satker                                             = $this->buatSatker();
+        $tampil                                             = $this->buatPegawaiDiSatker($satker, ['tgl_lahir' => '1980-11-10']);
+        $kecuali                                            = $this->buatPegawaiDiSatker($satker, ['tgl_lahir' => '1981-11-10', 'foto' => 'foto/k.png']);
+        $besok                                              = $this->buatPegawaiDiSatker($satker, ['tgl_lahir' => '1981-11-11']);
+        config(Dashboard::class)->nipDikecualikanUlangTahun = " {$kecuali} ,{$besok}, ";
+
+        $akun = $this->buatAkunTanpaNip('admin.ultah.kecuali', Role::SUPER_ADMIN);
+
+        $this->assertSame([$tampil], array_column($this->items($akun, 'ini'), 'nip'));
+        $this->assertSame([], $this->items($akun, 'besok'));
+        $this->asUser($akun)->get(self::URL . '/' . $kecuali . '/foto')->assertStatus(404);
     }
 
     public function testTanpaToken401(): void

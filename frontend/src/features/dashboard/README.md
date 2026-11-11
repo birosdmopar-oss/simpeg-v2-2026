@@ -24,6 +24,8 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   ikut aturan lonceng Jalur C: "—" tanpa tautan/polling selama `ACTIVE_PHASE < FASE_LONCENG`), `DirekturCard` (role 1/4, `GET /dashboard/direktur`).
 - M2b: `PegawaiDashboard` → `PrediksiCards` (teks view legacy: "-" bila kosong, "Sudah di Pangkat Puncak", JF "AK / target"
   + "Kurang N AK") dan `ButuhApprovalCard` untuk role 2; `BawahanCards` (presensi & AK bawahan) bila akun atasan.
+- `KelengkapanCards` (role 2 PNS): kartu kelengkapan < 100% (persen + bar merah < 50 / hijau ≥ 50), tautan ke tab Detail
+  Pegawai milik sendiri `/pegawai/{nip}?tab=<kode>`; tooltip legacy menjadi `aria-label`.
 - `UlangTahunCard` (hari ini / besok, semua role) di atas `UiCarouselPanel` (baru di `shared/ui`: pola WAI-ARIA carousel,
   ←/→/Home/End, Jeda/Putar, berhenti saat hover/fokus & `prefers-reduced-motion`); foto lewat blob
   `GET /dashboard/ulang-tahun/{kunci}/foto`, cadangan avatar inisial. `PresensiSayaCard` = tautan Presensi Saya (Q7-42).

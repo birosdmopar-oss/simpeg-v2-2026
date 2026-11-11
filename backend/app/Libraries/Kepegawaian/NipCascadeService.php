@@ -68,9 +68,9 @@ use Throwable;
 final class NipCascadeService implements NipCascadeInterface
 {
     /**
-     * Cakupan registry pada fase berjalan (Fase 6, DBV-027: tabel kerja SIASN).
+     * Cakupan registry pada fase berjalan (Fase 7, DBV-032: tabel konten & interaksi).
      */
-    public const FASE = 6;
+    public const FASE = 7;
 
     /**
      * Kolom registry yang tidak diarahkan ulang dengan UPDATE (tabel.kolom huruf kecil => alasan).
@@ -84,7 +84,17 @@ final class NipCascadeService implements NipCascadeInterface
     /**
      * PK tabel yang punya kolom JSON array NIP (`JenisRujukanNip::JsonArrayNip`).
      */
-    private const PK_JSON = ['dm_user_lokasi_presensi' => 'id_dm_user_lokasi_presensi'];
+    private const PK_JSON = [
+        'dm_user_lokasi_presensi' => 'id_dm_user_lokasi_presensi',
+        'popup'                   => 'id_popup',
+        'banner'                  => 'id_banner',
+        'form_digital'            => 'id_form_digital',
+    ];
+
+    /**
+     * Tabel JSON array NIP yang punya pasangan `<kolom>_desc` ("NIP - Nama"). Tabel Fase 7 tidak menyimpannya (Q7-47, DBV-032).
+     */
+    private const JSON_DENGAN_DESC = ['dm_user_lokasi_presensi'];
 
     /**
      * PK tabel yang punya kolom daftar NIP berpemisah (`JenisRujukanNip::DaftarNipBerpemisah`).
@@ -317,18 +327,20 @@ final class NipCascadeService implements NipCascadeInterface
 
     /**
      * Kolom JSON array NIP (`JsonArrayNip`): ganti elemen = NIP lama di `<kolom>` dan awalan "NIP lama - " di pasangan
-     * `<kolom>_desc` (format legacy `Lm_lokasi.php`: "NIP - Nama"). Baris dikunci `FOR UPDATE`; JSON ditulis ulang dengan
+     * `<kolom>_desc` bila tabelnya menyimpan kolom itu ({@see self::JSON_DENGAN_DESC}) (format legacy `Lm_lokasi.php`: "NIP - Nama"). Baris dikunci `FOR UPDATE`; JSON ditulis ulang dengan
      * format hook G-03 (UNESCAPED_UNICODE|UNESCAPED_SLASHES). Nilai yang bukan JSON array dibiarkan (data rusak tidak
      * diperbaiki di sini). Mengembalikan jumlah baris yang berubah.
      */
     private function arahkanJson(BaseConnection $db, RujukanNip $rujukan, string $lama, string $baru): int
     {
-        $kolom = $rujukan->kolomDiV2();
-        $desc  = $kolom . '_desc';
-        $pk    = self::PK_JSON[$rujukan->tabel] ?? throw new \LogicException("PK tabel JSON NIP {$rujukan->tabel} belum didaftarkan.");
-        $t     = $db->escapeIdentifiers($db->prefixTable($rujukan->tabel));
-        $rows  = $db->query(
-            "SELECT {$db->escapeIdentifiers($pk)} AS pk, {$db->escapeIdentifiers($kolom)} AS isi, {$db->escapeIdentifiers($desc)} AS deskripsi FROM {$t} WHERE {$db->escapeIdentifiers($kolom)} LIKE ? FOR UPDATE",
+        $kolom   = $rujukan->kolomDiV2();
+        $desc    = $kolom . '_desc';
+        $pk      = self::PK_JSON[$rujukan->tabel] ?? throw new \LogicException("PK tabel JSON NIP {$rujukan->tabel} belum didaftarkan.");
+        $t       = $db->escapeIdentifiers($db->prefixTable($rujukan->tabel));
+        $adaDesc = in_array($rujukan->tabel, self::JSON_DENGAN_DESC, true);
+        $kolDesc = $adaDesc ? $db->escapeIdentifiers($desc) : 'NULL';
+        $rows    = $db->query(
+            "SELECT {$db->escapeIdentifiers($pk)} AS pk, {$db->escapeIdentifiers($kolom)} AS isi, {$kolDesc} AS deskripsi FROM {$t} WHERE {$db->escapeIdentifiers($kolom)} LIKE ? FOR UPDATE",
             ['%' . $db->escapeLikeString($lama) . '%'],
         )->getResultArray();
         $flags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
@@ -342,7 +354,7 @@ final class NipCascadeService implements NipCascadeInterface
             }
 
             $baris = [$kolom => (string) json_encode(array_map(static fn ($n): string => (string) $n === $lama ? $baru : (string) $n, array_values($isi)), $flags)];
-            $d     = json_decode((string) $row['deskripsi'], true);
+            $d     = $adaDesc ? json_decode((string) $row['deskripsi'], true) : null;
 
             if (is_array($d)) {
                 $awalan       = $lama . ' - ';
