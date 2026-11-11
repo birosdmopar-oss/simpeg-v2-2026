@@ -36,4 +36,9 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
     $routes->get('dashboard/ulang-tahun/(:segment)/foto', 'BerandaController::fotoUlangTahun/$1');
     $routes->get('dashboard/ulang-tahun', 'BerandaController::ulangTahun');
     $routes->get('dashboard/direktur', 'BerandaController::direktur', ['filter' => Role::filter(Role::SUPER_ADMIN, Role::ADMIN_VIEW_ESELON1)]);
+
+    // F-06 form digital (MAKE-083, Jalur B, PRD Fase 7 v2.0 §5.7): sisi pegawai role 2/6/7 [K `MY_Controller.php:246`].
+    $pegawaiForm = ['filter' => Role::filter(Role::PEGAWAI, Role::PTT, Role::PPPK)];
+    $routes->get('form-digital/saya', 'FormDigitalController::saya', $pegawaiForm);
+    $routes->post('form-digital/(:num)/isi', 'FormDigitalController::isi/$1', $pegawaiForm);
 });
