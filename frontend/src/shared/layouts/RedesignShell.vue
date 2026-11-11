@@ -13,6 +13,7 @@ import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
+import InteraksiPopupHost from '@/features/form-digital/components/InteraksiPopupHost.vue'
 import NotifikasiPushShell from '@/features/integrasi/components/NotifikasiPushShell.vue'
 import PengingatCutiShell from '@/features/layanan/components/PengingatCutiShell.vue'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
@@ -192,5 +193,6 @@ async function logout(): Promise<void> {
 
     <!-- Pengingat persetujuan cuti sekali per sesi setelah login (PRD Fase 4 §6.4.7). -->
     <PengingatCutiShell />
+    <InteraksiPopupHost />
   </div>
 </template>
