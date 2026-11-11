@@ -28,6 +28,7 @@ const form: FormSaya = {
       { id: 'nama', tipe: 'teks', label: '<b>Nama</b>', wajib: true, maks: 255 },
       { id: 'minat', tipe: 'pilihan_ganda', label: 'Minat', wajib: false, opsi: ['A', 'B'] },
       { id: 'umur', tipe: 'angka', label: 'Umur', wajib: false },
+      { id: 'saran', tipe: 'paragraf', label: 'Saran', wajib: false, maks: 5000 },
     ],
   },
 }
@@ -53,6 +54,12 @@ describe('FormIsianDialog', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await flushPromises()
     expect(q('[data-testid="form-isian-dialog"]')).not.toBeNull()
+  })
+
+  it('paragraf dirender sebagai textarea', async () => {
+    mount(FormIsianDialog, { props: { form }, attachTo: document.body })
+    await flushPromises()
+    expect(q('[data-testid="form-isian-q-saran"] textarea')).not.toBeNull()
   })
 
   it('label HTML dirender sebagai teks', async () => {

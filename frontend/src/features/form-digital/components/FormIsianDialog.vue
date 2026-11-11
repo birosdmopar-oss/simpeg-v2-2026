@@ -12,6 +12,7 @@ import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRo
 import { computed, reactive, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
+import FormField from '@/shared/components/FormField.vue'
 import UiButton from '@/shared/ui/UiButton.vue'
 import UiCheckbox from '@/shared/ui/UiCheckbox.vue'
 import UiDatePicker from '@/shared/ui/UiDatePicker.vue'
@@ -140,7 +141,17 @@ const opsiRadio = (p: Pertanyaan) => (p.opsi ?? []).map((o) => ({ value: o, labe
         <form class="flex-1 space-y-5 overflow-y-auto px-5 py-4" novalidate @submit.prevent="simpan">
           <UiNotice v-if="umum" tone="danger" data-testid="form-isian-galat">{{ umum }}</UiNotice>
           <div v-for="p in pertanyaan" :key="p.id" :data-testid="`form-isian-q-${p.id}`">
-            <template v-if="p.tipe === 'teks' || p.tipe === 'paragraf' || p.tipe === 'angka'">
+            <FormField
+              v-if="p.tipe === 'paragraf'"
+              v-model="teks[p.id]"
+              type="textarea"
+              :label="p.label"
+              :required="p.wajib"
+              :name="p.id"
+              :error="galat[p.id]"
+              :hint="p.bantuan"
+            />
+            <template v-else-if="p.tipe === 'teks' || p.tipe === 'angka'">
               <UiTextField
                 v-model="teks[p.id]"
                 :label="p.label"
