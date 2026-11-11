@@ -3,13 +3,14 @@
  * Beranda keluarga pegawai (role 2/6/7; F-13 MAKE-087, PRD Fase 7 v2.0 §5.10). M2b: kartu prediksi (`PrediksiCards`; role 2
  * Pensiun/Naik Pangkat/Tanda Jasa/KGB, role 7 Pensiun + KGB, role 6 tanpa kartu) [K]. Kartu Butuh Approval (Jalur C) untuk
  * role 2, tautan Presensi Saya (Q7-42, `PresensiSayaCard`) role 2/6/7, lalu presensi & AK bawahan bila akun atasan
- * (`BawahanCards`) [K]. Kelengkapan data role 2 PNS (`KelengkapanCards`, kartu < 100%) dan ulang tahun. Slot berikutnya:
- * banner dan berita terbaru (Jalur A). Tautan
+ * (`BawahanCards`) [K]. Kelengkapan data role 2 PNS (`KelengkapanCards`, kartu < 100%), ulang tahun, lalu berita terbaru
+ * (`BeritaTerbaruWidget`, Jalur A; tidak tampil bila kosong). Banner dipasang di `HomeView` (semua role). Tautan
  * "update FK" PTT TIDAK dipasang: di legacy blok itu dikomentari (`dashboard_ptt.php:39-48`), jadi Q7-44 menunggu koreksi.
  */
 import { computed } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { BeritaTerbaruWidget } from '@/features/konten'
 import { BUTUH_APPROVAL_ROLES } from '@/features/notifikasi'
 import { PRESENSI_PEGAWAI_ROLES } from '@/features/presensi/roles'
 
@@ -44,5 +45,6 @@ const punyaPresensi = computed(() => auth.role !== null && PRESENSI_PEGAWAI_ROLE
       <UlangTahunCard hari="ini" />
       <UlangTahunCard hari="besok" />
     </div>
+    <BeritaTerbaruWidget />
   </div>
 </template>

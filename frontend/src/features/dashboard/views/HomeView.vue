@@ -4,12 +4,15 @@
  * (`User.php:526-567`): admin 1/3/4/5/8 → `AdminDashboard`, pegawai 2/6/7 → `PegawaiDashboard`. Data dari
  * `GET api/v1/dashboard/ringkasan`; galat memuat tidak merusak halaman (sapaan tetap tampil).
  * `data-testid="home-role"` dipertahankan untuk MTC-001 ("redirect ke dashboard sesuai role").
- * Popup aktif (`PopupAktifDialog`, Jalur A) dipasang di akar halaman ini pada M3.
+ * M3: popup aktif (`PopupAktifDialog`, Jalur A) di akar halaman (sekali per sesi login, lewat antrean dialog) dan banner
+ * (`BannerCarousel`) di bawah sapaan untuk SEMUA role (Q7-39; BE yang menyaring sasaran). Keduanya memuat data sendiri dan
+ * tidak merender apa pun bila kosong/403/galat, jadi tidak bergantung pada ringkasan beranda.
  */
 import { computed, onMounted, ref } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
+import { BannerCarousel, PopupAktifDialog } from '@/features/konten'
 import { isApiError } from '@/lib/axios'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
@@ -59,6 +62,8 @@ onMounted(() => {
         </p>
       </section>
 
+      <BannerCarousel />
+
       <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
       <p v-else-if="loading && !ringkasan" class="text-sm text-slate-500" data-testid="beranda-memuat">Memuat ringkasan…</p>
 
@@ -67,5 +72,6 @@ onMounted(() => {
       </template>
       <PegawaiDashboard v-else :ringkasan="dataPegawai" />
     </div>
+    <PopupAktifDialog />
   </RedesignShell>
 </template>
