@@ -143,6 +143,61 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   (Q-D13..Q-D17 A), `.env` rahasia `dashboard.penggunaLihatSemua` (Q-D12 A) dan `dashboard.nipDikecualikanUlangTahun`
   (Q-D18 A). Sisa: M3 (komponen Jalur A dan B).
 
+### Jalur A — konten admin (MAKE-079 Popup, MAKE-080 Banner), branch `fase7/make-079-popup` (lokal, belum di main)
+
+- BE: `Libraries/Dashboard/Konten/Penargetan/{SpesifikasiTarget,PemekarTarget,SinkronPenerima,TabelPenerima}` (dipakai juga Jalur B
+  untuk form digital), `Konten/Gambar/{JenisGambar,PenyimpananGambar,KontenGambarService}`, `Models/Konten/{Popup,Banner}Model`
+  (audit otomatis, Q7-16), `Controllers/Api/Konten/{Popup,Banner}Controller`, `Config/RoutesKonten.php`, `Config/Konten.php`.
+- Endpoint (`api/v1/konten/{popup|banner}`): daftar, buat/ubah (POST multipart `berkas`), hapus, `urutan` naik/turun, `target`,
+  `penerima`, `aktif` (role 2–8), `gambar` (terautentikasi; role 1 atau penerima, selain itu 404); `konten/opsi/{unit-satker,pegawai}`.
+- Keputusan: penargetan pegawai eksplisit ikut legacy (tanpa cek status; diabaikan bila "0"); gambar privat kunci acak,
+  banner wajib rasio 4:1 (±2%) lebar 800–4000 px, popup sisi 200–4000 px (angka ⚑ keputusan v2, `Config\Konten`); popup periode
+  DATETIME WIB, banner DATE; popup/banner tanpa status/soft delete (Hapus permanen) sampai DBV-032 menetapkan lain.
+- ⚑ Bergantung draf DBV-032 (kolom bisa berubah setelah D1): `popup/banner.{tgl_*,order,url,file,keterangan,target_uns,target_peg,excl_peg}`,
+  `user_popup/user_banner`, nama kolom induk di `TabelPenerima`.
+- Test: `SpesifikasiTargetTest` (12), `KontenPenargetanTest` (4), `KontenGambarServiceTest` (9), `KontenGambarEndpointTest` (3),
+  `KontrakMatriksRoleTest` (+20 baris kontrak). Test database memuat migration draf `MigrationsDitahan/` (grup `db-isolasi-penuh`).
+- FE: `features/konten` (kelola popup/banner/berita/DIBO/master, portal berita, DIBO baca, `GambarKonten` blob, `TargetPicker`,
+  `UiTeksSederhana`); rute dan menu `phase: 7`.
+- Sisa: berita (MAKE-081, sanitasi HTMLPurifier + approval + `SumberBerita`), DIBO (MAKE-082); antrean dialog menunggu MAKE-083.
+
+#### Jalur A — M3 F-07 Berita + master (MAKE-081, bagian dari MAKE-082), branch `fase7/make-079-popup`
+
+- BE: `Konten/Berita/{BeritaService,SanitasiBerita,SumberBerita}`, `Konten/{JenisMaster,MasterKontenService}` (kategori berita + jenis DIBO),
+  `Models/Konten/{News,NewsCategory,JenisDibo}Model`, `Controllers/Api/Konten/{Berita,BeritaKategori,DiboJenis,MasterKonten}Controller`,
+  rute di `RoutesKonten.php` (`konten/berita*`, `konten/berita/kategori*`, `konten/dibo-jenis*`).
+- Aturan: baca semua role (terbit + `publish_at` + target kementerian/unit/satker; role 1 semua yang terbit di portal dan semua di detail; detail =
+  aturan portal, perbaikan anomali legacy); kelola role 1,3; role 3 → menunggu, kategori `allow_ap`, hanya miliknya; ubah oleh role 3
+  kembali menunggu [V2]; proses role 1 (alasan wajib bila tolak, hanya status 0); isi disanitasi HTMLPurifier `p,br,strong,em,ul,ol,li,a[href]`;
+  `news_flag` per berita (tanpa DELETE global legacy), `POST konten/berita/dibuka` mereset penanda pembaca; publish_at disimpan UTC (masukan WIB).
+- `SumberBerita` (kontrak A↔C) siap + teruji, tetapi binding `Services::sumberNotifikasiBerita()` TETAP NoOp sampai tabel `news` ada di skema
+  utama (migration DBV-032 di `main`); lalu ganti satu baris `return` (catatan di Services.php). Mengganti sekarang merusak `tests/Notifikasi`.
+- Belum dibawa: lampiran berita (`news.lampiran`, FE belum memakai), hitung berita per kategori. Nilai awal `news.show_notif` ⚑ D1.
+- Test: `BeritaServiceTest` (12), `SumberBeritaTest` (4), `KontrakMatriksRoleTest` (+19 baris), FE `KelolaTeks.spec` (+penolakan beralasan).
+
+- **Hapus popup/banner = fisik (bukan hapus lunak)**, bukti legacy `application/libraries/hr/L_announcement.php`: `delete_popup` (:313) memanggil
+  `m_simpeg->delete("popup", "id_popup='{$id}'")` lalu `unlink(PS_BASE . $popup['file'])` setelah commit; `delete_dashban` (:1467) idem untuk `banner`.
+  Tabel `popup`/`banner` legacy tanpa kolom status (DBV-032 §3.1/3.3). v2: baris + berkas gambar privat dihapus; `user_*` ikut lewat FK CASCADE;
+  audit Q7-16 menyimpan snapshot baris sebelum dihapus (`BaseAuditableModel`, dicek di `KontenGambarServiceTest::testGeserDanHapus`).
+- **Pemilih pegawai target = pencarian server** (`GET pegawai?search=`, min. 3 huruf, debounce 300 ms, pola `PegawaiPicker` Modul C); daftar semua
+  pegawai TIDAK dikirim. `GET konten/{popup|banner}/{id}/target` menambah `label_pegawai` agar form ubah menampilkan nama.
+- Sanitasi berita memakai ulang `Libraries/Html/HtmlSanitizer` (kini menerima whitelist opsional; default tidak berubah) dengan `p,br,strong,b,em,i,ul,ol,li,a[href]`.
+- CI memakai `DBPrefix = t_` untuk grup `tests`: SQL mentah wajib `prefixTable()`; `select()` beralias harus SETELAH `join()`; total dari builder terpisah
+  tanpa join (clone + countAllResults mengosongkan pelacakan alias koneksi CI4).
+
+- **Berita — paritas legacy (cek 10-11, `application/libraries/hr/L_news.php`, `views/hr/news/*`):**
+  - **Lampiran DIBAWA** (legacy memakainya): unggah satu berkas JPG/JPEG/PNG/GIF/PDF ≤ 5 MB (`insert:282-340`, `update:489-545`), "Lihat Lampiran" di detail
+    (`detail.php:15`), ikon di daftar (`list.php:97`), berkas lama dihapus setelah commit saat diganti (`:717`) dan saat berita dihapus (`:812`); ubah tanpa
+    berkas mempertahankan lampiran lama (tanpa opsi hapus). v2: penyimpanan privat kunci acak `berita/<hex32>.<ext>` (perbaikan `nl_{publish_at}` yang bisa
+    saling menimpa), `GET konten/berita/{id}/lampiran` terautentikasi dengan visibilitas yang sama dengan detail.
+  - **Jam terbit** dibawa (`pub_date` + `pub_time` wajib di `form.php:62-66`): masukan WIB `Y-m-d H:i`, disimpan UTC.
+  - **KEPUTUSAN Horii 10-11: ubah berita oleh role 3 LANGSUNG BERLAKU seperti legacy [K]** — default `Config\Konten::$beritaUbahRole3KembaliMenunggu = false` (saklar + test kedua nilai dipertahankan). Catatan awal:
+  - **Role 3 mengubah berita → kembali menunggu = [V2], BUKAN legacy**: form ubah legacy tidak punya field status, `update` (`:489`, `set_param:877` hanya
+    mengisi status bila terkirim) membiarkan status. Diberi saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu` (default true; false = paritas legacy) —
+    menunggu keputusan Horii.
+  - Target tunggal (`set_param:894-925`: `sat_<id>` → satker, `0` → kementerian, selain itu unit) = skema [K]. Salinan `category`/`unit_satker_target` tidak dibawa
+    (diturunkan saat baca). `news.show_notif` nilai awal menunggu D1.
+
 ## F-08 Pusat Notifikasi — MAKE-085 (Jalur C, PRD Fase 7 v2.0 §5.9)
 
 - 10-11: BE + FE di `main` `7cacf4d5`. Kontrak: `app/Controllers/Api/Notifikasi/README.md`, `frontend/src/features/notifikasi/README.md`.
@@ -155,3 +210,26 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
 - Catatan: `getFieldNames()` CI4 juga ber-cache per tabel (`dataCache['field_names']`). Di modul ini aman karena kolom
   sumber tidak diubah sesudah dibaca dalam satu proses. Bila kelak ada migration/test yang mengubah kolom di tengah
   proses, pakai `information_schema.COLUMNS`.
+
+#### Jalur A — F-12 DIBO inti (MAKE-082), branch `fase7/make-079-popup`
+
+- BE: `Libraries/Dashboard/Konten/Dibo/{DiboService,PenyimpananDibo}`, `Models/Konten/DiboModel`, `Controllers/Api/Konten/DiboController`, rute
+  `konten/dibo*` di `RoutesKonten.php`; master `jenis_dibo` lewat `MasterKontenService` (sudah ada, M3).
+- Aturan (legacy `L_dibo.php:77-270,546-608`, views `hr/dibo`): wajib jenis (aktif), nomor, tahun, tentang; `file_1` wajib saat tambah; `file_1..3`
+  PDF/XLS/XLSX/DOC/DOCX ≤ 5 MB (paritas), tipe dari ISI berkas; ubah: berkas tak dikirim dipertahankan, `hapus_file_2/3 = 1` menghapus (padanan
+  `deleted_file[]`), berkas lama dihapus setelah commit. Berkas PRIVAT kunci acak `dibo/<hex32>.<ext>` (legacy: `assets/upload/dibo` publik di webroot),
+  unduh `GET konten/dibo/{id}/berkas/{1..3}` terautentikasi (attachment, no-store).
+- **Baca semua role HANYA status 1** (Q7-13) — perbaikan anomali legacy: filter status dikomentari (`L_dibo.php:12-27,62-66`) sehingga semua status tampil ke
+  semua role; admin (role 1) juga boleh mengunduh berkas status 2/10. Legacy `detail` menolak role 1 (`userAuth` 2–8): v2 mengizinkan. Filter jenis/tahun/cari
+  nomor|tentang + paginasi. Status 1 aktif / 2 dicabut [K] / 10 dihapus [V2: hapus lunak, berkas dipertahankan, bisa dipulihkan]. Audit Q7-16 otomatis.
+- Test: `DiboServiceTest` (8), `DiboEndpointTest` (3), `KontrakMatriksRoleTest` (+6 baris); FE `KelolaTeks.spec` + `BeritaLampiran.spec` (multipart DIBO).
+- Tidak dibawa/menunggu: duplikat jenis+nomor+tahun tidak dicek (legacy juga tidak; anomali dicatat M0 §4.2).
+
+- **Self-review keamanan unggah/unduh (Jalur A, 10-11)** — popup/banner, lampiran berita, DIBO: (1) indeks berkas DIBO di luar 1..3 (termasuk 0, -1, 99, 2^32) → 404 (service + HTTP); (2) kunci
+  penyimpanan di DB yang rusak/diubah (`../`, `dibo/../../x`, path absolut, byte nol) tidak bisa membaca berkas di luar akar — TEMUAN: adapter melempar
+  `InvalidArgumentException` sehingga hasilnya 500; kini `ada()` pada `PenyimpananGambar/Lampiran/Dibo` menganggap kunci tak valid = tidak ada → 404; (3) nama unduhan
+  hanya dari id angka + ekstensi `[a-z0-9]{1,5}` (selain itu `bin`) lewat `NamaBerkas::ekstensi()` — CR/LF, kutip, titik-koma, garis miring tidak pernah masuk header;
+  (4) berkas palsu ditolak 422 (PHP/HTML/SVG berskrip/PDF yang menyamar .pdf/.png/.docx, ekstensi terlarang .php/.html/.svg, ZIP polos bernama .docx, berkas kosong). Test:
+  `NamaBerkasTest` (13), `DiboServiceTest` (+3 skenario, 10 kasus palsu), `BeritaLampiranTest` (+3), `KontenGambarKeamananTest` (baru), `DiboEndpointTest` (+indeks).
+  Tambahan: kunci tak valid yang terdeteksi dicatat `log_message('warning', 'Kunci berkas {jenis} tidak valid (data diubah?): id={id}')` — HANYA jenis konten
+  (`popup`/`banner`/`lampiran-berita`/`dibo`) + id baris, bukan isi kunci/path (tanda data diubah; log tidak memuat masukan berbahaya). Diuji dengan `assertLogged`.

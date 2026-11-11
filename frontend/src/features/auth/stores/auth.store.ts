@@ -9,6 +9,7 @@ import { computed, ref } from 'vue'
 
 import { lepasTokenPush } from '@/features/integrasi/composables/notifikasiPush'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
+import { resetSesiKonten } from '@/features/konten/sesi'
 import { isApiError } from '@/lib/axios'
 
 import { authService } from '../services/auth.service'
@@ -46,6 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clearSession(): void {
+    resetSesiKonten()
     user.value = null
     claims.value = null
     status.value = 'guest'
@@ -80,6 +82,8 @@ export const useAuthStore = defineStore('auth', () => {
     })
     // Setiap login sukses (termasuk login ulang setelah 401) boleh memicu pengingat cuti lagi (PRD Fase 4 §6.4.7).
     resetPengingatCuti()
+    // Popup konten tampil sekali per sesi login (PRD Fase 7 Q7-02): login baru mengosongkan penanda.
+    resetSesiKonten()
     return result.user
   }
 

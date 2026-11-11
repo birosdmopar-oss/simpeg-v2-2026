@@ -69,7 +69,7 @@ final class PusatNotifikasiTest extends DatabaseTestCase
         $this->assertContains("alamat:{$idAlamat}", array_column($histori['items'], 'id'), 'S4 tetap terbaca walau cache tabel basi');
     }
 
-    public function testRingkasanBerlakuUntukSemuaRoleDenganSumberNoOpNull(): void
+    public function testRingkasanBerlakuUntukSemuaRoleDenganSumberTiketNoOp(): void
     {
         foreach ([Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK, Role::PIMPINAN] as $role) {
             $res = $this->asRole($role)->get(self::BASE . '/ringkasan');
@@ -80,7 +80,7 @@ final class PusatNotifikasiTest extends DatabaseTestCase
             $this->assertSame(['notifikasi_belum_dibaca', 'butuh_approval', 'berita_belum_dibaca', 'tiket_belum_dibaca', 'diperbarui_at'], array_keys($data), "role {$role}");
             $this->assertSame(0, $data['notifikasi_belum_dibaca']);
             $this->assertSame(0, $data['butuh_approval']);
-            $this->assertNull($data['berita_belum_dibaca'], 'berita NoOp sampai F-07 di main');
+            $this->assertSame(0, $data['berita_belum_dibaca'], 'sumber berita F-07 (SumberBerita): tanpa berita terbit = 0');
             $this->assertNull($data['tiket_belum_dibaca'], 'tiket NoOp sampai Fase 8 (Q8-06)');
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $data['diperbarui_at']);
         }
