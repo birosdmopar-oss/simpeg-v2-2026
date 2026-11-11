@@ -4,17 +4,26 @@
  * 2/6/7 → PegawaiDashboard; galat memuat tampil tanpa merusak sapaan (`home-role` MTC-001 tetap ada).
  * M2a: 4 kartu pengingat (label legacy, hanya Pensiun bertautan ke /dokumen/pensiun — Q7-37), kartu Butuh Approval hanya
  * role 1/3 di keluarga admin ("—" tanpa tautan selama ACTIVE_PHASE < FASE_LONCENG; fase 7 di ButuhApprovalCard.spec), tabel direktur hanya role 1/4 (+ galat lokal).
+ * M3: ACTIVE_PHASE dimock 6 (< FASE_KONTEN) → banner, berita, popup Jalur A tidak dipasang dan tidak ada request konten;
+ * fase 7 di `HomeView.konten.spec.ts`.
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { AxiosError } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/beranda.service', () => ({
   berandaService: { ringkasan: vi.fn(), direktur: vi.fn(), ulangTahun: vi.fn(), fotoUlangTahun: vi.fn() },
 }))
+vi.mock('@/shared/layouts/nav.config', async (asli) => ({ ...(await asli<typeof import('@/shared/layouts/nav.config')>()), ACTIVE_PHASE: 6 }))
+vi.mock('@/features/konten/services/konten.service', () => ({
+  kontenService: { popupAktif: vi.fn(), bannerAktif: vi.fn(), beritaTerbaru: vi.fn(), gambarBlob: vi.fn() },
+}))
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { resetSesiKonten } from '@/features/konten'
+import { kontenService } from '@/features/konten/services/konten.service'
+import { resetAntreanDialog } from '@/shared/composables/antreanDialog'
 import { Role, type RoleCode, type User } from '@/features/auth/types'
 import router from '@/router'
 
@@ -54,12 +63,17 @@ const admin = (tampilan: RingkasanAdmin['tampilan_komposisi']): RingkasanAdmin =
 async function mountAs(role: RoleCode) {
   setActivePinia(createPinia())
   useAuthStore().user = { username: 'uji', user_level: role } as User
-  const wrapper = mount(HomeView, { global: { plugins: [router], stubs: { RedesignShell: { template: '<div><slot /></div>' } } } })
+  const wrapper = mount(HomeView, { attachTo: document.body, global: { plugins: [router], stubs: { RedesignShell: { template: '<div><slot /></div>' } } } })
   await flushPromises()
   return wrapper
 }
 
 beforeEach(() => {
+  resetSesiKonten()
+  vi.mocked(kontenService.popupAktif).mockReset().mockResolvedValue([])
+  vi.mocked(kontenService.bannerAktif).mockReset().mockResolvedValue([])
+  vi.mocked(kontenService.beritaTerbaru).mockReset().mockResolvedValue([])
+  vi.mocked(kontenService.gambarBlob).mockReset().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
   vi.mocked(berandaService.ulangTahun).mockReset().mockResolvedValue([])
   vi.mocked(berandaService.fotoUlangTahun).mockReset().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
   URL.createObjectURL = vi.fn(() => 'blob:foto-uji')
@@ -69,6 +83,11 @@ beforeEach(() => {
     { nama: 'Dr. Direktur Fixture, M.Par.', politeknik: 'Politeknik Fixture', masa_kerja: '2 Tahun 3 Bulan' },
     { nama: 'Direktur Baru', politeknik: 'Politeknik Lain', masa_kerja: '' },
   ])
+})
+
+afterEach(() => {
+  resetAntreanDialog()
+  document.body.innerHTML = ''
 })
 
 describe('HomeView — kartu admin M2a', () => {
@@ -362,5 +381,25 @@ describe('HomeView — keluarga pegawai & galat', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('Server sedang bermasalah.')
     expect(wrapper.get('[data-testid="home-role"]').text()).toContain('1 — ')
     expect(wrapper.find('[data-testid="beranda-admin"]').exists()).toBe(false)
+  })
+})
+
+describe('HomeView — konten Jalur A digerbang fase (ACTIVE_PHASE 6 < FASE_KONTEN)', () => {
+  const gambar = (id: string) => ({ id, gambar_url: `/g/${id}.png`, url: null, keterangan: `Ket ${id}` })
+
+  it.each([Role.SUPER_ADMIN, Role.PEGAWAI])('role %i: tanpa banner, berita, popup, dan tanpa request konten', async (role) => {
+    vi.mocked(berandaService.ringkasan).mockResolvedValue(role === Role.SUPER_ADMIN ? admin('donut') : pegawai([]))
+    vi.mocked(kontenService.bannerAktif).mockResolvedValue([gambar('b1')])
+    vi.mocked(kontenService.popupAktif).mockResolvedValue([gambar('p1')])
+    vi.mocked(kontenService.beritaTerbaru).mockResolvedValue([{ id: '7', judul: 'Berita Uji', ringkasan: '', kategori: '', tanggal: null, foto_url: null }])
+    const wrapper = await mountAs(role)
+
+    expect(wrapper.find('[data-testid="konten-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="konten-berita-terbaru"]').exists()).toBe(false)
+    expect(document.body.querySelector('[data-testid="konten-popup-aktif"]')).toBeNull()
+    expect(kontenService.bannerAktif).not.toHaveBeenCalled()
+    expect(kontenService.popupAktif).not.toHaveBeenCalled()
+    expect(kontenService.beritaTerbaru).not.toHaveBeenCalled()
+    expect(wrapper.find(role === Role.SUPER_ADMIN ? '[data-testid="beranda-admin"]' : '[data-testid="beranda-pegawai"]').exists()).toBe(true)
   })
 })
