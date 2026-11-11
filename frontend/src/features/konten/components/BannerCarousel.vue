@@ -8,11 +8,15 @@ import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import GambarKonten from './GambarKonten.vue'
+import { sediakanCacheGambar } from '../cacheGambar'
 import { kontenService } from '../services/konten.service'
 import type { BannerAktif } from '../types'
 
 /** `class` dari parent diteruskan otomatis ke elemen akar (fallthrough attrs). */
 const props = withDefaults(defineProps<{ intervalMs?: number }>(), { intervalMs: 6000 })
+
+// Gambar per path diunduh sekali selama carousel hidup (endpoint no-store; T-08); object URL dilepas saat unmount.
+sediakanCacheGambar()
 
 const daftar = ref<BannerAktif[]>([])
 const indeks = ref(0)

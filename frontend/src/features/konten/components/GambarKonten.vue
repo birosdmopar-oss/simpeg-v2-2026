@@ -7,9 +7,14 @@
  */
 import { onBeforeUnmount, ref, watch } from 'vue'
 
+import { pakaiCacheGambar } from '../cacheGambar'
 import { kontenService } from '../services/konten.service'
 
 const props = defineProps<{ path: string; alt: string }>()
+
+// Di bawah carousel/dialog (penyedia cache) gambar per path diunduh sekali dan object URL-nya dilepas oleh penyedia (T-08);
+// tanpa penyedia, komponen ini memuat dan melepas object URL sendiri.
+const cache = pakaiCacheGambar()
 
 const PIKSEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
@@ -27,6 +32,13 @@ async function muat(path: string): Promise<void> {
   const saya = ++token
   gagal.value = false
   try {
+    if (cache) {
+      const url = await cache.ambil(path)
+      if (saya !== token) return
+      src.value = url
+      return
+    }
+
     const blob = await kontenService.gambarBlob(path)
     if (saya !== token) return
     lepas()

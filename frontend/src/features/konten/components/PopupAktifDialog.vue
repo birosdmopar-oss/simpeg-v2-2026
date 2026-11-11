@@ -12,11 +12,15 @@ import { computed, onMounted, ref } from 'vue'
 import { useAntreanDialog } from '@/shared/composables/antreanDialog'
 
 import GambarKonten from './GambarKonten.vue'
+import { sediakanCacheGambar } from '../cacheGambar'
 import { kontenService } from '../services/konten.service'
 import { popupSudahDitampilkan, tandaiPopupDitampilkan } from '../sesi'
 import type { PopupAktif } from '../types'
 
 const { minta } = useAntreanDialog()
+
+// Gambar per path diunduh sekali selama dialog hidup (bolak-balik Sebelumnya/Berikutnya tanpa unduh ulang; T-08).
+sediakanCacheGambar()
 let selesai: (() => void) | null = null
 
 const daftar = ref<PopupAktif[]>([])
