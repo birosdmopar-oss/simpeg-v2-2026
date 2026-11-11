@@ -41,7 +41,7 @@ final class DiboService
 
     private const PER_PAGE_MAX = 100;
 
-    private const NOMOR_MAKS = 150;
+    private const NOMOR_MAKS = 50;
 
     private const TAHUN_MIN = 1900;
 
@@ -326,8 +326,8 @@ final class DiboService
     {
         return [
             'id'         => (int) $r['id_dibo'],
-            'nomor'      => (string) $r['nomor'],
-            'tahun'      => (int) $r['tahun'],
+            'nomor'      => (string) ($r['nomor'] ?? ''),
+            'tahun'      => $r['tahun'] !== null ? (int) $r['tahun'] : null,
             'tentang'    => (string) $r['tentang'],
             'keterangan' => $r['keterangan'] !== null ? (string) $r['keterangan'] : null,
             'jenis'      => (string) ($r['jenis'] ?? ''),
@@ -342,7 +342,7 @@ final class DiboService
      */
     private function barisKelola(array $r): array
     {
-        return $this->barisBaca($r) + ['id_jenis' => (int) $r['id_jenis_dibo'], 'status' => (int) $r['status']];
+        return $this->barisBaca($r) + ['id_jenis' => $r['id_jenis_dibo'] !== null ? (int) $r['id_jenis_dibo'] : null, 'status' => (int) $r['status']];
     }
 
     /**

@@ -174,7 +174,7 @@ final class BeritaService
                 'id'           => (int) $r['id_news'],
                 'judul'        => (string) $r['title'],
                 'kategori'     => (string) ($r['category'] ?? ''),
-                'id_kategori'  => (int) $r['id_news_category'],
+                'id_kategori'  => $r['id_news_category'] !== null ? (int) $r['id_news_category'] : null,
                 'penulis'      => (string) ($r['penulis'] ?? ''),
                 'publish_at'   => $this->iso((string) $r['publish_at']),
                 'ada_lampiran' => (string) ($r['lampiran'] ?? '') !== '',
@@ -206,7 +206,7 @@ final class BeritaService
             'id'          => (int) $r['id_news'],
             'judul'       => (string) $r['title'],
             'kategori'    => (string) ($r['category'] ?? ''),
-            'id_kategori' => (int) $r['id_news_category'],
+            'id_kategori' => $r['id_news_category'] !== null ? (int) $r['id_news_category'] : null,
             'penulis'     => (string) ($r['penulis'] ?? ''),
             'tanggal'     => $this->iso((string) $r['publish_at']),
             'publish_at'  => (new DateTimeImmutable((string) $r['publish_at'], new DateTimeZone('UTC')))->setTimezone($zona)->format('Y-m-d'),
@@ -266,6 +266,11 @@ final class BeritaService
         $nilai = $this->validasi($auth, $input);
         $admin = (int) $auth->role() === Role::SUPER_ADMIN;
         $aktor = (int) $auth->idPengguna();
+
+        if (! $admin) {
+            $this->wajibAsalPembuatValid($auth);
+        }
+
         $kunci = $this->simpanLampiran($lampiran);
 
         $this->db->transStart();
@@ -321,7 +326,7 @@ final class BeritaService
 
         // Saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu`: default false = paritas legacy [K] (keputusan Horii 10-11), true = [V2] kembali menunggu.
         if (! $admin && config(Konten::class)->beritaUbahRole3KembaliMenunggu) {
-            $data += ['status' => self::MENUNGGU, 'approved_at' => null, 'approved_by' => null, 'reason_note' => null, 'show_notif' => null];
+            $data += ['status' => self::MENUNGGU, 'approved_at' => null, 'approved_by' => null, 'reason_note' => null, 'show_notif' => 0, 'notif_date' => null];
         }
 
         $this->db->transStart();
@@ -429,7 +434,9 @@ final class BeritaService
             throw new ApiException('Hanya berita yang menunggu persetujuan yang dapat diproses.', 409);
         }
 
-        $aktor = (int) $auth->idPengguna();
+        $aktor      = (int) $auth->idPengguna();
+        $sekarang   = gmdate('Y-m-d H:i:s');
+        $notifikasi = (int) $r['ul_creator'] === Role::ADMIN_SATKER;
 
         $this->db->transStart();
 
@@ -437,9 +444,10 @@ final class BeritaService
             (new NewsModel())->update($id, [
                 'status'      => $aksi === 'setuju' ? self::TERBIT : self::DITOLAK,
                 'reason_note' => $aksi === 'tolak' ? $alasan : null,
-                'approved_at' => gmdate('Y-m-d H:i:s'),
+                'approved_at' => $sekarang,
                 'approved_by' => $aktor,
-                'show_notif'  => (int) $r['ul_creator'] === Role::ADMIN_SATKER ? 1 : null,
+                'show_notif'  => $notifikasi ? 1 : 0,
+                'notif_date'  => $notifikasi ? $sekarang : null,
                 'updated_at'  => gmdate('Y-m-d H:i:s'),
                 'updated_by'  => $aktor,
             ]);
@@ -683,6 +691,28 @@ final class BeritaService
     }
 
     /**
+     * `news` tanpa FK ke unit/satker (DBV-032-Q11): asal pembuat role 3 divalidasi di sini — minimal satu dari unit/satker, dan
+     * yang terisi harus ada serta aktif (status 1). Admin pusat (role 1) tidak punya asal.
+     */
+    private function wajibAsalPembuatValid(AuthContext $auth): void
+    {
+        $unit   = $this->angka($auth->idUnit());
+        $satker = $this->angka($auth->idSatker());
+
+        if ($unit === null && $satker === null) {
+            throw new ApiException('Akun belum terhubung ke unit atau satker, sehingga tidak dapat membuat berita.', 403);
+        }
+
+        if ($unit !== null && $this->db->table('unit')->where('id_unit', $unit)->where('status', 1)->countAllResults() === 0) {
+            throw new ApiException('Unit akun tidak ditemukan atau tidak aktif.', 403);
+        }
+
+        if ($satker !== null && $this->db->table('satker')->where('id_satker', $satker)->where('status', 1)->countAllResults() === 0) {
+            throw new ApiException('Satker akun tidak ditemukan atau tidak aktif.', 403);
+        }
+    }
+
+    /**
      * Token target tunggal: `"0"` kementerian, `"<id_unit>"` unit, `"sat_<id_satker>"` satker.
      *
      * @return array{target: int, id_unit_target: ?int, id_satker_target: ?int}
@@ -696,16 +726,16 @@ final class BeritaService
         }
 
         if (preg_match('/^[1-9][0-9]{0,9}\z/', $t) === 1) {
-            if ($this->db->table('unit')->where('id_unit', (int) $t)->countAllResults() === 0) {
-                throw ValidationException::forField('target', 'Unit target tidak ditemukan.');
+            if ($this->db->table('unit')->where('id_unit', (int) $t)->where('status', 1)->countAllResults() === 0) {
+                throw ValidationException::forField('target', 'Unit target tidak ditemukan atau tidak aktif.');
             }
 
             return ['target' => 2, 'id_unit_target' => (int) $t, 'id_satker_target' => null];
         }
 
         if (preg_match('/^sat_([1-9][0-9]{0,9})\z/', $t, $m) === 1) {
-            if ($this->db->table('satker')->where('id_satker', (int) $m[1])->countAllResults() === 0) {
-                throw ValidationException::forField('target', 'Satker target tidak ditemukan.');
+            if ($this->db->table('satker')->where('id_satker', (int) $m[1])->where('status', 1)->countAllResults() === 0) {
+                throw ValidationException::forField('target', 'Satker target tidak ditemukan atau tidak aktif.');
             }
 
             return ['target' => 3, 'id_unit_target' => null, 'id_satker_target' => (int) $m[1]];
@@ -749,8 +779,10 @@ final class BeritaService
 
         $ids = array_map('intval', array_column($b->get()->getResultArray(), 'id_pengguna'));
 
+        $dibuat = gmdate('Y-m-d H:i:s');
+
         foreach (array_chunk($ids, self::BATCH) as $potong) {
-            $this->db->table('news_flag')->insertBatch(array_map(static fn (int $u): array => ['id_user' => $u, 'id_news' => $idNews], $potong));
+            $this->db->table('news_flag')->insertBatch(array_map(static fn (int $u): array => ['id_user' => $u, 'id_news' => $idNews, 'created_at' => $dibuat], $potong));
         }
     }
 

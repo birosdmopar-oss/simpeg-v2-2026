@@ -42,7 +42,7 @@ final class KontenGambarService
 
     private const PER_PAGE_MAX = 100;
 
-    private const URL_MAKS = 500;
+    private const URL_MAKS = 255;
 
     private const KETERANGAN_MAKS = 65535;
 

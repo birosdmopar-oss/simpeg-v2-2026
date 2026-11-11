@@ -65,7 +65,7 @@ final class SumberBerita implements SumberNotifikasiInterface
         }
 
         $hanyaBelumDibaca ? $b->where('news.show_notif', 1) : $b->whereIn('news.show_notif', [1, 3]);
-        $rows = $b->select('news.id_news, news.title, news.status, news.reason_note, news.show_notif, news.approved_at, news.updated_at, news.created_at')
+        $rows = $b->select('news.id_news, news.title, news.status, news.reason_note, news.show_notif, news.notif_date, news.approved_at, news.updated_at, news.created_at')
             ->orderBy('news.approved_at', 'DESC')->orderBy('news.id_news', 'DESC')->limit($batas)->get()->getResultArray();
 
         return array_map(fn (array $r): array => $this->item($r) + ['dibaca' => (int) $r['show_notif'] === 3, 'dapat_dihapus' => true], $rows);
@@ -243,7 +243,7 @@ final class SumberBerita implements SumberNotifikasiInterface
             'status_label' => $label,
             'reason_note'  => $status === BeritaService::DITOLAK && $r['reason_note'] !== null ? (string) $r['reason_note'] : null,
             'url_fe'       => $status === BeritaService::TERBIT ? '/berita/' . $r['id_news'] : self::URL_KELOLA,
-            'waktu'        => (string) ($r['approved_at'] ?? $r['created_at'] ?? gmdate('Y-m-d H:i:s')),
+            'waktu'        => (string) ($r['notif_date'] ?? $r['approved_at'] ?? $r['created_at'] ?? gmdate('Y-m-d H:i:s')),
         ];
     }
 }

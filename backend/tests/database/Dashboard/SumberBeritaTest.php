@@ -5,29 +5,21 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Dashboard\Konten\Berita\BeritaService;
 use App\Libraries\Dashboard\Konten\Berita\SumberBerita;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
-
 /**
  * Sumber notifikasi berita untuk Pusat Notifikasi F-08 (kontrak A ↔ C): notifikasi pembuat role 3 lewat `show_notif`
- * (1 baru, 3 dibaca, 2 dihapus), antrean/histori role 1, penghitung lonceng; role lain kosong. Memuat draf migration
- * `MigrationsDitahan/` (DBV-032).
+ * (1 baru, 3 dibaca, 2 dihapus), antrean/histori role 1, penghitung lonceng; role lain kosong.
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class SumberBeritaTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private CreateKontenInteraksiFase7 $m;
 
     private AuthContext $admin;
 
@@ -46,8 +38,6 @@ final class SumberBeritaTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
 
         $satkerA = $this->buatSatker($this->buatUnit());
         $satkerB = $this->buatSatker($this->buatUnit());
@@ -66,7 +56,6 @@ final class SumberBeritaTest extends DatabaseTestCase
 
     protected function tearDown(): void
     {
-        $this->m->down();
         parent::tearDown();
     }
 

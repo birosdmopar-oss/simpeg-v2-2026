@@ -53,6 +53,15 @@ describe('DiboBacaView', () => {
     w.unmount()
   })
 
+  it('baris legacy tanpa nomor/tahun/jenis tampil "—" tanpa galat (DBV-032: kolom NULL-able)', async () => {
+    svc.list.mockResolvedValue({ items: [{ ...baris, id: '9', nomor: '', tahun: '', jenis: '' }], total: 1 })
+    const w = mount(DiboBacaView)
+    await flushPromises()
+    const sel = w.findAll('[data-testid="dibo-row-9"] td').map((t) => t.text())
+    expect(sel.slice(0, 2)).toEqual(['—', '—'])
+    w.unmount()
+  })
+
   it('kosong → pesan', async () => {
     svc.list.mockResolvedValue({ items: [], total: 0 })
     const w = mount(DiboBacaView)

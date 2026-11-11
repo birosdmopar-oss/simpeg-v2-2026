@@ -4,42 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Database\Dashboard;
 
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Libraries\Dashboard\Konten\Penargetan\PemekarTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\SinkronPenerima;
 use App\Libraries\Dashboard\Konten\Penargetan\SpesifikasiTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\TabelPenerima;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
-
 /**
  * Penargetan F-04/F-05 (PRD Fase 7 v2.0 Q7-15): pemekaran target → NIP unik (status 1, kecuali menang) dan sinkron selisih
- * snapshot penerima. Masih memuat draf migration di `MigrationsDitahan/` (DBV-032); `require_once` dihapus saat dipindah.
+ * snapshot penerima.
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class KontenPenargetanTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private CreateKontenInteraksiFase7 $m;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
-    }
-
-    protected function tearDown(): void
-    {
-        $this->m->down();
-        parent::tearDown();
-    }
 
     public function testUnitSatkerPegawaiDanKecuali(): void
     {

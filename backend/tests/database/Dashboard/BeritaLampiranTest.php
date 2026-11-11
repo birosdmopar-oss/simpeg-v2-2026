@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
@@ -15,25 +14,19 @@ use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Konten;
 use DateTimeImmutable;
 use DateTimeZone;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
-
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
 
 /**
  * Lampiran berita (paritas legacy `L_news.php:282-340,489-545,785-818`, `views/hr/news/detail.php:15`): satu berkas
  * JPG/JPEG/PNG/GIF/PDF ≤ 5 MB, disimpan privat; ganti menghapus berkas lama setelah commit; hapus berita menghapus berkas;
- * dibaca lewat aturan visibilitas detail. Juga jam terbit (`pub_time` legacy). Memuat draf migration `MigrationsDitahan/`.
+ * dibaca lewat aturan visibilitas detail. Juga jam terbit (`pub_time` legacy).
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class BeritaLampiranTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private CreateKontenInteraksiFase7 $m;
 
     private string $akar;
 
@@ -53,8 +46,6 @@ final class BeritaLampiranTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
         $this->akar = sys_get_temp_dir() . '/lampiran_berita_' . bin2hex(random_bytes(4));
 
         $this->unitA = $this->buatUnit();
@@ -65,14 +56,12 @@ final class BeritaLampiranTest extends DatabaseTestCase
         $this->pegawaiA = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawaiDiSatker($satkerA), Role::PEGAWAI));
         $this->pegawaiB = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawaiDiSatker($satkerB), Role::PEGAWAI));
 
-        $this->db->table('news_category')->insert(['category' => 'Umum', 'allow_ap' => 0, 'order' => 1]);
+        $this->db->table('news_category')->insert(['category' => 'Umum', 'allow_ap' => 2, 'order' => 1]);
         $this->kategori = (int) $this->db->insertID();
     }
 
     protected function tearDown(): void
     {
-        $this->m->down();
-
         foreach ($this->tmp as $f) {
             @unlink($f);
         }

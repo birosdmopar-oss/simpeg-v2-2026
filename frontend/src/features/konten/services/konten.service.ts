@@ -117,7 +117,7 @@ export const diboBacaService = {
     return {
       items: (data?.items ?? []).map((r) => ({
         id: toId(r.id),
-        nomor: r.nomor,
+        nomor: r.nomor ?? '',
         tahun: String(r.tahun ?? ''),
         tentang: r.tentang,
         keterangan: r.keterangan ?? '',

@@ -95,7 +95,7 @@ final class MasterKontenService
         $data = [$kol => $nama];
 
         if ($this->jenis->punyaAllowAp()) {
-            $data['allow_ap'] = in_array($allowAp, [1, '1', true], true) ? 1 : 0;
+            $data['allow_ap'] = in_array($allowAp, [1, '1', true], true) ? 1 : 2; // DBV-032: 1 = role 3 boleh, 2 = tidak
         }
 
         $model = $this->jenis->model();
@@ -212,7 +212,7 @@ final class MasterKontenService
             'nama'     => (string) $r[$this->jenis->kolomNama()],
             'urutan'   => (int) $r['order'],
             'status'   => (int) $r['status'],
-            'allow_ap' => (int) ($r['allow_ap'] ?? 0),
+            'allow_ap' => (int) ($r['allow_ap'] ?? 2),
         ];
     }
 }

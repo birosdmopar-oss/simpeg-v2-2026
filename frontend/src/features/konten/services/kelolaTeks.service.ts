@@ -42,7 +42,7 @@ export function mapBerita(r: BeritaKelolaRowApi): BeritaKelolaRow {
 export function mapDibo(r: DiboRowApi): DiboRow {
   return {
     id: String(r.id),
-    nomor: r.nomor,
+    nomor: r.nomor ?? '',
     tahun: String(r.tahun ?? ''),
     tentang: r.tentang,
     jenis: r.jenis ?? '',

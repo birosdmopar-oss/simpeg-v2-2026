@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
@@ -15,25 +14,19 @@ use App\Libraries\Dashboard\Konten\JenisMaster;
 use App\Libraries\Dashboard\Konten\MasterKontenService;
 use DateTimeImmutable;
 use DateTimeZone;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
-
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
 
 /**
  * F-07 Berita (MAKE-081; PRD Fase 7 v2.0 §5.5, Q7-07..10): sanitasi isi, visibilitas menurut target & jadwal terbit (portal =
  * detail), alur role 3 → menunggu → persetujuan role 1, kepemilikan role 3, penanda `news_flag`, dan master kategori/jenis.
- * Memuat draf migration `MigrationsDitahan/` (DBV-032).
+ *
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class BeritaServiceTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private CreateKontenInteraksiFase7 $m;
 
     private int $unitA;
 
@@ -60,15 +53,13 @@ final class BeritaServiceTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
 
         $this->unitA   = $this->buatUnit();
         $this->satkerA = $this->buatSatker($this->unitA);
         $this->unitB   = $this->buatUnit();
         $this->satkerB = $this->buatSatker($this->unitB);
 
-        $this->kategori   = $this->buatKategori('Umum', 0);
+        $this->kategori   = $this->buatKategori('Umum', 2);
         $this->kategoriAp = $this->buatKategori('Pengumuman Satker', 1);
 
         $this->admin    = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawaiDiSatker($this->satkerA), Role::SUPER_ADMIN));
@@ -76,12 +67,6 @@ final class BeritaServiceTest extends DatabaseTestCase
         $this->satker3B = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawaiDiSatker($this->satkerB), Role::ADMIN_SATKER));
         $this->pegawaiA = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawaiDiSatker($this->satkerA), Role::PEGAWAI));
         $this->pegawaiB = $this->authUntukAkun($this->buatAkunUntuk($this->buatPegawaiDiSatker($this->satkerB), Role::PEGAWAI));
-    }
-
-    protected function tearDown(): void
-    {
-        $this->m->down();
-        parent::tearDown();
     }
 
     public function testAdminMembuatBeritaTerbitDenganIsiDisanitasi(): void
@@ -115,6 +100,63 @@ final class BeritaServiceTest extends DatabaseTestCase
         }
 
         $this->assertSame(0, $this->db->table('news')->countAllResults());
+    }
+
+    public function testBeritaAdminShowNotifNolTanpaNotifDate(): void
+    {
+        $r   = $this->service()->buat($this->admin, $this->input());
+        $row = $this->db->table('news')->where('id_news', $r['id'])->get()->getRowArray();
+
+        $this->assertSame(0, (int) $row['show_notif'], 'NOT NULL DEFAULT 0 (DBV-032)');
+        $this->assertNull($row['notif_date']);
+    }
+
+    public function testTargetUnitSatkerNonaktifAtauTidakAdaDitolak(): void
+    {
+        $this->db->table('unit')->where('id_unit', $this->unitB)->update(['status' => 2]);
+        $this->db->table('satker')->where('id_satker', $this->satkerB)->update(['status' => 2]);
+
+        foreach ([
+            'unit nonaktif'   => (string) $this->unitB,
+            'satker nonaktif' => 'sat_' . $this->satkerB,
+            'unit tak ada'    => '99999999',
+            'satker tak ada'  => 'sat_99999999',
+        ] as $label => $token) {
+            try {
+                $this->service()->buat($this->admin, $this->input(['target' => $token]));
+                $this->fail("Harus 422: {$label}");
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('target', $e->getErrors() ?? [], $label);
+            }
+        }
+
+        $this->assertSame(0, $this->db->table('news')->countAllResults());
+    }
+
+    public function testAsalPembuatRole3NonaktifDitolak(): void
+    {
+        $this->db->table('satker')->where('id_satker', $this->satkerA)->update(['status' => 2]);
+
+        try {
+            $this->service()->buat($this->satker3A, $this->input(['id_kategori' => $this->kategoriAp]));
+            $this->fail('Satker pembuat nonaktif harus ditolak');
+        } catch (ApiException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+
+        $this->assertSame(0, $this->db->table('news')->countAllResults());
+    }
+
+    public function testBarisLegacyKategoriNullTetapTerbaca(): void
+    {
+        $r = $this->service()->buat($this->admin, $this->input(['judul' => 'Legacy']));
+        $this->db->table('news')->where('id_news', $r['id'])->update(['id_news_category' => null]);
+
+        $d = $this->service()->detail($this->admin, $r['id']);
+        $this->assertNull($d['id_kategori']);
+        $this->assertSame('', $d['kategori']);
+        $this->assertSame(['Legacy'], array_column($this->service()->kelola($this->admin, [])['items'], 'judul'));
+        $this->assertSame(['Legacy'], array_column($this->service()->portal($this->pegawaiA, [])['items'], 'judul'));
     }
 
     public function testVisibilitasMenurutTargetJadwalDanPortalSamaDenganDetail(): void
@@ -199,7 +241,9 @@ final class BeritaServiceTest extends DatabaseTestCase
         $this->assertSame(1, $ok['status']);
         $row = $this->db->table('news')->where('id_news', $r['id'])->get()->getRowArray();
         $this->assertSame(1, (int) $row['show_notif']);
+        $this->assertNotNull($row['notif_date'], 'notif_date diisi saat diproses (DBV-032)');
         $this->assertNotNull($row['approved_at']);
+        $this->assertNotNull($this->db->table('news_flag')->where('id_news', $r['id'])->get()->getRow()->created_at, 'created_at flag diisi aplikasi');
         $this->assertSame(['Dari satker'], array_column($svc->portal($this->pegawaiA, [])['items'], 'judul'));
         $this->assertGreaterThan(0, $this->db->table('news_flag')->where('id_news', $r['id'])->countAllResults());
 
@@ -219,6 +263,9 @@ final class BeritaServiceTest extends DatabaseTestCase
 
         $this->assertSame(2, $t['status']);
         $this->assertSame('Kurang lengkap', $t['alasan']);
+        $row = $this->db->table('news')->where('id_news', $r['id'])->get()->getRowArray();
+        $this->assertSame(1, (int) $row['show_notif'], 'pembuat role 3 diberi notifikasi juga saat ditolak');
+        $this->assertNotNull($row['notif_date'], 'notif_date diisi juga saat tolak');
         $this->assertSame([], array_column($svc->portal($this->pegawaiA, [])['items'], 'judul'));
     }
 
@@ -308,6 +355,16 @@ final class BeritaServiceTest extends DatabaseTestCase
     {
         $this->expectException(ApiException::class);
         $this->service()->kelola($this->pegawaiA, []);
+    }
+
+    public function testMasterKategoriTanpaAllowApDisimpanSebagaiDua(): void
+    {
+        $m     = new MasterKontenService(JenisMaster::BeritaKategori, $this->db);
+        $tanpa = $m->simpan(null, 'Tanpa Persetujuan', 0, 1);
+
+        $this->assertSame(2, $tanpa['allow_ap'], 'allow_ap 1 = role 3 boleh, 2 = tidak (DBV-032)');
+        $this->assertSame(2, (int) $this->db->table('news_category')->where('id_news_category', $tanpa['id'])->get()->getRow()->allow_ap);
+        $this->assertSame(1, $m->simpan(null, 'Dengan Persetujuan', 1, 1)['allow_ap']);
     }
 
     public function testMasterKategoriNamaUnikUrutanStatusDanHapus(): void

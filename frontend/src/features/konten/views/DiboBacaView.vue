@@ -128,8 +128,8 @@ onMounted(async () => {
             <td colspan="5" class="px-4 py-8 text-center text-slate-500" data-testid="dibo-kosong">Belum ada DIBO yang cocok.</td>
           </tr>
           <tr v-for="row in items" v-else :key="row.id" class="hover:bg-slate-50" :data-testid="`dibo-row-${row.id}`">
-            <td class="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{{ row.nomor }}</td>
-            <td class="px-4 py-3 text-slate-600">{{ row.tahun }}</td>
+            <td class="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{{ row.nomor || '—' }}</td>
+            <td class="px-4 py-3 text-slate-600">{{ row.tahun || '—' }}</td>
             <td class="px-4 py-3 text-slate-700">
               {{ row.tentang }}
               <span v-if="row.keterangan" class="mt-0.5 block text-xs text-slate-500">{{ row.keterangan }}</span>

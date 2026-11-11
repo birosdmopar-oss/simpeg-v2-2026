@@ -154,8 +154,8 @@ export interface LampiranBerita {
 
 export interface DiboRowApi {
   id: number | string
-  nomor: string
-  tahun: number | string
+  nomor?: string | null
+  tahun?: number | string | null
   tentang: string
   jenis?: string | null
   id_jenis?: number | string | null
@@ -238,8 +238,8 @@ export interface BeritaKategoriOpsi {
 /** DIBO untuk dibaca semua role (PRD §5.6, Q7-12/13): hanya status 1; unduh berkas 1..3 terautentikasi. Draf kontrak. */
 export interface DiboBacaRowApi {
   id: KontenApiId
-  nomor: string
-  tahun: number | string
+  nomor?: string | null
+  tahun?: number | string | null
   tentang: string
   keterangan?: string | null
   jenis?: string | null

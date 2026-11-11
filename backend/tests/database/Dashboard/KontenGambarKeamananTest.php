@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Dashboard\Konten\Gambar\JenisGambar;
@@ -13,25 +12,19 @@ use App\Libraries\Dashboard\Konten\Gambar\KontenGambarService;
 use App\Libraries\Dashboard\Konten\Gambar\PenyimpananGambar;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Konten;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
-
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
 
 /**
  * Keamanan unggah/unduh gambar popup/banner (self-review Jalur A): kunci penyimpanan di DB yang rusak/diubah tidak boleh
  * membaca berkas di luar akar penyimpanan, nama unduhan tidak memuat karakter berbahaya, dan isi yang menyamar sebagai gambar
- * (PHP/HTML/SVG berskrip/PDF bernama .png) atau ekstensi terlarang ditolak. Memuat draf migration `MigrationsDitahan/` (DBV-032).
+ * (PHP/HTML/SVG berskrip/PDF bernama .png) atau ekstensi terlarang ditolak.
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class KontenGambarKeamananTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private CreateKontenInteraksiFase7 $m;
 
     private string $akar;
 
@@ -41,15 +34,11 @@ final class KontenGambarKeamananTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
         $this->akar = sys_get_temp_dir() . '/gambar_aman_' . bin2hex(random_bytes(4));
     }
 
     protected function tearDown(): void
     {
-        $this->m->down();
-
         foreach ($this->tmp as $f) {
             @unlink($f);
         }

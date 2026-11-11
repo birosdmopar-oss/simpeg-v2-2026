@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Libraries\Dashboard\Konten\Dibo\DiboService;
 use App\Libraries\Dashboard\Konten\Dibo\PenyimpananDibo;
 use CodeIgniter\Config\Factories;
@@ -13,22 +12,18 @@ use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\Test\FeatureTestTrait;
 use Config\Konten;
 use Config\Services;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
-
 /**
  * F-12 DIBO lewat HTTP (MAKE-082; PRD Fase 7 v2.0 §5.6, §6): baca semua role (hanya aktif), unduh berkas terautentikasi
  * (attachment, tanpa cache; non-admin tidak bisa mengunduh yang dicabut), kelola hanya role 1. Unggah multipart diuji di level
- * service (DiboServiceTest). Memuat draf migration `MigrationsDitahan/` (DBV-032).
+ * service (DiboServiceTest).
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class DiboEndpointTest extends DatabaseTestCase
 {
     use AuthTestTrait;
@@ -36,8 +31,6 @@ final class DiboEndpointTest extends DatabaseTestCase
     use PegawaiFixtureTrait;
 
     protected $seed = AuthSeeder::class;
-
-    private CreateKontenInteraksiFase7 $m;
 
     private string $akar;
 
@@ -49,8 +42,6 @@ final class DiboEndpointTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->clearAuthState();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
         $this->akar = sys_get_temp_dir() . '/dibo_http_' . bin2hex(random_bytes(4));
 
 
@@ -74,8 +65,6 @@ final class DiboEndpointTest extends DatabaseTestCase
         $this->clearAuthState();
         Services::reset(true);
         Factories::reset('config');
-        $this->m->down();
-
         foreach (glob($this->akar . '/*/*') ?: [] as $f) {
             @unlink($f);
         }

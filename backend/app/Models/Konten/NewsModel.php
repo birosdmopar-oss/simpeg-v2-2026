@@ -16,7 +16,7 @@ final class NewsModel extends BaseAuditableModel
     protected $returnType    = 'array';
     protected $useTimestamps = false;
     protected $allowedFields = [
-        'id_news_category', 'title', 'news', 'lampiran', 'publish_at', 'status', 'show_notif',
+        'id_news_category', 'title', 'news', 'lampiran', 'publish_at', 'status', 'show_notif', 'notif_date',
         'target', 'id_unit_target', 'id_satker_target', 'ul_creator', 'id_unit_creator', 'id_satker_creator',
         'approved_at', 'approved_by', 'reason_note',
         'created_at', 'updated_at', 'created_by', 'updated_by',

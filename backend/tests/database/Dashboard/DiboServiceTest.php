@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
@@ -14,25 +13,19 @@ use App\Libraries\Dashboard\Konten\Dibo\DiboService;
 use App\Libraries\Dashboard\Konten\Dibo\PenyimpananDibo;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Konten;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
-
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
 
 /**
  * F-12 DIBO (MAKE-082; PRD Fase 7 v2.0 §5.6, Q7-11..14; legacy `L_dibo.php`): CRUD role 1 dengan berkas 1–3 privat, hapus lunak
  * [V2], baca semua role HANYA status aktif (perbaikan anomali legacy), filter jenis/tahun/cari, unduh terautentikasi.
- * Memuat draf migration `MigrationsDitahan/` (DBV-032).
+ *
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class DiboServiceTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private CreateKontenInteraksiFase7 $m;
 
     private string $akar;
 
@@ -50,8 +43,6 @@ final class DiboServiceTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
         $this->akar = sys_get_temp_dir() . '/dibo_uji_' . bin2hex(random_bytes(4));
 
         $satker        = $this->buatSatker($this->buatUnit());
@@ -64,8 +55,6 @@ final class DiboServiceTest extends DatabaseTestCase
 
     protected function tearDown(): void
     {
-        $this->m->down();
-
         foreach ($this->tmp as $f) {
             @unlink($f);
         }
@@ -98,6 +87,32 @@ final class DiboServiceTest extends DatabaseTestCase
         $k = (string) $this->db->table('dibo')->where('id_dibo', $r['id'])->get()->getRow()->file_1;
         $this->assertMatchesRegularExpression('#^dibo/[0-9a-f]{32}\.pdf$#', $k);
         $this->assertFileExists($this->akar . '/' . $k);
+    }
+
+    public function testNomorMaksimal50Karakter(): void
+    {
+        $svc = $this->service();
+
+        try {
+            $svc->buat($this->admin, $this->input(['nomor' => str_repeat('N', 51)]), [1 => $this->pdf()]);
+            $this->fail('Nomor 51 karakter harus ditolak (VARCHAR(50), DBV-032)');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('nomor', $e->getErrors() ?? []);
+        }
+
+        $this->assertSame(str_repeat('N', 50), $svc->buat($this->admin, $this->input(['nomor' => str_repeat('N', 50)]), [1 => $this->pdf()])['nomor']);
+    }
+
+    public function testBarisLegacyJenisNomorTahunNullTetapTerbaca(): void
+    {
+        $svc = $this->service();
+        $r   = $svc->buat($this->admin, $this->input(), [1 => $this->pdf()]);
+        $this->db->table('dibo')->where('id_dibo', $r['id'])->update(['id_jenis_dibo' => null, 'nomor' => null, 'tahun' => null]);
+
+        $baca = $svc->baca([])['items'][0];
+        $this->assertSame(['', null, ''], [$baca['nomor'], $baca['tahun'], $baca['jenis']]);
+        $kelola = $svc->kelola($this->admin, [])['items'][0];
+        $this->assertNull($kelola['id_jenis']);
     }
 
     public function testValidasiDanFile1Wajib(): void

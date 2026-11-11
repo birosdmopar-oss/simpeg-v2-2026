@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Constants\Role;
-use App\Database\Migrations\CreateKontenInteraksiFase7;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Dashboard\Konten\Gambar\JenisGambar;
@@ -15,25 +14,19 @@ use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Konten;
 use DateTimeImmutable;
 use DateTimeZone;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
-
-require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
 
 /**
  * F-04 Popup / F-05 Banner (MAKE-079/080; PRD Fase 7 v2.0 §5.3/5.4): kelola (target → snapshot penerima, sinkron selisih,
  * urutan, hapus), validasi gambar (tipe dari isi, rasio banner 4:1) dan periode, tampil `aktif` per NIP + periode WIB,
- * akses gambar (role 1 / penerima), audit_logs. Masih memuat draf migration `MigrationsDitahan/` (DBV-032).
+ * akses gambar (role 1 / penerima), audit_logs.
  *
  * @internal
  */
-#[Group('db-isolasi-penuh')]
 final class KontenGambarServiceTest extends DatabaseTestCase
 {
     use PegawaiFixtureTrait;
-
-    private CreateKontenInteraksiFase7 $m;
 
     private string $akar;
 
@@ -43,15 +36,11 @@ final class KontenGambarServiceTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->m = new CreateKontenInteraksiFase7();
-        $this->m->up();
         $this->akar = sys_get_temp_dir() . '/konten_uji_' . bin2hex(random_bytes(4));
     }
 
     protected function tearDown(): void
     {
-        $this->m->down();
-
         foreach ($this->tmp as $f) {
             @unlink($f);
         }
@@ -299,6 +288,19 @@ final class KontenGambarServiceTest extends DatabaseTestCase
     private function input(array $o = []): array
     {
         return $o + ['tgl_mulai' => '2026-11-01 08:00', 'tgl_akhir' => '2026-11-30 17:00', 'url' => 'https://contoh.test/a', 'keterangan' => 'Uji'];
+    }
+
+    public function testUrlMaksimal255Karakter(): void
+    {
+        $svc = $this->service(JenisGambar::Popup);
+        $in  = $this->input(['target' => ['unit_satker' => ['0']]]);
+
+        try {
+            $svc->buat(['url' => 'https://contoh.test/' . str_repeat('a', 240)] + $in, $this->gambar(300, 200), 1);
+            $this->fail('URL > 255 karakter harus ditolak (VARCHAR(255), DBV-032)');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('url', $e->getErrors() ?? []);
+        }
     }
 
     private function service(JenisGambar $jenis, string $sekarang = '2026-11-15 10:00:00'): KontenGambarService
