@@ -7,6 +7,7 @@ namespace App\Controllers\Api\Dashboard;
 use App\Controllers\Api\ApiController;
 use App\Libraries\Dashboard\Interaksi\FormDigital\IsianFormDigital;
 use App\Libraries\Dashboard\Interaksi\FormDigital\KelolaFormDigital;
+use App\Libraries\Dashboard\Interaksi\FormDigital\RekapRespons;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -20,6 +21,27 @@ final class FormDigitalController extends ApiController
     private ?IsianFormDigital $isian = null;
 
     private ?KelolaFormDigital $kelola = null;
+
+    private ?RekapRespons $rekap = null;
+
+    public function respons(int $id): ResponseInterface
+    {
+        if ($this->request->getGet('format') === 'xlsx') {
+            $berkas = $this->rekap()->xlsx(service('authContext'), $id);
+
+            return $this->unduh($berkas['nama'], $berkas['mime'], $berkas['isi']);
+        }
+
+        return $this->respondSuccess($this->rekap()->halaman(service('authContext'), $id, $this->query()));
+    }
+
+    public function berkasJawaban(int $id, int $idJawaban, string $idPertanyaan): ResponseInterface
+    {
+        $berkas = $this->rekap()->berkas(service('authContext'), $id, $idJawaban, $idPertanyaan);
+        $mime   = (new \finfo(FILEINFO_MIME_TYPE))->buffer($berkas['isi']);
+
+        return $this->unduh($berkas['nama'], is_string($mime) ? $mime : 'application/octet-stream', $berkas['isi']);
+    }
 
     public function index(): ResponseInterface
     {
@@ -98,6 +120,24 @@ final class FormDigitalController extends ApiController
         $q = $this->request->getGet();
 
         return is_array($q) ? $q : [];
+    }
+
+    private function unduh(string $nama, string $mime, string $isi): ResponseInterface
+    {
+        $aman = preg_replace('/[^A-Za-z0-9._ -]/', '_', $nama) ?? 'berkas';
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setHeader('Content-Type', $mime)
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $aman . '"')
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('Cache-Control', 'private, no-store')
+            ->setBody($isi);
+    }
+
+    private function rekap(): RekapRespons
+    {
+        return $this->rekap ??= new RekapRespons(db_connect(), service('storageAdapter'));
     }
 
     private function kelola(): KelolaFormDigital
