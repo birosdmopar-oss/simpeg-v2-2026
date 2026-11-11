@@ -28,7 +28,10 @@ const open = ref(false)
 const items = ref<CutiItem[]>([])
 const error = ref('')
 const busyId = ref<number | null>(null)
-const { minta } = useAntreanDialog()
+const { daftar } = useAntreanDialog()
+// CR-118: daftar sinkron di setup (sebelum fetch) supaya urutan antrean deterministik.
+const peserta =
+  auth.role !== null && CUTI_ROLES.includes(auth.role) && !auth.mustChangePassword && !sudahDitampilkan() ? daftar('pengingat-cuti') : null
 let selesai: (() => void) | null = null
 
 watch(open, (buka) => {
@@ -39,16 +42,16 @@ watch(open, (buka) => {
 })
 
 async function muat(): Promise<void> {
-  if (auth.role === null || !CUTI_ROLES.includes(auth.role) || auth.mustChangePassword || sudahDitampilkan()) return
+  if (peserta === null) return
   try {
     const hasil = await cutiService.pengingat()
     tandaiDitampilkan()
-    if (hasil.items.length > 0) {
-      items.value = hasil.items
-      selesai = await minta('pengingat-cuti')
-      open.value = true
-    }
+    if (hasil.items.length === 0) return peserta.batal()
+    items.value = hasil.items
+    selesai = await peserta.minta()
+    open.value = true
   } catch {
+    peserta.batal()
     // Abaikan: pengingat hanya kemudahan.
   }
 }
