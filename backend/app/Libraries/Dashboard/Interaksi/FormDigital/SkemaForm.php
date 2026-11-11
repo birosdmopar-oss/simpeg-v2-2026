@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Dashboard\Interaksi\FormDigital;
 
 use App\Exceptions\ValidationException;
+use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 
 /**
  * Skema form digital v2 (F-06, PRD Fase 7 §5.7, Q7-18) yang disimpan di `form_digital.form_digital`:
