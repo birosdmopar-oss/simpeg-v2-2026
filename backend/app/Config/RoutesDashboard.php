@@ -46,6 +46,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
     $routes->get('form-digital', 'FormDigitalController::index', $adminForm);
     $routes->post('form-digital', 'FormDigitalController::create', $adminForm);
     $routes->get('form-digital/(:num)/target', 'FormDigitalController::target/$1', $adminForm);
+    $routes->get('form-digital/(:num)/respons/(:num)/berkas/(:segment)', 'FormDigitalController::berkasJawaban/$1/$2/$3', $adminForm);
+    $routes->get('form-digital/(:num)/respons', 'FormDigitalController::respons/$1', $adminForm);
     $routes->patch('form-digital/(:num)/status', 'FormDigitalController::status/$1', $adminForm);
     $routes->get('form-digital/(:num)', 'FormDigitalController::show/$1', $adminForm);
     $routes->put('form-digital/(:num)', 'FormDigitalController::update/$1', $adminForm);
