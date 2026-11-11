@@ -135,7 +135,7 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 | 11 | Snapshot `pegawai_*` lain — transaksi per tabel (K-M8); `id_riwayat_*` NOT NULL yatim → gagal | MAKE-069 |
 | 12 | Layanan sisa DBV-022 §5 (`jenis_layanan`/`jenis_pa` seed, `question_category`, petugas, `pa_layanan`, notifikasi KT, IB, PMK, `esign_hist`) | MAKE-069 |
 | 13 | **Tiket lama Halo Simpeg (F-02, MAKE-086)**: `disiplin_ticket` ← `inbox`, `disiplin_ticket_msg` ← `inbox_msg` (rename 1:1, PK tetap). Semua isi = tiket (penulis tunggal `L_support.php`); `inbox` v2 tidak ditulis (Q7-28). Sortir & eskalasi: bagian **Tiket lama (F-02)** di bawah | MAKE-086 |
-| 14 | **Konten & interaksi Fase 7 (MAKE-089, DBV-032 §10)** — transaksi per tabel + `--jejak`. Isi: `news_category` (status 0→2, `allow_ap` ENUM nilai), `news` (ENUM `status`/`target` dari nilai, isi disanitasi `SanitasiBerita`, lampiran → kunci, `publish_at` R1a), `news_flag` (PK sintetis), `jenis_dibo` (cocok seed), `dibo` (`tahun` 0000→NULL, berkas → kunci), `popup` (video `type≠1` dilewati + anaknya, `tgl_*` waktu bisnis WIB), `user_popup`, `banner`, `user_banner` (PK sintetis, batch), `skl` (UNIQUE ganda → id terkecil). Kolom legacy `target`/`type`/`id_unit_satker`/`unit_satker`/`*_desc`/`news.category`/`unit_satker_target` tidak dibawa. Aturan: `AturanKonten`. Form digital menyusul (M2) | MAKE-089 |
+| 14 | **Konten & interaksi Fase 7 (MAKE-089, DBV-032 §10)** — transaksi per tabel + `--jejak`. Isi: `news_category` (status 0→2, `allow_ap` ENUM nilai), `news` (ENUM `status`/`target` dari nilai, isi disanitasi `SanitasiBerita`, lampiran → kunci, `publish_at` R1a), `news_flag` (PK sintetis), `jenis_dibo` (cocok seed), `dibo` (`tahun` 0000→NULL, berkas → kunci), `popup` (video `type≠1` dilewati + anaknya, `tgl_*` waktu bisnis WIB), `user_popup`, `banner`, `user_banner` (PK sintetis, batch), `skl` (UNIQUE ganda → id terkecil). Kolom legacy `target`/`type`/`id_unit_satker`/`unit_satker`/`*_desc`/`news.category`/`unit_satker_target` tidak dibawa. Form digital (M2, `AturanFormDigital`): `form_digital` formBuilder → SkemaForm v2 (lolos `SkemaForm::normalisasi`; tak bisa dikonversi = ambigu), `user_form_digital` (target + turunan `filled_form_digital` yang tak ada di target, Q-089-5), `filled_form_digital` (response dibaca mentah, jawaban ke id v2, berkas → `form-digital/<id_form>/<hex32>.<ext>`, `ukuran: null`). Aturan: `AturanKonten`, `AturanFormDigital` | MAKE-089 |
 | 15 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
 
 **Aturan DBV-027 §13.3 (B3).** Pesan dan laporan hanya jumlah.
@@ -162,7 +162,13 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 - Kolom berkas diisi kunci DETERMINISTIK `<jenis>/<hex32>.<ext>`, dengan
   `hex32 = sha256("MAKE-089|<tabel>|<kolom>|<id>|<path legacy>")[0..32]` dan ekstensi dari daftar putih Jalur A. Formatnya
   sama dengan buatan aplikasi.
-- Berkasnya disalin terpisah oleh `impor:berkas-konten` (M3).
+- Berkasnya disalin terpisah oleh `impor:berkas-konten` (M3, `BerkasKonten`):
+  `php spark impor:berkas-konten --sumber=<skema> --dasar=<folder salinan aplikasi legacy> [--keputusan=<berkas.json>] [--dry-run]`.
+  - Baca-saja terhadap sumber; kunci dihitung ulang dengan fungsi tier 14 (`AturanKonten::kunciBerkas`,
+    `AturanFormDigital::berkasJawaban`), jadi sama persis dengan isi kolom hasil impor.
+  - Tujuan = `Config\Konten::akarPenyimpanan`. Asal = `--dasar` lewat `LocalStorageAdapter` (realpath wajib di dalam akar).
+  - Status per jenis: `disalin`, `sudah_ada` (isi sama, idempoten), `beda` (isi lain, TIDAK ditimpa), `hilang`,
+    `tidak_sah` (traversal/ekstensi/form tak terkonversi), `dilewati` (popup video, `"__buang"`). Layar hanya jumlah.
 - AMBIGU (pola F-02) diputus per id lewat bagian `baris` `<tabel>.f7` = `"__buang"` (satu-satunya nilai). Tanpa
   putusan → gagal dengan jumlah per kode, juga saat dry-run. AMBIGU mencakup:
   - path tidak sah (traversal, absolut, backslash);
@@ -290,6 +296,8 @@ segmen ketat.
 - `tests/unit/Impor/AturanImporTest.php`: aturan murni (transformasi, keputusan, penjaga).
 - `tests/unit/Impor/UrutanTierTest.php`: tier SIASN selalu `TIER_MAKS` dan sesudah tabel induk rujukannya.
 - `tests/Impor/ImporLegacyTier14Test.php` (MAKE-089): skema legacy D1 tiruan, ENUM/status/video/waktu bisnis/kunci berkas/PK sintetis ganda di batas batch/keputusan `<tabel>.f7`.
+- `tests/Impor/ImporLegacyTier14FormTest.php`, `tests/unit/Impor/AturanFormDigitalTest.php` (MAKE-089 M2): konversi skema/jawaban, turunan filled, anak ikut induk.
+- `tests/Impor/BerkasKontenTest.php` (MAKE-089 M3): salin idempoten, kunci = tier 14, isi beda tidak ditimpa, traversal ditolak, sumber tidak berubah.
 - `tests/Impor/ImporLegacyTiketLamaTest.php` (F-02): kelas sortir, eskalasi wajib diputus, manifest seimbang, `inbox` v2 = 0, command `impor:sortir-inbox`.
 - `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php`,
   `ImporLegacySiasnTest.php` (B3: kunci ganda SKP, tier SIASN, skema `--sumber-siasn` huruf besar),

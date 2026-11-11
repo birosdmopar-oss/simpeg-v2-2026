@@ -231,6 +231,36 @@ final class AturanFormDigital
     }
 
     /**
+     * Pasangan [path legacy, kunci v2 | null] untuk setiap berkas jawaban (dipakai `impor:berkas-konten`, Q-089-1 b). Kunci
+     * sama dengan {@see self::konversiJawaban()}; response tidak valid → daftar kosong.
+     *
+     * @param array{skema: array{versi: int, pertanyaan: list<array<string, mixed>>}, nama: array<string, string>, opsi: array<string, array<string, string>>, statis: int} $konversi
+     *
+     * @return list<array{0: string, 1: string|null}>
+     */
+    public static function berkasJawaban(string $responsMentah, array $konversi, int|string $idForm, string $nip): array
+    {
+        $respons = json_decode($responsMentah, true);
+
+        if (! is_array($respons)) {
+            $respons = json_decode(Transformasi::stripslashes($responsMentah), true);
+        }
+
+        $berkas = is_array($respons) && is_array($respons['file'] ?? null) ? $respons['file'] : [];
+        $tipe   = array_column($konversi['skema']['pertanyaan'], 'tipe', 'id');
+        $hasil  = [];
+
+        foreach ($berkas as $namaLegacy => $path) {
+            $id      = $konversi['nama'][(string) $namaLegacy] ?? null;
+            $id      = $id !== null && ($tipe[$id] ?? null) === 'berkas' ? $id : null;
+            $path    = is_scalar($path) ? (string) $path : '';
+            $hasil[] = [$path, $id === null ? null : self::kunciBerkasJawaban($idForm, $nip, $id, $path)];
+        }
+
+        return $hasil;
+    }
+
+    /**
      * Kunci berkas jawaban `form-digital/<id_form>/<hex32>.<ext>` (syarat Jalur B), deterministik per path legacy.
      */
     public static function kunciBerkasJawaban(int|string $idForm, string $nip, string $idPertanyaan, string $path): ?string
