@@ -56,6 +56,7 @@ final class SkemaFormTest extends CIUnitTestCase
         yield 'opsi > 50' => [[['tipe' => 'pilihan_ganda', 'label' => 'x', 'opsi' => array_map('strval', range(1, 51))]], 'form.pertanyaan.0.opsi'];
         yield 'angka min > maks' => [[['tipe' => 'angka', 'label' => 'x', 'min' => 5, 'maks_angka' => 1]], 'form.pertanyaan.0.maks_angka'];
         yield 'berkas jenis asing' => [[['tipe' => 'berkas', 'label' => 'x', 'berkas' => ['tipe' => ['exe']]]], 'form.pertanyaan.0.berkas.tipe'];
+        yield 'berkas 3 MB (bukan 1/2/5)' => [[['tipe' => 'berkas', 'label' => 'x', 'berkas' => ['maks_mb' => 3]]], 'form.pertanyaan.0.berkas.maks_mb'];
         yield 'berkas > 5 MB' => [[['tipe' => 'berkas', 'label' => 'x', 'berkas' => ['maks_mb' => 6]]], 'form.pertanyaan.0.berkas.maks_mb'];
         yield '> 100 pertanyaan' => [array_fill(0, 101, ['tipe' => 'teks', 'label' => 'x']), 'form.pertanyaan'];
     }

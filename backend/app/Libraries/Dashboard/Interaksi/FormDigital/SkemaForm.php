@@ -12,7 +12,7 @@ use App\Exceptions\ValidationException;
  *     {"versi":1,"pertanyaan":[{"id":"q1","tipe":"teks","label":"…","wajib":true,"bantuan":"…", …}]}
  *
  * Tipe: teks (`maks` ≤ 255), paragraf (`maks` ≤ 5000), pilihan_tunggal / pilihan_ganda (`opsi` 1..50 butir unik ≤ 200
- * karakter), tanggal, angka (`min`/`maks_angka` opsional), berkas (`berkas.tipe` ⊆ daftar, `berkas.maks_mb` 1..5).
+ * karakter), tanggal, angka (`min`/`maks_angka` opsional), berkas (`berkas.tipe` ⊆ daftar, `berkas.maks_mb` 1, 2, atau 5 = AturanLampiran::BATAS_MB).
  * Label/bantuan/opsi = teks polos (tanpa tag HTML; FE merender sebagai teks — menutup XSS formBuilder legacy).
  * `id` pertanyaan dibuat server bila kosong dan dipertahankan saat edit (jawaban merujuknya).
  *
@@ -268,8 +268,8 @@ final class SkemaForm
                     return [];
                 }
 
-                if (! is_int($mb) || $mb < 1 || $mb > self::MAKS_MB_BERKAS) {
-                    $galat["{$f}.berkas.maks_mb"] = ['Ukuran maksimal 1-' . self::MAKS_MB_BERKAS . ' MB.'];
+                if (! is_int($mb) || ! in_array($mb, AturanLampiran::BATAS_MB, true)) {
+                    $galat["{$f}.berkas.maks_mb"] = ['Ukuran maksimal hanya 1, 2, atau 5 MB.'];
 
                     return [];
                 }
