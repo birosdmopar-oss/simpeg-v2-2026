@@ -544,13 +544,17 @@ final class DaftarTabel
      * Aturan per baris & berkas: {@see AturanKonten}. ENUM legacy (`news.status`/`target`, `news_category.allow_ap`) dibaca
      * sebagai NILAI string lalu dicek domain (tanpa CAST/+0). Popup `tgl_*` DATETIME = waktu bisnis WIB (Jalur A), tidak
      * dikonversi; stempel lain (termasuk `news.publish_at`) R1a WIB → UTC; DATE apa adanya.
-     * M1: tanpa form digital (konverter SkemaForm Jalur B menyusul M2).
+     * Form digital (M2): skema formBuilder → SkemaForm v2 Jalur B, jawaban → id v2, berkas jawaban →
+     * `form-digital/<id_form>/<hex32>.<ext>` ({@see AturanFormDigital}); `user_form_digital` = target legacy + pasangan dari
+     * `filled_form_digital` yang tidak ada di target (legacy menghapus target saat submit; v2 permanen Q7-20, Q-089-5).
      *
      * @return list<DefinisiTabel>
      */
     private static function tierKonten(): array
     {
-        $r = 'MAKE-089, DBV-032 §10';
+        $r    = 'MAKE-089, DBV-032 §10';
+        $form = new AturanFormDigital();
+        $ufd  = 'NOT EXISTS (SELECT 1 FROM `user_form_digital` u WHERE u.`nip` = `filled_form_digital`.`nip` AND u.`id_form_digital` = `filled_form_digital`.`id_form_digital`)';
 
         return [
             new DefinisiTabel('news_category', 'id_news_category', $r, statusDomain: [0, 1], domain: ['allow_ap' => [1, 2]], khusus: AturanKonten::khususKategoriBerita()),
@@ -608,6 +612,48 @@ final class DaftarTabel
                 kolomKode: ['nip'],
                 kunciUrut: ['id_banner', 'nip'],
                 praPindai: AturanKonten::praPindaiAnak('banner', 'id_banner', 'banner', false),
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'form_digital',
+                'id_form_digital',
+                $r . ' (skema → SkemaForm v2)',
+                statusDomain: null,
+                khusus: $form->khususForm(),
+                praPindai: $form->praPindaiForm(...),
+            ),
+            new DefinisiTabel(
+                'user_form_digital',
+                'id_user_form_digital',
+                $r,
+                statusDomain: null,
+                kolomKode: ['nip'],
+                kunciUrut: ['id_form_digital', 'nip'],
+                praPindai: $form->praPindaiAnak(),
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'user_form_digital',
+                'id_user_form_digital',
+                $r . ' (turunan filled, Q7-20)',
+                statusDomain: null,
+                kolomKode: ['nip'],
+                kunciUrut: ['id_form_digital', 'nip'],
+                sumber: 'filled_form_digital',
+                praPindai: $form->praPindaiAnak(),
+                saringSumber: $ufd,
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'filled_form_digital',
+                'id_filled_form_digital',
+                $r . ' (response data pribadi)',
+                tanpaStripslashes: ['response'],
+                statusDomain: null,
+                khusus: $form->khususJawaban(),
+                kolomKode: ['nip'],
+                kunciUrut: ['id_form_digital', 'nip'],
+                praPindai: $form->praPindaiJawaban(...),
                 pkSintetis: true,
             ),
             new DefinisiTabel(
