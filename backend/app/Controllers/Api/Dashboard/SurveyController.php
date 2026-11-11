@@ -6,6 +6,7 @@ namespace App\Controllers\Api\Dashboard;
 
 use App\Controllers\Api\ApiController;
 use App\Libraries\Dashboard\Interaksi\Survei\RingkasanSkl;
+use App\Libraries\Dashboard\Interaksi\Survei\SurveiLayananService;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
@@ -14,6 +15,18 @@ use CodeIgniter\HTTP\ResponseInterface;
  */
 final class SurveyController extends ApiController
 {
+    public function saya(): ResponseInterface
+    {
+        return $this->respondSuccess((new SurveiLayananService(db_connect()))->saya(service('authContext')));
+    }
+
+    public function kirim(): ResponseInterface
+    {
+        $hasil = (new SurveiLayananService(db_connect()))->kirim(service('authContext'), $this->payload());
+
+        return $this->respondSuccess($hasil, $hasil['status'] === 'tercatat' ? 201 : 200);
+    }
+
     public function ringkasan(): ResponseInterface
     {
         $query = $this->request->getGet();
