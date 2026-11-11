@@ -138,6 +138,52 @@ final class FormDigitalKelolaTest extends DatabaseTestCase
         $this->asUser($this->admin)->get('api/v1/form-digital/999999')->assertStatus(404);
     }
 
+    /**
+     * CR-119 (QA T-07): penargetan form digital memakai spesifikasi yang sama dengan popup/banner — unit/satker pada token harus
+     * ada dan aktif (422 di `target`, pesan setara berita), buat maupun ubah; tanpa baris baru, target tersimpan tidak berubah.
+     */
+    public function testTargetUnitSatkerNonaktifAtauTidakAdaDitolak(): void
+    {
+        $unitAktif    = $this->buatUnit();
+        $satkerAktif  = $this->buatSatker($unitAktif);
+        $unitNonaktif = $this->buatUnit();
+        $satkerNon    = $this->buatSatker($unitAktif);
+        $this->db->table('unit')->where('id_unit', $unitNonaktif)->update(['status' => 2]);
+        $this->db->table('satker')->where('id_satker', $satkerNon)->update(['status' => 2]);
+        $nip = $this->buatPegawaiDiSatker($satkerAktif);
+
+        $id       = $this->buat(['target' => ['unit_satker' => ["sat_{$satkerAktif}"]]]);
+        $penerima = static fn (self $t): array => array_column($t->db->table('user_form_digital')->where('id_form_digital', $id)->get()->getResultArray(), 'nip');
+        $this->assertSame([$nip], $penerima($this));
+
+        $unit   = 'Unit target tidak ditemukan atau tidak aktif.';
+        $satker = 'Satker target tidak ditemukan atau tidak aktif.';
+
+        foreach ([
+            'unit nonaktif'    => [[(string) $unitNonaktif], $unit],
+            'unit tidak ada'   => [['99999'], $unit],
+            'satker nonaktif'  => [["sat_{$satkerNon}"], $satker],
+            'satker tidak ada' => [['sat_99999'], $satker],
+            'campur'           => [["sat_{$satkerAktif}", (string) $unitNonaktif], $unit],
+        ] as $nama => [$token, $pesan]) {
+            $target = ['target' => ['unit_satker' => $token]];
+
+            $buat = $this->asUser($this->admin)->withBodyFormat('json')->post('api/v1/form-digital', $this->input($target));
+            $buat->assertStatus(422);
+            $this->assertSame([$pesan], $this->json($buat)['errors']['target'] ?? null, "buat {$nama}");
+
+            $ubah = $this->asUser($this->admin)->withBodyFormat('json')->put("api/v1/form-digital/{$id}", $this->input($target));
+            $ubah->assertStatus(422);
+            $this->assertSame([$pesan], $this->json($ubah)['errors']['target'] ?? null, "ubah {$nama}");
+        }
+
+        $this->assertSame(1, $this->db->table('form_digital')->countAllResults(), 'tidak ada baris baru');
+        $this->assertSame([$nip], $penerima($this), 'ubah yang ditolak tidak mengubah penerima');
+
+        // target unit/satker aktif tetap diterima saat ubah; pegawai eksplisit tidak diperiksa status unit/satker
+        $this->asUser($this->admin)->withBodyFormat('json')->put("api/v1/form-digital/{$id}", $this->input(['target' => ['unit_satker' => [(string) $unitAktif]]]))->assertStatus(200);
+    }
+
     public function testRoleLainDitolak403(): void
     {
         $nip = $this->buatPegawai();
