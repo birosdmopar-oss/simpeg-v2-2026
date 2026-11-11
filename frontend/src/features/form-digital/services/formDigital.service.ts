@@ -3,6 +3,7 @@
  * Role ditegakkan backend: pegawai (2/6/7) `saya`/`isi`, kelola dan rekap role 1.
  */
 import { api } from '@/lib/axios'
+import type { SelectOption } from '@/shared/ui'
 
 import type { BarisTarget, FormDetail, FormInput, FormRingkas, FormSaya, Halaman, NilaiJawaban, RekapRespons } from '../types'
 
@@ -14,6 +15,12 @@ export interface QueryDaftar {
 }
 
 export const formDigitalService = {
+  /** Opsi unit/satker penargetan (endpoint bersama penargetan Jalur A, role 1). */
+  async opsiUnitSatker(): Promise<SelectOption[]> {
+    const { data } = await api.get<SelectOption[]>('/konten/opsi/unit-satker')
+    return data ?? []
+  },
+
   async saya(): Promise<FormSaya[]> {
     const { data } = await api.get<FormSaya[]>('/form-digital/saya')
     return data ?? []
