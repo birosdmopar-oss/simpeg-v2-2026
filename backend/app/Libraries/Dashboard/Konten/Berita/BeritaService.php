@@ -319,7 +319,7 @@ final class BeritaService
             $data['lampiran'] = $kunci;
         }
 
-        // [V2] saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu` (lihat docblock config): false = ikut legacy, status tetap.
+        // Saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu`: default false = paritas legacy [K] (keputusan Horii 10-11), true = [V2] kembali menunggu.
         if (! $admin && config(Konten::class)->beritaUbahRole3KembaliMenunggu) {
             $data += ['status' => self::MENUNGGU, 'approved_at' => null, 'approved_by' => null, 'reason_note' => null, 'show_notif' => null];
         }

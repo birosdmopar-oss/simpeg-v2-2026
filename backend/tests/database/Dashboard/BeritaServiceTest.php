@@ -222,7 +222,21 @@ final class BeritaServiceTest extends DatabaseTestCase
         $this->assertSame([], array_column($svc->portal($this->pegawaiA, [])['items'], 'judul'));
     }
 
-    public function testRole3HanyaMengubahMilikSendiriDanKembaliMenunggu(): void
+    public function testRole3HanyaMengubahMilikSendiriDanKembaliMenungguBilaSaklarAktif(): void
+    {
+        $konfig = config(\Config\Konten::class);
+        $semula = $konfig->beritaUbahRole3KembaliMenunggu;
+
+        $konfig->beritaUbahRole3KembaliMenunggu = true; // [V2] opsional; default = false (paritas legacy, keputusan Horii)
+
+        try {
+            $this->jalankanUbahRole3KembaliMenunggu();
+        } finally {
+            $konfig->beritaUbahRole3KembaliMenunggu = $semula;
+        }
+    }
+
+    private function jalankanUbahRole3KembaliMenunggu(): void
     {
         $svc = $this->service();
         $r   = $svc->buat($this->satker3A, $this->input(['id_kategori' => $this->kategoriAp]));
@@ -250,23 +264,20 @@ final class BeritaServiceTest extends DatabaseTestCase
         $this->assertSame(0, $this->db->table('news')->countAllResults());
     }
 
-    public function testSaklarParitasLegacyUbahRole3TidakMengembalikanKeMenunggu(): void
+    public function testDefaultParitasLegacyUbahRole3TidakMengembalikanKeMenunggu(): void
     {
-        $konfig = config(\Config\Konten::class);
-        $semula = $konfig->beritaUbahRole3KembaliMenunggu;
-        $svc    = $this->service();
-        $r      = $svc->buat($this->satker3A, $this->input(['id_kategori' => $this->kategoriAp]));
+        // Keputusan Horii (10-11): default langsung berlaku seperti legacy L_news.php:489/:877 [K].
+        $this->assertFalse(config(\Config\Konten::class)->beritaUbahRole3KembaliMenunggu);
+
+        $svc = $this->service();
+        $r   = $svc->buat($this->satker3A, $this->input(['id_kategori' => $this->kategoriAp]));
         $svc->proses($this->admin, $r['id'], ['aksi' => 'setuju']);
 
-        $konfig->beritaUbahRole3KembaliMenunggu = false;
+        $u = $svc->ubah($this->satker3A, $r['id'], $this->input(['id_kategori' => $this->kategoriAp, 'judul' => 'Revisi legacy']));
 
-        try {
-            $u = $svc->ubah($this->satker3A, $r['id'], $this->input(['id_kategori' => $this->kategoriAp, 'judul' => 'Revisi legacy']));
-            $this->assertSame(1, $u['status'], 'paritas legacy: status tetap terbit');
-            $this->assertGreaterThan(0, $this->db->table('news_flag')->where('id_news', $r['id'])->countAllResults());
-        } finally {
-            $konfig->beritaUbahRole3KembaliMenunggu = $semula;
-        }
+        $this->assertSame(1, $u['status'], 'paritas legacy: status tetap terbit');
+        $this->assertSame('Revisi legacy', $u['judul']);
+        $this->assertGreaterThan(0, $this->db->table('news_flag')->where('id_news', $r['id'])->countAllResults(), 'penanda tetap');
     }
 
     public function testAdminUbahTargetMenghitungUlangPenanda(): void

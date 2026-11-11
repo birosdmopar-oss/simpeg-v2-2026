@@ -188,6 +188,7 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
     berkas mempertahankan lampiran lama (tanpa opsi hapus). v2: penyimpanan privat kunci acak `berita/<hex32>.<ext>` (perbaikan `nl_{publish_at}` yang bisa
     saling menimpa), `GET konten/berita/{id}/lampiran` terautentikasi dengan visibilitas yang sama dengan detail.
   - **Jam terbit** dibawa (`pub_date` + `pub_time` wajib di `form.php:62-66`): masukan WIB `Y-m-d H:i`, disimpan UTC.
+  - **KEPUTUSAN Horii 10-11: ubah berita oleh role 3 LANGSUNG BERLAKU seperti legacy [K]** — default `Config\Konten::$beritaUbahRole3KembaliMenunggu = false` (saklar + test kedua nilai dipertahankan). Catatan awal:
   - **Role 3 mengubah berita → kembali menunggu = [V2], BUKAN legacy**: form ubah legacy tidak punya field status, `update` (`:489`, `set_param:877` hanya
     mengisi status bila terkirim) membiarkan status. Diberi saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu` (default true; false = paritas legacy) —
     menunggu keputusan Horii.

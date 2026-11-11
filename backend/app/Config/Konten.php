@@ -37,11 +37,12 @@ class Konten extends BaseConfig
     public int $popupSisiMaks = 4000;
 
     /**
-     * Berita (F-07): role 3 mengubah berita → status kembali menunggu persetujuan [V2]. Legacy TIDAK melakukannya: form ubah
-     * tidak punya field status, jadi `L_news::update` (:489, `set_param`:877) membiarkan status (berita terbit tetap terbit).
-     * true = [V2] (default, mencegah ubah isi tanpa persetujuan); false = paritas legacy. Menunggu keputusan Horii.
+     * Berita (F-07): role 3 mengubah berita → status kembali menunggu persetujuan? Keputusan Horii (10-11): FALSE = langsung berlaku
+     * seperti legacy [K] — form ubah legacy tidak punya field status, jadi `L_news::update` (:489, `set_param`:877) membiarkan
+     * status (berita terbit tetap terbit). true = [V2] opsional (ubah isi wajib persetujuan ulang); saklar dipertahankan agar
+     * keputusan bisa dibalik satu nilai, dan kedua nilai diuji.
      */
-    public bool $beritaUbahRole3KembaliMenunggu = true;
+    public bool $beritaUbahRole3KembaliMenunggu = false;
 
     /** Akar penyimpanan gambar (privat, di luar webroot); kunci berkas acak (Q7-14). */
     public string $akarPenyimpanan = WRITEPATH . 'uploads/konten';
