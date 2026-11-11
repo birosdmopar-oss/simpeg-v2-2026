@@ -51,9 +51,10 @@ const pegawai = (): RingkasanPegawai => ({
   kelengkapan: [],
 })
 
+/** Bentuk & label bawaan `RingkasanSkl` BE (F-11, `JenisLayananSkl::PETA` 1..5). */
 const skl = (jumlah: number[], rata: (number | null)[], total: { jumlah: number; rata_rata: number | null }): RingkasanSkl => ({
   periode: { dari: '2025-11-12', sampai: '2026-11-11' },
-  per_jenis: ['Kenaikan Pangkat', 'Kenaikan Gaji Berkala', 'Pensiun', 'Cuti', 'Tugas Belajar'].map((jenis_layanan, i) => ({
+  per_jenis: ['Cuti', 'KARIS/KARSU', 'KARPEG', 'Tugas Belajar', 'Izin Belajar'].map((jenis_layanan, i) => ({
     jenis_rwy: i + 1,
     jenis_layanan,
     jumlah: jumlah[i] ?? 0,
@@ -145,11 +146,11 @@ describe('HomeView — ringkasan SKL admin (M3 bagian B, Q7-26)', () => {
     expect(kartu.text()).toContain('20 penilaian')
     const baris = [1, 2, 3, 4, 5].map((n) => wrapper.get(`[data-testid="beranda-skl-jenis-${n}"]`).findAll('td').map((td) => td.text()))
     expect(baris).toEqual([
-      ['Kenaikan Pangkat', '10', '4,5'],
-      ['Kenaikan Gaji Berkala', '4', '3,0'],
-      ['Pensiun', '0', '—'],
-      ['Cuti', '6', '4,2'],
-      ['Tugas Belajar', '0', '—'],
+      ['Cuti', '10', '4,5'],
+      ['KARIS/KARSU', '4', '3,0'],
+      ['KARPEG', '0', '—'],
+      ['Tugas Belajar', '6', '4,2'],
+      ['Izin Belajar', '0', '—'],
     ])
     expect(berandaService.ringkasanSkl).toHaveBeenCalledTimes(1)
   })
