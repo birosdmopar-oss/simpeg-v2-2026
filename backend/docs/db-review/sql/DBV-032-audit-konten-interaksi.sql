@@ -105,6 +105,11 @@ FROM news_flag f LEFT JOIN news n ON n.id_news = f.id_news WHERE n.id_news IS NU
 SELECT 'INFO dibo tanpa jenis' AS butir, COUNT(*) AS jumlah
 FROM dibo d LEFT JOIN jenis_dibo j ON j.id_jenis_dibo = d.id_jenis_dibo WHERE j.id_jenis_dibo IS NULL;
 
+SELECT 'INFO dibo kolom NULL (jenis/nomor/tahun, dihitung per baris)' AS butir, COUNT(*) AS jumlah
+FROM dibo WHERE id_jenis_dibo IS NULL OR nomor IS NULL OR nomor = '' OR tahun IS NULL;
+
+SELECT 'INFO news tanpa kategori (NULL)' AS butir, COUNT(*) AS jumlah FROM news WHERE id_news_category IS NULL;
+
 SELECT 'INFO NIP yatim terhadap pegawai (5 tabel)' AS butir, SUM(n) AS jumlah FROM (
     SELECT COUNT(*) AS n FROM user_popup a LEFT JOIN pegawai p ON p.nip = a.nip WHERE p.nip IS NULL
     UNION ALL SELECT COUNT(*) FROM user_banner a LEFT JOIN pegawai p ON p.nip = a.nip WHERE p.nip IS NULL

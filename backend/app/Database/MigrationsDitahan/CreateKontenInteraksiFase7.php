@@ -20,7 +20,7 @@ use Throwable;
  *   - interaksi (Jalur B): `form_digital`, `user_form_digital`, `filled_form_digital`, `skl`.
  * `inbox`/`inbox_msg` TIDAK dibuat di sini (sudah ada, DBV-022).
  *
- * Konvensi: kolom [K-kode] mengikuti nama legacy; tipe yang belum dikunci D1 ditandai "⚑" di COMMENT dan di dokumen.
+ * Konvensi: kolom [K-kode] mengikuti nama legacy; tipe dicocokkan dengan D1 Fase 7 (salinan dev) 11-11-2026, dokumen §2a.
  * FK NIP memakai nama registry `TabelAnakNip` (RESTRICT/RESTRICT, koreksi NIP lewat aplikasi B-06); FK anak→induk
  * ON DELETE CASCADE kecuali `filled_form_digital` (RESTRICT, hapus form = lunak Q7-19). Kolom `*_by` = `id_pengguna`
  * tanpa FK (pola DBV-026). Waktu UTC diisi aplikasi (CR-086). Path berkas = kunci storage (Q7-14).
@@ -100,7 +100,7 @@ class CreateKontenInteraksiFase7 extends Migration
                     `order` INT NOT NULL DEFAULT 1 COMMENT 'Urutan tampil [K-kode]; DEFAULT 1 [K] D1',
                     `url` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Tautan [K] D1',
                     `file` VARCHAR(255) NOT NULL COMMENT 'Kunci storage gambar (Q7-14)',
-                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] ⚑',
+                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] D1',
                     {$this->kolomTarget('popup')}
                     {$this->kolomAudit()}
                     PRIMARY KEY (`id_popup`),
@@ -108,7 +108,7 @@ class CreateKontenInteraksiFase7 extends Migration
                     CONSTRAINT `chk_popup_periode` CHECK (`tgl_akhir` >= `tgl_mulai`)
                 ) " . self::TABLE_OPTIONS . " COMMENT='Popup pengumuman (F-04); kolom konstan legacy tidak dibawa (Q7-03), *_desc tidak dibawa (Q7-47)'",
             'user_popup' => "CREATE TABLE {$this->t('user_popup')} (
-                    `id_user_popup` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis ⚑ (PK legacy belum diketahui)',
+                    `id_user_popup` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis (legacy PK komposit, D1)',
                     `id_popup` INT UNSIGNED NOT NULL,
                     `nip` VARCHAR(30) NOT NULL,
                     PRIMARY KEY (`id_user_popup`),
@@ -120,11 +120,11 @@ class CreateKontenInteraksiFase7 extends Migration
             'banner' => "CREATE TABLE {$this->t('banner')} (
                     `id_banner` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                     `tgl_mulai` DATE NOT NULL COMMENT '[K] D1 DATE',
-                    `tgl_akhir` DATE NOT NULL COMMENT '[K-kode] ⚑',
+                    `tgl_akhir` DATE NOT NULL COMMENT '[K-kode] D1',
                     `order` INT NOT NULL DEFAULT 1 COMMENT 'Urutan slider [K-kode]; DEFAULT 1 [K] D1',
                     `url` VARCHAR(255) NULL DEFAULT NULL COMMENT '[K] D1',
                     `file` VARCHAR(255) NOT NULL COMMENT 'Kunci storage gambar (Q7-14)',
-                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] ⚑',
+                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] D1',
                     {$this->kolomTarget('banner')}
                     {$this->kolomAudit()}
                     PRIMARY KEY (`id_banner`),
@@ -132,7 +132,7 @@ class CreateKontenInteraksiFase7 extends Migration
                     CONSTRAINT `chk_banner_periode` CHECK (`tgl_akhir` >= `tgl_mulai`)
                 ) " . self::TABLE_OPTIONS . " COMMENT='Banner dashboard (F-05); kolom konstan legacy tidak dibawa (Q7-03), *_desc tidak dibawa (Q7-47)'",
             'user_banner' => "CREATE TABLE {$this->t('user_banner')} (
-                    `id_user_banner` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis ⚑',
+                    `id_user_banner` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis (legacy PK komposit/tanpa PK, D1)',
                     `id_banner` INT UNSIGNED NOT NULL,
                     `nip` VARCHAR(30) NOT NULL,
                     PRIMARY KEY (`id_user_banner`),
@@ -143,10 +143,10 @@ class CreateKontenInteraksiFase7 extends Migration
                 ) " . self::TABLE_OPTIONS . " COMMENT='Snapshot penerima banner (Q7-15)'",
             'news_category' => "CREATE TABLE {$this->t('news_category')} (
                     `id_news_category` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                    `category` VARCHAR(150) NOT NULL COMMENT '[K-kode L_news.php:1317-1352] ⚑',
+                    `category` VARCHAR(150) NOT NULL COMMENT '[K-kode L_news.php:1317-1352] D1',
                     `order` INT NOT NULL DEFAULT 0 COMMENT '[K-kode]',
                     `allow_ap` TINYINT NOT NULL DEFAULT 2 COMMENT '1 boleh dipakai role 3 (butuh persetujuan), 2 tidak [K] D1 enum 1/2',
-                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] ⚑',
+                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] D1',
                     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 aktif, 2 nonaktif, 10 dihapus [V2]; legacy 1/0 (0 → 2 saat impor)',
                     {$this->kolomAudit()}
                     PRIMARY KEY (`id_news_category`),
@@ -155,20 +155,20 @@ class CreateKontenInteraksiFase7 extends Migration
                 ) " . self::TABLE_OPTIONS . " COMMENT='Kategori berita (F-07)'",
             'news' => "CREATE TABLE {$this->t('news')} (
                     `id_news` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                    `id_news_category` INT UNSIGNED NOT NULL,
-                    `title` VARCHAR(255) NOT NULL COMMENT '[K-kode L_news.php:866-930] ⚑',
-                    `news` MEDIUMTEXT NOT NULL COMMENT 'HTML terbatas, dibersihkan server (Q7-10) ⚑',
+                    `id_news_category` INT UNSIGNED NULL DEFAULT NULL COMMENT 'NULL-able [K] D1; wajib di form v2 (DBV-032-Q10)',
+                    `title` VARCHAR(255) NOT NULL COMMENT '[K-kode L_news.php:866-930] D1',
+                    `news` MEDIUMTEXT NOT NULL COMMENT 'HTML terbatas, dibersihkan server (Q7-10) D1',
                     `lampiran` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Kunci storage (Q7-14)',
                     `publish_at` DATETIME NOT NULL COMMENT 'UTC [K-kode]',
                     `status` TINYINT NOT NULL DEFAULT 0 COMMENT 'Alur persetujuan [K]: 0 menunggu, 1 terbit, 2 ditolak',
                     `show_notif` TINYINT NOT NULL DEFAULT 0 COMMENT 'Notifikasi pembuat role 3 [K]: 0 belum, 1 baru, 2 dihapus, 3 dibaca; diisi 1 + notif_date oleh service saat status 0→1/2 (pengganti trigger news_beUpd, D1)',
                     `notif_date` DATETIME NULL DEFAULT NULL COMMENT 'UTC saat show_notif diisi 1 [K] D1',
                     `target` TINYINT NOT NULL DEFAULT 1 COMMENT '1 kementerian, 2 unit, 3 satker [K-kode]',
-                    `id_unit_target` INT NULL DEFAULT NULL COMMENT '[K-kode] ⚑ tanpa FK',
-                    `id_satker_target` INT NULL DEFAULT NULL COMMENT '[K-kode] ⚑ tanpa FK',
+                    `id_unit_target` INT NULL DEFAULT NULL COMMENT '[K-kode] D1 tanpa FK',
+                    `id_satker_target` INT NULL DEFAULT NULL COMMENT '[K-kode] D1 tanpa FK',
                     `ul_creator` TINYINT NOT NULL COMMENT 'Role pembuat (1/3) [K-kode]',
-                    `id_unit_creator` INT NULL DEFAULT NULL COMMENT 'Unit pembuat role 3 [K-kode] ⚑',
-                    `id_satker_creator` INT NULL DEFAULT NULL COMMENT 'Satker pembuat role 3 [K-kode] ⚑',
+                    `id_unit_creator` INT NULL DEFAULT NULL COMMENT 'Unit pembuat role 3 [K-kode] D1',
+                    `id_satker_creator` INT NULL DEFAULT NULL COMMENT 'Satker pembuat role 3 [K-kode] D1',
                     `approved_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC [K-kode]',
                     `approved_by` INT UNSIGNED NULL DEFAULT NULL COMMENT 'id_pengguna (tanpa FK) [K-kode]',
                     `reason_note` TEXT NULL DEFAULT NULL COMMENT 'Alasan penolakan [K-kode]',
@@ -180,9 +180,9 @@ class CreateKontenInteraksiFase7 extends Migration
                     CONSTRAINT `chk_news_status` CHECK (`status` IN (0, 1, 2)),
                     CONSTRAINT `chk_news_show_notif` CHECK (`show_notif` IN (0, 1, 2, 3)),
                     CONSTRAINT `chk_news_target` CHECK (`target` IN (1, 2, 3))
-                ) " . self::TABLE_OPTIONS . " COMMENT='Berita (F-07); salinan nama category/unit_satker_target legacy tidak dibawa, diturunkan saat baca ⚑'",
+                ) " . self::TABLE_OPTIONS . " COMMENT='Berita (F-07); salinan nama category/unit_satker_target legacy tidak dibawa, diturunkan saat baca (Q2)'",
             'news_flag' => "CREATE TABLE {$this->t('news_flag')} (
-                    `id_news_flag` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis ⚑',
+                    `id_news_flag` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis (legacy PK komposit/tanpa PK, D1)',
                     `id_user` INT UNSIGNED NOT NULL COMMENT 'pengguna.id_pengguna [K-kode news_flag.id_user]',
                     `id_news` INT UNSIGNED NOT NULL,
                     `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'UTC, diisi aplikasi [K] D1',
@@ -194,20 +194,21 @@ class CreateKontenInteraksiFase7 extends Migration
                 ) " . self::TABLE_OPTIONS . " COMMENT='Penanda berita belum dibaca per pengguna (Q7-09)'",
             'jenis_dibo' => "CREATE TABLE {$this->t('jenis_dibo')} (
                     `id_jenis_dibo` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                    `jenis_dibo` VARCHAR(150) NOT NULL COMMENT '[K-kode L_dibo.php:36,51] ⚑',
+                    `jenis_dibo` VARCHAR(255) NOT NULL COMMENT '[K] D1',
                     `order` INT NOT NULL DEFAULT 0 COMMENT '[K-kode]',
-                    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 aktif, 2 nonaktif, 10 dihapus (Q7-11)',
+                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K] D1',
+                    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 aktif, 2 nonaktif [K], 10 dihapus (Q7-11)',
                     {$this->kolomAudit()}
                     PRIMARY KEY (`id_jenis_dibo`),
                     CONSTRAINT `chk_jenis_dibo_status` CHECK (`status` IN (1, 2, 10))
                 ) " . self::TABLE_OPTIONS . " COMMENT='Master jenis DIBO (F-12, Q7-11); seed dari D1 (G7-2)'",
             'dibo' => "CREATE TABLE {$this->t('dibo')} (
                     `id_dibo` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                    `id_jenis_dibo` INT UNSIGNED NOT NULL,
-                    `nomor` VARCHAR(150) NOT NULL COMMENT '[K-kode L_dibo.php:599-608] ⚑',
-                    `tahun` SMALLINT UNSIGNED NOT NULL COMMENT '[K-kode] ⚑ (legacy year/varchar)',
-                    `tentang` TEXT NOT NULL COMMENT '[K-kode] ⚑',
-                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] ⚑',
+                    `id_jenis_dibo` INT UNSIGNED NULL DEFAULT NULL COMMENT 'NULL-able [K] D1; wajib di form v2 (DBV-032-Q12)',
+                    `nomor` VARCHAR(50) NULL DEFAULT NULL COMMENT 'NULL-able [K] D1; wajib di form v2 (Q12)',
+                    `tahun` YEAR NULL DEFAULT NULL COMMENT 'NULL-able [K] D1; wajib di form v2 (Q12)',
+                    `tentang` MEDIUMTEXT NOT NULL COMMENT '[K] D1',
+                    `keterangan` MEDIUMTEXT NULL DEFAULT NULL COMMENT '[K] D1',
                     `file_1` VARCHAR(255) NOT NULL COMMENT 'Kunci storage, wajib (Q7-14)',
                     `file_2` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Kunci storage',
                     `file_3` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Kunci storage',
@@ -220,12 +221,12 @@ class CreateKontenInteraksiFase7 extends Migration
                 ) " . self::TABLE_OPTIONS . " COMMENT='Kamus Digital Kepegawaian (F-12)'",
             'form_digital' => "CREATE TABLE {$this->t('form_digital')} (
                     `id_form_digital` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                    `judul_form` VARCHAR(255) NOT NULL COMMENT '[K-kode L_announcement.php:2615-2624] ⚑',
-                    `tgl_mulai` DATE NOT NULL COMMENT '[K-kode] ⚑',
-                    `tgl_akhir` DATE NOT NULL COMMENT '[K-kode] ⚑',
+                    `judul_form` VARCHAR(255) NOT NULL COMMENT '[K-kode L_announcement.php:2615-2624] D1',
+                    `tgl_mulai` DATE NOT NULL COMMENT '[K-kode] D1',
+                    `tgl_akhir` DATE NOT NULL COMMENT '[K-kode] D1',
                     `order` INT NOT NULL DEFAULT 0 COMMENT '[K-kode]',
-                    `form_digital` LONGTEXT NOT NULL COMMENT 'Skema form JSON v2 tervalidasi (Q7-18); legacy = JSON formBuilder ⚑',
-                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] ⚑',
+                    `form_digital` LONGTEXT NOT NULL COMMENT 'Skema form JSON v2 tervalidasi (Q7-18); legacy = JSON formBuilder D1',
+                    `keterangan` TEXT NULL DEFAULT NULL COMMENT '[K-kode] D1',
                     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 aktif, 2 nonaktif, 10 dihapus lunak (Q7-19) [V2]',
                     `deleted_at` DATETIME NULL DEFAULT NULL COMMENT 'UTC saat status 10',
                     {$this->kolomTarget('form_digital')}
@@ -235,9 +236,9 @@ class CreateKontenInteraksiFase7 extends Migration
                     CONSTRAINT `chk_form_digital_skema_json` CHECK (JSON_VALID(`form_digital`)),
                     CONSTRAINT `chk_form_digital_periode` CHECK (`tgl_akhir` >= `tgl_mulai`),
                     CONSTRAINT `chk_form_digital_status` CHECK (`status` IN (1, 2, 10))
-                ) " . self::TABLE_OPTIONS . " COMMENT='Form digital/kuesioner (F-06); kolom target JSON [I] ⚑ D1'",
+                ) " . self::TABLE_OPTIONS . " COMMENT='Form digital/kuesioner (F-06); kolom target JSON [K] D1'",
             'user_form_digital' => "CREATE TABLE {$this->t('user_form_digital')} (
-                    `id_user_form_digital` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis ⚑',
+                    `id_user_form_digital` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis (legacy PK komposit/tanpa PK, D1)',
                     `id_form_digital` INT UNSIGNED NOT NULL,
                     `nip` VARCHAR(30) NOT NULL,
                     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'UTC, diisi aplikasi',
@@ -248,10 +249,10 @@ class CreateKontenInteraksiFase7 extends Migration
                     CONSTRAINT `fk_nip_user_fd_to_pegawai` FOREIGN KEY (`nip`) REFERENCES {$this->t('pegawai')} (`nip`) {$r}
                 ) " . self::TABLE_OPTIONS . " COMMENT='Target form digital, permanen (Q7-20; legacy dihapus saat submit)'",
             'filled_form_digital' => "CREATE TABLE {$this->t('filled_form_digital')} (
-                    `id_filled_form_digital` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis ⚑',
+                    `id_filled_form_digital` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '[V2] PK sintetis (legacy PK komposit/tanpa PK, D1)',
                     `id_form_digital` INT UNSIGNED NOT NULL,
                     `nip` VARCHAR(30) NOT NULL,
-                    `response` LONGTEXT NOT NULL COMMENT 'Jawaban JSON per id pertanyaan; berkas = kunci storage [K-kode Announcement.php:511-518] ⚑',
+                    `response` LONGTEXT NOT NULL COMMENT 'Jawaban JSON per id pertanyaan; berkas = kunci storage [K-kode Announcement.php:511-518] D1',
                     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'UTC, diisi aplikasi',
                     `created_by` INT UNSIGNED NULL DEFAULT NULL COMMENT 'id_pengguna (tanpa FK) [K-kode]',
                     PRIMARY KEY (`id_filled_form_digital`),
@@ -267,7 +268,7 @@ class CreateKontenInteraksiFase7 extends Migration
                     `jenis_rwy` TINYINT NOT NULL COMMENT '1 cuti, 2 KARIS/KARSU, 3 KARPEG, 4 TB, 5 IB [K-kode L_survey.php:15-21]; lookup master v2 (Q7-22)',
                     `id_rwy` INT NOT NULL COMMENT 'PK baris riwayat_* sesuai jenis_rwy; polimorfik, tanpa FK',
                     `rate` TINYINT NOT NULL COMMENT '1-5 [K-kode survey_kepuasan.php:28-37]',
-                    `kritik_saran` TEXT NULL DEFAULT NULL COMMENT '[K-kode] ⚑',
+                    `kritik_saran` TEXT NULL DEFAULT NULL COMMENT '[K] D1 tinytext; TEXT superset',
                     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'UTC, diisi aplikasi',
                     `created_by` INT UNSIGNED NULL DEFAULT NULL COMMENT 'id_pengguna (tanpa FK) [K-kode]',
                     PRIMARY KEY (`id_skl`),

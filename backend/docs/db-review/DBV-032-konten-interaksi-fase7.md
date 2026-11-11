@@ -6,7 +6,7 @@ Branch `fase7/dbv-032-skema-dashboard` (dari `main` `57914b45`). Alur `[DBV]`:
 2. Migration dipindah dari `MigrationsDitahan/` ke `Migrations/`, test skema dijadikan permanen, dan registry NIP diperbarui.
 3. Reviewer CR me-merge dengan izin Horii.
 
-**Status:** ⏳ draf, **dicocokkan dengan D1 Fase 7 (11-11-2026, §2a)**. SHOW CREATE `skl`, `jenis_dibo`, `dibo` masih **menunggu D1 lanjutan**; pembukaan PR [DBV] diputuskan reviewer.
+**Status:** ⏳ draf, **dicocokkan dengan D1 Fase 7 lengkap 13/13 (11-11-2026, salinan dev, §2a)**; siap PR [DBV].
 
 **Penulis:** Jalur B Fase 7, 10-11-2026.
 
@@ -92,16 +92,17 @@ Pencocokan dengan D1 Fase 7 (`D1_fase7/ambil_d1_fase7.sql`, milik Horii, G7-2) m
 
 ## 2a. Pencocokan D1 Fase 7 (11-11-2026)
 
-Sumber: hasil `ambil_d1_fase7.sql` blok 1–10 dari produksi legacy (struktur dan agregat, tanpa NIP), di luar repo.
-**SHOW CREATE `skl`, `jenis_dibo`, `dibo` belum diterima.** Kolom ketiga tabel itu tetap ⚑ (menunggu D1 lanjutan);
-PK/indeks/FK-nya sudah dicocokkan dari blok indeks/FK.
+Sumber: hasil `ambil_d1_fase7.sql` blok 1–10 dari **D1 dari salinan dev** legacy (server dev, bukan produksi;
+struktur dan agregat, tanpa NIP), di luar repo. SHOW CREATE lengkap 13/13.
+**Struktur** dipakai sebagai acuan skema. **Semua angka di bagian ini (jumlah, ganda, yatim, sebaran) adalah angka dev;
+verifikasi ulang di produksi saat cutover/impor** dengan kueri audit Bagian 6.
 
 **Temuan umum:**
 - 13/13 tabel ada, semuanya InnoDB.
-- Kelompok ganda = 0 untuk semua kunci UNIQUE v2, termasuk `skl (nip,jenis_rwy,id_rwy)` dan `news_flag (id_user,id_news)` yang di legacy belum UNIQUE. UNIQUE v2 aman untuk impor.
-- Baris yatim = 0 untuk semua relasi yang dicek.
+- Kelompok ganda = 0 (angka dev) untuk semua kunci UNIQUE v2, termasuk `skl (nip,jenis_rwy,id_rwy)` dan `news_flag (id_user,id_news)` yang di legacy belum UNIQUE. UNIQUE v2 aman untuk impor.
+- Baris yatim = 0 (angka dev) untuk semua relasi yang dicek.
 - Collation: `dibo`, `news`, `news_category`, `news_flag` di legacy memakai `utf8mb4_0900_ai_ci`, sisanya `utf8mb4_unicode_ci`. v2 tetap `utf8mb4_unicode_ci` (standar proyek). **Impor:** konversi eksplisit saat membaca; perbandingan string antar-collation jangan dilakukan di SQL lintas DB.
-- Volume besar: `user_popup` ±1,2 juta baris, `user_banner` ±250 ribu. **Impor bertahap** (batch per induk), lihat Bagian 10.
+- Volume besar (angka dev): `user_popup` ±1,2 juta baris, `user_banner` ±250 ribu. **Impor bertahap** (batch per induk), lihat Bagian 10.
 - Trigger `news.news_beUpd`: status 0 → 1/2 mengisi `show_notif = 1` dan `notif_date = NOW()`. **v2 tanpa trigger**; service persetujuan/penolakan berita (Jalur A) wajib mengisi kedua kolom dalam UPDATE yang sama.
 
 **Disesuaikan ke D1 (draf diubah 11-11):**
@@ -116,6 +117,12 @@ PK/indeks/FK-nya sudah dicocokkan dari blok indeks/FK.
 | `news_flag.created_at` | tidak ada | DATETIME NULL DEFAULT CURRENT_TIMESTAMP | [K] |
 | `form_digital.form_digital`, `filled_form_digital.response` | MEDIUMTEXT | LONGTEXT | [K] |
 | `popup.tgl_*` DATETIME; `banner/form_digital.tgl_*` DATE | ⚑ | dikunci | [K] |
+| `news.id_news_category` | NOT NULL | NULL-able (legacy FK SET NULL); wajib di form v2 | [K] + validasi aplikasi (Q10) |
+| `jenis_dibo.jenis_dibo` | VARCHAR(150) | VARCHAR(255) | [K] |
+| `jenis_dibo.keterangan` | tidak ada | TEXT NULL | [K] |
+| `dibo.id_jenis_dibo`, `nomor`, `tahun` | NOT NULL; nomor VARCHAR(150); tahun SMALLINT | NULL-able; nomor VARCHAR(50); tahun YEAR; wajib di form v2 | [K] + validasi aplikasi (Q12) |
+| `dibo.tentang`, `dibo.keterangan` | TEXT | MEDIUMTEXT | [K] |
+| `skl` | ⚑ | cocok: jenis_rwy/rate TINYINT, id_rwy INT, kritik_saran TINYTEXT→TEXT (superset); `rate` tanpa DEFAULT (legacy DEFAULT 1 tidak dipakai, nilai wajib dikirim) | [K]/[V2] |
 
 **Tetap berbeda dari legacy (deviasi v2 yang disengaja):**
 
@@ -129,6 +136,8 @@ PK/indeks/FK-nya sudah dicocokkan dari blok indeks/FK.
 | FK `news_flag.id_user → pengguna` | CASCADE | RESTRICT | pengguna v2 dihapus lunak |
 | Tipe PK/FK | `int` | `INT UNSIGNED` | konvensi v2; nilai legacy positif |
 | `keterangan` | TINYTEXT | TEXT | superset, impor aman |
+| Tipe `jenis_dibo.id_jenis_dibo` | TINYINT | INT UNSIGNED | konvensi v2; 8 baris |
+| FK `dibo → jenis_dibo`, `news → news_category` | ON DELETE SET NULL | RESTRICT | master dihapus lunak (status 10), jadi DELETE fisik tidak terjadi |
 | `target_uns` | VARCHAR(255) | MEDIUMTEXT + CHECK JSON | superset, impor aman |
 | `news_category.status` | 0 nonaktif / 1 aktif | 1/2/10 | 0 → 2 saat impor |
 | `news.category`, `news.unit_satker_target` | salinan nama | tidak dibawa | DBV-032-Q2 |
@@ -276,7 +285,7 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
 
 ## 6. Kueri audit baca-saja
 
-`docs/db-review/sql/DBV-032-audit-konten-interaksi.sql` berisi 26 SELECT agregat, tanpa isi baris. Berkas ini dijalankan di **salinan** legacy saat gladi/freeze.
+`docs/db-review/sql/DBV-032-audit-konten-interaksi.sql` berisi 28 SELECT agregat, tanpa isi baris. Berkas ini dijalankan di **salinan** legacy saat gladi/freeze.
 
 | Bagian | Butir | Kelas |
 |---|---|---|
@@ -309,7 +318,7 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
   - FK: 1452 untuk induk/NIP/pengguna tidak ada; 1451 saat menghapus master, form ber-jawaban, atau pegawai.
 - **CASCADE:** anak ikut terhapus ketika popup/banner/form/news dihapus.
 - **Siklus:** `down()` lalu `up()` kembali.
-- **Audit:** kueri audit berjalan (26 kueri, kolom `butir`/`jumlah`).
+- **Audit:** kueri audit berjalan (28 kueri, kolom `butir`/`jumlah`).
 
 ## 8. Rencana test skema (setelah approve)
 
@@ -330,7 +339,8 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
 | DBV-032-Q7 | Tipe tanggal popup (DATETIME) vs banner/form (DATE) | ✅ Dikunci D1 11-11 (sesuai draf) |
 | DBV-032-Q8 | `news.show_notif` DEFAULT | ✅ D1: NOT NULL DEFAULT 0; draf disesuaikan (CHECK 0–3) + `notif_date` ditambahkan |
 | DBV-032-Q9 | D1 menunjukkan `popup.target` bervariasi (1/2/3) dan ada 1 popup `type` = 2 (video); `banner.target` 1/3; `form_digital.target` 1/3 | Usulan: tetap tidak dibawa (Q7-03 [V2]). `target` dapat diturunkan dari isi `target_uns`/`target_peg` saat impor (⚑ dicek pada data impor); popup video tunggal dicatat sebagai pengecualian impor. **Keputusan reviewer/Horii** karena menyentuh keputusan PRD Q7-03 |
-| DBV-032-Q10 | `news.id_news_category` legacy NULL-able (FK SET NULL), draf NOT NULL | Tetap NOT NULL bila jumlah NULL di produksi = 0 (⚑ minta angka di D1 lanjutan); bila > 0, impor memetakan ke kategori bawaan |
+| DBV-032-Q10 | `news.id_news_category` legacy NULL-able (FK SET NULL) | Kolom NULL-able [K]; wajib di form/service v2. Baris impor NULL dibawa apa adanya dan tampil "Tanpa kategori" (Jalur A). Hitungan: audit `INFO news tanpa kategori (NULL)` |
+| DBV-032-Q12 | `dibo.id_jenis_dibo`/`nomor`/`tahun` NULL-able di legacy, wajib di form v2 | Kolom NULL-able [K]; validasi wajib hanya di form/service v2 (create/edit). Baris impor NULL dibawa apa adanya tanpa nilai karangan; edit baris itu meminta pengguna melengkapinya. Hitungan: audit `INFO dibo kolom NULL` (mintakan di salinan dev/produksi) |
 | DBV-032-Q11 | Legacy memasang FK `news` ke `unit`, `satker`, `user_level`, `pengguna` (ON DELETE SET NULL) | Relevan untuk Q3: data legacy bersih karena FK. Usulan tetap tanpa FK di v2 (konsisten `*_by` tanpa FK; unit/satker v2 berstatus lunak); keputusan DB Validator |
 
 ## 10. Langkah pemindahan (setelah approve + izin Horii)

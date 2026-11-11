@@ -92,7 +92,8 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
             $this->assertSame(['mediumtext null', 'mediumtext null', 'mediumtext null'], [$kolom['target_uns'], $kolom['target_peg'], $kolom['excl_peg']], $tabel);
         }
 
-        $this->assertSame('tinyint not null', $this->skemaColumns('news')['show_notif']);
+        $this->assertSame('tinyint', $this->skemaColumns('news')['show_notif']);
+        $this->assertSame('year null', $this->skemaColumns('dibo')['tahun']);
         $this->assertSame('int', $this->skemaColumns('skl')['id_rwy']);
 
         foreach (['inbox', 'inbox_msg'] as $tabel) {
@@ -143,6 +144,7 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
         $jenis = $this->sisip('jenis_dibo', ['jenis_dibo' => 'Peraturan']);
         $this->sisip('dibo', ['id_jenis_dibo' => $jenis, 'nomor' => '1', 'tahun' => 2026, 'tentang' => 'Uji', 'file_1' => 'konten/d.pdf']);
         $this->assertDbError(self::CHECK, fn () => $this->sisip('dibo', ['id_jenis_dibo' => $jenis, 'nomor' => '2', 'tahun' => 2026, 'tentang' => 'Uji', 'file_1' => 'x', 'status' => 3]));
+        $this->sisip('dibo', ['tentang' => 'Impor legacy tanpa jenis/nomor/tahun', 'file_1' => 'konten/e.pdf']);
         $this->assertDbError([1451], fn () => $this->db->table('jenis_dibo')->where('id_jenis_dibo', $jenis)->delete());
 
         $form = $this->sisip('form_digital', ['judul_form' => 'Kuesioner', 'tgl_mulai' => '2026-11-10', 'tgl_akhir' => '2026-11-30', 'form_digital' => '{"pertanyaan":[]}']);
@@ -228,7 +230,7 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
             $n++;
         }
 
-        $this->assertSame(26, $n);
+        $this->assertSame(28, $n);
     }
 
     /**
