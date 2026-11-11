@@ -92,6 +92,38 @@ final class KontenGambarEndpointTest extends DatabaseTestCase
         $this->asRole(Role::SUPER_ADMIN)->get('api/v1/konten/popup/aktif')->assertStatus(403);
     }
 
+    /**
+     * Q7-05 / Q7-39 (bukti QA Lapis 1 butir K6): banner aktif tampil untuk SETIAP role ber-NIP yang menjadi target — termasuk admin
+     * satker (3), admin view eselon I (4), menteri (5), dan pimpinan (8) — dan route menolak role 1 (tanpa NIP) dengan 403.
+     */
+    public function testBannerAktifUntukRoleBerNipDanRole1Ditolak(): void
+    {
+        $role = [Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK, Role::PIMPINAN];
+        $nip  = array_map(static fn (int $r): string => AuthSeeder::nipForRole($r), $role);
+        $this->daftarkanPegawai(...$nip);
+
+        $c                  = new Konten();
+        $c->akarPenyimpanan = $this->akar;
+        $f                  = tempnam(sys_get_temp_dir(), 'bnr') . '.png';
+        imagepng(imagecreatetruecolor(1600, 400), $f);
+        $r = (new KontenGambarService(JenisGambar::Banner, $this->db, new PenyimpananGambar($c)))->buat(
+            ['tgl_mulai' => '2000-01-01', 'tgl_akhir' => '2099-12-31', 'target' => ['pegawai' => $nip]],
+            new UploadedFile($f, 'banner.png', 'image/png', (int) filesize($f), UPLOAD_ERR_OK),
+            1,
+        );
+        @unlink($f);
+
+        foreach ($role as $kode) {
+            $hasil = $this->asRole($kode)->get('api/v1/konten/banner/aktif');
+            $hasil->assertStatus(200);
+            $data = json_decode($hasil->getJSON(), true)['data'];
+            $this->assertCount(1, $data, "role {$kode} ber-NIP target harus melihat banner");
+            $this->assertSame($r['id'], $data[0]['id']);
+        }
+
+        $this->asRole(Role::SUPER_ADMIN)->get('api/v1/konten/banner/aktif')->assertStatus(403);
+    }
+
     public function testGambarTerautentikasiPenerimaAtauRole1(): void
     {
         $url = "api/v1/konten/popup/{$this->idPopup}/gambar";

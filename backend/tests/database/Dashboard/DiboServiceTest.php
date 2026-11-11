@@ -188,6 +188,48 @@ final class DiboServiceTest extends DatabaseTestCase
         $this->assertSame($a['id'] + 1, $b['id']);
     }
 
+    /**
+     * CR-116 (PRD v2.1 §5.6): DIBO aktif yang jenisnya nonaktif tidak terbaca non-admin (daftar, total, filter, unduh berkas);
+     * admin tetap melihat; jenis diaktifkan lagi → tampil lagi; baris tanpa jenis (NULL) tetap terbaca.
+     */
+    public function testBacaMenyembunyikanDiboBerjenisNonaktif(): void
+    {
+        $svc    = $this->service();
+        $jenisC = $this->buatJenis('Jenis Sementara', 1);
+        $aktif  = $svc->buat($this->admin, $this->input(['nomor' => 'JA-1']), [1 => $this->pdf()]);
+        $uji    = $svc->buat($this->admin, $this->input(['nomor' => 'JC-1', 'id_jenis' => $jenisC]), [1 => $this->pdf()]);
+        $tanpa  = $svc->buat($this->admin, $this->input(['nomor' => 'JN-1']), [1 => $this->pdf()]);
+        $this->db->table('dibo')->where('id_dibo', $tanpa['id'])->update(['id_jenis_dibo' => null]);
+
+        $nomor = static fn (array $h): array => array_column($h['items'], 'nomor');
+
+        $this->assertEqualsCanonicalizing(['JA-1', 'JC-1', 'JN-1'], $nomor($svc->baca([])), 'jenis aktif: semua tampil');
+
+        $this->db->table('jenis_dibo')->where('id_jenis_dibo', $jenisC)->update(['status' => 2]);
+
+        $baca = $svc->baca([]);
+        $this->assertEqualsCanonicalizing(['JA-1', 'JN-1'], $nomor($baca), 'jenis nonaktif disembunyikan, tanpa jenis tetap terbaca');
+        $this->assertSame(2, $baca['total'], 'total konsisten dengan daftar');
+        $this->assertSame([], $nomor($svc->baca(['jenis' => (string) $jenisC])), 'filter jenis nonaktif kosong');
+        $this->assertSame([], $nomor($svc->baca(['q' => 'JC-1'])));
+
+        try {
+            $svc->bacaBerkas($this->pegawai, $uji['id'], 1);
+            $this->fail('Berkas DIBO berjenis nonaktif harus 404 untuk non-admin');
+        } catch (NotFoundException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame('application/pdf', $svc->bacaBerkas($this->admin, $uji['id'], 1)['mime'], 'admin tetap bisa');
+        $this->assertSame('application/pdf', $svc->bacaBerkas($this->pegawai, $aktif['id'], 1)['mime']);
+        $this->assertSame('application/pdf', $svc->bacaBerkas($this->pegawai, $tanpa['id'], 1)['mime'], 'tanpa jenis tetap bisa');
+        $this->assertContains('JC-1', $nomor($svc->kelola($this->admin, [])), 'kelola admin tetap memuat');
+
+        $this->db->table('jenis_dibo')->where('id_jenis_dibo', $jenisC)->update(['status' => 1]);
+        $this->assertContains('JC-1', $nomor($svc->baca([])), 'jenis diaktifkan lagi → tampil lagi');
+        $this->assertSame('application/pdf', $svc->bacaBerkas($this->pegawai, $uji['id'], 1)['mime']);
+    }
+
     public function testKelolaHanyaRole1DenganFilterStatus(): void
     {
         $svc = $this->service();

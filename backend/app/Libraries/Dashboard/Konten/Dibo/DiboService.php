@@ -20,12 +20,13 @@ use Throwable;
 /**
  * F-12 DIBO / Kamus Digital Kepegawaian (MAKE-082; PRD Fase 7 v2.0 §5.6, Q7-11..14; legacy `hr/Dibo`, `L_dibo.php`).
  *
- * - Baca (semua role 1–8): HANYA `status = 1` (perbaikan anomali legacy: filter status dikomentari, `L_dibo.php:12-27,62-66`,
- *   sehingga semua status tampil ke semua role). Filter jenis, tahun, cari nomor/tentang; paginasi.
+ * - Baca (semua role 1–8): HANYA `status = 1` DAN jenis tidak nonaktif (perbaikan anomali legacy: filter status dikomentari,
+ *   `L_dibo.php:12-27,62-66`, sehingga semua status tampil ke semua role; jenis nonaktif: CR-116). Filter jenis, tahun, cari
+ *   nomor/tentang; paginasi.
  * - Kelola (role 1): status 1 aktif / 2 dicabut [K] / 10 dihapus [V2, hapus lunak, bisa dipulihkan]. Wajib: jenis aktif, nomor, tahun,
  *   tentang; `file_1` wajib saat tambah; `file_1..3` PDF/XLS/XLSX/DOC/DOCX ≤ 5 MB. Ubah: berkas yang tidak dikirim dipertahankan,
  *   `hapus_file_2` / `hapus_file_3` = 1 menghapus berkas itu (legacy `deleted_file[]`); `file_1` hanya bisa diganti.
- * - Berkas privat, kunci acak; unduh lewat `bacaBerkas()` (terautentikasi; non-admin hanya status 1). Berkas lama dihapus SETELAH
+ * - Berkas privat, kunci acak; unduh lewat `bacaBerkas()` (terautentikasi; non-admin hanya status 1 dan jenis tidak nonaktif). Berkas lama dihapus SETELAH
  *   commit; hapus lunak mempertahankan berkas (agar dapat dipulihkan).
  * ⚑ nama kolom mengikuti draf DBV-032.
  */
@@ -79,6 +80,7 @@ final class DiboService
 
         $saring = function (BaseBuilder $b) use ($q, $jenis, $tahun): void {
             $b->where('dibo.status', self::AKTIF);
+            $this->hanyaJenisTidakNonaktif($b);
 
             if ($jenis !== '' && ctype_digit($jenis)) {
                 $b->where('dibo.id_jenis_dibo', (int) $jenis);
@@ -144,7 +146,7 @@ final class DiboService
             throw new NotFoundException('Berkas tidak ditemukan.');
         }
 
-        if ((int) $auth->role() !== Role::SUPER_ADMIN && (int) $r['status'] !== self::AKTIF) {
+        if ((int) $auth->role() !== Role::SUPER_ADMIN && ((int) $r['status'] !== self::AKTIF || ! $this->jenisBolehDibaca($r['id_jenis_dibo']))) {
             throw new NotFoundException('Berkas tidak ditemukan.');
         }
 
@@ -315,6 +317,28 @@ final class DiboService
         $rows = $b->orderBy('dibo.tahun', 'DESC')->orderBy('dibo.id_dibo', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
 
         return ['items' => array_map($baris, $rows), 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+    }
+
+    /**
+     * Pembaca non-admin tidak melihat DIBO yang jenisnya NONAKTIF (PRD v2.1 §5.6 "status=1 + jenis aktif", CR-116; [V2] lanjutan
+     * Q7-13 — legacy punya filter `jdb.status='1'` tetapi dikomentari, `L_dibo.php:12-27,62-66`). Baris legacy tanpa jenis (NULL,
+     * kolom NULL-able [K]) tetap terbaca: "tanpa jenis" bukan "jenis nonaktif".
+     */
+    private function hanyaJenisTidakNonaktif(BaseBuilder $b): void
+    {
+        $b->groupStart()
+            ->where('dibo.id_jenis_dibo', null)
+            ->orWhereIn('dibo.id_jenis_dibo', static fn (BaseBuilder $sub) => $sub->select('id_jenis_dibo')->from('jenis_dibo')->where('status', 1))
+            ->groupEnd();
+    }
+
+    private function jenisBolehDibaca(mixed $idJenis): bool
+    {
+        if ($idJenis === null || $idJenis === '') {
+            return true;
+        }
+
+        return $this->db->table('jenis_dibo')->where('id_jenis_dibo', (int) $idJenis)->where('status', 1)->countAllResults() > 0;
     }
 
     /**
