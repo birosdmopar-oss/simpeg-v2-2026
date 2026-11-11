@@ -20,9 +20,11 @@ defineProps<{ halaman: HalamanKonten }>()
     <BeritaPortalView v-if="halaman === 'portal'" />
     <BeritaDetailView v-else-if="halaman === 'detail'" />
     <BeritaKelolaView v-else-if="halaman === 'berita-kelola'" />
-    <KontenGambarKelolaView v-else-if="halaman === 'popup' || halaman === 'banner'" :jenis="halaman" />
+    <!-- :key = halaman: route popup↔banner dan berita-kategori↔dibo-jenis memakai instans komponen yang sama; tanpa key data
+         lama (dan service/testid aksi lama) terbawa ke halaman baru karena view hanya memuat data di onMounted (CR-117, T-06). -->
+    <KontenGambarKelolaView v-else-if="halaman === 'popup' || halaman === 'banner'" :key="halaman" :jenis="halaman" />
     <DiboBacaView v-else-if="halaman === 'dibo-baca'" />
     <DiboKelolaView v-else-if="halaman === 'dibo'" />
-    <MasterKontenView v-else :jenis="halaman" />
+    <MasterKontenView v-else :key="halaman" :jenis="halaman" />
   </RedesignShell>
 </template>

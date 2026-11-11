@@ -211,6 +211,7 @@ onMounted(() => {
             <th class="px-4 py-3">Gambar</th>
             <th class="px-4 py-3">Keterangan</th>
             <th class="px-4 py-3">Periode</th>
+            <th class="px-4 py-3">Tautan</th>
             <th class="px-4 py-3">Urutan</th>
             <th class="px-4 py-3">Penerima</th>
             <th v-if="ADA_STATUS" class="px-4 py-3">Status</th>
@@ -219,10 +220,10 @@ onMounted(() => {
         </thead>
         <tbody class="divide-y divide-slate-100">
           <tr v-if="loading">
-            <td :colspan="ADA_STATUS ? 7 : 6" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
+            <td :colspan="ADA_STATUS ? 8 : 7" class="px-4 py-8 text-center text-slate-500">Memuat...</td>
           </tr>
           <tr v-else-if="items.length === 0">
-            <td :colspan="ADA_STATUS ? 7 : 6" class="px-4 py-8 text-center text-slate-500">Belum ada {{ nama.toLowerCase() }} yang cocok.</td>
+            <td :colspan="ADA_STATUS ? 8 : 7" class="px-4 py-8 text-center text-slate-500">Belum ada {{ nama.toLowerCase() }} yang cocok.</td>
           </tr>
           <tr v-for="(row, i) in items" v-else :key="row.id" class="hover:bg-slate-50" :data-testid="tid(`row-${row.id}`)">
             <td class="px-4 py-3">
@@ -231,6 +232,17 @@ onMounted(() => {
             </td>
             <td class="px-4 py-3 text-slate-800">{{ row.keterangan || '—' }}</td>
             <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ fmt(row.tgl_mulai) }}{{ jenis === 'popup' && row.jam_mulai ? ` ${row.jam_mulai}` : '' }} – {{ fmt(row.tgl_akhir) }}{{ jenis === 'popup' && row.jam_akhir ? ` ${row.jam_akhir}` : '' }}</td>
+            <td class="max-w-[14rem] px-4 py-3" :data-testid="tid(`tautan-${row.id}`)">
+              <a
+                v-if="row.url"
+                :href="row.url"
+                :title="row.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block truncate text-blue-700 hover:underline"
+              >{{ row.url }}</a>
+              <span v-else class="text-slate-400">—</span>
+            </td>
             <td class="px-4 py-3 text-slate-600">{{ row.urutan }}</td>
             <td class="px-4 py-3 text-slate-600">{{ row.jumlah_penerima }}</td>
             <td v-if="ADA_STATUS" class="px-4 py-3">
