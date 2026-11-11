@@ -13,7 +13,8 @@ use Tests\Support\Impor\ImporLegacyTestCase;
 
 /**
  * MAKE-089 — impor tier 14 Fase 7 (konten & interaksi, DBV-032 §10) dengan skema legacy tiruan berbentuk D1 (ENUM, PK
- * komposit, `news_flag` tanpa PK, kolom legacy yang tidak dibawa, collation 0900 di 4 tabel) dan data SINTETIS.
+ * komposit, `news_flag` tanpa PK, kolom legacy yang tidak dibawa, collation lain di 4 tabel: 0900 di MySQL 8, general di
+ * MariaDB) dan data SINTETIS.
  *
  * @internal
  */
@@ -173,11 +174,11 @@ final class ImporLegacyTier14Test extends ImporLegacyTestCase
         }
 
         $ddl = [
-            "CREATE TABLE {$l}.`news_category` (`id_news_category` int NOT NULL AUTO_INCREMENT, `category` varchar(100) NOT NULL, `allow_ap` enum('1','2') NOT NULL DEFAULT '2', `keterangan` tinytext, `order` tinyint NOT NULL DEFAULT 0, `status` tinyint(1) NOT NULL DEFAULT 1, `created_at` datetime NOT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_news_category`)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci",
-            "CREATE TABLE {$l}.`news` (`id_news` int NOT NULL AUTO_INCREMENT, `id_news_category` int DEFAULT NULL, `id_unit_target` int DEFAULT NULL, `id_satker_target` int DEFAULT NULL, `ul_creator` tinyint DEFAULT NULL, `id_unit_creator` int DEFAULT NULL, `id_satker_creator` int DEFAULT NULL, `category` varchar(250) DEFAULT NULL, `title` varchar(250) NOT NULL, `news` text NOT NULL, `target` enum('1','2','3') NOT NULL DEFAULT '1', `unit_satker_target` varchar(255) DEFAULT NULL, `lampiran` varchar(250) DEFAULT NULL, `publish_at` datetime NOT NULL, `status` enum('0','1','2') NOT NULL DEFAULT '0', `reason_note` tinytext, `show_notif` tinyint NOT NULL DEFAULT 0, `notif_date` datetime DEFAULT NULL, `created_at` datetime NOT NULL, `created_by` int DEFAULT NULL, `approved_at` datetime DEFAULT NULL, `approved_by` int DEFAULT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_news`)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci",
-            "CREATE TABLE {$l}.`news_flag` (`id_user` int NOT NULL, `id_news` int NOT NULL, `created_at` datetime DEFAULT NULL) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci",
+            "CREATE TABLE {$l}.`news_category` (`id_news_category` int NOT NULL AUTO_INCREMENT, `category` varchar(100) NOT NULL, `allow_ap` enum('1','2') NOT NULL DEFAULT '2', `keterangan` tinytext, `order` tinyint NOT NULL DEFAULT 0, `status` tinyint(1) NOT NULL DEFAULT 1, `created_at` datetime NOT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_news_category`)) DEFAULT CHARSET=utf8mb4 COLLATE={$this->collationLegacy()}",
+            "CREATE TABLE {$l}.`news` (`id_news` int NOT NULL AUTO_INCREMENT, `id_news_category` int DEFAULT NULL, `id_unit_target` int DEFAULT NULL, `id_satker_target` int DEFAULT NULL, `ul_creator` tinyint DEFAULT NULL, `id_unit_creator` int DEFAULT NULL, `id_satker_creator` int DEFAULT NULL, `category` varchar(250) DEFAULT NULL, `title` varchar(250) NOT NULL, `news` text NOT NULL, `target` enum('1','2','3') NOT NULL DEFAULT '1', `unit_satker_target` varchar(255) DEFAULT NULL, `lampiran` varchar(250) DEFAULT NULL, `publish_at` datetime NOT NULL, `status` enum('0','1','2') NOT NULL DEFAULT '0', `reason_note` tinytext, `show_notif` tinyint NOT NULL DEFAULT 0, `notif_date` datetime DEFAULT NULL, `created_at` datetime NOT NULL, `created_by` int DEFAULT NULL, `approved_at` datetime DEFAULT NULL, `approved_by` int DEFAULT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_news`)) DEFAULT CHARSET=utf8mb4 COLLATE={$this->collationLegacy()}",
+            "CREATE TABLE {$l}.`news_flag` (`id_user` int NOT NULL, `id_news` int NOT NULL, `created_at` datetime DEFAULT NULL) DEFAULT CHARSET=utf8mb4 COLLATE={$this->collationLegacy()}",
             "CREATE TABLE {$l}.`jenis_dibo` (`id_jenis_dibo` tinyint NOT NULL AUTO_INCREMENT, `jenis_dibo` varchar(255) NOT NULL, `order` tinyint NOT NULL DEFAULT 0, `keterangan` tinytext, `status` tinyint(1) NOT NULL DEFAULT 1, `created_at` datetime NOT NULL, `updated_at` datetime DEFAULT NULL, PRIMARY KEY (`id_jenis_dibo`)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE {$l}.`dibo` (`id_dibo` int NOT NULL AUTO_INCREMENT, `id_jenis_dibo` tinyint DEFAULT NULL, `nomor` varchar(50) DEFAULT NULL, `tahun` year DEFAULT NULL, `tentang` mediumtext NOT NULL, `file_1` varchar(255) NOT NULL, `file_2` varchar(255) DEFAULT NULL, `file_3` varchar(255) DEFAULT NULL, `keterangan` mediumtext, `status` tinyint NOT NULL DEFAULT 1, `created_at` datetime NOT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_dibo`)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci",
+            "CREATE TABLE {$l}.`dibo` (`id_dibo` int NOT NULL AUTO_INCREMENT, `id_jenis_dibo` tinyint DEFAULT NULL, `nomor` varchar(50) DEFAULT NULL, `tahun` year DEFAULT NULL, `tentang` mediumtext NOT NULL, `file_1` varchar(255) NOT NULL, `file_2` varchar(255) DEFAULT NULL, `file_3` varchar(255) DEFAULT NULL, `keterangan` mediumtext, `status` tinyint NOT NULL DEFAULT 1, `created_at` datetime NOT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_dibo`)) DEFAULT CHARSET=utf8mb4 COLLATE={$this->collationLegacy()}",
             "CREATE TABLE {$l}.`popup` (`id_popup` int NOT NULL AUTO_INCREMENT, `tgl_mulai` datetime NOT NULL, `tgl_akhir` datetime NOT NULL, `file` varchar(255) NOT NULL, `target` tinyint NOT NULL DEFAULT 1, `type` tinyint NOT NULL DEFAULT 1, `url` varchar(255) DEFAULT NULL, `id_unit_satker` varchar(20) DEFAULT NULL, `unit_satker` varchar(255) DEFAULT NULL, `target_uns` varchar(255) DEFAULT NULL, `target_uns_desc` mediumtext, `target_peg` mediumtext, `target_peg_desc` mediumtext, `excl_peg` mediumtext, `excl_peg_desc` mediumtext, `keterangan` tinytext, `order` int NOT NULL DEFAULT 1, `created_at` datetime NOT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_popup`)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE {$l}.`user_popup` (`nip` varchar(30) NOT NULL, `id_popup` int NOT NULL, PRIMARY KEY (`nip`,`id_popup`)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE {$l}.`banner` (`id_banner` int NOT NULL AUTO_INCREMENT, `tgl_mulai` date NOT NULL, `tgl_akhir` date NOT NULL, `file` varchar(255) NOT NULL, `target` tinyint NOT NULL DEFAULT 1, `type` tinyint NOT NULL DEFAULT 1, `url` varchar(255) DEFAULT NULL, `id_unit_satker` varchar(20) DEFAULT NULL, `unit_satker` varchar(255) DEFAULT NULL, `target_uns` varchar(255) DEFAULT NULL, `target_uns_desc` mediumtext, `target_peg` mediumtext, `target_peg_desc` mediumtext, `excl_peg` mediumtext, `excl_peg_desc` mediumtext, `keterangan` tinytext, `order` int NOT NULL DEFAULT 1, `created_at` datetime NOT NULL, `updated_at` datetime DEFAULT NULL, `updated_by` int DEFAULT NULL, PRIMARY KEY (`id_banner`)) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
@@ -188,6 +189,15 @@ final class ImporLegacyTier14Test extends ImporLegacyTestCase
         foreach ($ddl as $sql) {
             $this->db->query($sql);
         }
+    }
+
+    /**
+     * Collation legacy 4 tabel (`utf8mb4_0900_ai_ci`, D1) hanya ada di MySQL 8. MariaDB 10.4 (matriks CI) memakai
+     * `utf8mb4_general_ci`: tetap berbeda dari `utf8mb4_unicode_ci` v2, jadi maksud test (sumber ber-collation lain) terjaga.
+     */
+    private function collationLegacy(): string
+    {
+        return $this->db->query("SHOW COLLATION LIKE 'utf8mb4_0900_ai_ci'")->getResultArray() === [] ? 'utf8mb4_general_ci' : 'utf8mb4_0900_ai_ci';
     }
 
     private function isiSumber(): void
