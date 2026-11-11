@@ -5,7 +5,7 @@
  * 2. kartu Butuh Approval (Jalur C) untuk role yang angkanya berlaku (`BUTUH_APPROVAL_ROLES`: 1, 3 di keluarga ini);
  * 3. komposisi pegawai + status hari ini (`KomposisiPegawaiCard`, saklar Q7-36);
  * 4. masa kerja direktur politeknik (role 1/4, `DirekturCard`) [K];
- * 5. berita terbaru (`BeritaTerbaruWidget`, Jalur A; tidak tampil bila kosong);
+ * 5. berita terbaru (`BeritaTerbaruWidget`, Jalur A; tidak tampil bila kosong, tidak dipasang selama `ACTIVE_PHASE < FASE_KONTEN`);
  * 6. ulang tahun hari ini / besok (`UlangTahunCard`, Q7-45) [K].
  * Banner (Jalur A) dipasang di `HomeView` di atas kartu ini (Q7-39). Slot berikutnya: ringkasan SKL (Q7-26, endpoint rekap Jalur B).
  */
@@ -15,6 +15,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { BeritaTerbaruWidget } from '@/features/konten'
 import { BUTUH_APPROVAL_ROLES } from '@/features/notifikasi'
 
+import { KONTEN_BERANDA_AKTIF } from '../fase'
 import { DIREKTUR_ROLES, type RingkasanAdmin } from '../types'
 
 import ButuhApprovalCard from './ButuhApprovalCard.vue'
@@ -42,7 +43,7 @@ const punyaDirektur = computed(() => auth.role !== null && DIREKTUR_ROLES.includ
     </div>
     <KomposisiPegawaiCard :ringkasan="ringkasan" />
     <DirekturCard v-if="punyaDirektur" />
-    <BeritaTerbaruWidget />
+    <BeritaTerbaruWidget v-if="KONTEN_BERANDA_AKTIF" />
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <UlangTahunCard hari="ini" />
       <UlangTahunCard hari="besok" />

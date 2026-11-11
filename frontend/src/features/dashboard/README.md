@@ -35,5 +35,7 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   `PopupAktifDialog` di akar halaman (sekali per sesi login, lewat antrean dialog `form-digital → pengingat-cuti →
   popup-konten → skl`); `BeritaTerbaruWidget` (5 berita) di `AdminDashboard` (sesudah direktur) dan `PegawaiDashboard`
   (paling bawah). Ketiganya memuat data sendiri dan tidak merender bila kosong/403/galat, juga saat ringkasan gagal.
+  Gerbang fase (`fase.ts`, `FASE_KONTEN = 7`, pola lonceng/`InteraksiPopupHost`): selama `ACTIVE_PHASE < 7` ketiganya tidak
+  dipasang sama sekali (tanpa request `konten/*`); komponen Jalur A tidak diubah.
   Popup form digital/SKL dipasang Jalur B di shell (`InteraksiPopupHost`), bukan di beranda. Sisa: ringkasan SKL admin
   (Q7-26) setelah endpoint rekap Jalur B ada.

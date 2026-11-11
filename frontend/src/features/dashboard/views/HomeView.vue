@@ -6,7 +6,8 @@
  * `data-testid="home-role"` dipertahankan untuk MTC-001 ("redirect ke dashboard sesuai role").
  * M3: popup aktif (`PopupAktifDialog`, Jalur A) di akar halaman (sekali per sesi login, lewat antrean dialog) dan banner
  * (`BannerCarousel`) di bawah sapaan untuk SEMUA role (Q7-39; BE yang menyaring sasaran). Keduanya memuat data sendiri dan
- * tidak merender apa pun bila kosong/403/galat, jadi tidak bergantung pada ringkasan beranda.
+ * tidak merender apa pun bila kosong/403/galat, jadi tidak bergantung pada ringkasan beranda. Selama `ACTIVE_PHASE <
+ * FASE_KONTEN` keduanya tidak dipasang (tanpa request, `../fase.ts`).
  */
 import { computed, onMounted, ref } from 'vue'
 
@@ -18,6 +19,7 @@ import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
 import AdminDashboard from '../components/AdminDashboard.vue'
 import PegawaiDashboard from '../components/PegawaiDashboard.vue'
+import { KONTEN_BERANDA_AKTIF } from '../fase'
 import { berandaService } from '../services/beranda.service'
 import { ADMIN_DASHBOARD_ROLES, type RingkasanAdmin, type RingkasanBeranda, type RingkasanPegawai } from '../types'
 
@@ -62,7 +64,7 @@ onMounted(() => {
         </p>
       </section>
 
-      <BannerCarousel />
+      <BannerCarousel v-if="KONTEN_BERANDA_AKTIF" />
 
       <p v-if="error" class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
       <p v-else-if="loading && !ringkasan" class="text-sm text-slate-500" data-testid="beranda-memuat">Memuat ringkasan…</p>
@@ -72,6 +74,6 @@ onMounted(() => {
       </template>
       <PegawaiDashboard v-else :ringkasan="dataPegawai" />
     </div>
-    <PopupAktifDialog />
+    <PopupAktifDialog v-if="KONTEN_BERANDA_AKTIF" />
   </RedesignShell>
 </template>
