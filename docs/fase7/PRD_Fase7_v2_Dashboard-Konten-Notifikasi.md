@@ -1,8 +1,8 @@
-# PRD Fase 7 v2.0 — Dashboard, Konten, Notifikasi (sisa Modul F + ISSUE-058)
+# PRD Fase 7 v2.1 — Dashboard, Konten, Notifikasi (sisa Modul F + ISSUE-058)
 
 | Atribut | Isi |
 |---|---|
-| Versi | **v2.0 — 10-11-2026** (CR-112; disusun reviewer CR dari laporan M0 empat jalur `wt/f7-m0/M0_*.md`) |
+| Versi | **v2.1 — 11-11-2026** (CR-114: koreksi temuan koding + keputusan sesudah v2.0, lihat §11). v2.0 — 10-11-2026 (CR-112; disusun reviewer CR dari laporan M0 empat jalur `wt/f7-m0/M0_*.md`) |
 | Status | **BERLAKU — disetujui Horii 10-11-2026** (izin merge). 8 keputusan prioritas dipilih Horii; 39 keputusan lain = bawaan (saran) **dikonfirmasi Horii 10-11-2026** ("ikut bawaan semua") — semua dikunci (§4) |
 | Scope | Fase 7 sisa: F-01, F-02, F-04, F-05, F-06, F-07, F-08, F-11, F-12, F-13 + ISSUE-058 (deviasi K1 Fase 6). **F-03 & F-09 tetap diatur PRD v1.0** (`PRD_Fase7_Statistik-GeneratorDokumen.md`, Done). **F-10 Arsip Digital DITUNDA** (Horii 20-10-2026 & 10-11-2026) |
 | Izin kerja | [#4-WorkloadParalelFase7] (Horii 10-11-2026) — anggota & batas di §3 |
@@ -41,6 +41,7 @@
 | F-12 | DIBO (Kamus Digital Kepegawaian) | Daftar dasar hukum + berkas; lihat semua role; kelola role 1; master `jenis_dibo` | 109 | A / MAKE-082 |
 | F-13 | Frontend dashboard | Beranda admin & pegawai per role [K], donut komposisi [V2] dengan saklar rollback (Q7-36) | 110 | D / MAKE-087 |
 | ISSUE-058 | Log integrasi + Admin → Integrasi (deviasi K1 F6) | `GET api/v1/integrasi/log` + halaman role 1 | — | D / MAKE-078 (dikerjakan) |
+| Impor T14 | Impor legacy tier 14 konten Fase 7 (13 tabel) + `impor:berkas-konten` | Aturan §10 DBV-032 + §11 (v2.1); **masuk Fase 7** (Horii 11-11-2026) | — | C / MAKE-089 |
 | Penutup | QA Lapis 1 Fase 7 + laporan akhir | — | — | Reviewer / MAKE-088 |
 
 ### 1.2 Di luar scope
@@ -52,7 +53,7 @@
 | Fitur "ask" DIBO | Tidak ada di legacy (Q7-12) | DoD Trello dikoreksi |
 | IPASN di beranda | Ditunda (Q7-43) | Rumus IPASN belum di v2 |
 | Halaman daftar KP/TJ/KGB untuk kartu pengingat | Kartu tanpa tautan dulu (Q7-37) | — |
-| Impor data form digital & SKL legacy | Tiket impor tersendiri (Q7-24) | Tier impor Fase 7 dirancang di DBV-032 |
+| ~~Impor data form digital & SKL legacy~~ | **Dipindah ke dalam scope v2.1** (MAKE-089, Horii 11-11-2026) | Eksekusi data nyata tetap saat cutover |
 
 ---
 
@@ -106,7 +107,7 @@ butir dikunci. Rincian opsi & perbandingan: `Keputusan_Q7_Fase7.md`, `Perbanding
 | # | Keputusan bawaan | Label |
 |---|---|---|
 | Q7-01 | Pemilik form digital & SKL = Jalur B | — |
-| Q7-03 | Kolom popup yang selalu konstan (`target`, `type`, `id_unit_satker`, `unit_satker`) tidak dibawa | [V2] |
+| Q7-03 | Kolom popup `target`, `type`, `id_unit_satker`, `unit_satker` tidak dibawa. **v2.1:** premis "selalu konstan" keliru untuk `popup.target` (D1: 1/2/3) — tetap tidak dibawa, target diturunkan dari `target_uns`/`target_peg` saat impor; `popup.type` ≠ 1 (video, 1 baris) dilewati impor + dicatat | [V2] |
 | Q7-05 | Popup/banner tampil untuk semua role ber-NIP (2–8) yang ada di target; role 1 tanpa NIP tidak (legacy popup 2/6/7) | [V2] |
 | Q7-06 | Unggah gambar biasa + cek dimensi/rasio di server (≤ 5 MB, tipe dari isi berkas); tanpa pustaka cropper | [V2] |
 | Q7-07 | Berita role 1,3 (role 3 → status menunggu, disetujui role 1); kategori role 1 | [K] |
@@ -139,9 +140,9 @@ butir dikunci. Rincian opsi & perbandingan: `Keputusan_Q7_Fase7.md`, `Perbanding
 | Q7-38 | Daftar jabatan direktur politeknik di `Config\Dashboard` (bukan hardcode) | [V2] |
 | Q7-39 | Banner tampil juga di beranda admin (BE yang menyaring) | [V2] |
 | Q7-40 | Popup form digital & SKL tampil di halaman mana pun (shell), dipasang Jalur B | [K] |
-| Q7-42 | Presensi di beranda memakai ulang komponen Fase 5 lewat ekspor aditif yang disetujui pemilik | — |
+| Q7-42 | **v2.1:** presensi di beranda = **tautan ke Presensi Saya** (`PresensiSayaCard`); komponen Fase 5 yang bisa dipakai ulang tidak ada | — |
 | Q7-43 | IPASN ditunda | — |
-| Q7-44 | "Update FK" PTT = tautan ke halaman biodata/riwayat | — |
+| Q7-44 | **v2.1:** tautan "Update FK" PTT **tidak dipasang** — baris legacy-nya dikomentari (tidak tampil di legacy) [K] | [K] |
 | Q7-46 | Kepemilikan `features/dashboard` + `Libraries/Dashboard/Beranda` = Jalur D | — |
 | Q7-47 | Kolom `target_peg_desc`/`excl_peg_desc`/`target_uns_desc` ("NIP – nama") tidak dibawa; nama diturunkan saat baca | [V2] |
 
@@ -226,8 +227,8 @@ butir dikunci. Rincian opsi & perbandingan: `Keputusan_Q7_Fase7.md`, `Perbanding
   komposisi pegawai (donut atau angka sesuai saklar Q7-36) + status hari ini (TB, IB, CLTN, cuti, presensi online), kartu Butuh Approval
   (`useRingkasanNotifikasi`), masa kerja direktur politeknik role 1/4 (Q7-38), berita terbaru, ulang tahun (Q7-45), ringkasan SKL (Q7-26).
   Lingkup role 3 = satker/unit akun (resolver lingkup F-03).
-- **Pegawai (role 2/6/7):** banner, presensi hari ini (komponen Fase 5, Q7-42), kartu prediksi (role 2 penuh; role 7 Pensiun + KGB; role 6
-  tanpa kartu) [K], kelengkapan data, presensi & AK bawahan untuk atasan [K], ulang tahun, tautan update FK PTT (Q7-44), berita terbaru.
+- **Pegawai (role 2/6/7):** banner, tautan Presensi Saya (Q7-42 v2.1), kartu prediksi (role 2 penuh; role 7 Pensiun + KGB; role 6
+  tanpa kartu) [K], kelengkapan data, presensi & AK bawahan untuk atasan [K], ulang tahun, berita terbaru (tautan update FK PTT tidak dipasang, Q7-44 v2.1).
 - Popup (`PopupAktifDialog`) di akar `HomeView`.
 - BE Jalur D: `GET dashboard/ringkasan` (bentuk per keluarga role; cache pendek per lingkup kecuali "hari ini"; pengecualian NIP Q7-41),
   `GET dashboard/ulang-tahun?hari=ini|besok` (field sesuai view legacy, Q7-45), `GET dashboard/direktur` (role 1/4).
@@ -253,7 +254,7 @@ Tafsir "tarik ulang per periode" = form periode di tombol halaman, bukan aksi ba
 | `survei-layanan/saya`, `POST survei-layanan` | 2, 6 |
 | `notifikasi` (daftar), `DELETE notifikasi/...` | daftar 2, 3, 6, 7; hapus 1, 2, 6, 7 [K] |
 | `notifikasi/butuh-approval`, `notifikasi/histori-approval` | 1, 2, 3 [K] |
-| `notifikasi/ringkasan` (lonceng) | role lonceng legacy [K] |
+| `notifikasi/ringkasan` (lonceng) | **1–8** (semua role login, `MY_Controller:20-175`), angka per role [K]; tampil tanpa angka/polling selama `ACTIVE_PHASE` < 7 |
 | `dashboard/ringkasan`, `dashboard/ulang-tahun` | 1–8 (bentuk per keluarga role) |
 | `dashboard/direktur` | 1, 4 |
 | `integrasi/log` | 1 |
@@ -297,15 +298,44 @@ F-02 eksekusi data nyata = cutover (bukan syarat sign-off).
 
 ---
 
+## 11. Perubahan v2.1 (CR-114, 11-11-2026)
+Koreksi temuan selama koding + keputusan Horii/reviewer/DB Validator sesudah v2.0. Semua sudah diterapkan di `main` `ab1ff02d`.
+
+| # | Bagian | Perubahan | Sumber |
+|---|---|---|---|
+| 1 | D1 Fase 7 (G7-2) | D1 diambil dari **salinan DEV (simpegdev)**, bukan produksi (Horii). Struktur = acuan skema; angka (jumlah/ganda/yatim/sebaran) = angka dev, **diverifikasi ulang di produksi saat cutover** | Horii 11-11 |
+| 2 | Q7-03 | Premis "kolom konstan" dikoreksi (lihat §4.2) | D1 + reviewer |
+| 3 | Q7-42 / Q7-44 | Presensi = tautan Presensi Saya; update FK PTT tidak dipasang (lihat §4.2) | Jalur D, temuan legacy |
+| 4 | Q7-45 | Field kartu ulang tahun mengikuti view legacy + helper ulang tahun legacy (`function_helper.php` blok `getTodayBday`/`getTomorrowBday`, dibaca atas izin khusus); foto lewat endpoint terautentikasi | Jalur D |
+| 5 | Q7-29 / §6 | Lonceng ada di **semua role 1–8** dengan angka per role; daftar/hapus/approval tetap per role legacy | Jalur C |
+| 6 | F-04 penargetan | Pegawai eksplisit (`target_peg`) ikut **tanpa** filter status dan diabaikan bila target kementerian, persis legacy (`L_announcement.php:477-587`) [K] — deviasi awal dibatalkan | Jalur A |
+| 7 | F-04/F-05 gambar | Batas bawaan v2 di `Config\Konten`: banner rasio 4:1 (±2%) lebar 800–4000 px; popup sisi 200–4000 px; ≤ 5 MB; tipe dicek dari isi berkas (Q7-06) | Reviewer (bisa diubah di config) |
+| 8 | F-04/F-05 hapus | Popup/banner tanpa kolom status → **hapus permanen** + berkas dihapus, snapshot di log audit [K] (`L_announcement.php:313`, `:1467`) | Jalur A |
+| 9 | F-07 role 3 | Berita yang diubah role 3 **langsung berlaku** seperti legacy (Horii pilih B); saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu` (bawaan `false`) | Horii 11-11 |
+| 10 | F-07 lampiran & jam | Lampiran berita (JPG/PNG/GIF/PDF ≤ 5 MB, privat) dan jam terbit **dibawa** — dipakai legacy (`L_news.php`, `detail.php`) [K] | Jalur A |
+| 11 | F-07 notifikasi | `news.show_notif`/`notif_date` diisi service saat setuju **dan** tolak (pengganti trigger legacy `news_beUpd`); `SumberBerita` aktif di lonceng sejak DBV-032 | D1 + Jalur A |
+| 12 | F-12 DIBO | Hapus = **hapus lunak** (status 10, bisa dipulihkan) [V2]; detail DIBO boleh role 1 [V2]; pegawai hanya melihat status 1 (Q7-13) | Jalur A |
+| 13 | DBV-032 | Kolom legacy NULL-able (`news.id_news_category`, `news.ul_creator`, `dibo.id_jenis_dibo/nomor/tahun`) tetap NULL-able [K], wajib hanya di form; Q11 news tanpa FK ke unit/satker/user_level/pengguna (syarat: validasi id di service + audit yatim); FK master RESTRICT; seed `jenis_dibo` 8 id | DB Validator |
+| 14 | Koreksi NIP | `NipCascadeService::FASE` = 7: koreksi NIP ikut mengubah tabel Fase 7 (skl, user_popup/banner/form_digital, filled_form_digital) + elemen JSON `target_peg`/`excl_peg` | DBV-032 |
+| 15 | Antrean dialog | Urutan: form digital → pengingat cuti (Fase 4, ikut antrean atas keputusan Horii) → popup konten → SKL; ganti password paksa (MAKE-020) di luar antrean | Jalur B |
+| 16 | Gating Fase 7 | Menu, lonceng, host dialog, dan konten beranda diam (tanpa request) selama `ACTIVE_PHASE` < 7 (`FASE_LONCENG`/`FASE_INTERAKSI`/`FASE_KONTEN` = 7) | Reviewer |
+| 17 | Dashboard | Q-D12 `.env` `dashboard.penggunaLihatSemua`, Q-D18 `.env` `dashboard.nipDikecualikanUlangTahun` (rahasia, ikut legacy); Q-D13..Q-D17 kelengkapan data ikut legacy (A); Tanda Jasa satker/unit diperbaiki [V2] dengan saklar (Lampiran A) | Horii 10-11 |
+| 18 | `show_pl` | Histori PIC TB/IB/PMK di Pusat Notifikasi **ditunda** (Horii 10-11) | Horii |
+| 19 | Impor T14 | MAKE-089 masuk Fase 7: ENUM dari nilai string; popup video dilewati; JSON tak valid hanya lewat berkas keputusan "__buang" (pola F-02); form lama dikonversi ke SkemaForm v2; kunci berkas deterministik; `impor:berkas-konten` baca-saja sumber; `kritik_saran`/`response` tidak masuk log/laporan | Horii 11-11 + reviewer |
+| 20 | F-06/F-11 | Pertanyaan "paragraf" memakai `FormField` textarea; kritik & saran SKL wajib di form, opsional di server; label KARIS/KARSU ikut master | Jalur B |
+
 ## Lampiran A — Deviasi [V2] yang bisa dikembalikan ke perilaku legacy
 | # | Legacy | v2 | Cara kembali ke legacy |
 |---|---|---|---|
 | Q7-36 | Komposisi pegawai di dashboard admin tampil sebagai angka + persen (`views/user/dashboard_ad.php:47-180`), tanpa chart | Donut komposisi + tile angka | Ubah `Config\Dashboard::$tampilanKomposisi` dari `'donut'` ke `'angka'` (tanpa ubah kode/API/DB); test menjaga kedua mode |
 | Q7-10 | Editor HTML WYSIWYG, isi disimpan hampir mentah | Editor teks sederhana + pembersihan server | Tidak disarankan (celah XSS); bila perlu editor kaya → CR baru dengan pustaka yang disetujui |
-| Bawaan lain [V2] di §4.2 | Lihat label [V2] per butir | — | Perubahan sesudah kunci = CR baru atas keputusan Horii |
+| Tanda Jasa (v2.1) | Kartu Tanda Jasa satker/unit memakai tahun berjalan → ≈0 di Sep–Des (bug) | Tahun acuan kementerian | `.env` `dashboard.tandaJasaIkutLegacy = true` (tanpa ubah kode) |
+| F-07 role 3 (v2.1) | Berita diubah role 3 langsung berlaku | Sama dengan legacy (bawaan) | Saklar `Config\Konten::$beritaUbahRole3KembaliMenunggu = true` bila ingin kembali menunggu persetujuan |
+| Bawaan lain [V2] di §4.2 dan §11 | Lihat label [V2] per butir | — | Perubahan sesudah kunci = CR baru atas keputusan Horii |
 
 ## Lampiran B — Riwayat versi
 | Versi | Tanggal | Isi |
 |---|---|---|
 | v1.0 | 21-10-2026 | `PRD_Fase7_Statistik-GeneratorDokumen.md` — F-03, F-09 (Done) |
 | v2.0 | 10-11-2026 | CR-112: sisa Fase 7 + ISSUE-058 dari M0 empat jalur; 8 keputusan dipilih Horii, 39 bawaan dikonfirmasi Horii; disetujui masuk `main` |
+| v2.1 | 11-11-2026 | CR-114: §11 (20 koreksi/keputusan sesudah v2.0), Q7-03/42/44 dikoreksi, lonceng semua role, impor T14 masuk scope, Lampiran A + Tanda Jasa & berita role 3 |
