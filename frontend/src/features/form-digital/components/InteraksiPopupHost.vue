@@ -6,7 +6,7 @@
  * - Diam (tanpa request) bila `ACTIVE_PHASE` < {@link FASE_INTERAKSI} atau sesi wajib ganti password. Form digital untuk role
  *   2/6/7, SKL untuk role 2/6 (Q7-23); role lain tanpa request.
  * - Memuat `form-digital/saya` dan `survei-layanan/saya` sekali per pemasangan shell; daftar kosong → tidak meminta giliran.
- * - Ada isi → `minta('form-digital')` / `minta('skl')`; antrean menjamin form digital tampil lebih dulu dan SKL terakhir
+ * - Peserta antrean didaftarkan sinkron di setup (CR-118); ada isi → `minta()`, kosong/galat → `batal()`; antrean menjamin form digital tampil lebih dulu dan SKL terakhir
  *   (urutan legacy). Giliran dilepas setelah butir terakhir.
  */
 import { computed, onMounted, ref } from 'vue'
@@ -27,7 +27,12 @@ import type { FormSaya } from '../types'
 const props = withDefaults(defineProps<{ fase?: number }>(), { fase: ACTIVE_PHASE })
 
 const auth = useAuthStore()
-const { minta } = useAntreanDialog()
+const { daftar } = useAntreanDialog()
+
+// CR-118: daftar SINKRON di setup (sebelum fetch) supaya urutan antrean deterministik.
+const bolehTampil = props.fase >= FASE_INTERAKSI && !auth.mustChangePassword
+const pesertaForm = bolehTampil && auth.role !== null && FORM_DIGITAL_PENGISI_ROLES.includes(auth.role) ? daftar('form-digital') : null
+const pesertaSkl = bolehTampil && auth.role !== null && SKL_PENGISI_ROLES.includes(auth.role) ? daftar('skl') : null
 
 const antrean = ref<FormSaya[]>([])
 const skl = ref<TagihanSkl[]>([])
@@ -38,25 +43,27 @@ let lepasSkl: (() => void) | null = null
 const aktif = computed<FormSaya | undefined>(() => antrean.value[0])
 
 async function muatForm(): Promise<void> {
-  if (auth.role === null || !FORM_DIGITAL_PENGISI_ROLES.includes(auth.role)) return
+  if (pesertaForm === null) return
   try {
-    const daftar = await formDigitalService.saya()
-    if (daftar.length === 0) return
-    lepasForm = await minta('form-digital')
-    antrean.value = daftar
+    const rows = await formDigitalService.saya()
+    if (rows.length === 0) return pesertaForm.batal()
+    lepasForm = await pesertaForm.minta()
+    antrean.value = rows
   } catch (e) {
+    pesertaForm.batal()
     if (import.meta.env.DEV) console.warn('[form-digital] daftar form gagal dimuat', e)
   }
 }
 
 async function muatSkl(): Promise<void> {
-  if (auth.role === null || !SKL_PENGISI_ROLES.includes(auth.role)) return
+  if (pesertaSkl === null) return
   try {
-    const daftar = await surveiLayananService.saya()
-    if (daftar.length === 0) return
-    lepasSkl = await minta('skl')
-    skl.value = daftar
+    const rows = await surveiLayananService.saya()
+    if (rows.length === 0) return pesertaSkl.batal()
+    lepasSkl = await pesertaSkl.minta()
+    skl.value = rows
   } catch (e) {
+    pesertaSkl.batal()
     if (import.meta.env.DEV) console.warn('[survei-layanan] daftar survei gagal dimuat', e)
   }
 }
@@ -79,7 +86,7 @@ function sklSelesai(): void {
 }
 
 onMounted(() => {
-  if (props.fase < FASE_INTERAKSI || auth.mustChangePassword) return
+  if (!bolehTampil) return
   void muatForm()
   void muatSkl()
 })
