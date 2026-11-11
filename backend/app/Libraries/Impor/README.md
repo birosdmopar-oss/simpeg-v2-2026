@@ -17,7 +17,7 @@ php spark impor:legacy --sumber=<skema_salinan> --zona-sumber=WIB|UTC --konfirma
 - **Sumber SIASN** (`--sumber-siasn`, DBV-027 K-9): salinan skema `siasn_simpeg` (`REF_UNOR` + 7 tabel referensi) dari
   **snapshot yang sama** dengan sumber utama, di server dan akun yang sama; dibaca langsung, tidak disalin ke skema
   `simpeg01`. Tanpa opsi ini `siasn_ref_unor` dan `siasn_referensi` dilaporkan `dilewati: tanpa --sumber-siasn`; tabel
-  tabel tier SIASN (T14) lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
+  tabel tier SIASN (T15) lain tetap diimpor dari sumber utama. Salah satu dari 8 tabel tidak ada → gagal. Nama tabel sumber dicari tanpa
   beda huruf besar/kecil (`lower_case_table_names`). Skema ini juga melewati penjaga di bawah. Contoh:
   `php spark impor:legacy --sumber=up1_legacy_salinan --sumber-siasn=up1_legacy_salinan_siasn --zona-sumber=WIB
   --konfirmasi=<db_tujuan> --dry-run`. Ekstraksinya: `docs/up1/sql/up1-ekstraksi.sh` (`UP1_DB_SIASN`) atau
@@ -86,6 +86,13 @@ DEFAULT dari DB.
 - `bolehSeed` (GAP-3): untuk master yang sudah di-seed migration. Bila id dan nama sama, baris dilewati. Bila berbeda,
   impor gagal dengan menyebut tabel dan id.
 - `kunciUrut`: PK komposit untuk baca per batch, mis. `dh_online (nip, tgl)`.
+- `pkSintetis` (MAKE-089): PK tujuan = AUTO_INCREMENT sintetis yang tidak ada di sumber (tabel anak berpenerima, `news_flag`).
+  - Baris dikenali lewat `kunciUrut` (wajib).
+  - Kunci baca ganda → baris berikutnya dibuang `MAKE-089 kunci ganda (setara INSERT IGNORE)`. Jumlahnya dari SQL
+    `COUNT(*) - COUNT(DISTINCT …)`, termasuk duplikat di batas batch.
+  - Pra-cek UNIQUE di PHP dilewati untuk indeks yang kolomnya = himpunan `kunciUrut` (Q-089-6), supaya tidak memuat
+    jutaan kunci ke memori.
+  - Tidak bisa digabung dengan `bolehSeed`, `kolomTunda`, atau `isiUrutan`. Tier lama tidak memakainya.
 - `tanpaStripslashes`: kolom teks yang disalin mentah; `['*']` = semua kolom tabel (GAP-8: `bkn_periode_ekinper`,
   `riwayat_skp_periodik`).
 - `waktuBisnis`: kolom DATETIME berisi waktu kejadian, mis. `absen_ijin.date_start/date_end`,
@@ -128,7 +135,8 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
 | 11 | Snapshot `pegawai_*` lain — transaksi per tabel (K-M8); `id_riwayat_*` NOT NULL yatim → gagal | MAKE-069 |
 | 12 | Layanan sisa DBV-022 §5 (`jenis_layanan`/`jenis_pa` seed, `question_category`, petugas, `pa_layanan`, notifikasi KT, IB, PMK, `esign_hist`) | MAKE-069 |
 | 13 | **Tiket lama Halo Simpeg (F-02, MAKE-086)**: `disiplin_ticket` ← `inbox`, `disiplin_ticket_msg` ← `inbox_msg` (rename 1:1, PK tetap). Semua isi = tiket (penulis tunggal `L_support.php`); `inbox` v2 tidak ditulis (Q7-28). Sortir & eskalasi: bagian **Tiket lama (F-02)** di bawah | MAKE-086 |
-| 14 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
+| 14 | **Konten & interaksi Fase 7 (MAKE-089, DBV-032 §10)** — transaksi per tabel + `--jejak`. Isi: `news_category` (status 0→2, `allow_ap` ENUM nilai), `news` (ENUM `status`/`target` dari nilai, isi disanitasi `SanitasiBerita`, lampiran → kunci, `publish_at` R1a), `news_flag` (PK sintetis), `jenis_dibo` (cocok seed), `dibo` (`tahun` 0000→NULL, berkas → kunci), `popup` (video `type≠1` dilewati + anaknya, `tgl_*` waktu bisnis WIB), `user_popup`, `banner`, `user_banner` (PK sintetis, batch), `skl` (UNIQUE ganda → id terkecil). Kolom legacy `target`/`type`/`id_unit_satker`/`unit_satker`/`*_desc`/`news.category`/`unit_satker_target` tidak dibawa. Aturan: `AturanKonten`. Form digital menyusul (M2) | MAKE-089 |
+| 15 | Tabel kerja SIASN Fase 6 (DBV-027 §13.3): `siasn_ref_unor` ← `REF_UNOR`, `siasn_referensi` ← 7 tabel referensi (skema `--sumber-siasn`, disalin mentah), `double_riwayat_kp`, `siasn_upload_arsip` (semua status) | B3 |
 
 **Aturan DBV-027 §13.3 (B3).** Pesan dan laporan hanya jumlah.
 
@@ -143,12 +151,23 @@ Contoh ada di `docs/up1/keputusan-impor.contoh.json`. Isi finalnya diputuskan DB
   `status = 3` → `2` dengan `error_msg` "Terhenti saat cutover — periksa di SIASN sebelum mengantre ulang"
   (`DBV-027 K-7 status 3→2`). `id_da`/`id_rw` tanpa baris di `document_attachment` / `riwayat_mutasi_jabatan`
   (`Rw Jabatan`) / `riwayat_diklat` (`Rw Sertifikasi`) → INFO; bila tabel induknya masih kosong, kodenya menyebut
-  "belum diimpor (kosong)", artinya tier SIASN (T14) dijalankan sebelum riwayat dan lampiran (MAKE-069) diimpor.
+  "belum diimpor (kosong)", artinya tier SIASN (T15) dijalankan sebelum riwayat dan lampiran (MAKE-069) diimpor.
 - `double_riwayat_kp` (K-8): apa adanya; NIP tanpa `pegawai` → gagal (rujukan yatim).
 - Tidak diimpor: `siasn_status_pegawai` (dibangun job data-utama, K-5), `siasn_simpeg.dsp`, `firebase_token`/`fb_token`
   (PRD Fase 6 AC-01.2).
-- **Urutan:** tier SIASN (T14, selalu terakhir) dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
+- **Urutan:** tier SIASN (T15, selalu terakhir) dijalankan sesudah `document_attachment` dan tabel riwayat sumber diimpor dengan PK tetap (MAKE-069).
   Tiket lama (F-02) = T13 (MAKE-086). T12b Halo Simpeg (DBV-028) dan tier Fase 7 lain disisipkan sebelum tier SIASN.
+
+**Berkas & JSON tier 14 (MAKE-089, Q-089-1/4).**
+- Kolom berkas diisi kunci DETERMINISTIK `<jenis>/<hex32>.<ext>`, dengan
+  `hex32 = sha256("MAKE-089|<tabel>|<kolom>|<id>|<path legacy>")[0..32]` dan ekstensi dari daftar putih Jalur A. Formatnya
+  sama dengan buatan aplikasi.
+- Berkasnya disalin terpisah oleh `impor:berkas-konten` (M3).
+- AMBIGU (pola F-02) diputus per id lewat bagian `baris` `<tabel>.f7` = `"__buang"` (satu-satunya nilai). Tanpa
+  putusan → gagal dengan jumlah per kode, juga saat dry-run. AMBIGU mencakup:
+  - path tidak sah (traversal, absolut, backslash);
+  - ekstensi di luar daftar putih;
+  - JSON target ber-`addslashes` yang tetap tidak valid sesudah `stripslashes`.
 
 **Tiket lama (F-02, MAKE-086; PRD Fase 7 v2.0 §5.2, Q7-28; `AturanTiketLama`).** Kriteria dari KODE legacy (bukan data):
 bentuk tiket sah = pola `insert_inbox`/`set_param_conversation` (`L_support.php:937-1095,1505-1597`). `praPindai`
@@ -270,6 +289,7 @@ segmen ketat.
 
 - `tests/unit/Impor/AturanImporTest.php`: aturan murni (transformasi, keputusan, penjaga).
 - `tests/unit/Impor/UrutanTierTest.php`: tier SIASN selalu `TIER_MAKS` dan sesudah tabel induk rujukannya.
+- `tests/Impor/ImporLegacyTier14Test.php` (MAKE-089): skema legacy D1 tiruan, ENUM/status/video/waktu bisnis/kunci berkas/PK sintetis ganda di batas batch/keputusan `<tabel>.f7`.
 - `tests/Impor/ImporLegacyTiketLamaTest.php` (F-02): kelas sortir, eskalasi wajib diputus, manifest seimbang, `inbox` v2 = 0, command `impor:sortir-inbox`.
 - `tests/Impor/ImporLegacyTier1Test.php`, `ImporLegacyTier23Test.php`, `ImporLegacyTier456Test.php`,
   `ImporLegacySiasnTest.php` (B3: kunci ganda SKP, tier SIASN, skema `--sumber-siasn` huruf besar),

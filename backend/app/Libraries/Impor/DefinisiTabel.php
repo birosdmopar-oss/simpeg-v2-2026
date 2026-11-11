@@ -41,6 +41,12 @@ final class DefinisiTabel
      * @param array{kolom: string, nama: string, lingkup: list<string>}|null $isiUrutan [V2] kolom urutan yang tidak ada di sumber → 1..n per lingkup, urut nama (G-01 #4, G-04/05 P8)
      * @param array<string, array{0: string, 1: string}> $rujukan rujukan wajib tanpa FK di tujuan (FK masih ditahan): kolom → [tabel induk, kolom induk]; yatim → gagal
      * @param bool                          $hanyaSeed         semua id sumber wajib ada di seed migration (`bolehSeed`); id lain → gagal (mis. `jenis_rwy`)
+     * @param bool                          $pkSintetis        [MAKE-089] PK tujuan `$pk` = AUTO_INCREMENT sintetis yang TIDAK ada di sumber (tabel anak berpenerima,
+     *                                                         `news_flag`). Baris dikenali lewat `kunciUrut` (wajib); kunci baca ganda → baris
+     *                                                         berikutnya dibuang + dicatat (setara INSERT IGNORE, jumlah dari SQL
+     *                                                         `COUNT(*) - COUNT(DISTINCT …)`); pra-cek UNIQUE PHP dilewati untuk indeks UNIQUE yang
+     *                                                         kolomnya = himpunan `kunciUrut` (dijamin kunci baca, Q-089-6: tanpa memuat jutaan
+     *                                                         kunci ke memori). `bolehSeed`/`kolomTunda`/`isiUrutan` tidak didukung bersama opsi ini.
      */
     public function __construct(
         public readonly string $tabel,
@@ -70,8 +76,17 @@ final class DefinisiTabel
         public readonly ?array $isiUrutan = null,
         public readonly array $rujukan = [],
         public readonly bool $hanyaSeed = false,
+        public readonly bool $pkSintetis = false,
     ) {
+        if ($pkSintetis && ($kunciUrut === [] || $bolehSeed || $kolomTunda !== [] || $isiUrutan !== null)) {
+            throw new ImporGagal("Definisi {$tabel}: pkSintetis wajib kunciUrut dan tidak bisa digabung bolehSeed/kolomTunda/isiUrutan.");
+        }
     }
+
+    /**
+     * Kode baris ganda kunci baca (pkSintetis) yang dibuang.
+     */
+    public const KODE_GANDA = 'MAKE-089 kunci ganda (setara INSERT IGNORE)';
 
     /**
      * Kunci laporan: nama tabel tujuan, ditambah tabel sumber bila beberapa sumber mengisi satu tujuan.

@@ -327,6 +327,11 @@ final class PengimporLegacy
     {
         $kunci = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
 
+        if ($def->pkSintetis) {
+            // Kunci ganda pada tabel ber-PK sintetis dibuang + dicatat saat dibaca (imporTabel), bukan digagalkan.
+            return;
+        }
+
         if ($def->sumber === null && ! $def->skemaSiasn && array_intersect($kunci, $def->kolomKode) === []) {
             return;
         }
@@ -584,7 +589,13 @@ final class PengimporLegacy
             }
         }
 
-        if (! isset($kolom[$def->pk])) {
+        if ($def->pkSintetis) {
+            foreach ($def->kunciUrut as $k) {
+                if (! isset($kolom[$k])) {
+                    throw new ImporGagal("Kolom kunci baca {$def->tabel}.{$k} tidak ada di sumber (pkSintetis).");
+                }
+            }
+        } elseif (! isset($kolom[$def->pk])) {
             throw new ImporGagal("Kolom PK {$def->tabel}.{$def->pk} tidak ada di sumber.");
         }
 
@@ -637,7 +648,7 @@ final class PengimporLegacy
                 $def->rujukan,
             ),
             'seed'      => $seed,
-            'unik'      => $this->indeksUnik($this->tujuan->prefixTable($def->tabel)),
+            'unik'      => $this->unikDiperiksa($def, $this->indeksUnik($this->tujuan->prefixTable($def->tabel))),
             'onUpdate'  => $onUpdate,
             'barisSeed' => $barisSeed,
         ];
@@ -660,14 +671,17 @@ final class PengimporLegacy
         $jumlah = (int) $this->kueri($src, 'SELECT COUNT(*) AS n FROM ' . $tabel . $saring)->getRowArray()['n'];
         $this->laporan->mulai($tier, $def, $jumlah, $dryRun ? 'dry-run' : '');
 
-        $pilih    = implode(', ', array_map(static fn (string $k, array $t): string => $src->escapeIdentifiers($t['src']) . ' AS ' . $src->escapeIdentifiers($k), array_keys($rinci['kolom']), $rinci['kolom']));
-        $kunci    = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
-        $urutPk   = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($rinci['kolom'][$k]['src']), $kunci));
-        $buang    = $rinci['buang'];
-        $urutan   = [];
-        $tunda    = [];
-        $terakhir = null;
-        $dilihat  = [];
+        $pilih        = implode(', ', array_map(static fn (string $k, array $t): string => $src->escapeIdentifiers($t['src']) . ' AS ' . $src->escapeIdentifiers($k), array_keys($rinci['kolom']), $rinci['kolom']));
+        $kunci        = $def->kunciUrut === [] ? [$def->pk] : $def->kunciUrut;
+        $urutPk       = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($rinci['kolom'][$k]['src']), $kunci));
+        $buang        = $rinci['buang'];
+        $urutan       = [];
+        $tunda        = [];
+        $terakhir     = null;
+        $dilihat      = [];
+        $ganda        = $def->pkSintetis ? $this->jumlahGanda($src, $tabel, $def, $rinci['kolom'], $saring) : 0;
+        $gandaDibuang = 0;
+        $kunciSebelum = null;
 
         foreach ($rinci['barisSeed'] as $r) {
             $this->catatUnik($def, $rinci['unik'], $r, $dilihat);
@@ -685,9 +699,21 @@ final class PengimporLegacy
 
             foreach ($baris as $mentah) {
                 $terakhir = array_map(static fn (string $k): mixed => $mentah[$k], $kunci);
+                $idBaris  = $def->pkSintetis ? implode("\x1F", array_map('strval', $terakhir)) : (string) $mentah[$def->pk];
 
-                if (isset($buang[(string) $mentah[$def->pk]])) {
-                    $this->laporan->dibuang($def->kunci(), $buang[(string) $mentah[$def->pk]]);
+                if ($def->pkSintetis) {
+                    if ($idBaris === $kunciSebelum) {
+                        $this->laporan->dibuang($def->kunci(), DefinisiTabel::KODE_GANDA);
+                        $gandaDibuang++;
+
+                        continue;
+                    }
+
+                    $kunciSebelum = $idBaris;
+                }
+
+                if (isset($buang[$idBaris])) {
+                    $this->laporan->dibuang($def->kunci(), $buang[$idBaris]);
 
                     continue;
                 }
@@ -723,9 +749,9 @@ final class PengimporLegacy
                     }
                 }
 
-                $id = (string) $hasil[$def->pk];
+                $id = $def->pkSintetis ? $idBaris : (string) $hasil[$def->pk];
 
-                if (isset($rinci['seed'][$id])) {
+                if (! $def->pkSintetis && isset($rinci['seed'][$id])) {
                     $nama = (string) ($hasil[$def->kolomNama[0]] ?? '');
 
                     if (mb_strtolower($nama) !== mb_strtolower($rinci['seed'][$id])) {
@@ -754,6 +780,11 @@ final class PengimporLegacy
 
             $this->laporan->ditulis($def->kunci(), count($tulis));
         } while (count($baris) === $this->ukuranBatch);
+
+        // Duplikat kunci di batas batch tidak terbaca keyset `>` — sisa jumlah ganda dari SQL dicatat sebagai dibuang.
+        for ($i = $gandaDibuang; $i < $ganda; $i++) {
+            $this->laporan->dibuang($def->kunci(), DefinisiTabel::KODE_GANDA);
+        }
 
         $t = $this->laporan->semua()[$def->kunci()];
 
@@ -916,6 +947,42 @@ final class PengimporLegacy
      *
      * @return array<string, list<string>>
      */
+    /**
+     * Jumlah baris kunci baca ganda (pkSintetis) di sumber: `COUNT(*) - COUNT(DISTINCT kunci)`.
+     *
+     * @param array<string, array{src: string, tipeSumber: string, tipeTujuan: string, nullable: bool, panjang: int|null}> $kolom
+     */
+    private function jumlahGanda(BaseConnection $src, string $tabel, DefinisiTabel $def, array $kolom, string $saring): int
+    {
+        $kunci = implode(', ', array_map(static fn (string $k): string => $src->escapeIdentifiers($kolom[$k]['src']), $def->kunciUrut));
+
+        return (int) $this->kueri($src, "SELECT COUNT(*) - COUNT(DISTINCT {$kunci}) AS n FROM {$tabel}{$saring}")->getRowArray()['n'];
+    }
+
+    /**
+     * Indeks UNIQUE yang diperiksa di PHP. Untuk pkSintetis, indeks yang kolomnya = himpunan kunci baca dilewati: kunci baca
+     * dibaca berurut dan dideduplikasi, jadi bentrok mustahil (Q-089-6).
+     *
+     * @param array<string, list<string>> $unik
+     *
+     * @return array<string, list<string>>
+     */
+    private function unikDiperiksa(DefinisiTabel $def, array $unik): array
+    {
+        if (! $def->pkSintetis) {
+            return $unik;
+        }
+
+        $kunci = $def->kunciUrut;
+        sort($kunci);
+
+        return array_filter($unik, static function (array $kolom) use ($kunci): bool {
+            sort($kolom);
+
+            return $kolom !== $kunci;
+        });
+    }
+
     private function indeksUnik(string $tabel): array
     {
         $rows = $this->kueri(
