@@ -6,16 +6,59 @@ namespace App\Controllers\Api\Dashboard;
 
 use App\Controllers\Api\ApiController;
 use App\Libraries\Dashboard\Interaksi\FormDigital\IsianFormDigital;
+use App\Libraries\Dashboard\Interaksi\FormDigital\KelolaFormDigital;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
  * F-06 Form Digital (MAKE-083, Jalur B) — padanan legacy `hr/announcement` form digital. Sisi pegawai (role 2/6/7 lewat
- * filter route): `form-digital/saya`, `form-digital/{id}/isi`. Aturan bisnis di `Libraries/Dashboard/Interaksi/FormDigital`.
+ * filter route): `form-digital/saya`, `form-digital/{id}/isi`. Kelola (role 1): CRUD, status, hapus lunak, target.
+ * Aturan bisnis di `Libraries/Dashboard/Interaksi/FormDigital`.
  */
 final class FormDigitalController extends ApiController
 {
     private ?IsianFormDigital $isian = null;
+
+    private ?KelolaFormDigital $kelola = null;
+
+    public function index(): ResponseInterface
+    {
+        return $this->respondSuccess($this->kelola()->daftar(service('authContext'), $this->query()));
+    }
+
+    public function show(int $id): ResponseInterface
+    {
+        return $this->respondSuccess($this->kelola()->detail(service('authContext'), $id));
+    }
+
+    public function create(): ResponseInterface
+    {
+        return $this->respondSuccess($this->kelola()->buat(service('authContext'), $this->payload()), 201);
+    }
+
+    public function update(int $id): ResponseInterface
+    {
+        return $this->respondSuccess($this->kelola()->ubah(service('authContext'), $id, $this->payload()));
+    }
+
+    public function status(int $id): ResponseInterface
+    {
+        $this->kelola()->setStatus(service('authContext'), $id, $this->payload()['status'] ?? null);
+
+        return $this->respondSuccess(null);
+    }
+
+    public function delete(int $id): ResponseInterface
+    {
+        $this->kelola()->hapus(service('authContext'), $id);
+
+        return $this->respondSuccess(null);
+    }
+
+    public function target(int $id): ResponseInterface
+    {
+        return $this->respondSuccess($this->kelola()->target(service('authContext'), $id, $this->query()));
+    }
 
     public function saya(): ResponseInterface
     {
@@ -45,6 +88,21 @@ final class FormDigitalController extends ApiController
         }
 
         return $hasil;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function query(): array
+    {
+        $q = $this->request->getGet();
+
+        return is_array($q) ? $q : [];
+    }
+
+    private function kelola(): KelolaFormDigital
+    {
+        return $this->kelola ??= new KelolaFormDigital(db_connect());
     }
 
     private function isian(): IsianFormDigital
