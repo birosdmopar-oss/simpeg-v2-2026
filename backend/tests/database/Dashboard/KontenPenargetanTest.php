@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Database\Dashboard;
 
+use App\Libraries\Dashboard\Konten\Penargetan\LabelTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\PemekarTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\SinkronPenerima;
 use App\Libraries\Dashboard\Konten\Penargetan\SpesifikasiTarget;
@@ -106,6 +107,26 @@ final class KontenPenargetanTest extends DatabaseTestCase
 
         $this->assertSame(['ditambah' => 0, 'dihapus' => 1, 'dipertahankan' => 1], $hasil);
         $this->assertSame(1, $this->db->table('user_popup')->where('id_popup', $idPopup)->countAllResults());
+    }
+
+    public function testLabelTargetNipDanNamaBergelarUntukPegawaiDipilihDanDikecualikan(): void
+    {
+        $satker = $this->buatSatker($this->buatUnit());
+        $a      = $this->buatPegawaiDiSatker($satker, ['glr_awal' => 'Dr.', 'nama' => 'Ani Budi', 'glr_akhir' => 'M.Si']);
+        $b      = $this->buatPegawaiDiSatker($satker, ['glr_awal' => '', 'nama' => 'Cici', 'glr_akhir' => null]);
+
+        $spes  = SpesifikasiTarget::dariArray(['unit_satker' => ['sat_' . $satker], 'pegawai' => [$a, '000000000000000077'], 'kecuali' => [$b, $a]]);
+        $hasil = LabelTarget::untuk($this->db, $spes);
+
+        $this->assertSame($spes->keArray(), array_diff_key($hasil, ['label_pegawai' => 1]), 'bagian target tidak berubah');
+        $this->assertSame([$a => $a . ' - Dr. Ani Budi M.Si', $b => $b . ' - Cici'], $hasil['label_pegawai'], 'NIP tak dikenal dilewati; gelar kosong tidak menambah spasi');
+    }
+
+    public function testLabelTargetTanpaPegawaiMengembalikanLabelKosong(): void
+    {
+        $hasil = LabelTarget::untuk($this->db, SpesifikasiTarget::dariArray(['unit_satker' => ['0']]));
+
+        $this->assertSame(['unit_satker' => ['0'], 'pegawai' => [], 'kecuali' => [], 'label_pegawai' => []], $hasil);
     }
 
     private function buatPopup(): int
