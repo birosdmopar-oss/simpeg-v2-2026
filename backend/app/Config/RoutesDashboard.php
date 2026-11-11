@@ -41,4 +41,13 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
     $pegawaiForm = ['filter' => Role::filter(Role::PEGAWAI, Role::PTT, Role::PPPK)];
     $routes->get('form-digital/saya', 'FormDigitalController::saya', $pegawaiForm);
     $routes->post('form-digital/(:num)/isi', 'FormDigitalController::isi/$1', $pegawaiForm);
+    // Kelola role 1 (legacy hr/announcement form digital = Super Admin).
+    $adminForm = ['filter' => Role::filter(Role::SUPER_ADMIN)];
+    $routes->get('form-digital', 'FormDigitalController::index', $adminForm);
+    $routes->post('form-digital', 'FormDigitalController::create', $adminForm);
+    $routes->get('form-digital/(:num)/target', 'FormDigitalController::target/$1', $adminForm);
+    $routes->patch('form-digital/(:num)/status', 'FormDigitalController::status/$1', $adminForm);
+    $routes->get('form-digital/(:num)', 'FormDigitalController::show/$1', $adminForm);
+    $routes->put('form-digital/(:num)', 'FormDigitalController::update/$1', $adminForm);
+    $routes->delete('form-digital/(:num)', 'FormDigitalController::delete/$1', $adminForm);
 });

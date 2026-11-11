@@ -85,9 +85,17 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             // F-06 form digital sisi pegawai (MAKE-083): role 2/6/7 [K `MY_Controller.php:246`].
             'GET api/v1/form-digital/saya'          => [2, 6, 7],
             'POST api/v1/form-digital/([0-9]+)/isi' => [2, 6, 7],
-            'GET api/v1/statistik/lingkup'          => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)/xlsx'     => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)'          => [1, 3, 4, 5, 8],
+            // F-06 kelola (MAKE-083): role 1.
+            'GET api/v1/form-digital'                   => [1],
+            'POST api/v1/form-digital'                  => [1],
+            'GET api/v1/form-digital/([0-9]+)/target'   => [1],
+            'PATCH api/v1/form-digital/([0-9]+)/status' => [1],
+            'GET api/v1/form-digital/([0-9]+)'          => [1],
+            'PUT api/v1/form-digital/([0-9]+)'          => [1],
+            'DELETE api/v1/form-digital/([0-9]+)'       => [1],
+            'GET api/v1/statistik/lingkup'              => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)/xlsx'         => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)'              => [1, 3, 4, 5, 8],
             // F-09 generator dokumen (MAKE-037): Matriks Bagian 2 `hr/document/duk|nominatif|pensiun|baperjakat` = 1, 3, 4, 5, 8.
             'POST api/v1/dokumen/baperjakat/pdf'  => [1, 3, 4, 5, 8],
             'POST api/v1/dokumen/baperjakat/xlsx' => [1, 3, 4, 5, 8],
