@@ -52,4 +52,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Dashboard', 'filte
     $routes->get('form-digital/(:num)', 'FormDigitalController::show/$1', $adminForm);
     $routes->put('form-digital/(:num)', 'FormDigitalController::update/$1', $adminForm);
     $routes->delete('form-digital/(:num)', 'FormDigitalController::delete/$1', $adminForm);
+
+    // F-11 survei kepuasan layanan (MAKE-084, Jalur B, PRD Fase 7 v2.0 §5.8): ringkasan per jenis untuk beranda admin (Q7-26).
+    $routes->get('survei-layanan/ringkasan', 'SurveyController::ringkasan', $adminForm);
 });
