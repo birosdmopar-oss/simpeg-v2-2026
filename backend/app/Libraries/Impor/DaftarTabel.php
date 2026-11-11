@@ -14,14 +14,14 @@ use Config\WebConfig;
  */
 final class DaftarTabel
 {
-    public const TIER_MAKS = 14;
+    public const TIER_MAKS = 15;
 
     /**
      * Tier dengan satu transaksi per tabel + berkas jejak (DBV-029 K-M8): riwayat non-Tukin dan snapshot.
      *
      * @var list<int>
      */
-    public const TIER_PER_TABEL = [10, 11];
+    public const TIER_PER_TABEL = [10, 11, 14];
 
     /**
      * `siasn_referensi.jenis` → tabel legacy `siasn_simpeg` + kolom pemetaan lokal (null = dicari lewat `NAMA`), DBV-027 §3.6.
@@ -61,7 +61,8 @@ final class DaftarTabel
             11      => self::tier11(),
             12      => self::tier12(),
             13      => self::tierTiketLama(),
-            14      => self::tierSiasn(),
+            14      => self::tierKonten(),
+            15      => self::tierSiasn(),
             default => throw new ImporGagal("Tier {$tier} belum tersedia."),
         };
     }
@@ -537,7 +538,138 @@ final class DaftarTabel
     }
 
     /**
-     * T14 — tabel kerja SIASN Fase 6 (DBV-027 §13.3), selalu tier TERAKHIR (`TIER_MAKS`, dikunci test). Rujukan
+     * T14 — konten & interaksi Fase 7 (MAKE-089; DBV-032 §10, keputusan reviewer Q-089-1..6 11-11-2026). Transaksi per tabel
+     * + `--jejak` (volume `user_popup`/`user_banner`). Urutan induk → anak. Kolom legacy `target`/`type`/`id_unit_satker`/
+     * `unit_satker`/`*_desc`/`news.category`/`news.unit_satker_target` tidak ada di v2 sehingga tidak disalin (Q7-03/Q7-47/Q2).
+     * Aturan per baris & berkas: {@see AturanKonten}. ENUM legacy (`news.status`/`target`, `news_category.allow_ap`) dibaca
+     * sebagai NILAI string lalu dicek domain (tanpa CAST/+0). Popup `tgl_*` DATETIME = waktu bisnis WIB (Jalur A), tidak
+     * dikonversi; stempel lain (termasuk `news.publish_at`) R1a WIB → UTC; DATE apa adanya.
+     * Form digital (M2): skema formBuilder → SkemaForm v2 Jalur B, jawaban → id v2, berkas jawaban →
+     * `form-digital/<id_form>/<hex32>.<ext>` ({@see AturanFormDigital}); `user_form_digital` = target legacy + pasangan dari
+     * `filled_form_digital` yang tidak ada di target (legacy menghapus target saat submit; v2 permanen Q7-20, Q-089-5).
+     *
+     * @return list<DefinisiTabel>
+     */
+    private static function tierKonten(): array
+    {
+        $r    = 'MAKE-089, DBV-032 §10';
+        $form = new AturanFormDigital();
+        $ufd  = 'NOT EXISTS (SELECT 1 FROM `user_form_digital` u WHERE u.`nip` = `filled_form_digital`.`nip` AND u.`id_form_digital` = `filled_form_digital`.`id_form_digital`)';
+
+        return [
+            new DefinisiTabel('news_category', 'id_news_category', $r, statusDomain: [0, 1], domain: ['allow_ap' => [1, 2]], khusus: AturanKonten::khususKategoriBerita()),
+            new DefinisiTabel(
+                'news',
+                'id_news',
+                $r,
+                statusDomain: [0, 1, 2],
+                domain: ['target' => [1, 2, 3], 'show_notif' => [0, 1, 2, 3]],
+                khusus: AturanKonten::khususBerita(),
+                praPindai: AturanKonten::praPindaiBerkas('news', 'id_news', ['lampiran' => \App\Libraries\Dashboard\Konten\Berita\PenyimpananLampiran::EKSTENSI]),
+            ),
+            new DefinisiTabel('news_flag', 'id_news_flag', $r, statusDomain: null, kunciUrut: ['id_user', 'id_news'], pkSintetis: true),
+            new DefinisiTabel('jenis_dibo', 'id_jenis_dibo', $r . ' (seed T4)', kolomNama: ['jenis_dibo'], statusDomain: [1, 2], bolehSeed: true, hanyaSeed: true),
+            new DefinisiTabel(
+                'dibo',
+                'id_dibo',
+                $r,
+                statusDomain: [1, 2],
+                khusus: AturanKonten::khususDibo(),
+                praPindai: AturanKonten::praPindaiBerkas('dibo', 'id_dibo', array_fill_keys(['file_1', 'file_2', 'file_3'], \App\Libraries\Dashboard\Konten\Dibo\PenyimpananDibo::EKSTENSI)),
+            ),
+            new DefinisiTabel(
+                'popup',
+                'id_popup',
+                $r,
+                statusDomain: null,
+                waktuBisnis: ['tgl_mulai', 'tgl_akhir'],
+                khusus: AturanKonten::khususPengumuman('popup', 'id_popup', 'popup'),
+                praPindai: AturanKonten::praPindaiPengumuman('popup', 'id_popup', 'popup', true),
+            ),
+            new DefinisiTabel(
+                'user_popup',
+                'id_user_popup',
+                $r,
+                statusDomain: null,
+                kolomKode: ['nip'],
+                kunciUrut: ['id_popup', 'nip'],
+                praPindai: AturanKonten::praPindaiAnak('popup', 'id_popup', 'popup', true),
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'banner',
+                'id_banner',
+                $r,
+                statusDomain: null,
+                khusus: AturanKonten::khususPengumuman('banner', 'id_banner', 'banner'),
+                praPindai: AturanKonten::praPindaiPengumuman('banner', 'id_banner', 'banner', false),
+            ),
+            new DefinisiTabel(
+                'user_banner',
+                'id_user_banner',
+                $r,
+                statusDomain: null,
+                kolomKode: ['nip'],
+                kunciUrut: ['id_banner', 'nip'],
+                praPindai: AturanKonten::praPindaiAnak('banner', 'id_banner', 'banner', false),
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'form_digital',
+                'id_form_digital',
+                $r . ' (skema → SkemaForm v2)',
+                statusDomain: null,
+                khusus: $form->khususForm(),
+                praPindai: $form->praPindaiForm(...),
+            ),
+            new DefinisiTabel(
+                'user_form_digital',
+                'id_user_form_digital',
+                $r,
+                statusDomain: null,
+                kolomKode: ['nip'],
+                kunciUrut: ['id_form_digital', 'nip'],
+                praPindai: $form->praPindaiAnak(),
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'user_form_digital',
+                'id_user_form_digital',
+                $r . ' (turunan filled, Q7-20)',
+                statusDomain: null,
+                kolomKode: ['nip'],
+                kunciUrut: ['id_form_digital', 'nip'],
+                sumber: 'filled_form_digital',
+                praPindai: $form->praPindaiAnak(),
+                saringSumber: $ufd,
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'filled_form_digital',
+                'id_filled_form_digital',
+                $r . ' (response data pribadi)',
+                tanpaStripslashes: ['response'],
+                statusDomain: null,
+                khusus: $form->khususJawaban(),
+                kolomKode: ['nip'],
+                kunciUrut: ['id_form_digital', 'nip'],
+                praPindai: $form->praPindaiJawaban(...),
+                pkSintetis: true,
+            ),
+            new DefinisiTabel(
+                'skl',
+                'id_skl',
+                $r . ' (kritik_saran data pribadi, N3)',
+                statusDomain: null,
+                domain: ['jenis_rwy' => [1, 2, 3, 4, 5], 'rate' => [1, 2, 3, 4, 5]],
+                kolomKode: ['nip'],
+                praPindai: AturanKonten::praPindaiSkl(...),
+            ),
+        ];
+    }
+
+    /**
+     * T15 — tabel kerja SIASN Fase 6 (DBV-027 §13.3), selalu tier TERAKHIR (`TIER_MAKS`, dikunci test). Rujukan
      * `id_rw`/`id_da` menunjuk `riwayat_mutasi_jabatan` (T3), `riwayat_diklat` dan `document_attachment` (belum ada di
      * T10 MAKE-069). Bila dijalankan sebelum induknya terisi, INFO rujukan menyebut induk belum diimpor. `siasn_ref_unor` dan
      * `siasn_referensi` dibaca dari skema `--sumber-siasn` (K-9); isinya dari sinkron BKN dan pemetaan lokal, jadi disalin

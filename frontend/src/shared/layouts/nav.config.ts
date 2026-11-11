@@ -69,6 +69,7 @@ import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { FORM_DIGITAL_KELOLA_ROLES } from '@/features/form-digital/roles'
 import { KONTEN_ADMIN_ROLES, KONTEN_BERITA_ROLES } from '@/features/konten/roles'
+import { SKL_REKAP_ROLES } from '@/features/survei-layanan/roles'
 import { FASE_LONCENG, NOTIFIKASI_ROLES } from '@/features/notifikasi/roles'
 import {
   PENYESUAIAN_TUKIN_ROLES,
@@ -273,6 +274,8 @@ const NAV: NavGroup[] = [
       },
       // Fase 7 F-06 form digital (MAKE-083, Jalur B): role 1, phase 7.
       { key: 'form-digital', label: 'Form Digital', icon: ClipboardList, to: { name: 'form-digital-kelola' }, roles: FORM_DIGITAL_KELOLA_ROLES, phase: 7 },
+      // Fase 7 F-11 survei kepuasan layanan (MAKE-084, Jalur B): rekap role 1, phase 7.
+      { key: 'survei-layanan', label: 'Survei Layanan', icon: ClipboardList, to: { name: 'survei-layanan-rekap' }, roles: SKL_REKAP_ROLES, phase: 7 },
     ],
   },
   {

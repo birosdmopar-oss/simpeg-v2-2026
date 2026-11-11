@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/shared/layouts/nav.config', async (asli) => ({ ...(await asli<typeof import('@/shared/layouts/nav.config')>()), ACTIVE_PHASE: 7 }))
 vi.mock('../services/formDigital.service', () => ({ formDigitalService: { saya: vi.fn(), isi: vi.fn() } }))
+vi.mock('@/features/survei-layanan/services/surveiLayanan.service', () => ({ surveiLayananService: { saya: vi.fn(), kirim: vi.fn() } }))
 vi.mock('@/features/layanan/services/cuti.service', () => ({ cutiService: { pengingat: vi.fn(), tunda: vi.fn() } }))
 vi.mock('@/features/auth/services/auth.service', () => ({
   authService: { me: vi.fn(), login: vi.fn(), logout: vi.fn().mockResolvedValue(undefined), changePassword: vi.fn() },
@@ -17,6 +18,7 @@ vi.mock('@/features/auth/services/auth.service', () => ({
 
 import { Role, type RoleCode } from '@/features/auth/types'
 import { cutiService } from '@/features/layanan/services/cuti.service'
+import { surveiLayananService } from '@/features/survei-layanan/services/surveiLayanan.service'
 import type { CutiItem } from '@/features/layanan/types'
 import { resetAntreanDialog } from '@/shared/composables/antreanDialog'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
@@ -28,6 +30,7 @@ import type { FormSaya } from '../types'
 
 const svc = vi.mocked(formDigitalService)
 const cuti = vi.mocked(cutiService)
+const skl = vi.mocked(surveiLayananService)
 const q = <T extends Element = HTMLElement>(sel: string) => document.body.querySelector<T>(sel)
 
 const form = (id: number): FormSaya => ({
@@ -61,6 +64,8 @@ beforeEach(() => {
   svc.saya.mockResolvedValue([])
   svc.isi.mockResolvedValue({ id: 1 })
   cuti.pengingat.mockResolvedValue({ items: [], total: 0 })
+  skl.saya.mockResolvedValue([])
+  skl.kirim.mockResolvedValue({ status: 'tercatat' })
 })
 
 describe('InteraksiPopupHost', () => {
@@ -69,6 +74,7 @@ describe('InteraksiPopupHost', () => {
     mount(InteraksiPopupHost, { props: { fase: 6 } })
     await flushPromises()
     expect(svc.saya).not.toHaveBeenCalled()
+    expect(skl.saya).not.toHaveBeenCalled()
   })
 
   it('role di luar 2/6/7 dan sesi wajib ganti password → tidak memanggil API', async () => {
@@ -122,5 +128,25 @@ describe('InteraksiPopupHost', () => {
     expect(q('[data-testid="form-isian-dialog"]')).toBeNull()
     expect(q('[data-testid="pengingat-cuti-dialog"]')).not.toBeNull()
     expect(svc.isi.mock.calls.map((c) => c[0])).toEqual([1, 2])
+  })
+
+  it('SKL hanya role 2/6 dan tampil TERAKHIR: sesudah form digital', async () => {
+    svc.saya.mockResolvedValue([form(1)])
+    skl.saya.mockResolvedValue([{ jenis_rwy: 3, id_rwy: 9, jenis_layanan: 'KARPEG', info: 'Info KARPEG' }])
+    await mountShell(Role.PEGAWAI)
+
+    expect(q('[data-testid="form-isian-dialog"]')).not.toBeNull()
+    expect(q('[data-testid="skl-dialog"]')).toBeNull()
+    q<HTMLButtonElement>('[data-testid="form-isian-simpan"]')!.click()
+    await flushPromises()
+    expect(q('[data-testid="skl-dialog"]')?.textContent).toContain('Info KARPEG')
+  })
+
+  it('PPPK (role 7) tidak memuat SKL', async () => {
+    loginAs(Role.PPPK)
+    mount(InteraksiPopupHost, { props: { fase: 7 } }).unmount()
+    await flushPromises()
+    expect(svc.saya).toHaveBeenCalledTimes(1)
+    expect(skl.saya).not.toHaveBeenCalled()
   })
 })

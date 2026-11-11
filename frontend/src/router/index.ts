@@ -20,6 +20,7 @@ import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { formDigitalRoutes } from '@/features/form-digital/routes'
 import { kontenRoutes } from '@/features/konten/routes.konten'
+import { surveiLayananRoutes } from '@/features/survei-layanan/routes'
 import { notifikasiRoutes } from '@/features/notifikasi/routes.notifikasi'
 import { presensiRoutes } from '@/features/presensi/routes.presensi'
 
@@ -120,6 +121,8 @@ const routes: RouteRecordRaw[] = [
   ...kontenRoutes,
   // Modul F — Fase 7 F-06 form digital (MAKE-083).
   ...formDigitalRoutes,
+  // Modul F — Fase 7 F-11 survei kepuasan layanan (MAKE-084).
+  ...surveiLayananRoutes,
   // Modul H — Fase 6 Admin → Integrasi: log integrasi + tarik ulang e-Kinerja (MAKE-078, ISSUE-058).
   ...integrasiRoutes,
   // Modul D — Fase 5A Presensi & Slip Gaji (MAKE-034), termasuk rute publik `/verify/slip/:token`.
