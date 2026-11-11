@@ -1,16 +1,21 @@
 <script setup lang="ts">
 /**
- * Host dialog interaksi di shell (Q7-40, MAKE-083; SKL menyusul MAKE-084): form digital yang wajib diisi tampil di halaman
+ * Host dialog interaksi di shell (Q7-40): form digital (MAKE-083) dan Survei Kepuasan Layanan (MAKE-084) tampil di halaman
  * mana pun yang pertama dibuka (legacy memuatnya di `views/template/footer.php:196` pada setiap halaman).
  *
- * - Diam (tanpa request) bila `ACTIVE_PHASE` < {@link FASE_INTERAKSI}, role bukan 2/6/7, atau sesi wajib ganti password.
- * - Memuat `form-digital/saya` sekali per pemasangan shell; daftar kosong → tidak meminta giliran antrean.
- * - Ada form → `minta('form-digital')` (prioritas pertama antrean); form ditampilkan satu per satu; setelah form terakhir,
- *   giliran antrean dilepas.
+ * - Diam (tanpa request) bila `ACTIVE_PHASE` < {@link FASE_INTERAKSI} atau sesi wajib ganti password. Form digital untuk role
+ *   2/6/7, SKL untuk role 2/6 (Q7-23); role lain tanpa request.
+ * - Memuat `form-digital/saya` dan `survei-layanan/saya` sekali per pemasangan shell; daftar kosong → tidak meminta giliran.
+ * - Ada isi → `minta('form-digital')` / `minta('skl')`; antrean menjamin form digital tampil lebih dulu dan SKL terakhir
+ *   (urutan legacy). Giliran dilepas setelah butir terakhir.
  */
 import { computed, onMounted, ref } from 'vue'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import SurveiLayananDialog from '@/features/survei-layanan/components/SurveiLayananDialog.vue'
+import { SKL_PENGISI_ROLES } from '@/features/survei-layanan/roles'
+import { surveiLayananService } from '@/features/survei-layanan/services/surveiLayanan.service'
+import type { TagihanSkl } from '@/features/survei-layanan/types'
 import { useAntreanDialog } from '@/shared/composables/antreanDialog'
 import { ACTIVE_PHASE } from '@/shared/layouts/nav.config'
 
@@ -25,37 +30,63 @@ const auth = useAuthStore()
 const { minta } = useAntreanDialog()
 
 const antrean = ref<FormSaya[]>([])
+const skl = ref<TagihanSkl[]>([])
 const pesan = ref('')
-let lepas: (() => void) | null = null
+let lepasForm: (() => void) | null = null
+let lepasSkl: (() => void) | null = null
 
 const aktif = computed<FormSaya | undefined>(() => antrean.value[0])
 
-async function muat(): Promise<void> {
-  if (props.fase < FASE_INTERAKSI) return
-  if (auth.role === null || !FORM_DIGITAL_PENGISI_ROLES.includes(auth.role) || auth.mustChangePassword) return
+async function muatForm(): Promise<void> {
+  if (auth.role === null || !FORM_DIGITAL_PENGISI_ROLES.includes(auth.role)) return
   try {
     const daftar = await formDigitalService.saya()
     if (daftar.length === 0) return
-    lepas = await minta('form-digital')
+    lepasForm = await minta('form-digital')
     antrean.value = daftar
   } catch (e) {
     if (import.meta.env.DEV) console.warn('[form-digital] daftar form gagal dimuat', e)
   }
 }
 
-function selesai(info: string | null): void {
-  if (info) pesan.value = info
-  antrean.value = antrean.value.slice(1)
-  if (antrean.value.length === 0 && lepas) {
-    lepas()
-    lepas = null
+async function muatSkl(): Promise<void> {
+  if (auth.role === null || !SKL_PENGISI_ROLES.includes(auth.role)) return
+  try {
+    const daftar = await surveiLayananService.saya()
+    if (daftar.length === 0) return
+    lepasSkl = await minta('skl')
+    skl.value = daftar
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn('[survei-layanan] daftar survei gagal dimuat', e)
   }
 }
 
-onMounted(() => void muat())
+function selesai(info: string | null): void {
+  if (info) pesan.value = info
+  antrean.value = antrean.value.slice(1)
+  if (antrean.value.length === 0 && lepasForm) {
+    lepasForm()
+    lepasForm = null
+  }
+}
+
+function sklSelesai(): void {
+  skl.value = []
+  if (lepasSkl) {
+    lepasSkl()
+    lepasSkl = null
+  }
+}
+
+onMounted(() => {
+  if (props.fase < FASE_INTERAKSI || auth.mustChangePassword) return
+  void muatForm()
+  void muatSkl()
+})
 </script>
 
 <template>
   <FormIsianDialog v-if="aktif" :key="aktif.id" :form="aktif" @selesai="selesai" />
+  <SurveiLayananDialog v-if="skl.length > 0" :tagihan="skl" @selesai="sklSelesai" />
   <p v-if="pesan" class="sr-only" role="status" data-testid="form-isian-info">{{ pesan }}</p>
 </template>
