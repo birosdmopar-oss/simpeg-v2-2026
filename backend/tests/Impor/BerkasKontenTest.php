@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Impor;
 
+use App\Commands\ImporBerkasKonten;
 use App\Libraries\Impor\AturanFormDigital;
 use App\Libraries\Impor\AturanKonten;
 use App\Libraries\Impor\BerkasKonten;
 use App\Libraries\Impor\Keputusan;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
+use CodeIgniter\Config\Services;
+use CodeIgniter\Test\StreamFilterTrait;
+use Config\Konten;
 use FilesystemIterator;
 use PHPUnit\Framework\Attributes\Group;
 use RecursiveDirectoryIterator;
@@ -24,6 +28,8 @@ use Tests\Support\Impor\ImporLegacyTestCase;
 #[Group('db-isolasi-penuh')]
 final class BerkasKontenTest extends ImporLegacyTestCase
 {
+    use StreamFilterTrait;
+
     private const NIP = '000000000000000001';
 
     private string $asal;
@@ -148,6 +154,49 @@ final class BerkasKontenTest extends ImporLegacyTestCase
         $l = $this->jalankan();
         $this->assertSame(1, $l['banner']['beda']);
         $this->assertSame('isi v2 lain', file_get_contents($this->tujuan . '/' . $kunci));
+    }
+
+    /**
+     * @param array<int|string, string|null> $params
+     *
+     * @return array{0: int, 1: string}
+     */
+    private function command(array $params): array
+    {
+        $this->resetStreamFilterBuffer();
+        $kode = (new ImporBerkasKonten(Services::logger(), Services::commands()))->run($params);
+
+        return [$kode, (string) preg_replace('/\e\[[0-9;]*m/', '', $this->getStreamFilterBuffer())];
+    }
+
+    public function testCommandValidasiDanDryRunHanyaJumlah(): void
+    {
+        foreach ([['dasar' => $this->asal], ['sumber' => $this->lgc], ['sumber' => $this->lgc, 'dasar' => $this->asal . '/tidak-ada'], ['sumber' => $this->lgc, 'dasar' => $this->asal . '/assets/upload/popup/p1.png']] as $i => $params) {
+            [$kode, $layar] = $this->command($params);
+            $this->assertSame(EXIT_USER_INPUT, $kode, "kasus {$i}");
+            $this->assertStringContainsString('Pemakaian: impor:berkas-konten', $layar, "kasus {$i}: pesan jelas");
+        }
+
+        $konten                  = config(Konten::class);
+        $akar                    = $konten->akarPenyimpanan;
+        $konten->akarPenyimpanan = $this->tujuan;
+
+        try {
+            [$kode, $layar] = $this->command(['sumber' => $this->lgc, 'dasar' => $this->asal, 'dry-run' => null]);
+        } finally {
+            $konten->akarPenyimpanan = $akar;
+        }
+
+        $this->assertSame(EXIT_SUCCESS, $kode, $layar);
+        $this->assertStringContainsString('popup: disalin 2, sudah_ada 0, beda 0, hilang 0, tidak_sah 1, dilewati 1', $layar, 'tanpa --keputusan: hanya video dilewati');
+        $this->assertStringContainsString('form-digital: disalin 1', $layar);
+        $this->assertStringContainsString('Dry-run selesai', $layar);
+
+        foreach ([self::NIP, 'assets', 'p1.png', 'luar.png', $this->asal] as $bocor) {
+            $this->assertStringNotContainsString($bocor, $layar, 'keluaran hanya jumlah');
+        }
+
+        $this->assertDirectoryDoesNotExist($this->tujuan, 'dry-run tidak menulis');
     }
 
     public function testSumberHanyaDibaca(): void
