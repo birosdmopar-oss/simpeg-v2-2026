@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Database\Dashboard;
 
 use App\Database\Migrations\CreateKontenInteraksiFase7;
+use App\Database\Migrations\SeedJenisDibo;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\Support\DatabaseTestCase;
@@ -12,6 +13,7 @@ use Tests\Support\Kepegawaian\PegawaiFixtureTrait;
 use Tests\Support\SkemaKepegawaianTestTrait;
 
 require_once APPPATH . 'Database/MigrationsDitahan/CreateKontenInteraksiFase7.php';
+require_once APPPATH . 'Database/MigrationsDitahan/SeedJenisDibo.php';
 
 /**
  * DBV-032 — test skema draf konten & interaksi Fase 7 (DBV-032 Bagian 7). Diuji:
@@ -94,6 +96,7 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
 
         $this->assertSame('tinyint', $this->skemaColumns('news')['show_notif']);
         $this->assertSame('year null', $this->skemaColumns('dibo')['tahun']);
+        $this->assertSame('tinyint null', $this->skemaColumns('news')['ul_creator']);
         $this->assertSame('int', $this->skemaColumns('skl')['id_rwy']);
 
         foreach (['inbox', 'inbox_msg'] as $tabel) {
@@ -208,11 +211,47 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
         }
     }
 
+    public function testSeedJenisDiboIdLegacyDanAmanDiulang(): void
+    {
+        $this->naik();
+        $seed = new SeedJenisDibo();
+        $seed->up();
+        $seed->up(); // subset identik → dilewati
+
+        $isi = array_map(
+            static fn (array $r): array => [(string) $r['jenis_dibo'], (int) $r['order'], (int) $r['status']],
+            array_column($this->db->table('jenis_dibo')->orderBy('id_jenis_dibo')->get()->getResultArray(), null, 'id_jenis_dibo'),
+        );
+        $this->assertSame(array_map(static fn (array $v): array => [$v[0], $v[1], 1], SeedJenisDibo::ISI), $isi);
+
+        $this->db->table('jenis_dibo')->whereIn('id_jenis_dibo', [2, 3, 4, 5, 6, 7, 8])->delete();
+        $seed->up(); // sebagian sudah ada (identik) → sisanya diisi
+        $this->assertSame(8, $this->db->table('jenis_dibo')->countAllResults());
+
+        $seed->down();
+        $this->assertSame(0, $this->db->table('jenis_dibo')->countAllResults(), 'down menghapus 8 id');
+    }
+
+    public function testSeedJenisDiboMenolakIsiBerbeda(): void
+    {
+        $this->naik();
+        $this->db->table('jenis_dibo')->insert(['id_jenis_dibo' => 3, 'jenis_dibo' => 'Lain', 'order' => 3, 'status' => 1]);
+
+        try {
+            (new SeedJenisDibo())->up();
+            $this->fail('seed seharusnya menolak isi berbeda');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('id 3', $e->getMessage());
+        }
+
+        $this->assertSame(1, $this->db->table('jenis_dibo')->countAllResults(), 'data tidak diubah');
+    }
+
     public function testKueriAuditBerjalan(): void
     {
         $this->naik();
         $sql   = (string) preg_replace('/^\s*--.*$/m', '', (string) file_get_contents(ROOTPATH . 'docs/db-review/sql/DBV-032-audit-konten-interaksi.sql'));
-        $tabel = [...CreateKontenInteraksiFase7::TABEL, 'pegawai', 'riwayat_cuti', 'riwayat_kariskarsu', 'riwayat_karpeg', 'riwayat_tb', 'riwayat_ib'];
+        $tabel = [...CreateKontenInteraksiFase7::TABEL, 'pegawai', 'riwayat_cuti', 'riwayat_kariskarsu', 'riwayat_karpeg', 'riwayat_tb', 'riwayat_ib', 'unit', 'satker'];
         $n     = 0;
 
         foreach (array_filter(array_map('trim', explode(';', $sql))) as $q) {
@@ -230,7 +269,7 @@ final class SkemaKontenInteraksiFase7Test extends DatabaseTestCase
             $n++;
         }
 
-        $this->assertSame(28, $n);
+        $this->assertSame(35, $n);
     }
 
     /**
