@@ -12,6 +12,8 @@ vi.mock('../services/konten.service', () => ({
 import BannerCarousel from '../components/BannerCarousel.vue'
 import BeritaTerbaruWidget from '../components/BeritaTerbaruWidget.vue'
 import PopupAktifDialog from '../components/PopupAktifDialog.vue'
+import { useAntreanDialog, resetAntreanDialog } from '@/shared/composables/antreanDialog'
+
 import { resetSesiKonten } from '../sesi'
 import { kontenService } from '../services/konten.service'
 
@@ -33,6 +35,7 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn()
 })
 afterEach(() => {
+  resetAntreanDialog()
   vi.useRealTimers()
   vi.unstubAllGlobals()
   document.body.innerHTML = ''
@@ -71,8 +74,9 @@ describe('PopupAktifDialog', () => {
 
   it('login baru (resetSesiKonten) menampilkan popup lagi', async () => {
     popupAktif.mockResolvedValue([gambar('1')])
-    mount(PopupAktifDialog, { attachTo: document.body })
+    const w = mount(PopupAktifDialog, { attachTo: document.body })
     await flushPromises()
+    w.unmount()
     document.body.innerHTML = ''
     resetSesiKonten()
     mount(PopupAktifDialog, { attachTo: document.body })
@@ -98,6 +102,46 @@ describe('PopupAktifDialog', () => {
     q('konten-popup-tutup')?.click()
     await flushPromises()
     expect(tampil()).toBeNull()
+  })
+
+  it('menunggu antrean: form digital/pengingat cuti tampil dulu, popup baru setelah keduanya selesai', async () => {
+    const { minta } = useAntreanDialog()
+    const selesaiForm = await minta('form-digital')
+    popupAktif.mockResolvedValue([gambar('1')])
+    mount(PopupAktifDialog, { attachTo: document.body })
+    await flushPromises()
+    expect(popupAktif).toHaveBeenCalledTimes(1)
+    expect(tampil()).toBeNull()
+
+    const cuti = minta('pengingat-cuti')
+    selesaiForm()
+    const selesaiCuti = await cuti
+    await flushPromises()
+    expect(tampil()).toBeNull()
+
+    selesaiCuti()
+    await flushPromises()
+    expect(tampil()).not.toBeNull()
+  })
+
+  it('tanpa popup tidak meminta giliran; menutup popup membebaskan antrean', async () => {
+    const { minta, aktif } = useAntreanDialog()
+    popupAktif.mockResolvedValueOnce([])
+    mount(PopupAktifDialog, { attachTo: document.body })
+    await flushPromises()
+    expect(aktif.value).toBeNull()
+
+    resetSesiKonten()
+    popupAktif.mockResolvedValueOnce([gambar('1')])
+    mount(PopupAktifDialog, { attachTo: document.body })
+    await flushPromises()
+    expect(aktif.value).toBe('popup-konten')
+    const skl = minta('skl')
+    document.body.querySelector<HTMLButtonElement>('[data-testid="konten-popup-tutup"]')?.click()
+    await flushPromises()
+    expect(tampil()).toBeNull()
+    expect(aktif.value).toBe('skl')
+    ;(await skl)()
   })
 
   it('carousel: berikutnya/sebelumnya; tombol Berikutnya hilang di gambar terakhir', async () => {

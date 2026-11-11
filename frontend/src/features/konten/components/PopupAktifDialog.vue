@@ -3,15 +3,21 @@
  * Popup pengumuman beranda (F-04, PRD Fase 7 v2.0 §5.3, Q7-02): popup aktif milik aktor tampil SEKALI PER SESI LOGIN
  * sebagai carousel gambar (padanan flashdata `listPU` legacy). Tanpa props; memuat data sendiri. Daftar kosong, 403, atau
  * galat → tidak merender apa pun dan tidak memancarkan galat ke parent. Esc/Tutup menutup; gambar ber-URL menjadi tautan.
+ * Tampil lewat antrean dialog (`minta('popup-konten')`): menunggu form digital dan pengingat cuti, dan hanya diminta bila ada popup.
  */
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
 import { computed, onMounted, ref } from 'vue'
 
+import { useAntreanDialog } from '@/shared/composables/antreanDialog'
+
 import GambarKonten from './GambarKonten.vue'
 import { kontenService } from '../services/konten.service'
 import { popupSudahDitampilkan, tandaiPopupDitampilkan } from '../sesi'
 import type { PopupAktif } from '../types'
+
+const { minta } = useAntreanDialog()
+let selesai: (() => void) | null = null
 
 const daftar = ref<PopupAktif[]>([])
 const open = ref(false)
@@ -27,6 +33,7 @@ onMounted(async () => {
     if (rows.length === 0) return
     daftar.value = rows
     indeks.value = 0
+    selesai = await minta('popup-konten')
     open.value = true
     tandaiPopupDitampilkan()
   } catch (e) {
@@ -38,6 +45,10 @@ onMounted(async () => {
 function onUpdate(v: boolean): void {
   if (!v && !terakhir.value) return
   open.value = v
+  if (!v) {
+    selesai?.()
+    selesai = null
+  }
 }
 
 function tahan(e: Event): void {
