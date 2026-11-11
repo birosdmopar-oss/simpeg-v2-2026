@@ -97,6 +97,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'DELETE api/v1/form-digital/([0-9]+)'                              => [1],
             // F-11 SKL (MAKE-084): ringkasan role 1.
             'GET api/v1/survei-layanan/ringkasan' => [1],
+            'GET api/v1/survei-layanan'           => [1],
             'GET api/v1/survei-layanan/saya'      => [2, 6],
             'POST api/v1/survei-layanan'          => [2, 6],
             'GET api/v1/statistik/lingkup'        => [1, 3, 4, 5, 8],
