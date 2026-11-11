@@ -49,7 +49,15 @@ final class FormDigitalKelolaTest extends DatabaseTestCase
         $data = $this->json($hasil)['data'];
         $this->assertSame(['judul_form' => 'Survei', 'status' => 1, 'jumlah_target' => 2, 'sudah_mengisi' => 0, 'belum_mengisi' => 2, 'terkunci' => false], array_intersect_key($data, array_flip(['judul_form', 'status', 'jumlah_target', 'sudah_mengisi', 'belum_mengisi', 'terkunci'])));
         $this->assertSame('q1', $data['form']['pertanyaan'][0]['id']);
-        $this->assertSame(['unit_satker' => [], 'pegawai' => [$a, $b, $c], 'kecuali' => [$c]], $data['target']);
+        $this->assertSame(['unit_satker' => [], 'pegawai' => [$a, $b, $c], 'kecuali' => [$c]], array_intersect_key($data['target'], array_flip(['unit_satker', 'pegawai', 'kecuali'])));
+        $kunci = array_map('strval', array_keys($data['target']['label_pegawai']));
+        sort($kunci);
+        $harap = [$a, $b, $c];
+        sort($harap);
+        $this->assertSame($harap, $kunci);
+        $this->assertStringStartsWith($a . ' - ', $data['target']['label_pegawai'][$a]);
+        $detail = $this->json($this->asUser($this->admin)->get('api/v1/form-digital/' . $data['id']))['data'];
+        $this->assertSame($data['target']['label_pegawai'], $detail['target']['label_pegawai']);
         $nip = array_column($this->db->table('user_form_digital')->where('id_form_digital', $data['id'])->orderBy('nip')->get()->getResultArray(), 'nip');
         $exp = [$a, $b];
         sort($exp);

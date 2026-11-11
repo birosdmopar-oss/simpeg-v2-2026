@@ -9,6 +9,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Dashboard\Konten\Penargetan\LabelTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\PemekarTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\SinkronPenerima;
 use App\Libraries\Dashboard\Konten\Penargetan\SpesifikasiTarget;
@@ -392,7 +393,7 @@ final class KelolaFormDigital
 
         return $this->baris($row + ['jumlah_target' => $target, 'jumlah_jawaban' => $jawaban, 'sudah_mengisi' => $sudah]) + [
             'form'   => SkemaForm::dariJson((string) $row['form_digital']),
-            'target' => SpesifikasiTarget::dariKolom(self::str($row['target_uns'] ?? null), self::str($row['target_peg'] ?? null), self::str($row['excl_peg'] ?? null))->keArray(),
+            'target' => LabelTarget::untuk($this->db, SpesifikasiTarget::dariKolom(self::str($row['target_uns'] ?? null), self::str($row['target_peg'] ?? null), self::str($row['excl_peg'] ?? null))),
         ];
     }
 
