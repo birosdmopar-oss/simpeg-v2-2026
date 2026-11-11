@@ -15,6 +15,7 @@ vi.mock('@/features/auth/services/auth.service', () => ({
 }))
 
 import { Role, type RoleCode } from '@/features/auth/types'
+import { resetAntreanDialog, useAntreanDialog } from '@/shared/composables/antreanDialog'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 
@@ -60,6 +61,7 @@ async function mountShellDenganStore() {
 }
 
 afterEach(() => {
+  resetAntreanDialog()
   document.body.innerHTML = ''
   window.sessionStorage.clear()
 })
@@ -183,5 +185,25 @@ describe('PengingatCutiShell', () => {
     expect(svc.pengingat).toHaveBeenCalledTimes(1)
     expect(q('[data-testid="pengingat-cuti-dialog"]')).not.toBeNull()
     w3.unmount()
+  })
+
+  it('ikut antrean dialog (MAKE-083): menunggu form digital selesai, lalu tampil; tutup membebaskan giliran popup', async () => {
+    svc.pengingat.mockResolvedValue({ items: [baris(5)], total: 1 })
+    const antrean = useAntreanDialog()
+    const selesaiForm = await antrean.minta('form-digital')
+    await mountShell(Role.PEGAWAI)
+    expect(q('[data-testid="pengingat-cuti-dialog"]')).toBeNull()
+
+    selesaiForm()
+    await flushPromises()
+    expect(q('[data-testid="pengingat-cuti-dialog"]')).not.toBeNull()
+    expect(antrean.aktif.value).toBe('pengingat-cuti')
+
+    let popupDapat = false
+    void antrean.minta('popup-konten').then(() => (popupDapat = true))
+    svc.tunda.mockResolvedValue(baris(5))
+    q<HTMLButtonElement>('[data-testid="pengingat-tunda-5"]')!.click()
+    await flushPromises()
+    expect([antrean.aktif.value, popupDapat]).toEqual(['popup-konten', true])
   })
 })

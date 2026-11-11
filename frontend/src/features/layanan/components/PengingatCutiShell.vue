@@ -4,12 +4,15 @@
  * halaman mana pun yang pertama dibuka setelah login — bukan hanya halaman Cuti. Sekali per sesi tab (sessionStorage;
  * dikosongkan saat Keluar), hanya role Cuti dan bukan sesi wajib ganti password. Daftar dari `GET cuti/pengingat`;
  * gagal dimuat → diam (antrean tetap ada di tab Perlu Persetujuan).
+ * Fase 7 (MAKE-083, keputusan Horii 10-11): tampil lewat antrean dialog (`minta('pengingat-cuti')`), sesudah form digital
+ * dan sebelum popup konten.
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { describeApiError } from '@/features/kepegawaian/services/apiErrors'
+import { useAntreanDialog } from '@/shared/composables/antreanDialog'
 
 import PengingatCutiDialog from './PengingatCutiDialog.vue'
 import { sudahDitampilkan, tandaiDitampilkan } from '../composables/pengingatCuti'
@@ -25,6 +28,15 @@ const open = ref(false)
 const items = ref<CutiItem[]>([])
 const error = ref('')
 const busyId = ref<number | null>(null)
+const { minta } = useAntreanDialog()
+let selesai: (() => void) | null = null
+
+watch(open, (buka) => {
+  if (!buka && selesai) {
+    selesai()
+    selesai = null
+  }
+})
 
 async function muat(): Promise<void> {
   if (auth.role === null || !CUTI_ROLES.includes(auth.role) || auth.mustChangePassword || sudahDitampilkan()) return
@@ -33,6 +45,7 @@ async function muat(): Promise<void> {
     tandaiDitampilkan()
     if (hasil.items.length > 0) {
       items.value = hasil.items
+      selesai = await minta('pengingat-cuti')
       open.value = true
     }
   } catch {
