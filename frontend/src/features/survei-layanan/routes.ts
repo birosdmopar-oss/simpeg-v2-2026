@@ -11,7 +11,7 @@ export const surveiLayananRoutes: RouteRecordRaw[] = [
   {
     path: '/survei-layanan',
     name: SKL_ROUTE.REKAP,
-    component: () => import('./views/SurveiLayananRekapView.vue'),
+    component: () => import('./views/SurveiLayananPage.vue'),
     meta: { title: 'Survei Kepuasan Layanan', roles: SKL_REKAP_ROLES },
   },
 ]
