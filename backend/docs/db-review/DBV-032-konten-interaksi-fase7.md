@@ -6,7 +6,7 @@ Branch `fase7/dbv-032-skema-dashboard` (dari `main` `57914b45`). Alur `[DBV]`:
 2. Migration dipindah dari `MigrationsDitahan/` ke `Migrations/`, test skema dijadikan permanen, dan registry NIP diperbarui.
 3. Reviewer CR me-merge dengan izin Horii.
 
-**Status:** 🔎 **siap review DBV** (PR #39). Dicocokkan dengan D1 Fase 7 lengkap 13/13 (11-11-2026, salinan dev, §2a); perubahan wajib T1–T5 review WS-2 sudah diterapkan.
+**Status:** ✅ **DISETUJUI DBV @a997488e** (WS-2, PR #39, 11-11-2026). Migration dipindah ke `Migrations/` (`2026-11-11-100000_CreateKontenInteraksiFase7`, `2026-11-11-100100_SeedJenisDibo`); merge oleh reviewer CR dengan izin Horii.
 
 **Penulis:** Jalur B Fase 7, 10-11-2026.
 
@@ -155,7 +155,7 @@ verifikasi ulang di produksi saat cutover/impor** dengan kueri audit Bagian 6.
 
 ## 3. Skema v2 (= DDL final)
 
-DDL lengkap: `app/Database/MigrationsDitahan/CreateKontenInteraksiFase7.php` (+ seed `SeedJenisDibo.php`). Bagian ini harus selalu sama dengan DDL tersebut. Tipe sudah dicocokkan dengan D1 Fase 7 (salinan dev, §2a). Selain yang disebut, setiap tabel induk memakai kolom audit v2 `created_at`, `updated_at`, `created_by`, `updated_by`.
+DDL lengkap: `app/Database/Migrations/2026-11-11-100000_CreateKontenInteraksiFase7.php` (+ seed `2026-11-11-100100_SeedJenisDibo.php`). Bagian ini harus selalu sama dengan DDL tersebut. Tipe sudah dicocokkan dengan D1 Fase 7 (salinan dev, §2a). Selain yang disebut, setiap tabel induk memakai kolom audit v2 `created_at`, `updated_at`, `created_by`, `updated_by`.
 
 ### 3.1 `popup`
 | Kolom | Tipe | Label | Catatan |
@@ -340,6 +340,16 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
 - `NipReferenceRegistryTest` + `TabelAnakNipTest` ditambah 4 entri `JsonArrayNip`.
 - Uji `NipCascadeService` pada popup/banner/form_digital tanpa kolom `*_desc` (Bagian 10).
 
+## 8a. Keputusan DB Validator (WS-2, @a997488e)
+
+| # | Keputusan |
+|---|---|
+| Q5 | PK sintetis + UNIQUE (id_induk, nip) pada tabel anak dan `news_flag`: **SETUJU** [V2] |
+| Q10 (+ `ul_creator`) | `news.id_news_category` dan `news.ul_creator` NULL-able [K], wajib di form/service v2: **SETUJU**; angka NULL dev = 0 dicatat di §2a, diverifikasi ulang saat cutover (N6) |
+| Q11 | Tanpa FK `news` → `unit`/`satker`/`user_level`/`pengguna` [V2]: **SETUJU dengan syarat** audit yatim (Bagian 6, INFO) dan validasi id di service Jalur A |
+| Q12 | `dibo.id_jenis_dibo`/`nomor`/`tahun` NULL-able [K], wajib di form/service v2: **SETUJU** |
+| Q13 | FK master `dibo → jenis_dibo`, `news → news_category` RESTRICT (legacy SET NULL): **SETUJU** |
+
 ## 9. Keputusan yang diminta dari DB Validator
 
 | # | Pertanyaan | Usulan |
@@ -360,8 +370,8 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
 
 ## 10. Langkah pemindahan (setelah approve + izin Horii)
 
-1. Migration dipindah ke `Migrations/<timestamp>_CreateKontenInteraksiFase7.php` tanpa perubahan DDL dari versi yang disetujui. Bila ada koreksi D1, itu dibuat sebagai commit terpisah dan direview lebih dulu.
-2. Registry NIP: tambah `JenisRujukanNip::JsonArrayNip` untuk `popup.target_peg/excl_peg` dan `banner.target_peg/excl_peg`. Bila Q1 = simpan, tambahkan juga `form_digital.target_peg/excl_peg`. `NipCascadeService` disesuaikan agar tidak mewajibkan kolom `<kolom>_desc` (Q7-47).
+1. ✅ Migration dipindah ke `Migrations/2026-11-11-100000_CreateKontenInteraksiFase7.php` (+ seed `2026-11-11-100100_SeedJenisDibo.php`) tanpa perubahan DDL dari versi yang disetujui @a997488e.
+2. ✅ (dikerjakan saat pemindahan) Registry NIP: tambah `JenisRujukanNip::JsonArrayNip` untuk `popup.target_peg/excl_peg` dan `banner.target_peg/excl_peg`. Bila Q1 = simpan, tambahkan juga `form_digital.target_peg/excl_peg`. `NipCascadeService` disesuaikan agar tidak mewajibkan kolom `<kolom>_desc` (Q7-47), dan `NipCascadeService::FASE` dinaikkan ke 7 sehingga 5 FK NIP + 6 kolom JSON Fase 7 ikut koreksi NIP (dijaga `NipCascadeTest::testRegistryCocokDenganSkema`).
 3. Definisi tier impor Fase 7 di `Libraries/Impor` dibuat aditif. Isinya:
    - urutan induk → anak;
    - transformasi `stripslashes`/JSON;
@@ -370,16 +380,21 @@ Kunci pertanyaan untuk form yang sudah dijawab (Q7-25) ditegakkan di aplikasi, b
    - kolom legacy `news.category` dan `news.unit_satker_target` (salinan nama, [V2] tidak dibawa, Q2) dilewati;
      `id_news_category`/`id_*_target` yang dipakai;
    - target `user_form_digital` dari `filled`.
-   - **D1 11-11:** `news_category.allow_ap` ENUM '1'/'2' → TINYINT 1/2; `news.show_notif` 0 tetap 0; `news.status` ENUM → TINYINT;
+   - **(a) ENUM → TINYINT dari NILAI string**, bukan `CAST`/`+0` (keduanya memberi indeks ENUM): `news.status` ('0'/'1'/'2'),
+     `news.target` ('1'/'2'/'3'), `news_category.allow_ap` ('1'/'2'). Pemetaan eksplisit nilai → angka; nilai di luar domain → laporan impor;
+   - **D1 11-11:** `news.show_notif` 0 tetap 0;
      baca 4 tabel ber-collation `utf8mb4_0900_ai_ci` dengan konversi eksplisit;
    - `user_popup` (±1,2 juta) dan `user_banner` (±250 ribu) diimpor **bertahap per induk** dalam batch, dengan
      `INSERT IGNORE`-setara (UNIQUE) agar bisa diulang.
    - **JSON ber-`addslashes`:** `target_*`, `form_digital`, dan `response` legacy dinormalkan dulu (`stripslashes`), baru dinilai `JSON_VALID`.
      Alat impor **GAGAL-TERTUTUP per id**: baris yang JSON-nya tetap tidak valid tidak diimpor dan id-nya dicatat di laporan impor.
      Jangan mengosongkan nilai diam-diam.
+   - **(b) N5:** JSON tidak valid memakai pola keputusan F-02: id ambigu tanpa keputusan → impor **gagal**; `"__buang"` hanya lewat
+     berkas keputusan yang ditinjau. Terutama untuk `filled_form_digital.response` (jawaban pegawai).
+   - **(c) N6:** `news.ul_creator` NULL diverifikasi lewat audit `INFO news ul_creator NULL` saat cutover (angka dev belum diambil).
    - Pelanggaran NOT NULL/CHECK v2 yang tidak terlihat di salinan dev (angka D1 = angka dev) dicek ulang saat impor dan dilaporkan per id.
    Eksekusinya mengikuti tiket impor Q7-24.
-4. **Seed `jenis_dibo` (T4):** `MigrationsDitahan/SeedJenisDibo.php` dipindah ke `Migrations/` dengan timestamp sesudah
+4. ✅ **Seed `jenis_dibo` (T4):** `Migrations/2026-11-11-100100_SeedJenisDibo.php`, timestamp sesudah
    `CreateKontenInteraksiFase7`. Isi 8 id [K D1]: 1 UU, 2 PP, 3 PERPRES, 4 KEPPRES, 5 PERMEN, 6 KEPMEN, 7 SURAT EDARAN,
    8 PERKA BKN; `order` 1..8, `status` 1. Pola `SeedSimapiJd` (DBV-031):
    - isi berbeda → gagal tanpa mengubah data;

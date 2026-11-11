@@ -10,8 +10,8 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-032 (Fase 7, F-01, PRD v2.0 §5.1) — DRAF DITAHAN sampai disetujui DB Validator dan D1 Fase 7 (G7-2) diterima;
- * dipindah ke `Migrations/` dengan timestamp baru setelah approve (pola DBV-026/DBV-027/DBV-030). Dokumen:
+ * DBV-032 (Fase 7, F-01, PRD v2.0 §5.1) — disetujui DB Validator @a997488e (PR #39); seed master `jenis_dibo`
+ * menyusul di 2026-11-11-100100_SeedJenisDibo. Dokumen:
  * backend/docs/db-review/DBV-032-konten-interaksi-fase7.md.
  *
  * Tiga belas tabel baru, tanpa ALTER tabel lama dan tanpa data (impor = tiket tersendiri, Q7-24):

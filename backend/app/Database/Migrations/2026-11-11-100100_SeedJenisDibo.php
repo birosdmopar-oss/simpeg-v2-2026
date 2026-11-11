@@ -10,8 +10,7 @@ use RuntimeException;
 
 /**
  * DBV-032 (T4) — isi master `jenis_dibo` 8 baris dengan id EKSPLISIT sama dengan legacy [K D1, salinan dev]. Data referensi,
- * tanpa data pribadi. DRAF DITAHAN bersama CreateKontenInteraksiFase7; dipindah ke `Migrations/` (timestamp sesudahnya)
- * setelah approve DBV. Pola SeedSimapiJd (DBV-031). Dokumen: backend/docs/db-review/DBV-032-konten-interaksi-fase7.md §10.
+ * tanpa data pribadi. Berjalan sesudah 2026-11-11-100000_CreateKontenInteraksiFase7; disetujui DBV @a997488e. Pola SeedSimapiJd (DBV-031). Dokumen: backend/docs/db-review/DBV-032-konten-interaksi-fase7.md §10.
  *
  * Pra-cek: baris yang sudah ada harus identik dengan master (subset identik dilewati, aman diulang); id berisi lain → gagal
  * jelas tanpa mengubah data. down() menghapus hanya 8 id ini dan gagal bila sudah dirujuk `dibo` (FK RESTRICT).

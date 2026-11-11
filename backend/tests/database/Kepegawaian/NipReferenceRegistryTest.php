@@ -136,6 +136,14 @@ final class NipReferenceRegistryTest extends DatabaseTestCase
             'fk_nip_ssp_to_pegawai'  => ['siasn_status_pegawai', 'nip'],
             'fk_nip_sua_to_pegawai'  => ['siasn_upload_arsip', 'nip'],
         ],
+        // DBV-032 (Fase 7 F-01): tabel konten & interaksi, FK NIP RESTRICT di CREATE (nama = TabelAnakNip).
+        '2026-11-11-100000' => [
+            'fk_nip_ffd_to_pegawai'       => ['filled_form_digital', 'nip'],
+            'fk_nip_skl_to_peg'           => ['skl', 'nip'],
+            'fk_nip_usbanner_to_pegawai'  => ['user_banner', 'nip'],
+            'fk_nip_user_fd_to_pegawai'   => ['user_form_digital', 'nip'],
+            'fk_nip_userpopup_to_pegawai' => ['user_popup', 'nip'],
+        ],
     ];
 
     /**
