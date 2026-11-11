@@ -26,6 +26,7 @@ import {
   CircleHelp,
   ClipboardPen,
   FileText,
+  ClipboardList,
   Files,
   House,
   MessageCircle,
@@ -66,6 +67,7 @@ import {
 } from '@/features/layanan/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
+import { FORM_DIGITAL_KELOLA_ROLES } from '@/features/form-digital/roles'
 import { KONTEN_ADMIN_ROLES, KONTEN_BERITA_ROLES } from '@/features/konten/roles'
 import { FASE_LONCENG, NOTIFIKASI_ROLES } from '@/features/notifikasi/roles'
 import {
@@ -269,6 +271,8 @@ const NAV: NavGroup[] = [
           { key: 'konten-dibo-jenis', label: 'Jenis DIBO', to: { name: 'konten-dibo-jenis' } },
         ],
       },
+      // Fase 7 F-06 form digital (MAKE-083, Jalur B): role 1, phase 7.
+      { key: 'form-digital', label: 'Form Digital', icon: ClipboardList, to: { name: 'form-digital-kelola' }, roles: FORM_DIGITAL_KELOLA_ROLES, phase: 7 },
     ],
   },
   {

@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi|konten)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|form-digital|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi|konten)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -82,9 +82,22 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'GET api/v1/dashboard/direktur'                 => [1, 4],
             'GET api/v1/dashboard/ulang-tahun'              => self::JWT,
             'GET api/v1/dashboard/ulang-tahun/([^/]+)/foto' => self::JWT,
-            'GET api/v1/statistik/lingkup'                  => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)/xlsx'             => [1, 3, 4, 5, 8],
-            'GET api/v1/statistik/([^/]+)'                  => [1, 3, 4, 5, 8],
+            // F-06 form digital sisi pegawai (MAKE-083): role 2/6/7 [K `MY_Controller.php:246`].
+            'GET api/v1/form-digital/saya'          => [2, 6, 7],
+            'POST api/v1/form-digital/([0-9]+)/isi' => [2, 6, 7],
+            // F-06 kelola (MAKE-083): role 1.
+            'GET api/v1/form-digital'                                          => [1],
+            'POST api/v1/form-digital'                                         => [1],
+            'GET api/v1/form-digital/([0-9]+)/target'                          => [1],
+            'GET api/v1/form-digital/([0-9]+)/respons/([0-9]+)/berkas/([^/]+)' => [1],
+            'GET api/v1/form-digital/([0-9]+)/respons'                         => [1],
+            'PATCH api/v1/form-digital/([0-9]+)/status'                        => [1],
+            'GET api/v1/form-digital/([0-9]+)'                                 => [1],
+            'PUT api/v1/form-digital/([0-9]+)'                                 => [1],
+            'DELETE api/v1/form-digital/([0-9]+)'                              => [1],
+            'GET api/v1/statistik/lingkup'                                     => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)/xlsx'                                => [1, 3, 4, 5, 8],
+            'GET api/v1/statistik/([^/]+)'                                     => [1, 3, 4, 5, 8],
             // F-09 generator dokumen (MAKE-037): Matriks Bagian 2 `hr/document/duk|nominatif|pensiun|baperjakat` = 1, 3, 4, 5, 8.
             'POST api/v1/dokumen/baperjakat/pdf'  => [1, 3, 4, 5, 8],
             'POST api/v1/dokumen/baperjakat/xlsx' => [1, 3, 4, 5, 8],
