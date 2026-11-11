@@ -4,7 +4,7 @@
  * 2/6/7 → PegawaiDashboard; galat memuat tampil tanpa merusak sapaan (`home-role` MTC-001 tetap ada).
  * M2a: 4 kartu pengingat (label legacy, hanya Pensiun bertautan ke /dokumen/pensiun — Q7-37), kartu Butuh Approval hanya
  * role 1/3 di keluarga admin ("—" tanpa tautan selama ACTIVE_PHASE < FASE_LONCENG; fase 7 di ButuhApprovalCard.spec), tabel direktur hanya role 1/4 (+ galat lokal).
- * M3: ACTIVE_PHASE dimock 6 (< FASE_KONTEN) → banner, berita, popup Jalur A tidak dipasang dan tidak ada request konten;
+ * M3: ACTIVE_PHASE dimock 6 (< FASE_KONTEN) → banner, berita, popup Jalur A dan ringkasan SKL tidak dipasang, tanpa request;
  * fase 7 di `HomeView.konten.spec.ts`.
  */
 import { flushPromises, mount } from '@vue/test-utils'
@@ -13,7 +13,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/beranda.service', () => ({
-  berandaService: { ringkasan: vi.fn(), direktur: vi.fn(), ulangTahun: vi.fn(), fotoUlangTahun: vi.fn() },
+  berandaService: { ringkasan: vi.fn(), direktur: vi.fn(), ulangTahun: vi.fn(), fotoUlangTahun: vi.fn(), ringkasanSkl: vi.fn() },
 }))
 vi.mock('@/shared/layouts/nav.config', async (asli) => ({ ...(await asli<typeof import('@/shared/layouts/nav.config')>()), ACTIVE_PHASE: 6 }))
 vi.mock('@/features/konten/services/konten.service', () => ({
@@ -400,6 +400,8 @@ describe('HomeView — konten Jalur A digerbang fase (ACTIVE_PHASE 6 < FASE_KONT
     expect(kontenService.bannerAktif).not.toHaveBeenCalled()
     expect(kontenService.popupAktif).not.toHaveBeenCalled()
     expect(kontenService.beritaTerbaru).not.toHaveBeenCalled()
+    expect(berandaService.ringkasanSkl).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="beranda-skl"]').exists()).toBe(false)
     expect(wrapper.find(role === Role.SUPER_ADMIN ? '[data-testid="beranda-admin"]' : '[data-testid="beranda-pegawai"]').exists()).toBe(true)
   })
 })

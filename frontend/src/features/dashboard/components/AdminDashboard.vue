@@ -6,8 +6,9 @@
  * 3. komposisi pegawai + status hari ini (`KomposisiPegawaiCard`, saklar Q7-36);
  * 4. masa kerja direktur politeknik (role 1/4, `DirekturCard`) [K];
  * 5. berita terbaru (`BeritaTerbaruWidget`, Jalur A; tidak tampil bila kosong, tidak dipasang selama `ACTIVE_PHASE < FASE_KONTEN`);
- * 6. ulang tahun hari ini / besok (`UlangTahunCard`, Q7-45) [K].
- * Banner (Jalur A) dipasang di `HomeView` di atas kartu ini (Q7-39). Slot berikutnya: ringkasan SKL (Q7-26, endpoint rekap Jalur B).
+ * 6. ulang tahun hari ini / besok (`UlangTahunCard`, Q7-45) [K];
+ * 7. ringkasan SKL (`SklRingkasanCard`, role 1, Q7-26; endpoint F-11 Jalur B), juga digerbang `FASE_KONTEN`.
+ * Banner (Jalur A) dipasang di `HomeView` di atas kartu ini (Q7-39).
  */
 import { computed } from 'vue'
 
@@ -16,12 +17,13 @@ import { BeritaTerbaruWidget } from '@/features/konten'
 import { BUTUH_APPROVAL_ROLES } from '@/features/notifikasi'
 
 import { KONTEN_BERANDA_AKTIF } from '../fase'
-import { DIREKTUR_ROLES, type RingkasanAdmin } from '../types'
+import { DIREKTUR_ROLES, SKL_RINGKASAN_ROLES, type RingkasanAdmin } from '../types'
 
 import ButuhApprovalCard from './ButuhApprovalCard.vue'
 import DirekturCard from './DirekturCard.vue'
 import KomposisiPegawaiCard from './KomposisiPegawaiCard.vue'
 import PengingatCards from './PengingatCards.vue'
+import SklRingkasanCard from './SklRingkasanCard.vue'
 import UlangTahunCard from './UlangTahunCard.vue'
 
 defineProps<{ ringkasan: RingkasanAdmin }>()
@@ -32,6 +34,7 @@ const LABEL_LINGKUP = { kementerian: 'Kementerian', satker: 'Satker', unit: 'Uni
 
 const punyaApproval = computed(() => auth.role !== null && BUTUH_APPROVAL_ROLES.includes(auth.role))
 const punyaDirektur = computed(() => auth.role !== null && DIREKTUR_ROLES.includes(auth.role))
+const punyaSkl = computed(() => KONTEN_BERANDA_AKTIF && auth.role !== null && SKL_RINGKASAN_ROLES.includes(auth.role))
 </script>
 
 <template>
@@ -48,5 +51,6 @@ const punyaDirektur = computed(() => auth.role !== null && DIREKTUR_ROLES.includ
       <UlangTahunCard hari="ini" />
       <UlangTahunCard hari="besok" />
     </div>
+    <SklRingkasanCard v-if="punyaSkl" />
   </div>
 </template>

@@ -37,5 +37,8 @@ Komponen yang dipakai modul kedua dipindah ke `src/shared/`.
   (paling bawah). Ketiganya memuat data sendiri dan tidak merender bila kosong/403/galat, juga saat ringkasan gagal.
   Gerbang fase (`fase.ts`, `FASE_KONTEN = 7`, pola lonceng/`InteraksiPopupHost`): selama `ACTIVE_PHASE < 7` ketiganya tidak
   dipasang sama sekali (tanpa request `konten/*`); komponen Jalur A tidak diubah.
-  Popup form digital/SKL dipasang Jalur B di shell (`InteraksiPopupHost`), bukan di beranda. Sisa: ringkasan SKL admin
-  (Q7-26) setelah endpoint rekap Jalur B ada.
+  Popup form digital/SKL dipasang Jalur B di shell (`InteraksiPopupHost`), bukan di beranda.
+- M3 bagian B: `SklRingkasanCard` (role 1, Q7-26 [V2]) paling bawah `AdminDashboard`, `GET survei-layanan/ringkasan`
+  (endpoint F-11 Jalur B; bawaan 12 bulan terakhir): rata-rata total (dibobot jumlah) + tabel lima jenis layanan, satu
+  desimal koma, "—" bila jenis belum dinilai; total 0 → "Belum ada penilaian"; galat/403 → kartu tidak dirender; `sebaran`
+  tidak ditampilkan; digerbang `FASE_KONTEN`. Figma kartu belum ada (pola `DirekturCard`).

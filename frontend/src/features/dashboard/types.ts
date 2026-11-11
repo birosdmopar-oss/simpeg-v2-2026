@@ -115,3 +115,26 @@ export type RingkasanBeranda = RingkasanAdmin | RingkasanPegawai
 
 /** Palet donut komposisi (biru → toska, selaras palet laporan F-03). */
 export const PALET_KOMPOSISI = ['#1e3a8a', '#2563eb', '#0ea5e9', '#38bdf8', '#14b8a6', '#6366f1'] as const
+
+/** Ringkasan SKL beranda admin hanya role 1 (Q7-26; endpoint F-11 Jalur B, role lain 403). */
+export const SKL_RINGKASAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
+
+/** Skala penilaian SKL 1–5 (5 = Sangat Memuaskan). */
+export type SebaranSkl = Record<'1' | '2' | '3' | '4' | '5', number>
+
+/** Satu jenis layanan pada `GET survei-layanan/ringkasan` (lima jenis selalu ada, urut `jenis_rwy` 1→5). */
+export interface RingkasanSklJenis {
+  jenis_rwy: number
+  jenis_layanan: string
+  jumlah: number
+  /** Satu desimal; null bila `jumlah` 0. */
+  rata_rata: number | null
+  sebaran: SebaranSkl
+}
+
+/** `GET survei-layanan/ringkasan?dari&sampai` (bawaan 12 bulan terakhir WIB); rata-rata total dibobot jumlah. */
+export interface RingkasanSkl {
+  periode: { dari: string; sampai: string }
+  per_jenis: RingkasanSklJenis[]
+  total: { jumlah: number; rata_rata: number | null }
+}

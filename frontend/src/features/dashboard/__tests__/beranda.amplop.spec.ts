@@ -36,6 +36,14 @@ describe('berandaService — amplop backend nyata', () => {
     expect(server.panggilan).toEqual([{ method: 'get', url: '/dashboard/ringkasan' }])
   })
 
+  it('ringkasanSkl() GET /survei-layanan/ringkasan tanpa parameter (bawaan 12 bulan BE) → isi data', async () => {
+    const data = { periode: { dari: '2025-11-12', sampai: '2026-11-11' }, per_jenis: [], total: { jumlah: 0, rata_rata: null } }
+    server.balasan = { status: 200, body: { status: 'success', data } }
+
+    await expect(berandaService.ringkasanSkl()).resolves.toEqual(data)
+    expect(server.panggilan).toEqual([{ method: 'get', url: '/survei-layanan/ringkasan' }])
+  })
+
   it('galat diteruskan sebagai ApiError', async () => {
     server.balasan = { status: 500, body: { status: 'error', message: 'Terjadi kesalahan.' } }
 
