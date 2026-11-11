@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Libraries\Auth\AuthContext;
 use App\Libraries\Dashboard\Konten\Penargetan\LabelTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\PemekarTarget;
+use App\Libraries\Dashboard\Konten\Penargetan\PemeriksaTargetAktif;
 use App\Libraries\Dashboard\Konten\Penargetan\SinkronPenerima;
 use App\Libraries\Dashboard\Konten\Penargetan\SpesifikasiTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\TabelPenerima;
@@ -324,6 +325,9 @@ final class KelolaFormDigital
 
             if ($target->kosong()) {
                 $galat['target'] = ['Target wajib dipilih (unit/satker atau pegawai).'];
+            } elseif (($galatAktif = (new PemeriksaTargetAktif($this->db))->periksa($target)) !== null) {
+                // CR-119 (T-07): unit/satker pada token harus ada dan aktif (pesan setara berita).
+                $galat['target'] = [$galatAktif];
             } else {
                 $nip = (new PemekarTarget($this->db))->pekarkan($target);
 

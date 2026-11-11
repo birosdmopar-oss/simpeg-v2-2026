@@ -303,6 +303,64 @@ final class KontenGambarServiceTest extends DatabaseTestCase
         }
     }
 
+    /**
+     * CR-119 (QA T-07): token unit/satker pada masukan API harus ada dan aktif — popup & banner, buat & ubah. 422 di field `target`
+     * dengan pesan setara berita; tanpa baris baru, tanpa berkas tersisa, target tersimpan tidak berubah. Pegawai eksplisit
+     * tetap tanpa filter status ([K] PRD v2.1 §11-6).
+     */
+    public function testTargetUnitSatkerNonaktifAtauTidakAdaDitolak(): void
+    {
+        $unitAktif    = $this->buatUnit();
+        $satkerAktif  = $this->buatSatker($unitAktif);
+        $unitNonaktif = $this->buatUnit();
+        $satkerNon    = $this->buatSatker($unitAktif);
+        $this->db->table('unit')->where('id_unit', $unitNonaktif)->update(['status' => 2]);
+        $this->db->table('satker')->where('id_satker', $satkerNon)->update(['status' => 2]);
+
+        $salah = [
+            'unit nonaktif'    => [(string) $unitNonaktif, 'Unit target tidak ditemukan atau tidak aktif.'],
+            'unit tidak ada'   => ['99999', 'Unit target tidak ditemukan atau tidak aktif.'],
+            'satker nonaktif'  => ["sat_{$satkerNon}", 'Satker target tidak ditemukan atau tidak aktif.'],
+            'satker tidak ada' => ['sat_99999', 'Satker target tidak ditemukan atau tidak aktif.'],
+        ];
+
+        foreach ([[JenisGambar::Popup, 'popup', 300, 200], [JenisGambar::Banner, 'banner', 1600, 400]] as [$jenis, $tabel, $w, $h]) {
+            $svc   = $this->service($jenis);
+            $tgl   = $jenis === JenisGambar::Popup ? ['tgl_mulai' => '2026-11-01 08:00', 'tgl_akhir' => '2026-11-30 17:00'] : ['tgl_mulai' => '2026-11-01', 'tgl_akhir' => '2026-11-30'];
+            $baik  = $svc->buat($tgl + ['target' => ['unit_satker' => [(string) $unitAktif, "sat_{$satkerAktif}"]]], $this->gambar($w, $h), 1);
+            $awal  = $this->db->table($tabel)->where("id_{$tabel}", $baik['id'])->get()->getRowArray();
+            $files = glob($this->akar . "/{$tabel}/*") ?: [];
+            $this->assertSame(1, $this->db->table($tabel)->countAllResults(), 'target aktif diterima');
+            $this->assertCount(1, $files);
+
+            $campur = ['campur aktif + nonaktif' => [(string) $unitNonaktif, 'Unit target tidak ditemukan atau tidak aktif.']];
+
+            foreach ($salah + $campur as $nama => [$token, $pesan]) {
+                $target = $nama === 'campur aktif + nonaktif'
+                    ? ['unit_satker' => [(string) $unitAktif, $token]]
+                    : ['unit_satker' => [$token]];
+
+                foreach (['buat', 'ubah'] as $aksi) {
+                    try {
+                        $aksi === 'buat'
+                            ? $svc->buat($tgl + ['target' => $target], $this->gambar($w, $h), 1)
+                            : $svc->ubah($baik['id'], $tgl + ['target' => $target], $this->gambar($w, $h), 1);
+                        $this->fail("{$jenis->value} {$aksi} harus 422 untuk {$nama}");
+                    } catch (ValidationException $e) {
+                        $this->assertSame([$pesan], $e->getErrors()['target'] ?? null, "{$jenis->value} {$aksi} {$nama}");
+                    }
+                }
+            }
+
+            $this->assertSame(1, $this->db->table($tabel)->countAllResults(), 'tidak ada baris baru');
+            $this->assertCount(1, glob($this->akar . "/{$tabel}/*") ?: [], 'tidak ada berkas tersisa');
+            $this->assertSame($awal, $this->db->table($tabel)->where("id_{$tabel}", $baik['id'])->get()->getRowArray(), 'ubah yang ditolak tidak mengubah baris');
+
+            // token "0" (seluruh kementerian) dan pegawai eksplisit tidak diperiksa status unit/satker
+            $this->assertSame($baik['id'], $svc->ubah($baik['id'], $tgl + ['target' => ['unit_satker' => ['0']]], null, 1)['id']);
+        }
+    }
+
     private function service(JenisGambar $jenis, string $sekarang = '2026-11-15 10:00:00'): KontenGambarService
     {
         $c                  = new Konten();

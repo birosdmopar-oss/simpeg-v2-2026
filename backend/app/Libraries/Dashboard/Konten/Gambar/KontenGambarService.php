@@ -11,6 +11,7 @@ use App\Exceptions\ValidationException;
 use App\Libraries\Dashboard\Konten\NamaBerkas;
 use App\Libraries\Dashboard\Konten\Penargetan\LabelTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\PemekarTarget;
+use App\Libraries\Dashboard\Konten\Penargetan\PemeriksaTargetAktif;
 use App\Libraries\Dashboard\Konten\Penargetan\SinkronPenerima;
 use App\Libraries\Dashboard\Konten\Penargetan\SpesifikasiTarget;
 use App\Libraries\ListQuery;
@@ -467,6 +468,13 @@ final class KontenGambarService
 
         if ($spes->kosong()) {
             throw ValidationException::forField('target', 'Pilih minimal satu target (unit/satker atau pegawai).');
+        }
+
+        // CR-119 (T-07): unit/satker pada token harus ada dan aktif — dicek SEBELUM berkas diperiksa/disimpan (lihat buat/ubah).
+        $galatAktif = (new PemeriksaTargetAktif($this->db))->periksa($spes);
+
+        if ($galatAktif !== null) {
+            throw ValidationException::forField('target', $galatAktif);
         }
 
         return ['tgl_mulai' => $mulai, 'tgl_akhir' => $akhir, 'url' => $url === '' ? null : $url, 'keterangan' => $ket === '' ? null : $ket, 'target' => $spes];
