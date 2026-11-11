@@ -144,7 +144,10 @@ Keputusan PRD yang dipakai: F7-15..F7-25, F7-27 (tanpa skema, F7-26). Ringkasan 
   (Q-D18 A). Sisa: M3 (komponen Jalur A dan B).
 - M3 bagian A (branch `fase7/make-087-m3`, 11-11, dari `main` `f2d5580a`): `BannerCarousel` (semua role, Q7-39) +
   `PopupAktifDialog` di `HomeView`, `BeritaTerbaruWidget` di kedua keluarga, digerbang `FASE_KONTEN = 7` (tanpa request
-  selama `ACTIVE_PHASE < 7`, review 11-11); `HomeView.konten.spec` (7, fase 7) + `HomeView.spec` (+2, fase 6). Popup form digital/SKL
+  selama `ACTIVE_PHASE < 7`, review 11-11); `HomeView.konten.spec` (7, fase 7) + `HomeView.spec` (+2, fase 6). DI MAIN `472d5a2b`.
+- M3 bagian B (branch `fase7/make-087-m3b`, 11-11, dari `main` `472d5a2b`): `SklRingkasanCard` ringkasan SKL role 1 (Q7-26)
+  di `AdminDashboard`, kontrak F-11 `survei-layanan/ringkasan`; merge sesudah paket F-11 di `main`. `HomeView.konten.spec`
+  (+7), `beranda.amplop.spec` (+1). Popup form digital/SKL
   sudah dipasang Jalur B di shell. Sisa M3: ringkasan SKL admin (Q7-26) menunggu endpoint rekap Jalur B.
 
 ### Jalur A — konten admin (MAKE-079 Popup, MAKE-080 Banner), branch `fase7/make-079-popup` (lokal, belum di main)
