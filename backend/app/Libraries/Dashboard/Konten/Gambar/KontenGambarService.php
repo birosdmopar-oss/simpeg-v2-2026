@@ -9,6 +9,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use App\Libraries\Dashboard\Konten\NamaBerkas;
+use App\Libraries\Dashboard\Konten\Penargetan\LabelTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\PemekarTarget;
 use App\Libraries\Dashboard\Konten\Penargetan\SinkronPenerima;
 use App\Libraries\Dashboard\Konten\Penargetan\SpesifikasiTarget;
@@ -122,18 +123,10 @@ final class KontenGambarService
      */
     public function target(int $id): array
     {
-        $r     = $this->ambil($id);
-        $spes  = SpesifikasiTarget::dariKolom($r['target_uns'] ?? null, $r['target_peg'] ?? null, $r['excl_peg'] ?? null);
-        $nip   = array_values(array_unique([...$spes->pegawai, ...$spes->kecuali]));
-        $label = [];
+        $r    = $this->ambil($id);
+        $spes = SpesifikasiTarget::dariKolom($r['target_uns'] ?? null, $r['target_peg'] ?? null, $r['excl_peg'] ?? null);
 
-        if ($nip !== []) {
-            foreach ($this->db->table('pegawai')->select('nip, glr_awal, nama, glr_akhir')->whereIn('nip', $nip)->get()->getResultArray() as $p) {
-                $label[(string) $p['nip']] = $p['nip'] . ' - ' . self::namaLengkap($p);
-            }
-        }
-
-        return $spes->keArray() + ['label_pegawai' => $label];
+        return LabelTarget::untuk($this->db, $spes);
     }
 
     /**
@@ -161,7 +154,7 @@ final class KontenGambarService
             ->get()->getResultArray();
 
         return [
-            'items'    => array_map(static fn (array $r): array => ['nip' => (string) $r['nip'], 'nama' => self::namaLengkap($r)], $rows),
+            'items'    => array_map(static fn (array $r): array => ['nip' => (string) $r['nip'], 'nama' => LabelTarget::namaLengkap($r)], $rows),
             'total'    => $total,
             'page'     => $page,
             'per_page' => $perPage,
@@ -583,13 +576,5 @@ final class KontenGambarService
         } catch (Throwable) {
             // Berkas yatim tidak boleh menggagalkan permintaan; dibersihkan manual.
         }
-    }
-
-    /**
-     * @param array<string, mixed> $r
-     */
-    private static function namaLengkap(array $r): string
-    {
-        return trim(implode(' ', array_filter([(string) ($r['glr_awal'] ?? ''), (string) ($r['nama'] ?? ''), (string) ($r['glr_akhir'] ?? '')], static fn (string $s): bool => $s !== '')));
     }
 }
