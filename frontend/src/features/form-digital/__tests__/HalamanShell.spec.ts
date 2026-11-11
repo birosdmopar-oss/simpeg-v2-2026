@@ -61,4 +61,21 @@ describe('halaman F-06/F-11 di dalam RedesignShell', () => {
   it('rekap survei layanan', async () => {
     await buka('/survei-layanan', 'skl-rekap')
   })
+
+  it('pindah respons form A → B memuat ulang data form B (CR-118)', async () => {
+    const { formDigitalService } = await import('../services/formDigital.service')
+    loginAs(Role.SUPER_ADMIN)
+    const router = createShellRouter()
+    for (const r of formDigitalRoutes) router.addRoute(r)
+    await router.push('/form-digital/7/respons')
+    await router.isReady()
+    mount(RouterView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+    vi.mocked(formDigitalService.respons).mockClear()
+
+    await router.push('/form-digital/8/respons')
+    await flushPromises()
+    expect(vi.mocked(formDigitalService.respons).mock.calls.map((c) => c[0])).toEqual([8])
+  })
 })
+

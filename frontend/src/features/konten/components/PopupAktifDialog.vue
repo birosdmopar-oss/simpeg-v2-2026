@@ -16,7 +16,9 @@ import { kontenService } from '../services/konten.service'
 import { popupSudahDitampilkan, tandaiPopupDitampilkan } from '../sesi'
 import type { PopupAktif } from '../types'
 
-const { minta } = useAntreanDialog()
+const { daftar: daftarAntrean } = useAntreanDialog()
+// CR-118: daftar sinkron di setup (sebelum fetch) supaya urutan antrean deterministik.
+const peserta = popupSudahDitampilkan() ? null : daftarAntrean('popup-konten')
 let selesai: (() => void) | null = null
 
 const daftar = ref<PopupAktif[]>([])
@@ -27,16 +29,17 @@ const aktif = computed<PopupAktif | undefined>(() => daftar.value[indeks.value])
 const terakhir = computed(() => indeks.value >= daftar.value.length - 1)
 
 onMounted(async () => {
-  if (popupSudahDitampilkan()) return
+  if (peserta === null) return
   try {
     const rows = await kontenService.popupAktif()
-    if (rows.length === 0) return
+    if (rows.length === 0) return peserta.batal()
     daftar.value = rows
     indeks.value = 0
-    selesai = await minta('popup-konten')
+    selesai = await peserta.minta()
     open.value = true
     tandaiPopupDitampilkan()
   } catch (e) {
+    peserta.batal()
     if (import.meta.env.DEV) console.warn('[konten] popup aktif gagal dimuat', e)
   }
 })
