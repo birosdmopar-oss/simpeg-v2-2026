@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Arsip Kepegawaian (tombol di header Detail Pegawai; B-20 penutup × B-18, MAKE-014; keputusan user 13-10-2026 Q-M6-6)
+ * Arsip Data Umum (tombol di header Detail Pegawai; B-20 penutup × B-18, MAKE-014; keputusan user 13-10-2026 Q-M6-6)
  * = arsip Data Umum legacy lewat endpoint lampiran dengan `id_entri` = NIP, memakai ArsipTable:
  *  - Arsip Data Umum (kode 38): pilih jenis (KTP, Paspor, BPJS, Taspen, Kartu Istri/Suami/Pegawai, NPWP, Lain-lain + nama)
  *    lalu unggah; unggah/hapus role 1, 3 (lingkup), 2/6/7 milik sendiri; jpg/jpeg/png/pdf 5 MB;
@@ -82,7 +82,7 @@ const isianStatus = computed<Record<string, string>>(() => {
       >
         <div class="flex items-start justify-between gap-3">
           <div>
-            <DialogTitle class="text-h5 text-slate-900">Arsip Kepegawaian</DialogTitle>
+            <DialogTitle class="text-h5 text-slate-900">Arsip Data Umum</DialogTitle>
             <DialogDescription class="text-body2 text-slate-500">{{ nama }} ({{ nip }})</DialogDescription>
           </div>
           <DialogClose class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup">

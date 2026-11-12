@@ -60,3 +60,17 @@ export const PENUGASAN_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN, Role.ADMI
 export const PENUGASAN_TULIS_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
 /** Master Angka Kredit JF `dm_ak_jf` (MAKE-021; legacy `C_jabatan::akjf` userAuth ['1']). */
 export const AK_JF_ROLES: readonly RoleCode[] = [Role.SUPER_ADMIN]
+
+/**
+ * Halaman Arsip (F-10, MAKE-091; PRD F-10 F10-07, AC1-04): role 1–7 (legacy `Arsip.php:12`); role 8 tidak. Role 2/6/7
+ * hanya NIP sendiri, role 4/5 hanya lihat (lingkup `PegawaiScope` ditegakkan server).
+ */
+export const ARSIP_ROLES: readonly RoleCode[] = [
+  Role.SUPER_ADMIN,
+  Role.PEGAWAI,
+  Role.ADMIN_SATKER,
+  Role.ADMIN_VIEW_ESELON1,
+  Role.MENTERI,
+  Role.PTT,
+  Role.PPPK,
+]

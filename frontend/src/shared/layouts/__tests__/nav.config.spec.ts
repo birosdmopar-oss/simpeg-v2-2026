@@ -158,6 +158,28 @@ describe('buildNav — fase berikutnya', () => {
   })
 })
 
+describe('buildNav — Arsip (F-10, MAKE-091)', () => {
+  const arsip = (role: RoleCode | null, phase?: number) =>
+    buildNav(role, phase)
+      .flatMap((g) => g.items)
+      .find((i) => i.key === 'arsip')
+
+  it('menu Arsip = role 1–7 (role 8 dan tanpa role tidak), menuju route `arsip`, di grup Kepegawaian', () => {
+    const punya = Object.values(Role).filter((r) => arsip(r, 7) !== undefined)
+    expect(punya).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(arsip(null, 7)).toBeUndefined()
+    expect(arsip(Role.PEGAWAI, 7)).toMatchObject({ label: 'Arsip', to: { name: 'arsip' }, phase: 7 })
+    const grup = buildNav(Role.PEGAWAI, 7).find((g) => g.items.some((i) => i.key === 'arsip'))
+    expect(grup?.key).toBe('kepegawaian')
+  })
+
+  it('tetap tersembunyi pada fase aktif (QF10-3: ikut gerbang fase 7, tanpa `rilis`)', () => {
+    expect(ACTIVE_PHASE).toBeLessThan(7)
+    for (const role of Object.values(Role)) expect(arsip(role), `role ${role}`).toBeUndefined()
+    expect(arsip(Role.SUPER_ADMIN, 7)).not.toHaveProperty('rilis')
+  })
+})
+
 describe('buildNav — `rilis` & `NavChild.roles` (F5-18, PRD Fase 5A §7.8.2)', () => {
   const presensi = (role: RoleCode | null, phase?: number) =>
     buildNav(role, phase)

@@ -9,7 +9,7 @@
  * Koreksi NIP (B-06, `aksi.koreksi_nip`) lewat menu ⋯ kartu identitas; sukses → pindah ke URL NIP baru.
  *
  * Galat: 403 (izin/lingkup — termasuk NIP yang tidak ada bagi role ber-lingkup), 404, 501 (stub) ditampilkan sebagai
- * keadaan halaman, tidak pernah sebagai data contoh. Cetak DRH, Arsip Kepegawaian (MAKE-014) dan hapus pegawai (B-05) tersambung; Cetak Data Umum belum.
+ * keadaan halaman, tidak pernah sebagai data contoh. Cetak DRH, Arsip Data Umum (MAKE-014) dan hapus pegawai (B-05) tersambung; Cetak Data Umum belum.
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -31,7 +31,7 @@ import PegawaiHeaderCard from '../components/PegawaiHeaderCard.vue'
 import RiwayatMenuTabs from '../components/RiwayatMenuTabs.vue'
 import RiwayatTabHost from '../riwayat/RiwayatTabHost.vue'
 import { tabsFromDescriptors } from '../riwayat/registry'
-import { PEGAWAI_LIST_ROLES } from '../roles'
+import { ARSIP_ROLES, PEGAWAI_LIST_ROLES } from '../roles'
 import { describeApiError, type ApiFailure } from '../services/apiErrors'
 import { simpanBerkas } from '../services/berkasUnduhan'
 import { pegawaiService } from '../services/pegawai.service'
@@ -58,6 +58,8 @@ const prosesMode = ref<ApprovalAksi>('setujui')
 const busyDelete = ref(false)
 
 const role = computed(() => auth.role)
+/** Tombol "Arsip" (F-10): role 1–7. */
+const canBukaArsip = computed(() => role.value !== null && ARSIP_ROLES.includes(role.value))
 /**
  * Cetak DRH (MAKE-014, legacy print_drh UL_ALL; keputusan user Q-M6-5): role 2/6/7 hanya DRH sendiri, role lain yang boleh
  * melihat pegawai (lingkup ditegakkan server).
@@ -120,7 +122,7 @@ watch(nip, () => {
 }, { immediate: true })
 
 const pengajuan = computed(() => detail.value?.pengajuan ?? null)
-/** Arsip Kepegawaian = arsip Data Umum (MAKE-014). */
+/** Arsip Data Umum = dialog arsip 37/38 (MAKE-014). */
 const arsipOpen = ref(false)
 
 /** Pemilik/pengaju melihat perubahan yang diajukannya (MAKE-014; `GET biodata/pengajuan/{id}` mengizinkan pemilik). */
@@ -225,6 +227,7 @@ const crumbs = computed(() => [
           :can-print="canPrint"
           :can-delete="canDelete"
           :can-koreksi-nip="detail.aksi?.koreksi_nip ?? false"
+          :can-buka-arsip="canBukaArsip"
           :deleting="busyDelete"
           @koreksi-nip="koreksiOpen = true"
           @arsip="arsipOpen = true"

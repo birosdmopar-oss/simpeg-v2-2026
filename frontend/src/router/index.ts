@@ -12,6 +12,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { USER_MANAGEMENT_ROLES } from '@/features/auth/types'
 import { dokumenRoutes } from '@/features/dokumen/routes.dokumen'
 import { integrasiRoutes } from '@/features/integrasi/routes.integrasi'
+import { arsipRoutes } from '@/features/kepegawaian/routes.arsip'
 import { pegawaiRoutes } from '@/features/kepegawaian/routes.pegawai'
 import { riwayatRoutes } from '@/features/kepegawaian/routes.riwayat'
 import { laporanRoutes } from '@/features/laporan/routes.laporan'
@@ -111,6 +112,8 @@ const routes: RouteRecordRaw[] = [
   // Modul B (Fase 3): route per workstream — WS-2 di routes.pegawai.ts, WS-1 di routes.riwayat.ts.
   ...pegawaiRoutes,
   ...riwayatRoutes,
+  // Modul B — Fase 7 F-10 Arsip Digital (MAKE-091).
+  ...arsipRoutes,
   // Modul F — Fase 7 F-03 laporan statistik (MAKE-036).
   ...laporanRoutes,
   // Modul F — Fase 7 F-09 generator dokumen (MAKE-037).
