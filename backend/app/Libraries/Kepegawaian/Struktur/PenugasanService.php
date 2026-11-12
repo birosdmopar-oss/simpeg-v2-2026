@@ -186,7 +186,7 @@ final class PenugasanService
         $path  = (string) ($this->baris($auth, $jenis, $id)['lampiran'] ?? '');
         $kolom = $this->berkas ?? new KolomBerkas(null, $this->db());
 
-        // Path impor legacy (arsip remote, diawali "arsip/") belum ada di storage v2 → 404.
+        // Path impor legacy (mis. "arsip/…") dibaca lewat PathLegacy (MAKE-069); berkas yang belum disalin → 404.
         if ($path === '' || ! $kolom->ada($path)) {
             throw new NotFoundException('Lampiran tidak ditemukan.');
         }
