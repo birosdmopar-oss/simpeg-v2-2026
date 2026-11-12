@@ -241,6 +241,66 @@ Keputusan user 16-10-2026 (ISSUE-041). Service: `Libraries/Kepegawaian/AngkaKred
 
 Tanpa `DELETE` [K]. Route di `Config/RoutesRiwayat.php` (grup `ak-jf` dengan filter `Role::filter(Role::SUPER_ADMIN)`).
 
+### Arsip F-10 (WS-2, MAKE-090, aditif)
+
+Acuan: `docs/fase7/PRD_Fase7_F10_Arsip-Digital.md` (v1.3) §5, §7.2, §8.1–§8.2, §12.1. Service:
+`Libraries/Kepegawaian/Arsip` (`ArsipService`, `OtorisasiArsip`, `PenyajiUrlBerkas`, `RingkasanRiwayat`, `HeaderBerkas`);
+konfigurasi `Config\Arsip`. Tahap 1 = lihat + buka; aksi Tahap 2 (Edit/Hubungkan/Hapus/ekspor/`opsi-hubungkan`) milik
+MAKE-092.
+
+| Method & path | Role (route) | Isi |
+|---|---|---|
+| `GET pegawai/{nip}/arsip` | 1–7 | `{ pegawai: { nip, nama, glr_depan, glr_belakang }, folder: [ { id_jenis_rwy, kode, label, urutan, jumlah, jumlah_hilang, jumlah_tak_dapat_dibuka } ], total, total_hilang, total_tak_dapat_dibuka, penyajian_berkas_legacy, aksi: { tulis: false, jenis_hubungkan: [] } }` |
+| `GET pegawai/{nip}/arsip/berkas?id_jenis_rwy=&q=&sort=&order=&page=&per_page=` | 1–7 | `{ items: [ … ], total, page, per_page }` (lihat kolom di bawah) |
+| `GET pegawai/{nip}/arsip/berkas/{id}/buka` | 1–7 | Isi berkas PRIVAT (unggahan v2; berkas legacy hanya saat `arsip.penyajianBerkasLegacy = privat`) |
+
+- **Lingkup** = `PegawaiScope::bolehLihat` (jalur detail): 1/4/5 semua, 3 lingkup detail, 2/6/7 NIP sendiri. **Tanpa**
+  izin Definisi per kode (F10-30): semua baris `document_attachment` milik NIP tampil, termasuk kode 0, 37, 38, 42–50,
+  `id_riwayat` NULL, dan baris menggantung (riwayat status 10 / pengajuan / `id_entri` tidak ada, F10-16).
+- **Urutan galat**: 401 → 403 role (route) → 403 lingkup (NIP tak ada bagi role ber-lingkup = 403) → 404 NIP → 404 baris
+  → 422 (`id_jenis_rwy` bukan angka/`tanpa_jenis`, `sort` ∉ `id|nama|jenis|created_at`, `order` ∉ `asc|desc`, `page`).
+  `buka`: … → 404 baris (milik NIP lain juga 404) → 404 bukan akses privat / tak cocok regex / berkas hilang → 429
+  throttle → baca → audit → 200.
+- **Folder**: satu entri per `id_riwayat` yang punya ≥ 1 baris, urut `jenis_rwy.order`; `belum_terhubung` (kode 0) lalu
+  `tanpa_jenis` (`id_jenis_rwy` null, `urutan` null) paling bawah. `jumlah_hilang` = cocok regex tetapi tidak ada di disk;
+  `jumlah_tak_dapat_dibuka` = path tidak sah / tidak cocok regex. `ada()` diperiksa untuk semua baris tiap permintaan.
+- **Item daftar** (kolom TERTUTUP; `path`, `url`, `basename`, `document_id`, `NIP`, `filename` tidak pernah dikirim):
+  `id_attachment, nama_arsip, tag, display_name, id_riwayat, jenis_riwayat, id_entri, ringkasan_riwayat, file_type,
+  created_at, berkas_ada, status_berkas (ada|hilang|tak_dapat_dibuka), akses_berkas (publik|privat|null), url_berkas,
+  jenis_buka (pratinjau|unduh|null), aksi { edit, hubungkan, hapus }` (Tahap 1 selalu `false`).
+  - `nama_arsip` = `tag` → `display_name` → `filename`; baris berkunci v2 tanpa `tag`/`display_name` → "Berkas <id>".
+  - `url_berkas`: `publik` = `{arsip.dasarUrlBerkas}/<path ternormalisasi, tiap segmen rawurlencode>` (memuat path legacy,
+    deviasi sadar F10-18 (a)); `privat` = `pegawai/<nip>/arsip/berkas/<id>/buka` (path API relatif TANPA slash awal,
+    digabung klien dengan baseURL API; tanpa path/kunci); `null` bila hilang / tak dapat dibuka.
+  - Nullability: `akses_berkas`, `url_berkas`, dan `jenis_buka` bernilai `null` bersamaan, tepat bila `url_berkas` null
+    (`status_berkas` ≠ `ada`). Berkas yang ada tetapi tanpa ekstensi (atau ekstensi non-pratinjau) → `jenis_buka: "unduh"`.
+  - Regex (`Config\Arsip`, atas `PathLegacy::normalisasi()`): kunci v2 `^[0-9]{4}/[0-9]{2}/[0-9a-f]{32}\.[a-z0-9]{1,10}$`
+    (selalu privat); legacy `^arsip/(?:[^/.][^/]*/)*[^/.][^/]*$` dan `^assets/upload/(?:[^/.][^/]*/)*[^/.][^/]*$` (publik,
+    atau privat saat saklar `privat`). `jenis_buka` dari ekstensi path (pdf/jpg/jpeg/png/gif = pratinjau), bukan `file_ext`.
+  - `ringkasan_riwayat` = bentuk `previewRwy` legacy untuk kode 1, 3, 5, 7, 9, 36, 10, 11, 13, 14, 20, 22, 23, 32 (satu
+    query per tabel per halaman); lainnya, dan baris tidak ditemukan, "—". [V2] kecil (anti-IDOR F10-09, diterima
+    reviewer 12-11-2026): baris riwayat hanya diambil bila milik NIP itu (kode 3 lewat induk `riwayat_keluarga`), sedangkan
+    legacy membaca menurut PK saja.
+  - `q` = LIKE literal atas `tag`/`display_name`/`filename`; `per_page` bawaan 25, dijepit 1..100; urut bawaan
+    `id_attachment` menurun. `sort=nama` memakai ekspresi yang sama dengan `nama_arsip` (termasuk "Berkas <id>");
+    `sort=jenis` menaruh "Tanpa Jenis" selalu di belakang; seri diputus `id_attachment` menurun.
+- **`buka`** (F10-34..36): `Content-Type` dari daftar tertutup menurut ekstensi path (pdf `application/pdf`, jpg/jpeg
+  `image/jpeg`, png `image/png`, gif `image/gif`, lainnya `application/octet-stream`); `Content-Disposition`
+  `inline` (pratinjau) / `attachment`, SELALU dengan nama = nama arsip yang diakhiri ekstensi path ternormalisasi (ditambahkan
+  bila belum; berkas tanpa ekstensi = nama arsip apa adanya), cadangan ASCII + `filename*` UTF-8; `X-Content-Type-Options:
+  nosniff`, `Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`, `Content-Security-Policy` =
+  `Config\Arsip::CSP_BERKAS`. Isi dibaca lewat `StorageAdapterInterface::baca()` (tanpa streaming).
+- **Audit**: pembukaan folder/daftar arsip pegawai LAIN oleh role 1/3/4/5 → `audit_logs` `entity` `arsip_lihat`,
+  `entity_id` NIP sasaran, `after` `{ endpoint: folder|berkas, filter: { id_jenis_rwy, belum_terhubung, ada_pencarian } }`
+  (tanpa teks `q`/nama berkas), dedup 15 menit per (aktor, NIP), fail-closed (gagal tulis → 500). Setiap `buka` 200 (semua
+  role, termasuk pemilik) → `arsip_unduh`, `after` `{ id_attachment, id_riwayat, jenis_buka }`, tanpa dedup, hasil
+  `record()` tidak diperiksa (pola F-09).
+- **Throttle** `buka`: `arsip_unduh_<id_pengguna>`, token bucket CI4 kapasitas `Config\Arsip::BUKA_PER_MENIT` (6) per
+  menit → 429 "Terlalu banyak membuka berkas arsip. Coba lagi dalam satu menit."; dicek sesudah semua 403/404.
+- **Rute dev** `GET berkas/<path>` (di luar `api/v1`, `BerkasDevController`): hanya `ENVIRONMENT === 'development'` +
+  `arsip.sajiBerkasDev = true`; dua pola legacy saja, tanpa cek izin, header sama dengan Nginx §7.3. Tidak ada di
+  testing/production.
+
 ### Descriptor tab (beku)
 
 `GET pegawai/{nip}` mengembalikan `data.tabs`: array descriptor. Frontend merender tab dan tombol aksi **hanya** dari

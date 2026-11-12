@@ -97,6 +97,10 @@ final class RoutePegawaiKontrakTest extends CIUnitTestCase
             'unggah lampiran' => ['POST', "api/v1/pegawai/{$nip}/lampiran"],
             'unduh lampiran'  => ['GET', "api/v1/pegawai/{$nip}/lampiran/1/unduh"],
             'hapus lampiran'  => ['DELETE', "api/v1/pegawai/{$nip}/lampiran/1"],
+            // F-10 Arsip Tahap 1 (MAKE-090).
+            'folder arsip'        => ['GET', "api/v1/pegawai/{$nip}/arsip"],
+            'daftar berkas arsip' => ['GET', "api/v1/pegawai/{$nip}/arsip/berkas"],
+            'buka berkas arsip'   => ['GET', "api/v1/pegawai/{$nip}/arsip/berkas/1/buka"],
         ];
     }
 
