@@ -34,6 +34,10 @@ export function createShellRouter(): Router {
       { path: '/konket', name: 'konket-usulan', component: stub },
       { path: '/lkh/verifikasi', name: 'lkh-verifikasi', component: stub },
       { path: '/karpeg-karis', name: 'karpeg-karis-usulan', component: stub },
+      // F-10 Arsip (MAKE-091): dirujuk menu `arsip` dan tombol "Arsip" di header Detail Pegawai.
+      { path: '/arsip', name: 'arsip', component: stub },
+      { path: '/arsip/:nip', name: 'arsip-pegawai', component: stub },
+      { path: '/arsip/:nip/:folder', name: 'arsip-folder', component: stub },
       // Menu fase lanjutan memakai path string, tidak perlu nama route.
     ],
   })

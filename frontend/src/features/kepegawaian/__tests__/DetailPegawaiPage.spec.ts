@@ -347,7 +347,7 @@ describe('DetailPegawaiPage — aksi kartu', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('pegawai-list'))
   })
 
-  it('"Arsip Kepegawaian" membuka arsip Data Umum (38) & Arsip Status (37) dengan id_entri = NIP (MAKE-014)', async () => {
+  it('"Arsip Data Umum" membuka arsip Data Umum (38) & Arsip Status (37) dengan id_entri = NIP (MAKE-014)', async () => {
     const { wrapper } = await mountDetail()
     await wrapper.get('[data-testid="btn-arsip"]').trigger('click')
     await flushPromises()
@@ -371,7 +371,39 @@ describe('DetailPegawaiPage — aksi kartu', () => {
     expect(unggah?.disabled).toBe(false)
   })
 
-  it('Arsip Kepegawaian: role 4 hanya melihat (tanpa unggah)', async () => {
+  it('AC1-14: tombol lama berlabel "Arsip Data Umum" (testid btn-arsip TETAP), tombol baru "Arsip" (pegawai-header-arsip) menuju /arsip/<nip>', async () => {
+    const { wrapper } = await mountDetail()
+    const lama = wrapper.get('[data-testid="btn-arsip"]')
+    expect(lama.text()).toBe('Arsip Data Umum')
+    const baru = wrapper.get('[data-testid="pegawai-header-arsip"]')
+    expect(baru.text()).toBe('Arsip')
+    expect(baru.attributes('href')).toBe(`/arsip/${NIP}`)
+    expect(baru.attributes('data-testid')).not.toBe(lama.attributes('data-testid'))
+  })
+
+  it.each([Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI, Role.PEGAWAI, Role.PTT, Role.PPPK])(
+    'AC1-14: role %i melihat tombol "Arsip"',
+    async (role) => {
+      const { wrapper } = await mountDetail(`/pegawai/`, role, NIP)
+      expect(wrapper.find('[data-testid="pegawai-header-arsip"]').exists()).toBe(true)
+    },
+  )
+
+  it('AC1-04: role 8 tidak melihat tombol "Arsip"', async () => {
+    const { wrapper } = await mountDetail(`/pegawai/`, Role.PIMPINAN)
+    expect(wrapper.find('[data-testid="pegawai-header-arsip"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-arsip"]').exists()).toBe(true)
+  })
+
+  it('tombol "Arsip" membuka halaman Arsip pegawai itu (navigasi)', async () => {
+    const { wrapper, router } = await mountDetail()
+    await wrapper.get('[data-testid="pegawai-header-arsip"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('arsip-pegawai')
+    expect(router.currentRoute.value.params.nip).toBe(NIP)
+  })
+
+  it('Arsip Data Umum: role 4 hanya melihat (tanpa unggah)', async () => {
     const { wrapper } = await mountDetail(`/pegawai/${NIP}`, Role.ADMIN_VIEW_ESELON1)
     await wrapper.get('[data-testid="btn-arsip"]').trigger('click')
     await flushPromises()

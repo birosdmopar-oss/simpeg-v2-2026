@@ -65,6 +65,7 @@ import {
   STATUS_LAYANAN_ROLES,
   TB_ROLES,
 } from '@/features/layanan/roles'
+import { ARSIP_ROLES } from '@/features/kepegawaian/roles'
 import { LAPORAN_ROLES } from '@/features/laporan/types'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { FORM_DIGITAL_KELOLA_ROLES } from '@/features/form-digital/roles'
@@ -167,7 +168,7 @@ const NAV: NavGroup[] = [
       },
       { key: 'lkh-verifikasi', label: 'Verifikasi LKH', icon: ClipboardCheck, to: { name: 'lkh-verifikasi' }, roles: LKH_ROLES, phase: 3 },
       // Fase 7 (F-10 Arsip Digital).
-      { key: 'arsip', label: 'Arsip', icon: Folder, phase: 7 },
+      { key: 'arsip', label: 'Arsip', icon: Folder, to: { name: 'arsip' }, roles: ARSIP_ROLES, phase: 7 },
       // Fase 4 (Layanan & Approval): submenu per role PRD Fase 4 §6.11.2; grup tampil bila minimal satu anak tampil.
       {
         key: 'layanan',

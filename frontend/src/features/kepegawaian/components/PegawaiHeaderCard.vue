@@ -2,13 +2,13 @@
 /**
  * Kartu identitas Detail Pegawai (§4.1.6, Gambar 22–24): pita navy→oranye di atas, foto, nama (gelar akhir biru) +
  * badge status, ringkasan NIP/jenis/tanggal lahir, lalu tiga kelompok aksi yang DIPISAHKAN sesuai anotasi dokumen:
- *  - "Arsip Kepegawaian" (tombol biru sendiri),
+ *  - "Arsip" (tombol ke halaman Arsip F-10, role 1–7) dan "Arsip Data Umum" (dialog 37/38, tombol biru sendiri),
  *  - "Cetak" (menu: Cetak Data Umum, Cetak DRH — role 1,2,3,4,5),
  *  - "⋯" untuk aksi jarang & berisiko (role 1): "Koreksi NIP" (B-06) lalu "Hapus Pegawai" paling bawah (merah).
  * Foto: `GET pegawai/{nip}/foto` (blob → object URL) bila `ada_foto`; gagal/tidak ada → avatar inisial. Status = kolom
  * `pegawai.status` (1 Aktif, 2 Tidak Aktif, 10 Dihapus — COMMENT DDL).
  */
-import { Calendar, FolderOpen, IdCard, MoreHorizontal, PencilLine, Trash2, Upload, UserRound } from 'lucide-vue-next'
+import { Calendar, Folder, FolderOpen, IdCard, MoreHorizontal, PencilLine, Trash2, Upload, UserRound } from 'lucide-vue-next'
 import {
   DropdownMenuContent,
   DropdownMenuItem,
@@ -31,12 +31,15 @@ const props = withDefaults(
     canPrint: boolean
     canDelete: boolean
     canKoreksiNip?: boolean
+    /** Tombol "Arsip" ke halaman Arsip F-10 (role 1–7; role 8 tidak, PRD AC1-04). */
+    canBukaArsip?: boolean
     deleting?: boolean
     /** Jenis cetak yang tersedia (aditif MAKE-014: DRH tersambung; Cetak Data Umum belum). */
     printKinds?: Array<'data-umum' | 'drh'>
   }>(),
   {
     canKoreksiNip: false,
+    canBukaArsip: false,
     deleting: false,
     printKinds: () => ['data-umum', 'drh'],
   },
@@ -158,9 +161,14 @@ const menuItem =
       />
 
       <div class="flex w-full flex-wrap items-center gap-2 pt-3 lg:w-auto">
+        <UiButton v-if="canBukaArsip" :to="{ name: 'arsip-pegawai', params: { nip: detail.nip } }" data-testid="pegawai-header-arsip">
+          <template #icon-left><Folder class="h-4 w-4" aria-hidden="true" /></template>
+          Arsip
+        </UiButton>
+
         <UiButton data-testid="btn-arsip" @click="emit('arsip')">
           <template #icon-left><FolderOpen class="h-4 w-4" aria-hidden="true" /></template>
-          Arsip Kepegawaian
+          Arsip Data Umum
         </UiButton>
 
         <DropdownMenuRoot v-if="canPrint" :modal="false">
