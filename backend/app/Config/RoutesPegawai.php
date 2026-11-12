@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Constants\Role;
 use CodeIgniter\Router\RouteCollection;
+use Config\Arsip;
 
 /**
  * Route Modul B — pegawai, lampiran, biodata, koreksi NIP, struktur, Konket, LKH (milik WS-2). Dimuat lewat
@@ -91,5 +92,18 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->post('lkh/(:num)/process', 'LkhController::process/$1');
     $routes->get('lkh/(:num)/pdf', 'LkhController::pdf/$1');
 
+    // F-10 Arsip Tahap 1 (MAKE-090, PRD F-10 §8.1): role 1–7 di route (PegawaiScope::ROLE_LIHAT_SEMUA memuat role 8),
+    // lingkup lihat + kepemilikan baris di ArsipService. Endpoint Tahap 2 (aksi/ekspor/opsi-hubungkan) = MAKE-092.
+    $arsip = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK)];
+    $routes->get('pegawai/(:segment)/arsip', 'ArsipController::folder/$1', $arsip);
+    $routes->get('pegawai/(:segment)/arsip/berkas', 'ArsipController::berkas/$1', $arsip);
+    $routes->get('pegawai/(:segment)/arsip/berkas/(:num)/buka', 'ArsipController::buka/$1/$2', $arsip);
+
     // WS-2: endpoint tambahan ditambahkan di sini.
 });
+
+// F-10 rute KHUSUS MESIN DEV (PRD F-10 §7.4): pengganti Nginx `/berkas/` untuk dua pola berkas legacy, tanpa cek izin.
+// Hanya development + `arsip.sajiBerkasDev = true`; test penjaga memastikan tidak terdaftar di testing/production.
+if (ENVIRONMENT === 'development' && config(Arsip::class)->sajiBerkasDev) {
+    $routes->get('berkas/(:any)', 'BerkasDevController::saji/$1', ['namespace' => 'App\Controllers']);
+}
