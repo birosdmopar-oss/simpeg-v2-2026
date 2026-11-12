@@ -1,9 +1,9 @@
-# PRD F-10 Arsip Digital v1.0 (draf untuk ditinjau Horii)
+# PRD F-10 Arsip Digital v1.1 (draf untuk ditinjau Horii)
 
 | Atribut | Isi |
 |---|---|
-| Versi | **v1.0 draf, 12-11-2026** (CR-120). Disusun reviewer CR dari dokumen kerja `Mapping_F-10_Arsip_Digital.md` (folder kerja Horii, tidak di repo) dan kode `main` `0af9be4f`. Temuan dua peninjau (lensa keputusan/legacy dan lensa teknis) sudah dimasukkan |
-| Status | **DRAF, menunggu persetujuan Horii.** Keputusan Horii 12-11-2026 (#1–#18) **sudah final** dan dicatat apa adanya (§3.1). Butir F10-19 dst. adalah bawaan usulan reviewer yang masih perlu dikonfirmasi Horii (§3.2). Untuk bawaan §3.2, reviewer condong ke perilaku legacy bila tidak menyentuh pola keamanan v2 (F10-09), tetapi semuanya tetap usulan yang menunggu konfirmasi Horii (QF10-6) |
+| Versi | **v1.1 draf, 12-11-2026** (CR-120). Disusun reviewer CR dari dokumen kerja `Mapping_F-10_Arsip_Digital.md` (folder kerja Horii, tidak di repo) dan kode `main` `0af9be4f`. Temuan dua peninjau (lensa keputusan/legacy dan lensa teknis) sudah dimasukkan |
+| Status | **DRAF, menunggu persetujuan Horii.** Keputusan Horii 12-11-2026 (#1–#18) **sudah final** dan dicatat apa adanya (§3.1). Butir F10-19 dst. adalah bawaan usulan reviewer yang masih perlu dikonfirmasi Horii (§3.2). Untuk bawaan §3.2, reviewer condong ke perilaku legacy bila tidak menyentuh pola keamanan v2 (F10-09), tetapi semuanya tetap usulan yang menunggu konfirmasi Horii (QF10-6). Horii 12-11-2026 menjawab permintaan konfirmasi bawaan, R8, dan prioritas pratinjau atas CSP dengan "Yes, decision ini berdasarkan simpeg legacy basecode", lalu meminta **Plan B versi penyesuaian** sebagai pembanding (§14) untuk ditinjau |
 | Scope | F-10 Arsip Digital (Trello QASMTASK-107). Ditunda sejak 20-10-2026, dibuka kembali Horii 12-11-2026 sesudah sign-off Fase 7 (11-11-2026). Dikerjakan dalam dua tahap (§5, §6) |
 | Calon path | `docs/fase7/PRD_Fase7_F10_Arsip-Digital.md` |
 | Izin kerja | Belum ada. Kode izin workload diajukan reviewer **sesudah** PRD ini disetujui (F10-13, §13) |
@@ -20,6 +20,8 @@ Berkas dikelompokkan ke dalam "folder" per jenis riwayat. Folder ini hanya cara 
 Berkas dibuka **persis seperti legacy**: lewat alamat publik langsung yang disajikan server web (Nginx), tanpa pemeriksaan izin per berkas, dan tampil di jendela popup. Ini keputusan sadar Horii. Risikonya dicatat di §7 dan Lampiran A, termasuk satu akibat yang perlu Horii ketahui: lampiran layanan cuti/TB/IB (termasuk surat cuti ber-TTE) juga bisa dibuka lewat alamat publik (R8).
 
 Tahap 1 hanya untuk melihat. Tahap 2 menambah aksi legacy: Hubungkan, Ubah nama, Hapus arsip yatim, Ekspor, dan filter "belum terhubung". Aturan aksinya **persis legacy**, tetapi pola keamanan v2 tetap dipakai. Unggah tetap lewat form riwayat/Data Umum. Skema database tidak berubah, jadi DB Validator tidak diperlukan.
+
+**Plan B (§14).** Atas permintaan Horii, PRD ini juga memuat versi penyesuaian sebagai pembanding: per butir dicatat status legacy, status v2 sekarang, gap, serta kelebihan dan kekurangannya. Plan A (persis legacy) tetap rencana yang berjalan sampai Horii memilih butir Plan B tertentu.
 
 ## Cara pakai (WAJIB dibaca)
 1. Label perilaku:
@@ -590,7 +592,8 @@ Catatan matriks:
 | QF10-3 | Hanya soal **waktu** menu "Arsip" tampil: ikut gerbang Fase 7 (`ACTIVE_PHASE` ≥ 7) atau lebih awal lewat `rilis`. Menu tetap diaktifkan (F10-06) | Ikut gerbang Fase 7 | MAKE-091 (hanya flag) |
 | QF10-4 | Alamat terpisah untuk berkas (penguatan R5). Subdomain = same-site dan tidak menggantikan daftar tipe + `nosniff`; isolasi penuh butuh domain terdaftar berbeda | Dicatat di ADR; keputusan infrastruktur saat deploy | Tidak menahan |
 | QF10-5 | Keberadaan baris ber-`id_riwayat` NULL (D1 blok 9). Kode di luar daftar tidak mungkin ada karena FK | F10-29 (folder `tanpa_jenis`, Edit saja) | Tidak menahan |
-| QF10-6 | Konfirmasi bawaan F10-19..F10-33 | Ikut bawaan | G10-1 |
+| QF10-6 | Konfirmasi bawaan F10-19..F10-33 | Ikut bawaan. Horii 12-11-2026: "Yes, decision ini berdasarkan simpeg legacy basecode" | G10-1 |
+| QF10-7 | Butir Plan B mana (PB-1..PB-7, §14) yang dipakai, bila ada. Tanpa pilihan = Plan A | Lihat §14.6 | G10-1 |
 
 ---
 
@@ -611,6 +614,116 @@ Alur setiap paket: branch `f10/<key>-<slug>` dari `origin/main` → gate cepat �
 
 ---
 
+## 14. Plan B — versi penyesuaian (pembanding untuk ditinjau Horii)
+
+### 14.1 Kedudukan
+- **Plan A = PRD ini (§3–§13)**, yaitu rencana yang berjalan: persis legacy, dengan pola keamanan v2 (F10-09). Horii 12-11-2026 mengonfirmasi bahwa keputusan F-10 berbasis kode legacy ("Yes, decision ini berdasarkan simpeg legacy basecode").
+- **Plan B = versi penyesuaian**, dicatat atas permintaan Horii 12-11-2026 sebagai pembanding. Setiap butir memuat status legacy, status v2 sekarang, gap, serta kelebihan dan kekurangannya.
+- Butir Plan B **bisa dipilih satu per satu**; campuran Plan A dan Plan B boleh. Memilih satu butir Plan B = keputusan Horii baru yang mengubah butir F10 terkait lewat revisi PRD (CR). Tanpa keputusan itu, pelaksana mengerjakan Plan A.
+- Plan B **tidak** menambah migration. Semua butir masih memakai tabel dan kode `jenis_rwy` yang ada, sehingga tetap tanpa DBV.
+
+### 14.2 Status fitur secara umum
+| Sisi | Status |
+|---|---|
+| Legacy | **Berjalan.** Halaman "Arsip Kepegawaian" per pegawai (`hr/arsip/index/{nip}`): tabel datar semua baris `document_attachment` milik NIP, filter jenis + "belum terhubung", ekspor, aksi Hubungkan/Hapus (kode 0) + Ubah Nama, berkas dibuka lewat URL publik server arsip (`legacy:controllers/hr/Arsip.php`, `legacy:libraries/hr/L_arsip.php:12-19`, `legacy:views/hr/employee/arsip/list.php`, `legacy:helpers/function_helper.php:307-326`) |
+| v2 sekarang (`main` `0af9be4f`) | **Belum ada halaman Arsip.** Menu `arsip` masih placeholder (`phase: 7`, tersembunyi). Fondasinya sudah ada: tabel `document_attachment` + `jenis_rwy` (ikut impor tier 10), lampiran per riwayat di tab B-18 (`ArsipTable`, unduh privat lewat `LampiranController` + `OtorisasiLampiran`), dialog Data Umum 37/38 (`ArsipKepegawaianDialog`), penyimpanan lokal privat (`LocalStorageAdapter`), serta alat salin berkas legacy `lampiran:manifest/tarik/periksa` (MAKE-069 opsi A) |
+| Plan A | Halaman Arsip v2 yang perilakunya persis legacy (termasuk URL publik), ditambah folder, tanda berkas hilang, dan pola keamanan v2 |
+| Plan B | Halaman dan alur yang sama dengan Plan A, tetapi butir yang menyentuh kerahasiaan berkas dan konsistensi aturan B-18 mengikuti pola v2 (§14.3) |
+
+### 14.3 Butir yang berbeda antara Plan A dan Plan B
+
+#### PB-1. Cara membuka berkas (F10-18, F10-08)
+- **Legacy:** URL publik langsung `pathToSrc(path)` tanpa sesi. Berkas `arsip/` dari server arsip, path lain dari server aplikasi. Tanpa log unduh (`function_helper.php:307-326`, `list.php:81`).
+- **v2 sekarang:** semua lampiran **privat** sejak Fase 3: unduh lewat `GET pegawai/{nip}/lampiran/{id}/unduh` (jwt + izin Definisi + `PegawaiScope`, `attachment`, `nosniff`, `no-store`; `LampiranController.php:79-94`, `OtorisasiLampiran.php:110-125`). Path tidak pernah dikirim ke klien (`AttachmentService.php:29-38`). Dokumen F-09 sudah punya audit unduh + throttle 6/menit per akun (`DokumenService.php:26`, `:336`, `:357`).
+- **Plan A:** URL publik lewat alias Nginx `/berkas/` tanpa cek izin (§7). Audit unduh gugur.
+- **Plan B:** **privat**. Mode `'privat'` yang di Plan A hanya disiapkan sebagai saklar rollback (F10-24) menjadi bawaan: berkas dibuka lewat `GET pegawai/{nip}/arsip/berkas/{id}/buka` (jwt + lingkup + `no-store`), FE membuka sebagai blob lewat klien API (§9.3). Tidak ada blok Nginx `/berkas/`. Audit + throttle unduh dihidupkan lagi dengan pola F-09 (entity terpisah, mis. `arsip_unduh`).
+- **Gap:** legacy publik ↔ v2 privat. Plan A membalik pola v2 untuk berkas yang sama; Plan B mempertahankan pola v2 dan berbeda dari legacy hanya pada cara membuka (popup tetap ada).
+- **Kelebihan Plan B:** R1–R5, R7, dan R8 (§7.6) hilang; KTP/NPWP/BPJS (kode 38) tidak terbuka bagi yang sekadar tahu URL; audit unduh bisa dilakukan; invarian "path tidak ke klien" tetap utuh; tidak butuh setelan Nginx, hak baca user Nginx, uji header, maupun ADR pembalikan pola (G10-4 dan B10-3 gugur, MAKE-093 mengecil); satu pola dengan tab B-18.
+- **Kekurangan Plan B:** berbeda dari legacy: URL berkas tidak bisa dibagikan ke orang lain atau dibuka tanpa login; berkas melewati PHP, dan `StorageAdapterInterface::baca()` memuat seluruh isi berkas ke memori (`StorageAdapterInterface.php:25`), sehingga berkas besar butuh batas ukuran + `memory_limit` (DEPLOY-002.1) atau CR streaming terpisah; beban PHP-FPM sedikit naik; QR surat cuti lama (F10-14) tetap blocker terpisah, karena alias publik yang bisa dipakai untuk redirect tidak ada.
+
+#### PB-2. Publik hanya untuk berkas legacy (jalan tengah PB-1)
+- **Legacy:** semua berkas arsip adalah berkas legacy, dibuka publik.
+- **v2 sekarang:** berkas unggahan v2 (kunci `YYYY/MM/<32 hex>`) privat; berkas legacy hasil salinan MAKE-069 dibaca lewat `PathLegacy` oleh endpoint privat.
+- **Plan A:** tiga pola publik: kunci v2, `arsip/…`, `assets/upload/…` (§7.2).
+- **Plan B:** hanya `arsip/…` dan `assets/upload/…` yang disajikan Nginx (paritas URL lama legacy). Berkas unggahan v2, termasuk lampiran layanan 42–50, dibuka lewat endpoint privat `buka` seperti PB-1. Badge, folder, dan popup sama.
+- **Gap:** legacy tidak punya berkas unggahan v2, jadi Plan B tetap paritas penuh untuk semua berkas yang ada di legacy dan mempertahankan pola privat untuk berkas yang lahir di v2.
+- **Kelebihan Plan B:** R8 hilang (surat cuti ber-TTE dan lampiran cuti/TB/IB tidak terbuka lewat URL publik); berkas yang diunggah sejak v2 (termasuk KTP/NPWP unggahan baru) tetap privat; URL legacy yang sudah beredar tetap berfungsi; alias `arsip/` tetap membuka opsi redirect QR lama (B10-2).
+- **Kekurangan Plan B:** dua jalur buka (publik untuk berkas legacy, privat untuk berkas v2), sehingga FE, test, dan QA lebih banyak; R1, R2, R6, R7 tetap berlaku untuk berkas legacy; setelan Nginx tetap dibutuhkan (MAKE-093 tetap ada, dengan dua pola).
+
+#### PB-3. Izin per jenis riwayat (F10-30)
+- **Legacy:** semua baris per NIP tampil bagi role yang boleh membuka halaman, tanpa izin per jenis (`L_arsip.php:12-19`).
+- **v2 sekarang:** tab B-18 memakai izin Definisi per kode. Contoh: hukdis hanya boleh dilihat role 1/3 (`Definisi/Hukdis.php:92`); daftar lampiran B-18 ditolak bagi role tanpa izin `lihat` (`OtorisasiLampiran.php:69`).
+- **Plan A:** tanpa izin per kode; role 2/4/5/6/7 melihat lampiran + ringkasan hukdis (R9).
+- **Plan B:** baris dan folder disaring dengan izin `lihat` Definisi pemilik kode (pola `OtorisasiLampiran::bolehDaftar`). Kode tanpa Definisi riwayat (0, 37, 38, 42–50) memakai aturan tertulis: 0/37/38 = role yang boleh melihat pegawai; 42–50 = role yang boleh melihat layanan itu.
+- **Gap:** Plan A = legacy; Plan B = sama dengan B-18.
+- **Kelebihan Plan B:** halaman Arsip tidak menjadi jalan pintas ke data yang sengaja disembunyikan di B-18; satu aturan izin di seluruh aplikasi; R9 hilang.
+- **Kekurangan Plan B:** pegawai tidak melihat sebagian arsip miliknya sendiri (mis. lampiran hukdis), berbeda dari legacy; aturan kode 42–50 perlu dirinci dan diuji; `jumlah` folder berbeda per role.
+
+#### PB-4. Kunci aksi seperti B-18 (F10-31)
+- **Legacy:** Hubungkan dan Ubah Nama tanpa cek kunci baris (`Local.php:3496-3699`, `:3809-3890`).
+- **v2 sekarang:** unggah/hapus lampiran ke riwayat **Disetujui** dikunci untuk pegawai bila Definisi menguncinya (`OtorisasiLampiran.php:380-389`); tulis Arsip Data Umum 37 hanya role 1 (`ArsipDataUmum.php:52-56`).
+- **Plan A:** tanpa kunci; role 2/6/7 bisa meng-Hubungkan ke riwayat Disetujui, role 2/3/6/7 bisa mengubah nama arsip 37.
+- **Plan B:** Hubungkan memakai kunci baris Disetujui yang sama (403 "Data yang sudah disetujui tidak dapat diubah."); Ubah Nama kode 37 memakai `ArsipDataUmum::bolehTulis()`.
+- **Gap:** Plan A = legacy; Plan B = sama dengan B-18 dan Data Umum.
+- **Kelebihan Plan B:** pegawai tidak bisa menambah berkas ke riwayat yang sudah disahkan admin lewat jalur samping; konsisten dengan B-18.
+- **Kekurangan Plan B:** pegawai tidak bisa merapikan arsip yatim miliknya ke riwayat yang sudah disetujui; tugas itu jatuh ke admin (role 1/3).
+
+#### PB-5. Hapus arsip yatim (F10-09)
+- **Legacy:** hanya baris DB yang dihapus; berkas fisik tertinggal; tanpa log (`Local.php:3786-3797`).
+- **v2 sekarang:** `AttachmentService::hapus()` menghapus baris lalu menjadwalkan penghapusan berkas sesudah transaksi selesai (`AttachmentService.php:120-139`); hapus B-18 juga menjaga lampiran wajib terakhir (`OtorisasiLampiran.php:43-45`).
+- **Plan A:** baris saja, berkas tertinggal (R7, retensi = B10-1).
+- **Plan B:** memakai `AttachmentService::hapus()`, sehingga berkas fisik ikut terhapus sesudah commit. Sebelum dipakai, pelaksana memastikan tidak ada baris lain yang merujuk path yang sama [I].
+- **Gap:** Plan A = legacy; Plan B = pola v2.
+- **Kelebihan Plan B:** tidak ada berkas yatim yang menumpuk di disk; R7 hilang; retensi berkas yatim (bagian B10-1) lebih sederhana.
+- **Kekurangan Plan B:** berkas tidak bisa dipulihkan dari disk sesudah dihapus (bergantung backup, B10-1); berbeda dari legacy.
+
+#### PB-6. Hubungkan dan antrean SIASN (F10-09, §6.6)
+- **Legacy:** tanpa cek; Hubungkan bisa membuat berkas masuk antre unggah SIASN.
+- **v2 sekarang:** `AntreArsip` mengantre lampiran kode 9/36/41 (Jabatan) dan 5 (Diklat sertifikasi) berekstensi PDF untuk riwayat yang sudah terkirim ke SIASN (`AntreArsip.php:17-21`); belum ada jalur Hubungkan.
+- **Plan A:** tanpa pencegahan, risiko diterima.
+- **Plan B:** Hubungkan ke 9/36/5 hanya untuk role 1/3, dengan dialog konfirmasi yang menyebut bahwa berkas bisa ikut terkirim ke SIASN. Role 2/6/7 tetap bisa Hubungkan ke kode lain.
+- **Gap:** Plan A = legacy; Plan B = pencegahan ringan khusus v2.
+- **Kelebihan Plan B:** berkas yang dikirim ke SIASN atas nama instansi selalu lewat keputusan admin; pengiriman tak sengaja berkurang.
+- **Kekurangan Plan B:** pegawai tidak bisa menghubungkan SK Jabatan/sertifikat sendiri; aturan role per kode menambah test.
+
+#### PB-7. Lampiran "menggantung" (F10-16)
+- **Legacy:** tetap tampil dan bisa dibuka tanpa syarat status (`L_arsip.php:12`).
+- **v2 sekarang:** unduh B-18 untuk riwayat status 10 (Dihapus) → 404 (`OtorisasiLampiran.php:121`).
+- **Plan A:** tampil dan bisa dibuka, tanpa badge.
+- **Plan B:** tampil dengan badge status riwayat ("Riwayat dihapus" / "Pengajuan" / "Riwayat tidak ditemukan"); buka hanya untuk role 1/3; role lain melihat baris tanpa bisa membuka.
+- **Gap:** Plan A = legacy; Plan B = jalan tengah antara legacy (tampil) dan B-18 (404).
+- **Kelebihan Plan B:** admin tetap bisa memeriksa dan merapikan arsip; berkas dari riwayat yang sudah dihapus tidak beredar lagi; status baris jelas di layar.
+- **Kekurangan Plan B:** pegawai tidak bisa membuka berkas lama miliknya sendiri yang riwayatnya sudah dihapus; butuh satu query status per kode (tetap tanpa N+1).
+
+### 14.4 Butir yang sudah disesuaikan di Plan A (tidak berbeda di Plan B)
+| Butir | Legacy | v2 sekarang | Plan A = Plan B | Gap / catatan |
+|---|---|---|---|---|
+| Keamanan aksi (F10-09) | Aksi lewat GET, `tag` mentah (XSS), `opsi-hubungkan` hanya cek login | Endpoint tulis non-GET, sanitasi, cek lingkup | Non-GET, `tag` dibersihkan, cek role + lingkup + kepemilikan, audit baris | Celah legacy tidak ditiru; perilaku bisnisnya tetap |
+| Tipe berkas (F10-32) | Semua ekstensi disajikan apa adanya | Unduh B-18 selalu `attachment` | Semua bisa dibuka; hanya pdf/gambar sebagai pratinjau | Mencegah HTML/SVG berjalan sebagai halaman (R5) |
+| Folder (F10-04) | Tabel datar + filter | — | Folder virtual dari `jenis_rwy` + "Semua berkas" (filter legacy tetap) | "Semua berkas" = tampilan legacy |
+| Tanda berkas hilang (F10-23) | Tidak ada (link mati) | B-18 404 bila berkas tidak ada | Badge "Berkas hilang" / "Tidak dapat dibuka", tanpa 500 | Fitur baru v2 (DoD) |
+| Jejak buka daftar (F10-17) | Tanpa log | Audit F-09 untuk unduhan dokumen | Catat pembukaan daftar pegawai lain oleh 1/3/4/5 | Fitur baru v2 |
+| Paginasi, pencarian, CSV (F10-20/21/27) | DataTables di klien; CSV berekstensi `.txt` | Pola `ListQuery`, `EksporTabel` | Paginasi + `q` di server; `.csv` | Perbaikan teknis |
+| Role 4/5 dan 8 (F10-07) | 4/5 lihat; 8 ditolak | `PegawaiScope` | Sama | Tidak ada gap |
+
+### 14.5 Dampak bila butir Plan B dipilih
+| Butir | Bagian PRD yang direvisi | Paket |
+|---|---|---|
+| PB-1 | F10-18 (keputusan baru), F10-08 hidup lagi, F10-24 (bawaan `'privat'`), §7 diringkas, R1–R8, ADR §7.7 tidak perlu, G10-4/B10-3 gugur | MAKE-090 (endpoint `buka` + audit/throttle), MAKE-091 (buka via blob), MAKE-093 menyusut ke koreksi dokumen §7.5 |
+| PB-2 | F10-18 (dipersempit), §7.2 (dua pola), R8 hilang | MAKE-090 (dua jalur URL), MAKE-091 (dua cara buka), MAKE-093 (dua pola Nginx) |
+| PB-3 | F10-30, AC1-05, §12.1, daftar "Bukan bug" §11.3 | MAKE-090 (`OtorisasiArsip` memakai Definisi) |
+| PB-4 | F10-31, AC2-13 | MAKE-092 |
+| PB-5 | F10-09 (Hapus), AC2-09, R7 | MAKE-092 |
+| PB-6 | F10-09 (SIASN), F10-28, §6.6, AC2-07 | MAKE-092 |
+| PB-7 | F10-16, AC1-06 | MAKE-090, MAKE-091 |
+
+### 14.6 Catatan reviewer (bukan keputusan)
+- PB-1 dan PB-2 saling menggantikan. PB-1 paling aman; PB-2 menjaga paritas URL legacy sambil menutup R8.
+- PB-3..PB-7 tidak saling bergantung dan bisa dipilih tersendiri.
+- Bila Horii tetap memilih Plan A untuk semua butir, bagian ini tetap disimpan sebagai catatan alternatif dan dasar ADR (§7.7).
+
+---
+
 ## Lampiran A — Deviasi dan cara kembali
 | # | Legacy | v2 (F-10) | Cara kembali |
 |---|---|---|---|
@@ -628,3 +741,4 @@ Alur setiap paket: branch `f10/<key>-<slug>` dari `origin/main` → gate cepat �
 | Versi | Tanggal | Isi |
 |---|---|---|
 | v1.0 draf | 12-11-2026 | CR-120: PRD F-10 dari Mapping F-10 + keputusan Horii 12-11-2026 #1–#18 (F10-01..18); bawaan usulan F10-19..33; Tahap 1/2; penyajian URL publik + rollback; tanpa DBV. Sudah memuat hasil review keputusan/legacy dan review teknis, bawaan F10-19..33 menunggu konfirmasi Horii |
+| v1.1 draf | 12-11-2026 | Jawaban Horii atas konfirmasi bawaan dicatat (QF10-6); §14 Plan B versi penyesuaian (PB-1..PB-7: status legacy, status v2, gap, kelebihan, kekurangan, dampak paket) + QF10-7 |
