@@ -270,7 +270,10 @@ MAKE-092.
   jenis_buka (pratinjau|unduh|null), aksi { edit, hubungkan, hapus }` (Tahap 1 selalu `false`).
   - `nama_arsip` = `tag` → `display_name` → `filename`; baris berkunci v2 tanpa `tag`/`display_name` → "Berkas <id>".
   - `url_berkas`: `publik` = `{arsip.dasarUrlBerkas}/<path ternormalisasi, tiap segmen rawurlencode>` (memuat path legacy,
-    deviasi sadar F10-18 (a)); `privat` = `pegawai/<nip>/arsip/berkas/<id>/buka` (relatif dasar API, tanpa path/kunci).
+    deviasi sadar F10-18 (a)); `privat` = `pegawai/<nip>/arsip/berkas/<id>/buka` (path API relatif TANPA slash awal,
+    digabung klien dengan baseURL API; tanpa path/kunci); `null` bila hilang / tak dapat dibuka.
+  - Nullability: `akses_berkas`, `url_berkas`, dan `jenis_buka` bernilai `null` bersamaan, tepat bila `url_berkas` null
+    (`status_berkas` ≠ `ada`). Berkas yang ada tetapi tanpa ekstensi (atau ekstensi non-pratinjau) → `jenis_buka: "unduh"`.
   - Regex (`Config\Arsip`, atas `PathLegacy::normalisasi()`): kunci v2 `^[0-9]{4}/[0-9]{2}/[0-9a-f]{32}\.[a-z0-9]{1,10}$`
     (selalu privat); legacy `^arsip/(?:[^/.][^/]*/)*[^/.][^/]*$` dan `^assets/upload/(?:[^/.][^/]*/)*[^/.][^/]*$` (publik,
     atau privat saat saklar `privat`). `jenis_buka` dari ekstensi path (pdf/jpg/jpeg/png/gif = pratinjau), bukan `file_ext`.
@@ -280,7 +283,8 @@ MAKE-092.
     `id_attachment` menurun.
 - **`buka`** (F10-34..36): `Content-Type` dari daftar tertutup menurut ekstensi path (pdf `application/pdf`, jpg/jpeg
   `image/jpeg`, png `image/png`, gif `image/gif`, lainnya `application/octet-stream`); `Content-Disposition`
-  `inline` (pratinjau) / `attachment` dengan nama arsip + ekstensi path (ASCII + `filename*`); `X-Content-Type-Options:
+  `inline` (pratinjau) / `attachment`, SELALU dengan nama = nama arsip yang diakhiri ekstensi path ternormalisasi (ditambahkan
+  bila belum; berkas tanpa ekstensi = nama arsip apa adanya), cadangan ASCII + `filename*` UTF-8; `X-Content-Type-Options:
   nosniff`, `Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`, `Content-Security-Policy` =
   `Config\Arsip::CSP_BERKAS`. Isi dibaca lewat `StorageAdapterInterface::baca()` (tanpa streaming).
 - **Audit**: pembukaan folder/daftar arsip pegawai LAIN oleh role 1/3/4/5 → `audit_logs` `entity` `arsip_lihat`,
