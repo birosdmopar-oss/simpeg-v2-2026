@@ -278,9 +278,12 @@ MAKE-092.
     (selalu privat); legacy `^arsip/(?:[^/.][^/]*/)*[^/.][^/]*$` dan `^assets/upload/(?:[^/.][^/]*/)*[^/.][^/]*$` (publik,
     atau privat saat saklar `privat`). `jenis_buka` dari ekstensi path (pdf/jpg/jpeg/png/gif = pratinjau), bukan `file_ext`.
   - `ringkasan_riwayat` = bentuk `previewRwy` legacy untuk kode 1, 3, 5, 7, 9, 36, 10, 11, 13, 14, 20, 22, 23, 32 (satu
-    query per tabel per halaman, hanya baris milik NIP); lainnya "—".
+    query per tabel per halaman); lainnya, dan baris tidak ditemukan, "—". [V2] kecil (anti-IDOR F10-09, diterima
+    reviewer 12-11-2026): baris riwayat hanya diambil bila milik NIP itu (kode 3 lewat induk `riwayat_keluarga`), sedangkan
+    legacy membaca menurut PK saja.
   - `q` = LIKE literal atas `tag`/`display_name`/`filename`; `per_page` bawaan 25, dijepit 1..100; urut bawaan
-    `id_attachment` menurun.
+    `id_attachment` menurun. `sort=nama` memakai ekspresi yang sama dengan `nama_arsip` (termasuk "Berkas <id>");
+    `sort=jenis` menaruh "Tanpa Jenis" selalu di belakang; seri diputus `id_attachment` menurun.
 - **`buka`** (F10-34..36): `Content-Type` dari daftar tertutup menurut ekstensi path (pdf `application/pdf`, jpg/jpeg
   `image/jpeg`, png `image/png`, gif `image/gif`, lainnya `application/octet-stream`); `Content-Disposition`
   `inline` (pratinjau) / `attachment`, SELALU dengan nama = nama arsip yang diakhiri ekstensi path ternormalisasi (ditambahkan

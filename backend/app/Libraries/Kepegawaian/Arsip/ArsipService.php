@@ -39,6 +39,16 @@ final class ArsipService
 
     private const TANPA_JENIS = 'tanpa_jenis';
 
+    /**
+     * Ekspresi urut `sort=nama` = {@see self::namaArsip()} di SQL: `tag` → `display_name` → `filename` (kecuali baris
+     * berkunci v2) → "Berkas <id>". Regex kunci v2 = Config\Arsip::REGEX_KUNCI_V2 (`[.]` pengganti `\.`), dibandingkan
+     * peka huruf (`utf8mb4_bin`) seperti PHP. Beda kecil yang diterima: TRIM SQL hanya membuang spasi.
+     */
+    public const SQL_NAMA_ARSIP = "CASE WHEN TRIM(da.tag) <> '' THEN da.tag"
+        . " WHEN TRIM(da.display_name) <> '' THEN da.display_name"
+        . " WHEN TRIM(da.filename) <> '' AND NOT (COALESCE(da.path, '') COLLATE utf8mb4_bin REGEXP '^[0-9]{4}/[0-9]{2}/[0-9a-f]{32}[.][a-z0-9]{1,10}$') THEN da.filename"
+        . " ELSE CONCAT('Berkas ', da.id_attachment) END";
+
     public function __construct(
         private readonly BaseConnection $db,
         private readonly PegawaiScopeInterface $scope,
@@ -312,8 +322,9 @@ final class ArsipService
         $arahSql = strtoupper($arah);
 
         match ($sort) {
-            'nama'       => $b->orderBy("COALESCE(NULLIF(TRIM(da.tag), ''), NULLIF(TRIM(da.display_name), ''), da.filename) {$arahSql}", '', false),
-            'jenis'      => $b->orderBy('jr.jenis_rwy', $arahSql),
+            'nama' => $b->orderBy(self::SQL_NAMA_ARSIP . ' ' . $arahSql, '', false),
+            // "Tanpa Jenis" (id_riwayat NULL) selalu di belakang, apa pun arahnya (F10-29).
+            'jenis'      => $b->orderBy('jr.jenis_rwy IS NULL', '', false)->orderBy('jr.jenis_rwy', $arahSql),
             'created_at' => $b->orderBy('da.created_at', $arahSql),
             default      => $b->orderBy('da.id_attachment', $arahSql),
         };

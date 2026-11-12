@@ -9,6 +9,9 @@ use App\Libraries\Kepegawaian\Arsip\ArsipService;
 use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
 use App\Models\AuditLogModel;
 use CodeIgniter\Config\Factories;
+use CodeIgniter\Database\Query;
+use CodeIgniter\Events\Events;
+use CodeIgniter\I18n\Time;
 use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\Mock\MockCache;
 use CodeIgniter\Throttle\Throttler;
@@ -64,6 +67,7 @@ final class ArsipEndpointTest extends DatabaseTestCase
         $this->bersihkanLampiranUji();
         Services::reset(true);
         Factories::reset('config');
+        Time::setTestNow();
 
         parent::tearDown();
     }
@@ -306,10 +310,75 @@ final class ArsipEndpointTest extends DatabaseTestCase
     public function testCatatanPembukaanDaftarFailClosed(): void
     {
         $admin   = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
-        $service = new ArsipService($this->db, service('pegawaiScope'), service('storageAdapter'), new Arsip(), $this->throttler, $this->auditNol(), new MockCache());
+        $cache   = new MockCache();
+        $service = new ArsipService($this->db, service('pegawaiScope'), service('storageAdapter'), new Arsip(), $this->throttler, $this->auditNol(), $cache);
 
-        $this->expectException(RuntimeException::class);
-        $service->folder($this->authUntukAkun((int) $admin['id_pengguna']), $this->nip);
+        try {
+            $service->folder($this->authUntukAkun((int) $admin['id_pengguna']), $this->nip);
+            $this->fail('Catatan gagal ditulis harus menggagalkan permintaan.');
+        } catch (RuntimeException $e) {
+            $this->assertSame('Catatan pembukaan arsip gagal ditulis.', $e->getMessage());
+        }
+
+        // Kunci dedup TIDAK terisi sesudah gagal: permintaan berikutnya mencoba mencatat lagi (dan gagal lagi).
+        $this->assertSame([], $cache->getCacheInfo());
+        $this->expectExceptionMessage('Catatan pembukaan arsip gagal ditulis.');
+        $service->daftar($this->authUntukAkun((int) $admin['id_pengguna']), $this->nip, []);
+    }
+
+    public function testCatatanPembukaanPerRoleAktorTanpaNipDedupDanTtl(): void
+    {
+        $lihat  = fn (array $akun, string $nip) => $this->asUser($akun)->get("api/v1/pegawai/{$nip}/arsip")->assertStatus(200);
+        $jumlah = fn (): int => $this->db->table('audit_logs')->where('entity', 'arsip_lihat')->countAllResults();
+        $milik  = fn (array $akun): array => $this->db->table('audit_logs')->where('entity', 'arsip_lihat')->where('id_pengguna_actor', $akun['id_pengguna'])->get()->getResultArray();
+
+        // Role 3 (dalam lingkup), 4, 5 membuka NIP lain → tepat satu baris per aktor, aktor benar; arsip sendiri → tidak.
+        foreach ([Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI] as $role) {
+            $akun = $this->akun($this->buatPegawaiDiSatker($this->satker), $role);
+            $lihat($akun, $this->nip);
+            $lihat($akun, $this->nip);
+            $baris = $milik($akun);
+            $this->assertCount(1, $baris, "role {$role}");
+            $this->assertSame([$akun['nip'], $this->nip], [$baris[0]['nip_actor'], $baris[0]['entity_id']], "role {$role}");
+
+            $lihat($akun, (string) $akun['nip']);
+            $this->assertCount(1, $milik($akun), "role {$role} membuka arsip sendiri");
+        }
+
+        $this->assertSame(3, $jumlah());
+
+        foreach ([Role::PTT, Role::PPPK] as $role) {
+            $nip = $this->buatPegawaiDiSatker($this->satker);
+            $lihat($this->akun($nip, $role), $nip);
+        }
+
+        $this->assertSame(3, $jumlah(), 'role 6/7 membuka arsip sendiri tidak dicatat');
+
+        // Akun role 1 tanpa NIP → dicatat dengan nip_actor NULL.
+        $tanpaNip = $this->buatAkunTanpaNip('admin-arsip-uji');
+        $lihat($tanpaNip, $this->nip);
+        $baris = $milik($tanpaNip);
+        $this->assertCount(1, $baris);
+        $this->assertNull($baris[0]['nip_actor']);
+
+        // Dedup per (aktor, NIP): NIP kedua oleh aktor sama → baris baru; aktor kedua untuk NIP sama → baris baru.
+        $lihat($tanpaNip, $this->buatPegawai());
+        $this->assertSame(5, $jumlah());
+        $kedua = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $lihat($kedua, $this->nip);
+        $this->assertSame(6, $jumlah());
+
+        // TTL 15 menit: +899 detik masih dedup, +901 detik tercatat lagi (cache uji yang menghormati TTL lewat Time::now()).
+        Services::injectMock('cache', $this->cacheBerTtl());
+        $lihat($kedua, $this->nip);
+        $this->assertSame(7, $jumlah(), 'cache baru: tercatat sekali');
+        $mulai = Time::now();
+        Time::setTestNow($mulai->addSeconds(899));
+        $lihat($kedua, $this->nip);
+        $this->assertSame(7, $jumlah());
+        Time::setTestNow($mulai->addSeconds(901));
+        $lihat($kedua, $this->nip);
+        $this->assertSame(8, $jumlah());
     }
 
     public function testBukaHeaderAuditDanNamaBerekstensi(): void
@@ -378,13 +447,19 @@ final class ArsipEndpointTest extends DatabaseTestCase
 
     public function testThrottleTokenBucketSesudahPenolakanPasti(): void
     {
-        $v2   = $this->arsip(9, self::KUNCI_PDF);
-        $akun = $this->akun($this->nip, Role::PEGAWAI);
-        $url  = "api/v1/pegawai/{$this->nip}/arsip/berkas/{$v2}/buka";
+        $v2       = $this->arsip(9, self::KUNCI_PDF);
+        $hilang   = $this->arsip(9, '2026/11/' . str_repeat('c', 32) . '.pdf', [], false);
+        $takCocok = $this->arsip(9, 'kolom/a.pdf');
+        $legacy   = $this->arsip(0, 'arsip/' . $this->nip . '/sk.pdf');
+        $akun     = $this->akun($this->nip, Role::PEGAWAI);
+        $url      = "api/v1/pegawai/{$this->nip}/arsip/berkas/{$v2}/buka";
 
-        // 404/403 tidak memakan jatah.
+        // 404 (tidak ada, hilang, tak cocok regex, legacy saat saklar 'publik') dan 403 tidak memakan jatah.
         for ($i = 0; $i < 8; $i++) {
-            $this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/berkas/999999/buka")->assertStatus(404);
+            foreach ([999999, $hilang, $takCocok, $legacy] as $id) {
+                $this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/berkas/{$id}/buka")->assertStatus(404);
+            }
+
             $this->asUser($akun)->get('api/v1/pegawai/' . $this->buatPegawai() . "/arsip/berkas/{$v2}/buka")->assertStatus(403);
         }
 
@@ -401,6 +476,125 @@ final class ArsipEndpointTest extends DatabaseTestCase
         $this->throttler->setTestTime(1_790_000_011);
         $this->asUser($akun)->get($url)->assertStatus(200);
         $this->assertSame(8, $this->db->table('audit_logs')->where('entity', 'arsip_unduh')->countAllResults());
+    }
+
+    public function testThrottleEmberTerpisahDariUnduhDokumen(): void
+    {
+        $v2   = $this->arsip(9, self::KUNCI_PDF);
+        $akun = $this->akun($this->nip, Role::PEGAWAI);
+
+        // Ember F-09 `dok_unduh_<id>` dihabiskan; ember Arsip `arsip_unduh_<id>` tidak terpengaruh.
+        for ($i = 0; $i < 6; $i++) {
+            $this->assertTrue($this->throttler->check('dok_unduh_' . $akun['id_pengguna'], 6, MINUTE, 1));
+        }
+
+        $this->assertFalse($this->throttler->check('dok_unduh_' . $akun['id_pengguna'], 6, MINUTE, 1));
+        $this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/berkas/{$v2}/buka")->assertStatus(200);
+    }
+
+    public function testBukaMatriksRole(): void
+    {
+        $v2  = $this->arsip(9, self::KUNCI_PDF);
+        $url = static fn (string $nip, int $id): string => "api/v1/pegawai/{$nip}/arsip/berkas/{$id}/buka";
+
+        foreach ([Role::SUPER_ADMIN, Role::ADMIN_VIEW_ESELON1, Role::MENTERI] as $role) {
+            $this->asUser($this->akun($this->buatPegawai(), $role))->get($url($this->nip, $v2))->assertStatus(200);
+        }
+
+        foreach (Role::UL_PEGAWAI as $role) {
+            $sendiri = $this->buatPegawaiDiSatker($this->satker);
+            $milik   = $this->arsip(9, '2026/11/' . substr(hash('sha256', (string) $role), 0, 32) . '.pdf', [], true, null, $sendiri);
+            $akun    = $this->akun($sendiri, $role);
+            $this->asUser($akun)->get($url($sendiri, $milik))->assertStatus(200);
+            $this->asUser($akun)->get($url($this->nip, $v2))->assertStatus(403);
+        }
+
+        $this->asUser($this->akun($this->buatPegawaiDiSatker($this->satker), Role::ADMIN_SATKER))->get($url($this->nip, $v2))->assertStatus(200);
+        $this->asUser($this->akun($this->buatPegawaiDiSatker($this->buatSatker()), Role::ADMIN_SATKER))->get($url($this->nip, $v2))->assertStatus(403);
+        $this->asUser($this->akun($this->buatPegawai(), Role::PIMPINAN))->get($url($this->nip, $v2))->assertStatus(403);
+    }
+
+    public function testSortJenisTanpaJenisDiBelakangDanSortNamaSamaDenganNamaArsip(): void
+    {
+        $tanpa   = $this->arsip(null, 'kolom/a.pdf', ['tag' => 'aaa'], false);
+        $jabatan = $this->arsip(9, 'arsip/x/1.pdf', ['tag' => 'mmm'], false);
+        $alamat  = $this->arsip(1, 'arsip/x/2.pdf', ['tag' => 'zzz'], false);
+        $akun    = $this->akun($this->nip, Role::PEGAWAI);
+        $ids     = fn (string $qs): array => array_column($this->json($this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/berkas?{$qs}"))['data']['items'], 'id_attachment');
+
+        // "Tanpa Jenis" (id_riwayat NULL) selalu di belakang, apa pun arahnya (F10-29).
+        $this->assertSame([$alamat, $jabatan, $tanpa], $ids('sort=jenis&order=asc'));
+        $this->assertSame([$jabatan, $alamat, $tanpa], $ids('sort=jenis&order=desc'));
+
+        // Baris kunci v2 tanpa tag/display_name tampil & diurutkan sebagai "Berkas <id>", bukan basename kunci acak.
+        $this->db->table('document_attachment')->where('NIP', $this->nip)->delete();
+        $kunci = $this->arsip(9, '2026/11/' . str_repeat('0', 32) . '.pdf', ['tag' => null, 'display_name' => null, 'filename' => str_repeat('0', 32) . '.pdf'], false);
+        $ccc   = $this->arsip(9, 'arsip/x/3.pdf', ['tag' => 'Ccc'], false);
+        $aaa   = $this->arsip(9, 'arsip/x/4.pdf', ['tag' => null, 'display_name' => null, 'filename' => 'Aaa.pdf'], false);
+        $urut  = $this->json($this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/berkas?sort=nama&order=asc"))['data']['items'];
+
+        $this->assertSame([$aaa, $kunci, $ccc], array_column($urut, 'id_attachment'));
+        $this->assertSame(['Aaa.pdf', 'Berkas ' . $kunci, 'Ccc'], array_column($urut, 'nama_arsip'));
+        $this->assertStringContainsString(str_replace('\.', '[.]', Arsip::REGEX_KUNCI_V2), ArsipService::SQL_NAMA_ARSIP, 'regex SQL = Config\Arsip::REGEX_KUNCI_V2');
+    }
+
+    public function testRingkasanKodeLainDanTanpaNPlusSatu(): void
+    {
+        $nip = $this->nip;
+        $ins = function (string $tabel, array $data) use ($nip): string {
+            $this->db->table($tabel)->insert(['nip' => $nip, 'status' => 1] + $data);
+
+            return (string) $this->db->insertID();
+        };
+
+        // Master tanda jasa (FK): 44 = "lainnya" [K], 1 = biasa.
+        $this->db->table('tanda_jasa')->insertBatch([['id_tanda_jasa' => 44, 'tanda_jasa' => 'Lainnya'], ['id_tanda_jasa' => 1, 'tanda_jasa' => 'Satyalancana']]);
+
+        // [kode, id_entri, harapan] — dua baris per cabang khusus.
+        $entri = [
+            [1, $ins('riwayat_alamat', ['jenis_alamat' => 1, 'alamat' => 'Jl. Uji 1']), 'Alamat KTP - Jl. Uji 1'],
+            [1, $ins('riwayat_alamat', ['jenis_alamat' => 2, 'alamat' => 'Jl. Uji 2']), 'Alamat DOMISILI - Jl. Uji 2'],
+            [5, $ins('riwayat_diklat', ['jenis_diklat' => 1, 'nama_diklat' => 'Diklat\\ PIM', 'deskripsi' => 'Desk', 'tgl_sertifikat' => '2019-01-01']), 'STRUKTURAL - Diklat PIM'],
+            [5, $ins('riwayat_diklat', ['jenis_diklat' => 2, 'nama_diklat' => 'Abaikan', 'deskripsi' => 'Teknis Uji', 'tgl_sertifikat' => '2019-01-01']), 'TEKNIS - Teknis Uji'],
+            [10, $ins('riwayat_kgb', ['gaji_pokok' => 4567890, 'mker_gol_th' => 12, 'tmtsk' => '2020-01-01', 'tgl_sk' => '2020-01-01']), 'Rp. 4.567.890 - Masa Kerja: 12 Tahun'],
+            [10, $ins('riwayat_kgb', ['gaji_pokok' => 0, 'mker_gol_th' => 3, 'tmtsk' => '2020-01-01', 'tgl_sk' => '2020-01-01']), 'Rp. 0 - Masa Kerja: 3 Tahun'],
+            [11, $ins('riwayat_kp', ['jenis_kp' => 'Reguler', 'gol_ruang' => 'III/c', 'tmtsk' => '2020-01-01']), 'Reguler - III/c'],
+            [13, $ins('riwayat_organisasi', ['nama_organisasi' => 'Korpri']), 'Korpri'],
+            [22, $ins('riwayat_seminar', ['jenis_seminar' => 1, 'nama_seminar' => 'Seminar Uji', 'tgl_sertifikat' => '2019-01-01']), 'SEMINAR - Seminar Uji'],
+            [22, $ins('riwayat_seminar', ['jenis_seminar' => 2, 'nama_seminar' => 'Kursus Uji', 'tgl_sertifikat' => '2019-01-01']), 'KURSUS - Kursus Uji'],
+            [23, $ins('riwayat_tanda_jasa', ['id_tanda_jasa' => 44, 'tanda_jasa' => 'Abaikan', 'tanda_jasa_lain' => 'Jasa Lain', 'tgl_sertifikat' => '2018-12-09']), '9 Desember 2018 - Jasa Lain'],
+            [23, $ins('riwayat_tanda_jasa', ['id_tanda_jasa' => 1, 'tanda_jasa' => 'Satyalancana', 'tgl_sertifikat' => '2018-01-31']), '31 Januari 2018 - Satyalancana'],
+            [32, $ins('riwayat_skp', ['tahun' => 2024, 'nilai_prestasi_kerja' => '85.50', 'kategori_nilai_prestasi' => 'Baik']), '2024 - 85,5 [Baik]'],
+            [32, $ins('riwayat_skp', ['tahun' => 2023, 'nilai_prestasi_kerja' => 0, 'kategori_nilai_prestasi' => 'Kurang']), '2023 - 0 [Kurang]'],
+        ];
+
+        $id = [];
+
+        foreach ($entri as $i => [$kode, $idEntri]) {
+            $id[$i] = $this->arsip($kode, "arsip/x/{$i}.pdf", [], false, $idEntri);
+        }
+
+        $akun  = $this->akun($this->nip, Role::PEGAWAI);
+        $kueri = [];
+        $catat = static function (Query $q) use (&$kueri): void {
+            $kueri[] = $q->getQuery();
+        };
+        Events::on('DBQuery', $catat);
+
+        try {
+            $items = array_column($this->json($this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/berkas"))['data']['items'], 'ringkasan_riwayat', 'id_attachment');
+        } finally {
+            Events::removeListener('DBQuery', $catat);
+        }
+
+        foreach ($entri as $i => [$kode, , $harapan]) {
+            $this->assertSame($harapan, $items[$id[$i]], "kode {$kode} baris {$i}");
+        }
+
+        // Satu query per tabel riwayat (8 tabel untuk 14 baris), bukan per baris.
+        $kueriRiwayat = array_values(array_filter($kueri, static fn (string $sql): bool => preg_match('/FROM\s+`?\w*(riwayat_|detail_anak)/i', $sql) === 1));
+        $this->assertGreaterThan(0, count($kueriRiwayat));
+        $this->assertLessThanOrEqual(8, count($kueriRiwayat), implode("\n", $kueriRiwayat));
     }
 
     public function testBukaAuditNolTetapBerhasil(): void
@@ -440,6 +634,25 @@ final class ArsipEndpointTest extends DatabaseTestCase
         ], $kolom));
 
         return (int) $this->db->insertID();
+    }
+
+    /**
+     * MockCache yang menganggap butir kedaluwarsa menurut Time::now() (MockCache bawaan tidak memeriksa TTL saat get()).
+     */
+    private function cacheBerTtl(): MockCache
+    {
+        return new class () extends MockCache {
+            public function get(string $key): mixed
+            {
+                $k = static::validateKey($key, $this->prefix);
+
+                if (isset($this->expirations[$k]) && $this->expirations[$k] <= Time::now()->getTimestamp()) {
+                    return null;
+                }
+
+                return parent::get($key);
+            }
+        };
     }
 
     private function auditNol(): AuditLogModel
