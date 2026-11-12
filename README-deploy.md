@@ -509,7 +509,7 @@ Perubahan perilaku yang HARUS diberitahukan ke klien (daftar pemberitahuan re-ha
 - Kegagalan auth: SIMAPI HTTP 200 `{"status":"02"}` ("Authentication failed" / "Token is not valid", pesan seragam termasuk untuk
   `ambil_riwayat_mutasi`); `services/*` HTTP 401. Throttle HTTP 429 dengan `Retry-After`.
 - `a_sinkron/ambil_seluruh_pengguna` dan `s_dm/p_web_config` tidak tersedia (404).
-- URL berkas arsip dan foto tidak lagi terbuka tanpa login. `services/s_stat` (MuDig): kolom `arsip_*`/`file_*` berisi URL ke
+- URL berkas arsip dan foto tidak lagi terbuka tanpa login (kecuali berkas arsip legacy lewat `/berkas/`, §1l). `services/s_stat` (MuDig): kolom `arsip_*`/`file_*` berisi URL ke
   `GET services/s_stat/berkas/{jenis}/{nip}/{id}[/{kolom}]` yang butuh Basic klien `stat` (Q6-38). SIMAPI `a_employee`: `foto` berisi URL
   `GET simapi/v1/a_employee/foto/{nip}` yang butuh token SIMAPI di header `Authorization` (Q6-39). Klien harus mengirim kredensial/token
   saat mengambil berkas dan menyesuaikan bentuk URL; berkas/foto yang belum dimigrasikan mengembalikan 404 seragam.
