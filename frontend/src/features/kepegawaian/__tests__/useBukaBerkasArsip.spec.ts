@@ -10,7 +10,7 @@ import { defineComponent, h } from 'vue'
 vi.mock('../services/berkasUnduhan', () => ({ ambilBerkas: vi.fn(), simpanBerkas: vi.fn() }))
 
 import type { ArsipBerkas } from '../arsip.types'
-import { JEDA_CABUT_MS, PESAN_POPUP_DIBLOKIR, PESAN_TERLALU_BANYAK, tipePratinjau, useBukaBerkasArsip } from '../composables/useBukaBerkasArsip'
+import { JEDA_CABUT_MS, PESAN_GANTI_PASSWORD, PESAN_POPUP_DIBLOKIR, PESAN_TERLALU_BANYAK, tipePratinjau, useBukaBerkasArsip } from '../composables/useBukaBerkasArsip'
 import { ambilBerkas, simpanBerkas } from '../services/berkasUnduhan'
 
 const ambil = vi.mocked(ambilBerkas)
@@ -261,14 +261,22 @@ describe('Buka — galat (privat)', () => {
     expect(vm.galat).toBeNull()
   })
 
-  it('403 password_change_required: popup ditutup, tanpa pesan tambahan', async () => {
+  it('403 password_change_required (interceptor tak memicu handler untuk body Blob): popup ditutup, pesan server tampil', async () => {
     const popup = popupTiruan()
     openSpy.mockReturnValue(popup as unknown as Window)
     ambil.mockRejectedValue(galat(403, { code: 'password_change_required', message: 'Ganti password dulu.' }))
     const { vm } = pasang()
     vm.buka(item())
-    await vi.waitFor(() => expect(popup.close).toHaveBeenCalled())
-    expect(vm.galat).toBeNull()
+    await vi.waitFor(() => expect(vm.galat).toBe('Ganti password dulu.'))
+    expect(popup.close).toHaveBeenCalled()
+  })
+
+  it('403 password_change_required tanpa pesan server → cadangan, klik Buka tidak diam', async () => {
+    openSpy.mockReturnValue(popupTiruan() as unknown as Window)
+    ambil.mockRejectedValue(galat(403, { code: 'password_change_required' }))
+    const { vm } = pasang()
+    vm.buka(item())
+    await vi.waitFor(() => expect(vm.galat).toBe(PESAN_GANTI_PASSWORD))
   })
 
   it('galat pada jenis unduh: tidak ada popup untuk ditutup; pesan tampil', async () => {
@@ -289,5 +297,57 @@ describe('Buka — galat (privat)', () => {
     ambil.mockResolvedValueOnce({ blob: new Blob(['x']), nama: 'SK.pdf' })
     vm.buka(item())
     expect(vm.galat).toBeNull()
+  })
+})
+
+describe('Buka — pembukaan beruntun (satu popup bernama sama)', () => {
+  it('selama satu berkas privat dimuat, SEMUA Buka privat lain diabaikan (tanpa popup, tanpa API, tanpa jatah throttle)', async () => {
+    const popupA = popupTiruan()
+    openSpy.mockReturnValue(popupA as unknown as Window)
+    let gagalA!: (e: unknown) => void
+    ambil.mockReturnValue(new Promise((_, tolak) => (gagalA = tolak)))
+    const { vm } = pasang()
+    const A = item({ id_attachment: 1 })
+    const B = item({ id_attachment: 2, url_berkas: 'pegawai/<nip>/arsip/berkas/2/buka' })
+
+    vm.buka(A)
+    expect(vm.bisaDibuka(B)).toBe(false)
+    expect(vm.bisaDibuka(A)).toBe(false)
+    vm.buka(B)
+    vm.buka(A)
+    expect(openSpy).toHaveBeenCalledTimes(1)
+    expect(ambil).toHaveBeenCalledTimes(1)
+
+    // Galat A menutup popup A dan tampil; sesudahnya Buka privat aktif lagi.
+    gagalA(galat(404, { message: 'Berkas tidak ditemukan.' }))
+    await vi.waitFor(() => expect(vm.galat).toBe('Berkas tidak ditemukan.'))
+    expect(popupA.close).toHaveBeenCalledTimes(1)
+    expect(vm.sedangDimuat).toBeNull()
+    expect(vm.bisaDibuka(B)).toBe(true)
+  })
+
+  it('berkas publik tetap bisa dibuka saat berkas privat sedang dimuat', () => {
+    openSpy.mockReturnValue(popupTiruan() as unknown as Window)
+    ambil.mockReturnValue(new Promise(() => undefined))
+    const { vm } = pasang()
+    vm.buka(item())
+    const publik = item({ id_attachment: 9, akses_berkas: 'publik', url_berkas: '/berkas/arsip/<nip>/SK.pdf' })
+    expect(vm.bisaDibuka(publik)).toBe(true)
+    vm.buka(publik)
+    expect(openSpy).toHaveBeenLastCalledWith('/berkas/arsip/<nip>/SK.pdf', 'arsip-popup', 'width=600,height=600,noopener')
+  })
+
+  it('komponen di-unmount saat berkas dimuat → hasil basi: popup ditutup, object URL tidak dibuat', async () => {
+    const popup = popupTiruan()
+    openSpy.mockReturnValue(popup as unknown as Window)
+    let selesai!: (v: { blob: Blob; nama: string }) => void
+    ambil.mockReturnValue(new Promise((resolve) => (selesai = resolve)))
+    const { wrapper, vm } = pasang()
+    vm.buka(item())
+    wrapper.unmount()
+    selesai({ blob: new Blob(['x']), nama: 'SK.pdf' })
+    await vi.waitFor(() => expect(popup.close).toHaveBeenCalled())
+    expect(buatUrl).not.toHaveBeenCalled()
+    expect(popup.location.href).toBe('')
   })
 })

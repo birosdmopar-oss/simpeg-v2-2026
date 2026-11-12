@@ -13,6 +13,7 @@ import { UiButton, UiCard, UiNotice } from '@/shared/ui'
 import type { Crumb } from '@/shared/ui'
 
 import type { ArsipFolderResponse } from '../arsip.types'
+import { simpanFolderArsip } from '../arsip.cache'
 import { namaPegawaiArsip } from '../arsip.utils'
 import ArsipFolderGrid from '../components/arsip/ArsipFolderGrid.vue'
 import ArsipPemilihPegawai from '../components/arsip/ArsipPemilihPegawai.vue'
@@ -41,6 +42,7 @@ async function muat(): Promise<void> {
     const hasil = await arsipService.folder(nip.value)
     if (ini !== permintaan) return
     data.value = hasil
+    simpanFolderArsip(nip.value, hasil)
   } catch (error) {
     if (ini !== permintaan) return
     failure.value = describeApiError(error).message

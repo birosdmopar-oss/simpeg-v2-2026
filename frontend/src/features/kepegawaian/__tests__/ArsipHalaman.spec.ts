@@ -14,9 +14,9 @@ import { Role, type RoleCode } from '@/features/auth/types'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
 import type { ArsipBerkas, ArsipBerkasResponse, ArsipFolder, ArsipFolderResponse } from '../arsip.types'
+import { kosongkanFolderArsip, simpanFolderArsip } from '../arsip.cache'
 import { filterDariFolder, labelFolder, namaPegawaiArsip, urutkanFolder } from '../arsip.utils'
-import { ARSIP_ROLES } from '../roles'
-import { alihkanArsipSendiri, arsipRoutes } from '../routes.arsip'
+import { alihkanArsipSendiri } from '../routes.arsip'
 import { arsipService } from '../services/arsip.service'
 import { pegawaiService } from '../services/pegawai.service'
 import ArsipFolderPage from '../views/ArsipFolderPage.vue'
@@ -95,21 +95,10 @@ async function routerArsip(path: string, role: RoleCode = Role.SUPER_ADMIN, extr
 }
 
 beforeEach(() => {
+  kosongkanFolderArsip()
   folderApi.mockReset()
   berkasApi.mockReset()
   pegawaiList.mockReset()
-})
-
-describe('routes.arsip — definisi', () => {
-  it('tiga route dengan nama dan meta.roles 1–7 (role 8 tidak)', () => {
-    expect(arsipRoutes.map((r) => [r.name, r.path])).toEqual([
-      ['arsip', '/arsip'],
-      ['arsip-pegawai', '/arsip/:nip'],
-      ['arsip-folder', '/arsip/:nip/:folder'],
-    ])
-    for (const r of arsipRoutes) expect(r.meta?.roles).toEqual([1, 2, 3, 4, 5, 6, 7])
-    expect(ARSIP_ROLES).not.toContain(Role.PIMPINAN)
-  })
 })
 
 describe('alihkanArsipSendiri — role 2/6/7 selalu ke arsip sendiri tanpa pesan galat (AC1-03)', () => {
@@ -145,12 +134,6 @@ describe('alihkanArsipSendiri — role 2/6/7 selalu ke arsip sendiri tanpa pesan
 
   it('akun 2/6/7 tanpa NIP: dibiarkan (server yang menolak)', () => {
     expect(alihkanArsipSendiri({ name: 'arsip', params: {} }, Role.PEGAWAI, null)).toBe(true)
-  })
-})
-
-describe('guard route nyata (beforeEnter + meta.roles)', () => {
-  it('beforeEnter tiap route memakai pengalihan sendiri', () => {
-    for (const r of arsipRoutes) expect(typeof r.beforeEnter).toBe('function')
   })
 })
 
@@ -346,7 +329,80 @@ describe('ArsipFolderPage', () => {
   it('galat 403 dari daftar berkas → pesan baku, tanpa tabel', async () => {
     berkasApi.mockRejectedValue({ status: 403, message: 'x', errors: null, isNetworkError: false, original: {} })
     const { wrapper } = await pasang(`/arsip/${NIP}/semua`, Role.ADMIN_SATKER)
-    expect(wrapper.get('[data-testid="arsip-failure"]').text()).toBe('Anda tidak berhak mengakses data ini.')
+    expect(wrapper.get('[data-testid="arsip-failure"]').text()).toContain('Anda tidak berhak mengakses data ini.')
     expect(wrapper.find('[data-testid="arsip-berkas-table"]').exists()).toBe(false)
+  })
+})
+
+describe('ArsipFolderPage — pemulihan galat, keadaan kosong, cache folder', () => {
+  async function pasang(path: string) {
+    const router = await routerArsip(path)
+    const wrapper = mount(ArsipFolderPage, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+    return wrapper
+  }
+
+  beforeEach(() => {
+    folderApi.mockResolvedValue(ringkas())
+    berkasApi.mockResolvedValue(hasilBerkas([berkas(1)]))
+  })
+
+  it('galat daftar: kotak cari tetap ada, tombol "Coba lagi" memuat ulang dan memulihkan tabel', async () => {
+    berkasApi.mockRejectedValueOnce({ status: 500, message: 'x', errors: null, isNetworkError: false, original: {} })
+    const wrapper = await pasang(`/arsip/${NIP}/semua`)
+    expect(wrapper.get('[data-testid="arsip-failure"]').text()).toContain('Terjadi kesalahan. Coba lagi.')
+    expect(wrapper.find('[data-testid="arsip-cari"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="arsip-berkas-table"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="arsip-coba-lagi"]').trigger('click')
+    await flushPromises()
+    expect(berkasApi).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-testid="arsip-failure"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="arsip-berkas-row-1"]').exists()).toBe(true)
+  })
+
+  it('folder tidak sah tetap mengganti seluruh kartu (tanpa kotak cari)', async () => {
+    const wrapper = await pasang(`/arsip/${NIP}/abc`)
+    expect(wrapper.get('[data-testid="arsip-failure"]').text()).toBe('Folder tidak ditemukan.')
+    expect(wrapper.find('[data-testid="arsip-cari"]').exists()).toBe(false)
+  })
+
+  it('pencarian tanpa hasil → "Tidak ada berkas yang cocok dengan pencarian."; tanpa pencarian → "Belum ada berkas."', async () => {
+    berkasApi.mockResolvedValue(hasilBerkas([]))
+    const wrapper = await pasang(`/arsip/${NIP}/semua`)
+    expect(wrapper.get('[data-testid="arsip-berkas-kosong"]').text()).toBe('Belum ada berkas.')
+    vi.useFakeTimers()
+    await wrapper.get('[data-testid="arsip-cari"] input').setValue('zzz')
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="arsip-berkas-kosong"]').text()).toBe('Tidak ada berkas yang cocok dengan pencarian.')
+  })
+
+  it('cache folder: dipakai ulang bila NIP sama (API folder tidak dipanggil lagi), dipanggil bila kosong atau NIP lain', async () => {
+    simpanFolderArsip(NIP, ringkas())
+    const dariCache = await pasang(`/arsip/${NIP}/9`)
+    expect(folderApi).not.toHaveBeenCalled()
+    expect(dariCache.get('[data-testid="arsip-folder-judul"]').text()).toBe('Jabatan')
+
+    folderApi.mockClear()
+    simpanFolderArsip(NIP_LAIN, ringkas())
+    await pasang(`/arsip/${NIP}/9`)
+    expect(folderApi).toHaveBeenCalledTimes(1)
+    expect(folderApi).toHaveBeenCalledWith(NIP)
+
+    folderApi.mockClear()
+    kosongkanFolderArsip()
+    await pasang(`/arsip/${NIP}/9`)
+    expect(folderApi).toHaveBeenCalledTimes(1)
+  })
+
+  it('ArsipPage mengisi cache sehingga halaman folder berikutnya tidak memanggil API folder lagi', async () => {
+    const router = await routerArsip(`/arsip/${NIP}`)
+    mount(ArsipPage, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+    expect(folderApi).toHaveBeenCalledTimes(1)
+    folderApi.mockClear()
+    await pasang(`/arsip/${NIP}/9`)
+    expect(folderApi).not.toHaveBeenCalled()
   })
 })

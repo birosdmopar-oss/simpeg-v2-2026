@@ -7,7 +7,7 @@
  * galatnya tampil sebagai `UiNotice` di atas tabel. Semua teks diinterpolasi (tanpa `v-html`).
  */
 import { FileSearch } from 'lucide-vue-next'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import RowActionsMenu from '@/shared/components/RowActionsMenu.vue'
 import type { RowAction } from '@/shared/components/rowActions'
@@ -21,9 +21,19 @@ const props = defineProps<{
   loading: boolean
   /** Kolom "Jenis Riwayat" hanya di tampilan "Semua berkas". */
   tampilJenis: boolean
+  /** Ada kata pencarian aktif: keadaan kosong berarti "tidak cocok", bukan "belum ada berkas". */
+  mencari?: boolean
 }>()
 
 const { galat, bisaDibuka, buka } = useBukaBerkasArsip()
+
+// Pesan galat Buka milik daftar yang sedang tampil: dibuang saat daftar (halaman / pencarian / folder) berganti.
+watch(
+  () => props.items,
+  () => {
+    galat.value = null
+  },
+)
 
 const colspan = computed(() => (props.tampilJenis ? 5 : 4))
 
@@ -60,7 +70,7 @@ function onAksi(key: string, item: ArsipBerkas): void {
           <tr v-else-if="items.length === 0">
             <td :colspan="colspan" class="px-4 py-8 text-center" data-testid="arsip-berkas-kosong">
               <FileSearch class="mx-auto mb-2 h-6 w-6 text-slate-300" aria-hidden="true" />
-              <p class="text-slate-600">Belum ada berkas.</p>
+              <p class="text-slate-600">{{ mencari ? 'Tidak ada berkas yang cocok dengan pencarian.' : 'Belum ada berkas.' }}</p>
             </td>
           </tr>
           <template v-else>

@@ -13,6 +13,7 @@ import { UiButton, UiCard, UiNotice, UiPagination, UiSearchInput } from '@/share
 import type { Crumb } from '@/shared/ui'
 
 import { FOLDER_SEMUA, type ArsipBerkasResponse, type ArsipFolderResponse } from '../arsip.types'
+import { ambilFolderArsip, simpanFolderArsip } from '../arsip.cache'
 import { filterDariFolder, labelFolder, namaPegawaiArsip } from '../arsip.utils'
 import ArsipBerkasTable from '../components/arsip/ArsipBerkasTable.vue'
 import { describeApiError } from '../services/apiErrors'
@@ -26,6 +27,7 @@ const route = useRoute()
 const nip = computed(() => String(route.params.nip ?? ''))
 const folderParam = computed(() => String(route.params.folder ?? FOLDER_SEMUA))
 const filter = computed(() => filterDariFolder(folderParam.value))
+const folderTidakSah = computed(() => filter.value === null)
 const tampilJenis = computed(() => folderParam.value === FOLDER_SEMUA)
 
 const ringkas = ref<ArsipFolderResponse | null>(null)
@@ -79,10 +81,14 @@ async function muatBerkas(): Promise<void> {
 let permintaanRingkas = 0
 async function muatRingkas(): Promise<void> {
   const ini = ++permintaanRingkas
-  ringkas.value = null
+  const cache = ambilFolderArsip(nip.value)
+  ringkas.value = cache
+  if (cache !== null) return // dipakai ulang dari ArsipPage; API hanya dipanggil bila URL folder dibuka langsung
   try {
     const data = await arsipService.folder(nip.value)
-    if (ini === permintaanRingkas) ringkas.value = data
+    if (ini !== permintaanRingkas) return
+    simpanFolderArsip(nip.value, data)
+    ringkas.value = data
   } catch {
     // Breadcrumb memakai cadangan teks; galat nyata sudah tampil lewat daftar berkas.
   }
@@ -128,13 +134,17 @@ const nf = new Intl.NumberFormat('id-ID')
         <UiButton appearance="outline" :to="{ name: 'arsip-pegawai', params: { nip } }" data-testid="arsip-kembali">Semua folder</UiButton>
       </div>
 
-      <UiNotice v-if="failure" tone="danger" data-testid="arsip-failure">{{ failure }}</UiNotice>
+      <UiNotice v-if="folderTidakSah" tone="danger" data-testid="arsip-failure">{{ failure }}</UiNotice>
 
       <UiCard v-else title="Berkas">
         <div class="mb-4 max-w-md">
           <UiSearchInput v-model="cari" placeholder="Cari nama arsip" label="Cari arsip" data-testid="arsip-cari" @submit="cariSekarang" />
         </div>
-        <ArsipBerkasTable :items="hasil?.items ?? []" :loading="loading" :tampil-jenis="tampilJenis" />
+        <UiNotice v-if="failure" tone="danger" class="mb-3" data-testid="arsip-failure">
+          <span>{{ failure }}</span>
+          <UiButton size="sm" appearance="outline" class="ml-3" data-testid="arsip-coba-lagi" @click="muatBerkas">Coba lagi</UiButton>
+        </UiNotice>
+        <ArsipBerkasTable v-else :items="hasil?.items ?? []" :loading="loading" :tampil-jenis="tampilJenis" :mencari="kataCari !== ''" />
         <div v-if="hasil && hasil.total > hasil.per_page" class="mt-4 flex justify-end">
           <UiPagination v-model:page="page" :per-page="hasil.per_page" :total="hasil.total" />
         </div>

@@ -226,6 +226,25 @@ describe('ArsipBerkasTable', () => {
     expect(memuat.findAll('tbody tr[aria-hidden="true"]').length).toBeGreaterThan(0)
   })
 
+  it('pesan galat Buka dibuang saat daftar berganti (halaman / pencarian / folder)', async () => {
+    const wrapper = pasang([berkas(1)])
+    await selectRowAction(wrapper, 'arsip-actions-1', 'buka') // popup null → diblokir
+    expect(wrapper.find('[data-testid="arsip-buka-galat"]').exists()).toBe(true)
+    await wrapper.setProps({ items: [berkas(2)] })
+    expect(wrapper.find('[data-testid="arsip-buka-galat"]').exists()).toBe(false)
+  })
+
+  it('selama satu berkas privat dimuat, Buka privat lain disabled; berkas publik tidak', async () => {
+    openSpy.mockReturnValue({ location: { href: '' }, close: vi.fn(), document: { title: '', body: { textContent: '' } } } as unknown as Window)
+    ambil.mockReturnValue(new Promise(() => undefined))
+    const publik = berkas(2, { akses_berkas: 'publik', url_berkas: '/berkas/arsip/<nip>/SK.pdf' })
+    const wrapper = pasang([berkas(1), berkas(3), publik])
+    await selectRowAction(wrapper, 'arsip-actions-1', 'buka')
+    expect((await rowMenuActions(wrapper, 'arsip-actions-1'))[0]?.disabled).toBe(true)
+    expect((await rowMenuActions(wrapper, 'arsip-actions-3'))[0]?.disabled).toBe(true)
+    expect((await rowMenuActions(wrapper, 'arsip-actions-2'))[0]?.disabled).toBe(false)
+  })
+
   it('nama arsip dan ringkasan diinterpolasi sebagai teks (tanpa v-html)', () => {
     const wrapper = pasang([berkas(7, { nama_arsip: '<img src=x onerror=alert(1)>', ringkasan_riwayat: '<b>tebal</b>' })])
     expect(wrapper.find('img').exists()).toBe(false)

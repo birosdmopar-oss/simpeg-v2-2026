@@ -30,6 +30,7 @@ export const PESAN_POPUP_DIBLOKIR = 'Popup diblokir browser. Izinkan popup untuk
 export const PESAN_TERLALU_BANYAK = 'Terlalu banyak membuka berkas arsip. Coba lagi dalam satu menit.'
 const PESAN_UMUM = 'Berkas tidak dapat dibuka. Coba lagi.'
 const PESAN_MEMUAT = 'Memuat berkas…'
+export const PESAN_GANTI_PASSWORD = 'Anda harus mengganti password terlebih dahulu.'
 
 /** Daftar tertutup tipe pratinjau menurut ekstensi (huruf kecil); selain ini selalu `application/octet-stream`. */
 const TIPE_PRATINJAU: Readonly<Record<string, string>> = {
@@ -54,9 +55,11 @@ function pesanGalat(error: unknown): string | null {
   if (error.status === 401) return null
   const badan = error.original.response?.data as { code?: unknown; message?: unknown } | undefined
   const dikenal = badan !== undefined && badan !== null && typeof badan === 'object'
-  if (error.status === 403 && dikenal && badan.code === PASSWORD_CHANGE_REQUIRED_CODE) return null
   // Body JSON yang terbaca (diurai `ambilBerkas`) membawa pesan server; bila tidak terbaca pakai pesan baku.
   const dariServer = dikenal && typeof badan.message === 'string' ? badan.message : ''
+  // Interceptor membaca `code` saat body masih Blob, jadi handler ganti password tidak jalan untuk unduhan blob:
+  // tampilkan pesannya agar klik Buka tidak diam.
+  if (error.status === 403 && dikenal && badan.code === PASSWORD_CHANGE_REQUIRED_CODE) return dariServer !== '' ? dariServer : PESAN_GANTI_PASSWORD
   if (dariServer !== '') return dariServer
   return error.status === 429 ? PESAN_TERLALU_BANYAK : describeApiError(error).message
 }
@@ -64,9 +67,11 @@ function pesanGalat(error: unknown): string | null {
 export function useBukaBerkasArsip() {
   /** Pesan galat tampil di halaman (`UiNotice`); null = tidak ada. */
   const galat = ref<string | null>(null)
-  /** `id_attachment` berkas privat yang sedang dimuat (item Buka-nya `disabled`). */
+  /** `id_attachment` berkas privat yang sedang dimuat. Selama terisi SEMUA item Buka privat `disabled` (satu popup bernama sama). */
   const sedangDimuat = ref<number | null>(null)
 
+  /** Token permintaan privat: hanya permintaan terakhir (dan komponen yang masih terpasang) boleh mengisi popup / galat. */
+  let urutan = 0
   const timerCabut = new Map<string, ReturnType<typeof setTimeout>>()
 
   function jadwalkanCabut(url: string): void {
@@ -80,6 +85,7 @@ export function useBukaBerkasArsip() {
   }
 
   onBeforeUnmount(() => {
+    urutan++ // hasil permintaan yang masih berjalan menjadi basi
     for (const [url, timer] of timerCabut) {
       clearTimeout(timer)
       URL.revokeObjectURL(url)
@@ -87,9 +93,10 @@ export function useBukaBerkasArsip() {
     timerCabut.clear()
   })
 
-  /** Boleh dibuka bila URL ada dan tidak sedang memuat berkas privat lain. */
+  /** Boleh dibuka bila URL ada dan (untuk berkas privat) tidak ada berkas privat lain yang sedang dimuat. */
   function bisaDibuka(item: ArsipBerkas): boolean {
-    return item.url_berkas !== null && item.akses_berkas !== null && sedangDimuat.value !== item.id_attachment
+    if (item.url_berkas === null || item.akses_berkas === null) return false
+    return item.akses_berkas === 'publik' || sedangDimuat.value === null
   }
 
   function isiPopupMemuat(popup: Window): void {
@@ -103,9 +110,14 @@ export function useBukaBerkasArsip() {
   }
 
   async function bukaPrivat(item: ArsipBerkas, url: string, popup: Window | null): Promise<void> {
+    const ini = ++urutan
     sedangDimuat.value = item.id_attachment
     try {
       const berkas = await ambilBerkas(url, `arsip-${item.id_attachment}`)
+      if (ini !== urutan) {
+        popup?.close() // basi (mis. komponen sudah di-unmount): jangan buat object URL yang tak akan dicabut
+        return
+      }
       if (popup === null) {
         simpanBerkas(berkas)
         return
@@ -116,17 +128,18 @@ export function useBukaBerkasArsip() {
       popup.location.href = objectUrl
     } catch (error) {
       popup?.close()
-      galat.value = pesanGalat(error)
+      if (ini === urutan) galat.value = pesanGalat(error)
     } finally {
-      sedangDimuat.value = null
+      if (ini === urutan) sedangDimuat.value = null
     }
   }
 
   /** Handler klik ⋮ → Buka. Tidak melempar; galat masuk `galat`. Harus dipanggil sinkron dari event klik. */
   function buka(item: ArsipBerkas): void {
+    if (!bisaDibuka(item)) return
     galat.value = null
     const url = item.url_berkas
-    if (url === null || item.akses_berkas === null || sedangDimuat.value === item.id_attachment) return
+    if (url === null) return
 
     if (item.akses_berkas === 'publik') {
       window.open(url, NAMA_POPUP_ARSIP, `${UKURAN_POPUP},noopener`)

@@ -384,13 +384,15 @@ describe('DetailPegawaiPage — aksi kartu', () => {
   it.each([Role.SUPER_ADMIN, Role.ADMIN_SATKER, Role.ADMIN_VIEW_ESELON1, Role.MENTERI, Role.PEGAWAI, Role.PTT, Role.PPPK])(
     'AC1-14: role %i melihat tombol "Arsip"',
     async (role) => {
-      const { wrapper } = await mountDetail(`/pegawai/`, role, NIP)
+      const { wrapper } = await mountDetail(`/pegawai/${NIP}`, role, NIP)
+      expect(detail).toHaveBeenCalledWith(NIP)
       expect(wrapper.find('[data-testid="pegawai-header-arsip"]').exists()).toBe(true)
     },
   )
 
   it('AC1-04: role 8 tidak melihat tombol "Arsip"', async () => {
-    const { wrapper } = await mountDetail(`/pegawai/`, Role.PIMPINAN)
+    const { wrapper } = await mountDetail(`/pegawai/${NIP}`, Role.PIMPINAN)
+    expect(detail).toHaveBeenCalledWith(NIP)
     expect(wrapper.find('[data-testid="pegawai-header-arsip"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-arsip"]').exists()).toBe(true)
   })
