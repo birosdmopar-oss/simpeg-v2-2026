@@ -378,6 +378,11 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/pegawai/([^/]+)/lampiran'               => self::JWT,
             'GET api/v1/pegawai/([^/]+)/lampiran/([0-9]+)/unduh' => self::JWT,
             'DELETE api/v1/pegawai/([^/]+)/lampiran/([0-9]+)'    => self::JWT,
+            // F-10 Arsip Tahap 1 (MAKE-090, PRD F-10 §12.1): `hr/arsip/index` legacy level 1–7 (`Arsip.php:12`); lingkup
+            // PegawaiScope lihat di ArsipService (2/6/7 sendiri, 3 lingkup detail). Role 8 ditolak route.
+            'GET api/v1/pegawai/([^/]+)/arsip'                      => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/pegawai/([^/]+)/arsip/berkas'               => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/pegawai/([^/]+)/arsip/berkas/([0-9]+)/buka' => [1, 2, 3, 4, 5, 6, 7],
             // hr/so/full (Session Logged In) + Plt/Plh (PenugasanService::ROLE_LIHAT/ROLE_TULIS).
             'GET api/v1/struktur-organisasi'                   => self::JWT,
             'GET api/v1/struktur-organisasi/pdf'               => self::JWT,
