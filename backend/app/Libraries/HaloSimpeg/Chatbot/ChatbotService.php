@@ -74,9 +74,12 @@ final class ChatbotService
             return [];
         }
 
+        // Agregasi "paling sering cocok" dibatasi ke QnA kategori ini (R8-11).
         $log  = $this->db->prefixTable('log_chatbot');
+        $qna  = $this->db->prefixTable('qna');
+        $id   = (int) $idKategori;
         $rows = $this->db->table('qna q')->select('q.id_qna, q.pertanyaan')
-            ->join("(SELECT top_1_id_qna, COUNT(*) AS jml FROM {$log} WHERE status_match = 1 GROUP BY top_1_id_qna) l", 'l.top_1_id_qna = q.id_qna', 'left', false)
+            ->join("(SELECT top_1_id_qna, COUNT(*) AS jml FROM {$log} WHERE status_match = 1 AND top_1_id_qna IN (SELECT id_qna FROM {$qna} WHERE id_qna_kategori_fk = {$id}) GROUP BY top_1_id_qna) l", 'l.top_1_id_qna = q.id_qna', 'left', false)
             ->where('q.status_qna_fk', 1)->where('q.id_qna_kategori_fk', (int) $idKategori)
             ->orderBy('q.is_fallback_option', 'DESC')->orderBy('COALESCE(l.jml, 0)', 'DESC', false)->orderBy('q.id_qna', 'ASC')
             ->limit($this->config->maksBubblePertanyaan)->get()->getResultArray();
@@ -105,38 +108,34 @@ final class ChatbotService
     {
         $this->throttle($auth, 'balas', $this->config->throttleBalas);
 
-        $korpus = $this->korpus();
-        $bubble = $this->qnaBubble($p['id_qna'] ?? null, $korpus);
-        $pesan  = '';
-
-        if ($bubble === null) {
-            $pesan = is_string($p['pesan'] ?? null) ? trim($p['pesan']) : '';
-            $n     = mb_strlen($pesan);
-
-            if ($n < 1 || $n > $this->config->maksPesan) {
-                throw ValidationException::forField('pesan', 'Pesan wajib diisi (maks ' . $this->config->maksPesan . ' karakter).');
-            }
-        }
-
-        if ($korpus === []) {
-            return ['balasan' => self::BALASAN_KOSONG, 'cocok' => false, 'skor' => 0.0, 'id_log' => null, 'bisa_feedback' => false, 'saran' => []];
-        }
+        // R8-11: jalur bubble cukup satu baris QnA; korpus (tanpa kolom jawaban) hanya dimuat untuk jalur ketikan sesudah
+        // validasi pesan; jawaban diambil untuk kandidat teratas saja.
+        $bubble = $this->qnaBubble($p['id_qna'] ?? null);
 
         if ($bubble !== null) {
             $pesanLog = $bubble['pertanyaan'];
             $cocok    = true;
             $teratas  = ['id_qna' => $bubble['id_qna'], 'skor' => 1.0];
             $kandidat = [['id_qna' => $bubble['id_qna'], 'skor' => 1.0, 'skor_akhir' => 1.0]];
+            $jawaban  = $bubble['jawaban'];
         } else {
-            $pesanLog = $pesan;
-            $hasil    = (new MesinJawab($this->config))->rangking($pesanLog, array_map(
-                static fn (array $q): array => ['id_qna' => $q['id_qna'], 'teks' => $q['teks']],
-                $korpus,
-            ), $this->rekapFeedback());
+            $pesanLog = is_string($p['pesan'] ?? null) ? trim($p['pesan']) : '';
+            $n        = mb_strlen($pesanLog);
 
-            $cocok    = $hasil !== null && $hasil['cocok'];
-            $teratas  = ['id_qna' => $hasil['teratas']['id_qna'] ?? 0, 'skor' => $hasil['teratas']['skor'] ?? 0.0];
-            $kandidat = $hasil['kandidat'] ?? [];
+            if ($n < 1 || $n > $this->config->maksPesan) {
+                throw ValidationException::forField('pesan', 'Pesan wajib diisi (maks ' . $this->config->maksPesan . ' karakter).');
+            }
+
+            $hasil = (new MesinJawab($this->config))->rangking($pesanLog, $this->korpus(), $this->rekapFeedback());
+
+            if ($hasil === null) {
+                return ['balasan' => self::BALASAN_KOSONG, 'cocok' => false, 'skor' => 0.0, 'id_log' => null, 'bisa_feedback' => false, 'saran' => []];
+            }
+
+            $cocok    = $hasil['cocok'];
+            $teratas  = ['id_qna' => $hasil['teratas']['id_qna'], 'skor' => $hasil['teratas']['skor']];
+            $kandidat = $hasil['kandidat'];
+            $jawaban  = $cocok ? (string) $this->db->table('qna')->select('jawaban')->where('id_qna', $teratas['id_qna'])->get()->getRow('jawaban') : '';
         }
 
         $skor  = round($teratas['skor'], 4);
@@ -148,14 +147,6 @@ final class ChatbotService
             'status_match'    => $cocok ? 1 : 0,
             'waktu_interaksi' => gmdate('Y-m-d H:i:s'),
         ], true);
-
-        $jawaban = '';
-
-        foreach ($korpus as $q) {
-            if ($q['id_qna'] === $teratas['id_qna']) {
-                $jawaban = $q['jawaban'];
-            }
-        }
 
         $hasilBalas = [
             'balasan'       => $cocok ? $jawaban : self::BALASAN_FALLBACK,
@@ -220,12 +211,13 @@ final class ChatbotService
 
     /**
      * Korpus = QnA status 1 dengan nama tag status 1 (F8-39, catatan DBV N3), urut id menaik. Teks = pertanyaan + spasi + tag.
+     * Tanpa kolom jawaban (R8-11).
      *
-     * @return list<array{id_qna: int, pertanyaan: string, jawaban: string, teks: string}>
+     * @return list<array{id_qna: int, teks: string}>
      */
     private function korpus(): array
     {
-        $qna = $this->db->table('qna')->select('id_qna, pertanyaan, jawaban')->where('status_qna_fk', 1)->orderBy('id_qna', 'ASC')->get()->getResultArray();
+        $qna = $this->db->table('qna')->select('id_qna, pertanyaan')->where('status_qna_fk', 1)->orderBy('id_qna', 'ASC')->get()->getResultArray();
 
         if ($qna === []) {
             return [];
@@ -234,25 +226,24 @@ final class ChatbotService
         $tag = [];
 
         foreach ($this->db->table('qna_has_tag h')->select('h.qna_id, t.judul_tag')
-            ->join('qna_tag t', 't.id_qna_tag = h.qna_tag_id')->where('t.status_qna_tag_fk', 1)
+            ->join('qna_tag t', 't.id_qna_tag = h.qna_tag_id')->join('qna q', 'q.id_qna = h.qna_id')
+            ->where('t.status_qna_tag_fk', 1)->where('q.status_qna_fk', 1)
             ->orderBy('h.qna_id', 'ASC')->orderBy('h.qna_tag_id', 'ASC')->get()->getResultArray() as $r) {
             $tag[(int) $r['qna_id']][] = (string) $r['judul_tag'];
         }
 
         return array_map(static fn (array $q): array => [
-            'id_qna'     => (int) $q['id_qna'],
-            'pertanyaan' => (string) $q['pertanyaan'],
-            'jawaban'    => (string) $q['jawaban'],
-            'teks'       => $q['pertanyaan'] . ' ' . implode(' ', $tag[(int) $q['id_qna']] ?? []),
+            'id_qna' => (int) $q['id_qna'],
+            'teks'   => $q['pertanyaan'] . ' ' . implode(' ', $tag[(int) $q['id_qna']] ?? []),
         ], $qna);
     }
 
     /**
-     * @param list<array{id_qna: int, pertanyaan: string, jawaban: string, teks: string}> $korpus
+     * QnA status 1 yang dipilih dari bubble (satu baris), atau null (jalur ketikan).
      *
-     * @return array{id_qna: int, pertanyaan: string}|null QnA korpus yang dipilih dari bubble, atau null (jalur ketikan)
+     * @return array{id_qna: int, pertanyaan: string, jawaban: string}|null
      */
-    private function qnaBubble(mixed $idQna, array $korpus): ?array
+    private function qnaBubble(mixed $idQna): ?array
     {
         $id = is_int($idQna) ? (string) $idQna : (is_string($idQna) ? $idQna : '');
 
@@ -260,13 +251,9 @@ final class ChatbotService
             return null;
         }
 
-        foreach ($korpus as $q) {
-            if ($q['id_qna'] === (int) $id) {
-                return ['id_qna' => $q['id_qna'], 'pertanyaan' => $q['pertanyaan']];
-            }
-        }
+        $r = $this->db->table('qna')->select('id_qna, pertanyaan, jawaban')->where('id_qna', (int) $id)->where('status_qna_fk', 1)->get()->getRowArray();
 
-        return null;
+        return is_array($r) ? ['id_qna' => (int) $r['id_qna'], 'pertanyaan' => (string) $r['pertanyaan'], 'jawaban' => (string) $r['jawaban']] : null;
     }
 
     /**

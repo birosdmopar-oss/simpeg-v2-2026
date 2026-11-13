@@ -133,6 +133,12 @@ final class TfIdf
     /**
      * Kunci kesetaraan token setara `==` PHP dev untuk alfabet `[a-z0-9]`: string numerik (digit, atau digit dengan eksponen
      * `e`) dinormalisasi ke nilainya; selain itu string apa adanya (awalan `s:` agar tidak bertabrakan).
+     *
+     * BEDA YANG DIHARAPKAN (review CR W-5): `==` dev tidak transitif untuk bilangan ≥ 2^53, jadi tidak ada kunci hash yang
+     * sempurna. Bilangan bulat digit-saja di jangkauan int64 dibandingkan sebagai int (sama dengan dev), tetapi pasangan
+     * int-like vs bentuk eksponen ≥ 2^53 (mis. "9007199254740993" vs "9007199254740993e0", sama menurut `==` dev karena
+     * dibandingkan sebagai float) mendapat kunci berbeda di sini. Kasus ini tidak realistis untuk pertanyaan kepegawaian dan
+     * dikecualikan dari test pembanding.
      */
     public static function kunci(string $token): string
     {

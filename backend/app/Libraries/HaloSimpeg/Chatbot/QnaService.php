@@ -128,14 +128,14 @@ final class QnaService
 
         if ($pertanyaan === '') {
             $errors['pertanyaan'] = 'Pertanyaan tidak boleh kosong!';
-        } elseif (mb_strlen($pertanyaan) > 65535 / 4) {
-            $errors['pertanyaan'] = 'Pertanyaan terlalu panjang.';
+        } elseif (($p1 = BatasQna::pertanyaan($pertanyaan)) !== null) {
+            $errors['pertanyaan'] = $p1;
         }
 
         if (! HtmlSanitizer::hasVisibleContent($jawaban)) {
             $errors['jawaban'] = 'Jawaban tidak boleh kosong!';
-        } elseif (strlen($jawaban) > 65535) {
-            $errors['jawaban'] = 'Jawaban terlalu panjang.';
+        } elseif (($p2 = BatasQna::jawaban($jawaban)) !== null) {
+            $errors['jawaban'] = $p2;
         }
 
         $kategori = $this->kategoriValid($p['id_kategori'] ?? null, $lama, $errors);

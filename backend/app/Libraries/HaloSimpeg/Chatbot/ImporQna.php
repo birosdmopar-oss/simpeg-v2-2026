@@ -6,14 +6,18 @@ namespace App\Libraries\HaloSimpeg\Chatbot;
 
 use App\Exceptions\ValidationException;
 use App\Libraries\Html\HtmlSanitizer;
+use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
 use App\Models\AuditLogModel;
 use App\Models\HaloSimpeg\Chatbot\QnaKategoriModel;
 use App\Models\HaloSimpeg\Chatbot\QnaModel;
 use App\Models\HaloSimpeg\Chatbot\QnaTagModel;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Chatbot;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Throwable;
 
 /**
@@ -89,6 +93,14 @@ final class ImporQna
                     continue;
                 }
 
+                $terlaluPanjang = BatasQna::pertanyaan($pertanyaan) ?? BatasQna::jawaban($jawaban);
+
+                if ($terlaluPanjang !== null) {
+                    $galat[] = ['baris' => $no, 'alasan' => $terlaluPanjang];
+
+                    continue;
+                }
+
                 $idKategori = $this->cariAtauBuat('kategori', $kategori, $no, $galat);
                 $idTag      = [];
 
@@ -158,7 +170,7 @@ final class ImporQna
      */
     public static function template(): string
     {
-        return \App\Libraries\Kepegawaian\Pegawai\EksporTabel::xlsx(self::JUDUL_KOLOM, [self::CONTOH], 'Template QnA');
+        return EksporTabel::xlsx(self::JUDUL_KOLOM, [self::CONTOH], 'Template QnA');
     }
 
     /**
@@ -179,20 +191,52 @@ final class ImporQna
         }
 
         $path   = $berkas->getTempName();
+        $maks   = $this->config->imporMaksBaris;
         $reader = new Xlsx();
+        $buku   = null;
 
+        // Ukuran sheet diperiksa SEBELUM memuat (listWorksheetInfo membaca dimensi secara streaming): xlsx kecil dengan satu sel
+        // di baris 1.048.576 tidak boleh dimuat penuh ke memori (pola PembacaExcelSlip).
         try {
             if (! $reader->canRead($path)) {
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
             }
 
+            $info = $reader->listWorksheetInfo($path)[0] ?? null;
+
+            if ($info === null) {
+                throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
+            }
+
+            if ((int) $info['totalRows'] - 1 > $maks) {
+                throw ValidationException::forField('berkas', "Jumlah baris data maksimal {$maks}.");
+            }
+
             $reader->setReadDataOnly(true);
-            $sheet = $reader->load($path)->getSheet(0);
-            $sel   = $sheet->toArray(null, false, false, false);
+            $reader->setLoadSheetsOnly([(string) $info['worksheetName']]);
+            $reader->setReadFilter(new class ($maks + 1) implements IReadFilter {
+                public function __construct(private readonly int $barisMaks)
+                {
+                }
+
+                public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+                {
+                    return $row <= $this->barisMaks && in_array($columnAddress, ['A', 'B', 'C', 'D'], true);
+                }
+            });
+
+            $buku  = $reader->load($path);
+            $sheet = $buku->getSheet(0);
+            $akhir = max(1, min($sheet->getHighestDataRow(), $maks + 1));
+            $sel   = $sheet->rangeToArray('A1:D' . $akhir, null, false, false, false);
         } catch (ValidationException $e) {
             throw $e;
         } catch (Throwable) {
             throw ValidationException::forField('berkas', 'Berkas Excel rusak atau tidak dapat dibaca.');
+        } finally {
+            if ($buku instanceof Spreadsheet) {
+                $buku->disconnectWorksheets();
+            }
         }
 
         $judul = array_map(static fn (mixed $v): string => trim(self::teks($v)), $sel[0] ?? []);
@@ -207,7 +251,7 @@ final class ImporQna
 
         $data = [];
 
-        foreach (array_slice($sel, 1, null, true) as $i => $r) {
+        foreach (array_slice(array_values($sel), 1, null, true) as $i => $r) {
             $data[$i + 1] = [trim(self::teks($r[0] ?? null)), trim(self::teks($r[1] ?? null)), trim(self::teks($r[2] ?? null)), trim(self::teks($r[3] ?? null))];
         }
 
@@ -257,7 +301,18 @@ final class ImporQna
 
         $data  = [$kol => $judul, $st => 1, 'created_at' => gmdate('Y-m-d H:i:s')];
         $model = $kat ? new QnaKategoriModel($this->db) : new QnaTagModel($this->db);
-        $id    = (int) $model->insert($data, true);
+
+        try {
+            $id = (int) $model->insert($data, true);
+        } catch (Throwable $e) {
+            if ($e instanceof DatabaseException && $e->getCode() === 1062) {
+                // Balapan dengan admin lain (UNIQUE `judul_unik`, catatan DBV N2): baris itu belum terlihat oleh transaksi ini.
+                throw ValidationException::forField('berkas', "{$label} \"{$judul}\" baru saja dibuat pengguna lain. Ulangi impor.");
+            }
+
+            throw $e;
+        }
+
         $kat ? $this->kategoriBaru++ : $this->tagBaru++;
 
         return $id;

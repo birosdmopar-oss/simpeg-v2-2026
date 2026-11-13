@@ -7,8 +7,8 @@ namespace App\Models\HaloSimpeg\Chatbot;
 use App\Models\BaseAuditableModel;
 
 /**
- * QnA chatbot; relasi tag ditulis ChatbotAdminService dengan audit manual entitas `qna_has_tag` (DBV-033, MAKE-094). Tulis lewat model → `audit_logs` (PRD Fase 8 §7.10.4). Kolom bangkitan `judul_unik` tidak
- * pernah ditulis (bukan allowedFields, catatan DBV N4). Waktu UTC diisi service.
+ * QnA chatbot (DBV-033, MAKE-094). Tulis lewat model → `audit_logs` (PRD Fase 8 §7.10.4); relasi tag ditulis QnaService/ImporQna
+ * (audit manual entitas `qna_has_tag`). Waktu UTC diisi service.
  */
 final class QnaModel extends BaseAuditableModel
 {

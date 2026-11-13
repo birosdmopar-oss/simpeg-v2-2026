@@ -7,6 +7,7 @@ atau model helpdesk.
 | Kelas | Isi |
 |---|---|
 | `TfIdf` | Mesin murni TF-IDF + cosine, port apa adanya `dev:libraries/Nlp_engine.php`. Tokenisasi ASCII; token `"0"` terbuang; kesetaraan token numerik longgar ("01" = "1", "1e1" = "10"). Memakai peta hash (A9) dengan urutan penjumlahan kosakata dev, sehingga floating point identik |
+| (beda yang diharapkan) | Token angka ≥ 2^53 dalam bentuk eksponen vs digit-saja: `==` dev tidak transitif sehingga tidak bisa dihash sempurna; v2 menganggapnya berbeda (docstring `TfIdf::kunci`, dikunci test) |
 | `MesinJawab` | Ranking murni, port `dev:LC:707-738`: ambang dari skor asli; pengali feedback hanya untuk kandidat lolos; seri → `id_qna` menaik; 3 kandidat dibulatkan 4 desimal |
 | `ChatbotService` | Endpoint widget: bubble, populer, balas, feedback |
 | `TokenFeedback` | Token HMAC-SHA256 kepemilikan penilaian (F8-35) |
@@ -16,7 +17,8 @@ atau model helpdesk.
 | `StatistikChatbot` | Statistik/riwayat (F8-42) + ekspor tag xlsx (F8-47) |
 
 **`ChatbotService` (widget):**
-- **Korpus** = QnA status 1 + nama tag status 1 (F8-39, DBV N3).
+- **Korpus** = QnA status 1 + nama tag status 1 (F8-39, DBV N3). Korpus dimuat tanpa kolom jawaban, hanya untuk jalur ketikan
+  sesudah validasi pesan; jawaban diambil untuk kandidat teratas saja. Jalur bubble membaca satu baris QnA (R8-11).
 - **Log:** satu baris `log_chatbot` anonim per balas, lewat `LogChatbotModel` tanpa audit (BP8-15). Isi pesan tidak pernah ditulis ke
   log aplikasi.
 - **Korpus kosong:** 200 tanpa log (F8-44, DBV N1). Tidak ada log ber-`top_1_id_qna = 0`.
