@@ -129,7 +129,8 @@ sudah dipakai.").
     yang tetap dikirim dipertahankan; tag lama status 10 diabaikan (relasinya tetap di DB).
   - Simpan QnA + set tag dalam satu transaksi; ubah = ganti seluruh set.
 - `HasilImpor` = `{ditambah, kategori_baru, tag_baru, dilewati: {baris, alasan}[], galat: {baris, alasan}[]}`.
-  - `galat` tidak kosong → **tidak ada** baris tersimpan dan `ditambah = 0` (tetap 200, laporan per baris).
+  - **Semua-atau-tidak:** bila `galat` tidak kosong, **tidak ada yang disimpan** (QnA, kategori, maupun tag baru) dan
+    `ditambah = kategori_baru = tag_baru = 0`; tetap 200 dengan laporan per baris (operasi batch).
   - `baris` = nomor baris Excel (judul = baris 1).
   - Berkas bukan .xlsx / > 2 MB / > 1.000 baris data / rusak / judul kolom tidak sama template → 422 `errors.berkas`
     ("Format template tidak sesuai." untuk judul kolom).
