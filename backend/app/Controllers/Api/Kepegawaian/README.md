@@ -11,6 +11,11 @@ lingkup, lampiran, frontend). Setelah beku, kontrak di sini hanya boleh berubah 
 (lihat [Kepemilikan & perubahan](#kepemilikan--perubahan)). Runbook: `docs/fase3/SPRINT0_1_backend.md`. Revisi hasil
 review CR 07-10-2026 (lampiran satu request, lampiran terikat NIP, filter `jwt` grup) sudah termasuk.
 
+> **Koreksi non-aditif 12-11-2026** (PRD F-10 §7.5, MAKE-093, izin pemilik WS-2): teks lama "path arsip legacy → 404" pada
+> foto, lampiran Plt/Plh, dan berkas Konket sudah usang sejak adapter MAKE-069 (K-M3 opsi A). Path legacy (`arsip/…`) kini
+> dibaca lewat `PathLegacy` dari storage v2; hanya berkas yang belum disalin yang → 404. Perilaku endpoint tidak berubah
+> karena koreksi ini (test `tests/Kepegawaian/PathArsipLegacyTerbacaTest.php`).
+
 ### Aturan umum
 
 | Aturan | Isi |
@@ -151,7 +156,7 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
 | `GET pegawai?search=&status=&id_unit=&id_satker=&id_jenis_pegawai=&sort=&order=&page=&per_page=` | 1, 3, 4, 5, 8 (`Role::filter`) | `{ items, total, page, per_page }`. Default `status IN (1, 2)` (legacy `L_employee::list`), `status=1\|2` menyaring; lingkup `PegawaiScope::terapkanKeQuery` (jalur daftar CR-045, mis. admin unit 20 memuat UPT). `search` = nama/NIP/NIP lama (LIKE literal). `sort` ∈ `nama` (bawaan), `nip`, `jabatan`, `unit`, `satker`, `gol_ruang`; `per_page` ≤ 100. Item: biodata inti `pegawai` + `ada_foto` + snapshot `pegawai_mutasi_jabatan` (`id_unit`, `unit`, `id_satker`, `satker`, `id_jabatan`, `jabatan`, `tmt_jabatan`) + `pegawai_kp` (`gol_ruang`, `pangkat`) |
 | `GET pegawai/{nip}` | UL_ALL + `bolehLihat` | Kolom `pegawai` (tanpa `foto`/`siasn_flag`/`siasn_lu`/`deleted_at`) + `ada_foto`, `email` (akun), `jabatan_aktif` (pmj), `pangkat_aktif` (`pegawai_kp`), `pengajuan` (pengajuan biodata terakhir bila `flag_update` 1/2: `id_pegawai_hist`, `flag_update`, `reason_note`, `created_at`, `updated_at`, `notif_date`; selain itu `null`), `aksi` `{ ubah_biodata, ubah_langsung, koreksi_nip }`, `tabs` (= `descriptorUntuk`, fungsi yang sama dengan `GET pegawai/{nip}/riwayat`). Urutan 401 → 403 lingkup (NIP tidak ada bagi role ber-lingkup = 403) → 404 |
 | `PUT pegawai/{nip}/biodata` | 1, 2, 3, 6, 7 + `bolehUbah` | B-03 dua jalur. JSON kolom DDL `pegawai` + `email` + `jenis_kerabat_lain`; dengan foto: `POST` multipart + `_method=PUT`, berkas `foto` (jpg/jpeg/png, 5 MB). Patch: kolom yang tidak dikirim memakai nilai sekarang, kewajiban legacy diperiksa atas nilai akhir. Isian tanpa hak role yang nilainya berbeda → 422 `errors.<kolom>` (nama/gelar/tgl lahir/jenis status/TMT status hanya role 1; jenis pegawai role 1/3; `status`, `nip`, `flag_update` tidak pernah). Respons `{ jalur: 'langsung'\|'pengajuan', pegawai, pengajuan }` |
-| `GET pegawai/{nip}/foto` | UL_ALL + `bolehLihat` | Foto profil terkini (`Content-Type` dari isi, `inline`, `nosniff`, `no-store`); tanpa foto atau path arsip remote legacy → 404 |
+| `GET pegawai/{nip}/foto` | UL_ALL + `bolehLihat` | Foto profil terkini (`Content-Type` dari isi, `inline`, `nosniff`, `no-store`); tanpa foto → 404; path legacy dibaca lewat PathLegacy (MAKE-069); berkas belum disalin → 404 |
 | `POST pegawai` | 1 (`Role::filter`) | B-05 (MAKE-011) tambah: multipart isian Super Admin + `nip` + `email` + berkas `foto` (wajib) → 201 `{ pegawai, akun: { id_pengguna, username, user_level, created, initial_password, email_skipped } }`, `Cache-Control: no-store`; status awal selalu 1. Satu transaksi: pegawai (status 1) → `pegawai_foto` → akun A-09 dengan password awal = NIP [K] (`AccountProvisioner::provisionDenganPasswordNip`), `must_change_password` = 1 (MAKE-020 [V2]: wajib ganti saat login pertama, README Auth). 422 `errors.nip` (format/terdaftar/username akun lain), kolom biodata, `foto` |
 | `DELETE pegawai/{nip}` | 1 (`Role::filter`) | B-05 (MAKE-011) hapus FISIK ikut legacy (keputusan user 13-10-2026) → `{ deleted: true, soft_delete: false, item }`. Masih ada data turunan (FK RESTRICT ke `pegawai.nip`) → 422 `errors.nip`; akun ber-NIP dilepas (`nip` NULL, nonaktif, sesi dicabut); 404 NIP |
 | `GET biodata/pengajuan?search=&page=&per_page=` | 1, 3 (`Role::filter`) | B-04 (MAKE-011) antrean pengajuan menunggu (`flag_update` 1), lingkup jalur PROSES (`PegawaiScopeProsesInterface`: unit 20 tanpa UPT, unit 21 + satker BPO); item `id_pegawai_hist`, `nip`, `nama`, `glr_*`, `unit`, `satker`, `jabatan`, `tgl_permohonan` |
@@ -201,7 +206,7 @@ baru:
 | `POST penugasan/{plt\|plh}` | 1 | Tambah tanpa approval (JSON, atau multipart dengan berkas `lampiran` opsional 5 MB jpg/jpeg/png/gif/pdf/xls/xlsx/doc/docx) → 201. Isian legacy `validate_param_off_plt`: `status` 1/2, `jenis_jabatan` 1 (group, sub group, jabatan) atau 2 (`jenis_jabatan_koord` 1/2 + `id_jabatan_koord` yang jenisnya sama), `tgl_mulai` ≤ `tgl_akhir`, `id_unit`, `id_satker`, `id_group_jabatan_<jenis>`, `id_sub_group_jabatan_<jenis>`, `id_unit_<jenis>`, `id_satker_<jenis>`, `nip_<jenis>` (pegawai ada), `keterangan` ≤ 255; 422 per kolom |
 | `PUT penugasan/{plt\|plh}/{id}` | 1 | Ubah (isian lengkap; dengan berkas: `POST` multipart + `_method=PUT`). Berkas lama diganti sesudah commit |
 | `DELETE penugasan/{plt\|plh}/{id}` | 1 | Hapus PERMANEN ikut legacy (keputusan user 13-10-2026) → `{ deleted: true, soft_delete: false, id }`; audit_logs mencatat "before", berkas lampiran dibuang sesudah commit |
-| `GET penugasan/{plt\|plh}/{id}/lampiran` | 1, 3, 4, 5 | Unduh (`attachment`, `nosniff`, `no-store`); tanpa berkas / path arsip legacy → 404 |
+| `GET penugasan/{plt\|plh}/{id}/lampiran` | 1, 3, 4, 5 | Unduh (`attachment`, `nosniff`, `no-store`); tanpa berkas → 404; path legacy dibaca lewat PathLegacy (MAKE-069); berkas belum disalin → 404 |
 
 ### Konket, LKH, PDF (WS-2 M5, MAKE-013, aditif)
 
@@ -214,7 +219,7 @@ baru:
 | `PUT konket/{id}` | pemilik (status W) / role 1 / role 3 lingkup | Ubah (multipart `_method=PUT`); pegawai → kembali W; baris peserta → 422 `id_parent`. `affect_tukin` [V2] (CR-051): jenis (`kategori`) diganti → nilai master jenis baru, kecuali admin 1/3 mengirim `affect_tukin` (menimpa); jenis tetap → nilai tersimpan dipertahankan |
 | `DELETE konket/{id}` | pemilik / role 1 / role 3 lingkup | Status 10 ([V2], keputusan user); dinas gabungan bersama pesertanya → `{ deleted, id, ids }` |
 | `POST konket/{id}/process` | 1, 3 (lingkup proses) | `{ aksi: setujui\|tolak, reason_note }` → V/X (peserta ikut); alasan wajib saat tolak; hanya W |
-| `GET konket/{id}/berkas` | yang boleh melihat | Unduh berkas bukti; path arsip legacy → 404 |
+| `GET konket/{id}/berkas` | yang boleh melihat | Unduh berkas bukti; path legacy dibaca lewat PathLegacy (MAKE-069); berkas belum disalin → 404 |
 | `GET lkh?nip=&page=&per_page=` | 1, 2, 3, 6, 7 | B-12b LKH milik sendiri (role 1/3: `nip` lain dalam lingkup). Status 2/10 tidak ditampilkan; urut Revisi → Menunggu → Disetujui. Item: `id`, `nip`, `nama`, `tgl_laporan`, `nip_atasan`, `nama_atasan`, `status`, `catatan`, `jumlah`, `aksi {ubah, hapus, proses}` |
 | `GET lkh/opsi?nip=` | 1, 2, 3, 6, 7 | `{ nip, tanggal_minimal, tanggal_maksimal, atasan: { nip, nama } \| null, punya_jabatan }` |
 | `GET lkh/verifikasi?status=&ds=&de=&search=` | siapa pun (1, 2, 3, 6, 7) yang menjadi atasan langsung | Antrean `nip_atasan` = NIP pemanggil; bawaan status 0 |

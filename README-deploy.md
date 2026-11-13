@@ -98,6 +98,12 @@ Web server mengarah ke symlink `current` (di-resolve ulang tiap request, tidak p
 Contoh nginx (ringkas):
 
 ```nginx
+# konteks http (sekali): Content-Disposition berkas arsip legacy (§1l)
+map $uri $disposisi_berkas {
+    ~*\.(pdf|jpe?g|png|gif)$  inline;
+    default                   attachment;
+}
+
 server {
     server_name simpegdev.example.go.id;
     root /var/www/simpeg-v2/current/frontend/dist;
@@ -107,6 +113,29 @@ server {
         root /var/www/simpeg-v2/current/backend/public;
         try_files $uri /index.php$is_args$args;
     }
+
+    # F-10 (PRD F-10 §7, F10-18 (a)): berkas arsip LEGACY lewat URL publik, persis legacy. Tanpa PHP, tanpa listing (§1l).
+    # Berkas unggahan v2 (kunci YYYY/MM/<32 hex>) SENGAJA tidak ada di sini: privat lewat endpoint aplikasi `buka`.
+    # Prefix ^~ wajib, supaya blok regex PHP di bawah tidak pernah terpakai untuk /berkas/.
+    location ^~ /berkas/ {
+        autoindex off;
+        access_log off;
+        log_not_found off;
+        disable_symlinks on from=/var/www/simpeg-v2/shared/writable/uploads/lampiran;
+        types { application/pdf pdf; image/jpeg jpg jpeg; image/png png; image/gif gif; }
+        default_type application/octet-stream;
+
+        location ~ "^/berkas/(?<kunci>arsip/(?:[^/.][^/]*/)*[^/.][^/]*)$" {
+            alias /var/www/simpeg-v2/shared/writable/uploads/lampiran/$kunci;
+            include snippets/simpeg-berkas-header.conf;
+        }
+        location ~ "^/berkas/(?<kunci>assets/upload/(?:[^/.][^/]*/)*[^/.][^/]*)$" {
+            alias /var/www/simpeg-v2/shared/writable/uploads/lampiran/$kunci;
+            include snippets/simpeg-berkas-header.conf;
+        }
+        return 404;
+    }
+
     location ~ ^/(api/)?index\.php {
         root /var/www/simpeg-v2/current/backend/public;
         include fastcgi_params;
@@ -247,7 +276,7 @@ Driver `fcm` mengganti mock dengan FCM **HTTP v1** (OAuth2 service account; FCM 
 4. Frontend (web push): isi konfigurasi web Firebase proyek yang sama di `frontend/.env.production` (`VITE_FIREBASE_*`, lihat `frontend/.env.example`). Nilai web Firebase bukan rahasia, tetapi tetap tidak disalin dari `header.php` legacy; ambil dari Firebase console.
 5. Token web (`platform` 1) didaftarkan SPA lewat `POST api/v1/integrasi/fcm-token`. **Token Android (`platform` 2) tidak punya endpoint di SIMPEG v2** (legacy pun tidak): backend app mobile di luar repo yang menulis `firebase_token` legacy harus diarahkan menulis ke `firebase_token` DB v2 — `nip` pemilik, `platform` = 2, `fcm_token`, `token_hash` = SHA-256 heks token (unik per `nip` + `token_hash`), `id_pengguna` NULL. Siapa dan bagaimana caranya = pertanyaan cutover DEPLOY-001.1 (PRD Fase 6 §7.4); sampai terjawab, push Android dan topik presensi tidak punya penerima. Token yang dilaporkan FCM tidak terdaftar dihapus otomatis.
    Kontrak `data` push Android mengikuti legacy apa adanya (`{title, body, data: JSON baris sumber + kolom tambahan legacy}`, mis. cuti `file_bukti_url` + `status_str`) karena app Android bergantung padanya; TB/IB/PMK tidak dikirim ke Android (legacy pun tidak).
-6. Berkas service account wajib ber-`token_uri` `https://oauth2.googleapis.com/token` (berkas lain ditolak). Kunci privat dibaca dari berkas hanya saat menandatangani JWT; **token akses OAuth (±1 jam) disimpan di cache aplikasi** (handler cache CI4, bawaan berkas di `writable/cache`) — pastikan `writable/` tidak terjangkau dari web dan hanya dibaca user PHP.
+6. Berkas service account wajib ber-`token_uri` `https://oauth2.googleapis.com/token` (berkas lain ditolak). Kunci privat dibaca dari berkas hanya saat menandatangani JWT; **token akses OAuth (±1 jam) disimpan di cache aplikasi** (handler cache CI4, bawaan berkas di `writable/cache`) — pastikan `writable/` tidak terjangkau dari web dan hanya dibaca user PHP (satu-satunya pengecualian: dua pola berkas arsip legacy di bawah `uploads/lampiran`, §1l; `writable/cache` tidak pernah).
 7. Batas [V2]: maks 10 token web per akun (yang terlama dibuang), pendaftaran token dibatasi 20 permintaan/60 detik per akun (429).
 8. Pantau: `integrasi_log` layanan `fcm` (status code + pesan teredaksi; token tidak pernah tercatat) dan `php spark queue:failed`; galat per token pada topik presensi (HTTP 200 dengan `results[].error`) tercatat sebagai `warning` `[fcm-topik]` di log aplikasi dan hitungannya ada di hasil job.
 
@@ -480,7 +509,7 @@ Perubahan perilaku yang HARUS diberitahukan ke klien (daftar pemberitahuan re-ha
 - Kegagalan auth: SIMAPI HTTP 200 `{"status":"02"}` ("Authentication failed" / "Token is not valid", pesan seragam termasuk untuk
   `ambil_riwayat_mutasi`); `services/*` HTTP 401. Throttle HTTP 429 dengan `Retry-After`.
 - `a_sinkron/ambil_seluruh_pengguna` dan `s_dm/p_web_config` tidak tersedia (404).
-- URL berkas arsip dan foto tidak lagi terbuka tanpa login. `services/s_stat` (MuDig): kolom `arsip_*`/`file_*` berisi URL ke
+- URL berkas arsip dan foto tidak lagi terbuka tanpa login (kecuali berkas arsip legacy lewat `/berkas/`, §1l). `services/s_stat` (MuDig): kolom `arsip_*`/`file_*` berisi URL ke
   `GET services/s_stat/berkas/{jenis}/{nip}/{id}[/{kolom}]` yang butuh Basic klien `stat` (Q6-38). SIMAPI `a_employee`: `foto` berisi URL
   `GET simapi/v1/a_employee/foto/{nip}` yang butuh token SIMAPI di header `Authorization` (Q6-39). Klien harus mengirim kredensial/token
   saat mengambil berkas dan menyesuaikan bentuk URL; berkas/foto yang belum dimigrasikan mengembalikan 404 seragam.
@@ -513,6 +542,122 @@ dashboard.tandaJasaIkutLegacy = false
 Cache ringkasan beranda per lingkup (`Config\Dashboard::$ttlRingkasanDetik`, 900 detik) memakai cache aplikasi; perubahan
 `dashboard.nipDisembunyikan` / `dashboard.penggunaLihatSemua` langsung berlaku (sidik daftar yang berlaku untuk akun ada di
 kunci cache). Daftar ulang tahun tidak di-cache.
+
+### 1l. Nginx `/berkas/`: berkas arsip legacy lewat URL publik (F-10, MAKE-093, PRD F-10 §7)
+
+**Keputusan.** Horii memutuskan ini pada 12-11-2026: F10-18, pilihan "PB-2 + audit PB-1"; ADR-038.
+- **Berkas legacy** adalah berkas hasil salinan MAKE-069 yang path-nya berpola `arsip/…` atau `assets/upload/…`. Berkas ini dibuka **persis legacy**: lewat URL publik yang disajikan Nginx langsung dari akar lampiran, **tanpa** cek login atau izin. Siapa pun yang tahu URL-nya bisa membuka berkas itu. Ini keputusan sadar (risiko R1–R7, R9, R10 di ADR-038), **bukan** bug.
+- **Berkas unggahan v2** (kunci `YYYY/MM/<32 hex>.<ext>`, termasuk lampiran layanan 42–50 dan surat cuti ber-TTE) **tidak** disajikan Nginx. Berkas ini privat dan hanya dibuka lewat endpoint aplikasi `GET api/v1/pegawai/<nip>/arsip/berkas/<id>/buka`, dengan JWT, lingkup pegawai, audit `arsip_unduh`, dan throttle.
+
+**Yang terjangkau web hanya dua pola ini, di bawah `shared/writable/uploads/lampiran`.** Ketentuan "`writable/` tidak boleh terjangkau dari web" (§1d butir 6 dan lain-lain) tetap berlaku untuk semua isi lainnya, yaitu:
+- `writable/cache` (berisi token OAuth FCM);
+- `writable/logs`, `writable/session`;
+- `uploads/konten`, `uploads/slip-impor`;
+- di bawah akar lampiran: kunci v2 `YYYY/MM/…`, `kolom/…`, dan `form-digital/…`.
+
+Pengecualiannya sempit dan disengaja: **hanya** blok `location ^~ /berkas/` di §1 yang boleh menunjuk ke dalam `writable/`.
+
+**Pola yang disajikan.** Kedua regex legacy di tabel ini **sama persis** dengan konstanta di `backend/app/Config/Arsip.php`, dan dijaga oleh test pembanding string `backend/tests/unit/Deploy/ReadmeBerkasNginxTest.php`. Bila salah satu diubah, ubah README, contoh Nginx §1, `Config\Arsip`, dan Nginx server **bersamaan**. Regex kunci v2 sengaja tidak ditulis di README ini.
+
+| Pola (atas path relatif akar lampiran) | Contoh URL | Hasil |
+|---|---|---|
+| `^arsip/(?:[^/.][^/]*/)*[^/.][^/]*$` | `/berkas/arsip/<nip>/<sub>/<nama>.pdf` | Disajikan (berkas legacy server arsip) |
+| `^assets/upload/(?:[^/.][^/]*/)*[^/.][^/]*$` | `/berkas/assets/upload/<…>/<nama>.jpg` | Disajikan (berkas legacy server aplikasi, F10-33) |
+| lainnya: kunci v2, `kolom/`, `form-digital/`, segmen berawalan `.` | `/berkas/2026/11/<kunci>.pdf` | **404** |
+
+**Langkah pasang (server dev, lalu produksi; B10-3).**
+
+1. **Snippet header** `/etc/nginx/snippets/simpeg-berkas-header.conf`. `add_header` di blok dalam menimpa header blok luar, jadi snippet ini di-`include` di **setiap** blok dalam (§1):
+
+   ```nginx
+   add_header X-Content-Type-Options nosniff always;
+   add_header Cache-Control "no-store" always;
+   add_header Referrer-Policy no-referrer always;
+   add_header Content-Disposition $disposisi_berkas always;
+   add_header Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'" always;
+   ```
+
+   - `map $disposisi_berkas` (konteks `http`, §1) memberi `inline` untuk pdf/jpg/jpeg/png/gif, dan `attachment` untuk lainnya.
+   - `types` di blok `/berkas/` hanya mengenal empat tipe pratinjau. Ekstensi lain (doc, xls, zip, html, svg, …) selalu dikirim sebagai `application/octet-stream` dan diunduh (F10-25, F10-32). Ini mencegah berkas HTML/SVG legacy berjalan sebagai halaman di alamat aplikasi.
+   - CSP **tanpa** `sandbox`. Bila nilai CSP mematahkan pratinjau PDF/gambar di salah satu browser uji (langkah 6), **pratinjau didahulukan** (F10-10). Dalam hal itu, longgarkan atau hapus baris CSP saja; `nosniff`, `types`, dan `map` tetap dipasang. Catat nilai akhirnya di tabel hasil verifikasi.
+2. **Blok server.** Tambahkan `map` dan `location ^~ /berkas/` seperti contoh §1. Ketentuannya:
+   - letakkan **sebelum** blok regex PHP;
+   - prefix `^~` wajib;
+   - tanpa `fastcgi_pass`;
+   - `autoindex off`;
+   - `return 404` untuk path selain dua pola.
+
+   Path `/var/www/simpeg-v2/…` di contoh adalah contoh generik dan disesuaikan dengan `DEPLOY_ROOT`. `alias` dan `disable_symlinks … from=` menunjuk **langsung** ke `shared/writable/uploads/lampiran`, bukan lewat symlink `current/backend/writable`.
+3. **Tanpa log akses.** Di blok `/berkas/` pasang `access_log off;` dan `log_not_found off;`, karena URL dan path memuat NIP. Akses ke `error_log` server tetap dibatasi ke operator, karena bisa berisi path.
+4. **Tanpa symlink di dalam akar lampiran** (`disable_symlinks on from=<akar>`, B10-1). Symlink `writable → shared/writable` di **atas** akar tidak berpengaruh.
+   - Di **dalam** akar tidak boleh ada symlink. PHP (`realpath`) mengizinkan symlink yang tetap di dalam akar, sedangkan Nginx menolaknya, sehingga badge "berkas ada" di halaman Arsip bisa berbeda dengan kenyataan.
+   - Bila disk berkas dipindah, mount **langsung** ke path akar, bukan lewat symlink.
+   - Cek: `find /var/www/simpeg-v2/shared/writable/uploads/lampiran -type l` harus kosong.
+5. **Hak baca user Nginx.**
+   - PHP menulis berkas dengan hak `0640` dan folder `0750`, begitu juga hasil `lampiran:tarik`. Hak ini **tidak diubah**.
+   - User worker Nginx harus bisa membaca subtree `arsip/` dan `assets/upload/`. Caranya: masukkan user Nginx ke grup pemilik berkas (user PHP-FPM/deploy), atau jalankan keduanya dengan user yang sama. Contoh: `usermod -aG <grup-php> <user-nginx>`, lalu restart Nginx.
+   - Kunci v2 dibaca PHP, bukan Nginx.
+   - Uji: `sudo -u <user-nginx> test -r <akar>/arsip/<contoh berkas> && echo OK`.
+6. **`nginx -t && systemctl reload nginx`**, lalu jalankan verifikasi di bawah. Hasilnya dicatat di tabel hasil verifikasi (G10-4).
+
+**`.env` backend** (`shared/backend.env`):
+
+```ini
+# F10-24 saklar khusus berkas legacy: publik (bawaan, F10-18 (a)) | privat (rollback: berkas legacy juga lewat endpoint `buka`)
+arsip.penyajianBerkasLegacy = publik
+# Dasar URL publik berkas legacy; bawaan /berkas (relatif ke host aplikasi). Ganti hanya bila berkas dipindah ke alamat lain (ADR-038)
+arsip.dasarUrlBerkas = /berkas
+# Rute PHP pengganti Nginx khusus mesin dev (ENVIRONMENT = development). JANGAN diaktifkan di server
+arsip.sajiBerkasDev = false
+```
+
+**Verifikasi (server dev = G10-4; ulangi di produksi = B10-3).** `<host>` adalah host aplikasi. Contoh berkas diambil dari salinan MAKE-069. Jangan tempel NIP atau nama berkas nyata di laporan; sebut "berkas legacy PDF contoh" dan sejenisnya.
+
+```bash
+H=https://<host>
+curl -sI "$H/berkas/arsip/<nip>/<sub>/<nama>.pdf"         # 200, application/pdf, inline
+curl -sI "$H/berkas/arsip/<nip>/<sub>/<nama>.PDF"         # 200, application/pdf, inline (ekstensi huruf besar)
+curl -sI "$H/berkas/assets/upload/<…>/<nama>.jpg"         # 200, image/jpeg, inline
+curl -sI "$H/berkas/arsip/<nip>/<sub>/<nama>.docx"        # 200, application/octet-stream, attachment
+curl -sI "$H/berkas/arsip/<nip>/<sub>/<tidak-ada>.pdf"    # 404
+curl -sI "$H/berkas/2026/11/<kunci v2 yang ADA di disk>.pdf"   # 404 (kunci v2 tidak disajikan Nginx)
+curl -sI "$H/berkas/kolom/<…>"  "$H/berkas/form-digital/<…>"   # 404
+curl -sI "$H/berkas/arsip/<nip>/"                         # 404 (tanpa listing)
+curl -sI "$H/berkas/arsip/<nip>/.htaccess"                # 404 (segmen berawalan titik)
+curl -sI "$H/berkas/arsip/%2e%2e/%2e%2e/cache/<…>"        # 400/404, tidak pernah isi writable/cache
+curl -sI "$H/berkas/arsip/<nip>/<sub>/<nama>.php"         # octet-stream attachment, TIDAK dieksekusi
+```
+
+Untuk setiap respons 200, periksa header berikut:
+- `X-Content-Type-Options: nosniff`;
+- `Cache-Control: no-store`;
+- `Referrer-Policy: no-referrer`;
+- `Content-Security-Policy` sesuai snippet;
+- `Content-Disposition` sesuai tipe.
+
+Periksa juga bahwa `tail` log akses Nginx tidak memuat request `/berkas/`.
+
+Uji browser di **Chrome, Edge, dan Firefox** (desktop):
+
+1. **Jalur publik (berkas legacy).** Buka halaman Arsip, lalu ⋮ → Buka pada berkas legacy PDF, JPG, dan PNG. Popup harus menampilkan pratinjau. Tombol unduh dan cetak penampil PDF harus berfungsi.
+2. **Jalur privat (berkas unggahan v2).**
+   - Buka berkas PDF/JPG/PNG lewat ⋮ → Buka (popup + blob). Pratinjau harus tampil.
+   - Coba tombol unduh dan cetak penampil PDF **sebelum** dan **sesudah** penundaan pencabutan object URL (60 detik, F10-37 (5)).
+   - Buka juga URL `api/v1/pegawai/<nip>/arsip/berkas/<id>/buka` langsung sebagai tab, dalam keadaan login, untuk menguji CSP endpoint (F10-34 (4)).
+3. Bila CSP mematahkan pratinjau, terapkan langkah pasang butir 1.
+
+Hasil verifikasi (diisi operator/Horii saat G10-4; tanpa host, NIP, atau nama berkas):
+
+| Tanggal | Server | `curl -I` (header + 404 kunci v2) | Hak baca user Nginx | Chrome | Edge | Firefox | Nilai CSP akhir | Catatan |
+|---|---|---|---|---|---|---|---|---|
+| | dev | | | | | | | |
+
+**Rollback ke privat (tanpa deploy kode; ADR-038).** Rollback berlaku untuk berkas legacy dan dilakukan dalam dua langkah:
+
+1. Set `arsip.penyajianBerkasLegacy = privat` di `shared/backend.env`, lalu reload PHP-FPM.
+   - Halaman Arsip kemudian membuka berkas legacy lewat endpoint `buka`, dengan audit dan throttle yang sama.
+   - Sebelum dipakai, cek ukuran berkas legacy terbesar dari D1/manifest. Endpoint `buka` memuat seluruh isi berkas ke memori PHP, tanpa streaming (R10).
+2. Hapus blok `location ^~ /berkas/` (dan `map`), lalu `nginx -t && systemctl reload nginx`. Semua URL publik lama menjadi 404.
 
 ## 2. Cara push (operator deploy)
 

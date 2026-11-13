@@ -16,6 +16,7 @@ Folder ini menyimpan ADR yang ditulis setelah dokumen utama dan perlu dibaca cod
 | [ADR-035](ADR-035-ekspor-laporan-tukin-sinkron.md) | Ekspor rekap Tukin sinkron: kalkulasi per batch 500, PDF per unit/satker maks 800 baris (uji volume 5.000 pegawai) | Diterima 28-10-2026 | Repo |
 | [ADR-036](ADR-036-auth-antar-sistem.md) | Auth antar-sistem: klien layanan (HTTP Basic, allowlist IP, throttle) dan token SIMAPI ber-hash SHA-256 | Diusulkan 05-11-2026 | Repo |
 | [ADR-037](ADR-037-penjadwalan-job.md) | Penjadwalan job Fase 6: command `php spark` + crontab `flock` + `GET_LOCK`, tanpa endpoint HTTP cron | Diusulkan 04-11-2026 | Repo |
+| [ADR-038](ADR-038-penyajian-berkas-arsip-legacy-url-publik.md) | Penyajian berkas arsip legacy lewat URL publik (F-10): Nginx `/berkas/` dua pola legacy, berkas unggahan v2 tetap privat | Diusulkan 12-11-2026 | Repo |
 
 ## Format
 
