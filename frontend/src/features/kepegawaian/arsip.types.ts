@@ -92,9 +92,33 @@ export interface ArsipBerkasResponse {
 export interface ArsipBerkasQuery {
   /** Angka (`jenis_rwy`) atau `tanpa_jenis`; kosong = semua berkas. */
   id_jenis_rwy?: number | typeof FOLDER_TANPA_JENIS
+  /** Hanya arsip yang belum terhubung ke riwayat (Tahap 2); dikirim `belum_terhubung=1` bila true. */
+  belum_terhubung?: boolean
   q?: string
   sort?: 'id' | 'nama' | 'jenis' | 'created_at'
   order?: 'asc' | 'desc'
   page?: number
   per_page?: number
 }
+
+/** Satu calon data riwayat tujuan Hubungkan (`GET …/arsip/opsi-hubungkan`, Tahap 2; berstatus Disetujui, milik NIP). */
+export interface ArsipOpsiRiwayat {
+  id_entri: string
+  ringkasan: string
+}
+
+/** `GET pegawai/{nip}/arsip/opsi-hubungkan?id_riwayat=`. */
+export interface ArsipOpsiHubungkanResponse {
+  items: ArsipOpsiRiwayat[]
+}
+
+/** Isi `POST …/hubungkan`. Kode 38 (Arsip Data Umum) tanpa `id_entri`. */
+export interface ArsipHubungkanPayload {
+  id_riwayat: number
+  id_entri?: string
+}
+
+/** Kode `jenis_rwy` Arsip Data Umum: tujuan Hubungkan tanpa pilihan data riwayat (`id_entri` NULL, F10-28). */
+export const ID_ARSIP_DATA_UMUM = 38
+
+export type FormatEksporArsip = 'xlsx' | 'csv'

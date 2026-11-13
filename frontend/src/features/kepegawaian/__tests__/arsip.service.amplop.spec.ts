@@ -67,3 +67,57 @@ describe('arsipService — amplop {status,data}', () => {
     expect(diminta[0]?.url).toBe('/pegawai/a%2Fb/arsip/berkas')
   })
 })
+
+describe('arsipService — Tahap 2 (MAKE-096) lewat klien asli', () => {
+  it('ubahNama: PATCH /pegawai/<nip>/arsip/berkas/<id> dengan body { tag }', async () => {
+    pasangAdapter(null)
+    await arsipService.ubahNama(NIP, 77, 'Nama Baru')
+    expect(diminta[0]?.method).toBe('patch')
+    expect(diminta[0]?.url).toBe(`/pegawai/${NIP}/arsip/berkas/77`)
+    expect(JSON.parse(String(diminta[0]?.data))).toEqual({ tag: 'Nama Baru' })
+  })
+
+  it('hubungkan: POST …/berkas/<id>/hubungkan; kode 38 tanpa id_entri', async () => {
+    pasangAdapter(null)
+    await arsipService.hubungkan(NIP, 77, { id_riwayat: 9, id_entri: '456' })
+    await arsipService.hubungkan(NIP, 77, { id_riwayat: 38 })
+    expect(diminta[0]?.method).toBe('post')
+    expect(diminta[0]?.url).toBe(`/pegawai/${NIP}/arsip/berkas/77/hubungkan`)
+    expect(JSON.parse(String(diminta[0]?.data))).toEqual({ id_riwayat: 9, id_entri: '456' })
+    expect(JSON.parse(String(diminta[1]?.data))).toEqual({ id_riwayat: 38 })
+  })
+
+  it('hapus: DELETE …/berkas/<id> (bukan GET)', async () => {
+    pasangAdapter(null)
+    await arsipService.hapus(NIP, 77)
+    expect(diminta[0]?.method).toBe('delete')
+    expect(diminta[0]?.url).toBe(`/pegawai/${NIP}/arsip/berkas/77`)
+  })
+
+  it('opsiHubungkan: GET …/opsi-hubungkan?id_riwayat=, amplop terbuka menjadi { items }', async () => {
+    const payload = { items: [{ id_entri: '456', ringkasan: 'Analis' }] }
+    pasangAdapter(payload)
+    const hasil = await arsipService.opsiHubungkan(NIP, 9)
+    expect(diminta[0]?.method).toBe('get')
+    expect(diminta[0]?.url).toBe(`/pegawai/${NIP}/arsip/opsi-hubungkan`)
+    expect(diminta[0]?.params).toEqual({ id_riwayat: 9 })
+    expect(hasil).toEqual(payload)
+  })
+
+  it('belum_terhubung=1 hanya dikirim bila true (daftar berkas)', async () => {
+    pasangAdapter({ items: [], total: 0, page: 1, per_page: 25 })
+    await arsipService.berkas(NIP, { belum_terhubung: true, id_jenis_rwy: 9 })
+    await arsipService.berkas(NIP, { belum_terhubung: false })
+    expect(diminta[0]?.params).toEqual({ id_jenis_rwy: 9, belum_terhubung: 1 })
+    expect(diminta[1]?.params).toEqual({})
+  })
+
+  it('ekspor: GET …/ekspor?format=&filter sama, responseType blob, tanpa page/per_page/sort', async () => {
+    pasangAdapter(new Blob(['x']))
+    await arsipService.ekspor(NIP, 'csv', { id_jenis_rwy: 'tanpa_jenis', belum_terhubung: true, q: 'sk', page: 3, per_page: 25, sort: 'nama', order: 'asc' })
+    expect(diminta[0]?.method).toBe('get')
+    expect(diminta[0]?.url).toBe(`/pegawai/${NIP}/arsip/ekspor`)
+    expect(diminta[0]?.responseType).toBe('blob')
+    expect(diminta[0]?.params).toEqual({ format: 'csv', id_jenis_rwy: 'tanpa_jenis', belum_terhubung: 1, q: 'sk' })
+  })
+})

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * Tabel berkas satu folder / "Semua berkas" (F-10 Tahap 1, MAKE-091, PRD §9.2–§9.3): Nama Arsip | Jenis Riwayat (hanya di
- * "Semua berkas") | Data Riwayat | Status Berkas (badge) | Aksi ⋮ (sticky di kanan; tabel menggulir di dalam kartu, bukan
- * halaman — AC1-15). Aksi baris lewat `RowActionsMenu` (AGENTS.md §1); Tahap 1 hanya item `buka` (`disabled` bila
- * `url_berkas` null atau berkas privat sedang dimuat). Cara buka mengikuti `akses_berkas` item (`useBukaBerkasArsip`);
- * galatnya tampil sebagai `UiNotice` di atas tabel. Semua teks diinterpolasi (tanpa `v-html`).
+ * Tabel berkas satu folder / "Semua berkas" (F-10, MAKE-091 Tahap 1 + MAKE-096 Tahap 2, PRD §9.2–§9.3): Nama Arsip | Jenis Riwayat
+ * (hanya di "Semua berkas") | Data Riwayat | Status Berkas (badge) | Aksi ⋮ (sticky di kanan; tabel menggulir di dalam kartu, bukan
+ * halaman — AC1-15). Aksi baris lewat `RowActionsMenu` (AGENTS.md §1), urutan Edit → Buka → Hubungkan → Hapus (`danger`):
+ * Edit/Hubungkan/Hapus `hidden` bila `aksi.*` item false atau `bacaSaja` (role 4/5), dan `disabled` selama ada aksi tulis yang
+ * berjalan (`memproses`); Buka `disabled` bila `url_berkas` null atau berkas privat sedang dimuat. Cara buka mengikuti
+ * `akses_berkas` item (`useBukaBerkasArsip`); galatnya tampil sebagai `UiNotice` di atas tabel. Aksi tulis dipancarkan ke
+ * halaman (dialog / konfirmasi). Semua teks diinterpolasi (tanpa `v-html`).
  */
 import { FileSearch } from 'lucide-vue-next'
 import { computed, watch } from 'vue'
@@ -23,7 +25,13 @@ const props = defineProps<{
   tampilJenis: boolean
   /** Ada kata pencarian aktif: keadaan kosong berarti "tidak cocok", bukan "belum ada berkas". */
   mencari?: boolean
+  /** Role hanya-lihat (4/5): semua aksi tulis disembunyikan walau server mengirim `aksi.*`. */
+  bacaSaja?: boolean
+  /** Ada aksi tulis yang sedang berjalan: Edit / Hubungkan / Hapus `disabled`. */
+  memproses?: boolean
 }>()
+
+const emit = defineEmits<{ edit: [item: ArsipBerkas]; hubungkan: [item: ArsipBerkas]; hapus: [item: ArsipBerkas] }>()
 
 const { galat, bisaDibuka, buka } = useBukaBerkasArsip()
 
@@ -38,11 +46,20 @@ watch(
 const colspan = computed(() => (props.tampilJenis ? 5 : 4))
 
 function aksiBaris(item: ArsipBerkas): RowAction[] {
-  return [{ key: 'buka', label: 'Buka', disabled: !bisaDibuka(item) }]
+  const tulis = props.bacaSaja ? { edit: false, hubungkan: false, hapus: false } : item.aksi
+  return [
+    { key: 'edit', label: 'Edit', hidden: !tulis.edit, disabled: props.memproses },
+    { key: 'buka', label: 'Buka', disabled: !bisaDibuka(item) },
+    { key: 'hubungkan', label: 'Hubungkan', hidden: !tulis.hubungkan, disabled: props.memproses },
+    { key: 'hapus', label: 'Hapus', danger: true, hidden: !tulis.hapus, disabled: props.memproses },
+  ]
 }
 
 function onAksi(key: string, item: ArsipBerkas): void {
   if (key === 'buka') buka(item)
+  else if (key === 'edit') emit('edit', item)
+  else if (key === 'hubungkan') emit('hubungkan', item)
+  else if (key === 'hapus') emit('hapus', item)
 }
 </script>
 

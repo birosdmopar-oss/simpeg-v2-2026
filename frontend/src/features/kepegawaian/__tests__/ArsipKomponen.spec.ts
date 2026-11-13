@@ -252,3 +252,66 @@ describe('ArsipBerkasTable', () => {
     expect(wrapper.get('[data-testid="arsip-berkas-row-7"]').text()).toContain('<img src=x onerror=alert(1)>')
   })
 })
+
+describe('ArsipBerkasTable — aksi tulis Tahap 2 (MAKE-096)', () => {
+  let openSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+  })
+  afterEach(() => openSpy.mockRestore())
+
+  const SEMUA = { edit: true, hubungkan: true, hapus: true }
+
+  function pasang(item: ArsipBerkas, opsi: { bacaSaja?: boolean; memproses?: boolean } = {}) {
+    return mount(ArsipBerkasTable, { props: { items: [item], loading: false, tampilJenis: true, ...opsi }, attachTo: document.body })
+  }
+
+  it('urutan AGENTS.md §1: Edit → Buka → Hubungkan → Hapus (danger paling bawah)', async () => {
+    const wrapper = pasang(berkas(5, { id_riwayat: 0, jenis_riwayat: 'Belum Terhubung', aksi: SEMUA }))
+    expect(await rowMenuActions(wrapper, 'arsip-actions-5')).toEqual([
+      { key: 'edit', label: 'Edit', disabled: false, danger: false },
+      { key: 'buka', label: 'Buka', disabled: false, danger: false },
+      { key: 'hubungkan', label: 'Hubungkan', disabled: false, danger: false },
+      { key: 'hapus', label: 'Hapus', disabled: false, danger: true },
+    ])
+  })
+
+  it('item `hidden` mengikuti aksi.* baris (mis. arsip terhubung: hanya Edit + Buka)', async () => {
+    const wrapper = pasang(berkas(6, { aksi: { edit: true, hubungkan: false, hapus: false } }))
+    expect((await rowMenuActions(wrapper, 'arsip-actions-6')).map((a) => a.key)).toEqual(['edit', 'buka'])
+  })
+
+  it('kode 37 bagi selain role 1 (aksi.edit = false): Edit tidak tampil', async () => {
+    const wrapper = pasang(berkas(7, { id_riwayat: 37, aksi: { edit: false, hubungkan: false, hapus: false } }))
+    expect((await rowMenuActions(wrapper, 'arsip-actions-7')).map((a) => a.key)).toEqual(['buka'])
+  })
+
+  it('role 4/5 (bacaSaja): semua item tulis hidden walau server mengirim aksi.*', async () => {
+    const wrapper = pasang(berkas(8, { aksi: SEMUA }), { bacaSaja: true })
+    expect((await rowMenuActions(wrapper, 'arsip-actions-8')).map((a) => a.key)).toEqual(['buka'])
+  })
+
+  it('selama aksi tulis berjalan: Edit / Hubungkan / Hapus disabled, Buka tetap aktif', async () => {
+    const wrapper = pasang(berkas(9, { aksi: SEMUA }), { memproses: true })
+    expect(await rowMenuActions(wrapper, 'arsip-actions-9')).toEqual([
+      { key: 'edit', label: 'Edit', disabled: true, danger: false },
+      { key: 'buka', label: 'Buka', disabled: false, danger: false },
+      { key: 'hubungkan', label: 'Hubungkan', disabled: true, danger: false },
+      { key: 'hapus', label: 'Hapus', disabled: true, danger: true },
+    ])
+  })
+
+  it.each(['edit', 'hubungkan', 'hapus'] as const)('memilih %s memancarkan event dengan item baris', async (aksi) => {
+    const item = berkas(10, { aksi: SEMUA })
+    const wrapper = pasang(item)
+    await selectRowAction(wrapper, 'arsip-actions-10', aksi)
+    expect(wrapper.emitted(aksi)?.[0]).toEqual([item])
+  })
+
+  it('item disabled (memproses) tidak memancarkan event', async () => {
+    const wrapper = pasang(berkas(11, { aksi: SEMUA }), { memproses: true })
+    await selectRowAction(wrapper, 'arsip-actions-11', 'hapus')
+    expect(wrapper.emitted('hapus')).toBeUndefined()
+  })
+})
