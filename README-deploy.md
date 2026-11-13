@@ -659,6 +659,20 @@ Hasil verifikasi (diisi operator/Horii saat G10-4; tanpa host, NIP, atau nama be
    - Sebelum dipakai, cek ukuran berkas legacy terbesar dari D1/manifest. Endpoint `buka` memuat seluruh isi berkas ke memori PHP, tanpa streaming (R10).
 2. Hapus blok `location ^~ /berkas/` (dan `map`), lalu `nginx -t && systemctl reload nginx`. Semua URL publik lama menjadi 404.
 
+### 1m. Chatbot Vanya: kunci token penilaian (Fase 8 E-10, MAKE-094, PRD Fase 8 F8-35)
+
+Penilaian 👍/👎 jawaban Vanya dijaga token HMAC per log (log percakapan anonim, tanpa identitas pengirim). Kuncinya
+`chatbot.kunciTokenFeedback` di `.env` server; nilainya **tidak** di repo dan **bukan** `jwt.secret`.
+
+**Daftar periksa deploy (wajib, setiap server):**
+1. Isi `chatbot.kunciTokenFeedback` dengan minimal 32 byte acak, mis. hasil `php -r "echo bin2hex(random_bytes(32));"`.
+2. Sesudah deploy, cek `writable/logs`: **tidak boleh** ada baris `[chatbot] kunci token feedback tidak tersedia`. Baris itu
+   berarti kunci kosong atau kurang dari 32 byte. Akibatnya Vanya tetap menjawab, tetapi tombol 👍/👎 tidak tampil
+   (`bisa_feedback = false`) dan penilaian ditolak 403. Salah konfigurasi ini tidak membuat galat lain, jadi harus diperiksa.
+3. Mengganti kunci membatalkan semua token yang sedang berlaku (masa berlaku 24 jam). Pengguna cukup bertanya lagi.
+
+Kunci dan token tidak pernah ditulis ke log aplikasi.
+
 ## 2. Cara push (operator deploy)
 
 Satu kali: tambahkan remote ke bare repo server dev.
