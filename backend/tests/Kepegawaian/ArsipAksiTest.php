@@ -16,6 +16,7 @@ use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\Mock\MockCache;
 use CodeIgniter\Test\TestResponse;
 use Config\Services;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\Kepegawaian\LampiranUjiTrait;
@@ -142,7 +143,7 @@ final class ArsipAksiTest extends DatabaseTestCase
         }
 
         // AC2-06: jenis di luar F10-28 → 422; data riwayat kosong → 422.
-        foreach ([37, 39, 41, 42, 45, 0, 'abc', ''] as $kode) {
+        foreach ([37, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 0, 2, 'abc', '', '9.0'] as $kode) {
             $res = $this->hubungkan($admin, $yatim, ['id_riwayat' => $kode, 'id_entri' => $rmj]);
             $res->assertStatus(422);
             $this->assertArrayHasKey('id_riwayat', $this->json($res)['errors'], (string) $kode);
@@ -151,6 +152,13 @@ final class ArsipAksiTest extends DatabaseTestCase
         $res = $this->hubungkan($admin, $yatim, ['id_riwayat' => 9]);
         $res->assertStatus(422);
         $this->assertArrayHasKey('id_entri', $this->json($res)['errors']);
+
+        // id_entri wajib PK kanonik: MySQL akan mencocokkan "05"/"5abc" dengan PK 5, tetapi B-18 membandingkan string.
+        foreach (['0' . $rmj, $rmj . 'abc', '+' . $rmj, '1e1', '0', '-1', ' '] as $buruk) {
+            $res = $this->hubungkan($admin, $yatim, ['id_riwayat' => 9, 'id_entri' => $buruk]);
+            $res->assertStatus(422);
+            $this->assertArrayHasKey('id_entri', $this->json($res)['errors'], $buruk);
+        }
 
         // Riwayat bukan milik NIP / bukan Disetujui / tidak ada → 404.
         $lain     = $this->buatRiwayatMutasiJabatan($this->buatPegawai(), ['status' => 1]);
@@ -251,9 +259,9 @@ final class ArsipAksiTest extends DatabaseTestCase
             $baru  = $this->arsip(0, "arsip/x/r{$role}.pdf");
             $this->hubungkan($admin, $baru, ['id_riwayat' => 9, 'id_entri' => $rmj])->assertStatus(200);
             $jenis = $this->json($this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/arsip"))['data']['aksi']['jenis_hubungkan'];
-            $this->assertEqualsCanonicalizing(OtorisasiArsip::KODE_HUBUNGKAN, array_column($jenis, 'id_jenis_rwy'));
+            $this->assertEqualsCanonicalizing([1, 3, 5, 7, 9, 10, 11, 13, 14, 20, 22, 23, 32, 36, 38], array_column($jenis, 'id_jenis_rwy'), 'daftar literal F10-28');
             // Objek berlabel dari jenis_rwy, urut `order` (38 Data Umum order 3 sebelum 9 Jabatan order 6, 14 Pendidikan 13).
-            $urut = $this->db->table('jenis_rwy')->select('id_jenis_rwy, jenis_rwy')->whereIn('id_jenis_rwy', OtorisasiArsip::KODE_HUBUNGKAN)->orderBy('order', 'ASC')->orderBy('id_jenis_rwy', 'ASC')->get()->getResultArray();
+            $urut = $this->db->table('jenis_rwy')->select('id_jenis_rwy, jenis_rwy')->whereIn('id_jenis_rwy', [1, 3, 5, 7, 9, 10, 11, 13, 14, 20, 22, 23, 32, 36, 38])->orderBy('order', 'ASC')->orderBy('id_jenis_rwy', 'ASC')->get()->getResultArray();
             $this->assertSame(array_map(static fn (array $r): array => ['id_jenis_rwy' => (int) $r['id_jenis_rwy'], 'label' => $r['jenis_rwy']], $urut), $jenis);
             $this->assertContains(['id_jenis_rwy' => 14, 'label' => 'Pendidikan'], $jenis);
             $this->assertLessThan(array_search(9, array_column($jenis, 'id_jenis_rwy'), true), array_search(38, array_column($jenis, 'id_jenis_rwy'), true));
@@ -296,21 +304,119 @@ final class ArsipAksiTest extends DatabaseTestCase
         $this->assertSame(0, (int) $this->db->table('document_attachment')->select('id_riwayat')->where('id_attachment', $yatim)->get()->getRowArray()['id_riwayat']);
     }
 
-    public function testOpsiHubungkanHanyaDisetujuiMilikNipUrutMenurun(): void
+    /**
+     * @return array<string, array{0: int}>
+     */
+    public static function ulPegawaiProvider(): array
+    {
+        return ['pegawai (2)' => [Role::PEGAWAI], 'ptt (6)' => [Role::PTT], 'pppk (7)' => [Role::PPPK]];
+    }
+
+    #[DataProvider('ulPegawaiProvider')]
+    public function testPemilikUlPegawaiF1031(int $role): void
+    {
+        $rmj      = $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 1]);
+        $sembilan = $this->arsip(9, 'arsip/x/9.pdf', ['id_entri' => (string) $rmj]);
+        $status   = $this->arsip(37, 'arsip/x/37.pdf', ['tag' => 'Arsip Status']);
+        $yatim    = $this->arsip(0, 'arsip/x/0.pdf');
+        $yatim2   = $this->arsip(0, 'arsip/x/00.pdf');
+        $akun     = $this->akun($this->nip, $role);
+
+        $this->ubah($akun, $sembilan, 'Nama Baru')->assertStatus(200);
+        $tolak = $this->ubah($akun, $status, 'Ganti');
+        $tolak->assertStatus(403);
+        $this->assertSame(OtorisasiArsip::PESAN_DATA_UMUM, $this->json($tolak)['message']);
+        $aksi = array_column($this->json($this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/berkas"))['data']['items'], 'aksi', 'id_attachment');
+        $this->assertFalse($aksi[$status]['edit']);
+        $this->assertSame(['edit' => true, 'hubungkan' => true, 'hapus' => true], $aksi[$yatim]);
+
+        $this->hubungkan($akun, $yatim, ['id_riwayat' => 38])->assertStatus(200);
+        $kunci = $this->hubungkan($akun, $yatim2, ['id_riwayat' => 9, 'id_entri' => $rmj]);
+        $kunci->assertStatus(403);
+        $this->assertSame(OtorisasiArsip::PESAN_KUNCI, $this->json($kunci)['message']);
+        $opsi = $this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip/opsi-hubungkan?id_riwayat=9");
+        $opsi->assertStatus(403);
+        $this->assertSame(OtorisasiArsip::PESAN_KUNCI, $this->json($opsi)['message']);
+        $this->assertSame([['id_jenis_rwy' => 38, 'label' => 'Data Umum']], $this->json($this->asUser($akun)->get("api/v1/pegawai/{$this->nip}/arsip"))['data']['aksi']['jenis_hubungkan']);
+    }
+
+    public function testBalapanKodeDicekUlangSesudahForUpdate(): void
+    {
+        $admin   = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $pegawai = $this->akun($this->nip, Role::PEGAWAI);
+
+        // Hapus & Hubungkan: baris kode 0 menjadi id_riwayat 9 tepat saat `pegawai … FOR UPDATE` → 422, baris tidak terhapus
+        // dan tidak terhubung ke 38.
+        foreach (['hapus', 'hubungkan'] as $aksi) {
+            $id = $this->arsip(0, "arsip/x/{$aksi}.pdf");
+            $this->denganBalapan(['id_riwayat' => 9], $id, function () use ($admin, $id, $aksi): void {
+                $res = $aksi === 'hapus'
+                    ? $this->asUser($admin)->delete("api/v1/pegawai/{$this->nip}/arsip/berkas/{$id}")
+                    : $this->hubungkan($admin, $id, ['id_riwayat' => 38]);
+                $res->assertStatus(422);
+                $this->assertSame([AksiArsip::PESAN_SUDAH_TERHUBUNG], $this->json($res)['errors']['id_attachment'], $aksi);
+            });
+            $row = $this->db->table('document_attachment')->where('id_attachment', $id)->get()->getRowArray();
+            $this->assertIsArray($row, $aksi);
+            $this->assertNotSame(38, (int) $row['id_riwayat'], $aksi);
+        }
+
+        // Ubah Nama: baris 38 menjadi 37 tepat saat kunci → role 2 ditolak 403 dan tag tidak berubah.
+        $du = $this->arsip(38, 'arsip/x/du.pdf', ['tag' => 'KTP']);
+        $this->denganBalapan(['id_riwayat' => 37], $du, function () use ($pegawai, $du): void {
+            $res = $this->ubah($pegawai, $du, 'Ganti');
+            $res->assertStatus(403);
+            $this->assertSame(OtorisasiArsip::PESAN_DATA_UMUM, $this->json($res)['message']);
+        });
+        $this->assertSame('KTP', $this->db->table('document_attachment')->select('tag')->where('id_attachment', $du)->get()->getRowArray()['tag']);
+    }
+
+    /**
+     * Jalankan $kerja sambil mengubah baris arsip $id menjadi $ubah tepat saat baris `pegawai` dikunci `FOR UPDATE` di dalam
+     * transaksi aksi (simulasi tulis paralel di antara jalan cepat dan baca ulang terkunci).
+     *
+     * @param array<string, mixed> $ubah
+     * @param callable(): void     $kerja
+     */
+    private function denganBalapan(array $ubah, int $id, callable $kerja): void
+    {
+        $db     = $this->db;
+        $sekali = false;
+        $balap  = static function (Query $q) use ($db, $ubah, $id, &$sekali): void {
+            if (! $sekali && str_contains($q->getQuery(), 'pegawai') && str_contains($q->getQuery(), 'FOR UPDATE')) {
+                $sekali = true;
+                $db->table('document_attachment')->where('id_attachment', $id)->update($ubah);
+            }
+        };
+        Events::on('DBQuery', $balap);
+
+        try {
+            $kerja();
+        } finally {
+            Events::removeListener('DBQuery', $balap);
+        }
+
+        $this->assertTrue($sekali, 'balapan tersimulasi');
+    }
+
+    public function testOpsiHubungkanHanyaDisetujuiMilikNipUrutLegacy(): void
     {
         $admin = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
-        $a     = $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 1, 'jabatan' => 'A', 'satker' => 'S']);
+        $a     = $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 1, 'jabatan' => 'A', 'satker' => 'S', 'tmtsk' => '2010-01-01']);
         $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 0]);
         $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 2]);
         $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 10]);
-        $b = $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 1, 'jabatan' => 'B', 'satker' => 'S']);
+        $b = $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 1, 'jabatan' => 'B', 'satker' => 'S', 'tmtsk' => '2005-01-01']);
+        $c = $this->buatRiwayatMutasiJabatan($this->nip, ['status' => 1, 'jabatan' => 'C', 'satker' => 'S', 'tmtsk' => '2010-01-01']);
         $this->buatRiwayatMutasiJabatan($this->buatPegawai(), ['status' => 1]);
 
         // Kode 9 dan 36 berbagi tabel [K]; hukdis (kode 7) tetap ditawarkan walau tersembunyi di B-18 (F10-30).
         foreach ([9, 36] as $kode) {
             $this->assertSame([
+                // tmtsk menaik [K Local.php:3352], seri tmtsk diputus PK menaik.
                 ['id_entri' => (string) $b, 'ringkasan_riwayat' => 'B - S'],
                 ['id_entri' => (string) $a, 'ringkasan_riwayat' => 'A - S'],
+                ['id_entri' => (string) $c, 'ringkasan_riwayat' => 'C - S'],
             ], $this->json($this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/arsip/opsi-hubungkan?id_riwayat={$kode}"))['data']['items']);
         }
 
@@ -334,7 +440,13 @@ final class ArsipAksiTest extends DatabaseTestCase
         $this->assertSame('SK Jabatan x', $this->db->table('document_attachment')->select('tag')->where('id_attachment', $terhubung)->get()->getRowArray()['tag']);
         $this->assertSame(1, $this->db->table('audit_logs')->where('entity', 'document_attachment')->where('entity_id', (string) $terhubung)->where('event', 'update')->countAllResults());
 
-        foreach (['', '   ', '<i></i>', "\x00\x01", str_repeat('a', 256)] as $buruk) {
+        // Byte kontrol dibuang SEBELUM strip_tags: "<\nimg …>" tidak bisa menyatu kembali menjadi tag.
+        $res = $this->ubah($pegawai, $terhubung, "<\nimg src=x onerror=alert(1)>Foto");
+        $res->assertStatus(200);
+        $this->assertSame('Foto', $this->json($res)['data']['tag']);
+        $this->assertSame('a < b', $this->json($this->ubah($pegawai, $terhubung, 'a < b'))['data']['tag']);
+
+        foreach (['', '   ', '<i></i>', "\x00\x01", str_repeat('a', 256), "<\timg>", "<\x00script>", "\u{00A0}\u{3000}", "\u{00A0}"] as $buruk) {
             $res = $this->ubah($pegawai, $terhubung, $buruk);
             $res->assertStatus(422);
             $this->assertArrayHasKey('tag', $this->json($res)['errors']);
@@ -445,7 +557,18 @@ final class ArsipAksiTest extends DatabaseTestCase
         $this->asUser($this->akun($this->nip, Role::PEGAWAI))->get("api/v1/pegawai/{$this->nip}/arsip/ekspor?format=csv")->assertStatus(200);
         $this->asUser($this->akun($this->buatPegawai(), Role::MENTERI))->get("api/v1/pegawai/{$this->nip}/arsip/ekspor?format=csv")->assertStatus(200);
         $this->asUser($this->akun($this->buatPegawai(), Role::PIMPINAN))->get("api/v1/pegawai/{$this->nip}/arsip/ekspor?format=csv")->assertStatus(403);
+        $this->asUser($this->akun($this->buatPegawaiDiSatker($this->buatSatker()), Role::ADMIN_SATKER))->get("api/v1/pegawai/{$this->nip}/arsip/ekspor?format=csv")->assertStatus(403);
         $this->assertSame(4, $this->db->table('audit_logs')->where('entity', 'arsip_lihat')->countAllResults());
+
+        // Ekspor tidak mengisi kunci dedup: folder oleh admin yang sama sesudah ekspor tetap tercatat (endpoint folder).
+        $this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/arsip")->assertStatus(200);
+        $terakhir = $this->db->table('audit_logs')->where('entity', 'arsip_lihat')->where('id_pengguna_actor', $admin['id_pengguna'])->orderBy('id_log', 'DESC')->get()->getRowArray();
+        $this->assertSame('folder', json_decode((string) $terakhir['after_json'], true)['endpoint']);
+
+        // Ekspor role 4 dicatat.
+        $view = $this->akun($this->buatPegawai(), Role::ADMIN_VIEW_ESELON1);
+        $this->asUser($view)->get("api/v1/pegawai/{$this->nip}/arsip/ekspor?format=xlsx")->assertStatus(200);
+        $this->assertSame(1, $this->db->table('audit_logs')->where('entity', 'arsip_lihat')->where('id_pengguna_actor', $view['id_pengguna'])->countAllResults());
     }
 
     /**

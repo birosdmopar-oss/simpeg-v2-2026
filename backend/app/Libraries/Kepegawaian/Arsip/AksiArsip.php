@@ -40,6 +40,30 @@ final class AksiArsip
 
     public const TAG_MAKS = 255;
 
+    /**
+     * Urutan calon tujuan Hubungkan per kode, ikut `list_arsip_rwy_data` legacy
+     * (`legacy:controllers/hr/services/Local.php`: 1 `:3290`, 3 `:3308`, 5 `:3322`, 7 `:3339`, 9/36 `:3352`, 10 `:3365`,
+     * 11 `:3379`, 13 `:3392`, 14 `:3405`, 20 `:3418`, 22 `:3431`, 23 `:3444`, 32 `:3458`). Kolom kode 3 milik `detail_anak`.
+     *
+     * @var array<int, list<array{0: string, 1: 'ASC'|'DESC'}>>
+     */
+    public const URUTAN_OPSI = [
+        1  => [['id_riwayat_alamat', 'DESC']],
+        3  => [['tgl_lahir', 'ASC']],
+        5  => [['tgl_sertifikat', 'ASC']],
+        7  => [['tmtsk', 'ASC']],
+        9  => [['tmtsk', 'ASC']],
+        36 => [['tmtsk', 'ASC']],
+        10 => [['tmtsk', 'ASC']],
+        11 => [['tmtsk', 'ASC']],
+        13 => [['tgl_mulai', 'ASC']],
+        14 => [['tgl_lulus', 'ASC']],
+        20 => [['tgl_perkawinan', 'ASC']],
+        22 => [['tgl_sertifikat', 'ASC']],
+        23 => [['tgl_sertifikat', 'ASC']],
+        32 => [['tahun', 'ASC'], ['tgl_mulai', 'ASC']],
+    ];
+
     public function __construct(
         private readonly BaseConnection $db,
         private readonly OtorisasiArsip $otorisasi,
@@ -115,8 +139,9 @@ final class AksiArsip
     }
 
     /**
-     * `GET pegawai/{nip}/arsip/opsi-hubungkan?id_riwayat=` — calon data riwayat Disetujui milik NIP, urut PK menurun [K
-     * `list_arsip_rwy_data`]; kode 38 = tanpa data (`items` kosong). Kode terkunci bagi UL_PEGAWAI → 403.
+     * `GET pegawai/{nip}/arsip/opsi-hubungkan?id_riwayat=` — calon data riwayat Disetujui milik NIP, urut per kode seperti
+     * `list_arsip_rwy_data` legacy [K] ({@see self::URUTAN_OPSI}); kode 38 = tanpa data (`items` kosong). Kode terkunci
+     * bagi UL_PEGAWAI → 403.
      *
      * @return array{id_riwayat: int, butuh_data: bool, items: list<array{id_entri: string, ringkasan_riwayat: string}>}
      */
@@ -142,7 +167,9 @@ final class AksiArsip
     }
 
     /**
-     * `tag` (AC2-08): tag HTML dan byte kontrol dibuang, spasi tepi dipangkas; 1–255 karakter, selain itu 422 `errors.tag`.
+     * `tag` (AC2-08): byte kontrol/format DULU dibuang (agar `<` + `\n` tidak menyatu menjadi tag sesudah strip_tags), lalu
+     * tag HTML dibuang, lalu spasi tepi (termasuk spasi Unicode `\p{Z}`) dipangkas; sisa `<` yang diikuti huruf, `/`, `!`,
+     * atau `?` ditolak (pengaman); 1–255 karakter. Selain itu 422 `errors.tag`.
      */
     public static function tagBersih(mixed $tag): string
     {
@@ -152,10 +179,15 @@ final class AksiArsip
             throw ValidationException::forField('tag', 'Nama arsip tidak valid.');
         }
 
-        $bersih = trim((string) preg_replace('/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/u', '', strip_tags($teks)));
+        $tanpaKontrol = (string) preg_replace('/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/u', '', $teks);
+        $bersih       = (string) preg_replace('/^[\p{Z}\s]+|[\p{Z}\s]+$/u', '', strip_tags($tanpaKontrol));
 
         if ($bersih === '') {
             throw ValidationException::forField('tag', 'Nama arsip wajib diisi.');
+        }
+
+        if (preg_match('/<[\p{L}\/!?]/u', $bersih) === 1) {
+            throw ValidationException::forField('tag', 'Nama arsip tidak boleh memuat tag HTML.');
         }
 
         if (mb_strlen($bersih) > self::TAG_MAKS) {
@@ -179,12 +211,21 @@ final class AksiArsip
         return (int) $teks;
     }
 
+    /**
+     * `id_entri` tujuan: PK bilangan bulat positif berbentuk kanonik (`"5"`, bukan `"05"`/`"5abc"`/`"+5"`/`"1e1"`) — MySQL
+     * mengubah string ke angka saat dibandingkan dengan PK INT, sedangkan B-18 mencocokkan `id_entri` sebagai string, jadi
+     * bentuk tidak kanonik akan memutus tautan. Selain itu 422 `errors.id_entri`.
+     */
     private static function idEntri(mixed $nilai): string
     {
         $teks = is_int($nilai) || is_string($nilai) ? trim((string) $nilai) : '';
 
-        if ($teks === '' || strlen($teks) > 100) {
+        if ($teks === '') {
             throw ValidationException::forField('id_entri', 'Data riwayat wajib dipilih.');
+        }
+
+        if (! ctype_digit($teks) || strlen($teks) > 10 || (string) (int) $teks !== $teks || (int) $teks <= 0) {
+            throw ValidationException::forField('id_entri', 'Data riwayat tidak valid.');
         }
 
         return $teks;
@@ -271,7 +312,8 @@ final class AksiArsip
     }
 
     /**
-     * PK baris riwayat Disetujui milik {nip} untuk kode $kode, urut PK menurun.
+     * PK baris riwayat Disetujui milik {nip} untuk kode $kode, urut seperti `list_arsip_rwy_data` legacy per kode
+     * ({@see self::URUTAN_OPSI}); PK sebagai pemutus seri.
      *
      * @return list<string>
      */
@@ -283,19 +325,28 @@ final class AksiArsip
             return [];
         }
 
-        $anak = $definisi->entriLampiran($kode);
-        $pk   = $definisi->primaryKey();
+        $anak  = $definisi->entriLampiran($kode);
+        $pk    = $definisi->primaryKey();
+        $urut  = self::URUTAN_OPSI[$kode] ?? [];
+        $alias = $anak === null ? '' : 'a.';
 
         if ($anak === null) {
-            $rows = $this->db->table($definisi->tabel())->select($pk . ' AS id')
-                ->where($definisi->kolomNip(), $nip)->whereIn($definisi->kolomStatus(), $mentah)
-                ->orderBy($pk, 'DESC')->get()->getResultArray();
+            $b = $this->db->table($definisi->tabel())->select($pk . ' AS id')
+                ->where($definisi->kolomNip(), $nip)->whereIn($definisi->kolomStatus(), $mentah);
+            $pkUrut = $pk;
         } else {
-            $rows = $this->db->table($anak['tabel'] . ' a')->select('a.' . $anak['pk'] . ' AS id')
+            $b = $this->db->table($anak['tabel'] . ' a')->select('a.' . $anak['pk'] . ' AS id')
                 ->join($definisi->tabel() . ' i', 'i.' . $pk . ' = a.' . $anak['induk'], 'inner')
-                ->where('i.' . $definisi->kolomNip(), $nip)->whereIn('i.' . $definisi->kolomStatus(), $mentah)
-                ->orderBy('a.' . $anak['pk'], 'DESC')->get()->getResultArray();
+                ->where('i.' . $definisi->kolomNip(), $nip)->whereIn('i.' . $definisi->kolomStatus(), $mentah);
+            $pkUrut = 'a.' . $anak['pk'];
         }
+
+        foreach ($urut as [$kolom, $arah]) {
+            $b->orderBy($alias . $kolom, $arah);
+        }
+
+        // Pemutus seri: PK searah dengan kolom urut pertama (bawaan menaik).
+        $rows = $b->orderBy($pkUrut, ($urut[0][1] ?? 'ASC'))->get()->getResultArray();
 
         return array_map(static fn (array $r): string => (string) $r['id'], $rows);
     }

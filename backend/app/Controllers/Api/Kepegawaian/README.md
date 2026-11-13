@@ -319,11 +319,12 @@ lewat `DocumentAttachmentModel` (`document_attachment` `update`/`delete`). Izin 
   hanya `{ id_jenis_rwy: 38, label: "Data Umum" }`; 4/5: `tulis: false`, `[]`). Daftar ini hanya ada di respons folder. Item: `edit` = tulis kecuali kode 37 bagi selain role 1; `hubungkan` = tulis +
   kode 0 + `jenis_hubungkan` tidak kosong; `hapus` = tulis + kode 0. FE memakainya untuk `hidden`; server tetap menegakkan.
 - **Ubah Nama** (`PATCH`): semua baris [K] termasuk riwayat Disetujui, 38, dan `tanpa_jenis`; kode 37 hanya role 1
-  (`ArsipDataUmum::bolehTulis`) → selain itu 403 "Anda tidak berhak mengubah arsip data umum pegawai ini.". `tag`: tag HTML
-  dan byte kontrol dibuang, trim, 1–255 karakter → selain itu 422 `errors.tag`. Urutan: 404 baris → 403 → 422.
+  (`ArsipDataUmum::bolehTulis`) → selain itu 403 "Anda tidak berhak mengubah arsip data umum pegawai ini.". `tag`: byte
+  kontrol/format dibuang LEBIH DULU, lalu tag HTML, lalu spasi tepi (termasuk spasi Unicode); sisa `<` + huruf/`/`/`!`/`?`
+  ditolak; 1–255 karakter → selain itu 422 `errors.tag`. Urutan: 404 baris → 403 → 422.
 - **Hubungkan** (`POST …/hubungkan`): baris wajib kode 0 → selain itu 422 `errors.id_attachment` "Data arsip ini telah
   terhubung ke data riwayat pegawai. Silahkan hubungkan data arsip lain yang belum terhubung ke data riwayat." [K];
-  `id_riwayat` di luar F10-28 → 422 `errors.id_riwayat`; `id_entri` kosong (selain 38) → 422 `errors.id_entri`; tujuan
+  `id_riwayat` di luar F10-28 → 422 `errors.id_riwayat`; `id_entri` kosong atau bukan PK bulat positif kanonik (`"05"`, `"5abc"`, `"+5"` ditolak; selain 38) → 422 `errors.id_entri`; tujuan
   lewat Definisi pemilik kode (`RiwayatRegistry`; kode 3 = `detail_anak` lewat induk `riwayat_keluarga`; 9/36 berbagi
   `riwayat_mutasi_jabatan`) milik NIP berstatus Disetujui → selain itu 404; role 2/6/7 ke kode terkunci → 403 "Data yang
   sudah disetujui tidak dapat diubah.". Di transaksi: `pegawai` → `document_attachment` → baris tujuan `FOR UPDATE`, kode 0
@@ -332,7 +333,8 @@ lewat `DocumentAttachmentModel` (`document_attachment` `update`/`delete`). Izin 
 - **Hapus** (`DELETE`): baris kode 0 saja (selain itu 422 `errors.id_attachment`, pesan sama); hanya baris DB, berkas fisik
   TERTINGGAL [K].
 - **`opsi-hubungkan`**: `id_riwayat` di F10-28 (selain itu 422); kode terkunci bagi 2/6/7 → 403; baris Disetujui milik NIP
-  urut PK menurun [K `list_arsip_rwy_data`] dengan ringkasan; kode 38 → `butuh_data: false`, `items: []`.
+  urut per kode seperti `list_arsip_rwy_data` legacy [K] (mis. jabatan/KP/KGB/hukdis `tmtsk` menaik, pendidikan `tgl_lulus`,
+  SKP `tahun, tgl_mulai`, anak `tgl_lahir`, alamat PK menurun; PK pemutus seri; `AksiArsip::URUTAN_OPSI`) dengan ringkasan; kode 38 → `butuh_data: false`, `items: []`.
 - **Filter `belum_terhubung`** (`1` = kode 0; `0`/kosong = tanpa saringan; lainnya 422): digabung AND dengan
   `id_jenis_rwy` (centang + jenis lain → kosong [K]); berlaku juga untuk ekspor.
 - **Ekspor**: `format` `xlsx` (bawaan) / `csv` (lainnya 422); kolom Nama Arsip, Jenis Riwayat, Data Riwayat, tanpa URL;
