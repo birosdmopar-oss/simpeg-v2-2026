@@ -1,0 +1,10 @@
+{
+  "status": "success",
+  "data": {
+    "kpi": { "total_chat": 120, "chat_hari_ini": 7, "rata_skor": 0.4567, "rata_skor_cocok": 0.7012 },
+    "kepuasan": { "membantu": 9, "tidak_membantu": 3, "total": 12, "persen_puas": 75.0 },
+    "top_pesan": [ { "pesan": "<b>cuti</b>", "jumlah": 10 } ],
+    "top_qna_cocok": [ { "id_qna": 12, "pertanyaan": "Berapa jatah cuti tahunan?", "jumlah": 8 } ],
+    "top_qna_negatif": [ { "id_qna": 99, "pertanyaan": null, "jumlah": 2 } ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "id": 12,
+        "pertanyaan": "Berapa jatah cuti tahunan?",
+        "is_fallback_option": 1,
+        "status": "1",
+        "kategori": { "id": 3, "judul": "Cuti", "status": 1 },
+        "tag": [
+          { "id": 4, "judul": "cuti tahunan", "status": 1 },
+          { "id": 6, "judul": "libur", "status": 2 },
+          { "id": 7, "judul": "lama", "status": 10 }
+        ]
+      },
+      {
+        "id": 11,
+        "pertanyaan": "Bagaimana cara cek SKP?",
+        "is_fallback_option": 0,
+        "status": 2,
+        "kategori": { "id": 9, "judul": "Kinerja Lama", "status": 10 },
+        "tag": []
+      }
+    ],
+    "total": 2,
+    "page": 1,
+    "per_page": 20
+  }
+}

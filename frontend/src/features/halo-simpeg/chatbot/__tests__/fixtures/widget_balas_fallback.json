@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "data": {
+    "balasan": "Maaf, Vanya belum memahami pertanyaan Anda. Mungkin salah satu pertanyaan berikut yang Anda maksud?",
+    "cocok": false,
+    "skor": 0.1,
+    "id_log": 42,
+    "bisa_feedback": false,
+    "saran": [
+      { "id_qna": 9, "pertanyaan": "Bagaimana cara mengajukan cuti tahunan?" },
+      { "id_qna": 8, "pertanyaan": "Di mana melihat riwayat kinerja?" }
+    ]
+  }
+}

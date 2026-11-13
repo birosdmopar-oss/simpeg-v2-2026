@@ -1,0 +1,12 @@
+{
+  "status": "success",
+  "data": {
+    "items": [
+      { "id_log": 41, "waktu": "2026-11-12 17:30:00", "pesan_user": "<script>x</script> cuti", "pertanyaan_teratas": "Berapa jatah cuti tahunan?", "skor": 0.8123, "cocok": 1, "feedback": 1 },
+      { "id_log": 40, "waktu": "2026-11-12 16:59:00", "pesan_user": "asdf", "pertanyaan_teratas": null, "skor": 0, "cocok": 0, "feedback": null }
+    ],
+    "total": 2,
+    "page": 1,
+    "per_page": 25
+  }
+}

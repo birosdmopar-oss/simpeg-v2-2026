@@ -1,0 +1,12 @@
+{
+  "status": "success",
+  "data": {
+    "balasan": "<p>Jatah cuti tahunan adalah <strong>12 hari kerja</strong>.</p>",
+    "cocok": true,
+    "skor": 0.8123,
+    "id_log": 41,
+    "bisa_feedback": true,
+    "token_feedback": "MTcwMDAwMDAwMA.c2ludGV0aXM",
+    "saran": []
+  }
+}
