@@ -43,6 +43,12 @@ Ditambah `SkemaChatbotTest` dari DBV-033.
   memori. Pembacaan memakai sheet pertama saja, read filter A..D, dan `disconnectWorksheets`.
 - **Batas panjang** TEXT bersama untuk form dan impor (`BatasQna`).
 - **Balapan 1062** saat impor → 422 `errors.berkas`.
+- **Putaran V-1..V-8:**
+  - Pra-cek baris memakai `setReadEmptyCells(false)`; di PhpSpreadsheet 5.10 terbukti: border sampai baris 1.500 + 2 baris data
+    → `totalRows` 3, bukan 1.500.
+  - Judul kolom ekstra (E1) → 422.
+  - **Perubahan batas form:** pertanyaan sebelumnya ±16.383 karakter, sekarang 65.535 byte (ikut tipe TEXT, F8-41, sah). Jawaban
+    tetap 65.535 byte sesudah sanitasi.
 - **R8-11 (W-4):** jalur bubble membaca satu baris; korpus tanpa kolom jawaban dan dimuat sesudah validasi; agregasi bubble per
   kategori. Ukur lokal (MySQL 8.0.30, mesin dev, korpus sintetis 303 QnA, satu balas lewat HTTP test): ±23 ms. Angka ini indikatif,
   tanpa assertion waktu.
