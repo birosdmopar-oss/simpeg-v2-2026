@@ -5,7 +5,7 @@ Branch `fase8/dbv-033-skema-chatbot` (dari `main` `483c5892`). Alur `[CR]+[DBV]`
 1. Reviewer CR membuka PR; DB Validator (WS-2) me-review dan memberi approve.
 2. Reviewer CR me-merge dengan izin Horii.
 
-**Status:** ⏳ menunggu review DB Validator.
+**Status:** ✅ DISETUJUI DB Validator (WS-2) @`99be40a0`, 13-11-2026 — keputusan Q1–Q9 dan catatan non-blok di Bagian 11.
 
 **Penulis:** pelaksana C1 (izin `[#8-WorkloadChatbot]`), 13-11-2026.
 
@@ -282,11 +282,46 @@ Dijalankan di DB scratch `simpeg_v2_t_f8cb`, MySQL 8.0.30 port 3307, prefix test
 
 ## 10. Checklist DB Validator
 
-- [ ] Kolom dan tipe cocok dengan DDL D1 atau deviasinya berlabel [V2] beralasan (Bagian 2).
-- [ ] Status 1/2/10 + CHECK + seed.
-- [ ] Collation `utf8mb4_unicode_ci` keenam tabel.
-- [ ] FK RESTRICT/RESTRICT; tanpa FK ke helpdesk/FAQ; `log_chatbot` tanpa FK dan tanpa identitas.
-- [ ] Indeks `idx_log_waktu` dan `idx_log_qna_feedback`.
-- [ ] Keputusan Q1–Q9.
-- [ ] Kueri audit dapat dijalankan di DB dev untuk impor C4.
-- [ ] Migration naik/turun bersih (test skema).
+- [x] Kolom dan tipe cocok dengan DDL D1 atau deviasinya berlabel [V2] beralasan (Bagian 2).
+- [x] Status 1/2/10 + CHECK + seed.
+- [x] Collation `utf8mb4_unicode_ci` keenam tabel.
+- [x] FK RESTRICT/RESTRICT; tanpa FK ke helpdesk/FAQ; `log_chatbot` tanpa FK dan tanpa identitas.
+- [x] Indeks `idx_log_waktu` dan `idx_log_qna_feedback`.
+- [x] Keputusan Q1–Q9 (Bagian 11).
+- [x] Kueri audit dapat dijalankan di DB dev untuk impor C4 (hanya SELECT, agregat, blok LARANGAN).
+- [x] Migration naik/turun bersih (test skema).
+
+## 11. Keputusan DB Validator (WS-2, 13-11-2026, @`99be40a0`)
+
+Diperiksa terhadap D1 dev (`HASIL_D1_chatbot_1211`, blok [1]–[6] + lanjutan C-1..C-4) dan PRD Fase 8 v1.1 §7.10.1, F8-38..F8-41,
+F8-46, BP8-8/14/15. Kode dev dibaca untuk dua butir: skor yang disimpan = skor ASLI sebelum pengali feedback
+(`dev:libraries/hr/L_chatbot.php:752`, pengali hanya dipakai meranking ulang `:714`, `:724`), sehingga CHECK 0..1 aman; dan
+`top_3_kandidat`/`status_match` selalu diisi mesin (`:749-756`). Uji lokal DB scratch MySQL 8.0 port 3307:
+`SkemaChatbotTest` + `CollationInvariantTest` 10 test / 123 assertion OK; MariaDB 10.4 lewat CI (hijau).
+
+| No | Keputusan | Alasan |
+|---|---|---|
+| Q1 | **SETUJU** kolom bangkitan `judul_unik` STORED + UNIQUE + cek aplikasi | Menutup balapan dua tulis yang cek aplikasi saja tidak bisa; NULL untuk status 10 memberi "boleh dipakai lagi" tanpa indeks parsial; FK status RESTRICT, jadi larangan MySQL untuk STORED atas kolom FK CASCADE/SET NULL tidak berlaku |
+| Q2 | **SETUJU** PK komposit `(qna_id, qna_tag_id)` + FK RESTRICT | Relasi murni; PK = UNIQUE relasi (A13) sekaligus indeks; hapus v2 = status 10, jadi CASCADE tidak pernah dibutuhkan dan RESTRICT mencegah relasi hilang diam-diam |
+| Q3 | **SETUJU** `DECIMAL(5,4)` + CHECK 0..1 | Dev menyimpan `round(skor ASLI, 4)` (cosine TF-IDF non-negatif ≤ 1); DECIMAL membuat AVG statistik tepat; nilai mepet 1 karena galat floating point dibulatkan ke 1.0000 sebelum CHECK |
+| Q4 | **SETUJU** UNSIGNED `id_log` dan `top_1_id_qna` | Konsisten dengan PK `qna.id_qna` UNSIGNED; log dev tidak dimigrasi (Q-A13 INFO) |
+| Q5 | **SETUJU** LONGTEXT NOT NULL + CHECK JSON_VALID | Selalu diisi mesin dev (`json_encode`); pola JSON portabel DBV-032 |
+| Q6 | **SETUJU** NOT NULL + CHECK 0/1 | Selalu diisi mesin dev (`$is_match` 0/1); statistik tidak perlu memperlakukan NULL |
+| Q7 | **SETUJU** `idx_log_qna_feedback` ikut dev | Prefiks `top_1_id_qna` melayani rekap feedback per QnA (`GROUP BY top_1_id_qna`), "paling sering cocok", dan top-10; ditambah `idx_log_waktu` untuk rentang UTC |
+| Q8 | **SETUJU** tanpa AUTO_INCREMENT + CHECK 1/2/10 | Master baku; mencegah id status liar; seed dari migration |
+| Q9 | **SETUJU** NULL-able ikut dev, wajib di aplikasi | Sesuai keputusan reviewer 13-11-2026; D1: 0 QnA tanpa kategori; impor & form menolak (F8-41, F8-46) |
+
+**Catatan non-blok (untuk MAKE-094 / impor C4, tidak mengubah skema):**
+- **N1** `top_1_id_qna` NOT NULL tanpa FK: dev mengambil `$urutan[0]` tanpa penjaga, sehingga korpus kosong membuat dev gagal.
+  Aplikasi v2 wajib memutuskan perilaku tanpa kandidat (mis. tidak mencatat log atau jalur fallback tanpa log), bukan menulis
+  `0` diam-diam. Bila `0` dipakai sebagai "tanpa kandidat", catat sebagai keputusan di PRD.
+- **N2** `utf8mb4_unicode_ci` juga mengabaikan aksen ("Cuti" = "Cutí") dan PAD SPACE di belakang. Cek keunikan aplikasi
+  (F8-40) wajib membandingkan dengan collation kolom yang sama (`WHERE judul_kategori = ?` atas kolom `_ci`) dan sesudah trim,
+  agar 422 aplikasi dan 1062 DB selalu sepakat; 1062 dari `uk_*_judul_unik` diterjemahkan ke 422 yang sama.
+- **N3** Karena relasi tetap ada untuk tag status 2/10 (RESTRICT + hapus lunak), korpus mesin WAJIB menyaring
+  `qna_tag.status_qna_tag_fk = 1` dan `qna.status_qna_fk = 1` (F8-39); test MAKE-094 sebaiknya memuat tag status 10 yang masih
+  berelasi.
+- **N4** `judul_unik` tidak boleh ada di `allowedFields`, `insertBatch` impor C4, maupun SELECT `*` yang dikirim ke klien.
+- **N5** `log_chatbot` tumbuh tanpa batas (anonim, tanpa purge). Bukan blok; bila kelak perlu retensi, `idx_log_waktu` sudah
+  mendukung penghapusan per rentang.
+
