@@ -20,7 +20,8 @@ use Throwable;
  * Konvensi: FK RESTRICT/RESTRICT (hapus v2 = status 10, bukan hapus fisik; dev CASCADE pada `qna_has_tag`); waktu UTC
  * diisi aplikasi (BP8-8); `log_chatbot` anonim tanpa kolom identitas (K-4). Judul kategori/tag unik di antara status 1/2
  * lewat kolom bangkitan `judul_unik` (NULL bila status 10) + UNIQUE, pengaman DB untuk aturan aplikasi F8-40.
- * up() gagal → tabel yang sempat dibuat di-DROP; down() men-DROP keenam tabel (anak dulu).
+ * up() gagal → hanya tabel yang dibuat pada run itu yang di-DROP (tabel yang sudah ada tidak disentuh); down() men-DROP
+ * keenam tabel (anak dulu).
  */
 class CreateChatbotFase8 extends Migration
 {
@@ -40,9 +41,12 @@ class CreateChatbotFase8 extends Migration
 
     public function up(): void
     {
+        $dibuat = [];
+
         try {
             foreach (self::TABEL as $tabel) {
                 $this->exec($this->ddl($tabel), "CREATE TABLE {$tabel}");
+                $dibuat[] = $tabel;
             }
 
             foreach (self::STATUS as $id => $judul) {
@@ -51,11 +55,7 @@ class CreateChatbotFase8 extends Migration
                 }
             }
         } catch (Throwable $e) {
-            try {
-                $this->down();
-            } catch (Throwable) {
-                // Galat asli lebih penting.
-            }
+            $this->dropDibuat($dibuat);
 
             throw $e;
         }
@@ -65,6 +65,23 @@ class CreateChatbotFase8 extends Migration
     {
         foreach (array_reverse(self::TABEL) as $tabel) {
             $this->exec('DROP TABLE IF EXISTS ' . $this->t($tabel), "DROP TABLE {$tabel}");
+        }
+    }
+
+    /**
+     * Pembersihan setelah up() gagal: hanya tabel yang dibuat pada run ini, urutan terbalik (anak dulu). Tabel yang sudah
+     * ada sebelumnya (CREATE gagal 1050) tidak disentuh. Kegagalan DROP tidak menutupi galat asli (pola CreateFaq).
+     *
+     * @param list<string> $dibuat
+     */
+    private function dropDibuat(array $dibuat): void
+    {
+        foreach (array_reverse($dibuat) as $tabel) {
+            try {
+                $this->db->query('DROP TABLE IF EXISTS ' . $this->t($tabel));
+            } catch (Throwable) {
+                // Lanjut; galat asli tetap dilempar up().
+            }
         }
     }
 

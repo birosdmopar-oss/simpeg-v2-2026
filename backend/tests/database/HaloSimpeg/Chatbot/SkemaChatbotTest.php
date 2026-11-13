@@ -19,6 +19,8 @@ require_once APPPATH . 'Database/Migrations/2026-11-13-100000_CreateChatbotFase8
  * - FK RESTRICT/RESTRICT (1451/1452), UNIQUE (1062), CHECK (3819 MySQL / 4025 MariaDB);
  * - judul unik status 1/2 lewat `judul_unik` (F8-40): judul status 10 boleh dipakai lagi;
  * - tanpa kolom identitas di `log_chatbot` (K-4);
+ * - default (status 1, flag 0, auto_increment kecuali `qna_status`, `waktu_interaksi` tanpa default);
+ * - up() gagal tidak menyentuh tabel yang sudah ada;
  * - siklus down()/up().
  *
  * @internal
@@ -104,8 +106,15 @@ final class SkemaChatbotTest extends DatabaseTestCase
             'id_qna_kategori_fk' => ['id_qna_kategori_fk'],
             'status_kategori'    => ['status_qna_fk', 'id_qna_kategori_fk'],
         ], []], $this->skemaIndexes('qna'));
-        $this->assertSame('uk_qna_kategori_judul_unik', $this->skemaIndexes('qna_kategori')[2][0] ?? null);
-        $this->assertSame('uk_qna_tag_judul_unik', $this->skemaIndexes('qna_tag')[2][0] ?? null);
+        $this->assertSame([['id_qna_status'], [], []], $this->skemaIndexes('qna_status'));
+        $this->assertSame([['id_qna_kategori'], [
+            'status_qna_kategori_fk'     => ['status_qna_kategori_fk'],
+            'uk_qna_kategori_judul_unik' => ['judul_unik'],
+        ], ['uk_qna_kategori_judul_unik']], $this->skemaIndexes('qna_kategori'));
+        $this->assertSame([['id_qna_tag'], [
+            'status_qna_tag_fk'     => ['status_qna_tag_fk'],
+            'uk_qna_tag_judul_unik' => ['judul_unik'],
+        ], ['uk_qna_tag_judul_unik']], $this->skemaIndexes('qna_tag'));
 
         [$fks, , $bukanRestrict] = $this->skemaForeignKeys(CreateChatbotFase8::TABEL, []);
         $this->assertSame([
@@ -117,7 +126,51 @@ final class SkemaChatbotTest extends DatabaseTestCase
             'fk_qna_tag_status'      => ['qna_tag', 'status_qna_tag_fk', 'qna_status', 'id_qna_status'],
         ], $fks, 'log_chatbot tanpa FK; tidak ada FK ke helpdesk/FAQ');
         $this->assertSame([], $bukanRestrict);
-        $this->assertCount(10, $this->skemaChecks(CreateChatbotFase8::TABEL));
+        $this->assertSame([
+            'chk_log_chatbot_feedback'       => ['log_chatbot', 'feedbackisnullorfeedbackin-1,1'],
+            'chk_log_chatbot_skor'           => ['log_chatbot', 'top_1_skor>=0andtop_1_skor<=1'],
+            'chk_log_chatbot_status_match'   => ['log_chatbot', 'status_matchin0,1'],
+            'chk_log_chatbot_top_3_json'     => ['log_chatbot', 'json_validtop_3_kandidat'],
+            'chk_qna_is_fallback_option'     => ['qna', 'is_fallback_optionin0,1'],
+            'chk_qna_kategori_status'        => ['qna_kategori', 'status_qna_kategori_fkin1,2,10'],
+            'chk_qna_kategori_tampil_bubble' => ['qna_kategori', 'tampil_bubblein0,1'],
+            'chk_qna_status'                 => ['qna', 'status_qna_fkin1,2,10'],
+            'chk_qna_status_id'              => ['qna_status', 'id_qna_statusin1,2,10'],
+            'chk_qna_tag_status'             => ['qna_tag', 'status_qna_tag_fkin1,2,10'],
+        ], $this->skemaChecks(CreateChatbotFase8::TABEL));
+    }
+
+    public function testDefault(): void
+    {
+        $this->assertSame([], $this->skemaDefaults('qna_status'), 'id baku tanpa auto_increment');
+        $this->assertSame(['id_qna_kategori' => 'auto_increment', 'status_qna_kategori_fk' => '1', 'tampil_bubble' => '0'], $this->skemaDefaults('qna_kategori'));
+        $this->assertSame(['id_qna_tag' => 'auto_increment', 'status_qna_tag_fk' => '1'], $this->skemaDefaults('qna_tag'));
+        $this->assertSame(['id_qna' => 'auto_increment', 'status_qna_fk' => '1', 'is_fallback_option' => '0'], $this->skemaDefaults('qna'));
+        $this->assertSame([], $this->skemaDefaults('qna_has_tag'));
+        $this->assertSame(['id_log' => 'auto_increment'], $this->skemaDefaults('log_chatbot'), 'waktu_interaksi tanpa DEFAULT (BP8-8)');
+    }
+
+    public function testUpGagalTidakMenyentuhTabelYangSudahAda(): void
+    {
+        $this->lepasSejak(self::VERSI);
+        $this->db->query('CREATE TABLE ' . $this->db->escapeIdentifiers($this->db->prefixTable('qna_status')) . ' (`id_qna_status` INT UNSIGNED NOT NULL PRIMARY KEY, `judul_status` VARCHAR(50) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        $this->db->table('qna_status')->insert(['id_qna_status' => 1, 'judul_status' => 'Aktif']);
+
+        try {
+            (new CreateChatbotFase8())->up();
+            $this->fail('up() seharusnya gagal (1050)');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('qna_status', $e->getMessage());
+        }
+
+        $this->assertTrue($this->skemaTableExists('qna_status'), 'tabel lama tetap ada');
+        $this->assertSame(1, $this->db->table('qna_status')->countAllResults(), 'baris lama tetap utuh');
+
+        foreach (array_slice(CreateChatbotFase8::TABEL, 1) as $tabel) {
+            $this->assertFalse($this->skemaTableExists($tabel), $tabel);
+        }
+
+        $this->db->query('DROP TABLE ' . $this->db->escapeIdentifiers($this->db->prefixTable('qna_status')));
     }
 
     public function testSeedStatus(): void
@@ -148,6 +201,10 @@ final class SkemaChatbotTest extends DatabaseTestCase
         $this->assertDbError(self::CHECK, fn () => $this->sisip('qna', ['pertanyaan' => 'p', 'jawaban' => 'j', 'status_qna_fk' => 4]));
         $this->assertDbError(self::CHECK, fn () => $this->sisip('qna', ['pertanyaan' => 'p', 'jawaban' => 'j', 'is_fallback_option' => 2]));
 
+        foreach ([2, 10] as $status) {
+            $this->assertGreaterThan(0, $this->sisip('qna', ['pertanyaan' => "status {$status}", 'jawaban' => 'j', 'id_qna_kategori_fk' => $kat, 'status_qna_fk' => $status]));
+        }
+
         $log = ['pesan_user' => 'cuti', 'top_1_id_qna' => $qna, 'top_1_skor' => 0.25, 'top_3_kandidat' => '[]', 'status_match' => 1, 'waktu_interaksi' => '2026-11-13 01:00:00'];
         $id  = $this->sisip('log_chatbot', $log);
         $this->assertSame('0.2500', (string) $this->db->table('log_chatbot')->where('id_log', $id)->get()->getRow('top_1_skor'));
@@ -155,7 +212,10 @@ final class SkemaChatbotTest extends DatabaseTestCase
         $this->assertDbError(self::CHECK, fn () => $this->sisip('log_chatbot', ['top_3_kandidat' => 'bukan json'] + $log));
         $this->assertDbError(self::CHECK, fn () => $this->sisip('log_chatbot', ['status_match' => 2] + $log));
         $this->assertDbError(self::CHECK, fn () => $this->sisip('log_chatbot', ['feedback' => 0] + $log));
+        $this->assertDbError(self::CHECK, fn () => $this->sisip('log_chatbot', ['feedback' => 2] + $log));
         $this->assertDbError(self::CHECK, fn () => $this->sisip('log_chatbot', ['top_1_skor' => -0.1] + $log));
+        $this->assertDbError(self::CHECK, fn () => $this->sisip('log_chatbot', ['top_1_skor' => 1.0001] + $log));
+        $this->sisip('log_chatbot', ['top_1_skor' => 1.0] + $log);
         $this->sisip('log_chatbot', ['top_1_id_qna' => 999999] + $log); // tanpa FK: QnA hilang tetap tercatat (#id)
     }
 

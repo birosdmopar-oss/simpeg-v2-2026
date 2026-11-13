@@ -49,6 +49,7 @@ dikutip di sini. Isi QnA dev tidak dibawa di DBV ini (C4, PN8-6) dan **tidak per
 | Identitas | `log_chatbot` tanpa `id_pengguna`/NIP (K-4, BP8-15) |
 | JSON | `LONGTEXT` + `CHECK (JSON_VALID(...))`, portabel MySQL 8 / MariaDB 10.4 (pola DBV-032) |
 | Nama konstrain | `fk_<tabel>_<arti>`, `chk_<tabel>_<kolom>`, `uk_<tabel>_<kolom>` |
+| Rollback `up()` | gagal → hanya tabel yang dibuat pada run itu yang di-DROP (pola `CreateFaq`); tabel bernama sama yang sudah ada (mis. salinan dev, 1050) tidak disentuh |
 
 ## 2. Pencocokan D1 (DDL dev) → v2, per kolom
 
@@ -169,7 +170,8 @@ besar/kecil. Judul yang sama dengan baris status 10 boleh dipakai lagi sebagai b
   - collation `_ci` membuat "Cuti" = "cuti";
   - NULL (status 10) tidak bentrok, jadi judul baris yang dihapus boleh dipakai lagi;
   - balapan dua permintaan bersamaan berakhir 1062, yang diterjemahkan aplikasi menjadi 422 yang sama.
-- Spasi tepi tidak ditangani DB (nilai disimpan sudah di-trim aplikasi).
+- Spasi tepi tidak ditangani DB; nilai disimpan sudah di-trim aplikasi. Catatan: `utf8mb4_unicode_ci` memakai PAD SPACE, jadi
+  "Cuti" dan "Cuti " sudah bentrok di UNIQUE; spasi di **awal** tidak, sehingga trim aplikasi tetap wajib.
 - Konsekuensi: baris status 10 tidak bisa "dipulihkan" bila judulnya sudah dipakai baris aktif. v2 tidak punya Pulihkan (F8-38),
   jadi konsekuensi ini tidak muncul di aplikasi.
 - Kompatibilitas: MySQL 8.0 dan MariaDB 10.4 mendukung kolom bangkitan STORED + UNIQUE.
@@ -180,8 +182,10 @@ besar/kecil. Judul yang sama dengan baris status 10 boleh dipakai lagi sebagai b
 dua tulis bersamaan bisa lolos (tidak ada kunci baris untuk judul yang belum ada), kecuali transaksi memakai `SELECT … FOR
 UPDATE` pada rentang judul atau kunci aplikasi. Bila dipilih, kolom dan UNIQUE dihapus dari migration dan test skema.
 
-**Data dev (D1 blok [5]):** 2 judul kategori kembar dan 11 judul tag kembar. UNIQUE tidak menghalangi skema (tabel v2 kosong).
-Saat impor C4, judul kembar digabung ke baris aktif ber-id terkecil (K-12, F8-46). Kueri audit A6/A7 menghitungnya.
+**Data dev (D1 blok [5]):** 2 judul kategori kembar dan 11 judul tag kembar (semua status). UNIQUE tidak menghalangi skema
+(tabel v2 kosong). Kategori: pasangan "Syarat dan Hak Pensiun" (id 41/49) selesai oleh K-13, karena id 49 nonaktif tanpa QnA
+sehingga tidak dibawa; yang digabung hanya "Tunjangan Kinerja" (id 40/47). Tag: digabung ke baris aktif ber-id terkecil
+(K-12, F8-46). Kueri audit Q-A6/Q-A7 menghitung kembaran di antara baris yang **akan dibawa**.
 
 ## 4. Pemakaian aplikasi (MAKE-094, setelah DBV-033 di `main`)
 
@@ -201,33 +205,36 @@ dengan kueri audit Bagian 6 terhadap DB dev. Angka D1 yang sudah diketahui:
 |---|---|---|
 | Relasi QnA-tag ganda | 1 | dibuang + dilaporkan saat impor (F8-46) |
 | QnA tanpa kategori | 0 | dilaporkan, tidak dibawa (F8-46) |
-| Judul kategori kembar | 2 | digabung (K-12) |
-| Judul tag kembar | 11 | digabung (K-12) |
+| Judul kategori kembar | 2 (semua status) | 41/49 selesai oleh K-13 (49 tidak dibawa); 40/47 digabung (K-12) |
+| Judul tag kembar | 11 (semua status) | digabung (K-12); angka di antara tag yang dibawa = Q-A7 |
 | Jawaban berisiko (script/javascript:/on…=) | 0 | sanitasi saat impor (BP8-14) |
 
 ## 6. Kueri audit baca-saja
 
-Berkas `backend/docs/db-review/sql/DBV-033-audit-chatbot.sql`, 13 kueri, masing-masing mengembalikan `butir`, `jumlah`.
+Berkas `backend/docs/db-review/sql/DBV-033-audit-chatbot.sql`, 13 kueri (kode Q-A1..Q-A13, berbeda dari kode anomali
+A1..A16 PRD B.2), masing-masing mengembalikan `butir`, `jumlah`. Berkas memuat blok "Cara pakai" dan LARANGAN (akun baca
+saja, salinan DB dev, hanya SELECT).
 Kolom yang dipakai ada di DDL dev **dan** v2, sehingga berkas yang sama berjalan di keduanya.
 
 | Kode | Klasifikasi | Isi |
 |---|---|---|
-| A1 | WAJIB_0 | relasi `qna_has_tag` ganda |
-| A2 | WAJIB_0 | relasi tanpa QnA |
-| A3 | WAJIB_0 | relasi tanpa tag |
-| A4 | INFO | QnA tanpa kategori |
-| A5 | WAJIB_0 | QnA dengan kategori yang tidak ada |
-| A6 | INFO | judul kategori kembar (trim, _ci) |
-| A7 | INFO | judul tag kembar |
-| A8 | INFO | judul berspasi tepi |
-| A9 | WAJIB_0 | status di luar 1/2/10 |
-| A10 | WAJIB_0 | `tampil_bubble`/`is_fallback_option` di luar 0/1 |
-| A11 | INFO | QnA aktif di kategori nonaktif (F8-39, F8-46) |
-| A12 | INFO | relasi QnA aktif ke tag nonaktif (F8-46) |
-| A13 | INFO | log di luar domain v2 (log tidak dimigrasi) |
+| Q-A1 | INFO | relasi `qna_has_tag` ganda (dibuang impor) |
+| Q-A2 | WAJIB_0 | relasi tanpa QnA |
+| Q-A3 | WAJIB_0 | relasi tanpa tag |
+| Q-A4 | INFO | QnA aktif tanpa kategori (tidak dibawa) |
+| Q-A5 | WAJIB_0 | QnA dengan kategori yang tidak ada |
+| Q-A6 | INFO | judul kategori kembar di antara kategori yang dibawa (status 1, atau 2 yang dipakai QnA status 1) |
+| Q-A7 | INFO | judul tag kembar di antara tag yang dibawa |
+| Q-A8 | INFO | judul berspasi tepi (`CHAR_LENGTH`, karena PAD SPACE) |
+| Q-A9 | WAJIB_0 | status di luar 1/2/10 |
+| Q-A10 | WAJIB_0 | `tampil_bubble`/`is_fallback_option` di luar 0/1 |
+| Q-A11 | INFO | QnA aktif di kategori nonaktif (F8-39, F8-46) |
+| Q-A12 | INFO | relasi QnA aktif ke tag nonaktif (F8-46) |
+| Q-A13 | INFO | log di luar domain v2 (log tidak dimigrasi) |
 
-WAJIB_0 di DB dev = baris yang dibersihkan oleh impor C4. Di skema v2 selalu 0 (konstrain terpasang), dan itu ditegaskan
-oleh test skema.
+Klasifikasi: **WAJIB_0** hanya untuk butir yang dijamin konstrain dev (FK, domain status 1/2) atau konstrain v2 yang tidak
+dibersihkan impor; > 0 di sumber menghentikan impor C4 sampai diputus. Butir yang dibuang, digabung, atau tidak dibawa oleh
+impor (F8-46) = **INFO**. Di skema v2 butir WAJIB_0 selalu 0 (konstrain terpasang), dan itu ditegaskan oleh test skema.
 
 ## 7. Verifikasi developer
 
@@ -243,9 +250,11 @@ Dijalankan di DB scratch `simpeg_v2_t_f8cb`, MySQL 8.0.30 port 3307, prefix test
 | Test | Menegaskan |
 |---|---|
 | `testStrukturDanCollation` | InnoDB + `utf8mb4_unicode_ci` per tabel/kolom; tipe dan NULL tiap kolom; `log_chatbot` tanpa kolom identitas |
-| `testIndeksDanFk` | `idx_log_waktu`, `idx_log_qna_feedback`, `status_kategori`, PK komposit relasi, dua UNIQUE judul; 6 FK RESTRICT/RESTRICT; tanpa FK ke helpdesk/FAQ; 10 CHECK |
+| `testIndeksDanFk` | indeks penuh keenam tabel (PK, KEY, UNIQUE); 6 FK RESTRICT/RESTRICT; tanpa FK ke helpdesk/FAQ; nama + klausa ternormal kesepuluh CHECK |
+| `testDefault` | status DEFAULT 1, `tampil_bubble`/`is_fallback_option` DEFAULT 0, auto_increment kecuali `qna_status`, `waktu_interaksi` tanpa DEFAULT (BP8-8) |
+| `testUpGagalTidakMenyentuhTabelYangSudahAda` | `qna_status` sudah ada berisi baris → `up()` gagal (1050), tabel + baris utuh, tabel lain tidak tertinggal |
 | `testSeedStatus` | isi 1 Aktif / 2 Tidak Aktif / 10 Dihapus; id 3 ditolak CHECK |
-| `testCheckFkDanUnique` | relasi ganda 1062; FK 1452/1451; CHECK status/flag/JSON/status_match/feedback/skor; DECIMAL 0.2500; `top_1_id_qna` tanpa FK |
+| `testCheckFkDanUnique` | relasi ganda 1062; FK 1452/1451; CHECK status/flag/JSON/status_match/feedback (0, 2)/skor (-0.1, 1.0001); `qna` status 2 dan 10 diterima; skor 1.0 diterima; DECIMAL 0.2500; `top_1_id_qna` tanpa FK |
 | `testJudulUnikHanyaStatusAktifDanTidakAktif` | judul kembar beda huruf 1062 (status 1 dan 2); judul status 10 boleh dipakai lagi; dua baris status 10 berjudul sama; mengaktifkan ulang baris yang judulnya sudah dipakai 1062 |
 | `testDownLaluUpKembali` | `down()` men-DROP keenam tabel, FAQ tetap ada; `up()` memasang ulang + seed |
 | `testKueriAuditBerjalan` | 13 kueri audit berjalan di skema v2; butir WAJIB_0 = 0 |
