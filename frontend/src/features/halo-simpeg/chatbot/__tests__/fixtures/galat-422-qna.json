@@ -1,7 +1,9 @@
 {
     "status": "error",
-    "message": "Validasi gagal.",
+    "message": "Kategori QnA sudah dihapus. Pilih kategori lain.",
     "errors": {
-        "id_kategori": "Kategori QnA sudah dihapus. Pilih kategori lain."
+        "id_kategori": [
+            "Kategori QnA sudah dihapus. Pilih kategori lain."
+        ]
     }
 }

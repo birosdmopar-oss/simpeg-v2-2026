@@ -1,7 +1,7 @@
 /**
- * Galat 422 per kolom chatbot. Kontrak MAKE-094 (fixture `galat-422-*.json`) mengirim `errors` sebagai string per kolom
- * (`{"id_kategori": "…"}`), sedangkan tipe `ApiError.errors` di `@/lib/axios` ditulis `string[]` (bentuk endpoint lain).
- * Helper ini menerima kedua bentuk agar pesan tidak terpotong menjadi satu huruf (`m[0]` pada string).
+ * Galat 422 per kolom chatbot. Kontrak MAKE-094 mengikuti amplop v2: `errors: {kolom: [pesan, …]}` (fixture `galat-422-*.json`,
+ * keputusan reviewer 13-11-2026) → diambil pesan pertama. Tetap toleran terhadap string tunggal agar pesan tidak pernah
+ * terpotong menjadi satu huruf (`m[0]` pada string).
  */
 import { isApiError } from '@/lib/axios'
 

@@ -36,6 +36,7 @@ import QnaChatbotView from '../views/admin/QnaChatbotView.vue'
 import RiwayatChatbotView from '../views/admin/RiwayatChatbotView.vue'
 import StatistikChatbotView from '../views/admin/StatistikChatbotView.vue'
 import type { KategoriRow, QnaDetail, QnaRow, TagRow } from '../types'
+import galat422Qna from './fixtures/galat-422-qna.json'
 
 function apiError(status: number, message: string, errors: Record<string, string[]> | null = null) {
   return { status, message, errors, isNetworkError: false, original: new AxiosError('x') }
@@ -200,8 +201,8 @@ describe('Chatbot Manager — QnA', () => {
 
   it('form ubah QnA berkategori Dihapus: penanda + galat 422 BE ditampilkan', async () => {
     svc.qna.detail.mockResolvedValue({ ...qna[1]!, jawaban: '<p>x</p>' })
-    // Bentuk kontrak MAKE-094: `errors` string per kolom (fixture galat-422-qna.json).
-    svc.qna.simpan.mockRejectedValueOnce(apiError(422, 'Validasi gagal.', { id_kategori: 'Kategori QnA sudah dihapus. Pilih kategori lain.' } as never))
+    // Bentuk kontrak MAKE-094 = amplop v2 (fixture galat-422-qna.json).
+    svc.qna.simpan.mockRejectedValueOnce(apiError(422, galat422Qna.message, galat422Qna.errors))
     const w = await pasang(QnaChatbotView)
     await selectRowAction(w, 'chatbot-qna-actions-11', 'edit')
     await flushPromises()
@@ -210,7 +211,7 @@ describe('Chatbot Manager — QnA', () => {
     await flushPromises()
     expect(svc.qna.simpan).toHaveBeenCalledWith(11, expect.objectContaining({ id_kategori: 9 }))
     expect(document.querySelectorAll('[role="alert"]').length).toBeGreaterThan(0)
-    expect(document.body.textContent).toContain('Validasi gagal.')
+    expect(document.body.textContent).toContain(galat422Qna.message)
     expect([...document.querySelectorAll('[role="alert"]')].some((el) => el.textContent?.trim() === 'Kategori QnA sudah dihapus. Pilih kategori lain.')).toBe(true)
     void w
   })

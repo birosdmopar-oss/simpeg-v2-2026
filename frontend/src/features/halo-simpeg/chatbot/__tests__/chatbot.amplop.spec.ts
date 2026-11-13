@@ -134,10 +134,17 @@ describe('widget (fixture kontrak MAKE-094)', () => {
     expect(isApiError(e) && e.message).toBe(pesan)
   })
 
-  it('422 errors string per kolom (errors.pesan) terbaca utuh oleh galatPerKolom', async () => {
+  it('422 errors per kolom berbentuk array (amplop v2): pesan pertama; message = pesan pertama', async () => {
     jawab(galat422Pesan, 422)
     const e = await galatDari(vanyaService.balas(''))
-    expect(galatPerKolom(e)).toEqual({ pesan: galat422Pesan.errors.pesan })
+    expect(galatPerKolom(e)).toEqual({ pesan: 'Pesan wajib diisi (maks 300 karakter).' })
+    expect(isApiError(e) && e.message).toBe('Pesan wajib diisi (maks 300 karakter).')
+  })
+
+  it('galatPerKolom tetap toleran terhadap string tunggal', async () => {
+    jawab({ status: 'error', message: 'x', errors: { pesan: 'Pesan tunggal.' } }, 422)
+    const e = await galatDari(vanyaService.balas(''))
+    expect(galatPerKolom(e)).toEqual({ pesan: 'Pesan tunggal.' })
   })
 
   it('respons di luar kontrak → KontrakChatbotError', async () => {
@@ -210,7 +217,7 @@ describe('admin (fixture kontrak MAKE-094)', () => {
     ])
   })
 
-  it('qna simpan 422: errors string per kolom (id_kategori)', async () => {
+  it('qna simpan 422: errors array per kolom (id_kategori)', async () => {
     jawab(galat422Qna, 422)
     const e = await galatDari(qnaChatbotService.simpan(11, { id_kategori: 9, tag: [], is_fallback_option: false, status: 1, pertanyaan: 'x', jawaban: 'y' }))
     expect(galatPerKolom(e)).toEqual({ id_kategori: 'Kategori QnA sudah dihapus. Pilih kategori lain.' })

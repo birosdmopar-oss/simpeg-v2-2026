@@ -21,6 +21,7 @@ import VanyaWidget from '../components/widget/VanyaWidget.vue'
 import { _resetPeek } from '../stores/peek'
 import { resetChatbot } from '../stores/percakapan'
 import type { BalasanWidget } from '../types'
+import galat422Pesan from './fixtures/galat-422-pesan.json'
 
 function apiError(status: number | null, message: string) {
   return { status, message, errors: null, isNetworkError: status === null, original: new AxiosError('x') }
@@ -339,8 +340,8 @@ describe('VanyaWidget — galat', () => {
     expect(w.findAll('[data-pesan="galat"]').at(-1)?.text()).toContain('terjadi gangguan koneksi')
   })
 
-  it('balas 422 dengan errors.pesan (string per kolom, kontrak MAKE-094) → pesan kolom ditampilkan utuh', async () => {
-    svc.balas.mockRejectedValueOnce({ ...apiError(422, 'Validasi gagal.'), errors: { pesan: 'Pesan wajib diisi (maks 300 karakter).' } })
+  it('balas 422 dengan errors.pesan (array, amplop v2) → pesan kolom ditampilkan', async () => {
+    svc.balas.mockRejectedValueOnce({ ...apiError(422, galat422Pesan.message), errors: galat422Pesan.errors })
     const w = await pasang()
     await bukaChat(w)
     await w.get('[data-testid="vanya-input"]').setValue('cuti')

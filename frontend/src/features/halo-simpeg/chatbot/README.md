@@ -40,7 +40,8 @@ Kontrak beku: README `backend/app/Controllers/Api/HaloSimpeg/Chatbot` (MAKE-094 
 BE); test FE tidak membaca `backend/`, jadi salin ulang bila kontrak berubah lewat CR. Isi QnA dev tidak pernah masuk repo.
 
 Catatan kontrak yang ditangani FE:
-- galat 422 membawa `errors` **string** per kolom (`{"pesan": "…"}`), bukan array → baca lewat `galat.ts` (`galatPerKolom`);
+- galat 422 mengikuti amplop v2 `errors: {kolom: [pesan]}` (`message` = pesan pertama) → dibaca lewat `galat.ts` (`galatPerKolom`,
+  toleran string tunggal);
 - POST kategori/tag/QnA tanpa `status` (status awal 1), PUT dengan `status`;
 - riwayat `waktu` ISO-8601 berzona WIB; filter `feedback=0` = belum dinilai;
 - statistik `top_pesan[].pesan_user`; `pertanyaan: null` → `#<id_qna>`.
