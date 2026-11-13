@@ -1,0 +1,51 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id": 11,
+                "pertanyaan": "Berapa lama cuti besar?",
+                "is_fallback_option": 0,
+                "status": 2,
+                "kategori": {
+                    "id": 2,
+                    "judul": "Kinerja",
+                    "status": 2
+                },
+                "tag": [
+                    {
+                        "id": 4,
+                        "judul": "cuti",
+                        "status": 2
+                    }
+                ]
+            },
+            {
+                "id": 10,
+                "pertanyaan": "Bagaimana cara mengajukan cuti tahunan?",
+                "is_fallback_option": 1,
+                "status": 1,
+                "kategori": {
+                    "id": 1,
+                    "judul": "Cuti",
+                    "status": 1
+                },
+                "tag": [
+                    {
+                        "id": 4,
+                        "judul": "cuti",
+                        "status": 2
+                    },
+                    {
+                        "id": 5,
+                        "judul": "sandi",
+                        "status": 1
+                    }
+                ]
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+}

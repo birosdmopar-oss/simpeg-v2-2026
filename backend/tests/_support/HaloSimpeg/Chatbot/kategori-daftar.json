@@ -1,0 +1,22 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "judul": "Cuti",
+                "status": 1,
+                "tampil_bubble": 1
+            },
+            {
+                "id": 2,
+                "judul": "Kinerja",
+                "status": 2,
+                "tampil_bubble": 0
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+}

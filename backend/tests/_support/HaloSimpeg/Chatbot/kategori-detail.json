@@ -1,0 +1,9 @@
+{
+    "status": "success",
+    "data": {
+        "id": 1,
+        "judul": "Cuti",
+        "status": 1,
+        "tampil_bubble": 1
+    }
+}

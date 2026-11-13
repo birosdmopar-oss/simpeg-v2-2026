@@ -1,0 +1,19 @@
+{
+    "status": "success",
+    "data": {
+        "ditambah": 0,
+        "kategori_baru": 0,
+        "tag_baru": 0,
+        "dilewati": [],
+        "galat": [
+            {
+                "baris": 3,
+                "alasan": "Kategori wajib diisi."
+            },
+            {
+                "baris": 5,
+                "alasan": "Kategori \"Kinerja\" tidak aktif."
+            }
+        ]
+    }
+}
