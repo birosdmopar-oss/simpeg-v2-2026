@@ -250,7 +250,7 @@ ekspor, `opsi-hubungkan`, filter `belum_terhubung` (PRD §6, rincian di bawah ta
 
 | Method & path | Role (route) | Isi |
 |---|---|---|
-| `GET pegawai/{nip}/arsip` | 1–7 | `{ pegawai: { nip, nama, glr_depan, glr_belakang }, folder: [ { id_jenis_rwy, kode, label, urutan, jumlah, jumlah_hilang, jumlah_tak_dapat_dibuka } ], total, total_hilang, total_tak_dapat_dibuka, penyajian_berkas_legacy, aksi: { tulis, jenis_hubungkan } }` |
+| `GET pegawai/{nip}/arsip` | 1–7 | `{ pegawai: { nip, nama, glr_depan, glr_belakang }, folder: [ { id_jenis_rwy, kode, label, urutan, jumlah, jumlah_hilang, jumlah_tak_dapat_dibuka } ], total, total_hilang, total_tak_dapat_dibuka, penyajian_berkas_legacy, aksi: { tulis, jenis_hubungkan: [ { id_jenis_rwy, label } ] } }` |
 | `GET pegawai/{nip}/arsip/berkas?id_jenis_rwy=&belum_terhubung=&q=&sort=&order=&page=&per_page=` | 1–7 | `{ items: [ … ], total, page, per_page }` (lihat kolom di bawah) |
 | `GET pegawai/{nip}/arsip/berkas/{id}/buka` | 1–7 | Isi berkas PRIVAT (unggahan v2; berkas legacy hanya saat `arsip.penyajianBerkasLegacy = privat`) |
 | `GET pegawai/{nip}/arsip/ekspor?format=xlsx\|csv&<filter daftar>` | 1–7 | Berkas ekspor (T2) |
@@ -313,9 +313,10 @@ lewat `DocumentAttachmentModel` (`document_attachment` `update`/`delete`). Izin 
 
 - **Tulis** (`OtorisasiArsip::bolehTulis`): role 1, 2, 3, 6, 7 + `PegawaiScope::bolehUbah` (2/6/7 NIP sendiri, 3 lingkup
   ubah); 4/5/8 → 403. Urutan: 403 role → 403 lingkup → 404 NIP → 404 baris → 422/403 per aksi.
-- **`aksi`**: folder `{ tulis, jenis_hubungkan }`; `jenis_hubungkan` = kode F10-28 `[1, 3, 5, 7, 9, 10, 11, 13, 14, 20, 22,
-  23, 32, 36, 38]` yang boleh dituju aktor (role 2/6/7: tanpa kode milik Definisi `kunciBarisDisetujui()` = saat ini
-  `[38]`; 4/5: `tulis: false`, `[]`). Item: `edit` = tulis kecuali kode 37 bagi selain role 1; `hubungkan` = tulis +
+- **`aksi`**: folder `{ tulis, jenis_hubungkan: [ { id_jenis_rwy, label } ] }`; `jenis_hubungkan` = kode F10-28 `[1, 3, 5,
+  7, 9, 10, 11, 13, 14, 20, 22, 23, 32, 36, 38]` yang boleh dituju aktor, sebagai objek berlabel (`label` =
+  `jenis_rwy.jenis_rwy`), urut `jenis_rwy.order` (role 2/6/7: tanpa kode milik Definisi `kunciBarisDisetujui()` = saat ini
+  hanya `{ id_jenis_rwy: 38, label: "Data Umum" }`; 4/5: `tulis: false`, `[]`). Daftar ini hanya ada di respons folder. Item: `edit` = tulis kecuali kode 37 bagi selain role 1; `hubungkan` = tulis +
   kode 0 + `jenis_hubungkan` tidak kosong; `hapus` = tulis + kode 0. FE memakainya untuk `hidden`; server tetap menegakkan.
 - **Ubah Nama** (`PATCH`): semua baris [K] termasuk riwayat Disetujui, 38, dan `tanpa_jenis`; kode 37 hanya role 1
   (`ArsipDataUmum::bolehTulis`) → selain itu 403 "Anda tidak berhak mengubah arsip data umum pegawai ini.". `tag`: tag HTML

@@ -240,7 +240,7 @@ final class ArsipAksiTest extends DatabaseTestCase
         $this->assertSame(OtorisasiArsip::PESAN_KUNCI, $this->json($opsi)['message']);
 
         $folder = $this->json($this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/arsip"))['data'];
-        $this->assertSame(['tulis' => true, 'jenis_hubungkan' => [38]], $folder['aksi']);
+        $this->assertSame(['tulis' => true, 'jenis_hubungkan' => [['id_jenis_rwy' => 38, 'label' => 'Data Umum']]], $folder['aksi']);
         $this->assertSame(['id_riwayat' => 38, 'butuh_data' => false, 'items' => []], $this->json($this->asUser($pegawai)->get("api/v1/pegawai/{$this->nip}/arsip/opsi-hubungkan?id_riwayat=38"))['data']);
 
         $this->hubungkan($pegawai, $yatim, ['id_riwayat' => 38])->assertStatus(200);
@@ -250,7 +250,13 @@ final class ArsipAksiTest extends DatabaseTestCase
             $admin = $this->akun($this->buatPegawaiDiSatker($this->satker), $role);
             $baru  = $this->arsip(0, "arsip/x/r{$role}.pdf");
             $this->hubungkan($admin, $baru, ['id_riwayat' => 9, 'id_entri' => $rmj])->assertStatus(200);
-            $this->assertSame(OtorisasiArsip::KODE_HUBUNGKAN, $this->json($this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/arsip"))['data']['aksi']['jenis_hubungkan']);
+            $jenis = $this->json($this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/arsip"))['data']['aksi']['jenis_hubungkan'];
+            $this->assertEqualsCanonicalizing(OtorisasiArsip::KODE_HUBUNGKAN, array_column($jenis, 'id_jenis_rwy'));
+            // Objek berlabel dari jenis_rwy, urut `order` (38 Data Umum order 3 sebelum 9 Jabatan order 6, 14 Pendidikan 13).
+            $urut = $this->db->table('jenis_rwy')->select('id_jenis_rwy, jenis_rwy')->whereIn('id_jenis_rwy', OtorisasiArsip::KODE_HUBUNGKAN)->orderBy('order', 'ASC')->orderBy('id_jenis_rwy', 'ASC')->get()->getResultArray();
+            $this->assertSame(array_map(static fn (array $r): array => ['id_jenis_rwy' => (int) $r['id_jenis_rwy'], 'label' => $r['jenis_rwy']], $urut), $jenis);
+            $this->assertContains(['id_jenis_rwy' => 14, 'label' => 'Pendidikan'], $jenis);
+            $this->assertLessThan(array_search(9, array_column($jenis, 'id_jenis_rwy'), true), array_search(38, array_column($jenis, 'id_jenis_rwy'), true));
         }
 
         // Role 4 hanya lihat: tulis false, semua aksi baris false.

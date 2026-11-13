@@ -120,7 +120,7 @@ final class ArsipService
             'total_tak_dapat_dibuka'  => $total['tak'],
             'penyajian_berkas_legacy' => $this->config->modeLegacy(),
             // Tahap 2 (MAKE-092, F10-38 (3)): dihitung per aktor; FE memakainya untuk `hidden`, server tetap menegakkan.
-            'aksi' => $this->otorisasi()->peran($auth, $nip),
+            'aksi' => $this->aksiFolder($auth, $nip),
         ];
     }
 
@@ -505,6 +505,27 @@ final class ArsipService
             0       => 1,
             default => 0,
         };
+    }
+
+    /**
+     * `aksi` folder: `{ tulis, jenis_hubungkan: [ { id_jenis_rwy, label } ] }` — label dari `jenis_rwy.jenis_rwy`, urut
+     * `jenis_rwy.order` (dialog Hubungkan FE, kode tanpa folder berisi berkas tetap berlabel).
+     *
+     * @return array{tulis: bool, jenis_hubungkan: list<array{id_jenis_rwy: int, label: string}>}
+     */
+    private function aksiFolder(AuthContext $auth, string $nip): array
+    {
+        $peran = $this->otorisasi()->peran($auth, $nip);
+        $jenis = [];
+
+        if ($peran['jenis_hubungkan'] !== []) {
+            $rows = $this->db->table('jenis_rwy')->select('id_jenis_rwy, jenis_rwy')
+                ->whereIn('id_jenis_rwy', $peran['jenis_hubungkan'])
+                ->orderBy('order', 'ASC')->orderBy('id_jenis_rwy', 'ASC')->get()->getResultArray();
+            $jenis = array_map(static fn (array $r): array => ['id_jenis_rwy' => (int) $r['id_jenis_rwy'], 'label' => (string) $r['jenis_rwy']], $rows);
+        }
+
+        return ['tulis' => $peran['tulis'], 'jenis_hubungkan' => $jenis];
     }
 
     private function penyaji(): PenyajiUrlBerkas

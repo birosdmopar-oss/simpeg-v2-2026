@@ -139,7 +139,7 @@ final class ArsipEndpointTest extends DatabaseTestCase
         $this->assertSame([7, 1, 2], [$data['total'], $data['total_hilang'], $data['total_tak_dapat_dibuka']]);
         $this->assertSame('publik', $data['penyajian_berkas_legacy']);
         // Tahap 2 (MAKE-092): pemilik role 2 boleh menulis; tujuan Hubungkan hanya kode 38 (kunci F10-31).
-        $this->assertSame(['tulis' => true, 'jenis_hubungkan' => [38]], $data['aksi']);
+        $this->assertSame(['tulis' => true, 'jenis_hubungkan' => [['id_jenis_rwy' => 38, 'label' => 'Data Umum']]], $data['aksi']);
         $this->assertSame($this->nip, $data['pegawai']['nip']);
         $this->assertSame(['nip', 'nama', 'glr_depan', 'glr_belakang'], array_keys($data['pegawai']));
 
