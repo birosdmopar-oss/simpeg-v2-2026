@@ -11,6 +11,8 @@ import { describeApiError } from './services/apiErrors'
 const BAWAAN_AXIOS = /^Request failed with status code/i
 
 export interface GalatAksi {
+  /** Baris sudah berubah di server (404, atau 422 `errors.id_attachment`): daftar perlu dimuat ulang. */
+  basi: boolean
   /** Pesan umum (403/404/lainnya) atau pesan pertama bila 422 tanpa kunci yang dikenal. */
   umum: string
   /** Pesan per kolom 422 (`errors.<kolom>` → pesan pertama). */
@@ -19,7 +21,7 @@ export interface GalatAksi {
 
 export function urainGalatAksi(error: unknown, kolomDikenal: readonly string[] = []): GalatAksi {
   const baku = describeApiError(error).message
-  if (!isApiError(error)) return { umum: baku, kolom: {} }
+  if (!isApiError(error)) return { umum: baku, kolom: {}, basi: false }
 
   const kolom: Record<string, string> = {}
   const lain: string[] = []
@@ -30,11 +32,12 @@ export function urainGalatAksi(error: unknown, kolomDikenal: readonly string[] =
     else lain.push(pertama)
   }
 
+  const basi = error.status === 404 || (error.status === 422 && Boolean(error.errors?.id_attachment))
   const pesanServer = error.message !== '' && !BAWAAN_AXIOS.test(error.message) ? error.message : ''
   if (error.status === 422) {
     // Pesan 422 spesifik (kolom atau pesan umum server); "Periksa kembali …" hanya bila server tidak memberi apa pun.
-    return { umum: lain[0] ?? (Object.keys(kolom).length > 0 ? '' : pesanServer || baku), kolom }
+    return { umum: lain[0] ?? (Object.keys(kolom).length > 0 ? '' : pesanServer || baku), kolom, basi }
   }
-  if (error.status === 401 || error.status === null) return { umum: baku, kolom }
-  return { umum: pesanServer || baku, kolom }
+  if (error.status === 401 || error.status === null) return { umum: baku, kolom, basi: false }
+  return { umum: pesanServer || baku, kolom, basi }
 }

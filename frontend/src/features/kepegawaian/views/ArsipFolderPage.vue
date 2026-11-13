@@ -67,6 +67,8 @@ const page = ref(1)
 const jenisDipilih = ref('')
 const belumTerhubung = ref(false)
 const pesan = ref<{ tone: 'success' | 'danger'; text: string } | null>(null)
+/** Galat memuat folder (identitas / `aksi.jenis_hubungkan`); tampil dengan "Coba lagi". */
+const galatRingkas = ref<string | null>(null)
 
 let timer: ReturnType<typeof setTimeout> | undefined
 onBeforeUnmount(() => clearTimeout(timer))
@@ -95,6 +97,11 @@ watch(jenisDipilih, () => {
 const opsiJenis = computed<SelectOption[]>(() =>
   (ringkas.value?.folder ?? []).map((f) => ({ value: paramFolder(f), label: f.label })),
 )
+
+/** Folder terpilih bisa lenyap sesudah mutasi (mis. kode 0 habis): reset filter agar select dan kueri tidak berselisih. */
+watch(ringkas, (baru) => {
+  if (baru !== null && jenisDipilih.value !== '' && !opsiJenis.value.some((o) => String(o.value) === jenisDipilih.value)) jenisDipilih.value = ''
+})
 /** Filter aktif: folder dari URL, lalu (hanya di "Semua berkas") jenis + belum terhubung dari panel filter. */
 function kueriFilter(): ArsipBerkasQuery | null {
   const dasar = filter.value
@@ -140,18 +147,26 @@ async function muatBerkas(): Promise<void> {
 }
 
 let permintaanRingkas = 0
-async function muatRingkas(): Promise<void> {
+/**
+ * Folder pegawai (identitas, label, `aksi.jenis_hubungkan`). `paksa` = lewati cache (sesudah mutasi) TANPA mengosongkan
+ * `ringkas` lama sampai data baru tiba; galat dipertahankan sebagai pesan dengan "Coba lagi", bukan ditelan.
+ */
+async function muatRingkas(paksa = false): Promise<void> {
   const ini = ++permintaanRingkas
-  const cache = ambilFolderArsip(nip.value)
-  ringkas.value = cache
-  if (cache !== null) return // dipakai ulang dari ArsipPage; API hanya dipanggil bila URL folder dibuka langsung
+  galatRingkas.value = null
+  if (!paksa) {
+    const cache = ambilFolderArsip(nip.value)
+    ringkas.value = cache
+    if (cache !== null) return // dipakai ulang dari ArsipPage; API hanya dipanggil bila URL folder dibuka langsung
+  }
   try {
     const data = await arsipService.folder(nip.value)
     if (ini !== permintaanRingkas) return
     simpanFolderArsip(nip.value, data)
     ringkas.value = data
-  } catch {
-    // Breadcrumb memakai cadangan teks; galat nyata sudah tampil lewat daftar berkas.
+  } catch (error) {
+    if (ini !== permintaanRingkas) return
+    galatRingkas.value = describeApiError(error).message
   }
 }
 
@@ -213,7 +228,13 @@ function bukaHapus(item: ArsipBerkas): void {
 async function sesudahMutasi(teks: string): Promise<void> {
   pesan.value = { tone: 'success', text: teks }
   kosongkanFolderArsip()
-  await Promise.all([muatRingkas(), muatBerkas()])
+  await Promise.all([muatRingkas(true), muatBerkas()])
+}
+
+/** Mutasi gagal karena baris sudah berubah di server (404 / 422 `errors.id_attachment`): muat ulang tanpa pesan sukses. */
+async function muatUlangBasi(): Promise<void> {
+  kosongkanFolderArsip()
+  await Promise.all([muatRingkas(true), muatBerkas()])
 }
 
 async function konfirmasiHapus(): Promise<void> {
@@ -228,6 +249,7 @@ async function konfirmasiHapus(): Promise<void> {
   } catch (error) {
     const galat = urainGalatAksi(error, ['id_attachment'])
     pesan.value = { tone: 'danger', text: galat.kolom.id_attachment ?? galat.umum }
+    if (galat.basi) await muatUlangBasi()
   } finally {
     menghapus.value = false
   }
@@ -267,6 +289,11 @@ async function ekspor(format: ExportFormat['key']): Promise<void> {
       </div>
 
       <UiNotice v-if="pesan" :tone="pesan.tone" dismissible data-testid="arsip-pesan" @dismiss="pesan = null">{{ pesan.text }}</UiNotice>
+
+      <UiNotice v-if="galatRingkas" tone="danger" data-testid="arsip-galat-folder">
+        <span>{{ galatRingkas }}</span>
+        <UiButton size="sm" appearance="outline" class="ml-3" data-testid="arsip-folder-coba-lagi" @click="muatRingkas(true)">Coba lagi</UiButton>
+      </UiNotice>
 
       <UiNotice v-if="folderTidakSah" tone="danger" data-testid="arsip-failure">{{ failure }}</UiNotice>
 
@@ -313,13 +340,14 @@ async function ekspor(format: ExportFormat['key']): Promise<void> {
       </UiCard>
     </div>
 
-    <ArsipEditDialog v-model:open="editOpen" :nip="nip" :item="editItem" @done="sesudahMutasi" />
+    <ArsipEditDialog v-model:open="editOpen" :nip="nip" :item="editItem" @done="sesudahMutasi" @basi="muatUlangBasi" />
     <ArsipHubungkanDialog
       v-model:open="hubungkanOpen"
       :nip="nip"
       :item="hubungkanItem"
       :jenis-hubungkan="ringkas?.aksi.jenis_hubungkan ?? []"
       @done="sesudahMutasi"
+      @basi="muatUlangBasi"
     />
     <ConfirmDialog
       v-model:open="hapusOpen"

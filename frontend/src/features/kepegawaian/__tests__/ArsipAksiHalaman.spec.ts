@@ -228,7 +228,7 @@ describe('aksi baris', () => {
     expect(wrapper.get('[data-testid="arsip-pesan"]').text()).toContain('Arsip dihapus.')
   })
 
-  it('Hapus ditolak 422 (bukan kode 0) → pesan legacy apa adanya, tanpa muat ulang', async () => {
+  it('Hapus ditolak 422 (bukan kode 0) → pesan legacy apa adanya; daftar dimuat ulang karena baris sudah berubah', async () => {
     const pesan = 'Data arsip ini telah terhubung ke data riwayat pegawai. Silahkan hubungkan data arsip lain yang belum terhubung ke data riwayat.'
     hapusApi.mockRejectedValue(galat(422, 'Periksa kembali isian yang ditandai.', { id_attachment: [pesan] }))
     const wrapper = await pasang(`/arsip/${NIP}/semua`)
@@ -237,7 +237,7 @@ describe('aksi baris', () => {
     ;[...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ya, hapus')?.click()
     await flushPromises()
     expect(wrapper.get('[data-testid="arsip-pesan"]').text()).toContain(pesan)
-    expect(berkasApi).not.toHaveBeenCalled()
+    expect(berkasApi).toHaveBeenCalledTimes(1)
   })
 
   it('Hapus baris terakhir di halaman > 1 → mundur ke halaman sebelumnya', async () => {
@@ -299,11 +299,22 @@ describe('aksi baris', () => {
     expect(wrapper.get('[data-testid="arsip-pesan"]').text()).toContain('Arsip dihubungkan.')
   })
 
-  it('jenis_hubungkan kosong dari server → dialog Hubungkan tidak punya pilihan jenis', async () => {
-    folderApi.mockResolvedValue(ringkas([]))
+  it('baris dengan aksi.hubungkan = false (sudah terhubung) → item Hubungkan hidden', async () => {
     const wrapper = await pasang(`/arsip/${NIP}/semua`)
-    await selectRowAction(wrapper, 'arsip-actions-1', 'hubungkan')
-    const opsi = [...document.body.querySelectorAll('[data-testid="arsip-hubungkan-jenis"] option')].filter((o) => (o.textContent ?? '').trim() !== '' && (o as HTMLOptionElement).value !== '')
-    expect(opsi).toHaveLength(0)
+    expect((await rowMenuActions(wrapper, 'arsip-actions-2')).map((a) => a.key)).toEqual(['edit', 'buka'])
+  })
+
+  it('selama Hapus berjalan: Edit/Hubungkan/Hapus baris lain disabled, Buka tetap aktif', async () => {
+    let selesai!: () => void
+    hapusApi.mockReturnValue(new Promise<void>((resolve) => (selesai = resolve)))
+    const wrapper = await pasang(`/arsip/${NIP}/semua`)
+    await selectRowAction(wrapper, 'arsip-actions-1', 'hapus')
+    ;[...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ya, hapus')?.click()
+    await flushPromises()
+    const aksi = await rowMenuActions(wrapper, 'arsip-actions-2')
+    expect(aksi.find((a) => a.key === 'edit')?.disabled).toBe(true)
+    expect(aksi.find((a) => a.key === 'buka')?.disabled).toBe(false)
+    selesai()
+    await flushPromises()
   })
 })

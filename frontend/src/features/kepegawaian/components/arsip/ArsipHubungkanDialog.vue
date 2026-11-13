@@ -24,7 +24,7 @@ const props = defineProps<{
   /** Jenis tujuan yang boleh bagi aktor, berlabel dari server (`aksi.jenis_hubungkan` respons folder). */
   jenisHubungkan: ArsipJenisHubungkan[]
 }>()
-const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string] }>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string]; basi: [] }>()
 
 const jenis = ref<string>('')
 const entri = ref<string>('')
@@ -72,7 +72,8 @@ watch(jenis, async (nilai) => {
     opsi.value = hasil.items
   } catch (error) {
     if (ini !== permintaan) return
-    galat.value = urainGalatAksi(error, ['id_riwayat']).umum || 'Data riwayat tidak dapat dimuat.'
+    const g = urainGalatAksi(error, ['id_riwayat'])
+    galat.value = g.kolom.id_riwayat ?? (g.umum || 'Data riwayat tidak dapat dimuat.')
   } finally {
     if (ini === permintaan) memuatOpsi.value = false
   }
@@ -90,6 +91,7 @@ async function hubungkan(): Promise<void> {
   } catch (error) {
     const hasil = urainGalatAksi(error, ['id_attachment', 'id_riwayat', 'id_entri'])
     galat.value = hasil.kolom.id_attachment ?? hasil.kolom.id_riwayat ?? hasil.kolom.id_entri ?? hasil.umum
+    if (hasil.basi) emit('basi')
   } finally {
     busy.value = false
   }
@@ -115,14 +117,17 @@ async function hubungkan(): Promise<void> {
         </div>
 
         <form class="space-y-4" novalidate @submit.prevent="hubungkan">
-          <UiSelect v-model="jenis" label="Jenis Riwayat" placeholder="Pilih jenis riwayat" required :options="opsiJenis" data-testid="arsip-hubungkan-jenis" />
+          <UiNotice v-if="jenisHubungkan.length === 0" tone="warning" data-testid="arsip-hubungkan-tanpa-jenis">
+            Tidak ada jenis riwayat tujuan yang tersedia untuk Anda.
+          </UiNotice>
+          <UiSelect v-model="jenis" label="Jenis Riwayat" placeholder="Pilih jenis riwayat" required :disabled="busy" :options="opsiJenis" data-testid="arsip-hubungkan-jenis" />
 
           <template v-if="kode !== null && !tanpaPilihanData">
             <p v-if="memuatOpsi" class="text-body2 text-slate-500" data-testid="arsip-hubungkan-memuat">Memuat data riwayat…</p>
             <p v-else-if="opsi.length === 0 && !galat" class="text-body2 text-slate-600" data-testid="arsip-hubungkan-kosong">
               Tidak ada data riwayat berstatus Disetujui untuk jenis ini.
             </p>
-            <UiSelect v-else-if="opsi.length > 0" v-model="entri" label="Data Riwayat" placeholder="Pilih data riwayat" required :options="opsiEntri" data-testid="arsip-hubungkan-entri" />
+            <UiSelect v-else-if="opsi.length > 0" v-model="entri" label="Data Riwayat" placeholder="Pilih data riwayat" required :disabled="busy" :options="opsiEntri" data-testid="arsip-hubungkan-entri" />
           </template>
           <p v-else-if="tanpaPilihanData" class="text-body2 text-slate-600" data-testid="arsip-hubungkan-tanpa-data">Arsip Data Umum tidak memerlukan pilihan data riwayat.</p>
 

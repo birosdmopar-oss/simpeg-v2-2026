@@ -18,7 +18,7 @@ import { arsipService } from '../../services/arsip.service'
 const NAMA_ARSIP_MAKS = 255
 
 const props = defineProps<{ open: boolean; nip: string; item: ArsipBerkas | null }>()
-const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string] }>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string]; basi: [] }>()
 
 const nama = ref('')
 const busy = ref(false)
@@ -29,7 +29,7 @@ watch(
   () => [props.open, props.item?.id_attachment] as const,
   ([terbuka]) => {
     if (!terbuka) return
-    nama.value = props.item?.tag ?? props.item?.nama_arsip ?? ''
+    nama.value = props.item?.tag?.trim() ? props.item.tag : (props.item?.nama_arsip ?? '')
     galatKolom.value = ''
     galatUmum.value = ''
   },
@@ -59,6 +59,7 @@ async function simpan(): Promise<void> {
     const galat = urainGalatAksi(error, ['tag'])
     galatKolom.value = galat.kolom.tag ?? ''
     galatUmum.value = galat.kolom.tag ? '' : galat.umum
+    if (galat.basi) emit('basi')
   } finally {
     busy.value = false
   }
@@ -89,6 +90,7 @@ async function simpan(): Promise<void> {
             label="Nama Arsip"
             required
             autocomplete="off"
+            :disabled="busy"
             :state="galatKolom ? 'error' : 'default'"
             :help-text="galatKolom || `Wajib diisi, maksimal ${NAMA_ARSIP_MAKS} karakter.`"
             data-testid="arsip-edit-nama"
