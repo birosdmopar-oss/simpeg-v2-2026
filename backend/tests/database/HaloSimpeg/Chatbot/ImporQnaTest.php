@@ -110,13 +110,31 @@ final class ImporQnaTest extends DatabaseTestCase
         $buku = new Spreadsheet();
         $buku->getActiveSheet()->fromArray(ImporQna::JUDUL_KOLOM, null, 'A1');
         $buku->getActiveSheet()->setCellValue('D1048576', 'x');
-        $path = (string) tempnam(sys_get_temp_dir(), 'cbj');
-        (new XlsxWriter($buku))->save($path);
-        $buku->disconnectWorksheets();
-        $this->tmp[] = $path;
-        $this->assertLessThan(20_000, (int) filesize($path), 'berkas kecil');
+        $berkas = $this->simpanBuku($buku);
+        $this->assertLessThan(20_000, (int) filesize($berkas->getTempName()), 'berkas kecil');
 
-        $this->assertGalatBerkas('Jumlah baris data maksimal 1000.', new UploadedFile($path, 'qna.xlsx', 'application/octet-stream', (int) filesize($path), UPLOAD_ERR_OK));
+        // Bermakna juga saat memory_limit -1 (CI): kenaikan puncak memori dibatasi longgar (review CR V-3).
+        memory_reset_peak_usage();
+        $awal = memory_get_peak_usage();
+        $this->assertGalatBerkas('Jumlah baris data maksimal 1000.', $berkas);
+        $this->assertLessThan(64 * 1024 * 1024, memory_get_peak_usage() - $awal);
+    }
+
+    public function testSelKosongBergayaTidakDihitung(): void
+    {
+        $buku  = new Spreadsheet();
+        $sheet = $buku->getActiveSheet();
+        $sheet->fromArray(ImporQna::JUDUL_KOLOM, null, 'A1');
+        $sheet->fromArray([['Bergaya satu?', 'Jawab', 'Cuti', ''], ['Bergaya dua?', 'Jawab', 'Cuti', '']], null, 'A2');
+        $sheet->getStyle('A1:D1500')->getBorders()->getAllBorders()->setBorderStyle('thin');
+
+        $hasil = (new ImporQna($this->db))->impor($this->simpanBuku($buku));
+        $this->assertSame([2, []], [$hasil['ditambah'], $hasil['galat']], 'border sampai baris 1.500 + 2 baris data diterima (V-1)');
+    }
+
+    public function testJudulKolomEkstraDitolak(): void
+    {
+        $this->assertGalatBerkas('Format template tidak sesuai.', $this->berkas(EksporTabel::xlsx([...ImporQna::JUDUL_KOLOM, 'Ekstra'], [['a', 'b', 'c', 'd', 'e']])));
     }
 
     public function testIsiTerlaluPanjangJadiGalatBaris(): void
@@ -135,6 +153,7 @@ final class ImporQnaTest extends DatabaseTestCase
     public function testBalapanJudulTag1062(): void
     {
         $trg = $this->db->prefixTable('trg_uji_1062_tag');
+        $this->db->query("DROP TRIGGER IF EXISTS {$trg}"); // sisa run terhenti (review CR V-5)
         $this->db->query("CREATE TRIGGER {$trg} BEFORE INSERT ON " . $this->db->prefixTable('qna_tag') . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry uji'");
 
         try {
@@ -160,6 +179,16 @@ final class ImporQnaTest extends DatabaseTestCase
     private function impor(array $baris): array
     {
         return (new ImporQna($this->db))->impor($this->berkas(EksporTabel::xlsx(ImporQna::JUDUL_KOLOM, $baris)));
+    }
+
+    private function simpanBuku(Spreadsheet $buku): UploadedFile
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'cbj');
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+        $this->tmp[] = $path;
+
+        return new UploadedFile($path, 'qna.xlsx', 'application/octet-stream', (int) filesize($path), UPLOAD_ERR_OK);
     }
 
     private function berkas(string $isi, string $nama = 'qna.xlsx'): UploadedFile

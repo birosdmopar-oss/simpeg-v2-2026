@@ -134,6 +134,7 @@ final class WidgetEndpointTest extends DatabaseTestCase
         $d       = $this->data($this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'teks dari klien', 'id_qna' => $panjang]));
 
         $this->assertSame([true, 1.0], [$d['cocok'], (float) $d['skor']]);
+        $this->assertSame('<p>Jawaban ' . str_repeat('pertanyaan panjang ', 20) . '</p>', $d['balasan'], 'jawaban dari qnaBubble (V-6)');
         $this->assertSame(str_repeat('pertanyaan panjang ', 20), $this->db->table('log_chatbot')->get()->getRow('pesan_user'), 'pesan_user = pertanyaan QnA (F8-48)');
 
         // id_qna QnA nonaktif / tidak ada → jalur ketikan dengan validasi.
@@ -294,6 +295,8 @@ final class WidgetEndpointTest extends DatabaseTestCase
         $t = $this->pasangThrottlerChatbot();
 
         $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(200);
+        $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(429);
+        $t->setTestTime(1_790_000_000 + 59);
         $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(429);
         $t->setTestTime(1_790_000_000 + 61);
         $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(200);

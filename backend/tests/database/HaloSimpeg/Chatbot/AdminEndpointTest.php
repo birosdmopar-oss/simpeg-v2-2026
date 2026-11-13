@@ -137,6 +137,7 @@ final class AdminEndpointTest extends DatabaseTestCase
     public function testBalapan1062DiterjemahkanKe422(): void
     {
         $trg = $this->db->prefixTable('trg_uji_1062_kategori');
+        $this->db->query("DROP TRIGGER IF EXISTS {$trg}"); // sisa run terhenti (review CR V-5)
         $this->db->query("CREATE TRIGGER {$trg} BEFORE INSERT ON " . $this->db->prefixTable('qna_kategori') . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry uji'");
 
         try {
@@ -194,6 +195,23 @@ final class AdminEndpointTest extends DatabaseTestCase
         $this->assertArrayHasKey('tag', $this->errors($this->admin()->withBodyFormat('json')->post(self::URL . 'qna', ['tag' => [$tagNon]] + $dasar)));
         $this->assertArrayHasKey('tag', $this->errors($this->admin()->withBodyFormat('json')->post(self::URL . 'qna', ['tag' => [999999]] + $dasar)));
         $this->assertSame(0, $this->db->table('qna')->countAllResults());
+    }
+
+    public function testBatasPanjangPertanyaanJawaban(): void
+    {
+        $kat   = $this->buatKategori('K');
+        $dasar = ['id_kategori' => $kat, 'tag' => [], 'is_fallback_option' => 0];
+        $url   = self::URL . 'qna';
+
+        // Tepat 65.535 byte diterima; 65.536 byte → 422 (TEXT, review CR V-4).
+        $this->data($this->admin()->withBodyFormat('json')->post($url, ['pertanyaan' => str_repeat('p', 65535), 'jawaban' => '<p>J</p>'] + $dasar), 201);
+        $e = $this->errors($this->admin()->withBodyFormat('json')->post($url, ['pertanyaan' => str_repeat('p', 65536), 'jawaban' => '<p>J</p>'] + $dasar));
+        $this->assertSame('Pertanyaan terlalu panjang.', $e['pertanyaan']);
+
+        $this->data($this->admin()->withBodyFormat('json')->post($url, ['pertanyaan' => 'J pas', 'jawaban' => '<p>' . str_repeat('j', 65535 - 7) . '</p>'] + $dasar), 201);
+        $e = $this->errors($this->admin()->withBodyFormat('json')->post($url, ['pertanyaan' => 'J lebih', 'jawaban' => '<p>' . str_repeat('j', 65536 - 7) . '</p>'] + $dasar));
+        $this->assertSame('Jawaban terlalu panjang.', $e['jawaban']);
+        $this->assertSame(2, $this->db->table('qna')->countAllResults());
     }
 
     public function testStatusIndukQna(): void

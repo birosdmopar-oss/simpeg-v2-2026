@@ -72,8 +72,8 @@ final class KontrakFixtureTest extends DatabaseTestCase
         $this->cocok('widget-balas-fallback', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'zzz'])->getJSON());
         $c = json_decode((string) $cocok, true)['data'];
         $this->cocok('widget-feedback', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/feedback', ['id_log' => $c['id_log'], 'nilai' => -1, 'token' => $c['token_feedback']])->getJSON());
-        $this->cocok('galat-422-pesan', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => ''])->getJSON());
-        $this->cocok('galat-403-feedback', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/feedback', ['id_log' => $c['id_log'], 'nilai' => 1, 'token' => 'x'])->getJSON());
+        $this->cocok('galat-422-pesan', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => '']), 422);
+        $this->cocok('galat-403-feedback', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/feedback', ['id_log' => $c['id_log'], 'nilai' => 1, 'token' => 'x']), 403);
 
         $this->cocok('kategori-daftar', $this->asRole(Role::SUPER_ADMIN)->get(self::URL . 'kategori')->getJSON());
         $this->cocok('kategori-detail', $this->asRole(Role::SUPER_ADMIN)->get(self::URL . "kategori/{$kat}")->getJSON());
@@ -115,6 +115,7 @@ final class KontrakFixtureTest extends DatabaseTestCase
         $kat = $this->buatKategori('K');
         $tag = $this->buatTag('t');
         $trg = $this->db->prefixTable('trg_uji_tolak_relasi');
+        $this->db->query("DROP TRIGGER IF EXISTS {$trg}"); // sisa run terhenti (review CR V-5)
         $this->db->query("CREATE TRIGGER {$trg} BEFORE INSERT ON " . $this->db->prefixTable('qna_has_tag') . " FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'uji'");
 
         try {
@@ -155,7 +156,7 @@ final class KontrakFixtureTest extends DatabaseTestCase
 
     /**
      * Bandingkan bentuk (kunci + tipe JSON) secara rekursif. Daftar dibandingkan lewat elemen pertama; daftar kosong = bentuk
-     * `[]` (harus kosong juga di sisi lain); `null` di salah satu sisi = kolom nullable, dianggap sama dengan tipe sisi lain.
+     * `[]` (harus kosong juga di sisi lain); `null` di salah satu sisi = kolom nullable skalar, dianggap sama dengan tipe skalar sisi lain.
      * Bila `$status` diberikan, status HTTP ikut ditegaskan.
      */
     private function cocok(string $fixture, TestResponse|string|null $json, ?int $status = null): void
@@ -175,11 +176,12 @@ final class KontrakFixtureTest extends DatabaseTestCase
     }
 
     /**
-     * Kolom nullable (`string | null`, `Ringkas | null`): `null` di satu sisi dianggap sama dengan tipe di sisi lain.
+     * Kolom nullable skalar (`string | null`, `number | null`): `null` di satu sisi dianggap sama dengan tipe SKALAR di sisi
+     * lain, bukan objek/daftar (review CR V-8).
      */
     private static function samakanNull(mixed $a, mixed $b): mixed
     {
-        if ($a === 'null' && $b !== 'null') {
+        if ($a === 'null' && in_array($b, ['number', 'string', 'bool'], true)) {
             return $b;
         }
 
