@@ -38,6 +38,26 @@ Kontrak endpoint (beku, untuk MAKE-095): `backend/app/Controllers/Api/HaloSimpeg
 
 Ditambah `SkemaChatbotTest` dari DBV-033.
 
+**Perbaikan review CR (W-1..W-11, 13-11-2026):**
+- **Impor:** ukuran sheet diperiksa lewat `listWorksheetInfo` sebelum dimuat. Sel di baris 1.048.576 → 422, tidak lagi kehabisan
+  memori. Pembacaan memakai sheet pertama saja, read filter A..D, dan `disconnectWorksheets`.
+- **Batas panjang** TEXT bersama untuk form dan impor (`BatasQna`).
+- **Balapan 1062** saat impor → 422 `errors.berkas`.
+- **R8-11 (W-4):** jalur bubble membaca satu baris; korpus tanpa kolom jawaban dan dimuat sesudah validasi; agregasi bubble per
+  kategori. Ukur lokal (MySQL 8.0.30, mesin dev, korpus sintetis 303 QnA, satu balas lewat HTTP test): ±23 ms. Angka ini indikatif,
+  tanpa assertion waktu.
+- **Beda yang diharapkan W-5:** token angka ≥ 2^53 dalam bentuk eksponen (docstring `TfIdf::kunci`, dikunci test).
+- **Test tambahan:**
+  - token terikat `id_log`;
+  - tag status 2 tidak menambah skor;
+  - throttle pulih sesudah 61 detik;
+  - nilai bawaan `Config\Chatbot`;
+  - batas 6 bubble, 3 populer/saran, log tidak cocok tidak dihitung;
+  - top-10 statistik;
+  - literal dan nama berkas template;
+  - 1062 → 422 di kategori dan impor;
+  - 22 fixture FE dicocokkan dengan respons asli, termasuk impor HTTP multipart.
+
 **Catatan DB Validator N1–N5 (DBV-033 §11):**
 - N1: korpus kosong tanpa log.
 - N2: cek unik `_ci` + trim; 1062 → 422 yang sama.
