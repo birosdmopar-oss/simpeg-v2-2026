@@ -383,6 +383,13 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'GET api/v1/pegawai/([^/]+)/arsip'                      => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/pegawai/([^/]+)/arsip/berkas'               => [1, 2, 3, 4, 5, 6, 7],
             'GET api/v1/pegawai/([^/]+)/arsip/berkas/([0-9]+)/buka' => [1, 2, 3, 4, 5, 6, 7],
+            // F-10 Arsip Tahap 2 (MAKE-092, §12.1): ekspor = lihat (1–7); tulis & opsi-hubungkan = 1, 2, 3, 6, 7 (4/5/8 403,
+            // AC2-02); lingkup ubah + kunci F10-31 di AksiArsip.
+            'GET api/v1/pegawai/([^/]+)/arsip/ekspor'                     => [1, 2, 3, 4, 5, 6, 7],
+            'GET api/v1/pegawai/([^/]+)/arsip/opsi-hubungkan'             => [1, 2, 3, 6, 7],
+            'PATCH api/v1/pegawai/([^/]+)/arsip/berkas/([0-9]+)'          => [1, 2, 3, 6, 7],
+            'POST api/v1/pegawai/([^/]+)/arsip/berkas/([0-9]+)/hubungkan' => [1, 2, 3, 6, 7],
+            'DELETE api/v1/pegawai/([^/]+)/arsip/berkas/([0-9]+)'         => [1, 2, 3, 6, 7],
             // hr/so/full (Session Logged In) + Plt/Plh (PenugasanService::ROLE_LIHAT/ROLE_TULIS).
             'GET api/v1/struktur-organisasi'                   => self::JWT,
             'GET api/v1/struktur-organisasi/pdf'               => self::JWT,
