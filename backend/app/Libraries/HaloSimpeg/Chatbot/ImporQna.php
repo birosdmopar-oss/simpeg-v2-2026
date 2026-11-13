@@ -194,6 +194,7 @@ final class ImporQna
         $maks   = $this->config->imporMaksBaris;
         $reader = new Xlsx();
         $buku   = null;
+        $ekstra = '';
 
         // Ukuran sheet diperiksa SEBELUM memuat (listWorksheetInfo membaca dimensi secara streaming): xlsx kecil dengan satu sel
         // di baris 1.048.576 tidak boleh dimuat penuh ke memori (pola PembacaExcelSlip).
@@ -202,6 +203,8 @@ final class ImporQna
                 throw ValidationException::forField('berkas', 'Berkas harus berformat .xlsx.');
             }
 
+            // Sel kosong yang hanya bergaya (mis. border template sampai baris 1.500) tidak dihitung (review CR V-1).
+            $reader->setReadEmptyCells(false);
             $info = $reader->listWorksheetInfo($path)[0] ?? null;
 
             if ($info === null) {
@@ -221,14 +224,16 @@ final class ImporQna
 
                 public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
                 {
-                    return $row <= $this->barisMaks && in_array($columnAddress, ['A', 'B', 'C', 'D'], true);
+                    // Kolom E baris judul ikut dibaca untuk menolak judul kolom ekstra (review CR V-2).
+                    return ($row <= $this->barisMaks && in_array($columnAddress, ['A', 'B', 'C', 'D'], true)) || ($row === 1 && $columnAddress === 'E');
                 }
             });
 
-            $buku  = $reader->load($path);
-            $sheet = $buku->getSheet(0);
-            $akhir = max(1, min($sheet->getHighestDataRow(), $maks + 1));
-            $sel   = $sheet->rangeToArray('A1:D' . $akhir, null, false, false, false);
+            $buku   = $reader->load($path);
+            $sheet  = $buku->getSheet(0);
+            $akhir  = max(1, min($sheet->getHighestDataRow(), $maks + 1));
+            $sel    = $sheet->rangeToArray('A1:D' . $akhir, null, false, false, false);
+            $ekstra = trim(self::teks($sheet->getCell('E1')->getValue()));
         } catch (ValidationException $e) {
             throw $e;
         } catch (Throwable) {
@@ -245,7 +250,7 @@ final class ImporQna
             array_pop($judul);
         }
 
-        if ($judul !== self::JUDUL_KOLOM) {
+        if ($judul !== self::JUDUL_KOLOM || $ekstra !== '') {
             throw ValidationException::forField('berkas', 'Format template tidak sesuai.');
         }
 

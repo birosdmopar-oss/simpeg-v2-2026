@@ -121,7 +121,7 @@ sudah dipakai.").
   - `tag` memuat status 1 dan 2; tag status 10 tidak dikirim.
 - `QnaDetail` = `QnaBaris` + `jawaban` (HTML tersanitasi).
 - `QnaSimpan` = `{pertanyaan, jawaban, id_kategori, tag: number[], is_fallback_option: 0|1, status?: 1|2}` (status bawaan 1).
-  - Pertanyaan wajib ("Pertanyaan tidak boleh kosong!").
+  - Pertanyaan wajib ("Pertanyaan tidak boleh kosong!"), maks 65.535 byte ("Pertanyaan terlalu panjang.").
   - Jawaban wajib; kosong sesudah sanitasi → 422 `errors.jawaban` "Jawaban tidak boleh kosong!".
   - `id_kategori` wajib dan berstatus 1 ("Kategori wajib dipilih!"). Saat ubah, kategori lama status 2 boleh dipertahankan;
     kategori lama status 10 tidak diganti → 422 `errors.id_kategori` "Kategori QnA sudah dihapus. Pilih kategori lain.".
@@ -134,6 +134,10 @@ sudah dipakai.").
   - `baris` = nomor baris Excel (judul = baris 1).
   - Berkas bukan .xlsx / > 2 MB / > 1.000 baris data / rusak / judul kolom tidak sama template → 422 `errors.berkas`
     ("Format template tidak sesuai." untuk judul kolom).
+  - Batas 1.000 baris dihitung dari sel **berisi** (sel kosong yang hanya bergaya, mis. border template, tidak dihitung). Isi
+    tidak kosong di kolom mana pun, termasuk di luar A..D (mis. F1500), ikut menentukan jumlah baris, sehingga berkas seperti itu
+    dapat ditolak 422 walau kolom A..D-nya sedikit. Judul kolom ekstra (E1 terisi) → 422 "Format template tidak sesuai.".
+  - Panjang `pertanyaan` dan `jawaban` (sesudah sanitasi) maks 65.535 byte (tipe TEXT), sama untuk form dan impor.
   - Sukses: tampilkan "Data QnA beserta Kategori dan Tag berhasil diimpor!".
 
 ### Statistik & riwayat
