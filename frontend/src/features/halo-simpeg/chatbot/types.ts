@@ -146,14 +146,14 @@ export interface StatistikChatbot {
     total: number
     persen_puas: number
   }
-  top_pesan: { pesan: string; jumlah: number }[]
+  top_pesan: { pesan_user: string; jumlah: number }[]
   top_qna_cocok: { id_qna: number; pertanyaan: string | null; jumlah: number }[]
   top_qna_negatif: { id_qna: number; pertanyaan: string | null; jumlah: number }[]
 }
 
 export interface RiwayatRow {
   id_log: number
-  /** UTC `Y-m-d H:i:s` (BP8-8); tampil WIB. */
+  /** ISO-8601 berzona WIB (`2026-11-13T08:30:00+07:00`, kontrak MAKE-094); tampil WIB. */
   waktu: string
   pesan_user: string
   /** Pertanyaan QnA kandidat teratas; `null` bila tidak ada kecocokan / QnA sudah tidak ada. */
@@ -169,5 +169,6 @@ export interface FilterRiwayat {
   dari?: string
   sampai?: string
   cocok?: 0 | 1
-  feedback?: NilaiFeedback
+  /** 0 = belum dinilai (kontrak MAKE-094). */
+  feedback?: NilaiFeedback | 0
 }

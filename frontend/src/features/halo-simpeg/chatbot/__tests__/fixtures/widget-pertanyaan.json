@@ -1,0 +1,13 @@
+{
+    "status": "success",
+    "data": [
+        {
+            "id_qna": 10,
+            "pertanyaan": "Bagaimana cara mengajukan cuti tahunan?"
+        },
+        {
+            "id_qna": 11,
+            "pertanyaan": "Berapa lama cuti besar?"
+        }
+    ]
+}

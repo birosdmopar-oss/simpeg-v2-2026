@@ -15,6 +15,7 @@ import FormField from '@/shared/components/FormField.vue'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
 import { UiButton, UiNotice, UiRadioGroup } from '@/shared/ui'
 
+import { galatPerKolom } from '../../galat'
 import { qnaChatbotService } from '../../services/chatbot.service'
 import type { OpsiQna, QnaDetail, QnaRow, RujukanBerstatus, StatusUbah } from '../../types'
 import TagPilihan, { type OpsiTag } from './TagPilihan.vue'
@@ -131,9 +132,7 @@ async function onSubmit(): Promise<void> {
     emit('saved')
     emit('update:open', false)
   } catch (e) {
-    if (isApiError(e) && e.errors) {
-      for (const [f, m] of Object.entries(e.errors)) serverErrors.value[PETA_GALAT[f] ?? (f.startsWith('tag') ? 'tag' : f)] = m[0] ?? ''
-    }
+    serverErrors.value = galatPerKolom(e, (f) => PETA_GALAT[f] ?? (f.startsWith('tag') ? 'tag' : f))
     formError.value = isApiError(e) ? e.message : 'Terjadi kesalahan. Silakan coba lagi.'
   } finally {
     submitting.value = false

@@ -12,6 +12,7 @@ import { isApiError } from '@/lib/axios'
 import { FORM_ALERT_CLASS } from '@/shared/components/formLayout'
 import { UiButton, UiFileField, UiNotice } from '@/shared/ui'
 
+import { galatPerKolom } from '../../galat'
 import { qnaChatbotService } from '../../services/chatbot.service'
 import type { HasilImpor } from '../../types'
 
@@ -50,7 +51,7 @@ async function unggah(): Promise<void> {
     if (hasil.value.galat.length === 0) emit('imported')
   } catch (e) {
     galat.value = isApiError(e) ? e.message : 'Gagal mengimpor berkas.'
-    if (isApiError(e) && e.errors) galatKolom.value = Object.values(e.errors).flat()
+    galatKolom.value = Object.values(galatPerKolom(e)).filter((m) => m !== galat.value)
   } finally {
     mengunggah.value = false
   }

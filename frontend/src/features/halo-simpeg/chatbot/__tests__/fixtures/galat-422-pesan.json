@@ -1,0 +1,7 @@
+{
+    "status": "error",
+    "message": "Validasi gagal.",
+    "errors": {
+        "pesan": "Pesan wajib diisi (maks 300 karakter)."
+    }
+}

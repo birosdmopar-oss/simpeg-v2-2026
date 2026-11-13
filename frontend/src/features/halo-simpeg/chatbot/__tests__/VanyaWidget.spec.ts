@@ -339,6 +339,16 @@ describe('VanyaWidget — galat', () => {
     expect(w.findAll('[data-pesan="galat"]').at(-1)?.text()).toContain('terjadi gangguan koneksi')
   })
 
+  it('balas 422 dengan errors.pesan (string per kolom, kontrak MAKE-094) → pesan kolom ditampilkan utuh', async () => {
+    svc.balas.mockRejectedValueOnce({ ...apiError(422, 'Validasi gagal.'), errors: { pesan: 'Pesan wajib diisi (maks 300 karakter).' } })
+    const w = await pasang()
+    await bukaChat(w)
+    await w.get('[data-testid="vanya-input"]').setValue('cuti')
+    await w.get('[data-testid="vanya-form"]').trigger('submit')
+    await flushPromises()
+    expect(w.findAll('[data-pesan="galat"]').at(-1)?.text()).toBe('Pesan wajib diisi (maks 300 karakter).')
+  })
+
   it('feedback gagal → pesan server + "Coba lagi:", tombol aktif kembali; 👎 sukses → terima kasih 👎', async () => {
     svc.feedback.mockRejectedValueOnce(apiError(403, 'Sesi penilaian tidak ditemukan. Silakan ajukan pertanyaan lagi.'))
     const w = await pasang()

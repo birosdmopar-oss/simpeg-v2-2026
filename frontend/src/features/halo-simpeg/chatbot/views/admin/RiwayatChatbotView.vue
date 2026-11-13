@@ -12,6 +12,7 @@ import { isApiError } from '@/lib/axios'
 import { formatApiDateTime } from '@/shared/utils/dateTime'
 import { UiBadge, UiButton, UiCard, UiNotice, UiPagination, UiSelect, UiTextField, type SelectOption } from '@/shared/ui'
 
+import { galatPerKolom } from '../../galat'
 import { statistikChatbotService } from '../../services/chatbot.service'
 import type { FilterRiwayat, NilaiFeedback, RiwayatRow } from '../../types'
 
@@ -23,6 +24,7 @@ const OPSI_COCOK: SelectOption[] = [
 const OPSI_FEEDBACK: SelectOption[] = [
   { value: '1', label: 'Membantu' },
   { value: '-1', label: 'Tidak membantu' },
+  { value: '0', label: 'Belum dinilai' },
 ]
 const WIB: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }
 
@@ -48,7 +50,7 @@ function filter(): FilterRiwayat {
     dari: dari.value || undefined,
     sampai: sampai.value || undefined,
     cocok: cocok.value === '' ? undefined : (Number(cocok.value) as 0 | 1),
-    feedback: feedback.value === '' ? undefined : (Number(feedback.value) as NilaiFeedback),
+    feedback: feedback.value === '' ? undefined : (Number(feedback.value) as NilaiFeedback | 0),
   }
 }
 
@@ -63,7 +65,7 @@ async function muat(): Promise<void> {
   } catch (e) {
     items.value = []
     total.value = 0
-    if (isApiError(e) && e.status === 422 && e.errors) fieldErrors.value = Object.fromEntries(Object.entries(e.errors).map(([k, v]) => [k, v[0] ?? '']))
+    if (isApiError(e) && e.status === 422) fieldErrors.value = galatPerKolom(e)
     failure.value = isApiError(e) ? e.message : 'Gagal memuat riwayat chat.'
   } finally {
     memuat.value = false

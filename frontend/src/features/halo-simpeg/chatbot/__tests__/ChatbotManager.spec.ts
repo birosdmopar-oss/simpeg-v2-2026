@@ -200,7 +200,8 @@ describe('Chatbot Manager — QnA', () => {
 
   it('form ubah QnA berkategori Dihapus: penanda + galat 422 BE ditampilkan', async () => {
     svc.qna.detail.mockResolvedValue({ ...qna[1]!, jawaban: '<p>x</p>' })
-    svc.qna.simpan.mockRejectedValueOnce(apiError(422, 'Data tidak valid.', { id_kategori: ['Kategori QnA sudah dihapus. Pilih kategori lain.'] }))
+    // Bentuk kontrak MAKE-094: `errors` string per kolom (fixture galat-422-qna.json).
+    svc.qna.simpan.mockRejectedValueOnce(apiError(422, 'Validasi gagal.', { id_kategori: 'Kategori QnA sudah dihapus. Pilih kategori lain.' } as never))
     const w = await pasang(QnaChatbotView)
     await selectRowAction(w, 'chatbot-qna-actions-11', 'edit')
     await flushPromises()
@@ -209,7 +210,8 @@ describe('Chatbot Manager — QnA', () => {
     await flushPromises()
     expect(svc.qna.simpan).toHaveBeenCalledWith(11, expect.objectContaining({ id_kategori: 9 }))
     expect(document.querySelectorAll('[role="alert"]').length).toBeGreaterThan(0)
-    expect(document.body.textContent).toContain('Data tidak valid.')
+    expect(document.body.textContent).toContain('Validasi gagal.')
+    expect([...document.querySelectorAll('[role="alert"]')].some((el) => el.textContent?.trim() === 'Kategori QnA sudah dihapus. Pilih kategori lain.')).toBe(true)
     void w
   })
 
@@ -245,7 +247,7 @@ describe('Chatbot Manager — Statistik & Riwayat', () => {
     svc.stat.statistik.mockResolvedValue({
       kpi: { total_chat: 1200, chat_hari_ini: 7, rata_skor: 0.4567, rata_skor_cocok: 0.7 },
       kepuasan: { membantu: 9, tidak_membantu: 3, total: 12, persen_puas: 75 },
-      top_pesan: [{ pesan: '<b>cuti</b>', jumlah: 10 }],
+      top_pesan: [{ pesan_user: '<b>cuti</b>', jumlah: 10 }],
       top_qna_cocok: [{ id_qna: 12, pertanyaan: 'Berapa jatah cuti tahunan?', jumlah: 8 }],
       top_qna_negatif: [{ id_qna: 99, pertanyaan: null, jumlah: 2 }],
     })
@@ -263,8 +265,8 @@ describe('Chatbot Manager — Statistik & Riwayat', () => {
   it('riwayat: waktu WIB, pesan sebagai teks, status Cocok/Fallback, feedback untuk pembaca layar, filter ke server', async () => {
     svc.stat.riwayat.mockResolvedValue({
       items: [
-        { id_log: 41, waktu: '2026-11-12 17:30:00', pesan_user: '<script>x</script> cuti', pertanyaan_teratas: 'Berapa jatah cuti?', skor: 0.8123, cocok: true, feedback: 1 },
-        { id_log: 40, waktu: '2026-11-12 16:59:00', pesan_user: 'asdf', pertanyaan_teratas: null, skor: 0, cocok: false, feedback: null },
+        { id_log: 41, waktu: '2026-11-13T00:30:00+07:00', pesan_user: '<script>x</script> cuti', pertanyaan_teratas: 'Berapa jatah cuti?', skor: 0.8123, cocok: true, feedback: 1 },
+        { id_log: 40, waktu: '2026-11-12T23:59:00+07:00', pesan_user: 'asdf', pertanyaan_teratas: null, skor: 0, cocok: false, feedback: null },
       ],
       total: 2,
       page: 1,

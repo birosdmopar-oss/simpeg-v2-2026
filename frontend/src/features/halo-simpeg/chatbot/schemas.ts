@@ -87,7 +87,7 @@ const qnaHitung = z.object({ id_qna: id, pertanyaan: teks.nullable(), jumlah: an
 export const statistikSchema = z.object({
   kpi: z.object({ total_chat: angka, chat_hari_ini: angka, rata_skor: angka, rata_skor_cocok: angka }),
   kepuasan: z.object({ membantu: angka, tidak_membantu: angka, total: angka, persen_puas: angka }),
-  top_pesan: z.array(z.object({ pesan: teks, jumlah: angka })),
+  top_pesan: z.array(z.object({ pesan_user: teks, jumlah: angka })),
   top_qna_cocok: z.array(qnaHitung),
   top_qna_negatif: z.array(qnaHitung),
 })

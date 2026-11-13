@@ -10,6 +10,7 @@ import { reactive, readonly } from 'vue'
 import { isApiError } from '@/lib/axios'
 
 import { TEKS_VANYA } from '../constants'
+import { galatPerKolom } from '../galat'
 import { vanyaService } from '../services/chatbot.service'
 import type { NilaiFeedback, PertanyaanWidget, TopikWidget } from '../types'
 
@@ -51,8 +52,10 @@ function tambah(p: PesanBaru): void {
   state.pesan.push({ ...p, id: urutan } as PesanChat)
 }
 
-/** 429 (throttle) dan 422/403 membawa pesan server berbahasa Indonesia; selain itu pesan baku. */
+/** 429 (throttle) dan 422/403 membawa pesan server berbahasa Indonesia (422 per kolom didahulukan, mis. `errors.pesan`). */
 function pesanGalat(e: unknown, baku: string): string {
+  const kolom = Object.values(galatPerKolom(e))[0]
+  if (isApiError(e) && e.status === 422 && kolom) return kolom
   if (isApiError(e) && e.status !== null && [403, 422, 429].includes(e.status) && e.message) return e.message
   return baku
 }

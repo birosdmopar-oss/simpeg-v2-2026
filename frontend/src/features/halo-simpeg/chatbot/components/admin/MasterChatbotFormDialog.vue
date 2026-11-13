@@ -12,6 +12,7 @@ import FormField from '@/shared/components/FormField.vue'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
 import { UiButton, UiRadioGroup } from '@/shared/ui'
 
+import { galatPerKolom } from '../../galat'
 import { kategoriChatbotService, tagChatbotService } from '../../services/chatbot.service'
 import type { KategoriRow, StatusUbah, TagRow } from '../../types'
 
@@ -78,7 +79,7 @@ async function onSubmit(): Promise<void> {
     emit('saved')
     emit('update:open', false)
   } catch (e) {
-    if (isApiError(e) && e.errors) for (const [f, m] of Object.entries(e.errors)) serverErrors.value[f === 'judul_kategori' || f === 'judul_tag' ? 'judul' : f] = m[0] ?? ''
+    serverErrors.value = galatPerKolom(e, (f) => (f === 'judul_kategori' || f === 'judul_tag' ? 'judul' : f))
     formError.value = isApiError(e) ? e.message : 'Terjadi kesalahan. Silakan coba lagi.'
   } finally {
     submitting.value = false

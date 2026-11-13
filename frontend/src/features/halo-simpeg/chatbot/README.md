@@ -33,8 +33,14 @@ Simpeg: tidak memakai service, store, route, atau komponen helpdesk.
 - Tampilan widget mengikuti view widget dev (`dev:views/hr/chatbot/chatbot_popup.php`) dengan token desain v2 (K-11); tanpa
   frame Figma (dicatat). Teks sapaan, salam, pengantar bubble, fallback, galat, dan penilaian mengikuti dev.
 
-## Fixture
+## Kontrak & fixture
 
-`__tests__/fixtures/*.json` saat ini sintetis berbentuk §6.5 PRD. Sesudah MAKE-094 di `main`, fixture **disalin** dari
-`backend/tests/_support/HaloSimpeg/Chatbot/*.json` (test FE tidak membaca `backend/`) dan disalin ulang bila kontrak berubah lewat
-CR. Isi QnA dev tidak pernah masuk repo.
+Kontrak beku: README `backend/app/Controllers/Api/HaloSimpeg/Chatbot` (MAKE-094 @fd1e74ed). `__tests__/fixtures/*.json` adalah
+**salinan** contoh respons sintetis `backend/tests/_support/HaloSimpeg/Chatbot/*.json` (tanpa `pembanding.json` milik test mesin
+BE); test FE tidak membaca `backend/`, jadi salin ulang bila kontrak berubah lewat CR. Isi QnA dev tidak pernah masuk repo.
+
+Catatan kontrak yang ditangani FE:
+- galat 422 membawa `errors` **string** per kolom (`{"pesan": "…"}`), bukan array → baca lewat `galat.ts` (`galatPerKolom`);
+- POST kategori/tag/QnA tanpa `status` (status awal 1), PUT dengan `status`;
+- riwayat `waktu` ISO-8601 berzona WIB; filter `feedback=0` = belum dinilai;
+- statistik `top_pesan[].pesan_user`; `pertanyaan: null` → `#<id_qna>`.

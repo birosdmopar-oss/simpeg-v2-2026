@@ -96,13 +96,14 @@ export const vanyaService = {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-function crudSederhana<Row, Form>(basis: 'kategori' | 'tag', schema: z.ZodType<Row, z.ZodTypeDef, unknown>, body: (f: Form) => object) {
+/** `body(form, ubah)`: POST tanpa `status` (status awal 1), PUT dengan `status` (kontrak MAKE-094). */
+function crudSederhana<Row, Form>(basis: 'kategori' | 'tag', schema: z.ZodType<Row, z.ZodTypeDef, unknown>, body: (f: Form, ubah: boolean) => object) {
   return {
     async list(filter: FilterDaftar): Promise<Daftar<Row>> {
       return get(basis, daftar(schema), filter) as Promise<Daftar<Row>>
     },
     async simpan(id: number | null, form: Form): Promise<Row> {
-      const { data } = id === null ? await api.post<unknown>(`${BASIS_CHATBOT}/${basis}`, body(form)) : await api.put<unknown>(`${BASIS_CHATBOT}/${basis}/${id}`, body(form))
+      const { data } = id === null ? await api.post<unknown>(`${BASIS_CHATBOT}/${basis}`, body(form, false)) : await api.put<unknown>(`${BASIS_CHATBOT}/${basis}/${id}`, body(form, true))
       return parse(schema, data, basis)
     },
     async setStatus(id: number, status: StatusUbah): Promise<void> {
@@ -114,27 +115,27 @@ function crudSederhana<Row, Form>(basis: 'kategori' | 'tag', schema: z.ZodType<R
   }
 }
 
-export const kategoriChatbotService = crudSederhana<KategoriRow, KategoriForm>('kategori', kategoriSchema, (f) => ({
+export const kategoriChatbotService = crudSederhana<KategoriRow, KategoriForm>('kategori', kategoriSchema, (f, ubah) => ({
   judul: f.judul.trim(),
   tampil_bubble: f.tampil_bubble ? 1 : 0,
-  status: f.status,
+  ...(ubah ? { status: f.status } : {}),
 }))
 
 export const tagChatbotService = {
-  ...crudSederhana<TagRow, TagForm>('tag', tagSchema, (f) => ({ judul: f.judul.trim(), status: f.status })),
+  ...crudSederhana<TagRow, TagForm>('tag', tagSchema, (f, ubah) => ({ judul: f.judul.trim(), ...(ubah ? { status: f.status } : {}) })),
   /** Ekspor daftar tag xlsx (F8-47); nama berkas dari `Content-Disposition`. */
   ekspor(): Promise<BerkasUnduhan> {
     return ambilBerkas(`${BASIS_CHATBOT}/tag/ekspor`, 'Export_Tag_QnA', { format: 'xlsx' })
   },
 }
 
-const bodyQna = (f: QnaForm): object => ({
+const bodyQna = (f: QnaForm, ubah: boolean): object => ({
+  pertanyaan: f.pertanyaan.trim(),
+  jawaban: f.jawaban,
   id_kategori: f.id_kategori,
   tag: f.tag,
   is_fallback_option: f.is_fallback_option ? 1 : 0,
-  status: f.status,
-  pertanyaan: f.pertanyaan.trim(),
-  jawaban: f.jawaban,
+  ...(ubah ? { status: f.status } : {}),
 })
 
 export const qnaChatbotService = {
@@ -147,9 +148,9 @@ export const qnaChatbotService = {
   async opsi(): Promise<OpsiQna> {
     return get('qna/opsi', opsiQnaSchema)
   },
-  async simpan(id: number | null, form: QnaForm): Promise<QnaRow> {
-    const { data } = id === null ? await api.post<unknown>(`${BASIS_CHATBOT}/qna`, bodyQna(form)) : await api.put<unknown>(`${BASIS_CHATBOT}/qna/${id}`, bodyQna(form))
-    return parse(qnaSchema, data, 'qna')
+  async simpan(id: number | null, form: QnaForm): Promise<QnaDetail> {
+    const { data } = id === null ? await api.post<unknown>(`${BASIS_CHATBOT}/qna`, bodyQna(form, false)) : await api.put<unknown>(`${BASIS_CHATBOT}/qna/${id}`, bodyQna(form, true))
+    return parse(qnaDetailSchema, data, 'qna')
   },
   async setStatus(id: number, status: StatusUbah): Promise<void> {
     await api.patch(`${BASIS_CHATBOT}/qna/${id}/status`, { status })
@@ -158,7 +159,7 @@ export const qnaChatbotService = {
     await api.delete(`${BASIS_CHATBOT}/qna/${id}`)
   },
   template(): Promise<BerkasUnduhan> {
-    return ambilBerkas(`${BASIS_CHATBOT}/qna/template`, 'Template_Impor_QnA')
+    return ambilBerkas(`${BASIS_CHATBOT}/qna/template`, 'Template_Import_QnA')
   },
   async impor(berkas: File): Promise<HasilImpor> {
     const fd = new FormData()

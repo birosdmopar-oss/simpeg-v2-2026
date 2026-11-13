@@ -24,7 +24,7 @@ const qna = (r: { id_qna: number; pertanyaan: string | null }): string => r.pert
 const tabel = computed(() =>
   data.value
     ? [
-        { key: 'pesan', judul: 'Top 10 pesan paling sering', kolom: 'Pesan', baris: data.value.top_pesan.map((r) => ({ teks: r.pesan, jumlah: r.jumlah })) },
+        { key: 'pesan', judul: 'Top 10 pesan paling sering', kolom: 'Pesan', baris: data.value.top_pesan.map((r) => ({ teks: r.pesan_user, jumlah: r.jumlah })) },
         { key: 'cocok', judul: 'Top 10 QnA paling sering cocok', kolom: 'QnA', baris: data.value.top_qna_cocok.map((r) => ({ teks: qna(r), jumlah: r.jumlah })) },
         { key: 'negatif', judul: 'Top 10 QnA dengan 👎 terbanyak', kolom: 'QnA', baris: data.value.top_qna_negatif.map((r) => ({ teks: qna(r), jumlah: r.jumlah })) },
       ]
