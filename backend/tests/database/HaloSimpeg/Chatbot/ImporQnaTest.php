@@ -10,6 +10,9 @@ use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
 use CodeIgniter\Config\Factories;
 use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Chatbot;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
 use Tests\Support\HaloSimpeg\Chatbot\ChatbotFixtureTrait;
 
@@ -100,6 +103,53 @@ final class ImporQnaTest extends DatabaseTestCase
         $this->assertGalatBerkas('Jumlah baris data maksimal 2.', $this->berkas(EksporTabel::xlsx(ImporQna::JUDUL_KOLOM, [['a', 'b', 'c', ''], ['a', 'b', 'c', ''], ['a', 'b', 'c', '']])));
         $this->assertGalatBerkas('Ukuran berkas maksimal 2 MB.', $this->berkas(str_repeat('x', 100_001), 'qna.xlsx'));
         $this->assertSame(0, $this->db->table('qna')->countAllResults());
+    }
+
+    public function testSelJauhDitolakTanpaMemuatPenuh(): void
+    {
+        $buku = new Spreadsheet();
+        $buku->getActiveSheet()->fromArray(ImporQna::JUDUL_KOLOM, null, 'A1');
+        $buku->getActiveSheet()->setCellValue('D1048576', 'x');
+        $path = (string) tempnam(sys_get_temp_dir(), 'cbj');
+        (new XlsxWriter($buku))->save($path);
+        $buku->disconnectWorksheets();
+        $this->tmp[] = $path;
+        $this->assertLessThan(20_000, (int) filesize($path), 'berkas kecil');
+
+        $this->assertGalatBerkas('Jumlah baris data maksimal 1000.', new UploadedFile($path, 'qna.xlsx', 'application/octet-stream', (int) filesize($path), UPLOAD_ERR_OK));
+    }
+
+    public function testIsiTerlaluPanjangJadiGalatBaris(): void
+    {
+        $hasil = $this->impor([
+            // Sel Excel maks 32.767 karakter → pakai karakter 3 byte agar melewati TEXT 65.535 byte.
+            [str_repeat('€', 30000), 'Jawab', 'Cuti', ''],
+            ['Pendek?', '<p>' . str_repeat('€', 30000) . '</p>', 'Cuti', ''],
+        ]);
+
+        $this->assertSame([['baris' => 2, 'alasan' => 'Pertanyaan terlalu panjang.'], ['baris' => 3, 'alasan' => 'Jawaban terlalu panjang.']], $hasil['galat']);
+        $this->assertSame([0, 0], [$hasil['ditambah'], $this->db->table('qna')->countAllResults()]);
+    }
+
+    #[Group('db-isolasi-penuh')]
+    public function testBalapanJudulTag1062(): void
+    {
+        $trg = $this->db->prefixTable('trg_uji_1062_tag');
+        $this->db->query("CREATE TRIGGER {$trg} BEFORE INSERT ON " . $this->db->prefixTable('qna_tag') . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry uji'");
+
+        try {
+            try {
+                $this->impor([['P?', 'J', 'Cuti', 'balapan']]);
+                $this->fail('seharusnya 422');
+            } catch (ValidationException $e) {
+                $this->assertSame(['berkas' => ['Tag "balapan" baru saja dibuat pengguna lain. Ulangi impor.']], $e->getErrors());
+            }
+
+            $this->assertSame([0, 0], [$this->db->table('qna')->countAllResults(), $this->db->table('qna_kategori')->countAllResults()], 'semua dibatalkan');
+        } finally {
+            $this->db->query("DROP TRIGGER IF EXISTS {$trg}");
+            $this->bersihkanChatbot();
+        }
     }
 
     /**

@@ -77,6 +77,17 @@ final class StatistikRiwayatTest extends DatabaseTestCase
         ], $s['top_qna_negatif'], 'hanya 👎 > 0, urut 👎 menurun');
     }
 
+    public function testTopSepuluh(): void
+    {
+        for ($i = 1; $i <= 11; $i++) {
+            $q = $this->buatQna("q{$i}", null);
+            $this->buatLog($q, 1, -1, '2026-11-10 01:00:00', "pesan {$i}");
+        }
+
+        $s = (new StatistikChatbot($this->db, null, static fn (): string => '2026-11-13'))->statistik();
+        $this->assertSame([10, 10, 10], [count($s['top_pesan']), count($s['top_qna_cocok']), count($s['top_qna_negatif'])]);
+    }
+
     public function testStatistikKosong(): void
     {
         $s = $this->data('statistik');

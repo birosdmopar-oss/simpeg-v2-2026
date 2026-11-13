@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace Tests\Database\HaloSimpeg\Chatbot;
 
 use App\Constants\Role;
+use App\Libraries\HaloSimpeg\Chatbot\ImporQna;
 use App\Libraries\HaloSimpeg\Chatbot\QnaService;
+use App\Libraries\HaloSimpeg\Chatbot\TokenFeedback;
+use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
 use CodeIgniter\Config\Factories;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Test\FeatureTestTrait;
+use CodeIgniter\Test\TestResponse;
+use Config\Chatbot;
 use Config\Services;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
@@ -79,6 +84,27 @@ final class KontrakFixtureTest extends DatabaseTestCase
         $this->cocok('statistik', $this->asRole(Role::SUPER_ADMIN)->get(self::URL . 'statistik')->getJSON());
         $this->cocok('riwayat', $this->asRole(Role::SUPER_ADMIN)->get(self::URL . 'riwayat')->getJSON());
 
+        // Galat lain dengan status masing-masing.
+        $tidakCocok = $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'zzz']);
+        $logTC      = json_decode((string) $tidakCocok->getJSON(), true)['data']['id_log'];
+        $tokTC      = (new TokenFeedback(config(Chatbot::class)))->buat((int) $logTC, (int) $this->db->table('pengguna')->where('username', AuthSeeder::nipForRole(Role::PEGAWAI))->get()->getRow('id_pengguna'));
+        $this->cocok('galat-422-feedback-tidak-cocok', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/feedback', ['id_log' => $logTC, 'nilai' => 1, 'token' => $tokTC]), 422);
+        $hapus = $this->buatKategori('Dihapus', 10);
+        $this->db->table('qna')->where('id_qna', $q1)->update(['id_qna_kategori_fk' => $hapus]);
+        $this->cocok('galat-422-qna', $this->asRole(Role::SUPER_ADMIN)->withBodyFormat('json')->put(self::URL . "qna/{$q1}", ['pertanyaan' => 'P', 'jawaban' => '<p>J</p>', 'id_kategori' => $hapus, 'tag' => [], 'is_fallback_option' => 0]), 422);
+
+        // Impor lewat HTTP multipart (sukses + galat), keduanya 200.
+        $this->cocok('qna-impor-sukses', $this->imporHttp([['Impor satu?', 'Jawab', 'Impor', 'a, b'], ['', 'lewati', 'Impor', '']]), 200);
+        $this->cocok('qna-impor-galat', $this->imporHttp([['Tanpa kategori?', 'Jawab', '', '']]), 200);
+
+        $this->pasangConfigChatbot(self::KUNCI_UJI, static function (Chatbot $c): void {
+            $c->throttleBaca = 1;
+        });
+        $this->pasangThrottlerChatbot();
+        $this->asRole(Role::PEGAWAI)->get(self::URL . 'widget/populer')->assertStatus(200);
+        $this->cocok('galat-429', $this->asRole(Role::PEGAWAI)->get(self::URL . 'widget/populer'), 429);
+
+        $this->pasangConfigChatbot();
         $this->bersihkanChatbot();
         $this->cocok('widget-balas-korpus-kosong', $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->getJSON());
     }
@@ -107,11 +133,41 @@ final class KontrakFixtureTest extends DatabaseTestCase
     }
 
     /**
-     * Bandingkan bentuk (kunci + tipe) secara rekursif. Daftar dibandingkan lewat elemen pertama; daftar kosong di salah satu sisi
-     * dilewati.
+     * POST multipart `qna/impor` (field `berkas`) dengan xlsx sintetis. FeatureTestTrait tidak mengirim berkas, jadi array berkas
+     * diisi lewat service `superglobals` (dibaca FileCollection CI4 saat request diproses).
+     *
+     * @param list<list<string>> $baris
      */
-    private function cocok(string $fixture, ?string $json): void
+    private function imporHttp(array $baris): TestResponse
     {
+        $isi  = EksporTabel::xlsx(ImporQna::JUDUL_KOLOM, $baris);
+        $path = (string) tempnam(sys_get_temp_dir(), 'cbh');
+        file_put_contents($path, $isi);
+        service('superglobals')->setFilesArray(['berkas' => ['name' => 'qna.xlsx', 'type' => 'application/octet-stream', 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'size' => strlen($isi)]]);
+
+        try {
+            return $this->asRole(Role::SUPER_ADMIN)->post(self::URL . 'qna/impor');
+        } finally {
+            service('superglobals')->setFilesArray([]);
+            @unlink($path);
+        }
+    }
+
+    /**
+     * Bandingkan bentuk (kunci + tipe JSON) secara rekursif. Daftar dibandingkan lewat elemen pertama; daftar kosong = bentuk
+     * `[]` (harus kosong juga di sisi lain); `null` di salah satu sisi = kolom nullable, dianggap sama dengan tipe sisi lain.
+     * Bila `$status` diberikan, status HTTP ikut ditegaskan.
+     */
+    private function cocok(string $fixture, TestResponse|string|null $json, ?int $status = null): void
+    {
+        if ($json instanceof TestResponse) {
+            if ($status !== null) {
+                $json->assertStatus($status);
+            }
+
+            $json = $json->getJSON();
+        }
+
         $harap  = json_decode((string) file_get_contents(SUPPORTPATH . "HaloSimpeg/Chatbot/{$fixture}.json"), true, 512, JSON_THROW_ON_ERROR);
         $aktual = json_decode((string) $json, true, 512, JSON_THROW_ON_ERROR);
 

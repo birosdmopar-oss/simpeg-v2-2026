@@ -264,6 +264,87 @@ final class WidgetEndpointTest extends DatabaseTestCase
         $this->asRole(Role::PTT)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(200);
     }
 
+    public function testTokenTerikatIdLog(): void
+    {
+        $a = $this->data($this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cara mengajukan cuti tahunan']));
+        $b = $this->data($this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cara mengganti kata sandi']));
+        $this->assertTrue($a['cocok'] && $b['cocok']);
+
+        $r = $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/feedback', ['id_log' => $b['id_log'], 'nilai' => 1, 'token' => $a['token_feedback']]);
+        $r->assertStatus(403);
+        $this->assertSame(ChatbotService::PESAN_SESI, json_decode($r->getJSON(), true)['message']);
+        $this->assertNull($this->db->table('log_chatbot')->where('id_log', $b['id_log'])->get()->getRow('feedback'));
+    }
+
+    public function testTagTidakAktifTidakMenambahSkor(): void
+    {
+        $tag2 = $this->buatTag('lembur', 2);
+        $this->db->table('qna_has_tag')->insert(['qna_id' => $this->qSandi, 'qna_tag_id' => $tag2]);
+        $d = $this->data($this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'lembur']));
+
+        $this->assertFalse($d['cocok']);
+        $this->assertSame(0.0, (float) $d['skor']);
+    }
+
+    public function testThrottlePulihSesudahSatuMenit(): void
+    {
+        $this->pasangConfigChatbot(self::KUNCI_UJI, static function (Chatbot $c): void {
+            $c->throttleBalas = 1;
+        });
+        $t = $this->pasangThrottlerChatbot();
+
+        $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(200);
+        $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(429);
+        $t->setTestTime(1_790_000_000 + 61);
+        $this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'cuti'])->assertStatus(200);
+    }
+
+    public function testBatasBubbleDanPopuler(): void
+    {
+        $kat = $this->buatKategori('Banyak', 1, 1);
+        $ids = [];
+
+        for ($i = 1; $i <= 7; $i++) {
+            $ids[] = $this->buatQna("pertanyaan banyak {$i}", $kat);
+        }
+
+        // Log tidak cocok tidak menaikkan urutan; log cocok menaikkan.
+        $this->buatLog($ids[6], 0);
+        $this->buatLog($ids[6], 0);
+        $this->buatLog($ids[5], 1);
+
+        $bubble = array_column($this->data($this->asRole(Role::PEGAWAI)->get(self::URL . "widget/kategori/{$kat}/pertanyaan")), 'id_qna');
+        $this->assertSame([$ids[5], $ids[0], $ids[1], $ids[2], $ids[3], $ids[4]], $bubble, 'tepat 6; status_match=0 tidak dihitung');
+
+        $u = [];
+
+        for ($i = 1; $i <= 4; $i++) {
+            $u[] = $this->buatQna("unggulan {$i}", $kat, [], 1, 1);
+        }
+
+        $harap = [$u[3], $u[2], $u[1]];
+        $this->assertSame($harap, array_column($this->data($this->asRole(Role::PEGAWAI)->get(self::URL . 'widget/populer')), 'id_qna'));
+        $saran = $this->data($this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'zzz']))['saran'];
+        $this->assertSame($harap, array_column($saran, 'id_qna'), 'saran = 3 unggulan terbaru');
+    }
+
+    public function testKorpusRatusanQna(): void
+    {
+        $kat = $this->buatKategori('Besar');
+
+        for ($i = 1; $i <= 300; $i++) {
+            $this->db->table('qna')->insert(['pertanyaan' => "topik sintetis nomor {$i} kata{$i} umum", 'jawaban' => "<p>j{$i}</p>", 'id_qna_kategori_fk' => $kat, 'status_qna_fk' => 1, 'is_fallback_option' => 0]);
+        }
+
+        $target = (int) $this->db->table('qna')->where('pertanyaan', 'topik sintetis nomor 150 kata150 umum')->get()->getRow('id_qna');
+        $d      = $this->data($this->asRole(Role::PEGAWAI)->post(self::URL . 'widget/balas', ['pesan' => 'kata150']));
+
+        $this->assertTrue($d['cocok']);
+        $this->assertSame('<p>j150</p>', $d['balasan']);
+        $this->assertSame($target, (int) $this->db->table('log_chatbot')->get()->getRow('top_1_id_qna'));
+        // Waktu ukur dicatat di docs/progress/08-HaloSimpeg.md (tanpa assertion waktu, review CR W-4).
+    }
+
     /**
      * @return mixed
      */

@@ -11,6 +11,7 @@ use CodeIgniter\Test\FeatureTestTrait;
 use CodeIgniter\Test\TestResponse;
 use Config\Services;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\AuthTestTrait;
 use Tests\Support\Database\Seeds\AuthSeeder;
 use Tests\Support\DatabaseTestCase;
@@ -90,7 +91,9 @@ final class AdminEndpointTest extends DatabaseTestCase
             $a = $this->data($this->admin()->post(self::URL . $jalur, ['judul' => 'Tunjangan Kinerja']), 201);
             $this->admin()->post(self::URL . $jalur, ['judul' => ' tunjangan kinerja '])->assertStatus(422);
             $this->admin()->post(self::URL . $jalur, ['judul' => 'Tunjangan Kinérja'])->assertStatus(422);
-            $this->admin()->withBodyFormat('json')->patch(self::URL . "{$jalur}/{$a['id']}/status", ['status' => 2]);
+            $this->admin()->withBodyFormat('json')->patch(self::URL . "{$jalur}/{$a['id']}/status", ['status' => 2])->assertStatus(200);
+            $tabel = $jalur === 'kategori' ? ['qna_kategori', 'id_qna_kategori', 'status_qna_kategori_fk'] : ['qna_tag', 'id_qna_tag', 'status_qna_tag_fk'];
+            $this->assertSame('2', (string) $this->db->table($tabel[0])->where($tabel[1], $a['id'])->get()->getRow($tabel[2]));
             $this->admin()->post(self::URL . $jalur, ['judul' => 'TUNJANGAN KINERJA'])->assertStatus(422);
 
             $b = $this->data($this->admin()->post(self::URL . $jalur, ['judul' => 'Lain']), 201);
@@ -123,7 +126,26 @@ final class AdminEndpointTest extends DatabaseTestCase
     {
         $r = $this->admin()->get(self::URL . 'qna/template');
         $r->assertStatus(200);
-        $this->assertSame([ImporQna::JUDUL_KOLOM, ImporQna::CONTOH], $this->bacaXlsx((string) $r->response()->getBody()));
+        $this->assertSame('attachment; filename="Template_Import_QnA.xlsx"', $r->response()->getHeaderLine('Content-Disposition'));
+        $baris = $this->bacaXlsx((string) $r->response()->getBody());
+        $this->assertCount(2, $baris, 'judul + tepat satu baris contoh');
+        $this->assertSame(['Pertanyaan', 'Jawaban', 'Kategori', 'Tag (Pisahkan dengan koma)'], $baris[0], 'literal F8-47');
+        $this->assertSame(ImporQna::CONTOH, $baris[1]);
+    }
+
+    #[Group('db-isolasi-penuh')]
+    public function testBalapan1062DiterjemahkanKe422(): void
+    {
+        $trg = $this->db->prefixTable('trg_uji_1062_kategori');
+        $this->db->query("CREATE TRIGGER {$trg} BEFORE INSERT ON " . $this->db->prefixTable('qna_kategori') . " FOR EACH ROW SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry uji'");
+
+        try {
+            $e = $this->errors($this->admin()->post(self::URL . 'kategori', ['judul' => 'Balapan']));
+            $this->assertSame('Judul kategori sudah dipakai.', $e['judul']);
+        } finally {
+            $this->db->query("DROP TRIGGER IF EXISTS {$trg}");
+            $this->bersihkanChatbot();
+        }
     }
 
     public function testQnaSimpanUbahTagDanSanitasi(): void

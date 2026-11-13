@@ -34,11 +34,13 @@ trait ChatbotFixtureTrait
         return $c;
     }
 
-    protected function pasangThrottlerChatbot(): void
+    protected function pasangThrottlerChatbot(): Throttler
     {
         $t = new Throttler(new MockCache());
         $t->setTestTime(1_790_000_000);
         Services::injectMock('throttler', $t);
+
+        return $t;
     }
 
     protected function buatKategori(string $judul, int $status = 1, int $bubble = 0): int

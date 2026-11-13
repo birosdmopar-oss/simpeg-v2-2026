@@ -103,6 +103,9 @@ final class MesinJawabPembandingTest extends CIUnitTestCase
         $this->assertNotSame(TfIdf::kunci('1'), TfIdf::kunci('1a'));
         $this->assertNotSame(TfIdf::kunci('10'), TfIdf::kunci('s:10'));
         $this->assertSame(TfIdf::kunci('99999999999999999999'), TfIdf::kunci('99999999999999999998'), 'di luar int64 = float seperti PHP');
+        // Beda yang diharapkan (W-5): `==` dev menganggap keduanya sama (dibandingkan sebagai float), mesin v2 tidak; dikunci
+        // agar disengaja.
+        $this->assertNotSame(TfIdf::kunci('9007199254740993'), TfIdf::kunci('9007199254740993e0'));
     }
 
     public function testPengaliFeedback(): void
