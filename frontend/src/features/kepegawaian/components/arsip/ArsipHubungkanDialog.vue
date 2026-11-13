@@ -14,17 +14,15 @@ import { UiButton, UiNotice, UiSelect } from '@/shared/ui'
 import type { SelectOption } from '@/shared/ui'
 
 import { urainGalatAksi } from '../../arsip.galat'
-import { ID_ARSIP_DATA_UMUM, type ArsipBerkas, type ArsipOpsiRiwayat } from '../../arsip.types'
+import { ID_ARSIP_DATA_UMUM, type ArsipBerkas, type ArsipJenisHubungkan, type ArsipOpsiRiwayat } from '../../arsip.types'
 import { arsipService } from '../../services/arsip.service'
 
 const props = defineProps<{
   open: boolean
   nip: string
   item: ArsipBerkas | null
-  /** Kode tujuan yang boleh bagi aktor (`aksi.jenis_hubungkan` respons folder). */
-  jenisHubungkan: number[]
-  /** Label per kode `jenis_rwy` (dari folder / master); kode tanpa label tampil "Jenis <kode>". */
-  labelJenis: Record<number, string>
+  /** Jenis tujuan yang boleh bagi aktor, berlabel dari server (`aksi.jenis_hubungkan` respons folder). */
+  jenisHubungkan: ArsipJenisHubungkan[]
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string] }>()
 
@@ -39,7 +37,7 @@ const kode = computed(() => (jenis.value === '' ? null : Number(jenis.value)))
 const tanpaPilihanData = computed(() => kode.value === ID_ARSIP_DATA_UMUM)
 
 const opsiJenis = computed<SelectOption[]>(() =>
-  props.jenisHubungkan.map((k) => ({ value: String(k), label: props.labelJenis[k] ?? (k === ID_ARSIP_DATA_UMUM ? 'Arsip Data Umum' : `Jenis ${k}`) })),
+  props.jenisHubungkan.map((j) => ({ value: String(j.id_jenis_rwy), label: j.label })),
 )
 const opsiEntri = computed<SelectOption[]>(() => opsi.value.map((o) => ({ value: o.id_entri, label: o.ringkasan_riwayat })))
 

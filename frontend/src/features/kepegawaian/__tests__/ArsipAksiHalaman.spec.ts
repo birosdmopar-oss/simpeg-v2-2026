@@ -46,7 +46,7 @@ function ringkas(jenisHubungkan: number[] = [38]): ArsipFolderResponse {
     total_hilang: 0,
     total_tak_dapat_dibuka: 0,
     penyajian_berkas_legacy: 'publik',
-    aksi: { tulis: true, jenis_hubungkan: jenisHubungkan },
+    aksi: { tulis: true, jenis_hubungkan: jenisHubungkan.map((k) => ({ id_jenis_rwy: k, label: k === 38 ? 'Data Umum' : `Jenis ${k}` })) },
   }
 }
 
@@ -282,7 +282,7 @@ describe('aksi baris', () => {
     const wrapper = await pasang(`/arsip/${NIP}/semua`, Role.PEGAWAI)
     await selectRowAction(wrapper, 'arsip-actions-1', 'hubungkan')
     const opsi = [...document.body.querySelectorAll('[data-testid="arsip-hubungkan-jenis"] option')].map((o) => o.textContent?.trim() ?? '').filter((t) => t)
-    expect(opsi.filter((o) => o !== 'Pilih jenis riwayat')).toEqual(['Arsip Data Umum'])
+    expect(opsi.filter((o) => o !== 'Pilih jenis riwayat')).toEqual(['Data Umum'])
     const select = q<HTMLSelectElement>('[data-testid="arsip-hubungkan-jenis"] select')
     if (select) {
       select.value = '38'

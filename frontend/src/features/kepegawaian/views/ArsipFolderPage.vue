@@ -95,12 +95,6 @@ watch(jenisDipilih, () => {
 const opsiJenis = computed<SelectOption[]>(() =>
   (ringkas.value?.folder ?? []).map((f) => ({ value: paramFolder(f), label: f.label })),
 )
-const labelJenis = computed<Record<number, string>>(() => {
-  const peta: Record<number, string> = {}
-  for (const f of ringkas.value?.folder ?? []) if (f.id_jenis_rwy !== null) peta[f.id_jenis_rwy] = f.label
-  return peta
-})
-
 /** Filter aktif: folder dari URL, lalu (hanya di "Semua berkas") jenis + belum terhubung dari panel filter. */
 function kueriFilter(): ArsipBerkasQuery | null {
   const dasar = filter.value
@@ -325,7 +319,6 @@ async function ekspor(format: ExportFormat['key']): Promise<void> {
       :nip="nip"
       :item="hubungkanItem"
       :jenis-hubungkan="ringkas?.aksi.jenis_hubungkan ?? []"
-      :label-jenis="labelJenis"
       @done="sesudahMutasi"
     />
     <ConfirmDialog

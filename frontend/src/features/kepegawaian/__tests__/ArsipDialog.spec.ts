@@ -147,21 +147,21 @@ describe('ArsipEditDialog (Ubah Nama)', () => {
 })
 
 describe('ArsipHubungkanDialog (dua langkah)', () => {
-  const LABEL = { 9: 'Jabatan', 1: 'Pendidikan' }
+  const LABEL: Record<number, string> = { 9: 'Jabatan', 1: 'Pendidikan', 38: 'Data Umum' }
 
   async function pasang(jenisHubungkan: number[]) {
     const wrapper = mount(ArsipHubungkanDialog, {
-      props: { open: true, nip: NIP, item: berkas(), jenisHubungkan, labelJenis: LABEL },
+      props: { open: true, nip: NIP, item: berkas(), jenisHubungkan: jenisHubungkan.map((k) => ({ id_jenis_rwy: k, label: LABEL[k] ?? '' })) },
       attachTo: document.body,
     })
     await flushPromises()
     return wrapper
   }
 
-  it('hanya menawarkan jenis dari aksi.jenis_hubungkan (kode 38 = Arsip Data Umum); tombol nonaktif sampai lengkap', async () => {
+  it('hanya menawarkan jenis dari aksi.jenis_hubungkan (label dari server); tombol nonaktif sampai lengkap', async () => {
     await pasang([9, 38])
     const labels = [...document.body.querySelectorAll('[data-testid="arsip-hubungkan-jenis"] option')].map((o) => o.textContent?.trim())
-    expect(labels).toEqual(expect.arrayContaining(['Jabatan', 'Arsip Data Umum']))
+    expect(labels).toEqual(expect.arrayContaining(['Jabatan', 'Data Umum']))
     expect(labels).not.toContain('Pendidikan')
     expect(q<HTMLButtonElement>('[data-testid="arsip-hubungkan-simpan"]')?.disabled).toBe(true)
   })

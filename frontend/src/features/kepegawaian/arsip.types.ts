@@ -38,9 +38,15 @@ export interface ArsipFolder {
 }
 
 /** `aksi` tingkat halaman. Tahap 1: `tulis` false dan `jenis_hubungkan` kosong. */
+/** Jenis tujuan Hubungkan yang boleh bagi aktor; label dari `jenis_rwy` (urut `order`). */
+export interface ArsipJenisHubungkan {
+  id_jenis_rwy: number
+  label: string
+}
+
 export interface ArsipAksiHalaman {
   tulis: boolean
-  jenis_hubungkan: number[]
+  jenis_hubungkan: ArsipJenisHubungkan[]
 }
 
 /** `GET pegawai/{nip}/arsip`. */
