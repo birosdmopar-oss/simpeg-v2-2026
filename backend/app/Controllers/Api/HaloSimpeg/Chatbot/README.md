@@ -11,7 +11,7 @@ Prefix `api/v1/halo-simpeg/chatbot`, route di `Config/RoutesChatbot.php`. Semua 
 Role lain → 403 dari filter route. Amplop v2:
 - sukses `{status: "success", data}`;
 - galat `{status: "error", message, errors?, code?}`;
-- 422 validasi membawa `errors` per field.
+- 422 validasi membawa `errors` per field berbentuk `{field: [pesan]}`; `message` = pesan galat pertama.
 
 Pesan galat berbahasa Indonesia mengikuti teks dev bila ada. Semua tulis non-GET (A3); ubah status lewat `PATCH …/{id}/status`
 (F8-38).
@@ -39,7 +39,7 @@ Lewat batas → 429 `"Terlalu banyak permintaan ke Vanya. Coba lagi dalam satu m
 | Endpoint | Masuk | Keluar `data` |
 |---|---|---|
 | `GET widget/kategori` | — | `{id, judul}[]`: kategori status 1, `tampil_bubble = 1`, punya ≥ 1 QnA status 1; urut id menaik |
-| `GET widget/kategori/{id}/pertanyaan` | `id` di path | `PertanyaanBubble[]`, maks 6 QnA status 1 di kategori itu: unggulan dulu, lalu paling sering cocok, lalu id menaik. Kategori tidak ada/tidak aktif/`id` ≤ 0 → `[]` |
+| `GET widget/kategori/{id}/pertanyaan` | `id` di path | `PertanyaanBubble[]`, maks 6 QnA status 1 di kategori itu: unggulan dulu, lalu paling sering cocok, lalu id menaik. Status kategori tidak disaring (ikut dev; QnA aktif di kategori nonaktif tetap bisa dicapai lewat ketikan, F8-39). Kategori tidak ada / `id` ≤ 0 → `[]` |
 | `GET widget/populer` | — | `PertanyaanBubble[]`, 3 QnA unggulan status 1, id menurun |
 | `POST widget/balas` | `{pesan: string, id_qna?: number}` | `Balasan` (di bawah) |
 | `POST widget/feedback` | `{id_log: number, nilai: 1 \| -1, token: string}` | `{id_log, nilai}` |
