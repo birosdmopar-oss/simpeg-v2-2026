@@ -104,11 +104,15 @@ export interface ArsipBerkasQuery {
 /** Satu calon data riwayat tujuan Hubungkan (`GET …/arsip/opsi-hubungkan`, Tahap 2; berstatus Disetujui, milik NIP). */
 export interface ArsipOpsiRiwayat {
   id_entri: string
-  ringkasan: string
+  /** Bentuk `previewRwy` legacy (mis. jabatan = "<jabatan> - <satker>"); "—" bila tidak ditemukan. */
+  ringkasan_riwayat: string
 }
 
 /** `GET pegawai/{nip}/arsip/opsi-hubungkan?id_riwayat=`. */
 export interface ArsipOpsiHubungkanResponse {
+  id_riwayat: number
+  /** false untuk kode 38 (Arsip Data Umum): tanpa pilihan data riwayat. */
+  butuh_data: boolean
   items: ArsipOpsiRiwayat[]
 }
 

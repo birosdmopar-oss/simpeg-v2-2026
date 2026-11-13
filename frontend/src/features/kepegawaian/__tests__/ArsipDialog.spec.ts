@@ -167,7 +167,7 @@ describe('ArsipHubungkanDialog (dua langkah)', () => {
   })
 
   it('jenis dengan data riwayat: memuat opsi-hubungkan, pilih data, POST { id_riwayat, id_entri }', async () => {
-    opsi.mockResolvedValue({ items: [{ id_entri: '456', ringkasan: 'Analis (Satker A)' }, { id_entri: '457', ringkasan: 'Kepala (Satker B)' }] })
+    opsi.mockResolvedValue({ id_riwayat: 9, butuh_data: true, items: [{ id_entri: '456', ringkasan_riwayat: 'Analis (Satker A)' }, { id_entri: '457', ringkasan_riwayat: 'Kepala (Satker B)' }] })
     hubungkan.mockResolvedValue(undefined)
     const wrapper = await pasang([9])
     await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
@@ -195,7 +195,7 @@ describe('ArsipHubungkanDialog (dua langkah)', () => {
   })
 
   it('tidak ada data riwayat Disetujui → keterangan kosong, tombol tetap nonaktif', async () => {
-    opsi.mockResolvedValue({ items: [] })
+    opsi.mockResolvedValue({ id_riwayat: 9, butuh_data: true, items: [] })
     await pasang([9])
     await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
     expect(q('[data-testid="arsip-hubungkan-kosong"]')?.textContent).toContain('Tidak ada data riwayat berstatus Disetujui')
@@ -210,7 +210,7 @@ describe('ArsipHubungkanDialog (dua langkah)', () => {
   })
 
   it('POST 403 kunci → pesan server tampil, dialog tetap terbuka (AC2-13)', async () => {
-    opsi.mockResolvedValue({ items: [{ id_entri: '456', ringkasan: 'Analis' }] })
+    opsi.mockResolvedValue({ id_riwayat: 9, butuh_data: true, items: [{ id_entri: '456', ringkasan_riwayat: 'Analis' }] })
     hubungkan.mockRejectedValue(galat(403, 'Data yang sudah disetujui tidak dapat diubah.'))
     const wrapper = await pasang([9])
     await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
@@ -232,8 +232,19 @@ describe('ArsipHubungkanDialog (dua langkah)', () => {
     expect(q('[data-testid="arsip-hubungkan-galat"]')?.textContent).toContain(pesan)
   })
 
+  it('POST 422 errors.id_entri (data riwayat kosong untuk kode bukan 38) → pesan server di dialog', async () => {
+    opsi.mockResolvedValue({ id_riwayat: 9, butuh_data: true, items: [{ id_entri: '456', ringkasan_riwayat: 'Analis' }] })
+    hubungkan.mockRejectedValue(galat(422, 'Periksa kembali isian yang ditandai.', { id_entri: ['Data riwayat wajib dipilih.'] }))
+    await pasang([9])
+    await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
+    await pilih('[data-testid="arsip-hubungkan-entri"]', '456')
+    q<HTMLElement>('[data-testid="arsip-hubungkan-simpan"]')?.click()
+    await flushPromises()
+    expect(q('[data-testid="arsip-hubungkan-galat"]')?.textContent).toContain('Data riwayat wajib dipilih.')
+  })
+
   it('POST 404 (riwayat tujuan tidak ada / bukan Disetujui) → pesan server', async () => {
-    opsi.mockResolvedValue({ items: [{ id_entri: '456', ringkasan: 'Analis' }] })
+    opsi.mockResolvedValue({ id_riwayat: 9, butuh_data: true, items: [{ id_entri: '456', ringkasan_riwayat: 'Analis' }] })
     hubungkan.mockRejectedValue(galat(404, 'Data riwayat tidak ditemukan.'))
     await pasang([9])
     await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
@@ -244,7 +255,7 @@ describe('ArsipHubungkanDialog (dua langkah)', () => {
   })
 
   it('ganti jenis membuang pilihan data lama dan memuat ulang opsi', async () => {
-    opsi.mockResolvedValue({ items: [{ id_entri: '456', ringkasan: 'Analis' }] })
+    opsi.mockResolvedValue({ id_riwayat: 9, butuh_data: true, items: [{ id_entri: '456', ringkasan_riwayat: 'Analis' }] })
     await pasang([9, 1])
     await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
     await pilih('[data-testid="arsip-hubungkan-entri"]', '456')

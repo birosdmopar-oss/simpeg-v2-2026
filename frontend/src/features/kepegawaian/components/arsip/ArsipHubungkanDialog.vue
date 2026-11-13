@@ -41,7 +41,7 @@ const tanpaPilihanData = computed(() => kode.value === ID_ARSIP_DATA_UMUM)
 const opsiJenis = computed<SelectOption[]>(() =>
   props.jenisHubungkan.map((k) => ({ value: String(k), label: props.labelJenis[k] ?? (k === ID_ARSIP_DATA_UMUM ? 'Arsip Data Umum' : `Jenis ${k}`) })),
 )
-const opsiEntri = computed<SelectOption[]>(() => opsi.value.map((o) => ({ value: o.id_entri, label: o.ringkasan })))
+const opsiEntri = computed<SelectOption[]>(() => opsi.value.map((o) => ({ value: o.id_entri, label: o.ringkasan_riwayat })))
 
 const bisaKirim = computed(() => kode.value !== null && !memuatOpsi.value && (tanpaPilihanData.value || entri.value !== ''))
 

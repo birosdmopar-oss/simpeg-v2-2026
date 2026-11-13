@@ -95,7 +95,7 @@ describe('arsipService — Tahap 2 (MAKE-096) lewat klien asli', () => {
   })
 
   it('opsiHubungkan: GET …/opsi-hubungkan?id_riwayat=, amplop terbuka menjadi { items }', async () => {
-    const payload = { items: [{ id_entri: '456', ringkasan: 'Analis' }] }
+    const payload = { id_riwayat: 9, butuh_data: true, items: [{ id_entri: '456', ringkasan_riwayat: 'Analis' }] }
     pasangAdapter(payload)
     const hasil = await arsipService.opsiHubungkan(NIP, 9)
     expect(diminta[0]?.method).toBe('get')
