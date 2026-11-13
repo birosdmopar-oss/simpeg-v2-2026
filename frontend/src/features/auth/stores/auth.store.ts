@@ -7,6 +7,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import { resetChatbot } from '@/features/halo-simpeg/chatbot/stores/percakapan'
 import { lepasTokenPush } from '@/features/integrasi/composables/notifikasiPush'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
 import { resetSesiKonten } from '@/features/konten/sesi'
@@ -48,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function clearSession(): void {
     resetSesiKonten()
+    resetChatbot()
     user.value = null
     claims.value = null
     status.value = 'guest'
