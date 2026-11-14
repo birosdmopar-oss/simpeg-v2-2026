@@ -322,6 +322,9 @@ describe('Chatbot Manager — review CR (M-1..M-3, M-9, M-11)', () => {
     await flushPromises()
     expect(document.querySelector('[data-testid="impor-ditambah"]')?.textContent).toBe('2')
     expect(document.querySelector('[data-testid="chatbot-impor-kirim"]')).toBeNull()
+    // N-7: ringkasan berperan status dan fokus pindah ke "Tutup".
+    expect(document.querySelector('[data-testid="chatbot-impor-hasil"]')?.getAttribute('role')).toBe('status')
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('chatbot-impor-tutup')
     expect(svc.qna.impor).toHaveBeenCalledTimes(1)
   })
 
@@ -347,6 +350,31 @@ describe('Chatbot Manager — review CR (M-1..M-3, M-9, M-11)', () => {
     expect(svc.qna.simpan).toHaveBeenCalledWith(12, expect.objectContaining({ tag: [4, 6] }))
   })
 
+  it('N-6: opsi masih dimuat → teks netral (bukan alert), tanpa permintaan paralel; muat ulang sukses membersihkan galat halaman', async () => {
+    const opsiTunda = tunda<{ kategori: { id: number; judul: string }[]; tag: { id: number; judul: string }[] }>()
+    svc.qna.opsi.mockReset()
+    svc.qna.opsi.mockRejectedValueOnce(apiError(500, 'Opsi gagal.')).mockReturnValueOnce(opsiTunda.janji)
+    svc.qna.detail.mockResolvedValue({ ...qna[0]!, jawaban: '<p>x</p>' })
+    const w = await pasang(QnaChatbotView)
+    expect(w.text()).toContain('Opsi gagal.')
+    await selectRowAction(w, 'chatbot-qna-actions-12', 'edit')
+    await flushPromises()
+    const tombol = document.querySelector('[data-testid="chatbot-qna-opsi-muat-ulang"]') as HTMLButtonElement
+    tombol.click()
+    await flushPromises()
+    const memuat = document.querySelector('[data-testid="chatbot-qna-opsi-memuat"]')
+    expect(memuat?.textContent).toContain('Memuat pilihan kategori dan tag')
+    expect(memuat?.getAttribute('role')).toBeNull()
+    expect(document.querySelector('[data-testid="chatbot-qna-opsi-galat"]')).toBeNull()
+    // Klik lagi selama memuat tidak memicu permintaan kedua (tombol tidak ada, dan muatOpsi menolak paralel).
+    expect(svc.qna.opsi).toHaveBeenCalledTimes(2)
+
+    opsiTunda.lepas({ kategori: [{ id: 3, judul: 'Cuti' }], tag: [{ id: 4, judul: 'cuti tahunan' }] })
+    await flushPromises()
+    expect(document.querySelector('[data-testid="chatbot-qna-opsi-memuat"]')).toBeNull()
+    expect(w.text()).not.toContain('Opsi gagal.')
+  })
+
   it('M-3: respons daftar yang tiba terbalik — yang tampil hasil permintaan terakhir (Riwayat)', async () => {
     const pertama = tunda<ReturnType<typeof daftar<RiwayatRowUji>>>()
     const kedua = tunda<ReturnType<typeof daftar<RiwayatRowUji>>>()
@@ -354,9 +382,12 @@ describe('Chatbot Manager — review CR (M-1..M-3, M-9, M-11)', () => {
     const w = await pasang(RiwayatChatbotView)
     w.findAllComponents({ name: 'UiSelect' })[0]!.vm.$emit('update:modelValue', '1')
     await flushPromises()
-    kedua.lepas(daftar([riwayatRow(2, 'baru')]))
-    await flushPromises()
+    // N-5: permintaan lama selesai lebih dulu → diabaikan dan "Memuat..." tetap tampil sampai permintaan terakhir selesai.
     pertama.lepas(daftar([riwayatRow(1, 'lama')]))
+    await flushPromises()
+    expect(w.text()).toContain('Memuat...')
+    expect(w.find('[data-testid="chatbot-riwayat-row-1"]').exists()).toBe(false)
+    kedua.lepas(daftar([riwayatRow(2, 'baru')]))
     await flushPromises()
     expect(w.find('[data-testid="chatbot-riwayat-row-2"]').exists()).toBe(true)
     expect(w.find('[data-testid="chatbot-riwayat-row-1"]').exists()).toBe(false)

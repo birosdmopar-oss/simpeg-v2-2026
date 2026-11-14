@@ -243,8 +243,9 @@ describe('admin (fixture kontrak MAKE-094)', () => {
 
   it('M-10: template — GET qna/template; nama dari header, cadangan Template_Import_QnA.xlsx', async () => {
     const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    jawab(new Blob(['x'], { type: xlsx }), 200, { 'content-disposition': "attachment; filename*=UTF-8''Template_Import_QnA.xlsx" })
-    await expect(qnaChatbotService.template()).resolves.toMatchObject({ nama: 'Template_Import_QnA.xlsx' })
+    // N-8b: nama di header berbeda dari cadangan agar pembacaan header terbukti.
+    jawab(new Blob(['x'], { type: xlsx }), 200, { 'content-disposition': "attachment; filename*=UTF-8''Template_Import_QnA_v2.xlsx" })
+    await expect(qnaChatbotService.template()).resolves.toMatchObject({ nama: 'Template_Import_QnA_v2.xlsx' })
     expect(server.panggilan[0]).toMatchObject({ method: 'get', url: '/halo-simpeg/chatbot/qna/template' })
 
     jawab(new Blob(['x'], { type: xlsx }))

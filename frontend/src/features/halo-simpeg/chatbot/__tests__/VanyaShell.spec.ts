@@ -2,10 +2,26 @@
  * Titik pasang widget di RedesignShell (review CR M-11a): dengan gerbang fase terbuka (ACTIVE_PHASE = 8) pegawai melihat tepat
  * satu launcher Vanya; selama wajib ganti password tidak ada. `buildNav` dikosongkan agar router tiruan shell tidak perlu
  * memuat semua route fase 4–8 (menu diuji di nav.config.spec / ChatbotManager.spec).
+ * Hermetik (review N-1): komponen shell lain yang memanggil layanan (InteraksiPopupHost, PengingatCutiShell,
+ * NotifikasiPushShell) di-stub, dan klien `api` diganti adapter pencatat yang menolak semua request — test menegaskan
+ * tidak ada request jaringan sama sekali.
  */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+const jaringan = vi.hoisted(() => ({ panggilan: [] as string[] }))
+vi.mock('@/lib/axios', async (asli) => {
+  const a = await asli<typeof import('@/lib/axios')>()
+  return {
+    ...a,
+    api: a.createApiClient({
+      adapter: async (config) => {
+        jaringan.panggilan.push(`${String(config.method)} ${config.url ?? ''}`)
+        throw new Error('request jaringan tidak diizinkan di test ini')
+      },
+    }),
+  }
+})
 vi.mock('@/shared/layouts/nav.config', async (asli) => ({
   ...(await asli<typeof import('@/shared/layouts/nav.config')>()),
   ACTIVE_PHASE: 8,
@@ -32,12 +48,19 @@ async function mountShell(role: RoleCode, extra: Parameters<typeof loginAs>[1] =
   const router = createShellRouter()
   await router.push('/')
   await router.isReady()
-  const wrapper = mount(RedesignShell, { slots: { default: '<p>isi</p>' }, global: { plugins: [router] }, attachTo: document.body })
+  const wrapper = mount(RedesignShell, {
+    slots: { default: '<p>isi</p>' },
+    global: { plugins: [router], stubs: { InteraksiPopupHost: true, PengingatCutiShell: true, NotifikasiPushShell: true } },
+    attachTo: document.body,
+  })
   await flushPromises()
   return wrapper
 }
 
 afterEach(() => {
+  // Tidak ada request jaringan (widget belum dibuka → tidak memanggil vanyaService; layanan shell lain di-stub).
+  expect(jaringan.panggilan).toEqual([])
+  jaringan.panggilan = []
   document.body.innerHTML = ''
 })
 enableAutoUnmount(afterEach)

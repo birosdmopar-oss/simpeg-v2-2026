@@ -324,6 +324,8 @@ describe('VanyaWidget — review CR (M-5..M-8)', () => {
     const w = await pasang()
     await bukaChat(w)
     const input = w.get('[data-testid="vanya-input"]')
+    // N-2: jsdom tidak menegakkan maxlength; atribut dijaga ≥ 2×300 agar 300 emoji (600 satuan UTF-16) muat.
+    expect(input.attributes('maxlength')).toBe('600')
     const emoji = '😀'.repeat(300)
     await input.setValue(emoji)
     expect((input.element as HTMLInputElement).value).toBe(emoji)
@@ -341,28 +343,70 @@ describe('VanyaWidget — review CR (M-5..M-8)', () => {
     expect(svc.balas).not.toHaveBeenCalledWith('a'.repeat(301), undefined)
   })
 
+  it('N-3: sisipan di tengah yang melewati 300 code point ditolak tanpa mengubah nilai/kursor; tempel tetap dipangkas watch', async () => {
+    const w = await pasang()
+    await bukaChat(w)
+    const input = w.get('[data-testid="vanya-input"]')
+    const el = input.element as HTMLInputElement
+    const penuh = 'a'.repeat(150) + 'b'.repeat(150)
+    await input.setValue(penuh)
+    el.setSelectionRange(150, 150)
+    const tolak = new InputEvent('beforeinput', { data: 'X', inputType: 'insertText', cancelable: true, bubbles: true })
+    el.dispatchEvent(tolak)
+    expect(tolak.defaultPrevented).toBe(true)
+    expect(el.value).toBe(penuh)
+    expect(el.selectionStart).toBe(150)
+
+    // Mengganti pilihan dengan panjang sama tetap boleh.
+    el.setSelectionRange(0, 1)
+    const ganti = new InputEvent('beforeinput', { data: 'Z', inputType: 'insertText', cancelable: true, bubbles: true })
+    el.dispatchEvent(ganti)
+    expect(ganti.defaultPrevented).toBe(false)
+
+    // Di bawah batas: tidak ditolak.
+    await input.setValue('halo')
+    el.setSelectionRange(2, 2)
+    const boleh = new InputEvent('beforeinput', { data: '😀', inputType: 'insertText', cancelable: true, bubbles: true })
+    el.dispatchEvent(boleh)
+    expect(boleh.defaultPrevented).toBe(false)
+
+    // Tempel tidak dicegah di beforeinput; nilai yang terlalu panjang dipangkas watch.
+    await input.setValue('h'.repeat(299))
+    const tempel = new InputEvent('beforeinput', { data: 'xyz', inputType: 'insertFromPaste', cancelable: true, bubbles: true })
+    el.dispatchEvent(tempel)
+    expect(tempel.defaultPrevented).toBe(false)
+    await input.setValue('h'.repeat(299) + 'xyz')
+    await flushPromises()
+    expect([...el.value].length).toBe(300)
+  })
+
   it('M-5: store menolak kiriman lebih dari 300 code point (penjaga kedua)', async () => {
     const { usePercakapanVanya } = await import('../stores/percakapan')
     expect(usePercakapanVanya().kirim('a'.repeat(301), 300)).toBeNull()
     expect(svc.balas).not.toHaveBeenCalled()
   })
 
-  it('M-6: fokus kembali ke kotak ketik sesudah memilih chip, Topik/Populer, dan menilai', async () => {
+  it('M-6/N-4: fokus kembali ke kotak ketik sesudah memilih chip, Topik/Populer, dan menilai', async () => {
     const w = await pasang()
     await bukaChat(w)
     const input = w.get('[data-testid="vanya-input"]').element
-    await w.get('[data-testid="vanya-topik-3"]').trigger('click')
-    await flushPromises()
-    expect(document.activeElement).toBe(input)
+    const klikDariFokus = async (sel: string): Promise<void> => {
+      const el = w.get(sel).element as HTMLButtonElement
+      el.focus()
+      expect(document.activeElement).toBe(el)
+      await w.get(sel).trigger('click')
+      await flushPromises()
+      expect(document.activeElement).toBe(input)
+    }
+    await klikDariFokus('[data-testid="vanya-topik-3"]')
+    await klikDariFokus('[data-testid="vanya-btn-topik"]')
 
     ;(w.get('[data-testid="vanya-btn-populer"]').element as HTMLButtonElement).focus()
     await w.get('[data-testid="vanya-btn-populer"]').trigger('click')
     await flushPromises()
     expect(document.activeElement).toBe(input)
 
-    await w.get('[data-testid="vanya-pertanyaan-7"]').trigger('click')
-    await flushPromises()
-    expect(document.activeElement).toBe(input)
+    await klikDariFokus('[data-testid="vanya-pertanyaan-7"]')
 
     ;(w.get('[data-action="suka"]').element as HTMLButtonElement).focus()
     await w.get('[data-action="suka"]').trigger('click')
@@ -404,6 +448,7 @@ describe('VanyaWidget — review CR (M-5..M-8)', () => {
     expect(w.findAll('[data-pesan="sistem"]').filter((p) => p.text().startsWith('Halo, saya Vanya'))).toHaveLength(1)
   })
 
+  // Smoke test (N-8c): penjaga generasi di nilai() tidak teramati langsung dari UI karena pesan lama sudah dikosongkan.
   it('M-8: feedback yang masih menunggu saat logout tidak mengubah apa pun sesudahnya', async () => {
     let lepas: () => void = () => {}
     svc.feedback.mockImplementationOnce(() => new Promise<void>((r) => (lepas = r)))
