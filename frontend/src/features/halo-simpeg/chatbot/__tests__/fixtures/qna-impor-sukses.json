@@ -1,0 +1,15 @@
+{
+    "status": "success",
+    "data": {
+        "ditambah": 2,
+        "kategori_baru": 1,
+        "tag_baru": 2,
+        "dilewati": [
+            {
+                "baris": 4,
+                "alasan": "Pertanyaan atau jawaban kosong."
+            }
+        ],
+        "galat": []
+    }
+}

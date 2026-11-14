@@ -1,0 +1,11 @@
+{
+    "status": "success",
+    "data": {
+        "balasan": "Database QnA masih kosong.",
+        "cocok": false,
+        "skor": 0,
+        "id_log": null,
+        "bisa_feedback": false,
+        "saran": []
+    }
+}

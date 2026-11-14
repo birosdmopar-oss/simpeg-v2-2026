@@ -8,8 +8,10 @@ use App\Exceptions\NotFoundException;
 use App\Exceptions\TooManyRequestsException;
 use App\Exceptions\ValidationException;
 use App\Interfaces\Kepegawaian\PegawaiScopeInterface;
+use App\Interfaces\Kepegawaian\RiwayatRegistryInterface;
 use App\Interfaces\Kepegawaian\StorageAdapterInterface;
 use App\Libraries\Auth\AuthContext;
+use App\Libraries\Kepegawaian\Pegawai\EksporTabel;
 use App\Libraries\ListQuery;
 use App\Models\AuditLogModel;
 use CodeIgniter\Cache\CacheInterface;
@@ -57,6 +59,7 @@ final class ArsipService
         private readonly ?ThrottlerInterface $throttler = null,
         private readonly ?AuditLogModel $audit = null,
         private readonly ?CacheInterface $cache = null,
+        private readonly ?RiwayatRegistryInterface $registry = null,
     ) {
     }
 
@@ -116,8 +119,8 @@ final class ArsipService
             'total_hilang'            => $total['hilang'],
             'total_tak_dapat_dibuka'  => $total['tak'],
             'penyajian_berkas_legacy' => $this->config->modeLegacy(),
-            // Tahap 1: tanpa aksi tulis (MAKE-092 menghitung per aktor, F10-38).
-            'aksi' => ['tulis' => false, 'jenis_hubungkan' => []],
+            // Tahap 2 (MAKE-092, F10-38 (3)): dihitung per aktor; FE memakainya untuk `hidden`, server tetap menegakkan.
+            'aksi' => $this->aksiFolder($auth, $nip),
         ];
     }
 
@@ -132,12 +135,101 @@ final class ArsipService
     {
         $this->otorisasi()->bolehLihat($auth, $nip);
 
-        $q       = ListQuery::from($query, ['id_jenis_rwy', 'q', 'sort', 'order', 'page', 'per_page']);
-        $jenis   = $this->filterJenis($q->string('id_jenis_rwy'));
-        $sort    = $q->string('sort') === '' ? 'id' : $q->string('sort');
-        $arah    = $q->string('order') === '' ? ($sort === 'id' ? 'desc' : 'asc') : strtolower($q->string('order'));
+        $q       = ListQuery::from($query, ['id_jenis_rwy', 'belum_terhubung', 'q', 'sort', 'order', 'page', 'per_page']);
+        $saring  = $this->saringan($q);
         $page    = $q->page();
         $perPage = $q->perPage(Arsip::PER_PAGE_BAWAAN, Arsip::PER_PAGE_MAKS);
+
+        $this->catatLihat($auth, $nip, 'berkas', $saring['audit']);
+
+        $b     = $this->tersaring($nip, $saring, $q);
+        $total = (clone $b)->countAllResults(false);
+        $this->pilihKolom($b);
+        $this->urutkan($b, $saring['sort'], $saring['arah']);
+        $rows = $b->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+
+        return ['items' => $this->bentukItem($auth, $nip, $rows), 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+    }
+
+    /**
+     * Satu item daftar (bentuk sama dengan `daftar()`), mis. respons sesudah Ubah Nama / Hubungkan (MAKE-092). Tanpa
+     * catatan F10-17 (pemanggil sudah lolos otorisasi tulis); 404 bila baris tidak ada / milik NIP lain.
+     *
+     * @return array<string, mixed>
+     */
+    public function item(AuthContext $auth, string $nip, int $idAttachment): array
+    {
+        $b = $this->dasar($nip)->where('da.id_attachment', $idAttachment);
+        $this->pilihKolom($b);
+        $items = $this->bentukItem($auth, $nip, $b->get()->getResultArray());
+
+        if ($items === []) {
+            throw new NotFoundException('Arsip tidak ditemukan.');
+        }
+
+        return $items[0];
+    }
+
+    /**
+     * `GET pegawai/{nip}/arsip/ekspor?format=xlsx|csv&<filter daftar>` (§6.1 Ekspor, AC2-10): kolom Nama Arsip, Jenis
+     * Riwayat, Data Riwayat [K], tanpa URL berkas; filter & urutan sama dengan daftar (tanpa paginasi). Lewat `EksporTabel`
+     * (CSV UTF-8 BOM ber-`.csv` F10-27, XLSX `inlineStr`; sel berawalan `= + - @ TAB CR` aman). Ekspor arsip pegawai lain
+     * oleh role 1/3/4/5 dicatat SETIAP kali (F10-26, tanpa dedup, `endpoint: "ekspor"`).
+     *
+     * @param array<string, mixed> $query
+     *
+     * @return array{isi: string, nama: string, mime: string}
+     */
+    public function ekspor(AuthContext $auth, string $nip, array $query): array
+    {
+        $this->otorisasi()->bolehLihat($auth, $nip);
+
+        $q      = ListQuery::from($query, ['format', 'id_jenis_rwy', 'belum_terhubung', 'q', 'sort', 'order']);
+        $format = $q->string('format') === '' ? EksporTabel::XLSX : strtolower($q->string('format'));
+
+        if (! isset(EksporTabel::MIME[$format])) {
+            throw ValidationException::forField('format', 'Format ekspor harus csv atau xlsx.');
+        }
+
+        $saring = $this->saringan($q);
+        $this->catatLihat($auth, $nip, 'ekspor', $saring['audit'], false);
+
+        $b = $this->tersaring($nip, $saring, $q);
+        $this->pilihKolom($b);
+        $this->urutkan($b, $saring['sort'], $saring['arah']);
+        $rows = $b->get()->getResultArray();
+
+        $ringkasan = $this->ringkasan($nip, $rows);
+        $baris     = array_map(static fn (array $r): array => [
+            self::namaArsip($r),
+            $r['id_riwayat'] === null ? 'Tanpa Jenis' : (string) ($r['label_jenis'] ?? ''),
+            $ringkasan[(int) $r['id_attachment']] ?? RingkasanRiwayat::KOSONG,
+        ], $rows);
+        $header = ['Nama Arsip', 'Jenis Riwayat', 'Data Riwayat'];
+
+        return [
+            'isi'  => $format === EksporTabel::CSV ? EksporTabel::csv($header, $baris) : EksporTabel::xlsx($header, $baris, 'Arsip'),
+            'nama' => 'Arsip_' . preg_replace('/[^0-9A-Za-z]+/', '', $nip) . '_' . date('Ymd') . '.' . $format,
+            'mime' => EksporTabel::MIME[$format],
+        ];
+    }
+
+    /**
+     * Saringan daftar/ekspor: `id_jenis_rwy` (angka / `tanpa_jenis`), `belum_terhubung` (`1` = kode 0, digabung AND
+     * dengan `id_jenis_rwy`, §6.1 [K]: centang + jenis lain → kosong), `sort`, `order`. 422 per kolom.
+     *
+     * @return array{jenis: string|null, belum: bool, sort: string, arah: string, audit: array<string, mixed>}
+     */
+    private function saringan(ListQuery $q): array
+    {
+        $jenis = $this->filterJenis($q->string('id_jenis_rwy'));
+        $belum = $q->string('belum_terhubung');
+        $sort  = $q->string('sort') === '' ? 'id' : $q->string('sort');
+        $arah  = $q->string('order') === '' ? ($sort === 'id' ? 'desc' : 'asc') : strtolower($q->string('order'));
+
+        if (! in_array($belum, ['', '0', '1'], true)) {
+            throw ValidationException::forField('belum_terhubung', 'Saringan belum terhubung harus 0 atau 1.');
+        }
 
         if (! in_array($sort, self::SORT, true)) {
             throw ValidationException::forField('sort', 'Urutan harus salah satu dari: ' . implode(', ', self::SORT) . '.');
@@ -147,18 +239,30 @@ final class ArsipService
             throw ValidationException::forField('order', 'Arah urutan harus asc atau desc.');
         }
 
-        $this->catatLihat($auth, $nip, 'berkas', [
-            'id_jenis_rwy'    => $jenis,
-            'belum_terhubung' => null,
-            'ada_pencarian'   => $q->filled('q'),
-        ]);
+        return [
+            'jenis' => $jenis,
+            'belum' => $belum === '1',
+            'sort'  => $sort,
+            'arah'  => $arah,
+            'audit' => ['id_jenis_rwy' => $jenis, 'belum_terhubung' => $belum === '1', 'ada_pencarian' => $q->filled('q')],
+        ];
+    }
 
+    /**
+     * @param array{jenis: string|null, belum: bool, sort: string, arah: string, audit: array<string, mixed>} $saring
+     */
+    private function tersaring(string $nip, array $saring, ListQuery $q): BaseBuilder
+    {
         $b = $this->dasar($nip);
 
-        if ($jenis === self::TANPA_JENIS) {
+        if ($saring['jenis'] === self::TANPA_JENIS) {
             $b->where('da.id_riwayat', null);
-        } elseif ($jenis !== null) {
-            $b->where('da.id_riwayat', (int) $jenis);
+        } elseif ($saring['jenis'] !== null) {
+            $b->where('da.id_riwayat', (int) $saring['jenis']);
+        }
+
+        if ($saring['belum']) {
+            $b->where('da.id_riwayat', 0);
         }
 
         if ($q->filled('q')) {
@@ -167,19 +271,41 @@ final class ArsipService
             $b->groupStart()->like('da.tag', $like)->orLike('da.display_name', $like)->orLike('da.filename', $like)->groupEnd();
         }
 
-        $total = (clone $b)->countAllResults(false);
+        return $b;
+    }
 
+    private function pilihKolom(BaseBuilder $b): void
+    {
         $b->select('da.id_attachment, da.filename, da.id_riwayat, da.id_entri, da.tag, da.path, da.display_name, da.file_type, da.created_at, jr.jenis_rwy AS label_jenis');
-        $this->urutkan($b, $sort, $arah);
-        $rows = $b->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+    }
 
-        $ringkasan = (new RingkasanRiwayat($this->db))->untuk($nip, array_map(static fn (array $r): array => [
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return array<int, string>
+     */
+    private function ringkasan(string $nip, array $rows): array
+    {
+        return (new RingkasanRiwayat($this->db))->untuk($nip, array_map(static fn (array $r): array => [
             'id_attachment' => $r['id_attachment'],
             'id_riwayat'    => $r['id_riwayat'],
             'id_entri'      => $r['id_entri'] === null ? null : (string) $r['id_entri'],
         ], $rows));
-        $penyaji = $this->penyaji();
-        $items   = [];
+    }
+
+    /**
+     * Item daftar (kolom TERTUTUP, AC1-10) + `aksi` per baris (Tahap 2, F10-38 (4)).
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function bentukItem(AuthContext $auth, string $nip, array $rows): array
+    {
+        $ringkasan = $this->ringkasan($nip, $rows);
+        $penyaji   = $this->penyaji();
+        $peran     = $this->otorisasi()->peran($auth, $nip);
+        $items     = [];
 
         foreach ($rows as $r) {
             $id    = (int) $r['id_attachment'];
@@ -202,12 +328,11 @@ final class ArsipService
                 'akses_berkas'      => $nilai['akses_berkas'],
                 'url_berkas'        => $nilai['url_berkas'],
                 'jenis_buka'        => $nilai['jenis_buka'],
-                // Tahap 1: tanpa aksi tulis (MAKE-092).
-                'aksi' => ['edit' => false, 'hubungkan' => false, 'hapus' => false],
+                'aksi'              => OtorisasiArsip::aksiBaris($auth, $peran, $kode),
             ];
         }
 
-        return ['items' => $items, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+        return $items;
     }
 
     /**
@@ -340,7 +465,7 @@ final class ArsipService
      *
      * @param array<string, mixed> $filter
      */
-    private function catatLihat(AuthContext $auth, string $nip, string $endpoint, array $filter): void
+    private function catatLihat(AuthContext $auth, string $nip, string $endpoint, array $filter, bool $dedup = true): void
     {
         if (! OtorisasiArsip::wajibDicatat($auth, $nip)) {
             return;
@@ -349,7 +474,8 @@ final class ArsipService
         $cache = $this->cache ?? service('cache');
         $kunci = 'arsip_lihat_' . hash('sha256', ($auth->idPengguna() ?? 0) . '|' . $nip);
 
-        if ($cache->get($kunci) !== null) {
+        // Ekspor dicatat setiap kali (F10-26) dan tidak mengisi/membaca kunci dedup folder/daftar.
+        if ($dedup && $cache->get($kunci) !== null) {
             return;
         }
 
@@ -362,7 +488,9 @@ final class ArsipService
             throw new RuntimeException('Catatan pembukaan arsip gagal ditulis.');
         }
 
-        $cache->save($kunci, 1, Arsip::DEDUP_LIHAT_DETIK);
+        if ($dedup) {
+            $cache->save($kunci, 1, Arsip::DEDUP_LIHAT_DETIK);
+        }
     }
 
     /**
@@ -379,6 +507,27 @@ final class ArsipService
         };
     }
 
+    /**
+     * `aksi` folder: `{ tulis, jenis_hubungkan: [ { id_jenis_rwy, label } ] }` — label dari `jenis_rwy.jenis_rwy`, urut
+     * `jenis_rwy.order` (dialog Hubungkan FE, kode tanpa folder berisi berkas tetap berlabel).
+     *
+     * @return array{tulis: bool, jenis_hubungkan: list<array{id_jenis_rwy: int, label: string}>}
+     */
+    private function aksiFolder(AuthContext $auth, string $nip): array
+    {
+        $peran = $this->otorisasi()->peran($auth, $nip);
+        $jenis = [];
+
+        if ($peran['jenis_hubungkan'] !== []) {
+            $rows = $this->db->table('jenis_rwy')->select('id_jenis_rwy, jenis_rwy')
+                ->whereIn('id_jenis_rwy', $peran['jenis_hubungkan'])
+                ->orderBy('order', 'ASC')->orderBy('id_jenis_rwy', 'ASC')->get()->getResultArray();
+            $jenis = array_map(static fn (array $r): array => ['id_jenis_rwy' => (int) $r['id_jenis_rwy'], 'label' => (string) $r['jenis_rwy']], $rows);
+        }
+
+        return ['tulis' => $peran['tulis'], 'jenis_hubungkan' => $jenis];
+    }
+
     private function penyaji(): PenyajiUrlBerkas
     {
         return new PenyajiUrlBerkas($this->storage, $this->config);
@@ -386,6 +535,6 @@ final class ArsipService
 
     private function otorisasi(): OtorisasiArsip
     {
-        return new OtorisasiArsip($this->scope, $this->db);
+        return new OtorisasiArsip($this->scope, $this->db, $this->registry);
     }
 }

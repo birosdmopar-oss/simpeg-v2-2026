@@ -10,7 +10,7 @@ use App\Libraries\Auth\AuthContext;
 use App\Libraries\Kepegawaian\Riwayat\AturanLampiran;
 
 /**
- * Arsip Kepegawaian = arsip Data Umum (B-20 penutup × B-18, MAKE-014; keputusan user 13-10-2026 Q-M6-6), lewat endpoint
+ * Arsip Data Umum (dulu "Arsip Kepegawaian"; B-20 penutup × B-18, MAKE-014; keputusan user 13-10-2026 Q-M6-6), lewat endpoint
  * lampiran `pegawai/{nip}/lampiran*` dengan `id_entri` = NIP di request (data umum tidak punya baris riwayat). Disimpan
  * ikut legacy (`L_employee` :289-304): `id_entri` NULL, terikat kolom `NIP` (ikut koreksi NIP); daftar = NIP + kode.
  * Kode `jenis_rwy` legacy `ARSIP_RWY`:

@@ -1,0 +1,9 @@
+{
+    "status": "error",
+    "message": "Pesan wajib diisi (maks 300 karakter).",
+    "errors": {
+        "pesan": [
+            "Pesan wajib diisi (maks 300 karakter)."
+        ]
+    }
+}

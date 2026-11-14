@@ -11,6 +11,11 @@ lingkup, lampiran, frontend). Setelah beku, kontrak di sini hanya boleh berubah 
 (lihat [Kepemilikan & perubahan](#kepemilikan--perubahan)). Runbook: `docs/fase3/SPRINT0_1_backend.md`. Revisi hasil
 review CR 07-10-2026 (lampiran satu request, lampiran terikat NIP, filter `jwt` grup) sudah termasuk.
 
+> **Koreksi non-aditif 12-11-2026** (PRD F-10 §7.5, MAKE-093, izin pemilik WS-2): teks lama "path arsip legacy → 404" pada
+> foto, lampiran Plt/Plh, dan berkas Konket sudah usang sejak adapter MAKE-069 (K-M3 opsi A). Path legacy (`arsip/…`) kini
+> dibaca lewat `PathLegacy` dari storage v2; hanya berkas yang belum disalin yang → 404. Perilaku endpoint tidak berubah
+> karena koreksi ini (test `tests/Kepegawaian/PathArsipLegacyTerbacaTest.php`).
+
 ### Aturan umum
 
 | Aturan | Isi |
@@ -151,7 +156,7 @@ Contoh 422 (tambah riwayat tanpa lampiran wajib):
 | `GET pegawai?search=&status=&id_unit=&id_satker=&id_jenis_pegawai=&sort=&order=&page=&per_page=` | 1, 3, 4, 5, 8 (`Role::filter`) | `{ items, total, page, per_page }`. Default `status IN (1, 2)` (legacy `L_employee::list`), `status=1\|2` menyaring; lingkup `PegawaiScope::terapkanKeQuery` (jalur daftar CR-045, mis. admin unit 20 memuat UPT). `search` = nama/NIP/NIP lama (LIKE literal). `sort` ∈ `nama` (bawaan), `nip`, `jabatan`, `unit`, `satker`, `gol_ruang`; `per_page` ≤ 100. Item: biodata inti `pegawai` + `ada_foto` + snapshot `pegawai_mutasi_jabatan` (`id_unit`, `unit`, `id_satker`, `satker`, `id_jabatan`, `jabatan`, `tmt_jabatan`) + `pegawai_kp` (`gol_ruang`, `pangkat`) |
 | `GET pegawai/{nip}` | UL_ALL + `bolehLihat` | Kolom `pegawai` (tanpa `foto`/`siasn_flag`/`siasn_lu`/`deleted_at`) + `ada_foto`, `email` (akun), `jabatan_aktif` (pmj), `pangkat_aktif` (`pegawai_kp`), `pengajuan` (pengajuan biodata terakhir bila `flag_update` 1/2: `id_pegawai_hist`, `flag_update`, `reason_note`, `created_at`, `updated_at`, `notif_date`; selain itu `null`), `aksi` `{ ubah_biodata, ubah_langsung, koreksi_nip }`, `tabs` (= `descriptorUntuk`, fungsi yang sama dengan `GET pegawai/{nip}/riwayat`). Urutan 401 → 403 lingkup (NIP tidak ada bagi role ber-lingkup = 403) → 404 |
 | `PUT pegawai/{nip}/biodata` | 1, 2, 3, 6, 7 + `bolehUbah` | B-03 dua jalur. JSON kolom DDL `pegawai` + `email` + `jenis_kerabat_lain`; dengan foto: `POST` multipart + `_method=PUT`, berkas `foto` (jpg/jpeg/png, 5 MB). Patch: kolom yang tidak dikirim memakai nilai sekarang, kewajiban legacy diperiksa atas nilai akhir. Isian tanpa hak role yang nilainya berbeda → 422 `errors.<kolom>` (nama/gelar/tgl lahir/jenis status/TMT status hanya role 1; jenis pegawai role 1/3; `status`, `nip`, `flag_update` tidak pernah). Respons `{ jalur: 'langsung'\|'pengajuan', pegawai, pengajuan }` |
-| `GET pegawai/{nip}/foto` | UL_ALL + `bolehLihat` | Foto profil terkini (`Content-Type` dari isi, `inline`, `nosniff`, `no-store`); tanpa foto atau path arsip remote legacy → 404 |
+| `GET pegawai/{nip}/foto` | UL_ALL + `bolehLihat` | Foto profil terkini (`Content-Type` dari isi, `inline`, `nosniff`, `no-store`); tanpa foto → 404; path legacy dibaca lewat PathLegacy (MAKE-069); berkas belum disalin → 404 |
 | `POST pegawai` | 1 (`Role::filter`) | B-05 (MAKE-011) tambah: multipart isian Super Admin + `nip` + `email` + berkas `foto` (wajib) → 201 `{ pegawai, akun: { id_pengguna, username, user_level, created, initial_password, email_skipped } }`, `Cache-Control: no-store`; status awal selalu 1. Satu transaksi: pegawai (status 1) → `pegawai_foto` → akun A-09 dengan password awal = NIP [K] (`AccountProvisioner::provisionDenganPasswordNip`), `must_change_password` = 1 (MAKE-020 [V2]: wajib ganti saat login pertama, README Auth). 422 `errors.nip` (format/terdaftar/username akun lain), kolom biodata, `foto` |
 | `DELETE pegawai/{nip}` | 1 (`Role::filter`) | B-05 (MAKE-011) hapus FISIK ikut legacy (keputusan user 13-10-2026) → `{ deleted: true, soft_delete: false, item }`. Masih ada data turunan (FK RESTRICT ke `pegawai.nip`) → 422 `errors.nip`; akun ber-NIP dilepas (`nip` NULL, nonaktif, sesi dicabut); 404 NIP |
 | `GET biodata/pengajuan?search=&page=&per_page=` | 1, 3 (`Role::filter`) | B-04 (MAKE-011) antrean pengajuan menunggu (`flag_update` 1), lingkup jalur PROSES (`PegawaiScopeProsesInterface`: unit 20 tanpa UPT, unit 21 + satker BPO); item `id_pegawai_hist`, `nip`, `nama`, `glr_*`, `unit`, `satker`, `jabatan`, `tgl_permohonan` |
@@ -201,7 +206,7 @@ baru:
 | `POST penugasan/{plt\|plh}` | 1 | Tambah tanpa approval (JSON, atau multipart dengan berkas `lampiran` opsional 5 MB jpg/jpeg/png/gif/pdf/xls/xlsx/doc/docx) → 201. Isian legacy `validate_param_off_plt`: `status` 1/2, `jenis_jabatan` 1 (group, sub group, jabatan) atau 2 (`jenis_jabatan_koord` 1/2 + `id_jabatan_koord` yang jenisnya sama), `tgl_mulai` ≤ `tgl_akhir`, `id_unit`, `id_satker`, `id_group_jabatan_<jenis>`, `id_sub_group_jabatan_<jenis>`, `id_unit_<jenis>`, `id_satker_<jenis>`, `nip_<jenis>` (pegawai ada), `keterangan` ≤ 255; 422 per kolom |
 | `PUT penugasan/{plt\|plh}/{id}` | 1 | Ubah (isian lengkap; dengan berkas: `POST` multipart + `_method=PUT`). Berkas lama diganti sesudah commit |
 | `DELETE penugasan/{plt\|plh}/{id}` | 1 | Hapus PERMANEN ikut legacy (keputusan user 13-10-2026) → `{ deleted: true, soft_delete: false, id }`; audit_logs mencatat "before", berkas lampiran dibuang sesudah commit |
-| `GET penugasan/{plt\|plh}/{id}/lampiran` | 1, 3, 4, 5 | Unduh (`attachment`, `nosniff`, `no-store`); tanpa berkas / path arsip legacy → 404 |
+| `GET penugasan/{plt\|plh}/{id}/lampiran` | 1, 3, 4, 5 | Unduh (`attachment`, `nosniff`, `no-store`); tanpa berkas → 404; path legacy dibaca lewat PathLegacy (MAKE-069); berkas belum disalin → 404 |
 
 ### Konket, LKH, PDF (WS-2 M5, MAKE-013, aditif)
 
@@ -214,7 +219,7 @@ baru:
 | `PUT konket/{id}` | pemilik (status W) / role 1 / role 3 lingkup | Ubah (multipart `_method=PUT`); pegawai → kembali W; baris peserta → 422 `id_parent`. `affect_tukin` [V2] (CR-051): jenis (`kategori`) diganti → nilai master jenis baru, kecuali admin 1/3 mengirim `affect_tukin` (menimpa); jenis tetap → nilai tersimpan dipertahankan |
 | `DELETE konket/{id}` | pemilik / role 1 / role 3 lingkup | Status 10 ([V2], keputusan user); dinas gabungan bersama pesertanya → `{ deleted, id, ids }` |
 | `POST konket/{id}/process` | 1, 3 (lingkup proses) | `{ aksi: setujui\|tolak, reason_note }` → V/X (peserta ikut); alasan wajib saat tolak; hanya W |
-| `GET konket/{id}/berkas` | yang boleh melihat | Unduh berkas bukti; path arsip legacy → 404 |
+| `GET konket/{id}/berkas` | yang boleh melihat | Unduh berkas bukti; path legacy dibaca lewat PathLegacy (MAKE-069); berkas belum disalin → 404 |
 | `GET lkh?nip=&page=&per_page=` | 1, 2, 3, 6, 7 | B-12b LKH milik sendiri (role 1/3: `nip` lain dalam lingkup). Status 2/10 tidak ditampilkan; urut Revisi → Menunggu → Disetujui. Item: `id`, `nip`, `nama`, `tgl_laporan`, `nip_atasan`, `nama_atasan`, `status`, `catatan`, `jumlah`, `aksi {ubah, hapus, proses}` |
 | `GET lkh/opsi?nip=` | 1, 2, 3, 6, 7 | `{ nip, tanggal_minimal, tanggal_maksimal, atasan: { nip, nama } \| null, punya_jabatan }` |
 | `GET lkh/verifikasi?status=&ds=&de=&search=` | siapa pun (1, 2, 3, 6, 7) yang menjadi atasan langsung | Antrean `nip_atasan` = NIP pemanggil; bawaan status 0 |
@@ -241,18 +246,23 @@ Keputusan user 16-10-2026 (ISSUE-041). Service: `Libraries/Kepegawaian/AngkaKred
 
 Tanpa `DELETE` [K]. Route di `Config/RoutesRiwayat.php` (grup `ak-jf` dengan filter `Role::filter(Role::SUPER_ADMIN)`).
 
-### Arsip F-10 (WS-2, MAKE-090, aditif)
+### Arsip F-10 (WS-2, MAKE-090 + MAKE-092, aditif)
 
 Acuan: `docs/fase7/PRD_Fase7_F10_Arsip-Digital.md` (v1.3) §5, §7.2, §8.1–§8.2, §12.1. Service:
-`Libraries/Kepegawaian/Arsip` (`ArsipService`, `OtorisasiArsip`, `PenyajiUrlBerkas`, `RingkasanRiwayat`, `HeaderBerkas`);
-konfigurasi `Config\Arsip`. Tahap 1 = lihat + buka; aksi Tahap 2 (Edit/Hubungkan/Hapus/ekspor/`opsi-hubungkan`) milik
-MAKE-092.
+`Libraries/Kepegawaian/Arsip` (`ArsipService`, `OtorisasiArsip`, `PenyajiUrlBerkas`, `RingkasanRiwayat`, `HeaderBerkas`,
+`AksiArsip`); konfigurasi `Config\Arsip`. Tahap 1 (MAKE-090) = lihat + buka; Tahap 2 (MAKE-092) = Edit, Hubungkan, Hapus,
+ekspor, `opsi-hubungkan`, filter `belum_terhubung` (PRD §6, rincian di bawah tabel).
 
 | Method & path | Role (route) | Isi |
 |---|---|---|
-| `GET pegawai/{nip}/arsip` | 1–7 | `{ pegawai: { nip, nama, glr_depan, glr_belakang }, folder: [ { id_jenis_rwy, kode, label, urutan, jumlah, jumlah_hilang, jumlah_tak_dapat_dibuka } ], total, total_hilang, total_tak_dapat_dibuka, penyajian_berkas_legacy, aksi: { tulis: false, jenis_hubungkan: [] } }` |
-| `GET pegawai/{nip}/arsip/berkas?id_jenis_rwy=&q=&sort=&order=&page=&per_page=` | 1–7 | `{ items: [ … ], total, page, per_page }` (lihat kolom di bawah) |
+| `GET pegawai/{nip}/arsip` | 1–7 | `{ pegawai: { nip, nama, glr_depan, glr_belakang }, folder: [ { id_jenis_rwy, kode, label, urutan, jumlah, jumlah_hilang, jumlah_tak_dapat_dibuka } ], total, total_hilang, total_tak_dapat_dibuka, penyajian_berkas_legacy, aksi: { tulis, jenis_hubungkan: [ { id_jenis_rwy, label } ] } }` |
+| `GET pegawai/{nip}/arsip/berkas?id_jenis_rwy=&belum_terhubung=&q=&sort=&order=&page=&per_page=` | 1–7 | `{ items: [ … ], total, page, per_page }` (lihat kolom di bawah) |
 | `GET pegawai/{nip}/arsip/berkas/{id}/buka` | 1–7 | Isi berkas PRIVAT (unggahan v2; berkas legacy hanya saat `arsip.penyajianBerkasLegacy = privat`) |
+| `GET pegawai/{nip}/arsip/ekspor?format=xlsx\|csv&<filter daftar>` | 1–7 | Berkas ekspor (T2) |
+| `GET pegawai/{nip}/arsip/opsi-hubungkan?id_riwayat=` | 1, 2, 3, 6, 7 | `{ id_riwayat, butuh_data, items: [ { id_entri, ringkasan_riwayat } ] }` (T2) |
+| `PATCH pegawai/{nip}/arsip/berkas/{id}` | 1, 2, 3, 6, 7 | `{ tag }` → item daftar (T2, Ubah Nama) |
+| `POST pegawai/{nip}/arsip/berkas/{id}/hubungkan` | 1, 2, 3, 6, 7 | `{ id_riwayat, id_entri? }` → item daftar (T2) |
+| `DELETE pegawai/{nip}/arsip/berkas/{id}` | 1, 2, 3, 6, 7 | `{ deleted: true, soft_delete: false, item: { id_attachment } }` (T2, kode 0 saja) |
 
 - **Lingkup** = `PegawaiScope::bolehLihat` (jalur detail): 1/4/5 semua, 3 lingkup detail, 2/6/7 NIP sendiri. **Tanpa**
   izin Definisi per kode (F10-30): semua baris `document_attachment` milik NIP tampil, termasuk kode 0, 37, 38, 42–50,
@@ -267,7 +277,7 @@ MAKE-092.
 - **Item daftar** (kolom TERTUTUP; `path`, `url`, `basename`, `document_id`, `NIP`, `filename` tidak pernah dikirim):
   `id_attachment, nama_arsip, tag, display_name, id_riwayat, jenis_riwayat, id_entri, ringkasan_riwayat, file_type,
   created_at, berkas_ada, status_berkas (ada|hilang|tak_dapat_dibuka), akses_berkas (publik|privat|null), url_berkas,
-  jenis_buka (pratinjau|unduh|null), aksi { edit, hubungkan, hapus }` (Tahap 1 selalu `false`).
+  jenis_buka (pratinjau|unduh|null), aksi { edit, hubungkan, hapus }` (dihitung server, Tahap 2 di bawah).
   - `nama_arsip` = `tag` → `display_name` → `filename`; baris berkunci v2 tanpa `tag`/`display_name` → "Berkas <id>".
   - `url_berkas`: `publik` = `{arsip.dasarUrlBerkas}/<path ternormalisasi, tiap segmen rawurlencode>` (memuat path legacy,
     deviasi sadar F10-18 (a)); `privat` = `pegawai/<nip>/arsip/berkas/<id>/buka` (path API relatif TANPA slash awal,
@@ -291,8 +301,9 @@ MAKE-092.
   nosniff`, `Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`, `Content-Security-Policy` =
   `Config\Arsip::CSP_BERKAS`. Isi dibaca lewat `StorageAdapterInterface::baca()` (tanpa streaming).
 - **Audit**: pembukaan folder/daftar arsip pegawai LAIN oleh role 1/3/4/5 → `audit_logs` `entity` `arsip_lihat`,
-  `entity_id` NIP sasaran, `after` `{ endpoint: folder|berkas, filter: { id_jenis_rwy, belum_terhubung, ada_pencarian } }`
-  (tanpa teks `q`/nama berkas), dedup 15 menit per (aktor, NIP), fail-closed (gagal tulis → 500). Setiap `buka` 200 (semua
+  `entity_id` NIP sasaran, `after` `{ endpoint: folder|berkas|ekspor, filter: { id_jenis_rwy, belum_terhubung, ada_pencarian } }`
+  (tanpa teks `q`/nama berkas), dedup 15 menit per (aktor, NIP) untuk folder/daftar, ekspor dicatat SETIAP kali (F10-26),
+  fail-closed (gagal tulis → 500). Setiap `buka` 200 (semua
   role, termasuk pemilik) → `arsip_unduh`, `after` `{ id_attachment, id_riwayat, jenis_buka }`, tanpa dedup, hasil
   `record()` tidak diperiksa (pola F-09).
 - **Throttle** `buka`: `arsip_unduh_<id_pengguna>`, token bucket CI4 kapasitas `Config\Arsip::BUKA_PER_MENIT` (6) per
@@ -300,6 +311,41 @@ MAKE-092.
 - **Rute dev** `GET berkas/<path>` (di luar `api/v1`, `BerkasDevController`): hanya `ENVIRONMENT === 'development'` +
   `arsip.sajiBerkasDev = true`; dua pola legacy saja, tanpa cek izin, header sama dengan Nginx §7.3. Tidak ada di
   testing/production.
+
+**Tahap 2 (MAKE-092; PRD §6.1–§6.2, F10-09, F10-26..F10-28, F10-31, F10-38).** Aturan aksi legacy [K] + pola keamanan v2:
+non-GET, `tag` disanitasi, role + lingkup ubah + kepemilikan baris (`id_attachment = ? AND NIP = ?`) di setiap aksi, audit
+lewat `DocumentAttachmentModel` (`document_attachment` `update`/`delete`). Izin Definisi per kode tetap tidak dipakai (F10-30).
+
+- **Tulis** (`OtorisasiArsip::bolehTulis`): role 1, 2, 3, 6, 7 + `PegawaiScope::bolehUbah` (2/6/7 NIP sendiri, 3 lingkup
+  ubah); 4/5/8 → 403. Urutan: 403 role → 403 lingkup → 404 NIP → 404 baris → 422/403 per aksi.
+- **`aksi`**: folder `{ tulis, jenis_hubungkan: [ { id_jenis_rwy, label } ] }`; `jenis_hubungkan` = kode F10-28 `[1, 3, 5,
+  7, 9, 10, 11, 13, 14, 20, 22, 23, 32, 36, 38]` yang boleh dituju aktor, sebagai objek berlabel (`label` =
+  `jenis_rwy.jenis_rwy`), urut `jenis_rwy.order` (role 2/6/7: tanpa kode milik Definisi `kunciBarisDisetujui()` = saat ini
+  hanya `{ id_jenis_rwy: 38, label: "Data Umum" }`; 4/5: `tulis: false`, `[]`). Daftar ini hanya ada di respons folder. Item: `edit` = tulis kecuali kode 37 bagi selain role 1; `hubungkan` = tulis +
+  kode 0 + `jenis_hubungkan` tidak kosong; `hapus` = tulis + kode 0. FE memakainya untuk `hidden`; server tetap menegakkan.
+- **Ubah Nama** (`PATCH`): semua baris [K] termasuk riwayat Disetujui, 38, dan `tanpa_jenis`; kode 37 hanya role 1
+  (`ArsipDataUmum::bolehTulis`) → selain itu 403 "Anda tidak berhak mengubah arsip data umum pegawai ini.". `tag`: byte
+  kontrol/format dibuang LEBIH DULU, lalu tag HTML, lalu spasi tepi (termasuk spasi Unicode); sisa `<` + huruf/`/`/`!`/`?`
+  ditolak; 1–255 karakter → selain itu 422 `errors.tag`. Urutan: 404 baris → 403 → 422.
+- **Hubungkan** (`POST …/hubungkan`): baris wajib kode 0 → selain itu 422 `errors.id_attachment` "Data arsip ini telah
+  terhubung ke data riwayat pegawai. Silahkan hubungkan data arsip lain yang belum terhubung ke data riwayat." [K];
+  `id_riwayat` di luar F10-28 → 422 `errors.id_riwayat`; `id_entri` kosong atau bukan PK bulat positif kanonik (`"05"`, `"5abc"`, `"+5"` ditolak; selain 38) → 422 `errors.id_entri`; tujuan
+  lewat Definisi pemilik kode (`RiwayatRegistry`; kode 3 = `detail_anak` lewat induk `riwayat_keluarga`; 9/36 berbagi
+  `riwayat_mutasi_jabatan`) milik NIP berstatus Disetujui → selain itu 404; role 2/6/7 ke kode terkunci → 403 "Data yang
+  sudah disetujui tidak dapat diubah.". Di transaksi: `pegawai` → `document_attachment` → baris tujuan `FOR UPDATE`, kode 0
+  / Disetujui / kunci diulang. Mengisi `id_riwayat`, `nama_riwayat` (= `jenis_rwy.jenis_rwy`), `id_entri` (NULL untuk 38).
+  Tanpa cek/tulis `siasn_upload_arsip` (risiko diterima §6.6).
+- **Hapus** (`DELETE`): baris kode 0 saja (selain itu 422 `errors.id_attachment`, pesan sama); hanya baris DB, berkas fisik
+  TERTINGGAL [K].
+- **`opsi-hubungkan`**: `id_riwayat` di F10-28 (selain itu 422); kode terkunci bagi 2/6/7 → 403; baris Disetujui milik NIP
+  urut per kode seperti `list_arsip_rwy_data` legacy [K] (mis. jabatan/KP/KGB/hukdis `tmtsk` menaik, pendidikan `tgl_lulus`,
+  SKP `tahun, tgl_mulai`, anak `tgl_lahir`, alamat PK menurun; PK pemutus seri; `AksiArsip::URUTAN_OPSI`) dengan ringkasan; kode 38 → `butuh_data: false`, `items: []`.
+- **Filter `belum_terhubung`** (`1` = kode 0; `0`/kosong = tanpa saringan; lainnya 422): digabung AND dengan
+  `id_jenis_rwy` (centang + jenis lain → kosong [K]); berlaku juga untuk ekspor.
+- **Ekspor**: `format` `xlsx` (bawaan) / `csv` (lainnya 422); kolom Nama Arsip, Jenis Riwayat, Data Riwayat, tanpa URL;
+  filter & urutan sama dengan daftar (tanpa paginasi); `EksporTabel` (CSV UTF-8 BOM `.csv`, sel berawalan `= + - @ TAB CR`
+  diberi apostrof; XLSX `inlineStr`); `Content-Disposition: attachment; filename="Arsip_<nip>_<YYYYMMDD>.<format>"`,
+  `Cache-Control: no-store`, `nosniff`.
 
 ### Descriptor tab (beku)
 

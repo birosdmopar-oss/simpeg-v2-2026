@@ -102,6 +102,31 @@ final class RingkasanRiwayat
     }
 
     /**
+     * Ringkasan per `id_entri` untuk calon tujuan Hubungkan kode $kode milik $nip (`opsi-hubungkan`, MAKE-092).
+     *
+     * @param list<string> $ids
+     *
+     * @return array<string, string>
+     */
+    public function untukEntri(int $kode, string $nip, array $ids): array
+    {
+
+        $baris = [];
+
+        foreach ($ids as $i => $id) {
+            $baris[] = ['id_attachment' => $i, 'id_riwayat' => $kode, 'id_entri' => $id];
+        }
+
+        $hasil = [];
+
+        foreach ($this->untuk($nip, $baris) as $i => $teks) {
+            $hasil[$ids[$i]] = $teks;
+        }
+
+        return $hasil;
+    }
+
+    /**
      * @param list<string> $ids
      *
      * @return array<string, array<string, mixed>>

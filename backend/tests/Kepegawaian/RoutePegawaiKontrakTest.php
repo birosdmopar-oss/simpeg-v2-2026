@@ -101,6 +101,12 @@ final class RoutePegawaiKontrakTest extends CIUnitTestCase
             'folder arsip'        => ['GET', "api/v1/pegawai/{$nip}/arsip"],
             'daftar berkas arsip' => ['GET', "api/v1/pegawai/{$nip}/arsip/berkas"],
             'buka berkas arsip'   => ['GET', "api/v1/pegawai/{$nip}/arsip/berkas/1/buka"],
+            // F-10 Arsip Tahap 2 (MAKE-092).
+            'ekspor arsip'         => ['GET', "api/v1/pegawai/{$nip}/arsip/ekspor"],
+            'opsi hubungkan arsip' => ['GET', "api/v1/pegawai/{$nip}/arsip/opsi-hubungkan"],
+            'ubah nama arsip'      => ['PATCH', "api/v1/pegawai/{$nip}/arsip/berkas/1"],
+            'hubungkan arsip'      => ['POST', "api/v1/pegawai/{$nip}/arsip/berkas/1/hubungkan"],
+            'hapus arsip'          => ['DELETE', "api/v1/pegawai/{$nip}/arsip/berkas/1"],
         ];
     }
 

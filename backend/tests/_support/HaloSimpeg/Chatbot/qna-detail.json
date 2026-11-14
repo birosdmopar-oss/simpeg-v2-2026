@@ -1,0 +1,22 @@
+{
+    "status": "success",
+    "data": {
+        "id": 10,
+        "pertanyaan": "Bagaimana cara mengajukan cuti tahunan?",
+        "is_fallback_option": 1,
+        "status": 1,
+        "kategori": {
+            "id": 1,
+            "judul": "Cuti",
+            "status": 1
+        },
+        "tag": [
+            {
+                "id": 5,
+                "judul": "sandi",
+                "status": 1
+            }
+        ],
+        "jawaban": "<p>Ajukan lewat menu <strong>Layanan</strong>.</p>"
+    }
+}

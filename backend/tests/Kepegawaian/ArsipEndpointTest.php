@@ -138,7 +138,8 @@ final class ArsipEndpointTest extends DatabaseTestCase
         $this->assertSame(['Belum Terhubung', 0], [$perKode['belum_terhubung']['label'], $perKode['belum_terhubung']['urutan']]);
         $this->assertSame([7, 1, 2], [$data['total'], $data['total_hilang'], $data['total_tak_dapat_dibuka']]);
         $this->assertSame('publik', $data['penyajian_berkas_legacy']);
-        $this->assertSame(['tulis' => false, 'jenis_hubungkan' => []], $data['aksi']);
+        // Tahap 2 (MAKE-092): pemilik role 2 boleh menulis; tujuan Hubungkan hanya kode 38 (kunci F10-31).
+        $this->assertSame(['tulis' => true, 'jenis_hubungkan' => [['id_jenis_rwy' => 38, 'label' => 'Data Umum']]], $data['aksi']);
         $this->assertSame($this->nip, $data['pegawai']['nip']);
         $this->assertSame(['nip', 'nama', 'glr_depan', 'glr_belakang'], array_keys($data['pegawai']));
 
@@ -191,7 +192,8 @@ final class ArsipEndpointTest extends DatabaseTestCase
         }
 
         $this->assertSame(['Belum Terhubung', 'Data Umum', 'Jabatan'], [$items[$legacy]['jenis_riwayat'], $items[$assets]['jenis_riwayat'], $items[$v2]['jenis_riwayat']]);
-        $this->assertSame(['edit' => false, 'hubungkan' => false, 'hapus' => false], $items[$v2]['aksi']);
+        $this->assertSame(['edit' => true, 'hubungkan' => false, 'hapus' => false], $items[$v2]['aksi']);
+        $this->assertSame(['edit' => true, 'hubungkan' => true, 'hapus' => true], $items[$legacy]['aksi'], 'kode 0');
     }
 
     public function testSaklarPrivatMembuatBerkasLegacyLewatBuka(): void
@@ -298,7 +300,7 @@ final class ArsipEndpointTest extends DatabaseTestCase
         $this->asUser($admin)->get("api/v1/pegawai/{$this->nip}/arsip/berkas?q=rahasia-cari")->assertStatus(200);
         $rows = $this->db->table('audit_logs')->where('entity', 'arsip_lihat')->orderBy('id_log', 'ASC')->get()->getResultArray();
         $this->assertCount(2, $rows);
-        $this->assertEquals(['endpoint' => 'berkas', 'filter' => ['id_jenis_rwy' => null, 'belum_terhubung' => null, 'ada_pencarian' => true]], json_decode((string) $rows[1]['after_json'], true));
+        $this->assertEquals(['endpoint' => 'berkas', 'filter' => ['id_jenis_rwy' => null, 'belum_terhubung' => false, 'ada_pencarian' => true]], json_decode((string) $rows[1]['after_json'], true));
         $this->assertStringNotContainsString('rahasia-cari', (string) $rows[1]['after_json']);
 
         // Pemilik (role 2) dan admin yang membuka arsipnya sendiri tidak dicatat.

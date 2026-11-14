@@ -93,11 +93,19 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\Kepegawaian', 'fil
     $routes->get('lkh/(:num)/pdf', 'LkhController::pdf/$1');
 
     // F-10 Arsip Tahap 1 (MAKE-090, PRD F-10 §8.1): role 1–7 di route (PegawaiScope::ROLE_LIHAT_SEMUA memuat role 8),
-    // lingkup lihat + kepemilikan baris di ArsipService. Endpoint Tahap 2 (aksi/ekspor/opsi-hubungkan) = MAKE-092.
+    // lingkup lihat + kepemilikan baris di ArsipService.
     $arsip = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK)];
     $routes->get('pegawai/(:segment)/arsip', 'ArsipController::folder/$1', $arsip);
     $routes->get('pegawai/(:segment)/arsip/berkas', 'ArsipController::berkas/$1', $arsip);
     $routes->get('pegawai/(:segment)/arsip/berkas/(:num)/buka', 'ArsipController::buka/$1/$2', $arsip);
+    // F-10 Arsip Tahap 2 (MAKE-092, PRD F-10 §8.1, §12.1): literal (`ekspor`, `opsi-hubungkan`) sebelum route berparameter.
+    // Tulis = role 1, 2, 3, 6, 7 (+ lingkup ubah & kunci F10-31 di AksiArsip); ekspor = role 1–7 seperti daftar.
+    $arsipTulis = ['filter' => Role::filter(Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::PTT, Role::PPPK)];
+    $routes->get('pegawai/(:segment)/arsip/ekspor', 'ArsipController::ekspor/$1', $arsip);
+    $routes->get('pegawai/(:segment)/arsip/opsi-hubungkan', 'ArsipController::opsiHubungkan/$1', $arsipTulis);
+    $routes->patch('pegawai/(:segment)/arsip/berkas/(:num)', 'ArsipController::ubah/$1/$2', $arsipTulis);
+    $routes->post('pegawai/(:segment)/arsip/berkas/(:num)/hubungkan', 'ArsipController::hubungkan/$1/$2', $arsipTulis);
+    $routes->delete('pegawai/(:segment)/arsip/berkas/(:num)', 'ArsipController::hapus/$1/$2', $arsipTulis);
 
     // WS-2: endpoint tambahan ditambahkan di sini.
 });
