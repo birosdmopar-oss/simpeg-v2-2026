@@ -87,7 +87,9 @@ async function pasang() {
 
 async function hapusBaris(wrapper: ReturnType<typeof mount>, id: number): Promise<void> {
   await selectRowAction(wrapper, `arsip-actions-${id}`, 'hapus')
-  ;[...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ya, hapus')?.click()
+  const konfirmasi = [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ya, hapus')
+  expect(konfirmasi).toBeDefined()
+  konfirmasi?.click()
   await flushPromises()
 }
 
@@ -180,6 +182,7 @@ describe('muat ulang sesudah mutasi', () => {
 
 describe('cache folder terikat sesi (P-1)', () => {
   it('cache milik sesi sebelumnya dibuang saat clearSession → GET folder dipanggil lagi', async () => {
+    loginAs(Role.SUPER_ADMIN) // memasang Pinia aktif sendiri
     simpanFolderArsip(NIP, ringkas())
     useAuthStore().clearSession()
     await pasang()
@@ -215,8 +218,28 @@ describe('label folder khusus sesudah habis (P-5)', () => {
     const wrapper = mount(ArsipFolderPage, { global: { plugins: [router] }, attachTo: document.body })
     await flushPromises()
     expect(wrapper.get('[data-testid="arsip-folder-judul"]').text()).toBe('Belum Terhubung')
+    folderApi.mockClear()
     folderApi.mockResolvedValue(ringkas([folder(9, 'Jabatan', 6, 12)]))
     await hapusBaris(wrapper, 1)
+    expect(hapusApi).toHaveBeenCalledWith(NIP, 1)
+    expect(folderApi).toHaveBeenCalledTimes(1)
     expect(wrapper.get('[data-testid="arsip-folder-judul"]').text()).toBe('Belum Terhubung')
+  })
+})
+
+describe('retry muat folder dari dialog Hubungkan (Q-5)', () => {
+  it('retry ditolak lagi → galat tampil di dialog dan tombol aktif kembali; status memuat selama retry', async () => {
+    folderApi.mockRejectedValueOnce({ status: 500, message: 'x', errors: null, isNetworkError: false, original: {} })
+    const wrapper = await pasang()
+    await selectRowAction(wrapper, 'arsip-actions-1', 'hubungkan')
+    let tolak!: (e: unknown) => void
+    folderApi.mockReturnValueOnce(new Promise<ArsipFolderResponse>((_, reject) => (tolak = reject)))
+    q<HTMLElement>('[data-testid="arsip-hubungkan-coba-lagi"]')?.click()
+    await flushPromises()
+    expect(q<HTMLButtonElement>('[data-testid="arsip-hubungkan-coba-lagi"]')?.disabled).toBe(true)
+    tolak({ status: 500, message: 'x', errors: null, isNetworkError: false, original: {} })
+    await flushPromises()
+    expect(q('[data-testid="arsip-hubungkan-galat-jenis"]')?.textContent).toContain('Terjadi kesalahan. Coba lagi.')
+    expect(q<HTMLButtonElement>('[data-testid="arsip-hubungkan-coba-lagi"]')?.disabled).toBe(false)
   })
 })

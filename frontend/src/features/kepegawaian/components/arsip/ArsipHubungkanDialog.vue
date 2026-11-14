@@ -26,6 +26,10 @@ const props = defineProps<{
    * belum / gagal dimuat (beda dari `[]` = memang tidak ada jenis tujuan).
    */
   jenisHubungkan: ArsipJenisHubungkan[] | null
+  /** Folder sedang dimuat ulang (tombol "Coba lagi" menampilkan status memuat). */
+  memuatJenis?: boolean
+  /** Pesan galat memuat folder dari halaman (halaman tertutup modal, jadi ditampilkan di dialog). */
+  galatJenis?: string | null
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string]; basi: []; muatUlang: [] }>()
 
@@ -129,7 +133,8 @@ async function hubungkan(): Promise<void> {
         <form class="space-y-4" novalidate @submit.prevent="hubungkan">
           <UiNotice v-if="jenisHubungkan === null" tone="danger" data-testid="arsip-hubungkan-gagal-muat">
             <span>Daftar jenis riwayat belum dapat dimuat.</span>
-            <UiButton size="sm" appearance="outline" class="ml-3" data-testid="arsip-hubungkan-coba-lagi" @click="emit('muatUlang')">Coba lagi</UiButton>
+            <span v-if="galatJenis" class="ml-1" data-testid="arsip-hubungkan-galat-jenis">{{ galatJenis }}</span>
+            <UiButton size="sm" appearance="outline" class="ml-3" :loading="memuatJenis" data-testid="arsip-hubungkan-coba-lagi" @click="emit('muatUlang')">Coba lagi</UiButton>
           </UiNotice>
           <UiNotice v-else-if="jenisHubungkan.length === 0" tone="warning" data-testid="arsip-hubungkan-tanpa-jenis">
             Tidak ada jenis riwayat tujuan yang tersedia untuk Anda.

@@ -112,7 +112,7 @@ describe('ArsipEditDialog — perbaikan review', () => {
     q<HTMLElement>('[data-testid="arsip-edit-simpan"]')?.click()
     await flushPromises()
     expect(ubahNama).not.toHaveBeenCalled()
-    expect(document.body.textContent).toContain('maksimal 255')
+    expect(q('[data-testid="arsip-edit-nama"]')?.textContent).toContain('Nama arsip maksimal 255 karakter.')
   })
 
   it('422 errors.tag bukan baris basi → tidak memancarkan basi', async () => {

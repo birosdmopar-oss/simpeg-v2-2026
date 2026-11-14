@@ -57,6 +57,9 @@ describe('urainGalatAksi', () => {
   })
 
   it('bukan ApiError → pesan baku', () => {
-    expect(urainGalatAksi(new Error('boom')).basi).toBe(false)
+    const hasil = urainGalatAksi(new Error('boom'))
+    expect(hasil.basi).toBe(false)
+    expect(hasil.kolom).toEqual({})
+    expect(hasil.umum).toBe('Terjadi kesalahan. Coba lagi.')
   })
 })

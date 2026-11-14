@@ -69,6 +69,7 @@ const belumTerhubung = ref(false)
 const pesan = ref<{ tone: 'success' | 'danger'; text: string } | null>(null)
 /** Galat memuat folder (identitas / `aksi.jenis_hubungkan`); tampil dengan "Coba lagi". */
 const galatRingkas = ref<string | null>(null)
+const memuatRingkas = ref(false)
 
 let timer: ReturnType<typeof setTimeout> | undefined
 onBeforeUnmount(() => clearTimeout(timer))
@@ -157,8 +158,12 @@ async function muatRingkas(paksa = false): Promise<void> {
   if (!paksa) {
     const cache = ambilFolderArsip(nip.value)
     ringkas.value = cache
-    if (cache !== null) return // dipakai ulang dari ArsipPage; API hanya dipanggil bila URL folder dibuka langsung
+    if (cache !== null) {
+      memuatRingkas.value = false
+      return // dipakai ulang dari ArsipPage; API hanya dipanggil bila URL folder dibuka langsung
+    }
   }
+  memuatRingkas.value = true
   try {
     const data = await arsipService.folder(nip.value)
     if (ini !== permintaanRingkas) return
@@ -167,6 +172,8 @@ async function muatRingkas(paksa = false): Promise<void> {
   } catch (error) {
     if (ini !== permintaanRingkas) return
     galatRingkas.value = describeApiError(error).message
+  } finally {
+    if (ini === permintaanRingkas) memuatRingkas.value = false
   }
 }
 
@@ -346,6 +353,8 @@ async function ekspor(format: ExportFormat['key']): Promise<void> {
       :nip="nip"
       :item="hubungkanItem"
       :jenis-hubungkan="ringkas?.aksi.jenis_hubungkan ?? null"
+      :memuat-jenis="memuatRingkas"
+      :galat-jenis="galatRingkas"
       @done="sesudahMutasi"
       @basi="muatUlangBasi"
       @muat-ulang="muatRingkas(true)"

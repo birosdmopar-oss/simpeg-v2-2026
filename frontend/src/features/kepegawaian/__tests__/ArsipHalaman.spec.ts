@@ -162,6 +162,8 @@ describe('utilitas arsip', () => {
     expect(labelFolder('9', [folder(9, 'Jabatan', 6, 1)])).toBe('Jabatan')
     expect(labelFolder('tanpa_jenis', [folder(null, 'Tanpa Jenis', null, 1)])).toBe('Tanpa Jenis')
     expect(labelFolder('77', [])).toBe('Folder')
+    expect(labelFolder('0', [])).toBe('Belum Terhubung')
+    expect(labelFolder('tanpa_jenis', [])).toBe('Tanpa Jenis')
   })
 })
 
