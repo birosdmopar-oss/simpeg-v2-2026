@@ -1,0 +1,17 @@
+{
+    "status": "success",
+    "data": {
+        "kategori": [
+            {
+                "id": 1,
+                "judul": "Cuti"
+            }
+        ],
+        "tag": [
+            {
+                "id": 5,
+                "judul": "sandi"
+            }
+        ]
+    }
+}

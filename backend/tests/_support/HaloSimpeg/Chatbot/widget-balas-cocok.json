@@ -1,0 +1,12 @@
+{
+    "status": "success",
+    "data": {
+        "balasan": "<p>Ajukan lewat menu <strong>Layanan</strong> lalu pilih Cuti.</p>",
+        "cocok": true,
+        "skor": 0.7064,
+        "id_log": 101,
+        "bisa_feedback": true,
+        "token_feedback": "MTc5NDYzNjgwMA.c2ludGV0aXMtYnVrYW4tdG9rZW4tYXNsaQ",
+        "saran": []
+    }
+}

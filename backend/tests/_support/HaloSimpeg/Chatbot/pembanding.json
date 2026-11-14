@@ -1,0 +1,622 @@
+{
+    "_catatan": "MAKE-094 test pembanding mesin chatbot (AC-E10.3). Korpus dan pesan SINTETIS; nilai harapan dihasilkan sekali dari mesin legacy dev (Nlp_engine.php + ranking L_chatbot) di luar repo, PHP 8.4.2. Kode dev tidak masuk repo. Toleransi 0,0001.",
+    "skenario": {
+        "s01_cocok_biasa": {
+            "catatan": "(1) kecocokan biasa di atas ambang",
+            "bandingkan": true,
+            "pesan": "bagaimana cara mengajukan cuti tahunan",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "cara mengajukan cuti tahunan",
+                    "tag": [
+                        "cuti"
+                    ]
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "syarat kenaikan pangkat reguler",
+                    "tag": [
+                        "pangkat"
+                    ]
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "jadwal pembayaran tunjangan kinerja",
+                    "tag": [
+                        "tukin",
+                        "tunjangan"
+                    ]
+                },
+                {
+                    "id_qna": 4,
+                    "pertanyaan": "cara mengganti password akun",
+                    "tag": []
+                },
+                {
+                    "id_qna": 5,
+                    "pertanyaan": "cuti/izin sakit lebih dari tiga hari",
+                    "tag": [
+                        "sakit"
+                    ]
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": true,
+                "skor": 0.7064,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.7064,
+                        "skor_akhir": 0.7064
+                    },
+                    {
+                        "id_qna": 4,
+                        "skor": 0.0559,
+                        "skor_akhir": 0.0559
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s02_ambang_tepat": {
+            "catatan": "(2) skor tepat 0,25",
+            "bandingkan": true,
+            "pesan": "kata1",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "kata1 kata2 kata3 kata4 kata5 kata6 kata7 kata8 kata9 kata10 kata11 kata12 kata13 kata14 kata15 kata16",
+                    "tag": []
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "kata2 kata3 kata4 kata5 kata6 kata7 kata8 kata9 kata10 kata11 kata12 kata13 kata14 kata15 kata16",
+                    "tag": []
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": true,
+                "skor": 0.25,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.25,
+                        "skor_akhir": 0.25
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s03_non_ascii": {
+            "catatan": "(3) huruf beraksen/non-ASCII terbuang (\"cutí\" → \"cut\", \"ñ\" hilang)",
+            "bandingkan": true,
+            "pesan": "cutí tahunan ñ résumé",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "cara mengajukan cuti tahunan",
+                    "tag": [
+                        "cuti"
+                    ]
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "syarat kenaikan pangkat reguler",
+                    "tag": [
+                        "pangkat"
+                    ]
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "jadwal pembayaran tunjangan kinerja",
+                    "tag": [
+                        "tukin",
+                        "tunjangan"
+                    ]
+                },
+                {
+                    "id_qna": 4,
+                    "pertanyaan": "cara mengganti password akun",
+                    "tag": []
+                },
+                {
+                    "id_qna": 5,
+                    "pertanyaan": "cuti/izin sakit lebih dari tiga hari",
+                    "tag": [
+                        "sakit"
+                    ]
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": false,
+                "skor": 0.1017,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.1017,
+                        "skor_akhir": 0.1017
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    },
+                    {
+                        "id_qna": 3,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s04_tanda_baca_saja": {
+            "catatan": "(4) pesan hanya tanda baca → token kosong → magnitudo 0 → fallback",
+            "bandingkan": true,
+            "pesan": "?!... ,,,",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "cara mengajukan cuti tahunan",
+                    "tag": [
+                        "cuti"
+                    ]
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "syarat kenaikan pangkat reguler",
+                    "tag": [
+                        "pangkat"
+                    ]
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "jadwal pembayaran tunjangan kinerja",
+                    "tag": [
+                        "tukin",
+                        "tunjangan"
+                    ]
+                },
+                {
+                    "id_qna": 4,
+                    "pertanyaan": "cara mengganti password akun",
+                    "tag": []
+                },
+                {
+                    "id_qna": 5,
+                    "pertanyaan": "cuti/izin sakit lebih dari tiga hari",
+                    "tag": [
+                        "sakit"
+                    ]
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": false,
+                "skor": 0.0,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    },
+                    {
+                        "id_qna": 3,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s05_penyambung_kata": {
+            "catatan": "(5) \"cuti/izin\" → \"cutiizin\"",
+            "bandingkan": true,
+            "pesan": "cuti/izin sakit",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "cara mengajukan cuti tahunan",
+                    "tag": [
+                        "cuti"
+                    ]
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "syarat kenaikan pangkat reguler",
+                    "tag": [
+                        "pangkat"
+                    ]
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "jadwal pembayaran tunjangan kinerja",
+                    "tag": [
+                        "tukin",
+                        "tunjangan"
+                    ]
+                },
+                {
+                    "id_qna": 4,
+                    "pertanyaan": "cara mengganti password akun",
+                    "tag": []
+                },
+                {
+                    "id_qna": 5,
+                    "pertanyaan": "cuti/izin sakit lebih dari tiga hari",
+                    "tag": [
+                        "sakit"
+                    ]
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 5,
+                "cocok": true,
+                "skor": 0.5364,
+                "kandidat": [
+                    {
+                        "id_qna": 5,
+                        "skor": 0.5364,
+                        "skor_akhir": 0.5364
+                    },
+                    {
+                        "id_qna": 1,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s06_token_angka": {
+            "catatan": "(6) token \"0\" terbuang; \"01\" == \"1\", \"007\" == \"7\" (perbandingan longgar)",
+            "bandingkan": true,
+            "pesan": "formulir 0 01 7",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "formulir 1 nomor 007",
+                    "tag": []
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "formulir 0 lampiran",
+                    "tag": []
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "nomor 10 lampiran",
+                    "tag": []
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": true,
+                "skor": 0.8275,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.8275,
+                        "skor_akhir": 0.8275
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.1079,
+                        "skor_akhir": 0.1079
+                    },
+                    {
+                        "id_qna": 3,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s07_skor_seri": {
+            "catatan": "(7) skor seri → urut id_qna menaik",
+            "bandingkan": true,
+            "pesan": "lupa kata sandi",
+            "korpus": [
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "lupa kata sandi",
+                    "tag": []
+                },
+                {
+                    "id_qna": 5,
+                    "pertanyaan": "lupa kata sandi",
+                    "tag": []
+                },
+                {
+                    "id_qna": 8,
+                    "pertanyaan": "jadwal apel pagi",
+                    "tag": []
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 3,
+                "cocok": true,
+                "skor": 1.0,
+                "kandidat": [
+                    {
+                        "id_qna": 3,
+                        "skor": 1.0,
+                        "skor_akhir": 1.0
+                    },
+                    {
+                        "id_qna": 5,
+                        "skor": 1.0,
+                        "skor_akhir": 1.0
+                    },
+                    {
+                        "id_qna": 8,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s08_feedback_membalik": {
+            "catatan": "(8) pengali feedback membalik dua kandidat lolos",
+            "bandingkan": true,
+            "pesan": "cuti tahunan pegawai",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "cuti tahunan pegawai negeri",
+                    "tag": []
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "cuti tahunan pegawai kontrak",
+                    "tag": []
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "jadwal apel",
+                    "tag": []
+                }
+            ],
+            "feedback": [
+                {
+                    "id_qna": 1,
+                    "up": 0,
+                    "down": 10
+                },
+                {
+                    "id_qna": 2,
+                    "up": 10,
+                    "down": 0
+                }
+            ],
+            "harapan": {
+                "top_1_id_qna": 2,
+                "cocok": true,
+                "skor": 0.3382,
+                "kandidat": [
+                    {
+                        "id_qna": 2,
+                        "skor": 0.3382,
+                        "skor_akhir": 0.3608
+                    },
+                    {
+                        "id_qna": 1,
+                        "skor": 0.3382,
+                        "skor_akhir": 0.3157
+                    },
+                    {
+                        "id_qna": 3,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s09_feedback_di_bawah_ambang": {
+            "catatan": "(9) kandidat di bawah ambang dengan feedback positif tetap tidak lolos",
+            "bandingkan": true,
+            "pesan": "jadwal pembayaran",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "jadwal pembayaran tunjangan kinerja bulan ini untuk seluruh pegawai pusat dan daerah",
+                    "tag": []
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "cara mengganti password",
+                    "tag": []
+                }
+            ],
+            "feedback": [
+                {
+                    "id_qna": 1,
+                    "up": 50,
+                    "down": 0
+                }
+            ],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": false,
+                "skor": 0.1628,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.1628,
+                        "skor_akhir": 0.1777
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s10_korpus_satu": {
+            "catatan": "(10) korpus satu dokumen (pesan = dokumen ke-N, ln(N/df))",
+            "bandingkan": true,
+            "pesan": "cara mengajukan cuti",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "cara mengajukan cuti tahunan",
+                    "tag": []
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": false,
+                "skor": 0.0,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s11_tag_menambah_skor": {
+            "catatan": "(11) nama tag menambah skor",
+            "bandingkan": true,
+            "pesan": "tukin",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "cara mengajukan cuti tahunan",
+                    "tag": [
+                        "cuti"
+                    ]
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "syarat kenaikan pangkat reguler",
+                    "tag": [
+                        "pangkat"
+                    ]
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "jadwal pembayaran tunjangan kinerja",
+                    "tag": [
+                        "tukin",
+                        "tunjangan"
+                    ]
+                },
+                {
+                    "id_qna": 4,
+                    "pertanyaan": "cara mengganti password akun",
+                    "tag": []
+                },
+                {
+                    "id_qna": 5,
+                    "pertanyaan": "cuti/izin sakit lebih dari tiga hari",
+                    "tag": [
+                        "sakit"
+                    ]
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 3,
+                "cocok": false,
+                "skor": 0.2258,
+                "kandidat": [
+                    {
+                        "id_qna": 3,
+                        "skor": 0.2258,
+                        "skor_akhir": 0.2258
+                    },
+                    {
+                        "id_qna": 1,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        },
+        "s12_tag_ganda_dev": {
+            "catatan": "(12) BEDA YANG DIHARAPKAN: tag ganda di dev menaikkan TF (GROUP_CONCAT tanpa dedup); tidak dibandingkan",
+            "bandingkan": false,
+            "pesan": "sakit",
+            "korpus": [
+                {
+                    "id_qna": 1,
+                    "pertanyaan": "izin sakit",
+                    "tag": [
+                        "sakit",
+                        "sakit"
+                    ]
+                },
+                {
+                    "id_qna": 2,
+                    "pertanyaan": "izin sakit",
+                    "tag": [
+                        "sakit"
+                    ]
+                },
+                {
+                    "id_qna": 3,
+                    "pertanyaan": "jadwal apel pagi",
+                    "tag": []
+                }
+            ],
+            "feedback": [],
+            "harapan": {
+                "top_1_id_qna": 1,
+                "cocok": true,
+                "skor": 0.7797,
+                "kandidat": [
+                    {
+                        "id_qna": 1,
+                        "skor": 0.7797,
+                        "skor_akhir": 0.7797
+                    },
+                    {
+                        "id_qna": 2,
+                        "skor": 0.6387,
+                        "skor_akhir": 0.6387
+                    },
+                    {
+                        "id_qna": 3,
+                        "skor": 0.0,
+                        "skor_akhir": 0.0
+                    }
+                ]
+            }
+        }
+    }
+}

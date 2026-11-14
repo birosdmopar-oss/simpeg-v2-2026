@@ -1,0 +1,28 @@
+{
+    "status": "success",
+    "data": {
+        "items": [
+            {
+                "id_log": 102,
+                "waktu": "2026-11-13T08:30:00+07:00",
+                "pesan_user": "<b>halo</b>",
+                "pertanyaan_teratas": null,
+                "skor": 0,
+                "cocok": false,
+                "feedback": null
+            },
+            {
+                "id_log": 101,
+                "waktu": "2026-11-13T08:29:00+07:00",
+                "pesan_user": "cara cuti",
+                "pertanyaan_teratas": "Bagaimana cara mengajukan cuti tahunan?",
+                "skor": 0.7064,
+                "cocok": true,
+                "feedback": 1
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+}
