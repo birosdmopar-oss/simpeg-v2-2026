@@ -53,19 +53,25 @@ const pesan = (e: unknown, baku: string): string => (isApiError(e) ? e.message :
 const nomor = (i: number): number => (page.value - 1) * PER_PAGE + i + 1
 const bubble = (row: Row): boolean | null => ('tampil_bubble' in row ? row.tampil_bubble : null)
 
+/** Penjaga urutan (pola FaqView `searchSeq`, M-3): hanya respons permintaan terakhir yang ditulis. */
+let urutanMuat = 0
+
 async function muat(): Promise<void> {
+  const n = ++urutanMuat
   memuat.value = true
   failure.value = ''
   try {
     const r = await svc.value.list({ page: page.value, per_page: PER_PAGE, status: statusFilter.value === '' ? undefined : (Number(statusFilter.value) as StatusUbah), q: q.value })
+    if (n !== urutanMuat) return
     items.value = r.items
     total.value = r.total
   } catch (e) {
+    if (n !== urutanMuat) return
     items.value = []
     total.value = 0
     failure.value = pesan(e, `Gagal memuat ${props.jenis}.`)
   } finally {
-    memuat.value = false
+    if (n === urutanMuat) memuat.value = false
   }
 }
 

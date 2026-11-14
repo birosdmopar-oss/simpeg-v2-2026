@@ -38,6 +38,12 @@ watch(
   },
 )
 
+/** Berkas baru sesudah impor sukses membuka impor berikutnya (ringkasan lama disembunyikan). */
+function pilih(f: File | null): void {
+  berkas.value = f
+  if (f) hasil.value = null
+}
+
 const berhasil = computed(() => hasil.value !== null && hasil.value.galat.length === 0)
 
 async function unggah(): Promise<void> {
@@ -48,7 +54,12 @@ async function unggah(): Promise<void> {
   hasil.value = null
   try {
     hasil.value = await qnaChatbotService.impor(berkas.value)
-    if (hasil.value.galat.length === 0) emit('imported')
+    if (hasil.value.galat.length === 0) {
+      // Sukses: berkas dilepas dan tombol Impor hilang agar QnA tidak tersimpan dua kali (BE tidak mendedup, M-1).
+      berkas.value = null
+      kunciField.value += 1
+      emit('imported')
+    }
   } catch (e) {
     galat.value = isApiError(e) ? e.message : 'Gagal mengimpor berkas.'
     galatKolom.value = Object.values(galatPerKolom(e)).filter((m) => m !== galat.value)
@@ -77,7 +88,7 @@ async function unggah(): Promise<void> {
         </div>
 
         <div class="flex flex-col gap-4">
-          <UiFileField :key="kunciField" label="Berkas Excel" :allowed="['xlsx']" :max-mb="2" hint="Hanya .xlsx, maksimal 2 MB dan 1.000 baris." :disabled="mengunggah" @change="berkas = $event" />
+          <UiFileField :key="kunciField" label="Berkas Excel" :allowed="['xlsx']" :max-mb="2" hint="Hanya .xlsx, maksimal 2 MB dan 1.000 baris." :disabled="mengunggah" @change="pilih" />
           <p v-if="galat" :class="FORM_ALERT_CLASS" role="alert" data-testid="chatbot-impor-galat">
             {{ galat }}
             <template v-for="(m, i) in galatKolom" :key="i"><br />{{ m }}</template>
@@ -95,7 +106,7 @@ async function unggah(): Promise<void> {
             <div v-if="hasil.galat.length > 0">
               <p class="text-sm font-medium text-red-700">Baris galat</p>
               <ul class="list-disc pl-5 text-sm text-slate-700" data-testid="impor-daftar-galat">
-                <li v-for="b in hasil.galat" :key="`g${b.baris}`">Baris {{ b.baris }}: {{ b.alasan }}</li>
+                <li v-for="(b, i) in hasil.galat" :key="`${b.baris}-${i}`">Baris {{ b.baris }}: {{ b.alasan }}</li>
               </ul>
             </div>
             <div v-if="hasil.dilewati.length > 0">
@@ -110,7 +121,7 @@ async function unggah(): Promise<void> {
             <DialogClose as-child>
               <UiButton variant="secondary" appearance="soft">{{ berhasil ? 'Tutup' : 'Batal' }}</UiButton>
             </DialogClose>
-            <UiButton :disabled="!berkas || mengunggah" data-testid="chatbot-impor-kirim" @click="unggah">{{ mengunggah ? 'Mengimpor...' : 'Impor' }}</UiButton>
+            <UiButton v-if="!berhasil" :disabled="!berkas || mengunggah" data-testid="chatbot-impor-kirim" @click="unggah">{{ mengunggah ? 'Mengimpor...' : 'Impor' }}</UiButton>
           </div>
         </div>
       </DialogContent>

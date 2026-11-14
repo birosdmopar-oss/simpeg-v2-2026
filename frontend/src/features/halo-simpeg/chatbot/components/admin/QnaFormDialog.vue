@@ -20,8 +20,11 @@ import { qnaChatbotService } from '../../services/chatbot.service'
 import type { OpsiQna, QnaDetail, QnaRow, RujukanBerstatus, StatusUbah } from '../../types'
 import TagPilihan, { type OpsiTag } from './TagPilihan.vue'
 
-const props = defineProps<{ open: boolean; row: QnaRow | null; opsi: OpsiQna }>()
-const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [] }>()
+const props = withDefaults(defineProps<{ open: boolean; row: QnaRow | null; opsi: OpsiQna; opsiSiap?: boolean; opsiGalat?: string }>(), {
+  opsiSiap: true,
+  opsiGalat: '',
+})
+const emit = defineEmits<{ 'update:open': [value: boolean]; saved: []; 'muat-ulang-opsi': [] }>()
 
 const YA_TIDAK = [
   { value: '0', label: 'Tidak' },
@@ -94,7 +97,8 @@ const kategoriTidakAktif = computed(() => kategoriAwal.value?.status === 2 && fo
 const opsiTag = computed<OpsiTag[]>(() => {
   const opsi: OpsiTag[] = props.opsi.tag.map((t) => ({ id: t.id, judul: t.judul, aktif: true }))
   for (const t of tagAwal.value) {
-    if (t.status === 2 && !opsi.some((o) => o.id === t.id)) opsi.push({ id: t.id, judul: t.judul, aktif: false })
+    // Tag lama yang tidak ada di opsi (Tidak Aktif, atau opsi belum/gagal termuat) tetap tampil dan terpilih (M-2).
+    if (t.status !== 10 && !opsi.some((o) => o.id === t.id)) opsi.push({ id: t.id, judul: t.judul, aktif: t.status === 1 })
   }
   return opsi
 })
@@ -117,13 +121,13 @@ async function onSubmit(): Promise<void> {
   submitted.value = true
   formError.value = ''
   serverErrors.value = {}
-  if (Object.keys(errors.value).length > 0 || submitting.value || memuatDetail.value) return
+  if (Object.keys(errors.value).length > 0 || submitting.value || memuatDetail.value || !props.opsiSiap) return
   submitting.value = true
   try {
-    const terlihat = new Set(opsiTag.value.map((t) => t.id))
     await qnaChatbotService.simpan(props.row?.id ?? null, {
       id_kategori: Number(form.id_kategori),
-      tag: form.tag.filter((id) => terlihat.has(id)),
+      // Dikirim apa adanya: tag Dihapus sudah dibuang di isiDari, tag tambahan yang tidak aktif ditolak BE (M-2).
+      tag: [...form.tag],
       is_fallback_option: form.fallback === '1',
       status: Number(form.status) as StatusUbah,
       pertanyaan: form.pertanyaan,
@@ -160,6 +164,10 @@ async function onSubmit(): Promise<void> {
         <p v-if="memuatDetail" class="py-6 text-center text-sm text-slate-500" data-testid="chatbot-qna-memuat">Memuat...</p>
         <form v-else :class="FORM_GRID_CLASS" novalidate data-testid="chatbot-qna-form" @submit.prevent="onSubmit">
           <p v-if="formError" :class="FORM_ALERT_CLASS" role="alert">{{ formError }}</p>
+          <div v-if="!opsiSiap" :class="[FORM_WIDE_CLASS, FORM_ALERT_CLASS, 'flex flex-wrap items-center justify-between gap-2']" role="alert" data-testid="chatbot-qna-opsi-galat">
+            <span>{{ opsiGalat || 'Pilihan kategori dan tag belum termuat.' }} Simpan ditahan sampai pilihan termuat.</span>
+            <UiButton size="sm" variant="secondary" appearance="outline" data-testid="chatbot-qna-opsi-muat-ulang" @click="emit('muat-ulang-opsi')">Muat ulang</UiButton>
+          </div>
           <FormField
             v-model="form.id_kategori"
             name="id_kategori"
@@ -201,7 +209,7 @@ async function onSubmit(): Promise<void> {
             <DialogClose as-child>
               <UiButton variant="secondary" appearance="soft">Batal</UiButton>
             </DialogClose>
-            <UiButton type="submit" :disabled="submitting">{{ submitting ? 'Menyimpan...' : 'Simpan' }}</UiButton>
+            <UiButton type="submit" :disabled="submitting || !opsiSiap">{{ submitting ? 'Menyimpan...' : 'Simpan' }}</UiButton>
           </div>
         </form>
       </DialogContent>

@@ -24,13 +24,15 @@ export interface Penilaian {
   galat: string
 }
 
-export type PesanChat =
-  | { id: number; jenis: 'user'; teks: string }
-  | { id: number; jenis: 'sistem'; teks: string; galat?: boolean }
-  | { id: number; jenis: 'jawaban'; html: string; penilaian: Penilaian | null }
-  | { id: number; jenis: 'topik'; teks: string; topik: TopikWidget[] }
+/** `jam` = waktu lokal HH:MM saat pesan masuk, tampil kecil di bawah balon (`dev:VP:227`, `:245-257`). */
+export type PesanChat = { id: number; jam: string } & (
+  | { jenis: 'user'; teks: string }
+  | { jenis: 'sistem'; teks: string; galat?: boolean }
+  | { jenis: 'jawaban'; html: string; penilaian: Penilaian | null }
+  | { jenis: 'topik'; teks: string; topik: TopikWidget[] }
   /** `teks` kosong = saran yang menempel pada balasan sebelumnya (tanpa pengantar). */
-  | { id: number; jenis: 'pertanyaan'; teks: string; pertanyaan: PertanyaanWidget[] }
+  | { jenis: 'pertanyaan'; teks: string; pertanyaan: PertanyaanWidget[] }
+)
 
 interface StatePercakapan {
   terbuka: boolean
@@ -45,11 +47,18 @@ let urutan = 0
 /** Dinaikkan saat reset; respons yang datang sesudah reset dibuang (tidak bocor ke sesi berikutnya). */
 let generasi = 0
 
-type PesanBaru = PesanChat extends infer P ? (P extends PesanChat ? Omit<P, 'id'> : never) : never
+type PesanBaru = PesanChat extends infer P ? (P extends PesanChat ? Omit<P, 'id' | 'jam'> : never) : never
+
+const dua = (n: number): string => String(n).padStart(2, '0')
+
+function jamSekarang(): string {
+  const d = new Date()
+  return `${dua(d.getHours())}:${dua(d.getMinutes())}`
+}
 
 function tambah(p: PesanBaru): void {
   urutan += 1
-  state.pesan.push({ ...p, id: urutan } as PesanChat)
+  state.pesan.push({ ...p, id: urutan, jam: jamSekarang() } as PesanChat)
 }
 
 /** 429 (throttle) dan 422/403 membawa pesan server berbahasa Indonesia (422 per kolom didahulukan, mis. `errors.pesan`). */

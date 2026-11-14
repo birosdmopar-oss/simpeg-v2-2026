@@ -53,7 +53,11 @@ const pesan = (e: unknown, baku: string): string => (isApiError(e) ? e.message :
 const nomor = (i: number): number => (page.value - 1) * PER_PAGE + i + 1
 const tagTampil = (row: QnaRow) => row.tag.filter((t) => t.status !== 10)
 
+/** Penjaga urutan (pola FaqView `searchSeq`, M-3): hanya respons permintaan terakhir yang ditulis. */
+let urutanMuat = 0
+
 async function muat(): Promise<void> {
+  const n = ++urutanMuat
   memuat.value = true
   failure.value = ''
   try {
@@ -65,22 +69,31 @@ async function muat(): Promise<void> {
       tag: tagFilter.value === '' ? undefined : Number(tagFilter.value),
       q: q.value,
     })
+    if (n !== urutanMuat) return
     items.value = r.items
     total.value = r.total
   } catch (e) {
+    if (n !== urutanMuat) return
     items.value = []
     total.value = 0
     failure.value = pesan(e, 'Gagal memuat QnA.')
   } finally {
-    memuat.value = false
+    if (n === urutanMuat) memuat.value = false
   }
 }
 
+/** `opsiSiap` menahan form QnA sampai opsi kategori/tag termuat (M-2); galatnya ditampilkan di form + tombol muat ulang. */
+const opsiSiap = ref(false)
+const opsiGalat = ref('')
+
 async function muatOpsi(): Promise<void> {
+  opsiGalat.value = ''
   try {
     opsi.value = await qnaChatbotService.opsi()
+    opsiSiap.value = true
   } catch (e) {
-    failure.value = pesan(e, 'Gagal memuat pilihan kategori dan tag.')
+    opsiGalat.value = pesan(e, 'Gagal memuat pilihan kategori dan tag.')
+    failure.value = opsiGalat.value
   }
 }
 
@@ -266,7 +279,7 @@ onBeforeUnmount(() => {
       <div v-if="total > PER_PAGE" class="p-4"><UiPagination v-model:page="page" :per-page="PER_PAGE" :total="total" /></div>
     </UiCard>
 
-    <QnaFormDialog v-model:open="formOpen" :row="editing" :opsi="opsi" @saved="onSaved" />
+    <QnaFormDialog v-model:open="formOpen" :row="editing" :opsi="opsi" :opsi-siap="opsiSiap" :opsi-galat="opsiGalat" @saved="onSaved" @muat-ulang-opsi="muatOpsi" />
     <ImporQnaDialog v-model:open="imporOpen" @imported="onImported" />
     <ConfirmDialog
       :open="hapus.open"

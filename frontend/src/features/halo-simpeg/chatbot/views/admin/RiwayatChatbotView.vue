@@ -54,21 +54,27 @@ function filter(): FilterRiwayat {
   }
 }
 
+/** Penjaga urutan (pola FaqView `searchSeq`, M-3): hanya respons permintaan terakhir yang ditulis. */
+let urutanMuat = 0
+
 async function muat(): Promise<void> {
+  const n = ++urutanMuat
   memuat.value = true
   failure.value = ''
   fieldErrors.value = {}
   try {
     const r = await statistikChatbotService.riwayat(filter())
+    if (n !== urutanMuat) return
     items.value = r.items
     total.value = r.total
   } catch (e) {
+    if (n !== urutanMuat) return
     items.value = []
     total.value = 0
     if (isApiError(e) && e.status === 422) fieldErrors.value = galatPerKolom(e)
     failure.value = isApiError(e) ? e.message : 'Gagal memuat riwayat chat.'
   } finally {
-    memuat.value = false
+    if (n === urutanMuat) memuat.value = false
   }
 }
 

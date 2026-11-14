@@ -32,6 +32,11 @@ Simpeg: tidak memakai service, store, route, atau komponen helpdesk.
   kategori Tidak Aktif/Dihapus tampil berpenanda di form (kategori Dihapus harus diganti, ditegakkan BE 422).
 - Tampilan widget mengikuti view widget dev (`dev:views/hr/chatbot/chatbot_popup.php`) dengan token desain v2 (K-11); tanpa
   frame Figma (dicatat). Teks sapaan, salam, pengantar bubble, fallback, galat, dan penilaian mengikuti dev.
+  Jam HH:MM di bawah tiap balon ikut dev (`jam()` waktu lokal). Penyesuaian token v2 (K-11) yang dicatat: launcher 64 px
+  (dev `--vanya-ukuran`), warna aksen pink dev → `brand-tertiary`, kepala navy dev → `brand-primary`.
+- **Batas pesan 300** dihitung per code point (sama dengan `mb_strlen` BE), bukan satuan UTF-16 `maxlength` native
+  (hanya pengaman 2×): input dipangkas ke 300 code point dan `kirim()` tetap menolak yang lebih panjang.
+- **Fokus:** sesudah memilih chip, Topik/Populer, atau menilai, fokus kembali ke kotak ketik.
 
 ## Kontrak & fixture
 

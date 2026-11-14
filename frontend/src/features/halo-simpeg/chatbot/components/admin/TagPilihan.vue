@@ -29,10 +29,10 @@ function ubah(id: number, centang: boolean): void {
   const set = new Set(props.modelValue)
   if (centang) set.add(id)
   else set.delete(id)
-  emit(
-    'update:modelValue',
-    props.opsi.map((t) => t.id).filter((x) => set.has(x)),
-  )
+  // Urutan opsi, lalu id terpilih yang tidak ada di opsi tetap dipertahankan (M-2: opsi belum/gagal termuat).
+  const dariOpsi = props.opsi.map((t) => t.id).filter((x) => set.has(x))
+  const lain = props.modelValue.filter((x) => set.has(x) && !dariOpsi.includes(x))
+  emit('update:modelValue', [...dariOpsi, ...lain])
 }
 </script>
 

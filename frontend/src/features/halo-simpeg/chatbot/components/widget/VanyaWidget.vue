@@ -15,9 +15,17 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import SafeHtml from '@/shared/components/SafeHtml.vue'
 import { ACTIVE_PHASE } from '@/shared/layouts/nav.config'
 
-import { CHATBOT_WIDGET_ROLES, FASE_CHATBOT, MAKS_PESAN, PEEK_LAMA_MS, PEEK_TUNDA_MS, TEKS_VANYA } from '../../constants'
+import {
+  CHATBOT_WIDGET_ROLES,
+  FASE_CHATBOT,
+  MAKS_PESAN,
+  PEEK_LAMA_MS,
+  PEEK_TUNDA_MS,
+  TEKS_VANYA,
+} from '../../constants'
 import { peekSudahTampil, tandaiPeekTampil } from '../../stores/peek'
 import { usePercakapanVanya } from '../../stores/percakapan'
+import type { NilaiFeedback } from '../../types'
 import VanyaAvatar from './VanyaAvatar.vue'
 import VanyaPenilaian from './VanyaPenilaian.vue'
 
@@ -26,7 +34,11 @@ const vanya = usePercakapanVanya()
 const state = vanya.state
 
 const aktif = computed(
-  () => ACTIVE_PHASE >= FASE_CHATBOT && auth.role !== null && CHATBOT_WIDGET_ROLES.includes(auth.role) && !auth.mustChangePassword,
+  () =>
+    ACTIVE_PHASE >= FASE_CHATBOT &&
+    auth.role !== null &&
+    CHATBOT_WIDGET_ROLES.includes(auth.role) &&
+    !auth.mustChangePassword,
 )
 
 const launcherEl = ref<HTMLButtonElement | null>(null)
@@ -38,7 +50,13 @@ const kartuPeek = ref(false)
 const timers: ReturnType<typeof setTimeout>[] = []
 
 const kartuTampil = computed(() => !state.terbuka && (kartuHover.value || kartuPeek.value))
+/** Batas 300 dihitung per code point seperti `mb_strlen` BE (F8-41), bukan satuan UTF-16 `maxlength` native (yang hanya
+ * pengaman 2× di input): 300 emoji tetap bisa diketik dan dikirim. */
 const sisa = computed(() => MAKS_PESAN - [...ketikan.value].length)
+watch(ketikan, (v) => {
+  const huruf = [...v]
+  if (huruf.length > MAKS_PESAN) ketikan.value = huruf.slice(0, MAKS_PESAN).join('')
+})
 
 function fokusInput(): void {
   void nextTick(() => inputEl.value?.focus())
@@ -62,6 +80,17 @@ function alihkan(): void {
 
 function onDocKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape' && state.terbuka && aktif.value) tutup()
+}
+
+/** Sesudah aksi chip/Topik/Populer/penilaian, fokus kembali ke kotak ketik karena tombol yang tadi fokus di-disable atau
+ * dibuang (M-6). */
+async function lalu(jalan: Promise<void>): Promise<void> {
+  await jalan
+  fokusInput()
+}
+
+function nilai(idPesan: number, n: NilaiFeedback): Promise<void> {
+  return lalu(vanya.nilai(idPesan, n))
 }
 
 async function kirim(): Promise<void> {
@@ -100,13 +129,18 @@ onBeforeUnmount(() => {
   for (const t of timers) clearTimeout(t)
 })
 
-const kelasBalonBot = 'max-w-full whitespace-pre-wrap break-words rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700'
+const kelasBalonBot =
+  'max-w-full whitespace-pre-wrap break-words rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700'
 const kelasChip =
   'rounded-full border px-3 py-1.5 text-left text-xs font-semibold leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary disabled:opacity-60'
 </script>
 
 <template>
-  <div v-if="aktif" class="vanya pointer-events-none fixed bottom-4 right-4 z-30 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6" data-testid="vanya-widget">
+  <div
+    v-if="aktif"
+    class="vanya pointer-events-none fixed bottom-4 right-4 z-30 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6"
+    data-testid="vanya-widget"
+  >
     <section
       v-if="state.terbuka"
       id="vanya-jendela"
@@ -116,12 +150,17 @@ const kelasChip =
       data-testid="vanya-jendela"
     >
       <h2 id="vanya-judul" class="sr-only">{{ TEKS_VANYA.judulDialog }}</h2>
-      <header class="flex items-center gap-3 bg-gradient-to-br from-brand-primary to-[#2a4a80] px-4 py-3 text-white">
-        <span class="h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-white/85"><VanyaAvatar :size="40" /></span>
+      <header
+        class="flex items-center gap-3 bg-gradient-to-br from-brand-primary to-[#2a4a80] px-4 py-3 text-white"
+      >
+        <span class="h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-white/85"
+          ><VanyaAvatar :size="40"
+        /></span>
         <div class="min-w-0 flex-1">
           <p class="text-sm font-semibold">{{ TEKS_VANYA.nama }}</p>
           <p class="flex items-center gap-1.5 text-xs text-white/80">
-            <span class="inline-block h-2 w-2 rounded-full bg-success" aria-hidden="true" /> {{ TEKS_VANYA.peran }} · {{ TEKS_VANYA.online }}
+            <span class="inline-block h-2 w-2 rounded-full bg-success" aria-hidden="true" />
+            {{ TEKS_VANYA.peran }} · {{ TEKS_VANYA.online }}
           </p>
         </div>
         <button
@@ -135,61 +174,95 @@ const kelasChip =
         </button>
       </header>
 
-      <div ref="isiEl" class="scrollbar-slim flex flex-1 flex-col gap-3 overflow-y-auto bg-slate-50 px-3 py-4" aria-live="polite" data-testid="vanya-isi">
+      <div
+        ref="isiEl"
+        class="scrollbar-slim flex flex-1 flex-col gap-3 overflow-y-auto bg-slate-50 px-3 py-4"
+        aria-live="polite"
+        data-testid="vanya-isi"
+      >
         <template v-for="p in state.pesan" :key="p.id">
-          <div v-if="p.jenis === 'user'" class="ml-auto flex max-w-[85%] justify-end" data-pesan="user">
-            <p class="whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-brand-tertiary px-3 py-2 text-sm text-white">{{ p.teks }}</p>
+          <div v-if="p.jenis === 'user'" class="ml-auto flex max-w-[85%] flex-col items-end">
+            <p
+              class="whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-brand-tertiary px-3 py-2 text-sm text-white"
+              data-pesan="user"
+            >
+              {{ p.teks }}
+            </p>
+            <span class="mt-0.5 text-[0.6rem] text-slate-400" data-testid="vanya-jam">{{ p.jam }}</span>
           </div>
-          <div v-else class="flex max-w-[92%] items-end gap-2" :data-pesan="p.jenis === 'sistem' && p.galat ? 'galat' : p.jenis">
-            <span class="h-7 w-7 shrink-0 overflow-hidden rounded-full"><VanyaAvatar :size="28" /></span>
-            <div class="flex min-w-0 flex-col gap-2">
-              <p v-if="p.jenis === 'sistem'" :class="[kelasBalonBot, p.galat ? 'border-danger/40 bg-danger-soft text-red-700' : '']">{{ p.teks }}</p>
-              <div v-else-if="p.jenis === 'jawaban'" :class="kelasBalonBot" class="whitespace-normal">
-                <SafeHtml :html="p.html" />
-                <VanyaPenilaian v-if="p.penilaian" :penilaian="p.penilaian" :id-pesan="p.id" @nilai="vanya.nilai(p.id, $event)" />
+          <div v-else class="flex max-w-[92%] items-end gap-2">
+            <span class="mb-4 h-7 w-7 shrink-0 overflow-hidden rounded-full"><VanyaAvatar :size="28" /></span>
+            <div class="flex min-w-0 flex-col">
+              <div
+                class="flex min-w-0 flex-col gap-2"
+                :data-pesan="p.jenis === 'sistem' && p.galat ? 'galat' : p.jenis"
+              >
+                <p
+                  v-if="p.jenis === 'sistem'"
+                  :class="[kelasBalonBot, p.galat ? 'border-danger/40 bg-danger-soft text-red-700' : '']"
+                >
+                  {{ p.teks }}
+                </p>
+                <div v-else-if="p.jenis === 'jawaban'" :class="kelasBalonBot" class="whitespace-normal">
+                  <SafeHtml :html="p.html" />
+                  <VanyaPenilaian
+                    v-if="p.penilaian"
+                    :penilaian="p.penilaian"
+                    :id-pesan="p.id"
+                    @nilai="nilai(p.id, $event)"
+                  />
+                </div>
+                <template v-else-if="p.jenis === 'topik'">
+                  <p :class="kelasBalonBot">{{ p.teks }}</p>
+                  <ul class="flex flex-wrap gap-2" aria-label="Pilih topik">
+                    <li v-for="t in p.topik" :key="t.id">
+                      <button
+                        type="button"
+                        :class="kelasChip"
+                        class="border-brand-tertiary bg-white text-brand-tertiary hover:bg-brand-tertiary hover:text-white"
+                        :data-testid="`vanya-topik-${t.id}`"
+                        :disabled="state.mengetik"
+                        @click="lalu(vanya.pilihTopik(t))"
+                      >
+                        {{ t.judul }}
+                      </button>
+                    </li>
+                  </ul>
+                </template>
+                <template v-else>
+                  <p v-if="p.teks" :class="kelasBalonBot">{{ p.teks }}</p>
+                  <ul class="flex flex-col items-start gap-2" aria-label="Pilih pertanyaan">
+                    <li v-for="q in p.pertanyaan" :key="q.id_qna">
+                      <button
+                        type="button"
+                        :class="kelasChip"
+                        class="rounded-xl border-slate-300 bg-white font-medium text-brand-primary hover:border-brand-primary hover:bg-brand-primary hover:text-white"
+                        :data-testid="`vanya-pertanyaan-${q.id_qna}`"
+                        :disabled="state.mengetik"
+                        @click="lalu(vanya.pilihPertanyaan(q))"
+                      >
+                        {{ q.pertanyaan }}
+                      </button>
+                    </li>
+                  </ul>
+                </template>
               </div>
-              <template v-else-if="p.jenis === 'topik'">
-                <p :class="kelasBalonBot">{{ p.teks }}</p>
-                <ul class="flex flex-wrap gap-2" aria-label="Pilih topik">
-                  <li v-for="t in p.topik" :key="t.id">
-                    <button
-                      type="button"
-                      :class="kelasChip"
-                      class="border-brand-tertiary bg-white text-brand-tertiary hover:bg-brand-tertiary hover:text-white"
-                      :data-testid="`vanya-topik-${t.id}`"
-                      :disabled="state.mengetik"
-                      @click="vanya.pilihTopik(t)"
-                    >
-                      {{ t.judul }}
-                    </button>
-                  </li>
-                </ul>
-              </template>
-              <template v-else>
-                <p v-if="p.teks" :class="kelasBalonBot">{{ p.teks }}</p>
-                <ul class="flex flex-col items-start gap-2" aria-label="Pilih pertanyaan">
-                  <li v-for="q in p.pertanyaan" :key="q.id_qna">
-                    <button
-                      type="button"
-                      :class="kelasChip"
-                      class="rounded-xl border-slate-300 bg-white font-medium text-brand-primary hover:border-brand-primary hover:bg-brand-primary hover:text-white"
-                      :data-testid="`vanya-pertanyaan-${q.id_qna}`"
-                      :disabled="state.mengetik"
-                      @click="vanya.pilihPertanyaan(q)"
-                    >
-                      {{ q.pertanyaan }}
-                    </button>
-                  </li>
-                </ul>
-              </template>
+              <span class="mt-0.5 text-[0.6rem] text-slate-400" data-testid="vanya-jam">{{ p.jam }}</span>
             </div>
           </div>
         </template>
         <div v-if="state.mengetik" class="flex items-end gap-2" data-testid="vanya-mengetik">
           <span class="h-7 w-7 shrink-0 overflow-hidden rounded-full"><VanyaAvatar :size="28" /></span>
-          <p class="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-3">
+          <p
+            class="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-3"
+          >
             <span class="sr-only">{{ TEKS_VANYA.mengetik }}</span>
-            <span v-for="i in 3" :key="i" class="vanya-titik h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />
+            <span
+              v-for="i in 3"
+              :key="i"
+              class="vanya-titik h-1.5 w-1.5 rounded-full bg-slate-400"
+              aria-hidden="true"
+            />
           </p>
         </div>
       </div>
@@ -201,7 +274,7 @@ const kelasChip =
             class="flex items-center gap-1 rounded-full border border-brand-primary px-3 py-1 text-xs font-semibold text-brand-primary hover:bg-brand-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary disabled:opacity-60"
             data-testid="vanya-btn-topik"
             :disabled="state.mengetik"
-            @click="vanya.tampilTopik()"
+            @click="lalu(vanya.tampilTopik())"
           >
             <LayoutGrid class="h-3.5 w-3.5" aria-hidden="true" /> Topik
           </button>
@@ -210,7 +283,7 @@ const kelasChip =
             class="flex items-center gap-1 rounded-full border border-brand-primary px-3 py-1 text-xs font-semibold text-brand-primary hover:bg-brand-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tertiary disabled:opacity-60"
             data-testid="vanya-btn-populer"
             :disabled="state.mengetik"
-            @click="vanya.tampilPopuler()"
+            @click="lalu(vanya.tampilPopuler())"
           >
             <Star class="h-3.5 w-3.5" aria-hidden="true" /> Populer
           </button>
@@ -222,7 +295,7 @@ const kelasChip =
             ref="inputEl"
             v-model="ketikan"
             type="text"
-            :maxlength="MAKS_PESAN"
+            :maxlength="MAKS_PESAN * 2"
             autocomplete="off"
             :placeholder="TEKS_VANYA.placeholder"
             aria-describedby="vanya-sisa"
@@ -250,7 +323,8 @@ const kelasChip =
         data-testid="vanya-kartu"
         aria-hidden="true"
       >
-        <strong class="text-brand-primary">{{ TEKS_VANYA.kartuSapaanTebal }}</strong>{{ TEKS_VANYA.kartuSapaan }}
+        <strong class="text-brand-primary">{{ TEKS_VANYA.kartuSapaanTebal }}</strong
+        >{{ TEKS_VANYA.kartuSapaan }}
       </p>
       <button
         ref="launcherEl"
@@ -267,8 +341,13 @@ const kelasChip =
         @focus="kartuHover = true"
         @blur="kartuHover = false"
       >
-        <span class="block h-full w-full overflow-hidden rounded-full border-[3px] border-white shadow-panel"><VanyaAvatar :size="58" /></span>
-        <span class="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-success" aria-hidden="true" />
+        <span class="block h-full w-full overflow-hidden rounded-full border-[3px] border-white shadow-panel"
+          ><VanyaAvatar :size="58"
+        /></span>
+        <span
+          class="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-success"
+          aria-hidden="true"
+        />
       </button>
     </div>
   </div>
