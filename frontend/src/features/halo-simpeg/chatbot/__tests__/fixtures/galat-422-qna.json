@@ -1,0 +1,9 @@
+{
+    "status": "error",
+    "message": "Kategori QnA sudah dihapus. Pilih kategori lain.",
+    "errors": {
+        "id_kategori": [
+            "Kategori QnA sudah dihapus. Pilih kategori lain."
+        ]
+    }
+}

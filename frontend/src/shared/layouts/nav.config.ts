@@ -18,6 +18,7 @@ import {
   AlarmClock,
   BadgeCheck,
   Bell,
+  Bot,
   Briefcase,
   ClipboardCheck,
   Database,
@@ -45,6 +46,7 @@ import type { RouteLocationRaw } from 'vue-router'
 
 import { USER_MANAGEMENT_ROLES, type RoleCode } from '@/features/auth/types'
 import { DOKUMEN_ROLES } from '@/features/dokumen/types'
+import { CHATBOT_ADMIN_ROLES } from '@/features/halo-simpeg/chatbot/constants'
 import { INTEGRASI_ADMIN_ROLES } from '@/features/integrasi/integrasi.types'
 import {
   AK_JF_ROLES,
@@ -292,6 +294,22 @@ const NAV: NavGroup[] = [
       // MAKE-078 (ISSUE-058, PRD Fase 6 §6.2): Admin → Integrasi, role 1. Fase 6 sudah DONE tetapi ACTIVE_PHASE masih 5 →
       // `rilis` (hapus saat ACTIVE_PHASE ≥ 6).
       { key: 'integrasi', label: 'Integrasi', icon: Plug, to: { name: 'integrasi-admin' }, roles: INTEGRASI_ADMIN_ROLES, phase: 6, rilis: true },
+      // MAKE-095 (PRD Fase 8 v1.1 F8-43/F8-50): Chatbot Manager "Vanya", role 1. `phase: 8` tanpa `rilis` (pola lonceng F-08):
+      // menu dan widget terbuka bersamaan saat ACTIVE_PHASE ≥ 8; sebelum itu QA lewat URL langsung (pola F7-14).
+      {
+        key: 'chatbot-manager',
+        label: 'Chatbot Manager',
+        icon: Bot,
+        roles: CHATBOT_ADMIN_ROLES,
+        phase: 8,
+        children: [
+          { key: 'chatbot-kategori', label: 'Kategori', to: { name: 'chatbot-kategori' } },
+          { key: 'chatbot-tag', label: 'Tag', to: { name: 'chatbot-tag' } },
+          { key: 'chatbot-qna', label: 'QnA', to: { name: 'chatbot-qna' } },
+          { key: 'chatbot-statistik', label: 'Statistik', to: { name: 'chatbot-statistik' } },
+          { key: 'chatbot-riwayat', label: 'Riwayat', to: { name: 'chatbot-riwayat' } },
+        ],
+      },
     ],
   },
   {

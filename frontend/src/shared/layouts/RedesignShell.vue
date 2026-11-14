@@ -14,6 +14,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { ROLE_LABELS } from '@/features/auth/types'
 import InteraksiPopupHost from '@/features/form-digital/components/InteraksiPopupHost.vue'
+import VanyaWidget from '@/features/halo-simpeg/chatbot/components/widget/VanyaWidget.vue'
 import NotifikasiPushShell from '@/features/integrasi/components/NotifikasiPushShell.vue'
 import PengingatCutiShell from '@/features/layanan/components/PengingatCutiShell.vue'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
@@ -194,5 +195,7 @@ async function logout(): Promise<void> {
     <!-- Pengingat persetujuan cuti sekali per sesi setelah login (PRD Fase 4 §6.4.7). -->
     <PengingatCutiShell />
     <InteraksiPopupHost />
+    <!-- Widget chatbot Vanya (PRD Fase 8 v1.1 F8-30/F8-43/F8-50): role UL_PEGAWAI, gerbang fase di komponen. -->
+    <VanyaWidget v-if="!auth.mustChangePassword" />
   </div>
 </template>

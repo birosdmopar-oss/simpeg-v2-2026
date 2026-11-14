@@ -1,0 +1,16 @@
+{
+    "status": "success",
+    "data": {
+        "balasan": "Maaf, Vanya belum memahami pertanyaan Anda. Mungkin salah satu pertanyaan berikut yang Anda maksud?",
+        "cocok": false,
+        "skor": 0.1017,
+        "id_log": 102,
+        "bisa_feedback": false,
+        "saran": [
+            {
+                "id_qna": 12,
+                "pertanyaan": "Bagaimana cara mengganti kata sandi?"
+            }
+        ]
+    }
+}

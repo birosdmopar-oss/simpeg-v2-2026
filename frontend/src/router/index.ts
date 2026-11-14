@@ -20,6 +20,7 @@ import { layananRoutes } from '@/features/layanan/routes.layanan'
 import { HARI_LIBUR_READ_ROLES } from '@/features/master-data/hariLibur.types'
 import { MASTER_DATA_ROLES } from '@/features/master-data/types'
 import { formDigitalRoutes } from '@/features/form-digital/routes'
+import { chatbotRoutes } from '@/features/halo-simpeg/chatbot/routes.chatbot'
 import { kontenRoutes } from '@/features/konten/routes.konten'
 import { surveiLayananRoutes } from '@/features/survei-layanan/routes'
 import { notifikasiRoutes } from '@/features/notifikasi/routes.notifikasi'
@@ -128,6 +129,8 @@ const routes: RouteRecordRaw[] = [
   ...surveiLayananRoutes,
   // Modul H — Fase 6 Admin → Integrasi: log integrasi + tarik ulang e-Kinerja (MAKE-078, ISSUE-058).
   ...integrasiRoutes,
+  // Modul E — Fase 8 E-10 Chatbot Manager "Vanya" (MAKE-095), role 1.
+  ...chatbotRoutes,
   // Modul D — Fase 5A Presensi & Slip Gaji (MAKE-034), termasuk rute publik `/verify/slip/:token`.
   ...presensiRoutes,
   // Modul C — Fase 4 Layanan & Approval (MAKE-026): route ditambah per paket di routes.layanan.ts.
