@@ -57,7 +57,7 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
     /**
      * Prefiks modul yang sudah ada di main (Fase 0–3). Route di luar prefiks ini tidak diperiksa.
      */
-    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|form-digital|survei-layanan|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi|konten)(/|$)#';
+    private const PREFIKS_CAKUPAN = '#^api/v1/(health|auth|master|hari-libur|web-config|faq|_rbac|pegawai|biodata|struktur-organisasi|penugasan|konket|lkh|usulan|ak-jf|statistik|dokumen|dashboard|form-digital|survei-layanan|cuti|tb|ib|pmk|layanan|slip-gaji|publik|presensi|integrasi|notifikasi|konten|halo-simpeg/chatbot)(/|$)#';
 
     /**
      * Master yang dropdown `{key}/options`-nya hanya role 1 (publicOptions false, CR-003): konten FAQ.
@@ -167,6 +167,37 @@ final class KontrakMatriksRoleTest extends CIUnitTestCase
             'POST api/v1/konten/dibo/([0-9]+)'                => [1],
             'PATCH api/v1/konten/dibo/([0-9]+)/status'        => [1],
             'DELETE api/v1/konten/dibo/([0-9]+)'              => [1],
+            // Modul E — Fase 8 E-10 chatbot Vanya (MAKE-094, PRD Fase 8 v1.1 §6.5): widget = role 2/6/7 (F8-30, `dev:CB:215-243`
+            // UL_PEGAWAI); Chatbot Manager = role 1 (F8-32, `dev:CB:58-211`). Helpdesk Halo Simpeg menambah barisnya sendiri.
+            'GET api/v1/halo-simpeg/chatbot/widget/kategori'                    => [2, 6, 7],
+            'GET api/v1/halo-simpeg/chatbot/widget/kategori/([^/]+)/pertanyaan' => [2, 6, 7],
+            'GET api/v1/halo-simpeg/chatbot/widget/populer'                     => [2, 6, 7],
+            'POST api/v1/halo-simpeg/chatbot/widget/balas'                      => [2, 6, 7],
+            'POST api/v1/halo-simpeg/chatbot/widget/feedback'                   => [2, 6, 7],
+            'GET api/v1/halo-simpeg/chatbot/tag/ekspor'                         => [1],
+            'GET api/v1/halo-simpeg/chatbot/qna/opsi'                           => [1],
+            'GET api/v1/halo-simpeg/chatbot/qna/template'                       => [1],
+            'POST api/v1/halo-simpeg/chatbot/qna/impor'                         => [1],
+            'GET api/v1/halo-simpeg/chatbot/kategori'                           => [1],
+            'POST api/v1/halo-simpeg/chatbot/kategori'                          => [1],
+            'GET api/v1/halo-simpeg/chatbot/kategori/([0-9]+)'                  => [1],
+            'PUT api/v1/halo-simpeg/chatbot/kategori/([0-9]+)'                  => [1],
+            'PATCH api/v1/halo-simpeg/chatbot/kategori/([0-9]+)/status'         => [1],
+            'DELETE api/v1/halo-simpeg/chatbot/kategori/([0-9]+)'               => [1],
+            'GET api/v1/halo-simpeg/chatbot/tag'                                => [1],
+            'POST api/v1/halo-simpeg/chatbot/tag'                               => [1],
+            'GET api/v1/halo-simpeg/chatbot/tag/([0-9]+)'                       => [1],
+            'PUT api/v1/halo-simpeg/chatbot/tag/([0-9]+)'                       => [1],
+            'PATCH api/v1/halo-simpeg/chatbot/tag/([0-9]+)/status'              => [1],
+            'DELETE api/v1/halo-simpeg/chatbot/tag/([0-9]+)'                    => [1],
+            'GET api/v1/halo-simpeg/chatbot/qna'                                => [1],
+            'POST api/v1/halo-simpeg/chatbot/qna'                               => [1],
+            'GET api/v1/halo-simpeg/chatbot/qna/([0-9]+)'                       => [1],
+            'PUT api/v1/halo-simpeg/chatbot/qna/([0-9]+)'                       => [1],
+            'PATCH api/v1/halo-simpeg/chatbot/qna/([0-9]+)/status'              => [1],
+            'DELETE api/v1/halo-simpeg/chatbot/qna/([0-9]+)'                    => [1],
+            'GET api/v1/halo-simpeg/chatbot/statistik'                          => [1],
+            'GET api/v1/halo-simpeg/chatbot/riwayat'                            => [1],
             // Modul C — Fase 4 C-07 Tugas Belajar (MAKE-024 M5): PRD §5.2, Matriks `hr/rwy/tb/*` = 1, 2, 3, 6 (role 7 → 403,
             // DoD 070-4); aturan pemilik/PIC/lingkup/role 1 di service (TbService::ROLE_ROUTE).
             'GET api/v1/tb'                            => [1, 2, 3, 6],

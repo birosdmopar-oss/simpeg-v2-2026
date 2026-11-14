@@ -1,0 +1,42 @@
+{
+    "status": "success",
+    "data": {
+        "kpi": {
+            "total_chat": 74,
+            "chat_hari_ini": 3,
+            "rata_skor": 0.4821,
+            "rata_skor_cocok": 0.6512
+        },
+        "kepuasan": {
+            "membantu": 2,
+            "tidak_membantu": 1,
+            "total": 3,
+            "persen_puas": 66.7
+        },
+        "top_pesan": [
+            {
+                "pesan_user": "cara cuti",
+                "jumlah": 5
+            }
+        ],
+        "top_qna_cocok": [
+            {
+                "id_qna": 10,
+                "pertanyaan": "Bagaimana cara mengajukan cuti tahunan?",
+                "jumlah": 9
+            },
+            {
+                "id_qna": 99,
+                "pertanyaan": null,
+                "jumlah": 1
+            }
+        ],
+        "top_qna_negatif": [
+            {
+                "id_qna": 10,
+                "pertanyaan": "Bagaimana cara mengajukan cuti tahunan?",
+                "jumlah": 1
+            }
+        ]
+    }
+}

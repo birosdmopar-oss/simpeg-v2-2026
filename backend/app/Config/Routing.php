@@ -57,6 +57,8 @@ class Routing extends BaseRouting
         APPPATH . 'Config/RoutesNotifikasi.php',
         // Modul F Jalur A — konten admin (Fase 7, MAKE-079..082): popup, banner; berita dan DIBO menyusul (api/v1/konten/*).
         APPPATH . 'Config/RoutesKonten.php',
+        // Modul E — chatbot "Vanya" (Fase 8 E-10, MAKE-094): `api/v1/halo-simpeg/chatbot/*`.
+        APPPATH . 'Config/RoutesChatbot.php',
     ];
 
     /**

@@ -9,8 +9,8 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * Penyimpanan berkas lampiran di disk lokal (B-18, MAKE-009). Satu-satunya adapter Fase 3: arsip remote legacy tidak
- * disalin (repo publik); adapter remote menyusul di Fase 6 di balik StorageAdapterInterface yang sama.
+ * Penyimpanan berkas lampiran di disk lokal (B-18, MAKE-009). Satu-satunya adapter: tidak ada server arsip terpisah
+ * (PRD F-10 F10-01/F10-02); berkas legacy disalin ke akar ini saat cutover (MAKE-069 K-M3 opsi A).
  *
  * Akar default `writable/uploads/lampiran` (sudah diabaikan git). Path relatif untuk TULIS/HAPUS hanya boleh berisi segmen
  * `[A-Za-z0-9._-]` tanpa `.`/`..`, sehingga tidak pernah keluar dari akar. Tulis atomik: berkas sementara di folder
