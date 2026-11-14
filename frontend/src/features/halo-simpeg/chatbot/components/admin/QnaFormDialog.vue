@@ -20,10 +20,10 @@ import { qnaChatbotService } from '../../services/chatbot.service'
 import type { OpsiQna, QnaDetail, QnaRow, RujukanBerstatus, StatusUbah } from '../../types'
 import TagPilihan, { type OpsiTag } from './TagPilihan.vue'
 
-const props = withDefaults(defineProps<{ open: boolean; row: QnaRow | null; opsi: OpsiQna; opsiSiap?: boolean; opsiGalat?: string }>(), {
-  opsiSiap: true,
-  opsiGalat: '',
-})
+const props = withDefaults(
+  defineProps<{ open: boolean; row: QnaRow | null; opsi: OpsiQna; opsiSiap?: boolean; opsiGalat?: string; opsiMemuat?: boolean }>(),
+  { opsiSiap: true, opsiGalat: '', opsiMemuat: false },
+)
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: []; 'muat-ulang-opsi': [] }>()
 
 const YA_TIDAK = [
@@ -164,7 +164,10 @@ async function onSubmit(): Promise<void> {
         <p v-if="memuatDetail" class="py-6 text-center text-sm text-slate-500" data-testid="chatbot-qna-memuat">Memuat...</p>
         <form v-else :class="FORM_GRID_CLASS" novalidate data-testid="chatbot-qna-form" @submit.prevent="onSubmit">
           <p v-if="formError" :class="FORM_ALERT_CLASS" role="alert">{{ formError }}</p>
-          <div v-if="!opsiSiap" :class="[FORM_WIDE_CLASS, FORM_ALERT_CLASS, 'flex flex-wrap items-center justify-between gap-2']" role="alert" data-testid="chatbot-qna-opsi-galat">
+          <p v-if="!opsiSiap && opsiMemuat" :class="FORM_WIDE_CLASS" class="text-sm text-slate-500" data-testid="chatbot-qna-opsi-memuat">
+            Memuat pilihan kategori dan tag... Simpan ditahan sampai pilihan termuat.
+          </p>
+          <div v-else-if="!opsiSiap" :class="[FORM_WIDE_CLASS, FORM_ALERT_CLASS, 'flex flex-wrap items-center justify-between gap-2']" role="alert" data-testid="chatbot-qna-opsi-galat">
             <span>{{ opsiGalat || 'Pilihan kategori dan tag belum termuat.' }} Simpan ditahan sampai pilihan termuat.</span>
             <UiButton size="sm" variant="secondary" appearance="outline" data-testid="chatbot-qna-opsi-muat-ulang" @click="emit('muat-ulang-opsi')">Muat ulang</UiButton>
           </div>

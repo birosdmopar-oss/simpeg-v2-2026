@@ -53,6 +53,22 @@ const kartuTampil = computed(() => !state.terbuka && (kartuHover.value || kartuP
 /** Batas 300 dihitung per code point seperti `mb_strlen` BE (F8-41), bukan satuan UTF-16 `maxlength` native (yang hanya
  * pengaman 2× di input): 300 emoji tetap bisa diketik dan dikirim. */
 const sisa = computed(() => MAKS_PESAN - [...ketikan.value].length)
+/**
+ * Ketikan/sisipan yang membuat pesan lebih dari 300 code point ditolak sebelum masuk (nilai dan posisi kursor tetap, N-3).
+ * Tempel (`insertFromPaste`/`insertFromDrop`) dibiarkan lalu dipangkas watch di bawah sebagai pengaman.
+ */
+function onBeforeInput(e: Event): void {
+  const ev = e as InputEvent
+  const el = ev.target as HTMLInputElement | null
+  if (!el || !ev.inputType?.startsWith('insert') || ev.inputType === 'insertFromPaste' || ev.inputType === 'insertFromDrop') return
+  const sisip = ev.data ?? ''
+  if (sisip === '') return
+  const awal = el.selectionStart ?? el.value.length
+  const akhir = el.selectionEnd ?? awal
+  const baru = el.value.slice(0, awal) + sisip + el.value.slice(akhir)
+  if ([...baru].length > MAKS_PESAN) ev.preventDefault()
+}
+
 watch(ketikan, (v) => {
   const huruf = [...v]
   if (huruf.length > MAKS_PESAN) ketikan.value = huruf.slice(0, MAKS_PESAN).join('')
@@ -188,7 +204,7 @@ const kelasChip =
             >
               {{ p.teks }}
             </p>
-            <span class="mt-0.5 text-[0.6rem] text-slate-400" data-testid="vanya-jam">{{ p.jam }}</span>
+            <span class="mt-0.5 text-[0.6rem] text-slate-400" aria-hidden="true" data-testid="vanya-jam">{{ p.jam }}</span>
           </div>
           <div v-else class="flex max-w-[92%] items-end gap-2">
             <span class="mb-4 h-7 w-7 shrink-0 overflow-hidden rounded-full"><VanyaAvatar :size="28" /></span>
@@ -247,7 +263,7 @@ const kelasChip =
                   </ul>
                 </template>
               </div>
-              <span class="mt-0.5 text-[0.6rem] text-slate-400" data-testid="vanya-jam">{{ p.jam }}</span>
+              <span class="mt-0.5 text-[0.6rem] text-slate-400" aria-hidden="true" data-testid="vanya-jam">{{ p.jam }}</span>
             </div>
           </div>
         </template>
@@ -294,6 +310,7 @@ const kelasChip =
             id="vanya-input"
             ref="inputEl"
             v-model="ketikan"
+            @beforeinput="onBeforeInput"
             type="text"
             :maxlength="MAKS_PESAN * 2"
             autocomplete="off"

@@ -85,15 +85,24 @@ async function muat(): Promise<void> {
 /** `opsiSiap` menahan form QnA sampai opsi kategori/tag termuat (M-2); galatnya ditampilkan di form + tombol muat ulang. */
 const opsiSiap = ref(false)
 const opsiGalat = ref('')
+const opsiMemuat = ref(false)
 
 async function muatOpsi(): Promise<void> {
+  // Tidak mengirim permintaan opsi paralel selama yang sebelumnya masih berjalan (N-6).
+  if (opsiMemuat.value) return
+  opsiMemuat.value = true
+  const galatLama = opsiGalat.value
   opsiGalat.value = ''
   try {
     opsi.value = await qnaChatbotService.opsi()
     opsiSiap.value = true
+    // Galat opsi yang sudah teratasi tidak dibiarkan tampil di halaman (N-6).
+    if (galatLama !== '' && failure.value === galatLama) failure.value = ''
   } catch (e) {
     opsiGalat.value = pesan(e, 'Gagal memuat pilihan kategori dan tag.')
     failure.value = opsiGalat.value
+  } finally {
+    opsiMemuat.value = false
   }
 }
 
@@ -279,7 +288,7 @@ onBeforeUnmount(() => {
       <div v-if="total > PER_PAGE" class="p-4"><UiPagination v-model:page="page" :per-page="PER_PAGE" :total="total" /></div>
     </UiCard>
 
-    <QnaFormDialog v-model:open="formOpen" :row="editing" :opsi="opsi" :opsi-siap="opsiSiap" :opsi-galat="opsiGalat" @saved="onSaved" @muat-ulang-opsi="muatOpsi" />
+    <QnaFormDialog v-model:open="formOpen" :row="editing" :opsi="opsi" :opsi-siap="opsiSiap" :opsi-galat="opsiGalat" :opsi-memuat="opsiMemuat" @saved="onSaved" @muat-ulang-opsi="muatOpsi" />
     <ImporQnaDialog v-model:open="imporOpen" @imported="onImported" />
     <ConfirmDialog
       :open="hapus.open"

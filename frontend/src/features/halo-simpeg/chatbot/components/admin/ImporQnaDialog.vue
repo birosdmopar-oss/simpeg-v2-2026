@@ -6,7 +6,7 @@
  */
 import { X } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'radix-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import { isApiError } from '@/lib/axios'
 import { FORM_ALERT_CLASS } from '@/shared/components/formLayout'
@@ -44,6 +44,8 @@ function pilih(f: File | null): void {
   if (f) hasil.value = null
 }
 
+const tutupEl = ref<{ $el: unknown } | null>(null)
+
 const berhasil = computed(() => hasil.value !== null && hasil.value.galat.length === 0)
 
 async function unggah(): Promise<void> {
@@ -59,6 +61,9 @@ async function unggah(): Promise<void> {
       berkas.value = null
       kunciField.value += 1
       emit('imported')
+      // Tombol Impor hilang; fokus dipindah ke "Tutup" agar fokus keyboard tidak lepas ke body (N-7).
+      await nextTick()
+      ;(tutupEl.value?.$el as HTMLElement | undefined)?.focus()
     }
   } catch (e) {
     galat.value = isApiError(e) ? e.message : 'Gagal mengimpor berkas.'
@@ -94,7 +99,7 @@ async function unggah(): Promise<void> {
             <template v-for="(m, i) in galatKolom" :key="i"><br />{{ m }}</template>
           </p>
 
-          <div v-if="hasil" class="space-y-3" data-testid="chatbot-impor-hasil">
+          <div v-if="hasil" class="space-y-3" role="status" data-testid="chatbot-impor-hasil">
             <UiNotice :tone="berhasil ? 'success' : 'danger'">
               {{ berhasil ? 'Data QnA beserta Kategori dan Tag berhasil diimpor!' : 'Impor dibatalkan karena ada baris galat. Tidak ada data yang tersimpan.' }}
             </UiNotice>
@@ -119,7 +124,7 @@ async function unggah(): Promise<void> {
 
           <div class="flex justify-end gap-2">
             <DialogClose as-child>
-              <UiButton variant="secondary" appearance="soft">{{ berhasil ? 'Tutup' : 'Batal' }}</UiButton>
+              <UiButton ref="tutupEl" variant="secondary" appearance="soft" data-testid="chatbot-impor-tutup">{{ berhasil ? 'Tutup' : 'Batal' }}</UiButton>
             </DialogClose>
             <UiButton v-if="!berhasil" :disabled="!berkas || mengunggah" data-testid="chatbot-impor-kirim" @click="unggah">{{ mengunggah ? 'Mengimpor...' : 'Impor' }}</UiButton>
           </div>
