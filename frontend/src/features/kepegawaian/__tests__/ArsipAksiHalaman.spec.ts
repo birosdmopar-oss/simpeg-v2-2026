@@ -169,15 +169,35 @@ describe('ekspor', () => {
     await flushPromises()
   }
 
-  it('mengikuti filter aktif (jenis + belum terhubung + pencarian) dan menyimpan berkas', async () => {
+  async function ketikCari(wrapper: ReturnType<typeof mount>, teks: string): Promise<void> {
+    const input = wrapper.get('[data-testid="arsip-cari"] input')
+    await input.setValue(teks)
+    await vi.advanceTimersByTimeAsync(400) // melewati debounce 300 ms
+    await flushPromises()
+  }
+
+  it('mengikuti filter lengkap (centang → jenis → pencarian), sama dengan kueri daftar tanpa page/per_page, dan menyimpan berkas', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const berkasEkspor = { blob: new Blob(['x']), nama: 'arsip.xlsx' }
     eksporApi.mockResolvedValue(berkasEkspor)
     const wrapper = await pasang(`/arsip/${NIP}/semua`)
-    await pilihJenis(wrapper, '9')
     await centang(wrapper, true)
+    await pilihJenis(wrapper, '9')
+    await ketikCari(wrapper, 'sk cpns')
+    const terakhir = berkasApi.mock.calls.at(-1)?.[1]
+    expect(terakhir).toEqual({ id_jenis_rwy: 9, belum_terhubung: true, q: 'sk cpns', page: 1, per_page: 25 })
     await ekspor('xlsx')
-    expect(eksporApi).toHaveBeenCalledWith(NIP, 'xlsx', { belum_terhubung: true })
+    expect(eksporApi).toHaveBeenCalledWith(NIP, 'xlsx', { id_jenis_rwy: 9, belum_terhubung: true, q: 'sk cpns' })
     expect(simpan).toHaveBeenCalledWith(berkasEkspor)
+  })
+
+  it('folder tanpa_jenis: ekspor memakai id_jenis_rwy "tanpa_jenis" (+ pencarian)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    eksporApi.mockResolvedValue({ blob: new Blob(['x']), nama: 'arsip.csv' })
+    const wrapper = await pasang(`/arsip/${NIP}/tanpa_jenis`)
+    await ketikCari(wrapper, 'lama')
+    await ekspor('csv')
+    expect(eksporApi).toHaveBeenCalledWith(NIP, 'csv', { id_jenis_rwy: 'tanpa_jenis', q: 'lama' })
   })
 
   it('di folder tertentu memakai filter folder; CSV', async () => {
@@ -187,26 +207,31 @@ describe('ekspor', () => {
     expect(eksporApi).toHaveBeenCalledWith(NIP, 'csv', { id_jenis_rwy: 9 })
   })
 
-  it('role 4/5 juga boleh mengekspor (semua role 1–7)', async () => {
-    const wrapper = await pasang(`/arsip/${NIP}/semua`, Role.ADMIN_VIEW_ESELON1)
+  it.each([Role.ADMIN_VIEW_ESELON1, Role.MENTERI])('role %s (4/5) juga boleh mengekspor (semua role 1–7)', async (role) => {
+    eksporApi.mockResolvedValue({ blob: new Blob(['x']), nama: 'arsip.xlsx' })
+    const wrapper = await pasang(`/arsip/${NIP}/semua`, role)
     expect(wrapper.find('[data-testid="arsip-ekspor"]').exists()).toBe(true)
+    await ekspor('xlsx')
+    expect(eksporApi).toHaveBeenCalledTimes(1)
   })
 
   it('galat ekspor → pesan di halaman, tanpa menyimpan berkas', async () => {
-    eksporApi.mockRejectedValue(galat(403, 'Anda tidak berhak mengakses data ini.'))
+    eksporApi.mockRejectedValue(galat(403, 'Ekspor ditolak server.'))
     const wrapper = await pasang(`/arsip/${NIP}/semua`)
     await ekspor('xlsx')
-    expect(wrapper.get('[data-testid="arsip-pesan"]').text()).toContain('Anda tidak berhak mengakses data ini.')
+    expect(wrapper.get('[data-testid="arsip-pesan"]').text()).toContain('Ekspor ditolak server.')
     expect(simpan).not.toHaveBeenCalled()
   })
 })
 
 describe('aksi baris', () => {
-  it('role 1: Edit/Buka/Hubungkan/Hapus pada arsip yatim; role 4 hanya Buka', async () => {
+  it('role 1: Edit/Buka/Hubungkan/Hapus pada arsip yatim', async () => {
     const admin = await pasang(`/arsip/${NIP}/semua`)
     expect((await rowMenuActions(admin, 'arsip-actions-1')).map((a) => a.key)).toEqual(['edit', 'buka', 'hubungkan', 'hapus'])
-    admin.unmount()
-    const lihat = await pasang(`/arsip/${NIP}/semua`, Role.ADMIN_VIEW_ESELON1)
+  })
+
+  it.each([Role.ADMIN_VIEW_ESELON1, Role.MENTERI])('role %s (4/5) hanya Buka walau aksi.* dari server true', async (role) => {
+    const lihat = await pasang(`/arsip/${NIP}/semua`, role)
     expect((await rowMenuActions(lihat, 'arsip-actions-1')).map((a) => a.key)).toEqual(['buka'])
   })
 
@@ -215,6 +240,8 @@ describe('aksi baris', () => {
     const wrapper = await pasang(`/arsip/${NIP}/semua`)
     simpanFolderArsip(NIP, ringkas())
     expect(folderApi).toHaveBeenCalledTimes(1)
+    const dataBaru = { ...ringkas(), total: 14 }
+    folderApi.mockResolvedValue(dataBaru)
     await selectRowAction(wrapper, 'arsip-actions-1', 'hapus')
     expect(q('[role="alertdialog"], [role="dialog"]')?.textContent).toContain('Berkas fisik tidak ikut dihapus')
     expect(hapusApi).not.toHaveBeenCalled()
@@ -224,7 +251,7 @@ describe('aksi baris', () => {
     expect(hapusApi).toHaveBeenCalledWith(NIP, 1)
     expect(berkasApi).toHaveBeenCalledTimes(1)
     expect(folderApi).toHaveBeenCalledTimes(2)
-    expect(ambilFolderArsip(NIP)).not.toBeNull() // diisi ulang dari API terbaru
+    expect(ambilFolderArsip(NIP)).toEqual(dataBaru) // diisi ulang dari API terbaru, bukan sisa cache lama
     expect(wrapper.get('[data-testid="arsip-pesan"]').text()).toContain('Arsip dihapus.')
   })
 

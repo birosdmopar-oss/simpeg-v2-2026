@@ -10,6 +10,9 @@ vi.mock('../services/auth.service', () => ({
   authService: { me: vi.fn(), login: vi.fn(), logout: vi.fn(), changePassword: vi.fn() },
 }))
 
+import { ambilFolderArsip, kosongkanFolderArsip, simpanFolderArsip } from '@/features/kepegawaian/arsip.cache'
+import type { ArsipFolderResponse } from '@/features/kepegawaian/arsip.types'
+
 import { authService } from '../services/auth.service'
 import { useAuthStore } from '../stores/auth.store'
 import { Role, type User } from '../types'
@@ -126,5 +129,31 @@ describe('useAuthStore', () => {
 
     await expect(store.changePassword({ old_password: 'x', new_password: 'Baru12345', new_password_confirmation: 'Baru12345' })).rejects.toBeTruthy()
     expect(store.isAuthenticated).toBe(true)
+  })
+})
+
+describe('useAuthStore — cache folder Arsip terikat sesi (MAKE-096)', () => {
+  const dataArsip = { pegawai: { nip: 'x', nama: 'Uji', glr_depan: null, glr_belakang: null }, folder: [], total: 0 } as unknown as ArsipFolderResponse
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    kosongkanFolderArsip()
+    vi.mocked(authService.login).mockReset()
+    vi.mocked(authService.logout).mockReset()
+  })
+
+  it('clearSession mengosongkan cache folder Arsip', () => {
+    const store = useAuthStore()
+    simpanFolderArsip('nip-uji', dataArsip)
+    store.clearSession()
+    expect(ambilFolderArsip('nip-uji')).toBeNull()
+  })
+
+  it('login akun lain mengosongkan cache folder Arsip', async () => {
+    vi.mocked(authService.login).mockResolvedValue({ user: user(Role.ADMIN_SATKER), access_expires_at: 1 } as never)
+    const store = useAuthStore()
+    simpanFolderArsip('nip-uji', dataArsip)
+    await store.login({ username: 'u', password: 'p' } as never)
+    expect(ambilFolderArsip('nip-uji')).toBeNull()
   })
 })

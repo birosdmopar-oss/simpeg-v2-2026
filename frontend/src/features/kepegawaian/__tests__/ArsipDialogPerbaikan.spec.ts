@@ -88,6 +88,33 @@ describe('ArsipEditDialog — perbaikan review', () => {
     expect(wrapper.emitted('basi')).toHaveLength(1)
   })
 
+  it('batas 255 dihitung per code point: 130 emoji diterima, 256 huruf ditolak di klien', async () => {
+    ubahNama.mockResolvedValue(undefined)
+    const wrapper = mount(ArsipEditDialog, { props: { open: true, nip: NIP, item: berkas() }, attachTo: document.body })
+    await flushPromises()
+    const input = q<HTMLInputElement>('[data-testid="arsip-edit-nama"] input')
+    if (!input) throw new Error('input tidak ada')
+    input.value = '😀'.repeat(130)
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    q<HTMLElement>('[data-testid="arsip-edit-simpan"]')?.click()
+    await flushPromises()
+    expect(ubahNama).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+    ubahNama.mockClear()
+    mount(ArsipEditDialog, { props: { open: true, nip: NIP, item: berkas() }, attachTo: document.body })
+    await flushPromises()
+    const input2 = q<HTMLInputElement>('[data-testid="arsip-edit-nama"] input')
+    if (!input2) throw new Error('input tidak ada')
+    input2.value = 'a'.repeat(256)
+    input2.dispatchEvent(new Event('input'))
+    await flushPromises()
+    q<HTMLElement>('[data-testid="arsip-edit-simpan"]')?.click()
+    await flushPromises()
+    expect(ubahNama).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('maksimal 255')
+  })
+
   it('422 errors.tag bukan baris basi → tidak memancarkan basi', async () => {
     ubahNama.mockRejectedValue(galat(422, 'x', { tag: ['Nama arsip tidak valid.'] }))
     const wrapper = mount(ArsipEditDialog, { props: { open: true, nip: NIP, item: berkas() }, attachTo: document.body })
@@ -116,12 +143,38 @@ describe('ArsipHubungkanDialog — perbaikan review', () => {
     expect(wrapper.emitted('basi')).toHaveLength(1)
   })
 
+  it('404 tujuan → opsi dimuat ulang, entri dikosongkan, pesan 404 dipertahankan, tombol disabled', async () => {
+    opsi.mockResolvedValue({ id_riwayat: 9, butuh_data: true, items: [{ id_entri: '456', ringkasan_riwayat: 'Analis' }] })
+    hubungkan.mockRejectedValue(galat(404, 'Tujuan sudah tidak ada.'))
+    const wrapper = mount(ArsipHubungkanDialog, { props: { open: true, nip: NIP, item: berkas(), jenisHubungkan: JABATAN }, attachTo: document.body })
+    await flushPromises()
+    await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
+    await pilih('[data-testid="arsip-hubungkan-entri"]', '456')
+    q<HTMLElement>('[data-testid="arsip-hubungkan-simpan"]')?.click()
+    await flushPromises()
+    expect(opsi).toHaveBeenCalledTimes(2)
+    expect(q('[data-testid="arsip-hubungkan-galat"]')?.textContent).toContain('Tujuan sudah tidak ada.')
+    expect(q<HTMLSelectElement>('[data-testid="arsip-hubungkan-entri"] select')?.value).toBe('')
+    expect(q<HTMLButtonElement>('[data-testid="arsip-hubungkan-simpan"]')?.disabled).toBe(true)
+    expect(wrapper.emitted('basi')).toHaveLength(1)
+  })
+
   it('opsi-hubungkan 422 errors.id_riwayat → pesan server tampil', async () => {
     opsi.mockRejectedValue(galat(422, 'x', { id_riwayat: ['Jenis riwayat tidak dapat dihubungkan.'] }))
     mount(ArsipHubungkanDialog, { props: { open: true, nip: NIP, item: berkas(), jenisHubungkan: JABATAN }, attachTo: document.body })
     await flushPromises()
     await pilih('[data-testid="arsip-hubungkan-jenis"]', '9')
     expect(q('[data-testid="arsip-hubungkan-galat"]')?.textContent).toContain('Jenis riwayat tidak dapat dihubungkan.')
+  })
+
+  it('jenisHubungkan null (folder gagal dimuat) → galat muat + Coba lagi memancarkan muatUlang', async () => {
+    const wrapper = mount(ArsipHubungkanDialog, { props: { open: true, nip: NIP, item: berkas(), jenisHubungkan: null }, attachTo: document.body })
+    await flushPromises()
+    expect(q('[data-testid="arsip-hubungkan-tanpa-jenis"]')).toBeNull()
+    expect(q('[data-testid="arsip-hubungkan-gagal-muat"]')?.textContent).toContain('belum dapat dimuat')
+    q<HTMLElement>('[data-testid="arsip-hubungkan-coba-lagi"]')?.click()
+    await flushPromises()
+    expect(wrapper.emitted('muatUlang')).toHaveLength(1)
   })
 
   it('jenisHubungkan kosong → pesan penjelasan, bukan dialog buntu', async () => {

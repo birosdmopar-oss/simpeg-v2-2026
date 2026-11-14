@@ -40,5 +40,10 @@ export function filterDariFolder(param: string): Pick<ArsipBerkasQuery, 'id_jeni
 /** Label folder untuk breadcrumb/judul. */
 export function labelFolder(param: string, folder: readonly ArsipFolder[]): string {
   if (param === FOLDER_SEMUA) return 'Semua berkas'
-  return folder.find((f) => paramFolder(f) === param)?.label ?? 'Folder'
+  const ditemukan = folder.find((f) => paramFolder(f) === param)?.label
+  if (ditemukan !== undefined) return ditemukan
+  // Folder khusus bisa habis sesudah Hubungkan / Hapus: label tetap, bukan "Folder" generik.
+  if (param === String(ID_BELUM_TERHUBUNG)) return 'Belum Terhubung'
+  if (param === FOLDER_TANPA_JENIS) return 'Tanpa Jenis'
+  return 'Folder'
 }

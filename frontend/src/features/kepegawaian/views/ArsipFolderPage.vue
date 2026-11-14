@@ -345,9 +345,10 @@ async function ekspor(format: ExportFormat['key']): Promise<void> {
       v-model:open="hubungkanOpen"
       :nip="nip"
       :item="hubungkanItem"
-      :jenis-hubungkan="ringkas?.aksi.jenis_hubungkan ?? []"
+      :jenis-hubungkan="ringkas?.aksi.jenis_hubungkan ?? null"
       @done="sesudahMutasi"
       @basi="muatUlangBasi"
+      @muat-ulang="muatRingkas(true)"
     />
     <ConfirmDialog
       v-model:open="hapusOpen"

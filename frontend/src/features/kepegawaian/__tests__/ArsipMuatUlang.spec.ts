@@ -11,11 +11,12 @@ vi.mock('../services/arsip.service', () => ({
 }))
 vi.mock('../services/berkasUnduhan', () => ({ ambilBerkas: vi.fn(), simpanBerkas: vi.fn() }))
 
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role } from '@/features/auth/types'
 import { selectRowAction } from '@/shared/components/__tests__/rowActionsMenu.helpers'
 import { createShellRouter, loginAs } from '@/shared/layouts/__tests__/shellTestUtils'
 
-import { kosongkanFolderArsip } from '../arsip.cache'
+import { ambilFolderArsip, kosongkanFolderArsip, simpanFolderArsip } from '../arsip.cache'
 import type { ArsipBerkas, ArsipBerkasResponse, ArsipFolder, ArsipFolderResponse } from '../arsip.types'
 import { arsipService } from '../services/arsip.service'
 import ArsipFolderPage from '../views/ArsipFolderPage.vue'
@@ -109,6 +110,7 @@ describe('muat ulang sesudah mutasi', () => {
     folderApi.mockRejectedValueOnce({ status: 500, message: 'x', errors: null, isNetworkError: false, original: {} })
     await hapusBaris(wrapper, 1)
     expect(wrapper.get('[data-testid="arsip-galat-folder"]').text()).toContain('Terjadi kesalahan. Coba lagi.')
+    expect(ambilFolderArsip(NIP)).toBeNull() // cache dikosongkan sesudah mutasi dan tidak diisi data basi
     expect(wrapper.findAll('[data-testid="arsip-filter-jenis"] option').map((o) => o.text())).toEqual(expect.arrayContaining(['Jabatan']))
     await wrapper.get('[data-testid="arsip-folder-coba-lagi"]').trigger('click')
     await flushPromises()
@@ -128,7 +130,7 @@ describe('muat ulang sesudah mutasi', () => {
   })
 
   it('Hapus 404 (baris basi) → daftar dan folder dimuat ulang, tanpa pesan sukses', async () => {
-    hapusApi.mockRejectedValue(galat(404, 'Data tidak ditemukan.'))
+    hapusApi.mockRejectedValue(galat(404, 'Arsip sudah tidak ada.'))
     const wrapper = await pasang()
     berkasApi.mockClear()
     folderApi.mockClear()
@@ -136,7 +138,7 @@ describe('muat ulang sesudah mutasi', () => {
     expect(berkasApi).toHaveBeenCalledTimes(1)
     expect(folderApi).toHaveBeenCalledTimes(1)
     const teks = wrapper.get('[data-testid="arsip-pesan"]').text()
-    expect(teks).toContain('Data tidak ditemukan.')
+    expect(teks).toContain('Arsip sudah tidak ada.')
     expect(teks).not.toContain('Arsip dihapus.')
   })
 
@@ -173,5 +175,48 @@ describe('muat ulang sesudah mutasi', () => {
     expect(item('buka')?.hasAttribute('data-disabled')).toBe(false)
     selesai()
     await flushPromises()
+  })
+})
+
+describe('cache folder terikat sesi (P-1)', () => {
+  it('cache milik sesi sebelumnya dibuang saat clearSession → GET folder dipanggil lagi', async () => {
+    simpanFolderArsip(NIP, ringkas())
+    useAuthStore().clearSession()
+    await pasang()
+    expect(folderApi).toHaveBeenCalledWith(NIP)
+  })
+})
+
+describe('folder gagal dimuat saat pertama kali (P-2)', () => {
+  it('Hubungkan menampilkan galat muat + "Coba lagi", bukan "tidak tersedia untuk Anda"; sesudah berhasil jenis bisa dipilih', async () => {
+    folderApi.mockRejectedValueOnce({ status: 500, message: 'x', errors: null, isNetworkError: false, original: {} })
+    const wrapper = await pasang()
+    await selectRowAction(wrapper, 'arsip-actions-1', 'hubungkan')
+    expect(q('[data-testid="arsip-hubungkan-tanpa-jenis"]')).toBeNull()
+    expect(q('[data-testid="arsip-hubungkan-gagal-muat"]')?.textContent).toContain('Daftar jenis riwayat belum dapat dimuat.')
+    folderApi.mockClear()
+    q<HTMLElement>('[data-testid="arsip-hubungkan-coba-lagi"]')?.click()
+    await flushPromises()
+    expect(folderApi).toHaveBeenCalledWith(NIP)
+    expect(q('[data-testid="arsip-hubungkan-gagal-muat"]')).toBeNull()
+    const opsi = [...document.body.querySelectorAll('[data-testid="arsip-hubungkan-jenis"] option')].map((o) => o.textContent?.trim())
+    expect(opsi).toContain('Data Umum')
+  })
+})
+
+describe('label folder khusus sesudah habis (P-5)', () => {
+  it('hapus satu-satunya baris folder 0 → judul tetap "Belum Terhubung"', async () => {
+    hapusApi.mockResolvedValue(undefined)
+    berkasApi.mockResolvedValue(hasil([berkas(1)]))
+    loginAs(Role.SUPER_ADMIN)
+    const router = createShellRouter()
+    await router.push(`/arsip/${NIP}/0`)
+    await router.isReady()
+    const wrapper = mount(ArsipFolderPage, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="arsip-folder-judul"]').text()).toBe('Belum Terhubung')
+    folderApi.mockResolvedValue(ringkas([folder(9, 'Jabatan', 6, 12)]))
+    await hapusBaris(wrapper, 1)
+    expect(wrapper.get('[data-testid="arsip-folder-judul"]').text()).toBe('Belum Terhubung')
   })
 })

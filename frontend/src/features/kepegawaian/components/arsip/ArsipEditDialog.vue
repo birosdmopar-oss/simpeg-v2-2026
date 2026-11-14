@@ -45,7 +45,7 @@ async function simpan(): Promise<void> {
     galatKolom.value = 'Nama arsip wajib diisi.'
     return
   }
-  if (bersih.length > NAMA_ARSIP_MAKS) {
+  if ([...bersih].length > NAMA_ARSIP_MAKS) {
     galatKolom.value = `Nama arsip maksimal ${NAMA_ARSIP_MAKS} karakter.`
     return
   }

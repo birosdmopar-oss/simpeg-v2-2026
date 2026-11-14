@@ -21,10 +21,13 @@ const props = defineProps<{
   open: boolean
   nip: string
   item: ArsipBerkas | null
-  /** Jenis tujuan yang boleh bagi aktor, berlabel dari server (`aksi.jenis_hubungkan` respons folder). */
-  jenisHubungkan: ArsipJenisHubungkan[]
+  /**
+   * Jenis tujuan yang boleh bagi aktor, berlabel dari server (`aksi.jenis_hubungkan` respons folder). `null` = folder
+   * belum / gagal dimuat (beda dari `[]` = memang tidak ada jenis tujuan).
+   */
+  jenisHubungkan: ArsipJenisHubungkan[] | null
 }>()
-const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string]; basi: [] }>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; done: [pesan: string]; basi: []; muatUlang: [] }>()
 
 const jenis = ref<string>('')
 const entri = ref<string>('')
@@ -37,7 +40,7 @@ const kode = computed(() => (jenis.value === '' ? null : Number(jenis.value)))
 const tanpaPilihanData = computed(() => kode.value === ID_ARSIP_DATA_UMUM)
 
 const opsiJenis = computed<SelectOption[]>(() =>
-  props.jenisHubungkan.map((j) => ({ value: String(j.id_jenis_rwy), label: j.label })),
+  (props.jenisHubungkan ?? []).map((j) => ({ value: String(j.id_jenis_rwy), label: j.label })),
 )
 const opsiEntri = computed<SelectOption[]>(() => opsi.value.map((o) => ({ value: o.id_entri, label: o.ringkasan_riwayat })))
 
@@ -56,11 +59,12 @@ watch(
 )
 
 let permintaan = 0
-watch(jenis, async (nilai) => {
+/** Muat opsi data riwayat untuk satu jenis. `pertahankanGalat` = jangan hapus pesan galat yang sedang tampil (mis. 404 tujuan). */
+async function muatOpsi(nilai: string, pertahankanGalat = false): Promise<void> {
   const ini = ++permintaan
   entri.value = ''
   opsi.value = []
-  galat.value = ''
+  if (!pertahankanGalat) galat.value = ''
   if (nilai === '' || Number(nilai) === ID_ARSIP_DATA_UMUM) {
     memuatOpsi.value = false
     return
@@ -77,7 +81,8 @@ watch(jenis, async (nilai) => {
   } finally {
     if (ini === permintaan) memuatOpsi.value = false
   }
-})
+}
+watch(jenis, (nilai) => void muatOpsi(nilai))
 
 async function hubungkan(): Promise<void> {
   const item = props.item
@@ -92,6 +97,11 @@ async function hubungkan(): Promise<void> {
     const hasil = urainGalatAksi(error, ['id_attachment', 'id_riwayat', 'id_entri'])
     galat.value = hasil.kolom.id_attachment ?? hasil.kolom.id_riwayat ?? hasil.kolom.id_entri ?? hasil.umum
     if (hasil.basi) emit('basi')
+    // Tujuan sudah tidak ada / tidak lagi Disetujui: opsi dimuat ulang (entri lama dikosongkan), pesan 404 dipertahankan.
+    if (error !== null && typeof error === 'object' && (error as { status?: number }).status === 404 && !tanpaPilihanData.value) {
+      busy.value = false
+      await muatOpsi(jenis.value, true)
+    }
   } finally {
     busy.value = false
   }
@@ -117,7 +127,11 @@ async function hubungkan(): Promise<void> {
         </div>
 
         <form class="space-y-4" novalidate @submit.prevent="hubungkan">
-          <UiNotice v-if="jenisHubungkan.length === 0" tone="warning" data-testid="arsip-hubungkan-tanpa-jenis">
+          <UiNotice v-if="jenisHubungkan === null" tone="danger" data-testid="arsip-hubungkan-gagal-muat">
+            <span>Daftar jenis riwayat belum dapat dimuat.</span>
+            <UiButton size="sm" appearance="outline" class="ml-3" data-testid="arsip-hubungkan-coba-lagi" @click="emit('muatUlang')">Coba lagi</UiButton>
+          </UiNotice>
+          <UiNotice v-else-if="jenisHubungkan.length === 0" tone="warning" data-testid="arsip-hubungkan-tanpa-jenis">
             Tidak ada jenis riwayat tujuan yang tersedia untuk Anda.
           </UiNotice>
           <UiSelect v-model="jenis" label="Jenis Riwayat" placeholder="Pilih jenis riwayat" required :disabled="busy" :options="opsiJenis" data-testid="arsip-hubungkan-jenis" />

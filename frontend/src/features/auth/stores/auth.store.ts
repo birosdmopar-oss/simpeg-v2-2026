@@ -10,6 +10,7 @@ import { computed, ref } from 'vue'
 import { resetChatbot } from '@/features/halo-simpeg/chatbot/stores/percakapan'
 import { lepasTokenPush } from '@/features/integrasi/composables/notifikasiPush'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
+import { kosongkanFolderArsip } from '@/features/kepegawaian/arsip.cache'
 import { resetSesiKonten } from '@/features/konten/sesi'
 import { isApiError } from '@/lib/axios'
 
@@ -49,6 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function clearSession(): void {
     resetSesiKonten()
+    kosongkanFolderArsip()
     resetChatbot()
     user.value = null
     claims.value = null
@@ -86,6 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
     resetPengingatCuti()
     // Popup konten tampil sekali per sesi login (PRD Fase 7 Q7-02): login baru mengosongkan penanda.
     resetSesiKonten()
+    kosongkanFolderArsip()
     return result.user
   }
 
