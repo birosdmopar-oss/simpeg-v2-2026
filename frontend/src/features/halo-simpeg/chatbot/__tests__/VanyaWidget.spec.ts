@@ -233,11 +233,10 @@ describe('VanyaWidget — alur percakapan', () => {
     expect(w.text()).toContain('Belum ada pertanyaan pada topik ini.')
   })
 
-  it('ketikan: di-trim, kosong diabaikan, maxlength 300', async () => {
+  it('ketikan: di-trim, kosong diabaikan', async () => {
     const w = await pasang()
     await bukaChat(w)
     const input = w.get('[data-testid="vanya-input"]')
-    expect(input.attributes('maxlength')).toBe('300')
     await input.setValue('   ')
     await w.get('[data-testid="vanya-form"]').trigger('submit')
     expect(svc.balas).not.toHaveBeenCalled()
@@ -317,6 +316,115 @@ describe('VanyaWidget — alur percakapan', () => {
     const user = w.findAll('[data-pesan="user"]').at(-1)!
     expect(user.find('img').exists()).toBe(false)
     expect(user.text()).toBe('<img src=x onerror=alert(1)>')
+  })
+})
+
+describe('VanyaWidget — review CR (M-5..M-8)', () => {
+  it('M-5: batas 300 per code point — 300 emoji terkirim utuh; 301 ASCII dipangkas ke 300 sebelum dikirim', async () => {
+    const w = await pasang()
+    await bukaChat(w)
+    const input = w.get('[data-testid="vanya-input"]')
+    const emoji = '😀'.repeat(300)
+    await input.setValue(emoji)
+    expect((input.element as HTMLInputElement).value).toBe(emoji)
+    expect(w.get('#vanya-sisa').text()).toBe('Sisa 0 karakter')
+    await w.get('[data-testid="vanya-form"]').trigger('submit')
+    await flushPromises()
+    expect(svc.balas).toHaveBeenLastCalledWith(emoji, undefined)
+
+    await input.setValue('a'.repeat(301))
+    await flushPromises()
+    expect((input.element as HTMLInputElement).value).toBe('a'.repeat(300))
+    await w.get('[data-testid="vanya-form"]').trigger('submit')
+    await flushPromises()
+    expect(svc.balas).toHaveBeenLastCalledWith('a'.repeat(300), undefined)
+    expect(svc.balas).not.toHaveBeenCalledWith('a'.repeat(301), undefined)
+  })
+
+  it('M-5: store menolak kiriman lebih dari 300 code point (penjaga kedua)', async () => {
+    const { usePercakapanVanya } = await import('../stores/percakapan')
+    expect(usePercakapanVanya().kirim('a'.repeat(301), 300)).toBeNull()
+    expect(svc.balas).not.toHaveBeenCalled()
+  })
+
+  it('M-6: fokus kembali ke kotak ketik sesudah memilih chip, Topik/Populer, dan menilai', async () => {
+    const w = await pasang()
+    await bukaChat(w)
+    const input = w.get('[data-testid="vanya-input"]').element
+    await w.get('[data-testid="vanya-topik-3"]').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(input)
+
+    ;(w.get('[data-testid="vanya-btn-populer"]').element as HTMLButtonElement).focus()
+    await w.get('[data-testid="vanya-btn-populer"]').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(input)
+
+    await w.get('[data-testid="vanya-pertanyaan-7"]').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(input)
+
+    ;(w.get('[data-action="suka"]').element as HTMLButtonElement).focus()
+    await w.get('[data-action="suka"]').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('M-7: jam HH:MM di bawah setiap balon', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 14, 8, 5))
+    const w = await pasang()
+    await bukaChat(w)
+    const jam = w.findAll('[data-testid="vanya-jam"]').map((j) => j.text())
+    expect(jam.length).toBeGreaterThan(0)
+    expect(new Set(jam)).toEqual(new Set(['08:05']))
+    vi.useRealTimers()
+  })
+
+  it('M-8: respons balas yang tiba sesudah logout + login pegawai lain dibuang', async () => {
+    let lepas: (v: BalasanWidget) => void = () => {}
+    svc.balas.mockImplementationOnce(() => new Promise<BalasanWidget>((r) => (lepas = r)))
+    const w = await pasang()
+    await bukaChat(w)
+    await w.get('[data-testid="vanya-input"]').setValue('cuti')
+    await w.get('[data-testid="vanya-form"]').trigger('submit')
+    await flushPromises()
+    expect(w.find('[data-testid="vanya-mengetik"]').exists()).toBe(true)
+
+    useAuthStore().clearSession()
+    login(Role.PTT)
+    await flushPromises()
+    lepas(cocok())
+    await flushPromises()
+
+    expect(w.find('[data-testid="vanya-mengetik"]').exists()).toBe(false)
+    await bukaChat(w)
+    expect(w.findAll('[data-pesan="user"]')).toHaveLength(0)
+    expect(w.find('[data-pesan="jawaban"]').exists()).toBe(false)
+    expect(w.findAll('[data-pesan="sistem"]').filter((p) => p.text().startsWith('Halo, saya Vanya'))).toHaveLength(1)
+  })
+
+  it('M-8: feedback yang masih menunggu saat logout tidak mengubah apa pun sesudahnya', async () => {
+    let lepas: () => void = () => {}
+    svc.feedback.mockImplementationOnce(() => new Promise<void>((r) => (lepas = r)))
+    const w = await pasang()
+    await bukaChat(w)
+    await w.get('[data-testid="vanya-input"]').setValue('cuti')
+    await w.get('[data-testid="vanya-form"]').trigger('submit')
+    await flushPromises()
+    await w.get('[data-action="suka"]').trigger('click')
+    await flushPromises()
+
+    useAuthStore().clearSession()
+    login(Role.PEGAWAI)
+    await flushPromises()
+    lepas()
+    await flushPromises()
+
+    await bukaChat(w)
+    expect(w.find('[data-pesan="jawaban"]').exists()).toBe(false)
+    expect(w.find('[data-testid^="vanya-penilaian-"]').exists()).toBe(false)
+    expect(w.text()).not.toContain('Terima kasih atas penilaiannya!')
   })
 })
 

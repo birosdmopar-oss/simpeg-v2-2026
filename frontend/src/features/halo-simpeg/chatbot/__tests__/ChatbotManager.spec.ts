@@ -65,6 +65,9 @@ const qna: QnaRow[] = [
   { id: 11, pertanyaan: 'Cara cek SKP?', is_fallback_option: false, status: 2, kategori: { id: 9, judul: 'Kinerja Lama', status: 10 }, tag: [] },
 ]
 
+type RiwayatRowUji = { id_log: number; waktu: string; pesan_user: string; pertanyaan_teratas: string | null; skor: number; cocok: boolean; feedback: 1 | -1 | null }
+const riwayatRow = (id: number, pesan: string): RiwayatRowUji => ({ id_log: id, waktu: '2026-11-13T08:30:00+07:00', pesan_user: pesan, pertanyaan_teratas: null, skor: 0, cocok: false, feedback: null })
+
 let wrapper: VueWrapper | null = null
 
 async function pasang<C>(komponen: C, props: Record<string, unknown> = {}): Promise<VueWrapper> {
@@ -217,13 +220,13 @@ describe('Chatbot Manager — QnA', () => {
   })
 
   it('Unduh template dan Impor Excel (ringkasan hasil; galat → tidak ada yang tersimpan)', async () => {
-    svc.qna.template.mockResolvedValue({ blob: new Blob(['x']), nama: 'Template_Impor_QnA.xlsx' })
+    svc.qna.template.mockResolvedValue({ blob: new Blob(['x']), nama: 'Template_Import_QnA.xlsx' })
     svc.qna.impor.mockResolvedValueOnce({ ditambah: 0, kategori_baru: 0, tag_baru: 0, dilewati: [], galat: [{ baris: 3, alasan: 'Kategori wajib diisi.' }] })
     svc.qna.impor.mockResolvedValueOnce({ ditambah: 5, kategori_baru: 1, tag_baru: 2, dilewati: [{ baris: 7, alasan: 'Pertanyaan kosong.' }], galat: [] })
     const w = await pasang(QnaChatbotView)
     await w.get('[data-testid="chatbot-qna-template"]').trigger('click')
     await flushPromises()
-    expect(simpanBerkas).toHaveBeenCalledWith({ blob: expect.any(Blob), nama: 'Template_Impor_QnA.xlsx' })
+    expect(simpanBerkas).toHaveBeenCalledWith({ blob: expect.any(Blob), nama: 'Template_Import_QnA.xlsx' })
 
     await w.get('[data-testid="chatbot-qna-impor"]').trigger('click')
     await flushPromises()
@@ -290,6 +293,172 @@ describe('Chatbot Manager — Statistik & Riwayat', () => {
     pilihCocok.vm.$emit('update:modelValue', '0')
     await flushPromises()
     expect(svc.stat.riwayat).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, cocok: 0 }))
+  })
+})
+
+function tunda<T>() {
+  let lepas: (v: T) => void = () => {}
+  let tolak: (e: unknown) => void = () => {}
+  const janji = new Promise<T>((r, j) => {
+    lepas = r
+    tolak = j
+  })
+  return { janji, lepas, tolak }
+}
+
+const klikKonfirmasi = (): void => {
+  ;([...document.querySelectorAll('[role="alertdialog"] button')].find((b) => b.textContent?.trim() === 'Hapus') as HTMLButtonElement).click()
+}
+
+describe('Chatbot Manager — review CR (M-1..M-3, M-9, M-11)', () => {
+  it('M-1: sesudah impor sukses tombol Impor hilang dan berkas dilepas (tidak bisa impor dua kali)', async () => {
+    svc.qna.impor.mockResolvedValue({ ditambah: 2, kategori_baru: 0, tag_baru: 0, dilewati: [], galat: [] })
+    const w = await pasang(QnaChatbotView)
+    await w.get('[data-testid="chatbot-qna-impor"]').trigger('click')
+    await flushPromises()
+    w.findComponent({ name: 'UiFileField' }).vm.$emit('change', new File(['x'], 'qna.xlsx'))
+    await flushPromises()
+    ;(document.querySelector('[data-testid="chatbot-impor-kirim"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="impor-ditambah"]')?.textContent).toBe('2')
+    expect(document.querySelector('[data-testid="chatbot-impor-kirim"]')).toBeNull()
+    expect(svc.qna.impor).toHaveBeenCalledTimes(1)
+  })
+
+  it('M-2: opsi gagal → form ditahan + muat ulang; tag lama (aktif & Tidak Aktif) tetap terkirim walau tidak ada di opsi', async () => {
+    svc.qna.opsi.mockReset()
+    svc.qna.opsi.mockRejectedValueOnce(apiError(500, 'Server galat.'))
+    svc.qna.opsi.mockResolvedValueOnce({ kategori: [{ id: 3, judul: 'Cuti' }], tag: [{ id: 9, judul: 'lain' }] })
+    svc.qna.detail.mockResolvedValue({ ...qna[0]!, jawaban: '<p>x</p>' })
+    svc.qna.simpan.mockResolvedValue(qna[0])
+    const w = await pasang(QnaChatbotView)
+    await selectRowAction(w, 'chatbot-qna-actions-12', 'edit')
+    await flushPromises()
+    expect(document.querySelector('[data-testid="chatbot-qna-opsi-galat"]')?.textContent).toContain('Server galat.')
+    const simpan = document.querySelector('[data-testid="chatbot-qna-form"] button[type="submit"]') as HTMLButtonElement
+    expect(simpan.disabled).toBe(true)
+    expect(document.querySelector('[data-testid="chatbot-qna-tag-4"]')).not.toBeNull()
+
+    ;(document.querySelector('[data-testid="chatbot-qna-opsi-muat-ulang"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="chatbot-qna-opsi-galat"]')).toBeNull()
+    ;(document.querySelector('[data-testid="chatbot-qna-form"]') as HTMLFormElement).dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(svc.qna.simpan).toHaveBeenCalledWith(12, expect.objectContaining({ tag: [4, 6] }))
+  })
+
+  it('M-3: respons daftar yang tiba terbalik — yang tampil hasil permintaan terakhir (Riwayat)', async () => {
+    const pertama = tunda<ReturnType<typeof daftar<RiwayatRowUji>>>()
+    const kedua = tunda<ReturnType<typeof daftar<RiwayatRowUji>>>()
+    svc.stat.riwayat.mockReturnValueOnce(pertama.janji).mockReturnValueOnce(kedua.janji)
+    const w = await pasang(RiwayatChatbotView)
+    w.findAllComponents({ name: 'UiSelect' })[0]!.vm.$emit('update:modelValue', '1')
+    await flushPromises()
+    kedua.lepas(daftar([riwayatRow(2, 'baru')]))
+    await flushPromises()
+    pertama.lepas(daftar([riwayatRow(1, 'lama')]))
+    await flushPromises()
+    expect(w.find('[data-testid="chatbot-riwayat-row-2"]').exists()).toBe(true)
+    expect(w.find('[data-testid="chatbot-riwayat-row-1"]').exists()).toBe(false)
+    expect(w.text()).not.toContain('Memuat...')
+  })
+
+  it('M-3: galat permintaan lama tidak menimpa hasil terbaru (Master)', async () => {
+    const pertama = tunda<ReturnType<typeof daftar<KategoriRow>>>()
+    svc.kategori.list.mockReturnValueOnce(pertama.janji).mockResolvedValueOnce(daftar([kategori[1]!]))
+    const w = await pasang(MasterChatbotView, { jenis: 'kategori' })
+    w.findComponent({ name: 'UiSelect' }).vm.$emit('update:modelValue', '2')
+    await flushPromises()
+    pertama.tolak(apiError(500, 'lama gagal'))
+    await flushPromises()
+    expect(w.find('[data-testid="chatbot-kategori-row-4"]').exists()).toBe(true)
+    expect(w.text()).not.toContain('lama gagal')
+  })
+
+  it('M-3: respons terbalik di QnA — hasil filter terakhir yang tampil', async () => {
+    const pertama = tunda<ReturnType<typeof daftar<QnaRow>>>()
+    svc.qna.list.mockReturnValueOnce(pertama.janji).mockResolvedValueOnce(daftar([qna[1]!]))
+    const w = await pasang(QnaChatbotView)
+    w.findAllComponents({ name: 'UiSelect' })[0]!.vm.$emit('update:modelValue', '2')
+    await flushPromises()
+    pertama.lepas(daftar([qna[0]!]))
+    await flushPromises()
+    expect(w.find('[data-testid="chatbot-qna-row-11"]').exists()).toBe(true)
+    expect(w.find('[data-testid="chatbot-qna-row-12"]').exists()).toBe(false)
+  })
+
+  it('M-9: filter server QnA — argumen awal, kategori/tag lewat UiSelect, pencarian debounce 300 ms (fake timers)', async () => {
+    vi.useFakeTimers()
+    try {
+      const w = await pasang(QnaChatbotView)
+      expect(svc.qna.list).toHaveBeenLastCalledWith({ page: 1, per_page: 20, status: 1, kategori: undefined, tag: undefined, q: '' })
+      const pilih = w.findAllComponents({ name: 'UiSelect' })
+      pilih[1]!.vm.$emit('update:modelValue', '3')
+      await flushPromises()
+      expect(svc.qna.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, kategori: 3 }))
+      pilih[2]!.vm.$emit('update:modelValue', '4')
+      await flushPromises()
+      expect(svc.qna.list).toHaveBeenLastCalledWith(expect.objectContaining({ kategori: 3, tag: 4 }))
+      const sebelum = svc.qna.list.mock.calls.length
+      w.findComponent({ name: 'UiSearchInput' }).vm.$emit('update:modelValue', '  cuti ')
+      await vi.advanceTimersByTimeAsync(299)
+      expect(svc.qna.list.mock.calls.length).toBe(sebelum)
+      await vi.advanceTimersByTimeAsync(1)
+      await flushPromises()
+      expect(svc.qna.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, q: 'cuti' }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('M-9: filter server Riwayat — dari/sampai, feedback "0" → 0; galat 422 per kolom tampil', async () => {
+    svc.stat.riwayat.mockResolvedValue(daftar([]))
+    const w = await pasang(RiwayatChatbotView)
+    const tanggal = w.findAllComponents({ name: 'UiTextField' })
+    tanggal[0]!.vm.$emit('update:modelValue', '2026-11-01')
+    tanggal[1]!.vm.$emit('update:modelValue', '2026-11-13')
+    w.findAllComponents({ name: 'UiSelect' })[1]!.vm.$emit('update:modelValue', '0')
+    await flushPromises()
+    expect(svc.stat.riwayat).toHaveBeenLastCalledWith({ page: 1, per_page: 25, dari: '2026-11-01', sampai: '2026-11-13', cocok: undefined, feedback: 0 })
+
+    svc.stat.riwayat.mockRejectedValueOnce(apiError(422, 'Tanggal tidak valid.', { dari: ['Tanggal tidak valid.'] }))
+    tanggal[0]!.vm.$emit('update:modelValue', '2026-13-01')
+    await flushPromises()
+    expect(w.findAllComponents({ name: 'UiTextField' })[0]!.props('helpText')).toBe('Tanggal tidak valid.')
+  })
+
+  it('M-11b: ⋮ QnA — urutan baku, Aktifkan memanggil setStatus, Hapus menunggu ConfirmDialog', async () => {
+    const w = await pasang(QnaChatbotView)
+    expect((await rowMenuActions(w, 'chatbot-qna-actions-12')).map((a) => [a.label, a.danger])).toEqual([
+      ['Edit', false],
+      ['Nonaktifkan', false],
+      ['Hapus', true],
+    ])
+    expect((await rowMenuActions(w, 'chatbot-qna-actions-11')).map((a) => a.label)).toEqual(['Edit', 'Aktifkan', 'Hapus'])
+    await selectRowAction(w, 'chatbot-qna-actions-11', 'activate')
+    expect(svc.qna.setStatus).toHaveBeenCalledWith(11, 1)
+    await selectRowAction(w, 'chatbot-qna-actions-12', 'delete')
+    expect(svc.qna.hapus).not.toHaveBeenCalled()
+    klikKonfirmasi()
+    await flushPromises()
+    expect(svc.qna.hapus).toHaveBeenCalledWith(12)
+  })
+
+  it('M-11c: impor 422 errors.berkas → pesan tampil tepat sekali, tanpa ringkasan, daftar tidak dimuat ulang', async () => {
+    const pesan = 'Format template tidak sesuai.'
+    svc.qna.impor.mockRejectedValueOnce(apiError(422, pesan, { berkas: [pesan] }))
+    const w = await pasang(QnaChatbotView)
+    const muatAwal = svc.qna.list.mock.calls.length
+    await w.get('[data-testid="chatbot-qna-impor"]').trigger('click')
+    await flushPromises()
+    w.findComponent({ name: 'UiFileField' }).vm.$emit('change', new File(['x'], 'qna.xlsx'))
+    await flushPromises()
+    ;(document.querySelector('[data-testid="chatbot-impor-kirim"]') as HTMLButtonElement).click()
+    await flushPromises()
+    const galat = document.querySelector('[data-testid="chatbot-impor-galat"]')?.textContent ?? ''
+    expect(galat.split(pesan).length - 1).toBe(1)
+    expect(document.querySelector('[data-testid="chatbot-impor-hasil"]')).toBeNull()
+    expect(svc.qna.list.mock.calls.length).toBe(muatAwal)
   })
 })
 

@@ -8,7 +8,7 @@ import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const server = vi.hoisted(() => ({
-  balasan: { status: 200, body: {} as unknown },
+  balasan: { status: 200, body: {} as unknown, headers: {} as Record<string, string> },
   panggilan: [] as { method: string; url: string; params: unknown; body: unknown }[],
 }))
 
@@ -22,7 +22,7 @@ vi.mock('@/lib/axios', async (importOriginal) => {
       params: config.params ?? null,
       body: data instanceof FormData ? 'FormData' : data ? JSON.parse(String(data)) : null,
     })
-    const response: AxiosResponse = { status: server.balasan.status, statusText: 'x', headers: {}, config, data: server.balasan.body }
+    const response: AxiosResponse = { status: server.balasan.status, statusText: 'x', headers: server.balasan.headers, config, data: server.balasan.body }
     if (server.balasan.status >= 400) throw new AxiosError('gagal', 'ERR_BAD_REQUEST', config, null, response)
     return response
   }
@@ -57,8 +57,8 @@ import widgetKategori from './fixtures/widget-kategori.json'
 import widgetPertanyaan from './fixtures/widget-pertanyaan.json'
 import widgetPopuler from './fixtures/widget-populer.json'
 
-const jawab = (body: unknown, status = 200): void => {
-  server.balasan = { status, body }
+const jawab = (body: unknown, status = 200, headers: Record<string, string> = {}): void => {
+  server.balasan = { status, body, headers }
 }
 
 async function galatDari(p: Promise<unknown>): Promise<unknown> {
@@ -231,6 +231,24 @@ describe('admin (fixture kontrak MAKE-094)', () => {
     const g = await qnaChatbotService.impor(new File(['x'], 'qna.xlsx'))
     expect(g.ditambah).toBe(0)
     expect(g.galat).toEqual(qnaImporGalat.data.galat)
+  })
+
+  it('M-10: ekspor tag — GET tag/ekspor?format=xlsx, nama dari Content-Disposition', async () => {
+    const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    jawab(new Blob(['x'], { type: xlsx }), 200, { 'content-disposition': 'attachment; filename="Export_Tag_QnA_20261114_083000.xlsx"' })
+    const b = await tagChatbotService.ekspor()
+    expect(server.panggilan[0]).toMatchObject({ method: 'get', url: '/halo-simpeg/chatbot/tag/ekspor', params: { format: 'xlsx' } })
+    expect(b.nama).toBe('Export_Tag_QnA_20261114_083000.xlsx')
+  })
+
+  it('M-10: template — GET qna/template; nama dari header, cadangan Template_Import_QnA.xlsx', async () => {
+    const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    jawab(new Blob(['x'], { type: xlsx }), 200, { 'content-disposition': "attachment; filename*=UTF-8''Template_Import_QnA.xlsx" })
+    await expect(qnaChatbotService.template()).resolves.toMatchObject({ nama: 'Template_Import_QnA.xlsx' })
+    expect(server.panggilan[0]).toMatchObject({ method: 'get', url: '/halo-simpeg/chatbot/qna/template' })
+
+    jawab(new Blob(['x'], { type: xlsx }))
+    await expect(qnaChatbotService.template()).resolves.toMatchObject({ nama: 'Template_Import_QnA.xlsx' })
   })
 
   it('statistik: top_pesan.pesan_user; pertanyaan null untuk QnA yang sudah tidak ada', async () => {
