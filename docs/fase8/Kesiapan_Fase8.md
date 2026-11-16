@@ -83,16 +83,16 @@ Kerangka FE berdata contoh hanya ada di branch `feat/frontend-ui-redesign` commi
 |---|---|---|---|
 | F-10 MAKE-090 | BE Arsip Tahap 1 | WS-2 | ✔ di `main` `fa1f6686` |
 | F-10 MAKE-091 | FE Arsip Tahap 1 | Worker Fix Bug | ✔ di `main` `483c5892` |
-| F-10 MAKE-093 | Penyajian berkas legacy (README-deploy §1/§1l, ADR-038, `ReadmeBerkasNginxTest`) | Handling Case | Branch `f10/make-093-penyajian-berkas` @`29ca410c`, gate penuh diulang |
-| F-10 CR-122 | PRD F-10 v1.4 | Reviewer | Branch `docs/cr-122-prd-f10-v14` @`448b302c` (satu berkas dokumen) |
-| F-10 MAKE-092 / MAKE-096 | Tahap 2 BE / FE | WS-2 / Worker Fix Bug | Mulai 13-11-2026: branch `f10/make-092-arsip-aksi-be` @`c49d5a42` dan `f10/make-096-arsip-aksi-fe` @`149b816a` (masing-masing satu commit di atas `483c5892`), belum di `main`; CI/gate ◻ belum dicek. MAKE-096 belum tercatat di PRD F-10 (`main` maupun v1.4 menyebut MAKE-092 sebagai "BE+FE Tahap 2", `PRD_Fase7_F10_Arsip-Digital.md:654`) |
+| F-10 MAKE-093 | Penyajian berkas legacy (README-deploy §1/§1l, ADR-038, `ReadmeBerkasNginxTest`) | Handling Case | ✔ di `main` (merge `a0418d1f`, 13-11-2026) |
+| F-10 CR-122 | PRD F-10 v1.4 | Reviewer | ✔ di `main` `448b302c` (v1.5 CR-123 dan v1.6 CR-128 menyusul) |
+| F-10 MAKE-092 / MAKE-096 | Tahap 2 BE / FE | WS-2 / Worker Fix Bug | ✔ di `main` (MAKE-092 `f3827106` 14-11-2026, MAKE-096 `07d5a7a2` 15-11-2026); QA Lapis 1 F-10 selesai 15–16-11-2026; perbaikan QA CR-127/CR-126 berjalan |
 | E-10 C0 | Laporan pemahaman E-10 (⛔ reviewer, `8_2.md:74`, PRD `:823`) | ReadOne, Worker Muse | ✔ diterima reviewer 13-11-2026 (fakta reviewer) |
 | E-10 C1/C2 | DBV-033 + MAKE-094 | ReadOne (DB Validator: WS-2) | C1 berjalan (branch DBV-033 @`99be40a0`, G8-10) |
 | E-10 C3 | MAKE-095 | Worker Muse | C3 berjalan; koding penuh baru sesudah kontrak MAKE-094 beku (`8_2.md:70`) → §6.2 T-7 |
+| G10-4 | Verifikasi Nginx `/berkas/` (rancangan awal: server dev) | Reviewer + Horii | ✔ 16-11-2026 lewat K-12 (Nginx lokal; checklist QA F-10); sisa server di daftar periksa deploy README-deploy §1l (B10-3) |
+| B10-1..B10-3 | Blocker deploy/cutover F-10 | Horii/operator | ◻, bukan syarat sign-off (PRD §0 B10-1..B10-3, §11.4) |
 
 Izin [#8-WorkloadChatbot] (E-10) = fakta reviewer 13-11-2026, disetujui Horii 13-11-2026; tidak tercatat di repo.
-| G10-4 | Verifikasi Nginx `/berkas/` di server dev | Operator/Horii | ◻ (`PRD_Fase7_F10_Arsip-Digital.md:45`) |
-| B10-1..B10-3 | Blocker deploy/cutover F-10 | Horii/operator | ◻, bukan syarat sign-off (`:46-48`, `:608`) |
 
 ### 3.2 Anti-tabrakan berkas
 

@@ -643,7 +643,8 @@ Uji browser di **Chrome, Edge, dan Firefox** (desktop):
 1. **Jalur publik (berkas legacy).** Buka halaman Arsip, lalu ⋮ → Buka pada berkas legacy PDF, JPG, dan PNG. Popup harus menampilkan pratinjau. Tombol unduh dan cetak penampil PDF harus berfungsi.
 2. **Jalur privat (berkas unggahan v2).**
    - Buka berkas PDF/JPG/PNG lewat ⋮ → Buka (popup + blob). Pratinjau harus tampil.
-   - Coba tombol unduh dan cetak penampil PDF **sebelum** dan **sesudah** penundaan pencabutan object URL (60 detik, F10-37 (5)).
+   - Sejak PRD F-10 v1.6 (F10-37 (5)) popup memuat tombol "Unduh" bernama arsip, dan object URL hidup selama popup terbuka.
+     Coba tombol "Unduh" itu serta tombol unduh dan cetak penampil PDF segera dan sesudah lebih dari 60 detik.
    - Buka juga URL `api/v1/pegawai/<nip>/arsip/berkas/<id>/buka` langsung sebagai tab, dalam keadaan login, untuk menguji CSP endpoint (F10-34 (4)).
 3. Bila CSP mematahkan pratinjau, terapkan langkah pasang butir 1.
 
@@ -657,8 +658,9 @@ pasang:
    (`nginx -t` lolos).
 3. Cek cepat `curl -sI`: satu berkas legacy PDF → 200 `inline` dengan lima header; satu kunci v2 yang ada di disk → 404;
    `/berkas/kolom/<…>` → 404. Lalu `tail` log akses tanpa baris `/berkas/`.
-4. Uji browser cukup satu berkas legacy PDF dan satu berkas unggahan v2 lewat ⋮ → Buka, karena perilaku tiga browser sudah
-   diuji di G10-4 lokal.
+4. Uji browser cukup satu berkas legacy PDF dan satu berkas unggahan v2 lewat ⋮ → Buka, karena perilaku Chromium (Brave) dan
+   Edge sudah diuji di G10-4 lokal. **Firefox belum diuji** (diterima Horii, K-12): bila pengguna memakai Firefox, uji kedua
+   jalur di Firefox juga.
 5. Ponsel asli (R6 checklist QA F-10, K-12): ⋮ → Buka satu berkas legacy dan satu berkas unggahan v2 → terbuka sebagai tab.
 
 Hasil verifikasi (baris lokal = G10-4, K-12; baris server diisi operator saat deploy; tanpa host, NIP, atau nama berkas):
