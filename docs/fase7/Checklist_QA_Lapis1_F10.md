@@ -9,13 +9,18 @@ gerbang, §3 register F10-01..F10-38, §5.2 AC1-01..AC1-18, §6.2 AC2-01..AC2-13
 Fase 7 (`docs/fase7/Checklist_QA_Lapis1_Fase7.md`; F-10 dikecualikan di `:16`). Checklist ini **disepakati reviewer CR
 sebelum QA dimulai**; pertanyaan pra-QA dan keputusannya di §K.
 
-**Status (15-11-2026).** Dieksekusi reviewer CR di **mesin lokal** untuk semua butir non-[S] (K-11 diputus Horii
-13-11-2026), pada app demo `main` `07d5a7a2` dengan data sintetis. Semua paket F-10 sudah di `main`: Tahap 1 MAKE-090 BE
-(`fa1f6686`) dan MAKE-091 FE (`483c5892`), MAKE-093 penyajian berkas (merge `a0418d1f`), Tahap 2 MAKE-092 BE (`f3827106`)
-dan MAKE-096 FE (`07d5a7a2`). G10-4 (verifikasi Nginx server dev) **belum** dijalankan operator/Horii, jadi butir [S]
-menunggu. Ringkasan 154 butir GF–Z: **✅ 121**, **[test-otomatis] 11** (4 di antaranya
-sebagian: A3, D5, F9, Z5), **◻ [S] 20**, ◻ 1 (R6, bersama bagian R di server dev), GF5 ✅ (gate penuh lokal + CI), **❌ 0**. BB1..BB18: ✅ 14 (4 di antaranya ✅ lokal: BB2, BB6, BB10, BB14, bagian [S]-nya masih ◻), [test-otomatis]
-sebagian 1, ◻ [S] 2, ◻ 1 (bersama bagian R). Temuan §T: 4, semuanya rendah dan **tidak** menahan sign-off. Rujukan file:line
+**Status (16-11-2026).** Semua butir sudah dieksekusi, kecuali N10, N11, dan R6 yang dipindah ke daftar periksa deploy
+(K-12); **tidak ada butir yang gagal**. Bagian browser diuji di Brave (Chromium) dan Edge; **Firefox tidak diuji** dan
+diterima Horii 16-11-2026 (risiko di K-12). Butir non-[S] dijalankan reviewer CR di **mesin lokal** (K-11 diputus Horii
+13-11-2026; dijalankan 15-11-2026) pada app demo `main` `07d5a7a2` dengan data sintetis. Semua
+paket F-10 sudah di `main`: Tahap 1 MAKE-090 BE (`fa1f6686`) dan MAKE-091 FE (`483c5892`), MAKE-093 penyajian berkas (merge
+`a0418d1f`), Tahap 2 MAKE-092 BE (`f3827106`) dan MAKE-096 FE (`07d5a7a2`). Butir [S] dijalankan di **Nginx lokal** dengan
+blok `/berkas/` README apa adanya (K-12 diputus Horii 16-11-2026, menggantikan G10-4 di server dev): bagian `curl` oleh
+reviewer, bagian browser (Chrome, Edge, Firefox, emulasi ponsel) oleh Horii. Ringkasan 154 butir GF–Z: **✅ 139**
+(R1–R5, N12, GF4 tanpa Firefox), **[test-otomatis] 11** (4 di antaranya sebagian: A3, D5,
+F9, Z5), **— 3** (N10, N11 khusus Linux; R6 ponsel; dipindah ke daftar periksa deploy, K-12), GF5 ✅ (gate penuh lokal + CI),
+**❌ 0**. BB1..BB18: ✅ 16, [test-otomatis] sebagian 1 (BB8), — 1 (BB15, ikut R6). Temuan §T: 6, semuanya rendah dan
+**tidak** menahan sign-off; semuanya diputus Horii 16-11-2026. Rujukan file:line
 dan ekspektasi di 136 butir bagian GF, A–D, P, F, V, M, W, E, H, X, Y, Z dicocokkan ulang dengan `07d5a7a2` (K-07: 100
 cocok, 36 selisih kelas (a) berupa rujukan atau teks usang yang sudah dikoreksi langsung di kolom AC/Langkah/Hasil yang
 diharapkan, 0 selisih perilaku), kecuali `backend/.env.example:119-121`; satu rujukan usang tambahan (F11) dikoreksi saat
@@ -30,19 +35,31 @@ eksekusi `lampiran:tarik` data nyata (cutover), dan MTC-046 (fase Manual Testing
 **Cara membaca nomor butir.** Awalan bagian: `GF` gerbang, `A` akses & pintu masuk, `B` folder & daftar, `C` status berkas
 & URL, `D` catatan pembukaan daftar, `N` jalur publik Nginx, `P` jalur privat `buka` (API), `F` jalur privat (FE), `R`
 pratinjau tiga browser, `V` tampilan & viewport, `M` matriks role 1–8, `W`/`E`/`H`/`X`/`Y` aksi Tahap 2, `Z` regresi & efek
-yang diterima, `BB` daftar "Bukan bug". Butir bertanda **[S]** wajib di **server dev dengan Nginx** (G10-4). PRD menjalankan
-seluruh QA Lapis 1 di server dev dengan Nginx, bukan rute dev (§7.4 `:342`, §11.3 `:575`); sesuai keputusan K-11 (Horii
-13-11-2026), butir non-[S] dijalankan di mesin lokal dengan rute dev sesudah Tahap 2 di `main`, dan butir [S] menyusul di
-server dev sesudah G10-4. Kode data (mis. `AR1`, `PA`) menunjuk tabel "Data uji gabungan".
+yang diterima, `BB` daftar "Bukan bug". Butir bertanda **[S]** butuh Nginx (G10-4). PRD menjalankan seluruh QA Lapis 1 di
+server dev dengan Nginx, bukan rute dev (§7.4 `:342`, §11.3 `:575`); sesuai keputusan K-11 (Horii 13-11-2026), butir non-[S]
+dijalankan di mesin lokal dengan rute dev sesudah Tahap 2 di `main`, dan sesuai K-12 (Horii 16-11-2026) butir [S]
+dijalankan di Nginx lokal. Kode data (mis. `AR1`, `PA`) menunjuk tabel "Data uji gabungan".
 
 ## Lingkungan & persiapan
 
-**Server dev dengan Nginx (wajib untuk butir [S]; PRD §7.4 akhir, §11.3).** `main` terbaru terdeploy lewat hook
+**Server dev dengan Nginx (rancangan awal untuk butir [S]; PRD §7.4 akhir, §11.3; diganti Nginx lokal, K-12).** `main` terbaru terdeploy lewat hook
 (README-deploy §2). Prasyarat sebelum butir [S]: MAKE-093 di `main` (✔ merge `a0418d1f`) dan blok Nginx
 `location ^~ /berkas/` + `map` + snippet header terpasang sesuai README-deploy §1 dan §1l (`README-deploy.md:546` dst.), hasil
-verifikasi operator tercatat di tabel "Hasil verifikasi" §1l (`README-deploy.md:649-653`, per 15-11-2026 masih kosong; G10-4).
+verifikasi operator tercatat di tabel "Hasil verifikasi" §1l (`README-deploy.md:664-669`; baris lokal terisi 16-11-2026 lewat K-12, baris server diisi operator saat deploy).
 `.env` server: `arsip.penyajianBerkasLegacy = publik`, `arsip.dasarUrlBerkas = /berkas`, `arsip.sajiBerkasDev = false`
 (`backend/.env.example:119-121`). Host, akun, dan path server **tidak** ditulis di checklist maupun laporan.
+
+**Nginx lokal untuk butir [S] (✔ diputus K-12, Horii 16-11-2026).** Nginx 1.22 build Windows (Laragon) dengan `map
+$disposisi_berkas`, snippet header, dan blok `location ^~ /berkas/` **sama persis** dengan README-deploy §1 dan §1l, kecuali:
+(1) `alias` menunjuk akar lampiran app demo; (2) `disable_symlinks` dihapus, karena direktif itu tidak ada di Nginx Windows
+(`nginx -t`: "unknown directive"). `/api/` diteruskan ke backend demo (`php spark serve`) sebagai pengganti `fastcgi_pass`;
+SPA = hasil build app demo dengan base API relatif `/api/v1`, disajikan `try_files … /index.html` seperti §1; sebuah blok
+regex `\.php` (menjawab 418) menggantikan blok PHP untuk membuktikan prefix `^~` (N5). `.env` demo **tanpa** saklar
+`arsip.*`, jadi nilai bawaan `Config\Arsip` = mode server (`publik`, dasar URL `/berkas`, `sajiBerkasDev = false`). Data =
+data sintetis lokal yang sama (tabel "Data uji gabungan"). Batasan: Windows tidak punya user/grup Unix dan tidak mendukung
+`disable_symlinks`, jadi N10 dan N11 dipindah ke daftar periksa deploy B10-3 (README-deploy §1l); sistem berkas Windows tidak
+membedakan huruf besar/kecil (AR3 diminta dengan ejaan path yang sama persis). Konfigurasi, build, dan halaman peluncur uji
+browser berada di luar repo.
 
 **Mesin lokal (✔ diputus K-11, Horii 13-11-2026: butir non-[S] diuji di lokal dengan rute dev sesudah Tahap 2 di `main`).**
 App demo reviewer `wt/demo` pada `main` `07d5a7a2`, DB `simpeg_v2_t_app_demo` @3307, backend 8120, frontend 5190, captcha
@@ -64,10 +81,9 @@ F10-24; butir P11–P13, C9). Jangan ubah `.env` server dev tanpa izin operator 
 dikembalikan ke `publik`.
 
 **Isi kolom Hasil:** ✅ lolos / **✅ sebagian** (bagian yang dijalankan lolos; bagian yang tidak dijalankan disebut) /
-**✅ lokal** (bagian lokal lolos; bagian [S] masih ◻) / ❌ gagal (+ nomor temuan di §T) / — tidak berlaku /
+❌ gagal (+ nomor temuan di §T) / — tidak berlaku /
 **[test-otomatis]** (diterima lewat bukti test otomatis gate `main`, lihat §K) / **[test-otomatis] sebagian** (test hanya
-mencakup sebagian klaim; celahnya disebut) / **◻ [S] menunggu G10-4** (butir server dev) / **◻ bersama bagian R di server
-dev** (butir non-[S] yang dijalankan bersama bagian R). Butir [test-otomatis] BE (PHPUnit) isi test-nya dibaca, tetapi
+mencakup sebagian klaim; celahnya disebut) / **— dipindah ke B10-3** (butir khusus Linux, K-12). Butir [test-otomatis] BE (PHPUnit) isi test-nya dibaca, tetapi
 PHPUnit tidak dijalankan per butir; status lolosnya = CI `main` #825 dan gate penuh GF5 (4274 test lolos). Vitest dijalankan (F9, F10,
 F12). Bukti: tangkapan layar UI, respons
 API, keluaran `curl -I`, atau baris DB — **tanpa** NIP/NIK, host, token, path berkas, nama berkas nyata, id baris, maupun isi
@@ -100,7 +116,7 @@ curl -s -D - -o /dev/null -H "$T" "$B/pegawai/<NIP PA>/arsip/berkas/<id AR1>/buk
 for i in 1 2 3 4 5 6 7; do curl -s -o /dev/null -w "%{http_code}\n" -H "$T" "$B/pegawai/<NIP PA>/arsip/berkas/<id AR1>/buka"; done
 ```
 
-**Header Nginx [S]** (jalankan di mesin reviewer; `H=https://<host>`; perintah lengkap di README-deploy §1l "Verifikasi"):
+**Header Nginx [S]** (jalankan di mesin reviewer; `H=https://<host>`, K-12: `H=http://localhost:<port>` Nginx lokal; perintah lengkap di README-deploy §1l "Verifikasi"):
 
 ```bash
 curl -sI "$H/berkas/<path AR2 ter-encode>"          # 200 application/pdf inline + 5 header
@@ -133,8 +149,8 @@ cp uji.pdf uji.docx                                   # isi apa saja; yang diuji
 
 ## Data uji gabungan
 
-Semua data **sintetis** dengan penanda `[QA-F10 <kode>]`; NIP pegawai uji = NIP sintetis DB demo (atau NIP sintetis yang
-dibuat khusus di server dev, §K K-03). Skrip penanam data dan berkas `qa_f10.php` disiapkan reviewer di folder demo-seed (di
+Semua data **sintetis** dengan penanda `[QA-F10 <kode>]`; NIP pegawai uji = NIP sintetis DB demo (server dev tidak dipakai, §K
+K-03, K-12). Skrip penanam data dan berkas `qa_f10.php` disiapkan reviewer di folder demo-seed (di
 luar repo): idempoten (jalan kedua tidak membuat baris), dengan pengaman DB demo dan akar lampiran demo, tanpa DELETE/DROP, tanpa
 akun baru (§K K-03). Path ditulis relatif akar lampiran (`writable/uploads/lampiran`; server: `shared/writable/uploads/lampiran`).
 `<kunci>` = 32 hex acak. Lokal 15-11-2026: penanaman data menambah 76 baris QA `document_attachment` dan 2 pegawai (PL, PD); tahap tulis
@@ -200,11 +216,11 @@ mencatat penyimpangan dari rancangan.
 | GF1 | G10-1 | Cek PRD F-10 di `main` | v1.5 di `main` (memuat koreksi v1.4 CR-122 dan v1.5 CR-123); checklist mengacu v1.5 | ✅ Judul PRD di `main` "v1.5 (disetujui Horii)"; riwayat versi `:816-819` memuat v1.3, v1.4, v1.5 |
 | GF2 | G10-2 | Cek kode izin workload Tahap 1 dan Tahap 2 | Izin Tahap 1 (MAKE-090/091/093) dan Tahap 2 (MAKE-092/096) tercatat oleh reviewer | ✅ Izin [#7-WorkloadF10] (Tahap 1 + perubahan anggota Tahap 2 13-11-2026) tercatat reviewer |
 | GF3 | — | Cek isi `main`: MAKE-090, MAKE-091, MAKE-093; Tahap 2: MAKE-092, MAKE-096 | Tahap 1, MAKE-093, MAKE-092, dan MAKE-096 di `main` | ✅ `git merge-base --is-ancestor` ke `main` benar untuk MAKE-090 `fa1f6686`, MAKE-091 `483c5892`, MAKE-093 `a0418d1f`, MAKE-092 `f3827106`, MAKE-096 `07d5a7a2` |
-| GF4 | G10-4 [S] | Baca tabel "Hasil verifikasi" README-deploy §1l (`README-deploy.md:649-653`) | Terisi operator/Horii untuk server dev: `curl -I` (header + 404 kunci v2), hak baca user Nginx, Chrome/Edge/Firefox, nilai CSP akhir | ◻ [S] menunggu G10-4 (tabel masih kosong) |
+| GF4 | G10-4 [S] | Baca tabel "Hasil verifikasi" README-deploy §1l (`README-deploy.md:664-669`) | Terisi untuk G10-4 (K-12: baris lokal): `curl -I` (header + 404 kunci v2), Chrome/Edge/Firefox, nilai CSP akhir; hak baca user Nginx di daftar periksa deploy B10-3 | ✅ K-12 (16-11-2026): baris **lokal** tabel "Hasil verifikasi" README-deploy §1l terisi (`curl -I` lolos; Brave/Chromium ✅, Edge ✅, Firefox **tidak diuji** (diterima Horii 16-11-2026 berdasarkan Brave dan Edge; K-12); CSP sesuai snippet tanpa pelonggaran; hak baca user Nginx → B10-3). Baris server diisi operator saat deploy (B10-3) |
 | GF5 | §11.1–§11.2 | Cek gate penuh `./check.sh` dan CI `main` sesudah paket terakhir | Lolos (PHPUnit, PHPStan, PHP-CS-Fixer, ESLint, vue-tsc, Vitest, build); termasuk regresi B-18, Arsip Data Umum, SIASN arsip, `s_stat`, kelengkapan beranda | CI main #825 (`07d5a7a2`) hijau; gate penuh lokal: ✅ `./check.sh` di `07d5a7a2` (15-11-2026, DB scratch @3307): PHPStan "No errors", PHP-CS-Fixer 0 dari 1450 berkas, PHPUnit 4274 test (3 dilewati), Vitest 179 berkas / 1991 test, build lolos, EXIT=0, tanpa berkas terhapus |
 | GF6 | §11.4 | Cek B10-1..B10-3 | Tercatat sebagai blocker deploy/cutover, **tidak** menahan sign-off | ✅ Laporan Akhir Fase 7 §10.7 "Blocker deploy / cutover F-10 (bukan syarat sign-off, PRD §11.4)" memuat B10-1..B10-3; PRD `:46-48` sama |
-| GF7 | — | Cek status checklist ini | Checklist disepakati reviewer CR; butir ◻ §K (K-01..K-11) sudah diputus | ✅ Disepakati reviewer CR; §K diputus, ◻ tersisa (di §K) hanya K-02 (opsional) dan K-03 bagian server dev |
-| GF8 | K-03 | Cek data uji di lingkungan QA | Data uji sintetis (baris `document_attachment` + berkas sintetis sesuai tabel "Data uji gabungan") dan akun per role 1–8 tersedia, tanpa NIP nyata | ✅ Lokal (sesudah penanaman data, sebelum tahap tulis): `document_attachment` 96 baris (76 baris QA bertanda `[QA-F10`), 9 akun role 1–8 login 200; U3d tidak tersedia (A3 [test-otomatis]). Server dev: ◻ K-03 |
+| GF7 | — | Cek status checklist ini | Checklist disepakati reviewer CR; butir ◻ §K (K-01..K-12) sudah diputus | ✅ Disepakati reviewer CR; §K diputus (K-01..K-12), ◻ tersisa (di §K) hanya K-02 (opsional) |
+| GF8 | K-03 | Cek data uji di lingkungan QA | Data uji sintetis (baris `document_attachment` + berkas sintetis sesuai tabel "Data uji gabungan") dan akun per role 1–8 tersedia, tanpa NIP nyata | ✅ Lokal (sesudah penanaman data, sebelum tahap tulis): `document_attachment` 96 baris (76 baris QA bertanda `[QA-F10`), 9 akun role 1–8 login 200; U3d tidak tersedia (A3 [test-otomatis]). Server dev: tidak dibutuhkan (K-12; butir [S] memakai data sintetis yang sama di Nginx lokal) |
 
 ## A. Akses & pintu masuk (Tahap 1; AC1-01..AC1-04, AC1-14, §5.1, §9.1)
 
@@ -265,22 +281,25 @@ mencatat penyimpangan dari rancangan.
 | D5 | §8.2 fail-closed | Gagal tulis audit → 500 | [test-otomatis] `ArsipEndpointTest::testCatatanPembukaanDaftarFailClosed` (tidak diuji manual: merusak DB) | [test-otomatis] sebagian (K-09): `ArsipEndpointTest.php:312`, `record()` = 0 → RuntimeException untuk folder dan daftar, kunci dedup tidak terisi; diuji di tingkat service (controller tanpa catch → 500 lewat handler global) |
 | D6 | AC1-12 | Aktor role 1/3/4/5 yang belum tercatat untuk NIP PA dalam 15 menit memanggil API `…/arsip/berkas?q=uji` **lebih dulu** (tanpa membuka folder) | Satu baris `arsip_lihat`: `after_json.endpoint = "berkas"`, `filter` = `{id_jenis_rwy: null, belum_terhubung: false, ada_pencarian: true}` (`ArsipService.php:143`, `:247`), tanpa teks `q` di mana pun dalam baris | ✅ `demo.menteri`: 1 baris `endpoint` "berkas", `filter` sesuai; teks `q` tidak ada |
 
-## N. Jalur publik berkas legacy lewat Nginx (Tahap 1; F10-18 (a), F10-25, §7.3, G10-4) — semua [S]
+## N. Jalur publik berkas legacy lewat Nginx (Tahap 1; F10-18 (a), F10-25, §7.3, G10-4) — semua [S]; dijalankan di Nginx lokal (K-12, 16-11-2026)
+
+Semua request tanpa login dan tanpa cookie. Status, `Content-Type`, `Content-Disposition`, dan kelima header diperiksa per
+respons oleh skrip reviewer; kode data AR menunjuk tabel "Data uji gabungan".
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| N1 | §7.3 | [S] `curl -sI` URL publik AR2, AR4, AR5, AR6, AR26-42 | 200; `Content-Type` `application/pdf` / `image/jpeg` / `image/png` / `image/gif`; `Content-Disposition: inline`; `X-Content-Type-Options: nosniff`; `Cache-Control: no-store`; `Referrer-Policy: no-referrer`; CSP sesuai snippet (atau nilai akhir G10-4) | ◻ [S] menunggu G10-4 |
-| N2 | F10-33 | [S] `curl -sI` AR31 (`assets/upload/…`) dan AR3 (`.PDF`) | 200, tipe pratinjau, `inline` | ◻ [S] menunggu G10-4 |
-| N3 | §7.3 | [S] `curl -sI` URL publik tanpa login dan tanpa cookie | 200 (tanpa cek izin, keputusan sadar F10-18 (a); lihat BB1) | ◻ [S] menunggu G10-4 |
-| N4 | F10-32 | [S] `curl -sI` AR11 (`.docx`) | `application/octet-stream` + `attachment` | ◻ [S] menunggu G10-4 |
-| N5 | F10-25, R5 | [S] `curl -sI` AR28 (`.html`, `.svg`) dan AR33 (`.php`) | `application/octet-stream` + `attachment`; `.php` tidak dieksekusi (isi mentah, tanpa keluaran PHP) | ◻ [S] menunggu G10-4 |
-| N6 | F10-18 (b) | [S] `curl -sI /berkas/YYYY/MM/<kunci AR1>.pdf` (berkas ada di disk) | **404** | ◻ [S] menunggu G10-4 |
-| N7 | §7.3 butir 2 | [S] `curl -sI` AR16 (`kolom/…`), AR17 (`form-digital/…`), AR15 (segmen titik), `/berkas/arsip/<NIP PA>/` (folder), `/berkas/arsip/%2e%2e/%2e%2e/cache/<…>` | 404 (traversal 400/404), tidak pernah isi `writable/cache`, tanpa listing | ◻ [S] menunggu G10-4 |
-| N8 | AC1-07 | [S] `curl -sI` URL publik AR13 (berkas hilang) | 404 | ◻ [S] menunggu G10-4 |
-| N9 | §7.3 butir 4 | [S] Operator: `tail` log akses Nginx sesudah N1–N8 | Tidak ada baris `/berkas/` | ◻ [S] menunggu G10-4 |
-| N10 | §7.3 butir 5 | [S] Operator: `sudo -u <user-nginx> test -r <berkas AR2>` | OK; hak `0640`/`0750` tidak diubah | ◻ [S] menunggu G10-4 |
-| N11 | §7.3 butir 1, B10-1 | [S] Operator: `find <akar lampiran> -type l` | Kosong | ◻ [S] menunggu G10-4 |
-| N12 | §9.1 | [S] SPA: muat ulang `/arsip/<NIP PA>/9` di browser | Halaman SPA (bukan 404 Nginx); `/arsip/…` tidak bertabrakan dengan `/berkas/…` | ◻ [S] menunggu G10-4 |
+| N1 | §7.3 | [S] `curl -sI` URL publik AR2, AR4, AR5, AR6, AR26-42 | 200; `Content-Type` `application/pdf` / `image/jpeg` / `image/png` / `image/gif`; `Content-Disposition: inline`; `X-Content-Type-Options: nosniff`; `Cache-Control: no-store`; `Referrer-Policy: no-referrer`; CSP sesuai snippet (atau nilai akhir G10-4) | ✅ 200; AR2 dan AR26-42 `application/pdf`, AR4 `image/jpeg`, AR5 `image/png`, AR6 `image/gif`; `inline`; `nosniff`, `no-store`, `no-referrer`, dan CSP sama persis dengan snippet |
+| N2 | F10-33 | [S] `curl -sI` AR31 (`assets/upload/…`) dan AR3 (`.PDF`) | 200, tipe pratinjau, `inline` | ✅ AR31 `image/jpeg`, AR3 `application/pdf`; 200 `inline`, lima header lengkap |
+| N3 | §7.3 | [S] `curl -sI` URL publik tanpa login dan tanpa cookie | 200 (tanpa cek izin, keputusan sadar F10-18 (a); lihat BB1) | ✅ Semua request N1–N8 tanpa login/cookie; berkas legacy 200. Jumlah baris `audit_logs` tidak berubah sesudah membuka URL publik (BB5) |
+| N4 | F10-32 | [S] `curl -sI` AR11 (`.docx`) | `application/octet-stream` + `attachment` | ✅ 200 `application/octet-stream` `attachment` (baris AR11 sudah dihapus di X2; lihat X3) |
+| N5 | F10-25, R5 | [S] `curl -sI` AR28 (`.html`, `.svg`) dan AR33 (`.php`) | `application/octet-stream` + `attachment`; `.php` tidak dieksekusi (isi mentah, tanpa keluaran PHP) | ✅ AR28-html, AR28-svg, AR33: 200 `application/octet-stream` `attachment`, lima header; isi AR33 identik dengan berkas di disk (memuat `<?php`) dan tidak jatuh ke blok regex PHP |
+| N6 | F10-18 (b) | [S] `curl -sI /berkas/YYYY/MM/<kunci AR1>.pdf` (berkas ada di disk) | **404** | ✅ AR1, AR7, AR34 (berkas ada di disk) → 404 |
+| N7 | §7.3 butir 2 | [S] `curl -sI` AR16 (`kolom/…`), AR17 (`form-digital/…`), AR15 (segmen titik), `/berkas/arsip/<NIP PA>/` (folder), `/berkas/arsip/%2e%2e/%2e%2e/cache/<…>` | 404 (traversal 400, atau halaman SPA bila Nginx menormalisasi path keluar dari `/berkas/`), tidak pernah isi `writable/cache`, tanpa listing | ✅ AR16, AR17, AR15, folder bergaris miring, `.htaccess` → 404, tanpa listing. Folder tanpa garis miring → 301 ke versi bergaris miring lalu 404 (T-05). Traversal 3–4 tingkat → 400; 2 tingkat dinormalisasi keluar dari `/berkas/` → 200 `index.html` SPA. Isi `writable/cache` tidak pernah tersaji |
+| N8 | AC1-07 | [S] `curl -sI` URL publik AR13 (berkas hilang) | 404 | ✅ 404 |
+| N9 | §7.3 butir 4 | [S] `tail` log akses Nginx sesudah N1–N8 | Tidak ada baris `/berkas/` | ✅ 0 baris dari request yang dilayani blok `/berkas/`, dan 0 baris `/berkas/` yang memuat NIP. Request traversal yang dinormalisasi keluar dari `/berkas/` tetap tercatat oleh blok lain (tanpa NIP) |
+| N10 | §7.3 butir 5 | [S] Operator: `sudo -u <user-nginx> test -r <berkas AR2>` | OK; hak `0640`/`0750` tidak diubah | — dipindah ke B10-3 (K-12; Windows tanpa user/grup Unix) |
+| N11 | §7.3 butir 1, B10-1 | [S] Operator: `find <akar lampiran> -type l` | Kosong | — dipindah ke B10-3 (K-12; `disable_symlinks` tidak ada di Nginx Windows) |
+| N12 | §9.1 | [S] SPA: muat ulang `/arsip/<NIP PA>/9` di browser | Halaman SPA (bukan 404 Nginx); `/arsip/…` tidak bertabrakan dengan `/berkas/…` | ✅ `curl`: 200 `index.html` SPA. F5 di folder Jabatan menampilkan halaman Arsip lagi (8 baris) di Brave dan Edge. Firefox **tidak diuji** (diterima Horii 16-11-2026 berdasarkan Brave dan Edge; K-12) |
 
 ## P. Jalur privat `buka` — API (Tahap 1; AC1-17, F10-34..F10-36)
 
@@ -322,18 +341,18 @@ mencatat penyimpangan dari rancangan.
 | F11 | AC1-18 | Ganti halaman/pencarian sesudah pesan galat tampil | Pesan galat Buka hilang (`ArsipBerkasTable.vue:38-44`) | ✅ Pesan galat hilang saat pencarian diganti dan saat "Halaman berikutnya" |
 | F12 | AC1-18 | Tipe blob pratinjau dari daftar tertutup menurut ekstensi, bukan dari tipe respons (respons `text/html` bernama `.pdf` → `application/pdf`; ekstensi lain → `application/octet-stream`; PRD `:569`) | [test-otomatis] `useBukaBerkasArsip.spec.ts:148` | [test-otomatis] `useBukaBerkasArsip.spec.ts:148` lolos (daftar tertutup juga `:85-99`) |
 
-## R. Pratinjau di Chrome, Edge, Firefox (Tahap 1; F10-10, G10-4, §11.3) — R1–R5 [S]; R6 bersama bagian R di server dev
+## R. Pratinjau di Chrome, Edge, Firefox (Tahap 1; F10-10, G10-4, §11.3) — R1–R5 [S]; dijalankan di Nginx lokal (K-12, 16-11-2026): Brave (Chromium) dan Edge lewat ekstensi Claude oleh reviewer, konfirmasi visual dan R3 oleh Horii; Firefox tidak diuji (diterima Horii, K-12); R6 dipindah ke daftar periksa deploy
 
 Satu kolom hasil per butir; tuliskan hasil per browser (mis. "C ✅ / E ✅ / F ❌ T-0x").
 
 | # | AC | Langkah | Hasil yang diharapkan | Hasil |
 |---|---|---|---|---|
-| R1 | F10-10 | [S] Jalur publik: ⋮ → Buka AR2 (PDF), AR4 (JPG), AR5 (PNG) | Pratinjau tampil di popup di ketiga browser | ◻ [S] menunggu G10-4 |
-| R2 | F10-10 | [S] Jalur privat: ⋮ → Buka AR1 (PDF), AR7 (PNG), AR34 (JPG kunci v2) | Pratinjau tampil (popup + blob) di ketiga browser | ◻ [S] menunggu G10-4 |
-| R3 | F10-37 (5) | [S] Popup blob PDF: tombol unduh dan cetak penampil PDF, **sebelum** dan **sesudah** 60 detik | Berfungsi; bila gagal sesudah pencabutan, catat per browser di §T dan di tabel G10-4 | ◻ [S] menunggu G10-4 |
-| R4 | R5 | [S] ⋮ → Buka AR28 (`.html`, `.svg`) | Terunduh, tidak dirender, tidak ada `alert` | ◻ [S] menunggu G10-4 |
-| R5 | F10-34 (4) | [S] Dalam keadaan login, buka `api/v1/pegawai/<NIP PA>/arsip/berkas/<id AR1>/buka` langsung sebagai tab | Pratinjau tampil (CSP endpoint tidak mematahkan penampil); bila patah, catat nilai CSP yang dipakai (pratinjau didahulukan) | ◻ [S] menunggu G10-4 |
-| R6 | §5.1 | Peramban ponsel (atau emulasi): ⋮ → Buka AR2 dan AR1 | Terbuka sebagai tab (bukan bug, BB15) | ◻ bersama bagian R di server dev (tidak dijalankan di lokal) |
+| R1 | F10-10 | [S] Jalur publik: ⋮ → Buka AR2 (PDF), AR4 (JPG), AR5 (PNG) | Pratinjau tampil di popup di ketiga browser | ✅ Brave (Chromium, via ekstensi Claude): ⋮ → Buka memanggil `window.open('/berkas/…', 'arsip-popup', 'width=600,height=600,noopener')`; AR2 PDF tampil di penampil PDF (tombol unduh/cetak ada), AR4/AR5 600×400. Edge: argumen sama, AR4/AR5 600×400, AR2 PDF tampil (penampil terpasang; dikonfirmasi visual Horii). Firefox **tidak diuji** (diterima Horii 16-11-2026 berdasarkan Brave dan Edge; K-12) |
+| R2 | F10-10 | [S] Jalur privat: ⋮ → Buka AR1 (PDF), AR7 (PNG), AR34 (JPG kunci v2) | Pratinjau tampil (popup + blob) di ketiga browser | ✅ Brave: AR1 PDF, AR34 JPG, AR7 PNG di popup asli 600×600 berisi `blob:` dengan tipe benar (popup dipakai ulang). Edge: AR1 PDF dan AR34 JPG sama. Firefox **tidak diuji** (diterima Horii 16-11-2026 berdasarkan Brave dan Edge; K-12) |
+| R3 | F10-37 (5) | [S] Popup blob PDF: tombol unduh dan cetak penampil PDF, **sebelum** dan **sesudah** 60 detik | Berfungsi; bila gagal sesudah pencabutan, catat per browser di §T dan di tabel G10-4 | ✅ Brave dan Edge (Horii 16-11-2026): unduh dan cetak berfungsi sebelum dan sesudah 60 detik. Brave (reviewer): unduh sebelum 60 detik tersimpan (551 B); URL `blob:` terbukti dicabut di detik ke-79. Nama berkas unduhan = UUID blob (T-06). Firefox **tidak diuji** (diterima Horii 16-11-2026 berdasarkan Brave dan Edge; K-12) |
+| R4 | R5 | [S] ⋮ → Buka AR28 (`.html`, `.svg`) | Terunduh, tidak dirender, tidak ada `alert` | ✅ Brave dan Edge: membuka AR28-svg dan AR28-html tidak merender halaman (tab tetap di tempat), tanpa `alert`; berkas diunduh (Brave meminta konfirmasi untuk tipe berisiko). Firefox **tidak diuji** (diterima Horii 16-11-2026 berdasarkan Brave dan Edge; K-12) |
+| R5 | F10-34 (4) | [S] Dalam keadaan login, buka `api/v1/pegawai/<NIP PA>/arsip/berkas/<id AR1>/buka` langsung sebagai tab | Pratinjau tampil (CSP endpoint tidak mematahkan penampil); bila patah, catat nilai CSP yang dipakai (pratinjau didahulukan) | ✅ Brave: PDF tampil di tab (`inline`, CSP endpoint terpasang, tanpa pelonggaran). Edge: penampil PDF terpasang. Firefox **tidak diuji** (diterima Horii 16-11-2026 berdasarkan Brave dan Edge; K-12) |
+| R6 | §5.1 | Peramban ponsel (atau emulasi): ⋮ → Buka AR2 dan AR1 | Terbuka sebagai tab (bukan bug, BB15) | — dipindah ke daftar periksa deploy (K-12, Horii 16-11-2026): ponsel tidak bisa menjangkau Nginx lokal, mode perangkat browser desktop tetap membuka jendela popup, dan perilaku "terbuka sebagai tab" ditentukan browser ponsel (FE tidak punya logika khusus ponsel) |
 
 ## V. Tampilan & viewport (AC1-15, §9.2, §9.3)
 
@@ -361,7 +380,7 @@ Kolom endpoint Tahap 2 dijalankan sesudah MAKE-092/096 di `main` (✔).
 | M6 | 6 `demo.ptt` | Sendiri vs PA | Sama dengan M2 | ✅ API PB: opsi 38 200, 9 403 kunci; PATCH PB-38 200; `hubungkan` PB-0 → 38 200, ke riwayat jabatan Disetujui sendiri 403 kunci; DELETE PB-0b 200; NIP PA 403 lingkup |
 | M7 | 7 `demo.pppk` | Sendiri vs PA | Sama dengan M2 | ✅ API PC: sama dengan M6 (PC-38, PC-0, PC-0b); NIP PA 403 lingkup |
 | M8 | 8 `demo.pimpinan` | Semua endpoint F-10 | 403 `Forbidden` (filter route); tanpa menu/tombol | ✅ API: folder, daftar, `buka`, ekspor, `opsi-hubungkan`, PATCH, `hubungkan`, DELETE 403 `Forbidden`. UI: tanpa menu (A9) dan tombol header (A7) |
-| M9 | — | URL publik `/berkas/…` berkas legacy [S] | Tanpa cek izin untuk siapa pun (BB1) | ◻ [S] menunggu G10-4 |
+| M9 | — | URL publik `/berkas/…` berkas legacy [S] | Tanpa cek izin untuk siapa pun (BB1) | ✅ N3: URL publik berkas legacy 200 tanpa login/cookie |
 | M10 | §11.1 | Baris kontrak role di test | [test-otomatis] `backend/tests/feature/KontrakMatriksRoleTest.php:414-416` (Tahap 1) + `:419-423` (Tahap 2 MAKE-092) | [test-otomatis] isi dibaca: ekspor role 1–7; `opsi-hubungkan`, PATCH, `hubungkan`, DELETE role 1/2/3/6/7; ditegakkan `:572` (kontrak = filter route) dan `:598` (401/403) |
 
 ## W. Tahap 2 umum (Tahap 2; AC2-01..AC2-04, AC2-11, F10-38)
@@ -409,7 +428,7 @@ Kolom endpoint Tahap 2 dijalankan sesudah MAKE-092/096 di `main` (✔).
 |---|---|---|---|---|
 | X1 | AC2-11 | Sesudah bagian N: ⋮ → Hapus baris kode 0 (AR11; bila sudah dihapus, baris kode 0 lain) | `ConfirmDialog` "Hapus arsip?" (tombol Batal / "Ya, hapus") tampil; Batal tidak mengubah apa pun; konfirmasi → "Arsip dihapus." | ✅ UI: AR28-html → Batal, tanpa DELETE, baris tetap; AR33 → "Ya, hapus" → DELETE 200, "Arsip dihapus.", baris hilang, 1 audit `delete` |
 | X2 | AC2-09 | Konfirmasi Hapus AR11 | Baris hilang dari DB; audit `delete` dengan snapshot baris; berkas di disk **tetap ada** | ✅ API admin DELETE AR11 200 (`soft_delete: false`); baris hilang; 1 audit `delete` (snapshot di `before_json`); berkas fisik tetap |
-| X3 | R7 | [S] `curl -sI` URL publik AR11 (dicatat sebelum X2) | Masih 200 (BB10) | ◻ [S] menunggu G10-4 |
+| X3 | R7 | [S] `curl -sI` URL publik AR11 (dicatat sebelum X2) | Masih 200 (BB10) | ✅ AR11 (baris sudah dihapus di X2): 200 `attachment` |
 | X4 | AC2-05 | Hapus baris terhubung lewat API | 422 (lihat H5) | ✅ DELETE AR2 (admin dan pegawai) 422 pesan H5; DELETE AR10 sesudah H7 422 |
 | X5 | R7 | Hapus AR10b (kode 0, kunci v2; AR10 dipakai H7), lalu `buka` id-nya | 404 "Arsip tidak ditemukan."; berkas fisik tetap di disk | ✅ DELETE 200 + 1 audit; `buka` 404 "Arsip tidak ditemukan."; DELETE kedua 404; berkas fisik tetap |
 
@@ -431,7 +450,7 @@ Kolom endpoint Tahap 2 dijalankan sesudah MAKE-092/096 di `main` (✔).
 |---|---|---|---|---|
 | Z1 | §7.5 | Tab lampiran B-18 riwayat Jabatan PA: unduh lampiran | Tetap privat (`attachment`, butuh login; BB17); tidak berubah | ✅ Unduh B-18 AR1 dan AR2: tanpa token 401; pemilik 200 `application/pdf` `attachment` |
 | Z2 | §7.5 | Dialog "Arsip Data Umum": unggah, lihat, hapus 37/38 | Perilaku lama tetap | ✅ UI: dialog menampilkan seksi 38 dan 37 seperti biasa. API `demo.admin`: unggah 37 (`nama_arsip`) dan 38 (`jenis_arsip` "Lain-lain" + `nama_arsip_lain`) 201 dengan `tag` terisi, unduh 200 `attachment`, hapus 200, jumlah daftar kembali seperti semula; batas 100 tetap (E7) |
-| Z3 | §7.5 | Endpoint berkas layanan cuti/TB/IB/PMK | Tetap privat; berkas 43–50 tidak punya URL publik (N6) | ✅ Endpoint lampiran cuti/TB/IB/PMK tanpa token 401; AR25, AR26-43/46/49 privat ber-URL `buka`, rute dev `/berkas/<path>` 404. N6 Nginx ◻ [S] |
+| Z3 | §7.5 | Endpoint berkas layanan cuti/TB/IB/PMK | Tetap privat; berkas 43–50 tidak punya URL publik (N6) | ✅ Endpoint lampiran cuti/TB/IB/PMK tanpa token 401; AR25, AR26-43/46/49 privat ber-URL `buka`, rute dev `/berkas/<path>` 404. N6 Nginx ✅ (K-12) |
 | Z4 | §6.6 (Tahap 2) | Sesudah Hubungkan ke kode 11: kartu kelengkapan beranda pegawai PA | Bisa berubah [K] (BB11) | ✅ Kartu "Data Pangkat" 25% → 50% sesudah Hubungkan AR-Z4 ke riwayat KP; kartu lain tetap |
 | Z5 | §6.6 (Tahap 2) | Hubungkan ke 9/10/11/32: respons `services/s_stat` | Berkas bisa ikut tampil [K] (BB11); [test-otomatis] bila klien uji tidak tersedia | [test-otomatis] sebagian: `backend/tests/database/Integrasi/StatServiceTest.php` (kode 11 `:72`/`:99`, 32 `:78`/`:101`, 9 `:114`/`:151`, 10 `:203`/`:214`); klien layanan uji tidak tersedia; rantai Hubungkan → `s_stat` tidak diuji ujung-ke-ujung |
 | Z6 | §7.5 | Foto / Plt-Plh / Konket berpath `arsip/…` yang berkasnya ada | 200 (koreksi dokumen usang); [test-otomatis] `backend/tests/Kepegawaian/PathArsipLegacyTerbacaTest.php` (MAKE-093, di `main`) | [test-otomatis] `PathArsipLegacyTerbacaTest.php:63` (foto), `:76` (Plt/Plh), `:98` (Konket) |
@@ -443,21 +462,21 @@ Pelaksana QA **tidak** mencatat hal berikut sebagai temuan. Kolom Hasil diisi �
 
 | # | Perilaku | Dasar | Butir terkait | Hasil |
 |---|---|---|---|---|
-| BB1 | URL berkas legacy bisa dibuka tanpa login atau dari akun lain | F10-18 (a) | N3, M9 | ◻ [S] menunggu G10-4 |
-| BB2 | Berkas unggahan v2 (termasuk lampiran cuti/TB/IB/PMK dan surat ber-TTE) tidak punya URL publik; butuh login dengan izin melihat pegawai itu | F10-18 (b) | N6, P4 | ✅ lokal: P3, P4, Z3 (rute dev 404 untuk berkas v2); N6 Nginx ◻ [S] |
+| BB1 | URL berkas legacy bisa dibuka tanpa login atau dari akun lain | F10-18 (a) | N3, M9 | ✅ N3, M9 |
+| BB2 | Berkas unggahan v2 (termasuk lampiran cuti/TB/IB/PMK dan surat ber-TTE) tidak punya URL publik; butuh login dengan izin melihat pegawai itu | F10-18 (b) | N6, P4 | ✅ P3, P4, Z3 (rute dev 404 untuk berkas v2); N6 (Nginx lokal 404 untuk kunci v2) |
 | BB3 | Lebih dari 6 berkas v2 beruntun → pesan batas; ±10 detik kemudian satu berkas bisa dibuka lagi; berkas legacy tidak dibatasi | F10-36 | P12, P13, P17, F6 | ✅ P12, P13, P17, F6 |
 | BB4 | Pembukaan berkas v2 oleh pemiliknya sendiri tercatat di audit | F10-35 | P10 | ✅ P10 |
-| BB5 | Pembukaan berkas legacy lewat URL publik tidak tercatat di audit | F10-08 | N3 | ◻ [S] menunggu G10-4 |
-| BB6 | Lampiran cuti/TB/IB/PMK v2 bisa dibuka di Arsip walau endpoint layanan menolak role itu; PMK hasil impor legacy lewat URL publik | F10-30, §7.5 | P2, P18, C6, N1, Z3 | ✅ lokal: P2, P18, C6, Z3; N1 ◻ [S] |
+| BB5 | Pembukaan berkas legacy lewat URL publik tidak tercatat di audit | F10-08 | N3 | ✅ N3: jumlah baris `audit_logs` tidak berubah; log akses `/berkas/` juga mati (N9) |
+| BB6 | Lampiran cuti/TB/IB/PMK v2 bisa dibuka di Arsip walau endpoint layanan menolak role itu; PMK hasil impor legacy lewat URL publik | F10-30, §7.5 | P2, P18, C6, N1, Z3 | ✅ P2, P18, C6, Z3, N1 |
 | BB7 | Role 2/4/5/6/7 melihat lampiran **dan ringkasan** riwayat yang tersembunyi di B-18 (mis. hukdis), termasuk di opsi Hubungkan | F10-30 | B2, H9 | ✅ B2, H9 |
 | BB8 | Pegawai yang muncul di pemilih tetapi di luar lingkup detail role 3 → 403 | §5.1 | A3 | [test-otomatis] sebagian (A3, K-05, T-03) |
 | BB9 | Lampiran riwayat status 10 tetap tampil dan bisa dibuka | F10-16 | B3, P9 | ✅ B3, P9 |
-| BB10 | Hapus arsip yatim tidak menghapus berkas fisik; URL lama berkas legacy masih terbuka | F10-09, R7 | X2, X3 | ✅ lokal: X2, X5 (berkas fisik tetap); URL lama X3 ◻ [S] |
+| BB10 | Hapus arsip yatim tidak menghapus berkas fisik; URL lama berkas legacy masih terbuka | F10-09, R7 | X2, X3 | ✅ X2, X5 (berkas fisik tetap); URL lama X3 |
 | BB11 | Hubungkan ke Jabatan/Diklat sertifikasi bisa memicu antre SIASN; ke 9/10/11/32 mengubah `s_stat`; ke 11 mengubah kelengkapan beranda | §6.6 | H8, Z4, Z5 | ✅ H8 (Hubungkan tidak menulis antre), Z4; Z5 [test-otomatis] |
 | BB12 | Role 2/6/7 tidak bisa Hubungkan ke riwayat Disetujui (dialog praktis hanya Data Umum 38); role 2/3/6/7 tidak bisa mengubah nama kode 37; tetapi role 2/6/7 tetap bisa mengubah nama arsip yang terhubung ke riwayat Disetujui (selain 37) | F10-31, PB-4 | H6, E1, E4 | ✅ H6, E1, E4 |
 | BB13 | Centang "Belum terhubung" + memilih jenis → daftar kosong | §6.1 [K] | Y6 | ✅ Y6 |
-| BB14 | Berkas selain pdf/gambar terunduh, tidak dipratinjau | F10-32 | N4, F4, R4 | ✅ lokal: F4, P5; N4 dan R4 ◻ [S] |
-| BB15 | Berkas dibuka di popup kecil; di ponsel terbuka sebagai tab | §5.1 | R6 | ◻ bersama bagian R di server dev (popup 600×600 teramati di F1/F2) |
+| BB14 | Berkas selain pdf/gambar terunduh, tidak dipratinjau | F10-32 | N4, F4, R4 | ✅ F4, P5, N4, R4 |
+| BB15 | Berkas dibuka di popup kecil; di ponsel terbuka sebagai tab | §5.1 | R6 | — R6 dipindah ke daftar periksa deploy; popup 600×600 teramati di F1/F2, R1, R2 |
 | BB16 | Tidak ada token CSRF terpisah | §6.1 | W1 | ✅ W1 |
 | BB17 | Endpoint unduh B-18 lama tetap butuh login | §7.5 | Z1 | ✅ Z1 |
 | BB18 | Membuka URL folder langsung (`/arsip/<NIP>/semua` atau `/<kode>`) bisa menghasilkan dua baris `arsip_lihat` (permintaan folder dan daftar bersamaan; dedup cek-lalu-tulis) | AC1-12 (PRD `:200`) | D1, D2 | ✅ D1, D2 (API), D4 (UI): satu baris bila berurutan; skenario membuka URL folder langsung tidak diuji; bila baris ganda muncul tetap sesuai keputusan |
@@ -468,9 +487,9 @@ Pelaksana QA **tidak** mencatat hal berikut sebagai temuan. Kolom Hasil diisi �
 
 | # | Temuan / pertanyaan | Keputusan |
 |---|---|---|
-| K-01 | Bagian N dan R (dan GF4) bergantung pada MAKE-093 di `main` dan G10-4 oleh operator/Horii. Saat checklist disusun MAKE-093 masih di branch. "QA Tahap 1 boleh dilakukan reviewer lebih awal" (PRD §13 `:658`) ada dalam urutan **sesudah** MAKE-093. | ✔ MAKE-093 di `main` (merge `a0418d1f`); bagian N/R dan GF4 menunggu G10-4. Butir lain di lokal: lihat K-11 |
+| K-01 | Bagian N dan R (dan GF4) bergantung pada MAKE-093 di `main` dan G10-4 oleh operator/Horii. Saat checklist disusun MAKE-093 masih di branch. "QA Tahap 1 boleh dilakukan reviewer lebih awal" (PRD §13 `:658`) ada dalam urutan **sesudah** MAKE-093. | ✔ MAKE-093 di `main` (merge `a0418d1f`); bagian N/R dan GF4 dijalankan di Nginx lokal (K-12). Butir lain di lokal: lihat K-11 |
 | K-02 | `ACTIVE_PHASE` di `main` masih 5 (`nav.config.ts:97`) walau Fase 7 sudah sign-off 11-11-2026; menu Arsip ber-`phase: 7` (`:173`) tersembunyi. Di server dev konstanta tidak bisa diubah tanpa deploy. | Informasi tetap: `ACTIVE_PHASE` dinaikkan ke 7 hanya saat rilis Fase 7 (`docs/fase7/Laporan_Akhir_Fase7.md:168`, blocker deploy/go-live); F-10 ikut gerbang Fase 7 (QF10-3, PRD `:637`); kenaikan konstanta = keputusan Horii/reviewer di penutup rilis (F8-50, `docs/fase8/PRD_Fase8_HaloSimpeg.md:907`). QA di server dev memakai URL langsung + tombol header; A9 sudah dijalankan di lokal dengan 7 tanpa commit. ◻ Opsional: hanya bila Horii ingin menaikkan konstanta lebih awal |
-| K-03 | Data uji F-10 (baris `document_attachment` + berkas fisik sintetis, akun per role) belum punya skrip; di server dev belum jelas akun uji dan izin menanam data sintetis di DB + akar lampiran. | ✔ Lokal: skrip data sintetis `qa_f10.php` disiapkan reviewer di folder demo-seed (di luar repo), idempoten, dengan pengaman DB; tanpa NIP nyata dan tanpa akun baru. ◻ Bagian server dev (akun uji, data/berkas sintetis, pembersihan) tetap untuk Horii/operator |
+| K-03 | Data uji F-10 (baris `document_attachment` + berkas fisik sintetis, akun per role) belum punya skrip; di server dev belum jelas akun uji dan izin menanam data sintetis di DB + akar lampiran. | ✔ Lokal: skrip data sintetis `qa_f10.php` disiapkan reviewer di folder demo-seed (di luar repo), idempoten, dengan pengaman DB; tanpa NIP nyata dan tanpa akun baru. Bagian server dev tidak dibutuhkan lagi: butir [S] dijalankan di Nginx lokal dengan data sintetis yang sama (K-12) |
 | K-04 | Butir saklar `privat` (C9, P11) mengubah `.env`. | ✔ Hanya di lokal: C9/P11 lolos, `.env` dikembalikan |
 | K-05 | A3 butuh akun role 3 tanpa satker yang jalur daftar ≠ jalur detail (`PegawaiScope.php:30-34`); akun demo `demo.satker` bersatker sehingga kedua jalur sama. | ✔ A3 diterima [test-otomatis] **sebagian**: `PegawaiScopeTest` + `PegawaiEndpointTest` + `OtorisasiArsip` memakai jalur detail. Catatan celah: belum ada test endpoint Arsip role 3 tanpa satker → usulan T-03 |
 | K-06 | Tahap 2 dibagi MAKE-092 (BE) dan MAKE-096 (FE); semula PRD §13 menulis MAKE-092 "BE+FE" | ✔ Tercatat di PRD F-10 v1.5 §13 (CR-123) |
@@ -478,19 +497,26 @@ Pelaksana QA **tidak** mencatat hal berikut sebagai temuan. Kolom Hasil diisi �
 | K-08 | Docblock `frontend/src/features/kepegawaian/composables/useBukaBerkasArsip.ts:12-13` masih menyebut 403 `password_change_required` "ditangani interceptor tanpa pesan tambahan", sedangkan kode `:62` menampilkan pesan (sesuai F10-37 (6) PRD `:140`). PRD v1.4 §9.3 `:521` semula usang. | Informasi tetap: docblock `:12-13` masih usang (hanya komentar; perbaikan bisa ikut paket FE berikutnya); PRD v1.5 §9.3 `:521` sudah dikoreksi. Acuan F9 = F10-37 (6) `:140` dan §9.3 `:521` |
 | K-09 | Butir yang praktis hanya terbukti lewat test (fail-closed audit D5, audit 0 P16, pencabutan object URL F10, urutan kunci H10, regex README Z7, tanpa N+1 B12, tipe blob F12). | ✔ [test-otomatis] disepakati reviewer, dengan rujukan test di gate `main` (D5/P16 diuji di tingkat service) |
 | K-10 | Angka D1 (v1.4) dari salinan dev, bukan produksi: 0 baris `assets/upload/…`, 2 baris `id_riwayat` NULL, 2 baris `path` kosong, maksimum 576 baris per pegawai. | Informasi: AR18, AR19, AR31 sintetis; kinerja folder untuk pegawai ±576 baris tidak diuji (opsional) |
-| K-11 | PRD menjalankan QA Lapis 1 F-10 di server dev dengan Nginx, **bukan** rute dev (§7.4 `:342`, §11.3 `:575`). Checklist ini mengusulkan butir non-[S] (termasuk C9/P11 saklar `privat` dan pembukaan berkas legacy lewat rute dev `arsip.sajiBerkasDev = true`) di mesin lokal. Laporan Akhir Fase 7 §10.6 menulis G10-4 menahan QA Lapis 1 F-10. | ✔ Horii 13-11-2026: butir non-[S] diuji di lokal dengan rute dev sesudah Tahap 2 di `main`; butir [S] (Nginx, `curl -I`, tiga browser) menyusul di server dev sesudah G10-4 |
+| K-11 | PRD menjalankan QA Lapis 1 F-10 di server dev dengan Nginx, **bukan** rute dev (§7.4 `:342`, §11.3 `:575`). Checklist ini mengusulkan butir non-[S] (termasuk C9/P11 saklar `privat` dan pembukaan berkas legacy lewat rute dev `arsip.sajiBerkasDev = true`) di mesin lokal. Laporan Akhir Fase 7 §10.6 menulis G10-4 menahan QA Lapis 1 F-10. | ✔ Horii 13-11-2026: butir non-[S] diuji di lokal dengan rute dev sesudah Tahap 2 di `main`; butir [S] (Nginx, `curl -I`, tiga browser) menyusul di server dev sesudah G10-4. Bagian [S] diganti K-12 |
+| K-12 | G10-4 (verifikasi Nginx `/berkas/` di server dev) butuh operator dengan akses root serta data dan akun uji di server dev (K-03). Struktur DB dan kode sama dengan lokal; satu-satunya bagian khusus server adalah konfigurasi Nginx `/berkas/`. | ✔ Horii 16-11-2026: butir [S] dijalankan di **Nginx lokal** dengan blok README apa adanya ("Lingkungan & persiapan"); bagian `curl` oleh reviewer; uji browser di Brave (Chromium, mewakili Chrome) dan Edge lewat ekstensi Claude oleh reviewer, konfirmasi visual PDF Edge dan R3 oleh Horii. **Firefox tidak diuji**: Horii 16-11-2026 menerima hasil Brave dan Edge
+dan mencatat Firefox belum diuji. Risiko: Firefox memakai penampil PDF sendiri (pdf.js) dan penanganan popup/`blob:`
+berbeda dari Chromium, jadi bila pratinjau PDF, unduh/cetak sesudah 60 detik (F10-37 (5)), atau CSP bermasalah hanya di
+Firefox, sumbernya kemungkinan di sini; cek dulu nilai CSP (README-deploy §1l langkah pasang butir 1) dan penundaan
+pencabutan object URL. R6 (ponsel) dipindah ke daftar periksa deploy (Horii 16-11-2026). N10 (hak baca user Nginx) dan N11 (tanpa symlink) tidak bisa diuji di Windows → masuk daftar periksa deploy B10-3 (README-deploy §1l), dijalankan operator saat deploy dan **tidak** menahan sign-off. Baris server di tabel "Hasil verifikasi" §1l diisi operator saat deploy |
 
 ## T. Temuan
 
 Satu baris per temuan; kolom Butir memakai nomor berawalan. Tidak ada butir yang gagal; semua temuan berdampak rendah dan
-**tidak** menahan sign-off.
+**tidak** menahan sign-off. Keputusan Horii 16-11-2026 di kolom terakhir.
 
 | # | Butir | Temuan | Dampak | Usulan / status |
 |---|---|---|---|---|
-| T-01 | B8 (di luar butir) | URL folder berangka yang bukan `jenis_rwy` (mis. `/arsip/<NIP PA>/2`) menampilkan judul "Folder" + "Belum ada berkas.", bukan "Folder tidak ditemukan."; yang ditolak hanya nilai bukan angka selain `tanpa_jenis`. FE tidak dapat membedakan jenis tak dikenal dari jenis tanpa berkas karena folder 0 berkas tidak dikirim (AC1-05) | Rendah, kosmetik | Catat, tanpa perbaikan. ◻ Horii bila ingin ditangani di paket FE berikutnya |
-| T-02 | E2 | Ubah Nama dengan tag tak tertutup (mis. `a <b`) disimpan "a": `strip_tags` membuang sisa teks sesudah `<` yang dianggap awal tag. Sanitasi sesuai F10-38/AC2-08 (tag dibuang), tetapi bisa memotong teks | Rendah | Catat sebagai perilaku sanitasi yang diterima |
-| T-03 | A3, K-05 | Celah test: belum ada test endpoint Arsip untuk admin role 3 tanpa satker (jalur daftar ≠ jalur detail) | Rendah; kode memakai jalur detail `OtorisasiArsip` | Tambah test di paket CR berikutnya; tidak menahan sign-off |
-| T-04 | V6 | Di viewport 390 px menu Ekspor menempel tepi kiri layar (tidak meluber, tanpa scroll horizontal) | Rendah, kosmetik | Catat |
+| T-01 | B8 (di luar butir) | URL folder berangka yang bukan `jenis_rwy` (mis. `/arsip/<NIP PA>/2`) menampilkan judul "Folder" + "Belum ada berkas.", bukan "Folder tidak ditemukan."; yang ditolak hanya nilai bukan angka selain `tanpa_jenis`. FE tidak dapat membedakan jenis tak dikenal dari jenis tanpa berkas karena folder 0 berkas tidak dikirim (AC1-05) | Rendah, kosmetik | ✔ Perbaikan kecil FE di paket FE berikutnya (angka folder yang bukan `jenis_rwy` → "Folder tidak ditemukan.") |
+| T-02 | E2 | Ubah Nama dengan tag tak tertutup (mis. `a <b`) disimpan "a": `strip_tags` membuang sisa teks sesudah `<` yang dianggap awal tag. Sanitasi sesuai F10-38/AC2-08 (tag dibuang), tetapi bisa memotong teks | Rendah | ✔ Dicatat sebagai perilaku sanitasi yang diterima |
+| T-03 | A3, K-05 | Celah test: belum ada test endpoint Arsip untuk admin role 3 tanpa satker (jalur daftar ≠ jalur detail) | Rendah; kode memakai jalur detail `OtorisasiArsip` | ✔ Tambah 1 test PHPUnit (harapan 403) di paket CR berikutnya; tidak menahan sign-off |
+| T-04 | V6 | Di viewport 390 px menu Ekspor menempel tepi kiri layar (tidak meluber, tanpa scroll horizontal) | Rendah, kosmetik | ✔ Dicatat saja. Bila diperbaiki, jadi tiket UI tersendiri karena `UiExportMenu` dipakai banyak tabel (kemungkinan disesuaikan saat pengerjaan UI/UX) |
+| T-05 | N7 | Folder pegawai yang **ada** tanpa garis miring di akhir (`/berkas/arsip/<NIP>`) dijawab 301 ke versi bergaris miring (lalu 404, tanpa listing), sedangkan folder yang tidak ada dijawab 404; jadi keberadaan folder arsip seorang pegawai bisa ditebak dari URL | Rendah; tidak ada isi berkas atau daftar yang tersaji, dan URL berkas legacy memang publik (F10-18 (a)) | ✔ Dicatat saja |
+| T-06 | R3 | Unduhan dari penampil PDF di popup jalur privat (`blob:`) bernama UUID blob (mis. `3b935468-….pdf`), bukan nama arsip; jalur publik memakai nama berkas asli | Rendah, kenyamanan | ✔ Horii 16-11-2026: diperbaiki (paket FE tersendiri bersama T-01) |
 
 ### Catatan pelaksanaan
 
@@ -513,3 +539,14 @@ Bukan temuan; dicatat supaya hasil di atas dapat dibaca ulang.
 - Tahap tulis: satu kasus tolakan tambahan (tag tak tertutup, T-02) ternyata diterima sehingga AR2 sempat berganti nama
   sebelum E1 menggantinya lagi.
 - Sesudah QA: saklar `.env` demo dan `nav.config.ts` dikembalikan; worktree demo bersih, tanpa commit.
+- Ekspektasi N7 (traversal 2 tingkat → halaman SPA) dan GF4 (hak baca user Nginx → daftar periksa deploy B10-3) dikoreksi
+  16-11-2026 sesudah eksekusi: Nginx menormalisasi URI sebelum mencocokkan `location`, dan Nginx Windows tidak punya user/grup
+  Unix (K-12). GF4 hanya mencakup bagian G10-4 yang bisa diuji di lokal.
+- Butir [S] (K-12, 16-11-2026): Brave (Chromium) dan Edge dikendalikan reviewer lewat ekstensi Claude, login sebagai
+  pemilik arsip PA memakai sesi sintetis (tanpa mengetik password), lewat halaman peluncur lokal (di luar repo). Popup asli
+  terbuka (tidak disimulasikan). Jalur publik memakai `noopener` sehingga `window.open` mengembalikan null; argumennya
+  direkam lewat pembungkus dan tampilan berkasnya diuji dengan membuka URL yang sama di tab (header dan penampil identik).
+  Isi popup `blob:` (jalur privat) dibaca langsung karena satu origin. Penampil PDF Edge tidak tertangkap tangkapan layar
+  ekstensi, jadi tampilannya dikonfirmasi visual oleh Horii. Jejak uji tercatat di log akses Nginx lokal (user-agent
+  Chrome dan Edg) dan di `audit_logs` (`arsip_unduh`). Browser pane aplikasi desktop tidak dipakai sebagai bukti (tanpa
+  penampil PDF). Bagian `curl` dijalankan dengan skrip reviewer; NIP sintetis dimasker di keluaran.
