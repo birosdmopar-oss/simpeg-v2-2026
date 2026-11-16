@@ -41,6 +41,9 @@ final class ArsipService
 
     private const TANPA_JENIS = 'tanpa_jenis';
 
+    /** CR-127: pesan 404 untuk `id_jenis_rwy` yang tidak ada di master (FE menampilkan "Folder tidak ditemukan."). */
+    public const PESAN_FOLDER_TIDAK_ADA = 'Folder tidak ditemukan.';
+
     /**
      * Ekspresi urut `sort=nama` = {@see self::namaArsip()} di SQL: `tag` → `display_name` → `filename` (kecuali baris
      * berkunci v2) → "Berkas <id>". Regex kunci v2 = Config\Arsip::REGEX_KUNCI_V2 (`[.]` pengganti `\.`), dibandingkan
@@ -216,7 +219,8 @@ final class ArsipService
 
     /**
      * Saringan daftar/ekspor: `id_jenis_rwy` (angka / `tanpa_jenis`), `belum_terhubung` (`1` = kode 0, digabung AND
-     * dengan `id_jenis_rwy`, §6.1 [K]: centang + jenis lain → kosong), `sort`, `order`. 422 per kolom.
+     * dengan `id_jenis_rwy`, §6.1 [K]: centang + jenis lain → kosong), `sort`, `order`. 422 per kolom; kode jenis yang
+     * tidak ada di master `jenis_rwy` → 404 "Folder tidak ditemukan." (CR-127).
      *
      * @return array{jenis: string|null, belum: bool, sort: string, arah: string, audit: array<string, mixed>}
      */
@@ -237,6 +241,13 @@ final class ArsipService
 
         if (! in_array($arah, ['asc', 'desc'], true)) {
             throw ValidationException::forField('order', 'Arah urutan harus asc atau desc.');
+        }
+
+        // CR-127 (T-01): kode jenis berbentuk sah tetapi tidak ada di master `jenis_rwy` → 404 (sesudah otorisasi pegawai
+        // dan 422 format, sebelum catatan F10-17/F10-26).
+        if ($jenis !== null && $jenis !== self::TANPA_JENIS
+            && $this->db->table('jenis_rwy')->select('1', false)->where('id_jenis_rwy', (int) $jenis)->limit(1)->get()->getRowArray() === null) {
+            throw new NotFoundException(self::PESAN_FOLDER_TIDAK_ADA);
         }
 
         return [
