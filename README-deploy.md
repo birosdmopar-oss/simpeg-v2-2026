@@ -598,7 +598,7 @@ Pengecualiannya sempit dan disengaja: **hanya** blok `location ^~ /berkas/` di �
    - User worker Nginx harus bisa membaca subtree `arsip/` dan `assets/upload/`. Caranya: masukkan user Nginx ke grup pemilik berkas (user PHP-FPM/deploy), atau jalankan keduanya dengan user yang sama. Contoh: `usermod -aG <grup-php> <user-nginx>`, lalu restart Nginx.
    - Kunci v2 dibaca PHP, bukan Nginx.
    - Uji: `sudo -u <user-nginx> test -r <akar>/arsip/<contoh berkas> && echo OK`.
-6. **`nginx -t && systemctl reload nginx`**, lalu jalankan verifikasi di bawah. Hasilnya dicatat di tabel hasil verifikasi (G10-4).
+6. **`nginx -t && systemctl reload nginx`**, lalu jalankan daftar periksa deploy di bawah. Hasilnya dicatat di tabel hasil verifikasi (baris server, saat deploy).
 
 **`.env` backend** (`shared/backend.env`):
 
@@ -611,7 +611,7 @@ arsip.dasarUrlBerkas = /berkas
 arsip.sajiBerkasDev = false
 ```
 
-**Verifikasi (server dev = G10-4; ulangi di produksi = B10-3).** `<host>` adalah host aplikasi. Contoh berkas diambil dari salinan MAKE-069. Jangan tempel NIP atau nama berkas nyata di laporan; sebut "berkas legacy PDF contoh" dan sejenisnya.
+**Verifikasi (G10-4 sudah dijalankan di Nginx lokal, K-12 di `docs/fase7/Checklist_QA_Lapis1_F10.md`; di setiap server saat deploy cukup daftar periksa deploy di bawah: server dev, lalu produksi = B10-3).** `<host>` adalah host aplikasi. Contoh berkas diambil dari salinan MAKE-069. Jangan tempel NIP atau nama berkas nyata di laporan; sebut "berkas legacy PDF contoh" dan sejenisnya.
 
 ```bash
 H=https://<host>
@@ -624,7 +624,7 @@ curl -sI "$H/berkas/2026/11/<kunci v2 yang ADA di disk>.pdf"   # 404 (kunci v2 t
 curl -sI "$H/berkas/kolom/<…>"  "$H/berkas/form-digital/<…>"   # 404
 curl -sI "$H/berkas/arsip/<nip>/"                         # 404 (tanpa listing)
 curl -sI "$H/berkas/arsip/<nip>/.htaccess"                # 404 (segmen berawalan titik)
-curl -sI "$H/berkas/arsip/%2e%2e/%2e%2e/cache/<…>"        # 400/404, tidak pernah isi writable/cache
+curl -sI "$H/berkas/arsip/%2e%2e/%2e%2e/cache/<…>"        # 400, atau halaman SPA bila Nginx menormalisasi path keluar dari /berkas/; tidak pernah isi writable/cache
 curl -sI "$H/berkas/arsip/<nip>/<sub>/<nama>.php"         # octet-stream attachment, TIDAK dieksekusi
 ```
 
@@ -635,7 +635,8 @@ Untuk setiap respons 200, periksa header berikut:
 - `Content-Security-Policy` sesuai snippet;
 - `Content-Disposition` sesuai tipe.
 
-Periksa juga bahwa `tail` log akses Nginx tidak memuat request `/berkas/`.
+Periksa juga bahwa `tail` log akses Nginx tidak memuat request `/berkas/`, kecuali request traversal `%2e%2e` yang
+dinormalisasi keluar dari `/berkas/` dan dicatat blok lain (tanpa NIP).
 
 Uji browser di **Chrome, Edge, dan Firefox** (desktop):
 
@@ -646,10 +647,25 @@ Uji browser di **Chrome, Edge, dan Firefox** (desktop):
    - Buka juga URL `api/v1/pegawai/<nip>/arsip/berkas/<id>/buka` langsung sebagai tab, dalam keadaan login, untuk menguji CSP endpoint (F10-34 (4)).
 3. Bila CSP mematahkan pratinjau, terapkan langkah pasang butir 1.
 
-Hasil verifikasi (diisi operator/Horii saat G10-4; tanpa host, NIP, atau nama berkas):
+**Daftar periksa deploy (setiap server; produksi = B10-3).** Butir 1–2 tidak bisa diuji di Nginx Windows saat G10-4 lokal
+(K-12: butir N10 dan N11 checklist QA F-10), jadi **wajib** diperiksa operator; butir 3–5 adalah cek cepat sesudah langkah
+pasang:
+
+1. Hak baca user Nginx (langkah 5): `sudo -u <user-nginx> test -r <akar>/arsip/<contoh berkas> && echo OK`; hak `0640`/`0750`
+   tidak diubah.
+2. Tanpa symlink di dalam akar lampiran (langkah 4): `find <akar> -type l` kosong, dan `disable_symlinks` terpasang
+   (`nginx -t` lolos).
+3. Cek cepat `curl -sI`: satu berkas legacy PDF → 200 `inline` dengan lima header; satu kunci v2 yang ada di disk → 404;
+   `/berkas/kolom/<…>` → 404. Lalu `tail` log akses tanpa baris `/berkas/`.
+4. Uji browser cukup satu berkas legacy PDF dan satu berkas unggahan v2 lewat ⋮ → Buka, karena perilaku tiga browser sudah
+   diuji di G10-4 lokal.
+5. Ponsel asli (R6 checklist QA F-10, K-12): ⋮ → Buka satu berkas legacy dan satu berkas unggahan v2 → terbuka sebagai tab.
+
+Hasil verifikasi (baris lokal = G10-4, K-12; baris server diisi operator saat deploy; tanpa host, NIP, atau nama berkas):
 
 | Tanggal | Server | `curl -I` (header + 404 kunci v2) | Hak baca user Nginx | Chrome | Edge | Firefox | Nilai CSP akhir | Catatan |
 |---|---|---|---|---|---|---|---|---|
+| 16-11-2026 | lokal (Nginx 1.22 Windows; blok §1 tanpa `disable_symlinks`; data sintetis) | ✅ lima header lengkap; 404 untuk kunci v2, `kolom/`, `form-digital/`, segmen titik, folder; `.php` dikirim mentah sebagai `attachment` | — (Windows; daftar periksa deploy) | ✅ (Brave/Chromium) | ✅ | — tidak diuji (diterima Horii) | Sesuai snippet, tanpa pelonggaran | Folder pegawai yang ada tanpa garis miring → 301 lalu 404 (T-05 checklist QA F-10, dicatat) |
 | | dev | | | | | | | |
 
 **Rollback ke privat (tanpa deploy kode; ADR-038).** Rollback berlaku untuk berkas legacy dan dilakukan dalam dua langkah:
