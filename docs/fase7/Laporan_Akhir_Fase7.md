@@ -187,12 +187,14 @@ Sumber: fakta reviewer 13-11-2026 (tidak tercatat di repo); dicek ulang ke revie
 ## 10. Addendum F-10 Arsip Digital (sesudah sign-off 11-11-2026)
 
 Addendum ini **tidak** mengubah sign-off Fase 7 di atas (F-01, F-02, F-04..F-08, F-11..F-13 + ISSUE-058). Isinya hanya status
-F-10 yang dibuka kembali sesudah sign-off. Disusun reviewer CR 13-11-2026 dari `main` `483c5892`. Branch yang belum di `main`
+F-10 yang dibuka kembali sesudah sign-off. Disusun reviewer CR 13-11-2026 dari `main` `483c5892`; diperbarui 16-11-2026 (CR-128). Branch yang belum di `main`
 dibaca langsung dari `origin` dengan SHA yang disebut di bawah. Nomor CI, status izin, dan pelaksana per paket = fakta reviewer
 13-11-2026 (tidak tercatat di repo); SHA branch dicek ulang tepat sebelum commit.
 
-> **Status F-10:** **belum selesai.** Tahap 1 sebagian sudah di `main` (MAKE-090, MAKE-091), MAKE-093 belum, Tahap 2 baru dimulai,
-> dan QA Lapis 1 F-10 belum dijalankan. **Sign-off F-10: ◻ menunggu Horii.**
+> **Status F-10 (diperbarui 16-11-2026, CR-128):** semua paket Tahap 1 dan Tahap 2 di `main` (MAKE-090, MAKE-091, MAKE-093,
+> MAKE-092, MAKE-096; `main` `07d5a7a2` gate penuh lolos). QA Lapis 1 F-10 selesai 15–16-11-2026 dengan 0 butir gagal (CR-124,
+> CR-125; butir [S] lewat K-12). Perbaikan temuan QA CR-127 (BE) dan CR-126 (FE) berjalan. **Sign-off F-10: ◻ menunggu Horii,
+> sesudah CR-127 dan CR-126 di `main`** (keputusan Horii 16-11-2026).
 
 ### 10.1 Latar
 
@@ -217,10 +219,12 @@ dibaca langsung dari `origin` dengan SHA yang disebut di bawah. Nomor CI, status
 | Versi | Isi | Key | SHA | Status |
 |---|---|---|---|---|
 | v1.3 | PRD disetujui Horii 12-11-2026 ("Setuju, boleh merge PRD F-10"): keputusan F10-01..F10-38, Plan B, Lampiran A | CR-120 | `241ef9e5` | Di `main` (G10-1 ✔) |
-| v1.4 | Angka D1 salinan dev (§10, G10-3 ✔, B10-1, §8.1, QF10-1, QF10-5 ✔) + koreksi F10-37 (6): 403 `password_change_required` pada unduhan blob menampilkan pesan, tidak memicu handler interceptor (sesuai MAKE-091) | CR-122 | `448b302c` (branch `docs/cr-122-prd-f10-v14`) | **Belum di `main`**: CI manual #793 berjalan; izin merge sudah ada |
+| v1.4 | Angka D1 salinan dev (§10, G10-3 ✔, B10-1, §8.1, QF10-1, QF10-5 ✔) + koreksi F10-37 (6): 403 `password_change_required` pada unduhan blob menampilkan pesan, tidak memicu handler interceptor (sesuai MAKE-091) | CR-122 | `448b302c` | Di `main` (CI manual #793) |
+| v1.5 | MAKE-092 dipecah menjadi MAKE-092 BE + MAKE-096 FE (§13); §9.3 diselaraskan dengan F10-37 (6) | CR-123 | `5e46eb22` | Di `main` |
+| v1.6 | Hasil QA Lapis 1 F-10: G10-4 lewat K-12; F10-37 (3)/(5) halaman pembungkus popup privat (T-06 opsi 2); 404 + `code` jenis di luar master (T-01); CR-127 → CR-126 sebelum sign-off | CR-128 | branch `docs/cr-128-prd-f10-k12-t06` | ◻ menunggu izin merge |
 
-Rujukan baris di addendum ini memakai PRD v1.3 di `main`, kecuali yang ditandai "v1.4". Pada bagian yang dirujuk, nomor
-barisnya sama di kedua versi.
+Rujukan baris PRD di addendum ini memakai PRD v1.5 (`5e46eb22`), kecuali yang ditandai "v1.4"; di v1.6 (CR-128) sebagian
+nomor baris bergeser karena tambahan AC1-19 dan catatan v1.6, jadi rujukan bagian (§) yang menjadi acuan.
 
 ### 10.3 Paket F-10
 
@@ -233,9 +237,11 @@ Handling Case. Tahap 2 dimulai 13-11-2026 di bawah izin yang sama lewat perubaha
 |---|---|---|---|---|---|
 | MAKE-090 BE Tahap 1 | Folder + daftar berkas (`akses_berkas`, tanda berkas hilang), endpoint privat `buka` + audit `arsip_unduh` + throttle, catatan pembukaan daftar (F10-17), `Config\Arsip` (saklar F10-24 + regex), rute dev, kontrak README | `fa1f6686` | #787 hijau | `./check.sh` @`fa1f6686` EXIT=0 — PHPUnit 4.176 test / 70.819 asersi (3 skip), Vitest 1.701 | **Di `main`** |
 | MAKE-091 FE Tahap 1 | Halaman Arsip (route, menu, pemilih pegawai, folder, tabel, ⋮ Buka lewat URL publik atau popup + blob), tautan Detail Pegawai, label "Arsip Data Umum" | merge `483c5892` (branch `f10/make-091-arsip-fe` @`80c8c410`) | #790 hijau | FE saja di atas basis yang sudah lolos gate penuh: `npm run check` lolos (Vitest 170 berkas / 1.826 test) | **Di `main`** |
-| MAKE-093 Penyajian berkas legacy | `README-deploy.md` §1 (contoh server) dan §1l (Nginx `/berkas/` dua pola legacy, hak baca, tabel hasil verifikasi G10-4), ADR-038, koreksi dokumen usang §7.5 + `PathArsipLegacyTerbacaTest`, `ReadmeBerkasNginxTest` (regex + CSP README §1l vs `Config\Arsip`) | `f10/make-093-penyajian-berkas` @`29ca410c` | #791 hijau | Sedang diulang (Handling Case) | **Belum di `main`** |
-| MAKE-092 BE Tahap 2 | Ubah Nama, Hubungkan, Hapus arsip yatim (`AksiArsip`), ekspor `ArsipService::ekspor()` lewat `EksporTabel` (tanpa kelas `EksporArsip` seperti usulan PRD §8.3), `GET …/arsip/ekspor`, `GET …/arsip/opsi-hubungkan`, filter `belum_terhubung`, kunci aksi F10-31/F10-38, kontrak README | `f10/make-092-arsip-aksi-be` @`c49d5a42` (satu commit di atas `483c5892`) | ◻ belum dicek | — | Berjalan, belum di `main` |
-| MAKE-096 FE Tahap 2 | Dialog Edit/Hubungkan, Hapus, ekspor, filter jenis + "Belum terhubung" di halaman Arsip | `f10/make-096-arsip-aksi-fe` @`149b816a` (satu commit di atas `483c5892`) | ◻ belum dicek | — | Berjalan, belum di `main` |
+| MAKE-093 Penyajian berkas legacy | `README-deploy.md` §1 (contoh server) dan §1l (Nginx `/berkas/` dua pola legacy, hak baca, tabel hasil verifikasi G10-4), ADR-038, koreksi dokumen usang §7.5 + `PathArsipLegacyTerbacaTest`, `ReadmeBerkasNginxTest` (regex + CSP README §1l vs `Config\Arsip`) | merge `a0418d1f` | #791 hijau (branch) | Lolos | Di `main` (13-11-2026) |
+| MAKE-092 BE Tahap 2 | Ubah Nama, Hubungkan, Hapus arsip yatim (`AksiArsip`), ekspor `ArsipService::ekspor()` lewat `EksporTabel` (tanpa kelas `EksporArsip` seperti usulan PRD §8.3), `GET …/arsip/ekspor`, `GET …/arsip/opsi-hubungkan`, filter `belum_terhubung`, kunci aksi F10-31/F10-38, kontrak README | `f3827106` | Hijau | Lolos | Di `main` (14-11-2026) |
+| MAKE-096 FE Tahap 2 | Dialog Edit/Hubungkan, Hapus, ekspor, filter jenis + "Belum terhubung" di halaman Arsip | `07d5a7a2` | #825 hijau | Lolos (`main` `07d5a7a2`, checklist GF5) | Di `main` (15-11-2026) |
+| CR-127 BE perbaikan QA | T-01: `id_jenis_rwy` di luar master `jenis_rwy` → 404 + `code` `folder_tidak_ditemukan`, tanpa audit (WS-2) | `f10/cr-127-arsip-validasi-jenis` | ◻ | ◻ | Berjalan |
+| CR-126 FE perbaikan QA | T-01 tampilan 404 jenis; T-06 halaman pembungkus popup privat dengan tombol "Unduh" bernama arsip (Worker Fix Bug) | `f10/cr-126-arsip-t01-t06` | ◻ | ◻ | Berjalan |
 
 Catatan: PRD §13 menulis MAKE-092 sebagai satu paket "BE+FE Tahap 2" (`:654`). Dalam pelaksanaan, bagian FE dipisah menjadi key
 baru **MAKE-096** (perubahan anggota izin #7 disetujui Horii 13-11-2026). ✔ Pemisahan ini tercatat di PRD F-10 v1.5 §13 (CR-123).
@@ -261,28 +267,29 @@ bukan produksi, dan diverifikasi ulang di produksi saat cutover (G10-3). Folder 
 
 | Butir | Label | Isi | Cara kembali / catatan |
 |---|---|---|---|
-| F10-18 (a) — URL publik berkas legacy | [K] (membalik pola privat v2) | Berkas legacy (`arsip/…`, `assets/upload/…`) dibuka lewat URL publik Nginx `/berkas/` **tanpa** cek izin per berkas dan tanpa audit unduh. Horii memilihnya sesudah diberi tahu risikonya (URL bisa ditebak, KTP/NPWP legacy terbuka bagi yang tahu URL), PRD `:115`; risiko R1–R7, R9, R10 di PRD §7.6 `:355-369` | Saklar `arsip.penyajianBerkasLegacy` = `privat` (F10-24, PRD `:127`; Lampiran A `:794`). Alasan dan opsi lanjutan (alamat terpisah, URL bertanda tangan) dicatat di **ADR-038** (`docs/adr/ADR-038-penyajian-berkas-arsip-legacy-url-publik.md`, branch MAKE-093; status "Diusulkan 12-11-2026", belum di `main`) |
+| F10-18 (a) — URL publik berkas legacy | [K] (membalik pola privat v2) | Berkas legacy (`arsip/…`, `assets/upload/…`) dibuka lewat URL publik Nginx `/berkas/` **tanpa** cek izin per berkas dan tanpa audit unduh. Horii memilihnya sesudah diberi tahu risikonya (URL bisa ditebak, KTP/NPWP legacy terbuka bagi yang tahu URL), PRD `:115`; risiko R1–R7, R9, R10 di PRD §7.6 `:355-369` | Saklar `arsip.penyajianBerkasLegacy` = `privat` (F10-24, PRD `:127`; Lampiran A `:794`). Alasan dan opsi lanjutan (alamat terpisah, URL bertanda tangan) dicatat di **ADR-038** (`docs/adr/ADR-038-penyajian-berkas-arsip-legacy-url-publik.md`, di `main` bersama MAKE-093 `a0418d1f`; status "Diusulkan 12-11-2026") |
 | F10-18 (b) + F10-08 — berkas unggahan v2 | [V2] | Berkas unggahan v2 (termasuk lampiran layanan 42–50 dan surat cuti ber-TTE kode 45) privat lewat `GET pegawai/{nip}/arsip/berkas/{id}/buka`, dengan audit + throttle pola F-09. URL publik `/berkas/YYYY/MM/<kunci>` → 404 | Pola privat Fase 3 dipertahankan |
 | PB-4 = B (F10-31, F10-38) | [V2] | Role 2/6/7 tidak bisa meng-Hubungkan arsip ke riwayat Disetujui (403 seperti B-18). Ubah Nama kode 37 hanya untuk role 1. Akibatnya, pegawai praktis hanya bisa meng-Hubungkan ke kode 38 (PRD `:134`; §14.3 PB-4 `:725-733`) | Plan A (tanpa kunci) = legacy; perlu keputusan Horii baru |
-| F10-37 (6) — 403 `password_change_required` pada blob | [V2], koreksi v1.4 | FE menampilkan pesan server, tidak memicu handler ganti password (interceptor membaca `code` saat body masih Blob) | Perbaikan interceptor untuk semua unduhan blob = CR terpisah di luar F-10. ◻ PRD v1.4 §9.3 `:521` belum diselaraskan (masih menulis 403 `password_change_required` → handler ganti password) |
+| F10-37 (6) — 403 `password_change_required` pada blob | [V2], koreksi v1.4 | FE menampilkan pesan server, tidak memicu handler ganti password (interceptor membaca `code` saat body masih Blob) | Perbaikan interceptor untuk semua unduhan blob = CR terpisah di luar F-10. ✔ §9.3 diselaraskan di PRD v1.5 (CR-123) |
 
 ### 10.6 Butir tersisa sebelum sign-off F-10
 
 | No | Butir | Status |
 |---|---|---|
-| 1 | Gate penuh MAKE-093 lolos → review → merge ke `main` (izin Horii) | ◻ Gate sedang diulang |
-| 2 | PRD v1.4 (CR-122) masuk `main` | ◻ Menunggu CI manual #793 (izin merge sudah ada). §9.3 `:521` v1.4 belum diselaraskan dengan F10-37 (6) `:140`: amandemen CR-122 sebelum merge atau CR berikutnya (◻ reviewer) |
-| 3 | Tahap 2: MAKE-092 (BE) dan MAKE-096 (FE) ke `main` dengan AC2-01..AC2-13 (PRD `:239-254`), lalu regresi gate penuh | ◻ Berjalan |
+| 1 | Gate penuh MAKE-093 lolos → review → merge ke `main` (izin Horii) | ✔ Di `main` (merge `a0418d1f`, 13-11-2026) |
+| 2 | PRD v1.4 (CR-122) masuk `main` | ✔ v1.4 (CR-122) dan v1.5 (CR-123, §9.3 diselaraskan dengan F10-37 (6)) di `main`; v1.6 (CR-128) membawa hasil QA |
+| 3 | Tahap 2: MAKE-092 (BE) dan MAKE-096 (FE) ke `main` dengan AC2-01..AC2-13 (PRD `:239-254`), lalu regresi gate penuh | ✔ MAKE-092 di `main` (`f3827106`, 14-11-2026), MAKE-096 di `main` (`07d5a7a2`, 15-11-2026); gate penuh `main` `07d5a7a2` lolos (checklist GF5) |
 | 4 | Izin Tahap 2: perubahan anggota [#7-WorkloadF10] untuk MAKE-092/MAKE-096 | ✔ Horii 13-11-2026 (fakta reviewer) |
 | 5 | Pencatatan pemisahan MAKE-096 (FE) dari MAKE-092 (BE) | ✔ PRD F-10 v1.5 §13 (CR-123) |
-| 6 | Kontrak README Kepegawaian untuk endpoint Tahap 2 (DoD PRD §11.4 `:601`); perubahannya ada di branch MAKE-092 dan ikut merge | ◻ Ikut butir 3 |
-| 7 | **G10-4**: setelan Nginx `/berkas/` di server dev terpasang dan terverifikasi (`curl -I`, kunci v2 → 404, hak baca user Nginx, uji Chrome/Edge/Firefox untuk kedua jalur), hasil dicatat di tabel verifikasi README-deploy §1l (PRD `:45`) | ◻ Operator/Horii. Menurut PRD §7.4 `:342` dan §11.3 `:575` QA Lapis 1 dijalankan di server dev dengan Nginx, bukan rute dev, jadi G10-4 menahan seluruh QA Lapis 1 F-10; bila reviewer/Horii mengizinkan butir non-[S] di lokal (checklist K-11), G10-4 hanya menahan bagian N/R/GF4 |
-| 8 | Checklist `docs/fase7/Checklist_QA_Lapis1_F10.md` masuk `main` (CR-123) dan disepakati reviewer, termasuk butir ◻ §K | ◻ |
-| 9 | Data uji sintetis + berkas sintetis + akun per role di lingkungan QA (checklist K-03), tanpa NIP nyata | ◻ Prasyarat QA |
-| 10 | QA Lapis 1 F-10 dengan checklist di atas (PRD §11.3 `:574-597`; urutan PRD §13 `:657`) | ◻ Belum dijalankan |
-| 11 | ADR-038 masuk `main` bersama MAKE-093; laporan akhir F-10 (deviasi + cara kembali, Lampiran A) | ◻ |
+| 6 | Kontrak README Kepegawaian untuk endpoint Tahap 2 (DoD PRD §11.4 `:601`); perubahannya ada di branch MAKE-092 dan ikut merge | ✔ Ikut MAKE-092 |
+| 7 | **G10-4**: setelan Nginx `/berkas/` di server dev terpasang dan terverifikasi (`curl -I`, kunci v2 → 404, hak baca user Nginx, uji Chrome/Edge/Firefox untuk kedua jalur), hasil dicatat di tabel verifikasi README-deploy §1l (PRD `:45`) | ✔ 16-11-2026 lewat K-12 checklist QA F-10 (Horii): Nginx lokal dengan blok README apa adanya; `curl -I` lolos; Brave (Chromium) dan Edge lolos; Firefox tidak diuji (diterima); hak baca user Nginx, larangan symlink, dan uji ponsel pindah ke daftar periksa deploy README-deploy §1l (B10-3). PRD v1.6 (CR-128) |
+| 8 | Checklist `docs/fase7/Checklist_QA_Lapis1_F10.md` masuk `main` (CR-123) dan disepakati reviewer, termasuk butir ◻ §K | ✔ Checklist di `main` (CR-123), hasil QA CR-124 dan CR-125; §K K-01..K-12 diputus |
+| 9 | Data uji sintetis + berkas sintetis + akun per role di lingkungan QA (checklist K-03), tanpa NIP nyata | ✔ Lokal (skrip sintetis di luar repo); server dev tidak dibutuhkan (K-12) |
+| 10 | QA Lapis 1 F-10 dengan checklist di atas (PRD §11.3; urutan PRD §13) | ✔ Selesai 15–16-11-2026, 0 butir gagal (CR-124, CR-125); temuan T-01..T-06 diputus Horii |
+| 11 | ADR-038 masuk `main` bersama MAKE-093; laporan akhir F-10 (deviasi + cara kembali, Lampiran A) | ✔ ADR-038 di `main` bersama MAKE-093 (`a0418d1f`); ◻ laporan akhir F-10 saat sign-off |
 | 12 | Sinkron Trello QASMTASK-107 (+ butir explorer QASMTASK-110) dan Notion (PRD §11.4 `:599-608`) | ◻ Sesudah sign-off |
-| 13 | **Sign-off F-10** | ◻ **menunggu Horii** |
+| 12a | Perbaikan temuan QA: CR-127 (BE, T-01) dan CR-126 (FE, T-01 + T-06) ke `main` | ◻ Horii 16-11-2026: sign-off menunggu kedua paket ini; halaman pembungkus CR-126 diuji ulang reviewer di Brave dan Edge sebelum merge |
+| 13 | **Sign-off F-10** | ◻ **menunggu Horii** (sesudah butir 12a) |
 
 MTC-046 (banyak lampiran terindeks, satu berkas hilang ditandai) masuk fase Manual Testing tersendiri dan tidak menahan sign-off
 (PRD `:597`).
