@@ -20,7 +20,15 @@ import { onBeforeUnmount, ref } from 'vue'
 
 import { isApiError, PASSWORD_CHANGE_REQUIRED_CODE } from '@/lib/axios'
 
-import { catatObjectUrlArsip, cabutObjectUrlArsip, isiPopupArsip, namaUnduhArsip } from '../arsip.popup'
+import {
+  cabutObjectUrlArsip,
+  cabutObjectUrlBilaPopupTertutup,
+  catatObjectUrlArsip,
+  isiPopupArsip,
+  namaUnduhArsip,
+  popupAdalahBlank,
+  siapkanPopupBlank,
+} from '../arsip.popup'
 import type { ArsipBerkas } from '../arsip.types'
 import { describeApiError } from '../services/apiErrors'
 import { ambilBerkas, simpanBerkas } from '../services/berkasUnduhan'
@@ -67,6 +75,13 @@ function pesanGalat(error: unknown): string | null {
   return error.status === 429 ? PESAN_TERLALU_BANYAK : describeApiError(error).message
 }
 
+/**
+ * Pemilik jendela `arsip-popup` (satu jendela bernama sama untuk SEMUA instans): hanya permintaan yang masih pemilik yang
+ * boleh mengisi atau menutupnya. Pembukaan baru (privat/publik) mengambil alih, sehingga hasil basi — termasuk dari
+ * instans yang sudah di-unmount — tidak menutup/menimpa popup milik permintaan lain.
+ */
+let pemilikPopup = 0
+
 export function useBukaBerkasArsip() {
   /** Pesan galat tampil di halaman (`UiNotice`); null = tidak ada. */
   const galat = ref<string | null>(null)
@@ -78,7 +93,7 @@ export function useBukaBerkasArsip() {
 
   onBeforeUnmount(() => {
     urutan++ // hasil permintaan yang masih berjalan menjadi basi
-    cabutObjectUrlArsip()
+    cabutObjectUrlBilaPopupTertutup()
   })
 
   /** Boleh dibuka bila URL ada dan (untuk berkas privat) tidak ada berkas privat lain yang sedang dimuat. */
@@ -97,19 +112,33 @@ export function useBukaBerkasArsip() {
     }
   }
 
-  async function bukaPrivat(item: ArsipBerkas, url: string, popup: Window | null): Promise<void> {
+  async function bukaPrivat(item: ArsipBerkas, url: string, popup: Window | null, siap: Promise<boolean>): Promise<void> {
     const ini = ++urutan
+    const milik = popup === null ? 0 : pemilikPopup
+    const pemilik = (): boolean => popup !== null && milik === pemilikPopup
+    let tiba = false
     sedangDimuat.value = item.id_attachment
+    // Jendela yang masih memuat dokumen lain baru bisa ditulisi sesudah dinavigasi ke about:blank (R-1).
+    if (popup !== null) {
+      void siap.then((ok) => {
+        if (ok && !tiba && ini === urutan && pemilik()) isiPopupMemuat(popup)
+      })
+    }
     try {
       const berkas = await ambilBerkas(url, `arsip-${item.id_attachment}`)
-      if (ini !== urutan) {
-        popup?.close() // basi (mis. komponen sudah di-unmount): jangan buat object URL yang tak akan dicabut
+      tiba = true
+      const popupSiap = popup === null ? true : await siap
+      if (ini !== urutan || (popup !== null && !pemilik())) {
+        // Basi (komponen di-unmount, atau jendela sudah diambil alih): jangan buat object URL yang tak akan dicabut,
+        // dan tutup popup HANYA bila masih milik permintaan ini.
+        if (pemilik()) popup?.close()
         return
       }
       if (popup === null) {
         simpanBerkas(berkas)
         return
       }
+      if (!popupSiap) throw new Error('popup tidak siap')
       const tipe = tipePratinjau(berkas.nama)
       const objectUrl = URL.createObjectURL(new Blob([berkas.blob], { type: tipe }))
       catatObjectUrlArsip(objectUrl, popup)
@@ -121,7 +150,7 @@ export function useBukaBerkasArsip() {
         tipe,
       })
     } catch (error) {
-      popup?.close()
+      if (pemilik()) popup?.close()
       if (ini === urutan) galat.value = pesanGalat(error)
     } finally {
       if (ini === urutan) sedangDimuat.value = null
@@ -137,11 +166,13 @@ export function useBukaBerkasArsip() {
 
     if (item.akses_berkas === 'publik') {
       cabutObjectUrlArsip() // jendela bernama sama dinavigasi ke URL publik: isi blob sebelumnya hilang
+      pemilikPopup++ // hasil privat yang masih berjalan tidak boleh menimpa/menutup dokumen publik ini
       window.open(url, NAMA_POPUP_ARSIP, `${UKURAN_POPUP},noopener`)
       return
     }
 
     let popup: Window | null = null
+    let siap: Promise<boolean> = Promise.resolve(true)
     if (item.jenis_buka !== 'unduh') {
       cabutObjectUrlArsip() // popup bernama sama dipakai ulang untuk berkas ini
       popup = window.open('', NAMA_POPUP_ARSIP, UKURAN_POPUP)
@@ -149,9 +180,12 @@ export function useBukaBerkasArsip() {
         galat.value = PESAN_POPUP_DIBLOKIR
         return
       }
-      isiPopupMemuat(popup)
+      pemilikPopup++
+      // Dokumen jendela bukan about:blank (mis. berkas publik sebelumnya): navigasi dimulai sinkron di klik ini.
+      siap = siapkanPopupBlank(popup)
+      if (popupAdalahBlank(popup)) isiPopupMemuat(popup)
     }
-    void bukaPrivat(item, url, popup)
+    void bukaPrivat(item, url, popup, siap)
   }
 
   return { galat, sedangDimuat, bisaDibuka, buka }

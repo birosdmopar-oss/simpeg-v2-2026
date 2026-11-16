@@ -235,7 +235,7 @@ describe('ArsipBerkasTable', () => {
   })
 
   it('selama satu berkas privat dimuat, Buka privat lain disabled; berkas publik tidak', async () => {
-    openSpy.mockReturnValue({ location: { href: '' }, close: vi.fn(), document: { title: '', body: { textContent: '' } } } as unknown as Window)
+    openSpy.mockReturnValue({ location: { href: 'about:blank', replace: vi.fn() }, close: vi.fn(), document: { title: '', body: { textContent: '' } } } as unknown as Window)
     ambil.mockReturnValue(new Promise(() => undefined))
     const publik = berkas(2, { akses_berkas: 'publik', url_berkas: '/berkas/arsip/<nip>/SK.pdf' })
     const wrapper = pasang([berkas(1), berkas(3), publik])

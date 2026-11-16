@@ -10,6 +10,10 @@
 
 /** Selang pemeriksaan `popup.closed` untuk mencabut object URL sesudah popup ditutup. */
 export const SELANG_PERIKSA_POPUP_MS = 3_000
+/** Selang dan batas menunggu jendela bernama sama selesai dinavigasi ke `about:blank` (R-1). */
+export const SELANG_SIAP_POPUP_MS = 50
+export const BATAS_SIAP_POPUP_MS = 3_000
+const ALAMAT_BLANK = 'about:blank'
 const NAMA_CADANGAN = 'berkas'
 const NAMA_MAKS = 150
 /** Ekstensi tipe pratinjau (daftar tertutup F12). */
@@ -106,11 +110,56 @@ export function isiPopupArsip(popup: Window, isi: IsiPopupArsip): void {
   }
 }
 
+// ---- Dokumen popup milik aplikasi (R-1) ----------------------------------------------------------------------------
+
+/** Jendela bernama sama bisa masih memuat dokumen berkas PUBLIK (`/berkas/…`, CSP berkas) dari pembukaan sebelumnya. */
+export function popupAdalahBlank(popup: Window): boolean {
+  try {
+    return popup.location.href === ALAMAT_BLANK
+  } catch {
+    return false // tak terbaca (lintas-origin): perlakukan sebagai bukan dokumen kita
+  }
+}
+
+function dokumenSiap(popup: Window): boolean {
+  try {
+    return popup.location.href === ALAMAT_BLANK && popup.document.readyState === 'complete'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Pastikan `popup` memuat dokumen `about:blank` milik aplikasi sebelum pembungkus ditulis. Bila jendela masih memuat
+ * dokumen lain (mis. berkas publik, atau PDF dari Nginx dengan CSP berkas), navigasikan dulu ke `about:blank` — dimulai
+ * SINKRON (aman dari pemblokir popup) — lalu tunggu dokumen barunya siap. Pendeteksian lewat polling, bukan event
+ * `load`, karena pendengar yang dipasang pada dokumen lama hilang saat navigasi. Resolve `false` bila tak kunjung siap.
+ */
+export function siapkanPopupBlank(popup: Window): Promise<boolean> {
+  if (popupAdalahBlank(popup)) return Promise.resolve(true)
+  try {
+    popup.location.replace(ALAMAT_BLANK)
+  } catch {
+    return Promise.resolve(false)
+  }
+  return new Promise<boolean>((selesai) => {
+    let berlalu = 0
+    const timer = setInterval(() => {
+      berlalu += SELANG_SIAP_POPUP_MS
+      const siap = dokumenSiap(popup)
+      if (siap || berlalu >= BATAS_SIAP_POPUP_MS) {
+        clearInterval(timer)
+        selesai(siap)
+      }
+    }, SELANG_SIAP_POPUP_MS)
+  })
+}
+
 // ---- Masa hidup object URL (satu popup bernama sama → satu object URL aktif) -------------------------------------
 
-let aktif: { url: string; timer: ReturnType<typeof setInterval> } | null = null
+let aktif: { url: string; popup: Window; timer: ReturnType<typeof setInterval> } | null = null
 
-/** Cabut object URL popup yang aktif (popup dipakai ulang, popup ditutup, halaman di-unmount, logout). */
+/** Cabut object URL popup yang aktif (popup dipakai ulang, popup ditutup, logout). */
 export function cabutObjectUrlArsip(): void {
   if (aktif === null) return
   clearInterval(aktif.timer)
@@ -118,17 +167,28 @@ export function cabutObjectUrlArsip(): void {
   aktif = null
 }
 
+function popupTertutup(popup: Window): boolean {
+  try {
+    return popup.closed
+  } catch {
+    return true // tidak terbaca: anggap tertutup agar tidak bocor
+  }
+}
+
+/**
+ * Dipanggil saat halaman pemanggil di-unmount (R-3): popup yang masih terbuka tetap memegang tautan Unduh-nya (halaman
+ * hanya me-render ulang tabel), jadi object URL baru dicabut bila popup sudah tertutup; selebihnya selang pemeriksaan
+ * mencabutnya begitu popup ditutup, dan logout mencabutnya lewat `cabutObjectUrlArsip`.
+ */
+export function cabutObjectUrlBilaPopupTertutup(): void {
+  if (aktif !== null && popupTertutup(aktif.popup)) cabutObjectUrlArsip()
+}
+
 /** Catat object URL yang tampil di `popup`; yang sebelumnya dicabut, dan dicabut otomatis sesudah popup ditutup. */
 export function catatObjectUrlArsip(url: string, popup: Window): void {
   cabutObjectUrlArsip()
   const timer = setInterval(() => {
-    let tertutup = true
-    try {
-      tertutup = popup.closed
-    } catch {
-      // Tidak terbaca: anggap tertutup agar tidak bocor.
-    }
-    if (tertutup) cabutObjectUrlArsip()
+    if (popupTertutup(popup)) cabutObjectUrlArsip()
   }, SELANG_PERIKSA_POPUP_MS)
-  aktif = { url, timer }
+  aktif = { url, popup, timer }
 }

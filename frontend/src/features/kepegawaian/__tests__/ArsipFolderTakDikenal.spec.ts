@@ -135,3 +135,19 @@ describe('pembeda 404 jenis memakai code, bukan teks pesan', () => {
     expect(wrapper.find('[data-testid="arsip-coba-lagi"]').exists()).toBe(false)
   })
 })
+
+describe('filter jenis di "Semua berkas" hilang dari master (R-4)', () => {
+  it('404 code folder_tidak_ditemukan dari filter jenis: kartu + filter dipertahankan, filter dilepas, pesan server tampil', async () => {
+    berkasApi.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 25 })
+    const wrapper = await pasang(`/arsip/${NIP}/semua`)
+    berkasApi.mockRejectedValueOnce(galat(404, 'Jenis arsip sudah tidak ada (uji).', 'folder_tidak_ditemukan'))
+    await wrapper.get('[data-testid="arsip-filter-jenis"] select').setValue('9')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="arsip-pesan"]').text()).toContain('Jenis arsip sudah tidak ada (uji).')
+    expect(wrapper.find('[data-testid="arsip-filter-jenis"]').exists()).toBe(true)
+    expect(wrapper.get<HTMLSelectElement>('[data-testid="arsip-filter-jenis"] select').element.value).toBe('')
+    expect(wrapper.find('[data-testid="arsip-cari"]').exists()).toBe(true)
+    expect(berkasApi).toHaveBeenLastCalledWith(NIP, { q: '', page: 1, per_page: 25 })
+    expect(wrapper.find('[data-testid="arsip-ekspor"]').exists()).toBe(true)
+  })
+})

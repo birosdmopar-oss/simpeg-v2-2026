@@ -155,7 +155,12 @@ async function muatBerkas(): Promise<void> {
   } catch (error) {
     if (ini !== permintaan) return
     hasil.value = null
-    if (folderTakDitemukan(error)) {
+    if (folderTakDitemukan(error) && tampilJenis.value && jenisDipilih.value !== '') {
+      // Jenis di filter "Semua berkas" hilang dari master saat halaman terbuka: kartu + filter dipertahankan, filter
+      // jenis dilepas (memuat ulang daftar) dan pesan server tampil di atas (R-4).
+      pesan.value = { tone: 'danger', text: isApiError(error) && error.message !== '' ? error.message : PESAN_FOLDER_TAK_ADA }
+      jenisDipilih.value = ''
+    } else if (folderTakDitemukan(error)) {
       folderTakDikenal.value = true
       failure.value = isApiError(error) && error.message !== '' ? error.message : PESAN_FOLDER_TAK_ADA
     } else {
