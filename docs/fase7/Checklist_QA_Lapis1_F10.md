@@ -9,7 +9,7 @@ gerbang, §3 register F10-01..F10-38, §5.2 AC1-01..AC1-18, §6.2 AC2-01..AC2-13
 Fase 7 (`docs/fase7/Checklist_QA_Lapis1_Fase7.md`; F-10 dikecualikan di `:16`). Checklist ini **disepakati reviewer CR
 sebelum QA dimulai**; pertanyaan pra-QA dan keputusannya di §K.
 
-**Status (16-11-2026).** Semua butir sudah dieksekusi, kecuali N10, N11, dan R6 yang dipindah ke daftar periksa deploy
+**Status (16-11-2026).** **F-10 sign-off Horii 16-11-2026** sesudah CR-127 (`e092c058`) dan CR-126 (`fd9e8371`) di `main`. Semua butir sudah dieksekusi, kecuali N10, N11, dan R6 yang dipindah ke daftar periksa deploy
 (K-12); **tidak ada butir yang gagal**. Bagian browser diuji di Brave (Chromium) dan Edge; **Firefox tidak diuji** dan
 diterima Horii 16-11-2026 (risiko di K-12). Butir non-[S] dijalankan reviewer CR di **mesin lokal** (K-11 diputus Horii
 13-11-2026; dijalankan 15-11-2026) pada app demo `main` `07d5a7a2` dengan data sintetis. Semua

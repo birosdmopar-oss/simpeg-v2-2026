@@ -85,7 +85,7 @@ Kerangka FE berdata contoh hanya ada di branch `feat/frontend-ui-redesign` commi
 | F-10 MAKE-091 | FE Arsip Tahap 1 | Worker Fix Bug | ✔ di `main` `483c5892` |
 | F-10 MAKE-093 | Penyajian berkas legacy (README-deploy §1/§1l, ADR-038, `ReadmeBerkasNginxTest`) | Handling Case | ✔ di `main` (merge `a0418d1f`, 13-11-2026) |
 | F-10 CR-122 | PRD F-10 v1.4 | Reviewer | ✔ di `main` `448b302c` (v1.5 CR-123 dan v1.6 CR-128 menyusul) |
-| F-10 MAKE-092 / MAKE-096 | Tahap 2 BE / FE | WS-2 / Worker Fix Bug | ✔ di `main` (MAKE-092 `f3827106` 14-11-2026, MAKE-096 `07d5a7a2` 15-11-2026); QA Lapis 1 F-10 selesai 15–16-11-2026; perbaikan QA CR-127/CR-126 berjalan |
+| F-10 MAKE-092 / MAKE-096 | Tahap 2 BE / FE | WS-2 / Worker Fix Bug | ✔ di `main` (MAKE-092 `f3827106` 14-11-2026, MAKE-096 `07d5a7a2` 15-11-2026); QA Lapis 1 F-10 selesai 15–16-11-2026; perbaikan QA CR-127 `e092c058` dan CR-126 `fd9e8371` di `main`; **F-10 sign-off Horii 16-11-2026** |
 | E-10 C0 | Laporan pemahaman E-10 (⛔ reviewer, `8_2.md:74`, PRD `:823`) | ReadOne, Worker Muse | ✔ diterima reviewer 13-11-2026 (fakta reviewer) |
 | E-10 C1/C2 | DBV-033 + MAKE-094 | ReadOne (DB Validator: WS-2) | C1 berjalan (branch DBV-033 @`99be40a0`, G8-10) |
 | E-10 C3 | MAKE-095 | Worker Muse | C3 berjalan; koding penuh baru sesudah kontrak MAKE-094 beku (`8_2.md:70`) → §6.2 T-7 |
