@@ -15,6 +15,7 @@ import { useRoute } from 'vue-router'
 
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { Role } from '@/features/auth/types'
+import { isApiError } from '@/lib/axios'
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { UiButton, UiCard, UiCheckbox, UiExportMenu, UiNotice, UiPagination, UiSearchInput, UiSelect } from '@/shared/ui'
@@ -40,6 +41,8 @@ import { arsipService } from '../services/arsip.service'
 import { simpanBerkas } from '../services/berkasUnduhan'
 
 const PER_PAGE = 25
+/** Pesan 404 jenis (BE CR-127); 404 lain (mis. NIP tak ada) memakai pesan baku halaman. */
+const PESAN_FOLDER_TAK_ADA = 'Folder tidak ditemukan.'
 const JEDA_CARI_MS = 300
 const FORMAT_EKSPOR: ExportFormat[] = [
   { key: 'xlsx', label: 'Ekspor Excel' },
@@ -53,6 +56,9 @@ const nip = computed(() => String(route.params.nip ?? ''))
 const folderParam = computed(() => String(route.params.folder ?? FOLDER_SEMUA))
 const filter = computed(() => filterDariFolder(folderParam.value))
 const folderTidakSah = computed(() => filter.value === null)
+/** Server menjawab 404 "Folder tidak ditemukan." untuk `id_jenis_rwy` angka yang tidak ada di master jenis (CR-127). */
+const folderTakDikenal = ref(false)
+const folderTidakAda = computed(() => folderTidakSah.value || folderTakDikenal.value)
 const tampilJenis = computed(() => folderParam.value === FOLDER_SEMUA)
 /** Role 4 (Admin View) dan 5 (Menteri) hanya melihat: aksi tulis disembunyikan (AC2-02). */
 const bacaSaja = computed(() => auth.role === Role.ADMIN_VIEW_ESELON1 || auth.role === Role.MENTERI)
@@ -121,6 +127,7 @@ let permintaan = 0
 async function muatBerkas(): Promise<void> {
   const ini = ++permintaan
   failure.value = null
+  folderTakDikenal.value = false
   const kueri = kueriFilter()
   if (kueri === null) {
     hasil.value = null
@@ -141,7 +148,12 @@ async function muatBerkas(): Promise<void> {
   } catch (error) {
     if (ini !== permintaan) return
     hasil.value = null
-    failure.value = describeApiError(error).message
+    if (isApiError(error) && error.status === 404 && error.message === PESAN_FOLDER_TAK_ADA) {
+      folderTakDikenal.value = true
+      failure.value = PESAN_FOLDER_TAK_ADA
+    } else {
+      failure.value = describeApiError(error).message
+    }
   } finally {
     if (ini === permintaan) loading.value = false
   }
@@ -288,7 +300,7 @@ async function ekspor(format: ExportFormat['key']): Promise<void> {
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <div v-if="!folderTidakSah" data-testid="arsip-ekspor">
+          <div v-if="!folderTidakAda" data-testid="arsip-ekspor">
             <UiExportMenu :formats="FORMAT_EKSPOR" label="Ekspor" :disabled="mengekspor || loading" @select="ekspor" />
           </div>
           <UiButton appearance="outline" :to="{ name: 'arsip-pegawai', params: { nip } }" data-testid="arsip-kembali">Semua folder</UiButton>
@@ -302,7 +314,7 @@ async function ekspor(format: ExportFormat['key']): Promise<void> {
         <UiButton size="sm" appearance="outline" class="ml-3" data-testid="arsip-folder-coba-lagi" @click="muatRingkas(true)">Coba lagi</UiButton>
       </UiNotice>
 
-      <UiNotice v-if="folderTidakSah" tone="danger" data-testid="arsip-failure">{{ failure }}</UiNotice>
+      <UiNotice v-if="folderTidakAda" tone="danger" data-testid="arsip-failure">{{ failure }}</UiNotice>
 
       <UiCard v-else title="Berkas">
         <div class="mb-4 flex flex-wrap items-end gap-4">
