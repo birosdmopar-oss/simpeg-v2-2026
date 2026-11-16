@@ -268,7 +268,10 @@ ekspor, `opsi-hubungkan`, filter `belum_terhubung` (PRD §6, rincian di bawah ta
   izin Definisi per kode (F10-30): semua baris `document_attachment` milik NIP tampil, termasuk kode 0, 37, 38, 42–50,
   `id_riwayat` NULL, dan baris menggantung (riwayat status 10 / pengajuan / `id_entri` tidak ada, F10-16).
 - **Urutan galat**: 401 → 403 role (route) → 403 lingkup (NIP tak ada bagi role ber-lingkup = 403) → 404 NIP → 404 baris
-  → 422 (`id_jenis_rwy` bukan angka/`tanpa_jenis`, `sort` ∉ `id|nama|jenis|created_at`, `order` ∉ `asc|desc`, `page`).
+  → 422 (`id_jenis_rwy` bukan angka/`tanpa_jenis`, `sort` ∉ `id|nama|jenis|created_at`, `order` ∉ `asc|desc`, `page`)
+  → `berkas`/`ekspor`: 404 "Folder tidak ditemukan." dengan `code: "folder_tidak_ditemukan"` bila `id_jenis_rwy` berupa angka yang tidak ada di master `jenis_rwy`
+  (CR-127, T-01; `0` "Belum Terhubung" ada di master; `''` = semua dan `tanpa_jenis` tidak dicek), tanpa baris audit
+  `arsip_lihat`. Folder (`GET pegawai/{nip}/arsip`) tidak berubah.
   `buka`: … → 404 baris (milik NIP lain juga 404) → 404 bukan akses privat / tak cocok regex / berkas hilang → 429
   throttle → baca → audit → 200.
 - **Folder**: satu entri per `id_riwayat` yang punya ≥ 1 baris, urut `jenis_rwy.order`; `belum_terhubung` (kode 0) lalu

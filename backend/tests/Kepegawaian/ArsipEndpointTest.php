@@ -243,6 +243,63 @@ final class ArsipEndpointTest extends DatabaseTestCase
         $this->assertSame('Diskon 50 SK', $nama[0]);
     }
 
+    public function testJenisTakAdaDiMaster404TanpaAuditCr127(): void
+    {
+        $this->arsip(0, 'arsip/' . $this->nip . '/0.pdf');
+        $this->arsip(null, 'kolom/a.pdf', ['tag' => 'tanpa'], false);
+        $admin = $this->akun($this->buatPegawai(), Role::SUPER_ADMIN);
+        $url   = fn (string $ujung, string $qs): string => "api/v1/pegawai/{$this->nip}/arsip/{$ujung}?{$qs}";
+        $audit = fn (): int => $this->db->table('audit_logs')->where('entity', 'arsip_lihat')->countAllResults();
+
+        // Angka yang tidak ada di master jenis_rwy → 404 "Folder tidak ditemukan." (berkas & ekspor), tanpa audit.
+        foreach (['2', '4', '999999999', '0002'] as $kode) {
+            $this->assertSame(0, $this->db->table('jenis_rwy')->where('id_jenis_rwy', (int) $kode)->countAllResults(), $kode);
+
+            foreach (['berkas' => "id_jenis_rwy={$kode}", 'ekspor' => "format=csv&id_jenis_rwy={$kode}"] as $ujung => $qs) {
+                $res = $this->asUser($admin)->get($url($ujung, $qs));
+                $res->assertStatus(404);
+                $this->assertSame(ArsipService::PESAN_FOLDER_TIDAK_ADA, $this->json($res)['message'], "{$ujung} {$kode}");
+                $this->assertSame('folder_tidak_ditemukan', $this->json($res)['code'] ?? null, "{$ujung} {$kode}");
+            }
+        }
+        $this->asUser($admin)->get($url('berkas', 'id_jenis_rwy=2&belum_terhubung=1&q=x&sort=nama'))->assertStatus(404);
+        $this->assertSame(0, $audit(), 'tanpa baris arsip_lihat untuk 404 jenis');
+
+        // Format salah tetap 422 (lebih dulu dari cek master), termasuk bersama saringan lain yang salah.
+        foreach (['abc', '-1', '1e1', '1234567890'] as $buruk) {
+            $res = $this->asUser($admin)->get($url('berkas', 'id_jenis_rwy=' . rawurlencode($buruk)));
+            $res->assertStatus(422);
+            $this->assertArrayHasKey('id_jenis_rwy', $this->json($res)['errors'], $buruk);
+        }
+        $this->asUser($admin)->get($url('berkas', 'id_jenis_rwy=2&sort=path'))->assertStatus(422);
+        foreach (['abc', '0'] as $page) {
+            $res = $this->asUser($admin)->get($url('berkas', "id_jenis_rwy=2&page={$page}"));
+            $res->assertStatus(422);
+            $this->assertArrayHasKey('page', $this->json($res)['errors'], "page={$page}");
+        }
+        $this->asUser($admin)->get($url('ekspor', 'format=pdf&id_jenis_rwy=2'))->assertStatus(422);
+        $this->assertSame(0, $audit(), 'tanpa baris arsip_lihat untuk 422');
+
+        // Nilai sah tetap 200: '' (semua), 0 "Belum Terhubung", tanpa_jenis, angka master tanpa berkas (kosong).
+        $pegawai = $this->akun($this->nip, Role::PEGAWAI);
+        $total   = fn (string $qs): int => $this->json($this->asUser($pegawai)->get($url('berkas', $qs)))['data']['total'];
+        $this->assertSame([2, 1, 1, 0], [$total('id_jenis_rwy='), $total('id_jenis_rwy=0'), $total('id_jenis_rwy=tanpa_jenis'), $total('id_jenis_rwy=5')]);
+        foreach (['', '0', 'tanpa_jenis', '5'] as $sah) {
+            $this->asUser($pegawai)->get($url('ekspor', "format=csv&id_jenis_rwy={$sah}"))->assertStatus(200);
+        }
+
+        // Lingkup pegawai diperiksa lebih dulu: 403 lingkup / 404 NIP tidak berubah menjadi 404 folder.
+        $luar = $this->asUser($this->akun($this->buatPegawaiDiSatker($this->buatSatker()), Role::ADMIN_SATKER))->get($url('berkas', 'id_jenis_rwy=2'));
+        $luar->assertStatus(403);
+        $lain = $this->asUser($this->akun($this->buatPegawai(), Role::PEGAWAI))->get($url('ekspor', 'format=csv&id_jenis_rwy=2'));
+        $lain->assertStatus(403);
+        $tanpaNip = $this->asUser($admin)->get('api/v1/pegawai/000000000000000000/arsip/berkas?id_jenis_rwy=2');
+        $tanpaNip->assertStatus(404);
+        $this->assertNotSame(ArsipService::PESAN_FOLDER_TIDAK_ADA, $this->json($tanpaNip)['message']);
+        $this->assertArrayNotHasKey('code', $this->json($tanpaNip), '404 NIP tanpa kode folder');
+        $this->assertArrayNotHasKey('code', $this->json($luar));
+    }
+
     public function testRingkasanRiwayatPerKodeDanMenggantung(): void
     {
         $rmj = $this->buatRiwayatMutasiJabatan($this->nip, ['jabatan' => 'Analis SDM', 'satker' => 'Biro Uji']);
