@@ -271,7 +271,13 @@ final class ArsipEndpointTest extends DatabaseTestCase
             $this->assertArrayHasKey('id_jenis_rwy', $this->json($res)['errors'], $buruk);
         }
         $this->asUser($admin)->get($url('berkas', 'id_jenis_rwy=2&sort=path'))->assertStatus(422);
+        foreach (['abc', '0'] as $page) {
+            $res = $this->asUser($admin)->get($url('berkas', "id_jenis_rwy=2&page={$page}"));
+            $res->assertStatus(422);
+            $this->assertArrayHasKey('page', $this->json($res)['errors'], "page={$page}");
+        }
         $this->asUser($admin)->get($url('ekspor', 'format=pdf&id_jenis_rwy=2'))->assertStatus(422);
+        $this->assertSame(0, $audit(), 'tanpa baris arsip_lihat untuk 422');
 
         // Nilai sah tetap 200: '' (semua), 0 "Belum Terhubung", tanpa_jenis, angka master tanpa berkas (kosong).
         $pegawai = $this->akun($this->nip, Role::PEGAWAI);
