@@ -105,3 +105,19 @@ Kedua mode saklar dijaga test (MAKE-090). Mengubah dua regex legacy (mis. mengiz
   - Catatan 16-11-2026 (K-12 checklist QA F-10, Horii): G10-4 dijalankan di Nginx lokal dengan blok README apa adanya; hak baca user Nginx, larangan symlink, dan uji ponsel diperiksa operator lewat daftar periksa deploy README-deploy §1l di setiap server (B10-3).
 - Invarian "path tidak pernah ke klien" (`AttachmentService`) dilanggar sadar **hanya** untuk `url_berkas` berkas legacy di endpoint Arsip (`akses_berkas: "publik"`).
 - QR surat cuti ber-TTE legacy yang menunjuk server arsip lama tetap blocker cutover di luar F-10 (B10-2). Alias `/berkas/arsip/…` membuka opsi redirect QR lama ke v2.
+
+## 8. Addendum 16-11-2026: lampiran tiket Halo Simpeg lama (Fase 8)
+
+Dasar: keputusan Horii 13-11-2026 **H8-5 (a)** (`docs/fase8/Kesiapan_Fase8.md` §6.1) dan PRD Fase 8 v1.2 (BP8-5, F8-17, R8-6,
+AC-E04.7, AC-E08.9; `docs/fase8/PRD_Fase8_HaloSimpeg.md`).
+
+- Lampiran tiket Halo Simpeg lama hasil impor ber-path legacy di subfolder `inbox` arsip legacy (`arsip/{nip}/inbox/…`). Path itu
+  cocok dengan regex `^arsip/…` di §2 butir 1, sehingga berkasnya **ikut tersaji** lewat alias publik `/berkas/` seperti legacy.
+  H8-5 (a) menerimanya sebagai risiko sadar (perluasan R1/R6: isinya data percakapan pribadi). Alias **tidak** dipersempit untuk
+  subfolder `inbox`, dan regex di §2 butir 1 serta tabel pola `README-deploy.md` §1l **tidak berubah**.
+- Aplikasi v2 **tidak** memakai URL `/berkas/` untuk lampiran tiket. Lampiran lama dan baru disajikan lewat endpoint
+  ber-otorisasi E-04 `GET api/v1/halo-simpeg/tiket/{id}/pesan/{idPesan}/lampiran` dengan cek akses tiket (pemilik atau petugas
+  kategori; PRD Fase 8 BP8-2).
+- Alasannya: saklar rollback §2 butir 6 (`arsip.penyajianBerkasLegacy = 'privat'`) dan langkah rollback §4 membuat URL
+  `/berkas/` putus. Bila aplikasi bergantung pada URL itu, petugas kehilangan akses ke lampiran lama saat rollback.
+- Unggahan lampiran tiket baru v2 tetap privat (§2 butir 2) dan tidak pernah disajikan Nginx.

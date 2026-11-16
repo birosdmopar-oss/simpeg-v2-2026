@@ -1,17 +1,17 @@
-# PRD Fase 8 — Halo Simpeg (Modul E, ticketing helpdesk, SIMPEG v2)
+# PRD Fase 8 v1.2 — Halo Simpeg (Modul E, ticketing helpdesk, SIMPEG v2)
 
 | Butir | Isi |
 |---|---|
-| Dokumen | `docs/fase8/PRD_Fase8_HaloSimpeg.md` — **acuan utama** coder/agen AI Fase 8 (Bahan Baku `08-HaloSimpeg.md` E-01..E-08, ditambah E-09 dan E-10 Chatbot "Vanya"). Pembagian kerja paralel: [`8_1.md`](8_1.md) (Jalur BE) dan [`8_2.md`](8_2.md) (Jalur FE) |
-| Versi | **v1.1 — 12-11-2026 (CR-121)**: tambah **E-10 Chatbot "Vanya"** atas keputusan Horii 12-11-2026 ("ikut saran" K-1..K-11). v1.0 03-11-2026 (keputusan Horii atas Q8-01..Q8-15: semua ikut saran); v0.1 `70466eac`; riwayat §Lampiran D |
-| Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding Fase 8 terkunci gerbang §0.1; E-10 punya gerbang tambahan (§0.1, D1 chatbot) |
+| Dokumen | `docs/fase8/PRD_Fase8_HaloSimpeg.md` — **acuan utama** coder/agen AI Fase 8 (Bahan Baku `08-HaloSimpeg.md` E-01..E-08, ditambah E-09 dan E-10 Chatbot "Vanya"; Trello **DEV-009** (10 task), **QASMTASK-111..118** (E-01..E-08), **QASMTASK-123** (E-09), **QASMTASK-124** (E-10); pemetaan per task §1.1). Pembagian kerja paralel: [`8_1.md`](8_1.md) (Jalur BE) dan [`8_2.md`](8_2.md) (Jalur FE) |
+| Versi | **v1.2 — 16-11-2026 (CR-131)**: keputusan Horii 13-11-2026 (H8-1, H8-2, H8-5, H8-6; H8-4 terjawab lewat H8-1) dan 16-11-2026 ("ikut rekomendasi semua": H8-3, H8-11, H8-12, H8-13) dimasukkan; status E-10 di `main`; tabel paket × key × agen × izin (§3.1); kolom kartu Trello (§1.1); celah AC baru; kewajiban A0 untuk kontrak dan angka helpdesk; butir terbuka H8-14..H8-16 (§12). v1.1 12-11-2026 (CR-121): tambah **E-10 Chatbot "Vanya"** (K-1..K-11). v1.0 03-11-2026 (Q8-01..Q8-15: semua ikut saran); v0.1 `70466eac`; riwayat §Lampiran D |
+| Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding helpdesk terkunci gerbang §0.1 (gerbang sudah terbuka 16-11-2026; A0 dan B0 mulai sesudah CR-130 di `main`, laporan A0/B0 disetujui reviewer sesudah CR-131 di `main`); E-10 sudah di `main` (§0.1), tinggal QA Lapis 1 dan rilis |
 | Prinsip | **"Intinya ikut legacy"** (prinsip umum Horii 01-11-2026 pada Fase 6, dipakai sebagai default di sini): perilaku bisnis & kontrak ikut legacy [K]. Untuk E-10, acuannya **legacy dev** [K dev] karena fitur chatbot belum ada di legacy produksi. Deviasi [V2] hanya bila (a) keputusan eksplisit Horii, atau (b) teknis wajib/keamanan dasar — setiap deviasi tercatat di §5.2 dan Lampiran B |
-| Basis kode | `origin/main` = **`f7b9221e`** untuk rujukan `path:baris` repo v1.0; rujukan E-10 (v1.1) dicek di **`241ef9e5`** |
+| Basis kode | `origin/main` = **`f7b9221e`** untuk rujukan `path:baris` repo v1.0; rujukan E-10 (v1.1) dicek di **`241ef9e5`**; rujukan yang ditambah atau diubah di v1.2 dicek di **`603af133`** (rujukan lama yang tidak disentuh v1.2 tetap bertanggal basisnya dan dicek ulang di A0, T-3) |
 | Acuan legacy | Salinan kerja legacy CI3 (HEAD `0cf7e67`, sama dengan Fase 6; rujukan baris bercatatan AS-09, belum dicocokkan checksum produksi, Q5A-14). Rujukan relatif ke `application/`: `LS` = `libraries/hr/L_support.php`, `SC` = `controllers/hr/Support.php`, `MC` = `core/MY_Controller.php`, `LN` = `libraries/hr/L_notification.php`, `CR` = `controllers/hr/services/Cron.php`, `VI` = `views/hr/support/inbox.php`, `VD` = `views/hr/support/detail.php`, `VM` = `views/template/modal.php`. **Bahan chatbot legacy dev** (12 berkas CI3 dari codebase legacy dev, belum ada di produksi, diterima 12-11-2026): rujukan berawalan **`dev:`** relatif ke `application/` bahan itu (`dev:controllers/hr/Chatbot.php`, `dev:libraries/hr/L_chatbot.php`, `dev:libraries/Nlp_engine.php`, `dev:views/hr/chatbot/*`) supaya tidak tertukar dengan legacy produksi |
 | Scope | **Fase 8** = E-01..E-08 (`Bahan Baku SIMPEG/08-HaloSimpeg.md`) + ekspor rekap petugas (E-09, baru; ada di legacy `LS:1600`, tidak ada di Bahan Baku) + **E-10 Chatbot "Vanya"** (baru di v1.1; dari legacy dev, K-1) + penyediaan titik sambung notifikasi ke Fase 6 (MAKE-066) dan lonceng Fase 7 (F-08). **Penutup seluruh development** (sign-off Horii) |
-| Pelaksana | **Dua jalur paralel** (Q8-14 = B): **Jalur BE** ([`8_1.md`](8_1.md)) dan **Jalur FE** ([`8_2.md`](8_2.md)). E-10 dikerjakan sebagai sub-jalur chatbot di kedua berkas itu; pelaksananya boleh berbeda dan ditunjuk lewat kode izin workload sesudah PRD v1.1 disetujui (§3). **Reviewer** = reviewer CR (review, gate, merge, QA); **Horii** = keputusan & sign-off; **DBV** = review skema |
-| Key | Skema: **DBV-028** (helpdesk) dan **DBV-033** (chatbot, K-3). Pekerjaan baru: **MAKE-070..MAKE-074** (MAKE-069 dipakai paket impor cutover tahap 2) dan **MAKE-094** (BE chatbot) + **MAKE-095** (FE chatbot). Revisi PRD v1.1: **CR-121**. Perbaikan review/QA: CR-095 dst. ADR baru: tidak ada |
-| Sumber | `08-HaloSimpeg.md` (E-01..E-08, exit criteria); Matriks Role × Endpoint Modul E (dicocokkan saat M0); PRD Fase 4 (§C-01, D10, N1/N9–N13, K-22, `docs/fase4/PRD_Fase4.md:50,126,148,265,1130,1184,1406,1506`); DBV-022 §2.14, §3 (`backend/docs/db-review/DBV-022-layanan-fase4-schema.md`); PRD Fase 6 F6-12/F6-13 (`docs/fase6/PRD_Fase6_Integrasi.md:194-195`); `Mapping_Migrasi_Tidak_Dimigrasi.md:52`; PRD Fase 7 (F-02, F-08); frontend redesign `67fa7678` (branch `feat/frontend-ui-redesign`); riset kode legacy & v2 03-11-2026 (Lampiran A). **E-10:** bahan chatbot legacy dev (`dev:`); dokumen kerja reviewer `Mapping_Chatbot_Fase8.md` (12-11-2026, di luar repo; keputusan K-1..K-11 §6, anomali A1..A9 §3.4); paket permintaan D1 chatbot dari DB dev legacy (di luar repo, baca saja) |
+| Pelaksana | **Dua jalur paralel** (Q8-14 = B): **Jalur BE** ([`8_1.md`](8_1.md)) dan **Jalur FE** ([`8_2.md`](8_2.md)). E-10 dikerjakan sebagai sub-jalur chatbot di kedua berkas itu. Agen per paket dan kode izin: **§3.1** (Jalur BE helpdesk = Handling Case, Jalur FE helpdesk = Worker Muse, DB Validator = WS-2, chatbot BE = ReadOne, chatbot FE = Worker Muse). **Reviewer** = reviewer CR (review, gate, merge, QA); **Horii** = keputusan & sign-off; **DBV** = review skema |
+| Key | Skema: **DBV-028** (helpdesk) dan **DBV-033** (chatbot, K-3). Pekerjaan baru: **MAKE-070..MAKE-074** (MAKE-069 dipakai paket impor cutover tahap 2), **MAKE-094** (BE chatbot) + **MAKE-095** (FE chatbot), dan **MAKE-097** (T12b impor master helpdesk, H8-12). Revisi PRD v1.1: **CR-121**; v1.2: **CR-131**. Paket dokumen/QA/rilis: **CR-130** (sinkron status), **CR-132** (checklist QA Lapis 1), **CR-133** (test AC-E10.19), **CR-134** dst. (perbaikan QA chatbot), **CR-135** (rilis menu). Nomor CR lain = nomor kosong berikutnya dari reviewer (rujukan lama "CR-095 dst." gugur: CR-095..CR-129 sudah terpakai). ADR baru: tidak ada |
+| Sumber | `08-HaloSimpeg.md` (E-01..E-08, exit criteria); Matriks Role × Endpoint Modul E (dicocokkan saat M0); PRD Fase 4 (§C-01, D10, N1/N9–N13, K-22, `docs/fase4/PRD_Fase4.md:50,126,148,265,1130,1184,1406,1506`); DBV-022 §2.14, §3 (`backend/docs/db-review/DBV-022-layanan-fase4-schema.md`); PRD Fase 6 F6-12/F6-13 (`docs/fase6/PRD_Fase6_Integrasi.md:194-195`); `Mapping_Migrasi_Tidak_Dimigrasi.md:52`; PRD Fase 7 (F-02, F-08); frontend redesign `67fa7678` (branch `feat/frontend-ui-redesign`); riset kode legacy & v2 03-11-2026 (Lampiran A). **E-10:** bahan chatbot legacy dev (`dev:`); dokumen kerja reviewer `Mapping_Chatbot_Fase8.md` (12-11-2026, di luar repo; keputusan K-1..K-11 §6, anomali A1..A9 §3.4); paket permintaan D1 chatbot dari DB dev legacy (di luar repo, baca saja). **v1.2:** keputusan Horii H8-1, H8-2, H8-5, H8-6 13-11-2026 (H8-4 terjawab lewat H8-1; `docs/fase8/Kesiapan_Fase8.md` §6.1, `:205-206`, `:209-210`) dan keputusan 16-11-2026 (H8-3, H8-11, H8-12, H8-13; §12 register H8); rencana impor `docs/migrasi/MAKE-069-rencana.md` (T12b `:108-111`) |
 
 ## Cara pakai (WAJIB dibaca)
 
@@ -43,16 +43,23 @@
 - **PRD ini harus v1.0 dan masuk `main`** (keputusan Horii atas §12) sebelum koding atau migration DBV-028 dimulai.
 - **Boleh sebelum itu:** membaca PRD, M0 (laporan pemahaman tanpa commit kode), dan menjawab pertanyaan §12.
 - **Urutan terhadap fase lain (◻):** M1–M3 (skema, master, tiket + percakapan) tidak bergantung pada Fase 6 dan boleh jalan
-  paralel dengannya. **M4 (push) menunggu MAKE-066** (adapter FCM HTTP v1, Fase 6 jalur B5) di `main`; sebelum itu notifikasi
-  memakai `MockFcmAdapter` dan lolos test dengan mock. Uji push real = syarat **sebelum deploy** (dilacak MT/DEPLOY, bukan
-  menahan sign-off Fase 8), sama dengan F6-23.
+  paralel dengannya. **M4 (push) menunggu MAKE-066** (adapter FCM HTTP v1, Fase 6 jalur B5) di `main` — **terpenuhi (v1.2):
+  MAKE-066 sudah di `main` (`9debb366`)**, sehingga M4 memakai `FcmV1Adapter` + `FakeTransport` di test dan `MockFcmAdapter`
+  di dev. Uji push real = syarat **sebelum deploy** (dilacak MT-010/DEPLOY-001.1, bukan menahan sign-off Fase 8), sama dengan F6-23.
+- **Gerbang helpdesk (v1.2):** H8-2 (Horii 13-11-2026) = helpdesk mulai **sesudah F-10 sign-off**; F-10 sign-off Horii
+  16-11-2026 pada `main` `fd9e8371`, dicatat CR-129 `603af133`, sehingga gerbang **terbuka** (izin [#9-WorkloadHaloSimpeg]).
+  **Syarat mulai (v1.2):** A0 (Handling Case) dan B0 (Worker Muse) mulai sesudah CR-130 di `main`; laporan A0/B0 disetujui
+  reviewer sesudah CR-131 (PRD v1.2) di `main`.
 - **Gerbang E-10 Chatbot (v1.1):** koding E-10 dan migration DBV-033 menunggu **PRD v1.1 masuk `main`** (CR-121). DBV-033
   baru disusun **sesudah D1 chatbot dari DB dev legacy** diterima (PN8-5), karena DDL keenam tabel tidak ikut di bahan kode; D1
   chatbot adalah prasyarat DBV-033, **bukan** prasyarat PRD. Status 12-11-2026: blok [1]–[6] (struktur, `qna_status`, jumlah,
-  sebaran, integritas, bentuk jawaban) **sudah diterima** dan dipakai di §7.10.1, PN8-5, F8-40, F8-46. MAKE-094 menunggu DBV-033 di `main`; MAKE-095 menunggu kontrak
-  API MAKE-094 beku (§6.5). E-10 **tidak** bergantung pada DBV-028/MAKE-070..074, Fase 6 (tidak ada push), maupun F-08, dan
-  sebaliknya: helpdesk dan chatbot boleh berjalan paralel. Pelaksana E-10 ditunjuk lewat kode izin workload sesudah v1.1
-  disetujui.
+  sebaran, integritas, bentuk jawaban) **sudah diterima** dan dipakai di §7.10.1, PN8-5, F8-40, F8-46. E-10 **tidak** bergantung
+  pada DBV-028/MAKE-070..074, Fase 6 (tidak ada push), maupun F-08, dan sebaliknya: helpdesk dan chatbot boleh berjalan paralel.
+- **Status E-10 (v1.2, di `main` 603af133):** DBV-033 `3fb8c5f7` (PR #40), MAKE-094 `4af0c188`, MAKE-095 `2a8f405d` — kode,
+  skema, dan test **di `main`**. Yang tersisa: QA Lapis 1 chatbot (AC-E10.22/23, checklist CR-132, menunggu PN8-8), test AC-E10.19
+  sisi log aplikasi (CR-133), perbaikan temuan QA (CR-134 dst.), rilis menu dan widget bersama helpdesk (H8-11 (a),
+  CR-135). Pelaksana CR-133 (ReadOne) dan CR-134+ (ReadOne BE, Worker Muse FE) = usulan; izin workload pekerjaan chatbot
+  pasca-#8 diajukan ke Horii sebelum paket dibuka (◻). C4 impor isi QnA dev **keluar dari DoD** (H8-13 (b)) dan dilacak di DEPLOY-002.
 
 ### 0.2 Prasyarat non-teknis
 
@@ -75,21 +82,26 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 
 ### 1.1 Di dalam scope Fase 8
 
-| Task | Judul | Inti v2 | Key (usulan) |
-|---|---|---|---|
-| E-01 | Skema pendukung helpdesk | **DBV-028**: `support_officer`, `officer_category`, `help_desk_contact` (belum ada); verifikasi `question_category`, `disiplin_ticket`, `disiplin_ticket_msg` (**sudah ada**, DBV-022 — tidak dibuat ulang); ALTER indeks/kolom bila perlu | DBV-028 |
-| E-02 | Master kategori & petugas | CRUD `question_category` dan `support_officer` + `officer_category` (role 1) ikut legacy `LS:213-813` | MAKE-070 |
-| E-03 | Buat tiket | `disiplin_ticket` + pesan pertama + lampiran dalam satu transaksi `LS:937-1095`; **tidak** menyentuh `inbox` | MAKE-071 |
-| E-04 | Thread percakapan | Daftar tiket, baca thread, balas, tandai baca, lampiran `LS:817-927`, `LS:1097-1430`; cakupan data per pemilik/petugas kategori | MAKE-071 |
-| E-05 | Tutup tiket | `close_inbox` `LS:1432-1470`; hapus tiket `LS:1472-1503` sesuai Q8-03 | MAKE-071 |
-| E-06 | Notifikasi tiket | Push (queue `push`) ke pihak lawan + penghitung belum dibaca; titik sambung ke MAKE-066 (F6-13) dan lonceng F-08; **tidak** menulis `inbox` | MAKE-072 |
-| E-07 | Kontak helpdesk | CRUD `help_desk_contact` (role 1) `LS:14-210` + tampilan daftar (Q8-12) | MAKE-070 |
-| E-08 | Frontend | Ubah `frontend/src/features/halo-simpeg/` dari data contoh ke API; tampilan pegawai vs petugas | MAKE-073 |
-| E-09 | Ekspor rekap petugas | `export_hs` `LS:1600-1830` (xlsx; periode) — baru dibanding Bahan Baku | MAKE-074 |
-| E-10 (skema) | Skema chatbot "Vanya" | **DBV-033** (K-3): 6 tabel `qna`, `qna_kategori`, `qna_tag`, `qna_has_tag`, `qna_status`, `log_chatbot` ikut DDL dev hasil D1 chatbot; status 1/2/10 (memperbaiki anomali A1); terpisah dari DBV-028 | DBV-033 |
-| E-10 (BE) | Chatbot "Vanya" — backend | Mesin jawab TF-IDF port apa adanya [K dev `dev:libraries/Nlp_engine.php`, `dev:libraries/hr/L_chatbot.php:573-769`]; endpoint widget (role 2/6/7); CRUD admin kategori/tag/QnA, impor Excel + template, ekspor tag, statistik, riwayat berhalaman (role 1); throttle; token feedback (K-4) | MAKE-094 |
-| E-10 (FE) | Chatbot "Vanya" — frontend | Widget melayang di layout untuk role 2/6/7 (K-8) dengan tampilan legacy dev disesuaikan token desain v2 (K-11); halaman admin "Chatbot Manager" (role 1) dengan tabel ⋮ (AGENTS.md §1) | MAKE-095 |
-| Penutup | Progres, README modul, runbook cutover (impor master; isi QnA bila K-5 membawa isi dev), QA Lapis 1 (termasuk chatbot), sign-off | `backend/docs/progress/08-HaloSimpeg.md` | MAKE-074 (+ MAKE-094/095 untuk bagian chatbot; impor isi QnA = C4, key ✔ §10) |
+| Task | Judul | Inti v2 | Key (usulan) | Kartu Trello |
+|---|---|---|---|---|
+| E-01 | Skema pendukung helpdesk | **DBV-028**: `support_officer`, `officer_category`, `help_desk_contact` (belum ada); verifikasi `question_category`, `disiplin_ticket`, `disiplin_ticket_msg` (**sudah ada**, DBV-022 — tidak dibuat ulang); ALTER indeks/kolom bila perlu | DBV-028 | QASMTASK-111 |
+| E-02 | Master kategori & petugas | CRUD `question_category` dan `support_officer` + `officer_category` (role 1) ikut legacy `LS:213-813` | MAKE-070 | QASMTASK-112 |
+| E-03 | Buat tiket | `disiplin_ticket` + pesan pertama + lampiran dalam satu transaksi `LS:937-1095`; **tidak** menyentuh `inbox` | MAKE-071 | QASMTASK-113 |
+| E-04 | Thread percakapan | Daftar tiket, baca thread, balas, tandai baca, lampiran `LS:817-927`, `LS:1097-1430`; cakupan data per pemilik/petugas kategori | MAKE-071 | QASMTASK-114 |
+| E-05 | Tutup tiket | `close_inbox` `LS:1432-1470`; hapus tiket `LS:1472-1503` sesuai Q8-03 | MAKE-071 | QASMTASK-115 |
+| E-06 | Notifikasi tiket | Push (queue `push`) ke pihak lawan + penghitung belum dibaca; titik sambung ke MAKE-066 (F6-13) dan lonceng F-08; **tidak** menulis `inbox` | MAKE-072 (push); binding ringkasan lonceng di MAKE-071 (§7.6) | QASMTASK-116 |
+| E-07 | Kontak helpdesk | CRUD `help_desk_contact` (role 1) `LS:14-210` + tampilan daftar (Q8-12) | MAKE-070 | QASMTASK-117 |
+| E-08 | Frontend | Ubah `frontend/src/features/halo-simpeg/` dari data contoh ke API; tampilan pegawai vs petugas | MAKE-073 | QASMTASK-118 |
+| E-09 | Ekspor rekap petugas | `export_hs` `LS:1600-1830` (xlsx; periode) — baru dibanding Bahan Baku | MAKE-074 | QASMTASK-123 |
+| E-10 (skema) | Skema chatbot "Vanya" | **DBV-033** (K-3): 6 tabel `qna`, `qna_kategori`, `qna_tag`, `qna_has_tag`, `qna_status`, `log_chatbot` ikut DDL dev hasil D1 chatbot; status 1/2/10 (memperbaiki anomali A1); terpisah dari DBV-028. **Di `main` `3fb8c5f7`** | DBV-033 | QASMTASK-124 |
+| E-10 (BE) | Chatbot "Vanya" — backend | Mesin jawab TF-IDF port apa adanya [K dev `dev:libraries/Nlp_engine.php`, `dev:libraries/hr/L_chatbot.php:573-769`]; endpoint widget (role 2/6/7); CRUD admin kategori/tag/QnA, impor Excel + template, ekspor tag, statistik, riwayat berhalaman (role 1); throttle; token feedback (K-4). **Di `main` `4af0c188`** | MAKE-094 | QASMTASK-124 |
+| E-10 (FE) | Chatbot "Vanya" — frontend | Widget melayang di layout untuk role 2/6/7 (K-8) dengan tampilan legacy dev disesuaikan token desain v2 (K-11); halaman admin "Chatbot Manager" (role 1) dengan tabel ⋮ (AGENTS.md §1). **Di `main` `2a8f405d`** | MAKE-095 | QASMTASK-124 |
+| Penutup | Progres, README modul, runbook cutover (impor master T12b per H8-6; berkas lampiran), QA Lapis 1 (termasuk chatbot), laporan akhir, sign-off | `backend/docs/progress/08-HaloSimpeg.md` | MAKE-074 (+ MAKE-094/095 untuk bagian chatbot); kode impor master T12b = **MAKE-097** (H8-12); checklist QA = CR-132; rilis menu = CR-135 | DEV-009 (kartu induk) |
+| (pasca Fase 8) | Impor isi QnA dev (C4) dan uji push real | Keluar dari DoD (C4: H8-13 (b); uji push real: §0.1, AC-E06.8) | C4: key MAKE dari reviewer saat PN8-6 (F8-51) | DEPLOY-002 (C4, K-5); MT-010 / DEPLOY-001.1 (uji push real, F6-23) |
+
+Kartu Trello per 16-11-2026 (disinkron reviewer, akun Horii terverifikasi): QASMTASK-111..118 = E-01..E-08 berurutan,
+QASMTASK-123 = E-09, QASMTASK-124 = E-10 (label sudah diganti ke Testing-QA-Func pada 16-11-2026, sinkron reviewer: kode di
+`main`, tinggal QA), DEV-009 = kartu induk Fase 8 (10 task). Notion: E.6 (E-10) = Berjalan. Kartu baru atau perubahan pemetaan dicatat di sini dan di `docs/fase8/Kesiapan_Fase8.md` (CR-130).
 
 ### 1.2 DI LUAR scope Fase 8
 
@@ -107,6 +119,10 @@ Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; 
 | Ekspor QnA ke Excel | Tidak ada di legacy dev (K-7) | Ekspor hanya daftar tag |
 | Isi `log_chatbot` DB dev | Pesan bebas pegawai (data pribadi) | Tidak diambil dan tidak dimigrasi; log v2 mulai kosong |
 | Server Arsip remote untuk lampiran (J3.06) | Ditunda (F6-22) | Lampiran tiket memakai storage lokal v2 |
+| Kriteria UAT dan sign-off resmi pihak Kemenparekraf/Baparekraf (PIC, berita acara serah terima/BAST) | MT/DEPLOY (di luar 9 berkas checklist Bahan Baku) | Bahan Baku "Catatan Pasca-Fase 8" (`08-HaloSimpeg.md:99-105`); sign-off Horii Fase 8 = penutup development, bukan UAT/BAST (v1.2) |
+| Rencana cutover produksi (migrasi data produksi, jendela downtime, rencana rollback) | MT/DEPLOY (kartu DEPLOY di Trello) | Fase 8 hanya menyumbang runbook bagian Halo Simpeg (MAKE-074, T12b MAKE-097) dan chatbot (§1m README-deploy, K-5) (v1.2) |
+| Penghapusan kolom hash password legacy sesudah masa transisi | MT/DEPLOY | Bahan Baku "Catatan Pasca-Fase 8"; tidak disentuh Fase 8 (v1.2) |
+| Impor isi QnA dev (C4) dan keputusan K-5 | DEPLOY-002 (H8-13 (b), Horii 16-11-2026) | Keluar dari DoD Fase 8; key C4 tetap per F8-51 saat PN8-6; pelaksana bila dibuat: ReadOne (pemilik MAKE-094) (v1.2) |
 
 Catatan K-1 (v1.1): baris v1.0 "Chatbot / pencarian FAQ terintegrasi — tidak ada di legacy — usulan masa depan" dihapus dari
 tabel ini dan diganti E-10 (§1.1, F8-23); bahan chatbot legacy dev tersedia 12-11-2026.
@@ -133,12 +149,12 @@ tabel ini dan diganti E-10 (§1.1, F8-23); bahan chatbot legacy dev tersedia 12-
 | BP8-2 | **Cakupan data di service, bukan controller/UI** (ADR-005): pemilik hanya melihat tiketnya; petugas hanya tiket kategori yang ditugaskan kepadanya; tiket orang lain → 404 (bukan 403, agar id tidak bisa ditebak). Satu kelas `AksesTiket` dipakai semua endpoint | Isi percakapan = data pribadi; legacy mengulang pengecekan di tiap method controller (`SC:502-523`, `SC:571-585`, …) |
 | BP8-3 | **Query builder / binding saja.** Tidak ada SQL string + `addslashes` | Legacy (B-7) |
 | BP8-4 | **Teks polos.** `msg`/`subject` disimpan apa adanya (bukan `addslashes`), ditampilkan ter-escape; tidak ada HTML di pesan. Panjang dibatasi (§7.3) | Legacy menyimpan teks ber-`addslashes` (B-3) |
-| BP8-5 | **Lampiran** lewat `AturanLampiran` + `ValidasiBerkas` + `LocalStorageAdapter` yang sudah ada (jpg/jpeg/png/gif/pdf/doc/docx/xls/xlsx, 5 MB — sama dengan legacy `LS:963-975`; struktur isi dicek, MAKE-010); diunduh lewat endpoint ber-otorisasi (BP8-2), bukan URL berkas langsung | `ArsipDataUmum.php:45`, `ValidasiBerkas.php:22-34` |
+| BP8-5 | **Lampiran** lewat `AturanLampiran` + `ValidasiBerkas` + `LocalStorageAdapter` yang sudah ada (jpg/jpeg/png/gif/pdf/doc/docx/xls/xlsx, 5 MB — sama dengan legacy `LS:963-975`; struktur isi dicek, MAKE-010); diunduh lewat endpoint ber-otorisasi (BP8-2), bukan URL berkas langsung. **Berlaku untuk lampiran lama (impor, path `arsip/{nip}/inbox/…`) dan baru** (v1.2): aplikasi selalu memakai endpoint E-04 `tiket/{id}/pesan/{idPesan}/lampiran`. Paparan publik lampiran lama lewat alias Nginx `/berkas/` F-10 = **risiko sadar H8-5 (a)** (F8-17, R8-6), bukan jalur aplikasi | `ArsipDataUmum.php:45`, `ValidasiBerkas.php:22-34`; H8-5 `docs/fase8/Kesiapan_Fase8.md:209` |
 | BP8-6 | **Push setelah commit lewat queue** (ADR-013), tidak sinkron, dan kegagalan push **tidak menggagalkan** pengiriman pesan (BP-7 Fase 6). Payload tanpa isi rahasia; token tidak pernah dicatat | Legacy mengantre setelah commit (`LS:1078-1090`); N8 |
 | BP8-7 | **GET tidak mengubah data.** Penandaan "sudah dibaca" lewat `POST`, bukan efek samping membuka halaman (legacy `LS:907-920`) | Konsisten dengan keputusan Fase 6 (GET yang mengubah data tidak dibawa) |
 | BP8-8 | **Waktu:** DB menyimpan UTC (CR-086); `created_at`/`notify_at` diisi aplikasi (`StempelUtc`), bukan default DB; tampilan WIB di FE | CR-086 |
 | BP8-9 | **Audit:** semua tulis lewat model `BaseAuditableModel` → `audit_logs` (pengganti `mylog` legacy); hapus menyimpan snapshot `before` | ADR-011/012 |
-| BP8-10 | **Throttle** pembuatan tiket dan pesan per akun (batas dikonfigurasi di `Config\HaloSimpeg`), karena legacy tanpa batas dan modul ini paling terbuka | Pengaman dasar [V2] |
+| BP8-10 | **Throttle** pembuatan tiket dan pesan per akun (batas dikonfigurasi di `Config\HaloSimpeg`), karena legacy tanpa batas dan modul ini paling terbuka. Angka **ditetapkan di A0, dikonfirmasi Horii** (§7.3a) | Pengaman dasar [V2] |
 | BP8-11 | **Tabel daftar:** pagination di server (legacy memuat semua tiket + N+1 query, `LS:864-875`) dan aksi baris lewat menu ⋮ (`RowActionsMenu`, AGENTS.md §1) | AGENTS.md §1, BP-13 |
 | BP8-12 | Kualitas: PHPStan level 5, PHP-CS-Fixer, ESLint/vue-tsc, satu test per AC; README modul (`Controllers/Api/HaloSimpeg`, `Libraries/HaloSimpeg`, `Models/HaloSimpeg`, `features/halo-simpeg`) diperbarui per endpoint | AGENTS.md §2 |
 | BP8-13 | UI memakai komponen custom `shared/ui` (AGENTS.md §3): `UiSelect`, `UiTextField`, `UiFileField`, `UiTooltip`, `UiExportMenu`; tanpa `<select>`/`window.confirm` native | AGENTS.md §3 |
@@ -155,17 +171,18 @@ Pembagian **dua jalur paralel** (Q8-14 = B): **Jalur BE** ([`8_1.md`](8_1.md): D
 |---|---|---|
 | **BE-1 master** | `Controllers/Api/HaloSimpeg/{Kategori,Petugas,Kontak}Controller.php`, `Libraries/HaloSimpeg/{Kategori,Petugas,Kontak}Service.php`, `Models/HaloSimpeg/{QuestionCategory,SupportOfficer,OfficerCategory,HelpDeskContact}Model.php`, migration DBV-028 | E-01, E-02, E-07 |
 | **BE-2 tiket** | `Controllers/Api/HaloSimpeg/{Tiket,Pesan}Controller.php`, `Libraries/HaloSimpeg/{TiketService,PercakapanService,AksesTiket,LampiranTiket,RekapTiket}.php`, `Models/HaloSimpeg/{DisiplinTicket,DisiplinTicketMsg}Model.php` | E-03, E-04, E-05, E-09 |
-| **BE-3 notifikasi** | `Libraries/HaloSimpeg/{TicketNotifService,PenerimaTiket}.php`, `Jobs/PushHaloSimpegJob.php` | E-06 |
-| **FE** | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), route Halo Simpeg di `frontend/src/router` dan item menu `halo` di `nav.config.ts` (aditif, berkas bersama), badge di `frontend/src/shared/layouts/*` (aditif; `RedesignShell.vue` dan `nav.config.ts` = berkas bersama) | E-08 |
+| **BE-3 notifikasi** | `Libraries/HaloSimpeg/{TicketNotifService,PenerimaTiket}.php`, `Jobs/PushHaloSimpegJob.php` (**v1.2:** job tersendiri hanya bila H8-14 = (b); bila (a), produsen memakai `AntrePushPesan` → job `push-pesan` yang sudah ada dan perubahan penerima per akun = CR berkas bersama Push, §6.4); implementasi `RingkasanTiketInterface` (pengganti `RingkasanTiketNoOp`, MAKE-071) | E-06 |
+| **FE** | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), route Halo Simpeg di `frontend/src/router` dan item menu `halo` di `nav.config.ts` (aditif, berkas bersama), badge di `frontend/src/shared/layouts/*` (aditif; `RedesignShell.vue` dan `nav.config.ts` = berkas bersama), satu panggilan reset store helpdesk di `clearSession()` `auth.store.ts` (v1.2, berkas bersama), entri lonceng di `frontend/src/features/notifikasi/*` hanya bila H8-15 memilih entri panel (berkas bersama) | E-08 |
 | **BE-4 chatbot** | `Controllers/Api/HaloSimpeg/Chatbot/*`, `Libraries/HaloSimpeg/Chatbot/*` (mesin `MesinJawab`/`TfIdf`, `ChatbotService`, `TokenFeedback`, `ImporQna`, `StatistikChatbot`), `Models/HaloSimpeg/Chatbot/*`, `Config/Chatbot.php`, `Config/RoutesChatbot.php`, migration DBV-033, `backend/docs/db-review/DBV-033-*.md`, test `backend/tests/**/HaloSimpeg/Chatbot/*` dan `backend/tests/_support/HaloSimpeg/Chatbot/*`, perintah spark impor isi QnA C4 (`backend/app/Commands/HaloSimpeg/Chatbot/*`, ✔) (nama kelas final di M0, F8-43) | E-10 |
 | **FE chatbot** | `frontend/src/features/halo-simpeg/chatbot/*` (widget `VanyaWidget.vue`, halaman admin Chatbot Manager, `routes.chatbot.ts`, fixture test), item menu Chatbot Manager di `nav.config.ts`, satu titik pasang widget di `shared/layouts/RedesignShell.vue`, satu baris import route di `frontend/src/router/index.ts`, satu panggilan reset store di `frontend/src/features/auth/stores/auth.store.ts` `clearSession()` (empat terakhir = berkas bersama, aditif) | E-10 |
 
 | Jalur | Pelaksana | Berkas milik | Tidak boleh disentuh |
 |---|---|---|---|
-| **BE** | satu pelaksana (ditunjuk reviewer) | semua `backend/` **kecuali** berkas BE-4 chatbot, `docs/fase8/8_1.md`, `backend/docs/db-review/DBV-028-*.md` | `frontend/`; berkas BE-4 chatbot |
-| **FE** | satu pelaksana (ditunjuk reviewer) | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), item menu `halo` di `nav.config.ts`, route Halo Simpeg di router, badge di layout, `docs/fase8/8_2.md` | `backend/` (kebutuhan kontrak baru → CR ke jalur BE lewat reviewer); `features/halo-simpeg/chatbot/*` |
-| **Chatbot BE** (E-10, MAKE-094) | ditunjuk lewat kode izin workload (boleh sama atau berbeda dengan Jalur BE) | berkas BE-4 chatbot; bagian E-10 di `8_1.md` | `frontend/`; berkas BE-1..BE-3 helpdesk dan DBV-028 |
-| **Chatbot FE** (E-10, MAKE-095) | ditunjuk lewat kode izin workload (boleh sama atau berbeda dengan Jalur FE) | berkas FE chatbot; bagian E-10 di `8_2.md` | `backend/`; berkas FE helpdesk (`features/halo-simpeg/*` di luar `chatbot/`) |
+| **BE** | **Handling Case** (H8-1, izin #9) | semua `backend/` **kecuali** berkas BE-4 chatbot dan kode impor T12b (MAKE-097), `docs/fase8/8_1.md`, `backend/docs/db-review/DBV-028-*.md` | `frontend/`; berkas BE-4 chatbot |
+| **FE** | **Worker Muse** (H8-3, amandemen izin #9; cadangan Worker Fix Bug) | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), item menu `halo` di `nav.config.ts`, route Halo Simpeg di router, badge di layout, reset store helpdesk di `clearSession()`, `docs/fase8/8_2.md` | `backend/` (kebutuhan kontrak baru → CR ke jalur BE lewat reviewer); `features/halo-simpeg/chatbot/*` kecuali perbaikan QA chatbot yang ditugaskan (CR-134 dst.) |
+| **Chatbot BE** (E-10, MAKE-094) | **ReadOne** (izin #8, pekerjaan selesai; di `main`) | berkas BE-4 chatbot; bagian E-10 di `8_1.md` | `frontend/`; berkas BE-1..BE-3 helpdesk dan DBV-028 |
+| **Chatbot FE** (E-10, MAKE-095) | **Worker Muse** (izin #8, pekerjaan selesai; di `main`) | berkas FE chatbot; bagian E-10 di `8_2.md` | `backend/`; berkas FE helpdesk saat bertindak sebagai jalur chatbot |
+| **Impor master T12b** (MAKE-097) | **ReadOne** (H8-12, amandemen scope izin #9); review DB **WS-2** | kode impor tier T12b di `backend/app/Libraries/Impor/*` dan perintah/test terkait, bagian T12b di `docs/migrasi/MAKE-069-rencana.md` | berkas BE-1..BE-4, migration (skema milik DBV-028) |
 
 Titik temu: kontrak API beku (§6.1, §6.5) dan fixture JSON sintetis respons API yang dipakai bersama sebagai bahan test FE; perubahan kontrak
 setelah beku = CR yang disepakati kedua jalur lewat reviewer. Untuk chatbot (✔): Chatbot BE menghasilkan contoh respons di
@@ -182,14 +199,51 @@ merge kedua me-rebase dari `origin/main` dan reviewer memeriksa konflik di berka
 `.env.example` (chatbot: nama kunci token feedback F8-35 tanpa nilai), `README-deploy.md` (chatbot: pemeriksaan kunci F8-35),
 `backend/docs/progress/08-HaloSimpeg.md`, `frontend/src/router/index.ts`, `frontend/src/shared/layouts/nav.config.ts`,
 `frontend/src/shared/layouts/RedesignShell.vue`, `frontend/src/features/auth/stores/auth.store.ts` (chatbot: satu panggilan
-reset di `clearSession()`).
+reset di `clearSession()`; **helpdesk v1.2**: satu panggilan reset store tiket + badge ringkasan di `clearSession()`
+`auth.store.ts:52-60`, MAKE-073, dengan test "store helpdesk kosong sesudah logout/ganti akun" pola AC-E10.20),
+**`backend/tests/feature/KontrakMatriksRoleTest.php`** (v1.2: `PREFIKS_CAKUPAN` `:60` saat ini memuat `halo-simpeg/chatbot`;
+MAKE-070/071 memperluasnya menjadi prefiks `halo-simpeg` dan menambah baris endpoint §6.1, commit terpisah, AC-E02.7),
+`frontend/src/features/notifikasi/*` (v1.2: hanya bila H8-15 memilih entri lonceng; CR berkas bersama lewat reviewer), dan
+berkas Push `backend/app/Libraries/Push/*` + `backend/app/Jobs/PushPesanJob.php` (v1.2: hanya bila H8-14 = (a), CR berkas
+bersama lewat reviewer; kontrak `PushNotifGatewayInterface` tetap tidak disentuh).
 
 **DILARANG disentuh:** migration yang sudah di `main` (termasuk `CreateDisiplinTicketFase4`, `CreateMasterLayananFase4`);
 `Libraries/Layanan/Notifikasi*` dan model `Inbox*` (rumah notifikasi approval); kontrak `Interfaces/PushNotifGatewayInterface.php`;
 `Config/Database.php`; `MigrationsDitahan/AddFkNipLayananFase4.php` (keputusan FK di DBV-028, bukan edit berkas lama); berkas legacy rahasia (§Cara pakai 6).
 Untuk E-10 juga: modul FAQ (`Controllers/Api/MasterData/FaqController.php`, `Libraries/MasterData/Faq*`), `Libraries/Html/HtmlSanitizer.php`,
 `shared/components/SafeHtml.vue`, `shared/utils/sanitizeHtml.ts`, dan `Libraries/Kepegawaian/Pegawai/EksporTabel.php` **dipakai, tidak diubah**
-(kebutuhan perubahan → CR lewat reviewer).
+(kebutuhan perubahan → CR lewat reviewer). `Libraries/Kepegawaian/Lampiran/LocalStorageAdapter.php` juga dipakai, tidak diubah,
+kecuali A0 memutus hapus berkas legacy lewat CR adapter (§7.5, AC-E05.7).
+
+### 3.1 Paket × key × agen × izin (v1.2)
+
+Keputusan Horii 13-11-2026 (H8-1: izin [#9-WorkloadHaloSimpeg], BE Handling Case, DB Validator WS-2) dan 16-11-2026 ("ikut
+rekomendasi semua": H8-3, H8-11, H8-12, H8-13). Izin [#8-WorkloadChatbot] = pekerjaannya **selesai** (DBV-033, MAKE-094, MAKE-095
+di `main`). Izin [#9-WorkloadHaloSimpeg] = **aktif** dengan amandemen 16-11-2026 (anggota FE = Worker Muse; scope + T12b/MAKE-097).
+Setiap paket: branch dari `origin/main`, gate cepat lokal, CI gate penuh, merge atas izin Horii, serah terima lewat reviewer.
+
+| Urut | Paket | Key | Isi | Agen | Izin | Menunggu | Status |
+|---|---|---|---|---|---|---|---|
+| 0a | Sinkron status | CR-130 | `Kesiapan_Fase8.md` + progres `08-HaloSimpeg.md` + tabel kartu Trello | Reviewer CR (bagian progres BE: ReadOne; FE: Worker Muse) | — (tanpa kode workload); merge ⛔ izin Horii | — | ◻ |
+| 0b | PRD v1.2 | CR-131 | dokumen ini | Reviewer CR | — (tanpa kode workload); merge ⛔ izin Horii | — | ◻ (merge ⛔ izin Horii, sebelum laporan A0/B0 disetujui) |
+| 1 | A0 laporan pemahaman BE (bagian MAKE-070, tanpa kode) | — | §12 register H8 + daftar kewajiban A0 (§6.1a, §7.3a) | Handling Case | #9 | mulai sesudah CR-130 di `main`; laporan disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` | ◻ ⛔ reviewer |
+| 1' | B0 laporan pemahaman FE (bagian MAKE-073, tanpa kode) | — | rencana berkas bersama FE (nav, router, shell, `clearSession()`, lonceng) | Worker Muse | #9 (amandemen) | mulai sesudah CR-130 di `main`; laporan disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` | ◻ ⛔ reviewer; paralel A0–A2 |
+| 2 | Skema helpdesk E-01 | DBV-028 | PR `[CR][DBV]`, dokumen `backend/docs/db-review/DBV-028-*.md` | ditulis Handling Case; DB Validator WS-2 | #9 | A0 disetujui | ◻ |
+| 3 | Master E-02/E-07 | MAKE-070 | + `PATCH …/status`, matriks role prefiks `halo-simpeg` | Handling Case | #9 | DBV-028 di `main` | ◻ |
+| 4 | Tiket E-03..E-05 + ringkasan | MAKE-071 | + lampiran lama/baru lewat E-04, binding `RingkasanTiketInterface`, §7.8 (1)(2)(4)(5), kategori NULL (H8-16) | Handling Case | #9 | MAKE-070; H8-10 | ◻ |
+| 5a | FE helpdesk E-08 + layar admin (B1–B3, B5) | MAKE-073 | AGENTS.md §1, badge, reset store saat logout | Worker Muse (cadangan Worker Fix Bug) | #9 (amandemen) | kontrak MAKE-070 + MAKE-071 beku; H8-9 sebelum B3 | ◻ |
+| 5b | Push E-06 | MAKE-072 | penerima per H8-14; §7.8 (3) | Handling Case | #9 | MAKE-071; H8-8 (atau payload terbatas) | ◻ |
+| 5c | Impor master T12b | MAKE-097 | salin `id_user` apa adanya (H8-6, K-M11/K-M12) | ReadOne; review DB WS-2 | #9 (amandemen scope) | DBV-028 di `main` | ◻ |
+| 6 | Ekspor E-09 + penutup BE (A5) | MAKE-074 | WIB↔UTC dan audit unduhan (◻ usulan reviewer, menunggu konfirmasi Horii saat review PRD v1.2), batas baris; runbook | Handling Case | #9 | MAKE-071 (M3) | ◻ |
+| 6' | Tombol ekspor (B4) | MAKE-074 (FE) | `UiExportMenu` | Worker Muse | #9 (amandemen) | MAKE-074 BE + MAKE-073 | ◻ |
+| — | Checklist QA Lapis 1 Fase 8 | CR-132 | `docs/fase8/Checklist_QA_Lapis1_Fase8.md` (bagian A chatbot sekarang, bagian B helpdesk sesudah MAKE-073) | Reviewer CR (+ Worker Muse untuk chatbot, usulan) | — (tanpa kode workload); merge ⛔ izin Horii | bagian A: PN8-8 | ◻ |
+| — | Test AC-E10.19 sisi log aplikasi | CR-133 | logger uji: teks pesan chatbot tidak masuk log aplikasi | usulan: ReadOne | ◻ izin workload pekerjaan chatbot pasca-#8 diajukan ke Horii sebelum paket dibuka | izin workload | ◻ |
+| — | Perbaikan temuan QA chatbot | CR-134 dst. | BE ReadOne, FE Worker Muse (usulan) | usulan: ReadOne (BE) / Worker Muse (FE) | ◻ izin workload pekerjaan chatbot pasca-#8 diajukan ke Horii sebelum paket dibuka | QA bagian A; izin workload | ◻ |
+| 9 | Rilis menu (H8-11 (a)) | CR-135 | `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles` | Worker Muse (atau Worker Fix Bug) | ⛔ izin Horii | sign-off Fase 8 | ◻ |
+| — | Impor isi QnA dev | C4 (key per F8-51 saat PN8-6) | F8-46, AC-E10.30 | ReadOne | izin baru saat PN8-6 | PN8-6 (deploy) | **di luar DoD** (H8-13 (b), DEPLOY-002) |
+| ✔ | Skema chatbot | DBV-033 | E-10 | ditulis ReadOne; DB Validator WS-2 | #8 | — | ✔ di `main` `3fb8c5f7` |
+| ✔ | BE chatbot | MAKE-094 | E-10 | ReadOne | #8 | — | ✔ di `main` `4af0c188` |
+| ✔ | FE chatbot | MAKE-095 | E-10 | Worker Muse | #8 | — | ✔ di `main` `2a8f405d` |
 
 ---
 
@@ -248,15 +302,15 @@ Untuk E-10 juga: modul FAQ (`Controllers/Api/MasterData/FaqController.php`, `Lib
 | F8-10 | **Balas**: syarat tiket `status=0` dan `allow_reply=1` [K `LS:1116-1123`]; pelaku = pemilik atau petugas aktif kategorinya. Pesan: teks wajib, lampiran opsional (5 MB, 9 ekstensi) [K `LS:1552-1565`, `LS:963-975`]. Penanda baca otomatis: balasan pemilik → `is_read_off=2`; balasan petugas → `is_read=2` [I — logika trigger `inbox_msg_afIns`, DBV-022 `:301`; M0 mencocokkan dengan D1:7730-7739 lewat reviewer] | [K]+[I] | ✔ (default diterima) |
 | F8-11 | **Pengingat 24 jam** (`notify_pic`/`notify_at`): petugas dapat mencentang saat membalas; reset ke 2 bila petugas membalas lagi [K `LS:1172-1178`, `LS:1348-1352`]. Tiket `perlu_tindak` = `status=0` dan (`is_read_off=2` atau `notify_pic=1` dan `notify_at < sekarang`) [K `MC:292`] | [K] | ✔ (default diterima) |
 | F8-12 | **Popup login petugas dihapus**; diganti badge pada menu Halo Simpeg + panel "Perlu ditindak" di halaman petugas (legacy: modal saat login, hanya role 2/6, `MC:268-305`, `VM:734-807`) | [V2] UX | ✔ Q8-07 |
-| F8-13 | **Penerima push** — tiket baru → petugas aktif kategori (akun aktif); balasan petugas → pemilik; balasan pemilik → petugas aktif kategori [K `LS:1029-1075`, `LS:1202-1285`]. Perbaikan: akun petugas **semua role** diikutkan (legacy hanya `UserLevel='2'`, sehingga petugas role 1/6 tidak pernah dapat push, B-5); token dideduplikasi per perangkat | [K]+[V2] | ✔ (default diterima) |
+| F8-13 | **Penerima push** — tiket baru → petugas aktif kategori (akun aktif); balasan petugas → pemilik; balasan pemilik → petugas aktif kategori [K `LS:1029-1075`, `LS:1202-1285`]. Perbaikan: akun petugas **semua role** diikutkan (legacy hanya `UserLevel='2'`, sehingga petugas role 1/6 tidak pernah dapat push, B-5); token dideduplikasi per perangkat. **v1.2 — kontradiksi internal:** titik sambung MAKE-066 `AntrePushPesan::antre(array $nips, …)` (`backend/app/Libraries/Push/AntrePushPesan.php:48`) dan `PushPesanJob` (`backend/app/Jobs/PushPesanJob.php:39-47`) mencari token per **NIP** (§6.4 "per NIP"), padahal kandidat petugas mencakup akun role 1 yang umumnya tanpa NIP (F8-07), sehingga petugas role 1 tanpa NIP tidak akan menerima push (AC-E06.7). Diputus lewat **H8-14** sesudah A0 (§12) | [K]+[V2] | ✔ (default diterima); cara penerima tanpa NIP ◻ H8-14 |
 | F8-14 | **Perubahan status (tutup) memberi notifikasi** ke pihak lawan sesuai Bahan Baku E-06 (legacy tidak) | [V2] | ✔ Q8-05 |
 | F8-15 | **Kanal push**: Android ikut legacy; **web ditambahkan** karena infrastruktur web push Fase 6 sudah ada dan petugas bekerja di web (legacy hanya Android untuk Halo Simpeg) | [K]+[V2] | ✔ Q8-09 |
 | F8-16 | **Payload push**: judul "Halo Simpeg", isi = teks pesan terpotong; `data` = `{modul:'halo-simpeg', id_inbox, url}` + kunci kompatibilitas Android yang dikonfirmasi PN8-1. Legacy mengirim seluruh baris tiket (nip, jabatan, satker, nama pengirim) — **tidak** dibawa kecuali pemilik app Android memastikan membutuhkannya | [V2] privasi | ✔ Q8-08, **bersyarat**: payload minimal setelah pemilik app Android mengonfirmasi (PN8-1); sebelum itu hanya kunci `data` yang dibaca app |
-| F8-17 | **Lampiran** memakai `AturanLampiran`/`ValidasiBerkas` yang ada (BP8-5); path `halo-simpeg/{nip}/{id_inbox}/…` di storage lokal; unduh lewat endpoint ber-otorisasi. Berkas lampiran impor (path legacy `arsip/{nip}/inbox/…`) dicocokkan saat cutover | [K]+[V2] | ✔ Q8-10 |
+| F8-17 | **Lampiran** memakai `AturanLampiran`/`ValidasiBerkas` yang ada (BP8-5); path `halo-simpeg/{nip}/{id_inbox}/…` di storage lokal (pola kunci final diputus di A0, T-4); unduh lewat endpoint ber-otorisasi. Berkas lampiran impor (path legacy `arsip/{nip}/inbox/…`) dicocokkan saat cutover. **v1.2 — H8-5 (a), Horii 13-11-2026 (risiko sadar):** lampiran lama tetap ber-path legacy dan **ikut tersaji publik** lewat alias Nginx `/berkas/` F-10 seperti legacy (F10-18; README-deploy §1l); Halo Simpeg **tidak** mempersempit alias itu. Aplikasi v2 **tetap** menyajikan lampiran lama **dan** baru lewat endpoint E-04 `tiket/{id}/pesan/{idPesan}/lampiran` dengan cek akses BP8-2 (AC-E04.7), **bukan** dengan merujuk URL publik `/berkas/`: saklar rollback `arsip.penyajianBerkasLegacy = 'privat'` (`backend/app/Config/Arsip.php:12-17`, `:97`) memindahkan berkas legacy ke endpoint arsip F-10 yang izinnya per NIP pegawai, sehingga tautan `/berkas/` akan putus dan petugas kehilangan akses. `LocalStorageAdapter::baca()` sudah menerima path legacy (`backend/app/Libraries/Kepegawaian/Lampiran/LocalStorageAdapter.php:78`, `:104-109`). Unggahan v2 tetap privat | [K]+[V2] | ✔ Q8-10; ✔ H8-5 (a) |
 | F8-18 | **Kontak helpdesk**: CRUD role 1 [K `SC:11-160`]; daftar kontak aktif dapat dibaca semua role 1–7 (di halaman Halo Simpeg) — legacy hanya menampilkannya ke admin | [K]+[V2] | ✔ Q8-12 |
-| F8-19 | **Lonceng**: Fase 8 menyediakan `GET halo-simpeg/tiket/ringkasan` (jumlah belum dibaca sisi pemilik + sisi petugas [K `LN:12-60`]) dan **tidak** menulis ke `inbox`. Konsumsi oleh lonceng terpadu F-08 = keputusan Q8-06 | [K]+[V2] | ✔ Q8-06 (sumber lonceng hanya bila F-08 sudah ada saat M5; selain itu badge menu saja dan disambung di F-08) |
-| F8-20 | **Ekspor rekap** `export_hs` ikut legacy: hanya petugas; periode berdasar tanggal tiket (inklusif); kolom NO, ID PERTANYAAN, KATEGORI, NAMA PENANYA, NIP PENANYA, PERTANYAAN / JAWABAN, TIMESTAMP; xlsx [K `LS:1600-1830`, `SC:751-786`]. Perbaikan: sertakan tiket yang periode-nya cocok walau petugas belum menulis, urut tiket lalu pesan | [K]+[V2] | ✔ (default diterima) |
-| F8-21 | **Impor master**: `support_officer`, `officer_category`, `help_desk_contact` dipindah saat cutover (daftar petugas dan kategori berlaku langsung); `id_user` dipetakan ke `id_pengguna` v2 lewat tabel pemetaan UP-1; baris tanpa pemetaan dilaporkan, bukan dibuang diam-diam | [V2] | ✔ Q8-13 |
+| F8-19 | **Lonceng**: Fase 8 menyediakan `GET halo-simpeg/tiket/ringkasan` (jumlah belum dibaca sisi pemilik + sisi petugas [K `LN:12-60`]) dan **tidak** menulis ke `inbox`. Konsumsi oleh lonceng terpadu F-08 = keputusan Q8-06. **v1.2:** F-08 sudah di `main`, jadi Q8-06 = B berlaku: MAKE-071 mengganti binding `ringkasanTiket` NoOp (`backend/app/Config/Services.php:799-806`) dengan implementasi `RingkasanTiketInterface` yang memakai aturan hitung §6.2, dan `PusatNotifikasiService` (`backend/app/Libraries/Notifikasi/Pusat/PusatNotifikasiService.php:74`, `:110`) mengisi `tiket_belum_dibaca` dengan angka (AC-E06.9). Tujuan klik angka lonceng = **H8-15** (§12) | [K]+[V2] | ✔ Q8-06 (sumber lonceng hanya bila F-08 sudah ada saat M5; selain itu badge menu saja dan disambung di F-08); tujuan klik ◻ H8-15 |
+| F8-20 | **Ekspor rekap** `export_hs` ikut legacy: hanya petugas; periode berdasar tanggal tiket (inklusif); kolom NO, ID PERTANYAAN, KATEGORI, NAMA PENANYA, NIP PENANYA, PERTANYAAN / JAWABAN, TIMESTAMP; xlsx [K `LS:1600-1830`, `SC:751-786`]. Perbaikan: sertakan tiket yang periode-nya cocok walau petugas belum menulis, urut tiket lalu pesan. **v1.2:** `ds`/`de` = tanggal kalender **WIB** yang dikonversi ke rentang UTC tanpa `DATE()` atas kolom (pola F8-42); kolom TIMESTAMP ditulis dalam WIB; unduhan ekspor diaudit (pola F7-27/F-10: siapa, periode, jumlah baris, tanpa isi; AC-E09.7) | [K]+[V2] | ✔ (default diterima); WIB↔UTC dan audit unduhan (AC-E09.7) = ◻ usulan reviewer v1.2, menunggu konfirmasi Horii saat review PRD v1.2 |
+| F8-21 | **Impor master** (**v1.2, H8-6 Horii 13-11-2026 "seperti legacy saja"**): `support_officer`, `officer_category`, `help_desk_contact` dipindah saat cutover (daftar petugas dan kategori berlaku langsung); `support_officer.id_user` **disalin apa adanya** ke kolom akun v2 **tanpa tabel pemetaan UP-1** (K-M11); baris yang `id_user`-nya tidak ada di `pengguna` v2 **dibuang dan jumlahnya dicatat** di laporan impor (K-M12), dan `officer_category` milik baris yang dibuang ikut dibuang (`docs/migrasi/MAKE-069-rencana.md:108-111`). Kode impor = tier T12b **MAKE-097** (ReadOne, review DB WS-2; H8-12), mulai sesudah DBV-028 di `main`. Rumusan v1.0 ("dipetakan lewat tabel pemetaan UP-1; baris tanpa pemetaan dilaporkan") **gugur** | [K] (ikut legacy) | ✔ Q8-13; ✔ H8-6 |
 | F8-22 | **Tidak dibawa**: popup modal login (F8-12), `firebase_message_logs` (digantikan `integrasi_log` Fase 6), `andr_notif_queue` (digantikan queue `push`), file view bertanggal (`inbox_20220216.php` dst.), cabang debug berkode-keras NIP (`SC:469`), log `mylog` rusak (B-9) | — | ✔ (default diterima) |
 
 **E-10 Chatbot "Vanya" (v1.1).** F8-23..F8-33 = keputusan Horii 12-11-2026 ("ikut saran" K-1..K-11, §12). F8-34..F8-51 =
@@ -284,15 +338,15 @@ bawaan teknis usulan reviewer, **dikonfirmasi Horii 12-11-2026 ("setuju semua")*
 | F8-40 | **Judul kategori dan judul tag unik** (trim, abaikan huruf besar/kecil sesuai collation `_ci`) di antara status 1 dan 2, ditegakkan **aplikasi** di dalam transaksi tulis (422) (A11). Judul yang sama dengan baris status 10 **boleh** dipakai lagi (baris baru), sehingga UNIQUE biasa atas `judul` **tidak** dipakai (akan memblokir judul yang pernah dihapus dan memicu galat 1062 saat impor). Opsi indeks DB untuk DBV-033: kolom bangkitan, mis. `judul_unik = IF(status <> 10, judul, NULL)` + UNIQUE. D1: data dev memuat 2 judul kategori kembar dan 11 judul tag kembar; saat impor isi dev keduanya **digabung** (F8-46). **Keputusan Horii 12-11-2026 (K-12): judul kembar digabung saat impor, lalu judul dibuat unik** | [V2] | ✔ K-12 |
 | F8-41 | **Validasi & batas panjang**: pesan jalur ketikan wajib, 1..300 karakter (`mb_strlen` UTF-8 sesudah trim), ditegakkan BE [V2; dev hanya `maxlength` HTML `dev:views/hr/chatbot/chatbot_popup.php:95`, A14]; jalur bubble: F8-48; pertanyaan, judul, dan jawaban mengikuti tipe kolom DDL dev (`pertanyaan`/`jawaban` TEXT, `judul_kategori` varchar(150), `judul_tag` varchar(100) [K dev D1]; final DBV-033); jawaban yang kosong setelah sanitasi ditolak 422 (pola `FaqArticleHooks`); kategori QnA wajib dan berstatus 1, tag yang **ditambahkan** berstatus 1 [K dev `dev:libraries/hr/L_chatbot.php:318`, `:472-478`] (kategori/tag lama yang sudah terpasang: F8-49); simpan/ubah QnA + relasi tag dalam satu transaksi, ubah = ganti seluruh set tag [V2; dev tanpa transaksi `:323-333`, `:352-365`, A13] | [K dev]+[V2] | ✔ (dikonfirmasi Horii 12-11-2026) |
 | F8-42 | **Riwayat & statistik** (role 1): riwayat dengan paginasi server, urut waktu terbaru, filter rentang tanggal, status cocok, dan feedback (A6); statistik = KPI dan tiga tabel top-10 ikut dev (`dev:libraries/hr/L_chatbot.php:502-555`); "hari ini" dan filter tanggal = hari kalender WIB yang dikonversi ke rentang UTC (BP8-8, tanpa `DATE()` atas kolom, A8); tanpa ekspor riwayat; tanpa penghapusan log otomatis [K dev] | [K dev]+[V2] | ✔ (dikonfirmasi Horii 12-11-2026) |
-| F8-43 | **Penempatan kode & menu**: route `api/v1/halo-simpeg/chatbot/...` di `Config/RoutesChatbot.php` (didaftarkan di `Config/Routing.php:34-59`); folder `Chatbot` di bawah `Controllers/Api/HaloSimpeg`, `Libraries/HaloSimpeg`, `Models/HaloSimpeg`, dan `features/halo-simpeg`; menu admin Pengaturan → "Chatbot Manager" (Kategori, Tag, QnA, Statistik, Riwayat) role 1 `phase: 8`; route halaman admin di `features/halo-simpeg/chatbot/routes.chatbot.ts` (satu baris import di `frontend/src/router/index.ts`, pola `routes.*` per fitur `:13-25`); widget dipasang sekali di `shared/layouts/RedesignShell.vue` dengan syarat render F8-30 + `!auth.mustChangePassword` (pola `NotifikasiPushShell` `RedesignShell.vue:186`; selama wajib ganti password semua route non-`jwt:ganti_password` ditolak 403, `backend/app/Filters/JwtAuthFilter.php:49`) + gerbang rilis F8-50 | [V2] pola | ✔ (dikonfirmasi Horii 12-11-2026) |
+| F8-43 | **Penempatan kode & menu**: route `api/v1/halo-simpeg/chatbot/...` di `Config/RoutesChatbot.php` (didaftarkan di `Config/Routing.php:34-61`, baris `RoutesChatbot` `:60-61` di `603af133`); folder `Chatbot` di bawah `Controllers/Api/HaloSimpeg`, `Libraries/HaloSimpeg`, `Models/HaloSimpeg`, dan `features/halo-simpeg`; menu admin Pengaturan → "Chatbot Manager" (Kategori, Tag, QnA, Statistik, Riwayat) role 1 `phase: 8`; route halaman admin di `features/halo-simpeg/chatbot/routes.chatbot.ts` (satu baris import di `frontend/src/router/index.ts`, pola `routes.*` per fitur `:13-27`, import chatbot `:23` di `603af133`); widget dipasang sekali di `shared/layouts/RedesignShell.vue` dengan syarat render F8-30 + `!auth.mustChangePassword` (pola `NotifikasiPushShell` `RedesignShell.vue:187`, widget terpasang `:199` di `603af133`; selama wajib ganti password semua route non-`jwt:ganti_password` ditolak 403, `backend/app/Filters/JwtAuthFilter.php:49`) + gerbang rilis F8-50 | [V2] pola | ✔ (dikonfirmasi Horii 12-11-2026) |
 | F8-44 | **Kontrak widget** memakai amplop v2 (bukan `status: 'sukses'/'kosong'` dev): daftar kosong = 200 dengan `data: []`; pesan jalur ketikan kosong/lebih dari 300 → 422 (F8-41, F8-48); korpus QnA kosong → 200 dengan balasan sistem "Database QnA masih kosong.", `cocok = false`, tanpa baris log [K dev `dev:libraries/hr/L_chatbot.php:687-689`] | [K dev]+[V2] | ✔ (dikonfirmasi Horii 12-11-2026) |
 | F8-45 | **Avatar**: ilustrasi SVG dev di-port sebagai komponen Vue; foto opsional = aset statis FE yang diserahkan PN8-7 (bukan unggah lewat aplikasi, tanpa pemeriksaan berkas saat runtime seperti `dev:views/hr/chatbot/chatbot_popup.php:19-27`); foto gagal dimuat → kembali ke SVG [K dev `:396-411`] | [K dev]+[V2] | ✔ (dikonfirmasi Horii 12-11-2026) |
 | F8-46 | **Aturan impor isi dev** (hanya bila F8-27 membawa isi): **QnA** — hanya baris berstatus 1 yang dibawa (status 2 dev bisa berarti Tidak Aktif atau Dihapus, A1); QnA tanpa kategori (`id_qna_kategori_fk` NULL dimungkinkan DDL dev [K dev D1] dan impor dev, A13) **dilaporkan dan tidak dibawa** sampai Horii/admin menetapkan kategorinya (alternatif: kategori penampung, pertanyaan §12). **Kategori/tag** — status 1 dibawa sebagai status 1; status 2 dev yang **masih dipakai QnA aktif** dibawa sebagai status 2 (Tidak Aktif) agar QnA itu tetap terjawab seperti di dev (F8-39) dan relasinya tidak yatim; status 2 lainnya tidak dibawa. Relasi tag yatim/ganda dibuang dan dilaporkan; jawaban disanitasi dan baris yang berubah oleh sanitasi dilaporkan; isi disaring sesuai §Cara pakai 6 sebelum impor (kontak/URL internal/nama nyata dilaporkan ke Horii, D1 blok [6]); `id` dev tidak wajib dipertahankan karena `log_chatbot` tidak dimigrasi. **Pelaksanaan:** perintah impor sekali jalan (bukan seeder) yang menerima path CSV di **luar repo** sebagai argumen saat cutover; CSV dan isi QnA dev tidak pernah di-commit; test memakai CSV sintetis; satu transaksi semua-atau-tidak; menolak berjalan bila tabel QnA sudah berisi (tidak menggandakan isi). **Keputusan Horii 12-11-2026:** (K-12) judul kategori/tag kembar **digabung** ke satu baris (baris aktif ber-id terkecil dipertahankan, relasi QnA dari baris lain dialihkan ke sana, relasi yang jadi ganda dibuang); (K-13) kategori uji/nonaktif (mis. "test…") **tidak dibawa**, kategori **aktif** yang belum punya QnA **tetap dibawa** agar admin bisa mengisinya. Angka D1: relasi ganda 1, QnA tanpa kategori 0 | [V2] | ✔ K-12/K-13 (rincian dikonfirmasi 12-11-2026) |
 | F8-47 | **Ekspor tag & template impor**: xlsx lewat `EksporTabel::xlsx` (anti formula injection), kolom No, Tag, Status [K dev `dev:libraries/hr/L_chatbot.php:227-236`]; status 1 dan 2 saja [V2; dev mengekspor semua status `:217-221`]; nama berkas `Export_Tag_QnA_{Ymd_His}.xlsx` (waktu WIB) [K dev `:245`]. Template impor 4 kolom "Pertanyaan", "Jawaban", "Kategori", "Tag (Pisahkan dengan koma)" + satu baris contoh [K dev `:379-403`] | [K dev]+[V2] | ✔ (dikonfirmasi Horii 12-11-2026) |
 | F8-48 | **Jalur bubble & isi log**: bila `id_qna` ada di korpus, BE memakai `pertanyaan` QnA dari DB sebagai `pesan_user` di log dan **mengabaikan** teks `pesan` klien (hasil sama dengan dev pada pemakaian normal, karena widget dev mengirim teks pertanyaan itu sendiri `dev:views/hr/chatbot/chatbot_popup.php:319-327`, `:341`); batas 1..300 (F8-41) **hanya** untuk jalur ketikan, sehingga bubble/saran untuk QnA berpertanyaan panjang (`pertanyaan` TEXT [K dev D1]) tetap dijawab. `id_qna` tidak sah → jalur ketikan dengan validasi F8-41. `pertanyaan` **tidak** dibatasi 300 di form/impor (alternatif = pertanyaan §12) | [K dev]+[V2] | ✔ (dikonfirmasi Horii 12-11-2026) |
 | F8-49 | **QnA yang induknya berubah status**: (a) tag status 2 yang terpasang tampil di daftar/form admin berbadge "Tidak Aktif" dan **dipertahankan** saat QnA disimpan bila tidak dilepas admin (dev membuangnya diam-diam karena form hanya memuat tag aktif `dev:views/hr/chatbot/form_qna.php:54-61`) [V2]; (b) tag status 10 tidak tampil di admin dan relasinya diabaikan (tetap di DB, tidak dibaca korpus/daftar) [V2, A10]; (c) kategori status 2 milik QnA boleh dipertahankan saat ubah (tampil berbadge "Tidak Aktif"); mengganti kategori hanya ke status 1; (d) kategori status 10 tampil di daftar admin dengan penanda "Dihapus" dan menyimpan QnA tanpa mengganti kategorinya → 422 "Kategori QnA sudah dihapus. Pilih kategori lain." (teks usulan) [V2]; (e) tag status 2/10 tidak menambah skor korpus (F8-39) | [K dev]+[V2] | ✔ (dikonfirmasi Horii 12-11-2026) |
-| F8-50 | **Gerbang rilis menu & widget** (`ACTIVE_PHASE` = 5 di `frontend/src/shared/layouts/nav.config.ts:94`; semantik `rilis` `:120-124`): bawaan = pola lonceng F-08 (`RedesignShell.vue:110-118`): item menu Chatbot Manager `phase: 8` **tanpa** `rilis` (QA lewat URL langsung, pola F7-14) dan widget dirender hanya bila `ACTIVE_PHASE >= 8` (konstanta fase chatbot di fitur), sehingga menu dan widget dibuka bersamaan. Alternatif: menu `rilis: true` dan widget ikut tampil saat MAKE-095 masuk `main` (pola Integrasi `:293`). Siapa yang menaikkan `ACTIVE_PHASE` (atau menghapus `rilis`) = pertanyaan §12 | [V2] pola | ✔ (dikonfirmasi Horii 12-11-2026) |
-| F8-51 | **Key C4** (impor isi QnA dev): C4 adalah milestone tersendiri (menunggu PN8-6, bisa jauh sesudah C2 merge), sehingga mengikuti §2.1 "satu milestone = satu key = satu branch": bawaan = key MAKE tersendiri yang ditetapkan reviewer saat PN8-6 diputus (nomor berikutnya yang kosong), branch `fase8/<key>-impor-isi-qna`. Alternatif: bila PN8-6 diputus sebelum C2 merge, C4 menjadi bagian akhir branch MAKE-094 | — | ✔ (dikonfirmasi Horii 12-11-2026) |
+| F8-50 | **Gerbang rilis menu & widget** (`ACTIVE_PHASE` = 5 di `frontend/src/shared/layouts/nav.config.ts:97`; semantik `rilis` `:122-127`; rujukan `603af133`): bawaan = pola lonceng F-08 (`RedesignShell.vue:111-119`): item menu Chatbot Manager `phase: 8` **tanpa** `rilis` (QA lewat URL langsung, pola F7-14) dan widget dirender hanya bila `ACTIVE_PHASE >= 8` (konstanta fase chatbot di fitur), sehingga menu dan widget dibuka bersamaan. Alternatif: menu `rilis: true` dan widget ikut tampil saat MAKE-095 masuk `main` (pola Integrasi `:296`). Siapa yang menaikkan `ACTIVE_PHASE` (atau menghapus `rilis`) = pertanyaan §12. **v1.2 — H8-11 (a), Horii 16-11-2026:** chatbot dan helpdesk **dirilis bersama** di penutup Fase 8 lewat paket **CR-135** sesudah sign-off (⛔ izin Horii): `ACTIVE_PHASE` 5 → 8, pembersihan `rilis` yang sudah lewat fasenya (mis. Integrasi `:296`), item `halo` (`:320`, saat ini tanpa `to` dan `roles`) diberi `to`/`roles` 1–7. Menaikkan `ACTIVE_PHASE` juga membuka menu Fase 6/7. QA sebelum rilis memakai build lokal `ACTIVE_PHASE` = 8 tanpa commit (preseden `docs/fase7/Laporan_Akhir_Fase7.md:77`). (v1.2: alternatif `rilis: true` gugur, H8-11 (a); pertanyaan siapa menaikkan `ACTIVE_PHASE` terjawab: paket CR-135 sesudah sign-off atas izin Horii) | [V2] pola | ✔ (dikonfirmasi Horii 12-11-2026); ✔ H8-11 (a) |
+| F8-51 | **Key C4** (impor isi QnA dev): C4 adalah milestone tersendiri (menunggu PN8-6, bisa jauh sesudah C2 merge), sehingga mengikuti §2.1 "satu milestone = satu key = satu branch": bawaan = key MAKE tersendiri yang ditetapkan reviewer saat PN8-6 diputus (nomor berikutnya yang kosong), branch `fase8/<key>-impor-isi-qna`. Alternatif: bila PN8-6 diputus sebelum C2 merge, C4 menjadi bagian akhir branch MAKE-094. **v1.2 — H8-13 (b), Horii 16-11-2026:** C4 **keluar dari DoD/sign-off Fase 8** dan dilacak di Trello DEPLOY-002 (alternatif C2 gugur karena MAKE-094 sudah merge); aturan key tetap seperti di atas; pelaksana bila PN8-6 membawa isi dev = ReadOne (pemilik MAKE-094), izin diajukan saat itu | — | ✔ (dikonfirmasi Horii 12-11-2026); ✔ H8-13 (b) |
 
 ---
 
@@ -313,7 +367,7 @@ dengan Matriks Modul E saat M0.
 | `halo-simpeg/petugas/kandidat` | GET `?search=` | 1 | pencarian di server (F8-07) | E-02 |
 | `halo-simpeg/kontak` | GET | 1–7 (aktif), 1 (semua) | | E-07 |
 | `halo-simpeg/kontak`, `…/{id}` | POST, PUT, DELETE | 1 | | E-07 |
-| `halo-simpeg/tiket` | GET | 1–7 | `peran=saya|petugas`, filter `status`, `kategori`, `q`; urut pesan terakhir desc; paginasi | E-04 |
+| `halo-simpeg/tiket` | GET | 1–7 | `peran=saya\|petugas`, filter `status`, `kategori`, `q`; urut pesan terakhir desc; paginasi | E-04 |
 | `halo-simpeg/tiket` | POST (multipart) | `UL_PEGAWAI` (Q8-01) | `id_question_category`, `subject`, `msg`, `arsip?` | E-03 |
 | `halo-simpeg/tiket/ringkasan` | GET | 1–7 | belum dibaca per sisi, `perlu_tindak` | E-06 |
 | `halo-simpeg/tiket/{id}` | GET | 1–7 | pemilik atau petugas kategori; **tanpa efek samping** | E-04 |
@@ -327,6 +381,23 @@ dengan Matriks Modul E saat M0.
 Pesan galat berbahasa Indonesia dan mengikuti teks legacy bila ada (mis. "Percakapan ini telah ditutup …" [K `LS:1117`],
 "Percakapan ini tidak memerlukan balasan …" [K `LS:1121`]).
 
+#### 6.1a Kewajiban A0 / MAKE-070: butir kontrak yang wajib dibekukan (v1.2)
+
+Tabel §6.1 di atas = kontrak awal, **bukan** kontrak final. Butir berikut belum diputus di PRD ini; **Handling Case mengusulkan
+nilainya di laporan A0**, reviewer menyetujui, lalu MAKE-070 (master) dan MAKE-071 (tiket) **membekukannya di README
+`backend/app/Controllers/Api/HaloSimpeg/README.md`** sebelum B1 FE mulai (§3). Perubahan sesudah beku = CR lewat reviewer.
+
+| No | Butir yang wajib dibekukan | Batasan yang sudah berlaku | Paket |
+|---|---|---|---|
+| K-A1 | Endpoint ubah status master terpisah dari PUT payload penuh untuk kategori, petugas, dan kontak (bentuk `PATCH …/{id}/status`, nama path final) | AGENTS.md §1 (aksi ⋮ Aktifkan/Nonaktifkan), pola chatbot §6.5 dan `backend/app/Config/Routes.php:71`; domain status master 0/1 (DBV-022 DQ-5, F8-03) | MAKE-070 |
+| K-A2 | Parameter daftar kontak "aktif" (role 1–7) vs "semua" (role 1): nama parameter dan perilaku bila role selain 1 meminta "semua" | F8-18, AC-E07.1 | MAKE-070 |
+| K-A3 | Endpoint atau field "petugas saya": apakah pengguna petugas aktif, kategori yang ditugaskan, dipakai FE untuk AC-E08.1 dan badge | F8-06, §6.2 | MAKE-070/071 |
+| K-A4 | Definisi "hapus petugas bila tidak ada tiket aktif" (tiket terikat ke kategori, `receiver` = 0, bukan ke petugas): kapan hapus ditolak, pesan galat, dan AC-nya (AC-E02.8) | F8-09, `LS:709-711`, B-12 | MAKE-070 |
+| K-A5 | Bentuk respons daftar dan detail (nama field, paginasi: nama parameter halaman/ukuran, batas ukuran halaman, metadata), kode galat (`code` snake_case di amplop v2) | Amplop v2 + field `code`; pola `Config\Chatbot::$perHalamanBawaan`/`$perHalamanMaks` (`backend/app/Config/Chatbot.php:59`, `:61`) sebagai pembanding, bukan nilai | MAKE-070/071 |
+| K-A6 | Pola kunci path lampiran baru (`halo-simpeg/{nip}/{id_inbox}/…` atau pola kunci unggahan v2 `YYYY/MM/<32 hex>.<ext>`) | F8-17, T-4; keduanya privat | MAKE-071 |
+| K-A7 | Pencocokan tabel §6.1 dengan Matriks Role × Endpoint Modul E (role per route), lalu daftar baris yang masuk `KontrakMatriksRoleTest` | F8-04, AC-E02.7 | A0 → MAKE-070/071 |
+| K-A8 | Angka throttle, batas panjang, dan batas baris ekspor (§7.3a) | BP8-10, §7.3a | A0 → MAKE-071/074 |
+
 ### 6.2 Penghitung belum dibaca (E-06, titik sambung lonceng)
 
 `GET halo-simpeg/tiket/ringkasan` → `{ belum_dibaca_saya, belum_dibaca_petugas, perlu_tindak, total }`. Aturan hitung [K
@@ -335,7 +406,8 @@ yang bukan milik pengguna sendiri (tidak dihitung dua kali). Hanya membaca `disi
 
 ### 6.3 Frontend (E-08, E-10)
 
-Rute Halo Simpeg dipasang di `nav.config.ts` (item `halo`, `phase: 8` → aktif) dengan `roles` 1–7. Mengganti `halo.store.ts`
+Rute Halo Simpeg dipasang di `nav.config.ts` (item `halo`, `phase: 8`) dengan `roles` 1–7; menu tampil saat `ACTIVE_PHASE`
+dinaikkan ke 8 di paket rilis CR-135 (H8-11 (a), F8-50), sebelumnya QA lewat URL langsung. Mengganti `halo.store.ts`
 (memori, branch redesign) menjadi store/service API (ADR-021/022). Tampilan:
 
 | Tampilan | Pengguna | Isi |
@@ -348,22 +420,22 @@ Rute Halo Simpeg dipasang di `nav.config.ts` (item `halo`, `phase: 8` → aktif)
 
 Menu E-10 (✔ F8-43): Pengaturan → **"Chatbot Manager"** (role 1, `phase: 8`) dengan submenu Kategori, Tag, QnA, Statistik, Riwayat
 (nama menu ikut dev `dev:controllers/hr/Chatbot.php:39`). Widget tidak memakai item menu; komponen dipasang sekali di
-`RedesignShell.vue` (`<main id="main-content">` di `frontend/src/shared/layouts/RedesignShell.vue:188`) dan dirender hanya bila role sesi ∈
-`UL_PEGAWAI` **dan** `!auth.mustChangePassword` (pola `NotifikasiPushShell` `:186`), dengan gerbang rilis F8-50. Kerangka redesign `67fa7678` tidak memuat chatbot; di `main` `241ef9e5` folder `features/halo-simpeg/` baru berisi
-README + `.gitkeep`.
+`RedesignShell.vue` (`<main id="main-content">` di `frontend/src/shared/layouts/RedesignShell.vue:189`; widget `<VanyaWidget>` `:199`, rujukan `603af133`) dan dirender hanya bila role sesi ∈
+`UL_PEGAWAI` **dan** `!auth.mustChangePassword` (pola `NotifikasiPushShell` `:187`), dengan gerbang rilis F8-50. Kerangka redesign `67fa7678` tidak memuat chatbot. Di `main` `603af133`
+folder `features/halo-simpeg/chatbot/` sudah berisi MAKE-095; folder helpdesk `features/halo-simpeg/` lainnya baru berisi README + `.gitkeep`.
 
 Kerangka tampilan berupa **data contoh** ada di branch `feat/frontend-ui-redesign` (commit `67fa7678`: `halo.store.ts`, `types.ts`,
 `components/HaloDrawer.vue`, `views/AdminHaloPage.vue`) dan **belum ada di `main`** (di `main` hanya README modul dan item menu `halo`
-ber-`phase: 8` di `nav.config.ts:262` pada basis `f7b9221e`; di `241ef9e5` item itu ada di `:301`). Kerangka itu mengasumsikan satu percakapan per pengguna dan admin = role 1 & 3 (`types.ts`, "ASUMSI");
+ber-`phase: 8` di `nav.config.ts:262` pada basis `f7b9221e`; di `603af133` item itu ada di `:320`, tanpa `to` dan `roles`). Kerangka itu mengasumsikan satu percakapan per pengguna dan admin = role 1 & 3 (`types.ts`, "ASUMSI");
 keduanya diganti oleh model F8-02 dan F8-04/F8-06. Bila branch redesign belum di `main` saat M5, M5 mengambil berkas-berkas itu sebagai titik awal.
 
 ### 6.4 Titik sambung ke Fase 6 (B5 / MAKE-066)
 
 | Kebutuhan | Disediakan Fase 6 | Dipakai Fase 8 |
 |---|---|---|
-| Kirim push | `PushNotifGatewayInterface` + `FcmV1Adapter`/`MockFcmAdapter` (`Config/Services.php`) | `PushHaloSimpegJob` memanggil gateway yang sama |
-| Penyimpanan token | `firebase_token` (`nip`, `fcm_token`, `platform`, `token_hash`; DBV-027) | penerima ditentukan per NIP → semua token aktif (web + Android) |
-| Antrean | queue `push` (`queue:work push`) | job baru `push-halo-simpeg` terdaftar di `Config/Queue.php` |
+| Kirim push | `PushNotifGatewayInterface` + `FcmV1Adapter`/`MockFcmAdapter` (`Config/Services.php`) | `PushHaloSimpegJob` (bila H8-14 = (b)) atau `PushPesanJob` lewat `AntrePushPesan` (bila (a)) memanggil gateway yang sama |
+| Penyimpanan token | `firebase_token` (`nip`, `fcm_token`, `platform`, `token_hash`; DBV-027); token web terikat akun (`id_pengguna`, `backend/app/Libraries/Push/PenerimaTokenFcm.php:16`) | v1.0: "penerima ditentukan per NIP → semua token aktif (web + Android)". **v1.2:** rumusan per NIP bertentangan dengan F8-13/AC-E06.7 untuk petugas role 1 tanpa NIP → **H8-14** (§12) menetapkan penerima per akun atau per NIP |
+| Antrean | queue `push` (`queue:work push`); titik sambung Halo Simpeg yang sudah ada: `AntrePushPesan` → job `push-pesan` (`backend/app/Config/Queue.php:56-57`, `backend/app/Jobs/PushPesanJob.php:15`), mencari token Android per NIP dan token web lewat `pengguna.nip` (`PenerimaTokenFcm.php:41`, `:80-88`) | v1.0: job baru `push-halo-simpeg` di `Config/Queue.php`. **v1.2:** pilihan job mengikuti H8-14 ((a) `push-pesan` + CR berkas bersama Push untuk penerima per akun; (b) job Halo Simpeg tersendiri); diputus sesudah A0 (T-1) |
 | Token tidak valid | job menghapus token invalid dari error `UNREGISTERED`/`INVALID_ARGUMENT` | pola sama (`PushNotifLayananJob`: retry terbatas `TRIES`) |
 | Catatan percobaan | `integrasi_log` (F6-24, `IntegrasiLogInterface`) | tiap job mencatat hasil teredaksi |
 | Daftar token web | `POST api/v1/integrasi/fcm-token` | tidak diubah |
@@ -450,6 +522,12 @@ kategori; **AC-E02.3** petugas duplikat ditolak 422; **AC-E02.4** hapus kategori
 pegawai aktif satker kepegawaian + role 1; **AC-E02.6** semua tulis tercatat di `audit_logs`; **AC-E07.1** role 1–7 melihat kontak
 aktif, hanya role 1 melihat semua dan mengubah.
 
+**AC tambahan v1.2:** **AC-E02.7** semua route helpdesk `api/v1/halo-simpeg/*` (di luar `chatbot/`) terdaftar dan lolos
+`backend/tests/feature/KontrakMatriksRoleTest.php` dengan `PREFIKS_CAKUPAN` diperluas ke `halo-simpeg` (`:60`), role per route
+sesuai hasil pencocokan Matriks Modul E di A0 (K-A7); **AC-E02.8** aturan hapus petugas sesuai definisi yang dibekukan di A0/MAKE-070
+(K-A4) dan teruji dua arah (boleh / ditolak 422); **AC-E02.9** Aktifkan/Nonaktifkan kategori, petugas, dan kontak lewat endpoint
+status terpisah (K-A1) tanpa mengirim ulang payload penuh, dan tercatat di `audit_logs`.
+
 ### 7.3 E-03 — Buat tiket (MAKE-071)
 
 [K `LS:937-1095`, `LS:1505-1550`, `SC:606-659`].
@@ -466,8 +544,23 @@ aktif, hanya role 1 melihat semua dan mengubah.
 bertambah satu baris pun (test eksplisit); **AC-E03.3** kategori nonaktif/tidak ada → 422; **AC-E03.4** pesan kosong, subjek kosong
 → 422; **AC-E03.5** lampiran >5 MB / ekstensi di luar daftar / isi tidak cocok ekstensi → 422 dan tidak ada baris; **AC-E03.6**
 gagal di tengah transaksi → tidak ada tiket, pesan, atau berkas sisa; **AC-E03.7** role di luar `UL_PEGAWAI` (Q8-01) → 403; **AC-E03.8**
-snapshot jabatan/satker tersimpan; **AC-E03.9** melebihi throttle → 429; **AC-E03.10** push antre sesudah commit dan kegagalan
+snapshot jabatan/satker tersimpan; **AC-E03.9** melebihi throttle → 429 (angka per §7.3a); **AC-E03.10** push antre sesudah commit dan kegagalan
 antrean tidak menggagalkan tiket.
+
+#### 7.3a Angka terukur helpdesk (v1.2): ditetapkan di A0, dikonfirmasi Horii
+
+Angka di bawah **belum final**. Handling Case mengusulkan angkanya di laporan A0 (K-A8), reviewer memeriksa, **Horii
+mengonfirmasi**, lalu angka ditulis di `Config\HaloSimpeg` (bisa ditimpa `.env`) dan di README kontrak. Sebelum itu
+AC-E03.9, AC-E09.* yang bergantung pada angka belum bisa diuji tepat. Nilai **[usulan]** hanya diberikan bila ada sumber legacy.
+
+| Angka | Sumber legacy | Nilai |
+|---|---|---|
+| Throttle buat tiket per akun | Tidak ada (legacy tanpa batas, BP8-10) | Ditetapkan di A0, dikonfirmasi Horii (pembanding v2: throttle chatbot F8-36 `backend/app/Config/Chatbot.php:41-45`; bukan usulan) |
+| Throttle kirim pesan per akun | Tidak ada | Ditetapkan di A0, dikonfirmasi Horii |
+| Panjang `subject` | Kolom `subject` VARCHAR(250) (`backend/app/Database/Migrations/2026-10-26-100500_CreateDisiplinTicketFase4.php:79`, rename 1:1 legacy) | **[usulan] 250 karakter** [K] |
+| Panjang `msg` | Tidak ada batas aplikasi (validasi legacy hanya "tidak boleh kosong" `LS:1505-1526`); kolom `msg` TEXT (`…CreateDisiplinTicketFase4.php:114`, batas teknis 65.535 byte) | Ditetapkan di A0, dikonfirmasi Horii (tidak boleh melebihi batas kolom) |
+| Panjang nama kategori | `question_category` ≤ 250 (§7.2) | **[usulan] 250 karakter** [K] |
+| Batas baris ekspor E-09 | Tidak ada (legacy memuat seluruh periode `LS:1600-1830`) | Ditetapkan di A0, dikonfirmasi Horii, beserta perilaku bila terlampaui (422 berpesan, bukan berkas terpotong diam-diam) |
 
 ### 7.4 E-04 — Daftar & percakapan (MAKE-071)
 
@@ -488,9 +581,16 @@ urut di `disiplin_ticket_msg` dan tidak bercampur antar tiket (test dua tiket pa
 `allow_reply=0` ditolak dengan pesan legacy; **AC-E04.4** penanda baca: balasan petugas → `is_read=2`, balasan pemilik →
 `is_read_off=2`, buka thread → ditandai dibaca sesuai sisi; **AC-E04.5** petugas nonaktif tidak melihat antrean (F8-06) tetapi
 tetap melihat tiket miliknya; **AC-E04.6** daftar terpaginasi dan terurut pesan terakhir; **AC-E04.7** unduh lampiran hanya untuk
-pihak berhak, header aman (`Content-Disposition`, tipe dari daftar); **AC-E04.8** `GET` tidak mengubah baris (test); **AC-E04.9**
+pihak berhak, header aman (`Content-Disposition`, tipe dari daftar); **berlaku untuk lampiran lama (path legacy impor) dan baru**,
+dan tetap berfungsi baik saat saklar `arsip.penyajianBerkasLegacy` bernilai `publik` maupun `privat` (v1.2, F8-17); **AC-E04.8** `GET` tidak mengubah baris (test); **AC-E04.9**
 teks dengan tanda kutip/backslash tersimpan utuh (BP8-4); **AC-E04.10** balasan petugas dengan `ingatkan_24_jam` menyetel
 `notify_pic=1`, `notify_at` = +24 jam UTC, dan balasan petugas berikutnya mereset ke 2.
+
+**AC tambahan v1.2:** **AC-E04.11** tiket berkategori NULL (impor F-02: kolom nullable
+`backend/app/Database/Migrations/2026-10-26-100500_CreateDisiplinTicketFase4.php:78`, dihitung `INFO_KATEGORI_NULL`
+`backend/app/Libraries/Impor/AturanTiketLama.php:73`, `:119`, `:132`) diperlakukan sesuai keputusan **H8-16** (§12): siapa yang
+melihat, menutup, dan menghapusnya, serta bagaimana dihitung di ringkasan dan ekspor; ada test per perlakuan yang dipilih.
+Sebelum H8-16 diputus, AC ini ◻ dan perlakuannya diusulkan A0.
 
 ### 7.5 E-05 — Tutup & hapus (MAKE-071)
 
@@ -503,11 +603,24 @@ Hapus: F8-09 (fisik + audit `before` + hapus berkas). Setelah ditutup tidak bisa
 audit dan menghapus pesan serta berkas lampiran tiket itu saja; **AC-E05.6** tidak ada tiket Open yang tak bisa ditutup (test
 alur penuh buat → balas → tutup).
 
+**AC tambahan v1.2:** **AC-E05.7** hapus tiket **impor** yang lampirannya ber-path legacy (`arsip/{nip}/inbox/…`, termasuk nama
+berkas berspasi atau berkarakter di luar `[A-Za-z0-9._-]`) **tidak gagal** dan tidak meninggalkan baris yatim. Catatan teknis:
+`LocalStorageAdapter::hapus()` (`backend/app/Libraries/Kepegawaian/Lampiran/LocalStorageAdapter.php:62-69`) memakai validasi segmen
+ketat `lengkap()` (`:135-146`) yang menolak path legacy semacam itu, sedangkan `baca()` menerima path legacy lewat
+`PathLegacy::normalisasi()` (`:104-109`). A0 memutus salah satu: (a) berkas lampiran lama **tidak dihapus** dari storage dan
+jumlahnya dicatat (berkas yang sama juga tersaji lewat `/berkas/`, H8-5 (a)); opsi ini menyimpang dari F8-09/Q8-03 sehingga
+butuh konfirmasi Horii; atau (b) dihapus
+lewat CR adapter (hapus path legacy ternormalisasi, tetap di dalam akar). Test memakai nama berkas berspasi.
+**AC-E05.8** perlakuan tiket berkategori NULL saat tutup/hapus mengikuti H8-16 (AC-E04.11), sehingga tidak ada tiket Open yang
+menggantung tanpa pihak yang dapat menutupnya (exit criteria E-05).
+
 ### 7.6 E-06 — Notifikasi tiket (MAKE-072)
 
 [K `LS:1029-1090`, `LS:1202-1300`, `LS:1373-1425`, `CR:987-1066`].
 - `TicketNotifService` dipanggil **sesudah commit** oleh `TiketService`/`PercakapanService`; menentukan penerima (`PenerimaTiket`),
-  lalu mengantre `PushHaloSimpegJob` per pesan.
+  lalu mengantre `PushHaloSimpegJob` per pesan (v1.2: atau `AntrePushPesan` → `push-pesan` bila H8-14 = (a); §6.4).
+- **Pembagian paket (v1.2):** binding `RingkasanTiketInterface` (ganti NoOp) dan paket test §7.8 butir (5) masuk **MAKE-071**
+  bersama `GET tiket/ringkasan`; MAKE-072 hanya push.
 - **Penerima:** tiket baru → petugas aktif kategori; balasan petugas → pemilik; balasan pemilik → petugas aktif kategori; tutup →
   pihak lawan (F8-14). Pelaku tidak menerima notifikasi buatannya sendiri.
 - **Job:** ambil token `firebase_token` penerima (deduplikasi), kirim lewat `PushNotifGatewayInterface`, hapus token invalid, retry
@@ -522,7 +635,15 @@ ke pihak lawan, tidak ke pelaku; **AC-E06.3** push gagal tidak menggagalkan pesa
 CI tidak memanggil layanan nyata; **AC-E06.5** payload tidak memuat NIP, jabatan, satker, token, atau isi pesan lengkap;
 **AC-E06.6** `inbox`/`inbox_msg` tidak berubah oleh seluruh alur Halo Simpeg dan `disiplin_ticket(_msg)` tidak berubah oleh
 alur approval Fase 4 (dua test regresi, BP8-1); **AC-E06.7** petugas role 1 dan role 6 (bukan hanya role 2) menerima push (perbaikan B-5);
+v1.2: termasuk petugas role 1 **tanpa NIP**, dengan cara penerima sesuai **H8-14** (bila H8-14 = (c), AC ini dipersempit menjadi
+"petugas ber-NIP" atas keputusan Horii);
 **AC-E06.8** uji push sampai ke perangkat (Bahan Baku E-06) dilakukan **real** oleh reviewer sebelum deploy — dilacak MT/DEPLOY (bukan sign-off).
+**AC tambahan v1.2:** **AC-E06.9** binding `ringkasanTiket` di `backend/app/Config/Services.php:799-806` tidak lagi memakai
+`RingkasanTiketNoOp`; implementasi `RingkasanTiketInterface` menghitung sesuai §6.2, dan `GET api/v1/notifikasi/ringkasan`
+(`PusatNotifikasiService` `:110`) mengembalikan `tiket_belum_dibaca` berupa angka (bukan `null`) untuk pemilik, petugas, dan
+petugas yang juga pemilik (tanpa hitung ganda), serta angka itu sama dengan `GET halo-simpeg/tiket/ringkasan`;
+**AC-E06.10** angka tiket di lonceng F-08 dapat ditelusuri sesuai keputusan **H8-15** (§12) dan diuji di QA (ulang C-N10 Fase 7,
+`docs/fase7/Checklist_QA_Lapis1_Fase7.md:398`).
 
 ### 7.7 E-08 — Frontend (MAKE-073)
 
@@ -537,11 +658,15 @@ amplop axios). QA Lapis 1 oleh reviewer: daftar tiket, thread, badge status, for
 **AC-E08.1** pemilik melihat "tiket saya"; petugas melihat antrean kategorinya + tiket sendiri; **AC-E08.2** badge status & belum
 dibaca benar; **AC-E08.3** form tiket menolak input tidak valid dan menampilkan galat 422 per kolom; **AC-E08.4** semua kontrol dapat
 dioperasikan keyboard dan beraria benar; **AC-E08.5** halaman admin memakai `page-fill` + ⋮; **AC-E08.6** tidak ada `window.confirm`,
-`<select>` native, atau `title` sebagai tooltip; **AC-E08.7** QA Lapis 1 vs Figma lolos (frame yang belum ada dicatat).
+`<select>` native, atau `title` sebagai tooltip; **AC-E08.7** QA Lapis 1 vs Figma lolos (frame yang belum ada dicatat; bila H8-9 =
+tidak ada Figma, diuji terhadap pola komponen redesign).
+**AC tambahan v1.2:** **AC-E08.8** sesudah logout atau login akun lain, store tiket dan badge ringkasan helpdesk kosong (reset dari
+`clearSession()` `frontend/src/features/auth/stores/auth.store.ts:52-60`, pola `resetChatbot()` `:56`), dibuktikan Vitest "store
+kosong sesudah logout"; **AC-E08.9** lampiran (lama dan baru) dibuka hanya lewat endpoint E-04, tidak lewat URL `/berkas/`.
 
 ### 7.8 Verifikasi "thread tidak ter-mix" (exit criteria Bahan Baku)
 
-Paket test lintas modul (milik MAKE-071/072, dijalankan di CI): (1) dua tiket berbeda dengan pesan bersilang tidak saling
+Paket test lintas modul (milik MAKE-071/072, dijalankan di CI; v1.2: butir (1)(2)(4)(5) di MAKE-071, butir (3) di MAKE-072): (1) dua tiket berbeda dengan pesan bersilang tidak saling
 menampakkan pesan; (2) alur penuh Halo Simpeg tidak menambah baris `inbox`/`inbox_msg`; (3) alur penuh cuti/TB/IB/PMK (Fase 4)
 tidak menambah baris `disiplin_ticket(_msg)` (AC-06.4, `NotifikasiTidakKeTicketingTest` yang sudah ada tetap hijau); (4) petugas kategori A tidak melihat tiket kategori B; (5) lonceng/ringkasan
 tidak memuat notifikasi approval.
@@ -550,10 +675,16 @@ tidak memuat notifikasi approval.
 
 F8-20 [K `LS:1600-1830`, `SC:751-786`]. Parameter `ds`, `de` (wajib, inklusif), `format=xlsx` (satu-satunya format legacy,
 `SC:763`). Judul "REKAP PIC HALO SIMPEG {nama}" + periode; kolom bernomor; Excel lewat library yang sudah dipakai (ADR-032/035),
-sinkron dengan batas baris. NIP penanya sebagai teks. Tombol ekspor di halaman petugas (`UiExportMenu`).
+sinkron dengan batas baris (angka §7.3a). NIP penanya sebagai teks. Tombol ekspor di halaman petugas (`UiExportMenu`).
+**v1.2 (◻ usulan reviewer, menunggu konfirmasi Horii saat review PRD v1.2, F8-20):** `ds`/`de` = tanggal kalender WIB → rentang UTC `[ds 00:00 WIB, de+1 00:00 WIB)` tanpa `DATE()` atas kolom (pola F8-42,
+BP8-8; stempel tiket impor sudah UTC, DBV-029 R1a); kolom TIMESTAMP ditulis WIB; unduhan diaudit tanpa isi (pola F7-27
+`backend/app/Libraries/Dashboard/Statistik/StatistikService.php:169`, F-10 `backend/app/Libraries/Kepegawaian/Arsip/ArsipService.php:203`).
 
-**AC-E09.1** hanya petugas; **AC-E09.2** periode inklusif (23:59:59 hari akhir); **AC-E09.3** tiket kategori lain tidak ikut;
-**AC-E09.4** NIP tidak berubah menjadi angka ilmiah; **AC-E09.5** periode tanpa data → 200 dengan pesan kosong (bukan berkas rusak); **AC-E09.6** format selain xlsx → 422.
+**AC-E09.1** hanya petugas; **AC-E09.2** periode inklusif per hari WIB: tiket 00:00 WIB tanggal `ds` dan 23:59 WIB tanggal `de`
+ikut, 23:59 WIB sehari sebelum `ds` tidak ikut (v1.2, ◻ usulan reviewer menunggu konfirmasi Horii); **AC-E09.3** tiket kategori lain tidak ikut;
+**AC-E09.4** NIP tidak berubah menjadi angka ilmiah; **AC-E09.5** periode tanpa data → 200 dengan pesan kosong (bukan berkas rusak); **AC-E09.6** format selain xlsx → 422;
+**AC-E09.7** (v1.2, ◻ usulan reviewer menunggu konfirmasi Horii saat review PRD v1.2) setiap unduhan ekspor tercatat di `audit_logs` (siapa, periode, jumlah baris), tanpa isi percakapan, NIP penanya, atau isi berkas;
+**AC-E09.8** (v1.2) periode yang melebihi batas baris §7.3a → 422 berpesan Bahasa Indonesia, tidak menghasilkan berkas terpotong.
 
 ### 7.10 E-10 — Chatbot "Vanya" (DBV-033 skema, MAKE-094 BE, MAKE-095 FE)
 
@@ -647,7 +778,7 @@ semantik langkah 4** (token `"0"` terbuang, kesetaraan token numerik); rumus dan
   pembungkus route (mis. `frontend/src/features/auth/views/ChangePasswordPage.vue:9`), sehingga isi percakapan dan status buka/tutup
   disimpan di store fitur chatbot agar tidak hilang saat pindah halaman, dan dibersihkan saat muat ulang atau keluar (✔ [V2] UX;
   di dev percakapan hilang setiap pindah halaman karena halaman dimuat ulang). Pembersihan saat keluar/ganti akun dipanggil dari
-  `clearSession()` di `frontend/src/features/auth/stores/auth.store.ts` (pola `resetSesiKonten()` `:49-54`), mengosongkan pesan,
+  `clearSession()` di `frontend/src/features/auth/stores/auth.store.ts` (pola `resetSesiKonten()`; v1.2: `clearSession()` `:52-60`, `resetChatbot()` `:56`), mengosongkan pesan,
   status buka, dan token feedback, sehingga pengguna berikutnya di browser yang sama tidak melihat percakapan sebelumnya (BP8-15).
 - **Avatar:** F8-45. Gerak dikurangi untuk `prefers-reduced-motion` (`dev:VP:201-204`).
 
@@ -719,7 +850,8 @@ desimal; 0 bila belum ada penilaian), top-10 pesan, top-10 QnA cocok, top-10 QnA
 tidak ada tampil `#id`, semua teks ter-escape; **AC-E10.18** riwayat terpaginasi dan tersaring di server; filter `dari`/`sampai`
 memakai hari WIB inklusif yang dikonversi ke rentang UTC (log 00:00 dan 23:59 WIB tanggal batas ikut; log 23:30 WIB tidak bergeser ke hari
 berikutnya); pesan pengguna tampil sebagai teks; **AC-E10.19** semua tulis admin tercatat di `audit_logs`; `log_chatbot` dan isi pesan tidak masuk
-`audit_logs` maupun log aplikasi; **AC-E10.20** widget: dapat dioperasikan keyboard (buka, pilih bubble, kirim, nilai, Escape),
+`audit_logs` maupun log aplikasi (v1.2: sisi "tidak masuk log aplikasi" belum dikunci test di MAKE-094 dan ditambah lewat CR-133,
+pelaksana usulan ReadOne, izin diajukan ke Horii sebelum paket dibuka, dengan logger uji); **AC-E10.20** widget: dapat dioperasikan keyboard (buka, pilih bubble, kirim, nilai, Escape),
 ARIA benar, tidak dirender untuk role di luar `UL_PEGAWAI`, saat sesi wajib ganti password, atau sebelum gerbang rilis F8-50
 terbuka; sesudah logout atau login akun lain store chatbot kosong (pesan, status buka, token) dan widget hilang bila role sesi baru
 di luar `UL_PEGAWAI`; kartu sapaan tetap berfungsi (tanpa galat) bila `sessionStorage` melempar galat; **AC-E10.21** halaman admin `page-fill` + ⋮ dengan urutan dan label
@@ -742,7 +874,7 @@ mempertahankan tag status 2 yang tidak dilepas dan mengabaikan tag status 10; ka
 **AC-E10.28** `GET qna/template` mengembalikan xlsx dengan empat judul kolom F8-47 berurutan dan satu baris contoh;
 **AC-E10.29** jalur bubble (F8-48): QnA berpertanyaan lebih dari 300 karakter tetap dijawab lewat bubble/saran; teks `pesan` klien
 pada jalur bubble tidak masuk log (`pesan_user` = `pertanyaan` QnA); **AC-E10.30** impor isi dev (C4, hanya bila F8-27 membawa
-isi): dengan CSV sintetis, hanya QnA status 1 dibawa; kategori/tag status 2 yang masih dipakai QnA aktif dibawa sebagai status 2;
+isi; v1.2: di luar DoD Fase 8, H8-13 (b)): dengan CSV sintetis, hanya QnA status 1 dibawa; kategori/tag status 2 yang masih dipakai QnA aktif dibawa sebagai status 2;
 QnA tanpa kategori, relasi yatim/ganda dilaporkan dan tidak dibawa; jawaban disanitasi dan baris yang berubah dilaporkan; satu
 transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak memuat CSV/isi dev.
 
@@ -775,7 +907,11 @@ transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak mem
 - **RBAC:** role kode mengikuti `App\Constants\Role`; tidak ada role baru. Petugas bukan role, melainkan penugasan data (`support_officer`).
 - **Notifikasi Fase 4:** tidak diubah (BP8-1). **Lonceng F-08:** hanya mengonsumsi `ringkasan` bila Q8-06 = B.
 - **Fase 6:** token, adapter, antrean, log = milik Fase 6 (§6.4). Perubahan kontrak yang dibutuhkan Fase 8 = CR baru yang disepakati lewat reviewer.
-- **Impor/cutover:** urutan: pemetaan id pengguna (UP-1) → master (F8-21) → tiket & pesan (F-02) → berkas lampiran (path `attachments`).
+- **Impor/cutover (v1.2, H8-6):** urutan: akun `pengguna` (UP-1) → master T12b (F8-21, MAKE-097: `id_user` disalin apa adanya,
+  id yang tidak ada di `pengguna` v2 dibuang dan jumlahnya dicatat, K-M11/K-M12; **tanpa** tabel pemetaan id) → tiket & pesan
+  (F-02) → berkas lampiran (path `attachments`, tetap ber-path legacy dan disajikan aplikasi lewat E-04, F8-17).
+- **Arsip F-10 (v1.2, H8-5 (a)):** alias publik `/berkas/` F-10 tidak dipersempit untuk subfolder `inbox`; Halo Simpeg tidak
+  mengubah `Config\Arsip` maupun README-deploy §1l, dan tidak bergantung pada nilai saklar `arsip.penyajianBerkasLegacy`.
 - **Privasi:** tidak ada pencatatan isi pesan di log aplikasi/queue; `audit_logs` menyimpan metadata + snapshot `before` hanya untuk hapus.
 - **Chatbot ↔ helpdesk (E-10):** tidak berbagi tabel, service, atau route; chatbot tidak membuat tiket dan tidak menulis
   `disiplin_ticket(_msg)`, `inbox(_msg)`, atau push (K-9). Badge/ringkasan Halo Simpeg tidak menghitung apa pun dari chatbot.
@@ -791,7 +927,11 @@ transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak mem
 | PRD Fase 8 v1.0 di `main` | Semua koding | F8-01 |
 | DBV-028 | MAKE-070 → MAKE-071 → MAKE-072/073 | skema dulu; MAKE-073 (FE) menunggu kontrak API MAKE-071 beku |
 | MAKE-070 (master) | MAKE-071 (tiket butuh kategori & petugas) | |
-| MAKE-066 (Fase 6 B5) | M4 push real | mock sebelum itu |
+| MAKE-071 (M3) | MAKE-074 BE (ekspor + penutup BE) | v1.2: M6 BE cukup menunggu M3 (selaras `8_1.md` A5) |
+| MAKE-074 BE + MAKE-073 (M5) | MAKE-074 FE (B4 tombol ekspor) | v1.2 |
+| DBV-028 di `main` | MAKE-097 (T12b impor master) | v1.2, H8-12 |
+| A0 disetujui | H8-14, H8-15, H8-16 diputus | v1.2; H8-14 sebelum MAKE-072, H8-16 sebelum MAKE-071 selesai, H8-15 sebelum B1/MAKE-071 binding lonceng |
+| MAKE-066 (Fase 6 B5) | M4 push real | ✔ di `main` (`9debb366`) |
 | DBV-027 (`firebase_token.platform`, `token_hash`) | M4 | dari Fase 6 |
 | Fase 7 F-08 (lonceng) | Q8-06 = B | konsumen `ringkasan` |
 | Fase 7 F-02 + UP-1 | Impor data tiket & master | bukan koding |
@@ -799,7 +939,7 @@ transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak mem
 | PRD v1.1 di `main` (CR-121) | Koding E-10 dan DBV-033 | gerbang §0.1 |
 | D1 chatbot (PN8-5) | DBV-033 | DDL acuan; bukan prasyarat PRD |
 | DBV-033 | MAKE-094 → MAKE-095 | MAKE-095 menunggu kontrak API MAKE-094 beku (§6.5) |
-| Keputusan isi K-5 (PN8-6) | C4 (perintah impor isi QnA) dan impor saat cutover | C4 = koding kecil sesudah C2; impor = cutover |
+| Keputusan isi K-5 (PN8-6) | C4 (perintah impor isi QnA) dan impor saat cutover | C4 = koding kecil sesudah C2; impor = cutover. v1.2: di luar DoD Fase 8 (H8-13 (b), DEPLOY-002) |
 | Acuan visual widget dev (PN8-8) | QA Lapis 1 chatbot (AC-E10.22) | bukan koding |
 | DBV-028 / MAKE-070..074 / MAKE-066 / F-08 | — | **tidak** ada ketergantungan dengan E-10 (dua arah) |
 
@@ -807,16 +947,18 @@ transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak mem
 
 | M | Isi | Key | Menunggu |
 |---|---|---|---|
-| M0 | Laporan pemahaman ⛔ reviewer | — | PRD v1.0 |
+| M0 | Laporan pemahaman ⛔ reviewer (A0 BE Handling Case + B0 FE Worker Muse; wajib memuat kewajiban §6.1a, §7.3a, usulan H8-14/H8-15/H8-16, T-1..T-4, H8-10) | — | A0/B0 mulai sesudah CR-130 di `main`; laporan A0/B0 disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` |
 | M1 | Skema pendukung (PR `[DBV]`), E-01 | DBV-028 | M0 |
 | M2 | Master kategori/petugas/kontak — **BE** (layar admin FE ada di M5), E-02/E-07 | MAKE-070 | M1 di `main` |
-| M3 | Tiket, percakapan, tutup/hapus, lampiran, ringkasan BE, E-03/E-04/E-05 | MAKE-071 | M2 |
-| M4 | Notifikasi push + penerima + job, E-06 | MAKE-072 | M3; MAKE-066 untuk real |
+| M3 | Tiket, percakapan, tutup/hapus, lampiran, ringkasan BE + binding `RingkasanTiketInterface` + §7.8 (5), E-03/E-04/E-05 | MAKE-071 | M2 |
+| M4 | Notifikasi push + penerima + job, E-06 | MAKE-072 | M3; MAKE-066 ✔ di `main`; H8-14 |
 | M5 | Frontend pemilik/petugas **dan layar admin** Kategori/Petugas/Kontak, E-08 | MAKE-073 | kontrak API M2 + M3 beku |
-| M6 | Ekspor rekap (BE) + tombol ekspor (FE kecil lewat Jalur FE), penutup (progres, README, runbook cutover), E-09 | MAKE-074 | M3, M5 |
-| M7 | Reviewer: QA Lapis 1 Fase 8 (termasuk chatbot, AC-E10.22/23), laporan akhir → ⛔ sign-off Horii (penutup seluruh development) | — | M6, C3, dan C4 bila F8-27 membawa isi dev |
+| M6 | Ekspor rekap (BE) + tombol ekspor (FE kecil lewat Jalur FE), penutup (progres, README, runbook cutover), E-09 | MAKE-074 | v1.2: BE menunggu M3; tombol FE (B4) menunggu MAKE-074 BE + M5 |
+| M6' | Impor master helpdesk T12b (salin `id_user` per H8-6) | MAKE-097 | DBV-028 di `main` (v1.2, H8-12) |
+| M7 | Reviewer: QA Lapis 1 Fase 8 (checklist CR-132; termasuk chatbot, AC-E10.22/23), laporan akhir `docs/fase8/Laporan_Akhir_Fase8.md` → ⛔ sign-off Horii (penutup seluruh development) | — | M4, M5, M6 (BE + B4 FE), M6', C3 (v1.2: **tidak** menunggu C4, H8-13 (b)) |
+| M8 | Rilis menu chatbot + helpdesk bersama (H8-11 (a)): `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` `to`/`roles` | CR-135 | sign-off M7; ⛔ izin Horii |
 
-Sub-jalur **chatbot E-10** (paralel dengan M1–M6; pelaksana lewat kode izin workload):
+Sub-jalur **chatbot E-10** (paralel dengan M1–M6; pelaksana §3.1: BE ReadOne, FE Worker Muse, izin #8 selesai; C1–C3 ✔ di `main`):
 
 | M | Isi | Key | Menunggu |
 |---|---|---|---|
@@ -824,17 +966,24 @@ Sub-jalur **chatbot E-10** (paralel dengan M1–M6; pelaksana lewat kode izin wo
 | C1 | Skema chatbot (PR `[DBV]`), DDL acuan dari D1 chatbot | DBV-033 | C0; D1 chatbot (PN8-5) |
 | C2 | BE chatbot: mesin jawab + test pembanding, endpoint widget, CRUD admin (+ `PATCH …/status`), impor/template, ekspor tag, statistik, riwayat, throttle, token; kontrak API dibekukan di README `Controllers/Api/HaloSimpeg/Chatbot`; README `Libraries/HaloSimpeg/Chatbot` dan `Models/HaloSimpeg/Chatbot`; bagian chatbot di `backend/docs/progress/08-HaloSimpeg.md`; pemeriksaan kunci token di `README-deploy.md` | MAKE-094 | C1 di `main` |
 | C3 | FE chatbot: widget Vanya + halaman admin Chatbot Manager + menu; README `features/halo-simpeg/chatbot` | MAKE-095 | kontrak API C2 beku |
-| C4 | (bila F8-27 membawa isi dev) perintah impor sekali jalan isi QnA dari CSV di luar repo (F8-46, AC-E10.30) + langkah runbook cutover isi QnA | key ✔ F8-51 (MAKE tersendiri dari reviewer; atau bagian akhir MAKE-094 bila PN8-6 diputus sebelum C2 merge) | C2; keputusan PN8-6 |
+| C4 | (bila F8-27 membawa isi dev) perintah impor sekali jalan isi QnA dari CSV di luar repo (F8-46, AC-E10.30) + langkah runbook cutover isi QnA. **v1.2: pasca Fase 8, di luar DoD (H8-13 (b)), dilacak DEPLOY-002; pelaksana ReadOne** | key ✔ F8-51 (MAKE tersendiri dari reviewer saat PN8-6) | C2 ✔; keputusan PN8-6 (saat deploy) |
+
+Status sub-jalur chatbot (v1.2, `main` `603af133`): C1 ✔ DBV-033 `3fb8c5f7`, C2 ✔ MAKE-094 `4af0c188`, C3 ✔ MAKE-095
+`2a8f405d`; sisa QA Lapis 1 (CR-132 bagian A), CR-133, CR-134 dst., dan rilis CR-135. Pelaksana CR-133 (ReadOne) dan CR-134+
+(ReadOne BE, Worker Muse FE) = usulan; izin workload pekerjaan chatbot pasca-#8 diajukan ke Horii sebelum paket dibuka (◻).
 
 Setiap M: branch baru dari `origin/main` → gate cepat → push → CI `quality-gate` hijau → lapor → ⛔ merge oleh reviewer CR (izin Horii per paket).
 
 ## 11. Definition of Done & exit criteria
 
-**Fase 8 DONE** bila: E-01..E-10 DONE (AC terpenuhi, di `main`; E-10 = DBV-033 + MAKE-094 + MAKE-095 (+ C4 bila F8-27 membawa isi dev), AC-E10.1..30); verifikasi "thread tidak ter-mix" (§7.8) hijau; regresi Fase 4
-(notifikasi approval, C-05/C-06) dan FAQ (G-10) hijau; QA Lapis 1 Fase 8 lolos, termasuk widget dan Chatbot Manager; runbook cutover (impor master, pemetaan `id_user`, berkas
-lampiran, dan isi QnA bila F8-27 membawa isi dev) tercatat; laporan akhir `docs/fase8/Laporan_Akhir_Fase8.md`; **sign-off Horii sebagai penutup seluruh development**.
-Kartu Fase 8 dan kartu QA terkait di Trello disinkron. **Uji push real** tidak menahan sign-off tetapi
-wajib lolos sebelum deploy (MT/DEPLOY, pola F6-23).
+**Fase 8 DONE** bila: E-01..E-10 DONE (AC terpenuhi, di `main`; E-10 = DBV-033 + MAKE-094 + MAKE-095, AC-E10.1..29; AC-E10.30/C4
+**tidak** termasuk, v1.2 H8-13 (b)); verifikasi "thread tidak ter-mix" (§7.8) hijau; regresi Fase 4
+(notifikasi approval, C-05/C-06) dan FAQ (G-10) hijau; QA Lapis 1 Fase 8 lolos (checklist `docs/fase8/Checklist_QA_Lapis1_Fase8.md`, CR-132), termasuk widget dan Chatbot Manager; runbook cutover (impor master T12b MAKE-097 dengan `id_user` disalin apa adanya dan jumlah baris dibuang tercatat (H8-6, K-M11/K-M12), berkas
+lampiran lama lewat E-04 dan risiko sadar H8-5 (a), kunci token chatbot README-deploy §1m) tercatat; laporan akhir `docs/fase8/Laporan_Akhir_Fase8.md` (status per paket + SHA, temuan QA, butir yang ditunda ke DEPLOY-002); **sign-off Horii sebagai penutup seluruh development**.
+Kartu Trello Fase 8 (DEV-009, QASMTASK-111..118, QASMTASK-123, QASMTASK-124; §1.1) dan baris timeline **Notion** Fase 8 (E.1..E.4,
+E.5 = E-09, E.6 = E-10) disinkron final (v1.2). **Di luar DoD, dilacak DEPLOY-002 (C4/K-5) dan MT-010/DEPLOY-001.1 (uji push
+real):** uji push real (wajib lolos sebelum deploy, pola F6-23), keputusan K-5 dan C4 impor isi QnA dev (H8-13 (b)), dan langkah deploy lain (kunci §1m, T12b di server). **Sesudah
+sign-off:** rilis menu bersama CR-135 (H8-11 (a), ⛔ izin Horii).
 
 Format laporan milestone (blok kode): Status / Branch-SHA-CI / Berkas / Test (jumlah) / Berkas bersama / Deviasi / Blocker.
 
@@ -856,11 +1005,36 @@ Setiap baris: pertanyaan, opsi, saran, dan keputusan. Syarat pada Q8-06, Q8-08, 
 | Q8-10 | **Lampiran**: legacy 9 ekstensi, 5 MB; v2 sudah punya aturan identik + validasi isi | **A** ikut legacy via `AturanLampiran` (F8-17). **B** perketat (pdf/jpg/png saja) | **A** | **Ikut saran (Horii 03-11-2026).** |
 | Q8-11 | **Sumber kandidat petugas**: legacy hard-code satker `'101'` | **A** pakai `id_satker_kepegawaian` (Web Config) seperti PIC layanan; konfirmasi `101` = satker kepegawaian. **B** kunci konfigurasi baru khusus Halo Simpeg | **A** (satu sumber kebenaran) setelah Biro SDM mengonfirmasi | **Ikut saran (Horii 03-11-2026).** **Bersyarat:** setelah Biro SDM mengonfirmasi satker `101` = satker kepegawaian. |
 | Q8-12 | **Kontak helpdesk**: legacy hanya admin yang melihat daftar; Bahan Baku E-07 "view UL_ALL" | **A** ikut legacy (role 1 saja). **B** role 1–7 melihat kontak aktif | **B** | **Ikut saran (Horii 03-11-2026).** |
-| Q8-13 | **Impor master** (`support_officer`, `officer_category`, `help_desk_contact`) dan **nama kolom** (`id_user` vs `nip` di Bahan Baku E-01) | **A** impor master dengan `id_user`→`id_pengguna` (pemetaan UP-1); skema ikut legacy. **B** buat ulang manual lewat UI saat cutover. **C** skema memakai `nip` seperti Bahan Baku | **A** (impor lurus; DQ-4) | **Ikut saran (Horii 03-11-2026).** |
+| Q8-13 | **Impor master** (`support_officer`, `officer_category`, `help_desk_contact`) dan **nama kolom** (`id_user` vs `nip` di Bahan Baku E-01) | **A** impor master dengan `id_user`→`id_pengguna` (pemetaan UP-1); skema ikut legacy. **B** buat ulang manual lewat UI saat cutover. **C** skema memakai `nip` seperti Bahan Baku | **A** (impor lurus; DQ-4) | **Ikut saran (Horii 03-11-2026).** **v1.2:** cara impor `id_user` diperjelas H8-6 (Horii 13-11-2026): disalin apa adanya tanpa tabel pemetaan UP-1, id tak dikenal dibuang + jumlahnya dicatat (K-M11/K-M12 MAKE-069); skema tetap `id_user` (opsi A) |
 | Q8-14 | **Pembagian pelaksana**: satu coder BE→FE berurutan atau dua jalur paralel (BE: M1–M4, FE: M5 setelah kontrak API M3 beku)? Pelaksana jalur? | **A** satu jalur berurutan. **B** dua jalur paralel (pola Fase 6) | **B** bila ada dua pelaksana; kontrak API M3 dibekukan di PRD sebelum FE mulai | **Ikut saran (Horii 03-11-2026).** Pembagian jalur: §3, `8_1.md`, `8_2.md`. |
 | Q8-15 | **Model percakapan**: desain Figma/mock = satu utas per pegawai (drawer); legacy = tiket per topik dengan kategori + subjek (data impor bertipe ini) | **A** ikut legacy: tiket per topik, tampilan chat per tiket (F8-02). **B** satu utas per pegawai (menyimpang; kategori/petugas dan impor perlu rancang ulang) | **A** | **Ikut saran (Horii 03-11-2026).** |
 
 **Trigger `inbox_msg_afIns`** (D1:7730-7739) tetap berlabel [I] dan menjadi kewajiban M0; ekstraksi oleh DBA/Horii menyusul (dump D1 tidak ada di mesin reviewer).
+
+**Register H8 (v1.2).** Keputusan pelaksanaan helpdesk sesudah PRD v1.1 (`docs/fase8/Kesiapan_Fase8.md` §6.1: H8-1, H8-2, H8-5, H8-6
+dijawab Horii 13-11-2026, H8-4 terjawab lewat H8-1) dan keputusan Horii 16-11-2026 ("ikut rekomendasi semua": H8-3, H8-11, H8-12, H8-13). H8-7..H8-10 **tetap terbuka** dan dijawab Horii
+sebelum paket terkait. H8-14..H8-16 **diputus sesudah A0** Handling Case (opsi + rekomendasi di bawah; keputusan yang mengubah
+data atau mengurangi fungsi = Horii).
+
+| ID | Butir | Opsi | Rekomendasi | Keputusan / status |
+|---|---|---|---|---|
+| H8-1 | Izin workload helpdesk dan anggotanya | — | — | ✔ Horii 13-11-2026: [#9-WorkloadHaloSimpeg]; BE Handling Case, DB Validator DBV-028 WS-2, FE menyusul (§3.1) |
+| H8-2 | Kapan helpdesk mulai | (a) sekarang (b) sesudah MAKE-093 (c) sesudah F-10 sign-off | — | ✔ Horii 13-11-2026: (c). Terpenuhi: F-10 sign-off Horii 16-11-2026 pada `main` `fd9e8371`, dicatat CR-129 `603af133` |
+| H8-3 | Pelaksana FE helpdesk (MAKE-073 + B4) | (a) Worker Muse (b) Worker Fix Bug (c) berurutan BE → FE | (a) | ✔ Horii 16-11-2026: **(a) Worker Muse**, amandemen izin #9 (anggota FE); cadangan dan penanggung perbaikan QA = Worker Fix Bug. Butir dirumuskan ulang 16-11-2026 (Kesiapan `:207` semula: Q8-14 B tetap / A) |
+| H8-4 | DB Validator DBV-028 | — | — | ✔ terjawab lewat H8-1 (WS-2) |
+| H8-5 | Lampiran tiket lama `arsip/{nip}/inbox/…` vs alias publik `/berkas/` F-10 | (a) ikut legacy (b) subfolder `inbox` dikecualikan (c) diputus saat cutover | — | ✔ Horii 13-11-2026: **(a)**, risiko sadar (F8-17, BP8-5, R8-6); aplikasi tetap menyajikan lampiran lama lewat E-04 (addendum ADR-038 §8, README-deploy §1l) |
+| H8-6 | Impor master T12b: pemetaan UP-1 (F8-21 v1.0) atau salin apa adanya (K-M11/K-M12) | (a) K-M11/K-M12 (b) F8-21 v1.0 | — | ✔ Horii 13-11-2026: **"seperti legacy saja"** = (a); F8-21, §8, R8-2, DoD, `8_1.md` A5 diselaraskan di v1.2 |
+| H8-7 | Konfirmasi Biro SDM: satker `101` = satker kepegawaian (F8-07) | konfirmasi / tetap bersyarat | jawab sebelum QA (tidak menahan kode: kode memakai `id_satker_kepegawaian`) | ◻ terbuka |
+| H8-8 | Kontak pemilik app Android (PN8-1, kunci `data` push) | dapat kontak / payload terbatas dulu | jawab sebelum MAKE-072; tanpa jawaban MAKE-072 memakai payload terbatas dan uji push real dicatat ke DEPLOY | ◻ terbuka |
+| H8-9 | Frame Figma helpdesk (PN8-4) | ada (serahkan) / ikut pola layar v2 | jawab sebelum B3; tanpa Figma AC-E08.7 diuji terhadap pola komponen redesign | ◻ terbuka |
+| H8-10 | Ekstraksi trigger `inbox_msg_afIns` | ekstrak dari DB dev / tetap [I] | jawab sebelum MAKE-071; "tidak" boleh: F8-10 tetap [I] dan diuji per skenario AC-E04.4 | ◻ terbuka |
+| H8-11 | Gerbang rilis menu Halo Simpeg / chatbot | (a) dirilis bersama di penutup Fase 8 (pola F8-50) (b) chatbot dirilis lebih dulu lewat CR kecil | (a) | ✔ Horii 16-11-2026: **(a)**, paket rilis **CR-135** sesudah sign-off atas izin Horii (F8-50, M8) |
+| H8-12 | Key dan agen T12b impor master | (a) bagian MAKE-074 oleh Handling Case (b) paket MAKE-069 lanjutan **MAKE-097** oleh ReadOne | (b) | ✔ Horii 16-11-2026: **(b) MAKE-097 oleh ReadOne**, review DB WS-2, mulai sesudah DBV-028 di `main`; amandemen scope izin #9 |
+| H8-13 | C4 impor isi QnA dev vs sign-off | (a) C4 sebelum sign-off (b) C4 keluar dari DoD, dilacak DEPLOY-002 | (b) | ✔ Horii 16-11-2026: **(b)**; key C4 tetap per F8-51 saat PN8-6 |
+| H8-14 | Penerima push petugas tanpa NIP (AC-E06.7; F8-13 vs `AntrePushPesan` per NIP, §6.4) | (a) penerima per `id_pengguna` lewat `push-pesan` + CR berkas bersama Push (token web per akun, token Android per NIP bila ada); (b) job Halo Simpeg tersendiri (rencana v1.0, `PushHaloSimpegJob`); (c) AC-E06.7 dipersempit ke "petugas ber-NIP" | **(a)**: memakai titik sambung MAKE-066 yang ada dan tidak menduplikasi job; (c) hanya bila Horii menerima pengurangan fungsi | ◻ **diputus sesudah A0** (usulan Handling Case di A0, T-1); sebelum MAKE-072 |
+| H8-15 | Tujuan klik angka tiket di lonceng F-08 | (a) badge menu Halo Simpeg saja, lonceng hanya angka (pola berita F-07) (b) entri "Tiket Halo Simpeg (n)" di panel/halaman notifikasi yang menuju route Halo Simpeg (CR berkas bersama `features/notifikasi`) | **(b)**: angka bisa ditelusuri | ◻ **diputus sesudah A0/B0**; sebelum binding lonceng MAKE-071 dan B1 |
+| H8-16 | Tiket impor berkategori NULL (AC-E04.11, AC-E05.8) | (a) hanya terlihat dan dapat ditutup/dihapus role 1 (b) dipetakan ke kategori penampung saat impor (c) ditutup otomatis saat cutover | **(a)** sebagai bawaan tanpa mengubah data; (b)/(c) mengubah data sehingga butuh keputusan Horii | ◻ **diputus sesudah A0** (usulan Handling Case); sebelum MAKE-071 selesai |
+| PN8-8 | Acuan visual widget dev (AC-E10.22) | Horii menyerahkan tangkapan layar / reviewer merender ulang view dev di luar repo | serahkan sekarang | ◻ ditunggu dari Horii |
 
 **E-10 Chatbot "Vanya" (v1.1).** Pertanyaan K-1..K-11 dari dokumen kerja reviewer `Mapping_Chatbot_Fase8.md` §6 (12-11-2026). Syarat
 pada K-5 tetap berlaku.
@@ -904,8 +1078,8 @@ pada K-5 tetap berlaku.
 | F8-47 | Ekspor tag: status yang ikut, format template? | Status 1/2; template 4 kolom dev; nama berkas `Export_Tag_QnA_{Ymd_His}.xlsx` |
 | F8-48 | Jalur bubble: teks `pesan` klien dicatat apa adanya (dev) atau diganti `pertanyaan` QnA dari DB? Perlukah `pertanyaan` dibatasi 300? | Diganti `pertanyaan` dari DB; batas 300 hanya jalur ketikan; `pertanyaan` tidak dibatasi (alternatif: dibatasi ≤ 300 di form/impor) |
 | F8-49 | QnA yang kategori/tagnya Tidak Aktif atau Dihapus: tampil, dipertahankan, atau ditolak saat ubah? | Tag status 2 tampil berbadge dan dipertahankan; tag status 10 diabaikan; kategori status 2 boleh dipertahankan; kategori status 10 wajib diganti (422) |
-| F8-50 | **Gerbang rilis** menu Chatbot Manager dan widget selama `ACTIVE_PHASE` = 5; siapa yang menaikkan `ACTIVE_PHASE`/menghapus `rilis`? | Pola lonceng F-08: menu tanpa `rilis`, widget dijaga `ACTIVE_PHASE >= 8`; yang menaikkan `ACTIVE_PHASE` = keputusan Horii/reviewer di penutup rilis (di luar MAKE-095) |
-| F8-51 | Key milestone C4 (impor isi QnA dev)? | Key MAKE tersendiri dari reviewer saat PN8-6 diputus; atau bagian akhir MAKE-094 bila PN8-6 diputus sebelum C2 merge |
+| F8-50 | **Gerbang rilis** menu Chatbot Manager dan widget selama `ACTIVE_PHASE` = 5; siapa yang menaikkan `ACTIVE_PHASE`/menghapus `rilis`? | Pola lonceng F-08: menu tanpa `rilis`, widget dijaga `ACTIVE_PHASE >= 8`; yang menaikkan `ACTIVE_PHASE` = keputusan Horii/reviewer di penutup rilis (di luar MAKE-095). v1.2: ✔ H8-11 (a), CR-135 |
+| F8-51 | Key milestone C4 (impor isi QnA dev)? | Key MAKE tersendiri dari reviewer saat PN8-6 diputus; atau bagian akhir MAKE-094 bila PN8-6 diputus sebelum C2 merge (v1.2: alternatif MAKE-094 gugur; C4 di luar DoD, H8-13 (b)) |
 
 Prinsip umum: bila coder menemukan perilaku legacy yang belum diputus, default = ikut legacy [K]; deviasi hanya untuk alasan
 teknis wajib/keamanan dasar dan **wajib** dicatat di laporan milestone + `backend/docs/progress/08-HaloSimpeg.md`.
@@ -915,11 +1089,11 @@ teknis wajib/keamanan dasar dan **wajib** dicatat di laporan milestone + `backen
 | ID | Risiko | Dampak | Mitigasi |
 |---|---|---|---|
 | R8-1 | Payload push tidak cocok dengan app Android (kunci `data`) | Notifikasi Android tidak membuka tiket | PN8-1 / Q8-08 sebelum M4; test kontrak payload |
-| R8-2 | Pemetaan `id_user`/`sender`/`msg_sender` legacy → `id_pengguna` v2 tidak terawat saat impor UP-1 | Tiket yatim, petugas tak terhubung | Tabel pemetaan wajib; laporan baris tanpa pemetaan (F8-21); audit yatim sebelum FK `nip` |
+| R8-2 | `id_user`/`sender`/`msg_sender` legacy tidak cocok dengan `id_pengguna` v2 saat impor (v1.2: id disalin apa adanya, H8-6) | Tiket yatim, petugas tak terhubung | v1.2: `id_user` master disalin apa adanya (K-M11); id yang tidak ada di `pengguna` v2 dibuang dan jumlahnya dicatat di laporan impor MAKE-097 (K-M12, F8-21), lalu diperiksa reviewer sebelum cutover; audit yatim sebelum FK `nip` |
 | R8-3 | F-02 (sortir `inbox`) belum selesai | Data lama tidak bisa diimpor | Tidak menahan koding; menahan cutover (PN8-2) |
 | R8-4 | Logika baca-otomatis yang dulu di trigger `inbox_msg_afIns` ditebak keliru | Badge belum-dibaca salah | M0 mencocokkan dengan D1:7730-7739 (via reviewer); test per skenario (AC-E04.4) |
 | R8-5 | Pesan impor berisi backslash hasil `addslashes` (`LS:1576`) | Teks tampil dengan `\'` | Keputusan normalisasi di F-02/impor; FE tidak men-strip |
-| R8-6 | Isi percakapan = data pribadi; kebocoran lewat lampiran/URL/log | Pelanggaran privasi | BP8-2/BP8-5, endpoint unduh ber-otorisasi, fixture sintetis, payload minimal |
+| R8-6 | Isi percakapan = data pribadi; kebocoran lewat lampiran/URL/log | Pelanggaran privasi | BP8-2/BP8-5, endpoint unduh ber-otorisasi, fixture sintetis, payload minimal. **v1.2 — risiko sadar H8-5 (a) (Horii 13-11-2026):** lampiran tiket **lama** ber-path `arsip/{nip}/inbox/…` tetap dapat diunduh tanpa login lewat alias publik `/berkas/` F-10 seperti legacy (F10-18, README-deploy §1l); diterima Horii, tidak dimitigasi di Fase 8. Aplikasi tidak menautkan `/berkas/` (lampiran lama dan baru lewat E-04, AC-E04.7, AC-E08.9); unggahan v2 tetap privat; mempersempit alias kelak = keputusan Horii lewat QF10-2 / saklar `arsip.penyajianBerkasLegacy` (`backend/app/Config/Arsip.php:12-17`) |
 | R8-7 | Modul paling terbuka (role 1–7) → spam/penyalahgunaan | Antrean petugas banjir | Throttle (BP8-10), batas panjang, lampiran tervalidasi |
 | R8-8 | Frame Figma tidak lengkap | QA visual subjektif | PN8-4; ikut pola halaman lain dan dicatat |
 | R8-9 | Push real tidak teruji saat sign-off | Cacat muncul di produksi | Uji real terjadwal sebelum deploy (MT/DEPLOY) |
@@ -931,6 +1105,9 @@ teknis wajib/keamanan dasar dan **wajib** dicatat di laporan milestone + `backen
 | R8-15 | **Pesan bebas pegawai** di `log_chatbot` dapat memuat data pribadi yang diketik sendiri (NIP, nama) dan tampil di statistik/riwayat admin | Paparan data pribadi ke role 1 | Log anonim (K-4); hanya role 1; tidak ada ekspor riwayat; tidak dicatat di log aplikasi/audit (BP8-15); retensi = pertanyaan lanjutan bila Horii menghendaki |
 | R8-16 | Bahan chatbot berasal dari **legacy dev** yang belum diuji di produksi | Perilaku dev mengandung bug yang ikut terbawa | Anomali A1..A16 (Lampiran B.2) diperlakukan eksplisit; test pembanding hanya untuk mesin jawab |
 | R8-17 | **Penilaian berulang**: token hanya menjaga kepemilikan log, sehingga satu akun dapat meminta jawaban bubble yang sama berulang dan menilai tiap log; permintaan bubble juga menambah hitungan "paling sering cocok" (sama dengan dev) | Urutan bubble pertanyaan dan pengali feedback bisa digeser satu akun | Dibatasi throttle (F8-36) dan pengali feedback maks ±10% yang hanya berlaku bagi kandidat lolos ambang (F8-34); `pesan_user` jalur bubble diambil dari DB (F8-48); satu suara per akun per QnA = usulan lanjutan bila terbukti disalahgunakan (butuh identitas di log, bertentangan K-4) |
+| R8-18 | (v1.2) Petugas role 1 tanpa NIP tidak menerima push karena titik sambung push mencari token per NIP (§6.4, F8-13) | AC-E06.7 gagal; petugas admin tidak tahu ada tiket baru | H8-14 diputus sebelum MAKE-072; badge menu + lonceng (AC-E06.9) tetap memberi tahu di web |
+| R8-19 | (v1.2) Hapus tiket impor berlampiran legacy gagal di `LocalStorageAdapter::hapus()` atau meninggalkan berkas | Hapus tiket galat atau berkas yatim | AC-E05.7; perlakuan diputus di A0 (CR adapter atau tidak dihapus atas konfirmasi Horii) |
+| R8-20 | (v1.2) Tiket impor berkategori NULL tidak punya pemilik antrean | Tiket Open menggantung, melanggar exit criteria E-05 | H8-16, AC-E04.11, AC-E05.8; dicatat di runbook MAKE-074 |
 
 ---
 
@@ -1077,11 +1254,11 @@ A1..A9 dari `Mapping_Chatbot_Fase8.md` §3.4; A10..A16 temuan tambahan saat peny
 | Status 1/2/10 (Dihapus = 10) | Konvensi AGENTS.md §2; contoh konstanta | `backend/app/Libraries/Dashboard/Konten/Dibo/DiboService.php:39`, `backend/app/Libraries/Dashboard/Interaksi/FormDigital/KelolaFormDigital.php:45` |
 | Audit tulis | `BaseAuditableModel` → `audit_logs` | `backend/app/Models/BaseAuditableModel.php:21` |
 | Tabel aksi ⋮ | `RowActionsMenu.vue` + `rowActions.ts`; `ConfirmDialog.vue` | `frontend/src/shared/components/` |
-| Route file modul | Daftar `$routeFiles` | `backend/app/Config/Routing.php:34-59` |
-| Layout & menu | `RedesignShell.vue` (titik pasang widget); item `halo` Fase 8 di grup "Pusat Bantuan"; `ACTIVE_PHASE` = 5 dan semantik `rilis` | `frontend/src/shared/layouts/RedesignShell.vue:188`, `frontend/src/shared/layouts/nav.config.ts:301`, `:94`, `:120-124` |
-| Syarat render saat wajib ganti password; gerbang fase | `NotifikasiPushShell v-if="!auth.mustChangePassword"`; lonceng `ACTIVE_PHASE >= FASE_LONCENG`; filter JWT menolak route tanpa `jwt:ganti_password` | `frontend/src/shared/layouts/RedesignShell.vue:186`, `:116-118`; `backend/app/Filters/JwtAuthFilter.php:49` |
+| Route file modul | Daftar `$routeFiles` | `backend/app/Config/Routing.php:34-61` (v1.2, `603af133`) |
+| Layout & menu | `RedesignShell.vue` (titik pasang widget); item `halo` Fase 8 di grup "Pusat Bantuan"; `ACTIVE_PHASE` = 5 dan semantik `rilis` | `frontend/src/shared/layouts/RedesignShell.vue:189` (widget `:199`), `frontend/src/shared/layouts/nav.config.ts:320`, `:97`, `:122-127` (v1.2, `603af133`) |
+| Syarat render saat wajib ganti password; gerbang fase | `NotifikasiPushShell v-if="!auth.mustChangePassword"`; lonceng `ACTIVE_PHASE >= FASE_LONCENG`; filter JWT menolak route tanpa `jwt:ganti_password` | `frontend/src/shared/layouts/RedesignShell.vue:187`, `:117-119` (v1.2, `603af133`); `backend/app/Filters/JwtAuthFilter.php:49` |
 | Ubah status terpisah | `PATCH …/(:segment)/status` | `backend/app/Config/Routes.php:45`, `:71`; `backend/app/Config/RoutesKonten.php:60`, `:70`; `backend/app/Config/RoutesDashboard.php:51` |
-| Route FE per fitur; reset store saat keluar | import `routes.*` per fitur; `clearSession()` memanggil `resetSesiKonten()` | `frontend/src/router/index.ts:13-25`; `frontend/src/features/auth/stores/auth.store.ts:49-54` |
+| Route FE per fitur; reset store saat keluar | import `routes.*` per fitur; `clearSession()` memanggil `resetSesiKonten()` dan `resetChatbot()` | `frontend/src/router/index.ts:13-27`; `frontend/src/features/auth/stores/auth.store.ts:52-60` (v1.2, `603af133`) |
 | UI | `UiStatTile`, `UiTooltip`, `UiFileField`, `UiExportMenu`, `UiCheckbox`, `UiSearchInput`, `UiPagination`, `UiBadge` | `frontend/src/shared/ui/` |
 
 ## Lampiran D — Riwayat versi
@@ -1093,3 +1270,4 @@ A1..A9 dari `Mapping_Chatbot_Fase8.md` §3.4; A10..A16 temuan tambahan saat peny
 | v1.1 | 12-11-2026 | **CR-121.** Tambah **E-10 Chatbot "Vanya"** dari bahan legacy dev (rujukan `dev:`, label [K dev]) atas keputusan Horii 12-11-2026 K-1..K-11 (semua ikut saran; K-5 bersyarat D1): header, gerbang E-10 (§0.1), PN8-5..PN8-7, scope (§1.1) dan di luar scope (§1.2, baris chatbot lama diganti), BP8-14/15, jalur chatbot (§3), glosarium, keputusan F8-23..F8-33 (✔) dan bawaan teknis F8-34..F8-47 (✔), FE (§6.3), endpoint (§6.5), spesifikasi §7.10 (AC-E10.1..23), lintas modul, ketergantungan, sub-jalur C0..C4, DoD, register K-1..K-11 + pertanyaan terbuka, risiko R8-10..R8-16, Lampiran A.2a, B.2 (A1..A16), C (komponen E-10). Key DBV-033, MAKE-094, MAKE-095. Rujukan v2 E-10 dicek di `241ef9e5`. Penyuntingan hasil review v1.1 (masih 12-11-2026): hasil D1 chatbot blok [1]–[3] dipakai (§7.10.1 [K dev D1], PN8-5, R8-14), PN8-8 acuan visual, bawaan baru F8-48..F8-51 (+ F8-34a/b, F8-46a di §12), `PATCH …/status`, syarat render widget (wajib ganti password, gerbang rilis), semantik tokenisasi (token "0", kesetaraan numerik), CSV isi dev di luar repo, keunikan judul tanpa UNIQUE biasa, AC-E10.24..30 dan perluasan AC-E10.2/3/8/10/11/15/17/18/20/22, pembagian berkas chatbot (§3), R8-17. Tidak ada kode dan tidak ada migration |
 | v1.1 (lanjutan) | 12-11-2026 | Hasil D1 chatbot blok [1]–[6] dicatat (PN8-5); keputusan Horii 12-11-2026: K-5 ditunda ke saat deploy (PN8-6, F8-27, Trello DEPLOY-002), K-12 judul kembar digabung saat impor + judul unik (F8-40 ✔), K-13 kategori uji/nonaktif tidak dibawa, kategori aktif kosong dibawa (F8-46); F8-46a gugur (0 QnA tanpa kategori) |
 | v1.1 (konfirmasi) | 12-11-2026 | Horii: "setuju semua" → bawaan teknis E-10 F8-34..F8-51 dan bawaan kecil tanpa nomor (§6.5, §7.10) dikonfirmasi (◻ → ✔) |
+| v1.2 | 16-11-2026 | **CR-131.** Keputusan Horii 13-11-2026 (H8-1, H8-2, H8-5, H8-6; H8-4 terjawab lewat H8-1) dan 16-11-2026 ("ikut rekomendasi semua": H8-3 FE helpdesk = Worker Muse; H8-11 (a) rilis bersama CR-135; H8-12 T12b = MAKE-097 ReadOne + review DB WS-2; H8-13 (b) C4 keluar dari DoD → DEPLOY-002) dimasukkan: header (Trello, key CR-130..135 dan MAKE-097, "CR-095 dst." gugur), gerbang helpdesk terbuka dan status E-10 di `main` dengan SHA (§0.1), kolom kartu Trello (§1.1), di luar scope UAT/BAST, cutover produksi + rollback, hapus kolom hash legacy, C4 (§1.2), BP8-5/F8-17/R8-6 risiko sadar H8-5 (a) dengan lampiran lama tetap lewat E-04, F8-21/§8/R8-2/Q8-13/DoD/`8_1.md` A5 mengikuti H8-6 (K-M11/K-M12), tabel paket × key × agen × izin (§3.1), berkas bersama baru (`KontrakMatriksRoleTest`, reset store helpdesk di `clearSession()`, `features/notifikasi` dan berkas Push bersyarat), kontradiksi push per NIP vs petugas role 1 (F8-13, §6.4, H8-14), binding `RingkasanTiketInterface` (F8-19, AC-E06.9), kewajiban A0 kontrak (§6.1a K-A1..K-A8) dan angka (§7.3a, [usulan] hanya bila ada sumber legacy), AC baru AC-E02.7..9, AC-E04.11, AC-E05.7/8, AC-E06.9/10, AC-E08.8/9, AC-E09.7/8 (+ AC-E09.2 WIB↔UTC), ketergantungan M6/B4 dan §7.8 (5) ke MAKE-071, DoD (C4 keluar, Notion, checklist CR-132), M6'/M8 di §10, register H8 (H8-14..H8-16 terbuka sesudah A0; H8-7..H8-10 tetap terbuka), R8-18..R8-20, rujukan baris basi (`nav.config.ts`, `Routing.php`, `RedesignShell.vue`, `router/index.ts`, `auth.store.ts`) dicek ulang di `603af133`. Penyelarasan hasil verifikasi (masih 16-11-2026): syarat mulai A0/B0 seragam (§0.1, §3.1, §10 M0, `8_1.md` A0, `8_2.md` B0), M7 menunggu M4/M5, kartu uji push real MT-010/DEPLOY-001.1, pelaksana CR-133/CR-134+ = usulan (izin pasca-#8 ◻), WIB↔UTC dan AC-E09.7 = usulan menunggu konfirmasi Horii, SHA sign-off F-10 `fd9e8371`, addendum ADR-038 dan catatan README-deploy §1l untuk lampiran tiket lama. Tidak ada kode dan tidak ada migration |

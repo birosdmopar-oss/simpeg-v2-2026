@@ -557,6 +557,12 @@ kunci cache). Daftar ulang tahun tidak di-cache.
 
 Pengecualiannya sempit dan disengaja: **hanya** blok `location ^~ /berkas/` di §1 yang boleh menunjuk ke dalam `writable/`.
 
+**Catatan Halo Simpeg (PRD Fase 8 v1.2, H8-5 (a); ADR-038 §8).** Lampiran tiket Halo Simpeg lama ber-path `arsip/<nip>/inbox/…`,
+jadi ikut cocok dengan pola `arsip/` di bawah dan tersaji lewat `/berkas/` seperti legacy (risiko sadar). Aplikasi **tidak**
+membuka lampiran tiket lewat `/berkas/`: lampiran lama dan baru selalu lewat endpoint ber-otorisasi
+`GET api/v1/halo-simpeg/tiket/<id>/pesan/<idPesan>/lampiran` (E-04), sehingga tetap terbuka bagi petugas walau rollback `privat`
+di bawah dipakai. Pola dan blok Nginx tidak berubah karena catatan ini.
+
 **Pola yang disajikan.** Kedua regex legacy di tabel ini **sama persis** dengan konstanta di `backend/app/Config/Arsip.php`, dan dijaga oleh test pembanding string `backend/tests/unit/Deploy/ReadmeBerkasNginxTest.php`. Bila salah satu diubah, ubah README, contoh Nginx §1, `Config\Arsip`, dan Nginx server **bersamaan**. Regex kunci v2 sengaja tidak ditulis di README ini.
 
 | Pola (atas path relatif akar lampiran) | Contoh URL | Hasil |
