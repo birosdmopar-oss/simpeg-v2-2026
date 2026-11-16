@@ -40,14 +40,14 @@ class AlterDisiplinTicketIndeksFase8 extends Migration
 
         try {
             foreach (self::INDEKS as $nama => [$tabel, $kolom]) {
-                $daftar = implode(', ', array_map(fn (string $k): string => $this->db->escapeIdentifiers($k), $kolom));
-                $this->exec("ALTER TABLE {$this->t($tabel)} ADD INDEX {$this->db->escapeIdentifiers($nama)} ({$daftar})", "ADD INDEX {$nama}");
+                $daftar = implode(', ', array_map(fn (string $k): string => $this->q($k), $kolom));
+                $this->exec("ALTER TABLE {$this->t($tabel)} ADD INDEX {$this->q($nama)} ({$daftar})", "ADD INDEX {$nama}");
                 $dibuat[] = $nama;
             }
         } catch (Throwable $e) {
             foreach (array_reverse($dibuat) as $nama) {
                 try {
-                    $this->db->query("ALTER TABLE {$this->t(self::INDEKS[$nama][0])} DROP INDEX {$this->db->escapeIdentifiers($nama)}");
+                    $this->db->query("ALTER TABLE {$this->t(self::INDEKS[$nama][0])} DROP INDEX {$this->q($nama)}");
                 } catch (Throwable) {
                     // Lanjut; galat asli tetap dilempar.
                 }
@@ -60,17 +60,28 @@ class AlterDisiplinTicketIndeksFase8 extends Migration
     public function down(): void
     {
         foreach (array_reverse(self::INDEKS, true) as $nama => [$tabel]) {
-            $this->exec("ALTER TABLE {$this->t($tabel)} DROP INDEX {$this->db->escapeIdentifiers($nama)}", "DROP INDEX {$nama}");
+            $this->exec("ALTER TABLE {$this->t($tabel)} DROP INDEX {$this->q($nama)}", "DROP INDEX {$nama}");
         }
     }
 
     private function t(string $table): string
     {
+        return $this->q($this->koneksi()->prefixTable($table));
+    }
+
+    /** Identifier (nama indeks/kolom) yang di-escape untuk SQL mentah. */
+    private function q(string $identifier): string
+    {
+        return $this->koneksi()->escapeIdentifiers($identifier);
+    }
+
+    private function koneksi(): BaseConnection
+    {
         if (! $this->db instanceof BaseConnection) {
             throw new RuntimeException('DBV-028: koneksi database tidak mendukung prefix tabel.');
         }
 
-        return $this->db->escapeIdentifiers($this->db->prefixTable($table));
+        return $this->db;
     }
 
     private function exec(string $sql, string $label): void
