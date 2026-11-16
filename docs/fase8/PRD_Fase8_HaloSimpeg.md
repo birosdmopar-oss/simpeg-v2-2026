@@ -1,17 +1,17 @@
-# PRD Fase 8 v1.2 — Halo Simpeg (Modul E, ticketing helpdesk, SIMPEG v2)
+# PRD Fase 8 v1.3 — Halo Simpeg (Modul E, ticketing helpdesk, SIMPEG v2)
 
 | Butir | Isi |
 |---|---|
 | Dokumen | `docs/fase8/PRD_Fase8_HaloSimpeg.md` — **acuan utama** coder/agen AI Fase 8 (Bahan Baku `08-HaloSimpeg.md` E-01..E-08, ditambah E-09 dan E-10 Chatbot "Vanya"; Trello **DEV-009** (10 task), **QASMTASK-111..118** (E-01..E-08), **QASMTASK-123** (E-09), **QASMTASK-124** (E-10); pemetaan per task §1.1). Pembagian kerja paralel: [`8_1.md`](8_1.md) (Jalur BE) dan [`8_2.md`](8_2.md) (Jalur FE) |
-| Versi | **v1.2 — 16-11-2026 (CR-131)**: keputusan Horii 13-11-2026 (H8-1, H8-2, H8-5, H8-6; H8-4 terjawab lewat H8-1) dan 16-11-2026 ("ikut rekomendasi semua": H8-3, H8-11, H8-12, H8-13) dimasukkan; status E-10 di `main`; tabel paket × key × agen × izin (§3.1); kolom kartu Trello (§1.1); celah AC baru; kewajiban A0 untuk kontrak dan angka helpdesk; butir terbuka H8-14..H8-16 (§12). v1.1 12-11-2026 (CR-121): tambah **E-10 Chatbot "Vanya"** (K-1..K-11). v1.0 03-11-2026 (Q8-01..Q8-15: semua ikut saran); v0.1 `70466eac`; riwayat §Lampiran D |
-| Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding helpdesk terkunci gerbang §0.1 (gerbang sudah terbuka 16-11-2026; A0 dan B0 mulai sesudah CR-130 di `main`, laporan A0/B0 disetujui reviewer sesudah CR-131 di `main`); E-10 sudah di `main` (§0.1), tinggal QA Lapis 1 dan rilis |
+| Versi | **v1.3 — 16-11-2026 (CR-136)**: hasil laporan A0 (Handling Case, disetujui reviewer 16-11-2026) dan laporan B0 (Worker Muse, disetujui final 16-11-2026) dimasukkan; keputusan Horii 16-11-2026 ("ikut rekomendasi semua": H8-14 (a), H8-15 (b), H8-16 (a1), K-A4 (1'), Q-A0-6 (a'), angka Q-A0-8, penyamaran D7 (a), badge D8 (a), bawaan tab "Tiket saya", titik penanda sidebar ciut, R10 langkah 2, Q-A0-9) dan jawaban H8-9 (frame Figma helpdesk belum ada) serta PN8-8 (tangkapan layar widget dev diterima); keputusan reviewer CR 16-11-2026 (Q-A0-4, Q-A0-5/T-5 (T-5 = nomor laporan A0, = T-8 di `Kesiapan_Fase8.md` §6.2), Q-A0-7, konvensi nama, ekspor kosong, filter baca, `urutan_pengirim`, `bisa_ekspor`, urutan, tata letak master-detail); kontrak helpdesk disetujui A0 (§6.1b), §6.1a terpenuhi; status paket A0/B0/A1 (§0.1, §3.1); key **CR-136** (v1.3) dan **CR-137** (CR berkas bersama Push). v1.2 — 16-11-2026 (CR-131): keputusan Horii 13-11-2026 (H8-1, H8-2, H8-5, H8-6; H8-4 terjawab lewat H8-1) dan 16-11-2026 ("ikut rekomendasi semua": H8-3, H8-11, H8-12, H8-13) dimasukkan; status E-10 di `main`; tabel paket × key × agen × izin (§3.1); kolom kartu Trello (§1.1); celah AC baru; kewajiban A0 untuk kontrak dan angka helpdesk; butir terbuka H8-14..H8-16 (§12). v1.1 12-11-2026 (CR-121): tambah **E-10 Chatbot "Vanya"** (K-1..K-11). v1.0 03-11-2026 (Q8-01..Q8-15: semua ikut saran); v0.1 `70466eac`; riwayat §Lampiran D |
+| Status | **BERLAKU setelah masuk `main`** (izin Horii). Keputusan dikunci di §5.2 dan §12. Koding helpdesk terkunci gerbang §0.1 (gerbang sudah terbuka 16-11-2026; A0 dan B0 mulai sesudah CR-130 di `main`, laporan A0/B0 disetujui reviewer sesudah CR-131 di `main`). **(v1.3)** A0 ✔ dan B0 ✔ disetujui reviewer 16-11-2026; A1/DBV-028 dibuka 16-11-2026; kontrak helpdesk di §6.1b menjadi bahan README beku MAKE-070/071; E-10 sudah di `main` (§0.1), tinggal QA Lapis 1 dan rilis |
 | Prinsip | **"Intinya ikut legacy"** (prinsip umum Horii 01-11-2026 pada Fase 6, dipakai sebagai default di sini): perilaku bisnis & kontrak ikut legacy [K]. Untuk E-10, acuannya **legacy dev** [K dev] karena fitur chatbot belum ada di legacy produksi. Deviasi [V2] hanya bila (a) keputusan eksplisit Horii, atau (b) teknis wajib/keamanan dasar — setiap deviasi tercatat di §5.2 dan Lampiran B |
-| Basis kode | `origin/main` = **`f7b9221e`** untuk rujukan `path:baris` repo v1.0; rujukan E-10 (v1.1) dicek di **`241ef9e5`**; rujukan yang ditambah atau diubah di v1.2 dicek di **`603af133`** (rujukan lama yang tidak disentuh v1.2 tetap bertanggal basisnya dan dicek ulang di A0, T-3) |
+| Basis kode | `origin/main` = **`f7b9221e`** untuk rujukan `path:baris` repo v1.0; rujukan E-10 (v1.1) dicek di **`241ef9e5`**; rujukan yang ditambah atau diubah di v1.2 dicek di **`603af133`** (rujukan lama yang tidak disentuh v1.2 tetap bertanggal basisnya dan dicek ulang di A0, T-3); rujukan yang ditambah atau diubah di **v1.3** dicek di **`ef83356e`** (A0 T-3: di luar `docs/fase8/`, `git diff 603af133 ef83356e` hanya menyentuh `README-deploy.md`, ADR-038, dan progres 08, sehingga rujukan kode v1.2 tetap berlaku) |
 | Acuan legacy | Salinan kerja legacy CI3 (HEAD `0cf7e67`, sama dengan Fase 6; rujukan baris bercatatan AS-09, belum dicocokkan checksum produksi, Q5A-14). Rujukan relatif ke `application/`: `LS` = `libraries/hr/L_support.php`, `SC` = `controllers/hr/Support.php`, `MC` = `core/MY_Controller.php`, `LN` = `libraries/hr/L_notification.php`, `CR` = `controllers/hr/services/Cron.php`, `VI` = `views/hr/support/inbox.php`, `VD` = `views/hr/support/detail.php`, `VM` = `views/template/modal.php`. **Bahan chatbot legacy dev** (12 berkas CI3 dari codebase legacy dev, belum ada di produksi, diterima 12-11-2026): rujukan berawalan **`dev:`** relatif ke `application/` bahan itu (`dev:controllers/hr/Chatbot.php`, `dev:libraries/hr/L_chatbot.php`, `dev:libraries/Nlp_engine.php`, `dev:views/hr/chatbot/*`) supaya tidak tertukar dengan legacy produksi |
 | Scope | **Fase 8** = E-01..E-08 (`Bahan Baku SIMPEG/08-HaloSimpeg.md`) + ekspor rekap petugas (E-09, baru; ada di legacy `LS:1600`, tidak ada di Bahan Baku) + **E-10 Chatbot "Vanya"** (baru di v1.1; dari legacy dev, K-1) + penyediaan titik sambung notifikasi ke Fase 6 (MAKE-066) dan lonceng Fase 7 (F-08). **Penutup seluruh development** (sign-off Horii) |
 | Pelaksana | **Dua jalur paralel** (Q8-14 = B): **Jalur BE** ([`8_1.md`](8_1.md)) dan **Jalur FE** ([`8_2.md`](8_2.md)). E-10 dikerjakan sebagai sub-jalur chatbot di kedua berkas itu. Agen per paket dan kode izin: **§3.1** (Jalur BE helpdesk = Handling Case, Jalur FE helpdesk = Worker Muse, DB Validator = WS-2, chatbot BE = ReadOne, chatbot FE = Worker Muse). **Reviewer** = reviewer CR (review, gate, merge, QA); **Horii** = keputusan & sign-off; **DBV** = review skema |
-| Key | Skema: **DBV-028** (helpdesk) dan **DBV-033** (chatbot, K-3). Pekerjaan baru: **MAKE-070..MAKE-074** (MAKE-069 dipakai paket impor cutover tahap 2), **MAKE-094** (BE chatbot) + **MAKE-095** (FE chatbot), dan **MAKE-097** (T12b impor master helpdesk, H8-12). Revisi PRD v1.1: **CR-121**; v1.2: **CR-131**. Paket dokumen/QA/rilis: **CR-130** (sinkron status), **CR-132** (checklist QA Lapis 1), **CR-133** (test AC-E10.19), **CR-134** dst. (perbaikan QA chatbot), **CR-135** (rilis menu). Nomor CR lain = nomor kosong berikutnya dari reviewer (rujukan lama "CR-095 dst." gugur: CR-095..CR-129 sudah terpakai). ADR baru: tidak ada |
-| Sumber | `08-HaloSimpeg.md` (E-01..E-08, exit criteria); Matriks Role × Endpoint Modul E (dicocokkan saat M0); PRD Fase 4 (§C-01, D10, N1/N9–N13, K-22, `docs/fase4/PRD_Fase4.md:50,126,148,265,1130,1184,1406,1506`); DBV-022 §2.14, §3 (`backend/docs/db-review/DBV-022-layanan-fase4-schema.md`); PRD Fase 6 F6-12/F6-13 (`docs/fase6/PRD_Fase6_Integrasi.md:194-195`); `Mapping_Migrasi_Tidak_Dimigrasi.md:52`; PRD Fase 7 (F-02, F-08); frontend redesign `67fa7678` (branch `feat/frontend-ui-redesign`); riset kode legacy & v2 03-11-2026 (Lampiran A). **E-10:** bahan chatbot legacy dev (`dev:`); dokumen kerja reviewer `Mapping_Chatbot_Fase8.md` (12-11-2026, di luar repo; keputusan K-1..K-11 §6, anomali A1..A9 §3.4); paket permintaan D1 chatbot dari DB dev legacy (di luar repo, baca saja). **v1.2:** keputusan Horii H8-1, H8-2, H8-5, H8-6 13-11-2026 (H8-4 terjawab lewat H8-1; `docs/fase8/Kesiapan_Fase8.md` §6.1, `:239-240`, `:243-244`) dan keputusan 16-11-2026 (H8-3, H8-11, H8-12, H8-13; §12 register H8); rencana impor `docs/migrasi/MAKE-069-rencana.md` (T12b `:108-111`) |
+| Key | Skema: **DBV-028** (helpdesk) dan **DBV-033** (chatbot, K-3). Pekerjaan baru: **MAKE-070..MAKE-074** (MAKE-069 dipakai paket impor cutover tahap 2), **MAKE-094** (BE chatbot) + **MAKE-095** (FE chatbot), dan **MAKE-097** (T12b impor master helpdesk, H8-12). Revisi PRD v1.1: **CR-121**; v1.2: **CR-131**; v1.3: **CR-136**. CR berkas bersama Push (H8-14 (a)): **CR-137** (v1.3). Paket dokumen/QA/rilis: **CR-130** (sinkron status), **CR-132** (checklist QA Lapis 1), **CR-133** (test AC-E10.19), **CR-134** dst. (perbaikan QA chatbot), **CR-135** (rilis menu). Nomor CR lain = nomor kosong berikutnya dari reviewer (rujukan lama "CR-095 dst." gugur: CR-095..CR-129 sudah terpakai). ADR baru: tidak ada |
+| Sumber | `08-HaloSimpeg.md` (E-01..E-08, exit criteria); Matriks Role × Endpoint Modul E (dicocokkan saat M0); PRD Fase 4 (§C-01, D10, N1/N9–N13, K-22, `docs/fase4/PRD_Fase4.md:50,126,148,265,1130,1184,1406,1506`); DBV-022 §2.14, §3 (`backend/docs/db-review/DBV-022-layanan-fase4-schema.md`); PRD Fase 6 F6-12/F6-13 (`docs/fase6/PRD_Fase6_Integrasi.md:194-195`); `Mapping_Migrasi_Tidak_Dimigrasi.md:52`; PRD Fase 7 (F-02, F-08); frontend redesign `67fa7678` (branch `feat/frontend-ui-redesign`); riset kode legacy & v2 03-11-2026 (Lampiran A). **E-10:** bahan chatbot legacy dev (`dev:`); dokumen kerja reviewer `Mapping_Chatbot_Fase8.md` (12-11-2026, di luar repo; keputusan K-1..K-11 §6, anomali A1..A9 §3.4); paket permintaan D1 chatbot dari DB dev legacy (di luar repo, baca saja). **v1.2:** keputusan Horii H8-1, H8-2, H8-5, H8-6 13-11-2026 (H8-4 terjawab lewat H8-1; `docs/fase8/Kesiapan_Fase8.md` §6.1, `:239-240`, `:243-244`) dan keputusan 16-11-2026 (H8-3, H8-11, H8-12, H8-13; §12 register H8); rencana impor `docs/migrasi/MAKE-069-rencana.md` (T12b `:108-111`). **v1.3:** laporan A0 (Handling Case, disetujui reviewer 16-11-2026; daftar kontrak final = bagian revisi putaran 2 laporan itu), laporan B0 (Worker Muse, disetujui final 16-11-2026), keputusan Horii dan reviewer CR 16-11-2026 (di luar repo; isinya dimasukkan ke §5.2, §6.1b, §12) |
 
 ## Cara pakai (WAJIB dibaca)
 
@@ -50,14 +50,22 @@
   16-11-2026 pada `main` `fd9e8371`, dicatat CR-129 `603af133`, sehingga gerbang **terbuka** (izin [#9-WorkloadHaloSimpeg]).
   **Syarat mulai (v1.2):** A0 (Handling Case) dan B0 (Worker Muse) mulai sesudah CR-130 di `main`; laporan A0/B0 disetujui
   reviewer sesudah CR-131 (PRD v1.2) di `main`.
+- **Status helpdesk (v1.3, 16-11-2026):** CR-130 dan CR-131 di `main` (`ef83356e`). **A0 ✔** (laporan pemahaman BE Handling
+  Case, disetujui reviewer 16-11-2026 dengan syarat kontrak dilengkapi di revisi putaran 2; daftar kontrak final = §6.1b) dan
+  **B0 ✔** (laporan pemahaman FE Worker Muse, disetujui final 16-11-2026). Keputusan Horii atas usulan A0/B0 (H8-14..H8-16 dan
+  butir turunannya) diambil 16-11-2026 ("ikut rekomendasi semua", §12). **A1/DBV-028 dibuka 16-11-2026** (Handling Case menulis,
+  review DB WS-2, PR `[CR][DBV]`). MAKE-070/071 dibuka sesudah DBV-028 di `main`; B1 dibuka sesudah kontrak MAKE-070 beku
+  di README `Controllers/Api/HaloSimpeg`; bagian B1 yang memakai kontrak tiket (service/store tiket, ringkasan, badge) serta B2–B3
+  menunggu README MAKE-071 beku (§3, `8_2.md` §2). CR-136 = PRD v1.3 ini.
 - **Gerbang E-10 Chatbot (v1.1):** koding E-10 dan migration DBV-033 menunggu **PRD v1.1 masuk `main`** (CR-121). DBV-033
   baru disusun **sesudah D1 chatbot dari DB dev legacy** diterima (PN8-5), karena DDL keenam tabel tidak ikut di bahan kode; D1
   chatbot adalah prasyarat DBV-033, **bukan** prasyarat PRD. Status 12-11-2026: blok [1]–[6] (struktur, `qna_status`, jumlah,
   sebaran, integritas, bentuk jawaban) **sudah diterima** dan dipakai di §7.10.1, PN8-5, F8-40, F8-46. E-10 **tidak** bergantung
   pada DBV-028/MAKE-070..074, Fase 6 (tidak ada push), maupun F-08, dan sebaliknya: helpdesk dan chatbot boleh berjalan paralel.
 - **Status E-10 (v1.2, di `main` 603af133):** DBV-033 `3fb8c5f7` (PR #40), MAKE-094 `4af0c188`, MAKE-095 `2a8f405d` — kode,
-  skema, dan test **di `main`**. Yang tersisa: QA Lapis 1 chatbot (AC-E10.22/23, checklist CR-132, menunggu PN8-8), test AC-E10.19
-  sisi log aplikasi (CR-133), perbaikan temuan QA (CR-134 dst.), rilis menu dan widget bersama helpdesk (H8-11 (a),
+  skema, dan test **di `main`**. Yang tersisa: QA Lapis 1 chatbot (AC-E10.22/23, checklist CR-132; v1.3: acuan PN8-8 ✔ diterima 16-11-2026), test AC-E10.19
+  sisi log aplikasi (CR-133), perbaikan temuan QA (CR-134 dst.; v1.3: termasuk R10 langkah 2, migrasi helper galat dan pilih
+  banyak chatbot ke `shared/`, §3), rilis menu dan widget bersama helpdesk (H8-11 (a),
   CR-135). Pelaksana CR-133 (ReadOne) dan CR-134+ (ReadOne BE, Worker Muse FE) = usulan; izin workload pekerjaan chatbot
   pasca-#8 diajukan ke Horii sebelum paket dibuka (◻). C4 impor isi QnA dev **keluar dari DoD** (H8-13 (b)) dan dilacak di DEPLOY-002.
 
@@ -68,11 +76,11 @@
 | PN8-1 | Pemilik aplikasi **Android** mengonfirmasi kunci `data` pada push Halo Simpeg yang dibaca app (Q8-08), dan siapa penulis token Android ke DB v2 setelah cutover (pertanyaan cutover F6-13, PN-3 Fase 6) | Horii/TL | Q8-08, uji push real |
 | PN8-2 | **F-02 sortir `inbox` legacy** (Fase 7) selesai dan hasilnya siap diimpor ke `disiplin_ticket(_msg)`; Bahan Baku mensyaratkannya sebagai entry criteria | Reviewer/DBV | Impor data tiket (bukan koding) |
 | PN8-3 | Keputusan Horii untuk impor master Halo Simpeg (Q8-13): `support_officer`, `officer_category`, `help_desk_contact`, serta daftar petugas aktif dan kategori yang berlaku | Horii/Biro SDM | Cutover |
-| PN8-4 | Frame **Figma** untuk halaman yang belum ada (daftar tiket petugas, master kategori/petugas/kontak). Yang ada: Gambar 33 (drawer pegawai) dan Gambar 34 (inbox admin) di frontend redesign | Horii/desainer | QA visual (AGENTS.md §3.6: tanpa frame → ikut pola halaman lain + dicatat) |
+| PN8-4 | Frame **Figma** untuk halaman yang belum ada (daftar tiket petugas, master kategori/petugas/kontak). Yang ada: Gambar 33 (drawer pegawai) dan Gambar 34 (inbox admin) di frontend redesign | Horii/desainer | QA visual (AGENTS.md §3.6: tanpa frame → ikut pola halaman lain + dicatat). **✔ (v1.3) ditutup lewat H8-9 (Horii 16-11-2026): frame helpdesk belum ada**; daftar tiket petugas = master-detail ala Gambar 34, master Kategori/Petugas/Kontak = pola Master Data/PIC layanan (AGENTS.md:93-94), tiap layar tanpa frame dicatat; layar pemilik mengacu Gambar 33 |
 | PN8-5 | **D1 chatbot** dari DB **dev** legacy (baca saja): `SHOW CREATE TABLE` keenam tabel chatbot, isi `qna_status`, jumlah baris & sebaran status, QnA aktif per kategori, relasi yatim/ganda, panjang teks & jawaban ber-HTML, ringkasan angka log (blok [1]–[6]). Isi `log_chatbot.pesan_user` **tidak** diambil. **Status 12-11-2026: blok [1]–[6] DITERIMA** (struktur di §7.10.1, label [K dev D1]). Angka dev: 274 QnA (271 aktif, 3 unggulan); 60 kategori (56 aktif, 4 bubble: Cuti, Kinerja, Simpeg, Syarat dan Hak Pensiun; 3 kategori uji "test…" nonaktif; 8 kategori aktif tanpa QnA); 696 tag (688 aktif, 84 tanpa QnA); 827 relasi (1 ganda); QnA tanpa kategori 0; judul kategori kembar 2, judul tag kembar 11; pertanyaan terpanjang 193 karakter, jawaban terpanjang 1.318 karakter, jawaban ber-HTML 2, pola berisiko 0; log 74 baris uji (36% tidak cocok). Rincian di dokumen kerja `HASIL_D1_chatbot_1211.md` (di luar repo). **Urutan dua tahap:** D1 blok [1]–[6] → keputusan K-5 (PN8-6) → isi konten (blok [7]) diminta terpisah sesudahnya; bila blok [7] terlanjur diambil lebih awal, CSV-nya tetap disimpan di luar repo dan tidak dipakai sebelum K-5 diputus | Horii | DBV-033 (bukan PRD) |
 | PN8-6 | **Keputusan isi QnA awal (K-5)** — **DITUNDA ke saat deploy/cutover** (Horii 12-11-2026: "nanti saja, catat pada saat deploy"; dicatat di Trello DEPLOY-002). Saat itu Horii menetapkan apakah isi dev dibawa (CSV blok [7] → perintah impor sekali jalan lewat runbook cutover, F8-46; CSV tidak pernah di-commit) atau v2 mulai kosong dan diisi admin | Horii | Isi awal chatbot saat cutover (bukan koding) |
 | PN8-7 | **Foto avatar Vanya (opsional)**: legacy dev memakai foto `Vanya_Avatar.*` bila ada, selain itu ilustrasi SVG (`dev:views/hr/chatbot/chatbot_popup.php:19-27`). Berkas foto (bila dipakai) diserahkan sebagai aset FE dengan izin pemakaian gambar | Horii/desainer | Tidak menahan (SVG bawaan dipakai) |
-| PN8-8 | **Acuan visual widget dev** untuk QA Lapis 1 chatbot (AC-E10.22): tangkapan layar widget dev (launcher, kartu sapaan, jendela chat, bubble, penilaian, layar sempit) dari Horii, atau render ulang view dev di luar repo oleh reviewer. Tanpa frame Figma (K-11); tangkapan layar tidak masuk repo bila memuat data nyata | Horii/reviewer | QA Lapis 1 chatbot (bukan koding) |
+| PN8-8 | **Acuan visual widget dev** untuk QA Lapis 1 chatbot (AC-E10.22): tangkapan layar widget dev (launcher, kartu sapaan, jendela chat, bubble, penilaian, layar sempit) dari Horii, atau render ulang view dev di luar repo oleh reviewer. Tanpa frame Figma (K-11); tangkapan layar tidak masuk repo bila memuat data nyata. **✔ (v1.3) tangkapan layar widget chatbot dev diterima dari Horii 16-11-2026** sebagai acuan visual QA chatbot; disimpan di luar repo karena memuat foto avatar dan tidak di-commit; selisih dibahas di CR-132 bagian A / CR-134 | Horii/reviewer | QA Lapis 1 chatbot (bukan koding) |
 
 Kredensial dan alamat **tidak pernah** ditulis di repo, Trello, atau chat agen; hanya di `.env` server.
 
@@ -171,18 +179,18 @@ Pembagian **dua jalur paralel** (Q8-14 = B): **Jalur BE** ([`8_1.md`](8_1.md): D
 |---|---|---|
 | **BE-1 master** | `Controllers/Api/HaloSimpeg/{Kategori,Petugas,Kontak}Controller.php`, `Libraries/HaloSimpeg/{Kategori,Petugas,Kontak}Service.php`, `Models/HaloSimpeg/{QuestionCategory,SupportOfficer,OfficerCategory,HelpDeskContact}Model.php`, migration DBV-028 | E-01, E-02, E-07 |
 | **BE-2 tiket** | `Controllers/Api/HaloSimpeg/{Tiket,Pesan}Controller.php`, `Libraries/HaloSimpeg/{TiketService,PercakapanService,AksesTiket,LampiranTiket,RekapTiket}.php`, `Models/HaloSimpeg/{DisiplinTicket,DisiplinTicketMsg}Model.php` | E-03, E-04, E-05, E-09 |
-| **BE-3 notifikasi** | `Libraries/HaloSimpeg/{TicketNotifService,PenerimaTiket}.php`, `Jobs/PushHaloSimpegJob.php` (**v1.2:** job tersendiri hanya bila H8-14 = (b); bila (a), produsen memakai `AntrePushPesan` → job `push-pesan` yang sudah ada dan perubahan penerima per akun = CR berkas bersama Push, §6.4); implementasi `RingkasanTiketInterface` (pengganti `RingkasanTiketNoOp`, MAKE-071) | E-06 |
-| **FE** | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), route Halo Simpeg di `frontend/src/router` dan item menu `halo` di `nav.config.ts` (aditif, berkas bersama), badge di `frontend/src/shared/layouts/*` (aditif; `RedesignShell.vue` dan `nav.config.ts` = berkas bersama), satu panggilan reset store helpdesk di `clearSession()` `auth.store.ts` (v1.2, berkas bersama), entri lonceng di `frontend/src/features/notifikasi/*` hanya bila H8-15 memilih entri panel (berkas bersama) | E-08 |
+| **BE-3 notifikasi** | `Libraries/HaloSimpeg/{TicketNotifService,PenerimaTiket}.php`, ~~`Jobs/PushHaloSimpegJob.php`~~ (gugur v1.3: H8-14 = (a), tanpa job tersendiri); produsen memakai `AntrePushPesan::antreAkun(id_pengguna[])` → job `push-pesan` yang sudah ada; perubahan penerima per akun = **CR-137** (CR berkas bersama Push, commit terpisah di branch MAKE-072, §6.4); implementasi `App\Libraries\HaloSimpeg\RingkasanTiket` untuk `RingkasanTiketInterface` (pengganti `RingkasanTiketNoOp`, MAKE-071, §6.2) | E-06 |
+| **FE** | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), route Halo Simpeg di `frontend/src/router` dan item menu `halo` di `nav.config.ts` (aditif, berkas bersama), badge di `frontend/src/shared/layouts/*` (aditif; `RedesignShell.vue` dan `nav.config.ts` = berkas bersama), satu panggilan reset store helpdesk di `clearSession()` `auth.store.ts` (v1.2, berkas bersama). **v1.3 (final):** entri "Tiket Halo Simpeg (n)" di `frontend/src/features/notifikasi/views/NotifikasiPage.vue` (H8-15 (b), berkas bersama); titik penanda badge saat sidebar ciut di `frontend/src/shared/layouts/AppSidebar.vue` (sekitar `:258-261`, CR kecil berkas bersama, commit terpisah dalam #9, MAKE-073); R10 langkah 1 `frontend/src/shared/utils/galatKolom.ts` + `frontend/src/shared/ui/UiPilihBanyak.vue` (diekspor dari `shared/ui/index.ts`; aditif, dipakai helpdesk saja; R10 langkah 2 = migrasi chatbot di paket perbaikan QA chatbot, CR-134 dst.) | E-08 |
 | **BE-4 chatbot** | `Controllers/Api/HaloSimpeg/Chatbot/*`, `Libraries/HaloSimpeg/Chatbot/*` (mesin `MesinJawab`/`TfIdf`, `ChatbotService`, `TokenFeedback`, `ImporQna`, `StatistikChatbot`), `Models/HaloSimpeg/Chatbot/*`, `Config/Chatbot.php`, `Config/RoutesChatbot.php`, migration DBV-033, `backend/docs/db-review/DBV-033-*.md`, test `backend/tests/**/HaloSimpeg/Chatbot/*` dan `backend/tests/_support/HaloSimpeg/Chatbot/*`, perintah spark impor isi QnA C4 (`backend/app/Commands/HaloSimpeg/Chatbot/*`, ✔) (nama kelas final di M0, F8-43) | E-10 |
 | **FE chatbot** | `frontend/src/features/halo-simpeg/chatbot/*` (widget `VanyaWidget.vue`, halaman admin Chatbot Manager, `routes.chatbot.ts`, fixture test), item menu Chatbot Manager di `nav.config.ts`, satu titik pasang widget di `shared/layouts/RedesignShell.vue`, satu baris import route di `frontend/src/router/index.ts`, satu panggilan reset store di `frontend/src/features/auth/stores/auth.store.ts` `clearSession()` (empat terakhir = berkas bersama, aditif) | E-10 |
 
 | Jalur | Pelaksana | Berkas milik | Tidak boleh disentuh |
 |---|---|---|---|
-| **BE** | **Handling Case** (H8-1, izin #9) | semua `backend/` **kecuali** berkas BE-4 chatbot dan kode impor T12b (MAKE-097), `docs/fase8/8_1.md`, `backend/docs/db-review/DBV-028-*.md` | `frontend/`; berkas BE-4 chatbot |
-| **FE** | **Worker Muse** (H8-3, amandemen izin #9; cadangan Worker Fix Bug) | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), item menu `halo` di `nav.config.ts`, route Halo Simpeg di router, badge di layout, reset store helpdesk di `clearSession()`, `docs/fase8/8_2.md` | `backend/` (kebutuhan kontrak baru → CR ke jalur BE lewat reviewer); `features/halo-simpeg/chatbot/*` kecuali perbaikan QA chatbot yang ditugaskan (CR-134 dst.) |
+| **BE** | **Handling Case** (H8-1, izin #9) | semua `backend/` **kecuali** berkas BE-4 chatbot, kode impor T12b (MAKE-097), dan `Libraries/Lampiran/ManifestLampiran.php` (T-5, MAKE-097; v1.3), `docs/fase8/8_1.md`, `backend/docs/db-review/DBV-028-*.md` | `frontend/`; berkas BE-4 chatbot |
+| **FE** | **Worker Muse** (H8-3, amandemen izin #9; cadangan Worker Fix Bug) | `frontend/src/features/halo-simpeg/*` (kecuali `chatbot/`), item menu `halo` di `nav.config.ts`, route Halo Simpeg di router, badge di layout, reset store helpdesk di `clearSession()`, `docs/fase8/8_2.md`; v1.3: entri `NotifikasiPage.vue`, titik penanda `AppSidebar.vue`, `shared/utils/galatKolom.ts`, `shared/ui/UiPilihBanyak.vue` (semua berkas bersama, aditif, commit terpisah) | `backend/` (kebutuhan kontrak baru → CR ke jalur BE lewat reviewer); `features/halo-simpeg/chatbot/*` kecuali perbaikan QA chatbot yang ditugaskan (CR-134 dst., termasuk R10 langkah 2 dengan syarat test chatbot 83/83) |
 | **Chatbot BE** (E-10, MAKE-094) | **ReadOne** (izin #8, pekerjaan selesai; di `main`) | berkas BE-4 chatbot; bagian E-10 di `8_1.md` | `frontend/`; berkas BE-1..BE-3 helpdesk dan DBV-028 |
 | **Chatbot FE** (E-10, MAKE-095) | **Worker Muse** (izin #8, pekerjaan selesai; di `main`) | berkas FE chatbot; bagian E-10 di `8_2.md` | `backend/`; berkas FE helpdesk saat bertindak sebagai jalur chatbot |
-| **Impor master T12b** (MAKE-097) | **ReadOne** (H8-12, amandemen scope izin #9); review DB **WS-2** | kode impor tier T12b di `backend/app/Libraries/Impor/*` dan perintah/test terkait, bagian T12b di `docs/migrasi/MAKE-069-rencana.md` | berkas BE-1..BE-4, migration (skema milik DBV-028) |
+| **Impor master T12b** (MAKE-097) | **ReadOne** (H8-12, amandemen scope izin #9); review DB **WS-2** | kode impor tier T12b di `backend/app/Libraries/Impor/*` dan perintah/test terkait, bagian T12b di `docs/migrasi/MAKE-069-rencana.md`; v1.3: T-5 baris `disiplin_ticket_msg` di `backend/app/Libraries/Lampiran/ManifestLampiran.php` + test + kueri pra-cek + runbook (keputusan reviewer Q-A0-5) | berkas BE-1..BE-4, migration (skema milik DBV-028) |
 
 Titik temu: kontrak API beku (§6.1, §6.5) dan fixture JSON sintetis respons API yang dipakai bersama sebagai bahan test FE; perubahan kontrak
 setelah beku = CR yang disepakati kedua jalur lewat reviewer. Untuk chatbot (✔): Chatbot BE menghasilkan contoh respons di
@@ -207,13 +215,28 @@ MAKE-070/071 memperluasnya menjadi prefiks `halo-simpeg` dan menambah baris endp
 berkas Push `backend/app/Libraries/Push/*` + `backend/app/Jobs/PushPesanJob.php` (v1.2: hanya bila H8-14 = (a), CR berkas
 bersama lewat reviewer; kontrak `PushNotifGatewayInterface` tetap tidak disentuh).
 
+**Berkas bersama final (v1.3, sesudah keputusan Horii 16-11-2026):**
+
+| Berkas | Perubahan | Paket / commit |
+|---|---|---|
+| `backend/app/Libraries/Push/AntrePushPesan.php`, `PenerimaTokenFcm.php`, `README.md`; `backend/app/Jobs/PushPesanJob.php` | `antreAkun(list<int> $idPengguna, …)` aditif (kunci data `id_pengguna[]`), cabang `id_pengguna` di job, `webAkun()`/`androidAkun()` per akun + dedup token; pemanggil `nip[]` lama dan job yang sudah antre tidak berubah | **CR-137**, commit terpisah di branch MAKE-072, test regresi cuti/LKH/Konket (§6.4) |
+| `backend/app/Config/Services.php:805` + `backend/tests/Notifikasi/PusatNotifikasiTest.php:72-86` + `backend/app/Controllers/Api/Notifikasi/README.md:45` + `frontend/src/features/notifikasi/README.md:37` | binding `RingkasanTiket`; test yang meng-`assertNull` `tiket_belum_dibaca` (`:84`) diganti angka (0 untuk role 1–8 tanpa tiket, ditambah pemilik, petugas, petugas-pemilik); README dua sisi diselaraskan (README FE dikoordinasikan reviewer dengan Worker Muse); `RingkasanTiketNoOp` tidak dipakai test mana pun → dihapus di commit yang sama kecuali reviewer menyimpannya sebagai cadangan rollback | MAKE-071, satu commit berkas bersama |
+| `backend/tests/feature/KontrakMatriksRoleTest.php:60` | `PREFIKS_CAKUPAN` `halo-simpeg/chatbot` → `halo-simpeg` (route chatbot tetap tercakup) + baris endpoint §6.1 | MAKE-070 (master), MAKE-071 (tiket), commit terpisah |
+| `backend/app/Libraries/Lampiran/ManifestLampiran.php:25-51` | **T-5** (temuan laporan A0; di `Kesiapan_Fase8.md` §6.2 dicatat sebagai T-8 karena nomor T-5 di sana sudah dipakai untuk key CR): baris `'disiplin_ticket_msg' => ['attachments']` di `KOLOM` + test, supaya `lampiran:manifest`/`lampiran:tarik` menyalin lampiran tiket lama; dua kueri pra-cek (B6 irisan tiket NULL + Open + sender yatim; B7 path tidak cocok pola segmen) + runbook | **MAKE-097 (ReadOne)**, keputusan reviewer Q-A0-5; Handling Case tidak menyentuh berkas ini |
+| `frontend/src/features/notifikasi/views/NotifikasiPage.vue` | entri "Tiket Halo Simpeg (n)" (H8-15 (b), §6.3) | MAKE-073, commit terpisah |
+| `frontend/src/shared/layouts/AppSidebar.vue` (sekitar `:258-261`) | titik penanda + teks `sr-only` jumlah saat `ciut` dan `item.badge > 0`, berlaku untuk semua item ber-badge; test di `shared/layouts/__tests__`. Di `ef83356e` belum ada item ber-badge dan belum ada test badge (dicek ulang di basis B1; bila ada, diperbarui di commit yang sama) | MAKE-073, CR kecil commit terpisah dalam #9 |
+| `frontend/src/shared/utils/galatKolom.ts`, `frontend/src/shared/ui/UiPilihBanyak.vue` (+ `shared/ui/index.ts`) | R10 langkah 1: helper galat 422 per kolom dan pilih banyak berbasis `UiCheckbox` + pencarian, aditif, test di `__tests__` masing-masing; chatbot tidak disentuh | MAKE-073, commit terpisah (sebelum/bersama B1) |
+| `frontend/src/features/halo-simpeg/chatbot/galat.ts`, `chatbot/components/admin/TagPilihan.vue` + pemakainya | R10 langkah 2: migrasi ke versi `shared/` lalu hapus versi lokal; syarat test chatbot tetap **83/83** (VanyaWidget 36, chatbot.amplop 21, ChatbotManager 23, VanyaShell 3), termasuk jalur 422 `stores/percakapan.ts`; testid `chatbot-qna-tag-<id>` tetap. Sampai saat itu duplikasi = deviasi sementara (Lampiran B) | paket perbaikan QA chatbot (CR-134 dst.), ✔ izin Horii 16-11-2026 |
+
 **DILARANG disentuh:** migration yang sudah di `main` (termasuk `CreateDisiplinTicketFase4`, `CreateMasterLayananFase4`);
 `Libraries/Layanan/Notifikasi*` dan model `Inbox*` (rumah notifikasi approval); kontrak `Interfaces/PushNotifGatewayInterface.php`;
 `Config/Database.php`; `MigrationsDitahan/AddFkNipLayananFase4.php` (keputusan FK di DBV-028, bukan edit berkas lama); berkas legacy rahasia (§Cara pakai 6).
 Untuk E-10 juga: modul FAQ (`Controllers/Api/MasterData/FaqController.php`, `Libraries/MasterData/Faq*`), `Libraries/Html/HtmlSanitizer.php`,
 `shared/components/SafeHtml.vue`, `shared/utils/sanitizeHtml.ts`, dan `Libraries/Kepegawaian/Pegawai/EksporTabel.php` **dipakai, tidak diubah**
 (kebutuhan perubahan → CR lewat reviewer). `Libraries/Kepegawaian/Lampiran/LocalStorageAdapter.php` juga dipakai, tidak diubah,
-kecuali A0 memutus hapus berkas legacy lewat CR adapter (§7.5, AC-E05.7).
+kecuali A0 memutus hapus berkas legacy lewat CR adapter (§7.5, AC-E05.7). **v1.3:** Q-A0-6 = (a') (Horii 16-11-2026), jadi
+adapter **tidak** diubah; hapus lampiran lewat `PenjagaBerkas` (§7.5). `frontend/src/features/kepegawaian/services/berkasUnduhan.ts`
+(`ambilBerkas` `:59-66`) dipakai, tidak diubah: pemeriksaan ekspor kosong (200 JSON) ada di service helpdesk (§6.3).
 
 ### 3.1 Paket × key × agen × izin (v1.2)
 
@@ -221,24 +244,28 @@ Keputusan Horii 13-11-2026 (H8-1: izin [#9-WorkloadHaloSimpeg], BE Handling Case
 rekomendasi semua": H8-3, H8-11, H8-12, H8-13). Izin [#8-WorkloadChatbot] = pekerjaannya **selesai** (DBV-033, MAKE-094, MAKE-095
 di `main`). Izin [#9-WorkloadHaloSimpeg] = **aktif** dengan amandemen 16-11-2026 (anggota FE = Worker Muse; scope + T12b/MAKE-097).
 Setiap paket: branch dari `origin/main`, gate cepat lokal, CI gate penuh, merge atas izin Horii, serah terima lewat reviewer.
+**v1.3:** status per 16-11-2026 (A0 ✔, B0 ✔, A1/DBV-028 dibuka) dan baris baru CR-136, CR-137, T-5 di MAKE-097, serta
+sub-langkah berkas bersama MAKE-073.
 
 | Urut | Paket | Key | Isi | Agen | Izin | Menunggu | Status |
 |---|---|---|---|---|---|---|---|
-| 0a | Sinkron status | CR-130 | `Kesiapan_Fase8.md` + progres `08-HaloSimpeg.md` + tabel kartu Trello | Reviewer CR (bagian progres BE: ReadOne; FE: Worker Muse) | — (tanpa kode workload); merge ⛔ izin Horii | — | ◻ |
-| 0b | PRD v1.2 | CR-131 | dokumen ini | Reviewer CR | — (tanpa kode workload); merge ⛔ izin Horii | — | ◻ (merge ⛔ izin Horii, sebelum laporan A0/B0 disetujui) |
-| 1 | A0 laporan pemahaman BE (bagian MAKE-070, tanpa kode) | — | §12 register H8 + daftar kewajiban A0 (§6.1a, §7.3a) | Handling Case | #9 | mulai sesudah CR-130 di `main`; laporan disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` | ◻ ⛔ reviewer |
-| 1' | B0 laporan pemahaman FE (bagian MAKE-073, tanpa kode) | — | rencana berkas bersama FE (nav, router, shell, `clearSession()`, lonceng) | Worker Muse | #9 (amandemen) | mulai sesudah CR-130 di `main`; laporan disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` | ◻ ⛔ reviewer; paralel A0–A2 |
-| 2 | Skema helpdesk E-01 | DBV-028 | PR `[CR][DBV]`, dokumen `backend/docs/db-review/DBV-028-*.md` | ditulis Handling Case; DB Validator WS-2 | #9 | A0 disetujui | ◻ |
-| 3 | Master E-02/E-07 | MAKE-070 | + `PATCH …/status`, matriks role prefiks `halo-simpeg` | Handling Case | #9 | DBV-028 di `main` | ◻ |
-| 4 | Tiket E-03..E-05 + ringkasan | MAKE-071 | + lampiran lama/baru lewat E-04, binding `RingkasanTiketInterface`, §7.8 (1)(2)(4)(5), kategori NULL (H8-16) | Handling Case | #9 | MAKE-070; H8-10 | ◻ |
-| 5a | FE helpdesk E-08 + layar admin (B1–B3, B5) | MAKE-073 | AGENTS.md §1, badge, reset store saat logout | Worker Muse (cadangan Worker Fix Bug) | #9 (amandemen) | kontrak MAKE-070 + MAKE-071 beku; H8-9 sebelum B3 | ◻ |
-| 5b | Push E-06 | MAKE-072 | penerima per H8-14; §7.8 (3) | Handling Case | #9 | MAKE-071; H8-8 (atau payload terbatas) | ◻ |
-| 5c | Impor master T12b | MAKE-097 | salin `id_user` apa adanya (H8-6, K-M11/K-M12) | ReadOne; review DB WS-2 | #9 (amandemen scope) | DBV-028 di `main` | ◻ |
-| 6 | Ekspor E-09 + penutup BE (A5) | MAKE-074 | WIB↔UTC dan audit unduhan (◻ usulan reviewer, menunggu konfirmasi Horii saat review PRD v1.2), batas baris; runbook | Handling Case | #9 | MAKE-071 (M3) | ◻ |
+| 0a | Sinkron status | CR-130 | `Kesiapan_Fase8.md` + progres `08-HaloSimpeg.md` + tabel kartu Trello | Reviewer CR (bagian progres BE: ReadOne; FE: Worker Muse) | — (tanpa kode workload); merge ⛔ izin Horii | — | ✔ di `main` (v1.3; CR-131 lanjutan rujukan baris `ef83356e`) |
+| 0b | PRD v1.2 | CR-131 | dokumen ini | Reviewer CR | — (tanpa kode workload); merge ⛔ izin Horii | — | ✔ di `main` `ef83356e` (v1.3) |
+| 0c | PRD v1.3 | CR-136 | dokumen ini + `8_1.md`, `8_2.md`, `Kesiapan_Fase8.md`, progres `08-HaloSimpeg.md`: hasil A0/B0, keputusan Horii dan reviewer 16-11-2026, kontrak §6.1b | Reviewer CR | — (tanpa kode workload); merge ⛔ izin Horii | A0 ✔, B0 ✔ | ◻ (sebelum README beku MAKE-070/071) |
+| 1 | A0 laporan pemahaman BE (bagian MAKE-070, tanpa kode) | — | §12 register H8 + daftar kewajiban A0 (§6.1a, §7.3a) | Handling Case | #9 | mulai sesudah CR-130 di `main`; laporan disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` | ✔ disetujui reviewer 16-11-2026 (dua putaran revisi; daftar kontrak final §6.1b) |
+| 1' | B0 laporan pemahaman FE (bagian MAKE-073, tanpa kode) | — | rencana berkas bersama FE (nav, router, shell, `clearSession()`, lonceng) | Worker Muse | #9 (amandemen) | mulai sesudah CR-130 di `main`; laporan disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` | ✔ disetujui final 16-11-2026 (semua keputusan Horii untuk B0 lengkap) |
+| 2 | Skema helpdesk E-01 | DBV-028 | PR `[CR][DBV]`, dokumen `backend/docs/db-review/DBV-028-*.md`; indeks §7.1 (v1.3) dan kueri pra-cek | ditulis Handling Case; DB Validator WS-2 | #9 | A0 disetujui | ▶ dibuka 16-11-2026 (A1); worktree + DB scratch 3307 milik sendiri; merge reviewer dengan izin Horii |
+| 3 | Master E-02/E-07 | MAKE-070 | + `PATCH …/status`, matriks role prefiks `halo-simpeg`, `kontak/aktif` + `kontak`, `petugas/saya`, K-A4 (1'), README beku bagian master + fixture §6.1b | Handling Case | #9 | DBV-028 di `main` | ◻ |
+| 4 | Tiket E-03..E-05 + ringkasan | MAKE-071 | + lampiran lama/baru lewat E-04, binding `RingkasanTiketInterface` (commit berkas bersama §3), §7.8 (1)(2)(4)(5), kategori NULL (H8-16 (a1)), penyamaran D7 (a), `badge`, hapus lampiran lewat `PenjagaBerkas` (Q-A0-6 (a')), README beku bagian tiket + fixture §6.1b | Handling Case | #9 | MAKE-070; H8-10 (tanpa ekstraksi tetap [I] untuk sisi lawan, §6.2) | ◻ |
+| 5a | FE helpdesk E-08 + layar admin (B1–B3, B5) | MAKE-073 | AGENTS.md §1, badge, reset store saat logout; v1.3 sub-langkah berkas bersama (commit terpisah): R10 langkah 1 (`galatKolom.ts`, `UiPilihBanyak.vue`), entri `NotifikasiPage.vue` (H8-15 (b)), titik penanda `AppSidebar.vue` saat ciut, `sisipBadgeHalo` di `RedesignShell.vue`; tata letak master-detail (§6.3) | Worker Muse (cadangan Worker Fix Bug) | #9 (amandemen) | kontrak MAKE-070 + MAKE-071 beku (v1.3: B1 bagian master boleh mulai sesudah MAKE-070 beku, `8_2.md` §2); H8-9 ✔ (v1.3, gerbang B3 terpenuhi) | ◻ |
+| 5b | Push E-06 | MAKE-072 | penerima per H8-14 (a) `antreAkun`; §7.8 (3) | Handling Case | #9 | MAKE-071; H8-8 (atau payload terbatas) | ◻ |
+| 5b' | CR berkas bersama Push (v1.3) | CR-137 | `AntrePushPesan::antreAkun`, cabang `id_pengguna` di `PushPesanJob`, `PenerimaTokenFcm::webAkun`/`androidAkun`, satu kalimat `Push/README.md`; test regresi cuti/LKH/Konket (job lama `nip[]` tetap terkirim, akun role 1 tanpa NIP menerima token web, dedup) | Handling Case | #9 | commit terpisah di branch MAKE-072, review lewat reviewer | ◻ |
+| 5c | Impor master T12b | MAKE-097 | salin `id_user` apa adanya (H8-6, K-M11/K-M12); **v1.3 + T-5**: `'disiplin_ticket_msg' => ['attachments']` di `ManifestLampiran::KOLOM` + test + 2 kueri pra-cek (B6, B7) + runbook (jumlah tiket Open di kategori tanpa petugas aktif sesudah impor) | ReadOne; review DB WS-2 | #9 (amandemen scope) | DBV-028 di `main` | ◻ |
+| 6 | Ekspor E-09 + penutup BE (A5) | MAKE-074 | WIB↔UTC dan audit unduhan (✔ v1.3, Q-A0-9 Horii 16-11-2026; ekspor kosong tidak diaudit), batas baris 10.000 + batas ukuran (ambang diukur di test MAKE-074), sel dipotong 32.767; runbook (jumlah tiket NULL dan irisan NULL + Open + sender yatim, berkas lampiran anomali) | Handling Case | #9 | MAKE-071 (M3) | ◻ |
 | 6' | Tombol ekspor (B4) | MAKE-074 (FE) | `UiExportMenu` | Worker Muse | #9 (amandemen) | MAKE-074 BE + MAKE-073 | ◻ |
-| — | Checklist QA Lapis 1 Fase 8 | CR-132 | `docs/fase8/Checklist_QA_Lapis1_Fase8.md` (bagian A chatbot sekarang, bagian B helpdesk sesudah MAKE-073) | Reviewer CR (+ Worker Muse untuk chatbot, usulan) | — (tanpa kode workload); merge ⛔ izin Horii | bagian A: PN8-8 | ◻ |
+| — | Checklist QA Lapis 1 Fase 8 | CR-132 | `docs/fase8/Checklist_QA_Lapis1_Fase8.md` (bagian A chatbot sekarang, bagian B helpdesk sesudah MAKE-073) | Reviewer CR (+ Worker Muse untuk chatbot, usulan) | — (tanpa kode workload); merge ⛔ izin Horii | bagian A: PN8-8 (✔ diterima 16-11-2026, v1.3) | ◻ |
 | — | Test AC-E10.19 sisi log aplikasi | CR-133 | logger uji: teks pesan chatbot tidak masuk log aplikasi | usulan: ReadOne | ◻ izin workload pekerjaan chatbot pasca-#8 diajukan ke Horii sebelum paket dibuka | izin workload | ◻ |
-| — | Perbaikan temuan QA chatbot | CR-134 dst. | BE ReadOne, FE Worker Muse (usulan) | usulan: ReadOne (BE) / Worker Muse (FE) | ◻ izin workload pekerjaan chatbot pasca-#8 diajukan ke Horii sebelum paket dibuka | QA bagian A; izin workload | ◻ |
+| — | Perbaikan temuan QA chatbot | CR-134 dst. | BE ReadOne, FE Worker Muse (usulan); v1.3: termasuk R10 langkah 2 (migrasi `chatbot/galat.ts` + `TagPilihan.vue` ke `shared/`, ✔ izin Horii 16-11-2026, syarat test chatbot 83/83) | usulan: ReadOne (BE) / Worker Muse (FE) | ◻ izin workload pekerjaan chatbot pasca-#8 diajukan ke Horii sebelum paket dibuka | QA bagian A; izin workload | ◻ |
 | 9 | Rilis menu (H8-11 (a)) | CR-135 | `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` diberi `to`/`roles` | Worker Muse (atau Worker Fix Bug) | ⛔ izin Horii | sign-off Fase 8 | ◻ |
 | — | Impor isi QnA dev | C4 (key per F8-51 saat PN8-6) | F8-46, AC-E10.30 | ReadOne | izin baru saat PN8-6 | PN8-6 (deploy) | **di luar DoD** (H8-13 (b), DEPLOY-002) |
 | ✔ | Skema chatbot | DBV-033 | E-10 | ditulis ReadOne; DB Validator WS-2 | #8 | — | ✔ di `main` `3fb8c5f7` |
@@ -286,7 +313,7 @@ Setiap paket: branch dari `origin/main`, gate cepat lokal, CI gate penuh, merge 
 | CR-086 | Sesi DB UTC; stempel audit UTC diisi aplikasi | `App\Database\MySQLi\Connection` |
 | AGENTS.md §1, §3 | Aksi baris lewat ⋮; komponen custom | AGENTS.md |
 
-### 5.2 Keputusan Fase 8 (LOCKED — Horii 03-11-2026 dan 12-11-2026; ✔ Q8-xx / ✔ K-n = dijawab eksplisit di §12, ✔ (default diterima) = usulan tanpa pertanyaan yang tidak ditolak, ✔ = bawaan usulan reviewer yang menunggu konfirmasi)
+### 5.2 Keputusan Fase 8 (LOCKED — Horii 03-11-2026, 12-11-2026, dan 16-11-2026 (v1.3: keputusan atas usulan A0/B0, §12); ✔ Q8-xx / ✔ K-n = dijawab eksplisit di §12, ✔ (default diterima) = usulan tanpa pertanyaan yang tidak ditolak, ✔ = bawaan usulan reviewer yang menunggu konfirmasi)
 
 | ID | Keputusan | Label | Status |
 |---|---|---|---|
@@ -295,22 +322,22 @@ Setiap paket: branch dari `origin/main`, gate cepat lokal, CI gate penuh, merge 
 | F8-03 | **Skema baru hanya tiga tabel** (DBV-028): `support_officer`, `officer_category`, `help_desk_contact`. Kolom ikut legacy ([K]/[I] dari kode karena DDL produksi tidak ada di repo); deviasi [V2]: status 0/1 bertipe tinyint + CHECK, UNIQUE `(id_support_officer, id_question_category)`, FK RESTRICT (kebijakan V1), `support_officer.id_user` → `pengguna.id_pengguna` | [K]+[V2] | ✔ (default diterima) |
 | F8-04 | **Pembuat tiket** = role pegawai (`UL_PEGAWAI` 2, 6, 7) yang punya NIP [K `SC:608`]; melihat daftar/percakapan = role 1–7 [K `SC:466,498,550`]; **role 8 (Pimpinan) tidak punya akses** [K, tidak ada di daftar legacy]. Matriks Bahan Baku "role 1–7 sebagai pengguna" dibaca sebagai akses daftar/baca, bukan pembuatan | [K] | ✔ Q8-01 |
 | F8-05 | **Master (kategori, petugas, kontak) hanya role 1** untuk tulis [K `SC:13,39,…,438`]; kategori aktif dibaca semua role 1–7 untuk form tiket [K `LS:931`] | [K] | ✔ (default diterima) |
-| F8-06 | **Petugas harus berstatus aktif** untuk melihat/menjawab tiket (legacy hanya memeriksa status untuk push & popup, bukan akses: `SC:507-523` vs `LS:1035`, `MC:272`). Petugas dinonaktifkan → kehilangan akses antrean (tiket miliknya sendiri tetap terlihat) | [V2] keamanan | ✔ Q8-02 |
+| F8-06 | **Petugas harus berstatus aktif** untuk melihat/menjawab tiket (legacy hanya memeriksa status untuk push & popup, bukan akses: `SC:507-523` vs `LS:1035`, `MC:272`). Petugas dinonaktifkan → kehilangan akses antrean (tiket miliknya sendiri tetap terlihat). **v1.3:** syarat aktif berlaku untuk antrean, `GET tiket?peran=petugas` (non-petugas/nonaktif → 200 `Halaman` kosong, bukan 403), detail, balas, baca, `belum_dibaca_petugas`/`perlu_tindak`, dan ekspor (`bisa_ekspor`). Untuk **push**, melewati petugas/akun nonaktif = [K] (legacy memfilter `so.status='1' AND peng.status='1'`, `LS:1035`, `:1245`); [V2] F8-06 hanya untuk akses dan hitungan | [V2] keamanan | ✔ Q8-02 |
 | F8-07 | **Kandidat petugas** = pegawai aktif satker kepegawaian + akun role 1 aktif [K `LS:468-491`]. Satker diambil dari konfigurasi (bukan literal `'101'`): memakai `WebConfigService::value('id_satker_kepegawaian')` seperti PIC layanan (Q-06a Fase 4), dan peringatan bila kosong (pola `PetugasLayananService::PERINGATAN_SATKER_KOSONG`) | [K]+[V2] | ✔ Q8-11, **bersyarat**: setelah Biro SDM mengonfirmasi satker `101` = satker kepegawaian |
-| F8-08 | **Siapa yang menutup**: petugas kategori tiket itu dan pemilik tiket [K controller `SC:676-690`; UI legacy hanya menampilkan tombol untuk petugas `VI:133`]. Tutup: `status=1`, `allow_reply=0`, `is_read=1`, `is_read_off=1` [K `LS:1444-1449`] **dan `closed_by` diisi** (kolom ada tetapi tidak pernah ditulis legacy) [V2 perbaikan]. **Tanpa buka kembali**; pegawai membuat tiket baru [K `LS:1117`] | [K]+[V2] | ✔ Q8-04 |
-| F8-09 | **Hapus tiket**: petugas kategori itu (dan role 1 yang juga petugas) — bukan pemilik; hapus fisik [K `LS:1485`] dengan snapshot `before` di `audit_logs`; berkas lampiran ikut dihapus dari storage (legacy meninggalkan berkas yatim, B-2). Legacy controller juga mengizinkan pemilik yang bukan petugas menghapus (`SC:728-733`) walau UI tidak menampilkannya — tidak dibawa. Alternatif hapus lunak butuh ALTER skema | [K]+[V2] | ✔ Q8-03 |
-| F8-10 | **Balas**: syarat tiket `status=0` dan `allow_reply=1` [K `LS:1116-1123`]; pelaku = pemilik atau petugas aktif kategorinya. Pesan: teks wajib, lampiran opsional (5 MB, 9 ekstensi) [K `LS:1552-1565`, `LS:963-975`]. Penanda baca otomatis: balasan pemilik → `is_read_off=2`; balasan petugas → `is_read=2` [I — logika trigger `inbox_msg_afIns`, DBV-022 `:301`; M0 mencocokkan dengan D1:7730-7739 lewat reviewer] | [K]+[I] | ✔ (default diterima) |
-| F8-11 | **Pengingat 24 jam** (`notify_pic`/`notify_at`): petugas dapat mencentang saat membalas; reset ke 2 bila petugas membalas lagi [K `LS:1172-1178`, `LS:1348-1352`]. Tiket `perlu_tindak` = `status=0` dan (`is_read_off=2` atau `notify_pic=1` dan `notify_at < sekarang`) [K `MC:292`] | [K] | ✔ (default diterima) |
-| F8-12 | **Popup login petugas dihapus**; diganti badge pada menu Halo Simpeg + panel "Perlu ditindak" di halaman petugas (legacy: modal saat login, hanya role 2/6, `MC:268-305`, `VM:734-807`) | [V2] UX | ✔ Q8-07 |
-| F8-13 | **Penerima push** — tiket baru → petugas aktif kategori (akun aktif); balasan petugas → pemilik; balasan pemilik → petugas aktif kategori [K `LS:1029-1075`, `LS:1202-1285`]. Perbaikan: akun petugas **semua role** diikutkan (legacy hanya `UserLevel='2'`, sehingga petugas role 1/6 tidak pernah dapat push, B-5); token dideduplikasi per perangkat. **v1.2 — kontradiksi internal:** titik sambung MAKE-066 `AntrePushPesan::antre(array $nips, …)` (`backend/app/Libraries/Push/AntrePushPesan.php:48`) dan `PushPesanJob` (`backend/app/Jobs/PushPesanJob.php:39-47`) mencari token per **NIP** (§6.4 "per NIP"), padahal kandidat petugas mencakup akun role 1 yang umumnya tanpa NIP (F8-07), sehingga petugas role 1 tanpa NIP tidak akan menerima push (AC-E06.7). Diputus lewat **H8-14** sesudah A0 (§12) | [K]+[V2] | ✔ (default diterima); cara penerima tanpa NIP ◻ H8-14 |
+| F8-08 | **Siapa yang menutup**: petugas kategori tiket itu dan pemilik tiket [K controller `SC:676-690`; UI legacy hanya menampilkan tombol untuk petugas `VI:133`]. Tutup: `status=1`, `allow_reply=0`, `is_read=1`, `is_read_off=1` [K `LS:1444-1449`] **dan `closed_by` diisi** (kolom ada tetapi tidak pernah ditulis legacy) [V2 perbaikan]. **Tanpa buka kembali**; pegawai membuat tiket baru [K `LS:1117`]. **v1.3:** legacy menolak pemilik yang tercatat sebagai petugas kategori **lain** untuk balas (`SC:571-579`), tutup (`:676-684`), dan hapus (`:719-727`); v2: pemilik **selalu** boleh balas dan tutup [V2, B-19], hapus tetap hanya petugas (F8-09); test balas oleh pemilik yang petugas kategori lain. Tiket berkategori NULL hanya dapat ditutup pemiliknya (H8-16 (a1)). `ditutup_oleh_label` mengikuti aturan detail D7 (a) (§6.1b) | [K]+[V2] | ✔ Q8-04 |
+| F8-09 | **Hapus tiket**: petugas kategori itu (dan role 1 yang juga petugas) — bukan pemilik; hapus fisik [K `LS:1485`] dengan snapshot `before` di `audit_logs`; berkas lampiran ikut dihapus dari storage (legacy meninggalkan berkas yatim, B-2). Legacy controller juga mengizinkan pemilik yang bukan petugas menghapus (`SC:728-733`) walau UI tidak menampilkannya — tidak dibawa. Alternatif hapus lunak butuh ALTER skema. **v1.3:** pemilik (termasuk pemilik tiket berkategori NULL) yang menghapus → 403 `bukan_pihak_berwenang` [V2 terhadap `SC:728-733`]; tiket NULL karena itu tidak dapat dihapus siapa pun, hanya ditutup pemiliknya (H8-16 (a1)), dan jumlahnya dicatat di runbook. Berkas lampiran dihapus lewat `PenjagaBerkas::catat` di dalam transaksi + `selesaikan()` sesudah commit (Q-A0-6 (a'), Horii 16-11-2026): berkas hanya dihapus bila tidak dirujuk baris lain, path legacy anomali tidak dihapus dan dicatat tanpa path (§7.5) | [K]+[V2] | ✔ Q8-03; ✔ Q-A0-6 (a') |
+| F8-10 | **Balas**: syarat tiket `status=0` dan `allow_reply=1` [K `LS:1116-1123`]; pelaku = pemilik atau petugas aktif kategorinya. Pesan: teks wajib, lampiran opsional (5 MB, 9 ekstensi) [K `LS:1552-1565`, `LS:963-975`]. Penanda baca otomatis: balasan pemilik → `is_read_off=2`; balasan petugas → `is_read=2` [I — logika trigger `inbox_msg_afIns`, DBV-022 `:301`; M0 mencocokkan dengan D1:7730-7739 lewat reviewer]. **v1.3 (A0):** penanda baca **sebagian [K]**: membuka thread di legacy menyetel `is_read=1` bila pembuka = pemilik, selain itu `is_read_off=1` (`LS:907-919`; di v2 lewat `POST …/baca`, BP8-7); balas cepat petugas menyetel `is_read_off=1` eksplisit (`LS:1344-1347`) beserta `notify_pic`/`notify_at` (`:1348-1352`). Jadi balasan petugas → `is_read_off=1`, `is_read=2`; balasan pemilik → `is_read=1`, `is_read_off=2`. Yang tetap **[I]** (H8-10): penyetelan sisi **lawan** ke 2 dan sisi pembalas **pemilik** = 1; ekstraksi D1 tidak tersedia di mesin A0. Pesan pertama saat buat tiket dikecualikan (flag dari §7.3). Balasan pada tiket berkategori NULL → 422 `tiket_tanpa_kategori` (H8-16 (a1)) | [K]+[I] | ✔ (default diterima); ✔ penanda sebagian [K] (A0) |
+| F8-11 | **Pengingat 24 jam** (`notify_pic`/`notify_at`): petugas dapat mencentang saat membalas; reset ke 2 bila petugas membalas lagi [K `LS:1172-1178`, `LS:1348-1352`]. Tiket `perlu_tindak` = `status=0` dan (`is_read_off=2` atau `notify_pic=1` dan `notify_at < sekarang`) [K `MC:292`]. **v1.3:** field masukan `ingatkan_24_jam` ∈ {0,1} (nilai lain → 422 `errors.ingatkan_24_jam`); berlaku hanya bila pembalas = petugas **aktif** kategori dan bukan pemilik; nilai 1 dari pemilik/non-petugas → 422 "Pengingat 24 jam hanya dapat diatur petugas.", nilai 0 atau tanpa nilai diabaikan. Pada balasan petugas: 1 → `notify_pic=1`, `notify_at` = +24 jam UTC; tanpa nilai atau 0 → `notify_pic=2`, `notify_at=NULL` [K `LS:1348-1352`, `:1171-1178`]. Centang legacy hanya ada di popup login (dihapus F8-12), sehingga di v2 pindah ke form balas petugas dengan label legacy "Ingatkan Saya Kembali?" (deviasi tempat, bukan perilaku). `perlu_tindak` per baris memakai ekspresi SQL yang sama dengan `Ringkasan.perlu_tindak` | [K] | ✔ (default diterima) |
+| F8-12 | **Popup login petugas dihapus**; diganti badge pada menu Halo Simpeg + panel "Perlu ditindak" di halaman petugas (legacy: modal saat login, hanya role 2/6, `MC:268-305`, `VM:734-807`). **v1.3:** angka badge menu = `Ringkasan.badge` = jumlah tiket **distinct** (belum dibaca ∪ `perlu_tindak`), sehingga pengingat 24 jam yang jatuh tempo ikut terlihat; `total` tetap = angka lonceng (D8 (a), Horii 16-11-2026). Saat sidebar ciut tampil titik penanda + teks `sr-only` jumlah (CR kecil `AppSidebar.vue`, §3). Panel "Perlu ditindak" memuat daftar sendiri lewat `GET tiket?peran=petugas&perlu_tindak=1` (bukan menyaring halaman aktif) | [V2] UX | ✔ Q8-07; ✔ D8 (a) |
+| F8-13 | **Penerima push** — tiket baru → petugas aktif kategori (akun aktif); balasan petugas → pemilik; balasan pemilik → petugas aktif kategori [K `LS:1029-1075`, `LS:1202-1285`]. Perbaikan: akun petugas **semua role** diikutkan (legacy hanya `UserLevel='2'`, sehingga petugas role 1/6 tidak pernah dapat push, B-5); token dideduplikasi per perangkat. **v1.2 — kontradiksi internal:** titik sambung MAKE-066 `AntrePushPesan::antre(array $nips, …)` (`backend/app/Libraries/Push/AntrePushPesan.php:48`) dan `PushPesanJob` (`backend/app/Jobs/PushPesanJob.php:39-47`) mencari token per **NIP** (§6.4 "per NIP"), padahal kandidat petugas mencakup akun role 1 yang umumnya tanpa NIP (F8-07), sehingga petugas role 1 tanpa NIP tidak akan menerima push (AC-E06.7). Diputus lewat **H8-14** sesudah A0 (§12). **v1.3 — ✔ H8-14 (a) (Horii 16-11-2026):** semua penerima Halo Simpeg (petugas maupun pemilik) diantre **per `id_pengguna`** lewat `AntrePushPesan::antreAkun(list<int> $idPengguna, …)` (aditif, job `push-pesan` yang sama, kanal `semua` F8-15); token web per akun (`firebase_token.id_pengguna`) dan token Android lewat `pengguna.nip` bila ada; pelaku dikecualikan; akun nonaktif dan petugas nonaktif dilewati [K B4, F8-06]; token yang sama untuk dua penerima dikirim sekali. Perubahan berkas Push = **CR-137** (§3, §6.4) | [K]+[V2] | ✔ (default diterima); ✔ H8-14 (a) |
 | F8-14 | **Perubahan status (tutup) memberi notifikasi** ke pihak lawan sesuai Bahan Baku E-06 (legacy tidak) | [V2] | ✔ Q8-05 |
 | F8-15 | **Kanal push**: Android ikut legacy; **web ditambahkan** karena infrastruktur web push Fase 6 sudah ada dan petugas bekerja di web (legacy hanya Android untuk Halo Simpeg) | [K]+[V2] | ✔ Q8-09 |
 | F8-16 | **Payload push**: judul "Halo Simpeg", isi = teks pesan terpotong; `data` = `{modul:'halo-simpeg', id_inbox, url}` + kunci kompatibilitas Android yang dikonfirmasi PN8-1. Legacy mengirim seluruh baris tiket (nip, jabatan, satker, nama pengirim) — **tidak** dibawa kecuali pemilik app Android memastikan membutuhkannya | [V2] privasi | ✔ Q8-08, **bersyarat**: payload minimal setelah pemilik app Android mengonfirmasi (PN8-1); sebelum itu hanya kunci `data` yang dibaca app |
-| F8-17 | **Lampiran** memakai `AturanLampiran`/`ValidasiBerkas` yang ada (BP8-5); path `halo-simpeg/{nip}/{id_inbox}/…` di storage lokal (pola kunci final diputus di A0, T-4); unduh lewat endpoint ber-otorisasi. Berkas lampiran impor (path legacy `arsip/{nip}/inbox/…`) dicocokkan saat cutover. **v1.2 — H8-5 (a), Horii 13-11-2026 (risiko sadar):** lampiran lama tetap ber-path legacy dan **ikut tersaji publik** lewat alias Nginx `/berkas/` F-10 seperti legacy (F10-18; README-deploy §1l); Halo Simpeg **tidak** mempersempit alias itu. Aplikasi v2 **tetap** menyajikan lampiran lama **dan** baru lewat endpoint E-04 `tiket/{id}/pesan/{idPesan}/lampiran` dengan cek akses BP8-2 (AC-E04.7), **bukan** dengan merujuk URL publik `/berkas/`: saklar rollback `arsip.penyajianBerkasLegacy = 'privat'` (`backend/app/Config/Arsip.php:12-17`, `:97`) memindahkan berkas legacy ke endpoint arsip F-10 yang izinnya per NIP pegawai, sehingga tautan `/berkas/` akan putus dan petugas kehilangan akses. `LocalStorageAdapter::baca()` sudah menerima path legacy (`backend/app/Libraries/Kepegawaian/Lampiran/LocalStorageAdapter.php:78`, `:104-109`). Unggahan v2 tetap privat | [K]+[V2] | ✔ Q8-10; ✔ H8-5 (a) |
-| F8-18 | **Kontak helpdesk**: CRUD role 1 [K `SC:11-160`]; daftar kontak aktif dapat dibaca semua role 1–7 (di halaman Halo Simpeg) — legacy hanya menampilkannya ke admin | [K]+[V2] | ✔ Q8-12 |
-| F8-19 | **Lonceng**: Fase 8 menyediakan `GET halo-simpeg/tiket/ringkasan` (jumlah belum dibaca sisi pemilik + sisi petugas [K `LN:12-60`]) dan **tidak** menulis ke `inbox`. Konsumsi oleh lonceng terpadu F-08 = keputusan Q8-06. **v1.2:** F-08 sudah di `main`, jadi Q8-06 = B berlaku: MAKE-071 mengganti binding `ringkasanTiket` NoOp (`backend/app/Config/Services.php:799-806`) dengan implementasi `RingkasanTiketInterface` yang memakai aturan hitung §6.2, dan `PusatNotifikasiService` (`backend/app/Libraries/Notifikasi/Pusat/PusatNotifikasiService.php:74`, `:110`) mengisi `tiket_belum_dibaca` dengan angka (AC-E06.9). Tujuan klik angka lonceng = **H8-15** (§12) | [K]+[V2] | ✔ Q8-06 (sumber lonceng hanya bila F-08 sudah ada saat M5; selain itu badge menu saja dan disambung di F-08); tujuan klik ◻ H8-15 |
-| F8-20 | **Ekspor rekap** `export_hs` ikut legacy: hanya petugas; periode berdasar tanggal tiket (inklusif); kolom NO, ID PERTANYAAN, KATEGORI, NAMA PENANYA, NIP PENANYA, PERTANYAAN / JAWABAN, TIMESTAMP; xlsx [K `LS:1600-1830`, `SC:751-786`]. Perbaikan: sertakan tiket yang periode-nya cocok walau petugas belum menulis, urut tiket lalu pesan. **v1.2:** `ds`/`de` = tanggal kalender **WIB** yang dikonversi ke rentang UTC tanpa `DATE()` atas kolom (pola F8-42); kolom TIMESTAMP ditulis dalam WIB; unduhan ekspor diaudit (pola F7-27/F-10: siapa, periode, jumlah baris, tanpa isi; AC-E09.7) | [K]+[V2] | ✔ (default diterima); WIB↔UTC dan audit unduhan (AC-E09.7) = ◻ usulan reviewer v1.2, menunggu konfirmasi Horii saat review PRD v1.2 |
-| F8-21 | **Impor master** (**v1.2, H8-6 Horii 13-11-2026 "seperti legacy saja"**): `support_officer`, `officer_category`, `help_desk_contact` dipindah saat cutover (daftar petugas dan kategori berlaku langsung); `support_officer.id_user` **disalin apa adanya** ke kolom akun v2 **tanpa tabel pemetaan UP-1** (K-M11); baris yang `id_user`-nya tidak ada di `pengguna` v2 **dibuang dan jumlahnya dicatat** di laporan impor (K-M12), dan `officer_category` milik baris yang dibuang ikut dibuang (`docs/migrasi/MAKE-069-rencana.md:108-111`). Kode impor = tier T12b **MAKE-097** (ReadOne, review DB WS-2; H8-12), mulai sesudah DBV-028 di `main`. Rumusan v1.0 ("dipetakan lewat tabel pemetaan UP-1; baris tanpa pemetaan dilaporkan") **gugur** | [K] (ikut legacy) | ✔ Q8-13; ✔ H8-6 |
+| F8-17 | **Lampiran** memakai `AturanLampiran`/`ValidasiBerkas` yang ada (BP8-5); path `halo-simpeg/{nip}/{id_inbox}/…` di storage lokal (pola kunci final diputus di A0, T-4); unduh lewat endpoint ber-otorisasi. Berkas lampiran impor (path legacy `arsip/{nip}/inbox/…`) dicocokkan saat cutover. **v1.2 — H8-5 (a), Horii 13-11-2026 (risiko sadar):** lampiran lama tetap ber-path legacy dan **ikut tersaji publik** lewat alias Nginx `/berkas/` F-10 seperti legacy (F10-18; README-deploy §1l); Halo Simpeg **tidak** mempersempit alias itu. Aplikasi v2 **tetap** menyajikan lampiran lama **dan** baru lewat endpoint E-04 `tiket/{id}/pesan/{idPesan}/lampiran` dengan cek akses BP8-2 (AC-E04.7), **bukan** dengan merujuk URL publik `/berkas/`: saklar rollback `arsip.penyajianBerkasLegacy = 'privat'` (`backend/app/Config/Arsip.php:12-17`, `:97`) memindahkan berkas legacy ke endpoint arsip F-10 yang izinnya per NIP pegawai, sehingga tautan `/berkas/` akan putus dan petugas kehilangan akses. `LocalStorageAdapter::baca()` sudah menerima path legacy (`backend/app/Libraries/Kepegawaian/Lampiran/LocalStorageAdapter.php:78`, `:104-109`). Unggahan v2 tetap privat. **v1.3 — pola kunci final (K-A6, A0):** `halo-simpeg/{YYYY}/{MM}/{32 hex}.{ext}` (UTC, `random_bytes(16)`, pola modul v2 `berita/…`, `kolom/YYYY/MM/…`); rumusan `halo-simpeg/{nip}/{id_inbox}/…` di atas **gugur v1.3** (NIP di path = data pribadi dan `id_inbox` belum ada saat berkas disimpan sebelum transaksi). Awalan `halo-simpeg/` tidak cocok regex legacy `/berkas/` maupun `REGEX_KUNCI_V2` (`backend/app/Config/Arsip.php:32`), sehingga tetap privat; kunci baru tidak boleh berawalan `arsip/` atau `assets/upload/`. Nama asli berkas tidak disimpan; nama unduhan = `lampiran-{id_tiket}-{id_pesan}.{ext}` = `Content-Disposition` = `lampiran.nama` di respons. Unggahan dicatat `PenjagaBerkas::catat(path, 'disiplin_ticket_msg', 'attachments')` agar dikompensasi bila transaksi gagal (AC-E03.6). Header unduhan E-04: `Content-Type` dari ekstensi `AturanLampiran`, `Content-Disposition` inline untuk pdf/jpg/jpeg/png/gif dan attachment untuk lainnya, `X-Content-Type-Options: nosniff`, CSP `Config\Arsip::CSP_BERKAS`, `Cache-Control: private, no-store`. Lampiran lama baru tersalin ke storage v2 bila T-5 (Q-A0-5, MAKE-097) selesai | [K]+[V2] | ✔ Q8-10; ✔ H8-5 (a); ✔ K-A6 (A0) |
+| F8-18 | **Kontak helpdesk**: CRUD role 1 [K `SC:11-160`]; daftar kontak aktif dapat dibaca semua role 1–7 (di halaman Halo Simpeg) — legacy hanya menampilkannya ke admin. **v1.3 (Q-A0-7, keputusan reviewer):** dua path — `GET halo-simpeg/kontak/aktif` (role 1–7, array kontak `status=1`, urut `created_at` naik [K `LS:16`], tanpa paginasi) dan `GET halo-simpeg/kontak` (role 1, semua status, `Halaman<T>`, filter `status`, `q`); role 2–7 yang memanggil `kontak` → 403 dari filter route. Usulan parameter `?status=semua` gugur | [K]+[V2] | ✔ Q8-12; ✔ Q-A0-7 |
+| F8-19 | **Lonceng**: Fase 8 menyediakan `GET halo-simpeg/tiket/ringkasan` (jumlah belum dibaca sisi pemilik + sisi petugas [K `LN:12-60`]) dan **tidak** menulis ke `inbox`. Konsumsi oleh lonceng terpadu F-08 = keputusan Q8-06. **v1.2:** F-08 sudah di `main`, jadi Q8-06 = B berlaku: MAKE-071 mengganti binding `ringkasanTiket` NoOp (`backend/app/Config/Services.php:799-806`) dengan implementasi `RingkasanTiketInterface` yang memakai aturan hitung §6.2, dan `PusatNotifikasiService` (`backend/app/Libraries/Notifikasi/Pusat/PusatNotifikasiService.php:74`, `:110`) mengisi `tiket_belum_dibaca` dengan angka (AC-E06.9). Tujuan klik angka lonceng = **H8-15** (§12). **v1.3:** `GET tiket/ringkasan` → `Ringkasan {belum_dibaca_saya, belum_dibaca_petugas, perlu_tindak, badge, total}` (§6.2); `jumlahBelumDibaca()` = `total` (satu sumber hitung, sehingga AC-E06.9 berlaku menurut konstruksi) dan mengembalikan **0** untuk role di luar 1–7 (role 8 lonceng), `null` hanya untuk sumber yang belum terpasang. **✔ H8-15 (b) (Horii 16-11-2026):** entri "Tiket Halo Simpeg (n)" di `NotifikasiPage.vue` (kartu/baris di atas tab, angka dari `tiket_belum_dibaca` yang sudah ada) menuju route Halo Simpeg; ke tab antrean bila sisi petugas punya angka (`belum_dibaca_petugas`/`perlu_tindak` > 0 dari ringkasan helpdesk, bila sudah dimuat), selain itu ke `/halo-simpeg`; hanya `NOTIFIKASI_ROLES` 1/2/3/6/7 (`frontend/src/features/notifikasi/roles.ts:16`; klik lonceng `RedesignShell.vue:127-130`); petugas role 4/5 (petugas bisa ber-role 3/4/5 karena kandidat legacy = akun apa pun milik NIP satker kepegawaian, `LS:470-484`) memakai badge menu. BE tanpa perubahan kontrak | [K]+[V2] | ✔ Q8-06 (sumber lonceng hanya bila F-08 sudah ada saat M5; selain itu badge menu saja dan disambung di F-08); ✔ H8-15 (b) |
+| F8-20 | **Ekspor rekap** `export_hs` ikut legacy: hanya petugas; periode berdasar tanggal tiket (inklusif); kolom NO, ID PERTANYAAN, KATEGORI, NAMA PENANYA, NIP PENANYA, PERTANYAAN / JAWABAN, TIMESTAMP; xlsx [K `LS:1600-1830`, `SC:751-786`]. Perbaikan: sertakan tiket yang periode-nya cocok walau petugas belum menulis, urut tiket lalu pesan. **v1.2:** `ds`/`de` = tanggal kalender **WIB** yang dikonversi ke rentang UTC tanpa `DATE()` atas kolom (pola F8-42); kolom TIMESTAMP ditulis dalam WIB; unduhan ekspor diaudit (pola F7-27/F-10: siapa, periode, jumlah baris, tanpa isi; AC-E09.7). **v1.3:** WIB↔UTC dan audit unduhan **✔ Q-A0-9 (Horii 16-11-2026)**; ekspor periode kosong = 200 JSON tanpa berkas dan **tanpa audit unduhan** (tidak ada berkas; dicatat di README). Tombol/izin ekspor = `bisa_ekspor` = petugas **aktif** berapa pun jumlah kategorinya [V2 terhadap `VI:13` yang mensyaratkan > 1 kategori; keputusan reviewer]; selain itu 403 `bukan_petugas`. Pengaman sebelum membangun berkas: `COUNT` baris ≤ `eksporMaksBaris` (10.000) **dan** `SUM(CHAR_LENGTH(msg))` ≤ `eksporMaksKarakter` (ambang dari pengukuran memori di test MAKE-074); lewat salah satu → 422 `ekspor_terlalu_besar`. Isi sel dipotong di 32.767 karakter (batas sel Excel) dengan penanda "… [dipotong]" [V2], karena pesan impor legacy tidak dibatasi. Tiket berkategori NULL tidak ikut (H8-16 (a1)). `EksporTabel` menulis OOXML lewat ZipArchive (`backend/app/Libraries/Kepegawaian/Pegawai/EksporTabel.php:11-13`) | [K]+[V2] | ✔ (default diterima); ✔ Q-A0-9 (WIB↔UTC, AC-E09.7) |
+| F8-21 | **Impor master** (**v1.2, H8-6 Horii 13-11-2026 "seperti legacy saja"**): `support_officer`, `officer_category`, `help_desk_contact` dipindah saat cutover (daftar petugas dan kategori berlaku langsung); `support_officer.id_user` **disalin apa adanya** ke kolom akun v2 **tanpa tabel pemetaan UP-1** (K-M11); baris yang `id_user`-nya tidak ada di `pengguna` v2 **dibuang dan jumlahnya dicatat** di laporan impor (K-M12), dan `officer_category` milik baris yang dibuang ikut dibuang (`docs/migrasi/MAKE-069-rencana.md:108-111`). Kode impor = tier T12b **MAKE-097** (ReadOne, review DB WS-2; H8-12), mulai sesudah DBV-028 di `main`. Rumusan v1.0 ("dipetakan lewat tabel pemetaan UP-1; baris tanpa pemetaan dilaporkan") **gugur**. **v1.3 (T-5, keputusan reviewer Q-A0-5):** `disiplin_ticket_msg.attachments` belum tercantum di `ManifestLampiran::KOLOM` (`backend/app/Libraries/Lampiran/ManifestLampiran.php:25-51`), sehingga `lampiran:manifest`/`lampiran:tarik` tidak menyalin lampiran tiket lama dan E-04 akan 404 untuk semua lampiran lama; barisnya + test + 2 kueri pra-cek + runbook masuk **MAKE-097**. Runbook juga menghitung tiket Open di kategori tanpa petugas aktif sesudah impor (kueri angka) | [K] (ikut legacy) | ✔ Q8-13; ✔ H8-6; ✔ Q-A0-5 |
 | F8-22 | **Tidak dibawa**: popup modal login (F8-12), `firebase_message_logs` (digantikan `integrasi_log` Fase 6), `andr_notif_queue` (digantikan queue `push`), file view bertanggal (`inbox_20220216.php` dst.), cabang debug berkode-keras NIP (`SC:469`), log `mylog` rusak (B-9) | — | ✔ (default diterima) |
 
 **E-10 Chatbot "Vanya" (v1.1).** F8-23..F8-33 = keputusan Horii 12-11-2026 ("ikut saran" K-1..K-11, §12). F8-34..F8-51 =
@@ -363,20 +390,31 @@ dengan Matriks Modul E saat M0.
 | `halo-simpeg/kategori` | GET, POST | 1 | list semua status (paginasi), tambah | E-02 |
 | `halo-simpeg/kategori/{id}` | PUT, DELETE | 1 | ubah; hapus ditolak 422 bila dipakai tiket/petugas (sarankan nonaktifkan) | E-02 |
 | `halo-simpeg/petugas` | GET, POST | 1 | list + kategori, tambah (id_user unik) | E-02 |
-| `halo-simpeg/petugas/{id}` | PUT, DELETE | 1 | ubah (ganti set kategori atomik); hapus bila tidak ada tiket aktif | E-02 |
-| `halo-simpeg/petugas/kandidat` | GET `?search=` | 1 | pencarian di server (F8-07) | E-02 |
-| `halo-simpeg/kontak` | GET | 1–7 (aktif), 1 (semua) | | E-07 |
+| `halo-simpeg/petugas/{id}` | PUT, DELETE | 1 | ubah (ganti set kategori atomik); hapus bila tidak ada tiket aktif (rumusan gugur v1.3 → K-A4 (1'): 422 `petugas_terakhir` bila petugas itu petugas terakhir, aktif atau nonaktif, sebuah kategori ber-tiket Open) | E-02 |
+| `halo-simpeg/petugas/kandidat` | GET `?search=` | 1 | pencarian di server (F8-07); v1.3: `search` 2..50 karakter, maks 20 hasil `{id_user, label}` | E-02 |
+| `halo-simpeg/kontak` | GET | ~~1–7 (aktif), 1 (semua)~~ (gugur v1.3) → **1** | v1.3: semua status, `Halaman<T>`, filter `status`, `q` | E-07 |
+| `halo-simpeg/kontak/aktif` (v1.3) | GET | 1–7 | kontak `status=1`, array, urut `created_at` naik [K `LS:16`] (Q-A0-7) | E-07 |
 | `halo-simpeg/kontak`, `…/{id}` | POST, PUT, DELETE | 1 | | E-07 |
-| `halo-simpeg/tiket` | GET | 1–7 | `peran=saya\|petugas`, filter `status`, `kategori`, `q`; urut pesan terakhir desc; paginasi | E-04 |
+| `halo-simpeg/{kategori\|petugas\|kontak}/{id}/status` (v1.3) | PATCH | 1 | `{status: 0\|1}` (domain master 0/1); nilai lain → 422; status sama → 200 tanpa tulis/audit; diaudit (K-A1, AC-E02.9); respons `{...baris, peringatan}` (§6.1b) | E-02, E-07 |
+| `halo-simpeg/petugas/saya` (v1.3) | GET | 1–7 | selalu 200 `PetugasSaya` (bukan petugas → `petugas:false`); dipakai FE untuk tab antrean dan panel "Perlu ditindak" | E-02/E-04 |
+| `halo-simpeg/tiket` | GET | 1–7 | `peran=saya\|petugas`, filter `status`, `kategori`, `q`; urut pesan terakhir desc; paginasi. v1.3: + `baca=semua\|belum\|sudah`, `perlu_tindak=1` (hanya dengan `peran=petugas`, selain itu 422); `status=open\|closed`; urutan dan pemecah seri §6.1b | E-04 |
 | `halo-simpeg/tiket` | POST (multipart) | `UL_PEGAWAI` (Q8-01) | `id_question_category`, `subject`, `msg`, `arsip?` | E-03 |
-| `halo-simpeg/tiket/ringkasan` | GET | 1–7 | belum dibaca per sisi, `perlu_tindak` | E-06 |
+| `halo-simpeg/tiket/ringkasan` | GET | 1–7 | belum dibaca per sisi, `perlu_tindak`; v1.3: + `badge`, `total` (§6.2) | E-06 |
 | `halo-simpeg/tiket/{id}` | GET | 1–7 | pemilik atau petugas kategori; **tanpa efek samping** | E-04 |
-| `halo-simpeg/tiket/{id}/baca` | POST | 1–7 | menyetel `is_read` (pemilik) / `is_read_off` (petugas) | E-04 |
+| `halo-simpeg/tiket/{id}/baca` | POST | 1–7 | menyetel `is_read` (pemilik) / `is_read_off` (petugas); v1.3: pemilik **hanya** `is_read` apa pun status petugasnya, petugas aktif non-pemilik `is_read_off`; idempoten; 200 `Ringkasan` (§6.2) | E-04 |
 | `halo-simpeg/tiket/{id}/pesan` | POST (multipart) | 1–7 | `msg`, `arsip?`, `ingatkan_24_jam?` (petugas) | E-04 |
 | `halo-simpeg/tiket/{id}/pesan/{idPesan}/lampiran` | GET | 1–7 | berkas dialirkan setelah cek akses | E-04 |
 | `halo-simpeg/tiket/{id}/tutup` | POST | 1–7 | F8-08 | E-05 |
 | `halo-simpeg/tiket/{id}` | DELETE | 1–7 | F8-09 | E-05 |
-| `halo-simpeg/tiket/ekspor` | GET `?ds&de&format=xlsx` | 1–7 | hanya petugas (F8-20); 403 selain petugas | E-09 |
+| `halo-simpeg/tiket/ekspor` | GET `?ds&de&format=xlsx` | 1–7 | hanya petugas (F8-20); 403 selain petugas; v1.3: petugas **aktif** (`bisa_ekspor`), 403 `bukan_petugas`; periode kosong 200 JSON (§6.1b) | E-09 |
+
+**Pencocokan Matriks Modul E (v1.3, K-A7 A0).** Matriks Modul E hanya memuat satu baris (`hr/support/halo_simpeg`,
+`conversations`, `add_conversation`, `close_inbox` → role 1–7; judulnya "Semua role (1-8)" tetapi barisnya 1–7, sama dengan kode
+legacy, sehingga F8-04 tetap). Method lain dicocokkan ke `userAuth` legacy (`SC`): master `kategori`/`petugas`/`kontak` role 1
+(`SC:13-136`, `:164-287`, `:315-438`); `POST tiket` `UL_PEGAWAI` (`SC:608`); daftar, detail, balas, tutup, hapus, ekspor role 1–7
+(`SC:466`, `:498`, `:550`, `:663`, `:710`, `:753`); `petugas/saya`, `kontak/aktif`, `tiket/{id}/baca`, dan endpoint lampiran = [V2]
+baru. Semua baris masuk `kontrak()` `KontrakMatriksRoleTest` (MAKE-070 master, MAKE-071 tiket). Route literal (`kategori/opsi`,
+`petugas/saya`, `petugas/kandidat`, `kontak/aktif`, `tiket/ringkasan`, `tiket/ekspor`) didaftarkan **sebelum** `(:num)`.
 
 Pesan galat berbahasa Indonesia dan mengikuti teks legacy bila ada (mis. "Percakapan ini telah ditutup …" [K `LS:1117`],
 "Percakapan ini tidak memerlukan balasan …" [K `LS:1121`]).
@@ -387,22 +425,150 @@ Tabel §6.1 di atas = kontrak awal, **bukan** kontrak final. Butir berikut belum
 nilainya di laporan A0**, reviewer menyetujui, lalu MAKE-070 (master) dan MAKE-071 (tiket) **membekukannya di README
 `backend/app/Controllers/Api/HaloSimpeg/README.md`** sebelum B1 FE mulai (§3). Perubahan sesudah beku = CR lewat reviewer.
 
-| No | Butir yang wajib dibekukan | Batasan yang sudah berlaku | Paket |
-|---|---|---|---|
-| K-A1 | Endpoint ubah status master terpisah dari PUT payload penuh untuk kategori, petugas, dan kontak (bentuk `PATCH …/{id}/status`, nama path final) | AGENTS.md §1 (aksi ⋮ Aktifkan/Nonaktifkan), pola chatbot §6.5 dan `backend/app/Config/Routes.php:71`; domain status master 0/1 (DBV-022 DQ-5, F8-03) | MAKE-070 |
-| K-A2 | Parameter daftar kontak "aktif" (role 1–7) vs "semua" (role 1): nama parameter dan perilaku bila role selain 1 meminta "semua" | F8-18, AC-E07.1 | MAKE-070 |
-| K-A3 | Endpoint atau field "petugas saya": apakah pengguna petugas aktif, kategori yang ditugaskan, dipakai FE untuk AC-E08.1 dan badge | F8-06, §6.2 | MAKE-070/071 |
-| K-A4 | Definisi "hapus petugas bila tidak ada tiket aktif" (tiket terikat ke kategori, `receiver` = 0, bukan ke petugas): kapan hapus ditolak, pesan galat, dan AC-nya (AC-E02.8) | F8-09, `LS:709-711`, B-12 | MAKE-070 |
-| K-A5 | Bentuk respons daftar dan detail (nama field, paginasi: nama parameter halaman/ukuran, batas ukuran halaman, metadata), kode galat (`code` snake_case di amplop v2) | Amplop v2 + field `code`; pola `Config\Chatbot::$perHalamanBawaan`/`$perHalamanMaks` (`backend/app/Config/Chatbot.php:59`, `:61`) sebagai pembanding, bukan nilai | MAKE-070/071 |
-| K-A6 | Pola kunci path lampiran baru (`halo-simpeg/{nip}/{id_inbox}/…` atau pola kunci unggahan v2 `YYYY/MM/<32 hex>.<ext>`) | F8-17, T-4; keduanya privat | MAKE-071 |
-| K-A7 | Pencocokan tabel §6.1 dengan Matriks Role × Endpoint Modul E (role per route), lalu daftar baris yang masuk `KontrakMatriksRoleTest` | F8-04, AC-E02.7 | A0 → MAKE-070/071 |
-| K-A8 | Angka throttle, batas panjang, dan batas baris ekspor (§7.3a) | BP8-10, §7.3a | A0 → MAKE-071/074 |
+**Status v1.3: semua kewajiban terpenuhi.** Handling Case mengusulkan nilainya di laporan A0, reviewer menyetujui (16-11-2026,
+dua putaran revisi), dan Horii memutus butir yang menjadi wewenangnya (16-11-2026). Hasilnya = §6.1b. MAKE-070/071 tetap
+**membekukan** kontrak di README `Controllers/Api/HaloSimpeg` (README itu menjadi sumber beku final; bila berbeda dengan §6.1b,
+selisihnya diselesaikan lewat reviewer sebelum beku).
+
+| No | Butir yang wajib dibekukan | Batasan yang sudah berlaku | Paket | Status (v1.3) |
+|---|---|---|---|---|
+| K-A1 | Endpoint ubah status master terpisah dari PUT payload penuh untuk kategori, petugas, dan kontak (bentuk `PATCH …/{id}/status`, nama path final) | AGENTS.md §1 (aksi ⋮ Aktifkan/Nonaktifkan), pola chatbot §6.5 dan `backend/app/Config/Routes.php:71`; domain status master 0/1 (DBV-022 DQ-5, F8-03) | MAKE-070 | ✔ `PATCH halo-simpeg/{kategori\|petugas\|kontak}/{id}/status`, `{status: 0\|1}` (FE memetakan Aktifkan = 1, Nonaktifkan = 0; beda dengan chatbot 1/2); PUT tetap payload penuh dan boleh memuat `status` |
+| K-A2 | Parameter daftar kontak "aktif" (role 1–7) vs "semua" (role 1): nama parameter dan perilaku bila role selain 1 meminta "semua" | F8-18, AC-E07.1 | MAKE-070 | ✔ dua path `kontak/aktif` (1–7) dan `kontak` (1) (Q-A0-7, reviewer) |
+| K-A3 | Endpoint atau field "petugas saya": apakah pengguna petugas aktif, kategori yang ditugaskan, dipakai FE untuk AC-E08.1 dan badge | F8-06, §6.2 | MAKE-070/071 | ✔ `GET petugas/saya` → `PetugasSaya` (§6.1b); bentuk K-A3 laporan A0 putaran pertama (dengan `id_support_officer`) gugur |
+| K-A4 | Definisi "hapus petugas bila tidak ada tiket aktif" (tiket terikat ke kategori, `receiver` = 0, bukan ke petugas): kapan hapus ditolak, pesan galat, dan AC-nya (AC-E02.8) | F8-09, `LS:709-711`, B-12 | MAKE-070 | ✔ (1') Horii 16-11-2026 (§7.2) |
+| K-A5 | Bentuk respons daftar dan detail (nama field, paginasi: nama parameter halaman/ukuran, batas ukuran halaman, metadata), kode galat (`code` snake_case di amplop v2) | Amplop v2 + field `code`; pola `Config\Chatbot::$perHalamanBawaan`/`$perHalamanMaks` (`backend/app/Config/Chatbot.php:59`, `:61`) sebagai pembanding, bukan nilai | MAKE-070/071 | ✔ §6.1b (nama respons Indonesia berobjek; bentuk K-A5 putaran pertama gugur) |
+| K-A6 | Pola kunci path lampiran baru (`halo-simpeg/{nip}/{id_inbox}/…` atau pola kunci unggahan v2 `YYYY/MM/<32 hex>.<ext>`) | F8-17, T-4; keduanya privat | MAKE-071 | ✔ `halo-simpeg/{YYYY}/{MM}/{32 hex}.{ext}` (F8-17) |
+| K-A7 | Pencocokan tabel §6.1 dengan Matriks Role × Endpoint Modul E (role per route), lalu daftar baris yang masuk `KontrakMatriksRoleTest` | F8-04, AC-E02.7 | A0 → MAKE-070/071 | ✔ §6.1 (paragraf pencocokan Matriks) |
+| K-A8 | Angka throttle, batas panjang, dan batas baris ekspor (§7.3a) | BP8-10, §7.3a | A0 → MAKE-071/074 | ✔ §7.3a, dikonfirmasi Horii 16-11-2026 (Q-A0-8) |
+
+#### 6.1b Kontrak helpdesk disetujui A0 (v1.3)
+
+Sumber: daftar kontrak final laporan A0 (Handling Case, disetujui reviewer 16-11-2026), yang menggantikan K-A3, K-A5, dan
+rincian kontrak putaran pertama laporan itu, ditambah kebutuhan laporan B0 (Worker Muse) yang disetujui reviewer. **README
+`backend/app/Controllers/Api/HaloSimpeg/README.md` saat MAKE-070 (master) dan MAKE-071 (tiket) = sumber beku final**; tabel di
+bawah adalah bentuk ringkas yang wajib diikuti README itu. Perubahan sesudah beku = CR lewat reviewer (kedua jalur). `types.ts` /
+`schemas.ts` FE mengikuti README beku, bukan laporan B0.
+
+**Konvensi.** Amplop v2 `{status, data, message}` + `code` opsional snake_case (aditif); waktu ISO-8601 UTC berakhiran `Z` (pola
+`PusatNotifikasiService::iso`); teks polos (BP8-4); `Halaman<T> = {items, total, page, per_page}` (`page` ≥ 1, `per_page` 1..100
+bawaan 20 lewat `ListQuery`, angka di `Config\HaloSimpeg`; parameter berbentuk array → 422). **Masukan** multipart/JSON memakai
+nama legacy (`id_question_category`, `subject`, `msg`, `arsip`, `ingatkan_24_jam`, `category[]`, `id_user`, `email`, `no_hp`,
+`name`, `contact`, `status`); **respons** memakai nama Indonesia ringkas berobjek, pola README chatbot
+(`backend/app/Controllers/Api/HaloSimpeg/Chatbot/README.md`), satu set nama yang sama di README, fixture, dan FE. **Id akun petugas
+tidak pernah dikirim ke klien non-role-1** (`msg_sender`/`closed_by` mentah tidak dikirim). Role dicek di filter route bila bisa
+(tersapu `KontrakMatriksRoleTest`); kewenangan objek di `AksesTiket` (BP8-2), yang juga menghitung semua flag `bisa_*` (satu
+sumber dengan penegakan).
+
+**Master**
+
+| Bentuk | Field |
+|---|---|
+| `Kategori` | `id`, `nama`, `status: 0\|1`, `jumlah_petugas`, `bisa_hapus` (false bila dipakai tiket/petugas), `dibuat_pada`, `diubah_pada` |
+| `KategoriOpsi` | `id`, `nama` (hanya status 1; `GET kategori/opsi`, array) |
+| `Petugas` | `id`, `id_user`, `label` (§7.2: role 1 nama akun; lain NIP – nama – jabatan), `email`, `no_hp\|null`, `status: 0\|1`, `kategori: {id, nama, status}[]` (urut `id`), `bisa_hapus`, `alasan_tidak_bisa_hapus: string\|null` (teks 422 `petugas_terakhir` bila `bisa_hapus=false`) |
+| `PetugasKandidat` | `id_user`, `label` (`GET petugas/kandidat?search=` 2..50 karakter, maks 20 hasil) |
+| `PetugasSaya` | `{petugas: bool, aktif: bool, kategori: {id, nama, status}[], bisa_ekspor: bool}`; bukan petugas → `{petugas:false, aktif:false, kategori:[], bisa_ekspor:false}`; `id_support_officer` tidak dikirim; `bisa_ekspor` = petugas aktif berapa pun kategorinya |
+| `Kontak` | `id`, `nama`, `kontak`, `email\|null`, `status: 0\|1`, `dibuat_pada`, `diubah_pada`; `kontak/aktif` = array tanpa `status`/stempel |
+| PATCH `…/{id}/status` | 200 `{...baris master, peringatan: string\|null}`. Petugas: menonaktifkan petugas **aktif terakhir** sebuah kategori yang punya tiket Open → `peringatan` = "Petugas ini adalah petugas aktif terakhir pada kategori {daftar nama}. Tiket terbuka pada kategori tersebut tidak memiliki penjawab sampai petugas lain diaktifkan."; selain itu `null` (kategori/kontak selalu `null`) |
+| POST/PUT/DELETE master | POST 201 baris; PUT 200 baris; DELETE 200 `{id}` |
+
+**Tiket**
+
+| Bentuk | Field |
+|---|---|
+| `TiketBaris` | `id`, `subjek`, `kategori: {id, nama}\|null`, `status: 'open'\|'closed'`, `dibuat_pada`, `pemilik_nama`, `sebagai_petugas`, `belum_dibaca` (menurut sisi pemanggil), `perlu_tindak` (ekspresi SQL sama dengan `Ringkasan.perlu_tindak`; `false` bila pemanggil bukan petugas tiket itu), `pesan_terakhir: {id_inbox_msg, waktu, potongan (100 code point), pengirim_label (aturan daftar D7 (a)), lampiran: {nama, tipe}\|null}\|null` (kolom LAMPIRAN TERAKHIR [K `VI:76`, `:103-109`]; satu subkueri yang sama dengan pengurutan, tanpa N+1), `bisa_balas`, `bisa_tutup`, `bisa_hapus` |
+| `TiketDetail` | `TiketBaris` + `allow_reply`, `snapshot: {nip, jabatan, satker}\|null` (`null` bagi pemilik dan non-petugas; terisi bagi petugas tiket itu atau role 1 [K `VD:21-26`]), `ditutup_oleh_label: string\|null` [V2] (aturan detail D7 (a): nama bila penutup = pemilik atau peninjau role 1, selain itu "Admin"; `null` bila Open atau `closed_by` kosong), `pengingat: {aktif, jatuh_tempo}\|null` (petugas saja), `pesan: Pesan[]` (urut `waktu` naik, `id_inbox_msg` naik) |
+| `Pesan` | `id_inbox_msg`, `waktu`, `isi`, `pengirim_label` (aturan detail D7 (a)), `milik_saya`, `dari_pemilik`, `urutan_pengirim: int`, `lampiran: {nama, tipe, ukuran\|null}\|null` |
+| `Ringkasan` | `{belum_dibaca_saya, belum_dibaca_petugas, perlu_tindak, badge, total}` (aturan §6.2) |
+| `GET tiket` | `peran=saya\|petugas` (bawaan `saya`; `petugas` untuk non-petugas/nonaktif → 200 `Halaman` kosong), `status=open\|closed`, `kategori=<id>`, `q` (subjek/isi pesan, LIKE ter-escape), `baca=semua\|belum\|sudah` (bawaan BE `semua`; bawaan per tab ditentukan FE), `perlu_tindak=1` (hanya dengan `peran=petugas`, selain itu 422; `total` hasilnya = `Ringkasan.perlu_tindak`, diuji), `page`, `per_page` |
+| Respons tulis tiket | POST tiket → 201 `TiketDetail`; POST pesan → 201 `{pesan: Pesan, tiket: TiketBaris}`; POST tutup → 200 `TiketBaris`; DELETE → 200 `{id}`; POST baca → 200 `Ringkasan` |
+| Lampiran | `nama` = `lampiran-{id_tiket}-{id_pesan}.{ext}` = `Content-Disposition`; `tipe` dari ekstensi `AturanLampiran`; path tidak pernah dikirim (AC-E08.9) |
+| Ekspor ada data | 200 xlsx + `Content-Disposition: attachment; filename="Rekap_Halo_Simpeg_{ds}_{de}.xlsx"` + audit unduhan |
+| Ekspor kosong | 200 JSON `{status:'success', data:{kosong:true, jumlah:0}, message:'Tidak ada data Halo Simpeg pada periode ini.'}`, `Content-Type: application/json`, tanpa `Content-Disposition`, tanpa audit |
+
+**Urutan dan pemecah seri.** Pesan terakhir per tiket = `ORDER BY created_at DESC, id_inbox_msg DESC LIMIT 1`. Daftar =
+`pesan_terakhir.waktu DESC` dengan NULL terakhir (tiket tanpa pesan ditampilkan di akhir [V2], B-20), lalu `id_inbox DESC`.
+`disiplin_ticket.updated_at` tidak dipakai sebagai "pesan terakhir" karena ber-`ON UPDATE` (ikut berubah saat baca/tutup).
+
+**Penyamaran nama pengirim (D7 (a), Horii 16-11-2026: ikut legacy per layar).** `pengirim_label` dihitung BE; FE menampilkannya
+apa adanya.
+
+| Layar | Aturan `pengirim_label` |
+|---|---|
+| Daftar (`pesan_terakhir.pengirim_label`) | nama pengirim bila pengirim = pemilik tiket; selain itu **"Admin" bagi semua peninjau**, termasuk role 1 dan petugas yang menulis pesan itu [K `VI:110-117`] |
+| Detail (`Pesan.pengirim_label`) | nama pengirim bila pengirim = pemilik **atau** peninjau = role 1; selain itu "Admin" [K `VD:48-55`] |
+
+Nama bergelar (`msg_sender_name`) berlaku bagi semua akun **ber-NIP** role apa pun (PRD §7.4; legacy hanya `UserLevel` 2/6,
+`LS:1580-1588`, B-28). `milik_saya` membedakan gelembung kirim/terima. `urutan_pengirim` = 0 untuk pemilik; petugas 1..n menurut
+kemunculan pertama (urut `waktu`, `id_inbox_msg`) [K `VD:5-14`, warna gelembung `color-N` `:44`; legacy menomori relatif terhadap
+peninjau, v2 per tiket relatif pemilik = [V2] kecil, B-23]; tanpa rahasia, tidak dapat dibalik ke id dan tidak dapat dikaitkan
+antar tiket (usulan `kunci_pengirim` HMAC gugur v1.3).
+
+**Galat** (semua teks, batas panjang §7.3a, dan throttle ditulis lengkap di README):
+
+| Status | `code` | Teks |
+|---|---|---|
+| 404 | — | "Data percakapan tidak ditemukan." (tiket; BP8-2: tiket orang lain = tidak ditemukan); master: "Data tidak ditemukan." |
+| 403 | `bukan_petugas` | "Fitur ini hanya untuk petugas Halo Simpeg yang aktif." (ekspor) |
+| 403 | `bukan_pihak_berwenang` | "Anda tidak berwenang melakukan tindakan ini pada percakapan ini." (pihak yang bisa melihat tetapi tidak berhak, mis. pemilik menghapus, termasuk tiket NULL) |
+| 422 | `tiket_ditutup` | "Percakapan ini telah di tutup oleh admin. Silahkan tambah pertanyaan baru untuk memulai percakapan baru." [K `LS:1117`] |
+| 422 | `tiket_tanpa_balasan` | "Percakapan ini tidak memerlukan balasan. Silahkan tambah pertanyaan baru untuk memulai percakapan baru." [K `LS:1121`] |
+| 422 | `tiket_sudah_ditutup` | "Percakapan ini telah ditutup sebelumnya." [K `SC:672`, dipangkas] |
+| 422 | `tiket_tanpa_kategori` | "Pertanyaan ini tidak memiliki kategori. Silakan tambah pertanyaan baru." (H8-16 (a1)) |
+| 422 | `ekspor_terlalu_besar` | "Data pada periode ini terlalu besar untuk diekspor. Persempit periode." (satu teks netral untuk batas baris dan ukuran) |
+| 422 | `kategori_dipakai` | "Kategori masih dipakai tiket atau petugas. Nonaktifkan kategori ini." |
+| 422 | `kategori_duplikat` | "Kategori sudah terdaftar." [K `LS:392-424`] |
+| 422 | `petugas_duplikat` | "Akun ini sudah terdaftar sebagai petugas." [K `LS:765-788`] |
+| 422 | `petugas_terakhir` | "Petugas ini petugas terakhir pada kategori {nama} yang masih memiliki tiket terbuka. Tambahkan petugas lain lebih dulu." |
+| 422 | `kontak_duplikat` | "Nomor kontak sudah terdaftar." [K `LS:176-197`] |
+| 422 | (per kolom) | `errors.<field>` berbentuk array, termasuk `errors.arsip` dan `errors.ingatkan_24_jam`; teks per field di §7.3a |
+| 429 | `throttle` | tiket: "Terlalu banyak pertanyaan baru. Coba lagi dalam 10 menit."; pesan: "Terlalu banyak pesan. Coba lagi dalam satu menit." |
+
+**Fixture** sintetis di **`backend/tests/_support/HaloSimpeg/`** (di luar `Chatbot/`), dengan trait verifikasi bahwa fixture =
+respons nyata (pola `backend/tests/_support/HaloSimpeg/Chatbot/ChatbotFixtureTrait.php`); masuk DoD MAKE-070/071/074; FE menyalinnya
+ke `frontend/src/features/halo-simpeg/__tests__/fixtures/` (tanpa `*.php`), pola chatbot §3:
+
+| Kelompok | Fixture |
+|---|---|
+| Master | `kategori-daftar`, `kategori-opsi`, `petugas-daftar` (termasuk `bisa_hapus=false` + alasan), `kandidat`, `petugas-saya` (aktif, nonaktif, bukan petugas), `kontak-aktif`, `kontak-daftar`, `status-patch`, `status-patch-peringatan` |
+| Tiket | `tiket-daftar` (pemilik; petugas; dilihat role 1 → "Admin" di `pesan_terakhir`), `tiket-detail` (pemilik; petugas; yang sama dilihat role 1 → nama; kategori NULL `bisa_balas=false`; `snapshot` null dan terisi; `ditutup_oleh_label`; 4 kasus label: pesan pemilik, pesan petugas dilihat pemilik, pesan petugas dilihat petugas lain, pesan petugas sendiri), `tiket-ringkasan` (termasuk `badge > total`), `baca` |
+| Galat | `galat-422-tiket` (termasuk `errors.arsip`), `galat-422-ditutup`, `galat-422-tanpa-kategori`, `galat-422-petugas-terakhir`, `galat-422-ekspor`, `galat-403-bukan-petugas`, `galat-403-bukan-pihak-berwenang`, `galat-404`, `galat-429`, `ekspor-kosong` |
 
 ### 6.2 Penghitung belum dibaca (E-06, titik sambung lonceng)
 
 `GET halo-simpeg/tiket/ringkasan` → `{ belum_dibaca_saya, belum_dibaca_petugas, perlu_tindak, total }`. Aturan hitung [K
 `LN:12-60`]: tiket milik pengguna dengan `is_read=2`, ditambah (bila petugas aktif) tiket kategorinya dengan `is_read_off=2`
 yang bukan milik pengguna sendiri (tidak dihitung dua kali). Hanya membaca `disiplin_ticket`.
+
+**Aturan hitung final (v1.3, A0 + keputusan reviewer dan Horii 16-11-2026).** Satu kelas
+`App\Libraries\HaloSimpeg\RingkasanTiket implements RingkasanTiketInterface` dipakai `GET halo-simpeg/tiket/ringkasan` dan
+`jumlahBelumDibaca()` lonceng (BP8-1: hanya membaca `disiplin_ticket` dan `support_officer`/`officer_category`;
+`PusatNotifikasiService` tidak diubah). Bentuk respons: `{belum_dibaca_saya, belum_dibaca_petugas, perlu_tindak, badge, total}`.
+
+| Bagian | Aturan |
+|---|---|
+| `belum_dibaca_saya` | `sender = id_pengguna` AND `is_read = 2` [K `LN:13`]; termasuk tiket berkategori NULL milik sendiri (H8-16 (a1)) |
+| `belum_dibaca_petugas` | hanya bila petugas **aktif** [V2 F8-06; legacy tidak cek]: `id_question_category ∈ kategori petugas` AND `is_read_off = 2` AND `sender <> id_pengguna`. **Semua** tiket milik sendiri dikecualikan dari sisi petugas (Q-A0-4, keputusan reviewer: ikut PRD; legacy hanya mengecualikan tiket sendiri yang `is_read=2`, `LN:13-21`, `:44`), sehingga tiket sendiri di kategori sendiri hanya dihitung di sisi pemilik. Tiket NULL tidak pernah masuk sisi petugas |
+| `perlu_tindak` | sisi petugas aktif, bukan milik sendiri: `status = 0` AND (`is_read_off = 2` OR (`notify_pic = 1` AND `notify_at < sekarang UTC`)) [K `MC:292`, F8-11]; ekspresi yang sama dipakai `TiketBaris.perlu_tindak` dan filter `GET tiket?perlu_tindak=1` |
+| `badge` | jumlah tiket **distinct** (belum dibaca di sisi mana pun ∪ `perlu_tindak`) (D8 (a)); tiket yang belum dibaca sekaligus `perlu_tindak` dihitung sekali; dipakai badge menu Halo Simpeg |
+| `total` | `belum_dibaca_saya + belum_dibaca_petugas` = angka lonceng = `jumlahBelumDibaca()` (AC-E06.9); `perlu_tindak` tidak ditambahkan |
+| Role | route 1–7; `jumlahBelumDibaca()` untuk role di luar 1–7 (role 8) = **0**, bukan `null` |
+
+**Penanda baca (E7 final, v1.3).**
+
+| Kejadian | Hasil | Label |
+|---|---|---|
+| `POST …/baca` oleh **pemilik** | hanya `is_read = 1`, **apa pun** status petugasnya (pemilik yang juga petugas kategori itu tidak menyetel `is_read_off`) | [K `LS:907-912`, if/else] |
+| `POST …/baca` oleh petugas **aktif** kategori yang bukan pemilik | `is_read_off = 1` | [K `LS:914-918`]; syarat aktif [V2 F8-06] |
+| `POST …/baca` oleh pihak lain | 404 (tidak melihat tiket, BP8-2) | — |
+| Baca berulang | idempoten: tanpa tulis dan tanpa audit bila nilai sudah 1; respons 200 `Ringkasan` | [V2] |
+| Balasan pemilik | `is_read = 1`, `is_read_off = 2` | sisi pembalas pemilik = 1 dan sisi lawan = 2: [I] (H8-10) |
+| Balasan petugas | `is_read_off = 1`, `is_read = 2` (+ `notify_pic`/`notify_at` per F8-11) | `is_read_off = 1` [K `LS:1344-1347`]; `is_read = 2` [I] (H8-10) |
+
+Frasa "pemilik yang juga petugas kategori itu menyetel keduanya" (rincian putaran pertama laporan A0) **gugur v1.3**. Test wajib:
+pemilik yang juga petugas kategori itu membalas lalu `POST …/baca` → `is_read_off` tetap 2, dan petugas lain di kategori yang sama
+masih melihat tiket itu belum dibaca + `perlu_tindak`. Test AC-E06.9: angka untuk pemilik, petugas, dan petugas-pemilik tanpa hitung
+ganda; §7.8 (5): `tiket_belum_dibaca` tidak memuat `inbox`.
 
 ### 6.3 Frontend (E-08, E-10)
 
@@ -412,11 +578,41 @@ dinaikkan ke 8 di paket rilis CR-135 (H8-11 (a), F8-50), sebelumnya QA lewat URL
 
 | Tampilan | Pengguna | Isi |
 |---|---|---|
-| Drawer / halaman pegawai (Gambar 33) | pemilik | daftar tiket saya + form tiket baru (kategori, subjek, pesan, lampiran) + thread; badge status Open/Closed |
-| Inbox petugas (Gambar 34) | petugas | antrean tiket kategorinya (kiri), thread + balasan (kanan), tutup/hapus lewat menu ⋮, "Ingatkan 24 jam" |
-| Admin: Kategori, Petugas, Kontak | role 1 | tabel `page-fill` + ⋮ (Edit, Aktifkan/Nonaktifkan, Hapus); tanpa frame Figma → ikut pola Master Data/PIC layanan dan dicatat (AGENTS.md §3.6) |
+| Drawer / halaman pegawai (Gambar 33) | pemilik | daftar tiket saya + form tiket baru (kategori, subjek, pesan, lampiran) + thread; badge status Open/Closed. v1.3: **halaman** `/halo-simpeg` (bukan drawer global, agar tidak bertumpuk dengan launcher Vanya dan mudah di-deep-link) dengan tata letak master-detail yang sama dengan petugas; kartu "Kontak Helpdesk" dari `kontak/aktif` |
+| Inbox petugas (Gambar 34) | petugas | antrean tiket kategorinya (kiri), thread + balasan (kanan), tutup/hapus lewat menu ⋮, "Ingatkan 24 jam". v1.3: ⋮ Lihat detail → Tutup → Hapus mengisi panel kanan; panel "Perlu ditindak"; tombol ekspor bila `bisa_ekspor` |
+| Admin: Kategori, Petugas, Kontak | role 1 | tabel `page-fill` + ⋮ (Edit, Aktifkan/Nonaktifkan, Hapus); tanpa frame Figma → ikut pola Master Data/PIC layanan dan dicatat (AGENTS.md §3.6). v1.3: Aktifkan/Nonaktifkan lewat `PATCH …/status` (`hidden` sesuai status); ⋮ Hapus petugas `disabled` bila `bisa_hapus = false` (AGENTS.md §1 butir 4); 422 tetap ditangani (`UiNotice`); Nonaktifkan yang mengembalikan `peringatan` → `UiNotice` nada peringatan; form Petugas: kandidat lewat pencarian server ber-debounce + penjaga urutan, kategori multi lewat `UiPilihBanyak`. Tombol ekspor bawaan DataTables di list master legacy tidak dibawa (tidak ada di §6.1, B-31) |
 | **Widget Vanya** (E-10) | role 2/6/7 (K-8) | tombol avatar melayang di pojok kanan bawah semua halaman ber-layout (`RedesignShell.vue`), kecuali selama sesi wajib ganti password (F8-43); kartu sapaan saat hover/fokus, ditambah peek otomatis sekali per sesi browser untuk semua perangkat [K dev `dev:views/hr/chatbot/chatbot_popup.php:413-422`]; jendela chat: salam, bubble topik → bubble pertanyaan, tombol "Topik" dan "Populer", kotak ketik maks 300 karakter, 👍/👎 untuk jawaban cocok; tampilan ikut dev disesuaikan token v2 (K-11) |
 | **Admin: Chatbot Manager** (E-10) | role 1 (K-10) | Kategori (judul, status, "Bubble Vanya"), Tag (judul, status, tombol ekspor `UiExportMenu`), QnA (kategori, tag multi, opsi alternatif, status, pertanyaan, jawaban HTML + pratinjau `SafeHtml`; tombol "Unduh template" dan "Impor Excel" di level halaman), Statistik (KPI + tiga tabel top-10), Riwayat (tabel berhalaman, filter tanggal/status cocok/feedback, tanpa aksi baris). Tabel `page-fill` + ⋮ (Edit → Aktifkan/Nonaktifkan → Hapus) |
+
+**Helpdesk FE final (v1.3, laporan B0 + keputusan reviewer dan Horii 16-11-2026):**
+
+- **Tata letak master-detail (keputusan reviewer).** Bawaan layar petugas **dan** pemilik = master-detail ala Gambar 34: daftar kiri
+  berupa tabel biasa (`<table>`) dengan ⋮ per baris (AGENTS.md §1), urutan item **Lihat detail** → **Tutup** (`hidden` bila Closed
+  atau `bisa_tutup = false`, `ConfirmDialog` teks legacy `VI:136`) → **Hapus** (`danger`, `hidden` bila `bisa_hapus = false`,
+  `ConfirmDialog` teks `VI:140`); `testid` `halo-tiket-actions-<id>`, label "Aksi untuk <subjek>". "Lihat detail" melakukan
+  `router.push` ke `/halo-simpeg/tiket/:id`, dan rute itu menjadi keadaan panel kanan (deep-link lonceng/push dan tombol kembali
+  berfungsi; fokus pindah ke judul thread). Baris tidak dapat diklik; tanpa `listbox`/`option` dan **tanpa pengecualian AGENTS.md**.
+  Layar < 1024 px: daftar dan thread tampil sebagai dua halaman pada rute yang sama (panel kanan layar penuh + "Kembali ke
+  daftar") = perilaku responsif, bukan deviasi. Label "Tutup" mengikuti §7.7 (tanpa CR AGENTS.md). Layar petugas dan master tanpa
+  frame Figma (H8-9) dicatat per layar di laporan B1–B3 dan README.
+- **Filter baca.** `baca=semua|belum|sudah` lewat `UiSelect`; bawaan tab antrean = `belum` [K `VI:51`, `:198`], bawaan tab "Tiket
+  saya" = `semua` [V2] (Horii 16-11-2026; konstanta `BACA_BAWAAN_ANTREAN`, `BACA_BAWAAN_SAYA`). Filter kategori di tab antrean tampil
+  bila petugas punya ≥ 2 kategori [K `VI:31-36`]; di tab "Tiket saya" = [V2] §7.4. Tab antrean dan panel "Perlu ditindak" diturunkan
+  dari `GET petugas/saya`, tidak dari role.
+- **Ringkasan + badge.** State modul singleton dengan polling lembut saat pindah halaman (pola `useRingkasanNotifikasi`), aktif
+  hanya bila `ACTIVE_PHASE >= 8` **dan** role sesi ∈ 1–7 **dan** `!auth.mustChangePassword` (preseden lonceng
+  `RedesignShell.vue:117-125`, Vanya `:199`); polling dihentikan dan angka dikosongkan saat syarat berubah (`watch` +
+  `resetHaloSimpeg()`). Badge disisipkan lewat fungsi murni `sisipBadgeHalo(groups, ringkasan.badge)` di `features/halo-simpeg/`
+  yang dipakai computed `groups` `RedesignShell.vue:107` (`0` → tanpa badge; `buildNav` tidak diubah). Item `halo`
+  (`nav.config.ts:320`) tanpa `to`/`roles` sampai CR-135, sehingga badge baru tampil di QA lewat build lokal yang juga mengisi
+  `to`/`roles` (checklist CR-132 bagian B); CR-135 wajib menambah test badge pada `NAV` asli. Lonceng tetap memakai `total`.
+- **Lain-lain.** `POST …/baca` dipanggil eksplisit saat thread dibuka (BP8-7) dan respons `Ringkasan` langsung memperbarui badge;
+  lampiran (termasuk kolom "Lampiran terakhir") dibuka lewat E-04 (blob + object URL); ekspor: service helpdesk memeriksa
+  `Content-Type` respons 200 (`application/json` → hasil "kosong" + `message` di `UiNotice` tanpa `simpanBerkas`; xlsx →
+  `simpanBerkas`), `ambilBerkas` tidak diubah; dialog periode memakai tanggal kalender lokal (tanpa `toISOString()`), akhir ≥ mulai,
+  maksimum hari ini, wajib isi dengan pesan legacy (`VI:214-256`, `:305-310`); popover snapshot NIP/jabatan/satker lewat `UiTooltip`
+  untuk petugas/role 1; tiket kategori NULL berlabel "—" dan `bisa_balas = false` menyembunyikan form balas; Zod memakai angka
+  §7.3a sebagai konstanta tunggal (panjang dihitung code point); keadaan memuat/kosong/galat (403/404/500) per layar.
 
 Menu E-10 (✔ F8-43): Pengaturan → **"Chatbot Manager"** (role 1, `phase: 8`) dengan submenu Kategori, Tag, QnA, Statistik, Riwayat
 (nama menu ikut dev `dev:controllers/hr/Chatbot.php:39`). Widget tidak memakai item menu; komponen dipasang sekali di
@@ -441,6 +637,16 @@ keduanya diganti oleh model F8-02 dan F8-04/F8-06. Bila branch redesign belum di
 | Daftar token web | `POST api/v1/integrasi/fcm-token` | tidak diubah |
 
 Fase 8 **tidak** mengubah job `push-notif` (`PushNotifLayananJob`, terikat `inbox_msg`) — memakai job terpisah agar BP8-1 terjaga.
+
+**Keputusan final (v1.3, ✔ H8-14 (a), Horii 16-11-2026).** Kolom "Dipakai Fase 8" di atas yang menyebut opsi (b) / job
+`push-halo-simpeg` **gugur v1.3**. Yang berlaku:
+
+| Butir | Isi |
+|---|---|
+| Produsen | `TicketNotifService` (sesudah commit) → `AntrePushPesan::antreAkun(list<int> $idPengguna, judul, isi, data, kanal)`, job `push-pesan` yang sudah ada (`backend/app/Config/Queue.php:56-57`), kanal `semua` (F8-15); payload F8-16 `{modul:'halo-simpeg', id_inbox, url}` sampai PN8-1/H8-8 |
+| Penerima | semua pihak (petugas dan pemilik) per `id_pengguna`; pemilik selalu ber-NIP sehingga token Android tetap ketemu lewat `pengguna.nip` (setara legacy `inbox.nip`); petugas role 1 tanpa NIP menerima token web per akun (AC-E06.7); pelaku dikecualikan; akun dan petugas nonaktif dilewati [K B4]; token yang sama dikirim sekali |
+| CR berkas bersama **CR-137** | `AntrePushPesan.php` (method baru aditif, `:48` `antre(nip[])` tetap), `PushPesanJob.php` (membaca `nip[]` lama **atau** `id_pengguna[]` baru, `:37-61`), `PenerimaTokenFcm.php` (`webAkun(list<int>)` web per `id_pengguna` akun aktif, `androidAkun(list<int>)` Android lewat `pengguna.nip` bila ada, hasil digabung lalu dideduplikasi), `backend/app/Libraries/Push/README.md` (satu kalimat). `PushNotifGatewayInterface` dan `push-notif` tidak disentuh (BP8-1). Commit terpisah `fix(push): …` (CR-137) di branch MAKE-072 |
+| Test CR-137 | regresi pemakai lain `AntrePushPesan` (`PushAndroidCuti`, `PushAndroidLkhKonket`: cuti/LKH/Konket); job lama `nip[]` yang sudah antre tetap terkirim; akun role 1 tanpa NIP menerima token web; dedup |
 
 ### 6.5 Endpoint chatbot E-10 (prefix `api/v1/halo-simpeg/chatbot`, amplop v2, filter `jwt` + `role`)
 
@@ -498,6 +704,31 @@ keputusan **FK `nip` → `pegawai.nip`** yang ditahan di `MigrationsDitahan/AddF
 (`fk_nip_disiplin_ticket_to_pegawai`): dipasang hanya bila audit yatim setelah impor = 0, bila tidak validasi di aplikasi.
 Domain `is_read`/`is_read_off` (1/2) dan `notify_pic` (0/1/2) tidak diubah.
 
+**Koreksi indeks (v1.3, A0 + review putaran 2; nilai final = hasil review DBV-028).** Usulan `disiplin_ticket (sender,
+updated_at)` di atas **gugur v1.3**: `updated_at` ber-`ON UPDATE` (berubah saat baca/tutup) sehingga tidak melayani urutan.
+
+| Tabel | Indeks yang diajukan ke DBV | Untuk |
+|---|---|---|
+| `disiplin_ticket` | `(id_question_category, is_read_off, status)`, **atau** `(id_question_category, status, is_read_off)` dengan `status IN (0,1)` ditulis eksplisit di kueri ringkasan; dokumen DBV-028 memuat `EXPLAIN` kedua bentuk dan DBV memilih | antrean, `belum_dibaca_petugas`, `perlu_tindak` |
+| `disiplin_ticket` | `(sender, status)` (PK sudah ikut di indeks sekunder InnoDB) | daftar `peran=saya` + filter status, `belum_dibaca_saya` |
+| `disiplin_ticket_msg` | `(id_inbox, created_at)` | thread + subkueri pesan terakhir (`ORDER BY created_at DESC, id_inbox_msg DESC LIMIT 1`) |
+
+- Opsi terukur untuk DBV: kolom `last_msg_at` (diisi aplikasi saat sisip pesan) bila `EXPLAIN` daftar pada data uji besar buruk;
+  tanpa itu, urutan memakai subkueri lewat indeks `disiplin_ticket_msg`.
+- **Dua KEY FK menjadi redundan** terhadap indeks komposit berawalan sama: `fk_id_question_category_i_qc`
+  (`backend/app/Database/Migrations/2026-10-26-100500_CreateDisiplinTicketFase4.php:97`) dan `fk_id_inbox_im_qc` (`:121`). Membuang
+  atau mempertahankannya **diputus DBV** (FK tetap butuh satu indeks berawalan kolomnya); migration lama tidak diedit.
+- Tabel baru (usulan A0, label final di dokumen DBV): `support_officer.id_user` **INT UNSIGNED** NOT NULL UNIQUE FK RESTRICT ke
+  `pengguna.id_pengguna` (tipe sama dengan kolom acuan); `email` VARCHAR(150) [I], `no_hp` VARCHAR(20) NULL [I], `status` TINYINT
+  CHECK (0,1); `officer_category` UNIQUE `(id_support_officer, id_question_category)` + KEY `(id_question_category)`;
+  `help_desk_contact.contact` VARCHAR(20) UNIQUE, `name` VARCHAR(150), `email` NULL ≤ 150 [I]. Panjang [I] sampai D1 tiga tabel
+  (Q-A0-3, tidak menahan DBV-028). `question_category`: UNIQUE nama sesudah pra-cek atau unik di aplikasi seperti legacy = keputusan
+  DBV.
+- Kueri pra-cek (ditulis di dokumen, dijalankan DBV/reviewer di salinan dev, hanya angka): `contact` ganda; `id_user` ganda;
+  pasangan petugas-kategori ganda; `officer_category` yatim dua arah; `support_officer.status` di luar '0'/'1'; nama kategori ganda
+  (trim, ci); `support_officer.id_user` yang tidak ada di `pengguna`; irisan tiket NULL + Open + sender yatim (B6) dan `attachments`
+  yang tidak cocok pola segmen `^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$` (B7) untuk MAKE-097.
+
 **Tidak** ada tabel notifikasi/antrean baru (digantikan `integrasi_log` dan queue Fase 6). Label [K]/[V2]/[I] per kolom di dokumen DBV.
 
 **AC-E01.1** `backend/docs/db-review/DBV-028-*.md` di-approve DBV; **AC-E01.2** migration naik/turun bersih di DB scratch dan
@@ -516,6 +747,15 @@ tes skema `inbox`/`inbox_msg` (Fase 4, `SkemaInboxTicketTest`) tetap hijau.
   Menonaktifkan petugas menghentikan akses antrean (F8-06) tanpa mengubah tiket.
 - **Kontak:** `name`, `contact`, `email?`, `status`; nomor unik (`LS:156-200`).
 - Tulis lewat model beraudit; menu ⋮ (AGENTS.md §1). Menu navigasi: Pengaturan → "Halo Simpeg" (Kategori, Petugas, Kontak), role 1.
+- **Hapus petugas (v1.3, K-A4 (1'), Horii 16-11-2026).** Tiket terikat ke kategori (`receiver = 0` [K]), bukan ke petugas, sehingga
+  rumusan "tidak ada tiket aktif milik petugas" **gugur v1.3**. Hapus fisik [K]: `officer_category` lalu `support_officer` dalam
+  satu transaksi dengan snapshot `before`. Hapus → **422 `petugas_terakhir`** bila petugas itu petugas **terakhir** (aktif **atau**
+  nonaktif) sebuah kategori yang masih punya tiket Open (menutup celah Nonaktifkan → Hapus); selain itu boleh. **Nonaktifkan**
+  petugas aktif terakhir tetap boleh (offboarding darurat) → 200 + `peringatan` (§6.1b). `Petugas.bisa_hapus` +
+  `alasan_tidak_bisa_hapus` dihitung dari aturan yang sama agar ⋮ Hapus `disabled`. Runbook MAKE-074/MAKE-097 menghitung tiket
+  Open di kategori tanpa petugas aktif sesudah impor.
+- **Batas field master (v1.3):** §7.3a. Domain status master tetap 0/1 (berbeda dari chatbot 1/2). Tombol ekspor Excel/CSV bawaan
+  DataTables di list master legacy tidak dibawa (B-31).
 
 **AC-E02.1** CRUD kategori/petugas/kontak role 1; role lain 403; **AC-E02.2** satu kategori dengan ≥2 petugas, satu petugas dengan ≥2
 kategori; **AC-E02.3** petugas duplikat ditolak 422; **AC-E02.4** hapus kategori yang dipakai → 422; **AC-E02.5** kandidat hanya
@@ -525,8 +765,12 @@ aktif, hanya role 1 melihat semua dan mengubah.
 **AC tambahan v1.2:** **AC-E02.7** semua route helpdesk `api/v1/halo-simpeg/*` (di luar `chatbot/`) terdaftar dan lolos
 `backend/tests/feature/KontrakMatriksRoleTest.php` dengan `PREFIKS_CAKUPAN` diperluas ke `halo-simpeg` (`:60`), role per route
 sesuai hasil pencocokan Matriks Modul E di A0 (K-A7); **AC-E02.8** aturan hapus petugas sesuai definisi yang dibekukan di A0/MAKE-070
-(K-A4) dan teruji dua arah (boleh / ditolak 422); **AC-E02.9** Aktifkan/Nonaktifkan kategori, petugas, dan kontak lewat endpoint
-status terpisah (K-A1) tanpa mengirim ulang payload penuh, dan tercatat di `audit_logs`.
+(K-A4) dan teruji dua arah (boleh / ditolak 422); **v1.3 (1'):** petugas kedua (aktif) di kategori ber-tiket Open → hapus boleh;
+petugas terakhir (aktif atau nonaktif) kategori ber-tiket Open → 422 `petugas_terakhir`; Nonaktifkan petugas aktif terakhir → 200 +
+`peringatan` tidak `null`; `bisa_hapus` sama dengan hasil aksi (test kesetaraan); **AC-E02.9** Aktifkan/Nonaktifkan kategori, petugas, dan kontak lewat endpoint
+status terpisah (K-A1) tanpa mengirim ulang payload penuh, dan tercatat di `audit_logs`; v1.3: status sama dengan nilai sekarang
+→ 200 tanpa tulis dan tanpa audit (idempoten); nilai di luar 0/1 → 422. **AC-E07.1 (v1.3):** diuji pada dua path `kontak/aktif`
+(role 1–7) dan `kontak` (role 1; role 2–7 → 403 dari filter route).
 
 ### 7.3 E-03 — Buat tiket (MAKE-071)
 
@@ -539,6 +783,8 @@ status terpisah (K-A1) tanpa mengirim ulang payload penuh, dan tercatat di `audi
   `is_read_off=2`, `notify_pic=2`; sisipkan pesan pertama; simpan lampiran (dihapus bila transaksi gagal, `LS:1016-1020`).
 - Setelah commit: antre push ke petugas kategori (§7.6). Tiket **tidak** menulis `inbox`/`inbox_msg` (BP8-1).
 - Throttle (BP8-10); pesan sukses/galat mengikuti legacy ("Berhasil menambahkan data halo simpeg.").
+- **v1.3:** throttle dicek **sebelum** unggah (lewat batas → 429 tanpa baris tertulis dan tanpa berkas tersimpan); berkas
+  disimpan sebelum transaksi (urutan legacy) dengan kunci F8-17 dan dicatat `PenjagaBerkas`; respons 201 `TiketDetail` (§6.1b).
 
 **AC-E03.1** tiket tersimpan di `disiplin_ticket` berstatus Open dengan pesan pertama; **AC-E03.2** `inbox`/`inbox_msg` tidak
 bertambah satu baris pun (test eksplisit); **AC-E03.3** kategori nonaktif/tidak ada → 422; **AC-E03.4** pesan kosong, subjek kosong
@@ -548,6 +794,43 @@ snapshot jabatan/satker tersimpan; **AC-E03.9** melebihi throttle → 429 (angka
 antrean tidak menggagalkan tiket.
 
 #### 7.3a Angka terukur helpdesk (v1.2): ditetapkan di A0, dikonfirmasi Horii
+
+**✔ FINAL (v1.3): angka diusulkan A0 dan dikonfirmasi Horii 16-11-2026 (Q-A0-8, "ikut rekomendasi semua").** Tabel final di
+bawah menggantikan tabel v1.2 sesudahnya (kolom "Nilai" v1.2 yang berbunyi "Ditetapkan di A0…" gugur v1.3). Semua angka di
+`Config\HaloSimpeg` dan dapat ditimpa `.env`. Throttle memakai `Services::throttler()` dengan kunci per `id_pengguna` (pola
+`DokumenService::wajibThrottle`, `backend/app/Libraries/Dashboard/Dokumen/DokumenService.php:353-360`). Panjang = `mb_strlen`
+(code point) **sesudah trim**; galat 422 per kolom `errors.<field>`.
+
+| Angka / field | Nilai final | Teks galat / catatan |
+|---|---|---|
+| Throttle buat tiket | **5 per 10 menit** per akun (kapasitas 5, 600 detik) | 429 "Terlalu banyak pertanyaan baru. Coba lagi dalam 10 menit." |
+| Throttle kirim pesan | **20 per menit** per akun (satu kunci untuk balas di semua tiket) | 429 "Terlalu banyak pesan. Coba lagi dalam satu menit." |
+| tiket `id_question_category` | wajib, ada, status 1 | "Kategori wajib dipilih." / "Kategori tidak tersedia." |
+| tiket `subject` | wajib, ≤ **250** [K kolom VARCHAR(250)] | "Subjek wajib diisi." / "Subjek maksimal 250 karakter." |
+| tiket/pesan `msg` | wajib, ≤ **5.000** (kolom TEXT 65.535 byte ≈ 16.383 karakter utf8mb4, jadi jauh di bawah batas kolom) | "Pesan wajib diisi." / "Pesan maksimal 5.000 karakter." |
+| `arsip` | opsional; 9 ekstensi, ≤ 5 MB, isi cocok (`AturanLampiran`/`ValidasiBerkas`) | teks `ValidasiBerkas` yang ada |
+| `ingatkan_24_jam` | {0,1}; 1 hanya petugas aktif bukan pemilik (F8-11) | "Nilai pengingat tidak valid." / "Pengingat 24 jam hanya dapat diatur petugas." |
+| kategori `question_category` | wajib, ≤ **250** [K], unik (trim, ci) | "Nama kategori wajib diisi." / "Nama kategori maksimal 250 karakter." / `kategori_duplikat` |
+| `status` master | {0,1} | "Status tidak valid." |
+| petugas `id_user` | wajib, akun aktif, kandidat F8-07, unik | "Akun petugas wajib dipilih." / "Akun tidak memenuhi syarat petugas." / `petugas_duplikat` |
+| petugas `category[]` | ≥ 1, semua ada | "Minimal satu kategori." |
+| petugas `email` | wajib, format email, ≤ **150** [I] | "Email wajib diisi." / "Format email tidak valid." / "Email maksimal 150 karakter." |
+| petugas `no_hp` | opsional, ≤ **20** [I] | "Nomor HP maksimal 20 karakter." |
+| kontak `name` | wajib, ≤ **150** [I] | "Nama wajib diisi." / "Nama maksimal 150 karakter." |
+| kontak `contact` | wajib, ≤ **20** [I], unik | "Nomor kontak wajib diisi." / "Nomor kontak maksimal 20 karakter." / `kontak_duplikat` |
+| kontak `email` | **opsional**, format email, ≤ **150** [I] (legacy form tanpa validasi, `views/hr/support/help_desk/form.php:52-56`) | "Format email tidak valid." / "Email maksimal 150 karakter." |
+| kandidat `search` | 2..50 karakter, maks 20 hasil | "Kata kunci minimal 2 karakter." |
+| ekspor `ds`, `de` | wajib, `Y-m-d`, `ds` ≤ `de`; tanggal kalender WIB → rentang UTC `[ds 00:00 WIB, de+1 00:00 WIB)`; tanpa batas hari | "Tanggal awal dan akhir wajib diisi." / "Tanggal awal tidak boleh melebihi tanggal akhir." |
+| ekspor `format` | hanya `xlsx` (AC-E09.6) | "Format ekspor tidak didukung." |
+| Batas baris ekspor `eksporMaksBaris` | **10.000** baris pesan per berkas (dihitung `COUNT` sebelum membangun berkas) | 422 `ekspor_terlalu_besar` (teks netral §6.1b); tanpa berkas terpotong |
+| Batas ukuran ekspor `eksporMaksKarakter` | `SUM(CHAR_LENGTH(msg))` ≤ ambang; **ambang ditetapkan lewat pengukuran memori nyata di test MAKE-074** | 422 `ekspor_terlalu_besar` (teks sama) |
+| Potong sel ekspor | **32.767** karakter per sel (batas sel Excel), penanda "… [dipotong]" | [V2] (B-27); pengecualian AC-E09.8 |
+| Paginasi | `per_page` 1..100, bawaan 20 (`perHalamanBawaan`, `perHalamanMaks`) | parameter array → 422 |
+
+Panjang kolom master [I] di atas adalah batas aplikasi; nilai final mengikuti tipe kolom DBV-028, dan bila D1 tiga tabel didapat
+(Q-A0-3), batas aplikasi = panjang kolom.
+
+Tabel v1.2 (riwayat; kolom "Nilai" digantikan tabel final di atas):
 
 Angka di bawah **belum final**. Handling Case mengusulkan angkanya di laporan A0 (K-A8), reviewer memeriksa, **Horii
 mengonfirmasi**, lalu angka ditulis di `Config\HaloSimpeg` (bisa ditimpa `.env`) dan di README kontrak. Sebelum itu
@@ -566,7 +849,8 @@ AC-E03.9, AC-E09.* yang bergantung pada angka belum bisa diuji tepat. Nilai **[u
 
 [K `LS:817-927`, `LS:1097-1305`, `LS:1307-1430`, `LS:1567-1597`, `VI`, `VD`].
 - **Daftar** (`peran=saya|petugas`): `saya` = `sender` = pengguna; `petugas` = `id_question_category` ∈ kategori petugas aktif
-  (F8-06). Gabungan menandai `sebagai_petugas`. Hanya tiket yang punya pesan ditampilkan (`LS:868`). Kolom: tanggal tiket, subjek,
+  (F8-06). Gabungan menandai `sebagai_petugas`. Hanya tiket yang punya pesan ditampilkan (`LS:868`) (gugur v1.3: tiket tanpa pesan
+  ditampilkan di akhir [V2], lihat butir v1.3 di bawah). Kolom: tanggal tiket, subjek,
   kategori, pengirim (petugas melihat), tanggal & isi pesan terakhir (terpotong), status Open/Closed, penanda belum dibaca per sisi
   (`VI:87-92`). Urut pesan terakhir desc (`LS:878-883`). Filter kategori/status/kata kunci; paginasi di server.
 - **Detail:** semua pesan urut `created_at` ascending; lampiran per pesan; tiket orang lain → 404 (BP8-2).
@@ -574,33 +858,65 @@ AC-E03.9, AC-E09.* yang bergantung pada angka belum bisa diuji tepat. Nilai **[u
 - **Balas:** F8-10. `msg_sender` = id pengguna, `msg_sender_name` = nama bergelar untuk akun ber-NIP (`LS:1581-1588`),
   `msg_receiver` = pemilik bila pembalas petugas; bila pembalas pemilik → `receiver` tiket (0) (`LS:1590-1595`). Petugas boleh
   `ingatkan_24_jam` (F8-11).
-- Petugas yang juga pemilik tiket di kategorinya sendiri: dua sisi berlaku (tidak dihitung ganda di ringkasan).
+- Petugas yang juga pemilik tiket di kategorinya sendiri: dua sisi berlaku (tidak dihitung ganda di ringkasan). (v1.3: diperjelas
+  §6.2 — tiket milik sendiri hanya dihitung di sisi pemilik, dan `POST …/baca` oleh pemilik hanya menyetel `is_read`.)
+- **v1.3 (A0 + keputusan reviewer dan Horii 16-11-2026):**
+  - **Isi daftar** legacy = tiket sendiri ∪ tiket kategori petugas (bukan semua tiket). Tiket **tanpa pesan** (mungkin sesudah impor,
+    `backend/app/Libraries/Impor/AturanTiketLama.php:102-114`) **ditampilkan di akhir** dengan `pesan_terakhir: null` [V2, B-20],
+    agar tidak ada tiket Open tersembunyi yang tidak bisa ditutup (exit criteria E-05); urutan §6.1b.
+  - **Bentuk respons, flag, penyamaran, urutan_pengirim:** §6.1b. Penyamaran D7 (a) ikut legacy per layar [K]; id akun petugas tidak
+    dikirim ke non-role-1.
+  - **Filter baca** `baca=semua|belum|sudah` dan **`perlu_tindak=1`** (§6.1b); `peran=petugas` untuk non-petugas/nonaktif → 200
+    kosong (konsisten AC-E04.5).
+  - **Tiket berkategori NULL (✔ H8-16 (a1), Horii 16-11-2026, tanpa ubah data):** tampil di daftar pemiliknya [K]; detail dan baca
+    oleh pemilik = [V2] (detail legacy memakai INNER JOIN `question_category`, `LS:897-901`, sehingga tiket NULL tidak bisa dibuka
+    di legacy, B-21); balas → 422 `tiket_tanpa_kategori`; tutup hanya pemilik; hapus → 403 `bukan_pihak_berwenang` (F8-09 [V2]);
+    tidak terlihat petugas mana pun dan tidak ada perluasan akses role 1 (field `antrean_tanpa_kategori` tidak dibuat); tidak dihitung
+    di sisi petugas; tidak ikut ekspor; tiket NULL yang pengirimnya yatim tidak terlihat siapa pun (sama dengan legacy) dan jumlahnya,
+    beserta jumlah tiket NULL, dicatat di runbook MAKE-074 (kueri B6). Flag: `bisa_balas=false`, `bisa_tutup=true` (pemilik),
+    `bisa_hapus=false`.
+  - **Balas oleh pemilik yang petugas kategori lain** diizinkan [V2, B-19] (F8-08).
+  - **Nama bergelar** untuk semua akun ber-NIP (bukan hanya `UserLevel` 2/6, `LS:1580-1588`) [V2 kecil, B-28].
 
 **AC-E04.1** pemilik hanya melihat tiketnya; petugas melihat tiket kategorinya saja; pengguna lain 404; **AC-E04.2** pesan tersimpan
 urut di `disiplin_ticket_msg` dan tidak bercampur antar tiket (test dua tiket paralel); **AC-E04.3** balasan pada tiket Closed atau
 `allow_reply=0` ditolak dengan pesan legacy; **AC-E04.4** penanda baca: balasan petugas → `is_read=2`, balasan pemilik →
-`is_read_off=2`, buka thread → ditandai dibaca sesuai sisi; **AC-E04.5** petugas nonaktif tidak melihat antrean (F8-06) tetapi
+`is_read_off=2`, buka thread → ditandai dibaca sesuai sisi; v1.3: diuji per skenario pembanding legacy (i) pemilik `POST baca` →
+`is_read=1`, (ii) petugas `POST baca` → `is_read_off=1`, (iii) petugas membalas → `is_read_off=1`, `is_read=2`, (iv) pemilik membalas →
+`is_read=1`, `is_read_off=2`, ditambah test pemilik-petugas §6.2 (`is_read_off` tetap 2); **AC-E04.5** petugas nonaktif tidak melihat antrean (F8-06) tetapi
 tetap melihat tiket miliknya; **AC-E04.6** daftar terpaginasi dan terurut pesan terakhir; **AC-E04.7** unduh lampiran hanya untuk
 pihak berhak, header aman (`Content-Disposition`, tipe dari daftar); **berlaku untuk lampiran lama (path legacy impor) dan baru**,
 dan tetap berfungsi baik saat saklar `arsip.penyajianBerkasLegacy` bernilai `publik` maupun `privat` (v1.2, F8-17); **AC-E04.8** `GET` tidak mengubah baris (test); **AC-E04.9**
 teks dengan tanda kutip/backslash tersimpan utuh (BP8-4); **AC-E04.10** balasan petugas dengan `ingatkan_24_jam` menyetel
-`notify_pic=1`, `notify_at` = +24 jam UTC, dan balasan petugas berikutnya mereset ke 2.
+`notify_pic=1`, `notify_at` = +24 jam UTC, dan balasan petugas berikutnya mereset ke 2; v1.3: nilai 1 dari pemilik/non-petugas → 422,
+nilai di luar {0,1} → 422 `errors.ingatkan_24_jam`.
 
 **AC tambahan v1.2:** **AC-E04.11** tiket berkategori NULL (impor F-02: kolom nullable
 `backend/app/Database/Migrations/2026-10-26-100500_CreateDisiplinTicketFase4.php:78`, dihitung `INFO_KATEGORI_NULL`
 `backend/app/Libraries/Impor/AturanTiketLama.php:73`, `:119`, `:132`) diperlakukan sesuai keputusan **H8-16** (§12): siapa yang
 melihat, menutup, dan menghapusnya, serta bagaimana dihitung di ringkasan dan ekspor; ada test per perlakuan yang dipilih.
-Sebelum H8-16 diputus, AC ini ◻ dan perlakuannya diusulkan A0.
+Sebelum H8-16 diputus, AC ini ◻ dan perlakuannya diusulkan A0. **v1.3 — ✔ H8-16 (a1):** test pemilik melihat di daftar dan
+membuka detail (`kategori: null`, `bisa_balas=false`, `bisa_tutup=true`, `bisa_hapus=false`), balas → 422 `tiket_tanpa_kategori`,
+petugas mana pun dan role 1 non-pemilik → 404, tidak dihitung di `belum_dibaca_petugas`/`perlu_tindak`, tidak ikut ekspor.
+
+**AC tambahan v1.3:** **AC-E04.12** penyamaran D7 (a): fixture/test 4 kasus label
+detail (§6.1b) + pasangan daftar dilihat role 1 → "Admin" dan detail yang sama dilihat role 1 → nama; respons ke non-role-1 tidak
+memuat id akun petugas; **AC-E04.13** `perlu_tindak=1` hanya sah dengan `peran=petugas` (selain itu 422) dan `total`-nya =
+`Ringkasan.perlu_tindak`; **AC-E04.14** flag `bisa_balas`/`bisa_tutup`/`bisa_hapus` sama dengan hasil aksi untuk pemilik, petugas
+aktif, petugas nonaktif, pemilik yang petugas kategori lain (B-19), dan tiket NULL; **AC-E04.15** tiket tanpa pesan tampil di akhir
+daftar dengan `pesan_terakhir: null` (B-20); urutan dan pemecah seri §6.1b teruji.
 
 ### 7.5 E-05 — Tutup & hapus (MAKE-071)
 
 [K `LS:1432-1503`, `SC:661-749`]. Tutup: F8-08; sudah ditutup → 422 "Percakapan ini telah ditutup sebelumnya …" (`SC:672`).
-Hapus: F8-09 (fisik + audit `before` + hapus berkas). Setelah ditutup tidak bisa dibalas; alur berujung ke satu node akhir
+Hapus: F8-09 (fisik + audit `before` + hapus berkas; v1.3: hapus pesan dulu lalu tiket dalam satu transaksi, karena FK v2 RESTRICT
+sedangkan legacy CASCADE; berkas lewat `PenjagaBerkas`, di bawah). Setelah ditutup tidak bisa dibalas; alur berujung ke satu node akhir
 ("Closed"), tidak ada status menggantung (Bahan Baku E-05).
 
 **AC-E05.1** tutup mengubah status & flag sesuai F8-08 dan `closed_by` terisi; **AC-E05.2** balasan sesudah tutup ditolak;
 **AC-E05.3** menutup dua kali ditolak; **AC-E05.4** pihak tak berhak tutup/hapus → 404/403; **AC-E05.5** hapus meninggalkan jejak
-audit dan menghapus pesan serta berkas lampiran tiket itu saja; **AC-E05.6** tidak ada tiket Open yang tak bisa ditutup (test
+audit dan menghapus pesan serta berkas lampiran tiket itu saja (v1.3: berkas yang masih dirujuk baris lain tidak dihapus; berkas
+ber-path anomali tertinggal dan tercatat, Q-A0-6 (a')); **AC-E05.6** tidak ada tiket Open yang tak bisa ditutup (test
 alur penuh buat → balas → tutup).
 
 **AC tambahan v1.2:** **AC-E05.7** hapus tiket **impor** yang lampirannya ber-path legacy (`arsip/{nip}/inbox/…`, termasuk nama
@@ -611,14 +927,31 @@ ketat `lengkap()` (`:135-146`) yang menolak path legacy semacam itu, sedangkan `
 jumlahnya dicatat (berkas yang sama juga tersaji lewat `/berkas/`, H8-5 (a)); opsi ini menyimpang dari F8-09/Q8-03 sehingga
 butuh konfirmasi Horii; atau (b) dihapus
 lewat CR adapter (hapus path legacy ternormalisasi, tetap di dalam akar). Test memakai nama berkas berspasi.
+**v1.3 — ✔ Q-A0-6 (a') (Horii 16-11-2026), menggantikan opsi (a)/(b) di atas:** tanpa CR adapter. Urutan hapus tiket: (1) di dalam
+transaksi, setiap path lampiran pesan tiket itu dicatat lewat `PenjagaBerkas::catat($path, 'disiplin_ticket_msg', 'attachments')`;
+(2) pesan lalu tiket dihapus (FK `disiplin_ticket_msg` RESTRICT, DBV-022 V1), commit; (3) `selesaikan()`
+(`backend/app/Libraries/Kepegawaian/Lampiran/PenjagaBerkas.php:101-112`) menghapus berkas **hanya bila tidak ada baris lain yang
+merujuknya** (nama berkas legacy `lampiran_{id_qc}_{YmdHis}` tidak unik per pesan, B-29) dan menangkap path legacy yang ditolak
+`lengkap()` (log `info` tanpa path, ref sha1). `hapus()` **tidak** dipanggil langsung. Path legacy berasal dari respons server arsip
+(`LS:988`, `:1004`, `:1159-1161`); NIP kosong menghasilkan `arsip//inbox/…` yang ditolak segmen kosong
+(`LocalStorageAdapter.php:141`). Klaim "hampir semua terhapus" diganti **"diukur pra-cek"** (kueri B7, angka saja); jumlah berkas
+tak terhapus untuk audit/runbook diambil dari pra-cek itu. Test: dua tiket merujuk path legacy yang sama → hapus tiket pertama, tiket
+kedua tetap bisa mengunduh; path berspasi → hapus tiket tidak gagal, berkas tidak terhapus, tercatat.
 **AC-E05.8** perlakuan tiket berkategori NULL saat tutup/hapus mengikuti H8-16 (AC-E04.11), sehingga tidak ada tiket Open yang
-menggantung tanpa pihak yang dapat menutupnya (exit criteria E-05).
+menggantung tanpa pihak yang dapat menutupnya (exit criteria E-05). **v1.3 — ✔ H8-16 (a1):** pemilik menutup tiket NULL → 200;
+pemilik menghapus → 403 `bukan_pihak_berwenang`; tiket NULL Open yang pengirimnya yatim tidak dapat ditutup siapa pun (sama
+dengan legacy) dan jumlahnya dicatat di runbook MAKE-074 (kueri B6); bila angkanya > 0, Horii dapat memilih tutup otomatis khusus
+irisan itu saat cutover (keputusan data, di luar Fase 8).
+**AC tambahan v1.3:** **AC-E05.9** pemilik yang petugas kategori lain dapat menutup tiketnya sendiri (B-19); **AC-E05.10** `POST
+tutup` → 200 `TiketBaris`, `DELETE` → 200 `{id}`, `ditutup_oleh_label` sesuai aturan detail D7 (a).
 
 ### 7.6 E-06 — Notifikasi tiket (MAKE-072)
 
 [K `LS:1029-1090`, `LS:1202-1300`, `LS:1373-1425`, `CR:987-1066`].
 - `TicketNotifService` dipanggil **sesudah commit** oleh `TiketService`/`PercakapanService`; menentukan penerima (`PenerimaTiket`),
   lalu mengantre `PushHaloSimpegJob` per pesan (v1.2: atau `AntrePushPesan` → `push-pesan` bila H8-14 = (a); §6.4).
+  **v1.3 (✔ H8-14 (a)):** `AntrePushPesan::antreAkun(id_pengguna[])` → `push-pesan`; `PushHaloSimpegJob` gugur; berkas Push =
+  CR-137 (§6.4).
 - **Pembagian paket (v1.2):** binding `RingkasanTiketInterface` (ganti NoOp) dan paket test §7.8 butir (5) masuk **MAKE-071**
   bersama `GET tiket/ringkasan`; MAKE-072 hanya push.
 - **Penerima:** tiket baru → petugas aktif kategori; balasan petugas → pemilik; balasan pemilik → petugas aktif kategori; tutup →
@@ -636,20 +969,27 @@ CI tidak memanggil layanan nyata; **AC-E06.5** payload tidak memuat NIP, jabatan
 **AC-E06.6** `inbox`/`inbox_msg` tidak berubah oleh seluruh alur Halo Simpeg dan `disiplin_ticket(_msg)` tidak berubah oleh
 alur approval Fase 4 (dua test regresi, BP8-1); **AC-E06.7** petugas role 1 dan role 6 (bukan hanya role 2) menerima push (perbaikan B-5);
 v1.2: termasuk petugas role 1 **tanpa NIP**, dengan cara penerima sesuai **H8-14** (bila H8-14 = (c), AC ini dipersempit menjadi
-"petugas ber-NIP" atas keputusan Horii);
+"petugas ber-NIP" atas keputusan Horii); **v1.3:** H8-14 = (a), jadi AC ini tidak dipersempit: test akun role 1 tanpa NIP menerima
+token web lewat `antreAkun` (CR-137), plus regresi pemakai `nip[]` lama;
 **AC-E06.8** uji push sampai ke perangkat (Bahan Baku E-06) dilakukan **real** oleh reviewer sebelum deploy — dilacak MT/DEPLOY (bukan sign-off).
 **AC tambahan v1.2:** **AC-E06.9** binding `ringkasanTiket` di `backend/app/Config/Services.php:799-806` tidak lagi memakai
 `RingkasanTiketNoOp`; implementasi `RingkasanTiketInterface` menghitung sesuai §6.2, dan `GET api/v1/notifikasi/ringkasan`
 (`PusatNotifikasiService` `:110`) mengembalikan `tiket_belum_dibaca` berupa angka (bukan `null`) untuk pemilik, petugas, dan
-petugas yang juga pemilik (tanpa hitung ganda), serta angka itu sama dengan `GET halo-simpeg/tiket/ringkasan`;
+petugas yang juga pemilik (tanpa hitung ganda), serta angka itu sama dengan `GET halo-simpeg/tiket/ringkasan`; v1.3: sama dengan
+`Ringkasan.total` (bukan `badge`), 0 untuk role 1–8 tanpa tiket (role 8 = 0), dan commit binding sekaligus memperbarui
+`backend/tests/Notifikasi/PusatNotifikasiTest.php:72-86` (yang kini meng-`assertNull` `:84`) serta README notifikasi dua sisi (§3);
 **AC-E06.10** angka tiket di lonceng F-08 dapat ditelusuri sesuai keputusan **H8-15** (§12) dan diuji di QA (ulang C-N10 Fase 7,
-`docs/fase7/Checklist_QA_Lapis1_Fase7.md:398`).
+`docs/fase7/Checklist_QA_Lapis1_Fase7.md:398`). **v1.3 — ✔ H8-15 (b):** entri "Tiket Halo Simpeg (n)" di `NotifikasiPage.vue`
+tampil bila angka > 0 dan disembunyikan bila 0/`null`, menuju tab antrean bila sisi petugas punya angka, selain itu `/halo-simpeg`
+(test Vitest kedua arah navigasi); QA memuat skenario petugas role 3 dan role 4 (role 4/5 tidak bisa membuka lonceng, sehingga
+lewat badge menu).
 
 ### 7.7 E-08 — Frontend (MAKE-073)
 
 Per §6.3. Detail: halaman daftar tiket dengan `UiSearchInput`, `UiSelect` (kategori/status), `UiBadge` (Open/Closed, belum dibaca);
 thread bergaya gelembung (Gambar 33/34) dengan lampiran; form tiket baru (kategori, subjek, pesan, `UiFileField`); aksi baris tiket
-petugas lewat ⋮ (Tutup, Hapus; label baku AGENTS.md §1); panel "Perlu ditindak" untuk petugas; badge angka pada item menu Halo
+petugas lewat ⋮ (Tutup, Hapus; label baku AGENTS.md §1; v1.3: **Lihat detail → Tutup → Hapus** di tabel petugas **dan** pemilik,
+master-detail §6.3); panel "Perlu ditindak" untuk petugas; badge angka pada item menu Halo
 Simpeg; tampilan kosong/galat/memuat. Teks pesan ditampilkan sebagai teks (tanpa `v-html`). Tanpa data contoh; `halo.store.ts` mock
 (branch redesign) tidak dibawa. Test Vitest per komponen (keyboard + ARIA, AGENTS.md §3.3) dan test klien API asli (bukan hanya mock, pelajaran
 amplop axios). QA Lapis 1 oleh reviewer: daftar tiket, thread, badge status, form buat tiket, beda tampilan pemilik vs petugas
@@ -659,10 +999,22 @@ amplop axios). QA Lapis 1 oleh reviewer: daftar tiket, thread, badge status, for
 dibaca benar; **AC-E08.3** form tiket menolak input tidak valid dan menampilkan galat 422 per kolom; **AC-E08.4** semua kontrol dapat
 dioperasikan keyboard dan beraria benar; **AC-E08.5** halaman admin memakai `page-fill` + ⋮; **AC-E08.6** tidak ada `window.confirm`,
 `<select>` native, atau `title` sebagai tooltip; **AC-E08.7** QA Lapis 1 vs Figma lolos (frame yang belum ada dicatat; bila H8-9 =
-tidak ada Figma, diuji terhadap pola komponen redesign).
+tidak ada Figma, diuji terhadap pola komponen redesign). **v1.3 (✔ H8-9: frame helpdesk belum ada):** AC-E08.7 diuji terhadap pola
+redesign (pemilik: Gambar 33; petugas: master-detail Gambar 34; master: pola Master Data/PIC layanan) saat B5/QA bersama reviewer;
+tanpa test Vitest, dicatat di checklist CR-132 bagian B.
 **AC tambahan v1.2:** **AC-E08.8** sesudah logout atau login akun lain, store tiket dan badge ringkasan helpdesk kosong (reset dari
 `clearSession()` `frontend/src/features/auth/stores/auth.store.ts:52-60`, pola `resetChatbot()` `:56`), dibuktikan Vitest "store
 kosong sesudah logout"; **AC-E08.9** lampiran (lama dan baru) dibuka hanya lewat endpoint E-04, tidak lewat URL `/berkas/`.
+**AC tambahan v1.3:** **AC-E08.10** ⋮ "Lihat detail" mengubah rute dan mengisi panel kanan; klik baris tidak berbuat apa-apa; tidak
+ada `role="option"` di DOM; viewport < 1024 px menampilkan satu panel; **AC-E08.11** polling ringkasan tidak memanggil `GET
+halo-simpeg/tiket/ringkasan` untuk role 8, sesi wajib ganti password, atau `ACTIVE_PHASE` < 8 (role 2 → satu request; adapter
+pencatat yang menolak request lain); **AC-E08.12** badge menu = `Ringkasan.badge` (`sisipBadgeHalo`: ada, nol → tanpa badge, item
+tidak ada), titik penanda saat sidebar ciut, lonceng tetap `total`, fixture `badge > total`; **AC-E08.13** bawaan filter baca per tab
+(antrean `belum`, "Tiket saya" `semua`) dan panel "Perlu ditindak" memanggil service dengan `perlu_tindak: 1`; **AC-E08.14** ekspor:
+200 JSON → tanpa unduhan dan pesan tampil, 200 xlsx → nama dari header, 422 → pesan galat; validasi periode (hari ini lolos, besok
+ditolak, mulai = akhir lolos); **AC-E08.15** batas field Zod = §7.3a (= batas lolos, batas+1 ditolak) dan keadaan
+memuat/kosong/galat (403/404/500) per layar; **AC-E08.16** admin Petugas: ⋮ Hapus `disabled` dari `bisa_hapus`, 422 tampil di
+`UiNotice`, Nonaktifkan dengan `peringatan` menampilkan `UiNotice` peringatan.
 
 ### 7.8 Verifikasi "thread tidak ter-mix" (exit criteria Bahan Baku)
 
@@ -679,12 +1031,23 @@ sinkron dengan batas baris (angka §7.3a). NIP penanya sebagai teks. Tombol eksp
 **v1.2 (◻ usulan reviewer, menunggu konfirmasi Horii saat review PRD v1.2, F8-20):** `ds`/`de` = tanggal kalender WIB → rentang UTC `[ds 00:00 WIB, de+1 00:00 WIB)` tanpa `DATE()` atas kolom (pola F8-42,
 BP8-8; stempel tiket impor sudah UTC, DBV-029 R1a); kolom TIMESTAMP ditulis WIB; unduhan diaudit tanpa isi (pola F7-27
 `backend/app/Libraries/Dashboard/Statistik/StatistikService.php:169`, F-10 `backend/app/Libraries/Kepegawaian/Arsip/ArsipService.php:203`).
+**v1.3 — ✔ Q-A0-9 (Horii 16-11-2026):** usulan di atas dikonfirmasi (label "◻ usulan reviewer" gugur). Tambahan v1.3: izin =
+`bisa_ekspor` (petugas **aktif**, berapa pun kategorinya, [V2] terhadap `VI:13`, B-24); periode kosong = 200 JSON tanpa berkas dan
+tanpa audit (§6.1b); pengaman baris + ukuran dan potong sel 32.767 (§7.3a); tiket berkategori NULL tidak ikut; urut tiket lalu
+pesan; nama berkas `Rekap_Halo_Simpeg_{ds}_{de}.xlsx`; XLSX ditulis `EksporTabel` (OOXML lewat ZipArchive, semua sel teks).
 
-**AC-E09.1** hanya petugas; **AC-E09.2** periode inklusif per hari WIB: tiket 00:00 WIB tanggal `ds` dan 23:59 WIB tanggal `de`
-ikut, 23:59 WIB sehari sebelum `ds` tidak ikut (v1.2, ◻ usulan reviewer menunggu konfirmasi Horii); **AC-E09.3** tiket kategori lain tidak ikut;
-**AC-E09.4** NIP tidak berubah menjadi angka ilmiah; **AC-E09.5** periode tanpa data → 200 dengan pesan kosong (bukan berkas rusak); **AC-E09.6** format selain xlsx → 422;
-**AC-E09.7** (v1.2, ◻ usulan reviewer menunggu konfirmasi Horii saat review PRD v1.2) setiap unduhan ekspor tercatat di `audit_logs` (siapa, periode, jumlah baris), tanpa isi percakapan, NIP penanya, atau isi berkas;
-**AC-E09.8** (v1.2) periode yang melebihi batas baris §7.3a → 422 berpesan Bahasa Indonesia, tidak menghasilkan berkas terpotong.
+**AC-E09.1** hanya petugas (v1.3: petugas **aktif** = `bisa_ekspor`; petugas berkategori tunggal boleh; bukan petugas/nonaktif → 403
+`bukan_petugas`, diuji bersama flag); **AC-E09.2** periode inklusif per hari WIB: tiket 00:00 WIB tanggal `ds` dan 23:59 WIB tanggal `de`
+ikut, 23:59 WIB sehari sebelum `ds` tidak ikut (v1.2; ✔ v1.3 Q-A0-9); **AC-E09.3** tiket kategori lain tidak ikut (v1.3: termasuk tiket kategori NULL);
+**AC-E09.4** NIP tidak berubah menjadi angka ilmiah; **AC-E09.5** periode tanpa data → 200 dengan pesan kosong (bukan berkas rusak) (v1.3: **200 JSON**
+`{status:'success', data:{kosong:true, jumlah:0}, message}` dengan `Content-Type: application/json` dan tanpa `Content-Disposition`, fixture
+`ekspor-kosong`); **AC-E09.6** format selain xlsx → 422 (v1.3: juga `ds`/`de` kosong atau `ds` > `de` → 422, teks §7.3a);
+**AC-E09.7** (v1.2; ✔ v1.3 Q-A0-9) setiap unduhan ekspor tercatat di `audit_logs` (siapa, periode, jumlah baris), tanpa isi percakapan, NIP penanya, atau isi berkas;
+v1.3: ekspor periode kosong **tidak diaudit** (tidak ada berkas; dicatat di README), diuji;
+**AC-E09.8** (v1.2) periode yang melebihi batas baris §7.3a → 422 berpesan Bahasa Indonesia, tidak menghasilkan berkas terpotong. **v1.3:** juga
+melebihi batas ukuran `SUM(CHAR_LENGTH(msg))` → 422 `ekspor_terlalu_besar` (teks netral yang sama; ambang diukur di test MAKE-074). "Tidak
+terpotong" berarti **baris**: isi sel yang melebihi 32.767 karakter dipotong dengan penanda "… [dipotong]" [V2] sebagai **pengecualian AC ini**
+(B-27), diuji dengan pesan sintetis > 32.767 karakter.
 
 ### 7.10 E-10 — Chatbot "Vanya" (DBV-033 skema, MAKE-094 BE, MAKE-095 FE)
 
@@ -909,7 +1272,14 @@ transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak mem
 - **Fase 6:** token, adapter, antrean, log = milik Fase 6 (§6.4). Perubahan kontrak yang dibutuhkan Fase 8 = CR baru yang disepakati lewat reviewer.
 - **Impor/cutover (v1.2, H8-6):** urutan: akun `pengguna` (UP-1) → master T12b (F8-21, MAKE-097: `id_user` disalin apa adanya,
   id yang tidak ada di `pengguna` v2 dibuang dan jumlahnya dicatat, K-M11/K-M12; **tanpa** tabel pemetaan id) → tiket & pesan
-  (F-02) → berkas lampiran (path `attachments`, tetap ber-path legacy dan disajikan aplikasi lewat E-04, F8-17).
+  (F-02) → berkas lampiran (path `attachments`, tetap ber-path legacy dan disajikan aplikasi lewat E-04, F8-17). **v1.3 (T-5, Q-A0-5):**
+  salinan berkas lampiran tiket lama ke storage v2 bergantung pada baris `disiplin_ticket_msg` di `ManifestLampiran::KOLOM`
+  (MAKE-097); runbook mencatat jumlah tiket NULL, irisan NULL + Open + sender yatim (B6), `attachments` ber-path anomali (B7), dan
+  tiket Open di kategori tanpa petugas aktif.
+- **Push bersama (v1.3, H8-14 (a)):** perubahan `Libraries/Push/*` + `PushPesanJob` = CR-137, aditif dan kompatibel mundur bagi
+  pemakai `AntrePushPesan` lain (cuti, LKH/Konket).
+- **Lonceng F-08 (v1.3, H8-15 (b)):** `NotifikasiPage.vue` menampilkan entri tiket dari `tiket_belum_dibaca` yang sudah ada; tidak ada
+  perubahan kontrak `GET notifikasi/ringkasan` selain angka yang kini terisi (AC-E06.9).
 - **Arsip F-10 (v1.2, H8-5 (a)):** alias publik `/berkas/` F-10 tidak dipersempit untuk subfolder `inbox`; Halo Simpeg tidak
   mengubah `Config\Arsip` maupun README-deploy §1l, dan tidak bergantung pada nilai saklar `arsip.penyajianBerkasLegacy`.
 - **Privasi:** tidak ada pencatatan isi pesan di log aplikasi/queue; `audit_logs` menyimpan metadata + snapshot `before` hanya untuk hapus.
@@ -930,7 +1300,10 @@ transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak mem
 | MAKE-071 (M3) | MAKE-074 BE (ekspor + penutup BE) | v1.2: M6 BE cukup menunggu M3 (selaras `8_1.md` A5) |
 | MAKE-074 BE + MAKE-073 (M5) | MAKE-074 FE (B4 tombol ekspor) | v1.2 |
 | DBV-028 di `main` | MAKE-097 (T12b impor master) | v1.2, H8-12 |
-| A0 disetujui | H8-14, H8-15, H8-16 diputus | v1.2; H8-14 sebelum MAKE-072, H8-16 sebelum MAKE-071 selesai, H8-15 sebelum B1/MAKE-071 binding lonceng |
+| A0 disetujui | H8-14, H8-15, H8-16 diputus | v1.2; H8-14 sebelum MAKE-072, H8-16 sebelum MAKE-071 selesai, H8-15 sebelum B1/MAKE-071 binding lonceng. **v1.3: ✔ terpenuhi 16-11-2026** (A0 ✔, B0 ✔, H8-14 (a), H8-15 (b), H8-16 (a1)) |
+| CR-136 (PRD v1.3) di `main` | README beku MAKE-070/071 | v1.3; README mengikuti §6.1b |
+| MAKE-072 (branch) | CR-137 berkas bersama Push | v1.3; commit terpisah di branch MAKE-072 |
+| DBV-028 di `main` | MAKE-097 + T-5 (`ManifestLampiran`) | v1.3; cutover lampiran tiket lama |
 | MAKE-066 (Fase 6 B5) | M4 push real | ✔ di `main` (`9debb366`) |
 | DBV-027 (`firebase_token.platform`, `token_hash`) | M4 | dari Fase 6 |
 | Fase 7 F-08 (lonceng) | Q8-06 = B | konsumen `ringkasan` |
@@ -947,14 +1320,14 @@ transaksi; perintah menolak berjalan bila tabel QnA sudah berisi; repo tidak mem
 
 | M | Isi | Key | Menunggu |
 |---|---|---|---|
-| M0 | Laporan pemahaman ⛔ reviewer (A0 BE Handling Case + B0 FE Worker Muse; wajib memuat kewajiban §6.1a, §7.3a, usulan H8-14/H8-15/H8-16, T-1..T-4, H8-10) | — | A0/B0 mulai sesudah CR-130 di `main`; laporan A0/B0 disetujui reviewer sesudah CR-131 (PRD v1.2) di `main` |
-| M1 | Skema pendukung (PR `[DBV]`), E-01 | DBV-028 | M0 |
+| M0 | Laporan pemahaman ⛔ reviewer (A0 BE Handling Case + B0 FE Worker Muse; wajib memuat kewajiban §6.1a, §7.3a, usulan H8-14/H8-15/H8-16, T-1..T-4, H8-10) | — | A0/B0 mulai sesudah CR-130 di `main`; laporan A0/B0 disetujui reviewer sesudah CR-131 (PRD v1.2) di `main`. **v1.3: ✔ A0 dan B0 disetujui 16-11-2026** |
+| M1 | Skema pendukung (PR `[CR][DBV]`), E-01 | DBV-028 | M0 (v1.3: ▶ dibuka 16-11-2026) |
 | M2 | Master kategori/petugas/kontak — **BE** (layar admin FE ada di M5), E-02/E-07 | MAKE-070 | M1 di `main` |
 | M3 | Tiket, percakapan, tutup/hapus, lampiran, ringkasan BE + binding `RingkasanTiketInterface` + §7.8 (5), E-03/E-04/E-05 | MAKE-071 | M2 |
-| M4 | Notifikasi push + penerima + job, E-06 | MAKE-072 | M3; MAKE-066 ✔ di `main`; H8-14 |
-| M5 | Frontend pemilik/petugas **dan layar admin** Kategori/Petugas/Kontak, E-08 | MAKE-073 | kontrak API M2 + M3 beku |
+| M4 | Notifikasi push + penerima + job, E-06 (v1.3: + CR-137 berkas bersama Push, commit terpisah) | MAKE-072 (+ CR-137) | M3; MAKE-066 ✔ di `main`; H8-14 (✔ (a), v1.3) |
+| M5 | Frontend pemilik/petugas **dan layar admin** Kategori/Petugas/Kontak, E-08 | MAKE-073 | kontrak API M2 + M3 beku (v1.3: B1 bagian master boleh mulai sesudah MAKE-070 beku, `8_2.md` §2) |
 | M6 | Ekspor rekap (BE) + tombol ekspor (FE kecil lewat Jalur FE), penutup (progres, README, runbook cutover), E-09 | MAKE-074 | v1.2: BE menunggu M3; tombol FE (B4) menunggu MAKE-074 BE + M5 |
-| M6' | Impor master helpdesk T12b (salin `id_user` per H8-6) | MAKE-097 | DBV-028 di `main` (v1.2, H8-12) |
+| M6' | Impor master helpdesk T12b (salin `id_user` per H8-6); v1.3: + T-5 (Q-A0-5) `ManifestLampiran` | MAKE-097 | DBV-028 di `main` (v1.2, H8-12) |
 | M7 | Reviewer: QA Lapis 1 Fase 8 (checklist CR-132; termasuk chatbot, AC-E10.22/23), laporan akhir `docs/fase8/Laporan_Akhir_Fase8.md` → ⛔ sign-off Horii (penutup seluruh development) | — | M4, M5, M6 (BE + B4 FE), M6', C3 (v1.2: **tidak** menunggu C4, H8-13 (b)) |
 | M8 | Rilis menu chatbot + helpdesk bersama (H8-11 (a)): `ACTIVE_PHASE` 5 → 8, pembersihan `rilis`, item `halo` `to`/`roles` | CR-135 | sign-off M7; ⛔ izin Horii |
 
@@ -979,7 +1352,9 @@ Setiap M: branch baru dari `origin/main` → gate cepat → push → CI `quality
 **Fase 8 DONE** bila: E-01..E-10 DONE (AC terpenuhi, di `main`; E-10 = DBV-033 + MAKE-094 + MAKE-095, AC-E10.1..29; AC-E10.30/C4
 **tidak** termasuk, v1.2 H8-13 (b)); verifikasi "thread tidak ter-mix" (§7.8) hijau; regresi Fase 4
 (notifikasi approval, C-05/C-06) dan FAQ (G-10) hijau; QA Lapis 1 Fase 8 lolos (checklist `docs/fase8/Checklist_QA_Lapis1_Fase8.md`, CR-132), termasuk widget dan Chatbot Manager; runbook cutover (impor master T12b MAKE-097 dengan `id_user` disalin apa adanya dan jumlah baris dibuang tercatat (H8-6, K-M11/K-M12), berkas
-lampiran lama lewat E-04 dan risiko sadar H8-5 (a), kunci token chatbot README-deploy §1m) tercatat; laporan akhir `docs/fase8/Laporan_Akhir_Fase8.md` (status per paket + SHA, temuan QA, butir yang ditunda ke DEPLOY-002); **sign-off Horii sebagai penutup seluruh development**.
+lampiran lama lewat E-04 dan risiko sadar H8-5 (a), kunci token chatbot README-deploy §1m; v1.3: salinan lampiran tiket lama lewat
+T-5 (Q-A0-5), jumlah tiket NULL dan irisan NULL + Open + sender yatim, jumlah berkas lampiran ber-path anomali, tiket Open di kategori tanpa
+petugas aktif) tercatat; fixture `backend/tests/_support/HaloSimpeg/` §6.1b lengkap dan terverifikasi trait (v1.3); laporan akhir `docs/fase8/Laporan_Akhir_Fase8.md` (status per paket + SHA, temuan QA, butir yang ditunda ke DEPLOY-002); **sign-off Horii sebagai penutup seluruh development**.
 Kartu Trello Fase 8 (DEV-009, QASMTASK-111..118, QASMTASK-123, QASMTASK-124; §1.1) dan baris timeline **Notion** Fase 8 (E.1..E.4,
 E.5 = E-09, E.6 = E-10) disinkron final (v1.2). **Di luar DoD, dilacak DEPLOY-002 (C4/K-5) dan MT-010/DEPLOY-001.1 (uji push
 real):** uji push real (wajib lolos sebelum deploy, pola F6-23), keputusan K-5 dan C4 impor isi QnA dev (H8-13 (b)), dan langkah deploy lain (kunci §1m, T12b di server). **Sesudah
@@ -1014,7 +1389,9 @@ Setiap baris: pertanyaan, opsi, saran, dan keputusan. Syarat pada Q8-06, Q8-08, 
 **Register H8 (v1.2).** Keputusan pelaksanaan helpdesk sesudah PRD v1.1 (`docs/fase8/Kesiapan_Fase8.md` §6.1: H8-1, H8-2, H8-5, H8-6
 dijawab Horii 13-11-2026, H8-4 terjawab lewat H8-1) dan keputusan Horii 16-11-2026 ("ikut rekomendasi semua": H8-3, H8-11, H8-12, H8-13). H8-7..H8-10 **tetap terbuka** dan dijawab Horii
 sebelum paket terkait. H8-14..H8-16 **diputus sesudah A0** Handling Case (opsi + rekomendasi di bawah; keputusan yang mengubah
-data atau mengurangi fungsi = Horii).
+data atau mengurangi fungsi = Horii). **v1.3:** H8-14..H8-16 ✔ diputus Horii 16-11-2026 ("ikut rekomendasi semua"), H8-9 ✔ dijawab
+Horii 16-11-2026, PN8-8 ✔ diterima; yang **masih terbuka**: H8-7 (sebelum QA), H8-8 (sebelum MAKE-072), H8-10 (sebelum MAKE-071;
+tanpa ekstraksi tetap [I], tetapi penanda baca sisi pembalas petugas dan buka-detail sudah [K], F8-10).
 
 | ID | Butir | Opsi | Rekomendasi | Keputusan / status |
 |---|---|---|---|---|
@@ -1026,15 +1403,36 @@ data atau mengurangi fungsi = Horii).
 | H8-6 | Impor master T12b: pemetaan UP-1 (F8-21 v1.0) atau salin apa adanya (K-M11/K-M12) | (a) K-M11/K-M12 (b) F8-21 v1.0 | — | ✔ Horii 13-11-2026: **"seperti legacy saja"** = (a); F8-21, §8, R8-2, DoD, `8_1.md` A5 diselaraskan di v1.2 |
 | H8-7 | Konfirmasi Biro SDM: satker `101` = satker kepegawaian (F8-07) | konfirmasi / tetap bersyarat | jawab sebelum QA (tidak menahan kode: kode memakai `id_satker_kepegawaian`) | ◻ terbuka |
 | H8-8 | Kontak pemilik app Android (PN8-1, kunci `data` push) | dapat kontak / payload terbatas dulu | jawab sebelum MAKE-072; tanpa jawaban MAKE-072 memakai payload terbatas dan uji push real dicatat ke DEPLOY | ◻ terbuka |
-| H8-9 | Frame Figma helpdesk (PN8-4) | ada (serahkan) / ikut pola layar v2 | jawab sebelum B3; tanpa Figma AC-E08.7 diuji terhadap pola komponen redesign | ◻ terbuka |
-| H8-10 | Ekstraksi trigger `inbox_msg_afIns` | ekstrak dari DB dev / tetap [I] | jawab sebelum MAKE-071; "tidak" boleh: F8-10 tetap [I] dan diuji per skenario AC-E04.4 | ◻ terbuka |
+| H8-9 | Frame Figma helpdesk (PN8-4) | ada (serahkan) / ikut pola layar v2 | jawab sebelum B3; tanpa Figma AC-E08.7 diuji terhadap pola komponen redesign | ✔ Horii 16-11-2026 (v1.3): **frame Figma helpdesk belum ada** → daftar tiket petugas = master-detail ala Gambar 34, master Kategori/Petugas/Kontak = pola Master Data/PIC layanan (AGENTS.md:93-94), layar pemilik = Gambar 33; tiap layar tanpa frame dicatat; AC-E08.7 diuji terhadap pola redesign; gerbang B3 terpenuhi; PN8-4 ditutup |
+| H8-10 | Ekstraksi trigger `inbox_msg_afIns` | ekstrak dari DB dev / tetap [I] | jawab sebelum MAKE-071; "tidak" boleh: F8-10 tetap [I] dan diuji per skenario AC-E04.4 | ◻ terbuka. v1.3: ekstraksi D1 tidak tersedia di mesin A0; penanda baca buka-detail dan sisi pembalas petugas sudah [K] (`LS:907-919`, `:1344-1347`), yang tetap [I] hanya sisi lawan = 2 dan sisi pembalas pemilik = 1 (F8-10, §6.2) |
 | H8-11 | Gerbang rilis menu Halo Simpeg / chatbot | (a) dirilis bersama di penutup Fase 8 (pola F8-50) (b) chatbot dirilis lebih dulu lewat CR kecil | (a) | ✔ Horii 16-11-2026: **(a)**, paket rilis **CR-135** sesudah sign-off atas izin Horii (F8-50, M8) |
 | H8-12 | Key dan agen T12b impor master | (a) bagian MAKE-074 oleh Handling Case (b) paket MAKE-069 lanjutan **MAKE-097** oleh ReadOne | (b) | ✔ Horii 16-11-2026: **(b) MAKE-097 oleh ReadOne**, review DB WS-2, mulai sesudah DBV-028 di `main`; amandemen scope izin #9 |
 | H8-13 | C4 impor isi QnA dev vs sign-off | (a) C4 sebelum sign-off (b) C4 keluar dari DoD, dilacak DEPLOY-002 | (b) | ✔ Horii 16-11-2026: **(b)**; key C4 tetap per F8-51 saat PN8-6 |
-| H8-14 | Penerima push petugas tanpa NIP (AC-E06.7; F8-13 vs `AntrePushPesan` per NIP, §6.4) | (a) penerima per `id_pengguna` lewat `push-pesan` + CR berkas bersama Push (token web per akun, token Android per NIP bila ada); (b) job Halo Simpeg tersendiri (rencana v1.0, `PushHaloSimpegJob`); (c) AC-E06.7 dipersempit ke "petugas ber-NIP" | **(a)**: memakai titik sambung MAKE-066 yang ada dan tidak menduplikasi job; (c) hanya bila Horii menerima pengurangan fungsi | ◻ **diputus sesudah A0** (usulan Handling Case di A0, T-1); sebelum MAKE-072 |
-| H8-15 | Tujuan klik angka tiket di lonceng F-08 | (a) badge menu Halo Simpeg saja, lonceng hanya angka (pola berita F-07) (b) entri "Tiket Halo Simpeg (n)" di panel/halaman notifikasi yang menuju route Halo Simpeg (CR berkas bersama `features/notifikasi`) | **(b)**: angka bisa ditelusuri | ◻ **diputus sesudah A0/B0**; sebelum binding lonceng MAKE-071 dan B1 |
-| H8-16 | Tiket impor berkategori NULL (AC-E04.11, AC-E05.8) | (a) hanya terlihat dan dapat ditutup/dihapus role 1 (b) dipetakan ke kategori penampung saat impor (c) ditutup otomatis saat cutover | **(a)** sebagai bawaan tanpa mengubah data; (b)/(c) mengubah data sehingga butuh keputusan Horii | ◻ **diputus sesudah A0** (usulan Handling Case); sebelum MAKE-071 selesai |
-| PN8-8 | Acuan visual widget dev (AC-E10.22) | Horii menyerahkan tangkapan layar / reviewer merender ulang view dev di luar repo | serahkan sekarang | ◻ ditunggu dari Horii |
+| H8-14 | Penerima push petugas tanpa NIP (AC-E06.7; F8-13 vs `AntrePushPesan` per NIP, §6.4) | (a) penerima per `id_pengguna` lewat `push-pesan` + CR berkas bersama Push (token web per akun, token Android per NIP bila ada); (b) job Halo Simpeg tersendiri (rencana v1.0, `PushHaloSimpegJob`); (c) AC-E06.7 dipersempit ke "petugas ber-NIP" | **(a)**: memakai titik sambung MAKE-066 yang ada dan tidak menduplikasi job; (c) hanya bila Horii menerima pengurangan fungsi | ✔ Horii 16-11-2026 (v1.3): **(a)** `AntrePushPesan::antreAkun(id_pengguna[])` aditif; berkas Push bersama = **CR-137**, commit terpisah di branch MAKE-072, test regresi cuti/LKH/Konket (F8-13, §6.4) |
+| H8-15 | Tujuan klik angka tiket di lonceng F-08 | (a) badge menu Halo Simpeg saja, lonceng hanya angka (pola berita F-07) (b) entri "Tiket Halo Simpeg (n)" di panel/halaman notifikasi yang menuju route Halo Simpeg (CR berkas bersama `features/notifikasi`) | **(b)**: angka bisa ditelusuri | ✔ Horii 16-11-2026 (v1.3): **(b)** entri "Tiket Halo Simpeg (n)" di `NotifikasiPage.vue` menuju route Halo Simpeg (tab antrean bila sisi petugas > 0); petugas role 4/5 (di luar `NOTIFIKASI_ROLES`) lewat badge menu; BE tanpa perubahan kontrak (F8-19, AC-E06.10) |
+| H8-16 | Tiket impor berkategori NULL (AC-E04.11, AC-E05.8) | (a) hanya terlihat dan dapat ditutup/dihapus role 1 (b) dipetakan ke kategori penampung saat impor (c) ditutup otomatis saat cutover | **(a)** sebagai bawaan tanpa mengubah data; (b)/(c) mengubah data sehingga butuh keputusan Horii | ✔ Horii 16-11-2026 (v1.3): **(a1)** ikut legacy tanpa ubah data — opsi (a) "role 1" di kolom Opsi **gugur v1.3** (A0 menulis ulang opsinya: (a1) hanya pemilik, (a2) role 1 aktif ikut mengelola = perluasan akses isi percakapan, (b) kategori penampung, (c) tutup otomatis). Hanya pemilik melihat dan menutup; balas → 422 `tiket_tanpa_kategori`; hapus oleh pemilik → 403 `bukan_pihak_berwenang` (F8-09 [V2]); tidak ada antrean/perluasan role 1; tidak dihitung sisi petugas; tidak ikut ekspor; jumlah + irisan sender yatim dicatat runbook (§7.4, AC-E04.11, AC-E05.8) |
+| PN8-8 | Acuan visual widget dev (AC-E10.22) | Horii menyerahkan tangkapan layar / reviewer merender ulang view dev di luar repo | serahkan sekarang | ✔ (v1.3) tangkapan layar widget chatbot dev diterima dari Horii 16-11-2026; disimpan di luar repo (memuat foto avatar), tidak di-commit; selisih dibahas di CR-132 bagian A / CR-134 |
+
+**Butir turunan A0/B0 (v1.3).** Keputusan Horii 16-11-2026 ("ikut rekomendasi semua" atas opsi yang diajukan reviewer) dan
+keputusan reviewer CR 16-11-2026 (wewenang reviewer: kontrak dan pemilik berkas).
+
+| ID | Butir | Opsi | Rekomendasi | Keputusan |
+|---|---|---|---|---|
+| Q-A0-1 | Pembalas otomatis "sudah baca" di sisinya sendiri (trigger [I]) | ya / tidak | ya | Terjawab sebagian lewat fakta legacy: sisi pembalas petugas = 1 [K `LS:1344-1347`]; sisi pembalas pemilik = 1 tetap [I] (H8-10) (F8-10, §6.2) |
+| Q-A0-2 (K-A4) | Hapus petugas | (1') hapus → 422 bila petugas terakhir (aktif/nonaktif) kategori ber-tiket Open, Nonaktifkan → 200 + peringatan; (2) ikut legacy selalu boleh + peringatan | (1') | ✔ Horii: **(1')** + `bisa_hapus`, `alasan_tidak_bisa_hapus` (§7.2, AC-E02.8) |
+| Q-A0-3 | D1 struktur tiga tabel master dari salinan dev | minta / tidak | minta bila mudah | Tidak menahan DBV-028; tanpa D1 panjang kolom tetap [I] dan diputus DBV |
+| Q-A0-4 | Sisi petugas mengecualikan semua tiket milik sendiri atau hanya yang `is_read=2` (`LN:13-21`, `:44`) | PRD / legacy | PRD | ✔ reviewer: ikut PRD §6.2 (semua tiket sendiri dikecualikan) |
+| Q-A0-5 (T-5) | Pemilik baris `disiplin_ticket_msg` di `ManifestLampiran::KOLOM` | MAKE-097 / CR kecil | MAKE-097 | ✔ reviewer: **MAKE-097 (ReadOne)** + test + 2 kueri pra-cek + runbook; Handling Case tidak menyentuh berkas itu |
+| Q-A0-6 | Hapus lampiran legacy | (a') `PenjagaBerkas::catat` + `selesaikan()` (hitung rujukan; anomali tertinggal tercatat); (b) CR adapter | (a') | ✔ Horii: **(a')** (F8-09, §7.5) |
+| Q-A0-7 (K-A2) | Kontak aktif vs semua | dua path / parameter | dua path | ✔ reviewer: `GET kontak/aktif` (1–7, array) dan `GET kontak` (1, `Halaman<T>`); menggeser baris §6.1 |
+| Q-A0-8 (K-A8) | Angka throttle, panjang, ekspor | — | angka A0 | ✔ Horii: §7.3a final |
+| Q-A0-9 | F8-20 WIB↔UTC + audit unduhan AC-E09.7 | ikut usulan reviewer / tidak | ikut | ✔ Horii: disetujui; ekspor kosong tidak diaudit |
+| D7 | Penyamaran nama petugas | (a) ikut legacy per layar; (b) diseragamkan, role 1 melihat nama di daftar [V2] | (a) dari B0; (b) dari A0 | ✔ Horii: **(a)** ikut legacy per layar, dihitung BE (§6.1b) |
+| D8 | Angka badge menu | (a) `badge` = distinct(belum dibaca ∪ `perlu_tindak`), `total` tetap; (b) penanda kedua; (c) dibiarkan | (a) | ✔ Horii: **(a)** (F8-12, §6.2) |
+| R9(1) | Bawaan filter baca tab "Tiket saya" | semua / belum | semua | ✔ Horii: **semua** [V2]; antrean tetap `belum` [K] (B-25) |
+| R3 | Indikator badge saat sidebar ciut | (a) tidak perlu; (b) titik penanda | (b) | ✔ Horii: **(b)** CR kecil berkas bersama `AppSidebar.vue`, commit terpisah dalam #9 (MAKE-073) |
+| R10 | Helper galat 422 + pilih banyak chatbot ke `shared/` | langkah 1 (aditif, helpdesk saja) + langkah 2 (migrasi chatbot) | keduanya | Langkah 1 dalam #9 (MAKE-073); ✔ Horii: **langkah 2 disetujui**, dikerjakan bersama paket perbaikan QA chatbot (CR-134 dst.), syarat test chatbot 83/83; duplikasi sementara = B-30 |
+| Konvensi | Nama field respons, ekspor kosong, filter baca, `urutan_pengirim`, `bisa_ekspor`, urutan, `ditutup_oleh_label`, `snapshot`, tata letak master-detail | — | — | ✔ reviewer 16-11-2026 (§6.1b, §6.3) |
 
 **E-10 Chatbot "Vanya" (v1.1).** Pertanyaan K-1..K-11 dari dokumen kerja reviewer `Mapping_Chatbot_Fase8.md` §6 (12-11-2026). Syarat
 pada K-5 tetap berlaku.
@@ -1091,7 +1489,7 @@ teknis wajib/keamanan dasar dan **wajib** dicatat di laporan milestone + `backen
 | R8-1 | Payload push tidak cocok dengan app Android (kunci `data`) | Notifikasi Android tidak membuka tiket | PN8-1 / Q8-08 sebelum M4; test kontrak payload |
 | R8-2 | `id_user`/`sender`/`msg_sender` legacy tidak cocok dengan `id_pengguna` v2 saat impor (v1.2: id disalin apa adanya, H8-6) | Tiket yatim, petugas tak terhubung | v1.2: `id_user` master disalin apa adanya (K-M11); id yang tidak ada di `pengguna` v2 dibuang dan jumlahnya dicatat di laporan impor MAKE-097 (K-M12, F8-21), lalu diperiksa reviewer sebelum cutover; audit yatim sebelum FK `nip` |
 | R8-3 | F-02 (sortir `inbox`) belum selesai | Data lama tidak bisa diimpor | Tidak menahan koding; menahan cutover (PN8-2) |
-| R8-4 | Logika baca-otomatis yang dulu di trigger `inbox_msg_afIns` ditebak keliru | Badge belum-dibaca salah | M0 mencocokkan dengan D1:7730-7739 (via reviewer); test per skenario (AC-E04.4) |
+| R8-4 | Logika baca-otomatis yang dulu di trigger `inbox_msg_afIns` ditebak keliru | Badge belum-dibaca salah | M0 mencocokkan dengan D1:7730-7739 (via reviewer); test per skenario (AC-E04.4). v1.3: sebagian sudah [K] dari kode legacy (F8-10, §6.2); sisa [I] hanya sisi lawan = 2 dan sisi pembalas pemilik = 1 |
 | R8-5 | Pesan impor berisi backslash hasil `addslashes` (`LS:1576`) | Teks tampil dengan `\'` | Keputusan normalisasi di F-02/impor; FE tidak men-strip |
 | R8-6 | Isi percakapan = data pribadi; kebocoran lewat lampiran/URL/log | Pelanggaran privasi | BP8-2/BP8-5, endpoint unduh ber-otorisasi, fixture sintetis, payload minimal. **v1.2 — risiko sadar H8-5 (a) (Horii 13-11-2026):** lampiran tiket **lama** ber-path `arsip/{nip}/inbox/…` tetap dapat diunduh tanpa login lewat alias publik `/berkas/` F-10 seperti legacy (F10-18, README-deploy §1l); diterima Horii, tidak dimitigasi di Fase 8. Aplikasi tidak menautkan `/berkas/` (lampiran lama dan baru lewat E-04, AC-E04.7, AC-E08.9); unggahan v2 tetap privat; mempersempit alias kelak = keputusan Horii lewat QF10-2 / saklar `arsip.penyajianBerkasLegacy` (`backend/app/Config/Arsip.php:12-17`) |
 | R8-7 | Modul paling terbuka (role 1–7) → spam/penyalahgunaan | Antrean petugas banjir | Throttle (BP8-10), batas panjang, lampiran tervalidasi |
@@ -1105,9 +1503,13 @@ teknis wajib/keamanan dasar dan **wajib** dicatat di laporan milestone + `backen
 | R8-15 | **Pesan bebas pegawai** di `log_chatbot` dapat memuat data pribadi yang diketik sendiri (NIP, nama) dan tampil di statistik/riwayat admin | Paparan data pribadi ke role 1 | Log anonim (K-4); hanya role 1; tidak ada ekspor riwayat; tidak dicatat di log aplikasi/audit (BP8-15); retensi = pertanyaan lanjutan bila Horii menghendaki |
 | R8-16 | Bahan chatbot berasal dari **legacy dev** yang belum diuji di produksi | Perilaku dev mengandung bug yang ikut terbawa | Anomali A1..A16 (Lampiran B.2) diperlakukan eksplisit; test pembanding hanya untuk mesin jawab |
 | R8-17 | **Penilaian berulang**: token hanya menjaga kepemilikan log, sehingga satu akun dapat meminta jawaban bubble yang sama berulang dan menilai tiap log; permintaan bubble juga menambah hitungan "paling sering cocok" (sama dengan dev) | Urutan bubble pertanyaan dan pengali feedback bisa digeser satu akun | Dibatasi throttle (F8-36) dan pengali feedback maks ±10% yang hanya berlaku bagi kandidat lolos ambang (F8-34); `pesan_user` jalur bubble diambil dari DB (F8-48); satu suara per akun per QnA = usulan lanjutan bila terbukti disalahgunakan (butuh identitas di log, bertentangan K-4) |
-| R8-18 | (v1.2) Petugas role 1 tanpa NIP tidak menerima push karena titik sambung push mencari token per NIP (§6.4, F8-13) | AC-E06.7 gagal; petugas admin tidak tahu ada tiket baru | H8-14 diputus sebelum MAKE-072; badge menu + lonceng (AC-E06.9) tetap memberi tahu di web |
-| R8-19 | (v1.2) Hapus tiket impor berlampiran legacy gagal di `LocalStorageAdapter::hapus()` atau meninggalkan berkas | Hapus tiket galat atau berkas yatim | AC-E05.7; perlakuan diputus di A0 (CR adapter atau tidak dihapus atas konfirmasi Horii) |
-| R8-20 | (v1.2) Tiket impor berkategori NULL tidak punya pemilik antrean | Tiket Open menggantung, melanggar exit criteria E-05 | H8-16, AC-E04.11, AC-E05.8; dicatat di runbook MAKE-074 |
+| R8-18 | (v1.2) Petugas role 1 tanpa NIP tidak menerima push karena titik sambung push mencari token per NIP (§6.4, F8-13) | AC-E06.7 gagal; petugas admin tidak tahu ada tiket baru | H8-14 diputus sebelum MAKE-072; badge menu + lonceng (AC-E06.9) tetap memberi tahu di web. v1.3: ✔ H8-14 (a), penerima per `id_pengguna` lewat CR-137 (§6.4); sisa risiko = regresi pemakai `AntrePushPesan` lain, dimitigasi test regresi cuti/LKH/Konket |
+| R8-19 | (v1.2) Hapus tiket impor berlampiran legacy gagal di `LocalStorageAdapter::hapus()` atau meninggalkan berkas | Hapus tiket galat atau berkas yatim | AC-E05.7; perlakuan diputus di A0 (CR adapter atau tidak dihapus atas konfirmasi Horii). v1.3: ✔ Q-A0-6 (a') `PenjagaBerkas` (hitung rujukan, anomali tertinggal tercatat); jumlah anomali diukur pra-cek B7; lampiran lama baru tersedia di storage v2 sesudah T-5 (Q-A0-5, MAKE-097) |
+| R8-20 | (v1.2) Tiket impor berkategori NULL tidak punya pemilik antrean | Tiket Open menggantung, melanggar exit criteria E-05 | H8-16, AC-E04.11, AC-E05.8; dicatat di runbook MAKE-074. v1.3: ✔ H8-16 (a1): tiket NULL dapat ditutup pemiliknya; tiket NULL Open berpengirim yatim tetap menggantung seperti legacy, dihitung kueri B6, dan bila > 0 Horii dapat memilih tutup otomatis khusus irisan itu saat cutover |
+| R8-21 | (v1.3) Identitas petugas (nama/id akun) terbuka ke pemilik lewat respons API | Pelanggaran aturan penyamaran legacy dan privasi petugas | Penyamaran dihitung BE (D7 (a)); `msg_sender`/`closed_by` mentah tidak dikirim ke non-role-1; `urutan_pengirim` tanpa id; fixture 4 kasus + pasangan role 1 (AC-E04.12) |
+| R8-22 | (v1.3) Ekspor periode panjang dengan pesan impor sangat panjang menghabiskan memori | Ekspor gagal atau server lambat | Batas baris 10.000 + batas ukuran `SUM(CHAR_LENGTH(msg))` (ambang diukur di test MAKE-074) + potong sel 32.767 (AC-E09.8) |
+| R8-23 | (v1.3) Duplikasi sementara helper galat/pilih banyak chatbot vs `shared/` (R10) | Perbaikan di satu versi tidak ikut di versi lain | Langkah 2 di paket QA chatbot (CR-134 dst.) dengan syarat test chatbot 83/83; dicatat di README `features/halo-simpeg` dan laporan B1 (B-30) |
+| R8-24 | (v1.3) README beku MAKE-070/071 menyimpang dari §6.1b | FE membangun terhadap bentuk yang salah | README = sumber beku final; selisih diselesaikan lewat reviewer sebelum beku; fixture diverifikasi trait terhadap respons nyata |
 
 ---
 
@@ -1194,7 +1596,7 @@ Tabel dev: `qna`, `qna_kategori`, `qna_tag`, `qna_has_tag`, `qna_status`, `log_c
 | B-8 | Membuka halaman percakapan (GET) mengubah status baca | `LS:907-920` | `POST …/baca` (BP8-7) |
 | B-9 | Log audit rusak: `explode("\n", $array)` terbalik, menghasilkan galat/kosong | `LS:578`, `LS:661-664` | Diganti `audit_logs` |
 | B-10 | Memuat semua tiket + N+1 query per tiket | `LS:864-875` | Paginasi + join (BP8-11) |
-| B-11 | UI hanya petugas yang melihat tombol tutup/hapus, controller mengizinkan pemilik juga | `VI:133-142` vs `SC:676-690`, `SC:719-733` | Tutup: keduanya (F8-08); hapus: petugas saja (F8-09) |
+| B-11 | UI hanya petugas yang melihat tombol tutup/hapus, controller mengizinkan pemilik juga | `VI:133-142` vs `SC:676-690`, `SC:719-733` | Tutup: keduanya (F8-08); hapus: petugas saja (F8-09); v1.3: v2 menampilkan Tutup bagi pemilik di ⋮ menurut `bisa_tutup` (B-19, B-26) |
 | B-12 | Hapus kategori/petugas tanpa cek ketergantungan | `LS:363-365`, `LS:709-711` | FK RESTRICT + pesan 422 (E-02) |
 | B-13 | Popup login hanya muncul untuk petugas ber-role 2/6; petugas role 1 tidak diingatkan | `MC:271` | F8-12 |
 | B-14 | `support_officer.email` wajib di form tetapi tidak ditemukan dipakai mengirim surel di berkas yang dibaca | `LS:756` [I] | Dipertahankan sebagai data kontak |
@@ -1202,6 +1604,19 @@ Tabel dev: `qna`, `qna_kategori`, `qna_tag`, `qna_has_tag`, `qna_status`, `log_c
 | B-16 | Unik nomor kontak/petugas hanya di aplikasi (kondisi balapan) | `LS:176-199`, `LS:765-788` | UNIQUE di DB (F8-03) |
 | B-17 | Ekspor hanya memuat tiket yang pernah dijawab petugas yang sama dalam periode | `LS:1603-1609` | F8-20 (diperluas) |
 | B-18 | Antrean push dihapus sebelum dikirim → pesan hilang bila gagal | `CR:1013-1020` | Fase 6 (queue + retry); BP8-6 |
+| B-19 | (v1.3) Pemilik yang tercatat sebagai petugas kategori **lain** ditolak membalas, menutup, dan menghapus tiketnya sendiri (controller hanya memeriksa `officer_category` bila akun itu petugas) | `SC:571-579`, `:676-684`, `:719-727` | [V2]: pemilik selalu boleh balas dan tutup (F8-08); hapus tetap hanya petugas (F8-09); test balas/tutup |
+| B-20 | (v1.3) Daftar menyembunyikan tiket tanpa pesan | `LS:868` | [V2]: ditampilkan di akhir dengan `pesan_terakhir: null` agar tidak ada tiket Open tersembunyi (AC-E04.15) |
+| B-21 | (v1.3) Detail memakai INNER JOIN `question_category`, sehingga tiket berkategori NULL tidak bisa dibuka | `LS:897-901` | [V2]: pemilik dapat membuka, menandai baca, dan menutup; balas 422 (H8-16 (a1)) |
+| B-22 | (v1.3) Penyamaran nama petugas berbeda per layar: daftar "Admin" bagi semua peninjau bila pengirim pesan terakhir bukan pemilik; detail "Admin" hanya bagi peninjau bukan role 1 | `VI:110-117`; `VD:48-55`, `views/template/modal/pic_halo_simpeg.php:42-47` | [K] dipertahankan per layar (D7 (a), Horii 16-11-2026), dihitung BE; perbedaan dua aturan dicatat sebagai perilaku legacy yang disengaja; id akun petugas tidak dikirim ke non-role-1 [V2] |
+| B-23 | (v1.3) Penomoran pengirim (warna gelembung) relatif terhadap peninjau | `VD:5-14`, `:44` | [V2] kecil: `urutan_pengirim` per tiket relatif pemilik (0 = pemilik, petugas 1..n menurut kemunculan pertama) |
+| B-24 | (v1.3) Tombol ekspor hanya tampil bagi petugas dengan lebih dari satu kategori | `VI:13-14` | [V2]: `bisa_ekspor` = petugas aktif berapa pun kategorinya (F8-20, AC-E09.1) |
+| B-25 | (v1.3) Filter "Belum Dibaca" tercentang bawaan di daftar | `VI:51`, `:198` | Antrean petugas [K] bawaan `belum`; tab "Tiket saya" bawaan `semua` [V2] (Horii 16-11-2026) |
+| B-26 | (v1.3) Pemilik bukan petugas boleh menghapus tiketnya di controller (UI tidak menampilkan) | `SC:728-733` | [V2] (F8-09): pemilik → 403 `bukan_pihak_berwenang`, termasuk tiket NULL (tiket NULL hanya dapat ditutup) |
+| B-27 | (v1.3) Pesan legacy tanpa batas panjang (TEXT), melebihi batas sel Excel 32.767 karakter | `LS:1505-1526`; `CreateDisiplinTicketFase4.php:114` | [V2]: sel ekspor dipotong 32.767 dengan penanda "… [dipotong]" sebagai pengecualian AC-E09.8 ("tidak terpotong" = baris) |
+| B-28 | (v1.3) Nama bergelar pengirim pesan hanya untuk `UserLevel` 2/6 | `LS:1580-1588` | [V2] kecil: semua akun ber-NIP role apa pun (§7.4) |
+| B-29 | (v1.3) Nama berkas lampiran tidak unik per pesan (`lampiran_{id_qc}_{YmdHis}`), path dari respons server arsip; NIP kosong menghasilkan `arsip//inbox/…` | `LS:979-981`, `:988`, `:1004`, `:1159-1161` | Hapus lewat `PenjagaBerkas` (hitung rujukan; path anomali tertinggal tercatat, Q-A0-6 (a')); jumlah diukur pra-cek B7 |
+| B-30 | (v1.3) **Deviasi sementara v2 (bukan anomali legacy):** helper galat 422 dan komponen pilih banyak ada dua salinan (`features/halo-simpeg/chatbot/galat.ts` + `chatbot/components/admin/TagPilihan.vue` vs `shared/utils/galatKolom.ts` + `shared/ui/UiPilihBanyak.vue`) | R10 langkah 1 | Dicatat di README `features/halo-simpeg` dan laporan B1; dihapus di R10 langkah 2 (paket QA chatbot CR-134 dst., test chatbot 83/83) |
+| B-31 | (v1.3) Tombol ekspor Excel/CSV bawaan DataTables di list master (kategori, petugas, kontak) | `views/hr/support/categories/list.php:143-150` dan setara | Tidak dibawa (tidak ada di §6.1); endpoint baru bila Horii menghendaki |
 
 ### B.2 Anomali legacy dev chatbot (E-10) & perlakuan v2
 
@@ -1271,3 +1686,4 @@ A1..A9 dari `Mapping_Chatbot_Fase8.md` §3.4; A10..A16 temuan tambahan saat peny
 | v1.1 (lanjutan) | 12-11-2026 | Hasil D1 chatbot blok [1]–[6] dicatat (PN8-5); keputusan Horii 12-11-2026: K-5 ditunda ke saat deploy (PN8-6, F8-27, Trello DEPLOY-002), K-12 judul kembar digabung saat impor + judul unik (F8-40 ✔), K-13 kategori uji/nonaktif tidak dibawa, kategori aktif kosong dibawa (F8-46); F8-46a gugur (0 QnA tanpa kategori) |
 | v1.1 (konfirmasi) | 12-11-2026 | Horii: "setuju semua" → bawaan teknis E-10 F8-34..F8-51 dan bawaan kecil tanpa nomor (§6.5, §7.10) dikonfirmasi (◻ → ✔) |
 | v1.2 | 16-11-2026 | **CR-131.** Keputusan Horii 13-11-2026 (H8-1, H8-2, H8-5, H8-6; H8-4 terjawab lewat H8-1) dan 16-11-2026 ("ikut rekomendasi semua": H8-3 FE helpdesk = Worker Muse; H8-11 (a) rilis bersama CR-135; H8-12 T12b = MAKE-097 ReadOne + review DB WS-2; H8-13 (b) C4 keluar dari DoD → DEPLOY-002) dimasukkan: header (Trello, key CR-130..135 dan MAKE-097, "CR-095 dst." gugur), gerbang helpdesk terbuka dan status E-10 di `main` dengan SHA (§0.1), kolom kartu Trello (§1.1), di luar scope UAT/BAST, cutover produksi + rollback, hapus kolom hash legacy, C4 (§1.2), BP8-5/F8-17/R8-6 risiko sadar H8-5 (a) dengan lampiran lama tetap lewat E-04, F8-21/§8/R8-2/Q8-13/DoD/`8_1.md` A5 mengikuti H8-6 (K-M11/K-M12), tabel paket × key × agen × izin (§3.1), berkas bersama baru (`KontrakMatriksRoleTest`, reset store helpdesk di `clearSession()`, `features/notifikasi` dan berkas Push bersyarat), kontradiksi push per NIP vs petugas role 1 (F8-13, §6.4, H8-14), binding `RingkasanTiketInterface` (F8-19, AC-E06.9), kewajiban A0 kontrak (§6.1a K-A1..K-A8) dan angka (§7.3a, [usulan] hanya bila ada sumber legacy), AC baru AC-E02.7..9, AC-E04.11, AC-E05.7/8, AC-E06.9/10, AC-E08.8/9, AC-E09.7/8 (+ AC-E09.2 WIB↔UTC), ketergantungan M6/B4 dan §7.8 (5) ke MAKE-071, DoD (C4 keluar, Notion, checklist CR-132), M6'/M8 di §10, register H8 (H8-14..H8-16 terbuka sesudah A0; H8-7..H8-10 tetap terbuka), R8-18..R8-20, rujukan baris basi (`nav.config.ts`, `Routing.php`, `RedesignShell.vue`, `router/index.ts`, `auth.store.ts`) dicek ulang di `603af133`. Penyelarasan hasil verifikasi (masih 16-11-2026): syarat mulai A0/B0 seragam (§0.1, §3.1, §10 M0, `8_1.md` A0, `8_2.md` B0), M7 menunggu M4/M5, kartu uji push real MT-010/DEPLOY-001.1, pelaksana CR-133/CR-134+ = usulan (izin pasca-#8 ◻), WIB↔UTC dan AC-E09.7 = usulan menunggu konfirmasi Horii, SHA sign-off F-10 `fd9e8371`, addendum ADR-038 dan catatan README-deploy §1l untuk lampiran tiket lama. Tidak ada kode dan tidak ada migration |
+| v1.3 | 16-11-2026 | **CR-136.** Hasil laporan A0 (Handling Case, disetujui reviewer 16-11-2026, dua putaran revisi) dan laporan B0 (Worker Muse, disetujui final 16-11-2026) dimasukkan, beserta keputusan Horii 16-11-2026 ("ikut rekomendasi semua"): H8-14 (a) `antreAkun` + CR-137 berkas bersama Push; H8-15 (b) entri `NotifikasiPage` (role 4/5 lewat badge menu); H8-16 (a1) tiket NULL ikut legacy tanpa ubah data; K-A4 (1') hapus petugas terakhir 422 + Nonaktifkan dengan peringatan; Q-A0-6 (a') hapus lampiran lewat `PenjagaBerkas`; angka Q-A0-8 (§7.3a final); penyamaran D7 (a); badge D8 (a); bawaan tab "Tiket saya" `semua`; titik penanda sidebar ciut; R10 langkah 1 (dalam #9) dan langkah 2 (paket QA chatbot, test 83/83); Q-A0-9 WIB↔UTC + audit unduhan; H8-9 (frame helpdesk belum ada, PN8-4 ditutup); PN8-8 (tangkapan layar widget dev diterima). Keputusan reviewer CR 16-11-2026: Q-A0-4, Q-A0-5 (T-5 di MAKE-097), Q-A0-7 (kontak dua path), konvensi nama respons, ekspor kosong 200 JSON, filter `baca`, `urutan_pengirim`, `bisa_ekspor`, `ditutup_oleh_label`, `snapshot`, urutan + pemecah seri, tata letak master-detail tanpa pengecualian AGENTS.md. Bagian yang diubah: header (versi, basis `ef83356e`, key CR-136/CR-137, sumber), §0.1 status A0/B0/A1, §0.2 PN8-4/PN8-8, §3 (BE-3, FE, tabel berkas bersama final, ManifestLampiran milik MAKE-097, adapter tidak diubah), §3.1 (status, CR-136, CR-137, T-5, sub-langkah MAKE-073), §5.2 (F8-06, F8-08..F8-13, F8-17..F8-21), §6.1 (kontak dua path, status, `petugas/saya`, parameter tiket, pencocokan Matriks), §6.1a (terpenuhi), §6.1b baru (kontrak + galat + fixture), §6.2 (aturan hitung, `badge`, penanda baca E7), §6.3 (FE final), §6.4 (H8-14 (a)), §7.1 (indeks, KEY FK redundan, pra-cek), §7.2 (K-A4 (1'), AC-E02.8/9, AC-E07.1), §7.3/§7.3a (angka final), §7.4 (AC-E04.4/10/11, AC-E04.12..15 baru), §7.5 (`PenjagaBerkas`, AC-E05.5/7/8, AC-E05.9/10 baru), §7.6 (AC-E06.7/9/10), §7.7 (AC-E08.7, AC-E08.10..16 baru), §7.9 (AC-E09.1..8), §8, §9, §10, §11, §12 (register H8 + butir turunan A0/B0), §13 (R8-4, R8-18..R8-20, R8-21..R8-24 baru), Lampiran B (B-11, B-19..B-31). Sembilan usulan CR-136 dari laporan A0 dimasukkan (potong sel 32.767, ekspor kosong tidak diaudit, pemilik tiket NULL 403, urutan, `urutan_pengirim`, kontak dua path + `petugas/saya` + `bisa_ekspor`, penanda baca, indeks DBV-028, fixture `8_1.md` A3). Rumusan yang gugur ditandai "(gugur v1.3)". Tidak ada kode dan tidak ada migration |
