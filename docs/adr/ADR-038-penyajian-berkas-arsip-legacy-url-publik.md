@@ -102,5 +102,6 @@ Kedua mode saklar dijaga test (MAKE-090). Mengubah dua regex legacy (mis. mengiz
 
 - `writable/` kini punya **satu** pengecualian sempit yang terjangkau web: dua pola legacy di bawah `uploads/lampiran`. Ketentuan "`writable/` tidak terjangkau web" tetap berlaku untuk isi lainnya (`README-deploy.md` §1l).
 - Pasang/ubah setelan Nginx menjadi syarat QA (G10-4, server dev) dan rilis produksi (B10-3). Hasil verifikasi `curl -I` dan uji tiga browser dicatat di `README-deploy.md` §1l.
+  - Catatan 16-11-2026 (K-12 checklist QA F-10, Horii): G10-4 dijalankan di Nginx lokal dengan blok README apa adanya; hak baca user Nginx, larangan symlink, dan uji ponsel diperiksa operator lewat daftar periksa deploy README-deploy §1l di setiap server (B10-3).
 - Invarian "path tidak pernah ke klien" (`AttachmentService`) dilanggar sadar **hanya** untuk `url_berkas` berkas legacy di endpoint Arsip (`akses_berkas: "publik"`).
 - QR surat cuti ber-TTE legacy yang menunjuk server arsip lama tetap blocker cutover di luar F-10 (B10-2). Alias `/berkas/arsip/…` membuka opsi redirect QR lama ke v2.
