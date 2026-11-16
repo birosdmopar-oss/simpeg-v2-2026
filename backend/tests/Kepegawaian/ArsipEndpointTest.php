@@ -259,6 +259,7 @@ final class ArsipEndpointTest extends DatabaseTestCase
                 $res = $this->asUser($admin)->get($url($ujung, $qs));
                 $res->assertStatus(404);
                 $this->assertSame(ArsipService::PESAN_FOLDER_TIDAK_ADA, $this->json($res)['message'], "{$ujung} {$kode}");
+                $this->assertSame('folder_tidak_ditemukan', $this->json($res)['code'] ?? null, "{$ujung} {$kode}");
             }
         }
         $this->asUser($admin)->get($url('berkas', 'id_jenis_rwy=2&belum_terhubung=1&q=x&sort=nama'))->assertStatus(404);
@@ -295,6 +296,8 @@ final class ArsipEndpointTest extends DatabaseTestCase
         $tanpaNip = $this->asUser($admin)->get('api/v1/pegawai/000000000000000000/arsip/berkas?id_jenis_rwy=2');
         $tanpaNip->assertStatus(404);
         $this->assertNotSame(ArsipService::PESAN_FOLDER_TIDAK_ADA, $this->json($tanpaNip)['message']);
+        $this->assertArrayNotHasKey('code', $this->json($tanpaNip), '404 NIP tanpa kode folder');
+        $this->assertArrayNotHasKey('code', $this->json($luar));
     }
 
     public function testRingkasanRiwayatPerKodeDanMenggantung(): void

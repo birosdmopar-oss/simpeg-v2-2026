@@ -44,6 +44,9 @@ final class ArsipService
     /** CR-127: pesan 404 untuk `id_jenis_rwy` yang tidak ada di master (FE menampilkan "Folder tidak ditemukan."). */
     public const PESAN_FOLDER_TIDAK_ADA = 'Folder tidak ditemukan.';
 
+    /** CR-127 R-2: kode mesin `code` pada 404 jenis (FE tidak perlu mencocokkan teks pesan). */
+    public const KODE_FOLDER_TIDAK_ADA = 'folder_tidak_ditemukan';
+
     /**
      * Ekspresi urut `sort=nama` = {@see self::namaArsip()} di SQL: `tag` → `display_name` → `filename` (kecuali baris
      * berkunci v2) → "Berkas <id>". Regex kunci v2 = Config\Arsip::REGEX_KUNCI_V2 (`[.]` pengganti `\.`), dibandingkan
@@ -449,8 +452,8 @@ final class ArsipService
     }
 
     /**
-     * CR-127 (T-01): kode jenis berbentuk sah tetapi tidak ada di master `jenis_rwy` → 404 "Folder tidak ditemukan.".
-     * Dipanggil SESUDAH otorisasi pegawai dan SEMUA 422 (saringan, `page`/`per_page`, `format`), SEBELUM catatan
+     * CR-127 (T-01): kode jenis berbentuk sah tetapi tidak ada di master `jenis_rwy` → 404 "Folder tidak ditemukan."
+     * (`code: "folder_tidak_ditemukan"`). Dipanggil SESUDAH otorisasi pegawai dan SEMUA 422 (saringan, `page`/`per_page`, `format`), SEBELUM catatan
      * F10-17/F10-26 (tanpa audit). `null` (semua) dan `tanpa_jenis` tidak dicek.
      */
     private function pastikanJenisAda(?string $jenis): void
@@ -460,7 +463,7 @@ final class ArsipService
         }
 
         if ($this->db->table('jenis_rwy')->select('1', false)->where('id_jenis_rwy', (int) $jenis)->limit(1)->get()->getRowArray() === null) {
-            throw new NotFoundException(self::PESAN_FOLDER_TIDAK_ADA);
+            throw new NotFoundException(self::PESAN_FOLDER_TIDAK_ADA, self::KODE_FOLDER_TIDAK_ADA);
         }
     }
 
