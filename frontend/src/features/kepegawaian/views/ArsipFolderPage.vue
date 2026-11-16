@@ -41,8 +41,15 @@ import { arsipService } from '../services/arsip.service'
 import { simpanBerkas } from '../services/berkasUnduhan'
 
 const PER_PAGE = 25
-/** Pesan 404 jenis (BE CR-127); 404 lain (mis. NIP tak ada) memakai pesan baku halaman. */
+/** Kode mesin 404 jenis di envelope galat (BE CR-127); 404 NIP tak ada tidak memuat kode ini. */
+const KODE_FOLDER_TAK_ADA = 'folder_tidak_ditemukan'
 const PESAN_FOLDER_TAK_ADA = 'Folder tidak ditemukan.'
+
+function folderTakDitemukan(error: unknown): boolean {
+  if (!isApiError(error) || error.status !== 404) return false
+  const badan = error.original.response?.data as { code?: unknown } | undefined
+  return typeof badan === 'object' && badan !== null && badan.code === KODE_FOLDER_TAK_ADA
+}
 const JEDA_CARI_MS = 300
 const FORMAT_EKSPOR: ExportFormat[] = [
   { key: 'xlsx', label: 'Ekspor Excel' },
@@ -148,9 +155,9 @@ async function muatBerkas(): Promise<void> {
   } catch (error) {
     if (ini !== permintaan) return
     hasil.value = null
-    if (isApiError(error) && error.status === 404 && error.message === PESAN_FOLDER_TAK_ADA) {
+    if (folderTakDitemukan(error)) {
       folderTakDikenal.value = true
-      failure.value = PESAN_FOLDER_TAK_ADA
+      failure.value = isApiError(error) && error.message !== '' ? error.message : PESAN_FOLDER_TAK_ADA
     } else {
       failure.value = describeApiError(error).message
     }

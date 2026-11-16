@@ -11,6 +11,7 @@ vi.mock('../services/auth.service', () => ({
 }))
 
 import { ambilFolderArsip, kosongkanFolderArsip, simpanFolderArsip } from '@/features/kepegawaian/arsip.cache'
+import { catatObjectUrlArsip } from '@/features/kepegawaian/arsip.popup'
 import type { ArsipFolderResponse } from '@/features/kepegawaian/arsip.types'
 
 import { authService } from '../services/auth.service'
@@ -155,5 +156,13 @@ describe('useAuthStore — cache folder Arsip terikat sesi (MAKE-096)', () => {
     simpanFolderArsip('nip-uji', dataArsip)
     await store.login({ username: 'u', password: 'p' } as never)
     expect(ambilFolderArsip('nip-uji')).toBeNull()
+  })
+
+  it('clearSession mencabut object URL popup Arsip (logout)', () => {
+    const cabut = vi.fn()
+    Object.defineProperty(URL, 'revokeObjectURL', { value: cabut, configurable: true, writable: true })
+    catatObjectUrlArsip('blob:uji/logout', { closed: false } as unknown as Window)
+    useAuthStore().clearSession()
+    expect(cabut).toHaveBeenCalledWith('blob:uji/logout')
   })
 })

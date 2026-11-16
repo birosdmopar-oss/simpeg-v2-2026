@@ -1,7 +1,7 @@
 /**
  * Aksi "Buka" halaman Arsip (F-10, MAKE-091; AC1-18, PRD F10-37): jalur `publik` (window.open + noopener, tanpa API),
- * jalur `privat` pratinjau (popup sinkron sebelum API selesai, blob bertipe dari daftar tertutup, revoke tertunda +
- * saat unmount), jalur `privat` unduh (tanpa popup, `simpanBerkas`), serta galat (popup ditutup, pesan di halaman).
+ * jalur `privat` pratinjau (popup sinkron sebelum API selesai, blob bertipe dari daftar tertutup, isi popup = halaman
+ * pembungkus dengan tautan Unduh bernama arsip, object URL hidup selama popup terbuka — CR-126 T-06), jalur `privat` unduh (tanpa popup, `simpanBerkas`), serta galat (popup ditutup, pesan di halaman).
  */
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,8 +9,9 @@ import { defineComponent, h } from 'vue'
 
 vi.mock('../services/berkasUnduhan', () => ({ ambilBerkas: vi.fn(), simpanBerkas: vi.fn() }))
 
+import { SELANG_PERIKSA_POPUP_MS, cabutObjectUrlArsip, namaUnduhArsip } from '../arsip.popup'
 import type { ArsipBerkas } from '../arsip.types'
-import { JEDA_CABUT_MS, PESAN_GANTI_PASSWORD, PESAN_POPUP_DIBLOKIR, PESAN_TERLALU_BANYAK, tipePratinjau, useBukaBerkasArsip } from '../composables/useBukaBerkasArsip'
+import { PESAN_GANTI_PASSWORD, PESAN_POPUP_DIBLOKIR, PESAN_TERLALU_BANYAK, tipePratinjau, useBukaBerkasArsip } from '../composables/useBukaBerkasArsip'
 import { ambilBerkas, simpanBerkas } from '../services/berkasUnduhan'
 
 const ambil = vi.mocked(ambilBerkas)
@@ -54,9 +55,12 @@ function pasang() {
   return { wrapper, vm: wrapper.vm as unknown as ReturnType<typeof useBukaBerkasArsip> }
 }
 
+/** Popup tiruan dengan dokumen nyata (jsdom) agar isi pembungkus bisa diperiksa. */
 function popupTiruan() {
-  return { location: { href: '' }, close: vi.fn(), opener: {} as unknown, closed: false, document: { title: '', body: { textContent: '' } } }
+  return { location: { href: '' }, close: vi.fn(), opener: {} as unknown, closed: false, document: document.implementation.createHTMLDocument('') }
 }
+
+const sel = <T extends Element = HTMLElement>(popup: ReturnType<typeof popupTiruan>, q: string) => popup.document.querySelector<T>(q)
 
 let openSpy: ReturnType<typeof vi.spyOn>
 let buatUrl: ReturnType<typeof vi.fn>
@@ -78,6 +82,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cabutObjectUrlArsip()
   openSpy.mockRestore()
   vi.useRealTimers()
 })
@@ -133,13 +138,15 @@ describe('Buka — akses_berkas = privat, pratinjau (F10-37)', () => {
     expect(String(openSpy.mock.calls[0]?.[2])).not.toContain('noopener')
     expect(popup.opener).toBeNull()
     expect(popup.document.body.textContent).toBe('Memuat berkas…')
+    expect(popup.document.title).toBe('Memuat berkas…')
     expect(ambil).toHaveBeenCalledWith('pegawai/<nip>/arsip/berkas/123/buka', 'arsip-123')
-    expect(popup.location.href).toBe('')
+    expect(sel(popup, 'iframe')).toBeNull()
     expect(vm.sedangDimuat).toBe(123)
     expect(vm.bisaDibuka(item())).toBe(false)
 
     selesai({ blob: new Blob(['x'], { type: 'application/pdf' }), nama: 'SK Jabatan.pdf' })
-    await vi.waitFor(() => expect(popup.location.href).toBe('blob:uji/1'))
+    await vi.waitFor(() => expect(sel(popup, '[data-arsip="unduh"]')).not.toBeNull())
+    expect(popup.location.href).toBe('') // popup TIDAK dinavigasi ke blob:
     expect(vm.sedangDimuat).toBeNull()
     expect(popup.close).not.toHaveBeenCalled()
     expect(simpan).not.toHaveBeenCalled()
@@ -163,35 +170,6 @@ describe('Buka — akses_berkas = privat, pratinjau (F10-37)', () => {
     vm.buka(item())
     await vi.waitFor(() => expect(blobsDibuat).toHaveLength(3))
     expect(blobsDibuat[2]?.type).toBe('application/octet-stream')
-  })
-
-  it('object URL dicabut sesudah penundaan tetap (fake timer)', async () => {
-    vi.useFakeTimers()
-    openSpy.mockReturnValue(popupTiruan() as unknown as Window)
-    ambil.mockResolvedValue({ blob: new Blob(['x']), nama: 'SK.pdf' })
-    const { vm } = pasang()
-    vm.buka(item())
-    await vi.advanceTimersByTimeAsync(0)
-    expect(buatUrl).toHaveBeenCalledTimes(1)
-    expect(cabutUrl).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(JEDA_CABUT_MS - 1)
-    expect(cabutUrl).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(1)
-    expect(cabutUrl).toHaveBeenCalledWith('blob:uji/1')
-  })
-
-  it('object URL yang belum dicabut dicabut saat komponen di-unmount (dan timernya dibatalkan)', async () => {
-    vi.useFakeTimers()
-    openSpy.mockReturnValue(popupTiruan() as unknown as Window)
-    ambil.mockResolvedValue({ blob: new Blob(['x']), nama: 'SK.pdf' })
-    const { wrapper, vm } = pasang()
-    vm.buka(item())
-    await vi.advanceTimersByTimeAsync(0)
-    expect(cabutUrl).not.toHaveBeenCalled()
-    wrapper.unmount()
-    expect(cabutUrl).toHaveBeenCalledWith('blob:uji/1')
-    await vi.advanceTimersByTimeAsync(JEDA_CABUT_MS)
-    expect(cabutUrl).toHaveBeenCalledTimes(1)
   })
 
   it('popup diblokir (window.open null) → pesan, tanpa panggilan API', () => {
@@ -348,6 +326,154 @@ describe('Buka — pembukaan beruntun (satu popup bernama sama)', () => {
     selesai({ blob: new Blob(['x']), nama: 'SK.pdf' })
     await vi.waitFor(() => expect(popup.close).toHaveBeenCalled())
     expect(buatUrl).not.toHaveBeenCalled()
-    expect(popup.location.href).toBe('')
+    expect(sel(popup, 'iframe')).toBeNull()
+    expect(popup.document.body.textContent).toBe('Memuat berkas…')
+  })
+})
+
+describe('Buka privat — isi popup pembungkus (CR-126 T-06)', () => {
+  async function bukaDenganBerkas(nama: string, tipeBlob: string, overrides: Partial<ArsipBerkas> = {}) {
+    const popup = popupTiruan()
+    openSpy.mockReturnValue(popup as unknown as Window)
+    ambil.mockResolvedValue({ blob: new Blob(['x'], { type: tipeBlob }), nama })
+    const { wrapper, vm } = pasang()
+    vm.buka(item(overrides))
+    await vi.waitFor(() => expect(sel(popup, '[data-arsip="unduh"]')).not.toBeNull())
+    return { popup, wrapper, vm }
+  }
+
+  it('PDF: tautan Unduh (download = nama aman, href = object URL), iframe penampil, judul = nama arsip', async () => {
+    const { popup } = await bukaDenganBerkas('apa-saja.pdf', 'application/pdf', { nama_arsip: 'SK Jabatan' })
+    const unduh = sel<HTMLAnchorElement>(popup, '[data-arsip="unduh"]')
+    expect(unduh?.getAttribute('download')).toBe('SK Jabatan.pdf')
+    expect(unduh?.getAttribute('href')).toBe('blob:uji/1')
+    expect(unduh?.textContent).toBe('Unduh')
+    const penampil = sel(popup, '[data-arsip="penampil"]')
+    expect(penampil?.tagName).toBe('IFRAME')
+    expect(penampil?.getAttribute('src')).toBe('blob:uji/1')
+    expect(popup.document.title).toBe('SK Jabatan')
+    expect(sel(popup, '[data-arsip="nama"]')?.textContent).toBe('SK Jabatan')
+  })
+
+  it('gambar: <img> penampil dan ekstensi dari nama berkas server', async () => {
+    const { popup } = await bukaDenganBerkas('foto.JPG', 'image/jpeg', { nama_arsip: 'Foto KTP' })
+    expect(sel(popup, '[data-arsip="penampil"]')?.tagName).toBe('IMG')
+    expect(sel(popup, '[data-arsip="unduh"]')?.getAttribute('download')).toBe('Foto KTP.jpg')
+  })
+
+  it('nama arsip berisi HTML tampil sebagai teks (tanpa elemen b / img)', async () => {
+    const { popup } = await bukaDenganBerkas('x.pdf', 'application/pdf', { nama_arsip: '<b>x</b><img src=x onerror=alert(1)>' })
+    expect(popup.document.querySelector('b')).toBeNull()
+    expect(popup.document.querySelector('img')).toBeNull()
+    expect(sel(popup, '[data-arsip="nama"]')?.textContent).toBe('<b>x</b><img src=x onerror=alert(1)>')
+    expect(popup.document.title).toBe('<b>x</b><img src=x onerror=alert(1)>')
+  })
+
+  it('jalur publik tidak berubah: window.open(url, arsip-popup, ...noopener), tanpa API dan tanpa object URL', () => {
+    openSpy.mockReturnValue(null)
+    const { vm } = pasang()
+    vm.buka(item({ akses_berkas: 'publik', url_berkas: '/berkas/arsip/<nip>/SK.pdf' }))
+    expect(openSpy).toHaveBeenCalledWith('/berkas/arsip/<nip>/SK.pdf', 'arsip-popup', 'width=600,height=600,noopener')
+    expect(ambil).not.toHaveBeenCalled()
+    expect(buatUrl).not.toHaveBeenCalled()
+  })
+})
+
+describe('namaUnduhArsip — nama berkas unduhan yang aman', () => {
+  it.each([
+    ['SK Jabatan', null, 'x.pdf', 'SK Jabatan.pdf'],
+    ['SK: Jabatan/2026 <A>?', null, 'x.pdf', 'SK Jabatan 2026 A.pdf'],
+    ['a\\b|c*d"e', null, 'x.png', 'a b c d e.png'],
+    ['  \u0007Kontrol\u0000 ', null, 'x.gif', 'Kontrol.gif'],
+    ['SK.pdf', null, 'x.pdf', 'SK.pdf'],
+    ['SK.PDF', null, 'x.pdf', 'SK.pdf'],
+    ['', 'Nama Tampil', 'x.pdf', 'Nama Tampil.pdf'],
+    ['', null, 'x.pdf', 'berkas.pdf'],
+    ['///', '', 'x.jpeg', 'berkas.jpeg'],
+    ['..', null, 'x.pdf', 'berkas.pdf'],
+    ['Surat', null, 'tanpa-ekstensi', 'Surat'],
+    ['Surat', null, 'x.docx', 'Surat'],
+  ])('%j (display %j, server %s) → %s', (arsip, tampil, server, harapan) => {
+    expect(namaUnduhArsip(arsip, tampil, server)).toBe(harapan)
+  })
+
+  it('dipotong per code point (emoji tidak terbelah) dan ekstensi tetap ada', () => {
+    const hasil = namaUnduhArsip('\u{1F600}'.repeat(400), null, 'x.pdf')
+    expect(hasil.endsWith('.pdf')).toBe(true)
+    expect([...hasil.slice(0, -4)]).toHaveLength(150)
+    expect(hasil).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/)
+  })
+})
+
+describe('Buka privat — masa hidup object URL (CR-126 T-06)', () => {
+  async function bukaFake(popup: ReturnType<typeof popupTiruan>, id = 123) {
+    openSpy.mockReturnValue(popup as unknown as Window)
+    ambil.mockResolvedValue({ blob: new Blob(['x']), nama: 'SK.pdf' })
+    const host = pasang()
+    host.vm.buka(item({ id_attachment: id }))
+    await vi.advanceTimersByTimeAsync(0)
+    return host
+  }
+
+  it('TIDAK dicabut selama popup terbuka (jauh melewati 60 detik)', async () => {
+    vi.useFakeTimers()
+    await bukaFake(popupTiruan())
+    expect(buatUrl).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(cabutUrl).not.toHaveBeenCalled()
+  })
+
+  it('dicabut sesudah popup ditutup dan selang pemeriksaan lewat; pemeriksaan berhenti (tanpa timer bocor)', async () => {
+    vi.useFakeTimers()
+    const popup = popupTiruan()
+    await bukaFake(popup)
+    expect(vi.getTimerCount()).toBe(1)
+    popup.closed = true
+    await vi.advanceTimersByTimeAsync(SELANG_PERIKSA_POPUP_MS - 1)
+    expect(cabutUrl).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(cabutUrl).toHaveBeenCalledTimes(1)
+    expect(cabutUrl).toHaveBeenCalledWith('blob:uji/1')
+    expect(vi.getTimerCount()).toBe(0)
+    await vi.advanceTimersByTimeAsync(SELANG_PERIKSA_POPUP_MS * 3)
+    expect(cabutUrl).toHaveBeenCalledTimes(1)
+  })
+
+  it('dicabut saat popup yang sama dipakai ulang untuk berkas lain; URL baru hidup', async () => {
+    vi.useFakeTimers()
+    const popup = popupTiruan()
+    const { vm } = await bukaFake(popup)
+    ambil.mockResolvedValue({ blob: new Blob(['y']), nama: 'Lain.pdf' })
+    vm.buka(item({ id_attachment: 124, nama_arsip: 'Lain' }))
+    expect(cabutUrl).toHaveBeenCalledWith('blob:uji/1') // sinkron saat klik, sebelum berkas baru siap
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sel(popup, '[data-arsip="unduh"]')?.getAttribute('href')).toBe('blob:uji/2')
+    expect(cabutUrl).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(1)
+  })
+
+  it('dicabut saat berkas publik dibuka di jendela yang sama', async () => {
+    vi.useFakeTimers()
+    const { vm } = await bukaFake(popupTiruan())
+    openSpy.mockReturnValue(null)
+    vm.buka(item({ id_attachment: 9, akses_berkas: 'publik', url_berkas: '/berkas/arsip/<nip>/SK.pdf' }))
+    expect(cabutUrl).toHaveBeenCalledWith('blob:uji/1')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('dicabut saat halaman pemanggil di-unmount (timer dibatalkan)', async () => {
+    vi.useFakeTimers()
+    const { wrapper } = await bukaFake(popupTiruan())
+    wrapper.unmount()
+    expect(cabutUrl).toHaveBeenCalledWith('blob:uji/1')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('dicabut saat logout (cabutObjectUrlArsip dipanggil dari clearSession)', async () => {
+    vi.useFakeTimers()
+    await bukaFake(popupTiruan())
+    cabutObjectUrlArsip()
+    expect(cabutUrl).toHaveBeenCalledWith('blob:uji/1')
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

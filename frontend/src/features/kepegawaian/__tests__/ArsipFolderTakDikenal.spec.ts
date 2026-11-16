@@ -36,8 +36,8 @@ function ringkas(): ArsipFolderResponse {
   }
 }
 
-function galat(status: number, message: string) {
-  return { status, message, errors: null, isNetworkError: false, original: { response: { status, data: { message, errors: null } } } }
+function galat(status: number, message: string, code?: string) {
+  return { status, message, errors: null, isNetworkError: false, original: { response: { status, data: { message, errors: null, ...(code ? { code } : {}) } } } }
 }
 
 async function pasang(path: string) {
@@ -64,7 +64,7 @@ beforeEach(() => {
 
 describe('folder berangka tidak dikenal (404 dari BE)', () => {
   it('404 "Folder tidak ditemukan." → pesan itu, judul "Folder", tanpa tabel / "Belum ada berkas." / ekspor / coba lagi', async () => {
-    berkasApi.mockRejectedValue(galat(404, 'Folder tidak ditemukan.'))
+    berkasApi.mockRejectedValue(galat(404, 'Folder tidak ditemukan.', 'folder_tidak_ditemukan'))
     const wrapper = await pasang(`/arsip/${NIP}/2`)
     expect(berkasApi).toHaveBeenCalledWith(NIP, { id_jenis_rwy: 2, q: '', page: 1, per_page: 25 })
     expect(wrapper.get('[data-testid="arsip-failure"]').text()).toBe('Folder tidak ditemukan.')
@@ -76,8 +76,10 @@ describe('folder berangka tidak dikenal (404 dari BE)', () => {
     expect(wrapper.find('[data-testid="arsip-cari"]').exists()).toBe(false)
   })
 
-  it('404 lain (mis. NIP tidak ada) tidak diperlakukan sebagai folder tak dikenal: pesan baku + Coba lagi tetap ada', async () => {
+  it('404 tanpa code (mis. NIP tidak ada) tidak diperlakukan sebagai folder tak dikenal: pesan baku + Coba lagi tetap ada', async () => {
     berkasApi.mockRejectedValue(galat(404, 'Pegawai tidak ditemukan (uji).'))
+    // bahkan bila pesannya sama dengan pesan folder, tanpa code → galat biasa
+
     const wrapper = await pasang(`/arsip/${NIP}/9`)
     const teks = wrapper.get('[data-testid="arsip-failure"]').text()
     expect(teks).not.toContain('Folder tidak ditemukan.')
@@ -107,7 +109,7 @@ describe('folder berangka tidak dikenal (404 dari BE)', () => {
   })
 
   it('pindah dari folder tak dikenal ke folder sah memulihkan tampilan', async () => {
-    berkasApi.mockRejectedValueOnce(galat(404, 'Folder tidak ditemukan.'))
+    berkasApi.mockRejectedValueOnce(galat(404, 'Folder tidak ditemukan.', 'folder_tidak_ditemukan'))
     const wrapper = await pasang(`/arsip/${NIP}/2`)
     expect(wrapper.find('[data-testid="arsip-berkas-kosong"]').exists()).toBe(false)
     berkasApi.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 25 })
@@ -116,5 +118,20 @@ describe('folder berangka tidak dikenal (404 dari BE)', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="arsip-failure"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="arsip-berkas-kosong"]').text()).toContain('Belum ada berkas.')
+  })
+})
+
+describe('pembeda 404 jenis memakai code, bukan teks pesan', () => {
+  it('404 dengan pesan "Folder tidak ditemukan." TANPA code → galat biasa (Coba lagi tersedia)', async () => {
+    berkasApi.mockRejectedValue(galat(404, 'Folder tidak ditemukan.'))
+    const wrapper = await pasang(`/arsip/${NIP}/9`)
+    expect(wrapper.find('[data-testid="arsip-coba-lagi"]').exists()).toBe(true)
+  })
+
+  it('404 dengan code folder_tidak_ditemukan → pesan server ditampilkan apa adanya', async () => {
+    berkasApi.mockRejectedValue(galat(404, 'Jenis arsip tidak dikenal (uji).', 'folder_tidak_ditemukan'))
+    const wrapper = await pasang(`/arsip/${NIP}/2`)
+    expect(wrapper.get('[data-testid="arsip-failure"]').text()).toBe('Jenis arsip tidak dikenal (uji).')
+    expect(wrapper.find('[data-testid="arsip-coba-lagi"]').exists()).toBe(false)
   })
 })

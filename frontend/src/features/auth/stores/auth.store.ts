@@ -11,6 +11,7 @@ import { resetChatbot } from '@/features/halo-simpeg/chatbot/stores/percakapan'
 import { lepasTokenPush } from '@/features/integrasi/composables/notifikasiPush'
 import { resetPengingatCuti } from '@/features/layanan/composables/pengingatCuti'
 import { kosongkanFolderArsip } from '@/features/kepegawaian/arsip.cache'
+import { cabutObjectUrlArsip } from '@/features/kepegawaian/arsip.popup'
 import { resetSesiKonten } from '@/features/konten/sesi'
 import { isApiError } from '@/lib/axios'
 
@@ -51,6 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
   function clearSession(): void {
     resetSesiKonten()
     kosongkanFolderArsip()
+    cabutObjectUrlArsip()
     resetChatbot()
     user.value = null
     claims.value = null

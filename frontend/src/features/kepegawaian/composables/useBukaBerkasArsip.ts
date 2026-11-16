@@ -1,21 +1,26 @@
 /**
- * Aksi "Buka" berkas di halaman Arsip (F-10, MAKE-091; PRD F10-18, F10-37, §9.3). Jalur dipilih dari `akses_berkas` item,
- * bukan dari saklar global:
- *  - `publik` (berkas legacy): `window.open(url_berkas, 'arsip-popup', 'width=600,height=600,noopener')`, tanpa API.
+ * Aksi "Buka" berkas di halaman Arsip (F-10, MAKE-091 + CR-126 T-06; PRD F10-18, F10-37, §9.3). Jalur dipilih dari
+ * `akses_berkas` item, bukan dari saklar global:
+ *  - `publik` (berkas legacy): `window.open(url_berkas, 'arsip-popup', 'width=600,height=600,noopener')`, tanpa API
+ *    (object URL popup privat sebelumnya dicabut: jendela bernama sama dipakai ulang).
  *  - `privat` (berkas unggahan v2) + `pratinjau`: popup dibuka SINKRON di handler klik (sesudah `await` akan diblokir
- *    pemblokir popup) tanpa `noopener` (dengan `noopener` `window.open` mengembalikan null sehingga lokasi popup tidak bisa
+ *    pemblokir popup) tanpa `noopener` (dengan `noopener` `window.open` mengembalikan null sehingga isi popup tidak bisa
  *    diisi), lalu `opener = null`. Berkas diambil lewat `ambilBerkas` (klien `api`, interceptor refresh token ikut), blob
  *    dibuat ulang dengan tipe dari DAFTAR TERTUTUP menurut ekstensi nama berkas — bukan tipe respons mentah, karena object
- *    URL `blob:` mewarisi origin aplikasi (HTML/SVG tidak boleh berjalan di sana). Object URL dicabut sesudah jeda tetap
- *    dan saat komponen di-unmount.
+ *    URL `blob:` mewarisi origin aplikasi (HTML/SVG tidak boleh berjalan di sana). Popup TIDAK dinavigasi ke `blob:`
+ *    (penampil PDF Chromium akan menamai unduhan dengan UUID); isinya halaman pembungkus (`arsip.popup.ts`, DOM API):
+ *    nama arsip, tautan "Unduh" bernama arsip, dan penampil iframe (PDF) / img. Object URL hidup selama popup terbuka,
+ *    dicabut saat popup ditutup (diperiksa berkala), dipakai ulang untuk berkas lain, halaman di-unmount, atau logout.
  *  - `privat` + `unduh`: tanpa popup; `ambilBerkas` lalu `simpanBerkas` (nama dari `Content-Disposition`).
  * Semua galat menutup popup. 429/404/403 tampil sebagai pesan di halaman (`galat`), bukan JSON mentah. 401 sesudah refresh
- * gagal dan 403 `password_change_required` ditangani interceptor (login / ganti password), tanpa pesan tambahan.
+ * gagal ditangani interceptor (login) tanpa pesan tambahan. 403 `password_change_required` pada unduhan blob tidak memicu
+ * handler interceptor (body masih Blob saat `code` dibaca), jadi pesan server / cadangan ditampilkan di halaman.
  */
 import { onBeforeUnmount, ref } from 'vue'
 
 import { isApiError, PASSWORD_CHANGE_REQUIRED_CODE } from '@/lib/axios'
 
+import { catatObjectUrlArsip, cabutObjectUrlArsip, isiPopupArsip, namaUnduhArsip } from '../arsip.popup'
 import type { ArsipBerkas } from '../arsip.types'
 import { describeApiError } from '../services/apiErrors'
 import { ambilBerkas, simpanBerkas } from '../services/berkasUnduhan'
@@ -23,8 +28,6 @@ import { ambilBerkas, simpanBerkas } from '../services/berkasUnduhan'
 /** Nama jendela popup (sama untuk jalur publik dan privat; membuka berkas lain memakai ulang jendela yang sama). */
 export const NAMA_POPUP_ARSIP = 'arsip-popup'
 const UKURAN_POPUP = 'width=600,height=600'
-/** Jeda pencabutan object URL pratinjau (tanpa deteksi selesai-muat penampil PDF; PRD F10-37 (5)). */
-export const JEDA_CABUT_MS = 60_000
 
 export const PESAN_POPUP_DIBLOKIR = 'Popup diblokir browser. Izinkan popup untuk situs ini.'
 export const PESAN_TERLALU_BANYAK = 'Terlalu banyak membuka berkas arsip. Coba lagi dalam satu menit.'
@@ -72,25 +75,10 @@ export function useBukaBerkasArsip() {
 
   /** Token permintaan privat: hanya permintaan terakhir (dan komponen yang masih terpasang) boleh mengisi popup / galat. */
   let urutan = 0
-  const timerCabut = new Map<string, ReturnType<typeof setTimeout>>()
-
-  function jadwalkanCabut(url: string): void {
-    timerCabut.set(
-      url,
-      setTimeout(() => {
-        timerCabut.delete(url)
-        URL.revokeObjectURL(url)
-      }, JEDA_CABUT_MS),
-    )
-  }
 
   onBeforeUnmount(() => {
     urutan++ // hasil permintaan yang masih berjalan menjadi basi
-    for (const [url, timer] of timerCabut) {
-      clearTimeout(timer)
-      URL.revokeObjectURL(url)
-    }
-    timerCabut.clear()
+    cabutObjectUrlArsip()
   })
 
   /** Boleh dibuka bila URL ada dan (untuk berkas privat) tidak ada berkas privat lain yang sedang dimuat. */
@@ -122,10 +110,16 @@ export function useBukaBerkasArsip() {
         simpanBerkas(berkas)
         return
       }
-      const blob = new Blob([berkas.blob], { type: tipePratinjau(berkas.nama) })
-      const objectUrl = URL.createObjectURL(blob)
-      jadwalkanCabut(objectUrl)
-      popup.location.href = objectUrl
+      const tipe = tipePratinjau(berkas.nama)
+      const objectUrl = URL.createObjectURL(new Blob([berkas.blob], { type: tipe }))
+      catatObjectUrlArsip(objectUrl, popup)
+      const namaArsip = item.nama_arsip.trim() !== '' ? item.nama_arsip : (item.display_name ?? '')
+      isiPopupArsip(popup, {
+        namaArsip: namaArsip !== '' ? namaArsip : 'Berkas',
+        namaUnduh: namaUnduhArsip(item.nama_arsip, item.display_name, berkas.nama),
+        objectUrl,
+        tipe,
+      })
     } catch (error) {
       popup?.close()
       if (ini === urutan) galat.value = pesanGalat(error)
@@ -142,12 +136,14 @@ export function useBukaBerkasArsip() {
     if (url === null) return
 
     if (item.akses_berkas === 'publik') {
+      cabutObjectUrlArsip() // jendela bernama sama dinavigasi ke URL publik: isi blob sebelumnya hilang
       window.open(url, NAMA_POPUP_ARSIP, `${UKURAN_POPUP},noopener`)
       return
     }
 
     let popup: Window | null = null
     if (item.jenis_buka !== 'unduh') {
+      cabutObjectUrlArsip() // popup bernama sama dipakai ulang untuk berkas ini
       popup = window.open('', NAMA_POPUP_ARSIP, UKURAN_POPUP)
       if (popup === null) {
         galat.value = PESAN_POPUP_DIBLOKIR
