@@ -631,7 +631,8 @@ final class TiketService extends MasterHaloSimpeg
                 . 'lm.id_inbox_msg AS lm_id, lm.created_at AS lm_waktu, lm.msg AS lm_msg, lm.msg_sender AS lm_sender, lm.msg_sender_name AS lm_sender_name, lm.attachments AS lm_lampiran')
             ->select('(t.status = 0 AND ' . RingkasanTiket::sqlPerluTindak($this->db, 't') . ') AS perlu_tindak_sql', false)
             ->join('question_category qc', 'qc.id_question_category = t.id_question_category', 'left')
-            ->join('disiplin_ticket_msg lm', "lm.id_inbox_msg = (SELECT m.id_inbox_msg FROM {$msg} m WHERE m.id_inbox = t.id_inbox ORDER BY m.created_at DESC, m.id_inbox_msg DESC LIMIT 1)", 'left', false);
+            // escape=false mematikan prefix otomatis CI4, jadi nama tabel join diberi prefix sendiri.
+            ->join("{$msg} lm", "lm.id_inbox_msg = (SELECT m.id_inbox_msg FROM {$msg} m WHERE m.id_inbox = t.id_inbox ORDER BY m.created_at DESC, m.id_inbox_msg DESC LIMIT 1)", 'left', false);
     }
 
     /**

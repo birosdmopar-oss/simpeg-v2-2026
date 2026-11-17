@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Support\HaloSimpeg;
 
+use App\Libraries\Kepegawaian\Lampiran\LocalStorageAdapter;
+use CodeIgniter\Test\Mock\MockCache;
 use CodeIgniter\Test\TestResponse;
+use CodeIgniter\Throttle\Throttler;
+use Config\Services;
 
 /**
  * Data SINTETIS helpdesk Halo Simpeg untuk test MAKE-070 (master) dan paket tiket berikutnya, plus verifikasi bahwa contoh respons
@@ -57,6 +61,79 @@ trait HaloSimpegFixtureTrait
         ]);
 
         return (int) $this->db->insertID();
+    }
+
+    /**
+     * Pesan sintetis pada tiket `$tiket` (waktu UTC eksplisit agar urutan deterministik).
+     */
+    protected function buatPesanHs(int $tiket, int $pengirim, string $isi = 'Pesan uji', string $waktu = '2026-11-17 01:00:00', ?string $lampiran = null, string $nama = 'Pengirim Uji'): int
+    {
+        $this->db->table('disiplin_ticket_msg')->insert([
+            'id_inbox' => $tiket, 'msg_sender' => $pengirim, 'msg_sender_name' => $nama, 'msg_receiver' => 0, 'msg' => $isi, 'attachments' => $lampiran, 'created_at' => $waktu,
+        ]);
+
+        return (int) $this->db->insertID();
+    }
+
+    /** Throttler MockCache (tidak berbagi kuota antar test). */
+    protected function pasangThrottlerHs(): Throttler
+    {
+        $t = new Throttler(new MockCache());
+        $t->setTestTime(1_790_000_000);
+        Services::injectMock('throttler', $t);
+
+        return $t;
+    }
+
+    /** Storage lampiran di folder sementara milik test; dikembalikan path akarnya. */
+    protected function pasangStorageHs(): string
+    {
+        $akar = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'hs-uji-' . bin2hex(random_bytes(4));
+        mkdir($akar, 0700, true);
+        Services::injectMock('storageAdapter', new LocalStorageAdapter($akar));
+
+        return $akar;
+    }
+
+    protected static function hapusFolderHs(string $akar): void
+    {
+        if ($akar === '' || ! is_dir($akar)) {
+            return;
+        }
+
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($akar, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST) as $f) {
+            $f->isDir() ? @rmdir($f->getPathname()) : @unlink($f->getPathname());
+        }
+
+        @rmdir($akar);
+    }
+
+    /**
+     * Pasang `$_FILES['arsip']` untuk request berikutnya; kembalikan path sementara (hapus sesudah request).
+     */
+    protected function unggahHs(string $nama, string $isi): string
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'hsu');
+        file_put_contents($path, $isi);
+        service('superglobals')->setFilesArray(['arsip' => ['name' => $nama, 'type' => 'application/octet-stream', 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'size' => strlen($isi)]]);
+
+        return $path;
+    }
+
+    protected function lepasUnggahHs(string $path): void
+    {
+        service('superglobals')->setFilesArray([]);
+        @unlink($path);
+    }
+
+    /** Isi PDF minimal yang lolos deteksi MIME (`application/pdf`). */
+    protected static function pdfHs(): string
+    {
+        return '%PDF-1.4
+1 0 obj << /Type /Catalog >> endobj
+trailer << /Root 1 0 R >>
+%%EOF
+';
     }
 
     /**
