@@ -10,7 +10,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-028 (Fase 8 E-01, helpdesk Halo Simpeg; PRD Fase 8 v1.2 §7.1, F8-03) — tiga tabel master helpdesk yang belum ada di v2:
+ * DBV-028 (Fase 8 E-01, helpdesk Halo Simpeg; PRD Fase 8 v1.3 §7.1, F8-03) — tiga tabel master helpdesk yang belum ada di v2:
  * `help_desk_contact`, `support_officer`, `officer_category`. Dokumen: backend/docs/db-review/DBV-028-skema-helpdesk.md.
  *
  * Kolom ikut legacy [K]/[I] dari KODE legacy (`libraries/hr/L_support.php`); DDL produksi/dev ketiga tabel tidak tersedia,

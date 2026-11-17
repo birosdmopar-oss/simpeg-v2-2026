@@ -1,17 +1,19 @@
 -- =====================================================================================================================
 -- DBV-028 — Audit data helpdesk Halo Simpeg (master + tiket) — HANYA BACA (SELECT)
 -- =====================================================================================================================
--- Dokumen: backend/docs/db-review/DBV-028-skema-helpdesk.md Bagian 6. Sumber: PRD Fase 8 v1.2 §7.1, F8-03, F8-21 (H8-6),
+-- Dokumen: backend/docs/db-review/DBV-028-skema-helpdesk.md Bagian 6. Sumber: PRD Fase 8 v1.3 §7.1, F8-03, F8-21 (H8-6),
 -- AC-E04.11, AC-E05.7/8; laporan A0 Handling Case §R B6, B7, C4.
 --
--- Dua bagian:
+-- Tiga bagian:
 --   A. MASTER (Q-H1..Q-H10) — nama tabel/kolom SAMA di legacy dan v2 (`help_desk_contact`, `support_officer`,
 --      `officer_category`, `question_category`): dijalankan di SALINAN legacy (sebelum impor T12b/MAKE-097) dan di v2
 --      (sesudah impor). Memeriksa data terhadap UNIQUE/CHECK/FK [V2] DBV-028.
 --   B. TIKET v2 PASCA IMPOR (Q-H11..Q-H16) — memakai `disiplin_ticket(_msg)`/`pengguna` v2, dijalankan di DB v2 hasil impor
 --      F-02 + T12b (gladi cutover), bukan di legacy. Bahan runbook MAKE-074 (H8-16 (a1), Q-A0-6 (a')).
+--   C. LEGACY SAJA (Q-H17) — memakai kolom legacy `pengguna.id` (`LS:440`); dijalankan hanya di SALINAN legacy sebelum
+--      impor T12b. Di v2 butir ini dijamin FK `fk_id_user_so_to_pengguna`; baris yang dibuang dihitung laporan impor (K-M12).
 -- Hasil hanya agregat (COUNT), tanpa isi baris (percakapan = data pribadi, PRD Cara pakai 7).
--- Berkas yang sama berjalan di skema v2 kosong (test SkemaHaloSimpegTest::testKueriAuditBerjalan).
+-- Bagian A dan B berjalan di skema v2 kosong (test SkemaHaloSimpegTest::testKueriAuditBerjalan); bagian C tidak.
 --
 -- Klasifikasi:
 --   WAJIB_0 = harus 0; > 0 di salinan legacy menghentikan impor T12b sampai diputus Horii/DB Validator (konstrain v2 tidak
@@ -112,3 +114,13 @@ WHERE t.status = 0 AND t.id_question_category IS NOT NULL
 SELECT 'Q-H16 INFO tiket tanpa pesan' AS butir, COUNT(*) AS jumlah
 FROM disiplin_ticket t
 WHERE NOT EXISTS (SELECT 1 FROM disiplin_ticket_msg m WHERE m.id_inbox = t.id_inbox);
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- C. LEGACY SAJA
+-- ---------------------------------------------------------------------------------------------------------------------
+
+-- Q-H17 akun petugas yang tidak ada di `pengguna` legacy (impor T12b membuang + mencatat, K-M12; PRD v1.3 §7.1 pra-cek)
+SELECT 'Q-H17 INFO support_officer.id_user tanpa pengguna' AS butir, COUNT(*) AS jumlah
+FROM support_officer so
+WHERE NOT EXISTS (SELECT 1 FROM pengguna p WHERE p.id = so.id_user);

@@ -14,7 +14,7 @@ require_once APPPATH . 'Database/Migrations/2026-11-16-100000_CreateHaloSimpegFa
 require_once APPPATH . 'Database/Migrations/2026-11-16-100100_AlterDisiplinTicketIndeksFase8.php';
 
 /**
- * DBV-028 — test skema helpdesk Halo Simpeg (PRD Fase 8 v1.2 §7.1, AC-E01.2/AC-E01.3). Diuji:
+ * DBV-028 — test skema helpdesk Halo Simpeg (PRD Fase 8 v1.3 §7.1, AC-E01.2/AC-E01.3). Diuji:
  * - struktur, tipe, collation `utf8mb4_unicode_ci` tiga tabel baru (`id_user` INT UNSIGNED agar FK ke `pengguna`);
  * - UNIQUE `contact`, `id_user`, pasangan petugas-kategori (1062); FK RESTRICT/RESTRICT (1451/1452); CHECK status 0/1
  *   (3819 MySQL / 4025 MariaDB);
@@ -218,7 +218,12 @@ final class SkemaHaloSimpegTest extends DatabaseTestCase
 
     public function testKueriAuditBerjalan(): void
     {
-        $sql   = (string) preg_replace('/^\s*--.*$/m', '', (string) file_get_contents(ROOTPATH . 'docs/db-review/sql/DBV-028-audit-halo-simpeg.sql'));
+        $isi = (string) file_get_contents(ROOTPATH . 'docs/db-review/sql/DBV-028-audit-halo-simpeg.sql');
+        // Bagian C memakai kolom legacy (`pengguna.id`) dan hanya dijalankan di salinan legacy.
+        [$v2, $legacy] = explode('-- C. LEGACY SAJA', $isi, 2) + ['', ''];
+        $this->assertStringContainsString('Q-H17', $legacy);
+
+        $sql   = (string) preg_replace('/^\s*--.*$/m', '', $v2);
         $tabel = [...CreateHaloSimpegFase8::TABEL, 'question_category', 'disiplin_ticket_msg', 'disiplin_ticket', 'pengguna'];
         $n     = 0;
 

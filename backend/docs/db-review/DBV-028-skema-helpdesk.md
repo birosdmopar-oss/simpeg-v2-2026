@@ -14,7 +14,7 @@
 **Penulis:** Handling Case (pelaksana Jalur BE helpdesk A1, izin `[#9-WorkloadHaloSimpeg]`), 16-11-2026.
 
 **Asal kebutuhan:**
-- PRD Fase 8 v1.2 (`docs/fase8/PRD_Fase8_HaloSimpeg.md`): §7.1, F8-03, F8-06, F8-09, F8-21 (H8-6), AC-E01.1..4, AC-E04.11,
+- PRD Fase 8 v1.3 (`docs/fase8/PRD_Fase8_HaloSimpeg.md`, CR-136): §7.1 (termasuk "Koreksi indeks (v1.3)"), §6.1b, F8-03, F8-06, F8-09, F8-21 (H8-6), AC-E01.1..4, AC-E04.11,
   AC-E05.7/8.
 - `docs/fase8/8_1.md` A1.
 - Laporan A0 Handling Case §R/§R2 (16-11-2026, di luar repo, disetujui reviewer). Butir yang dipakai: C3 indeks, B6/B7/C4 pra-cek,
@@ -131,7 +131,7 @@ CHECK: `chk_help_desk_contact_status`, `chk_support_officer_status`.
 | `idx_dticket_sender_status` | `disiplin_ticket (sender, status)` | "tiket saya" + filter status; ringkasan sisi pemilik (`is_read = 2`). PK ikut di indeks sekunder InnoDB, jadi urut `id_inbox` tidak perlu kolom ketiga |
 | `idx_dticketmsg_inbox_waktu` | `disiplin_ticket_msg (id_inbox, created_at)` | thread urut waktu + pesan terakhir per tiket `ORDER BY created_at DESC, id_inbox_msg DESC LIMIT 1` (tanpa N+1, B-10) |
 
-`(sender, updated_at)` dari usulan awal PRD §7.1 **tidak** dipakai. `updated_at` ber-`ON UPDATE CURRENT_TIMESTAMP` ikut berubah saat
+`(sender, updated_at)` dari usulan awal PRD §7.1 **tidak** dipakai (gugur di PRD v1.3 §7.1). `updated_at` ber-`ON UPDATE CURRENT_TIMESTAMP` ikut berubah saat
 tiket dibaca atau ditutup, sehingga tidak mewakili "pesan terakhir" (review A0 C3).
 
 ### 4.1 EXPLAIN dua bentuk indeks kategori
@@ -185,7 +185,7 @@ biaya tulis dan membingungkan rencana kueri. Pembuangan cukup satu `ALTER … DR
 
 ## 6. Pra-cek dan kueri audit baca-saja
 
-Berkas `backend/docs/db-review/sql/DBV-028-audit-halo-simpeg.sql` berisi 16 kueri, semuanya agregat COUNT tanpa isi baris. Hanya
+Berkas `backend/docs/db-review/sql/DBV-028-audit-halo-simpeg.sql` berisi 17 kueri, semuanya agregat COUNT tanpa isi baris. Hanya
 **ditulis**; tidak dijalankan di salinan dev oleh pelaksana (aturan review A0). Berkas yang sama berjalan di skema v2
 (`SkemaHaloSimpegTest::testKueriAuditBerjalan`).
 
@@ -215,6 +215,13 @@ Berkas `backend/docs/db-review/sql/DBV-028-audit-halo-simpeg.sql` berisi 16 kuer
 | Q-H15 | INFO | tiket Open di kategori tanpa petugas aktif (C4) |
 | Q-H16 | INFO | tiket tanpa pesan (ditampilkan di akhir daftar, B3) |
 
+**C. Legacy saja** — memakai kolom legacy `pengguna.id` (`LS:440`), dijalankan hanya di salinan legacy sebelum impor T12b; di v2
+butir ini dijamin FK `fk_id_user_so_to_pengguna`, dan baris yang dibuang impor dihitung di laporan impor (K-M12, MAKE-097):
+
+| Kode | Kelas | Butir |
+|---|---|---|
+| Q-H17 | INFO | `support_officer.id_user` yang tidak ada di `pengguna` (pra-cek PRD v1.3 §7.1) |
+
 Catatan: baris `disiplin_ticket_msg.attachments` di `ManifestLampiran::KOLOM` (agar lampiran lama ikut disalin) adalah bagian
 **MAKE-097**, bukan DBV-028.
 
@@ -238,7 +245,7 @@ Dijalankan di DB scratch `simpeg_v2_t_f8be`, MySQL 8.0.30 port 3307, prefix test
 | `testUniqueFkDanCheckDitegakkan` | 1062 akun/pasangan/kontak ganda; 1452 akun/petugas/kategori tak ada; 1451 hapus kategori/petugas/akun yang dipakai; CHECK status 2; satu petugas ≥ 2 kategori dan satu kategori ≥ 2 petugas (AC-E02.2); email kontak opsional |
 | `testUpGagalTidakMenyentuhTabelYangSudahAda` | `help_desk_contact` sudah ada berisi baris → `up()` gagal (1050), tabel + baris utuh, dua tabel lain tidak tertinggal |
 | `testDownLaluUpKembali` | `down()` men-DROP tiga tabel dan tiga indeks aditif; `question_category`, `disiplin_ticket(_msg)`, `pengguna`, dan KEY DBV-022 tetap; `up()` memasang ulang |
-| `testKueriAuditBerjalan` | 16 kueri audit berjalan di skema v2; butir WAJIB_0 = 0 |
+| `testKueriAuditBerjalan` | 16 kueri audit bagian A/B berjalan di skema v2; butir WAJIB_0 = 0; bagian C (Q-H17) ada dan tidak dijalankan |
 
 `SkemaInboxTicketTest` dan `SkemaLayananTest` (Fase 4) tetap hijau (AC-E01.4), karena tidak ada kolom atau FK DBV-022 yang berubah.
 

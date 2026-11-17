@@ -10,7 +10,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * DBV-028 (Fase 8 E-01; PRD Fase 8 v1.2 §7.1, A0 §R C3 / review putaran 2) — indeks aditif untuk daftar, antrean, ringkasan, dan
+ * DBV-028 (Fase 8 E-01; PRD Fase 8 v1.3 §7.1, A0 §R C3 / review putaran 2) — indeks aditif untuk daftar, antrean, ringkasan, dan
  * thread helpdesk pada tabel DBV-022 yang sudah ada. Tidak mengubah kolom, domain, FK, atau migration lama
  * (`2026-10-26-100500_CreateDisiplinTicketFase4` tetap). Dokumen: backend/docs/db-review/DBV-028-skema-helpdesk.md Bagian 4.
  *
