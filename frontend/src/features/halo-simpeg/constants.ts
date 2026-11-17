@@ -70,3 +70,6 @@ export const TEKS_GALAT_MASTER = {
   cariMin: 'Kata kunci minimal 2 karakter.',
   cariMaks: 'Kata kunci maksimal 50 karakter.',
 } as const
+
+/** Nilai `?tab=` tab antrean petugas di `/halo-simpeg` (tab pemilik = bawaan tanpa query). */
+export const TAB_ANTREAN = 'antrean'
