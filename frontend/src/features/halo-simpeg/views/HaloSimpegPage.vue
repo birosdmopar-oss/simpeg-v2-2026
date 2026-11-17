@@ -6,10 +6,11 @@ import { computed } from 'vue'
 import RedesignShell from '@/shared/layouts/RedesignShell.vue'
 import { type Crumb, UiCard } from '@/shared/ui'
 
-const props = defineProps<{ idTiket: number | null }>()
+const props = defineProps<{ idTiket: number | null; idTidakSah: boolean }>()
 
 const crumbs = computed<Crumb[]>(() => {
   const dasar: Crumb[] = [{ label: 'Home', to: { name: 'home' } }, { label: 'Halo Simpeg', to: { name: 'halo-simpeg' } }]
+  if (props.idTidakSah) return [...dasar, { label: 'Tiket' }]
   return props.idTiket === null ? dasar : [...dasar, { label: `Tiket #${props.idTiket}` }]
 })
 </script>
@@ -18,7 +19,11 @@ const crumbs = computed<Crumb[]>(() => {
   <RedesignShell :breadcrumbs="crumbs">
     <UiCard>
       <h1 class="text-h5 font-semibold text-slate-900" data-testid="halo-judul">Halo Simpeg</h1>
-      <p class="mt-2 text-body2 text-slate-500" data-testid="halo-kerangka">Layar tiket sedang disiapkan.</p>
+      <!-- Teks 404 tiket = teks BE (PRD §6.1b). -->
+      <p v-if="idTidakSah" class="mt-2 text-body2 text-danger" role="alert" data-testid="halo-tiket-tidak-ditemukan">
+        Data percakapan tidak ditemukan.
+      </p>
+      <p v-else class="mt-2 text-body2 text-slate-500" data-testid="halo-kerangka">Layar tiket sedang disiapkan.</p>
     </UiCard>
   </RedesignShell>
 </template>

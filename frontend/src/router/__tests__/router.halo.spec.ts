@@ -12,7 +12,7 @@ vi.mock('@/features/auth/services/auth.service', () => ({
 import { authService } from '@/features/auth/services/auth.service'
 import { Role, type RoleCode, type User } from '@/features/auth/types'
 import { HALO_ADMIN_ROLES, HALO_ROLES } from '@/features/halo-simpeg/constants'
-import { haloRoutes, idTiketDariParam } from '@/features/halo-simpeg/routes.halo'
+import { haloRoutes, idTiketDariParam, type PropsHaloSimpeg } from '@/features/halo-simpeg/routes.halo'
 
 import router from '../index'
 
@@ -52,8 +52,12 @@ describe('route Halo Simpeg', () => {
   it('/halo-simpeg/tiket/:id hanya angka; props idTiket angka', () => {
     const r = router.resolve('/halo-simpeg/tiket/42')
     expect(r.name).toBe('halo-tiket')
-    const props = r.matched.at(-1)?.props.default as (rt: typeof r) => { idTiket: number | null }
-    expect(props(r)).toEqual({ idTiket: 42 })
+    const props = r.matched.at(-1)?.props.default as (rt: typeof r) => PropsHaloSimpeg
+    expect(props(r)).toEqual({ idTiket: 42, idTidakSah: false })
+    const nol = router.resolve('/halo-simpeg/tiket/0')
+    expect(nol.name).toBe('halo-tiket')
+    expect(props(nol)).toEqual({ idTiket: null, idTidakSah: true })
+    expect(router.resolve('/halo-simpeg').matched.at(-1)?.props.default).toEqual({ idTiket: null, idTidakSah: false })
     expect(router.resolve('/halo-simpeg/tiket/abc').name).not.toBe('halo-tiket')
     expect(idTiketDariParam('0')).toBeNull()
     expect(idTiketDariParam(['7'])).toBe(7)
