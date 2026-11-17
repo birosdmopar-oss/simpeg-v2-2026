@@ -69,7 +69,7 @@ final class PusatNotifikasiTest extends DatabaseTestCase
         $this->assertContains("alamat:{$idAlamat}", array_column($histori['items'], 'id'), 'S4 tetap terbaca walau cache tabel basi');
     }
 
-    public function testRingkasanBerlakuUntukSemuaRoleDenganSumberTiketNoOp(): void
+    public function testRingkasanBerlakuUntukSemuaRoleDenganSumberTiketTanpaTiket(): void
     {
         foreach ([Role::SUPER_ADMIN, Role::PEGAWAI, Role::ADMIN_SATKER, Role::ADMIN_VIEW_ESELON1, Role::MENTERI, Role::PTT, Role::PPPK, Role::PIMPINAN] as $role) {
             $res = $this->asRole($role)->get(self::BASE . '/ringkasan');
@@ -81,9 +81,45 @@ final class PusatNotifikasiTest extends DatabaseTestCase
             $this->assertSame(0, $data['notifikasi_belum_dibaca']);
             $this->assertSame(0, $data['butuh_approval']);
             $this->assertSame(0, $data['berita_belum_dibaca'], 'sumber berita F-07 (SumberBerita): tanpa berita terbit = 0');
-            $this->assertNull($data['tiket_belum_dibaca'], 'tiket NoOp sampai Fase 8 (Q8-06)');
+            $this->assertSame(0, $data['tiket_belum_dibaca'], 'RingkasanTiket (MAKE-071): tanpa tiket = 0 untuk role 1–8 (role 8 selalu 0)');
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $data['diperbarui_at']);
         }
+    }
+
+    /**
+     * AC-E06.9 (PRD Fase 8 v1.3 §6.2): `tiket_belum_dibaca` = `total` ringkasan Halo Simpeg — pemilik, petugas, dan petugas yang
+     * juga pemilik tanpa hitung ganda; role 8 = 0; notifikasi `inbox` tidak ikut dihitung (§7.8 (5)).
+     */
+    public function testTiketBelumDibacaPemilikPetugasDanPetugasPemilik(): void
+    {
+        $akun = fn (int $role): int => (int) $this->db->table('pengguna')->where('username', AuthSeeder::nipForRole($role))->get()->getRow('id_pengguna');
+        $this->db->table('question_category')->insert(['question_category' => 'Kategori Lonceng', 'status' => 1]);
+        $kat = (int) $this->db->insertID();
+
+        foreach ([Role::SUPER_ADMIN, Role::PTT] as $role) {
+            $this->db->table('support_officer')->insert(['id_user' => $akun($role), 'email' => "petugas{$role}@contoh.test", 'status' => 1]);
+            $this->db->table('officer_category')->insert(['id_support_officer' => (int) $this->db->insertID(), 'id_question_category' => $kat]);
+        }
+
+        foreach ([Role::PEGAWAI, Role::PTT] as $role) {
+            $this->db->table('disiplin_ticket')->insert([
+                'id_question_category' => $kat, 'subject' => 'Uji lonceng', 'sender' => $akun($role), 'sender_name' => 'Uji', 'nip' => '-',
+                'status' => 0, 'is_read' => 2, 'is_read_off' => 2,
+            ]);
+        }
+
+        $this->notifLayanan($this->nipPegawai, '2026-11-01 08:00:00');
+
+        // Pemilik: 1 (sisi pemilik). Petugas role 1: 2 (sisi petugas). Petugas-pemilik role 6: 1 miliknya + 1 milik pegawai; tiket
+        // miliknya tidak dihitung lagi di sisi petugas. Role 8 dan role tanpa tiket: 0.
+        $this->assertSame([1, 2, 2, 0, 0], [
+            $this->ringkasan(Role::PEGAWAI)['tiket_belum_dibaca'],
+            $this->ringkasan(Role::SUPER_ADMIN)['tiket_belum_dibaca'],
+            $this->ringkasan(Role::PTT)['tiket_belum_dibaca'],
+            $this->ringkasan(Role::PIMPINAN)['tiket_belum_dibaca'],
+            $this->ringkasan(Role::PPPK)['tiket_belum_dibaca'],
+        ]);
+        $this->assertSame(1, $this->ringkasan(Role::PEGAWAI)['notifikasi_belum_dibaca'], 'notifikasi inbox tetap terpisah dari tiket');
     }
 
     public function testDaftarGabunganLayananDanRiwayatTerbaruDulu(): void
