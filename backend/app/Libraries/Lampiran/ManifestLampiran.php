@@ -24,6 +24,7 @@ final class ManifestLampiran
      */
     public const KOLOM = [
         'absen_ijin'             => ['file_bukti', 'file_bukti_2', 'file_bukti_3', 'file_bukti_4', 'file_bukti_5'],
+        'disiplin_ticket_msg'    => ['attachments'],
         'document_attachment'    => ['path'],
         'esign_hist'             => ['file_pdf_to_sign'],
         'konv_ak'                => ['file_dupak'],

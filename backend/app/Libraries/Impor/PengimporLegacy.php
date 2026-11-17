@@ -24,7 +24,8 @@ use Throwable;
  * 7. `kolomKode`: karakter tak terlihat dibuang lalu trim PHP (kode wilayah DBV-011 §2.2 #7; NIP CR-089, dicatat di
  *    laporan). Teks melebihi panjang kolom tujuan → gagal.
  * 8. Rujukan FK dicek per batch terhadap tabel induk di tujuan (audit DBV-019 = 0): yatim → NULL bila kolomnya
- *    `yatimKeNull` (dicatat), selain itu gagal dengan jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
+ *    `yatimKeNull` (dicatat), barisnya dibuang bila kolomnya `yatimBuang` (dicatat, MAKE-097), selain itu gagal dengan
+ *    jumlah nilai yatim. Dry-run tidak memeriksa rujukan.
  *
  * 9. Indeks UNIQUE tujuan (selain PK) dicek di PHP per tabel, juga saat dry-run, terhadap baris seed dan baris yang akan
  *    ditulis: dua baris yang identik sesudah normalisasi (mis. nama beda spasi tengah) → gagal dengan nama tabel + indeks
@@ -1070,6 +1071,28 @@ final class PengimporLegacy
             $yatim = array_values(array_diff($nilai, $ada));
 
             if ($yatim === []) {
+                continue;
+            }
+
+            if (in_array($kolom, $def->yatimBuang, true)) {
+                $sisa = [];
+
+                foreach ($tulis as $baris) {
+                    if ($baris[$kolom] !== null && in_array((string) $baris[$kolom], $yatim, true)) {
+                        $this->laporan->dibuang($def->kunci(), DefinisiTabel::kodeYatimBuang($kolom));
+
+                        continue;
+                    }
+
+                    $sisa[] = $baris;
+                }
+
+                if ($sisa === []) {
+                    return [];
+                }
+
+                $tulis = $sisa;
+
                 continue;
             }
 
