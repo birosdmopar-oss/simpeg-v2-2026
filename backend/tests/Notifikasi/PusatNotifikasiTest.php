@@ -104,7 +104,7 @@ final class PusatNotifikasiTest extends DatabaseTestCase
         foreach ([Role::PEGAWAI, Role::PTT] as $role) {
             $this->db->table('disiplin_ticket')->insert([
                 'id_question_category' => $kat, 'subject' => 'Uji lonceng', 'sender' => $akun($role), 'sender_name' => 'Uji', 'nip' => '-',
-                'status' => 0, 'is_read' => 2, 'is_read_off' => 2,
+                'status'               => 0, 'is_read' => 2, 'is_read_off' => 2,
             ]);
         }
 
