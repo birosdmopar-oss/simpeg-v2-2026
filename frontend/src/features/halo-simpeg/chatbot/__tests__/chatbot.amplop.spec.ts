@@ -30,8 +30,8 @@ vi.mock('@/lib/axios', async (importOriginal) => {
 })
 
 import { isApiError } from '@/lib/axios'
+import { galatPerKolom } from '@/shared/utils/galatKolom'
 
-import { galatPerKolom } from '../galat'
 import { KontrakChatbotError } from '../schemas'
 import { kategoriChatbotService, qnaChatbotService, statistikChatbotService, tagChatbotService, vanyaService } from '../services/chatbot.service'
 import galat403 from './fixtures/galat-403-feedback.json'

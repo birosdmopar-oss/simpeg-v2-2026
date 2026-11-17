@@ -13,12 +13,11 @@ import { computed, reactive, ref, watch } from 'vue'
 import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
-import { UiButton, UiNotice, UiRadioGroup } from '@/shared/ui'
+import { type OpsiPilihBanyak, UiButton, UiNotice, UiPilihBanyak, UiRadioGroup } from '@/shared/ui'
+import { galatPerKolom } from '@/shared/utils/galatKolom'
 
-import { galatPerKolom } from '../../galat'
 import { qnaChatbotService } from '../../services/chatbot.service'
 import type { OpsiQna, QnaDetail, QnaRow, RujukanBerstatus, StatusUbah } from '../../types'
-import TagPilihan, { type OpsiTag } from './TagPilihan.vue'
 
 const props = withDefaults(
   defineProps<{ open: boolean; row: QnaRow | null; opsi: OpsiQna; opsiSiap?: boolean; opsiGalat?: string; opsiMemuat?: boolean }>(),
@@ -94,11 +93,12 @@ const kategoriDihapus = computed(() => kategoriAwal.value?.status === 10 && form
 const kategoriTidakAktif = computed(() => kategoriAwal.value?.status === 2 && form.id_kategori === String(kategoriAwal.value.id))
 
 /** Opsi tag: tag aktif + tag Tidak Aktif yang sudah terpasang (berbadge); tag Dihapus tidak tampil (F8-49a/b). */
-const opsiTag = computed<OpsiTag[]>(() => {
-  const opsi: OpsiTag[] = props.opsi.tag.map((t) => ({ id: t.id, judul: t.judul, aktif: true }))
+const TAG_TIDAK_AKTIF = { teks: 'Tidak Aktif', status: 2 } as const
+const opsiTag = computed<OpsiPilihBanyak[]>(() => {
+  const opsi: OpsiPilihBanyak[] = props.opsi.tag.map((t) => ({ id: t.id, label: t.judul }))
   for (const t of tagAwal.value) {
     // Tag lama yang tidak ada di opsi (Tidak Aktif, atau opsi belum/gagal termuat) tetap tampil dan terpilih (M-2).
-    if (t.status !== 10 && !opsi.some((o) => o.id === t.id)) opsi.push({ id: t.id, judul: t.judul, aktif: t.status === 1 })
+    if (t.status !== 10 && !opsi.some((o) => o.id === t.id)) opsi.push({ id: t.id, label: t.judul, ...(t.status === 1 ? {} : { badge: TAG_TIDAK_AKTIF }) })
   }
   return opsi
 })
@@ -191,7 +191,17 @@ async function onSubmit(): Promise<void> {
             </UiNotice>
           </div>
           <div :class="FORM_WIDE_CLASS">
-            <TagPilihan v-model="form.tag" :opsi="opsiTag" :disabled="submitting" :error="err('tag')" />
+            <UiPilihBanyak
+              v-model="form.tag"
+              :opsi="opsiTag"
+              legend="Tag"
+              label-cari="Cari tag"
+              petunjuk="Opsional. Kata kunci tambahan yang ikut dicocokkan mesin NLP."
+              teks-kosong="Tidak ada tag yang cocok."
+              testid="chatbot-qna-tag"
+              :disabled="submitting"
+              :error="err('tag')"
+            />
           </div>
           <div v-if="isEdit" :class="FORM_WIDE_CLASS" data-testid="chatbot-qna-status">
             <UiRadioGroup v-model="form.status" name="status" label="Status" :options="STATUS" />

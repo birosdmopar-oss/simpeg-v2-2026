@@ -11,8 +11,8 @@ import { isApiError } from '@/lib/axios'
 import FormField from '@/shared/components/FormField.vue'
 import { FORM_ACTIONS_CLASS, FORM_ALERT_CLASS, FORM_GRID_CLASS, FORM_WIDE_CLASS } from '@/shared/components/formLayout'
 import { UiButton, UiRadioGroup } from '@/shared/ui'
+import { galatPerKolom } from '@/shared/utils/galatKolom'
 
-import { galatPerKolom } from '../../galat'
 import { kategoriChatbotService, tagChatbotService } from '../../services/chatbot.service'
 import type { KategoriRow, StatusUbah, TagRow } from '../../types'
 
