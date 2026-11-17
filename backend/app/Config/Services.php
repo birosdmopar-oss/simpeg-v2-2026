@@ -794,7 +794,8 @@ class Services extends BaseService
     }
 
     /**
-     * Penghitung tiket Halo Simpeg untuk lonceng (Q8-06 = B, BP8-1). NoOp (null) sampai Fase 8.
+     * Penghitung tiket Halo Simpeg untuk lonceng (Q8-06 = B, BP8-1; PRD Fase 8 v1.3 §6.2, AC-E06.9, MAKE-071): angka = `total`
+     * `GET halo-simpeg/tiket/ringkasan`; role di luar 1–7 = 0.
      */
     public static function ringkasanTiket(bool $getShared = true): \App\Interfaces\Notifikasi\RingkasanTiketInterface
     {
@@ -802,6 +803,6 @@ class Services extends BaseService
             return static::getSharedInstance('ringkasanTiket');
         }
 
-        return new \App\Libraries\Notifikasi\Pusat\RingkasanTiketNoOp();
+        return new \App\Libraries\HaloSimpeg\RingkasanTiket(db_connect());
     }
 }

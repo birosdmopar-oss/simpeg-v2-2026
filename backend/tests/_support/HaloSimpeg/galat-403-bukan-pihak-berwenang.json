@@ -1,0 +1,5 @@
+{
+    "status": "error",
+    "code": "bukan_pihak_berwenang",
+    "message": "Anda tidak berwenang melakukan tindakan ini pada percakapan ini."
+}

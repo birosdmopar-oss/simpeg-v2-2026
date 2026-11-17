@@ -10,7 +10,7 @@ use App\Libraries\Auth\AuthContext;
  * Titik sambung penghitung tiket Halo Simpeg ke lonceng F-08 (PRD Fase 8 F8-19, Q8-06 = B; PRD Fase 7 v2.0 §5.9).
  *
  * BP8-1: modul notifikasi tidak membaca tabel tiket; angka tiket hanya lewat antarmuka ini. Binding
- * `Config\Services::ringkasanTiket()` = NoOp (null) sampai Fase 8 menyediakan implementasinya.
+ * `Config\Services::ringkasanTiket()` = `App\Libraries\HaloSimpeg\RingkasanTiket` (MAKE-071).
  */
 interface RingkasanTiketInterface
 {

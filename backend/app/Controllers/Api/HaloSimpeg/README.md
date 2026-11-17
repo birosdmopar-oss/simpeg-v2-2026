@@ -4,7 +4,7 @@ Controller REST API modul ini (`App\Controllers\Api\HaloSimpeg\*`). Semua contro
 route di-group `api/v1/...` dengan filter `jwt` + `role:*`. Chatbot "Vanya" punya README sendiri (`Chatbot/README.md`).
 
 Dokumen ini = **kontrak BEKU** helpdesk untuk FE (B1 Worker Muse, MAKE-073). Acuan: PRD Fase 8 v1.3 §6.1, §6.1b, §7.2, §7.3a.
-Bagian **master** beku di MAKE-070; bagian **tiket** ditambahkan MAKE-071. Perubahan sesudah beku = CR yang disepakati kedua
+Bagian **master** beku di MAKE-070; bagian **tiket** (di bawah garis pemisah) beku di MAKE-071. Perubahan sesudah beku = CR yang disepakati kedua
 jalur lewat reviewer. Contoh respons sintetis: `backend/tests/_support/HaloSimpeg/*.json` (bentuk ke-17 fixture master diuji sama
 dengan respons nyata oleh `MasterHaloSimpegTest` lewat `cocokFixtureHs`; FE menyalinnya ke
 `frontend/src/features/halo-simpeg/__tests__/fixtures/`, tanpa `*.php`).
@@ -216,3 +216,229 @@ Aturan:
 | S10 | Fixture tambahan: `kandidat-peringatan`, `petugas-put-peringatan`, `galat-422-master`, `galat-422-kategori-duplikat`, `galat-422-petugas-terakhir`, `galat-404-master`; `petugas-saya` dipecah tiga berkas | [V2] |
 | S11 | `status` opsional pada POST master, bawaan 1 (legacy: wajib di form) | [V2] |
 | S12 | Petugas/penjawab dibatasi akun ber-role 1–7: kandidat pegawai, syarat `id_user`, definisi petugas aktif (peringatan, `petugas/saya`). Role 8 tidak punya route helpdesk (F8-04); legacy menerima role apa pun [K `LS:476-484`] | [V2], keputusan reviewer M1 (dilaporkan ke Horii) |
+
+---
+
+# Bagian tiket (MAKE-071)
+
+Acuan: PRD Fase 8 v1.3 §6.1b, §6.2, §7.3–§7.5, §7.8, F8-08..F8-11, F8-17, H8-16 (a1), D7 (a). Bentuk respons tiket diuji sama dengan
+fixture `tiket-*.json` / `galat-*.json` oleh `KontrakFixtureTiketTest`.
+
+## Role dan kewenangan objek
+
+| Endpoint | Role route |
+|---|---|
+| `GET tiket`, `GET tiket/ringkasan`, `GET tiket/{id}`, `POST tiket/{id}/pesan`, `POST tiket/{id}/baca`, `POST tiket/{id}/tutup`, `DELETE tiket/{id}`, `GET tiket/{id}/pesan/{idPesan}/lampiran` | 1–7 |
+| `POST tiket` | 2, 6, 7 (pegawai, F8-04) |
+
+Kewenangan objek dihitung satu kelas, `AksesTiket` (BP8-2). Flag `bisa_*` = hasil aksi (diuji kesetaraan, AC-E04.14):
+
+- **Pemilik** = pembuat tiket (`sender`).
+- **Petugas tiket** = petugas **aktif** (status 1, akun aktif, role 1–7; F8-06, S12) yang memegang kategori tiket itu. Tiket
+  berkategori NULL tidak punya petugas. Role 1 tidak mendapat akses tambahan (H8-16 (a1)).
+- **Melihat** (daftar, detail, baca, lampiran) = pemilik atau petugas tiket. Selain itu **404** "Data percakapan tidak ditemukan."
+  (tiket orang lain = tidak ditemukan).
+- **Balas** (`bisa_balas`) = dapat melihat, kategori tidak NULL, Open, `allow_reply = 1`. Pemilik selalu boleh membalas tiketnya,
+  termasuk bila ia petugas kategori lain (B-19).
+- **Tutup** (`bisa_tutup`) = pemilik atau petugas tiket, tiket Open (F8-08).
+- **Hapus** (`bisa_hapus`) = petugas tiket yang **bukan pemilik** (F8-09 harfiah, B-11; keputusan Horii 17-11-2026). Pemilik → 403 `bukan_pihak_berwenang`,
+  termasuk bila ia petugas aktif kategori tiket itu; petugas lain di kategori yang sama tetap boleh menghapus.
+- Cek tulis diulang di dalam transaksi sesudah baris tiket dikunci (FOR UPDATE), sehingga balas ↔ tutup ↔ hapus bersamaan aman.
+- **Id akun tidak pernah dikirim** (`sender`, `msg_sender`, `closed_by` mentah tidak ada di respons).
+
+## Tipe
+
+| Tipe | Bentuk |
+|---|---|
+| `KategoriTiket` | `{id, nama}` |
+| `LampiranRingkas` | `{nama, tipe}`; `nama` = `lampiran-{id_tiket}-{id_pesan}.{ext}` (= `Content-Disposition`), `tipe` = tipe MIME dari ekstensi; path tidak pernah dikirim. Lampiran lama berekstensi di luar 9 ekstensi → `tipe` = `application/octet-stream`; path tanpa ekstensi → `nama` = `lampiran-{id_tiket}-{id_pesan}` [V2] |
+| `Lampiran` | `LampiranRingkas & {ukuran: null}` (ukuran tidak dihitung, selalu `null`) |
+| `PesanTerakhir` | `{id_inbox_msg, waktu, potongan, pengirim_label, lampiran: LampiranRingkas\|null}`; `potongan` = 100 karakter pertama isi |
+| `TiketBaris` | `{id, subjek, kategori: KategoriTiket\|null, status: 'open'\|'closed', dibuat_pada, pemilik_nama, sebagai_petugas, belum_dibaca, perlu_tindak, pesan_terakhir: PesanTerakhir\|null, bisa_balas, bisa_tutup, bisa_hapus}` |
+| `TiketDetail` | `TiketBaris & {allow_reply: bool, snapshot: {nip: string, jabatan: string\|null, satker: string\|null}\|null, ditutup_oleh_label: string\|null, pengingat: {aktif: bool, jatuh_tempo: string\|null}\|null, pesan: Pesan[]}` |
+| `Pesan` | `{id_inbox_msg, waktu, isi, pengirim_label, milik_saya, dari_pemilik, urutan_pengirim, lampiran: Lampiran\|null}` |
+| `Ringkasan` | `{belum_dibaca_saya, belum_dibaca_petugas, perlu_tindak, badge, total}` |
+
+Isi field:
+- `sebagai_petugas` = baris dilihat dari sisi petugas: `true` di `peran=petugas`; di detail/tutup/balas `true` bila peninjau petugas
+  tiket dan bukan pemilik.
+- `belum_dibaca` menurut sisi itu: sisi pemilik `is_read = 2`, sisi petugas `is_read_off = 2`.
+- `perlu_tindak` = sisi petugas saja, ekspresi SQL yang sama dengan `Ringkasan.perlu_tindak`: Open AND (`is_read_off = 2` OR pengingat
+  24 jam jatuh tempo). Selalu `false` di sisi pemilik.
+- `snapshot` dan `pengingat` hanya untuk petugas tiket yang bukan pemilik [K `VD:21-26`]; selain itu `null`. `snapshot.jabatan` /
+  `snapshot.satker` boleh `null` (pelapor tanpa snapshot jabatan) [K `LS:1543-1545`].
+- `pesan` urut `waktu` naik lalu `id_inbox_msg` naik. `urutan_pengirim` 0 = pemilik, petugas 1..n menurut kemunculan pertama (B-23).
+- `milik_saya` = pesan ditulis peninjau; `dari_pemilik` = pesan ditulis pemilik tiket.
+
+**Penyamaran nama pengirim (D7 (a), ikut legacy per layar):**
+
+| Layar | `pengirim_label` |
+|---|---|
+| Daftar (`pesan_terakhir`) | nama pengirim bila pengirim = pemilik; selain itu **"Admin" bagi semua peninjau**, termasuk role 1 [K `VI:110-117`] |
+| Detail (`pesan[]`) | nama pengirim bila pengirim = pemilik **atau** peninjau role 1; selain itu "Admin" [K `VD:48-55`] |
+| `ditutup_oleh_label` | [V2]: `null` bila Open **atau `closed_by` kosong** (tiket Closed hasil impor legacy); nama pemilik bila penutup = pemilik; nama penutup bila peninjau role 1; selain itu "Admin". FE: `null` pada tiket Closed = tampilkan status Closed tanpa nama penutup |
+
+Nama pengirim pesan baru = nama bergelar bila akun punya data pegawai (B-28), selain itu nama akun/username.
+
+## Endpoint
+
+| Endpoint | Masuk | Keluar `data` |
+|---|---|---|
+| `GET tiket` | `peran?` (`saya` bawaan \| `petugas`), `status?` (`open`\|`closed`), `kategori?` (id), `q?`, `baca?` (`semua` bawaan \| `belum` \| `sudah`), `perlu_tindak?` (`1`, hanya dengan `peran=petugas`), `page`, `per_page` | `Halaman<TiketBaris>` |
+| `GET tiket/ringkasan` | — | `Ringkasan` |
+| `GET tiket/{id}` | — | `TiketDetail` (tanpa efek samping) |
+| `POST tiket` | multipart/JSON `{id_question_category, subject, msg, arsip?}` | 201 `TiketDetail` |
+| `POST tiket/{id}/pesan` | multipart/JSON `{msg, arsip?, ingatkan_24_jam?}` | 201 `{pesan: Pesan, tiket: TiketBaris}` |
+| `POST tiket/{id}/baca` | — | 200 `Ringkasan` |
+| `POST tiket/{id}/tutup` | — | 200 `TiketBaris` |
+| `DELETE tiket/{id}` | — | 200 `{id}` |
+| `GET tiket/{id}/pesan/{idPesan}/lampiran` | — | berkas (bukan JSON) |
+
+**Daftar:**
+- `peran=saya` = tiket milik sendiri, termasuk berkategori NULL. `peran=petugas` = tiket kategori yang dipegang sebagai petugas aktif,
+  **tanpa** tiket milik sendiri (sama dengan sisi petugas `Ringkasan`). Bukan petugas / nonaktif → 200 `Halaman` kosong (AC-E04.5).
+- `q` = subjek atau isi pesan mana pun, dicari sebagai teks biasa (`%`/`_` bukan wildcard).
+- `baca` menurut sisi daftar (`saya`: `is_read`, `petugas`: `is_read_off`).
+- `perlu_tindak=1`: `total` = `Ringkasan.perlu_tindak` (AC-E04.13).
+- **Urutan:** waktu pesan terakhir turun, NULL (tiket tanpa pesan) di akhir, lalu `id` turun. Pesan terakhir = `created_at` turun,
+  `id_inbox_msg` turun, satu subkueri (tanpa N+1).
+- Paginasi dan galat query mengikuti konvensi master (`ListQuery`).
+
+**Buat tiket (E-03):**
+- Pelapor wajib akun ber-NIP yang terdaftar di `pegawai` [K `SC:612-617`]; selain itu 422 "Data pegawai tidak ditemukan didalam sistem.".
+- Throttle **5 per 10 menit** per akun, dicek sebelum validasi dan unggah: lewat batas → 429 tanpa baris dan tanpa berkas.
+- `id_question_category` kategori **aktif**; `subject` wajib ≤ 250; `msg` wajib ≤ 5.000 (karakter sesudah trim); `arsip` opsional.
+- Kategori aktif dicek ulang di dalam transaksi di bawah kunci bersama (`LOCK IN SHARE MODE`) sebelum INSERT; kategori yang
+  dinonaktifkan/dihapus di sela itu (termasuk FK 1452) → 422 `errors.id_question_category` "Kategori tidak tersedia.".
+- Tersimpan: `status = 0`, `allow_reply = 1`, `is_read = 1`, `is_read_off = 2`, `notify_pic = 2`, `receiver = 0`, `sender_name` =
+  nama bergelar, `nip`, snapshot `jabatan`/`satker` jabatan aktif (AC-E03.8) + pesan pertama, dalam satu transaksi. Tidak menulis
+  `inbox`/`inbox_msg` (BP8-1, AC-E03.2).
+
+**Balas (E-04):**
+- Urutan cek: akses (404) → kategori NULL (422 `tiket_tanpa_kategori`) → Closed (422 `tiket_ditutup`) → `allow_reply = 0`
+  (422 `tiket_tanpa_balasan`) → throttle **20 per menit** per akun (satu kunci untuk semua tiket) → isian. Balasan yang pasti ditolak
+  tidak memakan kuota.
+- `ingatkan_24_jam`: kosong/tidak dikirim = 0; `0`/`1`; nilai lain → 422 "Nilai pengingat tidak valid."; nilai 1 hanya untuk
+  petugas tiket yang bukan pemilik, selain itu 422 "Pengingat 24 jam hanya dapat diatur petugas." (F8-11).
+
+**Penanda baca (§6.2):**
+
+| Kejadian | Hasil | Label |
+|---|---|---|
+| `POST baca` oleh pemilik | `is_read = 1` saja (juga bila ia petugas kategori itu) | [K `LS:907-912`] |
+| `POST baca` oleh petugas tiket bukan pemilik | `is_read_off = 1` | [K `LS:914-918`] |
+| Baca berulang | idempoten: tanpa tulis/audit bila sudah 1 | [V2] |
+| Balasan petugas | `is_read_off = 1` [K `LS:1344-1347`], `is_read = 2` **[I]**; pengingat: 1 → `notify_pic = 1`, `notify_at` = +24 jam UTC; 0 → `notify_pic = 2`, `notify_at = NULL` [K] | H8-10 |
+| Balasan pemilik | `is_read = 1` **[I]**, `is_read_off = 2` **[I]** | H8-10 |
+
+Label **[I]** = sisi lawan dan sisi pembalas pemilik tidak bisa dicocokkan ke trigger legacy (keputusan Horii 17-11-2026, H8-10 tetap
+[I]); diuji per skenario AC-E04.4. GET tidak pernah menandai baca (AC-E04.8).
+
+**Tutup (E-05):** `status = 1`, `allow_reply = 0`, `is_read = 1`, `is_read_off = 1` [K `LS:1444-1449`] + `closed_by` [V2]. Sudah Closed →
+422 `tiket_sudah_ditutup`. Tanpa buka kembali.
+
+**Hapus (E-05):**
+- Pesan lalu tiket dihapus fisik dalam satu transaksi, dengan audit `before` (FK RESTRICT; legacy CASCADE).
+- Setiap path lampiran dicatat `PenjagaBerkas` di dalam transaksi lalu direkonsiliasi sesudah commit (Q-A0-6 (a')): berkas dihapus
+  hanya bila tidak dirujuk baris lain. Path legacy yang ditolak aturan tulis adapter (mis. nama berspasi) tidak dihapus fisik dan
+  dicatat log `info` tanpa path.
+
+**Tiket berkategori NULL (H8-16 (a1)):** tampil di daftar pemilik; detail dan baca oleh pemilik; `bisa_balas = false`,
+`bisa_tutup = true` (Open), `bisa_hapus = false`; balas → 422 `tiket_tanpa_kategori`; hapus → 403 `bukan_pihak_berwenang`; tidak
+terlihat petugas mana pun (404) dan tidak dihitung di sisi petugas.
+
+**Lampiran:**
+- Unggah `arsip`: 9 ekstensi (jpg, jpeg, png, gif, pdf, doc, docx, xls, xlsx), ≤ 5 MB, isi cocok ekstensi (`ValidasiBerkas`). Galat
+  memakai teks `ValidasiBerkas` di `errors.arsip` dan digabung dengan galat kolom lain dalam satu 422.
+- Kunci baru `halo-simpeg/{YYYY}/{MM}/{32 hex}.{ext}` (K-A6); disimpan sebelum transaksi dan dihapus `PenjagaBerkas` bila transaksi
+  gagal (AC-E03.6).
+- Unduh lampiran lama (path legacy impor) dan baru lewat endpoint yang sama sesudah cek akses (AC-E04.7):
+  - `Content-Type` dari ekstensi; `Content-Disposition` `inline` untuk pdf/jpg/jpeg/png/gif, selain itu `attachment`, dengan
+    `filename="lampiran-{id}-{idPesan}.{ext}"`;
+  - `X-Content-Type-Options: nosniff`, CSP `Config\Arsip::CSP_BERKAS`, `Cache-Control` `private, no-store`;
+  - pesan tanpa lampiran, berkas tidak ada, atau path ditolak adapter → 404 "Lampiran tidak ditemukan.";
+  - lampiran lama berekstensi di luar daftar → `Content-Type: application/octet-stream` + `attachment`; path tanpa ekstensi →
+    `filename="lampiran-{id}-{idPesan}"` [V2].
+
+## Ringkasan (§6.2)
+
+| Bagian | Aturan |
+|---|---|
+| `belum_dibaca_saya` | tiket milik sendiri `is_read = 2` (termasuk kategori NULL) |
+| `belum_dibaca_petugas` | hanya petugas aktif: kategori dipegang, `is_read_off = 2`, bukan milik sendiri |
+| `perlu_tindak` | sisi petugas aktif, bukan milik sendiri: Open AND (`is_read_off = 2` OR (`notify_pic = 1` AND `notify_at` < sekarang UTC)) |
+| `badge` | tiket distinct (belum dibaca di sisi mana pun ∪ `perlu_tindak`); bisa > `total` |
+| `total` | `belum_dibaca_saya + belum_dibaca_petugas` = angka lonceng `tiket_belum_dibaca` (AC-E06.9); role 8 = 0 |
+
+**Syarat DB Validator (DBV-028):**
+- **Q6 (beku):** kueri **ringkasan** sisi petugas (`belum_dibaca_petugas`, `perlu_tindak`, `badge`) **wajib** menulis
+  `status IN (0, 1)` eksplisit agar indeks `idx_dticket_kategori_status_baca` (kategori, status, is_read_off) terpakai sampai kolom
+  ketiga (key_len 10). Ditegakkan `TiketEksplainTest` (EXPLAIN pada data sintetis). Daftar `peran=petugas` tanpa filter status tidak
+  wajib menulisnya.
+- **Q8 (c):** daftar petugas memakai subkueri pesan terakhir lewat `idx_dticketmsg_inbox_waktu` (diuji EXPLAIN). Ambang ukur
+  `last_msg_at` = 100 ms daftar petugas / Q-H19 > 5.000 tiket per petugas, dinilai pada data gladi sebelum cutover (runbook MAKE-074),
+  bukan pada CI.
+
+## Galat tiket
+
+| Status | `code` | Teks |
+|---|---|---|
+| 404 | — | "Data percakapan tidak ditemukan." (tiket tidak ada / tidak berhak melihat) |
+| 404 | — | "Lampiran tidak ditemukan." |
+| 403 | `bukan_pihak_berwenang` | "Anda tidak berwenang melakukan tindakan ini pada percakapan ini." |
+| 422 | `tiket_ditutup` | "Percakapan ini telah di tutup oleh admin. Silahkan tambah pertanyaan baru untuk memulai percakapan baru." [K `LS:1117`] |
+| 422 | `tiket_tanpa_balasan` | "Percakapan ini tidak memerlukan balasan. Silahkan tambah pertanyaan baru untuk memulai percakapan baru." [K `LS:1121`] |
+| 422 | `tiket_sudah_ditutup` | "Percakapan ini telah ditutup sebelumnya." |
+| 422 | `tiket_tanpa_kategori` | "Pertanyaan ini tidak memiliki kategori. Silakan tambah pertanyaan baru." |
+| 422 | — | "Data pegawai tidak ditemukan didalam sistem." [K `SC:614`, ejaan legacy dipertahankan] |
+| 429 | `throttle` | buat: "Terlalu banyak pertanyaan baru. Coba lagi dalam 10 menit."; balas: "Terlalu banyak pesan. Coba lagi dalam satu menit." |
+
+| Kolom | Teks |
+|---|---|
+| `id_question_category` | "Kategori wajib dipilih." / "Kategori tidak tersedia." |
+| `subject` | "Subjek wajib diisi." / "Subjek maksimal 250 karakter." |
+| `msg` | "Pesan wajib diisi." / "Pesan maksimal 5.000 karakter." |
+| `arsip` | teks `ValidasiBerkas` (mis. "Jenis berkas tidak diizinkan (hanya jpg, jpeg, png, gif, pdf, doc, docx, xls, xlsx).", "Ukuran berkas melebihi 5 MB.", "Jenis isi berkas tidak sesuai dengan ekstensinya.") |
+| `ingatkan_24_jam` | "Nilai pengingat tidak valid." / "Pengingat 24 jam hanya dapat diatur petugas." |
+| `peran` / `status` / `kategori` / `baca` (query) | "Peran tidak valid." / "Status tidak valid." / "Kategori tidak valid." / "Filter baca tidak valid." |
+| `perlu_tindak` (query) | "Filter perlu ditindak tidak valid." / "Filter perlu ditindak hanya untuk peran petugas." |
+| kolom teks mana pun (array/objek/boolean) | "Isian harus berupa teks." |
+
+## Fixture tiket (`backend/tests/_support/HaloSimpeg/`)
+
+Nilai di fixture disamarkan (nama, NIP `000000000000000034`, waktu); yang dijamin sama dengan respons nyata hanya **bentuknya**
+(kunci + tipe JSON), diuji `KontrakFixtureTiketTest`.
+
+| Fixture | Respons |
+|---|---|
+| `tiket-buat` | `POST tiket` (dengan lampiran) |
+| `tiket-balas` | `POST tiket/{id}/pesan` |
+| `tiket-daftar-pemilik`, `tiket-daftar-petugas`, `tiket-daftar-role1` | `GET tiket` (sisi pemilik; sisi petugas; dilihat role 1 → "Admin" di `pesan_terakhir`) |
+| `tiket-detail-pemilik`, `tiket-detail-petugas`, `tiket-detail-role1` | `GET tiket/{id}` (snapshot `null` / terisi; label D7 (a)) |
+| `tiket-detail-tanpa-kategori` | tiket NULL dilihat pemilik |
+| `tiket-detail-tanpa-jabatan` | dilihat petugas; `snapshot.jabatan`/`satker` = `null` |
+| `tiket-detail-ditutup` | tiket Closed dengan `ditutup_oleh_label` |
+| `tiket-ringkasan` | `Ringkasan` dengan `badge > total` (pengingat 24 jam jatuh tempo pada tiket yang sudah dibaca petugas) |
+| `baca` | `Ringkasan` sesudah `POST baca` |
+| `tiket-tutup`, `tiket-hapus` | tutup, hapus |
+| `galat-422-tiket` (termasuk `errors.arsip`), `galat-422-ditutup`, `galat-422-tanpa-kategori`, `galat-403-bukan-pihak-berwenang`, `galat-404`, `galat-429` | galat tiket |
+
+Fixture ekspor (`galat-403-bukan-petugas`, `galat-422-ekspor`, `ekspor-kosong`) milik MAKE-074.
+
+## Selisih tiket terhadap PRD v1.3 (diterima reviewer 17-11-2026)
+
+| No | Selisih | Label |
+|---|---|---|
+| T1 | `peran=petugas` tanpa tiket milik sendiri (selaras §6.2, AC-E04.13): petugas yang juga pemilik melihat tiketnya hanya di `peran=saya` | [V2] |
+| T2 | Hapus = petugas tiket yang bukan pemilik; pemilik selalu 403, termasuk bila ia petugas kategori itu | [V2] F8-09 harfiah, keputusan Horii 17-11-2026 |
+| T3 | `snapshot`/`pengingat` hanya petugas tiket bukan pemilik; role 1 tanpa akses tambahan | [K]/[V2] |
+| T4 | `lampiran.tipe` = MIME dari ekstensi; `lampiran.ukuran` selalu `null` (FE tidak boleh bergantung pada ukuran) | [V2] |
+| T5 | Galat berkas digabung ke `errors.arsip` dengan teks `ValidasiBerkas` | [V2] |
+| T6 | Teks tambahan: pelapor tanpa pegawai [K `SC:614`, ejaan "didalam" apa adanya], lampiran 404, galat query (tabel galat) | [K]/[V2] |
+| T7 | Cek balas (akses, NULL, Closed, `allow_reply`) sebelum throttle; diulang di dalam transaksi berkunci | [V2] |
+| T8 | `ingatkan_24_jam` kosong = 0 | [V2] |
+| T9 | Respons tulis: POST pesan 201 `{pesan, tiket}`, baca 200 `Ringkasan`, tutup 200 `TiketBaris`, DELETE 200 `{id}` | [V2] |
+| T10 | Fixture tiket di tabel di atas; fixture ekspor di MAKE-074 | [V2] |
+| T11 | `q` = subjek atau isi pesan | [V2] |
+| T12 | Nama pengirim dan penutup = nama bergelar bila ada data pegawai | [V2] |
+| T13 | Q8 (c) dicatat sebagai ambang gladi, tidak diukur waktunya di CI | [V2] |
