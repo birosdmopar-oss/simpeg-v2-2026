@@ -598,6 +598,7 @@ final class MasterHaloSimpegTest extends DatabaseTestCase
         $lain = Database::connect('tests', false);
         $lain->transBegin();
         $lain->query('SELECT id_question_category FROM ' . $lain->escapeIdentifiers($lain->prefixTable('question_category')) . ' WHERE id_question_category = ? FOR UPDATE', [$k]);
+        $tunggu = (int) $this->db->query('SELECT @@SESSION.innodb_lock_wait_timeout AS t')->getRow('t');
         $this->db->query('SET SESSION innodb_lock_wait_timeout = 1');
 
         try {
@@ -608,10 +609,55 @@ final class MasterHaloSimpegTest extends DatabaseTestCase
         } finally {
             $lain->transRollback();
             $lain->close();
-            $this->db->query('SET SESSION innodb_lock_wait_timeout = 50');
+            $this->db->query('SET SESSION innodb_lock_wait_timeout = ' . $tunggu);
         }
 
         $this->kirim('delete', "petugas/{$id}")->assertStatus(200);
+    }
+
+    /**
+     * W1: cek petugas terakhir membaca data terbaru — petugas lain di kategori yang sama dihapus (commit) lewat koneksi kedua,
+     * lalu hapus petugas ini ditolak 422 (bukan memakai keadaan sebelum penghapusan).
+     */
+    #[Group('db-isolasi-penuh')]
+    public function testCekPetugasTerakhirMembacaDataTerbaru(): void
+    {
+        $k      = $this->buatKategoriHs('Kepegawaian');
+        [, $u2] = $this->pegawaiKandidat('Petugas Dua');
+        $this->buatTiketHs($k, $u2, 0);
+        $a = $this->buatPetugasHs($this->admin, [$k]);
+        $b = $this->buatPetugasHs($u2, [$k]);
+
+        $lain = Database::connect('tests', false);
+
+        try {
+            $lain->transBegin();
+            $lain->table('officer_category')->where('id_support_officer', $b)->delete();
+            $lain->table('support_officer')->where('id_support_officer', $b)->delete();
+            $lain->transCommit();
+        } finally {
+            $lain->close();
+        }
+
+        $this->harapGalat($this->kirim('delete', "petugas/{$a}"), 422, 'petugas_terakhir', PetugasService::pesanTerakhir(['Kepegawaian']));
+    }
+
+    public function testPutPetugasDenganPetugasLainRole8TetapPeringatanDanCariPetugasLiteral(): void
+    {
+        $k    = $this->buatKategoriHs('Kepegawaian');
+        $lain = $this->buatKategoriHs('Lain');
+        $nip  = $this->buatPegawaiDiSatker($this->satkerKepeg, ['nama' => 'Pimpinan Impor']);
+        $p8   = $this->buatAkunUntuk($nip, Role::PIMPINAN);
+        $this->buatTiketHs($k, $p8, 0);
+        $a = $this->buatPetugasHs($this->admin, [$k, $lain]);
+        $this->buatPetugasHs($p8, [$k]);
+
+        $res = $this->kirim('put', "petugas/{$a}", ['id_user' => $this->admin, 'category' => [$lain], 'email' => 'a@contoh.test']);
+        $this->assertSame(PetugasService::peringatanAktifTerakhir(['Kepegawaian']), $this->data($res)['peringatan'], 'petugas role 8 bukan penjawab');
+
+        $this->db->table('pengguna')->where('id_pengguna', $this->admin)->update(['name' => 'Admin 100% Uji']);
+        $this->assertSame([$a], array_column($this->data($this->kirim('get', 'petugas?q=%25'))['items'], 'id'));
+        $this->assertSame(0, $this->data($this->kirim('get', 'petugas?q=_'))['total']);
     }
 
     // -------------------------------------------------------------------- petugas/saya
